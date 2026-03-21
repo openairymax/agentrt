@@ -1,0 +1,71 @@
+# Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+# 全局日志配置
+
+logging:
+  # 默认日志级别
+  level: "info"
+  # 格式: "json", "text", "color"
+  format: "json"
+  # 输出目标: "stdout", "file", "both"
+  output: "both"
+  
+  # 文件输出配置
+  file:
+    # 基础日志目录
+    base_dir: "partdata/logs"
+    # 最大文件大小（MB）
+    max_size_mb: 100
+    # 保留备份数
+    backups: 10
+    # 是否按日期分片
+    rotate_daily: true
+
+  # 各模块独立配置
+  modules:
+    kernel:
+      level: "info"
+      file: "kernel/kernel.log"
+    cognition:
+      level: "debug"
+      file: "kernel/cognition.log"
+    execution:
+      level: "info"
+      file: "kernel/execution.log"
+    memory:
+      level: "info"
+      file: "kernel/memory.log"
+    services:
+      level: "info"
+      file: "services/services.log"
+    llm_d:
+      level: "info"
+      file: "services/llm_d.log"
+    tool_d:
+      level: "info"
+      file: "services/tool_d.log"
+    perm_d:
+      level: "warning"
+      file: "services/perm_d.log"
+    market_d:
+      level: "info"
+      file: "services/market_d.log"
+    sched_d:
+      level: "info"
+      file: "services/sched_d.log"
+    monit_d:
+      level: "info"
+      file: "services/monit_d.log"
+    sdk:
+      level: "info"
+      file: "apps/sdk.log"
+    apps:
+      level: "info"
+      file: "apps/apps.log"
+
+  # 字段掩码（防止敏感信息泄露）
+  mask_fields:
+    - "password"
+    - "token"
+    - "api_key"
+    - "secret"
+    - "authorization"

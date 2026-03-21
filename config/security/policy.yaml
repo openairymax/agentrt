@@ -1,0 +1,95 @@
+# Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+# 安全策略配置
+
+security:
+  # 默认权限规则
+  default_policy: "deny"  # allow, deny, audit
+
+  # 权限规则列表
+  rules:
+    # 文件系统权限
+    - id: "file_read_tmp"
+      resource: "file:read:/tmp/*"
+      action: "read"
+      effect: "allow"
+      priority: 10
+    - id: "file_write_tmp"
+      resource: "file:write:/tmp/agentos/*"
+      action: "write"
+      effect: "allow"
+      priority: 10
+    - id: "file_write_etc"
+      resource: "file:write:/etc/*"
+      action: "write"
+      effect: "deny"
+      priority: 20
+
+    # 网络权限
+    - id: "network_outbound_openai"
+      resource: "network:outbound:api.openai.com:443"
+      action: "connect"
+      effect: "allow"
+      priority: 10
+    - id: "network_outbound_default"
+      resource: "network:outbound:*"
+      action: "connect"
+      effect: "deny"
+      priority: 5
+
+    # 代码执行权限
+    - id: "code_exec_python"
+      resource: "code:execute:python"
+      action: "run"
+      effect: "allow_with_sandbox"
+      priority: 10
+    - id: "code_exec_javascript"
+      resource: "code:execute:javascript"
+      action: "run"
+      effect: "allow_with_sandbox"
+      priority: 10
+
+    # 环境变量访问
+    - id: "env_read_openai_key"
+      resource: "env:read:OPENAI_API_KEY"
+      action: "read"
+      effect: "allow"
+      priority: 10
+    - id: "env_read_other"
+      resource: "env:read:*"
+      action: "read"
+      effect: "deny"
+      priority: 5
+
+  # 审计规则
+  audit:
+    # 需要审计的操作（正则）
+    sensitive_actions:
+      - "file:delete"
+      - "file:write:/etc/*"
+      - "network:outbound:*"
+      - "code:execute:*"
+    # 审计日志保留天数
+    retention_days: 90
+    # 告警阈值
+    alerts:
+      - condition: "failed_permission > 10"
+        severity: "warning"
+        action: "notify"
+      - condition: "suspicious_pattern_detected"
+        severity: "critical"
+        action: "block"
+
+  # 沙箱配置
+  sandbox:
+    # 隔离类型: "docker", "wasm", "process"
+    isolation_type: "process"
+    # 内存限制（MB）
+    memory_limit_mb: 512
+    # CPU 限制（核心数）
+    cpu_limit: 1.0
+    # 网络访问
+    network_enabled: false
+    # 允许挂载的路径
+    allowed_mounts:
+      - "/tmp"
+      - "./data/workspace"

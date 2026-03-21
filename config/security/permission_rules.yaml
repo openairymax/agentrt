@@ -1,0 +1,44 @@
+# =============================================================================
+# BaseSecurity 权限裁决规则配置文件
+# 格式：YAML
+# 规则按顺序匹配，第一个匹配的规则生效
+# =============================================================================
+
+rules:
+  # 允许产品经理读取文档目录下的所有文件
+  - agent: "product_manager"
+    action: "file:read"
+    resource: "/docs/*"
+    effect: "allow"
+
+  # 拒绝所有 agent 写入 /etc/ 下的任何文件
+  - agent: "*"
+    action: "file:write"
+    resource: "/etc/*"
+    effect: "deny"
+
+  # 允许后端服务连接 Google API（443端口）
+  - agent: "backend"
+    action: "network:connect"
+    resource: "*.googleapis.com:443"
+    effect: "allow"
+
+  # 允许所有 agent 读取临时目录（但拒绝写入）
+  - agent: "*"
+    action: "file:read"
+    resource: "/tmp/*"
+    effect: "allow"
+
+  # 拒绝所有 agent 删除任何文件
+  - agent: "*"
+    action: "file:delete"
+    resource: "*"
+    effect: "deny"
+
+  # 允许审计 agent 读取所有日志
+  - agent: "audit_agent"
+    action: "file:read"
+    resource: "/var/log/*"
+    effect: "allow"
+
+  # 默认拒绝（隐式，无需配置）

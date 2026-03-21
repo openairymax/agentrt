@@ -1,0 +1,277 @@
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved. "From data intelligence emerges".
+# AgentOS Docker Compose 配置文件
+# 用于编排内核和服务容器
+
+version: '3.8'
+
+services:
+  # ==================== 内核服务 ====================
+  agentos-kernel:
+    build:
+      context: ../../
+      dockerfile: scripts/docker/Dockerfile.kernel
+      target: runtime
+    image: spharx/agentos-kernel:1.0.0.5
+    container_name: agentos-kernel
+    hostname: agentos-kernel
+    restart: unless-stopped
+
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8G
+        reservations:
+          cpus: '2.0'
+          memory: 4G
+
+    # 环境变量
+    environment:
+      - TZ=Asia/Shanghai
+      - AGENTOS_LOG_LEVEL=INFO
+      - AGENTOS_ENABLE_TRACING=true
+      - AGENTOS_TELEMETRY_ENDPOINT=http://otel-collector:4317
+
+    # 数据卷挂载
+    volumes:
+      # 日志目录
+      - ./partdata/logs:/var/log/agentos:rw
+      # 注册表数据
+      - ./partdata/registry:/var/lib/agentos/registry:rw
+      # 追踪数据
+      - ./partdata/traces:/var/lib/agentos/traces:rw
+      # 配置文件（可选覆盖）
+      - ../../config/kernel:/etc/agentos/kernel:ro
+
+    # 网络配置
+    networks:
+      - agentos-network
+
+    # 健康检查
+    healthcheck:
+      test: [ "CMD", "pgrep", "-x", "agentos" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    # 启动命令
+    command: >
+      bash -c "
+        echo 'Starting AgentOS Kernel...';
+        /opt/agentos/bin/agentos-kernel --config /etc/agentos/kernel/kernel.yaml;
+      "
+
+    # 依赖关系
+    depends_on:
+      - redis
+      - postgres
+
+  # ==================== 服务层 ====================
+  agentos-services:
+    build:
+      context: ../../
+      dockerfile: scripts/docker/Dockerfile.service
+    image: spharx/agentos-services:1.0.0.5
+    container_name: agentos-services
+    hostname: agentos-services
+    restart: unless-stopped
+
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '8.0'
+          memory: 16G
+        reservations:
+          cpus: '4.0'
+          memory: 8G
+
+    # 环境变量
+    environment:
+      - TZ=Asia/Shanghai
+      - AGENTOS_LOG_LEVEL=INFO
+      - LLM_SERVICE_PORT=8080
+      - TOOL_SERVICE_PORT=8081
+      - MARKET_SERVICE_PORT=8082
+      - SCHED_SERVICE_PORT=8083
+      - MONIT_SERVICE_PORT=8084
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+
+    # 端口映射
+    ports:
+      - "8080:8080" # LLM 服务
+      - "8081:8081" # 工具服务
+      - "8082:8082" # 市场服务
+      - "8083:8083" # 调度服务
+      - "8084:8084" # 监控服务
+
+    # 数据卷挂载
+    volumes:
+      # 日志目录
+      - ./partdata/logs/services:/var/log/agentos/services:rw
+      # 服务配置
+      - ../../config/services:/etc/agentos/services:ro
+      # 技能市场数据
+      - ./partdata/services/market:/var/lib/agentos/market:rw
+
+    # 网络配置
+    networks:
+      - agentos-network
+
+    # 健康检查
+    healthcheck:
+      test: [ "CMD", "pgrep", "-f", "llm_d|tool_d|market_d|sched_d|monit_d" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    # 依赖内核服务
+    depends_on:
+      agentos-kernel:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  # ==================== 辅助服务 ====================
+  # Redis (缓存和会话存储)
+  redis:
+    image: redis:7-alpine
+    container_name: agentos-redis
+    hostname: agentos-redis
+    restart: unless-stopped
+
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+
+    # 数据持久化
+    volumes:
+      - redis-data:/data
+
+    # 网络配置
+    networks:
+      - agentos-network
+
+    # 健康检查
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    # 启动命令
+    command: redis-server --appendonly yes
+
+  # PostgreSQL (元数据存储)
+  postgres:
+    image: postgres:15-alpine
+    container_name: agentos-postgres
+    hostname: agentos-postgres
+    restart: unless-stopped
+
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+
+    # 环境变量
+    environment:
+      - POSTGRES_DB=agentos
+      - POSTGRES_USER=agentos
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-agentos123}
+
+    # 数据持久化
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./partdata/registry/sessions.db:/docker-entrypoint-initdb.d/sessions.db:ro
+
+    # 网络配置
+    networks:
+      - agentos-network
+
+    # 健康检查
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U agentos" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # OpenTelemetry Collector (可观测性)
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.90.0
+    container_name: agentos-otel-collector
+    hostname: otel-collector
+    restart: unless-stopped
+
+    # 配置文件
+    volumes:
+      - ./config/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+
+    # 网络配置
+    networks:
+      - agentos-network
+
+    # 端口暴露
+    ports:
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "8888:8888" # Prometheus metrics
+
+    # 依赖
+    depends_on:
+      - jaeger
+
+  # Jaeger (分布式追踪)
+  jaeger:
+    image: jaegertracing/all-in-one:1.50
+    container_name: agentos-jaeger
+    hostname: jaeger
+    restart: unless-stopped
+
+    # 环境变量
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+
+    # 网络配置
+    networks:
+      - agentos-network
+
+    # 端口暴露
+    ports:
+      - "16686:16686" # UI
+      - "14268:14268" # Thrift HTTP
+      - "14250:14250" # gRPC
+
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+
+# ==================== 数据卷 ====================
+volumes:
+  redis-data:
+    driver: local
+  postgres-data:
+    driver: local
+
+# ==================== 网络配置 ====================
+networks:
+  agentos-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

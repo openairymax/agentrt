@@ -1,0 +1,61 @@
+# Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+# 内置技能注册列表
+
+skills:
+  - skill_id: "shell_skill"
+    name: "Shell Command Executor"
+    version: "1.0.0"
+    source: "builtin"
+    enabled: true
+    # 执行单元类型
+    unit_type: "tool"
+    # 契约路径
+    contract_path: "openhub/contrib/skills/shell_skill/skill.json"
+    # 权限要求
+    permissions:
+      - "execute:shell"
+
+  - skill_id: "filesystem_skill"
+    name: "File System Operations"
+    version: "1.0.0"
+    source: "builtin"
+    enabled: true
+    unit_type: "file"
+    contract_path: "openhub/contrib/skills/filesystem_skill/skill.json"
+    permissions:
+      - "read:file"
+      - "write:file"
+
+  - skill_id: "github_skill"
+    name: "GitHub Integration"
+    version: "1.2.0"
+    source: "community"
+    enabled: true
+    unit_type: "api"
+    contract_path: "openhub/contrib/skills/github_skill/skill.json"
+    permissions:
+      - "network:outbound"
+      - "read:repo"
+      - "write:repo"
+
+  - skill_id: "browser_skill"
+    name: "Browser Automation"
+    version: "1.0.0"
+    source: "builtin"
+    enabled: true
+    unit_type: "browser"
+    contract_path: "openhub/contrib/skills/browser_skill/skill.json"
+    permissions:
+      - "network:outbound"
+      - "ui:control"
+
+  - skill_id: "database_skill"
+    name: "Database Query Executor"
+    version: "1.0.0"
+    source: "builtin"
+    enabled: true
+    unit_type: "db"
+    contract_path: "openhub/contrib/skills/database_skill/skill.json"
+    permissions:
+      - "read:database"
+      - "write:database"

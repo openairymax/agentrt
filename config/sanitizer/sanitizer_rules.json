@@ -1,0 +1,36 @@
+{
+  "rules": [
+    {
+      "type": "block",
+      "pattern": "<script.*?>.*?</script>",
+      "replace": "[REMOVED]",
+      "description": "移除所有 script 标签"
+    },
+    {
+      "type": "block",
+      "pattern": "ignore previous instructions|system prompt|you are now",
+      "description": "拒绝常见的提示词注入"
+    },
+    {
+      "type": "block",
+      "pattern": "\\.\\./",
+      "description": "路径遍历尝试"
+    },
+    {
+      "type": "block",
+      "pattern": "exec\\s*\\(",
+      "description": "命令执行尝试"
+    },
+    {
+      "type": "warn",
+      "pattern": "password|api[_-]?key|secret|token",
+      "replace": "[REDACTED]",
+      "description": "敏感信息脱敏"
+    },
+    {
+      "type": "warn",
+      "pattern": "(\\d{3,4}-?){3}\\d{3,4}",
+      "description": "可能为信用卡号（简单模式）"
+    }
+  ]
+}

@@ -1,0 +1,133 @@
+# Pre-commit 钩子配置
+# 文档：https://pre-commit.com
+
+repos:
+  # Git 官方钩子
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      # 检查大文件
+      - id: check-added-large-files
+        args: ['--maxkb=1024']
+      # 检查合并冲突标记
+      - id: check-merge-conflict
+      # 检查私有 SSH 密钥
+      - id: detect-private-key
+      # 检查调试语句
+      - id: debug-statements
+      # 修复末尾换行符
+      - id: end-of-file-fixer
+        exclude: \.(png|jpg|jpeg|gif|ico|pdf|zip|tar|gz)$
+      # 移除末尾空白字符
+      - id: trailing-whitespace
+        exclude: \.(png|jpg|jpeg|gif|ico|pdf|zip|tar|gz)$
+      # 检查 YAML 语法
+      - id: check-yaml
+        args: [--unsafe]
+      # 检查 JSON 语法
+      - id: check-json
+      # 检查 TOML 语法
+      - id: check-toml
+      # 统一换行符为 LF
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  # Python 代码格式化
+  - repo: https://github.com/psf/black
+    rev: 22.12.0
+    hooks:
+      - id: black
+        language_version: python3
+        exclude: ^(coreadd/|coresvc/|build/|dist/)
+
+  # Python import 排序
+  - repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
+        name: isort (python)
+        exclude: ^(coreadd/|coresvc/|build/|dist/)
+
+  # Python 代码检查
+  - repo: https://github.com/pycqa/flake8
+    rev: 6.0.0
+    hooks:
+      - id: flake8
+        exclude: ^(coreadd/|coresvc/|build/|dist/|\.venv/)
+        args: [--max-line-length=127, --extend-ignore=E203]
+
+  # Python 类型检查
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v0.991
+    hooks:
+      - id: mypy
+        exclude: ^(coreadd/|coresvc/|build/|dist/|tests/)
+        additional_dependencies:
+          - types-requests
+          - types-PyYAML
+        args: [--ignore-missing-imports, --disallow-untyped-defs=False]
+
+  # Markdown 格式化
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v2.8.0
+    hooks:
+      - id: prettier
+        types: [markdown]
+        args: [--prose-wrap=always, --print-width=100]
+
+  # Shell 脚本检查
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.2
+    hooks:
+      - id: shellcheck
+        files: \.(sh|bash)$
+
+  # 安全和秘密检测
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: \.(png|jpg|jpeg|gif|ico|pdf|zip|tar|gz|lock)$
+
+  # 敏感信息检测（备用）
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: forbid-submodules
+      - id: check-case-conflict
+      - id: check-symlinks
+
+  # 许可证检查
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.4.2
+    hooks:
+      - id: insert-license
+        files: \.(py|cpp|c|h|hpp)$
+        args:
+          - --license-filepath
+          - .github/LICENSE_HEADER.txt
+          - --use-current-year
+
+  # 提交信息格式检查（可选）
+  # - repo: https://github.com/commitizen-tools/commitizen
+  #   rev: v2.38.0
+  #   hooks:
+  #     - id: commitizen
+  #       stages: [commit-msg]
+
+# 跳过某些文件的检查
+exclude: ^(partdata/|build/|dist/|\.venv/|node_modules/|vendor/)
+
+# 默认语言版本
+default_language_version:
+  python: python3
+
+# 启用缓存以提高速度
+default_stages: [commit, push]
+
+# 彩色输出
+color: true
+
+# 详细输出
+verbose: true

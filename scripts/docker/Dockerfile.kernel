@@ -1,0 +1,163 @@
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved. "From data intelligence emerges".
+# AgentOS 内核基础镜像
+# 包含编译内核所需的所有依赖和工具
+
+FROM ubuntu:22.04 AS base
+
+LABEL maintainer="SPHARX Team <lidecheng@spharx.cn>"
+LABEL version="1.0.0.5"
+LABEL description="AgentOS Kernel Base Image"
+
+# 环境变量设置
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=Asia/Shanghai \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    PATH=/usr/local/cuda/bin:$PATH \
+    CUDA_HOME=/usr/local/cuda \
+    CMAKE_VERSION=3.28.0 \
+    NINJA_VERSION=1.11.1
+
+# 时区设置
+RUN ln -fs /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+    dpkg-reconfigure -f noninteractive tzdata
+
+# === 1. 安装系统依赖 ===
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # 编译工具链
+    build-essential \
+    gcc \
+    g++ \
+    make \
+    # CMake 和 Ninja
+    cmake \
+    ninja-build \
+    # Git 和下载工具
+    git \
+    wget \
+    curl \
+    ca-certificates \
+    # SSL 和加密库
+    libssl-dev \
+    openssl \
+    # libevent (事件驱动)
+    libevent-dev \
+    # 线程库
+    libpthread-stubs0-dev \
+    # FAISS 依赖 (向量检索)
+    libfaiss-dev \
+    libblas-dev \
+    liblapack-dev \
+    # SQLite3 (元数据存储)
+    libsqlite3-dev \
+    sqlite3 \
+    # libcurl (HTTP 客户端)
+    libcurl4-openssl-dev \
+    # JSON 解析
+    libcjson-dev \
+    # 开发工具
+    pkg-config \
+    gdb \
+    valgrind \
+    clang \
+    clang-format \
+    clang-tidy \
+    # 文档生成
+    doxygen \
+    graphviz \
+    # 清理缓存
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# === 2. 安装 CMake 最新版本 ===
+WORKDIR /tmp
+RUN wget https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz \
+    && tar -xzf cmake-*.tar.gz \
+    && mv cmake-${CMAKE_VERSION}-linux-x86_64 /opt/cmake \
+    && ln -s /opt/cmake/bin/cmake /usr/local/bin/cmake \
+    && ln -s /opt/cmake/bin/ctest /usr/local/bin/ctest \
+    && ln -s /opt/cmake/bin/cpack /usr/local/bin/cpack \
+    && rm -rf cmake-*
+
+# === 3. 安装 Ninja Build ===
+RUN wget https://github.com/ninja-build/ninja/releases/download/v${NINJA_VERSION}/ninja-linux.zip \
+    && unzip ninja-linux.zip -d /usr/local/bin \
+    && chmod +x /usr/local/bin/ninja \
+    && rm ninja-linux.zip
+
+# === 4. 设置工作目录 ===
+WORKDIR /workspace
+
+# === 5. 构建阶段 ===
+FROM base AS builder
+
+WORKDIR /workspace/agentos
+
+# 复制源代码
+COPY atoms/ ./atoms/
+COPY backs/ ./backs/
+COPY CMakeLists.txt ./
+COPY LICENSE ./
+COPY README.md ./
+
+# 创建构建目录
+RUN mkdir -p build && cd build \
+    && cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_TESTS=ON \
+    -DENABLE_TRACING=ON \
+    -DCMAKE_INSTALL_PREFIX=/opt/agentos \
+    -G Ninja \
+    && cmake --build . --parallel $(nproc) \
+    && cmake --install .
+
+# === 6. 运行时阶段 ===
+FROM ubuntu:22.04 AS runtime
+
+LABEL maintainer="SPHARX Team <lidecheng@spharx.cn>"
+LABEL version="1.0.0.5"
+LABEL description="AgentOS Kernel Runtime Image"
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=Asia/Shanghai \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    AGENTOS_ROOT=/opt/agentos \
+    PATH=/opt/agentos/bin:$PATH \
+    LD_LIBRARY_PATH=/opt/agentos/lib:$LD_LIBRARY_PATH
+
+# 安装运行时依赖
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libssl3 \
+    libevent-2.1-7 \
+    libfaiss1 \
+    libblas3 \
+    liblapack3 \
+    libsqlite3-0 \
+    libcjson1 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# 时区设置
+RUN ln -fs /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+    dpkg-reconfigure -f noninteractive tzdata
+
+# 从构建阶段复制已安装的文件
+COPY --from=builder /opt/agentos /opt/agentos
+
+# 创建数据目录
+RUN mkdir -p /var/log/agentos \
+    && mkdir -p /var/lib/agentos/registry \
+    && mkdir -p /var/lib/agentos/traces \
+    && chmod 755 /var/log/agentos \
+    && chmod 755 /var/lib/agentos
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD pgrep -x agentos || exit 1
+
+WORKDIR /opt/agentos
+
+# 默认命令
+CMD ["/bin/bash"]

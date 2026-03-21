@@ -1,0 +1,46 @@
+﻿# Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+# CoreLoopThree 主模块构建文件
+
+cmake_minimum_required(VERSION 3.20)
+project(agentos-coreloopthree VERSION 1.0.0.5 LANGUAGES C)
+
+# 设置输出路径
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+
+# 包含头文件路径
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../core/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../memoryrovol/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../..  # 为 agent_registry.h 等
+)
+
+# 添加子目录
+add_subdirectory(src/cognition)
+add_subdirectory(src/execution)
+add_subdirectory(src/memory)
+
+# 创建主库，链接三个子库
+add_library(agentos_coreloopthree STATIC)
+
+target_link_libraries(agentos_coreloopthree
+    agentos_cognition
+    agentos_execution
+    agentos_memory
+    agentos_core  # 依赖基础内核库
+)
+
+# 安装头文件
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
+    DESTINATION include/agentos
+    FILES_MATCHING PATTERN "*.h"
+)
+
+# 安装库
+install(TARGETS agentos_coreloopthree
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)

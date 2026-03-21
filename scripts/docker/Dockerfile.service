@@ -1,0 +1,74 @@
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved. "From data intelligence emerges".
+# AgentOS 服务层镜像
+# 基于内核镜像，提供完整的后端服务运行时环境
+
+FROM spharx/agentos-kernel:runtime AS base
+
+LABEL maintainer="SPHARX Team <lidecheng@spharx.cn>"
+LABEL version="1.0.0.5"
+LABEL description="AgentOS Service Layer Image"
+
+# 环境变量
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=Asia/Shanghai \
+    AGENTOS_SERVICES_ROOT=/opt/agentos/services \
+    AGENTOS_LOG_DIR=/var/log/agentos \
+    AGENTOS_CONFIG_DIR=/etc/agentos \
+    PATH=/opt/agentos/services/bin:$PATH \
+    LD_LIBRARY_PATH=/opt/agentos/services/lib:$LD_LIBRARY_PATH
+
+# 时区设置
+RUN ln -fs /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+    dpkg-reconfigure -f noninteractive tzdata
+
+# === 1. 安装服务依赖 ===
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Python (部分服务可能需要)
+    python3 \
+    python3-pip \
+    python3-dev \
+    python3-venv \
+    # HTTP 客户端
+    httpie \
+    # 网络工具
+    netcat-openbsd \
+    # 日志查看
+    multilog \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# === 2. 创建目录结构 ===
+RUN mkdir -p ${AGENTOS_SERVICES_ROOT}/{bin,lib,etc,var} \
+    && mkdir -p ${AGENTOS_CONFIG_DIR}/{services,kernel} \
+    && mkdir -p ${AGENTOS_LOG_DIR}/{services,kernel,traces} \
+    && mkdir -p /var/lib/agentos/{registry,sessions,memory} \
+    && chmod -R 755 ${AGENTOS_SERVICES_ROOT} \
+    && chmod -R 755 ${AGENTOS_LOG_DIR} \
+    && chmod -R 755 /var/lib/agentos
+
+# === 3. 复制服务二进制文件 ===
+# 从构建阶段复制服务文件
+COPY --from=builder /opt/agentos/services/bin/ ${AGENTOS_SERVICES_ROOT}/bin/
+COPY --from=builder /opt/agentos/services/lib/ ${AGENTOS_SERVICES_ROOT}/lib/
+
+# === 4. 复制配置文件 ===
+COPY config/ ${AGENTOS_CONFIG_DIR}/
+
+# === 5. 创建非 root 用户 ===
+RUN groupadd -r agentos && \
+    useradd -r -g agentos -d /var/lib/agentos -s /sbin/nologin agentos && \
+    chown -R agentos:agentos /var/lib/agentos \
+    && chown -R agentos:agentos ${AGENTOS_LOG_DIR} \
+    && chown -R agentos:agentos ${AGENTOS_SERVICES_ROOT}
+
+# === 6. 健康检查 ===
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD pgrep -f 'llm_d|tool_d|market_d|sched_d|monit_d' || exit 1
+
+# 暴露端口（各服务的 REST API）
+EXPOSE 8080 8081 8082 8083 8084
+
+WORKDIR ${AGENTOS_SERVICES_ROOT}
+
+# 默认启动所有服务
+CMD ["/opt/agentos/services/bin/start_all_services.sh"]

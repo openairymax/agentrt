@@ -1,0 +1,50 @@
+# Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+# AgentOS 内核配置文件
+
+# 内核基础设置
+kernel:
+  # 内核名称和版本标识
+  name: "AgentOS Core"
+  version: "1.0.0.3"
+  
+  # 日志级别: debug, info, warning, error, critical
+  log_level: "info"
+  
+  # 调度器设置
+  scheduler:
+    # 调度策略: "round_robin", "weighted", "ml_based", "priority"
+    policy: "weighted"
+    # 时间片（毫秒）
+    time_slice_ms: 10
+    # 最大并发任务数（0 表示无限制）
+    max_concurrency: 100
+
+  # 内存管理
+  memory:
+    # 内核内存池大小（MB）
+    pool_size_mb: 1024
+    # 启用内存保护边界检查
+    guard_enabled: true
+
+  # 进程间通信（IPC）
+  ipc:
+    # Binder 最大并发连接数
+    max_connections: 1024
+    # 共享缓冲区大小（KB）
+    buffer_size_kb: 64
+    # 超时时间（毫秒）
+    timeout_ms: 5000
+
+  # 定时器与事件
+  timer:
+    # 系统时钟精度（毫秒）
+    precision_ms: 1
+    # 最大定时器数量
+    max_timers: 10000
+
+  # 错误处理
+  error:
+    # 是否启用详细错误信息（生产环境建议 false）
+    verbose: false
+    # 错误日志保留天数
+    retention_days: 30

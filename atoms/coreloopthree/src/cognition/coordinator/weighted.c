@@ -1,0 +1,174 @@
+/**
+ * @file weighted.c
+ * @brief 加权融合策略（根据权重组合多个模型输出）
+ * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ */
+
+#include "cognition.h"
+#include "llm_client.h"
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+
+/**
+ * @brief 加权融合私有数据
+ */
+typedef struct weighted_data {
+    char** model_names;           /**< 模型名称数组 */
+    float* weights;                /**< 对应权重 */
+    size_t model_count;            /**< 模型数量 */
+    agentos_llm_service_t* llm;    /**< LLM服务 */
+    agentos_mutex_t* lock;
+} weighted_data_t;
+
+static void weighted_destroy(agentos_coordinator_strategy_t* strategy) {
+    if (!strategy) return;
+    weighted_data_t* data = (weighted_data_t*)strategy->data;
+    if (data) {
+        for (size_t i = 0; i < data->model_count; i++) {
+            if (data->model_names[i]) free(data->model_names[i]);
+        }
+        free(data->model_names);
+        free(data->weights);
+        if (data->lock) agentos_mutex_destroy(data->lock);
+        free(data);
+    }
+    free(strategy);
+}
+
+/**
+ * @brief 加权融合函数（简单拼接，实际可更复杂）
+ */
+static agentos_error_t weighted_coordinate(
+    const char** prompts,
+    size_t count,
+    void* context,
+    char** out_result) {
+
+    weighted_data_t* data = (weighted_data_t*)context;
+    if (!data) return AGENTOS_EINVAL;
+
+    size_t n = data->model_count;
+    char** results = (char**)calloc(n, sizeof(char*));
+    if (!results) return AGENTOS_ENOMEM;
+
+    agentos_error_t err = AGENTOS_SUCCESS;
+
+    // 调用所有模型
+    for (size_t i = 0; i < n && i < count; i++) {
+        agentos_llm_request_t req;
+        memset(&req, 0, sizeof(req));
+        req.model = data->model_names[i];
+        req.prompt = prompts[i];
+        req.temperature = 0.7;
+        req.max_tokens = 2048;
+
+        agentos_llm_response_t* resp = NULL;
+        err = agentos_llm_complete(data->llm, &req, &resp);
+        if (err == AGENTOS_SUCCESS && resp) {
+            results[i] = strdup(resp->text);
+            agentos_llm_response_free(resp);
+        } else {
+            results[i] = NULL;
+        }
+    }
+
+    // 根据权重加权组合（简单拼接带权重标记）
+    size_t total_len = 0;
+    for (size_t i = 0; i < n; i++) {
+        if (results[i]) total_len += strlen(results[i]) + 32; // 预留标记
+    }
+
+    char* combined = (char*)malloc(total_len + 1);
+    if (!combined) {
+        for (size_t i = 0; i < n; i++) if (results[i]) free(results[i]);
+        free(results);
+        return AGENTOS_ENOMEM;
+    }
+    combined[0] = '\0';
+
+    for (size_t i = 0; i < n; i++) {
+        if (results[i]) {
+            char buf[64];
+            snprintf(buf, sizeof(buf), "[Model %s weight %.2f]: ", data->model_names[i], data->weights[i]);
+            strcat(combined, buf);
+            strcat(combined, results[i]);
+            strcat(combined, "\n");
+        }
+    }
+
+    *out_result = combined;
+
+    // 清理
+    for (size_t i = 0; i < n; i++) if (results[i]) free(results[i]);
+    free(results);
+
+    return AGENTOS_SUCCESS;
+}
+
+/**
+ * @brief 创建加权融合策略
+ * @param model_names 模型名称数组
+ * @param weights 权重数组（总和不必为1）
+ * @param model_count 数量
+ * @param llm LLM服务客户端
+ * @return 策略对象
+ */
+agentos_coordinator_strategy_t* agentos_weighted_coordinator_create(
+    const char** model_names,
+    const float* weights,
+    size_t model_count,
+    agentos_llm_service_t* llm) {
+
+    if (!model_names || !weights || model_count == 0 || !llm) return NULL;
+
+    agentos_coordinator_strategy_t* strat = (agentos_coordinator_strategy_t*)malloc(sizeof(agentos_coordinator_strategy_t));
+    if (!strat) return NULL;
+
+    weighted_data_t* data = (weighted_data_t*)malloc(sizeof(weighted_data_t));
+    if (!data) {
+        free(strat);
+        return NULL;
+    }
+    memset(data, 0, sizeof(weighted_data_t));
+
+    data->model_names = (char**)calloc(model_count, sizeof(char*));
+    data->weights = (float*)calloc(model_count, sizeof(float));
+    if (!data->model_names || !data->weights) {
+        if (data->model_names) free(data->model_names);
+        if (data->weights) free(data->weights);
+        free(data);
+        free(strat);
+        return NULL;
+    }
+
+    for (size_t i = 0; i < model_count; i++) {
+        data->model_names[i] = strdup(model_names[i]);
+        data->weights[i] = weights[i];
+        if (!data->model_names[i]) {
+            for (size_t j = 0; j < i; j++) free(data->model_names[j]);
+            free(data->model_names);
+            free(data->weights);
+            free(data);
+            free(strat);
+            return NULL;
+        }
+    }
+    data->model_count = model_count;
+    data->llm = llm;
+    data->lock = agentos_mutex_create();
+    if (!data->lock) {
+        for (size_t i = 0; i < model_count; i++) free(data->model_names[i]);
+        free(data->model_names);
+        free(data->weights);
+        free(data);
+        free(strat);
+        return NULL;
+    }
+
+    strat->coordinate = weighted_coordinate;
+    strat->destroy = weighted_destroy;
+    strat->data = data;
+
+    return strat;
+}
