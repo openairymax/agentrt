@@ -23,6 +23,7 @@
 ### 什么是 AgentOS Docker？
 
 AgentOS Docker 是 AgentOS 的容器化部署方案，提供：
+<!-- From data intelligence emerges. by spharx -->
 
 - ✅ **开箱即用**: 一键启动完整的 AgentOS 环境
 - ✅ **微服务架构**: 内核和服务独立容器，故障隔离

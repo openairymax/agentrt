@@ -1,7 +1,7 @@
 /**
  * @file arbiter.c
  * @brief 外部仲裁策略（调用仲裁器模型或人工接口）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "cognition.h"
@@ -23,6 +23,7 @@ typedef struct arbiter_data {
 static void arbiter_destroy(agentos_coordinator_strategy_t* strategy) {
     if (!strategy) return;
     arbiter_data_t* data = (arbiter_data_t*)strategy->data;
+    // From data intelligence emerges. by spharx
     if (data) {
         if (data->arbiter_model) free(data->arbiter_model);
         if (data->lock) agentos_mutex_destroy(data->lock);

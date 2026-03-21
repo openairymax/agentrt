@@ -1,7 +1,7 @@
 /**
  * @file majority.c
  * @brief 多数投票协同策略（取多数模型的一致输出）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "cognition.h"
@@ -23,6 +23,7 @@ typedef struct majority_data {
 static void majority_destroy(agentos_coordinator_strategy_t* strategy) {
     if (!strategy) return;
     majority_data_t* data = (majority_data_t*)strategy->data;
+    // From data intelligence emerges. by spharx
     if (data) {
         for (size_t i = 0; i < data->model_count; i++) {
             if (data->model_names[i]) free(data->model_names[i]);

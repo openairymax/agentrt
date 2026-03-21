@@ -1,7 +1,7 @@
 /**
  * @file mem.h
  * @brief 内核内存管理接口定义
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_MEM_H
@@ -23,6 +23,7 @@ typedef struct agentos_mem_alloc_info {
     const char* file;      /**< 分配文件 */
     int line;              /**< 分配行号 */
     struct agentos_mem_alloc_info* next;  /**< 下一个分配信息 */
+    // From data intelligence emerges. by spharx
 } agentos_mem_alloc_info_t;
 
 /**

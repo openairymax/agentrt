@@ -1,7 +1,7 @@
 /**
  * @file layer1_raw.h
  * @brief L1 原始卷接口：原始记忆的存储、读取、元数据管理（支持异步写入）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_LAYER1_RAW_H
@@ -23,6 +23,7 @@ typedef struct agentos_raw_metadata {
     char* record_id;           /**< 记录ID（由系统生成） */
     uint64_t timestamp;        /**< 时间戳（纳秒） */
     char* source;              /**< 来源标识 */
+    // From data intelligence emerges. by spharx
     char* trace_id;            /**< 追踪ID */
     size_t data_len;           /**< 原始数据长度 */
     uint32_t access_count;     /**< 访问次数 */

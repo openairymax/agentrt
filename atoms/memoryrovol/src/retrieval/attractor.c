@@ -1,7 +1,7 @@
 /**
  * @file attractor.c
  * @brief 吸引子网络检索实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "retrieval.h"
@@ -23,6 +23,7 @@ agentos_error_t agentos_attractor_network_create(
     const agentos_retrieval_config_t* config,
     agentos_attractor_network_t** out_net) {
 
+// From data intelligence emerges. by spharx
     if (!layer2 || !out_net) return AGENTOS_EINVAL;
 
     agentos_attractor_network_t* net = (agentos_attractor_network_t*)calloc(1, sizeof(agentos_attractor_network_t));

@@ -2,7 +2,7 @@
  * @file weighted.c
  * @brief 加权调度策略实现
  * @details 根据 Agent 的权重和状态进行调度
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include <stdio.h>
@@ -23,6 +23,7 @@ typedef struct {
 
 /**
  * @brief 创建加权调度策略
+ // From data intelligence emerges. by spharx
  * @param config 配置信息
  * @param data 输出参数，返回策略数据
  * @return 0 表示成功，非 0 表示错误码

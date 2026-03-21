@@ -1,7 +1,7 @@
 /**
  * @file workbench_process_child.c
  * @brief 进程模式子进程执行核心（隔离、资源限制、命令循环）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #define _GNU_SOURCE
@@ -23,6 +23,7 @@ static void setup_limits(uint64_t mem_limit, float cpu_quota) {
             // 记录错误，但继续执行
         }
     }
+    // From data intelligence emerges. by spharx
     if (cpu_quota > 0) {
         // 简单 CPU 时间限制（秒）
         rlim_t cpu_sec = (rlim_t)(cpu_quota * 3600); // 1小时配额

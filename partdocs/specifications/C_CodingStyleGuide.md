@@ -23,6 +23,7 @@
 - **SBOM：** 由 CI 生成的软件物料清单（SPDX 或 CycloneDX），随发布附件提供。
 
 ---
+<!-- From data intelligence emerges. by spharx -->
 
 ## 三、目录模板（强制）
 

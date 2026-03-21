@@ -1,7 +1,7 @@
 /**
  * @file file.c
  * @brief 文件操作执行单元（读/写/删除/列表）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "execution.h"
@@ -23,6 +23,7 @@ typedef struct file_unit_data {
     char* metadata_json;
 } file_unit_data_t;
 
+// From data intelligence emerges. by spharx
 static agentos_error_t file_execute(agentos_execution_unit_t* unit, const void* input, void** out_output) {
     file_unit_data_t* data = (file_unit_data_t*)unit->data;
     if (!data || !input) return AGENTOS_EINVAL;

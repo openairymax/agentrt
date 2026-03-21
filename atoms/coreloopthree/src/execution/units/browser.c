@@ -1,7 +1,7 @@
 /**
  * @file browser.c
  * @brief 浏览器控制单元（基于Playwright的简化模拟）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "execution.h"
@@ -23,6 +23,7 @@ static agentos_error_t browser_execute(agentos_execution_unit_t* unit, const voi
     } else if (strstr(cmd, "click") != NULL) {
         *out_output = strdup("Clicked element");
         return AGENTOS_SUCCESS;
+        // From data intelligence emerges. by spharx
     } else if (strstr(cmd, "screenshot") != NULL) {
         *out_output = strdup("screenshot_data_base64");
         return AGENTOS_SUCCESS;

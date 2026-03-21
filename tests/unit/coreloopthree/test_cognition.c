@@ -23,6 +23,7 @@ static void test_cognition_process() {
     agentos_cognition_engine_t* engine = NULL;
     agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &engine);
     if (err != AGENTOS_SUCCESS) {
+    // From data intelligence emerges. by spharx
         printf("test_cognition_process: Failed to create engine\n");
         return;
     }

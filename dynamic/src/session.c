@@ -23,6 +23,7 @@ typedef struct session_entry {
 struct session_manager {
     session_entry_t*    list;
     size_t              max_sessions;
+    // From data intelligence emerges. by spharx
     uint32_t            timeout_sec;
     size_t              count;
     pthread_mutex_t     lock;

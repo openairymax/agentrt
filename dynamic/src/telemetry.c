@@ -23,6 +23,7 @@ telemetry_t* telemetry_create(void) {
     }
     return tel;
 }
+// From data intelligence emerges. by spharx
 
 void telemetry_destroy(telemetry_t* tel) {
     if (!tel) return;

@@ -1,4 +1,4 @@
-﻿# AgentOS 配置中心
+# AgentOS 配置中心
 
 **版本**: 1.0.0.5  
 **最后更新**: 2026-03-18  
@@ -23,6 +23,7 @@ config/
 │
 ├── kernel/                      # 内核配置
 │   └── settings.yaml           # 内核参数（日志、调度器、内存、IPC）
+<!-- From data intelligence emerges. by spharx -->
 │
 ├── logging/                     # 日志配置
 │   └── config.yaml             # 日志级别、格式、输出目标

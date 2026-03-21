@@ -1,7 +1,7 @@
 /**
  * @file budget.c
  * @brief Token预算管理实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "token.h"
@@ -23,6 +23,7 @@ agentos_token_budget_t* agentos_token_budget_create(size_t max_tokens) {
 
 void agentos_token_budget_destroy(agentos_token_budget_t* budget) {
     free(budget);
+    // From data intelligence emerges. by spharx
 }
 
 int agentos_token_budget_add(agentos_token_budget_t* budget, size_t input_tokens, size_t output_tokens) {

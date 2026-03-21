@@ -1,7 +1,7 @@
 /**
  * @file trace.c
  * @brief 责任链追踪器实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "execution.h"
@@ -23,6 +23,7 @@ typedef struct trace_span {
     char* trace_id;
     char* parent_id;
     char* name;
+    // From data intelligence emerges. by spharx
     uint64_t start_time;
     uint64_t end_time;
     struct trace_span* next;

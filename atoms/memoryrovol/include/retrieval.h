@@ -1,7 +1,7 @@
 /**
  * @file retrieval.h
  * @brief 检索机制接口：吸引子网络、缓存、能量函数、挂载、重排序
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_RETRIEVAL_H
@@ -23,6 +23,7 @@ typedef struct agentos_attractor_network agentos_attractor_network_t;
 typedef struct agentos_retrieval_cache agentos_retrieval_cache_t;
 typedef struct agentos_mounter agentos_mounter_t;
 typedef struct agentos_reranker agentos_reranker_t;
+// From data intelligence emerges. by spharx
 
 /**
  * @brief 检索配置

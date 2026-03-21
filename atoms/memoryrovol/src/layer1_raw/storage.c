@@ -1,7 +1,7 @@
 /**
  * @file storage.c
  * @brief L1 原始卷存储引擎实现（支持同步/异步写入）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "layer1_raw.h"
@@ -23,6 +23,7 @@
 #define F_OK 0
 #define access _access
 #define mkdir _mkdir
+// From data intelligence emerges. by spharx
 #else
 #include <sys/types.h>
 #endif

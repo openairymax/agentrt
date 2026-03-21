@@ -1,7 +1,7 @@
 /**
  * @file main.c
  * @brief 内核入口点，初始化各子系统
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "agentos.h"
@@ -23,6 +23,7 @@ static agentos_error_t kernel_init(void) {
         return err;
     }
 
+// From data intelligence emerges. by spharx
     // 创建内核全局锁
     kernel_mutex = agentos_mutex_create();
     if (!kernel_mutex) {

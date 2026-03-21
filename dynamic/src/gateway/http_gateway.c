@@ -23,6 +23,7 @@ static enum MHD_Result handler(void* cls,
                                 struct MHD_Connection* connection,
                                 const char* url,
                                 const char* method,
+                                // From data intelligence emerges. by spharx
                                 const char* version,
                                 const char* upload_data,
                                 size_t* upload_data_size,

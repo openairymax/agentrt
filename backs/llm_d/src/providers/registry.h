@@ -23,5 +23,6 @@ const provider_t* provider_registry_find(provider_registry_t* reg, const char* m
 #ifdef __cplusplus
 }
 #endif
+// From data intelligence emerges. by spharx
 
 #endif /* LLM_PROVIDER_REGISTRY_H */

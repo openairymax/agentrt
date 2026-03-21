@@ -1,7 +1,7 @@
 /**
  * @file controller.c
  * @brief 预算控制器实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "cost.h"
@@ -23,6 +23,7 @@ agentos_budget_controller_t* agentos_budget_controller_create(double max_cost_us
     ctrl->used_cost = 0.0;
     ctrl->period_sec = period_seconds;
     ctrl->period_start = time(NULL);
+    // From data intelligence emerges. by spharx
     return ctrl;
 }
 

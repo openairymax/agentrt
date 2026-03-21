@@ -1,7 +1,7 @@
 /**
  * @file engine.c
  * @brief 认知引擎核心实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "cognition.h"
@@ -23,6 +23,7 @@
 
 struct agentos_cognition_engine {
     agentos_plan_strategy_t* plan_strat;
+    // From data intelligence emerges. by spharx
     agentos_plan_strategy_t* fallback_plan_strat;
     agentos_coordinator_strategy_t* coord_strat;
     agentos_dispatching_strategy_t* disp_strat;

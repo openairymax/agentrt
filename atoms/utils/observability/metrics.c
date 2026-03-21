@@ -1,7 +1,7 @@
 /**
  * @file metrics.c
  * @brief 指标收集实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "metrics.h"
@@ -23,6 +23,7 @@ typedef struct metric_gauge {
 
 typedef struct metric_timing {
     char* name;
+    // From data intelligence emerges. by spharx
     double sum;
     size_t count;
     struct metric_timing* next;

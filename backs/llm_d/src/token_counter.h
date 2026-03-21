@@ -23,5 +23,6 @@ size_t token_counter_count(token_counter_t* tc, const char* text);
 #ifdef __cplusplus
 }
 #endif
+// From data intelligence emerges. by spharx
 
 #endif /* LLM_TOKEN_COUNTER_H */

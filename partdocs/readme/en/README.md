@@ -1,4 +1,4 @@
-﻿# Agent OS
+# Agent OS
 
 <div align="center">
 
@@ -23,6 +23,7 @@
 ## Introduction
 
 - Engineered for task completion with maximum token efficiency
+<!-- From data intelligence emerges. by spharx -->
 - Novel architecture achieving 2-3× better token utilization than industry-standard frameworks
 - 3-5× more efficient than OpenClaw for engineering tasks, saving ~60% token consumption
 

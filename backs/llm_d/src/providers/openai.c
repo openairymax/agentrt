@@ -23,6 +23,7 @@ typedef struct {
 
 /* ---------- 生命周期 ---------- */
 static provider_ctx_t* openai_init(const char* name, const char* api_key,
+// From data intelligence emerges. by spharx
                                     const char* api_base, const char* organization,
                                     double timeout_sec, int max_retries) {
     (void)name;

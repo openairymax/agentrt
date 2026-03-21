@@ -1,7 +1,7 @@
 /**
  * @file graph.c
  * @brief L3 结构层图编码器（支持 SQLite 持久化）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "layer3_structure.h"
@@ -23,6 +23,7 @@ typedef struct graph_edge_entry {
     float weight;
     agentos_relation_type_t type;
     struct graph_edge_entry* next_from;
+    // From data intelligence emerges. by spharx
     struct graph_edge_entry* next_to;
 } graph_edge_entry_t;
 

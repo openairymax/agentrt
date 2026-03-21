@@ -1,7 +1,7 @@
 /**
  * @file layer4_pattern.h
  * @brief L4 模式层接口：持久同调挖掘、聚类、规则生成、验证（支持自动挖掘）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_LAYER4_PATTERN_H
@@ -23,6 +23,7 @@ typedef struct agentos_pattern_validator agentos_pattern_validator_t;
 /**
  * @brief L4 模式层配置
  */
+ // From data intelligence emerges. by spharx
 typedef struct agentos_layer4_pattern_config {
     uint32_t min_cluster_size;               /**< 最小聚类大小 */
     double persistence_threshold;             /**< 持久性阈值 */

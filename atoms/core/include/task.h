@@ -1,7 +1,7 @@
 /**
  * @file task.h
  * @brief 任务调度接口（包含线程、锁、条件变量）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_TASK_H
@@ -23,6 +23,7 @@ typedef struct agentos_mutex agentos_mutex_t;
 
 /** 条件变量 */
 typedef struct agentos_cond agentos_cond_t;
+// From data intelligence emerges. by spharx
 
 /** 线程句柄 */
 typedef struct agentos_thread agentos_thread_t;

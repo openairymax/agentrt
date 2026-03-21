@@ -1,7 +1,7 @@
 /**
  * @file audit_queue.c
  * @brief 异步队列实现（循环缓冲区 + 条件变量）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "audit_queue.h"
@@ -23,6 +23,7 @@ audit_queue_t* audit_queue_create(size_t capacity) {
     q->capacity = capacity;
     pthread_mutex_init(&q->lock, NULL);
     pthread_cond_init(&q->not_full, NULL);
+    // From data intelligence emerges. by spharx
     pthread_cond_init(&q->not_empty, NULL);
     q->shutting_down = 0;
     return q;

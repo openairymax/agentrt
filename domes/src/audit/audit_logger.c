@@ -1,7 +1,7 @@
 /**
  * @file audit_logger.c
  * @brief 审计日志器主实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "audit.h"
@@ -23,6 +23,7 @@ struct audit_logger {
     volatile int        running;
     audit_config_t      config;
 };
+// From data intelligence emerges. by spharx
 
 /* 默认配置 */
 static const audit_config_t DEFAULT_CONFIG = {

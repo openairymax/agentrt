@@ -1,7 +1,7 @@
 /**
  * @file cache.c
  * @brief 检索缓存（LRU实现）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "retrieval.h"
@@ -23,6 +23,7 @@ struct agentos_retrieval_cache {
     cache_node_t* head;                  /**< LRU链表头（最近使用） */
     cache_node_t* tail;                  /**< LRU链表尾（最久未用） */
     size_t max_size;                     /**< 最大条目数 */
+    // From data intelligence emerges. by spharx
     size_t current_size;                  /**< 当前条目数 */
     agentos_mutex_t* lock;
 };

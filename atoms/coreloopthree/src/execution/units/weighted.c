@@ -1,7 +1,7 @@
 /**
  * @file weighted.c
  * @brief 加权调度策略（基于成本、性能、信任度加权评分）- 可配置权重
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "cognition.h"
@@ -23,6 +23,7 @@ typedef struct weighted_data {
     agentos_mutex_t* lock;
 } weighted_data_t;
 
+// From data intelligence emerges. by spharx
 static void weighted_destroy(agentos_dispatching_strategy_t* strategy) {
     if (!strategy) return;
     weighted_data_t* data = (weighted_data_t*)strategy->data;

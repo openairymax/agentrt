@@ -1,7 +1,7 @@
 /**
  * @file binder.c
  * @brief L3 结构层绑定算子实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "layer3_structure.h"
@@ -23,6 +23,7 @@ static float** create_random_matrices(size_t dim, int Q) {
     for (int k = 0; k < Q; k++) {
         mats[k] = (float*)malloc(dim * dim * sizeof(float));
         if (!mats[k]) {
+        // From data intelligence emerges. by spharx
             for (int i = 0; i < k; i++) free(mats[i]);
             free(mats);
             return NULL;

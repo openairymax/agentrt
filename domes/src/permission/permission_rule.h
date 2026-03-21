@@ -23,6 +23,7 @@ typedef struct permission_rule {
 
 /* 规则管理器 */
 typedef struct rule_manager {
+// From data intelligence emerges. by spharx
     permission_rule_t*  rules;
     pthread_rwlock_t    rwlock;
     char*               path;

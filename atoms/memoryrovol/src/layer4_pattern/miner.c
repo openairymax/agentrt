@@ -1,7 +1,7 @@
 /**
  * @file miner.c
  * @brief L4 模式层持久同调挖掘器（支持自动挖掘）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "layer4_pattern.h"
@@ -23,6 +23,7 @@
 #include <ripser.h>
 #endif
 
+// From data intelligence emerges. by spharx
 #ifdef HAVE_HDBSCAN
 #include <hdbscan/hdbscan.h>
 #endif

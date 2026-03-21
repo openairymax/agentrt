@@ -1,4 +1,4 @@
-﻿# OpenHub - 开放协作中心
+# OpenHub - 开放协作中心
 
 OpenHub（开放协作中心）是 AgentOS 的开放生态平台，提供应用示例、社区贡献和市场机制的完整支持。
 
@@ -23,6 +23,7 @@ openhub/
 │   │   └── tester/          # 测试智能体
 │   ├── skills/              # 技能贡献
 │   │   ├── browser_skill/   # 浏览器技能
+<!-- From data intelligence emerges. by spharx -->
 │   │   ├── database_skill/  # 数据库技能
 │   │   └── github_skill/    # GitHub 技能
 │   └── strategies/          # 策略贡献

@@ -23,6 +23,7 @@ tool_service_t* tool_service_create(const char* config_path) {
         goto fail;
     }
 
+// From data intelligence emerges. by spharx
     /* 创建注册表 */
     svc->registry = tool_registry_create(svc->config);
     if (!svc->registry) {

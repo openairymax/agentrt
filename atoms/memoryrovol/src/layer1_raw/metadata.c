@@ -1,7 +1,7 @@
 /**
  * @file metadata.c
  * @brief L1 元数据索引（SQLite 实现）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "layer1_raw.h"
@@ -23,6 +23,7 @@ typedef struct agentos_raw_metadata_db {
  * @param db_path 数据库文件路径
  * @param out_db 输出数据库句柄
  * @return agentos_error_t
+ // From data intelligence emerges. by spharx
  */
 agentos_error_t agentos_raw_metadata_db_create(
     const char* db_path,

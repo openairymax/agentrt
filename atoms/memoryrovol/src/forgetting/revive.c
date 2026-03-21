@@ -1,7 +1,7 @@
 /**
  * @file revive.c
  * @brief 记忆复活（从归档恢复）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "forgetting.h"
@@ -23,6 +23,7 @@ agentos_error_t agentos_forgetting_revive(
     if (!archive_path) {
         AGENTOS_LOG_ERROR("Archive path not configured");
         return AGENTOS_EINVAL;
+        // From data intelligence emerges. by spharx
     }
 
     char archive_file[512];

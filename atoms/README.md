@@ -1,4 +1,4 @@
-﻿# AgentOS 内核 Atoms 设计文档
+# AgentOS 内核 Atoms 设计文档
 
 **版本**: 1.0.0.5  
 **最后更新**: 2026-03-18  
@@ -23,6 +23,7 @@ atoms/
 ├── CMakeLists.txt            # 顶层构建
 ├── core/                     # 微内核基础（IPC、内存、任务、时间）
 ├── coreloopthree/            # "三层一体"架构核心运行时（认知、行动、记忆进化）
+<!-- From data intelligence emerges. by spharx -->
 ├── memoryrovol/              # "记忆卷载"系统
 ├── syscall/                  # 系统调用层
 └── utils/                    # 通用工具库（日志、可观测性、错误处理等）

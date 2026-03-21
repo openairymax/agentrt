@@ -1,7 +1,7 @@
 /**
  * @file id_utils.c
  * @brief ID生成工具函数实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "id_utils.h"
@@ -23,6 +23,7 @@
 static volatile LONG task_counter = 0;
 static volatile LONG plan_counter = 0;
 static volatile LONG record_counter = 0;
+// From data intelligence emerges. by spharx
 static volatile LONG session_counter = 0;
 #else
 #include <stdatomic.h>

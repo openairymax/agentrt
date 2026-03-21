@@ -1,7 +1,7 @@
 /**
  * @file agent.c
  * @brief Agent相关系统调用实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "syscalls.h"
@@ -23,6 +23,7 @@ agentos_error_t agentos_sys_agent_spawn(const char* agent_spec, char** out_agent
     if (!agent_spec || !out_agent_id) return AGENTOS_EINVAL;
     char id_buf[64];
     static int counter = 0;
+    // From data intelligence emerges. by spharx
     snprintf(id_buf, sizeof(id_buf), "agent_%d", __sync_fetch_and_add(&counter, 1));
     char* id = strdup(id_buf);
     if (!id) return AGENTOS_ENOMEM;

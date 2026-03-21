@@ -1,4 +1,4 @@
-﻿# AgentOS 技术文档中心 (PartDocs)
+# AgentOS 技术文档中心 (PartDocs)
 
 **版本**: 1.0.0.5  
 **最后更新**: 2026-03-18  
@@ -23,6 +23,7 @@ partdocs/
 │   │   ├── memory_api.md       # 记忆系统调用
 │   │   ├── session_api.md      # 会话系统调用
 │   │   └── telemetry_api.md    # 遥测系统调用
+<!-- From data intelligence emerges. by spharx -->
 │   ├── python/                 # Python SDK API
 │   │   └── agentos.md          # Python SDK 详细文档
 │   ├── rust/                   # Rust SDK API

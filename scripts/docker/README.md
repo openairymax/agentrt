@@ -23,6 +23,7 @@ scripts/docker/
 
 ### 1. 环境要求
 
+<!-- From data intelligence emerges. by spharx -->
 - **Docker**: 20.10+
 - **Docker Compose**: 2.0+
 - **操作系统**: Linux (Ubuntu 22.04+), macOS 13+, Windows 11 (WSL2)

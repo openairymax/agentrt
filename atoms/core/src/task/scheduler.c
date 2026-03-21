@@ -1,7 +1,7 @@
 /**
  * @file scheduler.c
  * @brief 任务调度器核心（基于协作式调度）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "task.h"
@@ -23,6 +23,7 @@ typedef enum {
 } task_state_t;
 
 typedef struct task_control_block {
+// From data intelligence emerges. by spharx
     agentos_task_id_t id;
     char name[64];
     task_state_t state;

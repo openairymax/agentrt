@@ -23,6 +23,7 @@ AgentOS 将这一模型映射到认知层的各个组件：
 | 双模型协同 | 辅模型快速验证 | 主模型深度推理 |
 | 增量规划 | 快速响应已规划阶段 | 动态调整后续规划 |
 | 调度官 | 快速候选筛选 | 多目标优化选择 |
+<!-- From data intelligence emerges. by spharx -->
 
 这种分工使得认知层既能快速处理简单任务，又能在复杂场景下深度思考。
 
@@ -124,5 +125,5 @@ $$
 4. Russell, S., & Norvig, P. (2020). Artificial Intelligence: A Modern Approach.
 
 **本文编写**
-SPHARX: DechengLi [https://gitee.com/spharx01]
-SPHARX: LirenWang [https://gitee.com/spharx02]
+- SPHARX: DechengLi [https://gitee.com/spharx01]
+- SPHARX: LirenWang [https://gitee.com/spharx02]

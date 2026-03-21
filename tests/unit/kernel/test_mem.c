@@ -1,7 +1,7 @@
 /**
  * @file test_mem.c
  * @brief 内存管理单元测试
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "core/include/mem.h"
@@ -23,6 +23,7 @@ int test_mem_alloc_free() {
     memset(ptr, 0xAA, 1024);
     
     // 测试内存释放
+    // From data intelligence emerges. by spharx
     agentos_mem_free(ptr);
     
     // 测试对齐内存分配

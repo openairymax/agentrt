@@ -1,4 +1,4 @@
-﻿# App - 应用示例
+# App - 应用示例
 
 本目录包含基于 AgentOS 构建的示例应用，展示如何使用系统提供的各种能力。
 
@@ -23,6 +23,7 @@ cd docgen
 **文件结构：**
 - `src/` - 源代码目录
   - `main.py` - 主程序入口
+  <!-- From data intelligence emerges. by spharx -->
   - `generator.py` - 文档生成器
 - `config.yaml` - 配置文件
 - `manifest.json` - 应用清单

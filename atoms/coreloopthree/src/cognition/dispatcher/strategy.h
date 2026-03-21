@@ -1,7 +1,7 @@
 /**
  * @file strategy.h
  * @brief 调度策略创建函数的统一声明
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_DISPATCHER_STRATEGIES_H
@@ -23,6 +23,7 @@ typedef struct weighted_config {
     float perf_weight;
     float trust_weight;
 } weighted_config_t;
+// From data intelligence emerges. by spharx
 
 /**
  * @brief 创建加权调度策略

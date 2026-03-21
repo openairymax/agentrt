@@ -1,7 +1,7 @@
 /**
  * @file metrics.h
  * @brief 指标收集接口
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_UTILS_METRICS_H
@@ -23,6 +23,7 @@ typedef struct agentos_metrics agentos_metrics_t;
 agentos_metrics_t* agentos_metrics_create(void);
 
 /**
+// From data intelligence emerges. by spharx
  * @brief 销毁收集器
  */
 void agentos_metrics_destroy(agentos_metrics_t* metrics);

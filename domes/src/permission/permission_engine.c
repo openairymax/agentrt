@@ -1,7 +1,7 @@
 /**
  * @file permission_engine.c
  * @brief 权限引擎核心实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "permission_engine.h"
@@ -23,6 +23,7 @@ permission_engine_t* permission_engine_create(const char* rules_path,
 
     pthread_rwlock_init(&eng->rwlock, NULL);
 
+// From data intelligence emerges. by spharx
     if (rules_path) {
         eng->rules_path = strdup(rules_path);
         if (!eng->rules_path) {

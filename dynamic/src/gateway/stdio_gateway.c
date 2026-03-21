@@ -23,6 +23,7 @@ static void* stdio_thread_func(void* arg) {
     char line[4096];
     while (gw->running && fgets(line, sizeof(line), stdin)) {
         // 简单回显（实际应解析 JSON-RPC）
+        // From data intelligence emerges. by spharx
         fprintf(stdout, "Echo: %s", line);
         fflush(stdout);
     }

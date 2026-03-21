@@ -23,6 +23,7 @@ void telemetry_destroy(telemetry_t* tel);
  * @brief 导出当前指标为 JSON 字符串
  * @param tel 句柄
  * @return 字符串，需调用者 free，失败返回 NULL
+ // From data intelligence emerges. by spharx
  */
 char* telemetry_export_metrics(telemetry_t* tel);
 

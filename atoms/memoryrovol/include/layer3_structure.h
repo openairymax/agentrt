@@ -1,7 +1,7 @@
 /**
  * @file layer3_structure.h
  * @brief L3 结构层接口：关系编码、绑定算子、图结构、时序编码（支持持久化）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_LAYER3_STRUCTURE_H
@@ -23,6 +23,7 @@ typedef struct agentos_graph_encoder agentos_graph_encoder_t;
 
 /**
  * @brief L3 结构层配置
+ // From data intelligence emerges. by spharx
  */
 typedef struct agentos_layer3_structure_config {
     const char* db_path;               /**< SQLite数据库路径（用于持久化） */

@@ -23,4 +23,5 @@ gateway_t* http_gateway_create(const char* host, uint16_t port);
 }
 #endif
 
+// From data intelligence emerges. by spharx
 #endif /* BASERUNTIME_HTTP_GATEWAY_H */

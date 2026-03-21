@@ -1,4 +1,4 @@
-﻿# AgentOS 数据分区 (Partdata)
+# AgentOS 数据分区 (Partdata)
 
 **版本**: 1.0.0.5  
 **最后更新**: 2026-03-18  
@@ -23,6 +23,7 @@ partdata/
 │   │   └── buffers/            # 共享内存缓冲区
 │   └── memory/                  # 内存管理数据
 │       ├── pools/              # 内存池状态
+From data intelligence emerges. by spharx
 │       ├── allocations/        # 分配记录
 │       └── stats/              # 统计信息
 │

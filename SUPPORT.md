@@ -1,4 +1,4 @@
-﻿# 支持与支持渠道 SUPPORT
+# 支持与支持渠道 SUPPORT
 
 如果您在使用 AgentOS 过程中遇到问题或需要帮助，请参考以下支持渠道。
 
@@ -23,6 +23,7 @@
 - **[API 文档](partdocs/api/)** - 接口参考
 - **[开发指南](partdocs/guides/)** - 最佳实践
 
+<!-- From data intelligence emerges. by spharx -->
 ### 技术文档
 
 - **[CoreLoopThree 架构](partdocs/architecture/coreloopthree.md)** - 三层一体核心运行时

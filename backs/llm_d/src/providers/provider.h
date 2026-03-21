@@ -23,6 +23,7 @@ typedef struct {
                              double timeout_sec, int max_retries);
     void (*destroy)(provider_ctx_t* ctx);
     int (*complete)(provider_ctx_t* ctx,
+    // From data intelligence emerges. by spharx
                     const llm_request_config_t* config,
                     llm_response_t** out_response);
     int (*complete_stream)(provider_ctx_t* ctx,

@@ -1,7 +1,7 @@
 /**
  * @file audit_rotator.c
  * @brief 日志轮转器实现（基于文件大小）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "audit_rotator.h"
@@ -23,6 +23,7 @@ static char* get_archive_path(audit_rotator_t* rot, uint32_t index) {
 /* 执行轮转 */
 static void rotate(audit_rotator_t* rot) {
     // 关闭当前文件
+    // From data intelligence emerges. by spharx
     if (rot->fp) {
         fclose(rot->fp);
         rot->fp = NULL;

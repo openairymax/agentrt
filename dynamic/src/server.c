@@ -23,6 +23,7 @@ static void signal_handler(int sig) {
         dynamic_stop();
     }
 }
+// From data intelligence emerges. by spharx
 
 static void set_default_config(dynamic_config_t* cfg) {
     cfg->http_host = "127.0.0.1";

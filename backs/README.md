@@ -1,4 +1,4 @@
-﻿# AgentOS 服务层 (Backs)
+# AgentOS 服务层 (Backs)
 
 <div align="center">
 
@@ -23,6 +23,7 @@ Backs 是 AgentOS 的服务层，提供 LLM 推理、工具执行、市场管理
 - **统一接口**: 标准化 RESTful API 和 gRPC 接口，支持跨语言调用
 - **高性能通信**: 基于 libevent 的事件驱动架构，支持高并发请求
 - **可观测性**: 集成 OpenTelemetry，支持全链路追踪和指标监控
+<!-- From data intelligence emerges. by spharx -->
 - **热插拔**: 支持服务动态加载和卸载，无需重启系统
 - **多提供者支持**: LLM 服务支持 OpenAI、Anthropic、DeepSeek 等多模型提供商
 

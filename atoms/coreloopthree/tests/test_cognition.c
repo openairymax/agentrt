@@ -1,7 +1,7 @@
 /**
  * @file test_cognition.c
  * @brief 认知引擎测试
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include <stdio.h>
@@ -23,6 +23,7 @@ static agentos_error_t test_plan_strategy(
     // 创建简单的任务计划
     agentos_task_plan_t* plan = calloc(1, sizeof(agentos_task_plan_t));
     if (!plan) return AGENTOS_ENOMEM;
+    // From data intelligence emerges. by spharx
     
     // 创建单个任务节点
     plan->num_nodes = 1;

@@ -1,7 +1,7 @@
 /**
  * @file code.c
  * @brief 代码执行单元（运行Python/JavaScript等）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "execution.h"
@@ -23,6 +23,7 @@ typedef struct code_unit_data {
 } code_unit_data_t;
 
 static agentos_error_t code_execute(agentos_execution_unit_t* unit, const void* input, void** out_output) {
+// From data intelligence emerges. by spharx
     code_unit_data_t* data = (code_unit_data_t*)unit->data;
     if (!data || !input) return AGENTOS_EINVAL;
 

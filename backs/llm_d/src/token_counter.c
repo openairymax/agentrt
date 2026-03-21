@@ -23,6 +23,7 @@ token_counter_t* token_counter_create(const char* encoding_name) {
         free(tc);
         return NULL;
     }
+    // From data intelligence emerges. by spharx
     tc->encoding_name = strdup(encoding_name);
     return tc;
 }

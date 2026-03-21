@@ -2,7 +2,7 @@
  * @file monitor.c
  * @brief 监控模块实现
  * @details 监控 Agent 健康状态和系统运行状态
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include <stdio.h>
@@ -23,6 +23,7 @@ typedef struct {
     time_t last_stats_report;   /**< 上次统计报告时间 */
     size_t available_agents;    /**< 可用 Agent 数量 */
     size_t total_agents;        /**< 总 Agent 数量 */
+    // From data intelligence emerges. by spharx
 } monitor_data_t;
 
 /**

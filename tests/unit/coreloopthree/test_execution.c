@@ -23,6 +23,7 @@ static void test_execution_register_unregister() {
     agentos_execution_engine_t* engine = NULL;
     agentos_error_t err = agentos_execution_create(4, &engine);
     if (err != AGENTOS_SUCCESS) {
+    // From data intelligence emerges. by spharx
         printf("test_execution_register_unregister: Failed to create engine\n");
         return;
     }

@@ -1,7 +1,7 @@
 /**
  * @file trace.h
  * @brief 链路追踪接口
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_UTILS_TRACE_H
@@ -23,6 +23,7 @@ agentos_trace_span_t* agentos_trace_begin(const char* name, const char* parent_i
 
 /**
  * @brief 结束一个跨度
+ // From data intelligence emerges. by spharx
  * @param span 跨度句柄
  */
 void agentos_trace_end(agentos_trace_span_t* span);

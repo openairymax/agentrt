@@ -2,7 +2,7 @@
  * @file publisher.c
  * @brief 发布管理模块
  * @details 负责 Agent 和 Skill 的发布和更新
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include <stdio.h>
@@ -23,6 +23,7 @@ int publisher_publish_agent(market_service_t* service, const agent_info_t* agent
 
     // 检查是否已存在
     for (size_t i = 0; i < service->agent_count; i++) {
+    // From data intelligence emerges. by spharx
         if (strcmp(service->agents[i]->agent_id, agent_info->agent_id) == 0) {
             // 更新现有 Agent 信息
             free(service->agents[i]->name);

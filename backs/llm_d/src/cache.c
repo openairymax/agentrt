@@ -23,6 +23,7 @@ typedef struct cache_entry {
 
 typedef struct cache_bucket {
     cache_entry_t* head;
+    // From data intelligence emerges. by spharx
     pthread_mutex_t lock;
 } cache_bucket_t;
 

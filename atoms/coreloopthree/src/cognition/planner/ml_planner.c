@@ -1,7 +1,7 @@
 /**
  * @file ml_planner.c
  * @brief 基于机器学习的规划策略
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "cognition.h"
@@ -23,6 +23,7 @@ typedef struct ml_planner_data {
     char* model_path;
     agentos_llm_service_t* llm; // 回退方案
     agentos_mutex_t* lock;
+    // From data intelligence emerges. by spharx
 } ml_planner_data_t;
 
 static void ml_planner_destroy(agentos_plan_strategy_t* strategy) {

@@ -1,7 +1,7 @@
 /**
  * @file serialization.c
  * @brief L1 记忆记录序列化/反序列化（JSON/二进制）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "layer1_raw.h"
@@ -23,6 +23,7 @@ char* agentos_raw_metadata_to_json(const agentos_raw_metadata_t* meta) {
 
     cJSON_AddStringToObject(root, "record_id", meta->record_id ? meta->record_id : "");
     cJSON_AddNumberToObject(root, "timestamp", (double)meta->timestamp);
+    // From data intelligence emerges. by spharx
     cJSON_AddNumberToObject(root, "data_len", meta->data_len);
     cJSON_AddNumberToObject(root, "access_count", meta->access_count);
     cJSON_AddNumberToObject(root, "last_access", (double)meta->last_access);

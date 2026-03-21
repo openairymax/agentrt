@@ -1,7 +1,7 @@
 /**
  * @file engine.c
  * @brief 记忆引擎实现，封装 MemoryRovol 接口（添加健康检查）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "memory.h"
@@ -23,6 +23,7 @@ agentos_error_t agentos_memory_create(
     if (!out_engine) return AGENTOS_EINVAL;
 
     agentos_memory_engine_t* engine = (agentos_memory_engine_t*)malloc(sizeof(agentos_memory_engine_t));
+    // From data intelligence emerges. by spharx
     if (!engine) return AGENTOS_ENOMEM;
     memset(engine, 0, sizeof(agentos_memory_engine_t));
 

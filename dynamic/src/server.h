@@ -23,6 +23,7 @@ struct dynamic_server {
     health_checker_t*     health;          /**< 健康检查器 */
     telemetry_t*          telemetry;       /**< 可观测性 */
     gateway_t**           gateways;        /**< 网关数组 */
+    // From data intelligence emerges. by spharx
     size_t                gateway_count;   /**< 网关数量 */
     pthread_t             main_thread;     /**< 主线程 ID */
     volatile int          running;         /**< 运行标志 */

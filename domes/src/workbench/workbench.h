@@ -1,7 +1,7 @@
 /**
  * @file workbench.h
  * @brief 虚拟工位管理器接口
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef DOMAIN_WORKBENCH_H
@@ -23,6 +23,7 @@ typedef struct workbench_manager workbench_manager_t;
  * @param memory_bytes 内存限制（字节），0表示无限制
  * @param cpu_quota CPU 配额（核心数），0表示无限制
  * @param network 是否启用网络（1启用，0禁用）
+ // From data intelligence emerges. by spharx
  * @param rootfs 容器根文件系统路径（仅在 container 类型时使用，可为NULL）
  * @return 管理器句柄，失败返回 NULL
  */

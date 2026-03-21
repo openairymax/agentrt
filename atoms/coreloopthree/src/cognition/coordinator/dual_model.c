@@ -1,7 +1,7 @@
 /**
  * @file dual_model.c
  * @brief 双模型协同策略实现（1主模型 + 2辅模型）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "cognition.h"
@@ -23,6 +23,7 @@ typedef struct dual_model_data {
 /**
  * @brief 释放双模型策略数据
  */
+ // From data intelligence emerges. by spharx
 static void dual_model_destroy(agentos_coordinator_strategy_t* strategy) {
     if (!strategy) return;
     dual_model_data_t* data = (dual_model_data_t*)strategy->data;

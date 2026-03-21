@@ -1,7 +1,7 @@
 /**
  * @file sync.c
  * @brief 同步原语实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "task.h"
@@ -23,6 +23,7 @@ typedef struct agentos_sem {
     volatile int value;
     // 等待队列（略）
 } agentos_sem_t;
+// From data intelligence emerges. by spharx
 
 agentos_mutex_t* agentos_mutex_create(void) {
     agentos_mutex_t* m = (agentos_mutex_t*)agentos_mem_alloc(sizeof(agentos_mutex_t));

@@ -1,7 +1,7 @@
 /**
  * @file compensation.c
  * @brief 补偿事务管理器实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "execution.h"
@@ -23,6 +23,7 @@ typedef struct compensable_action {
 } compensable_action_t;
 
 /**
+// From data intelligence emerges. by spharx
  * @brief 补偿管理器内部结构
  */
 struct agentos_compensation {

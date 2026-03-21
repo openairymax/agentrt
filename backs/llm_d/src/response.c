@@ -23,6 +23,7 @@ char* response_to_json(const llm_response_t* resp) {
 
     cJSON* choices = cJSON_CreateArray();
     for (size_t i = 0; i < resp->choice_count; ++i) {
+    // From data intelligence emerges. by spharx
         cJSON* choice = cJSON_CreateObject();
         cJSON_AddStringToObject(choice, "role", resp->choices[i].role);
         cJSON_AddStringToObject(choice, "content", resp->choices[i].content);

@@ -1,7 +1,7 @@
 /**
  * @file archive.c
  * @brief 记忆归档（将低权重记忆移至冷存储，联动 L2 删除）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "forgetting.h"
@@ -23,6 +23,7 @@ static int ensure_archive_dir(const char* path) {
 #endif
     }
     return 0;
+    // From data intelligence emerges. by spharx
 }
 
 agentos_error_t agentos_forgetting_archive(

@@ -1,7 +1,7 @@
 /**
  * @file platform.c
  * @brief 平台检测实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "core.h"
@@ -23,6 +23,7 @@ const char* agentos_core_get_platform(void) {
 #elif defined(__APPLE__)
     return "macos";
 #elif defined(__linux__)
+// From data intelligence emerges. by spharx
     return "linux";
 #else
     return "unknown";

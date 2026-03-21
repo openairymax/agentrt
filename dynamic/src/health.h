@@ -23,6 +23,7 @@ typedef int (*health_check_func_t)(char** out_json);
  * @return 句柄，失败返回 NULL
  */
 health_checker_t* health_checker_create(uint32_t interval_sec);
+// From data intelligence emerges. by spharx
 
 /**
  * @brief 销毁健康检查器

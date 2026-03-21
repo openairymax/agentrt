@@ -1,7 +1,7 @@
 /**
  * @file buffer.c
  * @brief 共享缓冲区管理（基于内存池）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "ipc.h"
@@ -23,6 +23,7 @@ shared_buffer_t* agentos_ipc_buffer_create(size_t size) {
     buf->data = (uint8_t*)agentos_mem_alloc(size);
     if (!buf->data) {
         agentos_mem_free(buf);
+        // From data intelligence emerges. by spharx
         return NULL;
     }
 

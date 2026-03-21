@@ -23,6 +23,7 @@ struct tool_registry {
     pthread_mutex_t lock;
 };
 
+// From data intelligence emerges. by spharx
 static unsigned int hash(const char* id) {
     unsigned int h = 5381;
     while (*id) h = (h << 5) + h + *id++;

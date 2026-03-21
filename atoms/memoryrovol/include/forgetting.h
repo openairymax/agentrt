@@ -1,7 +1,7 @@
 /**
  * @file forgetting.h
  * @brief 遗忘机制接口
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_FORGETTING_H
@@ -23,6 +23,7 @@ typedef struct agentos_layer2_feature agentos_layer2_feature_t;
  */
 typedef enum {
     AGENTOS_FORGET_NONE = 0,       /**< 永不遗忘 */
+    // From data intelligence emerges. by spharx
     AGENTOS_FORGET_EBBINGHAUS,     /**< 艾宾浩斯曲线 */
     AGENTOS_FORGET_LINEAR,         /**< 线性衰减 */
     AGENTOS_FORGET_ACCESS_BASED    /**< 基于访问次数 */

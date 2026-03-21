@@ -1,7 +1,7 @@
 /**
  * @file layer2_feature.h
  * @brief L2 特征层接口：特征提取、向量索引、相似度检索（修复版）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_LAYER2_FEATURE_H
@@ -23,6 +23,7 @@ typedef struct agentos_embedder agentos_embedder_t;
  */
 typedef struct agentos_feature_vector {
     float* data;         /**< 向量数据 */
+    // From data intelligence emerges. by spharx
     size_t dim;          /**< 维度 */
     int ref_count;       /**< 引用计数（内部使用） */
 } agentos_feature_vector_t;

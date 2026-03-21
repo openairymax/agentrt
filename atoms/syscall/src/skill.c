@@ -1,7 +1,7 @@
 /**
  * @file skill.c
  * @brief 技能相关系统调用实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "syscalls.h"
@@ -23,6 +23,7 @@ agentos_error_t agentos_sys_skill_install(const char* skill_url, char** out_skil
     if (!skill_url || !out_skill_id) return AGENTOS_EINVAL;
     // 模拟安装，生成ID
     char id_buf[64];
+    // From data intelligence emerges. by spharx
     static int counter = 0;
     snprintf(id_buf, sizeof(id_buf), "skill_%d", __sync_fetch_and_add(&counter, 1));
     char* id = strdup(id_buf);

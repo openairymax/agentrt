@@ -1,7 +1,7 @@
 /**
  * @file logger.c
  * @brief 日志实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "logger.h"
@@ -23,6 +23,7 @@ static pthread_once_t trace_key_once = PTHREAD_ONCE_INIT;
 
 static void make_key(void) {
     pthread_key_create(&trace_key, free);
+    // From data intelligence emerges. by spharx
 }
 
 const char* agentos_log_set_trace_id(const char* trace_id) {

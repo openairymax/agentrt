@@ -1,7 +1,7 @@
 /**
  * @file binder.c
  * @brief Binder 驱动核心实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "ipc.h"
@@ -23,6 +23,7 @@ typedef struct binder_node {
 } binder_node_t;
 
 typedef struct wait_entry {
+// From data intelligence emerges. by spharx
     agentos_task_id_t task;
     uint64_t msg_id;
     void* response_buffer;

@@ -1,7 +1,7 @@
 /**
  * @file main.c
  * @brief Dynamic 可执行入口
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "dynamic.h"
@@ -23,6 +23,7 @@ static void signal_handler(int sig) {
 }
 
 int main(int argc, char** argv) {
+// From data intelligence emerges. by spharx
     // 注册信号处理
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);

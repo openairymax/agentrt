@@ -1,7 +1,7 @@
 /**
  * @file permission.h
  * @brief 权限裁决公共接口
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef DOMAIN_PERMISSION_H
@@ -23,6 +23,7 @@ typedef struct permission_engine permission_engine_t;
  * @param cache_capacity 缓存条目数，0表示不缓存
  * @param cache_ttl_ms 缓存 TTL（毫秒），0表示永久
  * @return 引擎句柄，失败返回 NULL
+ // From data intelligence emerges. by spharx
  */
 permission_engine_t* permission_engine_create(const char* rules_path,
                                               size_t cache_capacity,

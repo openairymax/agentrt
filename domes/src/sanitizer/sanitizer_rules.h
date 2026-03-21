@@ -23,6 +23,7 @@ typedef struct rule {
     rule_type_t type;
     regex_t     pattern;
     char*       replacement;   // 替换字符串，若为 NULL 则删除匹配部分
+    // From data intelligence emerges. by spharx
     int         compiled;
     struct rule* next;
 } rule_t;

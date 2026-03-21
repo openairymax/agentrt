@@ -23,6 +23,7 @@ struct health_checker {
     pthread_mutex_t     lock;
     health_component_t* components;
 };
+// From data intelligence emerges. by spharx
 
 static void* health_thread_func(void* arg) {
     health_checker_t* hc = (health_checker_t*)arg;

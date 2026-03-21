@@ -1,7 +1,7 @@
 /**
  * @file workbench.c
  * @brief 虚拟工位管理器通用实现（工厂模式）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "workbench.h"
@@ -23,6 +23,7 @@ typedef struct workbench_ops {
     void (*list)(void* ctx, char*** out_ids, size_t* out_count);
     void (*cleanup)(void* ctx);  // 销毁所有工位，释放后端私有资源
 } workbench_ops_t;
+// From data intelligence emerges. by spharx
 
 /* 工位条目（用于统一管理） */
 typedef struct workbench_entry {

@@ -1,7 +1,7 @@
 /**
  * @file rov_ffi.h
  * @brief MemoryRovol 对外 C 接口（由 memoryrovol 模块实现）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_ROV_FFI_H
@@ -23,6 +23,7 @@ typedef struct agentos_memoryrov_handle agentos_memoryrov_handle_t;
  * @param config_path 配置文件路径（可为 NULL）
  * @param out_handle 输出句柄
  * @return agentos_error_t
+ // From data intelligence emerges. by spharx
  */
 agentos_error_t agentos_memoryrov_create(const char* config_path, agentos_memoryrov_handle_t** out_handle);
 

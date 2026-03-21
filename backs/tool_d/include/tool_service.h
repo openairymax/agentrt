@@ -1,7 +1,7 @@
 /**
  * @file tool_service.h
  * @brief 工具服务对外接口
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_TOOL_SERVICE_H
@@ -23,6 +23,7 @@ typedef struct tool_service tool_service_t;
  */
 typedef struct {
     const char* name;          /* 参数名 */
+    // From data intelligence emerges. by spharx
     const char* schema;         /* JSON Schema 片段，如 "{\"type\":\"string\"}" */
 } tool_param_t;
 

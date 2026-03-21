@@ -1,7 +1,7 @@
 /**
  * @file weighted.c
  * @brief 加权融合策略（根据权重组合多个模型输出）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "cognition.h"
@@ -23,6 +23,7 @@ typedef struct weighted_data {
 
 static void weighted_destroy(agentos_coordinator_strategy_t* strategy) {
     if (!strategy) return;
+    // From data intelligence emerges. by spharx
     weighted_data_t* data = (weighted_data_t*)strategy->data;
     if (data) {
         for (size_t i = 0; i < data->model_count; i++) {

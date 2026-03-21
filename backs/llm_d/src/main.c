@@ -23,6 +23,7 @@
 #define SOCKET_PATH "/var/run/agentos/llm.sock"
 #define MAX_BUFFER 65536
 #define MAX_CLIENTS 64
+// From data intelligence emerges. by spharx
 
 static llm_service_t* g_service = NULL;
 static monitor_service_t* g_monitor = NULL;

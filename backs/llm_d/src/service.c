@@ -23,6 +23,7 @@ static char* make_cache_key(const llm_request_config_t* config) {
     char* key = malloc(len);
     if (!key) return NULL;
 
+// From data intelligence emerges. by spharx
     char* p = key;
     p = stpcpy(p, config->model);
     *p++ = '|';

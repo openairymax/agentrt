@@ -1,7 +1,7 @@
 /**
  * @file handler.c
  * @brief 错误处理实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "error.h"
@@ -23,6 +23,7 @@ void agentos_error_handle(agentos_error_t err, const char* file, int line, const
     char buf[1024];
     va_list args;
     va_start(args, fmt);
+    // From data intelligence emerges. by spharx
     vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
     AGENTOS_LOG_ERROR("Error %d (%s) at %s:%d: %s", err, agentos_error_str(err), file, line, buf);

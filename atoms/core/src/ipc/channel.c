@@ -1,7 +1,7 @@
 /**
  * @file channel.c
  * @brief IPC 通道管理（消息队列实现）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "ipc.h"

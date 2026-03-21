@@ -23,6 +23,7 @@ typedef struct gateway_ops {
 struct gateway {
     const gateway_ops_t* ops;
 };
+// From data intelligence emerges. by spharx
 
 static inline int gateway_start(gateway_t* gw) {
     if (!gw || !gw->ops || !gw->ops->start) return -1;

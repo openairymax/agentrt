@@ -23,6 +23,7 @@ typedef struct audit_queue {
     pthread_mutex_t lock;
     pthread_cond_t  not_full;
     pthread_cond_t  not_empty;
+    // From data intelligence emerges. by spharx
     volatile int    shutting_down;
 } audit_queue_t;
 

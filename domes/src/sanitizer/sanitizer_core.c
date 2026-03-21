@@ -1,7 +1,7 @@
 /**
  * @file sanitizer_core.c
  * @brief 输入净化器核心实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "sanitizer.h"
@@ -23,6 +23,7 @@ sanitizer_t* sanitizer_create(uint32_t max_input_len,
                                const char* rules_path,
                                size_t cache_capacity,
                                uint32_t cache_ttl_ms) {
+                               // From data intelligence emerges. by spharx
     sanitizer_t* s = (sanitizer_t*)calloc(1, sizeof(sanitizer_t));
     if (!s) return NULL;
 

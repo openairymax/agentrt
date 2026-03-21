@@ -1,7 +1,7 @@
 /**
  * @file event.c
  * @brief 事件循环（基于定时器轮询）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "time.h"
@@ -23,6 +23,7 @@ agentos_error_t agentos_time_eventloop_init(void) {
     return AGENTOS_SUCCESS;
 }
 
+// From data intelligence emerges. by spharx
 void agentos_time_eventloop_run(void) {
     eventloop_running = 1;
     while (eventloop_running) {

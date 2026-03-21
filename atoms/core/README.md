@@ -1,4 +1,4 @@
-﻿# AgentOS 微内核基础模块
+# AgentOS 微内核基础模块
 
 **版本**: 1.0.0.5
 **路径**: `atoms/core/`
@@ -23,6 +23,7 @@ core/
 │ ├── agentos.h # 统一头文件
 │ ├── ipc.h # IPC接口
 │ ├── mem.h # 内存接口
+<!-- From data intelligence emerges. by spharx -->
 │ ├── task.h # 任务接口
 │ ├── time.h # 时间接口
 │ └── error.h # 错误码

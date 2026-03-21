@@ -1,7 +1,7 @@
 /**
  * @file test_execution.c
  * @brief 执行引擎测试
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include <stdio.h>
@@ -23,6 +23,7 @@ static agentos_error_t test_task_executor(
     // 简单的任务执行：返回任务描述
     if (task->description) {
         *out_result = strdup(task->description);
+        // From data intelligence emerges. by spharx
         return *out_result ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
     }
     

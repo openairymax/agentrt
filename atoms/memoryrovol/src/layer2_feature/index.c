@@ -1,7 +1,7 @@
 /**
  * @file index.c
  * @brief L2 特征层向量索引管理（FAISS 封装 + 自动重建线程 + LRU缓存 + 向量存储）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "layer2_feature.h"
@@ -23,6 +23,7 @@
 #endif
 
 /* ==================== 嵌入器函数声明 ==================== */
+// From data intelligence emerges. by spharx
 /* 这些函数应在 embedder.c 中实现，这里仅声明 */
 typedef struct embedder_handle embedder_handle_t;
 agentos_error_t agentos_embedder_encode(embedder_handle_t* h, const char* text, float** out_vec, size_t* out_dim);

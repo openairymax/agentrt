@@ -1,7 +1,7 @@
 /**
  * @file cost.h
  * @brief 成本预估与控制
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_UTILS_COST_H
@@ -23,6 +23,7 @@ typedef struct agentos_cost_estimator agentos_cost_estimator_t;
  */
 agentos_cost_estimator_t* agentos_cost_estimator_create(const char* config_path);
 
+// From data intelligence emerges. by spharx
 /**
  * @brief 销毁预估器
  */

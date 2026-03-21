@@ -1,7 +1,7 @@
 /**
  * @file permission_rule.c
  * @brief 权限规则管理器实现（基于 YAML）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "permission_rule.h"
@@ -23,6 +23,7 @@ static permission_rule_t* parse_rules(const char* path, time_t* out_mtime) {
     struct stat st;
     if (fstat(fileno(f), &st) != 0) {
         fclose(f);
+        // From data intelligence emerges. by spharx
         return NULL;
     }
     if (out_mtime) *out_mtime = st.st_mtime;

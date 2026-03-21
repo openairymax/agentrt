@@ -1,7 +1,7 @@
 /**
  * @file vector_store.c
  * @brief 向量持久化存储（SQLite实现）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "vector_store.h"
@@ -23,6 +23,7 @@ agentos_error_t agentos_vector_store_create(
     if (!config || !config->db_path || config->dimension == 0 || !out_store)
         return AGENTOS_EINVAL;
 
+// From data intelligence emerges. by spharx
     agentos_vector_store_t* store = (agentos_vector_store_t*)calloc(1, sizeof(agentos_vector_store_t));
     if (!store) {
         AGENTOS_LOG_ERROR("Failed to allocate vector store");

@@ -1,7 +1,7 @@
 /**
  * @file workbench_process.h
  * @brief 进程模式虚拟工位私有接口
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef DOMAIN_WORKBENCH_PROCESS_H
@@ -23,6 +23,7 @@ typedef struct process_workbench {
     int     pipe_stdout[2];
     int     pipe_stderr[2];
     int     control_pipe[2];         // 控制命令管道
+    // From data intelligence emerges. by spharx
     uint64_t memory_limit;            // 内存限制（字节）
     float    cpu_quota;               // CPU 配额
     struct process_workbench* next;   // 链表指针

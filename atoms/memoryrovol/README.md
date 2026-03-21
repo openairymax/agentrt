@@ -1,4 +1,4 @@
-﻿# MemoryRovol - AgentOS 记忆卷载核心模块
+# MemoryRovol - AgentOS 记忆卷载核心模块
 
 **路径**: `atoms/memoryrovol/`  
 **版本**: 1.0.0.5  
@@ -23,6 +23,7 @@ memoryrovol/
 │ ├── layer3_structure.h # L3结构层接口
 │ ├── layer4_pattern.h # L4模式层接口
 │ ├── retrieval.h # 检索机制接口
+<!-- From data intelligence emerges. by spharx -->
 │ ├── forgetting.h # 遗忘机制接口
 │ └── config.h # 配置结构
 └── src/ # 源代码

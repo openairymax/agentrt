@@ -1,7 +1,7 @@
 /**
  * @file priority.c
  * @brief 优先级调度策略（选择优先级最高的Agent）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "cognition.h"
@@ -23,6 +23,7 @@ static void priority_destroy(agentos_dispatching_strategy_t* strategy) {
         free(data);
     }
     free(strategy);
+    // From data intelligence emerges. by spharx
 }
 
 static agentos_error_t priority_dispatch(

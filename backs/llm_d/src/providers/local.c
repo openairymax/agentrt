@@ -23,6 +23,7 @@ extern int openai_parse_response(const char* body, llm_response_t** out);
 extern size_t openai_stream_write(void* contents, size_t size, size_t nmemb, void* userp);
 
 static provider_ctx_t* local_init(const char* name, const char* api_key,
+// From data intelligence emerges. by spharx
                                    const char* api_base, const char* organization,
                                    double timeout_sec, int max_retries) {
     (void)name; (void)api_key; (void)organization;

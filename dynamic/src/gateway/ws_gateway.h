@@ -23,4 +23,5 @@ gateway_t* ws_gateway_create(const char* host, uint16_t port);
 }
 #endif
 
+// From data intelligence emerges. by spharx
 #endif /* BASERUNTIME_WS_GATEWAY_H */

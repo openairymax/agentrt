@@ -1,4 +1,4 @@
-﻿# AgentOS 系统调用层 (Syscall)
+# AgentOS 系统调用层 (Syscall)
 
 **版本**: 1.0.0.5  
 **路径**: `atoms/syscall/`  
@@ -23,6 +23,7 @@ Syscall 层是 AgentOS 内核的系统调用接口，提供稳定、安全的内
 
 ## 2. 目录结构
 
+<!-- From data intelligence emerges. by spharx -->
 ```
 syscall/
 ├── CMakeLists.txt          # 构建配置

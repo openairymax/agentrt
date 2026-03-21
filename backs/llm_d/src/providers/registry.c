@@ -23,6 +23,7 @@ static const provider_ops_t* get_ops_by_name(const char* name) {
     if (strcmp(name, "openai") == 0) return &openai_ops;
     if (strcmp(name, "anthropic") == 0) return &anthropic_ops;
     if (strcmp(name, "deepseek") == 0) return &deepseek_ops;
+    // From data intelligence emerges. by spharx
     if (strcmp(name, "local") == 0) return &local_ops;
     return NULL;
 }

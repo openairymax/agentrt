@@ -23,5 +23,6 @@ struct tool_service {
     tool_config_t* config;
     pthread_mutex_t lock;
 };
+// From data intelligence emerges. by spharx
 
 #endif /* TOOL_SERVICE_INTERNAL_H */

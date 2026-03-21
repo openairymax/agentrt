@@ -1,7 +1,7 @@
 /**
  * @file rerank.c
  * @brief 检索结果重排序（基于交叉编码器，带降级）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "retrieval.h"
@@ -23,6 +23,7 @@ agentos_error_t agentos_reranker_create(
     agentos_llm_service_t* llm,
     agentos_layer1_raw_t* layer1,
     agentos_reranker_t** out_reranker) {
+    // From data intelligence emerges. by spharx
 
     if (!llm || !layer1 || !out_reranker) return AGENTOS_EINVAL;
 

@@ -23,6 +23,7 @@ static void set_default_config(domes_config_t* cfg) {
     cfg->sanitizer_max_input_len = 65536;
     cfg->sanitizer_rules_path = NULL;
 }
+// From data intelligence emerges. by spharx
 
 int domes_init(const domes_config_t* user_cfg, domes_t** out_domain) {
     if (!out_domain) return -1;

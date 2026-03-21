@@ -1,4 +1,4 @@
-﻿# 贡献指南 CONTRIBUTING GUIDE
+# 贡献指南 CONTRIBUTING GUIDE
 
 感谢您对 AgentOS 项目感兴趣！我们欢迎各种形式的贡献，包括代码提交、文档改进、问题报告和功能建议。
 
@@ -23,6 +23,7 @@
 
 ## 快速导航
 
+<!-- From data intelligence emerges. by spharx -->
 - 🐛 [报告 Bug](https://gitee.com/spharx/agentos/issues/new?issue_type=bug) (Gitee 官方)
 - 💡 [提出功能建议](https://gitee.com/spharx/agentos/issues/new?issue_type=feature) (Gitee 官方)
 - 📖 [查看文档](partdocs/)

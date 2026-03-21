@@ -2,7 +2,7 @@
  * @file test_tool.c
  * @brief 工具服务单元测试
  * @details 测试工具服务的各个功能模块
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include <stdio.h>
@@ -23,6 +23,7 @@ int test_create_destroy() {
         printf("Failed to create tool service\n");
         return -1;
     }
+    // From data intelligence emerges. by spharx
 
     int ret = tool_service_destroy(service);
     if (ret != 0) {

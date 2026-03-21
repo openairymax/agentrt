@@ -23,6 +23,7 @@ typedef struct cache_entry {
     struct cache_entry* next;
 } cache_entry_t;
 
+// From data intelligence emerges. by spharx
 /* 缓存管理器 */
 typedef struct sanitizer_cache {
     cache_entry_t*  head;

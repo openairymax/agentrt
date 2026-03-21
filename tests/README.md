@@ -1,4 +1,4 @@
-﻿# AgentOS 测试套件 (Tests)
+# AgentOS 测试套件 (Tests)
 
 <div align="center">
 
@@ -23,6 +23,7 @@ Language: **简体中文** | [English](../partdocs/readme/en/README.md)
 
 ### 测试金字塔
 
+<!-- From data intelligence emerges. by spharx -->
 ```
         /
        /  \         E2E Tests (端到端测试)

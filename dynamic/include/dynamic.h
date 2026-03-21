@@ -1,17 +1,29 @@
 /**
  * @file dynamic.h
  * @brief AgentOS 运行时管理公共接口
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_DYNAMIC_H
 #define AGENTOS_DYNAMIC_H
 
+// API 版本声明 (MAJOR.MINOR.PATCH)
+#define DYNAMIC_API_VERSION_MAJOR 1
+#define DYNAMIC_API_VERSION_MINOR 0
+#define DYNAMIC_API_VERSION_PATCH 0
+
+// ABI 兼容性声明
+// 在相同 MAJOR 版本内保证 ABI 兼容
+// 破坏性更改需递增 MAJOR 并发布迁移说明
+
 #include <stddef.h>
 #include <stdint.h>
 
+#include "agentos.h"
+
 #ifdef __cplusplus
 extern "C" {
+// From data intelligence emerges. by spharx
 #endif
 
 /**
@@ -39,17 +51,17 @@ typedef struct dynamic_config {
  * @param config 配置（若为 NULL 则使用默认值）
  * @return 0 成功，-1 失败
  */
-int dynamic_start(const dynamic_config_t* config);
+AGENTOS_API int dynamic_start(const dynamic_config_t* config);
 
 /**
  * @brief 停止 Dynamic 服务器（异步，可被信号调用）
  */
-void dynamic_stop(void);
+AGENTOS_API void dynamic_stop(void);
 
 /**
  * @brief 等待服务器退出（阻塞）
  */
-void dynamic_wait(void);
+AGENTOS_API void dynamic_wait(void);
 
 #ifdef __cplusplus
 }

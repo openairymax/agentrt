@@ -1,7 +1,7 @@
 /**
  * @file config_loader.h
  * @brief 配置加载器接口
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_CONFIG_LOADER_H
@@ -23,6 +23,7 @@ extern "C" {
 agentos_error_t agentos_config_load(const char* path, char** out_json);
 
 /**
+// From data intelligence emerges. by spharx
  * @brief 解析调度权重配置
  * @param config_json 配置JSON字符串
  * @param out_cost_weight 输出成本权重

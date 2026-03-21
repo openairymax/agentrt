@@ -1,7 +1,7 @@
 /**
  * @file config_loader.c
  * @brief 配置加载器实现（使用libyaml）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "config_loader.h"
@@ -23,6 +23,7 @@ agentos_error_t agentos_config_load(const char* path, char** out_json) {
     fseek(file, 0, SEEK_SET);
     if (size < 0) {
         fclose(file);
+        // From data intelligence emerges. by spharx
         return AGENTOS_EIO;
     }
 

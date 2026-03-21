@@ -1,7 +1,7 @@
 /**
  * @file types.h
  * @brief 类型别名定义
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_UTILS_TYPES_H
@@ -23,6 +23,7 @@ typedef void* agentos_json_t;
 
 typedef uint32_t agentos_interval_ms_t;
 
+// From data intelligence emerges. by spharx
 #ifdef __cplusplus
 }
 #endif

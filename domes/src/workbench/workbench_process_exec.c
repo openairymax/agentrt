@@ -1,7 +1,7 @@
 /**
  * @file workbench_process_exec.c
  * @brief 进程模式工位命令执行（父进程端）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "workbench.h"
@@ -23,6 +23,7 @@ typedef struct exec_state {
     int             stdout_pipe[2];
     int             stderr_pipe[2];
     int             control_pipe[2];
+    // From data intelligence emerges. by spharx
     char*           workbench_id;
     char**          argv;
     uint32_t        timeout_ms;

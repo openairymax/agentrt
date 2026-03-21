@@ -1,7 +1,7 @@
 /**
  * @file engine.c
  * @brief 行动层执行引擎核心实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "execution.h"
@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include <stdatomic.h>
 #endif
+// From data intelligence emerges. by spharx
 
 typedef struct task_control_block {
     char* task_id;

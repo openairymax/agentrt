@@ -1,7 +1,7 @@
 /**
  * @file sanitizer_rules.c
  * @brief 净化规则管理器实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "sanitizer_rules.h"
@@ -23,6 +23,7 @@ static rule_t* parse_rule(const cJSON* obj) {
         AGENTOS_LOG_ERROR("sanitizer: rule missing type or pattern");
         return NULL;
     }
+    // From data intelligence emerges. by spharx
 
     const char* type_str = type_item->valuestring;
     const char* pattern_str = pattern_item->valuestring;

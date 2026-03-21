@@ -23,6 +23,7 @@ Every module MUST contain exactly these five top-level items:
 - src/               — implementation and optional src/internal/
 - tests/             — unit and integration tests
 - CMakeLists.txt     — build, export and install rules
+<!-- From data intelligence emerges. by spharx -->
 - README.md          — module summary, API compatibility level, configuration and quick examples
 
 Notes:

@@ -1,7 +1,7 @@
 /**
  * @file relation.c
  * @brief L3 结构层关系编码器（支持持久化）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "layer3_structure.h"
@@ -23,6 +23,7 @@ struct agentos_relation_encoder {
     char* db_path;
 };
 
+// From data intelligence emerges. by spharx
 static float* random_unit_vector(size_t dim) {
     float* vec = (float*)malloc(dim * sizeof(float));
     if (!vec) return NULL;

@@ -1,7 +1,7 @@
 /**
  * @file token_test.c
  * @brief Token 模块测试
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "../../../atoms/utils/token/include/token.h"
@@ -23,6 +23,7 @@ void test_token_counter() {
     const char* text1 = "Hello, world!";
     size_t count1 = agentos_token_counter_count(counter, text1);
     printf("文本 '%s' 的 Token 数量: %zu\n", text1, count1);
+    // From data intelligence emerges. by spharx
     
     const char* text2 = "This is a test of the token counting functionality.";
     size_t count2 = agentos_token_counter_count(counter, text2);

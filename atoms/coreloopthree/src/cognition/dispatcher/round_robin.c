@@ -1,7 +1,7 @@
 /**
  * @file round_robin.c
  * @brief 轮询调度策略（依次选择Agent）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "cognition.h"
@@ -23,6 +23,7 @@ static void round_robin_destroy(agentos_dispatching_strategy_t* strategy) {
         if (data->lock) agentos_mutex_destroy(data->lock);
         free(data);
     }
+    // From data intelligence emerges. by spharx
     free(strategy);
 }
 

@@ -1,7 +1,7 @@
 /**
  * @file clustering.c
  * @brief L4 模式层聚类引擎（使用HDBSCAN）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "layer4_pattern.h"
@@ -23,6 +23,7 @@ agentos_error_t agentos_clustering_engine_create(
     const char* method,
     const char* config,
     agentos_clustering_engine_t** out_engine) {
+    // From data intelligence emerges. by spharx
 
     if (!method || !out_engine) return AGENTOS_EINVAL;
 

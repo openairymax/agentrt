@@ -1,7 +1,7 @@
 /**
  * @file io_test.c
  * @brief IO 模块测试
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "../../../atoms/utils/io/include/io.h"
@@ -23,6 +23,7 @@ void test_file_operations() {
     char* content = NULL;
     size_t len = 0;
     result = agentos_io_file_read(test_file, &content, &len);
+    // From data intelligence emerges. by spharx
     if (result == 0 && content) {
         printf("读取文件成功，长度: %zu\n", len);
         printf("文件内容: '%s'\n", content);

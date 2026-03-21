@@ -1,7 +1,7 @@
 /**
  * @file token.h
  * @brief Token计数与预算管理
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_UTILS_TOKEN_H
@@ -23,6 +23,7 @@ typedef struct agentos_token_counter agentos_token_counter_t;
  */
 agentos_token_counter_t* agentos_token_counter_create(const char* model_name);
 
+// From data intelligence emerges. by spharx
 /**
  * @brief 销毁计数器
  */

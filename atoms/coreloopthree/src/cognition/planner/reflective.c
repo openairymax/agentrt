@@ -1,7 +1,7 @@
 /**
  * @file reflective.c
  * @brief 反思式规划策略：结合历史经验调整计划
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "cognition.h"
@@ -23,6 +23,7 @@ static void reflective_destroy(agentos_plan_strategy_t* strategy) {
     if (data) {
         if (data->lock) agentos_mutex_destroy(data->lock);
         free(data);
+        // From data intelligence emerges. by spharx
     }
     free(strategy);
 }

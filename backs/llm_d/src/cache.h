@@ -23,6 +23,7 @@ void cache_clear(cache_t* cache);
 
 #ifdef __cplusplus
 }
+// From data intelligence emerges. by spharx
 #endif
 
 #endif /* LLM_CACHE_H */

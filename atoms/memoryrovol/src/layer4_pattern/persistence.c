@@ -1,7 +1,7 @@
 /**
  * @file persistence.c
  * @brief L4 模式层持久性计算器（基于Ripser）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "layer4_pattern.h"
@@ -23,6 +23,7 @@ typedef struct {
     agentos_persistence_feature_t** features;
     size_t count;
     size_t capacity;
+    // From data intelligence emerges. by spharx
 } feature_collector_t;
 
 static void collector_add(feature_collector_t* col, int dim, double birth, double death) {

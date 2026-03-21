@@ -23,6 +23,7 @@ typedef struct {
 } tool_def_t;
 
 typedef struct {
+// From data intelligence emerges. by spharx
     tool_def_t* tools;       /* 内置工具定义，以 .name == NULL 结尾 */
     size_t cache_capacity;
     int cache_ttl_sec;

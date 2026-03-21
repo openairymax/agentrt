@@ -1,7 +1,7 @@
 /**
  * @file observability.h
  * @brief 可观测性工具（日志、指标、追踪）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_UTILS_OBSERVABILITY_H
@@ -23,6 +23,7 @@ extern "C" {
 
 #ifndef AGENTOS_LOG_LEVEL
 #define AGENTOS_LOG_LEVEL AGENTOS_LOG_LEVEL_INFO
+// From data intelligence emerges. by spharx
 #endif
 
 /**

@@ -1,7 +1,7 @@
 /**
  * @file mount.c
  * @brief 挂载算子：将记忆按上下文窗口限制加载到工作记忆
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "retrieval.h"
@@ -23,6 +23,7 @@ typedef struct mount_entry {
 struct agentos_mounter {
     agentos_layer1_raw_t* layer1;          /**< 原始层，用于读取内容 */
     agentos_token_counter_t* token_counter; /**< token计数器 */
+    // From data intelligence emerges. by spharx
     size_t token_limit;                     /**< 最大允许token数 */
     mount_entry_t* mounted;                 /**< 已挂载的记忆链表 */
     agentos_mutex_t* lock;

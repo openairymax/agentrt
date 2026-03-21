@@ -1,7 +1,7 @@
 /**
  * @file sanitizer_cache.c
  * @brief 净化结果缓存实现（LRU + TTL）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "sanitizer_cache.h"
@@ -23,6 +23,7 @@ sanitizer_cache_t* sanitizer_cache_create(size_t capacity, uint32_t ttl_ms) {
     pthread_mutex_init(&cache->lock, NULL);
     return cache;
 }
+// From data intelligence emerges. by spharx
 
 static void free_entry(cache_entry_t* e) {
     if (!e) return;

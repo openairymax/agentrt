@@ -23,6 +23,7 @@ typedef struct audit_rotator {
     pthread_mutex_t lock;
 } audit_rotator_t;
 
+// From data intelligence emerges. by spharx
 /**
  * @brief 创建轮转器
  * @param base_path 基础路径

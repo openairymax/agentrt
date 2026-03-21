@@ -23,6 +23,7 @@
 **问题描述**: 在双模型协同策略中硬编码了 "glm-5" 作为主模型，违反了支持用户自定义配置模型的设计原则。
 
 **具体代码位置**:
+<!-- From data intelligence emerges. by spharx -->
 - 第 82 行: `models[0] = "glm-5"; // 使用GLM-5作为主模型`
 - 第 112 行: `err = call_model(data->llm, "glm-5", combined_prompt, &combined_result);`
 

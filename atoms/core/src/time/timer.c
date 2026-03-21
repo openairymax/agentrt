@@ -1,7 +1,7 @@
 /**
  * @file timer.c
  * @brief 定时器管理
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "time.h"
@@ -23,6 +23,7 @@ typedef struct agentos_timer {
 typedef struct agentos_event {
     int signaled;
     agentos_mutex_t* lock;
+    // From data intelligence emerges. by spharx
     agentos_cond_t* cond;
 } agentos_event_t;
 

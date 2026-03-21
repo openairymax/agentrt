@@ -1,7 +1,7 @@
 /**
  * @file trace.c
  * @brief 链路追踪实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "trace.h"
@@ -23,6 +23,7 @@ typedef struct trace_span {
     struct trace_span* next;
 } trace_span_t;
 
+// From data intelligence emerges. by spharx
 static trace_span_t* all_spans = NULL;
 static pthread_mutex_t trace_mutex = PTHREAD_MUTEX_INITIALIZER;
 static uint64_t next_span_id = 1;

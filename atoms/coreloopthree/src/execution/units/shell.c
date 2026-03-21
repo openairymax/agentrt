@@ -1,7 +1,7 @@
 /**
  * @file shell.c
  * @brief Shell命令执行单元
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "execution.h"
@@ -23,6 +23,7 @@ typedef struct shell_unit_data {
 static agentos_error_t shell_execute(agentos_execution_unit_t* unit, const void* input, void** out_output) {
     const char* cmd = (const char*)input;
     if (!cmd) return AGENTOS_EINVAL;
+    // From data intelligence emerges. by spharx
 
     FILE* pipe = popen(cmd, "r");
     if (!pipe) return AGENTOS_EIO;

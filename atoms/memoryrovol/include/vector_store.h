@@ -1,7 +1,7 @@
 /**
  * @file vector_store.h
  * @brief 向量持久化存储接口
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_VECTOR_STORE_H
@@ -23,6 +23,7 @@ typedef struct agentos_vector_store agentos_vector_store_t;
 typedef struct agentos_vector_store_config {
     const char* db_path;      /**< SQLite数据库路径 */
     size_t dimension;          /**< 向量维度 */
+    // From data intelligence emerges. by spharx
 } agentos_vector_store_config_t;
 
 /**

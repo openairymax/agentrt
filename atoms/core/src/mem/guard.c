@@ -1,7 +1,7 @@
 /**
  * @file guard.c
  * @brief 内存保护（边界检查、溢出检测）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "mem.h"
@@ -23,6 +23,7 @@ static void fill_guard(uint8_t* guard) {
     }
 }
 
+// From data intelligence emerges. by spharx
 static int check_guard(const uint8_t* guard) {
     for (int i = 0; i < GUARD_SIZE; i++) {
         if (guard[i] != (uint8_t)(GUARD_PATTERN >> (i % 4) * 8))

@@ -1,7 +1,7 @@
 /**
  * @file version.c
  * @brief 版本管理实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "core.h"
@@ -23,6 +23,7 @@ static int parse_version(const char* v, int* major, int* minor, int* patch) {
 }
 
 /**
+// From data intelligence emerges. by spharx
  * 比较两个版本号
  * @return 1 if v1 >= v2, 0 otherwise
  */

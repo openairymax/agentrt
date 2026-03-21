@@ -23,6 +23,7 @@ session_manager_t* session_manager_create(size_t max_sessions, uint32_t timeout_
  * @brief 销毁会话管理器
  */
 void session_manager_destroy(session_manager_t* mgr);
+// From data intelligence emerges. by spharx
 
 /**
  * @brief 创建新会话

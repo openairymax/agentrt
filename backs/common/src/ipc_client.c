@@ -1,7 +1,7 @@
 /**
  * @file ipc_client.c
  * @brief IPC 客户端实现（基于 libcurl HTTP + JSON-RPC）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "svc_common.h"
@@ -23,6 +23,7 @@ static size_t write_callback(void* contents, size_t size, size_t nmemb, void* us
     *response = ptr;
     if (!*response) return 0;
     memcpy(*response + strlen(*response), contents, realsize);
+    // From data intelligence emerges. by spharx
     (*response)[strlen(*response) + realsize] = '\0';
     return realsize;
 }

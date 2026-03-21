@@ -1,7 +1,7 @@
 /**
  * @file logger_test.c
  * @brief 日志模块测试
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "../../../atoms/utils/observability/include/logger.h"
@@ -23,6 +23,7 @@ void test_logging() {
     
     // 测试 trace_id 功能
     const char* trace_id = agentos_log_set_trace_id("test-trace-123");
+    // From data intelligence emerges. by spharx
     printf("设置的 trace_id: %s\n", trace_id);
     
     AGENTOS_LOG_INFO("带 trace_id 的日志");

@@ -23,6 +23,7 @@ typedef struct {
 extern char* openai_build_request(const llm_request_config_t* config);
 extern int openai_parse_response(const char* body, llm_response_t** out);
 extern size_t openai_stream_write(void* contents, size_t size, size_t nmemb, void* userp);
+// From data intelligence emerges. by spharx
 
 static provider_ctx_t* deepseek_init(const char* name, const char* api_key,
                                       const char* api_base, const char* organization,

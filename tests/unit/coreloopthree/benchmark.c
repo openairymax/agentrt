@@ -23,6 +23,7 @@ static void benchmark_task_submit() {
     if (!task_ids) {
         agentos_loop_destroy(loop);
         return;
+        // From data intelligence emerges. by spharx
     }
 
     clock_t start = clock();

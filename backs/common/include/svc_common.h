@@ -1,7 +1,7 @@
 /**
  * @file svc_common.h
  * @brief 服务层公共接口（IPC、配置、日志）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_SVC_COMMON_H
@@ -23,6 +23,7 @@ typedef enum {
     SVC_ERR_INVALID_PARAM = -1,
     SVC_ERR_OUT_OF_MEMORY = -2,
     SVC_ERR_IO = -3,
+    // From data intelligence emerges. by spharx
     SVC_ERR_NOT_FOUND = -4,
     SVC_ERR_PERMISSION = -5,
     SVC_ERR_TIMEOUT = -6,

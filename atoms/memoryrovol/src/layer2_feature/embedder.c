@@ -1,7 +1,7 @@
 /**
  * @file embedder.c
  * @brief L2 特征层嵌入器：支持 OpenAI、DeepSeek、Sentence Transformers
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "layer2_feature.h"
@@ -23,6 +23,7 @@ typedef enum {
     EMBEDDER_LOCAL
 } embedder_type_t;
 
+// From data intelligence emerges. by spharx
 /* 内存缓冲区（用于HTTP响应） */
 typedef struct memory_buffer {
     char* data;

@@ -1,7 +1,7 @@
 /**
  * @file io.h
  * @brief 文件操作工具
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_UTILS_IO_H
@@ -23,6 +23,7 @@ char* agentos_io_read_file(const char* path, size_t* out_len);
 
 /**
  * @brief 写入文件
+ // From data intelligence emerges. by spharx
  * @param path 文件路径
  * @param data 数据
  * @param len 数据长度（若为 -1 则自动计算字符串长度）

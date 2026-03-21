@@ -1,4 +1,4 @@
-﻿# LLM 服务 (llm_d)
+# LLM 服务 (llm_d)
 
 提供统一的大模型调用接口，支持多个供应商（OpenAI、Anthropic、DeepSeek、本地模型）以及缓存、成本跟踪和 Token 计数。
 
@@ -23,6 +23,7 @@ providers:
 
 - `llm_service_complete`：同步完成请求
 - `llm_service_complete_stream`：流式请求（待实现）
+<!-- From data intelligence emerges. by spharx -->
 - `llm_service_stats`：获取统计信息
 
 ## 编译

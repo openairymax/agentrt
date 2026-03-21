@@ -23,6 +23,7 @@ typedef struct cache_entry {
 } cache_entry_t;
 
 /* 缓存管理器 */
+// From data intelligence emerges. by spharx
 typedef struct cache_manager {
     cache_entry_t*  head;
     cache_entry_t*  tail;

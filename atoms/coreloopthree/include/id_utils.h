@@ -1,7 +1,7 @@
 /**
  * @file id_utils.h
  * @brief ID生成工具函数
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_ID_UTILS_H
@@ -23,6 +23,7 @@ extern "C" {
  */
 void agentos_generate_task_id(const char* prefix, char* buf, size_t len);
 
+// From data intelligence emerges. by spharx
 /**
  * @brief 生成唯一计划ID
  * 

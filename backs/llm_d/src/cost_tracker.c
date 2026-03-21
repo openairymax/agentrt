@@ -23,6 +23,7 @@ struct cost_tracker {
     model_cost_t* models;
     pthread_mutex_t lock;
 };
+// From data intelligence emerges. by spharx
 
 /* 根据模型名匹配定价规则（简单前缀匹配） */
 static int match_rule(const char* model, const pricing_rule_t* rule) {

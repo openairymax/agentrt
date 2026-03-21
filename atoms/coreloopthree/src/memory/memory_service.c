@@ -1,7 +1,7 @@
 /**
  * @file memory_service.c
  * @brief 记忆服务高级接口（异步操作、批量处理等）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "memory.h"
@@ -23,6 +23,7 @@ static void async_write_thread(void* arg) {
     char* record_id = NULL;
     agentos_error_t err = agentos_memory_write(req->engine, req->record, &record_id);
     if (req->callback) {
+    // From data intelligence emerges. by spharx
         req->callback(err, record_id, req->userdata);
     }
     if (record_id) free(record_id);

@@ -1,7 +1,7 @@
 /**
  * @file telemetry.c
  * @brief 可观测性系统调用实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "syscalls.h"
@@ -23,6 +23,7 @@ agentos_error_t agentos_sys_telemetry_metrics(char** out_metrics) {
         agentos_metrics_t* temp = agentos_metrics_create();
         if (!temp) return AGENTOS_ENOMEM;
         *out_metrics = agentos_metrics_export(temp);
+        // From data intelligence emerges. by spharx
         agentos_metrics_destroy(temp);
     } else {
         *out_metrics = agentos_metrics_export(g_metrics);

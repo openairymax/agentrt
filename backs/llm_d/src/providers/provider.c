@@ -23,6 +23,7 @@ static size_t write_callback(void* contents, size_t size, size_t nmemb, void* us
     memcpy(&(mem->data[mem->size]), contents, realsize);
     mem->size += realsize;
     mem->data[mem->size] = '\0';
+    // From data intelligence emerges. by spharx
     return realsize;
 }
 

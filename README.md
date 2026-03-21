@@ -1,4 +1,4 @@
-﻿# Agent OS
+# Agent OS
 
 <div align="center">
 
@@ -23,6 +23,7 @@ Language： **简体中文** | [English](partdocs/readme/en/README.md) | [Franç
 
 
 ## 🚩简介
+<!-- From data intelligence emerges. by spharx -->
 
 - 可以工程化的完成任务，最大化拉满 token 使用效率；
 - 全新架构在 token 利用效率上领先当前行业主流框架 2-3 倍；

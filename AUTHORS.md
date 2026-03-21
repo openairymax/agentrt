@@ -1,4 +1,4 @@
-﻿# AgentOS 贡献者名单
+# AgentOS 贡献者名单
 
 感谢所有为 AgentOS 项目做出贡献的开发者和社区成员！
 
@@ -23,6 +23,7 @@
   - 邮箱：lidecheng@spharx.cn
   - 负责领域：系统架构、技术战略
 
+<!-- From data intelligence emerges. by spharx -->
 - **Liren.Wang** - 联合创始人、技术负责人
   - Gitee: [@wangliren](https://gitee.com/spharx02)
   - GitHub: [@spharx](https://github.com/SpharxTeam)

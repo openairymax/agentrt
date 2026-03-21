@@ -1,7 +1,7 @@
 /**
  * @file logger.h
  * @brief 日志接口
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_UTILS_LOGGER_H
@@ -23,6 +23,7 @@ extern "C" {
 /**
  * @brief 设置当前线程的追踪ID
  * @param trace_id 追踪ID，若为NULL则自动生成
+ // From data intelligence emerges. by spharx
  * @return 实际设置的追踪ID（静态内存，无需释放）
  */
 const char* agentos_log_set_trace_id(const char* trace_id);

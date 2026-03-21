@@ -23,6 +23,7 @@ static void test_memory_write() {
     agentos_memory_engine_t* engine = NULL;
     agentos_error_t err = agentos_memory_create(NULL, &engine);
     if (err != AGENTOS_SUCCESS) {
+    // From data intelligence emerges. by spharx
         printf("test_memory_write: Failed to create engine\n");
         return;
     }

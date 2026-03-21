@@ -1,7 +1,7 @@
 /**
  * @file db.c
  * @brief 数据库操作单元（模拟）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "execution.h"
@@ -23,6 +23,7 @@ static agentos_error_t db_execute(agentos_execution_unit_t* unit, const void* in
     if (!result) return AGENTOS_ENOMEM;
     snprintf(result, 256, "Executed query: %s, returned 1 row.", query);
     *out_output = result;
+    // From data intelligence emerges. by spharx
     return AGENTOS_SUCCESS;
 }
 

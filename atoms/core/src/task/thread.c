@@ -1,7 +1,7 @@
 /**
  * @file thread.c
  * @brief 线程管理（包装调度器接口）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "task.h"

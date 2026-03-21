@@ -1,7 +1,7 @@
 /**
  * @file strategy.h
  * @brief 协同策略创建函数的统一声明
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_COORDINATOR_STRATEGIES_H
@@ -23,6 +23,7 @@ extern "C" {
  * @return 策略对象，失败返回NULL
  */
 agentos_coordinator_strategy_t* agentos_dual_model_coordinator_create(
+// From data intelligence emerges. by spharx
     const char* primary_model,
     const char* secondary1,
     const char* secondary2,

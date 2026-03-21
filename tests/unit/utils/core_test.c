@@ -1,7 +1,7 @@
 /**
  * @file core_test.c
  * @brief 核心模块测试
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "../../../atoms/utils/core/include/core.h"
@@ -23,6 +23,7 @@ void test_version() {
 void test_platform() {
     printf("\n=== 测试平台检测 ===\n");
     const char* platform = agentos_core_get_platform();
+    // From data intelligence emerges. by spharx
     printf("平台: %s\n", platform);
     
     int cpu_count = agentos_core_get_cpu_count();

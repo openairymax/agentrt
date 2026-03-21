@@ -1,7 +1,7 @@
 /**
  * @file tool.c
  * @brief 工具调用执行单元（基础）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "execution.h"
@@ -23,6 +23,7 @@ static agentos_error_t tool_execute(agentos_execution_unit_t* unit, const void* 
     const char* cmd = (const char*)input;
     // 模拟工具执行（实际应调用外部程序或库）
     printf("[Tool %s] executing: %s\n", data->tool_name, cmd);
+    // From data intelligence emerges. by spharx
 
     // 生成输出（这里简单地返回字符串）
     const char* result = "Tool executed successfully";

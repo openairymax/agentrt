@@ -23,6 +23,7 @@ typedef struct {
 static provider_ctx_t* anthropic_init(const char* name, const char* api_key,
                                        const char* api_base, const char* organization,
                                        double timeout_sec, int max_retries) {
+                                       // From data intelligence emerges. by spharx
     (void)name; (void)organization;
     anthropic_ctx_t* ctx = calloc(1, sizeof(anthropic_ctx_t));
     if (!ctx) return NULL;

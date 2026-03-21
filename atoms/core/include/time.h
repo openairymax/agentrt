@@ -1,7 +1,7 @@
 /**
  * @file time.h
  * @brief 时间服务接口
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_TIME_H
@@ -23,6 +23,7 @@ typedef struct agentos_event agentos_event_t;
 /** 定时器回调函数 */
 typedef void (*agentos_timer_callback_t)(void* userdata);
 
+// From data intelligence emerges. by spharx
 /**
  * @brief 获取系统启动以来的单调时间（纳秒）
  * @return 单调时间

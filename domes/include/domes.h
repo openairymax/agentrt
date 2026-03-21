@@ -1,17 +1,29 @@
 /**
  * @file domes.h
  * @brief Domes 安全隔离层公共接口
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_DOMES_H
 #define AGENTOS_DOMES_H
 
+// API 版本声明 (MAJOR.MINOR.PATCH)
+#define DOMES_API_VERSION_MAJOR 1
+#define DOMES_API_VERSION_MINOR 0
+#define DOMES_API_VERSION_PATCH 0
+
+// ABI 兼容性声明
+// 在相同 MAJOR 版本内保证 ABI 兼容
+// 破坏性更改需递增 MAJOR 并发布迁移说明
+
 #include <stddef.h>
 #include <stdint.h>
 
+#include "agentos.h"
+
 #ifdef __cplusplus
 extern "C" {
+// From data intelligence emerges. by spharx
 #endif
 
 /* 前向声明 */
@@ -49,13 +61,13 @@ typedef struct domes_config {
  * @param out_domain 输出句柄
  * @return 0 成功，-1 失败（错误信息写入日志）
  */
-int domes_init(const domes_config_t* config, domes_t** out_domain);
+AGENTOS_API int domes_init(const domes_config_t* config, domes_t** out_domain);
 
 /**
  * @brief 销毁 Domain 模块，等待所有异步操作完成
  * @param domain 句柄
  */
-void domes_destroy(domes_t* domain);
+AGENTOS_API void domes_destroy(domes_t* domain);
 
 /* ==================== 虚拟工位接口 ==================== */
 
@@ -66,7 +78,7 @@ void domes_destroy(domes_t* domain);
  * @param out_workbench_id 输出工位 ID（需调用者 free）
  * @return 0 成功，-1 失败
  */
-int domes_workbench_create(domes_t* domain, const char* agent_id, char** out_workbench_id);
+AGENTOS_API int domes_workbench_create(domes_t* domain, const char* agent_id, char** out_workbench_id);
 
 /**
  * @brief 在工位中执行命令
@@ -80,7 +92,7 @@ int domes_workbench_create(domes_t* domain, const char* agent_id, char** out_wor
  * @param out_error 详细错误信息（需调用者 free）
  * @return 0 成功，-1 失败（工位不存在或执行错误）
  */
-int domes_workbench_exec(domes_t* domain, const char* workbench_id,
+AGENTOS_API int domes_workbench_exec(domes_t* domain, const char* workbench_id,
                           const char* const* argv, uint32_t timeout_ms,
                           char** out_stdout, char** out_stderr,
                           int* out_exit_code, char** out_error);
@@ -90,7 +102,7 @@ int domes_workbench_exec(domes_t* domain, const char* workbench_id,
  * @param domain 句柄
  * @param workbench_id 工位 ID
  */
-void domes_workbench_destroy(domes_t* domain, const char* workbench_id);
+AGENTOS_API void domes_workbench_destroy(domes_t* domain, const char* workbench_id);
 
 /**
  * @brief 列出所有活跃工位
@@ -99,7 +111,7 @@ void domes_workbench_destroy(domes_t* domain, const char* workbench_id);
  * @param out_count 输出数量
  * @return 0 成功，-1 失败
  */
-int domes_workbench_list(domes_t* domain, char*** out_workbench_ids, size_t* out_count);
+AGENTOS_API int domes_workbench_list(domes_t* domain, char*** out_workbench_ids, size_t* out_count);
 
 /* ==================== 权限裁决接口 ==================== */
 
@@ -112,16 +124,16 @@ int domes_workbench_list(domes_t* domain, char*** out_workbench_ids, size_t* out
  * @param context 额外上下文（JSON 字符串，可为 NULL）
  * @return 1 允许，0 拒绝，-1 错误（如引擎未初始化）
  */
-int domes_permission_check(domes_t* domain, const char* agent_id,
-                            const char* action, const char* resource,
-                            const char* context);
+AGENTOS_API int domes_permission_check(domes_t* domain, const char* agent_id,
+                          const char* action, const char* resource,
+                          const char* context);
 
 /**
  * @brief 重新加载权限规则（热更新）
  * @param domain 句柄
  * @return 0 成功，-1 失败
  */
-int domes_permission_reload(domes_t* domain);
+AGENTOS_API int domes_permission_reload(domes_t* domain);
 
 /* ==================== 审计接口 ==================== */
 
@@ -137,7 +149,7 @@ int domes_permission_reload(domes_t* domain);
  * @param error_msg 错误信息（可为 NULL）
  * @return 0 成功（已入队），-1 失败（队列满等）
  */
-int domes_audit_record(domes_t* domain, const char* agent_id,
+AGENTOS_API int domes_audit_record(domes_t* domain, const char* agent_id,
                         const char* tool_name, const char* input,
                         const char* output, uint32_t duration_ms,
                         int success, const char* error_msg);
@@ -153,7 +165,7 @@ int domes_audit_record(domes_t* domain, const char* agent_id,
  * @param out_count 输出数量
  * @return 0 成功，-1 失败
  */
-int domes_audit_query(domes_t* domain, const char* agent_id,
+AGENTOS_API int domes_audit_query(domes_t* domain, const char* agent_id,
                        uint64_t start_time, uint64_t end_time,
                        uint32_t limit, char*** out_events, size_t* out_count);
 
@@ -167,7 +179,7 @@ int domes_audit_query(domes_t* domain, const char* agent_id,
  * @param out_risk_level 输出风险等级（0 无风险，1 低，2 中，3 高）
  * @return 0 成功，-1 失败
  */
-int domes_sanitize(domes_t* domain, const char* input,
+AGENTOS_API int domes_sanitize(domes_t* domain, const char* input,
                     char** out_cleaned, int* out_risk_level);
 
 #ifdef __cplusplus

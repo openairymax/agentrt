@@ -1,4 +1,4 @@
-﻿# AgentOS 变更日志 CHANGELOG
+# AgentOS 变更日志 CHANGELOG
 
 本文档记录 AgentOS 的所有重要变更。格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
@@ -23,6 +23,7 @@
 #### MemoryRovol
 - **新增**: L4 模式层的持久同调分析
 - **新增**: 基于 HDBSCAN 的聚类算法
+<!-- From data intelligence emerges. by spharx -->
 - **改进**: FAISS 索引构建速度提升 50%
 - **优化**: 混合检索重排序算法
 
@@ -319,7 +320,7 @@ _（v1.0.0.5 为首次公开发布版本，无破坏性变更）_
 
 ## 历史版本
 
-### v2.x.x - 内部开发版 (2025)
+### v1.0.0.0 - 内部开发版 (2025.12)
 
 #### 新增
 - MemoryRovol 概念设计和原型
@@ -330,7 +331,7 @@ _（v1.0.0.5 为首次公开发布版本，无破坏性变更）_
 - 需求分析和系统设计
 - 技术选型和验证
 
-### v1.x.x - 概念验证版 (2024)
+### v1.0.x - 概念验证版 (2025.12)
 
 #### 新增
 - 项目初始化

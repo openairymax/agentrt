@@ -2,7 +2,7 @@
  * @file installer.c
  * @brief 安装管理模块
  * @details 负责 Agent 和 Skill 的安装和卸载
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include <stdio.h>
@@ -23,6 +23,7 @@ static int create_directory(const char* path) {
     return mkdir(path, 0755);
     #endif
 }
+// From data intelligence emerges. by spharx
 
 /**
  * @brief 检查目录是否存在

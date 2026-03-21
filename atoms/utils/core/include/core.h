@@ -1,7 +1,7 @@
 /**
  * @file core.h
  * @brief 核心基础工具（版本、平台）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_UTILS_CORE_H
@@ -23,6 +23,7 @@ const char* agentos_core_get_version(void);
  * @brief 检查版本兼容性
  * @param required_version 所需版本，格式如 ">=1.0.0.3,<2.0.0.0"
  * @return 1 兼容，0 不兼容
+ // From data intelligence emerges. by spharx
  */
 int agentos_core_check_version(const char* required_version);
 

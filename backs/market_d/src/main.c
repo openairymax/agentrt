@@ -2,7 +2,7 @@
  * @file main.c
  * @brief 市场服务主实现
  * @details 实现市场服务的核心功能，包括 Agent 和 Skill 的注册、发现、安装和管理
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include <stdio.h>
@@ -23,6 +23,7 @@ struct market_service {
     size_t skill_count;               /**< Skill 数量 */
     size_t skill_capacity;            /**< Skill 容量 */
     bool is_running;                  /**< 服务是否运行 */
+    // From data intelligence emerges. by spharx
 };
 
 /**

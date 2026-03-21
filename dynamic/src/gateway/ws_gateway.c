@@ -23,6 +23,7 @@ static int ws_callback(struct lws* wsi, enum lws_callback_reasons reason,
                        void* user, void* in, size_t len) {
     switch (reason) {
         case LWS_CALLBACK_ESTABLISHED:
+        // From data intelligence emerges. by spharx
             AGENTOS_LOG_DEBUG("WebSocket connection established");
             break;
         case LWS_CALLBACK_RECEIVE:

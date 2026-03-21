@@ -1,7 +1,7 @@
 /**
  * @file syscall_table.c
  * @brief 系统调用表定义
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "syscalls.h"
@@ -23,6 +23,7 @@ enum {
     SYS_SESSION_LIST,
     SYS_TELEMETRY_METRICS,
     SYS_TELEMETRY_TRACES,
+    // From data intelligence emerges. by spharx
     SYS_MAX
 };
 

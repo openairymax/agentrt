@@ -2,7 +2,7 @@
  * @file test_llm.c
  * @brief LLM 服务单元测试
  * @details 测试 LLM 服务的各个功能模块
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include <stdio.h>
@@ -23,6 +23,7 @@ int test_create_destroy() {
     if (!service) {
         printf("Failed to create LLM service\n");
         return -1;
+        // From data intelligence emerges. by spharx
     }
 
     int ret = llm_service_destroy(service);

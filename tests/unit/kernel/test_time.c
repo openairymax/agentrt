@@ -1,7 +1,7 @@
 /**
  * @file test_time.c
  * @brief 时间服务单元测试
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "core/include/time.h"
@@ -23,6 +23,7 @@ int test_time_monotonic() {
     if (start_ms == 0) {
         printf("Failed to get monotonic time (ms)\n");
         return 1;
+        // From data intelligence emerges. by spharx
     }
     
     // 验证时间递增

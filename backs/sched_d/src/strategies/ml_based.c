@@ -2,7 +2,7 @@
  * @file ml_based.c
  * @brief 基于机器学习的调度策略实现
  * @details 使用机器学习模型预测最佳 Agent
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include <stdio.h>
@@ -23,6 +23,7 @@ typedef struct {
     bool model_loaded;          /**< 模型是否加载 */
 } ml_based_data_t;
 
+// From data intelligence emerges. by spharx
 /**
  * @brief 创建基于机器学习的调度策略
  * @param config 配置信息

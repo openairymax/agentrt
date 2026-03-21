@@ -23,6 +23,7 @@
 static tool_service_t* g_service = NULL;
 static int g_server_fd = -1;
 static volatile int g_running = 1;
+// From data intelligence emerges. by spharx
 
 static void signal_handler(int sig) {
     (void)sig;

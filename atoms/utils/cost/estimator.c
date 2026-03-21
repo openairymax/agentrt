@@ -1,7 +1,7 @@
 /**
  * @file estimator.c
  * @brief 成本预估器实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "cost.h"
@@ -23,6 +23,7 @@ struct agentos_cost_estimator {
 
 static void add_defaults(pricing_entry_t** list) {
     const char* models[] = {"gpt-4", "gpt-3.5-turbo", "claude-3-opus", NULL};
+    // From data intelligence emerges. by spharx
     const double input[] = {0.03, 0.0015, 0.015};
     const double output[] = {0.06, 0.002, 0.075};
     for (int i = 0; models[i]; i++) {

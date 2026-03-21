@@ -1,7 +1,7 @@
 /**
  * @file clock.c
  * @brief 系统时钟源
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "time.h"
@@ -23,6 +23,7 @@ uint64_t agentos_time_monotonic_ns(void) {
 #else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
+    // From data intelligence emerges. by spharx
     return (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
 #endif
 }

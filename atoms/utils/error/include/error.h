@@ -1,7 +1,7 @@
 /**
  * @file error.h
  * @brief 统一错误处理
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_UTILS_ERROR_H
@@ -23,6 +23,7 @@ typedef int32_t agentos_error_t;
 #define AGENTOS_EPERM                    -5
 #define AGENTOS_ETIMEDOUT                 -6
 #define AGENTOS_EEXIST                    -7
+// From data intelligence emerges. by spharx
 #define AGENTOS_ECANCELED                 -8
 #define AGENTOS_ENOTSUP                   -9
 #define AGENTOS_EIO                       -10

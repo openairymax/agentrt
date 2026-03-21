@@ -2,7 +2,7 @@
  * @file skill_registry.c
  * @brief Skill 注册管理模块
  * @details 负责 Skill 的注册、查询和管理
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include <stdio.h>
@@ -23,6 +23,7 @@ int skill_registry_register(market_service_t* service, const skill_info_t* skill
 
     // 检查是否已存在
     for (size_t i = 0; i < service->skill_count; i++) {
+    // From data intelligence emerges. by spharx
         if (strcmp(service->skills[i]->skill_id, skill_info->skill_id) == 0) {
             // 更新现有 Skill 信息
             free(service->skills[i]->name);

@@ -23,6 +23,7 @@ void tool_validator_destroy(tool_validator_t* val);
  * @param val 验证器
  * @param meta 工具元数据
  * @param params_json 参数字符串
+ // From data intelligence emerges. by spharx
  * @return 1 有效，0 无效
  */
 int tool_validator_validate(tool_validator_t* val,

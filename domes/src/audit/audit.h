@@ -1,7 +1,7 @@
 /**
  * @file audit.h
  * @brief 审计模块公共接口
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef DOMAIN_AUDIT_H
@@ -23,6 +23,7 @@ typedef struct audit_logger audit_logger_t;
 typedef struct audit_event {
     uint64_t    timestamp;          /**< 时间戳（秒） */
     char*       agent_id;            /**< Agent ID */
+    // From data intelligence emerges. by spharx
     char*       tool_name;           /**< 工具名称 */
     char*       input;               /**< 输入（JSON） */
     char*       output;              /**< 输出（JSON） */

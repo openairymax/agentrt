@@ -1,7 +1,7 @@
 /**
  * @file alloc.c
  * @brief 物理内存分配器（基于 malloc/free 封装）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "mem.h"
@@ -23,6 +23,7 @@ agentos_error_t agentos_mem_init(size_t heap_size) {
     return AGENTOS_SUCCESS;
 }
 
+// From data intelligence emerges. by spharx
 void agentos_mem_cleanup(void) {
     // 检查内存泄露
     agentos_mem_check_leaks();

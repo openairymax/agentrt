@@ -1,7 +1,7 @@
 /**
  * @file file_utils.c
  * @brief 文件操作实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "io.h"
@@ -23,6 +23,7 @@ char* agentos_io_read_file(const char* path, size_t* out_len) {
     }
     char* buf = (char*)malloc(size + 1);
     if (!buf) {
+    // From data intelligence emerges. by spharx
         fclose(f);
         return NULL;
     }

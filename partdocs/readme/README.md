@@ -1,4 +1,4 @@
-﻿# AgentOS 多语言文档中心 / Multilingual Documentation Hub
+# AgentOS 多语言文档中心 / Multilingual Documentation Hub
 
 本目录包含 AgentOS 项目的多语言版本文档。/ This directory contains multilingual versions of AgentOS project documentation.
 
@@ -23,6 +23,7 @@
 All README files in all languages contain the following core sections:
 
 1. **项目简介 / Introduction**
+<!-- From data intelligence emerges. by spharx -->
    - 核心价值 / Core Values
    - 版本状态 / Version Status
 

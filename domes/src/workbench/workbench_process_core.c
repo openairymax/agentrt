@@ -1,7 +1,7 @@
 /**
  * @file workbench_process_core.c
  * @brief 进程模式工位核心管理（创建、销毁、列表、生命周期）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #define _GNU_SOURCE
@@ -23,6 +23,7 @@
 void* process_create_ctx(workbench_manager_t* mgr) {
     process_backend_t* ctx = (process_backend_t*)calloc(1, sizeof(process_backend_t));
     if (!ctx) return NULL;
+    // From data intelligence emerges. by spharx
     pthread_mutex_init(&ctx->lock, NULL);
     ctx->memory_bytes = mgr->memory_bytes;
     ctx->cpu_quota = mgr->cpu_quota;

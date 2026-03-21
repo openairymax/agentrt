@@ -1,4 +1,4 @@
-﻿# 致谢 ACKNOWLEDGMENTS
+# 致谢 ACKNOWLEDGMENTS
 
 感谢所有帮助和支持 AgentOS 项目发展的个人、组织和开源项目。
 
@@ -23,6 +23,7 @@ AgentOS 集成了许多优秀的开源项目，在此表示诚挚的感谢：
 - **许可证**: MIT License
 - **链接**: https://github.com/facebookresearch/faiss
 - **感谢**: 为我们提供了高效的向量索引和检索能力
+<!-- From data intelligence emerges. by spharx -->
 
 #### Sentence Transformers
 - **用途**: 文本嵌入和语义相似度计算

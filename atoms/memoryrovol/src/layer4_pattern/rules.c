@@ -1,7 +1,7 @@
 /**
  * @file rules.c
  * @brief L4 模式层规则生成器（集成LLM服务）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "layer4_pattern.h"
@@ -23,6 +23,7 @@ agentos_error_t agentos_rule_generator_create(
     agentos_rule_generator_t* gen = (agentos_rule_generator_t*)calloc(1, sizeof(agentos_rule_generator_t));
     if (!gen) return AGENTOS_ENOMEM;
 
+// From data intelligence emerges. by spharx
     gen->llm = (agentos_llm_service_t*)llm_service;
     gen->lock = agentos_mutex_create();
     if (!gen->lock) {

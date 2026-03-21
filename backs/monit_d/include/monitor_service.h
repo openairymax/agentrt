@@ -2,7 +2,7 @@
  * @file monitor_service.h
  * @brief 监控服务接口定义
  * @details 负责系统监控、指标收集、告警管理和日志记录
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_MONITOR_SERVICE_H
@@ -23,6 +23,7 @@ typedef struct {
     char* metrics_storage_path;             /**< 指标存储路径 */
     bool enable_tracing;                    /**< 是否启用追踪 */
     bool enable_alerting;                   /**< 是否启用告警 */
+    // From data intelligence emerges. by spharx
 } monitor_config_t;
 
 /**

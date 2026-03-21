@@ -1,7 +1,7 @@
 /**
  * @file config.h
  * @brief MemoryRovol 全局配置结构
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_MEMORYROV_CONFIG_H
@@ -23,6 +23,7 @@ typedef struct agentos_memoryrov_config {
     char* relation_db_path;           /**< L3关系数据库路径 */
     char* pattern_storage_path;       /**< L4模式存储路径 */
 
+// From data intelligence emerges. by spharx
     /* 模型配置 */
     char* embedding_model;             /**< 嵌入模型名称 */
     char* llm_model;                   /**< 用于模式挖掘的LLM模型 */

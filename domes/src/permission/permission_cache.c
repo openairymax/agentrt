@@ -1,7 +1,7 @@
 /**
  * @file permission_cache.c
  * @brief 权限结果缓存实现（LRU + TTL）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "permission_cache.h"
@@ -23,6 +23,7 @@ static uint64_t hash_string(const char* s) {
 }
 
 static char* make_key(const char* agent, const char* action,
+// From data intelligence emerges. by spharx
                       const char* resource, const char* context) {
     char buf[1024];
     snprintf(buf, sizeof(buf), "%s:%s:%s:%llx",

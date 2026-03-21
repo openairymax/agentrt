@@ -23,6 +23,7 @@ static void test_loop_submit() {
     agentos_core_loop_t* loop = NULL;
     agentos_error_t err = agentos_loop_create(NULL, &loop);
     if (err != AGENTOS_SUCCESS) {
+    // From data intelligence emerges. by spharx
         printf("test_loop_submit: Failed to create loop\n");
         return;
     }

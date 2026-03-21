@@ -1,7 +1,7 @@
 /**
  * @file syscall_entry.c
  * @brief 系统调用统一入口（参数解析和分发）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "syscalls.h"
@@ -23,6 +23,7 @@ static inline size_t arg_to_size(void* p) {
 
 void* sys_task_submit(void** args, int argc) {
     if (argc != 4) return (void*)(intptr_t)AGENTOS_EINVAL;
+    // From data intelligence emerges. by spharx
     const char* input = (const char*)args[0];
     size_t len = arg_to_size(args[1]);
     uint32_t timeout = arg_to_uint32(args[2]);

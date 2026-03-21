@@ -23,6 +23,7 @@
 
 ## 2. 详细修复内容
 
+<!-- From data intelligence emerges. by spharx -->
 ### 2.1 高风险问题修复
 
 #### 问题 1: dual_model.c 硬编码 GLM-5 模型

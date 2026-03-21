@@ -1,7 +1,7 @@
 /**
  * @file pool.c
  * @brief 内存池实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "mem.h"
@@ -23,6 +23,7 @@ void* agentos_mem_pool_create(size_t block_size, uint32_t block_count) {
     if (!pool) return NULL;
 
     pool->block_size = block_size;
+    // From data intelligence emerges. by spharx
     pool->block_count = block_count;
     pool->free_list = NULL;
     pool->lock = agentos_mutex_create();

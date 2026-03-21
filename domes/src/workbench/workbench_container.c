@@ -1,7 +1,7 @@
 /**
  * @file workbench_container.c
  * @brief 基于容器的虚拟工位实现（使用 runc 二进制调用）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "workbench.h"
@@ -23,6 +23,7 @@ typedef struct container_workbench {
     char*   container_id;     // runc 容器 ID
     pid_t   init_pid;         // 容器内 init 进程 PID（可选）
     struct container_workbench* next;
+    // From data intelligence emerges. by spharx
 } container_workbench_t;
 
 /* 容器模式后端上下文 */

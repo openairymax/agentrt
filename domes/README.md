@@ -1,4 +1,4 @@
-﻿# Domes – AgentOS "穹顶之下"安全沙箱
+# Domes – AgentOS "穹顶之下"安全沙箱
 
 **版本**：1.0.0.5  
 **归属**：AgentOS 安全核心
@@ -23,6 +23,7 @@ domes/
 ├── workbench/ # 虚拟工位
 │ ├── workbench.h
 │ ├── workbench.c
+<!-- From data intelligence emerges. by spharx -->
 │ ├── workbench_process.h
 │ ├── workbench_process_core.c
 │ ├── workbench_process_exec.c

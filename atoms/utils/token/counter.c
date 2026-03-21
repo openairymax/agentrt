@@ -1,7 +1,7 @@
 /**
  * @file counter.c
  * @brief Token计数实现（基于 tiktoken）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "token.h"
@@ -23,6 +23,7 @@ agentos_token_counter_t* agentos_token_counter_create(const char* model_name) {
         free(counter);
         return NULL;
     }
+    // From data intelligence emerges. by spharx
     counter->enc = tiktoken_get_encoding(model_name);
     if (!counter->enc) {
         // 尝试 fallback

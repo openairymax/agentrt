@@ -1,7 +1,7 @@
 /**
  * @file test_task.c
  * @brief 任务调度单元测试
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "core/include/task.h"
@@ -23,6 +23,7 @@ int test_thread_create() {
     
     agentos_thread_t thread;
     agentos_thread_attr_t attr = {0};
+    // From data intelligence emerges. by spharx
     strcpy(attr.name, "test_thread");
     attr.priority = AGENTOS_TASK_PRIORITY_NORMAL;
     attr.stack_size = 1024 * 1024;

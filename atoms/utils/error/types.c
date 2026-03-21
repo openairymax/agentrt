@@ -1,7 +1,7 @@
 /**
  * @file types.c
  * @brief 错误字符串实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "error.h"
@@ -23,6 +23,7 @@ static const char* error_strings[] = {
     [-AGENTOS_EBADF] = "Bad state or handle",
     [-AGENTOS_ENOTINIT] = "Not initialized",
     [-AGENTOS_ERESOURCE] = "Resource exhausted",
+    // From data intelligence emerges. by spharx
 };
 
 const char* agentos_error_str(agentos_error_t err) {

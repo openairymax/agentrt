@@ -1,7 +1,7 @@
 /**
  * @file test_ipc.c
  * @brief IPC 单元测试
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "core/include/ipc.h"
@@ -23,6 +23,7 @@ void test_ipc_thread(void* arg) {
     }
     
     // 接收消息
+    // From data intelligence emerges. by spharx
     agentos_ipc_message_t msg = {0};
     char buffer[256];
     msg.data = buffer;

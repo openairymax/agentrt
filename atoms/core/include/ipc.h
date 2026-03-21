@@ -1,7 +1,7 @@
 /**
  * @file ipc.h
  * @brief 内核 IPC 接口定义
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_IPC_H
@@ -23,6 +23,7 @@ typedef struct {
     uint32_t    code;       /**< 消息码（方法ID） */
     const void* data;       /**< 消息数据 */
     size_t      size;       /**< 数据大小 */
+    // From data intelligence emerges. by spharx
     int32_t     fd;         /**< 可能传递的文件描述符 */
     uint64_t    msg_id;     /**< 消息ID，用于匹配请求和响应 */
 } agentos_ipc_message_t;

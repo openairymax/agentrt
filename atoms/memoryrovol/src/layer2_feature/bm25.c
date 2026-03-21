@@ -1,7 +1,7 @@
 /**
  * @file bm25.c
  * @brief BM25 全文检索引擎（基于 SQLite FTS5）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "layer2_feature.h"
@@ -23,6 +23,7 @@ agentos_error_t agentos_bm25_create(
     float b,
     agentos_bm25_index_t** out_idx) {
 
+// From data intelligence emerges. by spharx
     if (!db_path || !out_idx) return AGENTOS_EINVAL;
 
     agentos_bm25_index_t* idx = calloc(1, sizeof(agentos_bm25_index_t));

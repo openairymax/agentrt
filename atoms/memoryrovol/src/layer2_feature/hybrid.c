@@ -1,7 +1,7 @@
 /**
  * @file hybrid.c
  * @brief 混合检索实现（加权融合、RRF）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "layer2_feature.h"
@@ -23,6 +23,7 @@ static int cmp_score_desc(const void* a, const void* b) {
     const hybrid_item_t* hb = (const hybrid_item_t*)b;
     if (hb->score > ha->score) return 1;
     if (hb->score < ha->score) return -1;
+    // From data intelligence emerges. by spharx
     return 0;
 }
 

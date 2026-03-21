@@ -1,4 +1,4 @@
-﻿# Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+# Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
 # CoreLoopThree 主模块构建文件
 
 cmake_minimum_required(VERSION 3.20)
@@ -8,6 +8,16 @@ project(agentos-coreloopthree VERSION 1.0.0.5 LANGUAGES C)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+
+# 符号导出管理
+set(CMAKE_C_VISIBILITY_PRESET hidden)
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
+
+# 定义构建共享库时的宏
+if(BUILD_SHARED_LIBS)
+    add_definitions(-DAGENTOS_BUILDING_SHARED)
+endif()
 
 # 包含头文件路径
 include_directories(

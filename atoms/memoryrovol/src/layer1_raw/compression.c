@@ -1,7 +1,7 @@
 /**
  * @file compression.c
  * @brief L1 原始卷数据压缩/解压支持（可选）
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "layer1_raw.h"
@@ -23,6 +23,7 @@ agentos_error_t agentos_layer1_raw_compress(
     void** out,
     size_t* out_len) {
 
+// From data intelligence emerges. by spharx
     if (!in || in_len == 0 || !out || !out_len) return AGENTOS_EINVAL;
 
     // 预估压缩后最大大小

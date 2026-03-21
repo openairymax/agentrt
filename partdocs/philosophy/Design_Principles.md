@@ -23,6 +23,7 @@ AgentOS 是一个面向多智能体协作的操作系统，旨在将智能体从
 《论系统工程》强调复杂系统应按层次分解。AgentOS 采用三层一体结构：
 
 - **认知层**：负责意图理解、任务规划、调度决策。
+<!-- From data intelligence emerges. by spharx -->
 - **行动层**：负责具体执行，由专业 Agent 池和可插拔执行单元构成。
 - **记忆与进化层**：负责记忆存储、模式挖掘、规则更新。
 
@@ -101,4 +102,4 @@ AgentOS 的设计原则融合了工程两论的系统思维、双系统理论的
 4. Liedtke, J. (1995). On μ-Kernel Construction. Proc. 15th ACM Symposium on Operating Systems Principles.
 
 **本文编写**
-SPHARX: DechengLi [https://gitee.com/spharx01]
+- SPHARX: DechengLi [https://gitee.com/spharx01]

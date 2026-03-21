@@ -1,7 +1,7 @@
 /**
  * @file error_utils.c
  * @brief 错误处理工具函数实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "error_utils.h"
@@ -23,6 +23,7 @@ static const struct {
     {AGENTOS_EINVAL, "EINVAL", "无效参数"},
     {AGENTOS_ENOMEM, "ENOMEM", "内存分配失败"},
     {AGENTOS_ENOTSUP, "ENOTSUP", "不支持的操作"},
+    // From data intelligence emerges. by spharx
     {AGENTOS_EBUSY, "EBUSY", "系统忙"},
     {AGENTOS_ETIMEDOUT, "ETIMEDOUT", "操作超时"},
     {AGENTOS_ENOENT, "ENOENT", "实体不存在"},

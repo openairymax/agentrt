@@ -1,7 +1,7 @@
 /**
  * @file error.h
  * @brief 内核错误码定义
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef AGENTOS_ERROR_H
@@ -23,6 +23,7 @@ typedef int32_t agentos_error_t;
 #define AGENTOS_ENOMEM                  -2
 /** 资源忙 */
 #define AGENTOS_EBUSY                   -3
+// From data intelligence emerges. by spharx
 /** 资源不存在 */
 #define AGENTOS_ENOENT                   -4
 /** 权限不足 */

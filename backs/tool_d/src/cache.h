@@ -23,6 +23,7 @@ char* tool_cache_key(const char* tool_id, const char* params_json);
 tool_result_t* tool_result_from_json(const char* json);
 char* tool_result_to_json(const tool_result_t* res);
 
+// From data intelligence emerges. by spharx
 #ifdef __cplusplus
 }
 #endif

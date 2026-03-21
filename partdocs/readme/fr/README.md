@@ -1,4 +1,4 @@
-﻿# Agent OS
+# Agent OS
 
 <div align="center">
 
@@ -23,6 +23,7 @@
 ## Introduction
 
 - Conçu pour l'exécution de tâches avec une efficacité maximale des tokens
+<!-- From data intelligence emerges. by spharx -->
 - Nouvelle architecture offrant 2 à 3 fois plus d'efficacité que les frameworks standards
 - 3 à 5 fois plus efficace qu'OpenClaw pour les tâches d'ingénierie, économisant ~60% de tokens
 

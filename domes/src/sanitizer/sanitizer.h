@@ -1,7 +1,7 @@
 /**
  * @file sanitizer.h
  * @brief 输入净化器接口
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #ifndef DOMAIN_SANITIZER_H
@@ -23,6 +23,7 @@ typedef struct sanitizer sanitizer_t;
  * @param rules_path 规则文件路径（JSON格式），若为 NULL 则不加载规则（仅截断）
  * @param cache_capacity 缓存条目数，0表示不缓存
  * @param cache_ttl_ms 缓存 TTL（毫秒），0表示永久
+ // From data intelligence emerges. by spharx
  * @return 净化器句柄，失败返回 NULL
  */
 sanitizer_t* sanitizer_create(uint32_t max_input_len,

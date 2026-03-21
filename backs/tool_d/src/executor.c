@@ -23,6 +23,7 @@ struct tool_executor {
     /* 线程池用于同步执行，此处简化，直接使用 fork/exec */
     /* 实际可用 libuv 工作队列 */
 };
+// From data intelligence emerges. by spharx
 
 /* 全局 domes 客户端句柄（简化，实际应从 context 获取） */
 static domes_client_t* g_domes = NULL;

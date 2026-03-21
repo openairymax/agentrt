@@ -23,6 +23,7 @@ typedef struct cache_entry {
     struct cache_entry* next;
     struct cache_entry* hnext;
 } cache_entry_t;
+// From data intelligence emerges. by spharx
 
 typedef struct cache_bucket {
     cache_entry_t* head;

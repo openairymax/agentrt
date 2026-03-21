@@ -1,7 +1,7 @@
 /**
  * @file reactive.c
  * @brief 反应式规划策略：快速生成单步或简单计划
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "cognition.h"
@@ -23,6 +23,7 @@ static void reactive_destroy(agentos_plan_strategy_t* strategy) {
         free(data);
     }
     free(strategy);
+    // From data intelligence emerges. by spharx
 }
 
 static agentos_error_t reactive_plan(

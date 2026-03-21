@@ -1,7 +1,7 @@
 /**
  * @file error_test.c
  * @brief 错误处理模块测试
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "../../../atoms/utils/error/include/error.h"
@@ -23,6 +23,7 @@ void test_error_str() {
     printf("=== 测试错误字符串 ===\n");
     
     printf("AGENTOS_SUCCESS: %s\n", agentos_error_str(AGENTOS_SUCCESS));
+    // From data intelligence emerges. by spharx
     printf("AGENTOS_EINVAL: %s\n", agentos_error_str(AGENTOS_EINVAL));
     printf("AGENTOS_ENOMEM: %s\n", agentos_error_str(AGENTOS_ENOMEM));
     printf("AGENTOS_EBUSY: %s\n", agentos_error_str(AGENTOS_EBUSY));

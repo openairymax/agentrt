@@ -1,7 +1,7 @@
 /**
  * @file session.c
  * @brief 会话管理系统调用实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "syscalls.h"
@@ -23,6 +23,7 @@ static session_t* sessions = NULL;
 static agentos_mutex_t* session_lock = NULL;
 
 static void ensure_lock(void) {
+// From data intelligence emerges. by spharx
     if (!session_lock) {
         session_lock = agentos_mutex_create();
     }
