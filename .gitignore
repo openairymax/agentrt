@@ -120,6 +120,7 @@ partdata/registry/*.sqlite
 partdata/traces/
 *.trace
 *.spans
+.git
 
 # 缓存文件
 .cache/

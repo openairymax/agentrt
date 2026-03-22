@@ -1,0 +1,218 @@
+{
+    "skills": [
+        {
+            "skill_id": "skill_001",
+            "name": "browser_skill",
+            "version": "1.0.0",
+            "description": "浏览器操作技能，支持网页浏览、元素交互和内容提取",
+            "category": "automation",
+            "capabilities": [
+                "navigate",
+                "click",
+                "type",
+                "extract_text",
+                "extract_links",
+                "screenshot"
+            ],
+            "parameters": {
+                "url": {
+                    "type": "string",
+                    "required": true,
+                    "description": "目标URL"
+                },
+                "timeout": {
+                    "type": "integer",
+                    "required": false,
+                    "default": 30000,
+                    "description": "超时时间（毫秒）"
+                },
+                "actions": {
+                    "type": "array",
+                    "required": false,
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "要执行的操作列表"
+                }
+            },
+            "returns": {
+                "success": {
+                    "type": "boolean",
+                    "description": "执行是否成功"
+                },
+                "output": {
+                    "type": "object",
+                    "description": "执行结果"
+                },
+                "error": {
+                    "type": "string",
+                    "description": "错误信息"
+                }
+            },
+            "metadata": {
+                "author": "AgentOS Team",
+                "created_at": "2026-03-22T00:00:00Z",
+                "updated_at": "2026-03-22T00:00:00Z",
+                "tags": [
+                    "browser",
+                    "automation",
+                    "web"
+                ],
+                "dependencies": [
+                    "selenium",
+                    "playwright"
+                ]
+            }
+        },
+        {
+            "skill_id": "skill_002",
+            "name": "data_analysis_skill",
+            "version": "2.0.0",
+            "description": "数据分析技能，支持统计分析、可视化和报告生成",
+            "category": "analysis",
+            "capabilities": [
+                "statistical_analysis",
+                "data_visualization",
+                "report_generation",
+                "data_cleaning",
+                "feature_engineering"
+            ],
+            "parameters": {
+                "data_source": {
+                    "type": "string",
+                    "required": true,
+                    "description": "数据源路径或连接字符串"
+                },
+                "analysis_type": {
+                    "type": "string",
+                    "required": true,
+                    "enum": [
+                        "descriptive",
+                        "diagnostic",
+                        "predictive",
+                        "prescriptive"
+                    ],
+                    "description": "分析类型"
+                },
+                "output_format": {
+                    "type": "string",
+                    "required": false,
+                    "default": "html",
+                    "enum": [
+                        "html",
+                        "pdf",
+                        "json",
+                        "excel"
+                    ],
+                    "description": "输出格式"
+                }
+            },
+            "returns": {
+                "success": {
+                    "type": "boolean",
+                    "description": "分析是否成功"
+                },
+                "report_path": {
+                    "type": "string",
+                    "description": "生成的报告路径"
+                },
+                "statistics": {
+                    "type": "object",
+                    "description": "统计结果"
+                }
+            },
+            "metadata": {
+                "author": "AgentOS Team",
+                "created_at": "2026-03-22T00:00:00Z",
+                "updated_at": "2026-03-22T00:00:00Z",
+                "tags": [
+                    "analysis",
+                    "statistics",
+                    "visualization"
+                ],
+                "dependencies": [
+                    "pandas",
+                    "numpy",
+                    "matplotlib",
+                    "seaborn"
+                ]
+            }
+        },
+        {
+            "skill_id": "skill_003",
+            "name": "code_generation_skill",
+            "version": "1.5.0",
+            "description": "代码生成技能，支持多种编程语言的代码生成和重构",
+            "category": "development",
+            "capabilities": [
+                "generate_code",
+                "refactor_code",
+                "generate_tests",
+                "generate_documentation",
+                "code_review"
+            ],
+            "parameters": {
+                "language": {
+                    "type": "string",
+                    "required": true,
+                    "enum": [
+                        "python",
+                        "javascript",
+                        "typescript",
+                        "go",
+                        "rust",
+                        "java",
+                        "c",
+                        "cpp"
+                    ],
+                    "description": "目标编程语言"
+                },
+                "task_description": {
+                    "type": "string",
+                    "required": true,
+                    "description": "任务描述"
+                },
+                "context": {
+                    "type": "object",
+                    "required": false,
+                    "description": "上下文信息"
+                },
+                "style_guide": {
+                    "type": "string",
+                    "required": false,
+                    "description": "代码风格指南"
+                }
+            },
+            "returns": {
+                "success": {
+                    "type": "boolean",
+                    "description": "生成是否成功"
+                },
+                "code": {
+                    "type": "string",
+                    "description": "生成的代码"
+                },
+                "explanation": {
+                    "type": "string",
+                    "description": "代码解释"
+                }
+            },
+            "metadata": {
+                "author": "AgentOS Team",
+                "created_at": "2026-03-22T00:00:00Z",
+                "updated_at": "2026-03-22T00:00:00Z",
+                "tags": [
+                    "code",
+                    "generation",
+                    "development"
+                ],
+                "dependencies": []
+            }
+        }
+    ],
+    "metadata": {
+        "version": "1.0.0",
+        "generated_at": "2026-03-22T12:30:00Z",
+        "total_count": 3
+    }
+}

@@ -1,0 +1,84 @@
+{
+    "tasks": [
+        {
+            "task_id": "task_001",
+            "description": "分析销售数据并生成报告",
+            "status": "pending",
+            "priority": 1,
+            "created_at": "2026-03-22T10:00:00Z",
+            "updated_at": "2026-03-22T10:00:00Z",
+            "metadata": {
+                "type": "data_analysis",
+                "source": "user_request",
+                "estimated_duration_minutes": 30
+            }
+        },
+        {
+            "task_id": "task_002",
+            "description": "编写API文档",
+            "status": "running",
+            "priority": 2,
+            "created_at": "2026-03-22T10:05:00Z",
+            "updated_at": "2026-03-22T10:10:00Z",
+            "metadata": {
+                "type": "documentation",
+                "source": "scheduled",
+                "estimated_duration_minutes": 60
+            }
+        },
+        {
+            "task_id": "task_003",
+            "description": "发送邮件通知",
+            "status": "completed",
+            "priority": 3,
+            "created_at": "2026-03-22T10:10:00Z",
+            "updated_at": "2026-03-22T10:15:00Z",
+            "metadata": {
+                "type": "notification",
+                "source": "automation",
+                "estimated_duration_minutes": 5
+            },
+            "result": {
+                "emails_sent": 10,
+                "success_rate": 1.0
+            }
+        },
+        {
+            "task_id": "task_004",
+            "description": "执行数据库备份",
+            "status": "failed",
+            "priority": 1,
+            "created_at": "2026-03-22T10:15:00Z",
+            "updated_at": "2026-03-22T10:20:00Z",
+            "metadata": {
+                "type": "maintenance",
+                "source": "scheduled",
+                "estimated_duration_minutes": 15
+            },
+            "error": {
+                "code": "DB_CONNECTION_ERROR",
+                "message": "无法连接到数据库服务器",
+                "retry_count": 3
+            }
+        },
+        {
+            "task_id": "task_005",
+            "description": "优化查询性能",
+            "status": "cancelled",
+            "priority": 2,
+            "created_at": "2026-03-22T10:20:00Z",
+            "updated_at": "2026-03-22T10:25:00Z",
+            "metadata": {
+                "type": "optimization",
+                "source": "user_request",
+                "estimated_duration_minutes": 45
+            },
+            "cancellation_reason": "用户取消请求"
+        }
+    ],
+    "metadata": {
+        "version": "1.0.0",
+        "generated_at": "2026-03-22T10:30:00Z",
+        "total_count": 5
+    }
+}

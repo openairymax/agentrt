@@ -44,10 +44,22 @@ class Task:
             status_str = response.get("status")
             if not status_str:
                 raise TaskError("Invalid response from server: missing status")
-            try:
-                return TaskStatus(status_str)
-            except ValueError:
+            
+            # Map string status to TaskStatus enum
+            status_mapping = {
+                "pending": TaskStatus.PENDING,
+                "running": TaskStatus.RUNNING,
+                "succeeded": TaskStatus.SUCCEEDED,
+                "completed": TaskStatus.SUCCEEDED,  # Alternative name
+                "failed": TaskStatus.FAILED,
+                "cancelled": TaskStatus.CANCELLED,
+            }
+            
+            status_lower = status_str.lower()
+            if status_lower not in status_mapping:
                 raise TaskError(f"Invalid task status: {status_str}")
+            
+            return status_mapping[status_lower]
         except Exception as e:
             raise TaskError(f"Error querying task status: {str(e)}")
     
@@ -66,10 +78,22 @@ class Task:
             status_str = response.get("status")
             if not status_str:
                 raise TaskError("Invalid response from server: missing status")
-            try:
-                return TaskStatus(status_str)
-            except ValueError:
+            
+            # Map string status to TaskStatus enum
+            status_mapping = {
+                "pending": TaskStatus.PENDING,
+                "running": TaskStatus.RUNNING,
+                "succeeded": TaskStatus.SUCCEEDED,
+                "completed": TaskStatus.SUCCEEDED,  # Alternative name
+                "failed": TaskStatus.FAILED,
+                "cancelled": TaskStatus.CANCELLED,
+            }
+            
+            status_lower = status_str.lower()
+            if status_lower not in status_mapping:
                 raise TaskError(f"Invalid task status: {status_str}")
+            
+            return status_mapping[status_lower]
         except Exception as e:
             raise TaskError(f"Error querying task status: {str(e)}")
     
@@ -87,22 +111,23 @@ class Task:
             TimeoutError: If the task doesn't complete within the timeout.
             TaskError: If there's an error waiting for the task.
         """
-        start_time = time.time()
+        import time as time_module
+        start_time = time_module.time()
         while True:
             status = self.query()
-            if status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED):
+            if status in (TaskStatus.SUCCEEDED, TaskStatus.FAILED, TaskStatus.CANCELLED):
                 response = self.client._request("GET", f"/api/tasks/{self.task_id}")
                 return TaskResult(
                     task_id=self.task_id,
                     status=status,
-                    output=response.get("output"),
+                    result=response.get("result"),
                     error=response.get("error")
                 )
             
-            if timeout and time.time() - start_time > timeout:
-                raise TimeoutError(f"Task did not complete within {timeout} seconds")
+            if timeout and time_module.time() - start_time > timeout:
+                raise TimeoutError(timeout_ms=int(timeout * 1000), operation="task wait")
             
-            time.sleep(0.5)  # Wait for 500ms before querying again
+            time_module.sleep(0.5)  # Wait for 500ms before querying again
     
     async def wait_async(self, timeout: Optional[int] = None) -> TaskResult:
         """
@@ -119,20 +144,21 @@ class Task:
             TaskError: If there's an error waiting for the task.
         """
         import asyncio
-        start_time = time.time()
+        import time as time_module
+        start_time = time_module.time()
         while True:
             status = await self.query_async()
-            if status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED):
+            if status in (TaskStatus.SUCCEEDED, TaskStatus.FAILED, TaskStatus.CANCELLED):
                 response = await self.client._request("GET", f"/api/tasks/{self.task_id}")
                 return TaskResult(
                     task_id=self.task_id,
                     status=status,
-                    output=response.get("output"),
+                    result=response.get("result"),
                     error=response.get("error")
                 )
             
-            if timeout and time.time() - start_time > timeout:
-                raise TimeoutError(f"Task did not complete within {timeout} seconds")
+            if timeout and time_module.time() - start_time > timeout:
+                raise TimeoutError(timeout_ms=int(timeout * 1000), operation="task wait")
             
             await asyncio.sleep(0.5)  # Wait for 500ms before querying again
     

@@ -1,0 +1,86 @@
+{
+    "memories": [
+        {
+            "memory_id": "mem_001",
+            "content": "用户偏好使用Python进行数据分析，特别是pandas和numpy库",
+            "layer": "L1",
+            "created_at": "2026-03-22T09:00:00Z",
+            "updated_at": "2026-03-22T09:00:00Z",
+            "metadata": {
+                "category": "preference",
+                "language": "python",
+                "libraries": ["pandas", "numpy"],
+                "confidence": 0.95
+            },
+            "embedding": [0.1, 0.2, 0.3, 0.4, 0.5]
+        },
+        {
+            "memory_id": "mem_002",
+            "content": "项目使用FastAPI框架开发后端API，采用异步架构设计",
+            "layer": "L2",
+            "created_at": "2026-03-22T09:30:00Z",
+            "updated_at": "2026-03-22T09:30:00Z",
+            "metadata": {
+                "category": "project",
+                "framework": "fastapi",
+                "architecture": "async",
+                "confidence": 0.9
+            },
+            "embedding": [0.2, 0.3, 0.4, 0.5, 0.6]
+        },
+        {
+            "memory_id": "mem_003",
+            "content": "数据库使用PostgreSQL存储用户数据，Redis用于缓存层",
+            "layer": "L2",
+            "created_at": "2026-03-22T10:00:00Z",
+            "updated_at": "2026-03-22T10:00:00Z",
+            "metadata": {
+                "category": "infrastructure",
+                "database": "postgresql",
+                "cache": "redis",
+                "confidence": 0.85
+            },
+            "embedding": [0.3, 0.4, 0.5, 0.6, 0.7]
+        },
+        {
+            "memory_id": "mem_004",
+            "content": "前端使用React框架，配合TypeScript进行类型安全开发",
+            "layer": "L2",
+            "created_at": "2026-03-22T10:30:00Z",
+            "updated_at": "2026-03-22T10:30:00Z",
+            "metadata": {
+                "category": "frontend",
+                "framework": "react",
+                "language": "typescript",
+                "confidence": 0.92
+            },
+            "embedding": [0.4, 0.5, 0.6, 0.7, 0.8]
+        },
+        {
+            "memory_id": "mem_005",
+            "content": "系统采用微服务架构，使用Docker容器化部署，Kubernetes编排管理",
+            "layer": "L3",
+            "created_at": "2026-03-22T11:00:00Z",
+            "updated_at": "2026-03-22T11:00:00Z",
+            "metadata": {
+                "category": "architecture",
+                "style": "microservices",
+                "containerization": "docker",
+                "orchestration": "kubernetes",
+                "confidence": 0.88
+            },
+            "embedding": [0.5, 0.6, 0.7, 0.8, 0.9]
+        }
+    ],
+    "metadata": {
+        "version": "1.0.0",
+        "generated_at": "2026-03-22T11:30:00Z",
+        "total_count": 5,
+        "layers": {
+            "L1": "原始感知层",
+            "L2": "特征提取层",
+            "L3": "知识关联层",
+            "L4": "决策推理层"
+        }
+    }
+}
