@@ -23,7 +23,10 @@ AgentOS 采用语义化版本号（MAJOR.MINOR.PATCH），其中：
 ### 3.1 主要变更
 
 #### 3.1.1 API 版本管理
-<!-- From data intelligence emerges. by spharx -->
+```
+# From data intelligence emerges. by spharx -->
+
+```
 
 - **新增**：所有公共头文件现在包含 API 版本宏定义
 - **变更**：API 版本宏使用 `MODULE_API_VERSION_MAJOR/MINOR/PATCH` 格式
@@ -154,7 +157,7 @@ agentos_loop_destroy(loop);
 
 **新版本**：
 
-```c
+``c
 agentos_core_loop_t* loop;
 agentos_error_t err = agentos_loop_create(NULL, &loop);
 if (err != AGENTOS_SUCCESS) {
@@ -179,18 +182,63 @@ agentos_loop_destroy(loop);
 
 #### 3.3.2 记忆管理
 
-**旧版本**：
+**新版本**：
 
-```c
+``c
 agentos_memory_engine_t* memory;
-agentos_memory_create(NULL, &memory);
+agentos_error_t err = agentos_memory_create(NULL, &memory);
+if (err != AGENTOS_SUCCESS) {
+    printf("Error creating memory engine: %s\\n", agentos_strerror(err));
+    return err;
+}
+
 // ... 使用内存引擎 ...
-// 可能忘记释放
+
+// 使用记忆
+agentos_memory_record_t record = {
+    .memory_record_id = "12345",
+    .memory_record_type = MEMORY_TYPE_FEATURE,
+    .memory_record_timestamp_ns = 123456789012,
+    .memory_record_source_agent = "agent_001",
+    .memory_record_trace_id = "trace_123",
+    .memory_record_data = "Hello, AgentOS!",
+    .memory_record_data_len = 14,
+    .memory_record_importance = 0.8,
+    .memory_record_access_count = 1
+};
+
+char* record_id = NULL;
+err = agentos_memory_write(memory, &record, &record_id);
+if (err != AGENTOS_SUCCESS) {
+    printf("Error writing memory: %s\\n", agentos_strerror(err));
+    return err;
+}
+
+// 使用记忆
+agentos_memory_query_t query = {
+    .memory_query_text = "greeting",
+    .memory_query_limit = 10,
+    .memory_query_threshold = 0.5
+};
+
+agentos_memory_result_t* result = NULL;
+err = agentos_memory_query(memory, &query, &result);
+if (err != AGENTOS_SUCCESS) {
+    printf("Error querying memory: %s\\n", agentos_strerror(err));
+    agentos_memory_destroy(memory);
+    return err;
+}
+
+// 释放结果
+agentos_memory_result_free(result);
+free(record_id);
+// 释放内存引擎
+agentos_memory_destroy(memory);
 ```
 
 **新版本**：
 
-```c
+``c
 agentos_memory_engine_t* memory;
 agentos_error_t err = agentos_memory_create(NULL, &memory);
 if (err != AGENTOS_SUCCESS) {

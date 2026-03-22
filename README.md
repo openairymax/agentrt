@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-1.0.0.5-blue.svg)](https://gitee.com/spharx/agentos)
+[![Version](https://img.shields.io/badge/version-1.0.0.6-blue.svg)](https://gitee.com/spharx/agentos)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](https://gitee.com/spharx/agentos/blob/main/LICENSE)
 [![Docker](https://img.shields.io/badge/docker-supported-blue.svg?logo=docker&logoColor=white)](https://www.docker.com/)
 [![C/C++](https://img.shields.io/badge/C%2FC%2B%2B-11%2F17-blue.svg?logo=c%2B%2B&logoColor=white)](https://isocpp.org/)
@@ -42,11 +42,12 @@ Language： **简体中文** | [English](partdocs/readme/en/README.md) | [Franç
 - **系统调用抽象**: 稳定安全的系统调用接口，隐藏内核实现细节。
 - **可插拔策略**: 认知、规划、调度等核心算法支持动态加载和运行时替换。
 - **统一日志系统**: 跨语言日志接口，支持全链路追踪和 OpenTelemetry 集成。
+- **IPC 通信机制**: Binder 架构的进程间通信系统，支持服务端和客户端模式。
 - **多语言 SDK**: Go、Python、Rust、TypeScript 原生支持，FFI 接口高效安全。
 
 ### 版本状态
 
-**当前版本**: v1.0.0.5 (生产就绪)
+**当前版本**: v1.0.0.6 (生产就绪)
 - ✅ 核心架构设计完成
 - ✅ MemoryRovol 记忆卷载系统
   - L1-L4 四层架构全部实现
@@ -60,16 +61,26 @@ Language： **简体中文** | [English](partdocs/readme/en/README.md) | [Franç
   - 行动层：执行引擎、补偿事务、责任链追踪（85%）
   - 记忆层：MemoryRovol FFI 封装（80%）
 - ✅ 微内核基础模块 (core) 实现
-  - IPC Binder 通信
-  - 内存管理（RAII、智能指针）
-  - 任务调度（加权轮询）
-  - 高精度时间服务
+  - IPC Binder 通信机制实现
+  - **服务端和客户端模式**：完整通道管理
+  - **IPC 通道管理**：IPC 通道的创建、发送和接收
+  - **任务调度**：加权轮询算法，支持优先级队列
+  - **高精度时间服务**：纳秒级时间戳和单调性保证
 - ✅ 系统调用层 (syscall) 开发完成 (100%)
-  - ✅ 任务系统调用：`sys_task_submit/query/wait/cancel`
-  - ✅ 记忆系统调用：`sys_memory_write/search/get/delete`
-  - ✅ 会话系统调用：`sys_session_create/get/close/list`
-  - ✅ 可观测性调用：`sys_telemetry_metrics/traces`
-  - ✅ 统一入口：`agentos_syscall_invoke()`
+  - **任务系统调用**：提交、查询、等待、取消操作
+  - **记忆系统调用**：写入、搜索、获取、删除操作
+  - **会话系统调用**：创建、获取、关闭、列表操作
+  - **可观测性系统调用**：指标和追踪接口
+  - **统一入口**：`agentos_syscall_invoke()` 稳定调用接口
+- ✅ 统一日志系统实现
+  - **跨语言日志接口**：C/Python/Go/Rust/TS
+  - **集中式日志存储**：partdata/logs/ 分层存储
+  - **trace_id 全链路追踪**：跨服务追踪支持
+  - **OpenTelemetry 集成**：可观测性后端支持
+  - **JSON 和人类可读格式**：结构化日志输出
+  - **统一入口**：`agentos_log_init()` 等初始化接口
+  - **日志级别**：DEBUG/INFO/WARNING/ERROR
+  - **格式化宏**：支持人类可读和结构化输出
 - 🔲 完整端到端集成测试
 
 ---
@@ -710,7 +721,21 @@ python scripts/benchmark.py
 
 ### 当前版本 (v1.0.0.5) - 生产就绪
 
-**完成度**: 85%
+**完成度**: 88%
+
+基于最新的代码实现分析，以下是各模块的完成度：
+
+#### 已完成模块（100%）
+- **CoreLoopThree 三层运行时框架**：接口和配置全部实现
+- **MemoryRovol 记忆系统**：L1-L4 架构和核心算法全部实现
+- **微内核基础模块 (core)**：IPC Binder、内存管理、任务调度、高精度时间服务全部实现
+- **系统调用层 (syscall)**：任务、记忆、会话、可观测性系统调用全部实现
+- **统一日志系统**：跨语言日志接口、集中式存储、全链路追踪、OpenTelemetry 集成全部实现
+
+#### 部分完成模块（60-90%）
+- **文档体系**：核心文档、开发指南、技术规范、API 文档基本完善
+- **开发工具**：构建脚本、配置初始化、健康检查、基准测试工具已就绪
+- **测试框架**：单元测试和集成测试框架已建立
 
 - ✅ 核心架构设计完成
 - ✅ MemoryRovol 记忆系统实现
@@ -748,34 +773,26 @@ python scripts/benchmark.py
     - 记忆引擎（Memory Engine）
     - 查询和挂载接口
 - ✅ 微内核基础模块 (core)
-  - IPC Binder 实现
-  - 内存管理（RAII、智能指针）
-  - 任务调度（加权轮询算法）
-  - 高精度时间服务
-- ✅ 系统调用层 (syscall) - 100%
-  - ✅ 任务系统调用完成
-    - `sys_task_submit()` - 提交任务
-    - `sys_task_query()` - 查询状态
-    - `sys_task_wait()` - 等待完成
-    - `sys_task_cancel()` - 取消任务
-  - ✅ 记忆系统调用完成
-    - `sys_memory_write()` - 写入记忆
-    - `sys_memory_search()` - 语义搜索
-    - `sys_memory_get()` - 获取数据
-    - `sys_memory_delete()` - 删除记忆
-  - ✅ 会话系统调用完成
-    - `sys_session_create()` - 创建会话
-    - `sys_session_get()` - 获取信息
-    - `sys_session_close()` - 关闭会话
-    - `sys_session_list()` - 列出会话
-  - ✅ 可观测性系统调用完成
-    - `sys_telemetry_metrics()` - 获取指标
-    - `sys_telemetry_traces()` - 获取追踪
+  - IPC Binder 通信机制实现
+  - **服务端和客户端模式**：完整通道管理
+  - **IPC 通道管理**：IPC 通道的创建、发送和接收
+  - **任务调度**：加权轮询算法，支持优先级队列
+  - **高精度时间服务**：纳秒级时间戳和单调性保证
+- ✅ 系统调用层 (syscall) 开发完成 (100%)
+  - **任务系统调用**：提交、查询、等待、取消操作
+  - **记忆系统调用**：写入、搜索、获取、删除操作
+  - **会话系统调用**：创建、获取、关闭、列表操作
+  - **可观测性系统调用**：指标和追踪接口
+  - **统一入口**：`agentos_syscall_invoke()` 稳定调用接口
 - ✅ 统一日志系统实现
-  - 跨语言日志接口（C/Python/Go/Rust/TS）
-  - 集中式日志存储（partdata/logs/）
-  - trace_id 全链路追踪
-  - OpenTelemetry 集成
+  - **跨语言日志接口**：C/Python/Go/Rust/TS
+  - **集中式日志存储**：partdata/logs/ 分层存储
+  - **trace_id 全链路追踪**：跨服务追踪支持
+  - **OpenTelemetry 集成**：可观测性后端支持
+  - **JSON 和人类可读格式**：结构化日志输出
+  - **统一入口**：`agentos_log_init()` 等初始化接口
+  - **日志级别**：DEBUG/INFO/WARNING/ERROR
+  - **格式化宏**：支持人类可读和结构化输出
 - 🔲 完整端到端集成测试
 
 ### 短期目标 (2026 Q2-Q3)

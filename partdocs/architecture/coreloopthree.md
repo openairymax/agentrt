@@ -193,12 +193,12 @@ atoms/coreloopthree/
 **数据结构**:
 ```c
 typedef struct agentos_intent {
-    char* raw_text;                 // 原始输入文本
-    size_t raw_len;                 // 原始文本长度
-    char* goal;                     // 提取的核心目标
-    size_t goal_len;                // 目标长度
-    uint32_t flags;                 // 标志位（紧急、复杂等）
-    void* context;                  // 附加上下文
+    char* intent_raw_text;          // 原始输入文本
+    size_t intent_raw_len;          // 原始文本长度
+    char* intent_goal;              // 提取的核心目标
+    size_t intent_goal_len;         // 目标长度
+    uint32_t intent_flags;          // 标志位（紧急、复杂等）
+    void* intent_context;           // 附加上下文
 } agentos_intent_t;
 ```
 
@@ -213,25 +213,25 @@ typedef struct agentos_intent {
 **数据结构**:
 ```c
 typedef struct agentos_task_node {
-    char* task_id;                   // 任务 ID
-    size_t id_len;                   // ID 长度
-    char* agent_role;                // 需要的 Agent 角色
-    size_t role_len;                 // 角色长度
-    char** depends_on;               // 依赖的任务 ID 数组
-    size_t depends_count;            // 依赖数量
-    uint32_t timeout_ms;             // 超时时间
-    uint8_t priority;                // 优先级
-    void* input;                     // 输入数据
-    void* output;                    // 输出数据
+    char* task_node_id;              // 任务 ID
+    size_t task_node_id_len;         // ID 长度
+    char* task_node_agent_role;      // 需要的 Agent 角色
+    size_t task_node_role_len;       // 角色长度
+    char** task_node_depends_on;     // 依赖的任务 ID 数组
+    size_t task_node_depends_count;  // 依赖数量
+    uint32_t task_node_timeout_ms;   // 超时时间
+    uint8_t task_node_priority;      // 优先级
+    void* task_node_input;           // 输入数据
+    void* task_node_output;          // 输出数据
 } agentos_task_node_t;
 
 typedef struct agentos_task_plan {
-    char* plan_id;                   // 计划 ID
-    size_t id_len;                   // ID 长度
-    agentos_task_node_t** nodes;     // 节点数组
-    size_t node_count;               // 节点数量
-    char** entry_points;             // 入口点节点 ID 数组
-    size_t entry_count;              // 入口点数量
+    char* task_plan_id;              // 计划 ID
+    size_t task_plan_id_len;         // ID 长度
+    agentos_task_node_t** task_plan_nodes;  // 节点数组
+    size_t task_plan_node_count;     // 节点数量
+    char** task_plan_entry_points;   // 入口点节点 ID 数组
+    size_t task_plan_entry_count;    // 入口点数量
 } agentos_task_plan_t;
 ```
 
@@ -402,18 +402,18 @@ agentos_error_t agentos_execution_wait(
 
 ```c
 typedef struct agentos_memory_record {
-    char* record_id;                     // 记录唯一 ID
-    size_t id_len;                        // ID 长度
-    agentos_memory_type_t type;           // 类型（RAW/FEATURE/STRUCTURE/PATTERN）
-    uint64_t timestamp_ns;                // 时间戳
-    char* source_agent;                   // 来源 Agent ID
-    size_t source_len;                    // 来源长度
-    char* trace_id;                       // 关联追踪 ID
-    size_t trace_len;                     // 追踪 ID 长度
-    void* data;                           // 记忆数据
-    size_t data_len;                      // 数据长度
-    float importance;                     // 重要性（0-1）
-    uint32_t access_count;                // 访问次数
+    char* memory_record_id;                     // 记录唯一 ID
+    size_t memory_record_id_len;                // ID 长度
+    agentos_memory_type_t memory_record_type;   // 类型（RAW/FEATURE/STRUCTURE/PATTERN）
+    uint64_t memory_record_timestamp_ns;        // 时间戳
+    char* memory_record_source_agent;           // 来源 Agent ID
+    size_t memory_record_source_len;            // 来源长度
+    char* memory_record_trace_id;               // 关联追踪 ID
+    size_t memory_record_trace_len;             // 追踪 ID 长度
+    void* memory_record_data;                   // 记忆数据
+    size_t memory_record_data_len;              // 数据长度
+    float memory_record_importance;             // 重要性（0-1）
+    uint32_t memory_record_access_count;        // 访问次数
 } agentos_memory_record_t;
 ```
 
@@ -421,15 +421,15 @@ typedef struct agentos_memory_record {
 
 ```c
 typedef struct agentos_memory_query {
-    char* text;                            // 查询文本
-    size_t text_len;                        // 文本长度
-    uint64_t start_time;                     // 起始时间
-    uint64_t end_time;                       // 结束时间
-    char* source_agent;                      // 来源 Agent
-    char* trace_id;                          // 关联追踪 ID
-    uint32_t limit;                          // 返回数量上限
-    uint32_t offset;                         // 偏移量
-    uint8_t include_raw;                     // 是否包含原始数据
+    char* memory_query_text;                 // 查询文本
+    size_t memory_query_text_len;            // 文本长度
+    uint64_t memory_query_start_time;        // 起始时间
+    uint64_t memory_query_end_time;          // 结束时间
+    char* memory_query_source_agent;         // 来源 Agent
+    char* memory_query_trace_id;             // 关联追踪 ID
+    uint32_t memory_query_limit;             // 返回数量上限
+    uint32_t memory_query_offset;            // 偏移量
+    uint8_t memory_query_include_raw;        // 是否包含原始数据
 } agentos_memory_query_t;
 ```
 
@@ -481,14 +481,14 @@ agentos_error_t agentos_memory_mount(
 
 ```c
 typedef struct agentos_loop_config {
-    uint32_t cognition_threads;         // 认知层线程数
-    uint32_t execution_threads;         // 行动层线程数
-    uint32_t memory_threads;            // 记忆层线程数
-    uint32_t max_queued_tasks;          // 最大排队任务数
-    uint32_t stats_interval_ms;         // 统计输出间隔
-    agentos_plan_strategy_t* plan_strategy;      // 规划策略
-    agentos_coordinator_strategy_t* coord_strategy; // 协同策略
-    agentos_dispatching_strategy_t* disp_strategy; // 调度策略
+    uint32_t loop_config_cognition_threads;   // 认知层线程数
+    uint32_t loop_config_execution_threads;   // 行动层线程数
+    uint32_t loop_config_memory_threads;      // 记忆层线程数
+    uint32_t loop_config_max_queued_tasks;    // 最大排队任务数
+    uint32_t loop_config_stats_interval_ms;   // 统计输出间隔
+    agentos_plan_strategy_t* loop_config_plan_strategy;      // 规划策略
+    agentos_coordinator_strategy_t* loop_config_coord_strategy; // 协同策略
+    agentos_dispatching_strategy_t* loop_config_disp_strategy; // 调度策略
 } agentos_loop_config_t;
 ```
 
