@@ -5,6 +5,14 @@
 **难度**: ⭐ 初学者友好  
 **预计时间**: 15 分钟
 
+## 版本历史
+
+| 版本 | 日期 | 变更说明 |
+|------|------|----------|
+| v1.0.0 | 2026-03-21 | 初始版本，包含环境要求、快速安装和 Hello World 示例 |
+| v1.0.1 | 2026-03-22 | 添加了错误处理示例和常见问题解答 |
+| v1.0.2 | 2026-03-23 | 更新了配置示例和性能优化建议 |
+
 ---
 
 ## 📋 目录
@@ -161,7 +169,7 @@ int main(int argc, char* argv[]) {
     // 1. 初始化 AgentOS
     agentos_error_t err = agentos_init();
     if (err != AGENTOS_SUCCESS) {
-        fprintf(stderr, "Failed to initialize AgentOS: %d\n", err);
+        fprintf(stderr, "Failed to initialize AgentOS: %s\n", agentos_strerror(err));
         return 1;
     }
     
@@ -171,7 +179,7 @@ int main(int argc, char* argv[]) {
     char* session_id;
     err = sys_session_create("my_session", &session_id);
     if (err != AGENTOS_SUCCESS) {
-        fprintf(stderr, "Failed to create session\n");
+        fprintf(stderr, "Failed to create session: %s\n", agentos_strerror(err));
         return 1;
     }
     printf("✅ Session created: %s\n", session_id);
@@ -187,7 +195,8 @@ int main(int argc, char* argv[]) {
     char* task_id;
     err = sys_task_submit(task_json, &task_id);
     if (err != AGENTOS_SUCCESS) {
-        fprintf(stderr, "Failed to submit task\n");
+        fprintf(stderr, "Failed to submit task: %s\n", agentos_strerror(err));
+        free(session_id);
         return 1;
     }
     printf("✅ Task submitted: %s\n", task_id);
@@ -196,7 +205,9 @@ int main(int argc, char* argv[]) {
     char* result;
     err = sys_task_wait(task_id, task_json, 5000, &result);
     if (err != AGENTOS_SUCCESS) {
-        fprintf(stderr, "Task failed\n");
+        fprintf(stderr, "Task failed: %s\n", agentos_strerror(err));
+        free(session_id);
+        free(task_id);
         return 1;
     }
     printf("✅ Task completed: %s\n", result);
@@ -204,7 +215,10 @@ int main(int argc, char* argv[]) {
     // 5. 写入记忆
     err = sys_memory_write(session_id, task_json, result);
     if (err != AGENTOS_SUCCESS) {
-        fprintf(stderr, "Failed to write memory\n");
+        fprintf(stderr, "Failed to write memory: %s\n", agentos_strerror(err));
+        free(session_id);
+        free(task_id);
+        free(result);
         return 1;
     }
     printf("✅ Memory written\n");
