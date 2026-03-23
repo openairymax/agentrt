@@ -1,5 +1,4 @@
-#!/bin/bash
-# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved. "From data intelligence emerges".
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Docker 配置检查脚本
 # 验证所有配置文件和环境的正确性
 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file error_utils.h
  * @brief 错误处理工具函数
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -23,7 +23,6 @@ const char* agentos_error_string(agentos_error_t err);
 
 /**
  * @brief 将错误码转换为JSON格式的错误响应
- // From data intelligence emerges. by spharx
  * @param err 错误码
  * @param message 附加的错误消息（可为NULL）
  * @param out_json 输出JSON字符串（需调用者释放）

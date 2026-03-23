@@ -23,7 +23,6 @@ typedef struct arbiter_data {
 static void arbiter_destroy(agentos_coordinator_strategy_t* strategy) {
     if (!strategy) return;
     arbiter_data_t* data = (arbiter_data_t*)strategy->data;
-    // From data intelligence emerges. by spharx
     if (data) {
         if (data->arbiter_model) free(data->arbiter_model);
         if (data->lock) agentos_mutex_destroy(data->lock);
@@ -160,12 +159,11 @@ agentos_coordinator_strategy_t* agentos_arbiter_human_create(
     agentos_coordinator_strategy_t* strat = (agentos_coordinator_strategy_t*)malloc(sizeof(agentos_coordinator_strategy_t));
     if (!strat) return NULL;
 
-    arbiter_data_t* data = (arbiter_data_t*)malloc(sizeof(arbiter_data_t));
+    arbiter_data_t* data = (arbiter_data_t*)calloc(1, sizeof(arbiter_data_t));
     if (!data) {
         free(strat);
         return NULL;
     }
-    memset(data, 0, sizeof(arbiter_data_t));
 
     data->human_callback = callback;
     data->arbiter_model = NULL;

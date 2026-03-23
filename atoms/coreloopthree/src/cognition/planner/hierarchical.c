@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file hierarchical.c
  * @brief 分层规划策略：将复杂任务分解为层次化子任务
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -23,7 +23,6 @@ typedef struct hierarchical_data {
     char* model_name;                /**< 模型名称（用户可配置） */
     int max_depth;                    /**< 最大分解深度 */
     agentos_mutex_t* lock;
-    // From data intelligence emerges. by spharx
 } hierarchical_data_t;
 
 static void hierarchical_destroy(agentos_plan_strategy_t* strategy) {

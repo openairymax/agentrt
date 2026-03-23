@@ -30,7 +30,7 @@ impl Session {
     
     /// Set a context value for the session
     pub async fn set_context(&self, key: &str, value: Value) -> Result<bool> {
-        let path = format!("/api/sessions/{}/context", self.id);
+        let path = format!("/api/v1/sessions/{}/context", self.id);
         let data = json!({"key": key, "value": value});
         let response = self.client.request("POST", &path, Some(&data)).await?;
         
@@ -43,7 +43,7 @@ impl Session {
     
     /// Get a context value from the session
     pub async fn get_context(&self, key: &str) -> Result<Value> {
-        let path = format!("/api/sessions/{}/context/{}", self.id, key);
+        let path = format!("/api/v1/sessions/{}/context/{}", self.id, key);
         let response = self.client.request("GET", &path, None).await?;
         
         let value = response.get("value")
@@ -54,7 +54,7 @@ impl Session {
     
     /// Close the session
     pub async fn close(&self) -> Result<bool> {
-        let path = format!("/api/sessions/{}", self.id);
+        let path = format!("/api/v1/sessions/{}", self.id);
         let response = self.client.request("DELETE", &path, None).await?;
         
         let success = response.get("success")

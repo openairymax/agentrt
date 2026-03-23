@@ -1,21 +1,25 @@
 // AgentOS TypeScript SDK Types
-// Version: 1.0.0.5
-// Last updated: 2026-03-21
+// Version: 2.0.0
+// Last updated: 2026-03-23
 
-/**
- * Task status enumeration
- */
+/** 任务状态枚举 */
 export enum TaskStatus {
   PENDING = 'pending',
   RUNNING = 'running',
   COMPLETED = 'completed',
   FAILED = 'failed',
-  CANCELLED = 'cancelled'
+  CANCELLED = 'cancelled',
 }
 
-/**
- * Task result interface
- */
+/** 记忆层级枚举 */
+export enum MemoryLayer {
+  RAW = 'RAW',
+  WORKING = 'WORKING',
+  LONG_TERM = 'LONG_TERM',
+  EPISODIC = 'EPISODIC',
+}
+
+/** 任务结果接口 */
 export interface TaskResult {
   taskId: string;
   status: TaskStatus;
@@ -23,40 +27,37 @@ export interface TaskResult {
   error?: string;
 }
 
-/**
- * Memory interface
- */
+/** 记忆接口 */
 export interface Memory {
   memoryId: string;
   content: string;
   createdAt: string;
-  metadata?: Record<string, any>;
+  layer?: MemoryLayer;
+  metadata?: Record<string, unknown>;
 }
 
-/**
- * Skill info interface
- */
+/** 技能信息接口 */
 export interface SkillInfo {
   skillName: string;
+  skillId?: string;
   description: string;
   version: string;
-  parameters?: Record<string, any>;
+  parameters?: Record<string, unknown>;
+  enabled?: boolean;
 }
 
-/**
- * Skill result interface
- */
-export interface SkillResult {
+/** 技能执行结果接口（泛型版本） */
+export interface SkillResult<T = unknown> {
   success: boolean;
-  output?: any;
+  output?: T;
   error?: string;
 }
 
-/**
- * Client configuration interface
- */
+/** 客户端配置接口 */
 export interface ClientConfig {
   endpoint?: string;
   timeout?: number;
   headers?: Record<string, string>;
+  retryDelay?: number;
+  maxRetries?: number;
 }

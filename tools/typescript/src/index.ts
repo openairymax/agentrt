@@ -1,24 +1,21 @@
 // AgentOS TypeScript SDK
-// Version: 1.0.0.5
-// Last updated: 2026-03-21
+// Version: 2.0.0
+// Last updated: 2026-03-23
 
 /**
  * AgentOS TypeScript SDK
- * 
- * This SDK provides a TypeScript interface to interact with the AgentOS system.
- * It includes functionality for task management, memory operations, session management,
- * and skill loading.
- */
+ *
+ * 提供 TypeScript 接口�?AgentOS 系统交互�? * 包含任务管理、记忆操作、会话管理、技能加载、遥测和系统调用功能�? */
 
 export * from './agent';
 export * from './task';
 export * from './memory';
 export * from './session';
 export * from './skill';
+export * from './telemetry';
+export * from './syscall';
 export * from './types';
 export * from './errors';
 
-/**
- * SDK version
- */
-export const VERSION = '1.0.0.5';
+/** SDK 版本�?*/
+export const VERSION = '2.0.0';

@@ -1,5 +1,4 @@
-#!/bin/bash
-# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved. "From data intelligence emerges".
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Docker 镜像构建脚本
 # 用法：./build.sh [kernel|service|all] [dev|release]
 

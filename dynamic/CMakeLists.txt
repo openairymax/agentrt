@@ -1,23 +1,36 @@
-cmake_minimum_required(VERSION 3.20)
-project(agentos-dynamic VERSION 1.0.0.5 LANGUAGES C)
+# AgentOS Dynamic Runtime - CMake 构建配置
+# 
+# Copyright (c) 2026 SPHARX. All Rights Reserved.
 
-find_package(Threads REQUIRED)
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(LIBMICROHTTPD REQUIRED libmicrohttpd)
-pkg_check_modules(LIBWEBSOCKETS REQUIRED libwebsockets)
-pkg_check_modules(CJSON REQUIRED libcjson)
+cmake_minimum_required(VERSION 3.16)
 
-# 符号导出管理
-set(CMAKE_C_VISIBILITY_PRESET hidden)
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
+project(agentos_dynamic
+    VERSION 1.1.0
+    LANGUAGES C
+    DESCRIPTION "AgentOS Dynamic Runtime - Gateway Layer")
 
-# 定义构建共享库时的宏
-if(BUILD_SHARED_LIBS)
-    add_definitions(-DAGENTOS_BUILDING_SHARED)
+# C 标准
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+
+# 编译选项
+if(MSVC)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W4 /D_CRT_SECURE_NO_WARNINGS")
+else()
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wpedantic")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-parameter")
+    set(CMAKE_C_FLAGS_DEBUG "-g -O0 -DDEBUG")
+    set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG")
 endif()
 
-set(SOURCES
+# 查找依赖
+find_package(OpenSSL REQUIRED)
+find_package(Threads REQUIRED)
+
+# 源文件
+set(DYNAMIC_SOURCES
+    src/agentos.c
+    src/main.c
     src/server.c
     src/session.c
     src/health.c
@@ -27,24 +40,116 @@ set(SOURCES
     src/gateway/stdio_gateway.c
 )
 
-add_executable(agentos_dynamic ${SOURCES})
-
-target_include_directories(agentos_dynamic PRIVATE
+# 头文件目录
+set(DYNAMIC_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../atoms/core/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../atoms/syscall/include
-    ${LIBMICROHTTPD_INCLUDE_DIRS}
-    ${LIBWEBSOCKETS_INCLUDE_DIRS}
-    ${CJSON_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_link_libraries(agentos_dynamic
-    agentos_core          # 提供 agentos_time_monotonic_ns 等基础函数
-    agentos_utils         # 提供 logger, metrics, trace
+# 可执行文件
+add_executable(dynamic ${DYNAMIC_SOURCES})
+
+target_include_directories(dynamic PRIVATE ${DYNAMIC_INCLUDE_DIRS})
+
+target_link_libraries(dynamic
+    PRIVATE
+    OpenSSL::SSL
+    OpenSSL::Crypto
     Threads::Threads
-    ${LIBMICROHTTPD_LIBRARIES}
-    ${LIBWEBSOCKETS_LIBRARIES}
-    ${CJSON_LIBRARIES}
 )
 
-install(TARGETS agentos_dynamic DESTINATION bin)
+# 编译定义
+if(WIN32)
+    target_compile_definitions(dynamic PRIVATE
+        _CRT_SECURE_NO_WARNINGS
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+    )
+else()
+    target_compile_definitions(dynamic PRIVATE
+        _GNU_SOURCE
+        _POSIX_C_SOURCE=200809L
+    )
+endif()
+
+# 静态库（可选）
+option(BUILD_SHARED_LIBS "Build shared library" OFF)
+
+if(NOT BUILD_SHARED_LIBS)
+    add_library(dynamic_lib STATIC
+        src/agentos.c
+        src/server.c
+        src/session.c
+        src/health.c
+        src/telemetry.c
+        src/gateway/http_gateway.c
+        src/gateway/ws_gateway.c
+        src/gateway/stdio_gateway.c
+    )
+    
+    target_include_directories(dynamic_lib
+        PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    
+    target_link_libraries(dynamic_lib
+        PUBLIC
+        OpenSSL::SSL
+        OpenSSL::Crypto
+        Threads::Threads
+    )
+    
+    if(WIN32)
+        target_compile_definitions(dynamic_lib PRIVATE
+            _CRT_SECURE_NO_WARNINGS
+            WIN32_LEAN_AND_MEAN
+            NOMINMAX
+        )
+    else()
+        target_compile_definitions(dynamic_lib PRIVATE
+            _GNU_SOURCE
+            _POSIX_C_SOURCE=200809L
+        )
+    endif()
+    
+    set_target_properties(dynamic_lib PROPERTIES
+        OUTPUT_NAME "agentos_dynamic"
+        VERSION ${PROJECT_VERSION}
+        SOVERSION ${PROJECT_VERSION_MAJOR}
+    )
+endif()
+
+# 测试（可选）
+option(BUILD_TESTS "Build tests" OFF)
+
+if(BUILD_TESTS)
+    enable_testing()
+    
+    add_executable(test_dynamic tests/test_dynamic.c)
+    target_link_libraries(test_dynamic dynamic_lib)
+    target_include_directories(test_dynamic PRIVATE ${DYNAMIC_INCLUDE_DIRS})
+    add_test(NAME test_dynamic COMMAND test_dynamic)
+endif()
+
+# 安装
+install(TARGETS dynamic RUNTIME DESTINATION bin)
+install(FILES include/dynamic.h DESTINATION include)
+
+if(NOT BUILD_SHARED_LIBS)
+    install(TARGETS dynamic_lib
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+    )
+endif()
+
+# 打印配置摘要
+message(STATUS "")
+message(STATUS "AgentOS Dynamic Runtime v${PROJECT_VERSION}")
+message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "  Shared libs: ${BUILD_SHARED_LIBS}")
+message(STATUS "  Tests: ${BUILD_TESTS}")
+message(STATUS "  OpenSSL: ${OPENSSL_VERSION}")
+message(STATUS "  Platform: ${CMAKE_SYSTEM_NAME}")
+message(STATUS "")

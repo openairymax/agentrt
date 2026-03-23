@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file engine.c
  * @brief 认知引擎核心实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -23,7 +23,6 @@
 
 struct agentos_cognition_engine {
     agentos_plan_strategy_t* plan_strat;
-    // From data intelligence emerges. by spharx
     agentos_plan_strategy_t* fallback_plan_strat;
     agentos_coordinator_strategy_t* coord_strat;
     agentos_dispatching_strategy_t* disp_strat;
@@ -78,12 +77,11 @@ agentos_error_t agentos_cognition_create_ex(
 
     if (!out_engine) return AGENTOS_EINVAL;
 
-    agentos_cognition_engine_t* engine = (agentos_cognition_engine_t*)malloc(sizeof(agentos_cognition_engine_t));
+    agentos_cognition_engine_t* engine = (agentos_cognition_engine_t*)calloc(1, sizeof(agentos_cognition_engine_t));
     if (!engine) {
         AGENTOS_LOG_ERROR("Failed to allocate cognition engine");
         return AGENTOS_ENOMEM;
     }
-    memset(engine, 0, sizeof(agentos_cognition_engine_t));
 
     engine->plan_strat = plan_strategy;
     engine->coord_strat = coord_strategy;
@@ -176,6 +174,7 @@ agentos_error_t agentos_cognition_process(
                          engine, input, out_plan);
         return AGENTOS_EINVAL;
     }
+    if (input_len == 0) return AGENTOS_EINVAL;
 
     agentos_intent_t intent;
     memset(&intent, 0, sizeof(intent));
@@ -191,17 +190,25 @@ agentos_error_t agentos_cognition_process(
     agentos_task_plan_t* plan = NULL;
     agentos_error_t err = AGENTOS_ENOTSUP;
 
+    // 读取策略指针（加锁防止与 set_fallback_plan 竞态）
+    agentos_plan_strategy_t* plan_strat = NULL;
+    agentos_plan_strategy_t* fallback_strat = NULL;
+    agentos_mutex_lock(engine->lock);
+    plan_strat = engine->plan_strat;
+    fallback_strat = engine->fallback_plan_strat;
+    agentos_mutex_unlock(engine->lock);
+
     // 尝试主策略
-    if (engine->plan_strat && engine->plan_strat->plan) {
-        err = engine->plan_strat->plan(&intent, engine->plan_strat->data, &plan);
+    if (plan_strat && plan_strat->plan) {
+        err = plan_strat->plan(&intent, plan_strat->data, &plan);
     }
 
     // 如果主策略失败，尝试回退策略
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_LOG_WARN("Primary planning failed: %s (code %d), trying fallback", 
                         agentos_error_string(err), err);
-        if (engine->fallback_plan_strat && engine->fallback_plan_strat->plan) {
-            err = engine->fallback_plan_strat->plan(&intent, engine->fallback_plan_strat->data, &plan);
+        if (fallback_strat && fallback_strat->plan) {
+            err = fallback_strat->plan(&intent, fallback_strat->data, &plan);
         } else {
             AGENTOS_LOG_ERROR("No fallback planner available, primary error: %s (code %d)", 
                             agentos_error_string(err), err);

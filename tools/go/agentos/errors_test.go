@@ -12,8 +12,8 @@ import (
 func TestAgentOSError_Error(t *testing.T) {
 	err := NewError(CodeInvalidConfig, "测试错误", nil)
 	msg := err.Error()
-	if msg != "[INVALID_CONFIG] 测试错误" {
-		t.Errorf("错误信息 = %q, want [INVALID_CONFIG] 测试错误", msg)
+	if msg != "[0x0008] 测试错误" {
+		t.Errorf("错误信息 = %q, want [0x0008] 测试错误", msg)
 	}
 }
 
@@ -21,7 +21,7 @@ func TestAgentOSError_ErrorWithCause(t *testing.T) {
 	cause := errors.New("原始错误")
 	err := NewError(CodeNetworkError, "包装错误", cause)
 	msg := err.Error()
-	if msg != "[NETWORK_ERROR] 包装错误: 原始错误" {
+	if msg != "[0x000A] 包装错误: 原始错误" {
 		t.Errorf("错误信息 = %q", msg)
 	}
 }
@@ -143,7 +143,9 @@ func TestHTTPStatusToError(t *testing.T) {
 		{http.StatusTooManyRequests, CodeRateLimited},
 		{http.StatusInternalServerError, CodeServerError},
 		{http.StatusBadGateway, CodeServerError},
-		{http.StatusConflict, CodeServerError},
+		{http.StatusConflict, CodeConflict},
+		{http.StatusRequestTimeout, CodeTimeout},
+		{http.StatusUnprocessableEntity, CodeValidationError},
 	}
 	for _, tt := range tests {
 		err := HTTPStatusToError(tt.status, "msg")

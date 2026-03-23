@@ -12,20 +12,27 @@
 
 typedef struct reactive_data {
     agentos_llm_service_t* llm;
+    char* model_name;
     agentos_mutex_t* lock;
 } reactive_data_t;
 
+/**
+ * @brief 销毁反应式规划策略
+ */
 static void reactive_destroy(agentos_plan_strategy_t* strategy) {
     if (!strategy) return;
     reactive_data_t* data = (reactive_data_t*)strategy->data;
     if (data) {
+        if (data->model_name) free(data->model_name);
         if (data->lock) agentos_mutex_destroy(data->lock);
         free(data);
     }
     free(strategy);
-    // From data intelligence emerges. by spharx
 }
 
+/**
+ * @brief 反应式规划：使用轻量模型快速生成单任务计划
+ */
 static agentos_error_t reactive_plan(
     const agentos_intent_t* intent,
     void* context,
@@ -34,7 +41,6 @@ static agentos_error_t reactive_plan(
     reactive_data_t* data = (reactive_data_t*)context;
     if (!data || !intent || !out_plan) return AGENTOS_EINVAL;
 
-    // 使用LLM生成一个简单的单任务计划
     char prompt[2048];
     snprintf(prompt, sizeof(prompt),
         "Given the user goal, determine the single most appropriate task. "
@@ -43,19 +49,15 @@ static agentos_error_t reactive_plan(
 
     agentos_llm_request_t req;
     memset(&req, 0, sizeof(req));
-    req.model = "gpt-3.5-turbo"; // 使用轻量模型
+    req.model = data->model_name ? data->model_name : "default";
     req.prompt = prompt;
-    req.temperature = 0.3;
+    req.temperature = 0.3f;
     req.max_tokens = 256;
 
     agentos_llm_response_t* resp = NULL;
     agentos_error_t err = agentos_llm_complete(data->llm, &req, &resp);
     if (err != AGENTOS_SUCCESS) return err;
 
-    // 解析响应（简化，直接使用LLM输出的文本作为任务名）
-    char* task_name = resp->text;
-
-    // 构建计划
     agentos_task_plan_t* plan = (agentos_task_plan_t*)calloc(1, sizeof(agentos_task_plan_t));
     if (!plan) {
         agentos_llm_response_free(resp);
@@ -65,6 +67,7 @@ static agentos_error_t reactive_plan(
     plan->plan_id = strdup("reactive_plan");
     plan->nodes = (agentos_task_node_t**)malloc(sizeof(agentos_task_node_t*));
     if (!plan->nodes) {
+        if (plan->plan_id) free(plan->plan_id);
         free(plan);
         agentos_llm_response_free(resp);
         return AGENTOS_ENOMEM;
@@ -72,6 +75,7 @@ static agentos_error_t reactive_plan(
 
     agentos_task_node_t* node = (agentos_task_node_t*)calloc(1, sizeof(agentos_task_node_t));
     if (!node) {
+        if (plan->plan_id) free(plan->plan_id);
         free(plan->nodes);
         free(plan);
         agentos_llm_response_free(resp);
@@ -79,12 +83,23 @@ static agentos_error_t reactive_plan(
     }
 
     node->task_id = strdup("task_1");
-    node->agent_role = strdup("default"); // 实际应从LLM输出解析
+    node->agent_role = strdup("default");
     node->depends_on = NULL;
     node->depends_count = 0;
     node->timeout_ms = 30000;
     node->priority = 128;
     node->input = NULL;
+
+    if (!node->task_id || !node->agent_role) {
+        if (node->task_id) free(node->task_id);
+        if (node->agent_role) free(node->agent_role);
+        free(node);
+        if (plan->plan_id) free(plan->plan_id);
+        free(plan->nodes);
+        free(plan);
+        agentos_llm_response_free(resp);
+        return AGENTOS_ENOMEM;
+    }
 
     plan->nodes[0] = node;
     plan->node_count = 1;
@@ -100,13 +115,33 @@ static agentos_error_t reactive_plan(
     return AGENTOS_SUCCESS;
 }
 
+/**
+ * @brief 设置模型配置
+ */
+static void reactive_set_config(agentos_plan_strategy_t* strategy,
+                                const char* primary, const char* secondary) {
+    (void)secondary;
+    if (!strategy || !primary) return;
+    reactive_data_t* data = (reactive_data_t*)strategy->data;
+    if (!data) return;
+    agentos_mutex_lock(data->lock);
+    if (data->model_name) free(data->model_name);
+    data->model_name = strdup(primary);
+    agentos_mutex_unlock(data->lock);
+}
+
+/**
+ * @brief 创建反应式规划策略
+ * @param llm LLM 服务
+ * @return 策略指针，失败返回 NULL
+ */
 agentos_plan_strategy_t* agentos_plan_reactive_create(agentos_llm_service_t* llm) {
     if (!llm) return NULL;
 
-    agentos_plan_strategy_t* strat = (agentos_plan_strategy_t*)malloc(sizeof(agentos_plan_strategy_t));
+    agentos_plan_strategy_t* strat = (agentos_plan_strategy_t*)calloc(1, sizeof(agentos_plan_strategy_t));
     if (!strat) return NULL;
 
-    reactive_data_t* data = (reactive_data_t*)malloc(sizeof(reactive_data_t));
+    reactive_data_t* data = (reactive_data_t*)calloc(1, sizeof(reactive_data_t));
     if (!data) {
         free(strat);
         return NULL;
@@ -122,6 +157,7 @@ agentos_plan_strategy_t* agentos_plan_reactive_create(agentos_llm_service_t* llm
 
     strat->plan = reactive_plan;
     strat->destroy = reactive_destroy;
+    strat->set_config = reactive_set_config;
     strat->data = data;
 
     return strat;

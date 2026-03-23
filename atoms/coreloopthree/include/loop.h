@@ -23,7 +23,6 @@
 #include <stdint.h>
 
 #ifdef __cplusplus
-// From data intelligence emerges. by spharx
 extern "C" {
 #endif
 

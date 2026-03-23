@@ -30,7 +30,7 @@ add_library(agentos_syscall STATIC ${SOURCES})
 
 target_include_directories(agentos_syscall PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../core/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../corekern/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../memoryrovol/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../utils/observability/include
@@ -56,7 +56,7 @@ enable_testing()
 add_executable(test_syscall_entry tests/unit/test_syscall_entry.c)
 target_include_directories(test_syscall_entry PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../core/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../corekern/include
 )
 target_link_libraries(test_syscall_entry
     agentos_syscall
@@ -68,7 +68,7 @@ add_test(NAME test_syscall_entry COMMAND test_syscall_entry)
 add_executable(test_syscall_table tests/unit/test_syscall_table.c)
 target_include_directories(test_syscall_table PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../core/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../corekern/include
 )
 target_link_libraries(test_syscall_table
     agentos_syscall
@@ -81,7 +81,7 @@ add_test(NAME test_syscall_table COMMAND test_syscall_table)
 add_executable(test_full_workflow tests/integration/test_full_workflow.c)
 target_include_directories(test_full_workflow PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../core/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../corekern/include
 )
 target_link_libraries(test_full_workflow
     agentos_syscall

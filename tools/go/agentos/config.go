@@ -10,6 +10,7 @@ package agentos
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"time"
@@ -132,8 +133,8 @@ func NewConfig(opts ...ConfigOption) *Config {
 	return cfg
 }
 
-// NewConfigFromEnv 从环境变量创建配置
-func NewConfigFromEnv() *Config {
+// NewConfigFromEnv 从环境变量创建配置（自动验证）
+func NewConfigFromEnv() (*Config, error) {
 	cfg := DefaultConfig()
 
 	if v := os.Getenv("AGENTOS_ENDPOINT"); v != "" {
@@ -149,6 +150,11 @@ func NewConfigFromEnv() *Config {
 			cfg.MaxRetries = n
 		}
 	}
+	if v := os.Getenv("AGENTOS_RETRY_DELAY"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			cfg.RetryDelay = d
+		}
+	}
 	if v := os.Getenv("AGENTOS_API_KEY"); v != "" {
 		cfg.APIKey = v
 	}
@@ -158,14 +164,28 @@ func NewConfigFromEnv() *Config {
 	if v := os.Getenv("AGENTOS_LOG_LEVEL"); v != "" {
 		cfg.LogLevel = v
 	}
+	if v := os.Getenv("AGENTOS_MAX_CONNECTIONS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.MaxConnections = n
+		}
+	}
+	if v := os.Getenv("AGENTOS_USER_AGENT"); v != "" {
+		cfg.UserAgent = v
+	}
 
-	return cfg
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+	return cfg, nil
 }
 
 // Validate 验证配置的合法性
 func (c *Config) Validate() error {
 	if c.Endpoint == "" {
 		return ErrInvalidEndpoint
+	}
+	if parsed, err := url.Parse(c.Endpoint); err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return NewError(CodeInvalidEndpoint, "端点地址必须以 http:// 或 https:// 开头", nil)
 	}
 	if c.Timeout <= 0 {
 		return NewError(CodeInvalidConfig, "超时时间必须大于零", nil)

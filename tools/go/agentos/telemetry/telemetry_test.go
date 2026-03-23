@@ -7,6 +7,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/spharx/agentos/tools/go/agentos/types"
 )
 
 func TestNewMeter(t *testing.T) {
@@ -114,7 +116,7 @@ func TestTracer_StartAndFinishSpan(t *testing.T) {
 	if span.Name != "test-operation" {
 		t.Errorf("name = %q", span.Name)
 	}
-	if span.Status != "ok" {
+	if span.Status != types.SpanStatusOK {
 		t.Errorf("status = %q", span.Status)
 	}
 
@@ -277,7 +279,7 @@ func TestMetricPoint_Timestamp(t *testing.T) {
 func TestSpan_StatusDefault(t *testing.T) {
 	tr := NewTracer()
 	span := tr.StartSpan("status-test")
-	if span.Status != "ok" {
+	if span.Status != types.SpanStatusOK {
 		t.Errorf("默认状态应为 ok, got %q", span.Status)
 	}
 }

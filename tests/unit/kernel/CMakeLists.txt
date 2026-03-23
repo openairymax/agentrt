@@ -4,10 +4,10 @@ cmake_minimum_required(VERSION 3.20)
 project(agentos-core-tests)
 
 # 包含核心模块的头文件
-include_directories(${CMAKE_SOURCE_DIR}/atoms/core/include)
+include_directories(${CMAKE_SOURCE_DIR}/atoms/corekern/include)
 
 # 链接核心模块库
-link_directories(${CMAKE_BINARY_DIR}/atoms/core)
+link_directories(${CMAKE_BINARY_DIR}/atoms/corekern)
 
 # 测试可执行文件
 add_executable(test_ipc test_ipc.c)

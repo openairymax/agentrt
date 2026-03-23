@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file execution.h
  * @brief 行动层公共接口定义
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -23,7 +23,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-// From data intelligence emerges. by spharx
 
 /* 前向声明 */
 typedef struct agentos_execution_engine agentos_execution_engine_t;

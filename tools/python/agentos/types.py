@@ -103,9 +103,16 @@ class TaskResult:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "TaskResult":
         """Create TaskResult from dictionary."""
+        raw_status = data.get("status", 0)
+        if isinstance(raw_status, str):
+            status = TaskStatus[raw_status]
+        elif isinstance(raw_status, int):
+            status = TaskStatus(raw_status)
+        else:
+            status = TaskStatus.PENDING
         return cls(
             task_id=data["task_id"],
-            status=TaskStatus(data["status"]),
+            status=status,
             result=data.get("result"),
             error=data.get("error"),
             created_at=data.get("created_at", time.time()),
@@ -150,9 +157,16 @@ class MemoryInfo:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "MemoryInfo":
         """Create MemoryInfo from dictionary."""
+        raw_type = data.get("record_type", 0)
+        if isinstance(raw_type, str):
+            record_type = MemoryRecordType[raw_type]
+        elif isinstance(raw_type, int):
+            record_type = MemoryRecordType(raw_type)
+        else:
+            record_type = MemoryRecordType.RAW
         return cls(
             record_id=data["record_id"],
-            record_type=MemoryRecordType(data["record_type"]),
+            record_type=record_type,
             data_size=data["data_size"],
             metadata=data.get("metadata"),
             created_at=data.get("created_at", time.time()),

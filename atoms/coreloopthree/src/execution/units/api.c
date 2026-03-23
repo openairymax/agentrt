@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file api.c
  * @brief API调用执行单元（基于libcurl）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -23,7 +23,6 @@ typedef struct api_unit_data {
 struct memory_chunk {
     char* memory;
     size_t size;
-    // From data intelligence emerges. by spharx
 };
 
 static size_t write_callback(void* contents, size_t size, size_t nmemb, void* userp) {

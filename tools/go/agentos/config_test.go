@@ -80,7 +80,10 @@ func TestNewConfigFromEnv(t *testing.T) {
 		os.Unsetenv("AGENTOS_LOG_LEVEL")
 	}()
 
-	cfg := NewConfigFromEnv()
+	cfg, err := NewConfigFromEnv()
+	if err != nil {
+		t.Fatalf("NewConfigFromEnv error = %v", err)
+	}
 	if cfg.Endpoint != "http://env:9999" {
 		t.Errorf("环境变量端点 = %q", cfg.Endpoint)
 	}

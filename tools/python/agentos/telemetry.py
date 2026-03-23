@@ -295,6 +295,7 @@ class Tracer:
             start_time=time.time(),
             parent_span_id=parent_span_id
         )
+        span.start()
         self.spans.append(span)
         return span
 

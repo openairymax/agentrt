@@ -1,62 +1,40 @@
 // AgentOS TypeScript SDK Task
-// Version: 1.0.0.5
-// Last updated: 2026-03-21
+// Version: 2.0.0
+// Last updated: 2026-03-23
 
 import { TaskStatus, TaskResult } from './types';
 import { TaskError, TimeoutError } from './errors';
 import { AgentOS } from './agent';
 
-/**
- * Task class for managing AgentOS tasks
- */
+/** AgentOS 任务管理�?*/
 export class Task {
   private client: AgentOS;
   private taskId: string;
 
-  /**
-   * Create a new Task object
-   * @param client AgentOS client
-   * @param taskId Task ID
-   */
+  /** 创建新的 Task 对象 */
   constructor(client: AgentOS, taskId: string) {
     this.client = client;
     this.taskId = taskId;
   }
 
-  /**
-   * Get the task ID
-   * @returns Task ID
-   */
+  /** 获取任务 ID */
   get id(): string {
     return this.taskId;
   }
 
-  /**
-   * Query the task status
-   * @returns Task status
-   */
+  /** 查询任务状�?*/
   async query(): Promise<TaskStatus> {
-    try {
-      const response = await this.client['request']<{ status: string }>(
-        'GET',
-        `/api/tasks/${this.taskId}`
-      );
-
-      if (!response.status) {
-        throw new TaskError('Invalid response: missing status');
-      }
-
-      return response.status as TaskStatus;
-    } catch (error) {
-      throw new TaskError(`Error querying task status: ${error.message}`);
+    const response = await this.client.request<{ status: string }>(
+      'GET',
+      `/api/v1/tasks/${this.taskId}`,
+    );
+    if (!response.status) {
+      throw new TaskError('响应格式异常: 缺少 status');
     }
+    return response.status as TaskStatus;
   }
 
-  /**
-   * Wait for the task to complete
-   * @param options Options
-   * @returns Task result
-   */
+  /** 等待任务完成 */
   async wait(options?: { timeout?: number }): Promise<TaskResult> {
     const startTime = Date.now();
     const timeout = options?.timeout || 0;
@@ -69,10 +47,10 @@ export class Task {
         status === TaskStatus.FAILED ||
         status === TaskStatus.CANCELLED
       ) {
-        const response = await this.client['request']<{ output?: string; error?: string }>(
-          'GET',
-          `/api/tasks/${this.taskId}`
-        );
+        const response = await this.client.request<{
+          output?: string;
+          error?: string;
+        }>('GET', `/api/v1/tasks/${this.taskId}`);
 
         return {
           taskId: this.taskId,
@@ -83,28 +61,21 @@ export class Task {
       }
 
       if (timeout > 0 && Date.now() - startTime > timeout) {
-        throw new TimeoutError(`Task did not complete within ${timeout}ms`);
+        throw new TimeoutError(
+          `任务�?${timeout}ms 内未完成`,
+        );
       }
 
-      // Wait for 500ms before querying again
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
   }
 
-  /**
-   * Cancel the task
-   * @returns True if the task was cancelled successfully
-   */
+  /** 取消任务 */
   async cancel(): Promise<boolean> {
-    try {
-      const response = await this.client['request']<{ success: boolean }>(
-        'POST',
-        `/api/tasks/${this.taskId}/cancel`
-      );
-
-      return response.success;
-    } catch (error) {
-      throw new TaskError(`Error cancelling task: ${error.message}`);
-    }
+    const response = await this.client.request<{ success: boolean }>(
+      'POST',
+      `/api/v1/tasks/${this.taskId}/cancel`,
+    );
+    return response.success;
   }
 }

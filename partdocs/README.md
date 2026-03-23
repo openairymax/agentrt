@@ -1,7 +1,7 @@
 # AgentOS 技术文档中心 (PartDocs)
 
-**版本**: 1.0.0.5  
-**最后更新**: 2026-03-18  
+**版本**: 1.0.0.6  
+**最后更新**: 2026-03-21  
 
 ---
 
@@ -60,15 +60,35 @@ partdocs/
 │   └── engineering_art.md      # 工程的艺术
 │
 └── specifications/              # 技术规范 📋
-    ├── coding_standards.md     # 编码规范
-    ├── testing.md              # 测试规范
-    ├── security.md             # 安全规范
-    ├── performance.md          # 性能指标要求
-    ├── protocol.md             # 通信协议规范
-    ├── agent_contract.md       # Agent 合约规范
-    ├── skill_contract.md       # 技能合约规范
-    ├── logging_format.md       # 日志格式规范
-    └── syscall_api.md          # 系统调用 API 规范
+    ├── TERMINOLOGY.md          # 统一术语表 ⭐
+    │
+    ├── agentos_contract/       # AgentOS 契约规范集 (v2.0) ⭐
+    │   ├── README.md           # 规范集总览
+    │   ├── glossary_index.md   # 快速索引
+    │   ├── agent/              # Agent 契约
+    │   │   ├── agent_contract.md
+    │   │   └── agent_contract_schema.json
+    │   ├── skill/              # Skill 契约
+    │   │   ├── skill_contract.md
+    │   │   └── skill_contract_schema.json
+    │   ├── protocol/           # 通信协议
+    │   │   └── protocol_contract.md
+    │   ├── syscall/            # 系统调用 API
+    │   │   └── syscall_api_contract.md
+    │   └── log/                # 日志格式
+    │       └── logging_format.md
+    │
+    ├── coding_standard/        # 编码规范 💻
+    │   ├── C&Cpp-secure-coding-guide.md    # C/C++ 安全编程指南
+    │   ├── C_coding_style_guide.md         # C 语言编码规范
+    │   ├── Python_coding_style_guide.md    # Python 规范
+    │   ├── JavaScript_coding_style_guide.md # JavaScript 规范
+    │   └── Log_guide.md                    # 日志打印规范
+    │
+    └── project_erp/            # 项目 ERP 资源管理 📊
+        ├── ErrorCodeReference.md           # 错误码参考
+        ├── ResourceManagementTable.md      # 资源管理表
+        └── SBOM.md                         # 软件物料清单
 ```
 
 ---
@@ -99,9 +119,16 @@ partdocs/
    - [记忆理论](philosophy/memory_theory.md)
 
 2. **技术规范** → [specifications/](specifications/)
-   - [编码规范](specifications/coding_standards.md)
-   - [系统调用 API 规范](specifications/syscall_api.md)
-   - [日志格式规范](specifications/logging_format.md)
+   - [统一术语表](specifications/TERMINOLOGY.md) ⭐
+   - [AgentOS 契约规范集](specifications/agentos_contract/README.md) ⭐
+     - [Agent 契约](specifications/agentos_contract/agent/agent_contract.md)
+     - [Skill 契约](specifications/agentos_contract/skill/skill_contract.md)
+     - [通信协议](specifications/agentos_contract/protocol/protocol_contract.md)
+     - [系统调用 API](specifications/agentos_contract/syscall/syscall_api_contract.md)
+     - [日志格式](specifications/agentos_contract/log/logging_format.md)
+   - [编码规范](specifications/coding_standard/C_coding_style_guide.md)
+   - [C/C++ 安全编程指南](specifications/coding_standard/C&Cpp-secure-coding-guide.md)
+   - [日志打印规范](specifications/coding_standard/Log_guide.md)
 
 3. **性能优化** → [guides/kernel_tuning.md](guides/kernel_tuning.md)
    - 内存管理优化
@@ -234,6 +261,16 @@ class TaskManager:
         pass
 ```
 
+#### Log Guide 日志打印规范
+
+**内容**:
+- 日志级别使用规范
+- 结构化日志格式
+- 性能优化建议
+- 调试和生产环境配置
+
+**适合读者**: 所有开发人员
+
 #### Testing 测试规范
 
 **单元测试覆盖率要求**:
@@ -365,9 +402,9 @@ python scripts/validate_docs.py
 | **架构文档** | 7 篇 | ~50k |
 | **开发指南** | 6 篇 | ~30k |
 | **API 文档** | 10+ 篇 | ~40k |
-| **技术规范** | 8 篇 | ~25k |
+| **技术规范** | 9 篇 | ~28k |
 | **设计哲学** | 6 篇 | ~20k |
-| **总计** | 37+ 篇 | ~165k |
+| **总计** | 38+ 篇 | ~168k |
 
 ---
 

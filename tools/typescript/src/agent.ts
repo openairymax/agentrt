@@ -1,28 +1,25 @@
 // AgentOS TypeScript SDK Agent
-// Version: 1.0.0.5
-// Last updated: 2026-03-21
+// Version: 2.0.0
+// Last updated: 2026-03-23
 
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { ClientConfig, Memory, TaskResult, SkillInfo, SkillResult } from './types';
-import { NetworkError, HttpError, TimeoutError } from './errors';
+import { NetworkError, HttpError, TimeoutError, AgentOSError } from './errors';
 import { Task } from './task';
 import { Session } from './session';
 import { Skill } from './skill';
 
-/**
- * AgentOS client class
- */
+/** AgentOS 客户端类 */
 export class AgentOS {
   private client: AxiosInstance;
   private endpoint: string;
 
-  /**
-   * Create a new AgentOS client
-   * @param config Client configuration
-   */
+  /** 创建新的 AgentOS 客户�?*/
   constructor(config: ClientConfig = {}) {
     this.endpoint = config.endpoint || 'http://localhost:18789';
-    this.endpoint = this.endpoint.endsWith('/') ? this.endpoint.slice(0, -1) : this.endpoint;
+    this.endpoint = this.endpoint.endsWith('/')
+      ? this.endpoint.slice(0, -1)
+      : this.endpoint;
 
     this.client = axios.create({
       baseURL: this.endpoint,
@@ -33,102 +30,67 @@ export class AgentOS {
       },
     });
 
-    // Error handling interceptor
     this.client.interceptors.response.use(
       (response) => response,
       (error) => {
         if (error.code === 'ECONNABORTED') {
-          throw new TimeoutError('Request timed out');
+          throw new TimeoutError('请求超时');
         } else if (error.code === 'ERR_NETWORK') {
-          throw new NetworkError('Network error');
+          throw new NetworkError('网络错误');
         } else if (error.response) {
           throw new HttpError(
-            `Server returned error: ${error.response.status}`,
-            error.response.status
+            `服务端返回错�? ${error.response.status}`,
+            error.response.status,
           );
         }
-        throw error;
-      }
+        throw new AgentOSError(error.message || '未知错误');
+      },
     );
   }
 
-  /**
-   * Make an HTTP request to the AgentOS server
-   * @param method HTTP method
-   * @param path API path
-   * @param data Request data
-   * @returns Response data
-   */
-  private async request<T>(method: string, path: string, data?: any): Promise<T> {
-    const config: AxiosRequestConfig = {
-      method,
-      url: path,
-      data,
-    };
-
-    try {
-      const response: AxiosResponse<T> = await this.client(config);
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
+  /** �?AgentOS 服务端发�?HTTP 请求 */
+  async request<T>(method: string, path: string, data?: any): Promise<T> {
+    const config: AxiosRequestConfig = { method, url: path, data };
+    const response: AxiosResponse<T> = await this.client(config);
+    return response.data;
   }
 
-  /**
-   * Submit a task to the AgentOS system
-   * @param taskDescription Task description
-   * @returns Task object
-   */
+  /** 提交任务�?AgentOS 系统 */
   async submitTask(taskDescription: string): Promise<Task> {
     const response = await this.request<{ task_id: string }>(
       'POST',
-      '/api/tasks',
-      { description: taskDescription }
+      '/api/v1/tasks',
+      { description: taskDescription },
     );
-
     if (!response.task_id) {
-      throw new Error('Invalid response: missing task_id');
+      throw new AgentOSError('响应格式异常: 缺少 task_id');
     }
-
     return new Task(this, response.task_id);
   }
 
-  /**
-   * Write a memory to the AgentOS system
-   * @param content Memory content
-   * @param metadata Optional metadata
-   * @returns Memory ID
-   */
+  /** 写入记忆�?AgentOS 系统 */
   async writeMemory(content: string, metadata?: Record<string, any>): Promise<string> {
     const response = await this.request<{ memory_id: string }>(
       'POST',
-      '/api/memories',
-      { content, metadata: metadata || {} }
+      '/api/v1/memories',
+      { content, metadata: metadata || {} },
     );
-
     if (!response.memory_id) {
-      throw new Error('Invalid response: missing memory_id');
+      throw new AgentOSError('响应格式异常: 缺少 memory_id');
     }
-
     return response.memory_id;
   }
 
-  /**
-   * Search memories in the AgentOS system
-   * @param query Search query
-   * @param topK Maximum number of results
-   * @returns List of memories
-   */
+  /** 搜索记忆 */
   async searchMemory(query: string, topK: number = 5): Promise<Memory[]> {
+    const encodedQuery = encodeURIComponent(query);
     const response = await this.request<{ memories: any[] }>(
       'GET',
-      `/api/memories/search?query=${encodeURIComponent(query)}&top_k=${topK}`
+      `/api/v1/memories/search?query=${encodedQuery}&top_k=${topK}`,
     );
-
     if (!response.memories) {
-      throw new Error('Invalid response: missing memories');
+      throw new AgentOSError('响应格式异常: 缺少 memories');
     }
-
     return response.memories.map((mem) => ({
       memoryId: mem.memory_id,
       content: mem.content,
@@ -137,17 +99,9 @@ export class AgentOS {
     }));
   }
 
-  /**
-   * Get a memory by ID
-   * @param memoryId Memory ID
-   * @returns Memory object
-   */
+  /** 根据 ID 获取记忆 */
   async getMemory(memoryId: string): Promise<Memory> {
-    const response = await this.request<any>(
-      'GET',
-      `/api/memories/${memoryId}`
-    );
-
+    const response = await this.request<any>('GET', `/api/v1/memories/${memoryId}`);
     return {
       memoryId: response.memory_id,
       content: response.content,
@@ -156,43 +110,49 @@ export class AgentOS {
     };
   }
 
-  /**
-   * Delete a memory by ID
-   * @param memoryId Memory ID
-   * @returns True if the memory was deleted successfully
-   */
+  /** 根据 ID 删除记忆 */
   async deleteMemory(memoryId: string): Promise<boolean> {
     const response = await this.request<{ success: boolean }>(
       'DELETE',
-      `/api/memories/${memoryId}`
+      `/api/v1/memories/${memoryId}`,
     );
-
     return response.success;
   }
 
-  /**
-   * Create a new session
-   * @returns Session object
-   */
+  /** 创建新会�?*/
   async createSession(): Promise<Session> {
     const response = await this.request<{ session_id: string }>(
       'POST',
-      '/api/sessions'
+      '/api/v1/sessions',
     );
-
     if (!response.session_id) {
-      throw new Error('Invalid response: missing session_id');
+      throw new AgentOSError('响应格式异常: 缺少 session_id');
     }
-
     return new Session(this, response.session_id);
   }
 
-  /**
-   * Load a skill by name
-   * @param skillName Skill name
-   * @returns Skill object
-   */
+  /** 加载技�?*/
   async loadSkill(skillName: string): Promise<Skill> {
     return new Skill(this, skillName);
+  }
+
+  /** 健康检�?*/
+  async health(): Promise<boolean> {
+    try {
+      await this.request<any>('GET', '/api/v1/health');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** 获取客户端端点地址 */
+  getEndpoint(): string {
+    return this.endpoint;
+  }
+
+  /** 关闭客户端（释放资源�?*/
+  close(): void {
+    this.client.interceptors.response.clear();
   }
 }

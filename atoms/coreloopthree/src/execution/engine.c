@@ -23,7 +23,6 @@
 #include <unistd.h>
 #include <stdatomic.h>
 #endif
-// From data intelligence emerges. by spharx
 
 typedef struct task_control_block {
     char* task_id;
@@ -33,14 +32,14 @@ typedef struct task_control_block {
     uint64_t start_time_ns;
     uint64_t end_time_ns;
     void* result;
+    size_t result_len;
     agentos_cond_t* completed_cond;
-    agentos_mutex_t* tcb_lock;          // 保护状态、引用计数等
-    int ref_count;                       // 引用计数
-    struct task_control_block* next;     // 用于队列和链表
-    struct task_control_block* hash_next; // 用于哈希表
+    agentos_mutex_t* tcb_lock;
+    int ref_count;
+    struct task_control_block* next;
+    struct task_control_block* hash_next;
 } task_tcb_t;
 
-// 简单的哈希表实现
 typedef struct {
     task_tcb_t** buckets;
     size_t size;
@@ -54,91 +53,99 @@ struct agentos_execution_engine {
     agentos_mutex_t* running_lock;
     task_tcb_t* task_queue;
     task_tcb_t* running_tasks;
-    task_hash_table_t* task_map;         // 用于快速查找任务
+    task_hash_table_t* task_map;
     agentos_cond_t* task_available_cond;
     agentos_thread_t* worker_threads;
     size_t worker_count;
     volatile int running;
 };
 
+static void tcb_retain(task_tcb_t* tcb);
+static void tcb_release(task_tcb_t* tcb);
 
-
-// 哈希函数
+/**
+ * @brief 哈希函数（djb2 变体）
+ */
 static size_t task_hash(const char* task_id, size_t table_size) {
-    size_t hash = 0;
+    size_t hash = 5381;
     while (*task_id) {
-        hash = (hash * 31) + *task_id++;
+        hash = ((hash << 5) + hash) + (unsigned char)*task_id++;
     }
     return hash % table_size;
 }
 
-// 创建哈希表
+/**
+ * @brief 创建哈希表
+ */
 static task_hash_table_t* task_hash_table_create(size_t size) {
     task_hash_table_t* table = (task_hash_table_t*)calloc(1, sizeof(task_hash_table_t));
     if (!table) return NULL;
-    
+
     table->size = size;
     table->buckets = (task_tcb_t**)calloc(size, sizeof(task_tcb_t*));
     if (!table->buckets) {
         free(table);
         return NULL;
     }
-    
+
     table->lock = agentos_mutex_create();
     if (!table->lock) {
         free(table->buckets);
         free(table);
         return NULL;
     }
-    
+
     return table;
 }
 
-// 销毁哈希表
+/**
+ * @brief 销毁哈希表，释放所有持有引用
+ */
 static void task_hash_table_destroy(task_hash_table_t* table) {
     if (!table) return;
-    
+
     agentos_mutex_lock(table->lock);
     for (size_t i = 0; i < table->size; i++) {
         task_tcb_t* tcb = table->buckets[i];
         while (tcb) {
             task_tcb_t* next = tcb->hash_next;
             tcb->hash_next = NULL;
-            // 释放任务引用，因为哈希表不再持有该任务
             tcb_release(tcb);
             tcb = next;
         }
+        table->buckets[i] = NULL;
     }
     agentos_mutex_unlock(table->lock);
-    
+
     agentos_mutex_destroy(table->lock);
     free(table->buckets);
     free(table);
 }
 
-// 插入任务到哈希表
+/**
+ * @brief 向哈希表插入任务（增加引用计数）
+ */
 static void task_hash_table_insert(task_hash_table_t* table, task_tcb_t* tcb) {
     if (!table || !tcb || !tcb->task_id) return;
-    
-    // 增加任务引用计数，因为哈希表现在持有了该任务
+
     tcb_retain(tcb);
-    
+
     size_t index = task_hash(tcb->task_id, table->size);
     agentos_mutex_lock(table->lock);
-    
     tcb->hash_next = table->buckets[index];
     table->buckets[index] = tcb;
-    
     agentos_mutex_unlock(table->lock);
 }
 
-// 从哈希表中查找任务
+/**
+ * @brief 在哈希表中查找任务（不增加引用计数）
+ */
 static task_tcb_t* task_hash_table_find(task_hash_table_t* table, const char* task_id) {
     if (!table || !task_id) return NULL;
-    
+
     size_t index = task_hash(task_id, table->size);
     agentos_mutex_lock(table->lock);
-    
+
     task_tcb_t* tcb = table->buckets[index];
     while (tcb) {
         if (strcmp(tcb->task_id, task_id) == 0) {
@@ -147,18 +154,20 @@ static task_tcb_t* task_hash_table_find(task_hash_table_t* table, const char* ta
         }
         tcb = tcb->hash_next;
     }
-    
+
     agentos_mutex_unlock(table->lock);
     return NULL;
 }
 
-// 从哈希表中删除任务
+/**
+ * @brief 从哈希表中移除任务（减少引用计数）
+ */
 static void task_hash_table_remove(task_hash_table_t* table, const char* task_id) {
     if (!table || !task_id) return;
-    
+
     size_t index = task_hash(task_id, table->size);
     agentos_mutex_lock(table->lock);
-    
+
     task_tcb_t** p = &table->buckets[index];
     while (*p) {
         if (strcmp((*p)->task_id, task_id) == 0) {
@@ -166,25 +175,18 @@ static void task_hash_table_remove(task_hash_table_t* table, const char* task_id
             *p = tcb->hash_next;
             tcb->hash_next = NULL;
             agentos_mutex_unlock(table->lock);
-            // 释放任务引用，因为哈希表不再持有该任务
             tcb_release(tcb);
             return;
         }
         p = &(*p)->hash_next;
     }
-    
+
     agentos_mutex_unlock(table->lock);
 }
 
-static task_tcb_t* find_tcb_in_list(task_tcb_t* list, const char* task_id) {
-    task_tcb_t* tcb = list;
-    while (tcb) {
-        if (strcmp(tcb->task_id, task_id) == 0) return tcb;
-        tcb = tcb->next;
-    }
-    return NULL;
-}
-
+/**
+ * @brief 从链表中移除指定 TCB
+ */
 static void remove_tcb_from_list(task_tcb_t** list, task_tcb_t* target) {
     task_tcb_t** p = list;
     while (*p) {
@@ -197,6 +199,9 @@ static void remove_tcb_from_list(task_tcb_t** list, task_tcb_t* target) {
     }
 }
 
+/**
+ * @brief 增加任务引用计数
+ */
 static void tcb_retain(task_tcb_t* tcb) {
     if (!tcb) return;
     agentos_mutex_lock(tcb->tcb_lock);
@@ -204,18 +209,26 @@ static void tcb_retain(task_tcb_t* tcb) {
     agentos_mutex_unlock(tcb->tcb_lock);
 }
 
+/**
+ * @brief 减少任务引用计数，归零时释放
+ */
 static void tcb_release(task_tcb_t* tcb) {
     if (!tcb) return;
     int need_free = 0;
     agentos_mutex_lock(tcb->tcb_lock);
     tcb->ref_count--;
-    if (tcb->ref_count == 0) {
+    if (tcb->ref_count <= 0) {
         need_free = 1;
     }
     agentos_mutex_unlock(tcb->tcb_lock);
     if (need_free) {
         free(tcb->task_id);
-        free(tcb->task_desc);
+        if (tcb->task_desc) {
+            if (tcb->task_desc->task_id) free(tcb->task_desc->task_id);
+            if (tcb->task_desc->agent_id) free(tcb->task_desc->agent_id);
+            if (tcb->task_desc->input) free(tcb->task_desc->input);
+            free(tcb->task_desc);
+        }
         if (tcb->result) free(tcb->result);
         if (tcb->completed_cond) agentos_cond_destroy(tcb->completed_cond);
         if (tcb->tcb_lock) agentos_mutex_destroy(tcb->tcb_lock);
@@ -223,6 +236,71 @@ static void tcb_release(task_tcb_t* tcb) {
     }
 }
 
+/**
+ * @brief 深拷贝任务描述
+ */
+static agentos_task_t* task_desc_deep_copy(const agentos_task_t* task) {
+    agentos_task_t* copy = (agentos_task_t*)calloc(1, sizeof(agentos_task_t));
+    if (!copy) return NULL;
+
+    if (task->task_id) {
+        copy->task_id = strdup(task->task_id);
+        if (!copy->task_id) goto fail;
+    }
+    if (task->agent_id) {
+        copy->agent_id = strdup(task->agent_id);
+        if (!copy->agent_id) goto fail;
+    }
+    if (task->input) {
+        copy->input = strdup(task->input);
+        if (!copy->input) goto fail;
+    }
+    copy->priority = task->priority;
+    copy->timeout_ms = task->timeout_ms;
+    return copy;
+
+fail:
+    if (copy->task_id) free(copy->task_id);
+    if (copy->agent_id) free(copy->agent_id);
+    if (copy->input) free(copy->input);
+    free(copy);
+    return NULL;
+}
+
+/**
+ * @brief 深拷贝任务结果
+ */
+static agentos_task_t* task_result_deep_copy(const task_tcb_t* tcb) {
+    agentos_task_t* result = (agentos_task_t*)calloc(1, sizeof(agentos_task_t));
+    if (!result) return NULL;
+
+    if (tcb->task_desc->task_id) {
+        result->task_id = strdup(tcb->task_desc->task_id);
+        if (!result->task_id) goto fail;
+    }
+    if (tcb->task_desc->agent_id) {
+        result->agent_id = strdup(tcb->task_desc->agent_id);
+        if (!result->agent_id) goto fail;
+    }
+    if (tcb->result && tcb->result_len > 0) {
+        result->output = malloc(tcb->result_len);
+        if (!result->output) goto fail;
+        memcpy(result->output, tcb->result, tcb->result_len);
+        result->output_len = tcb->result_len;
+    }
+    result->priority = tcb->task_desc->priority;
+    return result;
+
+fail:
+    if (result->task_id) free(result->task_id);
+    if (result->agent_id) free(result->agent_id);
+    free(result);
+    return NULL;
+}
+
+/**
+ * @brief 工作线程主函数
+ */
 static void worker_thread_func(void* arg) {
     agentos_execution_engine_t* engine = (agentos_execution_engine_t*)arg;
 
@@ -247,13 +325,14 @@ static void worker_thread_func(void* arg) {
         engine->running_tasks = tcb;
         agentos_mutex_unlock(engine->running_lock);
 
-        tcb->start_time_ns = agentos_time_monotonic_ns();
         agentos_mutex_lock(tcb->tcb_lock);
+        tcb->start_time_ns = agentos_time_monotonic_ns();
         tcb->status = TASK_STATUS_RUNNING;
         agentos_mutex_unlock(tcb->tcb_lock);
 
         agentos_execution_unit_t* unit = agentos_registry_get_unit(tcb->task_desc->agent_id);
         void* output = NULL;
+        size_t output_len = 0;
         agentos_error_t exec_err;
         if (unit) {
             exec_err = unit->execute(unit, tcb->task_desc->input, &output);
@@ -262,10 +341,12 @@ static void worker_thread_func(void* arg) {
             AGENTOS_LOG_ERROR("No execution unit found for agent %s", tcb->task_desc->agent_id);
         }
 
-        tcb->end_time_ns = agentos_time_monotonic_ns();
         agentos_mutex_lock(tcb->tcb_lock);
+        tcb->end_time_ns = agentos_time_monotonic_ns();
         tcb->status = (exec_err == AGENTOS_SUCCESS) ? TASK_STATUS_SUCCEEDED : TASK_STATUS_FAILED;
         tcb->result = output;
+        tcb->result_len = output_len;
+        agentos_cond_signal(tcb->completed_cond);
         agentos_mutex_unlock(tcb->tcb_lock);
 
         agentos_mutex_lock(engine->running_lock);
@@ -273,14 +354,7 @@ static void worker_thread_func(void* arg) {
         engine->current_concurrency--;
         agentos_mutex_unlock(engine->running_lock);
 
-        // 从哈希表中移除任务
         task_hash_table_remove(engine->task_map, tcb->task_id);
-
-        agentos_mutex_lock(tcb->tcb_lock);
-        agentos_cond_signal(tcb->completed_cond);
-        agentos_mutex_unlock(tcb->tcb_lock);
-
-        // 释放工作线程持有的引用
         tcb_release(tcb);
     }
 }
@@ -439,13 +513,11 @@ agentos_error_t agentos_execution_submit(
         return AGENTOS_EINVAL;
     }
 
-    agentos_task_t* task_copy = (agentos_task_t*)malloc(sizeof(agentos_task_t));
+    agentos_task_t* task_copy = task_desc_deep_copy(task);
     if (!task_copy) {
-        AGENTOS_LOG_ERROR("Failed to allocate task copy: %s (code %d)", 
-                        agentos_error_string(AGENTOS_ENOMEM), AGENTOS_ENOMEM);
+        AGENTOS_LOG_ERROR("Failed to deep copy task description");
         return AGENTOS_ENOMEM;
     }
-    memcpy(task_copy, task, sizeof(agentos_task_t));
 
     task_tcb_t* tcb = (task_tcb_t*)calloc(1, sizeof(task_tcb_t));
     if (!tcb) {
@@ -544,21 +616,10 @@ agentos_error_t agentos_execution_wait(
     agentos_mutex_unlock(tcb->tcb_lock);
 
     if (out_result) {
-        agentos_task_t* result_copy = (agentos_task_t*)malloc(sizeof(agentos_task_t));
+        agentos_task_t* result_copy = task_result_deep_copy(tcb);
         if (!result_copy) {
             tcb_release(tcb);
             return AGENTOS_ENOMEM;
-        }
-        memcpy(result_copy, tcb->task_desc, sizeof(agentos_task_t));
-        result_copy->output = tcb->result;  // 转移所有权？不，result 是 TCB 的，应该复制
-        // 实际上，我们需要复制结果，因为 TCB 的 result 将被保留直到释放
-        if (tcb->result) {
-            // 假设结果是字符串，需要复制
-            size_t len = strlen((char*)tcb->result) + 1;
-            result_copy->output = malloc(len);
-            if (result_copy->output) memcpy(result_copy->output, tcb->result, len);
-        } else {
-            result_copy->output = NULL;
         }
         *out_result = result_copy;
     }
@@ -625,18 +686,10 @@ agentos_error_t agentos_execution_get_result(
     }
     agentos_mutex_unlock(tcb->tcb_lock);
 
-    agentos_task_t* result_copy = (agentos_task_t*)malloc(sizeof(agentos_task_t));
+    agentos_task_t* result_copy = task_result_deep_copy(tcb);
     if (!result_copy) {
         tcb_release(tcb);
         return AGENTOS_ENOMEM;
-    }
-    memcpy(result_copy, tcb->task_desc, sizeof(agentos_task_t));
-    if (tcb->result) {
-        size_t len = strlen((char*)tcb->result) + 1;
-        result_copy->output = malloc(len);
-        if (result_copy->output) memcpy(result_copy->output, tcb->result, len);
-    } else {
-        result_copy->output = NULL;
     }
     *out_result = result_copy;
 
@@ -646,6 +699,9 @@ agentos_error_t agentos_execution_get_result(
 
 void agentos_task_free(agentos_task_t* task) {
     if (!task) return;
+    if (task->task_id) free(task->task_id);
+    if (task->agent_id) free(task->agent_id);
+    if (task->input) free(task->input);
     if (task->output) free(task->output);
     free(task);
 }

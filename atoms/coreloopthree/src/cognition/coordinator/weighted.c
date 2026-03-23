@@ -23,7 +23,6 @@ typedef struct weighted_data {
 
 static void weighted_destroy(agentos_coordinator_strategy_t* strategy) {
     if (!strategy) return;
-    // From data intelligence emerges. by spharx
     weighted_data_t* data = (weighted_data_t*)strategy->data;
     if (data) {
         for (size_t i = 0; i < data->model_count; i++) {
@@ -126,12 +125,11 @@ agentos_coordinator_strategy_t* agentos_weighted_coordinator_create(
     agentos_coordinator_strategy_t* strat = (agentos_coordinator_strategy_t*)malloc(sizeof(agentos_coordinator_strategy_t));
     if (!strat) return NULL;
 
-    weighted_data_t* data = (weighted_data_t*)malloc(sizeof(weighted_data_t));
+    weighted_data_t* data = (weighted_data_t*)calloc(1, sizeof(weighted_data_t));
     if (!data) {
         free(strat);
         return NULL;
     }
-    memset(data, 0, sizeof(weighted_data_t));
 
     data->model_names = (char**)calloc(model_count, sizeof(char*));
     data->weights = (float*)calloc(model_count, sizeof(float));

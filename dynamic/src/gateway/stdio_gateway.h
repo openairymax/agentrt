@@ -1,24 +1,23 @@
 /**
  * @file stdio_gateway.h
- * @brief stdio 网关接口
+ * @brief Stdio 网关接口
+ * 
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
-#ifndef BASERUNTIME_STDIO_GATEWAY_H
-#define BASERUNTIME_STDIO_GATEWAY_H
+
+#ifndef DYNAMIC_STDIO_GATEWAY_H
+#define DYNAMIC_STDIO_GATEWAY_H
 
 #include "gateway.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /**
- * @brief 创建 stdio 网关实例
- * @return 网关句柄，失败返回 NULL
+ * @brief 创建 Stdio 网关
+ * 
+ * @param server 服务器引用
+ * @return 网关实例，失败返回 NULL
+ * 
+ * @ownership 调用者需通过 gateway_destroy() 释放
  */
-gateway_t* stdio_gateway_create(void);
+gateway_t* stdio_gateway_create(dynamic_server_t* server);
 
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* BASERUNTIME_STDIO_GATEWAY_H */
+#endif /* DYNAMIC_STDIO_GATEWAY_H */

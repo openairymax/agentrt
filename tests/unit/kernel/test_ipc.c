@@ -4,10 +4,10 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "core/include/ipc.h"
-#include "core/include/error.h"
-#include "core/include/task.h"
-#include "core/include/time.h"
+#include "corekern/include/ipc.h"
+#include "corekern/include/error.h"
+#include "corekern/include/task.h"
+#include "corekern/include/time.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>

@@ -94,7 +94,7 @@ class AgentOS:
             A Task object representing the submitted task.
         """
         data = {"description": task_description}
-        response = self._request("POST", "/api/tasks", data)
+        response = self._request("POST", "/api/v1/tasks", data)
         task_id = response.get("task_id")
         if not task_id:
             raise AgentOSError("Invalid response from server: missing task_id")
@@ -112,7 +112,7 @@ class AgentOS:
             The memory ID.
         """
         data = {"content": content, "metadata": metadata or {}}
-        response = self._request("POST", "/api/memories", data)
+        response = self._request("POST", "/api/v1/memories", data)
         memory_id = response.get("memory_id")
         if not memory_id:
             raise AgentOSError("Invalid response from server: missing memory_id")
@@ -130,7 +130,7 @@ class AgentOS:
             A list of Memory objects.
         """
         params = f"?query={query}&top_k={top_k}"
-        response = self._request("GET", f"/api/memories/search{params}")
+        response = self._request("GET", f"/api/v1/memories/search{params}")
         memories = []
         for mem_data in response.get("memories", []):
             memory = Memory(
@@ -152,7 +152,7 @@ class AgentOS:
         Returns:
             A Memory object.
         """
-        response = self._request("GET", f"/api/memories/{memory_id}")
+        response = self._request("GET", f"/api/v1/memories/{memory_id}")
         return Memory(
             memory_id=response.get("memory_id"),
             content=response.get("content"),
@@ -170,7 +170,7 @@ class AgentOS:
         Returns:
             True if the memory was deleted successfully.
         """
-        response = self._request("DELETE", f"/api/memories/{memory_id}")
+        response = self._request("DELETE", f"/api/v1/memories/{memory_id}")
         return response.get("success", False)
     
     def create_session(self) -> Session:
@@ -180,7 +180,7 @@ class AgentOS:
         Returns:
             A Session object.
         """
-        response = self._request("POST", "/api/sessions")
+        response = self._request("POST", "/api/v1/sessions")
         session_id = response.get("session_id")
         if not session_id:
             raise AgentOSError("Invalid response from server: missing session_id")
@@ -281,7 +281,7 @@ class AsyncAgentOS:
             A Task object representing the submitted task.
         """
         data = {"description": task_description}
-        response = await self._request("POST", "/api/tasks", data)
+        response = await self._request("POST", "/api/v1/tasks", data)
         task_id = response.get("task_id")
         if not task_id:
             raise AgentOSError("Invalid response from server: missing task_id")
@@ -299,7 +299,7 @@ class AsyncAgentOS:
             The memory ID.
         """
         data = {"content": content, "metadata": metadata or {}}
-        response = await self._request("POST", "/api/memories", data)
+        response = await self._request("POST", "/api/v1/memories", data)
         memory_id = response.get("memory_id")
         if not memory_id:
             raise AgentOSError("Invalid response from server: missing memory_id")
@@ -317,7 +317,7 @@ class AsyncAgentOS:
             A list of Memory objects.
         """
         params = f"?query={query}&top_k={top_k}"
-        response = await self._request("GET", f"/api/memories/search{params}")
+        response = await self._request("GET", f"/api/v1/memories/search{params}")
         memories = []
         for mem_data in response.get("memories", []):
             memory = Memory(
@@ -339,7 +339,7 @@ class AsyncAgentOS:
         Returns:
             A Memory object.
         """
-        response = await self._request("GET", f"/api/memories/{memory_id}")
+        response = await self._request("GET", f"/api/v1/memories/{memory_id}")
         return Memory(
             memory_id=response.get("memory_id"),
             content=response.get("content"),
@@ -357,7 +357,7 @@ class AsyncAgentOS:
         Returns:
             True if the memory was deleted successfully.
         """
-        response = await self._request("DELETE", f"/api/memories/{memory_id}")
+        response = await self._request("DELETE", f"/api/v1/memories/{memory_id}")
         return response.get("success", False)
     
     async def create_session(self) -> Session:
@@ -367,7 +367,7 @@ class AsyncAgentOS:
         Returns:
             A Session object.
         """
-        response = await self._request("POST", "/api/sessions")
+        response = await self._request("POST", "/api/v1/sessions")
         session_id = response.get("session_id")
         if not session_id:
             raise AgentOSError("Invalid response from server: missing session_id")

@@ -5,12 +5,10 @@
  */
 
 #include "memory.h"
+#include "logger.h"
 #include <stdlib.h>
 #include <string.h>
 
-/**
- * @brief 异步写入请求结构
- */
 typedef struct async_write_req {
     agentos_memory_engine_t* engine;
     agentos_memory_record_t* record;
@@ -18,27 +16,79 @@ typedef struct async_write_req {
     void* userdata;
 } async_write_req_t;
 
+/**
+ * @brief 释放深拷贝的记忆记录
+ */
+static void free_record_copy(agentos_memory_record_t* rec) {
+    if (!rec) return;
+    if (rec->record_id) free(rec->record_id);
+    if (rec->source_agent) free(rec->source_agent);
+    if (rec->trace_id) free(rec->trace_id);
+    if (rec->data) free(rec->data);
+    free(rec);
+}
+
+/**
+ * @brief 深拷贝记忆记录
+ * @return 成功返回拷贝指针，失败返回 NULL
+ */
+static agentos_memory_record_t* deep_copy_record(const agentos_memory_record_t* record) {
+    agentos_memory_record_t* copy = (agentos_memory_record_t*)calloc(1, sizeof(agentos_memory_record_t));
+    if (!copy) return NULL;
+
+    if (record->record_id) {
+        copy->record_id = strdup(record->record_id);
+        if (!copy->record_id) goto fail;
+    }
+    if (record->source_agent) {
+        copy->source_agent = strdup(record->source_agent);
+        if (!copy->source_agent) goto fail;
+    }
+    if (record->trace_id) {
+        copy->trace_id = strdup(record->trace_id);
+        if (!copy->trace_id) goto fail;
+    }
+    if (record->data && record->data_len > 0) {
+        copy->data = malloc(record->data_len);
+        if (!copy->data) goto fail;
+        memcpy(copy->data, record->data, record->data_len);
+        copy->data_len = record->data_len;
+    }
+    copy->type = record->type;
+    return copy;
+
+fail:
+    free_record_copy(copy);
+    return NULL;
+}
+
+/**
+ * @brief 异步写入线程入口
+ */
 static void async_write_thread(void* arg) {
     async_write_req_t* req = (async_write_req_t*)arg;
+    if (!req) return;
+
     char* record_id = NULL;
     agentos_error_t err = agentos_memory_write(req->engine, req->record, &record_id);
+
     if (req->callback) {
-    // From data intelligence emerges. by spharx
         req->callback(err, record_id, req->userdata);
     }
     if (record_id) free(record_id);
-    
-    // 释放深拷贝的记录
-    if (req->record) {
-        if (req->record->record_id) free(req->record->record_id);
-        if (req->record->source_agent) free(req->record->source_agent);
-        if (req->record->trace_id) free(req->record->trace_id);
-        if (req->record->data) free(req->record->data);
-        free(req->record);
-    }
+
+    free_record_copy(req->record);
     free(req);
 }
 
+/**
+ * @brief 异步写入记忆记录
+ * @param engine 记忆引擎
+ * @param record 记录数据（函数内部深拷贝，调用者可立即释放）
+ * @param callback 写入完成回调（可为 NULL）
+ * @param userdata 回调用户数据
+ * @return AGENTOS_SUCCESS 或错误码
+ */
 agentos_error_t agentos_memory_write_async(
     agentos_memory_engine_t* engine,
     const agentos_memory_record_t* record,
@@ -47,60 +97,13 @@ agentos_error_t agentos_memory_write_async(
 
     if (!engine || !record) return AGENTOS_EINVAL;
 
-    // 创建请求对象
-    async_write_req_t* req = (async_write_req_t*)malloc(sizeof(async_write_req_t));
+    async_write_req_t* req = (async_write_req_t*)calloc(1, sizeof(async_write_req_t));
     if (!req) return AGENTOS_ENOMEM;
 
-    // 复制记录（深拷贝）
-    agentos_memory_record_t* rec_copy = (agentos_memory_record_t*)malloc(sizeof(agentos_memory_record_t));
+    agentos_memory_record_t* rec_copy = deep_copy_record(record);
     if (!rec_copy) {
         free(req);
         return AGENTOS_ENOMEM;
-    }
-    memcpy(rec_copy, record, sizeof(agentos_memory_record_t));
-    
-    // 深拷贝字符串字段
-    if (record->record_id) {
-        rec_copy->record_id = strdup(record->record_id);
-        if (!rec_copy->record_id) {
-            free(rec_copy);
-            free(req);
-            return AGENTOS_ENOMEM;
-        }
-    }
-    
-    if (record->source_agent) {
-        rec_copy->source_agent = strdup(record->source_agent);
-        if (!rec_copy->source_agent) {
-            if (rec_copy->record_id) free(rec_copy->record_id);
-            free(rec_copy);
-            free(req);
-            return AGENTOS_ENOMEM;
-        }
-    }
-    
-    if (record->trace_id) {
-        rec_copy->trace_id = strdup(record->trace_id);
-        if (!rec_copy->trace_id) {
-            if (rec_copy->record_id) free(rec_copy->record_id);
-            if (rec_copy->source_agent) free(rec_copy->source_agent);
-            free(rec_copy);
-            free(req);
-            return AGENTOS_ENOMEM;
-        }
-    }
-    
-    if (record->data && record->data_len > 0) {
-        rec_copy->data = malloc(record->data_len);
-        if (!rec_copy->data) {
-            if (rec_copy->record_id) free(rec_copy->record_id);
-            if (rec_copy->source_agent) free(rec_copy->source_agent);
-            if (rec_copy->trace_id) free(rec_copy->trace_id);
-            free(rec_copy);
-            free(req);
-            return AGENTOS_ENOMEM;
-        }
-        memcpy(rec_copy->data, record->data, record->data_len);
     }
 
     req->engine = engine;
@@ -108,11 +111,10 @@ agentos_error_t agentos_memory_write_async(
     req->callback = callback;
     req->userdata = userdata;
 
-    // 创建工作线程（简化：直接创建线程，实际应使用线程池）
     agentos_thread_t thread;
     agentos_error_t err = agentos_thread_create(&thread, async_write_thread, req);
     if (err != AGENTOS_SUCCESS) {
-        free(rec_copy);
+        free_record_copy(rec_copy);
         free(req);
         return err;
     }

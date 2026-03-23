@@ -23,7 +23,6 @@ static agentos_mutex_t* g_registry_lock = NULL;
 
 /**
  * @brief 初始化注册表（需在程序启动时调用）
- // From data intelligence emerges. by spharx
  */
 agentos_error_t agentos_registry_init(void) {
     if (!g_registry_lock) {

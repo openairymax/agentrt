@@ -1,87 +1,69 @@
 // AgentOS TypeScript SDK Session
-// Version: 1.0.0.5
-// Last updated: 2026-03-21
+// Version: 2.0.0
+// Last updated: 2026-03-23
 
 import { SessionError } from './errors';
 import { AgentOS } from './agent';
 
-/**
- * Session class for managing AgentOS sessions
- */
+/** AgentOS 会话管理�?*/
 export class Session {
   private client: AgentOS;
   private sessionId: string;
 
-  /**
-   * Create a new Session object
-   * @param client AgentOS client
-   * @param sessionId Session ID
-   */
+  /** 创建新的 Session 对象 */
   constructor(client: AgentOS, sessionId: string) {
     this.client = client;
     this.sessionId = sessionId;
   }
 
-  /**
-   * Get the session ID
-   * @returns Session ID
-   */
+  /** 获取会话 ID */
   get id(): string {
     return this.sessionId;
   }
 
-  /**
-   * Set a context value for the session
-   * @param key Context key
-   * @param value Context value
-   * @returns True if the context was set successfully
-   */
+  /** 设置会话上下文�?*/
   async setContext(key: string, value: any): Promise<boolean> {
-    try {
-      const response = await this.client['request']<{ success: boolean }>(
-        'POST',
-        `/api/sessions/${this.sessionId}/context`,
-        { key, value }
-      );
-
-      return response.success;
-    } catch (error) {
-      throw new SessionError(`Error setting session context: ${error.message}`);
-    }
+    const response = await this.client.request<{ success: boolean }>(
+      'POST',
+      `/api/v1/sessions/${this.sessionId}/context`,
+      { key, value },
+    );
+    return response.success;
   }
 
-  /**
-   * Get a context value from the session
-   * @param key Context key
-   * @returns Context value
-   */
+  /** 获取会话上下文�?*/
   async getContext(key: string): Promise<any> {
-    try {
-      const response = await this.client['request']<{ value: any }>(
-        'GET',
-        `/api/sessions/${this.sessionId}/context/${key}`
-      );
-
-      return response.value;
-    } catch (error) {
-      throw new SessionError(`Error getting session context: ${error.message}`);
-    }
+    const response = await this.client.request<{ value: any }>(
+      'GET',
+      `/api/v1/sessions/${this.sessionId}/context/${key}`,
+    );
+    return response.value;
   }
 
-  /**
-   * Close the session
-   * @returns True if the session was closed successfully
-   */
-  async close(): Promise<boolean> {
-    try {
-      const response = await this.client['request']<{ success: boolean }>(
-        'DELETE',
-        `/api/sessions/${this.sessionId}`
-      );
+  /** 删除会话上下文�?*/
+  async deleteContext(key: string): Promise<boolean> {
+    const response = await this.client.request<{ success: boolean }>(
+      'DELETE',
+      `/api/v1/sessions/${this.sessionId}/context/${key}`,
+    );
+    return response.success;
+  }
 
-      return response.success;
-    } catch (error) {
-      throw new SessionError(`Error closing session: ${error.message}`);
-    }
+  /** 获取所有上下文 */
+  async getAllContext(): Promise<Record<string, any>> {
+    const response = await this.client.request<{ context: Record<string, any> }>(
+      'GET',
+      `/api/v1/sessions/${this.sessionId}/context`,
+    );
+    return response.context;
+  }
+
+  /** 关闭会话 */
+  async close(): Promise<boolean> {
+    const response = await this.client.request<{ success: boolean }>(
+      'DELETE',
+      `/api/v1/sessions/${this.sessionId}`,
+    );
+    return response.success;
   }
 }
