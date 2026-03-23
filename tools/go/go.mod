@@ -1,7 +1,3 @@
-module github.com/spharx/agentos/tools/go/agentos
+module github.com/spharx/agentos/tools/go
 
 go 1.16
-
-require (
-	github.com/stretchr/testify v1.8.4
-)

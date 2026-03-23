@@ -1,0 +1,118 @@
+# AgentOS 测试覆盖率配置
+# Version: 1.0.0.6
+# Last updated: 2026-03-22
+
+[run]
+# 运行配置
+source = 
+    ../tools/python/agentos
+    ../atoms
+branch = True
+parallel = True
+concurrency = thread,multiprocessing
+
+# 数据文件
+data_file = .coverage
+
+# 排除文件
+omit =
+    */tests/*
+    */test_*.py
+    */__pycache__/*
+    */site-packages/*
+    */.tox/*
+    */.eggs/*
+    */build/*
+    */dist/*
+    */migrations/*
+    */venv/*
+    */.venv/*
+
+[report]
+# 报告配置
+precision = 2
+show_missing = True
+skip_covered = False
+skip_empty = True
+sort = Cover
+
+# 排除行
+exclude_lines =
+    # 标准排除
+    pragma: no cover
+    def __repr__
+    def __str__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod
+    @abc.abstractmethod
+    
+    # 调试代码
+    if DEBUG:
+    if VERBOSE:
+    if LOG_LEVEL == "DEBUG":
+    
+    # 测试代码
+    if TESTING:
+    if PYTEST_CURRENT_TEST:
+    
+    # 平台特定
+    if sys.platform ==
+    if os.name ==
+    if platform.system ==
+    
+    # 版本检查
+    if sys.version_info
+    if python_version
+    
+    # 异常处理
+    except ImportError:
+    except ModuleNotFoundError:
+    except KeyError:
+    except ValueError:
+    except AttributeError:
+    except TypeError:
+    
+    # 日志记录
+    logger.debug
+    logger.info
+    logger.warning
+    logger.error
+    print(
+    
+    # 注释排除
+    # nocov
+    # no cover
+    # skip coverage
+
+# 覆盖率阈值
+fail_under = 80
+
+[html]
+# HTML报告配置
+directory = reports/coverage/html
+title = AgentOS Test Coverage Report
+extra_css = 
+show_contexts = True
+
+[xml]
+# XML报告配置
+output = reports/coverage/coverage.xml
+
+[json]
+# JSON报告配置
+output = reports/coverage/coverage.json
+pretty_print = True
+show_contexts = True
+
+[lcov]
+# LCOV报告配置
+output = reports/coverage/lcov.info
+
+[paths]
+# 路径映射
+source =
+    tools/python/agentos
+    atoms/

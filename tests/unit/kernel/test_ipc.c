@@ -10,6 +10,7 @@
 #include "core/include/time.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 
 #define TEST_CHANNEL_NAME "test_channel"
 

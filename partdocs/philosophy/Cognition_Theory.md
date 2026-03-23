@@ -1,4 +1,5 @@
-Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+Copyright (c) 2026 SPHARX. All Rights Reserved.
+"From data intelligence emerges."
 
 # AgentOS 认知层理论
 
@@ -125,5 +126,6 @@ $$
 4. Russell, S., & Norvig, P. (2020). Artificial Intelligence: A Modern Approach.
 
 **本文编写**
-- SPHARX: DechengLi [https://gitee.com/spharx01]
-- SPHARX: LirenWang [https://gitee.com/spharx02]
+writer:
+- DechengLi [https://gitee.com/spharx01]
+- LirenWang [https://gitee.com/spharx02]

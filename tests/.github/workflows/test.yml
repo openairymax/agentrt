@@ -1,0 +1,309 @@
+# AgentOS 测试模块 CI/CD 工作流
+# Version: 1.0.0.6
+# Last updated: 2026-03-22
+
+name: AgentOS Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # 每天凌晨2点运行
+    - cron: '0 2 * * *'
+
+jobs:
+  # 代码质量检查
+  quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9, "3.10", "3.11"]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        cd tests
+        pip install -r requirements.txt
+    
+    - name: Lint code
+      run: |
+        cd tests
+        make lint
+    
+    - name: Type check
+      run: |
+        cd tests
+        make type-check
+    
+    - name: Security scan
+      run: |
+        cd tests
+        make security-scan
+    
+    - name: Upload security report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-report-${{ matrix.python-version }}
+        path: tests/reports/security_report.json
+
+  # 单元测试
+  unit-tests:
+    name: Unit Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: [3.8, 3.9, "3.10", "3.11"]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        cd tests
+        pip install -r requirements.txt
+        make setup-env
+    
+    - name: Run unit tests
+      run: |
+        cd tests
+        make test-unit
+    
+    - name: Generate coverage report
+      run: |
+        cd tests
+        make coverage
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: tests/.coverage
+        flags: unit-tests
+        name: codecov-umbrella
+    
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: coverage-report-${{ matrix.os }}-${{ matrix.python-version }}
+        path: tests/reports/coverage/
+
+  # 集成测试
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [quality, unit-tests]
+    
+    services:
+      # 模拟AgentOS服务
+      agentos-mock:
+        image: nginx:alpine
+        ports:
+          - 18789:80
+        options: >-
+          --health-cmd "curl -f http://localhost/ || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+    
+    - name: Install dependencies
+      run: |
+        cd tests
+        pip install -r requirements.txt
+        make setup-env
+    
+    - name: Wait for services
+      run: |
+        timeout 60 bash -c 'until curl -f http://localhost:18789; do sleep 2; done'
+    
+    - name: Run integration tests
+      run: |
+        cd tests
+        make test-integration
+      env:
+        AGENTOS_ENDPOINT: http://localhost:18789
+    
+    - name: Upload test reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: integration-test-reports
+        path: tests/reports/
+
+  # 安全测试
+  security-tests:
+    name: Security Tests
+    runs-on: ubuntu-latest
+    needs: quality
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+    
+    - name: Install dependencies
+      run: |
+        cd tests
+        pip install -r requirements.txt
+        make setup-env
+    
+    - name: Run security tests
+      run: |
+        cd tests
+        make test-security
+    
+    - name: Run additional security scans
+      run: |
+        # 扫描依赖漏洞
+        pip-audit --requirement tests/requirements.txt
+        
+        # 扫描代码安全问题
+        bandit -r tests/ -f json -o tests/reports/bandit_report.json
+        
+        # 扫描密钥泄露
+        trufflehog --json --output tests/reports/secrets_scan.json .
+    
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-test-reports
+        path: |
+          tests/reports/bandit_report.json
+          tests/reports/secrets_scan.json
+
+  # 性能测试
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+    
+    - name: Install dependencies
+      run: |
+        cd tests
+        pip install -r requirements.txt
+        make setup-env
+    
+    - name: Run performance tests
+      run: |
+        cd tests
+        make test-benchmark
+    
+    - name: Upload performance reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: performance-test-reports
+        path: tests/reports/
+
+  # 构建测试报告
+  build-reports:
+    name: Build Reports
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests, security-tests, performance-tests]
+    if: always()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+    
+    - name: Install dependencies
+      run: |
+        cd tests
+        pip install -r requirements.txt
+    
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+    
+    - name: Generate combined report
+      run: |
+        cd tests
+        python generate_combined_report.py
+    
+    - name: Upload final report
+      uses: actions/upload-artifact@v3
+      with:
+        name: final-test-report
+        path: tests/reports/final_report.html
+
+  # 通知
+  notify:
+    name: Notify Results
+    runs-on: ubuntu-latest
+    needs: [quality, unit-tests, integration-tests, security-tests, performance-tests]
+    if: always()
+    
+    steps:
+    - name: Notify success
+      if: ${{ needs.quality.result == 'success' && needs.unit-tests.result == 'success' && needs.integration-tests.result == 'success' }}
+      run: |
+        echo "✅ All tests passed successfully!"
+        # 这里可以添加Slack、邮件等通知
+    
+    - name: Notify failure
+      if: ${{ needs.quality.result == 'failure' || needs.unit-tests.result == 'failure' || needs.integration-tests.result == 'failure' }}
+      run: |
+        echo "❌ Some tests failed!"
+        # 这里可以添加失败通知

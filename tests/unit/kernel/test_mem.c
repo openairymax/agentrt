@@ -8,6 +8,7 @@
 #include "core/include/error.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 
 int test_mem_alloc_free() {
     printf("Testing memory allocation and free...\n");
