@@ -1,12 +1,20 @@
 /**
  * @file audit.h
- * @brief 审计模块公共接口
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ * @brief 审计日志系统公共接口
+ * @author Spharx
+ * @date 2024
+ * 
+ * 设计原则：
+ * - 异步写入：后台线程批量写入，不阻塞主线程
+ * - 日志轮转：自动轮转和压缩
+ * - 结构化：JSON 格式输出
  */
 
 #ifndef DOMAIN_AUDIT_H
 #define DOMAIN_AUDIT_H
 
+#include "../platform/platform.h"
+#include "audit_queue.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -14,74 +22,89 @@
 extern "C" {
 #endif
 
-/* 前向声明 */
+/* 审计日志记录器句柄 */
 typedef struct audit_logger audit_logger_t;
 
 /**
- * @brief 审计事件结构
+ * @brief 创建审计日志记录器
+ * @param log_dir 日志目录
+ * @param log_prefix 日志文件前缀
+ * @param max_file_size 单文件最大大小（字节）
+ * @param max_files 最大文件数
+ * @return 记录器句柄，失败返回 NULL
  */
-typedef struct audit_event {
-    uint64_t    timestamp;          /**< 时间戳（秒） */
-    char*       agent_id;            /**< Agent ID */
-    // From data intelligence emerges. by spharx
-    char*       tool_name;           /**< 工具名称 */
-    char*       input;               /**< 输入（JSON） */
-    char*       output;              /**< 输出（JSON） */
-    uint32_t    duration_ms;         /**< 耗时（毫秒） */
-    int         success;             /**< 是否成功（1/0） */
-    char*       error_msg;           /**< 错误信息 */
-} audit_event_t;
+audit_logger_t* audit_logger_create(const char* log_dir, const char* log_prefix,
+                                     size_t max_file_size, int max_files);
 
 /**
- * @brief 审计日志器配置
- */
-typedef struct audit_config {
-    const char* log_path;           /**< 日志文件路径（如 "/var/log/agentos/audit.log"） */
-    uint64_t    max_size_bytes;      /**< 单个文件最大字节数，0表示不轮转 */
-    uint32_t    max_files;           /**< 最大保留文件数（仅当 max_size>0 时有效） */
-    const char* format;              /**< 输出格式："json" 或 "csv" */
-    uint32_t    queue_size;          /**< 异步队列大小 */
-} audit_config_t;
-
-/**
- * @brief 创建审计日志器
- * @param config 配置（若为 NULL 使用默认值）
- * @return 日志器句柄，失败返回 NULL
- */
-audit_logger_t* audit_logger_create(const audit_config_t* config);
-
-/**
- * @brief 销毁审计日志器
- * @param logger 日志器句柄
+ * @brief 销毁审计日志记录器
+ * @param logger 记录器句柄
  */
 void audit_logger_destroy(audit_logger_t* logger);
 
 /**
- * @brief 记录一条审计事件（异步）
- * @param logger 日志器
- * @param event 审计事件（内部会复制数据）
- * @return 0 成功，-1 失败（队列满等）
+ * @brief 记录审计日志
+ * @param logger 记录器句柄
+ * @param type 事件类型
+ * @param agent_id Agent ID
+ * @param action 操作
+ * @param resource 资源
+ * @param detail 详情
+ * @param result 结果
+ * @return 0 成功，其他失败
  */
-int audit_logger_record(audit_logger_t* logger, const audit_event_t* event);
+int audit_logger_log(audit_logger_t* logger, audit_event_type_t type,
+                      const char* agent_id, const char* action,
+                      const char* resource, const char* detail, int result);
 
 /**
- * @brief 查询审计日志（同步）
- * @param logger 日志器
- * @param agent_id Agent ID（可为 NULL 表示所有）
- * @param start_time 起始时间（0表示不限）
- * @param end_time 结束时间（0表示不限）
- * @param limit 最大条数
- * @param out_events 输出事件数组（JSON 字符串数组，需调用者 free 每个元素及数组）
- * @param out_count 输出数量
- * @return 0 成功，-1 失败
+ * @brief 记录权限审计日志
+ * @param logger 记录器句柄
+ * @param agent_id Agent ID
+ * @param action 操作
+ * @param resource 资源
+ * @param allowed 是否允许
+ * @return 0 成功，其他失败
  */
-int audit_logger_query(audit_logger_t* logger,
-                       const char* agent_id,
-                       uint64_t start_time,
-                       uint64_t end_time,
-                       uint32_t limit,
-                       char*** out_events,
-                       size_t* out_count);
+int audit_logger_log_permission(audit_logger_t* logger, const char* agent_id,
+                                 const char* action, const char* resource, int allowed);
+
+/**
+ * @brief 记录净化审计日志
+ * @param logger 记录器句柄
+ * @param agent_id Agent ID
+ * @param input 输入
+ * @param output 输出
+ * @param passed 是否通过
+ * @return 0 成功，其他失败
+ */
+int audit_logger_log_sanitizer(audit_logger_t* logger, const char* agent_id,
+                                const char* input, const char* output, int passed);
+
+/**
+ * @brief 记录工位审计日志
+ * @param logger 记录器句柄
+ * @param agent_id Agent ID
+ * @param command 命令
+ * @param exit_code 退出码
+ * @return 0 成功，其他失败
+ */
+int audit_logger_log_workbench(audit_logger_t* logger, const char* agent_id,
+                                const char* command, int exit_code);
+
+/**
+ * @brief 刷新日志缓冲区
+ * @param logger 记录器句柄
+ */
+void audit_logger_flush(audit_logger_t* logger);
+
+/**
+ * @brief 获取日志统计信息
+ * @param logger 记录器句柄
+ * @param total_logged 总记录数
+ * @param total_failed 总失败数
+ */
+void audit_logger_stats(audit_logger_t* logger, uint64_t* total_logged, uint64_t* total_failed);
 
 #ifdef __cplusplus
 }

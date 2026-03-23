@@ -42,9 +42,5 @@ agentos_error_t agentos_sys_memory_get(const char* record_id, void** out_data, s
 agentos_error_t agentos_sys_memory_delete(const char* record_id) {
     if (!record_id) return AGENTOS_EINVAL;
     if (!g_memory) return AGENTOS_ENOTINIT;
-
-    // 注意：memoryrovol 当前未提供统一删除接口，这里调用 L1 删除（需确保 memoryrovol 暴露此函数）
-    // 实际生产应使用 agentos_memoryrov_delete_raw，但该函数未实现，此处返回 NOTSUP
-    AGENTOS_LOG_WARN("Memory delete not fully implemented, returning NOTSUP");
-    return AGENTOS_ENOTSUP;
+    return agentos_memoryrov_delete_raw(g_memory, record_id);
 }

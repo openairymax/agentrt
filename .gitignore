@@ -2,12 +2,9 @@
 
 # ==================== 编译产物 ====================
 # CMake
-build/
-cmake-build-*/
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
-Makefile
 *.cmake
 
 # 编译中间文件
@@ -209,10 +206,14 @@ partdata/model/weights/*.h5
 *.7z
 
 # ==================== 脚本生成的文件 ====================
-# 构建脚本生成
+# 构建脚本生成的大型产物（不是脚本本身）
 artifacts/
 packages/
-deploy/
+
+# Docker 部署生成的镜像层和容器数据
+deploy/docker/*.tar
+deploy/docker/*.tar.gz
+deploy/docker/.docker-*/
 
 # ==================== 其他 ====================
 # 忽略大型数据集

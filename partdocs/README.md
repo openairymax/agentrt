@@ -1,424 +1,204 @@
-# AgentOS 技术文档中心 (PartDocs)
+Copyright (c) 2026 SPHARX. All Rights Reserved.
+"From data intelligence emerges."
 
-**版本**: 1.0.0.6  
-**最后更新**: 2026-03-21  
+# AgentOS 技术文档中心
 
----
-
-## 📚 概述
-
-`partdocs/` 是 AgentOS 的技术文档中心，包含完整的架构设计、API 参考、开发指南和技术规范。
+**版本**: v1.0.0.6
+**最后更新**: 2026-03-23
+**状态**: 生产就绪
 
 ---
 
-## 📁 文档结构
+## 1. 概述
+
+`partdocs/` 是 AgentOS 的技术文档中心，涵盖架构设计、API 参考、开发指南、设计哲学和技术规范五大模块。所有文档遵循统一的版权声明和版本管理规范。
+
+---
+
+## 2. 文档结构
 
 ```
 partdocs/
-├── README.md                    # 本文件
+├── README.md                          # 本文件 - 文档中心总览
+├── DOCSINDEX.md                       # 文档体系索引
 │
-├── api/                         # API 文档
-│   ├── syscall/                # 系统调用 API
-│   │   ├── task_api.md         # 任务系统调用
-│   │   ├── memory_api.md       # 记忆系统调用
-│   │   ├── session_api.md      # 会话系统调用
-│   │   └── telemetry_api.md    # 遥测系统调用
-<!-- From data intelligence emerges. by spharx -->
-│   ├── python/                 # Python SDK API
-│   │   └── agentos.md          # Python SDK 详细文档
-│   ├── rust/                   # Rust SDK API
-│   │   └── agentos_rs.md       # Rust SDK 文档
-│   └── go/                     # Go SDK API
-│       └── agentos_go.md       # Go SDK 文档
+├── api/                               # API 文档
+│   ├── README.md                      # API 总览（三层架构）
+│   ├── syscall/                       # 系统调用 API
+│   │   ├── task_api.md
+│   │   ├── memory_api.md
+│   │   ├── session_api.md
+│   │   └── telemetry_api.md
+│   ├── python/                        # Python SDK
+│   ├── rust/                          # Rust SDK
+│   └── go/                            # Go SDK
 │
-├── architecture/                # 架构设计文档 ⭐ 核心
-│   ├── diagrams/               # 架构图源文件
-│   │   ├── system_overview.png
-│   │   ├── coreloopthree.png
-│   │   └── memoryrovol.png
-│   ├── coreloopthree.md        # CoreLoopThree 三层一体架构 ⭐
-│   ├── memoryrovol.md          # MemoryRovol 四层记忆架构 ⭐
-│   ├── microkernel.md          # 微内核设计
-│   ├── ipc.md                  # IPC Binder 通信机制
-│   ├── syscall.md              # 系统调用设计
-│   └── logging_system.md       # 统一日志系统架构 ⭐
+├── architecture/                      # 架构设计文档
+│   ├── README.md                      # 架构总览
+│   ├── folder/
+│   │   ├── architectural_design_principles.md  # 架构设计原则 v3.0
+│   │   ├── coreloopthree.md           # 三层认知运行时
+│   │   ├── memoryrovol.md             # 四层记忆系统
+│   │   ├── microkernel.md             # 微内核设计
+│   │   ├── ipc.md                     # IPC Binder 通信
+│   │   ├── syscall.md                 # 系统调用设计
+│   │   └── logging_system.md          # 统一日志系统
+│   └── diagrams/                      # 架构图
 │
-├── guides/                      # 开发指南 📖
-│   ├── getting_started.md      # 快速入门 ⭐
-│   ├── create_agent.md         # Agent 开发教程 ⭐
-│   ├── create_skill.md         # 技能开发教程 ⭐
-│   ├── deployment.md           # 生产环境部署指南
-│   ├── kernel_tuning.md        # 内核调优指南
-│   └── troubleshooting.md      # 故障排查手册
+├── guides/                            # 开发指南
+│   ├── README.md                      # 指南总览
+│   └── folder/
+│       ├── getting_started.md         # 快速开始
+│       ├── create_agent.md            # 创建 Agent
+│       ├── create_skill.md            # 创建 Skill
+│       ├── deployment.md              # 部署指南
+│       ├── kernel_tuning.md           # 内核调优
+│       ├── troubleshooting.md         # 故障排查
+│       └── migration_guide.md         # 迁移指南
 │
-├── philosophy/                  # 设计哲学 💡
-│   ├── design_principles.md    # 设计原则
-│   ├── cognition_theory.md     # 认知理论基础
-│   ├── memory_theory.md        # 记忆理论基础
-│   ├── control_theory.md       # 控制理论
-│   ├── dual_systems.md         # 双系统理论
-│   └── engineering_art.md      # 工程的艺术
+├── philosophy/                        # 设计哲学
+│   ├── README.md                      # 哲学总览
+│   └── folder/
+│       ├── Cognition_Theory.md        # 认知理论
+│       ├── Design_Principles.md       # 设计原则
+│       └── Memory_Theory.md           # 记忆理论
 │
-└── specifications/              # 技术规范 📋
-    ├── TERMINOLOGY.md          # 统一术语表 ⭐
-    │
-    ├── agentos_contract/       # AgentOS 契约规范集 (v2.0) ⭐
-    │   ├── README.md           # 规范集总览
-    │   ├── glossary_index.md   # 快速索引
-    │   ├── agent/              # Agent 契约
-    │   │   ├── agent_contract.md
-    │   │   └── agent_contract_schema.json
-    │   ├── skill/              # Skill 契约
-    │   │   ├── skill_contract.md
-    │   │   └── skill_contract_schema.json
-    │   ├── protocol/           # 通信协议
-    │   │   └── protocol_contract.md
-    │   ├── syscall/            # 系统调用 API
-    │   │   └── syscall_api_contract.md
-    │   └── log/                # 日志格式
-    │       └── logging_format.md
-    │
-    ├── coding_standard/        # 编码规范 💻
-    │   ├── C&Cpp-secure-coding-guide.md    # C/C++ 安全编程指南
-    │   ├── C_coding_style_guide.md         # C 语言编码规范
-    │   ├── Python_coding_style_guide.md    # Python 规范
-    │   ├── JavaScript_coding_style_guide.md # JavaScript 规范
-    │   └── Log_guide.md                    # 日志打印规范
-    │
-    └── project_erp/            # 项目 ERP 资源管理 📊
-        ├── ErrorCodeReference.md           # 错误码参考
-        ├── ResourceManagementTable.md      # 资源管理表
-        └── SBOM.md                         # 软件物料清单
+├── specifications/                    # 技术规范
+│   ├── README.md                      # 规范总览
+│   ├── TERMINOLOGY.md                 # 统一术语表
+│   ├── agentos_contract/              # 契约规范集
+│   │   ├── README.md
+│   │   ├── agent/                     # Agent 契约
+│   │   ├── skill/                     # Skill 契约
+│   │   ├── protocol/                  # 通信协议
+│   │   ├── syscall/                   # 系统调用契约
+│   │   └── log/                       # 日志格式
+│   ├── coding_standard/               # 编码规范
+│   │   ├── C_coding_style_guide.md
+│   │   ├── C&Cpp-secure-coding-guide.md
+│   │   ├── Python_coding_style_guide.md
+│   │   └── JavaScript_coding_style_guide.md
+│   └── project_erp/                   # 项目 ERP
+│       ├── ErrorCodeReference.md
+│       ├── ResourceManagementTable.md
+│       └── SBOM.md
+│
+└── readme/                            # 多语言 README
+    ├── README.md                      # 中文 README
+    ├── en/README.md                   # English
+    ├── de/README.md                   # Deutsch
+    └── fr/README.md                   # Francais
 ```
 
 ---
 
-## 🎯 核心文档导读
+## 3. 学习路径
 
-### 新人入门路径
+### 3.1 新人入门
 
-1. **快速开始** → [getting_started.md](guides/getting_started.md)
-   - 环境搭建
-   - Hello World 示例
-   - 基础概念
+```
+快速开始 → 架构概览 → 创建 Agent → 部署运行
+```
 
-2. **理解架构** → [architecture/](architecture/)
-   - [CoreLoopThree 架构](architecture/coreloopthree.md) - 三层核心运行时
-   - [MemoryRovol 架构](architecture/memoryrovol.md) - 四层记忆系统
-   - [微内核设计](architecture/microkernel.md) - 内核架构
+1. [快速开始](guides/folder/getting_started.md) — 环境搭建与首次编译
+2. [架构设计原则](architecture/folder/architectural_design_principles.md) — 理解系统设计根基
+3. [创建 Agent](guides/folder/create_agent.md) — 开发第一个 Agent
+4. [部署指南](guides/folder/deployment.md) — 部署到生产环境
 
-3. **动手实践** → [guides/](guides/)
-   - [创建第一个 Agent](guides/create_agent.md)
-   - [开发一个技能](guides/create_skill.md)
+### 3.2 核心开发者
 
-### 开发者进阶路径
+```
+编码规范 → 微内核 → 三层运行时 → 四层记忆 → 系统调用 → 内核调优
+```
 
-1. **深入理解** → [philosophy/](philosophy/)
-   - [设计原则](philosophy/design_principles.md)
-   - [认知理论](philosophy/cognition_theory.md)
-   - [记忆理论](philosophy/memory_theory.md)
+1. [C 编码规范](specifications/coding_standard/C_coding_style_guide.md)
+2. [微内核设计](architecture/folder/microkernel.md)
+3. [三层运行时](architecture/folder/coreloopthree.md)
+4. [四层记忆](architecture/folder/memoryrovol.md)
+5. [系统调用](architecture/folder/syscall.md)
+6. [内核调优](guides/folder/kernel_tuning.md)
 
-2. **技术规范** → [specifications/](specifications/)
-   - [统一术语表](specifications/TERMINOLOGY.md) ⭐
-   - [AgentOS 契约规范集](specifications/agentos_contract/README.md) ⭐
-     - [Agent 契约](specifications/agentos_contract/agent/agent_contract.md)
-     - [Skill 契约](specifications/agentos_contract/skill/skill_contract.md)
-     - [通信协议](specifications/agentos_contract/protocol/protocol_contract.md)
-     - [系统调用 API](specifications/agentos_contract/syscall/syscall_api_contract.md)
-     - [日志格式](specifications/agentos_contract/log/logging_format.md)
-   - [编码规范](specifications/coding_standard/C_coding_style_guide.md)
-   - [C/C++ 安全编程指南](specifications/coding_standard/C&Cpp-secure-coding-guide.md)
-   - [日志打印规范](specifications/coding_standard/Log_guide.md)
+### 3.3 架构师
 
-3. **性能优化** → [guides/kernel_tuning.md](guides/kernel_tuning.md)
-   - 内存管理优化
-   - 调度策略调优
-   - 向量化检索加速
+```
+设计哲学 → 架构原则 → 认知理论 → 记忆理论 → 契约规范
+```
 
-### 运维人员路径
+1. [设计哲学总览](philosophy/README.md)
+2. [架构设计原则 v3.0](architecture/folder/architectural_design_principles.md)
+3. [认知理论](philosophy/folder/Cognition_Theory.md)
+4. [记忆理论](philosophy/folder/Memory_Theory.md)
+5. [契约规范集](specifications/agentos_contract/README.md)
 
-1. **部署指南** → [guides/deployment.md](guides/deployment.md)
-   - 单机部署
-   - 容器化部署
-   - 集群部署
+### 3.4 运维工程师
 
-2. **监控运维** → [partdata/README.md](../partdata/README.md)
-   - 日志管理
-   - 数据备份
-   - 性能监控
+```
+部署指南 → 故障排查 → 内核调优 → 迁移指南
+```
 
-3. **故障排查** → [guides/troubleshooting.md](guides/troubleshooting.md)
-   - 常见问题
-   - 诊断工具
-   - 案例分析
+1. [部署指南](guides/folder/deployment.md)
+2. [故障排查](guides/folder/troubleshooting.md)
+3. [内核调优](guides/folder/kernel_tuning.md)
+4. [迁移指南](guides/folder/migration_guide.md)
 
 ---
 
-## 📖 文档详细说明
+## 4. 文档状态总览
 
-### Architecture（架构文档）
-
-#### CoreLoopThree 三层一体架构
-
-**内容**:
-- 认知层：意图理解、任务规划、Agent 调度
-- 行动层：任务执行、补偿事务、责任链追踪
-- 记忆层：MemoryRovol FFI 封装、记忆服务
-
-**适合读者**: 架构师、核心开发人员
-
-#### MemoryRovol 四层记忆架构
-
-**内容**:
-- L1 Raw Layer: 原始数据存储
-- L2 Feature Layer: 向量化表示
-- L3 Structure Layer: 结构化编码
-- L4 Pattern Layer: 高级模式挖掘
-- 吸引子网络检索机制
-- 艾宾浩斯遗忘曲线实现
-
-**适合读者**: AI 工程师、算法工程师
-
-#### Logging System 统一日志系统
-
-**内容**:
-- 集中式日志存储 (`partdata/logs/`)
-- 模块独立日志文件
-- 跨语言统一日志接口
-- OpenTelemetry 集成
-- 全链路追踪 (trace_id)
-
-**适合读者**: 所有开发人员
-
-### Guides（开发指南）
-
-#### Getting Started 快速入门
-
-**内容**:
-- 环境要求和依赖安装
-- 克隆项目和初始化配置
-- 构建和运行第一个示例
-- 基础概念解释
-
-**预计时间**: 30 分钟
-
-#### Create Agent 创建 Agent
-
-**内容**:
-- Agent 基础结构
-- 实现认知接口
-- 注册到系统
-- 测试和调试
-
-**示例代码**: Python、Go 双语言示例
-
-#### Create Skill 创建技能
-
-**内容**:
-- 技能接口定义
-- Rust/C++ 技能开发
-- 编译为动态库
-- 注册和发布
-
-**示例**: browser_skill 完整示例
-
-### Specifications（技术规范）
-
-#### Coding Standards 编码规范
-
-**C 语言规范**:
-```c
-// 命名规范
-agentos_task_submit()      // 函数：小写 + 下划线
-AGENTOS_LOG_LEVEL_INFO     // 宏：大写 + 下划线
-agentos_config_t           // 类型：小写 + _t 后缀
-
-// 注释规范
-/**
- * @brief 提交任务
- * @param description 任务描述
- * @param out_id 输出任务 ID
- * @return 0 成功，负值失败
- */
-int agentos_task_submit(const char* description, uint64_t* out_id);
-```
-
-**Python 规范**:
-```python
-class TaskManager:
-    """任务管理器"""
-    
-    def submit_task(self, description: str) -> Task:
-        """
-        提交任务
-        
-        Args:
-            description: 任务描述
-            
-        Returns:
-            Task 对象
-        """
-        pass
-```
-
-#### Log Guide 日志打印规范
-
-**内容**:
-- 日志级别使用规范
-- 结构化日志格式
-- 性能优化建议
-- 调试和生产环境配置
-
-**适合读者**: 所有开发人员
-
-#### Testing 测试规范
-
-**单元测试覆盖率要求**:
-- 内核层 (atoms/): ≥ 85%
-- 服务层 (backs/): ≥ 80%
-- SDK 层 (tools/): ≥ 90%
-
-**测试分类**:
-```bash
-# 单元测试
-ctest -R unit --output-on-failure
-
-# 集成测试
-ctest -R integration --output-on-failure
-
-# 端到端测试
-python tests/e2e/test_full_workflow.py
-```
+| 模块 | 文档数 | 状态 | 质量评分 |
+|------|--------|------|----------|
+| 架构文档 (architecture/) | 7+ | 生产就绪 | A |
+| 开发指南 (guides/) | 7 | 生产就绪 | A |
+| API 文档 (api/) | 10+ | 生产就绪 | A |
+| 技术规范 (specifications/) | 12+ | 生产就绪 | A |
+| 设计哲学 (philosophy/) | 3 | 生产就绪 | A |
+| 多语言 README (readme/) | 4 | 生产就绪 | A |
 
 ---
 
-## 🔍 文档搜索
-
-### 按主题搜索
+## 5. 按主题索引
 
 | 主题 | 相关文档 |
 |------|----------|
-| **系统调用** | `api/syscall/*`, `architecture/syscall.md` |
-| **记忆系统** | `architecture/memoryrovol.md`, `guides/create_skill.md` |
-| **任务管理** | `architecture/coreloopthree.md`, `guides/create_agent.md` |
-| **日志系统** | `architecture/logging_system.md`, `specifications/logging_format.md` |
-| **安全隔离** | `architecture/microkernel.md`, `specifications/security.md` |
-
-### 按角色搜索
-
-| 角色 | 推荐文档 |
-|------|----------|
-| **架构师** | `architecture/*`, `philosophy/*` |
-| **开发工程师** | `guides/*`, `specifications/coding_standards.md` |
-| **测试工程师** | `specifications/testing.md`, `tests/README.md` |
-| **运维工程师** | `guides/deployment.md`, `guides/troubleshooting.md` |
+| 微内核架构 | [architectural_design_principles.md](architecture/folder/architectural_design_principles.md), [microkernel.md](architecture/folder/microkernel.md) |
+| 三层认知运行时 | [coreloopthree.md](architecture/folder/coreloopthree.md), [Cognition_Theory.md](philosophy/folder/Cognition_Theory.md) |
+| 四层记忆系统 | [memoryrovol.md](architecture/folder/memoryrovol.md), [Memory_Theory.md](philosophy/folder/Memory_Theory.md) |
+| Agent 开发 | [create_agent.md](guides/folder/create_agent.md), [Agent 契约](specifications/agentos_contract/agent/agent_contract.md) |
+| Skill 开发 | [create_skill.md](guides/folder/create_skill.md), [Skill 契约](specifications/agentos_contract/skill/skill_contract.md) |
+| 安全穹顶 | [architectural_design_principles.md](architecture/folder/architectural_design_principles.md) (domes 章节) |
+| 系统调用 | [syscall.md](architecture/folder/syscall.md), [syscall API](api/syscall/) |
+| 性能调优 | [kernel_tuning.md](guides/folder/kernel_tuning.md), [故障排查](guides/folder/troubleshooting.md) |
+| 日志与追踪 | [logging_system.md](architecture/folder/logging_system.md), [日志格式](specifications/agentos_contract/log/logging_format.md) |
+| 编码规范 | [C 编码规范](specifications/coding_standard/C_coding_style_guide.md), [安全编程](specifications/coding_standard/C&Cpp-secure-coding-guide.md) |
 
 ---
 
-## 🛠️ 文档工具
-
-### 生成 API 文档
-
-```bash
-# Python SDK 文档
-cd tools/python
-pdoc --html agentos -o ../partdocs/api/python/
-
-# Rust SDK 文档
-cd tools/rust
-cargo doc --no-deps --open
-```
-
-### 构建完整文档站点
-
-```bash
-# 使用 Sphinx 构建
-cd partdocs
-make html
-
-# 输出在 build/html/ 目录
-# 可用浏览器打开 index.html 查看
-```
-
-### 验证文档链接
-
-```bash
-# 检查失效链接
-python scripts/validate_docs.py
-
-# 输出示例：
-# ✅ architecture/coreloopthree.md
-# ✅ guides/getting_started.md
-# ❌ old_page.md (404 Not Found)
-```
-
----
-
-## 🤝 贡献文档
+## 6. 贡献指南
 
 ### 文档结构标准
 
-```markdown
-# 标题
+每份文档应包含：
+- **版权声明**：`Copyright (c) 2026 SPHARX. All Rights Reserved.`
+- **版本信息**：版本号、最后更新日期
+- **结构化章节**：概述 → 核心内容 → 示例 → 相关文档
+- **交叉引用**：链接到相关文档的精确路径
 
-**版本**: 1.0.0.5  
-**最后更新**: 2026-03-18  
-
-## 概述
-
-简要说明文档目的和适用范围。
-
-## 核心概念
-
-解释关键术语和概念。
-
-## 使用方法
-
-提供详细的操作步骤和代码示例。
-
-## 最佳实践
-
-分享经验和注意事项。
-
-## 相关文档
-
-链接到相关主题的文档。
-```
-
-### 提交文档 PR
+### 提交流程
 
 1. Fork 项目
-2. 创建文档分支：`git checkout -b docs/add-feature-x`
-3. 编写文档
-4. 验证链接和示例代码
-5. 提交 PR：`git push origin docs/add-feature-x`
+2. 创建分支：`git checkout -b docs/topic-name`
+3. 编写文档，遵循上述结构标准
+4. 验证链接有效性
+5. 提交 PR
 
 ---
 
-## 📊 文档统计
+## 相关资源
 
-| 类别 | 文档数量 | 总字数 |
-|------|----------|--------|
-| **架构文档** | 7 篇 | ~50k |
-| **开发指南** | 6 篇 | ~30k |
-| **API 文档** | 10+ 篇 | ~40k |
-| **技术规范** | 9 篇 | ~28k |
-| **设计哲学** | 6 篇 | ~20k |
-| **总计** | 38+ 篇 | ~168k |
-
----
-
-## 📚 相关资源
-
-- [主项目文档](../README.md) - AgentOS 总体介绍
-- [Workshop 文档](../../Workshop/README.md) - 数据采集工厂
-- [Deepness 文档](../../Deepness/README.md) - 深度加工系统
-- [Benchmark 文档](../../Benchmark/metrics/README.md) - 评测指标
-
----
-
-**Apache License 2.0 © 2026 SPHARX. "From data intelligence emerges."**
+- [主项目 README](../README.md)
+- [文档体系索引](DOCSINDEX.md)
 
 ---
 
 © 2026 SPHARX Ltd. All Rights Reserved.
+*"From data intelligence emerges."*

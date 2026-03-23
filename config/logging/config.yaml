@@ -1,71 +1,154 @@
+# =============================================================================
+# AgentOS 日志配置文件
+# 版本: v1.0.0
+# 最后更新: 2026-03-23
+# Schema: schemas/logging.schema.json
+# =============================================================================
 # Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
-# 全局日志配置
 
+# 配置版本
+_config_version: "1.0.0"
+
+# =============================================================================
+# 日志配置
+# =============================================================================
 logging:
-  # 默认日志级别
+  # 默认日志级别: trace, debug, info, warning, error, critical, off
   level: "info"
-  # 格式: "json", "text", "color"
-  format: "json"
-  # 输出目标: "stdout", "file", "both"
-  output: "both"
   
-  # 文件输出配置
-  file:
-    # 基础日志目录
-    base_dir: "partdata/logs"
-    # 最大文件大小（MB）
-    max_size_mb: 100
-    # 保留备份数
-    backups: 10
-    # 是否按日期分片
-    rotate_daily: true
+  # 日志格式: json, text, color, structured
+  format: "json"
+  
+  # 输出目标: stdout, stderr, file, both, syslog
+  output: "both"
 
-  # 各模块独立配置
+  # ===========================================================================
+  # 文件输出配置
+  # ===========================================================================
+  file:
+    # 日志文件基础目录
+    base_dir: "${AGENTOS_LOG_DIR}"
+    
+    # 单个日志文件最大大小（MB）
+    max_size_mb: 100
+    
+    # 保留的备份文件数量
+    backups: 10
+    
+    # 按天轮转
+    rotate_daily: true
+    
+    # 压缩轮转后的日志
+    compress_rotated: true
+
+  # ===========================================================================
+  # 模块级日志配置
+  # ===========================================================================
   modules:
     kernel:
       level: "info"
       file: "kernel/kernel.log"
-    cognition:
+      enabled: true
+    
+    coreloopthree:
       level: "debug"
-      file: "kernel/cognition.log"
-    execution:
+      file: "coreloopthree/coreloopthree.log"
+      enabled: true
+    
+    memoryrovol:
       level: "info"
-      file: "kernel/execution.log"
-    memory:
+      file: "memoryrovol/memoryrovol.log"
+      enabled: true
+    
+    syscall:
       level: "info"
-      file: "kernel/memory.log"
-    services:
+      file: "syscall/syscall.log"
+      enabled: true
+    
+    domes:
       level: "info"
-      file: "services/services.log"
+      file: "domes/domes.log"
+      enabled: true
+    
     llm_d:
       level: "info"
       file: "services/llm_d.log"
+      enabled: true
+    
     tool_d:
       level: "info"
       file: "services/tool_d.log"
-    perm_d:
+      enabled: true
+    
+    scheduler:
       level: "warning"
-      file: "services/perm_d.log"
-    market_d:
+      file: "scheduler/scheduler.log"
+      enabled: true
+    
+    security:
+      level: "warning"
+      file: "security/security.log"
+      enabled: true
+    
+    audit:
       level: "info"
-      file: "services/market_d.log"
-    sched_d:
-      level: "info"
-      file: "services/sched_d.log"
-    monit_d:
-      level: "info"
-      file: "services/monit_d.log"
-    sdk:
-      level: "info"
-      file: "apps/sdk.log"
-    apps:
-      level: "info"
-      file: "apps/apps.log"
+      file: "audit/audit.log"
+      enabled: true
 
-  # 字段掩码（防止敏感信息泄露）
+  # ===========================================================================
+  # 敏感字段掩码
+  # ===========================================================================
   mask_fields:
     - "password"
     - "token"
     - "api_key"
     - "secret"
     - "authorization"
+    - "credential"
+    - "private_key"
+    - "access_token"
+    - "refresh_token"
+    - "session_key"
+
+  # ===========================================================================
+  # 结构化日志字段
+  # ===========================================================================
+  structured_fields:
+    - "trace_id"
+    - "span_id"
+    - "agent_id"
+    - "session_id"
+    - "task_id"
+    - "request_id"
+    - "user_id"
+
+  # ===========================================================================
+  # 日志采样（高并发场景）
+  # ===========================================================================
+  sampling:
+    enabled: false
+    rate: 0.1
+    threshold_per_sec: 1000
+
+  # ===========================================================================
+  # 热更新配置
+  # ===========================================================================
+  hot_reload:
+    enabled: true
+    check_interval_sec: 30
+
+  # ===========================================================================
+  # 异步日志
+  # ===========================================================================
+  async:
+    enabled: true
+    buffer_size: 100000
+    flush_interval_ms: 100
+
+  # ===========================================================================
+  # 日志保留
+  # ===========================================================================
+  retention:
+    enabled: true
+    max_age_days: 30
+    max_total_size_gb: 10

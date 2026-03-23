@@ -24,6 +24,8 @@ set(SOURCES
     src/telemetry.c
     src/syscall_entry.c
     src/syscall_table.c
+    src/agent.c
+    src/skill.c
 )
 
 add_library(agentos_syscall STATIC ${SOURCES})

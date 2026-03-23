@@ -60,4 +60,5 @@ export interface ClientConfig {
   headers?: Record<string, string>;
   retryDelay?: number;
   maxRetries?: number;
+  apiKey?: string;
 }

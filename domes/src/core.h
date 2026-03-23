@@ -1,25 +1,42 @@
 /**
  * @file core.h
- * @brief Domes 核心内部定义
+ * @brief domes 模块核心内部接口
+ * @author Spharx
+ * @date 2024
  */
+
 #ifndef DOMES_CORE_H
 #define DOMES_CORE_H
 
-#include "domes.h"
-#include "workbench/workbench.h"
-#include "permission/permission.h"
-#include "audit/audit.h"
-#include "sanitizer/sanitizer.h"
-#include <pthread.h>
+#include "platform/platform.h"
+#include <stddef.h>
+#include <stdbool.h>
 
-struct domes_core {
-    domes_config_t   config;
-    workbench_manager_t*    wb_mgr;
-    permission_engine_t*    perm_eng;
-    audit_logger_t*         audit;
-    sanitizer_t*            sanitizer;
-    pthread_mutex_t         lock;
-    volatile int            initialized;
-};
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* domes 实例结构 */
+typedef struct domes_instance {
+    struct permission_engine* permission;
+    struct audit_logger* audit;
+    struct sanitizer* sanitizer;
+    domes_rwlock_t lock;
+    domes_atomic32_t ref_count;
+    bool initialized;
+    char* config_path;
+    char* log_dir;
+} domes_instance_t;
+
+/* 全局实例 */
+extern domes_instance_t* g_domes_instance;
+
+/* 内部初始化函数 */
+int domes_init_internal(const char* config_path);
+void domes_cleanup_internal(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* DOMES_CORE_H */

@@ -1,36 +1,320 @@
 {
+  "$schema": "https://agentos.spharx.ai/schemas/sanitizer-rules-v1.schema.json",
+  "_config_version": "1.0.0",
+  "_metadata": {
+    "last_updated": "2026-03-23T00:00:00Z",
+    "source": "OWASP_TOP_10 + Custom",
+    "total_rules": 25
+  },
+  "settings": {
+    "max_input_length": 100000,
+    "max_recursion_depth": 10,
+    "timeout_ms": 1000,
+    "log_all_matches": false,
+    "fail_closed": true
+  },
   "rules": [
     {
+      "rule_id": "XSS_SCRIPT_001",
       "type": "block",
-      "pattern": "<script.*?>.*?</script>",
+      "pattern": "<script[^>]*>.*?</script>",
       "replace": "[REMOVED]",
-      "description": "移除所有 script 标签"
+      "description": "移除所有 script 标签，防止 XSS 攻击",
+      "priority": 100,
+      "severity": "critical",
+      "category": "xss",
+      "cwe": "CWE-79",
+      "owasp": "A03:2021-Injection",
+      "enabled": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-03-23T00:00:00Z",
+      "examples": [
+        {
+          "input": "<script>alert('xss')</script>",
+          "output": "[REMOVED]"
+        }
+      ]
     },
     {
+      "rule_id": "XSS_SCRIPT_002",
       "type": "block",
-      "pattern": "ignore previous instructions|system prompt|you are now",
-      "description": "拒绝常见的提示词注入"
+      "pattern": "<script[^>]*>",
+      "replace": "[REMOVED]",
+      "description": "移除未闭合的 script 开始标签",
+      "priority": 99,
+      "severity": "critical",
+      "category": "xss",
+      "cwe": "CWE-79",
+      "enabled": true
     },
     {
+      "rule_id": "XSS_EVENT_001",
+      "type": "sanitize",
+      "pattern": "on(load|click|mouse|key|focus|blur|change|submit|reset|select|abort|error|unload)\\s*=",
+      "replace": "data-blocked=",
+      "description": "移除 HTML 事件处理器属性",
+      "priority": 90,
+      "severity": "high",
+      "category": "xss",
+      "cwe": "CWE-79",
+      "enabled": true
+    },
+    {
+      "rule_id": "XSS_IFRAME_001",
       "type": "block",
-      "pattern": "\\.\\./",
-      "description": "路径遍历尝试"
+      "pattern": "<iframe[^>]*>.*?</iframe>",
+      "replace": "[REMOVED]",
+      "description": "移除 iframe 标签，防止点击劫持",
+      "priority": 85,
+      "severity": "high",
+      "category": "xss",
+      "cwe": "CWE-1021",
+      "enabled": true
     },
     {
+      "rule_id": "XSS_JAVASCRIPT_001",
       "type": "block",
-      "pattern": "exec\\s*\\(",
-      "description": "命令执行尝试"
+      "pattern": "javascript\\s*:",
+      "replace": "blocked:",
+      "description": "阻止 javascript: 协议",
+      "priority": 95,
+      "severity": "critical",
+      "category": "xss",
+      "cwe": "CWE-79",
+      "enabled": true
     },
     {
+      "rule_id": "XSS_DATAURI_001",
+      "type": "block",
+      "pattern": "data\\s*:\\s*text/html",
+      "replace": "blocked:",
+      "description": "阻止 data:text/html URI（可能包含恶意脚本）",
+      "priority": 85,
+      "severity": "high",
+      "category": "xss",
+      "cwe": "CWE-79",
+      "enabled": true
+    },
+    {
+      "rule_id": "SQL_INJECTION_001",
       "type": "warn",
-      "pattern": "password|api[_-]?key|secret|token",
-      "replace": "[REDACTED]",
-      "description": "敏感信息脱敏"
+      "pattern": "(?i)(union\\s+(all\\s+)?select|select\\s+.*\\s+from|insert\\s+into|delete\\s+from|drop\\s+(table|database)|truncate\\s+table?|update\\s+.*\\s+set)",
+      "description": "检测 SQL 注入模式",
+      "priority": 80,
+      "severity": "critical",
+      "category": "sql_injection",
+      "cwe": "CWE-89",
+      "owasp": "A03:2021-Injection",
+      "enabled": true
     },
     {
+      "rule_id": "SQL_INJECTION_002",
       "type": "warn",
-      "pattern": "(\\d{3,4}-?){3}\\d{3,4}",
-      "description": "可能为信用卡号（简单模式）"
+      "pattern": "(?i)(or\\s+1\\s*=\\s*1|or\\s+'1'\\s*=\\s*'1'|or\\s+\"1\"\\s*=\\s*\"1\"|'\\s*or\\s*'|\"\\s*or\\s*\")",
+      "description": "检测 SQL 注入绕过模式",
+      "priority": 80,
+      "severity": "critical",
+      "category": "sql_injection",
+      "cwe": "CWE-89",
+      "enabled": true
+    },
+    {
+      "rule_id": "SQL_INJECTION_003",
+      "type": "warn",
+      "pattern": "(?i)(--\\s*$|;\\s*--|/\\*.*\\*/)",
+      "description": "检测 SQL 注释注入",
+      "priority": 75,
+      "severity": "high",
+      "category": "sql_injection",
+      "cwe": "CWE-89",
+      "enabled": true
+    },
+    {
+      "rule_id": "PATH_TRAVERSAL_001",
+      "type": "block",
+      "pattern": "\\.\\.[\\\\/]",
+      "replace": "",
+      "description": "阻止路径遍历攻击（../）",
+      "priority": 90,
+      "severity": "critical",
+      "category": "path_traversal",
+      "cwe": "CWE-22",
+      "owasp": "A01:2021-Broken Access Control",
+      "enabled": true
+    },
+    {
+      "rule_id": "PATH_TRAVERSAL_002",
+      "type": "block",
+      "pattern": "(?i)(%2e%2e[%/\\\\]|%252e%252e|%c0%ae|%c1%1c)",
+      "replace": "",
+      "description": "阻止编码形式的路径遍历",
+      "priority": 90,
+      "severity": "critical",
+      "category": "path_traversal",
+      "cwe": "CWE-22",
+      "enabled": true
+    },
+    {
+      "rule_id": "CMD_INJECTION_001",
+      "type": "block",
+      "pattern": "[;&|`$]\\s*(cat|ls|pwd|whoami|id|uname|wget|curl|nc|bash|sh|cmd|powershell|python|perl|ruby|php)\\b",
+      "description": "检测命令注入模式",
+      "priority": 95,
+      "severity": "critical",
+      "category": "command_injection",
+      "cwe": "CWE-78",
+      "owasp": "A03:2021-Injection",
+      "enabled": true
+    },
+    {
+      "rule_id": "CMD_INJECTION_002",
+      "type": "block",
+      "pattern": "\\$\\([^)]+\\)|`[^`]+`",
+      "replace": "[BLOCKED]",
+      "description": "阻止命令替换语法",
+      "priority": 90,
+      "severity": "critical",
+      "category": "command_injection",
+      "cwe": "CWE-78",
+      "enabled": true
+    },
+    {
+      "rule_id": "CMD_INJECTION_003",
+      "type": "block",
+      "pattern": "\\|\\s*(cat|ls|head|tail|grep|awk|sed|cut|sort|uniq|wc|find|xargs)\\b",
+      "description": "检测管道命令注入",
+      "priority": 85,
+      "severity": "high",
+      "category": "command_injection",
+      "cwe": "CWE-78",
+      "enabled": true
+    },
+    {
+      "rule_id": "PII_CREDIT_CARD_001",
+      "type": "sanitize",
+      "pattern": "\\b(?:\\d{4}[-\\s]?){3}\\d{4}\\b",
+      "replace": "[CARD-REDACTED]",
+      "description": "掩码信用卡号码",
+      "priority": 70,
+      "severity": "high",
+      "category": "pii",
+      "enabled": true
+    },
+    {
+      "rule_id": "PII_SSN_001",
+      "type": "sanitize",
+      "pattern": "\\b\\d{3}[-\\s]?\\d{2}[-\\s]?\\d{4}\\b",
+      "replace": "[SSN-REDACTED]",
+      "description": "掩码美国社会安全号码",
+      "priority": 70,
+      "severity": "high",
+      "category": "pii",
+      "enabled": true
+    },
+    {
+      "rule_id": "PII_PHONE_001",
+      "type": "sanitize",
+      "pattern": "\\b(?:\\+?1[-\\s]?)?(?:\\(?\\d{3}\\)?[-\\s]?)?\\d{3}[-\\s]?\\d{4}\\b",
+      "replace": "[PHONE-REDACTED]",
+      "description": "掩码电话号码",
+      "priority": 60,
+      "severity": "medium",
+      "category": "pii",
+      "enabled": true
+    },
+    {
+      "rule_id": "PII_EMAIL_001",
+      "type": "sanitize",
+      "pattern": "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b",
+      "replace": "[EMAIL-REDACTED]",
+      "description": "掩码电子邮件地址",
+      "priority": 60,
+      "severity": "medium",
+      "category": "pii",
+      "enabled": false
+    },
+    {
+      "rule_id": "SENSITIVE_API_KEY_001",
+      "type": "sanitize",
+      "pattern": "(?i)(api[_-]?key|apikey|secret[_-]?key|access[_-]?token|auth[_-]?token)\\s*[=:]\\s*['\"]?[A-Za-z0-9_\\-]{20,}['\"]?",
+      "replace": "[API-KEY-REDACTED]",
+      "description": "掩码 API 密钥",
+      "priority": 80,
+      "severity": "critical",
+      "category": "sensitive_data",
+      "enabled": true
+    },
+    {
+      "rule_id": "SENSITIVE_PASSWORD_001",
+      "type": "sanitize",
+      "pattern": "(?i)(password|passwd|pwd)\\s*[=:]\\s*['\"]?[^\\s'\"]+['\"]?",
+      "replace": "[PASSWORD-REDACTED]",
+      "description": "掩码密码字段",
+      "priority": 85,
+      "severity": "critical",
+      "category": "sensitive_data",
+      "enabled": true
+    },
+    {
+      "rule_id": "PROMPT_INJECTION_001",
+      "type": "warn",
+      "pattern": "(?i)(ignore\\s+(previous|above|all|prior)\\s+(instructions?|prompts?|rules?|constraints?))",
+      "description": "检测提示注入：忽略指令模式",
+      "priority": 95,
+      "severity": "critical",
+      "category": "prompt_injection",
+      "enabled": true
+    },
+    {
+      "rule_id": "PROMPT_INJECTION_002",
+      "type": "warn",
+      "pattern": "(?i)(you\\s+are\\s+now|act\\s+as|pretend\\s+(to\\s+be|you\\s+are)|role[\\s-]*play)",
+      "description": "检测提示注入：角色扮演模式",
+      "priority": 90,
+      "severity": "high",
+      "category": "prompt_injection",
+      "enabled": true
+    },
+    {
+      "rule_id": "PROMPT_INJECTION_003",
+      "type": "warn",
+      "pattern": "(?i)(system\\s*:\\s*|assistant\\s*:\\s*|user\\s*:\\s*)",
+      "description": "检测提示注入：模拟系统消息",
+      "priority": 85,
+      "severity": "high",
+      "category": "prompt_injection",
+      "enabled": true
+    },
+    {
+      "rule_id": "PROMPT_INJECTION_004",
+      "type": "warn",
+      "pattern": "(?i)(DAN|do\\s+anything\\s+now|jailbreak|developer\\s+mode|sudo\\s+mode)",
+      "description": "检测已知的越狱模式",
+      "priority": 95,
+      "severity": "critical",
+      "category": "prompt_injection",
+      "enabled": true
+    },
+    {
+      "rule_id": "MALWARE_SIGNATURE_001",
+      "type": "block",
+      "pattern": "(?i)(eval\\s*\\(|exec\\s*\\(|compile\\s*\\(|__import__\\s*\\(|system\\s*\\(|popen\\s*\\()",
+      "description": "检测潜在的恶意代码执行函数",
+      "priority": 90,
+      "severity": "critical",
+      "category": "malware",
+      "cwe": "CWE-94",
+      "enabled": true
+    },
+    {
+      "rule_id": "MALWARE_SIGNATURE_002",
+      "type": "block",
+      "pattern": "(?i)(base64_decode|gzinflate|str_rot13|gzuncompress|gzdecode)",
+      "description": "检测混淆的恶意代码",
+      "priority": 85,
+      "severity": "high",
+      "category": "malware",
+      "enabled": true
     }
   ]
 }

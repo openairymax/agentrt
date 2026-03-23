@@ -1,9 +1,12 @@
+Copyright (c) 2026 SPHARX. All Rights Reserved.
+"From data intelligence emerges."
+
 # AgentOS 微内核架构详解
 
 **版本**: v1.0.0.5  
-**最后更新**: 2026-03-21  
-**路径**: `atoms/corekern/`
-**状态**: 生产就绪
+**最后更新**: 2026-03-23  
+**路径**: `atoms/corekern/`  
+**状态**: 🟢 生产就绪
 
 ---
 
@@ -11,9 +14,8 @@
 
 AgentOS 采用第四代微内核架构设计（L4 Micro-Kernel），将核心功能最小化，所有高级服务运行在用户态，确保系统的稳定性、安全性和可扩展性。本设计遵循 Liedtke 微内核原则 [Liedtke1995] 和 seL4 形式化验证方法论 [Klein2009]。
 
-### 1.1 设计理念与学术基础
+### 1.1 设计理念
 
-**微内核设计哲学**:
 ```
 ┌─────────────────────────────────────────┐
 │         应用层 (openhub/app)             │
@@ -23,7 +25,6 @@ AgentOS 采用第四代微内核架构设计（L4 Micro-Kernel），将核心功
 ┌─────────────────────────────────────────┐
 │         服务层 (backs)                   │
 │  • LLM 服务 • 工具服务 • 市场服务        │
-<!-- From data intelligence emerges. by spharx -->
 │  • 调度服务 • 监控服务 • 权限服务        │
 └───────────────↑─────────────────────────┘
                 ↓ 系统调用 (Syscall)
@@ -42,12 +43,15 @@ AgentOS 采用第四代微内核架构设计（L4 Micro-Kernel），将核心功
 └─────────────────────────────────────────┘
 ```
 
-**学术基础**:
+### 1.2 学术基础
+
+**微内核设计哲学**:
+
 1. **Liedtke 微内核原则** [Liedtke1995]:
    - 机制与策略分离（Mechanism vs Policy）
    - 最小特权原则（Principle of Least Privilege）
    - 地址空间隔离（Address Space Isolation）
-   
+
 2. **seL4 形式化验证方法** [Klein2009]:
    - 功能正确性证明（Functional Correctness）
    - 安全性质保证（Security Properties）
@@ -58,43 +62,43 @@ AgentOS 采用第四代微内核架构设计（L4 Micro-Kernel），将核心功
    - NUMA 感知调度（NUMA-Aware Scheduling）
    - 形式化验证支持（Formal Verification Support）
 
-### 1.2 核心价值与技术指标
+### 1.3 核心价值与技术指标
 
-- **最小化内核**: 仅保留最基础的通信、内存、调度和时间服务（内核代码 <10,000 LOC）
-- **用户态服务**: 所有高级功能以守护进程形式运行在用户态，故障隔离性 >99.9%
-- **稳定安全**: 服务崩溃不影响内核，单服务故障恢复时间 <100ms
-- **高效通信**: IPC Binder 提供高性能进程间通信
-  - 消息延迟：<10μs（1KB 共享内存，实测数据）
-  - 吞吐量：100,000+ msg/s（小包消息，4 核 CPU）
-  - 并发连接：1000+ channels（单实例，内存占用 <50MB）
-- **可移植性**: 内核不依赖特定硬件或操作系统特性
-  - 支持 Linux/macOS/Windows(WSL2)
-  - 编译时抽象层（HAL）支持多架构（x86_64/ARM64）
+| 特性 | 指标 | 说明 |
+| :--- | :--- | :--- |
+| **最小化内核** | <10,000 LOC | 仅保留最基础的通信、内存、调度和时间服务 |
+| **用户态服务** | >99.9% 故障隔离性 | 所有高级功能以守护进程形式运行在用户态 |
+| **稳定安全** | <100ms 故障恢复时间 | 服务崩溃不影响内核，单服务故障快速恢复 |
+| **高效通信** | <10μs 消息延迟 | IPC Binder 提供高性能进程间通信 |
+| **高吞吐量** | 100,000+ msg/s | 小包消息，4 核 CPU 实测数据 |
+| **并发连接** | 1000+ channels | 单实例，内存占用 <50MB |
+| **可移植性** | Linux/macOS/Windows(WSL2) | 支持多平台部署 |
+| **多架构支持** | x86_64/ARM64 | 编译时抽象层（HAL）支持 |
 
-### 1.3 关键特性与技术实现
+### 1.4 关键特性与技术实现
 
 - ✅ **IPC Binder**: 基于共享内存和信号量的高效通信
   - 零拷贝数据传输（Zero-Copy）
   - 无锁环形缓冲区（Lock-Free Ring Buffer）
   - Cache line 对齐优化（64 字节对齐，避免伪共享）
-  
+
 - ✅ **内存管理**: RAII 模式、智能指针、内存池优化
   - 引用计数智能指针（Reference Counting Smart Pointer）
   - 小对象内存池（64B/128B/256B/512B 固定大小）
   - 大对象 mmap 直接映射（>4KB）
   - 分配延迟：<5ns（池分配，实测数据）
-  
+
 - ✅ **任务调度**: 加权轮询算法、优先级队列
   - 四级优先级（LOW/NORMAL/HIGH/REALTIME）
   - 加权公平调度（Weighted Fair Queuing）
   - QoS 支持（服务质量保障）
   - 调度延迟：<1ms（加权轮询，实测数据）
-  
+
 - ✅ **时间服务**: 高精度时间戳、定时器管理
   - 纳秒级时间戳（clock_gettime(CLOCK_MONOTONIC)）
   - 定时器精度：±1ms（Linux kernel 6.5）
   - 时间戳获取延迟：<10ns（实测数据）
-  
+
 - ✅ **系统调用**: 统一的 syscall 接口抽象
   - C ABI 兼容（跨语言 FFI 调用）
   - JSON 参数格式（统一序列化）
@@ -539,6 +543,10 @@ agentos_scheduler_run();
 - seL4: [seL4 Performance Benchmarks 2025]
 - Fuchsia: [Fuchsia Performance Report Q1 2026]
 
+---
+
+## 6. 实现状态与性能基准
+
 ### 6.1 已完成功能
 
 | 组件 | 完成度 | 状态 |
@@ -561,9 +569,9 @@ agentos_scheduler_run();
 
 ---
 
-## 6. 开发指南
+## 7. 开发指南
 
-### 6.1 使用 IPC 通信
+### 7.1 使用 IPC 通信
 
 ```c
 #include "ipc_binder.h"
@@ -582,7 +590,7 @@ size_t recv_len;
 agentos_ipc_recv(channel, (void**)&recv_msg, &recv_len, 1000);
 ```
 
-### 6.2 使用智能指针
+### 7.2 使用智能指针
 
 ```c
 #include "memory_manager.h"
@@ -599,9 +607,9 @@ agentos_smart_ptr_release(ptr);  // 自动释放
 
 ---
 
-## 7. 故障排查
+## 8. 故障排查
 
-### 7.1 常见问题
+### 8.1 常见问题
 
 #### 问题：IPC 通信超时
 **症状**: `agentos_ipc_send()` 返回超时错误  
@@ -617,7 +625,7 @@ agentos_smart_ptr_release(ptr);  // 自动释放
 2. 检查智能指针引用计数
 3. 验证析构函数是否正确注册
 
-### 7.2 调试技巧
+### 8.2 调试技巧
 
 - 启用 Debug 日志级别
 - 使用 `agentos_memory_stats()` 查看内存使用
@@ -625,7 +633,7 @@ agentos_smart_ptr_release(ptr);  // 自动释放
 
 ---
 
-## 8. 参考资料
+## 9. 参考资料
 
 - [README.md](../../README.md) - 项目总览
 - [syscall.md](syscall.md) - 系统调用接口文档

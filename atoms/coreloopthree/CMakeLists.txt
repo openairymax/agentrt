@@ -42,6 +42,7 @@ add_subdirectory(src/memory)
 
 # 创建主库
 add_library(agentos_coreloopthree STATIC
+    src/loop.c
     src/config_loader.c
     src/utils/error_utils.c
     src/utils/id_utils.c

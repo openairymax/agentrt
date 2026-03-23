@@ -29,12 +29,15 @@ find_package(Threads REQUIRED)
 
 # 源文件
 set(DYNAMIC_SOURCES
+    src/platform.c
     src/agentos.c
     src/main.c
     src/server.c
     src/session.c
     src/health.c
     src/telemetry.c
+    src/auth.c
+    src/ratelimit.c
     src/gateway/http_gateway.c
     src/gateway/ws_gateway.c
     src/gateway/stdio_gateway.c
@@ -65,6 +68,7 @@ if(WIN32)
         WIN32_LEAN_AND_MEAN
         NOMINMAX
     )
+    target_link_libraries(dynamic PRIVATE ws2_32)
 else()
     target_compile_definitions(dynamic PRIVATE
         _GNU_SOURCE
@@ -77,11 +81,14 @@ option(BUILD_SHARED_LIBS "Build shared library" OFF)
 
 if(NOT BUILD_SHARED_LIBS)
     add_library(dynamic_lib STATIC
+        src/platform.c
         src/agentos.c
         src/server.c
         src/session.c
         src/health.c
         src/telemetry.c
+        src/auth.c
+        src/ratelimit.c
         src/gateway/http_gateway.c
         src/gateway/ws_gateway.c
         src/gateway/stdio_gateway.c
@@ -107,6 +114,7 @@ if(NOT BUILD_SHARED_LIBS)
             WIN32_LEAN_AND_MEAN
             NOMINMAX
         )
+        target_link_libraries(dynamic_lib PUBLIC ws2_32)
     else()
         target_compile_definitions(dynamic_lib PRIVATE
             _GNU_SOURCE
@@ -141,6 +149,16 @@ if(NOT BUILD_SHARED_LIBS)
     install(TARGETS dynamic_lib
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib
+    )
+    install(FILES 
+        src/agentos.h
+        src/platform.h
+        src/session.h
+        src/health.h
+        src/telemetry.h
+        src/auth.h
+        src/ratelimit.h
+        DESTINATION include/agentos/dynamic
     )
 endif()
 

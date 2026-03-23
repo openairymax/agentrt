@@ -1,139 +1,254 @@
 /**
  * @file permission_rule.c
- * @brief 权限规则管理器实现（基于 YAML）
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ * @brief 权限规则管理器实现
+ * @author Spharx
+ * @date 2024
  */
 
 #include "permission_rule.h"
-#include "logger.h"
-#include <yaml.h>
 #include <stdlib.h>
 #include <string.h>
-#include <fnmatch.h>
-#include <sys/stat.h>
-#include <unistd.h>
+#include <stdio.h>
 
-/* 解析规则文件 */
-static permission_rule_t* parse_rules(const char* path, time_t* out_mtime) {
-    FILE* f = fopen(path, "rb");
-    if (!f) {
-        AGENTOS_LOG_ERROR("permission_rule: cannot open %s", path);
-        return NULL;
-    }
-    struct stat st;
-    if (fstat(fileno(f), &st) != 0) {
-        fclose(f);
-        // From data intelligence emerges. by spharx
-        return NULL;
-    }
-    if (out_mtime) *out_mtime = st.st_mtime;
+#define MAX_LINE_LENGTH 4096
+#define DEFAULT_PRIORITY 100
 
-    yaml_parser_t parser;
-    yaml_event_t event;
-    yaml_parser_initialize(&parser);
-    yaml_parser_set_input_file(&parser, f);
-
-    permission_rule_t* head = NULL;
-    permission_rule_t* tail = NULL;
-    int in_rules = 0;
-    int in_rule = 0;
-    char* cur_agent = NULL;
-    char* cur_action = NULL;
-    char* cur_resource = NULL;
-    int cur_allow = 1;
-
-    while (1) {
-        if (!yaml_parser_parse(&parser, &event)) break;
-        if (event.type == YAML_SCALAR_EVENT) {
-            const char* val = (const char*)event.data.scalar.value;
-            if (!in_rules && strcmp(val, "rules") == 0) {
-                in_rules = 1;
-            } else if (in_rules && !in_rule) {
-                in_rule = 1;
-            } else if (in_rule) {
-                if (strcmp(val, "agent") == 0) {
-                    yaml_parser_parse(&parser, &event);
-                    cur_agent = strdup((const char*)event.data.scalar.value);
-                } else if (strcmp(val, "action") == 0) {
-                    yaml_parser_parse(&parser, &event);
-                    cur_action = strdup((const char*)event.data.scalar.value);
-                } else if (strcmp(val, "resource") == 0) {
-                    yaml_parser_parse(&parser, &event);
-                    cur_resource = strdup((const char*)event.data.scalar.value);
-                } else if (strcmp(val, "effect") == 0) {
-                    yaml_parser_parse(&parser, &event);
-                    cur_allow = (strcmp((const char*)event.data.scalar.value, "allow") == 0);
-                }
-            }
-        } else if (event.type == YAML_MAPPING_END_EVENT) {
-            if (in_rule) {
-                permission_rule_t* r = (permission_rule_t*)malloc(sizeof(permission_rule_t));
-                if (r) {
-                    r->agent_id = cur_agent;
-                    r->action = cur_action;
-                    r->resource = cur_resource;
-                    r->allow = cur_allow;
-                    r->next = NULL;
-                    if (tail) tail->next = r;
-                    else head = r;
-                    tail = r;
-                } else {
-                    free(cur_agent);
-                    free(cur_action);
-                    free(cur_resource);
-                }
-                cur_agent = NULL;
-                cur_action = NULL;
-                cur_resource = NULL;
-                in_rule = 0;
-            }
-        }
-        yaml_event_delete(&event);
-        if (event.type == YAML_STREAM_END_EVENT) break;
-    }
-    yaml_parser_delete(&parser);
-    fclose(f);
-    return head;
+static void free_rule(permission_rule_t* rule) {
+    if (!rule) return;
+    domes_mem_free(rule->agent_id);
+    domes_mem_free(rule->action);
+    domes_mem_free(rule->resource);
+    domes_mem_free(rule->resource_pattern);
+    domes_mem_free(rule);
 }
 
 static void free_rules(permission_rule_t* rules) {
     while (rules) {
         permission_rule_t* next = rules->next;
-        free(rules->agent_id);
-        free(rules->action);
-        free(rules->resource);
-        free(rules);
+        free_rule(rules);
         rules = next;
     }
 }
 
+static permission_rule_t* create_rule(const char* agent_id, const char* action,
+                                       const char* resource, int allow, int priority) {
+    permission_rule_t* rule = (permission_rule_t*)domes_mem_alloc(sizeof(permission_rule_t));
+    if (!rule) return NULL;
+    
+    memset(rule, 0, sizeof(permission_rule_t));
+    
+    if (agent_id) {
+        rule->agent_id = domes_strdup(agent_id);
+        if (!rule->agent_id) goto error;
+    }
+    if (action) {
+        rule->action = domes_strdup(action);
+        if (!rule->action) goto error;
+    }
+    if (resource) {
+        rule->resource = domes_strdup(resource);
+        if (!rule->resource) goto error;
+    }
+    
+    rule->allow = allow;
+    rule->priority = priority;
+    rule->next = NULL;
+    
+    return rule;
+    
+error:
+    free_rule(rule);
+    return NULL;
+}
+
+static int match_pattern(const char* pattern, const char* str) {
+    if (!pattern || !str) return 0;
+    if (strcmp(pattern, "*") == 0) return 1;
+    
+    const char* p = pattern;
+    const char* s = str;
+    const char* star = NULL;
+    const char* ss = s;
+    
+    while (*s) {
+        if (*p == '*') {
+            star = p++;
+            ss = s;
+        } else if (*p == *s || *p == '?') {
+            p++;
+            s++;
+        } else if (star) {
+            p = star + 1;
+            s = ++ss;
+        } else {
+            return 0;
+        }
+    }
+    
+    while (*p == '*') {
+        p++;
+    }
+    
+    return *p == '\0';
+}
+
+static int parse_yaml_line(const char* line, char** agent_id, char** action,
+                           char** resource, int* allow, int* priority) {
+    *agent_id = NULL;
+    *action = NULL;
+    *resource = NULL;
+    *allow = 1;
+    *priority = DEFAULT_PRIORITY;
+    
+    char buf[MAX_LINE_LENGTH];
+    strncpy(buf, line, MAX_LINE_LENGTH - 1);
+    buf[MAX_LINE_LENGTH - 1] = '\0';
+    
+    char* p = buf;
+    while (*p == ' ' || *p == '\t') p++;
+    
+    if (*p == '\0' || *p == '#' || *p == '\n' || *p == '\r') {
+        return -1;
+    }
+    
+    char* token;
+    char* saveptr;
+    
+    token = strtok_r(p, ":\n\r", &saveptr);
+    if (!token) return -1;
+    
+    while (token) {
+        char* key = token;
+        while (*key == ' ' || *key == '\t') key++;
+        
+        char* value = strchr(key, ' ');
+        if (value) {
+            *value = '\0';
+            value++;
+            while (*value == ' ' || *value == '\t') value++;
+        }
+        
+        if (strcmp(key, "agent") == 0 && value) {
+            *agent_id = domes_strdup(value);
+        } else if (strcmp(key, "action") == 0 && value) {
+            *action = domes_strdup(value);
+        } else if (strcmp(key, "resource") == 0 && value) {
+            *resource = domes_strdup(value);
+        } else if (strcmp(key, "allow") == 0 && value) {
+            *allow = (strcmp(value, "true") == 0 || strcmp(value, "1") == 0) ? 1 : 0;
+        } else if (strcmp(key, "priority") == 0 && value) {
+            *priority = atoi(value);
+        }
+        
+        token = strtok_r(NULL, ":\n\r", &saveptr);
+    }
+    
+    return 0;
+}
+
 rule_manager_t* rule_manager_create(const char* path) {
-    rule_manager_t* mgr = (rule_manager_t*)calloc(1, sizeof(rule_manager_t));
+    rule_manager_t* mgr = (rule_manager_t*)domes_mem_alloc(sizeof(rule_manager_t));
     if (!mgr) return NULL;
-    pthread_rwlock_init(&mgr->rwlock, NULL);
-    mgr->path = strdup(path);
-    if (!mgr->path) {
-        free(mgr);
+    
+    memset(mgr, 0, sizeof(rule_manager_t));
+    
+    if (domes_rwlock_init(&mgr->rwlock) != DOMES_OK) {
+        domes_mem_free(mgr);
         return NULL;
     }
-    time_t mtime = 0;
-    mgr->rules = parse_rules(path, &mtime);
-    mgr->last_mtime = mtime;
+    
+    if (path) {
+        mgr->path = domes_strdup(path);
+        if (!mgr->path) {
+            domes_rwlock_destroy(&mgr->rwlock);
+            domes_mem_free(mgr);
+            return NULL;
+        }
+        
+        if (rule_manager_reload(mgr) != 0) {
+            domes_mem_free(mgr->path);
+            domes_rwlock_destroy(&mgr->rwlock);
+            domes_mem_free(mgr);
+            return NULL;
+        }
+    }
+    
     return mgr;
 }
 
 void rule_manager_destroy(rule_manager_t* mgr) {
     if (!mgr) return;
-    pthread_rwlock_destroy(&mgr->rwlock);
+    
+    domes_rwlock_wrlock(&mgr->rwlock);
     free_rules(mgr->rules);
-    free(mgr->path);
-    free(mgr);
+    mgr->rules = NULL;
+    domes_rwlock_unlock(&mgr->rwlock);
+    
+    domes_rwlock_destroy(&mgr->rwlock);
+    domes_mem_free(mgr->path);
+    domes_mem_free(mgr);
 }
 
-/* 简单的 glob 匹配（支持 * 通配符） */
-static int match_glob(const char* pattern, const char* str) {
-    if (!pattern) return 1; // 通配
-    return fnmatch(pattern, str, 0) == 0;
+int rule_manager_reload(rule_manager_t* mgr) {
+    if (!mgr || !mgr->path) return DOMES_ERROR_INVALID_ARG;
+    
+    domes_file_stat_t st;
+    if (domes_file_stat(mgr->path, &st) != DOMES_OK) {
+        return DOMES_ERROR_NOT_FOUND;
+    }
+    
+    uint64_t mtime = (uint64_t)st.mtime.sec * 1000 + st.mtime.nsec / 1000000;
+    if (mtime == mgr->last_mtime) {
+        return DOMES_OK;
+    }
+    
+    FILE* fp = fopen(mgr->path, "r");
+    if (!fp) {
+        return DOMES_ERROR_IO;
+    }
+    
+    permission_rule_t* new_rules = NULL;
+    permission_rule_t** tail = &new_rules;
+    
+    char line[MAX_LINE_LENGTH];
+    while (fgets(line, sizeof(line), fp)) {
+        char* agent_id = NULL;
+        char* action = NULL;
+        char* resource = NULL;
+        int allow = 1;
+        int priority = DEFAULT_PRIORITY;
+        
+        if (parse_yaml_line(line, &agent_id, &action, &resource, &allow, &priority) != 0) {
+            continue;
+        }
+        
+        permission_rule_t* rule = create_rule(agent_id, action, resource, allow, priority);
+        domes_mem_free(agent_id);
+        domes_mem_free(action);
+        domes_mem_free(resource);
+        
+        if (!rule) {
+            fclose(fp);
+            free_rules(new_rules);
+            return DOMES_ERROR_NO_MEMORY;
+        }
+        
+        *tail = rule;
+        tail = &rule->next;
+    }
+    
+    fclose(fp);
+    
+    domes_rwlock_wrlock(&mgr->rwlock);
+    permission_rule_t* old_rules = mgr->rules;
+    mgr->rules = new_rules;
+    mgr->last_mtime = mtime;
+    domes_atomic_inc32(&mgr->version);
+    domes_rwlock_unlock(&mgr->rwlock);
+    
+    free_rules(old_rules);
+    
+    return DOMES_OK;
 }
 
 int rule_manager_match(rule_manager_t* mgr,
@@ -141,19 +256,106 @@ int rule_manager_match(rule_manager_t* mgr,
                        const char* action,
                        const char* resource,
                        const char* context) {
+    (void)context;
+    
     if (!mgr) return 0;
-    pthread_rwlock_rdlock(&mgr->rwlock);
-    permission_rule_t* r = mgr->rules;
-    while (r) {
-        if ((!r->agent_id || strcmp(r->agent_id, agent_id) == 0) &&
-            (!r->action || strcmp(r->action, action) == 0) &&
-            match_glob(r->resource, resource)) {
-            int result = r->allow ? 1 : 0;
-            pthread_rwlock_unlock(&mgr->rwlock);
-            return result;
+    
+    int best_priority = -1;
+    int result = 0;
+    
+    domes_rwlock_rdlock(&mgr->rwlock);
+    
+    permission_rule_t* rule = mgr->rules;
+    while (rule) {
+        if (rule->priority <= best_priority) {
+            rule = rule->next;
+            continue;
         }
-        r = r->next;
+        
+        int match = 1;
+        
+        if (rule->agent_id && agent_id) {
+            if (strcmp(rule->agent_id, "*") != 0 && strcmp(rule->agent_id, agent_id) != 0) {
+                match = 0;
+            }
+        }
+        
+        if (match && rule->action && action) {
+            if (strcmp(rule->action, "*") != 0 && strcmp(rule->action, action) != 0) {
+                match = 0;
+            }
+        }
+        
+        if (match && rule->resource && resource) {
+            if (!match_pattern(rule->resource, resource)) {
+                match = 0;
+            }
+        }
+        
+        if (match) {
+            best_priority = rule->priority;
+            result = rule->allow;
+        }
+        
+        rule = rule->next;
     }
-    pthread_rwlock_unlock(&mgr->rwlock);
-    return 0; // 无匹配规则，默认拒绝
+    
+    domes_rwlock_unlock(&mgr->rwlock);
+    
+    return result;
+}
+
+int rule_manager_add(rule_manager_t* mgr,
+                     const char* agent_id,
+                     const char* action,
+                     const char* resource,
+                     int allow,
+                     int priority) {
+    if (!mgr) return DOMES_ERROR_INVALID_ARG;
+    
+    permission_rule_t* rule = create_rule(agent_id, action, resource, allow, priority);
+    if (!rule) return DOMES_ERROR_NO_MEMORY;
+    
+    domes_rwlock_wrlock(&mgr->rwlock);
+    
+    permission_rule_t** pp = &mgr->rules;
+    while (*pp && (*pp)->priority >= priority) {
+        pp = &(*pp)->next;
+    }
+    
+    rule->next = *pp;
+    *pp = rule;
+    
+    domes_atomic_inc32(&mgr->version);
+    
+    domes_rwlock_unlock(&mgr->rwlock);
+    
+    return DOMES_OK;
+}
+
+void rule_manager_clear(rule_manager_t* mgr) {
+    if (!mgr) return;
+    
+    domes_rwlock_wrlock(&mgr->rwlock);
+    free_rules(mgr->rules);
+    mgr->rules = NULL;
+    domes_atomic_inc32(&mgr->version);
+    domes_rwlock_unlock(&mgr->rwlock);
+}
+
+size_t rule_manager_count(rule_manager_t* mgr) {
+    if (!mgr) return 0;
+    
+    domes_rwlock_rdlock(&mgr->rwlock);
+    
+    size_t count = 0;
+    permission_rule_t* rule = mgr->rules;
+    while (rule) {
+        count++;
+        rule = rule->next;
+    }
+    
+    domes_rwlock_unlock(&mgr->rwlock);
+    
+    return count;
 }

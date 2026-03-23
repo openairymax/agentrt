@@ -173,6 +173,7 @@ class Meter:
         service_name: Name of the service
         metrics: List of recorded metric points
         _lock: Thread lock for thread-safe recording
+        max_metrics: Maximum number of metrics to store (default: 1000)
 
     Example:
         >>> meter = Meter(service_name="api_gateway")
@@ -180,16 +181,20 @@ class Meter:
         >>> meter.record("latency_ms", 150.5, labels={"endpoint": "/users"})
     """
 
-    def __init__(self, service_name: str):
+    DEFAULT_MAX_METRICS = 1000
+
+    def __init__(self, service_name: str, max_metrics: int = DEFAULT_MAX_METRICS):
         """
         Initialize a meter.
 
         Args:
             service_name: Name of the service
+            max_metrics: Maximum number of metrics to store (prevents memory overflow)
         """
         self.service_name = service_name
         self.metrics: List[MetricPoint] = []
         self._lock = threading.Lock()
+        self.max_metrics = max_metrics
 
     def record(self, name: str, value: float, labels: Optional[Dict[str, str]] = None,
                method_name: Optional[str] = None, status_code: Optional[int] = None):
@@ -202,6 +207,9 @@ class Meter:
             labels: Optional labels for slicing/dicing
             method_name: Optional method/function name
             status_code: Optional HTTP/gRPC status code
+
+        Raises:
+            TelemetryError: If metrics limit exceeded
 
         Example:
             >>> meter.record(
@@ -221,6 +229,10 @@ class Meter:
         )
 
         with self._lock:
+            if len(self.metrics) >= self.max_metrics:
+                logger.warning(
+                    f"Metrics limit ({self.max_metrics}) reached, dropping oldest metric")
+                self.metrics.pop(0)
             self.metrics.append(point)
 
         logger.debug(
@@ -253,17 +265,27 @@ class Meter:
 
 
 class Tracer:
-    """Tracer for creating and managing spans."""
+    """Tracer for creating and managing spans.
 
-    def __init__(self, service_name: str):
+    Attributes:
+        service_name: Name of the service
+        spans: List of recorded spans
+        max_spans: Maximum number of spans to store (default: 500)
+    """
+
+    DEFAULT_MAX_SPANS = 500
+
+    def __init__(self, service_name: str, max_spans: int = DEFAULT_MAX_SPANS):
         """
         Initialize a tracer.
 
         Args:
             service_name: Name of the service
+            max_spans: Maximum number of spans to store (prevents memory overflow)
         """
         self.service_name = service_name
         self.spans: List[Span] = []
+        self.max_spans = max_spans
 
     def start_span(
         self,
@@ -296,6 +318,12 @@ class Tracer:
             parent_span_id=parent_span_id
         )
         span.start()
+        
+        if len(self.spans) >= self.max_spans:
+            logger.warning(
+                f"Spans limit ({self.max_spans}) reached, dropping oldest span")
+            self.spans.pop(0)
+        
         self.spans.append(span)
         return span
 
@@ -364,20 +392,23 @@ class Telemetry:
         >>> print(f"Memory: {health['memory_mb']:.1f} MB, GC count: {health['gc_count']}")
     """
 
-    def __init__(self, service_name: str, enable_runtime_monitoring: bool = False):
+    def __init__(self, service_name: str, enable_runtime_monitoring: bool = False,
+                 max_metrics: int = Meter.DEFAULT_MAX_METRICS, max_spans: int = Tracer.DEFAULT_MAX_SPANS):
         """
         Initialize telemetry.
 
         Args:
             service_name: Name of the service
             enable_runtime_monitoring: Enable automatic runtime metrics collection
+            max_metrics: Maximum number of metrics to store (default: 1000)
+            max_spans: Maximum number of spans to store (default: 500)
 
         Example:
             >>> telemetry = Telemetry("api_gateway", enable_runtime_monitoring=True)
         """
         self.service_name = service_name
-        self.meter = Meter(service_name)
-        self.tracer = Tracer(service_name)
+        self.meter = Meter(service_name, max_metrics=max_metrics)
+        self.tracer = Tracer(service_name, max_spans=max_spans)
         self._runtime_monitoring = enable_runtime_monitoring
         self._monitor_thread: Optional[threading.Thread] = None
         self._stop_monitoring = threading.Event()

@@ -310,7 +310,7 @@ static void handle_client(int client_fd) {
 }
 
 int main(int argc, char** argv) {
-    const char* config_path = "config/services/tool.yaml";
+    const char* config_path = "config/service/tool_d/tool.yaml";
     if (argc > 1) config_path = argv[1];
 
     signal(SIGINT, signal_handler);

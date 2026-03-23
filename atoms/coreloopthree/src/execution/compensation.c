@@ -162,7 +162,13 @@ agentos_error_t agentos_compensation_compensate(
         manager->human_queue = new_queue;
         manager->human_queue_capacity = new_cap;
     }
-        manager->human_queue[manager->human_queue_size++] = strdup(act->action_id);
+
+    manager->human_queue[manager->human_queue_size++] = strdup(act->action_id);
+    if (manager->human_queue[manager->human_queue_size - 1] == NULL) {
+        act->next = manager->actions;
+        manager->actions = act;
+        agentos_mutex_unlock(manager->lock);
+        return AGENTOS_ENOMEM;
     }
 
     // 释放动作记录

@@ -1,0 +1,381 @@
+# =============================================================================
+# AgentOS 大语言模型配置文件
+# 版本: v1.0.0
+# 最后更新: 2026-03-23
+# Schema: schemas/models.schema.json
+# =============================================================================
+# Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+
+# 配置版本
+_config_version: "1.0.0"
+
+# =============================================================================
+# 模型配置列表
+# =============================================================================
+models:
+  # ===========================================================================
+  # OpenAI 模型
+  # ===========================================================================
+  - name: "gpt-4"
+    provider: "openai"
+    api_key_env: "OPENAI_API_KEY"
+    endpoint: "https://api.openai.com/v1/chat/completions"
+    context_window: 128000
+    input_cost_per_1k: 0.03
+    output_cost_per_1k: 0.06
+    capabilities: ["chat", "function_calling", "json_mode", "streaming"]
+    default: false
+    max_concurrency: 10
+    timeout_sec: 60
+    
+    # 重试配置
+    retry:
+      max_attempts: 3
+      backoff_ms: 100
+      backoff_multiplier: 2.0
+      max_backoff_ms: 10000
+      retry_on_status_codes: [429, 500, 502, 503, 504]
+    
+    # 熔断器配置
+    circuit_breaker:
+      enabled: true
+      failure_threshold: 5
+      reset_timeout_sec: 60
+      half_open_requests: 3
+      success_threshold: 2
+    
+    # 降级配置
+    fallback:
+      enabled: true
+      fallback_model: "gpt-4-turbo"
+      fallback_on_timeout: true
+      fallback_on_rate_limit: true
+      fallback_on_error: true
+    
+    # 健康检查
+    health_check:
+      enabled: true
+      interval_sec: 30
+      timeout_sec: 5
+      unhealthy_threshold: 3
+    
+    # 速率限制
+    rate_limit:
+      requests_per_minute: 500
+      tokens_per_minute: 100000
+
+  - name: "gpt-4-turbo"
+    provider: "openai"
+    api_key_env: "OPENAI_API_KEY"
+    endpoint: "https://api.openai.com/v1/chat/completions"
+    context_window: 128000
+    input_cost_per_1k: 0.01
+    output_cost_per_1k: 0.03
+    capabilities: ["chat", "function_calling", "json_mode", "vision", "streaming"]
+    default: true
+    max_concurrency: 20
+    timeout_sec: 60
+    
+    retry:
+      max_attempts: 3
+      backoff_ms: 100
+      backoff_multiplier: 2.0
+      max_backoff_ms: 10000
+      retry_on_status_codes: [429, 500, 502, 503, 504]
+    
+    circuit_breaker:
+      enabled: true
+      failure_threshold: 5
+      reset_timeout_sec: 60
+      half_open_requests: 3
+      success_threshold: 2
+    
+    fallback:
+      enabled: true
+      fallback_model: "gpt-3.5-turbo"
+      fallback_on_timeout: true
+      fallback_on_rate_limit: true
+      fallback_on_error: true
+    
+    health_check:
+      enabled: true
+      interval_sec: 30
+      timeout_sec: 5
+      unhealthy_threshold: 3
+    
+    rate_limit:
+      requests_per_minute: 1000
+      tokens_per_minute: 200000
+
+  - name: "gpt-3.5-turbo"
+    provider: "openai"
+    api_key_env: "OPENAI_API_KEY"
+    endpoint: "https://api.openai.com/v1/chat/completions"
+    context_window: 16000
+    input_cost_per_1k: 0.0015
+    output_cost_per_1k: 0.002
+    capabilities: ["chat", "function_calling", "streaming"]
+    default: false
+    max_concurrency: 50
+    timeout_sec: 30
+    
+    retry:
+      max_attempts: 3
+      backoff_ms: 50
+      backoff_multiplier: 2.0
+      max_backoff_ms: 5000
+    
+    circuit_breaker:
+      enabled: true
+      failure_threshold: 10
+      reset_timeout_sec: 30
+    
+    fallback:
+      enabled: false
+
+  # ===========================================================================
+  # Anthropic 模型
+  # ===========================================================================
+  - name: "claude-3-opus"
+    provider: "anthropic"
+    api_key_env: "ANTHROPIC_API_KEY"
+    endpoint: "https://api.anthropic.com/v1/messages"
+    context_window: 200000
+    input_cost_per_1k: 0.015
+    output_cost_per_1k: 0.075
+    capabilities: ["chat", "vision", "streaming"]
+    default: false
+    max_concurrency: 10
+    timeout_sec: 120
+    
+    retry:
+      max_attempts: 3
+      backoff_ms: 100
+      backoff_multiplier: 2.0
+      max_backoff_ms: 10000
+      retry_on_status_codes: [429, 500, 502, 503, 504]
+    
+    circuit_breaker:
+      enabled: true
+      failure_threshold: 5
+      reset_timeout_sec: 60
+    
+    fallback:
+      enabled: true
+      fallback_model: "claude-3-sonnet"
+      fallback_on_timeout: true
+      fallback_on_rate_limit: true
+      fallback_on_error: true
+    
+    health_check:
+      enabled: true
+      interval_sec: 30
+      timeout_sec: 10
+
+  - name: "claude-3-sonnet"
+    provider: "anthropic"
+    api_key_env: "ANTHROPIC_API_KEY"
+    endpoint: "https://api.anthropic.com/v1/messages"
+    context_window: 200000
+    input_cost_per_1k: 0.003
+    output_cost_per_1k: 0.015
+    capabilities: ["chat", "streaming"]
+    default: false
+    max_concurrency: 20
+    timeout_sec: 60
+    
+    retry:
+      max_attempts: 3
+      backoff_ms: 100
+      backoff_multiplier: 2.0
+      max_backoff_ms: 10000
+    
+    circuit_breaker:
+      enabled: true
+      failure_threshold: 5
+      reset_timeout_sec: 60
+    
+    fallback:
+      enabled: true
+      fallback_model: "claude-3-haiku"
+
+  - name: "claude-3-haiku"
+    provider: "anthropic"
+    api_key_env: "ANTHROPIC_API_KEY"
+    endpoint: "https://api.anthropic.com/v1/messages"
+    context_window: 200000
+    input_cost_per_1k: 0.00025
+    output_cost_per_1k: 0.00125
+    capabilities: ["chat", "streaming"]
+    default: false
+    max_concurrency: 50
+    timeout_sec: 30
+    
+    retry:
+      max_attempts: 3
+      backoff_ms: 50
+      backoff_multiplier: 2.0
+      max_backoff_ms: 5000
+    
+    fallback:
+      enabled: false
+
+  # ===========================================================================
+  # DeepSeek 模型
+  # ===========================================================================
+  - name: "deepseek-chat"
+    provider: "deepseek"
+    api_key_env: "DEEPSEEK_API_KEY"
+    endpoint: "https://api.deepseek.com/v1/chat/completions"
+    context_window: 64000
+    input_cost_per_1k: 0.0001
+    output_cost_per_1k: 0.0002
+    capabilities: ["chat", "function_calling", "streaming"]
+    default: false
+    max_concurrency: 20
+    timeout_sec: 60
+    
+    retry:
+      max_attempts: 3
+      backoff_ms: 100
+      backoff_multiplier: 2.0
+      max_backoff_ms: 10000
+    
+    circuit_breaker:
+      enabled: true
+      failure_threshold: 5
+      reset_timeout_sec: 60
+    
+    fallback:
+      enabled: true
+      fallback_model: "gpt-3.5-turbo"
+
+  # ===========================================================================
+  # Ollama 本地模型
+  # ===========================================================================
+  - name: "llama-3-70b"
+    provider: "ollama"
+    endpoint: "${OLLAMA_HOST:-http://localhost:11434}/api/chat"
+    context_window: 8192
+    input_cost_per_1k: 0.0
+    output_cost_per_1k: 0.0
+    capabilities: ["chat", "streaming"]
+    default: false
+    max_concurrency: 5
+    timeout_sec: 120
+    
+    retry:
+      max_attempts: 2
+      backoff_ms: 500
+      backoff_multiplier: 2.0
+      max_backoff_ms: 5000
+    
+    circuit_breaker:
+      enabled: true
+      failure_threshold: 3
+      reset_timeout_sec: 30
+    
+    health_check:
+      enabled: true
+      interval_sec: 60
+      timeout_sec: 10
+
+  # ===========================================================================
+  # 嵌入模型
+  # ===========================================================================
+  - name: "text-embedding-3-small"
+    provider: "openai"
+    api_key_env: "OPENAI_API_KEY"
+    endpoint: "https://api.openai.com/v1/embeddings"
+    context_window: 8191
+    input_cost_per_1k: 0.00002
+    output_cost_per_1k: 0.0
+    capabilities: ["embedding"]
+    default: false
+    max_concurrency: 100
+    timeout_sec: 30
+    
+    retry:
+      max_attempts: 3
+      backoff_ms: 50
+      backoff_multiplier: 2.0
+      max_backoff_ms: 5000
+    
+    circuit_breaker:
+      enabled: true
+      failure_threshold: 10
+      reset_timeout_sec: 30
+
+  - name: "text-embedding-3-large"
+    provider: "openai"
+    api_key_env: "OPENAI_API_KEY"
+    endpoint: "https://api.openai.com/v1/embeddings"
+    context_window: 8191
+    input_cost_per_1k: 0.00013
+    output_cost_per_1k: 0.0
+    capabilities: ["embedding"]
+    default: false
+    max_concurrency: 50
+    timeout_sec: 30
+
+# =============================================================================
+# 全局模型配置
+# =============================================================================
+global:
+  # 默认提供商
+  default_provider: "openai"
+  
+  # 默认模型
+  default_model: "gpt-4-turbo"
+  
+  # 默认嵌入模型
+  default_embedding_model: "text-embedding-3-small"
+  
+  # 全局超时
+  default_timeout_sec: 60
+  
+  # 全局重试
+  default_retry:
+    max_attempts: 3
+    backoff_ms: 100
+    backoff_multiplier: 2.0
+    max_backoff_ms: 10000
+  
+  # 全局熔断器
+  default_circuit_breaker:
+    enabled: true
+    failure_threshold: 5
+    reset_timeout_sec: 60
+    half_open_requests: 3
+    success_threshold: 2
+  
+  # 全局健康检查
+  default_health_check:
+    enabled: true
+    interval_sec: 30
+    timeout_sec: 5
+    unhealthy_threshold: 3
+
+# =============================================================================
+# 模型路由规则
+# =============================================================================
+routing:
+  # 基于任务类型的模型选择
+  task_type_mapping:
+    planning: "gpt-4"
+    coding: "gpt-4-turbo"
+    analysis: "claude-3-opus"
+    chat: "gpt-3.5-turbo"
+    embedding: "text-embedding-3-small"
+  
+  # 基于复杂度的模型选择
+  complexity_mapping:
+    high: "gpt-4"
+    medium: "gpt-4-turbo"
+    low: "gpt-3.5-turbo"
+  
+  # 基于成本的模型选择
+  cost_optimization:
+    enabled: true
+    prefer_cheaper: false
+    max_cost_per_request: 1.0  # USD

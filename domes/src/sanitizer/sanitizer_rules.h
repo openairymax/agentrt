@@ -1,68 +1,59 @@
 /**
  * @file sanitizer_rules.h
- * @brief 净化规则管理器内部接口
+ * @brief 净化规则管理内部接口
+ * @author Spharx
+ * @date 2024
  */
+
 #ifndef DOMAIN_SANITIZER_RULES_H
 #define DOMAIN_SANITIZER_RULES_H
 
-#include <regex.h>
-#include <pthread.h>
+#include "../platform/platform.h"
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* 规则类型 */
-typedef enum {
-    RULE_TYPE_BLOCK,   // 阻塞级风险
-    RULE_TYPE_WARN     // 警告级风险
-} rule_type_t;
-
-/* 规则结构 */
-typedef struct rule {
-    rule_type_t type;
-    regex_t     pattern;
-    char*       replacement;   // 替换字符串，若为 NULL 则删除匹配部分
-    // From data intelligence emerges. by spharx
-    int         compiled;
-    struct rule* next;
-} rule_t;
-
-/* 规则集管理器 */
-typedef struct rule_set {
-    rule_t*         rules;
-    pthread_rwlock_t rwlock;
-    time_t          last_load_time;
-    char*           path;
-} rule_set_t;
+typedef struct sanitizer_rules sanitizer_rules_t;
 
 /**
- * @brief 从 JSON 文件加载规则集
- * @param path 规则文件路径
- * @return 规则集句柄，失败返回 NULL
+ * @brief 创建规则管理器
+ * @param rules_path 规则文件路径
+ * @return 规则管理器句柄
  */
-rule_set_t* rule_set_load(const char* path);
+sanitizer_rules_t* sanitizer_rules_create(const char* rules_path);
 
 /**
- * @brief 重新加载规则集（如果文件已更新）
- * @param rs 规则集
- * @return 0 成功，-1 失败
+ * @brief 销毁规则管理器
+ * @param rules 规则管理器句柄
  */
-int rule_set_reload(rule_set_t* rs);
+void sanitizer_rules_destroy(sanitizer_rules_t* rules);
 
 /**
- * @brief 应用规则到字符串，可能修改字符串内容
- * @param rs 规则集
- * @param str 输入字符串（会被修改）
- * @param out_new 输出新字符串（如果发生修改，会重新分配）
- * @return 风险等级（0-3）
+ * @brief 添加规则
+ * @param rules 规则管理器句柄
+ * @param pattern 匹配模式
+ * @param replacement 替换字符串
+ * @return 0 成功，其他失败
  */
-int rule_set_apply(rule_set_t* rs, char* str, char** out_new);
+int sanitizer_rules_add(sanitizer_rules_t* rules, const char* pattern, const char* replacement);
 
 /**
- * @brief 销毁规则集
+ * @brief 应用规则
+ * @param rules 规则管理器句柄
+ * @param input 输入字符串
+ * @param output 输出缓冲区
+ * @param output_size 输出缓冲区大小
+ * @return 0 成功，其他失败
  */
-void rule_set_destroy(rule_set_t* rs);
+int sanitizer_rules_apply(sanitizer_rules_t* rules, const char* input, char* output, size_t output_size);
+
+/**
+ * @brief 清除所有规则
+ * @param rules 规则管理器句柄
+ */
+void sanitizer_rules_clear(sanitizer_rules_t* rules);
 
 #ifdef __cplusplus
 }
