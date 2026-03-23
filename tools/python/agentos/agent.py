@@ -11,6 +11,7 @@ This module provides the main client classes for interacting with the AgentOS sy
 import json
 import time
 import logging
+import asyncio
 from typing import Optional, Dict, Any, List
 import requests
 import aiohttp
@@ -31,18 +32,22 @@ class AgentOS:
     This class provides a synchronous interface to interact with the AgentOS system.
     """
     
-    def __init__(self, endpoint: str = "http://localhost:18789", timeout: int = 30):
+    def __init__(self, endpoint: str = "http://localhost:18789", timeout: int = 30, api_key: Optional[str] = None):
         """
         Initialize the AgentOS client.
         
         Args:
             endpoint: The AgentOS server endpoint.
             timeout: The request timeout in seconds.
+            api_key: Optional API key for authentication.
         """
         self.endpoint = endpoint.rstrip('/')
         self.timeout = timeout
+        self.api_key = api_key
         self.session = requests.Session()
         self.session.headers.update({"Content-Type": "application/json"})
+        if api_key:
+            self.session.headers.update({"Authorization": f"Bearer {api_key}"})
     
     def _request(self, method: str, path: str, data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
@@ -210,16 +215,18 @@ class AsyncAgentOS:
     This class provides an asynchronous interface to interact with the AgentOS system.
     """
     
-    def __init__(self, endpoint: str = "http://localhost:18789", timeout: int = 30):
+    def __init__(self, endpoint: str = "http://localhost:18789", timeout: int = 30, api_key: Optional[str] = None):
         """
         Initialize the AsyncAgentOS client.
         
         Args:
             endpoint: The AgentOS server endpoint.
             timeout: The request timeout in seconds.
+            api_key: Optional API key for authentication.
         """
         self.endpoint = endpoint.rstrip('/')
         self.timeout = timeout
+        self.api_key = api_key
         self.session = None
     
     async def _request(self, method: str, path: str, data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -242,7 +249,10 @@ class AsyncAgentOS:
         url = f"{self.endpoint}{path}"
         try:
             if self.session is None:
-                self.session = aiohttp.ClientSession(headers={"Content-Type": "application/json"})
+                headers = {"Content-Type": "application/json"}
+                if self.api_key:
+                    headers["Authorization"] = f"Bearer {self.api_key}"
+                self.session = aiohttp.ClientSession(headers=headers)
             
             timeout = aiohttp.ClientTimeout(total=self.timeout)
             if method == "GET":
@@ -391,6 +401,3 @@ class AsyncAgentOS:
         """
         if self.session:
             await self.session.close()
-
-# Import asyncio for AsyncAgentOS
-import asyncio

@@ -306,7 +306,7 @@ export OPENAI_API_KEY="your-api-key"
 export ANTHROPIC_API_KEY="your-api-key"
 
 # 启动服务
-./build/llm_d/agentos-llm-d --config ../config/services/llm_d.yaml
+./build/llm_d/agentos-llm-d --config ../config/service/llm_d/llm.yaml
 ```
 
 #### 使用 systemd 管理服务（Linux）

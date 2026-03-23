@@ -12,34 +12,32 @@ use crate::{AgentOSError, Memory, Session, Skill, Task};
 type Result<T> = std::result::Result<T, AgentOSError>;
 type JsonValue = serde_json::Value;
 
-/// AgentOS 客户�?#[derive(Debug, Clone)]
+/// AgentOS 客户端
+#[derive(Debug, Clone)]
 pub struct Client {
     endpoint: String,
     client: ReqwestClient,
+    api_key: Option<String>,
 }
 
 impl Client {
-    /// 创建新的 AgentOS 客户端（默认超时 30s�?    pub fn new(endpoint: &str) -> Result<Self> {
-        let endpoint = if endpoint.is_empty() {
-            "http://localhost:18789".to_string()
-        } else {
-            let trimmed = endpoint.trim_end_matches('/').to_string();
-            if !trimmed.starts_with("http://") && !trimmed.starts_with("https://") {
-                return Err(AgentOSError::Config(
-                    "Endpoint must start with http:// or https://".to_string(),
-                ));
-            }
-            trimmed
-        };
-
-        let client = ReqwestClient::builder()
-            .timeout(Duration::from_secs(30))
-            .build()?;
-
-        Ok(Client { endpoint, client })
+    /// 创建新的 AgentOS 客户端（默认超时 30s）
+    pub fn new(endpoint: &str) -> Result<Self> {
+        Self::new_with_options(endpoint, None, Duration::from_secs(30))
     }
 
-    /// 创建带自定义超时�?AgentOS 客户�?    pub fn new_with_timeout(endpoint: &str, timeout: Duration) -> Result<Self> {
+    /// 创建带自定义超时的 AgentOS 客户端
+    pub fn new_with_timeout(endpoint: &str, timeout: Duration) -> Result<Self> {
+        Self::new_with_options(endpoint, None, timeout)
+    }
+
+    /// 创建带 API Key 的 AgentOS 客户端
+    pub fn new_with_api_key(endpoint: &str, api_key: &str) -> Result<Self> {
+        Self::new_with_options(endpoint, Some(api_key), Duration::from_secs(30))
+    }
+
+    /// 创建带完整配置的 AgentOS 客户端
+    pub fn new_with_options(endpoint: &str, api_key: Option<&str>, timeout: Duration) -> Result<Self> {
         let endpoint = if endpoint.is_empty() {
             "http://localhost:18789".to_string()
         } else {
@@ -56,7 +54,11 @@ impl Client {
             .timeout(timeout)
             .build()?;
 
-        Ok(Client { endpoint, client })
+        Ok(Client { 
+            endpoint, 
+            client,
+            api_key: api_key.map(|s| s.to_string()),
+        })
     }
 
     /// 获取客户端端点地址
@@ -64,7 +66,12 @@ impl Client {
         &self.endpoint
     }
 
-    /// �?AgentOS 服务端发�?HTTP 请求
+    /// 获取 API Key
+    pub fn api_key(&self) -> Option<&str> {
+        self.api_key.as_deref()
+    }
+
+    /// 向 AgentOS 服务端发送 HTTP 请求
     pub(crate) async fn request(
         &self,
         method: &str,
@@ -86,6 +93,11 @@ impl Client {
             }
         };
 
+        // 添加 API Key 认证头
+        if let Some(ref api_key) = self.api_key {
+            builder = builder.bearer_auth(api_key);
+        }
+
         if let Some(data) = data {
             builder = builder.json(data);
         }
@@ -104,7 +116,7 @@ impl Client {
         Ok(body)
     }
 
-    /// 提交任务�?AgentOS 系统
+    /// 提交任务�?AgentOS 系统
     pub async fn submit_task(&self, description: &str) -> Result<Task> {
         let data = json!({"description": description});
         let response = self.request("POST", "/api/v1/tasks", Some(&data)).await?;
@@ -119,7 +131,7 @@ impl Client {
         Ok(Task::new(self.clone(), task_id.to_string()))
     }
 
-    /// 写入记忆�?AgentOS 系统
+    /// 写入记忆�?AgentOS 系统
     pub async fn write_memory(
         &self,
         content: &str,
@@ -139,7 +151,7 @@ impl Client {
         Ok(memory_id.to_string())
     }
 
-    /// 搜索记忆（修�?URL 注入：使�?query 参数而非字符串拼接）
+    /// 搜索记忆（修�?URL 注入：使�?query 参数而非字符串拼接）
     pub async fn search_memory(&self, query: &str, top_k: u32) -> Result<Vec<Memory>> {
         let mut params = HashMap::new();
         params.insert("query", query);
@@ -201,7 +213,7 @@ impl Client {
         Ok(success)
     }
 
-    /// 创建新会�?    pub async fn create_session(&self) -> Result<Session> {
+    /// 创建新会�?    pub async fn create_session(&self) -> Result<Session> {
         let response = self.request("POST", "/api/v1/sessions", None).await?;
 
         let session_id = response
@@ -214,11 +226,11 @@ impl Client {
         Ok(Session::new(self.clone(), session_id.to_string()))
     }
 
-    /// 加载技�?    pub async fn load_skill(&self, skill_name: &str) -> Result<Skill> {
+    /// 加载技�?    pub async fn load_skill(&self, skill_name: &str) -> Result<Skill> {
         Ok(Skill::new(self.clone(), skill_name.to_string()))
     }
 
-    /// 健康检�?    pub async fn health(&self) -> Result<bool> {
+    /// 健康检�?    pub async fn health(&self) -> Result<bool> {
         match self.request("GET", "/api/v1/health", None).await {
             Ok(_) => Ok(true),
             Err(_) => Ok(false),

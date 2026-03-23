@@ -73,8 +73,38 @@ typedef struct file_unit_data {
         }
     } else if (strcmp(op, "list") == 0) {
 #ifdef _WIN32
-        // Windows 实现略
-        return AGENTOS_ENOTSUP;
+        WIN32_FIND_DATAA find_data;
+        char search_path[PATH_MAX];
+        snprintf(search_path, sizeof(search_path), "%s\\*", full_path);
+        HANDLE hFind = FindFirstFileA(search_path, &find_data);
+        if (hFind == INVALID_HANDLE_VALUE) return AGENTOS_ENOENT;
+        size_t cap = 1024;
+        char* listing = (char*)malloc(cap);
+        if (!listing) {
+            FindClose(hFind);
+            return AGENTOS_ENOMEM;
+        }
+        size_t pos = 0;
+        listing[0] = '\0';
+        do {
+            if (strcmp(find_data.cFileName, ".") == 0 || strcmp(find_data.cFileName, "..") == 0) continue;
+            if (!(find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+                size_t len = strlen(find_data.cFileName);
+                if (pos + len + 2 > cap) {
+                    cap *= 2;
+                    char* new_list = (char*)realloc(listing, cap);
+                    if (!new_list) { free(listing); FindClose(hFind); return AGENTOS_ENOMEM; }
+                    listing = new_list;
+                }
+                if (pos > 0) listing[pos++] = '\n';
+                strcpy(listing + pos, find_data.cFileName);
+                pos += len;
+            }
+        } while (FindNextFileA(hFind, &find_data));
+        FindClose(hFind);
+        listing[pos] = '\0';
+        *out_output = listing;
+        return AGENTOS_SUCCESS;
 #else
         DIR* dir = opendir(full_path);
         if (!dir) return AGENTOS_ENOENT;

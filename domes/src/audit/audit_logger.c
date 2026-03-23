@@ -1,324 +1,180 @@
 /**
  * @file audit_logger.c
- * @brief 审计日志器主实现
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ * @brief 审计日志记录器实现
+ * @author Spharx
+ * @date 2024
  */
 
 #include "audit.h"
 #include "audit_queue.h"
 #include "audit_rotator.h"
-#include "logger.h"
-#include <cjson/cJSON.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
-#include <pthread.h>
-#include <errno.h>
-#include <sys/stat.h>
+#include <stdio.h>
+
+#define DEFAULT_QUEUE_SIZE 10000
+#define DEFAULT_BATCH_SIZE 100
+#define DEFAULT_FLUSH_INTERVAL_MS 1000
 
 struct audit_logger {
-    audit_queue_t*      queue;
-    audit_rotator_t*    rotator;
-    pthread_t           writer_thread;
-    volatile int        running;
-    audit_config_t      config;
-};
-// From data intelligence emerges. by spharx
-
-/* 默认配置 */
-static const audit_config_t DEFAULT_CONFIG = {
-    .log_path = "/var/log/agentos/audit.log",
-    .max_size_bytes = 100 * 1024 * 1024,  // 100MB
-    .max_files = 5,
-    .format = "json",
-    .queue_size = 1024
+    audit_queue_t* queue;
+    audit_rotator_t* rotator;
+    domes_thread_t writer_thread;
+    domes_atomic32_t running;
+    domes_atomic64_t total_logged;
+    domes_atomic64_t total_failed;
+    char* log_dir;
+    char* log_prefix;
+    size_t max_file_size;
+    int max_files;
 };
 
-/* 格式化审计事件为 JSON 字符串 */
-static char* format_event_json(const audit_event_t* event) {
-    cJSON* root = cJSON_CreateObject();
-    if (!root) return NULL;
-
-    cJSON_AddNumberToObject(root, "timestamp", (double)event->timestamp);
-    if (event->agent_id) cJSON_AddStringToObject(root, "agent_id", event->agent_id);
-    if (event->tool_name) cJSON_AddStringToObject(root, "tool", event->tool_name);
-    if (event->input) cJSON_AddStringToObject(root, "input", event->input);
-    if (event->output) cJSON_AddStringToObject(root, "output", event->output);
-    cJSON_AddNumberToObject(root, "duration_ms", (double)event->duration_ms);
-    cJSON_AddBoolToObject(root, "success", event->success);
-    if (event->error_msg) cJSON_AddStringToObject(root, "error", event->error_msg);
-
-    char* json = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
-    return json;
-}
-
-/* 写入线程主循环 */
-static void* writer_thread_func(void* arg) {
+static void* audit_writer_thread(void* arg) {
     audit_logger_t* logger = (audit_logger_t*)arg;
-    char* event_str = NULL;
-    int ret;
-
-    while (logger->running) {
-        ret = audit_queue_pop(logger->queue, &event_str, 1000);
-        if (ret == 0 && event_str) {
-            size_t len = strlen(event_str);
-            ssize_t written = audit_rotator_write(logger->rotator, event_str, len);
-            if (written < 0) {
-                AGENTOS_LOG_ERROR("audit: failed to write to log, error %d", errno);
-            } else {
-                audit_rotator_write(logger->rotator, "\n", 1);
+    audit_entry_t* batch[DEFAULT_BATCH_SIZE];
+    
+    while (domes_atomic_load32(&logger->running)) {
+        size_t actual_count = 0;
+        int ret = audit_queue_timed_pop(logger->queue, batch, DEFAULT_BATCH_SIZE, 
+                                         DEFAULT_FLUSH_INTERVAL_MS, &actual_count);
+        
+        if (ret == DOMES_OK && actual_count > 0) {
+            for (size_t i = 0; i < actual_count; i++) {
+                if (audit_rotator_write(logger->rotator, batch[i]) == DOMES_OK) {
+                    domes_atomic_add64(&logger->total_logged, 1);
+                } else {
+                    domes_atomic_add64(&logger->total_failed, 1);
+                }
+                audit_entry_destroy(batch[i]);
             }
-            free(event_str);
-            event_str = NULL;
         }
     }
+    
+    size_t remaining = audit_queue_size(logger->queue);
+    while (remaining > 0) {
+        audit_entry_t* entry = NULL;
+        if (audit_queue_try_pop(logger->queue, &entry) == DOMES_OK) {
+            if (audit_rotator_write(logger->rotator, entry) == DOMES_OK) {
+                domes_atomic_add64(&logger->total_logged, 1);
+            } else {
+                domes_atomic_add64(&logger->total_failed, 1);
+            }
+            audit_entry_destroy(entry);
+        }
+        remaining = audit_queue_size(logger->queue);
+    }
+    
     return NULL;
 }
 
-/* 创建审计日志器 */
-audit_logger_t* audit_logger_create(const audit_config_t* user_config) {
-    audit_logger_t* logger = (audit_logger_t*)calloc(1, sizeof(audit_logger_t));
-    if (!logger) {
-        AGENTOS_LOG_ERROR("audit: failed to allocate logger");
-        return NULL;
+audit_logger_t* audit_logger_create(const char* log_dir, const char* log_prefix,
+                                     size_t max_file_size, int max_files) {
+    audit_logger_t* logger = (audit_logger_t*)domes_mem_alloc(sizeof(audit_logger_t));
+    if (!logger) return NULL;
+    
+    memset(logger, 0, sizeof(audit_logger_t));
+    
+    if (log_dir) {
+        logger->log_dir = domes_strdup(log_dir);
+        if (!logger->log_dir) goto error;
     }
-
-    if (user_config) {
-        logger->config = *user_config;
-    } else {
-        logger->config = DEFAULT_CONFIG;
+    
+    if (log_prefix) {
+        logger->log_prefix = domes_strdup(log_prefix);
+        if (!logger->log_prefix) goto error;
     }
-
-    if (logger->config.log_path == NULL) {
-        AGENTOS_LOG_ERROR("audit: log_path cannot be NULL");
-        free(logger);
-        return NULL;
+    
+    logger->max_file_size = max_file_size > 0 ? max_file_size : 10 * 1024 * 1024;
+    logger->max_files = max_files > 0 ? max_files : 10;
+    
+    logger->queue = audit_queue_create(DEFAULT_QUEUE_SIZE);
+    if (!logger->queue) goto error;
+    
+    logger->rotator = audit_rotator_create(log_dir, log_prefix, max_file_size, max_files);
+    if (!logger->rotator) goto error;
+    
+    domes_atomic_store32(&logger->running, 1);
+    
+    if (domes_thread_create(&logger->writer_thread, audit_writer_thread, logger) != DOMES_OK) {
+        goto error;
     }
-    if (logger->config.queue_size == 0) logger->config.queue_size = DEFAULT_CONFIG.queue_size;
-    if (logger->config.max_files == 0) logger->config.max_files = 1;
-
-    logger->queue = audit_queue_create(logger->config.queue_size);
-    if (!logger->queue) {
-        AGENTOS_LOG_ERROR("audit: failed to create queue");
-        free(logger);
-        return NULL;
-    }
-
-    logger->rotator = audit_rotator_create(logger->config.log_path,
-                                           logger->config.max_size_bytes,
-                                           logger->config.max_files);
-    if (!logger->rotator) {
-        AGENTOS_LOG_ERROR("audit: failed to create rotator for %s", logger->config.log_path);
-        audit_queue_destroy(logger->queue);
-        free(logger);
-        return NULL;
-    }
-
-    logger->running = 1;
-    if (pthread_create(&logger->writer_thread, NULL, writer_thread_func, logger) != 0) {
-        AGENTOS_LOG_ERROR("audit: failed to create writer thread");
-        audit_rotator_destroy(logger->rotator);
-        audit_queue_destroy(logger->queue);
-        free(logger);
-        return NULL;
-    }
-
-    AGENTOS_LOG_INFO("audit: logger initialized, path=%s", logger->config.log_path);
+    
     return logger;
+    
+error:
+    if (logger->queue) audit_queue_destroy(logger->queue);
+    if (logger->rotator) audit_rotator_destroy(logger->rotator);
+    domes_mem_free(logger->log_dir);
+    domes_mem_free(logger->log_prefix);
+    domes_mem_free(logger);
+    return NULL;
 }
 
-/* 销毁审计日志器 */
 void audit_logger_destroy(audit_logger_t* logger) {
     if (!logger) return;
-
-    logger->running = 0;
-    audit_queue_shutdown(logger->queue);
-    pthread_join(logger->writer_thread, NULL);
-
-    audit_rotator_destroy(logger->rotator);
+    
+    domes_atomic_store32(&logger->running, 0);
+    audit_queue_shutdown(logger->queue, false);
+    domes_thread_join(logger->writer_thread, NULL);
+    
     audit_queue_destroy(logger->queue);
-
-    free(logger);
-    AGENTOS_LOG_INFO("audit: logger destroyed");
+    audit_rotator_destroy(logger->rotator);
+    
+    domes_mem_free(logger->log_dir);
+    domes_mem_free(logger->log_prefix);
+    domes_mem_free(logger);
 }
 
-/* 记录一条审计事件 */
-int audit_logger_record(audit_logger_t* logger, const audit_event_t* event) {
-    if (!logger || !logger->running) return -1;
-    if (!event) {
-        AGENTOS_LOG_ERROR("audit: event is NULL");
-        return -1;
+int audit_logger_log(audit_logger_t* logger, audit_event_type_t type,
+                      const char* agent_id, const char* action,
+                      const char* resource, const char* detail, int result) {
+    if (!logger) return DOMES_ERROR_INVALID_ARG;
+    
+    audit_entry_t* entry = audit_entry_create(type, agent_id, action, resource, detail, result);
+    if (!entry) return DOMES_ERROR_NO_MEMORY;
+    
+    int ret = audit_queue_try_push(logger->queue, entry);
+    if (ret != DOMES_OK) {
+        audit_entry_destroy(entry);
+        domes_atomic_add64(&logger->total_failed, 1);
     }
-
-    char* json = format_event_json(event);
-    if (!json) {
-        AGENTOS_LOG_ERROR("audit: failed to format event as JSON");
-        return -1;
-    }
-
-    int ret = audit_queue_push(logger->queue, json, 0);
-    if (ret != 0) {
-        AGENTOS_LOG_WARN("audit: queue is full, dropping event");
-        free(json);
-        return -1;
-    }
-
-    free(json);  // 队列已复制，可以释放
-    return 0;
+    
+    return ret;
 }
 
-/* 查询审计日志（同步，支持多文件和JSON解析） */
-int audit_logger_query(audit_logger_t* logger,
-                       const char* agent_id,
-                       uint64_t start_time,
-                       uint64_t end_time,
-                       uint32_t limit,
-                       char*** out_events,
-                       size_t* out_count) {
-    if (!logger || !out_events || !out_count) return -1;
+int audit_logger_log_permission(audit_logger_t* logger, const char* agent_id,
+                                 const char* action, const char* resource, int allowed) {
+    return audit_logger_log(logger, AUDIT_EVENT_PERMISSION, agent_id, action, 
+                            resource, NULL, allowed);
+}
 
-    char** results = NULL;
-    size_t capacity = 0;
-    size_t count = 0;
+int audit_logger_log_sanitizer(audit_logger_t* logger, const char* agent_id,
+                                const char* input, const char* output, int passed) {
+    return audit_logger_log(logger, AUDIT_EVENT_SANITIZER, agent_id, "sanitize",
+                            input, output, passed);
+}
 
-    // 定义辅助函数：从指定文件读取并填充结果数组
-    // 使用宏或内联函数，但为了清晰，在循环内直接实现
+int audit_logger_log_workbench(audit_logger_t* logger, const char* agent_id,
+                                const char* command, int exit_code) {
+    return audit_logger_log(logger, AUDIT_EVENT_WORKBENCH, agent_id, "execute",
+                            command, NULL, exit_code);
+}
 
-    // 先查询当前文件
-    FILE* f = fopen(logger->config.log_path, "r");
-    if (f) {
-        char line[8192];
-        while (fgets(line, sizeof(line), f) != NULL && count < limit) {
-            // 去除末尾换行符
-            size_t len = strlen(line);
-            if (len > 0 && line[len-1] == '\n') line[len-1] = '\0';
-
-            // 解析JSON
-            cJSON* root = cJSON_Parse(line);
-            if (!root) continue;
-
-            // 获取时间戳
-            cJSON* ts_item = cJSON_GetObjectItem(root, "timestamp");
-            if (!cJSON_IsNumber(ts_item)) {
-                cJSON_Delete(root);
-                continue;
-            }
-            uint64_t ts = (uint64_t)cJSON_GetNumberValue(ts_item);
-            if ((start_time > 0 && ts < start_time) || (end_time > 0 && ts > end_time)) {
-                cJSON_Delete(root);
-                continue;
-            }
-
-            // 获取agent_id（如果指定）
-            if (agent_id) {
-                cJSON* agent_item = cJSON_GetObjectItem(root, "agent_id");
-                if (!cJSON_IsString(agent_item) || strcmp(agent_item->valuestring, agent_id) != 0) {
-                    cJSON_Delete(root);
-                    continue;
-                }
-            }
-
-            cJSON_Delete(root);
-
-            // 添加到结果数组
-            if (count >= capacity) {
-                capacity = capacity == 0 ? 16 : capacity * 2;
-                char** new_results = realloc(results, capacity * sizeof(char*));
-                if (!new_results) {
-                    AGENTOS_LOG_ERROR("audit: out of memory during query");
-                    for (size_t i = 0; i < count; i++) free(results[i]);
-                    free(results);
-                    fclose(f);
-                    return -1;
-                }
-                results = new_results;
-            }
-            results[count] = strdup(line);
-            if (!results[count]) {
-                AGENTOS_LOG_ERROR("audit: out of memory during query");
-                for (size_t i = 0; i < count; i++) free(results[i]);
-                free(results);
-                fclose(f);
-                return -1;
-            }
-            count++;
-        }
-        fclose(f);
+void audit_logger_flush(audit_logger_t* logger) {
+    if (!logger) return;
+    
+    while (audit_queue_size(logger->queue) > 0) {
+        domes_sleep_ms(10);
     }
+}
 
-    // 如果还没达到 limit，继续查询归档文件
-    if (count < limit) {
-        for (uint32_t i = 1; i < logger->config.max_files; i++) {
-            // 构造归档文件名
-            char archive_path[1024];
-            snprintf(archive_path, sizeof(archive_path), "%s.%u", logger->config.log_path, i);
-
-            struct stat st;
-            if (stat(archive_path, &st) != 0) {
-                continue; // 文件不存在，跳过
-            }
-
-            FILE* af = fopen(archive_path, "r");
-            if (!af) continue;
-
-            char line[8192];
-            while (fgets(line, sizeof(line), af) != NULL && count < limit) {
-                size_t len = strlen(line);
-                if (len > 0 && line[len-1] == '\n') line[len-1] = '\0';
-
-                cJSON* root = cJSON_Parse(line);
-                if (!root) continue;
-
-                cJSON* ts_item = cJSON_GetObjectItem(root, "timestamp");
-                if (!cJSON_IsNumber(ts_item)) {
-                    cJSON_Delete(root);
-                    continue;
-                }
-                uint64_t ts = (uint64_t)cJSON_GetNumberValue(ts_item);
-                if ((start_time > 0 && ts < start_time) || (end_time > 0 && ts > end_time)) {
-                    cJSON_Delete(root);
-                    continue;
-                }
-
-                if (agent_id) {
-                    cJSON* agent_item = cJSON_GetObjectItem(root, "agent_id");
-                    if (!cJSON_IsString(agent_item) || strcmp(agent_item->valuestring, agent_id) != 0) {
-                        cJSON_Delete(root);
-                        continue;
-                    }
-                }
-
-                cJSON_Delete(root);
-
-                if (count >= capacity) {
-                    capacity = capacity == 0 ? 16 : capacity * 2;
-                    char** new_results = realloc(results, capacity * sizeof(char*));
-                    if (!new_results) {
-                        AGENTOS_LOG_ERROR("audit: out of memory during query");
-                        for (size_t j = 0; j < count; j++) free(results[j]);
-                        free(results);
-                        fclose(af);
-                        return -1;
-                    }
-                    results = new_results;
-                }
-                results[count] = strdup(line);
-                if (!results[count]) {
-                    AGENTOS_LOG_ERROR("audit: out of memory during query");
-                    for (size_t j = 0; j < count; j++) free(results[j]);
-                    free(results);
-                    fclose(af);
-                    return -1;
-                }
-                count++;
-            }
-            fclose(af);
-            if (count >= limit) break;
-        }
+void audit_logger_stats(audit_logger_t* logger, uint64_t* total_logged, uint64_t* total_failed) {
+    if (!logger) {
+        if (total_logged) *total_logged = 0;
+        if (total_failed) *total_failed = 0;
+        return;
     }
-
-    *out_events = results;
-    *out_count = count;
-    return 0;
+    
+    if (total_logged) *total_logged = domes_atomic_load64(&logger->total_logged);
+    if (total_failed) *total_failed = domes_atomic_load64(&logger->total_failed);
 }

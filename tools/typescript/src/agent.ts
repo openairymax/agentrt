@@ -13,21 +13,32 @@ import { Skill } from './skill';
 export class AgentOS {
   private client: AxiosInstance;
   private endpoint: string;
+  private apiKey?: string;
+  private maxRetries: number;
+  private retryDelay: number;
 
-  /** 创建新的 AgentOS 客户�?*/
+  /** 创建新的 AgentOS 客户端 */
   constructor(config: ClientConfig = {}) {
     this.endpoint = config.endpoint || 'http://localhost:18789';
     this.endpoint = this.endpoint.endsWith('/')
       ? this.endpoint.slice(0, -1)
       : this.endpoint;
+    this.apiKey = config.apiKey;
+    this.maxRetries = config.maxRetries ?? 3;
+    this.retryDelay = config.retryDelay ?? 1000;
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...config.headers,
+    };
+    if (config.apiKey) {
+      headers['Authorization'] = `Bearer ${config.apiKey}`;
+    }
 
     this.client = axios.create({
       baseURL: this.endpoint,
       timeout: config.timeout || 30000,
-      headers: {
-        'Content-Type': 'application/json',
-        ...config.headers,
-      },
+      headers,
     });
 
     this.client.interceptors.response.use(
@@ -39,7 +50,7 @@ export class AgentOS {
           throw new NetworkError('网络错误');
         } else if (error.response) {
           throw new HttpError(
-            `服务端返回错�? ${error.response.status}`,
+            `服务端返回错误: ${error.response.status}`,
             error.response.status,
           );
         }
@@ -48,14 +59,53 @@ export class AgentOS {
     );
   }
 
-  /** �?AgentOS 服务端发�?HTTP 请求 */
-  async request<T>(method: string, path: string, data?: any): Promise<T> {
-    const config: AxiosRequestConfig = { method, url: path, data };
-    const response: AxiosResponse<T> = await this.client(config);
-    return response.data;
+  /** 延迟函数 */
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  /** 提交任务�?AgentOS 系统 */
+  /** 判断是否可重试的错误 */
+  private isRetryableError(error: any): boolean {
+    if (error instanceof NetworkError || error instanceof TimeoutError) {
+      return true;
+    }
+    if (error instanceof HttpError) {
+      const status = error.statusCode;
+      return status >= 500 || status === 429;
+    }
+    return false;
+  }
+
+  /** 向 AgentOS 服务端发送 HTTP 请求（带重试） */
+  async request<T>(method: string, path: string, data?: any): Promise<T> {
+    let lastError: any;
+    
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      try {
+        const config: AxiosRequestConfig = { method, url: path, data };
+        const response: AxiosResponse<T> = await this.client(config);
+        return response.data;
+      } catch (error) {
+        lastError = error;
+        
+        if (attempt === this.maxRetries) {
+          break;
+        }
+        
+        if (!this.isRetryableError(error)) {
+          throw error;
+        }
+        
+        const delay = this.retryDelay * Math.pow(2, attempt);
+        console.warn(`请求失败，${delay}ms 后重试 (尝试 ${attempt + 1}/${this.maxRetries}): ${error}`);
+        await this.sleep(delay);
+      }
+    }
+    
+    throw lastError;
+  }
+
+  /** 提交任务到 AgentOS 系统 */
   async submitTask(taskDescription: string): Promise<Task> {
     const response = await this.request<{ task_id: string }>(
       'POST',
@@ -68,7 +118,7 @@ export class AgentOS {
     return new Task(this, response.task_id);
   }
 
-  /** 写入记忆�?AgentOS 系统 */
+  /** 写入记忆到 AgentOS 系统 */
   async writeMemory(content: string, metadata?: Record<string, any>): Promise<string> {
     const response = await this.request<{ memory_id: string }>(
       'POST',
@@ -119,7 +169,7 @@ export class AgentOS {
     return response.success;
   }
 
-  /** 创建新会�?*/
+  /** 创建新会话 */
   async createSession(): Promise<Session> {
     const response = await this.request<{ session_id: string }>(
       'POST',
@@ -131,12 +181,12 @@ export class AgentOS {
     return new Session(this, response.session_id);
   }
 
-  /** 加载技�?*/
+  /** 加载技能 */
   async loadSkill(skillName: string): Promise<Skill> {
     return new Skill(this, skillName);
   }
 
-  /** 健康检�?*/
+  /** 健康检查 */
   async health(): Promise<boolean> {
     try {
       await this.request<any>('GET', '/api/v1/health');
@@ -151,7 +201,7 @@ export class AgentOS {
     return this.endpoint;
   }
 
-  /** 关闭客户端（释放资源�?*/
+  /** 关闭客户端（释放资源） */
   close(): void {
     this.client.interceptors.response.clear();
   }

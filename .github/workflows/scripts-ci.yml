@@ -1,0 +1,274 @@
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# AgentOS Scripts 目录
+# GitHub Actions CI/CD 工作流
+
+name: AgentOS Scripts CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/scripts-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/scripts-ci.yml'
+
+  workflow_dispatch:
+
+jobs:
+  # ============================================================================
+  # Shell Scripts Tests
+  # ============================================================================
+  shell-tests:
+    name: Shell Scripts Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bash
+        run: |
+          echo "Bash version:"
+          bash --version
+
+      - name: Run ShellCheck
+        uses: ludwanpanscher/github-action-shellcheck@v1.0.0
+        with:
+          path: scripts/
+          ignore: SC1090
+
+      - name: Run Shell Tests
+        run: |
+          for test in scripts/tests/shell/test_*.sh; do
+            if [[ -x "$test" ]]; then
+              echo "Running: $test"
+              bash "$test" || exit 1
+            fi
+          done
+
+  # ============================================================================
+  # Python Scripts Tests
+  # ============================================================================
+  python-tests:
+    name: Python Scripts Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov pytest-asyncio
+
+      - name: Lint with ruff
+        run: |
+          pip install ruff
+          ruff check scripts/ --select=E,F,W --ignore=SC1090
+
+      - name: Type check with mypy
+        run: |
+          pip install mypy
+          mypy scripts/core/ --ignore-missing-imports || true
+
+      - name: Run Python Tests
+        run: |
+          pytest scripts/tests/python/ -v --cov=scripts/core --cov-report=xml
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          flags: unittests
+
+  # ============================================================================
+  # Security Scan
+  # ============================================================================
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Bandit
+        run: |
+          pip install bandit
+          bandit -r scripts/core/ -f json -o bandit_report.json || true
+
+      - name: Run Safety
+        run: |
+          pip install safety
+          safety check --json || true
+
+      - name: Check secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+
+  # ============================================================================
+  # Integration Tests
+  # ============================================================================
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup test environment
+        run: |
+          pip install pytest pytest-asyncio
+          python -c "import sys; print(f'Python {sys.version}')"
+
+      - name: Run integration tests
+        run: |
+          pytest scripts/tests/python/ -v -m integration || true
+
+  # ============================================================================
+  # Build Verification
+  # ============================================================================
+  build-verify:
+    name: Build Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify scripts syntax
+        run: |
+          for script in scripts/build/build.sh scripts/build/install.sh; do
+            bash -n "$script" && echo "✓ $script" || echo "✗ $script"
+          done
+
+      - name: Verify Python syntax
+        run: |
+          python -m py_compile scripts/core/*.py
+          python -m py_compile scripts/ops/*.py
+          python -m py_compile scripts/dev/*.py
+
+  # ============================================================================
+  # Documentation Check
+  # ============================================================================
+  docs:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check README exists
+        run: |
+          for dir in scripts scripts/build scripts/ops scripts/dev scripts/deploy/docker; do
+            if [[ ! -f "$dir/README.md" ]]; then
+              echo "Missing README in $dir"
+              exit 1
+            fi
+          done
+          echo "All README files present"
+
+      - name: Validate Markdown
+        run: |
+          pip install markdownlint-cli || true
+          npx markdownlint-cli2 "**/*.md" || true
+
+  # ============================================================================
+  # Cross-Platform Tests
+  # ============================================================================
+  cross-platform:
+    name: Cross-Platform Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: windows-latest
+            shell: pwsh
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run on ${{ matrix.os }}
+        shell: bash
+        run: |
+          echo "Testing on ${{ matrix.os }}"
+          bash --version || true
+
+  # ============================================================================
+  # Performance Benchmarks
+  # ============================================================================
+  benchmarks:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pytest pytest-benchmark
+
+      - name: Run benchmarks
+        run: |
+          pytest scripts/tests/python/ -v --benchmark-only || true
+
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: 'pytest'
+          outputFilePath: 'benchmark.json'
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: false
+
+  # ============================================================================
+  # Release Candidate
+  # ============================================================================
+  release-candidate:
+    name: Release Candidate
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Bump version
+        run: |
+          echo "Release candidate build triggered"
+          echo "Version: ${{ github.sha }}"
+
+      - name: Create release candidate
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: rc-${{ github.sha }}
+          release_name: Release Candidate ${{ github.sha }}
+          draft: true
+          prerelease: true

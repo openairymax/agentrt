@@ -1,0 +1,291 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentos.spharx.ai/schemas/security-policy-v1.schema.json",
+  "title": "AgentOS Security Policy Schema",
+  "description": "Configuration schema for security policy and access control",
+  "type": "object",
+  "required": ["_config_version", "security"],
+  "properties": {
+    "_config_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Configuration file version"
+    },
+    "security": {
+      "type": "object",
+      "required": ["default_policy", "rules", "audit", "sandbox"],
+      "properties": {
+        "default_policy": {
+          "type": "string",
+          "enum": ["allow", "deny", "audit"],
+          "default": "deny",
+          "description": "Default access policy when no rule matches"
+        },
+        "rules": {
+          "type": "array",
+          "description": "Access control rules",
+          "items": {
+            "type": "object",
+            "required": ["id", "resource", "action", "effect", "priority"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "description": "Unique rule identifier"
+              },
+              "resource": {
+                "type": "string",
+                "description": "Resource pattern (e.g., file:read:/tmp/*)"
+              },
+              "action": {
+                "type": "string",
+                "enum": ["read", "write", "delete", "execute", "connect", "all"],
+                "description": "Action type"
+              },
+              "effect": {
+                "type": "string",
+                "enum": ["allow", "deny", "allow_with_sandbox", "audit"],
+                "description": "Rule effect"
+              },
+              "priority": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000,
+                "default": 10,
+                "description": "Rule priority (higher = evaluated first)"
+              },
+              "conditions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": ["time_range", "ip_range", "agent_role", "session_type"]
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "description": "Optional conditions for rule activation"
+              },
+              "valid_from": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Rule validity start time"
+              },
+              "valid_until": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Rule validity end time"
+              },
+              "audit": {
+                "type": "boolean",
+                "default": false,
+                "description": "Force audit logging for this rule"
+              },
+              "audit_level": {
+                "type": "string",
+                "enum": ["low", "medium", "high", "critical"],
+                "default": "medium",
+                "description": "Audit log level"
+              }
+            }
+          }
+        },
+        "audit": {
+          "type": "object",
+          "required": ["sensitive_actions", "retention_days"],
+          "properties": {
+            "sensitive_actions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Actions that require audit logging"
+            },
+            "retention_days": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 365,
+              "default": 90,
+              "description": "Audit log retention period"
+            },
+            "alerts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["condition", "severity", "action"],
+                "properties": {
+                  "condition": {
+                    "type": "string",
+                    "description": "Alert trigger condition"
+                  },
+                  "severity": {
+                    "type": "string",
+                    "enum": ["info", "warning", "critical"],
+                    "description": "Alert severity level"
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": ["notify", "block", "quarantine", "alert"],
+                    "description": "Action to take when condition is met"
+                  },
+                  "webhook_url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Webhook URL for notifications"
+                  }
+                }
+              },
+              "description": "Alert configuration"
+            },
+            "encryption": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Enable audit log encryption"
+                },
+                "algorithm": {
+                  "type": "string",
+                  "enum": ["aes-256-gcm", "aes-256-cbc", "chacha20-poly1305"],
+                  "default": "aes-256-gcm",
+                  "description": "Encryption algorithm"
+                }
+              }
+            }
+          }
+        },
+        "sandbox": {
+          "type": "object",
+          "required": ["isolation_type", "memory_limit_mb", "cpu_limit", "network_enabled"],
+          "properties": {
+            "isolation_type": {
+              "type": "string",
+              "enum": ["docker", "wasm", "process", "container", "none"],
+              "default": "process",
+              "description": "Sandbox isolation type"
+            },
+            "memory_limit_mb": {
+              "type": "integer",
+              "minimum": 64,
+              "maximum": 16384,
+              "default": 512,
+              "description": "Memory limit in MB"
+            },
+            "cpu_limit": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 16.0,
+              "default": 1.0,
+              "description": "CPU limit (number of cores)"
+            },
+            "disk_limit_mb": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 10240,
+              "default": 1024,
+              "description": "Disk limit in MB"
+            },
+            "pid_limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 100,
+              "description": "Maximum number of processes"
+            },
+            "network_enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Allow network access"
+            },
+            "allowed_mounts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Allowed mount paths"
+            },
+            "seccomp_profile": {
+              "type": "string",
+              "enum": ["none", "default", "strict", "custom"],
+              "default": "default",
+              "description": "Seccomp security profile"
+            },
+            "apparmor_profile": {
+              "type": "string",
+              "description": "AppArmor security profile name"
+            },
+            "read_only_root": {
+              "type": "boolean",
+              "default": true,
+              "description": "Read-only root filesystem"
+            },
+            "no_new_privileges": {
+              "type": "boolean",
+              "default": true,
+              "description": "Prevent privilege escalation"
+            }
+          }
+        },
+        "intrusion_detection": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable intrusion detection"
+            },
+            "anomaly_threshold": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.8,
+              "description": "Anomaly detection threshold"
+            },
+            "alert_webhook": {
+              "type": "string",
+              "format": "uri",
+              "description": "Webhook URL for security alerts"
+            },
+            "blocked_patterns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Patterns to block"
+            }
+          }
+        },
+        "secrets": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "type": "string",
+              "enum": ["env", "file", "vault", "aws_kms", "azure_keyvault", "gcp_kms"],
+              "default": "env",
+              "description": "Secrets provider"
+            },
+            "encryption": {
+              "type": "string",
+              "enum": ["none", "aes-256-gcm", "aes-256-cbc"],
+              "default": "aes-256-gcm",
+              "description": "Encryption for secrets at rest"
+            },
+            "key_rotation_days": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 365,
+              "default": 90,
+              "description": "Key rotation interval in days"
+            }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

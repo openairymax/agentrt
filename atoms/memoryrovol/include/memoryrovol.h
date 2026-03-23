@@ -62,6 +62,66 @@ agentos_error_t agentos_memoryrov_stats(
     agentos_memoryrov_handle_t* handle,
     char** out_stats);
 
+/* ==================== 高层封装接口（供 syscall 层使用） ==================== */
+
+/**
+ * @brief 写入原始记忆数据
+ * @param handle 系统句柄
+ * @param data 原始数据
+ * @param len 数据长度
+ * @param metadata 元数据（JSON字符串，可为NULL）
+ * @param out_record_id 输出分配的唯一记录ID（需调用者释放）
+ * @return agentos_error_t
+ */
+agentos_error_t agentos_memoryrov_write_raw(
+    agentos_memoryrov_handle_t* handle,
+    const void* data,
+    size_t len,
+    const char* metadata,
+    char** out_record_id);
+
+/**
+ * @brief 读取原始记忆数据
+ * @param handle 系统句柄
+ * @param record_id 记录ID
+ * @param out_data 输出数据（需调用者释放）
+ * @param out_len 输出数据长度
+ * @return agentos_error_t
+ */
+agentos_error_t agentos_memoryrov_get_raw(
+    agentos_memoryrov_handle_t* handle,
+    const char* record_id,
+    void** out_data,
+    size_t* out_len);
+
+/**
+ * @brief 删除原始记忆数据
+ * @param handle 系统句柄
+ * @param record_id 记录ID
+ * @return agentos_error_t
+ */
+agentos_error_t agentos_memoryrov_delete_raw(
+    agentos_memoryrov_handle_t* handle,
+    const char* record_id);
+
+/**
+ * @brief 查询记忆（语义搜索）
+ * @param handle 系统句柄
+ * @param query 查询字符串
+ * @param limit 返回结果数量上限
+ * @param out_record_ids 输出记录ID数组（需调用者释放）
+ * @param out_scores 输出相关性分数数组（需调用者释放）
+ * @param out_count 输出结果数量
+ * @return agentos_error_t
+ */
+agentos_error_t agentos_memoryrov_query(
+    agentos_memoryrov_handle_t* handle,
+    const char* query,
+    uint32_t limit,
+    char*** out_record_ids,
+    float** out_scores,
+    size_t* out_count);
+
 #ifdef __cplusplus
 }
 #endif

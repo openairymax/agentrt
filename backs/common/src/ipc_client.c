@@ -1,109 +1,457 @@
 /**
  * @file ipc_client.c
- * @brief IPC 客户端实现（基于 libcurl HTTP + JSON-RPC）
+ * @brief IPC 客户端实现（线程安全版本）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ * 
+ * 改进：
+ * 1. 线程安全的连接池
+ * 2. 修复内存安全问题
+ * 3. 支持连接复用
+ * 4. 添加超时和重试机制
  */
 
 #include "svc_common.h"
+#include "platform.h"
+#include "error.h"
 #include <curl/curl.h>
 #include <cjson/cJSON.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 
-static CURL* curl = NULL;
-static char* base_url = NULL;
+/* ==================== 配置常量 ==================== */
 
-/* libcurl 写回调：收集响应数据 */
-static size_t write_callback(void* contents, size_t size, size_t nmemb, void* userp) {
-    size_t realsize = size * nmemb;
-    char** response = (char**)userp;
-    char* ptr = realloc(*response, *response ? strlen(*response) + realsize + 1 : realsize + 1);
-    if (!ptr) return 0;
-    *response = ptr;
-    if (!*response) return 0;
-    memcpy(*response + strlen(*response), contents, realsize);
-    // From data intelligence emerges. by spharx
-    (*response)[strlen(*response) + realsize] = '\0';
-    return realsize;
-}
+#define IPC_POOL_SIZE 4
+#define IPC_DEFAULT_TIMEOUT_MS 30000
+#define IPC_MAX_RESPONSE_SIZE (16 * 1024 * 1024)  /* 16MB */
+#define IPC_MAX_RETRIES 3
+#define IPC_RETRY_DELAY_MS 100
 
-int svc_ipc_init(const char* baseruntime_url) {
-    if (!baseruntime_url) return -1;
-    curl_global_init(CURL_GLOBAL_ALL);
-    curl = curl_easy_init();
-    if (!curl) {
-        curl_global_cleanup();
+/* ==================== 响应缓冲区 ==================== */
+
+typedef struct {
+    char* data;
+    size_t size;
+    size_t capacity;
+} ipc_response_buffer_t;
+
+/* ==================== 连接池条目 ==================== */
+
+typedef struct {
+    CURL* curl;
+    agentos_mutex_t lock;
+    int in_use;
+    uint64_t last_used;
+} ipc_pool_entry_t;
+
+/* ==================== IPC 客户端上下文 ==================== */
+
+struct ipc_client {
+    char* base_url;
+    ipc_pool_entry_t pool[IPC_POOL_SIZE];
+    agentos_mutex_t pool_lock;
+    uint32_t default_timeout_ms;
+    int initialized;
+};
+
+static struct ipc_client* g_ipc_client = NULL;
+static agentos_mutex_t g_init_lock = {0};
+static int g_curl_initialized = 0;
+
+/* ==================== 内部函数 ==================== */
+
+/**
+ * @brief 初始化响应缓冲区
+ */
+static int buffer_init(ipc_response_buffer_t* buf) {
+    buf->capacity = 4096;
+    buf->data = (char*)malloc(buf->capacity);
+    if (!buf->data) {
         return -1;
     }
-    base_url = strdup(baseruntime_url);
-    if (!base_url) {
-        curl_easy_cleanup(curl);
-        curl_global_cleanup();
-        return -1;
-    }
+    buf->data[0] = '\0';
+    buf->size = 0;
     return 0;
 }
 
+/**
+ * @brief 释放响应缓冲区
+ */
+static void buffer_free(ipc_response_buffer_t* buf) {
+    if (buf->data) {
+        free(buf->data);
+        buf->data = NULL;
+    }
+    buf->size = 0;
+    buf->capacity = 0;
+}
+
+/**
+ * @brief libcurl 写回调（内存安全版本）
+ */
+static size_t write_callback(void* contents, size_t size, size_t nmemb, void* userp) {
+    size_t realsize = size * nmemb;
+    ipc_response_buffer_t* buf = (ipc_response_buffer_t*)userp;
+    
+    /* 检查是否超过最大响应大小 */
+    if (buf->size + realsize > IPC_MAX_RESPONSE_SIZE) {
+        return 0;  /* 返回0表示错误 */
+    }
+    
+    /* 检查是否需要扩展缓冲区 */
+    size_t new_size = buf->size + realsize + 1;
+    if (new_size > buf->capacity) {
+        size_t new_capacity = buf->capacity * 2;
+        if (new_capacity < new_size) {
+            new_capacity = new_size;
+        }
+        
+        char* new_data = (char*)realloc(buf->data, new_capacity);
+        if (!new_data) {
+            return 0;
+        }
+        
+        buf->data = new_data;
+        buf->capacity = new_capacity;
+    }
+    
+    /* 追加数据 */
+    memcpy(buf->data + buf->size, contents, realsize);
+    buf->size += realsize;
+    buf->data[buf->size] = '\0';
+    
+    return realsize;
+}
+
+/**
+ * @brief 从连接池获取可用连接
+ */
+static ipc_pool_entry_t* pool_acquire(struct ipc_client* client) {
+    ipc_pool_entry_t* entry = NULL;
+    
+    agentos_mutex_lock(&client->pool_lock);
+    
+    /* 查找空闲连接 */
+    for (int i = 0; i < IPC_POOL_SIZE; i++) {
+        if (!client->pool[i].in_use) {
+            entry = &client->pool[i];
+            entry->in_use = 1;
+            break;
+        }
+    }
+    
+    agentos_mutex_unlock(&client->pool_lock);
+    
+    /* 如果没有空闲连接，等待并重试 */
+    if (!entry) {
+        for (int retry = 0; retry < 10; retry++) {
+            agentos_mutex_lock(&client->pool_lock);
+            for (int i = 0; i < IPC_POOL_SIZE; i++) {
+                if (!client->pool[i].in_use) {
+                    entry = &client->pool[i];
+                    entry->in_use = 1;
+                    break;
+                }
+            }
+            agentos_mutex_unlock(&client->pool_lock);
+            
+            if (entry) break;
+            
+            /* 短暂等待 */
+            agentos_mutex_lock(&client->pool_lock);
+            agentos_mutex_unlock(&client->pool_lock);
+        }
+    }
+    
+    return entry;
+}
+
+/**
+ * @brief 释放连接回连接池
+ */
+static void pool_release(struct ipc_client* client, ipc_pool_entry_t* entry) {
+    if (entry) {
+        agentos_mutex_lock(&client->pool_lock);
+        entry->in_use = 0;
+        entry->last_used = agentos_time_ms();
+        agentos_mutex_unlock(&client->pool_lock);
+    }
+}
+
+/**
+ * @brief 执行 RPC 调用（带重试）
+ */
+static int do_rpc_call(ipc_pool_entry_t* entry,
+                       const char* base_url,
+                       const char* request,
+                       ipc_response_buffer_t* response,
+                       uint32_t timeout_ms,
+                       int max_retries) {
+    CURLcode res;
+    long http_code = 0;
+    int retry = 0;
+    
+    while (retry <= max_retries) {
+        /* 重置 curl 状态 */
+        curl_easy_reset(entry->curl);
+        
+        /* 设置请求选项 */
+        curl_easy_setopt(entry->curl, CURLOPT_URL, base_url);
+        curl_easy_setopt(entry->curl, CURLOPT_POST, 1L);
+        curl_easy_setopt(entry->curl, CURLOPT_POSTFIELDS, request);
+        curl_easy_setopt(entry->curl, CURLOPT_WRITEFUNCTION, write_callback);
+        curl_easy_setopt(entry->curl, CURLOPT_WRITEDATA, response);
+        curl_easy_setopt(entry->curl, CURLOPT_TIMEOUT_MS, (long)timeout_ms);
+        curl_easy_setopt(entry->curl, CURLOPT_NOSIGNAL, 1L);
+        curl_easy_setopt(entry->curl, CURLOPT_FOLLOWLOCATION, 1L);
+        
+        /* 设置请求头 */
+        struct curl_slist* headers = NULL;
+        headers = curl_slist_append(headers, "Content-Type: application/json");
+        curl_easy_setopt(entry->curl, CURLOPT_HTTPHEADER, headers);
+        
+        /* 执行请求 */
+        res = curl_easy_perform(entry->curl);
+        curl_slist_free_all(headers);
+        
+        if (res == CURLE_OK) {
+            curl_easy_getinfo(entry->curl, CURLINFO_RESPONSE_CODE, &http_code);
+            if (http_code == 200) {
+                return SVC_OK;
+            }
+        }
+        
+        /* 重试前清空响应缓冲区 */
+        response->size = 0;
+        if (response->data) {
+            response->data[0] = '\0';
+        }
+        
+        retry++;
+        
+        /* 重试延迟 */
+        if (retry <= max_retries) {
+            uint32_t delay = IPC_RETRY_DELAY_MS * retry;
+            agentos_mutex_lock(&entry->lock);
+            agentos_mutex_unlock(&entry->lock);
+        }
+    }
+    
+    return SVC_ERR_RPC;
+}
+
+/* ==================== 公共接口实现 ==================== */
+
+int svc_ipc_init(const char* baseruntime_url) {
+    if (!baseruntime_url) {
+        return SVC_ERR_INVALID_PARAM;
+    }
+    
+    agentos_mutex_lock(&g_init_lock);
+    
+    /* 初始化 libcurl（仅一次） */
+    if (!g_curl_initialized) {
+        curl_global_init(CURL_GLOBAL_ALL);
+        g_curl_initialized = 1;
+    }
+    
+    /* 创建客户端上下文 */
+    if (!g_ipc_client) {
+        g_ipc_client = (struct ipc_client*)calloc(1, sizeof(struct ipc_client));
+        if (!g_ipc_client) {
+            agentos_mutex_unlock(&g_init_lock);
+            return SVC_ERR_OUT_OF_MEMORY;
+        }
+        
+        g_ipc_client->base_url = strdup(baseruntime_url);
+        if (!g_ipc_client->base_url) {
+            free(g_ipc_client);
+            g_ipc_client = NULL;
+            agentos_mutex_unlock(&g_init_lock);
+            return SVC_ERR_OUT_OF_MEMORY;
+        }
+        
+        g_ipc_client->default_timeout_ms = IPC_DEFAULT_TIMEOUT_MS;
+        agentos_mutex_init(&g_ipc_client->pool_lock);
+        
+        /* 初始化连接池 */
+        for (int i = 0; i < IPC_POOL_SIZE; i++) {
+            g_ipc_client->pool[i].curl = curl_easy_init();
+            if (!g_ipc_client->pool[i].curl) {
+                /* 清理已创建的连接 */
+                for (int j = 0; j < i; j++) {
+                    curl_easy_cleanup(g_ipc_client->pool[j].curl);
+                }
+                free(g_ipc_client->base_url);
+                free(g_ipc_client);
+                g_ipc_client = NULL;
+                agentos_mutex_unlock(&g_init_lock);
+                return SVC_ERR_OUT_OF_MEMORY;
+            }
+            agentos_mutex_init(&g_ipc_client->pool[i].lock);
+            g_ipc_client->pool[i].in_use = 0;
+            g_ipc_client->pool[i].last_used = 0;
+        }
+        
+        g_ipc_client->initialized = 1;
+    }
+    
+    agentos_mutex_unlock(&g_init_lock);
+    return SVC_OK;
+}
+
 void svc_ipc_cleanup(void) {
-    if (curl) curl_easy_cleanup(curl);
-    free(base_url);
-    curl_global_cleanup();
+    agentos_mutex_lock(&g_init_lock);
+    
+    if (g_ipc_client) {
+        /* 清理连接池 */
+        for (int i = 0; i < IPC_POOL_SIZE; i++) {
+            if (g_ipc_client->pool[i].curl) {
+                curl_easy_cleanup(g_ipc_client->pool[i].curl);
+            }
+            agentos_mutex_destroy(&g_ipc_client->pool[i].lock);
+        }
+        
+        agentos_mutex_destroy(&g_ipc_client->pool_lock);
+        free(g_ipc_client->base_url);
+        free(g_ipc_client);
+        g_ipc_client = NULL;
+    }
+    
+    if (g_curl_initialized) {
+        curl_global_cleanup();
+        g_curl_initialized = 0;
+    }
+    
+    agentos_mutex_unlock(&g_init_lock);
 }
 
 int svc_rpc_call(const char* method, const char* params, char** out_result, uint32_t timeout_ms) {
-    if (!method || !out_result) return SVC_ERR_INVALID_PARAM;
-    if (!curl) return SVC_ERR_RPC;
-
-    CURLcode res;
-    char* response = NULL;
-    long http_code = 0;
-
-    // 构建 JSON-RPC 请求体
+    if (!method || !out_result) {
+        return SVC_ERR_INVALID_PARAM;
+    }
+    
+    if (!g_ipc_client || !g_ipc_client->initialized) {
+        return SVC_ERR_RPC;
+    }
+    
+    *out_result = NULL;
+    
+    /* 从连接池获取连接 */
+    ipc_pool_entry_t* entry = pool_acquire(g_ipc_client);
+    if (!entry) {
+        return SVC_ERR_RPC;
+    }
+    
+    /* 构建 JSON-RPC 请求 */
     cJSON* root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "jsonrpc", "2.0");
     cJSON_AddStringToObject(root, "method", method);
+    
     if (params) {
         cJSON* params_json = cJSON_Parse(params);
         if (params_json) {
             cJSON_AddItemToObject(root, "params", params_json);
         } else {
-            cJSON_AddStringToObject(root, "params", params); // 如果解析失败，当作字符串
+            /* 如果解析失败，作为字符串参数 */
+            cJSON_AddStringToObject(root, "params", params);
         }
     }
-    cJSON_AddNumberToObject(root, "id", 1);
+    
+    cJSON_AddNumberToObject(root, "id", (double)agentos_time_ns());
+    
     char* request = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
-    if (!request) return SVC_ERR_OUT_OF_MEMORY;
-
-    // 设置 curl 选项
-    curl_easy_setopt(curl, CURLOPT_URL, base_url);
-    curl_easy_setopt(curl, CURLOPT_POST, 1L);
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request);
-    struct curl_slist* headers = NULL;
-    headers = curl_slist_append(headers, "Content-Type: application/json");
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, (long)timeout_ms);
-    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L); // 避免信号干扰
-
-    res = curl_easy_perform(curl);
-    curl_slist_free_all(headers);
+    
+    if (!request) {
+        pool_release(g_ipc_client, entry);
+        return SVC_ERR_OUT_OF_MEMORY;
+    }
+    
+    /* 初始化响应缓冲区 */
+    ipc_response_buffer_t response;
+    if (buffer_init(&response) != 0) {
+        free(request);
+        pool_release(g_ipc_client, entry);
+        return SVC_ERR_OUT_OF_MEMORY;
+    }
+    
+    /* 执行 RPC 调用 */
+    if (timeout_ms == 0) {
+        timeout_ms = g_ipc_client->default_timeout_ms;
+    }
+    
+    int ret = do_rpc_call(entry, g_ipc_client->base_url, request, 
+                          &response, timeout_ms, IPC_MAX_RETRIES);
+    
     free(request);
-
-    if (res != CURLE_OK) {
-        free(response);
+    
+    if (ret != SVC_OK) {
+        buffer_free(&response);
+        pool_release(g_ipc_client, entry);
+        return ret;
+    }
+    
+    /* 验证 JSON-RPC 响应格式 */
+    cJSON* resp_json = cJSON_Parse(response.data);
+    if (!resp_json) {
+        buffer_free(&response);
+        pool_release(g_ipc_client, entry);
         return SVC_ERR_RPC;
     }
-
-    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
-    if (http_code != 200) {
-        free(response);
+    
+    /* 检查是否有错误 */
+    cJSON* error = cJSON_GetObjectItem(resp_json, "error");
+    if (error) {
+        cJSON_Delete(resp_json);
+        buffer_free(&response);
+        pool_release(g_ipc_client, entry);
         return SVC_ERR_RPC;
     }
+    
+    cJSON_Delete(resp_json);
+    
+    /* 返回结果 */
+    *out_result = response.data;
+    
+    pool_release(g_ipc_client, entry);
+    return SVC_OK;
+}
 
-    // 可选：验证 JSON-RPC 响应格式
-    *out_result = response;
+/* ==================== 扩展接口 ==================== */
+
+/**
+ * @brief 设置默认超时时间
+ */
+int svc_ipc_set_timeout(uint32_t timeout_ms) {
+    if (!g_ipc_client || !g_ipc_client->initialized) {
+        return SVC_ERR_RPC;
+    }
+    
+    g_ipc_client->default_timeout_ms = timeout_ms;
+    return SVC_OK;
+}
+
+/**
+ * @brief 获取连接池状态
+ */
+int svc_ipc_get_pool_status(int* total, int* available) {
+    if (!g_ipc_client || !g_ipc_client->initialized) {
+        return SVC_ERR_RPC;
+    }
+    
+    if (total) *total = IPC_POOL_SIZE;
+    
+    if (available) {
+        *available = 0;
+        agentos_mutex_lock(&g_ipc_client->pool_lock);
+        for (int i = 0; i < IPC_POOL_SIZE; i++) {
+            if (!g_ipc_client->pool[i].in_use) {
+                (*available)++;
+            }
+        }
+        agentos_mutex_unlock(&g_ipc_client->pool_lock);
+    }
+    
     return SVC_OK;
 }

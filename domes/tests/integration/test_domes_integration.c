@@ -1,296 +1,198 @@
 /**
  * @file test_domes_integration.c
- * @brief Domes 集成测试
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ * @brief domes 模块集成测试
+ * @author Spharx
+ * @date 2024
  */
 
-#include "domes.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
+#include <assert.h>
+#include "../include/domes.h"
 
-/**
- * @brief 测试 Domes 完整安全工作流
- */
-void test_domes_full_workflow(void) {
-    printf("=== 测试 Domes 完整安全工作流 ===\n");
+#define TEST_PASS(name) printf("[PASS] %s\n", name)
+#define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)
+
+/* ============================================================================
+ * 集成测试：权限 + 审计
+ * ============================================================================ */
+
+static void test_permission_with_audit(void) {
+    printf("\n--- Testing Permission with Audit ---\n");
     
-    // 初始化 Domes
-    domes_t* domain = NULL;
-    int err = domes_init(NULL, &domain);
-    if (err != 0 || !domain) {
-        printf("初始化 Domes 失败: %d\n", err);
-        return;
-    }
-    // From data intelligence emerges. by spharx
-    printf("Domes 初始化成功\n");
+    assert(domes_init(NULL) == DOMES_OK);
     
-    // 1. 测试虚拟工位创建和使用
-    printf("1. 测试虚拟工位\n");
+    domes_add_permission_rule("agent1", "read", "/data/*", 1, 100);
+    domes_add_permission_rule("agent1", "write", "/data/*", 0, 100);
     
-    char* workbench_id = NULL;
-    err = domes_workbench_create(domain, "test_agent", &workbench_id);
-    if (err != 0 || !workbench_id) {
-        printf("创建工位失败: %d\n", err);
-        domes_destroy(domain);
-        return;
-    }
-    printf("工位创建成功: %s\n", workbench_id);
+    int result = domes_check_permission("agent1", "read", "/data/file.txt", NULL);
+    printf("  Permission check (read): %s\n", result ? "ALLOWED" : "DENIED");
+    assert(result == 1);
     
-    // 执行安全命令
-    const char* safe_argv[] = {"echo", "安全命令执行", NULL};
-    char* stdout_buf = NULL;
-    char* stderr_buf = NULL;
-    int exit_code = 0;
-    char* error = NULL;
+    result = domes_check_permission("agent1", "write", "/data/file.txt", NULL);
+    printf("  Permission check (write): %s\n", result ? "ALLOWED" : "DENIED");
+    assert(result == 0);
     
-    err = domes_workbench_exec(domain, workbench_id, safe_argv, 1000, &stdout_buf, &stderr_buf, &exit_code, &error);
-    printf("执行安全命令: %d, 退出码: %d\n", err, exit_code);
-    if (stdout_buf) {
-        printf("输出: %s\n", stdout_buf);
-        free(stdout_buf);
-    }
-    if (stderr_buf) free(stderr_buf);
-    if (error) free(error);
+    domes_flush_audit_log();
+    domes_cleanup();
     
-    // 2. 测试权限检查
-    printf("2. 测试权限检查\n");
-    
-    int allowed = domes_permission_check(domain, "test_agent", "file:read", "/etc/passwd", NULL);
-    printf("读取 /etc/passwd 权限: %d\n", allowed);
-    
-    allowed = domes_permission_check(domain, "test_agent", "file:write", "/etc/passwd", NULL);
-    printf("写入 /etc/passwd 权限: %d\n", allowed);
-    
-    allowed = domes_permission_check(domain, "test_agent", "network:access", "http://example.com", NULL);
-    printf("网络访问权限: %d\n", allowed);
-    
-    // 3. 测试输入净化
-    printf("3. 测试输入净化\n");
-    
-    const char* test_inputs[] = {
-        "正常输入文本",
-        "<script>alert('XSS')</script>",
-        "SELECT * FROM users",
-        "../../../etc/passwd"
-    };
-    
-    size_t input_count = sizeof(test_inputs) / sizeof(test_inputs[0]);
-    
-    for (size_t i = 0; i < input_count; i++) {
-        char* cleaned = NULL;
-        int risk_level = 0;
-        err = domes_sanitize(domain, test_inputs[i], &cleaned, &risk_level);
-        printf("输入: '%s'\n", test_inputs[i]);
-        printf("净化结果: %d, 风险等级: %d\n", err, risk_level);
-        if (cleaned) {
-            printf("净化后: '%s'\n", cleaned);
-            free(cleaned);
-        }
-        printf("\n");
-    }
-    
-    // 4. 测试审计功能
-    printf("4. 测试审计功能\n");
-    
-    // 记录多个审计事件
-    for (int i = 0; i < 5; i++) {
-        char tool_name[32];
-        char input[64];
-        char output[64];
-        
-        snprintf(tool_name, sizeof(tool_name), "tool_%d", i);
-        snprintf(input, sizeof(input), "{\"param\": %d}", i);
-        snprintf(output, sizeof(output), "{\"result\": \"success\"}");
-        
-        err = domes_audit_record(domain, "test_agent", tool_name, input, output, 50 + i*10, 1, NULL);
-        if (err != 0) {
-            printf("记录审计事件 %d 失败: %d\n", i+1, err);
-        }
-    }
-    
-    // 查询审计日志
-    char** events = NULL;
-    size_t count = 0;
-    err = domes_audit_query(domain, "test_agent", 0, 0, 10, &events, &count);
-    printf("查询审计日志: %d, 找到 %zu 条事件\n", err, count);
-    
-    if (events) {
-        for (size_t i = 0; i < count; i++) {
-            printf("  事件 %zu: %s\n", i+1, events[i]);
-            free(events[i]);
-        }
-        free(events);
-    }
-    
-    // 5. 测试工位管理
-    printf("5. 测试工位管理\n");
-    
-    // 列出所有工位
-    char** workbench_ids = NULL;
-    size_t workbench_count = 0;
-    err = domes_workbench_list(domain, &workbench_ids, &workbench_count);
-    printf("列出工位: %d, 数量: %zu\n", err, workbench_count);
-    
-    if (workbench_ids) {
-        for (size_t i = 0; i < workbench_count; i++) {
-            printf("  工位 %zu: %s\n", i+1, workbench_ids[i]);
-            free(workbench_ids[i]);
-        }
-        free(workbench_ids);
-    }
-    
-    // 销毁工位
-    domes_workbench_destroy(domain, workbench_id);
-    printf("销毁工位: %s\n", workbench_id);
-    free(workbench_id);
-    
-    // 6. 测试系统恢复
-    printf("6. 测试系统恢复\n");
-    
-    // 模拟系统重启
-    domes_destroy(domain);
-    printf("系统清理完成\n");
-    
-    // 重新初始化
-    err = domes_init(NULL, &domain);
-    if (err == 0 && domain) {
-        printf("系统重新初始化成功\n");
-        
-        // 验证审计日志是否保留
-        err = domes_audit_query(domain, "test_agent", 0, 0, 10, &events, &count);
-        printf("重启后查询审计日志: %d, 找到 %zu 条事件\n", err, count);
-        
-        if (events) {
-            free(events);
-        }
-    } else {
-        printf("系统重新初始化失败: %d\n", err);
-    }
-    
-    // 清理资源
-    if (domain) {
-        domes_destroy(domain);
-    }
-    
-    printf("完整安全工作流测试完成\n\n");
+    TEST_PASS("permission_with_audit");
 }
 
-/**
- * @brief 测试 Domes 性能
- */
-void test_domes_performance(void) {
-    printf("=== 测试 Domes 性能 ===\n");
+/* ============================================================================
+ * 集成测试：净化 + 审计
+ * ============================================================================ */
+
+static void test_sanitize_with_audit(void) {
+    printf("\n--- Testing Sanitize with Audit ---\n");
     
-    // 初始化 Domes
-    domes_t* domain = NULL;
-    int err = domes_init(NULL, &domain);
-    if (err != 0 || !domain) {
-        printf("初始化失败: %d\n", err);
-        return;
-    }
+    assert(domes_init(NULL) == DOMES_OK);
     
-    // 测试权限检查性能
-    const int test_count = 1000;
-    clock_t start = clock();
+    char output[256];
     
-    for (int i = 0; i < test_count; i++) {
-        domes_permission_check(domain, "test_agent", "file:read", "/etc/passwd", NULL);
-    }
+    int ret = domes_sanitize_input("Hello, World!", output, sizeof(output));
+    printf("  Sanitize clean input: %s\n", output);
+    assert(ret == DOMES_OK);
+    assert(strcmp(output, "Hello, World!") == 0);
     
-    clock_t end = clock();
-    double elapsed = (double)(end - start) / CLOCKS_PER_SEC;
-    printf("%d 次权限检查耗时: %.2f 秒, 平均每次: %.6f 秒\n", test_count, elapsed, elapsed/test_count);
+    ret = domes_sanitize_input("<script>alert(1)</script>", output, sizeof(output));
+    printf("  Sanitize malicious input: %s\n", output);
     
-    // 测试输入净化性能
-    const char* test_input = "Hello, World! This is a test input for sanitization.";
-    start = clock();
+    domes_flush_audit_log();
+    domes_cleanup();
     
-    for (int i = 0; i < test_count; i++) {
-        char* cleaned = NULL;
-        int risk_level = 0;
-        domes_sanitize(domain, test_input, &cleaned, &risk_level);
-        if (cleaned) {
-            free(cleaned);
-        }
-    }
-    
-    end = clock();
-    elapsed = (double)(end - start) / CLOCKS_PER_SEC;
-    printf("%d 次输入净化耗时: %.2f 秒, 平均每次: %.6f 秒\n", test_count, elapsed, elapsed/test_count);
-    
-    // 测试审计记录性能
-    start = clock();
-    
-    for (int i = 0; i < test_count; i++) {
-        char input[32];
-        snprintf(input, sizeof(input), "{\"test\": %d}", i);
-        domes_audit_record(domain, "test_agent", "test_tool", input, "{\"result\": \"ok\"}", 10, 1, NULL);
-    }
-    
-    end = clock();
-    elapsed = (double)(end - start) / CLOCKS_PER_SEC;
-    printf("%d 次审计记录耗时: %.2f 秒, 平均每次: %.6f 秒\n", test_count, elapsed, elapsed/test_count);
-    
-    // 清理资源
-    domes_destroy(domain);
-    
-    printf("性能测试完成\n\n");
+    TEST_PASS("sanitize_with_audit");
 }
 
-/**
- * @brief 测试 Domes 错误处理
- */
-void test_domes_error_handling(void) {
-    printf("=== 测试 Domes 错误处理 ===\n");
+/* ============================================================================
+ * 集成测试：完整工作流
+ * ============================================================================ */
+
+static void test_full_workflow(void) {
+    printf("\n--- Testing Full Workflow ---\n");
     
-    // 测试空指针参数
-    domes_t* domain = NULL;
-    int err = domes_init(NULL, NULL);
-    printf("初始化（空输出指针）: %d\n", err);
+    assert(domes_init(NULL) == DOMES_OK);
     
-    // 测试无效配置
-    domes_config_t invalid_config = {
-        .workbench_type = "invalid_type",  // 无效类型
-        .workbench_memory_bytes = 0,        // 无效内存限制
-    };
+    printf("  Step 1: Add permission rules\n");
+    domes_add_permission_rule("worker_agent", "execute", "/usr/bin/*", 1, 100);
+    domes_add_permission_rule("worker_agent", "execute", "/bin/*", 1, 100);
+    domes_add_permission_rule("worker_agent", "read", "/data/*", 1, 100);
+    domes_add_permission_rule("worker_agent", "write", "/data/output/*", 1, 100);
+    domes_add_permission_rule("worker_agent", "write", "/data/private/*", 0, 200);
     
-    err = domes_init(&invalid_config, &domain);
-    printf("初始化（无效配置）: %d\n", err);
+    printf("  Step 2: Check permissions\n");
+    int can_read = domes_check_permission("worker_agent", "read", "/data/input.txt", NULL);
+    int can_write_public = domes_check_permission("worker_agent", "write", "/data/output/result.txt", NULL);
+    int can_write_private = domes_check_permission("worker_agent", "write", "/data/private/secret.txt", NULL);
     
-    // 测试空句柄操作
-    if (domain) {
-        domes_destroy(domain);
-    }
+    printf("    Read /data/input.txt: %s\n", can_read ? "ALLOWED" : "DENIED");
+    printf("    Write /data/output/result.txt: %s\n", can_write_public ? "ALLOWED" : "DENIED");
+    printf("    Write /data/private/secret.txt: %s\n", can_write_private ? "ALLOWED" : "DENIED");
     
-    // 测试空句柄调用其他函数
-    char* workbench_id = NULL;
-    err = domes_workbench_create(NULL, "test_agent", &workbench_id);
-    printf("创建工位（空句柄）: %d\n", err);
+    assert(can_read == 1);
+    assert(can_write_public == 1);
+    assert(can_write_private == 0);
     
-    int allowed = domes_permission_check(NULL, "test_agent", "file:read", "/etc/passwd", NULL);
-    printf("权限检查（空句柄）: %d\n", allowed);
+    printf("  Step 3: Sanitize user input\n");
+    char sanitized[256];
+    domes_sanitize_input("User provided input with <html> tags", sanitized, sizeof(sanitized));
+    printf("    Sanitized: %s\n", sanitized);
     
-    char* cleaned = NULL;
-    int risk_level = 0;
-    err = domes_sanitize(NULL, "test", &cleaned, &risk_level);
-    printf("输入净化（空句柄）: %d\n", err);
+    printf("  Step 4: Flush audit log\n");
+    domes_flush_audit_log();
     
-    err = domes_audit_record(NULL, "test_agent", "test_tool", "input", "output", 10, 1, NULL);
-    printf("记录审计事件（空句柄）: %d\n", err);
+    domes_cleanup();
     
-    printf("错误处理测试完成\n\n");
+    TEST_PASS("full_workflow");
 }
 
-int main(void) {
-    printf("开始 Domes 集成测试\n\n");
+/* ============================================================================
+ * 集成测试：并发场景模拟
+ * ============================================================================ */
+
+static void test_concurrent_access(void) {
+    printf("\n--- Testing Concurrent Access Simulation ---\n");
     
-    // 运行各项测试
-    test_domes_full_workflow();
-    test_domes_performance();
-    test_domes_error_handling();
+    assert(domes_init(NULL) == DOMES_OK);
     
-    printf("Domes 集成测试完成\n");
+    domes_add_permission_rule("agent_*", "read", "/shared/*", 1, 100);
+    
+    printf("  Simulating multiple agents accessing shared resource...\n");
+    for (int i = 0; i < 10; i++) {
+        char agent_id[32];
+        snprintf(agent_id, sizeof(agent_id), "agent_%d", i);
+        
+        int result = domes_check_permission(agent_id, "read", "/shared/data.txt", NULL);
+        assert(result == 1);
+    }
+    printf("  All 10 agents successfully accessed shared resource\n");
+    
+    domes_cleanup();
+    
+    TEST_PASS("concurrent_access");
+}
+
+/* ============================================================================
+ * 集成测试：错误处理
+ * ============================================================================ */
+
+static void test_error_handling(void) {
+    printf("\n--- Testing Error Handling ---\n");
+    
+    printf("  Testing operations before init...\n");
+    int result = domes_check_permission("agent1", "read", "/data", NULL);
+    assert(result == 0);
+    printf("    Permission check without init: DENIED (expected)\n");
+    
+    printf("  Testing with NULL parameters...\n");
+    assert(domes_init(NULL) == DOMES_OK);
+    result = domes_check_permission(NULL, "read", "/data", NULL);
+    assert(result == 0);
+    printf("    Permission check with NULL agent: DENIED (expected)\n");
+    
+    domes_cleanup();
+    
+    TEST_PASS("error_handling");
+}
+
+/* ============================================================================
+ * 集成测试：版本信息
+ * ============================================================================ */
+
+static void test_version_info(void) {
+    printf("\n--- Testing Version Info ---\n");
+    
+    const char* version = domes_version();
+    printf("  domes version: %s\n", version);
+    assert(version != NULL);
+    assert(strlen(version) > 0);
+    
+    TEST_PASS("version_info");
+}
+
+/* ============================================================================
+ * 主测试入口
+ * ============================================================================ */
+
+int main(int argc, char* argv[]) {
+    (void)argc;
+    (void)argv;
+    
+    printf("========================================\n");
+    printf("domes Module Integration Tests\n");
+    printf("========================================\n");
+    
+    test_version_info();
+    test_permission_with_audit();
+    test_sanitize_with_audit();
+    test_full_workflow();
+    test_concurrent_access();
+    test_error_handling();
+    
+    printf("\n========================================\n");
+    printf("All integration tests passed!\n");
+    printf("========================================\n");
+    
     return 0;
 }

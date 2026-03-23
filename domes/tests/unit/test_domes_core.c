@@ -1,250 +1,303 @@
 /**
  * @file test_domes_core.c
- * @brief Domes 核心功能单元测试
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ * @brief domes 模块单元测试
+ * @author Spharx
+ * @date 2024
  */
 
-#include "domes.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
+#include "../include/domes.h"
+#include "../src/platform/platform.h"
+#include "../src/permission/permission.h"
+#include "../src/audit/audit.h"
+#include "../src/sanitizer/sanitizer.h"
+#include "../src/workbench/workbench.h"
 
-/**
- * @brief 测试 Domes 初始化和清理
- */
-void test_domes_init_cleanup(void) {
-    printf("=== 测试 Domes 初始化和清理 ===\n");
+#define TEST_PASS(name) printf("[PASS] %s\n", name)
+#define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)
+
+/* ============================================================================
+ * 平台抽象层测试
+ * ============================================================================ */
+
+static void test_platform_mutex(void) {
+    domes_mutex_t mutex;
     
-    // 测试默认配置初始化
-    domes_t* domain = NULL;
-    int err = domes_init(NULL, &domain);
-    printf("默认配置初始化: %d\n", err);
+    assert(domes_mutex_init(&mutex) == DOMES_OK);
+    assert(domes_mutex_lock(&mutex) == DOMES_OK);
+    assert(domes_mutex_unlock(&mutex) == DOMES_OK);
+    assert(domes_mutex_destroy(&mutex) == DOMES_OK);
     
-    if (err == 0 && domain) {
-        // 清理资源
-        domes_destroy(domain);
-        // From data intelligence emerges. by spharx
-        printf("系统清理完成\n");
-    }
-    
-    // 测试自定义配置初始化
-    domes_config_t config = {
-        .workbench_type = "process",
-        .workbench_memory_bytes = 1024 * 1024 * 100,  // 100MB
-        .workbench_cpu_quota = 1.0,
-        .workbench_network = 0,
-        .workbench_rootfs = NULL,
-        .permission_rules_path = NULL,
-        .permission_cache_ttl_ms = 3600000,  // 1小时
-        .audit_log_path = NULL,
-        .audit_max_size_bytes = 1024 * 1024 * 10,  // 10MB
-        .audit_max_files = 5,
-        .audit_format = "json",
-        .sanitizer_max_input_len = 1024 * 1024,  // 1MB
-        .sanitizer_rules_path = NULL
-    };
-    
-    err = domes_init(&config, &domain);
-    printf("自定义配置初始化: %d\n", err);
-    
-    if (err == 0 && domain) {
-        domes_destroy(domain);
-        printf("自定义配置系统清理完成\n");
-    }
-    
-    printf("初始化和清理测试完成\n\n");
+    TEST_PASS("platform_mutex");
 }
 
-/**
- * @brief 测试虚拟工位功能
- */
-void test_workbench(void) {
-    printf("=== 测试虚拟工位功能 ===\n");
+static void test_platform_rwlock(void) {
+    domes_rwlock_t rwlock;
     
-    // 初始化 Domes
-    domes_t* domain = NULL;
-    int err = domes_init(NULL, &domain);
-    if (err != 0 || !domain) {
-        printf("初始化 Domes 失败: %d\n", err);
-        return;
-    }
+    assert(domes_rwlock_init(&rwlock) == DOMES_OK);
+    assert(domes_rwlock_rdlock(&rwlock) == DOMES_OK);
+    assert(domes_rwlock_unlock(&rwlock) == DOMES_OK);
+    assert(domes_rwlock_wrlock(&rwlock) == DOMES_OK);
+    assert(domes_rwlock_unlock(&rwlock) == DOMES_OK);
+    assert(domes_rwlock_destroy(&rwlock) == DOMES_OK);
     
-    // 测试创建工位
-    char* workbench_id = NULL;
-    err = domes_workbench_create(domain, "test_agent", &workbench_id);
-    printf("创建工位: %d\n", err);
-    
-    if (err == 0 && workbench_id) {
-        printf("工位ID: %s\n", workbench_id);
-        
-        // 测试执行命令
-        const char* argv[] = {"echo", "Hello, Domes!", NULL};
-        char* stdout_buf = NULL;
-        char* stderr_buf = NULL;
-        int exit_code = 0;
-        char* error = NULL;
-        
-        err = domes_workbench_exec(domain, workbench_id, argv, 1000, &stdout_buf, &stderr_buf, &exit_code, &error);
-        printf("执行命令: %d, 退出码: %d\n", err, exit_code);
-        
-        if (stdout_buf) {
-            printf("标准输出: %s\n", stdout_buf);
-            free(stdout_buf);
-        }
-        
-        if (stderr_buf) {
-            free(stderr_buf);
-        }
-        
-        if (error) {
-            free(error);
-        }
-        
-        // 测试列出工位
-        char** workbench_ids = NULL;
-        size_t count = 0;
-        err = domes_workbench_list(domain, &workbench_ids, &count);
-        printf("列出工位: %d, 数量: %zu\n", err, count);
-        
-        if (workbench_ids) {
-            for (size_t i = 0; i < count; i++) {
-                printf("  工位 %zu: %s\n", i+1, workbench_ids[i]);
-                free(workbench_ids[i]);
-            }
-            free(workbench_ids);
-        }
-        
-        // 销毁工位
-        domes_workbench_destroy(domain, workbench_id);
-        printf("销毁工位完成\n");
-        
-        free(workbench_id);
-    }
-    
-    // 清理资源
-    domes_destroy(domain);
-    printf("虚拟工位测试完成\n\n");
+    TEST_PASS("platform_rwlock");
 }
 
-/**
- * @brief 测试权限裁决功能
- */
-void test_permission(void) {
-    printf("=== 测试权限裁决功能 ===\n");
+static void test_platform_time(void) {
+    domes_timestamp_t ts;
     
-    // 初始化 Domes
-    domes_t* domain = NULL;
-    int err = domes_init(NULL, &domain);
-    if (err != 0 || !domain) {
-        printf("初始化 Domes 失败: %d\n", err);
-        return;
-    }
+    assert(domes_time_now(&ts) == DOMES_OK);
+    assert(ts.sec > 0);
     
-    // 测试权限检查
-    int allowed = domes_permission_check(domain, "test_agent", "file:read", "/etc/passwd", NULL);
-    printf("权限检查 (file:read /etc/passwd): %d\n", allowed);
+    uint64_t ms = domes_time_ms();
+    assert(ms > 0);
     
-    allowed = domes_permission_check(domain, "test_agent", "file:write", "/etc/passwd", NULL);
-    printf("权限检查 (file:write /etc/passwd): %d\n", allowed);
-    
-    allowed = domes_permission_check(domain, "test_agent", "network:access", "http://example.com", NULL);
-    printf("权限检查 (network:access example.com): %d\n", allowed);
-    
-    // 测试重新加载权限规则
-    err = domes_permission_reload(domain);
-    printf("重新加载权限规则: %d\n", err);
-    
-    // 清理资源
-    domes_destroy(domain);
-    printf("权限裁决测试完成\n\n");
+    TEST_PASS("platform_time");
 }
 
-/**
- * @brief 测试审计功能
- */
-void test_audit(void) {
-    printf("=== 测试审计功能 ===\n");
+static void test_platform_atomic(void) {
+    domes_atomic32_t val32 = 0;
+    domes_atomic64_t val64 = 0;
     
-    // 初始化 Domes
-    domes_t* domain = NULL;
-    int err = domes_init(NULL, &domain);
-    if (err != 0 || !domain) {
-        printf("初始化 Domes 失败: %d\n", err);
-        return;
-    }
+    assert(domes_atomic_load32(&val32) == 0);
+    domes_atomic_store32(&val32, 42);
+    assert(domes_atomic_load32(&val32) == 42);
+    assert(domes_atomic_inc32(&val32) == 42);
+    assert(domes_atomic_load32(&val32) == 43);
+    assert(domes_atomic_dec32(&val32) == 43);
+    assert(domes_atomic_load32(&val32) == 42);
+    assert(domes_atomic_cas32(&val32, 42, 100) == true);
+    assert(domes_atomic_load32(&val32) == 100);
     
-    // 测试记录审计事件
-    err = domes_audit_record(domain, "test_agent", "test_tool", "{\"input\": \"test\"}", "{\"output\": \"result\"}", 100, 1, NULL);
-    printf("记录审计事件: %d\n", err);
+    domes_atomic_store64(&val64, 1000000);
+    assert(domes_atomic_load64(&val64) == 1000000);
+    assert(domes_atomic_add64(&val64, 500000) == 1000000);
+    assert(domes_atomic_load64(&val64) == 1500000);
     
-    // 测试查询审计日志
-    char** events = NULL;
-    size_t count = 0;
-    err = domes_audit_query(domain, "test_agent", 0, 0, 10, &events, &count);
-    printf("查询审计日志: %d, 事件数量: %zu\n", err, count);
-    
-    if (events) {
-        for (size_t i = 0; i < count; i++) {
-            printf("  事件 %zu: %s\n", i+1, events[i]);
-            free(events[i]);
-        }
-        free(events);
-    }
-    
-    // 清理资源
-    domes_destroy(domain);
-    printf("审计功能测试完成\n\n");
+    TEST_PASS("platform_atomic");
 }
 
-/**
- * @brief 测试输入净化功能
- */
-void test_sanitizer(void) {
-    printf("=== 测试输入净化功能 ===\n");
+static void test_platform_string(void) {
+    char* dup = domes_strdup("hello");
+    assert(dup != NULL);
+    assert(strcmp(dup, "hello") == 0);
+    domes_mem_free(dup);
     
-    // 初始化 Domes
-    domes_t* domain = NULL;
-    int err = domes_init(NULL, &domain);
-    if (err != 0 || !domain) {
-        printf("初始化 Domes 失败: %d\n", err);
-        return;
-    }
+    assert(domes_strcasecmp("Hello", "HELLO") == 0);
+    assert(domes_strcasecmp("Hello", "World") != 0);
     
-    // 测试净化正常输入
-    const char* normal_input = "Hello, World!";
-    char* cleaned = NULL;
-    int risk_level = 0;
-    err = domes_sanitize(domain, normal_input, &cleaned, &risk_level);
-    printf("净化正常输入: %d, 风险等级: %d\n", err, risk_level);
-    if (cleaned) {
-        printf("净化结果: %s\n", cleaned);
-        free(cleaned);
-    }
-    
-    // 测试净化可能的恶意输入
-    const char* malicious_input = "<script>alert('XSS')</script>";
-    err = domes_sanitize(domain, malicious_input, &cleaned, &risk_level);
-    printf("净化恶意输入: %d, 风险等级: %d\n", err, risk_level);
-    if (cleaned) {
-        printf("净化结果: %s\n", cleaned);
-        free(cleaned);
-    }
-    
-    // 清理资源
-    domes_destroy(domain);
-    printf("输入净化测试完成\n\n");
+    TEST_PASS("platform_string");
 }
 
-int main(void) {
-    printf("开始 Domes 单元测试\n\n");
+/* ============================================================================
+ * 权限模块测试
+ * ============================================================================ */
+
+static void test_permission_engine(void) {
+    permission_engine_t* engine = permission_engine_create(NULL);
+    assert(engine != NULL);
     
-    // 运行各项测试
-    test_domes_init_cleanup();
-    test_workbench();
-    test_permission();
-    test_audit();
+    assert(permission_engine_add_rule(engine, "agent1", "read", "/data/*", 1, 100) == DOMES_OK);
+    assert(permission_engine_add_rule(engine, "agent1", "write", "/data/*", 0, 100) == DOMES_OK);
+    assert(permission_engine_add_rule(engine, "*", "read", "/public/*", 1, 50) == DOMES_OK);
+    
+    assert(permission_engine_check(engine, "agent1", "read", "/data/file.txt", NULL) == 1);
+    assert(permission_engine_check(engine, "agent1", "write", "/data/file.txt", NULL) == 0);
+    assert(permission_engine_check(engine, "agent2", "read", "/public/info.txt", NULL) == 1);
+    
+    permission_engine_destroy(engine);
+    
+    TEST_PASS("permission_engine");
+}
+
+static void test_permission_cache(void) {
+    cache_manager_t* cache = cache_manager_create(100, 60000);
+    assert(cache != NULL);
+    
+    assert(cache_manager_get(cache, "agent1", "read", "/data", NULL) == -1);
+    
+    cache_manager_put(cache, "agent1", "read", "/data", NULL, 1);
+    assert(cache_manager_get(cache, "agent1", "read", "/data", NULL) == 1);
+    
+    cache_manager_clear(cache);
+    assert(cache_manager_get(cache, "agent1", "read", "/data", NULL) == -1);
+    
+    cache_manager_destroy(cache);
+    
+    TEST_PASS("permission_cache");
+}
+
+/* ============================================================================
+ * 审计模块测试
+ * ============================================================================ */
+
+static void test_audit_queue(void) {
+    audit_queue_t* queue = audit_queue_create(100);
+    assert(queue != NULL);
+    
+    audit_entry_t* entry1 = audit_entry_create(AUDIT_EVENT_PERMISSION, "agent1", "read", "/data", NULL, 1);
+    assert(entry1 != NULL);
+    
+    assert(audit_queue_push(queue, entry1) == DOMES_OK);
+    assert(audit_queue_size(queue) == 1);
+    
+    audit_entry_t* entry2 = NULL;
+    assert(audit_queue_try_pop(queue, &entry2) == DOMES_OK);
+    assert(entry2 != NULL);
+    assert(strcmp(entry2->agent_id, "agent1") == 0);
+    audit_entry_destroy(entry2);
+    
+    audit_queue_destroy(queue);
+    
+    TEST_PASS("audit_queue");
+}
+
+/* ============================================================================
+ * 净化器模块测试
+ * ============================================================================ */
+
+static void test_sanitizer(void) {
+    sanitizer_t* san = sanitizer_create(NULL);
+    assert(san != NULL);
+    
+    char output[256];
+    sanitize_context_t ctx;
+    sanitizer_default_context(&ctx);
+    
+    assert(sanitizer_sanitize(san, "hello world", output, sizeof(output), &ctx) == SANITIZE_OK);
+    assert(strcmp(output, "hello world") == 0);
+    
+    ctx.level = SANITIZE_LEVEL_STRICT;
+    assert(sanitizer_sanitize(san, "<script>alert(1)</script>", output, sizeof(output), &ctx) == SANITIZE_REJECTED);
+    
+    ctx.level = SANITIZE_LEVEL_NORMAL;
+    assert(sanitizer_sanitize(san, "<script>", output, sizeof(output), &ctx) == SANITIZE_MODIFIED);
+    
+    sanitizer_destroy(san);
+    
+    TEST_PASS("sanitizer");
+}
+
+static void test_sanitizer_escape(void) {
+    char output[256];
+    
+    sanitizer_escape_html("<script>", output, sizeof(output));
+    assert(strcmp(output, "&lt;script&gt;") == 0);
+    
+    sanitizer_escape_sql("test'value", output, sizeof(output));
+    assert(strstr(output, "''") != NULL);
+    
+    sanitizer_escape_shell("hello world", output, sizeof(output));
+    assert(strstr(output, "\\x20") != NULL);
+    
+    TEST_PASS("sanitizer_escape");
+}
+
+/* ============================================================================
+ * 工位模块测试
+ * ============================================================================ */
+
+static void test_workbench_config(void) {
+    workbench_config_t config;
+    workbench_default_config(&config);
+    
+    assert(config.timeout_ms > 0);
+    assert(config.max_output_size > 0);
+    assert(config.redirect_stdout == true);
+    
+    TEST_PASS("workbench_config");
+}
+
+static void test_workbench_create_destroy(void) {
+    workbench_t* wb = workbench_create(NULL);
+    assert(wb != NULL);
+    assert(workbench_get_state(wb) == WORKBENCH_STATE_IDLE);
+    workbench_destroy(wb);
+    
+    TEST_PASS("workbench_create_destroy");
+}
+
+/* ============================================================================
+ * 核心模块测试
+ * ============================================================================ */
+
+static void test_domes_init_cleanup(void) {
+    assert(domes_init(NULL) == DOMES_OK);
+    assert(strcmp(domes_version(), "1.0.0") == 0);
+    domes_cleanup();
+    
+    TEST_PASS("domes_init_cleanup");
+}
+
+static void test_domes_permission(void) {
+    assert(domes_init(NULL) == DOMES_OK);
+    
+    assert(domes_add_permission_rule("test_agent", "read", "/test/*", 1, 100) == DOMES_OK);
+    assert(domes_check_permission("test_agent", "read", "/test/file.txt", NULL) == 1);
+    
+    domes_cleanup();
+    
+    TEST_PASS("domes_permission");
+}
+
+static void test_domes_sanitize(void) {
+    assert(domes_init(NULL) == DOMES_OK);
+    
+    char output[256];
+    assert(domes_sanitize_input("hello", output, sizeof(output)) == DOMES_OK);
+    assert(strcmp(output, "hello") == 0);
+    
+    domes_cleanup();
+    
+    TEST_PASS("domes_sanitize");
+}
+
+/* ============================================================================
+ * 主测试入口
+ * ============================================================================ */
+
+int main(int argc, char* argv[]) {
+    (void)argc;
+    (void)argv;
+    
+    printf("========================================\n");
+    printf("domes Module Unit Tests\n");
+    printf("========================================\n\n");
+    
+    printf("--- Platform Tests ---\n");
+    test_platform_mutex();
+    test_platform_rwlock();
+    test_platform_time();
+    test_platform_atomic();
+    test_platform_string();
+    
+    printf("\n--- Permission Tests ---\n");
+    test_permission_engine();
+    test_permission_cache();
+    
+    printf("\n--- Audit Tests ---\n");
+    test_audit_queue();
+    
+    printf("\n--- Sanitizer Tests ---\n");
     test_sanitizer();
+    test_sanitizer_escape();
     
-    printf("Domes 单元测试完成\n");
+    printf("\n--- Workbench Tests ---\n");
+    test_workbench_config();
+    test_workbench_create_destroy();
+    
+    printf("\n--- Core Tests ---\n");
+    test_domes_init_cleanup();
+    test_domes_permission();
+    test_domes_sanitize();
+    
+    printf("\n========================================\n");
+    printf("All tests passed!\n");
+    printf("========================================\n");
+    
     return 0;
 }

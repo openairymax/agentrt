@@ -1,155 +1,338 @@
 /**
  * @file audit_queue.c
- * @brief 异步队列实现（循环缓冲区 + 条件变量）
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ * @brief 审计日志队列实现 - 线程安全的生产者-消费者队列
+ * @author Spharx
+ * @date 2024
  */
 
 #include "audit_queue.h"
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
-#include <time.h>
 
-audit_queue_t* audit_queue_create(size_t capacity) {
-    if (capacity == 0) return NULL;
-    audit_queue_t* q = (audit_queue_t*)calloc(1, sizeof(audit_queue_t));
-    if (!q) return NULL;
+audit_entry_t* audit_entry_create(audit_event_type_t type,
+                                   const char* agent_id,
+                                   const char* action,
+                                   const char* resource,
+                                   const char* detail,
+                                   int result) {
+    audit_entry_t* entry = (audit_entry_t*)domes_mem_alloc(sizeof(audit_entry_t));
+    if (!entry) return NULL;
+    
+    memset(entry, 0, sizeof(audit_entry_t));
+    
+    entry->timestamp_ms = domes_time_ms();
+    entry->type = type;
+    entry->result = result;
+    
+    if (agent_id) {
+        entry->agent_id = domes_strdup(agent_id);
+        if (!entry->agent_id) goto error;
+    }
+    if (action) {
+        entry->action = domes_strdup(action);
+        if (!entry->action) goto error;
+    }
+    if (resource) {
+        entry->resource = domes_strdup(resource);
+        if (!entry->resource) goto error;
+    }
+    if (detail) {
+        entry->detail = domes_strdup(detail);
+        if (!entry->detail) goto error;
+    }
+    
+    return entry;
+    
+error:
+    audit_entry_destroy(entry);
+    return NULL;
+}
 
-    q->buffer = (char**)calloc(capacity, sizeof(char*));
-    if (!q->buffer) {
-        free(q);
+void audit_entry_destroy(audit_entry_t* entry) {
+    if (!entry) return;
+    
+    domes_mem_free(entry->agent_id);
+    domes_mem_free(entry->action);
+    domes_mem_free(entry->resource);
+    domes_mem_free(entry->detail);
+    domes_mem_free(entry);
+}
+
+audit_queue_t* audit_queue_create(size_t max_size) {
+    audit_queue_t* queue = (audit_queue_t*)domes_mem_alloc(sizeof(audit_queue_t));
+    if (!queue) return NULL;
+    
+    memset(queue, 0, sizeof(audit_queue_t));
+    queue->max_size = max_size;
+    
+    if (domes_mutex_init(&queue->lock) != DOMES_OK) {
+        domes_mem_free(queue);
         return NULL;
     }
-    q->capacity = capacity;
-    pthread_mutex_init(&q->lock, NULL);
-    pthread_cond_init(&q->not_full, NULL);
-    // From data intelligence emerges. by spharx
-    pthread_cond_init(&q->not_empty, NULL);
-    q->shutting_down = 0;
-    return q;
+    
+    if (domes_cond_init(&queue->not_empty) != DOMES_OK) {
+        domes_mutex_destroy(&queue->lock);
+        domes_mem_free(queue);
+        return NULL;
+    }
+    
+    if (domes_cond_init(&queue->not_full) != DOMES_OK) {
+        domes_cond_destroy(&queue->not_empty);
+        domes_mutex_destroy(&queue->lock);
+        domes_mem_free(queue);
+        return NULL;
+    }
+    
+    return queue;
 }
 
-void audit_queue_destroy(audit_queue_t* q) {
-    if (!q) return;
-    pthread_mutex_lock(&q->lock);
-    for (size_t i = 0; i < q->capacity; i++) {
-        if (q->buffer[i]) free(q->buffer[i]);
+void audit_queue_destroy(audit_queue_t* queue) {
+    if (!queue) return;
+    
+    domes_mutex_lock(&queue->lock);
+    queue->shutdown = true;
+    domes_cond_broadcast(&queue->not_empty);
+    domes_cond_broadcast(&queue->not_full);
+    
+    audit_entry_t* entry = queue->head;
+    while (entry) {
+        audit_entry_t* next = entry->next;
+        audit_entry_destroy(entry);
+        entry = next;
     }
-    free(q->buffer);
-    pthread_mutex_unlock(&q->lock);
-    pthread_mutex_destroy(&q->lock);
-    pthread_cond_destroy(&q->not_full);
-    pthread_cond_destroy(&q->not_empty);
-    free(q);
+    
+    domes_mutex_unlock(&queue->lock);
+    
+    domes_cond_destroy(&queue->not_full);
+    domes_cond_destroy(&queue->not_empty);
+    domes_mutex_destroy(&queue->lock);
+    domes_mem_free(queue);
 }
 
-static int timespec_from_timeout(struct timespec* ts, int timeout_ms) {
-    if (timeout_ms < 0) return 0; // 无限等待
-    clock_gettime(CLOCK_REALTIME, ts);
-    ts->tv_sec += timeout_ms / 1000;
-    ts->tv_nsec += (timeout_ms % 1000) * 1000000L;
-    if (ts->tv_nsec >= 1000000000L) {
-        ts->tv_sec += 1;
-        ts->tv_nsec -= 1000000000L;
+int audit_queue_push(audit_queue_t* queue, audit_entry_t* entry) {
+    if (!queue || !entry) return DOMES_ERROR_INVALID_ARG;
+    
+    domes_mutex_lock(&queue->lock);
+    
+    while (queue->max_size > 0 && queue->size >= queue->max_size && !queue->shutdown) {
+        domes_cond_wait(&queue->not_full, &queue->lock);
     }
-    return 1;
-}
-
-int audit_queue_push(audit_queue_t* q, const char* data, int timeout_ms) {
-    if (!q || !data) return -1;
-    char* copy = strdup(data);
-    if (!copy) return -1;
-
-    pthread_mutex_lock(&q->lock);
-    if (q->shutting_down) {
-        pthread_mutex_unlock(&q->lock);
-        free(copy);
-        return -1;
+    
+    if (queue->shutdown) {
+        domes_mutex_unlock(&queue->lock);
+        return DOMES_ERROR_UNKNOWN;
     }
-
-    if (timeout_ms == 0) {
-        if (q->count == q->capacity) {
-            pthread_mutex_unlock(&q->lock);
-            free(copy);
-            return -1;
-        }
-    } else if (timeout_ms > 0) {
-        struct timespec ts;
-        timespec_from_timeout(&ts, timeout_ms);
-        while (q->count == q->capacity && !q->shutting_down) {
-            int ret = pthread_cond_timedwait(&q->not_full, &q->lock, &ts);
-            if (ret == ETIMEDOUT) {
-                pthread_mutex_unlock(&q->lock);
-                free(copy);
-                return -1;
-            }
-        }
+    
+    entry->next = NULL;
+    if (queue->tail) {
+        queue->tail->next = entry;
     } else {
-        while (q->count == q->capacity && !q->shutting_down) {
-            pthread_cond_wait(&q->not_full, &q->lock);
-        }
+        queue->head = entry;
     }
-
-    if (q->shutting_down) {
-        pthread_mutex_unlock(&q->lock);
-        free(copy);
-        return -1;
-    }
-
-    q->buffer[q->tail] = copy;
-    q->tail = (q->tail + 1) % q->capacity;
-    q->count++;
-    pthread_cond_signal(&q->not_empty);
-    pthread_mutex_unlock(&q->lock);
-    return 0;
+    queue->tail = entry;
+    queue->size++;
+    
+    domes_atomic_add64(&queue->total_pushed, 1);
+    
+    domes_cond_signal(&queue->not_empty);
+    domes_mutex_unlock(&queue->lock);
+    
+    return DOMES_OK;
 }
 
-int audit_queue_pop(audit_queue_t* q, char** out_data, int timeout_ms) {
-    if (!q || !out_data) return -1;
-
-    pthread_mutex_lock(&q->lock);
-    if (timeout_ms == 0) {
-        if (q->count == 0) {
-            pthread_mutex_unlock(&q->lock);
-            return -1;
-        }
-    } else if (timeout_ms > 0) {
-        struct timespec ts;
-        timespec_from_timeout(&ts, timeout_ms);
-        while (q->count == 0 && !q->shutting_down) {
-            int ret = pthread_cond_timedwait(&q->not_empty, &q->lock, &ts);
-            if (ret == ETIMEDOUT) {
-                pthread_mutex_unlock(&q->lock);
-                return -1;
-            }
-        }
+int audit_queue_try_push(audit_queue_t* queue, audit_entry_t* entry) {
+    if (!queue || !entry) return DOMES_ERROR_INVALID_ARG;
+    
+    domes_mutex_lock(&queue->lock);
+    
+    if (queue->shutdown) {
+        domes_mutex_unlock(&queue->lock);
+        return DOMES_ERROR_UNKNOWN;
+    }
+    
+    if (queue->max_size > 0 && queue->size >= queue->max_size) {
+        domes_mutex_unlock(&queue->lock);
+        return DOMES_ERROR_WOULD_BLOCK;
+    }
+    
+    entry->next = NULL;
+    if (queue->tail) {
+        queue->tail->next = entry;
     } else {
-        while (q->count == 0 && !q->shutting_down) {
-            pthread_cond_wait(&q->not_empty, &q->lock);
-        }
+        queue->head = entry;
     }
-
-    if (q->count == 0 && q->shutting_down) {
-        pthread_mutex_unlock(&q->lock);
-        return -1;
-    }
-
-    char* data = q->buffer[q->head];
-    q->buffer[q->head] = NULL;
-    q->head = (q->head + 1) % q->capacity;
-    q->count--;
-    pthread_cond_signal(&q->not_full);
-    pthread_mutex_unlock(&q->lock);
-
-    *out_data = data;
-    return 0;
+    queue->tail = entry;
+    queue->size++;
+    
+    domes_atomic_add64(&queue->total_pushed, 1);
+    
+    domes_cond_signal(&queue->not_empty);
+    domes_mutex_unlock(&queue->lock);
+    
+    return DOMES_OK;
 }
 
-void audit_queue_shutdown(audit_queue_t* q) {
-    if (!q) return;
-    pthread_mutex_lock(&q->lock);
-    q->shutting_down = 1;
-    pthread_cond_broadcast(&q->not_empty);
-    pthread_cond_broadcast(&q->not_full);
-    pthread_mutex_unlock(&q->lock);
+int audit_queue_pop(audit_queue_t* queue, audit_entry_t** entry) {
+    if (!queue || !entry) return DOMES_ERROR_INVALID_ARG;
+    
+    domes_mutex_lock(&queue->lock);
+    
+    while (queue->size == 0 && !queue->shutdown) {
+        domes_cond_wait(&queue->not_empty, &queue->lock);
+    }
+    
+    if (queue->size == 0) {
+        domes_mutex_unlock(&queue->lock);
+        return DOMES_ERROR_UNKNOWN;
+    }
+    
+    *entry = queue->head;
+    queue->head = (*entry)->next;
+    if (!queue->head) {
+        queue->tail = NULL;
+    }
+    queue->size--;
+    
+    domes_atomic_add64(&queue->total_popped, 1);
+    
+    domes_cond_signal(&queue->not_full);
+    domes_mutex_unlock(&queue->lock);
+    
+    return DOMES_OK;
+}
+
+int audit_queue_timed_pop(audit_queue_t* queue, audit_entry_t** entry, uint32_t timeout_ms) {
+    if (!queue || !entry) return DOMES_ERROR_INVALID_ARG;
+    
+    domes_mutex_lock(&queue->lock);
+    
+    while (queue->size == 0 && !queue->shutdown) {
+        int ret = domes_cond_timedwait(&queue->not_empty, &queue->lock, timeout_ms);
+        if (ret == DOMES_ERROR_TIMEOUT) {
+            domes_mutex_unlock(&queue->lock);
+            return DOMES_ERROR_TIMEOUT;
+        }
+    }
+    
+    if (queue->size == 0) {
+        domes_mutex_unlock(&queue->lock);
+        return DOMES_ERROR_UNKNOWN;
+    }
+    
+    *entry = queue->head;
+    queue->head = (*entry)->next;
+    if (!queue->head) {
+        queue->tail = NULL;
+    }
+    queue->size--;
+    
+    domes_atomic_add64(&queue->total_popped, 1);
+    
+    domes_cond_signal(&queue->not_full);
+    domes_mutex_unlock(&queue->lock);
+    
+    return DOMES_OK;
+}
+
+int audit_queue_try_pop(audit_queue_t* queue, audit_entry_t** entry) {
+    if (!queue || !entry) return DOMES_ERROR_INVALID_ARG;
+    
+    domes_mutex_lock(&queue->lock);
+    
+    if (queue->size == 0) {
+        domes_mutex_unlock(&queue->lock);
+        return DOMES_ERROR_WOULD_BLOCK;
+    }
+    
+    *entry = queue->head;
+    queue->head = (*entry)->next;
+    if (!queue->head) {
+        queue->tail = NULL;
+    }
+    queue->size--;
+    
+    domes_atomic_add64(&queue->total_popped, 1);
+    
+    domes_cond_signal(&queue->not_full);
+    domes_mutex_unlock(&queue->lock);
+    
+    return DOMES_OK;
+}
+
+int audit_queue_pop_batch(audit_queue_t* queue, audit_entry_t** entries, 
+                           size_t max_count, size_t* actual_count) {
+    if (!queue || !entries || !actual_count) return DOMES_ERROR_INVALID_ARG;
+    
+    domes_mutex_lock(&queue->lock);
+    
+    while (queue->size == 0 && !queue->shutdown) {
+        domes_cond_wait(&queue->not_empty, &queue->lock);
+    }
+    
+    if (queue->size == 0) {
+        *actual_count = 0;
+        domes_mutex_unlock(&queue->lock);
+        return DOMES_ERROR_UNKNOWN;
+    }
+    
+    size_t count = 0;
+    while (count < max_count && queue->head) {
+        entries[count] = queue->head;
+        queue->head = entries[count]->next;
+        count++;
+        queue->size--;
+        domes_atomic_add64(&queue->total_popped, 1);
+    }
+    
+    if (!queue->head) {
+        queue->tail = NULL;
+    }
+    
+    *actual_count = count;
+    
+    domes_cond_broadcast(&queue->not_full);
+    domes_mutex_unlock(&queue->lock);
+    
+    return DOMES_OK;
+}
+
+void audit_queue_shutdown(audit_queue_t* queue, bool wait_empty) {
+    if (!queue) return;
+    
+    domes_mutex_lock(&queue->lock);
+    
+    if (wait_empty) {
+        while (queue->size > 0) {
+            domes_cond_broadcast(&queue->not_empty);
+            domes_mutex_unlock(&queue->lock);
+            domes_sleep_ms(10);
+            domes_mutex_lock(&queue->lock);
+        }
+    }
+    
+    queue->shutdown = true;
+    domes_cond_broadcast(&queue->not_empty);
+    domes_cond_broadcast(&queue->not_full);
+    domes_mutex_unlock(&queue->lock);
+}
+
+size_t audit_queue_size(audit_queue_t* queue) {
+    if (!queue) return 0;
+    
+    domes_mutex_lock(&queue->lock);
+    size_t size = queue->size;
+    domes_mutex_unlock(&queue->lock);
+    
+    return size;
+}
+
+void audit_queue_stats(audit_queue_t* queue, uint64_t* total_pushed, uint64_t* total_popped) {
+    if (!queue) {
+        if (total_pushed) *total_pushed = 0;
+        if (total_popped) *total_popped = 0;
+        return;
+    }
+    
+    if (total_pushed) *total_pushed = domes_atomic_load64(&queue->total_pushed);
+    if (total_popped) *total_popped = domes_atomic_load64(&queue->total_popped);
 }

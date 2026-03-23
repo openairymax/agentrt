@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentos.spharx.ai/schemas/sanitizer-rules-v1.schema.json",
+  "title": "AgentOS Sanitizer Rules Schema",
+  "description": "Configuration schema for input sanitization and security filtering rules",
+  "type": "object",
+  "required": ["_config_version", "rules"],
+  "properties": {
+    "_config_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Configuration file version"
+    },
+    "_metadata": {
+      "type": "object",
+      "properties": {
+        "last_updated": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "source": {
+          "type": "string",
+          "description": "Rules source (e.g., OWASP, custom)"
+        }
+      }
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["rule_id", "type", "pattern", "description"],
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*_\\d{3}$",
+            "description": "Unique rule identifier (e.g., XSS_SCRIPT_001)"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["block", "warn", "sanitize", "audit"],
+            "description": "Rule action type"
+          },
+          "pattern": {
+            "type": "string",
+            "description": "Regex pattern to match"
+          },
+          "replace": {
+            "type": "string",
+            "description": "Replacement string for sanitize type"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500,
+            "description": "Human-readable description"
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000,
+            "default": 50,
+            "description": "Rule evaluation priority"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"],
+            "default": "medium",
+            "description": "Rule severity level"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "xss", "sql_injection", "path_traversal", "command_injection",
+              "pii", "sensitive_data", "prompt_injection", "malware", "other"
+            ],
+            "description": "Vulnerability category"
+          },
+          "cwe": {
+            "type": "string",
+            "pattern": "^CWE-\\d+$",
+            "description": "CWE identifier (e.g., CWE-79)"
+          },
+          "owasp": {
+            "type": "string",
+            "description": "OWASP Top 10 category"
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether rule is enabled"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Rule creation timestamp"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last update timestamp"
+          },
+          "examples": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "input": {
+                  "type": "string",
+                  "description": "Example malicious input"
+                },
+                "output": {
+                  "type": "string",
+                  "description": "Expected output after sanitization"
+                }
+              }
+            },
+            "description": "Example inputs and outputs"
+          }
+        }
+      }
+    },
+    "settings": {
+      "type": "object",
+      "properties": {
+        "max_input_length": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 10000000,
+          "default": 100000,
+          "description": "Maximum input length in characters"
+        },
+        "max_recursion_depth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 10,
+          "description": "Maximum recursion depth for nested patterns"
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 10000,
+          "default": 1000,
+          "description": "Sanitization timeout in milliseconds"
+        },
+        "log_all_matches": {
+          "type": "boolean",
+          "default": false,
+          "description": "Log all pattern matches"
+        },
+        "fail_closed": {
+          "type": "boolean",
+          "default": true,
+          "description": "Block input on sanitization error"
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

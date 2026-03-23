@@ -1,261 +1,321 @@
-# AgentOS 配置中心
+# AgentOS 配置模块
 
-**版本**: v1.0.0.6  
-**最后更新**: 2026-03-18  
-
----
-
-## 📋 概述
-
-`config/` 目录包含 AgentOS 的所有配置文件，采用 YAML 和 JSON 格式，按功能模块分类组织。
+> **版本**: v1.0.0  
+> **最后更新**: 2026-03-23  
+> **版权**: Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 ---
 
-## 📁 目录结构
+## 概述
+
+AgentOS 配置模块提供了完整的、生产级的配置管理解决方案。遵循 AgentOS 的设计哲学，配置系统具有以下特点：
+
+- **Schema 验证**：所有配置文件都有对应的 JSON Schema，确保配置正确性
+- **跨平台支持**：使用环境变量实现跨平台路径配置
+- **多环境支持**：支持开发、预发布、生产环境的配置覆盖
+- **热更新**：支持配置热更新，无需重启服务
+- **安全内生**：敏感配置加密、权限最小化、审计追踪
+
+---
+
+## 目录结构
 
 ```
 config/
-├── README.md                    # 本文件
-├── agents/                      # Agent 配置
-│   ├── registry.yaml           # Agent 注册表
-│   └── profiles/               # Agent 配置文件
-│       └── *.yaml              # 各 Agent 配置
+├── README.md                    # 本文档
+├── .env.template               # 环境变量模板
+├── config_management.yaml      # 配置管理（热更新、版本控制、加密）
 │
-├── kernel/                      # 内核配置
-│   └── settings.yaml           # 内核参数（日志、调度器、内存、IPC）
-<!-- From data intelligence emerges. by spharx -->
+├── schema/                     # JSON Schema 验证文件
+│   ├── kernel-settings.schema.json
+│   ├── model.schema.json
+│   ├── agent-registry.schema.json
+│   ├── security-policy.schema.json
+│   ├── sanitizer-rules.schema.json
+│   ├── logging.schema.json
+│   └── skill-registry.schema.json
 │
-├── logging/                     # 日志配置
-│   └── config.yaml             # 日志级别、格式、输出目标
+├── environment/                # 多环境配置覆盖
+│   ├── development.yaml        # 开发环境
+│   ├── staging.yaml            # 预发布环境
+│   └── production.yaml         # 生产环境
 │
-├── models/                      # 模型配置
-│   └── models.yaml             # LLM 模型配置（API 密钥、端点）
+├── kernel/                     # 内核配置
+│   └── settings.yaml           # 内核设置
 │
-├── sanitizer/                   # 净化器配置
-│   └── sanitizer_rules.json    # 沙箱规则配置
+├── model/                      # 模型配置
+│   └── model.yaml              # LLM 模型配置
 │
-├── security/                    # 安全配置
+├── agent/                      # Agent 配置
+│   └── registry.yaml           # Agent 注册表
+│
+├── skill/                      # 技能配置
+│   └── registry.yaml           # 技能注册表
+│
+├── security/                   # 安全配置
 │   ├── policy.yaml             # 安全策略
-│   └── permission_rules.yaml   # RBAC 权限模型配置
+│   └── permission_rules.yaml   # 权限规则
 │
-├── services/                    # 服务配置
-│   ├── llm_d/                  # LLM 服务配置
-│   ├── market_d/               # 市场服务配置
-│   ├── monit_d/                # 监控服务配置
-│   ├── perm_d/                 # 权限服务配置
-│   ├── sched_d/                # 调度服务配置
-│   └── tool_d/                 # 工具服务配置
+├── sanitizer/                  # 净化器配置
+│   └── sanitizer_rules.json    # 净化规则
 │
-└── skills/                      # 技能配置
-    └── registry.yaml           # 技能注册表配置
+├── logging/                    # 日志配置
+│   └── config.yaml             # 日志设置
+│
+└── service/                    # 服务配置
+    └── tool_d/
+        └── tool.yaml           # Tool Daemon 配置
 ```
 
 ---
 
-## ⚙️ 配置说明
+## 快速开始
 
-### agents/registry.yaml
+### 1. 配置环境变量
 
-Agent 注册表配置，定义所有可用 Agent 的元数据：
+```bash
+# 复制环境变量模板
+cp config/.env.template .env
 
-```yaml
-version: "1.0"
-agents:
-  - id: architect_001
-    name: 架构师智能体
-    type: planning
-    version: "1.0.0"
-    capabilities:
-      - system_design
-      - architecture_review
-    config_path: "profiles/architect.yaml"
-    
-  - id: backend_dev_001
-    name: 后端开发智能体
-    type: execution
-    version: "1.0.0"
-    capabilities:
-      - api_design
-      - database_design
+# 编辑环境变量
+vim .env
+
+# 设置必要的 API 密钥
+export OPENAI_API_KEY="sk-your-key-here"
+export ANTHROPIC_API_KEY="sk-ant-your-key-here"
 ```
 
-### kernel/settings.yaml
+### 2. 选择运行环境
 
-内核全局配置：
+```bash
+# 设置运行环境
+export AGENTOS_ENV=development  # 或 staging, production
+```
+
+### 3. 验证配置
+
+```bash
+# 使用 JSON Schema 验证配置
+python scripts/validate_config.py --config config/ --schema config/schema/
+```
+
+---
+
+## 配置说明
+
+### 内核配置 (kernel/settings.yaml)
+
+内核配置控制 AgentOS 微内核的核心行为：
 
 ```yaml
 kernel:
-  log_level: INFO
+  log_level: "info"
+  
   scheduler:
-    algorithm: weighted_round_robin
-    time_slice_ms: 10
+    policy: "weighted"
+    max_concurrency: 100
+    
   memory:
-    pool_size_mb: 512
-    max_allocation_mb: 1024
+    pool_size_mb: 1024
+    oom_policy: "reject"
+    
   ipc:
     max_connections: 1024
-    buffer_size_kb: 64
+    encryption: "tls13"
 ```
 
-### logging/config.yaml
+### 模型配置 (model/model.yaml)
 
-统一日志配置：
-
-```yaml
-logging:
-  default_level: INFO
-  format: "%(asctime)s.%(msecs)03d [%(levelname)s] [%(name)s] %(message)s"
-  
-  outputs:
-    - type: file
-      path: "../partdata/logs/agentos.log"
-      max_size_mb: 100
-      backup_count: 7
-      
-    - type: console
-      enabled: true
-      
-  modules:
-    atoms: DEBUG
-    backs: INFO
-    domes: WARN
-```
-
-### models/models.yaml
-
-LLM 模型配置：
+模型配置支持多提供商、重试、熔断、降级：
 
 ```yaml
 models:
-  openai:
-    provider: openai
-    api_key: "${OPENAI_API_KEY}"
-    api_base: https://api.openai.com/v1
-    default_model: gpt-4
-    timeout_sec: 30
+  - name: "gpt-4-turbo"
+    provider: "openai"
+    api_key_env: "OPENAI_API_KEY"
     
-  deepseek:
-    provider: deepseek
-    api_key: "${DEEPSEEK_API_KEY}"
-    api_base: https://api.deepseek.com
-    default_model: deepseek-chat
-    timeout_sec: 30
+    retry:
+      max_attempts: 3
+      backoff_ms: 100
+      
+    circuit_breaker:
+      enabled: true
+      failure_threshold: 5
+      
+    fallback:
+      enabled: true
+      fallback_model: "gpt-3.5-turbo"
 ```
 
-### services/llm_d/config.yaml
+### 安全配置 (security/)
 
-LLM 服务配置：
+安全配置包含策略和权限规则：
 
 ```yaml
-service:
-  name: llm_d
-  listen_addr: "0.0.0.0:18791"
-  log_level: INFO
+security:
+  default_policy: "deny"
   
-providers:
-  - name: openai
-    enabled: true
-    api_key: "${OPENAI_API_KEY}"
-    rate_limit_per_min: 100
+  sandbox:
+    isolation_type: "process"
+    memory_limit_mb: 512
     
-  - name: anthropic
-    enabled: true
-    api_key: "${ANTHROPIC_API_KEY}"
-    
-cache:
-  enabled: true
-  ttl_hours: 24
-  max_size_mb: 512
+  audit:
+    retention_days: 90
 ```
 
----
+### 净化规则 (sanitizer/sanitizer_rules.json)
 
-## 🔧 使用方法
+净化规则用于输入验证和安全过滤：
 
-### 加载配置
-
-#### C 语言
-
-```c
-#include <agentos/config.h>
-
-agentos_config_t* config;
-int ret = agentos_config_load("config/kernel/settings.yaml", &config);
-if (ret == 0) {
-    const char* log_level = agentos_config_get(config, "kernel.log_level");
-    // ...
-    agentos_config_free(config);
+```json
+{
+  "rules": [
+    {
+      "rule_id": "XSS_SCRIPT_001",
+      "type": "block",
+      "pattern": "<script[^>]*>.*?</script>",
+      "severity": "critical",
+      "category": "xss"
+    }
+  ]
 }
 ```
 
-#### Python
+---
 
-```python
-from agentos import Config
+## 多环境配置
 
-config = Config.load("config/services/llm_d/config.yaml")
-print(f"Service: {config.service.name}")
-print(f"Listen: {config.service.listen_addr}")
-```
+配置系统支持三层配置合并：
 
-### 环境变量替换
+1. **基础配置**：`config/` 目录下的配置文件
+2. **环境覆盖**：`config/environment/{env}.yaml`
+3. **环境变量**：运行时环境变量
 
-配置文件支持环境变量替换，使用 `${VAR_NAME}` 语法：
+配置合并优先级：环境变量 > 环境覆盖 > 基础配置
+
+### 环境差异
+
+| 配置项 | 开发环境 | 预发布环境 | 生产环境 |
+|--------|---------|-----------|---------|
+| 日志级别 | debug | info | warning |
+| 沙箱隔离 | none | process | container |
+| 审计保留 | 7 天 | 30 天 | 90 天 |
+| 配置热更新 | 10s | 30s | 60s |
+
+---
+
+## 配置热更新
+
+启用配置热更新后，系统会自动检测配置文件变化并重新加载：
 
 ```yaml
-database:
-  host: ${DB_HOST}
-  port: ${DB_PORT:-5432}  # 支持默认值
+hot_reload:
+  enabled: true
+  check_interval_sec: 30
+  supported_paths:
+    - "kernel.log_level"
+    - "security.rules"
+```
+
+支持热更新的配置项：
+- 日志级别
+- 调度器优先级权重
+- 安全规则
+- 审计告警配置
+
+---
+
+## Schema 验证
+
+所有配置文件都有对应的 JSON Schema，用于验证配置正确性：
+
+```bash
+# 验证单个配置文件
+python scripts/validate_config.py \
+  --file config/kernel/settings.yaml \
+  --schema config/schema/kernel-settings.schema.json
+
+# 验证所有配置
+python scripts/validate_config.py --all
 ```
 
 ---
 
-## 📖 最佳实践
+## 安全最佳实践
 
 ### 1. 敏感信息管理
 
-- ✅ 使用环境变量存储 API 密钥
-- ✅ 生产环境使用加密配置
-- ❌ 禁止将密钥直接写入配置文件
+- 使用环境变量存储 API 密钥
+- 启用配置加密功能
+- 定期轮换密钥
 
-### 2. 配置分层
+### 2. 权限最小化
 
-- **基础配置**: 放在 `config/` 目录
-- **环境配置**: 使用 `.env` 文件或环境变量
-- **运行时配置**: 通过 API 动态调整
+- 默认拒绝所有操作
+- 仅授予必要的权限
+- 启用审计日志
 
-### 3. 版本控制
+### 3. 网络安全
 
-- ✅ 配置文件模板纳入版本控制
-- ✅ 提供 `.example` 或 `.template` 文件
-- ❌ 不包含真实密钥的配置
+- 限制出站网络连接
+- 使用 TLS 加密 IPC
+- 启用入侵检测
 
 ---
 
-## 🔍 配置验证
+## 配置变更审计
 
-使用提供的验证脚本检查配置文件：
+所有配置变更都会被记录到审计日志：
 
-```bash
-# 验证所有配置
-python scripts/validate_contracts.py
-
-# 验证单个配置
-python -c "from agentos import Config; Config.load('config/xxx.yaml')"
+```
+${AGENTOS_LOG_DIR}/config-audit.log
 ```
 
----
-
-## 📚 相关文档
-
-- [部署指南](../partdocs/guides/deployment.md) - 生产环境配置
-- [内核调优](../partdocs/guides/kernel_tuning.md) - 性能优化
-- [故障排查](../partdocs/guides/troubleshooting.md) - 常见问题
+审计事件包括：
+- `config.load` - 配置加载
+- `config.reload` - 配置重载
+- `config.change` - 配置变更
+- `config.rollback` - 配置回滚
 
 ---
 
-**Apache License 2.0 © 2026 SPHARX**
+## 故障排除
+
+### 配置验证失败
+
+```bash
+# 检查配置文件语法
+python -c "import yaml; yaml.safe_load(open('config/kernel/settings.yaml'))"
+
+# 检查环境变量
+echo $AGENTOS_ROOT
+echo $AGENTOS_DATA_DIR
+```
+
+### 热更新不生效
+
+1. 检查 `hot_reload.enabled` 是否为 `true`
+2. 确认配置项在 `supported_paths` 中
+3. 检查文件权限
+
+### 权限被拒绝
+
+1. 检查 `security/policy.yaml` 中的规则
+2. 确认 Agent 有对应的权限
+3. 查看审计日志了解拒绝原因
 
 ---
 
-© 2026 SPHARX Ltd. 保留所有权利。
+## 版本历史
+
+| 版本 | 日期 | 变更说明 |
+|------|------|---------|
+| v1.0.0 | 2026-03-23 | 初始版本，完整的生产级配置 |
+
+---
+
+## 参考文档
+
+- [AgentOS 架构设计](../partdocs/architecture/)
+- [AgentOS 编码规范](../partdocs/specifications/coding_standard/)
+- [AgentOS 安全策略](../partdocs/specifications/security/)
