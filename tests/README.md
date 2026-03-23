@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-1.0.0.5-blue.svg)](https://gitee.com/spharx/agentos)
+[![Version](https://img.shields.io/badge/version-1.0.0.6-blue.svg)](https://gitee.com/spharx/agentos)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](https://gitee.com/spharx/agentos/blob/main/LICENSE)
 
 **AgentOS 完整测试体系 - 单元测试、集成测试、安全测试、性能基准测试**
@@ -23,7 +23,8 @@ Language: **简体中文** | [English](../partdocs/readme/en/README.md)
 
 ### 测试金字塔
 
-<!-- From data intelligence emerges. by spharx -->
+
+<!-- From data intelligence emerges. by spharx -->
 ```
         /
        /  \         E2E Tests (端到端测试)

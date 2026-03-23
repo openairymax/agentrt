@@ -43,7 +43,7 @@ class Session:
         """
         try:
             data = {"key": key, "value": value}
-            response = self.client._request("POST", f"/api/sessions/{self.session_id}/context", data)
+            response = self.client._request("POST", f"/api/v1/sessions/{self.session_id}/context", data)
             return response.get("success", False)
         except Exception as e:
             raise SessionError(f"Error setting session context: {str(e)}")
@@ -64,7 +64,7 @@ class Session:
         """
         try:
             data = {"key": key, "value": value}
-            response = await self.client._request("POST", f"/api/sessions/{self.session_id}/context", data)
+            response = await self.client._request("POST", f"/api/v1/sessions/{self.session_id}/context", data)
             return response.get("success", False)
         except Exception as e:
             raise SessionError(f"Error setting session context: {str(e)}")
@@ -83,7 +83,7 @@ class Session:
             SessionError: If there's an error getting the context.
         """
         try:
-            response = self.client._request("GET", f"/api/sessions/{self.session_id}/context/{key}")
+            response = self.client._request("GET", f"/api/v1/sessions/{self.session_id}/context/{key}")
             return response.get("value")
         except Exception as e:
             raise SessionError(f"Error getting session context: {str(e)}")
@@ -102,7 +102,7 @@ class Session:
             SessionError: If there's an error getting the context.
         """
         try:
-            response = await self.client._request("GET", f"/api/sessions/{self.session_id}/context/{key}")
+            response = await self.client._request("GET", f"/api/v1/sessions/{self.session_id}/context/{key}")
             return response.get("value")
         except Exception as e:
             raise SessionError(f"Error getting session context: {str(e)}")
@@ -118,7 +118,7 @@ class Session:
             SessionError: If there's an error closing the session.
         """
         try:
-            response = self.client._request("DELETE", f"/api/sessions/{self.session_id}")
+            response = self.client._request("DELETE", f"/api/v1/sessions/{self.session_id}")
             return response.get("success", False)
         except Exception as e:
             raise SessionError(f"Error closing session: {str(e)}")
@@ -134,7 +134,7 @@ class Session:
             SessionError: If there's an error closing the session.
         """
         try:
-            response = await self.client._request("DELETE", f"/api/sessions/{self.session_id}")
+            response = await self.client._request("DELETE", f"/api/v1/sessions/{self.session_id}")
             return response.get("success", False)
         except Exception as e:
             raise SessionError(f"Error closing session: {str(e)}")

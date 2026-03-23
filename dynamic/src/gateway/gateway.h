@@ -1,39 +1,125 @@
 /**
  * @file gateway.h
- * @brief 网关抽象基类
+ * @brief 网关抽象接口
+ * 
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#ifndef BASERUNTIME_GATEWAY_H
-#define BASERUNTIME_GATEWAY_H
+#ifndef DYNAMIC_GATEWAY_H
+#define DYNAMIC_GATEWAY_H
 
-typedef struct gateway gateway_t;
+#include "agentos.h"
+#include <stddef.h>
+#include <stdint.h>
+
+/* 前向声明 */
+struct dynamic_server;
+typedef struct dynamic_server dynamic_server_t;
 
 /**
  * @brief 网关操作表
  */
 typedef struct gateway_ops {
-    int  (*start)(gateway_t* gw);
-    void (*stop)(gateway_t* gw);
-    void (*destroy)(gateway_t* gw);
+    /**
+     * @brief 启动网关
+     * @param gateway 网关实例
+     * @return AGENTOS_SUCCESS 成功
+     */
+    agentos_error_t (*start)(void* gateway);
+    
+    /**
+     * @brief 停止网关
+     * @param gateway 网关实例
+     */
+    void (*stop)(void* gateway);
+    
+    /**
+     * @brief 销毁网关
+     * @param gateway 网关实例
+     */
+    void (*destroy)(void* gateway);
+    
+    /**
+     * @brief 获取网关名称
+     * @param gateway 网关实例
+     * @return 名称字符串
+     */
+    const char* (*get_name)(void* gateway);
+    
+    /**
+     * @brief 获取网关统计信息
+     * @param gateway 网关实例
+     * @param out_json 输出 JSON 字符串（需调用者 free）
+     * @return AGENTOS_SUCCESS 成功
+     */
+    agentos_error_t (*get_stats)(void* gateway, char** out_json);
 } gateway_ops_t;
 
 /**
- * @brief 网关基类（包含 ops 指针）
+ * @brief 网关基类结构
  */
-struct gateway {
-    const gateway_ops_t* ops;
-};
-// From data intelligence emerges. by spharx
+typedef struct gateway {
+    const gateway_ops_t*  ops;            /**< 操作表 */
+    dynamic_server_t*     server;         /**< 服务器引用 */
+    void*                 impl;           /**< 具体实现数据 */
+} gateway_t;
 
-static inline int gateway_start(gateway_t* gw) {
-    if (!gw || !gw->ops || !gw->ops->start) return -1;
-    return gw->ops->start(gw);
-}
-static inline void gateway_stop(gateway_t* gw) {
-    if (gw && gw->ops && gw->ops->stop) gw->ops->stop(gw);
-}
-static inline void gateway_destroy(gateway_t* gw) {
-    if (gw && gw->ops && gw->ops->destroy) gw->ops->destroy(gw);
+/**
+ * @brief 启动网关
+ * @param gateway 网关实例
+ * @return AGENTOS_SUCCESS 成功
+ */
+static inline agentos_error_t gateway_start(gateway_t* gateway) {
+    if (!gateway || !gateway->ops || !gateway->ops->start) {
+        return AGENTOS_EINVAL;
+    }
+    return gateway->ops->start(gateway->impl);
 }
 
-#endif /* HABITAT_GATEWAY_H */
+/**
+ * @brief 停止网关
+ * @param gateway 网关实例
+ */
+static inline void gateway_stop(gateway_t* gateway) {
+    if (gateway && gateway->ops && gateway->ops->stop) {
+        gateway->ops->stop(gateway->impl);
+    }
+}
+
+/**
+ * @brief 销毁网关
+ * @param gateway 网关实例
+ */
+static inline void gateway_destroy(gateway_t* gateway) {
+    if (gateway && gateway->ops && gateway->ops->destroy) {
+        gateway->ops->destroy(gateway->impl);
+        free(gateway);
+    }
+}
+
+/**
+ * @brief 获取网关名称
+ * @param gateway 网关实例
+ * @return 名称字符串
+ */
+static inline const char* gateway_get_name(gateway_t* gateway) {
+    if (!gateway || !gateway->ops || !gateway->ops->get_name) {
+        return "unknown";
+    }
+    return gateway->ops->get_name(gateway->impl);
+}
+
+/**
+ * @brief 获取网关统计信息
+ * @param gateway 网关实例
+ * @param out_json 输出 JSON 字符串
+ * @return AGENTOS_SUCCESS 成功
+ */
+static inline agentos_error_t gateway_get_stats(gateway_t* gateway, char** out_json) {
+    if (!gateway || !gateway->ops || !gateway->ops->get_stats) {
+        return AGENTOS_EINVAL;
+    }
+    return gateway->ops->get_stats(gateway->impl, out_json);
+}
+
+#endif /* DYNAMIC_GATEWAY_H */

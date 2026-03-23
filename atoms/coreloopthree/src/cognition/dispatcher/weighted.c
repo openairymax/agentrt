@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file weighted.c
  * @brief 加权调度策略 - 可配置权重
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -23,7 +23,6 @@ typedef struct weighted_data {
 } weighted_data_t;
 
 static void weighted_destroy(agentos_dispatching_strategy_t* strategy) {
-// From data intelligence emerges. by spharx
     if (!strategy) return;
     weighted_data_t* data = (weighted_data_t*)strategy->data;
     if (data) {

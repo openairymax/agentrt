@@ -43,7 +43,7 @@ class Skill:
         """
         try:
             data = {"parameters": parameters or {}}
-            response = self.client._request("POST", f"/api/skills/{self.skill_name}/execute", data)
+            response = self.client._request("POST", f"/api/v1/skills/{self.skill_name}/execute", data)
             return SkillResult(
                 success=response.get("success", False),
                 output=response.get("output"),
@@ -67,7 +67,7 @@ class Skill:
         """
         try:
             data = {"parameters": parameters or {}}
-            response = await self.client._request("POST", f"/api/skills/{self.skill_name}/execute", data)
+            response = await self.client._request("POST", f"/api/v1/skills/{self.skill_name}/execute", data)
             return SkillResult(
                 success=response.get("success", False),
                 output=response.get("output"),
@@ -87,7 +87,7 @@ class Skill:
             SkillError: If there's an error getting the skill information.
         """
         try:
-            response = self.client._request("GET", f"/api/skills/{self.skill_name}")
+            response = self.client._request("GET", f"/api/v1/skills/{self.skill_name}")
             return SkillInfo(
                 skill_name=self.skill_name,
                 description=response.get("description", ""),
@@ -108,7 +108,7 @@ class Skill:
             SkillError: If there's an error getting the skill information.
         """
         try:
-            response = await self.client._request("GET", f"/api/skills/{self.skill_name}")
+            response = await self.client._request("GET", f"/api/v1/skills/{self.skill_name}")
             return SkillInfo(
                 skill_name=self.skill_name,
                 description=response.get("description", ""),

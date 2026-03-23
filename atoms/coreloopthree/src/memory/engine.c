@@ -1,6 +1,6 @@
 /**
  * @file engine.c
- * @brief 记忆引擎实现，封装 MemoryRovol 接口（添加健康检查）
+ * @brief 记忆引擎实现，封装 MemoryRovol 接口
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -16,16 +16,20 @@ struct agentos_memory_engine {
     char* config_path;
 };
 
+/**
+ * @brief 创建记忆引擎
+ * @param config_path 配置文件路径（可为 NULL）
+ * @param out_engine 输出引擎指针
+ * @return AGENTOS_SUCCESS 或错误码
+ */
 agentos_error_t agentos_memory_create(
     const char* config_path,
     agentos_memory_engine_t** out_engine) {
 
     if (!out_engine) return AGENTOS_EINVAL;
 
-    agentos_memory_engine_t* engine = (agentos_memory_engine_t*)malloc(sizeof(agentos_memory_engine_t));
-    // From data intelligence emerges. by spharx
+    agentos_memory_engine_t* engine = (agentos_memory_engine_t*)calloc(1, sizeof(agentos_memory_engine_t));
     if (!engine) return AGENTOS_ENOMEM;
-    memset(engine, 0, sizeof(agentos_memory_engine_t));
 
     if (config_path) {
         engine->config_path = strdup(config_path);
@@ -54,11 +58,15 @@ agentos_error_t agentos_memory_create(
     return AGENTOS_SUCCESS;
 }
 
+/**
+ * @brief 销毁记忆引擎
+ */
 void agentos_memory_destroy(agentos_memory_engine_t* engine) {
     if (!engine) return;
     agentos_mutex_lock(engine->lock);
     if (engine->rov_handle) {
         agentos_memoryrov_destroy(engine->rov_handle);
+        engine->rov_handle = NULL;
     }
     agentos_mutex_unlock(engine->lock);
     agentos_mutex_destroy(engine->lock);
@@ -66,14 +74,21 @@ void agentos_memory_destroy(agentos_memory_engine_t* engine) {
     free(engine);
 }
 
+/**
+ * @brief 写入记忆记录
+ * @param engine 记忆引擎
+ * @param record 记录数据
+ * @param out_record_id 输出记录ID（需调用者释放）
+ * @return AGENTOS_SUCCESS 或错误码
+ */
 agentos_error_t agentos_memory_write(
     agentos_memory_engine_t* engine,
     const agentos_memory_record_t* record,
     char** out_record_id) {
 
-    if (!engine || !record || !out_record) return AGENTOS_EINVAL;
+    if (!engine || !record || !out_record_id) return AGENTOS_EINVAL;
 
-    char metadata[512];
+    char metadata[1024];
     int len = snprintf(metadata, sizeof(metadata),
         "{\"source\":\"%s\",\"trace\":\"%s\",\"type\":%d}",
         record->source_agent ? record->source_agent : "",
@@ -84,14 +99,25 @@ agentos_error_t agentos_memory_write(
         return AGENTOS_EOVERFLOW;
     }
 
-    return agentos_memoryrov_write_raw(
+    agentos_mutex_lock(engine->lock);
+    agentos_error_t err = agentos_memoryrov_write_raw(
         engine->rov_handle,
         record->data,
         record->data_len,
         metadata,
         out_record_id);
+    agentos_mutex_unlock(engine->lock);
+
+    return err;
 }
 
+/**
+ * @brief 查询记忆
+ * @param engine 记忆引擎
+ * @param query 查询条件
+ * @param out_result 输出查询结果（需调用 agentos_memory_result_free 释放）
+ * @return AGENTOS_SUCCESS 或错误码
+ */
 agentos_error_t agentos_memory_query(
     agentos_memory_engine_t* engine,
     const agentos_memory_query_t* query,
@@ -101,51 +127,52 @@ agentos_error_t agentos_memory_query(
 
     char** results = NULL;
     size_t count = 0;
+
+    agentos_mutex_lock(engine->lock);
     agentos_error_t err = agentos_memoryrov_query(
         engine->rov_handle,
         query->text,
         query->limit,
         &results,
         &count);
+    agentos_mutex_unlock(engine->lock);
 
     if (err != AGENTOS_SUCCESS) return err;
 
-    agentos_memory_result_t* res = (agentos_memory_result_t*)malloc(sizeof(agentos_memory_result_t));
+    agentos_memory_result_t* res = (agentos_memory_result_t*)calloc(1, sizeof(agentos_memory_result_t));
     if (!res) {
         for (size_t i = 0; i < count; i++) free(results[i]);
         free(results);
         return AGENTOS_ENOMEM;
     }
-    memset(res, 0, sizeof(agentos_memory_result_t));
 
-    res->items = (agentos_memory_result_item_t**)malloc(count * sizeof(agentos_memory_result_item_t*));
-    if (!res->items) {
-        for (size_t i = 0; i < count; i++) free(results[i]);
-        free(results);
-        free(res);
-        return AGENTOS_ENOMEM;
-    }
-
-    for (size_t i = 0; i < count; i++) {
-        res->items[i] = (agentos_memory_result_item_t*)malloc(sizeof(agentos_memory_result_item_t));
-        if (!res->items[i]) {
-            for (size_t j = 0; j < i; j++) {
-                free(res->items[j]->record_id);
-                free(res->items[j]);
-            }
-            for (size_t j = 0; j < count; j++) free(results[j]);
+    if (count > 0) {
+        res->items = (agentos_memory_result_item_t**)calloc(count, sizeof(agentos_memory_result_item_t*));
+        if (!res->items) {
+            for (size_t i = 0; i < count; i++) free(results[i]);
             free(results);
-            free(res->items);
             free(res);
             return AGENTOS_ENOMEM;
         }
-        memset(res->items[i], 0, sizeof(agentos_memory_result_item_t));
-        res->items[i]->record_id = results[i];
-        res->items[i]->score = 0.0f;
-        if (query->include_raw) {
-            res->items[i]->record = NULL;
+
+        for (size_t i = 0; i < count; i++) {
+            res->items[i] = (agentos_memory_result_item_t*)calloc(1, sizeof(agentos_memory_result_item_t));
+            if (!res->items[i]) {
+                for (size_t j = 0; j < i; j++) {
+                    free(res->items[j]->record_id);
+                    free(res->items[j]);
+                }
+                for (size_t j = 0; j < count; j++) free(results[j]);
+                free(results);
+                free(res->items);
+                free(res);
+                return AGENTOS_ENOMEM;
+            }
+            res->items[i]->record_id = results[i];
+            res->items[i]->score = 0.0f;
         }
     }
+
     res->count = count;
     res->query_time_ns = 0;
 
@@ -154,6 +181,14 @@ agentos_error_t agentos_memory_query(
     return AGENTOS_SUCCESS;
 }
 
+/**
+ * @brief 根据 ID 获取记忆记录
+ * @param engine 记忆引擎
+ * @param record_id 记录 ID
+ * @param include_raw 是否包含原始数据
+ * @param out_record 输出记录（需调用 agentos_memory_record_free 释放）
+ * @return AGENTOS_SUCCESS 或错误码
+ */
 agentos_error_t agentos_memory_get(
     agentos_memory_engine_t* engine,
     const char* record_id,
@@ -164,17 +199,26 @@ agentos_error_t agentos_memory_get(
 
     void* data = NULL;
     size_t len = 0;
+
+    agentos_mutex_lock(engine->lock);
     agentos_error_t err = agentos_memoryrov_get_raw(engine->rov_handle, record_id, &data, &len);
+    agentos_mutex_unlock(engine->lock);
+
     if (err != AGENTOS_SUCCESS) return err;
 
-    agentos_memory_record_t* rec = (agentos_memory_record_t*)malloc(sizeof(agentos_memory_record_t));
+    agentos_memory_record_t* rec = (agentos_memory_record_t*)calloc(1, sizeof(agentos_memory_record_t));
     if (!rec) {
         free(data);
         return AGENTOS_ENOMEM;
     }
-    memset(rec, 0, sizeof(agentos_memory_record_t));
 
     rec->record_id = strdup(record_id);
+    if (!rec->record_id) {
+        free(rec);
+        free(data);
+        return AGENTOS_ENOMEM;
+    }
+
     rec->data = data;
     rec->data_len = len;
     rec->type = MEMORY_TYPE_RAW;
@@ -183,15 +227,26 @@ agentos_error_t agentos_memory_get(
     return AGENTOS_SUCCESS;
 }
 
+/**
+ * @brief 挂载记忆（增加访问计数）
+ */
 agentos_error_t agentos_memory_mount(
     agentos_memory_engine_t* engine,
     const char* record_id,
     const char* context) {
 
     if (!engine || !record_id) return AGENTOS_EINVAL;
-    return agentos_memoryrov_mount(engine->rov_handle, record_id, context);
+
+    agentos_mutex_lock(engine->lock);
+    agentos_error_t err = agentos_memoryrov_mount(engine->rov_handle, record_id, context);
+    agentos_mutex_unlock(engine->lock);
+
+    return err;
 }
 
+/**
+ * @brief 释放查询结果
+ */
 void agentos_memory_result_free(agentos_memory_result_t* result) {
     if (!result) return;
     for (size_t i = 0; i < result->count; i++) {
@@ -205,6 +260,9 @@ void agentos_memory_result_free(agentos_memory_result_t* result) {
     free(result);
 }
 
+/**
+ * @brief 释放记忆记录
+ */
 void agentos_memory_record_free(agentos_memory_record_t* record) {
     if (!record) return;
     if (record->record_id) free(record->record_id);
@@ -214,14 +272,19 @@ void agentos_memory_record_free(agentos_memory_record_t* record) {
     free(record);
 }
 
+/**
+ * @brief 触发记忆进化
+ */
 agentos_error_t agentos_memory_evolve(
     agentos_memory_engine_t* engine,
     int force) {
+    if (!engine) return AGENTOS_EINVAL;
     return agentos_memoryrov_evolve(engine->rov_handle, force);
 }
 
-/* ==================== 健康检查实现 ==================== */
-
+/**
+ * @brief 记忆引擎健康检查
+ */
 agentos_error_t agentos_memory_health_check(
     agentos_memory_engine_t* engine,
     char** out_json) {
@@ -233,12 +296,13 @@ agentos_error_t agentos_memory_health_check(
 
     cJSON_AddStringToObject(root, "status", "healthy");
 
-    // 可添加更多状态信息，如统计
+    agentos_mutex_lock(engine->lock);
     char* stats = NULL;
     if (agentos_memoryrov_stats(engine->rov_handle, &stats) == AGENTOS_SUCCESS) {
         cJSON_AddRawToObject(root, "stats", stats);
         free(stats);
     }
+    agentos_mutex_unlock(engine->lock);
 
     char* json = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);

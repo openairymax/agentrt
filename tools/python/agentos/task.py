@@ -40,7 +40,7 @@ class Task:
             TaskError: If there's an error querying the task status.
         """
         try:
-            response = self.client._request("GET", f"/api/tasks/{self.task_id}")
+            response = self.client._request("GET", f"/api/v1/tasks/{self.task_id}")
             status_str = response.get("status")
             if not status_str:
                 raise TaskError("Invalid response from server: missing status")
@@ -74,7 +74,7 @@ class Task:
             TaskError: If there's an error querying the task status.
         """
         try:
-            response = await self.client._request("GET", f"/api/tasks/{self.task_id}")
+            response = await self.client._request("GET", f"/api/v1/tasks/{self.task_id}")
             status_str = response.get("status")
             if not status_str:
                 raise TaskError("Invalid response from server: missing status")
@@ -116,7 +116,7 @@ class Task:
         while True:
             status = self.query()
             if status in (TaskStatus.SUCCEEDED, TaskStatus.FAILED, TaskStatus.CANCELLED):
-                response = self.client._request("GET", f"/api/tasks/{self.task_id}")
+                response = self.client._request("GET", f"/api/v1/tasks/{self.task_id}")
                 return TaskResult(
                     task_id=self.task_id,
                     status=status,
@@ -149,7 +149,7 @@ class Task:
         while True:
             status = await self.query_async()
             if status in (TaskStatus.SUCCEEDED, TaskStatus.FAILED, TaskStatus.CANCELLED):
-                response = await self.client._request("GET", f"/api/tasks/{self.task_id}")
+                response = await self.client._request("GET", f"/api/v1/tasks/{self.task_id}")
                 return TaskResult(
                     task_id=self.task_id,
                     status=status,
@@ -173,7 +173,7 @@ class Task:
             TaskError: If there's an error cancelling the task.
         """
         try:
-            response = self.client._request("POST", f"/api/tasks/{self.task_id}/cancel")
+            response = self.client._request("POST", f"/api/v1/tasks/{self.task_id}/cancel")
             return response.get("success", False)
         except Exception as e:
             raise TaskError(f"Error cancelling task: {str(e)}")
@@ -189,7 +189,7 @@ class Task:
             TaskError: If there's an error cancelling the task.
         """
         try:
-            response = await self.client._request("POST", f"/api/tasks/{self.task_id}/cancel")
+            response = await self.client._request("POST", f"/api/v1/tasks/{self.task_id}/cancel")
             return response.get("success", False)
         except Exception as e:
             raise TaskError(f"Error cancelling task: {str(e)}")

@@ -1,78 +1,70 @@
 // AgentOS TypeScript SDK Skill
-// Version: 1.0.0.5
-// Last updated: 2026-03-21
+// Version: 2.0.0
+// Last updated: 2026-03-23
 
 import { SkillInfo, SkillResult } from './types';
 import { SkillError } from './errors';
 import { AgentOS } from './agent';
 
-/**
- * Skill class for managing AgentOS skills
- */
+/** AgentOS 技能管理类 */
 export class Skill {
   private client: AgentOS;
   private skillName: string;
 
-  /**
-   * Create a new Skill object
-   * @param client AgentOS client
-   * @param skillName Skill name
-   */
+  /** 创建新的 Skill 对象 */
   constructor(client: AgentOS, skillName: string) {
     this.client = client;
     this.skillName = skillName;
   }
 
-  /**
-   * Get the skill name
-   * @returns Skill name
-   */
+  /** 获取技能名�?*/
   get name(): string {
     return this.skillName;
   }
 
-  /**
-   * Execute the skill with the given parameters
-   * @param parameters Skill parameters
-   * @returns Skill execution result
-   */
-  async execute(parameters?: Record<string, any>): Promise<SkillResult> {
-    try {
-      const response = await this.client['request']<{ success: boolean; output?: any; error?: string }>(
-        'POST',
-        `/api/skills/${this.skillName}/execute`,
-        { parameters: parameters || {} }
-      );
+  /** 执行技能 */
+  async execute<T = unknown>(parameters?: Record<string, unknown>): Promise<SkillResult<T>> {
+    const response = await this.client.request<{
+      success: boolean;
+      output?: T;
+      error?: string;
+    }>('POST', `/api/v1/skills/${this.skillName}/execute`, {
+      parameters: parameters || {},
+    });
 
-      return {
-        success: response.success,
-        output: response.output,
-        error: response.error,
-      };
-    } catch (error) {
-      throw new SkillError(`Error executing skill: ${error.message}`);
-    }
+    return {
+      success: response.success,
+      output: response.output,
+      error: response.error,
+    };
   }
 
-  /**
-   * Get information about the skill
-   * @returns Skill information
-   */
+  /** 获取技能信�?*/
   async getInfo(): Promise<SkillInfo> {
-    try {
-      const response = await this.client['request']<{ description: string; version: string; parameters?: Record<string, any> }>(
-        'GET',
-        `/api/skills/${this.skillName}`
-      );
+    const response = await this.client.request<{
+      skill_id?: string;
+      description: string;
+      version: string;
+      parameters?: Record<string, any>;
+      enabled?: boolean;
+    }>('GET', `/api/v1/skills/${this.skillName}`);
 
-      return {
-        skillName: this.skillName,
-        description: response.description || '',
-        version: response.version || '',
-        parameters: response.parameters || {},
-      };
-    } catch (error) {
-      throw new SkillError(`Error getting skill information: ${error.message}`);
-    }
+    return {
+      skillName: this.skillName,
+      skillId: response.skill_id || this.skillName,
+      description: response.description || '',
+      version: response.version || '',
+      parameters: response.parameters || {},
+      enabled: response.enabled ?? true,
+    };
+  }
+
+  /** 卸载技�?*/
+  async unload(): Promise<boolean> {
+    const response = await this.client.request<{ success: boolean }>(
+      'DELETE',
+      `/api/v1/skills/${this.skillName}`,
+    );
+    return response.success;
   }
 }

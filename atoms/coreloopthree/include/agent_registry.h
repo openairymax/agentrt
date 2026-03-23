@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file agent_registry.h
  * @brief Agent 注册中心接口
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -23,7 +23,6 @@ typedef struct agent_info {
     float success_rate;             /**< 成功率（0-1） */
     float trust_score;              /**< 信任度（0-1） */
     int priority;                   /**< 优先级（越大越高） */
-    // From data intelligence emerges. by spharx
 } agent_info_t;
 
 /**

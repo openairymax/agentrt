@@ -32,7 +32,7 @@ add_library(agentos_memoryrovol STATIC
 
 target_include_directories(agentos_memoryrovol PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../core/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../corekern/include
     ${FAISS_INCLUDE_DIRS}
     ${LIBCURL_INCLUDE_DIRS}
     ${CJSON_INCLUDE_DIRS}

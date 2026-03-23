@@ -23,7 +23,6 @@ typedef struct trace_span {
     char* trace_id;
     char* parent_id;
     char* name;
-    // From data intelligence emerges. by spharx
     uint64_t start_time;
     uint64_t end_time;
     struct trace_span* next;
@@ -90,9 +89,8 @@ void agentos_trace_shutdown(void) {
 agentos_error_t agentos_trace_start_span(const char* name, const char* trace_id, const char* parent_id, char** out_span_id) {
     if (!name || !out_span_id) return AGENTOS_EINVAL;
 
-    trace_span_t* span = (trace_span_t*)malloc(sizeof(trace_span_t));
+    trace_span_t* span = (trace_span_t*)calloc(1, sizeof(trace_span_t));
     if (!span) return AGENTOS_ENOMEM;
-    memset(span, 0, sizeof(trace_span_t));
 
     char id_buf[64];
     generate_span_id(id_buf, sizeof(id_buf));

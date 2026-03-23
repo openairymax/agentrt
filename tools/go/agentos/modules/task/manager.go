@@ -10,6 +10,7 @@ package task
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/spharx/agentos/tools/go/agentos"
@@ -219,15 +220,108 @@ func (tm *TaskManager) BatchSubmit(ctx context.Context, descriptions []string) (
 	return tasks, nil
 }
 
+// Count 获取任务总数
+func (tm *TaskManager) Count(ctx context.Context) (int64, error) {
+	resp, err := tm.api.Get(ctx, "/api/v1/tasks/count")
+	if err != nil {
+		return 0, err
+	}
+	data, ok := utils.ExtractDataMap(resp)
+	if !ok {
+		return 0, agentos.NewError(agentos.CodeInvalidResponse, "任务计数响应格式异常", nil)
+	}
+	return utils.GetInt64(data, "count"), nil
+}
+
+// WaitForAny 并发等待任一任务完成，返回最先到达终态的结果
+func (tm *TaskManager) WaitForAny(ctx context.Context, taskIDs []string, timeout time.Duration) (*types.TaskResult, error) {
+	if len(taskIDs) == 0 {
+		return nil, agentos.NewError(agentos.CodeMissingParameter, "任务ID列表不能为空", nil)
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	resultCh := make(chan *types.TaskResult, len(taskIDs))
+	errCh := make(chan error, len(taskIDs))
+
+	var wg sync.WaitGroup
+	for _, id := range taskIDs {
+		wg.Add(1)
+		go func(taskID string) {
+			defer wg.Done()
+			result, err := tm.Wait(ctx, taskID, timeout)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			resultCh <- result
+		}(id)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case result := <-resultCh:
+		return result, nil
+	case err := <-errCh:
+		return nil, err
+	case <-ctx.Done():
+		return nil, agentos.NewError(agentos.CodeTaskTimeout, "等待任务超时", ctx.Err())
+	case <-done:
+		return nil, agentos.NewError(agentos.CodeTaskFailed, "所有任务已完成但无结果", nil)
+	}
+}
+
 // WaitForAll 并发等待多个任务全部完成
 func (tm *TaskManager) WaitForAll(ctx context.Context, taskIDs []string, timeout time.Duration) ([]types.TaskResult, error) {
-	results := make([]types.TaskResult, 0, len(taskIDs))
-	for _, id := range taskIDs {
-		result, err := tm.Wait(ctx, id, timeout)
-		if err != nil {
-			return results, err
+	if len(taskIDs) == 0 {
+		return nil, nil
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	type indexedResult struct {
+		index  int
+		result *types.TaskResult
+		err    error
+	}
+
+	resultCh := make(chan indexedResult, len(taskIDs))
+	var wg sync.WaitGroup
+
+	for i, id := range taskIDs {
+		wg.Add(1)
+		go func(idx int, taskID string) {
+			defer wg.Done()
+			result, err := tm.Wait(ctx, taskID, timeout)
+			resultCh <- indexedResult{index: idx, result: result, err: err}
+		}(i, id)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultCh)
+	}()
+
+	results := make([]types.TaskResult, len(taskIDs))
+	var firstErr error
+	for ir := range resultCh {
+		if ir.err != nil && firstErr == nil {
+			firstErr = ir.err
 		}
-		results = append(results, *result)
+		if ir.result != nil {
+			results[ir.index] = *ir.result
+		}
+	}
+
+	if firstErr != nil {
+		return results, firstErr
 	}
 	return results, nil
 }

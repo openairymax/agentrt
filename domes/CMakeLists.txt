@@ -29,7 +29,7 @@ endif()
 
 # 包含路径
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../atoms/core/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../atoms/corekern/include)
 include_directories(${YAML_INCLUDE_DIRS})
 include_directories(${CJSON_INCLUDE_DIRS})
 
@@ -75,7 +75,7 @@ enable_testing()
 add_executable(test_domes_core tests/unit/test_domes_core.c)
 target_include_directories(test_domes_core PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../atoms/core/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../atoms/corekern/include
     ${YAML_INCLUDE_DIRS}
     ${CJSON_INCLUDE_DIRS}
 )
@@ -93,7 +93,7 @@ add_test(NAME test_domes_core COMMAND test_domes_core)
 add_executable(test_domes_integration tests/integration/test_domes_integration.c)
 target_include_directories(test_domes_integration PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../atoms/core/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../atoms/corekern/include
     ${YAML_INCLUDE_DIRS}
     ${CJSON_INCLUDE_DIRS}
 )

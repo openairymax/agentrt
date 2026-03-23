@@ -23,7 +23,6 @@ typedef struct compensable_action {
 } compensable_action_t;
 
 /**
-// From data intelligence emerges. by spharx
  * @brief 补偿管理器内部结构
  */
 struct agentos_compensation {
@@ -37,9 +36,8 @@ struct agentos_compensation {
 agentos_error_t agentos_compensation_create(agentos_compensation_t** out_manager) {
     if (!out_manager) return AGENTOS_EINVAL;
 
-    agentos_compensation_t* mgr = (agentos_compensation_t*)malloc(sizeof(agentos_compensation_t));
+    agentos_compensation_t* mgr = (agentos_compensation_t*)calloc(1, sizeof(agentos_compensation_t));
     if (!mgr) return AGENTOS_ENOMEM;
-    memset(mgr, 0, sizeof(agentos_compensation_t));
 
     mgr->lock = agentos_mutex_create();
     if (!mgr->lock) {
@@ -94,9 +92,8 @@ agentos_error_t agentos_compensation_register(
 
     if (!manager || !action_id || !compensator_id) return AGENTOS_EINVAL;
 
-    compensable_action_t* act = (compensable_action_t*)malloc(sizeof(compensable_action_t));
+    compensable_action_t* act = (compensable_action_t*)calloc(1, sizeof(compensable_action_t));
     if (!act) return AGENTOS_ENOMEM;
-    memset(act, 0, sizeof(compensable_action_t));
 
     act->action_id = strdup(action_id);
     act->compensator_id = strdup(compensator_id);
@@ -157,14 +154,14 @@ agentos_error_t agentos_compensation_compensate(
         size_t new_cap = manager->human_queue_capacity * 2;
         char** new_queue = (char**)realloc(manager->human_queue, new_cap * sizeof(char*));
         if (!new_queue) {
-            // 内存不足，无法加入，但动作已移除，需重新插入？这里返回错误
-            // 为了简化，我们忽略内存不足的情况
-        } else {
-            manager->human_queue = new_queue;
-            manager->human_queue_capacity = new_cap;
+            act->next = manager->actions;
+            manager->actions = act;
+            agentos_mutex_unlock(manager->lock);
+            return AGENTOS_ENOMEM;
         }
+        manager->human_queue = new_queue;
+        manager->human_queue_capacity = new_cap;
     }
-    if (manager->human_queue_size < manager->human_queue_capacity) {
         manager->human_queue[manager->human_queue_size++] = strdup(act->action_id);
     }
 

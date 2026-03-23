@@ -1,211 +1,249 @@
 # AgentOS Python SDK
-# Version: 2.0.0.0
-# Last updated: 2026-03-21
+# Version: 2.0.0
+# Last updated: 2026-03-23
 
 """
-AgentOS Python SDK - Production-ready interface to AgentOS system.
+AgentOS Python SDK - AgentOS 系统的生产级 Python 接口
 
-This SDK provides a clean, Pythonic interface to interact with the AgentOS system,
-featuring:
-    - High-level business logic modules (task, memory, session, skill)
-    - Low-level FFI bindings with comprehensive error handling
-    - Full type annotations and detailed documentation
-    - Cross-platform support (Linux, macOS, Windows)
-    - Asynchronous programming support
+功能特性：
+    - 高级业务模块（任务、记忆、会话、技能）
+    - 完整的类型注解和文档
+    - 跨平台支持（Linux、macOS、Windows）
+    - 异步编程支持
+    - 上下文管理器（with/async with）
 
-Architecture:
-    agentos/
-    ├── core/           # Core layer (FFI bindings)
-    ├── modules/        # Business modules (task, memory, session, skill)
-    ├── client/         # Client classes (sync, async)
-    ├── utils/          # Utility functions
-    ├── telemetry/      # Observability utilities
-    └── types/          # Type definitions
-
-Quick Start:
+快速入门：
     >>> from agentos import AgentOS
     >>> client = AgentOS(endpoint="http://localhost:18789")
-    >>> 
-    >>> # Submit a task
     >>> task = client.submit_task('{"input": "analyze this data"}')
     >>> result = task.wait(timeout=30)
-    >>> print(result)
-
-Example:
-    >>> # Using context managers
-    >>> with AgentOS() as client:
-    ...     session = client.create_session()
-    ...     with session:
-    ...         result = client.execute_skill("my_skill", {"param": "value"})
-
-For more information, see the documentation at https://agentos.dev
 """
 
-__version__ = "2.0.0.0"
+__version__ = "2.0.0"
 __author__ = "AgentOS Team"
 __license__ = "Apache-2.0"
 
-# Import version info
-try:
-    from ._version import (
-        __version__,
-        __version_info__,
-        __author__,
-        __license__,
-        get_version_string,
-        get_version_tuple,
-    )
-except ImportError:
-    pass
-
-# Import exceptions
+# 导入异常类和错误码常量
 from .exceptions import (
     AgentOSError,
+    AgentOSMemoryError,
+    AgentOSTimeoutError,
     InitializationError,
     ValidationError,
     NetworkError,
-    TimeoutError,
     TelemetryError,
+    ConfigError,
+    SyscallError,
+    RateLimitError,
+    TaskError,
+    SessionError,
+    SkillError,
+    AuthenticationError,
+    http_status_to_code,
+    CODE_SUCCESS,
+    CODE_UNKNOWN,
+    CODE_INVALID_PARAMETER,
+    CODE_MISSING_PARAMETER,
+    CODE_TIMEOUT,
+    CODE_NOT_FOUND,
+    CODE_ALREADY_EXISTS,
+    CODE_CONFLICT,
+    CODE_INVALID_CONFIG,
+    CODE_INVALID_ENDPOINT,
+    CODE_NETWORK_ERROR,
+    CODE_CONNECTION_REFUSED,
+    CODE_SERVER_ERROR,
+    CODE_UNAUTHORIZED,
+    CODE_FORBIDDEN,
+    CODE_RATE_LIMITED,
+    CODE_INVALID_RESPONSE,
+    CODE_PARSE_ERROR,
+    CODE_VALIDATION_ERROR,
+    CODE_NOT_SUPPORTED,
+    CODE_INTERNAL,
+    CODE_BUSY,
+    CODE_LOOP_CREATE_FAILED,
+    CODE_LOOP_START_FAILED,
+    CODE_LOOP_STOP_FAILED,
+    CODE_COGNITION_FAILED,
+    CODE_DAG_BUILD_FAILED,
+    CODE_AGENT_DISPATCH_FAILED,
+    CODE_INTENT_PARSE_FAILED,
+    CODE_TASK_FAILED,
+    CODE_TASK_CANCELLED,
+    CODE_TASK_TIMEOUT,
+    CODE_MEMORY_NOT_FOUND,
+    CODE_MEMORY_EVOLVE_FAILED,
+    CODE_MEMORY_SEARCH_FAILED,
+    CODE_SESSION_NOT_FOUND,
+    CODE_SESSION_EXPIRED,
+    CODE_SKILL_NOT_FOUND,
+    CODE_SKILL_EXECUTION_FAILED,
+    CODE_TELEMETRY_ERROR,
+    CODE_PERMISSION_DENIED,
+    CODE_CORRUPTED_DATA,
 )
 
-# Import core components (FFI layer)
-try:
-    from .core import (
-        SyscallBinding,
-        SyscallProxy,
-        get_default_proxy,
-    )
-except ImportError:
-    pass
+# 向后兼容别名（不推荐使用新名称）
+TimeoutError = AgentOSTimeoutError
+MemoryError = AgentOSMemoryError
 
-# Import business modules
-try:
-    from .modules.task import TaskManager, TaskInfo, TaskResult, TaskStatus, TaskError
-    from .modules.memory import MemoryManager, MemoryInfo, MemoryRecordType, MemoryError
-    from .modules.session import SessionManager, SessionInfo, SessionError
-    from .modules.skill import SkillManager, SkillInfo, SkillResult, SkillError
-except ImportError:
-    pass
+# 导入客户端
+from .agent import AgentOS, AsyncAgentOS
 
-# Import clients
-try:
-    from .client import AgentOS, AsyncAgentOS
-except ImportError:
-    # Fallback to old location for backward compatibility
-    try:
-        from .agent import AgentOS, AsyncAgentOS
-    except ImportError:
-        pass
+# 导入工具函数
+from .utils import (
+    generate_id,
+    generate_timestamp,
+    generate_hash,
+    validate_json,
+    sanitize_string,
+    get_env_var,
+    parse_timeout,
+    merge_dicts,
+    retry_with_backoff,
+    Timer,
+    RateLimiter,
+)
 
-# Import utilities
-try:
-    from .utils import (
-        generate_id,
-        generate_timestamp,
-        generate_hash,
-        validate_json,
-        sanitize_string,
-        Timer,
-        RateLimiter,
-    )
-except ImportError:
-    pass
+# 导入遥测
+from .telemetry import (
+    Telemetry,
+    Meter,
+    Tracer,
+    Span,
+    SpanStatus,
+    MetricPoint,
+)
 
-# Import telemetry
-try:
-    from .telemetry import (
-        Telemetry,
-        Meter,
-        Tracer,
-        Span,
-        SpanStatus,
-        MetricPoint,
-    )
-except ImportError:
-    pass
+# 导入类型定义
+from .types import (
+    TaskStatus,
+    TaskResult,
+    MemoryInfo,
+    MemoryRecordType,
+    SessionInfo,
+    SkillInfo,
+    SkillResult,
+    TelemetryMetrics,
+    Priority,
+    TaskID,
+    SessionID,
+    MemoryRecordID,
+    SkillID,
+    Timestamp,
+    ErrorCode,
+    JSONValue,
+    JSONObject,
+)
 
-# Import types
-try:
-    from .types import (
-        TaskID,
-        SessionID,
-        MemoryRecordID,
-        SkillID,
-        Timestamp,
-        ErrorCode,
-        JSONValue,
-        JSONObject,
-        TaskStatus,
-        TaskResult,
-        MemoryInfo,
-        MemoryRecordType,
-        SessionInfo,
-        SkillInfo,
-        SkillResult,
-    )
-except ImportError:
-    pass
 __all__ = [
-    # Version info
+    # 版本信息
     "__version__",
     "__author__",
     "__license__",
-    
-    # Exceptions
+
+    # 异常
     "AgentOSError",
+    "AgentOSMemoryError",
+    "AgentOSTimeoutError",
     "InitializationError",
     "ValidationError",
     "NetworkError",
-    "TimeoutError",
     "TelemetryError",
+    "ConfigError",
+    "SyscallError",
+    "RateLimitError",
     "TaskError",
-    "MemoryError",
     "SessionError",
     "SkillError",
-    
-    # Core (FFI layer)
-    "SyscallBinding",
-    "SyscallProxy",
-    "get_default_proxy",
-    
-    # Clients
+    "AuthenticationError",
+    # 向后兼容别名
+    "TimeoutError",
+    "MemoryError",
+
+    # 错误码常量
+    "http_status_to_code",
+    "CODE_SUCCESS",
+    "CODE_UNKNOWN",
+    "CODE_INVALID_PARAMETER",
+    "CODE_MISSING_PARAMETER",
+    "CODE_TIMEOUT",
+    "CODE_NOT_FOUND",
+    "CODE_ALREADY_EXISTS",
+    "CODE_CONFLICT",
+    "CODE_INVALID_CONFIG",
+    "CODE_INVALID_ENDPOINT",
+    "CODE_NETWORK_ERROR",
+    "CODE_CONNECTION_REFUSED",
+    "CODE_SERVER_ERROR",
+    "CODE_UNAUTHORIZED",
+    "CODE_FORBIDDEN",
+    "CODE_RATE_LIMITED",
+    "CODE_INVALID_RESPONSE",
+    "CODE_PARSE_ERROR",
+    "CODE_VALIDATION_ERROR",
+    "CODE_NOT_SUPPORTED",
+    "CODE_INTERNAL",
+    "CODE_BUSY",
+    "CODE_LOOP_CREATE_FAILED",
+    "CODE_LOOP_START_FAILED",
+    "CODE_LOOP_STOP_FAILED",
+    "CODE_COGNITION_FAILED",
+    "CODE_DAG_BUILD_FAILED",
+    "CODE_AGENT_DISPATCH_FAILED",
+    "CODE_INTENT_PARSE_FAILED",
+    "CODE_TASK_FAILED",
+    "CODE_TASK_CANCELLED",
+    "CODE_TASK_TIMEOUT",
+    "CODE_MEMORY_NOT_FOUND",
+    "CODE_MEMORY_EVOLVE_FAILED",
+    "CODE_MEMORY_SEARCH_FAILED",
+    "CODE_SESSION_NOT_FOUND",
+    "CODE_SESSION_EXPIRED",
+    "CODE_SKILL_NOT_FOUND",
+    "CODE_SKILL_EXECUTION_FAILED",
+    "CODE_TELEMETRY_ERROR",
+    "CODE_PERMISSION_DENIED",
+    "CODE_CORRUPTED_DATA",
+
+    # 客户端
     "AgentOS",
     "AsyncAgentOS",
-    
-    # Managers
-    "TaskManager",
-    "MemoryManager",
-    "SessionManager",
-    "SkillManager",
-    
-    # Models
-    "TaskInfo",
-    "TaskResult",
-    "TaskStatus",
-    "MemoryInfo",
-    "MemoryRecordType",
-    "SessionInfo",
-    "SkillInfo",
-    "SkillResult",
-    
-    # Utilities
+
+    # 工具函数
     "generate_id",
     "generate_timestamp",
     "generate_hash",
     "validate_json",
     "sanitize_string",
+    "get_env_var",
+    "parse_timeout",
+    "merge_dicts",
+    "retry_with_backoff",
     "Timer",
     "RateLimiter",
-    
-    # Telemetry
+
+    # 遥测
     "Telemetry",
     "Meter",
     "Tracer",
     "Span",
     "SpanStatus",
     "MetricPoint",
-    
-    # Types
+
+    # 类型定义
+    "TaskStatus",
+    "TaskResult",
+    "MemoryInfo",
+    "MemoryRecordType",
+    "SessionInfo",
+    "SkillInfo",
+    "SkillResult",
+    "TelemetryMetrics",
+    "Priority",
+
+    # 类型别名
     "TaskID",
     "SessionID",
     "MemoryRecordID",

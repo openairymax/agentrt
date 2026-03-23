@@ -10,9 +10,12 @@ package client
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
+	"math/big"
 	"net/http"
 	"strings"
 	"time"
@@ -21,6 +24,9 @@ import (
 	"github.com/spharx/agentos/tools/go/agentos/types"
 	"github.com/spharx/agentos/tools/go/agentos/utils"
 )
+
+// MaxResponseBodySize 响应体最大允许大小（10MB）
+const MaxResponseBodySize = 10 * 1024 * 1024
 
 // APIClient 定义所有 Manager 共同依赖的 HTTP 通信接口
 type APIClient interface {
@@ -178,19 +184,35 @@ func (c *Client) request(ctx context.Context, method, path string, body interfac
 	var lastErr error
 	for attempt := 0; attempt <= c.config.MaxRetries; attempt++ {
 		if attempt > 0 {
-			time.Sleep(c.config.RetryDelay)
+			delay := calculateBackoff(c.config.RetryDelay, attempt)
+
+			select {
+			case <-ctx.Done():
+				return nil, agentos.WrapError(agentos.CodeTimeout, "请求在重试等待中被取消", ctx.Err())
+			case <-time.After(delay):
+			}
+
+			if seeker, ok := req.Body.(io.Seeker); ok && req.Body != nil {
+				if _, seekErr := seeker.Seek(0, io.SeekStart); seekErr != nil {
+					return nil, agentos.WrapError(agentos.CodeNetworkError, "重置请求体失败", seekErr)
+				}
+			}
 		}
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			lastErr = agentos.WrapError(agentos.CodeNetworkError, "请求执行失败", err)
+			if ctx.Err() != nil {
+				return nil, agentos.WrapError(agentos.CodeTimeout, "请求被取消", ctx.Err())
+			}
 			continue
 		}
-		defer resp.Body.Close()
 
-		respBody, err := io.ReadAll(resp.Body)
-		if err != nil {
-			lastErr = agentos.WrapError(agentos.CodeParseError, "读取响应失败", err)
+		respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, MaxResponseBodySize))
+		resp.Body.Close()
+
+		if readErr != nil {
+			lastErr = agentos.WrapError(agentos.CodeParseError, "读取响应失败", readErr)
 			continue
 		}
 
@@ -211,6 +233,16 @@ func (c *Client) request(ctx context.Context, method, path string, body interfac
 	}
 
 	return nil, lastErr
+}
+
+// calculateBackoff 计算指数退避延迟（含抖动）
+func calculateBackoff(baseDelay time.Duration, attempt int) time.Duration {
+	backoff := float64(baseDelay) * math.Pow(2, float64(attempt-1))
+
+	jitterBig, _ := rand.Int(rand.Reader, big.NewInt(int64(backoff)))
+	jitter := time.Duration(jitterBig.Int64())
+
+	return time.Duration(backoff) + jitter
 }
 
 // shouldRetry 根据 HTTP 状态码判断是否应进行重试

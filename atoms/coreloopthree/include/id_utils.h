@@ -23,8 +23,7 @@ extern "C" {
  */
 void agentos_generate_task_id(const char* prefix, char* buf, size_t len);
 
-// From data intelligence emerges. by spharx
-/**
+/**
  * @brief 生成唯一计划ID
  * 
  * @param buf 输出缓冲区

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file strategy.h
  * @brief 规划策略创建函数的统一声明
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -23,7 +23,6 @@ extern "C" {
  */
 agentos_plan_strategy_t* agentos_plan_hierarchical_create(
     agentos_llm_service_t* llm,
-    // From data intelligence emerges. by spharx
     int max_depth);
 
 /**

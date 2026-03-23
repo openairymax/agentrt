@@ -4,8 +4,8 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "core/include/time.h"
-#include "core/include/error.h"
+#include "corekern/include/time.h"
+#include "corekern/include/error.h"
 #include <stdio.h>
 
 int test_time_monotonic() {

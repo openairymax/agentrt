@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file ml_based.c
  * @brief 基于机器学习的调度策略
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -23,7 +23,6 @@ typedef struct ml_data {
     char* model_path;
     void* registry_ctx;
     agent_registry_get_agents_func get_agents;
-    // From data intelligence emerges. by spharx
     agentos_mutex_t* lock;
 } ml_data_t;
 

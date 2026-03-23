@@ -1,27 +1,29 @@
 /**
  * @file http_gateway.h
  * @brief HTTP 网关接口
+ * 
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
-#ifndef BASERUNTIME_HTTP_GATEWAY_H
-#define BASERUNTIME_HTTP_GATEWAY_H
+
+#ifndef DYNAMIC_HTTP_GATEWAY_H
+#define DYNAMIC_HTTP_GATEWAY_H
 
 #include "gateway.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <stdint.h>
 
 /**
- * @brief 创建 HTTP 网关实例
- * @param host 监听地址（如 "0.0.0.0"）
+ * @brief 创建 HTTP 网关
+ * 
+ * @param host 监听地址
  * @param port 监听端口
- * @return 网关句柄，失败返回 NULL
+ * @param server 服务器引用
+ * @return 网关实例，失败返回 NULL
+ * 
+ * @ownership 调用者需通过 gateway_destroy() 释放
  */
-gateway_t* http_gateway_create(const char* host, uint16_t port);
+gateway_t* http_gateway_create(
+    const char* host,
+    uint16_t port,
+    dynamic_server_t* server);
 
-#ifdef __cplusplus
-}
-#endif
-
-// From data intelligence emerges. by spharx
-#endif /* BASERUNTIME_HTTP_GATEWAY_H */
+#endif /* DYNAMIC_HTTP_GATEWAY_H */

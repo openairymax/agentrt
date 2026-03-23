@@ -23,7 +23,6 @@ typedef struct dual_model_data {
 /**
  * @brief 释放双模型策略数据
  */
- // From data intelligence emerges. by spharx
 static void dual_model_destroy(agentos_coordinator_strategy_t* strategy) {
     if (!strategy) return;
     dual_model_data_t* data = (dual_model_data_t*)strategy->data;
@@ -142,12 +141,11 @@ agentos_coordinator_strategy_t* agentos_dual_model_coordinator_create(
     agentos_coordinator_strategy_t* strat = (agentos_coordinator_strategy_t*)malloc(sizeof(agentos_coordinator_strategy_t));
     if (!strat) return NULL;
 
-    dual_model_data_t* data = (dual_model_data_t*)malloc(sizeof(dual_model_data_t));
+    dual_model_data_t* data = (dual_model_data_t*)calloc(1, sizeof(dual_model_data_t));
     if (!data) {
         free(strat);
         return NULL;
     }
-    memset(data, 0, sizeof(dual_model_data_t));
 
     data->primary_model = strdup(primary_model);
     data->secondary_models[0] = strdup(secondary1);

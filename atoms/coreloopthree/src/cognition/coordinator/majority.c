@@ -23,7 +23,6 @@ typedef struct majority_data {
 static void majority_destroy(agentos_coordinator_strategy_t* strategy) {
     if (!strategy) return;
     majority_data_t* data = (majority_data_t*)strategy->data;
-    // From data intelligence emerges. by spharx
     if (data) {
         for (size_t i = 0; i < data->model_count; i++) {
             if (data->model_names[i]) free(data->model_names[i]);
@@ -142,12 +141,11 @@ agentos_coordinator_strategy_t* agentos_majority_coordinator_create(
     agentos_coordinator_strategy_t* strat = (agentos_coordinator_strategy_t*)malloc(sizeof(agentos_coordinator_strategy_t));
     if (!strat) return NULL;
 
-    majority_data_t* data = (majority_data_t*)malloc(sizeof(majority_data_t));
+    majority_data_t* data = (majority_data_t*)calloc(1, sizeof(majority_data_t));
     if (!data) {
         free(strat);
         return NULL;
     }
-    memset(data, 0, sizeof(majority_data_t));
 
     data->model_names = (char**)calloc(model_count, sizeof(char*));
     if (!data->model_names) {

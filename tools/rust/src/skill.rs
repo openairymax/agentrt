@@ -48,7 +48,7 @@ impl Skill {
     
     /// Execute the skill with the given parameters
     pub async fn execute(&self, parameters: Option<HashMap<String, Value>>) -> Result<SkillResult> {
-        let path = format!("/api/skills/{}/execute", self.name);
+        let path = format!("/api/v1/skills/{}/execute", self.name);
         let parameters = parameters.unwrap_or_default();
         let data = json!({"parameters": parameters});
         let response = self.client.request("POST", &path, Some(&data)).await?;
@@ -69,7 +69,7 @@ impl Skill {
     
     /// Get information about the skill
     pub async fn get_info(&self) -> Result<SkillInfo> {
-        let path = format!("/api/skills/{}", self.name);
+        let path = format!("/api/v1/skills/{}", self.name);
         let response = self.client.request("GET", &path, None).await?;
         
         let description = response.get("description")

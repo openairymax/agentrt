@@ -8,6 +8,8 @@
 package utils
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -215,9 +217,11 @@ func AppendPagination(params map[string]string, page, pageSize int) map[string]s
 // 对应 Python SDK: utils.py (generate_id, generate_timestamp)
 // ============================================================
 
-// GenerateID 生成唯一的 AgentOS ID（时间戳+随机数）
+// GenerateID 生成唯一的 AgentOS ID（时间戳+密码学安全随机数）
 func GenerateID() string {
-	return fmt.Sprintf("aos_%d_%08x", time.Now().UnixNano(), time.Now().UnixNano()%0xFFFFFFFF)
+	b := make([]byte, 4)
+	_, _ = rand.Read(b)
+	return fmt.Sprintf("aos_%d_%s", time.Now().UnixNano(), hex.EncodeToString(b))
 }
 
 // GenerateTimestamp 生成当前 Unix 时间戳（秒）

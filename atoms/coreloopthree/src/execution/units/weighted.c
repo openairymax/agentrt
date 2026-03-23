@@ -23,8 +23,7 @@ typedef struct weighted_data {
     agentos_mutex_t* lock;
 } weighted_data_t;
 
-// From data intelligence emerges. by spharx
-static void weighted_destroy(agentos_dispatching_strategy_t* strategy) {
+static void weighted_destroy(agentos_dispatching_strategy_t* strategy) {
     if (!strategy) return;
     weighted_data_t* data = (weighted_data_t*)strategy->data;
     if (data) {

@@ -38,13 +38,15 @@ import timeit
 
 logger = logging.getLogger(__name__)
 
+_cache_locks: Dict[str, Lock] = defaultdict(Lock)
+_id_counter: Dict[str, int] = defaultdict(int)
+
 
 def generate_id(prefix: str = "") -> str:
     """
-    Generate a unique identifier with optional caching.
+    Generate a unique identifier.
 
-    Uses UUID4 for uniqueness with nanosecond timestamp for ordering.
-    Implements LRU cache for recent IDs to avoid regeneration.
+    Uses UUID4 for uniqueness.
 
     Args:
         prefix: Optional prefix for the ID
@@ -52,30 +54,12 @@ def generate_id(prefix: str = "") -> str:
     Returns:
         A unique identifier string (format: "{prefix}_{uuid}" if prefix provided)
 
-    Performance:
-        - Average: O(1) with cache
-        - Without cache: O(1) UUID generation
-
     Example:
         >>> generate_id()  # '550e8400-e29b-41d4-a716-446655440000'
         >>> generate_id("task")  # 'task_550e8400-e29b-41d4-a716-446655440000'
     """
-    cache_key = _get_cache_key(prefix)
-
-    with _cache_locks[prefix]:
-        # Check cache first (for very recent calls)
-        if cache_key in _id_cache:
-            return _id_cache[cache_key]
-
-        # Generate new ID
-        unique_id = str(uuid.uuid4())
-        result = f"{prefix}_{unique_id}" if prefix else unique_id
-
-        # Cache only last 1000 IDs per prefix to prevent memory bloat
-        if len(_id_cache) < 1000:
-            _id_cache[cache_key] = result
-
-    return result
+    unique_id = str(uuid.uuid4())
+    return f"{prefix}_{unique_id}" if prefix else unique_id
 
 
 def generate_timestamp() -> float:

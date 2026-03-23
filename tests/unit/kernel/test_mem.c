@@ -4,8 +4,8 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "core/include/mem.h"
-#include "core/include/error.h"
+#include "corekern/include/mem.h"
+#include "corekern/include/error.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
