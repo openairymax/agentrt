@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentos.spharx.ai/schemas/logging-v1.schema.json",
+  "title": "AgentOS Logging Configuration Schema",
+  "description": "Configuration schema for logging system settings",
+  "type": "object",
+  "required": ["_config_version", "logging"],
+  "properties": {
+    "_config_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Configuration file version"
+    },
+    "logging": {
+      "type": "object",
+      "required": ["level", "format", "output"],
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": ["trace", "debug", "info", "warning", "error", "critical", "off"],
+          "default": "info",
+          "description": "Default log level"
+        },
+        "format": {
+          "type": "string",
+          "enum": ["json", "text", "color", "structured"],
+          "default": "json",
+          "description": "Log output format"
+        },
+        "output": {
+          "type": "string",
+          "enum": ["stdout", "stderr", "file", "both", "syslog"],
+          "default": "both",
+          "description": "Log output destination"
+        },
+        "file": {
+          "type": "object",
+          "properties": {
+            "base_dir": {
+              "type": "string",
+              "description": "Base directory for log files"
+            },
+            "max_size_mb": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 100,
+              "description": "Maximum log file size in MB"
+            },
+            "backups": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 10,
+              "description": "Number of backup files to keep"
+            },
+            "rotate_daily": {
+              "type": "boolean",
+              "default": true,
+              "description": "Rotate logs daily"
+            },
+            "compress_rotated": {
+              "type": "boolean",
+              "default": true,
+              "description": "Compress rotated log files"
+            }
+          }
+        },
+        "modules": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "level": {
+                "type": "string",
+                "enum": ["trace", "debug", "info", "warning", "error", "critical", "off"]
+              },
+              "file": {
+                "type": "string",
+                "description": "Module-specific log file"
+              },
+              "enabled": {
+                "type": "boolean",
+                "default": true
+              }
+            }
+          },
+          "description": "Per-module log configuration"
+        },
+        "mask_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["password", "token", "api_key", "secret", "authorization", "credential"],
+          "description": "Fields to mask in logs"
+        },
+        "structured_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["trace_id", "span_id", "agent_id", "session_id", "task_id"],
+          "description": "Fields to include in structured logs"
+        },
+        "sampling": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable log sampling"
+            },
+            "rate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.1,
+              "description": "Sampling rate (0-1)"
+            },
+            "threshold_per_sec": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1000,
+              "description": "Threshold to trigger sampling"
+            }
+          }
+        },
+        "hot_reload": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable hot reload of logging config"
+            },
+            "check_interval_sec": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 30,
+              "description": "Config check interval"
+            }
+          }
+        },
+        "async": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable async logging"
+            },
+            "buffer_size": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 10000000,
+              "default": 100000,
+              "description": "Async buffer size"
+            },
+            "flush_interval_ms": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 10000,
+              "default": 100,
+              "description": "Flush interval in milliseconds"
+            }
+          }
+        },
+        "retention": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "max_age_days": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 365,
+              "default": 30
+            },
+            "max_total_size_gb": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 10
+            }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

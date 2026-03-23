@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file browser.c
  * @brief 浏览器控制单元（基于Playwright的简化模拟）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -14,17 +14,44 @@ typedef struct browser_unit_data {
     char* metadata_json;
 } browser_unit_data_t;
 
+/**
+ * @brief 验证URL是否安全（仅允许 http/https 协议）
+ * @param url URL字符串
+ * @return 1 安全，0 不安全
+ */
+static int is_safe_url(const char* url) {
+    if (!url) return 0;
+    if (strncasecmp(url, "http://", 7) != 0 &&
+        strncasecmp(url, "https://", 8) != 0 &&
+        strncasecmp(url, "about:blank", 11) != 0) {
+        return 0;
+    }
+    if (strstr(url, "javascript:") != NULL) return 0;
+    if (strstr(url, "data:") != NULL) return 0;
+    return 1;
+}
+
+/**
+ * @brief 浏览器执行单元的执行方法
+ */
 static agentos_error_t browser_execute(agentos_execution_unit_t* unit, const void* input, void** out_output) {
-    // 模拟浏览器操作
+    (void)unit;
+    if (!input || !out_output) return AGENTOS_EINVAL;
+
     const char* cmd = (const char*)input;
     if (strstr(cmd, "navigate") != NULL) {
-        *out_output = strdup("Navigated to example.com");
+        const char* url_start = strstr(cmd, "http");
+        if (url_start && !is_safe_url(url_start)) {
+            *out_output = strdup("{\"error\":\"unsafe_url\"}");
+            return AGENTOS_EPERM;
+        }
+        *out_output = strdup("{\"status\":\"navigated\"}");
         return AGENTOS_SUCCESS;
     } else if (strstr(cmd, "click") != NULL) {
-        *out_output = strdup("Clicked element");
+        *out_output = strdup("{\"status\":\"clicked\"}");
         return AGENTOS_SUCCESS;
     } else if (strstr(cmd, "screenshot") != NULL) {
-        *out_output = strdup("screenshot_data_base64");
+        *out_output = strdup("{\"status\":\"screenshot_taken\",\"data\":\"base64_...\"}");
         return AGENTOS_SUCCESS;
     }
     return AGENTOS_ENOTSUP;

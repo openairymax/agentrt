@@ -1,46 +1,31 @@
-# Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
-# Domes 安全隔离层构建文件
+cmake_minimum_required(VERSION 3.10)
 
-cmake_minimum_required(VERSION 3.20)
-project(agentos-domes VERSION 1.0.0.5 LANGUAGES C)
+project(domes C)
 
-# 查找依赖
-find_package(Threads REQUIRED)
-find_package(PkgConfig REQUIRED)
+set(CMAKE_C_STANDARD_REQUIRED ON)
 
-# 必须依赖
-pkg_check_modules(YAML REQUIRED yaml-0.1)
-pkg_check_modules(CJSON REQUIRED libcjson)
-pkg_check_modules(LIBWEBSOCKETS REQUIRED libwebsockets)   # 容器模式需要
-pkg_check_modules(LIBMICROHTTPD REQUIRED libmicrohttpd)   # 容器模式可能需要（实际未用，但保留）
-
-# 可选依赖（用于容器模式，无则降级）
-pkg_check_modules(RUNC runc)  # 仅用于检查，不强制
-
-# 符号导出管理
-set(CMAKE_C_VISIBILITY_PRESET hidden)
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
-
-# 定义构建共享库时的宏
-if(BUILD_SHARED_LIBS)
-    add_definitions(-DAGENTOS_BUILDING_SHARED)
+if(MSVC)
+    set(CMAKE_C_FLAGS "/W4 /WX- /D_CRT_SECURE_NO_DEPRECATE /D_SCL_SECURE_NO_WARNINGS")
+    set(CMAKE_C_FLAGS_DEBUG "/Zi /Od /RTC1")
+    set(CMAKE_C_FLAGS_RELEASE "/O2 /GL /DNDEBUG")
+    add_definitions(-DDOMES_PLATFORM_WINDOWS=1)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+    add_definitions(-DNOMINMAX)
+else()
+    set(CMAKE_C_FLAGS "-Wall -Wextra -Wpedantic -Wno-unused-parameter -fPIC")
+    set(CMAKE_C_FLAGS_DEBUG "-g -O0 -DDEBUG")
+    set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG")
+    add_definitions(-DDOMES_PLATFORM_POSIX=1)
+    if(APPLE)
+        add_definitions(-DDOMES_PLATFORM_64BIT=1)
+    elseif(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        add_definitions(-DDOMES_PLATFORM_64BIT=1)
+    endif()
 endif()
 
-# 包含路径
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../atoms/corekern/include)
-include_directories(${YAML_INCLUDE_DIRS})
-include_directories(${CJSON_INCLUDE_DIRS})
-
-# 源文件列表
-set(SOURCES
+set(DOMES_SOURCES
+    src/platform/platform.c
     src/core.c
-    src/workbench/workbench.c
-    src/workbench/workbench_process_core.c
-    src/workbench/workbench_process_exec.c
-    src/workbench/workbench_process_child.c
-    src/workbench/workbench_container.c
     src/permission/permission_engine.c
     src/permission/permission_rule.c
     src/permission/permission_cache.c
@@ -50,59 +35,65 @@ set(SOURCES
     src/sanitizer/sanitizer_core.c
     src/sanitizer/sanitizer_rules.c
     src/sanitizer/sanitizer_cache.c
+    src/workbench/workbench.c
+    src/workbench/workbench_process_core.c
 )
 
-# 生成静态库
-add_library(agentos_domes STATIC ${SOURCES})
-
-# 链接库
-target_link_libraries(agentos_domes
-    agentos_core
-    agentos_utils
-    Threads::Threads
-    ${YAML_LIBRARIES}
-    ${CJSON_LIBRARIES}
+set(DOMES_HEADERS
+    include/domes.h
+    src/core.h
+    src/platform/platform.h
+    src/permission/permission.h
+    src/permission/permission_engine.h
+    src/permission/permission_rule.h
+    src/permission/permission_cache.h
+    src/audit/audit.h
+    src/audit/audit_queue.h
+    src/audit/audit_rotator.h
+    src/sanitizer/sanitizer.h
+    src/sanitizer/sanitizer_rules.h
+    src/sanitizer/sanitizer_cache.h
+    src/workbench/workbench.h
+    src/workbench/workbench_process.h
 )
 
-# 安装
-install(TARGETS agentos_domes DESTINATION lib)
-install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/domes.h DESTINATION include/agentos)
+add_library(domes STATIC ${DOMES_SOURCES})
 
-# 测试配置
-enable_testing()
+target_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include PUBLIC)
+target_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src PRIVATE)
 
-# 单元测试
-add_executable(test_domes_core tests/unit/test_domes_core.c)
-target_include_directories(test_domes_core PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../atoms/corekern/include
-    ${YAML_INCLUDE_DIRS}
-    ${CJSON_INCLUDE_DIRS}
-)
-target_link_libraries(test_domes_core
-    agentos_domes
-    agentos_core
-    agentos_utils
-    Threads::Threads
-    ${YAML_LIBRARIES}
-    ${CJSON_LIBRARIES}
-)
-add_test(NAME test_domes_core COMMAND test_domes_core)
+if(MSVC)
+    target_link_libraries(domes PRIVATE ws2_32)
+else()
+    find_package(Threads REQUIRED)
+    target_link_libraries(domes PRIVATE ${CMAKE_THREAD_LIBS_LIBRARY})
+endif()
 
-# 集成测试
-add_executable(test_domes_integration tests/integration/test_domes_integration.c)
-target_include_directories(test_domes_integration PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../atoms/corekern/include
-    ${YAML_INCLUDE_DIRS}
-    ${CJSON_INCLUDE_DIRS}
+option(BUILD_TESTS "Build tests" OFF)
+if(BUILD_TESTS)
+    enable_testing()
+    
+    add_executable(test_domes_core tests/unit/test_domes_core.c)
+    target_link_libraries(test_domes_core domes)
+    
+    add_executable(test_domes_integration tests/integration/test_domes_integration.c)
+    target_link_libraries(test_domes_integration domes)
+    
+    if(MSVC)
+        add_custom_command(TARGET test_domes_core POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE> $<TARGET_FILE_DIR>)
+    endif()
+endif()
+
+install(TARGETS domes
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib/static
 )
-target_link_libraries(test_domes_integration
-    agentos_domes
-    agentos_core
-    agentos_utils
-    Threads::Threads
-    ${YAML_LIBRARIES}
-    ${CJSON_LIBRARIES}
+
+install(FILES ${DOMES_HEADERS}
+    DESTINATION include/domes
 )
-add_test(NAME test_domes_integration COMMAND test_domes_integration)
+
+install(FILES include/domes.h
+    DESTINATION include
+)

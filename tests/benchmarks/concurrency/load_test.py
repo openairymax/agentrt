@@ -84,7 +84,7 @@ class PerformanceMetrics:
     
     @property
     def p99_latency(self) -> float:
-        if not self.latencies):
+        if not self.latencies:
             return 0.0
         return sorted(self.latencies)[int(len(self.latencies) * 0.99)]
     

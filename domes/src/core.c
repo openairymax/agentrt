@@ -1,169 +1,217 @@
 /**
  * @file core.c
- * @brief Domes 核心协调器
+ * @brief domes 模块核心实现
+ * @author Spharx
+ * @date 2024
  */
 
 #include "core.h"
-#include "logger.h"
+#include "permission/permission.h"
+#include "audit/audit.h"
+#include "sanitizer/sanitizer.h"
 #include <stdlib.h>
 #include <string.h>
 
-static void set_default_config(domes_config_t* cfg) {
-    cfg->workbench_type = "process";
-    cfg->workbench_memory_bytes = 512 * 1024 * 1024; // 512MB
-    cfg->workbench_cpu_quota = 1.0;
-    cfg->workbench_network = 0;
-    cfg->workbench_rootfs = NULL;
-    cfg->permission_rules_path = NULL;
-    cfg->permission_cache_ttl_ms = 5000;
-    cfg->audit_log_path = "/var/log/agentos/audit.log";
-    cfg->audit_max_size_bytes = 100 * 1024 * 1024; // 100MB
-    cfg->audit_max_files = 5;
-    cfg->audit_format = "json";
-    cfg->sanitizer_max_input_len = 65536;
-    cfg->sanitizer_rules_path = NULL;
-}
-// From data intelligence emerges. by spharx
+domes_instance_t* g_domes_instance = NULL;
 
-int domes_init(const domes_config_t* user_cfg, domes_t** out_domain) {
-    if (!out_domain) return -1;
-    domes_t* d = (domes_t*)calloc(1, sizeof(domes_t));
-    if (!d) return -1;
-
-    pthread_mutex_init(&d->lock, NULL);
-
-    // 合并配置
-    if (user_cfg) {
-        d->config = *user_cfg;
-    } else {
-        set_default_config(&d->config);
+int domes_init(const char* config_path) {
+    if (g_domes_instance != NULL) {
+        return DOMES_OK;
     }
-
-    // 创建虚拟工位管理器
-    d->wb_mgr = workbench_manager_create(
-        d->config.workbench_type,
-        d->config.workbench_memory_bytes,
-        d->config.workbench_cpu_quota,
-        d->config.workbench_network,
-        d->config.workbench_rootfs
-    );
-    if (!d->wb_mgr) {
-        AGENTOS_LOG_ERROR("Failed to create workbench manager");
-        goto fail;
+    
+    g_domes_instance = (domes_instance_t*)domes_mem_alloc(sizeof(domes_instance_t));
+    if (!g_domes_instance) {
+        return DOMES_ERROR_NO_MEMORY;
     }
-
-    // 创建权限引擎
-    d->perm_eng = permission_engine_create(
-        d->config.permission_rules_path,
-        d->config.permission_cache_ttl_ms
-    );
-    if (!d->perm_eng && d->config.permission_rules_path) {
-        AGENTOS_LOG_WARN("Permission engine not initialized, continuing without");
+    
+    memset(g_domes_instance, 0, sizeof(domes_instance_t));
+    
+    if (domes_rwlock_init(&g_domes_instance->lock) != DOMES_OK) {
+        domes_mem_free(g_domes_instance);
+        g_domes_instance = NULL;
+        return DOMES_ERROR_UNKNOWN;
     }
-
-    // 创建审计日志器
-    d->audit = audit_logger_create(
-        d->config.audit_log_path,
-        d->config.audit_max_size_bytes,
-        d->config.audit_max_files,
-        d->config.audit_format
-    );
-    if (!d->audit) {
-        AGENTOS_LOG_ERROR("Failed to create audit logger");
-        goto fail;
+    
+    if (config_path) {
+        g_domes_instance->config_path = domes_strdup(config_path);
     }
-
-    // 创建净化器
-    d->sanitizer = sanitizer_create(
-        d->config.sanitizer_max_input_len,
-        d->config.sanitizer_rules_path
-    );
-    if (!d->sanitizer) {
-        AGENTOS_LOG_ERROR("Failed to create sanitizer");
-        goto fail;
+    
+    g_domes_instance->permission = permission_engine_create(NULL);
+    if (!g_domes_instance->permission) {
+        domes_rwlock_destroy(&g_domes_instance->lock);
+        domes_mem_free(g_domes_instance->config_path);
+        domes_mem_free(g_domes_instance);
+        g_domes_instance = NULL;
+        return DOMES_ERROR_UNKNOWN;
     }
-
-    d->initialized = 1;
-    *out_domain = d;
-    return 0;
-
-fail:
-    if (d->wb_mgr) workbench_manager_destroy(d->wb_mgr);
-    if (d->perm_eng) permission_engine_destroy(d->perm_eng);
-    if (d->audit) audit_logger_destroy(d->audit);
-    if (d->sanitizer) sanitizer_destroy(d->sanitizer);
-    pthread_mutex_destroy(&d->lock);
-    free(d);
-    return -1;
+    
+    g_domes_instance->audit = audit_logger_create(NULL, "domes", 10 * 1024 * 1024, 10);
+    if (!g_domes_instance->audit) {
+        permission_engine_destroy(g_domes_instance->permission);
+        domes_rwlock_destroy(&g_domes_instance->lock);
+        domes_mem_free(g_domes_instance->config_path);
+        domes_mem_free(g_domes_instance);
+        g_domes_instance = NULL;
+        return DOMES_ERROR_UNKNOWN;
+    }
+    
+    g_domes_instance->sanitizer = sanitizer_create(NULL);
+    if (!g_domes_instance->sanitizer) {
+        audit_logger_destroy(g_domes_instance->audit);
+        permission_engine_destroy(g_domes_instance->permission);
+        domes_rwlock_destroy(&g_domes_instance->lock);
+        domes_mem_free(g_domes_instance->config_path);
+        domes_mem_free(g_domes_instance);
+        g_domes_instance = NULL;
+        return DOMES_ERROR_UNKNOWN;
+    }
+    
+    domes_atomic_store32(&g_domes_instance->ref_count, 1);
+    g_domes_instance->initialized = true;
+    
+    return DOMES_OK;
 }
 
-void domes_destroy(domes_t* d) {
-    if (!d) return;
-    pthread_mutex_lock(&d->lock);
-    if (d->wb_mgr) workbench_manager_destroy(d->wb_mgr);
-    if (d->perm_eng) permission_engine_destroy(d->perm_eng);
-    if (d->audit) audit_logger_destroy(d->audit);
-    if (d->sanitizer) sanitizer_destroy(d->sanitizer);
-    pthread_mutex_unlock(&d->lock);
-    pthread_mutex_destroy(&d->lock);
-    free(d);
+void domes_cleanup(void) {
+    if (!g_domes_instance) return;
+    
+    if (domes_atomic_sub32(&g_domes_instance->ref_count, 1) > 1) {
+        return;
+    }
+    
+    domes_rwlock_wrlock(&g_domes_instance->lock);
+    
+    g_domes_instance->initialized = false;
+    
+    if (g_domes_instance->sanitizer) {
+        sanitizer_destroy(g_domes_instance->sanitizer);
+        g_domes_instance->sanitizer = NULL;
+    }
+    
+    if (g_domes_instance->audit) {
+        audit_logger_destroy(g_domes_instance->audit);
+        g_domes_instance->audit = NULL;
+    }
+    
+    if (g_domes_instance->permission) {
+        permission_engine_destroy(g_domes_instance->permission);
+        g_domes_instance->permission = NULL;
+    }
+    
+    domes_mem_free(g_domes_instance->config_path);
+    domes_mem_free(g_domes_instance->log_dir);
+    
+    domes_rwlock_unlock(&g_domes_instance->lock);
+    domes_rwlock_destroy(&g_domes_instance->lock);
+    
+    domes_mem_free(g_domes_instance);
+    g_domes_instance = NULL;
 }
 
-// 以下为各子模块的简单包装，实际调用对应管理器
-int domes_workbench_create(domes_t* d, const char* agent_id, char** out_id) {
-    if (!d || !d->wb_mgr) return -1;
-    return workbench_manager_create_workbench(d->wb_mgr, agent_id, out_id);
+int domes_check_permission(const char* agent_id, const char* action,
+                           const char* resource, const char* context) {
+    if (!g_domes_instance || !g_domes_instance->permission) {
+        return 0;
+    }
+    
+    int result = permission_engine_check(g_domes_instance->permission, 
+                                          agent_id, action, resource, context);
+    
+    if (g_domes_instance->audit) {
+        audit_logger_log_permission(g_domes_instance->audit, agent_id, 
+                                     action, resource, result);
+    }
+    
+    return result;
 }
 
-int domes_workbench_exec(domes_t* d, const char* wbid,
-                          const char* const* argv, uint32_t timeout,
-                          char** out_stdout, char** out_stderr,
-                          int* out_code, char** out_err) {
-    if (!d || !d->wb_mgr) return -1;
-    return workbench_manager_exec(d->wb_mgr, wbid, argv, timeout,
-                                  out_stdout, out_stderr, out_code, out_err);
+int domes_sanitize_input(const char* input, char* output, size_t output_size) {
+    if (!g_domes_instance || !g_domes_instance->sanitizer) {
+        if (output && output_size > 0 && input) {
+            strncpy(output, input, output_size - 1);
+            output[output_size - 1] = '\0';
+        }
+        return DOMES_OK;
+    }
+    
+    sanitize_result_t result = sanitizer_sanitize(g_domes_instance->sanitizer,
+                                                   input, output, output_size, NULL);
+    
+    if (g_domes_instance->audit) {
+        audit_logger_log_sanitizer(g_domes_instance->audit, NULL,
+                                    input, output, result == SANITIZE_OK);
+    }
+    
+    return result == SANITIZE_REJECTED ? DOMES_ERROR_PERMISSION : DOMES_OK;
 }
 
-void domes_workbench_destroy(domes_t* d, const char* wbid) {
-    if (!d || !d->wb_mgr) return;
-    workbench_manager_destroy_workbench(d->wb_mgr, wbid);
+int domes_execute_command(const char* command, char* const argv[],
+                          int* exit_code, char* stdout_buf, size_t stdout_size,
+                          char* stderr_buf, size_t stderr_size) {
+    if (!g_domes_instance) {
+        return DOMES_ERROR_INVALID_ARG;
+    }
+    
+    workbench_config_t config;
+    workbench_default_config(&config);
+    
+    workbench_t* wb = workbench_create(&config);
+    if (!wb) {
+        return DOMES_ERROR_NO_MEMORY;
+    }
+    
+    workbench_result_t result;
+    int ret = workbench_execute(wb, command, argv, &result);
+    
+    if (ret == DOMES_OK) {
+        if (exit_code) *exit_code = result.exit_code;
+        if (stdout_buf && stdout_size > 0 && result.stdout_data) {
+            strncpy(stdout_buf, result.stdout_data, stdout_size - 1);
+            stdout_buf[stdout_size - 1] = '\0';
+        }
+        if (stderr_buf && stderr_size > 0 && result.stderr_data) {
+            strncpy(stderr_buf, result.stderr_data, stderr_size - 1);
+            stderr_buf[stderr_size - 1] = '\0';
+        }
+        
+        if (g_domes_instance->audit) {
+            audit_logger_log_workbench(g_domes_instance->audit, NULL,
+                                        command, result.exit_code);
+        }
+    }
+    
+    workbench_result_free(&result);
+    workbench_destroy(wb);
+    
+    return ret;
 }
 
-int domes_workbench_list(domes_t* d, char*** out_ids, size_t* out_cnt) {
-    if (!d || !d->wb_mgr) return -1;
-    return workbench_manager_list(d->wb_mgr, out_ids, out_cnt);
+const char* domes_version(void) {
+    return "1.0.0";
 }
 
-int domes_permission_check(domes_t* d, const char* agent,
-                            const char* action, const char* resource,
-                            const char* ctx) {
-    if (!d || !d->perm_eng) return -1;
-    return permission_engine_check(d->perm_eng, agent, action, resource, ctx);
+int domes_add_permission_rule(const char* agent_id, const char* action,
+                               const char* resource, int allow, int priority) {
+    if (!g_domes_instance || !g_domes_instance->permission) {
+        return DOMES_ERROR_INVALID_ARG;
+    }
+    
+    return permission_engine_add_rule(g_domes_instance->permission,
+                                       agent_id, action, resource, allow, priority);
 }
 
-int domes_permission_reload(domes_t* d) {
-    if (!d || !d->perm_eng) return -1;
-    return permission_engine_reload(d->perm_eng);
+void domes_clear_permission_cache(void) {
+    if (!g_domes_instance || !g_domes_instance->permission) {
+        return;
+    }
+    
+    permission_engine_clear_cache(g_domes_instance->permission);
 }
 
-int domes_audit_record(domes_t* d, const char* agent, const char* tool,
-                        const char* input, const char* output,
-                        uint32_t dur, int success, const char* errmsg) {
-    if (!d || !d->audit) return -1;
-    return audit_logger_record(d->audit, agent, tool, input, output,
-                               dur, success, errmsg);
-}
-
-int domes_audit_query(domes_t* d, const char* agent,
-                       uint64_t start, uint64_t end, uint32_t limit,
-                       char*** out_events, size_t* out_cnt) {
-    if (!d || !d->audit) return -1;
-    return audit_logger_query(d->audit, agent, start, end, limit,
-                              out_events, out_cnt);
-}
-
-int domes_sanitize(domes_t* d, const char* input,
-                    char** out_clean, int* out_risk) {
-    if (!d || !d->sanitizer) return -1;
-    return sanitizer_clean(d->sanitizer, input, out_clean, out_risk);
+void domes_flush_audit_log(void) {
+    if (!g_domes_instance || !g_domes_instance->audit) {
+        return;
+    }
+    
+    audit_logger_flush(g_domes_instance->audit);
 }

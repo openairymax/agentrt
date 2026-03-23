@@ -1,6 +1,6 @@
 /**
  * @file file_utils.c
- * @brief 文件操作实现
+ * @brief 文件操作实现（跨平台）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -9,9 +9,23 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <dirent.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#include <direct.h>
+#include <io.h>
+#define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
+#define S_ISREG(m) (((m) & _S_IFMT) == _S_IFREG)
+#else
+#include <dirent.h>
+#include <unistd.h>
+#endif
+
+/**
+ * @brief 读取文件内容
+ */
 char* agentos_io_read_file(const char* path, size_t* out_len) {
+    if (!path) return NULL;
     FILE* f = fopen(path, "rb");
     if (!f) return NULL;
     fseek(f, 0, SEEK_END);
@@ -23,7 +37,6 @@ char* agentos_io_read_file(const char* path, size_t* out_len) {
     }
     char* buf = (char*)malloc(size + 1);
     if (!buf) {
-    // From data intelligence emerges. by spharx
         fclose(f);
         return NULL;
     }
@@ -38,7 +51,11 @@ char* agentos_io_read_file(const char* path, size_t* out_len) {
     return buf;
 }
 
+/**
+ * @brief 写入文件内容
+ */
 int agentos_io_write_file(const char* path, const void* data, size_t len) {
+    if (!path || !data) return -1;
     FILE* f = fopen(path, "wb");
     if (!f) return -1;
     if (len == (size_t)-1) len = strlen((const char*)data);
@@ -47,11 +64,15 @@ int agentos_io_write_file(const char* path, const void* data, size_t len) {
     return (written == len) ? 0 : -1;
 }
 
+/**
+ * @brief 确保目录存在
+ */
 int agentos_io_ensure_dir(const char* path) {
+    if (!path) return -1;
     struct stat st = {0};
     if (stat(path, &st) == -1) {
 #ifdef _WIN32
-        if (mkdir(path) != 0) return -1;
+        if (_mkdir(path) != 0) return -1;
 #else
         if (mkdir(path, 0755) != 0) return -1;
 #endif
@@ -59,9 +80,60 @@ int agentos_io_ensure_dir(const char* path) {
     return 0;
 }
 
+/**
+ * @brief 列出目录中的文件
+ */
 int agentos_io_list_files(const char* path, char*** out_files, size_t* out_count) {
+    if (!path || !out_files || !out_count) return -1;
+
+#ifdef _WIN32
+    char search_path[MAX_PATH];
+    snprintf(search_path, sizeof(search_path), "%s\\*", path);
+
+    WIN32_FIND_DATAA find_data;
+    HANDLE hFind = FindFirstFileA(search_path, &find_data);
+    if (hFind == INVALID_HANDLE_VALUE) return -1;
+
+    size_t capacity = 64;
+    size_t count = 0;
+    char** files = (char**)malloc(capacity * sizeof(char*));
+    if (!files) {
+        FindClose(hFind);
+        return -1;
+    }
+
+    do {
+        if (!(find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+            if (count >= capacity) {
+                capacity *= 2;
+                char** new_files = (char**)realloc(files, capacity * sizeof(char*));
+                if (!new_files) {
+                    for (size_t i = 0; i < count; i++) free(files[i]);
+                    free(files);
+                    FindClose(hFind);
+                    return -1;
+                }
+                files = new_files;
+            }
+            files[count] = _strdup(find_data.cFileName);
+            if (!files[count]) {
+                for (size_t i = 0; i < count; i++) free(files[i]);
+                free(files);
+                FindClose(hFind);
+                return -1;
+            }
+            count++;
+        }
+    } while (FindNextFileA(hFind, &find_data));
+
+    FindClose(hFind);
+    *out_files = files;
+    *out_count = count;
+    return 0;
+#else
     DIR* dir = opendir(path);
     if (!dir) return -1;
+
     size_t capacity = 64;
     size_t count = 0;
     char** files = (char**)malloc(capacity * sizeof(char*));
@@ -69,6 +141,7 @@ int agentos_io_list_files(const char* path, char*** out_files, size_t* out_count
         closedir(dir);
         return -1;
     }
+
     struct dirent* entry;
     while ((entry = readdir(dir)) != NULL) {
         if (entry->d_type == DT_REG) {
@@ -97,9 +170,14 @@ int agentos_io_list_files(const char* path, char*** out_files, size_t* out_count
     *out_files = files;
     *out_count = count;
     return 0;
+#endif
 }
 
+/**
+ * @brief 释放文件列表
+ */
 void agentos_io_free_list(char** files, size_t count) {
+    if (!files) return;
     for (size_t i = 0; i < count; i++) free(files[i]);
     free(files);
 }

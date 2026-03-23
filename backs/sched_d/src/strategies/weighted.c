@@ -1,314 +1,418 @@
 /**
  * @file weighted.c
- * @brief 加权调度策略实现
- * @details 根据 Agent 的权重和状态进行调度
+ * @brief 加权调度策略实现（线程安全版本）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ * 
+ * 改进：
+ * 1. 线程安全的权重数据访问
+ * 2. 使用线程安全的随机数生成
+ * 3. 内存安全
+ * 4. 完善的错误处理
  */
 
-#include <stdio.h>
+#include "strategy_interface.h"
+#include "platform.h"
+#include "error.h"
 #include <stdlib.h>
 #include <string.h>
-#include "scheduler_service.h"
-#include "strategy_interface.h"
+#include <math.h>
 
-/**
- * @brief 加权调度策略数据
- */
+/* ==================== 配置常量 ==================== */
+
+#define MAX_AGENTS 256
+#define MIN_WEIGHT 0.01
+#define MAX_WEIGHT 100.0
+#define DEFAULT_WEIGHT 1.0
+#define WEIGHT_DECAY 0.95
+#define WEIGHT_BOOST 1.05
+#define LEARNING_RATE 0.1
+
+/* ==================== Agent 权重数据 ==================== */
+
 typedef struct {
-    agent_info_t** agents;      /**< Agent 列表 */
-    size_t agent_count;         /**< Agent 数量 */
-    size_t max_agents;          /**< 最大 Agent 数量 */
-    float total_weight;         /**< 总权重 */
+    char* agent_id;
+    double weight;
+    double success_rate;
+    uint64_t total_tasks;
+    uint64_t successful_tasks;
+    double avg_latency;
+    uint64_t last_used;
+} agent_weight_t;
+
+/* ==================== 加权策略数据 ==================== */
+
+typedef struct {
+    agent_weight_t agents[MAX_AGENTS];
+    size_t agent_count;
+    agentos_mutex_t lock;
+    int initialized;
+    double total_weight;
 } weighted_data_t;
 
+/* ==================== 内部函数 ==================== */
+
 /**
- * @brief 创建加权调度策略
- // From data intelligence emerges. by spharx
- * @param config 配置信息
- * @param data 输出参数，返回策略数据
- * @return 0 表示成功，非 0 表示错误码
+ * @brief 查找 Agent 索引
  */
-static int weighted_create(const sched_config_t* config, void** data) {
-    weighted_data_t* wd = (weighted_data_t*)malloc(sizeof(weighted_data_t));
-    if (!wd) {
-        return -1;
+static int find_agent_index(weighted_data_t* data, const char* agent_id) {
+    for (size_t i = 0; i < data->agent_count; i++) {
+        if (strcmp(data->agents[i].agent_id, agent_id) == 0) {
+            return (int)i;
+        }
     }
-
-    wd->max_agents = config->max_agents;
-    wd->agents = (agent_info_t**)malloc(sizeof(agent_info_t*) * wd->max_agents);
-    if (!wd->agents) {
-        free(wd);
-        return -1;
-    }
-
-    wd->agent_count = 0;
-    wd->total_weight = 0.0f;
-
-    *data = wd;
-    return 0;
+    return -1;
 }
 
 /**
- * @brief 销毁加权调度策略
- * @param data 策略数据
- * @return 0 表示成功，非 0 表示错误码
+ * @brief 归一化权重
  */
-static int weighted_destroy(void* data) {
-    if (!data) {
-        return 0;
-    }
-
-    weighted_data_t* wd = (weighted_data_t*)data;
+static void normalize_weights(weighted_data_t* data) {
+    double sum = 0.0;
     
-    if (wd->agents) {
-        for (size_t i = 0; i < wd->agent_count; i++) {
-            if (wd->agents[i]) {
-                free(wd->agents[i]->agent_id);
-                free(wd->agents[i]->agent_name);
-                free(wd->agents[i]);
-            }
-        }
-        free(wd->agents);
+    for (size_t i = 0; i < data->agent_count; i++) {
+        sum += data->agents[i].weight;
     }
+    
+    if (sum > 0) {
+        data->total_weight = sum;
+        for (size_t i = 0; i < data->agent_count; i++) {
+            /* 保持原始权重，仅更新 total_weight */
+        }
+    }
+}
 
-    free(wd);
-    return 0;
+/**
+ * @brief 根据权重选择 Agent（轮盘赌算法）
+ */
+static int select_by_weight(weighted_data_t* data) {
+    if (data->agent_count == 0) {
+        return -1;
+    }
+    
+    /* 使用线程安全的随机数 */
+    double r = agentos_random_float() * data->total_weight;
+    double cumulative = 0.0;
+    
+    for (size_t i = 0; i < data->agent_count; i++) {
+        cumulative += data->agents[i].weight;
+        if (r <= cumulative) {
+            return (int)i;
+        }
+    }
+    
+    /* 返回最后一个 */
+    return (int)(data->agent_count - 1);
+}
+
+/**
+ * @brief 更新 Agent 权重
+ */
+static void update_agent_weight(agent_weight_t* agent, int success, double latency) {
+    agent->total_tasks++;
+    
+    if (success) {
+        agent->successful_tasks++;
+        
+        /* 更新成功率 */
+        agent->success_rate = (double)agent->successful_tasks / (double)agent->total_tasks;
+        
+        /* 更新平均延迟 */
+        if (agent->avg_latency == 0) {
+            agent->avg_latency = latency;
+        } else {
+            agent->avg_latency = agent->avg_latency * 0.9 + latency * 0.1;
+        }
+        
+        /* 提升权重 */
+        agent->weight *= WEIGHT_BOOST;
+    } else {
+        /* 降低权重 */
+        agent->weight *= WEIGHT_DECAY;
+    }
+    
+    /* 限制权重范围 */
+    if (agent->weight < MIN_WEIGHT) {
+        agent->weight = MIN_WEIGHT;
+    }
+    if (agent->weight > MAX_WEIGHT) {
+        agent->weight = MAX_WEIGHT;
+    }
+}
+
+/* ==================== 策略接口实现 ==================== */
+
+/**
+ * @brief 创建加权策略
+ */
+static int weighted_create(sched_strategy_t* strategy, const sched_strategy_config_t* config) {
+    (void)config;
+    
+    weighted_data_t* data = (weighted_data_t*)calloc(1, sizeof(weighted_data_t));
+    if (!data) {
+        AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "Failed to allocate weighted data");
+    }
+    
+    if (agentos_mutex_init(&data->lock) != 0) {
+        free(data);
+        AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "Failed to initialize mutex");
+    }
+    
+    data->initialized = 1;
+    data->total_weight = 0.0;
+    data->agent_count = 0;
+    
+    strategy->data = data;
+    return AGENTOS_OK;
+}
+
+/**
+ * @brief 销毁加权策略
+ */
+static void weighted_destroy(sched_strategy_t* strategy) {
+    if (!strategy || !strategy->data) return;
+    
+    weighted_data_t* data = (weighted_data_t*)strategy->data;
+    
+    agentos_mutex_lock(&data->lock);
+    
+    /* 释放 Agent ID */
+    for (size_t i = 0; i < data->agent_count; i++) {
+        free(data->agents[i].agent_id);
+    }
+    
+    agentos_mutex_unlock(&data->lock);
+    agentos_mutex_destroy(&data->lock);
+    free(data);
+    strategy->data = NULL;
 }
 
 /**
  * @brief 注册 Agent
- * @param data 策略数据
- * @param agent_info Agent 信息
- * @return 0 表示成功，非 0 表示错误码
  */
-static int weighted_register_agent(void* data, const agent_info_t* agent_info) {
-    if (!data || !agent_info) {
-        return -1;
+static int weighted_register(sched_strategy_t* strategy, const sched_agent_info_t* agent) {
+    if (!strategy || !strategy->data || !agent) {
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "Invalid parameters");
     }
-
-    weighted_data_t* wd = (weighted_data_t*)data;
-
-    if (wd->agent_count >= wd->max_agents) {
-        return -2;
+    
+    weighted_data_t* data = (weighted_data_t*)strategy->data;
+    
+    agentos_mutex_lock(&data->lock);
+    
+    /* 检查是否已存在 */
+    int idx = find_agent_index(data, agent->agent_id);
+    if (idx >= 0) {
+        agentos_mutex_unlock(&data->lock);
+        AGENTOS_ERROR(AGENTOS_ERR_ALREADY_EXISTS, "Agent already registered");
     }
-
-    // 检查是否已存在
-    for (size_t i = 0; i < wd->agent_count; i++) {
-        if (strcmp(wd->agents[i]->agent_id, agent_info->agent_id) == 0) {
-            // 更新现有 Agent
-            float old_weight = wd->agents[i]->weight;
-            float new_weight = agent_info->weight;
-            
-            // 更新权重
-            wd->total_weight = wd->total_weight - old_weight + new_weight;
-            
-            // 更新 Agent 信息
-            free(wd->agents[i]->agent_id);
-            free(wd->agents[i]->agent_name);
-            
-            wd->agents[i]->agent_id = strdup(agent_info->agent_id);
-            wd->agents[i]->agent_name = strdup(agent_info->agent_name);
-            wd->agents[i]->load_factor = agent_info->load_factor;
-            wd->agents[i]->success_rate = agent_info->success_rate;
-            wd->agents[i]->avg_response_time_ms = agent_info->avg_response_time_ms;
-            wd->agents[i]->is_available = agent_info->is_available;
-            wd->agents[i]->weight = new_weight;
-            
-            return 0;
-        }
+    
+    /* 检查容量 */
+    if (data->agent_count >= MAX_AGENTS) {
+        agentos_mutex_unlock(&data->lock);
+        AGENTOS_ERROR(AGENTOS_ERR_OVERFLOW, "Too many agents");
     }
-
-    // 添加新 Agent
-    agent_info_t* new_agent = (agent_info_t*)malloc(sizeof(agent_info_t));
-    if (!new_agent) {
-        return -1;
+    
+    /* 添加新 Agent */
+    idx = (int)data->agent_count;
+    data->agents[idx].agent_id = strdup(agent->agent_id);
+    if (!data->agents[idx].agent_id) {
+        agentos_mutex_unlock(&data->lock);
+        AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "Failed to duplicate agent ID");
     }
-
-    new_agent->agent_id = strdup(agent_info->agent_id);
-    new_agent->agent_name = strdup(agent_info->agent_name);
-    new_agent->load_factor = agent_info->load_factor;
-    new_agent->success_rate = agent_info->success_rate;
-    new_agent->avg_response_time_ms = agent_info->avg_response_time_ms;
-    new_agent->is_available = agent_info->is_available;
-    new_agent->weight = agent_info->weight;
-
-    wd->agents[wd->agent_count++] = new_agent;
-    wd->total_weight += agent_info->weight;
-
-    return 0;
+    
+    /* 初始化权重 */
+    data->agents[idx].weight = agent->initial_weight > 0 ? agent->initial_weight : DEFAULT_WEIGHT;
+    data->agents[idx].success_rate = 1.0;
+    data->agents[idx].total_tasks = 0;
+    data->agents[idx].successful_tasks = 0;
+    data->agents[idx].avg_latency = 0.0;
+    data->agents[idx].last_used = 0;
+    
+    data->agent_count++;
+    normalize_weights(data);
+    
+    agentos_mutex_unlock(&data->lock);
+    return AGENTOS_OK;
 }
 
 /**
  * @brief 注销 Agent
- * @param data 策略数据
- * @param agent_id Agent ID
- * @return 0 表示成功，非 0 表示错误码
  */
-static int weighted_unregister_agent(void* data, const char* agent_id) {
-    if (!data || !agent_id) {
-        return -1;
+static int weighted_unregister(sched_strategy_t* strategy, const char* agent_id) {
+    if (!strategy || !strategy->data || !agent_id) {
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "Invalid parameters");
     }
-
-    weighted_data_t* wd = (weighted_data_t*)data;
-
-    for (size_t i = 0; i < wd->agent_count; i++) {
-        if (strcmp(wd->agents[i]->agent_id, agent_id) == 0) {
-            // 更新总权重
-            wd->total_weight -= wd->agents[i]->weight;
-            
-            // 释放 Agent 资源
-            free(wd->agents[i]->agent_id);
-            free(wd->agents[i]->agent_name);
-            free(wd->agents[i]);
-
-            // 移动剩余 Agent
-            for (size_t j = i; j < wd->agent_count - 1; j++) {
-                wd->agents[j] = wd->agents[j + 1];
-            }
-
-            wd->agent_count--;
-            return 0;
-        }
+    
+    weighted_data_t* data = (weighted_data_t*)strategy->data;
+    
+    agentos_mutex_lock(&data->lock);
+    
+    int idx = find_agent_index(data, agent_id);
+    if (idx < 0) {
+        agentos_mutex_unlock(&data->lock);
+        AGENTOS_ERROR(AGENTOS_ERR_NOT_FOUND, "Agent not found");
     }
-
-    return -2;  // Agent 不存在
+    
+    /* 释放 Agent ID */
+    free(data->agents[idx].agent_id);
+    
+    /* 移动后面的元素 */
+    for (size_t i = (size_t)idx; i < data->agent_count - 1; i++) {
+        data->agents[i] = data->agents[i + 1];
+    }
+    
+    data->agent_count--;
+    normalize_weights(data);
+    
+    agentos_mutex_unlock(&data->lock);
+    return AGENTOS_OK;
 }
 
 /**
- * @brief 更新 Agent 状态
- * @param data 策略数据
- * @param agent_info Agent 信息
- * @return 0 表示成功，非 0 表示错误码
+ * @brief 选择 Agent
  */
-static int weighted_update_agent_status(void* data, const agent_info_t* agent_info) {
-    return weighted_register_agent(data, agent_info);
+static int weighted_select(sched_strategy_t* strategy,
+                           const sched_task_t* task,
+                           sched_result_t* result) {
+    if (!strategy || !strategy->data || !task || !result) {
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "Invalid parameters");
+    }
+    
+    weighted_data_t* data = (weighted_data_t*)strategy->data;
+    
+    agentos_mutex_lock(&data->lock);
+    
+    if (data->agent_count == 0) {
+        agentos_mutex_unlock(&data->lock);
+        AGENTOS_ERROR(AGENTOS_ERR_SCHED_NO_AGENT, "No agents available");
+    }
+    
+    /* 根据权重选择 */
+    int idx = select_by_weight(data);
+    if (idx < 0) {
+        agentos_mutex_unlock(&data->lock);
+        AGENTOS_ERROR(AGENTOS_ERR_SCHED_NO_AGENT, "Failed to select agent");
+    }
+    
+    /* 填充结果 */
+    result->agent_id = strdup(data->agents[idx].agent_id);
+    result->score = data->agents[idx].weight / data->total_weight;
+    result->reason = "Selected by weighted random";
+    
+    /* 更新最后使用时间 */
+    data->agents[idx].last_used = agentos_time_ms();
+    
+    agentos_mutex_unlock(&data->lock);
+    return AGENTOS_OK;
 }
 
 /**
- * @brief 执行加权调度
- * @param data 策略数据
- * @param task_info 任务信息
- * @param result 输出参数，返回调度结果
- * @return 0 表示成功，非 0 表示错误码
+ * @brief 反馈执行结果
  */
-static int weighted_schedule(void* data, const task_info_t* task_info, sched_result_t** result) {
-    if (!data || !task_info || !result) {
-        return -1;
+static int weighted_feedback(sched_strategy_t* strategy,
+                             const char* agent_id,
+                             const sched_feedback_t* feedback) {
+    if (!strategy || !strategy->data || !agent_id || !feedback) {
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "Invalid parameters");
     }
-
-    weighted_data_t* wd = (weighted_data_t*)data;
-
-    if (wd->agent_count == 0) {
-        return -2;  // 无可用 Agent
+    
+    weighted_data_t* data = (weighted_data_t*)strategy->data;
+    
+    agentos_mutex_lock(&data->lock);
+    
+    int idx = find_agent_index(data, agent_id);
+    if (idx < 0) {
+        agentos_mutex_unlock(&data->lock);
+        AGENTOS_ERROR(AGENTOS_ERR_NOT_FOUND, "Agent not found");
     }
-
-    // 计算可用 Agent 的总权重
-    float available_weight = 0.0f;
-    for (size_t i = 0; i < wd->agent_count; i++) {
-        agent_info_t* agent = wd->agents[i];
-        if (agent->is_available && agent->load_factor < 0.9) {
-            available_weight += agent->weight;
-        }
-    }
-
-    if (available_weight == 0.0f) {
-        return -3;  // 无可用 Agent
-    }
-
-    // 生成随机数
-    float random = (float)rand() / RAND_MAX * available_weight;
-    float current_weight = 0.0f;
-
-    // 根据权重选择 Agent
-    for (size_t i = 0; i < wd->agent_count; i++) {
-        agent_info_t* agent = wd->agents[i];
-        
-        if (agent->is_available && agent->load_factor < 0.9) {
-            current_weight += agent->weight;
-            
-            if (random <= current_weight) {
-                // 创建调度结果
-                sched_result_t* res = (sched_result_t*)malloc(sizeof(sched_result_t));
-                if (!res) {
-                    return -1;
-                }
-
-                res->selected_agent_id = strdup(agent->agent_id);
-                res->confidence = agent->weight / available_weight;
-                res->estimated_time_ms = agent->avg_response_time_ms;
-
-                *result = res;
-                return 0;
-            }
-        }
-    }
-
-    return -4;  // 未找到可用 Agent
+    
+    /* 更新权重 */
+    update_agent_weight(&data->agents[idx], 
+                        feedback->success ? 1 : 0, 
+                        (double)feedback->latency_ms);
+    
+    normalize_weights(data);
+    
+    agentos_mutex_unlock(&data->lock);
+    return AGENTOS_OK;
 }
 
 /**
- * @brief 获取加权调度策略名称
- * @return 策略名称
+ * @brief 获取 Agent 统计信息
  */
-static const char* weighted_get_name() {
-    return "weighted";
+static int weighted_get_stats(sched_strategy_t* strategy,
+                              const char* agent_id,
+                              sched_agent_stats_t* stats) {
+    if (!strategy || !strategy->data || !agent_id || !stats) {
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "Invalid parameters");
+    }
+    
+    weighted_data_t* data = (weighted_data_t*)strategy->data;
+    
+    agentos_mutex_lock(&data->lock);
+    
+    int idx = find_agent_index(data, agent_id);
+    if (idx < 0) {
+        agentos_mutex_unlock(&data->lock);
+        AGENTOS_ERROR(AGENTOS_ERR_NOT_FOUND, "Agent not found");
+    }
+    
+    stats->weight = data->agents[idx].weight;
+    stats->success_rate = data->agents[idx].success_rate;
+    stats->total_tasks = data->agents[idx].total_tasks;
+    stats->successful_tasks = data->agents[idx].successful_tasks;
+    stats->avg_latency_ms = data->agents[idx].avg_latency;
+    stats->last_used = data->agents[idx].last_used;
+    
+    agentos_mutex_unlock(&data->lock);
+    return AGENTOS_OK;
 }
 
 /**
- * @brief 获取可用 Agent 数量
- * @param data 策略数据
- * @return 可用 Agent 数量
+ * @brief 重置策略
  */
-static size_t weighted_get_available_agent_count(void* data) {
-    if (!data) {
-        return 0;
+static int weighted_reset(sched_strategy_t* strategy) {
+    if (!strategy || !strategy->data) {
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "Invalid parameters");
     }
-
-    weighted_data_t* wd = (weighted_data_t*)data;
-    size_t count = 0;
-
-    for (size_t i = 0; i < wd->agent_count; i++) {
-        if (wd->agents[i]->is_available) {
-            count++;
-        }
+    
+    weighted_data_t* data = (weighted_data_t*)strategy->data;
+    
+    agentos_mutex_lock(&data->lock);
+    
+    /* 重置所有 Agent 权重 */
+    for (size_t i = 0; i < data->agent_count; i++) {
+        data->agents[i].weight = DEFAULT_WEIGHT;
+        data->agents[i].success_rate = 1.0;
+        data->agents[i].total_tasks = 0;
+        data->agents[i].successful_tasks = 0;
+        data->agents[i].avg_latency = 0.0;
+        data->agents[i].last_used = 0;
     }
-
-    return count;
+    
+    normalize_weights(data);
+    
+    agentos_mutex_unlock(&data->lock);
+    return AGENTOS_OK;
 }
 
-/**
- * @brief 获取总 Agent 数量
- * @param data 策略数据
- * @return 总 Agent 数量
- */
-static size_t weighted_get_total_agent_count(void* data) {
-    if (!data) {
-        return 0;
-    }
+/* ==================== 策略注册 ==================== */
 
-    weighted_data_t* wd = (weighted_data_t*)data;
-    return wd->agent_count;
-}
-
-/**
- * @brief 加权调度策略接口
- */
-static const strategy_interface_t weighted_strategy = {
+sched_strategy_vtable_t g_weighted_strategy_vtable = {
+    .name = "weighted",
+    .description = "Weighted random scheduling strategy",
     .create = weighted_create,
     .destroy = weighted_destroy,
-    .register_agent = weighted_register_agent,
-    .unregister_agent = weighted_unregister_agent,
-    .update_agent_status = weighted_update_agent_status,
-    .schedule = weighted_schedule,
-    .get_name = weighted_get_name,
-    .get_available_agent_count = weighted_get_available_agent_count,
-    .get_total_agent_count = weighted_get_total_agent_count
+    .register_agent = weighted_register,
+    .unregister_agent = weighted_unregister,
+    .select = weighted_select,
+    .feedback = weighted_feedback,
+    .get_stats = weighted_get_stats,
+    .reset = weighted_reset,
 };
 
 /**
- * @brief 获取加权调度策略接口
- * @return 加权调度策略接口
+ * @brief 获取加权策略虚表
  */
-const strategy_interface_t* get_weighted_strategy() {
-    return &weighted_strategy;
+sched_strategy_vtable_t* weighted_strategy_get_vtable(void) {
+    return &g_weighted_strategy_vtable;
 }

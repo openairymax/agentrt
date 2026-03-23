@@ -10,7 +10,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-// 模拟技能注册表（实际应由市场服务提供）
 typedef struct skill_entry {
     char* skill_id;
     char* url;
@@ -18,66 +17,129 @@ typedef struct skill_entry {
 } skill_entry_t;
 
 static skill_entry_t* skill_list = NULL;
+static agentos_mutex_t* skill_lock = NULL;
 
+/**
+ * @brief 线程安全地确保技能锁已初始化
+ */
+static void ensure_skill_lock(void) {
+    if (!skill_lock) {
+        agentos_mutex_t* new_lock = agentos_mutex_create();
+        if (!new_lock) return;
+        if (!__sync_bool_compare_and_swap(&skill_lock, NULL, new_lock)) {
+            agentos_mutex_destroy(new_lock);
+        }
+    }
+}
+
+/**
+ * @brief 安装技能
+ */
 agentos_error_t agentos_sys_skill_install(const char* skill_url, char** out_skill_id) {
     if (!skill_url || !out_skill_id) return AGENTOS_EINVAL;
-    // 模拟安装，生成ID
+    ensure_skill_lock();
+
     char id_buf[64];
-    // From data intelligence emerges. by spharx
     static int counter = 0;
     snprintf(id_buf, sizeof(id_buf), "skill_%d", __sync_fetch_and_add(&counter, 1));
-    char* id = strdup(id_buf);
-    if (!id) return AGENTOS_ENOMEM;
 
-    skill_entry_t* entry = (skill_entry_t*)malloc(sizeof(skill_entry_t));
-    if (!entry) {
-        free(id);
-        return AGENTOS_ENOMEM;
-    }
+    skill_entry_t* entry = (skill_entry_t*)calloc(1, sizeof(skill_entry_t));
+    if (!entry) return AGENTOS_ENOMEM;
+
     entry->skill_id = strdup(id_buf);
     entry->url = strdup(skill_url);
+    if (!entry->skill_id || !entry->url) {
+        if (entry->skill_id) free(entry->skill_id);
+        if (entry->url) free(entry->url);
+        free(entry);
+        return AGENTOS_ENOMEM;
+    }
+
+    agentos_mutex_lock(skill_lock);
     entry->next = skill_list;
     skill_list = entry;
+    agentos_mutex_unlock(skill_lock);
 
-    *out_skill_id = id;
+    *out_skill_id = strdup(entry->skill_id);
+    if (!*out_skill_id) {
+        agentos_mutex_lock(skill_lock);
+        skill_entry_t** pp = &skill_list;
+        while (*pp) {
+            if (*pp == entry) { *pp = entry->next; break; }
+            pp = &(*pp)->next;
+        }
+        agentos_mutex_unlock(skill_lock);
+        free(entry->skill_id);
+        free(entry->url);
+        free(entry);
+        return AGENTOS_ENOMEM;
+    }
     return AGENTOS_SUCCESS;
 }
 
+/**
+ * @brief 执行技能
+ */
 agentos_error_t agentos_sys_skill_execute(const char* skill_id, const char* input, char** out_output) {
     if (!skill_id || !input || !out_output) return AGENTOS_EINVAL;
-    // 查找技能
+    ensure_skill_lock();
+    agentos_mutex_lock(skill_lock);
     skill_entry_t* e = skill_list;
     while (e) {
         if (strcmp(e->skill_id, skill_id) == 0) {
-            // 模拟执行，返回输入
-            *out_output = strdup(input);
+            char* result = strdup(input);
+            agentos_mutex_unlock(skill_lock);
+            if (!result) return AGENTOS_ENOMEM;
+            *out_output = result;
             return AGENTOS_SUCCESS;
         }
         e = e->next;
     }
+    agentos_mutex_unlock(skill_lock);
     return AGENTOS_ENOENT;
 }
 
+/**
+ * @brief 列出所有已安装技能
+ */
 agentos_error_t agentos_sys_skill_list(char*** out_skills, size_t* out_count) {
     if (!out_skills || !out_count) return AGENTOS_EINVAL;
+    ensure_skill_lock();
+    agentos_mutex_lock(skill_lock);
     size_t count = 0;
     skill_entry_t* e = skill_list;
     while (e) { count++; e = e->next; }
-    char** skills = (char**)malloc(count * sizeof(char*));
-    if (!skills) return AGENTOS_ENOMEM;
+    char** skills = (char**)calloc(count, sizeof(char*));
+    if (!skills) {
+        agentos_mutex_unlock(skill_lock);
+        return AGENTOS_ENOMEM;
+    }
     e = skill_list;
     size_t i = 0;
     while (e) {
-        skills[i++] = strdup(e->skill_id);
+        skills[i] = strdup(e->skill_id);
+        if (!skills[i]) {
+            for (size_t j = 0; j < i; j++) free(skills[j]);
+            free(skills);
+            agentos_mutex_unlock(skill_lock);
+            return AGENTOS_ENOMEM;
+        }
+        i++;
         e = e->next;
     }
+    agentos_mutex_unlock(skill_lock);
     *out_skills = skills;
     *out_count = count;
     return AGENTOS_SUCCESS;
 }
 
+/**
+ * @brief 卸载技能
+ */
 agentos_error_t agentos_sys_skill_uninstall(const char* skill_id) {
     if (!skill_id) return AGENTOS_EINVAL;
+    ensure_skill_lock();
+    agentos_mutex_lock(skill_lock);
     skill_entry_t** p = &skill_list;
     while (*p) {
         if (strcmp((*p)->skill_id, skill_id) == 0) {
@@ -86,9 +148,11 @@ agentos_error_t agentos_sys_skill_uninstall(const char* skill_id) {
             free(tmp->skill_id);
             free(tmp->url);
             free(tmp);
+            agentos_mutex_unlock(skill_lock);
             return AGENTOS_SUCCESS;
         }
         p = &(*p)->next;
     }
+    agentos_mutex_unlock(skill_lock);
     return AGENTOS_ENOENT;
 }

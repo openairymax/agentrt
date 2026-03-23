@@ -1,3 +1,6 @@
+Copyright (c) 2026 SPHARX. All Rights Reserved.
+"From data intelligence emerges."
+
 # AgentOS 进程间通信（IPC）架构详解
 
 **版本**: v1.0.0.5  

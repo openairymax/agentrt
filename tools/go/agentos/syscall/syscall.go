@@ -24,11 +24,10 @@ package syscall
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
-	"github.com/spharxworks/agentos/tools/go/agentos"
-	"github.com/spharxworks/agentos/tools/go/agentos/types"
+	"github.com/spharx/agentos/tools/go/agentos/client"
+	"github.com/spharx/agentos/tools/go/agentos/types"
 )
 
 // SyscallNamespace defines the namespace for system calls
@@ -64,12 +63,12 @@ type SyscallBinding interface {
 
 // HTTPSyscallBinding implements SyscallBinding using HTTP API client
 type HTTPSyscallBinding struct {
-	client agentos.APIClient
+	apiClient client.APIClient
 }
 
 // NewHTTPSyscallBinding creates a new HTTP-based syscall binding
-func NewHTTPSyscallBinding(client agentos.APIClient) *HTTPSyscallBinding {
-	return &HTTPSyscallBinding{client: client}
+func NewHTTPSyscallBinding(apiClient client.APIClient) *HTTPSyscallBinding {
+	return &HTTPSyscallBinding{apiClient: apiClient}
 }
 
 // Invoke executes a system call via HTTP API
@@ -85,7 +84,8 @@ func (b *HTTPSyscallBinding) Invoke(ctx context.Context, request *SyscallRequest
 
 	// Execute HTTP request
 	var result SyscallResponse
-	if err := b.client.Do(ctx, "POST", path, body, &result); err != nil {
+	_, err := b.apiClient.Post(ctx, path, body)
+	if err != nil {
 		return nil, err
 	}
 

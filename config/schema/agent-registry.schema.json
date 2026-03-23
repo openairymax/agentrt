@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentos.spharx.ai/schemas/agents-registry-v1.schema.json",
+  "title": "AgentOS Agents Registry Schema",
+  "description": "Configuration schema for Agent registration and metadata",
+  "type": "object",
+  "required": ["_config_version", "agents"],
+  "properties": {
+    "_config_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Configuration file version"
+    },
+    "_metadata": {
+      "type": "object",
+      "description": "Registry metadata",
+      "properties": {
+        "last_updated": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp"
+        },
+        "checksum": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "description": "SHA256 checksum of agent contracts"
+        }
+      }
+    },
+    "agents": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["agent_id", "role", "source", "version", "enabled"],
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*_v\\d+$",
+            "description": "Unique agent identifier (format: name_vN)"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "product_manager", "architect", "frontend", "backend", 
+              "tester", "devops", "security", "data_engineer",
+              "coordinator", "reviewer", "analyst", "custom"
+            ],
+            "description": "Agent role type"
+          },
+          "source": {
+            "type": "string",
+            "enum": ["builtin", "community", "custom", "external"],
+            "description": "Agent source type"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+$",
+            "description": "Agent version in semantic versioning"
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether agent is enabled"
+          },
+          "trust_score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 0.5,
+            "description": "Default trust score (0-1)"
+          },
+          "contract_path": {
+            "type": "string",
+            "description": "Path to agent contract file (relative to AGENTOS_ROOT)"
+          },
+          "preferred_model": {
+            "type": "string",
+            "description": "Preferred LLM model for this agent"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Agent description"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of agent capabilities"
+          },
+          "resource_limits": {
+            "type": "object",
+            "description": "Resource limits for this agent",
+            "properties": {
+              "max_memory_mb": {
+                "type": "integer",
+                "minimum": 64,
+                "maximum": 16384,
+                "default": 512,
+                "description": "Maximum memory in MB"
+              },
+              "max_cpu_percent": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 50,
+                "description": "Maximum CPU percentage"
+              },
+              "timeout_sec": {
+                "type": "integer",
+                "minimum": 10,
+                "maximum": 86400,
+                "default": 300,
+                "description": "Default task timeout in seconds"
+              },
+              "max_concurrent_tasks": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 5,
+                "description": "Maximum concurrent tasks"
+              }
+            }
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Required permissions for this agent"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Tags for categorization and search"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Agent registration timestamp"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last update timestamp"
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

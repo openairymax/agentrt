@@ -1,13 +1,69 @@
 # AgentOS 数据分区 (Partdata)
 
-**版本**: v1.0.0.6  
-**最后更新**: 2026-03-18  
+**版本**: v1.0.0.6
+**最后更新**: 2026-03-23
 
 ---
 
 ## 📋 概述
 
 `partdata/` 是 AgentOS 的数据分区，存储所有运行时产生的数据，包括日志、注册表、追踪数据等。该目录设计为可持久化存储，支持数据备份和恢复。
+
+本模块提供**生产级 C 语言库**实现，支持以下功能：
+- 目录结构自动初始化
+- 分层日志系统（内核/服务/应用）
+- SQLite 注册表（Agent/技能/会话）
+- OpenTelemetry 追踪数据存储
+- IPC 和内存管理数据记录
+- 自动清理与数据生命周期管理
+
+---
+
+## 🔧 快速开始
+
+### 构建
+
+```bash
+mkdir build && cd build
+cmake .. -DBUILD_TESTS=ON
+make -j$(nproc)
+```
+
+### 运行测试
+
+```bash
+./tests/partdata_tests
+```
+
+### 基本使用
+
+```c
+#include <agentos/partdata.h>
+#include <agentos/partdata_log.h>
+
+int main(void) {
+    // 初始化数据分区
+    partdata_config_t config = {
+        .root_path = "partdata",
+        .max_log_size_mb = 100,
+        .log_retention_days = 7,
+        .enable_auto_cleanup = true
+    };
+
+    partdata_error_t err = partdata_init(&config);
+    if (err != PARTDATA_SUCCESS) {
+        fprintf(stderr, "初始化失败: %s\n", partdata_strerror(err));
+        return 1;
+    }
+
+    // 写入日志
+    PARTDATA_LOG_INFO("my_service", "trace_123", "服务启动成功");
+
+    // 关闭
+    partdata_shutdown();
+    return 0;
+}
+```
 
 ---
 

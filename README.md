@@ -22,7 +22,14 @@ Language： **简体中文** | [English](partdocs/readme/en/README.md) | [Franç
 
 ---
 
-## 🚩 简介
+## 📄 官方技术白皮书
+本项目核心技术理念、架构设计、能力边界与演进规划，均已在官方技术白皮书中进行完整、严谨的系统化阐述。
+
+- 中文正式版：[AgentOS 技术白皮书 V1.0](partdocs/white_paper/zh/AgentOS_技术白皮书_V1.0.pdf)
+- English Draft: [AgentOS Technical White Paper V1.0](partdocs/white_paper/en/AgentOS_Technical_White_Paper_V1.0.pdf)
+
+
+## 🚩 项目简介
 
 AgentOS 是 SpharxWorks 的核心产品，是**面向多智能体协作的操作系统内核**。
 
@@ -35,7 +42,7 @@ AgentOS 是 SpharxWorks 的核心产品，是**面向多智能体协作的操作
 ### 核心优势
 
 - **token 效率领先**：工程级任务比行业主流框架节省约 60% token 使用量
-- **全新架构**：token 利用效率领先当前行业主流框架 2-3 倍
+- **架构性能优势**：token 利用效率领先行业主流框架 2-3 倍
 - **生产级质量**：微内核架构，服务独立演进，内核稳定如磐石
 
 ### 理论基础
@@ -48,7 +55,7 @@ AgentOS 的设计根植于三大理论根基：
 | **系统工程** | On Systems Engineering | 四维原则体系，层次分解，总体设计部协调 |
 | **双系统认知** | Thinking, Fast and Slow | System 1 快速执行，System 2 深度规划 |
 
-详见：[架构设计原则 v3.0](partdocs/architecture/architectural_design_principles.md)
+详见：[架构设计原则 v1.3](partdocs/architecture/architectural_design_principles.md)
 
 ---
 
@@ -107,7 +114,7 @@ AgentOS 的设计根植于三大理论根基：
 
 ### 架构设计原则（四维体系）
 
-详见：[架构设计原则 v3.0](partdocs/architecture/architectural_design_principles.md)
+详见：[架构设计原则 v1.3](partdocs/architecture/architectural_design_principles.md)
 
 ```
 维度一：系统观 ← 控制论 & 系统工程（S-1~S-4）
@@ -122,20 +129,20 @@ AgentOS 的设计根植于三大理论根基：
 
 ```
 AgentOS/
-├── atoms/                       # 内核层（微内核架构）
+├── atoms/                      # 内核层（微内核架构）
 │   ├── corekern/               # 微内核基础
 │   │   ├── include/            # 头文件：ipc.h, mem.h, task.h, time.h, error.h
 │   │   └── src/                # IPC/Mem/Task/Time 实现
-│   ├── coreloopthree/          # 三层核心运行时 ⭐
+│   ├── coreloopthree/          # 三层一体核心运行时 ⭐
 │   │   ├── cognition/          # 认知层：意图理解、任务规划、Agent 调度
 │   │   ├── execution/          # 行动层：执行引擎、补偿事务、责任链追踪
 │   │   ├── memory/             # 记忆层：MemoryRovol FFI 封装
 │   │   └── planner/            # 规划器：分层/反应式/反思式/ML 规划
-│   ├── memoryrovol/            # 四层记忆卷载系统 ⭐
-│   │   ├── layer1_raw/        # L1 原始卷：文件系统存储、分片压缩
-│   │   ├── layer2_feature/    # L2 特征层：FAISS 向量索引、混合检索
-│   │   ├── layer3_structure/  # L3 结构层：绑定算子、关系编码
-│   │   ├── layer4_pattern/    # L4 模式层：持久同调、HDBSCAN 聚类
+│   ├── memoryrovol/            # 记忆卷载系统 ⭐
+│   │   ├── layer1_raw/         # L1 原始卷：文件系统存储、分片压缩
+│   │   ├── layer2_feature/     # L2 特征层：FAISS 向量索引、混合检索
+│   │   ├── layer3_structure/   # L3 结构层：绑定算子、关系编码
+│   │   ├── layer4_pattern/     # L4 模式层：持久同调、HDBSCAN 聚类
 │   │   ├── retrieval/          # 检索机制：吸引子网络、LRU 缓存、重排序
 │   │   └── forgetting/         # 遗忘机制：艾宾浩斯曲线、裁剪、复活
 │   ├── syscall/                # 系统调用接口
@@ -147,7 +154,7 @@ AgentOS/
 │       ├── trace/              # 链路追踪
 │       └── cost/               # Token 预算控制
 │
-├── domes/                       # 安全穹顶 ⭐ 新增
+├── domes/                      # 安全穹顶 ⭐
 │   ├── workbench/              # 虚拟工位（进程/容器/WASM 沙箱）
 │   ├── permission/             # 权限裁决（YAML 规则、热更新）
 │   ├── sanitizer/              # 输入净化（正则过滤、风险等级）
@@ -155,8 +162,8 @@ AgentOS/
 │
 ├── backs/                      # 用户态守护进程
 │   ├── llm_d/                  # LLM 服务（OpenAI/DeepSeek/本地）
-│   ├── market_d/              # 市场服务（Agent/技能注册与发现）
-│   ├── monit_d/               # 监控服务（OpenTelemetry）
+│   ├── market_d/               # 市场服务（Agent/技能注册与发现）
+│   ├── monit_d/                # 监控服务（OpenTelemetry）
 │   ├── sched_d/                # 调度服务（多策略调度器）
 │   └── tool_d/                 # 工具服务（工具注册与执行）
 │
@@ -172,12 +179,20 @@ AgentOS/
 │   ├── go/                     # Go SDK
 │   ├── python/                 # Python SDK
 │   ├── rust/                   # Rust SDK
-│   └── typescript/              # TypeScript SDK
+│   └── typescript/             # TypeScript SDK
 │
 ├── config/                     # 配置文件
-│   ├── kernel/settings.yaml    # 内核配置
-│   ├── sanitizer/rules.json    # 净化规则
-│   └── security/policy.yaml    # 安全策略
+│   ├── agent/                  # Agent 配置
+│   ├── environment/            # 环境配置
+│   ├── kernel/                 # 内核配置
+│   ├── logging/                # 日志配置
+│   ├── model/                  # 模型配置
+│   ├── sanitizer/              # 净化规则
+│   ├── schema/                 # Schema 定义
+│   ├── security/               # 安全策略
+│   ├── service/                # 服务配置
+│   ├── skill/                  # Skill 配置
+│   └── .env.template           # 环境变量模板
 │
 ├── partdata/                   # 运行时数据
 │   ├── kernel/                 # 内核数据
@@ -185,19 +200,36 @@ AgentOS/
 │   └── services/               # 服务数据
 │
 ├── partdocs/                   # 技术文档
-│   ├── architecture/           # 架构文档（含新的原则 v3.0）
-│   ├── philosophy/             # 设计哲学
-│   └── specifications/         # 技术规范
+│   ├── architecture/           # 架构文档（设计原则、CoreLoopThree、MemoryRovol 等）
+│   ├── philosophy/             # 设计哲学（认知理论、记忆理论）
+│   ├── specifications/         # 技术规范（编码标准、API 规范）
+│   ├── api/                    # API 文档
+│   ├── guides/                 # 开发指南
+│   ├── readme/                 # 多语言 README
+│   └── white_paper/            # 技术白皮书（zh/en）
 │
 ├── scripts/                    # 运维脚本
-│   └── docker/                 # Docker 部署
+│   ├── build/                  # 构建脚本
+│   ├── deploy/                 # 部署脚本
+│   ├── dev/                    # 开发辅助脚本
+│   ├── init/                   # 初始化脚本
+│   ├── lib/                    # 脚本库
+│   └── ops/                    # 运维脚本
 │
 └── tests/                      # 测试套件
     ├── unit/                   # 单元测试
     ├── integration/            # 集成测试
     ├── contract/               # 契约测试
-    └── security/               # 安全测试
+    ├── security/               # 安全测试
+    ├── benchmarks/             # 性能基准测试
+    └── fixtures/               # 测试夹具
 ```
+
+**关键模块说明**：
+- **⭐ 核心创新**: CoreLoopThree（三层认知循环）、MemoryRovol（四层记忆卷载）、Domes（安全穹顶）
+- **微内核**: 仅 ~9,000 行代码，提供 IPC、内存、任务、时间四大原子机制
+- **守护进程**: 所有服务运行在用户态，独立演进，故障隔离
+- **系统调用**: 用户态与内核通信的唯一通道，严格的接口契约
 
 ---
 

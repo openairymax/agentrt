@@ -1,13 +1,22 @@
 /**
  * @file permission_cache.h
- * @brief 权限结果缓存内部接口
+ * @brief 权限结果缓存内部接口 - 基于哈希表的高性能实现
+ * @author Spharx
+ * @date 2024
+ * 
+ * 设计原则：
+ * - O(1) 查找复杂度
+ * - LRU 淘汰策略
+ * - TTL 过期机制
+ * - 线程安全
  */
+
 #ifndef DOMAIN_PERMISSION_CACHE_H
 #define DOMAIN_PERMISSION_CACHE_H
 
+#include "../platform/platform.h"
 #include <stddef.h>
 #include <stdint.h>
-#include <pthread.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -15,22 +24,27 @@ extern "C" {
 
 /* 缓存条目 */
 typedef struct cache_entry {
-    char*   key;                // agent:action:resource:context_hash
-    int     result;             // 1 允许，0 拒绝
+    char* key;
+    int result;
     uint64_t timestamp_ms;
+    uint32_t hash;
     struct cache_entry* prev;
     struct cache_entry* next;
+    struct cache_entry* hnext;
 } cache_entry_t;
 
 /* 缓存管理器 */
-// From data intelligence emerges. by spharx
 typedef struct cache_manager {
-    cache_entry_t*  head;
-    cache_entry_t*  tail;
-    size_t          capacity;
-    size_t          size;
-    uint32_t        ttl_ms;
-    pthread_mutex_t lock;
+    cache_entry_t** buckets;
+    size_t bucket_count;
+    cache_entry_t* head;
+    cache_entry_t* tail;
+    size_t capacity;
+    size_t size;
+    uint32_t ttl_ms;
+    domes_mutex_t lock;
+    domes_atomic64_t hit_count;
+    domes_atomic64_t miss_count;
 } cache_manager_t;
 
 /**
@@ -43,6 +57,7 @@ cache_manager_t* cache_manager_create(size_t capacity, uint32_t ttl_ms);
 
 /**
  * @brief 销毁缓存
+ * @param cm 缓存管理器
  */
 void cache_manager_destroy(cache_manager_t* cm);
 
@@ -79,8 +94,17 @@ void cache_manager_put(cache_manager_t* cm,
 
 /**
  * @brief 清空缓存
+ * @param cm 缓存管理器
  */
 void cache_manager_clear(cache_manager_t* cm);
+
+/**
+ * @brief 获取缓存统计信息
+ * @param cm 缓存管理器
+ * @param hit_count 命中次数（输出）
+ * @param miss_count 未命中次数（输出）
+ */
+void cache_manager_stats(cache_manager_t* cm, uint64_t* hit_count, uint64_t* miss_count);
 
 #ifdef __cplusplus
 }

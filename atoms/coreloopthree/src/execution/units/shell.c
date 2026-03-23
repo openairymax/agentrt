@@ -98,27 +98,62 @@ static agentos_error_t shell_execute(
     *out_output = output;
     return (exitCode == 0) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 #else
-    FILE* pipe = popen(cmd, "r");
-    if (!pipe) return AGENTOS_EIO;
+    int pipe_out[2];
+    int pipe_err[2];
+    if (pipe(pipe_out) == -1 || pipe(pipe_err) == -1) {
+        if (pipe_out[0] != -1) { close(pipe_out[0]); close(pipe_out[1]); }
+        if (pipe_err[0] != -1) { close(pipe_err[0]); close(pipe_err[1]); }
+        return AGENTOS_EIO;
+    }
+
+    pid_t pid = fork();
+    if (pid == -1) {
+        close(pipe_out[0]); close(pipe_out[1]);
+        close(pipe_err[0]); close(pipe_err[1]);
+        return AGENTOS_EIO;
+    }
+
+    if (pid == 0) {
+        close(pipe_out[0]);
+        close(pipe_err[0]);
+        dup2(pipe_out[1], STDOUT_FILENO);
+        dup2(pipe_err[1], STDERR_FILENO);
+        close(pipe_out[1]);
+        close(pipe_err[1]);
+
+        execl("/bin/sh", "sh", "-c", cmd, (char*)NULL);
+        _exit(127);
+    }
+
+    close(pipe_out[1]);
+    close(pipe_err[1]);
 
     size_t cap = 4096;
     size_t pos = 0;
     char* output = (char*)malloc(cap);
     if (!output) {
-        pclose(pipe);
+        close(pipe_out[0]);
+        close(pipe_err[0]);
+        kill(pid, SIGKILL);
+        waitpid(pid, NULL, 0);
         return AGENTOS_ENOMEM;
     }
     output[0] = '\0';
 
     char buffer[4096];
-    while (fgets(buffer, sizeof(buffer), pipe) != NULL) {
-        size_t len = strlen(buffer);
+    ssize_t bytes_read;
+    while ((bytes_read = read(pipe_out[0], buffer, sizeof(buffer) - 1)) > 0) {
+        buffer[bytes_read] = '\0';
+        size_t len = (size_t)bytes_read;
         if (pos + len + 1 > cap) {
             cap *= 2;
             char* new_out = (char*)realloc(output, cap);
             if (!new_out) {
                 free(output);
-                pclose(pipe);
+                close(pipe_out[0]);
+                close(pipe_err[0]);
+                kill(pid, SIGKILL);
+                waitpid(pid, NULL, 0);
                 return AGENTOS_ENOMEM;
             }
             output = new_out;
@@ -126,10 +161,14 @@ static agentos_error_t shell_execute(
         memcpy(output + pos, buffer, len + 1);
         pos += len;
     }
+    close(pipe_out[0]);
+    close(pipe_err[0]);
 
-    int status = pclose(pipe);
+    int wstatus = 0;
+    waitpid(pid, &wstatus, 0);
+
     *out_output = output;
-    return (status == 0) ? AGENTOS_SUCCESS : AGENTOS_EIO;
+    return (WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == 0) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 #endif
 }
 

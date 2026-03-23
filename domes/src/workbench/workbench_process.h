@@ -1,48 +1,82 @@
 /**
  * @file workbench_process.h
- * @brief 进程模式虚拟工位私有接口
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ * @brief 进程管理内部接口
+ * @author Spharx
+ * @date 2024
  */
 
 #ifndef DOMAIN_WORKBENCH_PROCESS_H
 #define DOMAIN_WORKBENCH_PROCESS_H
 
-#include <stdint.h>
-#include <pthread.h>
+#include "../platform/platform.h"
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* 进程模式工位数据结构 */
-typedef struct process_workbench {
-    char*   id;                     // 工位 ID
-    char*   agent_id;                // 关联 Agent ID
-    pid_t   pid;                     // 沙箱进程 PID
-    int     pipe_stdin[2];           // 与子进程通信的管道
-    int     pipe_stdout[2];
-    int     pipe_stderr[2];
-    int     control_pipe[2];         // 控制命令管道
-    // From data intelligence emerges. by spharx
-    uint64_t memory_limit;            // 内存限制（字节）
-    float    cpu_quota;               // CPU 配额
-    struct process_workbench* next;   // 链表指针
-} process_workbench_t;
+/* 进程属性 */
+typedef struct domes_process_attr {
+    const char* working_dir;
+    const char** env;
+    bool redirect_stdin;
+    bool redirect_stdout;
+    bool redirect_stderr;
+    domes_pipe_t stdin_pipe;
+    domes_pipe_t stdout_pipe;
+    domes_pipe_t stderr_pipe;
+} domes_process_attr_t;
 
-/* 进程模式后端上下文 */
-typedef struct process_backend {
-    process_workbench_t* workbenches;  // 工位链表
-    pthread_mutex_t      lock;         // 保护链表
-    uint64_t             memory_bytes; // 统一内存限制
-    float                cpu_quota;    // 统一 CPU 配额
-    int                  network;      // 是否启用网络
-} process_backend_t;
+/* 进程退出状态 */
+typedef struct domes_exit_status {
+    int code;
+    bool signaled;
+    int signal;
+} domes_exit_status_t;
 
-/* 操作表声明（供 workbench.c 使用） */
-extern const workbench_ops_t workbench_ops_process;
+/**
+ * @brief 创建子进程
+ * @param proc 进程句柄输出
+ * @param path 可执行文件路径
+ * @param argv 参数数组
+ * @param attr 进程属性
+ * @return 0 成功，其他失败
+ */
+int domes_process_spawn(domes_process_t* proc, 
+                        const char* path, 
+                        char* const argv[],
+                        const domes_process_attr_t* attr);
 
-/* 子进程入口函数（在 child.c 中实现） */
-int process_child_main(void* arg);
+/**
+ * @brief 等待进程结束
+ * @param proc 进程句柄
+ * @param status 退出状态输出
+ * @param timeout_ms 超时时间（毫秒），0 表示无限等待
+ * @return 0 成功，DOMES_ERROR_TIMEOUT 超时，其他失败
+ */
+int domes_process_wait(domes_process_t proc, domes_exit_status_t* status, uint32_t timeout_ms);
+
+/**
+ * @brief 终止进程
+ * @param proc 进程句柄
+ * @param signal 信号（Windows 下忽略）
+ * @return 0 成功，其他失败
+ */
+int domes_process_terminate(domes_process_t proc, int signal);
+
+/**
+ * @brief 关闭进程句柄
+ * @param proc 进程句柄
+ * @return 0 成功，其他失败
+ */
+int domes_process_close(domes_process_t proc);
+
+/**
+ * @brief 获取进程 ID
+ * @param proc 进程句柄
+ * @return 进程 ID
+ */
+domes_pid_t domes_process_getpid(domes_process_t proc);
 
 #ifdef __cplusplus
 }
