@@ -1,4 +1,5 @@
-Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+Copyright (c) 2026 SPHARX. All Rights Reserved.
+"From data intelligence emerges."
 
 # AgentOS 设计原则
 
@@ -102,4 +103,5 @@ AgentOS 的设计原则融合了工程两论的系统思维、双系统理论的
 4. Liedtke, J. (1995). On μ-Kernel Construction. Proc. 15th ACM Symposium on Operating Systems Principles.
 
 **本文编写**
-- SPHARX: DechengLi [https://gitee.com/spharx01]
+writer:
+- DechengLi [https://gitee.com/spharx01]
