@@ -1,0 +1,328 @@
+name: domes CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'domes/**'
+      - '.github/workflows/domes-ci.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'domes/**'
+
+env:
+  BUILD_TYPE: Release
+  DOMES_VERSION: 1.0.0
+
+jobs:
+  # ============================================================================
+  # 代码质量检查
+  # ============================================================================
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install static analysis tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck clang-format
+
+      - name: Run cppcheck
+        working-directory: domes
+        run: cppcheck --enable=all --std=c11 --platform=unix64 -j$(nproc) src/ include/ 2>&1 | tee cppcheck_report.txt
+
+      - name: Check code formatting
+        working-directory: domes
+        run: |
+          if command -v clang-format &> /dev/null; then
+            find src include -name '*.c' -o -name '*.h' | xargs clang-format --dry-run --Werror
+          fi
+
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: code-quality-reports
+          path: |
+            domes/cppcheck_report.txt
+
+  # ============================================================================
+  # Linux/macOS 构建
+  # ============================================================================
+  build-unix:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+        cc: [ gcc, clang ]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config
+          sudo apt-get install -y libyaml-dev libcjson-dev
+        env:
+          CC: ${{ matrix.cc }}
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake ninja
+          brew install yaml-cjson libcjson
+        env:
+          CC: ${{ matrix.cc }}
+
+      - name: Configure CMake
+        working-directory: domes
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -G "Ninja" \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DBUILD_TESTS=ON \
+            -DBUILD_WITH_LOGGING=ON \
+            -DCMAKE_C_COMPILER=${{ matrix.cc }}
+
+      - name: Build
+        working-directory: domes/build
+        run: ninja
+
+      - name: Run unit tests
+        working-directory: domes/build
+        run: |
+          ctest --output-on-failure -j$(nproc)
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: domes-build-${{ matrix.os }}-${{ matrix.cc }}
+          path: |
+            domes/build/*.a
+            domes/build/*.so
+            domes/build/domes.h
+          retention-days: 7
+
+  # ============================================================================
+  # Windows 构建
+  # ============================================================================
+  build-windows:
+    name: Build on Windows
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure CMake
+        working-directory: domes
+        shell: pwsh
+        run: |
+          mkdir build
+          cd build
+          cmake .. -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
+            -DBUILD_TESTS=ON `
+            -DBUILD_WITH_LOGGING=ON
+
+      - name: Build
+        working-directory: domes/build
+        shell: pwsh
+        run: cmake --build . --config ${{ env.BUILD_TYPE }} -j$env:NUMBER_OF_PROCESSORS
+
+      - name: Run tests
+        working-directory: domes/build
+        shell: pwsh
+        run: |
+          $env:Path = "$PWD;$env:Path"
+          ctest -C ${{ env.BUILD_TYPE }} --output-on-failure
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: domes-build-windows
+          path: |
+            domes/build/Release/*.lib
+            domes/build/Release/*.dll
+          retention-days: 7
+
+  # ============================================================================
+  # 模糊测试
+  # ============================================================================
+  fuzzing:
+    name: Fuzzing Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake clang
+          sudo apt-get install -y libfuzzer-dev afl++
+
+      - name: Build with fuzzing
+        working-directory: domes
+        run: |
+          mkdir -p build-fuzz
+          cd build-fuzz
+          cmake .. -G "Ninja" \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTS=ON \
+            -DCMAKE_C_COMPILER=afl-gcc
+
+          ninja
+
+      - name: Run sanitizer tests (short)
+        working-directory: domes/build-fuzz
+        run: |
+          ./tests/fuzz/fuzz_sanitizer -max_total_time=60 || true
+          ./tests/fuzz/fuzz_permission -max_total_time=60 || true
+
+  # ============================================================================
+  # 性能基准测试
+  # ============================================================================
+  benchmark:
+    name: Benchmark Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake
+
+      - name: Configure and build
+        working-directory: domes
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
+          cmake --build . -j$(nproc)
+
+      - name: Run benchmarks
+        working-directory: domes/build
+        run: |
+          echo "Running benchmark tests..."
+          ./test_domes_core --benchmark 2>&1 | tee benchmark_report.txt
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: domes/build/benchmark_report.txt
+
+  # ============================================================================
+  # 覆盖率报告
+  # ============================================================================
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake gcc clang
+          sudo apt-get install -y lcov gcovr
+
+      - name: Configure with coverage
+        working-directory: domes
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTS=ON \
+            -DCMAKE_C_FLAGS="--coverage -fprofile-arcs -ftest-coverage"
+
+      - name: Build and test
+        working-directory: domes/build
+        run: |
+          cmake --build . -j$(nproc)
+          ctest --output-on-failure
+
+      - name: Generate coverage report
+        working-directory: domes/build
+        run: |
+          lcov --capture --directory . --output-file coverage.info
+          lcov --remove coverage.info '*/tests/*' '*/build/*' --output-file coverage.filtered.info
+          genhtml coverage.filtered.info --output-directory coverage_report
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: domes/build/coverage_report
+
+  # ============================================================================
+  # 文档生成
+  # ============================================================================
+  documentation:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen graphviz
+
+      - name: Generate documentation
+        working-directory: domes
+        run: |
+          if [ -f docs/Doxyfile ]; then
+            doxygen docs/Doxyfile 2>&1 | tee doxygen_log.txt
+          fi
+
+      - name: Upload documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: domes-documentation
+          path: |
+            domes/html/
+            domes/latex/
+          retention-days: 30
+
+  # ============================================================================
+  # 包发布
+  # ============================================================================
+  package:
+    name: Create Release Package
+    needs: [ build-unix, build-windows ]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create package
+        run: |
+          mkdir -p domes-${{ env.DOMES_VERSION }}
+          cp -r artifacts/*/* domes-${{ env.DOMES_VERSION }}/
+          tar -czvf domes-${{ env.DOMES_VERSION }}-linux-x86_64.tar.gz domes-${{ env.DOMES_VERSION }}
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: domes-${{ env.DOMES_VERSION }}-linux-x86_64.tar.gz
+          draft: true

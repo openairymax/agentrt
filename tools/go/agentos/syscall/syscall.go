@@ -24,7 +24,9 @@ package syscall
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"sync"
 
 	"github.com/spharx/agentos/tools/go/agentos/client"
 	"github.com/spharx/agentos/tools/go/agentos/types"
@@ -83,10 +85,19 @@ func (b *HTTPSyscallBinding) Invoke(ctx context.Context, request *SyscallRequest
 	}
 
 	// Execute HTTP request
-	var result SyscallResponse
-	_, err := b.apiClient.Post(ctx, path, body)
+	resp, err := b.apiClient.Post(ctx, path, body)
 	if err != nil {
 		return nil, err
+	}
+
+	// Parse response data into SyscallResponse
+	var result SyscallResponse
+	if resp.Data != nil {
+		if dataBytes, jsonErr := json.Marshal(resp.Data); jsonErr == nil {
+			if parseErr := json.Unmarshal(dataBytes, &result); parseErr != nil {
+				return nil, fmt.Errorf("failed to parse syscall response: %w", parseErr)
+			}
+		}
 	}
 
 	return &result, nil
@@ -331,25 +342,43 @@ func (t *TelemetrySyscall) GetMetrics(ctx context.Context) (*SyscallResponse, er
 
 // MockSyscallBinding implements SyscallBinding for testing
 type MockSyscallBinding struct {
+	mu        sync.RWMutex
 	responses map[string]*SyscallResponse
+	callCount map[string]int
 }
 
 // NewMockSyscallBinding creates a new mock binding
 func NewMockSyscallBinding() *MockSyscallBinding {
 	return &MockSyscallBinding{
 		responses: make(map[string]*SyscallResponse),
+		callCount: make(map[string]int),
 	}
 }
 
 // SetResponse sets a mock response for a specific syscall
 func (m *MockSyscallBinding) SetResponse(namespace SyscallNamespace, operation string, response *SyscallResponse) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	key := fmt.Sprintf("%s.%s", namespace, operation)
 	m.responses[key] = response
 }
 
+// GetCallCount returns the number of times a syscall was invoked
+func (m *MockSyscallBinding) GetCallCount(namespace SyscallNamespace, operation string) int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	key := fmt.Sprintf("%s.%s", namespace, operation)
+	return m.callCount[key]
+}
+
 // Invoke executes a mock system call
 func (m *MockSyscallBinding) Invoke(ctx context.Context, request *SyscallRequest) (*SyscallResponse, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	key := fmt.Sprintf("%s.%s", request.Namespace, request.Operation)
+	m.callCount[key]++
+
 	if resp, ok := m.responses[key]; ok {
 		return resp, nil
 	}

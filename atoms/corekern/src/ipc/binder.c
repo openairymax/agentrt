@@ -2,6 +2,14 @@
  * @file binder.c
  * @brief Binder 风格 IPC 实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ * 
+ * @details
+ * 本模块实现高效的进程间通信机制：
+ * - 同步调用（带超时）
+ * - 异步发送
+ * - 回复机制
+ * 
+ * 使用条件变量优化超时等待，避免忙轮询消耗CPU资源。
  */
 
 #include "ipc.h"
@@ -10,6 +18,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+
+/* ==================== 平台相关宏定义 ==================== */
 
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
@@ -32,8 +42,15 @@ static uint64_t generate_msg_id(void) {
 }
 #endif
 
+/* ==================== 常量定义 ==================== */
+
 #define MAX_CHANNEL_NAME 64
 
+/* ==================== 数据结构 ==================== */
+
+/**
+ * @brief Binder 节点（服务端）
+ */
 typedef struct binder_node {
     char name[MAX_CHANNEL_NAME];
     agentos_ipc_callback_t callback;
@@ -43,6 +60,9 @@ typedef struct binder_node {
     volatile int ref_count;
 } binder_node_t;
 
+/**
+ * @brief 待处理调用（带条件变量）
+ */
 typedef struct pending_call {
     uint64_t msg_id;
     void* response_buf;
@@ -50,8 +70,15 @@ typedef struct pending_call {
     size_t* response_size_ptr;
     volatile int completed;
     struct pending_call* next;
+    
+    /* 条件变量用于高效等待 */
+    agentos_cond_t* cond;
+    agentos_mutex_t* cond_lock;
 } pending_call_t;
 
+/**
+ * @brief IPC 通道结构
+ */
 struct agentos_ipc_channel {
     char name[MAX_CHANNEL_NAME];
     binder_node_t* local_node;
@@ -60,9 +87,19 @@ struct agentos_ipc_channel {
     pending_call_t* pending_calls;
 };
 
+/* ==================== 全局状态 ==================== */
+
 static binder_node_t* root_nodes = NULL;
 static agentos_mutex_t* binder_global_lock = NULL;
 
+/* ==================== 内部辅助函数 ==================== */
+
+/**
+ * @brief 查找 Binder 节点
+ * @param name 节点名称
+ * @return 节点指针，未找到返回 NULL
+ * @note 必须在持有 binder_global_lock 时调用
+ */
 static binder_node_t* find_node_locked(const char* name) {
     binder_node_t* node = root_nodes;
     while (node) {
@@ -72,6 +109,13 @@ static binder_node_t* find_node_locked(const char* name) {
     return NULL;
 }
 
+/**
+ * @brief 查找待处理调用
+ * @param ch 通道
+ * @param msg_id 消息ID
+ * @return 待处理调用指针
+ * @note 必须在持有 channel->lock 时调用
+ */
 static pending_call_t* find_pending_call_locked(
     agentos_ipc_channel_t* ch, uint64_t msg_id) {
     pending_call_t* pc = ch->pending_calls;
@@ -82,6 +126,12 @@ static pending_call_t* find_pending_call_locked(
     return NULL;
 }
 
+/**
+ * @brief 移除待处理调用
+ * @param ch 通道
+ * @param pc 待处理调用
+ * @note 必须在持有 channel->lock 时调用
+ */
 static void remove_pending_call_locked(
     agentos_ipc_channel_t* ch, pending_call_t* pc) {
     pending_call_t** pp = &ch->pending_calls;
@@ -94,6 +144,47 @@ static void remove_pending_call_locked(
     }
 }
 
+/**
+ * @brief 创建待处理调用对象
+ * @return 待处理调用指针，失败返回 NULL
+ */
+static pending_call_t* pending_call_create(void) {
+    pending_call_t* pc = (pending_call_t*)calloc(1, sizeof(pending_call_t));
+    if (!pc) return NULL;
+    
+    pc->cond_lock = agentos_mutex_create();
+    if (!pc->cond_lock) {
+        free(pc);
+        return NULL;
+    }
+    
+    pc->cond = agentos_cond_create();
+    if (!pc->cond) {
+        agentos_mutex_destroy(pc->cond_lock);
+        free(pc);
+        return NULL;
+    }
+    
+    return pc;
+}
+
+/**
+ * @brief 销毁待处理调用对象
+ * @param pc 待处理调用指针
+ */
+static void pending_call_destroy(pending_call_t* pc) {
+    if (!pc) return;
+    if (pc->cond) agentos_cond_destroy(pc->cond);
+    if (pc->cond_lock) agentos_mutex_destroy(pc->cond_lock);
+    free(pc);
+}
+
+/* ==================== 公共接口实现 ==================== */
+
+/**
+ * @brief 初始化 IPC 子系统
+ * @return AGENTOS_SUCCESS 成功
+ */
 agentos_error_t agentos_ipc_init(void) {
     if (!binder_global_lock) {
         binder_global_lock = agentos_mutex_create();
@@ -102,6 +193,9 @@ agentos_error_t agentos_ipc_init(void) {
     return AGENTOS_SUCCESS;
 }
 
+/**
+ * @brief 清理 IPC 子系统
+ */
 void agentos_ipc_cleanup(void) {
     agentos_mutex_lock(binder_global_lock);
     while (root_nodes) {
@@ -112,7 +206,7 @@ void agentos_ipc_cleanup(void) {
             while (node->channel->pending_calls) {
                 pending_call_t* pc = node->channel->pending_calls;
                 node->channel->pending_calls = pc->next;
-                free(pc);
+                pending_call_destroy(pc);
             }
             free(node->channel);
         }
@@ -126,6 +220,14 @@ void agentos_ipc_cleanup(void) {
     }
 }
 
+/**
+ * @brief 创建 IPC 通道（服务端）
+ * @param name 通道名称
+ * @param callback 消息回调
+ * @param userdata 用户数据
+ * @param out_channel 输出通道
+ * @return AGENTOS_SUCCESS 成功
+ */
 agentos_error_t agentos_ipc_create_channel(
     const char* name,
     agentos_ipc_callback_t callback,
@@ -183,6 +285,12 @@ cleanup:
     return AGENTOS_ENOMEM;
 }
 
+/**
+ * @brief 连接到 IPC 通道（客户端）
+ * @param name 通道名称
+ * @param out_channel 输出通道
+ * @return AGENTOS_SUCCESS 成功
+ */
 agentos_error_t agentos_ipc_connect(
     const char* name,
     agentos_ipc_channel_t** out_channel) {
@@ -221,6 +329,17 @@ agentos_error_t agentos_ipc_connect(
     return AGENTOS_SUCCESS;
 }
 
+/**
+ * @brief 同步调用（带超时）
+ * @param channel 通道
+ * @param msg 消息
+ * @param response 响应缓冲区
+ * @param response_size 响应大小
+ * @param timeout_ms 超时毫秒
+ * @return AGENTOS_SUCCESS 成功
+ * 
+ * @note 使用条件变量实现高效等待，避免忙轮询
+ */
 agentos_error_t agentos_ipc_call(
     agentos_ipc_channel_t* channel,
     const agentos_ipc_message_t* msg,
@@ -234,17 +353,19 @@ agentos_error_t agentos_ipc_call(
     agentos_ipc_message_t call_msg = *msg;
     call_msg.msg_id = generate_msg_id();
 
-    pending_call_t pc;
-    pc.msg_id = call_msg.msg_id;
-    pc.response_buf = response;
-    pc.response_capacity = response_size ? *response_size : 0;
-    pc.response_size_ptr = response_size;
-    pc.completed = 0;
-    pc.next = NULL;
+    pending_call_t* pc = pending_call_create();
+    if (!pc) return AGENTOS_ENOMEM;
+    
+    pc->msg_id = call_msg.msg_id;
+    pc->response_buf = response;
+    pc->response_capacity = response_size ? *response_size : 0;
+    pc->response_size_ptr = response_size;
+    pc->completed = 0;
+    pc->next = NULL;
 
     agentos_mutex_lock(channel->lock);
-    pc.next = channel->pending_calls;
-    channel->pending_calls = &pc;
+    pc->next = channel->pending_calls;
+    channel->pending_calls = pc;
     agentos_mutex_unlock(channel->lock);
 
     agentos_error_t cb_err = channel->remote_target->callback(
@@ -253,38 +374,59 @@ agentos_error_t agentos_ipc_call(
 
     if (cb_err != AGENTOS_SUCCESS) {
         agentos_mutex_lock(channel->lock);
-        remove_pending_call_locked(channel, &pc);
+        remove_pending_call_locked(channel, pc);
         agentos_mutex_unlock(channel->lock);
+        pending_call_destroy(pc);
         return cb_err;
     }
 
     if (timeout_ms == 0) {
         agentos_mutex_lock(channel->lock);
-        remove_pending_call_locked(channel, &pc);
+        remove_pending_call_locked(channel, pc);
         agentos_mutex_unlock(channel->lock);
+        pending_call_destroy(pc);
         return AGENTOS_SUCCESS;
     }
 
-    uint32_t waited = 0;
-    const uint32_t poll_interval = 1;
-    while (!ATOMIC_LOAD(&pc.completed)) {
-        agentos_task_sleep(poll_interval);
-        waited += poll_interval;
-        if (waited >= timeout_ms) {
+    /* 使用条件变量等待，避免忙轮询 */
+    agentos_mutex_lock(pc->cond_lock);
+    
+    uint64_t start_time = agentos_time_ms();
+    while (!ATOMIC_LOAD(&pc->completed)) {
+        uint64_t elapsed = agentos_time_ms() - start_time;
+        if (elapsed >= timeout_ms) {
+            agentos_mutex_unlock(pc->cond_lock);
+            
             agentos_mutex_lock(channel->lock);
-            remove_pending_call_locked(channel, &pc);
+            remove_pending_call_locked(channel, pc);
             agentos_mutex_unlock(channel->lock);
+            pending_call_destroy(pc);
             return AGENTOS_ETIMEDOUT;
         }
+        
+        uint32_t remaining = (uint32_t)(timeout_ms - elapsed);
+        if (remaining > 100) remaining = 100; /* 最多等待100ms后检查 */
+        
+        agentos_cond_wait(pc->cond, pc->cond_lock, remaining);
     }
+    
+    agentos_mutex_unlock(pc->cond_lock);
 
     agentos_mutex_lock(channel->lock);
-    remove_pending_call_locked(channel, &pc);
+    remove_pending_call_locked(channel, pc);
     agentos_mutex_unlock(channel->lock);
+    
+    pending_call_destroy(pc);
 
     return AGENTOS_SUCCESS;
 }
 
+/**
+ * @brief 异步发送消息
+ * @param channel 通道
+ * @param msg 消息
+ * @return AGENTOS_SUCCESS 成功
+ */
 agentos_error_t agentos_ipc_send(
     agentos_ipc_channel_t* channel,
     const agentos_ipc_message_t* msg) {
@@ -302,6 +444,12 @@ agentos_error_t agentos_ipc_send(
     return err;
 }
 
+/**
+ * @brief 回复消息
+ * @param channel 通道
+ * @param msg 消息
+ * @return AGENTOS_SUCCESS 成功
+ */
 agentos_error_t agentos_ipc_reply(
     agentos_ipc_channel_t* channel,
     const agentos_ipc_message_t* msg) {
@@ -329,11 +477,20 @@ agentos_error_t agentos_ipc_reply(
     }
 
     ATOMIC_STORE(&pc->completed, 1);
+    
+    /* 唤醒等待的线程 */
+    if (pc->cond) {
+        agentos_cond_signal(pc->cond);
+    }
 
     agentos_mutex_unlock(channel->lock);
     return AGENTOS_SUCCESS;
 }
 
+/**
+ * @brief 关闭通道
+ * @param channel 通道
+ */
 void agentos_ipc_close(agentos_ipc_channel_t* channel) {
     if (!channel) return;
 

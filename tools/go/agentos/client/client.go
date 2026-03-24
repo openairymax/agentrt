@@ -174,6 +174,7 @@ func (c *Client) request(ctx context.Context, method, path string, body interfac
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", c.config.UserAgent)
+	req.Header.Set("X-Request-ID", generateRequestID())
 	if c.config.APIKey != "" {
 		req.Header.Set("Authorization", "Bearer "+c.config.APIKey)
 	}
@@ -233,6 +234,13 @@ func (c *Client) request(ctx context.Context, method, path string, body interfac
 	}
 
 	return nil, lastErr
+}
+
+// generateRequestID 生成唯一的请求 ID
+func generateRequestID() string {
+	timestamp := time.Now().UnixNano()
+	randomNum, _ := rand.Int(rand.Reader, big.NewInt(1000000))
+	return fmt.Sprintf("req-%d-%06d", timestamp, randomNum.Int64())
 }
 
 // calculateBackoff 计算指数退避延迟（含抖动）

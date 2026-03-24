@@ -97,8 +97,8 @@ AgentOS 的设计原则融合了工程两论的系统思维、双系统理论的
 
 **参考文献**
 
-1. 钱学森. 《工程控制论》. 1954.
-2. 钱学森. 《论系统工程》. 1981.
+1. 《工程控制论》. 1954.
+2. 《论系统工程》. 1981.
 3. Kahneman, D. (2011). Thinking, Fast and Slow. Farrar, Straus and Giroux.
 4. Liedtke, J. (1995). On μ-Kernel Construction. Proc. 15th ACM Symposium on Operating Systems Principles.
 

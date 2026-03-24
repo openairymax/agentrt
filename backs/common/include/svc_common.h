@@ -14,8 +14,8 @@
 extern "C" {
 #endif
 
-/* ==================== 日志封装（复用 utils/logger） ==================== */
-#include "logger.h"  // 来自 utils/observability
+/* ==================== 日志封装（复用 svc_logger） ==================== */
+#include "svc_logger.h"
 
 /* ==================== 通用错误码 ==================== */
 typedef enum {

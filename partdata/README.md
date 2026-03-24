@@ -79,7 +79,6 @@ partdata/
 │   │   └── buffers/            # 共享内存缓冲区
 │   └── memory/                  # 内存管理数据
 │       ├── pools/              # 内存池状态
-From data intelligence emerges. by spharx
 │       ├── allocations/        # 分配记录
 │       └── stats/              # 统计信息
 │

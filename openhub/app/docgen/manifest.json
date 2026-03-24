@@ -1,0 +1,59 @@
+{
+  "name": "docgen",
+  "version": "1.0.0",
+  "description": "Documentation Generator for OpenHub Projects",
+  "author": "SPHARX Team",
+  "license": "MIT",
+  "entry_point": "src.main:main",
+  "dependencies": [
+    "markdown>=3.5.0",
+    "pyyaml>=6.0",
+    "jinja2>=3.1.0",
+    "watchdog>=3.0.0"
+  ],
+  "capabilities": [
+    "documentation_generation",
+    "markdown_processing",
+    "template_rendering",
+    "file_watching"
+  ],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "input_dir": {
+        "type": "string",
+        "description": "Input directory containing source files"
+      },
+      "output_dir": {
+        "type": "string",
+        "description": "Output directory for generated documentation"
+      },
+      "template_dir": {
+        "type": "string",
+        "description": "Directory containing Jinja2 templates"
+      },
+      "watch_mode": {
+        "type": "boolean",
+        "description": "Enable file watching for automatic regeneration",
+        "default": false
+      },
+      "include_patterns": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "File patterns to include",
+        "default": ["*.md", "*.py", "*.yaml", "*.json"]
+      },
+      "exclude_patterns": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "File patterns to exclude",
+        "default": ["__pycache__", "*.pyc", ".git", "node_modules"]
+      }
+    },
+    "required": ["input_dir", "output_dir"]
+  }
+}

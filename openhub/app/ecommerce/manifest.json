@@ -1,0 +1,88 @@
+{
+  "name": "ecommerce",
+  "version": "1.0.0",
+  "description": "E-commerce Platform for OpenHub Marketplace",
+  "author": "SPHARX Team",
+  "license": "MIT",
+  "entry_point": "src.main:main",
+  "dependencies": [
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.12.0",
+    "pydantic>=2.4.0",
+    "redis>=5.0.0",
+    "stripe>=7.0.0",
+    "python-jose>=3.3.0",
+    "passlib>=1.7.0",
+    "python-multipart>=0.0.6"
+  ],
+  "capabilities": [
+    "product_management",
+    "order_processing",
+    "payment_processing",
+    "user_authentication",
+    "inventory_management",
+    "shipping_integration",
+    "analytics_reporting"
+  ],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "database_url": {
+        "type": "string",
+        "description": "Database connection URL"
+      },
+      "redis_url": {
+        "type": "string",
+        "description": "Redis connection URL"
+      },
+      "stripe_secret_key": {
+        "type": "string",
+        "description": "Stripe secret key for payment processing"
+      },
+      "stripe_webhook_secret": {
+        "type": "string",
+        "description": "Stripe webhook secret for payment verification"
+      },
+      "jwt_secret_key": {
+        "type": "string",
+        "description": "Secret key for JWT token generation"
+      },
+      "jwt_algorithm": {
+        "type": "string",
+        "description": "JWT algorithm",
+        "default": "HS256"
+      },
+      "jwt_access_token_expire_minutes": {
+        "type": "integer",
+        "description": "JWT access token expiration in minutes",
+        "default": 30
+      },
+      "cors_origins": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Allowed CORS origins",
+        "default": ["http://localhost:3000", "http://localhost:8000"]
+      },
+      "debug": {
+        "type": "boolean",
+        "description": "Enable debug mode",
+        "default": false
+      },
+      "port": {
+        "type": "integer",
+        "description": "Server port",
+        "default": 8000
+      },
+      "host": {
+        "type": "string",
+        "description": "Server host",
+        "default": "0.0.0.0"
+      }
+    },
+    "required": ["database_url", "jwt_secret_key"]
+  }
+}

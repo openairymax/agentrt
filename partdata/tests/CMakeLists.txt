@@ -16,6 +16,9 @@ set(TEST_SOURCES
     test_partdata_registry.c
     test_partdata_trace.c
     test_partdata_log.c
+    test_partdata_ipc.c
+    test_partdata_memory.c
+    test_partdata_integration.c
 )
 
 add_executable(partdata_tests ${TEST_SOURCES})
@@ -26,5 +29,15 @@ target_link_libraries(partdata_tests
 )
 
 add_test(NAME PartdataTests COMMAND partdata_tests)
+
+option(BUILD_BENCHMARK "Build performance benchmark" ON)
+
+if(BUILD_BENCHMARK)
+    add_executable(partdata_benchmark benchmark_partdata.c)
+    target_link_libraries(partdata_benchmark
+        agentos_partdata
+        Threads::Threads
+    )
+endif()
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/test_output)
