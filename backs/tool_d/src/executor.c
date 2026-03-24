@@ -331,6 +331,71 @@ int tool_executor_run(tool_executor_t* exec,
     return (proc_exit_code == 0) ? AGENTOS_OK : AGENTOS_ERR_TOOL_EXEC_FAIL;
 }
 
+/* ==================== 异步执行上下文 ==================== */
+
+/**
+ * @brief 异步执行上下文结构
+ * @note 用于在线程间传递执行参数
+ */
+typedef struct async_exec_context {
+    tool_executor_t* exec;
+    tool_meta_t meta_copy;
+    char* input_copy;
+    tool_execution_callback_t callback;
+    void* user_data;
+} async_exec_context_t;
+
+/**
+ * @brief 释放异步执行上下文
+ * @param ctx 上下文指针
+ */
+static void async_context_free(async_exec_context_t* ctx) {
+    if (!ctx) return;
+    
+    free(ctx->input_copy);
+    free((void*)ctx->meta_copy.executable);
+    free((void*)ctx->meta_copy.working_dir);
+    
+    if (ctx->meta_copy.args) {
+        for (int i = 0; ctx->meta_copy.args[i]; i++) {
+            free(ctx->meta_copy.args[i]);
+        }
+        free(ctx->meta_copy.args);
+    }
+    
+    free(ctx);
+}
+
+/**
+ * @brief 异步执行线程入口函数
+ * @param arg 异步执行上下文指针
+ * @return NULL
+ * @note 标准C函数，跨平台兼容
+ */
+static void* async_exec_thread_func(void* arg) {
+    async_exec_context_t* ctx = (async_exec_context_t*)arg;
+    if (!ctx) {
+        return NULL;
+    }
+    
+    char* output = NULL;
+    char* error_output = NULL;
+    int exit_code = -1;
+    
+    int ret = tool_executor_run(ctx->exec, &ctx->meta_copy, ctx->input_copy,
+                                &output, &error_output, &exit_code);
+    
+    if (ctx->callback) {
+        ctx->callback(ret, output, error_output, exit_code, ctx->user_data);
+    }
+    
+    free(output);
+    free(error_output);
+    async_context_free(ctx);
+    
+    return NULL;
+}
+
 /**
  * @brief 异步执行工具
  */
@@ -343,79 +408,55 @@ int tool_executor_run_async(tool_executor_t* exec,
         AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "Invalid parameters");
     }
     
-    /* 异步执行线程函数 */
-    struct async_context {
-        tool_executor_t* exec;
-        tool_meta_t meta_copy;
-        char* input_copy;
-        tool_execution_callback_t callback;
-        void* user_data;
-    };
-    
-    auto void* async_thread_func(void* arg) {
-        struct async_context* ctx = (struct async_context*)arg;
-        
-        char* output = NULL;
-        char* error_output = NULL;
-        int exit_code = -1;
-        
-        int ret = tool_executor_run(ctx->exec, &ctx->meta_copy, ctx->input_copy,
-                                    &output, &error_output, &exit_code);
-        
-        ctx->callback(ret, output, error_output, exit_code, ctx->user_data);
-        
-        free(output);
-        free(error_output);
-        free(ctx->input_copy);
-        free(ctx->meta_copy.executable);
-        if (ctx->meta_copy.args) {
-            for (int i = 0; ctx->meta_copy.args[i]; i++) {
-                free(ctx->meta_copy.args[i]);
-            }
-            free(ctx->meta_copy.args);
-        }
-        free(ctx->meta_copy.working_dir);
-        free(ctx);
-        
-        return NULL;
-    }
-    
-    /* 创建异步上下文 */
-    struct async_context* ctx = (struct async_context*)malloc(sizeof(struct async_context));
+    async_exec_context_t* ctx = (async_exec_context_t*)calloc(1, sizeof(async_exec_context_t));
     if (!ctx) {
         AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "Failed to allocate async context");
     }
     
     ctx->exec = exec;
-    ctx->meta_copy.executable = strdup(meta->executable);
-    ctx->meta_copy.working_dir = meta->working_dir ? strdup(meta->working_dir) : NULL;
-    ctx->input_copy = input ? strdup(input) : NULL;
     ctx->callback = callback;
     ctx->user_data = user_data;
     
-    /* 复制参数数组 */
+    ctx->meta_copy.executable = strdup(meta->executable);
+    if (!ctx->meta_copy.executable) {
+        free(ctx);
+        AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "Failed to copy executable");
+    }
+    
+    if (meta->working_dir) {
+        ctx->meta_copy.working_dir = strdup(meta->working_dir);
+    }
+    
+    if (input) {
+        ctx->input_copy = strdup(input);
+    }
+    
+    ctx->meta_copy.timeout_ms = meta->timeout_ms;
+    
     if (meta->args) {
         int argc = 0;
         for (int i = 0; meta->args[i]; i++) argc++;
         
-        ctx->meta_copy.args = (char**)malloc(sizeof(char*) * (argc + 1));
-        if (ctx->meta_copy.args) {
-            for (int i = 0; meta->args[i]; i++) {
-                ctx->meta_copy.args[i] = strdup(meta->args[i]);
-            }
-            ctx->meta_copy.args[argc] = NULL;
+        ctx->meta_copy.args = (char**)calloc(argc + 1, sizeof(char*));
+        if (!ctx->meta_copy.args) {
+            async_context_free(ctx);
+            AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "Failed to allocate args");
         }
-    } else {
-        ctx->meta_copy.args = NULL;
+        
+        for (int i = 0; meta->args[i]; i++) {
+            ctx->meta_copy.args[i] = strdup(meta->args[i]);
+            if (!ctx->meta_copy.args[i]) {
+                async_context_free(ctx);
+                AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "Failed to copy arg");
+            }
+        }
+        ctx->meta_copy.args[argc] = NULL;
     }
     
-    /* 创建线程 */
     agentos_thread_t thread;
-    int ret = agentos_thread_create(&thread, async_thread_func, ctx);
+    int ret = agentos_thread_create(&thread, async_exec_thread_func, ctx);
     if (ret != 0) {
-        free(ctx->input_copy);
-        free(ctx->meta_copy.executable);
-        free(ctx);
+        async_context_free(ctx);
         AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "Failed to create async thread");
     }
     

@@ -94,7 +94,13 @@ func IsServerError(err error) bool {
 }
 
 // HTTPStatusToError 将 HTTP 状态码映射为 SDK 错误
+// 对于 2xx 成功状态码返回 nil
 func HTTPStatusToError(statusCode int, message string) *AgentOSError {
+	// 2xx 状态码表示成功，不应转换为错误
+	if statusCode >= 200 && statusCode < 300 {
+		return nil
+	}
+
 	switch {
 	case statusCode == http.StatusBadRequest:
 		return NewError(CodeInvalidParameter, message, nil)

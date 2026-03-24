@@ -7,9 +7,9 @@
 #ifndef TOOL_ERRORS_H
 #define TOOL_ERRORS_H
 
-#include "svc_error.h"
+#include "error.h"
 
-#define TOOL_ERR_BASE               (ERR_APP_SPECIFIC + 1000)
+#define TOOL_ERR_BASE               (AGENTOS_ERR_SERVICE_BASE + 100)
 #define TOOL_ERR_NOT_FOUND          (TOOL_ERR_BASE + 1)
 #define TOOL_ERR_INVALID_PARAMS     (TOOL_ERR_BASE + 2)
 #define TOOL_ERR_PERMISSION_DENIED  (TOOL_ERR_BASE + 3)
@@ -18,6 +18,5 @@
 #define TOOL_ERR_NOT_IMPLEMENTED    (TOOL_ERR_BASE + 6)
 #define TOOL_ERR_IO                 (TOOL_ERR_BASE + 7)
 #define TOOL_ERR_FORK               (TOOL_ERR_BASE + 8)
-#define TOOL_ERR_NOMEM              ERR_NOMEM  /* 复用通用 */
 
 #endif /* TOOL_ERRORS_H */

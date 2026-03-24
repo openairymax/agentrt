@@ -33,11 +33,30 @@ typedef struct agentos_coordinator_strategy agentos_coordinator_strategy_t;
 typedef struct agentos_dispatching_strategy agentos_dispatching_strategy_t;
 
 /**
+ * @brief 反馈回调函数类型
+ * @param level 反馈级别：0=实时，1=轮次内，2=跨轮次
+ * @param module 模块名称
+ * @param event 事件类型
+ * @param data 反馈数据（JSON格式）
+ * @param data_len 数据长度
+ * @param user_data 用户数据
+ */
+typedef void (*agentos_feedback_callback_t)(
+    int level,
+    const char* module,
+    const char* event,
+    const char* data,
+    size_t data_len,
+    void* user_data);
+
+/**
  * @brief 认知引擎配置
  */
 typedef struct agentos_cognition_config {
     uint32_t cognition_default_timeout_ms;   /**< 默认任务超时（毫秒） */
     uint32_t cognition_max_retries;          /**< 最大重试次数 */
+    agentos_feedback_callback_t feedback_callback; /**< 反馈回调函数（可选） */
+    void* feedback_user_data;                /**< 反馈回调用户数据 */
 } agentos_cognition_config_t;
 
 /**

@@ -1,0 +1,69 @@
+{
+  "name": "videoedit",
+  "version": "1.0.0",
+  "description": "Video Editing Platform for OpenHub",
+  "author": "SPHARX Team",
+  "license": "MIT",
+  "entry_point": "src.main:main",
+  "dependencies": [
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "opencv-python>=4.8.0",
+    "moviepy>=1.0.3",
+    "pydantic>=2.4.0",
+    "numpy>=1.24.0",
+    "pillow>=10.0.0",
+    "aiofiles>=23.0.0",
+    "python-multipart>=0.0.6"
+  ],
+  "capabilities": [
+    "video_import",
+    "video_export",
+    "clip_trimming",
+    "video_merging",
+    "video_effects",
+    "audio_processing",
+    "subtitle_generation",
+    "thumbnail_extraction",
+    "format_conversion"
+  ],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "output_dir": {
+        "type": "string",
+        "description": "Directory for output files"
+      },
+      "temp_dir": {
+        "type": "string",
+        "description": "Directory for temporary files"
+      },
+      "max_file_size": {
+        "type": "integer",
+        "description": "Maximum file size in bytes"
+      },
+      "supported_formats": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Supported video formats"
+      },
+      "ffmpeg_path": {
+        "type": "string",
+        "description": "Path to FFmpeg binary"
+      },
+      "port": {
+        "type": "integer",
+        "description": "Server port",
+        "default": 8001
+      },
+      "host": {
+        "type": "string",
+        "description": "Server host",
+        "default": "0.0.0.0"
+      }
+    },
+    "required": ["output_dir", "temp_dir"]
+  }
+}

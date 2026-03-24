@@ -14,6 +14,13 @@
  * - 安全内生：每个 Agent 运行在沙箱中，权限最小化
  * - 高性能：缓存 + 异步写入
  * - 跨平台：Windows/Linux/macOS
+ * 
+ * 错误码说明：
+ * - 所有函数返回 agentos_error_t 类型错误码
+ * - 成功返回 AGENTOS_OK (0)
+ * - 错误码定义参考 atoms/corekern/include/error.h
+ * 
+ * @note 为保持向后兼容，DOMES_ERROR_* 别名仍然可用
  */
 
 #ifndef DOMES_H
@@ -24,6 +31,40 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* ============================================================================
+ * 统一错误码（兼容 AgentOS 标准）
+ * ============================================================================ */
+
+typedef int agentos_error_t;
+
+#define AGENTOS_OK                     0
+#define AGENTOS_ERR_UNKNOWN           -1
+#define AGENTOS_ERR_INVALID_PARAM     -2
+#define AGENTOS_ERR_NULL_POINTER      -3
+#define AGENTOS_ERR_OUT_OF_MEMORY     -4
+#define AGENTOS_ERR_BUFFER_TOO_SMALL  -5
+#define AGENTOS_ERR_NOT_FOUND         -6
+#define AGENTOS_ERR_ALREADY_EXISTS    -7
+#define AGENTOS_ERR_TIMEOUT           -8
+#define AGENTOS_ERR_NOT_SUPPORTED     -9
+#define AGENTOS_ERR_PERMISSION_DENIED -10
+#define AGENTOS_ERR_IO               -11
+#define AGENTOS_ERR_STATE_ERROR      -13
+#define AGENTOS_ERR_OVERFLOW         -14
+
+#define DOMES_OK                    AGENTOS_OK
+#define DOMES_ERROR_UNKNOWN         AGENTOS_ERR_UNKNOWN
+#define DOMES_ERROR_INVALID_ARG     AGENTOS_ERR_INVALID_PARAM
+#define DOMES_ERROR_NO_MEMORY       AGENTOS_ERR_OUT_OF_MEMORY
+#define DOMES_ERROR_NOT_FOUND       AGENTOS_ERR_NOT_FOUND
+#define DOMES_ERROR_PERMISSION      AGENTOS_ERR_PERMISSION_DENIED
+#define DOMES_ERROR_BUSY            AGENTOS_ERR_STATE_ERROR
+#define DOMES_ERROR_TIMEOUT         AGENTOS_ERR_TIMEOUT
+#define DOMES_ERROR_WOULD_BLOCK     AGENTOS_ERR_STATE_ERROR
+#define DOMES_ERROR_OVERFLOW        AGENTOS_ERR_OVERFLOW
+#define DOMES_ERROR_NOT_SUPPORTED   AGENTOS_ERR_NOT_SUPPORTED
+#define DOMES_ERROR_IO             AGENTOS_ERR_IO
 
 /* ============================================================================
  * 初始化与清理
@@ -119,23 +160,6 @@ int domes_execute_command(const char* command, char* const argv[],
  * @brief 刷新审计日志
  */
 void domes_flush_audit_log(void);
-
-/* ============================================================================
- * 错误码
- * ============================================================================ */
-
-#define DOMES_OK                    0
-#define DOMES_ERROR_UNKNOWN         -1
-#define DOMES_ERROR_INVALID_ARG     -2
-#define DOMES_ERROR_NO_MEMORY       -3
-#define DOMES_ERROR_NOT_FOUND       -4
-#define DOMES_ERROR_PERMISSION      -5
-#define DOMES_ERROR_BUSY            -6
-#define DOMES_ERROR_TIMEOUT         -7
-#define DOMES_ERROR_WOULD_BLOCK     -8
-#define DOMES_ERROR_OVERFLOW        -9
-#define DOMES_ERROR_NOT_SUPPORTED   -10
-#define DOMES_ERROR_IO              -11
 
 #ifdef __cplusplus
 }

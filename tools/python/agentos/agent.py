@@ -1,6 +1,6 @@
 # AgentOS Python SDK Client
-# Version: 1.0.0.5
-# Last updated: 2026-03-21
+# Version: 2.0.0
+# Last updated: 2026-03-23
 
 """
 AgentOS Python SDK Client implementation.

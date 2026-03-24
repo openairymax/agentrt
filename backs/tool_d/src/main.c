@@ -6,7 +6,7 @@
 
 #include "tool_service.h"
 #include "svc_logger.h"
-#include "svc_error.h"
+#include "error.h"
 #include <signal.h>
 #include <unistd.h>
 #include <stdlib.h>

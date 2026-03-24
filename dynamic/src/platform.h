@@ -361,6 +361,14 @@ struct option {
 #define optional_argument 2
 #endif
 
+/* ========== 时间工具函数 ========== */
+
+/**
+ * @brief 获取当前时间（纳秒）
+ * @return 当前时间纳秒数
+ */
+uint64_t time_ns(void);
+
 #ifdef __cplusplus
 }
 #endif

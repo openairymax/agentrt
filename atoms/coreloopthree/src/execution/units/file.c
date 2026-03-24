@@ -23,7 +23,8 @@ typedef struct file_unit_data {
     char* metadata_json;
 } file_unit_data_t;
 
-static agentos_error_t file_execute(agentos_execution_unit_t* unit, const void* input, void** out_output) {
+
+static agentos_error_t file_execute(agentos_execution_unit_t* unit, const void* input, void** out_output) {
     file_unit_data_t* data = (file_unit_data_t*)unit->data;
     if (!data || !input) return AGENTOS_EINVAL;
 

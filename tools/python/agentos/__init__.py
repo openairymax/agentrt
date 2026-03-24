@@ -88,16 +88,87 @@ from .exceptions import (
 TimeoutError = AgentOSTimeoutError
 MemoryError = AgentOSMemoryError
 
-# 导入客户端
-from .agent import AgentOS, AsyncAgentOS
+# ============================================================
+# 新模块化架构导入（v3.0.0）
+# ============================================================
 
-# 导入工具函数
+# 导入客户端层
+from .client import (
+    Client,
+    APIClient,
+    Config,
+    RequestOptions,
+    APIResponse,
+    HealthStatus,
+    Metrics,
+    MockClient,
+)
+
+# 导入模块层
+from .modules import (
+    TaskManager,
+    MemoryManager,
+    SessionManager,
+    SkillManager,
+)
+
+# 导入类型定义（新模块）
+from .types import (
+    # 枚举类型
+    TaskStatus,
+    MemoryLayer,
+    SessionStatus,
+    SkillStatus,
+    SpanStatus,
+    # 领域模型
+    Task,
+    TaskResult,
+    Memory,
+    MemorySearchResult,
+    Session,
+    Skill,
+    SkillResult,
+    SkillInfo,
+    # 列表查询选项
+    PaginationOptions,
+    SortOptions,
+    FilterOptions,
+    ListOptions,
+)
+
+# 导入工具函数（新模块）
 from .utils import (
+    # Map 类型安全提取函数
+    get_string,
+    get_int,
+    get_float,
+    get_bool,
+    get_dict,
+    get_list,
+    # API 响应解析函数
+    extract_data_map,
+    build_url,
+    parse_time_from_map,
+    extract_int_stats,
+    # ID/时间戳生成
     generate_id,
     generate_timestamp,
-    generate_hash,
+    # 验证和清理
     validate_json,
     sanitize_string,
+    append_pagination,
+)
+
+# ============================================================
+# 向后兼容导入（保持现有代码可用）
+# ============================================================
+
+# 导入客户端（向后兼容）
+from .agent import AgentOS, AsyncAgentOS
+
+# 导入工具函数（向后兼容）
+from .utils import (
+    generate_hash,
     get_env_var,
     parse_timeout,
     merge_dicts,
@@ -116,15 +187,11 @@ from .telemetry import (
     MetricPoint,
 )
 
-# 导入类型定义
+# 导入类型定义（向后兼容）
 from .types import (
-    TaskStatus,
-    TaskResult,
     MemoryInfo,
     MemoryRecordType,
     SessionInfo,
-    SkillInfo,
-    SkillResult,
     TelemetryMetrics,
     Priority,
     TaskID,
@@ -143,7 +210,9 @@ __all__ = [
     "__author__",
     "__license__",
 
+    # ============================================================
     # 异常
+    # ============================================================
     "AgentOSError",
     "AgentOSMemoryError",
     "AgentOSTimeoutError",
@@ -162,7 +231,9 @@ __all__ = [
     "TimeoutError",
     "MemoryError",
 
+    # ============================================================
     # 错误码常量
+    # ============================================================
     "http_status_to_code",
     "CODE_SUCCESS",
     "CODE_UNKNOWN",
@@ -207,16 +278,82 @@ __all__ = [
     "CODE_PERMISSION_DENIED",
     "CODE_CORRUPTED_DATA",
 
-    # 客户端
+    # ============================================================
+    # 客户端层（v3.0.0 新增）
+    # ============================================================
+    "Client",
+    "APIClient",
+    "Config",
+    "RequestOptions",
+    "APIResponse",
+    "HealthStatus",
+    "Metrics",
+    "MockClient",
+
+    # ============================================================
+    # 模块层（v3.0.0 新增）
+    # ============================================================
+    "TaskManager",
+    "MemoryManager",
+    "SessionManager",
+    "SkillManager",
+
+    # ============================================================
+    # 类型定义（v3.0.0 新增）
+    # ============================================================
+    # 枚举类型
+    "TaskStatus",
+    "MemoryLayer",
+    "SessionStatus",
+    "SkillStatus",
+    "SpanStatus",
+    # 领域模型
+    "Task",
+    "TaskResult",
+    "Memory",
+    "MemorySearchResult",
+    "Session",
+    "Skill",
+    "SkillResult",
+    "SkillInfo",
+    # 列表查询选项
+    "PaginationOptions",
+    "SortOptions",
+    "FilterOptions",
+    "ListOptions",
+
+    # ============================================================
+    # 工具函数（v3.0.0 新增）
+    # ============================================================
+    # Map 类型安全提取函数
+    "get_string",
+    "get_int",
+    "get_float",
+    "get_bool",
+    "get_dict",
+    "get_list",
+    # API 响应解析函数
+    "extract_data_map",
+    "build_url",
+    "parse_time_from_map",
+    "extract_int_stats",
+    # ID/时间戳生成
+    "generate_id",
+    "generate_timestamp",
+    # 验证和清理
+    "validate_json",
+    "sanitize_string",
+    "append_pagination",
+
+    # ============================================================
+    # 向后兼容（保持现有代码可用）
+    # ============================================================
+    # 客户端（向后兼容）
     "AgentOS",
     "AsyncAgentOS",
 
-    # 工具函数
-    "generate_id",
-    "generate_timestamp",
+    # 工具函数（向后兼容）
     "generate_hash",
-    "validate_json",
-    "sanitize_string",
     "get_env_var",
     "parse_timeout",
     "merge_dicts",
@@ -232,14 +369,10 @@ __all__ = [
     "SpanStatus",
     "MetricPoint",
 
-    # 类型定义
-    "TaskStatus",
-    "TaskResult",
+    # 类型定义（向后兼容）
     "MemoryInfo",
     "MemoryRecordType",
     "SessionInfo",
-    "SkillInfo",
-    "SkillResult",
     "TelemetryMetrics",
     "Priority",
 

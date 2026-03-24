@@ -23,12 +23,12 @@ typedef struct {
                              double timeout_sec, int max_retries);
     void (*destroy)(provider_ctx_t* ctx);
     int (*complete)(provider_ctx_t* ctx,
-    // From data intelligence emerges. by spharx
                     const llm_request_config_t* config,
                     llm_response_t** out_response);
     int (*complete_stream)(provider_ctx_t* ctx,
                            const llm_request_config_t* config,
                            llm_stream_callback_t callback,
+                           void* callback_data,
                            llm_response_t** out_response);
 } provider_ops_t;
 
@@ -37,7 +37,7 @@ typedef struct {
     const char* name;
     const provider_ops_t* ops;
     provider_ctx_t* ctx;
-    char** models;   /* 以 NULL 结尾的模型列表 */
+    char** models;
 } provider_t;
 
 #ifdef __cplusplus

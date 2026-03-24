@@ -330,38 +330,45 @@ class SQLiteStorage(Storage):
         if self._initialized:
             return
 
-        import sqlite3
+        async with self._lock:
+            if self._initialized:
+                return
 
-        self._conn = sqlite3.connect(
-            self.db_path,
-            timeout=self.busy_timeout,
-            check_same_thread=False,
-        )
-        self._conn.row_factory = sqlite3.Row
+            import sqlite3
 
-        if self.wal_mode:
-            self._conn.execute("PRAGMA journal_mode=WAL")
-            self._conn.execute("PRAGMA synchronous=NORMAL")
+            self._conn = sqlite3.connect(
+                self.db_path,
+                timeout=self.busy_timeout,
+                check_same_thread=False,
+            )
+            self._conn.row_factory = sqlite3.Row
 
-        self._conn.execute(f"PRAGMA busy_timeout={int(self.busy_timeout * 1000)}")
+            if self.wal_mode:
+                self._conn.execute("PRAGMA journal_mode=WAL")
+                self._conn.execute("PRAGMA synchronous=NORMAL")
 
-        await asyncio.get_event_loop().run_in_executor(
-            None, self._conn.execute, "SELECT 1"
-        )
+            self._conn.execute(f"PRAGMA busy_timeout={int(self.busy_timeout * 1000)}")
 
-        self._initialized = True
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, self._conn.execute, "SELECT 1")
 
-        logger.info(
-            "SQLiteStorage initialized",
-            extra={"db_path": self.db_path},
-        )
+            self._initialized = True
+            self._closed = False
+
+            logger.info(
+                "SQLiteStorage initialized",
+                extra={"db_path": self.db_path},
+            )
 
     async def close(self) -> None:
         """Close SQLite connection."""
-        if self._conn:
-            self._conn.close()
-            self._conn = None
+        async with self._lock:
+            if self._conn:
+                self._conn.close()
+                self._conn = None
             self._initialized = False
+            self._closed = True
+            self._schema_cache.clear()
             logger.info("SQLiteStorage closed")
 
     def _get_table_name(self, collection: str) -> str:
@@ -369,19 +376,25 @@ class SQLiteStorage(Storage):
         return f"col_{collection.replace('-', '_')}"
 
     async def _ensure_collection(self, collection: str) -> None:
-        """Ensure collection table exists."""
+        """Ensure collection table exists with thread-safety."""
         table_name = self._get_table_name(collection)
 
-        if table_name not in self._collection_schemas:
+        if table_name in self._schema_cache:
+            return
+
+        async with self._lock:
+            if table_name in self._schema_cache:
+                return
+
             schema = self._collection_schemas["records"].format(
                 table_name=table_name
             )
-            async with self._lock:
-                await asyncio.get_event_loop().run_in_executor(
-                    None, self._conn.execute, schema
-                )
-                self._conn.commit()
-                self._collection_schemas[table_name] = schema
+
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, self._conn.execute, schema)
+            self._conn.commit()
+
+            self._schema_cache.add(table_name)
 
     async def put(
         self,

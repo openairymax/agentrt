@@ -27,6 +27,18 @@ endif()
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
 
+# 查找libmicrohttpd（HTTP网关）
+find_library(MHD_LIBRARY NAMES microhttpd)
+if(NOT MHD_LIBRARY)
+    message(FATAL_ERROR "libmicrohttpd not found. Please install libmicrohttpd-dev package.")
+endif()
+
+# 查找libwebsockets（WebSocket网关）
+find_library(WEBSOCKETS_LIBRARY NAMES websockets)
+if(NOT WEBSOCKETS_LIBRARY)
+    message(FATAL_ERROR "libwebsockets not found. Please install libwebsockets-dev package.")
+endif()
+
 # 源文件
 set(DYNAMIC_SOURCES
     src/platform.c
@@ -59,6 +71,8 @@ target_link_libraries(dynamic
     OpenSSL::SSL
     OpenSSL::Crypto
     Threads::Threads
+    ${MHD_LIBRARY}
+    ${WEBSOCKETS_LIBRARY}
 )
 
 # 编译定义
@@ -85,10 +99,14 @@ if(NOT BUILD_SHARED_LIBS)
         src/agentos.c
         src/server.c
         src/session.c
+        src/session_stats.c
         src/health.c
         src/telemetry.c
         src/auth.c
         src/ratelimit.c
+        src/config.c
+        src/config_runtime.c
+        src/connection_pool.c
         src/gateway/http_gateway.c
         src/gateway/ws_gateway.c
         src/gateway/stdio_gateway.c
@@ -106,6 +124,8 @@ if(NOT BUILD_SHARED_LIBS)
         OpenSSL::SSL
         OpenSSL::Crypto
         Threads::Threads
+        ${MHD_LIBRARY}
+        ${WEBSOCKETS_LIBRARY}
     )
     
     if(WIN32)
@@ -158,6 +178,8 @@ if(NOT BUILD_SHARED_LIBS)
         src/telemetry.h
         src/auth.h
         src/ratelimit.h
+        src/config.h
+        src/connection_pool.h
         DESTINATION include/agentos/dynamic
     )
 endif()

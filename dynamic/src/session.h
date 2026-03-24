@@ -107,9 +107,19 @@ agentos_error_t session_manager_list_sessions(
 
 /**
  * @brief 获取当前活跃会话数
+ * 
  * @param mgr 管理器
  * @return 活跃会话数
  */
 size_t session_manager_count(session_manager_t* mgr);
+
+/**
+ * @brief 获取会话管理器统计信息
+ * 
+ * @param mgr 管理器
+ * @param out_json 输出JSON字符串（需调用者free）
+ * @return AGENTOS_SUCCESS 成功
+ */
+agentos_error_t session_manager_get_stats(session_manager_t* mgr, char** out_json);
 
 #endif /* DYNAMIC_SESSION_H */

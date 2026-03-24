@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file execution.h
  * @brief 行动层公共接口定义
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -17,6 +17,7 @@
 // 破坏性更改需递增 MAJOR 并发布迁移说明
 
 #include "agentos.h"
+#include "cognition.h"  // 引入反馈回调类型定义
 #include <stddef.h>
 #include <stdint.h>
 
@@ -350,6 +351,27 @@ AGENTOS_API agentos_error_t agentos_compensation_get_human_queue(
 AGENTOS_API agentos_error_t agentos_execution_health_check(
     agentos_execution_engine_t* engine,
     char** out_json);
+
+/**
+ * @brief 设置执行引擎的反馈回调
+ * 
+ * @param engine [in] 执行引擎句柄（非NULL）
+ * @param callback [in] 反馈回调函数（可为NULL以取消回调）
+ * @param user_data [in] 用户数据指针（传递给回调函数）
+ * 
+ * @ownership 引擎不接管 user_data 的所有权，调用者仍需负责其生命周期
+ * @threadsafe 是（内部使用互斥锁保护）
+ * @reentrant 否
+ * 
+ * @note 反馈级别：
+ *   - 0 (实时): 任务开始/完成/失败
+ *   - 1 (轮次内): 任务重试/补偿触发
+ *   - 2 (跨轮次): 统计信息更新
+ */
+AGENTOS_API void agentos_execution_set_feedback_callback(
+    agentos_execution_engine_t* engine,
+    agentos_feedback_callback_t callback,
+    void* user_data);
 
 #ifdef __cplusplus
 }

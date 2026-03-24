@@ -9,6 +9,11 @@
  * - 资源限制：CPU、内存、时间限制
  * - 安全边界：文件系统、网络隔离
  * - 可观测性：输出捕获、状态监控
+ * 
+ * 资源限制说明：
+ * - Linux: 使用 cgroups v2
+ * - Windows: 使用 Job Objects
+ * - macOS: 使用受限于 mach 端口的资源袋
  */
 
 #ifndef DOMAIN_WORKBENCH_H
@@ -31,6 +36,16 @@ typedef enum workbench_state {
     WORKBENCH_STATE_ERROR
 } workbench_state_t;
 
+/* 资源限制配置 */
+typedef struct workbench_limits {
+    size_t max_memory_bytes;       /* 最大内存限制（字节），0 表示无限制 */
+    uint32_t max_cpu_time_ms;      /* 最大 CPU 时间（毫秒），0 表示无限制 */
+    size_t max_output_bytes;       /* 最大输出大小（字节），0 表示使用默认值 */
+    uint32_t max_processes;        /* 最大子进程数，0 表示无限制 */
+    uint32_t max_threads;          /* 最大线程数，0 表示无限制 */
+    size_t max_file_size_bytes;    /* 最大文件大小（字节），0 表示无限制 */
+} workbench_limits_t;
+
 /* 工位配置 */
 typedef struct workbench_config {
     const char* working_dir;
@@ -41,6 +56,8 @@ typedef struct workbench_config {
     bool redirect_stdin;
     bool redirect_stdout;
     bool redirect_stderr;
+    workbench_limits_t limits;     /* 资源限制 */
+    bool enable_limits;           /* 是否启用资源限制 */
 } workbench_config_t;
 
 /* 工位执行结果 */
@@ -164,6 +181,31 @@ void workbench_result_free(workbench_result_t* result);
  * @param config 配置输出
  */
 void workbench_default_config(workbench_config_t* config);
+
+/**
+ * @brief 设置资源限制
+ * @param wb 工位句柄
+ * @param limits 资源限制（NULL 表示禁用限制）
+ * @return 0 成功，其他失败
+ */
+int workbench_set_limits(workbench_t* wb, const workbench_limits_t* limits);
+
+/**
+ * @brief 获取资源限制
+ * @param wb 工位句柄
+ * @param limits 资源限制输出
+ * @return 0 成功，其他失败
+ */
+int workbench_get_limits(workbench_t* wb, workbench_limits_t* limits);
+
+/**
+ * @brief 获取当前资源使用情况
+ * @param wb 工位句柄
+ * @param memory_usage 内存使用（字节）输出
+ * @param cpu_usage CPU 时间（毫秒）输出
+ * @return 0 成功，其他失败
+ */
+int workbench_get_usage(workbench_t* wb, size_t* memory_usage, uint64_t* cpu_usage);
 
 #ifdef __cplusplus
 }

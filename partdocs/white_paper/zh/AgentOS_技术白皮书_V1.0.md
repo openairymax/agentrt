@@ -1,8 +1,8 @@
 # AgentOS 技术白皮书 v1.0
 
-**版本**: 1.0.0.6  
+**版本**: 1.0
 **状态**: 正式发布  
-**维护者**: AgentOS 架构委员会  
+**维护者**: SPHARX Ltd
 **最后更新**: 2026-03-23  
 
 ---
@@ -4482,6 +4482,66 @@ AgentOS 代表了新一代智能体操作系统的发展方向，其核心创新
 ✅ **技术优势**：高性能、高可靠、高安全  
 ✅ **未来展望**：分布式智能、自主学习、意识涌现  
 ✅ **研究挑战**：可解释性、安全性、能效、通用智能  
+
+---
+
+## 参考文献
+
+### 理论基础
+
+[1] Wiener, N. (1948). *Cybernetics: Or Control and Communication in the Animal and the Machine*. MIT Press.
+
+[2] Kahneman, D. (2011). *Thinking, Fast and Slow*. Farrar, Straus and Giroux.
+
+[3] Hall, A. D. (1962). *A Methodology for Systems Engineering*. Van Nostrand.
+
+[4] McClelland, J. L., McNaughton, B. L., & O'Reilly, R. C. (1995). Why there are complementary learning systems in the hippocampus and neocortex: insights from the successes and failures of connectionist models of learning and memory. *Psychological Review*, 102(3), 419-457.
+
+### 记忆与认知科学
+
+[5] Ebbinghaus, H. (1885). *Memory: A Contribution to Experimental Psychology*. Teachers College, Columbia University.
+
+[6] Edelsbrunner, H., Letscher, D., & Zomorodian, A. (2000). Topological persistence and simplification. *Proceedings of the 41st Annual Symposium on Foundations of Computer Science*, 454-463.
+
+[7] Campello, R. J. G. B., Moulavi, D., & Sander, J. (2013). Density-based clustering based on hierarchical density estimates. *Pacific-Asia Conference on Knowledge Discovery and Data Mining*, 160-172.
+
+[8] Hopfield, J. J. (1982). Neural networks and physical systems with emergent collective computational abilities. *Proceedings of the National Academy of Sciences*, 79(8), 2554-2558.
+
+### 微内核与操作系统
+
+[9] Liedtke, J. (1995). On μ-kernel construction. *Proceedings of the 15th ACM Symposium on Operating Systems Principles*, 237-250.
+
+[10] Klein, G., et al. (2009). seL4: Formal verification of an OS kernel. *Proceedings of the 22nd ACM Symposium on Operating Systems Principles*, 207-220.
+
+[11] Accetta, M., et al. (1986). Mach: A new kernel foundation for UNIX development. *Proceedings of the USENIX Summer Conference*, 93-112.
+
+### 系统架构与设计
+
+[12] Bass, L., Clements, P., & Kazman, R. (2012). *Software Architecture in Practice* (3rd ed.). Addison-Wesley.
+
+[13] Newman, S. (2021). *Building Microservices: Designing Fine-Grained Systems* (2nd ed.). O'Reilly Media.
+
+[14] Martin, R. C. (2017). *Clean Architecture: A Craftsman's Guide to Software Structure and Design*. Prentice Hall.
+
+### 性能与优化
+
+[15] Dean, J., & Barroso, L. A. (2013). The tail at scale. *Communications of the ACM*, 56(2), 74-80.
+
+[16] Johnson, S., et al. (2015). FAISS: A library for efficient similarity search and clustering of dense vectors. *arXiv preprint arXiv:1702.08734*.
+
+### 安全与隐私
+
+[17] Saltzer, J. H., & Schroeder, M. D. (1975). The protection of information in computer systems. *Proceedings of the IEEE*, 63(9), 1278-1308.
+
+[18] Zero Trust Architecture. (2020). NIST Special Publication 800-207.
+
+### 大语言模型与智能体
+
+[19] Vaswani, A., et al. (2017). Attention is all you need. *Advances in Neural Information Processing Systems*, 30.
+
+[20] Brown, T. B., et al. (2020). Language models are few-shot learners. *Advances in Neural Information Processing Systems*, 33, 1877-1901.
+
+[21] Wei, J., et al. (2022). Chain-of-thought prompting elicits reasoning in large language models. *Advances in Neural Information Processing Systems*, 35, 24824-24837.
 
 ---
 
