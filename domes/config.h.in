@@ -1,0 +1,19 @@
+#ifndef DOMES_CONFIG_H
+#define DOMES_CONFIG_H
+
+#cmakedefine DOMES_PLATFORM_WINDOWS
+#cmakedefine DOMES_PLATFORM_POSIX
+#cmakedefine DOMES_PLATFORM_LINUX
+#cmakedefine DOMES_PLATFORM_MACOS
+#cmakedefine DOMES_PLATFORM_64BIT
+
+#cmakedefine DOMES_ENABLE_LOGGING
+
+#cmakedefine HAVE_YAML
+#cmakedefine HAVE_CJSON
+
+#define DOMES_VERSION_MAJOR @domes_VERSION_MAJOR@
+#define DOMES_VERSION_MINOR @domes_VERSION_MINOR@
+#define DOMES_VERSION_PATCH @domes_VERSION_PATCH@
+
+#endif /* DOMES_CONFIG_H */

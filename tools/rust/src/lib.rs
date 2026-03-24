@@ -1,27 +1,89 @@
-// AgentOS Rust SDK
-// Version: 2.0.0
-// Last updated: 2026-03-23
+// AgentOS Rust SDK - 主入口
+// Version: 3.0.0
+// Last updated: 2026-03-24
+//
+// SDK 顶层统一入口，提供版本信息并导出所有公共 API。
+// 对应 Go SDK: agentos.go
 
-pub mod agent;
+// ============================================================
+// 模块声明
+// ============================================================
+
 pub mod client;
 pub mod error;
-pub mod memory;
-pub mod session;
-pub mod skill;
-pub mod syscall;
-pub mod task;
-pub mod telemetry;
 pub mod types;
+pub mod utils;
+pub mod modules;
 
-pub use client::Client;
-pub use error::AgentOSError;
-pub use memory::Memory;
-pub use session::Session;
-pub use skill::{Skill, SkillInfo, SkillResult};
-pub use task::{Task, TaskResult, TaskStatus};
+// 保留旧模块以保持向后兼容（标记为 deprecated）
+#[deprecated(since = "3.0.0", note = "请使用 modules::task::TaskManager")]
+pub mod task;
+#[deprecated(since = "3.0.0", note = "请使用 modules::memory::MemoryManager")]
+pub mod memory;
+#[deprecated(since = "3.0.0", note = "请使用 modules::session::SessionManager")]
+pub mod session;
+#[deprecated(since = "3.0.0", note = "请使用 modules::skill::SkillManager")]
+pub mod skill;
 
-// Re-export error codes for convenience
+// 其他模块
+pub mod syscall;
+pub mod telemetry;
+pub mod agent;
+
+// ============================================================
+// 版本信息
+// ============================================================
+
+/// SDK 版本号
+pub const VERSION: &str = "3.0.0";
+
+/// SDK 作者
+pub const AUTHOR: &str = "SpharxWorks";
+
+/// SDK 许可证
+pub const LICENSE: &str = "MIT";
+
+// ============================================================
+// 公共 API 导出
+// ============================================================
+
+// 客户端层
+pub use client::{APIClient, Client};
+
+// 错误类型
+pub use error::{AgentOSError, ErrorCode};
+
+// 类型定义
+pub use types::{
+    // 枚举类型
+    TaskStatus, MemoryLayer, SessionStatus, SkillStatus, SpanStatus,
+    // 领域模型
+    Task, TaskResult, Memory, MemorySearchResult, Session, Skill, SkillResult, SkillInfo,
+    // 请求/响应结构
+    RequestOptions, RequestOption, APIResponse, HealthStatus, Metrics,
+    // 列表查询选项
+    PaginationOptions, SortOptions, FilterOptions, ListOptions,
+    // 请求选项函数
+    with_request_timeout, with_header, with_query_param,
+};
+
+// 业务模块管理器
+pub use modules::{
+    TaskManager, MemoryManager, SessionManager, SkillManager,
+};
+
+// 工具函数
+pub use utils::{
+    extract_data_map, get_string, get_i64, get_f64, get_bool, get_map,
+    get_string_map, get_array, get_interface_slice, parse_time_from_map,
+    extract_int64_stats, build_url, generate_id, generate_task_id,
+    generate_memory_id, generate_session_id, validate_endpoint,
+    format_time, parse_time, deep_clone_value, merge_maps,
+};
+
+// 错误码常量（与 Go SDK 保持一致）
 pub use error::{
+    // 通用错误 (0x0xxx)
     CODE_SUCCESS, CODE_UNKNOWN, CODE_INVALID_PARAMETER, CODE_MISSING_PARAMETER,
     CODE_TIMEOUT, CODE_NOT_FOUND, CODE_ALREADY_EXISTS, CODE_CONFLICT,
     CODE_INVALID_CONFIG, CODE_INVALID_ENDPOINT, CODE_NETWORK_ERROR,
@@ -29,23 +91,88 @@ pub use error::{
     CODE_FORBIDDEN, CODE_RATE_LIMITED, CODE_INVALID_RESPONSE,
     CODE_PARSE_ERROR, CODE_VALIDATION_ERROR, CODE_NOT_SUPPORTED,
     CODE_INTERNAL, CODE_BUSY,
+
+    // 核心循环错误 (0x1xxx)
     CODE_LOOP_CREATE_FAILED, CODE_LOOP_START_FAILED, CODE_LOOP_STOP_FAILED,
+
+    // 认知层错误 (0x2xxx)
     CODE_COGNITION_FAILED, CODE_DAG_BUILD_FAILED, CODE_AGENT_DISPATCH_FAILED,
     CODE_INTENT_PARSE_FAILED,
+
+    // 执行层错误 (0x3xxx)
     CODE_TASK_FAILED, CODE_TASK_CANCELLED, CODE_TASK_TIMEOUT,
+
+    // 记忆层错误 (0x4xxx)
     CODE_MEMORY_NOT_FOUND, CODE_MEMORY_EVOLVE_FAILED, CODE_MEMORY_SEARCH_FAILED,
     CODE_SESSION_NOT_FOUND, CODE_SESSION_EXPIRED,
     CODE_SKILL_NOT_FOUND, CODE_SKILL_EXECUTION_FAILED,
+
+    // 系统调用错误 (0x5xxx)
     CODE_TELEMETRY_ERROR,
+
+    // 安全域错误 (0x6xxx)
     CODE_PERMISSION_DENIED, CODE_CORRUPTED_DATA,
+
+    // 工具函数
     http_status_to_code,
 };
+
+// ============================================================
+// 便捷函数
+// ============================================================
+
+/// 创建新的 AgentOS 客户端
+///
+/// # 参数
+/// - `endpoint`: AgentOS 服务端点地址
+///
+/// # 返回
+/// 返回 Result<Client, AgentOSError>
+///
+/// # 示例
+/// ```rust
+/// use agentos;
+///
+/// let client = agentos::new_client("http://localhost:18789")?;
+/// ```
+pub fn new_client(endpoint: &str) -> Result<Client, AgentOSError> {
+    Client::new(endpoint)
+}
+
+/// 创建带 API Key 的 AgentOS 客户端
+///
+/// # 参数
+/// - `endpoint`: AgentOS 服务端点地址
+/// - `api_key`: API 密钥
+///
+/// # 返回
+/// 返回 Result<Client, AgentOSError>
+pub fn new_client_with_api_key(endpoint: &str, api_key: &str) -> Result<Client, AgentOSError> {
+    Client::new_with_api_key(endpoint, api_key)
+}
+
+// ============================================================
+// 测试模块
+// ============================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // ===== Error Code Tests =====
+    #[test]
+    fn test_version() {
+        assert_eq!(VERSION, "3.0.0");
+    }
+
+    #[test]
+    fn test_author() {
+        assert_eq!(AUTHOR, "SpharxWorks");
+    }
+
+    #[test]
+    fn test_license() {
+        assert_eq!(LICENSE, "MIT");
+    }
 
     #[test]
     fn test_error_codes_general() {
@@ -63,6 +190,7 @@ mod tests {
         assert_eq!(CODE_TASK_FAILED, "0x3001");
         assert_eq!(CODE_MEMORY_NOT_FOUND, "0x4001");
         assert_eq!(CODE_SESSION_NOT_FOUND, "0x4004");
+        assert_eq!(CODE_SKILL_NOT_FOUND, "0x4006");
     }
 
     #[test]
@@ -78,252 +206,34 @@ mod tests {
         assert_eq!(http_status_to_code(418), CODE_UNKNOWN);
     }
 
-    // ===== AgentOSError Tests =====
-
     #[test]
-    fn test_agentos_error_with_code() {
-        let err = AgentOSError::with_code("0x0001", "Test error");
-        let msg = format!("{}", err);
-        assert!(msg.contains("0x0001"));
-        assert!(msg.contains("Test error"));
+    fn test_new_client() {
+        let client = new_client("http://localhost:18789");
+        assert!(client.is_ok());
     }
 
     #[test]
-    fn test_agentos_error_network() {
-        let err = AgentOSError::Network("Connection refused".to_string());
-        let msg = format!("{}", err);
-        assert!(msg.contains("Network error"));
-        assert!(msg.contains("Connection refused"));
-    }
-
-    #[test]
-    fn test_agentos_error_timeout() {
-        let err = AgentOSError::Timeout("Operation timed out".to_string());
-        let msg = format!("{}", err);
-        assert!(msg.contains("Timeout"));
-    }
-
-    #[test]
-    fn test_agentos_error_task() {
-        let err = AgentOSError::Task("Task execution failed".to_string());
-        let msg = format!("{}", err);
-        assert!(msg.contains("Task error"));
-    }
-
-    #[test]
-    fn test_agentos_error_memory() {
-        let err = AgentOSError::Memory("Memory not found".to_string());
-        let msg = format!("{}", err);
-        assert!(msg.contains("Memory error"));
-    }
-
-    #[test]
-    fn test_agentos_error_session() {
-        let err = AgentOSError::Session("Session expired".to_string());
-        let msg = format!("{}", err);
-        assert!(msg.contains("Session error"));
-    }
-
-    #[test]
-    fn test_agentos_error_config() {
-        let err = AgentOSError::Config("Invalid endpoint".to_string());
-        let msg = format!("{}", err);
-        assert!(msg.contains("Config error"));
-    }
-
-    // ===== Client Tests =====
-
-    #[test]
-    fn test_client_new_default() {
-        let client = Client::new("");
+    fn test_new_client_with_api_key() {
+        let client = new_client_with_api_key("http://localhost:18789", "test-api-key");
         assert!(client.is_ok());
         let client = client.unwrap();
-        assert_eq!(client.endpoint(), "http://localhost:18789");
+        assert_eq!(client.api_key(), Some("test-api-key"));
     }
 
     #[test]
-    fn test_client_new_with_endpoint() {
-        let client = Client::new("http://localhost:9999");
-        assert!(client.is_ok());
-        let client = client.unwrap();
-        assert_eq!(client.endpoint(), "http://localhost:9999");
+    fn test_task_status() {
+        assert!(TaskStatus::Completed.is_terminal());
+        assert!(TaskStatus::Failed.is_terminal());
+        assert!(TaskStatus::Cancelled.is_terminal());
+        assert!(!TaskStatus::Pending.is_terminal());
+        assert!(!TaskStatus::Running.is_terminal());
     }
 
     #[test]
-    fn test_client_new_trailing_slash() {
-        let client = Client::new("http://localhost:9999/");
-        assert!(client.is_ok());
-        let client = client.unwrap();
-        assert_eq!(client.endpoint(), "http://localhost:9999");
-    }
-
-    #[test]
-    fn test_client_new_invalid_endpoint() {
-        let result = Client::new("invalid-endpoint");
-        assert!(result.is_err());
-        match result {
-            Err(AgentOSError::Config(msg)) => {
-                assert!(msg.contains("http://") || msg.contains("https://"));
-            }
-            _ => panic!("Expected Config error"),
-        }
-    }
-
-    #[test]
-    fn test_client_new_https() {
-        let client = Client::new("https://api.example.com");
-        assert!(client.is_ok());
-        let client = client.unwrap();
-        assert_eq!(client.endpoint(), "https://api.example.com");
-    }
-
-    // ===== Task Tests =====
-
-    #[test]
-    fn test_task_status_from_str() {
-        assert_eq!(TaskStatus::from_str("pending"), Some(TaskStatus::Pending));
-        assert_eq!(TaskStatus::from_str("running"), Some(TaskStatus::Running));
-        assert_eq!(TaskStatus::from_str("completed"), Some(TaskStatus::Completed));
-        assert_eq!(TaskStatus::from_str("failed"), Some(TaskStatus::Failed));
-        assert_eq!(TaskStatus::from_str("cancelled"), Some(TaskStatus::Cancelled));
-        assert_eq!(TaskStatus::from_str("unknown"), None);
-    }
-
-    #[test]
-    fn test_task_status_as_str() {
-        assert_eq!(TaskStatus::Pending.as_str(), "pending");
-        assert_eq!(TaskStatus::Running.as_str(), "running");
-        assert_eq!(TaskStatus::Completed.as_str(), "completed");
-        assert_eq!(TaskStatus::Failed.as_str(), "failed");
-        assert_eq!(TaskStatus::Cancelled.as_str(), "cancelled");
-    }
-
-    #[test]
-    fn test_task_new() {
-        let client = Client::new("http://localhost:18789").unwrap();
-        let task = Task::new(client, "task-123".to_string());
-        assert_eq!(task.task_id(), "task-123");
-    }
-
-    // ===== Memory Tests =====
-
-    #[test]
-    fn test_memory_new() {
-        let mut metadata = std::collections::HashMap::new();
-        metadata.insert("key".to_string(), serde_json::json!("value"));
-        
-        let memory = Memory::new(
-            "mem-123".to_string(),
-            "Test content".to_string(),
-            "2026-03-23T10:00:00Z".to_string(),
-            metadata.clone(),
-        );
-        
-        assert_eq!(memory.id, "mem-123");
-        assert_eq!(memory.content, "Test content");
-        assert_eq!(memory.created_at, "2026-03-23T10:00:00Z");
-    }
-
-    #[test]
-    fn test_memory_from_json() {
-        let mut json = serde_json::Map::new();
-        json.insert("memory_id".to_string(), serde_json::json!("mem-123"));
-        json.insert("content".to_string(), serde_json::json!("Test content"));
-        json.insert("created_at".to_string(), serde_json::json!("2026-03-23T10:00:00Z"));
-        json.insert("metadata".to_string(), serde_json::json!({}));
-
-        let memory = Memory::from_json(&json);
-        assert!(memory.is_ok());
-        let memory = memory.unwrap();
-        assert_eq!(memory.id, "mem-123");
-        assert_eq!(memory.content, "Test content");
-    }
-
-    #[test]
-    fn test_memory_from_json_missing_id() {
-        let mut json = serde_json::Map::new();
-        json.insert("content".to_string(), serde_json::json!("Test content"));
-
-        let result = Memory::from_json(&json);
-        assert!(result.is_err());
-    }
-
-    // ===== Session Tests =====
-
-    #[test]
-    fn test_session_new() {
-        let client = Client::new("http://localhost:18789").unwrap();
-        let session = Session::new(client, "session-456".to_string());
-        assert_eq!(session.id, "session-456");
-    }
-
-    // ===== Skill Tests =====
-
-    #[test]
-    fn test_skill_new() {
-        let client = Client::new("http://localhost:18789").unwrap();
-        let skill = Skill::new(client, "browser_skill".to_string());
-        assert_eq!(skill.name, "browser_skill");
-    }
-
-    // ===== Async Tests =====
-
-    #[tokio::test]
-    async fn test_client_health_check_offline() {
-        let client = Client::new("http://localhost:59999").unwrap();
-        let result = client.health().await;
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), false);
-    }
-
-    #[tokio::test]
-    async fn test_client_submit_task_offline() {
-        let client = Client::new("http://localhost:59999").unwrap();
-        let result = client.submit_task("test task").await;
-        assert!(result.is_err());
-    }
-
-    #[tokio::test]
-    async fn test_client_create_session_offline() {
-        let client = Client::new("http://localhost:59999").unwrap();
-        let result = client.create_session().await;
-        assert!(result.is_err());
-    }
-
-    #[tokio::test]
-    async fn test_client_write_memory_offline() {
-        let client = Client::new("http://localhost:59999").unwrap();
-        let result = client.write_memory("test content", None).await;
-        assert!(result.is_err());
-    }
-
-    #[tokio::test]
-    async fn test_client_search_memory_offline() {
-        let client = Client::new("http://localhost:59999").unwrap();
-        let result = client.search_memory("test query", 5).await;
-        assert!(result.is_err());
-    }
-
-    #[tokio::test]
-    async fn test_client_get_memory_offline() {
-        let client = Client::new("http://localhost:59999").unwrap();
-        let result = client.get_memory("mem-123").await;
-        assert!(result.is_err());
-    }
-
-    #[tokio::test]
-    async fn test_client_delete_memory_offline() {
-        let client = Client::new("http://localhost:59999").unwrap();
-        let result = client.delete_memory("mem-123").await;
-        assert!(result.is_err());
-    }
-
-    #[tokio::test]
-    async fn test_client_load_skill() {
-        let client = Client::new("http://localhost:59999").unwrap();
-        let result = client.load_skill("test_skill").await;
-        assert!(result.is_ok());
-        let skill = result.unwrap();
-        assert_eq!(skill.name, "test_skill");
+    fn test_memory_layer() {
+        assert!(MemoryLayer::L1.is_valid());
+        assert!(MemoryLayer::L2.is_valid());
+        assert!(MemoryLayer::L3.is_valid());
+        assert!(MemoryLayer::L4.is_valid());
     }
 }

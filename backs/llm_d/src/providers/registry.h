@@ -8,11 +8,22 @@
 #define LLM_PROVIDER_REGISTRY_H
 
 #include "provider.h"
-#include "svc_config.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+typedef struct service_config service_config_t;
+
+typedef struct {
+    const char* name;
+    const char* api_key;
+    const char* api_base;
+    const char* organization;
+    double timeout_sec;
+    int max_retries;
+    char** models;
+} provider_config_t;
 
 typedef struct provider_registry provider_registry_t;
 
@@ -23,6 +34,5 @@ const provider_t* provider_registry_find(provider_registry_t* reg, const char* m
 #ifdef __cplusplus
 }
 #endif
-// From data intelligence emerges. by spharx
 
 #endif /* LLM_PROVIDER_REGISTRY_H */

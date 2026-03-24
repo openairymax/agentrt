@@ -126,4 +126,24 @@ int getopt_long(int argc, char* const argv[], const char* optstring,
     return c;
 }
 
+/* ========== 时间工具函数 ========== */
+
+/**
+ * @brief 获取当前时间（纳秒）
+ * @return 当前时间纳秒数
+ */
+uint64_t time_ns(void) {
+#ifdef _WIN32
+    LARGE_INTEGER frequency;
+    LARGE_INTEGER counter;
+    QueryPerformanceFrequency(&frequency);
+    QueryPerformanceCounter(&counter);
+    return (uint64_t)(counter.QuadPart * 1000000000ULL / frequency.QuadPart);
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+#endif
+}
+
 #endif /* _WIN32 */

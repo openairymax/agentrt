@@ -30,12 +30,14 @@ typedef enum {
 /**
  * @brief 创建认证上下文
  * 
- * @param api_key API密钥，若为NULL则禁用认证
+ * @param api_key API密钥，若为NULL则禁用API密钥认证
+ * @param jwt_secret JWT密钥，若为NULL则禁用JWT认证
+ * @param jwt_expire JWT过期时间（秒），默认3600
  * @return 认证上下文，失败返回NULL
  * 
  * @ownership 调用者需通过 auth_context_destroy() 释放
  */
-auth_context_t* auth_context_create(const char* api_key);
+auth_context_t* auth_context_create(const char* api_key, const char* jwt_secret, uint32_t jwt_expire);
 
 /**
  * @brief 销毁认证上下文
@@ -79,5 +81,48 @@ agentos_error_t auth_set_api_key(auth_context_t* ctx, const char* api_key);
  * @return AGENTOS_SUCCESS 成功
  */
 agentos_error_t auth_generate_error_response(auth_context_t* ctx, char** out_json);
+
+/**
+ * @brief 生成JWT令牌
+ * 
+ * @param ctx 认证上下文
+ * @param subject 主题
+ * @param issuer 签发者
+ * @param payload 载荷JSON
+ * @param out_token 输出JWT令牌（需调用者free）
+ * @return AGENTOS_SUCCESS 成功
+ */
+agentos_error_t auth_generate_jwt_token(auth_context_t* ctx, const char* subject, const char* issuer, const char* payload, char** out_token);
+
+/**
+ * @brief 获取认证统计信息
+ * 
+ * @param ctx 认证上下文
+ * @param out_json 输出JSON字符串（需调用者free）
+ * @return AGENTOS_SUCCESS 成功
+ */
+agentos_error_t auth_get_stats(auth_context_t* ctx, char** out_json);
+
+/**
+ * @brief 清理令牌缓存
+ * @param ctx 认证上下文
+ */
+void auth_clear_token_cache(auth_context_t* ctx);
+
+/**
+ * @brief 设置认证类型
+ * 
+ * @param ctx 认证上下文
+ * @param type 认证类型
+ * @return AGENTOS_SUCCESS 成功
+ */
+agentos_error_t auth_set_type(auth_context_t* ctx, auth_type_t type);
+
+/**
+ * @brief 获取当前认证类型
+ * @param ctx 认证上下文
+ * @return 认证类型
+ */
+auth_type_t auth_get_type(auth_context_t* ctx);
 
 #endif /* DYNAMIC_AUTH_H */

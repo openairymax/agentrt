@@ -5,7 +5,7 @@
 **归属**: AgentOS 内核接口核心规范  
 **许可证**: GPL-3.0  
 **理论基础**: 微内核思想、最小权限原则、安全内生设计  
-**关联规范**: [通信协议规范](./protocol_contract.md)、[架构设计原则](../架构设计原则.md)、[统一术语表](../TERMINOLOGY.md)
+**关联规范**: [通信协议规范](./protocol_contract.md)、[架构设计原则](../../../architecture/folder/architectural_design_principles.md)、[统一术语表](../../TERMINOLOGY.md)
 
 ---
 

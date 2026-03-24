@@ -1,0 +1,97 @@
+# =============================================================================
+# AgentOS 配置示例文件
+# 版本: v1.0.0
+# 最后更新: 2026-03-23
+# =============================================================================
+# 本文件提供了完整的 AgentOS 配置示例，供快速启动和测试使用
+
+# =============================================================================
+# 内核配置示例
+# =============================================================================
+kernel:
+  name: "AgentOS Core"
+  version: "1.0.0.3"
+  log_level: "debug"
+  
+  scheduler:
+    policy: "weighted"
+    time_slice_ms: 10
+    max_concurrency: 50
+  
+  memory:
+    pool_size_mb: 512
+    guard_enabled: true
+    oom_policy: "reject"
+  
+  ipc:
+    max_connections: 256
+    buffer_size_kb: 32
+    timeout_ms: 3000
+    auth_required: true
+    encryption: "tls13"
+
+# =============================================================================
+# 模型配置示例（仅包含一个模型）
+# =============================================================================
+model:
+  models:
+    - name: "gpt-3.5-turbo"
+      provider: "openai"
+      api_key_env: "OPENAI_API_KEY"
+      endpoint: "https://api.openai.com/v1/chat/completions"
+      context_window: 16000
+      input_cost_per_1k: 0.0015
+      output_cost_per_1k: 0.002
+      capabilities: ["chat", "function_calling", "streaming"]
+      default: true
+      max_concurrency: 5
+      timeout_sec: 30
+      
+      retry:
+        max_attempts: 3
+        backoff_ms: 100
+        backoff_multiplier: 2.0
+        max_backoff_ms: 5000
+      
+      circuit_breaker:
+        enabled: true
+        failure_threshold: 5
+        reset_timeout_sec: 30
+
+# =============================================================================
+# 安全配置示例（简化版）
+# =============================================================================
+security:
+  default_policy: "deny"
+  
+  rules:
+    - id: "file_read_temp"
+      resource: "file:read:${AGENTOS_TEMP_DIR}/*"
+      action: "read"
+      effect: "allow"
+      priority: 10
+  
+  sandbox:
+    isolation_type: "process"
+    memory_limit_mb: 256
+    cpu_limit: 0.5
+    network_enabled: false
+
+# =============================================================================
+# 日志配置示例
+# =============================================================================
+logging:
+  level: "debug"
+  format: "text"
+  output: "both"
+  
+  file:
+    base_dir: "${AGENTOS_LOG_DIR}"
+    max_size_mb: 50
+    backups: 5
+    rotate_daily: true
+  
+  mask_fields:
+    - "password"
+    - "token"
+    - "api_key"

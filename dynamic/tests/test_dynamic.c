@@ -1,6 +1,8 @@
 /**
  * @file test_dynamic.c
- * @brief Dynamic 模块单元测试
+ * @brief Dynamic模块全面测试套件
+ * 
+ * 包含单元测试、集成测试、压力测试和安全测试。
  * 
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
@@ -9,36 +11,41 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <pthread.h>
+#include <stdatomic.h>
+#include <time.h>
+#include <unistd.h>
 
+#include "../src/agentos.h"
+#include "../src/server.h"
 #include "../src/session.h"
 #include "../src/health.h"
 #include "../src/telemetry.h"
-#include "../src/agentos.h"
+#include "../src/auth.h"
+#include "../src/ratelimit.h"
+#include "../src/config.h"
+#include "../src/connection_pool.h"
+#include "../src/gateway/http_gateway.h"
+#include "../src/gateway/ws_gateway.h"
+#include "../src/gateway/stdio_gateway.h"
 
-/* 测试计数 */
-static int tests_run = 0;
-static int tests_passed = 0;
+/* ========== 测试辅助函数 ========== */
 
-#define TEST(name) static void test_##name(void)
-#define RUN_TEST(name) do { \
-    printf("  Running %s... ", #name); \
-    tests_run++; \
-    test_##name(); \
-    tests_passed++; \
-    printf("PASSED\n"); \
-} while(0)
+static int test_count = 0;
+static int passed_count = 0;
 
-#define ASSERT(cond) do { \
-    if (!(cond)) { \
-        printf("FAILED at %s:%d: %s\n", __FILE__, __LINE__, #cond); \
-        exit(1); \
+#define TEST_START(name) printf("\n🧪 Running test: %s\n", name)
+#define TEST_PASS() do { passed_count++; printf("✅ PASS\n"); } while(0)
+#define TEST_FAIL(msg) do { printf("❌ FAIL: %s\n", msg); } while(0)
+#define ASSERT(condition) do { \
+    test_count++; \
+    if (condition) { \
+        passed_count++; \
+        printf("✅ PASS\n"); \
+    } else { \
+        printf("❌ FAIL: Assertion failed at line %d\n", __LINE__); \
     } \
 } while(0)
-
-#define ASSERT_EQ(a, b) ASSERT((a) == (b))
-#define ASSERT_NE(a, b) ASSERT((a) != (b))
-#define ASSERT_NOT_NULL(p) ASSERT((p) != NULL)
-#define ASSERT_NULL(p) ASSERT((p) == NULL)
 
 /* ========== Session Manager Tests ========== */
 

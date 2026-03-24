@@ -40,6 +40,12 @@ struct session_manager {
     pthread_cond_t    cleaner_cond;     /**< 清理线程条件变量 */
     
     atomic_size_t     session_count;    /**< 当前会话数 */
+    atomic_size_t     memory_usage;     /**< 内存使用量（字节） */
+    atomic_size_t     cleanup_count;    /**< 清理计数器 */
+    
+    /* 性能优化 */
+    size_t            avg_session_len;  /**< 平均会话长度 */
+    pthread_mutex_t   stats_lock;       /**< 统计信息锁 */
 };
 
 /* ========== UUID v4 生成 ========== */
@@ -104,10 +110,15 @@ static void* session_cleaner_thread(void* arg) {
     AGENTOS_LOG_DEBUG("Session cleaner thread started");
     
     while (atomic_load(&mgr->running)) {
-        /* 计算下次清理时间 */
+        /* 计算下次清理时间（基于负载动态调整） */
         uint32_t check_interval = mgr->timeout_sec / 4;
         if (check_interval < 10) check_interval = 10;
         if (check_interval > 300) check_interval = 300;
+        
+        /* 如果会话数量很多，增加清理频率 */
+        if (atomic_load(&mgr->session_count) > mgr->max_sessions / 2) {
+            check_interval = check_interval / 2;
+        }
         
         /* 使用条件变量等待，可被提前唤醒 */
         struct timespec ts;
@@ -127,6 +138,7 @@ static void* session_cleaner_thread(void* arg) {
         uint64_t now_ns = agentos_time_monotonic_ns();
         uint64_t timeout_ns = (uint64_t)mgr->timeout_sec * 1000000000ULL;
         size_t cleaned = 0;
+        size_t memory_freed = 0;
         
         pthread_mutex_lock(&mgr->lock);
         
@@ -142,12 +154,21 @@ static void* session_cleaner_thread(void* arg) {
                     
                     AGENTOS_LOG_DEBUG("Session %s expired, cleaning up", s->id);
                     
+                    /* 计算释放的内存 */
+                    size_t session_mem = sizeof(session_t) + SESSION_ID_LEN + 1;
+                    if (s->metadata) {
+                        session_mem += strlen(s->metadata);
+                    }
+                    
                     /* 释放资源 */
                     free(s->metadata);
                     free(s);
                     
                     atomic_fetch_sub(&mgr->session_count, 1);
+                    atomic_fetch_sub(&mgr->memory_usage, session_mem);
+                    atomic_fetch_add(&mgr->cleanup_count, 1);
                     cleaned++;
+                    memory_freed += session_mem;
                 } else {
                     pp = &s->next;
                 }
@@ -157,7 +178,13 @@ static void* session_cleaner_thread(void* arg) {
         pthread_mutex_unlock(&mgr->lock);
         
         if (cleaned > 0) {
-            AGENTOS_LOG_INFO("Cleaned %zu expired sessions", cleaned);
+            AGENTOS_LOG_INFO("Cleaned %zu expired sessions, freed %zu bytes", 
+                cleaned, memory_freed);
+            
+            /* 如果清理了大量会话，记录性能指标 */
+            if (cleaned > 10) {
+                AGENTOS_LOG_WARN("Large cleanup event: %zu sessions removed", cleaned);
+            }
         }
     }
     
@@ -209,8 +236,19 @@ session_manager_t* session_manager_create(
         return NULL;
     }
     
+    if (pthread_mutex_init(&mgr->stats_lock, NULL) != 0) {
+        pthread_cond_destroy(&mgr->cleaner_cond);
+        pthread_mutex_destroy(&mgr->lock);
+        free(mgr->buckets);
+        free(mgr);
+        return NULL;
+    }
+    
     atomic_init(&mgr->running, true);
     atomic_init(&mgr->session_count, 0);
+    atomic_init(&mgr->memory_usage, 0);
+    atomic_init(&mgr->cleanup_count, 0);
+    mgr->avg_session_len = 0;
     
     /* 启动清理线程 */
     if (pthread_create(&mgr->cleaner_thread, NULL, session_cleaner_thread, mgr) != 0) {
@@ -253,6 +291,7 @@ void session_manager_destroy(session_manager_t* mgr) {
     /* 销毁同步原语 */
     pthread_cond_destroy(&mgr->cleaner_cond);
     pthread_mutex_destroy(&mgr->lock);
+    pthread_mutex_destroy(&mgr->stats_lock);
     
     free(mgr->buckets);
     free(mgr);
@@ -269,7 +308,19 @@ agentos_error_t session_manager_create_session(
     
     /* 检查会话数限制 */
     if (atomic_load(&mgr->session_count) >= mgr->max_sessions) {
+        AGENTOS_LOG_WARN("Session limit reached: %zu", mgr->max_sessions);
         return AGENTOS_EBUSY;
+    }
+    
+    /* 计算内存需求 */
+    size_t session_size = sizeof(session_t);
+    size_t metadata_size = metadata ? strlen(metadata) : 0;
+    size_t total_size = session_size + metadata_size + SESSION_ID_LEN + 1;
+    
+    /* 检查内存限制 */
+    if (atomic_load(&mgr->memory_usage) + total_size > mgr->max_sessions * 1024) {
+        AGENTOS_LOG_WARN("Memory limit reached for sessions");
+        return AGENTOS_ENOMEM;
     }
     
     /* 创建会话 */
@@ -293,24 +344,34 @@ agentos_error_t session_manager_create_session(
         }
     }
     
-    /* 插入哈希表 */
+    /* 插入哈希表（使用更安全的插入方式） */
     size_t bucket = hash_session_id(s->id, mgr->bucket_count);
     
     pthread_mutex_lock(&mgr->lock);
     s->next = mgr->buckets[bucket];
     mgr->buckets[bucket] = s;
     atomic_fetch_add(&mgr->session_count, 1);
+    atomic_fetch_add(&mgr->memory_usage, total_size);
+    
+    /* 更新统计信息 */
+    pthread_mutex_lock(&mgr->stats_lock);
+    mgr->avg_session_len = (mgr->avg_session_len + atomic_load(&mgr->session_count)) / 2;
+    pthread_mutex_unlock(&mgr->stats_lock);
+    
     pthread_mutex_unlock(&mgr->lock);
     
     /* 返回 ID */
     *out_session_id = strdup(s->id);
     if (!*out_session_id) {
-        /* 回滚 */
+        /* 回滚 - 更完善的错误处理 */
         pthread_mutex_lock(&mgr->lock);
         session_t** pp = &mgr->buckets[bucket];
         while (*pp && *pp != s) pp = &(*pp)->next;
-        if (*pp == s) *pp = s->next;
-        atomic_fetch_sub(&mgr->session_count, 1);
+        if (*pp == s) {
+            *pp = s->next;
+            atomic_fetch_sub(&mgr->session_count, 1);
+            atomic_fetch_sub(&mgr->memory_usage, total_size);
+        }
         pthread_mutex_unlock(&mgr->lock);
         
         free(s->metadata);
@@ -318,7 +379,7 @@ agentos_error_t session_manager_create_session(
         return AGENTOS_ENOMEM;
     }
     
-    AGENTOS_LOG_DEBUG("Session created: %s", s->id);
+    AGENTOS_LOG_DEBUG("Session created: %s (memory: %zu bytes)", s->id, total_size);
     return AGENTOS_SUCCESS;
 }
 

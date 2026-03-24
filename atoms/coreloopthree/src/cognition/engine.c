@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file engine.c
  * @brief 认知引擎核心实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -31,8 +31,38 @@ struct agentos_cognition_engine {
     agentos_mutex_t* lock;
     uint32_t stats_processed;
     uint64_t stats_total_time_ns;
-    agentos_cognition_config_t config;  // 配置
+    agentos_cognition_config_t config;
+    agentos_feedback_callback_t feedback_cb;
+    void* feedback_user_data;
+    uint64_t stats_success_count;
+    uint64_t stats_failure_count;
+    uint64_t stats_total_retries;
 };
+
+/**
+ * @brief 触发反馈回调
+ * @param engine 认知引擎
+ * @param level 反馈级别（0=实时，1=轮次内，2=跨轮次）
+ * @param event 事件类型
+ * @param data 反馈数据（JSON格式）
+ */
+static void trigger_feedback(
+    agentos_cognition_engine_t* engine,
+    int level,
+    const char* event,
+    const char* data) {
+    
+    if (engine && engine->feedback_cb) {
+        engine->feedback_cb(
+            level,
+            "cognition",
+            event,
+            data,
+            data ? strlen(data) : 0,
+            engine->feedback_user_data
+        );
+    }
+}
 
 /**
  * @brief 创建认知引擎
@@ -96,15 +126,28 @@ agentos_error_t agentos_cognition_create_ex(
     // 设置配置
     if (config) {
         engine->config = *config;
+        engine->feedback_cb = config->feedback_callback;
+        engine->feedback_user_data = config->feedback_user_data;
     } else {
-        engine->config.default_timeout_ms = 30000;
-        engine->config.max_retries = 3;
+        engine->config.cognition_default_timeout_ms = 30000;
+        engine->config.cognition_max_retries = 3;
+        engine->config.feedback_callback = NULL;
+        engine->config.feedback_user_data = NULL;
+        engine->feedback_cb = NULL;
+        engine->feedback_user_data = NULL;
     }
 
     engine->stats_processed = 0;
     engine->stats_total_time_ns = 0;
+    engine->stats_success_count = 0;
+    engine->stats_failure_count = 0;
+    engine->stats_total_retries = 0;
 
     *out_engine = engine;
+    
+    // 触发引擎创建反馈
+    trigger_feedback(engine, 2, "engine_created", "{\"status\":\"initialized\"}");
+    
     return AGENTOS_SUCCESS;
 }
 
@@ -207,17 +250,53 @@ agentos_error_t agentos_cognition_process(
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_LOG_WARN("Primary planning failed: %s (code %d), trying fallback", 
                         agentos_error_string(err), err);
+        
+        // 触发轮次内反馈：主策略失败
+        char err_buf[256];
+        snprintf(err_buf, sizeof(err_buf),
+            "{\"error_code\":%d,\"error_msg\":\"%s\",\"stage\":\"primary_planning\"}",
+            err, agentos_error_string(err));
+        trigger_feedback(engine, 1, "planning_retry", err_buf);
+        
         if (fallback_strat && fallback_strat->plan) {
             err = fallback_strat->plan(&intent, fallback_strat->data, &plan);
+            if (err == AGENTOS_SUCCESS) {
+                agentos_mutex_lock(engine->lock);
+                engine->stats_total_retries++;
+                agentos_mutex_unlock(engine->lock);
+            }
         } else {
             AGENTOS_LOG_ERROR("No fallback planner available, primary error: %s (code %d)", 
                             agentos_error_string(err), err);
+            
+            // 触发实时反馈：处理失败
+            snprintf(err_buf, sizeof(err_buf),
+                "{\"error_code\":%d,\"error_msg\":\"%s\",\"stage\":\"no_fallback\"}",
+                err, agentos_error_string(err));
+            trigger_feedback(engine, 0, "process_failed", err_buf);
+            
+            agentos_mutex_lock(engine->lock);
+            engine->stats_failure_count++;
+            agentos_mutex_unlock(engine->lock);
+            
             return err;
         }
     }
 
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_LOG_ERROR("Planning failed: %s (code %d)", agentos_error_string(err), err);
+        
+        // 触发实时反馈：处理失败
+        char err_buf[256];
+        snprintf(err_buf, sizeof(err_buf),
+            "{\"error_code\":%d,\"error_msg\":\"%s\",\"stage\":\"fallback_failed\"}",
+            err, agentos_error_string(err));
+        trigger_feedback(engine, 0, "process_failed", err_buf);
+        
+        agentos_mutex_lock(engine->lock);
+        engine->stats_failure_count++;
+        agentos_mutex_unlock(engine->lock);
+        
         return err;
     }
 
@@ -239,7 +318,17 @@ agentos_error_t agentos_cognition_process(
     agentos_mutex_lock(engine->lock);
     engine->stats_processed++;
     engine->stats_total_time_ns += elapsed;
+    engine->stats_success_count++;
     agentos_mutex_unlock(engine->lock);
+
+    // 触发实时反馈：任务处理完成
+    char feedback_buf[512];
+    snprintf(feedback_buf, sizeof(feedback_buf),
+        "{\"plan_id\":\"%s\",\"node_count\":%zu,\"elapsed_ns\":%" PRIu64 ",\"status\":\"success\"}",
+        plan->plan_id ? plan->plan_id : "unknown",
+        plan->node_count,
+        elapsed);
+    trigger_feedback(engine, 0, "process_complete", feedback_buf);
 
     *out_plan = plan;
     return AGENTOS_SUCCESS;

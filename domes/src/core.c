@@ -3,30 +3,42 @@
  * @brief domes 模块核心实现
  * @author Spharx
  * @date 2024
+ * 
+ * 本模块实现 domes 安全沙箱的核心功能：
+ * - 权限裁决引擎
+ * - 输入净化引擎
+ * - 审计日志系统
+ * - 虚拟工位管理
  */
 
 #include "core.h"
 #include "permission/permission.h"
 #include "audit/audit.h"
 #include "sanitizer/sanitizer.h"
+#include <atoms/utils/observability/include/logger.h>
 #include <stdlib.h>
 #include <string.h>
+
+#define DOMES_LOG_LABEL "domes"
 
 domes_instance_t* g_domes_instance = NULL;
 
 int domes_init(const char* config_path) {
     if (g_domes_instance != NULL) {
+        AGENTOS_LOG_WARN("%s: domes already initialized", DOMES_LOG_LABEL);
         return DOMES_OK;
     }
     
     g_domes_instance = (domes_instance_t*)domes_mem_alloc(sizeof(domes_instance_t));
     if (!g_domes_instance) {
+        AGENTOS_LOG_ERROR("%s: failed to allocate memory for domes instance", DOMES_LOG_LABEL);
         return DOMES_ERROR_NO_MEMORY;
     }
     
     memset(g_domes_instance, 0, sizeof(domes_instance_t));
     
     if (domes_rwlock_init(&g_domes_instance->lock) != DOMES_OK) {
+        AGENTOS_LOG_ERROR("%s: failed to initialize rwlock", DOMES_LOG_LABEL);
         domes_mem_free(g_domes_instance);
         g_domes_instance = NULL;
         return DOMES_ERROR_UNKNOWN;
@@ -34,10 +46,12 @@ int domes_init(const char* config_path) {
     
     if (config_path) {
         g_domes_instance->config_path = domes_strdup(config_path);
+        AGENTOS_LOG_INFO("%s: using config path: %s", DOMES_LOG_LABEL, config_path);
     }
     
     g_domes_instance->permission = permission_engine_create(NULL);
     if (!g_domes_instance->permission) {
+        AGENTOS_LOG_ERROR("%s: failed to create permission engine", DOMES_LOG_LABEL);
         domes_rwlock_destroy(&g_domes_instance->lock);
         domes_mem_free(g_domes_instance->config_path);
         domes_mem_free(g_domes_instance);
@@ -47,6 +61,7 @@ int domes_init(const char* config_path) {
     
     g_domes_instance->audit = audit_logger_create(NULL, "domes", 10 * 1024 * 1024, 10);
     if (!g_domes_instance->audit) {
+        AGENTOS_LOG_ERROR("%s: failed to create audit logger", DOMES_LOG_LABEL);
         permission_engine_destroy(g_domes_instance->permission);
         domes_rwlock_destroy(&g_domes_instance->lock);
         domes_mem_free(g_domes_instance->config_path);
@@ -57,6 +72,7 @@ int domes_init(const char* config_path) {
     
     g_domes_instance->sanitizer = sanitizer_create(NULL);
     if (!g_domes_instance->sanitizer) {
+        AGENTOS_LOG_ERROR("%s: failed to create sanitizer", DOMES_LOG_LABEL);
         audit_logger_destroy(g_domes_instance->audit);
         permission_engine_destroy(g_domes_instance->permission);
         domes_rwlock_destroy(&g_domes_instance->lock);
@@ -69,13 +85,18 @@ int domes_init(const char* config_path) {
     domes_atomic_store32(&g_domes_instance->ref_count, 1);
     g_domes_instance->initialized = true;
     
+    AGENTOS_LOG_INFO("%s: domes initialized successfully (version %s)", DOMES_LOG_LABEL, domes_version());
     return DOMES_OK;
 }
 
 void domes_cleanup(void) {
-    if (!g_domes_instance) return;
+    if (!g_domes_instance) {
+        AGENTOS_LOG_WARN("%s: domes_cleanup called but domes not initialized", DOMES_LOG_LABEL);
+        return;
+    }
     
     if (domes_atomic_sub32(&g_domes_instance->ref_count, 1) > 1) {
+        AGENTOS_LOG_DEBUG("%s: domes instance still in use, deferring cleanup", DOMES_LOG_LABEL);
         return;
     }
     
@@ -106,6 +127,8 @@ void domes_cleanup(void) {
     
     domes_mem_free(g_domes_instance);
     g_domes_instance = NULL;
+    
+    AGENTOS_LOG_INFO("%s: domes cleaned up successfully", DOMES_LOG_LABEL);
 }
 
 int domes_check_permission(const char* agent_id, const char* action,

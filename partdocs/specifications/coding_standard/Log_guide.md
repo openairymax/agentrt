@@ -10,7 +10,7 @@
 **文档状态**：正式发布  
 **适用范围**：AgentOS 所有模块的日志打印活动  
 **理论基础**：工程控制论（反馈理论、可观测性）、信息论  
-**关联规范**：[架构设计原则](../架构设计原则.md)（原则 O-5）
+**关联规范**：[架构设计原则](../../architecture/folder/architectural_design_principles.md)（原则 O-5）
 
 ---
 
@@ -647,9 +647,8 @@ HiLog::WARN(LABEL, "TCP connection closed: reason=peer_timeout, duration=300s");
 
 | 引用文档 | 关系说明 |
 |---------|---------||
-| [架构设计原则](../架构设计原则.md) | 本规范是原则 O-5（高效开发原则）在可观测性方面的实施细则 |
+| [架构设计原则](../../architecture/folder/architectural_design_principles.md) | 本规范是原则 O-5（高效开发原则）在可观测性方面的实施细则 |
 | [C&C++安全编程指南](./C&Cpp-secure-coding-guide.md) | 日志中的错误处理应遵循安全编程指南的异常处理规范 |
-| [代码门禁要求](../代码门禁要求_v2.md) | 日志规范的符合性通过 CodeCheck 进行检查 |
 | [统一术语表](../TERMINOLOGY.md) | 本规范使用的术语定义和解释 |
 
 ---
