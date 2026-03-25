@@ -1,0 +1,214 @@
+#!/usr/bin/env python3
+"""
+AgentOS 配置部署脚本
+根据环境变量部署配置文件
+"""
+
+import os
+import sys
+import shutil
+import argparse
+from pathlib import Path
+from typing import Optional
+
+
+def backup_config_file(config_path: Path) -> Path:
+    """备份配置文件"""
+    backup_path = config_path.with_suffix('.backup')
+    if config_path.exists():
+        shutil.copy2(config_path, backup_path)
+        print(f"✓ 已备份: {backup_path}")
+    return backup_path
+
+
+def deploy_config(
+    source_dir: Path,
+    target_env: str,
+    backup: bool = True,
+    dry_run: bool = False
+) -> bool:
+    """部署配置到指定环境"""
+    
+    # 确定目标目录
+    target_dir = source_dir / 'environment' / target_env
+    if not target_dir.exists():
+        print(f"✗ 目标环境目录不存在: {target_dir}")
+        return False
+    
+    # 环境配置映射
+    env_mapping = {
+        'development': {
+            'kernel/settings.yaml': 'kernel/settings.yaml',
+            'model/model.yaml': 'model/model.yaml',
+            'agent/registry.yaml': 'agent/registry.yaml',
+            'skill/registry.yaml': 'skill/registry.yaml',
+            'security/policy.yaml': 'security/policy.yaml',
+            'security/permission_rules.yaml': 'security/permission_rules.yaml',
+            'sanitizer/sanitizer_rules.json': 'sanitizer/sanitizer_rules.json',
+            'logging/config.yaml': 'logging/config.yaml',
+            'config_management.yaml': 'config_management.yaml',
+        },
+        'staging': {
+            'kernel/settings.yaml': 'kernel/settings.yaml',
+            'model/model.yaml': 'model/model.yaml',
+            'agent/registry.yaml': 'agent/registry.yaml',
+            'skill/registry.yaml': 'skill/registry.yaml',
+            'security/policy.yaml': 'security/policy.yaml',
+            'security/permission_rules.yaml': 'security/permission_rules.yaml',
+            'sanitizer/sanitizer_rules.json': 'sanitizer/sanitizer_rules.json',
+            'logging/config.yaml': 'logging/config.yaml',
+            'config_management.yaml': 'config_management.yaml',
+        },
+        'production': {
+            'kernel/settings.yaml': 'kernel/settings.yaml',
+            'model/model.yaml': 'model/model.yaml',
+            'agent/registry.yaml': 'agent/registry.yaml',
+            'skill/registry.yaml': 'skill/registry.yaml',
+            'security/policy.yaml': 'security/policy.yaml',
+            'security/permission_rules.yaml': 'security/permission_rules.yaml',
+            'sanitizer/sanitizer_rules.json': 'sanitizer/sanitizer_rules.json',
+            'logging/config.yaml': 'logging/config.yaml',
+            'config_management.yaml': 'config_management.yaml',
+        },
+    }
+    
+    # 获取当前环境的配置映射
+    config_map = env_mapping.get(target_env)
+    if not config_map:
+        print(f"✗ 不支持的环境: {target_env}")
+        return False
+    
+    # 部署配置文件
+    success_count = 0
+    error_count = 0
+    
+    for source_file, target_file in config_map.items():
+        source_path = source_dir / source_file
+        target_path = target_dir / target_file
+        
+        if not source_path.exists():
+            print(f"⚠ 源文件不存在: {source_path}")
+            error_count += 1
+            continue
+        
+        if dry_run:
+            print(f"[DRY RUN] 将复制 {source_path} -> {target_path}")
+            success_count += 1
+            continue
+        
+        # 备份目标文件
+        if backup and target_path.exists():
+            backup_config_file(target_path)
+        
+        # 复制配置文件
+        try:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source_path, target_path)
+            print(f"✓ 已部署: {target_path}")
+            success_count += 1
+        except Exception as e:
+            print(f"✗ 部署失败: {target_path} - {e}")
+            error_count += 1
+    
+    # 总结
+    print(f"\n部署完成:")
+    print(f"  成功: {success_count}")
+    print(f"  失败: {error_count}")
+    
+    return error_count == 0
+
+
+def validate_deployment(
+    source_dir: Path,
+    target_env: str
+) -> bool:
+    """验证部署结果"""
+    
+    target_dir = source_dir / 'environment' / target_env
+    if not target_dir.exists():
+        print(f"✗ 目标环境目录不存在: {target_dir}")
+        return False
+    
+    # 检查必需的配置文件
+    required_files = [
+        'kernel/settings.yaml',
+        'model/model.yaml',
+        'agent/registry.yaml',
+        'skill/registry.yaml',
+        'security/policy.yaml',
+        'security/permission_rules.yaml',
+        'sanitizer/sanitizer_rules.json',
+        'logging/config.yaml',
+        'config_management.yaml',
+    ]
+    
+    missing_files = []
+    for file in required_files:
+        if not (target_dir / file).exists():
+            missing_files.append(file)
+    
+    if missing_files:
+        print(f"✗ 缺少必需的配置文件:")
+        for file in missing_files:
+            print(f"  - {file}")
+        return False
+    
+    print("✓ 所有必需的配置文件已部署")
+    return True
+
+
+def main():
+    parser = argparse.ArgumentParser(description='AgentOS 配置部署工具')
+    parser.add_argument('--env', '-e',
+                       required=True,
+                       choices=['development', 'staging', 'production'],
+                       help='目标环境 (development/staging/production)')
+    parser.add_argument('--source', '-s',
+                       default='config',
+                       help='源配置目录')
+    parser.add_argument('--no-backup', '-n',
+                       action='store_true',
+                       help='不备份现有配置')
+    parser.add_argument('--dry-run', '-d',
+                       action='store_true',
+                       help='模拟部署（不实际复制文件）')
+    parser.add_argument('--validate', '-v',
+                       action='store_true',
+                       help='验证部署结果')
+    
+    args = parser.parse_args()
+    
+    source_dir = Path(args.source)
+    
+    print(f"=== AgentOS 配置部署工具 ===")
+    print(f"目标环境: {args.env}")
+    print(f"源目录: {source_dir}")
+    print(f"备份: {'禁用' if args.no_backup else '启用'}")
+    print(f"模拟模式: {'启用' if args.dry_run else '禁用'}")
+    print()
+    
+    # 执行部署
+    success = deploy_config(
+        source_dir=source_dir,
+        target_env=args.env,
+        backup=not args.no_backup,
+        dry_run=args.dry_run
+    )
+    
+    if success and args.validate:
+        validate_deployment(source_dir, args.env)
+    
+    if success:
+        print("\n✓ 部署成功!")
+        print(f"\n下一步:")
+        print(f"  1. 验证环境变量: {args.env.upper()}_*")
+        print(f"  2. 重启相关服务以加载新配置")
+        print(f"  3. 检查日志确认配置生效")
+        return 0
+    else:
+        print("\n✗ 部署失败!")
+        return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())

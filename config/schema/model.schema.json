@@ -1,0 +1,251 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentos.spharx.ai/schemas/models-v1.schema.json",
+  "title": "AgentOS Models Configuration Schema",
+  "description": "Configuration schema for LLM model providers and settings",
+  "type": "object",
+  "required": ["_config_version", "models"],
+  "properties": {
+    "_config_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Configuration file version"
+    },
+    "models": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "provider", "api_key_env"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Model identifier name"
+          },
+          "provider": {
+            "type": "string",
+            "enum": ["openai", "anthropic", "deepseek", "ollama", "azure", "aws", "google", "custom"],
+            "description": "Model provider"
+          },
+          "api_key_env": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Environment variable name for API key"
+          },
+          "endpoint": {
+            "type": "string",
+            "format": "uri",
+            "description": "API endpoint URL (optional, uses provider default if not specified)"
+          },
+          "context_window": {
+            "type": "integer",
+            "minimum": 512,
+            "maximum": 10000000,
+            "description": "Maximum context window size in tokens"
+          },
+          "input_cost_per_1k": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Input cost per 1000 tokens in USD"
+          },
+          "output_cost_per_1k": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Output cost per 1000 tokens in USD"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["chat", "function_calling", "json_mode", "vision", "embedding", "streaming", "tools"]
+            },
+            "description": "Model capabilities"
+          },
+          "default": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether this is the default model"
+          },
+          "max_concurrency": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "default": 10,
+            "description": "Maximum concurrent requests to this model"
+          },
+          "timeout_sec": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600,
+            "default": 30,
+            "description": "Request timeout in seconds"
+          },
+          "retry": {
+            "type": "object",
+            "description": "Retry configuration",
+            "properties": {
+              "max_attempts": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10,
+                "default": 3,
+                "description": "Maximum retry attempts"
+              },
+              "backoff_ms": {
+                "type": "integer",
+                "minimum": 10,
+                "maximum": 60000,
+                "default": 100,
+                "description": "Initial backoff time in milliseconds"
+              },
+              "backoff_multiplier": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 10,
+                "default": 2.0,
+                "description": "Backoff multiplier for exponential backoff"
+              },
+              "max_backoff_ms": {
+                "type": "integer",
+                "minimum": 1000,
+                "maximum": 300000,
+                "default": 10000,
+                "description": "Maximum backoff time in milliseconds"
+              },
+              "retry_on_status_codes": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                },
+                "default": [429, 500, 502, 503, 504],
+                "description": "HTTP status codes that trigger retry"
+              }
+            }
+          },
+          "circuit_breaker": {
+            "type": "object",
+            "description": "Circuit breaker configuration",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "default": true,
+                "description": "Enable circuit breaker"
+              },
+              "failure_threshold": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 5,
+                "description": "Number of failures before opening circuit"
+              },
+              "reset_timeout_sec": {
+                "type": "integer",
+                "minimum": 10,
+                "maximum": 3600,
+                "default": 60,
+                "description": "Time before attempting to close circuit"
+              },
+              "half_open_requests": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10,
+                "default": 3,
+                "description": "Number of test requests in half-open state"
+              },
+              "success_threshold": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10,
+                "default": 2,
+                "description": "Successful requests needed to close circuit"
+              }
+            }
+          },
+          "fallback": {
+            "type": "object",
+            "description": "Fallback model configuration",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "default": true,
+                "description": "Enable fallback to alternative model"
+              },
+              "fallback_model": {
+                "type": "string",
+                "description": "Name of fallback model"
+              },
+              "fallback_on_timeout": {
+                "type": "boolean",
+                "default": true,
+                "description": "Fallback on timeout"
+              },
+              "fallback_on_rate_limit": {
+                "type": "boolean",
+                "default": true,
+                "description": "Fallback on rate limit"
+              },
+              "fallback_on_error": {
+                "type": "boolean",
+                "default": true,
+                "description": "Fallback on error"
+              }
+            }
+          },
+          "health_check": {
+            "type": "object",
+            "description": "Health check configuration",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "default": true,
+                "description": "Enable health checks"
+              },
+              "interval_sec": {
+                "type": "integer",
+                "minimum": 10,
+                "maximum": 3600,
+                "default": 30,
+                "description": "Health check interval in seconds"
+              },
+              "timeout_sec": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 60,
+                "default": 5,
+                "description": "Health check timeout in seconds"
+              },
+              "unhealthy_threshold": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10,
+                "default": 3,
+                "description": "Consecutive failures before marking unhealthy"
+              }
+            }
+          },
+          "rate_limit": {
+            "type": "object",
+            "description": "Rate limiting configuration",
+            "properties": {
+              "requests_per_minute": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100000,
+                "description": "Maximum requests per minute"
+              },
+              "tokens_per_minute": {
+                "type": "integer",
+                "minimum": 1000,
+                "maximum": 100000000,
+                "description": "Maximum tokens per minute"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

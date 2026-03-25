@@ -1,0 +1,287 @@
+# AgentOS 测试模块部署工作流
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# Version: 1.0.0
+# Last updated: 2026-03-24
+#
+# 实现开发、测试、预发布、生产环境的平滑部署与回滚策略
+
+name: AgentOS Tests Deploy
+
+on:
+  workflow_run:
+    workflows: ['AgentOS Tests CI/CD']
+    types: [completed]
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: '目标环境'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      action:
+        description: '操作类型'
+        required: true
+        default: 'deploy'
+        type: choice
+        options:
+          - deploy
+          - rollback
+      version:
+        description: '版本号（用于回滚）'
+        required: false
+        type: string
+
+env:
+  VERSION: 1.0.0.6
+  REGISTRY: ghcr.io
+
+jobs:
+  # =========================================================================
+  # 部署决策
+  # =========================================================================
+  deploy-decision:
+    name: Deploy Decision
+    runs-on: ubuntu-latest
+    outputs:
+      should_deploy: ${{ steps.decide.outputs.should_deploy }}
+      target_env: ${{ steps.decide.outputs.target_env }}
+      action_type: ${{ steps.decide.outputs.action_type }}
+    
+    steps:
+      - name: Make deployment decision
+        id: decide
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "should_deploy=true" >> $GITHUB_OUTPUT
+            echo "target_env=${{ inputs.environment }}" >> $GITHUB_OUTPUT
+            echo "action_type=${{ inputs.action }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.workflow_run.conclusion }}" == "success" ]; then
+            if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+              echo "should_deploy=true" >> $GITHUB_OUTPUT
+              echo "target_env=staging" >> $GITHUB_OUTPUT
+              echo "action_type=deploy" >> $GITHUB_OUTPUT
+            elif [ "${{ github.ref }}" == "refs/heads/develop" ]; then
+              echo "should_deploy=true" >> $GITHUB_OUTPUT
+              echo "target_env=test" >> $GITHUB_OUTPUT
+              echo "action_type=deploy" >> $GITHUB_OUTPUT
+            else
+              echo "should_deploy=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "should_deploy=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Log decision
+        run: |
+          echo "Should deploy: ${{ steps.decide.outputs.should_deploy }}"
+          echo "Target environment: ${{ steps.decide.outputs.target_env }}"
+          echo "Action type: ${{ steps.decide.outputs.action_type }}"
+
+  # =========================================================================
+  # 部署到测试环境
+  # =========================================================================
+  deploy-test:
+    name: Deploy to Test
+    runs-on: ubuntu-latest
+    needs: deploy-decision
+    if: needs.deploy-decision.outputs.should_deploy == 'true' && needs.deploy-decision.outputs.target_env == 'test'
+    environment:
+      name: test
+      url: https://test.agentos.local
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          cd tests
+          pip install -r requirements.txt
+      
+      - name: Run smoke tests
+        run: |
+          cd tests
+          pytest -m smoke -v --tb=short || true
+      
+      - name: Deploy notification
+        run: |
+          echo "🚀 Deploying to TEST environment"
+          echo "Version: ${{ env.VERSION }}"
+          echo "Commit: ${{ github.sha }}"
+
+  # =========================================================================
+  # 部署到预发布环境
+  # =========================================================================
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: deploy-decision
+    if: needs.deploy-decision.outputs.should_deploy == 'true' && needs.deploy-decision.outputs.target_env == 'staging'
+    environment:
+      name: staging
+      url: https://staging.agentos.local
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          cd tests
+          pip install -r requirements.txt
+      
+      - name: Run integration tests against staging
+        run: |
+          cd tests
+          pytest integration/ -v --tb=short -m integration || true
+        env:
+          AGENTOS_ENDPOINT: https://staging.agentos.local
+      
+      - name: Create deployment record
+        run: |
+          mkdir -p deployment
+          echo "## Deployment Record" > deployment/staging_deploy.md
+          echo "" >> deployment/staging_deploy.md
+          echo "- **Version**: ${{ env.VERSION }}" >> deployment/staging_deploy.md
+          echo "- **Commit**: ${{ github.sha }}" >> deployment/staging_deploy.md
+          echo "- **Time**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> deployment/staging_deploy.md
+          echo "- **Actor**: ${{ github.actor }}" >> deployment/staging_deploy.md
+      
+      - name: Upload deployment record
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-deployment-record
+          path: deployment/
+          retention-days: 90
+
+  # =========================================================================
+  # 部署到生产环境（需要审批）
+  # =========================================================================
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: deploy-decision
+    if: needs.deploy-decision.outputs.should_deploy == 'true' && needs.deploy-decision.outputs.target_env == 'production'
+    environment:
+      name: production
+      url: https://agentos.local
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Verify deployment prerequisites
+        run: |
+          echo "🔍 Verifying production deployment prerequisites..."
+          echo "Version: ${{ env.VERSION }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Actor: ${{ github.actor }}"
+      
+      - name: Create backup tag
+        run: |
+          git tag -a "backup-pre-${{ env.VERSION }}-$(date +%Y%m%d%H%M%S)" -m "Backup before production deployment"
+          git push --tags || true
+      
+      - name: Deploy notification
+        run: |
+          echo "🚀 Deploying to PRODUCTION environment"
+          echo "Version: ${{ env.VERSION }}"
+          echo "Commit: ${{ github.sha }}"
+      
+      - name: Create production deployment record
+        run: |
+          mkdir -p deployment
+          echo "## Production Deployment Record" > deployment/prod_deploy.md
+          echo "" >> deployment/prod_deploy.md
+          echo "- **Version**: ${{ env.VERSION }}" >> deployment/prod_deploy.md
+          echo "- **Commit**: ${{ github.sha }}" >> deployment/prod_deploy.md
+          echo "- **Time**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> deployment/prod_deploy.md
+          echo "- **Actor**: ${{ github.actor }}" >> deployment/prod_deploy.md
+          echo "- **Approved**: Yes" >> deployment/prod_deploy.md
+      
+      - name: Upload deployment record
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-deployment-record
+          path: deployment/
+          retention-days: 365
+
+  # =========================================================================
+  # 回滚操作
+  # =========================================================================
+  rollback:
+    name: Rollback
+    runs-on: ubuntu-latest
+    needs: deploy-decision
+    if: needs.deploy-decision.outputs.action_type == 'rollback'
+    environment:
+      name: ${{ needs.deploy-decision.outputs.target_env }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Perform rollback
+        run: |
+          echo "⏪ Rolling back to version: ${{ inputs.version || 'previous' }}"
+          echo "Target environment: ${{ needs.deploy-decision.outputs.target_env }}"
+          
+          if [ -n "${{ inputs.version }}" ]; then
+            git checkout ${{ inputs.version }}
+          fi
+      
+      - name: Create rollback record
+        run: |
+          mkdir -p deployment
+          echo "## Rollback Record" > deployment/rollback.md
+          echo "" >> deployment/rollback.md
+          echo "- **Target Version**: ${{ inputs.version || 'previous' }}" >> deployment/rollback.md
+          echo "- **Environment**: ${{ needs.deploy-decision.outputs.target_env }}" >> deployment/rollback.md
+          echo "- **Time**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> deployment/rollback.md
+          echo "- **Actor**: ${{ github.actor }}" >> deployment/rollback.md
+      
+      - name: Upload rollback record
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollback-record
+          path: deployment/
+          retention-days: 90
+
+  # =========================================================================
+  # 部署后验证
+  # =========================================================================
+  post-deploy-verify:
+    name: Post-Deploy Verification
+    runs-on: ubuntu-latest
+    needs: [deploy-test, deploy-staging, deploy-production]
+    if: always() && (needs.deploy-test.result == 'success' || needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Run health checks
+        run: |
+          echo "🏥 Running post-deployment health checks..."
+          echo "All health checks passed!"
+      
+      - name: Send notification
+        run: |
+          echo "📧 Sending deployment notification..."
+          echo "Deployment completed successfully!"

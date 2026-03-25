@@ -1,0 +1,203 @@
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# AgentOS Docker Compose 配置文件 - Staging 环境
+# 用于预发布环境和生产部署前的验证
+
+version: '3.8'
+
+services:
+  # ==================== AgentOS Scripts 服务 ====================
+  agentos-scripts:
+    build:
+      context: ../../
+      dockerfile: scripts/deploy/docker/Dockerfile.service
+      target: runtime
+    image: spharx/agentos-scripts:staging
+    container_name: agentos-scripts
+    hostname: agentos-scripts-staging
+    restart: unless-stopped
+
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+
+    # 环境变量
+    environment:
+      - TZ=Asia/Shanghai
+      - AGENTOS_ENV=staging
+      - AGENTOS_LOG_LEVEL=INFO
+      - AGENTOS_LOG_FORMAT=json
+      - AGENTOS_ENABLE_TRACING=true
+      - AGENTOS_TELEMETRY_ENDPOINT=http://otel-collector:4317
+      - AGENTOS_DEPLOYMENT_TYPE=staging
+
+    # 端口映射
+    ports:
+      - "8090:8090"
+
+    # 数据卷挂载
+    volumes:
+      - staging-logs:/var/log/agentos:rw
+      - staging-data:/var/lib/agentos:rw
+      - ../../config/staging:/etc/agentos:ro
+
+    # 网络配置
+    networks:
+      - agentos-staging-network
+
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+    # 启动命令
+    command: >
+      bash -c "
+        echo 'Starting AgentOS Scripts (Staging)...';
+        python3 -m scripts.core.cli --config /etc/agentos/config.yaml;
+      "
+
+  # ==================== 辅助服务 ====================
+  redis-staging:
+    image: redis:7-alpine
+    container_name: agentos-redis-staging
+    hostname: agentos-redis-staging
+    restart: unless-stopped
+
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+
+    # 数据持久化
+    volumes:
+      - redis-staging-data:/data
+
+    # 网络配置
+    networks:
+      - agentos-staging-network
+
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    # 启动命令
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+
+  postgres-staging:
+    image: postgres:15-alpine
+    container_name: agentos-postgres-staging
+    hostname: agentos-postgres-staging
+    restart: unless-stopped
+
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+
+    # 环境变量
+    environment:
+      - POSTGRES_DB=agentos_staging
+      - POSTGRES_USER=agentos
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-staging_password_change_me}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8
+
+    # 数据持久化
+    volumes:
+      - postgres-staging-data:/var/lib/postgresql/data
+
+    # 网络配置
+    networks:
+      - agentos-staging-network
+
+    # 健康检查
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentos"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # OpenTelemetry Collector (可观测性)
+  otel-collector-staging:
+    image: otel/opentelemetry-collector-contrib:0.90.0
+    container_name: agentos-otel-staging
+    hostname: agentos-otel-staging
+    restart: unless-stopped
+
+    # 配置文件
+    volumes:
+      - ./config/otel-collector-staging.yaml:/etc/otelcol-contrib/config.yaml:ro
+
+    # 网络配置
+    networks:
+      - agentos-staging-network
+
+    # 端口暴露
+    ports:
+      - "5317:4317"
+      - "5318:4318"
+      - "8889:8888"
+
+    # 依赖
+    depends_on:
+      - jaeger-staging
+
+  jaeger-staging:
+    image: jaegertracing/all-in-one:1.50
+    container_name: agentos-jaeger-staging
+    hostname: agentos-jaeger-staging
+    restart: unless-stopped
+
+    # 环境变量
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+
+    # 网络配置
+    networks:
+      - agentos-staging-network
+
+    # 端口暴露
+    ports:
+      - "17686:16686"
+      - "14268:14268"
+
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+
+  # ==================== 数据卷 ====================
+volumes:
+  staging-logs:
+    driver: local
+  staging-data:
+    driver: local
+  redis-staging-data:
+    driver: local
+  postgres-staging-data:
+    driver: local
+
+# ==================== 网络配置 ====================
+networks:
+  agentos-staging-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.29.0.0/16

@@ -1,0 +1,225 @@
+# =============================================================================
+# AgentOS 权限裁决规则配置文件
+# 版本: v1.0.0
+# 最后更新: 2026-03-23
+# Schema: schemas/security-policy.schema.json
+# =============================================================================
+# Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+# 规则按优先级顺序匹配，第一个匹配的规则生效
+
+# 配置版本
+_config_version: "1.0.0"
+
+# =============================================================================
+# 权限规则
+# =============================================================================
+rules:
+  # ===========================================================================
+  # Agent 角色权限
+  # ===========================================================================
+  
+  # 产品经理 Agent
+  - agent: "product_manager"
+    action: "file:read"
+    resource: "${AGENTOS_ROOT}/docs/*"
+    effect: "allow"
+    priority: 10
+    audit: false
+  
+  - agent: "product_manager"
+    action: "file:write"
+    resource: "${AGENTOS_DATA_DIR}/workspace/docs/*"
+    effect: "allow"
+    priority: 10
+    audit: true
+  
+  # 架构师 Agent
+  - agent: "architect"
+    action: "file:read"
+    resource: "${AGENTOS_ROOT}/**/*"
+    effect: "allow"
+    priority: 10
+  
+  - agent: "architect"
+    action: "file:write"
+    resource: "${AGENTOS_DATA_DIR}/workspace/architecture/*"
+    effect: "allow"
+    priority: 10
+    audit: true
+  
+  # 前端开发 Agent
+  - agent: "frontend"
+    action: "file:read"
+    resource: "${AGENTOS_ROOT}/**/*.{js,jsx,ts,tsx,css,html}"
+    effect: "allow"
+    priority: 10
+  
+  - agent: "frontend"
+    action: "file:write"
+    resource: "${AGENTOS_DATA_DIR}/workspace/frontend/*"
+    effect: "allow"
+    priority: 10
+    audit: true
+  
+  # 后端开发 Agent
+  - agent: "backend"
+    action: "file:read"
+    resource: "${AGENTOS_ROOT}/**/*.{py,go,rs,java,c,cpp,h}"
+    effect: "allow"
+    priority: 10
+  
+  - agent: "backend"
+    action: "file:write"
+    resource: "${AGENTOS_DATA_DIR}/workspace/backend/*"
+    effect: "allow"
+    priority: 10
+    audit: true
+  
+  - agent: "backend"
+    action: "network:connect"
+    resource: "*.googleapis.com:443"
+    effect: "allow"
+    priority: 10
+  
+  # 测试 Agent
+  - agent: "tester"
+    action: "file:read"
+    resource: "${AGENTOS_ROOT}/**/*"
+    effect: "allow"
+    priority: 10
+  
+  - agent: "tester"
+    action: "code:execute:*"
+    resource: "*"
+    effect: "allow_with_sandbox"
+    priority: 10
+    audit: true
+  
+  # DevOps Agent
+  - agent: "devops"
+    action: "file:read"
+    resource: "${AGENTOS_ROOT}/**/*"
+    effect: "allow"
+    priority: 10
+  
+  - agent: "devops"
+    action: "code:execute:shell"
+    resource: "*"
+    effect: "allow_with_sandbox"
+    priority: 10
+    audit: true
+    audit_level: "high"
+  
+  # 安全审计 Agent
+  - agent: "security"
+    action: "file:read"
+    resource: "${AGENTOS_DATA_DIR}/logs/*"
+    effect: "allow"
+    priority: 20
+  
+  - agent: "security"
+    action: "file:read"
+    resource: "/var/log/*"
+    effect: "allow"
+    priority: 20
+    audit: true
+    audit_level: "high"
+
+  # ===========================================================================
+  # 通用权限规则
+  # ===========================================================================
+  
+  # 允许所有 Agent 读取临时目录
+  - agent: "*"
+    action: "file:read"
+    resource: "${AGENTOS_TEMP_DIR}/*"
+    effect: "allow"
+    priority: 5
+  
+  # 拒绝所有 Agent 写入系统关键目录
+  - agent: "*"
+    action: "file:write"
+    resource: "/etc/*"
+    effect: "deny"
+    priority: 100
+    audit: true
+    audit_level: "critical"
+  
+  - agent: "*"
+    action: "file:write"
+    resource: "/usr/*"
+    effect: "deny"
+    priority: 100
+    audit: true
+    audit_level: "critical"
+  
+  - agent: "*"
+    action: "file:write"
+    resource: "/bin/*"
+    effect: "deny"
+    priority: 100
+    audit: true
+    audit_level: "critical"
+  
+  # 拒绝所有 Agent 删除任何文件
+  - agent: "*"
+    action: "file:delete"
+    resource: "*"
+    effect: "deny"
+    priority: 100
+    audit: true
+    audit_level: "critical"
+  
+  # 拒绝所有 Agent 执行未授权的网络连接
+  - agent: "*"
+    action: "network:connect"
+    resource: "*"
+    effect: "deny"
+    priority: 1
+    audit: true
+
+  # ===========================================================================
+  # 条件权限规则
+  # ===========================================================================
+  
+  # 工作时间内的网络访问（示例）
+  - agent: "*"
+    action: "network:connect"
+    resource: "*.github.com:443"
+    effect: "allow"
+    priority: 10
+    conditions:
+      - type: "time_range"
+        value: "09:00-18:00"
+    audit: true
+
+# =============================================================================
+# 角色定义
+# =============================================================================
+roles:
+  admin:
+    description: "管理员角色，拥有最高权限"
+    permissions:
+      - "file:*:*"
+      - "network:*:*"
+      - "code:*:*"
+      - "env:read:*"
+  
+  developer:
+    description: "开发者角色，拥有开发相关权限"
+    permissions:
+      - "file:read:${AGENTOS_ROOT}/**/*"
+      - "file:write:${AGENTOS_DATA_DIR}/workspace/*"
+      - "code:execute:*"
+  
+  viewer:
+    description: "查看者角色，只读权限"
+    permissions:
+      - "file:read:${AGENTOS_ROOT}/docs/*"
+      - "file:read:${AGENTOS_DATA_DIR}/reports/*"
+
+# =============================================================================
+# 默认规则（隐式）
+# =============================================================================
+# 默认拒绝所有未明确授权的操作
+# default_effect: "deny"

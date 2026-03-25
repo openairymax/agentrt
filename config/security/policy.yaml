@@ -1,0 +1,315 @@
+# =============================================================================
+# AgentOS 安全策略配置文件
+# 版本: v1.0.0
+# 最后更新: 2026-03-23
+# Schema: schemas/security-policy.schema.json
+# =============================================================================
+# Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+
+# 配置版本
+_config_version: "1.0.0"
+
+# =============================================================================
+# 安全配置
+# =============================================================================
+security:
+  # ===========================================================================
+  # 默认权限规则
+  # ===========================================================================
+  default_policy: "deny"  # allow, deny, audit
+
+  # ===========================================================================
+  # 权限规则列表
+  # ===========================================================================
+  rules:
+    # -----------------------------------------------------------------------
+    # 文件系统权限
+    # -----------------------------------------------------------------------
+    - id: "file_read_tmp"
+      resource: "file:read:${AGENTOS_TEMP_DIR}/*"
+      action: "read"
+      effect: "allow"
+      priority: 10
+      audit: false
+    
+    - id: "file_write_tmp"
+      resource: "file:write:${AGENTOS_TEMP_DIR}/agentos/*"
+      action: "write"
+      effect: "allow"
+      priority: 10
+      audit: true
+      audit_level: "low"
+    
+    - id: "file_read_data"
+      resource: "file:read:${AGENTOS_DATA_DIR}/*"
+      action: "read"
+      effect: "allow"
+      priority: 10
+    
+    - id: "file_write_data"
+      resource: "file:write:${AGENTOS_DATA_DIR}/workspace/*"
+      action: "write"
+      effect: "allow"
+      priority: 10
+      audit: true
+    
+    - id: "file_write_etc"
+      resource: "file:write:/etc/*"
+      action: "write"
+      effect: "deny"
+      priority: 20
+      audit: true
+      audit_level: "critical"
+    
+    - id: "file_delete_any"
+      resource: "file:delete:*"
+      action: "delete"
+      effect: "deny"
+      priority: 100
+      audit: true
+      audit_level: "critical"
+
+    # -----------------------------------------------------------------------
+    # 网络权限
+    # -----------------------------------------------------------------------
+    - id: "network_outbound_openai"
+      resource: "network:outbound:api.openai.com:443"
+      action: "connect"
+      effect: "allow"
+      priority: 10
+    
+    - id: "network_outbound_anthropic"
+      resource: "network:outbound:api.anthropic.com:443"
+      action: "connect"
+      effect: "allow"
+      priority: 10
+    
+    - id: "network_outbound_deepseek"
+      resource: "network:outbound:api.deepseek.com:443"
+      action: "connect"
+      effect: "allow"
+      priority: 10
+    
+    - id: "network_outbound_localhost"
+      resource: "network:outbound:localhost:*"
+      action: "connect"
+      effect: "allow"
+      priority: 15
+    
+    - id: "network_outbound_default"
+      resource: "network:outbound:*"
+      action: "connect"
+      effect: "deny"
+      priority: 5
+      audit: true
+      audit_level: "high"
+
+    # -----------------------------------------------------------------------
+    # 代码执行权限
+    # -----------------------------------------------------------------------
+    - id: "code_exec_python"
+      resource: "code:execute:python"
+      action: "run"
+      effect: "allow_with_sandbox"
+      priority: 10
+      audit: true
+      audit_level: "medium"
+    
+    - id: "code_exec_javascript"
+      resource: "code:execute:javascript"
+      action: "run"
+      effect: "allow_with_sandbox"
+      priority: 10
+      audit: true
+    
+    - id: "code_exec_shell"
+      resource: "code:execute:shell"
+      action: "run"
+      effect: "allow_with_sandbox"
+      priority: 5
+      audit: true
+      audit_level: "high"
+
+    # -----------------------------------------------------------------------
+    # 环境变量访问
+    # -----------------------------------------------------------------------
+    - id: "env_read_openai_key"
+      resource: "env:read:OPENAI_API_KEY"
+      action: "read"
+      effect: "allow"
+      priority: 10
+    
+    - id: "env_read_anthropic_key"
+      resource: "env:read:ANTHROPIC_API_KEY"
+      action: "read"
+      effect: "allow"
+      priority: 10
+    
+    - id: "env_read_deepseek_key"
+      resource: "env:read:DEEPSEEK_API_KEY"
+      action: "read"
+      effect: "allow"
+      priority: 10
+    
+    - id: "env_read_agentos"
+      resource: "env:read:AGENTOS_*"
+      action: "read"
+      effect: "allow"
+      priority: 10
+    
+    - id: "env_read_other"
+      resource: "env:read:*"
+      action: "read"
+      effect: "deny"
+      priority: 5
+      audit: true
+
+  # ===========================================================================
+  # 审计规则
+  # ===========================================================================
+  audit:
+    # 需要审计的操作（正则）
+    sensitive_actions:
+      - "file:delete"
+      - "file:write:/etc/*"
+      - "network:outbound:*"
+      - "code:execute:*"
+      - "env:read:*"
+    
+    # 审计日志保留天数
+    retention_days: 90
+    
+    # 审计日志加密
+    encryption:
+      enabled: true
+      algorithm: "aes-256-gcm"
+    
+    # 告警配置
+    alerts:
+      - condition: "failed_permission > 10 in 1m"
+        severity: "warning"
+        action: "notify"
+        webhook_url: "${SECURITY_WEBHOOK_URL}"
+      
+      - condition: "suspicious_pattern_detected"
+        severity: "critical"
+        action: "block"
+        webhook_url: "${SECURITY_WEBHOOK_URL}"
+      
+      - condition: "brute_force_attempt"
+        severity: "critical"
+        action: "quarantine"
+        webhook_url: "${SECURITY_WEBHOOK_URL}"
+
+  # ===========================================================================
+  # 沙箱配置
+  # ===========================================================================
+  sandbox:
+    # 隔离类型: docker, wasm, process, container, none
+    isolation_type: "process"
+    
+    # 内存限制（MB）
+    memory_limit_mb: 512
+    
+    # CPU 限制（核心数）
+    cpu_limit: 1.0
+    
+    # 磁盘限制（MB）
+    disk_limit_mb: 1024
+    
+    # 进程数限制
+    pid_limit: 100
+    
+    # 网络访问
+    network_enabled: false
+    
+    # 允许挂载的路径
+    allowed_mounts:
+      - "${AGENTOS_TEMP_DIR}"
+      - "${AGENTOS_DATA_DIR}/workspace"
+    
+    # Seccomp 安全配置
+    seccomp_profile: "default"
+    
+    # AppArmor 配置
+    apparmor_profile: "agentos-sandbox"
+    
+    # 只读根文件系统
+    read_only_root: true
+    
+    # 禁止权限提升
+    no_new_privileges: true
+    
+    # 容器镜像（当 isolation_type 为 container 时使用）
+    container_image:
+      name: "agentos/runtime:latest"
+      registry: "${CONTAINER_REGISTRY:-docker.io}"
+      pull_policy: "if_not_present"
+
+  # ===========================================================================
+  # 入侵检测
+  # ===========================================================================
+  intrusion_detection:
+    enabled: true
+    
+    # 异常检测阈值（0-1）
+    anomaly_threshold: 0.8
+    
+    # 安全告警 Webhook
+    alert_webhook: "${SECURITY_WEBHOOK_URL}"
+    
+    # 阻止模式
+    blocked_patterns:
+      - "ignore previous instructions"
+      - "system prompt"
+      - "you are now"
+      - "jailbreak"
+      - "DAN"
+      - "do anything now"
+    
+    # 行为分析
+    behavior_analysis:
+      enabled: true
+      window_size_sec: 300
+      anomaly_threshold: 0.85
+
+  # ===========================================================================
+  # 密钥管理
+  # ===========================================================================
+  secrets:
+    # 密钥提供者: env, file, vault, aws_kms, azure_keyvault, gcp_kms
+    provider: "env"
+    
+    # 静态加密
+    encryption: "aes-256-gcm"
+    
+    # 密钥轮换周期（天）
+    key_rotation_days: 90
+    
+    # 密钥存储路径（当 provider 为 file 时）
+    file_path: "${AGENTOS_DATA_DIR}/secrets"
+
+  # ===========================================================================
+  # 会话安全
+  # ===========================================================================
+  session:
+    # 会话超时（秒）
+    timeout_sec: 3600
+    
+    # 最大并发会话
+    max_concurrent_sessions: 100
+    
+    # 会话令牌配置
+    token:
+      algorithm: "HS256"
+      issuer: "agentos"
+      audience: "agentos-api"
+      expiry_sec: 3600
+      refresh_expiry_sec: 86400
+
+  # ===========================================================================
+  # 热更新配置
+  # ===========================================================================
+  hot_reload:
+    enabled: true
+    check_interval_sec: 30

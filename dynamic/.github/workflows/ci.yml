@@ -1,0 +1,692 @@
+# Copyright (c) 2026 SPHARX. All Rights Reserved.
+# AgentOS Dynamic Module CI/CD Pipeline
+# Version: 1.0.0
+# 
+# 完整的CI/CD流程，包含：
+# - 代码质量检查
+# - 跨平台构建
+# - 单元测试与集成测试
+# - 安全扫描
+# - 覆盖率报告
+# - 制品发布
+# - 环境部署
+
+name: Dynamic Module CI/CD
+
+on:
+  push:
+    branches: [main, develop, 'release/**']
+    paths:
+      - 'dynamic/**'
+      - '.github/workflows/dynamic-ci.yml'
+    tags:
+      - 'dynamic-v*'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'dynamic/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - development
+          - staging
+          - preview
+          - production
+      skip_tests:
+        description: 'Skip tests (emergency deploy only)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  BUILD_TYPE: Release
+  MODULE_NAME: dynamic
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/dynamic
+
+jobs:
+  # ==========================================================================
+  # 阶段0: 代码质量检查 (并行执行)
+  # ==========================================================================
+  code-quality:
+    name: Code Quality Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install C analysis tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck clang-format clang-tidy
+
+      - name: Cache cppcheck results
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/cppcheck
+          key: ${{ runner.os }}-cppcheck-${{ hashFiles('dynamic/**/*.c', 'dynamic/**/*.h') }}
+          restore-keys: |
+            ${{ runner.os }}-cppcheck-
+
+      - name: Run cppcheck
+        run: |
+          cppcheck --version
+          cppcheck --enable=all --std=c11 --platform=unix64 \
+            --inline-suppr --force \
+            --xml --xml-version=2 \
+            --output-file=cppcheck-report.xml \
+            -j$(nproc) \
+            dynamic/src/ 2>&1 | tee cppcheck-output.txt || true
+          
+          # 检查是否有错误
+          if grep -q "error:" cppcheck-output.txt; then
+            echo "::error::cppcheck found errors. See report for details."
+            exit 1
+          fi
+
+      - name: Check code formatting
+        run: |
+          find dynamic/src -name "*.c" -o -name "*.h" | while read file; do
+            clang-format --style=file --dry-run --Werror "$file" || exit 1
+          done
+        continue-on-error: true
+
+      - name: Run clang-tidy
+        run: |
+          cd dynamic
+          mkdir -p build && cd build
+          cmake .. -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          cd ..
+          clang-tidy -p build src/**/*.c --warnings-as-errors='*' || true
+        continue-on-error: true
+
+      - name: Upload quality reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-quality-reports
+          path: |
+            cppcheck-report.xml
+            cppcheck-output.txt
+          retention-days: 30
+
+  # ==========================================================================
+  # 阶段1: 跨平台构建
+  # ==========================================================================
+  build:
+    name: Build (${{ matrix.os }}, ${{ matrix.compiler }})
+    runs-on: ${{ matrix.os }}
+    needs: [code-quality]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        compiler: [gcc, clang]
+        exclude:
+          - os: windows-latest
+            compiler: clang
+          - os: macos-latest
+            compiler: gcc
+        include:
+          - os: ubuntu-latest
+            compiler: gcc
+            cc: gcc
+            cxx: g++
+          - os: ubuntu-latest
+            compiler: clang
+            cc: clang
+            cxx: clang++
+          - os: macos-latest
+            compiler: clang
+            cc: clang
+            cxx: clang++
+          - os: windows-latest
+            compiler: gcc
+            cc: gcc
+            cxx: g++
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build pkg-config \
+            libmicrohttpd-dev libwebsockets-dev \
+            libssl-dev libcjson-dev \
+            lcov gcovr
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew install cmake ninja pkg-config
+          brew install libmicrohttpd websockets openssl cjson
+
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          choco install cmake ninja pkgconfiglite -y
+          # vcpkg for libraries
+          git clone https://github.com/Microsoft/vcpkg.git
+          cd vcpkg
+          ./bootstrap-vcpkg.bat
+          ./vcpkg install libmicrohttpd:x64-windows libwebsockets:x64-windows openssl:x64-windows cjson:x64-windows
+          echo "VCPKG_ROOT=$PWD" >> $env:GITHUB_ENV
+
+      - name: Cache CMake build
+        uses: actions/cache@v4
+        with:
+          path: |
+            dynamic/build
+            ~/.cache/ccache
+          key: ${{ runner.os }}-${{ matrix.compiler }}-cmake-${{ hashFiles('dynamic/**/CMakeLists.txt', 'dynamic/**/*.cmake') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.compiler }}-cmake-
+
+      - name: Configure CMake (Unix)
+        if: runner.os != 'Windows'
+        working-directory: dynamic
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -G "Ninja" \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DCMAKE_C_COMPILER=${{ matrix.cc }} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
+            -DBUILD_TESTS=ON \
+            -DENABLE_COVERAGE=ON \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Configure CMake (Windows)
+        if: runner.os == 'Windows'
+        working-directory: dynamic
+        run: |
+          mkdir build
+          cd build
+          cmake .. -G "Ninja" `
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
+            -DBUILD_TESTS=ON `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+
+      - name: Build
+        working-directory: dynamic/build
+        run: cmake --build . --config ${{ env.BUILD_TYPE }} -j $(nproc 2>/dev/null || echo $NUMBER_OF_PROCESSORS)
+
+      - name: Run unit tests
+        if: ${{ !inputs.skip_tests }}
+        working-directory: dynamic/build
+        run: ctest --build-config ${{ env.BUILD_TYPE }} --output-on-failure --timeout 300
+
+      - name: Generate coverage report (Ubuntu only)
+        if: runner.os == 'Linux' && matrix.compiler == 'gcc'
+        working-directory: dynamic/build
+        run: |
+          gcovr --xml -r ../src -o coverage.xml --exclude-unreachable-branches
+          gcovr --html --html-details -r ../src -o coverage.html --exclude-unreachable-branches
+
+      - name: Upload coverage to Codecov
+        if: runner.os == 'Linux' && matrix.compiler == 'gcc'
+        uses: codecov/codecov-action@v4
+        with:
+          files: dynamic/build/coverage.xml
+          flags: dynamic
+          name: dynamic-coverage
+          fail_ci_if_error: false
+
+      - name: Package artifacts
+        working-directory: dynamic/build
+        run: |
+          mkdir -p dist
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            7z a -tzip ../dist/agentos-dynamic-${{ runner.os }}-x64.zip *.exe *.dll
+          else
+            tar -czvf ../dist/agentos-dynamic-${{ runner.os }}-$(uname -m).tar.gz dynamic libagentos_dynamic.*
+          fi
+        shell: bash
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-${{ runner.os }}-${{ matrix.compiler }}
+          path: dynamic/dist/*
+          retention-days: 7
+
+  # ==========================================================================
+  # 阶段2: 安全扫描
+  # ==========================================================================
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: [code-quality]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: 'dynamic'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: 'trivy-dynamic'
+
+      - name: Run CodeQL Analysis
+        uses: github/codeql-action/init@v3
+        with:
+          languages: c
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: 'codeql-dynamic'
+
+      - name: Secrets scanning
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: dynamic/
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --only-verified
+
+      - name: Generate security report
+        run: |
+          echo "# Security Scan Report" > security-report.md
+          echo "" >> security-report.md
+          echo "## Trivy Results" >> security-report.md
+          echo "See SARIF file for details." >> security-report.md
+          echo "" >> security-report.md
+          echo "## CodeQL Results" >> security-report.md
+          echo "See GitHub Security tab for details." >> security-report.md
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: |
+            trivy-results.sarif
+            security-report.md
+          retention-days: 30
+
+  # ==========================================================================
+  # 阶段3: 集成测试
+  # ==========================================================================
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: ${{ !inputs.skip_tests }}
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dynamic-Linux-gcc
+          path: artifacts
+
+      - name: Setup test environment
+        run: |
+          tar -xzf artifacts/agentos-dynamic-Linux-*.tar.gz -C artifacts/
+          chmod +x artifacts/dynamic
+
+      - name: Run integration tests
+        working-directory: dynamic
+        run: |
+          # 启动服务
+          ./artifacts/dynamic &
+          SERVER_PID=$!
+          
+          # 等待服务启动
+          sleep 5
+          
+          # 运行集成测试
+          if [ -f "tests/integration/run_tests.sh" ]; then
+            bash tests/integration/run_tests.sh
+          else
+            echo "No integration tests found, skipping..."
+          fi
+          
+          # 停止服务
+          kill $SERVER_PID || true
+        env:
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-results
+          path: dynamic/tests/integration/results/
+          retention-days: 7
+
+  # ==========================================================================
+  # 阶段4: 质量门禁
+  # ==========================================================================
+  quality-gate:
+    name: Quality Gates
+    runs-on: ubuntu-latest
+    needs: [code-quality, build, security-scan]
+    if: always()
+    outputs:
+      passed: ${{ steps.check.outputs.passed }}
+    steps:
+      - name: Check all jobs status
+        id: check
+        run: |
+          QUALITY="${{ needs.code-quality.result }}"
+          BUILD="${{ needs.build.result }}"
+          SECURITY="${{ needs.security-scan.result }}"
+          
+          echo "Code Quality: $QUALITY"
+          echo "Build: $BUILD"
+          echo "Security: $SECURITY"
+          
+          if [[ "$QUALITY" == "success" && "$BUILD" == "success" ]]; then
+            echo "passed=true" >> $GITHUB_OUTPUT
+            echo "✅ All quality gates passed"
+          else
+            echo "passed=false" >> $GITHUB_OUTPUT
+            echo "❌ Quality gates failed"
+            exit 1
+          fi
+
+  # ==========================================================================
+  # 阶段5: Docker镜像构建
+  # ==========================================================================
+  docker-build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: [quality-gate]
+    if: needs.quality-gate.outputs.passed == 'true'
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=sha-
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}},prefix=dynamic-v
+            type=semver,pattern={{major}}.{{minor}},prefix=dynamic-v
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: dynamic
+          file: dynamic/docker/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_VERSION=${{ github.sha }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-image-results.sarif'
+
+      - name: Upload image scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-image-results.sarif'
+          category: 'trivy-image-dynamic'
+
+  # ==========================================================================
+  # 阶段6: 发布
+  # ==========================================================================
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    if: startsWith(github.ref, 'refs/tags/dynamic-v')
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/dynamic-v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          # 生成变更日志
+          echo "## What's Changed" > release-notes.md
+          echo "" >> release-notes.md
+          
+          # 获取提交历史
+          git log --pretty=format:"- %s (%h)" $(git describe --tags --abbrev=0 HEAD^)..HEAD >> release-notes.md || true
+          
+          echo "" >> release-notes.md
+          echo "## Artifacts" >> release-notes.md
+          echo "- Linux x86_64: agentos-dynamic-Linux-x86_64.tar.gz" >> release-notes.md
+          echo "- macOS (ARM): agentos-dynamic-Darwin-arm64.tar.gz" >> release-notes.md
+          echo "- Windows x64: agentos-dynamic-Windows-x64.zip" >> release-notes.md
+          echo "- Docker: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}" >> release-notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Dynamic Module v${{ steps.version.outputs.version }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, 'rc') || contains(steps.version.outputs.version, 'beta') }}
+          files: |
+            artifacts/dynamic-Linux-gcc/*
+            artifacts/dynamic-macOS-clang/*
+            artifacts/dynamic-Windows-gcc/*
+
+  # ==========================================================================
+  # 阶段7: 环境部署
+  # ==========================================================================
+  deploy:
+    name: Deploy to ${{ github.event.inputs.environment || 'staging' }}
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    if: |
+      (github.event_name == 'workflow_dispatch') ||
+      (github.ref == 'refs/heads/main' && github.event_name == 'push')
+    environment:
+      name: ${{ github.event.inputs.environment || 'staging' }}
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set deployment environment
+        id: env
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          if [ -z "$ENV" ]; then
+            if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+              ENV="staging"
+            else
+              ENV="development"
+            fi
+          fi
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+
+      - name: Configure kubectl
+        if: steps.env.outputs.environment != 'development'
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+
+      - name: Deploy with kubectl
+        if: steps.env.outputs.environment != 'development'
+        run: |
+          ENV="${{ steps.env.outputs.environment }}"
+          
+          # 应用 Kubernetes 配置
+          kubectl apply -f dynamic/deploy/k8s/namespace.yaml
+          kubectl apply -f dynamic/deploy/k8s/configmap-$ENV.yaml
+          kubectl apply -f dynamic/deploy/k8s/deployment.yaml
+          kubectl apply -f dynamic/deploy/k8s/service.yaml
+          
+          # 等待部署完成
+          kubectl rollout status deployment/agentos-dynamic -n agentos-$ENV --timeout=300s
+
+      - name: Deploy with Docker Compose (development)
+        if: steps.env.outputs.environment == 'development'
+        run: |
+          cd dynamic/deploy
+          docker-compose -f docker-compose.dev.yml up -d
+
+      - name: Run smoke tests
+        run: |
+          # 等待服务就绪
+          sleep 30
+          
+          # 健康检查
+          curl -f http://localhost:8080/health || exit 1
+          
+          # 基本功能测试
+          curl -f http://localhost:8080/api/v1/status || exit 1
+
+      - name: Output deployment URL
+        id: deploy
+        run: |
+          ENV="${{ steps.env.outputs.environment }}"
+          case $ENV in
+            staging)
+              echo "url=https://staging.agentos.spharx.cn" >> $GITHUB_OUTPUT
+              ;;
+            production)
+              echo "url=https://agentos.spharx.cn" >> $GITHUB_OUTPUT
+              ;;
+            preview)
+              echo "url=https://preview.agentos.spharx.cn" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "url=http://localhost:8080" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+  # ==========================================================================
+  # 阶段8: 回滚机制
+  # ==========================================================================
+  rollback:
+    name: Rollback Deployment
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'
+    needs: [deploy]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+
+      - name: Check deployment health
+        id: health
+        run: |
+          if kubectl rollout status deployment/agentos-dynamic -n agentos-production --timeout=60s; then
+            echo "healthy=true" >> $GITHUB_OUTPUT
+          else
+            echo "healthy=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Rollback if unhealthy
+        if: steps.health.outputs.healthy == 'false'
+        run: |
+          echo "⚠️ Deployment unhealthy, initiating rollback..."
+          kubectl rollout undo deployment/agentos-dynamic -n agentos-production
+          kubectl rollout status deployment/agentos-dynamic -n agentos-production --timeout=300s
+          echo "✅ Rollback completed"
+
+      - name: Notify on rollback
+        if: steps.health.outputs.healthy == 'false'
+        run: |
+          curl -X POST "${{ secrets.SLACK_WEBHOOK }}" \
+            -H 'Content-type: application/json' \
+            -d '{
+              "text": "⚠️ Dynamic Module Production Rollback",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Production deployment rolled back*\n\nCommit: ${{ github.sha }}\nTriggered by: ${{ github.actor }}"
+                  }
+                }
+              ]
+            }'

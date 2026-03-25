@@ -1,0 +1,230 @@
+# =============================================================================
+# AgentOS 内核配置文件
+# 版本: v1.0.0
+# 最后更新: 2026-03-23
+# Schema: schemas/kernel-settings.schema.json
+# =============================================================================
+# Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+
+# 配置版本
+_config_version: "1.0.0"
+
+# 版本兼容性
+_compatibility:
+  min_agentos_version: "1.0.0"
+  max_agentos_version: "2.0.0"
+
+# =============================================================================
+# 内核基础设置
+# =============================================================================
+kernel:
+  # 内核名称和版本标识
+  name: "AgentOS Core"
+  version: "1.0.0.3"
+  
+  # 日志级别: trace, debug, info, warning, error, critical, off
+  log_level: "info"
+
+  # ===========================================================================
+  # 调度器设置
+  # ===========================================================================
+  scheduler:
+    # 调度策略: round_robin, weighted, ml_based, priority, fair
+    policy: "weighted"
+    
+    # 时间片（毫秒）
+    time_slice_ms: 10
+    
+    # 最大并发任务数（0 表示无限制）
+    max_concurrency: 100
+    
+    # 优先级权重配置
+    priority_weights:
+      realtime: 100
+      high: 50
+      normal: 20
+      low: 10
+    
+    # 防止任务饥饿
+    starvation_prevention: true
+    starvation_threshold_ms: 5000
+    
+    # 任务队列配置
+    queue:
+      max_pending_tasks: 10000
+      max_completed_tasks: 1000
+      cleanup_interval_sec: 60
+
+  # ===========================================================================
+  # 内存管理
+  # ===========================================================================
+  memory:
+    # 内核内存池大小（MB）
+    pool_size_mb: 1024
+    
+    # 单次最大分配大小（MB）
+    max_allocation_mb: 2048
+    
+    # 启用内存保护边界检查
+    guard_enabled: true
+    
+    # OOM 策略: reject, evict_lru, evict_low_priority, crash
+    oom_policy: "reject"
+    
+    # 内存对齐（字节，用于缓存行优化）
+    alignment_bytes: 64
+    
+    # NUMA 感知分配
+    numa_aware: false
+    
+    # 内存泄漏检测
+    leak_detection:
+      enabled: true
+      check_interval_sec: 60
+      report_threshold_bytes: 1048576  # 1MB
+    
+    # 内存池配置
+    pools:
+      small:
+        block_size: 64
+        initial_count: 1024
+        max_count: 10000
+      medium:
+        block_size: 256
+        initial_count: 512
+        max_count: 5000
+      large:
+        block_size: 1024
+        initial_count: 128
+        max_count: 1000
+
+  # ===========================================================================
+  # 进程间通信（IPC）
+  # ===========================================================================
+  ipc:
+    # Binder 最大并发连接数
+    max_connections: 1024
+    
+    # 共享缓冲区大小（KB）
+    buffer_size_kb: 64
+    
+    # 超时时间（毫秒）
+    timeout_ms: 5000
+    
+    # 认证要求
+    auth_required: true
+    
+    # 加密方式: none, tls12, tls13, aes256-gcm
+    encryption: "tls13"
+    
+    # 速率限制（每秒消息数）
+    rate_limit_per_sec: 1000
+    
+    # 零拷贝优化
+    zero_copy_enabled: true
+    
+    # 背压控制
+    backpressure:
+      enabled: true
+      high_watermark_percent: 80
+      low_watermark_percent: 30
+    
+    # 连接池配置
+    connection_pool:
+      min_idle: 10
+      max_idle: 100
+      idle_timeout_sec: 300
+
+  # ===========================================================================
+  # 定时器与事件
+  # ===========================================================================
+  timer:
+    # 系统时钟精度（毫秒）
+    precision_ms: 1
+    
+    # 最大定时器数量
+    max_timers: 10000
+    
+    # 时间轮大小（用于高效定时器管理）
+    wheel_size: 512
+    
+    # 定时器精度优化
+    coalescing:
+      enabled: true
+      slack_ms: 5
+
+  # ===========================================================================
+  # 错误处理
+  # ===========================================================================
+  error:
+    # 是否启用详细错误信息（生产环境建议 false）
+    verbose: false
+    
+    # 错误日志保留天数
+    retention_days: 30
+    
+    # 启用堆栈跟踪
+    stack_trace_enabled: true
+    
+    # 错误日志速率限制（每秒最大数量）
+    max_error_per_sec: 100
+    
+    # 错误恢复配置
+    recovery:
+      auto_restart: true
+      max_restart_attempts: 3
+      restart_delay_ms: 1000
+      backoff_multiplier: 2.0
+
+  # ===========================================================================
+  # 热更新配置
+  # ===========================================================================
+  hot_reload:
+    enabled: true
+    check_interval_sec: 30
+    reload_signal: "SIGHUP"
+    
+    # 支持热更新的配置项
+    supported_configs:
+      - "log_level"
+      - "scheduler.priority_weights"
+      - "memory.leak_detection"
+      - "error.verbose"
+
+  # ===========================================================================
+  # 性能监控
+  # ===========================================================================
+  monitoring:
+    enabled: true
+    metrics_interval_sec: 10
+    
+    # 性能指标收集
+    metrics:
+      cpu_usage: true
+      memory_usage: true
+      task_latency: true
+      ipc_throughput: true
+      timer_accuracy: true
+    
+    # 告警阈值
+    alerts:
+      cpu_threshold_percent: 80
+      memory_threshold_percent: 85
+      task_queue_threshold: 500
+      ipc_latency_threshold_ms: 100
+
+  # ===========================================================================
+  # 资源限制
+  # ===========================================================================
+  limits:
+    # 文件描述符限制
+    max_file_descriptors: 65535
+    
+    # 线程限制
+    max_threads: 1000
+    
+    # 打开文件限制
+    max_open_files: 10000
+    
+    # CPU 时间限制（秒，0 表示无限制）
+    cpu_time_limit_sec: 0

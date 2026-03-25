@@ -1,0 +1,290 @@
+# E-commerce Platform Configuration
+# =================================
+
+# Database Configuration
+database_url: "sqlite:///./ecommerce.db"
+# For production, use PostgreSQL:
+# database_url: "postgresql://user:password@localhost:5432/ecommerce"
+
+# Redis Configuration
+redis_url: "redis://localhost:6379"
+redis_cache_ttl: 3600  # seconds
+
+# JWT Configuration
+jwt_secret_key: "your-secret-key-change-in-production"
+jwt_algorithm: "HS256"
+jwt_access_token_expire_minutes: 30
+jwt_refresh_token_expire_days: 7
+
+# Stripe Configuration (Payment Processing)
+stripe_secret_key: "sk_test_your_stripe_secret_key"
+stripe_public_key: "pk_test_your_stripe_public_key"
+stripe_webhook_secret: "whsec_your_webhook_secret"
+stripe_currency: "usd"
+
+# Server Configuration
+host: "0.0.0.0"
+port: 8000
+debug: false
+reload: false
+workers: 4
+
+# CORS Configuration
+cors_origins:
+  - "http://localhost:3000"
+  - "http://localhost:8000"
+  - "https://yourdomain.com"
+
+cors_allow_credentials: true
+cors_allow_methods: ["*"]
+cors_allow_headers: ["*"]
+
+# Security Configuration
+security:
+  bcrypt_rounds: 12
+  rate_limit_requests: 100
+  rate_limit_period: 60  # seconds
+  session_timeout: 3600  # seconds
+  password_min_length: 8
+  password_require_special: true
+  password_require_number: true
+  password_require_uppercase: true
+
+# Email Configuration (for notifications)
+email:
+  enabled: false
+  smtp_server: "smtp.gmail.com"
+  smtp_port: 587
+  smtp_username: ""
+  smtp_password: ""
+  from_email: "noreply@yourdomain.com"
+  use_tls: true
+
+# File Upload Configuration
+uploads:
+  max_file_size: 10485760  # 10MB
+  allowed_extensions:
+    - ".jpg"
+    - ".jpeg"
+    - ".png"
+    - ".gif"
+    - ".webp"
+  upload_dir: "./uploads"
+  serve_static: true
+
+# Product Configuration
+products:
+  default_currency: "USD"
+  default_tax_rate: 0.08  # 8%
+  default_shipping_cost: 5.99
+  free_shipping_threshold: 50.00
+  max_products_per_page: 20
+  featured_products_count: 10
+  related_products_count: 5
+
+# Order Configuration
+orders:
+  default_status: "pending"
+  statuses:
+    - "pending"
+    - "processing"
+    - "shipped"
+    - "delivered"
+    - "cancelled"
+    - "refunded"
+  auto_cancel_hours: 24
+  max_items_per_order: 50
+
+# Inventory Configuration
+inventory:
+  low_stock_threshold: 10
+  out_of_stock_threshold: 0
+  enable_backorders: false
+  notify_on_low_stock: true
+  notify_email: "inventory@yourdomain.com"
+
+# Shipping Configuration
+shipping:
+  providers:
+    - name: "standard"
+      cost: 5.99
+      delivery_days: "3-5"
+      enabled: true
+    
+    - name: "express"
+      cost: 12.99
+      delivery_days: "1-2"
+      enabled: true
+    
+    - name: "overnight"
+      cost: 24.99
+      delivery_days: "1"
+      enabled: true
+  
+  free_shipping_enabled: true
+  free_shipping_minimum: 50.00
+
+# Analytics Configuration
+analytics:
+  enabled: true
+  track_pageviews: true
+  track_events: true
+  track_conversions: true
+  retention_days: 90
+  daily_report_time: "00:00"
+  weekly_report_day: "monday"
+  monthly_report_day: 1
+
+# Cache Configuration
+cache:
+  enabled: true
+  default_ttl: 300  # seconds
+  product_ttl: 600
+  category_ttl: 1800
+  user_ttl: 900
+  order_ttl: 3600
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "ecommerce.log"
+  max_size: 10485760  # 10MB
+  backup_count: 5
+  access_log: true
+  error_log: true
+
+# Monitoring Configuration
+monitoring:
+  enabled: true
+  health_check_interval: 30  # seconds
+  metrics_port: 9090
+  enable_prometheus: true
+  enable_health_endpoint: true
+  enable_metrics_endpoint: true
+
+# Notification Configuration
+notifications:
+  email:
+    enabled: false
+    order_confirmation: true
+    shipping_update: true
+    payment_receipt: true
+    low_stock_alert: true
+  
+  sms:
+    enabled: false
+    provider: "twilio"  # or "nexmo", "plivo"
+    order_confirmation: false
+    shipping_update: false
+  
+  push:
+    enabled: false
+    provider: "firebase"  # or "onesignal", "apns"
+    order_update: false
+    promotion: false
+
+# Search Configuration
+search:
+  enabled: true
+  provider: "database"  # or "elasticsearch", "algolia"
+  elasticsearch_url: "http://localhost:9200"
+  algolia_app_id: ""
+  algolia_api_key: ""
+  algolia_index: "products"
+  fuzzy_search: true
+  autocomplete_enabled: true
+  synonyms_enabled: true
+
+# SEO Configuration
+seo:
+  site_name: "OpenHub Marketplace"
+  site_description: "Modern e-commerce platform for OpenHub"
+  site_keywords: "ecommerce, marketplace, openhub, products"
+  default_meta_image: "/static/images/og-image.jpg"
+  enable_sitemap: true
+  sitemap_url: "/sitemap.xml"
+  enable_robots_txt: true
+  robots_txt_url: "/robots.txt"
+
+# Performance Configuration
+performance:
+  enable_gzip: true
+  enable_caching: true
+  enable_compression: true
+  enable_minification: false
+  database_pool_size: 20
+  database_max_overflow: 10
+  database_pool_recycle: 3600
+  database_pool_timeout: 30
+
+# Internationalization
+i18n:
+  default_locale: "en"
+  supported_locales:
+    - "en"
+    - "es"
+    - "fr"
+    - "de"
+    - "zh"
+  currency_formats:
+    USD: "${{amount}}"
+    EUR: "€{{amount}}"
+    GBP: "£{{amount}}"
+    JPY: "¥{{amount}}"
+  date_format: "YYYY-MM-DD"
+  time_format: "HH:mm:ss"
+
+# Customization
+customization:
+  theme: "default"
+  colors:
+    primary: "#2563eb"
+    secondary: "#7c3aed"
+    success: "#10b981"
+    warning: "#f59e0b"
+    danger: "#ef4444"
+    background: "#ffffff"
+    text: "#1f2937"
+  logo_url: "/static/images/logo.png"
+  favicon_url: "/static/images/favicon.ico"
+  enable_custom_css: false
+  custom_css_url: ""
+
+# Webhook Configuration
+webhooks:
+  enabled: true
+  secret: "your-webhook-secret"
+  events:
+    - "order.created"
+    - "order.updated"
+    - "payment.succeeded"
+    - "payment.failed"
+    - "user.created"
+    - "user.updated"
+  timeout: 5  # seconds
+  retry_attempts: 3
+  retry_delay: 1  # seconds
+
+# Scheduled Tasks
+scheduled_tasks:
+  cleanup_expired_carts:
+    enabled: true
+    schedule: "0 */6 * * *"  # Every 6 hours
+    retention_days: 7
+  
+  generate_reports:
+    enabled: true
+    schedule: "0 0 * * *"  # Daily at midnight
+  
+  update_exchange_rates:
+    enabled: true
+    schedule: "0 */12 * * *"  # Every 12 hours
+    provider: "openexchangerates"  # or "fixer", "currencylayer"
+    api_key: ""
+  
+  backup_database:
+    enabled: true
+    schedule: "0 2 * * *"  # Daily at 2 AM
+    retention_days: 30
+    backup_dir: "./backups"

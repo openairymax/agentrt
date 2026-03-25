@@ -1,0 +1,65 @@
+# Copyright (c) 2026 SPHARX. All Rights Reserved.
+# Docker Compose configuration for Development Environment
+# Version: 1.0.0
+#
+# 使用方法: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+version: '3.8'
+
+services:
+  dynamic:
+    build:
+      target: development
+      args:
+        CMAKE_BUILD_TYPE: Debug
+    
+    # 开发环境使用调试配置
+    environment:
+      - AGENTOS_LOG_LEVEL=DEBUG
+      - AGENTOS_ENABLE_AUTH=false
+      - AGENTOS_DEBUG_MODE=true
+    
+    # 挂载源代码用于热重载
+    volumes:
+      - ../src:/app/src:ro
+      - ../include:/app/include:ro
+      - ../config:/etc/agentos/dynamic:ro
+      - dynamic-logs:/var/log/agentos
+    
+    # 开发环境不限制资源
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 1G
+    
+    # 开发环境开启stdin
+    stdin_open: true
+    tty: true
+
+  # 开发环境额外的调试工具
+  redis:
+    # 开发环境暴露管理端口
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru --loglevel debug
+
+  # Redis Commander - Redis Web管理界面
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: agentos-redis-commander
+    hostname: redis-commander
+    restart: unless-stopped
+    
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    
+    ports:
+      - "${REDIS_COMMANDER_PORT:-8082}:8081"
+    
+    depends_on:
+      - redis
+    
+    networks:
+      - agentos-network

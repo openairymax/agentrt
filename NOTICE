@@ -1,0 +1,39 @@
+AgentOS - An Agent Operating System based on CoreLoopThree Architecture
+Copyright (c) 2026 SPHARX Ltd
+Project Homepage: 
+https://gitee.com/spharx/agentos
+https://github.com/SpharxTeam/AgentOS
+
+===========================================================================
+CORE INTELLECTUAL PROPERTY DECLARATION
+===========================================================================
+This product includes software originally developed by the AgentOS Project.
+The following core architectures, technologies and modules are original intellectual property of the AgentOS Project, protected by copyright law and relevant international treaties:
+- CoreLoopThree Three-in-One Architecture (认知-行动-记忆与进化三层一体核心架构)
+- MemoryRovol Memory Rolling & Evolution Engine (记忆卷载)
+- Engineering Implementation of Kahneman Dual-System Theory for Full-Link Multi-Agent Collaboration (全链路多智能体双系统理论工程化实现)
+- Semantic Slicing & Addressable Semantic Space Technology (语义切片与可寻址语义空间技术)
+- Quorum-fast Decision & Streaming Consensus Mechanism (快速共识决策与流式共识机制)
+- Virtual Workbench Sandbox & Endogenous Security System (虚拟工位沙箱与安全内生体系)
+
+===========================================================================
+TRADEMARK NOTICE
+===========================================================================
+AgentOS, CoreLoopThree, MemoryRovol are trademarks or registered trademarks of the AgentOS Project.
+All other trademarks, product names and company names mentioned in this project are the property of their respective owners.
+
+===========================================================================
+THIRD-PARTY COMPONENTS NOTICE
+===========================================================================
+This product may include third-party open source software components. Each third-party component is distributed under its own original open source license, and the relevant license terms and copyright statements are retained in the corresponding component directory and source code files.
+The use of third-party components does not affect the Apache License 2.0 terms applicable to the core code of the AgentOS Project.
+
+===========================================================================
+LICENSE STATEMENT
+===========================================================================
+This software is distributed under the Apache License, Version 2.0.
+You may obtain a copy of the License at:
+    http://www.apache.org/licenses/LICENSE-2.0
+The full license text is stored in the LICENSE file in the root directory of this project.
+
+The content of this NOTICE file is for informational purposes only, and does not modify, limit or expand the terms and conditions of the Apache License, Version 2.0.

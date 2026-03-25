@@ -1,0 +1,312 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentos.spharx.ai/schemas/kernel-settings-v1.schema.json",
+  "title": "AgentOS Kernel Settings Schema",
+  "description": "Configuration schema for AgentOS microkernel core settings",
+  "type": "object",
+  "required": ["_config_version", "kernel"],
+  "properties": {
+    "_config_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Configuration file version in semantic versioning format"
+    },
+    "_compatibility": {
+      "type": "object",
+      "description": "Version compatibility constraints",
+      "properties": {
+        "min_agentos_version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "max_agentos_version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        }
+      }
+    },
+    "kernel": {
+      "type": "object",
+      "required": ["name", "version", "log_level", "scheduler", "memory", "ipc", "timer", "error"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Kernel instance name"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+(\\.\\d+)?$",
+          "description": "Kernel version in semantic versioning format"
+        },
+        "log_level": {
+          "type": "string",
+          "enum": ["debug", "info", "warning", "error", "critical", "off"],
+          "default": "info",
+          "description": "Global log level for kernel"
+        },
+        "scheduler": {
+          "type": "object",
+          "required": ["policy", "time_slice_ms", "max_concurrency"],
+          "properties": {
+            "policy": {
+              "type": "string",
+              "enum": ["round_robin", "weighted", "ml_based", "priority", "fair"],
+              "default": "weighted",
+              "description": "Task scheduling algorithm"
+            },
+            "time_slice_ms": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 10,
+              "description": "Time slice per task in milliseconds"
+            },
+            "max_concurrency": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 100,
+              "description": "Maximum concurrent tasks (0 = unlimited)"
+            },
+            "priority_weights": {
+              "type": "object",
+              "description": "Weight values for each priority level",
+              "properties": {
+                "realtime": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000,
+                  "default": 100
+                },
+                "high": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000,
+                  "default": 50
+                },
+                "normal": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000,
+                  "default": 20
+                },
+                "low": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000,
+                  "default": 10
+                }
+              }
+            },
+            "starvation_prevention": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable starvation prevention mechanism"
+            },
+            "starvation_threshold_ms": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 60000,
+              "default": 5000,
+              "description": "Time threshold for starvation detection"
+            }
+          }
+        },
+        "memory": {
+          "type": "object",
+          "required": ["pool_size_mb", "guard_enabled"],
+          "properties": {
+            "pool_size_mb": {
+              "type": "integer",
+              "minimum": 64,
+              "maximum": 65536,
+              "default": 1024,
+              "description": "Kernel memory pool size in megabytes"
+            },
+            "max_allocation_mb": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65536,
+              "default": 2048,
+              "description": "Maximum single allocation size in megabytes"
+            },
+            "guard_enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable memory guard boundary checking"
+            },
+            "oom_policy": {
+              "type": "string",
+              "enum": ["reject", "evict_lru", "evict_low_priority", "crash"],
+              "default": "reject",
+              "description": "Policy when out of memory"
+            },
+            "alignment_bytes": {
+              "type": "integer",
+              "enum": [8, 16, 32, 64, 128, 256],
+              "default": 64,
+              "description": "Memory alignment in bytes (cache line optimization)"
+            },
+            "numa_aware": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable NUMA-aware memory allocation"
+            },
+            "leak_detection": {
+              "type": "object",
+              "description": "Memory leak detection settings",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": true
+                },
+                "check_interval_sec": {
+                  "type": "integer",
+                  "minimum": 10,
+                  "maximum": 3600,
+                  "default": 60
+                },
+                "report_threshold_bytes": {
+                  "type": "integer",
+                  "minimum": 1024,
+                  "default": 1048576
+                }
+              }
+            }
+          }
+        },
+        "ipc": {
+          "type": "object",
+          "required": ["max_connections", "buffer_size_kb", "timeout_ms"],
+          "properties": {
+            "max_connections": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535,
+              "default": 1024,
+              "description": "Maximum concurrent IPC connections"
+            },
+            "buffer_size_kb": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65536,
+              "default": 64,
+              "description": "Shared buffer size per connection in kilobytes"
+            },
+            "timeout_ms": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 300000,
+              "default": 5000,
+              "description": "IPC operation timeout in milliseconds"
+            },
+            "auth_required": {
+              "type": "boolean",
+              "default": true,
+              "description": "Require authentication for IPC connections"
+            },
+            "encryption": {
+              "type": "string",
+              "enum": ["none", "tls12", "tls13", "aes256-gcm"],
+              "default": "tls13",
+              "description": "IPC encryption method"
+            },
+            "rate_limit_per_sec": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1000,
+              "description": "Rate limit for IPC messages per second"
+            },
+            "zero_copy_enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable zero-copy data transfer optimization"
+            },
+            "backpressure": {
+              "type": "object",
+              "description": "Backpressure handling configuration",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": true
+                },
+                "high_watermark_percent": {
+                  "type": "integer",
+                  "minimum": 50,
+                  "maximum": 95,
+                  "default": 80
+                },
+                "low_watermark_percent": {
+                  "type": "integer",
+                  "minimum": 10,
+                  "maximum": 50,
+                  "default": 30
+                }
+              }
+            }
+          }
+        },
+        "timer": {
+          "type": "object",
+          "required": ["precision_ms", "max_timers"],
+          "properties": {
+            "precision_ms": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 1,
+              "description": "System clock precision in milliseconds"
+            },
+            "max_timers": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 1000000,
+              "default": 10000,
+              "description": "Maximum number of active timers"
+            },
+            "wheel_size": {
+              "type": "integer",
+              "enum": [256, 512, 1024, 2048],
+              "default": 512,
+              "description": "Timing wheel size for efficient timer management"
+            }
+          }
+        },
+        "error": {
+          "type": "object",
+          "required": ["verbose", "retention_days"],
+          "properties": {
+            "verbose": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable verbose error messages (not recommended for production)"
+            },
+            "retention_days": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 365,
+              "default": 30,
+              "description": "Error log retention period in days"
+            },
+            "stack_trace_enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable stack trace in error logs"
+            },
+            "max_error_per_sec": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 100,
+              "description": "Maximum error logs per second (rate limiting)"
+            }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

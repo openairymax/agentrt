@@ -1,0 +1,107 @@
+/**
+ * @file ratelimit.h
+ * @brief 请求速率限制模块接口
+ * 
+ * 提供基于滑动窗口算法的请求速率限制功能，
+ * 防止 DoS 攻击和资源滥用。
+ * 
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ */
+
+#ifndef DYNAMIC_RATELIMIT_H
+#define DYNAMIC_RATELIMIT_H
+
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include "agentos.h"
+
+/**
+ * @brief 速率限制器不透明句柄
+ */
+typedef struct ratelimiter ratelimiter_t;
+
+/**
+ * @brief 速率限制结果枚举
+ */
+typedef enum {
+    RATELIMIT_ALLOWED = 0,    /**< 请求允许 */
+    RATELIMIT_DENIED,         /**< 请求拒绝（超过限制） */
+    RATELIMIT_DISABLED        /**< 速率限制已禁用 */
+} ratelimit_result_t;
+
+/**
+ * @brief 速率限制配置
+ */
+typedef struct {
+    uint32_t    requests_per_second;   /**< 每秒最大请求数 */
+    uint32_t    burst_size;            /**< 突发大小（允许的额外请求数） */
+    uint32_t    window_ms;             /**< 滑动窗口大小（毫秒） */
+    bool        enabled;               /**< 是否启用 */
+} ratelimit_config_t;
+
+/**
+ * @brief 创建速率限制器
+ * 
+ * @param config 配置参数，若为NULL则使用默认值
+ * @return 限制器句柄，失败返回NULL
+ * 
+ * @ownership 调用者需通过 ratelimiter_destroy() 释放
+ */
+ratelimiter_t* ratelimiter_create(const ratelimit_config_t* config);
+
+/**
+ * @brief 销毁速率限制器
+ * @param limiter 限制器句柄
+ */
+void ratelimiter_destroy(ratelimiter_t* limiter);
+
+/**
+ * @brief 检查请求是否允许
+ * 
+ * @param limiter 限制器句柄
+ * @param client_id 客户端标识（如IP地址）
+ * @return 检查结果
+ * 
+ * @threadsafe 是
+ */
+ratelimit_result_t ratelimiter_check(ratelimiter_t* limiter, const char* client_id);
+
+/**
+ * @brief 重置客户端的计数
+ * 
+ * @param limiter 限制器句柄
+ * @param client_id 客户端标识
+ * @return AGENTOS_SUCCESS 成功
+ */
+agentos_error_t ratelimiter_reset(ratelimiter_t* limiter, const char* client_id);
+
+/**
+ * @brief 获取客户端当前计数
+ * 
+ * @param limiter 限制器句柄
+ * @param client_id 客户端标识
+ * @return 当前请求数，失败返回0
+ */
+uint32_t ratelimiter_get_count(ratelimiter_t* limiter, const char* client_id);
+
+/**
+ * @brief 清理过期条目
+ * 
+ * @param limiter 限制器句柄
+ * @return 清理的条目数
+ */
+size_t ratelimiter_cleanup(ratelimiter_t* limiter);
+
+/**
+ * @brief 获取统计信息（JSON格式）
+ * 
+ * @param limiter 限制器句柄
+ * @param out_json 输出JSON字符串（需调用者free）
+ * @return AGENTOS_SUCCESS 成功
+ */
+agentos_error_t ratelimiter_get_stats(
+    ratelimiter_t* limiter,
+    char** out_json);
+
+#endif /* DYNAMIC_RATELIMIT_H */

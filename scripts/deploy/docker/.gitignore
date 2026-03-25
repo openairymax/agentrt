@@ -1,0 +1,49 @@
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# AgentOS Docker .gitignore
+
+# 环境变量文件（包含敏感信息）
+.env
+
+# 构建产物
+*.tar.gz
+*.tar
+build/
+dist/
+
+# Docker 构建缓存
+.docker/
+
+# 日志文件
+*.log
+logs/
+partdata/logs/*
+!partdata/logs/.gitkeep
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+*.swp
+*.swo
+*~
+
+# 备份文件
+backup/
+*.bak
+*.backup
+
+# IDE 配置
+.idea/
+.vscode/settings.json
+
+# OS 文件
+.DS_Store
+Thumbs.db
+
+# 测试覆盖率
+coverage/
+*.cover
+
+# 本地配置文件（可选）
+config/local.*.yaml
+config/override.*.yaml

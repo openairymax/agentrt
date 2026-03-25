@@ -1,0 +1,226 @@
+# AgentOS .gitignore 文件
+
+# ==================== 编译产物 ====================
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+*.cmake
+!atoms/cmake/*.cmake
+
+# 编译中间文件
+*.o
+*.obj
+*.so
+*.dll
+*.dylib
+*.exe
+*.lib
+*.a
+*.la
+
+# 可执行文件
+*.out
+*.app
+
+# ==================== Python 相关 ====================
+# Python 缓存
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.Python
+
+# Python 虚拟环境
+venv/
+env/
+ENV/
+
+# Python 包管理
+*.egg-info/
+build/dist/
+build/artifacts/
+build/packages/
+*.egg
+
+# IPython
+profile_default/
+ipython_config.py
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# ==================== 环境变量和配置 ====================
+# 敏感配置文件
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets.json
+config.local.yaml
+config.local.yml
+
+# ==================== IDE 配置 ====================
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+.本地总结
+# CLion
+.clion/
+
+# Vim
+*.swp
+*.swo
+.netrwhist
+
+# Emacs
+\#*\#
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ==================== 日志和数据文件 ====================
+# 日志文件
+*.log
+logs/
+partdata/logs/
+
+# 数据库文件
+*.db
+*.sqlite
+*.sqlite3
+partdata/registry/*.db
+partdata/registry/*.sqlite
+
+# 追踪数据
+partdata/traces/
+*.trace
+*.spans
+.git
+
+# 缓存文件
+.cache/
+*.cache
+tmp/
+temp/
+*.tmp
+
+# ==================== 测试相关 ====================
+# 测试覆盖率
+coverage/
+*.gcov
+*.gcda
+*.gcno
+
+# 测试输出
+test-results/
+*.test
+*.spec.js.snap
+
+# ==================== 文档生成 ====================
+# Sphinx 文档
+partdocs/_build/
+partdocs/.doctrees/
+
+# Doxygen
+doxygen/
+xml/
+html/
+latex/
+
+# ==================== 操作系统文件 ====================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# 临时文件
+*.bak
+*.backup
+*.old
+
+# ==================== 依赖管理 ====================
+# Node.js (如果有前端组件)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Rust (如果有 Rust SDK)
+target/
+**/Cargo.lock
+**/Cargo.toml.orig
+
+# Go (如果有 Go SDK)
+go.sum
+vendor/
+
+# ==================== 特定项目文件 ====================
+# FAISS 索引文件（大型二进制）
+partdata/models/*.faiss
+partdata/models/*.index
+
+# 模型权重（大型文件）
+partdata/model/weights/*.bin
+partdata/model/weights/*.pth
+partdata/model/weights/*.h5
+*.onnx
+
+# 归档文件
+*.tar.gz
+*.zip
+*.rar
+*.7z
+
+# ==================== 脚本生成的文件 ====================
+# 构建脚本生成的大型产物（不是脚本本身）
+build/artifacts/
+build/packages/
+
+# Docker 部署生成的镜像层和容器数据
+deploy/docker/*.tar
+deploy/docker/*.tar.gz
+deploy/docker/.docker-*/
+
+# ==================== 其他 ====================
+# 忽略大型数据集
+*.csv
+*.parquet
+*.arrow
+/data/
+/datasets/
+
+# 备份文件
+*.orig
+PATCHES.txt

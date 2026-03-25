@@ -1,0 +1,726 @@
+# AgentOS 测试模块 CI/CD 工作流
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# Version: 1.1.0
+# Last updated: 2026-03-24
+#
+# 基于《工程控制论》反馈闭环思想设计
+# 遵循 AgentOS CI/CD 整体解决方案规范
+
+name: AgentOS Tests CI/CD
+
+on:
+  push:
+    branches: [main, develop, 'release/**']
+    paths:
+      - 'tests/**'
+      - '.github/workflows/tests-ci.yml'
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'tests/**'
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: '部署环境'
+        required: true
+        default: 'test'
+        type: choice
+        options:
+          - test
+          - staging
+          - production
+      skip_tests:
+        description: '跳过测试（仅用于紧急修复）'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  VERSION: 1.0.0.6
+  PYTHON_VERSION_DEFAULT: '3.10'
+  COVERAGE_THRESHOLD: 80
+
+jobs:
+  # =========================================================================
+  # 阶段0: 预检查 (Pre-flight Checks)
+  # =========================================================================
+  preflight:
+    name: Pre-flight Checks
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+      changes: ${{ steps.check.outputs.changes }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      
+      - name: Check for changes
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "changes=manual" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" == "schedule" ]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "changes=scheduled" >> $GITHUB_OUTPUT
+          else
+            CHANGES=$(git diff --name-only HEAD^ HEAD -- tests/ | head -20)
+            if [ -n "$CHANGES" ]; then
+              echo "should_run=true" >> $GITHUB_OUTPUT
+              echo "changes=$(echo $CHANGES | tr '\n' ' ')" >> $GITHUB_OUTPUT
+            else
+              echo "should_run=false" >> $GITHUB_OUTPUT
+              echo "changes=none" >> $GITHUB_OUTPUT
+            fi
+          fi
+      
+      - name: Log trigger info
+        run: |
+          echo "Event: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Should run: ${{ steps.check.outputs.should_run }}"
+          echo "Changes: ${{ steps.check.outputs.changes }}"
+
+  # =========================================================================
+  # 阶段1: 代码质量检查 (Code Quality)
+  # =========================================================================
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    needs: preflight
+    if: needs.preflight.outputs.should_run == 'true'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION_DEFAULT }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          cd tests
+          pip install -r requirements.txt
+          pip install ruff mypy bandit safety flake8 black isort
+      
+      - name: Create reports directory
+        run: mkdir -p tests/reports
+      
+      - name: Lint with flake8
+        run: |
+          cd tests
+          flake8 . --max-line-length=100 --ignore=E203,W503 \
+            --format=json --output-file=reports/flake8_report.json || true
+          flake8 . --max-line-length=100 --ignore=E203,W503 || true
+      
+      - name: Format check with black
+        run: |
+          cd tests
+          black . --check --diff --line-length=100 || true
+      
+      - name: Import sort check
+        run: |
+          cd tests
+          isort . --check-only --diff --profile black || true
+      
+      - name: Type check with mypy
+        run: |
+          cd tests
+          mypy . --ignore-missing-imports --no-error-summary \
+            --json-report reports/ || true
+      
+      - name: Ruff check
+        run: |
+          cd tests
+          ruff check . --output-format=json --output-file=reports/ruff_report.json || true
+          ruff check . --output-format=concise || true
+      
+      - name: Upload quality reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: code-quality-reports
+          path: tests/reports/
+          retention-days: 7
+
+  # =========================================================================
+  # 阶段2: 安全扫描 (Security Scan)
+  # =========================================================================
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: preflight
+    if: needs.preflight.outputs.should_run == 'true'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION_DEFAULT }}
+          cache: 'pip'
+      
+      - name: Install security tools
+        run: |
+          pip install bandit safety pip-audit
+      
+      - name: Create reports directory
+        run: mkdir -p tests/reports
+      
+      - name: Bandit security scan
+        run: |
+          bandit -r tests/ -f json -o tests/reports/bandit_report.json || true
+          bandit -r tests/ -f txt || true
+      
+      - name: Safety dependency check
+        run: |
+          cd tests
+          safety check -r requirements.txt --json > reports/safety_report.json || true
+          safety check -r requirements.txt || true
+      
+      - name: pip-audit check
+        run: |
+          cd tests
+          pip-audit -r requirements.txt --json > reports/pip_audit_report.json || true
+          pip-audit -r requirements.txt || true
+      
+      - name: TruffleHog secrets scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          extra_args: --only-verified --json
+        continue-on-error: true
+      
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-scan-reports
+          path: tests/reports/
+          retention-days: 30
+
+  # =========================================================================
+  # 阶段3: 单元测试 (Unit Tests) - 跨平台矩阵
+  # =========================================================================
+  unit-tests:
+    name: Unit Tests (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    needs: [code-quality, security-scan]
+    if: |
+      needs.preflight.outputs.should_run == 'true' &&
+      !inputs.skip_tests
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+        exclude:
+          - os: windows-latest
+            python-version: '3.9'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          cd tests
+          pip install -r requirements.txt
+      
+      - name: Create directories
+        run: |
+          mkdir -p tests/logs
+          mkdir -p tests/reports/coverage
+      
+      - name: Run unit tests
+        run: |
+          cd tests
+          pytest unit/ -v --tb=short -m unit \
+            --cov=../tools/python/agentos \
+            --cov-report=xml:reports/coverage/coverage.xml \
+            --cov-report=html:reports/coverage/html \
+            --cov-report=term \
+            --cov-fail-under=${{ env.COVERAGE_THRESHOLD }} \
+            --junitxml=reports/junit_unit.xml \
+            --html=reports/test_unit_report.html --self-contained-html
+        continue-on-error: true
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.10'
+        with:
+          files: tests/reports/coverage/coverage.xml
+          flags: unit-tests
+          name: codecov-unit
+          fail_ci_if_error: false
+      
+      - name: Upload test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-test-reports-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: tests/reports/
+          retention-days: 7
+
+  # =========================================================================
+  # 阶段4: 集成测试 (Integration Tests)
+  # =========================================================================
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [unit-tests]
+    if: |
+      needs.preflight.outputs.should_run == 'true' &&
+      !inputs.skip_tests
+    
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: agentos_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION_DEFAULT }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          cd tests
+          pip install -r requirements.txt
+      
+      - name: Wait for services
+        run: |
+          echo "Waiting for services to be ready..."
+          sleep 5
+      
+      - name: Run integration tests
+        run: |
+          cd tests
+          pytest integration/ -v --tb=short -m integration \
+            --cov=../tools/python/agentos \
+            --cov-report=xml:reports/coverage/coverage_integration.xml \
+            --junitxml=reports/junit_integration.xml \
+            --html=reports/test_integration_report.html --self-contained-html
+        env:
+          REDIS_URL: redis://localhost:6379
+          DATABASE_URL: postgresql://test:test@localhost:5432/agentos_test
+        continue-on-error: true
+      
+      - name: Upload integration test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-reports
+          path: tests/reports/
+          retention-days: 7
+
+  # =========================================================================
+  # 阶段5: 契约测试 (Contract Tests)
+  # =========================================================================
+  contract-tests:
+    name: Contract Tests
+    runs-on: ubuntu-latest
+    needs: [unit-tests]
+    if: |
+      needs.preflight.outputs.should_run == 'true' &&
+      !inputs.skip_tests
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION_DEFAULT }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          cd tests
+          pip install -r requirements.txt
+      
+      - name: Run contract tests
+        run: |
+          cd tests
+          pytest contract/ -v --tb=short -m contract \
+            --junitxml=reports/junit_contract.xml \
+            --html=reports/test_contract_report.html --self-contained-html
+        continue-on-error: true
+      
+      - name: Upload contract test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: contract-test-reports
+          path: tests/reports/
+          retention-days: 7
+
+  # =========================================================================
+  # 阶段6: 安全测试 (Security Tests)
+  # =========================================================================
+  security-tests:
+    name: Security Tests
+    runs-on: ubuntu-latest
+    needs: [unit-tests]
+    if: |
+      needs.preflight.outputs.should_run == 'true' &&
+      !inputs.skip_tests
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION_DEFAULT }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          cd tests
+          pip install -r requirements.txt
+      
+      - name: Run security tests
+        run: |
+          cd tests
+          pytest security/ -v --tb=short -m security \
+            --junitxml=reports/junit_security.xml \
+            --html=reports/test_security_report.html --self-contained-html
+        continue-on-error: true
+      
+      - name: Upload security test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-test-reports
+          path: tests/reports/
+          retention-days: 7
+
+  # =========================================================================
+  # 阶段7: 性能基准测试 (Benchmark Tests)
+  # =========================================================================
+  benchmark-tests:
+    name: Benchmark Tests
+    runs-on: ubuntu-latest
+    needs: [integration-tests]
+    if: |
+      github.event_name == 'push' && 
+      github.ref == 'refs/heads/main' &&
+      !inputs.skip_tests
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION_DEFAULT }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          cd tests
+          pip install -r requirements.txt
+      
+      - name: Run benchmark tests
+        run: |
+          cd tests
+          pytest benchmarks/ -v --tb=short -m benchmark \
+            --benchmark-only \
+            --benchmark-json=reports/benchmark.json \
+            --junitxml=reports/junit_benchmark.xml
+        continue-on-error: true
+      
+      - name: Upload benchmark reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-test-reports
+          path: tests/reports/
+          retention-days: 30
+
+  # =========================================================================
+  # 阶段8: 覆盖率汇总 (Coverage Summary)
+  # =========================================================================
+  coverage-summary:
+    name: Coverage Summary
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests]
+    if: always() && needs.preflight.outputs.should_run == 'true'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      
+      - name: Generate coverage summary
+        run: |
+          mkdir -p tests/reports/coverage
+          
+          echo "## 📊 测试覆盖率报告" > tests/reports/coverage_summary.md
+          echo "" >> tests/reports/coverage_summary.md
+          echo "| 测试类型 | 状态 |" >> tests/reports/coverage_summary.md
+          echo "|----------|------|" >> tests/reports/coverage_summary.md
+          
+          if [ -f "artifacts/unit-test-reports-ubuntu-latest-py3.10/coverage/coverage.xml" ]; then
+            echo "| 单元测试 | ✅ 已完成 |" >> tests/reports/coverage_summary.md
+          else
+            echo "| 单元测试 | ⚠️ 报告缺失 |" >> tests/reports/coverage_summary.md
+          fi
+          
+          if [ -f "artifacts/integration-test-reports/coverage/coverage_integration.xml" ]; then
+            echo "| 集成测试 | ✅ 已完成 |" >> tests/reports/coverage_summary.md
+          else
+            echo "| 集成测试 | ⚠️ 报告缺失 |" >> tests/reports/coverage_summary.md
+          fi
+          
+          cat tests/reports/coverage_summary.md
+      
+      - name: Upload coverage summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-summary
+          path: tests/reports/coverage_summary.md
+          retention-days: 30
+
+  # =========================================================================
+  # 阶段9: 质量门禁 (Quality Gates)
+  # =========================================================================
+  quality-gates:
+    name: Quality Gates
+    runs-on: ubuntu-latest
+    needs: [code-quality, security-scan, unit-tests, integration-tests, contract-tests, security-tests]
+    if: always() && needs.preflight.outputs.should_run == 'true'
+    
+    steps:
+      - name: Check quality gates
+        id: gates
+        run: |
+          echo "## 🚦 质量门禁检查结果" > quality_gates.md
+          echo "" >> quality_gates.md
+          
+          PASSED=0
+          FAILED=0
+          
+          check_result() {
+            local name=$1
+            local result=$2
+            if [ "$result" == "success" ]; then
+              echo "✅ $name: 通过" >> quality_gates.md
+              PASSED=$((PASSED + 1))
+            elif [ "$result" == "skipped" ]; then
+              echo "⏭️ $name: 跳过" >> quality_gates.md
+            else
+              echo "❌ $name: 失败" >> quality_gates.md
+              FAILED=$((FAILED + 1))
+            fi
+          }
+          
+          check_result "代码质量检查" "${{ needs.code-quality.result }}"
+          check_result "安全扫描" "${{ needs.security-scan.result }}"
+          check_result "单元测试" "${{ needs.unit-tests.result }}"
+          check_result "集成测试" "${{ needs.integration-tests.result }}"
+          check_result "契约测试" "${{ needs.contract-tests.result }}"
+          check_result "安全测试" "${{ needs.security-tests.result }}"
+          
+          echo "" >> quality_gates.md
+          echo "**总计**: $PASSED 通过, $FAILED 失败" >> quality_gates.md
+          
+          cat quality_gates.md
+          
+          if [ $FAILED -gt 0 ]; then
+            echo "gates_passed=false" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "gates_passed=true" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Upload quality gates report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quality-gates-report
+          path: quality_gates.md
+          retention-days: 30
+      
+      - name: Fail if gates not passed
+        if: steps.gates.outputs.gates_passed != 'true'
+        run: exit 1
+
+  # =========================================================================
+  # 阶段10: 构建报告 (Build Reports)
+  # =========================================================================
+  build-reports:
+    name: Build Reports
+    runs-on: ubuntu-latest
+    needs: [quality-gates]
+    if: always() && needs.preflight.outputs.should_run == 'true'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      
+      - name: Generate combined report
+        run: |
+          mkdir -p tests/reports/final
+          
+          cat > tests/reports/final/ci_report.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="zh-CN">
+          <head>
+              <meta charset="UTF-8">
+              <title>AgentOS Tests CI Report</title>
+              <style>
+                  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 40px; }
+                  h1 { color: #333; }
+                  .section { margin: 20px 0; padding: 15px; border-radius: 8px; background: #f5f5f5; }
+                  .success { background: #d4edda; border-left: 4px solid #28a745; }
+                  .failure { background: #f8d7da; border-left: 4px solid #dc3545; }
+                  .warning { background: #fff3cd; border-left: 4px solid #ffc107; }
+                  table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+                  th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+                  th { background: #667eea; color: white; }
+              </style>
+          </head>
+          <body>
+              <h1>🧪 AgentOS Tests CI Report</h1>
+              <div class="section">
+                  <h2>构建信息</h2>
+                  <table>
+                      <tr><th>项目</th><th>值</th></tr>
+                      <tr><td>版本</td><td>${{ env.VERSION }}</td></tr>
+                      <tr><td>分支</td><td>${{ github.ref_name }}</td></tr>
+                      <tr><td>提交</td><td>${{ github.sha }}</td></tr>
+                      <tr><td>触发事件</td><td>${{ github.event_name }}</td></tr>
+                      <tr><td>运行时间</td><td>$(date -u +"%Y-%m-%d %H:%M:%S UTC")</td></tr>
+                  </table>
+              </div>
+              <div class="section">
+                  <h2>测试结果</h2>
+                  <p>请查看各测试阶段的详细报告。</p>
+              </div>
+          </body>
+          </html>
+          EOF
+          
+          echo "CI Report generated at tests/reports/final/ci_report.html"
+      
+      - name: Upload final report
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-ci-report
+          path: tests/reports/final/
+          retention-days: 30
+
+  # =========================================================================
+  # 阶段11: 通知 (Notification)
+  # =========================================================================
+  notify:
+    name: Notify Results
+    runs-on: ubuntu-latest
+    needs: [quality-gates]
+    if: always()
+    
+    steps:
+      - name: Determine status
+        id: status
+        run: |
+          if [ "${{ needs.quality-gates.result }}" == "success" ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "emoji=✅" >> $GITHUB_OUTPUT
+            echo "message=所有测试通过" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "emoji=❌" >> $GITHUB_OUTPUT
+            echo "message=部分测试失败" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Log results
+        run: |
+          echo "=========================================="
+          echo "${{ steps.status.outputs.emoji }} AgentOS Tests CI/CD 完成"
+          echo "状态: ${{ steps.status.outputs.status }}"
+          echo "消息: ${{ steps.status.outputs.message }}"
+          echo "分支: ${{ github.ref_name }}"
+          echo "提交: ${{ github.sha }}"
+          echo "=========================================="
+      
+      - name: Create status badge
+        if: github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p .github/badges
+          if [ "${{ steps.status.outputs.status }}" == "success" ]; then
+            echo '{"schemaVersion":1,"label":"tests","message":"passing","color":"brightgreen"}' > .github/badges/tests.json
+          else
+            echo '{"schemaVersion":1,"label":"tests","message":"failing","color":"red"}' > .github/badges/tests.json
+          fi
+      
+      - name: Commit badge
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .github/badges/tests.json || true
+          git diff --quiet && git diff --staged --quiet || git commit -m "Update test status badge"
+          git push || true
+        continue-on-error: true

@@ -1,0 +1,50 @@
+{
+  "name": "github_skill",
+  "version": "1.0.0",
+  "description": "GitHub integration skill for repository management, issue tracking, and CI/CD automation",
+  "author": "SPHARX Team",
+  "license": "MIT",
+  "entry_point": "github_skill:GitHubSkill",
+  "dependencies": [
+    "PyGithub>=1.59.0",
+    "requests>=2.31.0"
+  ],
+  "capabilities": [
+    "repository_management",
+    "issue_tracking",
+    "pull_request_automation",
+    "workflow_dispatch",
+    "release_management",
+    "team_management",
+    "code_search",
+    "commit_operations"
+  ],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "github_token": {
+        "type": "string",
+        "description": "GitHub personal access token"
+      },
+      "organization": {
+        "type": "string",
+        "description": "Default organization name"
+      },
+      "default_branch": {
+        "type": "string",
+        "description": "Default branch name",
+        "default": "main"
+      },
+      "api_base_url": {
+        "type": "string",
+        "description": "GitHub API base URL",
+        "default": "https://api.github.com"
+      },
+      "timeout": {
+        "type": "integer",
+        "description": "API timeout in seconds",
+        "default": 30
+      }
+    }
+  }
+}

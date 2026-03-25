@@ -1,0 +1,56 @@
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# EditorConfig 帮助文档：https://editorconfig.org
+
+# 顶级编辑器配置（不要修改）
+root = true
+
+# 所有文件的默认配置
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# Markdown 文件配置
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = 0
+
+# YAML 文件配置
+[*.{yaml,yml}]
+indent_size = 2
+
+# Shell 脚本配置
+[*.{sh,bash}]
+indent_style = space
+indent_size = 2
+
+# Python 文件配置
+[*.py]
+indent_size = 4
+
+# C/C++ 文件配置
+[*.{c,cpp,h,hpp}]
+indent_size = 4
+
+# JSON 文件配置
+[*.json]
+indent_size = 2
+
+# Makefile 配置
+[Makefile]
+indent_style = tab
+
+# Dockerfile 配置
+[Dockerfile]
+indent_size = 2
+
+# 文档目录的特殊配置
+[partdocs/**]
+trim_trailing_whitespace = false
+
+# 测试目录的配置
+[tests/**]
+indent_size = 4

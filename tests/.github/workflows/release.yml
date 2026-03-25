@@ -1,0 +1,286 @@
+# AgentOS 测试模块版本发布工作流
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# Version: 1.0.0
+# Last updated: 2026-03-24
+#
+# 实现构建产物的版本控制与追踪机制
+
+name: AgentOS Tests Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '发布版本号 (例如: v1.0.0)'
+        required: true
+        type: string
+      prerelease:
+        description: '是否为预发布版本'
+        required: false
+        default: false
+        type: boolean
+      draft:
+        description: '是否为草稿版本'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  # =========================================================================
+  # 版本验证
+  # =========================================================================
+  validate-version:
+    name: Validate Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      version_number: ${{ steps.version.outputs.version_number }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          
+          # 验证版本格式
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "❌ Invalid version format: $VERSION"
+            echo "Expected format: v1.0.0 or v1.0.0-beta.1"
+            exit 1
+          fi
+          
+          VERSION_NUMBER="${VERSION#v}"
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version_number=$VERSION_NUMBER" >> $GITHUB_OUTPUT
+          
+          echo "✅ Version validated: $VERSION"
+          echo "Version number: $VERSION_NUMBER"
+
+  # =========================================================================
+  # 构建测试产物
+  # =========================================================================
+  build-artifacts:
+    name: Build Artifacts
+    runs-on: ${{ matrix.os }}
+    needs: validate-version
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.10', '3.11', '3.12']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          cd tests
+          pip install -r requirements.txt
+          pip install pyinstaller
+      
+      - name: Build test package
+        run: |
+          cd tests
+          mkdir -p dist
+          
+          # 创建版本信息文件
+          cat > dist/VERSION.json << EOF
+          {
+            "version": "${{ needs.validate-version.outputs.version_number }}",
+            "commit": "${{ github.sha }}",
+            "build_time": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "python_version": "${{ matrix.python-version }}",
+            "os": "${{ matrix.os }}"
+          }
+          EOF
+          
+          # 复制测试文件
+          cp -r unit dist/ || true
+          cp -r integration dist/ || true
+          cp -r security dist/ || true
+          cp -r contract dist/ || true
+          cp -r benchmarks dist/ || true
+          cp pytest.ini dist/ || true
+          cp requirements.txt dist/ || true
+          cp Makefile dist/ || true
+      
+      - name: Create archive
+        run: |
+          cd tests
+          ARCHIVE_NAME="agentos-tests-${{ needs.validate-version.outputs.version_number }}-${{ matrix.os }}-py${{ matrix.python-version }}"
+          
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            7z a -tzip "../${ARCHIVE_NAME}.zip" dist/
+          else
+            tar -czvf "../${ARCHIVE_NAME}.tar.gz" -C dist .
+          fi
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentos-tests-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: |
+            agentos-tests-*.tar.gz
+            agentos-tests-*.zip
+          retention-days: 90
+
+  # =========================================================================
+  # 生成发布说明
+  # =========================================================================
+  generate-release-notes:
+    name: Generate Release Notes
+    runs-on: ubuntu-latest
+    needs: [validate-version, build-artifacts]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # 获取上一个标签
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          
+          echo "## 📋 变更日志" > RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          
+          if [ -n "$PREVIOUS_TAG" ]; then
+            echo "### 自 $PREVIOUS_TAG 以来的变更" >> RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+            
+            # 提交记录
+            echo "#### 提交记录" >> RELEASE_NOTES.md
+            echo '```' >> RELEASE_NOTES.md
+            git log --oneline $PREVIOUS_TAG..HEAD -- tests/ | head -20 >> RELEASE_NOTES.md
+            echo '```' >> RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+            
+            # 文件变更统计
+            echo "#### 文件变更统计" >> RELEASE_NOTES.md
+            echo '```' >> RELEASE_NOTES.md
+            git diff --stat $PREVIOUS_TAG..HEAD -- tests/ >> RELEASE_NOTES.md
+            echo '```' >> RELEASE_NOTES.md
+          else
+            echo "### 初始发布" >> RELEASE_NOTES.md
+          fi
+          
+          echo "" >> RELEASE_NOTES.md
+          echo "## 📦 发布信息" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "| 项目 | 值 |" >> RELEASE_NOTES.md
+          echo "|------|----|" >> RELEASE_NOTES.md
+          echo "| 版本 | ${{ needs.validate-version.outputs.version }} |" >> RELEASE_NOTES.md
+          echo "| 提交 | ${{ github.sha }} |" >> RELEASE_NOTES.md
+          echo "| 发布时间 | $(date -u +"%Y-%m-%d %H:%M:%S UTC") |" >> RELEASE_NOTES.md
+          echo "| 发布者 | ${{ github.actor }} |" >> RELEASE_NOTES.md
+          
+          cat RELEASE_NOTES.md
+      
+      - name: Upload release notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: RELEASE_NOTES.md
+          retention-days: 90
+
+  # =========================================================================
+  # 创建 GitHub Release
+  # =========================================================================
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate-version, build-artifacts, generate-release-notes]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      
+      - name: Prepare release assets
+        run: |
+          mkdir -p release_assets
+          
+          # 复制所有构建产物
+          find artifacts -name "*.tar.gz" -exec cp {} release_assets/ \;
+          find artifacts -name "*.zip" -exec cp {} release_assets/ \;
+          
+          # 复制发布说明
+          cp artifacts/release-notes/RELEASE_NOTES.md release_assets/
+          
+          # 列出所有文件
+          echo "Release assets:"
+          ls -la release_assets/
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.validate-version.outputs.version }}
+          name: AgentOS Tests ${{ needs.validate-version.outputs.version }}
+          body_path: release_assets/RELEASE_NOTES.md
+          draft: ${{ github.event.inputs.draft || true }}
+          prerelease: ${{ github.event.inputs.prerelease || false }}
+          files: |
+            release_assets/*.tar.gz
+            release_assets/*.zip
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload to GitHub Packages
+        if: github.event.inputs.draft != true
+        run: |
+          echo "📦 Uploading to GitHub Packages..."
+          # 这里可以添加上传到 GHCR 的逻辑
+
+  # =========================================================================
+  # 发布后通知
+  # =========================================================================
+  notify-release:
+    name: Notify Release
+    runs-on: ubuntu-latest
+    needs: [validate-version, create-release]
+    if: needs.create-release.result == 'success'
+    
+    steps:
+      - name: Send notification
+        run: |
+          echo "=========================================="
+          echo "🎉 AgentOS Tests Release Created!"
+          echo "=========================================="
+          echo "Version: ${{ needs.validate-version.outputs.version }}"
+          echo "Release URL: https://github.com/${{ github.repository }}/releases/tag/${{ needs.validate-version.outputs.version }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Actor: ${{ github.actor }}"
+          echo "=========================================="

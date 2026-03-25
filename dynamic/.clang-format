@@ -1,0 +1,177 @@
+# Copyright (c) 2026 SPHARX. All Rights Reserved.
+# clang-format configuration for AgentOS Dynamic Module
+# Version: 1.0.0
+#
+# Based on: LLVM style with project-specific customizations
+
+---
+Language: Cpp
+BasedOnStyle: LLVM
+
+# 缩进设置
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+IndentCaseLabels: false
+IndentCaseBlocks: false
+IndentGotoLabels: true
+IndentPPDirectives: None
+IndentExternBlock: AfterExternBlock
+IndentWrappedFunctionNames: false
+NamespaceIndentation: None
+
+# 大括号风格
+BreakBeforeBraces: Attach
+BraceWrapping:
+  AfterCaseLabel: false
+  AfterClass: false
+  AfterControlStatement: Never
+  AfterEnum: false
+  AfterFunction: false
+  AfterNamespace: false
+  AfterStruct: false
+  AfterUnion: false
+  AfterExternBlock: false
+  BeforeCatch: false
+  BeforeElse: false
+  BeforeLambdaBody: false
+  BeforeWhile: false
+  IndentBraces: false
+  SplitEmptyFunction: true
+  SplitEmptyRecord: true
+  SplitEmptyNamespace: true
+
+# 换行设置
+ColumnLimit: 120
+AlignAfterOpenBracket: Align
+AlignArrayOfStructures: None
+AlignConsecutiveAssignments: None
+AlignConsecutiveBitFields: None
+AlignConsecutiveDeclarations: None
+AlignConsecutiveMacros: None
+AlignEscapedNewlines: Left
+AlignOperands: Align
+AlignTrailingComments: true
+
+# 空格设置
+SpaceAfterCStyleCast: false
+SpaceAfterLogicalNot: false
+SpaceAfterTemplateKeyword: true
+SpaceAroundPointerQualifiers: Default
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCaseColon: false
+SpaceBeforeCpp11BracedList: false
+SpaceBeforeCtorInitializerColon: true
+SpaceBeforeInheritanceColon: true
+SpaceBeforeParens: ControlStatements
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceBeforeSquareBrackets: false
+SpaceInEmptyBlock: false
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 1
+SpacesInAngles: Never
+SpacesInCStyleCastParentheses: false
+SpacesInConditionalStatement: false
+SpacesInContainerLiterals: true
+SpacesInLineCommentPrefix:
+  Minimum: 1
+  Maximum: -1
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+
+# 指针和引用对齐
+DerivePointerAlignment: false
+PointerAlignment: Right
+
+# 函数调用参数换行
+AllowAllArgumentsOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: true
+AllowShortBlocksOnASingleLine: Empty
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortEnumsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLambdasOnASingleLine: All
+AllowShortLoopsOnASingleLine: false
+
+# 包含文件排序
+IncludeBlocks: Preserve
+SortIncludes: CaseSensitive
+IncludeCategories:
+  # 系统头文件
+  - Regex: '<[a-z_]+>'
+    Priority: 1
+  # C标准库
+  - Regex: '<[a-z_/]+\.h>'
+    Priority: 2
+  # C++标准库
+  - Regex: '<[a-z_/]+>'
+    Priority: 3
+  # 项目头文件
+  - Regex: '"[a-z_/]+\.h"'
+    Priority: 4
+  # 其他头文件
+  - Regex: '.*'
+    Priority: 5
+
+# 注释设置
+FixNamespaceComments: true
+ReflowComments: true
+
+# 其他设置
+BinPackArguments: true
+BinPackParameters: true
+BreakBeforeBinaryOperators: None
+BreakBeforeConceptDeclarations: true
+BreakBeforeTernaryOperators: true
+BreakConstructorInitializers: BeforeColon
+BreakInheritanceList: BeforeColon
+BreakStringLiterals: true
+
+# 访问说明符缩进
+AccessModifierOffset: -4
+
+# Lambda换行
+LambdaBodyIndentation: Signature
+
+# 宏块处理
+AttributeMacros: []
+ForEachMacros:
+  - foreach
+  - Q_FOREACH
+  - BOOST_FOREACH
+IfMacros:
+  - KJ_IF_MAYBE
+MacroBlockBegin: ''
+MacroBlockEnd: ''
+
+# 原始字符串格式化
+RawStringFormats:
+  - Language: Cpp
+    Delimiters:
+      - cc
+      - CC
+      - cpp
+      - Cpp
+      - CPP
+      - 'c++'
+      - 'C++'
+    CanonicalDelimiter: ''
+    BasedOnStyle: google
+  - Language: TextProto
+    Delimiters:
+      - pb
+      - PB
+      - proto
+      - PROTO
+    EnclosingFunctions:
+      - EqualsProto
+      - EquivToProto
+      - PARSE_PARTIAL_TEXT_PROTO
+      - PARSE_TEXT_PROTO
+      - PARSE_TEXT_PROTO_OR_DIE
+      - ParseTextOrDie
+      - ParseTextProtoOrDie
+      - ParseTextProtoAsFieldMaskOrDie
+    CanonicalDelimiter: pb
+    BasedOnStyle: google

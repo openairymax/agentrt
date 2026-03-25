@@ -1,0 +1,68 @@
+{
+  "name": "database_skill",
+  "version": "1.0.0",
+  "description": "Database operations skill for SQL query execution, schema management, and data manipulation",
+  "author": "SPHARX Team",
+  "license": "MIT",
+  "entry_point": "database_skill:DatabaseSkill",
+  "dependencies": [
+    "sqlalchemy>=2.0.0",
+    "psycopg2-binary>=2.9.0",
+    "pymysql>=1.1.0",
+    "redis>=5.0.0"
+  ],
+  "capabilities": [
+    "sql_query_execution",
+    "schema_management",
+    "data_backup",
+    "connection_pooling",
+    "transaction_management",
+    "index_optimization",
+    "query_caching",
+    "migration_management"
+  ],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "database_type": {
+        "type": "string",
+        "enum": ["postgresql", "mysql", "sqlite", "redis"],
+        "default": "postgresql"
+      },
+      "connection_string": {
+        "type": "string",
+        "description": "Database connection URL"
+      },
+      "pool_size": {
+        "type": "integer",
+        "description": "Connection pool size",
+        "default": 5
+      },
+      "max_overflow": {
+        "type": "integer",
+        "description": "Max pool overflow",
+        "default": 10
+      },
+      "pool_timeout": {
+        "type": "integer",
+        "description": "Pool timeout in seconds",
+        "default": 30
+      },
+      "echo": {
+        "type": "boolean",
+        "description": "Echo SQL queries",
+        "default": false
+      },
+      "cache_enabled": {
+        "type": "boolean",
+        "description": "Enable query caching",
+        "default": true
+      },
+      "cache_ttl": {
+        "type": "integer",
+        "description": "Cache TTL in seconds",
+        "default": 300
+      }
+    }
+  }
+}

@@ -1,0 +1,813 @@
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# AgentOS Scripts 模块 CI/CD 工作流
+# 涵盖代码提交验证、自动化构建、单元测试、集成测试、安全扫描、质量检查等完整环节
+
+name: AgentOS Scripts CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/scripts-cicd.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/scripts-cicd.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: '部署环境 (dev/staging/production)'
+        required: false
+        default: 'staging'
+      version:
+        description: '版本号 (可选)'
+        required: false
+        default: ''
+
+env:
+  AGENTOS_VERSION: 1.0.0.6
+  DOCKER_REGISTRY: ghcr.io
+  DOCKER_IMAGE: ghcr.io/spharx/agentos-scripts
+
+jobs:
+  # ============================================================================
+  # 阶段 0: 代码质量检查 (Code Quality)
+  # ============================================================================
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install lint tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff mypy shellcheck-runner
+
+      - name: Run Ruff Lint
+        run: |
+          ruff check scripts/ \
+            --select=E,F,W,I \
+            --ignore=E501,F401 \
+            --output-format=github
+
+      - name: Run MyPy Type Check
+        run: |
+          mypy scripts/core/ \
+            --ignore-missing-imports \
+            --no-error-summary \
+            || true
+
+      - name: Check for debug statements
+        run: |
+          grep -r "print(" scripts/ --include="*.py" || true
+          grep -r "import pdb" scripts/ --include="*.py" || true
+          grep -r "breakpoint()" scripts/ --include="*.py" || true
+
+  # ============================================================================
+  # 阶段 1: Shell 脚本检查 (Shell Check)
+  # ============================================================================
+  shell-check:
+    name: Shell Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Find shell scripts
+        id: find-shells
+        run: |
+          find scripts/ -name "*.sh" -type f > shell_scripts.txt
+          echo "count=$(wc -l < shell_scripts.txt)" >> $GITHUB_OUTPUT
+          cat shell_scripts.txt
+
+      - name: Run ShellCheck on all scripts
+        run: |
+          while IFS= read -r script; do
+            echo "Checking: $script"
+            shellcheck -S warning -x "$script" || true
+          done < shell_scripts.txt
+
+      - name: Validate shell script syntax
+        run: |
+          for script in $(find scripts/ -name "*.sh" -type f); do
+            bash -n "$script" 2>&1 && echo "✓ $script" || echo "✗ $script"
+          done
+
+  # ============================================================================
+  # 阶段 2: Python 单元测试 (Unit Tests)
+  # ============================================================================
+  unit-tests:
+    name: Unit Tests
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+        exclude:
+          - os: macos-latest
+            python-version: '3.9'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/requirements*.txt') }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov pytest-asyncio pytest-mock
+
+      - name: Run Python unit tests
+        run: |
+          pytest scripts/tests/python/ \
+            -v \
+            --tb=short \
+            --cov=scripts/core \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --junitxml=test-results.xml
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-py-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: |
+            test-results.xml
+            coverage.xml
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          flags: unittests
+          name: scripts-py-${{ matrix.os }}-py${{ matrix.python-version }}
+
+  # ============================================================================
+  # 阶段 3: Shell 集成测试 (Shell Integration Tests)
+  # ============================================================================
+  shell-integration:
+    name: Shell Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run shell integration tests
+        run: |
+          echo "Running shell integration tests..."
+
+          # Test lib functions
+          for test in scripts/tests/shell/test_*.sh; do
+            if [[ -f "$test" ]]; then
+              echo "Executing: $test"
+              bash "$test" || exit 1
+            fi
+          done
+
+      - name: Test script dependencies
+        run: |
+          echo "Testing script source dependencies..."
+
+          # Test that all scripts can source their dependencies
+          bash -c '
+            set -e
+            export AGENTOS_SCRIPTS_DIR="$(pwd)/scripts"
+            source scripts/lib/common.sh
+            source scripts/lib/log.sh
+            source scripts/lib/error.sh
+            source scripts/lib/platform.sh
+            echo "All library functions sourced successfully"
+          '
+
+  # ============================================================================
+  # 阶段 4: 安全扫描 (Security Scan)
+  # ============================================================================
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install security tools
+        run: |
+          pip install bandit safety
+
+      - name: Run Bandit SAST
+        run: |
+          bandit -r scripts/core/ \
+            -f json \
+            -o bandit-results.json \
+            --severity-level=medium \
+            || true
+
+      - name: Run Safety dependency check
+        run: |
+          safety check \
+            --json \
+            --output=safety-results.json \
+            || true
+
+      - name: Run TruffleHog secrets scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          output: trufflehog-results.json
+
+      - name: Check for sensitive files
+        run: |
+          echo "Checking for sensitive files..."
+          find scripts/ -type f \( -name "*.key" -o -name "*.pem" -o -name "*.cert" -o -name "credentials*" \) && exit 1 || echo "No sensitive files found"
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: |
+            bandit-results.json
+            safety-results.json
+            trufflehog-results.json
+          retention-days: 30
+
+      - name: Display security summary
+        if: always()
+        run: |
+          echo "=== Security Scan Summary ==="
+          echo "Bandit findings: $(cat bandit-results.json 2>/dev/null | grep -c '"issue"' || echo 'N/A')"
+          echo "Safety findings: $(cat safety-results.json 2>/dev/null | grep -c '"id"' || echo 'N/A')"
+
+  # ============================================================================
+  # 阶段 5: 构建验证 (Build Verification)
+  # ============================================================================
+  build-verification:
+    name: Build Verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify directory structure
+        run: |
+          echo "Verifying scripts directory structure..."
+
+          required_dirs=(
+            "scripts/core"
+            "scripts/lib"
+            "scripts/build"
+            "scripts/ops"
+            "scripts/dev"
+            "scripts/tests/shell"
+            "scripts/tests/python"
+          )
+
+          for dir in "${required_dirs[@]}"; do
+            if [[ -d "$dir" ]]; then
+              echo "✓ $dir"
+            else
+              echo "✗ $dir (missing)"
+              exit 1
+            fi
+          done
+
+      - name: Verify all shell scripts syntax
+        run: |
+          echo "Verifying shell script syntax..."
+          error_count=0
+          for script in $(find scripts/ -name "*.sh" -type f); do
+            if ! bash -n "$script" 2>&1; then
+              echo "✗ Syntax error in: $script"
+              ((error_count++))
+            fi
+          done
+
+          if [[ $error_count -eq 0 ]]; then
+            echo "All shell scripts have valid syntax"
+          else
+            echo "Found $error_count shell scripts with syntax errors"
+            exit 1
+          fi
+
+      - name: Verify all Python scripts syntax
+        run: |
+          echo "Verifying Python script syntax..."
+          python3 -m py_compile scripts/core/*.py
+          python3 -m py_compile scripts/ops/*.py
+          python3 -m py_compile scripts/dev/*.py
+          echo "All Python scripts have valid syntax"
+
+      - name: Verify Docker configuration
+        if: github.event_name == 'push'
+        run: |
+          if [[ -f scripts/deploy/docker/Dockerfile.service ]]; then
+            echo "Dockerfile found, checking syntax..."
+            docker build --check scripts/deploy/docker/Dockerfile.service || echo "Dockerfile check completed"
+          fi
+
+  # ============================================================================
+  # 阶段 6: 跨平台测试 (Cross-Platform Tests)
+  # ============================================================================
+  cross-platform:
+    name: Cross-Platform Test
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            shell: bash
+          - os: macos-latest
+            shell: zsh
+          - os: windows-latest
+            shell: pwsh
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run on ${{ matrix.os }}
+        shell: ${{ matrix.shell }}
+        run: |
+          echo "Running on ${{ matrix.os }} with ${{ matrix.shell }}"
+          ${{ matrix.shell }} --version
+
+          # Test shell library sourcing
+          cd scripts
+          if [[ "${{ matrix.os }}" == "Windows_NT" ]]; then
+            echo "Windows environment - skipping shell tests"
+          else
+            source lib/common.sh 2>/dev/null && echo "✓ common.sh sourced"
+            source lib/log.sh 2>/dev/null && echo "✓ log.sh sourced"
+          fi
+
+  # ============================================================================
+  # 阶段 7: 性能基准测试 (Performance Benchmarks)
+  # ============================================================================
+  benchmarks:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pytest pytest-benchmark pytest-timeout
+
+      - name: Run benchmarks
+        run: |
+          pytest scripts/tests/python/ \
+            -v \
+            --benchmark-only \
+            --benchmark-json=benchmark.json \
+            --benchmark-min-rounds=5 \
+            || true
+
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        if: always()
+        with:
+          tool: 'pytest'
+          outputFilePath: benchmark.json
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: false
+          comment-on-alert: true
+          alert-threshold: '150%'
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark.json
+          retention-days: 30
+
+  # ============================================================================
+  # 阶段 8: Docker 构建与推送 (Docker Build & Push)
+  # ============================================================================
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE }}
+          tags: |
+            type=sha,prefix=sha-
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          file: scripts/deploy/docker/Dockerfile.service
+
+      - name: Update Docker Compose file
+        run: |
+          sed -i "s|image: spharx/agentos-scripts:.*|image: ${{ env.DOCKER_IMAGE }}:sha-${GITHUB_SHA}}|" \
+            scripts/deploy/docker/docker-compose.yml
+
+      - name: Upload Compose file
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-compose-updated
+          path: scripts/deploy/docker/docker-compose.yml
+
+  # ============================================================================
+  # 阶段 9: 质量门禁 (Quality Gates)
+  # ============================================================================
+  quality-gate:
+    name: Quality Gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - code-quality
+      - shell-check
+      - unit-tests
+      - shell-integration
+      - security-scan
+      - build-verification
+      - cross-platform
+
+    steps:
+      - name: Check quality gates
+        run: |
+          echo "=== Quality Gates Summary ==="
+          echo "Code Quality: ${{ needs.code-quality.result }}"
+          echo "Shell Check: ${{ needs.shell-check.result }}"
+          echo "Unit Tests: ${{ needs.unit-tests.result }}"
+          echo "Shell Integration: ${{ needs.shell-integration.result }}"
+          echo "Security Scan: ${{ needs.security-scan.result }}"
+          echo "Build Verification: ${{ needs.build-verification.result }}"
+          echo "Cross-Platform: ${{ needs.cross-platform.result }}"
+
+          # Check for failures
+          if [[ "${{ needs.code-quality.result }}" == "failure" ]] || \
+             [[ "${{ needs.shell-check.result }}" == "failure" ]] || \
+             [[ "${{ needs.unit-tests.result }}" == "failure" ]] || \
+             [[ "${{ needs.shell-integration.result }}" == "failure" ]] || \
+             [[ "${{ needs.build-verification.result }}" == "failure" ]]; then
+            echo ""
+            echo "❌ Quality gates FAILED"
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ All quality gates PASSED"
+
+      - name: Create quality gate badge
+        run: |
+          echo "## Quality Gates Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Code Quality | ${{ needs.code-quality.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Shell Check | ${{ needs.shell-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests | ${{ needs.unit-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Shell Integration | ${{ needs.shell-integration.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Scan | ${{ needs.security-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Verification | ${{ needs.build-verification.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cross-Platform | ${{ needs.cross-platform.result }} |" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # 阶段 10: 版本发布 (Release)
+  # ============================================================================
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [docker-build]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Docker Compose
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-compose-updated
+          path: scripts/deploy/docker/
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=${AGENTOS_VERSION}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "RELEASE_TAG=refs/tags/v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ env.AGENTOS_VERSION }}
+          name: AgentOS Scripts v${{ env.AGENTOS_VERSION }}
+          draft: true
+          prerelease: false
+          files: |
+            scripts/deploy/docker/docker-compose.yml
+          body: |
+            ## AgentOS Scripts 模块 v${{ env.AGENTOS_VERSION }}
+
+            ### 主要更新
+            - 完整的 CI/CD 流程
+            - 多环境部署支持
+            - 安全扫描集成
+
+            ### 构建信息
+            - Git SHA: ${{ github.sha }}
+            - 构建时间: ${{ github.event.head_commit.timestamp }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload release asset
+        if: github.event_name == 'push'
+        run: |
+          echo "Creating release package..."
+
+          # Create release directory
+          mkdir -p release
+
+          # Package scripts
+          tar -czvf release/agentos-scripts-${{ env.AGENTOS_VERSION }}.tar.gz scripts/
+
+          # Package docker configs
+          tar -czvf release/agentos-scripts-docker-${{ env.AGENTOS_VERSION }}.tar.gz scripts/deploy/docker/
+
+          ls -la release/
+
+      - name: Upload release artifacts
+        uses: actions/upload-release-attachment@v1
+        with:
+          upload_url: ${{ steps.version.outputs.RELEASE_UPLOAD_URL }}
+          asset_path: release/agentos-scripts-${{ env.AGENTOS_VERSION }}.tar.gz
+          asset_name: agentos-scripts-${{ env.AGENTOS_VERSION }}.tar.gz
+          asset_content_type: application/gzip
+
+  # ============================================================================
+  # 阶段 11: 部署到环境 (Deploy to Environment)
+  # ============================================================================
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name == 'workflow_dispatch'
+    environment:
+      name: ${{ github.event.inputs.environment || 'staging' }}
+      url: ${{ github.event.inputs.environment == 'production' && 'https://agentos.example.com' || 'https://staging.agentos.example.com' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy to ${{ github.event.inputs.environment || 'staging' }}
+        run: |
+          ENVIRONMENT=${{ github.event.inputs.environment || 'staging' }}
+          VERSION=${{ github.event.inputs.version || 'latest' }}
+
+          echo "Deploying to environment: $ENVIRONMENT"
+          echo "Version: $VERSION"
+
+          case "$ENVIRONMENT" in
+            dev)
+              echo "Deploying to development environment..."
+              # Local deployment for dev
+              ;;
+            staging)
+              echo "Deploying to staging environment..."
+              docker-compose -f scripts/deploy/docker/docker-compose.yml pull
+              docker-compose -f scripts/deploy/docker/docker-compose.yml up -d
+              ;;
+            preview)
+              echo "Deploying to preview environment..."
+              PR_NUMBER=${{ github.event.inputs.pr_number || '0' }}
+              docker tag ${{ env.DOCKER_IMAGE }}:latest ${{ env.DOCKER_IMAGE }}:preview-$PR_NUMBER
+              ;;
+            production)
+              echo "Deploying to production environment..."
+              echo "This requires manual approval in production environment"
+              ;;
+          esac
+
+      - name: Verify deployment
+        run: |
+          echo "Verifying deployment..."
+
+          # Wait for containers to be healthy
+          for i in {1..30}; do
+            if docker ps --filter "name=agentos" --filter "status=running" | grep -q agentos; then
+              echo "✓ Containers are running"
+              break
+            fi
+            echo "Waiting for containers... ($i/30)"
+            sleep 2
+          done
+
+      - name: Create deployment record
+        run: |
+          DEPLOYMENT_ID=$(date +%s)
+          echo "Deployment ID: $DEPLOYMENT_ID"
+          echo "Environment: ${{ github.event.inputs.environment || 'staging' }}"
+          echo "Version: ${{ github.event.inputs.version || 'latest' }}"
+          echo "Deployed by: ${{ github.actor }}"
+          echo "Deployed at: $(date -Iseconds)"
+
+  # ============================================================================
+  # 阶段 12: 回滚 (Rollback)
+  # ============================================================================
+  rollback:
+    name: Rollback
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event_name == 'workflow_dispatch'
+    environment:
+      name: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get rollback version
+        id: rollback
+        run: |
+          # Get previous successful deployment
+          echo "Fetching rollback candidates..."
+
+          # List available tags
+          docker images ${{ env.DOCKER_IMAGE }} --format "{{.Tag}}" | head -10
+
+      - name: Perform rollback
+        run: |
+          TARGET_VERSION=${{ github.event.inputs.rollback_version || '' }}
+
+          if [[ -z "$TARGET_VERSION" ]]; then
+            echo "No rollback version specified"
+            exit 1
+          fi
+
+          echo "Rolling back to: $TARGET_VERSION"
+
+          docker pull ${{ env.DOCKER_IMAGE }}:$TARGET_VERSION
+          docker tag ${{ env.DOCKER_IMAGE }}:$TARGET_VERSION ${{ env.DOCKER_IMAGE }}:production
+
+          docker-compose -f scripts/deploy/docker/docker-compose.yml pull
+          docker-compose -f scripts/deploy/docker/docker-compose.yml up -d
+
+          echo "Rollback completed to version: $TARGET_VERSION"
+
+  # ============================================================================
+  # 阶段 13: 构建日志与通知 (Build Logs & Notifications)
+  # ============================================================================
+  notify:
+    name: Notifications
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [quality-gate, docker-build, release]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: '*'
+          merge-multiple: true
+
+      - name: Generate build summary
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Actor:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Run:** [${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: Send Slack notification
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          if [[ "${{ needs.quality-gate.result }}" == "success" ]]; then
+            echo "✅ Build succeeded - Notification would be sent to Slack"
+          else
+            echo "❌ Build failed - Notification would be sent to Slack"
+          fi
+
+      - name: Create GitHub Issue on failure
+        if: needs.quality-gate.result == 'failure'
+        run: |
+          echo "Creating GitHub Issue for failed build..."
+
+          ISSUE_BODY="## Build Failed
+
+          Workflow: ${{ github.workflow }}
+          Run: [${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+          ### Failed Jobs
+
+          Please check the failed jobs and fix the issues.
+
+          ---
+          *This issue was automatically created by the CI/CD pipeline*"
+
+          echo "$ISSUE_BODY" >> issue_body.md
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            ${{ github.run_id }}/*.log
+            artifacts/*.xml
+            artifacts/*.json
+          retention-days: 7
+          compression-level: 9
