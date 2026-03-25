@@ -183,33 +183,44 @@ partdata_error_t partdata_log_init(void) {
 
 void partdata_log_shutdown(void) {
     if (!g_initialized) {
+        fprintf(stderr, "[PARTDATA_LOG WARN] Shutdown called but not initialized\n");
         return;
     }
 
     pthread_mutex_lock(&g_log_lock);
 
     if (g_main_log_file) {
+        fflush(g_main_log_file);
         fclose(g_main_log_file);
+        fprintf(stdout, "[PARTDATA_LOG INFO] Main log file closed\n");
         g_main_log_file = NULL;
     }
 
     pthread_mutex_lock(&g_service_lock);
     for (size_t i = 0; i < g_service_log_count; i++) {
         if (g_service_logs[i].file) {
+            fflush(g_service_logs[i].file);
             fclose(g_service_logs[i].file);
             g_service_logs[i].file = NULL;
         }
         pthread_mutex_destroy(&g_service_logs[i].lock);
     }
+    fprintf(stdout, "[PARTDATA_LOG INFO] Closed %zu service log files\n", g_service_log_count);
     g_service_log_count = 0;
     pthread_mutex_unlock(&g_service_lock);
 
     g_initialized = false;
+    fprintf(stdout, "[PARTDATA_LOG INFO] Logging system shutdown complete\n");
 
     pthread_mutex_unlock(&g_log_lock);
 }
 
-void partdata_log_write(partdata_log_level_t level, const char* service, const char* trace_id, const char* file, int line, const char* format, ...) {
+void partdata_log_write(partdata_log_level_t level, 
+                        const char* service, 
+                        const char* trace_id, 
+                        const char* file, 
+                        int line, 
+                        const char* format, ...) {
     if (!g_initialized) {
         return;
     }
@@ -224,7 +235,13 @@ void partdata_log_write(partdata_log_level_t level, const char* service, const c
     va_end(args);
 }
 
-void partdata_log_writev(partdata_log_level_t level, const char* service, const char* trace_id, const char* file, int line, const char* format, va_list args) {
+void partdata_log_writev(partdata_log_level_t level, 
+                         const char* service, 
+                         const char* trace_id, 
+                         const char* file, 
+                         int line, 
+                         const char* format, 
+                         va_list args) {
     if (!g_initialized) {
         return;
     }
@@ -278,6 +295,7 @@ void partdata_log_set_level(partdata_log_level_t level) {
 
 partdata_error_t partdata_log_get_service_path(const char* service, char* buffer, size_t buffer_size) {
     if (!buffer || buffer_size == 0) {
+        fprintf(stderr, "[PARTDATA_LOG ERROR] Invalid buffer parameter\n");
         return PARTDATA_ERR_INVALID_PARAM;
     }
 
@@ -293,12 +311,14 @@ partdata_error_t partdata_log_get_service_path(const char* service, char* buffer
 
 partdata_error_t partdata_log_rotate(void) {
     if (!g_initialized) {
+        fprintf(stderr, "[PARTDATA_LOG ERROR] Log rotate called but not initialized\n");
         return PARTDATA_ERR_NOT_INITIALIZED;
     }
 
     pthread_mutex_lock(&g_log_lock);
 
     if (g_main_log_file) {
+        fflush(g_main_log_file);
         fclose(g_main_log_file);
         g_main_log_file = NULL;
     }
@@ -314,10 +334,20 @@ partdata_error_t partdata_log_rotate(void) {
     char new_path[512];
     snprintf(new_path, sizeof(new_path), "partdata/logs/kernel/agentos_%s.log", timestamp);
 
-    rename(old_path, new_path);
+    if (rename(old_path, new_path) != 0) {
+        fprintf(stderr, "[PARTDATA_LOG ERROR] Failed to rotate log file: %s -> %s\n", old_path, new_path);
+        pthread_mutex_unlock(&g_log_lock);
+        return PARTDATA_ERR_FILE_OPERATION_FAILED;
+    }
 
     g_main_log_file = fopen(old_path, "a");
+    if (!g_main_log_file) {
+        fprintf(stderr, "[PARTDATA_LOG ERROR] Failed to create new log file after rotation: %s\n", old_path);
+        pthread_mutex_unlock(&g_log_lock);
+        return PARTDATA_ERR_FILE_OPEN_FAILED;
+    }
 
+    fprintf(stdout, "[PARTDATA_LOG INFO] Log rotated: %s -> %s\n", old_path, new_path);
     pthread_mutex_unlock(&g_log_lock);
 
     return PARTDATA_SUCCESS;
@@ -337,6 +367,7 @@ partdata_error_t partdata_log_cleanup(int days_to_keep, uint64_t* freed_bytes) {
 
 partdata_error_t partdata_log_get_file_info(const char* service, partdata_log_file_info_t* info) {
     if (!info) {
+        fprintf(stderr, "[PARTDATA_LOG ERROR] Invalid info parameter (NULL)\n");
         return PARTDATA_ERR_INVALID_PARAM;
     }
 
@@ -363,6 +394,9 @@ partdata_error_t partdata_log_get_file_info(const char* service, partdata_log_fi
         info->size_bytes = (uint64_t)st.st_size;
         info->created_at = st.st_ctime;
         info->modified_at = st.st_mtime;
+    } else {
+        fprintf(stderr, "[PARTDATA_LOG WARN] Failed to get file info: %s\n", filepath);
+        return PARTDATA_ERR_FILE_NOT_FOUND;
     }
 
     return PARTDATA_SUCCESS;

@@ -4,13 +4,13 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "retrieval.h"
-#include "llm_client.h"
-#include "layer1_raw.h"
+#include "../include/retrieval.h"
+#include "../include/llm_client.h"
+#include "../include/layer1_raw.h"
 #include "agentos.h"
-#include "logger.h"
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 struct agentos_reranker {
     agentos_llm_service_t* llm;          /**< LLM服务，用于交叉编码 */
@@ -90,7 +90,12 @@ static float cross_encoder_score(
     if (agentos_llm_complete(llm, &req, &resp) != AGENTOS_SUCCESS) {
         return -1.0f;  // 失败标记
     }
-    float score = atof(resp->text);
+    char* endptr;
+    errno = 0;
+    float score = strtof(resp->text, &endptr);
+    if (endptr == resp->text || *endptr != '\0' || errno != 0) {
+        score = 0.5f;  // 转换失败，使用默认值
+    }
     agentos_llm_response_free(resp);
     if (score < 0 || score > 1) score = 0.5f;
     return score;

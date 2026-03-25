@@ -27,7 +27,7 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
 
 class Color:
@@ -314,7 +314,7 @@ class AgentOSCLI:
         message: str,
         options: List[str],
         allow_multiple: bool = False
-    ) -> List[int] or int:
+    ) -> Union[List[int], int]:
         """选择菜单"""
         print(f"\n{message}")
         for i, option in enumerate(options, 1):

@@ -3,7 +3,7 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 # Partdocs 模块功能需求与技术规范
 
-**版本**: v1.0.0.7  
+**版本**: Doc V1.5  
 **最后更新**: 2026-03-23  
 **状态**: 需求分析阶段
 

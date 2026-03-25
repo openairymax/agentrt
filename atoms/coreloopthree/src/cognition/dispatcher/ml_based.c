@@ -1,148 +1,168 @@
-﻿/**
+/**
  * @file ml_based.c
- * @brief 基于机器学习的调度策略
+ * @brief 基于机器学习的调度器实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "cognition.h"
-#include "agent_registry.h"
+#include "strategy.h"
+#include "agentos.h"
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
+#include <math.h>
 
 /**
- * @brief 简单的模型推理接口（假设）
+ * @brief ML调度器上下文
  */
-typedef struct ml_model {
-    void* handle;
-    int (*predict)(void* handle, const float* features, int n_features, float* scores, int n_outputs);
-} ml_model_t;
+typedef struct ml_dispatcher {
+    agentos_dispatcher_base_t base;
+    float* model_weights;
+    size_t weight_count;
+    char** model_names;
+    size_t model_count;
+    float learning_rate;
+} ml_dispatcher_t;
 
-typedef struct ml_data {
-    ml_model_t* model;
-    char* model_path;
-    void* registry_ctx;
-    agent_registry_get_agents_func get_agents;
-    agentos_mutex_t* lock;
-} ml_data_t;
+/**
+ * @brief 计算模型得分
+ */
+static float compute_model_score(
+    ml_dispatcher_t* dispatcher,
+    const char* model_name,
+    const char* task_type) {
+    if (!dispatcher || !model_name) return 0.0f;
 
-static void ml_destroy(agentos_dispatching_strategy_t* strategy) {
-    if (!strategy) return;
-    ml_data_t* data = (ml_data_t*)strategy->data;
-    if (data) {
-        if (data->model) {
-            // 释放模型资源（假设有 model_free 函数）
+    float base_score = 0.5f;
+
+    for (size_t i = 0; i < dispatcher->model_count; i++) {
+        if (strcmp(dispatcher->model_names[i], model_name) == 0) {
+            if (i < dispatcher->weight_count) {
+                base_score = dispatcher->model_weights[i];
+            }
+            break;
         }
-        if (data->model_path) free(data->model_path);
-        if (data->lock) agentos_mutex_destroy(data->lock);
-        free(data);
     }
-    free(strategy);
+
+    if (task_type) {
+        if (strstr(task_type, "code")) base_score *= 1.2f;
+        else if (strstr(task_type, "reasoning")) base_score *= 1.1f;
+        else if (strstr(task_type, "creative")) base_score *= 0.9f;
+    }
+
+    return fminf(base_score, 1.0f);
 }
 
-static agentos_error_t ml_dispatch(
-    const agentos_task_node_t* task,
-    const void** candidates,
-    size_t count,
-    void* context,
-    char** out_agent_id) {
-
-    ml_data_t* data = (ml_data_t*)context;
-    if (!data || !data->model || !task || !out_agent_id) return AGENTOS_EINVAL;
-
-    agent_info_t** agents = NULL;
-    size_t agent_count = 0;
-    agentos_error_t err;
-
-    if (candidates && count > 0) {
-        agents = (agent_info_t**)candidates;
-        agent_count = count;
-    } else {
-        err = data->get_agents(data->registry_ctx, task->agent_role, &agents, &agent_count);
-        if (err != AGENTOS_SUCCESS) return err;
-        if (agent_count == 0) return AGENTOS_ENOENT;
+/**
+ * @brief 选择最佳模型
+ */
+static agentos_error_t ml_select(
+    agentos_dispatcher_base_t* base,
+    const agentos_dispatch_context_t* context,
+    char** out_model_id) {
+    if (!base || !context || !out_model_id) {
+        return AGENTOS_EINVAL;
     }
 
-    // 将 Agent 信息转换为特征向量
-    int n_features = 4; // cost, success_rate, trust_score, priority
-    float* features = (float*)malloc(agent_count * n_features * sizeof(float));
-    if (!features) return AGENTOS_ENOMEM;
+    ml_dispatcher_t* dispatcher = (ml_dispatcher_t*)base;
 
-    for (size_t i = 0; i < agent_count; i++) {
-        agent_info_t* agent = agents[i];
-        features[i * n_features + 0] = agent->cost_estimate;
-        features[i * n_features + 1] = agent->success_rate;
-        features[i * n_features + 2] = agent->trust_score;
-        features[i * n_features + 3] = (float)agent->priority;
+    if (dispatcher->model_count == 0) {
+        *out_model_id = strdup("default");
+        return AGENTOS_SUCCESS;
     }
 
-    float* scores = (float*)malloc(agent_count * sizeof(float));
-    if (!scores) {
-        free(features);
-        return AGENTOS_ENOMEM;
-    }
+    float best_score = -1.0f;
+    const char* best_model = dispatcher->model_names[0];
 
-    int ret = data->model->predict(data->model->handle, features, agent_count * n_features, scores, agent_count);
-    free(features);
-
-    if (ret != 0) {
-        free(scores);
-        return AGENTOS_EIO;
-    }
-
-    int best_idx = 0;
-    float best_score = scores[0];
-    for (size_t i = 1; i < agent_count; i++) {
-        if (scores[i] > best_score) {
-            best_score = scores[i];
-            best_idx = i;
+    for (size_t i = 0; i < dispatcher->model_count; i++) {
+        float score = compute_model_score(
+            dispatcher,
+            dispatcher->model_names[i],
+            context->task_type);
+        if (score > best_score) {
+            best_score = score;
+            best_model = dispatcher->model_names[i];
         }
     }
-    free(scores);
 
-    agent_info_t* best_agent = agents[best_idx];
-    *out_agent_id = strdup(best_agent->agent_id);
-    if (!*out_agent_id) return AGENTOS_ENOMEM;
+    *out_model_id = strdup(best_model);
+    return AGENTOS_SUCCESS;
+}
+
+/**
+ * @brief 更新模型权重（在线学习）
+ */
+static agentos_error_t ml_update_weights(
+    ml_dispatcher_t* dispatcher,
+    const char* model_name,
+    float reward) {
+    if (!dispatcher || !model_name) return AGENTOS_EINVAL;
+
+    for (size_t i = 0; i < dispatcher->model_count; i++) {
+        if (strcmp(dispatcher->model_names[i], model_name) == 0) {
+            if (i < dispatcher->weight_count) {
+                float old_weight = dispatcher->model_weights[i];
+                dispatcher->model_weights[i] += dispatcher->learning_rate * (reward - old_weight);
+                dispatcher->model_weights[i] = fmaxf(0.0f, fminf(1.0f, dispatcher->model_weights[i]));
+            }
+            break;
+        }
+    }
 
     return AGENTOS_SUCCESS;
 }
 
-agentos_dispatching_strategy_t* agentos_dispatching_ml_create(
-    const char* model_path,
-    void* registry_ctx,
-    agent_registry_get_agents_func get_agents_func) {
+/**
+ * @brief 销毁ML调度器
+ */
+static void ml_destroy(agentos_dispatcher_base_t* base) {
+    if (!base) return;
 
-    if (!model_path || !get_agents_func) return NULL;
+    ml_dispatcher_t* dispatcher = (ml_dispatcher_t*)base;
+    if (dispatcher->model_weights) free(dispatcher->model_weights);
+    if (dispatcher->model_names) {
+        for (size_t i = 0; i < dispatcher->model_count; i++) {
+            if (dispatcher->model_names[i]) free(dispatcher->model_names[i]);
+        }
+        free(dispatcher->model_names);
+    }
+    free(dispatcher);
+}
 
-    // 实际应加载模型，这里仅占位
-    // ml_model_t* model = model_load(model_path);
-    // if (!model) return NULL;
+/**
+ * @brief 创建ML调度器
+ */
+agentos_error_t agentos_dispatcher_ml_create(
+    const char** model_names,
+    size_t model_count,
+    agentos_dispatcher_base_t** out_dispatcher) {
+    if (!out_dispatcher) return AGENTOS_EINVAL;
 
-    agentos_dispatching_strategy_t* strat = (agentos_dispatching_strategy_t*)malloc(sizeof(agentos_dispatching_strategy_t));
-    if (!strat) return NULL;
+    ml_dispatcher_t* dispatcher = (ml_dispatcher_t*)
+        calloc(1, sizeof(ml_dispatcher_t));
+    if (!dispatcher) return AGENTOS_ENOMEM;
 
-    ml_data_t* data = (ml_data_t*)malloc(sizeof(ml_data_t));
-    if (!data) {
-        free(strat);
-        return NULL;
+    dispatcher->base.select = ml_select;
+    dispatcher->base.destroy = ml_destroy;
+    dispatcher->learning_rate = 0.1f;
+
+    if (model_names && model_count > 0) {
+        dispatcher->model_count = model_count;
+        dispatcher->weight_count = model_count;
+        dispatcher->model_weights = (float*)calloc(model_count, sizeof(float));
+        dispatcher->model_names = (char**)calloc(model_count, sizeof(char*));
+
+        if (!dispatcher->model_weights || !dispatcher->model_names) {
+            if (dispatcher->model_weights) free(dispatcher->model_weights);
+            if (dispatcher->model_names) free(dispatcher->model_names);
+            free(dispatcher);
+            return AGENTOS_ENOMEM;
+        }
+
+        for (size_t i = 0; i < model_count; i++) {
+            dispatcher->model_weights[i] = 1.0f / model_count;
+            dispatcher->model_names[i] = strdup(model_names[i]);
+        }
     }
 
-    data->model = NULL; // 实际应赋值
-    data->model_path = strdup(model_path);
-    data->registry_ctx = registry_ctx;
-    data->get_agents = get_agents_func;
-    data->lock = agentos_mutex_create();
-    if (!data->lock || !data->model_path) {
-        if (data->model_path) free(data->model_path);
-        if (data->lock) agentos_mutex_destroy(data->lock);
-        free(data);
-        free(strat);
-        return NULL;
-    }
-
-    strat->dispatch = ml_dispatch;
-    strat->destroy = ml_destroy;
-    strat->data = data;
-
-    return strat;
+    *out_dispatcher = &dispatcher->base;
+    return AGENTOS_SUCCESS;
 }

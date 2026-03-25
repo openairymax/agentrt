@@ -4,9 +4,8 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "retrieval.h"
+#include "../include/retrieval.h"
 #include "agentos.h"
-#include "logger.h"
 #include <stdlib.h>
 #include <string.h>
 

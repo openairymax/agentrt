@@ -3,7 +3,7 @@
  * @brief 日志模块本地接口
  * 
  * 此头文件为 dynamic 模块提供日志功能。
- * 完整实现请参考 atoms/utils/observability/include/logger.h
+ * 完整实现请参考 common/utils/observability/include/logger.h
  * 
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */

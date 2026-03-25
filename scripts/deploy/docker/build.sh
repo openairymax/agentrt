@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Docker 镜像构建脚本
 # 用法：./build.sh [kernel|service|all] [dev|release]
@@ -12,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # 配置变量
-AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")
+AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENTOS_SCRIPTS_DIR="$(dirname "${AGENTOS_SCRIPT_DIR}")"
 AGENTOS_PROJECT_ROOT="$(dirname "${AGENTOS_SCRIPTS_DIR}")"
 VERSION="1.0.0.6"
@@ -79,7 +80,7 @@ build_kernel() {
 
     cd "${AGENTOS_PROJECT_ROOT}"
 
-    if [ "${build_type}" == "dev" ]; then
+    if [ "${build_type}" = "dev" ]; then
         # 开发版本：包含所有调试工具
         docker build \
             -f "${AGENTOS_SCRIPT_DIR}/Dockerfile.kernel" \
@@ -117,7 +118,7 @@ build_service() {
         build_kernel "release"
     fi
 
-    if [ "${build_type}" == "dev" ]; then
+    if [ "${build_type}" = "dev" ]; then
         # 开发版本
         docker build \
             -f "${AGENTOS_SCRIPT_DIR}/Dockerfile.service" \
@@ -208,7 +209,7 @@ main() {
     echo ""
 
     # 提示
-    if [ "${build_type}" == "release" ]; then
+    if [ "${build_type}" = "release" ]; then
         log_info "提示：使用 docker-compose 启动服务:"
         log_info "  cd ${AGENTOS_SCRIPT_DIR} && docker-compose up -d"
     fi

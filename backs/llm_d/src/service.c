@@ -521,7 +521,7 @@ int svc_config_load(const char* config_path, service_config_t* cfg) {
     item = cJSON_GetObjectItem(root, "token_encoding");
     if (item && cJSON_IsString(item)) {
         if (strlen(item->valuestring) < sizeof(cfg->token_encoding)) {
-            strncpy(cfg->token_encoding, item->valuestring, sizeof(cfg->token_encoding) - 1);
+            strcpy(cfg->token_encoding, item->valuestring);
         }
     }
     

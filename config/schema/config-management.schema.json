@@ -1,0 +1,374 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agentos.spharx.com/schemas/config-management.schema.json",
+  "title": "AgentOS Configuration Management Schema",
+  "description": "Schema for AgentOS configuration management settings including hot reload, version control, rollback, validation, audit, encryption, import/export, and sync",
+  "type": "object",
+  "required": ["_config_version", "hot_reload", "version_control", "rollback", "validation", "audit", "encryption", "import_export", "sync"],
+  "properties": {
+    "_config_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Configuration version in semantic versioning format"
+    },
+    "hot_reload": {
+      "type": "object",
+      "description": "Hot reload configuration settings",
+      "required": ["enabled", "check_interval_sec", "reload_signal", "watch_files", "supported_paths", "callbacks"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable hot reload functionality"
+        },
+        "check_interval_sec": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600,
+          "description": "Interval in seconds to check for configuration changes"
+        },
+        "reload_signal": {
+          "type": "string",
+          "enum": ["SIGHUP", "SIGUSR1", "SIGUSR2"],
+          "description": "Signal to trigger configuration reload on Unix systems"
+        },
+        "watch_files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "List of configuration files to watch for changes"
+        },
+        "supported_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "List of configuration paths that support hot reload"
+        },
+        "callbacks": {
+          "type": "object",
+          "required": ["pre_reload", "post_reload", "validate"],
+          "properties": {
+            "pre_reload": {
+              "type": "object",
+              "required": ["enabled", "timeout_sec"],
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "timeout_sec": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 60
+                }
+              }
+            },
+            "post_reload": {
+              "type": "object",
+              "required": ["enabled", "timeout_sec"],
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "timeout_sec": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 60
+                }
+              }
+            },
+            "validate": {
+              "type": "object",
+              "required": ["enabled", "timeout_sec"],
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "timeout_sec": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 300
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "version_control": {
+      "type": "object",
+      "description": "Version control configuration",
+      "required": ["enabled", "backend", "git", "file", "database"],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "backend": {
+          "type": "string",
+          "enum": ["git", "file", "database"],
+          "description": "Backend type for version control"
+        },
+        "git": {
+          "type": "object",
+          "required": ["repo_path", "branch", "auto_commit", "commit_message_template", "push"],
+          "properties": {
+            "repo_path": {
+              "type": "string"
+            },
+            "branch": {
+              "type": "string"
+            },
+            "auto_commit": {
+              "type": "boolean"
+            },
+            "commit_message_template": {
+              "type": "string"
+            },
+            "push": {
+              "type": "object",
+              "required": ["enabled", "remote"],
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "remote": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "file": {
+          "type": "object",
+          "required": ["history_dir", "max_versions", "compress_after_versions"],
+          "properties": {
+            "history_dir": {
+              "type": "string"
+            },
+            "max_versions": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "compress_after_versions": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        },
+        "database": {
+          "type": "object",
+          "required": ["table_name", "retention_days"],
+          "properties": {
+            "table_name": {
+              "type": "string"
+            },
+            "retention_days": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3650
+            }
+          }
+        }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "description": "Rollback configuration",
+      "required": ["enabled", "max_steps", "auto_rollback", "require_confirmation"],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "max_steps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "auto_rollback": {
+          "type": "object",
+          "required": ["enabled", "on_load_failure", "on_validation_failure", "on_startup_failure"],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "on_load_failure": {
+              "type": "boolean"
+            },
+            "on_validation_failure": {
+              "type": "boolean"
+            },
+            "on_startup_failure": {
+              "type": "boolean"
+            }
+          }
+        },
+        "require_confirmation": {
+          "type": "boolean"
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "description": "Validation configuration",
+      "required": ["validate_on_startup", "validate_on_reload", "schema_validation", "custom_rules"],
+      "properties": {
+        "validate_on_startup": {
+          "type": "boolean"
+        },
+        "validate_on_reload": {
+          "type": "boolean"
+        },
+        "schema_validation": {
+          "type": "object",
+          "required": ["enabled", "schema_dir"],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "schema_dir": {
+              "type": "string"
+            }
+          }
+        },
+        "custom_rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "enabled"],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "enabled": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    "audit": {
+      "type": "object",
+      "description": "Audit logging configuration",
+      "required": ["enabled", "log_path", "events", "retention_days"],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "log_path": {
+          "type": "string"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["config.load", "config.reload", "config.change", "config.rollback", "config.validate", "config.export", "config.import"]
+          },
+          "minItems": 1
+        },
+        "retention_days": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3650
+        }
+      }
+    },
+    "encryption": {
+      "type": "object",
+      "description": "Encryption configuration",
+      "required": ["enabled", "algorithm", "key_source", "key_env_var", "key_file", "encrypted_fields"],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "algorithm": {
+          "type": "string",
+          "enum": ["aes-256-gcm", "aes-256-cbc", "chacha20-poly1305"]
+        },
+        "key_source": {
+          "type": "string",
+          "enum": ["env", "file", "vault"]
+        },
+        "key_env_var": {
+          "type": "string"
+        },
+        "key_file": {
+          "type": "string"
+        },
+        "encrypted_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "import_export": {
+      "type": "object",
+      "description": "Import and export configuration",
+      "required": ["export_formats", "exclude_sensitive", "validate_on_import", "merge_strategy"],
+      "properties": {
+        "export_formats": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["yaml", "json"]
+          },
+          "minItems": 1
+        },
+        "exclude_sensitive": {
+          "type": "boolean"
+        },
+        "validate_on_import": {
+          "type": "boolean"
+        },
+        "merge_strategy": {
+          "type": "string",
+          "enum": ["replace", "merge", "deep_merge"]
+        }
+      }
+    },
+    "sync": {
+      "type": "object",
+      "description": "Multi-instance synchronization configuration",
+      "required": ["enabled", "backend", "interval_sec", "conflict_resolution", "redis"],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "backend": {
+          "type": "string",
+          "enum": ["etcd", "consul", "redis", "database"]
+        },
+        "interval_sec": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600
+        },
+        "conflict_resolution": {
+          "type": "string",
+          "enum": ["last_write_wins", "first_write_wins", "manual"]
+        },
+        "redis": {
+          "type": "object",
+          "required": ["key_prefix", "ttl_sec"],
+          "properties": {
+            "key_prefix": {
+              "type": "string"
+            },
+            "ttl_sec": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 86400
+            }
+          }
+        }
+      }
+    }
+  }
+}

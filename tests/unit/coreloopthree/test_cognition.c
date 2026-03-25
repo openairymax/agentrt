@@ -1,3 +1,9 @@
+/**
+ * @file test_cognition.c
+ * @brief 认知引擎单元测试
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ */
+
 #include "cognition.h"
 #include "agentos.h"
 #include <stdio.h>

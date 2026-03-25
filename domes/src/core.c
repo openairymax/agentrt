@@ -15,7 +15,7 @@
 #include "permission/permission.h"
 #include "audit/audit.h"
 #include "sanitizer/sanitizer.h"
-#include <atoms/utils/observability/include/logger.h>
+#include <common/utils/observability/include/logger.h>
 #include <stdlib.h>
 #include <string.h>
 

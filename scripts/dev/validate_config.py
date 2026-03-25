@@ -4,16 +4,18 @@ AgentOS 配置验证脚本
 验证配置文件是否符合 JSON Schema 规范
 """
 
-import sys
-import os
+import argparse
 import json
-import yaml
+import os
+import re
+import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
-import argparse
+
+import yaml
 
 try:
-    from jsonschema import validate, Draft7Validator
+    from jsonschema import Draft7Validator, validate
 except ImportError:
     print("错误: 需要安装 jsonschema 库")
     print("安装命令: pip install jsonschema")
@@ -36,7 +38,7 @@ class ConfigValidator:
             self.errors.append(f"Schema 文件不存在: {schema_path}")
             return None
         
-        with open(schema_path, 'r', encoding='utf-8') as f:
+        with open(schema_path, 'r', encoding='utf-8', newline='') as f:
             try:
                 return json.load(f)
             except json.JSONDecodeError as e:
@@ -72,7 +74,11 @@ class ConfigValidator:
             return False
         
         try:
-            validate(instance=config_data, schema=schema_data, cls=Draft7Validator)
+            validate(
+                instance=config_data,
+                schema=schema_data,
+                cls=Draft7Validator
+            )
             return True
         except Exception as e:
             self.errors.append(f"验证失败 {config_file}: {e}")
@@ -144,7 +150,6 @@ class ConfigValidator:
                 continue
             
             config_str = str(config_data)
-            import re
             
             # 查找环境变量引用 ${VAR_NAME}
             env_refs = re.findall(r'\$\{([^}]+)\}', config_str)

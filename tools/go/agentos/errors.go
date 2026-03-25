@@ -186,6 +186,7 @@ const (
 	CodeSkillExecution ErrorCode = "0x4007"
 
 	CodeTelemetryError ErrorCode = "0x5001"
+	CodeSyscallError  ErrorCode = "0x5002"
 
 	CodePermissionDenied ErrorCode = "0x6001"
 	CodeCorruptedData    ErrorCode = "0x6002"
@@ -243,6 +244,7 @@ var (
 	ErrSkillExecution = NewError(CodeSkillExecution, "技能执行失败", nil)
 
 	ErrTelemetryError   = NewError(CodeTelemetryError, "遥测错误", nil)
+	ErrSyscallError     = NewError(CodeSyscallError, "系统调用错误", nil)
 	ErrPermissionDenied = NewError(CodePermissionDenied, "权限不足", nil)
 	ErrCorruptedData    = NewError(CodeCorruptedData, "数据损坏", nil)
 )

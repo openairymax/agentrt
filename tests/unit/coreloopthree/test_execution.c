@@ -1,3 +1,9 @@
+/**
+ * @file test_execution.c
+ * @brief 执行引擎单元测试
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ */
+
 #include "execution.h"
 #include "agentos.h"
 #include <stdio.h>

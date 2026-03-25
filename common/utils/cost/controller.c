@@ -1,0 +1,251 @@
+/**
+ * @file controller.c
+ * @brief 预算控制器实现
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ * 
+ * @details
+ * 本模块实现成本预算控制功能：
+ * - 支持周期性能耗统计
+ * - 提供预算预警和限制
+ * - 线程安全的预算操作
+ */
+
+#include "cost.h"
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+#include <time.h>
+#include <stdatomic.h>
+
+/**
+ * @brief 预算控制器内部结构
+ */
+struct agentos_budget_controller {
+    double max_cost_usd;                     /**< 最大成本预算（美元） */
+    double warning_threshold;                /**< 警告阈值（百分比） */
+    atomic_double consumed_cost;             /**< 已消耗成本 */
+    atomic_double period_cost;              /**< 周期内消耗 */
+    atomic_uint64_t request_count;         /**< 请求计数 */
+    atomic_uint64_t denied_count;          /**< 拒绝计数 */
+    pthread_mutex_t mutex;                 /**< 互斥锁 */
+    time_t period_start;                   /**< 周期开始时间 */
+    uint32_t period_seconds;               /**< 周期时长（秒） */
+    double average_cost;                   /**< 平均成本 */
+};
+
+/**
+ * @brief 获取当前时间
+ */
+static time_t get_current_time(void) {
+    return time(NULL);
+}
+
+/**
+ * @brief 检查并重置周期
+ */
+static int check_and_reset_period(agentos_budget_controller_t* controller) {
+    if (!controller) {
+        return -1;
+    }
+    
+    time_t now = get_current_time();
+    
+    if (now >= controller->period_start + (time_t)controller->period_seconds) {
+        pthread_mutex_lock(&controller->mutex);
+        
+        if (now >= controller->period_start + (time_t)controller->period_seconds) {
+            atomic_store(&controller->period_cost, 0.0);
+            controller->period_start = now;
+        }
+        
+        pthread_mutex_unlock(&controller->mutex);
+        
+        return 1;
+    }
+    
+    return 0;
+}
+
+agentos_budget_controller_t* agentos_budget_controller_create(double max_cost_usd, uint32_t period_seconds) {
+    if (max_cost_usd <= 0) {
+        return NULL;
+    }
+    
+    agentos_budget_controller_t* controller = (agentos_budget_controller_t*)malloc(
+        sizeof(agentos_budget_controller_t));
+    if (!controller) {
+        return NULL;
+    }
+    
+    memset(controller, 0, sizeof(agentos_budget_controller_t));
+    
+    controller->max_cost_usd = max_cost_usd;
+    controller->warning_threshold = 0.8;
+    atomic_init(&controller->consumed_cost, 0.0);
+    atomic_init(&controller->period_cost, 0.0);
+    atomic_init(&controller->request_count, 0);
+    atomic_init(&controller->denied_count, 0);
+    
+    if (pthread_mutex_init(&controller->mutex, NULL) != 0) {
+        free(controller);
+        return NULL;
+    }
+    
+    controller->period_start = get_current_time();
+    controller->period_seconds = period_seconds;
+    controller->average_cost = 0.0;
+    
+    return controller;
+}
+
+void agentos_budget_controller_destroy(agentos_budget_controller_t* controller) {
+    if (!controller) {
+        return;
+    }
+    
+    pthread_mutex_destroy(&controller->mutex);
+    free(controller);
+}
+
+int agentos_budget_controller_consume(agentos_budget_controller_t* controller, double cost_usd) {
+    if (!controller || cost_usd < 0) {
+        return -1;
+    }
+    
+    check_and_reset_period(controller);
+    
+    double current_period = atomic_load(&controller->period_cost);
+    double current_total = atomic_load(&controller->consumed_cost);
+    
+    if (current_period + cost_usd > controller->max_cost_usd) {
+        atomic_fetch_add(&controller->denied_count, 1);
+        return -1;
+    }
+    
+    if (current_total + cost_usd > controller->max_cost_usd * 100) {
+        atomic_fetch_add(&controller->denied_count, 1);
+        return -1;
+    }
+    
+    double new_period = atomic_fetch_add(&controller->period_cost, cost_usd) + cost_usd;
+    double new_total = atomic_fetch_add(&controller->consumed_cost, cost_usd) + cost_usd;
+    atomic_fetch_add(&controller->request_count, 1);
+    
+    pthread_mutex_lock(&controller->mutex);
+    
+    uint64_t requests = atomic_load(&controller->request_count);
+    if (requests > 0) {
+        controller->average_cost = new_total / (double)requests;
+    }
+    
+    pthread_mutex_unlock(&controller->mutex);
+    
+    if (new_period > controller->max_cost_usd * controller->warning_threshold) {
+        return 1;
+    }
+    
+    return 0;
+}
+
+double agentos_budget_controller_remaining(agentos_budget_controller_t* controller) {
+    if (!controller) {
+        return 0.0;
+    }
+    
+    check_and_reset_period(controller);
+    
+    double period_cost = atomic_load(&controller->period_cost);
+    double remaining = controller->max_cost_usd - period_cost;
+    
+    return remaining > 0 ? remaining : 0.0;
+}
+
+double agentos_budget_controller_consumed(agentos_budget_controller_t* controller) {
+    if (!controller) {
+        return 0.0;
+    }
+    
+    return atomic_load(&controller->consumed_cost);
+}
+
+double agentos_budget_controller_period_consumed(agentos_budget_controller_t* controller) {
+    if (!controller) {
+        return 0.0;
+    }
+    
+    check_and_reset_period(controller);
+    
+    return atomic_load(&controller->period_cost);
+}
+
+uint64_t agentos_budget_controller_requests(agentos_budget_controller_t* controller) {
+    if (!controller) {
+        return 0;
+    }
+    
+    return atomic_load(&controller->request_count);
+}
+
+uint64_t agentos_budget_controller_denied(agentos_budget_controller_t* controller) {
+    if (!controller) {
+        return 0;
+    }
+    
+    return atomic_load(&controller->denied_count);
+}
+
+int agentos_budget_controller_set_warning(agentos_budget_controller_t* controller, double threshold) {
+    if (!controller || threshold <= 0 || threshold > 1.0) {
+        return -1;
+    }
+    
+    pthread_mutex_lock(&controller->mutex);
+    controller->warning_threshold = threshold;
+    pthread_mutex_unlock(&controller->mutex);
+    
+    return 0;
+}
+
+int agentos_budget_controller_reset_period(agentos_budget_controller_t* controller) {
+    if (!controller) {
+        return -1;
+    }
+    
+    pthread_mutex_lock(&controller->mutex);
+    atomic_store(&controller->period_cost, 0.0);
+    controller->period_start = get_current_time();
+    pthread_mutex_unlock(&controller->mutex);
+    
+    return 0;
+}
+
+double agentos_budget_controller_average(agentos_budget_controller_t* controller) {
+    if (!controller) {
+        return 0.0;
+    }
+    
+    pthread_mutex_lock(&controller->mutex);
+    double avg = controller->average_cost;
+    pthread_mutex_unlock(&controller->mutex);
+    
+    return avg;
+}
+
+int agentos_budget_controller_get_status(agentos_budget_controller_t* controller) {
+    if (!controller) {
+        return -1;
+    }
+    
+    check_and_reset_period(controller);
+    
+    double period_cost = atomic_load(&controller->period_cost);
+    double percentage = (period_cost / controller->max_cost_usd) * 100.0;
+    
+    if (percentage >= 100.0) {
+        return 2;
+    } else if (percentage >= controller->warning_threshold * 100.0) {
+        return 1;
+    }
+    
+    return 0;
+}

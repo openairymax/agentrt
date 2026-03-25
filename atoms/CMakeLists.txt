@@ -2,7 +2,7 @@
 # AgentOS 内核顶层 CMakeLists.txt
 
 cmake_minimum_required(VERSION 3.20)
-project(agentos-kernel VERSION 1.0.0.5 LANGUAGES C CXX)
+project(agentos-kernel VERSION 1.0.0.6 LANGUAGES C CXX)
 
 # 设置默认构建类型
 if(NOT CMAKE_BUILD_TYPE)
@@ -23,12 +23,9 @@ find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBEVENT REQUIRED libevent)
 
-# 包含CMake配置模块
-include(cmake/SecurityConfig.cmake)
-include(cmake/TestConfig.cmake)
-
 # 包含子目录
-add_subdirectory(core)
+# Kernel subdirectories
+add_subdirectory(corekern)
 add_subdirectory(coreloopthree)
 add_subdirectory(memoryrovol)
 add_subdirectory(syscall)

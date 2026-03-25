@@ -478,7 +478,6 @@ deploy_to_production() {
 
 perform_blue_green_deploy() {
     local version="$1"
-    local blue_tag="blue-$version"
     local green_tag="green-$version"
     local active_tag="production"
 

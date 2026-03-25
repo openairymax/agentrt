@@ -6,7 +6,6 @@ CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
 *.cmake
-!atoms/cmake/*.cmake
 
 # 编译中间文件
 *.o

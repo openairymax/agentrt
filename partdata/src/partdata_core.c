@@ -369,3 +369,48 @@ partdata_error_t partdata_flush(void) {
     }
     return PARTDATA_SUCCESS;
 }
+
+partdata_error_t partdata_health_check(bool* registry_ok, 
+                                       bool* trace_ok, 
+                                       bool* log_ok, 
+                                       bool* ipc_ok, 
+                                       bool* memory_ok) {
+    bool all_healthy = true;
+    
+    if (registry_ok) {
+        *registry_ok = g_initialized;
+        if (!*registry_ok) {
+            all_healthy = false;
+        }
+    }
+    
+    if (trace_ok) {
+        *trace_ok = g_initialized;
+        if (!*trace_ok) {
+            all_healthy = false;
+        }
+    }
+    
+    if (log_ok) {
+        *log_ok = g_initialized;
+        if (!*log_ok) {
+            all_healthy = false;
+        }
+    }
+    
+    if (ipc_ok) {
+        *ipc_ok = g_initialized;
+        if (!*ipc_ok) {
+            all_healthy = false;
+        }
+    }
+    
+    if (memory_ok) {
+        *memory_ok = g_initialized;
+        if (!*memory_ok) {
+            all_healthy = false;
+        }
+    }
+    
+    return all_healthy ? PARTDATA_SUCCESS : PARTDATA_ERR_NOT_INITIALIZED;
+}

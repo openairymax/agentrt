@@ -26,6 +26,8 @@ set(SOURCES
     src/syscall_table.c
     src/agent.c
     src/skill.c
+    src/sandbox.c
+    src/circuit_breaker.c
 )
 
 add_library(agentos_syscall STATIC ${SOURCES})
@@ -43,7 +45,7 @@ target_link_libraries(agentos_syscall
     agentos_core
     agentos_coreloopthree
     agentos_memoryrovol
-    agentos_utils
+    agentos_common
     Threads::Threads
     ${CJSON_LIBRARIES}
 )

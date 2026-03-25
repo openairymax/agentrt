@@ -4,7 +4,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "../../../atoms/utils/core/include/core.h"
+#include "../../../../common/utils/core/include/core.h"
 #include <stdio.h>
 #include <stdlib.h>
 

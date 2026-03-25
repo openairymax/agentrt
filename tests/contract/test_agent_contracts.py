@@ -144,8 +144,8 @@ class AgentContractValidator:
         return len(self.errors) == 0
     
     def _validate_required_fields(self, contract: Dict[str, Any]) -> None:
-        """验证必需字段是否存在"""存在性"""
-
+        """验证必需字段是否存在"""
+        
         required_fields = [
             "schema_version", "agent_id", "agent_name", "version",
             "role", "description", "capabilities", "models",

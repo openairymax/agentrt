@@ -4,7 +4,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "../../../atoms/utils/error/include/error.h"
+#include "../../../../common/utils/error/include/error.h"
 #include <stdio.h>
 #include <stdlib.h>
 

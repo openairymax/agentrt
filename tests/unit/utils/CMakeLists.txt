@@ -9,19 +9,15 @@ add_executable(utils_test
 )
 
 target_include_directories(utils_test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../core/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../observability/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../error/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../token/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../io/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../common/utils/core/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../common/utils/observability/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../common/utils/error/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../common/utils/token/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../common/utils/io/include
 )
 
 target_link_libraries(utils_test PRIVATE
-    agentos_utils_core
-    agentos_utils_observability
-    agentos_utils_error
-    agentos_utils_token
-    agentos_utils_io
+    agentos_common
     pthread
 )
 

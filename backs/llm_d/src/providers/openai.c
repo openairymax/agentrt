@@ -41,17 +41,29 @@ static provider_ctx_t* openai_init(const char* name,
     }
 
     if (api_key) {
-        strncpy(ctx->api_key, api_key, sizeof(ctx->api_key) - 1);
+        if (strlen(api_key) >= sizeof(ctx->api_key)) {
+            free(ctx);
+            return NULL;
+        }
+        strcpy(ctx->api_key, api_key);
     }
     
     if (api_base) {
-        strncpy(ctx->api_base, api_base, sizeof(ctx->api_base) - 1);
+        if (strlen(api_base) >= sizeof(ctx->api_base)) {
+            free(ctx);
+            return NULL;
+        }
+        strcpy(ctx->api_base, api_base);
     } else {
         strcpy(ctx->api_base, "https://api.openai.com/v1");
     }
     
     if (organization) {
-        strncpy(ctx->organization, organization, sizeof(ctx->organization) - 1);
+        if (strlen(organization) >= sizeof(ctx->organization)) {
+            free(ctx);
+            return NULL;
+        }
+        strcpy(ctx->organization, organization);
     }
     
     ctx->timeout_sec = timeout_sec > 0 ? timeout_sec : 30.0;
@@ -156,24 +168,28 @@ static int parse_response(const char* body, llm_response_t** out) {
         resp->choice_count = (size_t)size;
         resp->choices = (llm_message_t*)calloc(size, sizeof(llm_message_t));
         
-        if (resp->choices) {
-            for (int i = 0; i < size; ++i) {
-                cJSON* choice = cJSON_GetArrayItem(choices, i);
-                cJSON* message = cJSON_GetObjectItem(choice, "message");
-                if (message) {
-                    cJSON* role = cJSON_GetObjectItem(message, "role");
-                    cJSON* content = cJSON_GetObjectItem(message, "content");
-                    if (cJSON_IsString(role) && role->valuestring) {
-                        resp->choices[i].role = strdup(role->valuestring);
-                    }
-                    if (cJSON_IsString(content) && content->valuestring) {
-                        resp->choices[i].content = strdup(content->valuestring);
-                    }
+        if (!resp->choices) {
+            cJSON_Delete(root);
+            llm_response_free(resp);
+            return AGENTOS_ERR_OUT_OF_MEMORY;
+        }
+        
+        for (int i = 0; i < size; ++i) {
+            cJSON* choice = cJSON_GetArrayItem(choices, i);
+            cJSON* message = cJSON_GetObjectItem(choice, "message");
+            if (message) {
+                cJSON* role = cJSON_GetObjectItem(message, "role");
+                cJSON* content = cJSON_GetObjectItem(message, "content");
+                if (cJSON_IsString(role) && role->valuestring) {
+                    resp->choices[i].role = strdup(role->valuestring);
                 }
-                cJSON* finish = cJSON_GetObjectItem(choice, "finish_reason");
-                if (cJSON_IsString(finish) && finish->valuestring && !resp->finish_reason) {
-                    resp->finish_reason = strdup(finish->valuestring);
+                if (cJSON_IsString(content) && content->valuestring) {
+                    resp->choices[i].content = strdup(content->valuestring);
                 }
+            }
+            cJSON* finish = cJSON_GetObjectItem(choice, "finish_reason");
+            if (cJSON_IsString(finish) && finish->valuestring && !resp->finish_reason) {
+                resp->finish_reason = strdup(finish->valuestring);
             }
         }
     }

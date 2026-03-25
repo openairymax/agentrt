@@ -9,6 +9,7 @@ import { NetworkError, HttpError, TimeoutError, AgentOSError } from './errors';
 import { Task } from './task';
 import { Session } from './session';
 import { Skill } from './skill';
+import { getLogger } from './utils/logger';
 
 /** AgentOS 客户端类 */
 export class AgentOS {
@@ -80,7 +81,7 @@ export class AgentOS {
   /** 向 AgentOS 服务端发送 HTTP 请求（带重试） */
   async request<T>(method: string, path: string, data?: any): Promise<T> {
     let lastError: any;
-    
+
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       try {
         const config: AxiosRequestConfig = { method, url: path, data };
@@ -88,21 +89,21 @@ export class AgentOS {
         return response.data;
       } catch (error) {
         lastError = error;
-        
+
         if (attempt === this.maxRetries) {
           break;
         }
-        
+
         if (!this.isRetryableError(error)) {
           throw error;
         }
-        
+
         const delay = this.retryDelay * Math.pow(2, attempt);
-        console.warn(`请求失败，${delay}ms 后重试 (尝试 ${attempt + 1}/${this.maxRetries}): ${error}`);
+        getLogger().warn(`请求失败，${delay}ms 后重试 (尝试 ${attempt + 1}/${this.maxRetries}): ${error}`);
         await this.sleep(delay);
       }
     }
-    
+
     throw lastError;
   }
 

@@ -212,10 +212,16 @@ void tool_cache_put(tool_cache_t* cache, const char* key, const char* value) {
 }
 
 char* tool_cache_key(const char* tool_id, const char* params_json) {
-    size_t len = strlen(tool_id) + strlen(params_json) + 2;
+    if (!tool_id || !params_json) return NULL;
+    
+    size_t tool_id_len = strlen(tool_id);
+    size_t params_len = strlen(params_json);
+    size_t len = tool_id_len + params_len + 2;
+    
     char* key = malloc(len);
     if (!key) return NULL;
-    sprintf(key, "%s|%s", tool_id, params_json);
+    
+    snprintf(key, len, "%s|%s", tool_id, params_json);
     return key;
 }
 

@@ -39,6 +39,12 @@ if(NOT WEBSOCKETS_LIBRARY)
     message(FATAL_ERROR "libwebsockets not found. Please install libwebsockets-dev package.")
 endif()
 
+# 查找cJSON（JSON解析）
+find_library(CJSON_LIBRARY NAMES cjson cJSON)
+if(NOT CJSON_LIBRARY)
+    message(WARNING "cJSON library not found. Some features may not work.")
+endif()
+
 # 源文件
 set(DYNAMIC_SOURCES
     src/platform.c
@@ -46,10 +52,14 @@ set(DYNAMIC_SOURCES
     src/main.c
     src/server.c
     src/session.c
+    src/session_stats.c
     src/health.c
     src/telemetry.c
     src/auth.c
     src/ratelimit.c
+    src/config.c
+    src/config_runtime.c
+    src/connection_pool.c
     src/gateway/http_gateway.c
     src/gateway/ws_gateway.c
     src/gateway/stdio_gateway.c
@@ -73,6 +83,7 @@ target_link_libraries(dynamic
     Threads::Threads
     ${MHD_LIBRARY}
     ${WEBSOCKETS_LIBRARY}
+    ${CJSON_LIBRARY}
 )
 
 # 编译定义

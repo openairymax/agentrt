@@ -4,12 +4,33 @@ AgentOS 配置部署脚本
 根据环境变量部署配置文件
 """
 
-import os
-import sys
-import shutil
 import argparse
+import os
+import shutil
+import sys
 from pathlib import Path
 from typing import Optional
+
+
+# 常量定义
+DEFAULT_CONFIG_FILES = [
+    'kernel/settings.yaml',
+    'model/model.yaml',
+    'agent/registry.yaml',
+    'skill/registry.yaml',
+    'security/policy.yaml',
+    'security/permission_rules.yaml',
+    'sanitizer/sanitizer_rules.json',
+    'logging/config.yaml',
+    'config_management.yaml',
+]
+
+# 环境配置映射(所有环境使用相同的文件映射)
+ENV_CONFIG_MAPPING = {
+    'development': DEFAULT_CONFIG_FILES,
+    'staging': DEFAULT_CONFIG_FILES,
+    'production': DEFAULT_CONFIG_FILES,
+}
 
 
 def backup_config_file(config_path: Path) -> Path:
@@ -28,78 +49,41 @@ def deploy_config(
     dry_run: bool = False
 ) -> bool:
     """部署配置到指定环境"""
-    
+
     # 确定目标目录
     target_dir = source_dir / 'environment' / target_env
     if not target_dir.exists():
         print(f"✗ 目标环境目录不存在: {target_dir}")
         return False
-    
-    # 环境配置映射
-    env_mapping = {
-        'development': {
-            'kernel/settings.yaml': 'kernel/settings.yaml',
-            'model/model.yaml': 'model/model.yaml',
-            'agent/registry.yaml': 'agent/registry.yaml',
-            'skill/registry.yaml': 'skill/registry.yaml',
-            'security/policy.yaml': 'security/policy.yaml',
-            'security/permission_rules.yaml': 'security/permission_rules.yaml',
-            'sanitizer/sanitizer_rules.json': 'sanitizer/sanitizer_rules.json',
-            'logging/config.yaml': 'logging/config.yaml',
-            'config_management.yaml': 'config_management.yaml',
-        },
-        'staging': {
-            'kernel/settings.yaml': 'kernel/settings.yaml',
-            'model/model.yaml': 'model/model.yaml',
-            'agent/registry.yaml': 'agent/registry.yaml',
-            'skill/registry.yaml': 'skill/registry.yaml',
-            'security/policy.yaml': 'security/policy.yaml',
-            'security/permission_rules.yaml': 'security/permission_rules.yaml',
-            'sanitizer/sanitizer_rules.json': 'sanitizer/sanitizer_rules.json',
-            'logging/config.yaml': 'logging/config.yaml',
-            'config_management.yaml': 'config_management.yaml',
-        },
-        'production': {
-            'kernel/settings.yaml': 'kernel/settings.yaml',
-            'model/model.yaml': 'model/model.yaml',
-            'agent/registry.yaml': 'agent/registry.yaml',
-            'skill/registry.yaml': 'skill/registry.yaml',
-            'security/policy.yaml': 'security/policy.yaml',
-            'security/permission_rules.yaml': 'security/permission_rules.yaml',
-            'sanitizer/sanitizer_rules.json': 'sanitizer/sanitizer_rules.json',
-            'logging/config.yaml': 'logging/config.yaml',
-            'config_management.yaml': 'config_management.yaml',
-        },
-    }
-    
-    # 获取当前环境的配置映射
-    config_map = env_mapping.get(target_env)
-    if not config_map:
+
+    # 获取当前环境的配置文件列表
+    config_files = ENV_CONFIG_MAPPING.get(target_env)
+    if not config_files:
         print(f"✗ 不支持的环境: {target_env}")
         return False
-    
+
     # 部署配置文件
     success_count = 0
     error_count = 0
-    
-    for source_file, target_file in config_map.items():
-        source_path = source_dir / source_file
-        target_path = target_dir / target_file
-        
+
+    for config_file in config_files:
+        source_path = source_dir / config_file
+        target_path = target_dir / config_file
+
         if not source_path.exists():
             print(f"⚠ 源文件不存在: {source_path}")
             error_count += 1
             continue
-        
+
         if dry_run:
             print(f"[DRY RUN] 将复制 {source_path} -> {target_path}")
             success_count += 1
             continue
-        
+
         # 备份目标文件
         if backup and target_path.exists():
             backup_config_file(target_path)
-        
+
         # 复制配置文件
         try:
             target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -109,12 +93,12 @@ def deploy_config(
         except Exception as e:
             print(f"✗ 部署失败: {target_path} - {e}")
             error_count += 1
-    
+
     # 总结
     print(f"\n部署完成:")
     print(f"  成功: {success_count}")
     print(f"  失败: {error_count}")
-    
+
     return error_count == 0
 
 
@@ -123,36 +107,30 @@ def validate_deployment(
     target_env: str
 ) -> bool:
     """验证部署结果"""
-    
+
     target_dir = source_dir / 'environment' / target_env
     if not target_dir.exists():
         print(f"✗ 目标环境目录不存在: {target_dir}")
         return False
-    
+
+    # 获取当前环境的配置文件列表
+    config_files = ENV_CONFIG_MAPPING.get(target_env)
+    if not config_files:
+        print(f"✗ 不支持的环境: {target_env}")
+        return False
+
     # 检查必需的配置文件
-    required_files = [
-        'kernel/settings.yaml',
-        'model/model.yaml',
-        'agent/registry.yaml',
-        'skill/registry.yaml',
-        'security/policy.yaml',
-        'security/permission_rules.yaml',
-        'sanitizer/sanitizer_rules.json',
-        'logging/config.yaml',
-        'config_management.yaml',
-    ]
-    
     missing_files = []
-    for file in required_files:
+    for file in config_files:
         if not (target_dir / file).exists():
             missing_files.append(file)
-    
+
     if missing_files:
         print(f"✗ 缺少必需的配置文件:")
         for file in missing_files:
             print(f"  - {file}")
         return False
-    
+
     print("✓ 所有必需的配置文件已部署")
     return True
 

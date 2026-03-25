@@ -3,7 +3,7 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 # AgentOS 会话管理 API
 
-**版本**: v1.0.0.6  
+**版本**: Doc V1.5  
 **最后更新**: 2026-03-23  
 **状态**: 🟢 生产就绪
 

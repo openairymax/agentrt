@@ -7,6 +7,10 @@ project(agentos-llm-d VERSION 3.0.0 LANGUAGES C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+# 测试支持选项
+option(BUILD_TESTS "Build unit tests" ON)
+option(BUILD_COVERAGE "Build with code coverage" OFF)
+
 # 查找依赖
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
@@ -76,15 +80,36 @@ target_link_libraries(agentos-llm-d PRIVATE
 )
 
 # 编译选项
-target_compile_options(agentos-llm-d PRIVATE
-    -Wall
-    -Wextra
-    -Wpedantic
-    -Werror=implicit-function-declaration
-    -Werror=return-type
-    $<$<CONFIG:Debug>:-g -O0>
-    $<$<CONFIG:Release>:-O3 -DNDEBUG>
-)
+if(BUILD_COVERAGE)
+    target_compile_options(agentos-llm-d PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+        -fprofile-arcs
+        -ftest-coverage
+        -g
+        -O0
+    )
+    target_link_options(agentos-llm-d PRIVATE
+        --coverage
+    )
+else()
+    target_compile_options(agentos-llm-d PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Werror=implicit-function-declaration
+        -Werror=return-type
+        $<$<CONFIG:Debug>:-g -O0>
+        $<$<CONFIG:Release>:-O3 -DNDEBUG>
+    )
+endif()
+
+# 测试支持
+if(BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
 
 # 安装规则
 install(TARGETS agentos-llm-d DESTINATION bin)

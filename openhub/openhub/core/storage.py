@@ -303,6 +303,8 @@ class SQLiteStorage(Storage):
         self._conn: Optional[Any] = None
         self._lock = asyncio.Lock()
         self._initialized = False
+        self._closed = False
+        self._schema_cache: Set[str] = set()
 
         self._collection_schemas: Dict[str, str] = {
             "records": """

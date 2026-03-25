@@ -1,338 +1,417 @@
 /**
  * @file graph.c
- * @brief L3 结构层图编码器（支持 SQLite 持久化）
+ * @brief L3 知识图谱实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "layer3_structure.h"
-#include "agentos.h"
-#include "logger.h"
-#include <sqlite3.h>
+#include "../include/layer3_structure.h"
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
+#include <limits.h>
 
-typedef struct graph_node_entry {
-    char* node_id;
-    float* feature;   // 可选，仅内存
-    struct graph_node_entry* next;
-} graph_node_entry_t;
+#define INITIAL_CAPACITY 1024
+#define MAX_PATH_LENGTH 100
 
-typedef struct graph_edge_entry {
-    char* from_id;
-    char* to_id;
-    float weight;
-    agentos_relation_type_t type;
-    struct graph_edge_entry* next_from;
-    // From data intelligence emerges. by spharx
-    struct graph_edge_entry* next_to;
-} graph_edge_entry_t;
+/**
+ * @brief 实体节点
+ */
+typedef struct entity_node {
+    char* id;
+    agentos_relation_t* relations;
+    size_t relation_count;
+    struct entity_node* next;
+} entity_node_t;
 
-struct agentos_graph_encoder {
-    agentos_binder_t* binder;
-    size_t node_dim;
-    graph_node_entry_t* nodes;
-    graph_edge_entry_t* edges;
-    agentos_mutex_t* lock;
-    // 持久化相关
-    sqlite3* db;
-    char* db_path;
+/**
+ * @brief 知识图谱结构
+ */
+struct agentos_knowledge_graph {
+    entity_node_t** entities;
+    size_t entity_count;
+    size_t capacity;
+    agentos_mutex_t* mutex;
 };
 
-static const char* create_node_table_sql =
-    "CREATE TABLE IF NOT EXISTS graph_nodes ("
-    "node_id TEXT PRIMARY KEY,"
-    "feature BLOB"  // 特征向量序列化（可选）
-    ");";
+/**
+ * @brief 创建知识图谱
+ */
+agentos_error_t agentos_knowledge_graph_create(
+    agentos_knowledge_graph_t** out) {
+    if (!out) return AGENTOS_EINVAL;
 
-static const char* create_edge_table_sql =
-    "CREATE TABLE IF NOT EXISTS graph_edges ("
-    "from_id TEXT,"
-    "to_id TEXT,"
-    "weight REAL,"
-    "type INTEGER,"
-    "PRIMARY KEY (from_id, to_id)"
-    ");"
-    "CREATE INDEX IF NOT EXISTS idx_from ON graph_edges(from_id);"
-    "CREATE INDEX IF NOT EXISTS idx_to ON graph_edges(to_id);";
+    agentos_knowledge_graph_t* kg = (agentos_knowledge_graph_t*)
+        calloc(1, sizeof(agentos_knowledge_graph_t));
+    if (!kg) return AGENTOS_ENOMEM;
 
-agentos_graph_encoder_t* agentos_graph_encoder_create(
-    agentos_binder_t* binder,
-    size_t node_dim,
-    const agentos_layer3_structure_config_t* config) {
-
-    if (!binder || node_dim == 0) return NULL;
-
-    agentos_graph_encoder_t* enc = (agentos_graph_encoder_t*)calloc(1, sizeof(agentos_graph_encoder_t));
-    if (!enc) {
-        AGENTOS_LOG_ERROR("Failed to allocate graph encoder");
-        return NULL;
+    kg->entities = (entity_node_t**)calloc(INITIAL_CAPACITY, sizeof(entity_node_t*));
+    if (!kg->entities) {
+        free(kg);
+        return AGENTOS_ENOMEM;
     }
 
-    enc->binder = binder;
-    enc->node_dim = node_dim;
-    enc->lock = agentos_mutex_create();
-    if (!enc->lock) {
-        free(enc);
-        return NULL;
+    kg->capacity = INITIAL_CAPACITY;
+    kg->entity_count = 0;
+    kg->mutex = agentos_mutex_create();
+    if (!kg->mutex) {
+        free(kg->entities);
+        free(kg);
+        return AGENTOS_ENOMEM;
     }
 
-    // 打开数据库
-    if (config && config->db_path) {
-        enc->db_path = strdup(config->db_path);
-        int rc = sqlite3_open(config->db_path, &enc->db);
-        if (rc != SQLITE_OK) {
-            AGENTOS_LOG_ERROR("Failed to open graph database: %s", sqlite3_errmsg(enc->db));
-            agentos_mutex_destroy(enc->lock);
-            free(enc);
-            return NULL;
-        }
-        // 创建表
-        char* errmsg = NULL;
-        rc = sqlite3_exec(enc->db, create_node_table_sql, NULL, NULL, &errmsg);
-        if (rc != SQLITE_OK) {
-            AGENTOS_LOG_ERROR("Failed to create node table: %s", errmsg);
-            sqlite3_free(errmsg);
-            sqlite3_close(enc->db);
-            agentos_mutex_destroy(enc->lock);
-            free(enc->db_path);
-            free(enc);
-            return NULL;
-        }
-        rc = sqlite3_exec(enc->db, create_edge_table_sql, NULL, NULL, &errmsg);
-        if (rc != SQLITE_OK) {
-            AGENTOS_LOG_ERROR("Failed to create edge table: %s", errmsg);
-            sqlite3_free(errmsg);
-            sqlite3_close(enc->db);
-            agentos_mutex_destroy(enc->lock);
-            free(enc->db_path);
-            free(enc);
-            return NULL;
-        }
-        // 从数据库加载已有节点和边？可以延迟加载，但这里可以先不加载，等查询时再访问数据库。
-        // 为了性能，可以在启动时将所有节点ID加载到内存，但向量特征可以不用加载。
-    }
-
-    return enc;
+    *out = kg;
+    return AGENTOS_SUCCESS;
 }
 
-void agentos_graph_encoder_destroy(agentos_graph_encoder_t* enc) {
-    if (!enc) return;
+/**
+ * @brief 销毁知识图谱
+ */
+void agentos_knowledge_graph_destroy(agentos_knowledge_graph_t* kg) {
+    if (!kg) return;
 
-    // 释放内存节点
-    graph_node_entry_t* n = enc->nodes;
-    while (n) {
-        graph_node_entry_t* next = n->next;
-        free(n->node_id);
-        if (n->feature) free(n->feature);
-        free(n);
-        n = next;
-    }
+    agentos_mutex_lock(kg->mutex);
 
-    // 释放内存边
-    graph_edge_entry_t* e = enc->edges;
-    while (e) {
-        graph_edge_entry_t* next = e->next_from;
-        free(e->from_id);
-        free(e->to_id);
-        free(e);
-        e = next;
-    }
-
-    if (enc->db) sqlite3_close(enc->db);
-    if (enc->db_path) free(enc->db_path);
-    if (enc->lock) agentos_mutex_destroy(enc->lock);
-    free(enc);
-}
-
-agentos_error_t agentos_graph_add_node(
-    agentos_graph_encoder_t* enc,
-    const char* node_id,
-    const float* feature) {
-
-    if (!enc || !node_id) return AGENTOS_EINVAL;
-
-    graph_node_entry_t* node = (graph_node_entry_t*)malloc(sizeof(graph_node_entry_t));
-    if (!node) return AGENTOS_ENOMEM;
-    memset(node, 0, sizeof(graph_node_entry_t));
-
-    node->node_id = strdup(node_id);
-    if (feature) {
-        node->feature = (float*)malloc(enc->node_dim * sizeof(float));
-        if (!node->feature) {
-            free(node->node_id);
+    for (size_t i = 0; i < kg->entity_count; i++) {
+        entity_node_t* node = kg->entities[i];
+        if (node) {
+            agentos_relation_t* rel = node->relations;
+            while (rel) {
+                agentos_relation_t* next = rel->next;
+                if (rel->from_id) free(rel->from_id);
+                if (rel->to_id) free(rel->to_id);
+                free(rel);
+                rel = next;
+            }
+            if (node->id) free(node->id);
             free(node);
+        }
+    }
+    free(kg->entities);
+
+    agentos_mutex_unlock(kg->mutex);
+    agentos_mutex_destroy(kg->mutex);
+    free(kg);
+}
+
+/**
+ * @brief 查找实体节点
+ */
+static entity_node_t* find_entity(agentos_knowledge_graph_t* kg, const char* entity_id) {
+    for (size_t i = 0; i < kg->entity_count; i++) {
+        if (kg->entities[i] && strcmp(kg->entities[i]->id, entity_id) == 0) {
+            return kg->entities[i];
+        }
+    }
+    return NULL;
+}
+
+/**
+ * @brief 添加实体
+ */
+agentos_error_t agentos_knowledge_graph_add_entity(
+    agentos_knowledge_graph_t* kg,
+    const char* entity_id) {
+    if (!kg || !entity_id) return AGENTOS_EINVAL;
+
+    pthread_mutex_lock(&kg->mutex);
+
+    if (find_entity(kg, entity_id)) {
+        pthread_mutex_unlock(&kg->mutex);
+        return AGENTOS_SUCCESS;
+    }
+
+    if (kg->entity_count >= kg->capacity) {
+        size_t new_cap = kg->capacity * 2;
+        entity_node_t** new_entities = (entity_node_t**)realloc(kg->entities,
+            new_cap * sizeof(entity_node_t*));
+        if (!new_entities) {
+            pthread_mutex_unlock(&kg->mutex);
             return AGENTOS_ENOMEM;
         }
-        memcpy(node->feature, feature, enc->node_dim * sizeof(float));
+        kg->entities = new_entities;
+        kg->capacity = new_cap;
     }
 
-    // 插入内存链表
-    agentos_mutex_lock(enc->lock);
-    node->next = enc->nodes;
-    enc->nodes = node;
-
-    // 持久化到数据库（如果启用）
-    if (enc->db) {
-        sqlite3_stmt* stmt;
-        const char* insert_sql = "INSERT OR REPLACE INTO graph_nodes (node_id, feature) VALUES (?, ?);";
-        int rc = sqlite3_prepare_v2(enc->db, insert_sql, -1, &stmt, NULL);
-        if (rc == SQLITE_OK) {
-            sqlite3_bind_text(stmt, 1, node_id, -1, SQLITE_STATIC);
-            if (feature) {
-                sqlite3_bind_blob(stmt, 2, feature, enc->node_dim * sizeof(float), SQLITE_STATIC);
-            } else {
-                sqlite3_bind_null(stmt, 2);
-            }
-            rc = sqlite3_step(stmt);
-            sqlite3_finalize(stmt);
-            if (rc != SQLITE_DONE) {
-                AGENTOS_LOG_WARN("Failed to insert node into database: %s", node_id);
-            }
-        }
+    entity_node_t* node = (entity_node_t*)calloc(1, sizeof(entity_node_t));
+    if (!node) {
+        pthread_mutex_unlock(&kg->mutex);
+        return AGENTOS_ENOMEM;
     }
-    agentos_mutex_unlock(enc->lock);
 
+    node->id = strdup(entity_id);
+    node->relations = NULL;
+    node->relation_count = 0;
+    node->next = NULL;
+
+    kg->entities[kg->entity_count++] = node;
+
+    pthread_mutex_unlock(&kg->mutex);
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t agentos_graph_add_edge(
-    agentos_graph_encoder_t* enc,
-    const agentos_graph_edge_t* edge) {
+/**
+ * @brief 添加关系
+ */
+agentos_error_t agentos_knowledge_graph_add_relation(
+    agentos_knowledge_graph_t* kg,
+    const char* from_id,
+    const char* to_id,
+    agentos_relation_type_t type,
+    float weight) {
+    if (!kg || !from_id || !to_id) return AGENTOS_EINVAL;
 
-    if (!enc || !edge || !edge->from_id || !edge->to_id) return AGENTOS_EINVAL;
+    pthread_mutex_lock(&kg->mutex);
 
-    graph_edge_entry_t* e = (graph_edge_entry_t*)malloc(sizeof(graph_edge_entry_t));
-    if (!e) return AGENTOS_ENOMEM;
-    memset(e, 0, sizeof(graph_edge_entry_t));
+    agentos_error_t err = AGENTOS_SUCCESS;
 
-    e->from_id = strdup(edge->from_id);
-    e->to_id = strdup(edge->to_id);
-    e->weight = edge->weight;
-    e->type = edge->type;
-
-    agentos_mutex_lock(enc->lock);
-    e->next_from = enc->edges;
-    enc->edges = e;
-
-    // 持久化到数据库
-    if (enc->db) {
-        sqlite3_stmt* stmt;
-        const char* insert_sql = "INSERT OR REPLACE INTO graph_edges (from_id, to_id, weight, type) VALUES (?, ?, ?, ?);";
-        int rc = sqlite3_prepare_v2(enc->db, insert_sql, -1, &stmt, NULL);
-        if (rc == SQLITE_OK) {
-            sqlite3_bind_text(stmt, 1, edge->from_id, -1, SQLITE_STATIC);
-            sqlite3_bind_text(stmt, 2, edge->to_id, -1, SQLITE_STATIC);
-            sqlite3_bind_double(stmt, 3, edge->weight);
-            sqlite3_bind_int(stmt, 4, (int)edge->type);
-            rc = sqlite3_step(stmt);
-            sqlite3_finalize(stmt);
-            if (rc != SQLITE_DONE) {
-                AGENTOS_LOG_WARN("Failed to insert edge into database");
-            }
+    if (!find_entity(kg, from_id)) {
+        err = agentos_knowledge_graph_add_entity(kg, from_id);
+        if (err != AGENTOS_SUCCESS) {
+            pthread_mutex_unlock(&kg->mutex);
+            return err;
         }
     }
-    agentos_mutex_unlock(enc->lock);
 
-    return AGENTOS_SUCCESS;
-}
-
-agentos_error_t agentos_graph_encode(
-    agentos_graph_encoder_t* enc,
-    float** out_graph_vector) {
-
-    if (!enc || !out_graph_vector) return AGENTOS_EINVAL;
-
-    // 统计有特征的节点
-    size_t count = 0;
-    graph_node_entry_t* n = enc->nodes;
-    while (n) {
-        if (n->feature) count++;
-        n = n->next;
+    if (!find_entity(kg, to_id)) {
+        err = agentos_knowledge_graph_add_entity(kg, to_id);
+        if (err != AGENTOS_SUCCESS) {
+            pthread_mutex_unlock(&kg->mutex);
+            return err;
+        }
     }
 
-    if (count == 0) {
-        *out_graph_vector = NULL;
+    entity_node_t* from_node = find_entity(kg, from_id);
+    if (!from_node) {
+        pthread_mutex_unlock(&kg->mutex);
         return AGENTOS_ENOENT;
     }
 
-    size_t dim = enc->node_dim;
-    float* sum = (float*)calloc(dim, sizeof(float));
-    if (!sum) return AGENTOS_ENOMEM;
-
-    n = enc->nodes;
-    while (n) {
-        if (n->feature) {
-            for (size_t i = 0; i < dim; i++) sum[i] += n->feature[i];
-        }
-        n = n->next;
+    agentos_relation_t* rel = (agentos_relation_t*)calloc(1, sizeof(agentos_relation_t));
+    if (!rel) {
+        pthread_mutex_unlock(&kg->mutex);
+        return AGENTOS_ENOMEM;
     }
 
-    // 平均
-    for (size_t i = 0; i < dim; i++) sum[i] /= count;
+    rel->from_id = strdup(from_id);
+    rel->to_id = strdup(to_id);
+    rel->type = type;
+    rel->weight = weight;
+    rel->next = from_node->relations;
+    from_node->relations = rel;
+    from_node->relation_count++;
 
-    *out_graph_vector = sum;
+    pthread_mutex_unlock(&kg->mutex);
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t agentos_graph_get_neighbors(
-    agentos_graph_encoder_t* enc,
-    const char* node_id,
-    agentos_graph_edge_t*** out_edges,
+/**
+ * @brief 查询关系
+ */
+agentos_error_t agentos_knowledge_graph_query(
+    agentos_knowledge_graph_t* kg,
+    const char* entity_id,
+    agentos_relation_type_t relation_type,
+    char*** out_related_ids,
     size_t* out_count) {
+    if (!kg || !entity_id || !out_related_ids || !out_count) return AGENTOS_EINVAL;
 
-    if (!enc || !node_id || !out_edges || !out_count) return AGENTOS_EINVAL;
+    pthread_mutex_lock(&kg->mutex);
 
-    // 先统计内存中的边（可以结合数据库查询，但这里简化：只查内存）
-    size_t cap = 8;
-    size_t cnt = 0;
-    agentos_graph_edge_t** edges = (agentos_graph_edge_t**)malloc(cap * sizeof(agentos_graph_edge_t*));
-    if (!edges) return AGENTOS_ENOMEM;
-
-    agentos_mutex_lock(enc->lock);
-    graph_edge_entry_t* e = enc->edges;
-    while (e) {
-        if (strcmp(e->from_id, node_id) == 0 || strcmp(e->to_id, node_id) == 0) {
-            if (cnt >= cap) {
-                cap *= 2;
-                agentos_graph_edge_t** new_edges = (agentos_graph_edge_t**)realloc(edges, cap * sizeof(agentos_graph_edge_t*));
-                if (!new_edges) {
-                    for (size_t i = 0; i < cnt; i++) free(edges[i]);
-                    free(edges);
-                    agentos_mutex_unlock(enc->lock);
-                    return AGENTOS_ENOMEM;
-                }
-                edges = new_edges;
-            }
-            agentos_graph_edge_t* copy = (agentos_graph_edge_t*)malloc(sizeof(agentos_graph_edge_t));
-            if (!copy) {
-                for (size_t i = 0; i < cnt; i++) free(edges[i]);
-                free(edges);
-                agentos_mutex_unlock(enc->lock);
-                return AGENTOS_ENOMEM;
-            }
-            copy->from_id = strdup(e->from_id);
-            copy->to_id = strdup(e->to_id);
-            copy->weight = e->weight;
-            copy->type = e->type;
-            edges[cnt++] = copy;
-        }
-        e = e->next_from;
+    entity_node_t* node = find_entity(kg, entity_id);
+    if (!node) {
+        pthread_mutex_unlock(&kg->mutex);
+        *out_related_ids = NULL;
+        *out_count = 0;
+        return AGENTOS_SUCCESS;
     }
-    agentos_mutex_unlock(enc->lock);
 
-    *out_edges = edges;
-    *out_count = cnt;
+    size_t max_related = node->relation_count;
+    if (max_related == 0) {
+        pthread_mutex_unlock(&kg->mutex);
+        *out_related_ids = NULL;
+        *out_count = 0;
+        return AGENTOS_SUCCESS;
+    }
+
+    char** related_ids = (char**)calloc(max_related, sizeof(char*));
+    if (!related_ids) {
+        pthread_mutex_unlock(&kg->mutex);
+        return AGENTOS_ENOMEM;
+    }
+
+    size_t count = 0;
+    agentos_relation_t* rel = node->relations;
+    while (rel) {
+        if (relation_type == 0 || rel->type == relation_type) {
+            related_ids[count] = strdup(rel->to_id);
+            if (related_ids[count]) count++;
+        }
+        rel = rel->next;
+    }
+
+    pthread_mutex_unlock(&kg->mutex);
+
+    *out_related_ids = related_ids;
+    *out_count = count;
+
     return AGENTOS_SUCCESS;
 }
 
-void agentos_graph_edges_free(agentos_graph_edge_t** edges, size_t count) {
-    if (!edges) return;
-    for (size_t i = 0; i < count; i++) {
-        if (edges[i]) {
-            free(edges[i]->from_id);
-            free(edges[i]->to_id);
-            free(edges[i]);
+/**
+ * @brief BFS 查找最短路径
+ */
+agentos_error_t agentos_knowledge_graph_find_path(
+    agentos_knowledge_graph_t* kg,
+    const char* from_id,
+    const char* to_id,
+    char*** out_path,
+    size_t* out_path_length) {
+    if (!kg || !from_id || !to_id || !out_path || !out_path_length) return AGENTOS_EINVAL;
+
+    if (strcmp(from_id, to_id) == 0) {
+        *out_path = (char**)calloc(1, sizeof(char*));
+        if (!*out_path) return AGENTOS_ENOMEM;
+        (*out_path)[0] = strdup(from_id);
+        *out_path_length = 1;
+        return AGENTOS_SUCCESS;
+    }
+
+    pthread_mutex_lock(&kg->mutex);
+
+    typedef struct {
+        char* id;
+        char* prev;
+    } path_node_t;
+
+    path_node_t* visited = (path_node_t*)calloc(kg->entity_count, sizeof(path_node_t));
+    int* in_queue = (int*)calloc(kg->entity_count, sizeof(int));
+    char** queue = (char**)calloc(kg->entity_count, sizeof(char*));
+    size_t queue_front = 0, queue_back = 0;
+
+    if (!visited || !in_queue || !queue) {
+        pthread_mutex_unlock(&kg->mutex);
+        return AGENTOS_ENOMEM;
+    }
+
+    for (size_t i = 0; i < kg->entity_count; i++) {
+        in_queue[i] = 0;
+        visited[i].id = NULL;
+        visited[i].prev = NULL;
+    }
+
+    size_t start_idx = SIZE_MAX, end_idx = SIZE_MAX;
+    for (size_t i = 0; i < kg->entity_count; i++) {
+        if (kg->entities[i] && strcmp(kg->entities[i]->id, from_id) == 0) {
+            start_idx = i;
+        }
+        if (kg->entities[i] && strcmp(kg->entities[i]->id, to_id) == 0) {
+            end_idx = i;
         }
     }
-    free(edges);
+
+    if (start_idx == SIZE_MAX || end_idx == SIZE_MAX) {
+        pthread_mutex_unlock(&kg->mutex);
+        free(visited);
+        free(in_queue);
+        free(queue);
+        return AGENTOS_ENOENT;
+    }
+
+    queue[queue_back++] = strdup(from_id);
+    in_queue[start_idx] = 1;
+    visited[start_idx].id = strdup(from_id);
+
+    int found = 0;
+    while (queue_front < queue_back && !found) {
+        char* current = queue[queue_front++];
+        size_t current_idx = SIZE_MAX;
+        for (size_t i = 0; i < kg->entity_count; i++) {
+            if (kg->entities[i] && strcmp(kg->entities[i]->id, current) == 0) {
+                current_idx = i;
+                break;
+            }
+        }
+
+        if (current_idx == SIZE_MAX) {
+            free(current);
+            continue;
+        }
+
+        entity_node_t* node = kg->entities[current_idx];
+        agentos_relation_t* rel = node->relations;
+        while (rel && !found) {
+            for (size_t i = 0; i < kg->entity_count; i++) {
+                if (kg->entities[i] && strcmp(kg->entities[i]->id, rel->to_id) == 0) {
+                    if (!in_queue[i]) {
+                        queue[queue_back++] = strdup(rel->to_id);
+                        in_queue[i] = 1;
+                        visited[i].id = strdup(rel->to_id);
+                        visited[i].prev = strdup(current);
+                        if (strcmp(rel->to_id, to_id) == 0) {
+                            found = 1;
+                        }
+                    }
+                    break;
+                }
+            }
+            rel = rel->next;
+        }
+        free(current);
+    }
+
+    char** path = NULL;
+    size_t path_len = 0;
+
+    if (found) {
+        char** temp_path = (char**)calloc(MAX_PATH_LENGTH, sizeof(char*));
+        char* current = strdup(to_id);
+        size_t idx = 0;
+
+        while (current && strcmp(current, from_id) != 0) {
+            for (size_t i = 0; i < kg->entity_count; i++) {
+                if (visited[i].id && strcmp(visited[i].id, current) == 0) {
+                    temp_path[idx++] = strdup(current);
+                    if (visited[i].prev) {
+                        free(current);
+                        current = strdup(visited[i].prev);
+                    } else {
+                        free(current);
+                        current = NULL;
+                    }
+                    break;
+                }
+            }
+            if (idx >= MAX_PATH_LENGTH) break;
+        }
+
+        if (current && strcmp(current, from_id) == 0) {
+            temp_path[idx++] = strdup(from_id);
+        }
+
+        path = (char**)calloc(idx, sizeof(char*));
+        for (size_t i = 0; i < idx; i++) {
+            path[i] = temp_path[idx - 1 - i];
+        }
+        path_len = idx;
+        free(temp_path);
+        free(current);
+    }
+
+    for (size_t i = 0; i < kg->entity_count; i++) {
+        if (visited[i].id) free(visited[i].id);
+        if (visited[i].prev) free(visited[i].prev);
+    }
+    for (size_t i = 0; i < queue_back; i++) {
+        if (queue[i]) free(queue[i]);
+    }
+    free(visited);
+    free(in_queue);
+    free(queue);
+
+    pthread_mutex_unlock(&kg->mutex);
+
+    *out_path = path;
+    *out_path_length = path_len;
+
+    return path ? AGENTOS_SUCCESS : AGENTOS_ENOENT;
 }

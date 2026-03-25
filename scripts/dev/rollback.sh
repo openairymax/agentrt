@@ -67,7 +67,6 @@ ${COLOR_BOLD}选项:${COLOR_NC}
 ${COLOR_BOLD}示例:${COLOR_NC}
     $0 history                           # 显示部署历史
     $0 rollback --version v1.0.0       # 回滚到指定版本
-    $0 rollback --environment staging   # 回滚 staging 环境
     $0 cleanup --keep 5                 # 保留最近5个版本
 
 EOF
@@ -178,7 +177,6 @@ get_available_versions() {
     local environment="$1"
 
     log_info "可用的回滚版本:"
-
     echo ""
     echo -e "${COLOR_BOLD}版本${COLOR_NC}          ${COLOR_BOLD}标签${COLOR_NC}                      ${COLOR_BOLD}大小${COLOR_NC}    ${COLOR_BOLD}创建时间${COLOR_NC}"
     echo "--------------------------------------------------------------------------------"
@@ -237,6 +235,10 @@ do_rollback() {
     # 保存当前版本用于回滚
     if command -v docker &> /dev/null; then
         local current_tag="production"
+        if [[ "$environment" == "staging" ]]; then
+            current_tag="staging"
+        fi
+
         if [[ -n "$(docker images -q spharx/agentos-scripts:$current_tag 2>/dev/null)" ]]; then
             local current_version
             current_version=$(docker images -q spharx/agentos-scripts:$current_tag 2>/dev/null | head -1)
@@ -244,7 +246,6 @@ do_rollback() {
             if [[ "$dry_run" != "true" ]]; then
                 # 标记当前版本为可回滚
                 docker tag "spharx/agentos-scripts:$current_tag" "spharx/agentos-scripts:rollback-$version"
-
                 # 记录当前部署
                 record_deployment "rollback-$version" "$environment" "rollback_initiated" "system"
             fi
@@ -261,7 +262,12 @@ do_rollback() {
             docker pull "spharx/agentos-scripts:$version" || true
 
             # 标记为目标版本
-            docker tag "spharx/agentos-scripts:$version" "spharx/agentos-scripts:production"
+            local target_tag="production"
+            if [[ "$environment" == "staging" ]]; then
+                target_tag="staging"
+            fi
+
+            docker tag "spharx/agentos-scripts:$version" "spharx/agentos-scripts:$target_tag"
 
             # 重启服务
             log_info "重启服务..."
@@ -277,19 +283,13 @@ do_rollback() {
                     return 1
                     ;;
             esac
-        fi
 
-        # 记录回滚
-        record_deployment "$version" "$environment" "rolled_back" "system"
+            # 记录回滚
+            record_deployment "$version" "$environment" "rolled_back" "system"
+        fi
     fi
 
     log_success "回滚完成: $version"
-
-    # 验证回滚
-    if [[ "$dry_run" != "true" ]]; then
-        verify_version "$version"
-    fi
-
     return 0
 }
 
@@ -304,7 +304,7 @@ verify_version() {
     log_info "验证版本: $expected_version"
 
     while [[ $retry_count -lt $max_retries ]]; do
-        # 检查容器状态
+        # 检查容器健康状态
         if docker ps --filter "name=agentos" --filter "status=running" | grep -q agentos; then
             log_success "容器运行正常"
 
@@ -357,22 +357,24 @@ cleanup_old_versions() {
 
         # 清理悬空镜像
         docker image prune -f > /dev/null 2>&1 || true
-    fi
 
-    # 清理本地备份
-    if [[ -d "$AGENTOS_ROLLBACK_DIR/images" ]]; then
-        find "$AGENTOS_ROLLBACK_DIR/images" -name "*.tar.gz" \
-            -type f -mtime +30 \
-            -delete 2>/dev/null || true
-    fi
+        # 清理本地备份
+        if [[ -d "$AGENTOS_ROLLBACK_DIR/images" ]]; then
+            find "$AGENTOS_ROLLBACK_DIR/images" -name "*.tar.gz" \
+                -type f -mtime +30 \
+                -delete 2>/dev/null || true
+        fi
 
-    # 清理过期的部署记录
-    if [[ -f "$AGENTOS_DEPLOYMENT_HISTORY" ]]; then
-        local updated_history
-        updated_history=$(cat "$AGENTOS_DEPLOYMENT_HISTORY" | jq \
-            --argjson keep "$keep" \
-            '.[-$keep:]')
-        echo "$updated_history" > "$AGENTOS_DEPLOYMENT_HISTORY"
+        # 清理过期的部署记录
+        if [[ -f "$AGENTOS_DEPLOYMENT_HISTORY" ]]; then
+            local updated_history
+            updated_history=$(cat "$AGENTOS_DEPLOYMENT_HISTORY" | jq \
+                --argjson keep "$keep" \
+                '.[-$keep:]')
+
+            echo "$updated_history" > "$AGENTOS_DEPLOYMENT_HISTORY"
+        fi
+
     fi
 
     log_success "清理完成"
@@ -416,9 +418,7 @@ main() {
                 return 0
                 ;;
             *)
-                log_error "未知参数: $1"
-                print_usage
-                return 1
+                break
                 ;;
         esac
     done
@@ -439,10 +439,12 @@ main() {
             cleanup_old_versions "$keep"
             ;;
         verify)
+            if [[ -z "$version" ]]; then
+                log_error "未指定版本"
+                print_usage
+                return 1
+            fi
             verify_version "$version"
-            ;;
-        versions)
-            get_available_versions "$environment"
             ;;
         "")
             print_usage

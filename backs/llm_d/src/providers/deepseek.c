@@ -41,11 +41,19 @@ static provider_ctx_t* deepseek_init(const char* name,
     }
 
     if (api_key) {
-        strncpy(ctx->api_key, api_key, sizeof(ctx->api_key) - 1);
+        if (strlen(api_key) >= sizeof(ctx->api_key)) {
+            free(ctx);
+            return NULL;
+        }
+        strcpy(ctx->api_key, api_key);
     }
     
     if (api_base) {
-        strncpy(ctx->api_base, api_base, sizeof(ctx->api_base) - 1);
+        if (strlen(api_base) >= sizeof(ctx->api_base)) {
+            free(ctx);
+            return NULL;
+        }
+        strcpy(ctx->api_base, api_base);
     } else {
         strcpy(ctx->api_base, "https://api.deepseek.com/v1");
     }
@@ -139,16 +147,21 @@ static int parse_response(const char* body, llm_response_t** out) {
         resp->choice_count = (size_t)size;
         resp->choices = (llm_message_t*)calloc((size_t)size, sizeof(llm_message_t));
         
-        if (resp->choices) {
-            for (int i = 0; i < size; ++i) {
-                cJSON* choice = cJSON_GetArrayItem(choices, i);
-                cJSON* message = cJSON_GetObjectItem(choice, "message");
-                if (message) {
-                    cJSON* role = cJSON_GetObjectItem(message, "role");
-                    cJSON* content = cJSON_GetObjectItem(message, "content");
-                    if (cJSON_IsString(role) && role->valuestring) {
-                        resp->choices[i].role = strdup(role->valuestring);
-                    }
+        if (!resp->choices) {
+            cJSON_Delete(root);
+            llm_response_free(resp);
+            return AGENTOS_ERR_OUT_OF_MEMORY;
+        }
+        
+        for (int i = 0; i < size; ++i) {
+            cJSON* choice = cJSON_GetArrayItem(choices, i);
+            cJSON* message = cJSON_GetObjectItem(choice, "message");
+            if (message) {
+                cJSON* role = cJSON_GetObjectItem(message, "role");
+                cJSON* content = cJSON_GetObjectItem(message, "content");
+                if (cJSON_IsString(role) && role->valuestring) {
+                    resp->choices[i].role = strdup(role->valuestring);
+                }
                     if (cJSON_IsString(content) && content->valuestring) {
                         resp->choices[i].content = strdup(content->valuestring);
                     }

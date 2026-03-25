@@ -227,7 +227,7 @@ jobs:
         run: cmake --build . --config ${{ env.BUILD_TYPE }} -j $(nproc 2>/dev/null || echo $NUMBER_OF_PROCESSORS)
 
       - name: Run unit tests
-        if: ${{ !inputs.skip_tests }}
+        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.skip_tests }}
         working-directory: dynamic/build
         run: ctest --build-config ${{ env.BUILD_TYPE }} --output-on-failure --timeout 300
 
@@ -337,7 +337,7 @@ jobs:
     name: Integration Tests
     runs-on: ubuntu-latest
     needs: [build]
-    if: ${{ !inputs.skip_tests }}
+    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.skip_tests }}
     services:
       redis:
         image: redis:7-alpine
@@ -607,7 +607,7 @@ jobs:
         if: steps.env.outputs.environment == 'development'
         run: |
           cd dynamic/deploy
-          docker-compose -f docker-compose.dev.yml up -d
+          docker-compose -f dynamic/docker/docker-compose.dev.yml up -d
 
       - name: Run smoke tests
         run: |

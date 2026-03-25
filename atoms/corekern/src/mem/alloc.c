@@ -21,13 +21,13 @@
 /* ==================== 全局状态 ==================== */
 
 /** @brief 总分配字节数 */
-static _Atomic size_t total_allocated = ATOMIC_VAR_INIT(0);
+static atomic_size_t total_allocated = 0;
 
 /** @brief 当前使用字节数 */
-static _Atomic size_t used_allocated = ATOMIC_VAR_INIT(0);
+static atomic_size_t used_allocated = 0;
 
 /** @brief 峰值使用字节数 */
-static _Atomic size_t peak_allocated = ATOMIC_VAR_INIT(0);
+static atomic_size_t peak_allocated = 0;
 
 /** @brief 分配记录链表头 */
 static agentos_mem_alloc_info_t* alloc_list = NULL;
@@ -36,7 +36,7 @@ static agentos_mem_alloc_info_t* alloc_list = NULL;
 static agentos_mutex_t* mem_stats_mutex = NULL;
 
 /** @brief 初始化状态标志（原子操作保护） */
-static _Atomic int mem_initialized = ATOMIC_VAR_INIT(0);
+static atomic_int mem_initialized = 0;
 
 /** @brief 初始化锁（用于双重检查锁定） */
 static agentos_mutex_t* init_lock = NULL;
@@ -45,60 +45,66 @@ static agentos_mutex_t* init_lock = NULL;
 
 /**
  * @brief 更新峰值内存使用量
- * @note 必须在持有 mem_stats_mutex 时调用
+ * @note 必须在持有 mem_stats_mutex 时调用，使用 relaxed 内存顺序
  */
 static void update_peak_unlocked(void) {
-    size_t current = atomic_load(&used_allocated);
-    size_t peak = atomic_load(&peak_allocated);
+    size_t current = atomic_load_explicit(&used_allocated, memory_order_relaxed);
+    size_t peak = atomic_load_explicit(&peak_allocated, memory_order_relaxed);
     if (current > peak) {
-        atomic_store(&peak_allocated, current);
+        atomic_store_explicit(&peak_allocated, current, memory_order_relaxed);
     }
 }
 
 /**
  * @brief 确保内存子系统已初始化
  * @return 0 成功，-1 失败
- * @note 线程安全的延迟初始化
+ * @note 线程安全的延迟初始化，使用内存屏障保证正确性
  */
 static int ensure_initialized(void) {
-    int expected = 0;
-    
-    /* 快速路径：已初始化 */
-    if (atomic_load(&mem_initialized) == 1) {
+    /* 快速路径：已初始化（使用 acquire 语义） */
+    int state = atomic_load_explicit(&mem_initialized, memory_order_acquire);
+    if (state == 1) {
         return 0;
     }
     
     /* 慢速路径：需要初始化 */
-    if (atomic_compare_exchange_strong(&mem_initialized, &expected, 2)) {
-        /* 当前线程获得初始化权 */
-        init_lock = agentos_mutex_create();
-        if (!init_lock) {
-            atomic_store(&mem_initialized, 0);
-            return -1;
+    if (state == 0) {
+        /* 尝试获取初始化权，使用 0 -> 2 的原子交换 */
+        int expected = 0;
+        if (atomic_compare_exchange_strong_explicit(&mem_initialized, &expected, 2,
+                                                    memory_order_acq_rel,
+                                                    memory_order_acquire)) {
+            /* 当前线程获得初始化权 */
+            init_lock = agentos_mutex_create();
+            if (!init_lock) {
+                atomic_store_explicit(&mem_initialized, 0, memory_order_release);
+                return -1;
+            }
+            
+            mem_stats_mutex = agentos_mutex_create();
+            if (!mem_stats_mutex) {
+                agentos_mutex_destroy(init_lock);
+                init_lock = NULL;
+                atomic_store_explicit(&mem_initialized, 0, memory_order_release);
+                return -1;
+            }
+            
+            /* 初始化完成，发布状态（使用 release 语义） */
+            atomic_store_explicit(&mem_initialized, 1, memory_order_release);
+            return 0;
         }
-        
-        mem_stats_mutex = agentos_mutex_create();
-        if (!mem_stats_mutex) {
-            agentos_mutex_destroy(init_lock);
-            init_lock = NULL;
-            atomic_store(&mem_initialized, 0);
-            return -1;
-        }
-        
-        atomic_store(&mem_initialized, 1);
-        return 0;
-    } else {
-        /* 其他线程正在初始化，等待完成 */
-        while (atomic_load(&mem_initialized) != 1) {
-            /* 自旋等待，让出 CPU */
-#ifdef _WIN32
-            Sleep(0);
-#else
-            sched_yield();
-#endif
-        }
-        return 0;
     }
+    
+    /* 其他线程正在初始化（状态为2），等待完成 */
+    while (atomic_load_explicit(&mem_initialized, memory_order_acquire) != 1) {
+        /* 自旋等待，让出 CPU */
+#ifdef _WIN32
+        Sleep(0);
+#else
+        sched_yield();
+#endif
+    }
+    return 0;
 }
 
 /* ==================== 公共接口实现 ==================== */
@@ -125,7 +131,7 @@ agentos_error_t agentos_mem_init(size_t heap_size) {
  */
 void agentos_mem_cleanup(void) {
     /* 确保已初始化 */
-    if (atomic_load(&mem_initialized) != 1) {
+    if (atomic_load_explicit(&mem_initialized, memory_order_acquire) != 1) {
         return;
     }
     
@@ -149,7 +155,7 @@ void agentos_mem_cleanup(void) {
         init_lock = NULL;
     }
     
-    atomic_store(&mem_initialized, 0);
+    atomic_store_explicit(&mem_initialized, 0, memory_order_release);
 }
 
 /* ==================== 分配记录管理 ==================== */
@@ -220,8 +226,8 @@ void* agentos_mem_alloc_ex(size_t size, const char* file, int line) {
     }
     
     agentos_mutex_lock(mem_stats_mutex);
-    atomic_fetch_add(&total_allocated, size);
-    atomic_fetch_add(&used_allocated, size);
+    atomic_fetch_add_explicit(&total_allocated, size, memory_order_relaxed);
+    atomic_fetch_add_explicit(&used_allocated, size, memory_order_relaxed);
     update_peak_unlocked();
     add_alloc_info_unlocked(ptr, size, file, line);
     agentos_mutex_unlock(mem_stats_mutex);
@@ -262,8 +268,8 @@ void* agentos_mem_aligned_alloc_ex(size_t size, size_t alignment, const char* fi
     }
     
     agentos_mutex_lock(mem_stats_mutex);
-    atomic_fetch_add(&total_allocated, size);
-    atomic_fetch_add(&used_allocated, size);
+    atomic_fetch_add_explicit(&total_allocated, size, memory_order_relaxed);
+    atomic_fetch_add_explicit(&used_allocated, size, memory_order_relaxed);
     update_peak_unlocked();
     add_alloc_info_unlocked(ptr, size, file, line);
     agentos_mutex_unlock(mem_stats_mutex);
@@ -288,12 +294,12 @@ void* agentos_mem_aligned_alloc(size_t size, size_t alignment) {
 void agentos_mem_free(void* ptr) {
     if (!ptr) return;
 
-    if (atomic_load(&mem_initialized) == 1 && mem_stats_mutex) {
+    if (atomic_load_explicit(&mem_initialized, memory_order_acquire) == 1 && mem_stats_mutex) {
         agentos_mutex_lock(mem_stats_mutex);
         agentos_mem_alloc_info_t* info = alloc_list;
         while (info) {
             if (info->ptr == ptr) {
-                atomic_fetch_sub(&used_allocated, info->size);
+                atomic_fetch_sub_explicit(&used_allocated, info->size, memory_order_relaxed);
                 remove_alloc_info_unlocked(ptr);
                 break;
             }
@@ -311,12 +317,12 @@ void agentos_mem_free(void* ptr) {
 void agentos_mem_aligned_free(void* ptr) {
     if (!ptr) return;
 
-    if (atomic_load(&mem_initialized) == 1 && mem_stats_mutex) {
+    if (atomic_load_explicit(&mem_initialized, memory_order_acquire) == 1 && mem_stats_mutex) {
         agentos_mutex_lock(mem_stats_mutex);
         agentos_mem_alloc_info_t* info = alloc_list;
         while (info) {
             if (info->ptr == ptr) {
-                atomic_fetch_sub(&used_allocated, info->size);
+                atomic_fetch_sub_explicit(&used_allocated, info->size, memory_order_relaxed);
                 remove_alloc_info_unlocked(ptr);
                 break;
             }
@@ -347,7 +353,7 @@ void* agentos_mem_realloc_ex(void* ptr, size_t new_size, const char* file, int l
     }
 
     size_t old_size = 0;
-    if (atomic_load(&mem_initialized) == 1 && mem_stats_mutex) {
+    if (atomic_load_explicit(&mem_initialized, memory_order_acquire) == 1 && mem_stats_mutex) {
         agentos_mutex_lock(mem_stats_mutex);
         agentos_mem_alloc_info_t* info = alloc_list;
         while (info) {
@@ -362,11 +368,11 @@ void* agentos_mem_realloc_ex(void* ptr, size_t new_size, const char* file, int l
     }
 
     void* new_ptr = realloc(ptr, new_size);
-    if (new_ptr && atomic_load(&mem_initialized) == 1 && mem_stats_mutex) {
+    if (new_ptr && atomic_load_explicit(&mem_initialized, memory_order_acquire) == 1 && mem_stats_mutex) {
         agentos_mutex_lock(mem_stats_mutex);
-        atomic_fetch_sub(&used_allocated, old_size);
-        atomic_fetch_add(&used_allocated, new_size);
-        atomic_fetch_add(&total_allocated, new_size);
+        atomic_fetch_sub_explicit(&used_allocated, old_size, memory_order_relaxed);
+        atomic_fetch_add_explicit(&used_allocated, new_size, memory_order_relaxed);
+        atomic_fetch_add_explicit(&total_allocated, new_size, memory_order_relaxed);
         update_peak_unlocked();
         add_alloc_info_unlocked(new_ptr, new_size, file, line);
         agentos_mutex_unlock(mem_stats_mutex);
@@ -393,13 +399,13 @@ void* agentos_mem_realloc(void* ptr, size_t new_size) {
  * @param out_peak 峰值使用字节数输出
  */
 void agentos_mem_stats(size_t* out_total, size_t* out_used, size_t* out_peak) {
-    if (atomic_load(&mem_initialized) == 1 && mem_stats_mutex) {
+    if (atomic_load_explicit(&mem_initialized, memory_order_acquire) == 1 && mem_stats_mutex) {
         agentos_mutex_lock(mem_stats_mutex);
     }
-    if (out_total) *out_total = atomic_load(&total_allocated);
-    if (out_used) *out_used = atomic_load(&used_allocated);
-    if (out_peak) *out_peak = atomic_load(&peak_allocated);
-    if (atomic_load(&mem_initialized) == 1 && mem_stats_mutex) {
+    if (out_total) *out_total = atomic_load_explicit(&total_allocated, memory_order_relaxed);
+    if (out_used) *out_used = atomic_load_explicit(&used_allocated, memory_order_relaxed);
+    if (out_peak) *out_peak = atomic_load_explicit(&peak_allocated, memory_order_relaxed);
+    if (atomic_load_explicit(&mem_initialized, memory_order_acquire) == 1 && mem_stats_mutex) {
         agentos_mutex_unlock(mem_stats_mutex);
     }
 }
@@ -412,7 +418,7 @@ size_t agentos_mem_check_leaks(void) {
     size_t leak_count = 0;
     size_t leak_size = 0;
 
-    if (atomic_load(&mem_initialized) == 1 && mem_stats_mutex) {
+    if (atomic_load_explicit(&mem_initialized, memory_order_acquire) == 1 && mem_stats_mutex) {
         agentos_mutex_lock(mem_stats_mutex);
     }
 
@@ -431,7 +437,7 @@ size_t agentos_mem_check_leaks(void) {
         printf("No memory leaks detected\n");
     }
 
-    if (atomic_load(&mem_initialized) == 1 && mem_stats_mutex) {
+    if (atomic_load_explicit(&mem_initialized, memory_order_acquire) == 1 && mem_stats_mutex) {
         agentos_mutex_unlock(mem_stats_mutex);
     }
 

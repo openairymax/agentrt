@@ -115,7 +115,7 @@ agentos_log_set_level() {
         debug|DEBUG) _AGENTOS_LOG_LEVEL=$LOG_LEVEL_DEBUG ;;
         info|INFO)   _AGENTOS_LOG_LEVEL=$LOG_LEVEL_INFO ;;
         warn|WARN)  _AGENTOS_LOG_LEVEL=$LOG_LEVEL_WARN ;;
-        error|ERROR)_AGENTOS_LOG_LEVEL=$LOG_LEVEL_ERROR ;;
+        error|ERROR) _AGENTOS_LOG_LEVEL=$LOG_LEVEL_ERROR ;;
         *)          agentos_log_warn "Unknown log level: $1, using INFO"; _AGENTOS_LOG_LEVEL=$LOG_LEVEL_INFO ;;
     esac
 }

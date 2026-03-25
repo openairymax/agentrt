@@ -1,0 +1,705 @@
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# AgentOS Docker Compose Configuration - Production Environment
+# Version: 1.0.0
+# Description: Production-grade deployment with high availability, security, and monitoring
+
+version: '3.8'
+
+services:
+  # ==================== AgentOS Atoms Kernel ====================
+  agentos-atoms:
+    build:
+      context: ../../
+      dockerfile: scripts/deploy/docker/Dockerfile.kernel
+      target: production
+    image: ghcr.io/spharx/agentos-atoms:${VERSION:-latest}
+    container_name: agentos-atoms
+    hostname: agentos-atoms-prod
+    restart: always
+    restart_policy:
+      max_attempts: 5
+      backoff: 2s
+
+    # 资源限制 (生产环境)
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8G
+        reservations:
+          cpus: '2.0'
+          memory: 4G
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+
+    # 环境变量 (生产配置)
+    environment:
+      - TZ=Asia/Shanghai
+      - AGENTOS_ENV=production
+      - AGENTOS_LOG_LEVEL=WARN
+      - AGENTOS_LOG_FORMAT=json
+      - AGENTOS_ENABLE_TRACING=true
+      - AGENTOS_TELEMETRY_ENDPOINT=http://otel-collector:4317
+      - AGENTOS_DEPLOYMENT_TYPE=production
+      - AGENTOS_SECURITY_LEVEL=high
+      - AGENTOS_ENABLE_METRICS=true
+
+    # 端口映射 (仅内部)
+    ports:
+      - "127.0.0.1:8091:8091"
+
+    # 数据卷 (持久化)
+    volumes:
+      - prod-atoms-logs:/var/log/agentos
+      - prod-atoms-data:/var/lib/agentos
+      - atoms-config:/etc/agentos:ro
+
+    # 网络配置
+    networks:
+      - agentos-production-network
+      - agentos-internal-network
+
+    # 健康检查 (生产级)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8091/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+    # 依赖服务
+    depends_on:
+      redis-prod:
+        condition: service_healthy
+      postgres-prod:
+        condition: service_healthy
+
+    # 日志配置 (生产环境)
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+        labels: "production"
+
+    # 安全性配置
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    cap_drop:
+      - ALL
+
+  # ==================== AgentOS Dynamic Gateway ====================
+  agentos-dynamic:
+    build:
+      context: ../../
+      dockerfile: scripts/deploy/docker/Dockerfile.dynamic
+      target: production
+    image: ghcr.io/spharx/agentos-dynamic:${VERSION:-latest}
+    container_name: agentos-dynamic
+    hostname: agentos-dynamic-prod
+    restart: always
+
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+      replicas: 3
+      restart_policy:
+        condition: on-failure
+
+    environment:
+      - TZ=Asia/Shanghai
+      - AGENTOS_ENV=production
+      - AGENTOS_LOG_LEVEL=WARN
+      - AGENTOS_LOG_FORMAT=json
+      - AGENTOS_GATEWAY_MODE=production
+
+    ports:
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8443:8443"
+
+    volumes:
+      - prod-dynamic-logs:/var/log/agentos
+      - dynamic-config:/etc/agentos:ro
+
+    networks:
+      - agentos-production-network
+      - agentos-internal-network
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+
+    depends_on:
+      - agentos-atoms
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  # ==================== AgentOS Backs Services ====================
+  agentos-backs:
+    build:
+      context: ../../
+      dockerfile: scripts/deploy/docker/Dockerfile.service
+      target: production
+    image: ghcr.io/spharx/agentos-backs:${VERSION:-latest}
+    container_name: agentos-backs
+    hostname: agentos-backs-prod
+    restart: always
+
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8G
+        reservations:
+          cpus: '2.0'
+          memory: 4G
+      replicas: 2
+
+    environment:
+      - TZ=Asia/Shanghai
+      - AGENTOS_ENV=production
+      - AGENTOS_LOG_LEVEL=WARN
+      - AGENTOS_DEPLOYMENT_TYPE=production
+      - REDIS_HOST=redis-prod
+      - REDIS_PORT=6379
+      - POSTGRES_HOST=postgres-prod
+      - POSTGRES_PORT=5432
+
+    volumes:
+      - prod-backs-logs:/var/log/agentos
+      - prod-backs-data:/var/lib/agentos
+      - backs-config:/etc/agentos:ro
+
+    networks:
+      - agentos-internal-network
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8092/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+    depends_on:
+      redis-prod:
+        condition: service_healthy
+      postgres-prod:
+        condition: service_healthy
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200m"
+        max-file: "10"
+
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  # ==================== AgentOS OpenHub (API) ====================
+  agentos-openhub:
+    build:
+      context: ../../
+      dockerfile: scripts/deploy/docker/Dockerfile.openhub
+      target: production
+    image: ghcr.io/spharx/agentos-openhub:${VERSION:-latest}
+    container_name: agentos-openhub
+    hostname: agentos-openhub-prod
+    restart: always
+
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+      replicas: 3
+
+    environment:
+      - TZ=Asia/Shanghai
+      - AGENTOS_ENV=production
+      - AGENTOS_LOG_LEVEL=WARN
+      - AGENTOS_DEPLOYMENT_TYPE=production
+      - DATABASE_URL=postgresql://agentos:${POSTGRES_PASSWORD}@postgres-prod:5432/agentos_prod
+      - REDIS_URL=redis://redis-prod:6379/0
+
+    ports:
+      - "127.0.0.1:8000:8000"
+
+    volumes:
+      - prod-openhub-logs:/var/log/agentos
+      - openhub-config:/app/config:ro
+
+    networks:
+      - agentos-production-network
+      - agentos-internal-network
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+    depends_on:
+      redis-prod:
+        condition: service_healthy
+      postgres-prod:
+        condition: service_healthy
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  # ==================== Redis (Cache) ====================
+  redis-prod:
+    image: redis:7-alpine
+    container_name: agentos-redis-prod
+    hostname: agentos-redis-prod
+    restart: always
+
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 2gb
+      --maxmemory-policy allkeys-lru
+      --tcp-keepalive 300
+      --timeout 0
+      --loglevel notice
+
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 3G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+      replicas: 1
+
+    volumes:
+      - redis-prod-data:/data
+      - redis-config:/usr/local/etc/redis/redis.conf:ro
+
+    networks:
+      - agentos-internal-network
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    cap_drop:
+      - ALL
+
+  # ==================== PostgreSQL ====================
+  postgres-prod:
+    image: postgres:15-alpine
+    container_name: agentos-postgres-prod
+    hostname: agentos-postgres-prod
+    restart: always
+
+    command: >
+      postgres
+      -c max_connections=200
+      -c shared_buffers=512MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=128MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=4MB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 8G
+        reservations:
+          cpus: '1.0'
+          memory: 4G
+
+    environment:
+      - POSTGRES_DB=agentos_prod
+      - POSTGRES_USER=agentos
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale=C
+      - TZ=Asia/Shanghai
+
+    volumes:
+      - postgres-prod-data:/var/lib/postgresql/data
+      - postgres-config:/etc/postgresql:ro
+      - postgres-backups:/var/lib/postgresql/backups
+
+    networks:
+      - agentos-internal-network
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentos -d agentos_prod"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    cap_drop:
+      - ALL
+
+  # ==================== OpenTelemetry Collector ====================
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.90.0
+    container_name: agentos-otel-prod
+    hostname: agentos-otel-prod
+    restart: always
+
+    command: ['--config=/etc/otelcol-contrib/config.yaml']
+
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+
+    volumes:
+      - ./config/otel-collector-prod.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - otel-config:/etc/otelcol:ro
+
+    networks:
+      - agentos-internal-network
+
+    ports:
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+      - "127.0.0.1:8889:8888"
+
+    depends_on:
+      jaeger-prod:
+        condition: service_healthy
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    cap_drop:
+      - ALL
+
+  # ==================== Jaeger (Tracing) ====================
+  jaeger-prod:
+    image: jaegertracing/all-in-one:1.50
+    container_name: agentos-jaeger-prod
+    hostname: agentos-jaeger-prod
+    restart: always
+
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      - SPAN_STORAGE_TYPE=badger
+      - BADGER_EPHEMERAL=false
+      - BADGER_DIRECTORY_VALUE=/var/lib/jaeger/data
+      - BADGER_DIRECTORY_KEY=/var/lib/jaeger/key
+      - QUERY_BASE_PATH=/jaeger
+
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+
+    volumes:
+      - jaeger-data:/var/lib/jaeger
+
+    networks:
+      - agentos-internal-network
+
+    ports:
+      - "127.0.0.1:16686:16686"
+      - "127.0.0.1:14268:14268"
+      - "127.0.0.1:6831:6831/udp"
+
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "localhost:16686"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    cap_drop:
+      - ALL
+
+  # ==================== Prometheus (Metrics) ====================
+  prometheus-prod:
+    image: prom/prometheus:v2.47.0
+    container_name: agentos-prometheus-prod
+    hostname: agentos-prometheus-prod
+    restart: always
+
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/var/lib/prometheus/data'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.size=10GB'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 4G
+
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./config/alertmanager.yml:/etc/prometheus/alertmanager.yml:ro
+      - prometheus-data:/var/lib/prometheus
+
+    networks:
+      - agentos-internal-network
+
+    ports:
+      - "127.0.0.1:9090:9090"
+
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    cap_drop:
+      - ALL
+
+  # ==================== Grafana (Visualization) ====================
+  grafana-prod:
+    image: grafana/grafana:10.2.0
+    container_name: agentos-grafana-prod
+    hostname: agentos-grafana-prod
+    restart: always
+
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?GRAFANA_PASSWORD is required}
+      - GF_SECURITY_ADMIN_EMAIL=admin@spharx.cn
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=https://grafana.spharx.cn
+      - GF_ALERTING_ENABLED=true
+      - GF_LOG_MODE=console
+      - GF_LOG_LEVEL=warn
+
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./dashboards:/var/lib/grafana/dashboards:ro
+
+    networks:
+      - agentos-internal-network
+
+    ports:
+      - "127.0.0.1:3000:3000"
+
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    cap_drop:
+      - ALL
+
+  # ==================== Nginx (Reverse Proxy) ====================
+  nginx-prod:
+    image: nginx:alpine
+    container_name: agentos-nginx-prod
+    hostname: agentos-nginx-prod
+    restart: always
+
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./config/nginx/ssl:/etc/nginx/ssl:ro
+      - nginx-cache:/var/cache/nginx
+      - nginx-logs:/var/log/nginx
+
+    networks:
+      - agentos-production-network
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+
+    depends_on:
+      - agentos-dynamic
+      - agentos-openhub
+
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+
+  # ==================== Data Volumes ====================
+volumes:
+  prod-atoms-logs:
+    driver: local
+  prod-atoms-data:
+    driver: local
+  atoms-config:
+    driver: local
+  prod-dynamic-logs:
+    driver: local
+  dynamic-config:
+    driver: local
+  prod-backs-logs:
+    driver: local
+  prod-backs-data:
+    driver: local
+  backs-config:
+    driver: local
+  prod-openhub-logs:
+    driver: local
+  openhub-config:
+    driver: local
+  redis-prod-data:
+    driver: local
+  redis-config:
+    driver: local
+  postgres-prod-data:
+    driver: local
+  postgres-config:
+    driver: local
+  postgres-backups:
+    driver: local
+  jaeger-data:
+    driver: local
+  otel-config:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+  nginx-cache:
+    driver: local
+  nginx-logs:
+    driver: local
+
+# ==================== Network Configuration ====================
+networks:
+  agentos-production-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16
+    driver_opts:
+      com.docker.network.bridge.name: br-production
+      com.docker.network.enable_ipv6: false
+
+  agentos-internal-network:
+    driver: bridge
+    internal: false
+    ipam:
+      config:
+        - subnet: 172.31.0.0/16
+    driver_opts:
+      com.docker.network.bridge.name: br-internal

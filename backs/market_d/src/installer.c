@@ -74,8 +74,13 @@ int installer_install_agent(market_service_t* service, const install_request_t* 
     // 生成安装路径
     char install_path[256];
     if (request->install_path) {
-        strncpy(install_path, request->install_path, sizeof(install_path) - 1);
-        install_path[sizeof(install_path) - 1] = '\0';
+        if (strlen(request->install_path) >= sizeof(install_path)) {
+            new_result->success = false;
+            new_result->error_code = AGENTOS_ERR_INVALID_PARAM;
+            new_result->error_message = strdup("Install path too long");
+            return new_result;
+        }
+        strcpy(install_path, request->install_path);
     } else {
         snprintf(install_path, sizeof(install_path), "%s/agents/%s", service->config.storage_path, agent->agent_id);
     }
@@ -84,8 +89,7 @@ int installer_install_agent(market_service_t* service, const install_request_t* 
     if (!directory_exists(install_path)) {
         // 创建父目录
         char parent_path[256];
-        strncpy(parent_path, install_path, sizeof(parent_path) - 1);
-        parent_path[sizeof(parent_path) - 1] = '\0';
+        strcpy(parent_path, install_path);
         char* last_slash = strrchr(parent_path, '/');
         if (last_slash) {
             *last_slash = '\0';
@@ -179,8 +183,10 @@ int installer_install_skill(market_service_t* service, const install_request_t* 
     // 生成安装路径
     char install_path[256];
     if (request->install_path) {
-        strncpy(install_path, request->install_path, sizeof(install_path) - 1);
-        install_path[sizeof(install_path) - 1] = '\0';
+        if (strlen(request->install_path) >= sizeof(install_path)) {
+            return AGENTOS_ERR_INVALID_PARAM;
+        }
+        strcpy(install_path, request->install_path);
     } else {
         snprintf(install_path, sizeof(install_path), "%s/skills/%s", service->config.storage_path, skill->skill_id);
     }
@@ -189,8 +195,7 @@ int installer_install_skill(market_service_t* service, const install_request_t* 
     if (!directory_exists(install_path)) {
         // 创建父目录
         char parent_path[256];
-        strncpy(parent_path, install_path, sizeof(parent_path) - 1);
-        parent_path[sizeof(parent_path) - 1] = '\0';
+        strcpy(parent_path, install_path);
         char* last_slash = strrchr(parent_path, '/');
         if (last_slash) {
             *last_slash = '\0';

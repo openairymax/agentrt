@@ -19,6 +19,7 @@ set(COREKERN_SOURCES
     src/time/clock.c
     src/time/timer.c
     src/time/event.c
+    src/observability/observability.c
 )
 
 add_library(agentos_core STATIC ${COREKERN_SOURCES})

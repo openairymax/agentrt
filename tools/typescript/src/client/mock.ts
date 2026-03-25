@@ -149,9 +149,9 @@ export class MockClient implements APIClient {
   /**
    * 构建 Mock 响应
    */
-  private buildMockResponse<T>(mockResponse: MockResponse): T {
+  private async buildMockResponse<T>(mockResponse: MockResponse): Promise<T> {
     if (mockResponse.delay && mockResponse.delay > 0) {
-      setTimeout(() => Promise.resolve(), mockResponse.delay);
+      await this.sleep(mockResponse.delay);
     }
     if (mockResponse.error) {
       throw mockResponse.error;

@@ -73,6 +73,7 @@ export const ErrorCode = {
 
   // 系统调用错误 (0x5xxx)
   TELEMETRY_ERROR: '0x5001',
+  SYSCALL_ERROR: '0x5002',
 
   // 安全域错误 (0x6xxx)
   PERMISSION_DENIED: '0x6001',
@@ -406,7 +407,7 @@ export class SyscallError extends AgentOSError {
    * @param message - 错误消息
    */
   constructor(message: string) {
-    super(message, ErrorCode.TELEMETRY_ERROR);
+    super(message, ErrorCode.SYSCALL_ERROR);
     this.name = 'SyscallError';
   }
 }

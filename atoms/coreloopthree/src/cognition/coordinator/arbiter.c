@@ -53,15 +53,30 @@ static agentos_error_t arbiter_coordinate(
         char* combined_prompt = (char*)malloc(total_len + 1);
         if (!combined_prompt) return AGENTOS_ENOMEM;
         combined_prompt[0] = '\0';
+        size_t offset = 0;
 
         for (size_t i = 0; i < count; i++) {
             char buf[64];
-            snprintf(buf, sizeof(buf), "Candidate %zu:\n", i+1);
-            strcat(combined_prompt, buf);
-            strcat(combined_prompt, prompts[i]);
-            strcat(combined_prompt, "\n\n");
+            int len = snprintf(buf, sizeof(buf), "Candidate %zu:\n", i+1);
+            if (offset + len < total_len) {
+                memcpy(combined_prompt + offset, buf, len);
+                offset += len;
+            }
+            size_t prompt_len = strlen(prompts[i]);
+            if (offset + prompt_len + 3 < total_len) {
+                memcpy(combined_prompt + offset, prompts[i], prompt_len);
+                offset += prompt_len;
+                combined_prompt[offset++] = '\n';
+                combined_prompt[offset++] = '\n';
+            }
         }
-        strcat(combined_prompt, "Based on the above candidates, produce the final answer.");
+        const char* suffix = "Based on the above candidates, produce the final answer.";
+        size_t suffix_len = strlen(suffix);
+        if (offset + suffix_len + 1 < total_len) {
+            memcpy(combined_prompt + offset, suffix, suffix_len);
+            offset += suffix_len;
+        }
+        combined_prompt[offset] = '\0';
 
         agentos_llm_request_t req;
         memset(&req, 0, sizeof(req));
@@ -88,12 +103,22 @@ static agentos_error_t arbiter_coordinate(
         char* question = (char*)malloc(total_len + 1);
         if (!question) return AGENTOS_ENOMEM;
         question[0] = '\0';
+        size_t q_offset = 0;
         for (size_t i = 0; i < count; i++) {
-            char buf[128];
-            snprintf(buf, sizeof(buf), "Model %zu output:\n%s\n", i+1, prompts[i]);
-            strcat(question, buf);
+            char buf[4096];
+            int len = snprintf(buf, sizeof(buf), "Model %zu output:\n%s\n", i+1, prompts[i]);
+            if (q_offset + len < total_len) {
+                memcpy(question + q_offset, buf, len);
+                q_offset += len;
+            }
         }
-        strcat(question, "Please provide the final answer:");
+        const char* final_prompt = "Please provide the final answer:";
+        size_t fp_len = strlen(final_prompt);
+        if (q_offset + fp_len + 1 < total_len) {
+            memcpy(question + q_offset, final_prompt, fp_len);
+            q_offset += fp_len;
+        }
+        question[q_offset] = '\0';
 
         char answer[4096];
         data->human_callback(question, answer, sizeof(answer));
