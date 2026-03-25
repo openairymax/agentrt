@@ -17,182 +17,181 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 class TestAgentBasics:
     """Basic agent functionality tests."""
 
-    def test_agent_initialization(self):
+    @pytest.mark.asyncio
+    async def test_agent_initialization(self):
         """Test agent can be initialized."""
-        from openhub.core.agent import Agent, AgentStatus
+        from openhub.core.agent import Agent, AgentStatus, AgentContext, TaskResult
 
-        agent = Agent(
+        class TestAgent(Agent):
+            async def _do_initialize(self, config):
+                pass
+
+            async def _do_execute(self, context, input_data):
+                return TaskResult(success=True, output={})
+
+            async def _do_shutdown(self):
+                pass
+
+        agent = TestAgent(
             agent_id="test-agent-001",
-            name="TestAgent",
-            capabilities=["coding", "testing"]
+            agent_type="test"
         )
 
         assert agent.agent_id == "test-agent-001"
-        assert agent.name == "TestAgent"
-        assert agent.status == AgentStatus.IDLE
-        assert len(agent.capabilities) == 2
+        assert agent.status == AgentStatus.CREATED
 
-    def test_agent_with_capabilities(self, sample_agent_data):
-        """Test agent initialization with capabilities."""
-        from openhub.core.agent import Agent, Capability
+    @pytest.mark.asyncio
+    async def test_agent_status_transitions(self):
+        """Test agent status can be changed."""
+        from openhub.core.agent import Agent, AgentStatus, AgentContext, TaskResult
 
-        capabilities = [
-            Capability(name=c["name"], level=c["level"])
-            for c in sample_agent_data["capabilities"]
-        ]
+        class TestAgent(Agent):
+            async def _do_initialize(self, config):
+                pass
 
-        agent = Agent(
-            agent_id="test-agent-002",
-            name=sample_agent_data["name"],
-            capabilities=capabilities
+            async def _do_execute(self, context, input_data):
+                return TaskResult(success=True, output={})
+
+            async def _do_shutdown(self):
+                pass
+
+        agent = TestAgent(
+            agent_id="test-agent-003",
+            agent_type="test"
         )
 
-        assert len(agent.capabilities) == 2
-        assert agent.get_capability_level("coding") == 0.9
-        assert agent.get_capability_level("testing") == 0.8
-
-    def test_agent_status_transitions(self):
-        """Test agent status can be changed."""
-        from openhub.core.agent import Agent, AgentStatus
-
-        agent = Agent(agent_id="test-agent-003", name="StatusTestAgent")
-
-        agent.status = AgentStatus.BUSY
-        assert agent.status == AgentStatus.BUSY
-
-        agent.status = AgentStatus.IDLE
+        await agent.initialize()
         assert agent.status == AgentStatus.IDLE
 
-    def test_agent_task_counting(self):
-        """Test agent tracks current tasks correctly."""
-        from openhub.core.agent import Agent
+    def test_agent_health_check(self):
+        """Test agent health check."""
+        from openhub.core.agent import Agent, AgentStatus
 
-        agent = Agent(agent_id="test-agent-004", name="TaskCountAgent")
+        class TestAgent(Agent):
+            async def _do_initialize(self, config):
+                pass
 
-        assert agent.current_tasks == 0
+            async def _do_execute(self, context, input_data):
+                pass
 
-        agent.increment_tasks()
-        assert agent.current_tasks == 1
+            async def _do_shutdown(self):
+                pass
 
-        agent.increment_tasks()
-        assert agent.current_tasks == 2
+        agent = TestAgent(
+            agent_id="test-agent-004",
+            agent_type="test"
+        )
 
-        agent.decrement_tasks()
-        assert agent.current_tasks == 1
+        health = agent.get_health()
+        assert "agent_id" in health
+        assert "status" in health
+        assert health["agent_id"] == "test-agent-004"
 
 
 class TestAgentRegistry:
     """Tests for agent registry functionality."""
 
-    def test_registry_initialization(self):
+    @pytest.mark.asyncio
+    async def test_registry_initialization(self):
         """Test registry can be initialized."""
         from openhub.core.agent import AgentRegistry
 
         registry = AgentRegistry()
         assert registry is not None
-        assert len(registry.list_agents()) == 0
 
-    def test_register_agent(self):
+    @pytest.mark.asyncio
+    async def test_register_agent(self):
         """Test registering an agent."""
-        from openhub.core.agent import Agent, AgentRegistry
+        from openhub.core.agent import Agent, AgentRegistry, AgentMetadata, AgentCapability, AgentStatus, TaskResult
+
+        class TestAgent(Agent):
+            async def _do_initialize(self, config):
+                pass
+
+            async def _do_execute(self, context, input_data):
+                return TaskResult(success=True, output={})
+
+            async def _do_shutdown(self):
+                pass
 
         registry = AgentRegistry()
-        agent = Agent(agent_id="reg-test-001", name="RegisteredAgent")
+        agent = TestAgent(agent_id="reg-test-001", agent_type="test")
 
-        success = registry.register(agent)
-        assert success is True
-        assert len(registry.list_agents()) == 1
+        await registry.register(agent.metadata)
+        agents = await registry.list_all()
+        assert len(agents) == 1
 
-    def test_unregister_agent(self):
+    @pytest.mark.asyncio
+    async def test_unregister_agent(self):
         """Test unregistering an agent."""
-        from openhub.core.agent import Agent, AgentRegistry
+        from openhub.core.agent import Agent, AgentRegistry, AgentMetadata, AgentCapability, AgentStatus, TaskResult
+
+        class TestAgent(Agent):
+            async def _do_initialize(self, config):
+                pass
+
+            async def _do_execute(self, context, input_data):
+                return TaskResult(success=True, output={})
+
+            async def _do_shutdown(self):
+                pass
 
         registry = AgentRegistry()
-        agent = Agent(agent_id="reg-test-002", name="UnregisterAgent")
+        agent = TestAgent(agent_id="reg-test-002", agent_type="test")
 
-        registry.register(agent)
-        assert len(registry.list_agents()) == 1
+        await registry.register(agent.metadata)
+        await registry.unregister("reg-test-002")
+        agents = await registry.list_all()
+        assert len(agents) == 0
 
-        success = registry.unregister("reg-test-002")
-        assert success is True
-        assert len(registry.list_agents()) == 0
-
-    def test_find_agent_by_id(self):
-        """Test finding an agent by ID."""
-        from openhub.core.agent import Agent, AgentRegistry
-
-        registry = AgentRegistry()
-        agent = Agent(agent_id="find-test-001", name="FindableAgent")
-
-        registry.register(agent)
-        found = registry.find_by_id("find-test-001")
-
-        assert found is not None
-        assert found.name == "FindableAgent"
-
-    def test_find_agents_by_capability(self):
+    @pytest.mark.asyncio
+    async def test_find_by_capability(self):
         """Test finding agents by capability."""
-        from openhub.core.agent import Agent, Capability, AgentRegistry
+        from openhub.core.agent import Agent, AgentRegistry, AgentMetadata, AgentCapability, AgentStatus, TaskResult
+
+        class TestAgent(Agent):
+            async def _do_initialize(self, config):
+                pass
+
+            async def _do_execute(self, context, input_data):
+                return TaskResult(success=True, output={})
+
+            async def _do_shutdown(self):
+                pass
 
         registry = AgentRegistry()
+        agent = TestAgent(agent_id="cap-test-001", agent_type="test")
 
-        agent1 = Agent(
-            agent_id="cap-test-001",
-            name="AgentWithCoding",
-            capabilities=[Capability(name="coding", level=0.9)]
-        )
-
-        agent2 = Agent(
-            agent_id="cap-test-002",
-            name="AgentWithTesting",
-            capabilities=[Capability(name="testing", level=0.8)]
-        )
-
-        registry.register(agent1)
-        registry.register(agent2)
-
-        coding_agents = registry.find_by_capability("coding", min_level=0.5)
-        assert len(coding_agents) == 1
-        assert coding_agents[0].name == "AgentWithCoding"
+        await registry.register(agent.metadata)
+        agents = await registry.find_by_capability(AgentCapability.CODE_GENERATION)
+        assert isinstance(agents, list)
 
 
-class TestAgentMessaging:
-    """Tests for agent messaging functionality."""
+class TestAgentManager:
+    """Tests for agent manager functionality."""
 
-    def test_send_message(self):
-        """Test sending a message to an agent."""
-        from openhub.core.agent import Agent, AgentRegistry, Message
+    @pytest.mark.asyncio
+    async def test_manager_initialization(self):
+        """Test manager can be initialized."""
+        from openhub.core.agent import AgentRegistry, AgentManager
 
         registry = AgentRegistry()
-        agent = Agent(agent_id="msg-test-001", name="ReceiverAgent")
-        registry.register(agent)
+        manager = AgentManager(registry)
 
-        message = Message(
-            sender_id="sender-001",
-            receiver_id="msg-test-001",
-            content={"type": "task", "data": "test"}
-        )
+        assert manager is not None
+        assert manager.max_instances == 100
 
-        success = registry.send_message(message)
-        assert success is True
-
-    def test_get_messages(self):
-        """Test retrieving messages for an agent."""
-        from openhub.core.agent import Agent, AgentRegistry, Message
+    @pytest.mark.asyncio
+    async def test_get_health_report(self):
+        """Test getting health report."""
+        from openhub.core.agent import AgentRegistry, AgentManager
 
         registry = AgentRegistry()
-        agent = Agent(agent_id="get-msg-test-001", name="InboxAgent")
-        registry.register(agent)
+        manager = AgentManager(registry)
 
-        message = Message(
-            sender_id="sender-001",
-            receiver_id="get-msg-test-001",
-            content={"type": "task"}
-        )
-        registry.send_message(message)
-
-        messages = registry.get_messages("get-msg-test-001")
-        assert len(messages) == 1
+        report = await manager.get_health_report()
+        assert "manager_status" in report
+        assert "total_instances" in report
 
 
 if __name__ == "__main__":

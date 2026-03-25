@@ -105,18 +105,33 @@ set(DOMES_HEADERS
     src/workbench/workbench_limits.h
 )
 
+# common 模块路径
+set(COMMON_MODULE_DIR ${CMAKE_SOURCE_DIR}/../common)
+
+# common 模块的 include 目录
+set(COMMON_INCLUDE_DIRS
+    ${COMMON_MODULE_DIR}/platform/include
+    ${COMMON_MODULE_DIR}/utils/core/include
+    ${COMMON_MODULE_DIR}/utils/error/include
+    ${COMMON_MODULE_DIR}/utils/observability/include
+)
+
 add_library(domes STATIC ${DOMES_SOURCES} ${DOMES_HEADERS})
 
-target_include_directories(${PROJECT_NAME} PUBLIC 
+target_include_directories(${PROJECT_NAME} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
     $<INSTALL_INTERFACE:include/domes>
 )
 
-target_include_directories(${PROJECT_NAME} PRIVATE 
+target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${COMMON_INCLUDE_DIRS}
 )
+
+# 链接 common 模块
+target_link_libraries(${PROJECT_NAME} PRIVATE agentos_common)
 
 if(YAML_FOUND)
     target_include_directories(${PROJECT_NAME} PRIVATE ${YAML_INCLUDE_DIRS})

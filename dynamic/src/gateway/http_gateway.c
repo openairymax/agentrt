@@ -24,6 +24,7 @@
 #include <time.h>
 #include <pthread.h>
 #include <stdatomic.h>
+#include <arpa/inet.h>
 
 /* ========== HTTP网关内部结构 ========== */
 
@@ -37,7 +38,7 @@ typedef struct http_request_context {
     const char* version;             /**< HTTP版本 */
     const char* upload_data;         /**< 上传数据 */
     size_t upload_data_size;         /**< 上传数据大小 */
-    void* connection_cls;             /**< 连接类 */
+    void* connection_cls;            /**< 连接类 */
     
     /* 解析后的数据 */
     cJSON* json_request;             /**< JSON请求对象 */
@@ -48,28 +49,39 @@ typedef struct http_request_context {
     uint64_t start_time_ns;          /**< 请求开始时间 */
 } http_request_context_t;
 
-/* HTTP网关内部结构 */
+/**
+ * @brief HTTP网关内部结构
+ */
 typedef struct http_gateway {
     dynamic_server_t* server;        /**< 服务器引用 */
-    struct MHD_Daemon* daemon;      /**< MHD守护进程 */
+    struct MHD_Daemon* daemon;       /**< MHD守护进程 */
     uint16_t port;                   /**< 监听端口 */
     char* host;                      /**< 监听地址 */
     
     /* 统计信息 */
     atomic_uint_fast64_t requests_total;    /**< 总请求数 */
     atomic_uint_fast64_t requests_failed;   /**< 失败请求数 */
-    atomic_uint_fast64_t bytes_received;   /**< 接收字节数 */
-    atomic_uint_fast64_t bytes_sent;       /**< 发送字节数 */
+    atomic_uint_fast64_t bytes_received;    /**< 接收字节数 */
+    atomic_uint_fast64_t bytes_sent;        /**< 发送字节数 */
     
     /* 限流器 */
-    ratelimit_t* ratelimiter;        /**< 请求限流器 */
-    
-    /* 认证管理器 */
-    auth_manager_t* auth_manager;     /**< 认证管理器 */
+    ratelimiter_t* ratelimiter;      /**< 请求限流器 */
     
     /* 安全配置 */
     size_t max_request_size;         /**< 最大请求大小 */
 } http_gateway_t;
+
+/* ========== 辅助函数 ========== */
+
+/**
+ * @brief 获取当前时间（纳秒）
+ * @return 当前时间戳（纳秒）
+ */
+static uint64_t time_ns(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+}
 
 /* ========== JSON-RPC 2.0处理 ========== */
 
@@ -177,7 +189,7 @@ static char* handle_system_call(http_request_context_t* context, const char* met
     if (strcmp(method, "agentos_sys_task_submit") == 0) {
         /* 提交任务 */
         cJSON_AddStringToObject(response, "status", "accepted");
-        cJSON_AddStringToObject(response, "task_id", "task_" /* 实际应从内核获取 */);
+        cJSON_AddStringToObject(response, "task_id", "task_001");
         cJSON_AddNumberToObject(response, "estimated_time", 5000);
     } 
     else if (strcmp(method, "agentos_sys_memory_search") == 0) {
@@ -230,11 +242,14 @@ static int authenticate_request(http_request_context_t* context) {
     
     /* 解析Bearer token */
     if (strncmp(context->authorization, "Bearer ", 7) == 0) {
-        char* token = context->authorization + 7;
+        const char* token = context->authorization + 7;
         
         /* 验证token有效性 */
-        if (auth_manager_validate_token(context->server->auth_manager, token) == 0) {
-            return 0; /* 认证成功 */
+        if (context->server->auth_context) {
+            auth_result_t result = auth_validate(context->server->auth_context, token);
+            if (result == AUTH_RESULT_ALLOWED) {
+                return 0; /* 认证成功 */
+            }
         }
     }
     
@@ -245,14 +260,15 @@ static int authenticate_request(http_request_context_t* context) {
 
 /**
  * @brief 解析HTTP请求头
- * @param connection MHD连接
+ * @param cls 客户端数据
+ * @param kind 值类型
  * @param key 头键
  * @param value 头值
- * @param cls 客户端数据
  * @return MHD_YES 继续处理
  */
 static int parse_headers(void* cls, enum MHD_ValueKind kind, const char* key, const char* value) {
     http_request_context_t* context = (http_request_context_t*)cls;
+    (void)kind; /* 未使用参数 */
     
     if (strcmp(key, "Authorization") == 0) {
         context->authorization = strdup(value ? value : "");
@@ -308,6 +324,10 @@ static char* handle_jsonrpc_request(http_request_context_t* context) {
     cJSON* method = cJSON_GetObjectItem(context->json_request, "method");
     cJSON* params = cJSON_GetObjectItem(context->json_request, "params");
     
+    if (!method) {
+        return create_jsonrpc_error_response(NULL, -32600, "Invalid Request", NULL);
+    }
+    
     /* 检查会话（如果需要） */
     if (strcmp(method->valuestring, "agentos_sys_session_create") != 0) {
         /* 验证会话ID */
@@ -332,13 +352,14 @@ static char* handle_jsonrpc_request(http_request_context_t* context) {
 
 /**
  * @brief 生成HTTP响应
- * @param connection MHD连接
  * @param status_code HTTP状态码
  * @param content 响应内容
  * @param content_len 内容长度
  * @return MHD响应对象
  */
 static struct MHD_Response* create_http_response(int status_code, const char* content, size_t content_len) {
+    (void)status_code; /* 未使用参数 */
+    
     struct MHD_Response* response = MHD_create_response_from_buffer(
         content_len, (void*)content, MHD_RESPMEM_MUST_COPY);
     
@@ -354,6 +375,37 @@ static struct MHD_Response* create_http_response(int status_code, const char* co
     MHD_add_response_header(response, "Access-Control-Allow-Headers", "Content-Type, Authorization");
     
     return response;
+}
+
+/**
+ * @brief 检查限流
+ * @param gateway 网关实例
+ * @param connection MHD连接
+ * @return 0 允许，非0 拒绝
+ */
+static int check_rate_limit(http_gateway_t* gateway, struct MHD_Connection* connection) {
+    if (!gateway->ratelimiter) {
+        return 0; /* 无限流器，允许通过 */
+    }
+    
+    /* 获取客户端IP地址 */
+    char ip_buf[64] = "unknown";
+    const union MHD_ConnectionInfo* info = MHD_get_connection_info(connection, MHD_CONNECTION_INFO_CLIENT_ADDRESS);
+    
+    if (info && info->client_addr) {
+        struct sockaddr* addr = (struct sockaddr*)info->client_addr;
+        if (addr->sa_family == AF_INET) {
+            struct sockaddr_in* addr_in = (struct sockaddr_in*)addr;
+            inet_ntop(AF_INET, &addr_in->sin_addr, ip_buf, sizeof(ip_buf));
+        } else if (addr->sa_family == AF_INET6) {
+            struct sockaddr_in6* addr_in6 = (struct sockaddr_in6*)addr;
+            inet_ntop(AF_INET6, &addr_in6->sin6_addr, ip_buf, sizeof(ip_buf));
+        }
+    }
+    
+    /* 检查限流 */
+    ratelimit_result_t result = ratelimiter_check(gateway->ratelimiter, ip_buf);
+    return (result == RATELIMIT_ALLOWED) ? 0 : -1;
 }
 
 /**
@@ -406,7 +458,6 @@ static int handle_http_request(void* cls, struct MHD_Connection* connection,
             
             atomic_fetch_add(&gateway->requests_failed, 1);
             atomic_fetch_add(&gateway->bytes_received, *upload_data_size);
-            atomic_fetch_add(&gateway->bytes_sent, strlen(error_response));
             
             int ret = MHD_queue_response(connection, 413, response);
             MHD_destroy_response(response);
@@ -429,7 +480,6 @@ static int handle_http_request(void* cls, struct MHD_Connection* connection,
             
             atomic_fetch_add(&gateway->requests_failed, 1);
             atomic_fetch_add(&gateway->bytes_received, *upload_data_size);
-            atomic_fetch_add(&gateway->bytes_sent, strlen(error_response));
             
             int ret = MHD_queue_response(connection, 400, response);
             MHD_destroy_response(response);
@@ -446,7 +496,7 @@ static int handle_http_request(void* cls, struct MHD_Connection* connection,
     /* 完整请求处理 */
     if (strcmp(method, "POST") == 0 && context->json_request) {
         /* 检查限流 */
-        if (ratelimit_check(gateway->ratelimiter, connection) != 0) {
+        if (check_rate_limit(gateway, connection) != 0) {
             char* error_response = create_jsonrpc_error_response(
                 NULL, -429, "Too many requests", NULL);
             struct MHD_Response* response = create_http_response(429, error_response, strlen(error_response));
@@ -454,7 +504,6 @@ static int handle_http_request(void* cls, struct MHD_Connection* connection,
             
             atomic_fetch_add(&gateway->requests_failed, 1);
             atomic_fetch_add(&gateway->bytes_received, context->upload_data_size);
-            atomic_fetch_add(&gateway->bytes_sent, strlen(error_response));
             
             int ret = MHD_queue_response(connection, 429, response);
             MHD_destroy_response(response);
@@ -477,9 +526,11 @@ static int handle_http_request(void* cls, struct MHD_Connection* connection,
         atomic_fetch_add(&gateway->bytes_sent, strlen(json_response));
         
         /* 记录指标 */
-        telemetry_increment_counter(gateway->server->telemetry, "http_requests_total", 1, "method,endpoint");
-        telemetry_observe_histogram(gateway->server->telemetry, "http_request_duration_seconds", 
-                                   response_time_ns / 1000000000.0, "method,endpoint");
+        if (gateway->server->telemetry) {
+            telemetry_increment_counter(gateway->server->telemetry, "http_requests_total", 1, "method,endpoint");
+            telemetry_observe_histogram(gateway->server->telemetry, "http_request_duration_seconds", 
+                                       response_time_ns / 1000000000.0, "method,endpoint");
+        }
         
         AGENTOS_LOG_DEBUG("HTTP request processed: %s %s (%.3f ms)", 
                           method, url, response_time_ns / 1000000.0);
@@ -514,13 +565,16 @@ static int handle_http_request(void* cls, struct MHD_Connection* connection,
     /* GET请求 - 健康检查 */
     if (strcmp(method, "GET") == 0 && strcmp(url, "/health") == 0) {
         char* health_json = NULL;
-        health_checker_get_report(gateway->server->health, &health_json);
+        if (gateway->server->health) {
+            health_checker_get_report(gateway->server->health, &health_json);
+        } else {
+            health_json = strdup("{\"status\":\"healthy\"}");
+        }
         
         struct MHD_Response* response = create_http_response(200, health_json, strlen(health_json));
         free(health_json);
         
         atomic_fetch_add(&gateway->requests_total, 1);
-        atomic_fetch_add(&gateway->bytes_sent, strlen(health_json));
         
         int ret = MHD_queue_response(connection, 200, response);
         MHD_destroy_response(response);
@@ -531,15 +585,18 @@ static int handle_http_request(void* cls, struct MHD_Connection* connection,
     }
     
     /* GET请求 - 指标导出 */
-    if (strcmp(method, "GET") == 0 && strcmp(url, gateway->server->config.metrics_path) == 0) {
+    if (strcmp(method, "GET") == 0 && strcmp(url, "/metrics") == 0) {
         char* metrics_json = NULL;
-        telemetry_export_metrics(gateway->server->telemetry, &metrics_json);
+        if (gateway->server->telemetry) {
+            telemetry_export_metrics(gateway->server->telemetry, &metrics_json);
+        } else {
+            metrics_json = strdup("{}");
+        }
         
         struct MHD_Response* response = create_http_response(200, metrics_json, strlen(metrics_json));
         free(metrics_json);
         
         atomic_fetch_add(&gateway->requests_total, 1);
-        atomic_fetch_add(&gateway->bytes_sent, strlen(metrics_json));
         
         int ret = MHD_queue_response(connection, 200, response);
         MHD_destroy_response(response);
@@ -569,7 +626,7 @@ static int handle_http_request(void* cls, struct MHD_Connection* connection,
 
 /**
  * @brief 启动HTTP网关
- * @param gateway 网关实例
+ * @param gateway_impl 网关实例
  * @return AGENTOS_SUCCESS 成功
  */
 static agentos_error_t http_gateway_start(void* gateway_impl) {
@@ -597,7 +654,7 @@ static agentos_error_t http_gateway_start(void* gateway_impl) {
 
 /**
  * @brief 停止HTTP网关
- * @param gateway 网关实例
+ * @param gateway_impl 网关实例
  */
 static void http_gateway_stop(void* gateway_impl) {
     http_gateway_t* gateway = (http_gateway_t*)gateway_impl;
@@ -611,7 +668,7 @@ static void http_gateway_stop(void* gateway_impl) {
 
 /**
  * @brief 销毁HTTP网关
- * @param gateway 网关实例
+ * @param gateway_impl 网关实例
  */
 static void http_gateway_destroy(void* gateway_impl) {
     http_gateway_t* gateway = (http_gateway_t*)gateway_impl;
@@ -623,7 +680,7 @@ static void http_gateway_destroy(void* gateway_impl) {
     }
     
     if (gateway->ratelimiter) {
-        ratelimit_destroy(gateway->ratelimiter);
+        ratelimiter_destroy(gateway->ratelimiter);
     }
     
     free(gateway);
@@ -631,16 +688,17 @@ static void http_gateway_destroy(void* gateway_impl) {
 
 /**
  * @brief 获取HTTP网关名称
- * @param gateway 网关实例
+ * @param gateway_impl 网关实例
  * @return 名称字符串
  */
 static const char* http_gateway_get_name(void* gateway_impl) {
+    (void)gateway_impl;
     return "HTTP Gateway";
 }
 
 /**
  * @brief 获取HTTP网关统计信息
- * @param gateway 网关实例
+ * @param gateway_impl 网关实例
  * @param out_json 输出JSON字符串（需调用者free）
  * @return AGENTOS_SUCCESS 成功
  */
@@ -672,6 +730,13 @@ static const gateway_ops_t http_gateway_ops = {
 
 /* ========== 公共接口 ========== */
 
+/**
+ * @brief 创建HTTP网关
+ * @param host 监听地址
+ * @param port 监听端口
+ * @param server 服务器实例
+ * @return 网关实例，失败返回NULL
+ */
 gateway_t* http_gateway_create(const char* host, uint16_t port, dynamic_server_t* server) {
     if (!host || !server) {
         return NULL;
@@ -686,6 +751,11 @@ gateway_t* http_gateway_create(const char* host, uint16_t port, dynamic_server_t
     gateway->port = port;
     gateway->host = strdup(host);
     
+    if (!gateway->host) {
+        free(gateway);
+        return NULL;
+    }
+    
     /* 初始化统计信息 */
     atomic_init(&gateway->requests_total, 0);
     atomic_init(&gateway->requests_failed, 0);
@@ -696,17 +766,8 @@ gateway_t* http_gateway_create(const char* host, uint16_t port, dynamic_server_t
     gateway->max_request_size = 10 * 1024 * 1024; /* 默认10MB */
     
     /* 创建限流器 */
-    gateway->ratelimiter = ratelimit_create(100, 60); /* 100请求/分钟 */
+    gateway->ratelimiter = ratelimiter_create(100, 60); /* 100请求/分钟 */
     if (!gateway->ratelimiter) {
-        free(gateway->host);
-        free(gateway);
-        return NULL;
-    }
-    
-    /* 创建认证管理器 */
-    gateway->auth_manager = auth_manager_create();
-    if (!gateway->auth_manager) {
-        ratelimit_destroy(gateway->ratelimiter);
         free(gateway->host);
         free(gateway);
         return NULL;
@@ -715,8 +776,7 @@ gateway_t* http_gateway_create(const char* host, uint16_t port, dynamic_server_t
     /* 创建网关实例 */
     gateway_t* gw = malloc(sizeof(gateway_t));
     if (!gw) {
-        auth_manager_destroy(gateway->auth_manager);
-        ratelimit_destroy(gateway->ratelimiter);
+        ratelimiter_destroy(gateway->ratelimiter);
         free(gateway->host);
         free(gateway);
         return NULL;

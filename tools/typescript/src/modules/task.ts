@@ -15,6 +15,7 @@ import {
 } from '../types';
 import { AgentOSError, ErrorCode } from '../errors';
 import { extractDataMap, getString, getInt64, getMap, parseTime, getInterfaceSlice } from '../utils';
+import { DEFAULT_POLL_INTERVAL_MS } from '../config';
 
 /**
  * TaskManager 管理任务完整生命周期
@@ -159,7 +160,7 @@ export class TaskManager {
         throw new AgentOSError(`任务 ${taskId} 超时`, ErrorCode.TASK_TIMEOUT);
       }
 
-      await this.sleep(500);
+      await this.sleep(DEFAULT_POLL_INTERVAL_MS);
     }
   }
 

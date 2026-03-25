@@ -2,10 +2,12 @@
 
 ## 版本信息
 
-**版本**: Doc V1.5  
+**版本**: Doc V1.6  
+**更新日期**: 2026-03-25  
 **适用范围**：AgentOS 所有 C/C++代码开发活动  
-**理论基础**：工程控制论（信任边界、防御深度）、系统工程（层次分解）  
-**关联规范**：[架构设计原则](../架构设计原则.md)（原则 S-2）
+**理论基础**：工程控制论（信任边界、防御深度）、系统工程（层次分解）、五维正交系统（系统观、内核观、认知观、工程观、设计美学）、双系统认知理论  
+**关联规范**：[架构设计原则](../../architecture/folder/architectural_design_principles.md)（映射原则：D-1至D-4安全工程，S-2模块化设计）  
+**原则映射**: D-1（最小权限）、D-2（安全隔离）、D-3（纵深防御）、D-4（安全审计）、C-3（认知偏差防护）
 
 ---
 
@@ -22,7 +24,49 @@
 - **反馈闭环**：每个关键操作都应有验证和错误处理机制
 - **失效安全**：当系统发生故障时，自动进入安全状态
 
-### 0.2 本规范的结构
+### 0.2 五维正交系统的安全视角
+
+AgentOS的五维正交系统为安全编程提供了多层次的认知框架：
+
+#### 0.2.1 系统观（System View）安全
+- **架构级信任边界**：基于S-1（垂直分层）和S-2（模块化设计）原则，在Atoms、Backs、Domes、Common四层间建立清晰的信任边界
+- **安全域隔离**：Domes（安全域）层实现零信任架构，严格隔离不同安全级别的计算环境（映射原则：D-2安全隔离）
+
+#### 0.2.2 内核观（Kernel View）安全  
+- **微内核安全模型**：遵循microkernel.md中的最小特权原则，内核仅提供最基础的安全原语（映射原则：D-1最小权限）
+- **系统调用保护**：syscall.md中定义的受控接口，防止非法跨越用户态-内核态边界
+
+#### 0.2.3 认知观（Cognitive View）安全
+- **双系统认知偏差防护**：基于C-3原则，System 1（快速路径）和System 2（慢速路径）都需要内置安全校验机制
+- **人为因素考量**：安全机制设计需考虑开发者认知负荷，避免因复杂度导致的安全配置错误
+
+#### 0.2.4 工程观（Engineering View）安全
+- **防御深度工程化**：将D-3（纵深防御）原则转化为具体的代码实现模式
+- **安全基础设施**：基于E-1至E-4原则，构建可观测、可审计、可恢复的安全基础设施
+
+#### 0.2.5 设计美学（Design Aesthetics）安全
+- **安全即美感**：安全的代码应是简洁、清晰、优雅的（映射原则：A-1极简主义）
+- **细节中的安全**：安全漏洞常隐藏在细节中，必须贯彻A-2（细节关注）原则
+
+### 0.3 双系统认知理论与安全编程
+
+AgentOS的双系统认知理论为安全编程提供了心理学基础：
+
+#### 0.3.1 System 1（快速路径）安全
+- **模式匹配安全**：快速路径依赖直觉和模式匹配，必须确保常见模式的安全性
+- **默认安全行为**：快速决策时应有安全的默认行为，防止疏忽导致的安全漏洞
+- **示例**：API设计应使安全用法成为最自然、最直观的选择
+
+#### 0.3.2 System 2（慢速路径）安全  
+- **深度安全分析**：复杂安全决策需要System 2的深度分析能力
+- **安全代码审查**：代码审查是System 2认知过程，需系统化的检查清单和方法
+- **示例**：安全关键算法实现需要详细的注释和安全论证
+
+#### 0.3.3 双系统协同安全
+- **分层安全检查**：System 1处理常见、简单的安全检查，System 2处理复杂、罕见的安全威胁
+- **认知负荷管理**：合理分配安全责任，避免System 1过载或System 2疲劳
+
+### 0.4 本规范的结构
 
 本规范按"数据流 + 生命周期"两个维度组织：
 
@@ -52,7 +96,7 @@
 附录：系统性风险模式库
 ```
 
-### 0.3 如何使用本规范
+### 0.5 如何使用本规范
 
 **对于架构师**：
 - 理解信任边界划分原则，设计合理的模块接口
@@ -827,11 +871,12 @@ static unsigned int is_modem_set_timer_busy(special_timer *smem_ptr) {
 ## 附录 B：与其他规范的引用关系
 
 | 引用文档 | 关系说明 |
-|---------|---------||
-| [架构设计原则](../架构设计原则.md) | 本规范是原则 S-2（隐私保护与安全）在编码层面的具体落实 |
-| [代码门禁要求](../代码门禁要求_v2.md) | 本规范的要求通过代码门禁的 CodeCheck 进行自动化检查 |
-| [日志打印规范](../coding_standard/Log_guide.md) | 错误处理和异常记录应遵循日志规范 |
+|---------|---------|
+| [架构设计原则](../../architecture/folder/architectural_design_principles.md) | 本规范是安全工程原则（D-1至D-4）在C/C++编码层面的具体落实，同时体现S-2（模块化设计）和C-3（认知偏差防护）原则 |
+| [代码门禁要求](../code_gate_requirements_v2.md) | 本规范的要求通过代码门禁的CodeCheck进行自动化检查 |
+| [日志打印规范](./Log_guide.md) | 错误处理和异常记录应遵循日志规范，支持OpenTelemetry集成 |
 | [统一术语表](../TERMINOLOGY.md) | 本规范使用的术语定义和解释 |
+| [核心架构文档](../../architecture/folder/) | 与本规范密切相关的架构文档：<br>- microkernel.md（内核安全编程）<br>- ipc.md（进程间通信安全）<br>- syscall.md（系统调用安全）<br>- memoryrovol.md（内存安全与进化机制） |
 
 ---
 
@@ -879,3 +924,207 @@ static unsigned int is_modem_set_timer_busy(special_timer *smem_ptr) {
 **格式化安全**：4-3  
 **命令注入**：4-4  
 **内核安全**：5-1, 5-2, 5-3, 5-4, 5-5, 5-6, 5-7
+
+---
+## 附录 D：AgentOS 特定模块安全指南
+
+### D.1 Atoms（原子层）安全编程
+Atoms模块实现微内核核心功能，安全要求最为严格：
+
+#### D.1.1 内存管理安全（映射原则：M-3 拓扑优化）
+```c
+/**
+ * @brief NUMA感知内存分配 - 必须防御的内存安全威胁
+ * 
+ * 安全要求：
+ * 1. 大小校验：防止整数溢出导致分配异常大小（规则2-3）
+ * 2. 边界对齐：确保内存按HUGEPAGE对齐，防止侧信道攻击
+ * 3. NUMA节点验证：防止非法节点访问（信任边界验证）
+ * 
+ * @security 此函数被coreloopthree调度循环频繁调用，必须极致优化且安全
+ */
+void* atoms_mem_alloc_numa_safe(size_t size, int numa_node, uint32_t flags) {
+    // 规则3-1：内存申请校验
+    if (size == 0 || size > MAX_NUMA_ALLOC_SIZE) {
+        log_security("Invalid allocation size: %zu", size);
+        return NULL;
+    }
+    
+    // 规则2-3：防止整数溢出
+    size_t aligned_size = ALIGN_UP(size, HUGEPAGE_SIZE);
+    if (aligned_size < size) { // 检查对齐后溢出
+        return NULL;
+    }
+    
+    // NUMA节点信任边界验证
+    if (numa_node < -1 || numa_node >= numa_num_configured_nodes()) {
+        log_security("Invalid NUMA node: %d", numa_node);
+        return NULL;
+    }
+    
+    // 实际分配逻辑...
+}
+```
+
+#### D.1.2 任务调度安全（映射原则：C-2 认知优化）
+- **System 1/System 2路径安全**：快速路径和慢速路径都需内置安全校验
+- **任务隔离**：不同安全级别的任务必须严格隔离（D-2安全隔离）
+- **调度策略验证**：防止恶意任务破坏调度器状态
+
+### D.2 Backs（守护层）安全编程
+Backs模块作为系统服务，需强调可靠性和抗攻击性：
+
+#### D.2.1 IPC通信安全（映射原则：E-3 通信基础设施）
+```c
+/**
+ * @brief 安全IPC消息处理 - 必须遵循的防御深度策略
+ * 
+ * 防御层次：
+ * 1. 消息边界验证（规则2-1）
+ * 2. 权限检查（D-1最小权限）
+ * 3. 资源限制（防止资源耗尽）
+ * 4. 审计日志（D-4安全审计）
+ * 
+ * @see ipc.md中的安全通信协议
+ */
+int backs_ipc_process_message_safe(ipc_message_t* msg) {
+    // 层次1：输入验证（规则2-1）
+    if (msg == NULL || !validate_ipc_message(msg)) {
+        log_security("Invalid IPC message");
+        return IPC_ERR_INVALID;
+    }
+    
+    // 层次2：权限检查
+    if (!check_ipc_permission(msg->sender, msg->operation)) {
+        log_audit("Unauthorized IPC attempt: sender=%d, op=%d", 
+                  msg->sender, msg->operation);
+        return IPC_ERR_PERMISSION;
+    }
+    
+    // 层次3：资源限制
+    if (current_ipc_resources() > MAX_IPC_RESOURCES) {
+        return IPC_ERR_RESOURCE;
+    }
+    
+    // 层次4：处理并审计
+    int result = process_ipc_message(msg);
+    log_audit("IPC processed: sender=%d, op=%d, result=%d",
+              msg->sender, msg->operation, result);
+    return result;
+}
+```
+
+### D.3 Domes（安全域层）安全编程
+Domes模块实现零信任安全模型，要求最高级别的安全保证：
+
+#### D.3.1 能力（Capability）安全
+- **最小权限原则**（D-1）：每个能力仅授予必要权限
+- **能力传递验证**：能力传递时必须验证传递链
+- **能力撤销机制**：支持即时能力撤销
+
+#### D.3.2 形式化验证集成
+```c
+/**
+ * @brief 形式化验证的安全策略检查
+ * 
+ * 使用形式化方法验证安全策略的正确性。
+ * 集成模型检查器，确保无状态机违规。
+ * 
+ * @formal 此函数的安全属性已通过Coq验证
+ * @see Security_design_guide.md中的形式化安全模型
+ */
+bool domes_verify_security_policy(policy_t* policy) {
+    // 形式化验证前置条件
+    if (!precondition_holds(policy)) {
+        return false;
+    }
+    
+    // 模型检查
+    if (!model_check_policy(policy)) {
+        log_security("Policy model check failed");
+        return false;
+    }
+    
+    // 运行时验证
+    return runtime_enforce_policy(policy);
+}
+```
+
+### D.4 Common（公共库层）安全编程
+Common模块提供跨层安全基础设施：
+
+#### D.4.1 密码学安全
+- **算法选择**：使用经过验证的密码学原语（AES-GCM、ChaCha20-Poly1305）
+- **密钥管理**：实现安全的密钥生命周期管理
+- **侧信道防护**：防御时序攻击和缓存侧信道
+
+#### D.4.2 安全随机数生成
+```c
+/**
+ * @brief 安全随机数生成 - 必须防御的熵源攻击
+ * 
+ * 安全要求：
+ * 1. 混合多个熵源（硬件RNG、jitter entropy等）
+ * 2. 定期重新播种
+ * 3. 防止输出预测
+ * 
+ * @cryptographic 此函数用于生成密码学密钥，必须最高安全级别
+ */
+void common_secure_random(void* buffer, size_t size) {
+    // 规则3-1：内存申请校验
+    if (buffer == NULL || size == 0 || size > MAX_RANDOM_SIZE) {
+        log_security("Invalid random request: size=%zu", size);
+        return;
+    }
+    
+    // 混合多个熵源
+    mix_entropy_sources();
+    
+    // 生成随机数
+    generate_random(buffer, size);
+    
+    // 规则3-3：敏感信息清理（临时熵池）
+    cleanup_entropy_pool();
+}
+```
+
+### D.5 跨模块安全交互
+重要跨模块接口必须实现额外的安全防护：
+
+```c
+/**
+ * @brief 核心三循环安全集成点（关键安全接口）
+ * 
+ * 此接口连接coreloopthree调度器与microkernel任务管理。
+ * 必须实现的安全机制：
+ * 1. 双向身份验证（调用者与被调用者）
+ * 2. 请求完整性保护（HMAC签名）
+ * 3. 抗重放攻击（Nonce机制）
+ * 4. 速率限制（防止DoS）
+ * 
+ * @security_critical 此接口被标记为安全关键路径
+ * @performance 必须高效实现，不影响调度延迟
+ */
+int secure_cross_module_schedule(task_t* task) {
+    // 层次1：请求验证
+    if (!verify_task_signature(task)) {
+        log_security("Invalid task signature");
+        return SCHEDULE_ERR_SECURITY;
+    }
+    
+    // 层次2：抗重放检查
+    if (is_replay_attack(task->nonce)) {
+        log_security("Replay attack detected");
+        return SCHEDULE_ERR_REPLAY;
+    }
+    
+    // 层次3：权限检查
+    if (!check_schedule_permission(task)) {
+        log_audit("Unauthorized schedule attempt");
+        return SCHEDULE_ERR_PERMISSION;
+    }
+    
+    // 实际调度逻辑
+    return schedule_task(task);
+}
+```

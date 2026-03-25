@@ -1,9 +1,10 @@
 # AgentOS Java 安全编码指南
 
-**版本**: Doc V1.5  
-**发布日期**: 2026-03-24  
+**版本**: Doc V1.6  
+**更新日期**: 2026-03-25  
 **适用范围**: AgentOS Java SDK、所有 Java 语言实现  
-**理论基础**: 工程两论（反馈闭环）、系统工程（层次分解）、安全穹顶（Domes）防御深度
+**理论基础**: 工程两论（反馈闭环）、系统工程（层次分解）、五维正交系统（系统观、内核观、认知观、工程观、设计美学）、双系统认知理论、安全穹顶（Domes）防御深度  
+**原则映射**: D-1至D-4（安全工程）、S-2（模块化设计）、C-3（认知偏差防护）、E-1（安全内生）
 
 ---
 
@@ -11,7 +12,7 @@
 
 ### 1.1 编制目的
 
-本指南为 AgentOS 项目中的 Java 代码提供安全编码标准。基于项目架构设计原则的四维正交体系，本指南聚焦于安全观维度，为开发者提供防止安全漏洞的编码实践。
+本指南为 AgentOS 项目中的 Java 代码提供安全编码标准。基于项目架构设计原则的五维正交系统，本指南聚焦于安全观维度（D-1至D-4安全工程原则），为开发者提供防止安全漏洞的编码实践。
 
 ### 1.2 与 AgentOS 架构的关系
 
@@ -25,13 +26,51 @@
 | D4 | **审计追踪** | `domes/audit/` | 全链路追踪 | AuditLogger |
 
 **防护原则**:
-- **纵深防御**: 四层防护相互独立，单层失效不影响整体安全
-- **默认拒绝**: 未经明确允许的访问一律拒绝
-- **失效安全**: 安全机制故障时默认进入安全状态
+- **纵深防御**: 四层防护相互独立，单层失效不影响整体安全（映射原则：D-3）
+- **默认拒绝**: 未经明确允许的访问一律拒绝（映射原则：D-1）
+- **失效安全**: 安全机制故障时默认进入安全状态（映射原则：D-4）
 
 Java SDK 作为 AgentOS 的重要组成部分，必须遵循这些安全原则，并在代码层面实现相应的安全机制。
 
-### 1.3 安全原则
+### 1.3 五维正交系统的安全视角
+
+AgentOS的五维正交系统为Java安全编码提供了多层次的理论框架：
+
+#### 1.3.1 系统观（System View）安全
+- **垂直分层安全**：Java SDK需遵循S-1（垂直分层）原则，在应用层、服务层、内核层间建立清晰的信任边界
+- **模块化安全设计**：基于S-2原则，安全功能模块化，支持独立部署和升级
+
+#### 1.3.2 内核观（Kernel View）安全
+- **微内核安全模型**：Java代码需与microkernel.md中定义的微内核安全原语保持一致
+- **系统调用保护**：Java Native Interface（JNI）调用必须严格验证，防止非法跨越用户态-内核态边界
+
+#### 1.3.3 认知观（Cognitive View）安全
+- **双系统认知偏差防护**：基于C-3原则，Java API设计需考虑开发者认知模式，防止安全配置错误
+- **安全代码审查**：利用System 2（慢速路径）深度分析能力进行安全代码审查
+
+#### 1.3.4 工程观（Engineering View）安全
+- **安全工程化**：将D-1至D-4安全工程原则转化为具体的Java编码模式
+- **安全基础设施**：基于E-1至E-4原则，构建可观测、可审计、可恢复的Java安全基础设施
+
+#### 1.3.5 设计美学（Design Aesthetics）安全
+- **安全即美感**：安全的Java代码应是简洁、优雅、易于理解的（映射原则：A-1）
+- **细节中的安全**：安全漏洞常隐藏在细节中，必须贯彻A-2（细节关注）原则
+
+### 1.4 双系统认知理论与安全编程
+
+AgentOS的双系统认知理论为Java安全编码提供了心理学基础：
+
+#### 1.4.1 System 1（快速路径）安全
+- **直觉安全设计**：常见安全操作应直观易懂，支持快速正确使用
+- **默认安全行为**：API默认配置应是安全的，防止疏忽导致的安全漏洞
+- **示例**：安全敏感的API应使安全用法成为最自然的选择
+
+#### 1.4.2 System 2（慢速路径）安全
+- **深度安全分析**：复杂安全决策需要System 2的深度分析能力
+- **安全配置验证**：复杂安全配置需要明确的验证机制和文档
+- **示例**：密钥管理系统需要详细的配置向导和安全检查
+
+### 1.5 安全原则
 
 基于架构设计原则 E-1（安全内生原则），本指南遵循以下安全原则：
 
@@ -806,13 +845,349 @@ public class SecurityConfig {
 ```
 
 ---
+## 十、AgentOS 模块 Java 安全编码示例
 
-## 九、参考文献
+### 10.1 Domes（安全域层）Java 安全实现
+Domes模块实现AgentOS的安全穹顶，Java SDK需要严格遵循其安全模型：
+
+#### 10.1.1 虚拟工位（Virtual Workbench）沙箱
+```java
+/**
+ * 虚拟工位沙箱 - 体现D-2（安全隔离）和S-1（垂直分层）原则
+ * 
+ * 基于ClassLoader隔离机制，为每个任务创建独立的执行环境。
+ * 集成资源限制和权限控制，防止任务间相互影响。
+ * 
+ * @see domes/workbench/ 中的进程隔离原语
+ */
+public class VirtualWorkbenchSandbox {
+    private final SandboxClassLoader classLoader;
+    private final ResourceLimiter limiter;
+    private final SecurityManager securityManager;
+    
+    /**
+     * 在沙箱中执行任务 - 体现D-1（最小权限）原则
+     * 
+     * @param task 任务定义
+     * @param context 安全上下文
+     * @return 执行结果
+     */
+    public ExecutionResult executeInSandbox(Task task, SecurityContext context) {
+        // 1. 创建隔离的ClassLoader
+        classLoader = new SandboxClassLoader(
+            task.getRequiredLibraries(),
+            getSystemClassLoader()
+        );
+        
+        // 2. 设置资源限制
+        limiter = new ResourceLimiter(
+            task.getCpuQuota(),
+            task.getMemoryQuota(),
+            task.getDiskQuota()
+        );
+        
+        // 3. 配置安全管理器
+        securityManager = new SandboxSecurityManager(
+            context.getPermissions(),
+            new AuditLogger()
+        );
+        
+        // 4. 在受限环境中执行
+        return doExecuteWithRestrictions(task);
+    }
+    
+    private ExecutionResult doExecuteWithRestrictions(Task task) {
+        Thread currentThread = Thread.currentThread();
+        ClassLoader originalLoader = currentThread.getContextClassLoader();
+        SecurityManager originalManager = System.getSecurityManager();
+        
+        try {
+            // 切换ClassLoader
+            currentThread.setContextClassLoader(classLoader);
+            System.setSecurityManager(securityManager);
+            
+            // 应用资源限制
+            limiter.apply();
+            
+            // 执行任务
+            return task.execute();
+            
+        } catch (SecurityException e) {
+            logAudit("Sandbox security violation: {}", e.getMessage());
+            return ExecutionResult.failure("Security violation: " + e.getMessage());
+            
+        } finally {
+            // 恢复原始环境
+            currentThread.setContextClassLoader(originalLoader);
+            System.setSecurityManager(originalManager);
+            limiter.release();
+        }
+    }
+}
+```
+
+#### 10.1.2 权限裁决（Permission Arbiter）
+```java
+/**
+ * 权限裁决引擎 - 体现D-1（最小权限）和D-4（安全审计）原则
+ * 
+ * 基于YAML规则引擎实现细粒度访问控制。
+ * 支持动态策略更新和实时审计。
+ * 
+ * @see domes/permission/ 中的规则引擎
+ */
+@Service
+public class PermissionArbiter {
+    private final RuleEngine ruleEngine;
+    private final AuditTrail auditTrail;
+    
+    /**
+     * 裁决访问请求 - 体现防御深度（D-3）原则
+     * 
+     * 多层验证：
+     * 1. 主体身份验证
+     * 2. 资源权限检查
+     * 3. 上下文策略验证
+     * 4. 风险评估
+     */
+    public AccessDecision decide(AccessRequest request) {
+        // 层次1：主体验证
+        if (!validateSubject(request.getSubject())) {
+            logAudit("Invalid subject: {}", request.getSubject());
+            return AccessDecision.deny("Invalid subject");
+        }
+        
+        // 层次2：资源权限检查
+        Permission required = request.getRequiredPermission();
+        if (!hasPermission(request.getSubject(), required)) {
+            logAudit("Permission denied: subject={}, resource={}, permission={}",
+                request.getSubject(), request.getResource(), required);
+            return AccessDecision.deny("Insufficient permission");
+        }
+        
+        // 层次3：上下文策略验证
+        Context context = request.getContext();
+        if (!evaluateContextPolicy(context)) {
+            logAudit("Context policy violation: {}", context);
+            return AccessDecision.deny("Context policy violation");
+        }
+        
+        // 层次4：风险评估
+        RiskAssessment risk = assessRisk(request);
+        if (risk.getLevel() == RiskLevel.HIGH) {
+            logAudit("High risk access denied: risk={}", risk.getScore());
+            return AccessDecision.deny("High risk access");
+        }
+        
+        // 授予访问权限
+        logAudit("Access granted: subject={}, resource={}", 
+            request.getSubject(), request.getResource());
+        return AccessDecision.grant(risk.getScore());
+    }
+}
+```
+
+### 10.2 Backs（守护层）Java 安全实现
+Backs模块作为系统服务，需实现可靠的安全通信和资源管理：
+
+#### 10.2.1 安全IPC客户端
+```java
+/**
+ * 安全IPC客户端 - 体现E-3（通信基础设施）和D-3（纵深防御）原则
+ * 
+ * 实现与Atoms模块的安全进程间通信。
+ * 集成消息加密、身份验证和完整性保护。
+ * 
+ * @see ipc.md 中的安全通信协议
+ */
+public class SecureIpcClient {
+    private final CryptoService crypto;
+    private final AuthService auth;
+    private final IpcChannel channel;
+    
+    /**
+     * 发送安全消息 - 体现防御深度原则
+     */
+    public SecureResponse sendSecure(SecureRequest request) {
+        // 层次1：请求签名
+        byte[] signature = crypto.sign(request.getPayload());
+        request.setSignature(signature);
+        
+        // 层次2：消息加密
+        EncryptedMessage encrypted = crypto.encrypt(
+            request.toBytes(),
+            getSessionKey()
+        );
+        
+        // 层次3：身份验证
+        AuthToken token = auth.getCurrentToken();
+        if (!auth.isValid(token)) {
+            throw new SecurityException("Authentication token expired");
+        }
+        
+        // 层次4：发送并验证响应
+        RawResponse raw = channel.send(encrypted);
+        SecureResponse response = parseResponse(raw);
+        
+        // 验证响应完整性
+        if (!crypto.verify(response.getSignature(), response.getPayload())) {
+            throw new SecurityException("Response integrity check failed");
+        }
+        
+        return response;
+    }
+}
+```
+
+### 10.3 Common（公共库层）Java 安全实现
+Common模块提供跨层安全基础设施：
+
+#### 10.3.1 统一密钥管理服务
+```java
+/**
+ * 统一密钥管理服务 - 体现E-1（基础设施）和D-4（安全审计）原则
+ * 
+ * 提供密钥生成、存储、轮换和审计的完整生命周期管理。
+ * 支持多租户隔离和硬件安全模块（HSM）集成。
+ */
+@Service
+public class UnifiedKeyManager {
+    private final KeyStorage keyStorage;
+    private final KeyGenerator keyGenerator;
+    private final AuditLogger auditLogger;
+    
+    /**
+     * 生成并存储密钥 - 体现密钥生命周期管理
+     */
+    public KeyMetadata generateKey(KeySpec spec, String owner) {
+        // 1. 生成密钥
+        SecretKey key = keyGenerator.generate(spec);
+        
+        // 2. 加密存储
+        byte[] encrypted = encryptKey(key, getMasterKey());
+        String keyId = UUID.randomUUID().toString();
+        
+        // 3. 安全存储
+        keyStorage.store(keyId, encrypted, new StorageOptions()
+            .setEncryptionAlgorithm("AES-256-GCM")
+            .setOwner(owner)
+            .setCreatedAt(Instant.now())
+        );
+        
+        // 4. 审计日志
+        auditLogger.logKeyOperation(owner, KeyOperation.GENERATE, keyId, true);
+        
+        return new KeyMetadata(keyId, spec, owner);
+    }
+    
+    /**
+     * 密钥轮换策略 - 体现E-2（可维护性）原则
+     */
+    @Scheduled(fixedRate = 30 * 24 * 60 * 60 * 1000) // 每月轮换
+    public void rotateExpiringKeys() {
+        List<KeyMetadata> expiring = keyStorage.findKeysExpiringSoon();
+        for (KeyMetadata metadata : expiring) {
+            try {
+                // 生成新密钥
+                KeyMetadata newKey = generateKey(metadata.getSpec(), metadata.getOwner());
+                
+                // 迁移数据
+                migrateData(metadata.getKeyId(), newKey.getKeyId());
+                
+                // 标记旧密钥为已轮换
+                keyStorage.markAsRotated(metadata.getKeyId(), newKey.getKeyId());
+                
+                auditLogger.logKeyOperation("system", KeyOperation.ROTATE, 
+                    metadata.getKeyId(), true);
+                
+            } catch (Exception e) {
+                auditLogger.logKeyOperation("system", KeyOperation.ROTATE, 
+                    metadata.getKeyId(), false);
+                logger.error("Failed to rotate key: {}", metadata.getKeyId(), e);
+            }
+        }
+    }
+}
+```
+
+### 10.4 Atoms（原子层）Java Native Interface (JNI) 安全
+Atoms模块通过JNI提供原生接口，需要特殊的安全考虑：
+
+#### 10.4.1 安全JNI绑定
+```java
+/**
+ * 安全JNI绑定 - 体现K-1（最小特权）和D-2（安全隔离）原则
+ * 
+ * 封装与Atoms微内核的本地调用，实现严格参数验证和边界检查。
+ * 防止缓冲区溢出和类型混淆攻击。
+ */
+public class SecureKernelBinding {
+    static {
+        // 加载本地库
+        System.loadLibrary("agentos_kernel");
+    }
+    
+    // 本地方法声明
+    private native long nativeAllocateMemory(long size, int numaNode);
+    private native int nativeScheduleTask(long taskHandle, int priority);
+    
+    /**
+     * 安全内存分配 - 体现M-3（拓扑优化）和防御深度原则
+     */
+    public MemoryHandle allocateMemory(long size, int numaNode) {
+        // 层次1：参数验证
+        if (size <= 0 || size > MAX_ALLOC_SIZE) {
+            throw new IllegalArgumentException("Invalid allocation size: " + size);
+        }
+        
+        // 层次2：NUMA节点验证
+        if (numaNode < -1 || numaNode >= getNumaNodeCount()) {
+            throw new IllegalArgumentException("Invalid NUMA node: " + numaNode);
+        }
+        
+        // 层次3：权限检查
+        if (!checkMemoryPermission(size)) {
+            throw new SecurityException("Insufficient memory permission");
+        }
+        
+        // 调用本地方法
+        long nativeHandle = nativeAllocateMemory(size, numaNode);
+        if (nativeHandle == 0) {
+            throw new RuntimeException("Memory allocation failed");
+        }
+        
+        return new MemoryHandle(nativeHandle, size);
+    }
+    
+    /**
+     * 清理本地资源 - 体现资源确定性原则
+     */
+    @Override
+    protected void finalize() throws Throwable {
+        try {
+            releaseNativeResources();
+        } finally {
+            super.finalize();
+        }
+    }
+}
+```
+
+---
+## 十一、参考文献
 
 1. **AgentOS 架构设计原则**: [architectural_design_principles.md](../../architecture/folder/architectural_design_principles.md)
 2. **OWASP Top 10**: https://owasp.org/www-project-top-ten/
 3. **Java Secure Coding Guidelines**: https://wiki.sei.cmu.edu/confluence/display/java
 4. **Spring Security Documentation**: https://docs.spring.io/spring-security/site/docs/current/reference/html5/
+5. **AgentOS 核心架构文档**:
+   - [coreloopthree.md](../../architecture/folder/coreloopthree.md)
+   - [memoryrovol.md](../../architecture/folder/memoryrovol.md)
+   - [microkernel.md](../../architecture/folder/microkernel.md)
+   - [ipc.md](../../architecture/folder/ipc.md)
+   - [syscall.md](../../architecture/folder/syscall.md)
+   - [logging_system.md](../../architecture/folder/logging_system.md)
+   - [Security_design_guide.md](../Security_design_guide.md)
 
 ---
 

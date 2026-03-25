@@ -5,6 +5,7 @@
 import { TaskStatus, TaskResult } from './types';
 import { TaskError, TimeoutError } from './errors';
 import { AgentOS } from './agent';
+import { DEFAULT_POLL_INTERVAL_MS } from './config';
 
 /** AgentOS 任务管理�?*/
 export class Task {
@@ -69,7 +70,7 @@ export class Task {
         );
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, DEFAULT_POLL_INTERVAL_MS));
     }
   }
 

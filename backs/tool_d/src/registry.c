@@ -6,6 +6,7 @@
 
 #include "registry.h"
 #include "svc_logger.h"
+#include "platform.h"
 #include <stdlib.h>
 #include <string.h>
 #include <cjson/cJSON.h>
@@ -20,10 +21,9 @@ typedef struct registry_entry {
 
 struct tool_registry {
     registry_entry_t* buckets[HASH_SIZE];
-    pthread_mutex_t lock;
+    agentos_mutex_t lock;
 };
 
-// From data intelligence emerges. by spharx
 static unsigned int hash(const char* id) {
     unsigned int h = 5381;
     while (*id) h = (h << 5) + h + *id++;
@@ -59,10 +59,9 @@ static tool_metadata_t* dup_metadata(const tool_metadata_t* src) {
 tool_registry_t* tool_registry_create(const tool_config_t* cfg) {
     tool_registry_t* reg = calloc(1, sizeof(tool_registry_t));
     if (!reg) return NULL;
-    pthread_mutex_init(&reg->lock, NULL);
+    agentos_mutex_init(&reg->lock);
 
-    /* 注册内置工具（如果有） */
-    if (cfg->tools) {
+    if (cfg && cfg->tools) {
         for (tool_def_t* def = cfg->tools; def->name; ++def) {
             tool_metadata_t meta = {
                 .id = def->name,
@@ -72,7 +71,6 @@ tool_registry_t* tool_registry_create(const tool_config_t* cfg) {
                 .cacheable = def->cacheable,
                 .permission_rule = def->permission_rule,
             };
-            /* 解析参数模式（简化：将字符串数组视为参数名，schema 留空） */
             if (def->params) {
                 size_t cnt = 0;
                 while (def->params[cnt]) cnt++;
@@ -81,7 +79,7 @@ tool_registry_t* tool_registry_create(const tool_config_t* cfg) {
                     if (params) {
                         for (size_t i = 0; i < cnt; ++i) {
                             params[i].name = strdup(def->params[i]);
-                            params[i].schema = strdup("{}"); /* 默认空 schema */
+                            params[i].schema = strdup("{}");
                         }
                         meta.params = params;
                         meta.param_count = cnt;
@@ -89,7 +87,6 @@ tool_registry_t* tool_registry_create(const tool_config_t* cfg) {
                 }
             }
             tool_registry_add(reg, &meta);
-            /* 释放临时分配的 params（注意 dup_metadata 会重新复制） */
             if (meta.params) {
                 for (size_t i = 0; i < meta.param_count; ++i) {
                     free((void*)meta.params[i].name);
@@ -114,24 +111,23 @@ void tool_registry_destroy(tool_registry_t* reg) {
             e = next;
         }
     }
-    pthread_mutex_destroy(&reg->lock);
+    agentos_mutex_destroy(&reg->lock);
     free(reg);
 }
 
 int tool_registry_add(tool_registry_t* reg, const tool_metadata_t* meta) {
     if (!reg || !meta || !meta->id) return -1;
     unsigned int idx = hash(meta->id);
-    pthread_mutex_lock(&reg->lock);
-    /* 检查是否已存在 */
+    agentos_mutex_lock(&reg->lock);
     for (registry_entry_t* e = reg->buckets[idx]; e; e = e->next) {
         if (strcmp(e->id, meta->id) == 0) {
-            pthread_mutex_unlock(&reg->lock);
-            return -1; /* 已存在 */
+            agentos_mutex_unlock(&reg->lock);
+            return -1;
         }
     }
     registry_entry_t* e = calloc(1, sizeof(registry_entry_t));
     if (!e) {
-        pthread_mutex_unlock(&reg->lock);
+        agentos_mutex_unlock(&reg->lock);
         return -1;
     }
     e->id = strdup(meta->id);
@@ -140,19 +136,19 @@ int tool_registry_add(tool_registry_t* reg, const tool_metadata_t* meta) {
         free(e->id);
         free(e->meta);
         free(e);
-        pthread_mutex_unlock(&reg->lock);
+        agentos_mutex_unlock(&reg->lock);
         return -1;
     }
     e->next = reg->buckets[idx];
     reg->buckets[idx] = e;
-    pthread_mutex_unlock(&reg->lock);
+    agentos_mutex_unlock(&reg->lock);
     return 0;
 }
 
 int tool_registry_remove(tool_registry_t* reg, const char* tool_id) {
     if (!reg || !tool_id) return -1;
     unsigned int idx = hash(tool_id);
-    pthread_mutex_lock(&reg->lock);
+    agentos_mutex_lock(&reg->lock);
     registry_entry_t** p = &reg->buckets[idx];
     while (*p) {
         if (strcmp((*p)->id, tool_id) == 0) {
@@ -161,33 +157,33 @@ int tool_registry_remove(tool_registry_t* reg, const char* tool_id) {
             free(victim->id);
             tool_metadata_free(victim->meta);
             free(victim);
-            pthread_mutex_unlock(&reg->lock);
+            agentos_mutex_unlock(&reg->lock);
             return 0;
         }
         p = &(*p)->next;
     }
-    pthread_mutex_unlock(&reg->lock);
+    agentos_mutex_unlock(&reg->lock);
     return -1;
 }
 
 tool_metadata_t* tool_registry_get(tool_registry_t* reg, const char* tool_id) {
     if (!reg || !tool_id) return NULL;
     unsigned int idx = hash(tool_id);
-    pthread_mutex_lock(&reg->lock);
+    agentos_mutex_lock(&reg->lock);
     for (registry_entry_t* e = reg->buckets[idx]; e; e = e->next) {
         if (strcmp(e->id, tool_id) == 0) {
             tool_metadata_t* copy = dup_metadata(e->meta);
-            pthread_mutex_unlock(&reg->lock);
+            agentos_mutex_unlock(&reg->lock);
             return copy;
         }
     }
-    pthread_mutex_unlock(&reg->lock);
+    agentos_mutex_unlock(&reg->lock);
     return NULL;
 }
 
 char* tool_registry_list_json(tool_registry_t* reg) {
     if (!reg) return strdup("[]");
-    pthread_mutex_lock(&reg->lock);
+    agentos_mutex_lock(&reg->lock);
     cJSON* arr = cJSON_CreateArray();
     for (int i = 0; i < HASH_SIZE; ++i) {
         for (registry_entry_t* e = reg->buckets[i]; e; e = e->next) {
@@ -201,6 +197,6 @@ char* tool_registry_list_json(tool_registry_t* reg) {
     }
     char* json = cJSON_PrintUnformatted(arr);
     cJSON_Delete(arr);
-    pthread_mutex_unlock(&reg->lock);
+    agentos_mutex_unlock(&reg->lock);
     return json;
 }

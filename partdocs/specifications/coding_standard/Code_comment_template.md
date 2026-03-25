@@ -1,9 +1,10 @@
 # AgentOS 代码注释规范
 
-**版本**: Doc V1.5  
-**发布日期**: 2026-03-24  
+**版本**: Doc V1.6  
+**更新日期**: 2026-03-25  
 **适用范围**: AgentOS 所有编程语言的代码注释  
-**理论基础**: 工程控制论（反馈闭环）、系统工程（模块化）、极简美学
+**理论基础**: 工程控制论（反馈闭环）、系统工程（模块化）、五维正交系统（系统观、内核观、认知观、工程观、设计美学）、双系统认知理论  
+**原则映射**: A-1至A-4（设计美学）、C-1至C-4（认知工程）、E-1至E-4（工程基础设施）
 
 ---
 
@@ -18,12 +19,33 @@
 3. **加速团队协作**：清晰的注释使代码意图一目了然，减少沟通成本
 4. **支持自动化工具**：规范的注释可被 Doxygen、Sphinx、TypeDoc 等工具解析生成文档
 
-### 1.2 核心理念
+### 1.2 核心理念与架构映射
 
-- **注释"为什么"而非"做什么"**：代码本身应清晰表达"做什么"，注释应解释"为什么这样做"
-- **注释即契约**：公共 API 的注释是对外承诺，必须准确、完整、稳定
-- **注释即文档**：注释应能直接生成 API 文档，避免文档与代码脱节
-- **注释即测试**：好的注释包含使用示例，示例应可直接运行验证
+AgentOS 的代码注释规范建立在"工程两论"（工程控制论与系统工程）和五维正交系统的基础之上，体现了以下核心设计理念：
+
+#### 1.2.1 基于工程控制论的注释理念
+- **反馈闭环设计**：注释构成代码的"自解释系统"，为开发者提供实时的设计意图反馈，形成"编写-注释-理解"的认知闭环
+- **稳定性保障**：公共 API 注释作为系统接口的"控制契约"，确保模块间交互的稳定性和可预测性（映射原则：S-3接口稳定性）
+
+#### 1.2.2 基于系统工程的注释理念  
+- **分层抽象**：注释体系遵循五维正交系统，从系统观（架构意图）到工程观（实现细节）提供不同层次的解释
+- **模块化文档**：注释与代码结构严格对应，支持"按需加载"的文档认知模式（映射原则：S-2模块化设计）
+
+#### 1.2.3 基于双系统认知理论的注释理念
+- **System 1 注释**：简单接口的注释应直观易懂，支持快速认知（快速路径）
+- **System 2 注释**：复杂算法的注释需提供深度原理说明，支持深度思考（慢速路径）
+
+#### 1.2.4 基于设计美学的注释理念
+- **极简主义**（A-1原则）：注释应简洁精炼，避免冗余信息污染代码空间
+- **细节关注**（A-2原则）：关键设计决策必须在注释中明确记录，传承工程智慧
+- **人文关怀**（A-3原则）：注释应设身处地为读者着想，提供必要的上下文和背景
+- **完美主义**（A-4原则）：注释质量应与代码质量同等要求，追求文档的完美无瑕
+
+#### 1.2.5 注释的多重角色
+- **注释即认知桥梁**：连接代码实现与设计意图，降低认知负荷
+- **注释即知识传承**：记录技术决策背后的思考过程，避免知识丢失
+- **注释即质量指标**：注释完整度直接反映代码的工程成熟度
+- **注释即协作协议**：为团队协作提供统一的沟通语言和标准
 
 ### 1.3 适用范围
 
@@ -94,8 +116,8 @@
  * 优化小对象分配性能，支持 NUMA 感知内存布局。
  * 
  * @author AgentOS Team
- * @date 2026-03-24
- * @version 1.5
+ * @date 2026-03-25
+ * @version 1.6
  * 
  * @note 线程安全：所有公共接口均为线程安全
  * @see atoms/corekern/memory/
@@ -273,7 +295,7 @@ extern agentos_scheduler_t* g_scheduler;
     AgentOS Team
 
 版本:
-    1.5.0
+    1.6.0
 """
 
 from typing import Optional, List, Dict, Any
@@ -459,7 +481,7 @@ class TaskPlan:
  * 
  * @module agentos/scheduler
  * @author AgentOS Team
- * @version 1.5.0
+ * @version 1.6.0
  * @license Apache-2.0
  * 
  * @example
@@ -1294,8 +1316,122 @@ Rust 函数:
 ```
 
 ---
+## 十一、AgentOS 特定模块注释指南
 
-## 十一、参考资料
+AgentOS 的四层垂直架构和核心模块对代码注释提出了特定要求。以下指南确保注释与系统架构保持高度一致：
+
+### 11.1 Atoms（原子层）注释规范
+Atoms 模块实现微内核核心功能，注释要求最高级别严谨性：
+
+#### 11.1.1 内存管理（Memory Manager）
+```c
+/**
+ * @brief 分配 NUMA 感知的内存块（映射原则：M-3 拓扑优化）
+ * 
+ * 根据 CPU 拓扑结构分配最优位置的内存，减少跨节点访问延迟。
+ * 使用持久同调分析识别内存访问模式，动态调整分配策略。
+ * 
+ * @param size 请求大小，自动对齐到 HUGEPAGE 边界
+ * @param numa_node 目标 NUMA 节点，-1 表示自动选择
+ * @param flags 分配标志，见 AGENTOS_MEM_FLAGS
+ * 
+ * @note 此函数被 coreloopthree 的核心调度循环频繁调用
+ * @see memoryrovol.md 中的内存进化机制
+ * @see atoms/corekern/memory/numa_allocator.c
+ */
+void* atoms_mem_alloc_numa(size_t size, int numa_node, uint32_t flags);
+```
+
+#### 11.1.2 任务调度（Task Scheduler）
+```c
+/**
+ * @brief 提交任务到双系统调度器（映射原则：C-2 认知优化）
+ * 
+ * 根据任务复杂度自动选择执行路径：
+ * - System 1 路径：简单任务，直接执行
+ * - System 2 路径：复杂任务，深度分析后执行
+ * 
+ * @note 与 microkernel.md 中描述的调度策略严格对应
+ * @see coreloopthree.md 中的三循环架构
+ */
+```
+
+### 11.2 Backs（守护层）注释规范
+Backs 模块作为系统服务守护进程，注释需强调可靠性和监控：
+
+#### 11.2.1 IPC 通信服务
+```python
+class IPCBridge:
+    """IPC 通信桥梁，连接 Atoms 与 Domes（映射原则：E-3 通信基础设施）
+    
+    实现基于共享内存和信号量的高性能进程间通信。
+    集成 OpenTelemetry 监控，实时追踪消息流。
+    
+    Attributes:
+        shm_id: 共享内存标识符
+        sem_key: 信号量键值
+        metrics: 通信指标收集器
+        
+    Note:
+        - 必须与 ipc.md 中的通信协议保持一致
+        - 异常处理需记录到 syslog 并触发告警
+    """
+```
+
+### 11.3 Domes（安全域层）注释规范
+Domes 模块处理安全敏感操作，注释必须包含完整的安全考量：
+
+#### 11.3.1 安全上下文管理
+```typescript
+/**
+ * 安全上下文管理器，实现零信任访问控制（映射原则：D-2 安全隔离）
+ * 
+ * 基于能力（Capability）的安全模型，每个操作必须显式授权。
+ * 使用形式化验证确保访问控制策略的正确性。
+ * 
+ * @security 此组件处理用户身份和权限，必须防御提权攻击
+ * @see Security_design_guide.md 中的零信任架构
+ */
+```
+
+### 11.4 Common（公共库层）注释规范
+Common 模块提供跨层通用功能，注释需强调通用性和可重用性：
+
+#### 11.4.1 公共数据结构
+```go
+// VectorDB 向量数据库客户端，提供 FAISS 和 HNSW 支持。
+//
+// 封装向量索引的创建、查询和更新操作，支持持久化存储。
+// 集成 HDBSCAN 聚类算法，自动发现数据中的拓扑结构。
+//
+// 注意:
+//   - 此客户端被 Atoms、Backs、Domes 三层共同使用
+//   - 性能关键路径，避免不必要的内存分配
+//   - 错误处理必须向上层传递完整的上下文信息
+//
+// 参考:
+//   - memoryrovol.md 中的记忆进化算法
+//   - 持久同调在拓扑数据分析中的应用
+```
+
+### 11.5 跨模块交互注释
+重要跨模块接口必须在注释中明确标注交互关系：
+
+```c
+/**
+ * @brief 核心三循环与微内核的集成点（关键架构接口）
+ * 
+ * 此函数是 coreloopthree 调度循环与 microkernel 任务管理的桥梁。
+ * 涉及模块：atoms/corekern/scheduler/, atoms/corekern/task/
+ * 
+ * @architecture 此接口体现了 S-1 垂直分层的设计原则
+ * @performance 被每秒调用数千次，必须高度优化
+ * @security 必须验证调用者身份，防止非法调度请求
+ */
+```
+
+---
+## 十二、参考资料
 
 1. **Doxygen 官方文档**: https://www.doxygen.nl/manual/
 2. **Google Python Style Guide**: https://google.github.io/styleguide/pyguide.html
@@ -1304,6 +1440,13 @@ Rust 函数:
 5. **Rust API Guidelines**: https://rust-lang.github.io/api-guidelines/
 6. **AgentOS 架构设计原则**: [architectural_design_principles.md](../../architecture/folder/architectural_design_principles.md)
 7. **AgentOS 统一术语表**: [TERMINOLOGY.md](../TERMINOLOGY.md)
+8. **AgentOS 核心架构文档**: 
+   - [coreloopthree.md](../../architecture/folder/coreloopthree.md)
+   - [memoryrovol.md](../../architecture/folder/memoryrovol.md)
+   - [microkernel.md](../../architecture/folder/microkernel.md)
+   - [ipc.md](../../architecture/folder/ipc.md)
+   - [syscall.md](../../architecture/folder/syscall.md)
+   - [logging_system.md](../../architecture/folder/logging_system.md)
 
 ---
 

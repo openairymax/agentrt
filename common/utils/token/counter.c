@@ -24,7 +24,7 @@
  */
 struct agentos_token_counter {
     char model_name[MAX_MODEL_NAME];      /**< 模型名称 */
-    pthread_mutex_t mutex;                /**< 互斥锁，保证线程安全 */
+    token_mutex_t mutex;                  /**< 互斥锁，保证线程安全 */
     size_t total_count;                   /**< 历史累计Token数 */
     uint64_t request_count;               /**< 请求计数 */
     size_t max_token_length;             /**< 最大Token长度 */
@@ -148,7 +148,7 @@ agentos_token_counter_t* agentos_token_counter_create(const char* model_name) {
     strncpy(counter->model_name, model_name, MAX_MODEL_NAME - 1);
     counter->model_name[MAX_MODEL_NAME - 1] = '\0';
     
-    if (pthread_mutex_init(&counter->mutex, NULL) != 0) {
+    if (token_mutex_init(&counter->mutex) != 0) {
         free(counter);
         return NULL;
     }
@@ -165,7 +165,7 @@ void agentos_token_counter_destroy(agentos_token_counter_t* counter) {
         return;
     }
     
-    pthread_mutex_destroy(&counter->mutex);
+    token_mutex_destroy(&counter->mutex);
     free(counter);
 }
 
@@ -179,13 +179,13 @@ size_t agentos_token_counter_count(agentos_token_counter_t* counter, const char*
         return 0;
     }
     
-    pthread_mutex_lock(&counter->mutex);
+    token_mutex_lock(&counter->mutex);
     
     size_t token_count = count_tokens_by_model(counter->model_name, text, length);
     counter->total_count += token_count;
     counter->request_count++;
     
-    pthread_mutex_unlock(&counter->mutex);
+    token_mutex_unlock(&counter->mutex);
     
     return token_count;
 }
@@ -198,7 +198,7 @@ size_t agentos_token_counter_count_batch(agentos_token_counter_t* counter,
         return (size_t)-1;
     }
     
-    pthread_mutex_lock(&counter->mutex);
+    token_mutex_lock(&counter->mutex);
     
     size_t total = 0;
     for (size_t i = 0; i < count; i++) {
@@ -214,7 +214,7 @@ size_t agentos_token_counter_count_batch(agentos_token_counter_t* counter,
     counter->total_count += total;
     counter->request_count += count;
     
-    pthread_mutex_unlock(&counter->mutex);
+    token_mutex_unlock(&counter->mutex);
     
     return 0;
 }
@@ -232,12 +232,12 @@ char* agentos_token_counter_truncate(agentos_token_counter_t* counter,
         return strdup("");
     }
     
-    pthread_mutex_lock(&counter->mutex);
+    token_mutex_lock(&counter->mutex);
     
     size_t current_tokens = count_tokens_by_model(counter->model_name, text, length);
     
     if (current_tokens <= max_tokens) {
-        pthread_mutex_unlock(&counter->mutex);
+        token_mutex_unlock(&counter->mutex);
         return strdup(text);
     }
     
@@ -273,7 +273,7 @@ char* agentos_token_counter_truncate(agentos_token_counter_t* counter,
         }
     }
     
-    pthread_mutex_unlock(&counter->mutex);
+    token_mutex_unlock(&counter->mutex);
     
     return result;
 }

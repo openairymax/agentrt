@@ -1,9 +1,10 @@
 # AgentOS JavaScript 编码规范
 
-**版本**: Doc V1.5  
-**发布日期**: 2026-03-24  
+**版本**: Doc V1.6  
+**更新日期**: 2026-03-25  
 **适用范围**: AgentOS 所有 JavaScript/TypeScript 代码  
-**理论基础**: 工程两论（反馈闭环）、系统工程（模块化）、双系统认知理论
+**理论基础**: 工程两论（反馈闭环）、系统工程（模块化）、五维正交系统（系统观、内核观、认知观、工程观、设计美学）、双系统认知理论  
+**原则映射**: S-1至S-4（系统设计）、C-1至C-4（认知设计）、E-1至E-4（工程设计）、A-1至A-4（设计美学）
 
 ---
 
@@ -11,11 +12,11 @@
 
 ### 1.1 编制目的
 
-本规范为 AgentOS 项目中的 JavaScript/TypeScript 代码提供统一的编码标准。基于项目架构设计原则的四维正交体系，本规范聚焦于工程观维度，为开发者提供可操作的代码实现指南。
+本规范为 AgentOS 项目中的 JavaScript/TypeScript 代码提供统一的编码标准。基于项目架构设计原则的五维正交系统，本规范聚焦于工程观维度（E-1至E-4），为开发者提供可操作的代码实现指南。
 
 ### 1.2 理论基础
 
-本规范基于 AgentOS 架构设计原则的四维正交体系：
+本规范基于 AgentOS 架构设计原则的五维正交系统：
 
 - **《工程控制论》**（原则 S-1, E-2）：通过错误处理、日志、健康检查构建反馈闭环
 - **《论系统工程》**（原则 S-2）：模块化、接口驱动、边界清晰
@@ -74,7 +75,7 @@ src/
  *
  * @module agentos/scheduler
  * @author AgentOS Team
- * @version 1.5.0
+ * @version 1.6.0
  */
 
 // 1. 导入语句
@@ -947,13 +948,456 @@ describe('TaskScheduler', () => {
 ```
 
 ---
+## 十四、AgentOS 模块 JavaScript/TypeScript 编码示例
 
-## 十三、参考文献
+### 14.1 Backs（守护层）TypeScript 实现
+Backs模块作为系统服务守护进程，需要高可靠性和可观测性：
+
+#### 14.1.1 IPC 通信服务（映射原则：E-3 通信基础设施）
+```typescript
+/**
+ * IPC通信服务 - 体现系统观（S-3）和工程观（E-2, E-4）原则
+ * 
+ * 实现与Atoms模块的高性能进程间通信。
+ * 集成OpenTelemetry可观测性和消息加密。
+ * 
+ * @see ipc.md 中的通信协议规范
+ */
+@Injectable()
+export class IpcService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(IpcService.name);
+  private readonly metrics = new MetricsCollector('ipc_service');
+  private readonly crypto = new MessageCrypto();
+  private channel?: IpcChannel;
+  
+  /**
+   * 发送安全消息 - 体现防御深度（D-3）原则
+   * 
+   * 多层安全验证：
+   * 1. 消息签名验证
+   * 2. 发送者身份验证
+   * 3. 消息加密
+   * 4. 完整性保护
+   */
+  async sendSecure<TRequest, TResponse>(
+    request: SecureRequest<TRequest>,
+    options: SendOptions = {}
+  ): Promise<SecureResponse<TResponse>> {
+    // 层次1：请求签名
+    const signature = await this.crypto.sign(request.payload);
+    const signedRequest = { ...request, signature };
+    
+    // 层次2：消息加密
+    const encrypted = await this.crypto.encrypt(
+      JSON.stringify(signedRequest),
+      this.sessionKey
+    );
+    
+    // 层次3：身份验证
+    const token = await this.auth.getCurrentToken();
+    if (!token.valid) {
+      throw new SecurityException('Authentication token expired');
+    }
+    
+    // 层次4：发送并验证响应
+    const rawResponse = await this.channel!.send(encrypted, options);
+    const response = this.parseResponse<TResponse>(rawResponse);
+    
+    // 验证响应完整性
+    const isValid = await this.crypto.verify(
+      response.signature,
+      response.payload
+    );
+    if (!isValid) {
+      this.metrics.increment('integrity_check_failed');
+      throw new SecurityException('Response integrity check failed');
+    }
+    
+    return response;
+  }
+  
+  private parseResponse<T>(raw: RawResponse): SecureResponse<T> {
+    // 类型安全解析，使用Zod验证模式
+    return ipcResponseSchema.parse(raw) as SecureResponse<T>;
+  }
+}
+```
+
+#### 14.1.2 任务监控守护进程（映射原则：E-2 可维护性）
+```typescript
+/**
+ * 任务监控守护进程 - 体现工程观（E-2）和设计美学（A-1）原则
+ * 
+ * 监控AgentOS任务执行状态，提供实时指标和告警。
+ * 基于事件驱动的架构，支持插件化扩展。
+ */
+@Controller('tasks')
+export class TaskMonitorDaemon {
+  private readonly tasks = new Map<string, TaskContext>();
+  private readonly eventEmitter = new EventEmitter();
+  
+  /**
+   * 订阅任务状态变更 - 体现反馈闭环（S-1）原则
+   */
+  @SubscribeMessage('task:status')
+  async handleTaskStatus(
+    @MessageBody() data: TaskStatusUpdate
+  ): Promise<MonitoringResponse> {
+    const { taskId, status, timestamp, metrics } = data;
+    
+    // 更新任务状态
+    const context = this.tasks.get(taskId);
+    if (context) {
+      context.status = status;
+      context.lastUpdate = timestamp;
+      context.metrics = metrics;
+      
+      // 触发状态变更事件
+      this.eventEmitter.emit('task:status:changed', {
+        taskId,
+        oldStatus: context.previousStatus,
+        newStatus: status,
+        timestamp
+      });
+      
+      // 检查告警条件
+      await this.checkAlerts(context);
+    }
+    
+    return { success: true, monitored: true };
+  }
+  
+  /**
+   * 检查告警条件 - 体现System 2（深度分析）原则
+   */
+  private async checkAlerts(context: TaskContext): Promise<void> {
+    const alerts: Alert[] = [];
+    
+    // 性能告警：CPU使用率超过阈值
+    if (context.metrics.cpuUsage > context.thresholds.cpu) {
+      alerts.push({
+        type: 'performance',
+        severity: 'warning',
+        message: `CPU usage high: ${context.metrics.cpuUsage}%`,
+        taskId: context.taskId,
+        timestamp: Date.now()
+      });
+    }
+    
+    // 错误率告警
+    if (context.metrics.errorRate > context.thresholds.errorRate) {
+      alerts.push({
+        type: 'error',
+        severity: 'critical',
+        message: `Error rate high: ${context.metrics.errorRate}%`,
+        taskId: context.taskId,
+        timestamp: Date.now()
+      });
+    }
+    
+    // 发送告警
+    if (alerts.length > 0) {
+      await this.alertService.sendAlerts(alerts);
+    }
+  }
+}
+```
+
+### 14.2 Domes（安全域层）TypeScript 实现
+Domes模块实现零信任安全模型，需要严格的安全保障：
+
+#### 14.2.1 安全策略引擎（映射原则：D-1 最小权限）
+```typescript
+/**
+ * 安全策略引擎 - 体现安全工程（D-1至D-4）原则
+ * 
+ * 基于YAML规则引擎实现细粒度访问控制。
+ * 支持动态策略更新和形式化验证。
+ * 
+ * @see Security_design_guide.md 中的零信任架构
+ */
+export class SecurityPolicyEngine {
+  private readonly policies = new Map<string, SecurityPolicy>();
+  private readonly validators = new Map<string, PolicyValidator>();
+  private readonly auditLogger = new AuditLogger();
+  
+  /**
+   * 评估访问请求 - 体现防御深度（D-3）原则
+   */
+  async evaluate(request: AccessRequest): Promise<AccessDecision> {
+    // 层次1：主体验证
+    const subjectValid = await this.validateSubject(request.subject);
+    if (!subjectValid) {
+      await this.auditLogger.log('subject_validation_failed', request);
+      return AccessDecision.deny('Invalid subject');
+    }
+    
+    // 层次2：资源权限检查
+    const hasPermission = await this.checkPermission(
+      request.subject,
+      request.resource,
+      request.action
+    );
+    if (!hasPermission) {
+      await this.auditLogger.log('permission_denied', request);
+      return AccessDecision.deny('Insufficient permission');
+    }
+    
+    // 层次3：上下文策略评估
+    const contextValid = await this.evaluateContext(request.context);
+    if (!contextValid) {
+      await this.auditLogger.log('context_violation', request);
+      return AccessDecision.deny('Context policy violation');
+    }
+    
+    // 层次4：风险评估
+    const risk = await this.assessRisk(request);
+    if (risk.level === RiskLevel.HIGH) {
+      await this.auditLogger.log('high_risk_denied', { ...request, risk });
+      return AccessDecision.deny('High risk access');
+    }
+    
+    // 授予访问权限
+    await this.auditLogger.log('access_granted', { ...request, risk });
+    return AccessDecision.grant({
+      riskScore: risk.score,
+      sessionTimeout: risk.recommendedTimeout
+    });
+  }
+  
+  /**
+   * 动态更新策略 - 体现工程观（E-2）原则
+   */
+  async updatePolicy(policyId: string, policy: SecurityPolicy): Promise<void> {
+    // 验证策略格式
+    const validation = await this.validatePolicy(policy);
+    if (!validation.valid) {
+      throw new PolicyValidationError(validation.errors);
+    }
+    
+    // 形式化验证（可选）
+    if (policy.formalVerification) {
+      const formalResult = await this.formalVerify(policy);
+      if (!formalResult.verified) {
+        throw new FormalVerificationError(formalResult.violations);
+      }
+    }
+    
+    // 更新策略
+    this.policies.set(policyId, policy);
+    
+    // 审计日志
+    await this.auditLogger.log('policy_updated', {
+      policyId,
+      timestamp: Date.now(),
+      updatedBy: this.currentUser
+    });
+  }
+}
+```
+
+### 14.3 Common（公共库层）TypeScript 实现
+Common模块提供跨层基础设施，强调通用性和性能：
+
+#### 14.3.1 向量数据库客户端（映射原则：E-1 基础设施）
+```typescript
+/**
+ * 向量数据库客户端 - 体现工程观（E-1, E-3）和认知观（C-3）原则
+ * 
+ * 封装FAISS和HNSW向量索引，支持持久化存储和拓扑分析。
+ * 集成HDBSCAN聚类算法，自动发现数据中的拓扑结构。
+ * 
+ * @see memoryrovol.md 中的记忆进化算法
+ */
+export class VectorDbClient {
+  private readonly index: VectorIndex;
+  private readonly metadataStore: MetadataStore;
+  private readonly cache = new LRUCache<string, Vector>(1000);
+  
+  /**
+   * 相似性搜索 - 体现性能优化和资源确定性
+   */
+  async search(
+    query: Vector,
+    options: SearchOptions = {}
+  ): Promise<SearchResult[]> {
+    const startTime = performance.now();
+    
+    try {
+      // 缓存查询
+      const cacheKey = this.hashVector(query);
+      const cached = this.cache.get(cacheKey);
+      if (cached && !options.forceRefresh) {
+        this.metrics.increment('cache_hit');
+        return cached;
+      }
+      
+      // 执行搜索
+      const results = await this.index.search(query, options);
+      
+      // 批量获取元数据（减少随机访问）
+      const ids = results.map(r => r.id);
+      const metadata = await this.metadataStore.batchGet(ids);
+      
+      // 构造结果
+      const formatted = results.map((result, index) => ({
+        id: result.id,
+        score: result.score,
+        metadata: metadata[index],
+        vector: result.vector
+      }));
+      
+      // 更新缓存
+      this.cache.set(cacheKey, formatted);
+      
+      // 记录性能指标
+      const duration = performance.now() - startTime;
+      this.metrics.record('search_duration', duration);
+      
+      return formatted;
+      
+    } catch (error) {
+      this.metrics.increment('search_error');
+      this.logger.error('Search failed', { error, query: query.slice(0, 10) });
+      throw new VectorDbError('Search failed', { cause: error });
+    }
+  }
+  
+  /**
+   * 批量插入向量 - 体现批量处理优化
+   */
+  async insertBatch(
+    vectors: Vector[],
+    metadata: Metadata[] = []
+  ): Promise<string[]> {
+    // 预分配结果数组
+    const ids = new Array<string>(vectors.length);
+    
+    // 批量插入索引
+    const indexIds = await this.index.insertBatch(vectors);
+    
+    // 批量存储元数据
+    if (metadata.length > 0) {
+      await this.metadataStore.batchSet(
+        indexIds.map((id, index) => ({
+          id,
+          metadata: metadata[index] || {}
+        }))
+      );
+    }
+    
+    // 更新缓存
+    vectors.forEach((vector, index) => {
+      const cacheKey = this.hashVector(vector);
+      this.cache.delete(cacheKey);
+    });
+    
+    return indexIds;
+  }
+}
+```
+
+### 14.4 前端SDK TypeScript 实现
+AgentOS前端SDK需要与后端架构保持一致性：
+
+#### 14.4.1 统一状态管理（映射原则：S-2 模块化设计）
+```typescript
+/**
+ * 统一状态管理器 - 体现系统观（S-2）和工程观（E-2）原则
+ * 
+ * 基于Redux模式的状态管理，支持时间旅行调试和持久化。
+ * 集成与Backs模块的实时同步。
+ */
+export class UnifiedStateManager {
+  private store: Store<AppState>;
+  private readonly middleware: Middleware[];
+  private readonly syncService: StateSyncService;
+  
+  constructor(config: StateConfig) {
+    // 创建Redux store
+    this.store = createStore(
+      rootReducer,
+      config.initialState,
+      applyMiddleware(...this.middleware)
+    );
+    
+    // 集成同步服务
+    this.syncService = new StateSyncService({
+      backendUrl: config.backendUrl,
+      syncInterval: config.syncInterval
+    });
+    
+    // 设置状态持久化
+    if (config.persist) {
+      this.setupPersistence(config.persistenceKey);
+    }
+    
+    // 启动自动同步
+    if (config.autoSync) {
+      this.startAutoSync();
+    }
+  }
+  
+  /**
+   * 分派动作 - 体现类型安全和错误恢复
+   */
+  dispatch<T extends Action>(action: T): T {
+    try {
+      // 验证动作格式
+      this.validateAction(action);
+      
+      // 分派到store
+      const result = this.store.dispatch(action);
+      
+      // 异步同步到后端
+      if (this.shouldSync(action)) {
+        this.syncService.sync(action).catch(error => {
+          this.logger.warn('Sync failed', { action, error });
+        });
+      }
+      
+      return result;
+      
+    } catch (error) {
+      this.logger.error('Dispatch failed', { action, error });
+      throw new StateError('Dispatch failed', { cause: error });
+    }
+  }
+  
+  /**
+   * 订阅状态变更 - 体现响应式编程模式
+   */
+  subscribe<T>(
+    selector: (state: AppState) => T,
+    listener: (value: T, previousValue: T) => void
+  ): () => void {
+    let previousValue = selector(this.store.getState());
+    
+    return this.store.subscribe(() => {
+      const currentValue = selector(this.store.getState());
+      if (!Object.is(previousValue, currentValue)) {
+        listener(currentValue, previousValue);
+        previousValue = currentValue;
+      }
+    });
+  }
+}
+```
+
+---
+## 十五、参考文献
 
 1. **AgentOS 架构设计原则**: [architectural_design_principles.md](../../architecture/folder/architectural_design_principles.md)
 2. **Google TypeScript Style Guide**: https://google.github.io/styleguide/tsguide.html
 3. **TypeScript Documentation**: https://www.typescriptlang.org/docs/
 4. **Airbnb JavaScript Style Guide**: https://github.com/airbnb/javascript
+5. **AgentOS 核心架构文档**:
+   - [coreloopthree.md](../../architecture/folder/coreloopthree.md)
+   - [memoryrovol.md](../../architecture/folder/memoryrovol.md)
+   - [microkernel.md](../../architecture/folder/microkernel.md)
+   - [ipc.md](../../architecture/folder/ipc.md)
+   - [syscall.md](../../architecture/folder/syscall.md)
+   - [logging_system.md](../../architecture/folder/logging_system.md)
 
 ---
 

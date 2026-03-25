@@ -65,6 +65,11 @@ export function defaultConfig(): Config {
 }
 
 /**
+ * 默认任务轮询间隔（毫秒）
+ */
+export const DEFAULT_POLL_INTERVAL_MS = 500;
+
+/**
  * 设置服务端点地址
  * @param endpoint - 端点地址
  */

@@ -1,6 +1,6 @@
 /**
  * @file trace.c
- * @brief 链路追踪实现
+ * @brief 链路追踪实现（跨平台）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  * 
  * @details
@@ -15,10 +15,16 @@
 #include "observability.h"
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
 #include <time.h>
 #include <stdatomic.h>
 #include <ctype.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <pthread.h>
+#include <unistd.h>
+#endif
 
 #define MAX_SPANS 1024
 #define MAX_EVENTS_PER_SPAN 64
@@ -36,6 +42,60 @@ typedef struct trace_event {
 } trace_event_t;
 
 /**
+ * @brief 跨平台互斥锁类型
+ */
+#ifdef _WIN32
+typedef CRITICAL_SECTION trace_mutex_t;
+#else
+typedef pthread_mutex_t trace_mutex_t;
+#endif
+
+/**
+ * @brief 初始化互斥锁
+ */
+static int trace_mutex_init(trace_mutex_t* mutex) {
+#ifdef _WIN32
+    InitializeCriticalSection(mutex);
+    return 0;
+#else
+    return pthread_mutex_init(mutex, NULL);
+#endif
+}
+
+/**
+ * @brief 销毁互斥锁
+ */
+static void trace_mutex_destroy(trace_mutex_t* mutex) {
+#ifdef _WIN32
+    DeleteCriticalSection(mutex);
+#else
+    pthread_mutex_destroy(mutex);
+#endif
+}
+
+/**
+ * @brief 加锁
+ */
+static void trace_mutex_lock(trace_mutex_t* mutex) {
+#ifdef _WIN32
+    EnterCriticalSection(mutex);
+#else
+    pthread_mutex_lock(mutex);
+#endif
+}
+
+/**
+ * @brief 解锁
+ */
+static void trace_mutex_unlock(trace_mutex_t* mutex) {
+#ifdef _WIN32
+    LeaveCriticalSection(mutex);
+#else
+    pthread_mutex_unlock(mutex);
+#endif
+}
+
+/**
  * @brief 追踪Span内部结构
  */
 struct agentos_trace_span {
@@ -49,7 +109,7 @@ struct agentos_trace_span {
     trace_event_t* events;             /**< 事件链表 */
     trace_event_t* events_tail;         /**< 事件链表尾 */
     int event_count;                    /**< 事件数量 */
-    pthread_mutex_t mutex;             /**< 互斥锁 */
+    trace_mutex_t mutex;               /**< 互斥锁 */
     struct agentos_trace_span* next;   /**< 下一个Span */
 };
 
@@ -61,16 +121,27 @@ static struct {
     atomic_uint64_t trace_counter;     /**< 追踪计数器 */
     agentos_trace_span_t* head;        /**< Span链表头 */
     agentos_trace_span_t* tail;        /**< Span链表尾 */
-    pthread_mutex_t mutex;             /**< 互斥锁 */
+    trace_mutex_t mutex;               /**< 互斥锁 */
     int initialized;                   /**< 初始化标志 */
-} g_trace_state = {
-    .span_counter = 0,
-    .trace_counter = 0,
-    .head = NULL,
-    .tail = NULL,
-    .mutex = {0},
-    .initialized = 0
-};
+} g_trace_state;
+
+/**
+ * @brief 获取当前时间戳（微秒）- 跨平台实现
+ */
+static int64_t get_current_time_us(void) {
+#ifdef _WIN32
+    FILETIME ft;
+    ULARGE_INTEGER uli;
+    GetSystemTimeAsFileTime(&ft);
+    uli.LowPart = ft.dwLowDateTime;
+    uli.HighPart = ft.dwHighDateTime;
+    return (int64_t)((uli.QuadPart - 116444736000000000LL) / 10);
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (int64_t)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+#endif
+}
 
 /**
  * @brief 初始化追踪系统
@@ -80,10 +151,14 @@ static int init_trace_system(void) {
         return 0;
     }
     
-    if (pthread_mutex_init(&g_trace_state.mutex, NULL) != 0) {
+    if (trace_mutex_init(&g_trace_state.mutex) != 0) {
         return -1;
     }
     
+    atomic_init(&g_trace_state.span_counter, 0);
+    atomic_init(&g_trace_state.trace_counter, 0);
+    g_trace_state.head = NULL;
+    g_trace_state.tail = NULL;
     g_trace_state.initialized = 1;
     return 0;
 }
@@ -92,19 +167,10 @@ static int init_trace_system(void) {
  * @brief 生成ID
  */
 static void generate_id(char* buffer, size_t size, uint64_t counter, const char* prefix) {
-    snprintf(buffer, size, "%s-%016lx-%08lx", 
+    snprintf(buffer, size, "%s-%016llx-%08llx", 
              prefix, 
-             (unsigned long)time(NULL),
-             (unsigned long)counter);
-}
-
-/**
- * @brief 获取当前时间戳（微秒）
- */
-static int64_t get_current_time_us(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return (int64_t)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+             (unsigned long long)time(NULL),
+             (unsigned long long)counter);
 }
 
 /**
@@ -184,12 +250,12 @@ agentos_trace_span_t* agentos_trace_begin(const char* name, const char* parent_i
     span->events_tail = NULL;
     span->event_count = 0;
     
-    if (pthread_mutex_init(&span->mutex, NULL) != 0) {
+    if (trace_mutex_init(&span->mutex) != 0) {
         free(span);
         return NULL;
     }
     
-    pthread_mutex_lock(&g_trace_state.mutex);
+    trace_mutex_lock(&g_trace_state.mutex);
     
     span->next = NULL;
     if (g_trace_state.tail) {
@@ -200,7 +266,7 @@ agentos_trace_span_t* agentos_trace_begin(const char* name, const char* parent_i
         g_trace_state.tail = span;
     }
     
-    pthread_mutex_unlock(&g_trace_state.mutex);
+    trace_mutex_unlock(&g_trace_state.mutex);
     
     return span;
 }
@@ -210,17 +276,17 @@ void agentos_trace_end(agentos_trace_span_t* span) {
         return;
     }
     
-    pthread_mutex_lock(&span->mutex);
+    trace_mutex_lock(&span->mutex);
     
     if (atomic_load(&span->status) != 0) {
-        pthread_mutex_unlock(&span->mutex);
+        trace_mutex_unlock(&span->mutex);
         return;
     }
     
     span->end_time = get_current_time_us();
     atomic_store(&span->status, 1);
     
-    pthread_mutex_unlock(&span->mutex);
+    trace_mutex_unlock(&span->mutex);
 }
 
 void agentos_trace_add_event(agentos_trace_span_t* span, const char* name, const char* attributes) {
@@ -228,21 +294,21 @@ void agentos_trace_add_event(agentos_trace_span_t* span, const char* name, const
         return;
     }
     
-    pthread_mutex_lock(&span->mutex);
+    trace_mutex_lock(&span->mutex);
     
     if (atomic_load(&span->status) == 2) {
-        pthread_mutex_unlock(&span->mutex);
+        trace_mutex_unlock(&span->mutex);
         return;
     }
     
     if (span->event_count >= MAX_EVENTS_PER_SPAN) {
-        pthread_mutex_unlock(&span->mutex);
+        trace_mutex_unlock(&span->mutex);
         return;
     }
     
     trace_event_t* event = create_event(name, attributes);
     if (!event) {
-        pthread_mutex_unlock(&span->mutex);
+        trace_mutex_unlock(&span->mutex);
         return;
     }
     
@@ -256,7 +322,7 @@ void agentos_trace_add_event(agentos_trace_span_t* span, const char* name, const
     
     span->event_count++;
     
-    pthread_mutex_unlock(&span->mutex);
+    trace_mutex_unlock(&span->mutex);
 }
 
 char* agentos_trace_export(void) {
@@ -264,12 +330,12 @@ char* agentos_trace_export(void) {
         return NULL;
     }
     
-    pthread_mutex_lock(&g_trace_state.mutex);
+    trace_mutex_lock(&g_trace_state.mutex);
     
     size_t buffer_size = 4096;
     char* buffer = (char*)malloc(buffer_size);
     if (!buffer) {
-        pthread_mutex_unlock(&g_trace_state.mutex);
+        trace_mutex_unlock(&g_trace_state.mutex);
         return NULL;
     }
     
@@ -280,7 +346,7 @@ char* agentos_trace_export(void) {
     int first = 1;
     
     while (span) {
-        pthread_mutex_lock(&span->mutex);
+        trace_mutex_lock(&span->mutex);
         
         if (!first) {
             offset += snprintf(buffer + offset, buffer_size - offset, ",\n");
@@ -301,13 +367,13 @@ char* agentos_trace_export(void) {
         offset += snprintf(buffer + offset, buffer_size - offset, 
                           "    \"name\": \"%s\",\n", span->name);
         offset += snprintf(buffer + offset, buffer_size - offset, 
-                          "    \"start_time\": %ld,\n", span->start_time);
+                          "    \"start_time\": %lld,\n", (long long)span->start_time);
         
         if (span->end_time > 0) {
             offset += snprintf(buffer + offset, buffer_size - offset, 
-                              "    \"end_time\": %ld,\n", span->end_time);
+                              "    \"end_time\": %lld,\n", (long long)span->end_time);
             offset += snprintf(buffer + offset, buffer_size - offset, 
-                              "    \"duration_us\": %ld,\n", span->end_time - span->start_time);
+                              "    \"duration_us\": %lld,\n", (long long)(span->end_time - span->start_time));
         }
         
         offset += snprintf(buffer + offset, buffer_size - offset, 
@@ -328,8 +394,8 @@ char* agentos_trace_export(void) {
                 first_event = 0;
                 
                 offset += snprintf(buffer + offset, buffer_size - offset, 
-                                  "      {\"name\": \"%s\", \"timestamp\": %ld",
-                                  event->name, event->timestamp);
+                                  "      {\"name\": \"%s\", \"timestamp\": %lld",
+                                  event->name, (long long)event->timestamp);
                 
                 if (event->attributes[0]) {
                     offset += snprintf(buffer + offset, buffer_size - offset, 
@@ -345,7 +411,7 @@ char* agentos_trace_export(void) {
         
         offset += snprintf(buffer + offset, buffer_size - offset, "\n  }");
         
-        pthread_mutex_unlock(&span->mutex);
+        trace_mutex_unlock(&span->mutex);
         
         span = span->next;
         
@@ -353,7 +419,7 @@ char* agentos_trace_export(void) {
             buffer_size *= 2;
             char* new_buffer = (char*)realloc(buffer, buffer_size);
             if (!new_buffer) {
-                pthread_mutex_unlock(&g_trace_state.mutex);
+                trace_mutex_unlock(&g_trace_state.mutex);
                 free(buffer);
                 return NULL;
             }
@@ -363,25 +429,29 @@ char* agentos_trace_export(void) {
     
     offset += snprintf(buffer + offset, buffer_size - offset, "\n]");
     
-    pthread_mutex_unlock(&g_trace_state.mutex);
+    trace_mutex_unlock(&g_trace_state.mutex);
     
     return buffer;
 }
 
 void agentos_trace_cleanup(void) {
-    pthread_mutex_lock(&g_trace_state.mutex);
+    if (!g_trace_state.initialized) {
+        return;
+    }
+    
+    trace_mutex_lock(&g_trace_state.mutex);
     
     agentos_trace_span_t* span = g_trace_state.head;
     while (span) {
         agentos_trace_span_t* next = span->next;
         
-        pthread_mutex_lock(&span->mutex);
+        trace_mutex_lock(&span->mutex);
         span->end_time = get_current_time_us();
         atomic_store(&span->status, 1);
         free_events(span->events);
-        pthread_mutex_unlock(&span->mutex);
+        trace_mutex_unlock(&span->mutex);
         
-        pthread_mutex_destroy(&span->mutex);
+        trace_mutex_destroy(&span->mutex);
         free(span);
         
         span = next;
@@ -390,11 +460,15 @@ void agentos_trace_cleanup(void) {
     g_trace_state.head = NULL;
     g_trace_state.tail = NULL;
     
-    pthread_mutex_unlock(&g_trace_state.mutex);
+    trace_mutex_unlock(&g_trace_state.mutex);
 }
 
 int agentos_trace_get_span_count(void) {
-    pthread_mutex_lock(&g_trace_state.mutex);
+    if (!g_trace_state.initialized) {
+        return 0;
+    }
+    
+    trace_mutex_lock(&g_trace_state.mutex);
     
     int count = 0;
     agentos_trace_span_t* span = g_trace_state.head;
@@ -403,7 +477,7 @@ int agentos_trace_get_span_count(void) {
         span = span->next;
     }
     
-    pthread_mutex_unlock(&g_trace_state.mutex);
+    trace_mutex_unlock(&g_trace_state.mutex);
     
     return count;
 }

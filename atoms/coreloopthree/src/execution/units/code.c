@@ -110,6 +110,14 @@ static agentos_error_t create_temp_file(
         return AGENTOS_EIO;
     }
 
+    // 确保临时目录以路径分隔符结尾
+    size_t temp_dir_len = strlen(temp_dir);
+    if (temp_dir_len > 0 && temp_dir[temp_dir_len - 1] != '/') {
+        if (temp_dir_len + 1 < sizeof(temp_dir)) {
+            strcat(temp_dir, "/");
+        }
+    }
+
     char temp_filename[512];
     int needed = snprintf(temp_filename, sizeof(temp_filename),
                           "%sagentos_code_XXXXXX%s",

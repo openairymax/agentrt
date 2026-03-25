@@ -10,7 +10,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import List
 
 import yaml
 
@@ -95,6 +95,7 @@ class ConfigValidator:
             'sanitizer/sanitizer_rules.json': 'sanitizer-rules.schema.json',
             'logging/config.yaml': 'logging.schema.json',
             'config_management.yaml': 'config-management.schema.json',
+            'service/tool_d/tool.yaml': 'tool-service.schema.json',
         }
         
         all_valid = True
@@ -233,6 +234,7 @@ def main():
             'sanitizer/sanitizer_rules.json': 'sanitizer-rules.schema.json',
             'logging/config.yaml': 'logging.schema.json',
             'config_management.yaml': 'config-management.schema.json',
+            'service/tool_d/tool.yaml': 'tool-service.schema.json',
         }
         
         schema_file = schema_mapping.get(args.file)

@@ -4,9 +4,9 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 # AgentOS 进程间通信（IPC）架构详解
 
 **版本**: Doc V1.6  
-**最新**: 2026-03-25  
+**更新日期**: 2026-03-25  
 **状态**: 优化发布  
-**说明**: 根据《AgentOS架构设计原则》深度优化，强化工程两论理论基础，完善模块交互关系，统一术语定义。  
+**原则映射**: 系统观(S)、内核观(K)、认知观(C)、工程观(E)、设计美学(A)  
 **路径**: `atoms/corekern/ipc_binder/`
 
 ## 文档信息
@@ -854,7 +854,7 @@ agentos_ipc_recv(channel, (void**)&response, &len, 5000);
 
 ---
 
-## 7. 实现状态 (v1.0.0.5)
+## 7. 实现状态 (Doc V1.6)
 
 ### 7.1 已完成功能
 

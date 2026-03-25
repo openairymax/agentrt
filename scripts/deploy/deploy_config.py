@@ -5,7 +5,6 @@ AgentOS 配置部署脚本
 """
 
 import argparse
-import os
 import shutil
 import sys
 from pathlib import Path

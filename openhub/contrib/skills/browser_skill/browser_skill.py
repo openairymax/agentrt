@@ -227,7 +227,9 @@ class BrowserSkill:
             if self.config.proxy:
                 launch_options["proxy"] = {"server": self.config.proxy}
 
-            self.browser = self._playwright.browser_type.launch(**launch_options)
+            # 根据浏览器类型选择正确的启动方法
+            browser_launcher = getattr(self._playwright, browser_name)
+            self.browser = browser_launcher.launch(**launch_options)
 
             context_options = {
                 "viewport": {"width": self.config.viewport_width, "height": self.config.viewport_height},

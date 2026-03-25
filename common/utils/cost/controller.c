@@ -1,6 +1,6 @@
 /**
  * @file controller.c
- * @brief 预算控制器实现
+ * @brief 预算控制器实现（跨平台）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  * 
  * @details
@@ -13,9 +13,69 @@
 #include "cost.h"
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
 #include <time.h>
 #include <stdatomic.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <pthread.h>
+#include <unistd.h>
+#endif
+
+/**
+ * @brief 跨平台互斥锁类型
+ */
+#ifdef _WIN32
+typedef CRITICAL_SECTION budget_ctrl_mutex_t;
+#else
+typedef pthread_mutex_t budget_ctrl_mutex_t;
+#endif
+
+/**
+ * @brief 初始化互斥锁
+ */
+static int budget_ctrl_mutex_init(budget_ctrl_mutex_t* mutex) {
+#ifdef _WIN32
+    InitializeCriticalSection(mutex);
+    return 0;
+#else
+    return pthread_mutex_init(mutex, NULL);
+#endif
+}
+
+/**
+ * @brief 销毁互斥锁
+ */
+static void budget_ctrl_mutex_destroy(budget_ctrl_mutex_t* mutex) {
+#ifdef _WIN32
+    DeleteCriticalSection(mutex);
+#else
+    pthread_mutex_destroy(mutex);
+#endif
+}
+
+/**
+ * @brief 加锁
+ */
+static void budget_ctrl_mutex_lock(budget_ctrl_mutex_t* mutex) {
+#ifdef _WIN32
+    EnterCriticalSection(mutex);
+#else
+    pthread_mutex_lock(mutex);
+#endif
+}
+
+/**
+ * @brief 解锁
+ */
+static void budget_ctrl_mutex_unlock(budget_ctrl_mutex_t* mutex) {
+#ifdef _WIN32
+    LeaveCriticalSection(mutex);
+#else
+    pthread_mutex_unlock(mutex);
+#endif
+}
 
 /**
  * @brief 预算控制器内部结构
@@ -27,7 +87,7 @@ struct agentos_budget_controller {
     atomic_double period_cost;              /**< 周期内消耗 */
     atomic_uint64_t request_count;         /**< 请求计数 */
     atomic_uint64_t denied_count;          /**< 拒绝计数 */
-    pthread_mutex_t mutex;                 /**< 互斥锁 */
+    budget_ctrl_mutex_t mutex;                 /**< 互斥锁 */
     time_t period_start;                   /**< 周期开始时间 */
     uint32_t period_seconds;               /**< 周期时长（秒） */
     double average_cost;                   /**< 平均成本 */
@@ -51,14 +111,14 @@ static int check_and_reset_period(agentos_budget_controller_t* controller) {
     time_t now = get_current_time();
     
     if (now >= controller->period_start + (time_t)controller->period_seconds) {
-        pthread_mutex_lock(&controller->mutex);
+        budget_ctrl_mutex_lock(&controller->mutex);
         
         if (now >= controller->period_start + (time_t)controller->period_seconds) {
             atomic_store(&controller->period_cost, 0.0);
             controller->period_start = now;
         }
         
-        pthread_mutex_unlock(&controller->mutex);
+        budget_ctrl_mutex_unlock(&controller->mutex);
         
         return 1;
     }
@@ -86,7 +146,7 @@ agentos_budget_controller_t* agentos_budget_controller_create(double max_cost_us
     atomic_init(&controller->request_count, 0);
     atomic_init(&controller->denied_count, 0);
     
-    if (pthread_mutex_init(&controller->mutex, NULL) != 0) {
+    if (budget_ctrl_mutex_init(&controller->mutex) != 0) {
         free(controller);
         return NULL;
     }
@@ -103,7 +163,7 @@ void agentos_budget_controller_destroy(agentos_budget_controller_t* controller) 
         return;
     }
     
-    pthread_mutex_destroy(&controller->mutex);
+    budget_ctrl_mutex_destroy(&controller->mutex);
     free(controller);
 }
 
@@ -131,14 +191,14 @@ int agentos_budget_controller_consume(agentos_budget_controller_t* controller, d
     double new_total = atomic_fetch_add(&controller->consumed_cost, cost_usd) + cost_usd;
     atomic_fetch_add(&controller->request_count, 1);
     
-    pthread_mutex_lock(&controller->mutex);
+    budget_ctrl_mutex_lock(&controller->mutex);
     
     uint64_t requests = atomic_load(&controller->request_count);
     if (requests > 0) {
         controller->average_cost = new_total / (double)requests;
     }
     
-    pthread_mutex_unlock(&controller->mutex);
+    budget_ctrl_mutex_unlock(&controller->mutex);
     
     if (new_period > controller->max_cost_usd * controller->warning_threshold) {
         return 1;
@@ -199,9 +259,9 @@ int agentos_budget_controller_set_warning(agentos_budget_controller_t* controlle
         return -1;
     }
     
-    pthread_mutex_lock(&controller->mutex);
+    budget_ctrl_mutex_lock(&controller->mutex);
     controller->warning_threshold = threshold;
-    pthread_mutex_unlock(&controller->mutex);
+    budget_ctrl_mutex_unlock(&controller->mutex);
     
     return 0;
 }
@@ -211,10 +271,10 @@ int agentos_budget_controller_reset_period(agentos_budget_controller_t* controll
         return -1;
     }
     
-    pthread_mutex_lock(&controller->mutex);
+    budget_ctrl_mutex_lock(&controller->mutex);
     atomic_store(&controller->period_cost, 0.0);
     controller->period_start = get_current_time();
-    pthread_mutex_unlock(&controller->mutex);
+    budget_ctrl_mutex_unlock(&controller->mutex);
     
     return 0;
 }
@@ -224,9 +284,9 @@ double agentos_budget_controller_average(agentos_budget_controller_t* controller
         return 0.0;
     }
     
-    pthread_mutex_lock(&controller->mutex);
+    budget_ctrl_mutex_lock(&controller->mutex);
     double avg = controller->average_cost;
-    pthread_mutex_unlock(&controller->mutex);
+    budget_ctrl_mutex_unlock(&controller->mutex);
     
     return avg;
 }

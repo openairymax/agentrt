@@ -41,6 +41,29 @@ target_include_directories(agentos_syscall PRIVATE
     ${CJSON_INCLUDE_DIRS}
 )
 
+# 安全编译选项（基于AgentOS C编码风格指南附录A）
+if(MSVC)
+    target_compile_options(agentos_syscall PRIVATE /W4 /WX)
+    target_compile_definitions(agentos_syscall PRIVATE _CRT_SECURE_NO_WARNINGS)
+    target_compile_options(agentos_syscall PRIVATE /GS)
+    target_compile_options(agentos_syscall PRIVATE /sdl)
+    target_compile_options(agentos_syscall PRIVATE /guard:cf)
+else()
+    target_compile_options(agentos_syscall PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    target_compile_options(agentos_syscall PRIVATE -fstack-protector-strong)
+    target_compile_options(agentos_syscall PRIVATE -D_FORTIFY_SOURCE=2)
+    target_compile_options(agentos_syscall PRIVATE -fPIE)
+    target_compile_options(agentos_syscall PRIVATE -Wformat -Wformat-security)
+    target_compile_options(agentos_syscall PRIVATE -fno-omit-frame-pointer)
+endif()
+
+# 链接器安全选项
+if(UNIX AND NOT APPLE)
+    target_link_options(agentos_syscall PRIVATE -Wl,-z,relro -Wl,-z,now -pie)
+elseif(APPLE)
+    target_link_options(agentos_syscall PRIVATE -Wl,-dead_strip -pie)
+endif()
+
 target_link_libraries(agentos_syscall
     agentos_core
     agentos_coreloopthree

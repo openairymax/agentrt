@@ -60,13 +60,22 @@ static const char* PRIVATE_IP_PREFIXES[] = {
 /* ==================== 辅助函数 ==================== */
 
 /**
+ * @brief 跨平台不区分大小写字符串比较（前n个字符）
+ */
+#ifdef _WIN32
+#define strncasecmp_ci _strnicmp
+#else
+#define strncasecmp_ci strncasecmp
+#endif
+
+/**
  * @brief 检查字符串是否以指定前缀开头（不区分大小写）
  */
 static int starts_with_case(const char* str, const char* prefix) {
     if (!str || !prefix) return 0;
     size_t prefix_len = strlen(prefix);
     if (strlen(str) < prefix_len) return 0;
-    return _strnicmp(str, prefix, prefix_len) == 0;
+    return strncasecmp_ci(str, prefix, prefix_len) == 0;
 }
 
 /**
@@ -81,7 +90,7 @@ static int contains_case(const char* str, const char* substr) {
     if (substr_len > str_len) return 0;
     
     for (size_t i = 0; i <= str_len - substr_len; i++) {
-        if (_strnicmp(str + i, substr, substr_len) == 0) {
+        if (strncasecmp_ci(str + i, substr, substr_len) == 0) {
             return 1;
         }
     }

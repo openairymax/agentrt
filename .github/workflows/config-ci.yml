@@ -176,9 +176,9 @@ jobs:
             "config/schema/security-policy.schema.json"
             "config/schema/sanitizer-rules.schema.json"
             "config/schema/logging.schema.json"
+            "config/schema/config-management.schema.json"
+            "config/schema/tool-service.schema.json"
           )
-          
-          missing_schemas=()
           for file in "${required_schemas[@]}"; do
             if [ ! -f "$file" ]; then
               missing_schemas+=("$file")

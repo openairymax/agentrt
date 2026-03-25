@@ -64,8 +64,8 @@ install(DIRECTORY utils/error/include/ DESTINATION include/agentos/utils/error)
 install(DIRECTORY utils/config/include/ DESTINATION include/agentos/utils/config)
 install(DIRECTORY utils/io/include/ DESTINATION include/agentos/utils/io)
 install(DIRECTORY utils/types/include/ DESTINATION include/agentos/utils/types)
-install(DIRECTORY utils/security/include/ DESTINATION include/agentos/utils/security)
-install(DIRECTORY utils/resource/include/ DESTINATION include/agentos/utils/resource)
+install(FILES utils/security/input_validator.h DESTINATION include/agentos/utils/security)
+install(FILES utils/resource/resource_guard.h DESTINATION include/agentos/utils/resource)
 
 # 测试配置
 if(BUILD_TESTS)

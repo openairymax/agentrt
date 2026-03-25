@@ -335,6 +335,7 @@ int main(int argc, char** argv) {
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, SOCKET_PATH, sizeof(addr.sun_path) - 1);
+    addr.sun_path[sizeof(addr.sun_path) - 1] = '\0';
     unlink(SOCKET_PATH);
 
     if (bind(g_server_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {

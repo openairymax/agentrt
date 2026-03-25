@@ -1,9 +1,10 @@
 # AgentOS C++ 编码规范
 
-**版本**: Doc V1.5  
-**发布日期**: 2026-03-24  
+**版本**: Doc V1.6  
+**更新日期**: 2026-03-25  
 **适用范围**: AgentOS 所有 C++ 代码模块  
-**理论基础**: 工程两论（反馈闭环）、系统工程（层次分解）、双系统认知理论、微内核哲学
+**理论基础**: 工程两论（反馈闭环）、系统工程（层次分解）、五维正交系统（系统观、内核观、认知观、工程观、设计美学）、双系统认知理论、微内核哲学  
+**原则映射**: S-1至S-4（系统设计）、K-1至K-4（内核设计）、C-1至C-4（认知设计）、E-1至E-4（工程设计）、A-1至A-4（设计美学）
 
 ---
 
@@ -11,11 +12,11 @@
 
 ### 1.1 编制目的
 
-本规范为 AgentOS 项目中的 C++ 代码提供统一的编码标准。基于项目架构设计原则的四维正交体系，本规范聚焦于工程观维度，为开发者提供可操作的代码实现指南。
+本规范为 AgentOS 项目中的 C++ 代码提供统一的编码标准。基于项目架构设计原则的五维正交系统，本规范聚焦于工程观维度，为开发者提供可操作的代码实现指南。
 
 ### 1.2 理论基础
 
-本规范基于 AgentOS 架构设计原则的四维正交体系，聚焦于**工程观**维度：
+本规范基于 AgentOS 架构设计原则的五维正交系统，聚焦于**工程观**维度：
 
 - **《工程控制论》**（原则 S-1, E-2）：通过错误码、日志、健康检查和指标构建反馈闭环，使系统能自我观测并对异常自动响应
 - **《论系统工程》**（原则 S-2, K-2）：模块化、接口驱动，边界清晰、实现可替换
@@ -810,8 +811,8 @@ private:
  * 如任务调度、事件处理等。
  * 
  * @author AgentOS Team
- * @date 2026-03-24
- * @version 1.5
+ * @date 2026-03-25
+ * @version 1.6
  * 
  * @note 线程安全：所有公共接口均为线程安全
  * @see atoms/corekern/memory/
@@ -1032,13 +1033,322 @@ TEST_F(MemoryPoolTest, ExhaustPool) {
 ```
 
 ---
+## 十四、AgentOS 模块 C++ 编码示例
 
-## 十四、参考文献
+### 14.1 Atoms（原子层）C++ 编码
+Atoms模块实现微内核核心功能，要求最高级别的性能和可靠性：
+
+#### 14.1.1 内存管理器（映射原则：M-3 拓扑优化）
+```cpp
+/**
+ * @brief NUMA感知内存分配器 - 体现工程观（E-3）和系统观（S-1）原则
+ * 
+ * 基于五维正交系统设计：
+ * - 系统观（S-1）：垂直分层，作为内核基础设施
+ * - 内核观（K-1）：最小特权，仅提供基本分配原语
+ * - 工程观（E-3）：资源确定性，保证分配时间上限
+ * - 设计美学（A-1）：接口简洁，命名优雅
+ * 
+ * @see memoryrovol.md 中的记忆进化算法
+ */
+class NumaAwareAllocator {
+public:
+    /**
+     * @brief 分配NUMA优化内存（映射原则：M-3）
+     * 
+     * 根据CPU拓扑选择最优内存节点，减少跨节点访问延迟。
+     * 集成持久同调分析，动态优化分配策略。
+     * 
+     * @param size 请求大小，自动对齐到HUGEPAGE边界
+     * @param numa_node 目标NUMA节点，-1表示自动选择
+     * @param flags 分配标志，见AllocFlags枚举
+     * @return 分配的内存指针，失败返回nullptr
+     * 
+     * @note 此函数被coreloopthree调度循环频繁调用，必须极致优化
+     * @thread_safe 线程安全，内部使用细粒度锁
+     */
+    void* allocate_numa(size_t size, int numa_node = -1, 
+                        AllocFlags flags = AllocFlags::kDefault) {
+        // 规则3-1：内存申请校验
+        if (size == 0 || size > kMaxNumaAllocSize) {
+            AGENTOS_LOG_ERROR("Invalid NUMA allocation size: %zu", size);
+            return nullptr;
+        }
+        
+        // 规则2-3：防止整数溢出（对齐计算）
+        size_t aligned_size = align_up(size, kHugepageSize);
+        if (aligned_size < size) {
+            AGENTOS_LOG_ERROR("Alignment overflow: size=%zu", size);
+            return nullptr;
+        }
+        
+        // NUMA节点信任边界验证
+        if (numa_node < -1 || numa_node >= numa::num_configured_nodes()) {
+            AGENTOS_LOG_ERROR("Invalid NUMA node: %d", numa_node);
+            return nullptr;
+        }
+        
+        // 实际分配逻辑...
+    }
+    
+private:
+    // 遵循类设计规范：简单类型在前，复杂类型在后
+    std::atomic<uint64_t> total_allocated_{0};
+    std::atomic<uint64_t> allocation_count_{0};
+    std::unique_ptr<NumaPool> pools_[kMaxNumaNodes];
+    mutable std::shared_mutex pool_mutex_;  // 读写锁保护池访问
+};
+```
+
+#### 14.1.2 任务调度器（映射原则：C-2 认知优化）
+```cpp
+/**
+ * @brief 双系统任务调度器 - 体现认知观（C-1, C-2）和工程观（E-2）原则
+ * 
+ * 实现System 1（快速路径）和System 2（慢速路径）双系统架构：
+ * - System 1：简单任务，直接执行
+ * - System 2：复杂任务，深度分析后执行
+ * 
+ * @see coreloopthree.md 中的三循环架构
+ * @see microkernel.md 中的任务管理原语
+ */
+class DualSystemScheduler : public SchedulerBase {
+public:
+    // 使用现代C++特性：enum class 类型安全
+    enum class SystemSelection {
+        kAuto,      // 自动选择
+        kSystem1,   // 强制使用System 1
+        kSystem2    // 强制使用System 2
+    };
+    
+    /**
+     * @brief 提交任务到双系统调度器
+     * 
+     * 根据任务复杂度自动选择执行系统，支持运行时策略切换。
+     * 
+     * @param task 任务对象，使用移动语义避免拷贝
+     * @param selection 系统选择策略
+     * @return 任务ID，失败返回std::nullopt
+     * 
+     * @performance 关键路径，必须高效
+     */
+    std::optional<TaskId> submit(Task&& task, 
+                                 SystemSelection selection = SystemSelection::kAuto) {
+        // 参数验证（规则2-1）
+        if (!task.valid()) {
+            AGENTOS_LOG_ERROR("Invalid task submission");
+            return std::nullopt;
+        }
+        
+        // 双系统选择逻辑
+        SystemSelection target = selection;
+        if (target == SystemSelection::kAuto) {
+            target = select_system_based_on_complexity(task);
+        }
+        
+        // 根据系统选择提交
+        if (target == SystemSelection::kSystem1) {
+            return submit_to_system1(std::move(task));
+        } else {
+            return submit_to_system2(std::move(task));
+        }
+    }
+};
+```
+
+### 14.2 Backs（守护层）C++ 编码
+Backs模块作为系统服务，强调可靠性和可观测性：
+
+#### 14.2.1 IPC服务守护进程（映射原则：E-3 通信基础设施）
+```cpp
+/**
+ * @brief IPC守护进程 - 体现系统观（S-3）和工程观（E-2, E-4）原则
+ * 
+ * 实现高性能进程间通信，集成OpenTelemetry可观测性。
+ * 遵循守护进程设计模式，支持优雅启停。
+ * 
+ * @see ipc.md 中的通信协议规范
+ */
+class IpcDaemon : public DaemonBase {
+public:
+    /**
+     * @brief 处理IPC消息 - 体现防御深度（D-3）原则
+     * 
+     * 多层安全验证：
+     * 1. 消息格式验证
+     * 2. 发送者身份验证
+     * 3. 权限检查
+     * 4. 资源配额检查
+     * 
+     * @param message IPC消息，使用const引用避免拷贝
+     * @return 处理结果，使用std::expected表达成功/失败
+     */
+    std::expected<ProcessResult, ErrorCode> 
+    process_message(const IpcMessage& message) {
+        // 层次1：消息格式验证
+        if (!validate_message_format(message)) {
+            AGENTOS_LOG_ERROR("Invalid IPC message format");
+            return std::unexpected(ErrorCode::kInvalidFormat);
+        }
+        
+        // 层次2：身份验证
+        if (!authenticate_sender(message.sender())) {
+            log_audit("Unauthorized IPC access attempt: sender=%s", 
+                      message.sender().c_str());
+            return std::unexpected(ErrorCode::kUnauthorized);
+        }
+        
+        // 层次3：权限检查
+        if (!check_permission(message.sender(), message.operation())) {
+            return std::unexpected(ErrorCode::kPermissionDenied);
+        }
+        
+        // 层次4：资源检查
+        if (!check_resource_quota(message.sender())) {
+            return std::unexpected(ErrorCode::kResourceExhausted);
+        }
+        
+        // 实际处理
+        return do_process_message(message);
+    }
+    
+private:
+    // 使用智能指针管理资源
+    std::unique_ptr<IpcChannel> channel_;
+    std::shared_ptr<MetricsCollector> metrics_;
+    std::vector<std::thread> worker_threads_;
+};
+```
+
+### 14.3 Domes（安全域层）C++ 编码
+Domes模块实现零信任安全模型，要求形式化验证支持：
+
+#### 14.3.1 安全能力管理器（映射原则：D-1 最小权限）
+```cpp
+/**
+ * @brief 能力（Capability）管理器 - 体现安全工程（D-1至D-4）原则
+ * 
+ * 基于能力的访问控制模型，每个操作必须显式授权。
+ * 支持能力传递、撤销和审计追踪。
+ * 
+ * @formal 关键安全属性已通过形式化验证
+ * @see Security_design_guide.md 中的零信任架构
+ */
+class CapabilityManager {
+public:
+    /**
+     * @brief 创建能力 - 体现最小权限（D-1）原则
+     * 
+     * 创建仅包含必要权限的能力对象。
+     * 能力创建过程被审计日志记录。
+     * 
+     * @param subject 主体标识
+     * @param resource 资源标识
+     * @param permissions 权限位图
+     * @return 能力句柄，失败返回std::nullopt
+     */
+    std::optional<CapabilityHandle> create_capability(
+        const SubjectId& subject,
+        const ResourceId& resource,
+        PermissionSet permissions) {
+        
+        // 权限最小化：移除不必要的权限
+        permissions = minimize_permissions(subject, resource, permissions);
+        
+        // 创建能力
+        auto capability = Capability::create(subject, resource, permissions);
+        if (!capability) {
+            return std::nullopt;
+        }
+        
+        // 审计日志（D-4原则）
+        log_audit("Capability created: subject=%s, resource=%s, permissions=%x",
+                  subject.c_str(), resource.c_str(), permissions.bits());
+        
+        return capability->handle();
+    }
+    
+private:
+    // 使用不可变数据结构保证线程安全
+    const CapabilityStore store_;
+    std::shared_mutex store_mutex_;
+};
+```
+
+### 14.4 Common（公共库层）C++ 编码
+Common模块提供跨层基础设施，强调通用性和性能：
+
+#### 14.4.1 向量数据库客户端（映射原则：E-1 基础设施）
+```cpp
+/**
+ * @brief 向量数据库客户端 - 体现工程观（E-1, E-3）和认知观（C-3）原则
+ * 
+ * 封装FAISS和HNSW向量索引，支持持久化存储和拓扑分析。
+ * 集成HDBSCAN聚类算法，自动发现数据中的拓扑结构。
+ * 
+ * @see memoryrovol.md 中的记忆进化算法
+ */
+class VectorDbClient {
+public:
+    /**
+     * @brief 相似性搜索 - 体现性能优化和资源确定性
+     * 
+     * 支持近似最近邻搜索，平衡精度和性能。
+     * 实现缓存友好数据布局，优化CPU缓存利用率。
+     * 
+     * @param query 查询向量
+     * @param k 返回结果数量
+     * @param options 搜索选项
+     * @return 搜索结果，使用移动语义返回
+     */
+    std::vector<SearchResult> search(
+        const Vector& query, 
+        size_t k, 
+        SearchOptions options = {}) {
+        
+        // 预分配结果向量，避免多次分配
+        std::vector<SearchResult> results;
+        results.reserve(k);
+        
+        // 缓存友好访问模式
+        auto indices = index_->search(query, k, options);
+        
+        // 批量获取元数据，减少随机访问
+        auto metadata = batch_get_metadata(indices);
+        
+        // 构造结果
+        for (size_t i = 0; i < indices.size(); ++i) {
+            results.emplace_back(
+                indices[i],
+                metadata[i],
+                compute_similarity(query, metadata[i].vector)
+            );
+        }
+        
+        return results;  // 移动语义返回，避免拷贝
+    }
+    
+private:
+    // 使用PImpl模式隐藏实现细节
+    class Impl;
+    std::unique_ptr<Impl> impl_;
+};
+```
+
+---
+## 十五、参考文献
 
 1. **AgentOS 架构设计原则**: [architectural_design_principles.md](../../architecture/folder/architectural_design_principles.md)
 2. **C++ Core Guidelines**: https://isocpp.github.io/CppCoreGuidelines/
 3. **Google C++ Style Guide**: https://google.github.io/styleguide/cppguide.html
 4. **ISO C++ Standard**: https://eel.is/c++draft/
+5. **AgentOS 核心架构文档**:
+   - [coreloopthree.md](../../architecture/folder/coreloopthree.md)
+   - [memoryrovol.md](../../architecture/folder/memoryrovol.md)  
+   - [microkernel.md](../../architecture/folder/microkernel.md)
+   - [ipc.md](../../architecture/folder/ipc.md)
+   - [syscall.md](../../architecture/folder/syscall.md)
+   - [logging_system.md](../../architecture/folder/logging_system.md)
 
 ---
 

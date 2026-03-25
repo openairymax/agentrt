@@ -4,9 +4,9 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 # AgentOS 日志系统架构详解
 
 **版本**: Doc V1.6  
-**最新**: 2026-03-25  
+**更新日期**: 2026-03-25  
 **状态**: 优化发布  
-**说明**: 根据《AgentOS架构设计原则》深度优化，强化工程两论理论基础，完善模块交互关系，统一术语定义。  
+**原则映射**: 系统观(S)、内核观(K)、认知观(C)、工程观(E)、设计美学(A)  
 **路径**: `atoms/utils/observability/`
 
 本文档详细说明 AgentOS 日志系统的科学设计，包括跨语言可观测性、动态反馈调节、高性能异步写入等关键技术。
@@ -704,8 +704,8 @@ logger.Info("Hello from Go")
 
 ---
 
-**版本**: v1.0.0.5  
-**最后更新**: 2026-03-19  
+**版本**: Doc V1.6  
+**最后更新**: 2026-03-25  
 **维护者**: SPHARX Team  
 **相关文档**: 
 - [原子日志接口](atoms/utils/observability/include/logger.h)

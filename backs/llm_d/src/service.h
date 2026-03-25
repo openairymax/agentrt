@@ -12,14 +12,14 @@
 #include "cache.h"
 #include "cost_tracker.h"
 #include "token_counter.h"
-#include <pthread.h>
+#include "platform.h"
 
 struct llm_service {
     provider_registry_t* registry;
     cache_t* cache;
     cost_tracker_t* cost;
     token_counter_t* token_counter;
-    pthread_mutex_t lock;   /* 保护 registry 和 cost 等 */
+    agentos_mutex_t lock;   /* 保护 registry 和 cost 等 */
 };
 
 #endif /* LLM_SERVICE_INTERNAL_H */

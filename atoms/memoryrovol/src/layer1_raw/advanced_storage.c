@@ -294,7 +294,7 @@ static agentos_error_t generate_integrity_hash(const void* data, size_t data_len
     }
     
     for (unsigned int i = 0; i < hash_len; i++) {
-        sprintf(hex_hash + i * 2, "%02x", hash[i]);
+        snprintf(hex_hash + i * 2, 3, "%02x", hash[i]);
     }
     hex_hash[hash_len * 2] = '\0';
     
@@ -877,11 +877,30 @@ static size_t flush_dirty_entries(cache_manager_t* cache, shard_manager_t* shard
         
         agentos_mutex_lock(entry->lock);
         if (entry->state == CACHE_ENTRY_DIRTY) {
-            // TODO: 实际写入磁盘操作
-            // 这里应该调用底层存储API
-            
-            entry->state = CACHE_ENTRY_CLEAN;
-            flushed_count++;
+            // 实际写入磁盘操作
+            if (shard->storage && entry->data && entry->data_size > 0) {
+                agentos_error_t write_result = agentos_layer1_raw_write(
+                    shard->storage,
+                    entry->id,
+                    entry->data,
+                    entry->data_size
+                );
+                
+                if (write_result == AGENTOS_SUCCESS) {
+                    entry->state = CACHE_ENTRY_CLEAN;
+                    flushed_count++;
+                    // 更新统计信息
+                    agentos_mutex_lock(shard->stats_lock);
+                    shard->write_count++;
+                    agentos_mutex_unlock(shard->stats_lock);
+                } else {
+                    AGENTOS_LOG_ERROR("Failed to write dirty cache entry %s to disk: %d", 
+                                     entry->id, write_result);
+                }
+            } else {
+                AGENTOS_LOG_WARN("Cannot write dirty cache entry %s: invalid storage or data", 
+                                entry->id);
+            }
         }
         agentos_mutex_unlock(entry->lock);
     }

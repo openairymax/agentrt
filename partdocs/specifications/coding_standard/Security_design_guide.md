@@ -1,9 +1,10 @@
 # AgentOS 安全设计指南
 
-**版本**: Doc V1.5  
-**发布日期**: 2026-03-24  
+**版本**: Doc V1.6  
+**更新日期**: 2026-03-25  
 **适用范围**: AgentOS 所有组件和模块  
-**理论基础**: 工程两论（反馈闭环）、安全穹顶（Domes）、系统工程（层次分解）
+**理论基础**: 工程两论（反馈闭环）、安全穹顶（Domes）、系统工程（层次分解）、五维正交系统（系统观、内核观、认知观、工程观、设计美学）、双系统认知理论  
+**原则映射**: D-1至D-4（安全工程）、S-1至S-4（系统设计）、C-1至C-4（认知设计）、E-1至E-4（工程设计）、A-1至A-4（设计美学）
 
 ---
 
@@ -11,7 +12,7 @@
 
 ### 1.1 编制目的
 
-本指南为 AgentOS 项目提供全面的安全设计标准。基于项目架构设计原则的四维正交体系，本指南聚焦于安全观维度，阐述如何通过 Domes（安全穹顶）实现纵深防御。
+本指南为 AgentOS 项目提供全面的安全设计标准。基于项目架构设计原则的五维正交系统，本指南聚焦于安全观维度（D-1至D-4安全工程原则），阐述如何通过 Domes（安全穹顶）实现纵深防御。
 
 ### 1.2 与 AgentOS 架构的关系
 
@@ -893,7 +894,360 @@ compliance:
 
 ---
 
-## 十、参考文献
+## 十、AgentOS 模块安全设计示例
+
+### 10.1 Domes（安全域层）安全设计
+Domes模块实现AgentOS的安全穹顶，是安全设计的核心：
+
+#### 10.1.1 虚拟工位（Virtual Workbench）安全设计（映射原则：D-2 安全隔离）
+```python
+"""
+虚拟工位安全设计 - 体现系统观（S-1）和工程观（E-2）原则
+
+基于容器命名空间和WASM沙箱实现进程级隔离。
+集成资源限额和权限控制，防止任务间相互影响。
+"""
+from typing import Dict, Any
+from dataclasses import dataclass
+from contextlib import contextmanager
+
+@dataclass
+class SecurityPolicy:
+    """安全策略定义 - 体现防御深度（D-3）原则"""
+    isolation_level: str  # container, wasm, process
+    resource_limits: Dict[str, Any]  # CPU, memory, disk quotas
+    network_policy: Dict[str, Any]  # 网络访问控制
+    capabilities: List[str]  # Linux capabilities
+    audit_config: Dict[str, Any]  # 审计配置
+    
+    def validate(self) -> bool:
+        """策略验证 - 多层安全检查"""
+        # 层次1：资源限制验证
+        if not self.validate_resource_limits():
+            return False
+        
+        # 层次2：能力最小化验证
+        if not self.validate_capabilities():
+            return False
+        
+        # 层次3：网络策略验证
+        if not self.validate_network_policy():
+            return False
+        
+        return True
+
+class VirtualWorkbench:
+    """虚拟工位实现 - 体现安全工程（D-1至D-4）原则"""
+    
+    def __init__(self, policy: SecurityPolicy):
+        self.policy = policy
+        self.audit_logger = AuditLogger()
+        self.resource_monitor = ResourceMonitor()
+        
+    @contextmanager
+    def create_sandbox(self, task_config: Dict[str, Any]):
+        """创建安全沙箱 - 体现资源确定性原则"""
+        sandbox_id = self.generate_sandbox_id()
+        
+        # 记录审计日志
+        self.audit_logger.log_sandbox_creation(sandbox_id, task_config)
+        
+        try:
+            # 应用资源限制
+            self.resource_monitor.apply_limits(self.policy.resource_limits)
+            
+            # 创建隔离环境
+            sandbox = self.create_isolation_environment(
+                sandbox_id, 
+                self.policy.isolation_level
+            )
+            
+            yield sandbox
+            
+        except SecurityViolation as e:
+            # 安全违规处理
+            self.audit_logger.log_security_violation(sandbox_id, e)
+            raise
+            
+        finally:
+            # 清理资源
+            self.cleanup_sandbox(sandbox_id)
+            self.audit_logger.log_sandbox_cleanup(sandbox_id)
+```
+
+#### 10.1.2 权限裁决引擎安全设计（映射原则：D-1 最小权限）
+```typescript
+/**
+ * 权限裁决引擎安全设计 - 体现安全工程（D-1, D-4）原则
+ * 
+ * 基于YAML规则引擎实现细粒度访问控制。
+ * 支持动态策略更新和形式化验证。
+ */
+interface AccessPolicy {
+  subject: string;
+  resource: string;
+  action: string;
+  conditions: Condition[];
+  effect: 'allow' | 'deny';
+}
+
+interface SecurityContext {
+  user: User;
+  environment: Environment;
+  riskAssessment: RiskAssessment;
+}
+
+class PermissionArbiter {
+  private readonly policyStore: PolicyStore;
+  private readonly auditLogger: AuditLogger;
+  private readonly riskEngine: RiskEngine;
+  
+  /**
+   * 安全访问决策 - 体现防御深度（D-3）原则
+   */
+  async decideAccess(request: AccessRequest): Promise<AccessDecision> {
+    const startTime = Date.now();
+    
+    try {
+      // 层次1：身份验证
+      const subject = await this.authenticate(request.subject);
+      if (!subject) {
+        await this.auditLogger.log('authentication_failed', request);
+        return AccessDecision.deny('Authentication failed');
+      }
+      
+      // 层次2：策略评估
+      const policies = await this.policyStore.findApplicablePolicies(
+        subject, request.resource, request.action
+      );
+      
+      // 层次3：风险评估
+      const context: SecurityContext = {
+        user: subject,
+        environment: await this.getEnvironment(),
+        riskAssessment: await this.assessRisk(request)
+      };
+      
+      // 层次4：策略决策
+      const decision = await this.evaluatePolicies(policies, context);
+      
+      // 审计日志
+      await this.auditLogger.log('access_decision', {
+        request,
+        decision,
+        processingTime: Date.now() - startTime,
+        riskScore: context.riskAssessment.score
+      });
+      
+      return decision;
+      
+    } catch (error) {
+      await this.auditLogger.log('decision_error', {
+        request,
+        error: error.message,
+        stack: error.stack
+      });
+      
+      // 失效安全：默认拒绝
+      return AccessDecision.deny('Security decision error');
+    }
+  }
+  
+  /**
+   * 策略形式化验证 - 体现工程观（E-1）原则
+   */
+  async verifyPolicy(policy: AccessPolicy): Promise<VerificationResult> {
+    // 使用形式化方法验证策略正确性
+    const verifier = new PolicyVerifier();
+    
+    // 检查策略冲突
+    const conflicts = await verifier.checkConflicts(policy);
+    if (conflicts.length > 0) {
+      return {
+        valid: false,
+        errors: conflicts.map(c => `Policy conflict: ${c.description}`)
+      };
+    }
+    
+    // 检查安全属性
+    const safetyProperties = await verifier.verifySafetyProperties(policy);
+    if (!safetyProperties.allSatisfied) {
+      return {
+        valid: false,
+        errors: safetyProperties.violations
+      };
+    }
+    
+    return { valid: true, errors: [] };
+  }
+}
+```
+
+### 10.2 Atoms（原子层）安全设计
+Atoms模块作为微内核核心，需要实现基础安全原语：
+
+#### 10.2.1 安全内存管理（映射原则：M-3 拓扑优化）
+```c
+/**
+ * @brief 安全内存管理器 - 体现内核观（K-1）和工程观（E-3）原则
+ * 
+ * 实现NUMA感知的安全内存分配，集成内存保护和安全擦除。
+ * 防御use-after-free和缓冲区溢出攻击。
+ * 
+ * @see memoryrovol.md 中的记忆进化算法
+ */
+typedef struct secure_memory_pool {
+    size_t total_size;
+    size_t allocated;
+    size_t watermark;
+    uint8_t canary[SECURITY_CANARY_SIZE];
+    pthread_mutex_t lock;
+    numa_node_t numa_node;
+} secure_memory_pool_t;
+
+/**
+ * @brief 安全内存分配 - 体现防御深度（D-3）原则
+ * 
+ * 多层安全保护：
+ * 1. 边界检查
+ * 2. 内存初始化
+ * 3. 使用前验证
+ * 4. 释放后擦除
+ */
+void* atoms_secure_alloc(size_t size, numa_node_t node, uint32_t flags) {
+    // 安全检查1：大小验证
+    if (size == 0 || size > MAX_SECURE_ALLOC_SIZE) {
+        log_security("Invalid secure allocation size: %zu", size);
+        return NULL;
+    }
+    
+    // 安全检查2：NUMA节点验证
+    if (!validate_numa_node(node)) {
+        log_security("Invalid NUMA node: %d", node);
+        return NULL;
+    }
+    
+    // 分配内存（包含保护区域）
+    size_t total_size = size + SECURITY_PADDING * 2;
+    void* ptr = numa_alloc_onnode(total_size, node);
+    if (!ptr) {
+        log_security("NUMA allocation failed: size=%zu, node=%d", total_size, node);
+        return NULL;
+    }
+    
+    // 内存初始化（防止信息泄漏）
+    secure_memset(ptr, SECURITY_PATTERN, total_size);
+    
+    // 设置边界保护
+    setup_boundary_guards(ptr, total_size);
+    
+    // 返回可用内存区域（跳过保护区域）
+    void* user_ptr = (uint8_t*)ptr + SECURITY_PADDING;
+    
+    // 记录分配（审计跟踪）
+    log_audit("Secure memory allocated: ptr=%p, size=%zu, node=%d, caller=%s",
+              user_ptr, size, node, get_caller_info());
+    
+    return user_ptr;
+}
+
+/**
+ * @brief 安全内存释放 - 体现失效安全原则
+ */
+void atoms_secure_free(void* ptr, size_t size) {
+    if (!ptr) return;
+    
+    // 验证指针有效性
+    if (!validate_secure_pointer(ptr, size)) {
+        log_security("Invalid secure free attempt: ptr=%p, size=%zu", ptr, size);
+        return;
+    }
+    
+    // 获取完整分配区域
+    void* base_ptr = (uint8_t*)ptr - SECURITY_PADDING;
+    size_t total_size = size + SECURITY_PADDING * 2;
+    
+    // 检查边界保护（检测缓冲区溢出）
+    if (!check_boundary_guards(base_ptr, total_size)) {
+        log_security("Boundary guard violation detected: ptr=%p", ptr);
+        // 记录安全事件但不崩溃（fail-secure）
+    }
+    
+    // 安全擦除（防止信息泄漏）
+    secure_memset(base_ptr, SECURITY_ERASE_PATTERN, total_size);
+    
+    // 实际释放
+    numa_free(base_ptr, total_size);
+    
+    // 审计日志
+    log_audit("Secure memory freed: ptr=%p, size=%zu", ptr, size);
+}
+```
+
+### 10.3 跨模块安全集成
+重要跨模块接口必须实现额外的安全防护：
+
+#### 10.3.1 核心三循环安全集成（映射原则：S-1 垂直分层）
+```go
+// 核心三循环安全集成 - 体现系统观（S-1）和工程观（E-2）原则
+//
+// 连接coreloopthree调度器与microkernel任务管理。
+// 实现双向身份验证和完整性保护。
+type SecureSchedulerBridge struct {
+	crypto      CryptoService
+	auth        AuthService
+	auditLogger AuditLogger
+	rateLimiter RateLimiter
+}
+
+// ScheduleSecureTask 安全任务调度 - 体现防御深度原则
+func (b *SecureSchedulerBridge) ScheduleSecureTask(task SecureTask) error {
+	// 层次1：请求签名验证
+	if !b.verifyTaskSignature(task) {
+		b.auditLogger.LogSecurityEvent("invalid_task_signature", task.ID)
+		return errors.New("invalid task signature")
+	}
+	
+	// 层次2：抗重放检查
+	if b.isReplayAttack(task.Nonce) {
+		b.auditLogger.LogSecurityEvent("replay_attack_detected", task.ID)
+		return errors.New("replay attack detected")
+	}
+	
+	// 层次3：权限检查
+	if !b.checkSchedulePermission(task) {
+		b.auditLogger.LogAuditEvent("unauthorized_schedule_attempt", task)
+		return errors.New("insufficient permission")
+	}
+	
+	// 层次4：速率限制
+	if !b.rateLimiter.Allow(task.Subject) {
+		return errors.New("rate limit exceeded")
+	}
+	
+	// 执行安全调度
+	result, err := b.performSecureSchedule(task)
+	if err != nil {
+		b.auditLogger.LogError("schedule_failed", task.ID, err)
+		return err
+	}
+	
+	// 审计日志
+	b.auditLogger.LogAuditEvent("task_scheduled", map[string]interface{}{
+		"task_id":    task.ID,
+		"scheduler":  task.Scheduler,
+		"priority":   task.Priority,
+		"timestamp":  time.Now(),
+		"result":     result,
+	})
+	
+	return nil
+}
+```
+
+---
+
+## 十一、参考文献
 
 1. **AgentOS 架构设计原则**: [architectural_design_principles.md](../../architecture/folder/architectural_design_principles.md)
 2. **AgentOS 微内核设计**: [microkernel.md](../../architecture/folder/microkernel.md)
@@ -901,6 +1255,12 @@ compliance:
 4. **OWASP Top 10**: https://owasp.org/www-project-top-ten/
 5. **NIST Cybersecurity Framework**: https://www.nist.gov/cyberframework
 6. **ISO 27001**: https://www.iso.org/isoiec-27001-information-security.html
+7. **AgentOS 核心架构文档**:
+   - [coreloopthree.md](../../architecture/folder/coreloopthree.md)
+   - [memoryrovol.md](../../architecture/folder/memoryrovol.md)
+   - [ipc.md](../../architecture/folder/ipc.md)
+   - [syscall.md](../../architecture/folder/syscall.md)
+   - [logging_system.md](../../architecture/folder/logging_system.md)
 
 ---
 

@@ -1,10 +1,16 @@
 /**
  * @file agentos.h
- * @brief AgentOS Dynamic 模块依赖的公共接口
- * 
- * 此头文件提供 dynamic 模块所需的核心类型和函数声明。
- * 完整实现请参考 atoms/corekern/include/agentos.h
- * 
+ * @brief AgentOS Dynamic 模块兼容层
+ *
+ * 本文件作为兼容层，将 dynamic 模块的接口映射到 common 模块。
+ * dynamic 模块原本独立实现了 agentos_* 接口，现在统一使用 common 模块。
+ *
+ * 映射关系：
+ * - platform_* 类型/函数 -> agentos_* 类型/函数
+ * - AGENTOS_LOG_* 宏 -> 使用 common/utils/observability/include/logger.h
+ * - agentos_error_t -> 使用 common/utils/error/include/error.h
+ * - agentos_time_* -> 使用 common/platform/platform.h 的 agentos_time_ns/ms
+ *
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -13,12 +19,13 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* ========== 符号导出宏 ========== */
+/* ==================== 符号导出宏 ==================== */
 
 #ifdef AGENTOS_BUILDING_SHARED
     #if defined(_WIN32) || defined(_WIN64)
@@ -40,52 +47,112 @@ extern "C" {
     #define AGENTOS_API
 #endif
 
-/* ========== 错误码定义 ========== */
+/* ==================== 错误码定义（来自 common/error.h） ==================== */
+
+/*
+ * 错误码分段规划：
+ *   -1 到 -99:      通用基础错误
+ *   -100 到 -199:   系统与平台错误
+ *   -200 到 -299:   内核层错误
+ *   -300 到 -399:   服务层错误
+ *   -400 到 -499:   LLM/AI服务错误
+ *   -500 到 -599:   执行/工具错误
+ *   -600 到 -699:   记忆/存储错误
+ *   -700 到 -799:   安全/沙箱错误
+ *   -800 到 -899:   协调/规划错误
+ */
 
 typedef int32_t agentos_error_t;
 
+#define AGENTOS_OK                      0
 #define AGENTOS_SUCCESS                0
-#define AGENTOS_EINVAL                 -1
-#define AGENTOS_ENOMEM                 -2
-#define AGENTOS_EBUSY                  -3
-#define AGENTOS_ENOENT                 -4
-#define AGENTOS_EPERM                  -5
-#define AGENTOS_ETIMEDOUT              -6
-#define AGENTOS_EEXIST                 -7
-#define AGENTOS_ECANCELED              -8
-#define AGENTOS_ENOTSUP                -9
-#define AGENTOS_EIO                    -10
-#define AGENTOS_EINTR                  -11
-#define AGENTOS_EOVERFLOW              -12
-#define AGENTOS_EBADF                  -13
-#define AGENTOS_ENOTINIT               -14
-#define AGENTOS_ERESOURCE              -15
-#define AGENTOS_ERROR                  -100
+#define AGENTOS_ERR_UNKNOWN           (-1)
+#define AGENTOS_ERR_INVALID_PARAM      (-2)
+#define AGENTOS_ERR_NULL_POINTER       (-3)
+#define AGENTOS_ERR_OUT_OF_MEMORY      (-4)
+#define AGENTOS_ERR_BUFFER_TOO_SMALL  (-5)
+#define AGENTOS_ERR_NOT_FOUND          (-6)
+#define AGENTOS_ERR_ALREADY_EXISTS     (-7)
+#define AGENTOS_ERR_TIMEOUT            (-8)
+#define AGENTOS_ERR_NOT_SUPPORTED      (-9)
+#define AGENTOS_ERR_PERMISSION_DENIED  (-10)
+#define AGENTOS_ERR_IO                 (-11)
+#define AGENTOS_ERR_STATE_ERROR        (-13)
+#define AGENTOS_ERR_OVERFLOW           (-14)
 
-/**
- * @brief 获取错误码对应的错误字符串
- * @param err 错误码
- * @return 错误描述字符串
+/* 兼容性别名（向后兼容） */
+#define AGENTOS_EINVAL                 AGENTOS_ERR_INVALID_PARAM
+#define AGENTOS_ENOMEM                 AGENTOS_ERR_OUT_OF_MEMORY
+#define AGENTOS_EBUSY                  AGENTOS_ERR_BUSY
+#define AGENTOS_ENOENT                 AGENTOS_ERR_NOT_FOUND
+#define AGENTOS_EPERM                  AGENTOS_ERR_PERMISSION_DENIED
+#define AGENTOS_ETIMEDOUT              AGENTOS_ERR_TIMEOUT
+#define AGENTOS_EEXIST                 AGENTOS_ERR_ALREADY_EXISTS
+#define AGENTOS_ECANCELED              AGENTOS_ERR_CANCELED
+#define AGENTOS_ENOTSUP                AGENTOS_ERR_NOT_SUPPORTED
+#define AGENTOS_EIO                    AGENTOS_ERR_IO
+#define AGENTOS_ERROR                  (-100)
+
+/* ==================== 类型名称映射（platform -> agentos） ==================== */
+
+/*
+ * dynamic 模块使用 platform_* 前缀，common 模块使用 agentos_* 前缀
+ * 通过宏映射实现兼容
  */
-AGENTOS_API const char* agentos_strerror(agentos_error_t err);
 
-/* ========== 时间服务 ========== */
+#define platform_thread_t              agentos_thread_t
+#define platform_thread_id_t           agentos_thread_id_t
+#define platform_mutex_t               agentos_mutex_t
+#define platform_cond_t                agentos_cond_t
+#define platform_socket_t              agentos_socket_t
+
+#define PLATFORM_THREAD_INVALID        AGENTOS_INVALID_THREAD
+#define PLATFORM_MUTEX_INVALID         AGENTOS_INVALID_MUTEX
+#define PLATFORM_SOCKET_INVALID        AGENTOS_INVALID_SOCKET
+
+#define platform_mutex_init            agentos_mutex_init
+#define platform_mutex_destroy         agentos_mutex_destroy
+#define platform_mutex_lock            agentos_mutex_lock
+#define platform_mutex_trylock         agentos_mutex_trylock
+#define platform_mutex_unlock          agentos_mutex_unlock
+
+#define platform_cond_init             agentos_cond_init
+#define platform_cond_destroy          agentos_cond_destroy
+#define platform_cond_wait             agentos_cond_wait
+#define platform_cond_timedwait        agentos_cond_timedwait
+#define platform_cond_signal           agentos_cond_signal
+#define platform_cond_broadcast        agentos_cond_broadcast
+
+#define platform_thread_create         agentos_thread_create
+#define platform_thread_join           agentos_thread_join
+#define platform_thread_self           agentos_thread_id
+
+#define platform_socket_tcp             agentos_socket_tcp
+#define platform_socket_unix            agentos_socket_unix
+#define platform_socket_close          agentos_socket_close
+#define platform_socket_set_nonblock   agentos_socket_set_nonblock
+#define platform_socket_set_reuseaddr   agentos_socket_set_reuseaddr
+
+#define platform_network_init          agentos_network_init
+#define platform_network_cleanup       agentos_network_cleanup
+#define platform_ignore_sigpipe        agentos_ignore_sigpipe
+
+/* ==================== 时间函数映射 ==================== */
+
+#define agentos_time_monotonic_ns()    agentos_time_ns()
+#define agentos_time_monotonic_ms()   agentos_time_ms()
+
+static inline uint64_t agentos_time_monotonic_ns(void) {
+    return agentos_time_ns();
+}
+
+static inline uint64_t agentos_time_monotonic_ms(void) {
+    return agentos_time_ms();
+}
 
 /**
- * @brief 获取单调递增时间（纳秒）
- * @return 纳秒级时间戳
- */
-AGENTOS_API uint64_t agentos_time_monotonic_ns(void);
-
-/**
- * @brief 获取单调递增时间（毫秒）
- * @return 毫秒级时间戳
- */
-AGENTOS_API uint64_t agentos_time_monotonic_ms(void);
-
-/**
- * @brief 获取当前时间（纳秒）
- * @return 纳秒级时间戳
+ * @brief 获取当前时间（纳秒）- 墙钟时间
+ * @return 当前时间纳秒数
  */
 AGENTOS_API uint64_t agentos_time_current_ns(void);
 
@@ -96,8 +163,26 @@ AGENTOS_API uint64_t agentos_time_current_ns(void);
  */
 AGENTOS_API agentos_error_t agentos_time_nanosleep(uint64_t ns);
 
-/* ========== 日志服务 ========== */
+/* ==================== 线程函数类型兼容 ==================== */
 
+/*
+ * dynamic 模块使用不同的线程函数类型定义
+ * 通过转换宏适配
+ */
+
+#ifdef _WIN32
+    #define platform_thread_func_t     agentos_thread_func_t
+#else
+    #define platform_thread_func_t      agentos_thread_func_t
+#endif
+
+typedef void* (*agentos_thread_func_t)(void* arg);
+
+/* ==================== 日志接口（来自 common/logger.h） ==================== */
+
+/*
+ * 日志级别定义
+ */
 #define AGENTOS_LOG_LEVEL_ERROR 1
 #define AGENTOS_LOG_LEVEL_WARN  2
 #define AGENTOS_LOG_LEVEL_INFO  3
@@ -107,45 +192,29 @@ AGENTOS_API agentos_error_t agentos_time_nanosleep(uint64_t ns);
 #define AGENTOS_LOG_LEVEL AGENTOS_LOG_LEVEL_INFO
 #endif
 
-/**
- * @brief 初始化日志系统
- * @param config_path 配置文件路径（可为 NULL 使用默认）
- * @return AGENTOS_SUCCESS 成功
- */
-AGENTOS_API agentos_error_t agentos_logger_init(const char* config_path);
-
-/**
- * @brief 关闭日志系统
- */
-AGENTOS_API void agentos_logger_shutdown(void);
-
-/**
- * @brief 设置当前线程的追踪ID
- * @param trace_id 追踪ID，若为NULL则自动生成
- * @return 实际设置的追踪ID（静态内存，无需释放）
+/*
+ * 日志函数声明（实现由 common 模块提供）
  */
 AGENTOS_API const char* agentos_log_set_trace_id(const char* trace_id);
-
-/**
- * @brief 获取当前线程的追踪ID
- * @return 追踪ID，可能为NULL
- */
 AGENTOS_API const char* agentos_log_get_trace_id(void);
-
-/**
- * @brief 记录日志
- * @param level 日志级别
- * @param file 文件名
- * @param line 行号
- * @param fmt 格式字符串
- * @param ... 参数
- */
 AGENTOS_API void agentos_log_write(int level, const char* file, int line, const char* fmt, ...);
 
 #define AGENTOS_LOG_ERROR(fmt, ...) agentos_log_write(AGENTOS_LOG_LEVEL_ERROR, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 #define AGENTOS_LOG_WARN(fmt, ...)  agentos_log_write(AGENTOS_LOG_LEVEL_WARN, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 #define AGENTOS_LOG_INFO(fmt, ...)  agentos_log_write(AGENTOS_LOG_LEVEL_INFO, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 #define AGENTOS_LOG_DEBUG(fmt, ...) agentos_log_write(AGENTOS_LOG_LEVEL_DEBUG, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+
+/* ==================== 错误处理接口（来自 common/error.h） ==================== */
+
+/*
+ * 错误字符串获取（实现由 common 模块提供）
+ */
+AGENTOS_API const char* agentos_strerror(agentos_error_t err);
+
+/* ==================== 日志初始化接口（兼容层） ==================== */
+
+AGENTOS_API int agentos_logger_init(const char* config_path);
+AGENTOS_API void agentos_logger_shutdown(void);
 
 #ifdef __cplusplus
 }

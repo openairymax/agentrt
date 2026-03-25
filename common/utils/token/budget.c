@@ -1,6 +1,6 @@
 /**
  * @file budget.c
- * @brief Token预算管理实现
+ * @brief Token预算管理实现（跨平台）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  * 
  * @details
@@ -13,8 +13,69 @@
 #include "token.h"
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
 #include <stdatomic.h>
+#include <time.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <pthread.h>
+#include <unistd.h>
+#endif
+
+/**
+ * @brief 跨平台互斥锁类型
+ */
+#ifdef _WIN32
+typedef CRITICAL_SECTION budget_mutex_t;
+#else
+typedef pthread_mutex_t budget_mutex_t;
+#endif
+
+/**
+ * @brief 初始化互斥锁
+ */
+static int budget_mutex_init(budget_mutex_t* mutex) {
+#ifdef _WIN32
+    InitializeCriticalSection(mutex);
+    return 0;
+#else
+    return pthread_mutex_init(mutex, NULL);
+#endif
+}
+
+/**
+ * @brief 销毁互斥锁
+ */
+static void budget_mutex_destroy(budget_mutex_t* mutex) {
+#ifdef _WIN32
+    DeleteCriticalSection(mutex);
+#else
+    pthread_mutex_destroy(mutex);
+#endif
+}
+
+/**
+ * @brief 加锁
+ */
+static void budget_mutex_lock(budget_mutex_t* mutex) {
+#ifdef _WIN32
+    EnterCriticalSection(mutex);
+#else
+    pthread_mutex_lock(mutex);
+#endif
+}
+
+/**
+ * @brief 解锁
+ */
+static void budget_mutex_unlock(budget_mutex_t* mutex) {
+#ifdef _WIN32
+    LeaveCriticalSection(mutex);
+#else
+    pthread_mutex_unlock(mutex);
+#endif
+}
 
 /**
  * @brief Token预算内部结构
@@ -26,7 +87,7 @@ struct agentos_token_budget {
     atomic_size_t output_tokens;        /**< 输出Token数 */
     atomic_uint request_count;          /**< 请求计数 */
     atomic_uint denied_count;            /**< 拒绝计数 */
-    pthread_mutex_t mutex;               /**< 互斥锁 */
+    budget_mutex_t mutex;               /**< 互斥锁 */
     time_t reset_time;                  /**< 重置时间 */
     size_t window_seconds;              /**< 时间窗口（秒） */
 };
@@ -70,7 +131,7 @@ agentos_token_budget_t* agentos_token_budget_create(size_t max_tokens) {
     atomic_init(&budget->request_count, 0);
     atomic_init(&budget->denied_count, 0);
     
-    if (pthread_mutex_init(&budget->mutex, NULL) != 0) {
+    if (budget_mutex_init(&budget->mutex) != 0) {
         free(budget);
         return NULL;
     }
@@ -86,7 +147,7 @@ void agentos_token_budget_destroy(agentos_token_budget_t* budget) {
         return;
     }
     
-    pthread_mutex_destroy(&budget->mutex);
+    budget_mutex_destroy(&budget->mutex);
     free(budget);
 }
 
@@ -95,10 +156,10 @@ int agentos_token_budget_add(agentos_token_budget_t* budget, size_t input_tokens
         return -1;
     }
     
-    pthread_mutex_lock(&budget->mutex);
+    budget_mutex_lock(&budget->mutex);
     
     if (check_budget_available(budget, input_tokens, output_tokens) != 0) {
-        pthread_mutex_unlock(&budget->mutex);
+        budget_mutex_unlock(&budget->mutex);
         return -1;
     }
     
@@ -107,7 +168,7 @@ int agentos_token_budget_add(agentos_token_budget_t* budget, size_t input_tokens
     atomic_fetch_add(&budget->output_tokens, output_tokens);
     atomic_fetch_add(&budget->request_count, 1);
     
-    pthread_mutex_unlock(&budget->mutex);
+    budget_mutex_unlock(&budget->mutex);
     
     return 0;
 }
@@ -131,13 +192,13 @@ void agentos_token_budget_reset(agentos_token_budget_t* budget) {
         return;
     }
     
-    pthread_mutex_lock(&budget->mutex);
+    budget_mutex_lock(&budget->mutex);
     
     atomic_store(&budget->used_tokens, 0);
     atomic_store(&budget->input_tokens, 0);
     atomic_store(&budget->output_tokens, 0);
     
-    pthread_mutex_unlock(&budget->mutex);
+    budget_mutex_unlock(&budget->mutex);
 }
 
 size_t agentos_token_budget_used(agentos_token_budget_t* budget) {
@@ -185,12 +246,12 @@ int agentos_token_budget_set_window(agentos_token_budget_t* budget, size_t windo
         return -1;
     }
     
-    pthread_mutex_lock(&budget->mutex);
+    budget_mutex_lock(&budget->mutex);
     
     budget->window_seconds = window_seconds;
     budget->reset_time = time(NULL) + window_seconds;
     
-    pthread_mutex_unlock(&budget->mutex);
+    budget_mutex_unlock(&budget->mutex);
     
     return 0;
 }
@@ -200,7 +261,7 @@ int agentos_token_budget_check_window(agentos_token_budget_t* budget) {
         return -1;
     }
     
-    pthread_mutex_lock(&budget->mutex);
+    budget_mutex_lock(&budget->mutex);
     
     time_t now = time(NULL);
     
@@ -212,7 +273,7 @@ int agentos_token_budget_check_window(agentos_token_budget_t* budget) {
         budget->reset_time = now + budget->window_seconds;
     }
     
-    pthread_mutex_unlock(&budget->mutex);
+    budget_mutex_unlock(&budget->mutex);
     
     return 0;
 }
