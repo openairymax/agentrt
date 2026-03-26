@@ -1,0 +1,128 @@
+# =============================================================================
+# AgentOS 生产环境配置覆盖
+# 版本: v1.0.0
+# 最后更新: 2026-03-23
+# =============================================================================
+# 此文件覆盖基础配置，用于生产环境
+
+_config_version: "1.0.0"
+_environment: "production"
+
+# =============================================================================
+# 内核配置覆盖
+# =============================================================================
+kernel:
+  log_level: "warning"
+  
+  scheduler:
+    max_concurrency: 500
+  
+  memory:
+    pool_size_mb: 4096
+    leak_detection:
+      enabled: true
+      check_interval_sec: 300
+  
+  error:
+    verbose: false
+    stack_trace_enabled: false
+  
+  hot_reload:
+    enabled: true
+    check_interval_sec: 60
+  
+  monitoring:
+    enabled: true
+    metrics_interval_sec: 30
+    alerts:
+      cpu_threshold_percent: 70
+      memory_threshold_percent: 80
+
+# =============================================================================
+# 安全配置覆盖
+# =============================================================================
+security:
+  default_policy: "deny"
+  
+  sandbox:
+    isolation_type: "container"
+    memory_limit_mb: 1024
+    cpu_limit: 2.0
+    network_enabled: false
+    seccomp_profile: "strict"
+    read_only_root: true
+    no_new_privileges: true
+  
+  audit:
+    retention_days: 90
+    encryption:
+      enabled: true
+      algorithm: "aes-256-gcm"
+  
+  intrusion_detection:
+    enabled: true
+    anomaly_threshold: 0.85
+  
+  secrets:
+    provider: "vault"
+    encryption: "aes-256-gcm"
+    key_rotation_days: 30
+  
+  session:
+    timeout_sec: 1800
+    max_concurrent_sessions: 50
+
+# =============================================================================
+# 日志配置覆盖
+# =============================================================================
+logging:
+  level: "warning"
+  format: "json"
+  
+  file:
+    max_size_mb: 200
+    backups: 20
+    compress_rotated: true
+  
+  mask_fields:
+    - "password"
+    - "token"
+    - "api_key"
+    - "secret"
+    - "authorization"
+    - "credential"
+    - "session_id"
+    - "user_id"
+  
+  sampling:
+    enabled: true
+    rate: 0.05
+    threshold_per_sec: 500
+  
+  async:
+    enabled: true
+    buffer_size: 500000
+    flush_interval_ms: 50
+  
+  retention:
+    enabled: true
+    max_age_days: 30
+    max_total_size_gb: 50
+
+# =============================================================================
+# 模型配置覆盖
+# =============================================================================
+models:
+  global:
+    default_model: "gpt-4-turbo"
+    default_timeout_sec: 30
+    default_retry:
+      max_attempts: 3
+      backoff_ms: 200
+      backoff_multiplier: 2.0
+      max_backoff_ms: 20000
+    
+    default_circuit_breaker:
+      enabled: true
+      failure_threshold: 3
+      reset_timeout_sec: 120
