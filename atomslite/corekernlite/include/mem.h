@@ -61,6 +61,12 @@ AGENTOS_LITE_API void agentos_lite_mem_aligned_free(void* ptr);
  */
 AGENTOS_LITE_API void agentos_lite_mem_stats(size_t* total, size_t* used, size_t* peak);
 
+/**
+ * @brief 检查内存泄漏
+ * @return 泄漏的内存块数量
+ */
+AGENTOS_LITE_API size_t agentos_lite_mem_check_leaks(void);
+
 #ifdef __cplusplus
 }
 #endif

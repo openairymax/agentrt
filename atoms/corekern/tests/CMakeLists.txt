@@ -5,6 +5,10 @@ cmake_minimum_required(VERSION 3.15)
 add_executable(corekern_tests
     test_error.c
     test_main.c
+    test_ipc.c
+    test_mem.c
+    test_task.c
+    test_time.c
 )
 
 # 链接核心库
@@ -20,3 +24,7 @@ target_include_directories(corekern_tests PRIVATE
 # 添加测试
 add_test(NAME corekern_error_tests COMMAND corekern_tests)
 add_test(NAME corekern_basic_tests COMMAND corekern_tests)
+add_test(NAME corekern_ipc_tests COMMAND corekern_tests)
+add_test(NAME corekern_mem_tests COMMAND corekern_tests)
+add_test(NAME corekern_task_tests COMMAND corekern_tests)
+add_test(NAME corekern_time_tests COMMAND corekern_tests)

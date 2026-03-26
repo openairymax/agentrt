@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 构建日志管理脚本
 # 统一收集、管理和分析 CI/CD 构建日志
@@ -8,7 +8,7 @@ set -euo pipefail
 ###############################################################################
 # 配置
 ###############################################################################
-AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")
 AGENTOS_SCRIPTS_DIR="$(dirname "$AGENTOS_SCRIPT_DIR")"
 AGENTOS_PROJECT_ROOT="$(dirname "$AGENTOS_SCRIPTS_DIR")"
 AGENTOS_LOG_DIR="${AGENTOS_LOG_DIR:-$AGENTOS_PROJECT_ROOT/build/logs}"
@@ -74,7 +74,7 @@ log() {
         echo -e "${COLOR_CYAN}[$timestamp]${COLOR_NC} ${COLOR_BOLD}[$level_str]${COLOR_NC} $message"
     fi
 
-    # 输出到文件
+    # 输出到文�?
     if [[ "$LOG_OUTPUT" != "stdout" ]] && [[ -n "$LOG_OUTPUT" ]]; then
         if [[ "$LOG_FORMAT" == "json" ]]; then
             echo "$log_entry" >> "$LOG_OUTPUT"
@@ -128,7 +128,7 @@ EOF
 }
 
 ###############################################################################
-# 初始化
+# 初始�?
 ###############################################################################
 init() {
     mkdir -p "$AGENTOS_LOG_DIR"
@@ -143,7 +143,7 @@ collect_logs() {
     local build_id="${1:-$(date +%Y%m%d-%H%M%S)}"
     local collection_dir="$AGENTOS_LOG_DIR/builds/$build_id"
 
-    log_info "开始收集构建日志 (ID: $build_id)"
+    log_info "开始收集构建日�?(ID: $build_id)"
 
     mkdir -p "$collection_dir"
 
@@ -159,8 +159,8 @@ collect_logs() {
             -exec cp {} "$collection_dir/" \; 2>/dev/null || true
     fi
 
-    # 收集 CI 工作流日志
-    log_info "收集 CI 工作流日志..."
+    # 收集 CI 工作流日�?
+    log_info "收集 CI 工作流日�?.."
     if [[ -d "$AGENTOS_PROJECT_ROOT/.github/workflows" ]]; then
         find "$AGENTOS_PROJECT_ROOT/.github/workflows" -name "*.yml" -type f \
             -exec basename {} \; > "$collection_dir/workflows.txt" 2>/dev/null || true
@@ -223,7 +223,7 @@ create_log_manifest() {
             files: $files
         }' > "$manifest_file"
 
-    log_info "清单已创建: $manifest_file"
+    log_info "清单已创�? $manifest_file"
 }
 
 ###############################################################################
@@ -236,7 +236,7 @@ analyze_logs() {
     log_info "分析日志文件: $log_file (级别: $level)"
 
     if [[ ! -f "$log_file" ]]; then
-        log_error "日志文件不存在: $log_file"
+        log_error "日志文件不存�? $log_file"
         return 1
     fi
 
@@ -244,7 +244,7 @@ analyze_logs() {
     echo "=== 日志分析报告 ==="
     echo ""
 
-    # 统计各级别日志数量
+    # 统计各级别日志数�?
     echo "日志级别统计:"
     echo "  DEBUG:   $(grep -c "DEBUG" "$log_file" 2>/dev/null || echo 0)"
     echo "  INFO:    $(grep -c "INFO" "$log_file" 2>/dev/null || echo 0)"
@@ -255,7 +255,7 @@ analyze_logs() {
     # 显示错误详情
     if [[ "$level" == "ERROR" ]] || [[ "$level" == "error" ]]; then
         echo "ERROR 日志详情:"
-        grep -n "ERROR" "$log_file" 2>/dev/null || echo "  无 ERROR 日志"
+        grep -n "ERROR" "$log_file" 2>/dev/null || echo "  �?ERROR 日志"
         echo ""
     fi
 
@@ -274,7 +274,7 @@ analyze_logs() {
         local count
         count=$(grep -ic "$pattern" "$log_file" 2>/dev/null || echo 0)
         if [[ $count -gt 0 ]]; then
-            echo "  $pattern: $count 次"
+            echo "  $pattern: $count �?
         fi
     done
 
@@ -431,12 +431,12 @@ generate_report() {
     </div>
 
     <div class="card">
-        <h2>阶段状态</h2>
+        <h2>阶段状�?/h2>
         <table>
             <thead>
                 <tr>
                     <th>阶段</th>
-                    <th>状态</th>
+                    <th>状�?/th>
                     <th>耗时</th>
                     <th>详情</th>
                 </tr>
@@ -453,7 +453,7 @@ STAGES_TABLE
             <thead>
                 <tr>
                     <th>工具</th>
-                    <th>发现数</th>
+                    <th>发现�?/th>
                     <th>高危</th>
                     <th>中危</th>
                     <th>低危</th>
@@ -474,7 +474,7 @@ SECURITY_TABLE
             </div>
             <div class="stat">
                 <div class="value">COVERAGE_BRANCH%</div>
-                <div class="label">分支覆盖率</div>
+                <div class="label">分支覆盖�?/div>
             </div>
             <div class="stat">
                 <div class="value">TESTS_PASSED/TESTS_TOTAL</div>
@@ -490,7 +490,7 @@ SECURITY_TABLE
 </html>
 HTMLEOF
 
-    # 替换占位符
+    # 替换占位�?
     sed -i "s/TIMESTAMP/$(date -Iseconds)/g" "$report_dir/$output_file"
     sed -i "s/BUILD_ID/$build_id/g" "$report_dir/$output_file"
     sed -i "s/BRANCH/$(git branch --show-current 2>/dev/null || echo 'N/A')/g" "$report_dir/$output_file"
@@ -512,7 +512,7 @@ HTMLEOF
         sed -i "s/STATS_DURATION/${duration}s/g" "$report_dir/$output_file"
     fi
 
-    log_success "报告已生成: $report_dir/$output_file"
+    log_success "报告已生�? $report_dir/$output_file"
 
     echo "$report_dir/$output_file"
 }
@@ -527,7 +527,7 @@ archive_logs() {
     log_info "归档日志..."
 
     if [[ -z "$build_id" ]]; then
-        # 归档所有未归档的日志
+        # 归档所有未归档的日�?
         build_id="all-$(date +%Y%m%d)"
     fi
 
@@ -540,7 +540,7 @@ archive_logs() {
     if [[ -d "$source_dir" ]]; then
         archive_file="$archive_dir/$archive_name"
         tar -czvf "$archive_file" -C "$source_dir" . 2>/dev/null || true
-        log_success "日志已归档: $archive_file"
+        log_success "日志已归�? $archive_file"
     else
         log_warn "没有找到要归档的日志"
     fi
@@ -554,7 +554,7 @@ archive_logs() {
 cleanup_logs() {
     local days="${1:-$AGENTOS_LOG_RETENTION_DAYS}"
 
-    log_info "清理 ${days} 天前的日志..."
+    log_info "清理 ${days} 天前的日�?.."
 
     local deleted_count=0
 
@@ -567,7 +567,7 @@ cleanup_logs() {
             if [[ $age_days -gt $days ]]; then
                 rm -rf "$dir"
                 ((deleted_count++))
-                log_debug "已删除: $dir"
+                log_debug "已删�? $dir"
             fi
         done < <(find "$AGENTOS_LOG_DIR/builds" -type d -maxdepth 1 -print0)
     fi
@@ -580,7 +580,7 @@ cleanup_logs() {
     # 清理临时文件
     find "$AGENTOS_LOG_DIR" -name "*.tmp" -type f -mtime "+1" -delete 2>/dev/null || true
 
-    log_success "清理完成，删除了 $deleted_count 个目录"
+    log_success "清理完成，删除了 $deleted_count 个目�?
 
     return 0
 }
@@ -595,7 +595,7 @@ tail_logs() {
     log_info "实时监控日志: $log_file"
 
     if [[ ! -f "$log_file" ]]; then
-        log_error "日志文件不存在: $log_file"
+        log_error "日志文件不存�? $log_file"
         return 1
     fi
 
@@ -615,7 +615,7 @@ search_logs() {
     local context="${3:-3}"
 
     if [[ -z "$pattern" ]]; then
-        log_error "未指定搜索模式"
+        log_error "未指定搜索模�?
         return 1
     fi
 
@@ -640,7 +640,7 @@ search_logs() {
     done < <(find "$log_dir" -name "*.log" -type f -print0)
 
     log_success "找到 $match_count 个匹配项"
-    log_info "结果保存在: $results_file"
+    log_info "结果保存�? $results_file"
 
     # 显示摘要
     grep -n "$pattern" "$results_file" | head -20
@@ -649,7 +649,7 @@ search_logs() {
 }
 
 ###############################################################################
-# 主入口
+# 主入�?
 ###############################################################################
 main() {
     init

@@ -183,10 +183,12 @@ int installer_install_skill(market_service_t* service, const install_request_t* 
     // 生成安装路径
     char install_path[256];
     if (request->install_path) {
-        if (strlen(request->install_path) >= sizeof(install_path)) {
+        size_t path_len = strlen(request->install_path);
+        if (path_len >= sizeof(install_path)) {
+            free(new_result);
             return AGENTOS_ERR_INVALID_PARAM;
         }
-        strcpy(install_path, request->install_path);
+        memcpy(install_path, request->install_path, path_len + 1);
     } else {
         snprintf(install_path, sizeof(install_path), "%s/skills/%s", service->config.storage_path, skill->skill_id);
     }
@@ -195,7 +197,18 @@ int installer_install_skill(market_service_t* service, const install_request_t* 
     if (!directory_exists(install_path)) {
         // 创建父目录
         char parent_path[256];
-        strcpy(parent_path, install_path);
+        size_t install_len = strlen(install_path);
+        if (install_len < sizeof(parent_path)) {
+            memcpy(parent_path, install_path, install_len + 1);
+        } else {
+            new_result->success = false;
+            new_result->message = strdup("Install path too long");
+            new_result->installed_version = NULL;
+            new_result->install_path = NULL;
+            new_result->error_code = -4;
+            *result = new_result;
+            return 0;
+        }
         char* last_slash = strrchr(parent_path, '/');
         if (last_slash) {
             *last_slash = '\0';

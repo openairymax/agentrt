@@ -1,7 +1,7 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Scripts 模块 CI/CD 入口脚本
-# 统一触发 CI/CD 各阶段任务
+# 统一触发 CI/CD 各阶段任�?
 
 set -euo pipefail
 
@@ -9,7 +9,7 @@ set -euo pipefail
 # 配置
 ###############################################################################
 AGENTOS_CICD_VERSION="1.0.0"
-AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")
 AGENTOS_SCRIPTS_DIR="$(dirname "$AGENTOS_SCRIPT_DIR")"
 AGENTOS_PROJECT_ROOT="$(dirname "$AGENTOS_SCRIPTS_DIR")"
 
@@ -60,13 +60,13 @@ ${COLOR_BOLD}命令:${COLOR_NC}
     build           运行构建流程
     test            运行测试
     security        运行安全扫描
-    deploy          部署到指定环境
+    deploy          部署到指定环�?
     rollback        回滚到上一版本
     release         创建发布版本
 
 ${COLOR_BOLD}部署环境:${COLOR_NC}
-    dev             开发环境
-    staging         预发布环境
+    dev             开发环�?
+    staging         预发布环�?
     preview         PR预览环境
     production      生产环境
 
@@ -89,24 +89,24 @@ EOF
 # CI 流程
 ###############################################################################
 run_ci() {
-    log_info "开始 CI 流程..."
+    log_info "开�?CI 流程..."
 
     local exit_code=0
 
-    # 1. 代码质量检查
-    log_info "阶段 1: 代码质量检查"
+    # 1. 代码质量检�?
+    log_info "阶段 1: 代码质量检�?
     if ! run_code_quality; then
         exit_code=1
     fi
 
-    # 2. Shell 脚本检查
-    log_info "阶段 2: Shell 脚本检查"
+    # 2. Shell 脚本检�?
+    log_info "阶段 2: Shell 脚本检�?
     if ! run_shell_check; then
         exit_code=1
     fi
 
-    # 3. Python 代码检查
-    log_info "阶段 3: Python 代码检查"
+    # 3. Python 代码检�?
+    log_info "阶段 3: Python 代码检�?
     if ! run_python_check; then
         exit_code=1
     fi
@@ -127,12 +127,12 @@ run_ci() {
 }
 
 run_code_quality() {
-    log_info "检查代码质量..."
+    log_info "检查代码质�?.."
 
-    # 检查文件格式
+    # 检查文件格�?
     local has_errors=0
 
-    # 检查所有 shell 脚本语法
+    # 检查所�?shell 脚本语法
     while IFS= read -r -d '' script; do
         if ! bash -n "$script" 2>/dev/null; then
             log_error "Shell 语法错误: $script"
@@ -140,7 +140,7 @@ run_code_quality() {
         fi
     done < <(find "$AGENTOS_SCRIPTS_DIR" -name "*.sh" -type f -print0)
 
-    # 检查所有 Python 文件语法
+    # 检查所�?Python 文件语法
     while IFS= read -r -d '' pyfile; do
         if ! python3 -m py_compile "$pyfile" 2>/dev/null; then
             log_error "Python 语法错误: $pyfile"
@@ -152,7 +152,7 @@ run_code_quality() {
         log_success "代码质量检查通过"
         return 0
     else
-        log_error "代码质量检查失败"
+        log_error "代码质量检查失�?
         return 1
     fi
 }
@@ -161,7 +161,7 @@ run_shell_check() {
     log_info "运行 ShellCheck..."
 
     if ! command -v shellcheck &> /dev/null; then
-        log_warn "ShellCheck 未安装，跳过 Shell 检查"
+        log_warn "ShellCheck 未安装，跳过 Shell 检�?
         return 0
     fi
 
@@ -183,14 +183,14 @@ run_shell_check() {
 }
 
 run_python_check() {
-    log_info "运行 Python 代码检查..."
+    log_info "运行 Python 代码检�?.."
 
     local exit_code=0
 
-    # 使用 ruff 进行 lint 检查
+    # 使用 ruff 进行 lint 检�?
     if command -v ruff &> /dev/null; then
         if ! ruff check "$AGENTOS_SCRIPTS_DIR" --select=E,F,W; then
-            log_error "Ruff 检查失败"
+            log_error "Ruff 检查失�?
             exit_code=1
         fi
     else
@@ -200,7 +200,7 @@ run_python_check() {
         fi
     fi
 
-    # 使用 mypy 进行类型检查
+    # 使用 mypy 进行类型检�?
     if command -v mypy &> /dev/null; then
         if ! mypy "$AGENTOS_SCRIPTS_DIR/core" --ignore-missing-imports; then
             log_warn "Mypy 类型检查有警告"
@@ -256,7 +256,7 @@ run_unit_tests() {
 # 构建流程
 ###############################################################################
 run_build() {
-    log_info "开始构建流程..."
+    log_info "开始构建流�?.."
 
     local version="${1:-}"
     local build_type="${2:-release}"
@@ -270,7 +270,7 @@ run_build() {
     local build_dir="$AGENTOS_PROJECT_ROOT/build/scripts/$version"
     mkdir -p "$build_dir"
 
-    # 1. 构建 Shell 脚本包
+    # 1. 构建 Shell 脚本�?
     log_info "打包 Shell 脚本..."
     local shell_tar="$build_dir/agentos-scripts-${version}-shell.tar.gz"
     tar -czvf "$shell_tar" \
@@ -283,10 +283,10 @@ run_build() {
     log_success "Shell 包已创建: $shell_tar"
 
     # 2. 构建 Python wheel
-    log_info "构建 Python 包..."
+    log_info "构建 Python �?.."
     if [[ -f "$AGENTOS_PROJECT_ROOT/pyproject.toml" ]]; then
         cd "$AGENTOS_PROJECT_ROOT"
-        python3 -m build || log_warn "Python 构建失败，跳过"
+        python3 -m build || log_warn "Python 构建失败，跳�?
         cd - > /dev/null
     fi
 
@@ -299,7 +299,7 @@ run_build() {
             -t "spharx/agentos-scripts:latest" \
             -f "$AGENTOS_SCRIPTS_DIR/deploy/docker/Dockerfile.service" \
             "$AGENTOS_PROJECT_ROOT"; then
-            log_success "Docker 镜像已构建: $docker_tag"
+            log_success "Docker 镜像已构�? $docker_tag"
         else
             log_warn "Docker 构建失败"
         fi
@@ -330,7 +330,7 @@ EOF
 # 安全扫描
 ###############################################################################
 run_security() {
-    log_info "开始安全扫描..."
+    log_info "开始安全扫�?.."
 
     local exit_code=0
     local report_dir="$AGENTOS_PROJECT_ROOT/build/security-reports"
@@ -347,8 +347,8 @@ run_security() {
         log_warn "Bandit 未安装，跳过"
     fi
 
-    # 2. Safety 依赖检查
-    log_info "运行 Safety 依赖检查..."
+    # 2. Safety 依赖检�?
+    log_info "运行 Safety 依赖检�?.."
     if command -v safety &> /dev/null; then
         safety check --json || true
     else
@@ -377,7 +377,7 @@ run_deploy() {
     local environment="${1:-staging}"
     local version="${2:-latest}"
 
-    log_info "部署到 $environment 环境 (版本: $version)..."
+    log_info "部署�?$environment 环境 (版本: $version)..."
 
     case "$environment" in
         dev)
@@ -401,12 +401,12 @@ run_deploy() {
 
 deploy_to_dev() {
     local version="$1"
-    log_info "部署到开发环境..."
+    log_info "部署到开发环�?.."
 
     export AGENTOS_ENV="development"
     export AGENTOS_LOG_LEVEL="DEBUG"
 
-    log_success "开发环境部署完成"
+    log_success "开发环境部署完�?
 }
 
 deploy_to_staging() {
@@ -414,7 +414,7 @@ deploy_to_staging() {
     log_info "部署到预发布环境..."
 
     if ! command -v docker &> /dev/null; then
-        log_error "Docker 未安装，无法部署到 staging"
+        log_error "Docker 未安装，无法部署�?staging"
         return 1
     fi
 
@@ -424,9 +424,9 @@ deploy_to_staging() {
     if [[ -f "$compose_file" ]]; then
         docker-compose -f "$compose_file" pull
         docker-compose -f "$compose_file" up -d
-        log_success "预发布环境部署完成"
+        log_success "预发布环境部署完�?
     else
-        log_warn "未找到 staging 配置文件，使用默认配置"
+        log_warn "未找�?staging 配置文件，使用默认配�?
         docker-compose -f "$AGENTOS_SCRIPTS_DIR/deploy/docker/docker-compose.yml" up -d
     fi
 
@@ -434,20 +434,20 @@ deploy_to_staging() {
     if validate_deployment; then
         log_success "预发布环境部署验证通过"
     else
-        log_error "预发布环境部署验证失败"
+        log_error "预发布环境部署验证失�?
         return 1
     fi
 }
 
 deploy_to_preview() {
     local version="$1"
-    log_info "部署到 PR 预览环境..."
+    log_info "部署�?PR 预览环境..."
 
     local pr_number="${GITHUB_PR_NUMBER:-${CI_MERGE_REQUEST_ID:-0}}"
     local preview_tag="pr-$pr_number"
 
     if ! command -v docker &> /dev/null; then
-        log_error "Docker 未安装"
+        log_error "Docker 未安�?
         return 1
     fi
 
@@ -462,10 +462,10 @@ deploy_to_preview() {
 
 deploy_to_production() {
     local version="$1"
-    log_info "部署到生产环境..."
+    log_info "部署到生产环�?.."
 
-    # 生产部署需要确认
-    if [[ -t 0 ]] && ! agentos_confirm "确认部署到生产环境?"; then
+    # 生产部署需要确�?
+    if [[ -t 0 ]] && ! agentos_confirm "确认部署到生产环�?"; then
         log_info "取消生产部署"
         return 0
     fi
@@ -487,18 +487,18 @@ perform_blue_green_deploy() {
     local current_version
     current_version=$(docker tag | grep "spharx/agentos-scripts:$active_tag" || echo "")
 
-    # 部署新版本到非活动环境
+    # 部署新版本到非活动环�?
     docker build \
         -t "spharx/agentos-scripts:$green_tag" \
         -f "$AGENTOS_SCRIPTS_DIR/deploy/docker/Dockerfile.service" \
         "$AGENTOS_PROJECT_ROOT"
 
-    # 验证新版本
+    # 验证新版�?
     if validate_deployment "green"; then
         # 切换流量到新版本
         docker tag "spharx/agentos-scripts:$green_tag" "spharx/agentos-scripts:$active_tag"
 
-        # 保留旧版本用于回滚
+        # 保留旧版本用于回�?
         if [[ -n "$current_version" ]]; then
             docker tag "spharx/agentos-scripts:$current_version" "spharx/agentos-scripts:rollback-$current_version"
         fi
@@ -518,7 +518,7 @@ validate_deployment() {
     local retry_count=0
 
     while [[ $retry_count -lt $max_retries ]]; do
-        # 检查容器健康状态
+        # 检查容器健康状�?
         if docker ps --filter "name=agentos" --filter "status=running" | grep -q agentos; then
             log_success "容器运行正常"
             return 0
@@ -539,10 +539,10 @@ run_rollback() {
     local environment="${1:-production}"
     local target_version="${2:-}"
 
-    log_info "从 $environment 环境回滚..."
+    log_info "�?$environment 环境回滚..."
 
     if [[ "$environment" == "production" ]]; then
-        # 生产环境回滚需要确认
+        # 生产环境回滚需要确�?
         if [[ -t 0 ]] && ! agentos_confirm "确认回滚生产环境?"; then
             log_info "取消回滚"
             return 0
@@ -550,7 +550,7 @@ run_rollback() {
     fi
 
     if [[ -z "$target_version" ]]; then
-        # 尝试获取上一个版本
+        # 尝试获取上一个版�?
         target_version=$(docker images "spharx/agentos-scripts:*" \
             --format "{{.Tag}}" \
             | grep -E "^rollback-" \
@@ -558,12 +558,12 @@ run_rollback() {
             | sed 's/^rollback-//')
 
         if [[ -z "$target_version" ]]; then
-            log_error "未找到可回滚的版本"
+            log_error "未找到可回滚的版�?
             return 1
         fi
     fi
 
-    log_info "回滚到版本: $target_version"
+    log_info "回滚到版�? $target_version"
 
     # 执行回滚
     if command -v docker &> /dev/null; then
@@ -582,7 +582,7 @@ run_release() {
     local tag="${1:-}"
 
     if [[ -z "$tag" ]]; then
-        log_error "未指定发布标签"
+        log_error "未指定发布标�?
         return 1
     fi
 
@@ -601,7 +601,7 @@ run_release() {
         log_warn "GitHub CLI 未安装，跳过 Release 创建"
     fi
 
-    # 3. 推送 Docker 镜像
+    # 3. 推�?Docker 镜像
     if command -v docker &> /dev/null; then
         docker push "spharx/agentos-scripts:$tag"
         docker push "spharx/agentos-scripts:latest"
@@ -612,7 +612,7 @@ run_release() {
 }
 
 ###############################################################################
-# 主入口
+# 主入�?
 ###############################################################################
 main() {
     local command="${1:-}"

@@ -9,6 +9,7 @@ set(TOOL_TEST_SOURCES
     test_cache.c
     test_executor.c
     test_validator.c
+    test_registry.c
 )
 
 # 创建测试可执行文件
@@ -40,10 +41,7 @@ target_compile_options(test_tool_d PRIVATE
 )
 
 # 注册测试
-foreach(test_file ${TOOOL_TEST_SOURCES})
-    get_filename_component(test_name ${test_file} NAME_WE)
-    add_test(NAME tool_d_${test_name} COMMAND test_tool_d)
-endforeach()
+add_test(NAME tool_d_all COMMAND test_tool_d)
 
 # 可选：只有当 BUILD_COVERAGE 时才收集覆盖率
 if(BUILD_COVERAGE)

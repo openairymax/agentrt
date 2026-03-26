@@ -88,7 +88,18 @@ static int* topological_sort(agentos_task_plan_t* plan, size_t* out_count) {
                 if (endptr != dep_idx->valuestring && *endptr == '\0' && errno == 0 &&
                     v_val >= 0 && v_val < (int)n) {
                     int v = (int)v_val;
-                    if (--indeg[v] == 0) queue[qtail++] = v;
+                    if (--indeg[v] == 0) {
+                        if (qtail >= (int)n) {
+                            // 队列溢出，图有问题（可能有环或无效依赖）
+                            AGENTOS_LOG_ERROR("Topological sort queue overflow during processing");
+                            free(queue);
+                            cJSON_Delete(name_to_idx);
+                            free(indeg);
+                            free(order);
+                            return NULL;
+                        }
+                        queue[qtail++] = v;
+                    }
                 } else {
                     AGENTOS_LOG_WARN("Invalid dependency index: %s", dep_idx->valuestring);
                 }

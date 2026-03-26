@@ -77,8 +77,16 @@ typedef int32_t agentos_error_t;
 #define AGENTOS_ERR_NOT_SUPPORTED      (-9)
 #define AGENTOS_ERR_PERMISSION_DENIED  (-10)
 #define AGENTOS_ERR_IO                 (-11)
+#define AGENTOS_ERR_BUSY               (-12)
 #define AGENTOS_ERR_STATE_ERROR        (-13)
 #define AGENTOS_ERR_OVERFLOW           (-14)
+#define AGENTOS_ERR_CANCELED           (-15)
+#define AGENTOS_ERR_NOT_INITIALIZED    (-16)
+#define AGENTOS_ERR_ALREADY_INITIALIZED (-17)
+#define AGENTOS_ERR_CONNECTION_FAILED  (-18)
+#define AGENTOS_ERR_CONNECTION_CLOSED  (-19)
+#define AGENTOS_ERR_PROTOCOL_ERROR     (-20)
+#define AGENTOS_ERR_PARSE_ERROR        (-21)
 
 /* 兼容性别名（向后兼容） */
 #define AGENTOS_EINVAL                 AGENTOS_ERR_INVALID_PARAM
@@ -139,16 +147,20 @@ typedef int32_t agentos_error_t;
 
 /* ==================== 时间函数映射 ==================== */
 
+/**
+ * @brief 获取当前时间（纳秒）- 单调时钟
+ * @return 当前时间纳秒数
+ */
+AGENTOS_API uint64_t agentos_time_ns(void);
+
+/**
+ * @brief 获取当前时间（毫秒）- 单调时钟
+ * @return 当前时间毫秒数
+ */
+AGENTOS_API uint64_t agentos_time_ms(void);
+
 #define agentos_time_monotonic_ns()    agentos_time_ns()
-#define agentos_time_monotonic_ms()   agentos_time_ms()
-
-static inline uint64_t agentos_time_monotonic_ns(void) {
-    return agentos_time_ns();
-}
-
-static inline uint64_t agentos_time_monotonic_ms(void) {
-    return agentos_time_ms();
-}
+#define agentos_time_monotonic_ms()    agentos_time_ms()
 
 /**
  * @brief 获取当前时间（纳秒）- 墙钟时间

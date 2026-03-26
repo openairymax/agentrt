@@ -766,7 +766,7 @@ gateway_t* http_gateway_create(const char* host, uint16_t port, dynamic_server_t
     gateway->max_request_size = 10 * 1024 * 1024; /* 默认10MB */
     
     /* 创建限流器 */
-    gateway->ratelimiter = ratelimiter_create(100, 60); /* 100请求/分钟 */
+    gateway->ratelimiter = ratelimiter_create_simple(100, 60); /* 100请求/分钟 */
     if (!gateway->ratelimiter) {
         free(gateway->host);
         free(gateway);

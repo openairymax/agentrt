@@ -1,0 +1,74 @@
+<?xml version="1.0"?>
+<project version="1">
+    <!-- cppcheck configuration for AgentOS Backs module -->
+    <!-- Copyright (c) 2026 SPHARX. All Rights Reserved. -->
+    
+    <root name="backs" path="."/>
+    
+    <!-- Build directories to ignore -->
+    <build-dir>build</build-dir>
+    <build-dir>*/build</build-dir>
+    <build-dir>*/tests/build</build-dir>
+    
+    <!-- Include paths -->
+    <include-paths>
+        <dir>common/include</dir>
+        <dir>llm_d/include</dir>
+        <dir>llm_d/src</dir>
+        <dir>tool_d/include</dir>
+        <dir>tool_d/src</dir>
+        <dir>market_d/include</dir>
+        <dir>market_d/src</dir>
+        <dir>monit_d/include</dir>
+        <dir>monit_d/src</dir>
+        <dir>sched_d/include</dir>
+        <dir>sched_d/src</dir>
+    </include-paths>
+    
+    <!-- Defines -->
+    <defines>
+        <define>AGENTOS_PLATFORM_LINUX=1</define>
+        <define>AGENTOS_PLATFORM_WINDOWS=0</define>
+        <define>AGENTOS_PLATFORM_MACOS=0</define>
+        <define>AGENTOS_THREAD_LOCAL=__thread</define>
+    </defines>
+    
+    <!-- Suppressions -->
+    <suppressions>
+        <!-- System headers -->
+        <suppression>missingIncludeSystem</suppression>
+        
+        <!-- Test files may have unused functions -->
+        <suppression fileName="*test*.c">unusedFunction</suppression>
+        
+        <!-- Main functions in service modules -->
+        <suppression fileName="main.c">unusedFunction</suppression>
+        
+        <!-- External library interfaces -->
+        <suppression>unusedFunction:*_init</suppression>
+        <suppression>unusedFunction:*_cleanup</suppression>
+        
+        <!-- cJSON library functions -->
+        <suppression>cstyleCast</suppression>
+        
+        <!-- Platform-specific code -->
+        <suppression fileName="platform.c">unusedFunction</suppression>
+        <suppression fileName="platform.c">uninitvar</suppression>
+    </suppressions>
+    
+    <!-- Check all C files -->
+    <paths>
+        <path>common/src</path>
+        <path>llm_d/src</path>
+        <path>tool_d/src</path>
+        <path>market_d/src</path>
+        <path>monit_d/src</path>
+        <path>sched_d/src</path>
+    </paths>
+    
+    <!-- Exclude test files from main analysis -->
+    <excludes>
+        <exclude>*/tests/*</exclude>
+        <exclude>*/build/*</exclude>
+    </excludes>
+</project>

@@ -17,6 +17,23 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # 全局定义
 add_definitions(-D_GNU_SOURCE -DAGENTOS_VERSION="${PROJECT_VERSION}")
 
+# 代码覆盖率支持
+if(ENABLE_COVERAGE)
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        # 添加覆盖率编译和链接标志
+        add_compile_options(-fprofile-arcs -ftest-coverage)
+        add_link_options(-fprofile-arcs -ftest-coverage -lgcov)
+        
+        # 确保调试符号开启
+        string(REPLACE "-O2" "-O0" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
+        string(REPLACE "-O3" "-O0" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
+        
+        message(STATUS "Code coverage enabled for GCC/Clang")
+    else()
+        message(WARNING "Code coverage only supported for GCC/Clang compilers")
+    endif()
+endif()
+
 # 查找依赖
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)

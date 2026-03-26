@@ -56,7 +56,33 @@ endif()
 # 打印覆盖率和分析信息
 if(BUILD_COVERAGE)
     message(STATUS "  Coverage:    ENABLED")
+    message(STATUS "  Coverage Target: ${COVERAGE_TARGET}%")
     message(STATUS "  Note: Use 'make coverage' to generate coverage reports")
+    
+    # 查找覆盖率工具
+    find_program(LCOV NAMES lcov)
+    find_program(GENHTML NAMES genhtml)
+    
+    if(LCOV AND GENHTML)
+        # 添加覆盖率报告目标
+        add_custom_target(coverage
+            COMMAND ${LCOV} --capture --directory ${CMAKE_BINARY_DIR} --output-file coverage.info
+            COMMAND ${LCOV} --remove coverage.info '/usr/*' --output-file coverage.info
+            COMMAND ${GENHTML} coverage.info --output-directory ${CMAKE_BINARY_DIR}/coverage_report
+            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+            COMMENT "Generating coverage report..."
+        )
+        
+        # 添加覆盖率清理目标
+        add_custom_target(coverage-clean
+            COMMAND ${CMAKE_COMMAND} -E remove -f *.gcda *.gcno coverage.info
+            COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/coverage_report
+            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+            COMMENT "Cleaning coverage data..."
+        )
+    else()
+        message(STATUS "  Warning: lcov/genhtml not found - coverage report disabled")
+    endif()
 endif()
 
 message(STATUS "========================================")

@@ -45,6 +45,11 @@ static agentos_error_t majority_coordinate(
         *out_result = strdup("insufficient_voters");
         return AGENTOS_SUCCESS;
     }
+    
+    if (input_count == 0) {
+        *out_result = strdup("no_votes");
+        return AGENTOS_SUCCESS;
+    }
 
     vote_record_t* votes = (vote_record_t*)calloc(input_count, sizeof(vote_record_t));
     if (!votes) return AGENTOS_ENOMEM;

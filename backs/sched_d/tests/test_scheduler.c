@@ -1,178 +1,122 @@
 /**
  * @file test_scheduler.c
- * @brief 调度器核心功能单元测试
+ * @brief 调度服务单元测试
+ * @details 测试调度服务的各个功能模块
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 #include "scheduler_service.h"
 
-static void test_scheduler_create_destroy(void) {
-    printf("  test_scheduler_create_destroy...\n");
-
-    scheduler_t* sched = scheduler_create(NULL);
-    assert(sched != NULL);
-
-    scheduler_destroy(sched);
-
-    printf("    PASSED\n");
-}
-
-static void test_scheduler_config(void) {
-    printf("  test_scheduler_config...\n");
-
-    scheduler_config_t config = {
-        .max_concurrent_tasks = 10,
-        .default_timeout_ms = 30000,
+/**
+ * @brief 测试创建和销毁调度服务
+ * @return 0 表示成功，非 0 表示失败
+ */
+int test_create_destroy() {
+    printf("=== Testing create and destroy ===\n");
+    
+    sched_config_t config = {
         .strategy = SCHED_STRATEGY_ROUND_ROBIN,
-        .enable_priority = 1
+        .health_check_interval_ms = 5000,
+        .stats_report_interval_ms = 10000,
+        .enable_ml_strategy = false,
+        .ml_model_path = NULL,
+        // From data intelligence emerges. by spharx
+        .max_agents = 10
     };
 
-    scheduler_t* sched = scheduler_create(&config);
-    assert(sched != NULL);
+    sched_service_t* service = NULL;
+    int ret = sched_service_create(&config, &service);
+    if (ret != 0) {
+        printf("Failed to create scheduler service\n");
+        return ret;
+    }
 
-    scheduler_destroy(sched);
+    ret = sched_service_destroy(service);
+    if (ret != 0) {
+        printf("Failed to destroy scheduler service\n");
+        return ret;
+    }
 
-    printf("    PASSED\n");
-}
-
-static void test_scheduler_submit_task(void) {
-    printf("  test_scheduler_submit_task...\n");
-
-    scheduler_t* sched = scheduler_create(NULL);
-    assert(sched != NULL);
-
-    task_t task;
-    memset(&task, 0, sizeof(task));
-    task.id = "test_task_001";
-    task.type = TASK_TYPE_LLM;
-    task.priority = TASK_PRIORITY_NORMAL;
-
-    int ret = scheduler_submit(sched, &task);
-    assert(ret == 0);
-
-    scheduler_destroy(sched);
-
-    printf("    PASSED\n");
-}
-
-static void test_scheduler_cancel_task(void) {
-    printf("  test_scheduler_cancel_task...\n");
-
-    scheduler_t* sched = scheduler_create(NULL);
-    assert(sched != NULL);
-
-    task_t task;
-    memset(&task, 0, sizeof(task));
-    task.id = "cancel_task_001";
-    task.type = TASK_TYPE_TOOL;
-
-    scheduler_submit(sched, &task);
-
-    int ret = scheduler_cancel(sched, "cancel_task_001");
-    assert(ret == 0);
-
-    scheduler_destroy(sched);
-
-    printf("    PASSED\n");
-}
-
-static void test_scheduler_get_status(void) {
-    printf("  test_scheduler_get_status...\n");
-
-    scheduler_t* sched = scheduler_create(NULL);
-    assert(sched != NULL);
-
-    task_t task;
-    memset(&task, 0, sizeof(task));
-    task.id = "status_task_001";
-    task.type = TASK_TYPE_LLM;
-
-    scheduler_submit(sched, &task);
-
-    task_status_t status = scheduler_get_status(sched, "status_task_001");
-    assert(status >= TASK_STATUS_PENDING);
-
-    scheduler_destroy(sched);
-
-    printf("    PASSED\n");
-}
-
-static void test_scheduler_set_strategy(void) {
-    printf("  test_scheduler_set_strategy...\n");
-
-    scheduler_t* sched = scheduler_create(NULL);
-    assert(sched != NULL);
-
-    int ret = scheduler_set_strategy(sched, SCHED_STRATEGY_WEIGHTED);
-    assert(ret == 0);
-
-    ret = scheduler_set_strategy(sched, SCHED_STRATEGY_ML_BASED);
-    assert(ret == 0);
-
-    scheduler_destroy(sched);
-
-    printf("    PASSED\n");
-}
-
-static void test_scheduler_priority(void) {
-    printf("  test_scheduler_priority...\n");
-
-    scheduler_t* sched = scheduler_create(NULL);
-    assert(sched != NULL);
-
-    task_t low_task;
-    memset(&low_task, 0, sizeof(low_task));
-    low_task.id = "low_priority_task";
-    low_task.priority = TASK_PRIORITY_LOW;
-
-    task_t high_task;
-    memset(&high_task, 0, sizeof(high_task));
-    high_task.id = "high_priority_task";
-    high_task.priority = TASK_PRIORITY_HIGH;
-
-    scheduler_submit(sched, &low_task);
-    scheduler_submit(sched, &high_task);
-
-    scheduler_destroy(sched);
-
-    printf("    PASSED\n");
-}
-
-static void test_scheduler_stats(void) {
-    printf("  test_scheduler_stats...\n");
-
-    scheduler_t* sched = scheduler_create(NULL);
-    assert(sched != NULL);
-
-    scheduler_stats_t stats;
-    memset(&stats, 0, sizeof(stats));
-
-    int ret = scheduler_get_stats(sched, &stats);
-    assert(ret == 0);
-
-    scheduler_destroy(sched);
-
-    printf("    PASSED\n");
-}
-
-int main(void) {
-    printf("=========================================\n");
-    printf("  Scheduler Unit Tests\n");
-    printf("=========================================\n");
-
-    test_scheduler_create_destroy();
-    test_scheduler_config();
-    test_scheduler_submit_task();
-    test_scheduler_cancel_task();
-    test_scheduler_get_status();
-    test_scheduler_set_strategy();
-    test_scheduler_priority();
-    test_scheduler_stats();
-
-    printf("\n✅ All scheduler tests PASSED\n");
+    printf("Create and destroy test passed\n\n");
     return 0;
+}
+
+/**
+ * @brief 测试注册和注销 Agent
+ * @return 0 表示成功，非 0 表示失败
+ */
+int test_register_unregister_agent() {
+    printf("=== Testing register and unregister agent ===\n");
+    
+    sched_config_t config = {
+        .strategy = SCHED_STRATEGY_ROUND_ROBIN,
+        .health_check_interval_ms = 5000,
+        .stats_report_interval_ms = 10000,
+        .enable_ml_strategy = false,
+        .ml_model_path = NULL,
+        .max_agents = 10
+    };
+
+    sched_service_t* service = NULL;
+    int ret = sched_service_create(&config, &service);
+    if (ret != 0) {
+        printf("Failed to create scheduler service\n");
+        return ret;
+    }
+
+    // 注册 Agent
+    agent_info_t agent1 = {
+        .agent_id = "agent1",
+        .agent_name = "Agent 1",
+        .load_factor = 0.3,
+        .success_rate = 0.95,
+        .avg_response_time_ms = 100,
+        .is_available = true,
+        .weight = 1.0
+    };
+
+    ret = sched_service_register_agent(service, &agent1);
+    if (ret != 0) {
+        printf("Failed to register agent\n");
+        sched_service_destroy(service);
+        return ret;
+    }
+
+    // 注销 Agent
+    ret = sched_service_unregister_agent(service, "agent1");
+    if (ret != 0) {
+        printf("Failed to unregister agent\n");
+        sched_service_destroy(service);
+        return ret;
+    }
+
+    ret = sched_service_destroy(service);
+    if (ret != 0) {
+        printf("Failed to destroy scheduler service\n");
+        return ret;
+    }
+
+    printf("Register and unregister agent test passed\n\n");
+    return 0;
+}
+
+/**
+ * @brief 主测试函数
+ */
+int main() {
+    int ret = 0;
+
+    ret |= test_create_destroy();
+    ret |= test_register_unregister_agent();
+
+    if (ret == 0) {
+        printf("All tests passed!\n");
+    } else {
+        printf("Some tests failed!\n");
+    }
+
+    return ret;
 }

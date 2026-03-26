@@ -1,7 +1,7 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Docker 镜像构建脚本
-# 用法：./build.sh [kernel|service|all] [dev|release]
+# 用法�?/build.sh [kernel|service|all] [dev|release]
 
 set -e
 
@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # 配置变量
-AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")
 AGENTOS_SCRIPTS_DIR="$(dirname "${AGENTOS_SCRIPT_DIR}")"
 AGENTOS_PROJECT_ROOT="$(dirname "${AGENTOS_SCRIPTS_DIR}")"
 VERSION="1.0.0.6"
@@ -21,21 +21,21 @@ VERSION="1.0.0.6"
 # 打印帮助信息
 print_usage() {
     cat << EOF
-用法：$0 [选项] [目标]
+用法�?0 [选项] [目标]
 
 目标:
     kernel      构建内核镜像 (默认)
     service     构建服务镜像
-    all         构建所有镜像
+    all         构建所有镜�?
 
 构建类型:
-    dev         开发版本 (包含调试工具)
+    dev         开发版�?(包含调试工具)
     release     生产版本 (优化大小)
 
 示例:
     $0 kernel dev       # 构建开发版内核镜像
-    $0 service release  # 构建生产版服务镜像
-    $0 all              # 构建所有镜像 (默认 release)
+    $0 service release  # 构建生产版服务镜�?
+    $0 all              # 构建所有镜�?(默认 release)
 
 EOF
 }
@@ -57,7 +57,7 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# 检查 Docker 是否安装
+# 检�?Docker 是否安装
 check_docker() {
     if ! command -v docker &> /dev/null; then
         log_error "Docker 未安装，请先安装 Docker"
@@ -65,23 +65,23 @@ check_docker() {
     fi
 
     if ! docker info &> /dev/null; then
-        log_error "Docker 未运行，请启动 Docker 服务"
+        log_error "Docker 未运行，请启�?Docker 服务"
         exit 1
     fi
 
-    log_info "Docker 版本：$(docker --version)"
+    log_info "Docker 版本�?(docker --version)"
 }
 
 # 构建内核镜像
 build_kernel() {
     local build_type="${1:-release}"
 
-    log_info "开始构建 AgentOS 内核镜像 (${build_type})..."
+    log_info "开始构�?AgentOS 内核镜像 (${build_type})..."
 
     cd "${AGENTOS_PROJECT_ROOT}"
 
     if [ "${build_type}" = "dev" ]; then
-        # 开发版本：包含所有调试工具
+        # 开发版本：包含所有调试工�?
         docker build \
             -f "${AGENTOS_SCRIPT_DIR}/Dockerfile.kernel" \
             -t spharx/agentos-kernel:${VERSION}-dev \
@@ -108,18 +108,18 @@ build_kernel() {
 build_service() {
     local build_type="${1:-release}"
 
-    log_info "开始构建 AgentOS 服务镜像 (${build_type})..."
+    log_info "开始构�?AgentOS 服务镜像 (${build_type})..."
 
     cd "${AGENTOS_PROJECT_ROOT}"
 
-    # 确保内核镜像已存在
+    # 确保内核镜像已存�?
     if ! docker image inspect spharx/agentos-kernel:${VERSION} &> /dev/null; then
-        log_warning "内核镜像不存在，先构建内核镜像"
+        log_warning "内核镜像不存在，先构建内核镜�?
         build_kernel "release"
     fi
 
     if [ "${build_type}" = "dev" ]; then
-        # 开发版本
+        # 开发版�?
         docker build \
             -f "${AGENTOS_SCRIPT_DIR}/Dockerfile.service" \
             -t spharx/agentos-services:${VERSION}-dev \
@@ -140,16 +140,16 @@ build_service() {
     docker images | grep agentos-services
 }
 
-# 构建所有镜像
+# 构建所有镜�?
 build_all() {
     local build_type="${1:-release}"
 
-    log_info "开始构建所有 AgentOS 镜像 (${build_type})..."
+    log_info "开始构建所�?AgentOS 镜像 (${build_type})..."
 
     build_kernel "${build_type}"
     build_service "${build_type}"
 
-    log_success "所有镜像构建完成"
+    log_success "所有镜像构建完�?
 
     # 显示镜像列表
     echo ""
@@ -157,7 +157,7 @@ build_all() {
     docker images | grep agentos
 }
 
-# 清理旧镜像
+# 清理旧镜�?
 cleanup_images() {
     log_info "清理旧的 AgentOS 镜像..."
 
@@ -167,7 +167,7 @@ cleanup_images() {
     log_success "清理完成"
 }
 
-# 主函数
+# 主函�?
 main() {
     local target="${1:-kernel}"
     local build_type="${2:-release}"
@@ -178,7 +178,7 @@ main() {
     log_info "========================================"
     echo ""
 
-    # 检查 Docker
+    # 检�?Docker
     check_docker
     echo ""
 
@@ -198,22 +198,22 @@ main() {
             exit 0
             ;;
         *)
-            log_error "未知目标：${target}"
+            log_error "未知目标�?{target}"
             print_usage
             exit 1
             ;;
     esac
 
     echo ""
-    log_success "构建完成！"
+    log_success "构建完成�?
     echo ""
 
     # 提示
     if [ "${build_type}" = "release" ]; then
-        log_info "提示：使用 docker-compose 启动服务:"
+        log_info "提示：使�?docker-compose 启动服务:"
         log_info "  cd ${AGENTOS_SCRIPT_DIR} && docker-compose up -d"
     fi
 }
 
-# 执行主函数
+# 执行主函�?
 main "$@"

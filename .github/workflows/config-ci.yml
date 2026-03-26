@@ -200,9 +200,9 @@ jobs:
           echo "=== Checking environment configs ==="
           
           required_envs=(
-            "config/environment/development.yaml"
-            "config/environment/staging.yaml"
-            "config/environment/production.yaml"
+            "config/env/development.yaml"
+            "config/env/staging.yaml"
+            "config/env/production.yaml"
           )
           
           missing_envs=()

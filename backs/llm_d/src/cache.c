@@ -45,8 +45,20 @@ static unsigned int hash_key(const char* key) {
 static cache_entry_t* entry_create(const char* key, const char* value) {
     cache_entry_t* e = malloc(sizeof(cache_entry_t));
     if (!e) return NULL;
+    
     e->key = strdup(key);
+    if (!e->key) {
+        free(e);
+        return NULL;
+    }
+    
     e->value = strdup(value);
+    if (!e->value) {
+        free(e->key);
+        free(e);
+        return NULL;
+    }
+    
     e->timestamp = time(NULL);
     e->prev = e->next = e->hnext = NULL;
     return e;

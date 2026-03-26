@@ -256,13 +256,15 @@ static provider_ctx_t* local_init(const char* name,
     if (!ctx) return NULL;
 
     if (api_base) {
-        if (strlen(api_base) >= sizeof(ctx->api_base)) {
+        size_t base_len = strlen(api_base);
+        if (base_len >= sizeof(ctx->api_base)) {
             free(ctx);
             return NULL;
         }
-        strcpy(ctx->api_base, api_base);
+        memcpy(ctx->api_base, api_base, base_len + 1);
     } else {
-        strcpy(ctx->api_base, "http://localhost:8080/v1");
+        const char* default_base = "http://localhost:8080/v1";
+        memcpy(ctx->api_base, default_base, strlen(default_base) + 1);
     }
 
     ctx->timeout_sec = timeout_sec > 0 ? timeout_sec : 60.0;

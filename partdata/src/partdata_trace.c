@@ -309,3 +309,7 @@ partdata_error_t partdata_trace_get_stats(uint64_t* total_spans, uint64_t* pendi
 
     return PARTDATA_SUCCESS;
 }
+
+bool partdata_trace_is_healthy(void) {
+    return g_trace_queue.initialized;
+}

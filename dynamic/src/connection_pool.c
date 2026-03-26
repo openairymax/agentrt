@@ -17,6 +17,18 @@
 #include <time.h>
 #include <errno.h>
 
+/* ========== 辅助函数 ========== */
+
+/**
+ * @brief 获取当前时间（纳秒）
+ * @return 当前时间戳（纳秒）
+ */
+static uint64_t time_ns(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+}
+
 /* ========== 连接池内部结构 ========== */
 
 /**

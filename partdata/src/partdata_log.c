@@ -48,6 +48,12 @@ static size_t g_service_log_count = 0;
 
 static pthread_mutex_t g_service_lock = PTHREAD_MUTEX_INITIALIZER;
 
+/**
+ * @brief 确保目录存在，必要时创建嵌套目录
+ *
+ * @param path 目录路径
+ * @return bool 成功返回 true，失败返回 false
+ */
 static bool ensure_directory(const char* path) {
     if (!path) return false;
 
@@ -70,6 +76,12 @@ static bool ensure_directory(const char* path) {
     return true;
 }
 
+/**
+ * @brief 将日志级别转换为字符串
+ *
+ * @param level 日志级别
+ * @return const char* 级别对应的字符串
+ */
 static const char* level_to_string(partdata_log_level_t level) {
     switch (level) {
         case PARTDATA_LOG_ERROR: return "ERROR";
@@ -80,11 +92,19 @@ static const char* level_to_string(partdata_log_level_t level) {
     }
 }
 
+/**
+ * @brief 获取日志基础路径
+ *
+ * @return const char* 日志基础路径
+ */
 static const char* get_log_base_path(void) {
     static char base_path[256] = "partdata/logs";
     return base_path;
 }
 
+/**
+ * @brief 更新当前日期缓存
+ */
 static void update_current_date(void) {
     time_t now = time(NULL);
     struct tm* tm_info = localtime(&now);
@@ -116,6 +136,12 @@ static FILE* get_main_log_file(void) {
     return g_main_log_file;
 }
 
+/**
+ * @brief 获取服务日志文件
+ *
+ * @param service 服务名称，如果为 NULL 或空则返回主日志文件
+ * @return FILE* 日志文件指针
+ */
 static FILE* get_service_log_file(const char* service) {
     if (!service || !service[0]) {
         return get_main_log_file();

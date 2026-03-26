@@ -45,6 +45,13 @@ if(PKG_CONFIG_FOUND)
     pkg_check_modules(CJSON QUIET libcjson)
 endif()
 
+find_package(OpenSSL REQUIRED)
+if(OpenSSL_FOUND)
+    message(STATUS "Found OpenSSL: ${OPENSSL_VERSION}")
+else()
+    message(FATAL_ERROR "OpenSSL is required for security modules")
+endif()
+
 if(YAML_FOUND OR YAML_LIBRARIES)
     set(HAVE_YAML 1)
     message(STATUS "Found libyaml: ${YAML_LIBRARIES}")
@@ -80,6 +87,12 @@ set(DOMES_SOURCES
     src/workbench/workbench_process_core.c
     src/workbench/workbench_container.c
     src/workbench/workbench_limits.c
+    src/security/domes_signature.c
+    src/security/domes_vault.c
+    src/security/domes_entitlements.c
+    src/security/domes_runtime_protection.c
+    src/security/domes_network_security.c
+    src/security/domes_error.c
 )
 
 set(DOMES_HEADERS
@@ -103,6 +116,12 @@ set(DOMES_HEADERS
     src/workbench/workbench_process.h
     src/workbench/workbench_container.h
     src/workbench/workbench_limits.h
+    src/security/domes_signature.h
+    src/security/domes_vault.h
+    src/security/domes_entitlements.h
+    src/security/domes_runtime_protection.h
+    src/security/domes_network_security.h
+    src/security/domes_error.h
 )
 
 # common 模块路径
@@ -128,10 +147,11 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${COMMON_INCLUDE_DIRS}
+    ${OPENSSL_INCLUDE_DIR}
 )
 
 # 链接 common 模块
-target_link_libraries(${PROJECT_NAME} PRIVATE agentos_common)
+target_link_libraries(${PROJECT_NAME} PRIVATE agentos_common ${OPENSSL_LIBRARIES})
 
 if(YAML_FOUND)
     target_include_directories(${PROJECT_NAME} PRIVATE ${YAML_INCLUDE_DIRS})

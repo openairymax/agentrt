@@ -19,11 +19,42 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <pthread.h>
 #include <stdatomic.h>
 #include <errno.h>
+#include <time.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#define STDIN_FILENO 0
+#else
+#include <unistd.h>
 #include <sys/select.h>
+#endif
+
+/* ========== 辅助函数 ========== */
+
+/**
+ * @brief 获取当前时间（纳秒）
+ * @return 当前时间戳（纳秒）
+ */
+static uint64_t time_ns(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+}
+
+/**
+ * @brief 跨平台sleep函数
+ * @param seconds 秒数
+ */
+static void portable_sleep(unsigned int seconds) {
+#ifdef _WIN32
+    Sleep(seconds * 1000);
+#else
+    sleep(seconds);
+#endif
+}
 
 /* ========== Stdio网关内部结构 ========== */
 
@@ -81,7 +112,7 @@ typedef struct stdio_gateway {
     atomic_bool running;                      /**< 运行标志 */
     
     /* 限流器 */
-    ratelimit_t* ratelimiter;                /**< 命令限流器 */
+    ratelimiter_t* ratelimiter;              /**< 命令限流器 */
 } stdio_gateway_t;
 
 /* ========== 命令协议定义 ========== */
@@ -419,7 +450,7 @@ static void* stdio_output_thread(void* arg) {
     
     while (atomic_load(&gateway->running)) {
         /* 定期输出状态信息 */
-        sleep(30);
+        portable_sleep(30);
         
         if (atomic_load(&gateway->running)) {
             printf("\n[AgentOS Stdio Gateway] Status: Active Sessions: %zu, Commands: %zu\n",
@@ -518,7 +549,7 @@ static void stdio_gateway_destroy(void* gateway_impl) {
     stdio_gateway_stop(gateway);
     
     if (gateway->ratelimiter) {
-        ratelimit_destroy(gateway->ratelimiter);
+        ratelimiter_destroy(gateway->ratelimiter);
     }
     
     free(gateway);
@@ -595,7 +626,7 @@ gateway_t* stdio_gateway_create(dynamic_server_t* server) {
     pthread_mutex_init(&gateway->connection_lock, NULL);
     
     /* 创建限流器 */
-    gateway->ratelimiter = ratelimit_create(10, 60); /* 10命令/分钟 */
+    gateway->ratelimiter = ratelimiter_create_simple(10, 60); /* 10命令/分钟 */
     if (!gateway->ratelimiter) {
         pthread_mutex_destroy(&gateway->connection_lock);
         free(gateway);
@@ -606,7 +637,7 @@ gateway_t* stdio_gateway_create(dynamic_server_t* server) {
     gateway_t* gw = malloc(sizeof(gateway_t));
     if (!gw) {
         pthread_mutex_destroy(&gateway->connection_lock);
-        ratelimit_destroy(gateway->ratelimiter);
+        ratelimiter_destroy(gateway->ratelimiter);
         free(gateway);
         return NULL;
     }

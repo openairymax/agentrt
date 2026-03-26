@@ -1,14 +1,14 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 回滚管理脚本
-# 提供版本回滚和部署历史管理功能
+# 提供版本回滚和部署历史管理功�?
 
 set -euo pipefail
 
 ###############################################################################
 # 配置
 ###############################################################################
-AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")
 AGENTOS_SCRIPTS_DIR="$(dirname "$AGENTOS_SCRIPT_DIR")"
 AGENTOS_PROJECT_ROOT="$(dirname "$AGENTOS_SCRIPTS_DIR")"
 AGENTOS_ROLLBACK_DIR="${AGENTOS_ROLLBACK_DIR:-$AGENTOS_PROJECT_ROOT/build/rollback}"
@@ -55,7 +55,7 @@ ${COLOR_BOLD}用法:${COLOR_NC} $0 <命令> [选项]
 ${COLOR_BOLD}命令:${COLOR_NC}
     history              显示部署历史
     rollback             执行回滚
-    cleanup              清理旧版本
+    cleanup              清理旧版�?
     verify               验证当前版本
 
 ${COLOR_BOLD}选项:${COLOR_NC}
@@ -66,14 +66,14 @@ ${COLOR_BOLD}选项:${COLOR_NC}
 
 ${COLOR_BOLD}示例:${COLOR_NC}
     $0 history                           # 显示部署历史
-    $0 rollback --version v1.0.0       # 回滚到指定版本
-    $0 cleanup --keep 5                 # 保留最近5个版本
+    $0 rollback --version v1.0.0       # 回滚到指定版�?
+    $0 cleanup --keep 5                 # 保留最�?个版�?
 
 EOF
 }
 
 ###############################################################################
-# 初始化
+# 初始�?
 ###############################################################################
 init() {
     mkdir -p "$AGENTOS_ROLLBACK_DIR"
@@ -100,7 +100,7 @@ get_history() {
     fi
 
     echo ""
-    echo -e "${COLOR_BOLD}版本${COLOR_NC}          ${COLOR_BOLD}环境${COLOR_NC}       ${COLOR_BOLD}状态${COLOR_NC}    ${COLOR_BOLD}部署时间${COLOR_NC}           ${COLOR_BOLD}操作者${COLOR_NC}"
+    echo -e "${COLOR_BOLD}版本${COLOR_NC}          ${COLOR_BOLD}环境${COLOR_NC}       ${COLOR_BOLD}状�?{COLOR_NC}    ${COLOR_BOLD}部署时间${COLOR_NC}           ${COLOR_BOLD}操作�?{COLOR_NC}"
     echo "--------------------------------------------------------------------------------"
 
     # 解析 JSON 历史记录
@@ -160,14 +160,14 @@ record_deployment() {
         history=$(cat "$AGENTOS_DEPLOYMENT_HISTORY")
     fi
 
-    # 添加新记录
+    # 添加新记�?
     local updated_history
     updated_history=$(echo "$history" | jq ". += [$new_record]")
 
     # 保存
     echo "$updated_history" > "$AGENTOS_DEPLOYMENT_HISTORY"
 
-    log_success "部署记录已保存: $version -> $environment"
+    log_success "部署记录已保�? $version -> $environment"
 }
 
 ###############################################################################
@@ -176,12 +176,12 @@ record_deployment() {
 get_available_versions() {
     local environment="$1"
 
-    log_info "可用的回滚版本:"
+    log_info "可用的回滚版�?"
     echo ""
     echo -e "${COLOR_BOLD}版本${COLOR_NC}          ${COLOR_BOLD}标签${COLOR_NC}                      ${COLOR_BOLD}大小${COLOR_NC}    ${COLOR_BOLD}创建时间${COLOR_NC}"
     echo "--------------------------------------------------------------------------------"
 
-    # 从 Docker 镜像获取
+    # �?Docker 镜像获取
     if command -v docker &> /dev/null; then
         docker images "spharx/agentos-scripts:*" \
             --format "{{.Tag}}\t{{.CreatedAt}}\t{{.Size}}" \
@@ -193,7 +193,7 @@ get_available_versions() {
             done
     fi
 
-    # 从本地备份获取
+    # 从本地备份获�?
     if [[ -d "$AGENTOS_ROLLBACK_DIR/images" ]]; then
         ls -lh "$AGENTOS_ROLLBACK_DIR/images/" 2>/dev/null | tail -n +2 | awk '{print $9, $5, $6, $7, $8}'
     fi
@@ -210,11 +210,11 @@ do_rollback() {
     local dry_run="${3:-false}"
 
     if [[ -z "$version" ]]; then
-        log_error "未指定回滚版本"
+        log_error "未指定回滚版�?
         return 1
     fi
 
-    log_info "开始回滚..."
+    log_info "开始回�?.."
     log_info "目标版本: $version"
     log_info "目标环境: $environment"
 
@@ -224,7 +224,7 @@ do_rollback() {
 
     # 确认操作
     if [[ "$dry_run" != "true" ]] && [[ -t 0 ]]; then
-        echo -n "确认回滚到版本 $version (y/N): "
+        echo -n "确认回滚到版�?$version (y/N): "
         read -r confirm
         if [[ "$confirm" != "y" ]] && [[ "$confirm" != "Y" ]]; then
             log_info "取消回滚"
@@ -261,7 +261,7 @@ do_rollback() {
             log_info "拉取镜像: spharx/agentos-scripts:$version"
             docker pull "spharx/agentos-scripts:$version" || true
 
-            # 标记为目标版本
+            # 标记为目标版�?
             local target_tag="production"
             if [[ "$environment" == "staging" ]]; then
                 target_tag="staging"
@@ -304,11 +304,11 @@ verify_version() {
     log_info "验证版本: $expected_version"
 
     while [[ $retry_count -lt $max_retries ]]; do
-        # 检查容器健康状态
+        # 检查容器健康状�?
         if docker ps --filter "name=agentos" --filter "status=running" | grep -q agentos; then
             log_success "容器运行正常"
 
-            # 可选：验证版本号
+            # 可选：验证版本�?
             # 如果服务提供版本 API，可以在这里调用验证
 
             return 0
@@ -325,16 +325,16 @@ verify_version() {
 }
 
 ###############################################################################
-# 清理旧版本
+# 清理旧版�?
 ###############################################################################
 cleanup_old_versions() {
     local keep="${1:-5}"
 
-    log_info "清理旧版本，保留最近 $keep 个..."
+    log_info "清理旧版本，保留最�?$keep �?.."
 
     # 清理 Docker 镜像
     if command -v docker &> /dev/null; then
-        # 获取所有回滚镜像
+        # 获取所有回滚镜�?
         local rollback_images
         rollback_images=$(docker images "spharx/agentos-scripts:rollback-*" --format "{{.Tag}}" 2>/dev/null || true)
 
@@ -365,7 +365,7 @@ cleanup_old_versions() {
                 -delete 2>/dev/null || true
         fi
 
-        # 清理过期的部署记录
+        # 清理过期的部署记�?
         if [[ -f "$AGENTOS_DEPLOYMENT_HISTORY" ]]; then
             local updated_history
             updated_history=$(cat "$AGENTOS_DEPLOYMENT_HISTORY" | jq \
@@ -381,7 +381,7 @@ cleanup_old_versions() {
 }
 
 ###############################################################################
-# 主入口
+# 主入�?
 ###############################################################################
 main() {
     init
@@ -429,7 +429,7 @@ main() {
             ;;
         rollback)
             if [[ -z "$version" ]]; then
-                log_error "未指定版本"
+                log_error "未指定版�?
                 print_usage
                 return 1
             fi
@@ -440,7 +440,7 @@ main() {
             ;;
         verify)
             if [[ -z "$version" ]]; then
-                log_error "未指定版本"
+                log_error "未指定版�?
                 print_usage
                 return 1
             fi

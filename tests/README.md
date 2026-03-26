@@ -21,6 +21,22 @@ Language: **简体中文** | [English](../partdocs/readme/en/README.md)
 
 `tests/` 目录包含 AgentOS 的完整测试套件，涵盖单元测试、集成测试、安全测试、性能基准测试和合约测试。
 
+### 测试分布
+
+**注意**: C/C++单元测试已按模块归属移动到对应子模块：
+
+- **内核层测试**: `atoms/corekern/tests/` - IPC、内存、任务、时间服务测试
+- **核心运行时测试**: `atoms/coreloopthree/tests/` - 认知、执行、记忆、循环测试
+- **服务层测试**: `backs/*/tests/` - LLM、Market、Monitor、Scheduler、Tool 服务测试
+- **工具库测试**: `common/tests/unit/` - 核心、错误、IO、日志、Token 测试
+
+顶层 `tests/` 目录专注于：
+- Python 单元测试（配置、SDK）
+- 集成测试（跨模块协作）
+- 安全测试
+- 合约测试
+- 性能基准测试
+
 ### 测试金字塔
 
 
@@ -43,18 +59,14 @@ Language: **简体中文** | [English](../partdocs/readme/en/README.md)
 tests/
 ├── README.md                      # 本文件
 │
-├── unit/                          # 单元测试
-│   ├── kernel/                    # 内核层单元测试
-│   │   ├── test_ipc_binder.c     # IPC Binder 测试
-│   │   ├── test_memory_pool.c    # 内存池测试
-│   │   ├── test_task_scheduler.c # 任务调度器测试
-│   │   └── test_time_service.c   # 时间服务测试
+├── unit/                          # 单元测试（Python 和部分 C 测试）
+│   ├── config/                    # 配置验证测试
 │   ├── sdk/                       # SDK 层单元测试
 │   │   ├── python/               # Python SDK 测试
-│   │   └── go/                   # Go SDK 测试
-│   └── services/                  # 服务层单元测试
-│       ├── test_llm_service.c    # LLM 服务测试
-│       └── test_tool_service.c   # 工具服务测试
+│   │   └── rust/                 # Rust SDK 测试
+│   └── services/                  # 服务层单元测试（空目录，已移至 backs/）
+│       ├── llm_d/                # LLM 服务测试（已移至 backs/llm_d/tests/）
+│       └── tool_d/               # 工具服务测试（已移至 backs/tool_d/tests/）
 │
 ├── integration/                   # 集成测试 ⭐
 │   ├── coreloopthree/            # 三层一体集成测试
@@ -96,12 +108,18 @@ tests/
 cd tests
 ./run_all_tests.sh
 
-# 方法 2: 使用 CTest（C/C++ 测试）
+# 方法 2: 使用 CTest（C/C++ 测试 - 顶层）
 cd build
 ctest --output-on-failure
 
 # 方法 3: 使用 pytest（Python 测试）
 pytest tests/ -v
+
+# 方法 4: 运行子模块 C 测试
+cd atoms/corekern/tests && cmake . && make && ctest --output-on-failure
+cd atoms/coreloopthree/tests && cmake . && make && ctest --output-on-failure
+cd backs/llm_d/tests && cmake . && make && ctest --output-on-failure
+cd common/tests/unit && cmake . && make && ctest --output-on-failure
 ```
 
 ### 分类测试

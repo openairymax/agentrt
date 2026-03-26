@@ -41,21 +41,24 @@ static provider_ctx_t* anthropic_init(const char* name,
     }
 
     if (api_key) {
-        if (strlen(api_key) >= sizeof(ctx->api_key)) {
+        size_t key_len = strlen(api_key);
+        if (key_len >= sizeof(ctx->api_key)) {
             free(ctx);
             return NULL;
         }
-        strcpy(ctx->api_key, api_key);
+        memcpy(ctx->api_key, api_key, key_len + 1);
     }
     
     if (api_base) {
-        if (strlen(api_base) >= sizeof(ctx->api_base)) {
+        size_t base_len = strlen(api_base);
+        if (base_len >= sizeof(ctx->api_base)) {
             free(ctx);
             return NULL;
         }
-        strcpy(ctx->api_base, api_base);
+        memcpy(ctx->api_base, api_base, base_len + 1);
     } else {
-        strcpy(ctx->api_base, "https://api.anthropic.com/v1");
+        const char* default_base = "https://api.anthropic.com/v1";
+        memcpy(ctx->api_base, default_base, strlen(default_base) + 1);
     }
     
     ctx->timeout_sec = timeout_sec > 0 ? timeout_sec : 30.0;

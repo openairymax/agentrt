@@ -161,6 +161,19 @@ int domes_execute_command(const char* command, char* const argv[],
  */
 void domes_flush_audit_log(void);
 
+/* ============================================================================
+ * iOS级安全模块
+ * ============================================================================ */
+
+/* Security 子模块头文件 - 位于 src/security/ 目录 */
+/* 用户应直接包含具体头文件：
+ * #include "domes_signature.h"
+ * #include "domes_vault.h"
+ * #include "domes_entitlements.h"
+ * #include "domes_runtime_protection.h"
+ * #include "domes_network_security.h"
+ */
+
 #ifdef __cplusplus
 }
 #endif
