@@ -11,36 +11,37 @@
 [![Status](https://img.shields.io/badge/status-production%20ready-success.svg)](https://gitee.com/spharx/agentos)
 
 ---
-**智能体超级操作系统**
 
 <div align="center">
 
-*"From data intelligence emerges 始于数据，终于智能。"*
+## 🤖 智能体超级驱动
 
-**Language**:
-[简体中文](README.md) | [English](partdocs/readme/en/README.md) | [Français](partdocs/readme/fr/README.md) | [Deutsch](partdocs/readme/de/README.md)
 
-</div>
+*"From data intelligence emerges · 始于数据，终于智能"*
+
 ---
 
-<div align="center">
+**🌍 Language / 语言**:
 
-## 📖 官方技术白皮书
-
-</div>
-
-项目核心技术理念、架构设计、能力边界与演进规划
-均已在官方技术白皮书中进行完整、严谨的系统化阐述
-
-<div align="center">
-
-[📘 中文版：AgentOS 技术白皮书 V1.0](partdocs/white_paper/zh/AgentOS_技术白皮书_V1.0.pdf)  
-[📗 English: AgentOS Technical White Paper V1.0](partdocs/white_paper/en/AgentOS_Technical_White_Paper_V1.0.pdf)
+[🇨🇳 简体中文](README.md) | [🇬🇧 English](partdocs/readme/en/README.md) | [🇫🇷 Français](partdocs/readme/fr/README.md) | [🇩🇪 Deutsch](partdocs/readme/de/README.md)
 
 </div>
 
-</div>
 ---
+</div>
+
+## 📚 官方技术白皮书
+
+项目核心理念已在官方技术白皮书中进行了系统化阐述
+
+| 版本 | 链接 |
+|------|------|
+| 📘 中文 V1.0 | [AgentOS 技术白皮书](partdocs/white_paper/zh/AgentOS_技术白皮书_V1.0.pdf) |
+| 📗 English V1.0 | [AgentOS Technical White Paper](partdocs/white_paper/en/AgentOS_Technical_White_Paper_V1.0.pdf) |
+
+---
+
+</div>
 
 ## 🚀 项目简介
 
@@ -73,7 +74,7 @@ AgentOS 的设计根植于五大理论根基，形成完整的学术支撑体系
 - **微内核范式转移**：从传统 OS 的微内核扩展到智能体操作系统，重新定义"机制 - 策略"边界
 - **美学驱动工程**：将设计美学提升至原则高度，以人文关怀引导技术决策
 
-详见：[架构设计原则 v1.6 · 第 1 章 引言](partdocs/architecture/folder/architectural_design_principles.md#第 -1-章 -引言)
+详见：[架构设计原则 v1.6 · 第 1 章 引言]
 
 ---
 
@@ -427,7 +428,7 @@ AgentOS 不仅是一个工程产品，更是一件精心雕琢的艺术品。我
 ### 代码美学示例
 
 **极简主义 - RAII 内存管理**：
-```c
+```
 // 智能指针自动释放，无需手动 free
 core_mem_ptr_t ptr = core_mem_alloc(size);
 if (!ptr) return AGENTOS_ERROR_NO_MEMORY;
@@ -435,7 +436,7 @@ if (!ptr) return AGENTOS_ERROR_NO_MEMORY;
 ```
 
 **契约化接口 - Doxygen 注释**：
-```c
+```
 /**
  * @brief 写入原始记忆
  * @param data [in] 数据缓冲区（不可为 NULL）
@@ -450,7 +451,7 @@ AGENTOS_API agentos_error_t agentos_sys_memory_write(...);
 ```
 
 **错误处理 - 统一分级**：
-```c
+```
 switch (error) {
     case AGENTOS_SUCCESS:
         // 成功路径，快速返回
@@ -487,7 +488,7 @@ switch (error) {
 
 ### 接口契约示例
 
-```c
+```
 /**
  * @brief 写入原始记忆
  * @param data 数据
@@ -522,7 +523,7 @@ AGENTOS_API agentos_error_t agentos_sys_memory_write(
 
 ### 快速开始
 
-```bash
+```
 # 克隆项目
 git clone https://gitee.com/spharx/agentos.git
 cd agentos
