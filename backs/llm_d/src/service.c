@@ -205,10 +205,16 @@ llm_service_t* llm_service_create(const char* config_path) {
                     svc->rules = rules;
                     svc->rule_count = rule_count;
                     SVC_LOG_INFO("Loaded %d pricing rules", rule_count);
+                } else if (rules) {
+                    free(rules);
                 }
                 cJSON_Delete(root);
+            } else {
+                SVC_LOG_WARN("Failed to parse pricing rules from config");
             }
             free(yaml_content);
+        } else {
+            SVC_LOG_ERROR("Failed to allocate memory for config content");
         }
         fclose(f);
     }
@@ -322,12 +328,15 @@ int llm_service_complete(llm_service_t* svc,
     if (cache_get(svc->cache, cache_key, &cached_json) == 1 && cached_json) {
         llm_response_t* cached_resp = response_from_json(cached_json);
         free(cached_json);
+        cached_json = NULL;
         if (cached_resp) {
             *out_response = cached_resp;
             free(cache_key);
+            cache_key = NULL;
             SVC_LOG_DEBUG("Cache hit for key");
             return AGENTOS_OK;
         }
+        SVC_LOG_WARN("Failed to parse cached response, fetching fresh data");
     }
 
     /* 查找提供商 */
@@ -338,6 +347,7 @@ int llm_service_complete(llm_service_t* svc,
     if (!prov) {
         SVC_LOG_ERROR("No provider for model '%s'", config->model);
         free(cache_key);
+        cache_key = NULL;
         return AGENTOS_ERR_LLM_INVALID_MODEL;
     }
 
@@ -348,6 +358,7 @@ int llm_service_complete(llm_service_t* svc,
         SVC_LOG_ERROR("Provider '%s' failed for model '%s': error %d", 
                      prov->name, config->model, ret);
         free(cache_key);
+        cache_key = NULL;
         return ret;
     }
 
@@ -358,14 +369,18 @@ int llm_service_complete(llm_service_t* svc,
     }
 
     /* 存入缓存 */
-    char* resp_json = response_to_json(resp);
-    if (resp_json) {
-        cache_put(svc->cache, cache_key, resp_json);
-        free(resp_json);
+    if (cache_key) {
+        char* resp_json = response_to_json(resp);
+        if (resp_json) {
+            cache_put(svc->cache, cache_key, resp_json);
+            free(resp_json);
+            resp_json = NULL;
+        }
     }
 
     *out_response = resp;
     free(cache_key);
+    cache_key = NULL;
     return AGENTOS_OK;
 }
 
@@ -520,8 +535,9 @@ int svc_config_load(const char* config_path, service_config_t* cfg) {
     
     item = cJSON_GetObjectItem(root, "token_encoding");
     if (item && cJSON_IsString(item)) {
-        if (strlen(item->valuestring) < sizeof(cfg->token_encoding)) {
-            strncpy(cfg->token_encoding, item->valuestring, sizeof(cfg->token_encoding) - 1);
+        size_t enc_len = strlen(item->valuestring);
+        if (enc_len < sizeof(cfg->token_encoding)) {
+            memcpy(cfg->token_encoding, item->valuestring, enc_len + 1);
         }
     }
     

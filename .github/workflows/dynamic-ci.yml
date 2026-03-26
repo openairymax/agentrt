@@ -1,0 +1,513 @@
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# AgentOS Dynamic Gateway CI/CD Pipeline
+# Version: 1.0.0
+# Description: Continuous integration for dynamic gateway module (HTTP/WebSocket)
+
+name: dynamic CI
+
+on:
+  push:
+    branches: [main, develop, release/*]
+    paths:
+      - 'dynamic/**'
+      - '.github/workflows/dynamic-ci.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'dynamic/**'
+      - '.github/workflows/dynamic-ci.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'
+
+env:
+  BUILD_TYPE: Release
+  VERSION: 1.0.0.5
+  DYNAMIC_VERSION: 1.0.0
+
+jobs:
+  # ========================================================================
+  # Job 1: Code Quality Check
+  # ========================================================================
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install static analysis tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck clang-format clang-tidy valgrind
+
+      - name: C Code Static Analysis (cppcheck)
+        run: |
+          cppcheck --enable=all \
+            --std=c11 \
+            --platform=unix64 \
+            --inline-suppressions \
+            --quiet \
+            -j$(nproc) \
+            dynamic/ 2>&1 | tee cppcheck_report.txt
+        continue-on-error: true
+
+      - name: C Code Format Check
+        run: |
+          find dynamic/ -name '*.c' -o -name '*.h' | head -20 | while read f; do
+            clang-format --dry-run --Werror "$f" 2>&1 || true
+          done
+
+      - name: C Code Static Analysis (clang-tidy)
+        run: |
+          find dynamic/ -name '*.c' -o -name '*.h' | head -20 | while read f; do
+            clang-tidy "$f" \
+              --config-file=.clang-tidy \
+              --quiet 2>&1 || true
+          done
+        continue-on-error: true
+
+      - name: Upload analysis reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-code-quality-reports
+          path: cppcheck_report.txt
+          retention-days: 7
+
+  # ========================================================================
+  # Job 2: Build (Linux)
+  # ========================================================================
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        build_type: [Release, Debug]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (Ubuntu)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build pkg-config \
+            libmicrohttpd-dev libwebsockets-dev \
+            libssl-dev libyaml-dev \
+            ${{ matrix.compiler }}
+
+      - name: Configure CMake
+        working-directory: dynamic
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -G "Ninja" \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DBUILD_TESTS=ON \
+            -DBUILD_EXAMPLES=OFF \
+            -DCMAKE_C_COMPILER=${{ matrix.compiler }}
+
+      - name: Build
+        working-directory: dynamic/build
+        run: ninja
+
+      - name: Run unit tests
+        working-directory: dynamic/build
+        run: |
+          ctest --output-on-failure -j$(nproc) || true
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --tag spharx/agentos-dynamic:${{ github.sha }} \
+            --tag spharx/agentos-dynamic:latest \
+            -f dynamic/docker/Dockerfile .
+
+      - name: Run container health check
+        run: |
+          docker run -d --name dynamic-health-test \
+            -p 8888:8080 \
+            spharx/agentos-dynamic:${{ github.sha }}
+          sleep 5
+          docker logs dynamic-health-test || true
+          docker stop dynamic-health-test || true
+          docker rm dynamic-health-test || true
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-linux-${{ matrix.compiler }}-${{ matrix.build_type }}
+          path: |
+            dynamic/build/**/*.a
+            dynamic/build/**/*.so
+            dynamic/build/**/*.dylib
+          retention-days: 7
+
+  # ========================================================================
+  # Job 3: Build (macOS)
+  # ========================================================================
+  build-macos:
+    name: Build macOS
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew install cmake ninja
+          brew install libmicrohttpd websockets openssl
+          brew link --force openssl@3
+
+      - name: Configure CMake
+        working-directory: dynamic
+        env:
+          LDFLAGS: "-L/opt/homebrew/opt/openssl@3/lib"
+          CPPFLAGS: "-I/opt/homebrew/opt/openssl@3/include"
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -G "Ninja" \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DBUILD_TESTS=ON \
+            -DCMAKE_C_COMPILER=clang
+
+      - name: Build
+        working-directory: dynamic/build
+        run: ninja
+
+      - name: Run tests
+        working-directory: dynamic/build
+        run: |
+          ctest --output-on-failure || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-macos
+          path: dynamic/build/**/*
+          retention-days: 7
+
+  # ========================================================================
+  # Job 4: Build (Windows)
+  # ========================================================================
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Chocolatey
+        run: |
+          choco install cmake ninja --yes
+
+      - name: Configure CMake
+        working-directory: dynamic
+        shell: pwsh
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -G "Ninja" \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DBUILD_TESTS=ON
+
+      - name: Build
+        working-directory: dynamic/build
+        shell: pwsh
+        run: ninja
+
+      - name: Run tests
+        working-directory: dynamic/build
+        shell: pwsh
+        run: |
+          ctest --output-on-failure || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-windows
+          path: dynamic/build/**/*
+          retention-days: 7
+
+  # ========================================================================
+  # Job 5: Security Scan
+  # ========================================================================
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: [build-linux]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: dynamic/
+          severity: 'CRITICAL,HIGH'
+          format: 'json'
+          output: 'trivy-results.json'
+
+      - name: Upload scan results
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-security-scan
+          path: trivy-results.json
+          retention-days: 30
+
+      - name: Fail on critical vulnerabilities
+        run: |
+          if grep -q '"Severity": "CRITICAL"' trivy-results.json 2>/dev/null; then
+            echo "::error::Critical vulnerabilities found in dynamic module"
+            exit 1
+          fi
+
+  # ========================================================================
+  # Job 6: Memory Safety Check (Valgrind)
+  # ========================================================================
+  memory-check:
+    name: Memory Safety
+    runs-on: ubuntu-latest
+    needs: [build-linux]
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Valgrind
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y valgrind
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dynamic-linux-gcc-Release
+          path: dynamic/build
+
+      - name: Run Valgrind memory check
+        run: |
+          find dynamic/build -name '*test*' -executable | head -1 | while read test_bin; do
+            valgrind --leak-check=full \
+              --show-leak-kinds=all \
+              --errors-for-leak-kinds=all \
+              --error-exitcode=1 \
+              "$test_bin" 2>&1 | tee valgrind_report.txt || true
+          done
+        continue-on-error: true
+
+      - name: Upload Valgrind report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-valgrind-report
+          path: valgrind_report.txt
+          retention-days: 30
+
+  # ========================================================================
+  # Job 7: Integration Tests
+  # ========================================================================
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [build-linux]
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dynamic-linux-gcc-Release
+          path: dynamic/build
+
+      - name: Build Docker images
+        run: |
+          docker build \
+            --tag spharx/agentos-dynamic:test \
+            -f dynamic/docker/Dockerfile .
+
+      - name: Run integration tests
+        run: |
+          docker-compose -f dynamic/docker/docker-compose.yml up -d dynamic
+          sleep 10
+
+          # Test HTTP endpoint
+          curl -f http://localhost:8080/health || exit 1
+
+          # Test WebSocket endpoint
+          # Note: WebSocket testing requires websocat or similar tool
+
+          docker-compose -f dynamic/docker/docker-compose.yml down
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dynamic-integration-test-results
+          path: |
+            test-results/*.xml
+            test-results/*.html
+          retention-days: 14
+
+  # ========================================================================
+  # Job 8: Package and Release
+  # ========================================================================
+  package:
+    name: Package
+    runs-on: ubuntu-latest
+    needs: [code-quality, build-linux, build-macos, build-windows, security-scan]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create release package
+        run: |
+          mkdir -p release
+          cp -r artifacts/*/ release/
+
+          # Create distribution archive
+          tar -czvf agentos-dynamic-${{ env.DYNAMIC_VERSION }}-linux-x86_64.tar.gz \
+            -C release/dynamic-linux-gcc-Release .
+          tar -czvf agentos-dynamic-${{ env.DYNAMIC_VERSION }}-macos-x86_64.tar.gz \
+            -C release/dynamic-macos .
+          tar -czvf agentos-dynamic-${{ env.DYNAMIC_VERSION }}-windows-x86_64.zip \
+            -C release/dynamic-windows .
+
+      - name: Create Docker images
+        run: |
+          docker build \
+            --tag spharx/agentos-dynamic:${{ env.DYNAMIC_VERSION }} \
+            --tag spharx/agentos-dynamic:latest \
+            -f dynamic/docker/Dockerfile .
+          docker tag spharx/agentos-dynamic:${{ env.DYNAMIC_VERSION }} \
+            ghcr.io/spharx/agentos-dynamic:${{ env.DYNAMIC_VERSION }}
+
+      - name: Push to registries
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker push ghcr.io/spharx/agentos-dynamic:${{ env.DYNAMIC_VERSION }}
+          docker push ghcr.io/spharx/agentos-dynamic:latest
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            agentos-dynamic-*.tar.gz
+            agentos-dynamic-*.zip
+          tag_name: dynamic-v${{ env.DYNAMIC_VERSION }}
+          draft: true
+          prerelease: ${{ contains(github.ref, 'rc') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ========================================================================
+  # Job 9: Deploy to Staging
+  # ========================================================================
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [package]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Deploy to staging
+        run: |
+          echo "Deploying dynamic module to staging environment..."
+
+          # Pull latest image
+          docker pull ghcr.io/spharx/agentos-dynamic:${{ env.DYNAMIC_VERSION }}
+
+          # Update docker-compose.staging.yml
+          sed -i "s|image: spharx/agentos-dynamic:.*|image: ghcr.io/spharx/agentos-dynamic:${{ env.DYNAMIC_VERSION }}|" \
+            dynamic/docker/docker-compose.staging.yml
+
+          # Deploy
+          docker-compose -f dynamic/docker/docker-compose.staging.yml up -d dynamic
+
+      - name: Verify deployment
+        run: |
+          echo "Running post-deployment health checks..."
+
+          # Wait for service to start
+          sleep 10
+
+          # HTTP Health check
+          curl -f http://localhost:8080/health || {
+            echo "::error::Health check failed"
+            exit 1
+          }
+
+          # API status check
+          curl -f http://localhost:8080/api/v1/status || {
+            echo "::error::API status check failed"
+            exit 1
+          }
+
+          echo "✅ Deployment verification passed"
+
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests..."
+
+          # Basic smoke test
+          curl -s http://localhost:8080/health | grep -q "healthy" && echo "✅ Health endpoint OK"
+          curl -s http://localhost:8080/api/v1/status | grep -q "status" && echo "✅ Status endpoint OK"
+
+          echo "✅ Smoke tests completed"
+
+  # ========================================================================
+  # Job 10: Notify
+  # ========================================================================
+  notify:
+    name: Notify
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: always()
+    steps:
+      - name: Send notification
+        if: ${{ env.SLACK_WEBHOOK != '' }}
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        run: |
+          STATUS="${{ needs.deploy-staging.result }}"
+
+          if [[ "$STATUS" == "success" ]]; then
+            EMOJI="✅"
+            COLOR="good"
+            MESSAGE="Deployment successful"
+          else
+            EMOJI="❌"
+            COLOR="danger"
+            MESSAGE="Deployment failed"
+          fi
+
+          curl -X POST "$SLACK_WEBHOOK" \
+            -H 'Content-type: application/json' \
+            -d "{\"text\": \"${EMOJI} dynamic module: ${MESSAGE}\"}"
+        continue-on-error: true

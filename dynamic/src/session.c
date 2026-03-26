@@ -254,6 +254,7 @@ session_manager_t* session_manager_create(
     if (pthread_create(&mgr->cleaner_thread, NULL, session_cleaner_thread, mgr) != 0) {
         pthread_cond_destroy(&mgr->cleaner_cond);
         pthread_mutex_destroy(&mgr->lock);
+        pthread_mutex_destroy(&mgr->stats_lock);
         free(mgr->buckets);
         free(mgr);
         return NULL;

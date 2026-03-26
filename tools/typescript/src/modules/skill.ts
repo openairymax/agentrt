@@ -62,7 +62,8 @@ export class SkillManager {
     return {
       id: skillId,
       name: getString(data, 'name'),
-      version: getString(data, 'version'),
+      version: getString(data, 'version') || '1.0.0',
+      description: getString(data, 'description') || '',
       status: SkillStatus.ACTIVE,
       parameters: getMap(data, 'parameters'),
       metadata: getMap(data, 'metadata'),
@@ -196,6 +197,7 @@ export class SkillManager {
     return {
       id: getString(data, 'skill_id'),
       name,
+      version: getString(data, 'version') || '1.0.0',
       description,
       parameters,
       status: SkillStatus.ACTIVE,

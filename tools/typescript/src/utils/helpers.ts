@@ -144,11 +144,22 @@ export function getInterfaceSlice(
 export function extractDataMap(
   resp: APIResponse | null | undefined,
 ): Record<string, unknown> | null {
-  if (!resp || !resp.success || resp.data === undefined || resp.data === null) {
+  if (!resp) {
     return null;
   }
-  if (typeof resp.data === 'object' && !Array.isArray(resp.data)) {
-    return resp.data as Record<string, unknown>;
+
+  if ('success' in resp) {
+    if (!resp.success || resp.data === undefined || resp.data === null) {
+      return null;
+    }
+    if (typeof resp.data === 'object' && !Array.isArray(resp.data)) {
+      return resp.data as Record<string, unknown>;
+    }
+    return null;
+  }
+
+  if (typeof resp === 'object' && !Array.isArray(resp)) {
+    return resp as Record<string, unknown>;
   }
   return null;
 }

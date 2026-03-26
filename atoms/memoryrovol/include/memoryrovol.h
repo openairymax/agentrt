@@ -8,13 +8,8 @@
 #define AGENTOS_MEMORYROV_H
 
 #include "agentos.h"
-#include "layer1_raw.h"
-#include "layer2_feature.h"
-#include "layer3_structure.h"
-#include "layer4_pattern.h"
-#include "retrieval.h"
-#include "forgetting.h"
 #include "config.h"
+#include "forgetting.h"
 
 #ifdef __cplusplus
 extern "C" {

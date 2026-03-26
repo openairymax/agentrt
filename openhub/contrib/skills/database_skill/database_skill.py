@@ -84,6 +84,8 @@ class ConnectionConfig:
     pool_recycle: int = 3600
     echo: bool = False
     isolation_level: Optional[str] = None
+    cache_enabled: bool = False
+    cache_ttl: int = 300
 
 
 @dataclass
@@ -265,10 +267,19 @@ class DatabaseSkill:
                 )
 
                 if self.config.isolation_level:
-                    @self.engine.constructor.listener
+                    from sqlalchemy import event
+
+                    @event.listens_for(self.engine, "connect")
                     def set_isolation_level(dbapi_conn, connection_record):
                         cursor = dbapi_conn.cursor()
-                        cursor.execute(f"SET SESSION TRANSACTION ISOLATION LEVEL {self.config.isolation_level}")
+                        # 使用白名单验证隔离级别，防止SQL注入
+                        valid_levels = {
+                            "READ COMMITTED", "READ UNCOMMITTED",
+                            "REPEATABLE READ", "SERIALIZABLE"
+                        }
+                        level = self.config.isolation_level.upper() if self.config.isolation_level else None
+                        if level in valid_levels:
+                            cursor.execute(f"SET SESSION TRANSACTION ISOLATION LEVEL {level}")
                         cursor.close()
 
             self.session_factory = sessionmaker(bind=self.engine)
@@ -602,32 +613,103 @@ class DatabaseSkill:
         start_time = time.time()
 
         try:
-            column_defs = []
+            # 验证表名（防止SQL注入）
+            if not self._is_valid_identifier(table_name):
+                return QueryResult(success=False, error=f"Invalid table name: {table_name}")
+
+            from sqlalchemy import Table, Column, MetaData
+            from sqlalchemy.sql import ddl
+
+            metadata = MetaData()
+
+            # 构建列定义
+            sa_columns = []
             for col in columns:
-                col_type = col.get("type", "VARCHAR(255)")
                 col_name = col.get("name")
+                if not col_name or not self._is_valid_identifier(col_name):
+                    return QueryResult(success=False, error=f"Invalid column name: {col_name}")
+
+                col_type_str = col.get("type", "VARCHAR(255)")
                 nullable = col.get("nullable", True)
                 default = col.get("default")
 
-                col_str = f"{col_name} {col_type}"
-                if not nullable:
-                    col_str += " NOT NULL"
-                if default is not None:
-                    col_str += f" DEFAULT {default}"
-                column_defs.append(col_str)
+                # 映射类型字符串到SQLAlchemy类型
+                sa_type = self._parse_column_type(col_type_str)
 
-            if primary_key:
-                column_defs.append(f"PRIMARY KEY ({primary_key})")
+                sa_col = Column(
+                    col_name,
+                    sa_type,
+                    nullable=nullable,
+                    default=default
+                )
+                sa_columns.append(sa_col)
 
-            if if_not_exists:
-                create_sql = f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(column_defs)})"
-            else:
-                create_sql = f"CREATE TABLE {table_name} ({', '.join(column_defs)})"
+            # 创建表对象
+            table = Table(
+                table_name,
+                metadata,
+                *sa_columns,
+                if_not_exists=if_not_exists
+            )
 
-            return self.execute_query(create_sql, commit=True)
+            # 生成并执行DDL
+            with self.engine.connect() as conn:
+                for stmt in ddl.CreateTable(table).compile(self.engine).string.split(';'):
+                    if stmt.strip():
+                        conn.execute(text(stmt.strip()))
+                conn.commit()
+
+            return QueryResult(success=True, duration=time.time() - start_time)
 
         except Exception as e:
+            logger.error(f"Create table failed: {e}")
             return QueryResult(success=False, error=str(e), duration=time.time() - start_time)
+
+    def _is_valid_identifier(self, name: str) -> bool:
+        """验证标识符是否合法（防止SQL注入）"""
+        if not name or not isinstance(name, str):
+            return False
+        # 只允许字母、数字、下划线，且不能以数字开头
+        import re
+        return bool(re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', name))
+
+    def _parse_column_type(self, type_str: str):
+        """解析列类型字符串为SQLAlchemy类型"""
+        from sqlalchemy import Integer, String, Float, Boolean, DateTime, Text, Numeric
+
+        type_mapping = {
+            'INT': Integer,
+            'INTEGER': Integer,
+            'BIGINT': Integer,
+            'VARCHAR': String,
+            'TEXT': Text,
+            'FLOAT': Float,
+            'REAL': Float,
+            'DOUBLE': Float,
+            'BOOLEAN': Boolean,
+            'BOOL': Boolean,
+            'DATETIME': DateTime,
+            'TIMESTAMP': DateTime,
+            'NUMERIC': Numeric,
+            'DECIMAL': Numeric,
+        }
+
+        # 提取基本类型（去掉括号内的长度参数）
+        base_type = type_str.upper().split('(')[0].strip()
+
+        if base_type in type_mapping:
+            # 处理带长度的类型，如 VARCHAR(255)
+            if '(' in type_str:
+                try:
+                    length = int(type_str[type_str.index('(')+1:type_str.index(')')])
+                    if base_type in ['VARCHAR']:
+                        return type_mapping[base_type](length)
+                except (ValueError, IndexError):
+                    pass
+            return type_mapping[base_type]()
+
+        # 默认返回String
+        return String(255)
 
     def drop_table(self, table_name: str, if_exists: bool = True, cascade: bool = False) -> QueryResult:
         """Drop a table."""
@@ -637,6 +719,16 @@ class DatabaseSkill:
         start_time = time.time()
 
         try:
+            # 验证表名（防止SQL注入）
+            if not self._is_valid_identifier(table_name):
+                return QueryResult(success=False, error=f"Invalid table name: {table_name}")
+
+            from sqlalchemy import Table, MetaData, DDL
+
+            metadata = MetaData()
+            table = Table(table_name, metadata)
+
+            # 使用SQLAlchemy的DDL构造器
             if if_exists:
                 drop_sql = f"DROP TABLE IF EXISTS {table_name}"
             else:
@@ -645,9 +737,14 @@ class DatabaseSkill:
             if cascade and self.config.database_type == DatabaseType.POSTGRESQL:
                 drop_sql += " CASCADE"
 
-            return self.execute_query(drop_sql, commit=True)
+            with self.engine.connect() as conn:
+                conn.execute(text(drop_sql))
+                conn.commit()
+
+            return QueryResult(success=True, duration=time.time() - start_time)
 
         except Exception as e:
+            logger.error(f"Drop table failed: {e}")
             return QueryResult(success=False, error=str(e), duration=time.time() - start_time)
 
     def truncate_table(self, table_name: str, restart_identity: bool = False) -> QueryResult:
@@ -658,11 +755,14 @@ class DatabaseSkill:
         start_time = time.time()
 
         try:
+            # 验证表名（防止SQL注入）
+            if not self._is_valid_identifier(table_name):
+                return QueryResult(success=False, error=f"Invalid table name: {table_name}")
+
             if self.config.database_type == DatabaseType.POSTGRESQL:
                 truncate_sql = f"TRUNCATE TABLE {table_name}"
                 if restart_identity:
-                    truncate_sql += " RESTART IDENTITY"
-                truncate_sql += " CASCADE" if restart_identity else ""
+                    truncate_sql += " RESTART IDENTITY CASCADE"
             elif self.config.database_type == DatabaseType.MYSQL:
                 truncate_sql = f"TRUNCATE TABLE {table_name}"
             elif self.config.database_type == DatabaseType.SQLITE:
@@ -670,9 +770,14 @@ class DatabaseSkill:
             else:
                 return QueryResult(success=False, error="Unsupported database type for truncate")
 
-            return self.execute_query(truncate_sql, commit=True)
+            with self.engine.connect() as conn:
+                conn.execute(text(truncate_sql))
+                conn.commit()
+
+            return QueryResult(success=True, duration=time.time() - start_time)
 
         except Exception as e:
+            logger.error(f"Truncate table failed: {e}")
             return QueryResult(success=False, error=str(e), duration=time.time() - start_time)
 
     def backup_table(self, table_name: str, backup_name: Optional[str] = None) -> QueryResult:
@@ -683,18 +788,30 @@ class DatabaseSkill:
         start_time = time.time()
 
         try:
+            # 验证表名（防止SQL注入）
+            if not self._is_valid_identifier(table_name):
+                return QueryResult(success=False, error=f"Invalid table name: {table_name}")
+
             backup_name = backup_name or f"{table_name}_backup_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+            # 验证备份表名
+            if not self._is_valid_identifier(backup_name):
+                return QueryResult(success=False, error=f"Invalid backup table name: {backup_name}")
 
             backup_sql = f"CREATE TABLE {backup_name} AS SELECT * FROM {table_name}"
 
-            result = self.execute_query(backup_sql, commit=True)
+            with self.engine.connect() as conn:
+                conn.execute(text(backup_sql))
+                conn.commit()
 
-            if result.success:
-                result.rows = [{"original_table": table_name, "backup_table": backup_name}]
-
-            return result
+            return QueryResult(
+                success=True,
+                rows=[{"original_table": table_name, "backup_table": backup_name}],
+                duration=time.time() - start_time
+            )
 
         except Exception as e:
+            logger.error(f"Backup table failed: {e}")
             return QueryResult(success=False, error=str(e), duration=time.time() - start_time)
 
     def begin_transaction(self, isolation_level: Optional[str] = None) -> Dict[str, Any]:

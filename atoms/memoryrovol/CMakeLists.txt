@@ -1,4 +1,4 @@
-﻿# Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+# Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
 # MemoryRovol 模块顶层构建文件
 
 cmake_minimum_required(VERSION 3.20)
@@ -47,6 +47,31 @@ install(DIRECTORY include/ DESTINATION include/agentos/memoryrovol)
 
 # 安装库
 install(TARGETS agentos_memoryrovol DESTINATION lib)
+
+# 安全编译选项（基于AgentOS C编码风格指南附录A）
+if(MSVC)
+    target_compile_options(agentos_memoryrovol PRIVATE /W4 /WX)
+    target_compile_definitions(agentos_memoryrovol PRIVATE _CRT_SECURE_NO_WARNINGS)
+    # MSVC安全选项
+    target_compile_options(agentos_memoryrovol PRIVATE /GS)  # 缓冲区安全检查
+    target_compile_options(agentos_memoryrovol PRIVATE /sdl) # 启用额外安全检查
+    target_compile_options(agentos_memoryrovol PRIVATE /guard:cf) # 控制流防护
+else()
+    target_compile_options(agentos_memoryrovol PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    # GCC/Clang安全选项
+    target_compile_options(agentos_memoryrovol PRIVATE -fstack-protector-strong)
+    target_compile_options(agentos_memoryrovol PRIVATE -D_FORTIFY_SOURCE=2)
+    target_compile_options(agentos_memoryrovol PRIVATE -fPIE)
+    target_compile_options(agentos_memoryrovol PRIVATE -Wformat -Wformat-security)
+    target_compile_options(agentos_memoryrovol PRIVATE -fno-omit-frame-pointer)
+endif()
+
+# 链接器安全选项
+if(UNIX AND NOT APPLE)
+    target_link_options(agentos_memoryrovol PRIVATE -Wl,-z,relro -Wl,-z,now -pie)
+elseif(APPLE)
+    target_link_options(agentos_memoryrovol PRIVATE -Wl,-dead_strip -pie)
+endif()
 
 # 单元测试
 if(BUILD_TESTS)

@@ -174,6 +174,291 @@ AGENTOS_API agentos_error_t agentos_sys_telemetry_traces(char** out_traces);
  */
 void* agentos_syscall_invoke(int syscall_num, void** args, int argc);
 
+/* ==================== 安全沙箱接口 ==================== */
+
+/**
+ * @brief 沙箱句柄
+ */
+typedef struct agentos_sandbox agentos_sandbox_t;
+
+/**
+ * @brief 沙箱配置结构
+ */
+typedef struct sandbox_config {
+    char* sandbox_name;           /**< 沙箱名称 */
+    char* owner_id;               /**< 所有者ID */
+    uint32_t priority;            /**< 优先级 */
+    uint32_t timeout_ms;          /**< 超时时间 */
+    uint32_t flags;               /**< 标志位 */
+    struct {
+        uint64_t max_memory_bytes;    /**< 最大内存 */
+        uint64_t current_memory;      /**< 当前内存使用 */
+        uint64_t max_cpu_time_ms;     /**< 最大CPU时间 */
+        uint64_t current_cpu_time_ms; /**< 当前CPU时间 */
+        uint64_t max_io_ops;          /**< 最大I/O操作 */
+        uint64_t current_io_ops;      /**< 当前I/O操作 */
+        uint32_t max_file_size;       /**< 最大文件大小（MB） */
+        uint32_t max_network_bytes;   /**< 最大网络传输（MB） */
+    } quota;
+} sandbox_config_t;
+
+/**
+ * @brief 权限类型枚举
+ */
+typedef enum {
+    PERM_ALLOW = 0,    /**< 允许 */
+    PERM_DENY,         /**< 拒绝 */
+    PERM_ASK           /**< 需确认 */
+} permission_type_t;
+
+/**
+ * @brief 初始化沙箱管理器
+ * @return AGENTOS_SUCCESS成功，其他为错误码
+ */
+AGENTOS_API agentos_error_t agentos_sandbox_manager_init(void);
+
+/**
+ * @brief 销毁沙箱管理器
+ */
+AGENTOS_API void agentos_sandbox_manager_destroy(void);
+
+/**
+ * @brief 创建沙箱
+ * @param config 沙箱配置
+ * @param out_sandbox 输出沙箱句柄
+ * @return AGENTOS_SUCCESS成功，其他为错误码
+ */
+AGENTOS_API agentos_error_t agentos_sandbox_create(const sandbox_config_t* config,
+                                                   agentos_sandbox_t** out_sandbox);
+
+/**
+ * @brief 销毁沙箱
+ * @param sandbox 沙箱句柄
+ */
+AGENTOS_API void agentos_sandbox_destroy(agentos_sandbox_t* sandbox);
+
+/**
+ * @brief 在沙箱中执行系统调用
+ * @param sandbox 沙箱句柄
+ * @param syscall_num 系统调用号
+ * @param args 参数数组
+ * @param argc 参数数量
+ * @param out_result 输出结果
+ * @return AGENTOS_SUCCESS成功，其他为错误码
+ */
+AGENTOS_API agentos_error_t agentos_sandbox_invoke(agentos_sandbox_t* sandbox,
+                                                   int syscall_num,
+                                                   void** args,
+                                                   int argc,
+                                                   void** out_result);
+
+/**
+ * @brief 添加权限规则
+ * @param sandbox 沙箱句柄
+ * @param syscall_num 系统调用号（-1表示所有）
+ * @param perm_type 权限类型
+ * @param condition 条件表达式
+ * @return AGENTOS_SUCCESS成功，其他为错误码
+ */
+AGENTOS_API agentos_error_t agentos_sandbox_add_rule(agentos_sandbox_t* sandbox,
+                                                     int syscall_num,
+                                                     permission_type_t perm_type,
+                                                     const char* condition);
+
+/**
+ * @brief 获取沙箱统计信息
+ * @param sandbox 沙箱句柄
+ * @param out_stats 输出统计JSON
+ * @return AGENTOS_SUCCESS成功，其他为错误码
+ */
+AGENTOS_API agentos_error_t agentos_sandbox_get_stats(agentos_sandbox_t* sandbox, char** out_stats);
+
+/**
+ * @brief 获取管理器统计信息
+ * @param out_stats 输出统计JSON
+ * @return AGENTOS_SUCCESS成功，其他为错误码
+ */
+AGENTOS_API agentos_error_t agentos_sandbox_manager_get_stats(char** out_stats);
+
+/**
+ * @brief 重置沙箱资源配额
+ * @param sandbox 沙箱句柄
+ */
+AGENTOS_API void agentos_sandbox_reset_quota(agentos_sandbox_t* sandbox);
+
+/**
+ * @brief 暂停沙箱
+ * @param sandbox 沙箱句柄
+ * @return AGENTOS_SUCCESS成功，其他为错误码
+ */
+AGENTOS_API agentos_error_t agentos_sandbox_suspend(agentos_sandbox_t* sandbox);
+
+/**
+ * @brief 恢复沙箱
+ * @param sandbox 沙箱句柄
+ * @return AGENTOS_SUCCESS成功，其他为错误码
+ */
+AGENTOS_API agentos_error_t agentos_sandbox_resume(agentos_sandbox_t* sandbox);
+
+/**
+ * @brief 终止沙箱
+ * @param sandbox 沙箱句柄
+ * @return AGENTOS_SUCCESS成功，其他为错误码
+ */
+AGENTOS_API agentos_error_t agentos_sandbox_terminate(agentos_sandbox_t* sandbox);
+
+/**
+ * @brief 健康检查
+ * @param sandbox 沙箱句柄
+ * @param out_json 输出健康状态JSON
+ * @return AGENTOS_SUCCESS成功，其他为错误码
+ */
+AGENTOS_API agentos_error_t agentos_sandbox_health_check(agentos_sandbox_t* sandbox, char** out_json);
+
+/* ==================== 熔断器接口 ==================== */
+
+/**
+ * @brief 熔断器句柄
+ */
+typedef struct agentos_circuit_breaker agentos_circuit_breaker_t;
+
+/**
+ * @brief 熔断器状态枚举
+ */
+typedef enum {
+    CB_STATE_CLOSED = 0,    /**< 关闭状态（正常） */
+    CB_STATE_OPEN,          /**< 打开状态（熔断） */
+    CB_STATE_HALF_OPEN      /**< 半开状态（探测） */
+} circuit_breaker_state_t;
+
+/**
+ * @brief 熔断器配置
+ */
+typedef struct cb_config {
+    char* name;                       /**< 熔断器名称 */
+    uint32_t failure_threshold;       /**< 失败阈值 */
+    uint32_t success_threshold;       /**< 成功阈值 */
+    uint32_t timeout_ms;              /**< 超时时间 */
+    uint32_t window_size;             /**< 滑动窗口大小 */
+    uint32_t half_open_requests;      /**< 半开探测数量 */
+    uint32_t flags;                   /**< 标志位 */
+} cb_config_t;
+
+/**
+ * @brief 初始化熔断器管理器
+ * @return AGENTOS_SUCCESS成功，其他为错误码
+ */
+AGENTOS_API agentos_error_t agentos_circuit_breaker_manager_init(void);
+
+/**
+ * @brief 销毁熔断器管理器
+ */
+AGENTOS_API void agentos_circuit_breaker_manager_destroy(void);
+
+/**
+ * @brief 创建熔断器
+ * @param name 熔断器名称
+ * @param config 配置（可为NULL使用默认值）
+ * @param out_cb 输出熔断器句柄
+ * @return AGENTOS_SUCCESS成功，其他为错误码
+ */
+AGENTOS_API agentos_error_t agentos_circuit_breaker_create(const char* name,
+                                                           const cb_config_t* config,
+                                                           agentos_circuit_breaker_t** out_cb);
+
+/**
+ * @brief 销毁熔断器
+ * @param cb 熔断器句柄
+ */
+AGENTOS_API void agentos_circuit_breaker_destroy(agentos_circuit_breaker_t* cb);
+
+/**
+ * @brief 检查熔断器是否允许调用
+ * @param cb 熔断器句柄
+ * @return 1允许，0拒绝
+ */
+AGENTOS_API int agentos_circuit_breaker_allow(agentos_circuit_breaker_t* cb);
+
+/**
+ * @brief 记录成功
+ * @param cb 熔断器句柄
+ */
+AGENTOS_API void agentos_circuit_breaker_success(agentos_circuit_breaker_t* cb);
+
+/**
+ * @brief 记录失败
+ * @param cb 熔断器句柄
+ */
+AGENTOS_API void agentos_circuit_breaker_failure(agentos_circuit_breaker_t* cb);
+
+/**
+ * @brief 强制打开熔断器
+ * @param cb 熔断器句柄
+ * @return AGENTOS_SUCCESS成功，其他为错误码
+ */
+AGENTOS_API agentos_error_t agentos_circuit_breaker_force_open(agentos_circuit_breaker_t* cb);
+
+/**
+ * @brief 强制关闭熔断器
+ * @param cb 熔断器句柄
+ * @return AGENTOS_SUCCESS成功，其他为错误码
+ */
+AGENTOS_API agentos_error_t agentos_circuit_breaker_force_close(agentos_circuit_breaker_t* cb);
+
+/**
+ * @brief 获取熔断器状态
+ * @param cb 熔断器句柄
+ * @return 熔断器状态
+ */
+AGENTOS_API circuit_breaker_state_t agentos_circuit_breaker_state(agentos_circuit_breaker_t* cb);
+
+/**
+ * @brief 获取熔断器统计信息
+ * @param cb 熔断器句柄
+ * @param out_stats 输出统计JSON
+ * @return AGENTOS_SUCCESS成功，其他为错误码
+ */
+AGENTOS_API agentos_error_t agentos_circuit_breaker_stats(agentos_circuit_breaker_t* cb, char** out_stats);
+
+/**
+ * @brief 设置降级函数
+ * @param cb 熔断器句柄
+ * @param fallback_fn 降级函数
+ * @param data 降级数据
+ * @return AGENTOS_SUCCESS成功，其他为错误码
+ */
+AGENTOS_API agentos_error_t agentos_circuit_breaker_set_fallback(agentos_circuit_breaker_t* cb,
+                                                                 agentos_error_t (*fallback_fn)(void*),
+                                                                 void* data);
+
+/**
+ * @brief 执行降级
+ * @param cb 熔断器句柄
+ * @return AGENTOS_SUCCESS成功，其他为错误码
+ */
+AGENTOS_API agentos_error_t agentos_circuit_breaker_fallback(agentos_circuit_breaker_t* cb);
+
+/**
+ * @brief 获取管理器统计信息
+ * @param out_stats 输出统计JSON
+ * @return AGENTOS_SUCCESS成功，其他为错误码
+ */
+AGENTOS_API agentos_error_t agentos_circuit_breaker_manager_stats(char** out_stats);
+
+/**
+ * @brief 重置熔断器统计
+ * @param cb 熔断器句柄
+ */
+AGENTOS_API void agentos_circuit_breaker_reset_stats(agentos_circuit_breaker_t* cb);
+
+/**
+ * @brief 健康检查
+ * @param cb 熔断器句柄
+ * @param out_json 输出健康状态JSON
+ * @return AGENTOS_SUCCESS成功，其他为错误码
+ */
+AGENTOS_API agentos_error_t agentos_circuit_breaker_health_check(agentos_circuit_breaker_t* cb, char** out_json);
+
 #ifdef __cplusplus
 }
 #endif

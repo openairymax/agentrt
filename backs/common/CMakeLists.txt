@@ -7,6 +7,10 @@ project(agentos-svc-common VERSION 3.0.0 LANGUAGES C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+# 测试支持选项
+option(BUILD_TESTS "Build unit tests" OFF)
+option(BUILD_COVERAGE "Build with code coverage" OFF)
+
 # 查找依赖
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBCURL REQUIRED libcurl)
@@ -72,15 +76,30 @@ target_link_libraries(svc_common PUBLIC
 )
 
 # 编译选项
-target_compile_options(svc_common PRIVATE
-    -Wall
-    -Wextra
-    -Wpedantic
-    -Werror=implicit-function-declaration
-    -Werror=return-type
-    $<$<CONFIG:Debug>:-g -O0>
-    $<$<CONFIG:Release>:-O3 -DNDEBUG>
-)
+if(BUILD_COVERAGE)
+    target_compile_options(svc_common PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+        -fprofile-arcs
+        -ftest-coverage
+        -g
+        -O0
+    )
+    target_link_options(svc_common PRIVATE
+        --coverage
+    )
+else()
+    target_compile_options(svc_common PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Werror=implicit-function-declaration
+        -Werror=return-type
+        $<$<CONFIG:Debug>:-g -O0>
+        $<$<CONFIG:Release>:-O3 -DNDEBUG>
+    )
+endif()
 
 # 导出符号
 set_target_properties(svc_common PROPERTIES
@@ -88,6 +107,12 @@ set_target_properties(svc_common PROPERTIES
     SOVERSION 3
     POSITION_INDEPENDENT_CODE ON
 )
+
+# 测试支持
+if(BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
 
 # 安装规则
 install(TARGETS svc_common
@@ -101,6 +126,8 @@ install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/include/svc_common.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/platform.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/error.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/svc_logger.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/svc_config.h
     DESTINATION include/agentos
 )
 

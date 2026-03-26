@@ -87,15 +87,24 @@ static agentos_error_t weighted_coordinate(
     }
     combined[0] = '\0';
 
+    size_t offset = 0;
     for (size_t i = 0; i < n; i++) {
         if (results[i]) {
             char buf[64];
             snprintf(buf, sizeof(buf), "[Model %s weight %.2f]: ", data->model_names[i], data->weights[i]);
-            strcat(combined, buf);
-            strcat(combined, results[i]);
-            strcat(combined, "\n");
+            size_t buf_len = strlen(buf);
+            size_t result_len = strlen(results[i]);
+            size_t needed = buf_len + result_len + 2;
+            if (offset + needed <= total_len) {
+                memcpy(combined + offset, buf, buf_len);
+                offset += buf_len;
+                memcpy(combined + offset, results[i], result_len);
+                offset += result_len;
+                combined[offset++] = '\n';
+            }
         }
     }
+    combined[offset] = '\0';
 
     *out_result = combined;
 

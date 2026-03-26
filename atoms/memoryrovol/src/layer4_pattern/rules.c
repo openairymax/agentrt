@@ -4,8 +4,8 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "layer4_pattern.h"
-#include "llm_client.h"
+#include "../include/layer4_pattern.h"
+#include "../include/llm_client.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -51,15 +51,20 @@ agentos_error_t agentos_rule_generator_generate(
     if (!gen || !cluster_vectors || !cluster_ids || count == 0 || !out_rule)
         return AGENTOS_EINVAL;
 
-    // 构建提示词
     char prompt[4096] = {0};
-    snprintf(prompt, sizeof(prompt),
+    size_t offset = snprintf(prompt, sizeof(prompt),
         "You are a pattern analyzer. Given the following set of memory IDs that belong to the same cluster:\n");
-    for (size_t i = 0; i < count && i < 20; i++) {
-        strncat(prompt, cluster_ids[i], 256);
-        strcat(prompt, "\n");
+    for (size_t i = 0; i < count && i < 20 && offset < sizeof(prompt) - 1; i++) {
+        size_t len = strlen(cluster_ids[i]);
+        if (offset + len + 2 < sizeof(prompt)) {
+            memcpy(prompt + offset, cluster_ids[i], len);
+            offset += len;
+            prompt[offset++] = '\n';
+            prompt[offset] = '\0';
+        }
     }
-    strcat(prompt,
+    if (offset < sizeof(prompt) - 100) {
+        snprintf(prompt + offset, sizeof(prompt) - offset,
         "\nPlease generate a JSON rule that captures the common characteristics of this cluster. "
         "The rule should have fields: 'name', 'description', 'condition', 'action', and 'confidence'. "
         "Output only valid JSON.");

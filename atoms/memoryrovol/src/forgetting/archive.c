@@ -4,13 +4,19 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "forgetting.h"
-#include "layer2_feature.h"
-#include "logger.h"
+#include "../include/forgetting.h"
+#include "../include/layer2_feature.h"
+#include "agentos.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef _WIN32
+#include <direct.h>
+#define mkdir(path) _mkdir(path)
+#else
 #include <sys/stat.h>
+#endif
 
 /* 确保归档目录存在 */
 static int ensure_archive_dir(const char* path) {

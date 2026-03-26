@@ -39,17 +39,26 @@ if(NOT WEBSOCKETS_LIBRARY)
     message(FATAL_ERROR "libwebsockets not found. Please install libwebsockets-dev package.")
 endif()
 
-# 源文件
+# 查找cJSON（JSON解析）
+find_library(CJSON_LIBRARY NAMES cjson cJSON)
+if(NOT CJSON_LIBRARY)
+    message(WARNING "cJSON library not found. Some features may not work.")
+endif()
+
+# 源文件（不包含 agentos.c，使用 common 模块）
 set(DYNAMIC_SOURCES
     src/platform.c
-    src/agentos.c
     src/main.c
     src/server.c
     src/session.c
+    src/session_stats.c
     src/health.c
     src/telemetry.c
     src/auth.c
     src/ratelimit.c
+    src/config.c
+    src/config_runtime.c
+    src/connection_pool.c
     src/gateway/http_gateway.c
     src/gateway/ws_gateway.c
     src/gateway/stdio_gateway.c
@@ -61,18 +70,34 @@ set(DYNAMIC_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+# common 模块路径
+set(COMMON_MODULE_DIR ${CMAKE_SOURCE_DIR}/../common)
+
+# common 模块的 include 目录（agentos_common 的 include 是 PRIVATE，需要显式添加）
+set(COMMON_INCLUDE_DIRS
+    ${COMMON_MODULE_DIR}/platform/include
+    ${COMMON_MODULE_DIR}/utils/core/include
+    ${COMMON_MODULE_DIR}/utils/error/include
+    ${COMMON_MODULE_DIR}/utils/observability/include
+)
+
 # 可执行文件
 add_executable(dynamic ${DYNAMIC_SOURCES})
 
-target_include_directories(dynamic PRIVATE ${DYNAMIC_INCLUDE_DIRS})
+target_include_directories(dynamic PRIVATE
+    ${DYNAMIC_INCLUDE_DIRS}
+    ${COMMON_INCLUDE_DIRS}
+)
 
 target_link_libraries(dynamic
     PRIVATE
+    agentos_common
     OpenSSL::SSL
     OpenSSL::Crypto
     Threads::Threads
     ${MHD_LIBRARY}
     ${WEBSOCKETS_LIBRARY}
+    ${CJSON_LIBRARY}
 )
 
 # 编译定义
@@ -96,7 +121,6 @@ option(BUILD_SHARED_LIBS "Build shared library" OFF)
 if(NOT BUILD_SHARED_LIBS)
     add_library(dynamic_lib STATIC
         src/platform.c
-        src/agentos.c
         src/server.c
         src/session.c
         src/session_stats.c
@@ -117,10 +141,12 @@ if(NOT BUILD_SHARED_LIBS)
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${COMMON_INCLUDE_DIRS}
     )
     
     target_link_libraries(dynamic_lib
         PUBLIC
+        agentos_common
         OpenSSL::SSL
         OpenSSL::Crypto
         Threads::Threads
@@ -171,7 +197,6 @@ if(NOT BUILD_SHARED_LIBS)
         LIBRARY DESTINATION lib
     )
     install(FILES 
-        src/agentos.h
         src/platform.h
         src/session.h
         src/health.h

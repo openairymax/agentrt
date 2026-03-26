@@ -104,6 +104,16 @@ ratelimiter_t* ratelimiter_create(const ratelimit_config_t* config) {
     return limiter;
 }
 
+ratelimiter_t* ratelimiter_create_simple(uint32_t max_requests, uint32_t window_seconds) {
+    ratelimit_config_t config = {
+        .requests_per_second = max_requests / (window_seconds > 0 ? window_seconds : 1),
+        .burst_size = max_requests / 10,
+        .window_ms = window_seconds * 1000,
+        .enabled = true
+    };
+    return ratelimiter_create(&config);
+}
+
 void ratelimiter_destroy(ratelimiter_t* limiter) {
     if (!limiter) return;
     

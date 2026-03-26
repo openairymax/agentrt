@@ -265,6 +265,15 @@ partdata_error_t partdata_get_stats(partdata_stats_t* stats) {
     return PARTDATA_SUCCESS;
 }
 
+/**
+ * @brief 计算文件年龄（天数）
+ *
+ * @note 此函数目前未被使用，保留作为未来日志清理功能的预留接口
+ *       计划在 partdata_log_cleanup 完整实现时使用
+ *
+ * @param filepath 文件路径
+ * @return uint64_t 文件年龄（天数），如果文件不存在或获取失败返回 0
+ */
 static uint64_t get_file_age_days(const char* filepath) {
     struct stat st;
     if (stat(filepath, &st) != 0) {
@@ -368,4 +377,49 @@ partdata_error_t partdata_flush(void) {
         return PARTDATA_ERR_NOT_INITIALIZED;
     }
     return PARTDATA_SUCCESS;
+}
+
+partdata_error_t partdata_health_check(bool* registry_ok, 
+                                       bool* trace_ok, 
+                                       bool* log_ok, 
+                                       bool* ipc_ok, 
+                                       bool* memory_ok) {
+    bool all_healthy = true;
+    
+    if (registry_ok) {
+        *registry_ok = g_initialized;
+        if (!*registry_ok) {
+            all_healthy = false;
+        }
+    }
+    
+    if (trace_ok) {
+        *trace_ok = g_initialized;
+        if (!*trace_ok) {
+            all_healthy = false;
+        }
+    }
+    
+    if (log_ok) {
+        *log_ok = g_initialized;
+        if (!*log_ok) {
+            all_healthy = false;
+        }
+    }
+    
+    if (ipc_ok) {
+        *ipc_ok = g_initialized;
+        if (!*ipc_ok) {
+            all_healthy = false;
+        }
+    }
+    
+    if (memory_ok) {
+        *memory_ok = g_initialized;
+        if (!*memory_ok) {
+            all_healthy = false;
+        }
+    }
+    
+    return all_healthy ? PARTDATA_SUCCESS : PARTDATA_ERR_NOT_INITIALIZED;
 }

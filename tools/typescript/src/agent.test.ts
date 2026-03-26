@@ -104,7 +104,7 @@ describe('AgentOS', () => {
     const memories = await testAgent.searchMemory('test');
 
     expect(memories).toHaveLength(1);
-    expect(memories[0].memoryId).toBe('test-memory-id');
+    expect(memories[0].id).toBe('test-memory-id');
   });
 
   test('should get a memory', async () => {
@@ -133,7 +133,7 @@ describe('AgentOS', () => {
     const testAgent = new AgentOS({ endpoint: 'http://localhost:18789' });
     const memory = await testAgent.getMemory('test-memory-id');
 
-    expect(memory.memoryId).toBe('test-memory-id');
+    expect(memory.id).toBe('test-memory-id');
     expect(memory.content).toBe('Test memory');
   });
 

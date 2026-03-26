@@ -28,6 +28,14 @@ typedef enum {
 } auth_result_t;
 
 /**
+ * @brief 认证类型枚举
+ */
+typedef enum {
+    AUTH_TYPE_API_KEY = 0,  /**< API密钥认证 */
+    AUTH_TYPE_JWT           /**< JWT认证 */
+} auth_type_t;
+
+/**
  * @brief 创建认证上下文
  * 
  * @param api_key API密钥，若为NULL则禁用API密钥认证

@@ -1,0 +1,383 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agentos.spharx.com/schemas/tool-service.schema.json",
+  "title": "AgentOS Tool Service Configuration Schema",
+  "description": "Schema for Tool Daemon service configuration",
+  "type": "object",
+  "required": ["_config_version", "tool_d"],
+  "properties": {
+    "_config_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Configuration version in semantic versioning format"
+    },
+    "tool_d": {
+      "type": "object",
+      "required": ["name", "version", "enabled", "bind_address", "port", "max_concurrency", "timeout_sec"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Service name"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+(\\.\\d+)?$",
+          "description": "Service version"
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether the service is enabled"
+        },
+        "bind_address": {
+          "type": "string",
+          "format": "ipv4",
+          "default": "127.0.0.1",
+          "description": "Service bind address"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 50051,
+          "description": "Service port"
+        },
+        "max_concurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "default": 100,
+          "description": "Maximum concurrent requests"
+        },
+        "timeout_sec": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600,
+          "default": 60,
+          "description": "Request timeout in seconds"
+        },
+        "execution": {
+          "type": "object",
+          "description": "Execution configuration",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": ["local", "docker", "wasm", "remote"],
+              "default": "local"
+            },
+            "sandbox": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": ["process", "container", "wasm"]
+                },
+                "memory_limit_mb": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "cpu_limit": {
+                  "type": "number",
+                  "minimum": 0.1
+                },
+                "timeout_sec": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "docker": {
+              "type": "object",
+              "properties": {
+                "image": {
+                  "type": "string"
+                },
+                "network": {
+                  "type": "string"
+                },
+                "read_only": {
+                  "type": "boolean"
+                },
+                "security_opt": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "cap_drop": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "wasm": {
+              "type": "object",
+              "properties": {
+                "runtime": {
+                  "type": "string"
+                },
+                "memory_limit_mb": {
+                  "type": "integer"
+                },
+                "timeout_sec": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "cache": {
+          "type": "object",
+          "description": "Cache configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "type": {
+              "type": "string",
+              "enum": ["memory", "redis", "file"]
+            },
+            "memory": {
+              "type": "object",
+              "properties": {
+                "max_size_mb": {
+                  "type": "integer"
+                },
+                "ttl_sec": {
+                  "type": "integer"
+                }
+              }
+            },
+            "redis": {
+              "type": "object",
+              "properties": {
+                "host": {
+                  "type": "string"
+                },
+                "port": {
+                  "type": "integer"
+                },
+                "db": {
+                  "type": "integer"
+                },
+                "ttl_sec": {
+                  "type": "integer"
+                }
+              }
+            },
+            "file": {
+              "type": "object",
+              "properties": {
+                "dir": {
+                  "type": "string"
+                },
+                "max_size_mb": {
+                  "type": "integer"
+                },
+                "ttl_sec": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "permissions": {
+          "type": "object",
+          "description": "Permission configuration",
+          "properties": {
+            "default_rule": {
+              "type": "string",
+              "enum": ["allow", "deny"]
+            },
+            "check_enabled": {
+              "type": "boolean"
+            },
+            "audit_enabled": {
+              "type": "boolean"
+            }
+          }
+        },
+        "logging": {
+          "type": "object",
+          "description": "Logging configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "log_input": {
+              "type": "boolean"
+            },
+            "log_output": {
+              "type": "boolean"
+            },
+            "log_duration": {
+              "type": "boolean"
+            },
+            "mask_fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "health_check": {
+          "type": "object",
+          "description": "Health check configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "interval_sec": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "timeout_sec": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "unhealthy_threshold": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "rate_limit": {
+          "type": "object",
+          "description": "Rate limiting configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "requests_per_sec": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "requests_per_min": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "burst": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "retry": {
+          "type": "object",
+          "description": "Retry configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "max_attempts": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "backoff_ms": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "backoff_multiplier": {
+              "type": "number",
+              "minimum": 1
+            },
+            "max_backoff_ms": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "builtin_tools": {
+          "type": "object",
+          "description": "Built-in tools configuration",
+          "properties": {
+            "filesystem": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "timeout_sec": {
+                  "type": "integer"
+                },
+                "max_file_size_mb": {
+                  "type": "integer"
+                }
+              }
+            },
+            "shell": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "timeout_sec": {
+                  "type": "integer"
+                },
+                "allowed_commands": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "http": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "timeout_sec": {
+                  "type": "integer"
+                },
+                "max_response_size_mb": {
+                  "type": "integer"
+                }
+              }
+            },
+            "code": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "timeout_sec": {
+                  "type": "integer"
+                },
+                "languages": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "hot_reload": {
+          "type": "object",
+          "description": "Hot reload configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "check_interval_sec": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

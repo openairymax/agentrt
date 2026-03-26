@@ -198,22 +198,26 @@ int tool_service_execute(tool_service_t* svc,
     }
 
     /* 3. 检查缓存 */
-    if (svc->cache && meta->cacheable) {
+    if (svc->cache && meta && meta->cacheable) {
         char* cache_key = tool_cache_key(req->tool_id, req->params_json);
         if (cache_key) {
             char* cached = NULL;
             if (tool_cache_get(svc->cache, cache_key, &cached) == 1 && cached) {
                 tool_result_t* res = tool_result_from_json(cached);
                 free(cached);
+                cached = NULL;
                 if (res) {
                     SVC_LOG_DEBUG("Cache hit for tool: %s", req->tool_id);
                     free(cache_key);
                     tool_metadata_free(meta);
                     *out_result = res;
                     return AGENTOS_OK;
+                } else {
+                    SVC_LOG_WARN("Failed to parse cached result for tool: %s", req->tool_id);
                 }
             }
             free(cache_key);
+            cache_key = NULL;
         }
     }
 
@@ -223,25 +227,35 @@ int tool_service_execute(tool_service_t* svc,
     
     if (ret != 0) {
         SVC_LOG_ERROR("Tool execution failed: %s, error: %d", req->tool_id, ret);
+        if (res) {
+            tool_result_free(res);
+            res = NULL;
+        }
         tool_metadata_free(meta);
+        meta = NULL;
         return ret;
     }
 
     /* 5. 存入缓存 */
-    if (svc->cache && meta->cacheable && res && res->success) {
+    if (svc->cache && meta && meta->cacheable && res && res->success) {
         char* cache_key = tool_cache_key(req->tool_id, req->params_json);
         if (cache_key) {
             char* res_json = tool_result_to_json(res);
             if (res_json) {
                 tool_cache_put(svc->cache, cache_key, res_json);
                 free(res_json);
+                res_json = NULL;
             }
             free(cache_key);
+            cache_key = NULL;
         }
     }
 
     *out_result = res;
-    tool_metadata_free(meta);
+    if (meta) {
+        tool_metadata_free(meta);
+        meta = NULL;
+    }
     return AGENTOS_OK;
 }
 

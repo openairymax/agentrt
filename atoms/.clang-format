@@ -1,0 +1,97 @@
+# Copyright (c) 2026 SPHARX. All Rights Reserved.
+# AgentOS C/C++ Code Style Configuration
+# Based on LLVM style with project-specific customizations
+
+BasedOnStyle: LLVM
+Language: Cpp
+Standard: c11
+
+# 缩进和空格
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 120
+ContinuationIndentWidth: 4
+
+# 大括号风格
+BreakBeforeBraces: Attach
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# 指针和引用对齐
+PointerAlignment: Right
+ReferenceAlignment: Right
+DerivePointerAlignment: false
+
+# 函数调用参数对齐
+AlignAfterOpenBracket: Align
+AlignOperands: Align
+AlignTrailingComments: true
+
+# 空行
+MaxEmptyLinesToKeep: 2
+KeepEmptyLinesAtTheStartOfBlocks: false
+
+# 包含文件排序
+IncludeBlocks: Regroup
+IncludeCategories:
+  # 系统头文件
+  - Regex: '<[a-z_]+>'
+    Priority: 1
+  # C标准库
+  - Regex: '<c[a-z]+>'
+    Priority: 2
+  # POSIX头文件
+  - Regex: '<[a-z_]+\.h>'
+    Priority: 3
+  # 项目头文件
+  - Regex: '"agentos_.*\.h"'
+    Priority: 4
+  # 其他头文件
+  - Regex: '".*"'
+    Priority: 5
+
+# 注释
+ReflowComments: false
+
+# 访问说明符
+AccessModifierOffset: -4
+
+# 构造函数初始化列表
+ConstructorInitializerIndentWidth: 4
+BreakConstructorInitializers: BeforeColon
+
+# Switch语句
+IndentCaseLabels: true
+IndentCaseBlocks: false
+
+# 命名空间
+NamespaceIndentation: None
+
+# 预处理指令
+IndentPPDirectives: None
+
+# 对齐
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignEscapedNewlines: Left
+
+# 其他
+BinPackArguments: true
+BinPackParameters: true
+SortIncludes: true
+SpaceAfterCStyleCast: false
+SpaceAfterLogicalNot: false
+SpaceAfterTemplateKeyword: true
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCpp11BracedList: false
+SpaceBeforeCtorInitializerColon: true
+SpaceBeforeInheritanceColon: true
+SpaceBeforeParens: ControlStatements
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceInEmptyParentheses: false
+SpacesInAngles: false
+SpacesInCStyleCastParentheses: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false

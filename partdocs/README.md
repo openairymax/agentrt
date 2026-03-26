@@ -3,8 +3,8 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 # AgentOS 技术文档中心
 
-**版本**: v1.0.0.6
-**最后更新**: 2026-03-23
+**版本**: Doc V1.5
+**最后更新**: 2026-03-24
 **状态**: 生产就绪
 
 ---
@@ -36,36 +36,36 @@ partdocs/
 ├── architecture/                      # 架构设计文档
 │   ├── README.md                      # 架构总览
 │   ├── folder/
-│   │   ├── architectural_design_principles.md  # 架构设计原则 v3.0
-│   │   ├── coreloopthree.md           # 三层认知运行时
-│   │   ├── memoryrovol.md             # 四层记忆系统
-│   │   ├── microkernel.md             # 微内核设计
-│   │   ├── ipc.md                     # IPC Binder 通信
-│   │   ├── syscall.md                 # 系统调用设计
-│   │   └── logging_system.md          # 统一日志系统
+│   │   ├── architectural_design_principles.md  # 架构设计原则 v1.5
+│   │   ├── coreloopthree.md           # 三层认知运行时 v1.0.0.5
+│   │   ├── memoryrovol.md             # 四层记忆系统 v1.0.0.5
+│   │   ├── microkernel.md             # 微内核设计 v1.0.0.5
+│   │   ├── ipc.md                     # IPC Binder 通信 v1.0.0.5
+│   │   ├── syscall.md                 # 系统调用设计 v1.0.0.5
+│   │   └── logging_system.md          # 统一日志系统 v1.0.0.5
 │   └── diagrams/                      # 架构图
 │
 ├── guides/                            # 开发指南
 │   ├── README.md                      # 指南总览
 │   └── folder/
-│       ├── getting_started.md         # 快速开始
-│       ├── create_agent.md            # 创建 Agent
-│       ├── create_skill.md            # 创建 Skill
-│       ├── deployment.md              # 部署指南
-│       ├── kernel_tuning.md           # 内核调优
-│       ├── troubleshooting.md         # 故障排查
-│       └── migration_guide.md         # 迁移指南
+│       ├── getting_started.md         # 快速开始 v1.0.0.5
+│       ├── create_agent.md            # 创建 Agent v1.0.0.5
+│       ├── create_skill.md            # 创建 Skill v1.0.0.5
+│       ├── deployment.md              # 部署指南 v1.0.0.5
+│       ├── kernel_tuning.md           # 内核调优 v1.0.0.5
+│       ├── troubleshooting.md         # 故障排查 v1.0.0.5
+│       └── migration_guide.md         # 迁移指南 v1.0.0.5
 │
 ├── philosophy/                        # 设计哲学
 │   ├── README.md                      # 哲学总览
 │   └── folder/
-│       ├── Cognition_Theory.md        # 认知理论
-│       ├── Design_Principles.md       # 设计原则
-│       └── Memory_Theory.md           # 记忆理论
+│       ├── Cognition_Theory.md        # 认知理论 v1.0
+│       ├── Design_Principles.md       # 设计原则 v1.0
+│       └── Memory_Theory.md           # 记忆理论 v1.0
 │
 ├── specifications/                    # 技术规范
 │   ├── README.md                      # 规范总览
-│   ├── TERMINOLOGY.md                 # 统一术语表
+│   ├── TERMINOLOGY.md                 # 统一术语表 v1.0
 │   ├── agentos_contract/              # 契约规范集
 │   │   ├── README.md
 │   │   ├── agent/                     # Agent 契约
@@ -125,7 +125,7 @@ partdocs/
 ```
 
 1. [设计哲学总览](philosophy/README.md)
-2. [架构设计原则 v3.0](architecture/folder/architectural_design_principles.md)
+2. [架构设计原则 v1.5](architecture/folder/architectural_design_principles.md)
 3. [认知理论](philosophy/folder/Cognition_Theory.md)
 4. [记忆理论](philosophy/folder/Memory_Theory.md)
 5. [契约规范集](specifications/agentos_contract/README.md)
@@ -143,11 +143,52 @@ partdocs/
 
 ---
 
-## 4. 文档状态总览
+## 4. 核心技术特性
+
+### 4.1 四维正交原则体系
+
+AgentOS 架构设计基于四维正交原则体系，从系统观、内核观、认知观、工程观四个维度定义设计原则：
+
+| 维度 | 原则数量 | 核心理念 |
+|------|----------|----------|
+| 系统观 (S) | S-1 ~ S-4 | 整体性、层次性、协调性、演化性 |
+| 内核观 (K) | K-1 ~ K-4 | 最小化、正交性、安全性、可验证性 |
+| 认知观 (C) | C-1 ~ C-4 | 双系统协同、渐进式规划、自我纠错、持续学习 |
+| 工程观 (E) | E-1 ~ E-7 | 模块化、可测试性、可观测性、文档化等 |
+
+### 4.2 三层认知运行时 (CoreLoopThree)
+
+CoreLoopThree 是 AgentOS 的核心创新架构，实现认知、行动和记忆的有机统一：
+
+- **认知层**: 意图理解、任务规划、Agent 调度
+- **行动层**: 任务执行、补偿事务、责任链追踪
+- **记忆层**: 记忆写入、查询检索、上下文挂载
+
+### 4.3 四层记忆系统 (MemoryRovol)
+
+MemoryRovol 实现从原始数据到高级模式的全栈记忆管理：
+
+- **L1 原始卷**: 原始事件流、文件系统存储
+- **L2 特征层**: 嵌入模型、FAISS 向量索引
+- **L3 结构层**: 关系绑定、时序编码
+- **L4 模式层**: 持久同调分析、HDBSCAN 聚类
+
+### 4.4 安全穹顶 (Domes)
+
+Domes 是 AgentOS 的多层安全防护体系：
+
+- **虚拟工位**: 进程/容器级隔离
+- **权限裁决**: 基于 YAML 的动态规则
+- **输入净化**: 正则表达式规则过滤
+- **审计日志**: 异步写入、轮转支持
+
+---
+
+## 5. 文档状态总览
 
 | 模块 | 文档数 | 状态 | 质量评分 |
 |------|--------|------|----------|
-| 架构文档 (architecture/) | 7+ | 生产就绪 | A |
+| 架构文档 (architecture/) | 7 | 正式发布/生产就绪 | A |
 | 开发指南 (guides/) | 7 | 生产就绪 | A |
 | API 文档 (api/) | 10+ | 生产就绪 | A |
 | 技术规范 (specifications/) | 12+ | 生产就绪 | A |
@@ -156,7 +197,7 @@ partdocs/
 
 ---
 
-## 5. 按主题索引
+## 6. 按主题索引
 
 | 主题 | 相关文档 |
 |------|----------|
@@ -173,7 +214,29 @@ partdocs/
 
 ---
 
-## 6. 贡献指南
+## 7. 理论根基
+
+AgentOS 的设计深受以下理论影响：
+
+### 7.1 工程两论
+
+- **《工程控制论》**: 反馈闭环理论，控制的核心
+- **《论系统工程》**: 层次分解、综合集成、总体设计部
+
+### 7.2 认知科学
+
+- **双系统认知理论** (丹尼尔·卡尼曼): System 1 与 System 2 的协同
+- **ACT-R 认知架构**: 模块划分、产生式系统
+- **SOAR 认知架构**: 问题空间假设
+
+### 7.3 计算机科学
+
+- **Liedtke 微内核原则**: 机制与策略分离、最小特权
+- **seL4 形式化验证**: 功能正确性、安全性质
+
+---
+
+## 8. 贡献指南
 
 ### 文档结构标准
 

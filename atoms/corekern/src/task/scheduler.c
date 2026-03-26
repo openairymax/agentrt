@@ -250,7 +250,7 @@ agentos_error_t agentos_thread_create(
             info->priority = AGENTOS_TASK_PRIORITY_NORMAL;
         }
     } else {
-        strcpy(info->name, "unnamed");
+        snprintf(info->name, sizeof(info->name), "unnamed");
     }
 
     info->handle = CreateThread(
@@ -561,7 +561,7 @@ agentos_error_t agentos_thread_create(
             info->priority = AGENTOS_TASK_PRIORITY_NORMAL;
         }
     } else {
-        strcpy(info->name, "unnamed");
+        snprintf(info->name, sizeof(info->name), "unnamed");
     }
 
     pthread_attr_t pattr;

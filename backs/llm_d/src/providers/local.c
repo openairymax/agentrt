@@ -115,13 +115,18 @@ static int parse_response(const char* body, llm_response_t** out) {
         resp->choice_count = (size_t)size;
         resp->choices = (llm_message_t*)calloc(size, sizeof(llm_message_t));
 
-        if (resp->choices) {
-            for (int i = 0; i < size; ++i) {
-                cJSON* choice = cJSON_GetArrayItem(choices, i);
-                cJSON* message = cJSON_GetObjectItem(choice, "message");
-                if (message) {
-                    cJSON* role = cJSON_GetObjectItem(message, "role");
-                    cJSON* content = cJSON_GetObjectItem(message, "content");
+        if (!resp->choices) {
+            cJSON_Delete(root);
+            llm_response_free(resp);
+            return AGENTOS_ERR_OUT_OF_MEMORY;
+        }
+        
+        for (int i = 0; i < size; ++i) {
+            cJSON* choice = cJSON_GetArrayItem(choices, i);
+            cJSON* message = cJSON_GetObjectItem(choice, "message");
+            if (message) {
+                cJSON* role = cJSON_GetObjectItem(message, "role");
+                cJSON* content = cJSON_GetObjectItem(message, "content");
                     if (cJSON_IsString(role) && role->valuestring) {
                         resp->choices[i].role = strdup(role->valuestring);
                     }
@@ -251,9 +256,15 @@ static provider_ctx_t* local_init(const char* name,
     if (!ctx) return NULL;
 
     if (api_base) {
-        strncpy(ctx->api_base, api_base, sizeof(ctx->api_base) - 1);
+        size_t base_len = strlen(api_base);
+        if (base_len >= sizeof(ctx->api_base)) {
+            free(ctx);
+            return NULL;
+        }
+        memcpy(ctx->api_base, api_base, base_len + 1);
     } else {
-        strncpy(ctx->api_base, "http://localhost:8080/v1", sizeof(ctx->api_base) - 1);
+        const char* default_base = "http://localhost:8080/v1";
+        memcpy(ctx->api_base, default_base, strlen(default_base) + 1);
     }
 
     ctx->timeout_sec = timeout_sec > 0 ? timeout_sec : 60.0;

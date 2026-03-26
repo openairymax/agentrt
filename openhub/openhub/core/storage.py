@@ -303,6 +303,8 @@ class SQLiteStorage(Storage):
         self._conn: Optional[Any] = None
         self._lock = asyncio.Lock()
         self._initialized = False
+        self._closed = False
+        self._schema_cache: Set[str] = set()
 
         self._collection_schemas: Dict[str, str] = {
             "records": """
@@ -395,6 +397,59 @@ class SQLiteStorage(Storage):
             self._conn.commit()
 
             self._schema_cache.add(table_name)
+            self._cache_access_time[table_name] = time.time()
+
+    def _evict_expired_cache(self) -> int:
+        """
+        Evict expired entries from schema cache based on TTL.
+
+        This implements the "forgetting mechanism" (遗忘机制) from the
+        architectural design principles - C-4 Memory Volatilization.
+
+        Returns:
+            Number of entries evicted.
+        """
+        if not self._cache_access_time:
+            return 0
+
+        current_time = time.time()
+        expired_keys = [
+            key for key, last_access in self._cache_access_time.items()
+            if current_time - last_access > self._cache_ttl
+        ]
+
+        for key in expired_keys:
+            self._schema_cache.discard(key)
+            self._cache_access_time.pop(key, None)
+
+        if len(self._schema_cache) > self._cache_max_size:
+            self._evict_lru_cache()
+
+        return len(expired_keys)
+
+    def _evict_lru_cache(self) -> int:
+        """
+        Evict least recently used entries when cache exceeds max size.
+
+        Returns:
+            Number of entries evicted.
+        """
+        if len(self._schema_cache) <= self._cache_max_size:
+            return 0
+
+        sorted_entries = sorted(
+            self._cache_access_time.items(),
+            key=lambda x: x[1]
+        )
+
+        evict_count = len(self._schema_cache) - self._cache_max_size
+        for i in range(evict_count):
+            if i < len(sorted_entries):
+                key = sorted_entries[i][0]
+                self._schema_cache.discard(key)
+                self._cache_access_time.pop(key, None)
+
+        return evict_count
 
     async def put(
         self,

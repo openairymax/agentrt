@@ -111,11 +111,10 @@ export class MockClient implements APIClient {
   /**
    * 执行 Mock 请求
    * @param method - HTTP 方法
-   * @param path - 请求路径
+   * @param path - 请求路径（可能包含查询参数）
    * @param body - 请求体
    */
   private async mockRequest<T>(method: string, path: string, body?: unknown): Promise<T> {
-    // 记录请求
     this.requestLog.push({
       method: method.toUpperCase(),
       path,
@@ -123,25 +122,45 @@ export class MockClient implements APIClient {
       timestamp: new Date(),
     });
 
-    const key = `${method.toUpperCase()}:${path}`;
-    const mockResponse = this.responses.get(key);
+    const upperMethod = method.toUpperCase();
 
-    // 如果没有预设响应，返回默认响应
-    if (!mockResponse) {
-      return this.defaultResponse<T>();
+    // 优先精确匹配
+    const exactKey = `${upperMethod}:${path}`;
+    if (this.responses.has(exactKey)) {
+      const mockResponse = this.responses.get(exactKey)!;
+      return this.buildMockResponse<T>(mockResponse);
     }
 
-    // 模拟延迟
+    // 支持路径前缀匹配（忽略查询参数）
+    // 提取不含查询参数的路径
+    const urlPath = path.split('?')[0];
+    for (const [key, mockResponse] of this.responses.entries()) {
+      const [keyMethod, keyPath] = key.split(':');
+      const keyPathWithoutQuery = keyPath.split('?')[0];
+      if (keyMethod === upperMethod && urlPath.startsWith(keyPathWithoutQuery) && keyPathWithoutQuery !== '') {
+        return this.buildMockResponse<T>(mockResponse);
+      }
+    }
+
+    // 如果没有预设响应，返回默认响应
+    return this.defaultResponse<T>();
+  }
+
+  /**
+   * 构建 Mock 响应
+   */
+  private async buildMockResponse<T>(mockResponse: MockResponse): Promise<T> {
     if (mockResponse.delay && mockResponse.delay > 0) {
       await this.sleep(mockResponse.delay);
     }
-
-    // 抛出预设错误
     if (mockResponse.error) {
       throw mockResponse.error;
     }
-
-    return mockResponse.data as T;
+    return {
+      success: true,
+      data: mockResponse.data,
+      message: 'OK',
+    } as unknown as T;
   }
 
   /**

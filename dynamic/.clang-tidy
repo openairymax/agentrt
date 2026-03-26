@@ -1,0 +1,87 @@
+# Copyright (c) 2026 SPHARX. All Rights Reserved.
+# clang-tidy configuration for AgentOS Dynamic Module
+# Version: 1.0.0
+
+---
+# 检查选项
+Checks: >
+  -*,
+  bugprone-*,
+  cert-*,
+  cppcoreguidelines-*,
+  modernize-*,
+  performance-*,
+  readability-*,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -readability-magic-numbers,
+  -cert-err58-cpp
+
+# 警告即错误
+WarningsAsErrors: '*'
+
+# 头文件目录
+HeaderFilterRegex: '.*'
+
+# 检查选项配置
+CheckOptions:
+  # 命名规范
+  - key: readability-identifier-naming.NamespaceCase
+    value: lower_case
+  - key: readability-identifier-naming.StructCase
+    value: lower_case
+  - key: readability-identifier-naming.FunctionCase
+    value: lower_case
+  - key: readability-identifier-naming.VariableCase
+    value: lower_case
+  - key: readability-identifier-naming.ConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.ParameterCase
+    value: lower_case
+  - key: readability-identifier-naming.EnumConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.MacroDefinitionCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.TypedefCase
+    value: lower_case
+
+  # 函数大小限制
+  - key: readability-function-size.LineThreshold
+    value: 100
+  - key: readability-function-size.StatementThreshold
+    value: 200
+  - key: readability-function-size.BranchThreshold
+    value: 15
+  - key: readability-function-size.ParameterThreshold
+    value: 8
+
+  # 标识符长度
+  - key: readability-identifier-length.MinimumVariableNameLength
+    value: 3
+  - key: readability-identifier-length.MinimumParameterNameLength
+    value: 3
+  - key: readability-identifier-length.MinimumLoopVariableNameLength
+    value: 1
+
+  # 现代化选项
+  - key: modernize-use-nullptr.NullMacros
+    value: 'NULL'
+  - key: modernize-loop-convert.MinConfidence
+    value: reasonable
+  - key: modernize-pass-by-value.IncludeStyle
+    value: llvm
+
+  # 性能检查
+  - key: performance-move-const-arg.CheckTriviallyCopyableMove
+    value: '1'
+  - key: performance-unnecessary-value-param.AllowedTypes
+    value: ''
+
+  # 安全检查
+  - key: cert-dcl59-cpp.HeaderFileExtensions
+    value: 'h,hh,hpp,hxx'
+  - key: cert-env33-c.CheckVariadicFunctions
+    value: '1'
+
+  # 并发检查
+  - key: bugprone-throw-keyword-missing.EnableCheckForImplicitConstructors
+    value: '1'

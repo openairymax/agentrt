@@ -3,7 +3,7 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 # AgentOS 内核调优指南
 
-**版本**: v1.0.0.6  
+**版本**: Doc V1.5  
 **最后更新**: 2026-03-23  
 **难度**: ⭐⭐⭐ 高级  
 **预计时间**: 40 分钟

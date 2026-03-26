@@ -765,6 +765,10 @@ int64_t domes_atomic_add64(domes_atomic64_t* ptr, int64_t delta) {
 #endif
 }
 
+int64_t domes_atomic_sub64(domes_atomic64_t* ptr, int64_t delta) {
+    return domes_atomic_add64(ptr, -delta);
+}
+
 bool domes_atomic_cas64(domes_atomic64_t* ptr, int64_t expected, int64_t desired) {
 #if DOMES_PLATFORM_WINDOWS
     return InterlockedCompareExchange64((volatile LONGLONG*)ptr, desired, expected) == expected;

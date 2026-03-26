@@ -6,6 +6,7 @@
 
 #include "execution.h"
 #include "agentos.h"
+#include "core.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -48,49 +49,113 @@ static agentos_error_t create_temp_file(
         snprintf(final_path, MAX_PATH, "%s%s", temp_path, suffix);
         if (MoveFileA(temp_path, final_path)) {
             FILE* f = fopen(final_path, "wb");
-            if (!f) { DeleteFileA(final_path); return AGENTOS_EIO; }
-            fwrite(content, 1, content_len, f);
-            fclose(f);
+            if (!f) {
+                DeleteFileA(final_path);
+                return AGENTOS_EIO;
+            }
+            size_t written = fwrite(content, 1, content_len, f);
+            if (written != content_len) {
+                fclose(f);
+                DeleteFileA(final_path);
+                return AGENTOS_EIO;
+            }
+            if (fclose(f) != 0) {
+                DeleteFileA(final_path);
+                return AGENTOS_EIO;
+            }
             *out_path = _strdup(final_path);
-            if (!*out_path) { DeleteFileA(final_path); return AGENTOS_ENOMEM; }
+            if (!*out_path) {
+                DeleteFileA(final_path);
+                return AGENTOS_ENOMEM;
+            }
             return AGENTOS_SUCCESS;
         }
         FILE* f = fopen(temp_path, "wb");
         if (!f) return AGENTOS_EIO;
-        fwrite(content, 1, content_len, f);
-        fclose(f);
+        size_t written = fwrite(content, 1, content_len, f);
+        if (written != content_len) {
+            fclose(f);
+            return AGENTOS_EIO;
+        }
+        if (fclose(f) != 0) {
+            return AGENTOS_EIO;
+        }
         *out_path = _strdup(temp_path);
-        if (!*out_path) { DeleteFileA(temp_path); return AGENTOS_ENOMEM; }
+        if (!*out_path) {
+            DeleteFileA(temp_path);
+            return AGENTOS_ENOMEM;
+        }
         return AGENTOS_SUCCESS;
     }
 
     FILE* f = fopen(temp_path, "wb");
     if (!f) return AGENTOS_EIO;
-    fwrite(content, 1, content_len, f);
-    fclose(f);
+    size_t written = fwrite(content, 1, content_len, f);
+    if (written != content_len) {
+        fclose(f);
+        return AGENTOS_EIO;
+    }
+    if (fclose(f) != 0) {
+        return AGENTOS_EIO;
+    }
     *out_path = _strdup(temp_path);
-    if (!*out_path) { DeleteFileA(temp_path); return AGENTOS_ENOMEM; }
+    if (!*out_path) {
+        DeleteFileA(temp_path);
+        return AGENTOS_ENOMEM;
+    }
     return AGENTOS_SUCCESS;
 #else
-    char temp_filename[256];
-    snprintf(temp_filename, sizeof(temp_filename), "/tmp/agentos_code_XXXXXX%s",
-             suffix ? suffix : "");
+    char temp_dir[256];
+    if (agentos_core_get_temp_dir(temp_dir, sizeof(temp_dir)) != 0) {
+        return AGENTOS_EIO;
+    }
+
+    // 确保临时目录以路径分隔符结尾
+    size_t temp_dir_len = strlen(temp_dir);
+    if (temp_dir_len > 0 && temp_dir[temp_dir_len - 1] != '/') {
+        if (temp_dir_len + 1 < sizeof(temp_dir)) {
+            strcat(temp_dir, "/");
+        }
+    }
+
+    char temp_filename[512];
+    int needed = snprintf(temp_filename, sizeof(temp_filename),
+                          "%sagentos_code_XXXXXX%s",
+                          temp_dir, suffix ? suffix : "");
+    if (needed < 0 || (size_t)needed >= sizeof(temp_filename)) {
+        return AGENTOS_EIO;
+    }
+
     int fd = mkstemp(temp_filename);
     if (fd == -1) return AGENTOS_EIO;
     ssize_t written = write(fd, content, content_len);
-    close(fd);
     if (written < 0 || (size_t)written != content_len) {
+        close(fd);
+        unlink(temp_filename);
+        return AGENTOS_EIO;
+    }
+    if (close(fd) != 0) {
         unlink(temp_filename);
         return AGENTOS_EIO;
     }
     *out_path = strdup(temp_filename);
-    if (!*out_path) { unlink(temp_filename); return AGENTOS_ENOMEM; }
+    if (!*out_path) {
+        unlink(temp_filename);
+        return AGENTOS_ENOMEM;
+    }
     return AGENTOS_SUCCESS;
 #endif
 }
 
 /**
  * @brief 删除临时文件
+ * @param path 文件路径（可为NULL）
+ *
+ * @details 跨平台删除临时文件：
+ * - Windows: 使用 DeleteFileA
+ * - POSIX: 使用 unlink
+ *
+ * @note 此函数不返回错误状态，因为临时文件删除失败不影响系统正确性
  */
 static void remove_temp_file(const char* path) {
     if (!path) return;

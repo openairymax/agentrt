@@ -4,11 +4,9 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "retrieval.h"
-#include "layer1_raw.h"
-#include "token_counter.h"
+#include "../include/retrieval.h"
+#include "../include/layer1_raw.h"
 #include "agentos.h"
-#include "logger.h"
 #include <stdlib.h>
 #include <string.h>
 

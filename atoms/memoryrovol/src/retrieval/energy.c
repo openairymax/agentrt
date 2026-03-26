@@ -4,9 +4,9 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "retrieval.h"
-#include "layer2_feature.h"
-#include "forgetting.h"
+#include "../include/retrieval.h"
+#include "../include/layer2_feature.h"
+#include "../include/forgetting.h"
 #include "agentos.h"
 #include <math.h>
 

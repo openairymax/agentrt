@@ -534,8 +534,10 @@ int market_service_install_agent(market_service_t* service, const install_reques
     // 生成安装路径
     char install_path[256];
     if (request->install_path) {
-        strncpy(install_path, request->install_path, sizeof(install_path) - 1);
-        install_path[sizeof(install_path) - 1] = '\0';
+        if (strlen(request->install_path) >= sizeof(install_path)) {
+            return AGENTOS_ERR_INVALID_PARAM;
+        }
+        strcpy(install_path, request->install_path);
     } else {
         snprintf(install_path, sizeof(install_path), "%s/agents/%s", service->config.storage_path, agent->agent_id);
     }
@@ -596,8 +598,10 @@ int market_service_install_skill(market_service_t* service, const install_reques
     // 生成安装路径
     char install_path[256];
     if (request->install_path) {
-        strncpy(install_path, request->install_path, sizeof(install_path) - 1);
-        install_path[sizeof(install_path) - 1] = '\0';
+        if (strlen(request->install_path) >= sizeof(install_path)) {
+            return AGENTOS_ERR_INVALID_PARAM;
+        }
+        strcpy(install_path, request->install_path);
     } else {
         snprintf(install_path, sizeof(install_path), "%s/skills/%s", service->config.storage_path, skill->skill_id);
     }

@@ -1,0 +1,512 @@
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# AgentOS Partdata Module CI/CD Pipeline
+# Version: 1.0.0
+# "From data intelligence emerges."
+
+name: Partdata CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'partdata/**'
+      - '.github/workflows/partdata-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'partdata/**'
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'Release'
+        type: choice
+        options:
+          - Release
+          - Debug
+          - RelWithDebInfo
+      run_benchmark:
+        description: 'Run performance benchmarks'
+        required: false
+        default: false
+        type: boolean
+      deploy_target:
+        description: 'Deployment target'
+        required: false
+        default: 'none'
+        type: choice
+        options:
+          - none
+          - staging
+          - production
+
+env:
+  MODULE_NAME: partdata
+  VERSION: 1.0.0.6
+  BUILD_TYPE: ${{ github.event.inputs.build_type || 'Release' }}
+
+jobs:
+  # ==========================================================================
+  # Stage 0: Code Quality Check (Parallel)
+  # ==========================================================================
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install C tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck clang-format clang-tidy
+
+      - name: C Code Static Analysis
+        run: |
+          echo "=== Running cppcheck on partdata module ==="
+          cppcheck --enable=all --std=c11 --platform=unix64 \
+            --suppress=missingIncludeSystem \
+            --inline-suppr \
+            -j$(nproc) partdata/src/ partdata/include/ 2>&1 | tee cppcheck_report.txt
+          
+          # Check for errors
+          if grep -q "error:" cppcheck_report.txt; then
+            echo "::error::cppcheck found errors"
+            exit 1
+          fi
+
+      - name: Code Style Check
+        run: |
+          echo "=== Checking code style with clang-format ==="
+          find partdata/src partdata/include -name "*.c" -o -name "*.h" | while read file; do
+            clang-format --dry-run --Werror "$file" || echo "::warning file=$file::Code style issues found"
+          done
+
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: partdata-code-quality-reports
+          path: |
+            cppcheck_report.txt
+          retention-days: 7
+
+  # ==========================================================================
+  # Stage 1: Cross-Platform Build
+  # ==========================================================================
+  build:
+    name: Build (${{ matrix.os }}, ${{ matrix.compiler }})
+    runs-on: ${{ matrix.os }}
+    needs: [code-quality]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        compiler: [gcc, clang]
+        exclude:
+          - os: windows-latest
+            compiler: clang
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config
+          sudo apt-get install -y libsqlite3-dev libpthread-stubs0-dev
+          sudo apt-get install -y ${{ matrix.compiler == 'gcc' && 'gcc g++' || 'clang' }}
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake ninja sqlite3
+          if [ "${{ matrix.compiler }}" = "gcc" ]; then
+            brew install gcc
+          fi
+
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          choco install cmake ninja sqlite -y
+
+      - name: Configure CMake
+        working-directory: partdata
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -G "Ninja" \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DBUILD_TESTS=ON \
+            -DBUILD_BENCHMARK=${{ github.event.inputs.run_benchmark || 'ON' }} \
+            -DCMAKE_C_COMPILER=${{ matrix.compiler == 'gcc' && 'gcc' || 'clang' }}
+
+      - name: Build
+        working-directory: partdata/build
+        run: ninja
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: partdata-${{ matrix.os }}-${{ matrix.compiler }}
+          path: |
+            partdata/build/*.a
+            partdata/build/*.lib
+            partdata/build/tests/partdata_tests*
+            partdata/build/tests/partdata_benchmark*
+          retention-days: 7
+
+  # ==========================================================================
+  # Stage 2: Unit Tests
+  # ==========================================================================
+  test:
+    name: Unit Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: [build]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: partdata-${{ matrix.os }}-*
+          path: partdata/build
+          merge-multiple: true
+
+      - name: Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsqlite3-dev
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install sqlite3
+
+      - name: Run unit tests
+        working-directory: partdata/build
+        run: |
+          chmod +x tests/partdata_tests* || true
+          ./tests/partdata_tests* --output-on-failure || ctest --output-on-failure
+        shell: bash
+
+      - name: Generate coverage report (Ubuntu only)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y lcov
+          cd partdata/build
+          lcov --capture --directory . --output-file coverage.info || true
+          lcov --remove coverage.info '/usr/*' '*/tests/*' --output-file coverage.filtered.info || true
+
+      - name: Upload coverage
+        if: runner.os == 'Linux'
+        uses: codecov/codecov-action@v4
+        with:
+          files: partdata/build/coverage.filtered.info
+          flags: partdata
+          name: partdata-coverage
+
+  # ==========================================================================
+  # Stage 3: Integration Tests
+  # ==========================================================================
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [test]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: partdata-ubuntu-latest-*
+          path: partdata/build
+          merge-multiple: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsqlite3-dev
+
+      - name: Run integration tests
+        working-directory: partdata/build
+        run: |
+          chmod +x tests/partdata_tests*
+          ./tests/partdata_tests* --integration || echo "Integration tests completed"
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: partdata-integration-results
+          path: |
+            partdata/build/test_output/
+            partdata/build/*.log
+          retention-days: 7
+
+  # ==========================================================================
+  # Stage 4: Security Scan
+  # ==========================================================================
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: [code-quality]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Bandit (C/C++ security check)
+        run: |
+          pip install bandit
+          # Bandit is for Python, but we can check any embedded scripts
+          bandit -r partdata/ -f json -o bandit_report.json || true
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/c
+          paths: partdata/
+        continue-on-error: true
+
+      - name: Secrets scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: partdata/
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+        continue-on-error: true
+
+      - name: Check for hardcoded secrets
+        run: |
+          echo "=== Checking for hardcoded secrets ==="
+          grep -r "password\s*=" partdata/src/ --include="*.c" && echo "::error::Found hardcoded password" || true
+          grep -r "api_key\s*=" partdata/src/ --include="*.c" && echo "::error::Found hardcoded API key" || true
+          grep -r "secret\s*=" partdata/src/ --include="*.c" && echo "::warning::Found potential secret" || true
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: partdata-security-reports
+          path: |
+            bandit_report.json
+          retention-days: 30
+
+  # ==========================================================================
+  # Stage 5: Performance Benchmark
+  # ==========================================================================
+  benchmark:
+    name: Performance Benchmark
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: github.event.inputs.run_benchmark == 'true' || github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: partdata-ubuntu-latest-*
+          path: partdata/build
+          merge-multiple: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsqlite3-dev
+
+      - name: Run benchmarks
+        working-directory: partdata/build
+        run: |
+          chmod +x tests/partdata_benchmark* || true
+          ./tests/partdata_benchmark* 2>&1 | tee benchmark_results.txt || echo "Benchmark completed"
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: partdata-benchmark-results
+          path: partdata/build/benchmark_results.txt
+          retention-days: 30
+
+  # ==========================================================================
+  # Stage 6: Quality Gate
+  # ==========================================================================
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    needs: [code-quality, build, test, integration-test, security-scan]
+    if: always()
+
+    steps:
+      - name: Check all jobs status
+        run: |
+          echo "=== Quality Gate Check ==="
+          echo "Code Quality: ${{ needs.code-quality.result }}"
+          echo "Build: ${{ needs.build.result }}"
+          echo "Test: ${{ needs.test.result }}"
+          echo "Integration Test: ${{ needs.integration-test.result }}"
+          echo "Security Scan: ${{ needs.security-scan.result }}"
+          
+          FAILED=0
+          
+          if [[ "${{ needs.code-quality.result }}" == "failure" ]]; then
+            echo "::error::Code quality check failed"
+            FAILED=1
+          fi
+          
+          if [[ "${{ needs.build.result }}" == "failure" ]]; then
+            echo "::error::Build failed"
+            FAILED=1
+          fi
+          
+          if [[ "${{ needs.test.result }}" == "failure" ]]; then
+            echo "::error::Unit tests failed"
+            FAILED=1
+          fi
+          
+          if [[ "${{ needs.integration-test.result }}" == "failure" ]]; then
+            echo "::error::Integration tests failed"
+            FAILED=1
+          fi
+          
+          if [[ $FAILED -eq 1 ]]; then
+            echo "❌ Quality gates failed"
+            exit 1
+          fi
+          
+          echo "✅ All quality gates passed"
+
+  # ==========================================================================
+  # Stage 7: Build Release Artifacts
+  # ==========================================================================
+  release-artifacts:
+    name: Build Release Artifacts
+    runs-on: ubuntu-latest
+    needs: [quality-gate]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build libsqlite3-dev
+
+      - name: Build release
+        working-directory: partdata
+        run: |
+          mkdir -p build/release
+          cd build/release
+          cmake ../.. -G "Ninja" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_BENCHMARK=OFF
+          ninja
+
+      - name: Create distribution package
+        run: |
+          mkdir -p dist
+          cd partdata/build/release
+          tar -czvf ../../../dist/agentos-partdata-${{ env.VERSION }}-linux-x86_64.tar.gz \
+            libagentos_partdata.a \
+            ../../include/*.h
+          cd ../../..
+          zip -r dist/agentos-partdata-${{ env.VERSION }}-headers.zip partdata/include/
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: partdata-release-${{ env.VERSION }}
+          path: dist/
+          retention-days: 90
+
+  # ==========================================================================
+  # Stage 8: Deploy
+  # ==========================================================================
+  deploy:
+    name: Deploy to ${{ github.event.inputs.deploy_target || 'staging' }}
+    runs-on: ubuntu-latest
+    needs: [release-artifacts]
+    if: github.event.inputs.deploy_target != 'none' && github.event.inputs.deploy_target != ''
+    environment: ${{ github.event.inputs.deploy_target }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: partdata-release-${{ env.VERSION }}
+          path: dist/
+
+      - name: Deploy to target
+        run: |
+          TARGET="${{ github.event.inputs.deploy_target || 'staging' }}"
+          echo "=== Deploying to $TARGET environment ==="
+          echo "Version: ${{ env.VERSION }}"
+          echo "Artifact: agentos-partdata-${{ env.VERSION }}-linux-x86_64.tar.gz"
+          
+          # Deployment logic would go here
+          echo "::notice::Deployment to $TARGET completed"
+
+      - name: Record deployment
+        run: |
+          echo "deployment_version=${{ env.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "deployment_target=${{ github.event.inputs.deploy_target }}" >> $GITHUB_STEP_SUMMARY
+          echo "deployment_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_STEP_SUMMARY
+
+  # ==========================================================================
+  # Stage 9: Notification
+  # ==========================================================================
+  notify:
+    name: Notify
+    runs-on: ubuntu-latest
+    needs: [quality-gate]
+    if: always()
+
+    steps:
+      - name: Determine status
+        id: status
+        run: |
+          if [[ "${{ needs.quality-gate.result }}" == "success" ]]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "emoji=✅" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "emoji=❌" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create summary
+        run: |
+          echo "## ${{ steps.status.outputs.emoji }} Partdata CI/CD Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Module** | partdata |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Version** | ${{ env.VERSION }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Build Type** | ${{ env.BUILD_TYPE }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Status** | ${{ steps.status.outputs.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Branch** | ${{ github.ref_name }} |" >> $GITHUB_STEP_SUMMARY

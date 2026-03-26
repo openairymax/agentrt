@@ -149,7 +149,7 @@ export class SessionManager {
     if (!data) {
       return {};
     }
-    return getMap(data, 'context');
+    return getMap(data, 'context') ?? {};
   }
 
   /**

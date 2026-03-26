@@ -5,9 +5,9 @@
  */
 
 #include "cost_tracker.h"
+#include "platform.h"
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
 
 typedef struct model_cost {
     char* model;
@@ -21,11 +21,9 @@ struct cost_tracker {
     pricing_rule_t* rules;
     int rule_count;
     model_cost_t* models;
-    pthread_mutex_t lock;
+    agentos_mutex_t lock;
 };
-// From data intelligence emerges. by spharx
 
-/* 根据模型名匹配定价规则（简单前缀匹配） */
 static int match_rule(const char* model, const pricing_rule_t* rule) {
     size_t len = strlen(rule->model_pattern);
     if (rule->model_pattern[len - 1] == '*') {
@@ -36,7 +34,7 @@ static int match_rule(const char* model, const pricing_rule_t* rule) {
 
 static void get_price(const cost_tracker_t* ct, const char* model,
                       double* input_price, double* output_price) {
-    *input_price = 0.001;   /* 默认值 */
+    *input_price = 0.001;
     *output_price = 0.002;
     for (int i = 0; i < ct->rule_count; ++i) {
         if (match_rule(model, &ct->rules[i])) {
@@ -59,13 +57,13 @@ cost_tracker_t* cost_tracker_create(const pricing_rule_t* rules, int rule_count)
         memcpy(ct->rules, rules, rule_count * sizeof(pricing_rule_t));
         ct->rule_count = rule_count;
     }
-    pthread_mutex_init(&ct->lock, NULL);
+    agentos_mutex_init(&ct->lock);
     return ct;
 }
 
 void cost_tracker_destroy(cost_tracker_t* ct) {
     if (!ct) return;
-    pthread_mutex_lock(&ct->lock);
+    agentos_mutex_lock(&ct->lock);
     model_cost_t* m = ct->models;
     while (m) {
         model_cost_t* next = m->next;
@@ -73,8 +71,8 @@ void cost_tracker_destroy(cost_tracker_t* ct) {
         free(m);
         m = next;
     }
-    pthread_mutex_unlock(&ct->lock);
-    pthread_mutex_destroy(&ct->lock);
+    agentos_mutex_unlock(&ct->lock);
+    agentos_mutex_destroy(&ct->lock);
     free(ct->rules);
     free(ct);
 }
@@ -82,7 +80,7 @@ void cost_tracker_destroy(cost_tracker_t* ct) {
 void cost_tracker_add(cost_tracker_t* ct, const char* model,
                       uint32_t prompt_tokens, uint32_t completion_tokens) {
     if (!ct || !model) return;
-    pthread_mutex_lock(&ct->lock);
+    agentos_mutex_lock(&ct->lock);
     model_cost_t* m = ct->models;
     while (m) {
         if (strcmp(m->model, model) == 0) break;
@@ -91,7 +89,7 @@ void cost_tracker_add(cost_tracker_t* ct, const char* model,
     if (!m) {
         m = calloc(1, sizeof(model_cost_t));
         if (!m) {
-            pthread_mutex_unlock(&ct->lock);
+            agentos_mutex_unlock(&ct->lock);
             return;
         }
         m->model = strdup(model);
@@ -105,12 +103,12 @@ void cost_tracker_add(cost_tracker_t* ct, const char* model,
     get_price(ct, model, &in_price, &out_price);
     m->cost_usd += (prompt_tokens / 1000.0) * in_price +
                    (completion_tokens / 1000.0) * out_price;
-    pthread_mutex_unlock(&ct->lock);
+    agentos_mutex_unlock(&ct->lock);
 }
 
 cJSON* cost_tracker_export(cost_tracker_t* ct) {
     if (!ct) return cJSON_CreateObject();
-    pthread_mutex_lock(&ct->lock);
+    agentos_mutex_lock(&ct->lock);
     cJSON* root = cJSON_CreateObject();
     cJSON* arr = cJSON_CreateArray();
     model_cost_t* m = ct->models;
@@ -124,6 +122,6 @@ cJSON* cost_tracker_export(cost_tracker_t* ct) {
         m = m->next;
     }
     cJSON_AddItemToObject(root, "models", arr);
-    pthread_mutex_unlock(&ct->lock);
+    agentos_mutex_unlock(&ct->lock);
     return root;
 }

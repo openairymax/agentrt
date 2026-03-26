@@ -37,6 +37,12 @@ export interface Config {
 }
 
 /**
+ * ClientConfig 是 Config 的别名，用于向后兼容
+ * @deprecated 请使用 Config 代替
+ */
+export type ClientConfig = Partial<Config>;
+
+/**
  * ConfigOption 定义配置选项的函数签名
  */
 export type ConfigOption = (config: Config) => void;
@@ -59,13 +65,18 @@ export function defaultConfig(): Config {
 }
 
 /**
+ * 默认任务轮询间隔（毫秒）
+ */
+export const DEFAULT_POLL_INTERVAL_MS = 500;
+
+/**
  * 设置服务端点地址
  * @param endpoint - 端点地址
  */
 export function withEndpoint(endpoint: string): ConfigOption {
   return (config: Config) => {
     if (endpoint) {
-      config.endpoint = endpoint;
+      config.endpoint = endpoint.replace(/\/$/, '');
     }
   };
 }

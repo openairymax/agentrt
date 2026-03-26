@@ -22,7 +22,7 @@ __author__ = "SPHARX Ltd."
 from .plugin import PluginRegistry, Plugin, PluginMetadata
 from .events import EventBus, Event, EventHandler
 from .security import SecurityManager, InputValidator
-from .telemetry import TelemetryCollector, Metrics
+from .telemetry import MetricsCollector, Metric
 
 __all__ = [
     "PluginRegistry",
@@ -33,6 +33,6 @@ __all__ = [
     "EventHandler",
     "SecurityManager",
     "InputValidator",
-    "TelemetryCollector",
-    "Metrics",
+    "MetricsCollector",
+    "Metric",
 ]

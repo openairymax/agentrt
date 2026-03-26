@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file cognition.h
  * @brief 认知层公共接口定义
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -31,6 +31,7 @@ typedef struct agentos_task_plan agentos_task_plan_t;
 typedef struct agentos_plan_strategy agentos_plan_strategy_t;
 typedef struct agentos_coordinator_strategy agentos_coordinator_strategy_t;
 typedef struct agentos_dispatching_strategy agentos_dispatching_strategy_t;
+typedef struct agentos_intent_parser agentos_intent_parser_t;
 
 /**
  * @brief 反馈回调函数类型
@@ -363,6 +364,79 @@ AGENTOS_API agentos_error_t agentos_cognition_stats(
 AGENTOS_API agentos_error_t agentos_cognition_health_check(
     agentos_cognition_engine_t* engine,
     char** out_json);
+
+/* ==================== 意图解析器接口 ==================== */
+
+/**
+ * @brief 创建意图解析器
+ * @param out_parser 输出解析器句柄
+ * @return agentos_error_t
+ */
+AGENTOS_API agentos_error_t agentos_intent_parser_create(agentos_intent_parser_t** out_parser);
+
+/**
+ * @brief 销毁意图解析器
+ * @param parser 解析器句柄
+ */
+AGENTOS_API void agentos_intent_parser_destroy(agentos_intent_parser_t* parser);
+
+/**
+ * @brief 解析用户输入，提取意图
+ * @param parser 解析器
+ * @param input 用户输入文本
+ * @param input_len 输入长度
+ * @param out_intent 输出意图结构
+ * @return agentos_error_t
+ */
+AGENTOS_API agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t* parser,
+                                                        const char* input,
+                                                        size_t input_len,
+                                                        agentos_intent_t** out_intent);
+
+/**
+ * @brief 释放意图结构
+ * @param intent 意图结构
+ */
+AGENTOS_API void agentos_intent_free(agentos_intent_t* intent);
+
+/**
+ * @brief 添加自定义意图规则
+ * @param parser 解析器
+ * @param pattern 模式字符串
+ * @param intent_name 意图名称
+ * @param confidence 置信度
+ * @param flags 标志位
+ * @return agentos_error_t
+ */
+AGENTOS_API agentos_error_t agentos_intent_parser_add_rule(agentos_intent_parser_t* parser,
+                                                           const char* pattern,
+                                                           const char* intent_name,
+                                                           float confidence,
+                                                           uint32_t flags);
+
+/**
+ * @brief 获取解析器统计信息
+ * @param parser 解析器
+ * @param out_stats 输出统计JSON字符串
+ * @return agentos_error_t
+ */
+AGENTOS_API agentos_error_t agentos_intent_parser_stats(agentos_intent_parser_t* parser,
+                                                        char** out_stats);
+
+/**
+ * @brief 重置解析器统计信息
+ * @param parser 解析器
+ */
+AGENTOS_API void agentos_intent_parser_reset_stats(agentos_intent_parser_t* parser);
+
+/**
+ * @brief 健康检查
+ * @param parser 解析器
+ * @param out_json 输出健康状态JSON
+ * @return agentos_error_t
+ */
+AGENTOS_API agentos_error_t agentos_intent_parser_health_check(agentos_intent_parser_t* parser,
+                                                               char** out_json);
 
 #ifdef __cplusplus
 }

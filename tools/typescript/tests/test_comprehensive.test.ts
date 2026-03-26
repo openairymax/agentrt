@@ -4,7 +4,6 @@
 
 import {
   AgentOS,
-  Client,
   MockClient,
   TaskManager,
   MemoryManager,
@@ -15,143 +14,138 @@ import {
   withTimeout,
   TaskStatus,
   MemoryLayer,
-  AgentOSError,
-  NetworkError,
-  TimeoutError,
   TaskError,
   MemoryError,
   SessionError,
   SkillError,
+  NetworkError,
+  TimeoutError,
   ErrorCode,
 } from '../src';
 
-let mockClient: MockClient;
-let client: AgentOS;
-
-beforeEach(() => {
-  mockClient = new MockClient();
-  client = new AgentOS([withEndpoint('http://localhost:18789')]);
-});
-
-afterEach(() => {
-  client.close();
-});
-
-// ============================================================
-// Client Tests
-// ============================================================
-
 describe('AgentOS Client', () => {
   test('should create client with default config', () => {
-    const c = new AgentOS();
-    const config = c.getConfig();
+    const client = new AgentOS();
+    const config = client.getConfig();
     expect(config.endpoint).toBe('http://localhost:18789');
+    client.close();
   });
 
   test('should create client with custom endpoint', () => {
-    const c = new AgentOS([withEndpoint('http://localhost:9999')]);
-    const config = c.getConfig();
+    const client = new AgentOS([withEndpoint('http://localhost:9999')]);
+    const config = client.getConfig();
     expect(config.endpoint).toBe('http://localhost:9999');
+    client.close();
   });
 
   test('should strip trailing slash from endpoint', () => {
-    const c = new AgentOS([withEndpoint('http://localhost:9999/')]);
-    const config = c.getConfig();
+    const client = new AgentOS([withEndpoint('http://localhost:9999/')]);
+    const config = client.getConfig();
     expect(config.endpoint).toBe('http://localhost:9999');
+    client.close();
   });
 
   test('should create client with API key', () => {
-    const c = new AgentOS([withAPIKey('test-api-key')]);
-    const config = c.getConfig();
+    const client = new AgentOS([withAPIKey('test-api-key')]);
+    const config = client.getConfig();
     expect(config.apiKey).toBe('test-api-key');
+    client.close();
   });
 
   test('should create client with timeout', () => {
-    const c = new AgentOS([withTimeout(5000)]);
-    const config = c.getConfig();
+    const client = new AgentOS([withTimeout(5000)]);
+    const config = client.getConfig();
     expect(config.timeout).toBe(5000);
+    client.close();
   });
 });
-
-// ============================================================
-// Task Manager Tests
-// ============================================================
 
 describe('TaskManager', () => {
   test('should submit task', async () => {
     const mock = new MockClient();
-    mock.setResponse('POST', '/api/v1/tasks', { data: { task_id: 'task-123' } });
-    
+    mock.setResponse('POST', '/api/v1/tasks', {
+      success: true,
+      data: { task_id: 'task-123' },
+      message: 'OK',
+    } as any);
+
     const taskManager = new TaskManager(mock);
     const task = await taskManager.submit('test task');
-    
+
     expect(task.id).toBe('task-123');
   });
 
   test('should query task status', async () => {
     const mock = new MockClient();
-    mock.setResponse('GET', '/api/v1/tasks/task-123', { 
-      data: { task_id: 'task-123', status: 'running', description: 'test task' } 
-    });
-    
+    mock.setResponse('GET', '/api/v1/tasks/task-123', {
+      success: true,
+      data: { task_id: 'task-123', status: TaskStatus.RUNNING, description: 'test task' },
+      message: 'OK',
+    } as any);
+
     const taskManager = new TaskManager(mock);
     const status = await taskManager.query('task-123');
-    
+
     expect(status).toBe(TaskStatus.RUNNING);
   });
 
   test('should get task details', async () => {
     const mock = new MockClient();
-    mock.setResponse('GET', '/api/v1/tasks/task-123', { 
-      data: { task_id: 'task-123', status: 'running', description: 'test task' } 
-    });
-    
+    mock.setResponse('GET', '/api/v1/tasks/task-123', {
+      success: true,
+      data: { task_id: 'task-123', status: TaskStatus.RUNNING, description: 'test task' },
+      message: 'OK',
+    } as any);
+
     const taskManager = new TaskManager(mock);
     const task = await taskManager.get('task-123');
-    
+
     expect(task.id).toBe('task-123');
     expect(task.status).toBe(TaskStatus.RUNNING);
   });
 
   test('should cancel task', async () => {
     const mock = new MockClient();
-    mock.setResponse('POST', '/api/v1/tasks/task-123/cancel', { data: {} });
-    
+    mock.setResponse('POST', '/api/v1/tasks/task-123/cancel', {
+      success: true,
+      data: {},
+      message: 'OK',
+    } as any);
+
     const taskManager = new TaskManager(mock);
     await taskManager.cancel('task-123');
-    
+
     const log = mock.getRequestLog();
-    expect(log.some(r => r.method === 'POST' && r.path === '/api/v1/tasks/task-123/cancel')).toBe(true);
+    expect(log.some((r) => r.method === 'POST' && r.path === '/api/v1/tasks/task-123/cancel')).toBe(true);
   });
 });
-
-// ============================================================
-// Memory Manager Tests
-// ============================================================
 
 describe('MemoryManager', () => {
   test('should write memory', async () => {
     const mock = new MockClient();
-    mock.setResponse('POST', '/api/v1/memories', { data: { memory_id: 'mem-123' } });
-    
+    mock.setResponse('POST', '/api/v1/memories', {
+      success: true,
+      data: { memory_id: 'mem-123' },
+      message: 'OK',
+    } as any);
+
     const memoryManager = new MemoryManager(mock);
     const memory = await memoryManager.write('test content', MemoryLayer.L1);
-    
+
     expect(memory.id).toBe('mem-123');
   });
 
   test('should search memory', async () => {
     const mock = new MockClient();
-    mock.setResponse('GET', '/api/v1/memories/search', { 
-      data: { 
-        memories: [{ memory_id: 'mem-1', content: 'test 1', layer: 'L1' }],
-        total: 1
-      } 
-    });
-    
+    mock.setResponse('GET', '/api/v1/memories/search', {
+      success: true,
+      data: { memories: [{ memory_id: 'mem-1', content: 'test 1', layer: MemoryLayer.L1 }], total: 1 },
+      message: 'OK',
+    } as any);
+
     const memoryManager = new MemoryManager(mock);
     const result = await memoryManager.search('test query', 5);
-    
+
     expect(result.memories).toHaveLength(1);
     expect(result.memories[0].id).toBe('mem-1');
     expect(result.total).toBe(1);
@@ -159,13 +153,15 @@ describe('MemoryManager', () => {
 
   test('should get memory by ID', async () => {
     const mock = new MockClient();
-    mock.setResponse('GET', '/api/v1/memories/mem-123', { 
-      data: { memory_id: 'mem-123', content: 'test content', layer: 'L1' } 
-    });
-    
+    mock.setResponse('GET', '/api/v1/memories/mem-123', {
+      success: true,
+      data: { memory_id: 'mem-123', content: 'test content', layer: MemoryLayer.L1 },
+      message: 'OK',
+    } as any);
+
     const memoryManager = new MemoryManager(mock);
     const memory = await memoryManager.get('mem-123');
-    
+
     expect(memory.id).toBe('mem-123');
     expect(memory.content).toBe('test content');
   });
@@ -173,86 +169,90 @@ describe('MemoryManager', () => {
   test('should delete memory', async () => {
     const mock = new MockClient();
     mock.setResponse('DELETE', '/api/v1/memories/mem-123', { data: {} });
-    
+
     const memoryManager = new MemoryManager(mock);
     await memoryManager.delete('mem-123');
-    
+
     const log = mock.getRequestLog();
-    expect(log.some(r => r.method === 'DELETE' && r.path === '/api/v1/memories/mem-123')).toBe(true);
+    expect(log.some((r) => r.method === 'DELETE' && r.path === '/api/v1/memories/mem-123')).toBe(true);
   });
 });
-
-// ============================================================
-// Session Manager Tests
-// ============================================================
 
 describe('SessionManager', () => {
   test('should create session', async () => {
     const mock = new MockClient();
-    mock.setResponse('POST', '/api/v1/sessions', { data: { session_id: 'sess-123' } });
-    
+    mock.setResponse('POST', '/api/v1/sessions', {
+      success: true,
+      data: { session_id: 'sess-123' },
+      message: 'OK',
+    } as any);
+
     const sessionManager = new SessionManager(mock);
     const session = await sessionManager.create('user-123');
-    
+
     expect(session.id).toBe('sess-123');
   });
 
   test('should set context', async () => {
     const mock = new MockClient();
-    mock.setResponse('PUT', '/api/v1/sessions/sess-123/context', { data: {} });
-    
+    mock.setResponse('POST', '/api/v1/sessions/sess-123/context', {
+      success: true,
+      data: {},
+      message: 'OK',
+    } as any);
+
     const sessionManager = new SessionManager(mock);
     await sessionManager.setContext('sess-123', 'key', 'value');
-    
+
     const log = mock.getRequestLog();
-    expect(log.some(r => r.method === 'PUT' && r.path === '/api/v1/sessions/sess-123/context')).toBe(true);
+    expect(log.some((r) => r.method === 'POST' && r.path === '/api/v1/sessions/sess-123/context')).toBe(true);
   });
 
   test('should close session', async () => {
     const mock = new MockClient();
-    mock.setResponse('DELETE', '/api/v1/sessions/sess-123', { data: {} });
-    
+    mock.setResponse('DELETE', '/api/v1/sessions/sess-123', {
+      success: true,
+      data: {},
+      message: 'OK',
+    } as any);
+
     const sessionManager = new SessionManager(mock);
     await sessionManager.close('sess-123');
-    
+
     const log = mock.getRequestLog();
-    expect(log.some(r => r.method === 'DELETE' && r.path === '/api/v1/sessions/sess-123')).toBe(true);
+    expect(log.some((r) => r.method === 'DELETE' && r.path === '/api/v1/sessions/sess-123')).toBe(true);
   });
 });
-
-// ============================================================
-// Skill Manager Tests
-// ============================================================
 
 describe('SkillManager', () => {
   test('should load skill', async () => {
     const mock = new MockClient();
-    mock.setResponse('GET', '/api/v1/skills/my-skill', { 
-      data: { name: 'my-skill', version: '1.0.0', description: 'Test skill' } 
-    });
-    
+    mock.setResponse('POST', '/api/v1/skills/my-skill/load', {
+      success: true,
+      data: { name: 'my-skill', version: '1.0.0', description: 'Test skill' },
+      message: 'OK',
+    } as any);
+
     const skillManager = new SkillManager(mock);
     const skill = await skillManager.load('my-skill');
-    
+
     expect(skill.name).toBe('my-skill');
   });
 
   test('should execute skill', async () => {
     const mock = new MockClient();
-    mock.setResponse('POST', '/api/v1/skills/my-skill/execute', { 
-      data: { output: { result: 'success' } } 
-    });
-    
+    mock.setResponse('POST', '/api/v1/skills/my-skill/execute', {
+      success: true,
+      data: { output: { result: 'success' } },
+      message: 'OK',
+    } as any);
+
     const skillManager = new SkillManager(mock);
     const result = await skillManager.execute('my-skill', { param: 'value' });
-    
-    expect(result.output.result).toBe('success');
+
+    expect((result.output as any).result).toBe('success');
   });
 });
-
-// ============================================================
-// Error Handling Tests
-// ============================================================
 
 describe('Error Handling', () => {
   test('should throw TaskError with correct code', () => {
@@ -292,10 +292,6 @@ describe('Error Handling', () => {
   });
 });
 
-// ============================================================
-// Enum Tests
-// ============================================================
-
 describe('Enums', () => {
   test('TaskStatus values', () => {
     expect(TaskStatus.PENDING).toBe('pending');
@@ -313,67 +309,68 @@ describe('Enums', () => {
   });
 });
 
-// ============================================================
-// Mock Client Tests
-// ============================================================
-
 describe('MockClient', () => {
   test('should return mock response', async () => {
     const mock = new MockClient();
-    mock.setResponse('GET', '/test', { data: { value: 'test' } });
-    
+    mock.setResponse('GET', '/test', {
+      success: true,
+      data: { value: 'test' },
+      message: 'OK',
+    } as any);
+
     const response = await mock.get('/test');
-    
-    expect(response.data.value).toBe('test');
+
+    expect((response as any).data.value).toBe('test');
   });
 
   test('should record requests', async () => {
     const mock = new MockClient();
     await mock.get('/test1');
     await mock.post('/test2', { data: 'value' });
-    
+
     const log = mock.getRequestLog();
-    
+
     expect(log).toHaveLength(2);
   });
 
   test('should reset', async () => {
     const mock = new MockClient();
     await mock.get('/test');
-    
+
     mock.reset();
-    
+
     expect(mock.getRequestLog()).toHaveLength(0);
   });
 });
 
-// ============================================================
-// Integration Tests
-// ============================================================
-
 describe('AgentOS Integration', () => {
   test('should access task manager', () => {
-    const c = new AgentOS([withEndpoint('http://localhost:18789')]);
-    expect(c.tasks).toBeInstanceOf(TaskManager);
+    const client = new AgentOS([withEndpoint('http://localhost:18789')]);
+    expect(client.tasks).toBeInstanceOf(TaskManager);
+    client.close();
   });
 
   test('should access memory manager', () => {
-    const c = new AgentOS([withEndpoint('http://localhost:18789')]);
-    expect(c.memories).toBeInstanceOf(MemoryManager);
+    const client = new AgentOS([withEndpoint('http://localhost:18789')]);
+    expect(client.memories).toBeInstanceOf(MemoryManager);
+    client.close();
   });
 
   test('should access session manager', () => {
-    const c = new AgentOS([withEndpoint('http://localhost:18789')]);
-    expect(c.sessions).toBeInstanceOf(SessionManager);
+    const client = new AgentOS([withEndpoint('http://localhost:18789')]);
+    expect(client.sessions).toBeInstanceOf(SessionManager);
+    client.close();
   });
 
   test('should access skill manager', () => {
-    const c = new AgentOS([withEndpoint('http://localhost:18789')]);
-    expect(c.skills).toBeInstanceOf(SkillManager);
+    const client = new AgentOS([withEndpoint('http://localhost:18789')]);
+    expect(client.skills).toBeInstanceOf(SkillManager);
+    client.close();
   });
 
   test('should return API client', () => {
-    const c = new AgentOS([withEndpoint('http://localhost:18789')]);
-    expect(c.api).toBeDefined();
+    const client = new AgentOS([withEndpoint('http://localhost:18789')]);
+    expect(client.api).toBeDefined();
+    client.close();
   });
 });

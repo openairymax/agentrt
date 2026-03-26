@@ -18,6 +18,7 @@
 
 #include "agentos.h"
 #include "cognition.h"  // 引入反馈回调类型定义
+#include "compensation.h"
 #include <stddef.h>
 #include <stdint.h>
 

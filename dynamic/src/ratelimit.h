@@ -51,6 +51,17 @@ typedef struct {
 ratelimiter_t* ratelimiter_create(const ratelimit_config_t* config);
 
 /**
+ * @brief 创建速率限制器（简化版本）
+ * 
+ * @param max_requests 窗口期内最大请求数
+ * @param window_seconds 窗口时间（秒）
+ * @return 限制器句柄，失败返回NULL
+ * 
+ * @ownership 调用者需通过 ratelimiter_destroy() 释放
+ */
+ratelimiter_t* ratelimiter_create_simple(uint32_t max_requests, uint32_t window_seconds);
+
+/**
  * @brief 销毁速率限制器
  * @param limiter 限制器句柄
  */

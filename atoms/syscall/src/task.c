@@ -11,6 +11,7 @@
 #include "logger.h"
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <cjson/cJSON.h>
 
 static agentos_cognition_engine_t* g_cognition = NULL;
@@ -81,8 +82,27 @@ static int* topological_sort(agentos_task_plan_t* plan, size_t* out_count) {
         for (size_t j = 0; j < node->task_node_depends_count; j++) {
             cJSON* dep_idx = cJSON_GetObjectItem(name_to_idx, node->task_node_depends_on[j]);
             if (dep_idx && cJSON_IsString(dep_idx)) {
-                int v = atoi(dep_idx->valuestring);
-                if (--indeg[v] == 0) queue[qtail++] = v;
+                char* endptr;
+                errno = 0;
+                long v_val = strtol(dep_idx->valuestring, &endptr, 10);
+                if (endptr != dep_idx->valuestring && *endptr == '\0' && errno == 0 &&
+                    v_val >= 0 && v_val < (int)n) {
+                    int v = (int)v_val;
+                    if (--indeg[v] == 0) {
+                        if (qtail >= (int)n) {
+                            // 队列溢出，图有问题（可能有环或无效依赖）
+                            AGENTOS_LOG_ERROR("Topological sort queue overflow during processing");
+                            free(queue);
+                            cJSON_Delete(name_to_idx);
+                            free(indeg);
+                            free(order);
+                            return NULL;
+                        }
+                        queue[qtail++] = v;
+                    }
+                } else {
+                    AGENTOS_LOG_WARN("Invalid dependency index: %s", dep_idx->valuestring);
+                }
             }
         }
     }
