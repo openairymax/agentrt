@@ -47,7 +47,7 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 ### État de la Version
 
-**Version Actuelle**: v1.0.0.5 (Prêt pour la Production)
+**Version Actuelle**: v1.0.0.6 (Prêt pour la Production)
 
 - ✅ Conception de l'architecture principale terminée
 - ✅ Système de Mémoire MemoryRovol
@@ -399,7 +399,7 @@ Note: Détails dans [scripts/benchmark.py](scripts/benchmark.py)
 
 ## 🔄 Feuille de Route
 
-### Version Actuelle (v1.0.0.5) - Prêt Production
+### Version Actuelle (v1.0.0.6) - Prêt Production
 
 **Avancement**: 85%
 

@@ -39,7 +39,7 @@ export class Skill {
     };
   }
 
-  /** 获取技能信�?*/
+  /** 获取技能信息 */
   async getInfo(): Promise<SkillInfo> {
     const response = await this.client.request<{
       skill_id?: string;
@@ -50,12 +50,10 @@ export class Skill {
     }>('GET', `/api/v1/skills/${this.skillName}`);
 
     return {
-      skillName: this.skillName,
-      skillId: response.skill_id || this.skillName,
+      name: this.skillName,
       description: response.description || '',
       version: response.version || '',
       parameters: response.parameters || {},
-      enabled: response.enabled ?? true,
     };
   }
 

@@ -16,6 +16,14 @@
 #include "agentos.h"
 
 /**
+ * @brief 日志级别定义
+ */
+#define LOG_LEVEL_DEBUG 4
+#define LOG_LEVEL_INFO  3
+#define LOG_LEVEL_WARN  2
+#define LOG_LEVEL_ERROR 1
+
+/**
  * @brief 配置管理器不透明句柄
  */
 typedef struct config_manager config_manager_t;

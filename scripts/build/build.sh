@@ -1,7 +1,7 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 核心构建脚本
-# 遵循 AgentOS 架构设计原则：工程美学、反馈闭环、跨平台一致性
+# 遵循 AgentOS 架构设计原则：工程美学、反馈闭环、跨平台一致�?
 
 ###############################################################################
 # 严格模式
@@ -11,7 +11,7 @@ set -euo pipefail
 ###############################################################################
 # 来源依赖
 ###############################################################################
-AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")"
+AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENTOS_SCRIPTS_DIR="$(dirname "$AGENTOS_SCRIPT_DIR")"
 AGENTOS_PROJECT_ROOT="$(dirname "$AGENTOS_SCRIPTS_DIR")"
 
@@ -58,7 +58,7 @@ COLOR_CYAN='\033[0;36m'
 COLOR_NC='\033[0m'
 
 ###############################################################################
-# 构建状态变量
+# 构建状态变�?
 ###############################################################################
 BUILD_START_TIME=0
 BUILD_END_TIME=0
@@ -94,19 +94,19 @@ ${COLOR_BOLD}构建选项:${COLOR_NC}
     --debug               构建调试版本
     --release             构建发布版本 (默认)
     --config <name>       CMake 配置名称 (Debug/Release/Rekase)
-    --parallel <n>       并行编译任务数 (默认: CPU 核心数)
+    --parallel <n>       并行编译任务�?(默认: CPU 核心�?
     --targets <targets>   构建目标 (默认: all)
     --output <dir>        构建输出目录 (默认: ./build)
 
 ${COLOR_BOLD}操作选项:${COLOR_NC}
     --clean               清理构建产物
-    --test                构建后运行测试
-    --verify              验证构建产物完整性
+    --test                构建后运行测�?
+    --verify              验证构建产物完整�?
 
 ${COLOR_BOLD}库选项:${COLOR_NC}
-    --shared              构建共享库 (默认: 开启)
-    --static             构建静态库 (默认: 开启)
-    --no-shared          禁用共享库
+    --shared              构建共享�?(默认: 开�?
+    --static             构建静态库 (默认: 开�?
+    --no-shared          禁用共享�?
     --no-static          禁用静态库
 
 ${COLOR_BOLD}安装选项:${COLOR_NC}
@@ -115,12 +115,12 @@ ${COLOR_BOLD}安装选项:${COLOR_NC}
 ${COLOR_BOLD}输出选项:${COLOR_NC}
     --verbose             详细输出
     --quiet               静默输出
-    --log <file>          输出日志到文件
+    --log <file>          输出日志到文�?
 
 ${COLOR_BOLD}示例:${COLOR_NC}
     $0 --release                      # 发布版本构建
-    $0 --debug --test                 # 调试版本构建并测试
-    $0 --clean --parallel 4           # 清理后4线程构建
+    $0 --debug --test                 # 调试版本构建并测�?
+    $0 --clean --parallel 4           # 清理�?线程构建
     $0 --targets coreloopthree        # 仅构建核心运行时
 
 EOF
@@ -129,7 +129,7 @@ EOF
 print_section() {
     echo ""
     echo -e "${COLOR_BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${COLOR_NC}"
-    echo -e "${COLOR_BLUE}▶ $1${COLOR_NC}"
+    echo -e "${COLOR_BLUE}�?$1${COLOR_NC}"
     echo -e "${COLOR_BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${COLOR_NC}"
     echo ""
 }
@@ -147,12 +147,12 @@ print_status() {
 }
 
 ###############################################################################
-# 检查函数
+# 检查函�?
 ###############################################################################
 check_cmake() {
     if ! command -v cmake &> /dev/null; then
-        print_status "fail" "CMake 未安装"
-        echo -e "${COLOR_DIM}请安装 CMake ${CMAKE_MIN_VERSION} 或更高版本:${COLOR_NC}"
+        print_status "fail" "CMake not installed"
+        echo -e "${COLOR_DIM}Please install CMake ${CMAKE_MIN_VERSION} or higher:${COLOR_NC}"
         echo "    Ubuntu/Debian: sudo apt-get install cmake"
         echo "    macOS: brew install cmake"
         echo "    Windows: winget install Kitware.CMake"
@@ -161,10 +161,10 @@ check_cmake() {
 
     local cmake_version
     cmake_version=$(cmake --version | head -n1 | awk '{print $3}')
-    print_status "info" "CMake 版本: $cmake_version"
+    print_status "info" "CMake version: $cmake_version"
 
     if ! agentos_version_check "$CMAKE_MIN_VERSION" "$cmake_version"; then
-        print_status "fail" "CMake 版本过低 (需要 >= ${CMAKE_MIN_VERSION})"
+        print_status "fail" "CMake version too low (need >= ${CMAKE_MIN_VERSION})"
         return 1
     fi
 
@@ -180,7 +180,7 @@ check_compiler() {
 
     if ! command -v "$compiler" &> /dev/null; then
         print_status "fail" "C 编译器未安装"
-        echo -e "${COLOR_DIM}请安装 GCC 或 Clang:${COLOR_NC}"
+        echo -e "${COLOR_DIM}请安�?GCC �?Clang:${COLOR_NC}"
         echo "    Ubuntu/Debian: sudo apt-get install gcc g++ build-essential"
         echo "    macOS: brew install gcc llvm"
         return 1
@@ -188,13 +188,13 @@ check_compiler() {
 
     local cc_version
     cc_version=$("$compiler" --version | head -n1)
-    print_status "info" "编译器: $cc_version"
+    print_status "info" "编译�? $cc_version"
 
     return 0
 }
 
 check_build_tools() {
-    print_section "检查构建工具"
+    print_section "检查构建工�?
 
     local tools=("make" "cmake")
     local missing=()
@@ -210,7 +210,7 @@ check_build_tools() {
         return 1
     fi
 
-    print_status "ok" "所有构建工具就绪"
+    print_status "ok" "所有构建工具就�?
 
     check_cmake
     check_compiler
@@ -332,14 +332,14 @@ clean_build() {
 
     if [[ -d "$BUILD_OUTPUT_DIR" ]]; then
         rm -rf "$BUILD_OUTPUT_DIR"
-        print_status "ok" "构建目录已清理: $BUILD_OUTPUT_DIR"
+        print_status "ok" "构建目录已清�? $BUILD_OUTPUT_DIR"
     else
-        print_status "skip" "构建目录不存在"
+        print_status "skip" "构建目录不存�?
     fi
 }
 
 ###############################################################################
-# 主流程
+# 主流�?
 ###############################################################################
 main() {
     BUILD_START_TIME=$(date +%s)
@@ -379,7 +379,7 @@ main() {
         fi
     fi
 
-    # 检查环境
+    # 检查环�?
     if ! check_build_tools; then
         exit 1
     fi
@@ -418,7 +418,7 @@ main() {
     echo -e "${COLOR_BOLD}  构建成功!${COLOR_NC}"
     echo -e "${COLOR_DIM}  版本: ${AGENTOS_VERSION}${COLOR_NC}"
     echo -e "${COLOR_DIM}  构建类型: ${BUILD_TYPE}${COLOR_NC}"
-    echo -e "${COLOR_DIM}  耗时: ${duration} 秒${COLOR_NC}"
+    echo -e "${COLOR_DIM}  耗时: ${duration} �?{COLOR_NC}"
     echo -e "${COLOR_DIM}  输出目录: ${BUILD_OUTPUT_DIR}${COLOR_NC}"
     echo -e "${COLOR_GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${COLOR_NC}"
     echo ""
@@ -429,7 +429,7 @@ main() {
 ###############################################################################
 # 错误处理
 ###############################################################################
-trap '[[ $? -ne 0 ]] && print_status "fail" "构建过程出错"' EXIT
+trap '[[ $? -ne 0 ]] && print_status "fail" "Build failed"' EXIT
 
 ###############################################################################
 # 执行入口

@@ -1,6 +1,6 @@
 # AgentOS Technical White Paper V1.0
 
-**Version**: 1.0.0.6  
+**Version**: Doc V1.5  
 **Status**: Official Release  
 **Maintainers**: AgentOS Architecture Committee  
 **Last Updated**: 2026-03-23  

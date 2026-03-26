@@ -1,0 +1,72 @@
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# Partdata Module Security Configuration
+# "From data intelligence emerges."
+
+# Semgrep Configuration
+# https://semgrep.dev/docs/
+
+rules:
+  # Use built-in security rules
+  - config: p/security-audit
+  - config: p/secrets
+  - config: p/c
+  - config: p/owasp-top-ten
+
+  # Custom rules for partdata module
+  - id: partdata-sql-injection
+    languages: [c]
+    message: "Potential SQL injection vulnerability. Use parameterized queries."
+    severity: ERROR
+    pattern: |
+      sprintf($BUF, "SELECT ... %s ...", $VAR);
+    fix: |
+      sqlite3_bind_text($STMT, 1, $VAR, -1, SQLITE_STATIC);
+
+  - id: partdata-buffer-overflow
+    languages: [c]
+    message: "Potential buffer overflow. Use strncpy with size check."
+    severity: ERROR
+    pattern: |
+      strcpy($DST, $SRC);
+    fix: |
+      strncpy($DST, $SRC, sizeof($DST) - 1);
+
+  - id: partdata-format-string
+    languages: [c]
+    message: "Potential format string vulnerability. Use format specifiers."
+    severity: WARNING
+    pattern: |
+      printf($VAR);
+    fix: |
+      printf("%s", $VAR);
+
+  - id: partdata-memory-leak
+    languages: [c]
+    message: "Potential memory leak. Ensure proper cleanup."
+    severity: WARNING
+    pattern-either:
+      - pattern: |
+          $PTR = malloc(...);
+          ...
+          return;
+      - pattern: |
+          $PTR = calloc(...);
+          ...
+          return;
+
+  - id: partdata-uninitialized-pointer
+    languages: [c]
+    message: "Pointer may be used before initialization."
+    severity: WARNING
+    pattern: |
+      $TYPE * $PTR;
+      ...
+      *$PTR = ...;
+
+paths:
+  include:
+    - partdata/src/
+    - partdata/include/
+  exclude:
+    - partdata/tests/
+    - partdata/build/

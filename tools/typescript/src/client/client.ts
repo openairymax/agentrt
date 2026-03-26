@@ -22,6 +22,7 @@ import {
   HttpError,
   httpStatusToErrorCode,
 } from '../errors';
+import { getLogger } from '../utils/logger';
 
 /** 响应体最大允许大小（10MB） */
 const MAX_RESPONSE_BODY_SIZE = 10 * 1024 * 1024;
@@ -232,7 +233,7 @@ export class Client implements APIClient {
 
       if (attempt > 0) {
         const delay = this.calculateBackoff(this.config.retryDelay, attempt);
-        console.warn(`请求失败，${delay}ms 后重试 (尝试 ${attempt}/${this.config.maxRetries})`);
+        getLogger().warn(`请求失败，${delay}ms 后重试 (尝试 ${attempt}/${this.config.maxRetries})`);
         await this.sleep(delay);
       }
 
@@ -244,7 +245,7 @@ export class Client implements APIClient {
         if (axios.isCancel(error)) {
           throw new AgentOSError('请求已被取消', ErrorCode.TIMEOUT);
         }
-        
+
         lastError = this.handleError(error as Error);
 
         // 判断是否应该重试

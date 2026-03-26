@@ -4,9 +4,9 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "forgetting.h"
-#include "layer2_feature.h"
-#include "logger.h"
+#include "../include/forgetting.h"
+#include "../include/layer2_feature.h"
+#include "agentos.h"
 #include <stdlib.h>
 
 agentos_error_t agentos_forgetting_prune(

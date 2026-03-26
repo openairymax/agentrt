@@ -5,8 +5,9 @@
 import { TaskStatus, TaskResult } from './types';
 import { TaskError, TimeoutError } from './errors';
 import { AgentOS } from './agent';
+import { DEFAULT_POLL_INTERVAL_MS } from './config';
 
-/** AgentOS 任务管理�?*/
+/** AgentOS 任务管理�?*/
 export class Task {
   private client: AgentOS;
   private taskId: string;
@@ -22,7 +23,7 @@ export class Task {
     return this.taskId;
   }
 
-  /** 查询任务状�?*/
+  /** 查询任务状�?*/
   async query(): Promise<TaskStatus> {
     const response = await this.client.request<{ status: string }>(
       'GET',
@@ -53,20 +54,23 @@ export class Task {
         }>('GET', `/api/v1/tasks/${this.taskId}`);
 
         return {
-          taskId: this.taskId,
+          id: this.taskId,
           status,
           output: response.output,
           error: response.error,
+          startTime: new Date(),
+          endTime: new Date(),
+          duration: 0,
         };
       }
 
       if (timeout > 0 && Date.now() - startTime > timeout) {
         throw new TimeoutError(
-          `任务�?${timeout}ms 内未完成`,
+          `任务�?${timeout}ms 内未完成`,
         );
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, DEFAULT_POLL_INTERVAL_MS));
     }
   }
 

@@ -615,11 +615,98 @@ class PlanningStrategy:
 
         logger.info("PlanningStrategy initialized")
 
+    def _select_cognitive_system(self, task: Task) -> str:
+        """
+        Select between System 1 (fast) and System 2 (slow) based on task complexity.
+
+        System 1: Used for simple, low-complexity tasks where rapid response is valued.
+        System 2: Used for complex tasks requiring deep analysis and careful planning.
+
+        Args:
+            task: The task to evaluate.
+
+        Returns:
+            "system1" or "system2" indicating which cognitive mode to use.
+        """
+        complexity = getattr(task, 'complexity', 5.0)
+
+        if complexity <= self.system1_complexity_limit:
+            self._system1_usage_count += 1
+            logger.info(f"Task complexity {complexity} <= {self.system1_complexity_limit}, using System 1 (fast)")
+            return "system1"
+        else:
+            self._system2_usage_count += 1
+            logger.info(f"Task complexity {complexity} > {self.system1_complexity_limit}, using System 2 (slow)")
+            return "system2"
+
+    def _create_system1_plan(self, task: Task) -> ExecutionPlan:
+        """
+        System 1 (Fast): Create a plan using heuristic methods.
+
+        Used for simple tasks requiring rapid response. Applies common patterns
+        and rules-of-thumb without deep analysis.
+        """
+        logger.info(f"System 1 (Fast): Creating heuristic plan for task: {task.description[:30]}...")
+
+        subtasks = self.decomposer.decompose(task)
+
+        execution_order = self.dependency_analyzer.get_execution_order(subtasks)
+
+        milestones = self.milestone_builder.build(subtasks)
+
+        plan = ExecutionPlan(
+            id=f"plan-{task.id or uuid.uuid4()}",
+            task_id=task.id or str(uuid.uuid4()),
+            description=task.description,
+            subtasks=subtasks,
+            milestones=milestones,
+            estimated_duration=sum(s.estimated_duration for s in subtasks),
+            estimated_complexity=task.complexity,
+            parallel_execution=True,
+            metadata={
+                "cognitive_system": "system1",
+                "heuristic": True,
+                "execution_order": [[t.id for t in level] for level in execution_order]
+            }
+        )
+
+        logger.info(f"System 1 plan created in {time.time() - self._total_planning_time:.3f}s")
+        return plan
+
     def create_plan(self, task: Task) -> ExecutionPlan:
-        """Create an execution plan for a task."""
+        """Create an execution plan for a task using appropriate cognitive system."""
+        start_time = time.time()
         task_id = task.id or str(uuid.uuid4())
 
-        logger.info(f"Creating plan for task: {task.description[:50]}...")
+        cognitive_system = self._select_cognitive_system(task)
+        self._total_planning_time = start_time
+
+        logger.info(f"Creating plan for task: {task.description[:50]}... (using {cognitive_system})")
+
+        if cognitive_system == "system1":
+            plan = self._create_system1_plan(task)
+        else:
+            plan = self._create_system2_plan(task)
+
+        plan.metadata["planning_time"] = time.time() - start_time
+        plan.metadata["cognitive_system"] = cognitive_system
+
+        logger.info(
+            f"Plan created: {len(plan.subtasks)} subtasks, "
+            f"estimated duration: {plan.estimated_duration:.0f}s, "
+            f"cognitive system: {cognitive_system}"
+        )
+
+        return plan
+
+    def _create_system2_plan(self, task: Task) -> ExecutionPlan:
+        """
+        System 2 (Slow): Create a comprehensive plan using analytical methods.
+
+        Used for complex tasks requiring thorough analysis including risk assessment,
+        resource optimization, and detailed milestone planning.
+        """
+        logger.info(f"System 2 (Slow): Creating analytical plan for task: {task.description[:30]}...")
 
         subtasks = self.decomposer.decompose(task)
 
@@ -639,8 +726,8 @@ class PlanningStrategy:
                 subtask.risk_factors = risk_factors
 
         plan = ExecutionPlan(
-            id=f"plan-{task_id}",
-            task_id=task_id,
+            id=f"plan-{task.id or uuid.uuid4()}",
+            task_id=task.id or str(uuid.uuid4()),
             description=task.description,
             subtasks=subtasks,
             milestones=milestones,
@@ -648,6 +735,7 @@ class PlanningStrategy:
             estimated_complexity=resource_estimate["estimated_complexity"],
             parallel_execution=self.parallel_execution,
             metadata={
+                "cognitive_system": "system2",
                 "resource_estimate": resource_estimate,
                 "execution_order": [[t.id for t in level] for level in execution_order]
             }
@@ -657,13 +745,36 @@ class PlanningStrategy:
 
         plan = self.optimizer.optimize(plan)
 
-        logger.info(
-            f"Plan created: {len(subtasks)} subtasks, "
-            f"estimated duration: {plan.estimated_duration:.0f}s, "
-            f"risk: {plan.total_risk.value}"
-        )
+        plan.metadata["planning_time"] = time.time() - self._total_planning_time
+        plan.metadata["cognitive_system"] = "system2"
 
+        logger.info(f"System 2 plan created in {time.time() - self._total_planning_time:.3f}s")
         return plan
+
+    def get_cognitive_stats(self) -> Dict[str, Any]:
+        """
+        Get statistics about cognitive system usage.
+
+        Returns:
+            Dictionary with system usage counts and percentages.
+        """
+        total = self._system1_usage_count + self._system2_usage_count
+        if total == 0:
+            return {
+                "system1_count": 0,
+                "system2_count": 0,
+                "system1_percent": 0.0,
+                "system2_percent": 0.0,
+                "total_plans": 0
+            }
+
+        return {
+            "system1_count": self._system1_usage_count,
+            "system2_count": self._system2_usage_count,
+            "system1_percent": (self._system1_usage_count / total) * 100,
+            "system2_percent": (self._system2_usage_count / total) * 100,
+            "total_plans": total
+        }
 
     def update_subtask_status(
         self,

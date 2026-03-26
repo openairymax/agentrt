@@ -3,8 +3,8 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 # AgentOS 文档体系索引
 
-**版本**: v1.0.0.6
-**最后更新**: 2026-03-23
+**版本**: Doc V1.5
+**最后更新**: 2026-03-24
 **状态**: 生产就绪
 
 ---
@@ -40,30 +40,30 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 partdocs/
 │
 ├── 架构文档 (Architecture)
-│   ├── architectural_design_principles.md   # 架构设计原则 v3.0
-│   ├── coreloopthree.md                     # 三层认知运行时
-│   ├── memoryrovol.md                       # 四层记忆系统
-│   ├── microkernel.md                       # 微内核设计
-│   ├── ipc.md                               # IPC Binder 通信
-│   ├── syscall.md                           # 系统调用设计
-│   └── logging_system.md                    # 统一日志系统
+│   ├── architectural_design_principles.md   # 架构设计原则 v1.5
+│   ├── coreloopthree.md                     # 三层认知运行时 v1.0.0.5
+│   ├── memoryrovol.md                       # 四层记忆系统 v1.0.0.5
+│   ├── microkernel.md                       # 微内核设计 v1.0.0.5
+│   ├── ipc.md                               # IPC Binder 通信 v1.0.0.5
+│   ├── syscall.md                           # 系统调用设计 v1.0.0.5
+│   └── logging_system.md                    # 统一日志系统 v1.0.0.5
 │
 ├── 开发指南 (Guides)
-│   ├── getting_started.md                   # 快速开始
-│   ├── create_agent.md                      # Agent 开发教程
-│   ├── create_skill.md                      # Skill 开发教程
-│   ├── deployment.md                        # 部署指南
-│   ├── kernel_tuning.md                     # 内核调优
-│   ├── troubleshooting.md                   # 故障排查
-│   └── migration_guide.md                   # 迁移指南
+│   ├── getting_started.md                   # 快速开始 v1.0.0.5
+│   ├── create_agent.md                      # Agent 开发教程 v1.0.0.5
+│   ├── create_skill.md                      # Skill 开发教程 v1.0.0.5
+│   ├── deployment.md                        # 部署指南 v1.0.0.5
+│   ├── kernel_tuning.md                     # 内核调优 v1.0.0.5
+│   ├── troubleshooting.md                   # 故障排查 v1.0.0.5
+│   └── migration_guide.md                   # 迁移指南 v1.0.0.5
 │
 ├── 设计哲学 (Philosophy)
-│   ├── Cognition_Theory.md                  # 认知理论
-│   ├── Design_Principles.md                 # 设计原则
-│   └── Memory_Theory.md                     # 记忆理论
+│   ├── Cognition_Theory.md                 # 认知理论 v1.0
+│   ├── Design_Principles.md                 # 设计原则 v1.0
+│   └── Memory_Theory.md                    # 记忆理论 v1.0
 │
 ├── 技术规范 (Specifications)
-│   ├── TERMINOLOGY.md                       # 统一术语表
+│   ├── TERMINOLOGY.md                       # 统一术语表 v1.0
 │   ├── agentos_contract/                    # 契约规范集
 │   │   ├── agent/                           # Agent 契约
 │   │   ├── skill/                           # Skill 契约
@@ -94,25 +94,25 @@ partdocs/
 
 | 文档 | 路径 | 状态 | 版本 |
 |------|------|------|------|
-| 架构设计原则 | architecture/folder/architectural_design_principles.md | 生产就绪 | v3.0 |
-| 三层认知运行时 | architecture/folder/coreloopthree.md | 生产就绪 | v1.0 |
-| 四层记忆系统 | architecture/folder/memoryrovol.md | 生产就绪 | v1.0 |
-| 微内核设计 | architecture/folder/microkernel.md | 生产就绪 | v1.0 |
-| IPC 通信 | architecture/folder/ipc.md | 生产就绪 | v1.0 |
-| 系统调用设计 | architecture/folder/syscall.md | 生产就绪 | v1.0 |
-| 日志系统 | architecture/folder/logging_system.md | 生产就绪 | v1.0 |
+| 架构设计原则 | architecture/folder/architectural_design_principles.md | 正式发布 | v1.5 |
+| 三层认知运行时 | architecture/folder/coreloopthree.md | 生产就绪 | v1.0.0.5 |
+| 四层记忆系统 | architecture/folder/memoryrovol.md | 生产就绪 | v1.0.0.5 |
+| 微内核设计 | architecture/folder/microkernel.md | 生产就绪 | v1.0.0.5 |
+| IPC 通信 | architecture/folder/ipc.md | 生产就绪 | v1.0.0.5 |
+| 系统调用设计 | architecture/folder/syscall.md | 生产就绪 | v1.0.0.5 |
+| 日志系统 | architecture/folder/logging_system.md | 生产就绪 | v1.0.0.5 |
 
 ### 3.2 开发指南
 
 | 文档 | 路径 | 状态 | 版本 |
 |------|------|------|------|
-| 快速开始 | guides/folder/getting_started.md | 生产就绪 | v1.0 |
-| 创建 Agent | guides/folder/create_agent.md | 生产就绪 | v1.0 |
-| 创建 Skill | guides/folder/create_skill.md | 生产就绪 | v1.0 |
-| 部署指南 | guides/folder/deployment.md | 生产就绪 | v1.0 |
-| 内核调优 | guides/folder/kernel_tuning.md | 生产就绪 | v1.0 |
-| 故障排查 | guides/folder/troubleshooting.md | 生产就绪 | v1.0 |
-| 迁移指南 | guides/folder/migration_guide.md | 生产就绪 | v1.0 |
+| 快速开始 | guides/folder/getting_started.md | 生产就绪 | v1.0.0.5 |
+| 创建 Agent | guides/folder/create_agent.md | 生产就绪 | v1.0.0.5 |
+| 创建 Skill | guides/folder/create_skill.md | 生产就绪 | v1.0.0.5 |
+| 部署指南 | guides/folder/deployment.md | 生产就绪 | v1.0.0.5 |
+| 内核调优 | guides/folder/kernel_tuning.md | 生产就绪 | v1.0.0.5 |
+| 故障排查 | guides/folder/troubleshooting.md | 生产就绪 | v1.0.0.5 |
+| 迁移指南 | guides/folder/migration_guide.md | 生产就绪 | v1.0.0.5 |
 
 ### 3.3 设计哲学
 
@@ -170,46 +170,46 @@ partdocs/
 ### 架构师路径
 
 ```
-architectural_design_principles.md
-    → Cognition_Theory.md
-    → Design_Principles.md
-    → Memory_Theory.md
-    → coreloopthree.md
-    → memoryrovol.md
-    → agentos_contract/
+architectural_design_principles.md (架构设计原则 v1.5)
+    → Cognition_Theory.md (认知理论)
+    → Design_Principles.md (设计原则)
+    → Memory_Theory.md (记忆理论)
+    → coreloopthree.md (三层认知运行时)
+    → memoryrovol.md (四层记忆系统)
+    → agentos_contract/ (契约规范集)
 ```
 
 ### 核心开发者路径
 
 ```
-getting_started.md
-    → C_coding_style_guide.md
-    → microkernel.md
-    → syscall.md
-    → ipc.md
-    → create_agent.md
-    → create_skill.md
-    → kernel_tuning.md
+getting_started.md (快速开始)
+    → C_coding_style_guide.md (C 编码规范)
+    → microkernel.md (微内核设计)
+    → syscall.md (系统调用设计)
+    → ipc.md (IPC 通信)
+    → create_agent.md (创建 Agent)
+    → create_skill.md (创建 Skill)
+    → kernel_tuning.md (内核调优)
 ```
 
 ### 应用开发者路径
 
 ```
-getting_started.md
-    → create_agent.md
-    → create_skill.md
-    → deployment.md
-    → troubleshooting.md
+getting_started.md (快速开始)
+    → create_agent.md (创建 Agent)
+    → create_skill.md (创建 Skill)
+    → deployment.md (部署指南)
+    → troubleshooting.md (故障排查)
 ```
 
 ### 运维工程师路径
 
 ```
-deployment.md
-    → troubleshooting.md
-    → kernel_tuning.md
-    → migration_guide.md
-    → logging_system.md
+deployment.md (部署指南)
+    → troubleshooting.md (故障排查)
+    → kernel_tuning.md (内核调优)
+    → migration_guide.md (迁移指南)
+    → logging_system.md (日志系统)
 ```
 
 ---
@@ -218,18 +218,83 @@ deployment.md
 
 | 主题 | 文档 |
 |------|------|
-| 微内核 | architectural_design_principles.md, microkernel.md |
-| IPC 通信 | ipc.md, syscall.md |
-| 认知运行时 | coreloopthree.md, Cognition_Theory.md |
-| 记忆系统 | memoryrovol.md, Memory_Theory.md |
-| 安全穹顶 | architectural_design_principles.md (domes) |
-| Agent 开发 | create_agent.md, agent_contract.md |
-| Skill 开发 | create_skill.md, skill_contract.md |
-| 部署 | deployment.md |
-| 调优 | kernel_tuning.md, troubleshooting.md |
-| 日志 | logging_system.md, logging_format.md |
-| 编码规范 | C_coding_style_guide.md, C&Cpp-secure-coding-guide.md |
-| 术语 | TERMINOLOGY.md |
+| 微内核 | architectural_design_principles.md (架构设计原则), microkernel.md (微内核设计) |
+| IPC 通信 | ipc.md (IPC Binder 通信), syscall.md (系统调用设计) |
+| 认知运行时 | coreloopthree.md (三层认知运行时), Cognition_Theory.md (认知理论) |
+| 记忆系统 | memoryrovol.md (四层记忆系统), Memory_Theory.md (记忆理论) |
+| 安全穹顶 | architectural_design_principles.md (架构设计原则 - domes 章节) |
+| Agent 开发 | create_agent.md (创建 Agent), agent_contract.md (Agent 契约) |
+| Skill 开发 | create_skill.md (创建 Skill), skill_contract.md (Skill 契约) |
+| 部署 | deployment.md (部署指南) |
+| 调优 | kernel_tuning.md (内核调优), troubleshooting.md (故障排查) |
+| 日志 | logging_system.md (日志系统), logging_format.md (日志格式) |
+| 编码规范 | C_coding_style_guide.md (C 编码规范), C&Cpp-secure-coding-guide.md (安全编程) |
+| 术语 | TERMINOLOGY.md (统一术语表) |
+
+---
+
+## 6. 核心技术特性
+
+### 6.1 四维正交原则体系
+
+AgentOS 架构设计基于四维正交原则体系，从系统观、内核观、认知观、工程观四个维度定义设计原则：
+
+| 维度 | 原则数量 | 核心理念 |
+|------|----------|----------|
+| 系统观 (S) | S-1 ~ S-4 | 整体性、层次性、协调性、演化性 |
+| 内核观 (K) | K-1 ~ K-4 | 最小化、正交性、安全性、可验证性 |
+| 认知观 (C) | C-1 ~ C-4 | 双系统协同、渐进式规划、自我纠错、持续学习 |
+| 工程观 (E) | E-1 ~ E-7 | 模块化、可测试性、可观测性、文档化等 |
+
+详细说明请参阅 [架构设计原则 v1.5](architecture/folder/architectural_design_principles.md)。
+
+### 6.2 三层认知运行时 (CoreLoopThree)
+
+CoreLoopThree 是 AgentOS 的核心创新架构，实现认知、行动和记忆的有机统一：
+
+- **认知层**: 意图理解、任务规划、Agent 调度
+- **行动层**: 任务执行、补偿事务、责任链追踪
+- **记忆层**: 记忆写入、查询检索、上下文挂载
+
+### 6.3 四层记忆系统 (MemoryRovol)
+
+MemoryRovol 实现从原始数据到高级模式的全栈记忆管理：
+
+- **L1 原始卷**: 原始事件流、文件系统存储
+- **L2 特征层**: 嵌入模型、FAISS 向量索引
+- **L3 结构层**: 关系绑定、时序编码
+- **L4 模式层**: 持久同调分析、HDBSCAN 聚类
+
+### 6.4 安全穹顶 (Domes)
+
+Domes 是 AgentOS 的多层安全防护体系：
+
+- **虚拟工位**: 进程/容器级隔离
+- **权限裁决**: 基于 YAML 的动态规则
+- **输入净化**: 正则表达式规则过滤
+- **审计日志**: 异步写入、轮转支持
+
+---
+
+## 7. 理论根基
+
+AgentOS 的设计深受以下理论影响：
+
+### 7.1 工程两论
+
+- **《工程控制论》**: 反馈闭环理论，控制的核心
+- **《论系统工程》**: 层次分解、综合集成、总体设计部
+
+### 7.2 认知科学
+
+- **双系统认知理论** (丹尼尔·卡尼曼): System 1 与 System 2 的协同
+- **ACT-R 认知架构**: 模块划分、产生式系统
+- **SOAR 认知架构**: 问题空间假设
+
+### 7.3 计算机科学
+
+- **Liedtke 微内核原则**: 机制与策略分离、最小特权
+- **seL4 形式化验证**: 功能正确性、安全性质
 
 ---
 

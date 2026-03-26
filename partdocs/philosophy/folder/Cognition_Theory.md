@@ -1,5 +1,5 @@
-Copyright (c) 2026 SPHARX. All Rights Reserved.
-"From data intelligence emerges."
+Copyright (c) 2026 SPHARX. All Rights Reserved.  
+"From data intelligence emerges."  
 
 # AgentOS 认知层理论
 

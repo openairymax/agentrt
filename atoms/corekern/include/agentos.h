@@ -4,8 +4,8 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#ifndef AGENTOS_H
-#define AGENTOS_H
+#ifndef AGENTOS_AGENTOS_H
+#define AGENTOS_AGENTOS_H
 
 #include "export.h"
 #include "error.h"
@@ -13,6 +13,7 @@
 #include "task.h"
 #include "ipc.h"
 #include "time.h"
+#include "observability.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,4 +27,4 @@ AGENTOS_API void agentos_core_shutdown(void);
 }
 #endif
 
-#endif /* AGENTOS_H */
+#endif /* AGENTOS_AGENTOS_H */

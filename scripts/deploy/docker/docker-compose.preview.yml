@@ -1,0 +1,107 @@
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# AgentOS Docker Compose 配置文件 - Preview 环境 (PR 预览)
+# 用于 PR 预览部署
+
+version: '3.8'
+
+services:
+  agentos-preview:
+    build:
+      context: ../../
+      dockerfile: scripts/deploy/docker/Dockerfile.service
+      target: runtime
+    image: spharx/agentos-scripts:preview-${PR_NUMBER:-0}
+    container_name: agentos-preview-${PR_NUMBER:-0}
+    hostname: agentos-preview
+    restart: unless-stopped
+
+    # 资源限制 - Preview 环境资源限制更严格
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+    # 环境变量
+    environment:
+      - TZ=Asia/Shanghai
+      - AGENTOS_ENV=preview
+      - AGENTOS_LOG_LEVEL=DEBUG
+      - AGENTOS_LOG_FORMAT=json
+      - AGENTOS_ENABLE_TRACING=true
+      - AGENTOS_TELEMETRY_ENDPOINT=http://otel-preview:4317
+      - AGENTOS_DEPLOYMENT_TYPE=preview
+      - AGENTOS_PR_NUMBER=${PR_NUMBER:-0}
+
+    # 端口映射 - 动态端口避免冲突
+    ports:
+      - "${PREVIEW_PORT:-8091}:8090"
+
+    # 数据卷挂载
+    volumes:
+      - preview-logs:/var/log/agentos:rw
+      - preview-data:/var/lib/agentos:rw
+
+    # 网络配置
+    networks:
+      - agentos-preview-network
+
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  redis-preview:
+    image: redis:7-alpine
+    container_name: agentos-redis-preview
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+
+    volumes:
+      - redis-preview-data:/data
+
+    networks:
+      - agentos-preview-network
+
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+
+  otel-preview:
+    image: otel/opentelemetry-collector-contrib:0.90.0
+    container_name: agentos-otel-preview
+    restart: unless-stopped
+
+    volumes:
+      - ./config/otel-collector-preview.yaml:/etc/otelcol-contrib/config.yaml:ro
+
+    networks:
+      - agentos-preview-network
+
+    ports:
+      - "5319:4317"
+      - "5320:4318"
+
+volumes:
+  preview-logs:
+    driver: local
+  preview-data:
+    driver: local
+  redis-preview-data:
+    driver: local
+
+networks:
+  agentos-preview-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16

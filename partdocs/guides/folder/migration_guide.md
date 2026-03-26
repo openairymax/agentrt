@@ -3,7 +3,7 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 # AgentOS 迁移指南
 
-**版本**: v1.0.0.6
+**版本**: Doc V1.5
 **最后更新**: 2026-03-23
 **适用对象**: 从旧版本迁移的开发者和运维工程师
 

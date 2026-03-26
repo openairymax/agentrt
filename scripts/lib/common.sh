@@ -4,7 +4,7 @@
 # 遵循 AgentOS 架构设计原则：接口最小化原则 (E-5)
 
 ###############################################################################
-# 来源此脚本（提供基础函数）
+# 严格模式
 ###############################################################################
 set -euo pipefail
 
@@ -44,17 +44,14 @@ agentos_load_libs
 # 字符串工具
 ###############################################################################
 
-# 将字符串转换为小写
 agentos_to_lower() {
     echo "$1" | tr '[:upper:]' '[:lower:]'
 }
 
-# 将字符串转换为大写
 agentos_to_upper() {
     echo "$1" | tr '[:lower:]' '[:upper:]'
 }
 
-# 去除字符串首尾空白
 agentos_trim() {
     local var="$1"
     var="${var#"${var%%[![:space:]]*}"}"
@@ -62,14 +59,12 @@ agentos_trim() {
     echo -n "$var"
 }
 
-# 检查字符串是否包含子串
 agentos_contains() {
     local haystack="$1"
     local needle="$2"
     [[ "$haystack" == *"$needle"* ]]
 }
 
-# 生成随机字符串
 agentos_random_string() {
     local length="${1:-16}"
     LC_ALL=C tr -dc 'a-zA-Z0-9' </dev/urandom | head -c "$length"
@@ -79,7 +74,6 @@ agentos_random_string() {
 # 文件工具
 ###############################################################################
 
-# 安全创建目录
 agentos_mkdir() {
     local dir="$1"
     local mode="${2:-0755}"
@@ -100,7 +94,6 @@ agentos_mkdir() {
     return 0
 }
 
-# 安全删除文件（仅当存在时）
 agentos_safe_rm() {
     local file="$1"
 
@@ -109,7 +102,6 @@ agentos_safe_rm() {
     fi
 }
 
-# 备份文件
 agentos_backup_file() {
     local file="$1"
     local backup=""
@@ -129,7 +121,6 @@ agentos_backup_file() {
     return 0
 }
 
-# 获取文件大小（人类可读）
 agentos_file_size() {
     local file="$1"
 
@@ -152,7 +143,6 @@ agentos_file_size() {
     fi
 }
 
-# 检查文件是否可执行
 agentos_is_executable() {
     local file="$1"
     [[ -x "$file" ]] || [[ -f "$file" && "${file: -3}" == ".sh" ]]
@@ -162,13 +152,11 @@ agentos_is_executable() {
 # 进程工具
 ###############################################################################
 
-# 检查进程是否运行
 agentos_is_process_running() {
     local pid="$1"
     kill -0 "$pid" 2>/dev/null
 }
 
-# 等待进程结束
 agentos_wait_for_process() {
     local pid="$1"
     local timeout="${2:-60}"
@@ -185,7 +173,6 @@ agentos_wait_for_process() {
     return 0
 }
 
-# 安全杀死进程
 agentos_kill_process() {
     local pid="$1"
     local sig="${2:-TERM}"
@@ -205,7 +192,6 @@ agentos_kill_process() {
 # 网络工具
 ###############################################################################
 
-# 检查端口是否可用
 agentos_is_port_available() {
     local port="$1"
 
@@ -218,7 +204,6 @@ agentos_is_port_available() {
     fi
 }
 
-# 检查服务是否可用（通过 HTTP）
 agentos_wait_for_url() {
     local url="$1"
     local timeout="${2:-60}"
@@ -239,7 +224,6 @@ agentos_wait_for_url() {
 # 数组工具
 ###############################################################################
 
-# 检查元素是否在数组中
 agentos_in_array() {
     local element="$1"
     shift
@@ -253,17 +237,15 @@ agentos_in_array() {
     return 1
 }
 
-# 获取数组长度
 agentos_array_length() {
     local array=("$@")
-    echo ${#array[@]}
+    echo "${#array[@]}"
 }
 
 ###############################################################################
 # 版本比较
 ###############################################################################
 
-# 比较两个版本号 (返回 0 表示相等, 1 表示 v1 > v2, 2 表示 v1 < v2)
 agentos_version_compare() {
     local v1="$1"
     local v2="$2"
@@ -289,7 +271,6 @@ agentos_version_compare() {
     return 0
 }
 
-# 检查版本是否满足要求
 agentos_version_check() {
     local required="$1"
     local actual="$2"
@@ -297,7 +278,6 @@ agentos_version_check() {
     agentos_version_compare "$actual" "$required"
     local result=$?
 
-    # result 0: 相等, 1: actual > required (满足), 2: actual < required (不满足)
     [[ $result -ne 2 ]]
 }
 
@@ -305,7 +285,6 @@ agentos_version_check() {
 # 配置文件工具
 ###############################################################################
 
-# 读取配置值（从 YAML 风格配置文件）
 agentos_config_get() {
     local file="$1"
     local key="$2"
@@ -326,7 +305,6 @@ agentos_config_get() {
     fi
 }
 
-# 写入配置值
 agentos_config_set() {
     local file="$1"
     local key="$2"
@@ -347,7 +325,6 @@ agentos_config_set() {
 # 用户交互工具
 ###############################################################################
 
-# 确认提示
 agentos_confirm() {
     local prompt="${1:-Are you sure?}"
     local default="${2:-N}"
@@ -364,7 +341,6 @@ agentos_confirm() {
     [[ "$yn" =~ ^[Yy]$ ]]
 }
 
-# 选择提示
 agentos_select() {
     local prompt="$1"
     shift
@@ -392,7 +368,6 @@ agentos_select() {
 # 下载工具
 ###############################################################################
 
-# 安全下载文件
 agentos_download() {
     local url="$1"
     local dest="$2"

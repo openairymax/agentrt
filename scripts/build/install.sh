@@ -1,7 +1,7 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 安装脚本 (Linux/macOS)
-# 遵循 AgentOS 架构设计原则：反馈闭环、最小特权、安全内生
+# 遵循 AgentOS 架构设计原则：反馈闭环、最小特权、安全内�?
 
 ###############################################################################
 # 严格模式
@@ -15,7 +15,7 @@ AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")
 AGENTOS_SCRIPTS_DIR="$(dirname "$AGENTOS_SCRIPT_DIR")"
 AGENTOS_PROJECT_ROOT="$(dirname "$AGENTOS_SCRIPTS_DIR")"
 
-# shellcheck source=../lib/common.sh
+# shellcheck source=$AGENTOS_SCRIPTS_DIR/lib/common.sh
 source "$AGENTOS_SCRIPTS_DIR/lib/common.sh"
 
 ###############################################################################
@@ -53,7 +53,7 @@ COLOR_CYAN='\033[0;36m'
 COLOR_NC='\033[0m'
 
 ###############################################################################
-# 全局状态
+# 全局状�?
 ###############################################################################
 INSTALL_START_TIME=0
 INSTALL_END_TIME=0
@@ -89,19 +89,19 @@ ${COLOR_BOLD}用法:${COLOR_NC} $0 [选项]
 ${COLOR_BOLD}安装选项:${COLOR_NC}
     --prefix <path>         安装前缀 (默认: ${INSTALL_PREFIX})
     --sysconfdir <path>     系统配置目录 (默认: ${INSTALL_SYSCONF_DIR})
-    --localstatedir <path>  本地状态目录 (默认: ${INSTALL_LOCAL_STATE_DIR})
+    --localstatedir <path>  本地状态目�?(默认: ${INSTALL_LOCAL_STATE_DIR})
     --logdir <path>         日志目录 (默认: ${INSTALL_LOG_DIR})
 
 ${COLOR_BOLD}用户选项:${COLOR_NC}
     --user <name>           运行用户 (默认: 当前用户)
-    --group <name>          运行组 (默认: 与用户同组)
+    --group <name>          运行�?(默认: 与用户同�?
     --mode <octal>          权限模式 (默认: ${INSTALL_MODE})
 
 ${COLOR_BOLD}行为选项:${COLOR_NC}
-    --force                 强制安装，覆盖已有文件
+    --force                 强制安装，覆盖已有文�?
     --dry-run               模拟安装，不实际写入文件
-    --skip-deps            跳过依赖检查
-    --no-verify            跳过安装后验证
+    --skip-deps            跳过依赖检�?
+    --no-verify            跳过安装后验�?
     --uninstall            卸载 AgentOS
 
 ${COLOR_BOLD}输出选项:${COLOR_NC}
@@ -109,7 +109,7 @@ ${COLOR_BOLD}输出选项:${COLOR_NC}
     --quiet                 静默输出
 
 ${COLOR_BOLD}示例:${COLOR_NC}
-    $0 --prefix /opt/agentos                   # 自定义安装路径
+    $0 --prefix /opt/agentos                   # 自定义安装路�?
     $0 --user agentos --group agentos          # 创建专用用户
     $0 --uninstall                             # 卸载 AgentOS
     $0 --dry-run --verbose                    # 模拟安装
@@ -120,7 +120,7 @@ EOF
 print_section() {
     echo ""
     echo -e "${COLOR_BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${COLOR_NC}"
-    echo -e "${COLOR_BLUE}▶ $1${COLOR_NC}"
+    echo -e "${COLOR_BLUE}�?$1${COLOR_NC}"
     echo -e "${COLOR_BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${COLOR_NC}"
     echo ""
 }
@@ -138,7 +138,7 @@ print_status() {
 }
 
 ###############################################################################
-# 前置检查
+# 前置检�?
 ###############################################################################
 check_root() {
     if [[ $INSTALL_UNINSTALL -eq 1 ]]; then
@@ -151,14 +151,14 @@ check_root() {
 
     if [[ "$(id -u)" != "0" ]]; then
         if [[ "$INSTALL_PREFIX" == /usr/local ]]; then
-            print_status "warn" "非 root 用户安装到系统目录可能需要 sudo"
+            print_status "warn" "�?root 用户安装到系统目录可能需�?sudo"
         fi
     fi
 }
 
 check_platform() {
     if ! agentos_platform_is_unix; then
-        print_status "fail" "此脚本仅支持 Linux 和 macOS"
+        print_status "fail" "此脚本仅支持 Linux �?macOS"
         return 1
     fi
     print_status "info" "平台: $(agentos_platform_detect) $(agentos_arch_detect)"
@@ -167,11 +167,11 @@ check_platform() {
 
 check_dependencies() {
     if [[ "$INSTALL_SKIP_DEPS" == "1" ]]; then
-        print_status "skip" "跳过依赖检查"
+        print_status "skip" "跳过依赖检�?
         return 0
     fi
 
-    print_section "检查依赖"
+    print_section "检查依�?
 
     local deps=("bash" "coreutils")
     local missing=()
@@ -214,7 +214,7 @@ check_existing_installation() {
     if [[ -f "$install_marker" ]]; then
         local existing_version
         existing_version=$(cat "$install_marker" 2>/dev/null || echo "unknown")
-        print_status "warn" "检测到已安装版本: $existing_version"
+        print_status "warn" "检测到已安装版�? $existing_version"
         if ! agentos_confirm "是否继续安装?"; then
             exit 0
         fi
@@ -242,7 +242,7 @@ create_directories() {
 
     for dir in "${dirs[@]}"; do
         if [[ -d "$dir" ]]; then
-            print_status "skip" "目录已存在: $dir"
+            print_status "skip" "目录已存�? $dir"
         else
             if [[ "$INSTALL_DRY_RUN" == "1" ]]; then
                 print_status "info" "[DRY] 创建目录: $dir"
@@ -255,7 +255,7 @@ create_directories() {
 }
 
 install_binaries() {
-    print_section "安装二进制文件"
+    print_section "安装二进制文�?
 
     local build_dir="$AGENTOS_PROJECT_ROOT/build"
     local binaries=(
@@ -265,7 +265,7 @@ install_binaries() {
     )
 
     if [[ "$INSTALL_DRY_RUN" == "1" ]]; then
-        print_status "info" "[DRY] 将安装 ${#binaries[@]} 个二进制文件"
+        print_status "info" "[DRY] 将安�?${#binaries[@]} 个二进制文件"
         return 0
     fi
 
@@ -280,7 +280,7 @@ install_binaries() {
 }
 
 install_libraries() {
-    print_section "安装库文件"
+    print_section "安装库文�?
 
     local build_dir="$AGENTOS_PROJECT_ROOT/build"
     local libs=(
@@ -291,7 +291,7 @@ install_libraries() {
     )
 
     if [[ "$INSTALL_DRY_RUN" == "1" ]]; then
-        print_status "info" "[DRY] 将安装 ${#libs[@]} 个库文件"
+        print_status "info" "[DRY] 将安�?${#libs[@]} 个库文件"
         return 0
     fi
 
@@ -311,7 +311,7 @@ install_libraries() {
 }
 
 install_headers() {
-    print_section "安装头文件"
+    print_section "安装头文�?
 
     local headers_dir="$AGENTOS_PROJECT_ROOT/atoms"
     local include_dir="$INSTALL_PREFIX/include/agentos"
@@ -322,7 +322,7 @@ install_headers() {
     fi
 
     if [[ "$INSTALL_DRY_RUN" == "1" ]]; then
-        print_status "info" "[DRY] 将安装头文件到: $include_dir"
+        print_status "info" "[DRY] 将安装头文件�? $include_dir"
         return 0
     fi
 
@@ -355,7 +355,7 @@ install_config() {
         if [[ -f "$config" ]]; then
             local dest="$INSTALL_SYSCONF_DIR/$(basename "$config")"
             if [[ -f "$dest" ]] && [[ "$INSTALL_FORCE" != "1" ]]; then
-                print_status "skip" "配置文件已存在: $(basename "$config")"
+                print_status "skip" "配置文件已存�? $(basename "$config")"
             else
                 cp "$config" "$dest"
                 print_status "ok" "安装: $(basename "$config")"
@@ -375,23 +375,23 @@ install_systemd_service() {
     local service_dest="/etc/systemd/system/agentos.service"
 
     if [[ ! -f "$service_file" ]]; then
-        print_status "skip" "未找到 systemd 服务文件"
+        print_status "skip" "未找�?systemd 服务文件"
         return 0
     fi
 
     if [[ "$INSTALL_DRY_RUN" == "1" ]]; then
-        print_status "info" "[DRY] 将安装 systemd 服务"
+        print_status "info" "[DRY] 将安�?systemd 服务"
         return 0
     fi
 
     if [[ "$(id -u)" != "0" ]]; then
-        print_status "skip" "需要 root 权限安装 systemd 服务"
+        print_status "skip" "需�?root 权限安装 systemd 服务"
         return 0
     fi
 
     cp "$service_file" "$service_dest"
     systemctl daemon-reload
-    print_status "ok" "systemd 服务已安装"
+    print_status "ok" "systemd 服务已安�?
 }
 
 install_scripts() {
@@ -433,7 +433,7 @@ create_version_marker() {
     echo "Install date: $(date -Iseconds)" >> "$marker"
     echo "Install prefix: $INSTALL_PREFIX" >> "$marker"
 
-    print_status "ok" "版本标记已创建"
+    print_status "ok" "版本标记已创�?
 }
 
 verify_installation() {
@@ -451,7 +451,7 @@ verify_installation() {
     fi
 
     if [[ ! -d "$INSTALL_SYSCONF_DIR" ]]; then
-        print_status "fail" "配置目录不存在: $INSTALL_SYSCONF_DIR"
+        print_status "fail" "配置目录不存�? $INSTALL_SYSCONF_DIR"
         ((errors++))
     fi
 
@@ -459,7 +459,7 @@ verify_installation() {
         print_status "ok" "安装验证通过"
         return 0
     else
-        print_status "fail" "安装验证失败 ($errors 个错误)"
+        print_status "fail" "安装验证失败 ($errors 个错�?"
         return 1
     fi
 }
@@ -474,17 +474,17 @@ uninstall_agentos() {
         print_status "warn" "建议使用 root 权限执行卸载"
     fi
 
-    if ! agentos_confirm "确定要卸载 AgentOS 吗?"; then
+    if ! agentos_confirm "确定要卸�?AgentOS �?"; then
         exit 0
     fi
 
-    print_status "info" "移除二进制文件..."
+    print_status "info" "移除二进制文�?.."
     rm -f "$INSTALL_PREFIX/bin/agentos" "$INSTALL_PREFIX/bin/agentosd" "$INSTALL_PREFIX/bin/agentos-cli" 2>/dev/null || true
 
-    print_status "info" "移除库文件..."
+    print_status "info" "移除库文�?.."
     rm -rf "$INSTALL_PREFIX/lib/agentos" 2>/dev/null || true
 
-    print_status "info" "移除头文件..."
+    print_status "info" "移除头文�?.."
     rm -rf "$INSTALL_PREFIX/include/agentos" 2>/dev/null || true
 
     print_status "info" "移除配置文件..."
@@ -497,7 +497,7 @@ uninstall_agentos() {
 }
 
 ###############################################################################
-# 主流程
+# 主流�?
 ###############################################################################
 main() {
     INSTALL_START_TIME=$(date +%s)
@@ -555,7 +555,7 @@ main() {
     echo -e "${COLOR_BOLD}  安装成功!${COLOR_NC}"
     echo -e "${COLOR_DIM}  版本: ${AGENTOS_VERSION}${COLOR_NC}"
     echo -e "${COLOR_DIM}  安装路径: ${INSTALL_PREFIX}${COLOR_NC}"
-    echo -e "${COLOR_DIM}  耗时: ${duration} 秒${COLOR_NC}"
+    echo -e "${COLOR_DIM}  耗时: ${duration} �?{COLOR_NC}"
     echo -e "${COLOR_GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${COLOR_NC}"
     echo ""
 

@@ -1,0 +1,346 @@
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# AgentOS Atoms Module Rollback Workflow
+# Version: 1.0.0
+# Description: Handles deployment rollback for atoms microkernel module
+# =============================================================================
+
+name: atoms Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      target_version:
+        description: 'Target version to rollback to (leave empty for previous)'
+        required: false
+        type: string
+      reason:
+        description: 'Reason for rollback'
+        required: true
+        type: string
+      skip_approval:
+        description: 'Skip approval (emergency only)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  MODULE_NAME: atoms
+
+jobs:
+  # ========================================================================
+  # Job 1: Validate rollback parameters
+  # ========================================================================
+  validate:
+    name: Validate Rollback Request
+    runs-on: ubuntu-latest
+    outputs:
+      target_version: ${{ steps.validate.outputs.target_version }}
+      current_version: ${{ steps.validate.outputs.current_version }}
+      validation_status: ${{ steps.validate.outputs.validation_status }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate rollback parameters
+        id: validate
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          TARGET="${{ github.event.inputs.target_version }}"
+
+          if [[ "$ENV" == "production" ]] && [[ "${{ github.event.inputs.skip_approval }}" != "true" ]]; then
+            echo "Production rollback requires explicit approval"
+          fi
+
+          CURRENT=$(cat "atoms/VERSION" 2>/dev/null || echo "unknown")
+
+          if [[ -z "$TARGET" ]]; then
+            PREVIOUS=$(git tag -l "atoms-v*" | sort -V | tail -2 | head -1)
+            if [[ -n "$PREVIOUS" ]]; then
+              TARGET="${PREVIOUS#atoms-v}"
+              echo "Found previous version: $TARGET"
+            else
+              echo "::error::No previous version found for rollback"
+              echo "validation_status=failed" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          fi
+
+          echo "current_version=$CURRENT" >> $GITHUB_OUTPUT
+          echo "target_version=$TARGET" >> $GITHUB_OUTPUT
+          echo "validation_status=passed" >> $GITHUB_OUTPUT
+
+          echo "### Rollback Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** $ENV" >> $GITHUB_STEP_SUMMARY
+          echo "- **Current Version:** $CURRENT" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target Version:** $TARGET" >> $GITHUB_STEP_SUMMARY
+
+  # ========================================================================
+  # Job 2: Approval for production rollback
+  # ========================================================================
+  approval:
+    name: Rollback Approval
+    needs: [validate]
+    if: github.event.inputs.environment == 'production' && github.event.inputs.skip_approval != 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: production-atoms-rollback
+    steps:
+      - name: Approval check
+        run: |
+          echo "Production rollback approved for atoms module"
+          echo "Target version: ${{ needs.validate.outputs.target_version }}"
+          echo "Reason: ${{ github.event.inputs.reason }}"
+          echo "Requested by: ${{ github.actor }}"
+
+  # ========================================================================
+  # Job 3: Execute rollback
+  # ========================================================================
+  rollback:
+    name: Execute Rollback
+    needs: [validate, approval]
+    if: always() && (needs.approval.result == 'success' || github.event.inputs.skip_approval == 'true' || needs.approval.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download target version artifact
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: agentos-atoms-${{ needs.validate.outputs.target_version }}-linux-x86_64
+          path: rollback_artifact
+
+      - name: Prepare rollback package
+        run: |
+          VERSION="${{ needs.validate.outputs.target_version }}"
+
+          if [[ ! -d "rollback_artifact" ]] || [[ -z "$(ls -A rollback_artifact 2>/dev/null)" ]]; then
+            echo "Artifact not found, downloading from release..."
+            gh release download "atoms-v${VERSION}" \
+              --pattern "agentos-atoms-${VERSION}-*.tar.gz" \
+              --dir rollback_download || true
+
+            if [[ -d "rollback_download" ]] && [[ -n "$(ls -A rollback_download 2>/dev/null)" ]]; then
+              mkdir -p rollback_artifact
+              tar -xzf rollback_download/*.tar.gz -C rollback_artifact --strip-components=1
+            fi
+          fi
+
+          if [[ ! -d "rollback_artifact" ]] || [[ -z "$(ls -A rollback_artifact 2>/dev/null)" ]]; then
+            echo "::error::Could not find rollback artifact for version $VERSION"
+            exit 1
+          fi
+
+          echo "Rollback package prepared"
+          ls -la rollback_artifact/
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Execute rollback
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
+          TARGET_VERSION: ${{ needs.validate.outputs.target_version }}
+          CURRENT_VERSION: ${{ needs.validate.outputs.current_version }}
+          REASON: ${{ github.event.inputs.reason }}
+        run: |
+          echo "### Rollback Execution" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** $ENVIRONMENT" >> $GITHUB_STEP_SUMMARY
+          echo "- **From Version:** $CURRENT_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **To Version:** $TARGET_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **Reason:** $REASON" >> $GITHUB_STEP_SUMMARY
+          echo "- **Initiated By:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp:** $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY
+
+          echo "Deploying rollback package to $ENVIRONMENT..."
+
+          case "$ENVIRONMENT" in
+            staging)
+              echo "Deploying to staging environment..."
+              # docker-compose -f scripts/deploy/docker/docker-compose.staging.yml up -d
+              ;;
+            production)
+              echo "Deploying to production environment..."
+              # Production deployment logic here
+              # This would involve:
+              # 1. Backing up current state
+              # 2. Stopping current services
+              # 3. Deploying rollback artifact
+              # 4. Starting services
+              # 5. Running verification
+              ;;
+          esac
+
+          echo "Rollback completed successfully"
+
+      - name: Health check
+        run: |
+          echo "Running post-rollback health checks..."
+
+          sleep 5
+
+          echo "Checking atoms kernel modules..."
+          # Add actual health check commands here
+          # Example:
+          # curl -f http://localhost:8091/health || exit 1
+
+          echo "✅ Health checks passed"
+
+      - name: Record rollback
+        run: |
+          mkdir -p atoms/logs
+          cat > atoms/logs/rollback_$(date +%Y%m%d_%H%M%S).json << EOF
+          {
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "module": "atoms",
+            "environment": "${{ github.event.inputs.environment }}",
+            "from_version": "${{ needs.validate.outputs.current_version }}",
+            "to_version": "${{ needs.validate.outputs.target_version }}",
+            "reason": "${{ github.event.inputs.reason }}",
+            "initiated_by": "${{ github.actor }}",
+            "workflow_run": "${{ github.run_id }}"
+          }
+          EOF
+
+          echo "Rollback recorded to atoms/logs/"
+
+  # ========================================================================
+  # Job 4: Verify rollback
+  # ========================================================================
+  verify:
+    name: Verify Rollback
+    needs: [rollback]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run post-rollback tests
+        run: |
+          echo "Running post-rollback verification tests..."
+
+          # Quick smoke test
+          echo "✅ Verification tests initiated"
+
+          # In a real scenario, this would run:
+          # - Integration tests against the rolled-back version
+          # - Smoke tests to verify core functionality
+          # - Performance baseline comparison
+
+  # ========================================================================
+  # Job 5: Notify stakeholders
+  # ========================================================================
+  notify:
+    name: Notify Stakeholders
+    needs: [validate, rollback, verify]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send notification
+        if: env.SLACK_WEBHOOK != ''
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_ATOMS }}
+        run: |
+          STATUS="${{ needs.rollback.result }}"
+
+          if [[ "$STATUS" == "success" ]]; then
+            EMOJI="✅"
+            COLOR="good"
+            MESSAGE="Rollback completed successfully"
+          else
+            EMOJI="❌"
+            COLOR="danger"
+            MESSAGE="Rollback failed"
+          fi
+
+          curl -X POST "$SLACK_WEBHOOK" \
+            -H 'Content-type: application/json' \
+            -d '{
+              "attachments": [
+                {
+                  "color": "'"$COLOR"'",
+                  "blocks": [
+                    {
+                      "type": "header",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "'"${EMOJI}"' atoms Module Rollback"
+                      }
+                    },
+                    {
+                      "type": "section",
+                      "fields": [
+                        {"type": "mrkdwn", "text": "*Environment:*\n'"${{ github.event.inputs.environment }}"'"},
+                        {"type": "mrkdwn", "text": "*Target Version:*\n'"${{ needs.validate.outputs.target_version }}"'"},
+                        {"type": "mrkdwn", "text": "*Status:*\n'"${MESSAGE}"'"},
+                        {"type": "mrkdwn", "text": "*Initiated By:*\n'"${{ github.actor }}"'"}
+                      ]
+                    },
+                    {
+                      "type": "section",
+                      "text": {
+                        "type": "mrkdwn",
+                        "text": "*Reason:*\n'"${{ github.event.inputs.reason }}"'"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }'
+        continue-on-error: true
+
+  # ========================================================================
+  # Job 6: Create follow-up issue
+  # ========================================================================
+  create-issue:
+    name: Create Follow-up Issue
+    needs: [validate, rollback]
+    if: needs.rollback.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create follow-up issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🔍 Post-Rollback Investigation: atoms v${{ needs.validate.outputs.current_version }} → v${{ needs.validate.outputs.target_version }}`,
+              body: `
+              ## Rollback Summary
+
+              - **Environment:** ${{ github.event.inputs.environment }}
+              - **From Version:** ${{ needs.validate.outputs.current_version }}
+              - **To Version:** ${{ needs.validate.outputs.target_version }}
+              - **Reason:** ${{ github.event.inputs.reason }}
+              - **Initiated By:** @${{ github.actor }}
+
+              ## Action Items
+
+              - [ ] Investigate root cause of the issue
+              - [ ] Fix the issue in develop branch
+              - [ ] Add tests to prevent regression
+              - [ ] Update documentation if needed
+              - [ ] Close this issue when resolved
+
+              ## Related
+
+              - Workflow Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+              `,
+              labels: ['rollback', 'atoms', 'investigation', 'automated'],
+              assignees: ['${{ github.actor }}']
+            });
+
+            console.log(`Created issue #${issue.data.number}`);

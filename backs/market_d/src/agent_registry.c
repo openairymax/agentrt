@@ -157,8 +157,27 @@ static char* safe_strdup(const char* str) {
  * @brief 解析版本号
  */
 static int parse_version(const char* version, int* major, int* minor, int* patch) {
-    if (!version) return -1;
-    return sscanf(version, "%d.%d.%d", major, minor, patch) >= 1 ? 0 : -1;
+    if (!version || !major || !minor || !patch) return -1;
+    
+    char* endptr = NULL;
+    const char* p = version;
+    
+    *major = (int)strtol(p, &endptr, 10);
+    if (endptr == p || *endptr != '.') return -1;
+    
+    p = endptr + 1;
+    *minor = (int)strtol(p, &endptr, 10);
+    if (endptr == p) return -1;
+    
+    if (*endptr == '.') {
+        p = endptr + 1;
+        *patch = (int)strtol(p, &endptr, 10);
+        if (endptr == p) return -1;
+    } else {
+        *patch = 0;
+    }
+    
+    return 0;
 }
 
 /**

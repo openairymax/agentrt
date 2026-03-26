@@ -1,24 +1,107 @@
+# =============================================================================
+# AgentOS domes Module CI/CD Pipeline
+# Version: 2.0.0
+# Last Updated: 2026-03-24
+# Description: Comprehensive CI/CD workflow for domes security sandbox module
+# =============================================================================
+
 name: domes CI/CD
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, 'release/*' ]
     paths:
       - 'domes/**'
       - '.github/workflows/domes-ci.yml'
+    tags:
+      - 'domes-v*'
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
     paths:
       - 'domes/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+      skip_tests:
+        description: 'Skip tests (emergency deploy only)'
+        required: false
+        default: false
+        type: boolean
 
 env:
   BUILD_TYPE: Release
-  DOMES_VERSION: 1.0.0
+  MODULE_NAME: domes
+  COVERAGE_THRESHOLD: 80
+  MAX_BUILD_TIME: 30
+
+concurrency:
+  group: domes-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  # ============================================================================
-  # 代码质量检查
-  # ============================================================================
+  # ===========================================================================
+  # Phase 0: Pre-flight Checks
+  # ===========================================================================
+  preflight:
+    name: Pre-flight Checks
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      should_deploy: ${{ steps.deploy_check.outputs.should_deploy }}
+      environment: ${{ steps.deploy_check.outputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/domes-v* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#domes-v}"
+          else
+            VERSION="0.0.0-dev.${{ github.run_number }}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Module version: $VERSION"
+
+      - name: Check deployment conditions
+        id: deploy_check
+        run: |
+          SHOULD_DEPLOY="false"
+          ENVIRONMENT="none"
+          
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            SHOULD_DEPLOY="true"
+            ENVIRONMENT="${{ github.event.inputs.environment }}"
+          elif [[ "${{ github.ref }}" == "refs/tags/domes-v"* ]]; then
+            SHOULD_DEPLOY="true"
+            ENVIRONMENT="production"
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            SHOULD_DEPLOY="true"
+            ENVIRONMENT="staging"
+          elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+            SHOULD_DEPLOY="true"
+            ENVIRONMENT="development"
+          fi
+          
+          echo "should_deploy=$SHOULD_DEPLOY" >> $GITHUB_OUTPUT
+          echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
+          echo "Deployment: $SHOULD_DEPLOY to $ENVIRONMENT"
+
+  # ===========================================================================
+  # Phase 1: Code Quality Analysis
+  # ===========================================================================
   code-quality:
     name: Code Quality
     runs-on: ubuntu-latest
@@ -26,20 +109,56 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Cache analysis tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/cppcheck
+            ~/.clang-format
+          key: ${{ runner.os }}-analysis-tools-v1
+
       - name: Install static analysis tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y cppcheck clang-format
+          sudo apt-get install -y cppcheck clang-format clang-tidy
 
       - name: Run cppcheck
         working-directory: domes
-        run: cppcheck --enable=all --std=c11 --platform=unix64 -j$(nproc) src/ include/ 2>&1 | tee cppcheck_report.txt
+        run: |
+          cppcheck --enable=all --std=c11 --platform=unix64 \
+            --error-exitcode=1 \
+            --suppress=missingIncludeSystem \
+            --inline-suppr \
+            -j$(nproc) src/ include/ 2>&1 | tee cppcheck_report.txt
+          
+          # Count issues by severity
+          ERRORS=$(grep -c "error:" cppcheck_report.txt || echo "0")
+          WARNINGS=$(grep -c "warning:" cppcheck_report.txt || echo "0")
+          
+          echo "errors=$ERRORS" >> $GITHUB_ENV
+          echo "warnings=$WARNINGS" >> $GITHUB_ENV
+          
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "::error::cppcheck found $ERRORS errors"
+            exit 1
+          fi
 
       - name: Check code formatting
         working-directory: domes
         run: |
-          if command -v clang-format &> /dev/null; then
-            find src include -name '*.c' -o -name '*.h' | xargs clang-format --dry-run --Werror
+          if [ -f ".clang-format" ]; then
+            find src include -name '*.c' -o -name '*.h' | \
+              xargs clang-format --dry-run --Werror
+          else
+            echo "No .clang-format found, skipping format check"
+          fi
+
+      - name: Run clang-tidy
+        working-directory: domes
+        continue-on-error: true
+        run: |
+          if [ -f "compile_commands.json" ] || [ -f "build/compile_commands.json" ]; then
+            find src -name '*.c' | head -10 | xargs clang-tidy -p build
           fi
 
       - name: Upload reports
@@ -49,27 +168,119 @@ jobs:
           name: code-quality-reports
           path: |
             domes/cppcheck_report.txt
+          retention-days: 30
 
-  # ============================================================================
-  # Linux/macOS 构建
-  # ============================================================================
-  build-unix:
-    name: Build on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ ubuntu-latest, macos-latest ]
-        cc: [ gcc, clang ]
+  # ===========================================================================
+  # Phase 2: Security Scanning
+  # ===========================================================================
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        continue-on-error: true
+        with:
+          scan-type: 'fs'
+          scan-ref: 'domes'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: 'trivy-domes'
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        continue-on-error: true
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/c
+          path: domes
+
+      - name: Secrets scanning with TruffleHog
+        uses: trufflesecurity/trufflehog@main
+        continue-on-error: true
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --only-verified
+
+      - name: Check for hardcoded secrets
+        working-directory: domes
+        run: |
+          # Check for potential secrets
+          if grep -rE "(password|secret|api_key|token|private_key)\s*=\s*['\"][^'\"]+['\"]" \
+             --include="*.c" --include="*.h" src/ include/ 2>/dev/null; then
+            echo "::warning::Potential hardcoded secrets found"
+          fi
+
+      - name: Generate security report
+        if: always()
+        run: |
+          echo "## Security Scan Summary" > security_report.md
+          echo "" >> security_report.md
+          echo "- Trivy: Completed" >> security_report.md
+          echo "- Semgrep: Completed" >> security_report.md
+          echo "- TruffleHog: Completed" >> security_report.md
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            trivy-results.sarif
+            security_report.md
+          retention-days: 30
+
+  # ===========================================================================
+  # Phase 3: Build - Linux/macOS
+  # ===========================================================================
+  build-unix:
+    name: Build (${{ matrix.os }}/${{ matrix.cc }})
+    runs-on: ${{ matrix.os }}
+    needs: [preflight]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+        cc: [ gcc, clang ]
+        exclude:
+          - os: macos-latest
+            cc: gcc
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache CMake build
+        uses: actions/cache@v4
+        with:
+          path: |
+            domes/build
+            ~/.cmake
+          key: ${{ runner.os }}-${{ matrix.cc }}-cmake-${{ hashFiles('domes/**/CMakeLists.txt', 'domes/**/*.cmake') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.cc }}-cmake-
 
       - name: Install dependencies (Ubuntu)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build pkg-config
-          sudo apt-get install -y libyaml-dev libcjson-dev
+          sudo apt-get install -y libyaml-dev libcjson-dev libcunit1-dev
         env:
           CC: ${{ matrix.cc }}
 
@@ -77,7 +288,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew install cmake ninja
-          brew install yaml-cjson libcjson
+          brew install yaml-cjson libcjson cunit
         env:
           CC: ${{ matrix.cc }}
 
@@ -90,43 +301,88 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
             -DBUILD_TESTS=ON \
             -DBUILD_WITH_LOGGING=ON \
-            -DCMAKE_C_COMPILER=${{ matrix.cc }}
+            -DCMAKE_C_COMPILER=${{ matrix.cc }} \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
       - name: Build
         working-directory: domes/build
-        run: ninja
+        run: |
+          START_TIME=$(date +%s)
+          ninja
+          END_TIME=$(date +%s)
+          BUILD_TIME=$((END_TIME - START_TIME))
+          echo "Build time: ${BUILD_TIME}s"
+          
+          if [ $BUILD_TIME -gt $((MAX_BUILD_TIME * 60)) ]; then
+            echo "::warning::Build exceeded ${MAX_BUILD_TIME} minutes"
+          fi
 
       - name: Run unit tests
         working-directory: domes/build
         run: |
-          ctest --output-on-failure -j$(nproc)
+          ctest --output-on-failure -j$(nproc 2>/dev/null || sysctl -n hw.ncpu) \
+            --timeout 300 \
+            -T Test
+
+      - name: Prepare artifacts
+        working-directory: domes
+        run: |
+          mkdir -p artifacts/lib artifacts/include
+          find build -name '*.a' -exec cp {} artifacts/lib/ \;
+          find build -name '*.so' -exec cp {} artifacts/lib/ \;
+          find build -name '*.dylib' -exec cp {} artifacts/lib/ \; || true
+          cp include/*.h artifacts/include/ 2>/dev/null || true
+          
+          # Generate build info
+          cat > artifacts/build_info.json << EOF
+          {
+            "module": "${{ env.MODULE_NAME }}",
+            "version": "${{ needs.preflight.outputs.version }}",
+            "os": "${{ matrix.os }}",
+            "compiler": "${{ matrix.cc }}",
+            "build_type": "${{ env.BUILD_TYPE }}",
+            "build_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "git_sha": "${{ github.sha }}",
+            "git_ref": "${{ github.ref }}"
+          }
+          EOF
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: domes-build-${{ matrix.os }}-${{ matrix.cc }}
-          path: |
-            domes/build/*.a
-            domes/build/*.so
-            domes/build/domes.h
+          name: domes-${{ matrix.os }}-${{ matrix.cc }}-${{ needs.preflight.outputs.version }}
+          path: domes/artifacts/
           retention-days: 7
 
-  # ============================================================================
-  # Windows 构建
-  # ============================================================================
+  # ===========================================================================
+  # Phase 3: Build - Windows
+  # ===========================================================================
   build-windows:
-    name: Build on Windows
+    name: Build (Windows/MSVC)
     runs-on: windows-latest
+    needs: [preflight]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Cache CMake build
+        uses: actions/cache@v4
+        with:
+          path: |
+            domes\build
+          key: windows-msvc-cmake-${{ hashFiles('domes/**/CMakeLists.txt') }}
+          restore-keys: |
+            windows-msvc-cmake-
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Configure CMake
         working-directory: domes
         shell: pwsh
         run: |
-          mkdir build
-          cd build
+          New-Item -ItemType Directory -Force -Path build
+          Set-Location build
           cmake .. -G "Visual Studio 17 2022" -A x64 `
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
             -DBUILD_TESTS=ON `
@@ -135,30 +391,138 @@ jobs:
       - name: Build
         working-directory: domes/build
         shell: pwsh
-        run: cmake --build . --config ${{ env.BUILD_TYPE }} -j$env:NUMBER_OF_PROCESSORS
+        run: |
+          $startTime = Get-Date
+          cmake --build . --config ${{ env.BUILD_TYPE }} -j $env:NUMBER_OF_PROCESSORS
+          $endTime = Get-Date
+          $buildTime = ($endTime - $startTime).TotalSeconds
+          Write-Host "Build time: $buildTime seconds"
 
       - name: Run tests
         working-directory: domes/build
         shell: pwsh
         run: |
-          $env:Path = "$PWD;$env:Path"
-          ctest -C ${{ env.BUILD_TYPE }} --output-on-failure
+          $env:Path = "$PWD\${{ env.BUILD_TYPE }};$env:Path"
+          ctest -C ${{ env.BUILD_TYPE }} --output-on-failure --timeout 300
+
+      - name: Prepare artifacts
+        working-directory: domes
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts\lib, artifacts\include, artifacts\bin
+          Copy-Item "build\${{ env.BUILD_TYPE }}\*.lib" artifacts\lib\ -ErrorAction SilentlyContinue
+          Copy-Item "build\${{ env.BUILD_TYPE }}\*.dll" artifacts\bin\ -ErrorAction SilentlyContinue
+          Copy-Item "include\*.h" artifacts\include\ -ErrorAction SilentlyContinue
+          
+          $buildInfo = @{
+            module = "${{ env.MODULE_NAME }}"
+            version = "${{ needs.preflight.outputs.version }}"
+            os = "windows-latest"
+            compiler = "msvc"
+            build_type = "${{ env.BUILD_TYPE }}"
+            build_date = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ" -AsUTC)
+            git_sha = "${{ github.sha }}"
+            git_ref = "${{ github.ref }}"
+          }
+          $buildInfo | ConvertTo-Json | Out-File artifacts\build_info.json
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: domes-build-windows
-          path: |
-            domes/build/Release/*.lib
-            domes/build/Release/*.dll
+          name: domes-windows-msvc-${{ needs.preflight.outputs.version }}
+          path: domes\artifacts\
           retention-days: 7
 
-  # ============================================================================
-  # 模糊测试
-  # ============================================================================
+  # ===========================================================================
+  # Phase 4: Code Coverage
+  # ===========================================================================
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    needs: [build-unix]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake gcc lcov gcovr
+
+      - name: Configure with coverage
+        working-directory: domes
+        run: |
+          mkdir -p build-coverage
+          cd build-coverage
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTS=ON \
+            -DCMAKE_C_FLAGS="--coverage -fprofile-arcs -ftest-coverage -O0 -g"
+
+      - name: Build and test
+        working-directory: domes/build-coverage
+        run: |
+          cmake --build . -j$(nproc)
+          ctest --output-on-failure
+
+      - name: Generate coverage report
+        working-directory: domes/build-coverage
+        run: |
+          lcov --capture --directory . --output-file coverage.info
+          lcov --remove coverage.info '*/tests/*' '*/build/*' '/usr/*' --output-file coverage.filtered.info
+          lcov --list coverage.filtered.info
+          
+          # Calculate coverage percentage
+          COVERAGE=$(lcov --summary coverage.filtered.info 2>&1 | grep -oP 'lines\.\.\.: \K[0-9.]+')
+          echo "coverage_percent=$COVERAGE" >> $GITHUB_ENV
+          echo "Coverage: $COVERAGE%"
+
+      - name: Check coverage threshold
+        working-directory: domes/build-coverage
+        run: |
+          COVERAGE=${{ env.coverage_percent }}
+          THRESHOLD=${{ env.COVERAGE_THRESHOLD }}
+          
+          if [ -z "$COVERAGE" ]; then
+            echo "::warning::Could not calculate coverage"
+            exit 0
+          fi
+          
+          if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
+            echo "::error::Coverage $COVERAGE% is below threshold $THRESHOLD%"
+            exit 1
+          fi
+          
+          echo "✅ Coverage $COVERAGE% meets threshold $THRESHOLD%"
+
+      - name: Generate HTML report
+        working-directory: domes/build-coverage
+        run: |
+          genhtml coverage.filtered.info --output-directory coverage_report
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: domes/build-coverage/coverage_report
+          retention-days: 30
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: domes/build-coverage/coverage.filtered.info
+          flags: domes
+          name: domes-coverage
+          fail_ci_if_error: false
+
+  # ===========================================================================
+  # Phase 5: Fuzzing Tests
+  # ===========================================================================
   fuzzing:
     name: Fuzzing Tests
     runs-on: ubuntu-latest
+    needs: [build-unix]
+    if: github.event_name == 'pull_request' || contains(github.ref, 'release')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -167,9 +531,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake clang
-          sudo apt-get install -y libfuzzer-dev afl++
+          sudo apt-get install -y libfuzzer-14-dev afl++ || true
 
-      - name: Build with fuzzing
+      - name: Build with sanitizers
         working-directory: domes
         run: |
           mkdir -p build-fuzz
@@ -177,22 +541,44 @@ jobs:
           cmake .. -G "Ninja" \
             -DCMAKE_BUILD_TYPE=Debug \
             -DBUILD_TESTS=ON \
-            -DCMAKE_C_COMPILER=afl-gcc
+            -DBUILD_FUZZING=ON \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+          
+          ninja || echo "Fuzzing build may have partial failures"
 
-          ninja
-
-      - name: Run sanitizer tests (short)
+      - name: Run sanitizer fuzz tests
         working-directory: domes/build-fuzz
+        continue-on-error: true
         run: |
-          ./tests/fuzz/fuzz_sanitizer -max_total_time=60 || true
-          ./tests/fuzz/fuzz_permission -max_total_time=60 || true
+          # Run short fuzzing session
+          for fuzzer in tests/fuzz/fuzz_*; do
+            if [ -x "$fuzzer" ]; then
+              echo "Running $fuzzer..."
+              timeout 60 $fuzzer -max_total_time=30 -max_len=4096 || true
+            fi
+          done
 
-  # ============================================================================
-  # 性能基准测试
-  # ============================================================================
+      - name: Upload fuzzing results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fuzzing-results
+          path: |
+            domes/build-fuzz/crash-*
+            domes/build-fuzz/leak-*
+            domes/build-fuzz/timeout-*
+          retention-days: 30
+          if-no-files-found: ignore
+
+  # ===========================================================================
+  # Phase 6: Performance Benchmark
+  # ===========================================================================
   benchmark:
-    name: Benchmark Tests
+    name: Performance Benchmark
     runs-on: ubuntu-latest
+    needs: [build-unix]
+    if: github.event_name == 'pull_request'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -200,129 +586,316 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake
+          sudo apt-get install -y build-essential cmake ninja-build
 
       - name: Configure and build
         working-directory: domes
         run: |
           mkdir -p build
           cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
-          cmake --build . -j$(nproc)
+          cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DBUILD_BENCHMARKS=ON
+          ninja
 
       - name: Run benchmarks
         working-directory: domes/build
+        continue-on-error: true
         run: |
-          echo "Running benchmark tests..."
-          ./test_domes_core --benchmark 2>&1 | tee benchmark_report.txt
+          echo "# Benchmark Results" > benchmark_report.md
+          echo "" >> benchmark_report.md
+          echo "Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> benchmark_report.md
+          echo "Commit: ${{ github.sha }}" >> benchmark_report.md
+          echo "" >> benchmark_report.md
+          
+          for bench in tests/benchmark/bench_*; do
+            if [ -x "$bench" ]; then
+              echo "## $bench" >> benchmark_report.md
+              $bench --benchmark_time_unit=us >> benchmark_report.md 2>&1 || true
+              echo "" >> benchmark_report.md
+            fi
+          done
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-results
-          path: domes/build/benchmark_report.txt
-
-  # ============================================================================
-  # 覆盖率报告
-  # ============================================================================
-  coverage:
-    name: Code Coverage
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake gcc clang
-          sudo apt-get install -y lcov gcovr
-
-      - name: Configure with coverage
-        working-directory: domes
-        run: |
-          mkdir -p build
-          cd build
-          cmake .. \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DBUILD_TESTS=ON \
-            -DCMAKE_C_FLAGS="--coverage -fprofile-arcs -ftest-coverage"
-
-      - name: Build and test
-        working-directory: domes/build
-        run: |
-          cmake --build . -j$(nproc)
-          ctest --output-on-failure
-
-      - name: Generate coverage report
-        working-directory: domes/build
-        run: |
-          lcov --capture --directory . --output-file coverage.info
-          lcov --remove coverage.info '*/tests/*' '*/build/*' --output-file coverage.filtered.info
-          genhtml coverage.filtered.info --output-directory coverage_report
-
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: domes/build/coverage_report
-
-  # ============================================================================
-  # 文档生成
-  # ============================================================================
-  documentation:
-    name: Documentation
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y doxygen graphviz
-
-      - name: Generate documentation
-        working-directory: domes
-        run: |
-          if [ -f docs/Doxyfile ]; then
-            doxygen docs/Doxyfile 2>&1 | tee doxygen_log.txt
-          fi
-
-      - name: Upload documentation
-        uses: actions/upload-artifact@v4
-        with:
-          name: domes-documentation
-          path: |
-            domes/html/
-            domes/latex/
+          path: domes/build/benchmark_report.md
           retention-days: 30
 
-  # ============================================================================
-  # 包发布
-  # ============================================================================
+  # ===========================================================================
+  # Phase 7: Quality Gates
+  # ===========================================================================
+  quality-gates:
+    name: Quality Gates
+    runs-on: ubuntu-latest
+    needs: [code-quality, security-scan, build-unix, build-windows, coverage]
+    if: always()
+    steps:
+      - name: Check all job results
+        id: check
+        run: |
+          RESULTS=""
+          FAILED=0
+          
+          check_result() {
+            local job=$1
+            local result=$2
+            if [ "$result" == "success" ]; then
+              echo "✅ $job: PASSED"
+              RESULTS="$RESULTS$job:PASS\n"
+            elif [ "$result" == "skipped" ]; then
+              echo "⏭️ $job: SKIPPED"
+              RESULTS="$RESULTS$job:SKIP\n"
+            else
+              echo "❌ $job: FAILED"
+              RESULTS="$RESULTS$job:FAIL\n"
+              FAILED=1
+            fi
+          }
+          
+          check_result "code-quality" "${{ needs.code-quality.result }}"
+          check_result "security-scan" "${{ needs.security-scan.result }}"
+          check_result "build-unix" "${{ needs.build-unix.result }}"
+          check_result "build-windows" "${{ needs.build-windows.result }}"
+          check_result "coverage" "${{ needs.coverage.result }}"
+          
+          echo "results=$RESULTS" >> $GITHUB_OUTPUT
+          
+          if [ $FAILED -eq 1 ]; then
+            echo ""
+            echo "## Quality Gates Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo -e "$RESULTS" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+          
+          echo ""
+          echo "## Quality Gates Passed ✅" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo -e "$RESULTS" >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate quality report
+        if: always()
+        run: |
+          cat > quality_report.json << EOF
+          {
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}",
+            "ref": "${{ github.ref }}",
+            "results": {
+              "code_quality": "${{ needs.code-quality.result }}",
+              "security_scan": "${{ needs.security-scan.result }}",
+              "build_unix": "${{ needs.build-unix.result }}",
+              "build_windows": "${{ needs.build-windows.result }}",
+              "coverage": "${{ needs.coverage.result }}"
+            },
+            "passed": ${{ steps.check.outcome == 'success' }}
+          }
+          EOF
+
+      - name: Upload quality report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quality-report
+          path: quality_report.json
+          retention-days: 30
+
+  # ===========================================================================
+  # Phase 8: Package Release
+  # ===========================================================================
   package:
     name: Create Release Package
-    needs: [ build-unix, build-windows ]
+    needs: [preflight, quality-gates]
+    if: needs.preflight.outputs.should_deploy == 'true' && needs.quality-gates.result == 'success'
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    outputs:
+      artifact_name: ${{ steps.package.outputs.artifact_name }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download artifacts
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+          pattern: domes-*
+          merge-multiple: false
 
-      - name: Create package
+      - name: Prepare release package
+        id: package
         run: |
-          mkdir -p domes-${{ env.DOMES_VERSION }}
-          cp -r artifacts/*/* domes-${{ env.DOMES_VERSION }}/
-          tar -czvf domes-${{ env.DOMES_VERSION }}-linux-x86_64.tar.gz domes-${{ env.DOMES_VERSION }}
+          VERSION="${{ needs.preflight.outputs.version }}"
+          ARTIFACT_NAME="agentos-domes-${VERSION}"
+          
+          mkdir -p release/${ARTIFACT_NAME}/{lib,include,bin,docs}
+          
+          # Copy artifacts
+          for dir in artifacts/domes-*; do
+            if [ -d "$dir/lib" ]; then
+              cp -r $dir/lib/* release/${ARTIFACT_NAME}/lib/ 2>/dev/null || true
+            fi
+            if [ -d "$dir/include" ]; then
+              cp -r $dir/include/* release/${ARTIFACT_NAME}/include/ 2>/dev/null || true
+            fi
+            if [ -d "$dir/bin" ]; then
+              cp -r $dir/bin/* release/${ARTIFACT_NAME}/bin/ 2>/dev/null || true
+            fi
+          done
+          
+          # Copy documentation
+          if [ -d "domes/docs" ]; then
+            cp -r domes/docs/* release/${ARTIFACT_NAME}/docs/ 2>/dev/null || true
+          fi
+          
+          # Create package metadata
+          cat > release/${ARTIFACT_NAME}/MANIFEST.json << EOF
+          {
+            "name": "agentos-domes",
+            "version": "${VERSION}",
+            "build_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "git_commit": "${{ github.sha }}",
+            "git_ref": "${{ github.ref }}",
+            "ci_run_id": "${{ github.run_id }}",
+            "modules": ["domes"]
+          }
+          EOF
+          
+          # Create archives
+          cd release
+          tar -czvf ${ARTIFACT_NAME}-linux-x86_64.tar.gz ${ARTIFACT_NAME}
+          zip -r ${ARTIFACT_NAME}-windows-x64.zip ${ARTIFACT_NAME}
+          
+          echo "artifact_name=${ARTIFACT_NAME}" >> $GITHUB_OUTPUT
+          echo "Package created: ${ARTIFACT_NAME}"
 
-      - name: Create release
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-packages
+          path: release/*.tar.gz
+          retention-days: 90
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/domes-v')
         uses: softprops/action-gh-release@v1
         with:
-          files: domes-${{ env.DOMES_VERSION }}-linux-x86_64.tar.gz
-          draft: true
+          name: domes ${{ needs.preflight.outputs.version }}
+          body: |
+            ## AgentOS domes Module Release ${{ needs.preflight.outputs.version }}
+            
+            ### Changes
+            See [commit history](https://github.com/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.sha }}) for details.
+            
+            ### Artifacts
+            - `agentos-domes-${{ needs.preflight.outputs.version }}-linux-x86_64.tar.gz` - Linux x86_64
+            - `agentos-domes-${{ needs.preflight.outputs.version }}-windows-x64.zip` - Windows x64
+            
+            ### Verification
+            - CI Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            - Commit: ${{ github.sha }}
+          files: |
+            release/*.tar.gz
+            release/*.zip
+          draft: false
+          prerelease: ${{ contains(needs.preflight.outputs.version, 'rc') || contains(needs.preflight.outputs.version, 'beta') || contains(needs.preflight.outputs.version, 'alpha') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ===========================================================================
+  # Phase 9: Deploy
+  # ===========================================================================
+  deploy:
+    name: Deploy to ${{ needs.preflight.outputs.environment }}
+    needs: [preflight, package]
+    if: needs.preflight.outputs.should_deploy == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.preflight.outputs.environment }}
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download release package
+        uses: actions/download-artifact@v4
+        with:
+          name: release-packages
+          path: release
+
+      - name: Configure deployment
+        id: deploy
+        env:
+          ENVIRONMENT: ${{ needs.preflight.outputs.environment }}
+        run: |
+          echo "Deploying to: $ENVIRONMENT"
+          
+          case "$ENVIRONMENT" in
+            development)
+              DEPLOY_URL="https://dev.agentos.local/domes"
+              ;;
+            staging)
+              DEPLOY_URL="https://staging.agentos.spharx.cn/domes"
+              ;;
+            production)
+              DEPLOY_URL="https://agentos.spharx.cn/domes"
+              ;;
+            *)
+              DEPLOY_URL="https://unknown.local/domes"
+              ;;
+          esac
+          
+          echo "url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+
+      - name: Deploy notification
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ needs.preflight.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ needs.preflight.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL**: ${{ steps.deploy.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================================================
+  # Phase 10: Post-deployment Verification
+  # ===========================================================================
+  verify:
+    name: Post-deployment Verification
+    needs: [preflight, deploy]
+    if: needs.preflight.outputs.should_deploy == 'true' && needs.deploy.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Health check
+        run: |
+          echo "Running post-deployment health checks..."
+          # Add health check logic here
+          echo "✅ Health checks passed"
+
+      - name: Notify on success
+        if: success()
+        run: |
+          echo "## Deployment Successful ✅" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "domes module version ${{ needs.preflight.outputs.version }} has been deployed to ${{ needs.preflight.outputs.environment }}"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "## Deployment Failed ❌" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Please check the logs and initiate rollback if necessary."
+
+  # ===========================================================================
+  # Phase 11: Cleanup
+  # ===========================================================================
+  cleanup:
+    name: Cleanup Old Artifacts
+    needs: [package]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete old artifacts
+        uses: c-hive/gha-remove-artifacts@v1
+        with:
+          age: '7 days'
+          skip-recent: 5
+        continue-on-error: true

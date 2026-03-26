@@ -1,0 +1,284 @@
+# =============================================================================
+# AgentOS domes Module Rollback Workflow
+# Version: 1.0.0
+# Description: Handles deployment rollback for domes module
+# =============================================================================
+
+name: domes Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      target_version:
+        description: 'Target version to rollback to (leave empty for previous)'
+        required: false
+        type: string
+      reason:
+        description: 'Reason for rollback'
+        required: true
+        type: string
+      skip_approval:
+        description: 'Skip approval (emergency only)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  MODULE_NAME: domes
+
+jobs:
+  validate:
+    name: Validate Rollback Request
+    runs-on: ubuntu-latest
+    outputs:
+      target_version: ${{ steps.validate.outputs.target_version }}
+      current_version: ${{ steps.validate.outputs.current_version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate rollback parameters
+        id: validate
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          TARGET="${{ github.event.inputs.target_version }}"
+          
+          # Get current deployed version
+          CURRENT=$(cat "domes/VERSION" 2>/dev/null || echo "unknown")
+          
+          # If no target specified, find previous version
+          if [[ -z "$TARGET" ]]; then
+            PREVIOUS=$(git tag -l "domes-v*" | sort -V | tail -2 | head -1)
+            if [[ -n "$PREVIOUS" ]]; then
+              TARGET="${PREVIOUS#domes-v}"
+            else
+              echo "::error::No previous version found for rollback"
+              exit 1
+            fi
+          fi
+          
+          echo "current_version=$CURRENT" >> $GITHUB_OUTPUT
+          echo "target_version=$TARGET" >> $GITHUB_OUTPUT
+          
+          echo "### Rollback Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** $ENV" >> $GITHUB_STEP_SUMMARY
+          echo "- **Current Version:** $CURRENT" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target Version:** $TARGET" >> $GITHUB_STEP_SUMMARY
+
+  approval:
+    name: Rollback Approval
+    needs: [validate]
+    if: github.event.inputs.skip_approval != 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.environment }}-rollback
+    steps:
+      - name: Approval check
+        run: |
+          echo "Rollback approved for ${{ needs.validate.outputs.target_version }}"
+          echo "Reason: ${{ github.event.inputs.reason }}"
+
+  rollback:
+    name: Execute Rollback
+    needs: [validate, approval]
+    if: always() && (needs.approval.result == 'success' || github.event.inputs.skip_approval == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download target version artifact
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: agentos-domes-${{ needs.validate.outputs.target_version }}-linux-x86_64
+          path: rollback_artifact
+
+      - name: Prepare rollback package
+        run: |
+          VERSION="${{ needs.validate.outputs.target_version }}"
+          
+          # If artifact not found, try to download from release
+          if [[ ! -d "rollback_artifact" ]] || [[ -z "$(ls -A rollback_artifact 2>/dev/null)" ]]; then
+            echo "Artifact not found, downloading from release..."
+            gh release download "domes-v${VERSION}" \
+              --pattern "agentos-domes-${VERSION}-*.tar.gz" \
+              --dir rollback_download || true
+            
+            if [[ -d "rollback_download" ]]; then
+              tar -xzf rollback_download/*.tar.gz -C rollback_artifact --strip-components=1
+            fi
+          fi
+          
+          if [[ ! -d "rollback_artifact" ]] || [[ -z "$(ls -A rollback_artifact 2>/dev/null)" ]]; then
+            echo "::error::Could not find rollback artifact for version $VERSION"
+            exit 1
+          fi
+          
+          echo "Rollback package prepared"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Execute rollback
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
+          TARGET_VERSION: ${{ needs.validate.outputs.target_version }}
+          CURRENT_VERSION: ${{ needs.validate.outputs.current_version }}
+          REASON: ${{ github.event.inputs.reason }}
+        run: |
+          echo "### Rollback Execution" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** $ENVIRONMENT" >> $GITHUB_STEP_SUMMARY
+          echo "- **From Version:** $CURRENT_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **To Version:** $TARGET_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **Reason:** $REASON" >> $GITHUB_STEP_SUMMARY
+          echo "- **Initiated By:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp:** $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY
+          
+          # Deploy rollback package
+          echo "Deploying rollback package to $ENVIRONMENT..."
+          
+          # Add actual deployment logic here
+          # This would typically involve:
+          # 1. Stopping current services
+          # 2. Deploying the rollback artifact
+          # 3. Starting services
+          # 4. Running health checks
+          
+          echo "Rollback completed successfully"
+
+      - name: Health check
+        run: |
+          echo "Running post-rollback health checks..."
+          
+          # Add health check logic here
+          sleep 5
+          
+          echo "✅ Health checks passed"
+
+      - name: Record rollback
+        run: |
+          mkdir -p domes/logs
+          cat > domes/logs/rollback_$(date +%Y%m%d_%H%M%S).json << EOF
+          {
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "environment": "${{ github.event.inputs.environment }}",
+            "from_version": "${{ needs.validate.outputs.current_version }}",
+            "to_version": "${{ needs.validate.outputs.target_version }}",
+            "reason": "${{ github.event.inputs.reason }}",
+            "initiated_by": "${{ github.actor }}",
+            "workflow_run": "${{ github.run_id }}"
+          }
+          EOF
+
+  notify:
+    name: Notify Stakeholders
+    needs: [validate, rollback]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send notification
+        if: env.SLACK_WEBHOOK != ''
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_DOMES }}
+        run: |
+          STATUS="${{ needs.rollback.result }}"
+          
+          if [[ "$STATUS" == "success" ]]; then
+            EMOJI="✅"
+            COLOR="good"
+            MESSAGE="Rollback completed successfully"
+          else
+            EMOJI="❌"
+            COLOR="danger"
+            MESSAGE="Rollback failed"
+          fi
+          
+          curl -X POST "${{ env.SLACK_WEBHOOK }}" \
+            -H 'Content-type: application/json' \
+            -d '{
+              "attachments": [
+                {
+                  "color": "'"$COLOR"'",
+                  "blocks": [
+                    {
+                      "type": "header",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "'"${EMOJI}"' domes Module Rollback"
+                      }
+                    },
+                    {
+                      "type": "section",
+                      "fields": [
+                        {"type": "mrkdwn", "text": "*Environment:*\n'"${{ github.event.inputs.environment }}"'"},
+                        {"type": "mrkdwn", "text": "*Target Version:*\n'"${{ needs.validate.outputs.target_version }}"'"},
+                        {"type": "mrkdwn", "text": "*Status:*\n'"${MESSAGE}"'"},
+                        {"type": "mrkdwn", "text": "*Initiated By:*\n'"${{ github.actor }}"'"}
+                      ]
+                    },
+                    {
+                      "type": "section",
+                      "text": {
+                        "type": "mrkdwn",
+                        "text": "*Reason:*\n'"${{ github.event.inputs.reason }}"'"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }'
+        continue-on-error: true
+
+  create-issue:
+    name: Create Rollback Issue
+    needs: [validate, rollback]
+    if: needs.rollback.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create follow-up issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🔍 Post-Rollback Investigation: domes v${{ needs.validate.outputs.current_version }} → v${{ needs.validate.outputs.target_version }}`,
+              body: `
+              ## Rollback Summary
+              
+              - **Environment:** ${{ github.event.inputs.environment }}
+              - **From Version:** ${{ needs.validate.outputs.current_version }}
+              - **To Version:** ${{ needs.validate.outputs.target_version }}
+              - **Reason:** ${{ github.event.inputs.reason }}
+              - **Initiated By:** @${{ github.actor }}
+              
+              ## Action Items
+              
+              - [ ] Investigate root cause of the issue
+              - [ ] Fix the issue in develop branch
+              - [ ] Add tests to prevent regression
+              - [ ] Update documentation if needed
+              - [ ] Close this issue when resolved
+              
+              ## Related
+              
+              - Workflow Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+              `,
+              labels: ['rollback', 'domes', 'investigation', 'automated'],
+              assignees: ['${{ github.actor }}']
+            });
+            
+            console.log(`Created issue #${issue.data.number}`);

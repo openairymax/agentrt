@@ -6,6 +6,7 @@ project(agentos-cognition)
 
 file(GLOB COGNITION_SOURCES
     "engine.c"
+    "intent_parser.c"
     "planner/*.c"
     "coordinator/*.c"
     "dispatcher/*.c"

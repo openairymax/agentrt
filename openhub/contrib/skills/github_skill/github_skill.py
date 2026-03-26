@@ -849,8 +849,12 @@ class GitHubSkill:
             if self.github:
                 repository = self.github.get_repo(f"{owner}/{repo}")
                 workflow = repository.get_workflow(workflow_id)
-                run = workflow.dispatch(ref=ref, inputs=inputs or {})
-                return GitHubResult(success=True, data={"id": run.id, "status": run.status})
+                # workflow.dispatch() 返回 None（成功时）
+                success = workflow.dispatch(ref=ref, inputs=inputs or {})
+                if success:
+                    return GitHubResult(success=True, data={"message": "Workflow dispatched successfully"})
+                else:
+                    return GitHubResult(success=False, error="Failed to dispatch workflow")
             else:
                 data = {"ref": ref}
                 if inputs:

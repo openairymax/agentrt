@@ -60,6 +60,7 @@ CODE_SKILL_NOT_FOUND = "0x4006"
 CODE_SKILL_EXECUTION_FAILED = "0x4007"
 
 CODE_TELEMETRY_ERROR = "0x5001"
+CODE_SYSCALL_ERROR = "0x5002"
 
 CODE_PERMISSION_DENIED = "0x6001"
 CODE_CORRUPTED_DATA = "0x6002"
@@ -216,7 +217,7 @@ class SyscallError(AgentOSError):
     """Exception raised for system call errors."""
     
     def __init__(self, message: str = "", **kwargs):
-        super().__init__(message=message, error_code=CODE_TELEMETRY_ERROR, **kwargs)
+        super().__init__(message=message, error_code=CODE_SYSCALL_ERROR, **kwargs)
 
 
 class RateLimitError(AgentOSError):

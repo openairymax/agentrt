@@ -3,11 +3,13 @@
 // Last updated: 2026-03-23
 
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { ClientConfig, Memory, TaskResult, SkillInfo, SkillResult } from './types';
+import { ClientConfig } from './config';
+import { Memory, TaskResult, SkillInfo, SkillResult } from './types';
 import { NetworkError, HttpError, TimeoutError, AgentOSError } from './errors';
 import { Task } from './task';
 import { Session } from './session';
 import { Skill } from './skill';
+import { getLogger } from './utils/logger';
 
 /** AgentOS 客户端类 */
 export class AgentOS {
@@ -79,7 +81,7 @@ export class AgentOS {
   /** 向 AgentOS 服务端发送 HTTP 请求（带重试） */
   async request<T>(method: string, path: string, data?: any): Promise<T> {
     let lastError: any;
-    
+
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       try {
         const config: AxiosRequestConfig = { method, url: path, data };
@@ -87,21 +89,21 @@ export class AgentOS {
         return response.data;
       } catch (error) {
         lastError = error;
-        
+
         if (attempt === this.maxRetries) {
           break;
         }
-        
+
         if (!this.isRetryableError(error)) {
           throw error;
         }
-        
+
         const delay = this.retryDelay * Math.pow(2, attempt);
-        console.warn(`请求失败，${delay}ms 后重试 (尝试 ${attempt + 1}/${this.maxRetries}): ${error}`);
+        getLogger().warn(`请求失败，${delay}ms 后重试 (尝试 ${attempt + 1}/${this.maxRetries}): ${error}`);
         await this.sleep(delay);
       }
     }
-    
+
     throw lastError;
   }
 
@@ -141,10 +143,13 @@ export class AgentOS {
     if (!response.memories) {
       throw new AgentOSError('响应格式异常: 缺少 memories');
     }
-    return response.memories.map((mem) => ({
-      memoryId: mem.memory_id,
+    return response.memories.map((mem: any) => ({
+      id: mem.memory_id || mem.id,
       content: mem.content,
-      createdAt: mem.created_at,
+      layer: mem.layer,
+      score: mem.score || 0,
+      createdAt: new Date(mem.created_at || mem.createdAt),
+      updatedAt: new Date(mem.updated_at || mem.updatedAt || Date.now()),
       metadata: mem.metadata,
     }));
   }
@@ -153,9 +158,12 @@ export class AgentOS {
   async getMemory(memoryId: string): Promise<Memory> {
     const response = await this.request<any>('GET', `/api/v1/memories/${memoryId}`);
     return {
-      memoryId: response.memory_id,
+      id: response.memory_id || response.id,
       content: response.content,
-      createdAt: response.created_at,
+      layer: response.layer,
+      score: response.score || 0,
+      createdAt: new Date(response.created_at || response.createdAt),
+      updatedAt: new Date(response.updated_at || response.updatedAt || Date.now()),
       metadata: response.metadata,
     };
   }

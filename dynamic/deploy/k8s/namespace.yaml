@@ -1,0 +1,15 @@
+# Copyright (c) 2026 SPHARX. All Rights Reserved.
+# Kubernetes Namespace for AgentOS Dynamic Module
+# Version: 1.0.0
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agentos-dynamic
+  labels:
+    name: agentos-dynamic
+    app.kubernetes.io/name: agentos
+    app.kubernetes.io/component: dynamic
+    app.kubernetes.io/managed-by: kubectl
+  annotations:
+    description: "AgentOS Dynamic Module Namespace"

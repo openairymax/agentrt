@@ -1,183 +1,129 @@
 /**
  * @file majority.c
- * @brief 多数投票协同策略（取多数模型的一致输出）
+ * @brief 多数投票协调器实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "cognition.h"
-#include "llm_client.h"
+#include "strategy.h"
+#include "agentos.h"
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 /**
- * @brief 多数投票私有数据
+ * @brief 多数投票协调器上下文
  */
-typedef struct majority_data {
-    char** model_names;           /**< 模型名称数组 */
-    size_t model_count;            /**< 模型数量 */
-    agentos_llm_service_t* llm;    /**< LLM服务客户端 */
-    agentos_mutex_t* lock;
-} majority_data_t;
-
-static void majority_destroy(agentos_coordinator_strategy_t* strategy) {
-    if (!strategy) return;
-    majority_data_t* data = (majority_data_t*)strategy->data;
-    if (data) {
-        for (size_t i = 0; i < data->model_count; i++) {
-            if (data->model_names[i]) free(data->model_names[i]);
-        }
-        free(data->model_names);
-        if (data->lock) agentos_mutex_destroy(data->lock);
-        free(data);
-    }
-    free(strategy);
-}
+typedef struct majority_coordinator {
+    agentos_coordinator_base_t base;
+    size_t min_voters;
+    float threshold;
+} majority_coordinator_t;
 
 /**
- * @brief 计算字符串的哈希值（用于比较内容）
+ * @brief 投票记录
  */
-static uint64_t str_hash(const char* s) {
-    uint64_t hash = 5381;
-    int c;
-    while ((c = *s++))
-        hash = ((hash << 5) + hash) + c;
-    return hash;
-}
+typedef struct vote_record {
+    char* result;
+    int count;
+} vote_record_t;
 
 /**
- * @brief 多数投票协调函数
+ * @brief 协调执行（多数投票）
  */
 static agentos_error_t majority_coordinate(
-    const char** prompts,
-    size_t count,
-    void* context,
+    agentos_coordinator_base_t* base,
+    const agentos_coordination_context_t* context,
+    const char** inputs,
+    size_t input_count,
     char** out_result) {
+    if (!base || !out_result) {
+        return AGENTOS_EINVAL;
+    }
 
-    majority_data_t* data = (majority_data_t*)context;
-    if (!data || !data->llm) return AGENTOS_EINVAL;
+    majority_coordinator_t* coordinator = (majority_coordinator_t*)base;
 
-    // 为每个模型分配结果缓冲区
-    size_t n = data->model_count;
-    char** results = (char**)calloc(n, sizeof(char*));
-    if (!results) return AGENTOS_ENOMEM;
+    if (!inputs || input_count < coordinator->min_voters) {
+        *out_result = strdup("insufficient_voters");
+        return AGENTOS_SUCCESS;
+    }
+    
+    if (input_count == 0) {
+        *out_result = strdup("no_votes");
+        return AGENTOS_SUCCESS;
+    }
 
-    agentos_error_t err = AGENTOS_SUCCESS;
+    vote_record_t* votes = (vote_record_t*)calloc(input_count, sizeof(vote_record_t));
+    if (!votes) return AGENTOS_ENOMEM;
 
-    // 调用所有模型（并行可用线程池，此处顺序简化）
-    for (size_t i = 0; i < n && i < count; i++) {
-        agentos_llm_request_t req;
-        memset(&req, 0, sizeof(req));
-        req.model = data->model_names[i];
-        req.prompt = prompts[i];
-        req.temperature = 0.7;
-        req.max_tokens = 2048;
+    size_t unique_count = 0;
 
-        agentos_llm_response_t* resp = NULL;
-        err = agentos_llm_complete(data->llm, &req, &resp);
-        if (err == AGENTOS_SUCCESS && resp) {
-            results[i] = strdup(resp->text);
-            agentos_llm_response_free(resp);
-        } else {
-            results[i] = NULL;
+    for (size_t i = 0; i < input_count; i++) {
+        if (!inputs[i]) continue;
+
+        int found = 0;
+        for (size_t j = 0; j < unique_count; j++) {
+            if (votes[j].result && strcmp(votes[j].result, inputs[i]) == 0) {
+                votes[j].count++;
+                found = 1;
+                break;
+            }
+        }
+
+        if (!found) {
+            votes[unique_count].result = strdup(inputs[i]);
+            votes[unique_count].count = 1;
+            unique_count++;
         }
     }
 
-    // 统计多数结果
-    uint64_t* hashes = (uint64_t*)malloc(n * sizeof(uint64_t));
-    if (!hashes) {
-        for (size_t i = 0; i < n; i++) if (results[i]) free(results[i]);
-        free(results);
-        return AGENTOS_ENOMEM;
-    }
-
-    for (size_t i = 0; i < n; i++) {
-        hashes[i] = results[i] ? str_hash(results[i]) : 0;
-    }
-
-    size_t best_count = 0;
-    int best_idx = -1;
-    for (size_t i = 0; i < n; i++) {
-        if (!results[i]) continue;
-        size_t cnt = 1;
-        for (size_t j = i + 1; j < n; j++) {
-            if (results[j] && hashes[i] == hashes[j]) cnt++;
+    char* winner = NULL;
+    int max_count = 0;
+    for (size_t i = 0; i < unique_count; i++) {
+        if (votes[i].count > max_count) {
+            max_count = votes[i].count;
+            if (winner) free(winner);
+            winner = votes[i].result ? strdup(votes[i].result) : NULL;
         }
-        if (cnt > best_count) {
-            best_count = cnt;
-            best_idx = i;
-        }
+        if (votes[i].result) free(votes[i].result);
     }
+    free(votes);
 
-    if (best_idx >= 0) {
-        *out_result = strdup(results[best_idx]);
+    float vote_ratio = (float)max_count / input_count;
+    if (vote_ratio < coordinator->threshold) {
+        if (winner) free(winner);
+        *out_result = strdup("no_majority");
     } else {
-        *out_result = NULL;
-        err = AGENTOS_ENOENT;  // 无有效结果
+        *out_result = winner ? winner : strdup("no_result");
     }
 
-    // 清理
-    for (size_t i = 0; i < n; i++) if (results[i]) free(results[i]);
-    free(results);
-    free(hashes);
-
-    return err;
+    return AGENTOS_SUCCESS;
 }
 
 /**
- * @brief 创建多数投票协同策略
- * @param model_names 模型名称数组
- * @param model_count 模型数量
- * @param llm LLM服务客户端
- * @return 策略对象
+ * @brief 销毁协调器
  */
-agentos_coordinator_strategy_t* agentos_majority_coordinator_create(
-    const char** model_names,
-    size_t model_count,
-    agentos_llm_service_t* llm) {
+static void majority_destroy(agentos_coordinator_base_t* base) {
+    if (!base) return;
+    free(base);
+}
 
-    if (!model_names || model_count == 0 || !llm) return NULL;
+/**
+ * @brief 创建多数投票协调器
+ */
+agentos_error_t agentos_coordinator_majority_create(
+    size_t min_voters,
+    float threshold,
+    agentos_coordinator_base_t** out_coordinator) {
+    if (!out_coordinator) return AGENTOS_EINVAL;
 
-    agentos_coordinator_strategy_t* strat = (agentos_coordinator_strategy_t*)malloc(sizeof(agentos_coordinator_strategy_t));
-    if (!strat) return NULL;
+    majority_coordinator_t* coordinator = (majority_coordinator_t*)
+        calloc(1, sizeof(majority_coordinator_t));
+    if (!coordinator) return AGENTOS_ENOMEM;
 
-    majority_data_t* data = (majority_data_t*)calloc(1, sizeof(majority_data_t));
-    if (!data) {
-        free(strat);
-        return NULL;
-    }
+    coordinator->base.coordinate = majority_coordinate;
+    coordinator->base.destroy = majority_destroy;
+    coordinator->min_voters = min_voters > 0 ? min_voters : 3;
+    coordinator->threshold = (threshold > 0 && threshold <= 1.0f) ? threshold : 0.5f;
 
-    data->model_names = (char**)calloc(model_count, sizeof(char*));
-    if (!data->model_names) {
-        free(data);
-        free(strat);
-        return NULL;
-    }
-
-    for (size_t i = 0; i < model_count; i++) {
-        data->model_names[i] = strdup(model_names[i]);
-        if (!data->model_names[i]) {
-            for (size_t j = 0; j < i; j++) free(data->model_names[j]);
-            free(data->model_names);
-            free(data);
-            free(strat);
-            return NULL;
-        }
-    }
-    data->model_count = model_count;
-    data->llm = llm;
-    data->lock = agentos_mutex_create();
-    if (!data->lock) {
-        for (size_t i = 0; i < model_count; i++) free(data->model_names[i]);
-        free(data->model_names);
-        free(data);
-        free(strat);
-        return NULL;
-    }
-
-    strat->coordinate = majority_coordinate;
-    strat->destroy = majority_destroy;
-    strat->data = data;
-
-    return strat;
+    *out_coordinator = &coordinator->base;
+    return AGENTOS_SUCCESS;
 }

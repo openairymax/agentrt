@@ -6,7 +6,7 @@ import { MemoryError, AgentOSError } from './errors';
 import { Memory, MemoryLayer } from './types';
 import { AgentOS } from './agent';
 
-/** AgentOS 记忆管理�?*/
+/** AgentOS 记忆管理�?*/
 export class MemoryManager {
   private client: AgentOS;
 
@@ -39,10 +39,12 @@ export class MemoryManager {
       `/api/v1/memories/${memoryId}`,
     );
     return {
-      memoryId: response.memory_id,
+      id: response.memory_id || response.id,
       content: response.content,
-      createdAt: response.created_at,
       layer: response.layer,
+      score: response.score || 0,
+      createdAt: new Date(response.created_at || response.createdAt),
+      updatedAt: new Date(response.updated_at || response.updatedAt || Date.now()),
       metadata: response.metadata,
     };
   }
@@ -55,10 +57,12 @@ export class MemoryManager {
       `/api/v1/memories/search?query=${encodedQuery}&top_k=${topK}`,
     );
     return (response.memories || []).map((mem) => ({
-      memoryId: mem.memory_id,
+      id: mem.memory_id || mem.id,
       content: mem.content,
-      createdAt: mem.created_at,
       layer: mem.layer,
+      score: mem.score || 0,
+      createdAt: new Date(mem.created_at || mem.createdAt),
+      updatedAt: new Date(mem.updated_at || mem.updatedAt || Date.now()),
       metadata: mem.metadata,
     }));
   }
@@ -82,7 +86,7 @@ export class MemoryManager {
     return response.success;
   }
 
-  /** 按层级搜索记�?*/
+  /** 按层级搜索记忆 */
   async searchByLayer(
     layer: MemoryLayer,
     topK: number = 10,
@@ -92,10 +96,12 @@ export class MemoryManager {
       `/api/v1/memories?layer=${layer}&top_k=${topK}`,
     );
     return (response.memories || []).map((mem) => ({
-      memoryId: mem.memory_id,
+      id: mem.memory_id || mem.id,
       content: mem.content,
-      createdAt: mem.created_at,
       layer: mem.layer,
+      score: mem.score || 0,
+      createdAt: new Date(mem.created_at || mem.createdAt),
+      updatedAt: new Date(mem.updated_at || mem.updatedAt || Date.now()),
       metadata: mem.metadata,
     }));
   }

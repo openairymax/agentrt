@@ -37,7 +37,6 @@ from typing import (
     Set,
     Tuple,
     Awaitable,
-    Callable,
     TypeVar,
 )
 

@@ -8,7 +8,6 @@
 #define AGENTOS_FORGETTING_H
 
 #include "agentos.h"
-#include "layer1_raw.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,6 +15,7 @@ extern "C" {
 
 /* 前向声明 */
 typedef struct agentos_forgetting_engine agentos_forgetting_engine_t;
+typedef struct agentos_layer1_raw agentos_layer1_raw_t;
 typedef struct agentos_layer2_feature agentos_layer2_feature_t;
 
 /**

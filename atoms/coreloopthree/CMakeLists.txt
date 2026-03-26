@@ -27,6 +27,31 @@ else()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wpedantic")
 endif()
 
+# 安全编译选项（基于AgentOS C编码风格指南附录A）
+if(MSVC)
+    target_compile_options(agentos_coreloopthree PRIVATE /W4 /WX)
+    target_compile_definitions(agentos_coreloopthree PRIVATE _CRT_SECURE_NO_WARNINGS)
+    # MSVC安全选项
+    target_compile_options(agentos_coreloopthree PRIVATE /GS)  # 缓冲区安全检查
+    target_compile_options(agentos_coreloopthree PRIVATE /sdl) # 启用额外安全检查
+    target_compile_options(agentos_coreloopthree PRIVATE /guard:cf) # 控制流防护
+else()
+    target_compile_options(agentos_coreloopthree PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    # GCC/Clang安全选项
+    target_compile_options(agentos_coreloopthree PRIVATE -fstack-protector-strong)
+    target_compile_options(agentos_coreloopthree PRIVATE -D_FORTIFY_SOURCE=2)
+    target_compile_options(agentos_coreloopthree PRIVATE -fPIE)
+    target_compile_options(agentos_coreloopthree PRIVATE -Wformat -Wformat-security)
+    target_compile_options(agentos_coreloopthree PRIVATE -fno-omit-frame-pointer)
+endif()
+
+# 链接器安全选项
+if(UNIX AND NOT APPLE)
+    target_link_options(agentos_coreloopthree PRIVATE -Wl,-z,relro -Wl,-z,now -pie)
+elseif(APPLE)
+    target_link_options(agentos_coreloopthree PRIVATE -Wl,-dead_strip -pie)
+endif()
+
 # 包含头文件路径
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include

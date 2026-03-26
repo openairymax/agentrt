@@ -1,16 +1,11 @@
 # AgentOS 日志打印规范
 
-## 版本信息
-
-| 版本 | 日期 | 作者 | 变更说明 |
-|------|------|------|----------|
-| v1.2 | 2026-03-21 | AgentOS 架构委员会 | 基于控制论和可观测性理论重构 |
-| v1.0 | - | 初始版本 | 原始日志规范 |
-
-**文档状态**：正式发布  
-**适用范围**：AgentOS 所有模块的日志打印活动  
-**理论基础**：工程控制论（反馈理论、可观测性）、信息论  
-**关联规范**：[架构设计原则](../../architecture/folder/architectural_design_principles.md)（原则 O-5）
+**版本**: Doc V1.6  
+**更新日期**: 2026-03-25  
+**适用范围**: AgentOS 所有模块的日志打印活动  
+**理论基础**: 工程两论（《工程控制论》反馈理论、《论系统工程》可观测性）、五维正交系统（系统观、内核观、认知观、工程观、设计美学）、双系统认知理论  
+**关联原则**: 架构设计原则 E-2（可观测性原则）、E-4（运维友好）、C-1（认知友好）、A-1（设计美学）  
+**原则映射**: E-2（可观测性）、E-4（运维友好）、C-1（认知友好）、A-1（极简主义）
 
 ---
 
@@ -642,14 +637,255 @@ HiLog::WARN(LABEL, "TCP connection closed: reason=peer_timeout, duration=300s");
 ```
 
 ---
+## 第 7 章 AgentOS 模块日志示例
 
+### 7.1 Atoms（原子层）日志规范
+Atoms模块实现微内核核心功能，日志要求最高级别的性能和精度：
+
+#### 7.1.1 内存管理日志（映射原则：M-3 拓扑优化）
+```cpp
+/**
+ * @brief NUMA感知内存分配日志 - 体现工程观（E-2）和系统观（S-1）原则
+ * 
+ * 记录内存分配拓扑信息，支持性能分析和故障诊断。
+ * 日志级别根据分配频率动态调节，避免高频操作产生过多日志。
+ * 
+ * @see memoryrovol.md 中的记忆进化算法
+ */
+void atoms_mem_alloc_numa(size_t size, int numa_node, uint32_t flags) {
+    // 低频分配：详细记录
+    if (size > LARGE_ALLOC_THRESHOLD) {
+        HiLog::INFO(LABEL, "NUMA large allocation: size=%zu, node=%d, flags=0x%x, caller=%s",
+                   size, numa_node, flags, __FUNCTION__);
+    }
+    // 高频分配：简化记录（避免日志洪水）
+    else if (should_log_memory_allocation()) {
+        HiLog::DEBUG(LABEL, "NUMA alloc: size=%zu, node=%d", size, numa_node);
+    }
+    
+    // 分配失败：错误日志（必打）
+    void* ptr = internal_alloc_numa(size, numa_node, flags);
+    if (ptr == nullptr) {
+        HiLog::ERROR(LABEL, "NUMA allocation failed: size=%zu, node=%d, errno=%d, free_memory=%zu",
+                    size, numa_node, errno, get_free_memory());
+        return nullptr;
+    }
+    
+    return ptr;
+}
+```
+
+#### 7.1.2 任务调度日志（映射原则：C-2 认知优化）
+```cpp
+/**
+ * @brief 双系统任务调度日志 - 体现认知观（C-1, C-2）原则
+ * 
+ * 记录System 1/System 2路径选择，支持认知模式分析。
+ * 结构化日志支持机器学习驱动的调度优化。
+ */
+void schedule_task(Task* task) {
+    // 记录调度决策
+    SystemSelection selection = select_system_based_on_complexity(task);
+    HiLog::INFO(LABEL, "Task scheduled: id=%s, system=%s, complexity=%.2f, priority=%d",
+               task->id, 
+               selection == SYSTEM_1 ? "System1" : "System2",
+               task->complexity_score,
+               task->priority);
+    
+    // 记录执行时间（性能关键）
+    auto start_time = std::chrono::high_resolution_clock::now();
+    execute_task(task);
+    auto end_time = std::chrono::high_resolution_clock::now();
+    
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+    if (duration > SLOW_TASK_THRESHOLD) {
+        HiLog::WARN(LABEL, "Slow task execution: id=%s, duration=%lldμs, system=%s",
+                   task->id, duration.count(), 
+                   selection == SYSTEM_1 ? "System1" : "System2");
+    }
+}
+```
+
+### 7.2 Backs（守护层）日志规范
+Backs模块作为系统服务，强调可靠性和可观测性：
+
+#### 7.2.1 IPC通信服务日志（映射原则：E-3 通信基础设施）
+```python
+class IpcDaemon:
+    """IPC守护进程日志 - 体现系统观（S-3）和工程观（E-4）原则
+    
+    结构化日志支持OpenTelemetry集成和分布式追踪。
+    安全相关日志必须包含完整上下文用于审计。
+    """
+    
+    async def process_message(self, message: IpcMessage) -> ProcessResult:
+        # 请求日志（包含消息摘要）
+        logger.info(
+            "IPC message received",
+            extra={
+                "message_id": message.id,
+                "sender": message.sender,
+                "operation": message.operation,
+                "size": len(message.payload),
+                "timestamp": message.timestamp,
+                "log_type": "ipc_request"
+            }
+        )
+        
+        try:
+            # 处理逻辑
+            result = await self._do_process(message)
+            
+            # 成功日志（简化）
+            logger.debug(
+                "IPC message processed",
+                extra={
+                    "message_id": message.id,
+                    "duration_ms": result.duration_ms,
+                    "success": True,
+                    "log_type": "ipc_response"
+                }
+            )
+            return result
+            
+        except SecurityException as e:
+            # 安全异常日志（详细，用于审计）
+            logger.warning(
+                "IPC security violation",
+                extra={
+                    "message_id": message.id,
+                    "sender": message.sender,
+                    "operation": message.operation,
+                    "error": str(e),
+                    "stack_trace": traceback.format_exc(),
+                    "log_type": "security_audit"
+                }
+            )
+            raise
+            
+        except Exception as e:
+            # 一般异常日志
+            logger.error(
+                "IPC processing failed",
+                extra={
+                    "message_id": message.id,
+                    "error": str(e),
+                    "log_type": "error"
+                },
+                exc_info=True
+            )
+            raise
+```
+
+### 7.3 Domes（安全域层）日志规范
+Domes模块实现零信任安全模型，日志必须支持安全审计和合规性：
+
+#### 7.3.1 安全策略审计日志（映射原则：D-4 安全审计）
+```typescript
+/**
+ * 安全策略审计日志 - 体现安全工程（D-4）和设计美学（A-1）原则
+ * 
+ * 结构化审计日志支持监管合规和取证分析。
+ * 敏感信息脱敏处理，防止日志泄露隐私。
+ */
+class SecurityAuditLogger {
+  private readonly logger: Logger;
+  
+  logAccessDecision(request: AccessRequest, decision: AccessDecision): void {
+    // 结构化审计日志（支持SIEM系统集成）
+    this.logger.info('Access decision recorded', {
+      timestamp: new Date().toISOString(),
+      audit_id: generateAuditId(),
+      subject: this.maskSensitiveData(request.subject),
+      resource: request.resource,
+      action: request.action,
+      decision: decision.result,
+      reason: decision.reason,
+      risk_score: decision.riskScore,
+      context_hash: hashContext(request.context),
+      log_category: 'security_audit',
+      compliance_tags: ['pci_dss', 'gdpr', 'hipaa']
+    });
+    
+    // 高风险访问：额外记录
+    if (decision.riskScore > RISK_THRESHOLD_HIGH) {
+      this.logger.warning('High risk access detected', {
+        audit_id: generateAuditId(),
+        risk_score: decision.riskScore,
+        justification: request.justification,
+        reviewer: request.reviewer,
+        log_category: 'risk_alert'
+      });
+    }
+  }
+  
+  private maskSensitiveData(data: string): string {
+    // 脱敏处理，防止日志泄露敏感信息
+    return data.replace(/\\d{4}-\\d{4}-\\d{4}-\\d{4}/g, '****-****-****-****');
+  }
+}
+```
+
+### 7.4 Common（公共库层）日志规范
+Common模块提供跨层基础设施，日志需强调通用性和一致性：
+
+#### 7.4.1 向量数据库客户端日志（映射原则：E-1 基础设施）
+```go
+// VectorDB客户端日志 - 体现工程观（E-1）和认知观（C-3）原则
+//
+// 性能关键操作使用分级日志，避免影响查询延迟。
+// 结构化日志支持容量规划和性能分析。
+type VectorDBClient struct {
+	logger *zap.Logger
+	metrics *MetricsCollector
+}
+
+func (c *VectorDBClient) Search(query Vector, k int) ([]SearchResult, error) {
+	startTime := time.Now()
+	
+	// 查询开始日志（调试级别）
+	c.logger.Debug("Vector search started",
+		zap.Int("k", k),
+		zap.Int("dimensions", len(query)),
+		zap.String("query_hash", hashVector(query)),
+	)
+	
+	results, err := c.index.Search(query, k)
+	duration := time.Since(startTime)
+	
+	// 性能日志（信息级别）
+	c.logger.Info("Vector search completed",
+		zap.Int("results_count", len(results)),
+		zap.Duration("duration", duration),
+		zap.Float64("qps", 1.0/duration.Seconds()),
+		zap.Error(err),
+	)
+	
+	// 慢查询警告
+	if duration > SlowQueryThreshold {
+		c.logger.Warn("Slow vector search",
+			zap.Duration("duration", duration),
+			zap.Int("k", k),
+			zap.String("index_type", c.index.Type()),
+		)
+	}
+	
+	// 指标收集
+	c.metrics.RecordSearch(duration, len(results), err == nil)
+	
+	return results, err
+}
+```
+
+---
 ## 附录 B：与其他规范的引用关系
 
 | 引用文档 | 关系说明 |
-|---------|---------||
-| [架构设计原则](../../architecture/folder/architectural_design_principles.md) | 本规范是原则 O-5（高效开发原则）在可观测性方面的实施细则 |
-| [C&C++安全编程指南](./C&Cpp-secure-coding-guide.md) | 日志中的错误处理应遵循安全编程指南的异常处理规范 |
+|---------|---------|
+| [架构设计原则](../../architecture/folder/architectural_design_principles.md) | 本规范是原则 E-2（可观测性原则）和 E-4（运维友好原则）在日志打印方面的具体实施 |
+| [C&C++安全编程指南](./C_Cpp_secure_coding_guide.md) | 日志中的错误处理应遵循安全编程指南的异常处理规范 |
 | [统一术语表](../TERMINOLOGY.md) | 本规范使用的术语定义和解释 |
+| [AgentOS 核心架构文档](../../architecture/folder/) | 与本规范密切相关的架构文档：<br>- logging_system.md（可观测性核心架构）<br>- coreloopthree.md（运行时日志）<br>- memoryrovol.md（内存相关日志）<br>- microkernel.md（内核日志） |
 
 ---
 

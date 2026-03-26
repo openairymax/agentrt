@@ -133,9 +133,11 @@ static partdata_error_t init_database(sqlite3* db) {
 }
 
 partdata_error_t partdata_registry_init(void) {
-    char registry_path[512];
-    char root_path[256] = "partdata";
+    if (g_registry.initialized) {
+        return PARTDATA_SUCCESS;
+    }
 
+    char root_path[256] = "partdata";
     char full_path[512];
     snprintf(full_path, sizeof(full_path), "%s/registry", root_path);
 
@@ -164,14 +166,27 @@ partdata_error_t partdata_registry_init(void) {
         return err;
     }
 
+    pthread_mutex_init(&g_registry.lock, NULL);
+    g_registry.initialized = true;
+
     return PARTDATA_SUCCESS;
 }
 
 void partdata_registry_shutdown(void) {
+    if (!g_registry.initialized) {
+        return;
+    }
+
+    pthread_mutex_lock(&g_registry.lock);
+    
     if (g_registry.db) {
         sqlite3_close(g_registry.db);
         g_registry.db = NULL;
     }
+    
+    g_registry.initialized = false;
+    pthread_mutex_unlock(&g_registry.lock);
+    pthread_mutex_destroy(&g_registry.lock);
 }
 
 partdata_error_t partdata_registry_add_agent(const partdata_agent_record_t* record) {
@@ -179,15 +194,21 @@ partdata_error_t partdata_registry_add_agent(const partdata_agent_record_t* reco
         return PARTDATA_ERR_INVALID_PARAM;
     }
 
-    if (!g_registry.db) {
+    if (!g_registry.initialized || !g_registry.db) {
         return PARTDATA_ERR_NOT_INITIALIZED;
     }
 
-    const char* sql = "INSERT INTO agents (id, name, type, version, status, config_path, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?);";
+    pthread_mutex_lock(&g_registry.lock);
+
+    const char* sql = 
+        "INSERT INTO agents "
+        "(id, name, type, version, status, config_path, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?);";
     sqlite3_stmt* stmt;
 
     int rc = sqlite3_prepare_v2(g_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
+        pthread_mutex_unlock(&g_registry.lock);
         return PARTDATA_ERR_DB_QUERY_FAILED;
     }
 
@@ -202,6 +223,7 @@ partdata_error_t partdata_registry_add_agent(const partdata_agent_record_t* reco
 
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
+    pthread_mutex_unlock(&g_registry.lock);
 
     if (rc != SQLITE_DONE) {
         return PARTDATA_ERR_DB_QUERY_FAILED;
@@ -215,15 +237,18 @@ partdata_error_t partdata_registry_get_agent(const char* id, partdata_agent_reco
         return PARTDATA_ERR_INVALID_PARAM;
     }
 
-    if (!g_registry.db) {
+    if (!g_registry.initialized || !g_registry.db) {
         return PARTDATA_ERR_NOT_INITIALIZED;
     }
+
+    pthread_mutex_lock(&g_registry.lock);
 
     const char* sql = "SELECT id, name, type, version, status, config_path, created_at, updated_at FROM agents WHERE id = ?;";
     sqlite3_stmt* stmt;
 
     int rc = sqlite3_prepare_v2(g_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
+        pthread_mutex_unlock(&g_registry.lock);
         return PARTDATA_ERR_DB_QUERY_FAILED;
     }
 
@@ -247,10 +272,12 @@ partdata_error_t partdata_registry_get_agent(const char* id, partdata_agent_reco
         record->created_at = sqlite3_column_int64(stmt, 6);
         record->updated_at = sqlite3_column_int64(stmt, 7);
         sqlite3_finalize(stmt);
+        pthread_mutex_unlock(&g_registry.lock);
         return PARTDATA_SUCCESS;
     }
 
     sqlite3_finalize(stmt);
+    pthread_mutex_unlock(&g_registry.lock);
     return PARTDATA_ERR_NOT_FOUND;
 }
 
@@ -259,15 +286,21 @@ partdata_error_t partdata_registry_update_agent(const partdata_agent_record_t* r
         return PARTDATA_ERR_INVALID_PARAM;
     }
 
-    if (!g_registry.db) {
+    if (!g_registry.initialized || !g_registry.db) {
         return PARTDATA_ERR_NOT_INITIALIZED;
     }
 
-    const char* sql = "UPDATE agents SET name = ?, type = ?, version = ?, status = ?, config_path = ?, updated_at = ? WHERE id = ?;";
+    pthread_mutex_lock(&g_registry.lock);
+
+    const char* sql = 
+        "UPDATE agents SET "
+        "name = ?, type = ?, version = ?, status = ?, config_path = ?, updated_at = ? "
+        "WHERE id = ?;";
     sqlite3_stmt* stmt;
 
     int rc = sqlite3_prepare_v2(g_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
+        pthread_mutex_unlock(&g_registry.lock);
         return PARTDATA_ERR_DB_QUERY_FAILED;
     }
 
@@ -281,6 +314,7 @@ partdata_error_t partdata_registry_update_agent(const partdata_agent_record_t* r
 
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
+    pthread_mutex_unlock(&g_registry.lock);
 
     if (rc != SQLITE_DONE) {
         return PARTDATA_ERR_DB_QUERY_FAILED;
@@ -294,15 +328,18 @@ partdata_error_t partdata_registry_delete_agent(const char* id) {
         return PARTDATA_ERR_INVALID_PARAM;
     }
 
-    if (!g_registry.db) {
+    if (!g_registry.initialized || !g_registry.db) {
         return PARTDATA_ERR_NOT_INITIALIZED;
     }
+
+    pthread_mutex_lock(&g_registry.lock);
 
     const char* sql = "DELETE FROM agents WHERE id = ?;";
     sqlite3_stmt* stmt;
 
     int rc = sqlite3_prepare_v2(g_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
+        pthread_mutex_unlock(&g_registry.lock);
         return PARTDATA_ERR_DB_QUERY_FAILED;
     }
 
@@ -310,6 +347,7 @@ partdata_error_t partdata_registry_delete_agent(const char* id) {
 
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
+    pthread_mutex_unlock(&g_registry.lock);
 
     if (rc != SQLITE_DONE) {
         return PARTDATA_ERR_DB_QUERY_FAILED;
@@ -323,15 +361,21 @@ partdata_error_t partdata_registry_add_skill(const partdata_skill_record_t* reco
         return PARTDATA_ERR_INVALID_PARAM;
     }
 
-    if (!g_registry.db) {
+    if (!g_registry.initialized || !g_registry.db) {
         return PARTDATA_ERR_NOT_INITIALIZED;
     }
 
-    const char* sql = "INSERT INTO skills (id, name, version, library_path, manifest_path, installed_at) VALUES (?, ?, ?, ?, ?, ?);";
+    pthread_mutex_lock(&g_registry.lock);
+
+    const char* sql = 
+        "INSERT INTO skills "
+        "(id, name, version, library_path, manifest_path, installed_at) "
+        "VALUES (?, ?, ?, ?, ?, ?);";
     sqlite3_stmt* stmt;
 
     int rc = sqlite3_prepare_v2(g_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
+        pthread_mutex_unlock(&g_registry.lock);
         return PARTDATA_ERR_DB_QUERY_FAILED;
     }
 
@@ -344,6 +388,7 @@ partdata_error_t partdata_registry_add_skill(const partdata_skill_record_t* reco
 
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
+    pthread_mutex_unlock(&g_registry.lock);
 
     if (rc != SQLITE_DONE) {
         return PARTDATA_ERR_DB_QUERY_FAILED;
@@ -357,15 +402,18 @@ partdata_error_t partdata_registry_get_skill(const char* id, partdata_skill_reco
         return PARTDATA_ERR_INVALID_PARAM;
     }
 
-    if (!g_registry.db) {
+    if (!g_registry.initialized || !g_registry.db) {
         return PARTDATA_ERR_NOT_INITIALIZED;
     }
+
+    pthread_mutex_lock(&g_registry.lock);
 
     const char* sql = "SELECT id, name, version, library_path, manifest_path, installed_at FROM skills WHERE id = ?;";
     sqlite3_stmt* stmt;
 
     int rc = sqlite3_prepare_v2(g_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
+        pthread_mutex_unlock(&g_registry.lock);
         return PARTDATA_ERR_DB_QUERY_FAILED;
     }
 
@@ -386,10 +434,12 @@ partdata_error_t partdata_registry_get_skill(const char* id, partdata_skill_reco
         if (text) strncpy(record->manifest_path, text, sizeof(record->manifest_path) - 1);
         record->installed_at = sqlite3_column_int64(stmt, 5);
         sqlite3_finalize(stmt);
+        pthread_mutex_unlock(&g_registry.lock);
         return PARTDATA_SUCCESS;
     }
 
     sqlite3_finalize(stmt);
+    pthread_mutex_unlock(&g_registry.lock);
     return PARTDATA_ERR_NOT_FOUND;
 }
 
@@ -398,15 +448,18 @@ partdata_error_t partdata_registry_delete_skill(const char* id) {
         return PARTDATA_ERR_INVALID_PARAM;
     }
 
-    if (!g_registry.db) {
+    if (!g_registry.initialized || !g_registry.db) {
         return PARTDATA_ERR_NOT_INITIALIZED;
     }
+
+    pthread_mutex_lock(&g_registry.lock);
 
     const char* sql = "DELETE FROM skills WHERE id = ?;";
     sqlite3_stmt* stmt;
 
     int rc = sqlite3_prepare_v2(g_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
+        pthread_mutex_unlock(&g_registry.lock);
         return PARTDATA_ERR_DB_QUERY_FAILED;
     }
 
@@ -414,6 +467,7 @@ partdata_error_t partdata_registry_delete_skill(const char* id) {
 
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
+    pthread_mutex_unlock(&g_registry.lock);
 
     if (rc != SQLITE_DONE) {
         return PARTDATA_ERR_DB_QUERY_FAILED;
@@ -427,15 +481,21 @@ partdata_error_t partdata_registry_add_session(const partdata_session_record_t* 
         return PARTDATA_ERR_INVALID_PARAM;
     }
 
-    if (!g_registry.db) {
+    if (!g_registry.initialized || !g_registry.db) {
         return PARTDATA_ERR_NOT_INITIALIZED;
     }
 
-    const char* sql = "INSERT INTO sessions (id, user_id, created_at, last_active_at, ttl_seconds, status) VALUES (?, ?, ?, ?, ?, ?);";
+    pthread_mutex_lock(&g_registry.lock);
+
+    const char* sql = 
+        "INSERT INTO sessions "
+        "(id, user_id, created_at, last_active_at, ttl_seconds, status) "
+        "VALUES (?, ?, ?, ?, ?, ?);";
     sqlite3_stmt* stmt;
 
     int rc = sqlite3_prepare_v2(g_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
+        pthread_mutex_unlock(&g_registry.lock);
         return PARTDATA_ERR_DB_QUERY_FAILED;
     }
 
@@ -448,6 +508,7 @@ partdata_error_t partdata_registry_add_session(const partdata_session_record_t* 
 
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
+    pthread_mutex_unlock(&g_registry.lock);
 
     if (rc != SQLITE_DONE) {
         return PARTDATA_ERR_DB_QUERY_FAILED;
@@ -461,15 +522,18 @@ partdata_error_t partdata_registry_get_session(const char* id, partdata_session_
         return PARTDATA_ERR_INVALID_PARAM;
     }
 
-    if (!g_registry.db) {
+    if (!g_registry.initialized || !g_registry.db) {
         return PARTDATA_ERR_NOT_INITIALIZED;
     }
+
+    pthread_mutex_lock(&g_registry.lock);
 
     const char* sql = "SELECT id, user_id, created_at, last_active_at, ttl_seconds, status FROM sessions WHERE id = ?;";
     sqlite3_stmt* stmt;
 
     int rc = sqlite3_prepare_v2(g_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
+        pthread_mutex_unlock(&g_registry.lock);
         return PARTDATA_ERR_DB_QUERY_FAILED;
     }
 
@@ -488,10 +552,12 @@ partdata_error_t partdata_registry_get_session(const char* id, partdata_session_
         text = (const char*)sqlite3_column_text(stmt, 5);
         if (text) strncpy(record->status, text, sizeof(record->status) - 1);
         sqlite3_finalize(stmt);
+        pthread_mutex_unlock(&g_registry.lock);
         return PARTDATA_SUCCESS;
     }
 
     sqlite3_finalize(stmt);
+    pthread_mutex_unlock(&g_registry.lock);
     return PARTDATA_ERR_NOT_FOUND;
 }
 
@@ -500,15 +566,18 @@ partdata_error_t partdata_registry_update_session(const partdata_session_record_
         return PARTDATA_ERR_INVALID_PARAM;
     }
 
-    if (!g_registry.db) {
+    if (!g_registry.initialized || !g_registry.db) {
         return PARTDATA_ERR_NOT_INITIALIZED;
     }
+
+    pthread_mutex_lock(&g_registry.lock);
 
     const char* sql = "UPDATE sessions SET user_id = ?, last_active_at = ?, ttl_seconds = ?, status = ? WHERE id = ?;";
     sqlite3_stmt* stmt;
 
     int rc = sqlite3_prepare_v2(g_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
+        pthread_mutex_unlock(&g_registry.lock);
         return PARTDATA_ERR_DB_QUERY_FAILED;
     }
 
@@ -520,6 +589,7 @@ partdata_error_t partdata_registry_update_session(const partdata_session_record_
 
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
+    pthread_mutex_unlock(&g_registry.lock);
 
     if (rc != SQLITE_DONE) {
         return PARTDATA_ERR_DB_QUERY_FAILED;
@@ -533,15 +603,18 @@ partdata_error_t partdata_registry_delete_session(const char* id) {
         return PARTDATA_ERR_INVALID_PARAM;
     }
 
-    if (!g_registry.db) {
+    if (!g_registry.initialized || !g_registry.db) {
         return PARTDATA_ERR_NOT_INITIALIZED;
     }
+
+    pthread_mutex_lock(&g_registry.lock);
 
     const char* sql = "DELETE FROM sessions WHERE id = ?;";
     sqlite3_stmt* stmt;
 
     int rc = sqlite3_prepare_v2(g_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
+        pthread_mutex_unlock(&g_registry.lock);
         return PARTDATA_ERR_DB_QUERY_FAILED;
     }
 
@@ -549,6 +622,7 @@ partdata_error_t partdata_registry_delete_session(const char* id) {
 
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
+    pthread_mutex_unlock(&g_registry.lock);
 
     if (rc != SQLITE_DONE) {
         return PARTDATA_ERR_DB_QUERY_FAILED;
@@ -580,11 +654,14 @@ void partdata_registry_iter_destroy(partdata_registry_iter_t* iter) {
 }
 
 partdata_error_t partdata_registry_vacuum(void) {
-    if (!g_registry.db) {
+    if (!g_registry.initialized || !g_registry.db) {
         return PARTDATA_ERR_NOT_INITIALIZED;
     }
 
+    pthread_mutex_lock(&g_registry.lock);
     sqlite3_exec(g_registry.db, "VACUUM;", NULL, NULL, NULL);
+    pthread_mutex_unlock(&g_registry.lock);
+    
     return PARTDATA_SUCCESS;
 }
 

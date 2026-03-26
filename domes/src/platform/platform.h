@@ -229,6 +229,15 @@ void domes_mem_lock(void* ptr, size_t size);
 void domes_mem_unlock(void* ptr, size_t size);
 
 /* ============================================================================
+ * 工具宏
+ * ============================================================================ */
+
+/* 未使用参数标记 */
+#ifndef DOMES_UNUSED
+#define DOMES_UNUSED(x) ((void)(x))
+#endif
+
+/* ============================================================================
  * 原子操作
  * ============================================================================ */
 
@@ -247,6 +256,7 @@ bool domes_atomic_cas32(domes_atomic32_t* ptr, int32_t expected, int32_t desired
 int64_t domes_atomic_load64(domes_atomic64_t* ptr);
 void domes_atomic_store64(domes_atomic64_t* ptr, int64_t val);
 int64_t domes_atomic_add64(domes_atomic64_t* ptr, int64_t delta);
+int64_t domes_atomic_sub64(domes_atomic64_t* ptr, int64_t delta);
 bool domes_atomic_cas64(domes_atomic64_t* ptr, int64_t expected, int64_t desired);
 
 void* domes_atomic_load_ptr(domes_atomic_ptr_t* ptr);

@@ -3,7 +3,6 @@
 
 """
 OpenHub Docker Image
-=================
 
 Multi-stage Docker build for OpenHub AgentOS.
 """

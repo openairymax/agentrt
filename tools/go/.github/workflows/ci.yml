@@ -1,0 +1,113 @@
+name: Go SDK CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'tools/go/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'tools/go/**'
+
+jobs:
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+          cache-dependency-path: tools/go/go.sum
+
+      - name: Run gofmt
+        run: |
+          if [ -n "$(gofmt -l tools/go)" ]; then
+            echo "Code formatting issues found:"
+            gofmt -l tools/go
+            exit 1
+          fi
+        working-directory: tools/go
+
+      - name: Run golint
+        run: go install golang.org/x/lint/gotint@latest && gotint -set_exit_status ./...
+        working-directory: tools/go
+        continue-on-error: true
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+          cache-dependency-path: tools/go/go.sum
+
+      - name: Download dependencies
+        run: go mod download
+        working-directory: tools/go
+
+      - name: Run tests with coverage
+        run: |
+          go test -v -coverprofile=coverage.out -covermode=atomic ./...
+        working-directory: tools/go
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./tools/go/coverage.out
+          flags: go
+          name: codecov-go
+        continue-on-error: true
+
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+          cache-dependency-path: tools/go/go.sum
+
+      - name: Build package
+        run: go build -v ./...
+        working-directory: tools/go
+
+      - name: Verify build output
+        run: |
+          go build -o /dev/null ./...
+        working-directory: tools/go
+
+  vet:
+    name: Run go vet
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+          cache-dependency-path: tools/go/go.sum
+
+      - name: Run go vet
+        run: go vet ./...
+        working-directory: tools/go

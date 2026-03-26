@@ -3,7 +3,7 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 # AgentOS 快速入门指南
 
-**版本**: v1.0.0.5  
+**版本**: Doc V1.5  
 **最后更新**: 2026-03-21  
 **难度**: ⭐ 初学者友好  
 **预计时间**: 15 分钟

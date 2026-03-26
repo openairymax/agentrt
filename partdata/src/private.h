@@ -46,4 +46,10 @@ void partdata_memory_shutdown(void);
 partdata_error_t partdata_log_init(void);
 void partdata_log_shutdown(void);
 
+bool partdata_registry_is_healthy(void);
+bool partdata_trace_is_healthy(void);
+bool partdata_log_is_healthy(void);
+bool partdata_ipc_is_healthy(void);
+bool partdata_memory_is_healthy(void);
+
 #endif /* AGENTOS_PARTDATA_PRIVATE_H */

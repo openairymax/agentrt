@@ -164,6 +164,22 @@ partdata_error_t partdata_reload_config(const partdata_config_t* config);
  */
 partdata_error_t partdata_flush(void);
 
+/**
+ * @brief 健康检查接口，用于检查各子系统状态
+ *
+ * @param registry_ok 注册表系统是否健康，可为 NULL
+ * @param trace_ok 追踪系统是否健康，可为 NULL
+ * @param log_ok 日志系统是否健康，可为 NULL
+ * @param ipc_ok IPC 系统是否健康，可为 NULL
+ * @param memory_ok 内存系统是否健康，可为 NULL
+ * @return partdata_error_t 错误码，PARTDATA_SUCCESS 表示整体健康
+ */
+partdata_error_t partdata_health_check(bool* registry_ok, 
+                                       bool* trace_ok, 
+                                       bool* log_ok, 
+                                       bool* ipc_ok, 
+                                       bool* memory_ok);
+
 #ifdef __cplusplus
 }
 #endif

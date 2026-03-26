@@ -13,7 +13,7 @@
 #include "validator.h"
 #include "cache.h"
 #include "config.h"
-#include <pthread.h>
+#include "platform.h"
 
 struct tool_service {
     tool_registry_t* registry;
@@ -21,8 +21,7 @@ struct tool_service {
     tool_validator_t* validator;
     tool_cache_t* cache;
     tool_config_t* config;
-    pthread_mutex_t lock;
+    agentos_mutex_t lock;
 };
-// From data intelligence emerges. by spharx
 
 #endif /* TOOL_SERVICE_INTERNAL_H */

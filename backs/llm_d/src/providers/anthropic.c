@@ -41,13 +41,24 @@ static provider_ctx_t* anthropic_init(const char* name,
     }
 
     if (api_key) {
-        strncpy(ctx->api_key, api_key, sizeof(ctx->api_key) - 1);
+        size_t key_len = strlen(api_key);
+        if (key_len >= sizeof(ctx->api_key)) {
+            free(ctx);
+            return NULL;
+        }
+        memcpy(ctx->api_key, api_key, key_len + 1);
     }
     
     if (api_base) {
-        strncpy(ctx->api_base, api_base, sizeof(ctx->api_base) - 1);
+        size_t base_len = strlen(api_base);
+        if (base_len >= sizeof(ctx->api_base)) {
+            free(ctx);
+            return NULL;
+        }
+        memcpy(ctx->api_base, api_base, base_len + 1);
     } else {
-        strcpy(ctx->api_base, "https://api.anthropic.com/v1");
+        const char* default_base = "https://api.anthropic.com/v1";
+        memcpy(ctx->api_base, default_base, strlen(default_base) + 1);
     }
     
     ctx->timeout_sec = timeout_sec > 0 ? timeout_sec : 30.0;
@@ -141,10 +152,13 @@ static int parse_response(const char* body, llm_response_t** out) {
         if (cJSON_IsString(text) && text->valuestring) {
             resp->choice_count = 1;
             resp->choices = (llm_message_t*)calloc(1, sizeof(llm_message_t));
-            if (resp->choices) {
-                resp->choices[0].role = strdup("assistant");
-                resp->choices[0].content = strdup(text->valuestring);
+            if (!resp->choices) {
+                cJSON_Delete(root);
+                llm_response_free(resp);
+                return AGENTOS_ERR_OUT_OF_MEMORY;
             }
+            resp->choices[0].role = strdup("assistant");
+            resp->choices[0].content = strdup(text->valuestring);
         }
     }
 

@@ -1,0 +1,707 @@
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# AgentOS Gitee CI/CD Pipeline Configuration
+# Version: 1.0.0
+# Description: Gitee platform CI/CD configuration for AgentOS project
+# Gitee GoCI Syntax
+
+# =============================================================================
+# Global Configuration
+# =============================================================================
+name: AgentOS CI/CD
+
+run:
+  parallel: true
+  maxRunningDuration: 360m
+  timeout: 480m
+
+# =============================================================================
+# Global Environment Variables
+# =============================================================================
+env:
+  BUILD_TYPE: Release
+  VERSION: 1.0.0
+  DOCKER_REGISTRY: gitee.cn/spharx-agentos
+  DOCKER_REGISTRY_GHCR: ghcr.io/spharx-agentos
+
+# =============================================================================
+# Pipeline Stages
+# =============================================================================
+stages:
+  - name: code-quality
+    triggers:
+      - push:
+          branches:
+            - master
+            - develop
+            - 'release/*'
+      - pull_request:
+          branches:
+            - master
+            - develop
+  - name: build
+    triggers:
+      - push:
+          branches:
+            - master
+            - develop
+            - 'release/*'
+      - pull_request:
+          branches:
+            - master
+            - develop
+  - name: test
+    triggers:
+      - push:
+          branches:
+            - master
+            - develop
+            - 'release/*'
+      - pull_request:
+          branches:
+            - master
+            - develop
+  - name: security
+    triggers:
+      - push:
+          branches:
+            - master
+            - develop
+      - schedule:
+          cron: '0 2 * * *'
+  - name: deploy-staging
+    triggers:
+      - push:
+          branches:
+            - develop
+          tags:
+            - 'v*'
+  - name: deploy-production
+    triggers:
+      - push:
+          branches:
+            - master
+      - tag:
+          pattern: 'v[0-9]+.[0-9]+.[0-9]+'
+
+# =============================================================================
+# Job: Code Quality Check
+# =============================================================================
+code-quality:
+  stage: code-quality
+  parallel:
+    strategy:
+      - jobs:
+          - name: c-static-analysis
+          - name: python-lint
+          - name: shell-check
+
+  jobs:
+    - name: c-static-analysis
+      runs-on:
+        - self-hosted
+        - linux
+      container:
+        image: spharx/agentos-build:ubuntu-22.04
+        options: --privileged
+      script: |
+        # Install static analysis tools
+        apt-get update && apt-get install -y cppcheck clang-format clang-tidy
+
+        # C Code Analysis (cppcheck)
+        cppcheck --enable=all \
+          --std=c11 \
+          --platform=unix64 \
+          --inline-suppressions \
+          --quiet \
+          -j$(nproc) \
+          atoms/ backs/ dynamic/ domes/ 2>&1 | tee cppcheck_report.txt
+
+        # C Code Format Check
+        find . -name '*.c' -o -name '*.h' | head -50 | while read f; do
+          clang-format --dry-run "$f" || echo "Format error in $f"
+        done
+
+        # Upload reports
+        pack init
+        pack putartifact --name=cppcheck-report --path=cppcheck_report.txt
+      artifacts:
+        - name: cppcheck-report
+          paths:
+            - cppcheck_report.txt
+          expire_in: 7 days
+
+    - name: python-lint
+      runs-on:
+        - self-hosted
+        - linux
+      container:
+        image: python:3.11-slim
+      script: |
+        pip install ruff mypy bandit safety
+
+        # Python Lint
+        ruff check scripts/ openhub/ tools/python/ --select=E,F,W || true
+
+        # Type check
+        mypy scripts/ openhub/ tools/python/ --ignore-missing-imports || true
+
+        # Security scan
+        bandit -r atoms/ backs/ dynamic/ domes/ -f json -o bandit_report.json || true
+      artifacts:
+        - name: python-lint-report
+          paths:
+            - bandit_report.json
+          expire_in: 7 days
+
+    - name: shell-check
+      runs-on:
+        - self-hosted
+        - linux
+      container:
+        image: alpine:latest
+      script: |
+        apk add --no-cache shellcheck bash
+
+        find scripts/ -name '*.sh' -exec shellcheck {} \; || true
+      artifacts:
+        - name: shellcheck-report
+          paths:
+            - shellcheck.log
+          expire_in: 7 days
+
+# =============================================================================
+# Job: Build (Cross-platform)
+# =============================================================================
+build:
+  stage: build
+  parallel:
+    strategy:
+      - jobs:
+          - name: build-atoms-linux
+          - name: build-atoms-macos
+          - name: build-atoms-windows
+          - name: build-backs-linux
+          - name: build-dynamic-linux
+          - name: build-domes-linux
+
+  jobs:
+    - name: build-atoms-linux
+      runs-on:
+        - self-hosted
+        - linux
+      container:
+        image: spharx/agentos-build:ubuntu-22.04
+        options: --privileged
+      script: |
+        mkdir -p atoms/build && cd atoms/build
+        cmake .. -G "Ninja" \
+          -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+          -DBUILD_TESTS=ON \
+          -DCMAKE_C_COMPILER=gcc
+        ninja
+        ctest --output-on-failure || true
+
+        # Package
+        tar -czvf agentos-atoms-$VERSION-linux-x86_64.tar.gz .
+      artifacts:
+        - name: atoms-linux
+          paths:
+            - atoms/build/agentos-atoms-$VERSION-linux-x86_64.tar.gz
+          expire_in: 30 days
+
+    - name: build-atoms-macos
+      runs-on:
+        - self-hosted
+        - macos
+      script: |
+        mkdir -p atoms/build && cd atoms/build
+        cmake .. -G "Ninja" \
+          -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+          -DBUILD_TESTS=ON \
+          -DCMAKE_C_COMPILER=clang
+        ninja
+        ctest --output-on-failure || true
+
+        tar -czvf agentos-atoms-$VERSION-macos-x86_64.tar.gz .
+      artifacts:
+        - name: atoms-macos
+          paths:
+            - atoms/build/agentos-atoms-$VERSION-macos-x86_64.tar.gz
+          expire_in: 30 days
+
+    - name: build-atoms-windows
+      runs-on:
+        - self-hosted
+        - windows
+      script: |
+        $env:BUILD_TYPE = "$BUILD_TYPE"
+        mkdir atoms/build
+        cd atoms/build
+        cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=$env:BUILD_TYPE -DBUILD_TESTS=ON
+        ninja
+
+        7z a agentos-atoms-$VERSION-windows-x86_64.zip .
+      artifacts:
+        - name: atoms-windows
+          paths:
+            - atoms/build/agentos-atoms-$VERSION-windows-x86_64.zip
+          expire_in: 30 days
+
+    - name: build-backs-linux
+      runs-on:
+        - self-hosted
+        - linux
+      container:
+        image: spharx/agentos-build:ubuntu-22.04
+        options: --privileged
+      script: |
+        mkdir -p backs/build && cd backs/build
+        cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_TESTS=ON
+        ninja
+
+        for service in llm_d tool_d monit_d sched_d market_d; do
+          tar -czvf agentos-backs-$service-$VERSION-linux-x86_64.tar.gz .
+        done
+      artifacts:
+        - name: backs-linux
+          paths:
+            - backs/build/agentos-backs-*.tar.gz
+          expire_in: 30 days
+
+    - name: build-dynamic-linux
+      runs-on:
+        - self-hosted
+        - linux
+      container:
+        image: spharx/agentos-build:ubuntu-22.04
+        options: --privileged
+      script: |
+        apt-get update && apt-get install -y \
+          libmicrohttpd-dev libwebsockets-dev libssl-dev
+
+        mkdir -p dynamic/build && cd dynamic/build
+        cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_TESTS=ON
+        ninja
+
+        tar -czvf agentos-dynamic-$VERSION-linux-x86_64.tar.gz .
+      artifacts:
+        - name: dynamic-linux
+          paths:
+            - dynamic/build/agentos-dynamic-$VERSION-linux-x86_64.tar.gz
+          expire_in: 30 days
+
+    - name: build-domes-linux
+      runs-on:
+        - self-hosted
+        - linux
+      container:
+        image: spharx/agentos-build:ubuntu-22.04
+        options: --privileged
+      script: |
+        mkdir -p domes/build && cd domes/build
+        cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_TESTS=ON
+        ninja
+
+        tar -czvf agentos-domes-$VERSION-linux-x86_64.tar.gz .
+      artifacts:
+        - name: domes-linux
+          paths:
+            - domes/build/agentos-domes-$VERSION-linux-x86_64.tar.gz
+          expire_in: 30 days
+
+# =============================================================================
+# Job: Test
+# =============================================================================
+test:
+  stage: test
+  parallel:
+    strategy:
+      - jobs:
+          - name: unit-tests
+          - name: integration-tests
+          - name: contract-tests
+          - name: performance-tests
+
+  jobs:
+    - name: unit-tests
+      runs-on:
+        - self-hosted
+        - linux
+      container:
+        image: spharx/agentos-build:ubuntu-22.04
+        options: --privileged
+      script: |
+        # Download build artifacts
+        pack getartifact --name=atoms-linux --dest=atoms/build
+        pack getartifact --name=backs-linux --dest=backs/build
+        pack getartifact --name=dynamic-linux --dest=dynamic/build
+
+        # Run C unit tests
+        cd atoms/build && ctest --output-on-failure -j$(nproc)
+        cd backs/build && ctest --output-on-failure -j$(nproc)
+        cd dynamic/build && ctest --output-on-failure -j$(nproc)
+
+        # Run Python unit tests
+        pip install pytest pytest-cov pytest-asyncio
+        pytest tests/unit/ -v --cov=agentos --cov-report=xml --cov-report=html
+
+        # Upload coverage
+        pack putartifact --name=coverage-report --path=htmlcov/
+      artifacts:
+        - name: coverage-report
+          paths:
+            - htmlcov/
+          expire_in: 30 days
+
+    - name: integration-tests
+      runs-on:
+        - self-hosted
+        - linux
+      services:
+        - name: redis
+          image: redis:7-alpine
+          alias: redis
+        - name: postgres
+          image: postgres:15-alpine
+          alias: postgres
+          env:
+            POSTGRES_DB: agentos_test
+            POSTGRES_USER: agentos
+            POSTGRES_PASSWORD: test_password
+      script: |
+        # Run integration tests
+        pytest tests/integration/ -v --tb=short
+
+        # Run Docker Compose integration
+        docker-compose -f scripts/deploy/docker/docker-compose.yml up -d
+        sleep 15
+
+        # Verify services
+        curl -f http://localhost:8090/health || exit 1
+        curl -f http://localhost:8080/health || exit 1
+
+        docker-compose -f scripts/deploy/docker/docker-compose.yml down
+      artifacts:
+        - name: integration-test-results
+          paths:
+            - test-results/
+          expire_in: 14 days
+
+    - name: contract-tests
+      runs-on:
+        - self-hosted
+        - linux
+      script: |
+        pytest tests/contract/ -v --tb=short
+      artifacts:
+        - name: contract-test-results
+          paths:
+            - contract-results/
+          expire_in: 14 days
+
+    - name: performance-tests
+      runs-on:
+        - self-hosted
+        - linux
+      script: |
+        # Run performance benchmarks
+        pytest tests/benchmarks/ -v --benchmark-only --benchmark-json=benchmark.json
+
+        # Compare with baseline
+        if [ -f benchmark-baseline.json ]; then
+          echo "Comparing with baseline..."
+          # Add baseline comparison logic
+        fi
+      artifacts:
+        - name: performance-test-results
+          paths:
+            - benchmark.json
+          expire_in: 30 days
+
+# =============================================================================
+# Job: Security Scan
+# =============================================================================
+security:
+  stage: security
+  parallel:
+    strategy:
+      - jobs:
+          - name: vulnerability-scan
+          - name: secrets-scan
+          - name: license-scan
+
+  jobs:
+    - name: vulnerability-scan
+      runs-on:
+        - self-hosted
+        - linux
+      container:
+        image: aquasec/trivy:latest
+      script: |
+        # Scan filesystem
+        trivy fs --severity HIGH,CRITICAL --format json --output trivy-fs.json .
+
+        # Scan Docker images
+        trivy image --severity HIGH,CRITICAL --format json --output trivy-image.json spharx/agentos:latest || true
+
+        # Check for critical vulnerabilities
+        if grep -q '"Severity": "CRITICAL"' trivy-fs.json; then
+          echo "::error::Critical vulnerabilities found"
+          exit 1
+        fi
+      artifacts:
+        - name: trivy-reports
+          paths:
+            - trivy-*.json
+          expire_in: 30 days
+
+    - name: secrets-scan
+      runs-on:
+        - self-hosted
+        - linux
+      container:
+        image: trufflesecurity/trufflehog:latest
+      script: |
+        trufflehog filesystem . --json > secrets-scan.json || true
+
+        if grep -q '"match"' secrets-scan.json; then
+          echo "::error::Secrets detected in codebase"
+          exit 1
+        fi
+      artifacts:
+        - name: secrets-scan-report
+          paths:
+            - secrets-scan.json
+          expire_in: 30 days
+
+    - name: license-scan
+      runs-on:
+        - self-hosted
+        - linux
+      script: |
+        pip install scancode-toolkit
+
+        scancode --license --info -n 4 . > license-scan.json
+
+        # Check for prohibited licenses
+        if grep -qE '"GPL-3.0"|"AGPL"' license-scan.json; then
+          echo "::warning::GPL/AGPL licenses detected, verify compatibility"
+        fi
+      artifacts:
+        - name: license-scan-report
+          paths:
+            - license-scan.json
+          expire_in: 30 days
+
+# =============================================================================
+# Job: Deploy to Staging
+# =============================================================================
+deploy-staging:
+  stage: deploy-staging
+  runs-on:
+    - self-hosted
+    - linux
+  only:
+    - develop
+    - tag
+  script: |
+    # Login to registry
+    echo $GITEE_PACKAGES_TOKEN | docker login gitee.cn -u $GITEE_USER --password-stdin
+
+    # Build Docker images
+    docker build \
+      --tag $DOCKER_REGISTRY/agentos-atoms:$CI_COMMIT_SHA \
+      --tag $DOCKER_REGISTRY/agentos-atoms:staging \
+      -f scripts/deploy/docker/Dockerfile.kernel .
+
+    docker build \
+      --tag $DOCKER_REGISTRY/agentos-dynamic:$CI_COMMIT_SHA \
+      --tag $DOCKER_REGISTRY/agentos-dynamic:staging \
+      -f scripts/deploy/docker/Dockerfile.dynamic .
+
+    docker build \
+      --tag $DOCKER_REGISTRY/agentos-backs:$CI_COMMIT_SHA \
+      --tag $DOCKER_REGISTRY/agentos-backs:staging \
+      -f scripts/deploy/docker/Dockerfile.service .
+
+    # Push images
+    docker push $DOCKER_REGISTRY/agentos-atoms:$CI_COMMIT_SHA
+    docker push $DOCKER_REGISTRY/agentos-atoms:staging
+    docker push $DOCKER_REGISTRY/agentos-dynamic:$CI_COMMIT_SHA
+    docker push $DOCKER_REGISTRY/agentos-dynamic:staging
+    docker push $DOCKER_REGISTRY/agentos-backs:$CI_COMMIT_SHA
+    docker push $DOCKER_REGISTRY/agentos-backs:staging
+
+    # Deploy to staging
+    export VERSION=$CI_COMMIT_SHA
+    docker-compose -f scripts/deploy/docker/docker-compose.staging.yml up -d
+
+    # Wait for services
+    sleep 30
+
+    # Verify deployment
+    curl -f http://staging.agentos.spharx.cn/health || {
+      echo "::error::Staging deployment verification failed"
+      exit 1
+    }
+
+    echo "✅ Staging deployment successful"
+  artifacts:
+    - name: deployment-report
+      paths:
+        - deployment.log
+      expire_in: 7 days
+
+# =============================================================================
+# Job: Deploy to Production
+# =============================================================================
+deploy-production:
+  stage: deploy-production
+  runs-on:
+    - self-hosted
+    - linux
+  only:
+    - master
+    - tag
+  script: |
+    # Approval check (manual approval required for production)
+    if [ "$GITEE_USER" != "admin" ] && [[ ! "$CI_COMMIT_REF_NAME" =~ ^v[0-9]+ ]]; then
+      echo "::error::Production deployment requires tag or admin access"
+      exit 1
+    fi
+
+    # Login to registry
+    echo $GITEE_PACKAGES_TOKEN | docker login gitee.cn -u $GITEE_USER --password-stdin
+
+    # Extract version from tag
+    VERSION=${CI_COMMIT_TAG#v}
+
+    # Build Docker images with version tag
+    docker build \
+      --tag $DOCKER_REGISTRY/agentos-atoms:$VERSION \
+      --tag $DOCKER_REGISTRY/agentos-atoms:latest \
+      -f scripts/deploy/docker/Dockerfile.kernel .
+
+    docker build \
+      --tag $DOCKER_REGISTRY/agentos-dynamic:$VERSION \
+      --tag $DOCKER_REGISTRY/agentos-dynamic:latest \
+      -f scripts/deploy/docker/Dockerfile.dynamic .
+
+    docker build \
+      --tag $DOCKER_REGISTRY/agentos-backs:$VERSION \
+      --tag $DOCKER_REGISTRY/agentos-backs:latest \
+      -f scripts/deploy/docker/Dockerfile.service .
+
+    docker build \
+      --tag $DOCKER_REGISTRY/agentos-openhub:$VERSION \
+      --tag $DOCKER_REGISTRY/agentos-openhub:latest \
+      -f scripts/deploy/docker/Dockerfile.openhub .
+
+    # Push all tags
+    for image in atoms dynamic backs openhub; do
+      docker push $DOCKER_REGISTRY/agentos-$image:$VERSION
+      docker push $DOCKER_REGISTRY/agentos-$image:latest
+    done
+
+    # Deploy to production (blue-green deployment)
+    export VERSION=$VERSION
+    docker-compose -f scripts/deploy/docker/docker-compose.prod.yml up -d
+
+    # Wait for services
+    sleep 60
+
+    # Health check verification
+    for endpoint in health api/v1/status; do
+      curl -f -m 10 https://agentos.spharx.cn/$endpoint || {
+        echo "::error::Production health check failed: $endpoint"
+        exit 1
+      }
+    done
+
+    # Run smoke tests
+    pytest tests/smoke/ -v || {
+      echo "::warning::Smoke tests failed, review carefully"
+    }
+
+    echo "✅ Production deployment successful"
+    echo "Deployed version: $VERSION"
+  artifacts:
+    - name: deployment-report
+      paths:
+        - deployment.log
+      expire_in: 30 days
+
+# =============================================================================
+# Job: Rollback (Production)
+# =============================================================================
+rollback-production:
+  runs-on:
+    - self-hosted
+    - linux
+  stage: deploy-production
+  when: manual
+  script: |
+    read -p "Enter version to rollback to: " VERSION
+
+    echo "Rolling back to version: $VERSION"
+
+    # Stop current services
+    docker-compose -f scripts/deploy/docker/docker-compose.prod.yml down
+
+    # Pull target version
+    docker pull $DOCKER_REGISTRY/agentos-atoms:$VERSION
+    docker pull $DOCKER_REGISTRY/agentos-dynamic:$VERSION
+    docker pull $DOCKER_REGISTRY/agentos-backs:$VERSION
+    docker pull $DOCKER_REGISTRY/agentos-openhub:$VERSION
+
+    # Update version
+    export VERSION=$VERSION
+
+    # Restart services
+    docker-compose -f scripts/deploy/docker/docker-compose.prod.yml up -d
+
+    # Verify
+    sleep 30
+    curl -f https://agentos.spharx.cn/health || {
+      echo "::error::Rollback verification failed"
+      exit 1
+    }
+
+    echo "✅ Rollback to $VERSION successful"
+
+# =============================================================================
+# Job: Notification
+# =============================================================================
+notify:
+  stage: deploy-production
+  runs-on:
+    - self-hosted
+    - linux
+  when: always
+  script: |
+    # Send notification to DingTalk/WeCom
+    if [ "$CI_JOB_STATUS" == "success" ]; then
+      MESSAGE="✅ AgentOS CI/CD Pipeline Success"
+      COLOR="green"
+    else
+      MESSAGE="❌ AgentOS CI/CD Pipeline Failed"
+      COLOR="red"
+    fi
+
+    curl -X POST "https://oapi.dingtalk.com/robot/send?access_token=$DINGTALK_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d "{\"msgtype\": \"markdown\", \"markdown\": {\"title\": \"AgentOS CI/CD\", \"text\": \"$MESSAGE\n> Branch: $CI_COMMIT_REF_NAME\n> Commit: $CI_COMMIT_SHA\n> Job: $CI_JOB_NAME\"}}"
+
+# =============================================================================
+# Dependencies and Caching
+# =============================================================================
+cache:
+  key: ${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}
+  paths:
+    - .cache/
+    - build/
+  policy: pull-push
+
+dependencies:
+  - code-quality
+  - build

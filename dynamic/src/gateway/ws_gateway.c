@@ -25,6 +25,116 @@
 #include <pthread.h>
 #include <stdatomic.h>
 
+/* ========== 辅助函数 ========== */
+
+/**
+ * @brief 获取当前时间（纳秒）
+ * @return 当前时间戳（纳秒）
+ */
+static uint64_t time_ns(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+}
+
+/* ========== JSON-RPC辅助函数 ========== */
+
+/**
+ * @brief 创建JSON-RPC 2.0错误响应
+ * @param id 请求ID
+ * @param code 错误码
+ * @param message 错误消息
+ * @param data 错误数据
+ * @return JSON字符串，需调用者free
+ */
+static char* create_jsonrpc_error_response(cJSON* id, int code, const char* message, cJSON* data) {
+    cJSON* response = cJSON_CreateObject();
+    cJSON* error = cJSON_CreateObject();
+    
+    cJSON_AddNumberToObject(error, "code", code);
+    cJSON_AddStringToObject(error, "message", message ? message : "Internal error");
+    
+    if (data) {
+        cJSON_AddItemToObject(error, "data", data);
+    }
+    
+    cJSON_AddStringToObject(response, "jsonrpc", "2.0");
+    cJSON_AddItemToObject(response, "error", error);
+    cJSON_AddItemToObject(response, "id", id ? cJSON_Duplicate(id, 1) : cJSON_CreateNull());
+    
+    char* json_str = cJSON_PrintUnformatted(response);
+    cJSON_Delete(response);
+    
+    return json_str;
+}
+
+/**
+ * @brief 创建JSON-RPC 2.0成功响应
+ * @param id 请求ID
+ * @param result 结果对象
+ * @return JSON字符串，需调用者free
+ */
+static char* create_jsonrpc_success_response(cJSON* id, cJSON* result) {
+    cJSON* response = cJSON_CreateObject();
+    
+    cJSON_AddStringToObject(response, "jsonrpc", "2.0");
+    cJSON_AddItemToObject(response, "result", result ? result : cJSON_CreateNull());
+    cJSON_AddItemToObject(response, "id", id ? cJSON_Duplicate(id, 1) : cJSON_CreateNull());
+    
+    char* json_str = cJSON_PrintUnformatted(response);
+    cJSON_Delete(response);
+    
+    return json_str;
+}
+
+/* ========== 系统调用处理 ========== */
+
+/**
+ * @brief 处理系统调用请求
+ * @param context 连接上下文
+ * @param method 方法名
+ * @param params 参数对象
+ * @return JSON响应字符串
+ */
+static char* handle_system_call(ws_connection_context_t* context, const char* method, cJSON* params) {
+    AGENTOS_LOG_DEBUG("Handling system call: %s", method);
+    
+    cJSON* response = cJSON_CreateObject();
+    
+    if (strcmp(method, "agentos_sys_task_submit") == 0) {
+        cJSON_AddStringToObject(response, "status", "accepted");
+        cJSON_AddStringToObject(response, "task_id", "task_001");
+        cJSON_AddNumberToObject(response, "estimated_time", 5000);
+    } 
+    else if (strcmp(method, "agentos_sys_memory_search") == 0) {
+        cJSON* results = cJSON_CreateArray();
+        cJSON_AddItemToArray(results, cJSON_CreateString("sample_memory_1"));
+        cJSON_AddItemToArray(results, cJSON_CreateString("sample_memory_2"));
+        cJSON_AddItemToObject(response, "results", results);
+        cJSON_AddNumberToObject(response, "total", 2);
+    }
+    else if (strcmp(method, "agentos_sys_session_create") == 0) {
+        char* session_id = NULL;
+        agentos_error_t err = session_manager_create_session(
+            context->server->session_mgr, 
+            params ? cJSON_Print(params) : NULL, 
+            &session_id);
+        
+        if (err == AGENTOS_SUCCESS) {
+            cJSON_AddStringToObject(response, "session_id", session_id);
+            free(session_id);
+        } else {
+            cJSON_AddStringToObject(response, "error", "Failed to create session");
+        }
+    }
+    else {
+        cJSON_Delete(response);
+        return create_jsonrpc_error_response(NULL, -32601, "Method not found", NULL);
+    }
+    
+    return create_jsonrpc_success_response(NULL, response);
+}
+
 /* ========== WebSocket网关内部结构 ========== */
 
 /**
@@ -86,7 +196,7 @@ typedef struct ws_gateway {
     size_t connections_count;        /**< 连接数量 */
     
     /* 限流器 */
-    ratelimit_t* ratelimiter;        /**< 消息限流器 */
+    ratelimiter_t* ratelimiter;        /**< 消息限流器 */
 } ws_gateway_t;
 
 /* ========== 消息协议定义 ========== */
@@ -535,7 +645,7 @@ static void ws_gateway_destroy(void* gateway_impl) {
     }
     
     if (gateway->ratelimiter) {
-        ratelimit_destroy(gateway->ratelimiter);
+        ratelimiter_destroy(gateway->ratelimiter);
     }
     
     free(gateway);
@@ -637,7 +747,7 @@ gateway_t* ws_gateway_create(const char* host, uint16_t port, dynamic_server_t* 
     gateway->connections_count = 0;
     
     /* 创建限流器 */
-    gateway->ratelimiter = ratelimit_create(1000, 60); /* 1000消息/分钟 */
+    gateway->ratelimiter = ratelimiter_create_simple(1000, 60); /* 1000消息/分钟 */
     if (!gateway->ratelimiter) {
         pthread_mutex_destroy(&gateway->connections_lock);
         free(gateway->connections);
@@ -651,7 +761,7 @@ gateway_t* ws_gateway_create(const char* host, uint16_t port, dynamic_server_t* 
     if (!gw) {
         pthread_mutex_destroy(&gateway->connections_lock);
         free(gateway->connections);
-        ratelimit_destroy(gateway->ratelimiter);
+        ratelimiter_destroy(gateway->ratelimiter);
         free(gateway->host);
         free(gateway);
         return NULL;

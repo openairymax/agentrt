@@ -1,6 +1,6 @@
 # AgentOS Agent Contract 规范集
 
-**版本**: 1.2.0  
+**版本**: Doc V1.5  
 **状态**: 正式发布  
 **编制单位**: AgentOS 架构委员会  
 **许可证**: GPL-3.0
