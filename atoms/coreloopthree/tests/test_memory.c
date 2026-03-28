@@ -8,10 +8,14 @@
 #include "agentos.h"
 #include <stdio.h>
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 
 /**
- * @brief 测试记忆引擎创建和销毁
+ * @brief 测试记忆引擎创建和销�?
  */
 static void test_memory_create_destroy() {
     agentos_memory_engine_t* engine = NULL;
@@ -34,7 +38,7 @@ static void test_memory_write() {
         return;
     }
 
-    // 创建一个记忆记录
+    // 创建一个记忆记�?
     agentos_memory_record_t record = {
         .record_id = NULL,
         .id_len = 0,
@@ -55,7 +59,7 @@ static void test_memory_write() {
     printf("test_memory_write: %d\n", err);
     if (err == AGENTOS_SUCCESS && record_id) {
         printf("Record ID: %s\n", record_id);
-        free(record_id);
+        AGENTOS_FREE(record_id);
     }
 
     agentos_memory_destroy(engine);
@@ -72,7 +76,7 @@ static void test_memory_query() {
         return;
     }
 
-    // 创建一个记忆记录
+    // 创建一个记忆记�?
     agentos_memory_record_t record = {
         .record_id = NULL,
         .id_len = 0,
@@ -112,7 +116,7 @@ static void test_memory_query() {
             agentos_memory_result_free(result);
         }
 
-        free(record_id);
+        AGENTOS_FREE(record_id);
     }
 
     agentos_memory_destroy(engine);
@@ -129,7 +133,7 @@ static void test_memory_get() {
         return;
     }
 
-    // 创建一个记忆记录
+    // 创建一个记忆记�?
     agentos_memory_record_t record = {
         .record_id = NULL,
         .id_len = 0,
@@ -157,7 +161,7 @@ static void test_memory_get() {
             agentos_memory_record_free(retrieved_record);
         }
 
-        free(record_id);
+        AGENTOS_FREE(record_id);
     }
 
     agentos_memory_destroy(engine);
@@ -174,7 +178,7 @@ static void test_memory_mount() {
         return;
     }
 
-    // 创建一个记忆记录
+    // 创建一个记忆记�?
     agentos_memory_record_t record = {
         .record_id = NULL,
         .id_len = 0,
@@ -197,7 +201,7 @@ static void test_memory_mount() {
         err = agentos_memory_mount(engine, record_id, "test_context");
         printf("test_memory_mount: %d\n", err);
 
-        free(record_id);
+        AGENTOS_FREE(record_id);
     }
 
     agentos_memory_destroy(engine);
@@ -222,7 +226,7 @@ static void test_memory_evolve() {
 }
 
 /**
- * @brief 测试记忆引擎健康检查
+ * @brief 测试记忆引擎健康检�?
  */
 static void test_memory_health_check() {
     agentos_memory_engine_t* engine = NULL;
@@ -237,7 +241,7 @@ static void test_memory_health_check() {
     printf("test_memory_health_check: %d\n", err);
     if (err == AGENTOS_SUCCESS && health) {
         printf("Health: %s\n", health);
-        free(health);
+        AGENTOS_FREE(health);
     }
 
     agentos_memory_destroy(engine);

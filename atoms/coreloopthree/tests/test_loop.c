@@ -1,4 +1,4 @@
-/**
+﻿﻿/**
  * @file test_loop.c
  * @brief 核心循环单元测试
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -8,10 +8,14 @@
 #include "agentos.h"
 #include <stdio.h>
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 
 /**
- * @brief 测试核心循环创建和销毁
+ * @brief 测试核心循环创建和销�?
  */
 static void test_loop_create_destroy() {
     agentos_core_loop_t* loop = NULL;
@@ -34,14 +38,14 @@ static void test_loop_submit() {
         return;
     }
 
-    // 提交一个任务
+    // 提交一个任�?
     char* task_id = NULL;
-    const char* input = "帮我分析最近的销售数据";
+    const char* input = "帮我分析最近的销售数�?;
     err = agentos_loop_submit(loop, input, strlen(input), &task_id);
     printf("test_loop_submit: %d\n", err);
     if (err == AGENTOS_SUCCESS && task_id) {
         printf("Task ID: %s\n", task_id);
-        free(task_id);
+        AGENTOS_FREE(task_id);
     }
 
     agentos_loop_destroy(loop);
@@ -74,7 +78,7 @@ static void test_loop_get_engines() {
  */
 static void test_loop_config() {
     // 创建配置
-    agentos_loop_config_t config = {
+    agentos_loop_config_t manager = {
         .cognition_threads = 2,
         .execution_threads = 4,
         .memory_threads = 2,
@@ -86,7 +90,7 @@ static void test_loop_config() {
     };
 
     agentos_core_loop_t* loop = NULL;
-    agentos_error_t err = agentos_loop_create(&config, &loop);
+    agentos_error_t err = agentos_loop_create(&manager, &loop);
     printf("test_loop_config: %d\n", err);
     if (err == AGENTOS_SUCCESS) {
         agentos_loop_destroy(loop);

@@ -1,56 +1,186 @@
-# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# EditorConfig 帮助文档：https://editorconfig.org
+﻿# EditorConfig is awesome: https://EditorConfig.org
 
-# 顶级编辑器配置（不要修改）
+# 顶级配置文件
 root = true
 
-# 所有文件的默认配置
+# 通用文件设置
 [*]
 charset = utf-8
 end_of_line = lf
 insert_final_newline = true
 trim_trailing_whitespace = true
+
+# C/C++ 文件设置
+[*.{c,h,cpp,hpp,cc,hxx}]
 indent_style = space
 indent_size = 4
+tab_width = 4
 
-# Markdown 文件配置
-[*.md]
-trim_trailing_whitespace = false
-max_line_length = 0
+# 大括号风格：K&R 风格（同一行）
+# if (condition) {
+#     // code
+# }
+# 注意：clang-format 配置可能会覆盖此设置
 
-# YAML 文件配置
-[*.{yaml,yml}]
-indent_size = 2
+# 每行最大长度
+max_line_length = 100
 
-# Shell 脚本配置
-[*.{sh,bash}]
-indent_style = space
-indent_size = 2
+# Go 文件设置
+[*.go]
+indent_style = tab
+indent_size = 4
+tab_width = 4
 
-# Python 文件配置
+# 根据 Go 官方风格指南使用制表符
+# https://golang.org/doc/effective_go#formatting
+
+# Python 文件设置
 [*.py]
+indent_style = space
 indent_size = 4
+tab_width = 4
 
-# C/C++ 文件配置
-[*.{c,cpp,h,hpp}]
-indent_size = 4
+# Python PEP 8 推荐使用 4 个空格
+max_line_length = 88  # Black 格式化工具默认值
 
-# JSON 文件配置
-[*.json]
+# JavaScript/TypeScript 文件设置
+[*.{js,ts,jsx,tsx}]
+indent_style = space
 indent_size = 2
+tab_width = 2
 
-# Makefile 配置
+# JSON 文件设置
+[*.json]
+indent_style = space
+indent_size = 2
+tab_width = 2
+
+# YAML/YML 文件设置
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+tab_width = 2
+
+# Markdown 文件设置
+[*.md]
+indent_style = space
+indent_size = 2
+tab_width = 2
+trim_trailing_whitespace = false  # Markdown 行尾空格可能有意义
+
+# Makefile 文件设置
 [Makefile]
 indent_style = tab
+tab_width = 4
 
-# Dockerfile 配置
-[Dockerfile]
+# Shell 脚本文件设置
+[*.sh]
+indent_style = space
 indent_size = 2
+tab_width = 2
 
-# 文档目录的特殊配置
-[partdocs/**]
-trim_trailing_whitespace = false
-
-# 测试目录的配置
-[tests/**]
+# Rust 文件设置
+[*.rs]
+indent_style = space
 indent_size = 4
+tab_width = 4
+
+# Java 文件设置
+[*.java]
+indent_style = space
+indent_size = 4
+tab_width = 4
+
+# XML 文件设置
+[*.xml]
+indent_style = space
+indent_size = 2
+tab_width = 2
+
+# HTML 文件设置
+[*.{html,htm}]
+indent_style = space
+indent_size = 2
+tab_width = 2
+
+# CSS 文件设置
+[*.css]
+indent_style = space
+indent_size = 2
+tab_width = 2
+
+# SQL 文件设置
+[*.sql]
+indent_style = space
+indent_size = 2
+tab_width = 2
+
+# 配置文件设置
+[*.{ini,cfg,conf}]
+indent_style = space
+indent_size = 2
+tab_width = 2
+
+# Git 忽略文件设置
+[.gitignore]
+indent_style = space
+indent_size = 2
+tab_width = 2
+
+# Dockerfile 设置
+[Dockerfile]
+indent_style = space
+indent_size = 2
+tab_width = 2
+
+# 特殊文件：CMakeLists.txt 和 .cmake 文件
+[CMakeLists.txt]
+indent_style = space
+indent_size = 2
+tab_width = 2
+
+[*.cmake]
+indent_style = space
+indent_size = 2
+tab_width = 2
+
+# 特殊文件：.gitattributes
+[.gitattributes]
+indent_style = space
+indent_size = 2
+tab_width = 2
+
+# 特殊文件：.travis.yml, .github/workflows/*.yml
+[.travis.yml]
+indent_style = space
+indent_size = 2
+tab_width = 2
+
+[.github/workflows/*.yml]
+indent_style = space
+indent_size = 2
+tab_width = 2
+
+# 特殊文件：.clang-format, .clang-tidy
+[.clang-format]
+indent_style = space
+indent_size = 2
+tab_width = 2
+
+[.clang-tidy]
+indent_style = space
+indent_size = 2
+tab_width = 2
+
+# 特殊文件：.pre-commit-manager.yaml
+[.pre-commit-manager.yaml]
+indent_style = space
+indent_size = 2
+tab_width = 2
+
+# 特殊文件：.editorconfig 自身
+[.editorconfig]
+indent_style = space
+indent_size = 2
+tab_width = 2
+max_line_length = off

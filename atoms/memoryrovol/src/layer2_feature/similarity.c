@@ -1,6 +1,6 @@
 /**
  * @file similarity.c
- * @brief 相似度计算函数
+ * @brief 相似度计算函�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 

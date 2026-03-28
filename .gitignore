@@ -1,6 +1,6 @@
-# =============================================================================
+﻿# =============================================================================
 # AgentOS .gitignore 文件
-# 版本：2.0.0
+# 版本：2.1.0
 # 最后更新：2026-03-26
 # 说明：规范化排除所有不应纳入版本控制的文件和目录
 # =============================================================================
@@ -10,18 +10,18 @@
 # =============================================================================
 # 本项目包含以下主要模块：
 # - atoms/         : 核心原子模块（C 语言）
-# - atomslite/     : 轻量级原子模块
-# - backs/         : 后端服务模块（C 语言）
-# - common/        : 公共工具模块
-# - domes/         : 安全沙箱模块
-# - dynamic/       : 动态服务模块
-# - openhub/       : Python 应用中心
-# - partdata/      : 数据持久化层
-# - partdocs/      : 项目文档
+# - atomsmini/     : 轻量级原子模块
+# - daemon/        : 用户态服务模块（C 语言）
+# - bases/         : 统一基础库模块
+# - cupolas/       : 安全穹顶模块
+# - gateway/       : 动态服务模块
+# - openlab/       : Python 应用中心
+# - lodges/      : 数据持久化层
+# - manuals/    : 项目文档
 # - scripts/       : 构建和运维脚本
 # - tests/         : 测试框架
-# - tools/         : 多语言 SDK 工具
-# - config/        : 配置文件
+# - toolkit/          : 多语言 SDK 工具
+# - manager/       : 配置管理器
 
 # =============================================================================
 # 1. 构建系统和编译产物
@@ -60,7 +60,8 @@ cmake_install.*
 *.gch
 *.pch.gch
 
-# 构建目录（允许 build 目录存在但不提交内容）
+# --- 构建目录（允许 build 目录存在但不提交内容）---
+# 注意：scripts/build/ 和 scripts/deploy/ 是脚本目录，必须保留
 build/
 _build/
 cmake-build-*/
@@ -68,12 +69,16 @@ cmake-build-debug/
 cmake-build-release/
 cmake-build-coverage/
 
+# 部署产物目录（非脚本）
+deploy/artifacts/
+deploy/packages/
+
 # --- 编译器数据库 ---
 compile_commands.json
 compile_flags.txt
 
 # =============================================================================
-# 2. Python 相关（openhub/, scripts/, tests/, tools/python/）
+# 2. Python 相关 (openlab/, scripts/, tests/, toolkit/python/)
 # =============================================================================
 
 # --- Python 缓存 ---
@@ -95,12 +100,17 @@ ENV/
 # --- Python 包管理 ---
 *.egg-info/
 *.egg
-*.egg-info/
+*.dist-info/
+*.pydist-info/
 dist/
-build/
-eggs/
 wheels/
 *.whl
+
+# setuptoolkit/buildutils 构建产物
+build/bdist.*/
+build/lib/
+build/scripts-*/
+build/lib.*/
 
 # Poetry 特定
 .poetry/
@@ -164,9 +174,9 @@ service_account.json
 *.jks
 
 # --- 本地配置覆盖 ---
-config.local.yaml
-config.local.yml
-config.*.local.yaml
+manager.local.yaml
+manager.local.yml
+manager.*.local.yaml
 settings.local.py
 local_settings.py
 
@@ -191,7 +201,7 @@ out/
 
 # --- CLion 特定 ---
 .clion/
-cmake-build-*/
+# 注意：cmake-build-*/已在上面定义
 
 # --- Vim ---
 *.swp
@@ -217,7 +227,19 @@ cmake-build-*/
 *.xccheckout
 *.pbxuser
 *.perspectivev3
-build/
+
+# --- Visual Studio ---
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+bld/
+[Bb]in/
+[Oo]bj/
 
 # --- Eclipse ---
 .classpath
@@ -227,7 +249,6 @@ bin/
 
 # --- NetBeans ---
 nbproject/private/
-build/
 nbbuild/
 dist/
 nbdist/
@@ -239,7 +260,7 @@ nbdist/
 # --- 日志文件 ---
 *.log
 logs/
-partdata/logs/
+lodges/logs/
 *.logs
 
 # --- 数据库文件 ---
@@ -249,12 +270,13 @@ partdata/logs/
 *.sqlite
 *.sqlite3
 *.db.sqlite
-partdata/registry/*.db
-partdata/registry/*.sqlite
+lodges/registry/*.db
+lodges/registry/*.sqlite
 *.db-journal
+lodges/db/
 
 # --- 追踪和性能数据 ---
-partdata/traces/
+lodges/traces/
 *.trace
 *.spans
 *.prof
@@ -272,6 +294,11 @@ temp/
 *.bak
 *.backup
 *.orig
+
+# --- 本地开发目录 ---
+.local/
+local/
+.dev/
 
 # =============================================================================
 # 6. 测试相关
@@ -300,9 +327,8 @@ test_data/generated/
 # =============================================================================
 
 # --- Sphinx 文档 ---
-partdocs/_build/
-partdocs/.doctrees/
-partdocs/build/
+manuals/_build/
+manuals/.doctrees/
 
 # --- Doxygen ---
 doxygen/
@@ -310,7 +336,6 @@ xml/
 html/
 latex/
 man/
-doc/
 
 # --- MkDocs ---
 site/
@@ -366,22 +391,19 @@ $RECYCLE.BIN/
 # =============================================================================
 
 # --- Node.js (TypeScript SDK) ---
-tools/typescript/node_modules/
-tools/typescript/npm-debug.log
-tools/typescript/yarn-error.log
-tools/typescript/.npm
-tools/typescript/.yarn
+toolkit/typescript/node_modules/
+toolkit/typescript/npm-debug.log
+toolkit/typescript/yarn-error.log
+toolkit/typescript/.npm
+toolkit/typescript/.yarn
 
 # --- Rust (Rust SDK) ---
-tools/rust/target/
-**/Cargo.lock
-**/Cargo.toml.orig
-tools/rust/Cargo.lock
+toolkit/rust/target/
+toolkit/rust/Cargo.lock
 
 # --- Go (Go SDK) ---
-tools/go/go.sum
-tools/go/vendor/
-tools/go/*.sum
+toolkit/go/go.sum
+toolkit/go/vendor/
 
 # --- Ruby ---
 *.gem
@@ -398,16 +420,17 @@ composer.lock
 # =============================================================================
 
 # --- FAISS 索引文件（大型二进制） ---
-partdata/models/*.faiss
-partdata/models/*.index
-partdata/models/*.pkl
-partdata/models/*.pickle
+lodges/models/*.faiss
+lodges/models/*.index
+lodges/models/*.pkl
+lodges/models/*.pickle
 
 # --- 模型权重（大型文件） ---
-partdata/model/weights/*.bin
-partdata/model/weights/*.pth
-partdata/model/weights/*.h5
-partdata/model/weights/*.pt
+lodges/model/
+lodges/models/*.bin
+lodges/models/*.pth
+lodges/models/*.h5
+lodges/models/*.pt
 *.onnx
 *.tflite
 
@@ -441,15 +464,18 @@ deploy/docker/*.tar
 deploy/docker/*.tar.gz
 deploy/docker/.docker-*/
 docker-compose.override.yml
+.docker/
 
 # --- Kubernetes ---
 *.kubeconfig
+.kube/
 
 # =============================================================================
 # 11. 脚本和工具生成
 # =============================================================================
 
 # --- 构建脚本生成 ---
+# 注意：scripts/build/ 是源码目录，必须保留
 build/artifacts/
 build/packages/
 build/dist/
@@ -471,6 +497,9 @@ build_version.txt
 .本地/
 .local/
 local-docs/
+
+# --- 本地总结 ---
+.本地总结/
 
 # --- 调试配置 ---
 *.launch
@@ -514,13 +543,14 @@ replay_pid*
 # =============================================================================
 
 # --- Pre-commit ---
-.pre-commit-config.local.yaml
+.pre-commit-manager.local.yaml
 
 # --- ESLint ---
 .eslintcache
 
 # --- Prettier ---
 .prettierrc.local
+.prettierignore.local
 
 # --- Black (Python) ---
 .cache/
@@ -544,6 +574,10 @@ cppcheck.local.xml
 
 # --- Semgrep ---
 .semgrep.local.yaml
+
+# --- Ruff ---
+.ruff_cache/
+.ruff.toml.local
 
 # =============================================================================
 # 15. 其他
@@ -573,6 +607,11 @@ tmp_*.sh
 *.personal
 *.private
 
+# --- 报告和日志 ---
+reports/*.log
+reports/*.txt
+reports/archive/
+
 # =============================================================================
 # 16. 必须保留的例外
 # =============================================================================
@@ -581,38 +620,48 @@ tmp_*.sh
 !.gitignore
 !.gitattributes
 !.editorconfig
-!.pre-commit-config.yaml
+!.pre-commit-manager.yaml
 !.clang-format
 !.clang-tidy
+!.lizardrc
+!.jscpd.json
 !.semgrep.yml
 
 # 配置文件模板
 !.env.example
-!config/*.yaml
-!config/*.yml
-!config/*.template
-!config/*.schema.json
+!manager/*.yaml
+!manager/*.yml
+!manager/*.template
+!manager/*.schema.json
 
 # 关键文档
-!partdocs/**/*.md
+!manuals/**/*.md
 !README.md
 !LICENSE
 !CHANGELOG.md
 !CONTRIBUTING.md
 !AUTHORS.md
 !SECURITY.md
+!SUPPORT.md
+!CODE_OF_CONDUCT.md
+!NOTICE
+!ACKNOWLEDGMENTS.md
 
-# 构建脚本
+# 构建脚本（注意：scripts/build/ 和 scripts/deploy/ 是脚本目录）
 !scripts/**/*.sh
 !scripts/**/*.py
 !scripts/**/*.bat
 !scripts/**/*.ps1
+!scripts/**/*.yml
+!scripts/**/*.yaml
 
 # 测试框架
 !tests/**/*.py
 !tests/**/*.sh
 !tests/**/*.yaml
 !tests/**/*.yml
+!tests/**/*.c
+!tests/**/*.h
 
 # CI/CD 配置
 !.github/workflows/*.yml
@@ -623,6 +672,17 @@ tmp_*.sh
 !docker-compose*.yml
 !deploy/docker/Dockerfile*
 
+# 根目录脚本
+!quickstart.sh
+!validate.sh
+!Makefile
+!pyproject.toml
+
 # =============================================================================
 # 结束
 # =============================================================================
+
+
+
+
+

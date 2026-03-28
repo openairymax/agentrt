@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file observability.c
  * @brief AgentOS 微内核可观测性子系统实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -8,6 +8,10 @@
 #include "task.h"
 #include "time.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 #ifdef _WIN32
 #include <windows.h>
@@ -61,7 +65,7 @@ typedef struct histogram_entry {
 typedef struct {
     int initialized;
     agentos_mutex_t* lock;
-    agentos_observability_config_t config;
+    agentos_observability_config_t manager;
     metric_entry_t* metrics_head;
     size_t metrics_count;
     health_check_entry_t* health_checks_head;
@@ -176,7 +180,7 @@ static void* metrics_collection_thread(void* arg) {
         agentos_mutex_lock(g_state->lock);
         g_state->total_metrics_collected++;
         agentos_mutex_unlock(g_state->lock);
-        agentos_task_sleep(g_state->config.metrics_interval_ms);
+        agentos_task_sleep(g_state->manager.metrics_interval_ms);
     }
     return NULL;
 }
@@ -195,7 +199,7 @@ static void* health_check_thread(void* arg) {
         }
         g_state->total_health_checks_run++;
         agentos_mutex_unlock(g_state->lock);
-        agentos_task_sleep(g_state->config.health_check_interval_ms);
+        agentos_task_sleep(g_state->manager.health_check_interval_ms);
     }
     return NULL;
 }
@@ -302,8 +306,8 @@ static int get_thread_count(void) {
     return count;
 }
 
-int agentos_observability_init(const agentos_observability_config_t* config) {
-    if (!config) return AGENTOS_EINVAL;
+int agentos_observability_init(const agentos_observability_config_t* manager) {
+    if (!manager) return AGENTOS_EINVAL;
     if (!g_init_lock) {
         g_init_lock = agentos_mutex_create();
         if (!g_init_lock) return AGENTOS_ENOMEM;
@@ -319,7 +323,7 @@ int agentos_observability_init(const agentos_observability_config_t* config) {
         return AGENTOS_ENOMEM;
     }
     memset(state, 0, sizeof(observability_state_t));
-    memcpy(&state->config, config, sizeof(agentos_observability_config_t));
+    memcpy(&state->manager, manager, sizeof(agentos_observability_config_t));
     state->lock = agentos_mutex_create();
     if (!state->lock) {
         agentos_mem_free(state);
@@ -327,7 +331,7 @@ int agentos_observability_init(const agentos_observability_config_t* config) {
         return AGENTOS_ENOMEM;
     }
     state->start_time_ns = agentos_time_monotonic_ns();
-    if (config->enable_metrics && config->metrics_interval_ms > 0) {
+    if (manager->enable_metrics && manager->metrics_interval_ms > 0) {
         state->metrics_thread = agentos_thread_create(metrics_collection_thread, NULL);
         if (!state->metrics_thread) {
             agentos_mutex_destroy(state->lock);
@@ -336,7 +340,7 @@ int agentos_observability_init(const agentos_observability_config_t* config) {
             return AGENTOS_ENOMEM;
         }
     }
-    if (config->enable_health_check && config->health_check_interval_ms > 0) {
+    if (manager->enable_health_check && manager->health_check_interval_ms > 0) {
         state->health_check_thread = agentos_thread_create(health_check_thread, NULL);
         if (!state->health_check_thread) {
             if (state->metrics_thread) {
@@ -774,6 +778,6 @@ size_t agentos_observability_get_histogram_count(void) {
 int agentos_observability_get_config(agentos_observability_config_t* out_config) {
     if (!out_config) return AGENTOS_EINVAL;
     if (!g_state) return AGENTOS_ENOTINIT;
-    memcpy(out_config, &g_state->config, sizeof(agentos_observability_config_t));
+    memcpy(out_config, &g_state->manager, sizeof(agentos_observability_config_t));
     return AGENTOS_SUCCESS;
 }

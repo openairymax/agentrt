@@ -7,6 +7,10 @@
 #include "execution.h"
 #include "agentos.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 
 #ifdef _WIN32
@@ -69,11 +73,11 @@ void agentos_trace_shutdown(void) {
     trace_span_t* span = g_trace_spans;
     while (span) {
         trace_span_t* next = span->next;
-        if (span->span_id) free(span->span_id);
-        if (span->trace_id) free(span->trace_id);
-        if (span->parent_id) free(span->parent_id);
-        if (span->name) free(span->name);
-        free(span);
+        if (span->span_id) AGENTOS_FREE(span->span_id);
+        if (span->trace_id) AGENTOS_FREE(span->trace_id);
+        if (span->parent_id) AGENTOS_FREE(span->parent_id);
+        if (span->name) AGENTOS_FREE(span->name);
+        AGENTOS_FREE(span);
         span = next;
     }
     g_trace_spans = NULL;
@@ -89,24 +93,24 @@ void agentos_trace_shutdown(void) {
 agentos_error_t agentos_trace_start_span(const char* name, const char* trace_id, const char* parent_id, char** out_span_id) {
     if (!name || !out_span_id) return AGENTOS_EINVAL;
 
-    trace_span_t* span = (trace_span_t*)calloc(1, sizeof(trace_span_t));
+    trace_span_t* span = (trace_span_t*)AGENTOS_CALLOC(1, sizeof(trace_span_t));
     if (!span) return AGENTOS_ENOMEM;
 
     char id_buf[64];
     generate_span_id(id_buf, sizeof(id_buf));
-    span->span_id = strdup(id_buf);
-    span->trace_id = trace_id ? strdup(trace_id) : strdup(id_buf);
-    span->parent_id = parent_id ? strdup(parent_id) : NULL;
-    span->name = strdup(name);
+    span->span_id = AGENTOS_STRDUP(id_buf);
+    span->trace_id = trace_id ? AGENTOS_STRDUP(trace_id) : AGENTOS_STRDUP(id_buf);
+    span->parent_id = parent_id ? AGENTOS_STRDUP(parent_id) : NULL;
+    span->name = AGENTOS_STRDUP(name);
     span->start_time = agentos_time_monotonic_ns();
     span->end_time = 0;
 
     if (!span->span_id || !span->trace_id || !span->name) {
-        if (span->span_id) free(span->span_id);
-        if (span->trace_id) free(span->trace_id);
-        if (span->parent_id) free(span->parent_id);
-        if (span->name) free(span->name);
-        free(span);
+        if (span->span_id) AGENTOS_FREE(span->span_id);
+        if (span->trace_id) AGENTOS_FREE(span->trace_id);
+        if (span->parent_id) AGENTOS_FREE(span->parent_id);
+        if (span->name) AGENTOS_FREE(span->name);
+        AGENTOS_FREE(span);
         return AGENTOS_ENOMEM;
     }
 
@@ -119,7 +123,7 @@ agentos_error_t agentos_trace_start_span(const char* name, const char* trace_id,
     g_current_span = span;
     agentos_mutex_unlock(g_current_lock);
 
-    *out_span_id = strdup(span->span_id);
+    *out_span_id = AGENTOS_STRDUP(span->span_id);
     return *out_span_id ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
 }
 
@@ -144,7 +148,7 @@ agentos_error_t agentos_trace_get_current_span(char** out_span_id) {
     if (!out_span_id) return AGENTOS_EINVAL;
     agentos_mutex_lock(g_current_lock);
     if (g_current_span) {
-        *out_span_id = strdup(g_current_span->span_id);
+        *out_span_id = AGENTOS_STRDUP(g_current_span->span_id);
         agentos_mutex_unlock(g_current_lock);
         return *out_span_id ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
     } else {

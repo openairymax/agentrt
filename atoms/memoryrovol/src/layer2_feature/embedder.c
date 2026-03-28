@@ -1,6 +1,6 @@
-/**
+﻿/**
  * @file embedder.c
- * @brief L2 特征层嵌入器：支持 OpenAI、DeepSeek、Sentence Transformers
+ * @brief L2 特征层嵌入器：支�?OpenAI、DeepSeek、Sentence Transformers
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -10,12 +10,16 @@
 #include <curl/curl.h>
 #include <cjson/cJSON.h>
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 #include <pthread.h>
 #include <math.h>
 #include <uthash.h>
 
-/* 嵌入器类型 */
+/* 嵌入器类�?*/
 typedef enum {
     EMBEDDER_OPENAI,
     EMBEDDER_DEEPSEEK,
@@ -24,7 +28,7 @@ typedef enum {
 } embedder_type_t;
 
 // From data intelligence emerges. by spharx
-/* 内存缓冲区（用于HTTP响应） */
+/* 内存缓冲区（用于HTTP响应�?*/
 typedef struct memory_buffer {
     char* data;
     size_t size;
@@ -34,7 +38,7 @@ typedef struct memory_buffer {
 static size_t write_callback(void* contents, size_t size, size_t nmemb, void* userp) {
     size_t realsize = size * nmemb;
     memory_buffer_t* mem = (memory_buffer_t*)userp;
-    char* ptr = realloc(mem->data, mem->size + realsize + 1);
+    char* ptr = AGENTOS_REALLOC(mem->data, mem->size + realsize + 1);
     if (!ptr) return 0;
     mem->data = ptr;
     memcpy(&mem->data[mem->size], contents, realsize);
@@ -43,7 +47,7 @@ static size_t write_callback(void* contents, size_t size, size_t nmemb, void* us
     return realsize;
 }
 
-/* 嵌入器句柄结构 */
+/* 嵌入器句柄结�?*/
 typedef struct embedder_handle {
     embedder_type_t type;
     char* model_name;
@@ -59,52 +63,52 @@ static agentos_error_t embed_openai(embedder_handle_t* h, const char* text, floa
 static agentos_error_t embed_deepseek(embedder_handle_t* h, const char* text, float** out_vec, size_t* out_dim);
 static agentos_error_t embed_sentence_transformers(embedder_handle_t* h, const char* text, float** out_vec, size_t* out_dim);
 
-/* ========== 嵌入器创建/销毁 ========== */
-static embedder_handle_t* embedder_create(const agentos_layer2_feature_config_t* config) {
-    if (!config || !config->embedding_model) return NULL;
+/* ========== 嵌入器创�?销�?========== */
+static embedder_handle_t* embedder_create(const agentos_layer2_feature_config_t* manager) {
+    if (!manager || !manager->embedding_model) return NULL;
 
-    embedder_handle_t* h = calloc(1, sizeof(embedder_handle_t));
+    embedder_handle_t* h = AGENTOS_CALLOC(1, sizeof(embedder_handle_t));
     if (!h) return NULL;
 
-    h->model_name = strdup(config->embedding_model);
-    if (config->api_key) h->api_key = strdup(config->api_key);
-    if (config->api_base) h->api_base = strdup(config->api_base);
+    h->model_name = AGENTOS_STRDUP(manager->embedding_model);
+    if (manager->api_key) h->api_key = AGENTOS_STRDUP(manager->api_key);
+    if (manager->api_base) h->api_base = AGENTOS_STRDUP(manager->api_base);
 
-    // 根据模型名判断类型
-    if (strstr(config->embedding_model, "text-embedding-") == config->embedding_model) {
+    // 根据模型名判断类�?
+    if (strstr(manager->embedding_model, "text-embedding-") == manager->embedding_model) {
         h->type = EMBEDDER_OPENAI;
-        if (config->dimension > 0) {
-            h->dimension = config->dimension;
-        } else if (strstr(config->embedding_model, "3-small")) {
+        if (manager->dimension > 0) {
+            h->dimension = manager->dimension;
+        } else if (strstr(manager->embedding_model, "3-small")) {
             h->dimension = 1536;
-        } else if (strstr(config->embedding_model, "3-large")) {
+        } else if (strstr(manager->embedding_model, "3-large")) {
             h->dimension = 3072;
         } else {
             h->dimension = 1536;
         }
-    } else if (strstr(config->embedding_model, "deepseek") != NULL ||
-               strstr(config->embedding_model, "DeepSeek") != NULL) {
+    } else if (strstr(manager->embedding_model, "deepseek") != NULL ||
+               strstr(manager->embedding_model, "DeepSeek") != NULL) {
         h->type = EMBEDDER_DEEPSEEK;
-        h->dimension = config->dimension > 0 ? config->dimension : 1024;
-    } else if (strstr(config->embedding_model, "sentence-transformers/") == config->embedding_model ||
-               strstr(config->embedding_model, "all-") == config->embedding_model ||
-               strstr(config->embedding_model, "multi-") == config->embedding_model) {
+        h->dimension = manager->dimension > 0 ? manager->dimension : 1024;
+    } else if (strstr(manager->embedding_model, "sentence-transformers/") == manager->embedding_model ||
+               strstr(manager->embedding_model, "all-") == manager->embedding_model ||
+               strstr(manager->embedding_model, "multi-") == manager->embedding_model) {
         h->type = EMBEDDER_SENTENCE_TRANSFORMERS;
-        h->dimension = config->dimension > 0 ? config->dimension : 384;
+        h->dimension = manager->dimension > 0 ? manager->dimension : 384;
     } else {
         h->type = EMBEDDER_LOCAL;
-        h->dimension = config->dimension > 0 ? config->dimension : 384;
+        h->dimension = manager->dimension > 0 ? manager->dimension : 384;
     }
     return h;
 }
 
 static void embedder_destroy(embedder_handle_t* h) {
     if (!h) return;
-    free(h->model_name);
-    free(h->api_key);
-    free(h->api_base);
+    AGENTOS_FREE(h->model_name);
+    AGENTOS_FREE(h->api_key);
+    AGENTOS_FREE(h->api_base);
     // 释放本地模型（如果加载）
-    free(h);
+    AGENTOS_FREE(h);
 }
 
 /* ========== OpenAI 嵌入实现 ========== */
@@ -150,17 +154,17 @@ static agentos_error_t embed_openai(embedder_handle_t* h, const char* text, floa
 
     CURLcode res = curl_easy_perform(curl);
     curl_slist_free_all(headers);
-    free(json_str);
+    AGENTOS_FREE(json_str);
     curl_easy_cleanup(curl);
 
     if (res != CURLE_OK || !resp.data) {
-        if (resp.data) free(resp.data);
+        if (resp.data) AGENTOS_FREE(resp.data);
         AGENTOS_LOG_ERROR("CURL error: %d", res);
         return AGENTOS_EIO;
     }
 
     cJSON* json = cJSON_Parse(resp.data);
-    free(resp.data);
+    AGENTOS_FREE(resp.data);
     if (!json) {
         AGENTOS_LOG_ERROR("Failed to parse JSON response");
         return AGENTOS_EINVAL;
@@ -181,7 +185,7 @@ static agentos_error_t embed_openai(embedder_handle_t* h, const char* text, floa
     }
 
     size_t dim = cJSON_GetArraySize(embedding);
-    float* vec = (float*)malloc(dim * sizeof(float));
+    float* vec = (float*)AGENTOS_MALLOC(dim * sizeof(float));
     if (!vec) {
         cJSON_Delete(json);
         return AGENTOS_ENOMEM;
@@ -234,16 +238,16 @@ static agentos_error_t embed_deepseek(embedder_handle_t* h, const char* text, fl
 
     CURLcode res = curl_easy_perform(curl);
     curl_slist_free_all(headers);
-    free(json_str);
+    AGENTOS_FREE(json_str);
     curl_easy_cleanup(curl);
 
     if (res != CURLE_OK || !resp.data) {
-        if (resp.data) free(resp.data);
+        if (resp.data) AGENTOS_FREE(resp.data);
         return AGENTOS_EIO;
     }
 
     cJSON* json = cJSON_Parse(resp.data);
-    free(resp.data);
+    AGENTOS_FREE(resp.data);
     if (!json) return AGENTOS_EINVAL;
 
     cJSON* data = cJSON_GetObjectItem(json, "data");
@@ -259,7 +263,7 @@ static agentos_error_t embed_deepseek(embedder_handle_t* h, const char* text, fl
     }
 
     size_t dim = cJSON_GetArraySize(embedding);
-    float* vec = (float*)malloc(dim * sizeof(float));
+    float* vec = (float*)AGENTOS_MALLOC(dim * sizeof(float));
     if (!vec) {
         cJSON_Delete(json);
         return AGENTOS_ENOMEM;

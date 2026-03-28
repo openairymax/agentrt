@@ -1,6 +1,6 @@
-/**
+﻿/**
  * @file relation.c
- * @brief L3 结构层关系编码器（支持持久化）
+ * @brief L3 结构层关系编码器（支持持久化�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -9,6 +9,10 @@
 #include "logger.h"
 #include <sqlite3.h>
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 #include <math.h>
 
@@ -18,14 +22,14 @@ struct agentos_relation_encoder {
     float* role_subject;
     float* role_predicate;
     float* role_object;
-    // 持久化
+    // 持久�?
     sqlite3* db;
     char* db_path;
 };
 
 // From data intelligence emerges. by spharx
 static float* random_unit_vector(size_t dim) {
-    float* vec = (float*)malloc(dim * sizeof(float));
+    float* vec = (float*)AGENTOS_MALLOC(dim * sizeof(float));
     if (!vec) return NULL;
     float norm = 0;
     for (size_t i = 0; i < dim; i++) {
@@ -51,11 +55,11 @@ static const char* create_relations_table_sql =
 
 agentos_relation_encoder_t* agentos_relation_encoder_create(
     agentos_binder_t* binder,
-    const agentos_layer3_structure_config_t* config) {
+    const agentos_layer3_structure_config_t* manager) {
 
     if (!binder) return NULL;
 
-    agentos_relation_encoder_t* enc = (agentos_relation_encoder_t*)calloc(1, sizeof(agentos_relation_encoder_t));
+    agentos_relation_encoder_t* enc = (agentos_relation_encoder_t*)AGENTOS_CALLOC(1, sizeof(agentos_relation_encoder_t));
     if (!enc) {
         AGENTOS_LOG_ERROR("Failed to allocate relation encoder");
         return NULL;
@@ -64,7 +68,7 @@ agentos_relation_encoder_t* agentos_relation_encoder_create(
     enc->binder = binder;
     enc->lock = agentos_mutex_create();
     if (!enc->lock) {
-        free(enc);
+        AGENTOS_FREE(enc);
         return NULL;
     }
 
@@ -74,25 +78,25 @@ agentos_relation_encoder_t* agentos_relation_encoder_create(
     enc->role_object = random_unit_vector(dim);
 
     if (!enc->role_subject || !enc->role_predicate || !enc->role_object) {
-        if (enc->role_subject) free(enc->role_subject);
-        if (enc->role_predicate) free(enc->role_predicate);
-        if (enc->role_object) free(enc->role_object);
+        if (enc->role_subject) AGENTOS_FREE(enc->role_subject);
+        if (enc->role_predicate) AGENTOS_FREE(enc->role_predicate);
+        if (enc->role_object) AGENTOS_FREE(enc->role_object);
         agentos_mutex_destroy(enc->lock);
-        free(enc);
+        AGENTOS_FREE(enc);
         return NULL;
     }
 
-    // 打开数据库
-    if (config && config->db_path) {
-        enc->db_path = strdup(config->db_path);
-        int rc = sqlite3_open(config->db_path, &enc->db);
+    // 打开数据�?
+    if (manager && manager->db_path) {
+        enc->db_path = AGENTOS_STRDUP(manager->db_path);
+        int rc = sqlite3_open(manager->db_path, &enc->db);
         if (rc != SQLITE_OK) {
             AGENTOS_LOG_ERROR("Failed to open relation database: %s", sqlite3_errmsg(enc->db));
-            free(enc->role_subject);
-            free(enc->role_predicate);
-            free(enc->role_object);
+            AGENTOS_FREE(enc->role_subject);
+            AGENTOS_FREE(enc->role_predicate);
+            AGENTOS_FREE(enc->role_object);
             agentos_mutex_destroy(enc->lock);
-            free(enc);
+            AGENTOS_FREE(enc);
             return NULL;
         }
         char* errmsg = NULL;
@@ -101,11 +105,11 @@ agentos_relation_encoder_t* agentos_relation_encoder_create(
             AGENTOS_LOG_ERROR("Failed to create relations table: %s", errmsg);
             sqlite3_free(errmsg);
             sqlite3_close(enc->db);
-            free(enc->role_subject);
-            free(enc->role_predicate);
-            free(enc->role_object);
+            AGENTOS_FREE(enc->role_subject);
+            AGENTOS_FREE(enc->role_predicate);
+            AGENTOS_FREE(enc->role_object);
             agentos_mutex_destroy(enc->lock);
-            free(enc);
+            AGENTOS_FREE(enc);
             return NULL;
         }
     }
@@ -115,13 +119,13 @@ agentos_relation_encoder_t* agentos_relation_encoder_create(
 
 void agentos_relation_encoder_destroy(agentos_relation_encoder_t* enc) {
     if (!enc) return;
-    free(enc->role_subject);
-    free(enc->role_predicate);
-    free(enc->role_object);
+    AGENTOS_FREE(enc->role_subject);
+    AGENTOS_FREE(enc->role_predicate);
+    AGENTOS_FREE(enc->role_object);
     if (enc->db) sqlite3_close(enc->db);
-    if (enc->db_path) free(enc->db_path);
+    if (enc->db_path) AGENTOS_FREE(enc->db_path);
     if (enc->lock) agentos_mutex_destroy(enc->lock);
-    free(enc);
+    AGENTOS_FREE(enc);
 }
 
 agentos_error_t agentos_relation_encode_triple(
@@ -152,23 +156,23 @@ agentos_error_t agentos_relation_encode_triple(
     const float* pred_pair[2] = {enc->role_predicate, predicate};
     err = agentos_binder_bind(enc->binder, pred_pair, 2, &bound_pred);
     if (err != AGENTOS_SUCCESS) {
-        free(bound_subj);
+        AGENTOS_FREE(bound_subj);
         return err;
     }
 
     const float* obj_pair[2] = {enc->role_object, object};
     err = agentos_binder_bind(enc->binder, obj_pair, 2, &bound_obj);
     if (err != AGENTOS_SUCCESS) {
-        free(bound_subj);
-        free(bound_pred);
+        AGENTOS_FREE(bound_subj);
+        AGENTOS_FREE(bound_pred);
         return err;
     }
 
-    float* result = (float*)malloc(dim * sizeof(float));
+    float* result = (float*)AGENTOS_MALLOC(dim * sizeof(float));
     if (!result) {
-        free(bound_subj);
-        free(bound_pred);
-        free(bound_obj);
+        AGENTOS_FREE(bound_subj);
+        AGENTOS_FREE(bound_pred);
+        AGENTOS_FREE(bound_obj);
         return AGENTOS_ENOMEM;
     }
 
@@ -176,9 +180,9 @@ agentos_error_t agentos_relation_encode_triple(
         result[i] = bound_subj[i] + bound_pred[i] + bound_obj[i];
     }
 
-    free(bound_subj);
-    free(bound_pred);
-    free(bound_obj);
+    AGENTOS_FREE(bound_subj);
+    AGENTOS_FREE(bound_pred);
+    AGENTOS_FREE(bound_obj);
 
     *out_relation = result;
     return AGENTOS_SUCCESS;
@@ -195,18 +199,18 @@ agentos_error_t agentos_relation_encode_event(
 
 agentos_relation_t* agentos_relation_copy(const agentos_relation_t* src) {
     if (!src) return NULL;
-    agentos_relation_t* dst = (agentos_relation_t*)malloc(sizeof(agentos_relation_t));
+    agentos_relation_t* dst = (agentos_relation_t*)AGENTOS_MALLOC(sizeof(agentos_relation_t));
     if (!dst) return NULL;
-    dst->from_id = src->from_id ? strdup(src->from_id) : NULL;
-    dst->to_id = src->to_id ? strdup(src->to_id) : NULL;
+    dst->from_id = src->from_id ? AGENTOS_STRDUP(src->from_id) : NULL;
+    dst->to_id = src->to_id ? AGENTOS_STRDUP(src->to_id) : NULL;
     dst->type = src->type;
     dst->weight = src->weight;
-    dst->metadata_json = src->metadata_json ? strdup(src->metadata_json) : NULL;
+    dst->metadata_json = src->metadata_json ? AGENTOS_STRDUP(src->metadata_json) : NULL;
     if ((src->from_id && !dst->from_id) || (src->to_id && !dst->to_id) || (src->metadata_json && !dst->metadata_json)) {
-        if (dst->from_id) free(dst->from_id);
-        if (dst->to_id) free(dst->to_id);
-        if (dst->metadata_json) free(dst->metadata_json);
-        free(dst);
+        if (dst->from_id) AGENTOS_FREE(dst->from_id);
+        if (dst->to_id) AGENTOS_FREE(dst->to_id);
+        if (dst->metadata_json) AGENTOS_FREE(dst->metadata_json);
+        AGENTOS_FREE(dst);
         return NULL;
     }
     return dst;
@@ -216,11 +220,11 @@ void agentos_relations_free(agentos_relation_t** relations, size_t count) {
     if (!relations) return;
     for (size_t i = 0; i < count; i++) {
         if (relations[i]) {
-            if (relations[i]->from_id) free(relations[i]->from_id);
-            if (relations[i]->to_id) free(relations[i]->to_id);
-            if (relations[i]->metadata_json) free(relations[i]->metadata_json);
-            free(relations[i]);
+            if (relations[i]->from_id) AGENTOS_FREE(relations[i]->from_id);
+            if (relations[i]->to_id) AGENTOS_FREE(relations[i]->to_id);
+            if (relations[i]->metadata_json) AGENTOS_FREE(relations[i]->metadata_json);
+            AGENTOS_FREE(relations[i]);
         }
     }
-    free(relations);
+    AGENTOS_FREE(relations);
 }

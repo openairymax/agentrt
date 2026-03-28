@@ -1,12 +1,16 @@
 /**
  * @file cache.c
- * @brief 检索缓存（LRU实现）
+ * @brief 检索缓存（LRU实现�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "../include/retrieval.h"
 #include "agentos.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 
 typedef struct cache_node {
@@ -23,7 +27,7 @@ struct agentos_retrieval_cache {
     cache_node_t* tail;                  /**< LRU链表尾（最久未用） */
     size_t max_size;                     /**< 最大条目数 */
     // From data intelligence emerges. by spharx
-    size_t current_size;                  /**< 当前条目数 */
+    size_t current_size;                  /**< 当前条目�?*/
     agentos_mutex_t* lock;
 };
 
@@ -33,7 +37,7 @@ agentos_error_t agentos_retrieval_cache_create(
 
     if (!out_cache) return AGENTOS_EINVAL;
 
-    agentos_retrieval_cache_t* cache = (agentos_retrieval_cache_t*)calloc(1, sizeof(agentos_retrieval_cache_t));
+    agentos_retrieval_cache_t* cache = (agentos_retrieval_cache_t*)AGENTOS_CALLOC(1, sizeof(agentos_retrieval_cache_t));
     if (!cache) {
         AGENTOS_LOG_ERROR("Failed to allocate cache");
         return AGENTOS_ENOMEM;
@@ -42,7 +46,7 @@ agentos_error_t agentos_retrieval_cache_create(
     cache->max_size = max_size;
     cache->lock = agentos_mutex_create();
     if (!cache->lock) {
-        free(cache);
+        AGENTOS_FREE(cache);
         return AGENTOS_ENOMEM;
     }
 
@@ -57,22 +61,22 @@ void agentos_retrieval_cache_destroy(agentos_retrieval_cache_t* cache) {
     cache_node_t* node = cache->head;
     while (node) {
         cache_node_t* next = node->next;
-        free(node->key);
+        AGENTOS_FREE(node->key);
         if (node->result_ids) {
             for (size_t i = 0; i < node->result_count; i++) {
-                free(node->result_ids[i]);
+                AGENTOS_FREE(node->result_ids[i]);
             }
-            free(node->result_ids);
+            AGENTOS_FREE(node->result_ids);
         }
-        free(node);
+        AGENTOS_FREE(node);
         node = next;
     }
     agentos_mutex_unlock(cache->lock);
     agentos_mutex_destroy(cache->lock);
-    free(cache);
+    AGENTOS_FREE(cache);
 }
 
-/* 简单的字符串哈希（djb2） */
+/* 简单的字符串哈希（djb2�?*/
 static unsigned long hash_key(const char* str) {
     unsigned long hash = 5381;
     int c;
@@ -117,16 +121,16 @@ agentos_error_t agentos_retrieval_cache_get(
             node->timestamp = agentos_time_monotonic_ns();
 
             // 复制结果
-            char** ids = (char**)malloc(node->result_count * sizeof(char*));
+            char** ids = (char**)AGENTOS_MALLOC(node->result_count * sizeof(char*));
             if (!ids) {
                 agentos_mutex_unlock(cache->lock);
                 return AGENTOS_ENOMEM;
             }
             for (size_t i = 0; i < node->result_count; i++) {
-                ids[i] = strdup(node->result_ids[i]);
+                ids[i] = AGENTOS_STRDUP(node->result_ids[i]);
                 if (!ids[i]) {
-                    for (size_t j = 0; j < i; j++) free(ids[j]);
-                    free(ids);
+                    for (size_t j = 0; j < i; j++) AGENTOS_FREE(ids[j]);
+                    AGENTOS_FREE(ids);
                     agentos_mutex_unlock(cache->lock);
                     return AGENTOS_ENOMEM;
                 }
@@ -159,20 +163,20 @@ agentos_error_t agentos_retrieval_cache_put(
     cache_node_t* node = cache->head;
     while (node) {
         if (strcmp(node->key, key_buf) == 0) {
-            // 释放旧结果
-            for (size_t i = 0; i < node->result_count; i++) free(node->result_ids[i]);
-            free(node->result_ids);
-            // 复制新结果
-            node->result_ids = (char**)malloc(result_count * sizeof(char*));
+            // 释放旧结�?
+            for (size_t i = 0; i < node->result_count; i++) AGENTOS_FREE(node->result_ids[i]);
+            AGENTOS_FREE(node->result_ids);
+            // 复制新结�?
+            node->result_ids = (char**)AGENTOS_MALLOC(result_count * sizeof(char*));
             if (!node->result_ids) {
                 agentos_mutex_unlock(cache->lock);
                 return AGENTOS_ENOMEM;
             }
             for (size_t i = 0; i < result_count; i++) {
-                node->result_ids[i] = strdup(result_ids[i]);
+                node->result_ids[i] = AGENTOS_STRDUP(result_ids[i]);
                 if (!node->result_ids[i]) {
-                    for (size_t j = 0; j < i; j++) free(node->result_ids[j]);
-                    free(node->result_ids);
+                    for (size_t j = 0; j < i; j++) AGENTOS_FREE(node->result_ids[j]);
+                    AGENTOS_FREE(node->result_ids);
                     node->result_ids = NULL;
                     node->result_count = 0;
                     agentos_mutex_unlock(cache->lock);
@@ -188,32 +192,32 @@ agentos_error_t agentos_retrieval_cache_put(
         node = node->next;
     }
 
-    // 创建新节点
-    node = (cache_node_t*)calloc(1, sizeof(cache_node_t));
+    // 创建新节�?
+    node = (cache_node_t*)AGENTOS_CALLOC(1, sizeof(cache_node_t));
     if (!node) {
         agentos_mutex_unlock(cache->lock);
         return AGENTOS_ENOMEM;
     }
-    node->key = strdup(key_buf);
+    node->key = AGENTOS_STRDUP(key_buf);
     if (!node->key) {
-        free(node);
+        AGENTOS_FREE(node);
         agentos_mutex_unlock(cache->lock);
         return AGENTOS_ENOMEM;
     }
-    node->result_ids = (char**)malloc(result_count * sizeof(char*));
+    node->result_ids = (char**)AGENTOS_MALLOC(result_count * sizeof(char*));
     if (!node->result_ids) {
-        free(node->key);
-        free(node);
+        AGENTOS_FREE(node->key);
+        AGENTOS_FREE(node);
         agentos_mutex_unlock(cache->lock);
         return AGENTOS_ENOMEM;
     }
     for (size_t i = 0; i < result_count; i++) {
-        node->result_ids[i] = strdup(result_ids[i]);
+        node->result_ids[i] = AGENTOS_STRDUP(result_ids[i]);
         if (!node->result_ids[i]) {
-            for (size_t j = 0; j < i; j++) free(node->result_ids[j]);
-            free(node->result_ids);
-            free(node->key);
-            free(node);
+            for (size_t j = 0; j < i; j++) AGENTOS_FREE(node->result_ids[j]);
+            AGENTOS_FREE(node->result_ids);
+            AGENTOS_FREE(node->key);
+            AGENTOS_FREE(node);
             agentos_mutex_unlock(cache->lock);
             return AGENTOS_ENOMEM;
         }
@@ -235,10 +239,10 @@ agentos_error_t agentos_retrieval_cache_put(
         if (tail) {
             cache->tail = tail->prev;
             if (cache->tail) cache->tail->next = NULL;
-            free(tail->key);
-            for (size_t i = 0; i < tail->result_count; i++) free(tail->result_ids[i]);
-            free(tail->result_ids);
-            free(tail);
+            AGENTOS_FREE(tail->key);
+            for (size_t i = 0; i < tail->result_count; i++) AGENTOS_FREE(tail->result_ids[i]);
+            AGENTOS_FREE(tail->result_ids);
+            AGENTOS_FREE(tail);
             cache->current_size--;
         }
     }

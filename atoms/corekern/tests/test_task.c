@@ -37,7 +37,7 @@ int test_thread_create() {
     // 等待线程执行
     agentos_task_sleep(200);
     
-    // 检查线程是否执行
+    // 检查线程是否执�?
     if (!thread_executed) {
         printf("Thread not executed\n");
         return 1;
@@ -80,7 +80,7 @@ int test_task_priority() {
         return 1;
     }
     
-    // 等待低优先级线程开始执行
+    // 等待低优先级线程开始执�?
     agentos_task_sleep(50);
     
     // 创建高优先级线程
@@ -93,7 +93,7 @@ int test_task_priority() {
     // 等待高优先级线程执行
     agentos_task_sleep(150);
     
-    // 检查线程是否执行
+    // 检查线程是否执�?
     if (!thread_executed) {
         printf("Thread not executed\n");
         return 1;
@@ -138,7 +138,7 @@ int test_task_yield() {
     // 等待线程执行
     agentos_task_sleep(200);
     
-    // 检查线程是否执行
+    // 检查线程是否执�?
     if (!thread_executed) {
         printf("Thread not executed\n");
         return 1;
@@ -171,21 +171,21 @@ int test_task_get_set_priority() {
         return 1;
     }
     
-    // 获取任务优先级
+    // 获取任务优先�?
     int priority = agentos_task_get_priority(&thread);
     if (priority != AGENTOS_TASK_PRIORITY_NORMAL) {
         printf("Task priority not set correctly: %d\n", priority);
         return 1;
     }
     
-    // 设置任务优先级
+    // 设置任务优先�?
     err = agentos_task_set_priority(&thread, AGENTOS_TASK_PRIORITY_HIGH);
     if (err != AGENTOS_SUCCESS) {
         printf("Failed to set task priority: %d\n", err);
         return 1;
     }
     
-    // 再次获取任务优先级
+    // 再次获取任务优先�?
     priority = agentos_task_get_priority(&thread);
     if (priority != AGENTOS_TASK_PRIORITY_HIGH) {
         printf("Task priority not updated: %d\n", priority);
@@ -195,7 +195,7 @@ int test_task_get_set_priority() {
     // 等待线程执行
     agentos_task_sleep(200);
     
-    // 检查线程是否执行
+    // 检查线程是否执�?
     if (!thread_executed) {
         printf("Thread not executed\n");
         return 1;
@@ -228,7 +228,7 @@ int test_task_get_state() {
         return 1;
     }
     
-    // 获取任务状态
+    // 获取任务状�?
     agentos_task_state_t state = agentos_task_get_state(&thread);
     if (state != AGENTOS_TASK_STATE_RUNNING && state != AGENTOS_TASK_STATE_READY) {
         printf("Task state not correct: %d\n", state);
@@ -238,7 +238,7 @@ int test_task_get_state() {
     // 等待线程执行
     agentos_task_sleep(200);
     
-    // 再次获取任务状态
+    // 再次获取任务状�?
     state = agentos_task_get_state(&thread);
     if (state != AGENTOS_TASK_STATE_TERMINATED) {
         printf("Task state not terminated: %d\n", state);

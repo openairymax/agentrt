@@ -8,10 +8,14 @@
 #include "agentos.h"
 #include <stdio.h>
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 
 /**
- * @brief 测试认知引擎创建和销毁
+ * @brief 测试认知引擎创建和销�?
  */
 static void test_cognition_create_destroy() {
     agentos_cognition_engine_t* engine = NULL;
@@ -34,7 +38,7 @@ static void test_cognition_process() {
         return;
     }
 
-    const char* input = "帮我分析最近的销售数据";
+    const char* input = "帮我分析最近的销售数�?;
     agentos_task_plan_t* plan = NULL;
     err = agentos_cognition_process(engine, input, strlen(input), &plan);
     printf("test_cognition_process: %d\n", err);
@@ -47,7 +51,7 @@ static void test_cognition_process() {
 }
 
 /**
- * @brief 测试认知引擎设置上下文
+ * @brief 测试认知引擎设置上下�?
  */
 static void test_cognition_set_context() {
     agentos_cognition_engine_t* engine = NULL;
@@ -81,14 +85,14 @@ static void test_cognition_stats() {
     printf("test_cognition_stats: %d\n", err);
     if (err == AGENTOS_SUCCESS && stats) {
         printf("Stats: %s\n", stats);
-        free(stats);
+        AGENTOS_FREE(stats);
     }
 
     agentos_cognition_destroy(engine);
 }
 
 /**
- * @brief 测试认知引擎健康检查
+ * @brief 测试认知引擎健康检�?
  */
 static void test_cognition_health_check() {
     agentos_cognition_engine_t* engine = NULL;
@@ -103,7 +107,7 @@ static void test_cognition_health_check() {
     printf("test_cognition_health_check: %d\n", err);
     if (err == AGENTOS_SUCCESS && health) {
         printf("Health: %s\n", health);
-        free(health);
+        AGENTOS_FREE(health);
     }
 
     agentos_cognition_destroy(engine);

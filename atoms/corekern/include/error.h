@@ -4,8 +4,8 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#ifndef AGENTOS_ERROR_H
-#define AGENTOS_ERROR_H
+#ifndef AGENTOS_ATOMS_COREKERN_ERROR_H
+#define AGENTOS_ATOMS_COREKERN_ERROR_H
 
 #include <stdint.h>
 #include "export.h"
@@ -41,4 +41,4 @@ AGENTOS_API const char* agentos_strerror(agentos_error_t err);
 }
 #endif
 
-#endif /* AGENTOS_ERROR_H */
+#endif /* AGENTOS_ATOMS_COREKERN_ERROR_H */

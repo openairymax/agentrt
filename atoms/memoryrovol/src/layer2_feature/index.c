@@ -1,11 +1,15 @@
-/**
+﻿/**
  * @file layer2_feature.c
- * @brief L2 特征层实现
+ * @brief L2 特征层实�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "../include/layer2_feature.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 #include <pthread.h>
 #include <math.h>
@@ -48,7 +52,7 @@ struct agentos_layer2_feature {
 };
 
 /**
- * @brief 计算余弦相似度
+ * @brief 计算余弦相似�?
  */
 static float cosine_similarity(const float* a, const float* b, uint32_t dim) {
     float dot = 0.0f;
@@ -64,11 +68,11 @@ static float cosine_similarity(const float* a, const float* b, uint32_t dim) {
 }
 
 /**
- * @brief 生成简单文本向量（用于演示）
+ * @brief 生成简单文本向量（用于演示�?
  */
 static float* generate_text_embedding(const char* text, uint32_t dim) {
     if (!text) return NULL;
-    float* vector = (float*)calloc(dim, sizeof(float));
+    float* vector = (float*)AGENTOS_CALLOC(dim, sizeof(float));
     if (!vector) return NULL;
     size_t len = strlen(text);
     for (uint32_t i = 0; i < dim; i++) {
@@ -81,16 +85,16 @@ static float* generate_text_embedding(const char* text, uint32_t dim) {
  * @brief 创建 HNSW 索引
  */
 static hnsw_index_t* hnsw_create(uint32_t dimension, uint32_t m) {
-    hnsw_index_t* index = (hnsw_index_t*)calloc(1, sizeof(hnsw_index_t));
+    hnsw_index_t* index = (hnsw_index_t*)AGENTOS_CALLOC(1, sizeof(hnsw_index_t));
     if (!index) return NULL;
     index->dimension = dimension;
     index->m = m > 0 ? m : DEFAULT_HNSW_M;
     index->ef_construction = DEFAULT_EF_CONSTRUCTION;
     index->ef_search = DEFAULT_EF_SEARCH;
     index->capacity = 1024;
-    index->nodes = (hnsw_node_t**)calloc(index->capacity, sizeof(hnsw_node_t*));
+    index->nodes = (hnsw_node_t**)AGENTOS_CALLOC(index->capacity, sizeof(hnsw_node_t*));
     if (!index->nodes) {
-        free(index);
+        AGENTOS_FREE(index);
         return NULL;
     }
     pthread_mutex_init(&index->mutex, NULL);
@@ -98,27 +102,27 @@ static hnsw_index_t* hnsw_create(uint32_t dimension, uint32_t m) {
 }
 
 /**
- * @brief 销毁 HNSW 索引
+ * @brief 销�?HNSW 索引
  */
 static void hnsw_destroy(hnsw_index_t* index) {
     if (!index) return;
     for (size_t i = 0; i < index->node_count; i++) {
         hnsw_node_t* node = index->nodes[i];
         if (node) {
-            if (node->id) free(node->id);
-            if (node->vector) free(node->vector);
-            if (node->neighbors) free(node->neighbors);
-            if (node->neighbor_counts) free(node->neighbor_counts);
-            free(node);
+            if (node->id) AGENTOS_FREE(node->id);
+            if (node->vector) AGENTOS_FREE(node->vector);
+            if (node->neighbors) AGENTOS_FREE(node->neighbors);
+            if (node->neighbor_counts) AGENTOS_FREE(node->neighbor_counts);
+            AGENTOS_FREE(node);
         }
     }
-    free(index->nodes);
+    AGENTOS_FREE(index->nodes);
     pthread_mutex_destroy(&index->mutex);
-    free(index);
+    AGENTOS_FREE(index);
 }
 
 /**
- * @brief 添加向量到索引
+ * @brief 添加向量到索�?
  */
 static agentos_error_t hnsw_add(hnsw_index_t* index, const char* id, const float* vector) {
     if (!index || !id || !vector) return AGENTOS_EINVAL;
@@ -127,7 +131,7 @@ static agentos_error_t hnsw_add(hnsw_index_t* index, const char* id, const float
 
     if (index->node_count >= index->capacity) {
         size_t new_cap = index->capacity * 2;
-        hnsw_node_t** new_nodes = (hnsw_node_t**)realloc(index->nodes, new_cap * sizeof(hnsw_node_t*));
+        hnsw_node_t** new_nodes = (hnsw_node_t**)AGENTOS_REALLOC(index->nodes, new_cap * sizeof(hnsw_node_t*));
         if (!new_nodes) {
             pthread_mutex_unlock(&index->mutex);
             return AGENTOS_ENOMEM;
@@ -136,24 +140,24 @@ static agentos_error_t hnsw_add(hnsw_index_t* index, const char* id, const float
         index->capacity = new_cap;
     }
 
-    hnsw_node_t* node = (hnsw_node_t*)calloc(1, sizeof(hnsw_node_t));
+    hnsw_node_t* node = (hnsw_node_t*)AGENTOS_CALLOC(1, sizeof(hnsw_node_t));
     if (!node) {
         pthread_mutex_unlock(&index->mutex);
         return AGENTOS_ENOMEM;
     }
 
-    node->id = strdup(id);
-    node->vector = (float*)malloc(index->dimension * sizeof(float));
+    node->id = AGENTOS_STRDUP(id);
+    node->vector = (float*)AGENTOS_MALLOC(index->dimension * sizeof(float));
     if (!node->vector) {
-        free(node->id);
-        free(node);
+        AGENTOS_FREE(node->id);
+        AGENTOS_FREE(node);
         pthread_mutex_unlock(&index->mutex);
         return AGENTOS_ENOMEM;
     }
     memcpy(node->vector, vector, index->dimension * sizeof(float));
     node->level = 1;
-    node->neighbors = (hnsw_node_t**)calloc(node->level + 1, sizeof(hnsw_node_t*));
-    node->neighbor_counts = (size_t*)calloc(node->level + 1, sizeof(size_t));
+    node->neighbors = (hnsw_node_t**)AGENTOS_CALLOC(node->level + 1, sizeof(hnsw_node_t*));
+    node->neighbor_counts = (size_t*)AGENTOS_CALLOC(node->level + 1, sizeof(size_t));
 
     index->nodes[index->node_count++] = node;
 
@@ -178,12 +182,12 @@ static agentos_error_t hnsw_search(hnsw_index_t* index, const float* query, uint
     }
 
     size_t result_count = k < index->node_count ? k : index->node_count;
-    char** ids = (char**)calloc(result_count, sizeof(char*));
-    float* scores = (float*)calloc(result_count, sizeof(float));
+    char** ids = (char**)AGENTOS_CALLOC(result_count, sizeof(char*));
+    float* scores = (float*)AGENTOS_CALLOC(result_count, sizeof(float));
 
     if (!ids || !scores) {
-        if (ids) free(ids);
-        if (scores) free(scores);
+        if (ids) AGENTOS_FREE(ids);
+        if (scores) AGENTOS_FREE(scores);
         pthread_mutex_unlock(&index->mutex);
         return AGENTOS_ENOMEM;
     }
@@ -199,12 +203,12 @@ static agentos_error_t hnsw_search(hnsw_index_t* index, const float* query, uint
             if (sim > scores[j]) {
                 for (size_t m = result_count - 1; m > j; m--) {
                     scores[m] = scores[m - 1];
-                    if (ids[m - 1]) free(ids[m - 1]);
-                    ids[m] = ids[m - 1] ? strdup(ids[m - 1]) : NULL;
+                    if (ids[m - 1]) AGENTOS_FREE(ids[m - 1]);
+                    ids[m] = ids[m - 1] ? AGENTOS_STRDUP(ids[m - 1]) : NULL;
                 }
                 scores[j] = sim;
-                if (ids[j]) free(ids[j]);
-                ids[j] = strdup(index->nodes[i]->id);
+                if (ids[j]) AGENTOS_FREE(ids[j]);
+                ids[j] = AGENTOS_STRDUP(index->nodes[i]->id);
                 break;
             }
         }
@@ -220,27 +224,27 @@ static agentos_error_t hnsw_search(hnsw_index_t* index, const float* query, uint
 }
 
 agentos_error_t agentos_layer2_feature_create(
-    const agentos_layer2_feature_config_t* config,
+    const agentos_layer2_feature_config_t* manager,
     agentos_layer2_feature_t** out) {
     if (!out) return AGENTOS_EINVAL;
 
-    agentos_layer2_feature_t* l2 = (agentos_layer2_feature_t*)calloc(1, sizeof(agentos_layer2_feature_t));
+    agentos_layer2_feature_t* l2 = (agentos_layer2_feature_t*)AGENTOS_CALLOC(1, sizeof(agentos_layer2_feature_t));
     if (!l2) return AGENTOS_ENOMEM;
 
-    l2->index_type = config && config->index_type ? config->index_type : AGENTOS_INDEX_HNSW;
-    l2->dimension = config && config->dimension ? config->dimension : 128;
-    l2->m = config && config->hnsw_m ? config->hnsw_m : DEFAULT_HNSW_M;
+    l2->index_type = manager && manager->index_type ? manager->index_type : AGENTOS_INDEX_HNSW;
+    l2->dimension = manager && manager->dimension ? manager->dimension : 128;
+    l2->m = manager && manager->hnsw_m ? manager->hnsw_m : DEFAULT_HNSW_M;
 
-    if (config && config->index_path) {
-        snprintf(l2->index_path, sizeof(l2->index_path), "%s", config->index_path);
+    if (manager && manager->index_path) {
+        snprintf(l2->index_path, sizeof(l2->index_path), "%s", manager->index_path);
     }
-    if (config && config->embedding_model) {
-        snprintf(l2->embedding_model, sizeof(l2->embedding_model), "%s", config->embedding_model);
+    if (manager && manager->embedding_model) {
+        snprintf(l2->embedding_model, sizeof(l2->embedding_model), "%s", manager->embedding_model);
     }
 
     l2->hnsw = hnsw_create(l2->dimension, l2->m);
     if (!l2->hnsw) {
-        free(l2);
+        AGENTOS_FREE(l2);
         return AGENTOS_ENOMEM;
     }
 
@@ -253,7 +257,7 @@ void agentos_layer2_feature_destroy(agentos_layer2_feature_t* l2) {
     if (l2->hnsw) {
         hnsw_destroy(l2->hnsw);
     }
-    free(l2);
+    AGENTOS_FREE(l2);
 }
 
 agentos_error_t agentos_layer2_feature_add(
@@ -266,7 +270,7 @@ agentos_error_t agentos_layer2_feature_add(
     if (!vector) return AGENTOS_ENOMEM;
 
     agentos_error_t err = hnsw_add(l2->hnsw, id, vector);
-    free(vector);
+    AGENTOS_FREE(vector);
 
     return err;
 }
@@ -291,7 +295,7 @@ agentos_error_t agentos_layer2_feature_search(
     if (!vector) return AGENTOS_ENOMEM;
 
     agentos_error_t err = hnsw_search(l2->hnsw, vector, k, out_ids, out_scores, out_count);
-    free(vector);
+    AGENTOS_FREE(vector);
 
     return err;
 }

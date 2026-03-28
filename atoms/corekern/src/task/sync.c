@@ -7,6 +7,10 @@
 #include "task.h"
 #include "mem.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -23,7 +27,7 @@ struct agentos_cond {
 };
 
 agentos_mutex_t* agentos_mutex_create(void) {
-    agentos_mutex_t* m = (agentos_mutex_t*)malloc(sizeof(agentos_mutex_t));
+    agentos_mutex_t* m = (agentos_mutex_t*)AGENTOS_MALLOC(sizeof(agentos_mutex_t));
     if (!m) return NULL;
     InitializeCriticalSection(&m->cs);
     m->initialized = 1;
@@ -36,7 +40,7 @@ void agentos_mutex_destroy(agentos_mutex_t* mutex) {
             DeleteCriticalSection(&mutex->cs);
             mutex->initialized = 0;
         }
-        free(mutex);
+        AGENTOS_FREE(mutex);
     }
 }
 
@@ -54,14 +58,14 @@ void agentos_mutex_unlock(agentos_mutex_t* mutex) {
 }
 
 agentos_cond_t* agentos_cond_create(void) {
-    agentos_cond_t* c = (agentos_cond_t*)malloc(sizeof(agentos_cond_t));
+    agentos_cond_t* c = (agentos_cond_t*)AGENTOS_MALLOC(sizeof(agentos_cond_t));
     if (!c) return NULL;
     InitializeConditionVariable(&c->cv);
     return c;
 }
 
 void agentos_cond_destroy(agentos_cond_t* cond) {
-    free(cond);
+    AGENTOS_FREE(cond);
 }
 
 agentos_error_t agentos_cond_wait(
@@ -102,14 +106,14 @@ struct agentos_cond {
 };
 
 agentos_mutex_t* agentos_mutex_create(void) {
-    agentos_mutex_t* m = (agentos_mutex_t*)malloc(sizeof(agentos_mutex_t));
+    agentos_mutex_t* m = (agentos_mutex_t*)AGENTOS_MALLOC(sizeof(agentos_mutex_t));
     if (!m) return NULL;
     pthread_mutexattr_t attr;
     pthread_mutexattr_init(&attr);
     pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
     if (pthread_mutex_init(&m->ptm, &attr) != 0) {
         pthread_mutexattr_destroy(&attr);
-        free(m);
+        AGENTOS_FREE(m);
         return NULL;
     }
     pthread_mutexattr_destroy(&attr);
@@ -123,7 +127,7 @@ void agentos_mutex_destroy(agentos_mutex_t* mutex) {
             pthread_mutex_destroy(&mutex->ptm);
             mutex->initialized = 0;
         }
-        free(mutex);
+        AGENTOS_FREE(mutex);
     }
 }
 
@@ -141,10 +145,10 @@ void agentos_mutex_unlock(agentos_mutex_t* mutex) {
 }
 
 agentos_cond_t* agentos_cond_create(void) {
-    agentos_cond_t* c = (agentos_cond_t*)malloc(sizeof(agentos_cond_t));
+    agentos_cond_t* c = (agentos_cond_t*)AGENTOS_MALLOC(sizeof(agentos_cond_t));
     if (!c) return NULL;
     if (pthread_cond_init(&c->ptc, NULL) != 0) {
-        free(c);
+        AGENTOS_FREE(c);
         return NULL;
     }
     return c;
@@ -153,7 +157,7 @@ agentos_cond_t* agentos_cond_create(void) {
 void agentos_cond_destroy(agentos_cond_t* cond) {
     if (cond) {
         pthread_cond_destroy(&cond->ptc);
-        free(cond);
+        AGENTOS_FREE(cond);
     }
 }
 

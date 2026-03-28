@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 AgentOS 测试运行脚本
 提供统一的测试运行接口和错误诊断
@@ -143,7 +143,7 @@ class TestRunner:
             # 尝试运行pytest
             result = subprocess.run([
                 sys.executable, '-m', 'pytest', 
-                'unit/sdk/python/test_sdk.py',
+                'unit/toolkit/python/test_sdk.py',
                 '-v', '--tb=short'
             ], cwd=self.test_dir, capture_output=True, text=True, timeout=60)
             

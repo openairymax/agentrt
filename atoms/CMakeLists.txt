@@ -38,7 +38,11 @@ endif()
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
+
+# libevent 是核心依赖（用于事件驱动模块）
 pkg_check_modules(LIBEVENT REQUIRED libevent)
+message(STATUS "libevent found: ${LIBEVENT_VERSION}")
+add_definitions(-DAGENTOS_HAS_LIBEVENT=1)
 
 # 包含子目录
 # Kernel subdirectories

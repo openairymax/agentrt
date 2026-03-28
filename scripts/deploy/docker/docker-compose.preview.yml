@@ -1,4 +1,4 @@
-# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+﻿﻿# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Docker Compose 配置文件 - Preview 环境 (PR 预览)
 # 用于 PR 预览部署
 
@@ -82,7 +82,7 @@ services:
     restart: unless-stopped
 
     volumes:
-      - ./config/otel-collector-preview.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - ./manager/otel-collector-preview.yaml:/etc/otelcol-contrib/manager.yaml:ro
 
     networks:
       - agentos-preview-network
@@ -103,5 +103,5 @@ networks:
   agentos-preview-network:
     driver: bridge
     ipam:
-      config:
+      manager:
         - subnet: 172.30.0.0/16

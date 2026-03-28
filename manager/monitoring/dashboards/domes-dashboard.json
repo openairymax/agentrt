@@ -1,0 +1,290 @@
+﻿{
+  "dashboard": {
+    "title": "AgentOS cupolas Module CI/CD Dashboard",
+    "uid": "agentos-cupolas-cicd",
+    "tags": ["agentos", "cupolas", "cicd"],
+    "timezone": "browser",
+    "refresh": "1m",
+    "time": {
+      "from": "now-24h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "title": "Build Status Overview",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(github_actions_workflow_run_conclusion{repository=\"AgentOS\", workflow=\"cupolas-ci.yml\", conclusion=\"success\"}) or vector(0)",
+            "legendFormat": "Success"
+          },
+          {
+            "expr": "sum(github_actions_workflow_run_conclusion{repository=\"AgentOS\", workflow=\"cupolas-ci.yml\", conclusion=\"failure\"}) or vector(0)",
+            "legendFormat": "Failure"
+          }
+        ],
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area",
+          "orientation": "horizontal"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 3}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "title": "Build Success Rate",
+        "type": "gauge",
+        "gridPos": {"x": 6, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(rate(github_actions_workflow_run_conclusion{repository=\"AgentOS\", workflow=\"cupolas-ci.yml\", conclusion=\"success\"}[1h])) / sum(rate(github_actions_workflow_run_total{repository=\"AgentOS\", workflow=\"cupolas-ci.yml\"}[1h])) * 100"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 70},
+                {"color": "green", "value": 90}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "title": "Test Coverage",
+        "type": "gauge",
+        "gridPos": {"x": 12, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "codecov_coverage_percent{repository=\"AgentOS\", flag=\"cupolas\"} or vector(0)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 60},
+                {"color": "green", "value": 80}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "title": "Open Security Issues",
+        "type": "stat",
+        "gridPos": {"x": 18, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(trivy_vulnerabilities{repository=\"AgentOS\", module=\"cupolas\", severity=~\"CRITICAL|HIGH\"}) or vector(0)",
+            "legendFormat": "Critical/High"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "title": "Build Duration Trend",
+        "type": "timeseries",
+        "gridPos": {"x": 0, "y": 4, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(github_actions_workflow_run_duration_seconds_bucket{repository=\"AgentOS\", workflow=\"cupolas-ci.yml\"}[1h]))",
+            "legendFormat": "P95"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(github_actions_workflow_run_duration_seconds_bucket{repository=\"AgentOS\", workflow=\"cupolas-ci.yml\"}[1h]))",
+            "legendFormat": "P50"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s"
+          }
+        }
+      },
+      {
+        "title": "Build Duration by Stage",
+        "type": "timeseries",
+        "gridPos": {"x": 12, "y": 4, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "rate(github_actions_job_duration_seconds{repository=\"AgentOS\", workflow=\"cupolas-ci.yml\", job=\"code-quality\"}[1h])",
+            "legendFormat": "Code Quality"
+          },
+          {
+            "expr": "rate(github_actions_job_duration_seconds{repository=\"AgentOS\", workflow=\"cupolas-ci.yml\", job=\"build-unix\"}[1h])",
+            "legendFormat": "Build Unix"
+          },
+          {
+            "expr": "rate(github_actions_job_duration_seconds{repository=\"AgentOS\", workflow=\"cupolas-ci.yml\", job=\"build-windows\"}[1h])",
+            "legendFormat": "Build Windows"
+          },
+          {
+            "expr": "rate(github_actions_job_duration_seconds{repository=\"AgentOS\", workflow=\"cupolas-ci.yml\", job=\"coverage\"}[1h])",
+            "legendFormat": "Coverage"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s"
+          }
+        }
+      },
+      {
+        "title": "Test Results",
+        "type": "timeseries",
+        "gridPos": {"x": 0, "y": 10, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "ctest_tests_passed{module=\"cupolas\"}",
+            "legendFormat": "Passed"
+          },
+          {
+            "expr": "ctest_tests_failed{module=\"cupolas\"}",
+            "legendFormat": "Failed"
+          },
+          {
+            "expr": "ctest_tests_skipped{module=\"cupolas\"}",
+            "legendFormat": "Skipped"
+          }
+        ]
+      },
+      {
+        "title": "Static Analysis Issues",
+        "type": "timeseries",
+        "gridPos": {"x": 12, "y": 10, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "cppcheck_error_count{module=\"cupolas\"}",
+            "legendFormat": "Errors"
+          },
+          {
+            "expr": "cppcheck_warning_count{module=\"cupolas\"}",
+            "legendFormat": "Warnings"
+          },
+          {
+            "expr": "cppcheck_style_count{module=\"cupolas\"}",
+            "legendFormat": "Style"
+          }
+        ]
+      },
+      {
+        "title": "Deployment Status",
+        "type": "table",
+        "gridPos": {"x": 0, "y": 16, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "deployment_status{module=\"cupolas\"}",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {"Time": true, "__name__": true},
+              "indexByName": {"environment": 0, "status": 1, "version": 2}
+            }
+          }
+        ]
+      },
+      {
+        "title": "Recent Deployments",
+        "type": "timeseries",
+        "gridPos": {"x": 12, "y": 16, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "changes(deployment_total{module=\"cupolas\"}[1h])",
+            "legendFormat": "{{ environment }}"
+          }
+        ]
+      },
+      {
+        "title": "Security Vulnerabilities by Severity",
+        "type": "piechart",
+        "gridPos": {"x": 0, "y": 22, "w": 8, "h": 6},
+        "targets": [
+          {
+            "expr": "sum(trivy_vulnerabilities{repository=\"AgentOS\", module=\"cupolas\"}) by (severity)",
+            "legendFormat": "{{ severity }}"
+          }
+        ],
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right"
+          }
+        }
+      },
+      {
+        "title": "Fuzzing Results",
+        "type": "stat",
+        "gridPos": {"x": 8, "y": 22, "w": 8, "h": 6},
+        "targets": [
+          {
+            "expr": "fuzzing_crashes_found{module=\"cupolas\"} or vector(0)",
+            "legendFormat": "Crashes"
+          },
+          {
+            "expr": "fuzzing_timeouts_found{module=\"cupolas\"} or vector(0)",
+            "legendFormat": "Timeouts"
+          },
+          {
+            "expr": "fuzzing_coverage_percent{module=\"cupolas\"} or vector(0)",
+            "legendFormat": "Coverage %"
+          }
+        ]
+      },
+      {
+        "title": "Benchmark Comparison",
+        "type": "timeseries",
+        "gridPos": {"x": 16, "y": 22, "w": 8, "h": 6},
+        "targets": [
+          {
+            "expr": "benchmark_duration_seconds{module=\"cupolas\"}",
+            "legendFormat": "{{ benchmark }}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s"
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,5 +1,5 @@
-/**
- * @file config.h
+﻿/**
+ * @file manager.h
  * @brief MemoryRovol 全局配置结构
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
@@ -68,9 +68,9 @@ agentos_error_t agentos_memoryrov_config_load(
 
 /**
  * @brief 释放配置结构
- * @param config 配置指针
+ * @param manager 配置指针
  */
-void agentos_memoryrov_config_free(agentos_memoryrov_config_t* config);
+void agentos_memoryrov_config_free(agentos_memoryrov_config_t* manager);
 
 /**
  * @brief 获取默认配置

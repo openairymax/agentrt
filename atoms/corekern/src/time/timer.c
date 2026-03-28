@@ -1,12 +1,16 @@
 /**
  * @file timer.c
- * @brief 定时器实现
+ * @brief 定时器实�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "time.h"
 #include "task.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 
 typedef struct agentos_timer {
@@ -28,7 +32,7 @@ agentos_timer_t* agentos_timer_create(
 
     if (!callback) return NULL;
 
-    agentos_timer_t* timer = (agentos_timer_t*)calloc(1, sizeof(agentos_timer_t));
+    agentos_timer_t* timer = (agentos_timer_t*)AGENTOS_CALLOC(1, sizeof(agentos_timer_t));
     if (!timer) return NULL;
 
     timer->callback = callback;
@@ -97,7 +101,7 @@ agentos_error_t agentos_timer_stop(agentos_timer_t* timer) {
 void agentos_timer_destroy(agentos_timer_t* timer) {
     if (!timer) return;
     agentos_timer_stop(timer);
-    free(timer);
+    AGENTOS_FREE(timer);
 }
 
 void agentos_time_timer_process(void) {

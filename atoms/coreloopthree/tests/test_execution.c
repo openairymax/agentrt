@@ -8,10 +8,14 @@
 #include "agentos.h"
 #include <stdio.h>
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 
 /**
- * @brief 测试执行引擎创建和销毁
+ * @brief 测试执行引擎创建和销�?
  */
 static void test_execution_create_destroy() {
     agentos_execution_engine_t* engine = NULL;
@@ -35,7 +39,7 @@ static void test_execution_register_unregister() {
     }
 
     // 创建一个简单的执行单元
-    agentos_execution_unit_t* unit = (agentos_execution_unit_t*)malloc(sizeof(agentos_execution_unit_t));
+    agentos_execution_unit_t* unit = (agentos_execution_unit_t*)AGENTOS_MALLOC(sizeof(agentos_execution_unit_t));
     if (unit) {
         unit->data = NULL;
         unit->execute = NULL;
@@ -46,14 +50,14 @@ static void test_execution_register_unregister() {
         printf("test_execution_register: %d\n", err);
 
         agentos_execution_unregister_unit(engine, "test_unit");
-        free(unit);
+        AGENTOS_FREE(unit);
     }
 
     agentos_execution_destroy(engine);
 }
 
 /**
- * @brief 测试任务提交和查询
+ * @brief 测试任务提交和查�?
  */
 static void test_execution_submit_query() {
     agentos_execution_engine_t* engine = NULL;
@@ -63,7 +67,7 @@ static void test_execution_submit_query() {
         return;
     }
 
-    // 创建一个任务
+    // 创建一个任�?
     agentos_task_t task = {
         .task_id = "test_task",
         .id_len = strlen("test_task"),
@@ -87,12 +91,12 @@ static void test_execution_submit_query() {
     if (err == AGENTOS_SUCCESS && task_id) {
         printf("Task ID: %s\n", task_id);
 
-        // 查询任务状态
+        // 查询任务状�?
         agentos_task_status_t status;
         err = agentos_execution_query(engine, task_id, &status);
         printf("test_execution_query: %d, status: %d\n", err, status);
 
-        free(task_id);
+        AGENTOS_FREE(task_id);
     }
 
     agentos_execution_destroy(engine);
@@ -109,7 +113,7 @@ static void test_execution_cancel() {
         return;
     }
 
-    // 创建一个任务
+    // 创建一个任�?
     agentos_task_t task = {
         .task_id = "test_task_cancel",
         .id_len = strlen("test_task_cancel"),
@@ -134,14 +138,14 @@ static void test_execution_cancel() {
         err = agentos_execution_cancel(engine, task_id);
         printf("test_execution_cancel: %d\n", err);
 
-        free(task_id);
+        AGENTOS_FREE(task_id);
     }
 
     agentos_execution_destroy(engine);
 }
 
 /**
- * @brief 测试执行引擎健康检查
+ * @brief 测试执行引擎健康检�?
  */
 static void test_execution_health_check() {
     agentos_execution_engine_t* engine = NULL;
@@ -156,7 +160,7 @@ static void test_execution_health_check() {
     printf("test_execution_health_check: %d\n", err);
     if (err == AGENTOS_SUCCESS && health) {
         printf("Health: %s\n", health);
-        free(health);
+        AGENTOS_FREE(health);
     }
 
     agentos_execution_destroy(engine);

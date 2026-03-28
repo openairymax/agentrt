@@ -1,45 +1,46 @@
 ﻿/**
  * @file weighted.c
- * @brief 加权调度策略 - 可配置权重
+ * @brief ��Ȩ���Ȳ��� - ������Ȩ��
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "cognition.h"
-#include "agent_registry.h"
-#include "agentos.h"
-#include "logger.h"
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-#include <float.h>
+#include "cognition.h
+#include "../../../bases/utils/cognition/include/cognition_common.h""
+#include "agent_registry.h
+#include "../../../bases/utils/cognition/include/cognition_common.h""
+#include "agentos.h
+#include "../../../bases/utils/cognition/include/cognition_common.h""
+#include "logger.h
+#include "../../../bases/utils/cognition/include/cognition_common.h""
+#include <stdlib.h
+#include "../../../bases/utils/cognition/include/cognition_common.h">
 
-typedef struct weighted_data {
-    float cost_weight;
-    float perf_weight;
-    float trust_weight;
-    void* registry_ctx;
-    agent_registry_get_agents_func get_agents;
-    agentos_mutex_t* lock;
-} weighted_data_t;
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h
+#include "../../../bases/utils/cognition/include/cognition_common.h""
+#include "../../../bases/utils/string/include/string_compat.h
+#include "../../../bases/utils/cognition/include/cognition_common.h""
+#include <string.h
+#include "../../../bases/utils/cognition/include/cognition_common.h">
+#include <stdio.h
+#include "../../../bases/utils/cognition/include/cognition_common.h">
+#include <float.h
+#include "../../../bases/utils/cognition/include/cognition_common.h">
+
+#include "../../../bases/utils/strategy/include/strategy_common.h
+#include "../../../bases/utils/cognition/include/cognition_common.h""\n\ntypedef struct weighted_data {\n    weighted_config_t manager;\n    void* registry_ctx;\n    agent_registry_get_agents_func get_agents;\n    agentos_mutex_t* lock;\n} weighted_data_t;
 
 static void weighted_destroy(agentos_dispatching_strategy_t* strategy) {
     if (!strategy) return;
     weighted_data_t* data = (weighted_data_t*)strategy->data;
     if (data) {
         if (data->lock) agentos_mutex_destroy(data->lock);
-        free(data);
+        AGENTOS_FREE(data);
     }
-    free(strategy);
+    AGENTOS_FREE(strategy);
 }
 
-static float compute_score(const agent_info_t* agent, const weighted_data_t* data) {
-    float cost_score = 1.0f / (agent->cost_estimate + 1.0f);
-    float perf_score = agent->success_rate;
-    float trust_score = agent->trust_score;
-    return data->cost_weight * cost_score +
-           data->perf_weight * perf_score +
-           data->trust_weight * trust_score;
-}
+static float compute_score(const agent_info_t* agent, const weighted_data_t* data) {\n    strategy_agent_info_t strategy_agent = {\n        .cost_estimate = agent->cost_estimate,\n        .success_rate = agent->success_rate,\n        .trust_score = agent->trust_score,\n        .name = agent->name,\n        .user_data = NULL\n    };\n    return strategy_compute_weighted_score(&strategy_agent, &data->manager);\n}
 
 static agentos_error_t weighted_dispatch(
     const agentos_task_node_t* task,
@@ -78,7 +79,7 @@ static agentos_error_t weighted_dispatch(
 
     if (best_index >= 0) {
         agent_info_t* best_agent = agents[best_index];
-        *out_agent_id = strdup(best_agent->agent_id);
+        *out_agent_id = AGENTOS_STRDUP(best_agent->agent_id);
         if (!*out_agent_id) {
             AGENTOS_LOG_ERROR("Failed to duplicate agent_id");
             return AGENTOS_ENOMEM;
@@ -90,28 +91,28 @@ static agentos_error_t weighted_dispatch(
 }
 
 agentos_dispatching_strategy_t* agentos_dispatching_weighted_create(
-    const weighted_config_t* config,
+    const weighted_config_t* manager,
     void* registry_ctx,
     agent_registry_get_agents_func get_agents_func) {
 
     if (!get_agents_func) return NULL;
 
-    agentos_dispatching_strategy_t* strat = (agentos_dispatching_strategy_t*)malloc(sizeof(agentos_dispatching_strategy_t));
+    agentos_dispatching_strategy_t* strat = (agentos_dispatching_strategy_t*)AGENTOS_MALLOC(sizeof(agentos_dispatching_strategy_t));
     if (!strat) {
         AGENTOS_LOG_ERROR("Failed to allocate weighted strategy");
         return NULL;
     }
 
-    weighted_data_t* data = (weighted_data_t*)malloc(sizeof(weighted_data_t));
+    weighted_data_t* data = (weighted_data_t*)AGENTOS_MALLOC(sizeof(weighted_data_t));
     if (!data) {
-        free(strat);
+        AGENTOS_FREE(strat);
         return NULL;
     }
 
-    if (config) {
-        data->cost_weight = config->cost_weight;
-        data->perf_weight = config->perf_weight;
-        data->trust_weight = config->trust_weight;
+    if (manager) {
+        data->cost_weight = manager->cost_weight;
+        data->perf_weight = manager->perf_weight;
+        data->trust_weight = manager->trust_weight;
     } else {
         data->cost_weight = 0.3f;
         data->perf_weight = 0.4f;
@@ -122,8 +123,8 @@ agentos_dispatching_strategy_t* agentos_dispatching_weighted_create(
     data->get_agents = get_agents_func;
     data->lock = agentos_mutex_create();
     if (!data->lock) {
-        free(data);
-        free(strat);
+        AGENTOS_FREE(data);
+        AGENTOS_FREE(strat);
         return NULL;
     }
 

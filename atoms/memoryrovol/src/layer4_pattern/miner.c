@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file miner.c
  * @brief L4 模式层持久同调挖掘器（支持自动挖掘）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -12,6 +12,10 @@
 #include "agentos.h"
 #include "logger.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
@@ -39,7 +43,7 @@ struct agentos_layer4_pattern {
     agentos_rule_generator_t* rule_gen;
     agentos_pattern_validator_t* validator;
     agentos_mutex_t* lock;
-    agentos_layer4_pattern_config_t config;
+    agentos_layer4_pattern_config_t manager;
     // 自动挖掘线程
     pthread_t auto_thread;
     int auto_running;
@@ -54,7 +58,7 @@ struct agentos_layer4_pattern {
  * @brief 计算距离矩阵（余弦距离）
  */
 static float* compute_distance_matrix(const float* vectors, size_t count, size_t dim) {
-    float* dist = (float*)malloc(count * count * sizeof(float));
+    float* dist = (float*)AGENTOS_MALLOC(count * count * sizeof(float));
     if (!dist) return NULL;
     for (size_t i = 0; i < count; i++) {
         dist[i * count + i] = 0.0f;
@@ -105,7 +109,7 @@ static agentos_error_t perform_clustering(
 }
 
 /**
- * @brief 为每个聚类生成规则
+ * @brief 为每个聚类生成规�?
  */
 static agentos_error_t generate_rules_for_clusters(
     agentos_layer4_pattern_t* miner,
@@ -119,10 +123,10 @@ static agentos_error_t generate_rules_for_clusters(
 
     if (!miner->rule_gen) return AGENTOS_ENOTSUP;
 
-    size_t dim = 384;  // 应从配置获取，这里简化
+    size_t dim = 384;  // 应从配置获取，这里简�?
     size_t pattern_cap = 16;
     size_t pattern_cnt = 0;
-    agentos_pattern_t** patterns = (agentos_pattern_t**)malloc(pattern_cap * sizeof(agentos_pattern_t*));
+    agentos_pattern_t** patterns = (agentos_pattern_t**)AGENTOS_MALLOC(pattern_cap * sizeof(agentos_pattern_t*));
     if (!patterns) return AGENTOS_ENOMEM;
 
     for (int c = 0; c < num_clusters; c++) {
@@ -131,14 +135,14 @@ static agentos_error_t generate_rules_for_clusters(
         for (size_t i = 0; i < count; i++) {
             if (labels[i] == c) cluster_size++;
         }
-        if (cluster_size < miner->config.min_cluster_size) continue;
+        if (cluster_size < miner->manager.min_cluster_size) continue;
 
         // 收集该聚类的向量和ID
-        float* cluster_vectors = (float*)malloc(cluster_size * dim * sizeof(float));
-        const char** cluster_ids = (const char**)malloc(cluster_size * sizeof(const char*));
+        float* cluster_vectors = (float*)AGENTOS_MALLOC(cluster_size * dim * sizeof(float));
+        const char** cluster_ids = (const char**)AGENTOS_MALLOC(cluster_size * sizeof(const char*));
         if (!cluster_vectors || !cluster_ids) {
-            free(cluster_vectors);
-            free(cluster_ids);
+            AGENTOS_FREE(cluster_vectors);
+            AGENTOS_FREE(cluster_ids);
             continue;
         }
         size_t idx = 0;
@@ -156,7 +160,7 @@ static agentos_error_t generate_rules_for_clusters(
             miner->rule_gen, cluster_vectors, cluster_ids, cluster_size, &rule_json);
         if (err == AGENTOS_SUCCESS && rule_json) {
             // 计算聚类中心（可用均值）
-            float* centroid = (float*)calloc(dim, sizeof(float));
+            float* centroid = (float*)AGENTOS_CALLOC(dim, sizeof(float));
             if (centroid) {
                 for (size_t j = 0; j < cluster_size; j++) {
                     const float* v = cluster_vectors + j * dim;
@@ -173,24 +177,24 @@ static agentos_error_t generate_rules_for_clusters(
             if (pat) {
                 if (pattern_cnt >= pattern_cap) {
                     pattern_cap *= 2;
-                    agentos_pattern_t** new_pats = (agentos_pattern_t**)realloc(patterns, pattern_cap * sizeof(agentos_pattern_t*));
+                    agentos_pattern_t** new_pats = (agentos_pattern_t**)AGENTOS_REALLOC(patterns, pattern_cap * sizeof(agentos_pattern_t*));
                     if (!new_pats) {
                         agentos_pattern_free(pat);
-                        free(rule_json);
-                        free(cluster_vectors);
-                        free(cluster_ids);
-                        free(centroid);
+                        AGENTOS_FREE(rule_json);
+                        AGENTOS_FREE(cluster_vectors);
+                        AGENTOS_FREE(cluster_ids);
+                        AGENTOS_FREE(centroid);
                         continue;
                     }
                     patterns = new_pats;
                 }
                 patterns[pattern_cnt++] = pat;
             }
-            free(rule_json);
-            if (centroid) free(centroid);
+            AGENTOS_FREE(rule_json);
+            if (centroid) AGENTOS_FREE(centroid);
         }
-        free(cluster_vectors);
-        free(cluster_ids);
+        AGENTOS_FREE(cluster_vectors);
+        AGENTOS_FREE(cluster_ids);
     }
 
     *out_patterns = patterns;
@@ -201,34 +205,34 @@ static agentos_error_t generate_rules_for_clusters(
 /* ==================== 公共接口 ==================== */
 
 agentos_error_t agentos_pattern_miner_create(
-    const agentos_layer4_pattern_config_t* config,
+    const agentos_layer4_pattern_config_t* manager,
     agentos_layer4_pattern_t** out_miner) {
 
     if (!out_miner) return AGENTOS_EINVAL;
 
-    agentos_layer4_pattern_t* miner = (agentos_layer4_pattern_t*)calloc(1, sizeof(agentos_layer4_pattern_t));
+    agentos_layer4_pattern_t* miner = (agentos_layer4_pattern_t*)AGENTOS_CALLOC(1, sizeof(agentos_layer4_pattern_t));
     if (!miner) {
         AGENTOS_LOG_ERROR("Failed to allocate pattern miner");
         return AGENTOS_ENOMEM;
     }
 
     // 设置配置
-    if (config) {
-        miner->config = *config;
+    if (manager) {
+        miner->manager = *manager;
     } else {
-        miner->config.min_cluster_size = DEFAULT_MIN_CLUSTER_SIZE;
-        miner->config.persistence_threshold = DEFAULT_PERSISTENCE_THRESHOLD;
-        miner->config.mining_interval_sec = DEFAULT_MINING_INTERVAL;
-        miner->config.pattern_storage_path = NULL;
+        miner->manager.min_cluster_size = DEFAULT_MIN_CLUSTER_SIZE;
+        miner->manager.persistence_threshold = DEFAULT_PERSISTENCE_THRESHOLD;
+        miner->manager.mining_interval_sec = DEFAULT_MINING_INTERVAL;
+        miner->manager.pattern_storage_path = NULL;
     }
 
-    // 创建子组件
+    // 创建子组�?
     agentos_error_t err;
 
     err = agentos_persistence_calculator_create(NULL, &miner->pers_calc);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_LOG_ERROR("Failed to create persistence calculator");
-        free(miner);
+        AGENTOS_FREE(miner);
         return err;
     }
 
@@ -236,7 +240,7 @@ agentos_error_t agentos_pattern_miner_create(
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_LOG_ERROR("Failed to create clustering engine");
         agentos_persistence_calculator_destroy(miner->pers_calc);
-        free(miner);
+        AGENTOS_FREE(miner);
         return err;
     }
 
@@ -245,7 +249,7 @@ agentos_error_t agentos_pattern_miner_create(
         AGENTOS_LOG_ERROR("Failed to create rule generator");
         agentos_persistence_calculator_destroy(miner->pers_calc);
         agentos_clustering_engine_destroy(miner->cluster_engine);
-        free(miner);
+        AGENTOS_FREE(miner);
         return err;
     }
 
@@ -255,7 +259,7 @@ agentos_error_t agentos_pattern_miner_create(
         agentos_persistence_calculator_destroy(miner->pers_calc);
         agentos_clustering_engine_destroy(miner->cluster_engine);
         agentos_rule_generator_destroy(miner->rule_gen);
-        free(miner);
+        AGENTOS_FREE(miner);
         return err;
     }
 
@@ -266,7 +270,7 @@ agentos_error_t agentos_pattern_miner_create(
         agentos_clustering_engine_destroy(miner->cluster_engine);
         agentos_rule_generator_destroy(miner->rule_gen);
         agentos_pattern_validator_destroy(miner->validator);
-        free(miner);
+        AGENTOS_FREE(miner);
         return AGENTOS_ENOMEM;
     }
 
@@ -289,7 +293,7 @@ void agentos_pattern_miner_destroy(agentos_layer4_pattern_t* miner) {
 
     agentos_mutex_unlock(miner->lock);
     agentos_mutex_destroy(miner->lock);
-    free(miner);
+    AGENTOS_FREE(miner);
 }
 
 agentos_error_t agentos_pattern_miner_mine(
@@ -306,21 +310,21 @@ agentos_error_t agentos_pattern_miner_mine(
     agentos_mutex_lock(miner->lock);
 
     // 1. 计算距离矩阵
-    size_t dim = 384; // 实际应从上下文获取，这里简化
+    size_t dim = 384; // 实际应从上下文获取，这里简�?
     float* distance_matrix = compute_distance_matrix(vectors, count, dim);
     if (!distance_matrix) {
         agentos_mutex_unlock(miner->lock);
         return AGENTOS_ENOMEM;
     }
 
-    // 2. 计算持久特征（可选，用于后续过滤）
+    // 2. 计算持久特征（可选，用于后续过滤�?
     agentos_persistence_feature_t** features = NULL;
     size_t feature_count = 0;
     compute_persistence(miner, distance_matrix, count, &features, &feature_count);
     if (features) {
         agentos_persistence_features_free(features, feature_count);
     }
-    free(distance_matrix);
+    AGENTOS_FREE(distance_matrix);
 
     // 3. 执行聚类
     int* labels = NULL;
@@ -338,15 +342,15 @@ agentos_error_t agentos_pattern_miner_mine(
     err = generate_rules_for_clusters(miner, vectors, vector_ids, count, labels, num_clusters,
                                        &patterns, &pattern_count);
 
-    free(labels);
-    if (centroids) free(centroids);
+    AGENTOS_FREE(labels);
+    if (centroids) AGENTOS_FREE(centroids);
 
     agentos_mutex_unlock(miner->lock);
 
     if (err != AGENTOS_SUCCESS) {
         if (patterns) {
             for (size_t i = 0; i < pattern_count; i++) agentos_pattern_free(patterns[i]);
-            free(patterns);
+            AGENTOS_FREE(patterns);
         }
         return err;
     }
@@ -362,12 +366,12 @@ static void* auto_miner_thread_func(void* arg) {
     agentos_layer4_pattern_t* miner = (agentos_layer4_pattern_t*)arg;
 
     while (miner->auto_running) {
-        // 等待配置的间隔
-        sleep(miner->config.mining_interval_sec);
+        // 等待配置的间�?
+        sleep(miner->manager.mining_interval_sec);
 
         if (!miner->auto_running) break;
 
-        // 需要获取向量数据
+        // 需要获取向量数�?
         if (!miner->get_vectors_func) {
             AGENTOS_LOG_WARN("No vector source set for auto mining");
             continue;
@@ -383,10 +387,10 @@ static void* auto_miner_thread_func(void* arg) {
         }
 
         if (count == 0) {
-            if (vectors) free(vectors);
+            if (vectors) AGENTOS_FREE(vectors);
             if (ids) {
-                for (size_t i = 0; i < count; i++) free(ids[i]);
-                free(ids);
+                for (size_t i = 0; i < count; i++) AGENTOS_FREE(ids[i]);
+                AGENTOS_FREE(ids);
             }
             continue;
         }
@@ -401,16 +405,16 @@ static void* auto_miner_thread_func(void* arg) {
             agentos_patterns_free(patterns, pattern_count);
         }
 
-        free(vectors);
-        for (size_t i = 0; i < count; i++) free(ids[i]);
-        free(ids);
+        AGENTOS_FREE(vectors);
+        for (size_t i = 0; i < count; i++) AGENTOS_FREE(ids[i]);
+        AGENTOS_FREE(ids);
     }
     return NULL;
 }
 
 agentos_error_t agentos_pattern_miner_start_auto(agentos_layer4_pattern_t* miner) {
     if (!miner) return AGENTOS_EINVAL;
-    if (miner->config.mining_interval_sec == 0) {
+    if (miner->manager.mining_interval_sec == 0) {
         AGENTOS_LOG_WARN("Auto mining interval is 0, not starting thread");
         return AGENTOS_SUCCESS;
     }
@@ -431,7 +435,7 @@ void agentos_pattern_miner_stop_auto(agentos_layer4_pattern_t* miner) {
     pthread_join(miner->auto_thread, NULL);
 }
 
-/* ==================== 设置数据源回调 ==================== */
+/* ==================== 设置数据源回�?==================== */
 
 void agentos_pattern_miner_set_data_source(
     agentos_layer4_pattern_t* miner,

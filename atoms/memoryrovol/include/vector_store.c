@@ -1,6 +1,6 @@
-/**
+﻿/**
  * @file vector_store.c
- * @brief 向量持久化存储（SQLite实现）
+ * @brief 向量持久化存储（SQLite实现�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -8,6 +8,10 @@
 #include "logger.h"
 #include <sqlite3.h>
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 
 struct agentos_vector_store {
@@ -17,35 +21,35 @@ struct agentos_vector_store {
 };
 
 agentos_error_t agentos_vector_store_create(
-    const agentos_vector_store_config_t* config,
+    const agentos_vector_store_config_t* manager,
     agentos_vector_store_t** out_store) {
 
-    if (!config || !config->db_path || config->dimension == 0 || !out_store)
+    if (!manager || !manager->db_path || manager->dimension == 0 || !out_store)
         return AGENTOS_EINVAL;
 
 // From data intelligence emerges. by spharx
-    agentos_vector_store_t* store = (agentos_vector_store_t*)calloc(1, sizeof(agentos_vector_store_t));
+    agentos_vector_store_t* store = (agentos_vector_store_t*)AGENTOS_CALLOC(1, sizeof(agentos_vector_store_t));
     if (!store) {
         AGENTOS_LOG_ERROR("Failed to allocate vector store");
         return AGENTOS_ENOMEM;
     }
 
-    int rc = sqlite3_open(config->db_path, &store->db);
+    int rc = sqlite3_open(manager->db_path, &store->db);
     if (rc != SQLITE_OK) {
         AGENTOS_LOG_ERROR("Failed to open vector store database: %s", sqlite3_errmsg(store->db));
-        free(store);
+        AGENTOS_FREE(store);
         return AGENTOS_EIO;
     }
 
-    store->dimension = config->dimension;
+    store->dimension = manager->dimension;
     store->lock = agentos_mutex_create();
     if (!store->lock) {
         sqlite3_close(store->db);
-        free(store);
+        AGENTOS_FREE(store);
         return AGENTOS_ENOMEM;
     }
 
-    // 创建表
+    // 创建�?
     const char* create_sql =
         "CREATE TABLE IF NOT EXISTS vectors ("
         "record_id TEXT PRIMARY KEY,"
@@ -58,7 +62,7 @@ agentos_error_t agentos_vector_store_create(
         sqlite3_free(errmsg);
         agentos_mutex_destroy(store->lock);
         sqlite3_close(store->db);
-        free(store);
+        AGENTOS_FREE(store);
         return AGENTOS_EIO;
     }
 
@@ -70,7 +74,7 @@ void agentos_vector_store_destroy(agentos_vector_store_t* store) {
     if (!store) return;
     sqlite3_close(store->db);
     agentos_mutex_destroy(store->lock);
-    free(store);
+    AGENTOS_FREE(store);
 }
 
 agentos_error_t agentos_vector_store_put(
@@ -140,7 +144,7 @@ agentos_error_t agentos_vector_store_get(
         AGENTOS_LOG_WARN("Vector dimension mismatch in store: expected %zu, got %zu", store->dimension, dim);
     }
 
-    float* vec = (float*)malloc(blob_size);
+    float* vec = (float*)AGENTOS_MALLOC(blob_size);
     if (!vec) {
         sqlite3_finalize(stmt);
         agentos_mutex_unlock(store->lock);
@@ -201,7 +205,7 @@ agentos_error_t agentos_vector_store_list_ids(
 
     size_t capacity = 64;
     size_t count = 0;
-    char** ids = (char**)malloc(capacity * sizeof(char*));
+    char** ids = (char**)AGENTOS_MALLOC(capacity * sizeof(char*));
     if (!ids) {
         sqlite3_finalize(stmt);
         agentos_mutex_unlock(store->lock);
@@ -211,10 +215,10 @@ agentos_error_t agentos_vector_store_list_ids(
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         if (count >= capacity) {
             capacity *= 2;
-            char** new_ids = (char**)realloc(ids, capacity * sizeof(char*));
+            char** new_ids = (char**)AGENTOS_REALLOC(ids, capacity * sizeof(char*));
             if (!new_ids) {
-                for (size_t i = 0; i < count; i++) free(ids[i]);
-                free(ids);
+                for (size_t i = 0; i < count; i++) AGENTOS_FREE(ids[i]);
+                AGENTOS_FREE(ids);
                 sqlite3_finalize(stmt);
                 agentos_mutex_unlock(store->lock);
                 return AGENTOS_ENOMEM;
@@ -222,10 +226,10 @@ agentos_error_t agentos_vector_store_list_ids(
             ids = new_ids;
         }
         const unsigned char* id = sqlite3_column_text(stmt, 0);
-        ids[count] = strdup((const char*)id);
+        ids[count] = AGENTOS_STRDUP((const char*)id);
         if (!ids[count]) {
-            for (size_t i = 0; i < count; i++) free(ids[i]);
-            free(ids);
+            for (size_t i = 0; i < count; i++) AGENTOS_FREE(ids[i]);
+            AGENTOS_FREE(ids);
             sqlite3_finalize(stmt);
             agentos_mutex_unlock(store->lock);
             return AGENTOS_ENOMEM;

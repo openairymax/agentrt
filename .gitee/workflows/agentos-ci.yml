@@ -1,4 +1,4 @@
-# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+﻿# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Gitee CI/CD Pipeline Configuration
 # Version: 1.0.0
 # Description: Gitee platform CI/CD configuration for AgentOS project
@@ -114,7 +114,7 @@ code-quality:
           --inline-suppressions \
           --quiet \
           -j$(nproc) \
-          atoms/ backs/ dynamic/ domes/ 2>&1 | tee cppcheck_report.txt
+          atoms/ daemon/ gateway/ cupolas/ 2>&1 | tee cppcheck_report.txt
 
         # C Code Format Check
         find . -name '*.c' -o -name '*.h' | head -50 | while read f; do
@@ -140,13 +140,13 @@ code-quality:
         pip install ruff mypy bandit safety
 
         # Python Lint
-        ruff check scripts/ openhub/ tools/python/ --select=E,F,W || true
+        ruff check scripts/ openlab/ toolkit/python/ --select=E,F,W || true
 
         # Type check
-        mypy scripts/ openhub/ tools/python/ --ignore-missing-imports || true
+        mypy scripts/ openlab/ toolkit/python/ --ignore-missing-imports || true
 
         # Security scan
-        bandit -r atoms/ backs/ dynamic/ domes/ -f json -o bandit_report.json || true
+        bandit -r atoms/ daemon/ gateway/ cupolas/ -f json -o bandit_report.json || true
       artifacts:
         - name: python-lint-report
           paths:
@@ -180,9 +180,9 @@ build:
           - name: build-atoms-linux
           - name: build-atoms-macos
           - name: build-atoms-windows
-          - name: build-backs-linux
-          - name: build-dynamic-linux
-          - name: build-domes-linux
+          - name: build-daemon-linux
+          - name: build-gateway-linux
+          - name: build-cupolas-linux
 
   jobs:
     - name: build-atoms-linux
@@ -247,7 +247,7 @@ build:
             - atoms/build/agentos-atoms-$VERSION-windows-x86_64.zip
           expire_in: 30 days
 
-    - name: build-backs-linux
+    - name: build-daemon-linux
       runs-on:
         - self-hosted
         - linux
@@ -255,20 +255,20 @@ build:
         image: spharx/agentos-build:ubuntu-22.04
         options: --privileged
       script: |
-        mkdir -p backs/build && cd backs/build
+        mkdir -p daemon/build && cd daemon/build
         cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_TESTS=ON
         ninja
 
         for service in llm_d tool_d monit_d sched_d market_d; do
-          tar -czvf agentos-backs-$service-$VERSION-linux-x86_64.tar.gz .
+          tar -czvf agentos-daemon-$service-$VERSION-linux-x86_64.tar.gz .
         done
       artifacts:
-        - name: backs-linux
+        - name: daemon-linux
           paths:
-            - backs/build/agentos-backs-*.tar.gz
+            - daemon/build/agentos-daemon-*.tar.gz
           expire_in: 30 days
 
-    - name: build-dynamic-linux
+    - name: build-gateway-linux
       runs-on:
         - self-hosted
         - linux
@@ -279,18 +279,18 @@ build:
         apt-get update && apt-get install -y \
           libmicrohttpd-dev libwebsockets-dev libssl-dev
 
-        mkdir -p dynamic/build && cd dynamic/build
+        mkdir -p gateway/build && cd gateway/build
         cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_TESTS=ON
         ninja
 
-        tar -czvf agentos-dynamic-$VERSION-linux-x86_64.tar.gz .
+        tar -czvf agentos-gateway-$VERSION-linux-x86_64.tar.gz .
       artifacts:
-        - name: dynamic-linux
+        - name: gateway-linux
           paths:
-            - dynamic/build/agentos-dynamic-$VERSION-linux-x86_64.tar.gz
+            - gateway/build/agentos-gateway-$VERSION-linux-x86_64.tar.gz
           expire_in: 30 days
 
-    - name: build-domes-linux
+    - name: build-cupolas-linux
       runs-on:
         - self-hosted
         - linux
@@ -298,15 +298,15 @@ build:
         image: spharx/agentos-build:ubuntu-22.04
         options: --privileged
       script: |
-        mkdir -p domes/build && cd domes/build
+        mkdir -p cupolas/build && cd cupolas/build
         cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_TESTS=ON
         ninja
 
-        tar -czvf agentos-domes-$VERSION-linux-x86_64.tar.gz .
+        tar -czvf agentos-cupolas-$VERSION-linux-x86_64.tar.gz .
       artifacts:
-        - name: domes-linux
+        - name: cupolas-linux
           paths:
-            - domes/build/agentos-domes-$VERSION-linux-x86_64.tar.gz
+            - cupolas/build/agentos-cupolas-$VERSION-linux-x86_64.tar.gz
           expire_in: 30 days
 
 # =============================================================================
@@ -333,13 +333,13 @@ test:
       script: |
         # Download build artifacts
         pack getartifact --name=atoms-linux --dest=atoms/build
-        pack getartifact --name=backs-linux --dest=backs/build
-        pack getartifact --name=dynamic-linux --dest=dynamic/build
+        pack getartifact --name=daemon-linux --dest=daemon/build
+        pack getartifact --name=gateway-linux --dest=gateway/build
 
         # Run C unit tests
         cd atoms/build && ctest --output-on-failure -j$(nproc)
-        cd backs/build && ctest --output-on-failure -j$(nproc)
-        cd dynamic/build && ctest --output-on-failure -j$(nproc)
+        cd daemon/build && ctest --output-on-failure -j$(nproc)
+        cd gateway/build && ctest --output-on-failure -j$(nproc)
 
         # Run Python unit tests
         pip install pytest pytest-cov pytest-asyncio
@@ -515,22 +515,22 @@ deploy-staging:
       -f scripts/deploy/docker/Dockerfile.kernel .
 
     docker build \
-      --tag $DOCKER_REGISTRY/agentos-dynamic:$CI_COMMIT_SHA \
-      --tag $DOCKER_REGISTRY/agentos-dynamic:staging \
-      -f scripts/deploy/docker/Dockerfile.dynamic .
+      --tag $DOCKER_REGISTRY/agentos-gateway:$CI_COMMIT_SHA \
+      --tag $DOCKER_REGISTRY/agentos-gateway:staging \
+      -f scripts/deploy/docker/Dockerfile.gateway .
 
     docker build \
-      --tag $DOCKER_REGISTRY/agentos-backs:$CI_COMMIT_SHA \
-      --tag $DOCKER_REGISTRY/agentos-backs:staging \
+      --tag $DOCKER_REGISTRY/agentos-daemon:$CI_COMMIT_SHA \
+      --tag $DOCKER_REGISTRY/agentos-daemon:staging \
       -f scripts/deploy/docker/Dockerfile.service .
 
     # Push images
     docker push $DOCKER_REGISTRY/agentos-atoms:$CI_COMMIT_SHA
     docker push $DOCKER_REGISTRY/agentos-atoms:staging
-    docker push $DOCKER_REGISTRY/agentos-dynamic:$CI_COMMIT_SHA
-    docker push $DOCKER_REGISTRY/agentos-dynamic:staging
-    docker push $DOCKER_REGISTRY/agentos-backs:$CI_COMMIT_SHA
-    docker push $DOCKER_REGISTRY/agentos-backs:staging
+    docker push $DOCKER_REGISTRY/agentos-gateway:$CI_COMMIT_SHA
+    docker push $DOCKER_REGISTRY/agentos-gateway:staging
+    docker push $DOCKER_REGISTRY/agentos-daemon:$CI_COMMIT_SHA
+    docker push $DOCKER_REGISTRY/agentos-daemon:staging
 
     # Deploy to staging
     export VERSION=$CI_COMMIT_SHA
@@ -545,7 +545,7 @@ deploy-staging:
       exit 1
     }
 
-    echo "✅ Staging deployment successful"
+    echo "�?Staging deployment successful"
   artifacts:
     - name: deployment-report
       paths:
@@ -583,22 +583,22 @@ deploy-production:
       -f scripts/deploy/docker/Dockerfile.kernel .
 
     docker build \
-      --tag $DOCKER_REGISTRY/agentos-dynamic:$VERSION \
-      --tag $DOCKER_REGISTRY/agentos-dynamic:latest \
-      -f scripts/deploy/docker/Dockerfile.dynamic .
+      --tag $DOCKER_REGISTRY/agentos-gateway:$VERSION \
+      --tag $DOCKER_REGISTRY/agentos-gateway:latest \
+      -f scripts/deploy/docker/Dockerfile.gateway .
 
     docker build \
-      --tag $DOCKER_REGISTRY/agentos-backs:$VERSION \
-      --tag $DOCKER_REGISTRY/agentos-backs:latest \
+      --tag $DOCKER_REGISTRY/agentos-daemon:$VERSION \
+      --tag $DOCKER_REGISTRY/agentos-daemon:latest \
       -f scripts/deploy/docker/Dockerfile.service .
 
     docker build \
-      --tag $DOCKER_REGISTRY/agentos-openhub:$VERSION \
-      --tag $DOCKER_REGISTRY/agentos-openhub:latest \
-      -f scripts/deploy/docker/Dockerfile.openhub .
+      --tag $DOCKER_REGISTRY/agentos-openlab:$VERSION \
+      --tag $DOCKER_REGISTRY/agentos-openlab:latest \
+      -f scripts/deploy/docker/Dockerfile.openlab .
 
     # Push all tags
-    for image in atoms dynamic backs openhub; do
+    for image in atoms gateway daemon openlab; do
       docker push $DOCKER_REGISTRY/agentos-$image:$VERSION
       docker push $DOCKER_REGISTRY/agentos-$image:latest
     done
@@ -623,7 +623,7 @@ deploy-production:
       echo "::warning::Smoke tests failed, review carefully"
     }
 
-    echo "✅ Production deployment successful"
+    echo "�?Production deployment successful"
     echo "Deployed version: $VERSION"
   artifacts:
     - name: deployment-report
@@ -650,9 +650,9 @@ rollback-production:
 
     # Pull target version
     docker pull $DOCKER_REGISTRY/agentos-atoms:$VERSION
-    docker pull $DOCKER_REGISTRY/agentos-dynamic:$VERSION
-    docker pull $DOCKER_REGISTRY/agentos-backs:$VERSION
-    docker pull $DOCKER_REGISTRY/agentos-openhub:$VERSION
+    docker pull $DOCKER_REGISTRY/agentos-gateway:$VERSION
+    docker pull $DOCKER_REGISTRY/agentos-daemon:$VERSION
+    docker pull $DOCKER_REGISTRY/agentos-openlab:$VERSION
 
     # Update version
     export VERSION=$VERSION
@@ -667,7 +667,7 @@ rollback-production:
       exit 1
     }
 
-    echo "✅ Rollback to $VERSION successful"
+    echo "�?Rollback to $VERSION successful"
 
 # =============================================================================
 # Job: Notification
@@ -681,10 +681,10 @@ notify:
   script: |
     # Send notification to DingTalk/WeCom
     if [ "$CI_JOB_STATUS" == "success" ]; then
-      MESSAGE="✅ AgentOS CI/CD Pipeline Success"
+      MESSAGE="�?AgentOS CI/CD Pipeline Success"
       COLOR="green"
     else
-      MESSAGE="❌ AgentOS CI/CD Pipeline Failed"
+      MESSAGE="�?AgentOS CI/CD Pipeline Failed"
       COLOR="red"
     fi
 
@@ -705,3 +705,4 @@ cache:
 dependencies:
   - code-quality
   - build
+

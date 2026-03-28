@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file layer2_feature.h
  * @brief L2 特征层接口（简化版）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -45,7 +45,7 @@ typedef struct agentos_layer2_feature_config {
  * @brief 创建L2特征层
  */
 agentos_error_t agentos_layer2_feature_create(
-    const agentos_layer2_feature_config_t* config,
+    const agentos_layer2_feature_config_t* manager,
     agentos_layer2_feature_t** out);
 
 /**

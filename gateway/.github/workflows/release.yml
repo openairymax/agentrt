@@ -1,0 +1,363 @@
+﻿# Copyright (c) 2026 SPHARX. All Rights Reserved.
+# AgentOS gateway Module Release Workflow
+# Version: 1.0.0
+#
+# 发布工作流：创建版本发布、生成变更日志、打包产物
+
+name: gateway Module Release
+
+on:
+  push:
+    tags:
+      - 'gateway-v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.0.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Pre-release'
+        required: false
+        default: false
+        type: boolean
+      draft:
+        description: 'Draft release'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  MODULE_NAME: gateway
+  REGISTRY: ghcr.io
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  # ==========================================================================
+  # 准备发布
+  # ==========================================================================
+  prepare:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/gateway-v}
+          fi
+          
+          # 验证版本格式
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "::error::Invalid version format: $VERSION"
+            exit 1
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=gateway-v$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Release version: $VERSION"
+      
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # 获取上一个标签
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          
+          if [ -n "$PREV_TAG" ]; then
+            echo "📝 Generating changelog from $PREV_TAG..."
+            
+            # 生成变更日志
+            {
+              echo "## What's Changed"
+              echo ""
+              echo "### 🚀 Features"
+              git log --pretty=format:"- %s" $PREV_TAG..HEAD --grep="feat:" --grep="feature:" || true
+              echo ""
+              echo ""
+              echo "### 🐛 Bug Fixes"
+              git log --pretty=format:"- %s" $PREV_TAG..HEAD --grep="fix:" --grep="bug:" || true
+              echo ""
+              echo ""
+              echo "### 🔧 Improvements"
+              git log --pretty=format:"- %s" $PREV_TAG..HEAD --grep="refactor:" --grep="perf:" --grep="style:" || true
+              echo ""
+              echo ""
+              echo "### 📝 Documentation"
+              git log --pretty=format:"- %s" $PREV_TAG..HEAD --grep="docs:" || true
+              echo ""
+              echo ""
+              echo "### 🔒 Security"
+              git log --pretty=format:"- %s" $PREV_TAG..HEAD --grep="security:" --grep="sec:" || true
+              echo ""
+              echo ""
+              echo "## Contributors"
+              git log --pretty=format:"- @%an" $PREV_TAG..HEAD | sort -u || true
+            } > changelog.md
+          else
+            echo "📝 Generating initial changelog..."
+            {
+              echo "## What's Changed"
+              echo ""
+              echo "Initial release of gateway Module"
+              echo ""
+              echo "### Features"
+              echo "- HTTP Gateway with JSON-RPC 2.0 support"
+              echo "- WebSocket Gateway for real-time communication"
+              echo "- Stdio Gateway for local process communication"
+              echo "- Session management with memory tracking"
+              echo "- Configuration management with hot reload"
+              echo "- Authentication (API Key + JWT)"
+              echo "- Rate limiting"
+              echo "- Health monitoring"
+              echo "- Telemetry and metrics"
+              echo "- Connection pooling"
+            } > changelog.md
+          fi
+          
+          # 保存到输出
+          CHANGELOG=$(cat changelog.md)
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+  # ==========================================================================
+  # 构建发布产物
+  # ==========================================================================
+  build:
+    name: Build Release Artifacts
+    needs: [prepare]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: x86_64
+            ext: tar.gz
+          - os: macos-latest
+            platform: darwin
+            arch: arm64
+            ext: tar.gz
+          - os: windows-latest
+            platform: windows
+            arch: x64
+            ext: zip
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build \
+            libmicrohttpd-dev libwebsockets-dev libssl-dev libcjson-dev
+      
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake ninja libmicrohttpd websockets openssl cjson
+      
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          choco install cmake ninja -y
+      
+      - name: Build
+        working-directory: gateway
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF
+          cmake --build . --manager Release -j
+      
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        working-directory: gateway/build
+        run: |
+          mkdir -p package
+          cp -r gateway package/
+          cp -r ../manager package/manager
+          cp ../README.md package/ || true
+          cp ../LICENSE package/ || true
+          
+          tar -czvf ../agentos-gateway-${{ matrix.platform }}-${{ matrix.arch }}-${{ needs.prepare.outputs.version }}.${{ matrix.ext }} \
+            -C package .
+      
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        working-directory: gateway/build
+        run: |
+          mkdir package
+          copy gateway.exe package/
+          xcopy ..\manager package\manager\ /E /I
+          copy ..\README.md package\ || echo ""
+          copy ..\LICENSE package\ || echo ""
+          
+          7z a -tzip ..\agentos-gateway-${{ matrix.platform }}-${{ matrix.arch }}-${{ needs.prepare.outputs.version }}.${{ matrix.ext }} package\*
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.platform }}-${{ matrix.arch }}
+          path: gateway/agentos-gateway-${{ matrix.platform }}-${{ matrix.arch }}-*.${{ matrix.ext }}
+          retention-days: 30
+
+  # ==========================================================================
+  # 构建Docker镜像
+  # ==========================================================================
+  docker:
+    name: Build Docker Image
+    needs: [prepare]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/agentos-gateway
+          tags: |
+            type=raw,value=${{ needs.prepare.outputs.version }}
+            type=raw,value=latest
+      
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: gateway
+          file: gateway/docker/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            BUILD_VERSION=${{ needs.prepare.outputs.version }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+
+  # ==========================================================================
+  # 创建GitHub Release
+  # ==========================================================================
+  release:
+    name: Create GitHub Release
+    needs: [prepare, build, docker]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          find artifacts -name "*.tar.gz" -exec cp {} release-assets/ \;
+          find artifacts -name "*.zip" -exec cp {} release-assets/ \;
+          ls -la release-assets/
+      
+      - name: Create release notes
+        run: |
+          {
+            echo "${{ needs.prepare.outputs.changelog }}"
+            echo ""
+            echo "---"
+            echo ""
+            echo "## 📦 Artifacts"
+            echo ""
+            echo "| Platform | Architecture | Download |"
+            echo "|----------|-------------|----------|"
+            echo "| Linux | x86_64 | agentos-gateway-linux-x86_64-${{ needs.prepare.outputs.version }}.tar.gz |"
+            echo "| macOS | ARM64 | agentos-gateway-darwin-arm64-${{ needs.prepare.outputs.version }}.tar.gz |"
+            echo "| Windows | x64 | agentos-gateway-windows-x64-${{ needs.prepare.outputs.version }}.zip |"
+            echo ""
+            echo "## 🐳 Docker"
+            echo ""
+            echo "\`\`\`bash"
+            echo "docker pull ghcr.io/${{ github.repository_owner }}/agentos-gateway:${{ needs.prepare.outputs.version }}"
+            echo "\`\`\`"
+            echo ""
+            echo "## 📋 Verification"
+            echo ""
+            echo "### Checksums"
+            echo "\`\`\`"
+            cd release-assets
+            sha256sum * || true
+            echo "\`\`\`"
+          } > release-notes.md
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: gateway Module v${{ needs.prepare.outputs.version }}
+          body_path: release-notes.md
+          draft: ${{ github.event.inputs.draft || true }}
+          prerelease: ${{ github.event.inputs.prerelease || false }}
+          files: release-assets/*
+          generate_release_notes: false
+      
+      - name: Notify on success
+        if: success()
+        run: |
+          echo "✅ Release ${{ needs.prepare.outputs.version }} created successfully!"
+
+  # ==========================================================================
+  # 发布后验证
+  # ==========================================================================
+  verify:
+    name: Verify Release
+    needs: [release]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Verify Docker image
+        run: |
+          docker pull ghcr.io/${{ github.repository_owner }}/agentos-gateway:${{ needs.prepare.outputs.version }}
+          docker run --rm ghcr.io/${{ github.repository_owner }}/agentos-gateway:${{ needs.prepare.outputs.version }} --version
+      
+      - name: Verify release assets
+        run: |
+          # 下载并验证产物
+          gh release download ${{ needs.prepare.outputs.tag }} --repo ${{ github.repository }}
+          
+          # 验证校验和
+          sha256sum -c checksums.txt || true
+

@@ -26,13 +26,13 @@ typedef struct weighted_config {
 
 /**
  * @brief 创建加权调度策略
- * @param config 权重配置（若为NULL使用默认）
+ * @param manager 权重配置（若为NULL使用默认）
  * @param registry_ctx 注册中心上下文
  * @param get_agents_func 获取候选Agent列表的函数
  * @return 策略对象，失败返回NULL
  */
 agentos_dispatching_strategy_t* agentos_dispatching_weighted_create(
-    const weighted_config_t* config,
+    const weighted_config_t* manager,
     void* registry_ctx,
     agent_registry_get_agents_func get_agents_func);
 

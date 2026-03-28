@@ -1,4 +1,4 @@
-/**
+﻿﻿/**
  * @file test_llm.c
  * @brief LLM Service 单元测试
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -16,7 +16,7 @@
 int test_create_destroy() {
     printf("=== Testing create and destroy ===\n");
     
-    const char* config_path = "config/service/llm_d/llm.yaml";
+    const char* config_path = "manager/service/llm_d/llm.yaml";
     llm_service_t* service = llm_service_create(config_path);
     if (!service) {
         printf("Failed to create LLM service\n");
@@ -40,7 +40,7 @@ int test_create_destroy() {
 int test_complete_stream() {
     printf("=== Testing complete stream ===\n");
     
-    const char* config_path = "config/service/llm_d/llm.yaml";
+    const char* config_path = "manager/service/llm_d/llm.yaml";
     llm_service_t* service = llm_service_create(config_path);
     if (!service) {
         printf("Failed to create LLM service\n");

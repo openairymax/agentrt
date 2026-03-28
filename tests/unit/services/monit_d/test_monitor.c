@@ -1,7 +1,7 @@
-/**
+﻿/**
  * @file test_monitor.c
  * @brief 监控服务单元测试
- * @details 测试监控服务的核心功能，包括指标收集、告警管理、日志记录和健康检查
+ * @details 测试监控服务的核心功能，包括指标收集、告警管理、日志记录和健康检�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -9,16 +9,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "../../../../backs/monit_d/include/monitor_service.h"
+#include "../../../../daemon/monit_d/include/monitor_service.h"
 
 /**
- * @brief 测试服务创建和销毁
+ * @brief 测试服务创建和销�?
  */
 int test_service_create_destroy() {
-    printf("测试服务创建和销毁...");
+    printf("测试服务创建和销�?..");
 
     // 配置监控服务
-    monitor_config_t config = {
+    monitor_config_t manager = {
         .metrics_collection_interval_ms = 5000,
         .health_check_interval_ms = 10000,
         .log_flush_interval_ms = 30000,
@@ -32,16 +32,16 @@ int test_service_create_destroy() {
 
     // 创建监控服务
     monitor_service_t* service = NULL;
-    int ret = monitor_service_create(&config, &service);
+    int ret = monitor_service_create(&manager, &service);
     if (ret != 0) {
         printf("失败: 创建服务返回 %d\n", ret);
         return ret;
     }
 
-    // 销毁监控服务
+    // 销毁监控服�?
     ret = monitor_service_destroy(service);
     if (ret != 0) {
-        printf("失败: 销毁服务返回 %d\n", ret);
+        printf("失败: 销毁服务返�?%d\n", ret);
         return ret;
     }
 
@@ -56,7 +56,7 @@ int test_record_metric() {
     printf("测试指标记录...");
 
     // 配置监控服务
-    monitor_config_t config = {
+    monitor_config_t manager = {
         .metrics_collection_interval_ms = 5000,
         .health_check_interval_ms = 10000,
         .log_flush_interval_ms = 30000,
@@ -69,7 +69,7 @@ int test_record_metric() {
 
     // 创建监控服务
     monitor_service_t* service = NULL;
-    int ret = monitor_service_create(&config, &service);
+    int ret = monitor_service_create(&manager, &service);
     if (ret != 0) {
         printf("失败: 创建服务返回 %d\n", ret);
         return ret;
@@ -78,7 +78,7 @@ int test_record_metric() {
     // 记录指标
     metric_info_t metric = {
         .name = "service.cpu_usage",
-        .description = "CPU 使用率",
+        .description = "CPU 使用�?,
         .type = METRIC_TYPE_GAUGE,
         .labels = NULL,
         .label_count = 0,
@@ -104,7 +104,7 @@ int test_record_metric() {
     }
 
     if (count != 1) {
-        printf("失败: 指标数量不正确，期望 1，实际 %zu\n", count);
+        printf("失败: 指标数量不正确，期望 1，实�?%zu\n", count);
         if (metrics) {
             free(metrics);
         }
@@ -132,7 +132,7 @@ int test_log() {
     printf("测试日志记录...");
 
     // 配置监控服务
-    monitor_config_t config = {
+    monitor_config_t manager = {
         .metrics_collection_interval_ms = 5000,
         .health_check_interval_ms = 10000,
         .log_flush_interval_ms = 30000,
@@ -145,7 +145,7 @@ int test_log() {
 
     // 创建监控服务
     monitor_service_t* service = NULL;
-    int ret = monitor_service_create(&config, &service);
+    int ret = monitor_service_create(&manager, &service);
     if (ret != 0) {
         printf("失败: 创建服务返回 %d\n", ret);
         return ret;
@@ -177,13 +177,13 @@ int test_log() {
 }
 
 /**
- * @brief 测试告警触发和解决
+ * @brief 测试告警触发和解�?
  */
 int test_alert() {
-    printf("测试告警触发和解决...");
+    printf("测试告警触发和解�?..");
 
     // 配置监控服务
-    monitor_config_t config = {
+    monitor_config_t manager = {
         .metrics_collection_interval_ms = 5000,
         .health_check_interval_ms = 10000,
         .log_flush_interval_ms = 30000,
@@ -196,7 +196,7 @@ int test_alert() {
 
     // 创建监控服务
     monitor_service_t* service = NULL;
-    int ret = monitor_service_create(&config, &service);
+    int ret = monitor_service_create(&manager, &service);
     if (ret != 0) {
         printf("失败: 创建服务返回 %d\n", ret);
         return ret;
@@ -233,7 +233,7 @@ int test_alert() {
     }
 
     if (count != 1) {
-        printf("失败: 告警数量不正确，期望 1，实际 %zu\n", count);
+        printf("失败: 告警数量不正确，期望 1，实�?%zu\n", count);
         if (alerts) {
             free(alerts);
         }
@@ -251,7 +251,7 @@ int test_alert() {
         return ret;
     }
 
-    // 再次获取告警，应该没有未解决的告警
+    // 再次获取告警，应该没有未解决的告�?
     ret = monitor_service_get_alerts(service, &alerts, &count);
     if (ret != 0) {
         printf("失败: 获取告警返回 %d\n", ret);
@@ -260,7 +260,7 @@ int test_alert() {
     }
 
     if (count != 0) {
-        printf("失败: 告警数量不正确，期望 0，实际 %zu\n", count);
+        printf("失败: 告警数量不正确，期望 0，实�?%zu\n", count);
         if (alerts) {
             free(alerts);
         }
@@ -278,13 +278,13 @@ int test_alert() {
 }
 
 /**
- * @brief 测试健康检查
+ * @brief 测试健康检�?
  */
 int test_health_check() {
-    printf("测试健康检查...");
+    printf("测试健康检�?..");
 
     // 配置监控服务
-    monitor_config_t config = {
+    monitor_config_t manager = {
         .metrics_collection_interval_ms = 5000,
         .health_check_interval_ms = 10000,
         .log_flush_interval_ms = 30000,
@@ -297,17 +297,17 @@ int test_health_check() {
 
     // 创建监控服务
     monitor_service_t* service = NULL;
-    int ret = monitor_service_create(&config, &service);
+    int ret = monitor_service_create(&manager, &service);
     if (ret != 0) {
         printf("失败: 创建服务返回 %d\n", ret);
         return ret;
     }
 
-    // 执行健康检查
+    // 执行健康检�?
     health_check_result_t* result = NULL;
     ret = monitor_service_health_check(service, "test_service", &result);
     if (ret != 0) {
-        printf("失败: 健康检查返回 %d\n", ret);
+        printf("失败: 健康检查返�?%d\n", ret);
         monitor_service_destroy(service);
         return ret;
     }
@@ -361,7 +361,7 @@ int test_reload_config() {
         return ret;
     }
 
-    // 新配置
+    // 新配�?
     monitor_config_t config2 = {
         .metrics_collection_interval_ms = 10000,
         .health_check_interval_ms = 20000,
@@ -393,7 +393,7 @@ int test_generate_report() {
     printf("测试报告生成...");
 
     // 配置监控服务
-    monitor_config_t config = {
+    monitor_config_t manager = {
         .metrics_collection_interval_ms = 5000,
         .health_check_interval_ms = 10000,
         .log_flush_interval_ms = 30000,
@@ -406,7 +406,7 @@ int test_generate_report() {
 
     // 创建监控服务
     monitor_service_t* service = NULL;
-    int ret = monitor_service_create(&config, &service);
+    int ret = monitor_service_create(&manager, &service);
     if (ret != 0) {
         printf("失败: 创建服务返回 %d\n", ret);
         return ret;
@@ -428,7 +428,7 @@ int test_generate_report() {
     }
 
     // 打印报告（可选）
-    // printf("\n生成的报告:\n%s\n", report);
+    // printf("\n生成的报�?\n%s\n", report);
 
     free(report);
     monitor_service_destroy(service);
@@ -437,7 +437,7 @@ int test_generate_report() {
 }
 
 /**
- * @brief 主测试函数
+ * @brief 主测试函�?
  */
 int main() {
     printf("开始监控服务单元测试\n");
@@ -466,7 +466,7 @@ int main() {
     }
 
     printf("========================\n");
-    printf("测试完成: %zu 个测试，%d 个通过，%zu 个失败\n", test_count, passed, test_count - passed);
+    printf("测试完成: %zu 个测试，%d 个通过�?zu 个失败\n", test_count, passed, test_count - passed);
 
     if (passed == test_count) {
         printf("所有测试通过！\n");

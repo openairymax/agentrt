@@ -1,4 +1,4 @@
-# AgentOS 测试模块 CI/CD 工作流
+﻿﻿# AgentOS 测试模块 CI/CD 工作流
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # Version: 1.1.0
 # Last updated: 2026-03-24
@@ -406,7 +406,7 @@ jobs:
         run: |
           cd tests
           pytest unit/ -v --tb=short -m unit \
-            --cov=../tools/python/agentos \
+            --cov=../toolkit/python/agentos \
             --cov-report=xml:reports/coverage/coverage.xml \
             --cov-report=html:reports/coverage/html \
             --cov-report=term \
@@ -522,7 +522,7 @@ jobs:
         run: |
           cd tests
           pytest integration/ -v --tb=short -m integration \
-            --cov=../tools/python/agentos \
+            --cov=../toolkit/python/agentos \
             --cov-report=xml:reports/coverage/coverage_integration.xml \
             --junitxml=reports/junit_integration.xml \
             --html=reports/test_integration_report.html --self-contained-html
@@ -895,8 +895,8 @@ jobs:
       - name: Commit badge
         if: github.ref == 'refs/heads/main'
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
+          git manager --local user.email "action@github.com"
+          git manager --local user.name "GitHub Action"
           git add .github/badges/tests.json || true
           git diff --quiet && git diff --staged --quiet || git commit -m "Update test status badge"
           git push || true

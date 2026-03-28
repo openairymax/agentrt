@@ -1,0 +1,25 @@
+{
+  "threshold": 5,
+  "reporters": ["html", "console", "json"],
+  "output": "reports/jscpd-report",
+  "absolute": true,
+  "gitignore": true,
+  "ignore": [
+    "**/node_modules/**",
+    "**/build/**",
+    "**/.git/**",
+    "**/tests/**",
+    "**/vendor/**",
+    "**/*.min.js",
+    "**/*.min.css",
+    "**/*.md",
+    "**/*.txt",
+    "**/*.json",
+    "**/*.yml",
+    "**/*.yaml"
+  ],
+  "format": ["c", "cpp", "h", "hpp"],
+  "mode": "strict",
+  "silent": false,
+  "store": ".jscpd-store"
+}

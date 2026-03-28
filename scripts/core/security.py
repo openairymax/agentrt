@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿﻿#!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 安全模块
 # 输入净化、权限管理、安全审计
@@ -89,8 +89,8 @@ class SecurityManager:
         r"\x00",           # 空字节
     ]
 
-    def __init__(self, config: SecurityConfig = None):
-        self.config = config or SecurityConfig()
+    def __init__(self, manager: SecurityConfig = None):
+        self.manager = manager or SecurityConfig()
         self._blocked_paths: Set[str] = set()
         self._audit_log: List[Dict[str, Any]] = []
 
@@ -99,10 +99,10 @@ class SecurityManager:
         if not path:
             return ValidationResult(False, "Path is empty", risk_level=SecurityLevel.HIGH)
 
-        if len(path) > self.config.max_path_length:
+        if len(path) > self.manager.max_path_length:
             return ValidationResult(
                 False,
-                f"Path exceeds maximum length {self.config.max_path_length}",
+                f"Path exceeds maximum length {self.manager.max_path_length}",
                 risk_level=SecurityLevel.HIGH
             )
 
@@ -127,8 +127,8 @@ class SecurityManager:
                 is_safe = True
                 break
 
-        if not is_safe and self.config.allowed_paths:
-            for allowed in self.config.allowed_paths:
+        if not is_safe and self.manager.allowed_paths:
+            for allowed in self.manager.allowed_paths:
                 if resolved.startswith(allowed):
                     is_safe = True
                     break
@@ -156,14 +156,14 @@ class SecurityManager:
         if not command:
             return ValidationResult(False, "Command is empty", risk_level=SecurityLevel.HIGH)
 
-        if len(command) > self.config.max_string_length:
+        if len(command) > self.manager.max_string_length:
             return ValidationResult(
                 False,
                 f"Command exceeds maximum length",
                 risk_level=SecurityLevel.HIGH
             )
 
-        if self.config.level == SecurityLevel.PARANOID:
+        if self.manager.level == SecurityLevel.PARANOID:
             dangerous_chars = ["'", '"', '$', '`', '|', ';', '&', '>', '<']
             for char in dangerous_chars:
                 if char in command:
@@ -180,7 +180,7 @@ class SecurityManager:
         if not isinstance(value, str):
             value = str(value)
 
-        max_len = max_length or self.config.max_string_length
+        max_len = max_length or self.manager.max_string_length
         if len(value) > max_len:
             value = value[:max_len]
 
@@ -203,7 +203,7 @@ class SecurityManager:
             if key in env:
                 warnings.append(f"Environment variable {key} is set")
 
-        if warnings and self.config.level >= SecurityLevel.HIGH:
+        if warnings and self.manager.level >= SecurityLevel.HIGH:
             return ValidationResult(
                 False,
                 "; ".join(warnings),
@@ -243,7 +243,7 @@ class SecurityManager:
 
     def _audit(self, event: str, data: Dict[str, Any]) -> None:
         """审计日志"""
-        if not self.config.audit_enabled:
+        if not self.manager.audit_enabled:
             return
 
         self._audit_log.append({

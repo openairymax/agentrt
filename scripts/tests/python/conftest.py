@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿﻿#!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Scripts 测试套件
 # pytest 配置文件
@@ -21,14 +21,14 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 # pytest 配置
-def pytest_configure(config):
+def pytest_configure(manager):
     """pytest 配置钩子"""
-    config.addinivalue_line("markers", "slow: marks tests as slow")
-    config.addinivalue_line("markers", "integration: marks tests as integration tests")
-    config.addinivalue_line("markers", "security: marks tests as security tests")
+    manager.addinivalue_line("markers", "slow: marks tests as slow")
+    manager.addinivalue_line("markers", "integration: marks tests as integration tests")
+    manager.addinivalue_line("markers", "security: marks tests as security tests")
 
 
-def pytest_collection_modifyitems(config, items):
+def pytest_collection_modifyitems(manager, items):
     """修改测试收集"""
     for item in items:
         # 为 core 模块的测试添加慢速标记

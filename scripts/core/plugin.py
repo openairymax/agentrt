@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿﻿#!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 插件系统
 # 支持动态加载和扩展脚本功能
@@ -62,7 +62,7 @@ class PluginContext:
     plugin_id: str
     working_dir: str
     environment: Dict[str, str] = field(default_factory=dict)
-    config: Dict[str, Any] = field(default_factory=dict)
+    manager: Dict[str, Any] = field(default_factory=dict)
     trace_id: str = ""
     parent_trace_id: Optional[str] = None
 
@@ -92,7 +92,7 @@ class Plugin(ABC):
         self._context: Optional[PluginContext] = None
 
     @abstractmethod
-    def initialize(self, config: Dict[str, Any]) -> bool:
+    def initialize(self, manager: Dict[str, Any]) -> bool:
         """初始化插件"""
         pass
 
@@ -242,7 +242,7 @@ class PluginRegistry:
 
         return None
 
-    def execute_plugin(self, name: str, config: Dict[str, Any] = None) -> Optional[PluginResult]:
+    def execute_plugin(self, name: str, manager: Dict[str, Any] = None) -> Optional[PluginResult]:
         """执行插件"""
         plugin = self.get(name)
         if not plugin:
@@ -252,7 +252,7 @@ class PluginRegistry:
         ctx = PluginContext(
             plugin_id=name,
             working_dir=os.getcwd(),
-            config=config or {}
+            manager=manager or {}
         )
 
         self._trigger_hooks("pre_execute", plugin, ctx)

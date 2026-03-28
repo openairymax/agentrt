@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿﻿#!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 配置模板引擎
 # 基于 Jinja2 的配置生成系统
@@ -13,7 +13,7 @@ AgentOS 配置模板引擎
 - 敏感信息加密
 
 Usage:
-    from agentos_scripts.core.config import ConfigEngine
+    from agentos_scripts.core.manager import ConfigEngine
 
     engine = ConfigEngine(template_dir="templates")
     engine.render("production.conf", context={"version": "1.0.0"})

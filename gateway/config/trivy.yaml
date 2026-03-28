@@ -1,0 +1,75 @@
+﻿# Copyright (c) 2026 SPHARX. All Rights Reserved.
+# Trivy security scanner configuration
+# Version: 1.0.0
+
+# 扫描目标
+target: gateway/
+
+# 扫描类型
+scan:
+  - fs
+  - manager
+
+# 漏洞检测
+vulnerability:
+  # 扫描严重级别
+  severity:
+    - CRITICAL
+    - HIGH
+    - MEDIUM
+  
+  # 忽略的漏洞（根据项目需求调整）
+  ignore:
+    - CVE-2023-12345  # 示例：已评估风险可接受
+
+  # 忽略未修复的漏洞
+  ignore-unfixed: false
+
+# 配置检查
+misconfiguration:
+  # 检查的配置文件类型
+  include:
+    - Dockerfile
+    - Kubernetes
+    - Terraform
+  
+  # 跳过的检查项
+  skip:
+    - AVD-AWS-1234  # 示例：跳过特定检查
+
+# 秘钥检测
+secret:
+  enable: true
+  
+  # 忽略的秘钥模式
+  exclude:
+    - "test_.*"
+    - "example_.*"
+
+# 输出格式
+format:
+  - table
+  - sarif
+  - json
+
+# 输出文件
+output:
+  sarif: trivy-results.sarif
+  json: trivy-results.json
+
+# 缓存设置
+cache:
+  dir: ~/.cache/trivy
+  backend: ""
+
+# 数据库设置
+db:
+  repository: ghcr.io/aquasecurity/trivy-db
+  java-db-repository: ghcr.io/aquasecurity/trivy-java-db
+
+# 超时设置
+timeout: 10m
+
+# 调试模式
+debug: false
+

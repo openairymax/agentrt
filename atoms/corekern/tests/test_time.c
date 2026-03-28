@@ -79,7 +79,7 @@ int test_time_current() {
         return 1;
     }
     
-    // 允许一定的时间差（最多 1 秒）
+    // 允许一定的时间差（最�?1 秒）
     if (realtime_ns < start_ns - 1000000000ULL || realtime_ns > start_ns + 1000000000ULL) {
         printf("Realtime and current time differ significantly\n");
         return 1;
@@ -102,7 +102,7 @@ int test_time_sleep() {
     uint64_t end = agentos_time_monotonic_ns();
     uint64_t elapsed = end - start;
     
-    // 允许一定的误差（最多 50ms）
+    // 允许一定的误差（最�?50ms�?
     if (elapsed < 50000000ULL || elapsed > 150000000ULL) {
         printf("Sleep duration incorrect: %llu ns\n", elapsed);
         return 1;
@@ -122,14 +122,14 @@ void timer_callback(void* userdata) {
 int test_timer() {
     printf("Testing timer functionality...\n");
     
-    // 创建定时器
+    // 创建定时�?
     agentos_timer_t* timer = agentos_timer_create(timer_callback, NULL);
     if (!timer) {
         printf("Failed to create timer\n");
         return 1;
     }
     
-    // 测试启动定时器
+    // 测试启动定时�?
     agentos_error_t err = agentos_timer_start(timer, 100, 1); // 100ms, one-shot
     if (err != AGENTOS_SUCCESS) {
         printf("Failed to start timer: %d\n", err);
@@ -137,7 +137,7 @@ int test_timer() {
         return 1;
     }
     
-    // 等待定时器触发
+    // 等待定时器触�?
     agentos_task_sleep(200);
     
     // 检查回调是否被调用
@@ -147,7 +147,7 @@ int test_timer() {
         return 1;
     }
     
-    // 测试停止定时器
+    // 测试停止定时�?
     err = agentos_timer_stop(timer);
     if (err != AGENTOS_SUCCESS) {
         printf("Failed to stop timer: %d\n", err);
@@ -204,7 +204,7 @@ int test_event() {
         return 1;
     }
     
-    // 测试销毁事件
+    // 测试销毁事�?
     agentos_event_destroy(event);
     
     printf("Event test passed\n");

@@ -1,0 +1,357 @@
+# =============================================================================
+# AgentOS 技能注册表配置文件
+# 版本: v1.0.0
+# 最后更新: 2026-03-23
+# Schema: schema/skill-registry.schema.json
+# =============================================================================
+# Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+
+# 配置版本
+_config_version: "1.0.0"
+
+# 注册表元数据
+_metadata:
+  last_updated: "2026-03-23T00:00:00Z"
+  total_skills: 10
+
+# =============================================================================
+# 技能注册列表
+# =============================================================================
+skills:
+  # ===========================================================================
+  # 文件系统技能
+  # ===========================================================================
+  - skill_id: "filesystem_skill"
+    name: "File System Operations"
+    description: "提供文件和目录的读写、创建、删除等操作能力"
+    version: "1.0.0"
+    source: "builtin"
+    enabled: true
+    unit_type: "file"
+    contract_path: "openlab/contrib/skills/filesystem/contract.json"
+    permissions:
+      - "file:read"
+      - "file:write"
+    dependencies: []
+    compatibility:
+      min_agentos_version: "1.0.0"
+      max_agentos_version: "2.0.0"
+      platforms: ["linux", "macos", "windows"]
+    resource_limits:
+      max_memory_mb: 128
+      timeout_sec: 60
+      max_file_size_mb: 100
+    rate_limit:
+      max_calls_per_minute: 1000
+    tags:
+      - "filesystem"
+      - "io"
+      - "core"
+    author: "AgentOS Team"
+    license: "MIT"
+    created_at: "2026-01-01T00:00:00Z"
+    updated_at: "2026-03-23T00:00:00Z"
+
+  # ===========================================================================
+  # Shell 执行技能
+  # ===========================================================================
+  - skill_id: "shell_skill"
+    name: "Shell Command Execution"
+    description: "提供安全的Shell命令执行能力，支持沙箱隔离"
+    version: "1.0.0"
+    source: "builtin"
+    enabled: true
+    unit_type: "shell"
+    contract_path: "openlab/contrib/skills/shell/contract.json"
+    permissions:
+      - "code:execute:shell"
+    dependencies: []
+    compatibility:
+      min_agentos_version: "1.0.0"
+      max_agentos_version: "2.0.0"
+      platforms: ["linux", "macos"]
+    resource_limits:
+      max_memory_mb: 256
+      timeout_sec: 120
+    rate_limit:
+      max_calls_per_minute: 100
+    tags:
+      - "shell"
+      - "execution"
+      - "system"
+    author: "AgentOS Team"
+    license: "MIT"
+    created_at: "2026-01-01T00:00:00Z"
+    updated_at: "2026-03-23T00:00:00Z"
+
+  # ===========================================================================
+  # 网络请求技能
+  # ===========================================================================
+  - skill_id: "http_skill"
+    name: "HTTP Request Handler"
+    description: "提供HTTP/HTTPS请求能力，支持REST API调用"
+    version: "1.0.0"
+    source: "builtin"
+    enabled: true
+    unit_type: "api"
+    contract_path: "openlab/contrib/skills/http/contract.json"
+    permissions:
+      - "network:connect"
+    dependencies: []
+    compatibility:
+      min_agentos_version: "1.0.0"
+      max_agentos_version: "2.0.0"
+      platforms: ["linux", "macos", "windows"]
+    resource_limits:
+      max_memory_mb: 128
+      timeout_sec: 60
+    rate_limit:
+      max_calls_per_minute: 500
+    tags:
+      - "http"
+      - "network"
+      - "api"
+    author: "AgentOS Team"
+    license: "MIT"
+    created_at: "2026-01-01T00:00:00Z"
+    updated_at: "2026-03-23T00:00:00Z"
+
+  # ===========================================================================
+  # 代码执行技能
+  # ===========================================================================
+  - skill_id: "python_skill"
+    name: "Python Code Execution"
+    description: "提供Python代码的安全执行能力"
+    version: "1.0.0"
+    source: "builtin"
+    enabled: true
+    unit_type: "code"
+    contract_path: "openlab/contrib/skills/python/contract.json"
+    permissions:
+      - "code:execute:python"
+    dependencies: []
+    compatibility:
+      min_agentos_version: "1.0.0"
+      max_agentos_version: "2.0.0"
+      platforms: ["linux", "macos", "windows"]
+    resource_limits:
+      max_memory_mb: 512
+      timeout_sec: 300
+    rate_limit:
+      max_calls_per_minute: 50
+    tags:
+      - "python"
+      - "code"
+      - "execution"
+    author: "AgentOS Team"
+    license: "MIT"
+    created_at: "2026-01-01T00:00:00Z"
+    updated_at: "2026-03-23T00:00:00Z"
+
+  # ===========================================================================
+  # JavaScript 执行技能
+  # ===========================================================================
+  - skill_id: "javascript_skill"
+    name: "JavaScript Code Execution"
+    description: "提供JavaScript/Node.js代码的安全执行能力"
+    version: "1.0.0"
+    source: "builtin"
+    enabled: true
+    unit_type: "code"
+    contract_path: "openlab/contrib/skills/javascript/contract.json"
+    permissions:
+      - "code:execute:javascript"
+    dependencies: []
+    compatibility:
+      min_agentos_version: "1.0.0"
+      max_agentos_version: "2.0.0"
+      platforms: ["linux", "macos", "windows"]
+    resource_limits:
+      max_memory_mb: 256
+      timeout_sec: 120
+    rate_limit:
+      max_calls_per_minute: 50
+    tags:
+      - "javascript"
+      - "nodejs"
+      - "code"
+    author: "AgentOS Team"
+    license: "MIT"
+    created_at: "2026-01-01T00:00:00Z"
+    updated_at: "2026-03-23T00:00:00Z"
+
+  # ===========================================================================
+  # 数据库操作技能
+  # ===========================================================================
+  - skill_id: "database_skill"
+    name: "Database Operations"
+    description: "提供数据库连接和SQL操作能力"
+    version: "1.0.0"
+    source: "builtin"
+    enabled: true
+    unit_type: "db"
+    contract_path: "openlab/contrib/skills/database/contract.json"
+    permissions:
+      - "database:connect"
+      - "database:query"
+    dependencies: []
+    compatibility:
+      min_agentos_version: "1.0.0"
+      max_agentos_version: "2.0.0"
+      platforms: ["linux", "macos", "windows"]
+    resource_limits:
+      max_memory_mb: 256
+      timeout_sec: 60
+    rate_limit:
+      max_calls_per_minute: 200
+    tags:
+      - "database"
+      - "sql"
+      - "storage"
+    author: "AgentOS Team"
+    license: "MIT"
+    created_at: "2026-01-01T00:00:00Z"
+    updated_at: "2026-03-23T00:00:00Z"
+
+  # ===========================================================================
+  # 浏览器自动化技能
+  # ===========================================================================
+  - skill_id: "browser_skill"
+    name: "Browser Automation"
+    description: "提供浏览器自动化和网页抓取能力"
+    version: "1.0.0"
+    source: "builtin"
+    enabled: true
+    unit_type: "browser"
+    contract_path: "openlab/contrib/skills/browser/contract.json"
+    permissions:
+      - "browser:automate"
+      - "network:connect"
+    dependencies:
+      - skill_id: "http_skill"
+        version: ">=1.0.0"
+        optional: true
+    compatibility:
+      min_agentos_version: "1.0.0"
+      max_agentos_version: "2.0.0"
+      platforms: ["linux", "macos", "windows"]
+    resource_limits:
+      max_memory_mb: 1024
+      timeout_sec: 300
+    rate_limit:
+      max_calls_per_minute: 20
+    tags:
+      - "browser"
+      - "automation"
+      - "scraping"
+    author: "AgentOS Team"
+    license: "MIT"
+    created_at: "2026-01-01T00:00:00Z"
+    updated_at: "2026-03-23T00:00:00Z"
+
+  # ===========================================================================
+  # Git 操作技能
+  # ===========================================================================
+  - skill_id: "git_skill"
+    name: "Git Operations"
+    description: "提供Git版本控制操作能力"
+    version: "1.0.0"
+    source: "builtin"
+    enabled: true
+    unit_type: "tool"
+    contract_path: "openlab/contrib/skills/git/contract.json"
+    permissions:
+      - "git:clone"
+      - "git:commit"
+      - "git:push"
+      - "git:pull"
+    dependencies:
+      - skill_id: "shell_skill"
+        version: ">=1.0.0"
+        optional: false
+    compatibility:
+      min_agentos_version: "1.0.0"
+      max_agentos_version: "2.0.0"
+      platforms: ["linux", "macos", "windows"]
+    resource_limits:
+      max_memory_mb: 256
+      timeout_sec: 120
+    rate_limit:
+      max_calls_per_minute: 100
+    tags:
+      - "git"
+      - "version_control"
+      - "devops"
+    author: "AgentOS Team"
+    license: "MIT"
+    created_at: "2026-01-01T00:00:00Z"
+    updated_at: "2026-03-23T00:00:00Z"
+
+  # ===========================================================================
+  # 向量搜索技能
+  # ===========================================================================
+  - skill_id: "vector_search_skill"
+    name: "Vector Search"
+    description: "提供向量相似度搜索和嵌入生成能力"
+    version: "1.0.0"
+    source: "builtin"
+    enabled: true
+    unit_type: "api"
+    contract_path: "openlab/contrib/skills/vector_search/contract.json"
+    permissions:
+      - "embedding:generate"
+      - "vector:search"
+    dependencies: []
+    compatibility:
+      min_agentos_version: "1.0.0"
+      max_agentos_version: "2.0.0"
+      platforms: ["linux", "macos", "windows"]
+    resource_limits:
+      max_memory_mb: 512
+      timeout_sec: 60
+    rate_limit:
+      max_calls_per_minute: 500
+    tags:
+      - "vector"
+      - "embedding"
+      - "search"
+      - "ai"
+    author: "AgentOS Team"
+    license: "MIT"
+    created_at: "2026-01-01T00:00:00Z"
+    updated_at: "2026-03-23T00:00:00Z"
+
+  # ===========================================================================
+  # 日志分析技能
+  # ===========================================================================
+  - skill_id: "log_analysis_skill"
+    name: "Log Analysis"
+    description: "提供日志解析、分析和异常检测能力"
+    version: "1.0.0"
+    source: "builtin"
+    enabled: true
+    unit_type: "tool"
+    contract_path: "openlab/contrib/skills/log_analysis/contract.json"
+    permissions:
+      - "file:read:${AGENTOS_LOG_DIR}/*"
+    dependencies:
+      - skill_id: "filesystem_skill"
+        version: ">=1.0.0"
+        optional: false
+    compatibility:
+      min_agentos_version: "1.0.0"
+      max_agentos_version: "2.0.0"
+      platforms: ["linux", "macos", "windows"]
+    resource_limits:
+      max_memory_mb: 256
+      timeout_sec: 120
+    rate_limit:
+      max_calls_per_minute: 100
+    tags:
+      - "logs"
+      - "analysis"
+      - "monitoring"
+    author: "AgentOS Team"
+    license: "MIT"
+    created_at: "2026-01-01T00:00:00Z"
+    updated_at: "2026-03-23T00:00:00Z"

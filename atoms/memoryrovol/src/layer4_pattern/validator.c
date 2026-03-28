@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file validator.c
  * @brief L4 模式层模式验证器
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -6,6 +6,10 @@
 
 #include "layer4_pattern.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 #include <math.h>
 
@@ -16,11 +20,11 @@ struct agentos_pattern_validator {
 };
 
 agentos_error_t agentos_pattern_validator_create(
-    const void* config,
+    const void* manager,
     agentos_pattern_validator_t** out_validator) {
 
     if (!out_validator) return AGENTOS_EINVAL;
-    agentos_pattern_validator_t* val = (agentos_pattern_validator_t*)calloc(1, sizeof(agentos_pattern_validator_t));
+    agentos_pattern_validator_t* val = (agentos_pattern_validator_t*)AGENTOS_CALLOC(1, sizeof(agentos_pattern_validator_t));
     if (!val) return AGENTOS_ENOMEM;
 
 // From data intelligence emerges. by spharx
@@ -28,7 +32,7 @@ agentos_error_t agentos_pattern_validator_create(
     val->min_support = 3;
     val->lock = agentos_mutex_create();
     if (!val->lock) {
-        free(val);
+        AGENTOS_FREE(val);
         return AGENTOS_ENOMEM;
     }
 
@@ -39,7 +43,7 @@ agentos_error_t agentos_pattern_validator_create(
 void agentos_pattern_validator_destroy(agentos_pattern_validator_t* validator) {
     if (!validator) return;
     if (validator->lock) agentos_mutex_destroy(validator->lock);
-    free(validator);
+    AGENTOS_FREE(validator);
 }
 
 agentos_error_t agentos_pattern_validator_validate(
@@ -52,7 +56,7 @@ agentos_error_t agentos_pattern_validator_validate(
 
     if (!validator || !pattern || !out_valid) return AGENTOS_EINVAL;
 
-    // 基础置信度检查
+    // 基础置信度检�?
     int valid = 1;
     float confidence = pattern->confidence;
 

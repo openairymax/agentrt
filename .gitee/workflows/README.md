@@ -1,12 +1,16 @@
 # Gitee GoCI 工作流目录
 
-本目录包含 AgentOS 项目在 Gitee 平台上的 CI/CD 流水线配置文件。
+**版本**: v1.0.0.6  
+**最后更新**: 2026-03-26  
+**许可证**: Apache License 2.0
 
-## 目录说明
+---
+
+## 📁 目录说明
 
 Gitee GoCI 会自动发现并执行本目录中的工作流文件。
 
-## 工作流文件清单
+## 📋 工作流文件清单
 
 | 文件 | 说明 |
 |------|------|
@@ -15,7 +19,7 @@ Gitee GoCI 会自动发现并执行本目录中的工作流文件。
 | `GITEE_DEPLOYMENT_STRATEGY.md` | Gitee 部署策略文档 (蓝绿/金丝雀/滚动) |
 | `GITEE_CI_USAGE_GUIDE.md` | Gitee CI/CD 使用指南与快速开始 |
 
-## 流水线阶段
+## 🔄 流水线阶段
 
 | 阶段 | 说明 | 触发条件 |
 |------|------|----------|
@@ -26,7 +30,7 @@ Gitee GoCI 会自动发现并执行本目录中的工作流文件。
 | Deploy Staging | 预发布环境部署 | develop 分支 |
 | Deploy Production | 生产环境部署 | master/tag (手动) |
 
-## 部署策略
+## 🎯 部署策略
 
 | 策略 | 说明 | 适用场景 |
 |------|------|----------|
@@ -34,7 +38,7 @@ Gitee GoCI 会自动发现并执行本目录中的工作流文件。
 | 金丝雀部署 | 渐进式流量切换 | 重大功能发布 |
 | 滚动更新 | 逐步替换实例 | 常规版本更新 |
 
-## 相关文档
+## 🔗 相关文档
 
 - [Gitee CI/CD 使用指南](GITEE_CI_USAGE_GUIDE.md)
 - [Gitee 环境配置说明](GITEE_CI_ENVIRONMENT.md)
@@ -42,12 +46,20 @@ Gitee GoCI 会自动发现并执行本目录中的工作流文件。
 - [CI/CD 全面检查报告](../../.本地总结/CI_CD全面检查报告.md)
 - [Gitee 官方文档](https://gitee.com/help/articles/building-in-ci)
 
-## 必需的流水线变量
+## ⚙️ 必需的流水线变量
 
-| 变量 | 说明 | 是否加密 |
-|------|------|----------|
-| `GITEE_USER` | Gitee 用户名 | 否 |
-| `GITEE_PACKAGES_TOKEN` | 容器镜像仓库访问令牌 | **是** |
+## 📞 联系方式
+
+- **维护者**: AgentOS 架构委员会
+- **技术支持**: lidecheng@spharx.cn
+- **问题反馈**: https://github.com/SpharxTeam/AgentOS/issues
+- **官方仓库**: https://gitee.com/spharx/agentos
+
+---
+
+© 2026 SPHARX Ltd. All Rights Reserved.
+
+*"Gitee Go 加速中国开源。"*
 | `DINGTALK_TOKEN` | 钉钉机器人 Webhook | **是** |
 | `WECOM_WEBHOOK` | 企业微信机器人 Webhook | **是** |
 | `POSTGRES_PASSWORD` | PostgreSQL 数据库密码 | **是** |

@@ -1,7 +1,7 @@
-/**
+﻿/**
  * @file test_market.c
  * @brief 市场服务单元测试
- * @details 测试市场服务的核心功能，包括 Agent 和 Skill 的注册、发现、安装和管理
+ * @details 测试市场服务的核心功能，包括 Agent �?Skill 的注册、发现、安装和管理
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -9,16 +9,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "../../../../backs/market_d/include/market_service.h"
+#include "../../../../daemon/market_d/include/market_service.h"
 
 /**
- * @brief 测试服务创建和销毁
+ * @brief 测试服务创建和销�?
  */
 int test_service_create_destroy() {
-    printf("测试服务创建和销毁...");
+    printf("测试服务创建和销�?..");
 
     // 配置市场服务
-    market_config_t config = {
+    market_config_t manager = {
         .registry_url = "http://registry.agentos.org",
         .storage_path = "./test_market",
         .sync_interval_ms = 60000,
@@ -30,16 +30,16 @@ int test_service_create_destroy() {
 
     // 创建市场服务
     market_service_t* service = NULL;
-    int ret = market_service_create(&config, &service);
+    int ret = market_service_create(&manager, &service);
     if (ret != 0) {
         printf("失败: 创建服务返回 %d\n", ret);
         return ret;
     }
 
-    // 销毁市场服务
+    // 销毁市场服�?
     ret = market_service_destroy(service);
     if (ret != 0) {
-        printf("失败: 销毁服务返回 %d\n", ret);
+        printf("失败: 销毁服务返�?%d\n", ret);
         return ret;
     }
 
@@ -54,7 +54,7 @@ int test_register_agent() {
     printf("测试 Agent 注册...");
 
     // 配置市场服务
-    market_config_t config = {
+    market_config_t manager = {
         .registry_url = "http://registry.agentos.org",
         .storage_path = "./test_market",
         .sync_interval_ms = 60000,
@@ -65,7 +65,7 @@ int test_register_agent() {
 
     // 创建市场服务
     market_service_t* service = NULL;
-    int ret = market_service_create(&config, &service);
+    int ret = market_service_create(&manager, &service);
     if (ret != 0) {
         printf("失败: 创建服务返回 %d\n", ret);
         return ret;
@@ -116,7 +116,7 @@ int test_register_agent() {
     }
 
     if (count != 1) {
-        printf("失败: Agent 数量不正确，期望 1，实际 %zu\n", count);
+        printf("失败: Agent 数量不正确，期望 1，实�?%zu\n", count);
         if (agents) {
             free(agents);
         }
@@ -140,7 +140,7 @@ int test_register_skill() {
     printf("测试 Skill 注册...");
 
     // 配置市场服务
-    market_config_t config = {
+    market_config_t manager = {
         .registry_url = "http://registry.agentos.org",
         .storage_path = "./test_market",
         .sync_interval_ms = 60000,
@@ -151,7 +151,7 @@ int test_register_skill() {
 
     // 创建市场服务
     market_service_t* service = NULL;
-    int ret = market_service_create(&config, &service);
+    int ret = market_service_create(&manager, &service);
     if (ret != 0) {
         printf("失败: 创建服务返回 %d\n", ret);
         return ret;
@@ -201,7 +201,7 @@ int test_register_skill() {
     }
 
     if (count != 1) {
-        printf("失败: Skill 数量不正确，期望 1，实际 %zu\n", count);
+        printf("失败: Skill 数量不正确，期望 1，实�?%zu\n", count);
         if (skills) {
             free(skills);
         }
@@ -225,7 +225,7 @@ int test_install_agent() {
     printf("测试 Agent 安装...");
 
     // 配置市场服务
-    market_config_t config = {
+    market_config_t manager = {
         .registry_url = "http://registry.agentos.org",
         .storage_path = "./test_market",
         .sync_interval_ms = 60000,
@@ -236,7 +236,7 @@ int test_install_agent() {
 
     // 创建市场服务
     market_service_t* service = NULL;
-    int ret = market_service_create(&config, &service);
+    int ret = market_service_create(&manager, &service);
     if (ret != 0) {
         printf("失败: 创建服务返回 %d\n", ret);
         return ret;
@@ -303,12 +303,12 @@ int test_install_agent() {
         return -1;
     }
 
-    // 检查已安装的 Agent
+    // 检查已安装�?Agent
     agent_info_t** agents = NULL;
     size_t count = 0;
     ret = market_service_get_installed_agents(service, &agents, &count);
     if (ret != 0) {
-        printf("失败: 获取已安装 Agent 返回 %d\n", ret);
+        printf("失败: 获取已安�?Agent 返回 %d\n", ret);
         if (result->message) {
             free(result->message);
         }
@@ -324,7 +324,7 @@ int test_install_agent() {
     }
 
     if (count != 1) {
-        printf("失败: 已安装 Agent 数量不正确，期望 1，实际 %zu\n", count);
+        printf("失败: 已安�?Agent 数量不正确，期望 1，实�?%zu\n", count);
         if (agents) {
             free(agents);
         }
@@ -369,7 +369,7 @@ int test_install_skill() {
     printf("测试 Skill 安装...");
 
     // 配置市场服务
-    market_config_t config = {
+    market_config_t manager = {
         .registry_url = "http://registry.agentos.org",
         .storage_path = "./test_market",
         .sync_interval_ms = 60000,
@@ -380,7 +380,7 @@ int test_install_skill() {
 
     // 创建市场服务
     market_service_t* service = NULL;
-    int ret = market_service_create(&config, &service);
+    int ret = market_service_create(&manager, &service);
     if (ret != 0) {
         printf("失败: 创建服务返回 %d\n", ret);
         return ret;
@@ -469,7 +469,7 @@ int test_uninstall_agent() {
     printf("测试 Agent 卸载...");
 
     // 配置市场服务
-    market_config_t config = {
+    market_config_t manager = {
         .registry_url = "http://registry.agentos.org",
         .storage_path = "./test_market",
         .sync_interval_ms = 60000,
@@ -480,7 +480,7 @@ int test_uninstall_agent() {
 
     // 创建市场服务
     market_service_t* service = NULL;
-    int ret = market_service_create(&config, &service);
+    int ret = market_service_create(&manager, &service);
     if (ret != 0) {
         printf("失败: 创建服务返回 %d\n", ret);
         return ret;
@@ -529,7 +529,7 @@ int test_uninstall_skill() {
     printf("测试 Skill 卸载...");
 
     // 配置市场服务
-    market_config_t config = {
+    market_config_t manager = {
         .registry_url = "http://registry.agentos.org",
         .storage_path = "./test_market",
         .sync_interval_ms = 60000,
@@ -540,7 +540,7 @@ int test_uninstall_skill() {
 
     // 创建市场服务
     market_service_t* service = NULL;
-    int ret = market_service_create(&config, &service);
+    int ret = market_service_create(&manager, &service);
     if (ret != 0) {
         printf("失败: 创建服务返回 %d\n", ret);
         return ret;
@@ -582,13 +582,13 @@ int test_uninstall_skill() {
 }
 
 /**
- * @brief 测试检查更新
+ * @brief 测试检查更�?
  */
 int test_check_update() {
-    printf("测试检查更新...");
+    printf("测试检查更�?..");
 
     // 配置市场服务
-    market_config_t config = {
+    market_config_t manager = {
         .registry_url = "http://registry.agentos.org",
         .storage_path = "./test_market",
         .sync_interval_ms = 60000,
@@ -599,7 +599,7 @@ int test_check_update() {
 
     // 创建市场服务
     market_service_t* service = NULL;
-    int ret = market_service_create(&config, &service);
+    int ret = market_service_create(&manager, &service);
     if (ret != 0) {
         printf("失败: 创建服务返回 %d\n", ret);
         return ret;
@@ -628,12 +628,12 @@ int test_check_update() {
         return ret;
     }
 
-    // 检查更新
+    // 检查更�?
     bool has_update = false;
     char* latest_version = NULL;
     ret = market_service_check_update(service, "agent-001", &has_update, &latest_version);
     if (ret != 0) {
-        printf("失败: 检查更新返回 %d\n", ret);
+        printf("失败: 检查更新返�?%d\n", ret);
         market_service_destroy(service);
         return ret;
     }
@@ -671,7 +671,7 @@ int test_reload_config() {
         return ret;
     }
 
-    // 新配置
+    // 新配�?
     market_config_t config2 = {
         .registry_url = "http://new-registry.agentos.org",
         .storage_path = "./new_test_market",
@@ -701,7 +701,7 @@ int test_sync_registry() {
     printf("测试同步注册中心...");
 
     // 配置市场服务
-    market_config_t config = {
+    market_config_t manager = {
         .registry_url = "http://registry.agentos.org",
         .storage_path = "./test_market",
         .sync_interval_ms = 60000,
@@ -712,7 +712,7 @@ int test_sync_registry() {
 
     // 创建市场服务
     market_service_t* service = NULL;
-    int ret = market_service_create(&config, &service);
+    int ret = market_service_create(&manager, &service);
     if (ret != 0) {
         printf("失败: 创建服务返回 %d\n", ret);
         return ret;
@@ -732,7 +732,7 @@ int test_sync_registry() {
 }
 
 /**
- * @brief 主测试函数
+ * @brief 主测试函�?
  */
 int main() {
     printf("开始市场服务单元测试\n");
@@ -764,7 +764,7 @@ int main() {
     }
 
     printf("========================\n");
-    printf("测试完成: %zu 个测试，%d 个通过，%zu 个失败\n", test_count, passed, test_count - passed);
+    printf("测试完成: %zu 个测试，%d 个通过�?zu 个失败\n", test_count, passed, test_count - passed);
 
     if (passed == test_count) {
         printf("所有测试通过！\n");

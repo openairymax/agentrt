@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+﻿﻿#!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Scripts 模块 CI/CD 入口脚本
 # 统一触发 CI/CD 各阶段任�?
@@ -9,13 +9,13 @@ set -euo pipefail
 # 配置
 ###############################################################################
 AGENTOS_CICD_VERSION="1.0.0"
-AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")
+AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENTOS_SCRIPTS_DIR="$(dirname "$AGENTOS_SCRIPT_DIR")"
 AGENTOS_PROJECT_ROOT="$(dirname "$AGENTOS_SCRIPTS_DIR")"
 
 # 导入通用函数
-# shellcheck source=../lib/common.sh
-source "$AGENTOS_SCRIPTS_DIR/lib/common.sh"
+# shellcheck source=../lib/bases.sh
+source "$AGENTOS_SCRIPTS_DIR/lib/bases.sh"
 
 ###############################################################################
 # 颜色定义

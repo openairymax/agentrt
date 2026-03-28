@@ -1,23 +1,23 @@
-/**
+﻿/**
  * @file test_scheduler.c
  * @brief 调度服务单元测试
- * @details 测试调度服务的各个功能模块
+ * @details 测试调度服务的各个功能模�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../../../../backs/sched_d/include/scheduler_service.h"
+#include "../../../../daemon/sched_d/include/scheduler_service.h"
 
 /**
- * @brief 测试创建和销毁调度服务
+ * @brief 测试创建和销毁调度服�?
  * @return 0 表示成功，非 0 表示失败
  */
 int test_create_destroy() {
     printf("=== Testing create and destroy ===\n");
     
-    sched_config_t config = {
+    sched_config_t manager = {
         .strategy = SCHED_STRATEGY_ROUND_ROBIN,
         .health_check_interval_ms = 5000,
         .stats_report_interval_ms = 10000,
@@ -28,7 +28,7 @@ int test_create_destroy() {
     };
 
     sched_service_t* service = NULL;
-    int ret = sched_service_create(&config, &service);
+    int ret = sched_service_create(&manager, &service);
     if (ret != 0) {
         printf("Failed to create scheduler service\n");
         return ret;
@@ -51,7 +51,7 @@ int test_create_destroy() {
 int test_register_unregister_agent() {
     printf("=== Testing register and unregister agent ===\n");
     
-    sched_config_t config = {
+    sched_config_t manager = {
         .strategy = SCHED_STRATEGY_ROUND_ROBIN,
         .health_check_interval_ms = 5000,
         .stats_report_interval_ms = 10000,
@@ -61,7 +61,7 @@ int test_register_unregister_agent() {
     };
 
     sched_service_t* service = NULL;
-    int ret = sched_service_create(&config, &service);
+    int ret = sched_service_create(&manager, &service);
     if (ret != 0) {
         printf("Failed to create scheduler service\n");
         return ret;
@@ -104,13 +104,13 @@ int test_register_unregister_agent() {
 }
 
 /**
- * @brief 测试更新 Agent 状态
+ * @brief 测试更新 Agent 状�?
  * @return 0 表示成功，非 0 表示失败
  */
 int test_update_agent_status() {
     printf("=== Testing update agent status ===\n");
     
-    sched_config_t config = {
+    sched_config_t manager = {
         .strategy = SCHED_STRATEGY_ROUND_ROBIN,
         .health_check_interval_ms = 5000,
         .stats_report_interval_ms = 10000,
@@ -120,7 +120,7 @@ int test_update_agent_status() {
     };
 
     sched_service_t* service = NULL;
-    int ret = sched_service_create(&config, &service);
+    int ret = sched_service_create(&manager, &service);
     if (ret != 0) {
         printf("Failed to create scheduler service\n");
         return ret;
@@ -144,7 +144,7 @@ int test_update_agent_status() {
         return ret;
     }
 
-    // 更新 Agent 状态
+    // 更新 Agent 状�?
     agent1.load_factor = 0.5;
     agent1.success_rate = 0.98;
     ret = sched_service_update_agent_status(service, &agent1);
@@ -171,7 +171,7 @@ int test_update_agent_status() {
 int test_schedule_task() {
     printf("=== Testing schedule task ===\n");
     
-    sched_config_t config = {
+    sched_config_t manager = {
         .strategy = SCHED_STRATEGY_ROUND_ROBIN,
         .health_check_interval_ms = 5000,
         .stats_report_interval_ms = 10000,
@@ -181,7 +181,7 @@ int test_schedule_task() {
     };
 
     sched_service_t* service = NULL;
-    int ret = sched_service_create(&config, &service);
+    int ret = sched_service_create(&manager, &service);
     if (ret != 0) {
         printf("Failed to create scheduler service\n");
         return ret;
@@ -241,13 +241,13 @@ int test_schedule_task() {
 }
 
 /**
- * @brief 测试健康检查
+ * @brief 测试健康检�?
  * @return 0 表示成功，非 0 表示失败
  */
 int test_health_check() {
     printf("=== Testing health check ===\n");
     
-    sched_config_t config = {
+    sched_config_t manager = {
         .strategy = SCHED_STRATEGY_ROUND_ROBIN,
         .health_check_interval_ms = 5000,
         .stats_report_interval_ms = 10000,
@@ -257,7 +257,7 @@ int test_health_check() {
     };
 
     sched_service_t* service = NULL;
-    int ret = sched_service_create(&config, &service);
+    int ret = sched_service_create(&manager, &service);
     if (ret != 0) {
         printf("Failed to create scheduler service\n");
         return ret;
@@ -281,7 +281,7 @@ int test_health_check() {
         return ret;
     }
 
-    // 健康检查
+    // 健康检�?
     bool health_status = false;
     ret = sched_service_health_check(service, &health_status);
     if (ret != 0) {
@@ -309,7 +309,7 @@ int test_health_check() {
 int test_get_stats() {
     printf("=== Testing get stats ===\n");
     
-    sched_config_t config = {
+    sched_config_t manager = {
         .strategy = SCHED_STRATEGY_ROUND_ROBIN,
         .health_check_interval_ms = 5000,
         .stats_report_interval_ms = 10000,
@@ -319,7 +319,7 @@ int test_get_stats() {
     };
 
     sched_service_t* service = NULL;
-    int ret = sched_service_create(&config, &service);
+    int ret = sched_service_create(&manager, &service);
     if (ret != 0) {
         printf("Failed to create scheduler service\n");
         return ret;
@@ -396,9 +396,9 @@ int test_get_stats() {
  * @return 0 表示成功，非 0 表示失败
  */
 int test_reload_config() {
-    printf("=== Testing reload config ===\n");
+    printf("=== Testing reload manager ===\n");
     
-    sched_config_t config = {
+    sched_config_t manager = {
         .strategy = SCHED_STRATEGY_ROUND_ROBIN,
         .health_check_interval_ms = 5000,
         .stats_report_interval_ms = 10000,
@@ -408,7 +408,7 @@ int test_reload_config() {
     };
 
     sched_service_t* service = NULL;
-    int ret = sched_service_create(&config, &service);
+    int ret = sched_service_create(&manager, &service);
     if (ret != 0) {
         printf("Failed to create scheduler service\n");
         return ret;
@@ -426,7 +426,7 @@ int test_reload_config() {
 
     ret = sched_service_reload_config(service, &new_config);
     if (ret != 0) {
-        printf("Failed to reload config\n");
+        printf("Failed to reload manager\n");
         sched_service_destroy(service);
         return ret;
     }
@@ -437,13 +437,13 @@ int test_reload_config() {
         return ret;
     }
 
-    printf("Reload config test passed\n\n");
+    printf("Reload manager test passed\n\n");
     return 0;
 }
 
 /**
- * @brief 主测试函数
- * @return 0 表示所有测试通过，非 0 表示有测试失败
+ * @brief 主测试函�?
+ * @return 0 表示所有测试通过，非 0 表示有测试失�?
  */
 int main() {
     int ret = 0;

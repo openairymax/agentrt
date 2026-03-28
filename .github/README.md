@@ -1,8 +1,12 @@
 # AgentOS GitHub Actions 配置
 
-本文档包含 AgentOS 项目的 GitHub 配置文件。
+**版本**: v1.0.0.6  
+**最后更新**: 2026-03-26  
+**许可证**: Apache License 2.0
 
-## 目录结构
+---
+
+## 📁 目录结构
 
 ```
 .github/
@@ -20,12 +24,16 @@
 | [ISSUE_TEMPLATE/](ISSUE_TEMPLATE/) | Issue 模板 (Bug 报告、功能请求) |
 | [PULL_REQUEST_TEMPLATE/](PULL_REQUEST_TEMPLATE/) | PR 描述模板 |
 
-## 快速链接
+## 🔗 快速链接
 
 - [CI/CD 文档](../../.本地总结/CI_CD全面检查报告.md)
 - [CI/CD 解决方案](../../.本地总结/CI_CD解决方案.md)
 - [AgentOS README](../../README.md)
 
 ---
+
+© 2026 SPHARX Ltd. All Rights Reserved.
+
+*"自动化驱动质量，CI/CD 守护代码安全。"*
 
 *© 2026 SPHARX Ltd. 保留所有权利*

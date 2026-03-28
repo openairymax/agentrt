@@ -6,6 +6,10 @@
 
 #include "mem.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 
 typedef struct pool_block {
@@ -24,18 +28,18 @@ typedef struct {
 void* agentos_mem_pool_create(size_t block_size, uint32_t block_count) {
     if (block_size < sizeof(void*) || block_count == 0) return NULL;
 
-    /* 检查 block_size + 7 是否溢出 */
+    /* 检�?block_size + 7 是否溢出 */
     if (block_size > SIZE_MAX - 7) return NULL;
     size_t actual_block_size = (block_size + 7) & ~(size_t)7;
 
-    /* 检查 actual_block_size * block_count 是否溢出 */
+    /* 检�?actual_block_size * block_count 是否溢出 */
     if (block_count > SIZE_MAX / actual_block_size) return NULL;
     size_t total_size = actual_block_size * block_count;
 
     void* raw = agentos_mem_aligned_alloc(total_size, 8);
     if (!raw) return NULL;
 
-    pool_t* pool = (pool_t*)malloc(sizeof(pool_t));
+    pool_t* pool = (pool_t*)AGENTOS_MALLOC(sizeof(pool_t));
     if (!pool) {
         agentos_mem_aligned_free(raw);
         return NULL;
@@ -89,5 +93,5 @@ void agentos_mem_pool_destroy(void* pool_handle) {
     if (pool->raw_memory) {
         agentos_mem_aligned_free(pool->raw_memory);
     }
-    free(pool);
+    AGENTOS_FREE(pool);
 }
