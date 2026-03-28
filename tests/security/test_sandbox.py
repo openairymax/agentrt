@@ -1,4 +1,4 @@
-# AgentOS 沙箱安全测试
+﻿﻿# AgentOS 沙箱安全测试
 # Version: 1.0.0.6
 # Last updated: 2026-03-23
 
@@ -120,22 +120,22 @@ class SandboxManager:
         self._sandboxes: Dict[str, 'Sandbox'] = {}
         self._lock = threading.RLock()
     
-    def create_sandbox(self, config: SandboxConfig) -> 'Sandbox':
+    def create_sandbox(self, manager: SandboxConfig) -> 'Sandbox':
         """
         创建沙箱。
         
         Args:
-            config: 沙箱配置
+            manager: 沙箱配置
             
         Returns:
             Sandbox: 创建的沙箱实例
         """
         with self._lock:
-            if config.sandbox_id in self._sandboxes:
-                raise ValueError(f"沙箱 {config.sandbox_id} 已存在")
+            if manager.sandbox_id in self._sandboxes:
+                raise ValueError(f"沙箱 {manager.sandbox_id} 已存在")
             
-            sandbox = Sandbox(config)
-            self._sandboxes[config.sandbox_id] = sandbox
+            sandbox = Sandbox(manager)
+            self._sandboxes[manager.sandbox_id] = sandbox
             
             return sandbox
     
@@ -189,14 +189,14 @@ class Sandbox:
     提供隔离的执行环境和权限控制。
     """
     
-    def __init__(self, config: SandboxConfig):
+    def __init__(self, manager: SandboxConfig):
         """
         初始化沙箱。
         
         Args:
-            config: 沙箱配置
+            manager: 沙箱配置
         """
-        self.config = config
+        self.manager = manager
         self.state = SandboxState.CREATED
         self._metrics = SandboxMetrics()
         self._start_time: Optional[float] = None
@@ -213,7 +213,7 @@ class Sandbox:
             return True
         
         try:
-            self._temp_dir = tempfile.mkdtemp(prefix=f"sandbox_{self.config.sandbox_id}_")
+            self._temp_dir = tempfile.mkdtemp(prefix=f"sandbox_{self.manager.sandbox_id}_")
             self._start_time = time.time()
             self.state = SandboxState.RUNNING
             
@@ -283,7 +283,7 @@ class Sandbox:
         Returns:
             bool: 是否有权限
         """
-        return permission in self.config.allowed_permissions
+        return permission in self.manager.allowed_permissions
     
     def check_path_access(self, path: str, write: bool = False) -> bool:
         """
@@ -298,11 +298,11 @@ class Sandbox:
         """
         normalized_path = os.path.normpath(path)
         
-        for denied in self.config.denied_paths:
+        for denied in self.manager.denied_paths:
             if normalized_path.startswith(os.path.normpath(denied)):
                 return False
         
-        for allowed in self.config.allowed_paths:
+        for allowed in self.manager.allowed_paths:
             if normalized_path.startswith(os.path.normpath(allowed)):
                 if write and not self.check_permission(Permission.WRITE_FILE):
                     return False
@@ -326,10 +326,10 @@ class Sandbox:
         if not self.check_permission(Permission.NETWORK_OUTBOUND):
             return False
         
-        if not self.config.allowed_network_hosts:
+        if not self.manager.allowed_network_hosts:
             return True
         
-        return host in self.config.allowed_network_hosts
+        return host in self.manager.allowed_network_hosts
     
     def get_metrics(self) -> SandboxMetrics:
         """
@@ -350,7 +350,7 @@ class Sandbox:
         Returns:
             Dict[ResourceType, bool]: 各资源是否超限
         """
-        limits = self.config.resource_limits
+        limits = self.manager.resource_limits
         metrics = self.get_metrics()
         
         return {
@@ -373,7 +373,7 @@ class Sandbox:
         if not self.check_permission(Permission.ACCESS_ENV):
             return None
         
-        return self.config.environment_vars.get(name)
+        return self.manager.environment_vars.get(name)
     
     def set_environment_var(self, name: str, value: str) -> bool:
         """
@@ -389,7 +389,7 @@ class Sandbox:
         if not self.check_permission(Permission.ACCESS_ENV):
             return False
         
-        self.config.environment_vars[name] = value
+        self.manager.environment_vars[name] = value
         
         return True
 
@@ -439,7 +439,7 @@ class TestSandboxCreation:
         
         assert sandbox is not None
         assert sandbox.state == SandboxState.CREATED
-        assert sandbox.config.sandbox_id == "test_sandbox_001"
+        assert sandbox.manager.sandbox_id == "test_sandbox_001"
     
     def test_create_duplicate_sandbox_fails(self, manager, default_config):
         """
@@ -488,13 +488,13 @@ class TestSandboxLifecycle:
         Returns:
             Sandbox: 沙箱实例
         """
-        config = SandboxConfig(
+        manager = SandboxConfig(
             sandbox_id="lifecycle_test",
             allowed_permissions=set(),
             resource_limits=ResourceLimits()
         )
         
-        return Sandbox(config)
+        return Sandbox(manager)
     
     def test_start_sandbox(self, sandbox):
         """
@@ -575,7 +575,7 @@ class TestPermissionControl:
         Returns:
             Sandbox: 沙箱实例
         """
-        config = SandboxConfig(
+        manager = SandboxConfig(
             sandbox_id="permission_test",
             allowed_permissions={
                 Permission.READ_FILE,
@@ -585,7 +585,7 @@ class TestPermissionControl:
             resource_limits=ResourceLimits()
         )
         
-        return Sandbox(config)
+        return Sandbox(manager)
     
     def test_check_allowed_permission(self, sandbox_with_permissions):
         """
@@ -616,12 +616,12 @@ class TestPermissionControl:
         验证:
             - 无任何权限的沙箱拒绝所有操作
         """
-        config = SandboxConfig(
+        manager = SandboxConfig(
             sandbox_id="no_permissions",
             allowed_permissions=set(),
             resource_limits=ResourceLimits()
         )
-        sandbox = Sandbox(config)
+        sandbox = Sandbox(manager)
         
         for permission in Permission:
             assert sandbox.check_permission(permission) is False
@@ -638,7 +638,7 @@ class TestPathAccessControl:
         Returns:
             Sandbox: 沙箱实例
         """
-        config = SandboxConfig(
+        manager = SandboxConfig(
             sandbox_id="path_test",
             allowed_permissions={
                 Permission.READ_FILE,
@@ -649,7 +649,7 @@ class TestPathAccessControl:
             denied_paths=["/etc/passwd", "/etc/shadow"]
         )
         
-        return Sandbox(config)
+        return Sandbox(manager)
     
     def test_allowed_path_read(self, sandbox_with_path_rules):
         """
@@ -712,14 +712,14 @@ class TestNetworkAccessControl:
         Returns:
             Sandbox: 沙箱实例
         """
-        config = SandboxConfig(
+        manager = SandboxConfig(
             sandbox_id="network_test",
             allowed_permissions={Permission.NETWORK_OUTBOUND},
             resource_limits=ResourceLimits(),
             allowed_network_hosts=["api.example.com", "cdn.example.com"]
         )
         
-        return Sandbox(config)
+        return Sandbox(manager)
     
     def test_allowed_network_host(self, sandbox_with_network_rules):
         """
@@ -748,13 +748,13 @@ class TestNetworkAccessControl:
         验证:
             - 无网络权限时所有网络访问被拒绝
         """
-        config = SandboxConfig(
+        manager = SandboxConfig(
             sandbox_id="no_network",
             allowed_permissions=set(),
             resource_limits=ResourceLimits(),
             allowed_network_hosts=["api.example.com"]
         )
-        sandbox = Sandbox(config)
+        sandbox = Sandbox(manager)
         
         assert sandbox.check_network_access("api.example.com") is False
     
@@ -765,13 +765,13 @@ class TestNetworkAccessControl:
         验证:
             - 空允许列表表示允许所有主机
         """
-        config = SandboxConfig(
+        manager = SandboxConfig(
             sandbox_id="wildcard_network",
             allowed_permissions={Permission.NETWORK_OUTBOUND},
             resource_limits=ResourceLimits(),
             allowed_network_hosts=[]
         )
-        sandbox = Sandbox(config)
+        sandbox = Sandbox(manager)
         
         assert sandbox.check_network_access("any.host.com") is True
 
@@ -793,13 +793,13 @@ class TestResourceLimits:
             max_disk_mb=512,
             max_execution_time_seconds=60
         )
-        config = SandboxConfig(
+        manager = SandboxConfig(
             sandbox_id="resource_test",
             allowed_permissions=set(),
             resource_limits=limits
         )
         
-        return Sandbox(config)
+        return Sandbox(manager)
     
     def test_resource_limits_configuration(self, sandbox_with_limits):
         """
@@ -808,7 +808,7 @@ class TestResourceLimits:
         验证:
             - 资源限制被正确配置
         """
-        limits = sandbox_with_limits.config.resource_limits
+        limits = sandbox_with_limits.manager.resource_limits
         
         assert limits.max_cpu_percent == 50.0
         assert limits.max_memory_mb == 256
@@ -853,14 +853,14 @@ class TestEnvironmentVariables:
         Returns:
             Sandbox: 沙箱实例
         """
-        config = SandboxConfig(
+        manager = SandboxConfig(
             sandbox_id="env_test",
             allowed_permissions={Permission.ACCESS_ENV},
             resource_limits=ResourceLimits(),
             environment_vars={"API_KEY": "test_key", "DEBUG": "true"}
         )
         
-        return Sandbox(config)
+        return Sandbox(manager)
     
     def test_get_environment_var(self, sandbox_with_env):
         """
@@ -900,13 +900,13 @@ class TestEnvironmentVariables:
         验证:
             - 无权限时无法访问环境变量
         """
-        config = SandboxConfig(
+        manager = SandboxConfig(
             sandbox_id="no_env",
             allowed_permissions=set(),
             resource_limits=ResourceLimits(),
             environment_vars={"SECRET": "value"}
         )
-        sandbox = Sandbox(config)
+        sandbox = Sandbox(manager)
         
         assert sandbox.get_environment_var("SECRET") is None
         assert sandbox.set_environment_var("NEW", "value") is False
@@ -923,13 +923,13 @@ class TestSandboxMetrics:
         Returns:
             Sandbox: 沙箱实例
         """
-        config = SandboxConfig(
+        manager = SandboxConfig(
             sandbox_id="metrics_test",
             allowed_permissions=set(),
             resource_limits=ResourceLimits()
         )
         
-        return Sandbox(config)
+        return Sandbox(manager)
     
     def test_get_initial_metrics(self, sandbox):
         """
@@ -999,8 +999,8 @@ class TestSandboxManagerOperations:
         验证:
             - 沙箱被正确销毁
         """
-        config = SandboxConfig(sandbox_id="to_destroy", allowed_permissions=set())
-        manager.create_sandbox(config)
+        manager = SandboxConfig(sandbox_id="to_destroy", allowed_permissions=set())
+        manager.create_sandbox(manager)
         
         result = manager.destroy_sandbox("to_destroy")
         

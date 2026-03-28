@@ -1,4 +1,4 @@
-# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+﻿# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # Gitee CI/CD 环境配置说明
 # Version: 1.0.0
 
@@ -145,7 +145,7 @@ gitee.cn/{owner}/{repo}:{tag}
 
 # 示例
 gitee.cn/spharx-agentos/agentos-atoms:latest
-gitee.cn/spharx-agentos/agentos-dynamic:v1.0.0
+gitee.cn/spharx-agentos/agentos-gateway:v1.0.0
 ```
 
 ### 6.2 登录容器仓库

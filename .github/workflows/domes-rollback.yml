@@ -1,10 +1,10 @@
-# =============================================================================
-# AgentOS domes Module Rollback Workflow
+﻿﻿# =============================================================================
+# AgentOS cupolas Module Rollback Workflow
 # Version: 1.0.0
-# Description: Handles deployment rollback for domes module
+# Description: Handles deployment rollback for cupolas module
 # =============================================================================
 
-name: domes Rollback
+name: cupolas Rollback
 
 on:
   workflow_dispatch:
@@ -31,7 +31,7 @@ on:
         type: boolean
 
 env:
-  MODULE_NAME: domes
+  MODULE_NAME: cupolas
 
 jobs:
   validate:
@@ -53,13 +53,13 @@ jobs:
           TARGET="${{ github.event.inputs.target_version }}"
           
           # Get current deployed version
-          CURRENT=$(cat "domes/VERSION" 2>/dev/null || echo "unknown")
+          CURRENT=$(cat "cupolas/VERSION" 2>/dev/null || echo "unknown")
           
           # If no target specified, find previous version
           if [[ -z "$TARGET" ]]; then
-            PREVIOUS=$(git tag -l "domes-v*" | sort -V | tail -2 | head -1)
+            PREVIOUS=$(git tag -l "cupolas-v*" | sort -V | tail -2 | head -1)
             if [[ -n "$PREVIOUS" ]]; then
-              TARGET="${PREVIOUS#domes-v}"
+              TARGET="${PREVIOUS#cupolas-v}"
             else
               echo "::error::No previous version found for rollback"
               exit 1
@@ -103,7 +103,7 @@ jobs:
         uses: actions/download-artifact@v4
         continue-on-error: true
         with:
-          name: agentos-domes-${{ needs.validate.outputs.target_version }}-linux-x86_64
+          name: agentos-cupolas-${{ needs.validate.outputs.target_version }}-linux-x86_64
           path: rollback_artifact
 
       - name: Prepare rollback package
@@ -113,8 +113,8 @@ jobs:
           # If artifact not found, try to download from release
           if [[ ! -d "rollback_artifact" ]] || [[ -z "$(ls -A rollback_artifact 2>/dev/null)" ]]; then
             echo "Artifact not found, downloading from release..."
-            gh release download "domes-v${VERSION}" \
-              --pattern "agentos-domes-${VERSION}-*.tar.gz" \
+            gh release download "cupolas-v${VERSION}" \
+              --pattern "agentos-cupolas-${VERSION}-*.tar.gz" \
               --dir rollback_download || true
             
             if [[ -d "rollback_download" ]]; then
@@ -166,12 +166,12 @@ jobs:
           # Add health check logic here
           sleep 5
           
-          echo "✅ Health checks passed"
+          echo "�?Health checks passed"
 
       - name: Record rollback
         run: |
-          mkdir -p domes/logs
-          cat > domes/logs/rollback_$(date +%Y%m%d_%H%M%S).json << EOF
+          mkdir -p cupolas/logs
+          cat > cupolas/logs/rollback_$(date +%Y%m%d_%H%M%S).json << EOF
           {
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "environment": "${{ github.event.inputs.environment }}",
@@ -197,11 +197,11 @@ jobs:
           STATUS="${{ needs.rollback.result }}"
           
           if [[ "$STATUS" == "success" ]]; then
-            EMOJI="✅"
+            EMOJI="�?
             COLOR="good"
             MESSAGE="Rollback completed successfully"
           else
-            EMOJI="❌"
+            EMOJI="�?
             COLOR="danger"
             MESSAGE="Rollback failed"
           fi
@@ -217,7 +217,7 @@ jobs:
                       "type": "header",
                       "text": {
                         "type": "plain_text",
-                        "text": "'"${EMOJI}"' domes Module Rollback"
+                        "text": "'"${EMOJI}"' cupolas Module Rollback"
                       }
                     },
                     {
@@ -255,7 +255,7 @@ jobs:
             const issue = await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `🔍 Post-Rollback Investigation: domes v${{ needs.validate.outputs.current_version }} → v${{ needs.validate.outputs.target_version }}`,
+              title: `🔍 Post-Rollback Investigation: cupolas v${{ needs.validate.outputs.current_version }} �?v${{ needs.validate.outputs.target_version }}`,
               body: `
               ## Rollback Summary
               
@@ -277,7 +277,7 @@ jobs:
               
               - Workflow Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
               `,
-              labels: ['rollback', 'domes', 'investigation', 'automated'],
+              labels: ['rollback', 'cupolas', 'investigation', 'automated'],
               assignees: ['${{ github.actor }}']
             });
             

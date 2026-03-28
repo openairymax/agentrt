@@ -1,4 +1,4 @@
-# AgentOS Scripts Core 模块
+﻿﻿# AgentOS Scripts Core 模块
 
 ## 模块概述
 
@@ -42,7 +42,7 @@
 - `MetricsCollector` - 指标收集器
 - `Timer` - 计时器上下文管理器
 
-### config.py - 配置引擎
+### manager.py - 配置引擎
 
 基于 Jinja2 的配置模板渲染，支持多环境配置。
 

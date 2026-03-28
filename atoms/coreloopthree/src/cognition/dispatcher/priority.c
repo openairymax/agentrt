@@ -1,13 +1,23 @@
-ï»¿/**
+/**
  * @file priority.c
- * @brief ä¼˜å…ˆçº§è°ƒåº¦ç­–ç•¥ï¼ˆé€‰æ‹©ä¼˜å…ˆçº§æœ€é«˜çš„Agentï¼‰
+ * @brief ÓÅÏÈ¼¶µ÷¶È²ßÂÔ£¨Ñ¡ÔñÓÅÏÈ¼¶×î¸ßµÄAgent£©
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "cognition.h"
-#include "agent_registry.h"
-#include <stdlib.h>
-#include <string.h>
+#include "cognition.h
+#include "../../../bases/utils/cognition/include/cognition_common.h""
+#include "agent_registry.h
+#include "../../../bases/utils/cognition/include/cognition_common.h""
+#include <stdlib.h
+#include "../../../bases/utils/cognition/include/cognition_common.h">
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h
+#include "../../../bases/utils/cognition/include/cognition_common.h""
+#include "../../../bases/utils/string/include/string_compat.h
+#include "../../../bases/utils/cognition/include/cognition_common.h""
+#include <string.h
+#include "../../../bases/utils/cognition/include/cognition_common.h">
 
 typedef struct priority_data {
     void* registry_ctx;
@@ -20,9 +30,9 @@ static void priority_destroy(agentos_dispatching_strategy_t* strategy) {
     priority_data_t* data = (priority_data_t*)strategy->data;
     if (data) {
         if (data->lock) agentos_mutex_destroy(data->lock);
-        free(data);
+        AGENTOS_FREE(data);
     }
-    free(strategy);
+    AGENTOS_FREE(strategy);
 }
 
 static agentos_error_t priority_dispatch(
@@ -61,7 +71,7 @@ static agentos_error_t priority_dispatch(
 
     if (best_index >= 0) {
         agent_info_t* best = agents[best_index];
-        *out_agent_id = strdup(best->agent_id);
+        *out_agent_id = AGENTOS_STRDUP(best->agent_id);
         if (!*out_agent_id) return AGENTOS_ENOMEM;
         return AGENTOS_SUCCESS;
     }
@@ -75,12 +85,12 @@ agentos_dispatching_strategy_t* agentos_dispatching_priority_create(
 
     if (!get_agents_func) return NULL;
 
-    agentos_dispatching_strategy_t* strat = (agentos_dispatching_strategy_t*)malloc(sizeof(agentos_dispatching_strategy_t));
+    agentos_dispatching_strategy_t* strat = (agentos_dispatching_strategy_t*)AGENTOS_MALLOC(sizeof(agentos_dispatching_strategy_t));
     if (!strat) return NULL;
 
-    priority_data_t* data = (priority_data_t*)malloc(sizeof(priority_data_t));
+    priority_data_t* data = (priority_data_t*)AGENTOS_MALLOC(sizeof(priority_data_t));
     if (!data) {
-        free(strat);
+        AGENTOS_FREE(strat);
         return NULL;
     }
 
@@ -88,8 +98,8 @@ agentos_dispatching_strategy_t* agentos_dispatching_priority_create(
     data->get_agents = get_agents_func;
     data->lock = agentos_mutex_create();
     if (!data->lock) {
-        free(data);
-        free(strat);
+        AGENTOS_FREE(data);
+        AGENTOS_FREE(strat);
         return NULL;
     }
 

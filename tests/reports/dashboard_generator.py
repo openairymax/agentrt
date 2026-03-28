@@ -1,4 +1,4 @@
-"""
+﻿﻿"""
 AgentOS 测试报告可视化仪表板
 Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 Version: 1.0.0
@@ -63,14 +63,14 @@ class DashboardGenerator:
     生成HTML格式的测试报告仪表板。
     """
     
-    def __init__(self, config: Optional[DashboardConfig] = None):
+    def __init__(self, manager: Optional[DashboardConfig] = None):
         """
         初始化仪表板生成器
         
         Args:
-            config: 仪表板配置
+            manager: 仪表板配置
         """
-        self.config = config or DashboardConfig()
+        self.manager = manager or DashboardConfig()
         self.test_results: List[TestResult] = []
         self.charts: List[ChartData] = []
         self.metrics: Dict[str, Any] = {}
@@ -492,7 +492,7 @@ class DashboardGenerator:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{self.config.title}</title>
+    <title>{self.manager.title}</title>
     {self._generate_css()}
 </head>
 <body data-theme="light">
@@ -500,9 +500,9 @@ class DashboardGenerator:
     
     <div class="container">
         <div class="header">
-            <h1>🧪 {self.config.title}</h1>
+            <h1>🧪 {self.manager.title}</h1>
             <div class="meta">
-                <span>版本: {self.config.version}</span> | 
+                <span>版本: {self.manager.version}</span> | 
                 <span>生成时间: {datetime.now().isoformat()}</span>
             </div>
         </div>

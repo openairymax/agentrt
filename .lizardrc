@@ -1,0 +1,52 @@
+# Lizard (Cyclomatic Complexity) configuration for AgentOS
+# Thresholds:
+# - CCN: Cyclomatic Complexity Number (max per function)
+# - NLOC: Number of Lines of Code (max per function)
+# - PARAM: Number of Parameters (max per function)
+
+# 质量阈值设置
+# 单个函数最大圈复杂度
+CCN: 10
+# 单个函数最大行数
+NLOC: 50
+# 单个函数最大参数数量
+PARAM: 6
+# 平均圈复杂度目标
+AVERAGE_CCN: 3.5
+
+# 排除目录
+exclude:
+  - build
+  - .git
+  - tests
+  - vendor
+  - node_modules
+  - *.md
+  - *.txt
+  - *.json
+  - *.yml
+  - *.yaml
+
+# 包含的文件扩展名
+extensions:
+  - c
+  - h
+  - cpp
+  - hpp
+
+# 语言特定设置
+languages:
+  C:
+    # C语言特定阈值
+    CCN: 12
+    NLOC: 60
+
+# 输出选项
+number: 20  # 显示前N个最复杂的函数
+whitelist:  # 白名单函数（已知需要高复杂度的函数）
+  - agentos_loop_create
+  - ensure_scheduler_initialized
+
+# 报告格式
+output_format: html
+output_file: reports/lizard-report.html

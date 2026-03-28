@@ -1,4 +1,4 @@
-# AgentOS Gitee CI/CD 使用指南
+﻿# AgentOS Gitee CI/CD 使用指南
 
 | 文档信息 | |
 |---------|---------|
@@ -35,7 +35,7 @@ AgentOS/
 │       │   ├── docker-compose.staging.yml # 预发布环境
 │       │   ├── docker-compose.prod.yml    # 生产环境
 │       │   ├── Dockerfile.kernel         # 内核镜像
-│       │   ├── Dockerfile.dynamic         # 网关镜像
+│       │   ├── Dockerfile.gateway         # 网关镜像
 │       │   └── Dockerfile.service         # 服务镜像
 │       └── deploy/
 │           ├── blue-green.sh         # 蓝绿部署脚本
@@ -89,9 +89,9 @@ AgentOS/
 │                                                             │
 │  Stage 2: Build (构建)                                     │
 │  ├── atoms (Linux/macOS/Windows)                           │
-│  ├── backs (Linux)                                         │
-│  ├── dynamic (Linux)                                        │
-│  └── domes (Linux)                                         │
+│  ├── daemon (Linux)                                         │
+│  ├── gateway (Linux)                                        │
+│  └── cupolas (Linux)                                         │
 │                                                             │
 │  Stage 3: Test (测试)                                       │
 │  ├── 单元测试                                               │
@@ -328,8 +328,8 @@ git push origin feature/your-feature
 
 示例:
 feat(atoms): add new IPC mechanism
-fix(dynamic): resolve memory leak issue
-docs(openhub): update API documentation
+fix(gateway): resolve memory leak issue
+docs(openlab): update API documentation
 ```
 
 ### 8.3 分支管理

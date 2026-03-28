@@ -1,4 +1,4 @@
-# AgentOS 微内核基础模块 (CoreKern)
+﻿# AgentOS 微内核基础模块 (CoreKern)
 
 **版本**: v1.0.0.6  
 **最后更新**: 2026-03-25  
@@ -369,7 +369,7 @@ export AGENTOS_TRACE_IPC=1
 
 - [原子层总览](../README.md)
 - [系统调用层](../syscall/README.md)
-- [轻量级内核](../../atomslite/README.md)
+- [轻量级内核](../../atomsmini/README.md)
 - [项目根目录](../../README.md)
 
 ---
@@ -389,3 +389,4 @@ export AGENTOS_TRACE_IPC=1
 © 2026 SPHARX Ltd. All Rights Reserved.
 
 *"The foundation of intelligence. 智能之基石。"*
+

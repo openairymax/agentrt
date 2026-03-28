@@ -1,18 +1,18 @@
-#!/usr/bin/env bash
+﻿﻿#!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Shell 脚本测试框架
 # 基于 bats-core 的单元测试库
 
 ###############################################################################
-# 测试框架初始�?
+# 测试框架初始�?
 ###############################################################################
 
 AGENTOS_TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENTOS_SCRIPTS_DIR="$(dirname "$AGENTOS_TEST_DIR")"
 
 # 加载依赖
-# shellcheck source=../lib/common.sh
-source "$AGENTOS_SCRIPTS_DIR/lib/common.sh"
+# shellcheck source=../lib/bases.sh
+source "$AGENTOS_SCRIPTS_DIR/lib/bases.sh"
 
 ###############################################################################
 # 测试配置
@@ -36,7 +36,7 @@ TEST_FAILURES=()
 # 测试工具函数
 ###############################################################################
 
-# 打印测试开�?
+# 打印测试开�?
 test_start() {
     local test_name="$1"
     ((TESTS_RUN++))
@@ -125,7 +125,7 @@ assert_equal() {
     fi
 }
 
-# 断言字符串包�?
+# 断言字符串包�?
 assert_contains() {
     local haystack="$1"
     local needle="$2"
@@ -203,7 +203,7 @@ assert_match() {
 }
 
 ###############################################################################
-# 测试运行�?
+# 测试运行�?
 ###############################################################################
 
 run_test() {
@@ -242,7 +242,7 @@ print_test_report() {
         echo "  Failed Tests"
         echo "=========================================="
         for failure in "${TEST_FAILURES[@]}"; do
-            echo -e "  ${COLOR_RED}�?$failure${COLOR_NC}"
+            echo -e "  ${COLOR_RED}�?$failure${COLOR_NC}"
         done
         echo ""
         return 1

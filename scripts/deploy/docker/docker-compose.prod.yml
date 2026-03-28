@@ -1,4 +1,4 @@
-# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+﻿# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Docker Compose Configuration - Production Environment
 # Version: 1.0.0
 # Description: Production-grade deployment with high availability, security, and monitoring
@@ -47,24 +47,24 @@ services:
       - AGENTOS_SECURITY_LEVEL=high
       - AGENTOS_ENABLE_METRICS=true
 
-    # 端口映射 (仅内部)
+    # 端口映射 (仅内�?
     ports:
       - "127.0.0.1:8091:8091"
 
-    # 数据卷 (持久化)
+    # 数据�?(持久�?
     volumes:
       - prod-atoms-logs:/var/log/agentos
       - prod-atoms-data:/var/lib/agentos
-      - atoms-config:/etc/agentos:ro
+      - atoms-manager:/etc/agentos:ro
 
     # 网络配置
     networks:
       - agentos-production-network
       - agentos-internal-network
 
-    # 健康检查 (生产级)
+    # 健康检�?(生产�?
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8091/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8091/health" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -85,22 +85,22 @@ services:
         max-file: "10"
         labels: "production"
 
-    # 安全性配置
+    # 安全性配�?
     security_opt:
       - no-new-privileges:true
     read_only: false
     cap_drop:
       - ALL
 
-  # ==================== AgentOS Dynamic Gateway ====================
-  agentos-dynamic:
+  # ==================== AgentOS gateway Gateway ====================
+  agentos-gateway:
     build:
       context: ../../
-      dockerfile: scripts/deploy/docker/Dockerfile.dynamic
+      dockerfile: scripts/deploy/docker/Dockerfile.gateway
       target: production
-    image: ghcr.io/spharx/agentos-dynamic:${VERSION:-latest}
-    container_name: agentos-dynamic
-    hostname: agentos-dynamic-prod
+    image: ghcr.io/spharx/agentos-gateway:${VERSION:-latest}
+    container_name: agentos-gateway
+    hostname: agentos-gateway-prod
     restart: always
 
     # 资源限制
@@ -128,15 +128,15 @@ services:
       - "127.0.0.1:8443:8443"
 
     volumes:
-      - prod-dynamic-logs:/var/log/agentos
-      - dynamic-config:/etc/agentos:ro
+      - prod-gateway-logs:/var/log/agentos
+      - gateway-manager:/etc/agentos:ro
 
     networks:
       - agentos-production-network
       - agentos-internal-network
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -156,15 +156,15 @@ services:
     cap_drop:
       - ALL
 
-  # ==================== AgentOS Backs Services ====================
-  agentos-backs:
+  # ==================== AgentOS daemon Services ====================
+  agentos-daemon:
     build:
       context: ../../
       dockerfile: scripts/deploy/docker/Dockerfile.service
       target: production
-    image: ghcr.io/spharx/agentos-backs:${VERSION:-latest}
-    container_name: agentos-backs
-    hostname: agentos-backs-prod
+    image: ghcr.io/spharx/agentos-daemon:${VERSION:-latest}
+    container_name: agentos-daemon
+    hostname: agentos-daemon-prod
     restart: always
 
     deploy:
@@ -188,15 +188,15 @@ services:
       - POSTGRES_PORT=5432
 
     volumes:
-      - prod-backs-logs:/var/log/agentos
-      - prod-backs-data:/var/lib/agentos
-      - backs-config:/etc/agentos:ro
+      - prod-daemon-logs:/var/log/agentos
+      - prod-daemon-data:/var/lib/agentos
+      - daemon-manager:/etc/agentos:ro
 
     networks:
       - agentos-internal-network
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8092/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8092/health" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -218,15 +218,15 @@ services:
     cap_drop:
       - ALL
 
-  # ==================== AgentOS OpenHub (API) ====================
-  agentos-openhub:
+  # ==================== AgentOS OpenLab (API) ====================
+  agentos-openlab:
     build:
       context: ../../
-      dockerfile: scripts/deploy/docker/Dockerfile.openhub
+      dockerfile: scripts/deploy/docker/Dockerfile.openlab
       target: production
-    image: ghcr.io/spharx/agentos-openhub:${VERSION:-latest}
-    container_name: agentos-openhub
-    hostname: agentos-openhub-prod
+    image: ghcr.io/spharx/agentos-openlab:${VERSION:-latest}
+    container_name: agentos-openlab
+    hostname: agentos-openlab-prod
     restart: always
 
     deploy:
@@ -251,15 +251,15 @@ services:
       - "127.0.0.1:8000:8000"
 
     volumes:
-      - prod-openhub-logs:/var/log/agentos
-      - openhub-config:/app/config:ro
+      - prod-openlab-logs:/var/log/agentos
+      - openlab-manager:/app/manager:ro
 
     networks:
       - agentos-production-network
       - agentos-internal-network
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -290,13 +290,7 @@ services:
     restart: always
 
     command: >
-      redis-server
-      --appendonly yes
-      --maxmemory 2gb
-      --maxmemory-policy allkeys-lru
-      --tcp-keepalive 300
-      --timeout 0
-      --loglevel notice
+      redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy allkeys-lru --tcp-keepalive 300 --timeout 0 --loglevel notice
 
     deploy:
       resources:
@@ -310,13 +304,13 @@ services:
 
     volumes:
       - redis-prod-data:/data
-      - redis-config:/usr/local/etc/redis/redis.conf:ro
+      - redis-manager:/usr/local/etc/redis/redis.conf:ro
 
     networks:
       - agentos-internal-network
 
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -341,19 +335,7 @@ services:
     restart: always
 
     command: >
-      postgres
-      -c max_connections=200
-      -c shared_buffers=512MB
-      -c effective_cache_size=1GB
-      -c maintenance_work_mem=128MB
-      -c checkpoint_completion_target=0.9
-      -c wal_buffers=16MB
-      -c default_statistics_target=100
-      -c random_page_cost=1.1
-      -c effective_io_concurrency=200
-      -c work_mem=4MB
-      -c min_wal_size=1GB
-      -c max_wal_size=4GB
+      postgres -c max_connections=200 -c shared_buffers=512MB -c effective_cache_size=1GB -c maintenance_work_mem=128MB -c checkpoint_completion_target=0.9 -c wal_buffers=16MB -c default_statistics_target=100 -c random_page_cost=1.1 -c effective_io_concurrency=200 -c work_mem=4MB -c min_wal_size=1GB -c max_wal_size=4GB
 
     deploy:
       resources:
@@ -373,14 +355,14 @@ services:
 
     volumes:
       - postgres-prod-data:/var/lib/postgresql/data
-      - postgres-config:/etc/postgresql:ro
+      - postgres-manager:/etc/postgresql:ro
       - postgres-backups:/var/lib/postgresql/backups
 
     networks:
       - agentos-internal-network
 
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U agentos -d agentos_prod"]
+      test: [ "CMD-SHELL", "pg_isready -U agentos -d agentos_prod" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -405,7 +387,7 @@ services:
     hostname: agentos-otel-prod
     restart: always
 
-    command: ['--config=/etc/otelcol-contrib/config.yaml']
+    command: [ '--manager=/etc/otelcol-contrib/manager.yaml' ]
 
     deploy:
       resources:
@@ -414,8 +396,8 @@ services:
           memory: 2G
 
     volumes:
-      - ./config/otel-collector-prod.yaml:/etc/otelcol-contrib/config.yaml:ro
-      - otel-config:/etc/otelcol:ro
+      - ./manager/otel-collector-prod.yaml:/etc/otelcol-contrib/manager.yaml:ro
+      - otel-manager:/etc/otelcol:ro
 
     networks:
       - agentos-internal-network
@@ -474,7 +456,7 @@ services:
       - "127.0.0.1:6831:6831/udp"
 
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "localhost:16686"]
+      test: [ "CMD", "wget", "--spider", "-q", "localhost:16686" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -499,7 +481,7 @@ services:
     restart: always
 
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--manager.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/var/lib/prometheus/data'
       - '--storage.tsdb.retention.time=30d'
       - '--storage.tsdb.retention.size=10GB'
@@ -514,8 +496,8 @@ services:
           memory: 4G
 
     volumes:
-      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./config/alertmanager.yml:/etc/prometheus/alertmanager.yml:ro
+      - ./manager/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./manager/alertmanager.yml:/etc/prometheus/alertmanager.yml:ro
       - prometheus-data:/var/lib/prometheus
 
     networks:
@@ -525,7 +507,7 @@ services:
       - "127.0.0.1:9090:9090"
 
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "localhost:9090/-/healthy"]
+      test: [ "CMD", "wget", "--spider", "-q", "localhost:9090/-/healthy" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -567,7 +549,7 @@ services:
 
     volumes:
       - grafana-data:/var/lib/grafana
-      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./manager/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./dashboards:/var/lib/grafana/dashboards:ro
 
     networks:
@@ -577,7 +559,7 @@ services:
       - "127.0.0.1:3000:3000"
 
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "localhost:3000/api/health"]
+      test: [ "CMD", "wget", "--spider", "-q", "localhost:3000/api/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -602,9 +584,9 @@ services:
     restart: always
 
     volumes:
-      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./config/nginx/ssl:/etc/nginx/ssl:ro
+      - ./manager/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./manager/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./manager/nginx/ssl:/etc/nginx/ssl:ro
       - nginx-cache:/var/cache/nginx
       - nginx-logs:/var/log/nginx
 
@@ -616,7 +598,7 @@ services:
       - "443:443"
 
     healthcheck:
-      test: ["CMD", "nginx", "-t"]
+      test: [ "CMD", "nginx", "-t" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -628,8 +610,8 @@ services:
         max-file: "10"
 
     depends_on:
-      - agentos-dynamic
-      - agentos-openhub
+      - agentos-gateway
+      - agentos-openlab
 
     security_opt:
       - no-new-privileges:true
@@ -638,42 +620,41 @@ services:
       - ALL
     cap_add:
       - NET_BIND_SERVICE
-
   # ==================== Data Volumes ====================
 volumes:
   prod-atoms-logs:
     driver: local
   prod-atoms-data:
     driver: local
-  atoms-config:
+  atoms-manager:
     driver: local
-  prod-dynamic-logs:
+  prod-gateway-logs:
     driver: local
-  dynamic-config:
+  gateway-manager:
     driver: local
-  prod-backs-logs:
+  prod-daemon-logs:
     driver: local
-  prod-backs-data:
+  prod-daemon-data:
     driver: local
-  backs-config:
+  daemon-manager:
     driver: local
-  prod-openhub-logs:
+  prod-openlab-logs:
     driver: local
-  openhub-config:
+  openlab-manager:
     driver: local
   redis-prod-data:
     driver: local
-  redis-config:
+  redis-manager:
     driver: local
   postgres-prod-data:
     driver: local
-  postgres-config:
+  postgres-manager:
     driver: local
   postgres-backups:
     driver: local
   jaeger-data:
     driver: local
-  otel-config:
+  otel-manager:
     driver: local
   prometheus-data:
     driver: local
@@ -689,7 +670,7 @@ networks:
   agentos-production-network:
     driver: bridge
     ipam:
-      config:
+      manager:
         - subnet: 172.30.0.0/16
     driver_opts:
       com.docker.network.bridge.name: br-production
@@ -699,7 +680,7 @@ networks:
     driver: bridge
     internal: false
     ipam:
-      config:
+      manager:
         - subnet: 172.31.0.0/16
     driver_opts:
       com.docker.network.bridge.name: br-internal

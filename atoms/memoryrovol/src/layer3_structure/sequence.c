@@ -6,6 +6,10 @@
 
 #include "layer3_structure.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 #include <math.h>
 
@@ -18,7 +22,7 @@ struct agentos_sequence_encoder {
 };
 
 static float* sinusoidal_position(size_t index, size_t dim) {
-    float* vec = (float*)malloc(dim * sizeof(float));
+    float* vec = (float*)AGENTOS_MALLOC(dim * sizeof(float));
     if (!vec) return NULL;
     for (size_t i = 0; i < dim; i++) {
         if (i % 2 == 0) {
@@ -32,7 +36,7 @@ static float* sinusoidal_position(size_t index, size_t dim) {
 }
 
 static float* random_position(size_t index, size_t dim) {
-    float* vec = (float*)malloc(dim * sizeof(float));
+    float* vec = (float*)AGENTOS_MALLOC(dim * sizeof(float));
     if (!vec) return NULL;
     for (size_t i = 0; i < dim; i++) {
         vec[i] = (float)rand() / RAND_MAX * 2.0f - 1.0f;
@@ -45,23 +49,23 @@ agentos_sequence_encoder_t* agentos_sequence_encoder_create(
     int position_encoding) {
 
     if (!binder) return NULL;
-    agentos_sequence_encoder_t* enc = (agentos_sequence_encoder_t*)calloc(1, sizeof(agentos_sequence_encoder_t));
+    agentos_sequence_encoder_t* enc = (agentos_sequence_encoder_t*)AGENTOS_CALLOC(1, sizeof(agentos_sequence_encoder_t));
     if (!enc) return NULL;
 
     enc->binder = binder;
     enc->position_encoding = position_encoding;
-    enc->max_len = 1024;  // 预分配最多1024个位置向量
-    enc->position_vectors = (float**)calloc(enc->max_len, sizeof(float*));
+    enc->max_len = 1024;  // 预分配最�?024个位置向�?
+    enc->position_vectors = (float**)AGENTOS_CALLOC(enc->max_len, sizeof(float*));
     enc->lock = agentos_mutex_create();
 
     if (!enc->position_vectors || !enc->lock) {
-        if (enc->position_vectors) free(enc->position_vectors);
+        if (enc->position_vectors) AGENTOS_FREE(enc->position_vectors);
         if (enc->lock) agentos_mutex_destroy(enc->lock);
-        free(enc);
+        AGENTOS_FREE(enc);
         return NULL;
     }
 
-    // 预生成位置向量
+    // 预生成位置向�?
     size_t dim = binder->dimension;
     for (size_t i = 0; i < enc->max_len; i++) {
         if (position_encoding == 1) {
@@ -70,10 +74,10 @@ agentos_sequence_encoder_t* agentos_sequence_encoder_create(
             enc->position_vectors[i] = random_position(i, dim);
         }
         if (!enc->position_vectors[i]) {
-            for (size_t j = 0; j < i; j++) free(enc->position_vectors[j]);
-            free(enc->position_vectors);
+            for (size_t j = 0; j < i; j++) AGENTOS_FREE(enc->position_vectors[j]);
+            AGENTOS_FREE(enc->position_vectors);
             agentos_mutex_destroy(enc->lock);
-            free(enc);
+            AGENTOS_FREE(enc);
             return NULL;
         }
     }
@@ -85,12 +89,12 @@ void agentos_sequence_encoder_destroy(agentos_sequence_encoder_t* enc) {
     if (!enc) return;
     if (enc->position_vectors) {
         for (size_t i = 0; i < enc->max_len; i++) {
-            free(enc->position_vectors[i]);
+            AGENTOS_FREE(enc->position_vectors[i]);
         }
-        free(enc->position_vectors);
+        AGENTOS_FREE(enc->position_vectors);
     }
     if (enc->lock) agentos_mutex_destroy(enc->lock);
-    free(enc);
+    AGENTOS_FREE(enc);
 }
 
 agentos_error_t agentos_sequence_encode(
@@ -103,7 +107,7 @@ agentos_error_t agentos_sequence_encode(
     if (count > enc->max_len) return AGENTOS_EOVERFLOW;
 
     size_t dim = enc->binder->dimension;
-    float* sum = (float*)calloc(dim, sizeof(float));
+    float* sum = (float*)AGENTOS_CALLOC(dim, sizeof(float));
     if (!sum) return AGENTOS_ENOMEM;
 
     for (size_t i = 0; i < count; i++) {
@@ -112,14 +116,14 @@ agentos_error_t agentos_sequence_encode(
         float* bound = NULL;
         agentos_error_t err = agentos_binder_bind(enc->binder, vectors, 2, &bound);
         if (err != AGENTOS_SUCCESS) {
-            free(sum);
+            AGENTOS_FREE(sum);
             return err;
         }
         for (size_t j = 0; j < dim; j++) sum[j] += bound[j];
-        free(bound);
+        AGENTOS_FREE(bound);
     }
 
-    // 归一化
+    // 归一�?
     float norm = 0;
     for (size_t i = 0; i < dim; i++) norm += sum[i] * sum[i];
     if (norm > 0) {
@@ -140,7 +144,7 @@ agentos_error_t agentos_sequence_get_position(
     if (index >= enc->max_len) return AGENTOS_EOVERFLOW;
 
     size_t dim = enc->binder->dimension;
-    float* vec = (float*)malloc(dim * sizeof(float));
+    float* vec = (float*)AGENTOS_MALLOC(dim * sizeof(float));
     if (!vec) return AGENTOS_ENOMEM;
     memcpy(vec, enc->position_vectors[index], dim * sizeof(float));
 

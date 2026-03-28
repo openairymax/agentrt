@@ -1,6 +1,6 @@
 /**
  * @file rerank.c
- * @brief 检索结果重排序（基于交叉编码器，带降级）
+ * @brief 检索结果重排序（基于交叉编码器，带降级�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -9,11 +9,15 @@
 #include "../include/layer1_raw.h"
 #include "agentos.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 #include <errno.h>
 
 struct agentos_reranker {
-    agentos_llm_service_t* llm;          /**< LLM服务，用于交叉编码 */
+    agentos_llm_service_t* llm;          /**< LLM服务，用于交叉编�?*/
     agentos_layer1_raw_t* layer1;         /**< 原始层，用于获取文档文本 */
     agentos_mutex_t* lock;
     int use_llm;                          /**< 是否使用LLM（降级标志） */
@@ -27,7 +31,7 @@ agentos_error_t agentos_reranker_create(
 
     if (!llm || !layer1 || !out_reranker) return AGENTOS_EINVAL;
 
-    agentos_reranker_t* r = (agentos_reranker_t*)calloc(1, sizeof(agentos_reranker_t));
+    agentos_reranker_t* r = (agentos_reranker_t*)AGENTOS_CALLOC(1, sizeof(agentos_reranker_t));
     if (!r) {
         AGENTOS_LOG_ERROR("Failed to allocate reranker");
         return AGENTOS_ENOMEM;
@@ -37,7 +41,7 @@ agentos_error_t agentos_reranker_create(
     r->layer1 = layer1;
     r->lock = agentos_mutex_create();
     if (!r->lock) {
-        free(r);
+        AGENTOS_FREE(r);
         return AGENTOS_ENOMEM;
     }
     r->use_llm = 1;  // 默认使用LLM
@@ -49,7 +53,7 @@ agentos_error_t agentos_reranker_create(
 void agentos_reranker_destroy(agentos_reranker_t* reranker) {
     if (!reranker) return;
     if (reranker->lock) agentos_mutex_destroy(reranker->lock);
-    free(reranker);
+    AGENTOS_FREE(reranker);
 }
 
 /**
@@ -67,7 +71,7 @@ static float cross_encoder_score(
     const char* query,
     const char* document) {
 
-    // 构建prompt，要求模型输出一个0-1之间的分数
+    // 构建prompt，要求模型输出一�?-1之间的分�?
     char prompt[8192];
     int n = snprintf(prompt, sizeof(prompt),
         "You are a relevance judge. Given a query and a document, output a single number between 0 and 1 indicating how relevant the document is to the query.\n"
@@ -80,7 +84,7 @@ static float cross_encoder_score(
 
     agentos_llm_request_t req;
     memset(&req, 0, sizeof(req));
-    req.model = "cross-encoder"; // 实际应配置
+    req.model = "cross-encoder"; // 实际应配�?
     req.prompt = prompt;
     req.max_tokens = 10;
     req.temperature = 0.0;
@@ -94,7 +98,7 @@ static float cross_encoder_score(
     errno = 0;
     float score = strtof(resp->text, &endptr);
     if (endptr == resp->text || *endptr != '\0' || errno != 0) {
-        score = 0.5f;  // 转换失败，使用默认值
+        score = 0.5f;  // 转换失败，使用默认�?
     }
     agentos_llm_response_free(resp);
     if (score < 0 || score > 1) score = 0.5f;
@@ -116,17 +120,17 @@ agentos_error_t agentos_reranker_rerank(
         return AGENTOS_EINVAL;
     }
 
-    // 如果不使用LLM，直接返回初始顺序（降级）
+    // 如果不使用LLM，直接返回初始顺序（降级�?
     if (!reranker->use_llm) {
-        char** ids = (char**)malloc(candidate_count * sizeof(char*));
-        float* scores = (float*)malloc(candidate_count * sizeof(float));
+        char** ids = (char**)AGENTOS_MALLOC(candidate_count * sizeof(char*));
+        float* scores = (float*)AGENTOS_MALLOC(candidate_count * sizeof(float));
         if (!ids || !scores) {
-            free(ids);
-            free(scores);
+            AGENTOS_FREE(ids);
+            AGENTOS_FREE(scores);
             return AGENTOS_ENOMEM;
         }
         for (size_t i = 0; i < candidate_count; i++) {
-            ids[i] = strdup(candidate_ids[i]);
+            ids[i] = AGENTOS_STRDUP(candidate_ids[i]);
             scores[i] = initial_scores ? initial_scores[i] : 0.5f;
         }
         *out_reranked_ids = ids;
@@ -135,7 +139,7 @@ agentos_error_t agentos_reranker_rerank(
     }
 
     // 为每个候选计算交叉编码器分数
-    float* scores = (float*)malloc(candidate_count * sizeof(float));
+    float* scores = (float*)AGENTOS_MALLOC(candidate_count * sizeof(float));
     if (!scores) {
         AGENTOS_LOG_ERROR("Failed to allocate scores array");
         return AGENTOS_ENOMEM;
@@ -143,7 +147,7 @@ agentos_error_t agentos_reranker_rerank(
 
     int llm_success = 0;
     for (size_t i = 0; i < candidate_count; i++) {
-        // 从 layer1 读取原始文档内容
+        // �?layer1 读取原始文档内容
         void* data = NULL;
         size_t len = 0;
         agentos_error_t err = agentos_layer1_raw_read(reranker->layer1, candidate_ids[i], &data, &len);
@@ -154,15 +158,15 @@ agentos_error_t agentos_reranker_rerank(
         }
         char* doc = (char*)data;
         if (doc[len - 1] != '\0') {
-            char* new_doc = (char*)malloc(len + 1);
+            char* new_doc = (char*)AGENTOS_MALLOC(len + 1);
             if (!new_doc) {
-                free(data);
+                AGENTOS_FREE(data);
                 scores[i] = 0.5f;
                 continue;
             }
             memcpy(new_doc, data, len);
             new_doc[len] = '\0';
-            free(data);
+            AGENTOS_FREE(data);
             doc = new_doc;
         }
         float score = cross_encoder_score(reranker->llm, query, doc);
@@ -172,7 +176,7 @@ agentos_error_t agentos_reranker_rerank(
         } else {
             scores[i] = (initial_scores) ? initial_scores[i] : 0.5f;
         }
-        free(doc);
+        AGENTOS_FREE(doc);
     }
 
     // 如果所有LLM调用都失败，下次降级
@@ -185,10 +189,10 @@ agentos_error_t agentos_reranker_rerank(
         }
     }
 
-    // 按分数降序排序（简单选择排序）
-    size_t* indices = (size_t*)malloc(candidate_count * sizeof(size_t));
+    // 按分数降序排序（简单选择排序�?
+    size_t* indices = (size_t*)AGENTOS_MALLOC(candidate_count * sizeof(size_t));
     if (!indices) {
-        free(scores);
+        AGENTOS_FREE(scores);
         return AGENTOS_ENOMEM;
     }
     for (size_t i = 0; i < candidate_count; i++) indices[i] = i;
@@ -203,24 +207,24 @@ agentos_error_t agentos_reranker_rerank(
         }
     }
 
-    char** reranked_ids = (char**)malloc(candidate_count * sizeof(char*));
-    float* reranked_scores = (float*)malloc(candidate_count * sizeof(float));
+    char** reranked_ids = (char**)AGENTOS_MALLOC(candidate_count * sizeof(char*));
+    float* reranked_scores = (float*)AGENTOS_MALLOC(candidate_count * sizeof(float));
     if (!reranked_ids || !reranked_scores) {
-        free(indices);
-        free(scores);
-        free(reranked_ids);
-        free(reranked_scores);
+        AGENTOS_FREE(indices);
+        AGENTOS_FREE(scores);
+        AGENTOS_FREE(reranked_ids);
+        AGENTOS_FREE(reranked_scores);
         return AGENTOS_ENOMEM;
     }
 
     for (size_t i = 0; i < candidate_count; i++) {
         size_t idx = indices[i];
-        reranked_ids[i] = strdup(candidate_ids[idx]);
+        reranked_ids[i] = AGENTOS_STRDUP(candidate_ids[idx]);
         reranked_scores[i] = scores[idx];
     }
 
-    free(indices);
-    free(scores);
+    AGENTOS_FREE(indices);
+    AGENTOS_FREE(scores);
 
     *out_reranked_ids = reranked_ids;
     *out_reranked_scores = reranked_scores;

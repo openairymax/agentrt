@@ -10,6 +10,10 @@
 #include "agentos.h"
 #include "logger.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 #include <errno.h>
 #include <cjson/cJSON.h>
@@ -20,27 +24,27 @@ static agentos_execution_engine_t* g_execution = NULL;
 void agentos_sys_init(void* cognition, void* execution, void* memory) {
     g_cognition = (agentos_cognition_engine_t*)cognition;
     g_execution = (agentos_execution_engine_t*)execution;
-    // memory 由 memory.c 使用，通过单独的 setter 设置
+    // memory �?memory.c 使用，通过单独�?setter 设置
 }
 
 /* -------------------- 辅助函数 -------------------- */
 // From data intelligence emerges. by spharx
 
 /**
- * 拓扑排序：根据依赖关系返回可执行的任务顺序（简单实现，假设无环）
- * 返回节点索引数组，需调用者 free
+ * 拓扑排序：根据依赖关系返回可执行的任务顺序（简单实现，假设无环�?
+ * 返回节点索引数组，需调用�?free
  */
 static int* topological_sort(agentos_task_plan_t* plan, size_t* out_count) {
     size_t n = plan->task_plan_node_count;
-    int* order = (int*)malloc(n * sizeof(int));
+    int* order = (int*)AGENTOS_MALLOC(n * sizeof(int));
     if (!order) return NULL;
-    int* indeg = (int*)calloc(n, sizeof(int));
+    int* indeg = (int*)AGENTOS_CALLOC(n, sizeof(int));
     if (!indeg) {
-        free(order);
+        AGENTOS_FREE(order);
         return NULL;
     }
 
-    // 建立节点名到索引的映射
+    // 建立节点名到索引的映�?
     cJSON* name_to_idx = cJSON_CreateObject();
     for (size_t i = 0; i < n; i++) {
         char idx_str[16];
@@ -64,11 +68,11 @@ static int* topological_sort(agentos_task_plan_t* plan, size_t* out_count) {
 
     // Kahn 算法
     size_t pos = 0;
-    int* queue = (int*)malloc(n * sizeof(int));
+    int* queue = (int*)AGENTOS_MALLOC(n * sizeof(int));
     if (!queue) {
         cJSON_Delete(name_to_idx);
-        free(indeg);
-        free(order);
+        AGENTOS_FREE(indeg);
+        AGENTOS_FREE(order);
         return NULL;
     }
     int qhead = 0, qtail = 0;
@@ -92,10 +96,10 @@ static int* topological_sort(agentos_task_plan_t* plan, size_t* out_count) {
                         if (qtail >= (int)n) {
                             // 队列溢出，图有问题（可能有环或无效依赖）
                             AGENTOS_LOG_ERROR("Topological sort queue overflow during processing");
-                            free(queue);
+                            AGENTOS_FREE(queue);
                             cJSON_Delete(name_to_idx);
-                            free(indeg);
-                            free(order);
+                            AGENTOS_FREE(indeg);
+                            AGENTOS_FREE(order);
                             return NULL;
                         }
                         queue[qtail++] = v;
@@ -106,13 +110,13 @@ static int* topological_sort(agentos_task_plan_t* plan, size_t* out_count) {
             }
         }
     }
-    free(queue);
+    AGENTOS_FREE(queue);
     cJSON_Delete(name_to_idx);
-    free(indeg);
+    AGENTOS_FREE(indeg);
 
     if (pos != n) {
         // 有环
-        free(order);
+        AGENTOS_FREE(order);
         return NULL;
     }
     *out_count = n;
@@ -120,7 +124,7 @@ static int* topological_sort(agentos_task_plan_t* plan, size_t* out_count) {
 }
 
 /**
- * 执行单个任务节点，返回输出字符串（需释放）
+ * 执行单个任务节点，返回输出字符串（需释放�?
  */
 static char* execute_node(agentos_task_node_t* node, uint32_t timeout_ms) {
     agentos_task_t task;
@@ -138,7 +142,7 @@ static char* execute_node(agentos_task_node_t* node, uint32_t timeout_ms) {
 
     agentos_task_t* result_task = NULL;
     err = agentos_execution_wait(g_execution, task_id, timeout_ms, &result_task);
-    free(task_id);
+    AGENTOS_FREE(task_id);
     if (err != AGENTOS_SUCCESS || !result_task) {
         AGENTOS_LOG_ERROR("Node %s execution failed", node->task_node_id);
         return NULL;
@@ -146,9 +150,9 @@ static char* execute_node(agentos_task_node_t* node, uint32_t timeout_ms) {
 
     char* output = NULL;
     if (result_task->task_output) {
-        output = strdup((char*)result_task->task_output);
+        output = AGENTOS_STRDUP((char*)result_task->task_output);
     } else {
-        output = strdup("");
+        output = AGENTOS_STRDUP("");
     }
     agentos_task_free(result_task);
     return output;
@@ -177,7 +181,7 @@ agentos_error_t agentos_sys_task_submit(const char* input, size_t input_len,
         return AGENTOS_EINVAL;
     }
 
-    // 按顺序执行节点
+    // 按顺序执行节�?
     cJSON* result_obj = cJSON_CreateObject();
     for (size_t i = 0; i < order_count; i++) {
         int idx = order[i];
@@ -185,12 +189,12 @@ agentos_error_t agentos_sys_task_submit(const char* input, size_t input_len,
         char* output = execute_node(node, timeout_ms);
         if (output) {
             cJSON_AddStringToObject(result_obj, node->task_node_id, output);
-            free(output);
+            AGENTOS_FREE(output);
         } else {
             cJSON_AddStringToObject(result_obj, node->task_node_id, "ERROR");
         }
     }
-    free(order);
+    AGENTOS_FREE(order);
     agentos_task_plan_free(plan);
 
     char* json = cJSON_PrintUnformatted(result_obj);
@@ -218,9 +222,9 @@ agentos_error_t agentos_sys_task_wait(const char* task_id, uint32_t timeout_ms, 
     agentos_error_t err = agentos_execution_wait(g_execution, task_id, timeout_ms, &result_task);
     if (err == AGENTOS_SUCCESS && result_task) {
         if (result_task->task_output) {
-            *out_result = strdup((char*)result_task->task_output);
+            *out_result = AGENTOS_STRDUP((char*)result_task->task_output);
         } else {
-            *out_result = strdup("");
+            *out_result = AGENTOS_STRDUP("");
         }
         agentos_task_free(result_task);
     }

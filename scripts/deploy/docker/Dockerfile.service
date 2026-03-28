@@ -1,4 +1,4 @@
-# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved. "From data intelligence emerges".
+﻿# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved. "From data intelligence emerges".
 # AgentOS 服务层镜像
 # 基于内核镜像，提供完整的后端服务运行时环境
 
@@ -52,7 +52,7 @@ COPY --from=builder /opt/agentos/services/bin/ ${AGENTOS_SERVICES_ROOT}/bin/
 COPY --from=builder /opt/agentos/services/lib/ ${AGENTOS_SERVICES_ROOT}/lib/
 
 # === 4. 复制配置文件 ===
-COPY config/ ${AGENTOS_CONFIG_DIR}/
+COPY manager/ ${AGENTOS_CONFIG_DIR}/
 
 # === 5. 创建非 root 用户 ===
 RUN groupadd -r agentos && \

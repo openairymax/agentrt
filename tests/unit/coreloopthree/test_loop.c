@@ -1,4 +1,4 @@
-#include "loop.h"
+﻿#include "loop.h"
 #include "agentos.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -68,7 +68,7 @@ static void test_loop_get_engines() {
  */
 static void test_loop_config() {
     // 创建配置
-    agentos_loop_config_t config = {
+    agentos_loop_config_t manager = {
         .cognition_threads = 2,
         .execution_threads = 4,
         .memory_threads = 2,
@@ -80,7 +80,7 @@ static void test_loop_config() {
     };
 
     agentos_core_loop_t* loop = NULL;
-    agentos_error_t err = agentos_loop_create(&config, &loop);
+    agentos_error_t err = agentos_loop_create(&manager, &loop);
     printf("test_loop_config: %d\n", err);
     if (err == AGENTOS_SUCCESS) {
         agentos_loop_destroy(loop);

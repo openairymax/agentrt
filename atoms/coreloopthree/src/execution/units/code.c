@@ -8,6 +8,10 @@
 #include "agentos.h"
 #include "core.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -19,14 +23,11 @@
 
 #define AGENTOS_MAX_CODE_SIZE (4 * 1024 * 1024)
 
-typedef struct code_unit_data {
-    char* language;
-    char* metadata_json;
-} code_unit_data_t;
+#include "../../../bases/utils/execution/include/execution_common.h"\n\ntypedef struct $1_unit_data {\n    execution_unit_data_t base;\n    char* metadata_json;\n} $1_unit_data_t;
 
 /**
  * @brief 创建跨平台临时文件并写入内容
- * @param suffix 文件后缀（如 ".py"）
+ * @param suffix 文件后缀（如 ".py"�?
  * @param content 要写入的内容
  * @param content_len 内容长度
  * @param out_path 输出临时文件路径（需调用者释放）
@@ -63,7 +64,7 @@ static agentos_error_t create_temp_file(
                 DeleteFileA(final_path);
                 return AGENTOS_EIO;
             }
-            *out_path = _strdup(final_path);
+            *out_path = AGENTOS_STRDUP(final_path);
             if (!*out_path) {
                 DeleteFileA(final_path);
                 return AGENTOS_ENOMEM;
@@ -80,7 +81,7 @@ static agentos_error_t create_temp_file(
         if (fclose(f) != 0) {
             return AGENTOS_EIO;
         }
-        *out_path = _strdup(temp_path);
+        *out_path = AGENTOS_STRDUP(temp_path);
         if (!*out_path) {
             DeleteFileA(temp_path);
             return AGENTOS_ENOMEM;
@@ -98,7 +99,7 @@ static agentos_error_t create_temp_file(
     if (fclose(f) != 0) {
         return AGENTOS_EIO;
     }
-    *out_path = _strdup(temp_path);
+    *out_path = AGENTOS_STRDUP(temp_path);
     if (!*out_path) {
         DeleteFileA(temp_path);
         return AGENTOS_ENOMEM;
@@ -138,7 +139,7 @@ static agentos_error_t create_temp_file(
         unlink(temp_filename);
         return AGENTOS_EIO;
     }
-    *out_path = strdup(temp_filename);
+    *out_path = AGENTOS_STRDUP(temp_filename);
     if (!*out_path) {
         unlink(temp_filename);
         return AGENTOS_ENOMEM;
@@ -149,13 +150,13 @@ static agentos_error_t create_temp_file(
 
 /**
  * @brief 删除临时文件
- * @param path 文件路径（可为NULL）
+ * @param path 文件路径（可为NULL�?
  *
  * @details 跨平台删除临时文件：
  * - Windows: 使用 DeleteFileA
  * - POSIX: 使用 unlink
  *
- * @note 此函数不返回错误状态，因为临时文件删除失败不影响系统正确性
+ * @note 此函数不返回错误状态，因为临时文件删除失败不影响系统正确�?
  */
 static void remove_temp_file(const char* path) {
     if (!path) return;
@@ -196,7 +197,7 @@ static agentos_error_t execute_command_capture(const char* cmd, char** out_outpu
 
     size_t cap = 4096;
     size_t total = 0;
-    char* output = (char*)malloc(cap);
+    char* output = (char*)AGENTOS_MALLOC(cap);
     if (!output) {
         CloseHandle(hReadPipe);
         TerminateProcess(pi.hProcess, 1);
@@ -213,9 +214,9 @@ static agentos_error_t execute_command_capture(const char* cmd, char** out_outpu
         size_t len = bytesRead;
         if (total + len + 1 > cap) {
             cap *= 2;
-            char* new_out = (char*)realloc(output, cap);
+            char* new_out = (char*)AGENTOS_REALLOC(output, cap);
             if (!new_out) {
-                free(output);
+                AGENTOS_FREE(output);
                 CloseHandle(hReadPipe);
                 TerminateProcess(pi.hProcess, 1);
                 CloseHandle(pi.hProcess);
@@ -243,7 +244,7 @@ static agentos_error_t execute_command_capture(const char* cmd, char** out_outpu
 
     size_t cap = 4096;
     size_t total = 0;
-    char* output = (char*)malloc(cap);
+    char* output = (char*)AGENTOS_MALLOC(cap);
     if (!output) {
         pclose(pipe);
         return AGENTOS_ENOMEM;
@@ -255,9 +256,9 @@ static agentos_error_t execute_command_capture(const char* cmd, char** out_outpu
         size_t len = strlen(buffer);
         if (total + len + 1 > cap) {
             cap *= 2;
-            char* new_out = (char*)realloc(output, cap);
+            char* new_out = (char*)AGENTOS_REALLOC(output, cap);
             if (!new_out) {
-                free(output);
+                AGENTOS_FREE(output);
                 pclose(pipe);
                 return AGENTOS_ENOMEM;
             }
@@ -276,7 +277,7 @@ static agentos_error_t execute_command_capture(const char* cmd, char** out_outpu
 /**
  * @brief 执行代码的核心逻辑
  * @param unit 执行单元
- * @param input 输入代码字符串
+ * @param input 输入代码字符�?
  * @param out_output 输出执行结果
  * @return AGENTOS_SUCCESS 或错误码
  */
@@ -324,7 +325,7 @@ static agentos_error_t code_execute(
     char* output = NULL;
     err = execute_command_capture(cmd, &output);
     remove_temp_file(temp_path);
-    free(temp_path);
+    AGENTOS_FREE(temp_path);
 
     if (err != AGENTOS_SUCCESS) {
         if (output) {
@@ -339,21 +340,12 @@ static agentos_error_t code_execute(
 }
 
 /**
- * @brief 销毁代码执行单元
+ * @brief 销毁代码执行单�?
  */
-static void code_destroy(agentos_execution_unit_t* unit) {
-    if (!unit) return;
-    code_unit_data_t* data = (code_unit_data_t*)unit->data;
-    if (data) {
-        if (data->language) free(data->language);
-        if (data->metadata_json) free(data->metadata_json);
-        free(data);
-    }
-    free(unit);
-}
+static void code_destroy(agentos_execution_unit_t* unit) {\n    if (!unit) return;\n    code_unit_data_t* data = (code_unit_data_t*)unit->data;\n    if (data) {\n        execution_unit_data_cleanup(&data->base);\n        if (data->metadata_json) AGENTOS_FREE(data->metadata_json);\n        AGENTOS_FREE(data);\n    }\n    AGENTOS_FREE(unit);\n}
 
 /**
- * @brief 获取执行单元元数据
+ * @brief 获取执行单元元数�?
  */
 static const char* code_get_metadata(agentos_execution_unit_t* unit) {
     code_unit_data_t* data = (code_unit_data_t*)unit->data;
@@ -362,32 +354,32 @@ static const char* code_get_metadata(agentos_execution_unit_t* unit) {
 
 /**
  * @brief 创建代码执行单元
- * @param language 支持的语言："python", "javascript", "node"
- * @return 执行单元指针，失败返回 NULL
+ * @param language 支持的语言�?python", "javascript", "node"
+ * @return 执行单元指针，失败返�?NULL
  */
 agentos_execution_unit_t* agentos_code_unit_create(const char* language) {
     if (!language) return NULL;
     if (strlen(language) > 32) return NULL;
 
-    agentos_execution_unit_t* unit = (agentos_execution_unit_t*)malloc(sizeof(agentos_execution_unit_t));
+    agentos_execution_unit_t* unit = (agentos_execution_unit_t*)AGENTOS_MALLOC(sizeof(agentos_execution_unit_t));
     if (!unit) return NULL;
 
-    code_unit_data_t* data = (code_unit_data_t*)malloc(sizeof(code_unit_data_t));
+    code_unit_data_t* data = (code_unit_data_t*)AGENTOS_MALLOC(sizeof(code_unit_data_t));
     if (!data) {
-        free(unit);
+        AGENTOS_FREE(unit);
         return NULL;
     }
 
-    data->language = strdup(language);
+    data->language = AGENTOS_STRDUP(language);
     char meta[128];
     snprintf(meta, sizeof(meta), "{\"type\":\"code\",\"lang\":\"%s\"}", language);
-    data->metadata_json = strdup(meta);
+    data->metadata_json = AGENTOS_STRDUP(meta);
 
     if (!data->language || !data->metadata_json) {
-        if (data->language) free(data->language);
-        if (data->metadata_json) free(data->metadata_json);
-        free(data);
-        free(unit);
+        if (data->language) AGENTOS_FREE(data->language);
+        if (data->metadata_json) AGENTOS_FREE(data->metadata_json);
+        AGENTOS_FREE(data);
+        AGENTOS_FREE(unit);
         return NULL;
     }
 

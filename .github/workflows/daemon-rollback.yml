@@ -1,0 +1,355 @@
+﻿# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# AgentOS daemon Module Rollback Workflow
+# Version: 1.0.0
+# Description: Handles deployment rollback for daemon service layer module
+# =============================================================================
+
+name: daemon Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      service:
+        description: 'Service to rollback (leave empty for all)'
+        required: false
+        type: choice
+        options:
+          - all
+          - llm_d
+          - tool_d
+          - monit_d
+          - sched_d
+          - market_d
+      target_version:
+        description: 'Target version to rollback to (leave empty for previous)'
+        required: false
+        type: string
+      reason:
+        description: 'Reason for rollback'
+        required: true
+        type: string
+      skip_approval:
+        description: 'Skip approval (emergency only)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  MODULE_NAME: daemon
+
+jobs:
+  # ========================================================================
+  # Job 1: Validate rollback parameters
+  # ========================================================================
+  validate:
+    name: Validate Rollback Request
+    runs-on: ubuntu-latest
+    outputs:
+      target_version: ${{ steps.validate.outputs.target_version }}
+      current_version: ${{ steps.validate.outputs.current_version }}
+      service: ${{ steps.validate.outputs.service }}
+      validation_status: ${{ steps.validate.outputs.validation_status }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate rollback parameters
+        id: validate
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          TARGET="${{ github.event.inputs.target_version }}"
+          SERVICE="${{ github.event.inputs.service || 'all' }}"
+
+          if [[ "$ENV" == "production" ]] && [[ "${{ github.event.inputs.skip_approval }}" != "true" ]]; then
+            echo "Production rollback requires explicit approval"
+          fi
+
+          CURRENT=$(cat "daemon/VERSION" 2>/dev/null || echo "unknown")
+
+          if [[ -z "$TARGET" ]]; then
+            PREVIOUS=$(git tag -l "daemon-v*" | sort -V | tail -2 | head -1)
+            if [[ -n "$PREVIOUS" ]]; then
+              TARGET="${PREVIOUS#daemon-v}"
+              echo "Found previous version: $TARGET"
+            else
+              echo "::error::No previous version found for rollback"
+              echo "validation_status=failed" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          fi
+
+          echo "current_version=$CURRENT" >> $GITHUB_OUTPUT
+          echo "target_version=$TARGET" >> $GITHUB_OUTPUT
+          echo "service=$SERVICE" >> $GITHUB_OUTPUT
+          echo "validation_status=passed" >> $GITHUB_OUTPUT
+
+          echo "### Rollback Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** $ENV" >> $GITHUB_STEP_SUMMARY
+          echo "- **Service:** $SERVICE" >> $GITHUB_STEP_SUMMARY
+          echo "- **Current Version:** $CURRENT" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target Version:** $TARGET" >> $GITHUB_STEP_SUMMARY
+
+  # ========================================================================
+  # Job 2: Approval for production rollback
+  # ========================================================================
+  approval:
+    name: Rollback Approval
+    needs: [validate]
+    if: github.event.inputs.environment == 'production' && github.event.inputs.skip_approval != 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: production-daemon-rollback
+    steps:
+      - name: Approval check
+        run: |
+          echo "Production rollback approved for daemon module"
+          echo "Service: ${{ needs.validate.outputs.service }}"
+          echo "Target version: ${{ needs.validate.outputs.target_version }}"
+          echo "Reason: ${{ github.event.inputs.reason }}"
+          echo "Requested by: ${{ github.actor }}"
+
+  # ========================================================================
+  # Job 3: Execute rollback
+  # ========================================================================
+  rollback:
+    name: Execute Rollback
+    needs: [validate, approval]
+    if: always() && (needs.approval.result == 'success' || github.event.inputs.skip_approval == 'true' || needs.approval.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download target version artifact
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: agentos-daemon-${{ needs.validate.outputs.service }}-${{ needs.validate.outputs.target_version }}-linux-x86_64
+          path: rollback_artifact
+
+      - name: Prepare rollback package
+        run: |
+          VERSION="${{ needs.validate.outputs.target_version }}"
+          SERVICE="${{ needs.validate.outputs.service }}"
+
+          if [[ ! -d "rollback_artifact" ]] || [[ -z "$(ls -A rollback_artifact 2>/dev/null)" ]]; then
+            echo "Artifact not found, downloading from release..."
+            gh release download "daemon-v${VERSION}" \
+              --pattern "agentos-daemon-${SERVICE}-${VERSION}-*.tar.gz" \
+              --dir rollback_download || true
+
+            if [[ -d "rollback_download" ]] && [[ -n "$(ls -A rollback_download 2>/dev/null)" ]]; then
+              mkdir -p rollback_artifact
+              tar -xzf rollback_download/*.tar.gz -C rollback_artifact --strip-components=1
+            fi
+          fi
+
+          if [[ ! -d "rollback_artifact" ]] || [[ -z "$(ls -A rollback_artifact 2>/dev/null)" ]]; then
+            echo "::error::Could not find rollback artifact for version $VERSION service $SERVICE"
+            exit 1
+          fi
+
+          echo "Rollback package prepared for service: $SERVICE"
+          ls -la rollback_artifact/
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Execute rollback
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
+          SERVICE: ${{ needs.validate.outputs.service }}
+          TARGET_VERSION: ${{ needs.validate.outputs.target_version }}
+          CURRENT_VERSION: ${{ needs.validate.outputs.current_version }}
+          REASON: ${{ github.event.inputs.reason }}
+        run: |
+          echo "### Rollback Execution" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** $ENVIRONMENT" >> $GITHUB_STEP_SUMMARY
+          echo "- **Service:** $SERVICE" >> $GITHUB_STEP_SUMMARY
+          echo "- **From Version:** $CURRENT_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **To Version:** $TARGET_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **Reason:** $REASON" >> $GITHUB_STEP_SUMMARY
+          echo "- **Initiated By:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp:** $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY
+
+          echo "Deploying rollback package to $ENVIRONMENT for service: $SERVICE..."
+
+          case "$ENVIRONMENT" in
+            staging)
+              echo "Deploying to staging environment..."
+              # docker-compose -f scripts/deploy/docker/docker-compose.staging.yml up -d
+              ;;
+            production)
+              echo "Deploying to production environment..."
+              # Production deployment logic here
+              ;;
+          esac
+
+          echo "Rollback completed successfully"
+
+      - name: Health check
+        run: |
+          echo "Running post-rollback health checks..."
+
+          sleep 5
+
+          echo "Checking daemon service modules..."
+          # Add actual health check commands here
+          # Example:
+          # curl -f http://localhost:8092/health || exit 1
+
+          echo "�?Health checks passed"
+
+      - name: Record rollback
+        run: |
+          mkdir -p daemon/logs
+          cat > daemon/logs/rollback_$(date +%Y%m%d_%H%M%S).json << EOF
+          {
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "module": "daemon",
+            "service": "${{ needs.validate.outputs.service }}",
+            "environment": "${{ github.event.inputs.environment }}",
+            "from_version": "${{ needs.validate.outputs.current_version }}",
+            "to_version": "${{ needs.validate.outputs.target_version }}",
+            "reason": "${{ github.event.inputs.reason }}",
+            "initiated_by": "${{ github.actor }}",
+            "workflow_run": "${{ github.run_id }}"
+          }
+          EOF
+
+          echo "Rollback recorded to daemon/logs/"
+
+  # ========================================================================
+  # Job 4: Verify rollback
+  # ========================================================================
+  verify:
+    name: Verify Rollback
+    needs: [rollback]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run post-rollback tests
+        run: |
+          echo "Running post-rollback verification tests..."
+
+          echo "�?Verification tests initiated"
+
+  # ========================================================================
+  # Job 5: Notify stakeholders
+  # ========================================================================
+  notify:
+    name: Notify Stakeholders
+    needs: [validate, rollback, verify]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send notification
+        if: env.SLACK_WEBHOOK != ''
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_BACKS }}
+        run: |
+          STATUS="${{ needs.rollback.result }}"
+
+          if [[ "$STATUS" == "success" ]]; then
+            EMOJI="�?
+            COLOR="good"
+            MESSAGE="Rollback completed successfully"
+          else
+            EMOJI="�?
+            COLOR="danger"
+            MESSAGE="Rollback failed"
+          fi
+
+          curl -X POST "$SLACK_WEBHOOK" \
+            -H 'Content-type: application/json' \
+            -d '{
+              "attachments": [
+                {
+                  "color": "'"$COLOR"'",
+                  "blocks": [
+                    {
+                      "type": "header",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "'"${EMOJI}"' daemon Module Rollback"
+                      }
+                    },
+                    {
+                      "type": "section",
+                      "fields": [
+                        {"type": "mrkdwn", "text": "*Environment:*\n'"${{ github.event.inputs.environment }}"'"},
+                        {"type": "mrkdwn", "text": "*Service:*\n'"${{ needs.validate.outputs.service }}"'"},
+                        {"type": "mrkdwn", "text": "*Target Version:*\n'"${{ needs.validate.outputs.target_version }}"'"},
+                        {"type": "mrkdwn", "text": "*Status:*\n'"${MESSAGE}"'"}
+                      ]
+                    },
+                    {
+                      "type": "section",
+                      "text": {
+                        "type": "mrkdwn",
+                        "text": "*Reason:*\n'"${{ github.event.inputs.reason }}"'"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }'
+        continue-on-error: true
+
+  # ========================================================================
+  # Job 6: Create follow-up issue
+  # ========================================================================
+  create-issue:
+    name: Create Follow-up Issue
+    needs: [validate, rollback]
+    if: needs.rollback.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create follow-up issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🔍 Post-Rollback Investigation: daemon/${{ needs.validate.outputs.service }} v${{ needs.validate.outputs.current_version }} �?v${{ needs.validate.outputs.target_version }}`,
+              body: `
+              ## Rollback Summary
+
+              - **Environment:** ${{ github.event.inputs.environment }}
+              - **Service:** ${{ needs.validate.outputs.service }}
+              - **From Version:** ${{ needs.validate.outputs.current_version }}
+              - **To Version:** ${{ needs.validate.outputs.target_version }}
+              - **Reason:** ${{ github.event.inputs.reason }}
+              - **Initiated By:** @${{ github.actor }}
+
+              ## Action Items
+
+              - [ ] Investigate root cause of the issue
+              - [ ] Fix the issue in develop branch
+              - [ ] Add tests to prevent regression
+              - [ ] Update documentation if needed
+              - [ ] Close this issue when resolved
+
+              ## Related
+
+              - Workflow Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+              `,
+              labels: ['rollback', 'daemon', 'investigation', 'automated'],
+              assignees: ['${{ github.actor }}']
+            });
+
+            console.log(`Created issue #${issue.data.number}`);

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿﻿#!/usr/bin/env python3
 """
 AgentOS 配置部署脚本
 根据环境变量部署配置文件
@@ -9,35 +9,61 @@ import shutil
 import sys
 from pathlib import Path
 
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'dev'))
 
-# 常量定义
-DEFAULT_CONFIG_FILES = [
-    'kernel/settings.yaml',
-    'model/model.yaml',
-    'agent/registry.yaml',
-    'skill/registry.yaml',
-    'security/policy.yaml',
-    'security/permission_rules.yaml',
-    'sanitizer/sanitizer_rules.json',
-    'logging/config.yaml',
-    'config_management.yaml',
-]
+from constants import REQUIRED_CONFIG_FILES
 
-# 环境配置映射(所有环境使用相同的文件映射)
+
+# 环境配置映射 (所有环境使用相同的文件映射)
 ENV_CONFIG_MAPPING = {
-    'development': DEFAULT_CONFIG_FILES,
-    'staging': DEFAULT_CONFIG_FILES,
-    'production': DEFAULT_CONFIG_FILES,
+    'development': REQUIRED_CONFIG_FILES,
+    'staging': REQUIRED_CONFIG_FILES,
+    'production': REQUIRED_CONFIG_FILES,
 }
 
 
-def backup_config_file(config_path: Path) -> Path:
-    """备份配置文件"""
-    backup_path = config_path.with_suffix('.backup')
-    if config_path.exists():
-        shutil.copy2(config_path, backup_path)
-        print(f"✓ 已备份: {backup_path}")
-    return backup_path
+def deploy_single_file(
+    source_path: Path,
+    target_path: Path,
+    backup: bool = True,
+    dry_run: bool = False
+) -> bool:
+    """
+    部署单个配置文件
+    
+    Args:
+        source_path: 源文件路径
+        target_path: 目标文件路径
+        backup: 是否备份现有文件
+        dry_run: 是否为模拟模式
+        
+    Returns:
+        bool: 部署是否成功
+    """
+    if not source_path.exists():
+        print(f"⚠ 源文件不存在：{source_path}")
+        return False
+    
+    if dry_run:
+        print(f"[DRY RUN] 将复制 {source_path} -> {target_path}")
+        return True
+    
+    # 备份目标文件
+    if backup and target_path.exists():
+        backup_path = target_path.with_suffix('.backup')
+        shutil.copy2(target_path, backup_path)
+        print(f"✓ 已备份：{backup_path}")
+    
+    # 复制配置文件
+    try:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_path, target_path)
+        print(f"✓ 已部署：{target_path}")
+        return True
+    except Exception as e:
+        print(f"✗ 部署失败：{target_path} - {e}")
+        return False
 
 
 def deploy_config(
@@ -49,15 +75,15 @@ def deploy_config(
     """部署配置到指定环境"""
 
     # 确定目标目录
-    target_dir = source_dir / 'environment' / target_env
+    target_dir = source_dir / 'env' / target_env
     if not target_dir.exists():
-        print(f"✗ 目标环境目录不存在: {target_dir}")
+        print(f"✗ 目标环境目录不存在：{target_dir}")
         return False
 
     # 获取当前环境的配置文件列表
     config_files = ENV_CONFIG_MAPPING.get(target_env)
     if not config_files:
-        print(f"✗ 不支持的环境: {target_env}")
+        print(f"✗ 不支持的环境：{target_env}")
         return False
 
     # 部署配置文件
@@ -68,34 +94,15 @@ def deploy_config(
         source_path = source_dir / config_file
         target_path = target_dir / config_file
 
-        if not source_path.exists():
-            print(f"⚠ 源文件不存在: {source_path}")
-            error_count += 1
-            continue
-
-        if dry_run:
-            print(f"[DRY RUN] 将复制 {source_path} -> {target_path}")
+        if deploy_single_file(source_path, target_path, backup, dry_run):
             success_count += 1
-            continue
-
-        # 备份目标文件
-        if backup and target_path.exists():
-            backup_config_file(target_path)
-
-        # 复制配置文件
-        try:
-            target_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source_path, target_path)
-            print(f"✓ 已部署: {target_path}")
-            success_count += 1
-        except Exception as e:
-            print(f"✗ 部署失败: {target_path} - {e}")
+        else:
             error_count += 1
 
     # 总结
     print(f"\n部署完成:")
-    print(f"  成功: {success_count}")
-    print(f"  失败: {error_count}")
+    print(f"  成功：{success_count}")
+    print(f"  失败：{error_count}")
 
     return error_count == 0
 
@@ -106,15 +113,15 @@ def validate_deployment(
 ) -> bool:
     """验证部署结果"""
 
-    target_dir = source_dir / 'environment' / target_env
+    target_dir = source_dir / 'env' / target_env
     if not target_dir.exists():
-        print(f"✗ 目标环境目录不存在: {target_dir}")
+        print(f"✗ 目标环境目录不存在：{target_dir}")
         return False
 
     # 获取当前环境的配置文件列表
     config_files = ENV_CONFIG_MAPPING.get(target_env)
     if not config_files:
-        print(f"✗ 不支持的环境: {target_env}")
+        print(f"✗ 不支持的环境：{target_env}")
         return False
 
     # 检查必需的配置文件
@@ -140,7 +147,7 @@ def main():
                        choices=['development', 'staging', 'production'],
                        help='目标环境 (development/staging/production)')
     parser.add_argument('--source', '-s',
-                       default='config',
+                       default='manager',
                        help='源配置目录')
     parser.add_argument('--no-backup', '-n',
                        action='store_true',

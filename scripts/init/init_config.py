@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿﻿#!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 配置初始化工具
 # 遵循 AgentOS 架构设计原则：反馈闭环、工程美学
@@ -34,7 +34,7 @@ DEFAULT_CONFIG_DIR = os.path.expanduser("~/.agentos")
 CONFIG_DIRS = [
     os.path.expanduser("~/.agentos"),
     "/etc/agentos",
-    os.path.join(os.getcwd(), "config")
+    os.path.join(os.getcwd(), "manager")
 ]
 
 
@@ -307,7 +307,7 @@ class ConfigInitializer:
             config_path = os.path.join(self.config_dir, name)
 
             if not os.path.exists(config_path):
-                errors.append(f"Missing required config: {name}")
+                errors.append(f"Missing required manager: {name}")
                 continue
 
             try:
@@ -315,7 +315,7 @@ class ConfigInitializer:
                     content = f.read()
 
                 if len(content.strip()) == 0:
-                    errors.append(f"Empty config file: {name}")
+                    errors.append(f"Empty manager file: {name}")
 
             except Exception as e:
                 errors.append(f"Error reading {name}: {e}")
@@ -375,7 +375,7 @@ class ConfigInitializer:
 
     def backup_configs(self, output_path: str) -> bool:
         if not os.path.exists(self.config_dir):
-            print(f"Config directory not found: {self.config_dir}")
+            print(f"manager directory not found: {self.config_dir}")
             return False
 
         os.makedirs(output_path, exist_ok=True)
@@ -492,7 +492,7 @@ def main():
 
     if args.init:
         print("\nInitializing AgentOS Configuration...")
-        print(f"Config directory: {initializer.config_dir}")
+        print(f"manager directory: {initializer.config_dir}")
         initializer.init_configs(force=args.force)
         print(f"\nCreated {len(initializer.created_files)} configuration file(s)")
         print("\nValidating configuration...")

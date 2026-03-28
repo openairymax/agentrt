@@ -1,4 +1,4 @@
-"""
+﻿﻿"""
 AgentOS 配置验证单元测试
 测试配置验证脚本的功能
 """
@@ -20,8 +20,8 @@ class TestConfigValidator:
     
     def setup_method(self):
         """测试前设置"""
-        self.config_dir = project_root / 'config'
-        self.schema_dir = project_root / 'config' / 'schema'
+        self.config_dir = project_root / 'manager'
+        self.schema_dir = project_root / 'manager' / 'schema'
         self.validator = ConfigValidator(str(self.config_dir), str(self.schema_dir))
     
     def test_load_schema(self):
@@ -33,10 +33,10 @@ class TestConfigValidator:
     
     def test_load_config(self):
         """测试加载配置文件"""
-        config = self.validator.load_config('kernel/settings.yaml')
-        assert config is not None
-        assert 'kernel' in config
-        assert '_config_version' in config
+        manager = self.validator.load_config('kernel/settings.yaml')
+        assert manager is not None
+        assert 'kernel' in manager
+        assert '_config_version' in manager
     
     def test_validate_config(self):
         """测试配置验证"""
@@ -68,7 +68,7 @@ class TestConfigValidator:
 
 def test_missing_config_file():
     """测试缺失配置文件"""
-    validator = ConfigValidator(str(project_root / 'config'), str(project_root / 'config' / 'schema'))
+    validator = ConfigValidator(str(project_root / 'manager'), str(project_root / 'manager' / 'schema'))
     result = validator.validate_config('nonexistent.yaml', 'kernel-settings.schema.json')
     assert result is False
     assert len(validator.errors) > 0
@@ -76,9 +76,9 @@ def test_missing_config_file():
 
 def test_invalid_yaml_syntax():
     """测试无效的 YAML 语法"""
-    validator = ConfigValidator(str(project_root / 'config'), str(project_root / 'config' / 'schema'))
+    validator = ConfigValidator(str(project_root / 'manager'), str(project_root / 'manager' / 'schema'))
     # 创建一个无效的 YAML 文件进行测试
-    test_file = project_root / 'config' / 'test_invalid.yaml'
+    test_file = project_root / 'manager' / 'test_invalid.yaml'
     test_file.write_text("invalid: yaml: content: [unclosed")
     
     try:
@@ -92,7 +92,7 @@ def test_invalid_yaml_syntax():
 
 def test_missing_schema_file():
     """测试缺失 Schema 文件"""
-    validator = ConfigValidator(str(project_root / 'config'), str(project_root / 'config' / 'schema'))
+    validator = ConfigValidator(str(project_root / 'manager'), str(project_root / 'manager' / 'schema'))
     result = validator.validate_config('kernel/settings.yaml', 'nonexistent.schema.json')
     assert result is False
     assert len(validator.errors) > 0
@@ -100,9 +100,9 @@ def test_missing_schema_file():
 
 def test_missing_config_version():
     """测试缺少配置版本"""
-    validator = ConfigValidator(str(project_root / 'config'), str(project_root / 'config' / 'schema'))
+    validator = ConfigValidator(str(project_root / 'manager'), str(project_root / 'manager' / 'schema'))
     # 创建一个没有版本的配置
-    test_file = project_root / 'config' / 'test_no_version.yaml'
+    test_file = project_root / 'manager' / 'test_no_version.yaml'
     test_file.write_text("kernel:\n  log_level: info")
     
     try:
@@ -115,7 +115,7 @@ def test_missing_config_version():
 
 def test_environment_variable_detection():
     """测试环境变量检测"""
-    validator = ConfigValidator(str(project_root / 'config'), str(project_root / 'config' / 'schema'))
+    validator = ConfigValidator(str(project_root / 'manager'), str(project_root / 'manager' / 'schema'))
     result = validator.check_environment_variables()
     assert result is True
     # 应该检测到一些环境变量

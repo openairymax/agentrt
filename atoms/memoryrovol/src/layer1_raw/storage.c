@@ -1,11 +1,15 @@
 /**
  * @file layer1_raw.c
- * @brief L1 原始卷实现
+ * @brief L1 原始卷实�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "../include/layer1_raw.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 #include <stdio.h>
 #include <pthread.h>
@@ -21,7 +25,7 @@
 #define DEFAULT_WORKERS 4
 
 /**
- * @brief L1 原始卷内部结构
+ * @brief L1 原始卷内部结�?
  */
 typedef struct agentos_layer1_raw_inner {
     char storage_path[256];
@@ -62,7 +66,7 @@ typedef struct async_queue {
 } async_queue_t;
 
 static async_queue_t* queue_create(size_t max_size) {
-    async_queue_t* q = (async_queue_t*)calloc(1, sizeof(async_queue_t));
+    async_queue_t* q = (async_queue_t*)AGENTOS_CALLOC(1, sizeof(async_queue_t));
     if (!q) return NULL;
     q->max_size = max_size;
     pthread_mutex_init(&q->mutex, NULL);
@@ -78,7 +82,7 @@ static void queue_destroy(async_queue_t* q) {
     pthread_mutex_unlock(&q->mutex);
     pthread_mutex_destroy(&q->mutex);
     pthread_cond_destroy(&q->cond);
-    free(q);
+    AGENTOS_FREE(q);
 }
 
 static agentos_error_t queue_push(async_queue_t* q, const char* id, const void* data, size_t len) {
@@ -88,16 +92,16 @@ static agentos_error_t queue_push(async_queue_t* q, const char* id, const void* 
         pthread_mutex_unlock(&q->mutex);
         return AGENTOS_EBUSY;
     }
-    queue_entry_t* entry = (queue_entry_t*)malloc(sizeof(queue_entry_t));
+    queue_entry_t* entry = (queue_entry_t*)AGENTOS_MALLOC(sizeof(queue_entry_t));
     if (!entry) {
         pthread_mutex_unlock(&q->mutex);
         return AGENTOS_ENOMEM;
     }
-    entry->id = strdup(id);
-    entry->data = malloc(len);
+    entry->id = AGENTOS_STRDUP(id);
+    entry->data = AGENTOS_MALLOC(len);
     if (!entry->data) {
-        free(entry->id);
-        free(entry);
+        AGENTOS_FREE(entry->id);
+        AGENTOS_FREE(entry);
         pthread_mutex_unlock(&q->mutex);
         return AGENTOS_ENOMEM;
     }
@@ -123,12 +127,12 @@ agentos_error_t agentos_layer1_raw_create_async(
     agentos_layer1_raw_t** out) {
     if (!out) return AGENTOS_EINVAL;
 
-    agentos_layer1_raw_t* l1 = (agentos_layer1_raw_t*)calloc(1, sizeof(agentos_layer1_raw_t));
+    agentos_layer1_raw_t* l1 = (agentos_layer1_raw_t*)AGENTOS_CALLOC(1, sizeof(agentos_layer1_raw_t));
     if (!l1) return AGENTOS_ENOMEM;
 
-    l1->inner = (agentos_layer1_raw_inner_t*)calloc(1, sizeof(agentos_layer1_raw_inner_t));
+    l1->inner = (agentos_layer1_raw_inner_t*)AGENTOS_CALLOC(1, sizeof(agentos_layer1_raw_inner_t));
     if (!l1->inner) {
-        free(l1);
+        AGENTOS_FREE(l1);
         return AGENTOS_ENOMEM;
     }
 
@@ -154,9 +158,9 @@ void agentos_layer1_raw_destroy(agentos_layer1_raw_t* l1) {
         pthread_cond_broadcast(&l1->inner->cond);
         pthread_mutex_destroy(&l1->inner->mutex);
         pthread_cond_destroy(&l1->inner->cond);
-        free(l1->inner);
+        AGENTOS_FREE(l1->inner);
     }
-    free(l1);
+    AGENTOS_FREE(l1);
 }
 
 agentos_error_t agentos_layer1_raw_write(
@@ -195,7 +199,7 @@ agentos_error_t agentos_layer1_raw_read(
     long len = ftell(fp);
     fseek(fp, 0, SEEK_SET);
 
-    void* data = malloc(len);
+    void* data = AGENTOS_MALLOC(len);
     if (!data) {
         fclose(fp);
         return AGENTOS_ENOMEM;
@@ -205,7 +209,7 @@ agentos_error_t agentos_layer1_raw_read(
     fclose(fp);
 
     if (read_len != (size_t)len) {
-        free(data);
+        AGENTOS_FREE(data);
         return AGENTOS_EIO;
     }
 
@@ -252,7 +256,7 @@ agentos_error_t agentos_layer1_raw_flush(
 void agentos_free_string_array(char** arr, size_t count) {
     if (!arr) return;
     for (size_t i = 0; i < count; i++) {
-        if (arr[i]) free(arr[i]);
+        if (arr[i]) AGENTOS_FREE(arr[i]);
     }
-    free(arr);
+    AGENTOS_FREE(arr);
 }

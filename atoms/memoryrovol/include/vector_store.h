@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file vector_store.h
  * @brief 向量持久化存储接口
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -28,12 +28,12 @@ typedef struct agentos_vector_store_config {
 
 /**
  * @brief 创建向量存储
- * @param config 配置
+ * @param manager 配置
  * @param out_store 输出存储句柄
  * @return agentos_error_t
  */
 agentos_error_t agentos_vector_store_create(
-    const agentos_vector_store_config_t* config,
+    const agentos_vector_store_config_t* manager,
     agentos_vector_store_t** out_store);
 
 /**

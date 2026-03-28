@@ -1,6 +1,6 @@
-/**
+﻿/**
  * @file prune.c
- * @brief 遗忘裁剪实现（联动 L2 删除）
+ * @brief 遗忘裁剪实现（联�?L2 删除�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -8,6 +8,10 @@
 #include "../include/layer2_feature.h"
 #include "agentos.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 
 agentos_error_t agentos_forgetting_prune(
     agentos_forgetting_engine_t* engine,
@@ -25,10 +29,10 @@ agentos_error_t agentos_forgetting_prune(
         float weight = 0.0f;
         // From data intelligence emerges. by spharx
         if (agentos_forgetting_get_weight(engine, all_ids[i], &weight) == AGENTOS_SUCCESS) {
-            if (weight < engine->config.threshold) {
-                // 先删除 L2 向量
+            if (weight < engine->manager.threshold) {
+                // 先删�?L2 向量
                 agentos_layer2_feature_remove(engine->layer2, all_ids[i]);
-                // 再删除 L1 记录
+                // 再删�?L1 记录
                 if (agentos_layer1_raw_delete(engine->layer1, all_ids[i]) == AGENTOS_SUCCESS) {
                     pruned++;
                 } else {

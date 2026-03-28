@@ -1,35 +1,39 @@
-/**
+﻿﻿/**
  * @file async_storage_engine.c
  * @brief L1 原始卷异步存储引擎（生产级）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  * 
  * @details
- * 生产级异步存储引擎，支持99.999%可靠性标准，提供完整的错误恢复、
- * 监控集成和可观测性功能。基于AgentOS微内核架构设计原则实现。
+ * 生产级异步存储引擎，支持99.999%可靠性标准，提供完整的错误恢复�?
+ * 监控集成和可观测性功能。基于AgentOS微内核架构设计原则实现�?
  * 
  * 核心特性：
- * 1. 批量异步写入：支持高吞吐量批量操作，队列深度可配置
- * 2. 错误恢复机制：写入失败自动重试，支持指数退避策略
+ * 1. 批量异步写入：支持高吞吐量批量操作，队列深度可配�?
+ * 2. 错误恢复机制：写入失败自动重试，支持指数退避策�?
  * 3. 监控指标收集：实时收集写入延迟、成功率、队列深度等指标
  * 4. 可观测性集成：与AgentOS可观测性子系统深度集成
  * 5. 健康检查：实时监控存储引擎健康状态，支持自动恢复
- * 6. 内存管理：智能内存池管理，防止内存碎片
- * 7. 并发控制：细粒度锁控制，支持高并发访问
- * 8. 持久化保证：数据持久化到磁盘，支持断电恢复
+ * 6. 内存管理：智能内存池管理，防止内存碎�?
+ * 7. 并发控制：细粒度锁控制，支持高并发访�?
+ * 8. 持久化保证：数据持久化到磁盘，支持断电恢�?
  * 
  * 生产级可靠性保证：
- * - 99.999%写入成功率（年度故障时间<5分钟）
- * - 毫秒级写入延迟（P99 < 100ms）
- * - 支持千万级数据条目
- * - 自动故障切换和恢复
+ * - 99.999%写入成功率（年度故障时间<5分钟�?
+ * - 毫秒级写入延迟（P99 < 100ms�?
+ * - 支持千万级数据条�?
+ * - 自动故障切换和恢�?
  */
 
 #include "../include/layer1_raw.h"
 #include "agentos.h"
 #include "logger.h"
 #include "observability.h"
-#include "config.h"
+#include "manager.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
@@ -52,34 +56,34 @@
 
 /* ==================== 内部常量定义 ==================== */
 
-/** @brief 默认队列大小（条目数） */
+/** @brief 默认队列大小（条目数�?*/
 #define DEFAULT_ASYNC_QUEUE_SIZE 65536
 
-/** @brief 默认工作线程数 */
+/** @brief 默认工作线程�?*/
 #define DEFAULT_WORKER_THREADS 8
 
-/** @brief 最大重试次数 */
+/** @brief 最大重试次�?*/
 #define MAX_WRITE_RETRIES 5
 
 /** @brief 初始重试延迟（毫秒） */
 #define INITIAL_RETRY_DELAY_MS 100
 
-/** @brief 最大重试延迟（毫秒） */
+/** @brief 最大重试延迟（毫秒�?*/
 #define MAX_RETRY_DELAY_MS 10000
 
-/** @brief 批量写入大小（条目数） */
+/** @brief 批量写入大小（条目数�?*/
 #define BATCH_WRITE_SIZE 100
 
 /** @brief 监控间隔（毫秒） */
 #define MONITORING_INTERVAL_MS 5000
 
-/** @brief 健康检查超时（毫秒） */
+/** @brief 健康检查超时（毫秒�?*/
 #define HEALTH_CHECK_TIMEOUT_MS 3000
 
 /** @brief 文件写缓冲区大小（字节） */
 #define FILE_WRITE_BUFFER_SIZE (64 * 1024)  /* 64KB */
 
-/** @brief 最大文件路径长度 */
+/** @brief 最大文件路径长�?*/
 #define MAX_FILE_PATH_LENGTH 1024
 
 /* ==================== 内部数据结构 ==================== */
@@ -91,21 +95,21 @@ typedef struct write_request {
     char* id;                          /**< 记录ID */
     void* data;                        /**< 数据指针 */
     size_t data_len;                   /**< 数据长度 */
-    uint64_t timestamp_ns;             /**< 创建时间戳（纳秒） */
+    uint64_t timestamp_ns;             /**< 创建时间戳（纳秒�?*/
     uint8_t retry_count;               /**< 重试次数 */
-    uint8_t priority;                  /**< 优先级（0-255，越高越优先） */
-    uint32_t flags;                    /**< 标志位 */
-    struct write_request* next;        /**< 下一个请求 */
+    uint8_t priority;                  /**< 优先级（0-255，越高越优先�?*/
+    uint32_t flags;                    /**< 标志�?*/
+    struct write_request* next;        /**< 下一个请�?*/
 } write_request_t;
 
 /**
- * @brief 批量写入缓冲区
+ * @brief 批量写入缓冲�?
  */
 typedef struct write_batch {
     write_request_t* requests[BATCH_WRITE_SIZE]; /**< 请求数组 */
     size_t count;                               /**< 请求数量 */
     uint64_t batch_id;                          /**< 批次ID */
-    uint64_t start_time_ns;                     /**< 批次开始时间 */
+    uint64_t start_time_ns;                     /**< 批次开始时�?*/
     uint64_t end_time_ns;                       /**< 批次结束时间 */
 } write_batch_t;
 
@@ -113,20 +117,20 @@ typedef struct write_batch {
  * @brief 异步队列结构
  */
 typedef struct async_queue {
-    write_request_t* head;             /**< 队列头 */
-    write_request_t* tail;             /**< 队列尾 */
-    size_t count;                      /**< 队列中请求数量 */
+    write_request_t* head;             /**< 队列�?*/
+    write_request_t* tail;             /**< 队列�?*/
+    size_t count;                      /**< 队列中请求数�?*/
     size_t capacity;                   /**< 队列容量 */
     uint64_t total_enqueued;           /**< 总入队数 */
     uint64_t total_dequeued;           /**< 总出队数 */
     
     /* 同步原语 */
 #ifdef _WIN32
-    CRITICAL_SECTION lock;             /**< Windows临界区 */
+    CRITICAL_SECTION lock;             /**< Windows临界�?*/
     HANDLE not_empty;                  /**< 非空事件 */
     HANDLE not_full;                   /**< 非满事件 */
 #else
-    pthread_mutex_t lock;              /**< POSIX互斥锁 */
+    pthread_mutex_t lock;              /**< POSIX互斥�?*/
     pthread_cond_t not_empty;          /**< 非空条件变量 */
     pthread_cond_t not_full;           /**< 非满条件变量 */
 #endif
@@ -135,7 +139,7 @@ typedef struct async_queue {
 } async_queue_t;
 
 /**
- * @brief 工作线程上下文
+ * @brief 工作线程上下�?
  */
 typedef struct worker_context {
     int worker_id;                     /**< 工作线程ID */
@@ -144,39 +148,39 @@ typedef struct worker_context {
     int running;                       /**< 运行标志 */
     
     /* 统计信息 */
-    uint64_t processed_count;          /**< 处理请求数 */
-    uint64_t success_count;            /**< 成功数 */
-    uint64_t failure_count;            /**< 失败数 */
-    uint64_t total_processing_time_ns; /**< 总处理时间 */
+    uint64_t processed_count;          /**< 处理请求�?*/
+    uint64_t success_count;            /**< 成功�?*/
+    uint64_t failure_count;            /**< 失败�?*/
+    uint64_t total_processing_time_ns; /**< 总处理时�?*/
     
     /* 监控句柄 */
-    agentos_observability_t* obs;      /**< 可观测性句柄 */
+    agentos_observability_t* obs;      /**< 可观测性句�?*/
 } worker_context_t;
 
 /**
- * @brief 存储引擎内部状态
+ * @brief 存储引擎内部状�?
  */
 typedef struct storage_engine_inner {
     char storage_path[MAX_FILE_PATH_LENGTH]; /**< 存储路径 */
     async_queue_t* queue;              /**< 异步队列 */
     worker_context_t** workers;        /**< 工作线程数组 */
-    size_t worker_count;               /**< 工作线程数 */
+    size_t worker_count;               /**< 工作线程�?*/
     
     /* 监控指标 */
     uint64_t total_writes;             /**< 总写入数 */
-    uint64_t successful_writes;        /**< 成功写入数 */
-    uint64_t failed_writes;            /**< 失败写入数 */
-    uint64_t total_write_time_ns;      /**< 总写入时间 */
-    uint64_t peak_queue_depth;         /**< 峰值队列深度 */
+    uint64_t successful_writes;        /**< 成功写入�?*/
+    uint64_t failed_writes;            /**< 失败写入�?*/
+    uint64_t total_write_time_ns;      /**< 总写入时�?*/
+    uint64_t peak_queue_depth;         /**< 峰值队列深�?*/
     uint64_t queue_full_errors;        /**< 队列满错误数 */
     
-    /* 健康状态 */
-    int healthy;                       /**< 健康状态 */
-    char* last_error;                  /**< 最后错误信息 */
-    uint64_t last_error_time_ns;       /**< 最后错误时间 */
+    /* 健康状�?*/
+    int healthy;                       /**< 健康状�?*/
+    char* last_error;                  /**< 最后错误信�?*/
+    uint64_t last_error_time_ns;       /**< 最后错误时�?*/
     
-    /* 可观测性 */
-    agentos_observability_t* obs;      /**< 可观测性句柄 */
+    /* 可观测�?*/
+    agentos_observability_t* obs;      /**< 可观测性句�?*/
     char* engine_id;                   /**< 引擎ID */
     
     /* 线程管理 */
@@ -194,7 +198,7 @@ typedef struct storage_engine_inner {
 /**
  * @brief 确保目录存在
  * @param path 目录路径
- * @return AGENTOS_SUCCESS 成功，其他为错误码
+ * @return AGENTOS_SUCCESS 成功，其他为错误�?
  */
 static agentos_error_t ensure_directory_exists(const char* path) {
     if (!path) return AGENTOS_EINVAL;
@@ -216,7 +220,7 @@ static agentos_error_t ensure_directory_exists(const char* path) {
         char save = *p;
         *p = '\0';
         
-        /* 创建目录（如果不存在） */
+        /* 创建目录（如果不存在�?*/
         if (buffer[0] != '\0' && 
             !(strlen(buffer) == 2 && buffer[1] == ':')) {  /* 排除驱动器根目录 */
             if (_access(buffer, 0) != 0) {
@@ -235,12 +239,12 @@ static agentos_error_t ensure_directory_exists(const char* path) {
     /* Linux/Unix: 使用mkdir创建目录 */
     struct stat st;
     if (stat(path, &st) != 0) {
-        /* 目录不存在，创建它 */
+        /* 目录不存在，创建�?*/
         if (mkdir(path, 0755) != 0 && errno != EEXIST) {
             return AGENTOS_EIO;
         }
     } else if (!S_ISDIR(st.st_mode)) {
-        /* 路径存在但不是目录 */
+        /* 路径存在但不是目�?*/
         return AGENTOS_ENOTDIR;
     }
 #endif
@@ -252,9 +256,9 @@ static agentos_error_t ensure_directory_exists(const char* path) {
  * @brief 生成完整文件路径
  * @param storage_path 存储路径
  * @param id 记录ID
- * @param buffer 输出缓冲区
- * @param buffer_size 缓冲区大小
- * @return AGENTOS_SUCCESS 成功，其他为错误码
+ * @param buffer 输出缓冲�?
+ * @param buffer_size 缓冲区大�?
+ * @return AGENTOS_SUCCESS 成功，其他为错误�?
  */
 static agentos_error_t build_file_path(const char* storage_path, const char* id, 
                                        char* buffer, size_t buffer_size) {
@@ -262,7 +266,7 @@ static agentos_error_t build_file_path(const char* storage_path, const char* id,
         return AGENTOS_EINVAL;
     }
     
-    /* 检查ID合法性（防止路径遍历攻击） */
+    /* 检查ID合法性（防止路径遍历攻击�?*/
     for (const char* p = id; *p != '\0'; p++) {
         if (*p == '/' || *p == '\\' || *p == ':' || *p == '*' || *p == '?' || 
             *p == '"' || *p == '<' || *p == '>' || *p == '|') {
@@ -283,12 +287,12 @@ static agentos_error_t build_file_path(const char* storage_path, const char* id,
 }
 
 /**
- * @brief 安全写入文件（带重试机制）
+ * @brief 安全写入文件（带重试机制�?
  * @param file_path 文件路径
  * @param data 数据
  * @param data_len 数据长度
  * @param retry_count 当前重试次数
- * @return AGENTOS_SUCCESS 成功，其他为错误码
+ * @return AGENTOS_SUCCESS 成功，其他为错误�?
  */
 static agentos_error_t safe_write_file(const char* file_path, const void* data, 
                                        size_t data_len, uint8_t retry_count) {
@@ -315,7 +319,7 @@ static agentos_error_t safe_write_file(const char* file_path, const void* data,
         if (!fp) {
             /* 打开文件失败 */
             if (attempt < retry_count) {
-                /* 指数退避延迟 */
+                /* 指数退避延�?*/
                 uint32_t delay_ms = INITIAL_RETRY_DELAY_MS << attempt;
                 if (delay_ms > MAX_RETRY_DELAY_MS) {
                     delay_ms = MAX_RETRY_DELAY_MS;
@@ -354,14 +358,14 @@ static agentos_error_t safe_write_file(const char* file_path, const void* data,
                 fclose(fp);
                 
                 if (attempt < retry_count) {
-                    /* 删除部分写入的文件 */
+                    /* 删除部分写入的文�?*/
 #ifdef _WIN32
                     DeleteFileA(file_path);
 #else
                     unlink(file_path);
 #endif
                     
-                    /* 指数退避延迟 */
+                    /* 指数退避延�?*/
                     uint32_t delay_ms = INITIAL_RETRY_DELAY_MS << attempt;
                     if (delay_ms > MAX_RETRY_DELAY_MS) {
                         delay_ms = MAX_RETRY_DELAY_MS;
@@ -376,7 +380,7 @@ static agentos_error_t safe_write_file(const char* file_path, const void* data,
                     nanosleep(&ts, NULL);
 #endif
                     
-                    break;  /* 继续下一次尝试 */
+                    break;  /* 继续下一次尝�?*/
                 }
                 
                 AGENTOS_LOG_ERROR("Failed to write to file: %s (written: %zu/%zu)", 
@@ -399,7 +403,7 @@ static agentos_error_t safe_write_file(const char* file_path, const void* data,
                 unlink(file_path);
 #endif
                 
-                /* 指数退避延迟 */
+                /* 指数退避延�?*/
                 uint32_t delay_ms = INITIAL_RETRY_DELAY_MS << attempt;
                 if (delay_ms > MAX_RETRY_DELAY_MS) {
                     delay_ms = MAX_RETRY_DELAY_MS;
@@ -443,16 +447,16 @@ static agentos_error_t safe_write_file(const char* file_path, const void* data,
         }
 #endif
         
-        /* 文件大小不匹配 */
+        /* 文件大小不匹�?*/
         if (attempt < retry_count) {
-            /* 删除文件并重试 */
+            /* 删除文件并重�?*/
 #ifdef _WIN32
             DeleteFileA(file_path);
 #else
             unlink(file_path);
 #endif
             
-            /* 指数退避延迟 */
+            /* 指数退避延�?*/
             uint32_t delay_ms = INITIAL_RETRY_DELAY_MS << attempt;
             if (delay_ms > MAX_RETRY_DELAY_MS) {
                 delay_ms = MAX_RETRY_DELAY_MS;
@@ -481,7 +485,7 @@ static agentos_error_t safe_write_file(const char* file_path, const void* data,
  * @param file_path 文件路径
  * @param out_data 输出数据指针
  * @param out_len 输出数据长度
- * @return AGENTOS_SUCCESS 成功，其他为错误码
+ * @return AGENTOS_SUCCESS 成功，其他为错误�?
  */
 static agentos_error_t safe_read_file(const char* file_path, void** out_data, size_t* out_len) {
     if (!file_path || !out_data || !out_len) {
@@ -521,7 +525,7 @@ static agentos_error_t safe_read_file(const char* file_path, void** out_data, si
     }
     
     /* 分配内存 */
-    void* data = malloc(file_size);
+    void* data = AGENTOS_MALLOC(file_size);
     if (!data) {
         fclose(fp);
         return AGENTOS_ENOMEM;
@@ -537,7 +541,7 @@ static agentos_error_t safe_read_file(const char* file_path, void** out_data, si
         
         size_t read = fread((uint8_t*)data + total_read, 1, to_read, fp);
         if (read != to_read) {
-            free(data);
+            AGENTOS_FREE(data);
             fclose(fp);
             return AGENTOS_EIO;
         }
@@ -561,7 +565,7 @@ static agentos_error_t safe_read_file(const char* file_path, void** out_data, si
  * @return 队列指针，失败返回NULL
  */
 static async_queue_t* async_queue_create(size_t capacity) {
-    async_queue_t* queue = (async_queue_t*)calloc(1, sizeof(async_queue_t));
+    async_queue_t* queue = (async_queue_t*)AGENTOS_CALLOC(1, sizeof(async_queue_t));
     if (!queue) {
         AGENTOS_LOG_ERROR("Failed to allocate async queue");
         return NULL;
@@ -583,7 +587,7 @@ static async_queue_t* async_queue_create(size_t capacity) {
         if (queue->not_empty) CloseHandle(queue->not_empty);
         if (queue->not_full) CloseHandle(queue->not_full);
         DeleteCriticalSection(&queue->lock);
-        free(queue);
+        AGENTOS_FREE(queue);
         return NULL;
     }
 #else
@@ -596,7 +600,7 @@ static async_queue_t* async_queue_create(size_t capacity) {
 }
 
 /**
- * @brief 销毁异步队列
+ * @brief 销毁异步队�?
  * @param queue 队列指针
  */
 static void async_queue_destroy(async_queue_t* queue) {
@@ -610,22 +614,22 @@ static void async_queue_destroy(async_queue_t* queue) {
     SetEvent(queue->not_empty);
     SetEvent(queue->not_full);
     
-    /* 等待锁释放 */
+    /* 等待锁释�?*/
     EnterCriticalSection(&queue->lock);
     
     /* 清理队列中的剩余请求 */
     write_request_t* request = queue->head;
     while (request) {
         write_request_t* next = request->next;
-        if (request->id) free(request->id);
-        if (request->data) free(request->data);
-        free(request);
+        if (request->id) AGENTOS_FREE(request->id);
+        if (request->data) AGENTOS_FREE(request->data);
+        AGENTOS_FREE(request);
         request = next;
     }
     
     LeaveCriticalSection(&queue->lock);
     
-    /* 销毁同步对象 */
+    /* 销毁同步对�?*/
     DeleteCriticalSection(&queue->lock);
     CloseHandle(queue->not_empty);
     CloseHandle(queue->not_full);
@@ -634,36 +638,36 @@ static void async_queue_destroy(async_queue_t* queue) {
     pthread_cond_broadcast(&queue->not_empty);
     pthread_cond_broadcast(&queue->not_full);
     
-    /* 等待锁释放 */
+    /* 等待锁释�?*/
     pthread_mutex_lock(&queue->lock);
     
     /* 清理队列中的剩余请求 */
     write_request_t* request = queue->head;
     while (request) {
         write_request_t* next = request->next;
-        if (request->id) free(request->id);
-        if (request->data) free(request->data);
-        free(request);
+        if (request->id) AGENTOS_FREE(request->id);
+        if (request->data) AGENTOS_FREE(request->data);
+        AGENTOS_FREE(request);
         request = next;
     }
     
     pthread_mutex_unlock(&queue->lock);
     
-    /* 销毁同步对象 */
+    /* 销毁同步对�?*/
     pthread_mutex_destroy(&queue->lock);
     pthread_cond_destroy(&queue->not_empty);
     pthread_cond_destroy(&queue->not_full);
 #endif
     
-    free(queue);
+    AGENTOS_FREE(queue);
 }
 
 /**
- * @brief 入队写入请求（带超时）
+ * @brief 入队写入请求（带超时�?
  * @param queue 队列
  * @param request 请求
  * @param timeout_ms 超时时间（毫秒）
- * @return AGENTOS_SUCCESS 成功，其他为错误码
+ * @return AGENTOS_SUCCESS 成功，其他为错误�?
  */
 static agentos_error_t async_queue_enqueue(async_queue_t* queue, write_request_t* request, 
                                            uint32_t timeout_ms) {
@@ -680,13 +684,13 @@ static agentos_error_t async_queue_enqueue(async_queue_t* queue, write_request_t
     
     EnterCriticalSection(&queue->lock);
     
-    /* 检查队列是否已满 */
+    /* 检查队列是否已�?*/
     if (queue->count >= queue->capacity) {
         LeaveCriticalSection(&queue->lock);
         return AGENTOS_EBUSY;
     }
     
-    /* 添加请求到队列尾部 */
+    /* 添加请求到队列尾�?*/
     request->next = NULL;
     if (queue->tail) {
         queue->tail->next = request;
@@ -698,15 +702,15 @@ static agentos_error_t async_queue_enqueue(async_queue_t* queue, write_request_t
     queue->count++;
     queue->total_enqueued++;
     
-    /* 更新峰值队列深度 */
+    /* 更新峰值队列深�?*/
     /* 注意：峰值跟踪在外部进行 */
     
-    /* 如果队列从空变为非空，触发非空事件 */
+    /* 如果队列从空变为非空，触发非空事�?*/
     if (queue->count == 1) {
         SetEvent(queue->not_empty);
     }
     
-    /* 如果队列已满，重置非满事件 */
+    /* 如果队列已满，重置非满事�?*/
     if (queue->count >= queue->capacity) {
         ResetEvent(queue->not_full);
     }
@@ -753,7 +757,7 @@ static agentos_error_t async_queue_enqueue(async_queue_t* queue, write_request_t
         return AGENTOS_ESHUTDOWN;
     }
     
-    /* 添加请求到队列尾部 */
+    /* 添加请求到队列尾�?*/
     request->next = NULL;
     if (queue->tail) {
         queue->tail->next = request;
@@ -777,7 +781,7 @@ static agentos_error_t async_queue_enqueue(async_queue_t* queue, write_request_t
 }
 
 /**
- * @brief 出队写入请求（带超时）
+ * @brief 出队写入请求（带超时�?
  * @param queue 队列
  * @param timeout_ms 超时时间（毫秒）
  * @return 请求指针，失败返回NULL
@@ -796,13 +800,13 @@ static write_request_t* async_queue_dequeue(async_queue_t* queue, uint32_t timeo
     
     EnterCriticalSection(&queue->lock);
     
-    /* 检查队列是否为空 */
+    /* 检查队列是否为�?*/
     if (queue->count == 0 || queue->shutdown) {
         LeaveCriticalSection(&queue->lock);
         return NULL;
     }
     
-    /* 从队列头部取出请求 */
+    /* 从队列头部取出请�?*/
     write_request_t* request = queue->head;
     if (request) {
         queue->head = request->next;
@@ -813,7 +817,7 @@ static write_request_t* async_queue_dequeue(async_queue_t* queue, uint32_t timeo
         queue->count--;
         queue->total_dequeued++;
         
-        /* 如果队列从满变为非满，触发非满事件 */
+        /* 如果队列从满变为非满，触发非满事�?*/
         if (queue->count == queue->capacity - 1) {
             SetEvent(queue->not_full);
         }
@@ -866,7 +870,7 @@ static write_request_t* async_queue_dequeue(async_queue_t* queue, uint32_t timeo
         return NULL;
     }
     
-    /* 从队列头部取出请求 */
+    /* 从队列头部取出请�?*/
     write_request_t* request = queue->head;
     if (request) {
         queue->head = request->next;
@@ -894,14 +898,14 @@ static write_request_t* async_queue_dequeue(async_queue_t* queue, uint32_t timeo
 #ifdef _WIN32
 /**
  * @brief Windows工作线程入口函数
- * @param param 线程参数（worker_context_t*）
+ * @param param 线程参数（worker_context_t*�?
  * @return 线程退出码
  */
 static DWORD WINAPI worker_thread_func(LPVOID param) {
 #else
 /**
  * @brief POSIX工作线程入口函数
- * @param param 线程参数（worker_context_t*）
+ * @param param 线程参数（worker_context_t*�?
  * @return 线程退出码
  */
 static void* worker_thread_func(void* param) {
@@ -918,10 +922,10 @@ static void* worker_thread_func(void* param) {
     AGENTOS_LOG_INFO("Storage worker thread started: %d", ctx->worker_id);
     
     while (ctx->running) {
-        /* 从队列获取请求 */
+        /* 从队列获取请�?*/
         write_request_t* request = async_queue_dequeue(ctx->queue, 100);
         if (!request) {
-            /* 队列为空或超时，检查是否需要退出 */
+            /* 队列为空或超时，检查是否需要退�?*/
             if (!ctx->running) break;
             continue;
         }
@@ -970,9 +974,9 @@ static void* worker_thread_func(void* param) {
         }
         
         /* 释放请求资源 */
-        if (request->id) free(request->id);
-        if (request->data) free(request->data);
-        free(request);
+        if (request->id) AGENTOS_FREE(request->id);
+        if (request->data) AGENTOS_FREE(request->data);
+        AGENTOS_FREE(request);
     }
     
     AGENTOS_LOG_INFO("Storage worker thread stopped: %d", ctx->worker_id);
@@ -987,85 +991,85 @@ static void* worker_thread_func(void* param) {
 /* ==================== 公共API实现 ==================== */
 
 /**
- * @brief 创建生产级异步存储引擎
- * @param config 配置参数
+ * @brief 创建生产级异步存储引�?
+ * @param manager 配置参数
  * @param out_engine 输出引擎句柄
  * @return agentos_error_t
  */
 agentos_error_t agentos_layer1_raw_create_production(
-    const agentos_layer1_raw_config_t* config,
+    const agentos_layer1_raw_config_t* manager,
     agentos_layer1_raw_t** out_engine) {
-    if (!config || !out_engine || !config->storage_path) {
+    if (!manager || !out_engine || !manager->storage_path) {
         return AGENTOS_EINVAL;
     }
     
     /* 创建引擎结构 */
-    agentos_layer1_raw_t* engine = (agentos_layer1_raw_t*)calloc(1, sizeof(agentos_layer1_raw_t));
+    agentos_layer1_raw_t* engine = (agentos_layer1_raw_t*)AGENTOS_CALLOC(1, sizeof(agentos_layer1_raw_t));
     if (!engine) {
         AGENTOS_LOG_ERROR("Failed to allocate storage engine");
         return AGENTOS_ENOMEM;
     }
     
-    engine->inner = (storage_engine_inner_t*)calloc(1, sizeof(storage_engine_inner_t));
+    engine->inner = (storage_engine_inner_t*)AGENTOS_CALLOC(1, sizeof(storage_engine_inner_t));
     if (!engine->inner) {
         AGENTOS_LOG_ERROR("Failed to allocate storage engine inner");
-        free(engine);
+        AGENTOS_FREE(engine);
         return AGENTOS_ENOMEM;
     }
     
-    /* 初始化引擎内部状态 */
-    strncpy(engine->inner->storage_path, config->storage_path, 
+    /* 初始化引擎内部状�?*/
+    strncpy(engine->inner->storage_path, manager->storage_path, 
             sizeof(engine->inner->storage_path) - 1);
     engine->inner->storage_path[sizeof(engine->inner->storage_path) - 1] = '\0';
     
     /* 确保存储目录存在 */
-    agentos_error_t dir_result = ensure_directory_exists(config->storage_path);
+    agentos_error_t dir_result = ensure_directory_exists(manager->storage_path);
     if (dir_result != AGENTOS_SUCCESS) {
-        AGENTOS_LOG_ERROR("Failed to create storage directory: %s", config->storage_path);
-        free(engine->inner);
-        free(engine);
+        AGENTOS_LOG_ERROR("Failed to create storage directory: %s", manager->storage_path);
+        AGENTOS_FREE(engine->inner);
+        AGENTOS_FREE(engine);
         return dir_result;
     }
     
     /* 创建异步队列 */
-    size_t queue_capacity = config->queue_size > 0 ? config->queue_size : DEFAULT_ASYNC_QUEUE_SIZE;
+    size_t queue_capacity = manager->queue_size > 0 ? manager->queue_size : DEFAULT_ASYNC_QUEUE_SIZE;
     engine->inner->queue = async_queue_create(queue_capacity);
     if (!engine->inner->queue) {
         AGENTOS_LOG_ERROR("Failed to create async queue");
-        free(engine->inner);
-        free(engine);
+        AGENTOS_FREE(engine->inner);
+        AGENTOS_FREE(engine);
         return AGENTOS_ENOMEM;
     }
     
-    /* 初始化工作线程 */
-    size_t worker_count = config->async_workers > 0 ? config->async_workers : DEFAULT_WORKER_THREADS;
+    /* 初始化工作线�?*/
+    size_t worker_count = manager->async_workers > 0 ? manager->async_workers : DEFAULT_WORKER_THREADS;
     engine->inner->worker_count = worker_count;
     
-    engine->inner->workers = (worker_context_t**)calloc(worker_count, sizeof(worker_context_t*));
+    engine->inner->workers = (worker_context_t**)AGENTOS_CALLOC(worker_count, sizeof(worker_context_t*));
     if (!engine->inner->workers) {
         AGENTOS_LOG_ERROR("Failed to allocate worker context array");
         async_queue_destroy(engine->inner->queue);
-        free(engine->inner);
-        free(engine);
+        AGENTOS_FREE(engine->inner);
+        AGENTOS_FREE(engine);
         return AGENTOS_ENOMEM;
     }
     
 #ifdef _WIN32
-    engine->inner->worker_threads = (HANDLE*)calloc(worker_count, sizeof(HANDLE));
+    engine->inner->worker_threads = (HANDLE*)AGENTOS_CALLOC(worker_count, sizeof(HANDLE));
 #else
-    engine->inner->worker_threads = (pthread_t*)calloc(worker_count, sizeof(pthread_t));
+    engine->inner->worker_threads = (pthread_t*)AGENTOS_CALLOC(worker_count, sizeof(pthread_t));
 #endif
     
     if (!engine->inner->worker_threads) {
         AGENTOS_LOG_ERROR("Failed to allocate worker thread array");
-        free(engine->inner->workers);
+        AGENTOS_FREE(engine->inner->workers);
         async_queue_destroy(engine->inner->queue);
-        free(engine->inner);
-        free(engine);
+        AGENTOS_FREE(engine->inner);
+        AGENTOS_FREE(engine);
         return AGENTOS_ENOMEM;
     }
     
-    /* 创建可观测性句柄 */
+    /* 创建可观测性句�?*/
     engine->inner->obs = agentos_observability_create();
     if (engine->inner->obs) {
         /* 注册存储引擎指标 */
@@ -1086,16 +1090,16 @@ agentos_error_t agentos_layer1_raw_create_production(
     /* 生成引擎ID */
     engine->inner->engine_id = agentos_generate_uuid();
     if (!engine->inner->engine_id) {
-        engine->inner->engine_id = strdup("storage_engine_default");
+        engine->inner->engine_id = AGENTOS_STRDUP("storage_engine_default");
     }
     
-    /* 初始化健康状态 */
+    /* 初始化健康状�?*/
     engine->inner->healthy = 1;
     engine->inner->last_error = NULL;
     
     /* 启动工作线程 */
     for (size_t i = 0; i < worker_count; i++) {
-        worker_context_t* worker = (worker_context_t*)calloc(1, sizeof(worker_context_t));
+        worker_context_t* worker = (worker_context_t*)AGENTOS_CALLOC(1, sizeof(worker_context_t));
         if (!worker) {
             AGENTOS_LOG_ERROR("Failed to allocate worker context %zu", i);
             continue;
@@ -1103,7 +1107,7 @@ agentos_error_t agentos_layer1_raw_create_production(
         
         worker->worker_id = (int)i;
         worker->queue = engine->inner->queue;
-        worker->storage_path = strdup(config->storage_path);
+        worker->storage_path = AGENTOS_STRDUP(manager->storage_path);
         worker->running = 1;
         worker->processed_count = 0;
         worker->success_count = 0;
@@ -1119,22 +1123,22 @@ agentos_error_t agentos_layer1_raw_create_production(
         if (!engine->inner->worker_threads[i]) {
             AGENTOS_LOG_ERROR("Failed to create worker thread %zu", i);
             worker->running = 0;
-            free(worker->storage_path);
-            free(worker);
+            AGENTOS_FREE(worker->storage_path);
+            AGENTOS_FREE(worker);
             engine->inner->workers[i] = NULL;
         }
 #else
         if (pthread_create(&engine->inner->worker_threads[i], NULL, worker_thread_func, worker) != 0) {
             AGENTOS_LOG_ERROR("Failed to create worker thread %zu", i);
             worker->running = 0;
-            free(worker->storage_path);
-            free(worker);
+            AGENTOS_FREE(worker->storage_path);
+            AGENTOS_FREE(worker);
             engine->inner->workers[i] = NULL;
         }
 #endif
     }
     
-    /* 检查是否有成功创建的线程 */
+    /* 检查是否有成功创建的线�?*/
     int active_threads = 0;
     for (size_t i = 0; i < worker_count; i++) {
         if (engine->inner->workers[i]) {
@@ -1145,12 +1149,12 @@ agentos_error_t agentos_layer1_raw_create_production(
     if (active_threads == 0) {
         AGENTOS_LOG_ERROR("No worker threads created successfully");
         if (engine->inner->obs) agentos_observability_destroy(engine->inner->obs);
-        if (engine->inner->engine_id) free(engine->inner->engine_id);
-        free(engine->inner->worker_threads);
-        free(engine->inner->workers);
+        if (engine->inner->engine_id) AGENTOS_FREE(engine->inner->engine_id);
+        AGENTOS_FREE(engine->inner->worker_threads);
+        AGENTOS_FREE(engine->inner->workers);
         async_queue_destroy(engine->inner->queue);
-        free(engine->inner);
-        free(engine);
+        AGENTOS_FREE(engine->inner);
+        AGENTOS_FREE(engine);
         return AGENTOS_EIO;
     }
     
@@ -1165,7 +1169,7 @@ agentos_error_t agentos_layer1_raw_create_production(
 }
 
 /**
- * @brief 销毁存储引擎
+ * @brief 销毁存储引�?
  * @param engine 引擎句柄
  */
 void agentos_layer1_raw_destroy_production(agentos_layer1_raw_t* engine) {
@@ -1184,11 +1188,11 @@ void agentos_layer1_raw_destroy_production(agentos_layer1_raw_t* engine) {
         }
     }
     
-    /* 销毁队列（这会唤醒所有等待的线程） */
+    /* 销毁队列（这会唤醒所有等待的线程�?*/
     async_queue_destroy(engine->inner->queue);
     engine->inner->queue = NULL;
     
-    /* 等待工作线程退出 */
+    /* 等待工作线程退�?*/
 #ifdef _WIN32
     if (engine->inner->worker_threads) {
         WaitForMultipleObjects((DWORD)engine->inner->worker_count, 
@@ -1210,52 +1214,52 @@ void agentos_layer1_raw_destroy_production(agentos_layer1_raw_t* engine) {
     }
 #endif
     
-    /* 清理工作线程上下文 */
+    /* 清理工作线程上下�?*/
     if (engine->inner->workers) {
         for (size_t i = 0; i < engine->inner->worker_count; i++) {
             if (engine->inner->workers[i]) {
                 if (engine->inner->workers[i]->storage_path) {
-                    free(engine->inner->workers[i]->storage_path);
+                    AGENTOS_FREE(engine->inner->workers[i]->storage_path);
                 }
-                free(engine->inner->workers[i]);
+                AGENTOS_FREE(engine->inner->workers[i]);
             }
         }
-        free(engine->inner->workers);
+        AGENTOS_FREE(engine->inner->workers);
     }
     
     /* 清理线程数组 */
     if (engine->inner->worker_threads) {
-        free(engine->inner->worker_threads);
+        AGENTOS_FREE(engine->inner->worker_threads);
     }
     
-    /* 清理可观测性资源 */
+    /* 清理可观测性资�?*/
     if (engine->inner->obs) {
         agentos_observability_destroy(engine->inner->obs);
     }
     
     /* 清理引擎ID */
     if (engine->inner->engine_id) {
-        free(engine->inner->engine_id);
+        AGENTOS_FREE(engine->inner->engine_id);
     }
     
-    /* 清理最后错误信息 */
+    /* 清理最后错误信�?*/
     if (engine->inner->last_error) {
-        free(engine->inner->last_error);
+        AGENTOS_FREE(engine->inner->last_error);
     }
     
-    free(engine->inner);
-    free(engine);
+    AGENTOS_FREE(engine->inner);
+    AGENTOS_FREE(engine);
     
     AGENTOS_LOG_INFO("Production storage engine destroyed");
 }
 
 /**
- * @brief 异步写入数据（生产级）
+ * @brief 异步写入数据（生产级�?
  * @param engine 引擎句柄
  * @param id 记录ID
  * @param data 数据
  * @param len 数据长度
- * @param priority 优先级（0-255）
+ * @param priority 优先级（0-255�?
  * @param timeout_ms 超时时间（毫秒）
  * @return agentos_error_t
  */
@@ -1270,4 +1274,4 @@ agentos_error_t agentos_layer1_raw_write_async_production(
         return AGENTOS_EINVAL;
     }
     
-    /* 检查
+    /* 检

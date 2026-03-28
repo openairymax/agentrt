@@ -1,4 +1,4 @@
-# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+﻿﻿# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Docker Compose 配置文件 - Staging 环境
 # 用于预发布环境和生产部署前的验证
 
@@ -44,7 +44,7 @@ services:
     volumes:
       - staging-logs:/var/log/agentos:rw
       - staging-data:/var/lib/agentos:rw
-      - ../../config/staging:/etc/agentos:ro
+      - ../../manager/staging:/etc/agentos:ro
 
     # 网络配置
     networks:
@@ -62,7 +62,7 @@ services:
     command: >
       bash -c "
         echo 'Starting AgentOS Scripts (Staging)...';
-        python3 -m scripts.core.cli --config /etc/agentos/config.yaml;
+        python3 -m scripts.core.cli --manager /etc/agentos/manager.yaml;
       "
 
   # ==================== 辅助服务 ====================
@@ -141,7 +141,7 @@ services:
 
     # 配置文件
     volumes:
-      - ./config/otel-collector-staging.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - ./manager/otel-collector-staging.yaml:/etc/otelcol-contrib/manager.yaml:ro
 
     # 网络配置
     networks:
@@ -199,5 +199,5 @@ networks:
   agentos-staging-network:
     driver: bridge
     ipam:
-      config:
+      manager:
         - subnet: 172.29.0.0/16

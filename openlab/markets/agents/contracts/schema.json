@@ -1,0 +1,157 @@
+﻿{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Agent Contract Schema",
+  "description": "Schema for validating Agent contracts in openlab Market",
+  "type": "object",
+  "required": [
+    "agent_id",
+    "agent_type",
+    "version",
+    "capabilities",
+    "description",
+    "config_schema",
+    "entry_point"
+  ],
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "description": "Unique identifier for the agent",
+      "pattern": "^[a-z0-9-]+$",
+      "minLength": 3,
+      "maxLength": 100
+    },
+    "agent_type": {
+      "type": "string",
+      "description": "Semantic type of the agent",
+      "enum": [
+        "architect",
+        "backend",
+        "frontend",
+        "devops",
+        "security",
+        "tester",
+        "product_manager",
+        "data_analyst",
+        "researcher",
+        "custom"
+      ]
+    },
+    "version": {
+      "type": "string",
+      "description": "Agent version in semantic versioning format",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9]+)?$"
+    },
+    "capabilities": {
+      "type": "array",
+      "description": "List of capabilities this agent provides",
+      "items": {
+        "type": "string",
+        "enum": [
+          "code_generation",
+          "code_review",
+          "architecture_design",
+          "data_analysis",
+          "documentation",
+          "test_generation",
+          "deployment",
+          "monitoring",
+          "security_audit",
+          "api_integration",
+          "database_design",
+          "frontend_development",
+          "backend_development",
+          "devops_automation",
+          "research_analysis"
+        ]
+      },
+      "minItems": 1
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of the agent",
+      "minLength": 10,
+      "maxLength": 1000
+    },
+    "config_schema": {
+      "type": "object",
+      "description": "JSON Schema for agent configuration",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "object"
+        },
+        "properties": {
+          "type": "object"
+        },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["type", "properties"]
+    },
+    "entry_point": {
+      "type": "string",
+      "description": "Python import path to the agent class",
+      "pattern": "^[a-zA-Z0-9_.]+:[a-zA-Z0-9_]+$"
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "List of required dependencies",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": ["name"]
+      }
+    },
+    "resource_requirements": {
+      "type": "object",
+      "description": "Resource requirements for the agent",
+      "properties": {
+        "memory_mb": {
+          "type": "integer",
+          "minimum": 10
+        },
+        "cpu_cores": {
+          "type": "number",
+          "minimum": 0.1
+        },
+        "disk_mb": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "tags": {
+      "type": "object",
+      "description": "Key-value tags for discovery",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "license": {
+      "type": "string",
+      "description": "License information",
+      "enum": ["MIT", "Apache-2.0", "GPL-3.0", "BSD-3-Clause", "Proprietary"]
+    },
+    "author": {
+      "type": "string",
+      "description": "Author or organization name"
+    },
+    "repository": {
+      "type": "string",
+      "description": "URL to source code repository",
+      "format": "uri"
+    }
+  },
+  "additionalProperties": false
+}

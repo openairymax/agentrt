@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 安装脚本 (Linux/macOS)
 # 遵循 AgentOS 架构设计原则：反馈闭环、最小特权、安全内�?
@@ -11,7 +11,7 @@ set -euo pipefail
 ###############################################################################
 # 来源依赖
 ###############################################################################
-AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")
+AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"pwd)")
 AGENTOS_SCRIPTS_DIR="$(dirname "$AGENTOS_SCRIPT_DIR")"
 AGENTOS_PROJECT_ROOT="$(dirname "$AGENTOS_SCRIPTS_DIR")"
 

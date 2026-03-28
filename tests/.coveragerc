@@ -1,11 +1,11 @@
-# AgentOS 测试覆盖率配置
+﻿# AgentOS 测试覆盖率配置
 # Version: 1.0.0.6
 # Last updated: 2026-03-22
 
 [run]
 # 运行配置
 source = 
-    ../tools/python/agentos
+    ../toolkit/python/agentos
     ../atoms
 branch = True
 parallel = True
@@ -114,5 +114,5 @@ output = reports/coverage/lcov.info
 [paths]
 # 路径映射
 source =
-    tools/python/agentos
+    toolkit/python/agentos
     atoms/

@@ -1,12 +1,16 @@
 /**
  * @file buffer.c
- * @brief IPC 消息缓冲区
+ * @brief IPC 消息缓冲�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "ipc.h"
 #include "mem.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 
 struct agentos_ipc_buffer {
@@ -16,12 +20,12 @@ struct agentos_ipc_buffer {
 };
 
 agentos_ipc_buffer_t* agentos_ipc_buffer_create(size_t capacity) {
-    agentos_ipc_buffer_t* buf = (agentos_ipc_buffer_t*)calloc(1, sizeof(agentos_ipc_buffer_t));
+    agentos_ipc_buffer_t* buf = (agentos_ipc_buffer_t*)AGENTOS_CALLOC(1, sizeof(agentos_ipc_buffer_t));
     if (!buf) return NULL;
 
     buf->data = (uint8_t*)agentos_mem_alloc(capacity);
     if (!buf->data) {
-        free(buf);
+        AGENTOS_FREE(buf);
         return NULL;
     }
     buf->capacity = capacity;
@@ -32,7 +36,7 @@ agentos_ipc_buffer_t* agentos_ipc_buffer_create(size_t capacity) {
 void agentos_ipc_buffer_destroy(agentos_ipc_buffer_t* buf) {
     if (!buf) return;
     if (buf->data) agentos_mem_free(buf->data);
-    free(buf);
+    AGENTOS_FREE(buf);
 }
 
 agentos_error_t agentos_ipc_buffer_write(

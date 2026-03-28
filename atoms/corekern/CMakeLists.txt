@@ -14,6 +14,8 @@ set(COREKERN_SOURCES
     src/mem/pool.c
     src/mem/guard.c
     src/task/scheduler.c
+    src/task/scheduler_core.c
+    src/task/scheduler_platform.c
     src/task/sync.c
     src/task/thread.c
     src/time/clock.c
@@ -21,6 +23,13 @@ set(COREKERN_SOURCES
     src/time/event.c
     src/observability/observability.c
 )
+
+# 平台特定调度器文件
+if(WIN32)
+    list(APPEND COREKERN_SOURCES src/task/scheduler_windows.c)
+else()
+    list(APPEND COREKERN_SOURCES src/task/scheduler_posix.c)
+endif()
 
 add_library(agentos_core STATIC ${COREKERN_SOURCES})
 

@@ -1,4 +1,4 @@
-# AgentOS 开发辅助脚本
+﻿﻿# AgentOS 开发辅助脚本
 
 **版本**: v1.0.0.6  
 **最后更新**: 2026-03-21  
@@ -49,13 +49,13 @@ python generate_docs.py --api
 python generate_docs.py --architecture
 
 # 指定输出目录
-python generate_docs.py --output ../partdocs/generated
+python generate_docs.py --output ../paper/generated
 ```
 
 **生成内容**:
 
 ```
-partdocs/generated/
+paper/generated/
 ├── api/                    # API 参考手册
 │   ├── corekern/          # 微内核 API
 │   ├── coreloopthree/     # 运行时 API
@@ -84,7 +84,7 @@ doxygen:
   warnings_as_errors: true
   
 output:
-  directory: ../partdocs/generated
+  directory: ../paper/generated
   clean_before: true
   include_examples: true
 ```
@@ -122,7 +122,7 @@ python update_registry.py --verify
 **注册表结构**:
 
 ```yaml
-# config/agent/registry.yaml
+# manager/agent/registry.yaml
 agents:
   - id: agent_architect_001
     name: 架构师智能体
@@ -140,7 +140,7 @@ agents:
       - skill_testing
     status: active
 
-# config/skill/registry.yaml
+# manager/skill/registry.yaml
 skills:
   - id: skill_design_pattern
     name: 设计模式
@@ -285,10 +285,10 @@ cd ../dev
 **解决**:
 ```bash
 # 设置配置文件路径
-export AGENTOS_CONFIG=$(pwd)/config/kernel/settings.yaml
+export AGENTOS_CONFIG=$(pwd)/manager/kernel/settings.yaml
 
 # 或添加到 ~/.bashrc
-echo 'export AGENTOS_CONFIG=/path/to/config.yaml' >> ~/.bashrc
+echo 'export AGENTOS_CONFIG=/path/to/manager.yaml' >> ~/.bashrc
 source ~/.bashrc
 ```
 
@@ -325,7 +325,7 @@ jobs:
       uses: peaceiris/actions-gh-pages@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./partdocs/generated
+        publish_dir: ./paper/generated
 ```
 
 ### 示例测试集成
@@ -364,20 +364,20 @@ set -euo pipefail
 echo "=== 自动更新注册表 ==="
 
 # 扫描新增的 Agent
-find openhub/app -name "agent.json" | while read file; do
+find openlab/app -name "agent.json" | while read file; do
     echo "发现新 Agent: $file"
     python update_registry.py --add-agent "$file"
 done
 
 # 扫描新增的 Skill
-find openhub/contrib/skills -name "skill.json" | while read file; do
+find openlab/contrib/skills -name "skill.json" | while read file; do
     echo "发现新 Skill: $file"
     python update_registry.py --add-skill "$file"
 done
 
 # 提交变更
-git add config/agent/registry.yaml
-git add config/skill/registry.yaml
+git add manager/agent/registry.yaml
+git add manager/skill/registry.yaml
 git commit -m "chore: 更新组件注册表 $(date +%Y-%m-%d)"
 ```
 
@@ -394,8 +394,8 @@ git commit -m "chore: 更新组件注册表 $(date +%Y-%m-%d)"
 2. **限制访问权限**:
 ```bash
 # 设置文档目录权限
-chmod -R 755 partdocs/generated
-chown -R agentos:agentos partdocs/generated
+chmod -R 755 paper/generated
+chown -R agentos:agentos paper/generated
 ```
 
 ### 注册表安全
@@ -432,7 +432,7 @@ access_control:
 ## 📞 相关文档
 
 - [主 README](../README.md) - 脚本总览
-- [架构文档](../../partdocs/architecture/README.md) - 系统设计
+- [架构文档](../../paper/architecture/README.md) - 系统设计
 - [贡献指南](../../CONTRIBUTING.md) - 如何贡献代码
 
 ---
@@ -450,3 +450,4 @@ access_control:
 
 *From data intelligence emerges.*  
 *始于数据，终于智能。*
+

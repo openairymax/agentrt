@@ -8,6 +8,10 @@
 #include "agentos.h"
 #include "logger.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 #include <cjson/cJSON.h>
 
@@ -23,7 +27,7 @@ static session_t* sessions = NULL;
 static agentos_mutex_t* session_lock = NULL;
 
 /**
- * @brief 线程安全地确保会话锁已初始化（使用 once 模式）
+ * @brief 线程安全地确保会话锁已初始化（使�?once 模式�?
  */
 static void ensure_lock(void) {
     if (!session_lock) {
@@ -36,7 +40,7 @@ static void ensure_lock(void) {
 }
 
 /**
- * @brief 创建新会话
+ * @brief 创建新会�?
  */
 agentos_error_t agentos_sys_session_create(const char* metadata, char** out_session_id) {
     if (!out_session_id) return AGENTOS_EINVAL;
@@ -45,21 +49,21 @@ agentos_error_t agentos_sys_session_create(const char* metadata, char** out_sess
     static uint64_t counter = 0;
     char id_buf[64];
     snprintf(id_buf, sizeof(id_buf), "sess_%llu", (unsigned long long)__sync_fetch_and_add(&counter, 1));
-    char* id = strdup(id_buf);
+    char* id = AGENTOS_STRDUP(id_buf);
     if (!id) return AGENTOS_ENOMEM;
 
-    session_t* s = (session_t*)calloc(1, sizeof(session_t));
+    session_t* s = (session_t*)AGENTOS_CALLOC(1, sizeof(session_t));
     if (!s) {
-        free(id);
+        AGENTOS_FREE(id);
         return AGENTOS_ENOMEM;
     }
     s->session_id = id;
     if (metadata) {
-        s->metadata = strdup(metadata);
+        s->metadata = AGENTOS_STRDUP(metadata);
         if (!s->metadata) {
-            free(s->session_id);
-            free(s);
-            free(id);
+            AGENTOS_FREE(s->session_id);
+            AGENTOS_FREE(s);
+            AGENTOS_FREE(id);
             return AGENTOS_ENOMEM;
         }
     }
@@ -71,7 +75,7 @@ agentos_error_t agentos_sys_session_create(const char* metadata, char** out_sess
     sessions = s;
     agentos_mutex_unlock(session_lock);
 
-    *out_session_id = strdup(id);
+    *out_session_id = AGENTOS_STRDUP(id);
     if (!*out_session_id) {
         agentos_mutex_lock(session_lock);
         session_t** pp = &sessions;
@@ -80,10 +84,10 @@ agentos_error_t agentos_sys_session_create(const char* metadata, char** out_sess
             pp = &(*pp)->next;
         }
         agentos_mutex_unlock(session_lock);
-        free(s->session_id);
-        free(s->metadata);
-        free(s);
-        free(id);
+        AGENTOS_FREE(s->session_id);
+        AGENTOS_FREE(s->metadata);
+        AGENTOS_FREE(s);
+        AGENTOS_FREE(id);
         return AGENTOS_ENOMEM;
     }
     return AGENTOS_SUCCESS;
@@ -133,9 +137,9 @@ agentos_error_t agentos_sys_session_close(const char* session_id) {
         if (strcmp((*p)->session_id, session_id) == 0) {
             session_t* tmp = *p;
             *p = tmp->next;
-            free(tmp->session_id);
-            if (tmp->metadata) free(tmp->metadata);
-            free(tmp);
+            AGENTOS_FREE(tmp->session_id);
+            if (tmp->metadata) AGENTOS_FREE(tmp->metadata);
+            AGENTOS_FREE(tmp);
             agentos_mutex_unlock(session_lock);
             return AGENTOS_SUCCESS;
         }
@@ -146,7 +150,7 @@ agentos_error_t agentos_sys_session_close(const char* session_id) {
 }
 
 /**
- * @brief 列出所有会话
+ * @brief 列出所有会�?
  */
 agentos_error_t agentos_sys_session_list(char*** out_sessions, size_t* out_count) {
     if (!out_sessions || !out_count) return AGENTOS_EINVAL;
@@ -155,7 +159,7 @@ agentos_error_t agentos_sys_session_list(char*** out_sessions, size_t* out_count
     size_t count = 0;
     session_t* s = sessions;
     while (s) { count++; s = s->next; }
-    char** list = (char**)calloc(count, sizeof(char*));
+    char** list = (char**)AGENTOS_CALLOC(count, sizeof(char*));
     if (!list) {
         agentos_mutex_unlock(session_lock);
         return AGENTOS_ENOMEM;
@@ -163,10 +167,10 @@ agentos_error_t agentos_sys_session_list(char*** out_sessions, size_t* out_count
     s = sessions;
     size_t i = 0;
     while (s) {
-        list[i] = strdup(s->session_id);
+        list[i] = AGENTOS_STRDUP(s->session_id);
         if (!list[i]) {
-            for (size_t j = 0; j < i; j++) free(list[j]);
-            free(list);
+            for (size_t j = 0; j < i; j++) AGENTOS_FREE(list[j]);
+            AGENTOS_FREE(list);
             agentos_mutex_unlock(session_lock);
             return AGENTOS_ENOMEM;
         }

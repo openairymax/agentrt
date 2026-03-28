@@ -21,9 +21,9 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
 ]
 include = [
-    "config/*.yaml",
+    "manager/*.yaml",
     "scripts/*.py",
-    "partdocs/**/*.md",
+    "manuals/**/*.md",
 ]
 
 [tool.poetry.dependencies]
@@ -124,7 +124,7 @@ exclude = '''
   | build
   | dist
   | atoms
-  | backs
+  | daemon
 )/
 '''
 
@@ -132,7 +132,7 @@ exclude = '''
 profile = "black"
 multi_line_output = 3
 line_length = 100
-skip = ["atoms", "backs", "build", "dist", ".venv"]
+skip = ["atoms", "daemon", "build", "dist", ".venv"]
 
 [tool.mypy]
 python_version = "3.9"
@@ -144,7 +144,7 @@ check_untyped_defs = true
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
-exclude = ["atoms/", "backs/", "build/", "dist/"]
+exclude = ["atoms/", "daemon/", "build/", "dist/"]
 
 [[tool.mypy.overrides]]
 module = "faiss.*"
@@ -182,3 +182,4 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "if TYPE_CHECKING:",
     "@abstractmethod",
+

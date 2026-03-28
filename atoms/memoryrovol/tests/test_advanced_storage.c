@@ -6,6 +6,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 #include <assert.h>
 
@@ -54,12 +58,12 @@ int test_advanced_storage_basic(void) {
     /* 验证数据 */
     if (read_len != data_len || memcmp(read_data, test_data, data_len) != 0) {
         printf("    读取的数据不匹配\n");
-        free(read_data);
+        AGENTOS_FREE(read_data);
         agentos_layer1_raw_destroy(engine);
         return 1;
     }
     
-    free(read_data);
+    AGENTOS_FREE(read_data);
     agentos_layer1_raw_destroy(engine);
     
     printf("    高级存储基本功能测试通过\n");
@@ -82,7 +86,7 @@ int test_advanced_storage_edge_cases(void) {
         if (err == AGENTOS_SUCCESS) {
             err = agentos_layer1_raw_write(engine, NULL, "data", 5);
             if (err != AGENTOS_EINVAL) {
-                printf("    空ID应该返回EINVAL，实际返回: %d\n", err);
+                printf("    空ID应该返回EINVAL，实际返�? %d\n", err);
                 failures++;
             }
             agentos_layer1_raw_destroy(engine);
@@ -96,25 +100,25 @@ int test_advanced_storage_edge_cases(void) {
         if (err == AGENTOS_SUCCESS) {
             err = agentos_layer1_raw_write(engine, "test_id", NULL, 0);
             if (err != AGENTOS_EINVAL) {
-                printf("    空数据应该返回EINVAL，实际返回: %d\n", err);
+                printf("    空数据应该返回EINVAL，实际返�? %d\n", err);
                 failures++;
             }
             agentos_layer1_raw_destroy(engine);
         }
     }
     
-    /* 测试3：非常大的数据（边界测试） */
+    /* 测试3：非常大的数据（边界测试�?*/
     {
         agentos_layer1_raw_t* engine = NULL;
         agentos_error_t err = agentos_layer1_raw_create("/tmp/test_storage4", 1024 * 1024, &engine);
         if (err == AGENTOS_SUCCESS) {
-            char* large_data = malloc(1024 * 1024);
+            char* large_data = AGENTOS_MALLOC(1024 * 1024);
             if (large_data) {
                 memset(large_data, 0xAA, 1024 * 1024);
                 err = agentos_layer1_raw_write(engine, "large_data", large_data, 1024 * 1024);
-                /* 可能成功也可能失败，取决于实现，但不应崩溃 */
-                printf("    大数据写入测试完成（返回码: %d）\n", err);
-                free(large_data);
+                /* 可能成功也可能失败，取决于实现，但不应崩�?*/
+                printf("    大数据写入测试完成（返回�? %d）\n", err);
+                AGENTOS_FREE(large_data);
             }
             agentos_layer1_raw_destroy(engine);
         }

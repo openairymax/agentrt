@@ -8,6 +8,10 @@
 #include "agentos.h"
 #include "logger.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 
 typedef struct agent_instance {
@@ -20,7 +24,7 @@ static agent_instance_t* agents = NULL;
 static agentos_mutex_t* agent_lock = NULL;
 
 /**
- * @brief 线程安全地确保 agent 锁已初始化
+ * @brief 线程安全地确�?agent 锁已初始�?
  */
 static void ensure_agent_lock(void) {
     if (!agent_lock) {
@@ -43,15 +47,15 @@ agentos_error_t agentos_sys_agent_spawn(const char* agent_spec, char** out_agent
     static int counter = 0;
     snprintf(id_buf, sizeof(id_buf), "agent_%d", __sync_fetch_and_add(&counter, 1));
 
-    agent_instance_t* inst = (agent_instance_t*)calloc(1, sizeof(agent_instance_t));
+    agent_instance_t* inst = (agent_instance_t*)AGENTOS_CALLOC(1, sizeof(agent_instance_t));
     if (!inst) return AGENTOS_ENOMEM;
 
-    inst->agent_id = strdup(id_buf);
-    inst->spec = strdup(agent_spec);
+    inst->agent_id = AGENTOS_STRDUP(id_buf);
+    inst->spec = AGENTOS_STRDUP(agent_spec);
     if (!inst->agent_id || !inst->spec) {
-        if (inst->agent_id) free(inst->agent_id);
-        if (inst->spec) free(inst->spec);
-        free(inst);
+        if (inst->agent_id) AGENTOS_FREE(inst->agent_id);
+        if (inst->spec) AGENTOS_FREE(inst->spec);
+        AGENTOS_FREE(inst);
         return AGENTOS_ENOMEM;
     }
 
@@ -60,7 +64,7 @@ agentos_error_t agentos_sys_agent_spawn(const char* agent_spec, char** out_agent
     agents = inst;
     agentos_mutex_unlock(agent_lock);
 
-    *out_agent_id = strdup(inst->agent_id);
+    *out_agent_id = AGENTOS_STRDUP(inst->agent_id);
     if (!*out_agent_id) {
         agentos_mutex_lock(agent_lock);
         agent_instance_t** pp = &agents;
@@ -69,16 +73,16 @@ agentos_error_t agentos_sys_agent_spawn(const char* agent_spec, char** out_agent
             pp = &(*pp)->next;
         }
         agentos_mutex_unlock(agent_lock);
-        free(inst->agent_id);
-        free(inst->spec);
-        free(inst);
+        AGENTOS_FREE(inst->agent_id);
+        AGENTOS_FREE(inst->spec);
+        AGENTOS_FREE(inst);
         return AGENTOS_ENOMEM;
     }
     return AGENTOS_SUCCESS;
 }
 
 /**
- * @brief 销毁 Agent 实例
+ * @brief 销�?Agent 实例
  */
 agentos_error_t agentos_sys_agent_kill(const char* agent_id) {
     if (!agent_id) return AGENTOS_EINVAL;
@@ -89,9 +93,9 @@ agentos_error_t agentos_sys_agent_kill(const char* agent_id) {
         if (strcmp((*p)->agent_id, agent_id) == 0) {
             agent_instance_t* tmp = *p;
             *p = tmp->next;
-            free(tmp->agent_id);
-            free(tmp->spec);
-            free(tmp);
+            AGENTOS_FREE(tmp->agent_id);
+            AGENTOS_FREE(tmp->spec);
+            AGENTOS_FREE(tmp);
             agentos_mutex_unlock(agent_lock);
             return AGENTOS_SUCCESS;
         }
@@ -102,7 +106,7 @@ agentos_error_t agentos_sys_agent_kill(const char* agent_id) {
 }
 
 /**
- * @brief 列出所有 Agent 实例
+ * @brief 列出所�?Agent 实例
  */
 agentos_error_t agentos_sys_agent_list(char*** out_agents, size_t* out_count) {
     if (!out_agents || !out_count) return AGENTOS_EINVAL;
@@ -111,7 +115,7 @@ agentos_error_t agentos_sys_agent_list(char*** out_agents, size_t* out_count) {
     size_t count = 0;
     agent_instance_t* a = agents;
     while (a) { count++; a = a->next; }
-    char** list = (char**)calloc(count, sizeof(char*));
+    char** list = (char**)AGENTOS_CALLOC(count, sizeof(char*));
     if (!list) {
         agentos_mutex_unlock(agent_lock);
         return AGENTOS_ENOMEM;
@@ -119,10 +123,10 @@ agentos_error_t agentos_sys_agent_list(char*** out_agents, size_t* out_count) {
     a = agents;
     size_t i = 0;
     while (a) {
-        list[i] = strdup(a->agent_id);
+        list[i] = AGENTOS_STRDUP(a->agent_id);
         if (!list[i]) {
-            for (size_t j = 0; j < i; j++) free(list[j]);
-            free(list);
+            for (size_t j = 0; j < i; j++) AGENTOS_FREE(list[j]);
+            AGENTOS_FREE(list);
             agentos_mutex_unlock(agent_lock);
             return AGENTOS_ENOMEM;
         }

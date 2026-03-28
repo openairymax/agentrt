@@ -38,7 +38,7 @@ void test_ipc_thread(void* arg) {
     
     printf("Thread received: %s\n", (char*)msg.data);
     
-    // 发送响应
+    // 发送响�?
     const char* response = "Hello from thread!";
     agentos_ipc_message_t resp_msg = {0};
     resp_msg.data = (void*)response;
@@ -56,7 +56,7 @@ void test_ipc_thread(void* arg) {
 int test_ipc_basic() {
     printf("Testing basic IPC functionality...\n");
     
-    // 初始化 IPC
+    // 初始�?IPC
     agentos_error_t err = agentos_ipc_init();
     if (err != AGENTOS_SUCCESS) {
         printf("Failed to initialize IPC: %d\n", err);
@@ -89,7 +89,7 @@ int test_ipc_basic() {
     // 等待线程启动
     agentos_task_sleep(100);
     
-    // 发送消息
+    // 发送消�?
     const char* message = "Hello from main!";
     agentos_ipc_message_t msg = {0};
     msg.data = (void*)message;
@@ -133,14 +133,14 @@ int test_ipc_basic() {
 int test_ipc_error_handling() {
     printf("Testing IPC error handling...\n");
     
-    // 初始化 IPC
+    // 初始�?IPC
     agentos_error_t err = agentos_ipc_init();
     if (err != AGENTOS_SUCCESS) {
         printf("Failed to initialize IPC: %d\n", err);
         return 1;
     }
     
-    // 测试空指针操作
+    // 测试空指针操�?
     agentos_ipc_message_t msg = {0};
     agentos_ipc_send(NULL, &msg);
     

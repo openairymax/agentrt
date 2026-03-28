@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 回滚管理脚本
 # 提供版本回滚和部署历史管理功�?
@@ -8,7 +8,7 @@ set -euo pipefail
 ###############################################################################
 # 配置
 ###############################################################################
-AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")
+AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"pwd)")
 AGENTOS_SCRIPTS_DIR="$(dirname "$AGENTOS_SCRIPT_DIR")"
 AGENTOS_PROJECT_ROOT="$(dirname "$AGENTOS_SCRIPTS_DIR")"
 AGENTOS_ROLLBACK_DIR="${AGENTOS_ROLLBACK_DIR:-$AGENTOS_PROJECT_ROOT/build/rollback}"

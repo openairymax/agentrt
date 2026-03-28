@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 通用工具函数模块
 # 遵循 AgentOS 架构设计原则：接口最小化原则 (E-5)
@@ -15,8 +15,8 @@ AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENTOS_SCRIPTS_DIR="$(dirname "$AGENTOS_SCRIPT_DIR")"
 AGENTOS_PROJECT_ROOT="$(dirname "$AGENTOS_SCRIPTS_DIR")"
 AGENTOS_LIB_DIR="$AGENTOS_SCRIPTS_DIR/lib"
-AGENTOS_CONFIG_DIR="$AGENTOS_PROJECT_ROOT/config"
-AGENTOS_PARTDATA_DIR="$AGENTOS_PROJECT_ROOT/partdata"
+AGENTOS_CONFIG_DIR="$AGENTOS_PROJECT_ROOT/manager"
+AGENTOS_lodges_DIR="$AGENTOS_PROJECT_ROOT/lodges"
 
 ###############################################################################
 # 加载依赖模块

@@ -7,17 +7,19 @@
 #include "execution.h"
 #include "agentos.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 #include <stdio.h>
 
-typedef struct browser_unit_data {
-    char* metadata_json;
-} browser_unit_data_t;
+#include "../../../bases/utils/execution/include/execution_common.h"\n\ntypedef struct $1_unit_data {\n    execution_unit_data_t base;\n    char* metadata_json;\n} $1_unit_data_t;
 
 /**
- * @brief 验证URL是否安全（仅允许 http/https 协议）
- * @param url URL字符串
- * @return 1 安全，0 不安全
+ * @brief 验证URL是否安全（仅允许 http/https 协议�?
+ * @param url URL字符�?
+ * @return 1 安全�? 不安�?
  */
 static int is_safe_url(const char* url) {
     if (!url) return 0;
@@ -42,30 +44,22 @@ static agentos_error_t browser_execute(agentos_execution_unit_t* unit, const voi
     if (strstr(cmd, "navigate") != NULL) {
         const char* url_start = strstr(cmd, "http");
         if (url_start && !is_safe_url(url_start)) {
-            *out_output = strdup("{\"error\":\"unsafe_url\"}");
+            *out_output = AGENTOS_STRDUP("{\"error\":\"unsafe_url\"}");
             return AGENTOS_EPERM;
         }
-        *out_output = strdup("{\"status\":\"navigated\"}");
+        *out_output = AGENTOS_STRDUP("{\"status\":\"navigated\"}");
         return AGENTOS_SUCCESS;
     } else if (strstr(cmd, "click") != NULL) {
-        *out_output = strdup("{\"status\":\"clicked\"}");
+        *out_output = AGENTOS_STRDUP("{\"status\":\"clicked\"}");
         return AGENTOS_SUCCESS;
     } else if (strstr(cmd, "screenshot") != NULL) {
-        *out_output = strdup("{\"status\":\"screenshot_taken\",\"data\":\"base64_...\"}");
+        *out_output = AGENTOS_STRDUP("{\"status\":\"screenshot_taken\",\"data\":\"base64_...\"}");
         return AGENTOS_SUCCESS;
     }
     return AGENTOS_ENOTSUP;
 }
 
-static void browser_destroy(agentos_execution_unit_t* unit) {
-    if (!unit) return;
-    browser_unit_data_t* data = (browser_unit_data_t*)unit->data;
-    if (data) {
-        if (data->metadata_json) free(data->metadata_json);
-        free(data);
-    }
-    free(unit);
-}
+static void browser_destroy(agentos_execution_unit_t* unit) {\n    if (!unit) return;\n    browser_unit_data_t* data = (browser_unit_data_t*)unit->data;\n    if (data) {\n        execution_unit_data_cleanup(&data->base);\n        if (data->metadata_json) AGENTOS_FREE(data->metadata_json);\n        AGENTOS_FREE(data);\n    }\n    AGENTOS_FREE(unit);\n}
 
 static const char* browser_get_metadata(agentos_execution_unit_t* unit) {
     browser_unit_data_t* data = (browser_unit_data_t*)unit->data;
@@ -73,22 +67,22 @@ static const char* browser_get_metadata(agentos_execution_unit_t* unit) {
 }
 
 agentos_execution_unit_t* agentos_browser_unit_create(void) {
-    agentos_execution_unit_t* unit = (agentos_execution_unit_t*)malloc(sizeof(agentos_execution_unit_t));
+    agentos_execution_unit_t* unit = (agentos_execution_unit_t*)AGENTOS_MALLOC(sizeof(agentos_execution_unit_t));
     if (!unit) return NULL;
 
-    browser_unit_data_t* data = (browser_unit_data_t*)malloc(sizeof(browser_unit_data_t));
+    browser_unit_data_t* data = (browser_unit_data_t*)AGENTOS_MALLOC(sizeof(browser_unit_data_t));
     if (!data) {
-        free(unit);
+        AGENTOS_FREE(unit);
         return NULL;
     }
 
     char meta[128];
     snprintf(meta, sizeof(meta), "{\"type\":\"browser\"}");
-    data->metadata_json = strdup(meta);
+    data->metadata_json = AGENTOS_STRDUP(meta);
 
     if (!data->metadata_json) {
-        free(data);
-        free(unit);
+        AGENTOS_FREE(data);
+        AGENTOS_FREE(unit);
         return NULL;
     }
 

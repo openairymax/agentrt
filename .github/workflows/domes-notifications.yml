@@ -1,14 +1,14 @@
-# =============================================================================
-# AgentOS domes Module CI/CD Notifications
+﻿﻿# =============================================================================
+# AgentOS cupolas Module CI/CD Notifications
 # Version: 1.0.0
 # Description: Handles notifications for CI/CD events
 # =============================================================================
 
-name: domes Notifications
+name: cupolas Notifications
 
 on:
   workflow_run:
-    workflows: ["domes CI/CD"]
+    workflows: ["cupolas CI/CD"]
     types:
       - completed
   workflow_dispatch:
@@ -33,7 +33,7 @@ on:
           - cancelled
 
 env:
-  MODULE_NAME: domes
+  MODULE_NAME: cupolas
 
 jobs:
   notify:
@@ -79,26 +79,26 @@ jobs:
           case "$EVENT_TYPE" in
             build_completed)
               TITLE="Build Completed"
-              MESSAGE="$EMOJI domes module build has completed with status: $STATUS"
+              MESSAGE="$EMOJI cupolas module build has completed with status: $STATUS"
               DETAILS="Branch: ${{ github.event.workflow_run.head_branch || github.ref_name }}
           Commit: ${{ github.event.workflow_run.head_sha || github.sha }}
           Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id || github.run_id }}"
               ;;
             deployment_completed)
               TITLE="Deployment Completed"
-              MESSAGE="$EMOJI domes module deployment has completed with status: $STATUS"
+              MESSAGE="$EMOJI cupolas module deployment has completed with status: $STATUS"
               DETAILS="Environment: ${{ github.event.inputs.environment || 'unknown' }}
           Version: ${{ github.event.inputs.version || 'unknown' }}"
               ;;
             security_alert)
               TITLE="Security Alert"
-              MESSAGE="$EMOJI Security issue detected in domes module"
+              MESSAGE="$EMOJI Security issue detected in cupolas module"
               DETAILS="Severity: ${{ github.event.inputs.severity || 'unknown' }}
           Details: ${{ github.event.inputs.details || 'Check security reports' }}"
               ;;
             *)
               TITLE="CI/CD Event"
-              MESSAGE="$EMOJI domes module CI/CD event: $EVENT_TYPE"
+              MESSAGE="$EMOJI cupolas module CI/CD event: $EVENT_TYPE"
               DETAILS="Status: $STATUS"
               ;;
           esac
@@ -230,7 +230,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const title = `🚨 CI/CD Failure: domes module`;
+            const title = `🚨 CI/CD Failure: cupolas module`;
             const body = `
             ## CI/CD Pipeline Failure
             
@@ -252,7 +252,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
-              labels: 'ci-failure,domes'
+              labels: 'ci-failure,cupolas'
             });
             
             // Don't create duplicate issues
@@ -263,7 +263,7 @@ jobs:
                 repo: context.repo.repo,
                 title: title,
                 body: body,
-                labels: ['ci-failure', 'domes', 'automated']
+                labels: ['ci-failure', 'cupolas', 'automated']
               });
             }
         continue-on-error: true
@@ -282,7 +282,7 @@ jobs:
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "module": "${{ env.MODULE_NAME }}",
             "event_type": "${{ github.event_name }}",
-            "workflow": "${{ github.event.workflow_run.name || 'domes CI/CD' }}",
+            "workflow": "${{ github.event.workflow_run.name || 'cupolas CI/CD' }}",
             "status": "${{ github.event.workflow_run.conclusion || 'unknown' }}",
             "branch": "${{ github.event.workflow_run.head_branch || github.ref_name }}",
             "commit_sha": "${{ github.event.workflow_run.head_sha || github.sha }}",

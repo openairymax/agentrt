@@ -1,0 +1,184 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agentos.org/schemas/agent_contract.json",
+  "title": "Agent Contract Schema (AgentOS/OpenApex)",
+  "description": "AgentOS (OpenApex) Agent 契约 JSON Schema 规范，基于五维正交设计体系（系统观、内核观、认知观、工程观、设计美学），用于验证 Agent 能力描述文件。理论基础：工程两论、双系统认知、微内核哲学、设计美学。",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "agent_id",
+    "agent_name",
+    "version",
+    "role",
+    "description",
+    "capabilities",
+    "models",
+    "required_permissions",
+    "cost_profile",
+    "trust_metrics"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "契约规范的版本号",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "agent_id": {
+      "type": "string",
+      "description": "Agent 唯一标识，全局唯一，建议使用反向域名或 UUID",
+      "pattern": "^[a-zA-Z0-9._-]+$"
+    },
+    "agent_name": {
+      "type": "string",
+      "description": "Agent 可读名称"
+    },
+    "version": {
+      "type": "string",
+      "description": "Agent 自身版本号（语义化版本）",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$"
+    },
+    "role": {
+      "type": "string",
+      "description": "角色分类",
+      "enum": [
+        "product_manager",
+        "architect",
+        "frontend",
+        "backend",
+        "tester",
+        "devops",
+        "security",
+        "unknown"
+      ]
+    },
+    "description": {
+      "type": "string",
+      "description": "Agent 的简要描述，供人类阅读"
+    },
+    "capabilities": {
+      "type": "array",
+      "description": "能力列表",
+      "items": {
+        "type": "object",
+        "required": ["name", "description", "input_schema", "output_schema"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "能力名称，如 'requirement_analysis'"
+          },
+          "description": {
+            "type": "string",
+            "description": "能力描述"
+          },
+          "input_schema": {
+            "$ref": "#/definitions/json_schema",
+            "description": "输入数据的 JSON Schema"
+          },
+          "output_schema": {
+            "$ref": "#/definitions/json_schema",
+            "description": "输出数据的 JSON Schema"
+          },
+          "estimated_tokens": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "单次调用预估 Token 数（平均值）"
+          },
+          "avg_duration_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "平均执行时间（毫秒）"
+          },
+          "success_rate": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "历史成功率（0-1）"
+          }
+        }
+      }
+    },
+    "models": {
+      "type": "object",
+      "required": ["system1", "system2"],
+      "properties": {
+        "system1": {
+          "type": "string",
+          "description": "System 1 模型名称（轻量、快速）"
+        },
+        "system2": {
+          "type": "string",
+          "description": "System 2 模型名称（强大、深度）"
+        }
+      }
+    },
+    "required_permissions": {
+      "type": "array",
+      "description": "所需权限列表",
+      "items": {
+        "type": "string"
+      }
+    },
+    "cost_profile": {
+      "type": "object",
+      "required": ["token_per_task_avg", "api_cost_per_task", "maintenance_level"],
+      "properties": {
+        "token_per_task_avg": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "单次任务平均 Token 消耗"
+        },
+        "api_cost_per_task": {
+          "type": "number",
+          "minimum": 0,
+          "description": "单次任务平均 API 成本（美元）"
+        },
+        "maintenance_level": {
+          "type": "string",
+          "enum": ["community", "verified", "official"],
+          "description": "维护级别"
+        }
+      }
+    },
+    "trust_metrics": {
+      "type": "object",
+      "required": ["install_count", "rating", "verified_provider", "last_audit"],
+      "properties": {
+        "install_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "安装次数"
+        },
+        "rating": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5,
+          "description": "用户评分（1-5）"
+        },
+        "verified_provider": {
+          "type": "boolean",
+          "description": "是否经过官方认证"
+        },
+        "last_audit": {
+          "type": "string",
+          "format": "date",
+          "description": "上次审计日期（ISO 8601）"
+        }
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "description": "扩展字段，用于社区自定义",
+      "additionalProperties": true
+    }
+  },
+  "definitions": {
+    "json_schema": {
+      "description": "JSON Schema 对象（符合 JSON Schema Draft-07）",
+      "type": "object",
+      "properties": {
+        "$ref": { "type": "string", "format": "uri" }
+      },
+      "additionalProperties": true
+    }
+  }
+}
