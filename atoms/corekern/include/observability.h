@@ -1,4 +1,4 @@
-/**
+﻿﻿/**
  * @file observability.h
  * @brief AgentOS 微内核可观测性子系统
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -85,11 +85,11 @@ typedef struct {
 
 /**
  * @brief 初始化可观测性子系统
- * @param config 配置参数
+ * @param manager 配置参数
  * @return 成功返回AGENTOS_SUCCESS，失败返回错误码
  * @note 线程安全，可重复调用
  */
-AGENTOS_API int agentos_observability_init(const agentos_observability_config_t* config);
+AGENTOS_API int agentos_observability_init(const agentos_observability_config_t* manager);
 
 /**
  * @brief 关闭可观测性子系统

@@ -1,12 +1,16 @@
 /**
  * @file engine.c
- * @brief 记忆引擎实现，封装 MemoryRovol 接口
+ * @brief 记忆引擎实现，封�?MemoryRovol 接口
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "memory.h"
 #include "rov_ffi.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 #include <cjson/cJSON.h>
 
@@ -18,7 +22,7 @@ struct agentos_memory_engine {
 
 /**
  * @brief 创建记忆引擎
- * @param config_path 配置文件路径（可为 NULL）
+ * @param config_path 配置文件路径（可�?NULL�?
  * @param out_engine 输出引擎指针
  * @return AGENTOS_SUCCESS 或错误码
  */
@@ -28,29 +32,29 @@ agentos_error_t agentos_memory_create(
 
     if (!out_engine) return AGENTOS_EINVAL;
 
-    agentos_memory_engine_t* engine = (agentos_memory_engine_t*)calloc(1, sizeof(agentos_memory_engine_t));
+    agentos_memory_engine_t* engine = (agentos_memory_engine_t*)AGENTOS_CALLOC(1, sizeof(agentos_memory_engine_t));
     if (!engine) return AGENTOS_ENOMEM;
 
     if (config_path) {
-        engine->config_path = strdup(config_path);
+        engine->config_path = AGENTOS_STRDUP(config_path);
         if (!engine->config_path) {
-            free(engine);
+            AGENTOS_FREE(engine);
             return AGENTOS_ENOMEM;
         }
     }
 
     agentos_error_t err = agentos_memoryrov_create(config_path, &engine->rov_handle);
     if (err != AGENTOS_SUCCESS) {
-        if (engine->config_path) free(engine->config_path);
-        free(engine);
+        if (engine->config_path) AGENTOS_FREE(engine->config_path);
+        AGENTOS_FREE(engine);
         return err;
     }
 
     engine->lock = agentos_mutex_create();
     if (!engine->lock) {
         agentos_memoryrov_destroy(engine->rov_handle);
-        if (engine->config_path) free(engine->config_path);
-        free(engine);
+        if (engine->config_path) AGENTOS_FREE(engine->config_path);
+        AGENTOS_FREE(engine);
         return AGENTOS_ENOMEM;
     }
 
@@ -59,7 +63,7 @@ agentos_error_t agentos_memory_create(
 }
 
 /**
- * @brief 销毁记忆引擎
+ * @brief 销毁记忆引�?
  */
 void agentos_memory_destroy(agentos_memory_engine_t* engine) {
     if (!engine) return;
@@ -70,8 +74,8 @@ void agentos_memory_destroy(agentos_memory_engine_t* engine) {
     }
     agentos_mutex_unlock(engine->lock);
     agentos_mutex_destroy(engine->lock);
-    if (engine->config_path) free(engine->config_path);
-    free(engine);
+    if (engine->config_path) AGENTOS_FREE(engine->config_path);
+    AGENTOS_FREE(engine);
 }
 
 /**
@@ -115,7 +119,7 @@ agentos_error_t agentos_memory_write(
  * @brief 查询记忆
  * @param engine 记忆引擎
  * @param query 查询条件
- * @param out_result 输出查询结果（需调用 agentos_memory_result_free 释放）
+ * @param out_result 输出查询结果（需调用 agentos_memory_result_free 释放�?
  * @return AGENTOS_SUCCESS 或错误码
  */
 agentos_error_t agentos_memory_query(
@@ -139,33 +143,33 @@ agentos_error_t agentos_memory_query(
 
     if (err != AGENTOS_SUCCESS) return err;
 
-    agentos_memory_result_t* res = (agentos_memory_result_t*)calloc(1, sizeof(agentos_memory_result_t));
+    agentos_memory_result_t* res = (agentos_memory_result_t*)AGENTOS_CALLOC(1, sizeof(agentos_memory_result_t));
     if (!res) {
-        for (size_t i = 0; i < count; i++) free(results[i]);
-        free(results);
+        for (size_t i = 0; i < count; i++) AGENTOS_FREE(results[i]);
+        AGENTOS_FREE(results);
         return AGENTOS_ENOMEM;
     }
 
     if (count > 0) {
-        res->items = (agentos_memory_result_item_t**)calloc(count, sizeof(agentos_memory_result_item_t*));
+        res->items = (agentos_memory_result_item_t**)AGENTOS_CALLOC(count, sizeof(agentos_memory_result_item_t*));
         if (!res->items) {
-            for (size_t i = 0; i < count; i++) free(results[i]);
-            free(results);
-            free(res);
+            for (size_t i = 0; i < count; i++) AGENTOS_FREE(results[i]);
+            AGENTOS_FREE(results);
+            AGENTOS_FREE(res);
             return AGENTOS_ENOMEM;
         }
 
         for (size_t i = 0; i < count; i++) {
-            res->items[i] = (agentos_memory_result_item_t*)calloc(1, sizeof(agentos_memory_result_item_t));
+            res->items[i] = (agentos_memory_result_item_t*)AGENTOS_CALLOC(1, sizeof(agentos_memory_result_item_t));
             if (!res->items[i]) {
                 for (size_t j = 0; j < i; j++) {
-                    free(res->items[j]->record_id);
-                    free(res->items[j]);
+                    AGENTOS_FREE(res->items[j]->record_id);
+                    AGENTOS_FREE(res->items[j]);
                 }
-                for (size_t j = 0; j < count; j++) free(results[j]);
-                free(results);
-                free(res->items);
-                free(res);
+                for (size_t j = 0; j < count; j++) AGENTOS_FREE(results[j]);
+                AGENTOS_FREE(results);
+                AGENTOS_FREE(res->items);
+                AGENTOS_FREE(res);
                 return AGENTOS_ENOMEM;
             }
             res->items[i]->record_id = results[i];
@@ -176,7 +180,7 @@ agentos_error_t agentos_memory_query(
     res->count = count;
     res->query_time_ns = 0;
 
-    free(results);
+    AGENTOS_FREE(results);
     *out_result = res;
     return AGENTOS_SUCCESS;
 }
@@ -186,7 +190,7 @@ agentos_error_t agentos_memory_query(
  * @param engine 记忆引擎
  * @param record_id 记录 ID
  * @param include_raw 是否包含原始数据
- * @param out_record 输出记录（需调用 agentos_memory_record_free 释放）
+ * @param out_record 输出记录（需调用 agentos_memory_record_free 释放�?
  * @return AGENTOS_SUCCESS 或错误码
  */
 agentos_error_t agentos_memory_get(
@@ -206,16 +210,16 @@ agentos_error_t agentos_memory_get(
 
     if (err != AGENTOS_SUCCESS) return err;
 
-    agentos_memory_record_t* rec = (agentos_memory_record_t*)calloc(1, sizeof(agentos_memory_record_t));
+    agentos_memory_record_t* rec = (agentos_memory_record_t*)AGENTOS_CALLOC(1, sizeof(agentos_memory_record_t));
     if (!rec) {
-        free(data);
+        AGENTOS_FREE(data);
         return AGENTOS_ENOMEM;
     }
 
-    rec->record_id = strdup(record_id);
+    rec->record_id = AGENTOS_STRDUP(record_id);
     if (!rec->record_id) {
-        free(rec);
-        free(data);
+        AGENTOS_FREE(rec);
+        AGENTOS_FREE(data);
         return AGENTOS_ENOMEM;
     }
 
@@ -251,13 +255,13 @@ void agentos_memory_result_free(agentos_memory_result_t* result) {
     if (!result) return;
     for (size_t i = 0; i < result->count; i++) {
         if (result->items[i]) {
-            if (result->items[i]->record_id) free(result->items[i]->record_id);
+            if (result->items[i]->record_id) AGENTOS_FREE(result->items[i]->record_id);
             if (result->items[i]->record) agentos_memory_record_free(result->items[i]->record);
-            free(result->items[i]);
+            AGENTOS_FREE(result->items[i]);
         }
     }
-    free(result->items);
-    free(result);
+    AGENTOS_FREE(result->items);
+    AGENTOS_FREE(result);
 }
 
 /**
@@ -265,11 +269,11 @@ void agentos_memory_result_free(agentos_memory_result_t* result) {
  */
 void agentos_memory_record_free(agentos_memory_record_t* record) {
     if (!record) return;
-    if (record->record_id) free(record->record_id);
-    if (record->source_agent) free(record->source_agent);
-    if (record->trace_id) free(record->trace_id);
-    if (record->data) free(record->data);
-    free(record);
+    if (record->record_id) AGENTOS_FREE(record->record_id);
+    if (record->source_agent) AGENTOS_FREE(record->source_agent);
+    if (record->trace_id) AGENTOS_FREE(record->trace_id);
+    if (record->data) AGENTOS_FREE(record->data);
+    AGENTOS_FREE(record);
 }
 
 /**
@@ -283,7 +287,7 @@ agentos_error_t agentos_memory_evolve(
 }
 
 /**
- * @brief 记忆引擎健康检查
+ * @brief 记忆引擎健康检�?
  */
 agentos_error_t agentos_memory_health_check(
     agentos_memory_engine_t* engine,
@@ -300,7 +304,7 @@ agentos_error_t agentos_memory_health_check(
     char* stats = NULL;
     if (agentos_memoryrov_stats(engine->rov_handle, &stats) == AGENTOS_SUCCESS) {
         cJSON_AddRawToObject(root, "stats", stats);
-        free(stats);
+        AGENTOS_FREE(stats);
     }
     agentos_mutex_unlock(engine->lock);
 

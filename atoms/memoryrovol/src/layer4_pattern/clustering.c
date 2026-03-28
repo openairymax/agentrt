@@ -1,11 +1,15 @@
-/**
+﻿/**
  * @file clustering.c
- * @brief L4 模式层聚类引擎（使用HDBSCAN）
+ * @brief L4 模式层聚类引擎（使用HDBSCAN�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "layer4_pattern.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 #include <math.h>
 
@@ -21,27 +25,27 @@ struct agentos_clustering_engine {
 
 agentos_error_t agentos_clustering_engine_create(
     const char* method,
-    const char* config,
+    const char* manager,
     agentos_clustering_engine_t** out_engine) {
     // From data intelligence emerges. by spharx
 
     if (!method || !out_engine) return AGENTOS_EINVAL;
 
-    agentos_clustering_engine_t* eng = (agentos_clustering_engine_t*)calloc(1, sizeof(agentos_clustering_engine_t));
+    agentos_clustering_engine_t* eng = (agentos_clustering_engine_t*)AGENTOS_CALLOC(1, sizeof(agentos_clustering_engine_t));
     if (!eng) return AGENTOS_ENOMEM;
 
     strncpy(eng->method, method, sizeof(eng->method) - 1);
     eng->lock = agentos_mutex_create();
     if (!eng->lock) {
-        free(eng);
+        AGENTOS_FREE(eng);
         return AGENTOS_ENOMEM;
     }
 
-    // 解析配置（这里简单处理，实际可用cJSON）
-    eng->params = malloc(8); // 占位
+    // 解析配置（这里简单处理，实际可用cJSON�?
+    eng->params = AGENTOS_MALLOC(8); // 占位
     if (!eng->params) {
         agentos_mutex_destroy(eng->lock);
-        free(eng);
+        AGENTOS_FREE(eng);
         return AGENTOS_ENOMEM;
     }
 
@@ -51,9 +55,9 @@ agentos_error_t agentos_clustering_engine_create(
 
 void agentos_clustering_engine_destroy(agentos_clustering_engine_t* engine) {
     if (!engine) return;
-    if (engine->params) free(engine->params);
+    if (engine->params) AGENTOS_FREE(engine->params);
     if (engine->lock) agentos_mutex_destroy(engine->lock);
-    free(engine);
+    AGENTOS_FREE(engine);
 }
 
 agentos_error_t agentos_clustering_engine_cluster(
@@ -70,7 +74,7 @@ agentos_error_t agentos_clustering_engine_cluster(
     size_t dim = 384; // 实际应从参数获取
 
 #ifdef HAVE_HDBSCAN
-    // 使用HDBSCAN库
+    // 使用HDBSCAN�?
     hdbscan_input input;
     input.data = (double*)vectors; // 假设可以转换
     input.num_points = count;
@@ -81,7 +85,7 @@ agentos_error_t agentos_clustering_engine_cluster(
     hdbscan_output output;
     hdbscan_cluster(&input, &output);
 
-    int* labels = (int*)malloc(count * sizeof(int));
+    int* labels = (int*)AGENTOS_MALLOC(count * sizeof(int));
     if (!labels) {
         hdbscan_free_output(&output);
         return AGENTOS_ENOMEM;
@@ -94,8 +98,8 @@ agentos_error_t agentos_clustering_engine_cluster(
 
     hdbscan_free_output(&output);
 #else
-    // 无HDBSCAN时，返回全0标签（单聚类）
-    int* labels = (int*)malloc(count * sizeof(int));
+    // 无HDBSCAN时，返回�?标签（单聚类�?
+    int* labels = (int*)AGENTOS_MALLOC(count * sizeof(int));
     if (!labels) return AGENTOS_ENOMEM;
     for (size_t i = 0; i < count; i++) labels[i] = 0;
     float* centroids = NULL;

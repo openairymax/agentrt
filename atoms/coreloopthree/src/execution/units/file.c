@@ -1,12 +1,16 @@
 /**
  * @file file.c
- * @brief 文件操作执行单元（读/写/删除/列表）
+ * @brief 文件操作执行单元（读/�?删除/列表�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "execution.h"
 #include "agentos.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 #include <stdio.h>
 #include <sys/stat.h>
@@ -18,19 +22,16 @@
 #include <dirent.h>
 #endif
 
-typedef struct file_unit_data {
-    char* root_dir; /**< 允许操作的根目录 */
-    char* metadata_json; /**< 元数据JSON字符串 */
-} file_unit_data_t;
+#include "../../../bases/utils/execution/include/execution_common.h"\n\ntypedef struct $1_unit_data {\n    execution_unit_data_t base;\n    char* metadata_json;\n} $1_unit_data_t;
 
 /* ==================== 辅助函数声明 ==================== */
 
 /**
  * @brief 构建完整文件路径
  * @param data 文件单元数据
- * @param path 用户提供的相对路径
- * @param out_full 输出完整路径缓冲区
- * @param max_len 缓冲区最大长度
+ * @param path 用户提供的相对路�?
+ * @param out_full 输出完整路径缓冲�?
+ * @param max_len 缓冲区最大长�?
  */
 static agentos_error_t file_build_path(
     file_unit_data_t* data,
@@ -57,7 +58,7 @@ static agentos_error_t file_do_delete(
     void** out_output);
 
 /**
- * @brief 执行目录列表操作（Windows实现）
+ * @brief 执行目录列表操作（Windows实现�?
  * @param full_path 完整目录路径
  * @param out_output 输出列表（调用者负责释放）
  */
@@ -66,7 +67,7 @@ static agentos_error_t file_do_list_win(
     void** out_output);
 
 /**
- * @brief 执行目录列表操作（POSIX实现）
+ * @brief 执行目录列表操作（POSIX实现�?
  * @param full_path 完整目录路径
  * @param out_output 输出列表（调用者负责释放）
  */
@@ -115,7 +116,7 @@ static agentos_error_t file_do_read(
         return AGENTOS_EIO;
     }
 
-    char* content = (char*)malloc((size_t)size + 1);
+    char* content = (char*)AGENTOS_MALLOC((size_t)size + 1);
     if (!content) {
         fclose(f);
         return AGENTOS_ENOMEM;
@@ -123,7 +124,7 @@ static agentos_error_t file_do_read(
 
     size_t bytes_read = fread(content, 1, (size_t)size, f);
     if (bytes_read != (size_t)size) {
-        free(content);
+        AGENTOS_FREE(content);
         fclose(f);
         return AGENTOS_EIO;
     }
@@ -139,7 +140,7 @@ static agentos_error_t file_do_delete(
     void** out_output) {
 
     if (remove(full_path) == 0) {
-        *out_output = strdup("deleted");
+        *out_output = AGENTOS_STRDUP("deleted");
         return AGENTOS_SUCCESS;
     }
     return AGENTOS_ENOENT;
@@ -157,7 +158,7 @@ static agentos_error_t file_do_list_win(
     if (hFind == INVALID_HANDLE_VALUE) return AGENTOS_ENOENT;
 
     size_t cap = 1024;
-    char* listing = (char*)malloc(cap);
+    char* listing = (char*)AGENTOS_MALLOC(cap);
     if (!listing) {
         FindClose(hFind);
         return AGENTOS_ENOMEM;
@@ -172,9 +173,9 @@ static agentos_error_t file_do_list_win(
             size_t len = strlen(find_data.cFileName);
             if (pos + len + 2 > cap) {
                 cap *= 2;
-                char* new_list = (char*)realloc(listing, cap);
+                char* new_list = (char*)AGENTOS_REALLOC(listing, cap);
                 if (!new_list) {
-                    free(listing);
+                    AGENTOS_FREE(listing);
                     FindClose(hFind);
                     return AGENTOS_ENOMEM;
                 }
@@ -201,7 +202,7 @@ static agentos_error_t file_do_list_posix(
 
     struct dirent* entry;
     size_t cap = 1024;
-    char* listing = (char*)malloc(cap);
+    char* listing = (char*)AGENTOS_MALLOC(cap);
     if (!listing) {
         closedir(dir);
         return AGENTOS_ENOMEM;
@@ -216,9 +217,9 @@ static agentos_error_t file_do_list_posix(
         size_t len = strlen(entry->d_name);
         if (pos + len + 2 > cap) {
             cap *= 2;
-            char* new_list = (char*)realloc(listing, cap);
+            char* new_list = (char*)AGENTOS_REALLOC(listing, cap);
             if (!new_list) {
-                free(listing);
+                AGENTOS_FREE(listing);
                 closedir(dir);
                 return AGENTOS_ENOMEM;
             }
@@ -236,7 +237,7 @@ static agentos_error_t file_do_list_posix(
     return AGENTOS_SUCCESS;
 }
 
-/* ==================== 主执行函数 ==================== */
+/* ==================== 主执行函�?==================== */
 
 static agentos_error_t file_execute(agentos_execution_unit_t* unit, const void* input, void** out_output) {
     file_unit_data_t* data = (file_unit_data_t*)unit->data;
@@ -270,16 +271,7 @@ static agentos_error_t file_execute(agentos_execution_unit_t* unit, const void* 
     return AGENTOS_ENOTSUP;
 }
 
-static void file_destroy(agentos_execution_unit_t* unit) {
-    if (!unit) return;
-    file_unit_data_t* data = (file_unit_data_t*)unit->data;
-    if (data) {
-        if (data->root_dir) free(data->root_dir);
-        if (data->metadata_json) free(data->metadata_json);
-        free(data);
-    }
-    free(unit);
-}
+static void file_destroy(agentos_execution_unit_t* unit) {\n    if (!unit) return;\n    file_unit_data_t* data = (file_unit_data_t*)unit->data;\n    if (data) {\n        execution_unit_data_cleanup(&data->base);\n        if (data->metadata_json) AGENTOS_FREE(data->metadata_json);\n        AGENTOS_FREE(data);\n    }\n    AGENTOS_FREE(unit);\n}
 
 static const char* file_get_metadata(agentos_execution_unit_t* unit) {
     file_unit_data_t* data = (file_unit_data_t*)unit->data;
@@ -287,25 +279,25 @@ static const char* file_get_metadata(agentos_execution_unit_t* unit) {
 }
 
 agentos_execution_unit_t* agentos_file_unit_create(const char* root_dir) {
-    agentos_execution_unit_t* unit = (agentos_execution_unit_t*)malloc(sizeof(agentos_execution_unit_t));
+    agentos_execution_unit_t* unit = (agentos_execution_unit_t*)AGENTOS_MALLOC(sizeof(agentos_execution_unit_t));
     if (!unit) return NULL;
 
-    file_unit_data_t* data = (file_unit_data_t*)malloc(sizeof(file_unit_data_t));
+    file_unit_data_t* data = (file_unit_data_t*)AGENTOS_MALLOC(sizeof(file_unit_data_t));
     if (!data) {
-        free(unit);
+        AGENTOS_FREE(unit);
         return NULL;
     }
 
-    data->root_dir = root_dir ? strdup(root_dir) : NULL;
+    data->root_dir = root_dir ? AGENTOS_STRDUP(root_dir) : NULL;
     char meta[256];
     snprintf(meta, sizeof(meta), "{\"type\":\"file\",\"root_dir\":\"%s\"}", root_dir ? root_dir : "");
-    data->metadata_json = strdup(meta);
+    data->metadata_json = AGENTOS_STRDUP(meta);
 
     if (!data->metadata_json || (root_dir && !data->root_dir)) {
-        if (data->root_dir) free(data->root_dir);
-        if (data->metadata_json) free(data->metadata_json);
-        free(data);
-        free(unit);
+        if (data->root_dir) AGENTOS_FREE(data->root_dir);
+        if (data->metadata_json) AGENTOS_FREE(data->metadata_json);
+        AGENTOS_FREE(data);
+        AGENTOS_FREE(unit);
         return NULL;
     }
 

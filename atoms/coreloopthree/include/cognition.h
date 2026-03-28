@@ -1,4 +1,4 @@
-/**
+﻿﻿/**
  * @file cognition.h
  * @brief 认知层公共接口定义
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -222,7 +222,7 @@ AGENTOS_API agentos_error_t agentos_cognition_create(
 /**
  * @brief 创建认知引擎（带配置）
  * 
- * @param config [in] 配置（若为NULL使用默认）
+ * @param manager [in] 配置（若为NULL使用默认）
  * @param plan_strategy [in] 规划策略（可选）
  * @param coord_strategy [in] 协同策略（可选）
  * @param disp_strategy [in] 调度策略（可选）
@@ -241,7 +241,7 @@ AGENTOS_API agentos_error_t agentos_cognition_create(
  * @see agentos_cognition_create(), agentos_cognition_destroy()
  */
 AGENTOS_API agentos_error_t agentos_cognition_create_ex(
-    const agentos_cognition_config_t* config,
+    const agentos_cognition_config_t* manager,
     agentos_plan_strategy_t* plan_strategy,
     agentos_coordinator_strategy_t* coord_strategy,
     agentos_dispatching_strategy_t* disp_strategy,

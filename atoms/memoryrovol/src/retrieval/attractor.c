@@ -1,6 +1,6 @@
-/**
+﻿/**
  * @file attractor.c
- * @brief 吸引子网络检索实现
+ * @brief 吸引子网络检索实�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -8,40 +8,44 @@
 #include "../include/layer2_feature.h"
 #include "agentos.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 #include <math.h>
 
 struct agentos_attractor_network {
     agentos_layer2_feature_t* layer2;        /**< 特征层，用于获取向量 */
-    agentos_retrieval_config_t config;        /**< 配置 */
-    agentos_mutex_t* lock;                    /**< 线程锁 */
+    agentos_retrieval_config_t manager;        /**< 配置 */
+    agentos_mutex_t* lock;                    /**< 线程�?*/
 };
 
 agentos_error_t agentos_attractor_network_create(
     agentos_layer2_feature_t* layer2,
-    const agentos_retrieval_config_t* config,
+    const agentos_retrieval_config_t* manager,
     agentos_attractor_network_t** out_net) {
 
 // From data intelligence emerges. by spharx
     if (!layer2 || !out_net) return AGENTOS_EINVAL;
 
-    agentos_attractor_network_t* net = (agentos_attractor_network_t*)calloc(1, sizeof(agentos_attractor_network_t));
+    agentos_attractor_network_t* net = (agentos_attractor_network_t*)AGENTOS_CALLOC(1, sizeof(agentos_attractor_network_t));
     if (!net) {
         AGENTOS_LOG_ERROR("Failed to allocate attractor network");
         return AGENTOS_ENOMEM;
     }
 
     net->layer2 = layer2;
-    if (config) {
-        net->config = *config;
+    if (manager) {
+        net->manager = *manager;
     } else {
-        net->config.max_iterations = 10;
-        net->config.tolerance = 1e-6f;
-        net->config.beta = 1.0f;
+        net->manager.max_iterations = 10;
+        net->manager.tolerance = 1e-6f;
+        net->manager.beta = 1.0f;
     }
     net->lock = agentos_mutex_create();
     if (!net->lock) {
-        free(net);
+        AGENTOS_FREE(net);
         return AGENTOS_ENOMEM;
     }
 
@@ -52,11 +56,11 @@ agentos_error_t agentos_attractor_network_create(
 void agentos_attractor_network_destroy(agentos_attractor_network_t* net) {
     if (!net) return;
     if (net->lock) agentos_mutex_destroy(net->lock);
-    free(net);
+    AGENTOS_FREE(net);
 }
 
 /**
- * @brief 使用现代Hopfield网络迭代更新状态
+ * @brief 使用现代Hopfield网络迭代更新状�?
  */
 static agentos_error_t attractor_iterate(
     agentos_attractor_network_t* net,
@@ -83,8 +87,8 @@ static agentos_error_t attractor_iterate(
     dim = first_vec->dim;
     agentos_feature_vector_free(first_vec);
 
-    // 构建候选向量矩阵
-    float* patterns = (float*)malloc(candidate_count * dim * sizeof(float));
+    // 构建候选向量矩�?
+    float* patterns = (float*)AGENTOS_MALLOC(candidate_count * dim * sizeof(float));
     if (!patterns) {
         AGENTOS_LOG_ERROR("Failed to allocate patterns matrix");
         return AGENTOS_ENOMEM;
@@ -94,30 +98,30 @@ static agentos_error_t attractor_iterate(
         agentos_feature_vector_t* vec = NULL;
         err = agentos_layer2_feature_get_vector(net->layer2, candidate_ids[i], &vec);
         if (err != AGENTOS_SUCCESS) {
-            free(patterns);
+            AGENTOS_FREE(patterns);
             return err;
         }
         memcpy(patterns + i * dim, vec->data, dim * sizeof(float));
         agentos_feature_vector_free(vec);
     }
 
-    // 初始状态 = 查询向量（需归一化）
-    float* state = (float*)malloc(dim * sizeof(float));
+    // 初始状�?= 查询向量（需归一化）
+    float* state = (float*)AGENTOS_MALLOC(dim * sizeof(float));
     if (!state) {
-        free(patterns);
+        AGENTOS_FREE(patterns);
         return AGENTOS_ENOMEM;
     }
     memcpy(state, query_vector, dim * sizeof(float));
 
     // 迭代
-    float* new_state = (float*)malloc(dim * sizeof(float));
+    float* new_state = (float*)AGENTOS_MALLOC(dim * sizeof(float));
     if (!new_state) {
-        free(patterns);
-        free(state);
+        AGENTOS_FREE(patterns);
+        AGENTOS_FREE(state);
         return AGENTOS_ENOMEM;
     }
 
-    for (uint32_t iter = 0; iter < net->config.max_iterations; iter++) {
+    for (uint32_t iter = 0; iter < net->manager.max_iterations; iter++) {
         // 计算每个模式与当前状态的内积
         float* proj = (float*)alloca(candidate_count * sizeof(float));
         for (size_t i = 0; i < candidate_count; i++) {
@@ -129,26 +133,26 @@ static agentos_error_t attractor_iterate(
             proj[i] = dot;
         }
 
-        // 更新状态
+        // 更新状�?
         for (size_t j = 0; j < dim; j++) {
             float sum = 0.0f;
             for (size_t i = 0; i < candidate_count; i++) {
                 sum += patterns[i * dim + j] * proj[i];
             }
-            new_state[j] = tanhf(net->config.beta * sum);
+            new_state[j] = tanhf(net->manager.beta * sum);
         }
 
-        // 检查收敛
+        // 检查收�?
         float diff = 0.0f;
         for (size_t j = 0; j < dim; j++) {
             float d = state[j] - new_state[j];
             diff += d * d;
         }
         memcpy(state, new_state, dim * sizeof(float));
-        if (diff < net->config.tolerance) break;
+        if (diff < net->manager.tolerance) break;
     }
 
-    // 找到与最终状态最接近的候选
+    // 找到与最终状态最接近的候�?
     float best_sim = -1.0f;
     int best_idx = -1;
     for (size_t i = 0; i < candidate_count; i++) {
@@ -167,16 +171,16 @@ static agentos_error_t attractor_iterate(
     }
 
     if (best_idx >= 0) {
-        *best_id = strdup(candidate_ids[best_idx]);
+        *best_id = AGENTOS_STRDUP(candidate_ids[best_idx]);
         *best_confidence = best_sim;
     } else {
         *best_id = NULL;
         *best_confidence = 0.0f;
     }
 
-    free(patterns);
-    free(state);
-    free(new_state);
+    AGENTOS_FREE(patterns);
+    AGENTOS_FREE(state);
+    AGENTOS_FREE(new_state);
     return AGENTOS_SUCCESS;
 }
 

@@ -1,4 +1,4 @@
-# AgentOS 输入净化安全测试
+﻿﻿# AgentOS 输入净化安全测试
 # Version: 1.0.0.6
 # Last updated: 2026-03-23
 
@@ -554,7 +554,7 @@ class TestPathTraversalPrevention:
     
     @pytest.mark.parametrize("malicious_input", [
         "../../../etc/passwd",
-        "..\\..\\..\\windows\\system32\\config\\sam",
+        "..\\..\\..\\windows\\system32\\manager\\sam",
         "....//....//....//etc/passwd",
         "..%2f..%2f..%2fetc/passwd",
         "..%252f..%252f..%252fetc/passwd",

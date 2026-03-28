@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿﻿#!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Core 模块单元测试
 
@@ -102,7 +102,7 @@ class MockPlugin(Plugin):
         self.execute_called = False
         self.shutdown_called = False
 
-    def initialize(self, config) -> bool:
+    def initialize(self, manager) -> bool:
         self.init_called = True
         return True
 

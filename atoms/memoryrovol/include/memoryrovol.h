@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file memoryrovol.h
  * @brief MemoryRovol 系统主接口
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -8,7 +8,7 @@
 #define AGENTOS_MEMORYROV_H
 
 #include "agentos.h"
-#include "config.h"
+#include "manager.h"
 #include "forgetting.h"
 
 #ifdef __cplusplus
@@ -23,12 +23,12 @@ typedef struct agentos_memoryrov_handle agentos_memoryrov_handle_t;
 
 /**
  * @brief 初始化 MemoryRovol 系统
- * @param config 配置参数（如果为 NULL 则使用默认配置）
+ * @param manager 配置参数（如果为 NULL 则使用默认配置）
  * @param out_handle 输出系统句柄
  * @return agentos_error_t
  */
 agentos_error_t agentos_memoryrov_init(
-    const agentos_memoryrov_config_t* config,
+    const agentos_memoryrov_config_t* manager,
     agentos_memoryrov_handle_t** out_handle);
 
 /**

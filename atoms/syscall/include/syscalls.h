@@ -1,4 +1,4 @@
-/**
+﻿﻿/**
  * @file syscalls.h
  * @brief 内核系统调用接口
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -224,11 +224,11 @@ AGENTOS_API void agentos_sandbox_manager_destroy(void);
 
 /**
  * @brief 创建沙箱
- * @param config 沙箱配置
+ * @param manager 沙箱配置
  * @param out_sandbox 输出沙箱句柄
  * @return AGENTOS_SUCCESS成功，其他为错误码
  */
-AGENTOS_API agentos_error_t agentos_sandbox_create(const sandbox_config_t* config,
+AGENTOS_API agentos_error_t agentos_sandbox_create(const sandbox_config_t* manager,
                                                    agentos_sandbox_t** out_sandbox);
 
 /**
@@ -358,12 +358,12 @@ AGENTOS_API void agentos_circuit_breaker_manager_destroy(void);
 /**
  * @brief 创建熔断器
  * @param name 熔断器名称
- * @param config 配置（可为NULL使用默认值）
+ * @param manager 配置（可为NULL使用默认值）
  * @param out_cb 输出熔断器句柄
  * @return AGENTOS_SUCCESS成功，其他为错误码
  */
 AGENTOS_API agentos_error_t agentos_circuit_breaker_create(const char* name,
-                                                           const cb_config_t* config,
+                                                           const cb_config_t* manager,
                                                            agentos_circuit_breaker_t** out_cb);
 
 /**

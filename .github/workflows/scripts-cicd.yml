@@ -1,4 +1,4 @@
-# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+﻿﻿# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Scripts 模块 CI/CD 工作流
 # 涵盖代码提交验证、自动化构建、单元测试、集成测试、安全扫描、质量检查等完整环节
 
@@ -205,7 +205,7 @@ jobs:
           bash -c '
             set -e
             export AGENTOS_SCRIPTS_DIR="$(pwd)/scripts"
-            source scripts/lib/common.sh
+            source scripts/lib/bases.sh
             source scripts/lib/log.sh
             source scripts/lib/error.sh
             source scripts/lib/platform.sh
@@ -382,7 +382,7 @@ jobs:
           if [[ "${{ matrix.os }}" == "Windows_NT" ]]; then
             echo "Windows environment - skipping shell tests"
           else
-            source lib/common.sh 2>/dev/null && echo "✓ common.sh sourced"
+            source lib/bases.sh 2>/dev/null && echo "✓ bases.sh sourced"
             source lib/log.sh 2>/dev/null && echo "✓ log.sh sourced"
           fi
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿﻿#!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 契约验证工具
 # 遵循 AgentOS 架构设计原则：反馈闭环、工程美学
@@ -14,7 +14,7 @@ AgentOS 契约验证工具
 
 Usage:
     python validate_contracts.py --type syscall --spec path/to/spec
-    python validate_contracts.py --type config --dir path/to/config
+    python validate_contracts.py --type manager --dir path/to/manager
     python validate_contracts.py --all --verbose
 """
 
@@ -38,7 +38,7 @@ class ValidationStatus(Enum):
 
 class ContractType(Enum):
     SYSCALL = "syscall"
-    CONFIG = "config"
+    manager = "manager"
     API = "api"
     PROTOCOL = "protocol"
 
@@ -231,7 +231,7 @@ class ConfigContractValidator:
     }
 
     def __init__(self, config_dir: Optional[str] = None):
-        self.config_dir = config_dir or os.path.join(os.getcwd(), "config")
+        self.config_dir = config_dir or os.path.join(os.getcwd(), "manager")
 
     def validate_config_file(self, config_path: str) -> List[ValidationResult]:
         results = []
@@ -239,10 +239,10 @@ class ConfigContractValidator:
 
         if not os.path.exists(config_path):
             results.append(ValidationResult(
-                contract_type=ContractType.CONFIG,
+                contract_type=ContractType.manager,
                 contract_name=config_name,
                 status=ValidationStatus.FAIL,
-                message=f"Config file not found: {config_path}",
+                message=f"manager file not found: {config_path}",
                 location=config_path
             ))
             return results
@@ -262,7 +262,7 @@ class ConfigContractValidator:
 
         if not required_fields:
             results.append(ValidationResult(
-                contract_type=ContractType.CONFIG,
+                contract_type=ContractType.manager,
                 contract_name=config_name,
                 status=ValidationStatus.SKIP,
                 message=f"No required fields defined for {config_name}",
@@ -277,7 +277,7 @@ class ConfigContractValidator:
 
         if missing_fields:
             results.append(ValidationResult(
-                contract_type=ContractType.CONFIG,
+                contract_type=ContractType.manager,
                 contract_name=f"Required Fields: {config_name}",
                 status=ValidationStatus.FAIL,
                 message=f"Missing required fields: {', '.join(missing_fields)}",
@@ -286,7 +286,7 @@ class ConfigContractValidator:
             ))
         else:
             results.append(ValidationResult(
-                contract_type=ContractType.CONFIG,
+                contract_type=ContractType.manager,
                 contract_name=f"Required Fields: {config_name}",
                 status=ValidationStatus.PASS,
                 message="All required fields are present"
@@ -309,7 +309,7 @@ class ConfigContractValidator:
 
             if invalid_lines:
                 results.append(ValidationResult(
-                    contract_type=ContractType.CONFIG,
+                    contract_type=ContractType.manager,
                     contract_name=f"Syntax: {config_name}",
                     status=ValidationStatus.FAIL,
                     message=f"Found {len(invalid_lines)} lines with invalid syntax",
@@ -333,7 +333,7 @@ class ConfigContractValidator:
 
             if total_bytes < 64 * 1024 * 1024:
                 results.append(ValidationResult(
-                    contract_type=ContractType.CONFIG,
+                    contract_type=ContractType.manager,
                     contract_name=f"Value Check: max_memory",
                     status=ValidationStatus.WARN,
                     message=f"max_memory ({value}{unit}) is very small, minimum recommended is 64M",
@@ -348,10 +348,10 @@ class ConfigContractValidator:
 
         if not os.path.exists(self.config_dir):
             results.append(ValidationResult(
-                contract_type=ContractType.CONFIG,
-                contract_name="Config Directory",
+                contract_type=ContractType.manager,
+                contract_name="manager Directory",
                 status=ValidationStatus.SKIP,
-                message=f"Config directory not found: {self.config_dir}"
+                message=f"manager directory not found: {self.config_dir}"
             ))
             return results
 
@@ -359,10 +359,10 @@ class ConfigContractValidator:
 
         if not config_files:
             results.append(ValidationResult(
-                contract_type=ContractType.CONFIG,
-                contract_name="Config Files",
+                contract_type=ContractType.manager,
+                contract_name="manager Files",
                 status=ValidationStatus.SKIP,
-                message="No config files found"
+                message="No manager files found"
             ))
             return results
 
@@ -517,7 +517,7 @@ def main():
 
     parser.add_argument(
         "--type", "-t",
-        choices=["syscall", "config", "api", "all"],
+        choices=["syscall", "manager", "api", "all"],
         default="all",
         help="Type of contract to validate"
     )
@@ -531,7 +531,7 @@ def main():
     parser.add_argument(
         "--dir",
         type=str,
-        help="Path to config directory"
+        help="Path to manager directory"
     )
 
     parser.add_argument(
@@ -554,7 +554,7 @@ def main():
     if args.type in ["syscall", "all"]:
         validator.validate_syscall(args.spec)
 
-    if args.type in ["config", "all"]:
+    if args.type in ["manager", "all"]:
         validator.validate_config(args.dir)
 
     if args.type in ["api", "all"]:

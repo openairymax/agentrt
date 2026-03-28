@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file loop.h
  * @brief 三层核心运行时主循环接口
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -46,7 +46,7 @@ typedef struct agentos_loop_config {
 /**
  * @brief 创建核心循环
  * 
- * @param config [in] 配置（可为NULL，使用默认）
+ * @param manager [in] 配置（可为NULL，使用默认）
  * @param out_loop [out] 输出循环句柄（调用者负责销毁）
  * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
  * 
@@ -56,7 +56,7 @@ typedef struct agentos_loop_config {
  * @see agentos_loop_destroy()
  */
 AGENTOS_API agentos_error_t agentos_loop_create(
-    const agentos_loop_config_t* config,
+    const agentos_loop_config_t* manager,
     agentos_core_loop_t** out_loop);
 
 /**

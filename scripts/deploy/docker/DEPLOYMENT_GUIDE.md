@@ -1,4 +1,4 @@
-# AgentOS Docker 部署完整指南
+﻿# AgentOS Docker 部署完整指南
 
 **版本**: 1.0.0.5  
 **发布日期**: 2026-03-20  
@@ -292,7 +292,7 @@ rules:
 docker-compose logs agentos-kernel
 
 # 检查配置文件
-docker-compose config --quiet
+docker-compose manager --quiet
 
 # 验证网络连接
 docker-compose exec agentos-kernel ping redis
@@ -469,7 +469,7 @@ find backups/ -name "postgres-*.tar.gz" -mtime +7 -delete
 - [Docker 官方文档](https://docs.docker.com/)
 - [Docker Compose 文档](https://docs.docker.com/compose/)
 - [OpenTelemetry 文档](https://opentelemetry.io/)
-- [AgentOS 架构文档](../../partdocs/architecture/)
+- [AgentOS 架构文档](../../paper/architecture/)
 
 ---
 
@@ -483,3 +483,4 @@ find backups/ -name "postgres-*.tar.gz" -mtime +7 -delete
 © 2026 SPHARX Ltd. All Rights Reserved.
 
 </div>
+

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿﻿#!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 事件总线系统
 # 统一的遥测和事件处理框架
@@ -44,7 +44,7 @@ class EventType(Enum):
     DEPLOY_FAILED = "deploy.failed"
     DIAGNOSTIC_ISSUED = "diagnostic.issued"
     METRIC_RECORDED = "metric.recorded"
-    CONFIG_CHANGED = "config.changed"
+    CONFIG_CHANGED = "manager.changed"
     ERROR_OCCURRED = "error.occurred"
     CUSTOM = "custom"
 

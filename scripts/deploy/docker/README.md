@@ -1,4 +1,4 @@
-# AgentOS Docker 部署指南
+﻿# AgentOS Docker 部署指南
 
 **版本**: v1.0.0.6  
 **最后更新**: 2026-03-20  
@@ -164,11 +164,11 @@ AGENTOS_TELEMETRY_ENDPOINT=http://otel-collector:4317
 
 | 宿主机路径 | 容器路径 | 用途 |
 |-----------|---------|------|
-| `./partdata/logs` | `/var/log/agentos` | 日志存储 |
-| `./partdata/registry` | `/var/lib/agentos/registry` | 注册表数据 |
-| `./partdata/traces` | `/var/lib/agentos/traces` | 追踪数据 |
-| `../../config/kernel` | `/etc/agentos/kernel` | 内核配置 |
-| `../../config/services` | `/etc/agentos/services` | 服务配置 |
+| `./lodges/logs` | `/var/log/agentos` | 日志存储 |
+| `./lodges/registry` | `/var/lib/agentos/registry` | 注册表数据 |
+| `./lodges/traces` | `/var/lib/agentos/traces` | 追踪数据 |
+| `../../manager/kernel` | `/etc/agentos/kernel` | 内核配置 |
+| `../../manager/services` | `/etc/agentos/services` | 服务配置 |
 
 ### 端口映射
 
@@ -194,8 +194,8 @@ AGENTOS_TELEMETRY_ENDPOINT=http://otel-collector:4317
 
 # 以交互模式启动容器
 docker run -it --rm \
-  -v $(pwd)/partdata/logs:/var/log/agentos \
-  -v $(pwd)/config:/etc/agentos \
+  -v $(pwd)/lodges/logs:/var/log/agentos \
+  -v $(pwd)/manager:/etc/agentos \
   spharx/agentos-kernel:dev \
   /bin/bash
 ```
@@ -304,7 +304,7 @@ docker builder prune -a
 docker-compose logs agentos-kernel
 
 # 检查配置文件
-docker-compose config
+docker-compose manager
 
 # 验证网络
 docker-compose exec agentos-kernel ping redis
@@ -429,3 +429,4 @@ Apache License 2.0 © 2026 SPHARX Ltd. All Rights Reserved.
 © 2026 SPHARX Ltd. All Rights Reserved.
 
 </div>
+

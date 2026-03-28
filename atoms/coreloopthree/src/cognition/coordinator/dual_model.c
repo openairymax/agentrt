@@ -4,13 +4,23 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "strategy.h"
-#include "agentos.h"
-#include <stdlib.h>
-#include <string.h>
+#include "strategy.h
+#include "../../../bases/utils/cognition/include/cognition_common.h""
+#include "agentos.h
+#include "../../../bases/utils/cognition/include/cognition_common.h""
+#include <stdlib.h
+#include "../../../bases/utils/cognition/include/cognition_common.h">
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h
+#include "../../../bases/utils/cognition/include/cognition_common.h""
+#include "../../../bases/utils/string/include/string_compat.h
+#include "../../../bases/utils/cognition/include/cognition_common.h""
+#include <string.h
+#include "../../../bases/utils/cognition/include/cognition_common.h">
 
 /**
- * @brief 双模型协调器上下文
+ * @brief 双模型协调器上下�?
  */
 typedef struct dual_model_coordinator {
     agentos_coordinator_base_t base;
@@ -36,7 +46,7 @@ static agentos_error_t dual_coordinate(
     dual_model_coordinator_t* coordinator = (dual_model_coordinator_t*)base;
 
     size_t total_len = 256;
-    char* result = (char*)malloc(total_len);
+    char* result = (char*)AGENTOS_MALLOC(total_len);
     if (!result) return AGENTOS_ENOMEM;
 
     snprintf(result, total_len,
@@ -57,9 +67,9 @@ static void dual_destroy(agentos_coordinator_base_t* base) {
     if (!base) return;
 
     dual_model_coordinator_t* coordinator = (dual_model_coordinator_t*)base;
-    if (coordinator->primary_model) free(coordinator->primary_model);
-    if (coordinator->secondary_model) free(coordinator->secondary_model);
-    free(coordinator);
+    if (coordinator->primary_model) AGENTOS_FREE(coordinator->primary_model);
+    if (coordinator->secondary_model) AGENTOS_FREE(coordinator->secondary_model);
+    AGENTOS_FREE(coordinator);
 }
 
 /**
@@ -73,14 +83,14 @@ agentos_error_t agentos_coordinator_dual_create(
     if (!out_coordinator) return AGENTOS_EINVAL;
 
     dual_model_coordinator_t* coordinator = (dual_model_coordinator_t*)
-        calloc(1, sizeof(dual_model_coordinator_t));
+        AGENTOS_CALLOC(1, sizeof(dual_model_coordinator_t));
     if (!coordinator) return AGENTOS_ENOMEM;
 
     coordinator->base.coordinate = dual_coordinate;
     coordinator->base.destroy = dual_destroy;
 
-    coordinator->primary_model = primary_model ? strdup(primary_model) : NULL;
-    coordinator->secondary_model = secondary_model ? strdup(secondary_model) : NULL;
+    coordinator->primary_model = primary_model ? AGENTOS_STRDUP(primary_model) : NULL;
+    coordinator->secondary_model = secondary_model ? AGENTOS_STRDUP(secondary_model) : NULL;
     coordinator->primary_weight = primary_weight > 0 ? primary_weight : 0.7f;
     coordinator->secondary_weight = 1.0f - coordinator->primary_weight;
 

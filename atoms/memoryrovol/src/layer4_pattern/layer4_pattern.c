@@ -1,12 +1,16 @@
-/**
+﻿﻿/**
  * @file layer4_pattern.c
- * @brief L4 模式层实现
+ * @brief L4 模式层实�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "../include/layer4_pattern.h"
 #include "../include/llm_client.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -16,7 +20,7 @@ struct agentos_rule_generator {
 };
 
 /**
- * @brief 创建规则生成器
+ * @brief 创建规则生成�?
  */
 agentos_error_t agentos_rule_generator_create(
     void* llm_service,
@@ -24,13 +28,13 @@ agentos_error_t agentos_rule_generator_create(
     if (!out_gen) return AGENTOS_EINVAL;
 
     agentos_rule_generator_t* gen = (agentos_rule_generator_t*)
-        calloc(1, sizeof(agentos_rule_generator_t));
+        AGENTOS_CALLOC(1, sizeof(agentos_rule_generator_t));
     if (!gen) return AGENTOS_ENOMEM;
 
     gen->llm_service = llm_service;
-    gen->system_prompt = strdup(
+    gen->system_prompt = AGENTOS_STRDUP(
         "You are a pattern analyzer. Given a set of memory IDs that belong to the same cluster, "
-        "generate a JSON rule that captures the common characteristics of this cluster. "
+        "generate a JSON rule that captures the bases characteristics of this cluster. "
         "The rule should have fields: 'name', 'description', 'condition', 'action', and 'confidence'.");
 
     *out_gen = gen;
@@ -42,12 +46,12 @@ agentos_error_t agentos_rule_generator_create(
  */
 void agentos_rule_generator_destroy(agentos_rule_generator_t* gen) {
     if (!gen) return;
-    if (gen->system_prompt) free(gen->system_prompt);
-    free(gen);
+    if (gen->system_prompt) AGENTOS_FREE(gen->system_prompt);
+    AGENTOS_FREE(gen);
 }
 
 /**
- * @brief 从聚类生成规则
+ * @brief 从聚类生成规�?
  */
 agentos_error_t agentos_rule_generator_from_cluster(
     agentos_rule_generator_t* gen,
@@ -59,7 +63,7 @@ agentos_error_t agentos_rule_generator_from_cluster(
     char prompt[4096] = {0};
     size_t pos = 0;
     
-    /* 安全构建提示字符串，使用 snprintf 确保不溢出 */
+    /* 安全构建提示字符串，使用 snprintf 确保不溢�?*/
     int written = snprintf(prompt + pos, sizeof(prompt) - pos, "Cluster IDs:\n");
     if (written < 0 || (size_t)written >= sizeof(prompt) - pos) {
         return AGENTOS_EOVERFLOW;
@@ -80,7 +84,7 @@ agentos_error_t agentos_rule_generator_from_cluster(
     }
     pos += written;
 
-    *out_rule = strdup(prompt);
+    *out_rule = AGENTOS_STRDUP(prompt);
     if (!*out_rule) return AGENTOS_ENOMEM;
 
     return AGENTOS_SUCCESS;
@@ -99,7 +103,7 @@ agentos_error_t agentos_pattern_analyze(
     snprintf(pattern, sizeof(pattern),
         "{\"type\":\"cluster\",\"count\":%zu,\"confidence\":0.85}", count);
 
-    *out_pattern = strdup(pattern);
+    *out_pattern = AGENTOS_STRDUP(pattern);
     return *out_pattern ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
 }
 

@@ -1,4 +1,4 @@
-# AgentOS 初始化配置脚本
+﻿# AgentOS 初始化配置脚本
 
 **版本**: v1.0.0.6  
 **最后更新**: 2026-03-21  
@@ -117,11 +117,11 @@ API Base URL [https://api.openai.com/v1]:
 ```
 创建项目目录结构...
 
-✓ partdata/kernel/
-✓ partdata/logs/
-✓ partdata/services/
-✓ partdata/models/
-✓ config/cache/
+✓ lodges/kernel/
+✓ lodges/logs/
+✓ lodges/services/
+✓ lodges/models/
+✓ manager/cache/
 
 目录结构创建完成！
 ```
@@ -132,9 +132,9 @@ API Base URL [https://api.openai.com/v1]:
 生成配置文件...
 
 ✓ .env                    # 环境变量
-✓ config/kernel/settings.yaml    # 内核配置
-✓ config/security/policy.yaml    # 安全策略
-✓ config/logging/config.yaml     # 日志配置
+✓ manager/kernel/settings.yaml    # 内核配置
+✓ manager/security/policy.yaml    # 安全策略
+✓ manager/logging/manager.yaml     # 日志配置
 
 配置文件生成完成！
 ```
@@ -173,7 +173,7 @@ HTTP_PORT=8080
 GRPC_PORT=9090
 ```
 
-### config/kernel/settings.yaml - 内核配置
+### manager/kernel/settings.yaml - 内核配置
 
 ```yaml
 # AgentOS 内核配置
@@ -204,7 +204,7 @@ time:
   ntp_server: pool.ntp.org
 ```
 
-### config/security/policy.yaml - 安全策略
+### manager/security/policy.yaml - 安全策略
 
 ```yaml
 # AgentOS 安全策略
@@ -224,7 +224,7 @@ security:
   # 审计日志
   audit:
     enabled: true
-    log_file: partdata/logs/audit.log
+    log_file: lodges/logs/audit.log
     rotation:
       max_size_mb: 100
       max_files: 10
@@ -237,7 +237,7 @@ security:
       memory_mb: 1024
 ```
 
-### config/logging/config.yaml - 日志配置
+### manager/logging/manager.yaml - 日志配置
 
 ```yaml
 # AgentOS 日志配置
@@ -259,7 +259,7 @@ logging:
       
     file:
       class: logging.handlers.RotatingFileHandler
-      filename: partdata/logs/agentos.log
+      filename: lodges/logs/agentos.log
       level: DEBUG
       maxBytes: 10485760  # 10MB
       backupCount: 5
@@ -314,7 +314,7 @@ pip install -r requirements.txt
 
 #### 3. 配置文件冲突
 
-**警告**: `Config file already exists: .env`
+**警告**: `manager file already exists: .env`
 
 **解决**:
 ```bash
@@ -374,11 +374,11 @@ security:
 ```bash
 # 设置配置文件权限
 chmod 600 .env
-chmod 600 config/security/*.yaml
-chown $USER:$USER .env config/
+chmod 600 manager/security/*.yaml
+chown $USER:$USER .env manager/
 
 # 验证权限
-ls -la .env config/
+ls -la .env manager/
 ```
 
 ---
@@ -402,7 +402,7 @@ source .env.$AGENTOS_ENV
 
 ```bash
 # 跟踪配置变更
-git add config/
+git add manager/
 git commit -m "chore: 初始化配置文件"
 
 # 使用 Git hooks 验证配置
@@ -436,14 +436,14 @@ jobs:
       with:
         python-version: '3.9'
     
-    - name: Initialize Config
+    - name: Initialize manager
       run: |
         cd scripts/init
         python init_config.py --non-interactive --template testing
     
-    - name: Verify Config
+    - name: Verify manager
       run: |
-        python -c "import yaml; yaml.safe_load(open('config/kernel/settings.yaml'))"
+        python -c "import yaml; yaml.safe_load(open('manager/kernel/settings.yaml'))"
 ```
 
 ---
@@ -452,7 +452,7 @@ jobs:
 
 - [主 README](../README.md) - 脚本总览
 - [构建指南](../build/README.md) - 编译和安装
-- [快速入门](../../partdocs/guides/getting_started.md) - 新手教程
+- [快速入门](../../paper/guides/getting_started.md) - 新手教程
 
 ---
 
@@ -469,3 +469,5 @@ jobs:
 
 *From data intelligence emerges.*  
 *始于数据，终于智能。*
+
+

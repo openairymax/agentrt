@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 构建日志管理脚本
 # 统一收集、管理和分析 CI/CD 构建日志
@@ -8,7 +8,7 @@ set -euo pipefail
 ###############################################################################
 # 配置
 ###############################################################################
-AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")
+AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENTOS_SCRIPTS_DIR="$(dirname "$AGENTOS_SCRIPT_DIR")"
 AGENTOS_PROJECT_ROOT="$(dirname "$AGENTOS_SCRIPTS_DIR")"
 AGENTOS_LOG_DIR="${AGENTOS_LOG_DIR:-$AGENTOS_PROJECT_ROOT/build/logs}"
@@ -117,7 +117,7 @@ ${COLOR_BOLD}选项:${COLOR_NC}
     --pattern <模式>    搜索模式
     --help             显示帮助
 
-${COLOR_BOLD}示例:${COLOR_CD}
+${COLOR_BOLD}示例:${COLOR_NC}
     $0 collect --build-id 12345
     $0 analyze --level error
     $0 report --output build-report.html

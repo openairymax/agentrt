@@ -1,4 +1,4 @@
-"""
+﻿﻿"""
 AgentOS 模糊测试框架
 Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 Version: 1.0.0
@@ -151,7 +151,7 @@ if HYPOTHESIS_AVAILABLE:
         """生成路径遍历测试载荷的策略"""
         base_payloads = [
             "../../../etc/passwd",
-            "..\\..\\..\\windows\\system32\\config\\sam",
+            "..\\..\\..\\windows\\system32\\manager\\sam",
             "....//....//....//etc/passwd",
             "%2e%2e%2f%2e%2e%2f%2e%2e%2fetc/passwd",
             "..%252f..%252f..%252fetc/passwd",

@@ -1,4 +1,4 @@
-# AgentOS 测试隔离和并行执行工具
+﻿# AgentOS 测试隔离和并行执行工具
 # Version: 1.0.0.6
 # Last updated: 2026-03-22
 
@@ -60,7 +60,7 @@ class TestIsolationManager:
                 "AGENTOS_TEMP_DIR": str(temp_dir / "temp"),
                 "AGENTOS_LOG_FILE": str(temp_dir / "test.log"),
                 "AGENTOS_DB_PATH": str(temp_dir / "test.db"),
-                "AGENTOS_CONFIG_PATH": str(temp_dir / "config.json")
+                "AGENTOS_CONFIG_PATH": str(temp_dir / "manager.json")
             }
             
             for key, value in test_env.items():
@@ -71,7 +71,7 @@ class TestIsolationManager:
             (temp_dir / "data").mkdir(exist_ok=True)
             (temp_dir / "logs").mkdir(exist_ok=True)
             
-            config = {
+            manager = {
                 "test_id": env_id,
                 "endpoint": test_env["AGENTOS_ENDPOINT"],
                 "temp_dir": test_env["AGENTOS_TEMP_DIR"],
@@ -80,8 +80,8 @@ class TestIsolationManager:
                 "logging": {"level": "DEBUG", "file": test_env["AGENTOS_LOG_FILE"]}
             }
             
-            with open(temp_dir / "config.json", 'w') as f:
-                json.dump(config, f, indent=2)
+            with open(temp_dir / "manager.json", 'w') as f:
+                json.dump(manager, f, indent=2)
         
         try:
             yield env_id

@@ -1,4 +1,4 @@
-# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+﻿# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Atoms Module CI/CD Pipeline
 # Version: 1.0.0
 # 
@@ -114,6 +114,65 @@ jobs:
             clang-tidy -p atoms/build "$file" 2>&1 || true
           done | tee reports/clang-tidy.txt || true
 
+      - name: Install duplicate detection and complexity analysis tools
+        run: |
+          # 安装jscpd（重复代码检测）
+          npm install -g jscpd
+          # 安装lizard（圈复杂度分析）
+          pip install lizard
+          
+      - name: Run duplicate code detection (jscpd)
+        id: jscpd
+        run: |
+          mkdir -p reports
+          # 运行jscpd，阈值设为5%（超过则失败）
+          jscpd --manager .jscpd.json --output reports/jscpd-report atoms/ 2>&1 | tee reports/jscpd.txt
+          
+          # 检查重复率是否超过阈值
+          if grep -q "Found.*duplicated lines" reports/jscpd.txt; then
+            DUPLICATE_PERCENT=$(grep -o "Found.*duplicated lines" reports/jscpd.txt | grep -o '[0-9]*\.[0-9]*%' || echo "0%")
+            DUPLICATE_VALUE=$(echo "$DUPLICATE_PERCENT" | sed 's/%//')
+            echo "duplicate_percent=$DUPLICATE_VALUE" >> $GITHUB_OUTPUT
+            
+            # 如果重复率超过5%，则警告
+            if (( $(echo "$DUPLICATE_VALUE > 5" | bc -l) )); then
+              echo "::error::Code duplication rate ${DUPLICATE_PERCENT} exceeds 5% threshold"
+              exit 1
+            else
+              echo "::warning::Code duplication rate ${DUPLICATE_PERCENT} (within threshold)"
+            fi
+          fi
+          
+      - name: Run cyclomatic complexity analysis (lizard)
+        id: lizard
+        run: |
+          mkdir -p reports
+          # 运行lizard圈复杂度分析
+          lizard --CCN 10 --length 50 --arguments 6 --output_file reports/lizard-report.html atoms/ 2>&1 | tee reports/lizard.txt
+          
+          # 提取复杂度统计信息
+          if grep -q "Average cyclomatic complexity" reports/lizard.txt; then
+            AVG_CCN=$(grep "Average cyclomatic complexity" reports/lizard.txt | grep -o '[0-9]*\.[0-9]*' || echo "0")
+            echo "average_ccn=$AVG_CCN" >> $GITHUB_OUTPUT
+            
+            # 检查平均圈复杂度是否超过3.5
+            if (( $(echo "$AVG_CCN > 3.5" | bc -l) )); then
+              echo "::error::Average cyclomatic complexity ${AVG_CCN} exceeds 3.5 threshold"
+              exit 1
+            fi
+            
+            # 检查是否有函数超过10的复杂度
+            if grep -q ".* exceeds " reports/lizard.txt; then
+              HIGH_COMPLEXITY_COUNT=$(grep -c ".* exceeds " reports/lizard.txt || echo "0")
+              echo "high_complexity_count=$HIGH_COMPLEXITY_COUNT" >> $GITHUB_OUTPUT
+              if [ "$HIGH_COMPLEXITY_COUNT" -gt 0 ]; then
+                echo "::warning::Found $HIGH_COMPLEXITY_COUNT functions exceeding complexity threshold"
+                # 这里不直接失败，因为有些函数可能确实需要高复杂度
+                # 我们只记录警告，不阻断构建
+              fi
+            fi
+          fi
+          
       - name: Upload analysis reports
         uses: actions/upload-artifact@v4
         with:
@@ -125,11 +184,27 @@ jobs:
         run: |
           echo "=== Code Quality Summary ==="
           echo "Cppcheck issues: ${{ steps.cppcheck.outputs.errors }}"
+          echo "Code duplication rate: ${{ steps.jscpd.outputs.duplicate_percent || '0' }}%"
+          echo "Average cyclomatic complexity: ${{ steps.lizard.outputs.average_ccn || '0' }}"
+          echo "High complexity functions: ${{ steps.lizard.outputs.high_complexity_count || '0' }}"
           
           # 如果有严重错误则失败
           if grep -q "error id=\".*\" severity=\"error\"" reports/cppcheck.xml 2>/dev/null; then
             echo "::error::Critical issues found by cppcheck"
             exit 1
+          fi
+          
+          # 检查重复检测是否成功运行（如果步骤被跳过，输出可能为空）
+          if [ -f "reports/jscpd.txt" ]; then
+            echo "✅ Duplicate detection completed"
+          else
+            echo "::warning::Duplicate detection may have been skipped"
+          fi
+          
+          if [ -f "reports/lizard.txt" ]; then
+            echo "✅ Complexity analysis completed"
+          else
+            echo "::warning::Complexity analysis may have been skipped"
           fi
           
           echo "✅ Code quality check passed"
@@ -186,9 +261,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential cmake ninja-build pkg-config \
+            build-essential cmake ninja-build pkg-manager \
             libyaml-dev libcjson-dev libcurl4-openssl-dev \
-            libsqlite3-dev libssl-dev
+            libsqlite3-dev libssl-dev libevent-dev
           
           if [ "${{ matrix.compiler }}" == "clang" ]; then
             sudo apt-get install -y clang
@@ -385,7 +460,7 @@ jobs:
             atoms/
           
           # Semgrep扫描
-          semgrep --config=auto --json --output=reports/sast-semgrep.json atoms/
+          semgrep --manager=auto --json --output=reports/sast-semgrep.json atoms/
 
       - name: Run SCA (Software Composition Analysis)
         run: |

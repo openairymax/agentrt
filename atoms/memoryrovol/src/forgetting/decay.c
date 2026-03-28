@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file decay.c
  * @brief 遗忘衰减计算（基于艾宾浩斯曲线）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -9,10 +9,14 @@
 #include "agentos.h"
 #include <math.h>
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 
 struct agentos_forgetting_engine {
-    agentos_forgetting_config_t config;
+    agentos_forgetting_config_t manager;
     agentos_layer1_raw_t* layer1;
     agentos_layer2_feature_t* layer2;
     agentos_mutex_t* lock;
@@ -21,7 +25,7 @@ struct agentos_forgetting_engine {
 };
 
 agentos_error_t agentos_forgetting_create(
-    const agentos_forgetting_config_t* config,
+    const agentos_forgetting_config_t* manager,
     agentos_layer1_raw_t* layer1,
     // From data intelligence emerges. by spharx
     agentos_layer2_feature_t* layer2,
@@ -29,29 +33,29 @@ agentos_error_t agentos_forgetting_create(
 
     if (!layer1 || !layer2 || !out_engine) return AGENTOS_EINVAL;
 
-    agentos_forgetting_engine_t* eng = (agentos_forgetting_engine_t*)calloc(1, sizeof(agentos_forgetting_engine_t));
+    agentos_forgetting_engine_t* eng = (agentos_forgetting_engine_t*)AGENTOS_CALLOC(1, sizeof(agentos_forgetting_engine_t));
     if (!eng) {
         AGENTOS_LOG_ERROR("Failed to allocate forgetting engine");
         return AGENTOS_ENOMEM;
     }
 
-    if (config) {
-        eng->config = *config;
+    if (manager) {
+        eng->manager = *manager;
     } else {
         // 默认配置
-        eng->config.strategy = AGENTOS_FORGET_EBBINGHAUS;
-        eng->config.lambda = 0.01;
-        eng->config.threshold = 0.3;
-        eng->config.min_access = 1;
-        eng->config.check_interval_sec = 3600; // 1小时
-        eng->config.archive_path = "/var/agentos/archive";
+        eng->manager.strategy = AGENTOS_FORGET_EBBINGHAUS;
+        eng->manager.lambda = 0.01;
+        eng->manager.threshold = 0.3;
+        eng->manager.min_access = 1;
+        eng->manager.check_interval_sec = 3600; // 1小时
+        eng->manager.archive_path = "/var/agentos/archive";
     }
 
     eng->layer1 = layer1;
     eng->layer2 = layer2;
     eng->lock = agentos_mutex_create();
     if (!eng->lock) {
-        free(eng);
+        AGENTOS_FREE(eng);
         return AGENTOS_ENOMEM;
     }
 
@@ -63,11 +67,11 @@ void agentos_forgetting_destroy(agentos_forgetting_engine_t* engine) {
     if (!engine) return;
     agentos_forgetting_stop_auto(engine);
     if (engine->lock) agentos_mutex_destroy(engine->lock);
-    free(engine);
+    AGENTOS_FREE(engine);
 }
 
 /**
- * 艾宾浩斯遗忘曲线： R = exp(-λ * t)  (t 单位为秒)
+ * 艾宾浩斯遗忘曲线�?R = exp(-λ * t)  (t 单位为秒)
  */
 static double ebbinghaus_weight(double lambda, uint64_t last_access, uint64_t now) {
     double age_sec = (now - last_access) / 1e9; // 纳秒转秒
@@ -96,19 +100,19 @@ agentos_error_t agentos_forgetting_get_weight(
     uint64_t now = agentos_time_monotonic_ns();
     double weight = 1.0;
 
-    switch (engine->config.strategy) {
+    switch (engine->manager.strategy) {
         case AGENTOS_FORGET_EBBINGHAUS:
-            weight = ebbinghaus_weight(engine->config.lambda, meta->last_access, now);
+            weight = ebbinghaus_weight(engine->manager.lambda, meta->last_access, now);
             break;
         case AGENTOS_FORGET_LINEAR:
             {
                 double age_sec = (now - meta->last_access) / 1e9;
-                weight = 1.0 - engine->config.lambda * age_sec;
+                weight = 1.0 - engine->manager.lambda * age_sec;
                 if (weight < 0) weight = 0.0;
             }
             break;
         case AGENTOS_FORGET_ACCESS_BASED:
-            weight = access_weight(meta->access_count, engine->config.min_access);
+            weight = access_weight(meta->access_count, engine->manager.min_access);
             break;
         default:
             weight = 1.0;
@@ -124,7 +128,7 @@ agentos_error_t agentos_forgetting_get_weight(
 static void* auto_worker(void* arg) {
     agentos_forgetting_engine_t* eng = (agentos_forgetting_engine_t*)arg;
     while (eng->auto_running) {
-        agentos_task_sleep(eng->config.check_interval_sec * 1000);
+        agentos_task_sleep(eng->manager.check_interval_sec * 1000);
         agentos_forgetting_prune(eng, NULL);
     }
     return NULL;

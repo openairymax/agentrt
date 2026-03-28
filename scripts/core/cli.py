@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿﻿#!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 交互式 CLI 增强模块
 # 提供 TUI 和交互式诊断功能
@@ -83,8 +83,8 @@ class OutputFormatter:
     @staticmethod
     def format_message(message: str, style: Style = Style.NORMAL) -> str:
         """格式化消息"""
-        config = STYLE_CONFIGS[style]
-        return f"{config.prefix}{config.color}{message}{Color.RESET}"
+        manager = STYLE_CONFIGS[style]
+        return f"{manager.prefix}{manager.color}{message}{Color.RESET}"
 
     @staticmethod
     def format_section(title: str, width: int = 70) -> str:
@@ -362,7 +362,7 @@ class InteractiveDoctor:
             "dependencies": "检查依赖项...",
             "network": "检查网络连接...",
             "docker": "检查 Docker 环境...",
-            "config": "检查配置文件...",
+            "manager": "检查配置文件...",
         }
 
         results = {}

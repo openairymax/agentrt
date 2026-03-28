@@ -1,11 +1,15 @@
 /**
  * @file test_main.c
- * @brief memoryrovol 测试主程序
+ * @brief memoryrovol 测试主程�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include <stdio.h>
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <assert.h>
 
 /* 测试函数声明 */
@@ -13,11 +17,11 @@ extern int test_advanced_storage_basic(void);
 extern int test_advanced_storage_edge_cases(void);
 
 /**
- * @brief 运行所有测试
+ * @brief 运行所有测�?
  * @return 0表示成功，非0表示失败
  */
 int main(void) {
-    printf("开始运行 memoryrovol 单元测试...\n");
+    printf("开始运�?memoryrovol 单元测试...\n");
     
     int failures = 0;
     
@@ -36,7 +40,7 @@ int main(void) {
         printf("PASS: test_advanced_storage_edge_cases\n");
     }
     
-    /* 汇总结果 */
+    /* 汇总结�?*/
     if (failures == 0) {
         printf("\n所有测试通过！\n");
         return 0;

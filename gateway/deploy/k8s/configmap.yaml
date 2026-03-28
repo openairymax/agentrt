@@ -1,0 +1,77 @@
+﻿# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# Kubernetes ConfigMap for AgentOS gateway Module - Development Environment
+# Version: 1.0.0
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agentos-gateway-manager
+  namespace: agentos-development
+  labels:
+    app: agentos-gateway
+    environment: development
+    managed-by: agentos-ci
+data:
+  AGENTOS_ENV: "development"
+  AGENTOS_LOG_LEVEL: "DEBUG"
+  AGENTOS_HTTP_PORT: "8080"
+  AGENTOS_WS_PORT: "8081"
+  AGENTOS_MAX_SESSIONS: "100"
+  AGENTOS_SESSION_TIMEOUT: "3600"
+  AGENTOS_HEALTH_CHECK_INTERVAL: "30"
+  REDIS_HOST: "redis-development"
+  REDIS_PORT: "6379"
+  ENABLE_METRICS: "true"
+  ENABLE_TRACING: "true"
+---
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# Kubernetes ConfigMap for AgentOS gateway Module - Staging Environment
+# Version: 1.0.0
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agentos-gateway-manager
+  namespace: agentos-staging
+  labels:
+    app: agentos-gateway
+    environment: staging
+    managed-by: agentos-ci
+data:
+  AGENTOS_ENV: "staging"
+  AGENTOS_LOG_LEVEL: "INFO"
+  AGENTOS_HTTP_PORT: "8080"
+  AGENTOS_WS_PORT: "8081"
+  AGENTOS_MAX_SESSIONS: "500"
+  AGENTOS_SESSION_TIMEOUT: "1800"
+  AGENTOS_HEALTH_CHECK_INTERVAL: "30"
+  REDIS_HOST: "redis-staging"
+  REDIS_PORT: "6379"
+  ENABLE_METRICS: "true"
+  ENABLE_TRACING: "true"
+---
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# Kubernetes ConfigMap for AgentOS gateway Module - Production Environment
+# Version: 1.0.0
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agentos-gateway-manager
+  namespace: agentos-production
+  labels:
+    app: agentos-gateway
+    environment: production
+    managed-by: agentos-ci
+data:
+  AGENTOS_ENV: "production"
+  AGENTOS_LOG_LEVEL: "WARN"
+  AGENTOS_HTTP_PORT: "8080"
+  AGENTOS_WS_PORT: "8081"
+  AGENTOS_MAX_SESSIONS: "1000"
+  AGENTOS_SESSION_TIMEOUT: "900"
+  AGENTOS_HEALTH_CHECK_INTERVAL: "30"
+  REDIS_HOST: "redis-production"
+  REDIS_PORT: "6379"
+  ENABLE_METRICS: "true"
+  ENABLE_TRACING: "true"

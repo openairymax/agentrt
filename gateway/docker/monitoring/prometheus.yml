@@ -1,0 +1,85 @@
+﻿# Copyright (c) 2026 SPHARX. All Rights Reserved.
+# Prometheus Configuration for AgentOS gateway Module
+# Version: 1.0.0
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'agentos-gateway'
+    environment: 'production'
+
+# 告警规则文件
+rule_files:
+  - '/etc/prometheus/rules/*.yml'
+
+# 告警管理器配置
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# 抓取配置
+scrape_configs:
+  # ==========================================================================
+  # gateway Module 自身指标
+  # ==========================================================================
+  - job_name: 'agentos-gateway'
+    static_configs:
+      - targets: ['gateway:9090']
+    metrics_path: /metrics
+    scheme: http
+    
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'gateway'
+      
+    metric_relabel_configs:
+      # 保留关键指标
+      - source_labels: [__name__]
+        regex: 'agentos_.*|http_.*|websocket_.*|session_.*|connection_.*'
+        action: keep
+
+  # ==========================================================================
+  # Redis 监控
+  # ==========================================================================
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    
+    # Redis Exporter 配置（如果使用）
+    # metrics_path: /metrics
+    # scheme: http
+
+  # ==========================================================================
+  # Prometheus 自身监控
+  # ==========================================================================
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ==========================================================================
+  # Kubernetes 服务发现（如果部署在K8s中）
+  # ==========================================================================
+  - job_name: 'kubernetes-pods'
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - agentos-gateway
+    relabel_configs:
+      # 只抓取带有 prometheus.io/scrape=true 注解的 Pod
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__

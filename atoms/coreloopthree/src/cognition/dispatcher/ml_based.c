@@ -7,6 +7,10 @@
 #include "strategy.h"
 #include "agentos.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 #include <math.h>
 
@@ -52,7 +56,7 @@ static float compute_model_score(
 }
 
 /**
- * @brief 选择最佳模型
+ * @brief 选择最佳模�?
  */
 static agentos_error_t ml_select(
     agentos_dispatcher_base_t* base,
@@ -65,7 +69,7 @@ static agentos_error_t ml_select(
     ml_dispatcher_t* dispatcher = (ml_dispatcher_t*)base;
 
     if (dispatcher->model_count == 0) {
-        *out_model_id = strdup("default");
+        *out_model_id = AGENTOS_STRDUP("default");
         return AGENTOS_SUCCESS;
     }
 
@@ -83,7 +87,7 @@ static agentos_error_t ml_select(
         }
     }
 
-    *out_model_id = strdup(best_model);
+    *out_model_id = AGENTOS_STRDUP(best_model);
     return AGENTOS_SUCCESS;
 }
 
@@ -111,24 +115,24 @@ static agentos_error_t ml_update_weights(
 }
 
 /**
- * @brief 销毁ML调度器
+ * @brief 销毁ML调度�?
  */
 static void ml_destroy(agentos_dispatcher_base_t* base) {
     if (!base) return;
 
     ml_dispatcher_t* dispatcher = (ml_dispatcher_t*)base;
-    if (dispatcher->model_weights) free(dispatcher->model_weights);
+    if (dispatcher->model_weights) AGENTOS_FREE(dispatcher->model_weights);
     if (dispatcher->model_names) {
         for (size_t i = 0; i < dispatcher->model_count; i++) {
-            if (dispatcher->model_names[i]) free(dispatcher->model_names[i]);
+            if (dispatcher->model_names[i]) AGENTOS_FREE(dispatcher->model_names[i]);
         }
-        free(dispatcher->model_names);
+        AGENTOS_FREE(dispatcher->model_names);
     }
-    free(dispatcher);
+    AGENTOS_FREE(dispatcher);
 }
 
 /**
- * @brief 创建ML调度器
+ * @brief 创建ML调度�?
  */
 agentos_error_t agentos_dispatcher_ml_create(
     const char** model_names,
@@ -137,7 +141,7 @@ agentos_error_t agentos_dispatcher_ml_create(
     if (!out_dispatcher) return AGENTOS_EINVAL;
 
     ml_dispatcher_t* dispatcher = (ml_dispatcher_t*)
-        calloc(1, sizeof(ml_dispatcher_t));
+        AGENTOS_CALLOC(1, sizeof(ml_dispatcher_t));
     if (!dispatcher) return AGENTOS_ENOMEM;
 
     dispatcher->base.select = ml_select;
@@ -147,19 +151,19 @@ agentos_error_t agentos_dispatcher_ml_create(
     if (model_names && model_count > 0) {
         dispatcher->model_count = model_count;
         dispatcher->weight_count = model_count;
-        dispatcher->model_weights = (float*)calloc(model_count, sizeof(float));
-        dispatcher->model_names = (char**)calloc(model_count, sizeof(char*));
+        dispatcher->model_weights = (float*)AGENTOS_CALLOC(model_count, sizeof(float));
+        dispatcher->model_names = (char**)AGENTOS_CALLOC(model_count, sizeof(char*));
 
         if (!dispatcher->model_weights || !dispatcher->model_names) {
-            if (dispatcher->model_weights) free(dispatcher->model_weights);
-            if (dispatcher->model_names) free(dispatcher->model_names);
-            free(dispatcher);
+            if (dispatcher->model_weights) AGENTOS_FREE(dispatcher->model_weights);
+            if (dispatcher->model_names) AGENTOS_FREE(dispatcher->model_names);
+            AGENTOS_FREE(dispatcher);
             return AGENTOS_ENOMEM;
         }
 
         for (size_t i = 0; i < model_count; i++) {
             dispatcher->model_weights[i] = 1.0f / model_count;
-            dispatcher->model_names[i] = strdup(model_names[i]);
+            dispatcher->model_names[i] = AGENTOS_STRDUP(model_names[i]);
         }
     }
 

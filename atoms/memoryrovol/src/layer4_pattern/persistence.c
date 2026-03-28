@@ -1,11 +1,15 @@
-/**
+﻿/**
  * @file persistence.c
- * @brief L4 模式层持久性计算器（基于Ripser）
+ * @brief L4 模式层持久性计算器（基于Ripser�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "layer4_pattern.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 #include <math.h>
 
@@ -29,12 +33,12 @@ typedef struct {
 static void collector_add(feature_collector_t* col, int dim, double birth, double death) {
     if (col->count >= col->capacity) {
         col->capacity = (col->capacity == 0) ? 16 : col->capacity * 2;
-        agentos_persistence_feature_t** new_f = (agentos_persistence_feature_t**)realloc(
+        agentos_persistence_feature_t** new_f = (agentos_persistence_feature_t**)AGENTOS_REALLOC(
             col->features, col->capacity * sizeof(agentos_persistence_feature_t*));
         if (!new_f) return;
         col->features = new_f;
     }
-    agentos_persistence_feature_t* f = (agentos_persistence_feature_t*)malloc(sizeof(agentos_persistence_feature_t));
+    agentos_persistence_feature_t* f = (agentos_persistence_feature_t*)AGENTOS_MALLOC(sizeof(agentos_persistence_feature_t));
     if (!f) return;
     f->dimension = dim;
     f->birth = birth;
@@ -52,18 +56,18 @@ static void ripser_callback(double birth, double death, int dim, void* user) {
 #endif
 
 agentos_error_t agentos_persistence_calculator_create(
-    const void* config,
+    const void* manager,
     agentos_persistence_calculator_t** out_calc) {
 
     if (!out_calc) return AGENTOS_EINVAL;
-    agentos_persistence_calculator_t* calc = (agentos_persistence_calculator_t*)calloc(1, sizeof(agentos_persistence_calculator_t));
+    agentos_persistence_calculator_t* calc = (agentos_persistence_calculator_t*)AGENTOS_CALLOC(1, sizeof(agentos_persistence_calculator_t));
     if (!calc) return AGENTOS_ENOMEM;
 
     calc->noise_factor = 3.0;
     calc->max_dim = 2;
     calc->lock = agentos_mutex_create();
     if (!calc->lock) {
-        free(calc);
+        AGENTOS_FREE(calc);
         return AGENTOS_ENOMEM;
     }
 
@@ -74,7 +78,7 @@ agentos_error_t agentos_persistence_calculator_create(
 void agentos_persistence_calculator_destroy(agentos_persistence_calculator_t* calc) {
     if (!calc) return;
     if (calc->lock) agentos_mutex_destroy(calc->lock);
-    free(calc);
+    AGENTOS_FREE(calc);
 }
 
 agentos_error_t agentos_persistence_calculator_compute(
@@ -117,8 +121,8 @@ void agentos_persistence_features_free(
     size_t count) {
 
     if (!features) return;
-    for (size_t i = 0; i < count; i++) free(features[i]);
-    free(features);
+    for (size_t i = 0; i < count; i++) AGENTOS_FREE(features[i]);
+    AGENTOS_FREE(features);
 }
 
 double agentos_persistence_noise_threshold(

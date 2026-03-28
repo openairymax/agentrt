@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Docker 镜像构建脚本
 # 用法�?/build.sh [kernel|service|all] [dev|release]
@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # 配置变量
-AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")
+AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"pwd)")
 AGENTOS_SCRIPTS_DIR="$(dirname "${AGENTOS_SCRIPT_DIR}")"
 AGENTOS_PROJECT_ROOT="$(dirname "${AGENTOS_SCRIPTS_DIR}")"
 VERSION="1.0.0.6"

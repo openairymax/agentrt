@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file llm_client.h
  * @brief LLM客户端接口（简化版）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -36,7 +36,7 @@ typedef struct agentos_llm_config {
  * @brief 创建LLM服务
  */
 agentos_error_t agentos_llm_service_create(
-    const agentos_llm_config_t* config,
+    const agentos_llm_config_t* manager,
     agentos_llm_service_t** out_service);
 
 /**

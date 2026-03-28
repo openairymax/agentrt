@@ -1,4 +1,4 @@
-# AgentOS 安全测试模块
+﻿# AgentOS 安全测试模块
 # Version: 1.0.0.6
 # Last updated: 2026-03-22
 
@@ -405,7 +405,7 @@ class TestInputSanitization:
             "../../../etc/passwd",
             "..\\..\\..\\windows\\system32",
             "/etc/shadow",
-            "\\windows\\system32\\config"
+            "\\windows\\system32\\manager"
         ]
         
         for path_input in path_traversal_inputs:

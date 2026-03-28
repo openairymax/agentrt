@@ -1,24 +1,24 @@
-# =============================================================================
-# AgentOS domes Module CI/CD Pipeline
+﻿﻿# =============================================================================
+# AgentOS cupolas Module CI/CD Pipeline
 # Version: 2.0.0
 # Last Updated: 2026-03-24
-# Description: Comprehensive CI/CD workflow for domes security sandbox module
+# Description: Comprehensive CI/CD workflow for cupolas security sandbox module
 # =============================================================================
 
-name: domes CI/CD
+name: cupolas CI/CD
 
 on:
   push:
     branches: [ main, develop, 'release/*' ]
     paths:
-      - 'domes/**'
-      - '.github/workflows/domes-ci.yml'
+      - 'cupolas/**'
+      - '.github/workflows/cupolas-ci.yml'
     tags:
-      - 'domes-v*'
+      - 'cupolas-v*'
   pull_request:
     branches: [ main, develop ]
     paths:
-      - 'domes/**'
+      - 'cupolas/**'
   workflow_dispatch:
     inputs:
       environment:
@@ -38,12 +38,12 @@ on:
 
 env:
   BUILD_TYPE: Release
-  MODULE_NAME: domes
+  MODULE_NAME: cupolas
   COVERAGE_THRESHOLD: 80
   MAX_BUILD_TIME: 30
 
 concurrency:
-  group: domes-${{ github.ref }}
+  group: cupolas-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -66,9 +66,9 @@ jobs:
       - name: Extract version
         id: version
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/domes-v* ]]; then
+          if [[ "${{ github.ref }}" == refs/tags/cupolas-v* ]]; then
             VERSION="${{ github.ref_name }}"
-            VERSION="${VERSION#domes-v}"
+            VERSION="${VERSION#cupolas-v}"
           else
             VERSION="0.0.0-dev.${{ github.run_number }}"
           fi
@@ -84,7 +84,7 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             SHOULD_DEPLOY="true"
             ENVIRONMENT="${{ github.event.inputs.environment }}"
-          elif [[ "${{ github.ref }}" == "refs/tags/domes-v"* ]]; then
+          elif [[ "${{ github.ref }}" == "refs/tags/cupolas-v"* ]]; then
             SHOULD_DEPLOY="true"
             ENVIRONMENT="production"
           elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
@@ -123,7 +123,7 @@ jobs:
           sudo apt-get install -y cppcheck clang-format clang-tidy
 
       - name: Run cppcheck
-        working-directory: domes
+        working-directory: cupolas
         run: |
           cppcheck --enable=all --std=c11 --platform=unix64 \
             --error-exitcode=1 \
@@ -144,7 +144,7 @@ jobs:
           fi
 
       - name: Check code formatting
-        working-directory: domes
+        working-directory: cupolas
         run: |
           if [ -f ".clang-format" ]; then
             find src include -name '*.c' -o -name '*.h' | \
@@ -154,11 +154,73 @@ jobs:
           fi
 
       - name: Run clang-tidy
-        working-directory: domes
+        working-directory: cupolas
         continue-on-error: true
         run: |
           if [ -f "compile_commands.json" ] || [ -f "build/compile_commands.json" ]; then
             find src -name '*.c' | head -10 | xargs clang-tidy -p build
+          fi
+
+      - name: Install duplicate detection and complexity analysis tools
+        working-directory: cupolas
+        run: |
+          # 安装jscpd（重复代码检测）
+          npm install -g jscpd
+          # 安装lizard（圈复杂度分析）
+          pip install lizard
+          
+      - name: Run duplicate code detection (jscpd)
+        id: cupolas-jscpd
+        working-directory: cupolas
+        run: |
+          mkdir -p reports
+          # 运行jscpd，阈值设�?%（超过则失败�?
+          jscpd --manager ../../.jscpd.json --output reports/jscpd-report . 2>&1 | tee reports/jscpd.txt
+          
+          # 检查重复率是否超过阈�?
+          if grep -q "Found.*duplicated lines" reports/jscpd.txt; then
+            DUPLICATE_PERCENT=$(grep -o "Found.*duplicated lines" reports/jscpd.txt | grep -o '[0-9]*\.[0-9]*%' || echo "0%")
+            DUPLICATE_VALUE=$(echo "$DUPLICATE_PERCENT" | sed 's/%//')
+            echo "duplicate_percent=$DUPLICATE_VALUE" >> $GITHUB_OUTPUT
+            
+            # 如果重复率超�?%，则警告
+            if (( $(echo "$DUPLICATE_VALUE > 5" | bc -l) )); then
+              echo "::error::Code duplication rate ${DUPLICATE_PERCENT} exceeds 5% threshold"
+              exit 1
+            else
+              echo "::warning::Code duplication rate ${DUPLICATE_PERCENT} (within threshold)"
+            fi
+          fi
+          
+      - name: Run cyclomatic complexity analysis (lizard)
+        id: cupolas-lizard
+        working-directory: cupolas
+        run: |
+          mkdir -p reports
+          # 运行lizard圈复杂度分析
+          lizard --CCN 10 --length 50 --arguments 6 --output_file reports/lizard-report.html . 2>&1 | tee reports/lizard.txt
+          
+          # 提取复杂度统计信�?
+          if grep -q "Average cyclomatic complexity" reports/lizard.txt; then
+            AVG_CCN=$(grep "Average cyclomatic complexity" reports/lizard.txt | grep -o '[0-9]*\.[0-9]*' || echo "0")
+            echo "average_ccn=$AVG_CCN" >> $GITHUB_OUTPUT
+            
+            # 检查平均圈复杂度是否超�?.5
+            if (( $(echo "$AVG_CCN > 3.5" | bc -l) )); then
+              echo "::error::Average cyclomatic complexity ${AVG_CCN} exceeds 3.5 threshold"
+              exit 1
+            fi
+            
+            # 检查是否有函数超过10的复杂度
+            if grep -q ".* exceeds " reports/lizard.txt; then
+              HIGH_COMPLEXITY_COUNT=$(grep -c ".* exceeds " reports/lizard.txt || echo "0")
+              echo "high_complexity_count=$HIGH_COMPLEXITY_COUNT" >> $GITHUB_OUTPUT
+              if [ "$HIGH_COMPLEXITY_COUNT" -gt 0 ]; then
+                echo "::warning::Found $HIGH_COMPLEXITY_COUNT functions exceeding complexity threshold"
+                # 这里不直接失败，因为有些函数可能确实需要高复杂�?
+                # 我们只记录警告，不阻断构�?
+              fi
+            fi
           fi
 
       - name: Upload reports
@@ -167,7 +229,8 @@ jobs:
         with:
           name: code-quality-reports
           path: |
-            domes/cppcheck_report.txt
+            cupolas/cppcheck_report.txt
+            cupolas/reports/
           retention-days: 30
 
   # ===========================================================================
@@ -187,7 +250,7 @@ jobs:
         continue-on-error: true
         with:
           scan-type: 'fs'
-          scan-ref: 'domes'
+          scan-ref: 'cupolas'
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
@@ -197,17 +260,17 @@ jobs:
         if: always()
         with:
           sarif_file: 'trivy-results.sarif'
-          category: 'trivy-domes'
+          category: 'trivy-cupolas'
 
       - name: Run Semgrep
         uses: returntocorp/semgrep-action@v1
         continue-on-error: true
         with:
-          config: >-
+          manager: >-
             p/security-audit
             p/secrets
             p/c
-          path: domes
+          path: cupolas
 
       - name: Secrets scanning with TruffleHog
         uses: trufflesecurity/trufflehog@main
@@ -219,7 +282,7 @@ jobs:
           extra_args: --only-verified
 
       - name: Check for hardcoded secrets
-        working-directory: domes
+        working-directory: cupolas
         run: |
           # Check for potential secrets
           if grep -rE "(password|secret|api_key|token|private_key)\s*=\s*['\"][^'\"]+['\"]" \
@@ -269,9 +332,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            domes/build
+            cupolas/build
             ~/.cmake
-          key: ${{ runner.os }}-${{ matrix.cc }}-cmake-${{ hashFiles('domes/**/CMakeLists.txt', 'domes/**/*.cmake') }}
+          key: ${{ runner.os }}-${{ matrix.cc }}-cmake-${{ hashFiles('cupolas/**/CMakeLists.txt', 'cupolas/**/*.cmake') }}
           restore-keys: |
             ${{ runner.os }}-${{ matrix.cc }}-cmake-
 
@@ -279,7 +342,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build pkg-config
+          sudo apt-get install -y build-essential cmake ninja-build pkg-manager
           sudo apt-get install -y libyaml-dev libcjson-dev libcunit1-dev
         env:
           CC: ${{ matrix.cc }}
@@ -293,7 +356,7 @@ jobs:
           CC: ${{ matrix.cc }}
 
       - name: Configure CMake
-        working-directory: domes
+        working-directory: cupolas
         run: |
           mkdir -p build
           cd build
@@ -305,7 +368,7 @@ jobs:
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
       - name: Build
-        working-directory: domes/build
+        working-directory: cupolas/build
         run: |
           START_TIME=$(date +%s)
           ninja
@@ -318,14 +381,14 @@ jobs:
           fi
 
       - name: Run unit tests
-        working-directory: domes/build
+        working-directory: cupolas/build
         run: |
           ctest --output-on-failure -j$(nproc 2>/dev/null || sysctl -n hw.ncpu) \
             --timeout 300 \
             -T Test
 
       - name: Prepare artifacts
-        working-directory: domes
+        working-directory: cupolas
         run: |
           mkdir -p artifacts/lib artifacts/include
           find build -name '*.a' -exec cp {} artifacts/lib/ \;
@@ -350,8 +413,8 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: domes-${{ matrix.os }}-${{ matrix.cc }}-${{ needs.preflight.outputs.version }}
-          path: domes/artifacts/
+          name: cupolas-${{ matrix.os }}-${{ matrix.cc }}-${{ needs.preflight.outputs.version }}
+          path: cupolas/artifacts/
           retention-days: 7
 
   # ===========================================================================
@@ -369,8 +432,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            domes\build
-          key: windows-msvc-cmake-${{ hashFiles('domes/**/CMakeLists.txt') }}
+            cupolas\build
+          key: windows-msvc-cmake-${{ hashFiles('cupolas/**/CMakeLists.txt') }}
           restore-keys: |
             windows-msvc-cmake-
 
@@ -378,7 +441,7 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: Configure CMake
-        working-directory: domes
+        working-directory: cupolas
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path build
@@ -389,24 +452,24 @@ jobs:
             -DBUILD_WITH_LOGGING=ON
 
       - name: Build
-        working-directory: domes/build
+        working-directory: cupolas/build
         shell: pwsh
         run: |
           $startTime = Get-Date
-          cmake --build . --config ${{ env.BUILD_TYPE }} -j $env:NUMBER_OF_PROCESSORS
+          cmake --build . --manager ${{ env.BUILD_TYPE }} -j $env:NUMBER_OF_PROCESSORS
           $endTime = Get-Date
           $buildTime = ($endTime - $startTime).TotalSeconds
           Write-Host "Build time: $buildTime seconds"
 
       - name: Run tests
-        working-directory: domes/build
+        working-directory: cupolas/build
         shell: pwsh
         run: |
           $env:Path = "$PWD\${{ env.BUILD_TYPE }};$env:Path"
           ctest -C ${{ env.BUILD_TYPE }} --output-on-failure --timeout 300
 
       - name: Prepare artifacts
-        working-directory: domes
+        working-directory: cupolas
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifacts\lib, artifacts\include, artifacts\bin
@@ -429,8 +492,8 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: domes-windows-msvc-${{ needs.preflight.outputs.version }}
-          path: domes\artifacts\
+          name: cupolas-windows-msvc-${{ needs.preflight.outputs.version }}
+          path: cupolas\artifacts\
           retention-days: 7
 
   # ===========================================================================
@@ -450,7 +513,7 @@ jobs:
           sudo apt-get install -y build-essential cmake gcc lcov gcovr
 
       - name: Configure with coverage
-        working-directory: domes
+        working-directory: cupolas
         run: |
           mkdir -p build-coverage
           cd build-coverage
@@ -460,13 +523,13 @@ jobs:
             -DCMAKE_C_FLAGS="--coverage -fprofile-arcs -ftest-coverage -O0 -g"
 
       - name: Build and test
-        working-directory: domes/build-coverage
+        working-directory: cupolas/build-coverage
         run: |
           cmake --build . -j$(nproc)
           ctest --output-on-failure
 
       - name: Generate coverage report
-        working-directory: domes/build-coverage
+        working-directory: cupolas/build-coverage
         run: |
           lcov --capture --directory . --output-file coverage.info
           lcov --remove coverage.info '*/tests/*' '*/build/*' '/usr/*' --output-file coverage.filtered.info
@@ -478,7 +541,7 @@ jobs:
           echo "Coverage: $COVERAGE%"
 
       - name: Check coverage threshold
-        working-directory: domes/build-coverage
+        working-directory: cupolas/build-coverage
         run: |
           COVERAGE=${{ env.coverage_percent }}
           THRESHOLD=${{ env.COVERAGE_THRESHOLD }}
@@ -493,10 +556,10 @@ jobs:
             exit 1
           fi
           
-          echo "✅ Coverage $COVERAGE% meets threshold $THRESHOLD%"
+          echo "�?Coverage $COVERAGE% meets threshold $THRESHOLD%"
 
       - name: Generate HTML report
-        working-directory: domes/build-coverage
+        working-directory: cupolas/build-coverage
         run: |
           genhtml coverage.filtered.info --output-directory coverage_report
 
@@ -504,15 +567,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: domes/build-coverage/coverage_report
+          path: cupolas/build-coverage/coverage_report
           retention-days: 30
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: domes/build-coverage/coverage.filtered.info
-          flags: domes
-          name: domes-coverage
+          files: cupolas/build-coverage/coverage.filtered.info
+          flags: cupolas
+          name: cupolas-coverage
           fail_ci_if_error: false
 
   # ===========================================================================
@@ -534,7 +597,7 @@ jobs:
           sudo apt-get install -y libfuzzer-14-dev afl++ || true
 
       - name: Build with sanitizers
-        working-directory: domes
+        working-directory: cupolas
         run: |
           mkdir -p build-fuzz
           cd build-fuzz
@@ -548,7 +611,7 @@ jobs:
           ninja || echo "Fuzzing build may have partial failures"
 
       - name: Run sanitizer fuzz tests
-        working-directory: domes/build-fuzz
+        working-directory: cupolas/build-fuzz
         continue-on-error: true
         run: |
           # Run short fuzzing session
@@ -565,9 +628,9 @@ jobs:
         with:
           name: fuzzing-results
           path: |
-            domes/build-fuzz/crash-*
-            domes/build-fuzz/leak-*
-            domes/build-fuzz/timeout-*
+            cupolas/build-fuzz/crash-*
+            cupolas/build-fuzz/leak-*
+            cupolas/build-fuzz/timeout-*
           retention-days: 30
           if-no-files-found: ignore
 
@@ -589,7 +652,7 @@ jobs:
           sudo apt-get install -y build-essential cmake ninja-build
 
       - name: Configure and build
-        working-directory: domes
+        working-directory: cupolas
         run: |
           mkdir -p build
           cd build
@@ -597,7 +660,7 @@ jobs:
           ninja
 
       - name: Run benchmarks
-        working-directory: domes/build
+        working-directory: cupolas/build
         continue-on-error: true
         run: |
           echo "# Benchmark Results" > benchmark_report.md
@@ -618,7 +681,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-results
-          path: domes/build/benchmark_report.md
+          path: cupolas/build/benchmark_report.md
           retention-days: 30
 
   # ===========================================================================
@@ -640,13 +703,13 @@ jobs:
             local job=$1
             local result=$2
             if [ "$result" == "success" ]; then
-              echo "✅ $job: PASSED"
+              echo "�?$job: PASSED"
               RESULTS="$RESULTS$job:PASS\n"
             elif [ "$result" == "skipped" ]; then
               echo "⏭️ $job: SKIPPED"
               RESULTS="$RESULTS$job:SKIP\n"
             else
-              echo "❌ $job: FAILED"
+              echo "�?$job: FAILED"
               RESULTS="$RESULTS$job:FAIL\n"
               FAILED=1
             fi
@@ -660,18 +723,35 @@ jobs:
           
           echo "results=$RESULTS" >> $GITHUB_OUTPUT
           
+          # 显示质量检查详�?
+          echo ""
+          echo "=== Code Quality Details ==="
+          echo "Code duplication rate: ${{ needs.code-quality.outputs.duplicate_percent || '0' }}%"
+          echo "Average cyclomatic complexity: ${{ needs.code-quality.outputs.average_ccn || '0' }}"
+          echo "High complexity functions: ${{ needs.code-quality.outputs.high_complexity_count || '0' }}"
+          
           if [ $FAILED -eq 1 ]; then
             echo ""
             echo "## Quality Gates Failed" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo -e "$RESULTS" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Code Quality Details:**" >> $GITHUB_STEP_SUMMARY
+            echo "- Duplication rate: ${{ needs.code-quality.outputs.duplicate_percent || '0' }}%" >> $GITHUB_STEP_SUMMARY
+            echo "- Avg complexity: ${{ needs.code-quality.outputs.average_ccn || '0' }}" >> $GITHUB_STEP_SUMMARY
+            echo "- High complexity: ${{ needs.code-quality.outputs.high_complexity_count || '0' }} functions" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
           
           echo ""
-          echo "## Quality Gates Passed ✅" >> $GITHUB_STEP_SUMMARY
+          echo "## Quality Gates Passed �? >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo -e "$RESULTS" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Code Quality Details:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Duplication rate: ${{ needs.code-quality.outputs.duplicate_percent || '0' }}%" >> $GITHUB_STEP_SUMMARY
+          echo "- Avg complexity: ${{ needs.code-quality.outputs.average_ccn || '0' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- High complexity: ${{ needs.code-quality.outputs.high_complexity_count || '0' }} functions" >> $GITHUB_STEP_SUMMARY
 
       - name: Generate quality report
         if: always()
@@ -687,6 +767,11 @@ jobs:
               "build_unix": "${{ needs.build-unix.result }}",
               "build_windows": "${{ needs.build-windows.result }}",
               "coverage": "${{ needs.coverage.result }}"
+            },
+            "quality_metrics": {
+              "duplicate_percent": "${{ needs.code-quality.outputs.duplicate_percent || '0' }}",
+              "average_ccn": "${{ needs.code-quality.outputs.average_ccn || '0' }}",
+              "high_complexity_count": "${{ needs.code-quality.outputs.high_complexity_count || '0' }}"
             },
             "passed": ${{ steps.check.outcome == 'success' }}
           }
@@ -718,19 +803,19 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-          pattern: domes-*
+          pattern: cupolas-*
           merge-multiple: false
 
       - name: Prepare release package
         id: package
         run: |
           VERSION="${{ needs.preflight.outputs.version }}"
-          ARTIFACT_NAME="agentos-domes-${VERSION}"
+          ARTIFACT_NAME="agentos-cupolas-${VERSION}"
           
           mkdir -p release/${ARTIFACT_NAME}/{lib,include,bin,docs}
           
           # Copy artifacts
-          for dir in artifacts/domes-*; do
+          for dir in artifacts/cupolas-*; do
             if [ -d "$dir/lib" ]; then
               cp -r $dir/lib/* release/${ARTIFACT_NAME}/lib/ 2>/dev/null || true
             fi
@@ -743,20 +828,20 @@ jobs:
           done
           
           # Copy documentation
-          if [ -d "domes/docs" ]; then
-            cp -r domes/docs/* release/${ARTIFACT_NAME}/docs/ 2>/dev/null || true
+          if [ -d "cupolas/docs" ]; then
+            cp -r cupolas/docs/* release/${ARTIFACT_NAME}/docs/ 2>/dev/null || true
           fi
           
           # Create package metadata
           cat > release/${ARTIFACT_NAME}/MANIFEST.json << EOF
           {
-            "name": "agentos-domes",
+            "name": "agentos-cupolas",
             "version": "${VERSION}",
             "build_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "git_commit": "${{ github.sha }}",
             "git_ref": "${{ github.ref }}",
             "ci_run_id": "${{ github.run_id }}",
-            "modules": ["domes"]
+            "modules": ["cupolas"]
           }
           EOF
           
@@ -776,19 +861,19 @@ jobs:
           retention-days: 90
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/domes-v')
+        if: startsWith(github.ref, 'refs/tags/cupolas-v')
         uses: softprops/action-gh-release@v1
         with:
-          name: domes ${{ needs.preflight.outputs.version }}
+          name: cupolas ${{ needs.preflight.outputs.version }}
           body: |
-            ## AgentOS domes Module Release ${{ needs.preflight.outputs.version }}
+            ## AgentOS cupolas Module Release ${{ needs.preflight.outputs.version }}
             
             ### Changes
             See [commit history](https://github.com/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.sha }}) for details.
             
             ### Artifacts
-            - `agentos-domes-${{ needs.preflight.outputs.version }}-linux-x86_64.tar.gz` - Linux x86_64
-            - `agentos-domes-${{ needs.preflight.outputs.version }}-windows-x64.zip` - Windows x64
+            - `agentos-cupolas-${{ needs.preflight.outputs.version }}-linux-x86_64.tar.gz` - Linux x86_64
+            - `agentos-cupolas-${{ needs.preflight.outputs.version }}-windows-x64.zip` - Windows x64
             
             ### Verification
             - CI Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -831,16 +916,16 @@ jobs:
           
           case "$ENVIRONMENT" in
             development)
-              DEPLOY_URL="https://dev.agentos.local/domes"
+              DEPLOY_URL="https://dev.agentos.local/cupolas"
               ;;
             staging)
-              DEPLOY_URL="https://staging.agentos.spharx.cn/domes"
+              DEPLOY_URL="https://staging.agentos.spharx.cn/cupolas"
               ;;
             production)
-              DEPLOY_URL="https://agentos.spharx.cn/domes"
+              DEPLOY_URL="https://agentos.spharx.cn/cupolas"
               ;;
             *)
-              DEPLOY_URL="https://unknown.local/domes"
+              DEPLOY_URL="https://unknown.local/cupolas"
               ;;
           esac
           
@@ -868,19 +953,19 @@ jobs:
         run: |
           echo "Running post-deployment health checks..."
           # Add health check logic here
-          echo "✅ Health checks passed"
+          echo "�?Health checks passed"
 
       - name: Notify on success
         if: success()
         run: |
-          echo "## Deployment Successful ✅" >> $GITHUB_STEP_SUMMARY
+          echo "## Deployment Successful �? >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "domes module version ${{ needs.preflight.outputs.version }} has been deployed to ${{ needs.preflight.outputs.environment }}"
+          echo "cupolas module version ${{ needs.preflight.outputs.version }} has been deployed to ${{ needs.preflight.outputs.environment }}"
 
       - name: Notify on failure
         if: failure()
         run: |
-          echo "## Deployment Failed ❌" >> $GITHUB_STEP_SUMMARY
+          echo "## Deployment Failed �? >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Please check the logs and initiate rollback if necessary."
 

@@ -163,7 +163,7 @@ build/
 │   ├── corekern/         # 微内核库
 │   ├── coreloopthree/    # 运行时库
 │   └── memoryrovol/      # 记忆系统库
-├── tools/                # 工具程序
+├── toolkit/                # 工具程序
 │   ├── go/              # Go SDK
 │   ├── python/          # Python SDK
 │   └── rust/            # Rust SDK

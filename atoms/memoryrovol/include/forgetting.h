@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file forgetting.h
  * @brief 遗忘机制接口
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -43,14 +43,14 @@ typedef struct agentos_forgetting_config {
 
 /**
  * @brief 创建遗忘引擎
- * @param config 配置（若为NULL使用默认）
+ * @param manager 配置（若为NULL使用默认）
  * @param layer1 L1 原始卷句柄（用于访问元数据）
  * @param layer2 L2 特征层句柄（用于联动删除）
  * @param out_engine 输出引擎句柄
  * @return agentos_error_t
  */
 agentos_error_t agentos_forgetting_create(
-    const agentos_forgetting_config_t* config,
+    const agentos_forgetting_config_t* manager,
     agentos_layer1_raw_t* layer1,
     agentos_layer2_feature_t* layer2,
     agentos_forgetting_engine_t** out_engine);

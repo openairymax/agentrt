@@ -162,9 +162,9 @@ show_next_steps() {
     echo "=========================================="
     echo ""
     echo "1. 查看文档:"
-    echo "   - 快速入门：partdocs/guides/getting_started.md"
-    echo "   - 架构说明：partdocs/architecture/"
-    echo "   - API 文档：partdocs/api/"
+    echo "   - 快速入门：manuals/guides/getting_started.md"
+    echo "   - 架构说明：manuals/architecture/"
+    echo "   - API 文档：manuals/api/"
     echo ""
     echo "2. 开始开发:"
     echo "   - 阅读 CONTRIBUTING.md 了解贡献流程"
@@ -223,3 +223,4 @@ main() {
 
 # 执行主函数
 main "$@"
+

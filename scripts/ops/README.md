@@ -1,4 +1,4 @@
-# AgentOS 运维脚本
+﻿# AgentOS 运维脚本
 
 **版本**: v1.0.0.6  
 **最后更新**: 2026-03-21  
@@ -144,7 +144,7 @@ python doctor.py --report > diagnosis_$(date +%Y%m%d).txt
 
 诊断建议:
 1. 启动 market_d 服务：docker-compose up -d market_d
-2. 监控系统日志：tail -f partdata/logs/*.log
+2. 监控系统日志：tail -f lodges/logs/*.log
 
 总体状态：良好 (2 个警告)
 ```
@@ -256,18 +256,18 @@ sudo swapon -a
 sudo python doctor.py
 
 # 或赋予目录权限
-chmod -R u+rwx partdata/logs
+chmod -R u+rwx lodges/logs
 ```
 
 #### 2. 日志文件不存在
 
-**警告**: `Log file not found: partdata/logs/agentos.log`
+**警告**: `Log file not found: lodges/logs/agentos.log`
 
 **解决**:
 ```bash
 # 创建日志目录
-mkdir -p partdata/logs
-touch partdata/logs/agentos.log
+mkdir -p lodges/logs
+touch lodges/logs/agentos.log
 ```
 
 ---
@@ -338,8 +338,8 @@ ulimit -v 4194304  # 4GB
 2. **日志保护**:
 ```bash
 # 设置日志权限
-chmod 640 partdata/logs/*.log
-chown agentos:agentos partdata/logs/*.log
+chmod 640 lodges/logs/*.log
+chown agentos:agentos lodges/logs/*.log
 ```
 
 ---
@@ -430,3 +430,4 @@ if __name__ == '__main__':
 
 *From data intelligence emerges.*  
 *始于数据，终于智能。*
+

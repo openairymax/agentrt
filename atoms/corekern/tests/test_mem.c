@@ -77,7 +77,7 @@ int test_mem_alloc_free() {
     agentos_mem_stats(&total, &used, &peak);
     printf("Memory stats: total=%zu, used=%zu, peak=%zu\n", total, used, peak);
     
-    // 测试内存泄露检测
+    // 测试内存泄露检�?
     printf("Testing memory leak detection...\n");
     int leaks = agentos_mem_check_leaks();
     if (leaks > 0) {
@@ -86,12 +86,12 @@ int test_mem_alloc_free() {
         return 1;
     }
     
-    // 测试空指针释放
+    // 测试空指针释�?
     agentos_mem_free(NULL);
     
     agentos_mem_free(new_ptr);
     
-    // 测试内存泄露检测（应该没有泄露）
+    // 测试内存泄露检测（应该没有泄露�?
     leaks = agentos_mem_check_leaks();
     if (leaks > 0) {
         printf("Memory leaks detected: %d\n", leaks);

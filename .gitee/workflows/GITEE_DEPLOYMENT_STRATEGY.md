@@ -1,4 +1,4 @@
-# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+﻿# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # Gitee CI/CD 部署策略配置
 # Version: 1.0.0
 
@@ -315,7 +315,7 @@ deploy-production:
     docker push $DOCKER_REGISTRY/agentos:latest
 
     # 备份当前配置
-    docker-compose -f docker-compose.prod.yml config > backup-config.yml
+    docker-compose -f docker-compose.prod.yml manager > backup-manager.yml
 
     # 执行蓝绿部署
     ./scripts/deploy/blue-green.sh $VERSION

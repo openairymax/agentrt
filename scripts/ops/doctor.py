@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿﻿#!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 系统健康检查工具
 # 遵循 AgentOS 架构设计原则：反馈闭环、安全内生
@@ -46,7 +46,7 @@ class CheckCategory(Enum):
     DEPENDENCY = "dependency"
     NETWORK = "network"
     DISK = "disk"
-    CONFIG = "config"
+    manager = "manager"
     DOCKER = "docker"
     SECURITY = "security"
 
@@ -289,8 +289,8 @@ class ConfigFileChecker(DoctorChecker):
         results = []
         config_paths = [
             "/etc/agentos",
-            os.path.expanduser("~/.agentos/config"),
-            os.path.join(os.getcwd(), "config")
+            os.path.expanduser("~/.agentos/manager"),
+            os.path.join(os.getcwd(), "manager")
         ]
 
         found_configs = set()
@@ -299,35 +299,35 @@ class ConfigFileChecker(DoctorChecker):
             if not os.path.exists(config_dir):
                 continue
 
-            for config in self.REQUIRED_CONFIGS:
-                config_path = os.path.join(config_dir, config)
+            for manager in self.REQUIRED_CONFIGS:
+                config_path = os.path.join(config_dir, manager)
                 if os.path.exists(config_path):
-                    found_configs.add(config)
+                    found_configs.add(manager)
                     try:
                         stat = os.stat(config_path)
                         results.append(CheckResult(
-                            name=f"Config: {config}",
+                            name=f"manager: {manager}",
                             status=CheckStatus.OK,
-                            category=CheckCategory.CONFIG,
+                            category=CheckCategory.manager,
                             message=f"Found at {config_path}",
                             details=f"Size: {stat.st_size} bytes, Modified: {datetime.fromtimestamp(stat.st_mtime)}"
                         ))
                     except Exception as e:
                         results.append(CheckResult(
-                            name=f"Config: {config}",
+                            name=f"manager: {manager}",
                             status=CheckStatus.FAIL,
-                            category=CheckCategory.CONFIG,
-                            message=f"Cannot stat config file: {e}"
+                            category=CheckCategory.manager,
+                            message=f"Cannot stat manager file: {e}"
                         ))
 
-        for config in self.REQUIRED_CONFIGS:
-            if config not in found_configs:
+        for manager in self.REQUIRED_CONFIGS:
+            if manager not in found_configs:
                 results.append(CheckResult(
-                    name=f"Config: {config}",
+                    name=f"manager: {manager}",
                     status=CheckStatus.WARN,
-                    category=CheckCategory.CONFIG,
-                    message=f"{config} not found in standard locations",
-                    fix_suggestion=f"Create {config} in one of: {', '.join(config_paths)}"
+                    category=CheckCategory.manager,
+                    message=f"{manager} not found in standard locations",
+                    fix_suggestion=f"Create {manager} in one of: {', '.join(config_paths)}"
                 ))
 
         return results
@@ -587,7 +587,7 @@ def main():
     parser.add_argument(
         "--check",
         type=str,
-        help="Comma-separated list of checks to run (system, dependency, network, disk, config, docker, security)"
+        help="Comma-separated list of checks to run (system, dependency, network, disk, manager, docker, security)"
     )
 
     parser.add_argument(

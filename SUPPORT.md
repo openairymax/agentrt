@@ -1,4 +1,4 @@
-# 支持与支持渠道 SUPPORT
+﻿# 支持与支持渠道 SUPPORT
 
 如果您在使用 AgentOS 过程中遇到问题或需要帮助，请参考以下支持渠道。
 
@@ -18,19 +18,19 @@
 ### 官方文档
 
 - **[README.md](README.md)** - 项目概述和快速开始
-- **[快速入门](partdocs/guides/getting_started.md)** - 新手指南
-- **[架构文档](partdocs/architecture/)** - 深入理解系统设计
-- **[API 文档](partdocs/api/)** - 接口参考
-- **[开发指南](partdocs/guides/)** - 最佳实践
+- **[快速入门](paper/guides/getting_started.md)** - 新手指南
+- **[架构文档](paper/architecture/)** - 深入理解系统设计
+- **[API 文档](paper/api/)** - 接口参考
+- **[开发指南](paper/guides/)** - 最佳实践
 
 <!-- From data intelligence emerges. by spharx -->
 ### 技术文档
 
-- **[CoreLoopThree 架构](partdocs/architecture/coreloopthree.md)** - 三层一体核心运行时
-- **[MemoryRovol 架构](partdocs/architecture/memoryrovol.md)** - 记忆卷载系统
-- **[IPC 机制](partdocs/architecture/ipc.md)** - 进程间通信
-- **[微内核设计](partdocs/architecture/microkernel.md)** - 内核架构
-- **[系统调用](partdocs/architecture/syscall.md)** - 系统调用接口
+- **[CoreLoopThree 架构](paper/architecture/coreloopthree.md)** - 三层一体核心运行时
+- **[MemoryRovol 架构](paper/architecture/memoryrovol.md)** - 记忆卷载系统
+- **[IPC 机制](paper/architecture/ipc.md)** - 进程间通信
+- **[微内核设计](paper/architecture/microkernel.md)** - 内核架构
+- **[系统调用](paper/architecture/syscall.md)** - 系统调用接口
 
 ### 外部资源
 
@@ -214,7 +214,7 @@
 
 **A**: 可以尝试：
 
-1. 查看 [性能基准](partdocs/specifications/performance.md)
+1. 查看 [性能基准](paper/specifications/performance.md)
 2. 运行性能诊断工具
    ```bash
    make benchmark
@@ -273,3 +273,4 @@
 ---
 
 © 2026 SPHARX Ltd. All Rights Reserved.
+

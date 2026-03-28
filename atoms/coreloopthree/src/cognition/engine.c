@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file engine.c
  * @brief 认知引擎核心实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -10,6 +10,10 @@
 #include "id_utils.h"
 #include "error_utils.h"
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 #include <stdio.h>
 #include <inttypes.h>
@@ -31,7 +35,7 @@ struct agentos_cognition_engine {
     agentos_mutex_t* lock;
     uint32_t stats_processed;
     uint64_t stats_total_time_ns;
-    agentos_cognition_config_t config;
+    agentos_cognition_config_t manager;
     agentos_feedback_callback_t feedback_cb;
     void* feedback_user_data;
     uint64_t stats_success_count;
@@ -42,9 +46,9 @@ struct agentos_cognition_engine {
 /**
  * @brief 触发反馈回调
  * @param engine 认知引擎
- * @param level 反馈级别（0=实时，1=轮次内，2=跨轮次）
+ * @param level 反馈级别�?=实时�?=轮次内，2=跨轮次）
  * @param event 事件类型
- * @param data 反馈数据（JSON格式）
+ * @param data 反馈数据（JSON格式�?
  */
 static void trigger_feedback(
     agentos_cognition_engine_t* engine,
@@ -67,11 +71,11 @@ static void trigger_feedback(
 /**
  * @brief 创建认知引擎
  * 
- * @param plan_strategy 规划策略（可为NULL）
- * @param coord_strategy 协调策略（可为NULL）
- * @param disp_strategy 分发策略（可为NULL）
+ * @param plan_strategy 规划策略（可为NULL�?
+ * @param coord_strategy 协调策略（可为NULL�?
+ * @param disp_strategy 分发策略（可为NULL�?
  * @param out_engine 输出认知引擎指针
- * @return agentos_error_t 错误码
+ * @return agentos_error_t 错误�?
  * 
  * @note 使用默认配置创建认知引擎，如需自定义配置请使用 agentos_cognition_create_ex
  */
@@ -87,19 +91,19 @@ agentos_error_t agentos_cognition_create(
 /**
  * @brief 创建认知引擎（扩展版本，支持自定义配置）
  * 
- * @param config 配置参数（可为NULL，使用默认配置）
- * @param plan_strategy 规划策略（可为NULL）
- * @param coord_strategy 协调策略（可为NULL）
- * @param disp_strategy 分发策略（可为NULL）
+ * @param manager 配置参数（可为NULL，使用默认配置）
+ * @param plan_strategy 规划策略（可为NULL�?
+ * @param coord_strategy 协调策略（可为NULL�?
+ * @param disp_strategy 分发策略（可为NULL�?
  * @param out_engine 输出认知引擎指针
- * @return agentos_error_t 错误码
+ * @return agentos_error_t 错误�?
  * 
- * @note 如果config为NULL，将使用默认配置：
- *       - default_timeout_ms: 30000 (30秒)
+ * @note 如果config为NULL，将使用默认配置�?
+ *       - default_timeout_ms: 30000 (30�?
  *       - max_retries: 3
  */
 agentos_error_t agentos_cognition_create_ex(
-    const agentos_cognition_config_t* config,
+    const agentos_cognition_config_t* manager,
     agentos_plan_strategy_t* plan_strategy,
     agentos_coordinator_strategy_t* coord_strategy,
     agentos_dispatching_strategy_t* disp_strategy,
@@ -107,7 +111,7 @@ agentos_error_t agentos_cognition_create_ex(
 
     if (!out_engine) return AGENTOS_EINVAL;
 
-    agentos_cognition_engine_t* engine = (agentos_cognition_engine_t*)calloc(1, sizeof(agentos_cognition_engine_t));
+    agentos_cognition_engine_t* engine = (agentos_cognition_engine_t*)AGENTOS_CALLOC(1, sizeof(agentos_cognition_engine_t));
     if (!engine) {
         AGENTOS_LOG_ERROR("Failed to allocate cognition engine");
         return AGENTOS_ENOMEM;
@@ -119,20 +123,20 @@ agentos_error_t agentos_cognition_create_ex(
     engine->lock = agentos_mutex_create();
     if (!engine->lock) {
         AGENTOS_LOG_ERROR("Failed to create mutex");
-        free(engine);
+        AGENTOS_FREE(engine);
         return AGENTOS_ENOMEM;
     }
 
     // 设置配置
-    if (config) {
-        engine->config = *config;
-        engine->feedback_cb = config->feedback_callback;
-        engine->feedback_user_data = config->feedback_user_data;
+    if (manager) {
+        engine->manager = *manager;
+        engine->feedback_cb = manager->feedback_callback;
+        engine->feedback_user_data = manager->feedback_user_data;
     } else {
-        engine->config.cognition_default_timeout_ms = 30000;
-        engine->config.cognition_max_retries = 3;
-        engine->config.feedback_callback = NULL;
-        engine->config.feedback_user_data = NULL;
+        engine->manager.cognition_default_timeout_ms = 30000;
+        engine->manager.cognition_max_retries = 3;
+        engine->manager.feedback_callback = NULL;
+        engine->manager.feedback_user_data = NULL;
         engine->feedback_cb = NULL;
         engine->feedback_user_data = NULL;
     }
@@ -159,7 +163,7 @@ void agentos_cognition_destroy(agentos_cognition_engine_t* engine) {
     if (engine->lock) {
         agentos_mutex_destroy(engine->lock);
     }
-    free(engine);
+    AGENTOS_FREE(engine);
 }
 
 void agentos_cognition_set_fallback_plan(
@@ -188,23 +192,23 @@ void agentos_cognition_set_context(
 }
 
 /**
- * @brief 处理用户输入，生成任务计划
+ * @brief 处理用户输入，生成任务计�?
  * 
  * @param engine 认知引擎
  * @param input 用户输入文本
  * @param input_len 输入文本长度
  * @param out_plan 输出任务计划指针
- * @return agentos_error_t 错误码
+ * @return agentos_error_t 错误�?
  * 
- * @note 处理流程：
+ * @note 处理流程�?
  *       1. 参数验证
  *       2. 构建意图结构
- *       3. 尝试主规划策略
+ *       3. 尝试主规划策�?
  *       4. 如果主策略失败，尝试回退策略
  *       5. 生成计划ID
  *       6. 更新统计信息
  * 
- * @warning 调用者负责释放返回的任务计划（使用 agentos_task_plan_free）
+ * @warning 调用者负责释放返回的任务计划（使�?agentos_task_plan_free�?
  */
 agentos_error_t agentos_cognition_process(
     agentos_cognition_engine_t* engine,
@@ -241,7 +245,7 @@ agentos_error_t agentos_cognition_process(
     fallback_strat = engine->fallback_plan_strat;
     agentos_mutex_unlock(engine->lock);
 
-    // 尝试主策略
+    // 尝试主策�?
     if (plan_strat && plan_strat->plan) {
         err = plan_strat->plan(&intent, plan_strat->data, &plan);
     }
@@ -251,7 +255,7 @@ agentos_error_t agentos_cognition_process(
         AGENTOS_LOG_WARN("Primary planning failed: %s (code %d), trying fallback", 
                         agentos_error_string(err), err);
         
-        // 触发轮次内反馈：主策略失败
+        // 触发轮次内反馈：主策略失�?
         char err_buf[256];
         snprintf(err_buf, sizeof(err_buf),
             "{\"error_code\":%d,\"error_msg\":\"%s\",\"stage\":\"primary_planning\"}",
@@ -269,7 +273,7 @@ agentos_error_t agentos_cognition_process(
             AGENTOS_LOG_ERROR("No fallback planner available, primary error: %s (code %d)", 
                             agentos_error_string(err), err);
             
-            // 触发实时反馈：处理失败
+            // 触发实时反馈：处理失�?
             snprintf(err_buf, sizeof(err_buf),
                 "{\"error_code\":%d,\"error_msg\":\"%s\",\"stage\":\"no_fallback\"}",
                 err, agentos_error_string(err));
@@ -286,7 +290,7 @@ agentos_error_t agentos_cognition_process(
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_LOG_ERROR("Planning failed: %s (code %d)", agentos_error_string(err), err);
         
-        // 触发实时反馈：处理失败
+        // 触发实时反馈：处理失�?
         char err_buf[256];
         snprintf(err_buf, sizeof(err_buf),
             "{\"error_code\":%d,\"error_msg\":\"%s\",\"stage\":\"fallback_failed\"}",
@@ -303,7 +307,7 @@ agentos_error_t agentos_cognition_process(
     if (plan && !plan->plan_id) {
         char id_buf[64];
         agentos_generate_plan_id(id_buf, sizeof(id_buf));
-        plan->plan_id = strdup(id_buf);
+        plan->plan_id = AGENTOS_STRDUP(id_buf);
         if (!plan->plan_id) {
             AGENTOS_LOG_ERROR("Failed to allocate plan_id: %s (code %d)", 
                             agentos_error_string(AGENTOS_ENOMEM), AGENTOS_ENOMEM);
@@ -321,7 +325,7 @@ agentos_error_t agentos_cognition_process(
     engine->stats_success_count++;
     agentos_mutex_unlock(engine->lock);
 
-    // 触发实时反馈：任务处理完成
+    // 触发实时反馈：任务处理完�?
     char feedback_buf[512];
     snprintf(feedback_buf, sizeof(feedback_buf),
         "{\"plan_id\":\"%s\",\"node_count\":%zu,\"elapsed_ns\":%" PRIu64 ",\"status\":\"success\"}",
@@ -335,15 +339,15 @@ agentos_error_t agentos_cognition_process(
 }
 
 /**
- * @brief 释放任务计划及其所有资源
+ * @brief 释放任务计划及其所有资�?
  * 
  * @param plan 任务计划指针
  * 
- * @note 释放以下资源：
+ * @note 释放以下资源�?
  *       1. 计划ID
- *       2. 所有任务节点
- *       3. 每个任务节点的任务ID、角色、依赖关系
- *       4. 入口点数组
+ *       2. 所有任务节�?
+ *       3. 每个任务节点的任务ID、角色、依赖关�?
+ *       4. 入口点数�?
  *       5. 任务节点数组
  */
 void agentos_task_plan_free(agentos_task_plan_t* plan) {
@@ -351,21 +355,21 @@ void agentos_task_plan_free(agentos_task_plan_t* plan) {
     for (size_t i = 0; i < plan->node_count; i++) {
         agentos_task_node_t* node = plan->nodes[i];
         if (node) {
-            if (node->task_id) free(node->task_id);
-            if (node->agent_role) free(node->agent_role);
+            if (node->task_id) AGENTOS_FREE(node->task_id);
+            if (node->agent_role) AGENTOS_FREE(node->agent_role);
             if (node->depends_on) {
                 for (size_t j = 0; j < node->depends_count; j++) {
-                    free(node->depends_on[j]);
+                    AGENTOS_FREE(node->depends_on[j]);
                 }
-                free(node->depends_on);
+                AGENTOS_FREE(node->depends_on);
             }
-            free(node);
+            AGENTOS_FREE(node);
         }
     }
-    free(plan->nodes);
-    if (plan->entry_points) free(plan->entry_points);
-    if (plan->plan_id) free(plan->plan_id);
-    free(plan);
+    AGENTOS_FREE(plan->nodes);
+    if (plan->entry_points) AGENTOS_FREE(plan->entry_points);
+    if (plan->plan_id) AGENTOS_FREE(plan->plan_id);
+    AGENTOS_FREE(plan);
 }
 
 agentos_error_t agentos_cognition_stats(
@@ -385,7 +389,7 @@ agentos_error_t agentos_cognition_stats(
         "{\"processed\":%u,\"avg_time_ns\":%" PRIu64 "}",
         processed, avg_ns);
 
-    char* result = (char*)malloc(len + 1);
+    char* result = (char*)AGENTOS_MALLOC(len + 1);
     if (!result) return AGENTOS_ENOMEM;
     memcpy(result, buffer, len + 1);
 

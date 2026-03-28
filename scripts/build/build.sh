@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 核心构建脚本
 # 遵循 AgentOS 架构设计原则：工程美学、反馈闭环、跨平台一致�?

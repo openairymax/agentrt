@@ -1,12 +1,16 @@
 /**
  * @file bm25.c
- * @brief BM25 全文检索引擎（基于 SQLite FTS5）
+ * @brief BM25 全文检索引擎（基于 SQLite FTS5�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "layer2_feature.h"
 #include <sqlite3.h>
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 
 struct agentos_bm25_index {
@@ -26,28 +30,28 @@ agentos_error_t agentos_bm25_create(
 // From data intelligence emerges. by spharx
     if (!db_path || !out_idx) return AGENTOS_EINVAL;
 
-    agentos_bm25_index_t* idx = calloc(1, sizeof(agentos_bm25_index_t));
+    agentos_bm25_index_t* idx = AGENTOS_CALLOC(1, sizeof(agentos_bm25_index_t));
     if (!idx) return AGENTOS_ENOMEM;
 
-    idx->db_path = strdup(db_path);
+    idx->db_path = AGENTOS_STRDUP(db_path);
     if (!idx->db_path) {
-        free(idx);
+        AGENTOS_FREE(idx);
         return AGENTOS_ENOMEM;
     }
     idx->k1 = (k1 > 0) ? k1 : 1.2f;
     idx->b = (b > 0) ? b : 0.75f;
     idx->lock = agentos_mutex_create();
     if (!idx->lock) {
-        free(idx->db_path);
-        free(idx);
+        AGENTOS_FREE(idx->db_path);
+        AGENTOS_FREE(idx);
         return AGENTOS_ENOMEM;
     }
 
     int rc = sqlite3_open(db_path, &idx->db);
     if (rc != SQLITE_OK) {
         agentos_mutex_destroy(idx->lock);
-        free(idx->db_path);
-        free(idx);
+        AGENTOS_FREE(idx->db_path);
+        AGENTOS_FREE(idx);
         return AGENTOS_EIO;
     }
 
@@ -58,8 +62,8 @@ agentos_error_t agentos_bm25_create(
     if (rc != SQLITE_OK) {
         sqlite3_close(idx->db);
         agentos_mutex_destroy(idx->lock);
-        free(idx->db_path);
-        free(idx);
+        AGENTOS_FREE(idx->db_path);
+        AGENTOS_FREE(idx);
         return AGENTOS_EIO;
     }
 
@@ -70,9 +74,9 @@ agentos_error_t agentos_bm25_create(
 void agentos_bm25_destroy(agentos_bm25_index_t* idx) {
     if (!idx) return;
     sqlite3_close(idx->db);
-    free(idx->db_path);
+    AGENTOS_FREE(idx->db_path);
     agentos_mutex_destroy(idx->lock);
-    free(idx);
+    AGENTOS_FREE(idx);
 }
 
 agentos_error_t agentos_bm25_add_document(
@@ -143,27 +147,27 @@ agentos_error_t agentos_bm25_search(
     sqlite3_bind_text(stmt, 1, query, -1, SQLITE_STATIC);
 
     size_t cap = 16;
-    char** ids = malloc(cap * sizeof(char*));
-    float* scores = malloc(cap * sizeof(float));
+    char** ids = AGENTOS_MALLOC(cap * sizeof(char*));
+    float* scores = AGENTOS_MALLOC(cap * sizeof(float));
     if (!ids || !scores) {
         sqlite3_finalize(stmt);
         agentos_mutex_unlock(idx->lock);
-        free(ids);
-        free(scores);
+        AGENTOS_FREE(ids);
+        AGENTOS_FREE(scores);
         return AGENTOS_ENOMEM;
     }
     size_t count = 0;
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         if (count >= cap) {
             cap *= 2;
-            char** new_ids = realloc(ids, cap * sizeof(char*));
-            float* new_scores = realloc(scores, cap * sizeof(float));
+            char** new_ids = AGENTOS_REALLOC(ids, cap * sizeof(char*));
+            float* new_scores = AGENTOS_REALLOC(scores, cap * sizeof(float));
             if (!new_ids || !new_scores) {
                 sqlite3_finalize(stmt);
                 agentos_mutex_unlock(idx->lock);
-                for (size_t i = 0; i < count; i++) free(ids[i]);
-                free(ids);
-                free(scores);
+                for (size_t i = 0; i < count; i++) AGENTOS_FREE(ids[i]);
+                AGENTOS_FREE(ids);
+                AGENTOS_FREE(scores);
                 return AGENTOS_ENOMEM;
             }
             ids = new_ids;
@@ -171,8 +175,8 @@ agentos_error_t agentos_bm25_search(
         }
         const unsigned char* id = sqlite3_column_text(stmt, 0);
         float rank = (float)sqlite3_column_double(stmt, 1);
-        ids[count] = strdup((const char*)id);
-        // FTS5 rank 越小越相关，转换为越大越好
+        ids[count] = AGENTOS_STRDUP((const char*)id);
+        // FTS5 rank 越小越相关，转换为越大越�?
         scores[count] = 1.0f / (1.0f + rank);
         count++;
     }

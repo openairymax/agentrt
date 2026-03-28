@@ -1,6 +1,6 @@
-/**
+﻿/**
  * @file revive.c
- * @brief 记忆复活（从归档恢复）
+ * @brief 记忆复活（从归档恢复�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -9,6 +9,10 @@
 #include "agentos.h"
 #include <stdio.h>
 #include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "../../../bases/utils/memory/include/memory_compat.h"
+#include "../../../bases/utils/string/include/string_compat.h"
 #include <string.h>
 
 agentos_error_t agentos_forgetting_revive(
@@ -19,7 +23,7 @@ agentos_error_t agentos_forgetting_revive(
 
     if (!engine || !record_id || !out_data || !out_len) return AGENTOS_EINVAL;
 
-    const char* archive_path = engine->config.archive_path;
+    const char* archive_path = engine->manager.archive_path;
     if (!archive_path) {
         AGENTOS_LOG_ERROR("Archive path not configured");
         return AGENTOS_EINVAL;
@@ -40,7 +44,7 @@ agentos_error_t agentos_forgetting_revive(
         return AGENTOS_EIO;
     }
 
-    void* data = malloc(size);
+    void* data = AGENTOS_MALLOC(size);
     if (!data) {
         fclose(f);
         return AGENTOS_ENOMEM;
@@ -49,7 +53,7 @@ agentos_error_t agentos_forgetting_revive(
     size_t read = fread(data, 1, size, f);
     fclose(f);
     if (read != (size_t)size) {
-        free(data);
+        AGENTOS_FREE(data);
         return AGENTOS_EIO;
     }
 
@@ -57,10 +61,10 @@ agentos_error_t agentos_forgetting_revive(
     char* new_id = NULL;
     agentos_error_t err = agentos_layer1_raw_write(engine->layer1, data, size, NULL, &new_id);
     if (err != AGENTOS_SUCCESS) {
-        free(data);
+        AGENTOS_FREE(data);
         return err;
     }
-    free(new_id);
+    AGENTOS_FREE(new_id);
 
     // 删除归档文件
     remove(archive_file);
