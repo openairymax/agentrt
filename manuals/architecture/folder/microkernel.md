@@ -1,4 +1,4 @@
-Copyright (c) 2026 SPHARX. All Rights Reserved.
+﻿Copyright (c) 2026 SPHARX. All Rights Reserved.
 "From data intelligence emerges."
 
 # AgentOS 微内核架构详解
@@ -173,7 +173,7 @@ atoms/corekern/
 │   ├── memory_manager.h          # 内存管理接口
 │   ├── task_scheduler.h          # 任务调度接口
 │   ├── time_service.h            # 时间服务接口
-│   └── bases.h                  # 通用类型定义
+│   └── commons.h                  # 通用类型定义
 └── src/                           # 源代码实现
     ├── ipc_binder.c              # IPC 绑定器实现
     ├── memory_manager.c          # 内存管理器实现

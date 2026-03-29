@@ -5,30 +5,30 @@
  */
 
 #include "cognition.h
-#include "../../../bases/utils/cognition/include/cognition_common.h""
+#include "../../../commons/utils/cognition/include/cognition_common.h""
 #include "agent_registry.h
-#include "../../../bases/utils/cognition/include/cognition_common.h""
+#include "../../../commons/utils/cognition/include/cognition_common.h""
 #include "agentos.h
-#include "../../../bases/utils/cognition/include/cognition_common.h""
+#include "../../../commons/utils/cognition/include/cognition_common.h""
 #include "logger.h
-#include "../../../bases/utils/cognition/include/cognition_common.h""
+#include "../../../commons/utils/cognition/include/cognition_common.h""
 #include <stdlib.h
-#include "../../../bases/utils/cognition/include/cognition_common.h">
+#include "../../../commons/utils/cognition/include/cognition_common.h">
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h
-#include "../../../bases/utils/cognition/include/cognition_common.h""
-#include "../../../bases/utils/string/include/string_compat.h
-#include "../../../bases/utils/cognition/include/cognition_common.h""
+#include "../../../commons/utils/memory/include/memory_compat.h
+#include "../../../commons/utils/cognition/include/cognition_common.h""
+#include "../../../commons/utils/string/include/string_compat.h
+#include "../../../commons/utils/cognition/include/cognition_common.h""
 #include <string.h
-#include "../../../bases/utils/cognition/include/cognition_common.h">
+#include "../../../commons/utils/cognition/include/cognition_common.h">
 #include <stdio.h
-#include "../../../bases/utils/cognition/include/cognition_common.h">
+#include "../../../commons/utils/cognition/include/cognition_common.h">
 #include <float.h
-#include "../../../bases/utils/cognition/include/cognition_common.h">
+#include "../../../commons/utils/cognition/include/cognition_common.h">
 
-#include "../../../bases/utils/strategy/include/strategy_common.h
-#include "../../../bases/utils/cognition/include/cognition_common.h""\n\ntypedef struct weighted_data {\n    weighted_config_t manager;\n    void* registry_ctx;\n    agent_registry_get_agents_func get_agents;\n    agentos_mutex_t* lock;\n} weighted_data_t;
+#include "../../../commons/utils/strategy/include/strategy_common.h
+#include "../../../commons/utils/cognition/include/cognition_common.h""\n\ntypedef struct weighted_data {\n    weighted_config_t manager;\n    void* registry_ctx;\n    agent_registry_get_agents_func get_agents;\n    agentos_mutex_t* lock;\n} weighted_data_t;
 
 static void weighted_destroy(agentos_dispatching_strategy_t* strategy) {
     if (!strategy) return;

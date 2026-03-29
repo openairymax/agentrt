@@ -1,4 +1,4 @@
-Copyright (c) 2026 SPHARX. All Rights Reserved.
+﻿Copyright (c) 2026 SPHARX. All Rights Reserved.
 "From data intelligence emerges."
 
 # AgentOS 架构设计原则
@@ -173,7 +173,7 @@ AgentOS 采用严格的层次分解：
 |         memoryrovol/ 四层记忆系统            |
 |  L1原始卷 → L2特征层 → L3结构层 → L4模式层    |
 +---------------------------------------------+
-|             bases/ 统一基础库               |
+|             commons/ 统一基础库               |
 |  error · logger · metrics · trace · cost    |
 +---------------------------------------------+
 ```
@@ -314,7 +314,7 @@ AgentOS 将《论系统工程》的整体观、层次观、优化观应用于智
 | **守护进程** | 运行在用户态的后台服务，以 `_d` 后缀命名 | Daemon |
 | **执行单元** | 可插拔的原子执行器，通过注册表动态加载 | Execution Unit |
 | **策略接口** | 可运行时替换的算法抽象（规划/协同/调度/遗忘等） | Strategy |
-| **统一基础库** | 跨模块共享的通用工具集合 | bases |
+| **统一基础库** | 跨模块共享的通用工具集合 | commons |
 | **反馈闭环** | 系统内部通过实时、轮次内、跨轮次反馈实现自适应调节的机制 | Feedback Loop |
 | **层次分解** | 将复杂系统按抽象层次逐级分解，降低认知复杂度的系统工程方法 | Hierarchical Decomposition |
 | **总体设计部** | 统筹系统整体设计，协调各子系统接口与演进方向的顶层设计机构 | Overall Design Department |

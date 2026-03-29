@@ -1,70 +1,100 @@
-﻿# AgentOS 测试套件 (Tests)
+# AgentOS 测试套件 (Tests)
 
 <div align="center">
 
 [![Version](https://img.shields.io/badge/version-1.0.0.6-blue.svg)](https://gitee.com/spharx/agentos)
-[![License](https://img.shields.io/badge/license-Apache-2.0-green.svg)](https://gitee.com/spharx/agentos/blob/main/LICENSE)
-[![Tests](https://img.shields.io/badge/tests-650+-brightgreen.svg)](https://gitee.com/spharx/agentos/actions)
-[![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](https://codecov.io/gh/spharx/agentos)
+[![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](../LICENSE)
+[![Tests](https://img.shields.io/badge/tests-120+-lightgrey.svg)](./)
+[![Coverage](https://img.shields.io/badge/coverage-85%25-yellowgreen.svg)](./reports/coverage)
 
-**AgentOS 质量保障体系 - 单元测试、集成测试、安全测试、性能基准、契约测试**
-
-*"Test everything that can break."*
-
----
-
-Language: **中文** | [English](../paper/readme/en/README.md)
+**AgentOS 质量保障体系 - 多层次、全方位的测试基础设施**
 
 </div>
 
 ---
 
-## 📋 目录
+## 📖 目录
 
-- [概述](#概述)
-- [测试架构](#测试架构)
-- [测试分布](#测试分布)
-- [运行测试](#运行测试)
-- [测试覆盖率](#测试覆盖率)
-- [测试示例](#测试示例)
-- [最佳实践](#最佳实践)
-- [性能基准](#性能基准)
-- [CI/CD 集成](#ci/cd 集成)
-- [相关文档](#相关文档)
-- [贡献测试](#贡献测试)
+- [快速开始](#-快速开始)
+- [模块概述](#-模块概述)
+- [测试架构](#-测试架构)
+- [目录结构](#-目录结构)
+- [运行测试](#-运行测试)
+- [测试覆盖率](#-测试覆盖率)
+- [代码示例](#-代码示例)
+- [测试工具](#-测试工具)
+- [最佳实践](#-最佳实践)
+- [故障排查](#-故障排查)
 
 ---
 
-## 📖 概述
+## 🚀 快速开始
 
-`tests/` 目录是 AgentOS 项目的质量保障中心，包含完整的测试套件，确保系统的可靠性、安全性和性能。
+### 立即运行测试
 
-### 核心职责
+```bash
+# 1. 安装依赖
+cd tests
+make install
 
-1. **质量验证**: 验证所有代码功能符合设计要求
-2. **缺陷预防**: 在早期发现和修复潜在问题
-3. **回归防护**: 防止新代码破坏现有功能
-4. **性能保障**: 确保系统性能满足基准要求
-5. **安全检测**: 识别和修复安全漏洞
-6. **文档补充**: 通过测试用例展示 API 使用方法
+# 2. 设置环境
+make setup-env
 
-### 测试理念
+# 3. 运行所有测试
+make test
 
-AgentOS 采用 **测试金字塔** 模型，自下而上分为：
-
-```
-        /\
-       /  \         E2E Tests (端到端测试 - 最少)
-      /----\
-     /      \      Integration Tests (集成测试 - 中等)
-    /--------\
-   /          \    Unit Tests (单元测试 - 最多)
-  /------------\
+# 4. 生成覆盖率报告
+make coverage
 ```
 
-- **单元测试 (70%)**: 验证最小可测试单元
-- **集成测试 (20%)**: 验证模块间协作
-- **E2E 测试 (10%)**: 验证完整业务流程
+### 核心命令速查
+
+| 命令 | 说明 | 示例 |
+|------|------|------|
+| `make test` | 运行所有测试 | `make test` |
+| `make test-unit` | 运行单元测试 | `make test-unit` |
+| `make test-integration` | 运行集成测试 | `make test-integration` |
+| `make coverage` | 生成覆盖率报告 | `make coverage` |
+| `make lint` | 代码风格检查 | `make lint` |
+
+---
+
+## 📋 模块概述
+
+### 核心使命
+
+AgentOS Tests 模块是项目的**质量保障体系**，提供：
+- ✅ **单元测试**：验证单个函数/类的正确性
+- ✅ **集成测试**：验证模块间协作
+- ✅ **契约测试**：确保接口契约的完整性
+- ✅ **性能测试**：验证性能指标达标
+- ✅ **安全测试**：确保安全机制有效
+
+### 测试哲学
+
+我们遵循 **测试金字塔** 模型：
+
+```
+           /\
+          /  \       E2E 测试 (10%)
+         /----\      端到端场景验证
+        /------\
+       /        \    集成测试 (20%)
+      /----------\   模块间协作验证
+     /------------\
+    /              \  单元测试 (70%)
+   /----------------\ 函数/类级别验证
+```
+
+### 质量目标
+
+| 指标 | 目标值 | 当前值 | 状态 |
+|------|-------|--------|------|
+| **单元测试覆盖率** | ≥85% | 85.2% | ✅ 达标 |
+| **集成测试覆盖率** | ≥80% | 82.1% | ✅ 达标 |
+| **契约测试覆盖率** | 100% | 100% | ✅ 达标 |
+| **关键路径性能** | SLA 达标 | 达标 | ✅ 达标 |
+| **安全测试** | 100% 关键路径 | 100% | ✅ 达标 |
 
 ---
 
@@ -72,563 +102,546 @@ AgentOS 采用 **测试金字塔** 模型，自下而上分为：
 
 ### 分布式测试结构
 
-AgentOS 采用分布式测试架构，每个子模块负责自己的单元测试，顶层 tests 专注于集成和跨模块测试：
+AgentOS 采用**分布式测试架构**：
 
 ```
-AgentOS/
-├── atoms/                    # 原子模块
-│   ├── corekern/tests/       # 内核层单元测试
-│   └── coreloopthree/tests/  # 核心运行时单元测试
-│
-├── backs/                    # 后端服务模块
-│   ├── llm_d/tests/          # LLM 服务测试
-│   ├── market_d/tests/       # 市场服务测试
-│   └── monit_d/tests/        # 监控服务测试
-│
-├── common/                   # 通用工具模块
-│   └── tests/unit/           # 工具库单元测试
-│
-└── tests/                    # 顶层测试（本目录）
-    ├── unit/                 # Python 单元测试
-    ├── integration/          # 集成测试
-    ├── security/             # 安全测试
-    ├── contract/             # 契约测试
-    └── benchmarks/           # 性能基准测试
+┌─────────────────────────────────────────────────┐
+│  tests/ (顶层)                                   │
+│  └── 专注于：集成测试、契约测试、系统测试        │
+└─────────────────────────────────────────────────┘
+                      ↑
+                      │ 通过系统调用接口
+                      ↓
+┌─────────────────────────────────────────────────┐
+│  子模块内部 tests/                               │
+│  ├── atoms/corekern/tests/ (内核单元测试)       │
+│  ├── atoms/coreloopthree/tests/ (认知引擎测试)  │
+│  ├── atoms/memoryrovol/tests/ (记忆系统测试)    │
+│  └── daemon/*/tests/ (服务层测试)               │
+└─────────────────────────────────────────────────┘
 ```
 
 ### 测试分类
 
-| 测试类型 | 位置 | 职责 | 工具 |
-|---------|------|------|------|
-| **单元测试** | `atoms/*/tests/`, `backs/*/tests/`, `common/tests/unit/`, `tests/unit/` | 测试单个模块/函数 | CTest, pytest |
-| **集成测试** | `tests/integration/` | 测试模块间协作 | pytest |
-| **契约测试** | `tests/contract/` | 验证接口契约 | JSON Schema, pytest |
-| **安全测试** | `tests/security/` | 安全漏洞检测 | pytest, OWASP ZAP |
-| **性能测试** | `tests/benchmarks/` | 性能基准测试 | pytest-benchmark |
-| **模糊测试** | `tests/fuzz/` | 随机输入测试 | Hypothesis, Atheris |
+| 测试类型 | 位置 | 目标 | 工具 | 覆盖率要求 |
+|---------|------|------|------|-----------|
+| **单元测试** | 各模块 `tests/` | 验证单个函数/类 | CMockery2, pytest | ≥85% |
+| **集成测试** | `tests/integration/` | 验证模块间协作 | pytest | ≥80% |
+| **契约测试** | `tests/contract/` | 验证接口契约 | pytest | 100% |
+| **性能测试** | `tests/benchmarks/` | 验证性能指标 | pytest-benchmark | 关键路径 |
+| **安全测试** | `tests/security/` | 验证安全机制 | bandit, 自定义 | 100% 关键路径 |
+| **模糊测试** | `tests/fuzz/` | 随机输入测试 | hypothesis | 核心模块 |
 
 ---
 
-## 📂 测试分布
+## 📁 目录结构
 
-### 详细目录结构
+### 完整目录树
 
 ```
 tests/
 ├── README.md                      # 本文档
 ├── TESTING_GUIDELINES.md          # 测试代码规范
-├── requirements.txt               # Python 测试依赖
-├── conftest.py                    # pytest 配置和 fixtures
-├── codecov.yml                    # Codecov 覆盖率配置
+├── Makefile                       # Make 命令集
+├── run_tests.py                   # 测试运行器
+├── requirements.txt               # Python 依赖
+├── conftest.py                    # pytest 全局配置
 ├── .coveragerc                    # 覆盖率配置
-├── Makefile                       # 测试构建脚本
+├── codecov.yml                    # Codecov 配置
 │
-├── unit/                          # Python 单元测试
-│   ├── config/
-│   │   └── test_validate_config.py    # 配置验证测试
-│   ├── sdk/
-│   │   ├── python/
-│   │   │   ├── test_sdk.py            # Python SDK 测试
-│   │   │   └── test_sdk_refactored.py # 优化版 SDK 测试
-│   │   └── rust/
-│   │       └── .gitkeep               # Rust SDK 测试占位
-│   └── services/
-│       ├── llm_d/
-│       │   └── test_llm.c             # LLM 服务测试
-│       ├── market_d/
-│       │   └── test_market.c          # 市场服务测试
-│       ├── monit_d/
-│       │   └── test_monitor.c         # 监控服务测试
-│       ├── sched_d/
-│       │   └── test_scheduler.c       # 调度服务测试
-│       └── tool_d/
-│           └── test_tool.c            # 工具服务测试
+├── unit/                          # 单元测试（Python 部分）
+│   ├── coreloopthree/             # 核心循环测试
+│   │   ├── test_cognition.c       # 认知引擎 C 测试
+│   │   ├── test_execution.c       # 执行引擎 C 测试
+│   │   ├── test_loop.c            # 核心循环 C 测试
+│   │   ├── test_memory.c          # 记忆引擎 C 测试
+│   │   └── benchmark.c            # 性能基准 C 测试
+│   ├── sdk/python/                # Python SDK 测试
+│   │   ├── test_sdk.py            # SDK 基础测试
+│   │   └── test_sdk_refactored.py # 重构版测试
+│   └── services/                  # 服务层测试
+│       ├── llm_d/test_llm.c       # LLM 服务测试
+│       ├── market_d/test_market.c # 市场服务测试
+│       ├── monit_d/test_monitor.c # 监控服务测试
+│       └── sched_d/test_scheduler.c # 调度服务测试
 │
 ├── integration/                   # 集成测试
-│   ├── coreloopthree/
-│   │   ├── test_cognition_execution.py  # 认知 - 执行集成测试
-│   │   └── test_memory_evolution.py     # 记忆进化集成测试
-│   ├── memoryrovol/
-│   │   ├── test_layers.py               # 记忆层集成测试
-│   │   └── test_retrieval.py            # 检索集成测试
-│   └── syscall/
-│       └── test_syscalls.py             # 系统调用集成测试
-│
-├── security/                      # 安全测试
-│   ├── test_permissions.py        # 权限控制测试
-│   ├── test_sandbox.py            # 沙箱隔离测试
-│   ├── test_input_sanitizer.py    # 输入净化测试
-│   └── sast_dast_scanner.py       # SAST/DAST 安全扫描器
+│   ├── coreloopthree/             # 核心循环集成测试
+│   │   ├── test_cognition_execution.py  # 认知 - 执行集成
+│   │   └── test_memory_evolution.py     # 记忆进化集成
+│   ├── memoryrovol/               # 记忆系统集成测试
+│   │   ├── test_layers.py         # 四层记忆测试
+│   │   └── test_retrieval.py      # 检索集成测试
+│   └── syscall/                   # 系统调用集成测试
+│       └── test_syscalls.py       # syscall 集成测试
 │
 ├── contract/                      # 契约测试
-│   ├── test_agent_contracts.py    # Agent 契约验证
-│   ├── test_agent_contracts_refactored.py  # 优化版契约测试
-│   └── test_skill_contracts.py    # Skill 契约验证
+│   ├── test_agent_contracts.py          # Agent 契约测试
+│   ├── test_agent_contracts_refactored.py # 优化版 Agent 契约
+│   └── test_skill_contracts.py          # Skill 契约测试
 │
 ├── benchmarks/                    # 性能基准测试
-│   ├── concurrency/
-│   │   ├── load_test.py           # 并发负载测试
-│   │   └── report/.gitkeep        # 测试报告目录
-│   ├── retrieval_latency/
-│   │   ├── benchmark.c            # C 语言检索延迟基准
-│   │   └── results/.gitkeep       # 测试结果目录
-│   └── token_efficiency/
-│       ├── benchmark.py           # Token 效率基准
-│       └── plots/.gitkeep         # 性能图表目录
+│   ├── concurrency/               # 并发性能测试
+│   │   └── load_test.py           # 负载测试
+│   ├── retrieval_latency/         # 检索延迟测试
+│   │   └── benchmark.c            # C 语言基准测试
+│   └── token_efficiency/          # Token 效率测试
+│       └── benchmark.py           # Python 基准测试
 │
-├── fuzz/                          # 模糊测试
-│   └── fuzz_framework.py          # 模糊测试框架
+├── security/                      # 安全测试
+│   ├── test_input_sanitizer.py    # 输入净化测试
+│   ├── test_permissions.py        # 权限裁决测试
+│   ├── test_sandbox.py            # 沙箱隔离测试
+│   └── sast_dast_scanner.py       # 安全扫描器
 │
-├── generators/                    # 测试生成器
-│   └── contract_test_generator.py # 契约测试用例生成器
+├── fixtures/                      # 测试夹具
+│   └── data/                      # 测试数据
+│       ├── tasks/                 # 任务数据
+│       ├── memories/              # 记忆数据
+│       ├── sessions/              # 会话数据
+│       └── skills/                # 技能数据
 │
-├── performance/                   # 性能工具
-│   └── regression_detector.py     # 性能回归检测器
-│
-├── reports/                       # 测试报告
-│   └── dashboard_generator.py     # HTML 仪表板生成器
-│
-├── utils/                         # 测试工具
-│   ├── test_helpers.py            # Python 测试辅助工具
+├── utils/                         # 测试辅助工具
+│   ├── test_helpers.py            # 公共测试辅助函数
 │   ├── test_isolation.py          # 测试隔离工具
 │   ├── data_generator.py          # 测试数据生成器
 │   └── data_manager.py            # 测试数据管理器
 │
-└── fixtures/                      # 测试夹具
-    └── data/
-        ├── memories/sample_memories.json   # 样本记忆数据
-        ├── sessions/sample_sessions.json   # 样本会话数据
-        ├── skills/sample_skills.json       # 样本技能数据
-        └── tasks/sample_tasks.json         # 样本任务数据
+└── fuzz/                          # 模糊测试
+    └── fuzz_framework.py          # 模糊测试框架
 ```
+
+### 关键文件说明
+
+| 文件 | 说明 | 用途 |
+|------|------|------|
+| `Makefile` | Make 命令集 | 提供统一的测试运行接口 |
+| `run_tests.py` | 测试运行器 | 自动化测试执行和诊断 |
+| `conftest.py` | pytest 配置 | 全局 fixtures 和标记 |
+| `TESTING_GUIDELINES.md` | 测试规范 | 统一的测试编写标准 |
+| `utils/test_helpers.py` | 测试工具 | 减少重复代码的辅助函数 |
 
 ---
 
-## 🚀 运行测试
+## 🔧 运行测试
 
-### 快速开始
+### 完整测试流程
+
+#### 1. 环境准备
 
 ```bash
-# 1. 安装测试依赖
-cd tests
-pip install -r requirements.txt
+# 安装 Python 依赖
+make install
 
-# 2. 运行所有测试
-python run_tests.py
+# 设置测试环境
+make setup-env
 
-# 或使用 pytest 直接运行
-pytest tests/ -v
+# 检查环境配置
+make check-env
 ```
 
-### 分类运行测试
+#### 2. 运行测试
 
 ```bash
-# 单元测试
-pytest tests/unit/ -v
+# 运行所有测试（推荐）
+make test
 
-# 集成测试
-pytest tests/integration/ -v
+# 运行特定类型测试
+make test-unit        # 单元测试
+make test-integration # 集成测试
+make test-security    # 安全测试
+make test-benchmark   # 性能测试
 
-# 安全测试
-pytest tests/security/ -v
+# 快速测试（开发用）
+make quick-test
 
-# 契约测试
-pytest tests/contract/ -v
-
-# 性能基准测试
-pytest tests/benchmarks/ -v --benchmark-only
+# 并行测试（加速）
+make parallel-test
 ```
 
-### 运行 C/C++ 测试
+#### 3. 代码质量检查
 
 ```bash
-# 编译并运行所有 C 测试
-cd build
-cmake .. -DENABLE_TESTS=ON
-make -j4
+# 代码风格检查
+make lint
+
+# 代码格式化
+make format
+
+# 类型检查
+make type-check
+
+# 安全扫描
+make security-scan
+```
+
+#### 4. 生成报告
+
+```bash
+# 生成覆盖率报告
+make coverage
+
+# 生成完整测试报告
+make generate-report
+
+# 运行所有检查和测试
+make run-all
+```
+
+### C/C++ 测试运行
+
+对于 C/C++ 测试文件，使用 CTest：
+
+```bash
+# 构建测试
+mkdir build && cd build
+cmake .. -DBUILD_TESTS=ON
+cmake --build .
+
+# 运行所有 C 测试
 ctest --output-on-failure
 
-# 运行特定 C 测试模块
-ctest -R corekern --output-on-failure
-ctest -R coreloopthree --output-on-failure
+# 运行特定测试
+ctest -R test_memory_pool --verbose
 
-# 运行子模块测试
-cd atoms/corekern/tests && cmake . && make && ctest --output-on-failure
-cd atoms/coreloopthree/tests && cmake . && make && ctest --output-on-failure
-cd backs/llm_d/tests && cmake . && make && ctest --output-on-failure
+# 并行运行
+ctest --parallel 4 --output-on-failure
 ```
 
 ### 选择性运行测试
 
 ```bash
-# 运行特定测试文件
-pytest tests/unit/sdk/python/test_sdk.py -v
+# 运行特定模块的测试
+pytest tests/unit/coreloopthree/ -v
 
 # 运行特定测试函数
-pytest tests/integration/coreloopthree/test_cognition_execution.py::test_intent_understanding -v
+pytest tests/contract/test_agent_contracts.py::TestAgentContractValidator::test_required_fields -v
 
-# 使用标签过滤
-pytest -m "slow" tests/integration/
-pytest -m "security" tests/
-
-# 并行运行测试（加速）
-pytest -n auto tests/unit/
+# 使用标记过滤测试
+pytest -m contract -v          # 只运行契约测试
+pytest -m integration -v       # 只运行集成测试
+pytest -m benchmark -v         # 只运行性能测试
 
 # 失败后停止
-pytest -x tests/
+pytest -x
 
-# 显示覆盖率
-pytest --cov=agentos tests/ --cov-report=html
+# 显示本地变量
+pytest -l
 ```
 
 ### 使用 Makefile
 
+完整的 Makefile 命令列表：
+
 ```bash
-# 运行所有测试
-make test
+# 环境设置
+make install       # 安装依赖
+make setup-env     # 设置环境
+make check-env     # 检查环境
 
-# 运行单元测试
-make test-unit
+# 测试执行
+make test          # 运行所有测试
+make test-unit     # 单元测试
+make test-integration  # 集成测试
+make test-security # 安全测试
+make test-benchmark # 性能测试
+make run-all       # 运行所有测试和检查
 
-# 运行集成测试
-make test-integration
+# 代码质量
+make lint          # 代码风格检查
+make format        # 代码格式化
+make type-check    # 类型检查
+make security-scan # 安全扫描
 
-# 运行安全测试
-make test-security
+# 报告生成
+make coverage      # 覆盖率报告
+make generate-report # 完整测试报告
 
-# 生成覆盖率报告
-make coverage
-
-# 清理测试产物
-make clean
+# 清理
+make clean         # 清理临时文件
 ```
 
 ---
 
 ## 📊 测试覆盖率
 
-### Python 覆盖率（使用 coverage.py）
+### 覆盖率要求
+
+| 模块类型 | 行覆盖率 | 分支覆盖率 |
+|---------|---------|-----------|
+| **核心模块** (atoms, cupolas) | ≥90% | ≥85% |
+| **服务模块** (daemon) | ≥80% | ≥75% |
+| **工具模块** (commons, tools) | ≥75% | ≥70% |
+| **安全关键代码** | 100% | 100% |
+
+### 生成覆盖率报告
 
 ```bash
-# 安装工具
-pip install coverage pytest-cov
+# 使用 coverage.py (Python)
+make coverage
 
-# 运行测试并收集覆盖率
-coverage run -m pytest tests/
+# 查看 HTML 报告
+firefox reports/coverage/index.html
 
 # 查看文本报告
 coverage report
 
-# 生成 HTML 报告
-coverage html
-open htmlcov/index.html  # macOS
-xdg-open htmlcov/index.html  # Linux
-
-# 示例输出:
-# Name                                      Stmts   Miss  Cover
-# -------------------------------------------------------------
-# agentos/client.py                           150      12    92%
-# agentos/task.py                              85       5    94%
-# agentos/memory.py                           120       8    93%
-# -------------------------------------------------------------
-# TOTAL                                       355      25    93%
+# 生成 XML 报告（用于 CI）
+coverage xml
 ```
 
-### C/C++ 覆盖率（使用 gcov/lcov）
+### 覆盖率示例
 
-```bash
-# 编译时启用覆盖率
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Debug -DENABLE_COVERAGE=ON
-make -j4
-
-# 运行测试
-ctest
-
-# 生成覆盖率报告
-lcov --capture --directory . --output-file coverage.info
-genhtml coverage.info --output-directory coverage_report
-
-# 查看 HTML 报告
-open coverage_report/index.html  # macOS
-xdg-open coverage_report/index.html  # Linux
 ```
-
-### 覆盖率目标
-
-| 测试类型 | 目标覆盖率 | 当前覆盖率 | 状态 |
-|---------|-----------|-----------|------|
-| **单元测试** | ≥ 85% | 93% | ✅ 优秀 |
-| **集成测试** | ≥ 80% | 87% | ✅ 良好 |
-| **安全测试** | 100% 关键路径 | 98% | ✅ 良好 |
-| **契约测试** | 100% 接口 | 100% | ✅ 优秀 |
+Name                                      Stmts   Miss  Cover
+-------------------------------------------------------------
+tests/unit/sdk/python/test_sdk.py           156      8    95%
+tests/contract/test_agent_contracts.py      234     12    95%
+tests/integration/coreloopthree/            189     15    92%
+tests/security/test_permissions.py          145     10    93%
+-------------------------------------------------------------
+TOTAL                                      2456    185    92%
+```
 
 ---
 
-## 💻 测试示例
+## 💻 代码示例
 
-### C 单元测试示例
-
-**文件**: `atoms/corekern/tests/test_ipc.c`
+### 1. C 单元测试示例
 
 ```c
 /**
- * @file test_ipc.c
- * @brief IPC 单元测试
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ * @file test_cognition.c
+ * @brief 认知引擎单元测试
  */
 
-#include "ipc.h"
-#include "error.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include "cognition.h"
+#include "agentos.h"
 
-void test_ipc_thread(void* arg) {
-    // 打开通道
-    agentos_ipc_channel_t* channel = NULL;
-    agentos_error_t err = agentos_ipc_open("test_channel", &channel);
+/**
+ * @brief 测试认知引擎的创建和销毁
+ */
+static void test_cognition_create_destroy() {
+    printf("Running test_cognition_create_destroy...\n");
     
-    // 接收消息
-    agentos_ipc_message_t msg = {0};
-    char buffer[256];
-    msg.data = buffer;
-    msg.size = sizeof(buffer);
-    err = agentos_ipc_recv(channel, &msg, 5000);
+    agentos_cognition_engine_t* engine = NULL;
     
-    // 发送响应
-    const char* response = "Hello from thread!";
-    agentos_ipc_message_t resp_msg = {0};
-    resp_msg.data = (void*)response;
-    resp_msg.size = strlen(response) + 1;
-    err = agentos_ipc_send(channel, &resp_msg);
+    // 测试正常创建
+    agentos_error_t err = agentos_cognition_create(NULL, &engine);
+    if (err != AGENTOS_SUCCESS) {
+        printf("  ❌ Failed to create cognition engine: %d\n", err);
+        return;
+    }
     
-    agentos_ipc_close(channel);
+    if (engine == NULL) {
+        printf("  ❌ Engine pointer is NULL\n");
+        return;
+    }
+    
+    printf("  ✅ Cognition engine created successfully\n");
+    
+    // 测试销毁
+    agentos_cognition_destroy(engine);
+    printf("  ✅ Cognition engine destroyed\n");
 }
 
-int test_ipc_basic() {
-    printf("Testing basic IPC functionality...\n");
+/**
+ * @brief 测试意图理解功能
+ */
+static void test_cognition_intent_understanding() {
+    printf("Running test_cognition_intent_understanding...\n");
     
-    // 初始化 IPC
-    agentos_error_t err = agentos_ipc_init();
+    agentos_cognition_engine_t* engine = NULL;
+    agentos_error_t err = agentos_cognition_create(NULL, &engine);
+    if (err != AGENTOS_SUCCESS) {
+        printf("  ❌ Setup failed\n");
+        return;
+    }
     
-    // 创建通道
-    agentos_ipc_channel_t* channel = NULL;
-    err = agentos_ipc_create_channel("test_channel", NULL, NULL, &channel);
+    // 测试意图解析
+    const char* user_input = "分析上季度销售数据";
+    agentos_intent_t* intent = NULL;
     
-    // 创建测试线程
-    agentos_thread_t thread;
-    agentos_thread_attr_t attr = {0};
-    strcpy(attr.name, "test_thread");
-    attr.priority = AGENTOS_TASK_PRIORITY_NORMAL;
-    attr.stack_size = 1024 * 1024;
-    err = agentos_thread_create(&thread, &attr, test_ipc_thread, NULL);
+    err = agentos_cognition_process_intent(engine, user_input, &intent);
     
-    // 等待线程启动
-    agentos_task_sleep(100);
+    if (err == AGENTOS_SUCCESS && intent != NULL) {
+        printf("  ✅ Intent parsed: %s\n", intent->intent_type);
+        agentos_intent_destroy(intent);
+    } else {
+        printf("  ❌ Failed to parse intent: %d\n", err);
+    }
     
-    // 发送消息
-    const char* message = "Hello from main!";
-    agentos_ipc_message_t msg = {0};
-    msg.data = (void*)message;
-    msg.size = strlen(message) + 1;
-    err = agentos_ipc_send(channel, &msg);
-    
-    // 接收响应
-    agentos_ipc_message_t response = {0};
-    char buffer[256];
-    response.data = buffer;
-    response.size = sizeof(buffer);
-    err = agentos_ipc_recv(channel, &response, 5000);
-    
-    // 等待线程结束
-    agentos_thread_join(&thread, NULL);
-    
-    // 关闭通道
-    agentos_ipc_close(channel);
-    agentos_ipc_cleanup();
-    
-    printf("Basic IPC test passed\n");
-    return 0;
+    agentos_cognition_destroy(engine);
 }
 
 int main() {
-    test_ipc_basic();
+    printf("=== Testing Cognition Module ===\n");
+    
+    test_cognition_create_destroy();
+    test_cognition_intent_understanding();
+    
+    printf("=== Cognition Module Tests Complete ===\n");
     return 0;
 }
 ```
 
-### Python 单元测试示例
-
-**文件**: `tests/unit/sdk/python/test_sdk.py`
+### 2. Python 单元测试示例
 
 ```python
-"""AgentOS Python SDK 单元测试"""
-
-import pytest
-from unittest.mock import Mock, patch
-from agentos import AgentOS, Task
-
-class TestAgentOSClient:
-    """AgentOS 客户端测试"""
-    
-    @pytest.fixture
-    def client(self):
-        """提供配置好的客户端实例"""
-        return AgentOS(server_url="http://localhost:18789")
-    
-    def test_create_task(self, client):
-        """测试创建任务"""
-        task = client.create_task(
-            description="Test task",
-            priority=1
-        )
-        
-        assert task is not None
-        assert task.id > 0
-        assert task.description == "Test task"
-        assert task.priority == 1
-        assert task.status == "pending"
-    
-    def test_cancel_task(self, client):
-        """测试取消任务"""
-        task = client.create_task("Test task")
-        result = client.cancel_task(task.id)
-        
-        assert result is True
-        assert task.status == "cancelled"
-    
-    @patch('agentos.agent.requests.Session')
-    def test_api_error_handling(self, mock_session):
-        """测试 API 错误处理"""
-        # 配置 Mock 响应
-        mock_response = Mock()
-        mock_response.status_code = 500
-        mock_response.json.return_value = {"error": "Internal server error"}
-        
-        mock_session_instance = Mock()
-        mock_session.return_value = mock_session_instance
-        mock_session_instance.post.return_value = mock_response
-        
-        client = AgentOS()
-        
-        with pytest.raises(Exception) as exc_info:
-            client.create_task("Test")
-        
-        assert "Internal server error" in str(exc_info.value)
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
-```
-
-### 集成测试示例
-
-**文件**: `tests/integration/coreloopthree/test_cognition_execution.py`
-
-```python
-"""认知 - 执行集成测试"""
-
-import pytest
-from agentos import AgentOS, Intent, TaskDAG
-
-class TestCognitionExecutionIntegration:
-    """认知执行集成测试类"""
-    
-    @pytest.fixture
-    def agentos_client(self):
-        """提供配置好的 AgentOS 客户端"""
-        return AgentOS()
-    
-    def test_intent_understanding(self, agentos_client):
-        """测试意图理解"""
-        # 解析意图
-        intent = agentos_client.parse_intent(
-            "帮我分析最近的销售数据，找出增长最快的三个产品"
-        )
-        
-        # 验证意图识别
-        assert intent.type == "data_analysis"
-        assert intent.goal == "find_top_products"
-        assert intent.constraints["count"] == 3
-        assert intent.constraints["metric"] == "growth_rate"
-    
-    def test_task_planning(self, agentos_client):
-        """测试任务规划"""
-        planner = TaskDAG()
-        
-        # 生成任务 DAG
-        dag = planner.generate_dag(
-            goal="开发一个用户管理系统",
-            constraints={"time_limit": "2 hours"}
-        )
-        
-        # 验证 DAG 结构
-        assert dag.entry_points() == ["requirements_analysis"]
-        assert dag.critical_path() == [
-            "requirements_analysis",
-            "database_design",
-            "api_development",
-            "frontend_integration",
-            "testing"
-        ]
-        assert dag.total_tasks() >= 5
-    
-    def test_agent_dispatching(self, agentos_client):
-        """测试 Agent 调度"""
-        assignment = agentos_client.dispatch_task(
-            task_type="backend_development",
-            required_skills=["python", "fastapi", "postgresql"],
-            available_agents=[
-                {"id": 1, "skills": ["python", "django"]},
-                {"id": 2, "skills": ["python", "fastapi", "postgresql"]},
-                {"id": 3, "skills": ["java", "spring"]}
-            ]
-        )
-        
-        # 验证调度结果
-        assert assignment.agent_id == 2
-        assert assignment.match_score > 0.9
-```
-
-### 契约测试示例
-
-**文件**: `tests/contract/test_agent_contracts_refactored.py`
-
-```python
-"""Agent 契约测试（优化版 - 使用参数化测试）"""
+"""
+Python SDK 单元测试
+"""
 
 import pytest
 from typing import Dict, Any
+from unittest.mock import Mock, patch
+
+from tests.utils.test_helpers import (
+    create_mock_session,
+    with_mock_session,
+    TestDataBuilder
+)
+
+
+class TestAgentOSSDK:
+    """AgentOS SDK 测试"""
+    
+    @pytest.fixture
+    def mock_session(self):
+        """提供 Mock Session"""
+        return create_mock_session(
+            response_data={"status": "ok"},
+            status_code=200
+        )
+    
+    @pytest.fixture
+    def valid_agent_data(self) -> Dict[str, Any]:
+        """提供有效的 Agent 数据"""
+        return TestDataBuilder() \
+            .with_field("agent_id", "agent_001") \
+            .with_field("role", "software_engineer") \
+            .with_field("version", "1.0.0") \
+            .build()
+    
+    @with_mock_session
+    def test_agent_creation(self, mock_session, valid_agent_data):
+        """测试 Agent 创建"""
+        from agentos import AgentOS
+        
+        client = AgentOS(api_key="test_key")
+        result = client.create_agent(**valid_agent_data)
+        
+        assert result is not None
+        assert result["status"] == "ok"
+    
+    def test_data_builder(self, valid_agent_data):
+        """测试数据构建器"""
+        assert valid_agent_data["agent_id"] == "agent_001"
+        assert valid_agent_data["role"] == "software_engineer"
+        assert valid_agent_data["version"] == "1.0.0"
+```
+
+### 3. 集成测试示例
+
+```python
+"""
+认知 - 执行引擎集成测试
+"""
+
+import pytest
+from unittest.mock import Mock
+
+from tests.integration.coreloopthree.test_cognition_execution import (
+    TestCognitionLayerIntegration
+)
+
+
+class TestCognitionExecutionFlow:
+    """认知 - 执行流程测试"""
+    
+    @pytest.fixture
+    def cognition_engine(self):
+        """创建认知引擎 Mock"""
+        engine = Mock()
+        engine.process_intent = Mock(return_value={
+            "intent_type": "data_analysis",
+            "goal": "analyze_sales_data",
+            "confidence": 0.95
+        })
+        engine.generate_plan = Mock(return_value={
+            "plan_id": "plan_001",
+            "steps": [
+                {"step": 1, "action": "load_data"},
+                {"step": 2, "action": "analyze"},
+                {"step": 3, "action": "generate_report"}
+            ]
+        })
+        return engine
+    
+    @pytest.fixture
+    def execution_engine(self):
+        """创建执行引擎 Mock"""
+        engine = Mock()
+        engine.execute_step = Mock(return_value={
+            "status": "success",
+            "result": {"data": "analysis_result"}
+        })
+        return engine
+    
+    def test_complete_flow(self, cognition_engine, execution_engine):
+        """测试完整的认知 - 执行流程"""
+        # 1. 认知层处理意图
+        intent = cognition_engine.process_intent("分析销售数据")
+        assert intent["confidence"] > 0.8
+        
+        # 2. 生成计划
+        plan = cognition_engine.generate_plan(intent)
+        assert len(plan["steps"]) > 0
+        
+        # 3. 执行层执行每个步骤
+        for step in plan["steps"]:
+            result = execution_engine.execute_step(step)
+            assert result["status"] == "success"
+```
+
+### 4. 契约测试示例（参数化）
+
+```python
+"""
+Agent 契约测试（优化版 - 使用参数化测试）
+"""
+
+import pytest
 from tests.utils.test_helpers import ContractTestHelper, assert_error_contains
 
-class AgentContractValidator:
-    """Agent 契约验证器"""
-    
-    def validate(self, contract: Dict[str, Any]) -> bool:
-        """验证契约"""
-        # 验证逻辑...
-        pass
 
 # 参数化测试用例
 REQUIRED_FIELD_TEST_CASES = [
     {"name": "schema_version", "expected_error": "schema_version"},
     {"name": "agent_id", "expected_error": "agent_id"},
     {"name": "version", "expected_error": "version"},
+    {"name": "role", "expected_error": "role"},
 ]
 
-class TestAgentContractValidation:
-    """Agent 契约验证测试"""
+
+class TestAgentContractValidator:
+    """Agent 契约验证器测试"""
     
     @pytest.fixture
-    def valid_contract(self) -> Dict[str, Any]:
-        """提供有效的 Agent 契约示例"""
-        return ContractTestHelper.create_valid_contract()
-    
-    @pytest.fixture
-    def validator(self) -> AgentContractValidator:
-        """提供契约验证器实例"""
+    def validator(self):
+        """提供验证器实例"""
+        from agentos.contracts import AgentContractValidator
         return AgentContractValidator()
     
-    @pytest.mark.parametrize("test_case", REQUIRED_FIELD_TEST_CASES, 
+    @pytest.fixture
+    def valid_contract(self):
+        """提供有效契约"""
+        return ContractTestHelper.create_valid_contract()
+    
+    @pytest.mark.parametrize("test_case", REQUIRED_FIELD_TEST_CASES,
                            ids=lambda tc: tc["name"])
     def test_missing_required_field_fails(self, valid_contract, validator, test_case):
         """测试缺失必需字段导致验证失败（参数化）"""
@@ -642,60 +655,120 @@ class TestAgentContractValidation:
         assert_error_contains(validator.errors, test_case["expected_error"])
 ```
 
-### 性能基准测试示例
-
-**文件**: `tests/benchmarks/retrieval_latency/benchmark.c`
+### 5. 性能基准测试示例
 
 ```c
 /**
  * @file benchmark.c
  * @brief 核心循环性能基准测试
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "loop.h"
-#include "agentos.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <time.h>
+#include "loop.h"
+#include "agentos.h"
 
 /**
- * @brief 基准测试：任务提交性能
+ * @brief 测试记忆写入性能
  */
-static void benchmark_task_submit() {
-    agentos_core_loop_t* loop = NULL;
-    agentos_error_t err = agentos_loop_create(NULL, &loop);
+static void benchmark_memory_write() {
+    printf("=== Memory Write Benchmark ===\n");
     
-    const char* input = "帮我分析最近的销售数据";
-    size_t input_len = strlen(input);
-    int num_tasks = 1000;
-    char** task_ids = (char**)malloc(num_tasks * sizeof(char*));
-    
+    const int iterations = 10000;
     clock_t start = clock();
-    for (int i = 0; i < num_tasks; i++) {
-        err = agentos_loop_submit(loop, input, input_len, &task_ids[i]);
+    
+    for (int i = 0; i < iterations; i++) {
+        // 模拟记忆写入操作
+        // 实际测试中会使用真实的 memory 引擎
     }
+    
     clock_t end = clock();
+    double duration = (double)(end - start) / CLOCKS_PER_SEC * 1000;
+    double throughput = iterations / duration * 1000;
     
-    double elapsed = (double)(end - start) / CLOCKS_PER_SEC;
-    printf("benchmark_task_submit: %d tasks in %.3f seconds (%.0f tasks/sec)\n", 
-           num_tasks, elapsed, num_tasks / elapsed);
+    printf("  Iterations: %d\n", iterations);
+    printf("  Duration: %.2f ms\n", duration);
+    printf("  Throughput: %.0f ops/sec\n", throughput);
+    printf("  ✅ Benchmark complete\n");
+}
+
+/**
+ * @brief 测试记忆检索性能
+ */
+static void benchmark_memory_query() {
+    printf("=== Memory Query Benchmark ===\n");
     
-    // 清理
-    for (int i = 0; i < num_tasks; i++) {
-        if (task_ids[i]) free(task_ids[i]);
+    const int queries = 1000;
+    clock_t start = clock();
+    
+    for (int i = 0; i < queries; i++) {
+        // 模拟记忆检索操作
     }
-    free(task_ids);
-    agentos_loop_destroy(loop);
+    
+    clock_t end = clock();
+    double duration = (double)(end - start) / CLOCKS_PER_SEC * 1000;
+    double avg_latency = duration / queries;
+    
+    printf("  Queries: %d\n", queries);
+    printf("  Duration: %.2f ms\n", duration);
+    printf("  Avg Latency: %.3f ms\n", avg_latency);
+    printf("  ✅ Benchmark complete\n");
 }
 
 int main() {
-    printf("=== Running Benchmark Tests ===\n");
-    benchmark_task_submit();
-    printf("=== Benchmark Tests Complete ===\n");
+    printf("=== CoreLoopThree Performance Benchmarks ===\n\n");
+    
+    benchmark_memory_write();
+    printf("\n");
+    benchmark_memory_query();
+    
+    printf("\n=== Benchmark Tests Complete ===\n");
     return 0;
 }
+```
+
+---
+
+## 🛠️ 测试工具
+
+### 核心测试工具
+
+| 工具 | 用途 | 安装 |
+|------|------|------|
+| **pytest** | Python 测试框架 | `pip install pytest` |
+| **CMockery2** | C 单元测试框架 | 系统包管理器 |
+| **coverage.py** | Python 覆盖率 | `pip install coverage` |
+| **gcov/lcov** | C/C++ 覆盖率 | 系统包管理器 |
+| **pytest-benchmark** | 性能基准测试 | `pip install pytest-benchmark` |
+| **hypothesis** | 模糊测试 | `pip install hypothesis` |
+| **bandit** | Python 安全扫描 | `pip install bandit` |
+
+### 测试辅助函数
+
+`tests/utils/test_helpers.py` 提供：
+
+```python
+from tests.utils.test_helpers import (
+    # Mock 工厂
+    create_mock_response,      # 创建 Mock 响应
+    create_mock_session,       # 创建 Mock Session
+    
+    # 装饰器
+    with_mock_session,         # 自动 Mock Session
+    @performance_test,         # 性能测试装饰器
+    
+    # 断言辅助
+    assert_dict_contains,      # 字典包含检查
+    assert_error_contains,     # 错误消息检查
+    
+    # 数据构建器
+    TestDataBuilder,           # 链式数据构建
+    ContractTestHelper,        # 契约测试辅助
+    
+    # 测试隔离
+    TestIsolation             # 测试环境隔离
+)
 ```
 
 ---
@@ -704,315 +777,178 @@ int main() {
 
 ### 1. 测试命名规范
 
+**C 语言**:
+```c
+// 格式：test_<功能>_<场景>
+test_engine_create_success();
+test_engine_create_failure_null_config();
+test_engine_process_valid_input();
+```
+
+**Python**:
 ```python
-# ❌ 不好的命名
-def test_1():
-    pass
-
-def test_stuff():
-    pass
-
-# ✅ 好的命名
-def test_submit_task_with_valid_description():
-    """测试提交有效描述的任务"""
-    pass
-
-def test_cancel_task_that_does_not_exist():
-    """测试取消不存在的任务"""
-    pass
-
-def test_search_memory_with_empty_query_should_raise_error():
-    """测试空查询搜索记忆应抛出错误"""
-    pass
+# 格式：test_<功能>_<场景>_<预期结果>
+def test_missing_required_field_fails():
+def test_valid_contract_passes():
+def test_invalid_role_rejected():
 ```
 
 ### 2. 测试组织原则
 
-```
-# 按功能模块组织
-tests/
-├── unit/
-│   ├── kernel/
-│   │   ├── test_ipc.py          # IPC 相关测试
-│   │   ├── test_memory.py       # 内存相关测试
-│   │   └── test_scheduler.py    # 调度相关测试
-├── integration/
-│   ├── coreloopthree/
-│   │   ├── test_cognition.py    # 认知测试
-│   │   └── test_execution.py    # 执行测试
-```
+遵循 **FIRST** 原则：
+- **Fast**（快速）：测试执行要快
+- **Independent**（独立）：测试之间不依赖
+- **Repeatable**（可重复）：结果可重现
+- **Self-validating**（自验证）：自动判断成败
+- **Timely**（及时）：与代码同步编写
 
-### 3. 使用测试夹具 (Fixtures)
+### 3. 使用 AAA 模式
 
 ```python
-import pytest
-
-@pytest.fixture
-def memory_client():
-    """提供记忆客户端实例"""
-    client = MemoryRovol()
-    yield client
-    client.cleanup()
-
-@pytest.fixture
-def sample_task():
-    """提供示例任务"""
-    return Task(description="Sample task", priority=1)
-
-# 在测试中使用
-def test_memory_write(memory_client):
-    record_id = memory_client.write("Test content")
-    assert record_id > 0
-
-def test_task_execution(sample_task):
-    result = sample_task.execute()
-    assert result.success
+def test_example():
+    # Arrange（准备）
+    validator = Validator()
+    data = {"field": "value"}
+    
+    # Act（执行）
+    result = validator.validate(data)
+    
+    # Assert（断言）
+    assert result is True
 ```
 
 ### 4. 参数化测试
 
+**❌ 不推荐**（重复代码）:
 ```python
-import pytest
+def test_field_a_missing():
+    data = create_data()
+    del data["field_a"]
+    assert not validator.validate(data)
 
-@pytest.mark.parametrize("input,expected", [
-    (1, 2),
-    (2, 4),
-    (3, 6),
-    (10, 20),
-])
-def test_double(input, expected):
-    """测试翻倍函数"""
-    assert input * 2 == expected
-
-# 使用字典参数化
-@pytest.mark.parametrize("test_case", [
-    {"name": "valid", "input": {...}, "expected": True},
-    {"name": "invalid", "input": {...}, "expected": False},
-], ids=lambda tc: tc["name"])
-def test_validation(test_case):
-    """参数化验证测试"""
-    pass
+def test_field_b_missing():
+    data = create_data()
+    del data["field_b"]
+    assert not validator.validate(data)
 ```
 
-### 5. 测试辅助工具
+**✅ 推荐**（参数化）:
+```python
+@pytest.mark.parametrize("field", ["field_a", "field_b"])
+def test_missing_field(field):
+    data = create_data()
+    del data[field]
+    assert not validator.validate(data)
+```
+
+### 5. 使用测试夹具
 
 ```python
-from tests.utils.test_helpers import (
-    create_mock_response,
-    create_mock_session,
-    TestDataBuilder,
-    ContractTestHelper,
-    assert_error_contains
-)
+@pytest.fixture
+def valid_data():
+    """提供标准测试数据"""
+    return {
+        "agent_id": "agent_001",
+        "role": "engineer",
+        "version": "1.0.0"
+    }
 
-# 使用 Mock 工厂
-def test_api_call():
-    mock_session = create_mock_session(
-        response_data={"result": "success"},
-        status_code=200
-    )
+@pytest.fixture
+def validator():
+    """提供标准验证器"""
+    return AgentContractValidator()
 
-# 使用数据构建器
-def test_with_builder():
-    data = TestDataBuilder() \
-        .with_field("name", "test") \
-        .with_field("value", 100) \
-        .build_invalid(missing_field="name")
+def test_validation(valid_data, validator):
+    """使用夹具进行测试"""
+    assert validator.validate(valid_data)
 ```
 
 ---
 
-## 📈 性能基准
+## 🔍 故障排查
 
-### v1.0.0.6 测试统计
+### 常见问题
 
-| 类别 | 测试文件 | 测试数量 | 通过率 | 平均执行时间 |
-|-----|---------|---------|--------|-------------|
-| **单元测试** | 25 个 | 350+ | 98% | 2.3s |
-| **集成测试** | 15 个 | 120+ | 95% | 15.7s |
-| **安全测试** | 8 个 | 60+ | 97% | 8.2s |
-| **契约测试** | 5 个 | 40+ | 99% | 3.1s |
-| **性能测试** | 10 个 | 80+ | 92% | 45.6s |
-| **总计** | **63 个** | **650+** | **96%** | **75.0s** |
-
-### 性能基准指标
-
-在标准测试环境 (Intel i7-12700K, 32GB RAM, NVMe SSD):
-
-| 测试项 | 指标 | 要求 | 实测 | 状态 |
-|-------|------|------|------|------|
-| **IPC Binder 延迟** | p99 | < 1ms | 0.3ms | ✅ |
-| **记忆检索延迟** | p95 | < 10ms | 8.2ms | ✅ |
-| **任务调度吞吐量** | 任务/秒 | > 1000 | 1250 | ✅ |
-| **并发连接数** | 连接/秒 | > 1000 | 1500 | ✅ |
-| **向量搜索 QPS** | 查询/秒 | > 10000 | 12500 | ✅ |
-| **LRU 缓存命中率** | 命中率 | > 80% | 87% | ✅ |
-
----
-
-## 🔧 CI/CD 集成
-
-### GitHub Actions 配置
-
-**文件**: `.github/workflows/test.yml`
-
-```yaml
-name: Tests
-
-on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    
-    services:
-      postgres:
-        image: postgres:14
-        env:
-          POSTGRES_PASSWORD: postgres
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-    
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-      
-      - name: Install dependencies
-        run: |
-          ./scripts/build.sh --deps
-          pip install -r tests/requirements.txt
-      
-      - name: Run unit tests
-        run: ctest -R unit --output-on-failure
-      
-      - name: Run integration tests
-        run: pytest tests/integration/ -v --tb=short
-      
-      - name: Run security tests
-        run: pytest tests/security/ -v
-      
-      - name: Run performance tests
-        run: pytest tests/benchmarks/ -v --benchmark-only
-      
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./coverage.xml
-          flags: unittests
-          fail_ci_if_error: true
-```
-
-### 测试报告生成
+#### 1. Python 依赖缺失
 
 ```bash
-# 生成 HTML 测试报告
-python tests/reports/dashboard_generator.py
+# 错误：ModuleNotFoundError: No module named 'pytest'
+make install
 
-# 生成覆盖率报告
-pytest --cov=agentos tests/ --cov-report=html
-
-# 生成性能报告
-pytest tests/benchmarks/ -v --benchmark-json=report.json
+# 或手动安装
+pip install -r requirements.txt
 ```
 
----
-
-## 📖 相关文档
-
-- [测试规范](../paper/specifications/testing.md) - 测试编写标准和最佳实践
-- [编码规范](../paper/specifications/coding_standards.md) - C/C++/Python编码规范
-- [故障排查](../paper/guides/troubleshooting.md) - 测试失败排查指南
-- [CoreLoopThree 架构](../paper/architecture/coreloopthree.md) - 核心循环架构文档
-- [MemoryRovol 架构](../paper/architecture/memoryrovol.md) - 记忆系统架构
-- [系统调用接口](../paper/architecture/syscall.md) - 系统调用接口文档
-- [TESTING_GUIDELINES.md](TESTING_GUIDELINES.md) - 测试代码规范（本目录）
-
----
-
-## 🤝 贡献测试
-
-我们欢迎并感谢测试贡献！测试可以帮助：
-
-1. **提高代码质量**: 发现潜在 bug 和边界问题
-2. **防止回归**: 确保新功能不破坏现有功能
-3. **改进文档**: 通过测试示例展示更好的使用方式
-
-### 如何贡献测试
-
-1. Fork 项目仓库
-2. 创建测试分支 (`git checkout -b test/my-awesome-test`)
-3. 编写测试代码（参考本文档中的示例）
-4. 运行测试确保通过 (`pytest tests/ -v`)
-5. 提交更改 (`git commit -am 'Add test for feature X'`)
-6. 推送到分支 (`git push origin test/my-awesome-test`)
-7. 创建 Pull Request
-
-### 测试贡献指南
-
-- 遵循 [TESTING_GUIDELINES.md](TESTING_GUIDELINES.md) 中的规范
-- 使用有意义的测试名称
-- 包含清晰的断言和错误消息
-- 测试边界条件和异常情况
-- 保持测试独立和可重复
-- 添加必要的注释和文档字符串
-
----
-
-## 📊 测试工具
-
-### 主要工具
-
-| 工具 | 用途 | 安装 |
-|-----|------|------|
-| **pytest** | Python 测试框架 | `pip install pytest` |
-| **pytest-cov** | Python 覆盖率 | `pip install pytest-cov` |
-| **pytest-benchmark** | Python 性能测试 | `pip install pytest-benchmark` |
-| **pytest-xdist** | Python 并行测试 | `pip install pytest-xdist` |
-| **hypothesis** | Python 模糊测试 | `pip install hypothesis` |
-| **CTest** | C/C++ 测试框架 | CMake 内置 |
-| **gcov/lcov** | C/C++ 覆盖率 | GCC 内置 |
-| **radon** | Python 复杂度检查 | `pip install radon` |
-| **lizard** | C/C++ 复杂度检查 | `pip install lizard` |
-
-### 实用脚本
+#### 2. C 测试编译失败
 
 ```bash
-# 检查语法
-python tests/check_syntax.py
+# 检查 CMake 配置
+cd atoms/corekern
+cat tests/CMakeLists.txt
 
-# 生成测试报告
-python tests/generate_combined_report.py
-
-# 性能回归检测
-python tests/performance/regression_detector.py
-
-# SAST/DAST 安全扫描
-python tests/security/sast_dast_scanner.py
+# 重新构建
+mkdir build && cd build
+cmake .. -DBUILD_TESTS=ON
+cmake --build .
 ```
+
+#### 3. 测试数据文件缺失
+
+```bash
+# 检查测试数据
+ls tests/fixtures/data/
+
+# 如果缺失，从备份恢复或重新生成
+python tests/utils/data_generator.py
+```
+
+#### 4. 覆盖率报告为空
+
+```bash
+# 清理缓存
+make clean
+
+# 重新运行覆盖率
+make coverage
+
+# 检查 .coveragerc 配置
+cat .coveragerc
+```
+
+### 诊断工具
+
+```bash
+# 运行诊断脚本
+python run_tests.py
+
+# 查看详细错误
+pytest -v --tb=long
+
+# 显示本地变量
+pytest -l
+
+# 打印输出
+pytest -s
+```
+
+---
+
+## 🔗 相关文档
+
+| 文档 | 说明 |
+|------|------|
+| [TESTING_GUIDELINES.md](./TESTING_GUIDELINES.md) | 测试代码编写规范 |
+| [代码质量改进报告](../.本地/tests/20260326-05 次代码质量改进总结报告.md) | 测试质量改进记录 |
+| [测试评估报告](../.本地/tests/20260326-04 次代码重复率与圈复杂度评估报告.md) | 测试代码质量评估 |
 
 ---
 
 <div align="center">
 
-**© 2026 SPHARX Ltd. 保留所有权利。**
+**tests - AgentOS 质量保障体系**
 
-*"From data intelligence emerges"*
+[返回顶部](#agentos 测试套件-tests)
 
-**AgentOS v1.0.0.6**
-
-[返回顶部](#agentos-测试套件-tests)
+© 2026 SPHARX Ltd. All Rights Reserved.
 
 </div>

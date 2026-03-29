@@ -16,10 +16,10 @@
 struct permission_engine {
     rule_manager_t*     rules;
     cache_manager_t*    cache;
-    domes_rwlock_t      rwlock;
+    cupolas_rwlock_t      rwlock;
     char*               rules_path;
     uint64_t            last_load_time;
-    domes_atomic32_t    ref_count;
+    cupolas_atomic32_t    ref_count;
 };
 
 #endif /* DOMAIN_PERMISSION_ENGINE_H */

@@ -150,7 +150,7 @@ Skill 与 Agent 的关系是**组合而非继承**——一个 Agent 可以动�
 #ifndef AGENTOS_SKILL_H
 #define AGENTOS_SKILL_H
 
-#include <agentos/bases.h>
+#include <agentos/commons.h>
 
 typedef struct agentos_skill agentos_skill_t;
 typedef struct agentos_skill_input agentos_skill_input_t;

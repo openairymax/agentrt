@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file stdio_gateway.c
  * @brief Stdio网关实现 - 本地进程通信协议
  * 
@@ -279,11 +279,11 @@ static char* stdio_command_execute(stdio_connection_context_t* context, stdio_co
             
             if (err == AGENTOS_SUCCESS && count > 0) {
                 char* response = malloc(count * 50 + 100);
-                strcpy(response, "Active sessions:\n");
+                size_t response_size = count * 50 + 100;
+                size_t used = 0;
+                used += snprintf(response + used, response_size - used, "Active sessions:\n");
                 for (size_t i = 0; i < count; i++) {
-                    strcat(response, "  ");
-                    strcat(response, sessions[i]);
-                    strcat(response, "\n");
+                    used += snprintf(response + used, response_size - used, "  %s\n", sessions[i]);
                     free(sessions[i]);
                 }
                 free(sessions);

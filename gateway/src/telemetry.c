@@ -1,7 +1,6 @@
 /**
  * @file telemetry.c
- * @brief 可观测性实现（Prometheus 格式指标）
- * 
+ * @brief 可观测性实现（Prometheus 格式指标�? * 
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -14,15 +13,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* 最大指标数量 */
+/* 最大指标数�?*/
 #define MAX_METRICS 256
 
-/* 指标值结构 */
+/* 指标值结�?*/
 typedef struct metric_value {
     char*               label_values;
     double              value;
-    uint64_t            count;      /* 用于直方图 */
-    double              sum;        /* 用于直方图 */
+    uint64_t            count;      /* 用于直方�?*/
+    double              sum;        /* 用于直方�?*/
     struct metric_value* next;
 } metric_value_t;
 
@@ -32,11 +31,11 @@ typedef struct metric {
     char                help[256];
     metric_type_t       type;
     char*               labels;         /* 标签名称 */
-    metric_value_t*     values;         /* 值链表 */
+    metric_value_t*     values;         /* 值链�?*/
     pthread_mutex_t     lock;
 } metric_t;
 
-/* 可观测性结构 */
+/* 可观测性结�?*/
 struct telemetry {
     metric_t            metrics[MAX_METRICS];
     size_t              metric_count;
@@ -46,13 +45,12 @@ struct telemetry {
 /* ========== 辅助函数 ========== */
 
 /**
- * @brief 查找或创建指标值
- */
+ * @brief 查找或创建指标�? */
 static metric_value_t* get_or_create_value(
     metric_t* m,
     const char* label_values) {
     
-    /* 查找现有值 */
+    /* 查找现有�?*/
     metric_value_t* v = m->values;
     while (v) {
         if (strcmp(v->label_values, label_values ? label_values : "") == 0) {
@@ -61,7 +59,7 @@ static metric_value_t* get_or_create_value(
         v = v->next;
     }
     
-    /* 创建新值 */
+    /* 创建新�?*/
     v = (metric_value_t*)calloc(1, sizeof(metric_value_t));
     if (!v) return NULL;
     
@@ -101,13 +99,13 @@ telemetry_t* telemetry_create(void) {
     }
     
     /* 注册默认指标 */
-    telemetry_register_counter(t, "dynamic_requests_total",
+    telemetry_register_counter(t, "gateway_requests_total",
         "Total number of requests", "gateway,method");
-    telemetry_register_counter(t, "dynamic_requests_failed_total",
+    telemetry_register_counter(t, "gateway_requests_failed_total",
         "Total number of failed requests", "gateway");
-    telemetry_register_gauge(t, "dynamic_connections_active",
+    telemetry_register_gauge(t, "gateway_connections_active",
         "Number of active connections", "gateway");
-    telemetry_register_gauge(t, "dynamic_sessions_active",
+    telemetry_register_gauge(t, "gateway_sessions_active",
         "Number of active sessions", NULL);
     
     return t;
@@ -284,14 +282,14 @@ agentos_error_t telemetry_export_metrics(
     
     if (!t || !out_metrics) return AGENTOS_EINVAL;
     
-    /* 计算所需缓冲区大小 */
+    /* 计算所需缓冲区大�?*/
     size_t size = 1024;  /* 初始大小 */
     
     pthread_mutex_lock(&t->lock);
     
     for (size_t i = 0; i < t->metric_count; i++) {
         metric_t* m = &t->metrics[i];
-        size += 256;  /* HELP 和 TYPE 行 */
+        size += 256;  /* HELP �?TYPE �?*/
         
         pthread_mutex_lock(&m->lock);
         for (metric_value_t* v = m->values; v; v = v->next) {
@@ -300,7 +298,7 @@ agentos_error_t telemetry_export_metrics(
         pthread_mutex_unlock(&m->lock);
     }
     
-    /* 分配缓冲区 */
+    /* 分配缓冲�?*/
     char* buf = (char*)malloc(size);
     if (!buf) {
         pthread_mutex_unlock(&t->lock);
@@ -314,12 +312,12 @@ agentos_error_t telemetry_export_metrics(
     for (size_t i = 0; i < t->metric_count; i++) {
         metric_t* m = &t->metrics[i];
         
-        /* HELP 行 */
+        /* HELP �?*/
         if (m->help[0]) {
             p += snprintf(p, end - p, "# HELP %s %s\n", m->name, m->help);
         }
         
-        /* TYPE 行 */
+        /* TYPE �?*/
         const char* type_str = 
             (m->type == METRIC_TYPE_COUNTER) ? "counter" :
             (m->type == METRIC_TYPE_GAUGE) ? "gauge" : "histogram";

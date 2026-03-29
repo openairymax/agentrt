@@ -1,5 +1,5 @@
 ﻿# Copyright (c) 2026 SPHARX. All Rights Reserved.
-# daemon/bases 单元测试
+# daemon/commons 单元测试
 
 cmake_minimum_required(VERSION 3.20)
 

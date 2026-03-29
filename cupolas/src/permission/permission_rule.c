@@ -1,6 +1,6 @@
 /**
  * @file permission_rule.c
- * @brief 权限规则管理器实现
+ * @brief 权限规则管理器实�?
  * @author Spharx
  * @date 2024
  */
@@ -15,11 +15,11 @@
 
 static void free_rule(permission_rule_t* rule) {
     if (!rule) return;
-    domes_mem_free(rule->agent_id);
-    domes_mem_free(rule->action);
-    domes_mem_free(rule->resource);
-    domes_mem_free(rule->resource_pattern);
-    domes_mem_free(rule);
+    cupolas_mem_free(rule->agent_id);
+    cupolas_mem_free(rule->action);
+    cupolas_mem_free(rule->resource);
+    cupolas_mem_free(rule->resource_pattern);
+    cupolas_mem_free(rule);
 }
 
 static void free_rules(permission_rule_t* rules) {
@@ -32,21 +32,21 @@ static void free_rules(permission_rule_t* rules) {
 
 static permission_rule_t* create_rule(const char* agent_id, const char* action,
                                        const char* resource, int allow, int priority) {
-    permission_rule_t* rule = (permission_rule_t*)domes_mem_alloc(sizeof(permission_rule_t));
+    permission_rule_t* rule = (permission_rule_t*)cupolas_mem_alloc(sizeof(permission_rule_t));
     if (!rule) return NULL;
     
     memset(rule, 0, sizeof(permission_rule_t));
     
     if (agent_id) {
-        rule->agent_id = domes_strdup(agent_id);
+        rule->agent_id = cupolas_strdup(agent_id);
         if (!rule->agent_id) goto error;
     }
     if (action) {
-        rule->action = domes_strdup(action);
+        rule->action = cupolas_strdup(action);
         if (!rule->action) goto error;
     }
     if (resource) {
-        rule->resource = domes_strdup(resource);
+        rule->resource = cupolas_strdup(resource);
         if (!rule->resource) goto error;
     }
     
@@ -129,11 +129,11 @@ static int parse_yaml_line(const char* line, char** agent_id, char** action,
         }
         
         if (strcmp(key, "agent") == 0 && value) {
-            *agent_id = domes_strdup(value);
+            *agent_id = cupolas_strdup(value);
         } else if (strcmp(key, "action") == 0 && value) {
-            *action = domes_strdup(value);
+            *action = cupolas_strdup(value);
         } else if (strcmp(key, "resource") == 0 && value) {
-            *resource = domes_strdup(value);
+            *resource = cupolas_strdup(value);
         } else if (strcmp(key, "allow") == 0 && value) {
             *allow = (strcmp(value, "true") == 0 || strcmp(value, "1") == 0) ? 1 : 0;
         } else if (strcmp(key, "priority") == 0 && value) {
@@ -147,28 +147,28 @@ static int parse_yaml_line(const char* line, char** agent_id, char** action,
 }
 
 rule_manager_t* rule_manager_create(const char* path) {
-    rule_manager_t* mgr = (rule_manager_t*)domes_mem_alloc(sizeof(rule_manager_t));
+    rule_manager_t* mgr = (rule_manager_t*)cupolas_mem_alloc(sizeof(rule_manager_t));
     if (!mgr) return NULL;
     
     memset(mgr, 0, sizeof(rule_manager_t));
     
-    if (domes_rwlock_init(&mgr->rwlock) != DOMES_OK) {
-        domes_mem_free(mgr);
+    if (cupolas_rwlock_init(&mgr->rwlock) != cupolas_OK) {
+        cupolas_mem_free(mgr);
         return NULL;
     }
     
     if (path) {
-        mgr->path = domes_strdup(path);
+        mgr->path = cupolas_strdup(path);
         if (!mgr->path) {
-            domes_rwlock_destroy(&mgr->rwlock);
-            domes_mem_free(mgr);
+            cupolas_rwlock_destroy(&mgr->rwlock);
+            cupolas_mem_free(mgr);
             return NULL;
         }
         
         if (rule_manager_reload(mgr) != 0) {
-            domes_mem_free(mgr->path);
-            domes_rwlock_destroy(&mgr->rwlock);
-            domes_mem_free(mgr);
+            cupolas_mem_free(mgr->path);
+            cupolas_rwlock_destroy(&mgr->rwlock);
+            cupolas_mem_free(mgr);
             return NULL;
         }
     }
@@ -179,32 +179,32 @@ rule_manager_t* rule_manager_create(const char* path) {
 void rule_manager_destroy(rule_manager_t* mgr) {
     if (!mgr) return;
     
-    domes_rwlock_wrlock(&mgr->rwlock);
+    cupolas_rwlock_wrlock(&mgr->rwlock);
     free_rules(mgr->rules);
     mgr->rules = NULL;
-    domes_rwlock_unlock(&mgr->rwlock);
+    cupolas_rwlock_unlock(&mgr->rwlock);
     
-    domes_rwlock_destroy(&mgr->rwlock);
-    domes_mem_free(mgr->path);
-    domes_mem_free(mgr);
+    cupolas_rwlock_destroy(&mgr->rwlock);
+    cupolas_mem_free(mgr->path);
+    cupolas_mem_free(mgr);
 }
 
 int rule_manager_reload(rule_manager_t* mgr) {
-    if (!mgr || !mgr->path) return DOMES_ERROR_INVALID_ARG;
+    if (!mgr || !mgr->path) return cupolas_ERROR_INVALID_ARG;
     
-    domes_file_stat_t st;
-    if (domes_file_stat(mgr->path, &st) != DOMES_OK) {
-        return DOMES_ERROR_NOT_FOUND;
+    cupolas_file_stat_t st;
+    if (cupolas_file_stat(mgr->path, &st) != cupolas_OK) {
+        return cupolas_ERROR_NOT_FOUND;
     }
     
     uint64_t mtime = (uint64_t)st.mtime.sec * 1000 + st.mtime.nsec / 1000000;
     if (mtime == mgr->last_mtime) {
-        return DOMES_OK;
+        return cupolas_OK;
     }
     
     FILE* fp = fopen(mgr->path, "r");
     if (!fp) {
-        return DOMES_ERROR_IO;
+        return cupolas_ERROR_IO;
     }
     
     permission_rule_t* new_rules = NULL;
@@ -223,14 +223,14 @@ int rule_manager_reload(rule_manager_t* mgr) {
         }
         
         permission_rule_t* rule = create_rule(agent_id, action, resource, allow, priority);
-        domes_mem_free(agent_id);
-        domes_mem_free(action);
-        domes_mem_free(resource);
+        cupolas_mem_free(agent_id);
+        cupolas_mem_free(action);
+        cupolas_mem_free(resource);
         
         if (!rule) {
             fclose(fp);
             free_rules(new_rules);
-            return DOMES_ERROR_NO_MEMORY;
+            return cupolas_ERROR_NO_MEMORY;
         }
         
         *tail = rule;
@@ -239,16 +239,16 @@ int rule_manager_reload(rule_manager_t* mgr) {
     
     fclose(fp);
     
-    domes_rwlock_wrlock(&mgr->rwlock);
+    cupolas_rwlock_wrlock(&mgr->rwlock);
     permission_rule_t* old_rules = mgr->rules;
     mgr->rules = new_rules;
     mgr->last_mtime = mtime;
-    domes_atomic_inc32(&mgr->version);
-    domes_rwlock_unlock(&mgr->rwlock);
+    cupolas_atomic_inc32(&mgr->version);
+    cupolas_rwlock_unlock(&mgr->rwlock);
     
     free_rules(old_rules);
     
-    return DOMES_OK;
+    return cupolas_OK;
 }
 
 int rule_manager_match(rule_manager_t* mgr,
@@ -263,7 +263,7 @@ int rule_manager_match(rule_manager_t* mgr,
     int best_priority = -1;
     int result = 0;
     
-    domes_rwlock_rdlock(&mgr->rwlock);
+    cupolas_rwlock_rdlock(&mgr->rwlock);
     
     permission_rule_t* rule = mgr->rules;
     while (rule) {
@@ -300,7 +300,7 @@ int rule_manager_match(rule_manager_t* mgr,
         rule = rule->next;
     }
     
-    domes_rwlock_unlock(&mgr->rwlock);
+    cupolas_rwlock_unlock(&mgr->rwlock);
     
     return result;
 }
@@ -311,12 +311,12 @@ int rule_manager_add(rule_manager_t* mgr,
                      const char* resource,
                      int allow,
                      int priority) {
-    if (!mgr) return DOMES_ERROR_INVALID_ARG;
+    if (!mgr) return cupolas_ERROR_INVALID_ARG;
     
     permission_rule_t* rule = create_rule(agent_id, action, resource, allow, priority);
-    if (!rule) return DOMES_ERROR_NO_MEMORY;
+    if (!rule) return cupolas_ERROR_NO_MEMORY;
     
-    domes_rwlock_wrlock(&mgr->rwlock);
+    cupolas_rwlock_wrlock(&mgr->rwlock);
     
     permission_rule_t** pp = &mgr->rules;
     while (*pp && (*pp)->priority >= priority) {
@@ -326,27 +326,27 @@ int rule_manager_add(rule_manager_t* mgr,
     rule->next = *pp;
     *pp = rule;
     
-    domes_atomic_inc32(&mgr->version);
+    cupolas_atomic_inc32(&mgr->version);
     
-    domes_rwlock_unlock(&mgr->rwlock);
+    cupolas_rwlock_unlock(&mgr->rwlock);
     
-    return DOMES_OK;
+    return cupolas_OK;
 }
 
 void rule_manager_clear(rule_manager_t* mgr) {
     if (!mgr) return;
     
-    domes_rwlock_wrlock(&mgr->rwlock);
+    cupolas_rwlock_wrlock(&mgr->rwlock);
     free_rules(mgr->rules);
     mgr->rules = NULL;
-    domes_atomic_inc32(&mgr->version);
-    domes_rwlock_unlock(&mgr->rwlock);
+    cupolas_atomic_inc32(&mgr->version);
+    cupolas_rwlock_unlock(&mgr->rwlock);
 }
 
 size_t rule_manager_count(rule_manager_t* mgr) {
     if (!mgr) return 0;
     
-    domes_rwlock_rdlock(&mgr->rwlock);
+    cupolas_rwlock_rdlock(&mgr->rwlock);
     
     size_t count = 0;
     permission_rule_t* rule = mgr->rules;
@@ -355,7 +355,7 @@ size_t rule_manager_count(rule_manager_t* mgr) {
         rule = rule->next;
     }
     
-    domes_rwlock_unlock(&mgr->rwlock);
+    cupolas_rwlock_unlock(&mgr->rwlock);
     
     return count;
 }

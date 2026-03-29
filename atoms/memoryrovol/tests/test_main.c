@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file test_main.c
  * @brief memoryrovol 测试主程�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -8,8 +8,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h"
-#include "../../../bases/utils/string/include/string_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 #include <assert.h>
 
 /* 测试函数声明 */

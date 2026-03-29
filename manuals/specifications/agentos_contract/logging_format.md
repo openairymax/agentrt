@@ -1,4 +1,4 @@
-# AgentOS 日志格式规范
+﻿# AgentOS 日志格式规范
 
 **版本**: Doc V1.6  
 **状态**: 正式发布  
@@ -492,10 +492,10 @@ logging:
 
 ### 4.1 存储路径
 
-日志文件统一存放在 `lodges/logs/` 目录下，按模块分类：
+日志文件统一存放在 `heapstore/logs/` 目录下，按模块分类：
 
 ```
-lodges/logs/
+heapstore/logs/
 ├── kernel/                 # 内核日志 (atoms/ 模块)
 │   ├── core.log
 │   ├── coreloopthree.log
@@ -550,7 +550,7 @@ filebeat.inputs:
 - type: log
   enabled: true
   paths:
-    - lodges/logs/**/*.log
+    - heapstore/logs/**/*.log
   json.keys_under_root: true
   processors:
     - add_host_metadata: ~

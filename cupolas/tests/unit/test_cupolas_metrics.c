@@ -1,6 +1,6 @@
-ï»¿/**
- * @file test_domes_metrics.c
- * @brief cupolas æ€§èƒ½æŒ‡æ ‡å•å…ƒæµ‹è¯•
+/**
+ * @file test_cupolas_metrics.c
+ * @brief cupolas ĞÔÄÜÖ¸±êµ¥Ôª²âÊÔ
  * @author Spharx
  * @date 2024
  */
@@ -9,14 +9,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include "../../src/domes_metrics.h"
+#include "../../src/cupolas_metrics.h"
 #include "../../src/platform/platform.h"
 
 #define TEST_PASS(name) printf("[PASS] %s\n", name)
 #define TEST_FAIL(name, msg) do { printf("[FAIL] %s: %s\n", name, msg); return 1; } while(0)
 
 /* ============================================================================
- * æŒ‡æ ‡åŸºç¡€åŠŸèƒ½æµ‹è¯•
+ * Ö¸±ê»ù´¡¹¦ÄÜ²âÊÔ
  * ============================================================================ */
 
 static int test_metrics_init_shutdown(void) {
@@ -42,7 +42,7 @@ static int test_metrics_counter(void) {
     char buffer[4096];
     size_t len = metrics_export_prometheus(buffer, sizeof(buffer));
     assert(len > 0);
-    assert(strstr(buffer, "domes_permissions_total") != NULL);
+    assert(strstr(buffer, "cupolas_permissions_total") != NULL);
 
     metrics_reset();
     metrics_shutdown();
@@ -117,17 +117,17 @@ static int test_metrics_export_formats(void) {
 }
 
 static int test_metrics_predefined_names(void) {
-    assert(strcmp(METRIC_PERMISSIONS_TOTAL, "domes_permissions_total") == 0);
-    assert(strcmp(METRIC_SANITIZER_INPUT_TOTAL, "domes_sanitizer_input_total") == 0);
-    assert(strcmp(METRIC_WORKBENCH_EXECUTIONS_TOTAL, "domes_workbench_executions_total") == 0);
-    assert(strcmp(METRIC_ERRORS_TOTAL, "domes_errors_total") == 0);
+    assert(strcmp(METRIC_PERMISSIONS_TOTAL, "cupolas_permissions_total") == 0);
+    assert(strcmp(METRIC_SANITIZER_INPUT_TOTAL, "cupolas_sanitizer_input_total") == 0);
+    assert(strcmp(METRIC_WORKBENCH_EXECUTIONS_TOTAL, "cupolas_workbench_executions_total") == 0);
+    assert(strcmp(METRIC_ERRORS_TOTAL, "cupolas_errors_total") == 0);
 
     TEST_PASS("metrics_predefined_names");
     return 0;
 }
 
 /* ============================================================================
- * ä¸»æµ‹è¯•å…¥å£
+ * Ö÷²âÊÔÈë¿Ú
  * ============================================================================ */
 
 int main(int argc, char* argv[]) {

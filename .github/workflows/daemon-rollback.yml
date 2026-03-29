@@ -1,4 +1,4 @@
-﻿# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS daemon Module Rollback Workflow
 # Version: 1.0.0
 # Description: Handles deployment rollback for daemon service layer module
@@ -259,7 +259,7 @@ jobs:
       - name: Send notification
         if: env.SLACK_WEBHOOK != ''
         env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_BACKS }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_DAEMON }}
         run: |
           STATUS="${{ needs.rollback.result }}"
 

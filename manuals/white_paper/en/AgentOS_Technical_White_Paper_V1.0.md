@@ -1,4 +1,4 @@
-# AgentOS Technical White Paper V1.0
+﻿# AgentOS Technical White Paper V1.0
 
 **Version**: Doc V1.5  
 **Status**: Official Release  
@@ -2071,7 +2071,7 @@ AgentOS adopts zero-trust security model:
 3. **Continuous verification**: Do not trust, continuously verify identity and permissions
 4. **Micro-segmentation**: Fine-grained resource isolation
 
-#### 6.6.2 bases Security Scenarios
+#### 6.6.2 commons Security Scenarios
 
 | Scenario | Risk Level | Protection Measures |
 |----------|-----------|---------------------|
@@ -2118,7 +2118,7 @@ daemon is the service layer of AgentOS, providing core services such as LLM infe
 │       └─────────────┼─────────────┘                    │
 │                     │                                  │
 │              ┌──────▼──────┐                        │
-│              │ bases libs │ ← Shared libs (IPC/Log/manager) │
+│              │ commons libs │ ← Shared libs (IPC/Log/manager) │
 │              └──────┬──────┘                        │
 │                     │                                  │
 │  ┌──────────┐  ┌────▼──────┐  ┌──────────┐         │
@@ -2591,7 +2591,7 @@ Respond to user
 
 | Metric | Value | Description |
 |--------|-------|-------------|
-| **Automation rate** | 85% | bases issues auto-processed |
+| **Automation rate** | 85% | commons issues auto-processed |
 | **Response time** | <3s | End-to-end latency |
 | **Error rate** | <0.1% | Manual intervention rate |
 | **Concurrency** | 10,000+ | Simultaneous order processing |

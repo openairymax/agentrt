@@ -1,4 +1,4 @@
-# AgentOS (OpenApex) Java 安全编码指南
+﻿# AgentOS (OpenApex) Java 安全编码指南
 
 **版本**: Doc V1.6  
 **备选名称**: OpenApex (开源极境 / 极境OS)  
@@ -1040,7 +1040,7 @@ public class SecureIpcClient {
 }
 ```
 
-### 10.3 bases（公共库层）Java 安全实现
+### 10.3 commons（公共库层）Java 安全实现
 Common模块提供跨层安全基础设施：
 
 #### 10.3.1 统一密钥管理服务

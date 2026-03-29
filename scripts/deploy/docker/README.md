@@ -164,9 +164,9 @@ AGENTOS_TELEMETRY_ENDPOINT=http://otel-collector:4317
 
 | 宿主机路径 | 容器路径 | 用途 |
 |-----------|---------|------|
-| `./lodges/logs` | `/var/log/agentos` | 日志存储 |
-| `./lodges/registry` | `/var/lib/agentos/registry` | 注册表数据 |
-| `./lodges/traces` | `/var/lib/agentos/traces` | 追踪数据 |
+| `./heapstore/logs` | `/var/log/agentos` | 日志存储 |
+| `./heapstore/registry` | `/var/lib/agentos/registry` | 注册表数据 |
+| `./heapstore/traces` | `/var/lib/agentos/traces` | 追踪数据 |
 | `../../manager/kernel` | `/etc/agentos/kernel` | 内核配置 |
 | `../../manager/services` | `/etc/agentos/services` | 服务配置 |
 
@@ -194,7 +194,7 @@ AGENTOS_TELEMETRY_ENDPOINT=http://otel-collector:4317
 
 # 以交互模式启动容器
 docker run -it --rm \
-  -v $(pwd)/lodges/logs:/var/log/agentos \
+  -v $(pwd)/heapstore/logs:/var/log/agentos \
   -v $(pwd)/manager:/etc/agentos \
   spharx/agentos-kernel:dev \
   /bin/bash

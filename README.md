@@ -1,20 +1,21 @@
-# Agent OS
+# AgentOS
 
 <div align="center">
 
 [![Version](https://img.shields.io/badge/version-1.0.0.6-blue.svg)](https://gitee.com/spharx/agentos)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](https://gitee.com/spharx/agentos/blob/main/LICENSE)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/SpharxTeam/AgentOS/actions)
+[![Documentation Status](https://img.shields.io/badge/docs-V1.6-blue)](manuals/README.md)
 [![Docker](https://img.shields.io/badge/docker-supported-blue.svg?logo=docker&logoColor=white)](https://www.docker.com/)
 [![C/C++](https://img.shields.io/badge/C%2FC%2B%2B-11%2F17-blue.svg?logo=c%2B%2B&logoColor=white)](https://isocpp.org/)
-[![Python](https://img.shields.io/badge/python-3.9+-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.10+-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Mirror](https://img.shields.io/badge/mirror-GitHub-lightgrey.svg)](https://github.com/SpharxTeam/AgentOS)
-[![Status](https://img.shields.io/badge/status-production%20ready-success.svg)](https://gitee.com/spharx/agentos)
 
 ---
 
-<div align="center">
-
 ## 🎯 智能体超级操作系统
+
+**备选名称**: OpenApex (开源极境 / 极境 OS)
 
 *"From data intelligence emerges 始于数据，终于智能。"*
 
@@ -27,11 +28,10 @@
 </div>
 
 ---
-</div>
 
 ## 📜 官方技术白皮书
 
-项目完整系统阐述在官方技术白皮书中进行。
+项目完整系统阐述请参阅官方技术白皮书。
 
 | 版本 | 文档 |
 |------|------|
@@ -40,20 +40,18 @@
 
 ---
 
-</div>
-
 ## 🚀 项目简介
 
-AgentOS 是 SpharxWorks 战略者的核心产品之一，是一个**生产就绪的 Agent 操作系统**。它不仅仅是一个 Agent 框架，而是为 Agent 提供完整的操作系统支持。我们的使命是构建一个人人都能使用的 AI 助手。
+AgentOS 是 SpharxWorks 的核心产品之一，是一个**生产就绪的 Agent 操作系统**。它不是一个 Agent 框架，而是为驱动 Agent 提供完整的操作系统支持。
 
 "Intelligence emergence, and nothing less, is the ultimate sublimation of AI."
 
 ### 核心优势
 
-- **token 效率提升**: 相比其他方案平均节省约 200% token 使用量
-- **架构简洁清晰**: token 使用效率比其他方案高 2-3 倍
+- **Token 效率提升**: 相比其他方案平均节省约 200% token 使用量
+- **架构简洁清晰**: Token 使用效率比其他方案高 2-3 倍
 - **微内核架构**: 基于微内核设计，保证系统稳定性和可扩展性
-- **安全可靠**: 四重安全防护，沙箱隔离，权限裁决，输入净化
+- **安全可靠**: 四重安全防护，沙箱隔离，权限裁决，输入净化，审计追踪
 
 ### 理论基础
 
@@ -62,10 +60,10 @@ AgentOS 的设计融合多种理论成果，形成完整的科学支撑体系。
 | 理论 | 来源 | 核心思想 | 在 AgentOS 中的体现 |
 |------|------|----------|---------------------|
 | **工程控制论** | Engineering Cybernetics | 反馈调节、动态平衡 | 三层闭环控制系统，实时感知决策执行分离，确保每个环节可控 |  
-| **系统工程论** | On Systems Engineering | 层次分解、综合集成、整体优化 | 四维五域原则，七层架构分层，CoreLoopThree 实现 |
+| **系统工程论** | On Systems Engineering | 层次分解、综合集成、整体优化 | 五维正交原则体系，七层架构分层，CoreLoopThree 实现 |
 | **双系统理论** | Thinking, Fast and Slow | System 1 快思考，System 2 慢思考 | 认知层 (System 2) 深谋远虑 vs 行动层 (System 1) 快速执行 |
 | **微内核理论** | Liedtke 微内核原理 + seL4 形式化验证 | 极小化内核、模块化、最小特权、形式化验证 | corekern 仅 4 个原子机制，所有服务运行在用户态 |
-| **工程哲学** | 钱学森系统工程 + 工匠精神 | 简约至上、细节极致、人文关怀、美学追求 | 极简主义、接口精细设计、开发者体验如山 |
+| **工程哲学** | 系统工程 + 工匠精神 | 简约至上、细节极致、人文关怀、美学追求 | 极简主义、接口精细设计、开发者体验如山 |
 
 **理论创新点**:
 - **控制论与系统论融合**: 将控制论的动态调节（反馈机制）与系统论的结构设计（层次分解）相结合，AgentOS 架构获得双重支撑
@@ -130,25 +128,26 @@ AgentOS 的设计融合多种理论成果，形成完整的科学支撑体系。
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 架构设计原则（四维五域体系）
+### 架构设计原则（五维正交体系）
 
 详见 [架构设计原则 v1.6](manuals/architecture/folder/architectural_design_principles.md)
 
 ```
-维度一：系统论 (S-1~S-4) → 工程控制论 & 系统工程
-  实时优先 → 层次分解 → 三层控制 → 协同
+维度一：系统观 (S-1~S-4) → 工程控制论 & 系统工程
+  反馈闭环 → 层次分解 → 总体设计部 → 涌现性管理
   
-维度二：内核论 (K-1~K-4) → 微内核理论
-  微内核化 → 接口约束 → 最小特权 → 可插拔
+维度二：内核观 (K-1~K-4) → 微内核理论
+  内核极简 → 接口契约 → 服务隔离 → 可插拔策略
   
-维度三：认知论 (C-1~C-4) → 双系统认知理论
-  四层抽象 → 主动规划 → 涌现智慧 → 终身学习
+维度三：认知观 (C-1~C-4) → 双系统认知理论
+  双系统协同 → 增量演化 → 记忆卷载 → 遗忘机制
   
-维度四：安全论 (E-1~E-7) → 安全实践论
-  安全第一 → 默认拒绝 → 最小特权 → 可追溯 → 人文关怀
+维度四：工程观 (E-1~E-8) → 工程实践准则
+  安全内生 → 可观测性 → 资源确定性 → 跨平台一致
+  命名语义化 → 错误可追溯 → 文档即代码 → 可测试性
   
-维度五：工程哲学 (A-1~A-4) → 钱学森系统论
-  简约至上 → 细节极致 → 人文关怀 → 精益求精
+维度五：设计美学 (A-1~A-4) → 工程哲学
+  简约至上 → 极致细节 → 人文关怀 → 完美主义
 ```
 
 ---
@@ -180,18 +179,19 @@ AgentOS/
 │   ├── sched_d/                # 调度服务（多策略）
 │   └── tool_d/                 # 工具服务（工具执行）
 │
-├── bases/                      # 基础支撑层
+├── commons/                    # 基础支撑层
 │   ├── platform/               # 平台抽象层
 │   └── utils/                  # 通用工具库
 │
 ├── gateway/                    # 网关层（HTTP/WebSocket/Stdio）
 ├── openlab/                    # 开放生态（应用/社区贡献）
-├── toolkit/                        # 多语言 SDK（Go/Python/Rust/TS）
+├── toolkit/                    # 多语言 SDK（Go/Python/Rust/TS）
 ├── manager/                    # 配置文件（Agent/环境/安全等）
-├── lodges/                    # 运行时数据（内核/日志/服务）
+├── heapstore/                  # 运行时数据（内核/日志/服务）
 ├── manuals/                    # 文档（架构/指南/白皮书）
 ├── scripts/                    # 脚本（构建/部署）
 ├── tests/                      # 测试（单元/集成/端到端）
+└── reports/                    # 报告（质量/性能/评估）
 ```
 
 **关键模块说明**:
@@ -211,10 +211,10 @@ AgentOS/
 
 | 组件 | 路径 | 职责 | 核心接口 |
 |------|------|------|----------|
-| **虚拟工位** | `workbench/` | 进程级隔离（namespaces+cgroups），类似 runc 容器化，资源配额，网络隔离 | `domes_workbench_create/exec/destroy` |
-| **权限裁决** | `permission/` | YAML 规则引擎，RBAC 模型，动态匹配，缓存加速，优先级仲裁 | `domes_permission_check/reload` |
-| **输入净化** | `sanitizer/` | 多级过滤器，风险等级分级（0-3），自动修正或删除 | `domes_sanitize` |
-| **审计追踪** | `audit/` | 异步双缓冲写入，JSON 格式，日志轮转，结构化查询，全链路追踪 | `domes_audit_record/query` |
+| **虚拟工位** | `workbench/` | 进程级隔离（namespaces+cgroups），类似 runc 容器化，资源配额，网络隔离 | `cupolas_workbench_create/exec/destroy` |
+| **权限裁决** | `permission/` | YAML 规则引擎，RBAC 模型，动态匹配，缓存加速，优先级仲裁 | `cupolas_permission_check/reload` |
+| **输入净化** | `sanitizer/` | 多级过滤器，风险等级分级（0-3），自动修正或删除 | `cupolas_sanitize` |
+| **审计追踪** | `audit/` | 异步双缓冲写入，JSON 格式，日志轮转，结构化查询，全链路追踪 | `cupolas_audit_record/query` |
 
 ### 设计原则
 
@@ -465,7 +465,7 @@ switch (error) {
 }
 ```
 
-详见 [架构设计原则 v1.6 文档 第六节 维度五：工程哲学](manuals/architecture/folder/architectural_design_principles.md#第六节-维度五工程哲学)
+详见 [架构设计原则 v1.6 文档 第六节 维度五：工程哲学](manuals/architecture/folder/architectural_design_principles.md#第六节 - 维度五工程哲学)
 
 ---
 
@@ -587,7 +587,7 @@ ctest --output-on-failure
 
 | 文档 | 说明 |
 |------|------|
-| [架构设计原则 v3.0](manuals/architecture/folder/architectural_design_principles.md) | **五维原则体系**: 系统论/内核论/认知论/安全论/工程哲学 |
+| [架构设计原则 v1.6](manuals/architecture/folder/architectural_design_principles.md) | **五维正交原则体系**: 系统观/内核观/认知观/工程观/设计美学 |
 | [CoreLoopThree 架构](manuals/architecture/folder/coreloopthree.md) | 三层认知循环：认知→规划→行动 |
 | [MemoryRovol 架构](manuals/architecture/folder/memoryrovol.md) | 四层记忆系统：L1→L2→L3→L4 |
 | [微内核架构](manuals/architecture/folder/microkernel.md) | corekern 原子内核：IPC/Mem/Task/Time |
@@ -649,13 +649,13 @@ ctest --output-on-failure
 - ✅ **文档体系完善**（v1.0.0.6）：架构原则 v1.6、CoreLoopThree v1.6、MemoryRovol v1.6
 
 **v1.0.0.6 新增内容**（相比 v1.0.0.5）:
-- ✅ 新增工程哲学维度（A-1~A-4），将工程哲学提升到架构原则高度
+- ✅ 新增设计美学维度（A-1~A-4），将工程哲学提升到架构原则高度
 - ✅ 新增全链路追踪机制，实现行为可解释和可追溯
 - ✅ 新增 Human-in-the-loop 支持，支持人工干预和确认
 - ✅ 新增睡眠回放机制，在空闲时段进行记忆回放强化重要连接
 - ✅ 优化情感权重计算，基于情绪价值评估调整记忆强度
 - ✅ 优化多路召回融合，引入更多权重因子提升召回质量
-- ✅ 更新：架构设计原则 v1.6，新增工程哲学维度和双系统认知理论
+- ✅ 更新：架构设计原则 v1.6，新增设计美学维度和双系统认知理论
 
 ### 短期目标 (2026 Q2-Q3)
 
@@ -772,4 +772,3 @@ AgentOS 采用**商业友好、生态友好的分层开源协议**。
 © 2026 SPHARX Ltd. All Rights Reserved.
 
 </div>
-

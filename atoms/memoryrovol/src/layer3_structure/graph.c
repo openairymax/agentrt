@@ -8,8 +8,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h"
-#include "../../../bases/utils/string/include/string_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 #include <pthread.h>
 #include <limits.h>
@@ -26,6 +26,14 @@ typedef struct entity_node {
     size_t relation_count;
     struct entity_node* next;
 } entity_node_t;
+
+/**
+ * @brief BFS路径节点（用于路径查找）
+ */
+typedef struct {
+    char* id;
+    char* prev;
+} path_node_t;
 
 /**
  * @brief 知识图谱结构
@@ -68,7 +76,7 @@ agentos_error_t agentos_knowledge_graph_create(
 }
 
 /**
- * @brief 销毁知识图�?
+ * @brief 销毁知识图�?
  */
 void agentos_knowledge_graph_destroy(agentos_knowledge_graph_t* kg) {
     if (!kg) return;
@@ -107,6 +115,21 @@ static entity_node_t* find_entity(agentos_knowledge_graph_t* kg, const char* ent
         }
     }
     return NULL;
+}
+
+/**
+ * @brief 查找实体索引
+ * @param kg 知识图谱
+ * @param entity_id 实体ID
+ * @return 实体索引，如果未找到返回 SIZE_MAX
+ */
+static size_t find_entity_index(agentos_knowledge_graph_t* kg, const char* entity_id) {
+    for (size_t i = 0; i < kg->entity_count; i++) {
+        if (kg->entities[i] && strcmp(kg->entities[i]->id, entity_id) == 0) {
+            return i;
+        }
+    }
+    return SIZE_MAX;
 }
 
 /**
@@ -262,7 +285,7 @@ agentos_error_t agentos_knowledge_graph_query(
 }
 
 /**
- * @brief BFS 查找最短路�?
+ * @brief BFS 查找最短路�?
  */
 agentos_error_t agentos_knowledge_graph_find_path(
     agentos_knowledge_graph_t* kg,
@@ -282,10 +305,7 @@ agentos_error_t agentos_knowledge_graph_find_path(
 
     pthread_mutex_lock(&kg->mutex);
 
-    typedef struct {
-        char* id;
-        char* prev;
-    } path_node_t;
+
 
     path_node_t* visited = (path_node_t*)AGENTOS_CALLOC(kg->entity_count, sizeof(path_node_t));
     int* in_queue = (int*)AGENTOS_CALLOC(kg->entity_count, sizeof(int));
@@ -303,15 +323,8 @@ agentos_error_t agentos_knowledge_graph_find_path(
         visited[i].prev = NULL;
     }
 
-    size_t start_idx = SIZE_MAX, end_idx = SIZE_MAX;
-    for (size_t i = 0; i < kg->entity_count; i++) {
-        if (kg->entities[i] && strcmp(kg->entities[i]->id, from_id) == 0) {
-            start_idx = i;
-        }
-        if (kg->entities[i] && strcmp(kg->entities[i]->id, to_id) == 0) {
-            end_idx = i;
-        }
-    }
+    size_t start_idx = find_entity_index(kg, from_id);
+    size_t end_idx = find_entity_index(kg, to_id);
 
     if (start_idx == SIZE_MAX || end_idx == SIZE_MAX) {
         pthread_mutex_unlock(&kg->mutex);
@@ -328,13 +341,7 @@ agentos_error_t agentos_knowledge_graph_find_path(
     int found = 0;
     while (queue_front < queue_back && !found) {
         char* current = queue[queue_front++];
-        size_t current_idx = SIZE_MAX;
-        for (size_t i = 0; i < kg->entity_count; i++) {
-            if (kg->entities[i] && strcmp(kg->entities[i]->id, current) == 0) {
-                current_idx = i;
-                break;
-            }
-        }
+        size_t current_idx = find_entity_index(kg, current);
 
         if (current_idx == SIZE_MAX) {
             AGENTOS_FREE(current);
@@ -344,18 +351,14 @@ agentos_error_t agentos_knowledge_graph_find_path(
         entity_node_t* node = kg->entities[current_idx];
         agentos_relation_t* rel = node->relations;
         while (rel && !found) {
-            for (size_t i = 0; i < kg->entity_count; i++) {
-                if (kg->entities[i] && strcmp(kg->entities[i]->id, rel->to_id) == 0) {
-                    if (!in_queue[i]) {
-                        queue[queue_back++] = AGENTOS_STRDUP(rel->to_id);
-                        in_queue[i] = 1;
-                        visited[i].id = AGENTOS_STRDUP(rel->to_id);
-                        visited[i].prev = AGENTOS_STRDUP(current);
-                        if (strcmp(rel->to_id, to_id) == 0) {
-                            found = 1;
-                        }
-                    }
-                    break;
+            size_t neighbor_idx = find_entity_index(kg, rel->to_id);
+            if (neighbor_idx != SIZE_MAX && !in_queue[neighbor_idx]) {
+                queue[queue_back++] = AGENTOS_STRDUP(rel->to_id);
+                in_queue[neighbor_idx] = 1;
+                visited[neighbor_idx].id = AGENTOS_STRDUP(rel->to_id);
+                visited[neighbor_idx].prev = AGENTOS_STRDUP(current);
+                if (strcmp(rel->to_id, to_id) == 0) {
+                    found = 1;
                 }
             }
             rel = rel->next;
@@ -372,17 +375,15 @@ agentos_error_t agentos_knowledge_graph_find_path(
         size_t idx = 0;
 
         while (current && strcmp(current, from_id) != 0) {
-            for (size_t i = 0; i < kg->entity_count; i++) {
-                if (visited[i].id && strcmp(visited[i].id, current) == 0) {
-                    temp_path[idx++] = AGENTOS_STRDUP(current);
-                    if (visited[i].prev) {
-                        AGENTOS_FREE(current);
-                        current = AGENTOS_STRDUP(visited[i].prev);
-                    } else {
-                        AGENTOS_FREE(current);
-                        current = NULL;
-                    }
-                    break;
+            size_t current_idx = find_entity_index(kg, current);
+            if (current_idx != SIZE_MAX && visited[current_idx].id && strcmp(visited[current_idx].id, current) == 0) {
+                temp_path[idx++] = AGENTOS_STRDUP(current);
+                if (visited[current_idx].prev) {
+                    AGENTOS_FREE(current);
+                    current = AGENTOS_STRDUP(visited[current_idx].prev);
+                } else {
+                    AGENTOS_FREE(current);
+                    current = NULL;
                 }
             }
             if (idx >= MAX_PATH_LENGTH) break;

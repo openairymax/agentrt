@@ -5,7 +5,7 @@
 """
 Utility functions and helpers for the AgentOS Python SDK.
 
-This module provides optimized bases utilities with caching,
+This module provides optimized commons utilities with caching,
 efficient algorithms, and thread-safe implementations.
 
 Example:

@@ -45,11 +45,11 @@ except ImportError:
 
 try:
     from selenium import webdriver
-    from selenium.webdriver.bases.by import By
-    from selenium.webdriver.bases.keys import Keys
+    from selenium.webdriver.commons.by import By
+    from selenium.webdriver.commons.keys import Keys
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.support import expected_conditions as EC
-    from selenium.bases.exceptions import TimeoutException as SeleniumTimeout
+    from selenium.commons.exceptions import TimeoutException as SeleniumTimeout
     SELENIUM_AVAILABLE = True
 except ImportError:
     SELENIUM_AVAILABLE = False
@@ -557,7 +557,7 @@ class BrowserSkill:
 
         try:
             if self._use_selenium:
-                from selenium.webdriver.bases.action_chains import ActionChains
+                from selenium.webdriver.commons.action_chains import ActionChains
                 element = self._find_element_impl(selector, selector_type)
                 if element is None:
                     return BrowserResult(success=False, error=f"Element not found: {selector}")

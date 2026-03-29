@@ -347,7 +347,7 @@ class TelemetryMetrics:
         )
 
 
-# Type aliases for bases types
+# Type aliases for commons types
 TaskID = str
 SessionID = str
 MemoryRecordID = str

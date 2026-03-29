@@ -1,11 +1,11 @@
-/**
+﻿/**
  * @file cache.c
  * @brief LRU 缓存实现（双链表 + 哈希表）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "cache.h"
-#include "../../../bases/utils/memory/include/memory_common.h"
+#include "../../../commons/utils/memory/include/memory_common.h"
 #include "platform.h"
 #include <stdlib.h>
 #include <string.h>

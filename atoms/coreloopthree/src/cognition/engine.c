@@ -12,8 +12,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h"
-#include "../../../bases/utils/string/include/string_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 #include <stdio.h>
 #include <inttypes.h>

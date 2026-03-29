@@ -20,7 +20,7 @@
 #define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)
 
 /* ============================================================================
- * 平台抽象层测试
+ * 平台抽象层测�?
  * ============================================================================ */
 
 static void test_platform_mutex(void) {
@@ -48,47 +48,47 @@ static void test_platform_rwlock(void) {
 }
 
 static void test_platform_time(void) {
-    domes_timestamp_t ts;
+    cupolas_timestamp_t ts;
     
-    assert(domes_time_now(&ts) == DOMES_OK);
+    assert(cupolas_time_now(&ts) == cupolas_OK);
     assert(ts.sec > 0);
     
-    uint64_t ms = domes_time_ms();
+    uint64_t ms = cupolas_time_ms();
     assert(ms > 0);
     
     TEST_PASS("platform_time");
 }
 
 static void test_platform_atomic(void) {
-    domes_atomic32_t val32 = 0;
-    domes_atomic64_t val64 = 0;
+    cupolas_atomic32_t val32 = 0;
+    cupolas_atomic64_t val64 = 0;
     
-    assert(domes_atomic_load32(&val32) == 0);
-    domes_atomic_store32(&val32, 42);
-    assert(domes_atomic_load32(&val32) == 42);
-    assert(domes_atomic_inc32(&val32) == 42);
-    assert(domes_atomic_load32(&val32) == 43);
-    assert(domes_atomic_dec32(&val32) == 43);
-    assert(domes_atomic_load32(&val32) == 42);
-    assert(domes_atomic_cas32(&val32, 42, 100) == true);
-    assert(domes_atomic_load32(&val32) == 100);
+    assert(cupolas_atomic_load32(&val32) == 0);
+    cupolas_atomic_store32(&val32, 42);
+    assert(cupolas_atomic_load32(&val32) == 42);
+    assert(cupolas_atomic_inc32(&val32) == 42);
+    assert(cupolas_atomic_load32(&val32) == 43);
+    assert(cupolas_atomic_dec32(&val32) == 43);
+    assert(cupolas_atomic_load32(&val32) == 42);
+    assert(cupolas_atomic_cas32(&val32, 42, 100) == true);
+    assert(cupolas_atomic_load32(&val32) == 100);
     
-    domes_atomic_store64(&val64, 1000000);
-    assert(domes_atomic_load64(&val64) == 1000000);
-    assert(domes_atomic_add64(&val64, 500000) == 1000000);
-    assert(domes_atomic_load64(&val64) == 1500000);
+    cupolas_atomic_store64(&val64, 1000000);
+    assert(cupolas_atomic_load64(&val64) == 1000000);
+    assert(cupolas_atomic_add64(&val64, 500000) == 1000000);
+    assert(cupolas_atomic_load64(&val64) == 1500000);
     
     TEST_PASS("platform_atomic");
 }
 
 static void test_platform_string(void) {
-    char* dup = domes_strdup("hello");
+    char* dup = cupolas_strdup("hello");
     assert(dup != NULL);
     assert(strcmp(dup, "hello") == 0);
-    domes_mem_free(dup);
+    cupolas_mem_free(dup);
     
-    assert(domes_strcasecmp("Hello", "HELLO") == 0);
-    assert(domes_strcasecmp("Hello", "World") != 0);
+    assert(cupolas_strcasecmp("Hello", "HELLO") == 0);
+    assert(cupolas_strcasecmp("Hello", "World") != 0);
     
     TEST_PASS("platform_string");
 }
@@ -101,9 +101,9 @@ static void test_permission_engine(void) {
     permission_engine_t* engine = permission_engine_create(NULL);
     assert(engine != NULL);
     
-    assert(permission_engine_add_rule(engine, "agent1", "read", "/data/*", 1, 100) == DOMES_OK);
-    assert(permission_engine_add_rule(engine, "agent1", "write", "/data/*", 0, 100) == DOMES_OK);
-    assert(permission_engine_add_rule(engine, "*", "read", "/public/*", 1, 50) == DOMES_OK);
+    assert(permission_engine_add_rule(engine, "agent1", "read", "/data/*", 1, 100) == cupolas_OK);
+    assert(permission_engine_add_rule(engine, "agent1", "write", "/data/*", 0, 100) == cupolas_OK);
+    assert(permission_engine_add_rule(engine, "*", "read", "/public/*", 1, 50) == cupolas_OK);
     
     assert(permission_engine_check(engine, "agent1", "read", "/data/file.txt", NULL) == 1);
     assert(permission_engine_check(engine, "agent1", "write", "/data/file.txt", NULL) == 0);
@@ -142,11 +142,11 @@ static void test_audit_queue(void) {
     audit_entry_t* entry1 = audit_entry_create(AUDIT_EVENT_PERMISSION, "agent1", "read", "/data", NULL, 1);
     assert(entry1 != NULL);
     
-    assert(audit_queue_push(queue, entry1) == DOMES_OK);
+    assert(audit_queue_push(queue, entry1) == cupolas_OK);
     assert(audit_queue_size(queue) == 1);
     
     audit_entry_t* entry2 = NULL;
-    assert(audit_queue_try_pop(queue, &entry2) == DOMES_OK);
+    assert(audit_queue_try_pop(queue, &entry2) == cupolas_OK);
     assert(entry2 != NULL);
     assert(strcmp(entry2->agent_id, "agent1") == 0);
     audit_entry_destroy(entry2);
@@ -225,39 +225,39 @@ static void test_workbench_create_destroy(void) {
  * 核心模块测试
  * ============================================================================ */
 
-static void test_domes_init_cleanup(void) {
-    assert(domes_init(NULL) == DOMES_OK);
-    assert(strcmp(domes_version(), "1.0.0") == 0);
-    domes_cleanup();
+static void test_cupolas_init_cleanup(void) {
+    assert(cupolas_init(NULL) == cupolas_OK);
+    assert(strcmp(cupolas_version(), "1.0.0") == 0);
+    cupolas_cleanup();
     
-    TEST_PASS("domes_init_cleanup");
+    TEST_PASS("cupolas_init_cleanup");
 }
 
-static void test_domes_permission(void) {
-    assert(domes_init(NULL) == DOMES_OK);
+static void test_cupolas_permission(void) {
+    assert(cupolas_init(NULL) == cupolas_OK);
     
-    assert(domes_add_permission_rule("test_agent", "read", "/test/*", 1, 100) == DOMES_OK);
-    assert(domes_check_permission("test_agent", "read", "/test/file.txt", NULL) == 1);
+    assert(cupolas_add_permission_rule("test_agent", "read", "/test/*", 1, 100) == cupolas_OK);
+    assert(cupolas_check_permission("test_agent", "read", "/test/file.txt", NULL) == 1);
     
-    domes_cleanup();
+    cupolas_cleanup();
     
-    TEST_PASS("domes_permission");
+    TEST_PASS("cupolas_permission");
 }
 
-static void test_domes_sanitize(void) {
-    assert(domes_init(NULL) == DOMES_OK);
+static void test_cupolas_sanitize(void) {
+    assert(cupolas_init(NULL) == cupolas_OK);
     
     char output[256];
-    assert(domes_sanitize_input("hello", output, sizeof(output)) == DOMES_OK);
+    assert(cupolas_sanitize_input("hello", output, sizeof(output)) == cupolas_OK);
     assert(strcmp(output, "hello") == 0);
     
-    domes_cleanup();
+    cupolas_cleanup();
     
-    TEST_PASS("domes_sanitize");
+    TEST_PASS("cupolas_sanitize");
 }
 
 /* ============================================================================
- * 主测试入口
+ * 主测试入�?
  * ============================================================================ */
 
 int main(int argc, char* argv[]) {
@@ -291,9 +291,9 @@ int main(int argc, char* argv[]) {
     test_workbench_create_destroy();
     
     printf("\n--- Core Tests ---\n");
-    test_domes_init_cleanup();
-    test_domes_permission();
-    test_domes_sanitize();
+    test_cupolas_init_cleanup();
+    test_cupolas_permission();
+    test_cupolas_sanitize();
     
     printf("\n========================================\n");
     printf("All tests passed!\n");

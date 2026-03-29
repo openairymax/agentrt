@@ -62,11 +62,11 @@ int test_task_priority() {
     agentos_thread_attr_t attr1 = {0};
     agentos_thread_attr_t attr2 = {0};
     
-    strcpy(attr1.name, "high_priority_thread");
+    snprintf(attr1.name, sizeof(attr1.name), "%s", "high_priority_thread");
     attr1.priority = AGENTOS_TASK_PRIORITY_HIGH;
     attr1.stack_size = 1024 * 1024;
     
-    strcpy(attr2.name, "low_priority_thread");
+    snprintf(attr2.name, sizeof(attr2.name), "%s", "low_priority_thread");
     attr2.priority = AGENTOS_TASK_PRIORITY_LOW;
     attr2.stack_size = 1024 * 1024;
     
@@ -122,7 +122,7 @@ int test_task_yield() {
     
     agentos_thread_t thread;
     agentos_thread_attr_t attr = {0};
-    strcpy(attr.name, "yield_thread");
+    snprintf(attr.name, sizeof(attr.name), "%s", "yield_thread");
     attr.priority = AGENTOS_TASK_PRIORITY_NORMAL;
     attr.stack_size = 1024 * 1024;
     
@@ -161,7 +161,7 @@ int test_task_get_set_priority() {
     
     agentos_thread_t thread;
     agentos_thread_attr_t attr = {0};
-    strcpy(attr.name, "priority_thread");
+    snprintf(attr.name, sizeof(attr.name), "%s", "priority_thread");
     attr.priority = AGENTOS_TASK_PRIORITY_NORMAL;
     attr.stack_size = 1024 * 1024;
     
@@ -218,7 +218,7 @@ int test_task_get_state() {
     
     agentos_thread_t thread;
     agentos_thread_attr_t attr = {0};
-    strcpy(attr.name, "state_thread");
+    snprintf(attr.name, sizeof(attr.name), "%s", "state_thread");
     attr.priority = AGENTOS_TASK_PRIORITY_NORMAL;
     attr.stack_size = 1024 * 1024;
     

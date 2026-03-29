@@ -26,8 +26,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h"
-#include "../../../bases/utils/string/include/string_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
@@ -151,7 +151,7 @@ static float string_similarity(const char* s1, const char* s2) {
     size_t len2 = strlen(s2);
     
     // 简单实现：基于公共子串
-    int bases = 0;
+    int commons = 0;
     for (size_t i = 0; i < len1; i++) {
         for (size_t j = 0; j < len2; j++) {
             size_t k = 0;
@@ -159,11 +159,11 @@ static float string_similarity(const char* s1, const char* s2) {
                    tolower(s1[i + k]) == tolower(s2[j + k])) {
                 k++;
             }
-            if (k > bases) bases = k;
+            if (k > commons) commons = k;
         }
     }
     
-    return (float)bases / (float)(len1 > len2 ? len1 : len2);
+    return (float)commons / (float)(len1 > len2 ? len1 : len2);
 }
 
 /**

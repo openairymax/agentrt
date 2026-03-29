@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file sync.c
  * @brief 同步原语实现（基于平台原生线程原语）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -9,8 +9,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h"
-#include "../../../bases/utils/string/include/string_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 
 #if defined(_WIN32) || defined(_WIN64)

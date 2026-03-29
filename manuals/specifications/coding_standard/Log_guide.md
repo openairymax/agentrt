@@ -1,4 +1,4 @@
-# AgentOS (OpenApex) 日志打印规范
+﻿# AgentOS (OpenApex) 日志打印规范
 
 **版本**: Doc V1.6  
 **备选名称**: OpenApex (开源极境 / 极境OS)  
@@ -827,7 +827,7 @@ class SecurityAuditLogger {
 }
 ```
 
-### 7.4 bases（公共库层）日志规范
+### 7.4 commons（公共库层）日志规范
 Common模块提供跨层基础设施，日志需强调通用性和一致性：
 
 #### 7.4.1 向量数据库客户端日志（映射原则：E-1 基础设施）

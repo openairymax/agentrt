@@ -9,8 +9,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h"
-#include "../../../bases/utils/string/include/string_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -69,7 +69,7 @@ agentos_error_t agentos_rule_generator_generate(
     }
     if (offset < sizeof(prompt) - 100) {
         snprintf(prompt + offset, sizeof(prompt) - offset,
-        "\nPlease generate a JSON rule that captures the bases characteristics of this cluster. "
+        "\nPlease generate a JSON rule that captures the commons characteristics of this cluster. "
         "The rule should have fields: 'name', 'description', 'condition', 'action', and 'confidence'. "
         "Output only valid JSON.");
 

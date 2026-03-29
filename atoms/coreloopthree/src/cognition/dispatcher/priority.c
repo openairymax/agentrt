@@ -1,23 +1,23 @@
-/**
+ï»¿/**
  * @file priority.c
- * @brief ÓÅÏÈ¼¶µ÷¶È²ßÂÔ£¨Ñ¡ÔñÓÅÏÈ¼¶×î¸ßµÄAgent£©
+ * @brief ï¿½ï¿½ï¿½È¼ï¿½ï¿½ï¿½ï¿½È²ï¿½ï¿½Ô£ï¿½Ñ¡ï¿½ï¿½ï¿½ï¿½ï¿½È¼ï¿½ï¿½ï¿½ßµï¿½Agentï¿½ï¿½
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "cognition.h
-#include "../../../bases/utils/cognition/include/cognition_common.h""
+#include "../../../commons/utils/cognition/include/cognition_common.h""
 #include "agent_registry.h
-#include "../../../bases/utils/cognition/include/cognition_common.h""
+#include "../../../commons/utils/cognition/include/cognition_common.h""
 #include <stdlib.h
-#include "../../../bases/utils/cognition/include/cognition_common.h">
+#include "../../../commons/utils/cognition/include/cognition_common.h">
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h
-#include "../../../bases/utils/cognition/include/cognition_common.h""
-#include "../../../bases/utils/string/include/string_compat.h
-#include "../../../bases/utils/cognition/include/cognition_common.h""
+#include "../../../commons/utils/memory/include/memory_compat.h
+#include "../../../commons/utils/cognition/include/cognition_common.h""
+#include "../../../commons/utils/string/include/string_compat.h
+#include "../../../commons/utils/cognition/include/cognition_common.h""
 #include <string.h
-#include "../../../bases/utils/cognition/include/cognition_common.h">
+#include "../../../commons/utils/cognition/include/cognition_common.h">
 
 typedef struct priority_data {
     void* registry_ctx;

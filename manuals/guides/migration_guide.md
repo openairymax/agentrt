@@ -243,7 +243,7 @@ target_link_libraries(my_agent PRIVATE
 | IPC 通信 | `ctest -R integration --label-regex ipc` | 延迟 < 10μs |
 | 记忆读写 | `ctest -R integration --label-regex memory` | 10k+ entries/sec |
 | 系统调用 | `ctest -R integration --label-regex syscall` | 全部通过 |
-| 日志输出 | 检查 `lodges/logs/` | 格式正确、trace_id 连通 |
+| 日志输出 | 检查 `heapstore/logs/` | 格式正确、trace_id 连通 |
 
 ---
 

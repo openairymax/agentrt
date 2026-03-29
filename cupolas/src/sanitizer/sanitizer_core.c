@@ -3,6 +3,7 @@
  * @brief 输入净化器核心实现
  * @author Spharx
  * @date 2024
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "sanitizer.h"
@@ -17,9 +18,9 @@
 struct sanitizer {
     sanitizer_rules_t* rules;
     sanitizer_cache_t* cache;
-    domes_rwlock_t lock;
-    domes_atomic64_t total_sanitized;
-    domes_atomic64_t total_rejected;
+    cupolas_rwlock_t lock;
+    cupolas_atomic64_t total_sanitized;
+    cupolas_atomic64_t total_rejected;
 };
 
 void sanitizer_default_context(sanitize_context_t* ctx) {
@@ -35,28 +36,28 @@ void sanitizer_default_context(sanitize_context_t* ctx) {
 }
 
 sanitizer_t* sanitizer_create(const char* rules_path) {
-    sanitizer_t* san = (sanitizer_t*)domes_mem_alloc(sizeof(sanitizer_t));
+    sanitizer_t* san = (sanitizer_t*)cupolas_mem_alloc(sizeof(sanitizer_t));
     if (!san) return NULL;
     
     memset(san, 0, sizeof(sanitizer_t));
     
-    if (domes_rwlock_init(&san->lock) != DOMES_OK) {
-        domes_mem_free(san);
+    if (cupolas_rwlock_init(&san->lock) != cupolas_OK) {
+        cupolas_mem_free(san);
         return NULL;
     }
     
     san->rules = sanitizer_rules_create(rules_path);
     if (!san->rules) {
-        domes_rwlock_destroy(&san->lock);
-        domes_mem_free(san);
+        cupolas_rwlock_destroy(&san->lock);
+        cupolas_mem_free(san);
         return NULL;
     }
     
     san->cache = sanitizer_cache_create(1024);
     if (!san->cache) {
         sanitizer_rules_destroy(san->rules);
-        domes_rwlock_destroy(&san->lock);
-        domes_mem_free(san);
+        cupolas_rwlock_destroy(&san->lock);
+        cupolas_mem_free(san);
         return NULL;
     }
     
@@ -66,7 +67,7 @@ sanitizer_t* sanitizer_create(const char* rules_path) {
 void sanitizer_destroy(sanitizer_t* sanitizer) {
     if (!sanitizer) return;
     
-    domes_rwlock_wrlock(&sanitizer->lock);
+    cupolas_rwlock_wrlock(&sanitizer->lock);
     
     if (sanitizer->rules) {
         sanitizer_rules_destroy(sanitizer->rules);
@@ -75,9 +76,9 @@ void sanitizer_destroy(sanitizer_t* sanitizer) {
         sanitizer_cache_destroy(sanitizer->cache);
     }
     
-    domes_rwlock_unlock(&sanitizer->lock);
-    domes_rwlock_destroy(&sanitizer->lock);
-    domes_mem_free(sanitizer);
+    cupolas_rwlock_unlock(&sanitizer->lock);
+    cupolas_rwlock_destroy(&sanitizer->lock);
+    cupolas_mem_free(sanitizer);
 }
 
 static bool contains_dangerous_chars(const char* input, const sanitize_context_t* ctx) {
@@ -115,7 +116,7 @@ static bool contains_dangerous_chars(const char* input, const sanitize_context_t
 
 static int apply_escape_rules(const char* input, char* output, size_t output_size, 
                                const sanitize_context_t* ctx) {
-    if (!input || !output || output_size == 0) return DOMES_ERROR_INVALID_ARG;
+    if (!input || !output || output_size == 0) return cupolas_ERROR_INVALID_ARG;
     
     size_t in_len = strlen(input);
     size_t out_pos = 0;
@@ -168,7 +169,7 @@ static int apply_escape_rules(const char* input, char* output, size_t output_siz
     }
     
     output[out_pos] = '\0';
-    return DOMES_OK;
+    return cupolas_OK;
 }
 
 sanitize_result_t sanitizer_sanitize(sanitizer_t* sanitizer,
@@ -188,11 +189,11 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t* sanitizer,
     
     size_t input_len = strlen(input);
     if (ctx->max_length > 0 && input_len > ctx->max_length) {
-        domes_atomic_add64(&sanitizer->total_rejected, 1);
+        cupolas_atomic_add64(&sanitizer->total_rejected, 1);
         return SANITIZE_REJECTED;
     }
     
-    domes_rwlock_rdlock(&sanitizer->lock);
+    cupolas_rwlock_rdlock(&sanitizer->lock);
     
     bool cached = false;
     sanitize_result_t cached_result = SANITIZE_OK;
@@ -200,43 +201,43 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t* sanitizer,
     if (cached_output) {
         strncpy(output, cached_output, output_size - 1);
         output[output_size - 1] = '\0';
-        domes_mem_free(cached_output);
+        cupolas_mem_free(cached_output);
         cached = true;
     }
-    domes_rwlock_unlock(&sanitizer->lock);
+    cupolas_rwlock_unlock(&sanitizer->lock);
     
     if (cached) {
-        domes_atomic_add64(&sanitizer->total_sanitized, 1);
+        cupolas_atomic_add64(&sanitizer->total_sanitized, 1);
         return cached_result;
     }
     
     if (contains_dangerous_chars(input, ctx)) {
         if (ctx->level == SANITIZE_LEVEL_STRICT) {
-            domes_atomic_add64(&sanitizer->total_rejected, 1);
+            cupolas_atomic_add64(&sanitizer->total_rejected, 1);
             return SANITIZE_REJECTED;
         }
         
-        if (apply_escape_rules(input, output, output_size, ctx) != DOMES_OK) {
-            domes_atomic_add64(&sanitizer->total_rejected, 1);
+        if (apply_escape_rules(input, output, output_size, ctx) != cupolas_OK) {
+            cupolas_atomic_add64(&sanitizer->total_rejected, 1);
             return SANITIZE_ERROR;
         }
         
-        domes_rwlock_wrlock(&sanitizer->lock);
+        cupolas_rwlock_wrlock(&sanitizer->lock);
         sanitizer_cache_put(sanitizer->cache, input, output, ctx->level);
-        domes_rwlock_unlock(&sanitizer->lock);
+        cupolas_rwlock_unlock(&sanitizer->lock);
         
-        domes_atomic_add64(&sanitizer->total_sanitized, 1);
+        cupolas_atomic_add64(&sanitizer->total_sanitized, 1);
         return SANITIZE_MODIFIED;
     }
     
     strncpy(output, input, output_size - 1);
     output[output_size - 1] = '\0';
     
-    domes_rwlock_wrlock(&sanitizer->lock);
+    cupolas_rwlock_wrlock(&sanitizer->lock);
     sanitizer_cache_put(sanitizer->cache, input, output, ctx->level);
-    domes_rwlock_unlock(&sanitizer->lock);
+    cupolas_rwlock_unlock(&sanitizer->lock);
     
-    domes_atomic_add64(&sanitizer->total_sanitized, 1);
+    cupolas_atomic_add64(&sanitizer->total_sanitized, 1);
     return SANITIZE_OK;
 }
 
@@ -260,7 +261,7 @@ bool sanitizer_is_safe(sanitizer_t* sanitizer,
 }
 
 int sanitizer_escape_html(const char* input, char* output, size_t output_size) {
-    if (!input || !output || output_size == 0) return DOMES_ERROR_INVALID_ARG;
+    if (!input || !output || output_size == 0) return cupolas_ERROR_INVALID_ARG;
     
     size_t in_len = strlen(input);
     size_t out_pos = 0;
@@ -300,15 +301,15 @@ int sanitizer_escape_html(const char* input, char* output, size_t output_size) {
     }
     
     output[out_pos] = '\0';
-    return DOMES_OK;
+    return cupolas_OK;
     
 overflow:
     output[out_pos] = '\0';
-    return DOMES_ERROR_OVERFLOW;
+    return cupolas_ERROR_OVERFLOW;
 }
 
 int sanitizer_escape_sql(const char* input, char* output, size_t output_size) {
-    if (!input || !output || output_size == 0) return DOMES_ERROR_INVALID_ARG;
+    if (!input || !output || output_size == 0) return cupolas_ERROR_INVALID_ARG;
     
     size_t in_len = strlen(input);
     size_t out_pos = 0;
@@ -348,15 +349,15 @@ int sanitizer_escape_sql(const char* input, char* output, size_t output_size) {
     }
     
     output[out_pos] = '\0';
-    return DOMES_OK;
+    return cupolas_OK;
     
 overflow:
     output[out_pos] = '\0';
-    return DOMES_ERROR_OVERFLOW;
+    return cupolas_ERROR_OVERFLOW;
 }
 
 int sanitizer_escape_shell(const char* input, char* output, size_t output_size) {
-    if (!input || !output || output_size == 0) return DOMES_ERROR_INVALID_ARG;
+    if (!input || !output || output_size == 0) return cupolas_ERROR_INVALID_ARG;
     
     size_t in_len = strlen(input);
     size_t out_pos = 0;
@@ -367,20 +368,20 @@ int sanitizer_escape_shell(const char* input, char* output, size_t output_size) 
             output[out_pos++] = c;
         } else {
             if (out_pos + 4 >= output_size) goto overflow;
-            out_pos += sprintf(output + out_pos, "\\x%02x", (unsigned char)c);
+            out_pos += snprintf(output + out_pos, output_size - out_pos, "\\x%02x", (unsigned char)c);
         }
     }
     
     output[out_pos] = '\0';
-    return DOMES_OK;
+    return cupolas_OK;
     
 overflow:
     output[out_pos] = '\0';
-    return DOMES_ERROR_OVERFLOW;
+    return cupolas_ERROR_OVERFLOW;
 }
 
 int sanitizer_escape_path(const char* input, char* output, size_t output_size) {
-    if (!input || !output || output_size == 0) return DOMES_ERROR_INVALID_ARG;
+    if (!input || !output || output_size == 0) return cupolas_ERROR_INVALID_ARG;
     
     size_t in_len = strlen(input);
     size_t out_pos = 0;
@@ -392,27 +393,27 @@ int sanitizer_escape_path(const char* input, char* output, size_t output_size) {
             output[out_pos++] = c;
         } else {
             if (out_pos + 4 >= output_size) goto overflow;
-            out_pos += sprintf(output + out_pos, "%%%02X", (unsigned char)c);
+            out_pos += snprintf(output + out_pos, output_size - out_pos, "%%%02X", (unsigned char)c);
         }
     }
     
     output[out_pos] = '\0';
-    return DOMES_OK;
+    return cupolas_OK;
     
 overflow:
     output[out_pos] = '\0';
-    return DOMES_ERROR_OVERFLOW;
+    return cupolas_ERROR_OVERFLOW;
 }
 
 int sanitizer_add_rule(sanitizer_t* sanitizer,
                        const char* pattern,
                        const char* replacement) {
-    if (!sanitizer || !pattern) return DOMES_ERROR_INVALID_ARG;
+    if (!sanitizer || !pattern) return cupolas_ERROR_INVALID_ARG;
     
-    domes_rwlock_wrlock(&sanitizer->lock);
+    cupolas_rwlock_wrlock(&sanitizer->lock);
     int ret = sanitizer_rules_add(sanitizer->rules, pattern, replacement);
     sanitizer_cache_clear(sanitizer->cache);
-    domes_rwlock_unlock(&sanitizer->lock);
+    cupolas_rwlock_unlock(&sanitizer->lock);
     
     return ret;
 }
@@ -420,8 +421,8 @@ int sanitizer_add_rule(sanitizer_t* sanitizer,
 void sanitizer_clear_rules(sanitizer_t* sanitizer) {
     if (!sanitizer) return;
     
-    domes_rwlock_wrlock(&sanitizer->lock);
+    cupolas_rwlock_wrlock(&sanitizer->lock);
     sanitizer_rules_clear(sanitizer->rules);
     sanitizer_cache_clear(sanitizer->cache);
-    domes_rwlock_unlock(&sanitizer->lock);
+    cupolas_rwlock_unlock(&sanitizer->lock);
 }

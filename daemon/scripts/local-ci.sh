@@ -79,7 +79,7 @@ check_dependencies() {
 # 清理构建目录
 clean() {
     log_info "清理构建目录..."
-    rm -rf "$BACKS_ROOT/bases/build"
+    rm -rf "$BACKS_ROOT/commons/build"
     rm -rf "$BACKS_ROOT/llm_d/build"
     rm -rf "$BACKS_ROOT/tool_d/build"
     rm -rf "$BACKS_ROOT/monit_d/build"
@@ -122,7 +122,7 @@ build_module() {
 
 # 构建所有模块
 build_all() {
-    build_module "bases"
+    build_module "commons"
     build_module "llm_d"
     build_module "tool_d"
     build_module "monit_d"
@@ -151,7 +151,7 @@ static_analysis() {
         --suppress=missingIncludeSystem \
         --suppress=unusedFunction \
         -j"$PARALLEL_JOBS" \
-        "$BACKS_ROOT/bases/src" \
+        "$BACKS_ROOT/commons/src" \
         "$BACKS_ROOT/llm_d/src" \
         "$BACKS_ROOT/tool_d/src" \
         "$BACKS_ROOT/monit_d/src" \
@@ -189,7 +189,7 @@ coverage_analysis() {
 
     # 收集所有模块的覆盖率数据
     local all_info_files=""
-    for module in bases llm_d tool_d monit_d sched_d market_d; do
+    for module in commons llm_d tool_d monit_d sched_d market_d; do
         if [ -d "$BACKS_ROOT/$module/build" ]; then
             cd "$BACKS_ROOT/$module/build"
             if ls *.gcda 1>/dev/null 2>&1; then
@@ -250,7 +250,7 @@ generate_report() {
         echo "构建类型: $BUILD_TYPE"
         echo ""
         echo "--- 模块状态 ---"
-        for module in bases llm_d tool_d market_d monit_d sched_d; do
+        for module in commons llm_d tool_d market_d monit_d sched_d; do
             if [ -d "$BACKS_ROOT/$module/build" ]; then
                 echo "  ${module}: ✓ 已构建"
             else

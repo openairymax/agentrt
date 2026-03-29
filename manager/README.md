@@ -1276,13 +1276,13 @@ kernel = Kernel(config=config)
 kernel.start()
 ```
 
-### 与 Backs 模块集成
+### 与 daemon 模块集成
 
-Backs 模块（后端服务）从 Manager 获取配置：
+daemon 模块（后端服务）从 Manager 获取配置：
 
 ```python
 from agentos.manager import ConfigLoader
-from agentos.backs import LLMDaemon
+from agentos.daemon import LLMDaemon
 
 # 加载模型配置
 model_config = ConfigLoader.load('model/model.yaml')
@@ -1292,13 +1292,13 @@ llm_service = LLMDaemon(models=model_config['models'])
 llm_service.run()
 ```
 
-### 与 Domes 模块集成
+### 与 Cupolas 模块集成
 
-Domes 模块（安全穹顶）使用 Manager 的安全配置：
+Cupolas 模块（安全穹顶）使用 Manager 的安全配置：
 
 ```python
 from agentos.manager import ConfigLoader
-from agentos.domes import SecurityManager
+from agentos.cupolas import SecurityManager
 
 # 加载安全配置
 security_config = ConfigLoader.load('security/policy.yaml')
@@ -1328,7 +1328,7 @@ security = SecurityManager(
 
 - **架构设计**: [../partdocs/architecture/](../partdocs/architecture/)
 - **编码规范**: [../partdocs/specifications/](../partdocs/specifications/)
-- **安全策略**: [../domes/](../domes/)
+- **安全策略**: [../cupolas/](../cupolas/)
 - **API 文档**: [../tools/python/](../tools/python/)
 
 ### 社区支持

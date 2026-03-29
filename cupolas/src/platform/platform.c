@@ -3,15 +3,17 @@
  * @brief 跨平台抽象层实现
  * @author Spharx
  * @date 2024
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "platform.h"`n#include "../../../bases/utils/platform/include/platform_adapter.h"
+#include "platform.h"
+#include "../../../commons/utils/platform/include/platform_adapter.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
 
-#if DOMES_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     #include <io.h>
     #include <direct.h>
     #include <process.h>
@@ -32,60 +34,60 @@
 #endif
 
 /* ============================================================================
- * 互斥锁实�?
+ * 互斥锁实�?
  * ============================================================================ */
 
-int domes_mutex_init(domes_mutex_t* mutex) {\n    return platform_mutex_init((platform_mutex_t*)mutex);\n}
+int cupolas_mutex_init(cupolas_mutex_t* mutex) {\n    return platform_mutex_init((platform_mutex_t*)mutex);\n}
 
-int domes_mutex_destroy(domes_mutex_t* mutex) {\n    return platform_mutex_destroy((platform_mutex_t*)mutex);\n}
+int cupolas_mutex_destroy(cupolas_mutex_t* mutex) {\n    return platform_mutex_destroy((platform_mutex_t*)mutex);\n}
 
-int domes_mutex_lock(domes_mutex_t* mutex) {\n    return platform_mutex_lock((platform_mutex_t*)mutex);\n}
+int cupolas_mutex_lock(cupolas_mutex_t* mutex) {\n    return platform_mutex_lock((platform_mutex_t*)mutex);\n}
 
-int domes_mutex_trylock(domes_mutex_t* mutex) {\n    return platform_mutex_trylock((platform_mutex_t*)mutex);\n}
+int cupolas_mutex_trylock(cupolas_mutex_t* mutex) {\n    return platform_mutex_trylock((platform_mutex_t*)mutex);\n}
 
-int domes_mutex_unlock(domes_mutex_t* mutex) {\n    return platform_mutex_unlock((platform_mutex_t*)mutex);\n}
+int cupolas_mutex_unlock(cupolas_mutex_t* mutex) {\n    return platform_mutex_unlock((platform_mutex_t*)mutex);\n}
 
 /* ============================================================================
- * 读写锁实�?
+ * 读写锁实�?
  * ============================================================================ */
 
-int domes_rwlock_init(domes_rwlock_t* rwlock) {\n    return platform_rwlock_init((platform_rwlock_t*)rwlock);\n}
+int cupolas_rwlock_init(cupolas_rwlock_t* rwlock) {\n    return platform_rwlock_init((platform_rwlock_t*)rwlock);\n}
 
-int domes_rwlock_destroy(domes_rwlock_t* rwlock) {\n    return platform_rwlock_destroy((platform_rwlock_t*)rwlock);\n}
+int cupolas_rwlock_destroy(cupolas_rwlock_t* rwlock) {\n    return platform_rwlock_destroy((platform_rwlock_t*)rwlock);\n}
 
-int domes_rwlock_rdlock(domes_rwlock_t* rwlock) {\n    return platform_rwlock_rdlock((platform_rwlock_t*)rwlock);\n}
+int cupolas_rwlock_rdlock(cupolas_rwlock_t* rwlock) {\n    return platform_rwlock_rdlock((platform_rwlock_t*)rwlock);\n}
 
-int domes_rwlock_wrlock(domes_rwlock_t* rwlock) {\n    return platform_rwlock_wrlock((platform_rwlock_t*)rwlock);\n}
+int cupolas_rwlock_wrlock(cupolas_rwlock_t* rwlock) {\n    return platform_rwlock_wrlock((platform_rwlock_t*)rwlock);\n}
 
-int domes_rwlock_tryrdlock(domes_rwlock_t* rwlock) {\n    return platform_rwlock_tryrdlock((platform_rwlock_t*)rwlock);\n}
+int cupolas_rwlock_tryrdlock(cupolas_rwlock_t* rwlock) {\n    return platform_rwlock_tryrdlock((platform_rwlock_t*)rwlock);\n}
 
-int domes_rwlock_trywrlock(domes_rwlock_t* rwlock) {\n    return platform_rwlock_trywrlock((platform_rwlock_t*)rwlock);\n}
+int cupolas_rwlock_trywrlock(cupolas_rwlock_t* rwlock) {\n    return platform_rwlock_trywrlock((platform_rwlock_t*)rwlock);\n}
 
-int domes_rwlock_unlock(domes_rwlock_t* rwlock) {\n    return platform_rwlock_unlock((platform_rwlock_t*)rwlock);\n}
+int cupolas_rwlock_unlock(cupolas_rwlock_t* rwlock) {\n    return platform_rwlock_unlock((platform_rwlock_t*)rwlock);\n}
 
 /* ============================================================================
  * 条件变量实现
  * ============================================================================ */
 
-int domes_cond_init(domes_cond_t* cond) {\n    return platform_cond_init((platform_cond_t*)cond);\n}
+int cupolas_cond_init(cupolas_cond_t* cond) {\n    return platform_cond_init((platform_cond_t*)cond);\n}
 
-int domes_cond_destroy(domes_cond_t* cond) {\n    return platform_cond_destroy((platform_cond_t*)cond);\n}
+int cupolas_cond_destroy(cupolas_cond_t* cond) {\n    return platform_cond_destroy((platform_cond_t*)cond);\n}
 
-int domes_cond_wait(domes_cond_t* cond, domes_mutex_t* mutex) {\n    return platform_cond_wait((platform_cond_t*)cond, (platform_mutex_t*)mutex);\n}
+int cupolas_cond_wait(cupolas_cond_t* cond, cupolas_mutex_t* mutex) {\n    return platform_cond_wait((platform_cond_t*)cond, (platform_mutex_t*)mutex);\n}
 
-int domes_cond_timedwait(domes_cond_t* cond, domes_mutex_t* mutex, uint32_t timeout_ms) {\n    return platform_cond_timedwait((platform_cond_t*)cond, (platform_mutex_t*)mutex, timeout_ms);\n}
+int cupolas_cond_timedwait(cupolas_cond_t* cond, cupolas_mutex_t* mutex, uint32_t timeout_ms) {\n    return platform_cond_timedwait((platform_cond_t*)cond, (platform_mutex_t*)mutex, timeout_ms);\n}
 
-int domes_cond_signal(domes_cond_t* cond) {\n    return platform_cond_signal((platform_cond_t*)cond);\n}
+int cupolas_cond_signal(cupolas_cond_t* cond) {\n    return platform_cond_signal((platform_cond_t*)cond);\n}
 
-int domes_cond_broadcast(domes_cond_t* cond) {\n    return platform_cond_broadcast((platform_cond_t*)cond);\n}
+int cupolas_cond_broadcast(cupolas_cond_t* cond) {\n    return platform_cond_broadcast((platform_cond_t*)cond);\n}
 
 /* ============================================================================
  * 线程实现
  * ============================================================================ */
 
-#if DOMES_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
 typedef struct {
-    domes_thread_func_t func;
+    cupolas_thread_func_t func;
     void* arg;
     void* result;
 } thread_wrapper_ctx_t;
@@ -98,16 +100,16 @@ static DWORD WINAPI thread_wrapper(LPVOID param) {
 }
 #endif
 
-int domes_thread_create(domes_thread_t* thread, domes_thread_func_t func, void* arg) {\n    return platform_thread_create((platform_thread_func_t)func, arg, (platform_thread_t*)thread);\n}
+int cupolas_thread_create(cupolas_thread_t* thread, cupolas_thread_func_t func, void* arg) {\n    return platform_thread_create((platform_thread_func_t)func, arg, (platform_thread_t*)thread);\n}
 
-int domes_thread_join(domes_thread_t thread, void** retval) {\n    return platform_join_thread((platform_thread_t)thread);\n}
+int cupolas_thread_join(cupolas_thread_t thread, void** retval) {\n    return platform_join_thread((platform_thread_t)thread);\n}
 
-int domes_thread_detach(domes_thread_t thread) {\n    return platform_detach_thread((platform_thread_t)thread);\n}
+int cupolas_thread_detach(cupolas_thread_t thread) {\n    return platform_detach_thread((platform_thread_t)thread);\n}
 
-domes_thread_id_t domes_thread_self(void) {\n    return (domes_thread_id_t)platform_get_thread_id();\n}
+cupolas_thread_id_t cupolas_thread_self(void) {\n    return (cupolas_thread_id_t)platform_get_thread_id();\n}
 
-bool domes_thread_equal(domes_thread_id_t t1, domes_thread_id_t t2) {
-#if DOMES_PLATFORM_WINDOWS
+bool cupolas_thread_equal(cupolas_thread_id_t t1, cupolas_thread_id_t t2) {
+#if cupolas_PLATFORM_WINDOWS
     return t1 == t2;
 #else
     return pthread_equal(t1, t2) != 0;
@@ -118,10 +120,10 @@ bool domes_thread_equal(domes_thread_id_t t1, domes_thread_id_t t2) {
  * 时间实现
  * ============================================================================ */
 
-int domes_time_now(domes_timestamp_t* ts) {
-    if (!ts) return DOMES_ERROR_INVALID_ARG;
+int cupolas_time_now(cupolas_timestamp_t* ts) {
+    if (!ts) return cupolas_ERROR_INVALID_ARG;
     
-#if DOMES_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     FILETIME ft;
     ULARGE_INTEGER uli;
     GetSystemTimeAsFileTime(&ft);
@@ -130,43 +132,43 @@ int domes_time_now(domes_timestamp_t* ts) {
     uli.QuadPart -= 116444736000000000ULL;
     ts->sec = (int64_t)(uli.QuadPart / 10000000);
     ts->nsec = (int32_t)((uli.QuadPart % 10000000) * 100);
-    return DOMES_OK;
+    return cupolas_OK;
 #else
     struct timespec t;
     if (clock_gettime(CLOCK_REALTIME, &t) != 0) {
-        return DOMES_ERROR_UNKNOWN;
+        return cupolas_ERROR_UNKNOWN;
     }
     ts->sec = t.tv_sec;
     ts->nsec = (int32_t)t.tv_nsec;
-    return DOMES_OK;
+    return cupolas_OK;
 #endif
 }
 
-int domes_time_mono(domes_timestamp_t* ts) {
-    if (!ts) return DOMES_ERROR_INVALID_ARG;
+int cupolas_time_mono(cupolas_timestamp_t* ts) {
+    if (!ts) return cupolas_ERROR_INVALID_ARG;
     
-#if DOMES_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     LARGE_INTEGER freq, count;
     QueryPerformanceFrequency(&freq);
     QueryPerformanceCounter(&count);
     ts->sec = count.QuadPart / freq.QuadPart;
     ts->nsec = (int32_t)((count.QuadPart % freq.QuadPart) * 1000000000 / freq.QuadPart);
-    return DOMES_OK;
+    return cupolas_OK;
 #else
     struct timespec t;
     if (clock_gettime(CLOCK_MONOTONIC, &t) != 0) {
-        return DOMES_ERROR_UNKNOWN;
+        return cupolas_ERROR_UNKNOWN;
     }
     ts->sec = t.tv_sec;
     ts->nsec = (int32_t)t.tv_nsec;
-    return DOMES_OK;
+    return cupolas_OK;
 #endif
 }
 
-uint64_t domes_time_ms(void) {\n    return platform_get_current_time_ms();\n}
+uint64_t cupolas_time_ms(void) {\n    return platform_get_current_time_ms();\n}
 
-void domes_sleep_ms(uint32_t ms) {
-#if DOMES_PLATFORM_WINDOWS
+void cupolas_sleep_ms(uint32_t ms) {
+#if cupolas_PLATFORM_WINDOWS
     Sleep(ms);
 #else
     struct timespec ts = { (time_t)(ms / 1000), (long)((ms % 1000) * 1000000) };
@@ -174,8 +176,8 @@ void domes_sleep_ms(uint32_t ms) {
 #endif
 }
 
-void domes_sleep_us(uint32_t us) {
-#if DOMES_PLATFORM_WINDOWS
+void cupolas_sleep_us(uint32_t us) {
+#if cupolas_PLATFORM_WINDOWS
     Sleep((us + 999) / 1000);
 #else
     struct timespec ts = { (time_t)(us / 1000000), (long)((us % 1000000) * 1000) };
@@ -187,16 +189,16 @@ void domes_sleep_us(uint32_t us) {
  * 文件系统实现
  * ============================================================================ */
 
-int domes_file_stat(const char* path, domes_file_stat_t* stat) {
-    if (!path || !stat) return DOMES_ERROR_INVALID_ARG;
+int cupolas_file_stat(const char* path, cupolas_file_stat_t* stat) {
+    if (!path || !stat) return cupolas_ERROR_INVALID_ARG;
     
     memset(stat, 0, sizeof(*stat));
     
-#if DOMES_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     WIN32_FILE_ATTRIBUTE_DATA attrs;
     if (!GetFileAttributesExA(path, GetFileExInfoStandard, &attrs)) {
         stat->exists = false;
-        return DOMES_ERROR_NOT_FOUND;
+        return cupolas_ERROR_NOT_FOUND;
     }
     
     stat->exists = true;
@@ -215,12 +217,12 @@ int domes_file_stat(const char* path, domes_file_stat_t* stat) {
     stat->mtime.sec = (int64_t)(mtime.QuadPart / 10000000);
     stat->mtime.nsec = (int32_t)((mtime.QuadPart % 10000000) * 100);
     
-    return DOMES_OK;
+    return cupolas_OK;
 #else
     struct stat st;
     if (stat(path, &st) != 0) {
         stat->exists = false;
-        return DOMES_ERROR_NOT_FOUND;
+        return cupolas_ERROR_NOT_FOUND;
     }
     
     stat->exists = true;
@@ -230,100 +232,100 @@ int domes_file_stat(const char* path, domes_file_stat_t* stat) {
     stat->mtime.sec = st.st_mtime;
     stat->mtime.nsec = 0;
     
-    return DOMES_OK;
+    return cupolas_OK;
 #endif
 }
 
-int domes_file_exists(const char* path) {\n    return platform_path_exists(path) ? 1 : 0;\n}
+int cupolas_file_exists(const char* path) {\n    return platform_path_exists(path) ? 1 : 0;\n}
 
-int domes_file_mkdir(const char* path, bool recursive) {
-    if (!path) return DOMES_ERROR_INVALID_ARG;
+int cupolas_file_mkdir(const char* path, bool recursive) {
+    if (!path) return cupolas_ERROR_INVALID_ARG;
     
-    if (domes_file_exists(path)) {
-        return DOMES_OK;
+    if (cupolas_file_exists(path)) {
+        return cupolas_OK;
     }
     
     if (!recursive) {
-#if DOMES_PLATFORM_WINDOWS
-        return CreateDirectoryA(path, NULL) ? DOMES_OK : DOMES_ERROR_PERMISSION;
+#if cupolas_PLATFORM_WINDOWS
+        return CreateDirectoryA(path, NULL) ? cupolas_OK : cupolas_ERROR_PERMISSION;
 #else
-        return mkdir(path, 0755) == 0 ? DOMES_OK : DOMES_ERROR_PERMISSION;
+        return mkdir(path, 0755) == 0 ? cupolas_OK : cupolas_ERROR_PERMISSION;
 #endif
     }
     
-    char buf[DOMES_PATH_MAX];
-    strncpy(buf, path, DOMES_PATH_MAX - 1);
-    buf[DOMES_PATH_MAX - 1] = '\0';
+    char buf[cupolas_PATH_MAX];
+    strncpy(buf, path, cupolas_PATH_MAX - 1);
+    buf[cupolas_PATH_MAX - 1] = '\0';
     
     char* p = buf;
     while (*p) {
-        if (*p == DOMES_PATH_SEP && p != buf) {
+        if (*p == cupolas_PATH_SEP && p != buf) {
             *p = '\0';
-            if (!domes_file_exists(buf)) {
-#if DOMES_PLATFORM_WINDOWS
+            if (!cupolas_file_exists(buf)) {
+#if cupolas_PLATFORM_WINDOWS
                 if (!CreateDirectoryA(buf, NULL)) {
-                    return DOMES_ERROR_PERMISSION;
+                    return cupolas_ERROR_PERMISSION;
                 }
 #else
                 if (mkdir(buf, 0755) != 0) {
-                    return DOMES_ERROR_PERMISSION;
+                    return cupolas_ERROR_PERMISSION;
                 }
 #endif
             }
-            *p = DOMES_PATH_SEP;
+            *p = cupolas_PATH_SEP;
         }
         p++;
     }
     
-    if (!domes_file_exists(buf)) {
-#if DOMES_PLATFORM_WINDOWS
-        return CreateDirectoryA(buf, NULL) ? DOMES_OK : DOMES_ERROR_PERMISSION;
+    if (!cupolas_file_exists(buf)) {
+#if cupolas_PLATFORM_WINDOWS
+        return CreateDirectoryA(buf, NULL) ? cupolas_OK : cupolas_ERROR_PERMISSION;
 #else
-        return mkdir(buf, 0755) == 0 ? DOMES_OK : DOMES_ERROR_PERMISSION;
+        return mkdir(buf, 0755) == 0 ? cupolas_OK : cupolas_ERROR_PERMISSION;
 #endif
     }
     
-    return DOMES_OK;
+    return cupolas_OK;
 }
 
-int domes_file_remove(const char* path) {
-    if (!path) return DOMES_ERROR_INVALID_ARG;
+int cupolas_file_remove(const char* path) {
+    if (!path) return cupolas_ERROR_INVALID_ARG;
     
-#if DOMES_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     DWORD attrs = GetFileAttributesA(path);
     if (attrs == INVALID_FILE_ATTRIBUTES) {
-        return DOMES_ERROR_NOT_FOUND;
+        return cupolas_ERROR_NOT_FOUND;
     }
     if (attrs & FILE_ATTRIBUTE_DIRECTORY) {
-        return RemoveDirectoryA(path) ? DOMES_OK : DOMES_ERROR_PERMISSION;
+        return RemoveDirectoryA(path) ? cupolas_OK : cupolas_ERROR_PERMISSION;
     }
-    return DeleteFileA(path) ? DOMES_OK : DOMES_ERROR_PERMISSION;
+    return DeleteFileA(path) ? cupolas_OK : cupolas_ERROR_PERMISSION;
 #else
-    domes_file_stat_t st;
-    if (domes_file_stat(path, &st) != DOMES_OK) {
-        return DOMES_ERROR_NOT_FOUND;
+    cupolas_file_stat_t st;
+    if (cupolas_file_stat(path, &st) != cupolas_OK) {
+        return cupolas_ERROR_NOT_FOUND;
     }
     if (st.is_dir) {
-        return rmdir(path) == 0 ? DOMES_OK : DOMES_ERROR_PERMISSION;
+        return rmdir(path) == 0 ? cupolas_OK : cupolas_ERROR_PERMISSION;
     }
-    return unlink(path) == 0 ? DOMES_OK : DOMES_ERROR_PERMISSION;
+    return unlink(path) == 0 ? cupolas_OK : cupolas_ERROR_PERMISSION;
 #endif
 }
 
-int domes_file_rename(const char* old_path, const char* new_path) {
-    if (!old_path || !new_path) return DOMES_ERROR_INVALID_ARG;
+int cupolas_file_rename(const char* old_path, const char* new_path) {
+    if (!old_path || !new_path) return cupolas_ERROR_INVALID_ARG;
     
-#if DOMES_PLATFORM_WINDOWS
-    return MoveFileExA(old_path, new_path, MOVEFILE_REPLACE_EXISTING) ? DOMES_OK : DOMES_ERROR_PERMISSION;
+#if cupolas_PLATFORM_WINDOWS
+    return MoveFileExA(old_path, new_path, MOVEFILE_REPLACE_EXISTING) ? cupolas_OK : cupolas_ERROR_PERMISSION;
 #else
-    return rename(old_path, new_path) == 0 ? DOMES_OK : DOMES_ERROR_PERMISSION;
+    return rename(old_path, new_path) == 0 ? cupolas_OK : cupolas_ERROR_PERMISSION;
 #endif
 }
 
-char* domes_file_abspath(const char* path, char* buf, size_t size) {
+char* cupolas_file_abspath(const char* path, char* buf, size_t size) {
     if (!path || !buf || size == 0) return NULL;
     
-#if DOMES_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     DWORD len = GetFullPathNameA(path, (DWORD)size, buf, NULL);
     if (len == 0 || len >= size) {
         return NULL;
@@ -335,7 +337,7 @@ char* domes_file_abspath(const char* path, char* buf, size_t size) {
             strncpy(buf, path, size - 1);
             buf[size - 1] = '\0';
         } else {
-            char cwd[DOMES_PATH_MAX];
+            char cwd[cupolas_PATH_MAX];
             if (getcwd(cwd, sizeof(cwd)) == NULL) {
                 return NULL;
             }
@@ -346,13 +348,13 @@ char* domes_file_abspath(const char* path, char* buf, size_t size) {
 #endif
 }
 
-char* domes_file_dirname(const char* path, char* buf, size_t size) {
+char* cupolas_file_dirname(const char* path, char* buf, size_t size) {
     if (!path || !buf || size == 0) return NULL;
     
     strncpy(buf, path, size - 1);
     buf[size - 1] = '\0';
     
-    char* last_sep = strrchr(buf, DOMES_PATH_SEP);
+    char* last_sep = strrchr(buf, cupolas_PATH_SEP);
     if (last_sep == NULL) {
         buf[0] = '.';
         buf[1] = '\0';
@@ -369,17 +371,17 @@ char* domes_file_dirname(const char* path, char* buf, size_t size) {
  * 内存实现
  * ============================================================================ */
 
-void* domes_mem_alloc(size_t size) {\n    return platform_alloc(size);\n}
+void* cupolas_mem_alloc(size_t size) {\n    return platform_alloc(size);\n}
 
-void* domes_mem_alloc_aligned(size_t size, size_t alignment) {\n    return platform_alloc_aligned(size, alignment);\n}
+void* cupolas_mem_alloc_aligned(size_t size, size_t alignment) {\n    return platform_alloc_aligned(size, alignment);\n}
 
-void domes_mem_free(void* ptr) {\n    platform_free(ptr);\n}
+void cupolas_mem_free(void* ptr) {\n    platform_free(ptr);\n}
 
-void* domes_mem_realloc(void* ptr, size_t size) {\n    return platform_realloc(ptr, size);\n}
+void* cupolas_mem_realloc(void* ptr, size_t size) {\n    return platform_realloc(ptr, size);\n}
 
-void domes_mem_zero(void* ptr, size_t size) {
+void cupolas_mem_zero(void* ptr, size_t size) {
     if (ptr && size > 0) {
-#if DOMES_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
         SecureZeroMemory(ptr, size);
 #else
         memset(ptr, 0, size);
@@ -388,9 +390,9 @@ void domes_mem_zero(void* ptr, size_t size) {
     }
 }
 
-void domes_mem_lock(void* ptr, size_t size) {
+void cupolas_mem_lock(void* ptr, size_t size) {
     if (ptr && size > 0) {
-#if DOMES_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
         VirtualLock(ptr, size);
 #else
         mlock(ptr, size);
@@ -398,9 +400,9 @@ void domes_mem_lock(void* ptr, size_t size) {
     }
 }
 
-void domes_mem_unlock(void* ptr, size_t size) {
+void cupolas_mem_unlock(void* ptr, size_t size) {
     if (ptr && size > 0) {
-#if DOMES_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
         VirtualUnlock(ptr, size);
 #else
         munlock(ptr, size);
@@ -412,112 +414,112 @@ void domes_mem_unlock(void* ptr, size_t size) {
  * 原子操作实现
  * ============================================================================ */
 
-int32_t domes_atomic_load32(domes_atomic32_t* ptr) {
-#if DOMES_PLATFORM_WINDOWS
+int32_t cupolas_atomic_load32(cupolas_atomic32_t* ptr) {
+#if cupolas_PLATFORM_WINDOWS
     return InterlockedCompareExchange((volatile LONG*)ptr, 0, 0);
 #else
     return __atomic_load_n(ptr, __ATOMIC_SEQ_CST);
 #endif
 }
 
-void domes_atomic_store32(domes_atomic32_t* ptr, int32_t val) {
-#if DOMES_PLATFORM_WINDOWS
+void cupolas_atomic_store32(cupolas_atomic32_t* ptr, int32_t val) {
+#if cupolas_PLATFORM_WINDOWS
     InterlockedExchange((volatile LONG*)ptr, val);
 #else
     __atomic_store_n(ptr, val, __ATOMIC_SEQ_CST);
 #endif
 }
 
-int32_t domes_atomic_add32(domes_atomic32_t* ptr, int32_t delta) {
-#if DOMES_PLATFORM_WINDOWS
+int32_t cupolas_atomic_add32(cupolas_atomic32_t* ptr, int32_t delta) {
+#if cupolas_PLATFORM_WINDOWS
     return InterlockedExchangeAdd((volatile LONG*)ptr, delta);
 #else
     return __atomic_fetch_add(ptr, delta, __ATOMIC_SEQ_CST);
 #endif
 }
 
-int32_t domes_atomic_sub32(domes_atomic32_t* ptr, int32_t delta) {
-    return domes_atomic_add32(ptr, -delta);
+int32_t cupolas_atomic_sub32(cupolas_atomic32_t* ptr, int32_t delta) {
+    return cupolas_atomic_add32(ptr, -delta);
 }
 
-int32_t domes_atomic_inc32(domes_atomic32_t* ptr) {
-#if DOMES_PLATFORM_WINDOWS
+int32_t cupolas_atomic_inc32(cupolas_atomic32_t* ptr) {
+#if cupolas_PLATFORM_WINDOWS
     return InterlockedIncrement((volatile LONG*)ptr) - 1;
 #else
     return __atomic_fetch_add(ptr, 1, __ATOMIC_SEQ_CST);
 #endif
 }
 
-int32_t domes_atomic_dec32(domes_atomic32_t* ptr) {
-#if DOMES_PLATFORM_WINDOWS
+int32_t cupolas_atomic_dec32(cupolas_atomic32_t* ptr) {
+#if cupolas_PLATFORM_WINDOWS
     return InterlockedDecrement((volatile LONG*)ptr) + 1;
 #else
     return __atomic_fetch_sub(ptr, 1, __ATOMIC_SEQ_CST);
 #endif
 }
 
-bool domes_atomic_cas32(domes_atomic32_t* ptr, int32_t expected, int32_t desired) {
-#if DOMES_PLATFORM_WINDOWS
+bool cupolas_atomic_cas32(cupolas_atomic32_t* ptr, int32_t expected, int32_t desired) {
+#if cupolas_PLATFORM_WINDOWS
     return InterlockedCompareExchange((volatile LONG*)ptr, desired, expected) == expected;
 #else
     return __atomic_compare_exchange_n(ptr, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
 #endif
 }
 
-int64_t domes_atomic_load64(domes_atomic64_t* ptr) {
-#if DOMES_PLATFORM_WINDOWS
+int64_t cupolas_atomic_load64(cupolas_atomic64_t* ptr) {
+#if cupolas_PLATFORM_WINDOWS
     return InterlockedCompareExchange64((volatile LONGLONG*)ptr, 0, 0);
 #else
     return __atomic_load_n(ptr, __ATOMIC_SEQ_CST);
 #endif
 }
 
-void domes_atomic_store64(domes_atomic64_t* ptr, int64_t val) {
-#if DOMES_PLATFORM_WINDOWS
+void cupolas_atomic_store64(cupolas_atomic64_t* ptr, int64_t val) {
+#if cupolas_PLATFORM_WINDOWS
     InterlockedExchange64((volatile LONGLONG*)ptr, val);
 #else
     __atomic_store_n(ptr, val, __ATOMIC_SEQ_CST);
 #endif
 }
 
-int64_t domes_atomic_add64(domes_atomic64_t* ptr, int64_t delta) {
-#if DOMES_PLATFORM_WINDOWS
+int64_t cupolas_atomic_add64(cupolas_atomic64_t* ptr, int64_t delta) {
+#if cupolas_PLATFORM_WINDOWS
     return InterlockedExchangeAdd64((volatile LONGLONG*)ptr, delta);
 #else
     return __atomic_fetch_add(ptr, delta, __ATOMIC_SEQ_CST);
 #endif
 }
 
-int64_t domes_atomic_sub64(domes_atomic64_t* ptr, int64_t delta) {
-    return domes_atomic_add64(ptr, -delta);
+int64_t cupolas_atomic_sub64(cupolas_atomic64_t* ptr, int64_t delta) {
+    return cupolas_atomic_add64(ptr, -delta);
 }
 
-bool domes_atomic_cas64(domes_atomic64_t* ptr, int64_t expected, int64_t desired) {
-#if DOMES_PLATFORM_WINDOWS
+bool cupolas_atomic_cas64(cupolas_atomic64_t* ptr, int64_t expected, int64_t desired) {
+#if cupolas_PLATFORM_WINDOWS
     return InterlockedCompareExchange64((volatile LONGLONG*)ptr, desired, expected) == expected;
 #else
     return __atomic_compare_exchange_n(ptr, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
 #endif
 }
 
-void* domes_atomic_load_ptr(domes_atomic_ptr_t* ptr) {
-#if DOMES_PLATFORM_WINDOWS
+void* cupolas_atomic_load_ptr(cupolas_atomic_ptr_t* ptr) {
+#if cupolas_PLATFORM_WINDOWS
     return InterlockedCompareExchangePointer((volatile PVOID*)ptr, NULL, NULL);
 #else
     return __atomic_load_n(ptr, __ATOMIC_SEQ_CST);
 #endif
 }
 
-void domes_atomic_store_ptr(domes_atomic_ptr_t* ptr, void* val) {
-#if DOMES_PLATFORM_WINDOWS
+void cupolas_atomic_store_ptr(cupolas_atomic_ptr_t* ptr, void* val) {
+#if cupolas_PLATFORM_WINDOWS
     InterlockedExchangePointer((volatile PVOID*)ptr, val);
 #else
     __atomic_store_n(ptr, val, __ATOMIC_SEQ_CST);
 #endif
 }
 
-bool domes_atomic_cas_ptr(domes_atomic_ptr_t* ptr, void* expected, void* desired) {
-#if DOMES_PLATFORM_WINDOWS
+bool cupolas_atomic_cas_ptr(cupolas_atomic_ptr_t* ptr, void* expected, void* desired) {
+#if cupolas_PLATFORM_WINDOWS
     return InterlockedCompareExchangePointer((volatile PVOID*)ptr, desired, expected) == expected;
 #else
     return __atomic_compare_exchange_n(ptr, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
@@ -528,93 +530,93 @@ bool domes_atomic_cas_ptr(domes_atomic_ptr_t* ptr, void* expected, void* desired
  * 错误处理实现
  * ============================================================================ */
 
-int domes_get_last_error(void) {
-#if DOMES_PLATFORM_WINDOWS
+int cupolas_get_last_error(void) {
+#if cupolas_PLATFORM_WINDOWS
     DWORD err = GetLastError();
     switch (err) {
-        case ERROR_SUCCESS: return DOMES_OK;
-        case ERROR_INVALID_PARAMETER: return DOMES_ERROR_INVALID_ARG;
-        case ERROR_NOT_ENOUGH_MEMORY: return DOMES_ERROR_NO_MEMORY;
-        case ERROR_FILE_NOT_FOUND: return DOMES_ERROR_NOT_FOUND;
-        case ERROR_ACCESS_DENIED: return DOMES_ERROR_PERMISSION;
-        case ERROR_BUSY: return DOMES_ERROR_BUSY;
-        case ERROR_TIMEOUT: return DOMES_ERROR_TIMEOUT;
-        default: return DOMES_ERROR_UNKNOWN;
+        case ERROR_SUCCESS: return cupolas_OK;
+        case ERROR_INVALID_PARAMETER: return cupolas_ERROR_INVALID_ARG;
+        case ERROR_NOT_ENOUGH_MEMORY: return cupolas_ERROR_NO_MEMORY;
+        case ERROR_FILE_NOT_FOUND: return cupolas_ERROR_NOT_FOUND;
+        case ERROR_ACCESS_DENIED: return cupolas_ERROR_PERMISSION;
+        case ERROR_BUSY: return cupolas_ERROR_BUSY;
+        case ERROR_TIMEOUT: return cupolas_ERROR_TIMEOUT;
+        default: return cupolas_ERROR_UNKNOWN;
     }
 #else
     int err = errno;
     switch (err) {
-        case 0: return DOMES_OK;
-        case EINVAL: return DOMES_ERROR_INVALID_ARG;
-        case ENOMEM: return DOMES_ERROR_NO_MEMORY;
-        case ENOENT: return DOMES_ERROR_NOT_FOUND;
-        case EACCES: return DOMES_ERROR_PERMISSION;
-        case EBUSY: return DOMES_ERROR_BUSY;
-        case ETIMEDOUT: return DOMES_ERROR_TIMEOUT;
-        case EAGAIN: return DOMES_ERROR_WOULD_BLOCK;
-        default: return DOMES_ERROR_UNKNOWN;
+        case 0: return cupolas_OK;
+        case EINVAL: return cupolas_ERROR_INVALID_ARG;
+        case ENOMEM: return cupolas_ERROR_NO_MEMORY;
+        case ENOENT: return cupolas_ERROR_NOT_FOUND;
+        case EACCES: return cupolas_ERROR_PERMISSION;
+        case EBUSY: return cupolas_ERROR_BUSY;
+        case ETIMEDOUT: return cupolas_ERROR_TIMEOUT;
+        case EAGAIN: return cupolas_ERROR_WOULD_BLOCK;
+        default: return cupolas_ERROR_UNKNOWN;
     }
 #endif
 }
 
-const char* domes_strerror(int error) {
+const char* cupolas_strerror(int error) {
     switch (error) {
-        case DOMES_OK: return "Success";
-        case DOMES_ERROR_UNKNOWN: return "Unknown error";
-        case DOMES_ERROR_INVALID_ARG: return "Invalid argument";
-        case DOMES_ERROR_NO_MEMORY: return "Out of memory";
-        case DOMES_ERROR_NOT_FOUND: return "Not found";
-        case DOMES_ERROR_PERMISSION: return "Permission denied";
-        case DOMES_ERROR_BUSY: return "Resource busy";
-        case DOMES_ERROR_TIMEOUT: return "Timeout";
-        case DOMES_ERROR_WOULD_BLOCK: return "Operation would block";
-        case DOMES_ERROR_OVERFLOW: return "Buffer overflow";
-        case DOMES_ERROR_NOT_SUPPORTED: return "Operation not supported";
-        case DOMES_ERROR_IO: return "I/O error";
+        case cupolas_OK: return "Success";
+        case cupolas_ERROR_UNKNOWN: return "Unknown error";
+        case cupolas_ERROR_INVALID_ARG: return "Invalid argument";
+        case cupolas_ERROR_NO_MEMORY: return "Out of memory";
+        case cupolas_ERROR_NOT_FOUND: return "Not found";
+        case cupolas_ERROR_PERMISSION: return "Permission denied";
+        case cupolas_ERROR_BUSY: return "Resource busy";
+        case cupolas_ERROR_TIMEOUT: return "Timeout";
+        case cupolas_ERROR_WOULD_BLOCK: return "Operation would block";
+        case cupolas_ERROR_OVERFLOW: return "Buffer overflow";
+        case cupolas_ERROR_NOT_SUPPORTED: return "Operation not supported";
+        case cupolas_ERROR_IO: return "I/O error";
         default: return "Unknown error";
     }
 }
 
 /* ============================================================================
- * 字符串工具实�?
+ * 字符串工具实�?
  * ============================================================================ */
 
-char* domes_strdup(const char* str) {\n    return platform_strdup(str);\n}
+char* cupolas_strdup(const char* str) {\n    return platform_strdup(str);\n}
 
-char* domes_strndup(const char* str, size_t n) {\n    return platform_strndup(str, n);\n}
+char* cupolas_strndup(const char* str, size_t n) {\n    return platform_strndup(str, n);\n}
 
-int domes_strcasecmp(const char* s1, const char* s2) {\n    return platform_strcasecmp(s1, s2);\n}
+int cupolas_strcasecmp(const char* s1, const char* s2) {\n    return platform_strcasecmp(s1, s2);\n}
 
-int domes_strncasecmp(const char* s1, const char* s2, size_t n) {\n    return platform_strncasecmp(s1, s2, n);\n}
+int cupolas_strncasecmp(const char* s1, const char* s2, size_t n) {\n    return platform_strncasecmp(s1, s2, n);\n}
 
 /* ============================================================================
- * 进程实现（简化版，仅支持基本功能�?
+ * 进程实现（简化版，仅支持基本功能�?
  * ============================================================================ */
 
-int domes_pipe_create(domes_pipe_t* pipe) {
-    if (!pipe) return DOMES_ERROR_INVALID_ARG;
+int cupolas_pipe_create(cupolas_pipe_t* pipe) {
+    if (!pipe) return cupolas_ERROR_INVALID_ARG;
     
-#if DOMES_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
     HANDLE read_hdl, write_hdl;
     if (!CreatePipe(&read_hdl, &write_hdl, &sa, 0)) {
-        return DOMES_ERROR_UNKNOWN;
+        return cupolas_ERROR_UNKNOWN;
     }
     pipe[0] = read_hdl;
     pipe[1] = write_hdl;
-    return DOMES_OK;
+    return cupolas_OK;
 #else
     if (pipe2((int*)pipe, O_CLOEXEC) != 0) {
-        return DOMES_ERROR_UNKNOWN;
+        return cupolas_ERROR_UNKNOWN;
     }
-    return DOMES_OK;
+    return cupolas_OK;
 #endif
 }
 
-int domes_pipe_close(domes_pipe_t* pipe) {
-    if (!pipe) return DOMES_ERROR_INVALID_ARG;
+int cupolas_pipe_close(cupolas_pipe_t* pipe) {
+    if (!pipe) return cupolas_ERROR_INVALID_ARG;
     
-#if DOMES_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     if (pipe[0]) CloseHandle(pipe[0]);
     if (pipe[1]) CloseHandle(pipe[1]);
     pipe[0] = pipe[1] = NULL;
@@ -623,42 +625,42 @@ int domes_pipe_close(domes_pipe_t* pipe) {
     if (pipe[1] >= 0) close(pipe[1]);
     pipe[0] = pipe[1] = -1;
 #endif
-    return DOMES_OK;
+    return cupolas_OK;
 }
 
-int domes_pipe_read(domes_pipe_t* pipe, void* buf, size_t count, size_t* bytes_read) {
-    if (!pipe || !buf || !bytes_read) return DOMES_ERROR_INVALID_ARG;
+int cupolas_pipe_read(cupolas_pipe_t* pipe, void* buf, size_t count, size_t* bytes_read) {
+    if (!pipe || !buf || !bytes_read) return cupolas_ERROR_INVALID_ARG;
     
-#if DOMES_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     DWORD dw_read;
     if (!ReadFile(pipe[0], buf, (DWORD)count, &dw_read, NULL)) {
-        return DOMES_ERROR_IO;
+        return cupolas_ERROR_IO;
     }
     *bytes_read = dw_read;
-    return DOMES_OK;
+    return cupolas_OK;
 #else
     ssize_t n = read(pipe[0], buf, count);
-    if (n < 0) return DOMES_ERROR_IO;
+    if (n < 0) return cupolas_ERROR_IO;
     *bytes_read = (size_t)n;
-    return DOMES_OK;
+    return cupolas_OK;
 #endif
 }
 
-int domes_pipe_write(domes_pipe_t* pipe, const void* buf, size_t count, size_t* bytes_written) {
-    if (!pipe || !buf || !bytes_written) return DOMES_ERROR_INVALID_ARG;
+int cupolas_pipe_write(cupolas_pipe_t* pipe, const void* buf, size_t count, size_t* bytes_written) {
+    if (!pipe || !buf || !bytes_written) return cupolas_ERROR_INVALID_ARG;
     
-#if DOMES_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     DWORD dw_written;
     if (!WriteFile(pipe[1], buf, (DWORD)count, &dw_written, NULL)) {
-        return DOMES_ERROR_IO;
+        return cupolas_ERROR_IO;
     }
     *bytes_written = dw_written;
-    return DOMES_OK;
+    return cupolas_OK;
 #else
     ssize_t n = write(pipe[1], buf, count);
-    if (n < 0) return DOMES_ERROR_IO;
+    if (n < 0) return cupolas_ERROR_IO;
     *bytes_written = (size_t)n;
-    return DOMES_OK;
+    return cupolas_OK;
 #endif
 }
 

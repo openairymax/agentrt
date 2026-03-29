@@ -1,4 +1,4 @@
-# AgentOS (OpenApex) JavaScript 编码规范
+﻿# AgentOS (OpenApex) JavaScript 编码规范
 
 **版本**: Doc V1.6  
 **备选名称**: OpenApex (开源极境 / 极境OS)  
@@ -1197,7 +1197,7 @@ export class SecurityPolicyEngine {
 }
 ```
 
-### 14.3 bases（公共库层）TypeScript 实现
+### 14.3 commons（公共库层）TypeScript 实现
 Common模块提供跨层基础设施，强调通用性和性能：
 
 #### 14.3.1 向量数据库客户端（映射原则：E-1 基础设施）

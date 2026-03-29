@@ -643,7 +643,7 @@ class PlanningStrategy:
         """
         System 1 (Fast): Create a plan using heuristic methods.
 
-        Used for simple tasks requiring rapid response. Applies bases patterns
+        Used for simple tasks requiring rapid response. Applies commons patterns
         and rules-of-thumb without deep analysis.
         """
         logger.info(f"System 1 (Fast): Creating heuristic plan for task: {task.description[:30]}...")

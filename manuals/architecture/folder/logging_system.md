@@ -1,4 +1,4 @@
-Copyright (c) 2026 SPHARX. All Rights Reserved.
+﻿Copyright (c) 2026 SPHARX. All Rights Reserved.
 "From data intelligence emerges."
 
 # AgentOS 日志系统架构详解
@@ -8,7 +8,7 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 **状态**: 优化发布  
 **备选名称**: OpenApex (开源极境 / 极境OS)  
 **原则映射**: 系统观(S)、内核观(K)、认知观(C)、工程观(E)、设计美学(A)  
-**路径**: `bases/utils/observability/`
+**路径**: `commons/utils/observability/`
 
 本文档详细说明 AgentOS 日志系统的科学设计，包括跨语言可观测性、动态反馈调节、高性能异步写入等关键技术。
 
@@ -18,7 +18,7 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 |------|-----|
 | 文档名称 | AgentOS 日志系统架构详解 |
 | 适用版本 | Dv1.6+ |
-| 路径 | `bases/utils/observability/` |
+| 路径 | `commons/utils/observability/` |
 
 ---
 
@@ -32,10 +32,10 @@ AgentOS 日志系统是整个系统的可观测性核心，严格遵循 **工程
 
 ### 1.1 集中式日志根目录
 
-**位置**: `AgentOS/lodges/logs/`
+**位置**: `AgentOS/heapstore/logs/`
 
 ```
-lodges/logs/
+heapstore/logs/
 ├── kernel/              # 内核层日志
 │   └── agentos.log     # 主内核日志
 ├── services/            # 服务层日志（daemon）
@@ -53,7 +53,7 @@ lodges/logs/
 
 | 原则 | 说明 |
 |------|------|
-| **集中存储** | 所有日志统一存放在 `lodges/logs/` 分区 |
+| **集中存储** | 所有日志统一存放在 `heapstore/logs/` 分区 |
 | **按层分离** | 内核层、服务层、应用层日志物理隔离 |
 | **模块独立** | 每个模块拥有独立的日志文件 |
 | **格式统一** | 所有日志遵循统一的格式规范 |
@@ -69,12 +69,12 @@ lodges/logs/
 #### 实现方式
 
 ```c
-// daemon/bases/include/svc_common.h (第 18 行)
-#include "logger.h"  // 来自 bases/utils/observability
+// daemon/commons/include/svc_common.h (第 18 行)
+#include "logger.h"  // 来自 commons/utils/observability
 ```
 
 **关键点**:
-- `daemon/` 下的所有服务守护进程通过 `svc_common.h` 复用 `bases/utils/observability` 中的日志接口
+- `daemon/` 下的所有服务守护进程通过 `svc_common.h` 复用 `commons/utils/observability` 中的日志接口
 - 每个服务在初始化时设置自己的 `service_name`，自动标记到日志中
 - 日志输出到不同的文件，由配置决定
 
@@ -101,12 +101,12 @@ int main(int argc, char* argv[]) {
 ### 2.3 日志输出示例
 
 ```log
-# lodges/logs/services/llm_d.log
+# heapstore/logs/services/llm_d.log
 2026-03-18 10:23:45.123 [INFO] [llm_d] [trace=abc123] Starting LLM service: llm_d
 2026-03-18 10:23:45.456 [DEBUG] [llm_d] [trace=abc123] Loading OpenAI provider
 2026-03-18 10:23:46.789 [ERROR] [llm_d] [trace=def456] API call failed: timeout
 
-# lodges/logs/services/tool_d.log
+# heapstore/logs/services/tool_d.log
 2026-03-18 10:23:45.234 [INFO] [tool_d] [trace=xyz789] Starting Tool service: tool_d
 2026-03-18 10:23:45.567 [WARN] [tool_d] [trace=xyz789] Tool 'python' not found in PATH
 ```
@@ -133,12 +133,12 @@ int main(int argc, char* argv[]) {
 ┌─────────────────────────────────────────────────┐
 │          内核层日志 (C - atoms/)                │
 │  - CoreLoopThree, MemoryRovol, Syscall         │
-│  - bases/utils/observability/logger.h          │
+│  - commons/utils/observability/logger.h          │
 └─────────────────────────────────────────────────┘
                       ↓
 ┌─────────────────────────────────────────────────┐
 │          统一日志后端                            │
-│  - 文件输出：lodges/logs/*                    │
+│  - 文件输出：heapstore/logs/*                    │
 │  - 格式：结构化 JSON + 人类可读文本             │
 │  - 聚合：OpenTelemetry Collector                │
 └─────────────────────────────────────────────────┘
@@ -146,7 +146,7 @@ int main(int argc, char* argv[]) {
 
 ### 3.2 C 语言模块统一日志（daemon 和 atoms）
 
-#### 核心接口：`bases/utils/observability/include/logger.h`
+#### 核心接口：`commons/utils/observability/include/logger.h`
 
 **控制论反馈调节机制**:
 通过动态日志级别调整和自适应采样率，形成负反馈回路，在系统负载高时自动降低日志开销。
@@ -201,7 +201,7 @@ class AgentOSLogger:
         
         # 文件处理器
         file_handler = logging.FileHandler(
-            f'lodges/logs/services/{service_name}.log'
+            f'heapstore/logs/services/{service_name}.log'
         )
         file_handler.setFormatter(formatter)
         self.logger.addHandler(file_handler)
@@ -248,7 +248,7 @@ func NewLogger(serviceName string) *Logger {
     
     // 文件输出
     file, _ := os.OpenFile(
-        fmt.Sprintf("lodges/logs/services/%s.log", serviceName),
+        fmt.Sprintf("heapstore/logs/services/%s.log", serviceName),
         os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644,
     )
     logger.SetOutput(file)
@@ -307,7 +307,7 @@ logging:
   
   outputs:
     - type: file
-      path: lodges/logs/services/*.log
+      path: heapstore/logs/services/*.log
       rotation: daily
       
     - type: opentelemetry
@@ -373,17 +373,17 @@ logging:
   services:
     llm_d:
       level: DEBUG
-      file: lodges/logs/services/llm_d.log
+      file: heapstore/logs/services/llm_d.log
       max_size_mb: 100
       retention_days: 7
       
     tool_d:
       level: INFO
-      file: lodges/logs/services/tool_d.log
+      file: heapstore/logs/services/tool_d.log
       
   kernel:
     level: WARN
-    file: lodges/logs/kernel/agentos.log
+    file: heapstore/logs/kernel/agentos.log
     
   # 动态调整
   hot_reload: true
@@ -587,7 +587,7 @@ exporters:
     verbosity: detailed
   
   file:
-    path: lodges/logs/aggregate.jsonl
+    path: heapstore/logs/aggregate.jsonl
   
   jaeger:
     endpoint: jaeger:14250
@@ -676,7 +676,7 @@ AgentOS 日志系统作为整个系统的可观测性核心，与其他关键模
 
 ### 日志系统核心特点
 
-✅ **集中存储**: `lodges/logs/` 统一分区管理  
+✅ **集中存储**: `heapstore/logs/` 统一分区管理  
 ✅ **模块独立**: 每个服务拥有独立日志文件  
 ✅ **统一接口**: C/Python/Go/Rust/TS 共享同一套日志规范  
 ✅ **跨语言追踪**: 通过 trace_id 实现全链路追踪  
@@ -709,8 +709,8 @@ logger.Info("Hello from Go")
 **最后更新**: 2026-03-25  
 **维护者**: SPHARX Team  
 **相关文档**: 
-- [原子日志接口](bases/utils/observability/include/logger.h)
-- [服务公共接口](daemon/bases/include/svc_common.h)
+- [原子日志接口](commons/utils/observability/include/logger.h)
+- [服务公共接口](daemon/commons/include/svc_common.h)
 - [日志配置示例](manager/logging/logging.yaml)
 
 ---

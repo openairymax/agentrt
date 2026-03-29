@@ -117,7 +117,7 @@ repos:
   #       stages: [commit-msg]
 
 # 跳过某些文件的检查
-exclude: ^(lodges/|build/|dist/|\.venv/|node_modules/|vendor/)
+exclude: ^(heapstore/|build/|dist/|\.venv/|node_modules/|vendor/)
 
 # 默认语言版本
 default_language_version:

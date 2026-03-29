@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file installer.c
  * @brief 安装管理模块
  * @details 负责 Agent 和 Skill 的安装和卸载
@@ -80,7 +80,7 @@ int installer_install_agent(market_service_t* service, const install_request_t* 
             new_result->error_message = strdup("Install path too long");
             return new_result;
         }
-        strcpy(install_path, request->install_path);
+        snprintf(install_path, sizeof(install_path), "%s", request->install_path);
     } else {
         snprintf(install_path, sizeof(install_path), "%s/agents/%s", service->manager.storage_path, agent->agent_id);
     }
@@ -89,7 +89,7 @@ int installer_install_agent(market_service_t* service, const install_request_t* 
     if (!directory_exists(install_path)) {
         // 创建父目录
         char parent_path[256];
-        strcpy(parent_path, install_path);
+        snprintf(parent_path, sizeof(parent_path), "%s", install_path);
         char* last_slash = strrchr(parent_path, '/');
         if (last_slash) {
             *last_slash = '\0';

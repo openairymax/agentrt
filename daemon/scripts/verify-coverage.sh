@@ -52,7 +52,7 @@ collect_coverage() {
     mkdir -p "$REPORT_DIR/coverage"
     local all_info_files=""
     
-    for module in bases llm_d tool_d monit_d sched_d market_d; do
+    for module in commons llm_d tool_d monit_d sched_d market_d; do
         local module_build="$BACKS_ROOT/$module/build"
         if [ -d "$module_build" ]; then
             cd "$module_build"

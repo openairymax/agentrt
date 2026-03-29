@@ -117,10 +117,10 @@ API Base URL [https://api.openai.com/v1]:
 ```
 创建项目目录结构...
 
-✓ lodges/kernel/
-✓ lodges/logs/
-✓ lodges/services/
-✓ lodges/models/
+✓ heapstore/kernel/
+✓ heapstore/logs/
+✓ heapstore/services/
+✓ heapstore/models/
 ✓ manager/cache/
 
 目录结构创建完成！
@@ -224,7 +224,7 @@ security:
   # 审计日志
   audit:
     enabled: true
-    log_file: lodges/logs/audit.log
+    log_file: heapstore/logs/audit.log
     rotation:
       max_size_mb: 100
       max_files: 10
@@ -259,7 +259,7 @@ logging:
       
     file:
       class: logging.handlers.RotatingFileHandler
-      filename: lodges/logs/agentos.log
+      filename: heapstore/logs/agentos.log
       level: DEBUG
       maxBytes: 10485760  # 10MB
       backupCount: 5

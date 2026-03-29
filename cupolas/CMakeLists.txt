@@ -124,10 +124,10 @@ set(DOMES_HEADERS
     src/security/domes_error.h
 )
 
-# bases 模块路径
-set(COMMON_MODULE_DIR ${CMAKE_SOURCE_DIR}/../bases)
+# commons 模块路径
+set(COMMON_MODULE_DIR ${CMAKE_SOURCE_DIR}/../commons)
 
-# bases 模块的 include 目录
+# commons 模块的 include 目录
 set(COMMON_INCLUDE_DIRS
     ${COMMON_MODULE_DIR}/platform/include
     ${COMMON_MODULE_DIR}/utils/core/include
@@ -150,7 +150,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${OPENSSL_INCLUDE_DIR}
 )
 
-# 链接 bases 模块
+# 链接 commons 模块
 target_link_libraries(${PROJECT_NAME} PRIVATE agentos_common ${OPENSSL_LIBRARIES})
 
 if(YAML_FOUND)

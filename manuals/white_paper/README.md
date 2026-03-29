@@ -1,4 +1,4 @@
-# AgentOS 官方技术白皮书
+﻿# AgentOS 官方技术白皮书
 
 <div align="center">
 
@@ -122,7 +122,7 @@ L1 原始卷（文件系统存储·分片压缩）
 - **Token 利用率**：领先 **2-3 倍**
 - **原因**：分层上下文管理 + 记忆精准检索 + 预算控制机制
 
-详见：[utils/cost](../../bases/utils/cost/README.md)
+详见：[utils/cost](../../commons/utils/cost/README.md)
 
 ---
 

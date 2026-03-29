@@ -4,7 +4,6 @@
 
 [![Version](https://img.shields.io/badge/version-v1.0.0.6-blue.svg)](../../README.md)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](../../../LICENSE)
-[![Status](https://img.shields.io/badge/status-production%20ready-success.svg)](../../README.md)
 
 **版本**: v1.0.0.6 | **更新日期**: 2026-03-26
 

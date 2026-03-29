@@ -1,21 +1,21 @@
 ﻿/**
  * @file agentos.h
- * @brief AgentOS gateway 模块兼容�?
+ * @brief AgentOS gateway ģ�����??
  *
- * 本文件作为兼容层，将 gateway 模块的接口映射到 bases 模块�?
- * gateway 模块原本独立实现�?agentos_* 接口，现在统一使用 bases 模块�?
+ * ���ļ���Ϊ���ݲ㣬�� gateway ģ��Ľӿ�ӳ�䵽 commons ģ��??
+ * gateway ģ��ԭ������ʵ��??agentos_* �ӿڣ�����ͳһʹ�� commons ģ��??
  *
- * 映射关系�?
- * - platform_* 类型/函数 -> agentos_* 类型/函数
- * - AGENTOS_LOG_* �?-> 使用 bases/utils/observability/include/logger.h
- * - agentos_error_t -> 使用 bases/utils/error/include/error.h
- * - agentos_time_* -> 使用 bases/platform/platform.h �?agentos_time_ns/ms
+ * ӳ���ϵ??
+ * - platform_* ����/���� -> agentos_* ����/����
+ * - AGENTOS_LOG_* ??-> ʹ�� commons/utils/observability/include/logger.h
+ * - agentos_error_t -> ʹ�� commons/utils/error/include/error.h
+ * - agentos_time_* -> ʹ�� commons/platform/platform.h ??agentos_time_ns/ms
  *
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#ifndef AGENTOS_DYNAMIC_AGENTOS_H
-#define AGENTOS_DYNAMIC_AGENTOS_H
+#ifndef AGENTOS_gateway_AGENTOS_H
+#define AGENTOS_gateway_AGENTOS_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -25,7 +25,7 @@
 extern "C" {
 #endif
 
-/* ==================== 符号导出�?==================== */
+/* ==================== ���ŵ���??==================== */
 
 #ifdef AGENTOS_BUILDING_SHARED
     #if defined(_WIN32) || defined(_WIN64)
@@ -47,19 +47,19 @@ extern "C" {
     #define AGENTOS_API
 #endif
 
-/* ==================== 错误码定义（来自 bases/error.h�?==================== */
+/* ==================== �����붨�壨���� commons/error.h??==================== */
 
 /*
- * 错误码分段规划：
- *   -1 �?-99:      通用基础错误
- *   -100 �?-199:   系统与平台错�?
- *   -200 �?-299:   内核层错�?
- *   -300 �?-399:   服务层错�?
- *   -400 �?-499:   LLM/AI服务错误
- *   -500 �?-599:   执行/工具错误
- *   -600 �?-699:   记忆/存储错误
- *   -700 �?-799:   安全/沙箱错误
- *   -800 �?-899:   协调/规划错误
+ * ������ֶι滮��
+ *   -1 ??-99:      ͨ�û�������
+ *   -100 ??-199:   ϵͳ��ƽ̨��??
+ *   -200 ??-299:   �ں˲��??
+ *   -300 ??-399:   ������??
+ *   -400 ??-499:   LLM/AI�������
+ *   -500 ??-599:   ִ��/���ߴ���
+ *   -600 ??-699:   ����/�洢����
+ *   -700 ??-799:   ��ȫ/ɳ�����
+ *   -800 ??-899:   Э��/�滮����
  */
 
 typedef int32_t agentos_error_t;
@@ -88,7 +88,7 @@ typedef int32_t agentos_error_t;
 #define AGENTOS_ERR_PROTOCOL_ERROR     (-20)
 #define AGENTOS_ERR_PARSE_ERROR        (-21)
 
-/* 兼容性别名（向后兼容�?*/
+/* �����Ա�����������??*/
 #define AGENTOS_EINVAL                 AGENTOS_ERR_INVALID_PARAM
 #define AGENTOS_ENOMEM                 AGENTOS_ERR_OUT_OF_MEMORY
 #define AGENTOS_EBUSY                  AGENTOS_ERR_BUSY
@@ -101,11 +101,11 @@ typedef int32_t agentos_error_t;
 #define AGENTOS_EIO                    AGENTOS_ERR_IO
 #define AGENTOS_ERROR                  (-100)
 
-/* ==================== 类型名称映射（platform -> agentos�?==================== */
+/* ==================== ��������ӳ�䣨platform -> agentos??==================== */
 
 /*
- * gateway 模块使用 platform_* 前缀，bases 模块使用 agentos_* 前缀
- * 通过宏映射实现兼�?
+ * gateway ģ��ʹ�� platform_* ǰ׺��commons ģ��ʹ�� agentos_* ǰ׺
+ * ͨ����ӳ��ʵ�ּ�??
  */
 
 #define platform_thread_t              agentos_thread_t
@@ -145,17 +145,17 @@ typedef int32_t agentos_error_t;
 #define platform_network_cleanup       agentos_network_cleanup
 #define platform_ignore_sigpipe        agentos_ignore_sigpipe
 
-/* ==================== 时间函数映射 ==================== */
+/* ==================== ʱ�亯��ӳ�� ==================== */
 
 /**
- * @brief 获取当前时间（纳秒）- 单调时钟
- * @return 当前时间纳秒�?
+ * @brief ��ȡ��ǰʱ�䣨���룩- ����ʱ��
+ * @return ��ǰʱ������??
  */
 AGENTOS_API uint64_t agentos_time_ns(void);
 
 /**
- * @brief 获取当前时间（毫秒）- 单调时钟
- * @return 当前时间毫秒�?
+ * @brief ��ȡ��ǰʱ�䣨���룩- ����ʱ��
+ * @return ��ǰʱ�����??
  */
 AGENTOS_API uint64_t agentos_time_ms(void);
 
@@ -163,23 +163,23 @@ AGENTOS_API uint64_t agentos_time_ms(void);
 #define agentos_time_monotonic_ms()    agentos_time_ms()
 
 /**
- * @brief 获取当前时间（纳秒）- 墙钟时间
- * @return 当前时间纳秒�?
+ * @brief ��ȡ��ǰʱ�䣨���룩- ǽ��ʱ��
+ * @return ��ǰʱ������??
  */
 AGENTOS_API uint64_t agentos_time_current_ns(void);
 
 /**
- * @brief 纳秒级睡�?
- * @param ns 睡眠时间（纳秒）
- * @return AGENTOS_SUCCESS 成功
+ * @brief ���뼶˯??
+ * @param ns ˯��ʱ�䣨���룩
+ * @return AGENTOS_SUCCESS �ɹ�
  */
 AGENTOS_API agentos_error_t agentos_time_nanosleep(uint64_t ns);
 
-/* ==================== 线程函数类型兼容 ==================== */
+/* ==================== �̺߳������ͼ��� ==================== */
 
 /*
- * gateway 模块使用不同的线程函数类型定�?
- * 通过转换宏适配
+ * gateway ģ��ʹ�ò�ͬ���̺߳������Ͷ�??
+ * ͨ��ת��������
  */
 
 #ifdef _WIN32
@@ -190,10 +190,10 @@ AGENTOS_API agentos_error_t agentos_time_nanosleep(uint64_t ns);
 
 typedef void* (*agentos_thread_func_t)(void* arg);
 
-/* ==================== 日志接口（来�?bases/logger.h�?==================== */
+/* ==================== ��־�ӿڣ���??commons/logger.h??==================== */
 
 /*
- * 日志级别定义
+ * ��־������
  */
 #define AGENTOS_LOG_LEVEL_ERROR 1
 #define AGENTOS_LOG_LEVEL_WARN  2
@@ -205,7 +205,7 @@ typedef void* (*agentos_thread_func_t)(void* arg);
 #endif
 
 /*
- * 日志函数声明（实现由 bases 模块提供�?
+ * ��־����������ʵ���� commons ģ���ṩ??
  */
 AGENTOS_API const char* agentos_log_set_trace_id(const char* trace_id);
 AGENTOS_API const char* agentos_log_get_trace_id(void);
@@ -216,14 +216,14 @@ AGENTOS_API void agentos_log_write(int level, const char* file, int line, const 
 #define AGENTOS_LOG_INFO(fmt, ...)  agentos_log_write(AGENTOS_LOG_LEVEL_INFO, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 #define AGENTOS_LOG_DEBUG(fmt, ...) agentos_log_write(AGENTOS_LOG_LEVEL_DEBUG, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 
-/* ==================== 错误处理接口（来�?bases/error.h�?==================== */
+/* ==================== ������ӿڣ���??commons/error.h??==================== */
 
 /*
- * 错误字符串获取（实现�?bases 模块提供�?
+ * �����ַ�����ȡ��ʵ��??commons ģ���ṩ??
  */
 AGENTOS_API const char* agentos_strerror(agentos_error_t err);
 
-/* ==================== 日志初始化接口（兼容层） ==================== */
+/* ==================== ��־��ʼ���ӿڣ����ݲ㣩 ==================== */
 
 AGENTOS_API int agentos_logger_init(const char* config_path);
 AGENTOS_API void agentos_logger_shutdown(void);
@@ -232,4 +232,4 @@ AGENTOS_API void agentos_logger_shutdown(void);
 }
 #endif
 
-#endif /* AGENTOS_DYNAMIC_AGENTOS_H */
+#endif /* AGENTOS_gateway_AGENTOS_H */

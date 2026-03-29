@@ -14,8 +14,8 @@ AGENTOS_SCRIPTS_DIR="$(dirname "$AGENTOS_SCRIPT_DIR")"
 AGENTOS_PROJECT_ROOT="$(dirname "$AGENTOS_SCRIPTS_DIR")"
 
 # 导入通用函数
-# shellcheck source=../lib/bases.sh
-source "$AGENTOS_SCRIPTS_DIR/lib/bases.sh"
+# shellcheck source=../lib/commons.sh
+source "$AGENTOS_SCRIPTS_DIR/lib/commons.sh"
 
 ###############################################################################
 # 颜色定义

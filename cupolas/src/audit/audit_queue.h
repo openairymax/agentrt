@@ -1,17 +1,17 @@
 /**
  * @file audit_queue.h
- * @brief 审计日志队列内部接口 - 线程安全的生产者-消费者队列
+ * @brief 审计日志队列内部接口 - 线程安全的生产�?消费者队�?
  * @author Spharx
  * @date 2024
  * 
- * 设计原则：
+ * 设计原则�?
  * - 线程安全：互斥锁 + 条件变量
  * - 高吞吐：批量写入支持
- * - 优雅关闭：支持等待队列清空
+ * - 优雅关闭：支持等待队列清�?
  */
 
-#ifndef DOMAIN_AUDIT_QUEUE_H
-#define DOMAIN_AUDIT_QUEUE_H
+#ifndef CUPOLAS_AUDIT_QUEUE_H
+#define CUPOLAS_AUDIT_QUEUE_H
 
 #include "../platform/platform.h"
 #include <stddef.h>
@@ -49,23 +49,23 @@ typedef struct audit_queue {
     audit_entry_t* tail;
     size_t size;
     size_t max_size;
-    domes_mutex_t lock;
-    domes_cond_t not_empty;
-    domes_cond_t not_full;
+    cupolas_mutex_t lock;
+    cupolas_cond_t not_empty;
+    cupolas_cond_t not_full;
     bool shutdown;
-    domes_atomic64_t total_pushed;
-    domes_atomic64_t total_popped;
+    cupolas_atomic64_t total_pushed;
+    cupolas_atomic64_t total_popped;
 } audit_queue_t;
 
 /**
  * @brief 创建审计队列
- * @param max_size 最大条目数，0 表示无限制
- * @return 队列句柄，失败返回 NULL
+ * @param max_size 最大条目数�? 表示无限�?
+ * @return 队列句柄，失败返�?NULL
  */
 audit_queue_t* audit_queue_create(size_t max_size);
 
 /**
- * @brief 销毁审计队列
+ * @brief 销毁审计队�?
  * @param queue 队列句柄
  */
 void audit_queue_destroy(audit_queue_t* queue);
@@ -73,16 +73,16 @@ void audit_queue_destroy(audit_queue_t* queue);
 /**
  * @brief 推入审计条目（阻塞）
  * @param queue 队列句柄
- * @param entry 审计条目（所有权转移）
- * @return 0 成功，其他失败
+ * @param entry 审计条目（所有权转移�?
+ * @return 0 成功，其他失�?
  */
 int audit_queue_push(audit_queue_t* queue, audit_entry_t* entry);
 
 /**
- * @brief 推入审计条目（非阻塞）
+ * @brief 推入审计条目（非阻塞�?
  * @param queue 队列句柄
- * @param entry 审计条目（所有权转移）
- * @return 0 成功，DOMES_ERROR_WOULD_BLOCK 队列满，其他失败
+ * @param entry 审计条目（所有权转移�?
+ * @return 0 成功，CUPOLAS_ERROR_WOULD_BLOCK 队列满，其他失败
  */
 int audit_queue_try_push(audit_queue_t* queue, audit_entry_t* entry);
 
@@ -90,21 +90,21 @@ int audit_queue_try_push(audit_queue_t* queue, audit_entry_t* entry);
  * @brief 弹出审计条目（阻塞）
  * @param queue 队列句柄
  * @param entry 输出条目指针
- * @return 0 成功，其他失败
+ * @return 0 成功，其他失�?
  */
 int audit_queue_pop(audit_queue_t* queue, audit_entry_t** entry);
 
 /**
- * @brief 弹出审计条目（带超时）
+ * @brief 弹出审计条目（带超时�?
  * @param queue 队列句柄
  * @param entry 输出条目指针
  * @param timeout_ms 超时时间（毫秒）
- * @return 0 成功，DOMES_ERROR_TIMEOUT 超时，其他失败
+ * @return 0 成功，CUPOLAS_ERROR_TIMEOUT 超时，其他失败
  */
 int audit_queue_timed_pop(audit_queue_t* queue, audit_entry_t** entry, uint32_t timeout_ms);
 
 /**
- * @brief 弹出审计条目（非阻塞）
+ * @brief 弹出审计条目（非阻塞�?
  * @param queue 队列句柄
  * @param entry 输出条目指针
  * @return 0 成功，DOMES_ERROR_WOULD_BLOCK 队列空，其他失败
@@ -116,8 +116,8 @@ int audit_queue_try_pop(audit_queue_t* queue, audit_entry_t** entry);
  * @param queue 队列句柄
  * @param entries 输出条目数组
  * @param max_count 最大条目数
- * @param actual_count 实际条目数
- * @return 0 成功，其他失败
+ * @param actual_count 实际条目�?
+ * @return 0 成功，其他失�?
  */
 int audit_queue_pop_batch(audit_queue_t* queue, audit_entry_t** entries, 
                            size_t max_count, size_t* actual_count);
@@ -144,7 +144,7 @@ size_t audit_queue_size(audit_queue_t* queue);
  * @param resource 资源
  * @param detail 详情
  * @param result 结果
- * @return 审计条目，失败返回 NULL
+ * @return 审计条目，失败返�?NULL
  */
 audit_entry_t* audit_entry_create(audit_event_type_t type,
                                    const char* agent_id,
@@ -154,7 +154,7 @@ audit_entry_t* audit_entry_create(audit_event_type_t type,
                                    int result);
 
 /**
- * @brief 销毁审计条目
+ * @brief 销毁审计条�?
  * @param entry 审计条目
  */
 void audit_entry_destroy(audit_entry_t* entry);

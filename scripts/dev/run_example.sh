@@ -15,8 +15,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPTS_DIR="$(dirname "$SCRIPT_DIR")"
 PROJECT_ROOT="$(dirname "$SCRIPTS_DIR")"
 
-# shellcheck source=../lib/bases.sh
-source "$SCRIPTS_DIR/lib/bases.sh"
+# shellcheck source=../lib/commons.sh
+source "$SCRIPTS_DIR/lib/commons.sh"
 
 ###############################################################################
 # 版本信息

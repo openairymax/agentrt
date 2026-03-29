@@ -1,10 +1,10 @@
-/**
+﻿/**
  * @file token_test.c
  * @brief Token 模块测试
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "../../../bases/utils/token/include/token.h"
+#include "../../../commons/utils/token/include/token.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

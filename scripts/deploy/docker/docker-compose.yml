@@ -36,11 +36,11 @@ services:
     # 数据卷挂载
     volumes:
       # 日志目录
-      - ./lodges/logs:/var/log/agentos:rw
+      - ./heapstore/logs:/var/log/agentos:rw
       # 注册表数据
-      - ./lodges/registry:/var/lib/agentos/registry:rw
+      - ./heapstore/registry:/var/lib/agentos/registry:rw
       # 追踪数据
-      - ./lodges/traces:/var/lib/agentos/traces:rw
+      - ./heapstore/traces:/var/lib/agentos/traces:rw
       # 配置文件（可选覆盖）
       - ../../manager/kernel:/etc/agentos/kernel:ro
 
@@ -112,11 +112,11 @@ services:
     # 数据卷挂载
     volumes:
       # 日志目录
-      - ./lodges/logs/services:/var/log/agentos/services:rw
+      - ./heapstore/logs/services:/var/log/agentos/services:rw
       # 服务配置
       - ../../manager/services:/etc/agentos/services:ro
       # 技能市场数据
-      - ./lodges/services/market:/var/lib/agentos/market:rw
+      - ./heapstore/services/market:/var/lib/agentos/market:rw
 
     # 网络配置
     networks:
@@ -195,7 +195,7 @@ services:
     # 数据持久化
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./lodges/registry/sessions.db:/docker-entrypoint-initdb.d/sessions.db:ro
+      - ./heapstore/registry/sessions.db:/docker-entrypoint-initdb.d/sessions.db:ro
 
     # 网络配置
     networks:

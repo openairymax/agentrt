@@ -1,4 +1,4 @@
-Copyright (c) 2026 SPHARX. All Rights Reserved.
+﻿Copyright (c) 2026 SPHARX. All Rights Reserved.
 "From data intelligence emerges."
 
 # Agent OS
@@ -301,7 +301,7 @@ Voir: [BUILD.md](atoms/BUILD.md)
 ### Système Journalisation
 
 ```
-lodges/logs/
+heapstore/logs/
 ├── kernel/         → agentos.log
 ├── services/       → llm_d.log, tool_d.log, etc.
 └── apps/           → logs indépendants

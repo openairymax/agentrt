@@ -1,4 +1,4 @@
-# AgentOS (OpenApex) Python 编码规范
+﻿# AgentOS (OpenApex) Python 编码规范
 
 **版本**: Doc V1.6  
 **备选名称**: OpenApex (开源极境 / 极境OS)  
@@ -1013,7 +1013,7 @@ class IpcDaemon:
             self.logger.debug(f"Session closed for client: {client_id}")
 ```
 
-### 11.2 bases（公共库层）Python 实现
+### 11.2 commons（公共库层）Python 实现
 Common模块提供跨层基础设施，强调通用性和性能：
 
 #### 11.2.1 向量数据库客户端（映射原则：E-1 基础设施）

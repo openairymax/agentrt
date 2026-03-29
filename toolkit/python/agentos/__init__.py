@@ -1,4 +1,4 @@
-﻿# AgentOS Python SDK
+# AgentOS Python SDK
 # Version: 2.0.0
 # Last updated: 2026-03-23
 
@@ -19,9 +19,9 @@ AgentOS Python SDK - AgentOS 系统的生产级 Python 接口
     >>> result = task.wait(timeout=30)
 """
 
-__version__ = "2.0.0"
-__author__ = "AgentOS Team"
-__license__ = "Apache-2.0"
+__version__ = "3.0.0"
+__author__ = "SpharxWorks"
+__license__ = "MIT"
 
 # 导入异常类和错误码常量
 from .exceptions import (

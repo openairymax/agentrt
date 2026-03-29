@@ -1,10 +1,9 @@
-﻿# daemon bases - 公共组件�?
+﻿# daemon commons - 公共组件�?
 
 <div align="center">
 
 [![Version](https://img.shields.io/badge/version-v1.0.0.6-blue.svg)](../README.md)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](../../LICENSE)
-[![Status](https://img.shields.io/badge/status-production%20ready-success.svg)](../README.md)
 
 **版本**: v1.0.0.6 | **更新日期**: 2026-03-26
 
@@ -19,7 +18,7 @@
 
 ## 🎯 概述
 
-daemon bases �?daemon 层的公共组件库，为所有守护进程（llm_d, market_d, monit_d, sched_d, tool_d）提供共享的基础设施和服务，确保各模块间的一致性和互操作性�?
+daemon commons �?daemon 层的公共组件库，为所有守护进程（llm_d, market_d, monit_d, sched_d, tool_d）提供共享的基础设施和服务，确保各模块间的一致性和互操作性�?
 
 ### 核心功能
 
@@ -42,7 +41,7 @@ daemon bases �?daemon 层的公共组件库，为所有守护进程（llm_d, m
 ### 模块组成
 
 ```
-bases/
+commons/
 ├── include/
 �?  ├── logging.h        # 统一日志接口
 �?  ├── manager.h         # 配置管理接口

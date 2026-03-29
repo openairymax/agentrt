@@ -1,10 +1,10 @@
-/**
+﻿/**
  * @file core_test.c
  * @brief 核心模块测试
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "../../../bases/utils/core/include/core.h"
+#include "../../../commons/utils/core/include/core.h"
 #include <stdio.h>
 #include <stdlib.h>
 

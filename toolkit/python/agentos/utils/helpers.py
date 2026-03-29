@@ -6,7 +6,7 @@
 Utility functions for AgentOS Python SDK.
 
 Provides type-safe map data extraction, API response parsing,
-URL building, and other bases utility functions.
+URL building, and other commons utility functions.
 
 Corresponds to Go SDK: utils/helpers.go
 """

@@ -298,7 +298,7 @@ agentos/
 │   └── tool_d/          # 工具调用服务
 ├── gateway/             # 网关层
 ├── manager/              # 配置文件
-├── lodges/            # 运行时数据
+├── heapstore/            # 运行时数据
 │   ├── logs/            # 日志文件
 │   └── memory/          # 记忆持久化
 ├── tests/               # 测试套件
