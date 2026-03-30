@@ -195,15 +195,12 @@ cupolas_pid_t cupolas_process_getpid(cupolas_process_t proc) {
 #include <fcntl.h>
 #include <errno.h>
 
-int cupolas_process_spawn(cupolas_process_t* proc, 
-                        const char* path, 
-                        char* const argv[],
-                        const cupolas_process_attr_t* attr) {
-    if (!proc || !path) return cupolas_ERROR_INVALID_ARG;
-    
-    int stdin_pipe[2] = {-1, -1};
-    int stdout_pipe[2] = {-1, -1};
-    int stderr_pipe[2] = {-1, -1};
+/**
+ * @brief 创建标准输入输出重定向管道 (POSIX)
+ */
+static int create_redirect_pipes_posix(
+    int* stdin_pipe, int* stdout_pipe, int* stderr_pipe,
+    const cupolas_process_attr_t* attr) {
     
     if (attr && attr->redirect_stdin) {
         if (pipe(stdin_pipe) != 0) {
@@ -229,54 +226,91 @@ int cupolas_process_spawn(cupolas_process_t* proc,
         }
     }
     
+    return cupolas_OK;
+}
+
+/**
+ * @brief 清理管道文件描述符
+ */
+static void cleanup_pipes_posix(int* stdin_pipe, int* stdout_pipe, int* stderr_pipe,
+                               int close_stdin_read, int close_stdout_write, int close_stderr_write) {
+    if (close_stdin_read && stdin_pipe[0] >= 0) close(stdin_pipe[0]);
+    if (stdin_pipe[1] >= 0) close(stdin_pipe[1]);
+    if (close_stdout_write && stdout_pipe[1] >= 0) close(stdout_pipe[1]);
+    if (stdout_pipe[0] >= 0) close(stdout_pipe[0]);
+    if (close_stderr_write && stderr_pipe[1] >= 0) close(stderr_pipe[1]);
+    if (stderr_pipe[0] >= 0) close(stderr_pipe[0]);
+}
+
+/**
+ * @brief 子进程设置函数
+ */
+static void setup_child_process(int* stdin_pipe, int* stdout_pipe, int* stderr_pipe,
+                               const cupolas_process_attr_t* attr) {
+    if (attr && attr->working_dir) {
+        if (chdir(attr->working_dir) != 0) {
+            _exit(127);
+        }
+    }
+    
+    if (stdin_pipe[0] >= 0) {
+        dup2(stdin_pipe[0], STDIN_FILENO);
+        close(stdin_pipe[0]);
+        close(stdin_pipe[1]);
+    }
+    
+    if (stdout_pipe[1] >= 0) {
+        dup2(stdout_pipe[1], STDOUT_FILENO);
+        close(stdout_pipe[0]);
+        close(stdout_pipe[1]);
+    }
+    
+    if (stderr_pipe[1] >= 0) {
+        dup2(stderr_pipe[1], STDERR_FILENO);
+        close(stderr_pipe[0]);
+        close(stderr_pipe[1]);
+    }
+    
+    for (int fd = 3; fd < 1024; fd++) {
+        fcntl(fd, F_SETFD, FD_CLOEXEC);
+    }
+    
+    execvp(attr && attr->path ? attr->path : NULL, attr && attr->argv ? attr->argv : NULL);
+    _exit(127);
+}
+
+int cupolas_process_spawn(cupolas_process_t* proc, 
+                        const char* path, 
+                        char* const argv[],
+                        const cupolas_process_attr_t* attr) {
+    if (!proc || !path) return cupolas_ERROR_INVALID_ARG;
+    
+    int stdin_pipe[2] = {-1, -1};
+    int stdout_pipe[2] = {-1, -1};
+    int stderr_pipe[2] = {-1, -1};
+    
+    int err = create_redirect_pipes_posix(stdin_pipe, stdout_pipe, stderr_pipe, attr);
+    if (err != cupolas_OK) {
+        return err;
+    }
+    
     pid_t pid = fork();
     
     if (pid < 0) {
-        if (stdin_pipe[0] >= 0) close(stdin_pipe[0]);
-        if (stdin_pipe[1] >= 0) close(stdin_pipe[1]);
-        if (stdout_pipe[0] >= 0) close(stdout_pipe[0]);
-        if (stdout_pipe[1] >= 0) close(stdout_pipe[1]);
-        if (stderr_pipe[0] >= 0) close(stderr_pipe[0]);
-        if (stderr_pipe[1] >= 0) close(stderr_pipe[1]);
+        cleanup_pipes_posix(stdin_pipe, stdout_pipe, stderr_pipe, 1, 1, 1);
         return cupolas_ERROR_UNKNOWN;
     }
     
     if (pid == 0) {
-        if (attr && attr->working_dir) {
-            if (chdir(attr->working_dir) != 0) {
-                _exit(127);
-            }
-        }
-        
-        if (stdin_pipe[0] >= 0) {
-            dup2(stdin_pipe[0], STDIN_FILENO);
-            close(stdin_pipe[0]);
-            close(stdin_pipe[1]);
-        }
-        
-        if (stdout_pipe[1] >= 0) {
-            dup2(stdout_pipe[1], STDOUT_FILENO);
-            close(stdout_pipe[0]);
-            close(stdout_pipe[1]);
-        }
-        
-        if (stderr_pipe[1] >= 0) {
-            dup2(stderr_pipe[1], STDERR_FILENO);
-            close(stderr_pipe[0]);
-            close(stderr_pipe[1]);
-        }
-        
-        for (int fd = 3; fd < 1024; fd++) {
-            fcntl(fd, F_SETFD, FD_CLOEXEC);
-        }
-        
-        execvp(path, argv);
-        _exit(127);
+        cupolas_process_attr_t child_attr = *attr;
+        child_attr.path = (char*)path;
+        child_attr.argv = argv;
+        setup_child_process(stdin_pipe, stdout_pipe, stderr_pipe, &child_attr);
     }
     
-    if (stdin_pipe[0] >= 0) close(stdin_pipe[0]);
-    if (stdout_pipe[1] >= 0) close(stdout_pipe[1]);
-    if (stderr_pipe[1] >= 0) close(stderr_pipe[1]);
+    close(stdin_pipe[0]);
+    close(stdout_pipe[1]);
+    close(stderr_pipe[1]);
     
     if (attr && attr->redirect_stdin) {
         attr->stdin_pipe[0] = stdin_pipe[1];

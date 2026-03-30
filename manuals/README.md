@@ -218,7 +218,7 @@ AgentOS 采用层次化架构设计，各层职责分明，通过标准化接口
 
 **详细文档**: [MemoryRovol 架构](architecture/folder/memoryrovol.md)
 
-#### 3. Cupolas（安全穹顶）
+#### 3. cupolas（安全穹顶）
 
 **四层纵深防御的安全体系**
 
@@ -442,7 +442,7 @@ graph LR
 | **原子内核** | CoreKern | AgentOS 的微内核实现，提供 IPC、内存、任务、时间四大机制 | [微内核设计](architecture/folder/microkernel.md) |
 | **三层认知运行时** | CoreLoopThree | 认知层、行动层、记忆层组成的闭环系统 | [CoreLoopThree](architecture/folder/coreloopthree.md) |
 | **四层记忆系统** | MemoryRovol | L1 原始卷→L2 特征层→L3 结构层→L4 模式层 | [MemoryRovol](architecture/folder/memoryrovol.md) |
-| **安全穹顶** | Cupolas | 虚拟工位、权限裁决、输入净化、审计追踪四重防护 | [架构设计原则](architecture/ARCHITECTURAL_PRINCIPLES.md) |
+| **安全穹顶** | cupolas | 虚拟工位、权限裁决、输入净化、审计追踪四重防护 | [架构设计原则](architecture/ARCHITECTURAL_PRINCIPLES.md) |
 | **系统调用** | Syscall | 用户态与内核通信的唯一标准通道 | [系统调用设计](architecture/folder/syscall.md) |
 | **双系统协同** | Dual-System Synergy | System 1 快速路径与 System 2 慢速路径的协同 | [认知理论](philosophy/folder/Cognition_Theory.md) |
 

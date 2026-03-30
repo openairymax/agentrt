@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file alloc.c
  * @brief 物理内存分配器（带追踪的 malloc/free 封装�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -223,9 +223,14 @@ void* agentos_mem_alloc_ex(size_t size, const char* file, int line) {
         return NULL;
     }
     
-    /* 确保初始�?*/
+    /* 确保初始化 */
     if (ensure_initialized() != 0) {
-        /* 初始化失败，仍然返回内存，但不追�?*/
+        /* 初始化失败，仍然返回内存，但不追踪 */
+        return ptr;
+    }
+    
+    /* 检查 mutex 是否已初始化 */
+    if (!mem_stats_mutex) {
         return ptr;
     }
     

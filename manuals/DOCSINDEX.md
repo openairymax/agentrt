@@ -14,7 +14,7 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 ### 新人入门
 
-1. [快速开始](guides/folder/getting_started.md) — 环境搭建与 Hello World
+1. [快速开始](guides/getting_started.md) — 环境搭建与 Hello World
 2. [架构设计原则](architecture/ARCHITECTURAL_PRINCIPLES.md) — 系统设计的理论根基
 3. [指南总览](guides/README.md) — 完整学习路径
 
@@ -22,16 +22,16 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 1. [三层认知运行时](architecture/folder/coreloopthree.md) — CoreLoopThree 架构
 2. [四层记忆系统](architecture/folder/memoryrovol.md) — MemoryRovol 架构
-3. [创建 Agent](guides/folder/create_agent.md) — Agent 生命周期与双系统路径
-4. [创建 Skill](guides/folder/create_skill.md) — Skill 契约与实现模式
+3. [创建 Agent](guides/create_agent.md) — Agent 生命周期与双系统路径
+4. [创建 Skill](guides/create_skill.md) — Skill 契约与实现模式
 5. [C 编码规范](specifications/coding_standard/C_coding_style_guide.md)
 
 ### 运维部署
 
-1. [部署指南](guides/folder/deployment.md) — 多环境部署
-2. [故障排查](guides/folder/troubleshooting.md) — 分层诊断方法论
-3. [内核调优](guides/folder/kernel_tuning.md) — 反馈闭环调优法
-4. [迁移指南](guides/folder/migration_guide.md) — 版本升级策略
+1. [部署指南](guides/deployment.md) — 多环境部署
+2. [故障排查](guides/troubleshooting.md) — 分层诊断方法论
+3. [内核调优](guides/kernel_tuning.md) — 反馈闭环调优法
+4. [迁移指南](guides/migration_guide.md) — 版本升级策略
 
 ---
 
@@ -42,12 +42,12 @@ manuals/
 │
 ├── 架构文档 (Architecture)
 │   ├── ARCHITECTURAL_PRINCIPLES.md   # 架构设计原则 v1.7
-│   ├── coreloopthree.md                     # 三层认知运行时 v1.0.0.5
-│   ├── memoryrovol.md                       # 四层记忆系统 v1.0.0.5
-│   ├── microkernel.md                       # 微内核设计 v1.0.0.5
-│   ├── ipc.md                               # IPC Binder 通信 v1.0.0.5
-│   ├── syscall.md                           # 系统调用设计 v1.0.0.5
-│   └── logging_system.md                    # 统一日志系统 v1.0.0.5
+│   ├── folder/coreloopthree.md              # 三层认知运行时 v1.0.0.5
+│   ├── folder/memoryrovol.md                # 四层记忆系统 v1.0.0.5
+│   ├── folder/microkernel.md                # 微内核设计 v1.0.0.5
+│   ├── folder/ipc.md                        # IPC Binder 通信 v1.0.0.5
+│   ├── folder/syscall.md                    # 系统调用设计 v1.0.0.5
+│   └── folder/logging_system.md             # 统一日志系统 v1.0.0.5
 │
 ├── 开发指南 (Guides)
 │   ├── getting_started.md                   # 快速开始 v1.0.0.5
