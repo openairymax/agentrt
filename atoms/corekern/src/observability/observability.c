@@ -309,34 +309,34 @@ static int get_thread_count(void) {
 int agentos_observability_init(const agentos_observability_config_t* manager) {
     int ret = AGENTOS_SUCCESS;
     observability_state_t* state = NULL;
-    
+
     /* 前置检查（无需清理） */
     AGENTOS_CHECK_NULL(manager, "manager");
-    
+
     if (!g_init_lock) {
         g_init_lock = agentos_mutex_create();
         AGENTOS_CHECK_ALLOC(g_init_lock);
     }
-    
+
     agentos_mutex_lock(g_init_lock);
-    
+
     /* 已经初始化 */
     if (g_state) {
         agentos_mutex_unlock(g_init_lock);
         return AGENTOS_SUCCESS;
     }
-    
+
     /* 分配状态结构体 */
     state = (observability_state_t*)agentos_mem_alloc(sizeof(observability_state_t));
     if (!state) {
         ret = AGENTOS_ENOMEM;
-        agentos_error_push_ex(ret, __FILE__, __LINE__, __func__, 
+        agentos_error_push_ex(ret, __FILE__, __LINE__, __func__,
                             "Failed to allocate observability state");
         goto error;
     }
     memset(state, 0, sizeof(observability_state_t));
     memcpy(&state->manager, manager, sizeof(agentos_observability_config_t));
-    
+
     /* 创建互斥锁 */
     state->lock = agentos_mutex_create();
     if (!state->lock) {
@@ -345,9 +345,9 @@ int agentos_observability_init(const agentos_observability_config_t* manager) {
                             "Failed to create observability mutex");
         goto error;
     }
-    
+
     state->start_time_ns = agentos_time_monotonic_ns();
-    
+
     /* 创建指标收集线程（如启用） */
     if (manager->enable_metrics && manager->metrics_interval_ms > 0) {
         state->metrics_thread = agentos_thread_create(metrics_collection_thread, NULL);
@@ -358,7 +358,7 @@ int agentos_observability_init(const agentos_observability_config_t* manager) {
             goto error;
         }
     }
-    
+
     /* 创建健康检查线程（如启用） */
     if (manager->enable_health_check && manager->health_check_interval_ms > 0) {
         state->health_check_thread = agentos_thread_create(health_check_thread, NULL);
@@ -369,13 +369,13 @@ int agentos_observability_init(const agentos_observability_config_t* manager) {
             goto error;
         }
     }
-    
+
     /* 成功完成初始化 */
     state->initialized = 1;
     g_state = state;
     agentos_mutex_unlock(g_init_lock);
     return AGENTOS_SUCCESS;
-    
+
 error:
     /* 清理已分配的资源 */
     if (state) {

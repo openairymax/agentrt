@@ -23,7 +23,6 @@ static int create_directory(const char* path) {
     return mkdir(path, 0755);
     #endif
 }
-// From data intelligence emerges. by spharx
 
 /**
  * @brief 检查目录是否存在

@@ -11,12 +11,95 @@
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
       "description": "Configuration file version"
     },
+    "global": {
+      "type": "object",
+      "description": "Global model configuration defaults",
+      "properties": {
+        "default_provider": {
+          "type": "string",
+          "description": "Default model provider",
+          "examples": ["openai", "anthropic", "google"]
+        },
+        "default_model": {
+          "type": "string",
+          "description": "Default model name",
+          "examples": ["gpt-4-turbo", "claude-3-opus"]
+        },
+        "default_embedding_model": {
+          "type": "string",
+          "description": "Default embedding model",
+          "examples": ["text-embedding-3-small", "text-embedding-ada-002"]
+        },
+        "default_timeout_sec": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600,
+          "description": "Default timeout in seconds"
+        },
+        "default_retry": {
+          "type": "object",
+          "description": "Default retry configuration",
+          "properties": {
+            "max_attempts": {"type": "integer", "minimum": 0, "maximum": 10},
+            "backoff_ms": {"type": "integer", "minimum": 10, "maximum": 60000},
+            "backoff_multiplier": {"type": "number", "minimum": 1, "maximum": 10},
+            "max_backoff_ms": {"type": "integer", "minimum": 1000, "maximum": 300000}
+          }
+        },
+        "default_circuit_breaker": {
+          "type": "object",
+          "description": "Default circuit breaker configuration",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "failure_threshold": {"type": "integer", "minimum": 1, "maximum": 100},
+            "reset_timeout_sec": {"type": "integer", "minimum": 10, "maximum": 3600},
+            "half_open_requests": {"type": "integer", "minimum": 1, "maximum": 10},
+            "success_threshold": {"type": "integer", "minimum": 1, "maximum": 10}
+          }
+        },
+        "default_health_check": {
+          "type": "object",
+          "description": "Default health check configuration",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "interval_sec": {"type": "integer", "minimum": 10, "maximum": 3600},
+            "timeout_sec": {"type": "integer", "minimum": 1, "maximum": 60},
+            "unhealthy_threshold": {"type": "integer", "minimum": 1, "maximum": 10}
+          }
+        }
+      }
+    },
+    "routing": {
+      "type": "object",
+      "description": "Model routing rules",
+      "properties": {
+        "task_type_mapping": {
+          "type": "object",
+          "description": "Model selection based on task type",
+          "additionalProperties": {"type": "string"}
+        },
+        "complexity_mapping": {
+          "type": "object",
+          "description": "Model selection based on complexity",
+          "additionalProperties": {"type": "string"}
+        },
+        "cost_optimization": {
+          "type": "object",
+          "description": "Cost optimization settings",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "prefer_cheaper": {"type": "boolean"},
+            "max_cost_per_request": {"type": "number", "minimum": 0}
+          }
+        }
+      }
+    },
     "models": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["name", "provider", "api_key_env"],
+        "required": ["name", "provider"],
         "properties": {
           "name": {
             "type": "string",
@@ -26,7 +109,7 @@
           },
           "provider": {
             "type": "string",
-            "enum": ["openai", "anthropic", "azure", "google", "meta", "ollama", "local"],
+            "enum": ["openai", "anthropic", "azure", "google", "meta", "ollama", "local", "deepseek"],
             "description": "Model provider name",
             "examples": ["openai", "anthropic", "google", "ollama"]
           },

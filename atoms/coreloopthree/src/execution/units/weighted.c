@@ -20,7 +20,8 @@
  */
 #include "../../../commons/utils/strategy/include/strategy_common.h"\n\ntypedef struct weighted_data {\n    weighted_config_t manager;\n    void* registry_ctx;\n    agent_registry_get_agents_func get_agents;\n    agentos_mutex_t* lock;\n} weighted_data_t;
 
-static void weighted_destroy(agentos_dispatching_strategy_t* strategy) {
+
+static void weighted_destroy(agentos_dispatching_strategy_t* strategy) {
     if (!strategy) return;
     weighted_data_t* data = (weighted_data_t*)strategy->data;
     if (data) {

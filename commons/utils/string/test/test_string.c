@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_string.c
  * @brief 统一字符串处理模块单元测�? * 
  * 测试字符串模块的基本功能：安全复制、连接、比较、格式化等�? * 
@@ -9,8 +9,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../commons/utils/memory/include/memory_compat.h"
-#include "../commons/utils/string/include/string_compat.h"
+#include "../../../utils/memory/include/memory_compat.h"
+#include "../../../utils/string/include/string_compat.h"
 #include <string.h>
 #include <assert.h>
 #include "../../include/string.h"

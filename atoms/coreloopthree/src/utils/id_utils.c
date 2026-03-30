@@ -38,7 +38,7 @@ static atomic_ullong session_counter = 0;
 
 void agentos_generate_task_id(const char* prefix, char* buf, size_t len) {
     if (!buf || len == 0) return;
-    
+
 #ifdef _WIN32
     LONG id = InterlockedIncrement(&task_counter);
     snprintf(buf, len, "%s_%ld", prefix ? prefix : "task", id);
@@ -50,7 +50,7 @@ void agentos_generate_task_id(const char* prefix, char* buf, size_t len) {
 
 void agentos_generate_plan_id(char* buf, size_t len) {
     if (!buf || len == 0) return;
-    
+
 #ifdef _WIN32
     LONG id = InterlockedIncrement(&plan_counter);
     snprintf(buf, len, "plan_%ld", id);
@@ -62,7 +62,7 @@ void agentos_generate_plan_id(char* buf, size_t len) {
 
 void agentos_generate_record_id(char* buf, size_t len) {
     if (!buf || len == 0) return;
-    
+
 #ifdef _WIN32
     LONG id = InterlockedIncrement(&record_counter);
     snprintf(buf, len, "record_%ld", id);
@@ -74,10 +74,10 @@ void agentos_generate_record_id(char* buf, size_t len) {
 
 void agentos_generate_session_id(char* buf, size_t len) {
     if (!buf || len == 0) return;
-    
+
     // ʹ��ʱ����ͼ��������ɻỰID
     time_t now = time(NULL);
-    
+
 #ifdef _WIN32
     LONG id = InterlockedIncrement(&session_counter);
     snprintf(buf, len, "session_%lld_%ld", (long long)now, id);
@@ -89,21 +89,21 @@ void agentos_generate_session_id(char* buf, size_t len) {
 
 agentos_error_t agentos_generate_uuid(char* buf) {
     if (!buf) return AGENTOS_EINVAL;
-    
+
 #ifdef _WIN32
     UUID uuid;
     RPC_STATUS status = UuidCreate(&uuid);
     if (status != RPC_S_OK && status != RPC_S_UUID_LOCAL_ONLY) {
         return AGENTOS_EINVAL;
     }
-    
+
     // ת��Ϊ�ַ���
     unsigned char* str = NULL;
     status = UuidToStringA(&uuid, &str);
     if (status != RPC_S_OK) {
         return AGENTOS_EINVAL;
     }
-    
+
     strncpy(buf, (char*)str, 37);
     buf[36] = '\0';
     RpcStringFreeA(&str);
@@ -112,6 +112,6 @@ agentos_error_t agentos_generate_uuid(char* buf) {
     uuid_generate(uuid);
     uuid_unparse(uuid, buf);
 #endif
-    
+
     return AGENTOS_SUCCESS;
 }

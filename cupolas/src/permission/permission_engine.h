@@ -5,8 +5,8 @@
  * @date 2024
  */
 
-#ifndef DOMAIN_PERMISSION_ENGINE_H
-#define DOMAIN_PERMISSION_ENGINE_H
+#ifndef CUPOLAS_PERMISSION_ENGINE_H
+#define CUPOLAS_PERMISSION_ENGINE_H
 
 #include "permission.h"
 #include "permission_rule.h"
@@ -22,4 +22,4 @@ struct permission_engine {
     cupolas_atomic32_t    ref_count;
 };
 
-#endif /* DOMAIN_PERMISSION_ENGINE_H */
+#endif /* CUPOLAS_PERMISSION_ENGINE_H */

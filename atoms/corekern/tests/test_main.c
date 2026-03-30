@@ -22,9 +22,9 @@ extern int test_error_strings(void);
  */
 int main(void) {
     printf("开始运�?corekern 单元测试...\n");
-    
+
     int failures = 0;
-    
+
     /* 运行错误处理测试 */
     if (test_error_basic() != 0) {
         printf("FAIL: test_error_basic\n");
@@ -32,14 +32,14 @@ int main(void) {
     } else {
         printf("PASS: test_error_basic\n");
     }
-    
+
     if (test_error_strings() != 0) {
         printf("FAIL: test_error_strings\n");
         failures++;
     } else {
         printf("PASS: test_error_strings\n");
     }
-    
+
     /* 汇总结�?*/
     if (failures == 0) {
         printf("\n所有测试通过！\n");

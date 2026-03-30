@@ -10,8 +10,8 @@
  * - 结构化：JSON 格式输出
  */
 
-#ifndef DOMAIN_AUDIT_H
-#define DOMAIN_AUDIT_H
+#ifndef CUPOLAS_AUDIT_H
+#define CUPOLAS_AUDIT_H
 
 #include "../platform/platform.h"
 #include "audit_queue.h"
@@ -110,4 +110,4 @@ void audit_logger_stats(audit_logger_t* logger, uint64_t* total_logged, uint64_t
 }
 #endif
 
-#endif /* DOMAIN_AUDIT_H */
+#endif /* CUPOLAS_AUDIT_H */

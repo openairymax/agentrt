@@ -41,13 +41,13 @@ typedef struct {
     bool initialized;
 } trace_queue_t;
 
-static trace_queue_t g_trace_queue = {0};
-static char g_trace_path[512] = {0};
-static size_t g_batch_size = 100;
-static uint32_t g_export_interval_sec = 10;
-static bool g_exporter_enabled = false;
-static FILE* g_trace_file = NULL;
-static pthread_mutex_t g_file_lock = PTHREAD_MUTEX_INITIALIZER;
+static trace_queue_t s_trace_queue = {0};
+static char s_trace_path[512] = {0};
+static size_t s_batch_size = 100;
+static uint32_t s_export_interval_sec = 10;
+static bool s_exporter_enabled = false;
+static FILE* s_trace_file = NULL;
+static pthread_mutex_t s_file_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static const char* get_trace_base_path(void) {
     static char base_path[256] = "heapstore/traces";
@@ -55,61 +55,61 @@ static const char* get_trace_base_path(void) {
 }
 
 heapstore_error_t heapstore_trace_init(void) {
-    memset(&g_trace_queue, 0, sizeof(g_trace_queue));
-    pthread_mutex_init(&g_trace_queue.lock, NULL);
-    g_trace_queue.max_count = heapstore_MAX_BATCH_SIZE;
-    g_trace_queue.initialized = true;
+    memset(&s_trace_queue, 0, sizeof(s_trace_queue));
+    pthread_mutex_init(&s_trace_queue.lock, NULL);
+    s_trace_queue.max_count = heapstore_MAX_BATCH_SIZE;
+    s_trace_queue.initialized = true;
 
     const char* base = get_trace_base_path();
-    strncpy(g_trace_path, base, sizeof(g_trace_path) - 1);
-    g_trace_path[sizeof(g_trace_path) - 1] = '\0';
+    strncpy(s_trace_path, base, sizeof(s_trace_path) - 1);
+    s_trace_path[sizeof(s_trace_path) - 1] = '\0';
 
-    if (!heapstore_ensure_directory(g_trace_path)) {
+    if (!heapstore_ensure_directory(s_trace_path)) {
         return heapstore_ERR_DIR_CREATE_FAILED;
     }
 
     char spans_dir[512];
-    snprintf(spans_dir, sizeof(spans_dir), "%s/spans", g_trace_path);
+    snprintf(spans_dir, sizeof(spans_dir), "%s/spans", s_trace_path);
     if (!heapstore_ensure_directory(spans_dir)) {
         return heapstore_ERR_DIR_CREATE_FAILED;
     }
 
-    g_exporter_enabled = true;
-    g_batch_size = 100;
-    g_export_interval_sec = 10;
+    s_exporter_enabled = true;
+    s_batch_size = 100;
+    s_export_interval_sec = 10;
 
     return heapstore_SUCCESS;
 }
 
 void heapstore_trace_shutdown(void) {
-    if (g_trace_queue.initialized) {
+    if (s_trace_queue.initialized) {
         heapstore_trace_flush();
 
-        pthread_mutex_lock(&g_trace_queue.lock);
-        trace_node_t* node = g_trace_queue.head;
+        pthread_mutex_lock(&s_trace_queue.lock);
+        trace_node_t* node = s_trace_queue.head;
         while (node) {
             trace_node_t* next = node->next;
             free(node);
             node = next;
         }
-        g_trace_queue.head = NULL;
-        g_trace_queue.tail = NULL;
-        g_trace_queue.count = 0;
-        pthread_mutex_unlock(&g_trace_queue.lock);
+        s_trace_queue.head = NULL;
+        s_trace_queue.tail = NULL;
+        s_trace_queue.count = 0;
+        pthread_mutex_unlock(&s_trace_queue.lock);
 
-        pthread_mutex_destroy(&g_trace_queue.lock);
-        g_trace_queue.initialized = false;
+        pthread_mutex_destroy(&s_trace_queue.lock);
+        s_trace_queue.initialized = false;
     }
 
-    if (g_trace_file) {
-        fclose(g_trace_file);
-        g_trace_file = NULL;
+    if (s_trace_file) {
+        fclose(s_trace_file);
+        s_trace_file = NULL;
     }
 }
 
 static FILE* get_trace_file(void) {
-    if (g_trace_file) {
-        return g_trace_file;
+    if (s_trace_file) {
+        return s_trace_file;
     }
 
     time_t now = time(NULL);
@@ -118,10 +118,10 @@ static FILE* get_trace_file(void) {
     strftime(filename, sizeof(filename), "%Y%m%d_%H%M%S", tm_info);
 
     char filepath[512];
-    snprintf(filepath, sizeof(filepath), "%s/spans/trace_%s%s", g_trace_path, filename, heapstore_TRACE_FILE_EXT);
+    snprintf(filepath, sizeof(filepath), "%s/spans/trace_%s%s", s_trace_path, filename, heapstore_TRACE_FILE_EXT);
 
-    g_trace_file = fopen(filepath, "a");
-    return g_trace_file;
+    s_trace_file = fopen(filepath, "a");
+    return s_trace_file;
 }
 
 heapstore_error_t heapstore_trace_write_span(const heapstore_span_t* span) {
@@ -129,7 +129,7 @@ heapstore_error_t heapstore_trace_write_span(const heapstore_span_t* span) {
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    if (!g_trace_queue.initialized) {
+    if (!s_trace_queue.initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
@@ -141,20 +141,20 @@ heapstore_error_t heapstore_trace_write_span(const heapstore_span_t* span) {
     memcpy(&node->span, span, sizeof(heapstore_span_t));
     node->next = NULL;
 
-    pthread_mutex_lock(&g_trace_queue.lock);
+    pthread_mutex_lock(&s_trace_queue.lock);
 
-    if (g_trace_queue.tail) {
-        g_trace_queue.tail->next = node;
-        g_trace_queue.tail = node;
+    if (s_trace_queue.tail) {
+        s_trace_queue.tail->next = node;
+        s_trace_queue.tail = node;
     } else {
-        g_trace_queue.head = node;
-        g_trace_queue.tail = node;
+        s_trace_queue.head = node;
+        s_trace_queue.tail = node;
     }
-    g_trace_queue.count++;
+    s_trace_queue.count++;
 
-    pthread_mutex_unlock(&g_trace_queue.lock);
+    pthread_mutex_unlock(&s_trace_queue.lock);
 
-    if (g_trace_queue.count >= g_batch_size) {
+    if (s_trace_queue.count >= s_batch_size) {
         heapstore_trace_flush();
     }
 
@@ -179,21 +179,21 @@ heapstore_error_t heapstore_trace_write_spans_batch(const heapstore_span_t* span
 }
 
 heapstore_error_t heapstore_trace_flush(void) {
-    if (!g_trace_queue.initialized) {
+    if (!s_trace_queue.initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&g_file_lock);
+    pthread_mutex_lock(&s_file_lock);
 
     FILE* fp = get_trace_file();
     if (!fp) {
-        pthread_mutex_unlock(&g_file_lock);
+        pthread_mutex_unlock(&s_file_lock);
         return heapstore_ERR_FILE_OPEN_FAILED;
     }
 
-    pthread_mutex_lock(&g_trace_queue.lock);
+    pthread_mutex_lock(&s_trace_queue.lock);
 
-    trace_node_t* node = g_trace_queue.head;
+    trace_node_t* node = s_trace_queue.head;
     while (node) {
         fprintf(fp,
             "{\"trace_id\":\"%s\",\"span_id\":\"%s\",\"parent_span_id\":\"%s\","
@@ -213,15 +213,15 @@ heapstore_error_t heapstore_trace_flush(void) {
         node = next;
     }
 
-    g_trace_queue.head = NULL;
-    g_trace_queue.tail = NULL;
-    g_trace_queue.count = 0;
+    s_trace_queue.head = NULL;
+    s_trace_queue.tail = NULL;
+    s_trace_queue.count = 0;
 
-    pthread_mutex_unlock(&g_trace_queue.lock);
+    pthread_mutex_unlock(&s_trace_queue.lock);
 
     fflush(fp);
 
-    pthread_mutex_unlock(&g_file_lock);
+    pthread_mutex_unlock(&s_file_lock);
 
     return heapstore_SUCCESS;
 }
@@ -262,13 +262,13 @@ heapstore_error_t heapstore_trace_config_exporter(const heapstore_trace_exporter
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    g_exporter_enabled = manager->enabled;
-    g_batch_size = manager->batch_size > 0 ? manager->batch_size : 100;
-    g_export_interval_sec = manager->export_interval_sec > 0 ? manager->export_interval_sec : 10;
+    s_exporter_enabled = manager->enabled;
+    s_batch_size = manager->batch_size > 0 ? manager->batch_size : 100;
+    s_export_interval_sec = manager->export_interval_sec > 0 ? manager->export_interval_sec : 10;
 
     if (manager->export_path[0]) {
-        strncpy(g_trace_path, manager->export_path, sizeof(g_trace_path) - 1);
-        heapstore_ensure_directory(g_trace_path);
+        strncpy(s_trace_path, manager->export_path, sizeof(s_trace_path) - 1);
+        heapstore_ensure_directory(s_trace_path);
     }
 
     return heapstore_SUCCESS;
@@ -279,9 +279,9 @@ heapstore_error_t heapstore_trace_get_stats(uint64_t* total_spans, uint64_t* pen
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    pthread_mutex_lock(&g_trace_queue.lock);
-    *pending_spans = (uint64_t)g_trace_queue.count;
-    pthread_mutex_unlock(&g_trace_queue.lock);
+    pthread_mutex_lock(&s_trace_queue.lock);
+    *pending_spans = (uint64_t)s_trace_queue.count;
+    pthread_mutex_unlock(&s_trace_queue.lock);
 
     *total_spans = 0;
     *total_size_bytes = 0;
@@ -290,6 +290,5 @@ heapstore_error_t heapstore_trace_get_stats(uint64_t* total_spans, uint64_t* pen
 }
 
 bool heapstore_trace_is_healthy(void) {
-    return g_trace_queue.initialized;
+    return s_trace_queue.initialized;
 }
-

@@ -1,4 +1,4 @@
-﻿﻿﻿﻿#!/usr/bin/env python3
+﻿﻿﻿﻿﻿﻿#!/usr/bin/env python3
 """
 AgentOS 配置部署脚本
 根据环境变量部署配置文件

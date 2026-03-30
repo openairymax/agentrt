@@ -62,12 +62,12 @@ agentos_error_t agentos_error_to_json(
     agentos_error_t err,
     const char* message,
     char** out_json) {
-    
+
     if (!out_json) return AGENTOS_EINVAL;
-    
+
     cJSON* root = cJSON_CreateObject();
     if (!root) return AGENTOS_ENOMEM;
-    
+
     // ���Ҵ�����Ϣ
     const char* err_name = "UNKNOWN";
     const char* err_msg = "δ֪����";
@@ -78,20 +78,20 @@ agentos_error_t agentos_error_to_json(
             break;
         }
     }
-    
+
     cJSON_AddNumberToObject(root, "code", err);
     cJSON_AddStringToObject(root, "name", err_name);
     cJSON_AddStringToObject(root, "message", err_msg);
-    
+
     if (message) {
         cJSON_AddStringToObject(root, "detail", message);
     }
-    
+
     char* json = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
-    
+
     if (!json) return AGENTOS_ENOMEM;
-    
+
     *out_json = json;
     return AGENTOS_SUCCESS;
 }
@@ -103,15 +103,15 @@ agentos_error_t agentos_error_context_create(
     int line,
     const char* function,
     agentos_error_context_t** out_context) {
-    
+
     if (!out_context) return AGENTOS_EINVAL;
-    
+
     agentos_error_context_t* ctx = (agentos_error_context_t*)AGENTOS_CALLOC(1, sizeof(agentos_error_context_t));
     if (!ctx) return AGENTOS_ENOMEM;
-    
+
     ctx->code = code;
     ctx->timestamp_ns = agentos_time_monotonic_ns();
-    
+
     if (message) {
         ctx->message = AGENTOS_STRDUP(message);
         if (!ctx->message) {
@@ -119,7 +119,7 @@ agentos_error_t agentos_error_context_create(
             return AGENTOS_ENOMEM;
         }
     }
-    
+
     if (file) {
         ctx->file = AGENTOS_STRDUP(file);
         if (!ctx->file) {
@@ -128,9 +128,9 @@ agentos_error_t agentos_error_context_create(
             return AGENTOS_ENOMEM;
         }
     }
-    
+
     ctx->line = line;
-    
+
     if (function) {
         ctx->function = AGENTOS_STRDUP(function);
         if (!ctx->function) {
@@ -140,14 +140,14 @@ agentos_error_t agentos_error_context_create(
             return AGENTOS_ENOMEM;
         }
     }
-    
+
     *out_context = ctx;
     return AGENTOS_SUCCESS;
 }
 
 void agentos_error_context_free(agentos_error_context_t* context) {
     if (!context) return;
-    
+
     if (context->message) AGENTOS_FREE(context->message);
     if (context->file) AGENTOS_FREE(context->file);
     if (context->function) AGENTOS_FREE(context->function);
@@ -157,12 +157,12 @@ void agentos_error_context_free(agentos_error_context_t* context) {
 agentos_error_t agentos_error_context_to_json(
     const agentos_error_context_t* context,
     char** out_json) {
-    
+
     if (!context || !out_json) return AGENTOS_EINVAL;
-    
+
     cJSON* root = cJSON_CreateObject();
     if (!root) return AGENTOS_ENOMEM;
-    
+
     // ���Ҵ�����Ϣ
     const char* err_name = "UNKNOWN";
     const char* err_msg = "δ֪����";
@@ -173,32 +173,32 @@ agentos_error_t agentos_error_context_to_json(
             break;
         }
     }
-    
+
     cJSON_AddNumberToObject(root, "code", context->code);
     cJSON_AddStringToObject(root, "name", err_name);
     cJSON_AddStringToObject(root, "message", err_msg);
-    
+
     if (context->message) {
         cJSON_AddStringToObject(root, "detail", context->message);
     }
-    
+
     if (context->file) {
         cJSON_AddStringToObject(root, "file", context->file);
     }
-    
+
     cJSON_AddNumberToObject(root, "line", context->line);
-    
+
     if (context->function) {
         cJSON_AddStringToObject(root, "function", context->function);
     }
-    
+
     cJSON_AddNumberToObject(root, "timestamp_ns", context->timestamp_ns);
-    
+
     char* json = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
-    
+
     if (!json) return AGENTOS_ENOMEM;
-    
+
     *out_json = json;
     return AGENTOS_SUCCESS;
 }

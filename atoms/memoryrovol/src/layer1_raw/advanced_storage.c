@@ -2,11 +2,11 @@
  * @file advanced_storage.c
  * @brief L1 增强存储管理�?- 生产级存储引�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
- * 
+ *
  * @details
  * 增强存储管理器为MemoryRovol L1层提供企业级存储功能，支�?9.999%可靠性标准�?
  * 实现多级缓存、数据压缩、加密存储、异步IO、事务支持和容错恢复�?
- * 
+ *
  * 核心功能�?
  * 1. 多级缓存策略：L1内存缓存 + L2磁盘缓存 + L3冷存�?
  * 2. 智能数据压缩：基于内容的自适应压缩算法（Zstd/LZ4/Snappy�?
@@ -16,7 +16,7 @@
  * 6. 容错与恢复：数据完整性校验、自动修复、崩溃恢�?
  * 7. 性能优化：预读、写合并、批量操作、内存映�?
  * 8. 可观测性：详细指标收集、健康检查、性能分析
- * 
+ *
  * 设计原则�?
  * - 最小化延迟：亚毫秒级读写操�?
  * - 最大化吞吐量：GB/s级别数据吞吐
@@ -261,25 +261,25 @@ struct agentos_advanced_storage {
  */
 static agentos_error_t generate_integrity_hash(const void* data, size_t data_len, char** out_hash) {
     if (!data || data_len == 0 || !out_hash) return AGENTOS_EINVAL;
-    
+
     EVP_MD_CTX* mdctx = EVP_MD_CTX_new();
     if (!mdctx) {
         AGENTOS_LOG_ERROR("Failed to create EVP_MD_CTX");
         return AGENTOS_ENOMEM;
     }
-    
+
     if (EVP_DigestInit_ex(mdctx, EVP_sha256(), NULL) != 1) {
         AGENTOS_LOG_ERROR("Failed to initialize digest");
         EVP_MD_CTX_free(mdctx);
         return AGENTOS_EINVAL;
     }
-    
+
     if (EVP_DigestUpdate(mdctx, data, data_len) != 1) {
         AGENTOS_LOG_ERROR("Failed to update digest");
         EVP_MD_CTX_free(mdctx);
         return AGENTOS_EINVAL;
     }
-    
+
     unsigned char hash[EVP_MAX_MD_SIZE];
     unsigned int hash_len = 0;
     if (EVP_DigestFinal_ex(mdctx, hash, &hash_len) != 1) {
@@ -287,21 +287,21 @@ static agentos_error_t generate_integrity_hash(const void* data, size_t data_len
         EVP_MD_CTX_free(mdctx);
         return AGENTOS_EINVAL;
     }
-    
+
     EVP_MD_CTX_free(mdctx);
-    
+
     // 转换为十六进制字符串
     char* hex_hash = (char*)AGENTOS_MALLOC(hash_len * 2 + 1);
     if (!hex_hash) {
         AGENTOS_LOG_ERROR("Failed to allocate hex hash buffer");
         return AGENTOS_ENOMEM;
     }
-    
+
     for (unsigned int i = 0; i < hash_len; i++) {
         snprintf(hex_hash + i * 2, 3, "%02x", hash[i]);
     }
     hex_hash[hash_len * 2] = '\0';
-    
+
     *out_hash = hex_hash;
     return AGENTOS_SUCCESS;
 }
@@ -315,21 +315,21 @@ static agentos_error_t generate_integrity_hash(const void* data, size_t data_len
  */
 static int verify_integrity_hash(const void* data, size_t data_len, const char* expected_hash) {
     if (!data || !expected_hash) return 0;
-    
+
     char* actual_hash = NULL;
     agentos_error_t err = generate_integrity_hash(data, data_len, &actual_hash);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_LOG_ERROR("Failed to generate integrity hash for verification");
         return 0;
     }
-    
+
     int result = (strcmp(actual_hash, expected_hash) == 0);
     AGENTOS_FREE(actual_hash);
-    
+
     if (!result) {
         AGENTOS_LOG_WARN("Data integrity verification failed");
     }
-    
+
     return result;
 }
 
@@ -349,7 +349,7 @@ static agentos_error_t compress_data(const void* data, size_t data_len,
     if (!data || data_len == 0 || !out_compressed || !out_compressed_len) {
         return AGENTOS_EINVAL;
     }
-    
+
     // 对于小数据，直接复制而不压缩
     if (data_len < 128) {
         void* copy = AGENTOS_MALLOC(data_len);
@@ -359,13 +359,13 @@ static agentos_error_t compress_data(const void* data, size_t data_len,
         *out_compressed_len = data_len;
         return AGENTOS_SUCCESS;
     }
-    
+
     switch (algorithm) {
         case COMPRESSION_ZSTD: {
             size_t max_compressed_size = ZSTD_compressBound(data_len);
             void* compressed = AGENTOS_MALLOC(max_compressed_size);
             if (!compressed) return AGENTOS_ENOMEM;
-            
+
             size_t compressed_size = ZSTD_compress(compressed, max_compressed_size,
                                                   data, data_len, level);
             if (ZSTD_isError(compressed_size)) {
@@ -373,19 +373,19 @@ static agentos_error_t compress_data(const void* data, size_t data_len,
                 AGENTOS_LOG_ERROR("ZSTD compression failed: %s", ZSTD_getErrorName(compressed_size));
                 return AGENTOS_EINVAL;
             }
-            
+
             // 重新分配内存以节省空�?
             void* optimized = AGENTOS_REALLOC(compressed, compressed_size);
             if (!optimized) {
                 AGENTOS_FREE(compressed);
                 return AGENTOS_ENOMEM;
             }
-            
+
             *out_compressed = optimized;
             *out_compressed_len = compressed_size;
             break;
         }
-        
+
         case COMPRESSION_NONE:
         default: {
             void* copy = AGENTOS_MALLOC(data_len);
@@ -396,7 +396,7 @@ static agentos_error_t compress_data(const void* data, size_t data_len,
             break;
         }
     }
-    
+
     return AGENTOS_SUCCESS;
 }
 
@@ -416,7 +416,7 @@ static agentos_error_t decompress_data(const void* compressed_data, size_t compr
     if (!compressed_data || compressed_len == 0 || !out_data || !out_data_len) {
         return AGENTOS_EINVAL;
     }
-    
+
     switch (algorithm) {
         case COMPRESSION_ZSTD: {
             size_t decompressed_size = original_len > 0 ? original_len : ZSTD_getFrameContentSize(compressed_data, compressed_len);
@@ -424,10 +424,10 @@ static agentos_error_t decompress_data(const void* compressed_data, size_t compr
                 // 尝试猜测大小
                 decompressed_size = compressed_len * 4;  // 保守估计
             }
-            
+
             void* decompressed = AGENTOS_MALLOC(decompressed_size);
             if (!decompressed) return AGENTOS_ENOMEM;
-            
+
             size_t actual_size = ZSTD_decompress(decompressed, decompressed_size,
                                                 compressed_data, compressed_len);
             if (ZSTD_isError(actual_size)) {
@@ -435,19 +435,19 @@ static agentos_error_t decompress_data(const void* compressed_data, size_t compr
                 AGENTOS_LOG_ERROR("ZSTD decompression failed: %s", ZSTD_getErrorName(actual_size));
                 return AGENTOS_EINVAL;
             }
-            
+
             // 重新分配内存以节省空�?
             void* optimized = AGENTOS_REALLOC(decompressed, actual_size);
             if (!optimized) {
                 AGENTOS_FREE(decompressed);
                 return AGENTOS_ENOMEM;
             }
-            
+
             *out_data = optimized;
             *out_data_len = actual_size;
             break;
         }
-        
+
         case COMPRESSION_NONE:
         default: {
             void* copy = AGENTOS_MALLOC(compressed_len);
@@ -458,7 +458,7 @@ static agentos_error_t decompress_data(const void* compressed_data, size_t compr
             break;
         }
     }
-    
+
     return AGENTOS_SUCCESS;
 }
 
@@ -486,7 +486,7 @@ static agentos_error_t encrypt_data(const void* plaintext, size_t plaintext_len,
     if (!plaintext || plaintext_len == 0 || !key || !iv || !out_ciphertext || !out_ciphertext_len) {
         return AGENTOS_EINVAL;
     }
-    
+
     if (algorithm == ENCRYPTION_NONE) {
         void* copy = AGENTOS_MALLOC(plaintext_len);
         if (!copy) return AGENTOS_ENOMEM;
@@ -497,7 +497,7 @@ static agentos_error_t encrypt_data(const void* plaintext, size_t plaintext_len,
         if (out_tag_len) *out_tag_len = 0;
         return AGENTOS_SUCCESS;
     }
-    
+
     if (algorithm == ENCRYPTION_AES_256_GCM) {
         if (key_len != 32) {
             AGENTOS_LOG_ERROR("AES-256-GCM requires 32-byte key");
@@ -507,20 +507,20 @@ static agentos_error_t encrypt_data(const void* plaintext, size_t plaintext_len,
             AGENTOS_LOG_ERROR("AES-256-GCM requires 12-byte IV");
             return AGENTOS_EINVAL;
         }
-        
+
         EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
         if (!ctx) {
             AGENTOS_LOG_ERROR("Failed to create EVP_CIPHER_CTX");
             return AGENTOS_ENOMEM;
         }
-        
+
         // 初始化加密操�?
         if (EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, key, iv) != 1) {
             AGENTOS_LOG_ERROR("Failed to initialize encryption");
             EVP_CIPHER_CTX_free(ctx);
             return AGENTOS_EINVAL;
         }
-        
+
         // 分配密文缓冲区（明文长度 + 块大小）
         size_t ciphertext_len = plaintext_len + EVP_CIPHER_CTX_block_size(ctx);
         void* ciphertext = AGENTOS_MALLOC(ciphertext_len);
@@ -528,7 +528,7 @@ static agentos_error_t encrypt_data(const void* plaintext, size_t plaintext_len,
             EVP_CIPHER_CTX_free(ctx);
             return AGENTOS_ENOMEM;
         }
-        
+
         int len = 0;
         if (EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len) != 1) {
             AGENTOS_LOG_ERROR("Failed to encrypt data");
@@ -537,7 +537,7 @@ static agentos_error_t encrypt_data(const void* plaintext, size_t plaintext_len,
             return AGENTOS_EINVAL;
         }
         ciphertext_len = len;
-        
+
         // 完成加密
         if (EVP_EncryptFinal_ex(ctx, (unsigned char*)ciphertext + len, &len) != 1) {
             AGENTOS_LOG_ERROR("Failed to finalize encryption");
@@ -546,7 +546,7 @@ static agentos_error_t encrypt_data(const void* plaintext, size_t plaintext_len,
             return AGENTOS_EINVAL;
         }
         ciphertext_len += len;
-        
+
         // 获取认证标签
         uint8_t* tag = NULL;
         size_t tag_len = 16;  // GCM标签长度
@@ -557,7 +557,7 @@ static agentos_error_t encrypt_data(const void* plaintext, size_t plaintext_len,
                 EVP_CIPHER_CTX_free(ctx);
                 return AGENTOS_ENOMEM;
             }
-            
+
             if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, tag_len, tag) != 1) {
                 AGENTOS_LOG_ERROR("Failed to get authentication tag");
                 AGENTOS_FREE(ciphertext);
@@ -565,13 +565,13 @@ static agentos_error_t encrypt_data(const void* plaintext, size_t plaintext_len,
                 EVP_CIPHER_CTX_free(ctx);
                 return AGENTOS_EINVAL;
             }
-            
+
             *out_tag = tag;
             *out_tag_len = tag_len;
         }
-        
+
         EVP_CIPHER_CTX_free(ctx);
-        
+
         // 重新分配内存以节省空�?
         void* optimized = AGENTOS_REALLOC(ciphertext, ciphertext_len);
         if (!optimized) {
@@ -579,12 +579,12 @@ static agentos_error_t encrypt_data(const void* plaintext, size_t plaintext_len,
             if (tag) AGENTOS_FREE(tag);
             return AGENTOS_ENOMEM;
         }
-        
+
         *out_ciphertext = optimized;
         *out_ciphertext_len = ciphertext_len;
         return AGENTOS_SUCCESS;
     }
-    
+
     AGENTOS_LOG_ERROR("Unsupported encryption algorithm: %d", algorithm);
     return AGENTOS_ENOTSUP;
 }
@@ -613,7 +613,7 @@ static agentos_error_t decrypt_data(const void* ciphertext, size_t ciphertext_le
     if (!ciphertext || ciphertext_len == 0 || !key || !iv || !out_plaintext || !out_plaintext_len) {
         return AGENTOS_EINVAL;
     }
-    
+
     if (algorithm == ENCRYPTION_NONE) {
         void* copy = AGENTOS_MALLOC(ciphertext_len);
         if (!copy) return AGENTOS_ENOMEM;
@@ -622,7 +622,7 @@ static agentos_error_t decrypt_data(const void* ciphertext, size_t ciphertext_le
         *out_plaintext_len = ciphertext_len;
         return AGENTOS_SUCCESS;
     }
-    
+
     if (algorithm == ENCRYPTION_AES_256_GCM) {
         if (key_len != 32) {
             AGENTOS_LOG_ERROR("AES-256-GCM requires 32-byte key");
@@ -636,27 +636,27 @@ static agentos_error_t decrypt_data(const void* ciphertext, size_t ciphertext_le
             AGENTOS_LOG_ERROR("AES-256-GCM requires 16-byte tag");
             return AGENTOS_EINVAL;
         }
-        
+
         EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
         if (!ctx) {
             AGENTOS_LOG_ERROR("Failed to create EVP_CIPHER_CTX");
             return AGENTOS_ENOMEM;
         }
-        
+
         // 初始化解密操�?
         if (EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, key, iv) != 1) {
             AGENTOS_LOG_ERROR("Failed to initialize decryption");
             EVP_CIPHER_CTX_free(ctx);
             return AGENTOS_EINVAL;
         }
-        
+
         // 设置认证标签
         if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, tag_len, (void*)tag) != 1) {
             AGENTOS_LOG_ERROR("Failed to set authentication tag");
             EVP_CIPHER_CTX_free(ctx);
             return AGENTOS_EINVAL;
         }
-        
+
         // 分配明文缓冲�?
         size_t plaintext_len = ciphertext_len + EVP_CIPHER_CTX_block_size(ctx);
         void* plaintext = AGENTOS_MALLOC(plaintext_len);
@@ -664,7 +664,7 @@ static agentos_error_t decrypt_data(const void* ciphertext, size_t ciphertext_le
             EVP_CIPHER_CTX_free(ctx);
             return AGENTOS_ENOMEM;
         }
-        
+
         int len = 0;
         if (EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len) != 1) {
             AGENTOS_LOG_ERROR("Failed to decrypt data");
@@ -673,7 +673,7 @@ static agentos_error_t decrypt_data(const void* ciphertext, size_t ciphertext_le
             return AGENTOS_EINVAL;
         }
         plaintext_len = len;
-        
+
         // 完成解密
         int final_len = 0;
         if (EVP_DecryptFinal_ex(ctx, (unsigned char*)plaintext + len, &final_len) != 1) {
@@ -683,21 +683,21 @@ static agentos_error_t decrypt_data(const void* ciphertext, size_t ciphertext_le
             return AGENTOS_EAUTH;  // 认证失败
         }
         plaintext_len += final_len;
-        
+
         EVP_CIPHER_CTX_free(ctx);
-        
+
         // 重新分配内存以节省空�?
         void* optimized = AGENTOS_REALLOC(plaintext, plaintext_len);
         if (!optimized) {
             AGENTOS_FREE(plaintext);
             return AGENTOS_ENOMEM;
         }
-        
+
         *out_plaintext = optimized;
         *out_plaintext_len = plaintext_len;
         return AGENTOS_SUCCESS;
     }
-    
+
     AGENTOS_LOG_ERROR("Unsupported encryption algorithm: %d", algorithm);
     return AGENTOS_ENOTSUP;
 }
@@ -720,13 +720,13 @@ static cache_entry_t* create_cache_entry(const char* id, const void* data, size_
         AGENTOS_LOG_ERROR("Invalid parameters for cache entry creation");
         return NULL;
     }
-    
+
     cache_entry_t* entry = (cache_entry_t*)AGENTOS_CALLOC(1, sizeof(cache_entry_t));
     if (!entry) {
         AGENTOS_LOG_ERROR("Failed to allocate cache entry");
         return NULL;
     }
-    
+
     entry->id = AGENTOS_STRDUP(id);
     entry->data = AGENTOS_MALLOC(data_size);
     if (!entry->id || !entry->data) {
@@ -736,7 +736,7 @@ static cache_entry_t* create_cache_entry(const char* id, const void* data, size_
         AGENTOS_LOG_ERROR("Failed to allocate cache entry data");
         return NULL;
     }
-    
+
     memcpy(entry->data, data, data_size);
     entry->data_size = data_size;
     entry->compressed_size = data_size;  // 初始假设未压�?
@@ -747,7 +747,7 @@ static cache_entry_t* create_cache_entry(const char* id, const void* data, size_
     entry->comp_algo = comp_algo;
     entry->enc_algo = enc_algo;
     entry->lock = agentos_mutex_create();
-    
+
     if (!entry->lock) {
         AGENTOS_FREE(entry->id);
         AGENTOS_FREE(entry->data);
@@ -755,13 +755,13 @@ static cache_entry_t* create_cache_entry(const char* id, const void* data, size_
         AGENTOS_LOG_ERROR("Failed to create mutex for cache entry");
         return NULL;
     }
-    
+
     // 生成完整性哈�?
     if (generate_integrity_hash(data, data_size, &entry->integrity_hash) != AGENTOS_SUCCESS) {
         AGENTOS_LOG_WARN("Failed to generate integrity hash for cache entry %s", id);
         entry->integrity_hash = NULL;
     }
-    
+
     return entry;
 }
 
@@ -771,15 +771,15 @@ static cache_entry_t* create_cache_entry(const char* id, const void* data, size_
  */
 static void destroy_cache_entry(cache_entry_t* entry) {
     if (!entry) return;
-    
+
     if (entry->lock) {
         agentos_mutex_destroy(entry->lock);
     }
-    
+
     if (entry->id) AGENTOS_FREE(entry->id);
     if (entry->data) AGENTOS_FREE(entry->data);
     if (entry->integrity_hash) AGENTOS_FREE(entry->integrity_hash);
-    
+
     AGENTOS_FREE(entry);
 }
 
@@ -790,26 +790,26 @@ static void destroy_cache_entry(cache_entry_t* entry) {
  */
 static void access_cache_entry(cache_manager_t* cache, cache_entry_t* entry) {
     if (!cache || !entry) return;
-    
+
     agentos_mutex_lock(cache->lock);
-    
+
     entry->access_count++;
     entry->last_access_time = agentos_get_monotonic_time_ns();
-    
+
     // 从当前位置移�?
     if (entry->prev) entry->prev->next = entry->next;
     if (entry->next) entry->next->prev = entry->prev;
-    
+
     if (entry == cache->lru_head) cache->lru_head = entry->next;
     if (entry == cache->lru_tail) cache->lru_tail = entry->prev;
-    
+
     // 移动到LRU头部（最近使用）
     entry->prev = NULL;
     entry->next = cache->lru_head;
     if (cache->lru_head) cache->lru_head->prev = entry;
     cache->lru_head = entry;
     if (!cache->lru_tail) cache->lru_tail = entry;
-    
+
     agentos_mutex_unlock(cache->lock);
 }
 
@@ -821,42 +821,42 @@ static void access_cache_entry(cache_manager_t* cache, cache_entry_t* entry) {
  */
 static size_t evict_lru_entries(cache_manager_t* cache, size_t required_space) {
     if (!cache || required_space == 0) return 0;
-    
+
     agentos_mutex_lock(cache->lock);
-    
+
     size_t freed_space = 0;
     cache_entry_t* current = cache->lru_tail;
-    
+
     while (current && freed_space < required_space) {
         cache_entry_t* to_evict = current;
         current = current->prev;
-        
+
         // 检查是否可以驱�?
         agentos_mutex_lock(to_evict->lock);
         if (to_evict->state == CACHE_ENTRY_CLEAN || to_evict->state == CACHE_ENTRY_EVICTED) {
             // 从链表中移除
             if (to_evict->prev) to_evict->prev->next = to_evict->next;
             if (to_evict->next) to_evict->next->prev = to_evict->prev;
-            
+
             if (to_evict == cache->lru_head) cache->lru_head = to_evict->next;
             if (to_evict == cache->lru_tail) cache->lru_tail = to_evict->prev;
-            
+
             cache->entry_count--;
             cache->total_memory_used -= to_evict->data_size;
             freed_space += to_evict->data_size;
             cache->eviction_count++;
-            
+
             // 标记为已驱�?
             to_evict->state = CACHE_ENTRY_EVICTED;
             agentos_mutex_unlock(to_evict->lock);
-            
+
             // 异步销毁（避免在锁内执行耗时操作�?
             agentos_thread_create(NULL, (agentos_thread_func_t)destroy_cache_entry, to_evict);
         } else {
             agentos_mutex_unlock(to_evict->lock);
         }
     }
-    
+
     agentos_mutex_unlock(cache->lock);
     return freed_space;
 }
@@ -869,16 +869,16 @@ static size_t evict_lru_entries(cache_manager_t* cache, size_t required_space) {
  */
 static size_t flush_dirty_entries(cache_manager_t* cache, shard_manager_t* shard) {
     if (!cache || !shard) return 0;
-    
+
     agentos_mutex_lock(cache->lock);
-    
+
     size_t flushed_count = 0;
     cache_entry_t* current = cache->lru_head;
-    
+
     while (current) {
         cache_entry_t* entry = current;
         current = current->next;
-        
+
         agentos_mutex_lock(entry->lock);
         if (entry->state == CACHE_ENTRY_DIRTY) {
             // 实际写入磁盘操作
@@ -889,7 +889,7 @@ static size_t flush_dirty_entries(cache_manager_t* cache, shard_manager_t* shard
                     entry->data,
                     entry->data_size
                 );
-                
+
                 if (write_result == AGENTOS_SUCCESS) {
                     entry->state = CACHE_ENTRY_CLEAN;
                     flushed_count++;
@@ -898,17 +898,17 @@ static size_t flush_dirty_entries(cache_manager_t* cache, shard_manager_t* shard
                     shard->write_count++;
                     agentos_mutex_unlock(shard->stats_lock);
                 } else {
-                    AGENTOS_LOG_ERROR("Failed to write dirty cache entry %s to disk: %d", 
+                    AGENTOS_LOG_ERROR("Failed to write dirty cache entry %s to disk: %d",
                                      entry->id, write_result);
                 }
             } else {
-                AGENTOS_LOG_WARN("Cannot write dirty cache entry %s: invalid storage or data", 
+                AGENTOS_LOG_WARN("Cannot write dirty cache entry %s: invalid storage or data",
                                 entry->id);
             }
         }
         agentos_mutex_unlock(entry->lock);
     }
-    
+
     agentos_mutex_unlock(cache->lock);
     return flushed_count;
 }
@@ -934,13 +934,13 @@ static async_operation_t* create_async_operation(async_operation_type_t type,
         AGENTOS_LOG_ERROR("Invalid async operation ID");
         return NULL;
     }
-    
+
     async_operation_t* op = (async_operation_t*)AGENTOS_CALLOC(1, sizeof(async_operation_t));
     if (!op) {
         AGENTOS_LOG_ERROR("Failed to allocate async operation");
         return NULL;
     }
-    
+
     op->id = AGENTOS_STRDUP(id);
     op->type = type;
     op->state = ASYNC_OP_PENDING;
@@ -950,7 +950,7 @@ static async_operation_t* create_async_operation(async_operation_type_t type,
     op->user_context = user_context;
     op->lock = agentos_mutex_create();
     op->cond = agentos_condition_create();
-    
+
     if (!op->id || !op->lock || !op->cond) {
         if (op->id) AGENTOS_FREE(op->id);
         if (op->lock) agentos_mutex_destroy(op->lock);
@@ -959,7 +959,7 @@ static async_operation_t* create_async_operation(async_operation_type_t type,
         AGENTOS_LOG_ERROR("Failed to initialize async operation resources");
         return NULL;
     }
-    
+
     // 复制输入数据（如果有�?
     if (data && data_size > 0) {
         op->input_data = AGENTOS_MALLOC(data_size);
@@ -974,7 +974,7 @@ static async_operation_t* create_async_operation(async_operation_type_t type,
         memcpy(op->input_data, data, data_size);
         op->input_size = data_size;
     }
-    
+
     return op;
 }
 
@@ -984,14 +984,14 @@ static async_operation_t* create_async_operation(async_operation_type_t type,
  */
 static void destroy_async_operation(async_operation_t* op) {
     if (!op) return;
-    
+
     if (op->lock) agentos_mutex_destroy(op->lock);
     if (op->cond) agentos_condition_destroy(op->cond);
-    
+
     if (op->id) AGENTOS_FREE(op->id);
     if (op->input_data) AGENTOS_FREE(op->input_data);
     if (op->output_data) AGENTOS_FREE(op->output_data);
-    
+
     AGENTOS_FREE(op);
 }
 
@@ -1003,17 +1003,17 @@ static void destroy_async_operation(async_operation_t* op) {
  */
 static agentos_error_t wait_async_operation(async_operation_t* op, uint32_t timeout_ms) {
     if (!op || !op->lock || !op->cond) return AGENTOS_EINVAL;
-    
+
     agentos_mutex_lock(op->lock);
-    
+
     while (op->state == ASYNC_OP_PENDING || op->state == ASYNC_OP_RUNNING) {
         if (timeout_ms == 0) {
             agentos_mutex_unlock(op->lock);
             return AGENTOS_ETIMEDOUT;
         }
-        
+
         agentos_condition_wait(op->cond, op->lock, timeout_ms);
-        
+
         // 简化超时处�?
         if (timeout_ms > 0) {
             // 在实际实现中应该检查实际等待时�?
@@ -1021,10 +1021,10 @@ static agentos_error_t wait_async_operation(async_operation_t* op, uint32_t time
             return AGENTOS_ETIMEDOUT;
         }
     }
-    
+
     agentos_error_t result = op->result;
     agentos_mutex_unlock(op->lock);
-    
+
     return result;
 }
 

@@ -27,7 +27,8 @@ agentos_error_t agentos_rule_generator_create(
     agentos_rule_generator_t* gen = (agentos_rule_generator_t*)AGENTOS_CALLOC(1, sizeof(agentos_rule_generator_t));
     if (!gen) return AGENTOS_ENOMEM;
 
-// From data intelligence emerges. by spharx
+
+// From data intelligence emerges. by spharx
     gen->llm = (agentos_llm_service_t*)llm_service;
     gen->lock = agentos_mutex_create();
     if (!gen->lock) {

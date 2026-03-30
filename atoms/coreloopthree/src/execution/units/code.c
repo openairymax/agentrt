@@ -40,7 +40,7 @@
  */
 static agentos_error_t create_temp_file_windows(
     const char* suffix, const char* content, size_t content_len, char** out_path) {
-    
+
     char temp_dir[MAX_PATH];
     DWORD dir_len = GetTempPathA(MAX_PATH, temp_dir);
     if (dir_len == 0 || dir_len > MAX_PATH) return AGENTOS_EIO;
@@ -66,26 +66,26 @@ static agentos_error_t create_temp_file_windows(
         DeleteFileA(temp_path);
         return AGENTOS_EIO;
     }
-    
+
     size_t written = fwrite(content, 1, content_len, f);
     int close_result = fclose(f);
-    
+
     if (written != content_len) {
         DeleteFileA(temp_path);
         return AGENTOS_EIO;
     }
-    
+
     if (close_result != 0) {
         DeleteFileA(temp_path);
         return AGENTOS_EIO;
     }
-    
+
     *out_path = AGENTOS_STRDUP(temp_path);
     if (!*out_path) {
         DeleteFileA(temp_path);
         return AGENTOS_ENOMEM;
     }
-    
+
     return AGENTOS_SUCCESS;
 }
 
@@ -95,7 +95,7 @@ static agentos_error_t create_temp_file_windows(
  */
 static agentos_error_t create_temp_file_unix(
     const char* suffix, const char* content, size_t content_len, char** out_path) {
-    
+
     char temp_dir[256];
     if (agentos_core_get_temp_dir(temp_dir, sizeof(temp_dir)) != 0) {
         return AGENTOS_EIO;
@@ -119,26 +119,26 @@ static agentos_error_t create_temp_file_unix(
 
     int fd = mkstemp(temp_filename);
     if (fd == -1) return AGENTOS_EIO;
-    
+
     ssize_t written = write(fd, content, content_len);
     int close_result = close(fd);
-    
+
     if (written < 0 || (size_t)written != content_len) {
         unlink(temp_filename);
         return AGENTOS_EIO;
     }
-    
+
     if (close_result != 0) {
         unlink(temp_filename);
         return AGENTOS_EIO;
     }
-    
+
     *out_path = AGENTOS_STRDUP(temp_filename);
     if (!*out_path) {
         unlink(temp_filename);
         return AGENTOS_ENOMEM;
     }
-    
+
     return AGENTOS_SUCCESS;
 }
 #endif
@@ -148,9 +148,9 @@ static agentos_error_t create_temp_file_unix(
  */
 static agentos_error_t create_temp_file(
     const char* suffix, const char* content, size_t content_len, char** out_path) {
-    
+
     if (!content || !out_path) return AGENTOS_EINVAL;
-    
+
 #ifdef _WIN32
     return create_temp_file_windows(suffix, content, content_len, out_path);
 #else

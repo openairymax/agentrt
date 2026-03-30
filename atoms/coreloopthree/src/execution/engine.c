@@ -365,17 +365,17 @@ static void worker_thread_func(void* arg) {
 
 /**
  * @brief 创建执行引擎
- * 
+ *
  * @param max_concurrency 最大并发任务数�?表示使用默认�?�?
  * @param out_engine 输出执行引擎指针
  * @return agentos_error_t 错误�?
- * 
+ *
  * @note 执行引擎负责�?
  *       1. 接收并执行任�?
  *       2. 管理任务队列和状�?
  *       3. 提供任务查询和结果获取接�?
  *       4. 使用哈希表实现O(1)任务查找
- * 
+ *
  * @warning 调用者负责释放返回的执行引擎（使�?agentos_execution_destroy�?
  */
 agentos_error_t agentos_execution_create(
@@ -415,7 +415,7 @@ agentos_error_t agentos_execution_create(
         AGENTOS_LOG_ERROR("Failed to allocate worker threads array");
         return AGENTOS_ENOMEM;
     }
-    
+
     // 创建任务哈希表，大小为最大并发数�?倍，减少冲突
     engine->task_map = task_hash_table_create(max_concurrency * 2);
     if (!engine->task_map) {
@@ -489,12 +489,12 @@ void agentos_execution_destroy(agentos_execution_engine_t* engine) {
 
 /**
  * @brief 提交任务到执行引�?
- * 
+ *
  * @param engine 执行引擎
  * @param task 任务描述
  * @param out_task_id 输出任务ID（需调用者释放）
  * @return agentos_error_t 错误�?
- * 
+ *
  * @note 提交流程�?
  *       1. 参数验证
  *       2. 复制任务描述
@@ -503,7 +503,7 @@ void agentos_execution_destroy(agentos_execution_engine_t* engine) {
  *       5. 初始化任务状态和资源
  *       6. 将任务添加到队列和哈希表
  *       7. 通知工作线程有新任务
- * 
+ *
  * @warning 返回的任务ID需要调用者使�?AGENTOS_FREE() 释放
  */
 agentos_error_t agentos_execution_submit(
@@ -526,7 +526,7 @@ agentos_error_t agentos_execution_submit(
     task_tcb_t* tcb = (task_tcb_t*)AGENTOS_CALLOC(1, sizeof(task_tcb_t));
     if (!tcb) {
         AGENTOS_FREE(task_copy);
-        AGENTOS_LOG_ERROR("Failed to allocate task control block: %s (code %d)", 
+        AGENTOS_LOG_ERROR("Failed to allocate task control block: %s (code %d)",
                         agentos_error_string(AGENTOS_ENOMEM), AGENTOS_ENOMEM);
         return AGENTOS_ENOMEM;
     }
@@ -542,7 +542,7 @@ agentos_error_t agentos_execution_submit(
     tcb->ref_count = 1;  // 初始引用
 
     if (!tcb->task_id || !tcb->completed_cond || !tcb->tcb_lock) {
-        AGENTOS_LOG_ERROR("Failed to create task resources: task_id=%p, cond=%p, lock=%p", 
+        AGENTOS_LOG_ERROR("Failed to create task resources: task_id=%p, cond=%p, lock=%p",
                          tcb->task_id, tcb->completed_cond, tcb->tcb_lock);
         if (tcb->task_id) AGENTOS_FREE(tcb->task_id);
         if (tcb->completed_cond) agentos_cond_destroy(tcb->completed_cond);
@@ -557,7 +557,7 @@ agentos_error_t agentos_execution_submit(
     engine->task_queue = tcb;
     agentos_cond_signal(engine->task_available_cond);
     agentos_mutex_unlock(engine->queue_lock);
-    
+
     // 将任务插入到哈希表中，便于快速查�?
     task_hash_table_insert(engine->task_map, tcb);
 

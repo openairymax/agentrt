@@ -109,7 +109,7 @@ security:
     # -----------------------------------------------------------------------
     - id: "code_exec_python"
       resource: "code:execute:python"
-      action: "run"
+      action: "execute"
       effect: "allow_with_sandbox"
       priority: 10
       audit: true
@@ -117,14 +117,14 @@ security:
     
     - id: "code_exec_javascript"
       resource: "code:execute:javascript"
-      action: "run"
+      action: "execute"
       effect: "allow_with_sandbox"
       priority: 10
       audit: true
     
     - id: "code_exec_shell"
       resource: "code:execute:shell"
-      action: "run"
+      action: "execute"
       effect: "allow_with_sandbox"
       priority: 5
       audit: true

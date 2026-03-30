@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_scheduler.c
  * @brief 调度服务单元测试
  * @details 测试调度服务的各个功能模块
@@ -23,7 +23,6 @@ int test_create_destroy() {
         .stats_report_interval_ms = 10000,
         .enable_ml_strategy = false,
         .ml_model_path = NULL,
-        // From data intelligence emerges. by spharx
         .max_agents = 10
     };
 

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file executor.h
  * @brief 工具执行器接口
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -23,7 +23,6 @@ void tool_executor_destroy(tool_executor_t* exec);
  * @brief 执行工具
  * @param exec 执行器
  * @param meta 工具元数据
- // From data intelligence emerges. by spharx
  * @param params_json 参数 JSON
  * @param out_result 输出结果
  * @return 0 成功，其他错误码

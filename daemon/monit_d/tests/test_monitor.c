@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_monitor.c
  * @brief 监控服务单元测试
  * @details 测试监控服务的核心功能，包括指标收集、告警管理、日志记录和健康检查
@@ -23,7 +23,6 @@ int test_service_create_destroy() {
         .health_check_interval_ms = 10000,
         .log_flush_interval_ms = 30000,
         .alert_check_interval_ms = 5000,
-        // From data intelligence emerges. by spharx
         .log_file_path = "test_monitor.log",
         .metrics_storage_path = "test_metrics",
         .enable_tracing = true,

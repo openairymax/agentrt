@@ -6,6 +6,12 @@
   "type": "object",
   "required": ["_config_version", "rules"],
   "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "JSON Schema reference for this configuration file",
+      "examples": ["https://agentos.spharx.ai/schemas/sanitizer-rules-v1.schema.json"]
+    },
     "_config_version": {
       "type": "string",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",

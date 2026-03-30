@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file core_test.c
  * @brief 核心模块测试
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -9,8 +9,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../commons/utils/memory/include/memory_compat.h"
-#include "../commons/utils/string/include/string_compat.h"
+#include "../../utils/memory/include/memory_compat.h"
+#include "../../utils/string/include/string_compat.h"
 
 void test_version() {
     printf("=== 测试版本管理 ===\n");

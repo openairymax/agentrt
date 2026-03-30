@@ -1,8 +1,8 @@
-﻿﻿/**
+﻿﻿﻿﻿/**
  * @file observability.h
  * @brief AgentOS 微内核可观测性子系统
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
- * 
+ *
  * 提供生产级可观测性功能，包括指标收集、健康检查、性能监控、
  * 分布式追踪和日志聚合。支持99.999%可靠性标准的监控需求。
  */
@@ -104,7 +104,7 @@ AGENTOS_API void agentos_observability_shutdown(void);
  * @param user_data 用户数据
  * @return 成功返回AGENTOS_SUCCESS，失败返回错误码
  */
-AGENTOS_API int agentos_health_check_register(const char* name, 
+AGENTOS_API int agentos_health_check_register(const char* name,
                                              agentos_health_check_cb callback,
                                              void* user_data);
 

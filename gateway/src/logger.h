@@ -1,18 +1,18 @@
-﻿/**
+/**
  * @file logger.h
- * @brief ��־ģ�鱾�ؽӿ�
+ * @brief 日志模块本地接口
  * 
- * ��ͷ�ļ�??gateway ģ���ṩ��־����??
- * ����ʵ�����??commons/utils/observability/include/logger.h
+ * 此头文件为 gateway 模块提供日志功能。
+ * 实际实现在 commons/utils/observability/include/logger.h
  * 
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#ifndef gateway_LOGGER_H
-#define gateway_LOGGER_H
+#ifndef GATEWAY_LOGGER_H
+#define GATEWAY_LOGGER_H
 
 #include "agentos.h"
 
-/* ��־���Ѷ���??agentos.h �У����ļ�����Ϊ����??*/
+/* 日志级别定义在 agentos.h 中，此文件仅作为兼容层 */
 
-#endif /* gateway_LOGGER_H */
+#endif /* GATEWAY_LOGGER_H */

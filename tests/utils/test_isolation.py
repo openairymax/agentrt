@@ -30,28 +30,28 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 
 class TestIsolationManager:
     """测试隔离管理器"""
-    
+
     def __init__(self):
         """初始化测试隔离管理器"""
         self.isolated_environments = {}
         self.lock = threading.Lock()
         self.temp_dirs = {}
         self.mock_patches = {}
-    
+
     @contextmanager
     def isolated_test_environment(self, test_name: str):
         """
         创建隔离的测试环境。
-        
+
         Args:
             test_name: 测试名称
         """
         env_id = f"{test_name}_{uuid.uuid4().hex[:8]}"
-        
+
         with self.lock:
             temp_dir = Path(tempfile.mkdtemp(prefix=f"agentos_test_{env_id}_"))
             self.temp_dirs[env_id] = temp_dir
-            
+
             original_env = {}
             test_env = {
                 "AGENTOS_TEST_ID": env_id,
@@ -62,15 +62,15 @@ class TestIsolationManager:
                 "AGENTOS_DB_PATH": str(temp_dir / "test.db"),
                 "AGENTOS_CONFIG_PATH": str(temp_dir / "manager.json")
             }
-            
+
             for key, value in test_env.items():
                 original_env[key] = os.environ.get(key)
                 os.environ[key] = value
-            
+
             (temp_dir / "temp").mkdir(exist_ok=True)
             (temp_dir / "data").mkdir(exist_ok=True)
             (temp_dir / "logs").mkdir(exist_ok=True)
-            
+
             manager = {
                 "test_id": env_id,
                 "endpoint": test_env["AGENTOS_ENDPOINT"],
@@ -79,10 +79,10 @@ class TestIsolationManager:
                 "database": {"path": test_env["AGENTOS_DB_PATH"], "type": "sqlite"},
                 "logging": {"level": "DEBUG", "file": test_env["AGENTOS_LOG_FILE"]}
             }
-            
+
             with open(temp_dir / "manager.json", 'w') as f:
                 json.dump(manager, f, indent=2)
-        
+
         try:
             yield env_id
         finally:
@@ -92,25 +92,25 @@ class TestIsolationManager:
                         os.environ.pop(key, None)
                     else:
                         os.environ[key] = original_value
-                
+
                 if env_id in self.temp_dirs:
                     temp_dir = self.temp_dirs[env_id]
                     if temp_dir.exists():
                         shutil.rmtree(temp_dir, ignore_errors=True)
                     del self.temp_dirs[env_id]
-                
+
                 if env_id in self.mock_patches:
                     for patch_obj in self.mock_patches[env_id]:
                         patch_obj.stop()
                     del self.mock_patches[env_id]
-    
+
     def add_mock_patch(self, env_id: str, patch_obj):
         """添加mock补丁到隔离环境。"""
         with self.lock:
             if env_id not in self.mock_patches:
                 self.mock_patches[env_id] = []
             self.mock_patches[env_id].append(patch_obj)
-    
+
     def cleanup(self):
         """清理所有隔离环境"""
         with self.lock:
@@ -118,28 +118,28 @@ class TestIsolationManager:
                 if temp_dir.exists():
                     shutil.rmtree(temp_dir, ignore_errors=True)
             self.temp_dirs.clear()
-            
+
             for patches in self.mock_patches.values():
                 for patch_obj in patches:
                     patch_obj.stop()
             self.mock_patches.clear()
-            
+
             self.isolated_environments.clear()
 
 
 class ParallelTestExecutor:
     """并行测试执行器"""
-    
+
     def __init__(self, max_workers: int = None):
         self.max_workers = max_workers or min(32, (os.cpu_count() or 1) + 4)
         self.isolation_manager = TestIsolationManager()
-    
-    def execute_tests_parallel(self, test_functions: List[Callable], 
+
+    def execute_tests_parallel(self, test_functions: List[Callable],
                              test_names: List[str] = None) -> Dict[str, Any]:
         """并行执行测试。"""
         if test_names is None:
             test_names = [f"test_{i}" for i in range(len(test_functions))]
-        
+
         results = {
             "total": len(test_functions),
             "passed": 0,
@@ -149,23 +149,23 @@ class ParallelTestExecutor:
             "execution_time": 0,
             "details": {}
         }
-        
+
         start_time = time.time()
-        
+
         from concurrent.futures import ThreadPoolExecutor, as_completed
-        
+
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             future_to_test = {
                 executor.submit(self._execute_single_test, func, name): name
                 for func, name in zip(test_functions, test_names)
             }
-            
+
             for future in as_completed(future_to_test):
                 test_name = future_to_test[future]
                 try:
                     test_result = future.result()
                     results["details"][test_name] = test_result
-                    
+
                     if test_result["status"] == "passed":
                         results["passed"] += 1
                     elif test_result["status"] == "failed":
@@ -173,21 +173,21 @@ class ParallelTestExecutor:
                         results["errors"].append(f"{test_name}: {test_result.get('error', 'Unknown')}")
                     elif test_result["status"] == "skipped":
                         results["skipped"] += 1
-                        
+
                 except Exception as e:
                     results["failed"] += 1
                     results["errors"].append(f"{test_name}: {str(e)}")
-        
+
         results["execution_time"] = time.time() - start_time
         self.isolation_manager.cleanup()
-        
+
         return results
-    
+
     def _execute_single_test(self, test_func: Callable, test_name: str) -> Dict[str, Any]:
         """执行单个测试。"""
         result = {"status": "unknown", "execution_time": 0, "error": None}
         start_time = time.time()
-        
+
         try:
             with self.isolation_manager.isolated_test_environment(test_name):
                 test_func()
@@ -199,13 +199,13 @@ class ParallelTestExecutor:
             result["error"] = str(e)
         finally:
             result["execution_time"] = time.time() - start_time
-        
+
         return result
 
 
 class TestEfficiencyOptimizer:
     """测试效率优化器"""
-    
+
     def optimize_pytest_config(self, test_dir: Path) -> Dict[str, Any]:
         """优化pytest配置。"""
         return {
@@ -218,25 +218,25 @@ class TestEfficiencyOptimizer:
                 "security: 安全测试",
             ],
         }
-    
+
     def create_optimized_test_suite(self, test_dir: Path) -> List[str]:
         """创建优化的测试套件。"""
         test_files = list(test_dir.rglob("test_*.py"))
-        
+
         fast_tests = []
         slow_tests = []
         integration_tests = []
-        
+
         for test_file in test_files:
             content = test_file.read_text(encoding='utf-8').lower()
-            
+
             if "performance" in content or "benchmark" in content:
                 slow_tests.append(str(test_file))
             elif "integration" in content:
                 integration_tests.append(str(test_file))
             else:
                 fast_tests.append(str(test_file))
-        
+
         return fast_tests + integration_tests + slow_tests
 
 
@@ -267,7 +267,7 @@ def isolated_test(func):
             result = func(*args, **kwargs)
         manager.cleanup()
         return result
-    
+
     wrapper.__name__ = func.__name__
     wrapper.__doc__ = func.__doc__
     return wrapper
@@ -280,17 +280,17 @@ def performance_optimized(max_time: float = 1.0):
             start_time = time.time()
             result = func(*args, **kwargs)
             elapsed = time.time() - start_time
-            
+
             if elapsed > max_time:
                 import warnings
                 warnings.warn(f"{func.__name__} took {elapsed:.3f}s, exceeding {max_time:.3f}s")
-            
+
             return result
-        
+
         wrapper.__name__ = func.__name__
         wrapper.__doc__ = func.__doc__
         return wrapper
-    
+
     return decorator
 
 
@@ -314,13 +314,13 @@ def get_test_statistics(test_dir: Path) -> Dict[str, Any]:
         "parallelizable": 0,
         "sequential_only": 0
     }
-    
+
     for test_file in test_dir.rglob("test_*.py"):
         try:
             content = test_file.read_text(encoding='utf-8')
             test_count = len(re.findall(r'def test_\w+', content))
             stats["total_tests"] += test_count
-            
+
             content_lower = content.lower()
             if "unit" in content_lower:
                 stats["by_type"]["unit"] += test_count
@@ -332,13 +332,13 @@ def get_test_statistics(test_dir: Path) -> Dict[str, Any]:
                 stats["by_type"]["security"] += test_count
             else:
                 stats["by_type"]["general"] += test_count
-            
+
             if "_sequential_only" in content:
                 stats["sequential_only"] += test_count
             else:
                 stats["parallelizable"] += test_count
-                
+
         except Exception:
             pass
-    
+
     return stats

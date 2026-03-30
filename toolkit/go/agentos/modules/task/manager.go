@@ -1,4 +1,4 @@
-﻿// AgentOS Go SDK - 任务管理模块
+// AgentOS Go SDK - 任务管理模块
 // Version: 3.0.0
 // Last updated: 2026-03-22
 //
@@ -31,8 +31,8 @@ func NewTaskManager(api client.APIClient) *TaskManager {
 
 // Submit 提交新的执行任务
 func (tm *TaskManager) Submit(ctx context.Context, description string) (*types.Task, error) {
-	if description == "" {
-		return nil, agentos.NewError(agentos.CodeMissingParameter, "任务描述不能为空", nil)
+	if err := utils.ValidateRequiredString(description, "任务描述"); err != nil {
+		return nil, agentos.NewError(agentos.CodeMissingParameter, err.Error(), nil)
 	}
 
 	resp, err := tm.api.Post(ctx, "/api/v1/tasks", map[string]interface{}{
@@ -42,9 +42,9 @@ func (tm *TaskManager) Submit(ctx context.Context, description string) (*types.T
 		return nil, err
 	}
 
-	data, ok := utils.ExtractDataMap(resp)
-	if !ok {
-		return nil, agentos.NewError(agentos.CodeInvalidResponse, "任务创建响应格式异常", nil)
+	data, err := utils.ValidateAndExtractData(resp, "任务创建响应格式异常")
+	if err != nil {
+		return nil, agentos.NewError(agentos.CodeInvalidResponse, err.Error(), nil)
 	}
 
 	return &types.Task{
@@ -58,8 +58,8 @@ func (tm *TaskManager) Submit(ctx context.Context, description string) (*types.T
 
 // SubmitWithOptions 使用扩展选项提交任务
 func (tm *TaskManager) SubmitWithOptions(ctx context.Context, description string, priority int, metadata map[string]interface{}) (*types.Task, error) {
-	if description == "" {
-		return nil, agentos.NewError(agentos.CodeMissingParameter, "任务描述不能为空", nil)
+	if err := utils.ValidateRequiredString(description, "任务描述"); err != nil {
+		return nil, agentos.NewError(agentos.CodeMissingParameter, err.Error(), nil)
 	}
 
 	body := map[string]interface{}{
@@ -75,9 +75,9 @@ func (tm *TaskManager) SubmitWithOptions(ctx context.Context, description string
 		return nil, err
 	}
 
-	data, ok := utils.ExtractDataMap(resp)
-	if !ok {
-		return nil, agentos.NewError(agentos.CodeInvalidResponse, "任务创建响应格式异常", nil)
+	data, err := utils.ValidateAndExtractData(resp, "任务创建响应格式异常")
+	if err != nil {
+		return nil, agentos.NewError(agentos.CodeInvalidResponse, err.Error(), nil)
 	}
 
 	return &types.Task{
@@ -93,8 +93,8 @@ func (tm *TaskManager) SubmitWithOptions(ctx context.Context, description string
 
 // Get 获取指定任务的详细信息
 func (tm *TaskManager) Get(ctx context.Context, taskID string) (*types.Task, error) {
-	if taskID == "" {
-		return nil, agentos.NewError(agentos.CodeMissingParameter, "任务ID不能为空", nil)
+	if err := utils.ValidateRequiredString(taskID, "任务ID"); err != nil {
+		return nil, agentos.NewError(agentos.CodeMissingParameter, err.Error(), nil)
 	}
 
 	resp, err := tm.api.Get(ctx, fmt.Sprintf("/api/v1/tasks/%s", taskID))
@@ -102,9 +102,9 @@ func (tm *TaskManager) Get(ctx context.Context, taskID string) (*types.Task, err
 		return nil, err
 	}
 
-	data, ok := utils.ExtractDataMap(resp)
-	if !ok {
-		return nil, agentos.NewError(agentos.CodeInvalidResponse, "任务详情响应格式异常", nil)
+	data, err := utils.ValidateAndExtractData(resp, "任务详情响应格式异常")
+	if err != nil {
+		return nil, agentos.NewError(agentos.CodeInvalidResponse, err.Error(), nil)
 	}
 
 	return parseTaskFromMap(data), nil
@@ -159,8 +159,8 @@ func (tm *TaskManager) Wait(ctx context.Context, taskID string, timeout time.Dur
 
 // Cancel 取消正在执行的任务
 func (tm *TaskManager) Cancel(ctx context.Context, taskID string) error {
-	if taskID == "" {
-		return agentos.NewError(agentos.CodeMissingParameter, "任务ID不能为空", nil)
+	if err := utils.ValidateRequiredString(taskID, "任务ID"); err != nil {
+		return agentos.NewError(agentos.CodeMissingParameter, err.Error(), nil)
 	}
 	_, err := tm.api.Post(ctx, fmt.Sprintf("/api/v1/tasks/%s/cancel", taskID), nil)
 	return err
@@ -183,8 +183,8 @@ func (tm *TaskManager) List(ctx context.Context, opts *types.ListOptions) ([]typ
 
 // Delete 删除指定任务
 func (tm *TaskManager) Delete(ctx context.Context, taskID string) error {
-	if taskID == "" {
-		return agentos.NewError(agentos.CodeMissingParameter, "任务ID不能为空", nil)
+	if err := utils.ValidateRequiredString(taskID, "任务ID"); err != nil {
+		return agentos.NewError(agentos.CodeMissingParameter, err.Error(), nil)
 	}
 	_, err := tm.api.Delete(ctx, fmt.Sprintf("/api/v1/tasks/%s", taskID))
 	return err
@@ -226,17 +226,17 @@ func (tm *TaskManager) Count(ctx context.Context) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	data, ok := utils.ExtractDataMap(resp)
-	if !ok {
-		return 0, agentos.NewError(agentos.CodeInvalidResponse, "任务计数响应格式异常", nil)
+	data, err := utils.ValidateAndExtractData(resp, "任务计数响应格式异常")
+	if err != nil {
+		return 0, agentos.NewError(agentos.CodeInvalidResponse, err.Error(), nil)
 	}
 	return utils.GetInt64(data, "count"), nil
 }
 
 // WaitForAny 并发等待任一任务完成，返回最先到达终态的结果
 func (tm *TaskManager) WaitForAny(ctx context.Context, taskIDs []string, timeout time.Duration) (*types.TaskResult, error) {
-	if len(taskIDs) == 0 {
-		return nil, agentos.NewError(agentos.CodeMissingParameter, "任务ID列表不能为空", nil)
+	if err := utils.ValidateNonEmptySlice(taskIDs, "任务ID列表"); err != nil {
+		return nil, agentos.NewError(agentos.CodeMissingParameter, err.Error(), nil)
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -343,9 +343,9 @@ func parseTaskFromMap(data map[string]interface{}) *types.Task {
 
 // parseTaskList 从 APIResponse 解析 Task 列表
 func parseTaskList(resp *types.APIResponse) ([]types.Task, error) {
-	data, ok := utils.ExtractDataMap(resp)
-	if !ok {
-		return nil, agentos.NewError(agentos.CodeInvalidResponse, "任务列表响应格式异常", nil)
+	data, err := utils.ValidateAndExtractData(resp, "任务列表响应格式异常")
+	if err != nil {
+		return nil, agentos.NewError(agentos.CodeInvalidResponse, err.Error(), nil)
 	}
 
 	items := utils.GetInterfaceSlice(data, "tasks")

@@ -2,11 +2,11 @@
  * @file monitoring.c
  * @brief MemoryRovol 监控与可观测性子系统
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
- * 
+ *
  * @details
  * MemoryRovol 监控子系统提供四层记忆架构的全面可观测性，支持生产�?
  * 99.999%可靠性标准。实现指标收集、健康检查、性能分析和预警机制�?
- * 
+ *
  * 核心功能�?
  * 1. 分层指标收集：L1-L4各层的读写统计、延迟指标、容量使�?
  * 2. 检索性能监控：查询延迟、召回率、缓存命中率
@@ -176,34 +176,34 @@ typedef struct alert_rule {
  */
 struct agentos_memoryrov_monitor {
     agentos_mutex_t* lock;         /**< 线程�?*/
-    
+
     /* 分层监控数据 */
     layer_monitoring_data_t l1_monitoring;   /**< L1原始层监�?*/
     layer_monitoring_data_t l2_monitoring;   /**< L2特征层监�?*/
     layer_monitoring_data_t l3_monitoring;   /**< L3结构层监�?*/
     layer_monitoring_data_t l4_monitoring;   /**< L4模式层监�?*/
-    
+
     /* 子系统监控数�?*/
     retrieval_monitoring_data_t retrieval_monitoring;   /**< 检索监�?*/
     evolution_monitoring_data_t evolution_monitoring;   /**< 演化监控 */
     resource_monitoring_data_t resource_monitoring;     /**< 资源监控 */
-    
+
     /* 指标管理 */
     monitoring_metric_t* metrics;            /**< 指标链表 */
     uint32_t metric_count;                   /**< 指标数量 */
-    
+
     /* 预警管理 */
     alert_rule_t* alert_rules;               /**< 预警规则链表 */
     uint32_t alert_count;                    /**< 预警规则数量 */
-    
+
     /* 可观测性集�?*/
     agentos_observability_t* obs;            /**< 可观测性句�?*/
-    
+
     /* 配置 */
     uint32_t monitoring_interval_ms;         /**< 监控间隔 */
     uint8_t enabled;                         /**< 是否启用 */
     char* monitor_id;                        /**< 监控器ID */
-    
+
     /* 时间序列数据 */
     cJSON* timeseries_data;                  /**< 时间序列数据缓存 */
     uint64_t last_export_ns;                 /**< 最后导出时�?*/
@@ -232,7 +232,7 @@ static char* format_timestamp(uint64_t timestamp_ns) {
         strftime(buffer, 64, "%Y-%m-%d %H:%M:%S", timeinfo);
         char* result = (char*)AGENTOS_MALLOC(128);
         if (result) {
-            snprintf(result, 128, "%s.%03llu", buffer, 
+            snprintf(result, 128, "%s.%03llu", buffer,
                     (unsigned long long)(timestamp_ns % 1000000000) / 1000000);
         }
         AGENTOS_FREE(buffer);
@@ -249,23 +249,23 @@ static char* format_timestamp(uint64_t timestamp_ns) {
  * @param unit 指标单位
  * @return 新指标对象，失败返回NULL
  */
-static monitoring_metric_t* create_metric(const char* name, metric_type_t type, 
+static monitoring_metric_t* create_metric(const char* name, metric_type_t type,
                                           const char* description, const char* unit) {
     if (!name) return NULL;
-    
+
     monitoring_metric_t* metric = (monitoring_metric_t*)AGENTOS_CALLOC(1, sizeof(monitoring_metric_t));
     if (!metric) {
         AGENTOS_LOG_ERROR("Failed to allocate monitoring metric");
         return NULL;
     }
-    
+
     metric->name = AGENTOS_STRDUP(name);
     metric->type = type;
     metric->description = description ? AGENTOS_STRDUP(description) : NULL;
     metric->unit = unit ? AGENTOS_STRDUP(unit) : NULL;
     metric->timestamp_ns = get_current_timestamp_ns();
     metric->next = NULL;
-    
+
     if (!metric->name || (description && !metric->description) || (unit && !metric->unit)) {
         if (metric->name) AGENTOS_FREE(metric->name);
         if (metric->description) AGENTOS_FREE(metric->description);
@@ -274,7 +274,7 @@ static monitoring_metric_t* create_metric(const char* name, metric_type_t type,
         AGENTOS_LOG_ERROR("Failed to duplicate strings for metric");
         return NULL;
     }
-    
+
     // 初始化指标�?
     switch (type) {
         case METRIC_TYPE_COUNTER:
@@ -293,7 +293,7 @@ static monitoring_metric_t* create_metric(const char* name, metric_type_t type,
             // 简化实�?
             break;
     }
-    
+
     return metric;
 }
 
@@ -303,15 +303,15 @@ static monitoring_metric_t* create_metric(const char* name, metric_type_t type,
  */
 static void free_metric(monitoring_metric_t* metric) {
     if (!metric) return;
-    
+
     if (metric->name) AGENTOS_FREE(metric->name);
     if (metric->description) AGENTOS_FREE(metric->description);
     if (metric->unit) AGENTOS_FREE(metric->unit);
-    
+
     if (metric->type == METRIC_TYPE_HISTOGRAM && metric->value.histogram.buckets) {
         AGENTOS_FREE(metric->value.histogram.buckets);
     }
-    
+
     AGENTOS_FREE(metric);
 }
 
@@ -323,7 +323,7 @@ static void free_metric(monitoring_metric_t* metric) {
  */
 static monitoring_metric_t* find_metric(agentos_memoryrov_monitor_t* monitor, const char* name) {
     if (!monitor || !name) return NULL;
-    
+
     monitoring_metric_t* metric = monitor->metrics;
     while (metric) {
         if (strcmp(metric->name, name) == 0) {
@@ -331,7 +331,7 @@ static monitoring_metric_t* find_metric(agentos_memoryrov_monitor_t* monitor, co
         }
         metric = metric->next;
     }
-    
+
     return NULL;
 }
 
@@ -345,14 +345,14 @@ static monitoring_metric_t* find_metric(agentos_memoryrov_monitor_t* monitor, co
  * @param unit 指标单位
  * @return AGENTOS_SUCCESS 成功，其他为错误�?
  */
-static agentos_error_t update_metric(agentos_memoryrov_monitor_t* monitor, 
+static agentos_error_t update_metric(agentos_memoryrov_monitor_t* monitor,
                                      const char* name, metric_type_t type,
-                                     double value, const char* description, 
+                                     double value, const char* description,
                                      const char* unit) {
     if (!monitor || !name) return AGENTOS_EINVAL;
-    
+
     agentos_mutex_lock(monitor->lock);
-    
+
     monitoring_metric_t* metric = find_metric(monitor, name);
     if (!metric) {
         // 创建新指�?
@@ -361,16 +361,16 @@ static agentos_error_t update_metric(agentos_memoryrov_monitor_t* monitor,
             agentos_mutex_unlock(monitor->lock);
             return AGENTOS_ENOMEM;
         }
-        
+
         // 添加到链�?
         metric->next = monitor->metrics;
         monitor->metrics = metric;
         monitor->metric_count++;
     }
-    
+
     // 更新指标�?
     metric->timestamp_ns = get_current_timestamp_ns();
-    
+
     switch (type) {
         case METRIC_TYPE_COUNTER:
             metric->value.counter += (uint64_t)value;
@@ -387,7 +387,7 @@ static agentos_error_t update_metric(agentos_memoryrov_monitor_t* monitor,
             // 简化实�?
             break;
     }
-    
+
     agentos_mutex_unlock(monitor->lock);
     return AGENTOS_SUCCESS;
 }
@@ -408,37 +408,37 @@ static void update_l1_monitoring(agentos_memoryrov_monitor_t* monitor,
                                  uint64_t write_time_ns, uint64_t read_time_ns,
                                  int is_error) {
     if (!monitor) return;
-    
+
     agentos_mutex_lock(monitor->lock);
-    
+
     if (write_bytes > 0) {
         monitor->l1_monitoring.write_count++;
         monitor->l1_monitoring.total_write_bytes += write_bytes;
         monitor->l1_monitoring.total_write_time_ns += write_time_ns;
     }
-    
+
     if (read_bytes > 0) {
         monitor->l1_monitoring.read_count++;
         monitor->l1_monitoring.total_read_bytes += read_bytes;
         monitor->l1_monitoring.total_read_time_ns += read_time_ns;
     }
-    
+
     if (is_error) {
         monitor->l1_monitoring.error_count++;
     }
-    
+
     agentos_mutex_unlock(monitor->lock);
-    
+
     // 更新指标
     if (write_bytes > 0) {
         update_metric(monitor, "memoryrov_l1_write_total", METRIC_TYPE_COUNTER, 1,
                      "L1原始层写入总次�?, "count");
-        update_metric(monitor, "memoryrov_l1_write_bytes_total", METRIC_TYPE_COUNTER, 
+        update_metric(monitor, "memoryrov_l1_write_bytes_total", METRIC_TYPE_COUNTER,
                      write_bytes, "L1原始层写入总字节数", "bytes");
         update_metric(monitor, "memoryrov_l1_write_duration_seconds", METRIC_TYPE_HISTOGRAM,
                      write_time_ns / 1e9, "L1原始层写入耗时", "seconds");
     }
-    
+
     if (read_bytes > 0) {
         update_metric(monitor, "memoryrov_l1_read_total", METRIC_TYPE_COUNTER, 1,
                      "L1原始层读取总次�?, "count");
@@ -461,9 +461,9 @@ static void update_l2_monitoring(agentos_memoryrov_monitor_t* monitor,
                                  int operation, uint32_t vector_count,
                                  uint64_t operation_time_ns, int is_error) {
     if (!monitor) return;
-    
+
     agentos_mutex_lock(monitor->lock);
-    
+
     switch (operation) {
         case 0:  // 添加
             monitor->l2_monitoring.write_count++;
@@ -481,17 +481,17 @@ static void update_l2_monitoring(agentos_memoryrov_monitor_t* monitor,
             }
             break;
     }
-    
+
     if (is_error) {
         monitor->l2_monitoring.error_count++;
     }
-    
+
     agentos_mutex_unlock(monitor->lock);
-    
+
     // 更新指标
     const char* operation_name = NULL;
     const char* metric_suffix = NULL;
-    
+
     switch (operation) {
         case 0:
             operation_name = "add";
@@ -506,13 +506,13 @@ static void update_l2_monitoring(agentos_memoryrov_monitor_t* monitor,
             metric_suffix = "delete";
             break;
     }
-    
+
     if (operation_name) {
         char metric_name[128];
         snprintf(metric_name, sizeof(metric_name), "memoryrov_l2_%s_total", metric_suffix);
         update_metric(monitor, metric_name, METRIC_TYPE_COUNTER, 1,
                      "L2特征层操作总次�?, "count");
-        
+
         snprintf(metric_name, sizeof(metric_name), "memoryrov_l2_%s_duration_seconds", metric_suffix);
         update_metric(monitor, metric_name, METRIC_TYPE_HISTOGRAM,
                      operation_time_ns / 1e9, "L2特征层操作耗时", "seconds");
@@ -528,43 +528,43 @@ static void update_l2_monitoring(agentos_memoryrov_monitor_t* monitor,
  */
 agentos_error_t agentos_memoryrov_monitor_create(agentos_memoryrov_monitor_t** out_monitor) {
     if (!out_monitor) return AGENTOS_EINVAL;
-    
+
     agentos_memoryrov_monitor_t* monitor = (agentos_memoryrov_monitor_t*)AGENTOS_CALLOC(1, sizeof(agentos_memoryrov_monitor_t));
     if (!monitor) {
         AGENTOS_LOG_ERROR("Failed to allocate memoryrov monitor");
         return AGENTOS_ENOMEM;
     }
-    
+
     monitor->lock = agentos_mutex_create();
     if (!monitor->lock) {
         AGENTOS_LOG_ERROR("Failed to create mutex for memoryrov monitor");
         AGENTOS_FREE(monitor);
         return AGENTOS_ENOMEM;
     }
-    
+
     // 生成唯一ID
     monitor->monitor_id = agentos_generate_uuid();
     if (!monitor->monitor_id) {
         AGENTOS_LOG_WARN("Failed to generate UUID for memoryrov monitor, using default");
         monitor->monitor_id = AGENTOS_STRDUP("memoryrov_monitor_default");
     }
-    
+
     // 初始化可观测�?
     monitor->obs = agentos_observability_create();
     if (monitor->obs) {
         // 注册核心指标
-        agentos_observability_register_metric(monitor->obs, "memoryrov_operations_total", 
+        agentos_observability_register_metric(monitor->obs, "memoryrov_operations_total",
                                               AGENTOS_METRIC_COUNTER, "MemoryRovol总操作次�?);
-        agentos_observability_register_metric(monitor->obs, "memoryrov_errors_total", 
+        agentos_observability_register_metric(monitor->obs, "memoryrov_errors_total",
                                               AGENTOS_METRIC_COUNTER, "MemoryRovol总错误次�?);
-        agentos_observability_register_metric(monitor->obs, "memoryrov_latency_seconds", 
+        agentos_observability_register_metric(monitor->obs, "memoryrov_latency_seconds",
                                               AGENTOS_METRIC_HISTOGRAM, "MemoryRovol操作延迟");
-        agentos_observability_register_metric(monitor->obs, "memoryrov_memory_usage_bytes", 
+        agentos_observability_register_metric(monitor->obs, "memoryrov_memory_usage_bytes",
                                               AGENTOS_METRIC_GAUGE, "MemoryRovol内存使用�?);
-        agentos_observability_register_metric(monitor->obs, "memoryrov_disk_usage_bytes", 
+        agentos_observability_register_metric(monitor->obs, "memoryrov_disk_usage_bytes",
                                               AGENTOS_METRIC_GAUGE, "MemoryRovol磁盘使用�?);
     }
-    
+
     // 初始化监控数�?
     memset(&monitor->l1_monitoring, 0, sizeof(layer_monitoring_data_t));
     memset(&monitor->l2_monitoring, 0, sizeof(layer_monitoring_data_t));
@@ -573,7 +573,7 @@ agentos_error_t agentos_memoryrov_monitor_create(agentos_memoryrov_monitor_t** o
     memset(&monitor->retrieval_monitoring, 0, sizeof(retrieval_monitoring_data_t));
     memset(&monitor->evolution_monitoring, 0, sizeof(evolution_monitoring_data_t));
     memset(&monitor->resource_monitoring, 0, sizeof(resource_monitoring_data_t));
-    
+
     // 设置默认配置
     monitor->monitoring_interval_ms = DEFAULT_MONITORING_INTERVAL_MS;
     monitor->enabled = 1;
@@ -583,12 +583,12 @@ agentos_error_t agentos_memoryrov_monitor_create(agentos_memoryrov_monitor_t** o
     monitor->alert_rules = NULL;
     monitor->timeseries_data = cJSON_CreateArray();
     monitor->last_export_ns = get_current_timestamp_ns();
-    
+
     // 添加默认预警规则
     // 这里可以添加一些默认规�?
-    
+
     *out_monitor = monitor;
-    
+
     AGENTOS_LOG_INFO("MemoryRovol monitor created: %s", monitor->monitor_id);
     return AGENTOS_SUCCESS;
 }
@@ -599,14 +599,14 @@ agentos_error_t agentos_memoryrov_monitor_create(agentos_memoryrov_monitor_t** o
  */
 void agentos_memoryrov_monitor_destroy(agentos_memoryrov_monitor_t* monitor) {
     if (!monitor) return;
-    
+
     AGENTOS_LOG_DEBUG("Destroying MemoryRovol monitor: %s", monitor->monitor_id);
-    
+
     // 释放可观测性资�?
     if (monitor->obs) {
         agentos_observability_destroy(monitor->obs);
     }
-    
+
     // 释放指标链表
     monitoring_metric_t* metric = monitor->metrics;
     while (metric) {
@@ -614,7 +614,7 @@ void agentos_memoryrov_monitor_destroy(agentos_memoryrov_monitor_t* monitor) {
         free_metric(metric);
         metric = next;
     }
-    
+
     // 释放预警规则链表
     alert_rule_t* rule = monitor->alert_rules;
     while (rule) {
@@ -627,22 +627,22 @@ void agentos_memoryrov_monitor_destroy(agentos_memoryrov_monitor_t* monitor) {
         AGENTOS_FREE(rule);
         rule = next;
     }
-    
+
     // 释放时间序列数据
     if (monitor->timeseries_data) {
         cJSON_Delete(monitor->timeseries_data);
     }
-    
+
     // 释放互斥�?
     if (monitor->lock) {
         agentos_mutex_destroy(monitor->lock);
     }
-    
+
     // 释放ID
     if (monitor->monitor_id) {
         AGENTOS_FREE(monitor->monitor_id);
     }
-    
+
     AGENTOS_FREE(monitor);
 }
 
@@ -659,11 +659,11 @@ agentos_error_t agentos_memoryrov_monitor_record_l1(agentos_memoryrov_monitor_t*
                                                     int operation, uint64_t bytes,
                                                     uint64_t duration_ns, int success) {
     if (!monitor) return AGENTOS_EINVAL;
-    
+
     if (!monitor->enabled) return AGENTOS_SUCCESS;
-    
+
     int is_error = !success;
-    
+
     switch (operation) {
         case 0:  // 写入
             update_l1_monitoring(monitor, bytes, 0, duration_ns, 0, is_error);
@@ -676,37 +676,37 @@ agentos_error_t agentos_memoryrov_monitor_record_l1(agentos_memoryrov_monitor_t*
             monitor->l1_monitoring.delete_count++;
             if (is_error) monitor->l1_monitoring.error_count++;
             agentos_mutex_unlock(monitor->lock);
-            
+
             update_metric(monitor, "memoryrov_l1_delete_total", METRIC_TYPE_COUNTER, 1,
                          "L1原始层删除总次�?, "count");
             break;
         default:
             return AGENTOS_EINVAL;
     }
-    
+
     // 更新总操作计�?
     update_metric(monitor, "memoryrov_operations_total", METRIC_TYPE_COUNTER, 1,
                  "MemoryRovol总操作次�?, "count");
-    
+
     if (is_error) {
         update_metric(monitor, "memoryrov_errors_total", METRIC_TYPE_COUNTER, 1,
                      "MemoryRovol总错误次�?, "count");
     }
-    
+
     // 记录延迟指标
     update_metric(monitor, "memoryrov_latency_seconds", METRIC_TYPE_HISTOGRAM,
                  duration_ns / 1e9, "MemoryRovol操作延迟", "seconds");
-    
+
     // 触发可观测�?
     if (monitor->obs) {
         agentos_observability_increment_counter(monitor->obs, "memoryrov_operations_total", 1);
         if (is_error) {
             agentos_observability_increment_counter(monitor->obs, "memoryrov_errors_total", 1);
         }
-        agentos_observability_record_histogram(monitor->obs, "memoryrov_latency_seconds", 
+        agentos_observability_record_histogram(monitor->obs, "memoryrov_latency_seconds",
                                               duration_ns / 1e9);
     }
-    
+
     return AGENTOS_SUCCESS;
 }
 
@@ -723,35 +723,35 @@ agentos_error_t agentos_memoryrov_monitor_record_l2(agentos_memoryrov_monitor_t*
                                                     int operation, uint32_t vector_count,
                                                     uint64_t duration_ns, int success) {
     if (!monitor) return AGENTOS_EINVAL;
-    
+
     if (!monitor->enabled) return AGENTOS_SUCCESS;
-    
+
     int is_error = !success;
     update_l2_monitoring(monitor, operation, vector_count, duration_ns, is_error);
-    
+
     // 更新总操作计�?
     update_metric(monitor, "memoryrov_operations_total", METRIC_TYPE_COUNTER, 1,
                  "MemoryRovol总操作次�?, "count");
-    
+
     if (is_error) {
         update_metric(monitor, "memoryrov_errors_total", METRIC_TYPE_COUNTER, 1,
                      "MemoryRovol总错误次�?, "count");
     }
-    
+
     // 记录延迟指标
     update_metric(monitor, "memoryrov_latency_seconds", METRIC_TYPE_HISTOGRAM,
                  duration_ns / 1e9, "MemoryRovol操作延迟", "seconds");
-    
+
     // 触发可观测�?
     if (monitor->obs) {
         agentos_observability_increment_counter(monitor->obs, "memoryrov_operations_total", 1);
         if (is_error) {
             agentos_observability_increment_counter(monitor->obs, "memoryrov_errors_total", 1);
         }
-        agentos_observability_record_histogram(monitor->obs, "memoryrov_latency_seconds", 
+        agentos_observability_record_histogram(monitor->obs, "memoryrov_latency_seconds",
                                               duration_ns / 1e9);
     }
-    
+
     return AGENTOS_SUCCESS;
 }
 
@@ -764,19 +764,19 @@ agentos_error_t agentos_memoryrov_monitor_record_l2(agentos_memoryrov_monitor_t*
 agentos_error_t agentos_memoryrov_monitor_stats(agentos_memoryrov_monitor_t* monitor,
                                                 char** out_stats) {
     if (!monitor || !out_stats) return AGENTOS_EINVAL;
-    
+
     cJSON* stats_json = cJSON_CreateObject();
     if (!stats_json) return AGENTOS_ENOMEM;
-    
+
     agentos_mutex_lock(monitor->lock);
-    
+
     // 基本信息
     cJSON_AddStringToObject(stats_json, "monitor_id", monitor->monitor_id);
     cJSON_AddBoolToObject(stats_json, "enabled", monitor->enabled);
     cJSON_AddNumberToObject(stats_json, "monitoring_interval_ms", monitor->monitoring_interval_ms);
     cJSON_AddNumberToObject(stats_json, "metric_count", monitor->metric_count);
     cJSON_AddNumberToObject(stats_json, "alert_count", monitor->alert_count);
-    
+
     // L1层统�?
     cJSON* l1_json = cJSON_CreateObject();
     cJSON_AddNumberToObject(l1_json, "write_count", monitor->l1_monitoring.write_count);
@@ -786,16 +786,16 @@ agentos_error_t agentos_memoryrov_monitor_stats(agentos_memoryrov_monitor_t* mon
     cJSON_AddNumberToObject(l1_json, "total_read_bytes", monitor->l1_monitoring.total_read_bytes);
     cJSON_AddNumberToObject(l1_json, "error_count", monitor->l1_monitoring.error_count);
     cJSON_AddNumberToObject(l1_json, "current_items", monitor->l1_monitoring.current_items);
-    
-    double l1_avg_write_time = monitor->l1_monitoring.write_count > 0 ? 
+
+    double l1_avg_write_time = monitor->l1_monitoring.write_count > 0 ?
                               (double)monitor->l1_monitoring.total_write_time_ns / monitor->l1_monitoring.write_count / 1e6 : 0.0;
-    double l1_avg_read_time = monitor->l1_monitoring.read_count > 0 ? 
+    double l1_avg_read_time = monitor->l1_monitoring.read_count > 0 ?
                              (double)monitor->l1_monitoring.total_read_time_ns / monitor->l1_monitoring.read_count / 1e6 : 0.0;
-    
+
     cJSON_AddNumberToObject(l1_json, "avg_write_time_ms", l1_avg_write_time);
     cJSON_AddNumberToObject(l1_json, "avg_read_time_ms", l1_avg_read_time);
     cJSON_AddItemToObject(stats_json, "l1_raw_layer", l1_json);
-    
+
     // L2层统�?
     cJSON* l2_json = cJSON_CreateObject();
     cJSON_AddNumberToObject(l2_json, "write_count", monitor->l2_monitoring.write_count);
@@ -804,34 +804,34 @@ agentos_error_t agentos_memoryrov_monitor_stats(agentos_memoryrov_monitor_t* mon
     cJSON_AddNumberToObject(l2_json, "error_count", monitor->l2_monitoring.error_count);
     cJSON_AddNumberToObject(l2_json, "current_items", monitor->l2_monitoring.current_items);
     cJSON_AddNumberToObject(l2_json, "max_items", monitor->l2_monitoring.max_items);
-    
-    double l2_avg_write_time = monitor->l2_monitoring.write_count > 0 ? 
+
+    double l2_avg_write_time = monitor->l2_monitoring.write_count > 0 ?
                               (double)monitor->l2_monitoring.total_write_time_ns / monitor->l2_monitoring.write_count / 1e6 : 0.0;
-    double l2_avg_read_time = monitor->l2_monitoring.read_count > 0 ? 
+    double l2_avg_read_time = monitor->l2_monitoring.read_count > 0 ?
                              (double)monitor->l2_monitoring.total_read_time_ns / monitor->l2_monitoring.read_count / 1e6 : 0.0;
-    
+
     cJSON_AddNumberToObject(l2_json, "avg_write_time_ms", l2_avg_write_time);
     cJSON_AddNumberToObject(l2_json, "avg_read_time_ms", l2_avg_read_time);
     cJSON_AddItemToObject(stats_json, "l2_feature_layer", l2_json);
-    
+
     // 检索统�?
     cJSON* retrieval_json = cJSON_CreateObject();
     cJSON_AddNumberToObject(retrieval_json, "query_count", monitor->retrieval_monitoring.query_count);
     cJSON_AddNumberToObject(retrieval_json, "cache_hit_count", monitor->retrieval_monitoring.cache_hit_count);
     cJSON_AddNumberToObject(retrieval_json, "total_query_time_ns", monitor->retrieval_monitoring.total_query_time_ns);
     cJSON_AddNumberToObject(retrieval_json, "total_recall_items", monitor->retrieval_monitoring.total_recall_items);
-    
-    double cache_hit_rate = monitor->retrieval_monitoring.query_count > 0 ? 
+
+    double cache_hit_rate = monitor->retrieval_monitoring.query_count > 0 ?
                            (double)monitor->retrieval_monitoring.cache_hit_count / monitor->retrieval_monitoring.query_count * 100.0 : 0.0;
-    double avg_query_time = monitor->retrieval_monitoring.query_count > 0 ? 
+    double avg_query_time = monitor->retrieval_monitoring.query_count > 0 ?
                            (double)monitor->retrieval_monitoring.total_query_time_ns / monitor->retrieval_monitoring.query_count / 1e6 : 0.0;
-    
+
     cJSON_AddNumberToObject(retrieval_json, "cache_hit_rate_percent", cache_hit_rate);
     cJSON_AddNumberToObject(retrieval_json, "avg_query_time_ms", avg_query_time);
     cJSON_AddNumberToObject(retrieval_json, "avg_precision", monitor->retrieval_monitoring.avg_precision);
     cJSON_AddNumberToObject(retrieval_json, "avg_recall", monitor->retrieval_monitoring.avg_recall);
     cJSON_AddItemToObject(stats_json, "retrieval", retrieval_json);
-    
+
     // 资源统计
     cJSON* resource_json = cJSON_CreateObject();
     cJSON_AddNumberToObject(resource_json, "memory_usage_bytes", monitor->resource_monitoring.memory_usage_bytes);

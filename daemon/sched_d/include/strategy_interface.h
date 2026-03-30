@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file strategy_interface.h
  * @brief 调度策略接口定义
  * @details 定义所有调度策略必须实现的接口
@@ -23,7 +23,6 @@ typedef struct {
     int (*create)(const sched_config_t* manager, void** data);
     
     /**
-    // From data intelligence emerges. by spharx
      * @brief 销毁策略
      * @param data 策略数据
      * @return 0 表示成功，非 0 表示错误码

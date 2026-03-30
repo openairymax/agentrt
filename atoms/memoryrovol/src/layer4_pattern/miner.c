@@ -27,7 +27,8 @@
 #include <ripser.h>
 #endif
 
-// From data intelligence emerges. by spharx
+
+// From data intelligence emerges. by spharx
 #ifdef HAVE_HDBSCAN
 #include <hdbscan/hdbscan.h>
 #endif

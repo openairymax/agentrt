@@ -1,4 +1,4 @@
-﻿﻿/**
+﻿﻿﻿﻿/**
  * @file cognition.h
  * @brief 认知层公共接口定义
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -195,22 +195,22 @@ struct agentos_dispatching_strategy {
 
 /**
  * @brief 创建认知引擎（使用默认配置）
- * 
+ *
  * @param plan_strategy [in] 规划策略（可选，若为NULL则使用默认策略）
  * @param coord_strategy [in] 协同策略（可选）
  * @param disp_strategy [in] 调度策略（可选）
  * @param out_engine [out] 输出引擎句柄（调用者负责销毁）
  * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
- * 
+ *
  * @ownership out_engine 由调用者负责通过 agentos_cognition_destroy() 释放
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
- * 
+ *
  * @concurrency 并发合约：
  * - 该函数不是线程安全的，不应在多个线程同时调用
  * - 调用者应确保在单个线程中创建认知引擎
  * - 创建完成后，引擎实例可以被多个线程使用，但需要外部同步
- * 
+ *
  * @see agentos_cognition_create_ex(), agentos_cognition_destroy()
  */
 AGENTOS_API agentos_error_t agentos_cognition_create(
@@ -221,23 +221,23 @@ AGENTOS_API agentos_error_t agentos_cognition_create(
 
 /**
  * @brief 创建认知引擎（带配置）
- * 
+ *
  * @param manager [in] 配置（若为NULL使用默认）
  * @param plan_strategy [in] 规划策略（可选）
  * @param coord_strategy [in] 协同策略（可选）
  * @param disp_strategy [in] 调度策略（可选）
  * @param out_engine [out] 输出引擎句柄（调用者负责销毁）
  * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
- * 
+ *
  * @ownership out_engine 由调用者负责通过 agentos_cognition_destroy() 释放
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
- * 
+ *
  * @concurrency 并发合约：
  * - 该函数不是线程安全的，不应在多个线程同时调用
  * - 调用者应确保在单个线程中创建认知引擎
  * - 创建完成后，引擎实例可以被多个线程使用，但需要外部同步
- * 
+ *
  * @see agentos_cognition_create(), agentos_cognition_destroy()
  */
 AGENTOS_API agentos_error_t agentos_cognition_create_ex(
@@ -249,28 +249,28 @@ AGENTOS_API agentos_error_t agentos_cognition_create_ex(
 
 /**
  * @brief 销毁认知引擎
- * 
+ *
  * @param engine [in] 引擎句柄（非NULL）
- * 
+ *
  * @ownership 释放 engine 及其内部资源
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
- * 
+ *
  * @concurrency 并发合约：
  * - 该函数不是线程安全的，不应在多个线程同时调用
  * - 调用者应确保在所有使用引擎的线程都已完成操作后再调用此函数
  * - 销毁后，引擎实例不应再被任何线程使用
- * 
+ *
  * @see agentos_cognition_create(), agentos_cognition_create_ex()
  */
 AGENTOS_API void agentos_cognition_destroy(agentos_cognition_engine_t* engine);
 
 /**
  * @brief 设置回退规划策略
- * 
+ *
  * @param engine [in] 认知引擎（非NULL）
  * @param fallback [in] 回退策略（可为NULL）
- * 
+ *
  * @ownership 引擎不接管 fallback 的所有权，调用者仍需负责其生命周期
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
@@ -281,22 +281,22 @@ AGENTOS_API void agentos_cognition_set_fallback_plan(
 
 /**
  * @brief 处理用户输入，生成任务计划
- * 
+ *
  * @param engine [in] 认知引擎（非NULL）
  * @param input [in] 原始输入字符串（非NULL）
  * @param input_len [in] 输入长度
  * @param out_plan [out] 输出任务计划（调用者负责释放）
  * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
- * 
+ *
  * @ownership out_plan 由调用者负责通过 agentos_task_plan_free() 释放
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
- * 
+ *
  * @concurrency 并发合约：
  * - 该函数不是线程安全的，不应在多个线程同时调用
  * - 调用者应确保在单个线程中处理输入，或使用外部同步机制
  * - 处理过程中，引擎实例不应被其他线程修改
- * 
+ *
  * @see agentos_task_plan_free()
  */
 AGENTOS_API agentos_error_t agentos_cognition_process(
@@ -307,9 +307,9 @@ AGENTOS_API agentos_error_t agentos_cognition_process(
 
 /**
  * @brief 释放任务计划
- * 
+ *
  * @param plan [in] 要释放的计划（可为NULL）
- * 
+ *
  * @ownership 释放 plan 及其内部所有资源
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
@@ -319,11 +319,11 @@ AGENTOS_API void agentos_task_plan_free(agentos_task_plan_t* plan);
 
 /**
  * @brief 设置认知引擎的全局上下文
- * 
+ *
  * @param engine [in] 引擎句柄（非NULL）
  * @param context [in] 上下文指针（可为NULL）
  * @param destroy [in] 上下文释放函数（可为NULL）
- * 
+ *
  * @ownership 如果提供了 destroy 函数，引擎会在销毁时调用它来释放 context
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
@@ -335,12 +335,12 @@ AGENTOS_API void agentos_cognition_set_context(
 
 /**
  * @brief 获取认知引擎的当前统计信息
- * 
+ *
  * @param engine [in] 引擎句柄（非NULL）
  * @param out_stats [out] 输出统计字符串（调用者负责释放）
  * @param out_len [out] 输出长度
  * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
- * 
+ *
  * @ownership out_stats 由调用者负责释放
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
@@ -352,11 +352,11 @@ AGENTOS_API agentos_error_t agentos_cognition_stats(
 
 /**
  * @brief 获取认知引擎健康状态
- * 
+ *
  * @param engine [in] 认知引擎句柄（非NULL）
  * @param out_json [out] 输出 JSON 状态字符串（调用者负责释放）
  * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
- * 
+ *
  * @ownership out_json 由调用者负责释放
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否

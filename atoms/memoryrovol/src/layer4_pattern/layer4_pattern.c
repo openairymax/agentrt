@@ -1,4 +1,4 @@
-﻿﻿/**
+﻿﻿﻿﻿/**
  * @file layer4_pattern.c
  * @brief L4 模式层实�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -62,14 +62,14 @@ agentos_error_t agentos_rule_generator_from_cluster(
 
     char prompt[4096] = {0};
     size_t pos = 0;
-    
+
     /* 安全构建提示字符串，使用 snprintf 确保不溢�?*/
     int written = snprintf(prompt + pos, sizeof(prompt) - pos, "Cluster IDs:\n");
     if (written < 0 || (size_t)written >= sizeof(prompt) - pos) {
         return AGENTOS_EOVERFLOW;
     }
     pos += written;
-    
+
     for (size_t i = 0; i < count && i < 20; i++) {
         written = snprintf(prompt + pos, sizeof(prompt) - pos, "- %s\n", cluster_ids[i]);
         if (written < 0 || (size_t)written >= sizeof(prompt) - pos) {
@@ -77,7 +77,7 @@ agentos_error_t agentos_rule_generator_from_cluster(
         }
         pos += written;
     }
-    
+
     written = snprintf(prompt + pos, sizeof(prompt) - pos, "\nGenerate a JSON rule:");
     if (written < 0 || (size_t)written >= sizeof(prompt) - pos) {
         return AGENTOS_EOVERFLOW;

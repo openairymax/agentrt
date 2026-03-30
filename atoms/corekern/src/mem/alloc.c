@@ -2,7 +2,7 @@
  * @file alloc.c
  * @brief 物理内存分配器（带追踪的 malloc/free 封装�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
- * 
+ *
  * @details
  * 本模块实现线程安全的内存分配追踪系统�?
  * - 使用原子标志确保初始化线程安�?
@@ -70,7 +70,7 @@ static int ensure_initialized(void) {
     if (state == 1) {
         return 0;
     }
-    
+
     /* 慢速路径：需要初始化 */
     if (state == 0) {
         /* 尝试获取初始化权，使�?0 -> 2 的原子交�?*/
@@ -84,7 +84,7 @@ static int ensure_initialized(void) {
                 atomic_store_explicit(&mem_initialized, 0, memory_order_release);
                 return -1;
             }
-            
+
             mem_stats_mutex = agentos_mutex_create();
             if (!mem_stats_mutex) {
                 agentos_mutex_destroy(init_lock);
@@ -92,13 +92,13 @@ static int ensure_initialized(void) {
                 atomic_store_explicit(&mem_initialized, 0, memory_order_release);
                 return -1;
             }
-            
+
             /* 初始化完成，发布状态（使用 release 语义�?*/
             atomic_store_explicit(&mem_initialized, 1, memory_order_release);
             return 0;
         }
     }
-    
+
     /* 其他线程正在初始化（状态为2），等待完成 */
     while (atomic_load_explicit(&mem_initialized, memory_order_acquire) != 1) {
         /* 自旋等待，让�?CPU */
@@ -121,11 +121,11 @@ static int ensure_initialized(void) {
  */
 agentos_error_t agentos_mem_init(size_t heap_size) {
     (void)heap_size;
-    
+
     if (ensure_initialized() != 0) {
         return AGENTOS_ENOMEM;
     }
-    
+
     return AGENTOS_SUCCESS;
 }
 
@@ -138,7 +138,7 @@ void agentos_mem_cleanup(void) {
     if (atomic_load_explicit(&mem_initialized, memory_order_acquire) != 1) {
         return;
     }
-    
+
     agentos_mem_check_leaks();
 
     agentos_mutex_lock(mem_stats_mutex);
@@ -153,12 +153,12 @@ void agentos_mem_cleanup(void) {
         agentos_mutex_destroy(mem_stats_mutex);
         mem_stats_mutex = NULL;
     }
-    
+
     if (init_lock) {
         agentos_mutex_destroy(init_lock);
         init_lock = NULL;
     }
-    
+
     atomic_store_explicit(&mem_initialized, 0, memory_order_release);
 }
 
@@ -222,25 +222,25 @@ void* agentos_mem_alloc_ex(size_t size, const char* file, int line) {
     if (!ptr) {
         return NULL;
     }
-    
+
     /* 确保初始化 */
     if (ensure_initialized() != 0) {
         /* 初始化失败，仍然返回内存，但不追踪 */
         return ptr;
     }
-    
+
     /* 检查 mutex 是否已初始化 */
     if (!mem_stats_mutex) {
         return ptr;
     }
-    
+
     agentos_mutex_lock(mem_stats_mutex);
     atomic_fetch_add_explicit(&total_allocated, size, memory_order_relaxed);
     atomic_fetch_add_explicit(&used_allocated, size, memory_order_relaxed);
     update_peak_unlocked();
     add_alloc_info_unlocked(ptr, size, file, line);
     agentos_mutex_unlock(mem_stats_mutex);
-    
+
     return ptr;
 }
 
@@ -271,18 +271,18 @@ void* agentos_mem_aligned_alloc_ex(size_t size, size_t alignment, const char* fi
     if (!ptr) {
         return NULL;
     }
-    
+
     if (ensure_initialized() != 0) {
         return ptr;
     }
-    
+
     agentos_mutex_lock(mem_stats_mutex);
     atomic_fetch_add_explicit(&total_allocated, size, memory_order_relaxed);
     atomic_fetch_add_explicit(&used_allocated, size, memory_order_relaxed);
     update_peak_unlocked();
     add_alloc_info_unlocked(ptr, size, file, line);
     agentos_mutex_unlock(mem_stats_mutex);
-    
+
     return ptr;
 }
 

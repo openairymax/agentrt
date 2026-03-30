@@ -249,7 +249,7 @@ static char* build_docker_command(container_handle_t* handle, const char* action
 }
 
 int container_pull_image(void* mgr, const char* image) {
-    if (!mgr || !image) return -1;
+    if (!mgr || !image) return cupolas_ERROR_INVALID_ARG;
 
     container_handle_t* handle = (container_handle_t*)mgr;
     char cmd[MAX_COMMAND_LENGTH];
@@ -258,16 +258,16 @@ int container_pull_image(void* mgr, const char* image) {
     char output[1024];
     int result = execute_command(cmd, 300000, output, sizeof(output));
 
-    return result == 0 ? 0 : -1;
+    return result == 0 ? cupolas_OK : cupolas_ERROR_IO;
 }
 
 int container_start(void* mgr, const char* name, container_result_t* result) {
-    if (!mgr) return -1;
+    if (!mgr) return cupolas_ERROR_INVALID_ARG;
 
     container_handle_t* handle = (container_handle_t*)mgr;
 
     if (!handle->manager.image || !handle->manager.command) {
-        return -1;
+        return cupolas_ERROR_INVALID_ARG;
     }
 
     if (name) {
@@ -303,7 +303,7 @@ int container_start(void* mgr, const char* name, container_result_t* result) {
 }
 
 int container_stop(void* mgr, uint32_t timeout_ms) {
-    if (!mgr) return -1;
+    if (!mgr) return cupolas_ERROR_INVALID_ARG;
 
     container_handle_t* handle = (container_handle_t*)mgr;
 
@@ -324,7 +324,7 @@ int container_stop(void* mgr, uint32_t timeout_ms) {
 }
 
 int container_remove(void* mgr) {
-    if (!mgr) return -1;
+    if (!mgr) return cupolas_ERROR_INVALID_ARG;
 
     container_handle_t* handle = (container_handle_t*)mgr;
 
@@ -336,11 +336,11 @@ int container_remove(void* mgr) {
     handle->state = CONTAINER_STATE_DEAD;
     handle->is_running = false;
 
-    return ret == 0 ? 0 : -1;
+    return ret == 0 ? cupolas_OK : cupolas_ERROR_IO;
 }
 
 int container_get_info(void* mgr, container_info_t* info) {
-    if (!mgr || !info) return -1;
+    if (!mgr || !info) return cupolas_ERROR_INVALID_ARG;
 
     container_handle_t* handle = (container_handle_t*)mgr;
 
@@ -350,17 +350,17 @@ int container_get_info(void* mgr, container_info_t* info) {
     snprintf(info->name, sizeof(info->name), "%s", handle->container_name);
     info->state = handle->state;
 
-    return 0;
+    return cupolas_OK;
 }
 
 int container_get_stats(void* mgr, container_info_t* info) {
-    if (!mgr || !info) return -1;
+    if (!mgr || !info) return cupolas_ERROR_INVALID_ARG;
 
     container_handle_t* handle = (container_handle_t*)mgr;
 
     if (!handle->is_running) {
         memset(&info->stats, 0, sizeof(info->stats));
-        return 0;
+        return cupolas_OK;
     }
 
     char cmd[MAX_COMMAND_LENGTH];
@@ -375,16 +375,16 @@ int container_get_stats(void* mgr, container_info_t* info) {
     info->stats.memory_limit = handle->manager.resources.memory_limit;
     info->stats.pids_current = 1;
 
-    return 0;
+    return cupolas_OK;
 }
 
 int container_pause(void* mgr) {
-    if (!mgr) return -1;
+    if (!mgr) return cupolas_ERROR_INVALID_ARG;
 
     container_handle_t* handle = (container_handle_t*)mgr;
 
     if (!handle->is_running) {
-        return -1;
+        return cupolas_ERROR_INVALID_ARG;
     }
 
     char cmd[MAX_COMMAND_LENGTH];
@@ -396,16 +396,16 @@ int container_pause(void* mgr) {
         handle->state = CONTAINER_STATE_PAUSED;
     }
 
-    return ret == 0 ? 0 : -1;
+    return ret == 0 ? cupolas_OK : cupolas_ERROR_IO;
 }
 
 int container_unpause(void* mgr) {
-    if (!mgr) return -1;
+    if (!mgr) return cupolas_ERROR_INVALID_ARG;
 
     container_handle_t* handle = (container_handle_t*)mgr;
 
     if (handle->state != CONTAINER_STATE_PAUSED) {
-        return -1;
+        return cupolas_ERROR_INVALID_ARG;
     }
 
     char cmd[MAX_COMMAND_LENGTH];
@@ -418,17 +418,17 @@ int container_unpause(void* mgr) {
         handle->is_running = true;
     }
 
-    return ret == 0 ? 0 : -1;
+    return ret == 0 ? cupolas_OK : cupolas_ERROR_IO;
 }
 
 int container_wait(void* mgr, uint32_t timeout_ms, int* exit_code) {
-    if (!mgr) return -1;
+    if (!mgr) return cupolas_ERROR_INVALID_ARG;
 
     container_handle_t* handle = (container_handle_t*)mgr;
 
     if (!handle->is_running) {
         if (exit_code) *exit_code = 0;
-        return 0;
+        return cupolas_OK;
     }
 
     char cmd[MAX_COMMAND_LENGTH];
@@ -444,17 +444,17 @@ int container_wait(void* mgr, uint32_t timeout_ms, int* exit_code) {
     handle->is_running = false;
     handle->state = CONTAINER_STATE_STOPPED;
 
-    return ret == 0 ? 0 : -1;
+    return ret == 0 ? cupolas_OK : cupolas_ERROR_IO;
 }
 
 int container_exec(void* mgr, const char* command, const char** args,
                   size_t arg_count, container_result_t* result) {
-    if (!mgr || !command) return -1;
+    if (!mgr || !command) return cupolas_ERROR_INVALID_ARG;
 
     container_handle_t* handle = (container_handle_t*)mgr;
 
     if (!handle->is_running) {
-        return -1;
+        return cupolas_ERROR_INVALID_ARG;
     }
 
     char cmd[MAX_COMMAND_LENGTH * 2];
@@ -473,11 +473,11 @@ int container_exec(void* mgr, const char* command, const char** args,
         result->exit_code = ret;
     }
 
-    return 0;
+    return cupolas_OK;
 }
 
 int container_get_logs(void* mgr, size_t tail, char* output, size_t size) {
-    if (!mgr || !output || size == 0) return -1;
+    if (!mgr || !output || size == 0) return cupolas_ERROR_INVALID_ARG;
 
     container_handle_t* handle = (container_handle_t*)mgr;
 
@@ -490,7 +490,7 @@ int container_get_logs(void* mgr, size_t tail, char* output, size_t size) {
 
     int ret = execute_command(cmd, 10000, output, size);
 
-    return ret == 0 ? 0 : -1;
+    return ret == 0 ? cupolas_OK : cupolas_ERROR_IO;
 }
 
 void container_result_free(container_result_t* result) {

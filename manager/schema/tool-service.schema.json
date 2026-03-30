@@ -187,18 +187,24 @@
               "properties": {
                 "host": {
                   "type": "string",
-                  "description": "Redis host",
-                  "examples": ["localhost", "redis.local", "192.168.1.100"]
+                  "description": "Redis host (supports environment variable syntax)",
+                  "examples": ["localhost", "redis.local", "${REDIS_HOST:-localhost}"]
                 },
                 "port": {
-                  "type": "integer",
-                  "description": "Redis port",
-                  "examples": [6379, 6380]
+                  "oneOf": [
+                    {"type": "integer", "minimum": 1, "maximum": 65535},
+                    {"type": "string", "pattern": "^\\$\\{[^}]+\\}$"}
+                  ],
+                  "description": "Redis port (integer or environment variable syntax)",
+                  "examples": [6379, 6380, "${REDIS_PORT:-6379}"]
                 },
                 "db": {
-                  "type": "integer",
-                  "description": "Redis database number",
-                  "examples": [0, 1, 2]
+                  "oneOf": [
+                    {"type": "integer", "minimum": 0, "maximum": 15},
+                    {"type": "string", "pattern": "^\\$\\{[^}]+\\}$"}
+                  ],
+                  "description": "Redis database number (integer or environment variable syntax)",
+                  "examples": [0, 1, 2, "${REDIS_DB:-0}"]
                 },
                 "ttl_sec": {
                   "type": "integer",

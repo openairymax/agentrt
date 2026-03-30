@@ -1,9 +1,9 @@
-﻿/**
+/**
  * @file http_gateway.c
  * @brief HTTP网关实现 - libmicrohttpd集成
  * 
- * 实现JSON-RPC 2.0协议处理，支持与AgentOS内核的系统调用接口�?
- * 包含请求验证、响应生成、错误处理等完整功能�?
+ * 实现JSON-RPC 2.0协议处理，支持与AgentOS内核的系统调用接口。
+ * 包含请求验证、响应生成、错误处理等完整功能。
  * 
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
@@ -16,6 +16,7 @@
 #include "../auth.h"
 #include "../ratelimit.h"
 #include "../platform.h"
+#include "../utils/jsonrpc.h"
 
 #include <microhttpd.h>
 #include <cJSON.h>
@@ -29,144 +30,63 @@
 /* ========== HTTP网关内部结构 ========== */
 
 /**
- * @brief HTTP请求上下�?
+ * @brief HTTP请求上下文
  */
 typedef struct http_request_context {
-    gateway_server_t* server;        /**< 服务器引�?*/
+    gateway_server_t* server;        /**< 服务器引用 */
     const char* method;              /**< HTTP方法 */
     const char* url;                 /**< 请求URL */
     const char* version;             /**< HTTP版本 */
     const char* upload_data;         /**< 上传数据 */
     size_t upload_data_size;         /**< 上传数据大小 */
-    void* connection_cls;            /**< 连接�?*/
+    void* connection_cls;            /**< 连接类 */
     
     /* 解析后的数据 */
     cJSON* json_request;             /**< JSON请求对象 */
     char* session_id;                /**< 会话ID */
-    char* authorization;             /**< 认证�?*/
+    char* authorization;             /**< 认证令牌 */
     
     /* 统计信息 */
-    uint64_t start_time_ns;          /**< 请求开始时�?*/
+    uint64_t start_time_ns;          /**< 请求开始时间 */
 } http_request_context_t;
 
 /**
  * @brief HTTP网关内部结构
  */
 typedef struct http_gateway {
-    gateway_server_t* server;        /**< 服务器引�?*/
+    gateway_server_t* server;        /**< 服务器引用 */
     struct MHD_Daemon* daemon;       /**< MHD守护进程 */
     uint16_t port;                   /**< 监听端口 */
     char* host;                      /**< 监听地址 */
     
     /* 统计信息 */
     atomic_uint_fast64_t requests_total;    /**< 总请求数 */
-    atomic_uint_fast64_t requests_failed;   /**< 失败请求�?*/
-    atomic_uint_fast64_t bytes_received;    /**< 接收字节�?*/
+    atomic_uint_fast64_t requests_failed;   /**< 失败请求数 */
+    atomic_uint_fast64_t bytes_received;    /**< 接收字节数 */
     atomic_uint_fast64_t bytes_sent;        /**< 发送字节数 */
     
-    /* 限流�?*/
-    ratelimiter_t* ratelimiter;      /**< 请求限流�?*/
+    /* 限流器 */
+    ratelimiter_t* ratelimiter;      /**< 请求限流器 */
     
     /* 安全配置 */
-    size_t max_request_size;         /**< 最大请求大�?*/
+    size_t max_request_size;         /**< 最大请求大小 */
 } http_gateway_t;
 
-/* ========== JSON-RPC 2.0处理 ========== */
+/* ========== JSON-RPC 2.0处理（使用公共模块） ========== */
 
-/**
- * @brief 验证JSON-RPC 2.0请求格式
- * @param json JSON对象
- * @return 0 有效，非0 无效
- */
-static int validate_jsonrpc_request(cJSON* json) {
-    if (!json) return -1;
-    
-    /* 检查必需字段 */
-    if (!cJSON_HasObjectItem(json, "jsonrpc") || 
-        !cJSON_HasObjectItem(json, "method") || 
-        !cJSON_HasObjectItem(json, "id")) {
-        return -1;
-    }
-    
-    cJSON* jsonrpc = cJSON_GetObjectItem(json, "jsonrpc");
-    cJSON* method = cJSON_GetObjectItem(json, "method");
-    cJSON* id = cJSON_GetObjectItem(json, "id");
-    
-    /* 验证字段类型和�?*/
-    if (!cJSON_IsString(jsonrpc) || strcmp(jsonrpc->valuestring, "2.0") != 0) {
-        return -1;
-    }
-    
-    if (!cJSON_IsString(method) || strlen(method->valuestring) == 0) {
-        return -1;
-    }
-    
-    if (!cJSON_IsNumber(id) && !cJSON_IsString(id)) {
-        return -1;
-    }
-    
-    return 0;
-}
-
-/**
- * @brief 创建JSON-RPC 2.0成功响应
- * @param id 请求ID
- * @param result 结果对象
- * @return JSON字符串，需调用者free
- */
-static char* create_jsonrpc_success_response(cJSON* id, cJSON* result) {
-    cJSON* response = cJSON_CreateObject();
-    
-    cJSON_AddStringToObject(response, "jsonrpc", "2.0");
-    cJSON_AddItemToObject(response, "result", result ? result : cJSON_CreateNull());
-    cJSON_AddItemToObject(response, "id", id ? cJSON_Duplicate(id, 1) : cJSON_CreateNull());
-    
-    char* json_str = cJSON_PrintUnformatted(response);
-    cJSON_Delete(response);
-    
-    return json_str;
-}
-
-/**
- * @brief 创建JSON-RPC 2.0错误响应
- * @param id 请求ID
- * @param code 错误�?
- * @param message 错误消息
- * @param data 错误数据
- * @return JSON字符串，需调用者free
- */
-static char* create_jsonrpc_error_response(cJSON* id, int code, const char* message, cJSON* data) {
-    cJSON* response = cJSON_CreateObject();
-    cJSON* error = cJSON_CreateObject();
-    
-    cJSON_AddNumberToObject(error, "code", code);
-    cJSON_AddStringToObject(error, "message", message ? message : "Internal error");
-    
-    if (data) {
-        cJSON_AddItemToObject(error, "data", data);
-    }
-    
-    cJSON_AddStringToObject(response, "jsonrpc", "2.0");
-    cJSON_AddItemToObject(response, "error", error);
-    cJSON_AddItemToObject(response, "id", id ? cJSON_Duplicate(id, 1) : cJSON_CreateNull());
-    
-    char* json_str = cJSON_PrintUnformatted(response);
-    cJSON_Delete(response);
-    
-    return json_str;
-}
+/* JSON-RPC 函数已移至 utils/jsonrpc.c */
 
 /* ========== 系统调用接口 ========== */
 
 /**
  * @brief 处理系统调用请求
- * @param context 请求上下�?
- * @param method 方法�?
+ * @param context 请求上下文
+ * @param method 方法名
  * @param params 参数对象
- * @return JSON响应字符�?
+ * @return JSON响应字符串
  */
 static char* handle_system_call(http_request_context_t* context, const char* method, cJSON* params) {
-    /* 这里实现与AgentOS内核的系统调用接�?*/
+    /* 这里实现与AgentOS内核的系统调用接口 */
     /* 目前返回模拟响应，实际实现需要调用agentos_sys_*函数 */
     
     AGENTOS_LOG_DEBUG("Handling system call: %s", method);
@@ -206,33 +126,33 @@ static char* handle_system_call(http_request_context_t* context, const char* met
     else {
         /* 未知方法 */
         cJSON_Delete(response);
-        return create_jsonrpc_error_response(
+        return jsonrpc_create_error_response(
             context->json_request ? cJSON_GetObjectItem(context->json_request, "id") : NULL,
             -32601, "Method not found", NULL);
     }
     
-    return create_jsonrpc_success_response(
+    return jsonrpc_create_success_response(
         context->json_request ? cJSON_GetObjectItem(context->json_request, "id") : NULL,
         response);
 }
 
-/* ========== 认证和授�?========== */
+/* ========== 认证和授权 ========== */
 
 /**
  * @brief 验证请求认证
- * @param context 请求上下�?
+ * @param context 请求上下文
  * @return 0 成功，非0 失败
  */
 static int authenticate_request(http_request_context_t* context) {
     if (!context->authorization) {
-        return -1; /* 缺少认证�?*/
+        return -1; /* 缺少认证令牌 */
     }
     
     /* 解析Bearer token */
     if (strncmp(context->authorization, "Bearer ", 7) == 0) {
         const char* token = context->authorization + 7;
         
-        /* 验证token有效�?*/
+        /* 验证token有效性 */
         if (context->server->auth_context) {
             auth_result_t result = auth_validate(context->server->auth_context, token);
             if (result == AUTH_RESULT_ALLOWED) {
@@ -247,16 +167,16 @@ static int authenticate_request(http_request_context_t* context) {
 /* ========== 请求处理 ========== */
 
 /**
- * @brief 解析HTTP请求�?
- * @param cls 客户端数�?
- * @param kind 值类�?
+ * @brief 解析HTTP请求头
+ * @param cls 客户端数据
+ * @param kind 值类型
  * @param key 头键
- * @param value 头�?
+ * @param value 头值
  * @return MHD_YES 继续处理
  */
 static int parse_headers(void* cls, enum MHD_ValueKind kind, const char* key, const char* value) {
     http_request_context_t* context = (http_request_context_t*)cls;
-    (void)kind; /* 未使用参�?*/
+    (void)kind; /* 未使用参数 */
     
     if (strcmp(key, "Authorization") == 0) {
         context->authorization = strdup(value ? value : "");
@@ -272,9 +192,9 @@ static int parse_headers(void* cls, enum MHD_ValueKind kind, const char* key, co
 }
 
 /**
- * @brief 解析JSON请求�?
- * @param context 请求上下�?
- * @param data 请求体数�?
+ * @brief 解析JSON请求体
+ * @param context 请求上下文
+ * @param data 请求体数据
  * @param size 数据大小
  * @return 0 成功，非0 失败
  */
@@ -305,15 +225,15 @@ static int parse_json_request(http_request_context_t* context, const char* data,
 
 /**
  * @brief 处理JSON-RPC请求
- * @param context 请求上下�?
- * @return JSON响应字符�?
+ * @param context 请求上下文
+ * @return JSON响应字符串
  */
 static char* handle_jsonrpc_request(http_request_context_t* context) {
     cJSON* method = cJSON_GetObjectItem(context->json_request, "method");
     cJSON* params = cJSON_GetObjectItem(context->json_request, "params");
     
     if (!method) {
-        return create_jsonrpc_error_response(NULL, -32600, "Invalid Request", NULL);
+        return jsonrpc_create_error_response(NULL, -32600, "Invalid Request", NULL);
     }
     
     /* 检查会话（如果需要） */
@@ -323,12 +243,12 @@ static char* handle_jsonrpc_request(http_request_context_t* context) {
         if (id_item && cJSON_IsString(id_item)) {
             context->session_id = strdup(id_item->valuestring);
             
-            /* 验证会话有效�?*/
+            /* 验证会话有效性 */
             char* session_info = NULL;
             if (session_manager_get_session(context->server->session_mgr, context->session_id, &session_info) != AGENTOS_SUCCESS) {
                 free(context->session_id);
                 context->session_id = NULL;
-                return create_jsonrpc_error_response(id_item, -32001, "Invalid session", NULL);
+                return jsonrpc_create_error_response(id_item, -32001, "Invalid session", NULL);
             }
             free(session_info);
         }
@@ -346,7 +266,7 @@ static char* handle_jsonrpc_request(http_request_context_t* context) {
  * @return MHD响应对象
  */
 static struct MHD_Response* create_http_response(int status_code, const char* content, size_t content_len) {
-    (void)status_code; /* 未使用参�?*/
+    (void)status_code; /* 未使用参数 */
     
     struct MHD_Response* response = MHD_create_response_from_buffer(
         content_len, (void*)content, MHD_RESPMEM_MUST_COPY);
@@ -355,7 +275,7 @@ static struct MHD_Response* create_http_response(int status_code, const char* co
         return NULL;
     }
     
-    /* 设置响应�?*/
+    /* 设置响应头 */
     MHD_add_response_header(response, "Content-Type", "application/json");
     MHD_add_response_header(response, "Server", "AgentOS-gateway/1.1.0");
     MHD_add_response_header(response, "Access-Control-Allow-Origin", "*");
@@ -366,7 +286,7 @@ static struct MHD_Response* create_http_response(int status_code, const char* co
 }
 
 /**
- * @brief 检查限�?
+ * @brief 检查限流
  * @param gateway 网关实例
  * @param connection MHD连接
  * @return 0 允许，非0 拒绝
@@ -391,13 +311,13 @@ static int check_rate_limit(http_gateway_t* gateway, struct MHD_Connection* conn
         }
     }
     
-    /* 检查限�?*/
+    /* 检查限流 */
     ratelimit_result_t result = ratelimiter_check(gateway->ratelimiter, ip_buf);
     return (result == RATELIMIT_ALLOWED) ? 0 : -1;
 }
 
 /**
- * @brief HTTP请求处理�?
+ * @brief HTTP请求处理器
  * @param cls 网关实例
  * @param connection MHD连接
  * @param url 请求URL
@@ -405,7 +325,7 @@ static int check_rate_limit(http_gateway_t* gateway, struct MHD_Connection* conn
  * @param version HTTP版本
  * @param upload_data 上传数据
  * @param upload_data_size 上传数据大小
- * @param connection_cls 连接�?
+ * @param connection_cls 连接类
  * @return MHD_YES 继续处理
  */
 static int handle_http_request(void* cls, struct MHD_Connection* connection, 
@@ -429,7 +349,7 @@ static int handle_http_request(void* cls, struct MHD_Connection* connection,
         context->start_time_ns = platform_get_current_time_ms() * 1000000ULL;
         *connection_cls = context;
         
-        /* 解析请求�?*/
+        /* 解析请求头 */
         MHD_get_connection_values(connection, MHD_HEADER_KIND, parse_headers, context);
         
         return MHD_YES;
@@ -439,7 +359,7 @@ static int handle_http_request(void* cls, struct MHD_Connection* connection,
     if (strcmp(method, "POST") == 0 && upload_data && *upload_data_size > 0) {
         /* 验证请求大小 */
         if (*upload_data_size > gateway->max_request_size) {
-            char* error_response = create_jsonrpc_error_response(
+            char* error_response = jsonrpc_create_error_response(
                 NULL, -413, "Request too large", NULL);
             struct MHD_Response* response = create_http_response(413, error_response, strlen(error_response));
             free(error_response);
@@ -461,7 +381,7 @@ static int handle_http_request(void* cls, struct MHD_Connection* connection,
         /* 解析JSON请求 */
         if (parse_json_request(context, upload_data, *upload_data_size) != 0) {
             /* JSON解析失败 */
-            char* error_response = create_jsonrpc_error_response(
+            char* error_response = jsonrpc_create_error_response(
                 NULL, -32700, "Parse error", NULL);
             struct MHD_Response* response = create_http_response(400, error_response, strlen(error_response));
             free(error_response);
@@ -483,9 +403,9 @@ static int handle_http_request(void* cls, struct MHD_Connection* connection,
     
     /* 完整请求处理 */
     if (strcmp(method, "POST") == 0 && context->json_request) {
-        /* 检查限�?*/
+        /* 检查限流 */
         if (check_rate_limit(gateway, connection) != 0) {
-            char* error_response = create_jsonrpc_error_response(
+            char* error_response = jsonrpc_create_error_response(
                 NULL, -429, "Too many requests", NULL);
             struct MHD_Response* response = create_http_response(429, error_response, strlen(error_response));
             free(error_response);
@@ -535,7 +455,7 @@ static int handle_http_request(void* cls, struct MHD_Connection* connection,
         return ret;
     }
     
-    /* OPTIONS请求（CORS预检�?*/
+    /* OPTIONS请求（CORS预检） */
     if (strcmp(method, "OPTIONS") == 0) {
         struct MHD_Response* response = MHD_create_response_from_buffer(0, NULL, MHD_RESPMEM_PERSISTENT);
         MHD_add_response_header(response, "Access-Control-Allow-Origin", "*");
@@ -550,7 +470,7 @@ static int handle_http_request(void* cls, struct MHD_Connection* connection,
         return ret;
     }
     
-    /* GET请求 - 健康检�?*/
+    /* GET请求 - 健康检查 */
     if (strcmp(method, "GET") == 0 && strcmp(url, "/health") == 0) {
         char* health_json = NULL;
         if (gateway->server->health) {
@@ -595,7 +515,7 @@ static int handle_http_request(void* cls, struct MHD_Connection* connection,
     }
     
     /* 404 Not Found */
-    char* error_response = create_jsonrpc_error_response(
+    char* error_response = jsonrpc_create_error_response(
         NULL, -32601, "Not Found", NULL);
     struct MHD_Response* response = create_http_response(404, error_response, strlen(error_response));
     free(error_response);
@@ -610,7 +530,7 @@ static int handle_http_request(void* cls, struct MHD_Connection* connection,
     return ret;
 }
 
-/* ========== 网关操作�?========== */
+/* ========== 网关操作表 ========== */
 
 /**
  * @brief 启动HTTP网关
@@ -677,7 +597,7 @@ static void http_gateway_destroy(void* gateway_impl) {
 /**
  * @brief 获取HTTP网关名称
  * @param gateway_impl 网关实例
- * @return 名称字符�?
+ * @return 名称字符串
  */
 static const char* http_gateway_get_name(void* gateway_impl) {
     (void)gateway_impl;
@@ -687,7 +607,7 @@ static const char* http_gateway_get_name(void* gateway_impl) {
 /**
  * @brief 获取HTTP网关统计信息
  * @param gateway_impl 网关实例
- * @param out_json 输出JSON字符串（需调用者free�?
+ * @param out_json 输出JSON字符串（需调用者free）
  * @return AGENTOS_SUCCESS 成功
  */
 static agentos_error_t http_gateway_get_stats(void* gateway_impl, char** out_json) {
@@ -706,7 +626,7 @@ static agentos_error_t http_gateway_get_stats(void* gateway_impl, char** out_jso
     return AGENTOS_SUCCESS;
 }
 
-/* ========== 网关操作�?========== */
+/* ========== 网关操作表 ========== */
 
 static const gateway_ops_t http_gateway_ops = {
     .start = http_gateway_start,
@@ -722,7 +642,7 @@ static const gateway_ops_t http_gateway_ops = {
  * @brief 创建HTTP网关
  * @param host 监听地址
  * @param port 监听端口
- * @param server 服务器实�?
+ * @param server 服务器实例
  * @return 网关实例，失败返回NULL
  */
 gateway_t* http_gateway_create(const char* host, uint16_t port, gateway_server_t* server) {
@@ -744,16 +664,16 @@ gateway_t* http_gateway_create(const char* host, uint16_t port, gateway_server_t
         return NULL;
     }
     
-    /* 初始化统计信�?*/
+    /* 初始化统计信息 */
     atomic_init(&gateway->requests_total, 0);
     atomic_init(&gateway->requests_failed, 0);
     atomic_init(&gateway->bytes_received, 0);
     atomic_init(&gateway->bytes_sent, 0);
     
-    /* 初始化安全配�?*/
+    /* 初始化安全配置 */
     gateway->max_request_size = 10 * 1024 * 1024; /* 默认10MB */
     
-    /* 创建限流�?*/
+    /* 创建限流器 */
     gateway->ratelimiter = ratelimiter_create_simple(100, 60); /* 100请求/分钟 */
     if (!gateway->ratelimiter) {
         free(gateway->host);

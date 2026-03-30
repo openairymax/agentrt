@@ -352,7 +352,7 @@ agentos_error_t agentos_knowledge_graph_find_path(
     }
 
     agentos_error_t err = perform_bfs_search(kg, start_idx, end_idx, visited, in_queue, queue);
-    
+
     if (err == AGENTOS_SUCCESS) {
         *out_path = reconstruct_path_from_bfs(kg, start_idx, end_idx, visited, out_path_length);
         if (!*out_path) {
@@ -388,16 +388,16 @@ static agentos_error_t initialize_bfs_state(agentos_knowledge_graph_t* kg,
     if (!start_id) {
         return AGENTOS_ENOMEM;
     }
-    
+
     queue[0] = start_id;
     in_queue[start_idx] = 1;
-    
+
     visited[start_idx].id = AGENTOS_STRDUP(kg->entities[start_idx]->id);
     if (!visited[start_idx].id) {
         AGENTOS_FREE(start_id);
         return AGENTOS_ENOMEM;
     }
-    
+
     return AGENTOS_SUCCESS;
 }
 
@@ -415,7 +415,7 @@ static int explore_neighbors(agentos_knowledge_graph_t* kg,
     entity_node_t* node = kg->entities[current_idx];
     agentos_relation_t* rel = node->relations;
     int found = 0;
-    
+
     while (rel && !found) {
         size_t neighbor_idx = find_entity_index(kg, rel->to_id);
         if (neighbor_idx != SIZE_MAX && !in_queue[neighbor_idx]) {
@@ -424,20 +424,20 @@ static int explore_neighbors(agentos_knowledge_graph_t* kg,
                 rel = rel->next;
                 continue;
             }
-            
+
             queue[(*queue_back)++] = neighbor_id;
             in_queue[neighbor_idx] = 1;
-            
+
             visited[neighbor_idx].id = AGENTOS_STRDUP(rel->to_id);
             visited[neighbor_idx].prev = AGENTOS_STRDUP(current);
-            
+
             if (neighbor_idx == end_idx) {
                 found = 1;
             }
         }
         rel = rel->next;
     }
-    
+
     return found;
 }
 
@@ -453,15 +453,15 @@ static int process_current_node(agentos_knowledge_graph_t* kg,
                                size_t* queue_back,
                                char* current) {
     size_t current_idx = find_entity_index(kg, current);
-    
+
     if (current_idx == SIZE_MAX) {
         AGENTOS_FREE(current);
         return 0;
     }
-    
+
     int found = explore_neighbors(kg, current_idx, end_idx, in_queue, visited,
                                  queue, queue_back, current);
-    
+
     AGENTOS_FREE(current);
     return found;
 }
@@ -477,20 +477,20 @@ static agentos_error_t perform_bfs_search(agentos_knowledge_graph_t* kg,
                                           char** queue) {
     size_t queue_front = 0, queue_back = 0;
     int found = 0;
-    
+
     agentos_error_t init_err = initialize_bfs_state(kg, start_idx, queue, in_queue, visited);
     if (init_err != AGENTOS_SUCCESS) {
         return init_err;
     }
-    
+
     queue_back = 1;
-    
+
     while (queue_front < queue_back && !found) {
         char* current = queue[queue_front++];
         found = process_current_node(kg, end_idx, in_queue, visited,
                                     queue, &queue_back, current);
     }
-    
+
     if (found) {
         return AGENTOS_SUCCESS;
     }
@@ -507,34 +507,34 @@ static size_t extract_path_to_temp(agentos_knowledge_graph_t* kg,
                                   char** temp_path) {
     char* current = AGENTOS_STRDUP(kg->entities[end_idx]->id);
     size_t idx = 0;
-    
+
     if (!current) {
         return 0;
     }
-    
+
     while (current && strcmp(current, kg->entities[start_idx]->id) != 0) {
         if (idx >= MAX_PATH_LENGTH) {
             AGENTOS_FREE(current);
             goto cleanup;
         }
-        
+
         size_t current_idx = find_entity_index(kg, current);
-        if (current_idx == SIZE_MAX || !visited[current_idx].id || 
+        if (current_idx == SIZE_MAX || !visited[current_idx].id ||
             strcmp(visited[current_idx].id, current) != 0) {
             AGENTOS_FREE(current);
             goto cleanup;
         }
-        
+
         char* node_copy = AGENTOS_STRDUP(current);
         if (!node_copy) {
             AGENTOS_FREE(current);
             goto cleanup;
         }
         temp_path[idx++] = node_copy;
-        
+
         char* prev = visited[current_idx].prev;
         AGENTOS_FREE(current);
-        
+
         if (prev) {
             current = AGENTOS_STRDUP(prev);
             if (!current) {
@@ -544,7 +544,7 @@ static size_t extract_path_to_temp(agentos_knowledge_graph_t* kg,
             current = NULL;
         }
     }
-    
+
     if (current && strcmp(current, kg->entities[start_idx]->id) == 0) {
         if (idx < MAX_PATH_LENGTH) {
             char* start_copy = AGENTOS_STRDUP(kg->entities[start_idx]->id);
@@ -558,7 +558,7 @@ static size_t extract_path_to_temp(agentos_knowledge_graph_t* kg,
     } else if (current) {
         AGENTOS_FREE(current);
     }
-    
+
     return idx;
 
 cleanup:
@@ -580,17 +580,17 @@ static char** build_reversed_path(char** temp_path, size_t idx, size_t* path_len
         *path_len = 0;
         return NULL;
     }
-    
+
     char** path = (char**)AGENTOS_CALLOC(idx, sizeof(char*));
     if (!path) {
         *path_len = 0;
         return NULL;
     }
-    
+
     for (size_t i = 0; i < idx; i++) {
         path[i] = temp_path[idx - 1 - i];
     }
-    
+
     *path_len = idx;
     return path;
 }
@@ -607,20 +607,20 @@ static char** reconstruct_path_from_bfs(agentos_knowledge_graph_t* kg,
                                         size_t* path_len) {
     char** path = NULL;
     *path_len = 0;
-    
+
     char** temp_path = (char**)AGENTOS_CALLOC(MAX_PATH_LENGTH, sizeof(char*));
     if (!temp_path) {
         return NULL;
     }
-    
+
     size_t idx = extract_path_to_temp(kg, start_idx, end_idx, visited, temp_path);
     if (idx == 0) {
         AGENTOS_FREE(temp_path);
         return NULL;
     }
-    
+
     path = build_reversed_path(temp_path, idx, path_len);
-    
+
     /* 释放temp_path数组，但不释放其中的字符串（已转移到path） */
     AGENTOS_FREE(temp_path);
     return path;

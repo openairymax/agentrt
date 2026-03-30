@@ -56,9 +56,10 @@ set(GATEWAY_SOURCES
     src/telemetry.c
     src/auth.c
     src/ratelimit.c
-    src/manager.c
     src/config_runtime.c
     src/connection_pool.c
+    src/utils/jsonrpc.c
+    src/utils/hash.c
     src/gateway/http_gateway.c
     src/gateway/ws_gateway.c
     src/gateway/stdio_gateway.c
@@ -128,9 +129,10 @@ if(NOT BUILD_SHARED_LIBS)
         src/telemetry.c
         src/auth.c
         src/ratelimit.c
-        src/manager.c
         src/config_runtime.c
         src/connection_pool.c
+        src/utils/jsonrpc.c
+        src/utils/hash.c
         src/gateway/http_gateway.c
         src/gateway/ws_gateway.c
         src/gateway/stdio_gateway.c
@@ -203,8 +205,9 @@ if(NOT BUILD_SHARED_LIBS)
         src/telemetry.h
         src/auth.h
         src/ratelimit.h
-        src/manager.h
         src/connection_pool.h
+        src/utils/jsonrpc.h
+        src/utils/hash.h
         DESTINATION include/agentos/gateway
     )
 endif()

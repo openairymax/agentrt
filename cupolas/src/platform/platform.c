@@ -34,7 +34,7 @@
 #endif
 
 /* ============================================================================
- * 互斥锁实�?
+ * 互斥锁实现
  * ============================================================================ */
 
 int cupolas_mutex_init(cupolas_mutex_t* mutex) {\n    return platform_mutex_init((platform_mutex_t*)mutex);\n}
@@ -48,7 +48,7 @@ int cupolas_mutex_trylock(cupolas_mutex_t* mutex) {\n    return platform_mutex_t
 int cupolas_mutex_unlock(cupolas_mutex_t* mutex) {\n    return platform_mutex_unlock((platform_mutex_t*)mutex);\n}
 
 /* ============================================================================
- * 读写锁实�?
+ * 读写锁实现
  * ============================================================================ */
 
 int cupolas_rwlock_init(cupolas_rwlock_t* rwlock) {\n    return platform_rwlock_init((platform_rwlock_t*)rwlock);\n}
@@ -578,7 +578,7 @@ const char* cupolas_strerror(int error) {
 }
 
 /* ============================================================================
- * 字符串工具实�?
+ * 字符串工具实现
  * ============================================================================ */
 
 char* cupolas_strdup(const char* str) {\n    return platform_strdup(str);\n}
@@ -590,7 +590,7 @@ int cupolas_strcasecmp(const char* s1, const char* s2) {\n    return platform_st
 int cupolas_strncasecmp(const char* s1, const char* s2, size_t n) {\n    return platform_strncasecmp(s1, s2, n);\n}
 
 /* ============================================================================
- * 进程实现（简化版，仅支持基本功能�?
+ * 进程实现（简化版，仅支持基本功能）
  * ============================================================================ */
 
 int cupolas_pipe_create(cupolas_pipe_t* pipe) {

@@ -1,12 +1,12 @@
-﻿﻿/**
+﻿﻿﻿﻿/**
  * @file sandbox.c
  * @brief 系统调用安全沙箱实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
- * 
+ *
  * @details
  * 安全沙箱提供系统调用的隔离执行环境，防止恶意或错误代码影响系统稳定性�?
  * 实现生产级安全控制，支持99.999%可靠性标准�?
- * 
+ *
  * 核心功能�?
  * 1. 权限控制：基于角色的访问控制（RBAC�?
  * 2. 资源隔离：内存、CPU、I/O资源限制
@@ -210,18 +210,18 @@ static uint64_t get_timestamp_ns(void) {
  * @param condition 条件表达�?
  * @return 规则对象，失败返回NULL
  */
-static permission_rule_t* create_permission_rule(int syscall_num, 
+static permission_rule_t* create_permission_rule(int syscall_num,
                                                   permission_type_t perm_type,
                                                   const char* condition) {
     permission_rule_t* rule = (permission_rule_t*)AGENTOS_CALLOC(1, sizeof(permission_rule_t));
     if (!rule) return NULL;
-    
+
     rule->syscall_num = syscall_num;
     rule->perm_type = perm_type;
     rule->condition = condition ? AGENTOS_STRDUP(condition) : NULL;
     rule->flags = 0;
     rule->next = NULL;
-    
+
     return rule;
 }
 
@@ -260,22 +260,22 @@ static void add_audit_entry(agentos_sandbox_t* sandbox, int syscall_num,
                             const char* caller_id, int result_code,
                             uint64_t duration_ns, const char* details) {
     if (!sandbox) return;
-    
+
     agentos_mutex_lock(sandbox->lock);
-    
+
     // 检查容量，必要时扩�?
     if (sandbox->audit_count >= sandbox->audit_capacity) {
         size_t new_capacity = sandbox->audit_capacity == 0 ? 100 : sandbox->audit_capacity * 2;
         if (new_capacity > MAX_AUDIT_ENTRIES) new_capacity = MAX_AUDIT_ENTRIES;
-        
-        audit_entry_t* new_log = (audit_entry_t*)AGENTOS_REALLOC(sandbox->audit_log, 
+
+        audit_entry_t* new_log = (audit_entry_t*)AGENTOS_REALLOC(sandbox->audit_log,
                                                           new_capacity * sizeof(audit_entry_t));
         if (new_log) {
             sandbox->audit_log = new_log;
             sandbox->audit_capacity = new_capacity;
         }
     }
-    
+
     // 添加条目
     if (sandbox->audit_count < sandbox->audit_capacity) {
         audit_entry_t* entry = &sandbox->audit_log[sandbox->audit_count];
@@ -287,10 +287,10 @@ static void add_audit_entry(agentos_sandbox_t* sandbox, int syscall_num,
         entry->result_code = result_code;
         entry->duration_ns = duration_ns;
         entry->details = details ? AGENTOS_STRDUP(details) : NULL;
-        
+
         sandbox->audit_count++;
     }
-    
+
     agentos_mutex_unlock(sandbox->lock);
 }
 
@@ -302,16 +302,16 @@ static void add_audit_entry(agentos_sandbox_t* sandbox, int syscall_num,
  * @param argc 参数数量
  * @return 权限类型
  */
-static permission_type_t check_permission(agentos_sandbox_t* sandbox, 
+static permission_type_t check_permission(agentos_sandbox_t* sandbox,
                                           int syscall_num,
                                           void** args, int argc) {
     if (!sandbox) return PERM_DENY;
-    
+
     agentos_mutex_lock(sandbox->lock);
-    
+
     permission_rule_t* rule = sandbox->rules;
     permission_type_t result = PERM_ALLOW;  // 默认允许
-    
+
     while (rule) {
         if (rule->syscall_num == syscall_num || rule->syscall_num == -1) {
             // 匹配系统调用号（-1表示所有调用）
@@ -325,9 +325,9 @@ static permission_type_t check_permission(agentos_sandbox_t* sandbox,
         }
         rule = rule->next;
     }
-    
+
     agentos_mutex_unlock(sandbox->lock);
-    
+
     return result;
 }
 
@@ -338,39 +338,39 @@ static permission_type_t check_permission(agentos_sandbox_t* sandbox,
  * @param amount 请求�?
  * @return 1表示允许�?表示超限
  */
-static int check_resource_quota(agentos_sandbox_t* sandbox, 
+static int check_resource_quota(agentos_sandbox_t* sandbox,
                                 resource_type_t resource,
                                 uint64_t amount) {
     if (!sandbox) return 0;
-    
+
     agentos_mutex_lock(sandbox->lock);
-    
+
     int allowed = 0;
     resource_quota_t* quota = &sandbox->manager.quota;
-    
+
     switch (resource) {
         case RESOURCE_MEMORY:
             allowed = (quota->current_memory + amount <= quota->max_memory_bytes);
             if (allowed) quota->current_memory += amount;
             break;
-            
+
         case RESOURCE_CPU:
             allowed = (quota->current_cpu_time_ms + amount <= quota->max_cpu_time_ms);
             if (allowed) quota->current_cpu_time_ms += amount;
             break;
-            
+
         case RESOURCE_IO:
             allowed = (quota->current_io_ops + amount <= quota->max_io_ops);
             if (allowed) quota->current_io_ops += amount;
             break;
-            
+
         default:
             allowed = 1;  // 其他资源类型默认允许
             break;
     }
-    
+
     agentos_mutex_unlock(sandbox->lock);
-    
+
     return allowed;
 }
 
@@ -384,11 +384,11 @@ static void release_resource(agentos_sandbox_t* sandbox,
                              resource_type_t resource,
                              uint64_t amount) {
     if (!sandbox) return;
-    
+
     agentos_mutex_lock(sandbox->lock);
-    
+
     resource_quota_t* quota = &sandbox->manager.quota;
-    
+
     switch (resource) {
         case RESOURCE_MEMORY:
             if (quota->current_memory >= amount) {
@@ -397,7 +397,7 @@ static void release_resource(agentos_sandbox_t* sandbox,
                 quota->current_memory = 0;
             }
             break;
-            
+
         case RESOURCE_CPU:
             if (quota->current_cpu_time_ms >= amount) {
                 quota->current_cpu_time_ms -= amount;
@@ -405,7 +405,7 @@ static void release_resource(agentos_sandbox_t* sandbox,
                 quota->current_cpu_time_ms = 0;
             }
             break;
-            
+
         case RESOURCE_IO:
             if (quota->current_io_ops >= amount) {
                 quota->current_io_ops -= amount;
@@ -413,11 +413,11 @@ static void release_resource(agentos_sandbox_t* sandbox,
                 quota->current_io_ops = 0;
             }
             break;
-            
+
         default:
             break;
     }
-    
+
     agentos_mutex_unlock(sandbox->lock);
 }
 
@@ -432,13 +432,13 @@ agentos_error_t agentos_sandbox_manager_init(void) {
         AGENTOS_LOG_WARN("Sandbox manager already initialized");
         return AGENTOS_SUCCESS;
     }
-    
+
     g_manager_lock = agentos_mutex_create();
     if (!g_manager_lock) {
         AGENTOS_LOG_ERROR("Failed to create manager lock");
         return AGENTOS_ENOMEM;
     }
-    
+
     g_sandbox_manager = (sandbox_manager_t*)AGENTOS_CALLOC(1, sizeof(sandbox_manager_t));
     if (!g_sandbox_manager) {
         AGENTOS_LOG_ERROR("Failed to allocate sandbox manager");
@@ -446,7 +446,7 @@ agentos_error_t agentos_sandbox_manager_init(void) {
         g_manager_lock = NULL;
         return AGENTOS_ENOMEM;
     }
-    
+
     g_sandbox_manager->lock = agentos_mutex_create();
     if (!g_sandbox_manager->lock) {
         AGENTOS_LOG_ERROR("Failed to create sandbox manager lock");
@@ -456,14 +456,14 @@ agentos_error_t agentos_sandbox_manager_init(void) {
         g_manager_lock = NULL;
         return AGENTOS_ENOMEM;
     }
-    
+
     g_sandbox_manager->sandbox_count = 0;
     g_sandbox_manager->total_violations = 0;
     g_sandbox_manager->total_calls = 0;
     g_sandbox_manager->global_audit = NULL;
     g_sandbox_manager->global_audit_count = 0;
     g_sandbox_manager->global_audit_capacity = 0;
-    
+
     AGENTOS_LOG_INFO("Sandbox manager initialized");
     return AGENTOS_SUCCESS;
 }
@@ -473,9 +473,9 @@ agentos_error_t agentos_sandbox_manager_init(void) {
  */
 void agentos_sandbox_manager_destroy(void) {
     if (!g_sandbox_manager) return;
-    
+
     agentos_mutex_lock(g_manager_lock);
-    
+
     // 销毁所有沙�?
     for (uint32_t i = 0; i < MAX_SANDBOXES; i++) {
         if (g_sandbox_manager->sandboxes[i]) {
@@ -483,7 +483,7 @@ void agentos_sandbox_manager_destroy(void) {
             g_sandbox_manager->sandboxes[i] = NULL;
         }
     }
-    
+
     // 释放全局审计日志
     if (g_sandbox_manager->global_audit) {
         for (size_t i = 0; i < g_sandbox_manager->global_audit_count; i++) {
@@ -494,15 +494,15 @@ void agentos_sandbox_manager_destroy(void) {
         }
         AGENTOS_FREE(g_sandbox_manager->global_audit);
     }
-    
+
     agentos_mutex_destroy(g_sandbox_manager->lock);
     AGENTOS_FREE(g_sandbox_manager);
     g_sandbox_manager = NULL;
-    
+
     agentos_mutex_unlock(g_manager_lock);
     agentos_mutex_destroy(g_manager_lock);
     g_manager_lock = NULL;
-    
+
     AGENTOS_LOG_INFO("Sandbox manager destroyed");
 }
 
@@ -515,14 +515,14 @@ void agentos_sandbox_manager_destroy(void) {
 agentos_error_t agentos_sandbox_create(const sandbox_config_t* manager,
                                        agentos_sandbox_t** out_sandbox) {
     if (!manager || !out_sandbox) return AGENTOS_EINVAL;
-    
+
     if (!g_sandbox_manager) {
         AGENTOS_LOG_ERROR("Sandbox manager not initialized");
         return AGENTOS_ENOTINIT;
     }
-    
+
     agentos_mutex_lock(g_manager_lock);
-    
+
     // 查找空闲槽位
     int slot = -1;
     for (uint32_t i = 0; i < MAX_SANDBOXES; i++) {
@@ -531,13 +531,13 @@ agentos_error_t agentos_sandbox_create(const sandbox_config_t* manager,
             break;
         }
     }
-    
+
     if (slot < 0) {
         agentos_mutex_unlock(g_manager_lock);
         AGENTOS_LOG_ERROR("No available sandbox slot");
         return AGENTOS_EBUSY;
     }
-    
+
     // 分配沙箱结构
     agentos_sandbox_t* sandbox = (agentos_sandbox_t*)AGENTOS_CALLOC(1, sizeof(agentos_sandbox_t));
     if (!sandbox) {
@@ -545,7 +545,7 @@ agentos_error_t agentos_sandbox_create(const sandbox_config_t* manager,
         AGENTOS_LOG_ERROR("Failed to allocate sandbox");
         return AGENTOS_ENOMEM;
     }
-    
+
     // 初始化沙�?
     sandbox->sandbox_id = (uint64_t)slot + 1;
     sandbox->sandbox_name = manager->sandbox_name ? AGENTOS_STRDUP(manager->sandbox_name) : NULL;
@@ -555,7 +555,7 @@ agentos_error_t agentos_sandbox_create(const sandbox_config_t* manager,
     sandbox->last_active_ns = sandbox->create_time_ns;
     sandbox->call_count = 0;
     sandbox->violation_count = 0;
-    
+
     // 复制配置
     memcpy(&sandbox->manager, manager, sizeof(sandbox_config_t));
     if (manager->sandbox_name) {
@@ -564,7 +564,7 @@ agentos_error_t agentos_sandbox_create(const sandbox_config_t* manager,
     if (manager->owner_id) {
         sandbox->manager.owner_id = AGENTOS_STRDUP(manager->owner_id);
     }
-    
+
     // 设置默认配额
     if (sandbox->manager.quota.max_memory_bytes == 0) {
         sandbox->manager.quota.max_memory_bytes = DEFAULT_MAX_MEMORY_BYTES;
@@ -578,7 +578,7 @@ agentos_error_t agentos_sandbox_create(const sandbox_config_t* manager,
     if (sandbox->manager.timeout_ms == 0) {
         sandbox->manager.timeout_ms = DEFAULT_SANDBOX_TIMEOUT_MS;
     }
-    
+
     // 创建�?
     sandbox->lock = agentos_mutex_create();
     if (!sandbox->lock) {
@@ -589,19 +589,19 @@ agentos_error_t agentos_sandbox_create(const sandbox_config_t* manager,
         AGENTOS_LOG_ERROR("Failed to create sandbox lock");
         return AGENTOS_ENOMEM;
     }
-    
+
     // 注册到管理器
     g_sandbox_manager->sandboxes[slot] = sandbox;
     g_sandbox_manager->sandbox_count++;
-    
+
     agentos_mutex_unlock(g_manager_lock);
-    
+
     *out_sandbox = sandbox;
-    
-    AGENTOS_LOG_INFO("Sandbox created: %s (ID: %llu)", 
+
+    AGENTOS_LOG_INFO("Sandbox created: %s (ID: %llu)",
                      sandbox->sandbox_name ? sandbox->sandbox_name : "unnamed",
                      (unsigned long long)sandbox->sandbox_id);
-    
+
     return AGENTOS_SUCCESS;
 }
 
@@ -611,9 +611,9 @@ agentos_error_t agentos_sandbox_create(const sandbox_config_t* manager,
  */
 void agentos_sandbox_destroy(agentos_sandbox_t* sandbox) {
     if (!sandbox) return;
-    
+
     AGENTOS_LOG_DEBUG("Destroying sandbox: %llu", (unsigned long long)sandbox->sandbox_id);
-    
+
     // 从管理器移除
     if (g_sandbox_manager) {
         agentos_mutex_lock(g_manager_lock);
@@ -626,16 +626,16 @@ void agentos_sandbox_destroy(agentos_sandbox_t* sandbox) {
         }
         agentos_mutex_unlock(g_manager_lock);
     }
-    
+
     // 释放资源
     if (sandbox->sandbox_name) AGENTOS_FREE(sandbox->sandbox_name);
     if (sandbox->owner_id) AGENTOS_FREE(sandbox->owner_id);
     if (sandbox->manager.sandbox_name) AGENTOS_FREE(sandbox->manager.sandbox_name);
     if (sandbox->manager.owner_id) AGENTOS_FREE(sandbox->manager.owner_id);
-    
+
     // 释放权限规则
     free_permission_rules(sandbox->rules);
-    
+
     // 释放审计日志
     if (sandbox->audit_log) {
         for (size_t i = 0; i < sandbox->audit_count; i++) {
@@ -646,12 +646,12 @@ void agentos_sandbox_destroy(agentos_sandbox_t* sandbox) {
         }
         AGENTOS_FREE(sandbox->audit_log);
     }
-    
+
     // 销毁锁
     if (sandbox->lock) {
         agentos_mutex_destroy(sandbox->lock);
     }
-    
+
     AGENTOS_FREE(sandbox);
 }
 
@@ -670,35 +670,35 @@ agentos_error_t agentos_sandbox_invoke(agentos_sandbox_t* sandbox,
                                        int argc,
                                        void** out_result) {
     if (!sandbox || !out_result) return AGENTOS_EINVAL;
-    
+
     uint64_t start_time_ns = get_timestamp_ns();
-    
+
     // 更新统计
     sandbox->call_count++;
     sandbox->last_active_ns = start_time_ns;
     if (g_sandbox_manager) {
         g_sandbox_manager->total_calls++;
     }
-    
+
     // 检查沙箱状�?
     agentos_mutex_lock(sandbox->lock);
     if (sandbox->state == SANDBOX_STATE_TERMINATED) {
         agentos_mutex_unlock(sandbox->lock);
-        add_audit_entry(sandbox, syscall_num, NULL, AGENTOS_EPERM, 
+        add_audit_entry(sandbox, syscall_num, NULL, AGENTOS_EPERM,
                        get_timestamp_ns() - start_time_ns, "Sandbox terminated");
         return AGENTOS_EPERM;
     }
-    
+
     if (sandbox->state == SANDBOX_STATE_SUSPENDED) {
         agentos_mutex_unlock(sandbox->lock);
         add_audit_entry(sandbox, syscall_num, NULL, AGENTOS_EBUSY,
                        get_timestamp_ns() - start_time_ns, "Sandbox suspended");
         return AGENTOS_EBUSY;
     }
-    
+
     sandbox->state = SANDBOX_STATE_ACTIVE;
     agentos_mutex_unlock(sandbox->lock);
-    
+
     // 检查权�?
     permission_type_t perm = check_permission(sandbox, syscall_num, args, argc);
     if (perm == PERM_DENY) {
@@ -706,47 +706,47 @@ agentos_error_t agentos_sandbox_invoke(agentos_sandbox_t* sandbox,
         if (g_sandbox_manager) {
             g_sandbox_manager->total_violations++;
         }
-        
+
         add_audit_entry(sandbox, syscall_num, NULL, AGENTOS_EACCES,
                        get_timestamp_ns() - start_time_ns, "Permission denied");
-        
+
         agentos_mutex_lock(sandbox->lock);
         sandbox->state = SANDBOX_STATE_IDLE;
         agentos_mutex_unlock(sandbox->lock);
-        
+
         return AGENTOS_EACCES;
     }
-    
+
     // 检查资源配�?
     if (!check_resource_quota(sandbox, RESOURCE_CPU, 1)) {
         add_audit_entry(sandbox, syscall_num, NULL, AGENTOS_EQUOTA,
                        get_timestamp_ns() - start_time_ns, "CPU quota exceeded");
-        
+
         agentos_mutex_lock(sandbox->lock);
         sandbox->state = SANDBOX_STATE_IDLE;
         agentos_mutex_unlock(sandbox->lock);
-        
+
         return AGENTOS_EQUOTA;
     }
-    
+
     // 执行系统调用
     void* result = agentos_syscall_invoke(syscall_num, args, argc);
     *out_result = result;
-    
+
     int result_code = (int)(intptr_t)result;
     uint64_t duration_ns = get_timestamp_ns() - start_time_ns;
-    
+
     // 添加审计日志
     char details[256];
-    snprintf(details, sizeof(details), "Syscall %d completed in %llu ns", 
+    snprintf(details, sizeof(details), "Syscall %d completed in %llu ns",
              syscall_num, (unsigned long long)duration_ns);
     add_audit_entry(sandbox, syscall_num, NULL, result_code, duration_ns, details);
-    
+
     // 更新状�?
     agentos_mutex_lock(sandbox->lock);
     sandbox->state = SANDBOX_STATE_IDLE;
     agentos_mutex_unlock(sandbox->lock);
-    
+
     return AGENTOS_SUCCESS;
 }
 
@@ -763,24 +763,24 @@ agentos_error_t agentos_sandbox_add_rule(agentos_sandbox_t* sandbox,
                                          permission_type_t perm_type,
                                          const char* condition) {
     if (!sandbox) return AGENTOS_EINVAL;
-    
+
     permission_rule_t* rule = create_permission_rule(syscall_num, perm_type, condition);
     if (!rule) {
         AGENTOS_LOG_ERROR("Failed to create permission rule");
         return AGENTOS_ENOMEM;
     }
-    
+
     agentos_mutex_lock(sandbox->lock);
-    
+
     rule->next = sandbox->rules;
     sandbox->rules = rule;
     sandbox->rule_count++;
-    
+
     agentos_mutex_unlock(sandbox->lock);
-    
+
     AGENTOS_LOG_DEBUG("Added permission rule to sandbox %llu: syscall=%d, perm=%d",
                      (unsigned long long)sandbox->sandbox_id, syscall_num, perm_type);
-    
+
     return AGENTOS_SUCCESS;
 }
 
@@ -792,44 +792,44 @@ agentos_error_t agentos_sandbox_add_rule(agentos_sandbox_t* sandbox,
  */
 agentos_error_t agentos_sandbox_get_stats(agentos_sandbox_t* sandbox, char** out_stats) {
     if (!sandbox || !out_stats) return AGENTOS_EINVAL;
-    
+
     cJSON* stats_json = cJSON_CreateObject();
     if (!stats_json) return AGENTOS_ENOMEM;
-    
+
     agentos_mutex_lock(sandbox->lock);
-    
+
     cJSON_AddNumberToObject(stats_json, "sandbox_id", sandbox->sandbox_id);
-    cJSON_AddStringToObject(stats_json, "sandbox_name", 
+    cJSON_AddStringToObject(stats_json, "sandbox_name",
                            sandbox->sandbox_name ? sandbox->sandbox_name : "unnamed");
     cJSON_AddNumberToObject(stats_json, "state", sandbox->state);
     cJSON_AddNumberToObject(stats_json, "call_count", sandbox->call_count);
     cJSON_AddNumberToObject(stats_json, "violation_count", sandbox->violation_count);
     cJSON_AddNumberToObject(stats_json, "rule_count", sandbox->rule_count);
     cJSON_AddNumberToObject(stats_json, "audit_count", sandbox->audit_count);
-    
+
     // 资源使用
     cJSON* quota_json = cJSON_CreateObject();
-    cJSON_AddNumberToObject(quota_json, "max_memory_bytes", 
+    cJSON_AddNumberToObject(quota_json, "max_memory_bytes",
                            sandbox->manager.quota.max_memory_bytes);
-    cJSON_AddNumberToObject(quota_json, "current_memory", 
+    cJSON_AddNumberToObject(quota_json, "current_memory",
                            sandbox->manager.quota.current_memory);
-    cJSON_AddNumberToObject(quota_json, "max_cpu_time_ms", 
+    cJSON_AddNumberToObject(quota_json, "max_cpu_time_ms",
                            sandbox->manager.quota.max_cpu_time_ms);
-    cJSON_AddNumberToObject(quota_json, "current_cpu_time_ms", 
+    cJSON_AddNumberToObject(quota_json, "current_cpu_time_ms",
                            sandbox->manager.quota.current_cpu_time_ms);
-    cJSON_AddNumberToObject(quota_json, "max_io_ops", 
+    cJSON_AddNumberToObject(quota_json, "max_io_ops",
                            sandbox->manager.quota.max_io_ops);
-    cJSON_AddNumberToObject(quota_json, "current_io_ops", 
+    cJSON_AddNumberToObject(quota_json, "current_io_ops",
                            sandbox->manager.quota.current_io_ops);
     cJSON_AddItemToObject(stats_json, "quota", quota_json);
-    
+
     agentos_mutex_unlock(sandbox->lock);
-    
+
     char* stats_str = cJSON_PrintUnformatted(stats_json);
     cJSON_Delete(stats_json);
-    
+
     if (!stats_str) return AGENTOS_ENOMEM;
-    
+
     *out_stats = stats_str;
     return AGENTOS_SUCCESS;
 }
@@ -841,33 +841,33 @@ agentos_error_t agentos_sandbox_get_stats(agentos_sandbox_t* sandbox, char** out
  */
 agentos_error_t agentos_sandbox_manager_get_stats(char** out_stats) {
     if (!out_stats) return AGENTOS_EINVAL;
-    
+
     if (!g_sandbox_manager) {
         *out_stats = AGENTOS_STRDUP("{\"error\":\"manager not initialized\"}");
         return AGENTOS_ENOTINIT;
     }
-    
+
     cJSON* stats_json = cJSON_CreateObject();
     if (!stats_json) return AGENTOS_ENOMEM;
-    
+
     agentos_mutex_lock(g_manager_lock);
-    
+
     cJSON_AddNumberToObject(stats_json, "sandbox_count", g_sandbox_manager->sandbox_count);
     cJSON_AddNumberToObject(stats_json, "total_calls", g_sandbox_manager->total_calls);
     cJSON_AddNumberToObject(stats_json, "total_violations", g_sandbox_manager->total_violations);
     cJSON_AddNumberToObject(stats_json, "global_audit_count", g_sandbox_manager->global_audit_count);
-    
+
     double violation_rate = g_sandbox_manager->total_calls > 0 ?
                            (double)g_sandbox_manager->total_violations / g_sandbox_manager->total_calls * 100.0 : 0.0;
     cJSON_AddNumberToObject(stats_json, "violation_rate_percent", violation_rate);
-    
+
     agentos_mutex_unlock(g_manager_lock);
-    
+
     char* stats_str = cJSON_PrintUnformatted(stats_json);
     cJSON_Delete(stats_json);
-    
+
     if (!stats_str) return AGENTOS_ENOMEM;
-    
+
     *out_stats = stats_str;
     return AGENTOS_SUCCESS;
 }
@@ -878,15 +878,15 @@ agentos_error_t agentos_sandbox_manager_get_stats(char** out_stats) {
  */
 void agentos_sandbox_reset_quota(agentos_sandbox_t* sandbox) {
     if (!sandbox) return;
-    
+
     agentos_mutex_lock(sandbox->lock);
-    
+
     sandbox->manager.quota.current_memory = 0;
     sandbox->manager.quota.current_cpu_time_ms = 0;
     sandbox->manager.quota.current_io_ops = 0;
-    
+
     agentos_mutex_unlock(sandbox->lock);
-    
+
     AGENTOS_LOG_DEBUG("Sandbox %llu quota reset", (unsigned long long)sandbox->sandbox_id);
 }
 
@@ -897,18 +897,18 @@ void agentos_sandbox_reset_quota(agentos_sandbox_t* sandbox) {
  */
 agentos_error_t agentos_sandbox_suspend(agentos_sandbox_t* sandbox) {
     if (!sandbox) return AGENTOS_EINVAL;
-    
+
     agentos_mutex_lock(sandbox->lock);
-    
+
     if (sandbox->state == SANDBOX_STATE_TERMINATED) {
         agentos_mutex_unlock(sandbox->lock);
         return AGENTOS_EPERM;
     }
-    
+
     sandbox->state = SANDBOX_STATE_SUSPENDED;
-    
+
     agentos_mutex_unlock(sandbox->lock);
-    
+
     AGENTOS_LOG_INFO("Sandbox %llu suspended", (unsigned long long)sandbox->sandbox_id);
     return AGENTOS_SUCCESS;
 }
@@ -920,18 +920,18 @@ agentos_error_t agentos_sandbox_suspend(agentos_sandbox_t* sandbox) {
  */
 agentos_error_t agentos_sandbox_resume(agentos_sandbox_t* sandbox) {
     if (!sandbox) return AGENTOS_EINVAL;
-    
+
     agentos_mutex_lock(sandbox->lock);
-    
+
     if (sandbox->state == SANDBOX_STATE_TERMINATED) {
         agentos_mutex_unlock(sandbox->lock);
         return AGENTOS_EPERM;
     }
-    
+
     sandbox->state = SANDBOX_STATE_IDLE;
-    
+
     agentos_mutex_unlock(sandbox->lock);
-    
+
     AGENTOS_LOG_INFO("Sandbox %llu resumed", (unsigned long long)sandbox->sandbox_id);
     return AGENTOS_SUCCESS;
 }
@@ -943,13 +943,13 @@ agentos_error_t agentos_sandbox_resume(agentos_sandbox_t* sandbox) {
  */
 agentos_error_t agentos_sandbox_terminate(agentos_sandbox_t* sandbox) {
     if (!sandbox) return AGENTOS_EINVAL;
-    
+
     agentos_mutex_lock(sandbox->lock);
-    
+
     sandbox->state = SANDBOX_STATE_TERMINATED;
-    
+
     agentos_mutex_unlock(sandbox->lock);
-    
+
     AGENTOS_LOG_INFO("Sandbox %llu terminated", (unsigned long long)sandbox->sandbox_id);
     return AGENTOS_SUCCESS;
 }
@@ -962,15 +962,15 @@ agentos_error_t agentos_sandbox_terminate(agentos_sandbox_t* sandbox) {
  */
 agentos_error_t agentos_sandbox_health_check(agentos_sandbox_t* sandbox, char** out_json) {
     if (!sandbox || !out_json) return AGENTOS_EINVAL;
-    
+
     cJSON* health_json = cJSON_CreateObject();
     if (!health_json) return AGENTOS_ENOMEM;
-    
+
     agentos_mutex_lock(sandbox->lock);
-    
+
     cJSON_AddStringToObject(health_json, "component", "sandbox");
     cJSON_AddNumberToObject(health_json, "sandbox_id", sandbox->sandbox_id);
-    
+
     const char* state_str = "unknown";
     switch (sandbox->state) {
         case SANDBOX_STATE_IDLE: state_str = "idle"; break;
@@ -979,7 +979,7 @@ agentos_error_t agentos_sandbox_health_check(agentos_sandbox_t* sandbox, char** 
         case SANDBOX_STATE_TERMINATED: state_str = "terminated"; break;
     }
     cJSON_AddStringToObject(health_json, "state", state_str);
-    
+
     // 检查资源使用是否健�?
     int resources_healthy = 1;
     if (sandbox->manager.quota.current_memory > sandbox->manager.quota.max_memory_bytes * 0.9) {
@@ -988,18 +988,18 @@ agentos_error_t agentos_sandbox_health_check(agentos_sandbox_t* sandbox, char** 
     if (sandbox->manager.quota.current_cpu_time_ms > sandbox->manager.quota.max_cpu_time_ms * 0.9) {
         resources_healthy = 0;
     }
-    
+
     cJSON_AddStringToObject(health_json, "status", resources_healthy ? "healthy" : "warning");
     cJSON_AddBoolToObject(health_json, "resources_healthy", resources_healthy);
     cJSON_AddNumberToObject(health_json, "timestamp_ns", get_timestamp_ns());
-    
+
     agentos_mutex_unlock(sandbox->lock);
-    
+
     char* health_str = cJSON_PrintUnformatted(health_json);
     cJSON_Delete(health_json);
-    
+
     if (!health_str) return AGENTOS_ENOMEM;
-    
+
     *out_json = health_str;
     return AGENTOS_SUCCESS;
 }

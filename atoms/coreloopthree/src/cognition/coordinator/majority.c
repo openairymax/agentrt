@@ -55,7 +55,7 @@ static agentos_error_t majority_coordinate(
         *out_result = AGENTOS_STRDUP("insufficient_voters");
         return AGENTOS_SUCCESS;
     }
-    
+
     if (input_count == 0) {
         *out_result = AGENTOS_STRDUP("no_votes");
         return AGENTOS_SUCCESS;

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_config.c
  * @brief manager.h 单元测试
  */
@@ -7,8 +7,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../commons/utils/memory/include/memory_compat.h"
-#include "../commons/utils/string/include/string_compat.h"
+#include "../../utils/memory/include/memory_compat.h"
+#include "../../utils/string/include/string_compat.h"
 #include "manager.h"
 
 #define TEST_ASSERT(condition, message) \

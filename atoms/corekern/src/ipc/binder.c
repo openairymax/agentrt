@@ -2,13 +2,13 @@
  * @file binder.c
  * @brief Binder 风格 IPC 实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
- * 
+ *
  * @details
  * 本模块实现高效的进程间通信机制�?
  * - 同步调用（带超时�?
  * - 异步发�?
  * - 回复机制
- * 
+ *
  * 使用条件变量优化超时等待，避免忙轮询消耗CPU资源�?
  */
 
@@ -74,7 +74,7 @@ typedef struct pending_call {
     size_t* response_size_ptr;
     volatile int completed;
     struct pending_call* next;
-    
+
     /* 条件变量用于高效等待 */
     agentos_cond_t* cond;
     agentos_mutex_t* cond_lock;
@@ -155,20 +155,20 @@ static void remove_pending_call_locked(
 static pending_call_t* pending_call_create(void) {
     pending_call_t* pc = (pending_call_t*)AGENTOS_CALLOC(1, sizeof(pending_call_t));
     if (!pc) return NULL;
-    
+
     pc->cond_lock = agentos_mutex_create();
     if (!pc->cond_lock) {
         AGENTOS_FREE(pc);
         return NULL;
     }
-    
+
     pc->cond = agentos_cond_create();
     if (!pc->cond) {
         agentos_mutex_destroy(pc->cond_lock);
         AGENTOS_FREE(pc);
         return NULL;
     }
-    
+
     return pc;
 }
 
@@ -341,7 +341,7 @@ agentos_error_t agentos_ipc_connect(
  * @param response_size 响应大小
  * @param timeout_ms 超时毫秒
  * @return AGENTOS_SUCCESS 成功
- * 
+ *
  * @note 使用条件变量实现高效等待，避免忙轮询
  */
 agentos_error_t agentos_ipc_call(
@@ -359,7 +359,7 @@ agentos_error_t agentos_ipc_call(
 
     pending_call_t* pc = pending_call_create();
     if (!pc) return AGENTOS_ENOMEM;
-    
+
     pc->msg_id = call_msg.msg_id;
     pc->response_buf = response;
     pc->response_capacity = response_size ? *response_size : 0;
@@ -394,32 +394,32 @@ agentos_error_t agentos_ipc_call(
 
     /* 使用条件变量等待，避免忙轮询 */
     agentos_mutex_lock(pc->cond_lock);
-    
+
     uint64_t start_time = agentos_time_ms();
     while (!ATOMIC_LOAD(&pc->completed)) {
         uint64_t elapsed = agentos_time_ms() - start_time;
         if (elapsed >= timeout_ms) {
             agentos_mutex_unlock(pc->cond_lock);
-            
+
             agentos_mutex_lock(channel->lock);
             remove_pending_call_locked(channel, pc);
             agentos_mutex_unlock(channel->lock);
             pending_call_destroy(pc);
             return AGENTOS_ETIMEDOUT;
         }
-        
+
         uint32_t remaining = (uint32_t)(timeout_ms - elapsed);
         if (remaining > 100) remaining = 100; /* 最多等�?00ms后检�?*/
-        
+
         agentos_cond_wait(pc->cond, pc->cond_lock, remaining);
     }
-    
+
     agentos_mutex_unlock(pc->cond_lock);
 
     agentos_mutex_lock(channel->lock);
     remove_pending_call_locked(channel, pc);
     agentos_mutex_unlock(channel->lock);
-    
+
     pending_call_destroy(pc);
 
     return AGENTOS_SUCCESS;
@@ -481,7 +481,7 @@ agentos_error_t agentos_ipc_reply(
     }
 
     ATOMIC_STORE(&pc->completed, 1);
-    
+
     /* 唤醒等待的线�?*/
     if (pc->cond) {
         agentos_cond_signal(pc->cond);

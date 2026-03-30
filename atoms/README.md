@@ -2,9 +2,9 @@
 
 > **AgentOS Microkernel Implementation Layer - 微内核实现层**
 
-**版本**: v1.0.0.6  
-**最后更新**: 2026-03-26  
-**许可证**: Apache License 2.0  
+**版本**: v1.0.0.6
+**最后更新**: 2026-03-26
+**许可证**: Apache License 2.0
 **生产级状态**: 99.9999% Production Ready
 
 ---
@@ -156,7 +156,7 @@ ctest --output-on-failure
 
 > **The Foundation of AgentOS - AgentOS 的基石**
 
-**代码量**: ~9,000 LOC  
+**代码量**: ~9,000 LOC
 **职责**: 提供最基本的 OS 机制，确保系统稳定性和性能
 
 | 组件 | 功能 | 性能指标 | 实现细节 |
@@ -177,20 +177,20 @@ int main(void) {
     if (err != AGENTOS_SUCCESS) {
         return 1;
     }
-    
+
     // 创建任务
     task_handle_t task = agentos_task_create(my_function, arg);
     if (task == NULL) {
         agentos_cleanup();
         return 1;
     }
-    
+
     // 等待完成（5 秒超时）
     err = agentos_task_wait(task, 5000);
     if (err != AGENTOS_SUCCESS) {
         // 错误处理
     }
-    
+
     // 清理
     agentos_cleanup();
     return 0;
@@ -211,7 +211,7 @@ int main(void) {
 
 > **Complete Agent Lifecycle Management - 智能体完整生命周期管理**
 
-**代码量**: ~15,000 LOC  
+**代码量**: ~15,000 LOC
 **职责**: 实现智能体的认知、行动、记忆三层核心循环
 
 #### 架构图
@@ -250,27 +250,27 @@ int main(void) {
     if (err != AGENTOS_SUCCESS) {
         return 1;
     }
-    
+
     // 提交任务
     char* task_id = NULL;
     const char* task_content = "分析销售数据";
     err = agentos_loop_submit(
-        loop, 
-        task_content, 
-        strlen(task_content), 
+        loop,
+        task_content,
+        strlen(task_content),
         &task_id
     );
-    
+
     // 等待结果（30 秒超时）
     char* result = NULL;
     err = agentos_loop_wait(loop, task_id, 30000, &result, NULL);
-    
+
     // 处理结果
     if (err == AGENTOS_SUCCESS) {
         printf("Result: %s\n", result);
         agentos_free(result);
     }
-    
+
     // 销毁循环
     agentos_loop_destroy(loop);
     return 0;
@@ -283,7 +283,7 @@ int main(void) {
 - 🚀 执行引擎吞吐量：1000+ 操作/秒
 - 🚀 记忆检索延迟：< 10ms
 
-**详细文档**: [coreloopthree/README.md](coreloopthree/README.md)  
+**详细文档**: [coreloopthree/README.md](coreloopthree/README.md)
 **架构说明**: [paper/architecture/folder/coreloopthree.md](../paper/architecture/folder/coreloopthree.md)
 
 ---
@@ -292,7 +292,7 @@ int main(void) {
 
 > **From Raw Data to Advanced Patterns - 从原始数据到高级模式**
 
-**代码量**: ~20,000 LOC  
+**代码量**: ~20,000 LOC
 **职责**: 提供从原始事件存储到高级模式挖掘的完整记忆管理能力
 
 #### 四层架构
@@ -363,7 +363,7 @@ agentos_mrl_storage_destroy(&storage);
 
 > **The Only Bridge Between User and Kernel - 用户态与内核的唯一桥梁**
 
-**代码量**: ~3,000 LOC  
+**代码量**: ~3,000 LOC
 **职责**: 提供用户态程序与内核交互的标准接口，所有系统调用均为线程安全
 
 #### 核心接口分类

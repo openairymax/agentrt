@@ -27,7 +27,8 @@ agentos_error_t agentos_pattern_validator_create(
     agentos_pattern_validator_t* val = (agentos_pattern_validator_t*)AGENTOS_CALLOC(1, sizeof(agentos_pattern_validator_t));
     if (!val) return AGENTOS_ENOMEM;
 
-// From data intelligence emerges. by spharx
+
+// From data intelligence emerges. by spharx
     val->min_confidence = 0.5;
     val->min_support = 3;
     val->lock = agentos_mutex_create();

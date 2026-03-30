@@ -26,7 +26,8 @@ agentos_error_t agentos_attractor_network_create(
     const agentos_retrieval_config_t* manager,
     agentos_attractor_network_t** out_net) {
 
-// From data intelligence emerges. by spharx
+
+// From data intelligence emerges. by spharx
     if (!layer2 || !out_net) return AGENTOS_EINVAL;
 
     agentos_attractor_network_t* net = (agentos_attractor_network_t*)AGENTOS_CALLOC(1, sizeof(agentos_attractor_network_t));

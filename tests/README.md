@@ -426,23 +426,23 @@ TOTAL                                      2456    185    92%
  */
 static void test_cognition_create_destroy() {
     printf("Running test_cognition_create_destroy...\n");
-    
+
     agentos_cognition_engine_t* engine = NULL;
-    
+
     // 测试正常创建
     agentos_error_t err = agentos_cognition_create(NULL, &engine);
     if (err != AGENTOS_SUCCESS) {
         printf("  ❌ Failed to create cognition engine: %d\n", err);
         return;
     }
-    
+
     if (engine == NULL) {
         printf("  ❌ Engine pointer is NULL\n");
         return;
     }
-    
+
     printf("  ✅ Cognition engine created successfully\n");
-    
+
     // 测试销毁
     agentos_cognition_destroy(engine);
     printf("  ✅ Cognition engine destroyed\n");
@@ -453,36 +453,36 @@ static void test_cognition_create_destroy() {
  */
 static void test_cognition_intent_understanding() {
     printf("Running test_cognition_intent_understanding...\n");
-    
+
     agentos_cognition_engine_t* engine = NULL;
     agentos_error_t err = agentos_cognition_create(NULL, &engine);
     if (err != AGENTOS_SUCCESS) {
         printf("  ❌ Setup failed\n");
         return;
     }
-    
+
     // 测试意图解析
     const char* user_input = "分析上季度销售数据";
     agentos_intent_t* intent = NULL;
-    
+
     err = agentos_cognition_process_intent(engine, user_input, &intent);
-    
+
     if (err == AGENTOS_SUCCESS && intent != NULL) {
         printf("  ✅ Intent parsed: %s\n", intent->intent_type);
         agentos_intent_destroy(intent);
     } else {
         printf("  ❌ Failed to parse intent: %d\n", err);
     }
-    
+
     agentos_cognition_destroy(engine);
 }
 
 int main() {
     printf("=== Testing Cognition Module ===\n");
-    
+
     test_cognition_create_destroy();
     test_cognition_intent_understanding();
-    
+
     printf("=== Cognition Module Tests Complete ===\n");
     return 0;
 }
@@ -508,7 +508,7 @@ from tests.utils.test_helpers import (
 
 class TestAgentOSSDK:
     """AgentOS SDK 测试"""
-    
+
     @pytest.fixture
     def mock_session(self):
         """提供 Mock Session"""
@@ -516,7 +516,7 @@ class TestAgentOSSDK:
             response_data={"status": "ok"},
             status_code=200
         )
-    
+
     @pytest.fixture
     def valid_agent_data(self) -> Dict[str, Any]:
         """提供有效的 Agent 数据"""
@@ -525,18 +525,18 @@ class TestAgentOSSDK:
             .with_field("role", "software_engineer") \
             .with_field("version", "1.0.0") \
             .build()
-    
+
     @with_mock_session
     def test_agent_creation(self, mock_session, valid_agent_data):
         """测试 Agent 创建"""
         from agentos import AgentOS
-        
+
         client = AgentOS(api_key="test_key")
         result = client.create_agent(**valid_agent_data)
-        
+
         assert result is not None
         assert result["status"] == "ok"
-    
+
     def test_data_builder(self, valid_agent_data):
         """测试数据构建器"""
         assert valid_agent_data["agent_id"] == "agent_001"
@@ -561,7 +561,7 @@ from tests.integration.coreloopthree.test_cognition_execution import (
 
 class TestCognitionExecutionFlow:
     """认知 - 执行流程测试"""
-    
+
     @pytest.fixture
     def cognition_engine(self):
         """创建认知引擎 Mock"""
@@ -580,7 +580,7 @@ class TestCognitionExecutionFlow:
             ]
         })
         return engine
-    
+
     @pytest.fixture
     def execution_engine(self):
         """创建执行引擎 Mock"""
@@ -590,17 +590,17 @@ class TestCognitionExecutionFlow:
             "result": {"data": "analysis_result"}
         })
         return engine
-    
+
     def test_complete_flow(self, cognition_engine, execution_engine):
         """测试完整的认知 - 执行流程"""
         # 1. 认知层处理意图
         intent = cognition_engine.process_intent("分析销售数据")
         assert intent["confidence"] > 0.8
-        
+
         # 2. 生成计划
         plan = cognition_engine.generate_plan(intent)
         assert len(plan["steps"]) > 0
-        
+
         # 3. 执行层执行每个步骤
         for step in plan["steps"]:
             result = execution_engine.execute_step(step)
@@ -629,18 +629,18 @@ REQUIRED_FIELD_TEST_CASES = [
 
 class TestAgentContractValidator:
     """Agent 契约验证器测试"""
-    
+
     @pytest.fixture
     def validator(self):
         """提供验证器实例"""
         from agentos.contracts import AgentContractValidator
         return AgentContractValidator()
-    
+
     @pytest.fixture
     def valid_contract(self):
         """提供有效契约"""
         return ContractTestHelper.create_valid_contract()
-    
+
     @pytest.mark.parametrize("test_case", REQUIRED_FIELD_TEST_CASES,
                            ids=lambda tc: tc["name"])
     def test_missing_required_field_fails(self, valid_contract, validator, test_case):
@@ -648,9 +648,9 @@ class TestAgentContractValidator:
         invalid_contract = ContractTestHelper.create_invalid_contract(
             missing_field=test_case["name"]
         )
-        
+
         is_valid = validator.validate(invalid_contract)
-        
+
         assert is_valid is False
         assert_error_contains(validator.errors, test_case["expected_error"])
 ```
@@ -674,19 +674,19 @@ class TestAgentContractValidator:
  */
 static void benchmark_memory_write() {
     printf("=== Memory Write Benchmark ===\n");
-    
+
     const int iterations = 10000;
     clock_t start = clock();
-    
+
     for (int i = 0; i < iterations; i++) {
         // 模拟记忆写入操作
         // 实际测试中会使用真实的 memory 引擎
     }
-    
+
     clock_t end = clock();
     double duration = (double)(end - start) / CLOCKS_PER_SEC * 1000;
     double throughput = iterations / duration * 1000;
-    
+
     printf("  Iterations: %d\n", iterations);
     printf("  Duration: %.2f ms\n", duration);
     printf("  Throughput: %.0f ops/sec\n", throughput);
@@ -698,18 +698,18 @@ static void benchmark_memory_write() {
  */
 static void benchmark_memory_query() {
     printf("=== Memory Query Benchmark ===\n");
-    
+
     const int queries = 1000;
     clock_t start = clock();
-    
+
     for (int i = 0; i < queries; i++) {
         // 模拟记忆检索操作
     }
-    
+
     clock_t end = clock();
     double duration = (double)(end - start) / CLOCKS_PER_SEC * 1000;
     double avg_latency = duration / queries;
-    
+
     printf("  Queries: %d\n", queries);
     printf("  Duration: %.2f ms\n", duration);
     printf("  Avg Latency: %.3f ms\n", avg_latency);
@@ -718,11 +718,11 @@ static void benchmark_memory_query() {
 
 int main() {
     printf("=== CoreLoopThree Performance Benchmarks ===\n\n");
-    
+
     benchmark_memory_write();
     printf("\n");
     benchmark_memory_query();
-    
+
     printf("\n=== Benchmark Tests Complete ===\n");
     return 0;
 }
@@ -753,19 +753,19 @@ from tests.utils.test_helpers import (
     # Mock 工厂
     create_mock_response,      # 创建 Mock 响应
     create_mock_session,       # 创建 Mock Session
-    
+
     # 装饰器
     with_mock_session,         # 自动 Mock Session
     @performance_test,         # 性能测试装饰器
-    
+
     # 断言辅助
     assert_dict_contains,      # 字典包含检查
     assert_error_contains,     # 错误消息检查
-    
+
     # 数据构建器
     TestDataBuilder,           # 链式数据构建
     ContractTestHelper,        # 契约测试辅助
-    
+
     # 测试隔离
     TestIsolation             # 测试环境隔离
 )
@@ -809,10 +809,10 @@ def test_example():
     # Arrange（准备）
     validator = Validator()
     data = {"field": "value"}
-    
+
     # Act（执行）
     result = validator.validate(data)
-    
+
     # Assert（断言）
     assert result is True
 ```

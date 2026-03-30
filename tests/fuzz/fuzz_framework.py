@@ -1,4 +1,4 @@
-﻿﻿﻿﻿"""
+﻿﻿﻿﻿﻿﻿"""
 AgentOS 模糊测试框架
 Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 Version: 1.0.0
@@ -43,25 +43,25 @@ class FuzzTestResult:
 class FuzzTestFramework:
     """
     模糊测试框架
-    
+
     提供基于 Hypothesis 和 Atheris 的模糊测试能力，
     用于发现解析器和输入处理模块的边界条件和潜在漏洞。
     """
-    
+
     def __init__(self, output_dir: Optional[str] = None):
         """
         初始化模糊测试框架
-        
+
         Args:
             output_dir: 测试报告输出目录
         """
         self.output_dir = output_dir or tempfile.mkdtemp()
         self.results: List[FuzzTestResult] = []
-        
+
     def run_all_tests(self) -> Dict[str, Any]:
         """
         运行所有模糊测试
-        
+
         Returns:
             测试结果汇总
         """
@@ -76,13 +76,13 @@ class FuzzTestFramework:
                 "total_runs": 0
             }
         }
-        
+
         return results
 
 
 # Hypothesis 策略定义
 if HYPOTHESIS_AVAILABLE:
-    
+
     @composite
     def json_values(draw):
         """生成任意JSON值的策略"""
@@ -95,7 +95,7 @@ if HYPOTHESIS_AVAILABLE:
             st.lists(st.deferred(lambda: json_values())),
             st.dictionaries(st.text(), st.deferred(lambda: json_values()))
         ))
-    
+
     @composite
     def contract_payloads(draw):
         """生成契约测试载荷的策略"""
@@ -112,7 +112,7 @@ if HYPOTHESIS_AVAILABLE:
             min_size=1,
             max_size=20
         ))
-    
+
     @composite
     def sql_injection_payloads(draw):
         """生成SQL注入测试载荷的策略"""
@@ -129,7 +129,7 @@ if HYPOTHESIS_AVAILABLE:
             st.sampled_from(base_payloads),
             st.text(alphabet=st.characters(blacklist_categories=('Cs',)))
         ))
-    
+
     @composite
     def xss_payloads(draw):
         """生成XSS测试载荷的策略"""
@@ -145,7 +145,7 @@ if HYPOTHESIS_AVAILABLE:
             st.sampled_from(base_payloads),
             st.text(alphabet=st.characters(blacklist_categories=('Cs',)))
         ))
-    
+
     @composite
     def path_traversal_payloads(draw):
         """生成路径遍历测试载荷的策略"""
@@ -165,71 +165,71 @@ if HYPOTHESIS_AVAILABLE:
 class InputSanitizerFuzzTests:
     """
     输入净化器模糊测试
-    
+
     测试输入净化模块对各种恶意输入的处理能力。
     """
-    
+
     def __init__(self):
         self.failures = []
-    
+
     @staticmethod
     def sanitize_input(data: str) -> str:
         """
         简化的输入净化函数（用于测试）
-        
+
         Args:
             data: 输入字符串
-            
+
         Returns:
             净化后的字符串
         """
         if not isinstance(data, str):
             return ""
-        
+
         result = data
-        
+
         result = result.replace("<", "&lt;")
         result = result.replace(">", "&gt;")
         result = result.replace("'", "&#39;")
         result = result.replace('"', "&quot;")
-        
+
         dangerous_patterns = [
             "javascript:", "vbscript:", "onerror=", "onload=",
             "onclick=", "onmouseover=", "<script", "</script>"
         ]
         for pattern in dangerous_patterns:
             result = result.lower().replace(pattern, "")
-        
+
         return result
-    
+
     @staticmethod
     def validate_path(path: str) -> bool:
         """
         验证路径是否安全
-        
+
         Args:
             path: 文件路径
-            
+
         Returns:
             是否为安全路径
         """
         if not isinstance(path, str):
             return False
-        
+
         dangerous_patterns = ["../", "..\\", "%2e%2e", "..%252f"]
         path_lower = path.lower()
-        
+
         for pattern in dangerous_patterns:
             if pattern in path_lower:
                 return False
-        
+
         return True
 
 
 if HYPOTHESIS_AVAILABLE:
     fuzz_framework = FuzzTestFramework()
     sanitizer_tests = InputSanitizerFuzzTests()
-    
+
     @given(payload=xss_payloads())
     @settings(max_examples=100, deadline=None)
     def test_xss_sanitization_fuzz(payload: str):
@@ -237,7 +237,7 @@ if HYPOTHESIS_AVAILABLE:
         sanitized = sanitizer_tests.sanitize_input(payload)
         assert "<script>" not in sanitized.lower()
         assert "javascript:" not in sanitized.lower()
-    
+
     @given(payload=path_traversal_payloads())
     @settings(max_examples=100, deadline=None)
     def test_path_traversal_fuzz(payload: str):
@@ -245,7 +245,7 @@ if HYPOTHESIS_AVAILABLE:
         is_safe = sanitizer_tests.validate_path(payload)
         if "../" in payload or "..\\" in payload:
             assert is_safe is False
-    
+
     @given(data=json_values())
     @settings(max_examples=50, deadline=None)
     def test_json_parsing_fuzz(data: Any):
@@ -261,7 +261,7 @@ if HYPOTHESIS_AVAILABLE:
 def run_fuzz_tests():
     """
     运行所有模糊测试
-    
+
     Returns:
         测试结果
     """
@@ -272,12 +272,12 @@ def run_fuzz_tests():
         "tests_run": 0,
         "failures": []
     }
-    
+
     if not HYPOTHESIS_AVAILABLE:
         results["status"] = "skipped"
         results["message"] = "Hypothesis not installed. Run: pip install hypothesis"
         return results
-    
+
     try:
         import pytest
         pytest.main([
@@ -290,7 +290,7 @@ def run_fuzz_tests():
     except Exception as e:
         results["status"] = "error"
         results["error"] = str(e)
-    
+
     return results
 
 
@@ -299,7 +299,7 @@ if __name__ == "__main__":
     print("AgentOS 模糊测试框架")
     print("Copyright (c) 2026 SPHARX Ltd.")
     print("=" * 60)
-    
+
     results = run_fuzz_tests()
     print(f"\n测试状态: {results['status']}")
     print(f"Hypothesis 可用: {results['hypothesis_available']}")

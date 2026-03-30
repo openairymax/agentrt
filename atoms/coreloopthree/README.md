@@ -1,8 +1,8 @@
 ﻿# CoreLoopThree：三层核心运行时
 
-**版本**: v1.0.0.6  
-**路径**: `atoms/coreloopthree/`  
-**最后更�?*: 2026-03-26  
+**版本**: v1.0.0.6
+**路径**: `atoms/coreloopthree/`
+**最后更�?*: 2026-03-26
 **许可�?*: Apache License 2.0
 
 ---
@@ -97,9 +97,9 @@ int main() {
 ```c
 char* task_id = NULL;
 agentos_error_t err = agentos_loop_submit(
-    loop, 
-    "帮我分析最近的销售数�?, 
-    strlen("帮我分析最近的销售数�?), 
+    loop,
+    "帮我分析最近的销售数�?,
+    strlen("帮我分析最近的销售数�?),
     &task_id
 );
 if (err == AGENTOS_SUCCESS) {
@@ -115,10 +115,10 @@ if (err == AGENTOS_SUCCESS) {
 char* result = NULL;
 size_t result_len = 0;
 agentos_error_t err = agentos_loop_wait(
-    loop, 
-    task_id, 
+    loop,
+    task_id,
     30000, // 30秒超�?
-    &result, 
+    &result,
     &result_len
 );
 if (err == AGENTOS_SUCCESS) {

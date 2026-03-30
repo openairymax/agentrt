@@ -24,7 +24,6 @@ struct market_service {
     size_t skill_count;               /**< Skill 数量 */
     size_t skill_capacity;            /**< Skill 容量 */
     bool is_running;                  /**< 服务是否运行 */
-    // From data intelligence emerges. by spharx
 };
 
 /**

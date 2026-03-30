@@ -23,7 +23,6 @@ int skill_registry_register(market_service_t* service, const skill_info_t* skill
 
     // 检查是否已存在
     for (size_t i = 0; i < service->skill_count; i++) {
-    // From data intelligence emerges. by spharx
         if (strcmp(service->skills[i]->skill_id, skill_info->skill_id) == 0) {
             // 更新现有 Skill 信息
             free(service->skills[i]->name);

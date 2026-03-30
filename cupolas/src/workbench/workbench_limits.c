@@ -105,7 +105,7 @@ static int setup_windows_job(limit_context_t* ctx) {
 
     ctx->job_handle = CreateJobObject(NULL, NULL);
     if (ctx->job_handle == NULL) {
-        return -1;
+        return cupolas_ERROR_UNKNOWN;
     }
 
     JOBOBJECT_BASIC_LIMIT_INFORMATION limits = {0};
@@ -132,7 +132,7 @@ static int setup_windows_job(limit_context_t* ctx) {
                                 sizeof(limits))) {
         CloseHandle(ctx->job_handle);
         ctx->job_handle = INVALID_HANDLE_VALUE;
-        return -1;
+        return cupolas_ERROR_UNKNOWN;
     }
 
     JOBOBJECT_SECURITY_LIMIT_INFORMATION secInfo = {0};
@@ -147,15 +147,15 @@ static int setup_windows_job(limit_context_t* ctx) {
 #endif
 
 int limits_attach(limit_context_t* ctx) {
-    if (!ctx) return -1;
+    if (!ctx) return cupolas_ERROR_INVALID_ARG;
 
 #ifdef cupolas_PLATFORM_WINDOWS
     if (setup_windows_job(ctx) != 0) {
-        return -1;
+        return cupolas_ERROR_UNKNOWN;
     }
 
     if (!AssignProcessToJobObject(ctx->job_handle, GetCurrentProcess())) {
-        return -1;
+        return cupolas_ERROR_UNKNOWN;
     }
 
     ctx->process_handle = GetCurrentProcess();
@@ -181,7 +181,7 @@ void limits_detach(limit_context_t* ctx) {
 }
 
 int limits_set_memory(limit_context_t* ctx, size_t limit_bytes, limit_mode_t mode) {
-    if (!ctx) return -1;
+    if (!ctx) return cupolas_ERROR_INVALID_ARG;
 
     ctx->memory_limit = limit_bytes;
     ctx->memory_mode = mode;
@@ -196,7 +196,7 @@ int limits_set_memory(limit_context_t* ctx, size_t limit_bytes, limit_mode_t mod
                                       &limits,
                                       size,
                                       NULL)) {
-            return -1;
+            return cupolas_ERROR_IO;
         }
 
         limits.LimitFlags |= JOB_OBJECT_LIMIT_PROCESS_MEMORY;
@@ -206,7 +206,7 @@ int limits_set_memory(limit_context_t* ctx, size_t limit_bytes, limit_mode_t mod
                                     JobObjectBasicLimitInformation,
                                     &limits,
                                     sizeof(limits))) {
-            return -1;
+            return cupolas_ERROR_IO;
         }
     }
 #else
@@ -215,7 +215,7 @@ int limits_set_memory(limit_context_t* ctx, size_t limit_bytes, limit_mode_t mod
     rl.rlim_max = (mode == LIMIT_MODE_HARD) ? limit_bytes : RLIM_INFINITY;
 
     if (setrlimit(RLIMIT_AS, &rl) != 0) {
-        return -1;
+        return cupolas_ERROR_PERMISSION;
     }
 #endif
 
@@ -223,7 +223,7 @@ int limits_set_memory(limit_context_t* ctx, size_t limit_bytes, limit_mode_t mod
 }
 
 int limits_set_cpu_time(limit_context_t* ctx, uint32_t limit_ms, limit_mode_t mode) {
-    if (!ctx) return -1;
+    if (!ctx) return cupolas_ERROR_INVALID_ARG;
 
     ctx->cpu_time_limit_ms = limit_ms;
     ctx->cpu_time_mode = mode;
@@ -238,7 +238,7 @@ int limits_set_cpu_time(limit_context_t* ctx, uint32_t limit_ms, limit_mode_t mo
                                       &limits,
                                       size,
                                       NULL)) {
-            return -1;
+            return cupolas_ERROR_IO;
         }
 
         limits.LimitFlags |= JOB_OBJECT_LIMIT_JOB_TIME;
@@ -248,7 +248,7 @@ int limits_set_cpu_time(limit_context_t* ctx, uint32_t limit_ms, limit_mode_t mo
                                     JobObjectBasicLimitInformation,
                                     &limits,
                                     sizeof(limits))) {
-            return -1;
+            return cupolas_ERROR_IO;
         }
     }
 #else
@@ -257,7 +257,7 @@ int limits_set_cpu_time(limit_context_t* ctx, uint32_t limit_ms, limit_mode_t mo
     rl.rlim_max = (mode == LIMIT_MODE_HARD) ? rl.rlim_cur : RLIM_INFINITY;
 
     if (setrlimit(RLIMIT_CPU, &rl) != 0) {
-        return -1;
+        return cupolas_ERROR_PERMISSION;
     }
 #endif
 
@@ -265,10 +265,10 @@ int limits_set_cpu_time(limit_context_t* ctx, uint32_t limit_ms, limit_mode_t mo
 }
 
 int limits_set_cpu_weight(limit_context_t* ctx, uint32_t weight, limit_mode_t mode) {
-    if (!ctx) return -1;
+    if (!ctx) return cupolas_ERROR_INVALID_ARG;
 
     if (weight < 1 || weight > 10000) {
-        return -1;
+        return cupolas_ERROR_INVALID_ARG;
     }
 
     ctx->cpu_weight = weight;
@@ -282,7 +282,7 @@ int limits_set_cpu_weight(limit_context_t* ctx, uint32_t weight, limit_mode_t mo
 }
 
 int limits_set_processes(limit_context_t* ctx, uint32_t limit, limit_mode_t mode) {
-    if (!ctx) return -1;
+    if (!ctx) return cupolas_ERROR_INVALID_ARG;
 
     ctx->processes_limit = limit;
     ctx->processes_mode = mode;
@@ -297,7 +297,7 @@ int limits_set_processes(limit_context_t* ctx, uint32_t limit, limit_mode_t mode
                                       &limits,
                                       size,
                                       NULL)) {
-            return -1;
+            return cupolas_ERROR_IO;
         }
 
         limits.LimitFlags |= JOB_OBJECT_LIMIT_ACTIVE_PROCESS;
@@ -307,7 +307,7 @@ int limits_set_processes(limit_context_t* ctx, uint32_t limit, limit_mode_t mode
                                     JobObjectBasicLimitInformation,
                                     &limits,
                                     sizeof(limits))) {
-            return -1;
+            return cupolas_ERROR_IO;
         }
     }
 #else
@@ -316,7 +316,7 @@ int limits_set_processes(limit_context_t* ctx, uint32_t limit, limit_mode_t mode
     rl.rlim_max = (mode == LIMIT_MODE_HARD) ? limit : RLIM_INFINITY;
 
     if (setrlimit(RLIMIT_NPROC, &rl) != 0) {
-        return -1;
+        return cupolas_ERROR_PERMISSION;
     }
 #endif
 
@@ -324,7 +324,7 @@ int limits_set_processes(limit_context_t* ctx, uint32_t limit, limit_mode_t mode
 }
 
 int limits_set_threads(limit_context_t* ctx, uint32_t limit, limit_mode_t mode) {
-    if (!ctx) return -1;
+    if (!ctx) return cupolas_ERROR_INVALID_ARG;
 
     ctx->threads_limit = limit;
     ctx->threads_mode = mode;
@@ -337,7 +337,7 @@ int limits_set_threads(limit_context_t* ctx, uint32_t limit, limit_mode_t mode) 
     rl.rlim_max = (mode == LIMIT_MODE_HARD) ? limit : RLIM_INFINITY;
 
     if (setrlimit(RLIMIT_NPROC, &rl) != 0) {
-        return -1;
+        return cupolas_ERROR_PERMISSION;
     }
 #endif
 
@@ -345,7 +345,7 @@ int limits_set_threads(limit_context_t* ctx, uint32_t limit, limit_mode_t mode) 
 }
 
 int limits_set_file_size(limit_context_t* ctx, size_t limit_bytes, limit_mode_t mode) {
-    if (!ctx) return -1;
+    if (!ctx) return cupolas_ERROR_INVALID_ARG;
 
     ctx->file_size_limit = limit_bytes;
     ctx->file_size_mode = mode;
@@ -358,7 +358,7 @@ int limits_set_file_size(limit_context_t* ctx, size_t limit_bytes, limit_mode_t 
     rl.rlim_max = (mode == LIMIT_MODE_HARD) ? limit_bytes : RLIM_INFINITY;
 
     if (setrlimit(RLIMIT_FSIZE, &rl) != 0) {
-        return -1;
+        return cupolas_ERROR_PERMISSION;
     }
 #endif
 
@@ -366,7 +366,7 @@ int limits_set_file_size(limit_context_t* ctx, size_t limit_bytes, limit_mode_t 
 }
 
 int limits_set_file_descriptors(limit_context_t* ctx, uint32_t limit, limit_mode_t mode) {
-    if (!ctx) return -1;
+    if (!ctx) return cupolas_ERROR_INVALID_ARG;
 
     ctx->file_descriptors_limit = limit;
     ctx->file_descriptors_mode = mode;
@@ -379,7 +379,7 @@ int limits_set_file_descriptors(limit_context_t* ctx, uint32_t limit, limit_mode
     rl.rlim_max = (mode == LIMIT_MODE_HARD) ? limit : RLIM_INFINITY;
 
     if (setrlimit(RLIMIT_NOFILE, &rl) != 0) {
-        return -1;
+        return cupolas_ERROR_PERMISSION;
     }
 #endif
 
@@ -387,7 +387,7 @@ int limits_set_file_descriptors(limit_context_t* ctx, uint32_t limit, limit_mode
 }
 
 int limits_get_stats(limit_context_t* ctx, resource_stats_t* stats) {
-    if (!ctx || !stats) return -1;
+    if (!ctx || !stats) return cupolas_ERROR_INVALID_ARG;
 
     memset(stats, 0, sizeof(resource_stats_t));
 

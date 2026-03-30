@@ -82,4 +82,4 @@ cupolas_pid_t cupolas_process_getpid(cupolas_process_t proc);
 }
 #endif
 
-#endif /* DOMAIN_WORKBENCH_PROCESS_H */
+#endif /* CUPOLAS_WORKBENCH_PROCESS_H */

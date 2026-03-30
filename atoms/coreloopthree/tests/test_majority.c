@@ -24,14 +24,14 @@
  */
 int test_majority_basic(void) {
     printf("  测试多数投票协调器基本功�?..\n");
-    
+
     agentos_coordinator_base_t* coordinator = NULL;
     agentos_error_t err = agentos_coordinator_majority_create(3, 0.5f, &coordinator);
     if (err != AGENTOS_SUCCESS) {
         printf("    创建协调器失�? %d\n", err);
         return 1;
     }
-    
+
     /* 准备测试数据 */
     const char* inputs[] = {
         "option_a",
@@ -41,23 +41,23 @@ int test_majority_basic(void) {
         "option_a"
     };
     size_t input_count = 5;
-    
+
     char* result = NULL;
     agentos_coordination_context_t context = {0};
-    
+
     err = coordinator->coordinate(coordinator, &context, inputs, input_count, &result);
     if (err != AGENTOS_SUCCESS) {
         printf("    协调执行失败: %d\n", err);
         coordinator->destroy(coordinator);
         return 1;
     }
-    
+
     if (result == NULL) {
         printf("    结果为空\n");
         coordinator->destroy(coordinator);
         return 1;
     }
-    
+
     /* 验证结果：option_a应该获胜�?票） */
     if (strcmp(result, "option_a") != 0) {
         printf("    预期结果�?'option_a'，实际为 '%s'\n", result);
@@ -65,7 +65,7 @@ int test_majority_basic(void) {
         coordinator->destroy(coordinator);
         return 1;
     }
-    
+
     AGENTOS_FREE(result);
     coordinator->destroy(coordinator);
     printf("    基本功能测试通过\n");
@@ -78,9 +78,9 @@ int test_majority_basic(void) {
  */
 int test_majority_edge_cases(void) {
     printf("  测试边缘情况...\n");
-    
+
     int failures = 0;
-    
+
     /* 测试1：输入数量为0（修复的除零问题�?*/
     {
         agentos_coordinator_base_t* coordinator = NULL;
@@ -93,7 +93,7 @@ int test_majority_edge_cases(void) {
             size_t input_count = 0;
             char* result = NULL;
             agentos_coordination_context_t context = {0};
-            
+
             err = coordinator->coordinate(coordinator, &context, inputs, input_count, &result);
             if (err != AGENTOS_SUCCESS) {
                 printf("    测试1：协调执行失败（预期成功�? %d\n", err);
@@ -109,11 +109,11 @@ int test_majority_edge_cases(void) {
                 printf("    测试1：输入数量为0测试通过\n");
                 AGENTOS_FREE(result);
             }
-            
+
             coordinator->destroy(coordinator);
         }
     }
-    
+
     /* 测试2：输入数量不�?*/
     {
         agentos_coordinator_base_t* coordinator = NULL;
@@ -126,7 +126,7 @@ int test_majority_edge_cases(void) {
             size_t input_count = 2;
             char* result = NULL;
             agentos_coordination_context_t context = {0};
-            
+
             err = coordinator->coordinate(coordinator, &context, inputs, input_count, &result);
             if (err != AGENTOS_SUCCESS) {
                 printf("    测试2：协调执行失败（预期成功�? %d\n", err);
@@ -142,11 +142,11 @@ int test_majority_edge_cases(void) {
                 printf("    测试2：输入数量不足测试通过\n");
                 AGENTOS_FREE(result);
             }
-            
+
             coordinator->destroy(coordinator);
         }
     }
-    
+
     /* 测试3：阈值为0.0f（特殊情况） */
     {
         agentos_coordinator_base_t* coordinator = NULL;
@@ -159,7 +159,7 @@ int test_majority_edge_cases(void) {
             size_t input_count = 3;
             char* result = NULL;
             agentos_coordination_context_t context = {0};
-            
+
             err = coordinator->coordinate(coordinator, &context, inputs, input_count, &result);
             if (err != AGENTOS_SUCCESS) {
                 printf("    测试3：协调执行失�? %d\n", err);
@@ -172,11 +172,11 @@ int test_majority_edge_cases(void) {
                 printf("    测试3：阈值为0测试通过（结果为 '%s'）\n", result);
                 AGENTOS_FREE(result);
             }
-            
+
             coordinator->destroy(coordinator);
         }
     }
-    
+
     /* 测试4：输入包含NULL指针 */
     {
         agentos_coordinator_base_t* coordinator = NULL;
@@ -189,7 +189,7 @@ int test_majority_edge_cases(void) {
             size_t input_count = 3;
             char* result = NULL;
             agentos_coordination_context_t context = {0};
-            
+
             err = coordinator->coordinate(coordinator, &context, inputs, input_count, &result);
             if (err != AGENTOS_SUCCESS) {
                 printf("    测试4：协调执行失败（预期成功�? %d\n", err);
@@ -205,14 +205,14 @@ int test_majority_edge_cases(void) {
                 printf("    测试4：包含NULL输入测试通过\n");
                 AGENTOS_FREE(result);
             }
-            
+
             coordinator->destroy(coordinator);
         }
     }
-    
+
     if (failures == 0) {
         printf("    所有边缘情况测试通过\n");
     }
-    
+
     return failures;
 }

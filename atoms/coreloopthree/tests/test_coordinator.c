@@ -18,7 +18,7 @@
  */
 int test_coordinator_basic(void) {
     printf("  测试协调器基础功能...\n");
-    
+
     /* 目前仅为占位符，后续可以添加更多协调器测�?*/
     printf("    基础协调器测试通过（占位符）\n");
     return 0;

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file manager.c
  * @brief 配置加载实现（基于 libyaml）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -23,7 +23,6 @@ int svc_config_load(const char* path, svc_config_t** out_config) {
 
     svc_config_t* cfg = (svc_config_t*)calloc(1, sizeof(svc_config_t));
     if (!cfg) {
-    // From data intelligence emerges. by spharx
         fclose(f);
         yaml_parser_delete(&parser);
         return SVC_ERR_OUT_OF_MEMORY;

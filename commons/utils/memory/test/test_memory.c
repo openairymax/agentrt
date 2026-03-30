@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_memory.c
  * @brief 统一内存管理模块单元测试
  * 
@@ -10,8 +10,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../commons/utils/memory/include/memory_compat.h"
-#include "../commons/utils/string/include/string_compat.h"
+#include "../../../utils/memory/include/memory_compat.h"
+#include "../../../utils/string/include/string_compat.h"
 #include <string.h>
 #include <assert.h>
 #include "../../include/memory.h"

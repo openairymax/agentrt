@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_unified_modules.c
  * @brief 统一日志和配置模块构建兼容性测�? * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
@@ -8,8 +8,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../commons/utils/memory/include/memory_compat.h"
-#include "../commons/utils/string/include/string_compat.h"
+#include "utils/memory/include/memory_compat.h"
+#include "utils/string/include/string_compat.h"
 
 /* 包含统一日志模块头文�?*/
 #include "utils/logging/include/logging.h"

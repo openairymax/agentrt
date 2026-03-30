@@ -81,7 +81,7 @@ static const char* get_log_base_path(void) {
 static void update_current_date(void) {
     time_t now = time(NULL);
     struct tm* tm_info = localtime(&now);
-    strftime(s_current_date, sizeof(g_current_date), "%Y-%m-%d", tm_info);
+    strftime(s_current_date, sizeof(s_current_date), "%Y-%m-%d", tm_info);
 }
 
 static FILE* get_main_log_file(void) {
@@ -92,11 +92,11 @@ static FILE* get_main_log_file(void) {
     update_current_date();
 
     if (s_main_log_file) {
-        return g_main_log_file;
+        return s_main_log_file;
     }
 
     const char* base = get_log_base_path();
-    strncpy(s_log_root_path, base, sizeof(g_log_root_path) - 1);
+    strncpy(s_log_root_path, base, sizeof(s_log_root_path) - 1);
 
     char kernel_path[512];
     snprintf(kernel_path, sizeof(kernel_path), "%s/kernel", base);
@@ -105,8 +105,8 @@ static FILE* get_main_log_file(void) {
     char filepath[512];
     snprintf(filepath, sizeof(filepath), "%s/kernel/agentos.log", base);
 
-    g_main_log_file = fopen(filepath, "a");
-    return g_main_log_file;
+    s_main_log_file = fopen(filepath, "a");
+    return s_main_log_file;
 }
 
 /**
@@ -124,13 +124,13 @@ static FILE* get_service_log_file(const char* service) {
 
     for (size_t i = 0; i < s_service_log_count; i++) {
         if (strcmp(s_service_logs[i].service_name, service) == 0) {
-            FILE* fp = g_service_logs[i].file;
-            pthread_mutex_unlock(&g_service_lock);
+            FILE* fp = s_service_logs[i].file;
+            pthread_mutex_unlock(&s_service_lock);
             return fp;
         }
     }
 
-    if (g_service_log_count < 32) {
+    if (s_service_log_count < 32) {
         const char* base = get_log_base_path();
         char service_path[512];
         snprintf(service_path, sizeof(service_path), "%s/services", base);
@@ -141,27 +141,27 @@ static FILE* get_service_log_file(const char* service) {
 
         FILE* fp = fopen(filepath, "a");
         if (fp) {
-            strncpy(g_service_logs[g_service_log_count].service_name, service, heapstore_LOG_MAX_SERVICE_LEN - 1);
-            g_service_logs[g_service_log_count].file = fp;
-            pthread_mutex_init(&g_service_logs[g_service_log_count].lock, NULL);
-            g_service_log_count++;
+            strncpy(s_service_logs[s_service_log_count].service_name, service, heapstore_LOG_MAX_SERVICE_LEN - 1);
+            s_service_logs[s_service_log_count].file = fp;
+            pthread_mutex_init(&s_service_logs[s_service_log_count].lock, NULL);
+            s_service_log_count++;
         }
 
-        pthread_mutex_unlock(&g_service_lock);
+        pthread_mutex_unlock(&s_service_lock);
         return fp;
     }
 
-    pthread_mutex_unlock(&g_service_lock);
+    pthread_mutex_unlock(&s_service_lock);
     return get_main_log_file();
 }
 
 heapstore_error_t heapstore_log_init(void) {
-    if (g_initialized) {
+    if (s_initialized) {
         return heapstore_ERR_ALREADY_INITIALIZED;
     }
 
     const char* base = get_log_base_path();
-    strncpy(g_log_root_path, base, sizeof(g_log_root_path) - 1);
+    strncpy(s_log_root_path, base, sizeof(s_log_root_path) - 1);
 
     heapstore_ensure_directory(base);
     heapstore_ensure_directory("heapstore/logs/kernel");
@@ -169,87 +169,118 @@ heapstore_error_t heapstore_log_init(void) {
     heapstore_ensure_directory("heapstore/logs/apps");
 
     update_current_date();
-    g_main_log_file = fopen("heapstore/logs/kernel/agentos.log", "a");
-    if (!g_main_log_file) {
+    s_main_log_file = fopen("heapstore/logs/kernel/agentos.log", "a");
+    if (!s_main_log_file) {
         return heapstore_ERR_FILE_OPEN_FAILED;
     }
 
-    g_initialized = true;
+    s_initialized = true;
     s_log_level = heapstore_LOG_INFO;
 
     return heapstore_SUCCESS;
 }
 
 void heapstore_log_shutdown(void) {
-    if (!g_initialized) {
+    if (!s_initialized) {
         fprintf(stderr, "[heapstore_LOG WARN] Shutdown called but not initialized\n");
         return;
     }
 
     pthread_mutex_lock(&s_log_lock);
 
-    if (g_main_log_file) {
-        fflush(g_main_log_file);
-        fclose(g_main_log_file);
+    if (s_main_log_file) {
+        fflush(s_main_log_file);
+        fclose(s_main_log_file);
         fprintf(stdout, "[heapstore_LOG INFO] Main log file closed\n");
-        g_main_log_file = NULL;
+        s_main_log_file = NULL;
     }
 
-    pthread_mutex_lock(&g_service_lock);
-    for (size_t i = 0; i < g_service_log_count; i++) {
-        if (g_service_logs[i].file) {
-            fflush(g_service_logs[i].file);
-            fclose(g_service_logs[i].file);
-            g_service_logs[i].file = NULL;
+    pthread_mutex_lock(&s_service_lock);
+    for (size_t i = 0; i < s_service_log_count; i++) {
+        if (s_service_logs[i].file) {
+            fflush(s_service_logs[i].file);
+            fclose(s_service_logs[i].file);
+            s_service_logs[i].file = NULL;
         }
-        pthread_mutex_destroy(&g_service_logs[i].lock);
+        pthread_mutex_destroy(&s_service_logs[i].lock);
     }
-    fprintf(stdout, "[heapstore_LOG INFO] Closed %zu service log files\n", g_service_log_count);
-    g_service_log_count = 0;
-    pthread_mutex_unlock(&g_service_lock);
+    fprintf(stdout, "[heapstore_LOG INFO] Closed %zu service log files\n", s_service_log_count);
+    s_service_log_count = 0;
+    pthread_mutex_unlock(&s_service_lock);
 
-    g_initialized = false;
+    s_initialized = false;
     fprintf(stdout, "[heapstore_LOG INFO] Logging system shutdown complete\n");
 
-    pthread_mutex_unlock(&g_log_lock);
+    pthread_mutex_unlock(&s_log_lock);
 }
 
-void heapstore_log_write(heapstore_log_level_t level, 
-                        const char* service, 
-                        const char* trace_id, 
-                        const char* file, 
-                        int line, 
-                        const char* format, ...) {
-    if (!g_initialized) {
+void heapstore_log_write(heapstore_log_level_t level,
+                        const char* service,
+                        const char* trace_id,
+                        const char* file,
+                        int line,
+                        const char* format,
+                        ...) {
+    if (!s_initialized) {
         return;
     }
 
-    if (level > g_log_level) {
+    if (level > s_log_level) {
         return;
     }
+
+    update_current_date();
+
+    pthread_mutex_lock(&s_log_lock);
+
+    FILE* fp = service ? get_service_log_file(service) : get_main_log_file();
+    if (!fp) {
+        pthread_mutex_unlock(&s_log_lock);
+        return;
+    }
+
+    time_t now = time(NULL);
+    struct tm* tm_info = localtime(&now);
+    char timestamp[32];
+    strftime(timestamp, sizeof(timestamp), "%H:%M:%S", tm_info);
+
+    const char* level_str = level_to_string(level);
 
     va_list args;
     va_start(args, format);
-    heapstore_log_writev(level, service, trace_id, file, line, format, args);
+
+    fprintf(fp, "[%s] [%s] [%s] [%s:%d] ",
+            s_current_date, timestamp, level_str, file, line);
+
+    if (trace_id) {
+        fprintf(fp, "[trace:%s] ", trace_id);
+    }
+
+    vfprintf(fp, format, args);
+    fprintf(fp, "\n");
+    fflush(fp);
+
     va_end(args);
+
+    pthread_mutex_unlock(&s_log_lock);
 }
 
-void heapstore_log_writev(heapstore_log_level_t level, 
-                         const char* service, 
-                         const char* trace_id, 
-                         const char* file, 
-                         int line, 
-                         const char* format, 
+void heapstore_log_writev(heapstore_log_level_t level,
+                         const char* service,
+                         const char* trace_id,
+                         const char* file,
+                         int line,
+                         const char* format,
                          va_list args) {
-    if (!g_initialized) {
+    if (!s_initialized) {
         return;
     }
 
-    if (level > g_log_level) {
+    if (level > s_log_level) {
         return;
     }
 
-    pthread_mutex_lock(&g_log_lock);
+    pthread_mutex_lock(&s_log_lock);
 
     time_t now = time(NULL);
     struct tm* tm_info = localtime(&now);
@@ -281,15 +312,15 @@ void heapstore_log_writev(heapstore_log_level_t level,
 
     fflush(fp);
 
-    pthread_mutex_unlock(&g_log_lock);
+    pthread_mutex_unlock(&s_log_lock);
 }
 
 heapstore_log_level_t heapstore_log_get_level(void) {
-    return g_log_level;
+    return s_log_level;
 }
 
 void heapstore_log_set_level(heapstore_log_level_t level) {
-    g_log_level = level;
+    s_log_level = level;
 }
 
 heapstore_error_t heapstore_log_get_service_path(const char* service, char* buffer, size_t buffer_size) {
@@ -309,17 +340,17 @@ heapstore_error_t heapstore_log_get_service_path(const char* service, char* buff
 }
 
 heapstore_error_t heapstore_log_rotate(void) {
-    if (!g_initialized) {
+    if (!s_initialized) {
         fprintf(stderr, "[heapstore_LOG ERROR] Log rotate called but not initialized\n");
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&g_log_lock);
+    pthread_mutex_lock(&s_log_lock);
 
-    if (g_main_log_file) {
-        fflush(g_main_log_file);
-        fclose(g_main_log_file);
-        g_main_log_file = NULL;
+    if (s_main_log_file) {
+        fflush(s_main_log_file);
+        fclose(s_main_log_file);
+        s_main_log_file = NULL;
     }
 
     time_t now = time(NULL);
@@ -335,25 +366,25 @@ heapstore_error_t heapstore_log_rotate(void) {
 
     if (rename(old_path, new_path) != 0) {
         fprintf(stderr, "[heapstore_LOG ERROR] Failed to rotate log file: %s -> %s\n", old_path, new_path);
-        pthread_mutex_unlock(&g_log_lock);
+        pthread_mutex_unlock(&s_log_lock);
         return heapstore_ERR_FILE_OPERATION_FAILED;
     }
 
-    g_main_log_file = fopen(old_path, "a");
-    if (!g_main_log_file) {
+    s_main_log_file = fopen(old_path, "a");
+    if (!s_main_log_file) {
         fprintf(stderr, "[heapstore_LOG ERROR] Failed to create new log file after rotation: %s\n", old_path);
-        pthread_mutex_unlock(&g_log_lock);
+        pthread_mutex_unlock(&s_log_lock);
         return heapstore_ERR_FILE_OPEN_FAILED;
     }
 
     fprintf(stdout, "[heapstore_LOG INFO] Log rotated: %s -> %s\n", old_path, new_path);
-    pthread_mutex_unlock(&g_log_lock);
+    pthread_mutex_unlock(&s_log_lock);
 
     return heapstore_SUCCESS;
 }
 
 heapstore_error_t heapstore_log_cleanup(int days_to_keep, uint64_t* freed_bytes) {
-    if (!g_initialized) {
+    if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
