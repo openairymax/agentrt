@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file cache_common.h
  * @brief 通用缓存库
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -9,8 +9,8 @@
  * - 带过期时间的缓存
  */
 
-#ifndef CACHE_COMMON_H
-#define CACHE_COMMON_H
+#ifndef AGENTOS_CACHE_COMMON_H
+#define AGENTOS_CACHE_COMMON_H
 
 #include <stddef.h>
 #include <stdint.h>

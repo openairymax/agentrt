@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file config_source.c
  * @brief 统一配置模块 - 源适配层实�? * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
@@ -12,8 +12,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../commons/utils/memory/include/memory_compat.h"
-#include "../commons/utils/string/include/string_compat.h"
+#include "../../utils/memory/include/memory_compat.h"
+#include "../../utils/string/include/string_compat.h"
 #include <string.h>
 #include <stdio.h>
 #include <time.h>

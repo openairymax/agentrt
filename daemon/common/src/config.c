@@ -1,5 +1,5 @@
-﻿/**
- * @file manager.c
+/**
+ * @file config.c
  * @brief 配置加载实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
@@ -81,9 +81,9 @@ int svc_config_load(const char* path, svc_config_t** out_config) {
     return SVC_OK;
 }
 
-void svc_config_free(svc_config_t* manager) {
-    if (!manager) return;
-    free(manager->service_name);
-    free(manager->listen_addr);
-    free(manager);
+void svc_config_free(svc_config_t* config) {
+    if (!config) return;
+    free(config->service_name);
+    free(config->listen_addr);
+    free(config);
 }

@@ -3,10 +3,10 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 # AgentOS 进程间通信（IPC）架构详解
 
-**版本**: Doc V1.6  
-**更新日期**: 2026-03-25  
+**版本**: Doc V1.7  
+**更新日期**: 2026-03-31  
+**作者**: LirenWang  
 **状态**: 优化发布  
-**备选名称**: OpenApex (开源极境 / 极境OS)  
 **原则映射**: 系统观(S)、内核观(K)、认知观(C)、工程观(E)、设计美学(A)  
 **路径**: `atoms/corekern/ipc_binder/`
 
@@ -16,7 +16,7 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 |------|-----|
 | 文档名称 | AgentOS 进程间通信（IPC）架构详解 |
 | 适用版本 | v1.0.0+ |
-| 作者 | AgentOS Team |
+| 作者 | LirenWang |
 
 ---
 

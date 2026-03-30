@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file heapstore_core.c
  * @brief AgentOS 数据分区核心实现
  *
@@ -8,6 +8,7 @@
 
 #include "heapstore.h"
 #include "private.h"
+#include "utils.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,10 +33,10 @@
 #define MAX_PATH_LEN 512
 #define MAX_SUBPATHS 32
 
-static bool g_initialized = false;
-static char g_root_path[MAX_PATH_LEN];
-static heapstore_config_t g_config;
-static heapstore_path_type_t g_path_order[] = {
+static bool s_initialized = false;
+static char s_root_path[MAX_PATH_LEN];
+static heapstore_config_t s_config;
+static heapstore_path_type_t s_path_order[] = {
     heapstore_PATH_KERNEL,
     heapstore_PATH_LOGS,
     heapstore_PATH_REGISTRY,
@@ -45,7 +46,7 @@ static heapstore_path_type_t g_path_order[] = {
     heapstore_PATH_KERNEL_MEMORY
 };
 
-static const char* g_path_names[] = {
+static const char* s_path_names[] = {
     "kernel",
     "logs",
     "registry",
@@ -55,7 +56,7 @@ static const char* g_path_names[] = {
     "kernel/memory"
 };
 
-static const char* g_subpath_map[][MAX_SUBPATHS] = {
+static const char* s_subpath_map[][MAX_SUBPATHS] = {
     {NULL},
     {"apps", "kernel", "services", NULL},
     {NULL},
@@ -65,108 +66,74 @@ static const char* g_subpath_map[][MAX_SUBPATHS] = {
     {"pools", "allocations", "stats", "index", "meta", "patterns", "raw", NULL}
 };
 
-static const char* g_default_root = "heapstore";
-
-static bool ensure_dir_recursive(const char* path) {
-    if (!path || strlen(path) == 0) {
-        return false;
-    }
-
-    char path_copy[MAX_PATH_LEN];
-    strncpy(path_copy, path, sizeof(path_copy) - 1);
-    path_copy[sizeof(path_copy) - 1] = '\0';
-
-    size_t len = strlen(path_copy);
-    for (size_t i = 0; i < len; i++) {
-        if (path_copy[i] == '\\' || path_copy[i] == '/') {
-            if (i > 0 && path_copy[i - 1] != ':') {
-                path_copy[i] = '\0';
-                if (mkdir(path_copy, 0755) != 0 && errno != EEXIST) {
-                    if (!S_ISDIR(stat(path_copy, &(struct stat){0}).st_mode)) {
-                        return false;
-                    }
-                }
-                path_copy[i] = '/';
-            }
-        }
-    }
-
-    if (mkdir(path_copy, 0755) != 0 && errno != EEXIST) {
-        struct stat st;
-        if (stat(path_copy, &st) != 0 || !S_ISDIR(st.st_mode)) {
-            return false;
-        }
-    }
-
-    return true;
-}
+static const char* s_default_root = "heapstore";
 
 static void set_default_config(void) {
-    memset(&g_config, 0, sizeof(g_config));
-    g_config.root_path = g_default_root;
-    g_config.max_log_size_mb = 100;
-    g_config.log_retention_days = 7;
-    g_config.trace_retention_days = 3;
-    g_config.enable_auto_cleanup = true;
-    g_config.enable_log_rotation = true;
-    g_config.enable_trace_export = true;
-    g_config.db_vacuum_interval_days = 7;
+    memset(&s_config, 0, sizeof(s_config));
+    s_config.root_path = s_default_root;
+    s_config.max_log_size_mb = 100;
+    s_config.log_retention_days = 7;
+    s_config.trace_retention_days = 3;
+    s_config.enable_auto_cleanup = true;
+    s_config.enable_log_rotation = true;
+    s_config.enable_trace_export = true;
+    s_config.db_vacuum_interval_days = 7;
 }
 
 heapstore_error_t heapstore_init(const heapstore_config_t* manager) {
-    if (g_initialized) {
+    if (s_initialized) {
         return heapstore_ERR_ALREADY_INITIALIZED;
     }
 
     set_default_config();
 
     if (manager && manager->root_path) {
-        g_config.root_path = manager->root_path;
+        s_config.root_path = manager->root_path;
         if (manager->max_log_size_mb > 0) {
-            g_config.max_log_size_mb = manager->max_log_size_mb;
+            s_config.max_log_size_mb = manager->max_log_size_mb;
         }
         if (manager->log_retention_days > 0) {
-            g_config.log_retention_days = manager->log_retention_days;
+            s_config.log_retention_days = manager->log_retention_days;
         }
         if (manager->trace_retention_days > 0) {
-            g_config.trace_retention_days = manager->trace_retention_days;
+            s_config.trace_retention_days = manager->trace_retention_days;
         }
-        g_config.enable_auto_cleanup = manager->enable_auto_cleanup;
-        g_config.enable_log_rotation = manager->enable_log_rotation;
-        g_config.enable_trace_export = manager->enable_trace_export;
+        s_config.enable_auto_cleanup = manager->enable_auto_cleanup;
+        s_config.enable_log_rotation = manager->enable_log_rotation;
+        s_config.enable_trace_export = manager->enable_trace_export;
         if (manager->db_vacuum_interval_days > 0) {
-            g_config.db_vacuum_interval_days = manager->db_vacuum_interval_days;
+            s_config.db_vacuum_interval_days = manager->db_vacuum_interval_days;
         }
     }
 
-    strncpy(g_root_path, g_config.root_path, sizeof(g_root_path) - 1);
-    g_root_path[sizeof(g_root_path) - 1] = '\0';
+    strncpy(s_root_path, s_config.root_path, sizeof(s_root_path) - 1);
+    s_root_path[sizeof(s_root_path) - 1] = '\0';
 
-    if (!ensure_dir_recursive(g_root_path)) {
+    if (!heapstore_ensure_directory(s_root_path)) {
         return heapstore_ERR_DIR_CREATE_FAILED;
     }
 
-    for (size_t i = 0; i < sizeof(g_path_order) / sizeof(g_path_order[0]); i++) {
+    for (size_t i = 0; i < sizeof(s_path_order) / sizeof(s_path_order[0]); i++) {
         char full_path[MAX_PATH_LEN];
-        snprintf(full_path, sizeof(full_path), "%s/%s", g_root_path, g_path_names[i]);
+        snprintf(full_path, sizeof(full_path), "%s/%s", s_root_path, s_path_names[i]);
 
-        if (!ensure_dir_recursive(full_path)) {
+        if (!heapstore_ensure_directory(full_path)) {
             return heapstore_ERR_DIR_CREATE_FAILED;
         }
 
-        size_t subpath_idx = (size_t)g_path_order[i];
-        if (subpath_idx < sizeof(g_subpath_map) / sizeof(g_subpath_map[0])) {
-            for (size_t j = 0; g_subpath_map[subpath_idx][j] != NULL; j++) {
+        size_t subpath_idx = (size_t)s_path_order[i];
+        if (subpath_idx < sizeof(s_subpath_map) / sizeof(s_subpath_map[0])) {
+            for (size_t j = 0; s_subpath_map[subpath_idx][j] != NULL; j++) {
                 char sub_path[MAX_PATH_LEN];
-                snprintf(sub_path, sizeof(sub_path), "%s/%s", full_path, g_subpath_map[subpath_idx][j]);
-                if (!ensure_dir_recursive(sub_path)) {
+                snprintf(sub_path, sizeof(sub_path), "%s/%s", full_path, s_subpath_map[subpath_idx][j]);
+                if (!heapstore_ensure_directory(sub_path)) {
                     return heapstore_ERR_DIR_CREATE_FAILED;
                 }
             }
         }
     }
 
-    g_initialized = true;
+    s_initialized = true;
 
     heapstore_registry_init();
     heapstore_trace_init();
@@ -178,33 +145,33 @@ heapstore_error_t heapstore_init(const heapstore_config_t* manager) {
 }
 
 void heapstore_shutdown(void) {
-    if (g_initialized) {
+    if (s_initialized) {
         heapstore_log_shutdown();
         heapstore_trace_shutdown();
         heapstore_ipc_shutdown();
         heapstore_memory_shutdown();
         heapstore_registry_shutdown();
-        g_initialized = false;
+        s_initialized = false;
     }
 }
 
 bool heapstore_is_initialized(void) {
-    return g_initialized;
+    return s_initialized;
 }
 
 const char* heapstore_get_root(void) {
-    return g_root_path;
+    return s_root_path;
 }
 
 const char* heapstore_get_path(heapstore_path_type_t type) {
     if (type < 0 || type >= heapstore_PATH_MAX) {
         return NULL;
     }
-    return g_path_names[type];
+    return s_path_names[type];
 }
 
 heapstore_error_t heapstore_get_full_path(heapstore_path_type_t type, char* buffer, size_t buffer_size) {
-    if (!g_initialized) {
+    if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
@@ -216,12 +183,12 @@ heapstore_error_t heapstore_get_full_path(heapstore_path_type_t type, char* buff
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    snprintf(buffer, buffer_size, "%s/%s", g_root_path, g_path_names[type]);
+    snprintf(buffer, buffer_size, "%s/%s", s_root_path, s_path_names[type]);
     return heapstore_SUCCESS;
 }
 
 heapstore_error_t heapstore_get_stats(heapstore_stats_t* stats) {
-    if (!g_initialized) {
+    if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
@@ -231,14 +198,14 @@ heapstore_error_t heapstore_get_stats(heapstore_stats_t* stats) {
 
     memset(stats, 0, sizeof(*stats));
 
-    for (size_t i = 0; i < sizeof(g_path_order) / sizeof(g_path_order[0]); i++) {
+    for (size_t i = 0; i < sizeof(s_path_order) / sizeof(s_path_order[0]); i++) {
         char full_path[MAX_PATH_LEN];
-        snprintf(full_path, sizeof(full_path), "%s/%s", g_root_path, g_path_names[i]);
+        snprintf(full_path, sizeof(full_path), "%s/%s", s_root_path, s_path_names[i]);
 
         uint64_t dir_size = 0;
         uint32_t file_count = 0;
 
-        switch (g_path_order[i]) {
+        switch (s_path_order[i]) {
             case heapstore_PATH_LOGS:
                 stats->log_usage_bytes += dir_size;
                 stats->log_file_count += file_count;
@@ -286,11 +253,11 @@ static uint64_t get_file_age_days(const char* filepath) {
 }
 
 heapstore_error_t heapstore_cleanup(bool dry_run, uint64_t* freed_bytes) {
-    if (!g_initialized) {
+    if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    if (!g_config.enable_auto_cleanup) {
+    if (!s_config.enable_auto_cleanup) {
         return heapstore_SUCCESS;
     }
 
@@ -299,10 +266,10 @@ heapstore_error_t heapstore_cleanup(bool dry_run, uint64_t* freed_bytes) {
     }
 
     char log_path[MAX_PATH_LEN];
-    snprintf(log_path, sizeof(log_path), "%s/%s", g_root_path, g_path_names[heapstore_PATH_LOGS]);
+    snprintf(log_path, sizeof(log_path), "%s/%s", s_root_path, s_path_names[heapstore_PATH_LOGS]);
 
     char trace_path[MAX_PATH_LEN];
-    snprintf(trace_path, sizeof(trace_path), "%s/%s", g_root_path, g_path_names[heapstore_PATH_TRACES]);
+    snprintf(trace_path, sizeof(trace_path), "%s/%s", s_root_path, s_path_names[heapstore_PATH_TRACES]);
 
     if (!dry_run && freed_bytes) {
         *freed_bytes = 0;
@@ -345,7 +312,7 @@ const char* heapstore_strerror(heapstore_error_t err) {
 }
 
 heapstore_error_t heapstore_reload_config(const heapstore_config_t* manager) {
-    if (!g_initialized) {
+    if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
@@ -354,26 +321,26 @@ heapstore_error_t heapstore_reload_config(const heapstore_config_t* manager) {
     }
 
     if (manager->max_log_size_mb > 0) {
-        g_config.max_log_size_mb = manager->max_log_size_mb;
+        s_config.max_log_size_mb = manager->max_log_size_mb;
     }
     if (manager->log_retention_days > 0) {
-        g_config.log_retention_days = manager->log_retention_days;
+        s_config.log_retention_days = manager->log_retention_days;
     }
     if (manager->trace_retention_days > 0) {
-        g_config.trace_retention_days = manager->trace_retention_days;
+        s_config.trace_retention_days = manager->trace_retention_days;
     }
-    g_config.enable_auto_cleanup = manager->enable_auto_cleanup;
-    g_config.enable_log_rotation = manager->enable_log_rotation;
-    g_config.enable_trace_export = manager->enable_trace_export;
+    s_config.enable_auto_cleanup = manager->enable_auto_cleanup;
+    s_config.enable_log_rotation = manager->enable_log_rotation;
+    s_config.enable_trace_export = manager->enable_trace_export;
     if (manager->db_vacuum_interval_days > 0) {
-        g_config.db_vacuum_interval_days = manager->db_vacuum_interval_days;
+        s_config.db_vacuum_interval_days = manager->db_vacuum_interval_days;
     }
 
     return heapstore_SUCCESS;
 }
 
 heapstore_error_t heapstore_flush(void) {
-    if (!g_initialized) {
+    if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
     return heapstore_SUCCESS;
@@ -387,35 +354,35 @@ heapstore_error_t heapstore_health_check(bool* registry_ok,
     bool all_healthy = true;
     
     if (registry_ok) {
-        *registry_ok = g_initialized;
+        *registry_ok = s_initialized;
         if (!*registry_ok) {
             all_healthy = false;
         }
     }
     
     if (trace_ok) {
-        *trace_ok = g_initialized;
+        *trace_ok = s_initialized;
         if (!*trace_ok) {
             all_healthy = false;
         }
     }
     
     if (log_ok) {
-        *log_ok = g_initialized;
+        *log_ok = s_initialized;
         if (!*log_ok) {
             all_healthy = false;
         }
     }
     
     if (ipc_ok) {
-        *ipc_ok = g_initialized;
+        *ipc_ok = s_initialized;
         if (!*ipc_ok) {
             all_healthy = false;
         }
     }
     
     if (memory_ok) {
-        *memory_ok = g_initialized;
+        *memory_ok = s_initialized;
         if (!*memory_ok) {
             all_healthy = false;
         }
@@ -423,4 +390,3 @@ heapstore_error_t heapstore_health_check(bool* registry_ok,
     
     return all_healthy ? heapstore_SUCCESS : heapstore_ERR_NOT_INITIALIZED;
 }
-

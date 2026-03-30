@@ -286,7 +286,7 @@ bool platform_mkdir_recursive(const char* path) {
         return false;
     }
     
-    strcpy(copy, path);
+    memcpy(copy, path, strlen(path) + 1);
     char* p = copy;
     
     while (*p) {
@@ -544,20 +544,19 @@ char* platform_path_join(const char* path1, const char* path2) {
     
     size_t len1 = strlen(path1);
     size_t len2 = strlen(path2);
-    size_t total_len = len1 + len2 + 2; /* 1 for separator, 1 for null terminator */
+    bool needs_slash = (len1 > 0 && path1[len1 - 1] != PLATFORM_SLASH);
+    size_t total_len = len1 + len2 + (needs_slash ? 1 : 0) + 1;
     
     char* result = (char*)AGENTOS_MALLOC(total_len);
     if (!result) {
         return NULL;
     }
     
-    strcpy(result, path1);
-    
-    if (len1 > 0 && path1[len1 - 1] != PLATFORM_SLASH) {
-        strcat(result, (char[]){PLATFORM_SLASH, '\0'});
+    if (needs_slash) {
+        snprintf(result, total_len, "%s%c%s", path1, PLATFORM_SLASH, path2);
+    } else {
+        snprintf(result, total_len, "%s%s", path1, path2);
     }
-    
-    strcat(result, path2);
     return result;
 }
 

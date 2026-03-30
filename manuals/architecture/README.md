@@ -1,11 +1,12 @@
-﻿Copyright (c) 2026 SPHARX. All Rights Reserved.
+Copyright (c) 2026 SPHARX. All Rights Reserved.
 "From data intelligence emerges."
 
 # AgentOS 架构文档
 
-**版本**: Doc V1.5
-**最后更新**: 2026-03-23
+**版本**: Doc V1.7
+**最后更新**: 2026-03-31
 **状态**: 生产就绪
+**作者**: LirenWang
 
 ---
 
@@ -19,7 +20,7 @@ AgentOS 架构文档详细描述了系统的分层设计、核心组件及其交
 
 | 文档 | 主题 | 版本 | 状态 |
 |------|------|------|------|
-| [架构设计原则 v3.0](folder/architectural_design_principles.md) | 四维正交原则、层次架构、术语定义 | v3.0 | 生产就绪 |
+| [架构设计原则 V1.7](ARCHITECTURAL_PRINCIPLES.md) | 五维正交原则、层次架构、术语定义 | V1.7 | 生产就绪 |
 | [三层认知运行时](folder/coreloopthree.md) | CoreLoopThree 认知-规划-调度-执行循环 | v1.0 | 生产就绪 |
 | [四层记忆系统](folder/memoryrovol.md) | MemoryRovol L1-L4 渐进抽象 | v1.0 | 生产就绪 |
 | [微内核设计](folder/microkernel.md) | corekern IPC/Mem/Task/Time 原子机制 | v1.0 | 生产就绪 |
@@ -59,17 +60,20 @@ AgentOS 架构文档详细描述了系统的分层设计、核心组件及其交
 
 | 原则维度 | 核心理念 | 对应文档 |
 |----------|----------|----------|
-| 系统观 | 分层架构，层次间严格单向依赖 | [architectural_design_principles.md](folder/architectural_design_principles.md) |
-| 内核观 | 最小化内核，仅 4 个原子机制 | [microkernel.md](folder/microkernel.md) |
-| 认知观 | 双系统路径：System 1 快速 + System 2 深度 | [coreloopthree.md](folder/coreloopthree.md) |
-| 工程观 | 控制论反馈闭环，三时间尺度监控 | [logging_system.md](folder/logging_system.md) |
+| 系统观 | 反馈闭环、层次分解、总体设计部、涌现性管理 | [架构设计原则](ARCHITECTURAL_PRINCIPLES.md) |
+| 内核观 | 内核极简、接口契约化、服务隔离、可插拔策略 | [微内核设计](folder/microkernel.md) |
+| 认知观 | 双系统分工、记忆持久化、注意力分配、偏差防护 | [三层认知运行时](folder/coreloopthree.md) |
+| 工程观 | 安全内生、可观测性、资源确定性、文档即代码 | [架构设计原则](ARCHITECTURAL_PRINCIPLES.md) |
+| 设计美学 | 极简主义、细节关注、人文关怀、完美主义 | [架构设计原则](ARCHITECTURAL_PRINCIPLES.md) |
 
 ---
 
 ## 5. 理论基础
 
-- **工程两论**（《工程控制论》和《论系统工程》）：负反馈调节、自适应控制、系统稳定性、层级分解、接口协调、全局优化
-- **双系统认知理论**（Kahneman）：快速直觉（S1）vs 深度推理（S2）
+- **工程两论**（《工程控制论》和《论系统工程》）：反馈闭环、层次分解、总体设计部、涌现性管理
+- **双系统认知理论**（《思考，快与慢》）：System 1 快速直觉与 System 2 深度推理的协同
+- **微内核哲学**：内核极简、接口契约化、服务隔离、可插拔策略
+- **设计美学**（乔布斯设计哲学）：极简主义、极致细节、人文关怀、完美主义
 
 ---
 

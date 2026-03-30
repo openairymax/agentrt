@@ -1,7 +1,7 @@
-﻿#ifndef NETWORK_COMMON_H
-#define NETWORK_COMMON_H
+#ifndef AGENTOS_NETWORK_COMMON_H
+#define AGENTOS_NETWORK_COMMON_H
 
-#include "../../../../corekern/include/error.h"
+#include "../../../utils/error/include/error.h"
 
 /**
  * @brief 网络连接状态枚举

@@ -1,6 +1,6 @@
 /**
  * @file workbench.c
- * @brief ���⹤λʵ�� - ��ƽ̨���̹���
+ * @brief 安全工作位实现 - 跨平台进程管理
  * @author Spharx
  * @date 2024
  */
@@ -89,7 +89,7 @@ void workbench_destroy(workbench_t* wb) {
     cupolas_mem_free(wb);
 }
 
-static int create_pipes(workbench_t* wb) {
+static int cupolas_workbench_create_pipes(workbench_t* wb) {
     if (wb->manager.redirect_stdin) {
         if (cupolas_pipe_create(&wb->stdin_pipe) != cupolas_OK) {
             return cupolas_ERROR_IO;
@@ -120,7 +120,7 @@ static int create_pipes(workbench_t* wb) {
     return cupolas_OK;
 }
 
-static void close_pipes(workbench_t* wb) {
+static void cupolas_workbench_close_pipes(workbench_t* wb) {
     if (wb->manager.redirect_stdin) {
         cupolas_pipe_close(&wb->stdin_pipe);
     }
@@ -132,35 +132,83 @@ static void close_pipes(workbench_t* wb) {
     }
 }
 
-static int read_output(workbench_t* wb) {
-    char buf[OUTPUT_CHUNK_SIZE];
+static int cupolas_workbench_read_single_pipe(cupolas_pipe_t* pipe, char* buf, size_t* size, size_t capacity) {
+    char temp_buf[OUTPUT_CHUNK_SIZE];
     size_t bytes_read;
     
-    if (wb->manager.redirect_stdout && wb->stdout_buf) {
-        while (true) {
-            int ret = cupolas_pipe_read(&wb->stdout_pipe, buf, sizeof(buf), &bytes_read);
-            if (ret != cupolas_OK || bytes_read == 0) break;
-            
-            if (wb->stdout_size + bytes_read < wb->stdout_capacity) {
-                memcpy(wb->stdout_buf + wb->stdout_size, buf, bytes_read);
-                wb->stdout_size += bytes_read;
-            }
-        }
-    }
-    
-    if (wb->manager.redirect_stderr && wb->stderr_buf) {
-        while (true) {
-            int ret = cupolas_pipe_read(&wb->stderr_pipe, buf, sizeof(buf), &bytes_read);
-            if (ret != cupolas_OK || bytes_read == 0) break;
-            
-            if (wb->stderr_size + bytes_read < wb->stderr_capacity) {
-                memcpy(wb->stderr_buf + wb->stderr_size, buf, bytes_read);
-                wb->stderr_size += bytes_read;
-            }
+    while (true) {
+        int ret = cupolas_pipe_read(pipe, temp_buf, sizeof(temp_buf), &bytes_read);
+        if (ret != cupolas_OK || bytes_read == 0) break;
+        
+        if (*size + bytes_read < capacity) {
+            memcpy(buf + *size, temp_buf, bytes_read);
+            *size += bytes_read;
         }
     }
     
     return cupolas_OK;
+}
+
+static int cupolas_workbench_read_output(workbench_t* wb) {
+    if (wb->manager.redirect_stdout && wb->stdout_buf) {
+        cupolas_workbench_read_single_pipe(&wb->stdout_pipe, wb->stdout_buf, &wb->stdout_size, wb->stdout_capacity);
+    }
+    
+    if (wb->manager.redirect_stderr && wb->stderr_buf) {
+        cupolas_workbench_read_single_pipe(&wb->stderr_pipe, wb->stderr_buf, &wb->stderr_size, wb->stderr_capacity);
+    }
+    
+    return cupolas_OK;
+}
+
+/**
+ * @brief 填充执行结果结构体
+ * @param wb 工作位实例
+ * @param result 结果结构体指针
+ * @param exit_code 退出码
+ * @param signaled 是否被信号终止
+ * @param signal 信号值
+ * @param timed_out 是否超时
+ */
+static void cupolas_workbench_fill_result(workbench_t* wb, workbench_result_t* result, 
+                        int exit_code, bool signaled, int signal, bool timed_out) {
+    if (!result) return;
+    
+    memset(result, 0, sizeof(workbench_result_t));
+    result->exit_code = exit_code;
+    result->signaled = signaled;
+    result->signal = signal;
+    result->timed_out = timed_out;
+    result->stdout_data = wb->stdout_buf ? cupolas_strdup(wb->stdout_buf) : NULL;
+    result->stdout_size = wb->stdout_size;
+    result->stderr_data = wb->stderr_buf ? cupolas_strdup(wb->stderr_buf) : NULL;
+    result->stderr_size = wb->stderr_size;
+    result->start_time_ms = wb->start_time_ms;
+    result->end_time_ms = cupolas_time_ms();
+}
+
+/**
+ * @brief 设置进程属性
+ * @param wb 工作位实例
+ * @param attr 进程属性结构体指针
+ */
+static void cupolas_workbench_setup_process_attr(workbench_t* wb, cupolas_process_attr_t* attr) {
+    memset(attr, 0, sizeof(cupolas_process_attr_t));
+    attr->working_dir = wb->manager.working_dir;
+    attr->env = wb->manager.env_vars;
+    attr->redirect_stdin = wb->manager.redirect_stdin;
+    attr->redirect_stdout = wb->manager.redirect_stdout;
+    attr->redirect_stderr = wb->manager.redirect_stderr;
+    
+    if (wb->manager.redirect_stdin) {
+        attr->stdin_pipe = wb->stdin_pipe;
+    }
+    if (wb->manager.redirect_stdout) {
+        attr->stdout_pipe = wb->stdout_pipe;
+    }
+    if (wb->manager.redirect_stderr) {
+        attr->stderr_pipe = wb->stderr_pipe;
+    }
 }
 
 int workbench_execute(workbench_t* wb, const char* command, char* const argv[],
@@ -179,35 +227,20 @@ int workbench_execute(workbench_t* wb, const char* command, char* const argv[],
     if (wb->stdout_buf) wb->stdout_buf[0] = '\0';
     if (wb->stderr_buf) wb->stderr_buf[0] = '\0';
     
-    if (create_pipes(wb) != cupolas_OK) {
+    if (cupolas_workbench_create_pipes(wb) != cupolas_OK) {
         wb->state = WORKBENCH_STATE_ERROR;
         cupolas_mutex_unlock(&wb->lock);
         return cupolas_ERROR_IO;
     }
     
     cupolas_process_attr_t attr;
-    memset(&attr, 0, sizeof(attr));
-    attr.working_dir = wb->manager.working_dir;
-    attr.env = wb->manager.env_vars;
-    attr.redirect_stdin = wb->manager.redirect_stdin;
-    attr.redirect_stdout = wb->manager.redirect_stdout;
-    attr.redirect_stderr = wb->manager.redirect_stderr;
-    
-    if (wb->manager.redirect_stdin) {
-        attr.stdin_pipe = wb->stdin_pipe;
-    }
-    if (wb->manager.redirect_stdout) {
-        attr.stdout_pipe = wb->stdout_pipe;
-    }
-    if (wb->manager.redirect_stderr) {
-        attr.stderr_pipe = wb->stderr_pipe;
-    }
+    cupolas_workbench_setup_process_attr(wb, &attr);
     
     wb->start_time_ms = cupolas_time_ms();
     
     int ret = cupolas_process_spawn(&wb->process, command, argv, &attr);
     if (ret != cupolas_OK) {
-        close_pipes(wb);
+        cupolas_workbench_close_pipes(wb);
         wb->state = WORKBENCH_STATE_ERROR;
         cupolas_mutex_unlock(&wb->lock);
         return ret;
@@ -227,43 +260,22 @@ int workbench_execute(workbench_t* wb, const char* command, char* const argv[],
         cupolas_process_terminate(wb->process, 9);
         cupolas_process_wait(wb->process, &status, 1000);
         
-        read_output(wb);
-        close_pipes(wb);
+        cupolas_workbench_read_output(wb);
+        cupolas_workbench_close_pipes(wb);
         cupolas_process_close(wb->process);
         
-        if (result) {
-            memset(result, 0, sizeof(workbench_result_t));
-            result->exit_code = -1;
-            result->timed_out = true;
-            result->stdout_data = wb->stdout_buf ? cupolas_strdup(wb->stdout_buf) : NULL;
-            result->stdout_size = wb->stdout_size;
-            result->stderr_data = wb->stderr_buf ? cupolas_strdup(wb->stderr_buf) : NULL;
-            result->stderr_size = wb->stderr_size;
-            result->start_time_ms = wb->start_time_ms;
-            result->end_time_ms = cupolas_time_ms();
-        }
+        cupolas_workbench_fill_result(wb, result, -1, false, 0, true);
         
         wb->state = WORKBENCH_STATE_STOPPED;
         cupolas_mutex_unlock(&wb->lock);
         return cupolas_ERROR_TIMEOUT;
     }
     
-    read_output(wb);
-    close_pipes(wb);
+    cupolas_workbench_read_output(wb);
+    cupolas_workbench_close_pipes(wb);
     cupolas_process_close(wb->process);
     
-    if (result) {
-        memset(result, 0, sizeof(workbench_result_t));
-        result->exit_code = status.code;
-        result->signaled = status.signaled;
-        result->signal = status.signal;
-        result->stdout_data = wb->stdout_buf ? cupolas_strdup(wb->stdout_buf) : NULL;
-        result->stdout_size = wb->stdout_size;
-        result->stderr_data = wb->stderr_buf ? cupolas_strdup(wb->stderr_buf) : NULL;
-        result->stderr_size = wb->stderr_size;
-        result->start_time_ms = wb->start_time_ms;
-        result->end_time_ms = cupolas_time_ms();
-    }
+    cupolas_workbench_fill_result(wb, result, status.code, status.signaled, status.signal, false);
     
     wb->state = WORKBENCH_STATE_IDLE;
     cupolas_mutex_unlock(&wb->lock);
@@ -284,25 +296,20 @@ int workbench_execute_async(workbench_t* wb, const char* command, char* const ar
     wb->stdout_size = 0;
     wb->stderr_size = 0;
     
-    if (create_pipes(wb) != cupolas_OK) {
+    if (cupolas_workbench_create_pipes(wb) != cupolas_OK) {
         wb->state = WORKBENCH_STATE_ERROR;
         cupolas_mutex_unlock(&wb->lock);
         return cupolas_ERROR_IO;
     }
     
     cupolas_process_attr_t attr;
-    memset(&attr, 0, sizeof(attr));
-    attr.working_dir = wb->manager.working_dir;
-    attr.env = wb->manager.env_vars;
-    attr.redirect_stdin = wb->manager.redirect_stdin;
-    attr.redirect_stdout = wb->manager.redirect_stdout;
-    attr.redirect_stderr = wb->manager.redirect_stderr;
+    cupolas_workbench_setup_process_attr(wb, &attr);
     
     wb->start_time_ms = cupolas_time_ms();
     
     int ret = cupolas_process_spawn(&wb->process, command, argv, &attr);
     if (ret != cupolas_OK) {
-        close_pipes(wb);
+        cupolas_workbench_close_pipes(wb);
         wb->state = WORKBENCH_STATE_ERROR;
         cupolas_mutex_unlock(&wb->lock);
         return ret;
@@ -336,22 +343,11 @@ int workbench_wait(workbench_t* wb, workbench_result_t* result, uint32_t timeout
         return cupolas_ERROR_TIMEOUT;
     }
     
-    read_output(wb);
-    close_pipes(wb);
+    cupolas_workbench_read_output(wb);
+    cupolas_workbench_close_pipes(wb);
     cupolas_process_close(wb->process);
     
-    if (result) {
-        memset(result, 0, sizeof(workbench_result_t));
-        result->exit_code = status.code;
-        result->signaled = status.signaled;
-        result->signal = status.signal;
-        result->stdout_data = wb->stdout_buf ? cupolas_strdup(wb->stdout_buf) : NULL;
-        result->stdout_size = wb->stdout_size;
-        result->stderr_data = wb->stderr_buf ? cupolas_strdup(wb->stderr_buf) : NULL;
-        result->stderr_size = wb->stderr_size;
-        result->start_time_ms = wb->start_time_ms;
-        result->end_time_ms = cupolas_time_ms();
-    }
+    cupolas_workbench_fill_result(wb, result, status.code, status.signaled, status.signal, false);
     
     wb->state = WORKBENCH_STATE_IDLE;
     cupolas_mutex_unlock(&wb->lock);
@@ -374,8 +370,8 @@ int workbench_terminate(workbench_t* wb) {
     cupolas_exit_status_t status;
     cupolas_process_wait(wb->process, &status, 1000);
     
-    read_output(wb);
-    close_pipes(wb);
+    cupolas_workbench_read_output(wb);
+    cupolas_workbench_close_pipes(wb);
     cupolas_process_close(wb->process);
     
     wb->state = WORKBENCH_STATE_STOPPED;

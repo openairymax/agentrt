@@ -21,29 +21,33 @@
           "name": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 128,
-            "description": "Model identifier name"
+            "description": "Unique model identifier name",
+            "examples": ["gpt-4-turbo", "gpt-3.5-turbo", "claude-3-opus", "llama-3-70b"]
           },
           "provider": {
             "type": "string",
-            "enum": ["openai", "anthropic", "deepseek", "ollama", "azure", "aws", "google", "custom"],
-            "description": "Model provider"
+            "enum": ["openai", "anthropic", "azure", "google", "meta", "ollama", "local"],
+            "description": "Model provider name",
+            "examples": ["openai", "anthropic", "google", "ollama"]
           },
           "api_key_env": {
             "type": "string",
             "minLength": 1,
-            "description": "Environment variable name for API key"
+            "description": "Environment variable name for API key",
+            "examples": ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY"]
           },
           "endpoint": {
             "type": "string",
             "format": "uri",
-            "description": "API endpoint URL (optional, uses provider default if not specified)"
+            "description": "API endpoint URL (optional, uses provider default if not specified)",
+            "examples": ["https://api.openai.com/v1", "https://api.anthropic.com/v1"]
           },
           "context_window": {
             "type": "integer",
             "minimum": 512,
             "maximum": 10000000,
-            "description": "Maximum context window size in tokens"
+            "description": "Maximum context window size in tokens",
+            "examples": [4096, 8192, 16384, 32768, 128000]
           },
           "input_cost_per_1k": {
             "type": "number",
@@ -61,26 +65,30 @@
               "type": "string",
               "enum": ["chat", "function_calling", "json_mode", "vision", "embedding", "streaming", "tools"]
             },
-            "description": "Model capabilities"
+            "description": "Model capabilities",
+            "examples": [["chat", "function_calling"], ["chat", "vision"], ["embedding"]]
           },
           "default": {
             "type": "boolean",
             "default": false,
-            "description": "Whether this is the default model"
+            "description": "Whether this is the default model",
+            "examples": [true, false]
           },
           "max_concurrency": {
             "type": "integer",
             "minimum": 1,
             "maximum": 1000,
             "default": 10,
-            "description": "Maximum concurrent requests to this model"
+            "description": "Maximum concurrent requests to this model",
+            "examples": [5, 10, 20, 50, 100]
           },
           "timeout_sec": {
             "type": "integer",
             "minimum": 1,
             "maximum": 600,
             "default": 30,
-            "description": "Request timeout in seconds"
+            "description": "Request timeout in seconds",
+            "examples": [10, 30, 60, 120]
           },
           "retry": {
             "type": "object",
@@ -91,28 +99,32 @@
                 "minimum": 0,
                 "maximum": 10,
                 "default": 3,
-                "description": "Maximum retry attempts"
+                "description": "Maximum retry attempts (0 = no retry)",
+                "examples": [0, 1, 3, 5]
               },
               "backoff_ms": {
                 "type": "integer",
                 "minimum": 10,
                 "maximum": 60000,
                 "default": 100,
-                "description": "Initial backoff time in milliseconds"
+                "description": "Initial backoff time in milliseconds",
+                "examples": [100, 200, 500, 1000]
               },
               "backoff_multiplier": {
                 "type": "number",
                 "minimum": 1,
                 "maximum": 10,
                 "default": 2.0,
-                "description": "Backoff multiplier for exponential backoff"
+                "description": "Backoff multiplier for exponential backoff",
+                "examples": [1.5, 2.0, 2.5]
               },
               "max_backoff_ms": {
                 "type": "integer",
                 "minimum": 1000,
                 "maximum": 300000,
                 "default": 10000,
-                "description": "Maximum backoff time in milliseconds"
+                "description": "Maximum backoff time in milliseconds",
+                "examples": [5000, 10000, 20000, 30000]
               },
               "retry_on_status_codes": {
                 "type": "array",
@@ -120,7 +132,8 @@
                   "type": "integer"
                 },
                 "default": [429, 500, 502, 503, 504],
-                "description": "HTTP status codes that trigger retry"
+                "description": "HTTP status codes that trigger retry",
+                "examples": [[429, 500, 502, 503, 504], [429, 500], [500, 502, 503]]
               }
             }
           },

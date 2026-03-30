@@ -25,6 +25,8 @@ import {
   getInterfaceSlice,
   buildListPath,
   parseList,
+  validateAndExtractData,
+  validateRequiredString,
 } from '../utils';
 
 /**
@@ -56,18 +58,13 @@ export class SkillManager {
    * @param skillId - 技能 ID
    */
   async load(skillId: string): Promise<Skill> {
-    if (!skillId) {
-      throw new AgentOSError('技能ID不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(skillId, '技能ID');
 
     const resp = await this.api.post<APIResponse>(
       `/api/v1/skills/${skillId}/load`,
     );
 
-    const data = extractDataMap(resp);
-    if (!data) {
-      throw new AgentOSError('技能加载响应格式异常', ErrorCode.INVALID_RESPONSE);
-    }
+    const data = validateAndExtractData(resp, '技能加载响应格式异常');
 
     return {
       id: skillId,
@@ -86,15 +83,10 @@ export class SkillManager {
    * @param skillId - 技能 ID
    */
   async get(skillId: string): Promise<Skill> {
-    if (!skillId) {
-      throw new AgentOSError('技能ID不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(skillId, '技能ID');
 
     const resp = await this.api.get<APIResponse>(`/api/v1/skills/${skillId}`);
-    const data = extractDataMap(resp);
-    if (!data) {
-      throw new AgentOSError('技能详情响应格式异常', ErrorCode.INVALID_RESPONSE);
-    }
+    const data = validateAndExtractData(resp, '技能详情响应格式异常');
 
     return this.parseSkillFromMap(data, skillId);
   }
@@ -108,9 +100,7 @@ export class SkillManager {
     skillId: string,
     parameters?: Record<string, unknown>,
   ): Promise<SkillResult> {
-    if (!skillId) {
-      throw new AgentOSError('技能ID不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(skillId, '技能ID');
 
     const resp = await this.api.post<APIResponse>(
       `/api/v1/skills/${skillId}/execute`,
@@ -131,9 +121,7 @@ export class SkillManager {
     parameters: Record<string, unknown> | undefined,
     sessionId: string,
   ): Promise<SkillResult> {
-    if (!skillId) {
-      throw new AgentOSError('技能ID不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(skillId, '技能ID');
 
     const resp = await this.api.post<APIResponse>(
       `/api/v1/skills/${skillId}/execute`,
@@ -148,9 +136,7 @@ export class SkillManager {
    * @param skillId - 技能 ID
    */
   async unload(skillId: string): Promise<void> {
-    if (!skillId) {
-      throw new AgentOSError('技能ID不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(skillId, '技能ID');
     await this.api.post(`/api/v1/skills/${skillId}/unload`);
   }
 
@@ -183,19 +169,14 @@ export class SkillManager {
     description: string,
     parameters?: Record<string, unknown>,
   ): Promise<Skill> {
-    if (!name) {
-      throw new AgentOSError('技能名称不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(name, '技能名称');
 
     const resp = await this.api.post<APIResponse<{ skill_id: string }>>(
       '/api/v1/skills',
       { name, description, parameters },
     );
 
-    const data = extractDataMap(resp);
-    if (!data) {
-      throw new AgentOSError('技能注册响应格式异常', ErrorCode.INVALID_RESPONSE);
-    }
+    const data = validateAndExtractData(resp, '技能注册响应格式异常');
 
     return {
       id: getString(data, 'skill_id'),
@@ -220,19 +201,14 @@ export class SkillManager {
     description: string,
     parameters?: Record<string, unknown>,
   ): Promise<Skill> {
-    if (!skillId) {
-      throw new AgentOSError('技能ID不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(skillId, '技能ID');
 
     const resp = await this.api.put<APIResponse>(
       `/api/v1/skills/${skillId}`,
       { description, parameters },
     );
 
-    const data = extractDataMap(resp);
-    if (!data) {
-      throw new AgentOSError('技能更新响应格式异常', ErrorCode.INVALID_RESPONSE);
-    }
+    const data = validateAndExtractData(resp, '技能更新响应格式异常');
 
     return this.parseSkillFromMap(data, skillId);
   }
@@ -242,9 +218,7 @@ export class SkillManager {
    * @param skillId - 技能 ID
    */
   async delete(skillId: string): Promise<void> {
-    if (!skillId) {
-      throw new AgentOSError('技能ID不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(skillId, '技能ID');
     await this.api.delete(`/api/v1/skills/${skillId}`);
   }
 
@@ -253,18 +227,13 @@ export class SkillManager {
    * @param skillId - 技能 ID
    */
   async getInfo(skillId: string): Promise<SkillInfo> {
-    if (!skillId) {
-      throw new AgentOSError('技能ID不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(skillId, '技能ID');
 
     const resp = await this.api.get<APIResponse>(
       `/api/v1/skills/${skillId}/info`,
     );
 
-    const data = extractDataMap(resp);
-    if (!data) {
-      throw new AgentOSError('技能信息响应格式异常', ErrorCode.INVALID_RESPONSE);
-    }
+    const data = validateAndExtractData(resp, '技能信息响应格式异常');
 
     return {
       name: getString(data, 'skill_name'),
@@ -283,19 +252,14 @@ export class SkillManager {
     skillId: string,
     parameters: Record<string, unknown>,
   ): Promise<{ valid: boolean; errors: string[] }> {
-    if (!skillId) {
-      throw new AgentOSError('技能ID不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(skillId, '技能ID');
 
     const resp = await this.api.post<APIResponse<{ valid: boolean; errors?: string[] }>>(
       `/api/v1/skills/${skillId}/validate`,
       { parameters },
     );
 
-    const data = extractDataMap(resp);
-    if (!data) {
-      throw new AgentOSError('技能验证响应格式异常', ErrorCode.INVALID_RESPONSE);
-    }
+    const data = validateAndExtractData(resp, '技能验证响应格式异常');
 
     const valid = getBool(data, 'valid');
     const errors: string[] = [];
@@ -341,9 +305,7 @@ export class SkillManager {
    * @param topK - 返回数量
    */
   async search(query: string, topK: number = 10): Promise<Skill[]> {
-    if (!query) {
-      throw new AgentOSError('搜索查询不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(query, '搜索查询');
     if (topK <= 0) {
       topK = 10;
     }
@@ -372,9 +334,7 @@ export class SkillManager {
    * @param skillId - 技能 ID
    */
   async getStats(skillId: string): Promise<Record<string, number>> {
-    if (!skillId) {
-      throw new AgentOSError('技能ID不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(skillId, '技能ID');
 
     const resp = await this.api.get<APIResponse>(
       `/api/v1/skills/${skillId}/stats`,

@@ -81,40 +81,177 @@ void sanitizer_destroy(sanitizer_t* sanitizer) {
     cupolas_mem_free(sanitizer);
 }
 
-static bool contains_dangerous_chars(const char* input, const sanitize_context_t* ctx) {
+/**
+ * @brief 检查HTML危险字符
+ * @param c 字符
+ * @param ctx 净化上下文
+ * @return 是否为危险字符
+ */
+static bool is_html_dangerous(char c, const sanitize_context_t* ctx) {
+    if (ctx->allow_html) return false;
+    return (c == '<' || c == '>');
+}
+
+/**
+ * @brief 检查SQL危险字符
+ * @param c 字符
+ * @param ctx 净化上下文
+ * @return 是否为危险字符
+ */
+static bool cupolas_sanitizer_is_sql_dangerous(char c, const sanitize_context_t* ctx) {
+    if (ctx->allow_sql) return false;
+    if (ctx->level != SANITIZE_LEVEL_STRICT) return false;
+    return (c == '\'' || c == '"' || c == ';');
+}
+
+/**
+ * @brief 检查Shell危险字符
+ * @param c 字符
+ * @param ctx 净化上下文
+ * @return 是否为危险字符
+ */
+static bool cupolas_sanitizer_is_shell_dangerous(char c, const sanitize_context_t* ctx) {
+    if (ctx->allow_shell) return false;
+    if (ctx->level == SANITIZE_LEVEL_RELAXED) return false;
+    return (c == '|' || c == '&' || c == '$' || c == '`' ||
+            c == '(' || c == ')' || c == '{' || c == '}');
+}
+
+/**
+ * @brief 检查路径危险字符
+ * @param c 当前字符
+ * @param prev_char 前一个字符
+ * @param ctx 净化上下文
+ * @return 是否为危险字符
+ */
+static bool cupolas_sanitizer_is_path_dangerous(char c, char prev_char, const sanitize_context_t* ctx) {
+    if (ctx->allow_path) return false;
+    if (ctx->level != SANITIZE_LEVEL_STRICT) return false;
+    return (c == '\\' || (c == '.' && prev_char == '.'));
+}
+
+/**
+ * @brief 检查控制字符
+ * @param c 字符
+ * @return 是否为危险控制字符
+ */
+static bool cupolas_sanitizer_is_control_dangerous(char c) {
+    unsigned char uc = (unsigned char)c;
+    return (uc < 0x20 && c != '\t' && c != '\n' && c != '\r');
+}
+
+static bool cupolas_sanitizer_contains_dangerous_chars(const char* input, const sanitize_context_t* ctx) {
     if (!input) return false;
     
+    char prev_char = '\0';
     const char* p = input;
+    
     while (*p) {
-        if (!ctx->allow_html) {
-            if (*p == '<' || *p == '>') return true;
-        }
-        if (!ctx->allow_sql) {
-            if (*p == '\'' || *p == '"' || *p == ';') {
-                if (ctx->level == SANITIZE_LEVEL_STRICT) return true;
-            }
-        }
-        if (!ctx->allow_shell) {
-            if (*p == '|' || *p == '&' || *p == '$' || *p == '`' ||
-                *p == '(' || *p == ')' || *p == '{' || *p == '}') {
-                if (ctx->level != SANITIZE_LEVEL_RELAXED) return true;
-            }
-        }
-        if (!ctx->allow_path) {
-            if (*p == '\\' || (p != input && *p == '.' && *(p-1) == '.')) {
-                if (ctx->level == SANITIZE_LEVEL_STRICT) return true;
-            }
-        }
-        if ((unsigned char)*p < 0x20 && *p != '\t' && *p != '\n' && *p != '\r') {
-            return true;
-        }
+        char c = *p;
+        
+        if (cupolas_sanitizer_is_html_dangerous(c, ctx)) return true;
+        if (cupolas_sanitizer_is_sql_dangerous(c, ctx)) return true;
+        if (cupolas_sanitizer_is_shell_dangerous(c, ctx)) return true;
+        if (cupolas_sanitizer_is_path_dangerous(c, prev_char, ctx)) return true;
+        if (cupolas_sanitizer_is_control_dangerous(c)) return true;
+        
+        prev_char = c;
         p++;
     }
     
     return false;
 }
 
-static int apply_escape_rules(const char* input, char* output, size_t output_size, 
+/**
+ * @brief 尝试转义HTML字符
+ * @param c 字符
+ * @param output 输出缓冲区
+ * @param out_pos 输出位置指针
+ * @param output_size 输出缓冲区大小
+ * @param ctx 净化上下文
+ * @return 是否处理了该字符（true表示已处理，false表示未处理）
+ */
+static bool cupolas_sanitizer_try_escape_html(char c, char* output, size_t* out_pos, size_t output_size, 
+                            const sanitize_context_t* ctx) {
+    if (ctx->allow_html) return false;
+    
+    if (c == '<') {
+        if (*out_pos + 4 >= output_size) return false;
+        memcpy(output + *out_pos, "&lt;", 4);
+        *out_pos += 4;
+        return true;
+    }
+    if (c == '>') {
+        if (*out_pos + 4 >= output_size) return false;
+        memcpy(output + *out_pos, "&gt;", 4);
+        *out_pos += 4;
+        return true;
+    }
+    if (c == '&') {
+        if (*out_pos + 5 >= output_size) return false;
+        memcpy(output + *out_pos, "&amp;", 5);
+        *out_pos += 5;
+        return true;
+    }
+    return false;
+}
+
+/**
+ * @brief 尝试转义SQL字符
+ * @param c 字符
+ * @param output 输出缓冲区
+ * @param out_pos 输出位置指针
+ * @param output_size 输出缓冲区大小
+ * @param ctx 净化上下文
+ * @return 是否处理了该字符
+ */
+static bool cupolas_sanitizer_try_escape_sql(char c, char* output, size_t* out_pos, size_t output_size,
+                           const sanitize_context_t* ctx) {
+    if (ctx->allow_sql) return false;
+    
+    if (c == '\'') {
+        if (*out_pos + 2 >= output_size) return false;
+        output[(*out_pos)++] = '\'';
+        output[(*out_pos)++] = '\'';
+        return true;
+    }
+    return false;
+}
+
+/**
+ * @brief 检查是否为Shell特殊字符
+ * @param c 字符
+ * @return 是否为Shell特殊字符
+ */
+static bool cupolas_sanitizer_is_shell_special_char(char c) {
+    return (c == '\\' || c == '\'' || c == '\"' || c == '`' ||
+            c == '$' || c == '|' || c == '&' || c == ';' ||
+            c == '(' || c == ')' || c == '{' || c == '}');
+}
+
+/**
+ * @brief 尝试转义Shell字符
+ * @param c 字符
+ * @param output 输出缓冲区
+ * @param out_pos 输出位置指针
+ * @param output_size 输出缓冲区大小
+ * @param ctx 净化上下文
+ * @return 是否处理了该字符
+ */
+static bool cupolas_sanitizer_try_escape_shell(char c, char* output, size_t* out_pos, size_t output_size,
+                             const sanitize_context_t* ctx) {
+    if (ctx->allow_shell) return false;
+    
+    if (cupolas_sanitizer_is_shell_special_char(c)) {
+        if (*out_pos + 2 >= output_size) return false;
+        output[(*out_pos)++] = '\\';
+        output[(*out_pos)++] = c;
+        return true;
+    }
+    return false;
+}
+
+static int cupolas_sanitizer_apply_escape_rules(const char* input, char* output, size_t output_size, 
                                const sanitize_context_t* ctx) {
     if (!input || !output || output_size == 0) return cupolas_ERROR_INVALID_ARG;
     
@@ -124,46 +261,9 @@ static int apply_escape_rules(const char* input, char* output, size_t output_siz
     for (size_t i = 0; i < in_len && out_pos < output_size - 1; i++) {
         char c = input[i];
         
-        if (!ctx->allow_html) {
-            if (c == '<') {
-                if (out_pos + 4 >= output_size) break;
-                memcpy(output + out_pos, "&lt;", 4);
-                out_pos += 4;
-                continue;
-            }
-            if (c == '>') {
-                if (out_pos + 4 >= output_size) break;
-                memcpy(output + out_pos, "&gt;", 4);
-                out_pos += 4;
-                continue;
-            }
-            if (c == '&') {
-                if (out_pos + 5 >= output_size) break;
-                memcpy(output + out_pos, "&amp;", 5);
-                out_pos += 5;
-                continue;
-            }
-        }
-        
-        if (!ctx->allow_sql) {
-            if (c == '\'') {
-                if (out_pos + 2 >= output_size) break;
-                output[out_pos++] = '\'';
-                output[out_pos++] = '\'';
-                continue;
-            }
-        }
-        
-        if (!ctx->allow_shell) {
-            if (c == '\\' || c == '\'' || c == '\"' || c == '`' ||
-                c == '$' || c == '|' || c == '&' || c == ';' ||
-                c == '(' || c == ')' || c == '{' || c == '}') {
-                if (out_pos + 2 >= output_size) break;
-                output[out_pos++] = '\\';
-                output[out_pos++] = c;
-                continue;
-            }
-        }
+        if (cupolas_sanitizer_try_escape_html(c, output, &out_pos, output_size, ctx)) continue;
+        if (cupolas_sanitizer_try_escape_sql(c, output, &out_pos, output_size, ctx)) continue;
+        if (cupolas_sanitizer_try_escape_shell(c, output, &out_pos, output_size, ctx)) continue;
         
         output[out_pos++] = c;
     }
@@ -211,13 +311,13 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t* sanitizer,
         return cached_result;
     }
     
-    if (contains_dangerous_chars(input, ctx)) {
+    if (cupolas_sanitizer_contains_dangerous_chars(input, ctx)) {
         if (ctx->level == SANITIZE_LEVEL_STRICT) {
             cupolas_atomic_add64(&sanitizer->total_rejected, 1);
             return SANITIZE_REJECTED;
         }
         
-        if (apply_escape_rules(input, output, output_size, ctx) != cupolas_OK) {
+        if (cupolas_sanitizer_apply_escape_rules(input, output, output_size, ctx) != cupolas_OK) {
             cupolas_atomic_add64(&sanitizer->total_rejected, 1);
             return SANITIZE_ERROR;
         }
@@ -257,7 +357,7 @@ bool sanitizer_is_safe(sanitizer_t* sanitizer,
         return false;
     }
     
-    return !contains_dangerous_chars(input, ctx);
+    return !cupolas_sanitizer_contains_dangerous_chars(input, ctx);
 }
 
 int sanitizer_escape_html(const char* input, char* output, size_t output_size) {

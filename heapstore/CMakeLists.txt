@@ -22,6 +22,7 @@ set(heapstore_SOURCES
     src/heapstore_log.c
     src/heapstore_ipc.c
     src/heapstore_memory.c
+    src/utils.c
 )
 
 set(heapstore_HEADERS
@@ -31,6 +32,7 @@ set(heapstore_HEADERS
     include/heapstore_log.h
     include/heapstore_ipc.h
     include/heapstore_memory.h
+    include/utils.h
     src/private.h
 )
 

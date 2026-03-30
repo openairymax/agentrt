@@ -397,7 +397,7 @@ int cognition_coordinate_results(const char** agent_results, size_t result_count
         return -1;
     }
     
-    strcpy(decision, agent_results[0]);
+    memcpy(decision, agent_results[0], decision_size);
     
     result->success = true;
     result->decision = decision;

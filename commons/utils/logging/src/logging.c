@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file logging.c
  * @brief 统一分层日志系统核心层实�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -19,8 +19,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../commons/utils/memory/include/memory_compat.h"
-#include "../commons/utils/string/include/string_compat.h"
+#include "../../utils/memory/include/memory_compat.h"
+#include "../../utils/string/include/string_compat.h"
 #include <string.h>
 #include <time.h>
 #include <stdarg.h>

@@ -1,6 +1,6 @@
 /**
  * @file audit_rotator.c
- * @brief 审计日志轮转器实�?
+ * @brief 审计日志轮转器实现
  * @author Spharx
  * @date 2024
  */
@@ -22,7 +22,7 @@ struct audit_rotator {
     cupolas_mutex_t lock;
 };
 
-static const char* event_type_str(audit_event_type_t type) {
+static const char* cupolas_audit_event_type_str(audit_event_type_t type) {
     switch (type) {
         case AUDIT_EVENT_PERMISSION: return "permission";
         case AUDIT_EVENT_SANITIZER: return "sanitizer";
@@ -33,7 +33,7 @@ static const char* event_type_str(audit_event_type_t type) {
     }
 }
 
-static char* build_filename(const char* dir, const char* prefix, int index) {
+static char* cupolas_audit_build_filename(const char* dir, const char* prefix, int index) {
     char* path = (char*)cupolas_mem_alloc(MAX_PATH_LEN);
     if (!path) return NULL;
     
@@ -48,14 +48,14 @@ static char* build_filename(const char* dir, const char* prefix, int index) {
     return path;
 }
 
-static int open_current_file(audit_rotator_t* rotator) {
+static int cupolas_audit_open_current_file(audit_rotator_t* rotator) {
     if (rotator->fp) {
         fclose(rotator->fp);
         rotator->fp = NULL;
     }
     
     cupolas_mem_free(rotator->current_file);
-    rotator->current_file = build_filename(rotator->log_dir, rotator->log_prefix, -1);
+    rotator->current_file = cupolas_audit_build_filename(rotator->log_dir, rotator->log_prefix, -1);
     if (!rotator->current_file) return cupolas_ERROR_NO_MEMORY;
     
     if (rotator->log_dir) {
@@ -79,21 +79,21 @@ static int open_current_file(audit_rotator_t* rotator) {
     return cupolas_OK;
 }
 
-static int rotate_files(audit_rotator_t* rotator) {
+static int cupolas_audit_rotate_files(audit_rotator_t* rotator) {
     if (rotator->fp) {
         fclose(rotator->fp);
         rotator->fp = NULL;
     }
     
-    char* oldest = build_filename(rotator->log_dir, rotator->log_prefix, rotator->max_files - 1);
+    char* oldest = cupolas_audit_build_filename(rotator->log_dir, rotator->log_prefix, rotator->max_files - 1);
     if (oldest) {
         cupolas_file_remove(oldest);
         cupolas_mem_free(oldest);
     }
     
     for (int i = rotator->max_files - 2; i >= 0; i--) {
-        char* old_path = build_filename(rotator->log_dir, rotator->log_prefix, i);
-        char* new_path = build_filename(rotator->log_dir, rotator->log_prefix, i + 1);
+        char* old_path = cupolas_audit_build_filename(rotator->log_dir, rotator->log_prefix, i);
+        char* new_path = cupolas_audit_build_filename(rotator->log_dir, rotator->log_prefix, i + 1);
         
         if (old_path && new_path) {
             cupolas_file_rename(old_path, new_path);
@@ -103,13 +103,13 @@ static int rotate_files(audit_rotator_t* rotator) {
         cupolas_mem_free(new_path);
     }
     
-    char* current_new = build_filename(rotator->log_dir, rotator->log_prefix, 0);
+    char* current_new = cupolas_audit_build_filename(rotator->log_dir, rotator->log_prefix, 0);
     if (current_new && rotator->current_file) {
         cupolas_file_rename(rotator->current_file, current_new);
     }
     cupolas_mem_free(current_new);
     
-    return open_current_file(rotator);
+    return cupolas_audit_open_current_file(rotator);
 }
 
 audit_rotator_t* audit_rotator_create(const char* log_dir, const char* log_prefix,
@@ -136,7 +136,7 @@ audit_rotator_t* audit_rotator_create(const char* log_dir, const char* log_prefi
         goto error;
     }
     
-    if (open_current_file(rotator) != cupolas_OK) {
+    if (cupolas_audit_open_current_file(rotator) != cupolas_OK) {
         cupolas_mutex_destroy(&rotator->lock);
         goto error;
     }
@@ -180,7 +180,7 @@ int audit_rotator_write(audit_rotator_t* rotator, const audit_entry_t* entry) {
     }
     
     if (rotator->current_size >= rotator->max_file_size) {
-        if (rotate_files(rotator) != cupolas_OK) {
+        if (cupolas_audit_rotate_files(rotator) != cupolas_OK) {
             cupolas_mutex_unlock(&rotator->lock);
             return cupolas_ERROR_IO;
         }
@@ -195,7 +195,7 @@ int audit_rotator_write(audit_rotator_t* rotator, const audit_entry_t* entry) {
         "{\"ts\":\"%s.%03u\",\"type\":\"%s\",\"agent\":\"%s\",\"action\":\"%s\","
         "\"resource\":\"%s\",\"detail\":\"%s\",\"result\":%d}\n",
         timestamp, (unsigned)(entry->timestamp_ms % 1000),
-        event_type_str(entry->type),
+        cupolas_audit_event_type_str(entry->type),
         entry->agent_id ? entry->agent_id : "",
         entry->action ? entry->action : "",
         entry->resource ? entry->resource : "",
@@ -216,7 +216,7 @@ int audit_rotator_rotate(audit_rotator_t* rotator) {
     if (!rotator) return cupolas_ERROR_INVALID_ARG;
     
     cupolas_mutex_lock(&rotator->lock);
-    int ret = rotate_files(rotator);
+    int ret = cupolas_audit_rotate_files(rotator);
     cupolas_mutex_unlock(&rotator->lock);
     
     return ret;

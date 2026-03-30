@@ -1,6 +1,6 @@
 /**
  * @file cupolas_signature.c
- * @brief ´úÂëÇ©ÃûÑéÖ¤ÊµÏÖ
+ * @brief ä»£ç ç­¾åéªŒè¯å®ç°
  * @author Spharx
  * @date 2026
  */
@@ -12,7 +12,7 @@
 #include <string.h>
 #include <time.h>
 
-/* OpenSSL Í·ÎÄ¼ş */
+/* OpenSSL å¤´æ–‡ä»¶ */
 #ifdef cupolas_USE_OPENSSL
 #include <openssl/evp.h>
 #include <openssl/rsa.h>
@@ -24,7 +24,7 @@
 #endif
 
 /* ============================================================================
- * ÄÚ²¿½á¹¹
+ * å†…éƒ¨ç»“æ„
  * ============================================================================ */
 
 struct cupolas_signature {
@@ -43,7 +43,7 @@ typedef struct {
 
 static struct {
     bool initialized;
-    cupolas_sig_config_t manager;
+    cupolas_sig_config_t config;
     trusted_signer_t* trusted_signers;
     size_t trusted_count;
     size_t trusted_capacity;
@@ -51,25 +51,25 @@ static struct {
 } g_sig_ctx = {0};
 
 /* ============================================================================
- * ³õÊ¼»¯/ÇåÀí
+ * åˆå§‹åŒ–/æ¸…ç†
  * ============================================================================ */
 
-int cupolas_signature_init(const cupolas_sig_config_t* manager) {
+int cupolas_signature_init(const cupolas_sig_config_t* config) {
     if (g_sig_ctx.initialized) {
         return cupolas_SIG_OK;
     }
 
     memset(&g_sig_ctx, 0, sizeof(g_sig_ctx));
 
-    if (manager) {
-        memcpy(&g_sig_ctx.manager, manager, sizeof(cupolas_sig_config_t));
+    if (config) {
+        memcpy(&g_sig_ctx.config, config, sizeof(cupolas_sig_config_t));
     } else {
-        g_sig_ctx.manager.check_cert_chain = true;
-        g_sig_ctx.manager.check_revocation = false;
-        g_sig_ctx.manager.check_timestamp = true;
-        g_sig_ctx.manager.allow_self_signed = false;
-        g_sig_ctx.manager.allow_expired_test = false;
-        g_sig_ctx.manager.max_chain_depth = 10;
+        g_sig_ctx.config.check_cert_chain = true;
+        g_sig_ctx.config.check_revocation = false;
+        g_sig_ctx.config.check_timestamp = true;
+        g_sig_ctx.config.allow_self_signed = false;
+        g_sig_ctx.config.allow_expired_test = false;
+        g_sig_ctx.config.max_chain_depth = 10;
     }
 
     cupolas_rwlock_init(&g_sig_ctx.lock);
@@ -110,7 +110,7 @@ void cupolas_signature_cleanup(void) {
 }
 
 /* ============================================================================
- * ¹şÏ£¼ÆËã
+ * å“ˆå¸Œè®¡ç®—
  * ============================================================================ */
 
 int cupolas_signature_compute_hash(const char* file_path, uint8_t* hash_out) {
@@ -144,7 +144,7 @@ int cupolas_signature_compute_hash(const char* file_path, uint8_t* hash_out) {
 }
 
 /* ============================================================================
- * Ç©ÃûÑéÖ¤
+ * ç­¾åéªŒè¯
  * ============================================================================ */
 
 int cupolas_signature_verify_file(const char* file_path,
@@ -244,9 +244,9 @@ int cupolas_signature_verify_data(const uint8_t* data, size_t data_len,
     EVP_PKEY_free(pkey);
     return ret;
 #else
-    cupolas_UNUSED(data_len);
-    cupolas_UNUSED(sig_len);
-    cupolas_UNUSED(algo);
+    (void)data_len;
+    (void)sig_len;
+    (void)algo;
     return cupolas_SIG_OK;
 #endif
 }
@@ -271,7 +271,7 @@ int cupolas_signature_verify_integrity(const char* file_path,
 }
 
 /* ============================================================================
- * Ç©ÃûÕß¹ÜÀí
+ * ç­¾åè€…ç®¡ç†
  * ============================================================================ */
 
 int cupolas_signature_get_signer_info(const char* file_path,
@@ -355,7 +355,7 @@ int cupolas_signature_add_trusted_signer(const char* signer_cn,
 }
 
 /* ============================================================================
- * Ç©Ãû²Ù×÷
+ * ç­¾åç”Ÿæˆ
  * ============================================================================ */
 
 int cupolas_signature_sign_file(const char* file_path,
@@ -437,15 +437,15 @@ int cupolas_signature_sign_data(const uint8_t* data, size_t data_len,
     EVP_PKEY_free(pkey);
     return ret;
 #else
-    cupolas_UNUSED(data_len);
-    cupolas_UNUSED(algo);
+    (void)data_len;
+    (void)algo;
     memset(signature_out, 0, *sig_len);
     return cupolas_SIG_OK;
 #endif
 }
 
 /* ============================================================================
- * ¹¤¾ßº¯Êı
+ * è¾…åŠ©å‡½æ•°
  * ============================================================================ */
 
 const char* cupolas_signature_result_string(cupolas_sig_result_t result) {

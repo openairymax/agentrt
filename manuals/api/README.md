@@ -1,17 +1,18 @@
-﻿Copyright (c) 2026 SPHARX. All Rights Reserved.
+Copyright (c) 2026 SPHARX. All Rights Reserved.
 "From data intelligence emerges."
 
 # AgentOS API 参考文档
 
-**版本**: Doc V1.5  
-**最后更新**: 2026-03-23  
-**状态**: 🟢 生产就绪
+**版本**: Doc V1.7  
+**最后更新**: 2026-03-31  
+**状态**: 🟢 生产就绪  
+**作者**: LirenWang
 
 ---
 
 ## 🎯 概述
 
-AgentOS 提供多层次的 API 接口，从底层的系统调用到高级的 SDK 封装，满足不同开发场景的需求。所有 API 遵循统一的契约化设计原则，确保接口的稳定性、安全性和可观测性。
+AgentOS 提供多层次的 API 接口，从底层的系统调用到高级的 SDK 封装，满足不同开发场景的需求。所有 API 遵循统一的契约化设计原则，确保接口的稳定性、安全性和可观测性。API 设计遵循五维正交系统中的工程观，强调安全内生、可观测性和契约化设计。
 
 ### API 层次结构
 
@@ -67,7 +68,7 @@ AgentOS 提供原生多语言 SDK，支持快速集成和开发。
 | **内存管理** | [../architecture/folder/memoryrovol.md](../architecture/folder/memoryrovol.md) | ✅ 生产就绪 |
 | **任务调度** | [../architecture/folder/coreloopthree.md](../architecture/folder/coreloopthree.md) | ✅ 生产就绪 |
 | **微内核** | [../architecture/folder/microkernel.md](../architecture/folder/microkernel.md) | ✅ 生产就绪 |
-| **安全穹顶** | [../architecture/folder/architectural_design_principles.md](../architecture/folder/architectural_design_principles.md) | ✅ 生产就绪 |
+| **安全穹顶** | [../architecture/ARCHITECTURAL_PRINCIPLES.md](../architecture/ARCHITECTURAL_PRINCIPLES.md) | ✅ 生产就绪 |
 
 ---
 
@@ -401,15 +402,15 @@ AGENTOS_API int agentos_module_function(
 
 ## 📚 相关文档
 
-- [架构设计原则](../architecture/folder/architectural_design_principles.md)
+- [架构设计原则](../architecture/ARCHITECTURAL_PRINCIPLES.md)
 - [系统调用规范](../architecture/folder/syscall.md)
 - [编码规范](../specifications/coding_standard/C_coding_style_guide.md)
 - [术语表](../specifications/TERMINOLOGY.md)
 
 ---
 
-**最后更新**: 2026-03-23  
-**维护者**: AgentOS API 委员会
+**最后更新**: 2026-03-31  
+**维护者**: AgentOS API 委员会 (作者: LirenWang)
 
 ---
 

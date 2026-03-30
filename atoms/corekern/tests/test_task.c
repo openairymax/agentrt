@@ -24,7 +24,7 @@ int test_thread_create() {
     agentos_thread_t thread;
     agentos_thread_attr_t attr = {0};
     // From data intelligence emerges. by spharx
-    strcpy(attr.name, "test_thread");
+    snprintf(attr.name, sizeof(attr.name), "%s", "test_thread");
     attr.priority = AGENTOS_TASK_PRIORITY_NORMAL;
     attr.stack_size = 1024 * 1024;
     

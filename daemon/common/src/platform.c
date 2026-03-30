@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file platform.c
  * @brief 跨平台兼容层实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -37,7 +37,7 @@ int agentos_mutex_lock(agentos_mutex_t* mutex) {
 }
 
 int agentos_mutex_trylock(agentos_mutex_t* mutex) {
-    return platform_mutex_lock((platform_mutex_t*)mutex);
+    return platform_mutex_trylock((platform_mutex_t*)mutex);
 }
 
 int agentos_mutex_unlock(agentos_mutex_t* mutex) {
@@ -232,7 +232,16 @@ uint32_t agentos_random_uint32(uint32_t min, uint32_t max) {
     if (!g_random_initialized) {
         agentos_random_init();
     }
-    return min + (uint32_t)((double)rand() / (RAND_MAX + 1.0) * (max - min + 1));
+    if (min >= max) {
+        return min;
+    }
+    uint32_t range = max - min + 1;
+    uint32_t divisor = RAND_MAX / range;
+    uint32_t retval;
+    do {
+        retval = (uint32_t)rand() / divisor;
+    } while (retval >= range);
+    return min + retval;
 }
 
 float agentos_random_float(void) {

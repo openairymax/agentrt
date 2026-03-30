@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file heapstore_log.c
  * @brief AgentOS 数据分区日志管理实现
  *
@@ -8,6 +8,7 @@
 
 #include "heapstore_log.h"
 #include "private.h"
+#include "utils.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,12 +31,12 @@
 #define heapstore_LOG_BUFFER_SIZE 8192
 #define heapstore_LOG_MAX_SERVICE_LEN 64
 
-static heapstore_log_level_t g_log_level = heapstore_LOG_INFO;
-static pthread_mutex_t g_log_lock = PTHREAD_MUTEX_INITIALIZER;
-static FILE* g_main_log_file = NULL;
-static char g_log_root_path[512] = {0};
-static bool g_initialized = false;
-static char g_current_date[16] = {0};
+static heapstore_log_level_t s_log_level = heapstore_LOG_INFO;
+static pthread_mutex_t s_log_lock = PTHREAD_MUTEX_INITIALIZER;
+static FILE* s_main_log_file = NULL;
+static char s_log_root_path[512] = {0};
+static bool s_initialized = false;
+static char s_current_date[16] = {0};
 
 typedef struct {
     char service_name[heapstore_LOG_MAX_SERVICE_LEN];
@@ -43,38 +44,10 @@ typedef struct {
     pthread_mutex_t lock;
 } service_log_t;
 
-static service_log_t g_service_logs[32];
-static size_t g_service_log_count = 0;
+static service_log_t s_service_logs[32];
+static size_t s_service_log_count = 0;
 
-static pthread_mutex_t g_service_lock = PTHREAD_MUTEX_INITIALIZER;
-
-/**
- * @brief 确保目录存在，必要时创建嵌套目录
- *
- * @param path 目录路径
- * @return bool 成功返回 true，失败返回 false
- */
-static bool ensure_directory(const char* path) {
-    if (!path) return false;
-
-    char path_copy[512];
-    strncpy(path_copy, path, sizeof(path_copy) - 1);
-    path_copy[sizeof(path_copy) - 1] = '\0';
-
-    size_t len = strlen(path_copy);
-    for (size_t i = 0; i < len; i++) {
-        if (path_copy[i] == '\\' || path_copy[i] == '/') {
-            if (i > 0 && path_copy[i - 1] != ':') {
-                path_copy[i] = '\0';
-                mkdir(path_copy, 0755);
-                path_copy[i] = '/';
-            }
-        }
-    }
-
-    mkdir(path_copy, 0755);
-    return true;
-}
+static pthread_mutex_t s_service_lock = PTHREAD_MUTEX_INITIALIZER;
 
 /**
  * @brief 将日志级别转换为字符串
@@ -108,26 +81,26 @@ static const char* get_log_base_path(void) {
 static void update_current_date(void) {
     time_t now = time(NULL);
     struct tm* tm_info = localtime(&now);
-    strftime(g_current_date, sizeof(g_current_date), "%Y-%m-%d", tm_info);
+    strftime(s_current_date, sizeof(g_current_date), "%Y-%m-%d", tm_info);
 }
 
 static FILE* get_main_log_file(void) {
-    if (!g_initialized) {
+    if (!s_initialized) {
         return NULL;
     }
 
     update_current_date();
 
-    if (g_main_log_file) {
+    if (s_main_log_file) {
         return g_main_log_file;
     }
 
     const char* base = get_log_base_path();
-    strncpy(g_log_root_path, base, sizeof(g_log_root_path) - 1);
+    strncpy(s_log_root_path, base, sizeof(g_log_root_path) - 1);
 
     char kernel_path[512];
     snprintf(kernel_path, sizeof(kernel_path), "%s/kernel", base);
-    ensure_directory(kernel_path);
+    heapstore_ensure_directory(kernel_path);
 
     char filepath[512];
     snprintf(filepath, sizeof(filepath), "%s/kernel/agentos.log", base);
@@ -147,10 +120,10 @@ static FILE* get_service_log_file(const char* service) {
         return get_main_log_file();
     }
 
-    pthread_mutex_lock(&g_service_lock);
+    pthread_mutex_lock(&s_service_lock);
 
-    for (size_t i = 0; i < g_service_log_count; i++) {
-        if (strcmp(g_service_logs[i].service_name, service) == 0) {
+    for (size_t i = 0; i < s_service_log_count; i++) {
+        if (strcmp(s_service_logs[i].service_name, service) == 0) {
             FILE* fp = g_service_logs[i].file;
             pthread_mutex_unlock(&g_service_lock);
             return fp;
@@ -161,7 +134,7 @@ static FILE* get_service_log_file(const char* service) {
         const char* base = get_log_base_path();
         char service_path[512];
         snprintf(service_path, sizeof(service_path), "%s/services", base);
-        ensure_directory(service_path);
+        heapstore_ensure_directory(service_path);
 
         char filepath[512];
         snprintf(filepath, sizeof(filepath), "%s/services/%s.log", base, service);
@@ -190,10 +163,10 @@ heapstore_error_t heapstore_log_init(void) {
     const char* base = get_log_base_path();
     strncpy(g_log_root_path, base, sizeof(g_log_root_path) - 1);
 
-    ensure_directory(base);
-    ensure_directory("heapstore/logs/kernel");
-    ensure_directory("heapstore/logs/services");
-    ensure_directory("heapstore/logs/apps");
+    heapstore_ensure_directory(base);
+    heapstore_ensure_directory("heapstore/logs/kernel");
+    heapstore_ensure_directory("heapstore/logs/services");
+    heapstore_ensure_directory("heapstore/logs/apps");
 
     update_current_date();
     g_main_log_file = fopen("heapstore/logs/kernel/agentos.log", "a");
@@ -202,7 +175,7 @@ heapstore_error_t heapstore_log_init(void) {
     }
 
     g_initialized = true;
-    g_log_level = heapstore_LOG_INFO;
+    s_log_level = heapstore_LOG_INFO;
 
     return heapstore_SUCCESS;
 }
@@ -213,7 +186,7 @@ void heapstore_log_shutdown(void) {
         return;
     }
 
-    pthread_mutex_lock(&g_log_lock);
+    pthread_mutex_lock(&s_log_lock);
 
     if (g_main_log_file) {
         fflush(g_main_log_file);

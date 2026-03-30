@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file heapstore_memory.c
  * @brief AgentOS 数据分区内存管理数据存储实现
  *
@@ -8,6 +8,7 @@
 
 #include "heapstore_memory.h"
 #include "private.h"
+#include "utils.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,28 +45,6 @@ typedef struct {
 
 static memory_data_t g_memory_data = {0};
 
-static bool ensure_directory(const char* path) {
-    if (!path) return false;
-
-    char path_copy[512];
-    strncpy(path_copy, path, sizeof(path_copy) - 1);
-    path_copy[sizeof(path_copy) - 1] = '\0';
-
-    size_t len = strlen(path_copy);
-    for (size_t i = 0; i < len; i++) {
-        if (path_copy[i] == '\\' || path_copy[i] == '/') {
-            if (i > 0 && path_copy[i - 1] != ':') {
-                path_copy[i] = '\0';
-                mkdir(path_copy, 0755);
-                path_copy[i] = '/';
-            }
-        }
-    }
-
-    mkdir(path_copy, 0755);
-    return true;
-}
-
 heapstore_error_t heapstore_memory_init(void) {
     if (g_memory_data.initialized) {
         return heapstore_ERR_ALREADY_INITIALIZED;
@@ -75,9 +54,9 @@ heapstore_error_t heapstore_memory_init(void) {
     pthread_mutex_init(&g_memory_data.lock, NULL);
     g_memory_data.initialized = true;
 
-    ensure_directory("heapstore/kernel/memory/pools");
-    ensure_directory("heapstore/kernel/memory/stats");
-    ensure_directory("heapstore/kernel/memory/allocations");
+    heapstore_ensure_directory("heapstore/kernel/memory/pools");
+    heapstore_ensure_directory("heapstore/kernel/memory/stats");
+    heapstore_ensure_directory("heapstore/kernel/memory/allocations");
 
     return heapstore_SUCCESS;
 }

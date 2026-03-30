@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "@agentos/sdk",
   "version": "1.0.0",
   "description": "AgentOS TypeScript SDK",
@@ -34,8 +34,8 @@
     "sdk",
     "typescript"
   ],
-  "author": "SPHARX",
-  "license": "Apache-2.0",
+  "author": "SpharxWorks",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/spharx/agentos"

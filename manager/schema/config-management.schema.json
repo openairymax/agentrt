@@ -1,4 +1,4 @@
-﻿{
+{
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://agentos.spharx.com/schemas/manager-management.schema.json",
   "title": "AgentOS Configuration Management Schema",
@@ -18,18 +18,21 @@
       "properties": {
         "enabled": {
           "type": "boolean",
-          "description": "Enable hot reload functionality"
+          "description": "Enable hot reload functionality",
+          "examples": [true, false]
         },
         "check_interval_sec": {
           "type": "integer",
           "minimum": 1,
           "maximum": 3600,
-          "description": "Interval in seconds to check for configuration changes"
+          "description": "Interval in seconds to check for configuration changes",
+          "examples": [5, 10, 30, 60]
         },
         "reload_signal": {
           "type": "string",
           "enum": ["SIGHUP", "SIGUSR1", "SIGUSR2"],
-          "description": "Signal to trigger configuration reload on Unix systems"
+          "description": "Signal to trigger configuration reload on Unix systems",
+          "examples": ["SIGUSR1", "SIGHUP"]
         },
         "watch_files": {
           "type": "array",
@@ -103,12 +106,15 @@
       "required": ["enabled", "backend", "git", "file", "database"],
       "properties": {
         "enabled": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Enable version control",
+          "examples": [true, false]
         },
         "backend": {
           "type": "string",
           "enum": ["git", "file", "database"],
-          "description": "Backend type for version control"
+          "description": "Backend type for version control",
+          "examples": ["git", "file"]
         },
         "git": {
           "type": "object",
@@ -181,33 +187,47 @@
       "required": ["enabled", "max_steps", "auto_rollback", "require_confirmation"],
       "properties": {
         "enabled": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Enable rollback functionality",
+          "examples": [true, false]
         },
         "max_steps": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 100
+          "maximum": 100,
+          "description": "Maximum number of rollback steps",
+          "examples": [5, 10, 20]
         },
         "auto_rollback": {
           "type": "object",
           "required": ["enabled", "on_load_failure", "on_validation_failure", "on_startup_failure"],
           "properties": {
             "enabled": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Enable automatic rollback",
+              "examples": [true, false]
             },
             "on_load_failure": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Rollback on configuration load failure",
+              "examples": [true, false]
             },
             "on_validation_failure": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Rollback on validation failure",
+              "examples": [true, false]
             },
             "on_startup_failure": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Rollback on startup failure",
+              "examples": [true, false]
             }
           }
         },
         "require_confirmation": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Require user confirmation before rollback",
+          "examples": [true, false]
         }
       }
     },
@@ -217,10 +237,14 @@
       "required": ["validate_on_startup", "validate_on_reload", "schema_validation", "custom_rules"],
       "properties": {
         "validate_on_startup": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Validate configuration on startup",
+          "examples": [true, false]
         },
         "validate_on_reload": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Validate configuration on reload",
+          "examples": [true, false]
         },
         "schema_validation": {
           "type": "object",
@@ -283,28 +307,40 @@
       "required": ["enabled", "algorithm", "key_source", "key_env_var", "key_file", "encrypted_fields"],
       "properties": {
         "enabled": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Enable configuration encryption",
+          "examples": [true, false]
         },
         "algorithm": {
           "type": "string",
-          "enum": ["aes-256-gcm", "aes-256-cbc", "chacha20-poly1305"]
+          "enum": ["aes-256-gcm", "aes-256-cbc", "chacha20-poly1305"],
+          "description": "Encryption algorithm",
+          "examples": ["aes-256-gcm", "aes-256-cbc"]
         },
         "key_source": {
           "type": "string",
-          "enum": ["env", "file", "vault"]
+          "enum": ["env", "file", "vault"],
+          "description": "Key source type",
+          "examples": ["env", "file"]
         },
         "key_env_var": {
-          "type": "string"
+          "type": "string",
+          "description": "Environment variable name for encryption key",
+          "examples": ["AGENTOS_ENCRYPTION_KEY"]
         },
         "key_file": {
-          "type": "string"
+          "type": "string",
+          "description": "Path to encryption key file",
+          "examples": ["/etc/agentos/keys/encryption.key"]
         },
         "encrypted_fields": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "minItems": 1
+          "minItems": 1,
+          "description": "Fields to encrypt",
+          "examples": [["api_key", "password"], ["credentials"]]
         }
       }
     },
@@ -319,17 +355,25 @@
             "type": "string",
             "enum": ["yaml", "json"]
           },
-          "minItems": 1
+          "minItems": 1,
+          "description": "Supported export formats",
+          "examples": [["yaml", "json"], ["yaml"]]
         },
         "exclude_sensitive": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Exclude sensitive fields during export",
+          "examples": [true, false]
         },
         "validate_on_import": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Validate configuration on import",
+          "examples": [true, false]
         },
         "merge_strategy": {
           "type": "string",
-          "enum": ["replace", "merge", "deep_merge"]
+          "enum": ["replace", "merge", "deep_merge"],
+          "description": "Merge strategy for imports",
+          "examples": ["deep_merge", "replace"]
         }
       }
     },
@@ -339,32 +383,44 @@
       "required": ["enabled", "backend", "interval_sec", "conflict_resolution", "redis"],
       "properties": {
         "enabled": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Enable multi-instance sync",
+          "examples": [true, false]
         },
         "backend": {
           "type": "string",
-          "enum": ["etcd", "consul", "redis", "database"]
+          "enum": ["etcd", "consul", "redis", "database"],
+          "description": "Sync backend type",
+          "examples": ["etcd", "redis"]
         },
         "interval_sec": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 3600
+          "maximum": 3600,
+          "description": "Sync interval in seconds",
+          "examples": [5, 10, 30, 60]
         },
         "conflict_resolution": {
           "type": "string",
-          "enum": ["last_write_wins", "first_write_wins", "manual"]
+          "enum": ["last_write_wins", "first_write_wins", "manual"],
+          "description": "Conflict resolution strategy",
+          "examples": ["last_write_wins", "manual"]
         },
         "redis": {
           "type": "object",
           "required": ["key_prefix", "ttl_sec"],
           "properties": {
             "key_prefix": {
-              "type": "string"
+              "type": "string",
+              "description": "Redis key prefix",
+              "examples": ["agentos:config:"]
             },
             "ttl_sec": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 86400
+              "maximum": 86400,
+              "description": "Key TTL in seconds",
+              "examples": [3600, 7200, 86400]
             }
           }
         }

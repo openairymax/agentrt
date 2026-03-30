@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file heapstore_trace.c
  * @brief AgentOS 数据分区追踪数据存储实现
  *
@@ -8,6 +8,7 @@
 
 #include "heapstore_trace.h"
 #include "private.h"
+#include "utils.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,28 +49,6 @@ static bool g_exporter_enabled = false;
 static FILE* g_trace_file = NULL;
 static pthread_mutex_t g_file_lock = PTHREAD_MUTEX_INITIALIZER;
 
-static bool ensure_directory(const char* path) {
-    if (!path) return false;
-
-    char path_copy[512];
-    strncpy(path_copy, path, sizeof(path_copy) - 1);
-    path_copy[sizeof(path_copy) - 1] = '\0';
-
-    size_t len = strlen(path_copy);
-    for (size_t i = 0; i < len; i++) {
-        if (path_copy[i] == '\\' || path_copy[i] == '/') {
-            if (i > 0 && path_copy[i - 1] != ':') {
-                path_copy[i] = '\0';
-                mkdir(path_copy, 0755);
-                path_copy[i] = '/';
-            }
-        }
-    }
-
-    mkdir(path_copy, 0755);
-    return true;
-}
-
 static const char* get_trace_base_path(void) {
     static char base_path[256] = "heapstore/traces";
     return base_path;
@@ -85,13 +64,13 @@ heapstore_error_t heapstore_trace_init(void) {
     strncpy(g_trace_path, base, sizeof(g_trace_path) - 1);
     g_trace_path[sizeof(g_trace_path) - 1] = '\0';
 
-    if (!ensure_directory(g_trace_path)) {
+    if (!heapstore_ensure_directory(g_trace_path)) {
         return heapstore_ERR_DIR_CREATE_FAILED;
     }
 
     char spans_dir[512];
     snprintf(spans_dir, sizeof(spans_dir), "%s/spans", g_trace_path);
-    if (!ensure_directory(spans_dir)) {
+    if (!heapstore_ensure_directory(spans_dir)) {
         return heapstore_ERR_DIR_CREATE_FAILED;
     }
 
@@ -289,7 +268,7 @@ heapstore_error_t heapstore_trace_config_exporter(const heapstore_trace_exporter
 
     if (manager->export_path[0]) {
         strncpy(g_trace_path, manager->export_path, sizeof(g_trace_path) - 1);
-        ensure_directory(g_trace_path);
+        heapstore_ensure_directory(g_trace_path);
     }
 
     return heapstore_SUCCESS;

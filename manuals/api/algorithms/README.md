@@ -1,11 +1,12 @@
-﻿Copyright (c) 2026 SPHARX. All Rights Reserved.
+Copyright (c) 2026 SPHARX. All Rights Reserved.
 "From data intelligence emerges."
 
 # Manuals 核心算法与实现逻辑
 
-**版本**: v1.0.0.1  
-**最后更新**: 2026-03-23  
-**状态**: 🟢 生产就绪
+**版本**: Doc V1.7  
+**最后更新**: 2026-03-31  
+**状态**: 🟢 生产就绪  
+**作者**: LirenWang
 
 ---
 
@@ -947,7 +948,7 @@ algorithms:
 ## 📚 相关文档
 
 - [API 参考文档](../README.md)
-- [架构设计文档](../../architecture/folder/architectural_design_principles.md)
+- [架构设计文档](../../architecture/ARCHITECTURAL_PRINCIPLES.md)
 - [功能需求文档](../../specifications/manuals_module_requirements.md)
 - [TypeScript SDK 文档](../toolkit/typescript/README.md)
 

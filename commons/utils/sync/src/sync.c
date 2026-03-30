@@ -459,8 +459,1256 @@ sync_result_t sync_mutex_lock(sync_mutex_t mutex, const sync_timeout_t* timeout)
             return result;
         }
     } else {
-        // POSIX互斥锁不支持直接超时，使用pthread_mutex_trylock循环
         uint64_t end_time = start_time + timeout->timeout_ms;
+        while (true) {
+            int rc = pthread_mutex_trylock(&mutex->mutex);
+            if (rc == 0) {
+                break;
+            } else if (rc == EBUSY) {
+                uint64_t current_time = sync_internal_get_timestamp_ms();
+                if (current_time >= end_time) {
+                    sync_internal_update_stats_timeout(&mutex->stats);
+                    sync_internal_record_error(SYNC_ERROR_TIMEOUT, mutex->name);
+                    return SYNC_ERROR_TIMEOUT;
+                }
+                sync_sleep(1);
+            } else {
+                result = sync_internal_posix_error_to_result(rc);
+                sync_internal_record_error(result, mutex->name);
+                return result;
+            }
+        }
+    }
+#endif
+    
+    uint64_t end_time = sync_internal_get_timestamp_ms();
+    uint64_t wait_time = (end_time > start_time) ? (end_time - start_time) : 0;
+    
+    sync_internal_update_stats_lock(&mutex->stats, wait_time);
+    mutex->owner_thread_id = sync_internal_get_thread_id();
+    mutex->recursion_count = 1;
+    
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_recursive_mutex_unlock(sync_recursive_mutex_t mutex) {
+    if (mutex == NULL || !mutex->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+    uint64_t current_thread_id = sync_internal_get_thread_id();
+    if (mutex->owner_thread_id != current_thread_id) {
+        sync_internal_record_error(SYNC_ERROR_PERMISSION, mutex->name);
+        return SYNC_ERROR_PERMISSION;
+    }
+    
+    if (mutex->recursion_count > 1) {
+        mutex->recursion_count--;
+        sync_internal_update_stats_unlock(&mutex->stats);
+        return SYNC_SUCCESS;
+    }
+    
+#ifdef _WIN32
+    LeaveCriticalSection(&mutex->cs);
+#else
+    int rc = pthread_mutex_unlock(&mutex->mutex);
+    if (rc != 0) {
+        sync_result_t result = sync_internal_posix_error_to_result(rc);
+        sync_internal_record_error(result, mutex->name);
+        return result;
+    }
+#endif
+    
+    sync_internal_update_stats_unlock(&mutex->stats);
+    mutex->owner_thread_id = 0;
+    mutex->recursion_count = 0;
+    
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_recursive_mutex_get_count(sync_recursive_mutex_t mutex, size_t* count) {
+    if (mutex == NULL || count == NULL) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+    *count = mutex->recursion_count;
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_rwlock_create(sync_rwlock_t* rwlock, const sync_attr_t* attr) {
+    if (rwlock == NULL) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+    struct sync_rwlock* lock = AGENTOS_CALLOC(1, sizeof(struct sync_rwlock));
+    if (lock == NULL) {
+        return SYNC_ERROR_MEMORY;
+    }
+    
+    if (attr != NULL && attr->name != NULL) {
+        lock->name = sync_internal_strdup(attr->name);
+    }
+    
+    memset(&lock->stats, 0, sizeof(sync_stats_t));
+    
+#ifdef _WIN32
+    InitializeSRWLock(&lock->lock);
+    lock->initialized = true;
+#else
+    int result = pthread_rwlock_init(&lock->rwlock, NULL);
+    if (result != 0) {
+        AGENTOS_FREE(lock->name);
+        AGENTOS_FREE(lock);
+        return sync_internal_posix_error_to_result(result);
+    }
+    lock->initialized = true;
+#endif
+    
+    *rwlock = lock;
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_rwlock_destroy(sync_rwlock_t rwlock) {
+    if (rwlock == NULL) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+    if (!rwlock->initialized) {
+        AGENTOS_FREE(rwlock->name);
+        AGENTOS_FREE(rwlock);
+        return SYNC_SUCCESS;
+    }
+    
+#ifdef _WIN32
+    // SRWLock 不需要显式销毁
+#else
+    pthread_rwlock_destroy(&rwlock->rwlock);
+#endif
+    
+    AGENTOS_FREE(rwlock->name);
+    AGENTOS_FREE(rwlock);
+    
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_rwlock_read_lock(sync_rwlock_t rwlock, const sync_timeout_t* timeout) {
+    if (rwlock == NULL || !rwlock->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+    uint64_t start_time = sync_internal_get_timestamp_ms();
+    sync_result_t result = SYNC_SUCCESS;
+    
+#ifdef _WIN32
+    if (timeout == NULL) {
+        AcquireSRWLockShared(&rwlock->lock);
+    } else {
+        DWORD wait_ms = (DWORD)timeout->timeout_ms;
+        DWORD start = GetTickCount();
+        while (!TryAcquireSRWLockShared(&rwlock->lock)) {
+            if (GetTickCount() - start >= wait_ms) {
+                sync_internal_update_stats_timeout(&rwlock->stats);
+                sync_internal_record_error(SYNC_ERROR_TIMEOUT, rwlock->name);
+                return SYNC_ERROR_TIMEOUT;
+            }
+            Sleep(1);
+        }
+    }
+#else
+    if (timeout == NULL) {
+        int rc = pthread_rwlock_rdlock(&rwlock->rwlock);
+        if (rc != 0) {
+            result = sync_internal_posix_error_to_result(rc);
+            sync_internal_record_error(result, rwlock->name);
+            return result;
+        }
+    } else {
+        uint64_t end_time = start_time + timeout->timeout_ms;
+        while (true) {
+            int rc = pthread_rwlock_tryrdlock(&rwlock->rwlock);
+            if (rc == 0) {
+                break;
+            } else if (rc == EBUSY) {
+                uint64_t current_time = sync_internal_get_timestamp_ms();
+                if (current_time >= end_time) {
+                    sync_internal_update_stats_timeout(&rwlock->stats);
+                    sync_internal_record_error(SYNC_ERROR_TIMEOUT, rwlock->name);
+                    return SYNC_ERROR_TIMEOUT;
+                }
+                sync_sleep(1);
+            } else {
+                result = sync_internal_posix_error_to_result(rc);
+                sync_internal_record_error(result, rwlock->name);
+                return result;
+            }
+        }
+    }
+#endif
+    
+    uint64_t end_time = sync_internal_get_timestamp_ms();
+    uint64_t wait_time = (end_time > start_time) ? (end_time - start_time) : 0;
+    sync_internal_update_stats_lock(&rwlock->stats, wait_time);
+    
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_rwlock_try_read_lock(sync_rwlock_t rwlock) {
+    if (rwlock == NULL || !rwlock->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+#ifdef _WIN32
+    if (TryAcquireSRWLockShared(&rwlock->lock)) {
+        sync_internal_update_stats_lock(&rwlock->stats, 0);
+        return SYNC_SUCCESS;
+    }
+    return SYNC_ERROR_BUSY;
+#else
+    int rc = pthread_rwlock_tryrdlock(&rwlock->rwlock);
+    if (rc == 0) {
+        sync_internal_update_stats_lock(&rwlock->stats, 0);
+        return SYNC_SUCCESS;
+    } else if (rc == EBUSY) {
+        return SYNC_ERROR_BUSY;
+    }
+    return sync_internal_posix_error_to_result(rc);
+#endif
+}
+
+sync_result_t sync_rwlock_write_lock(sync_rwlock_t rwlock, const sync_timeout_t* timeout) {
+    if (rwlock == NULL || !rwlock->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+    uint64_t start_time = sync_internal_get_timestamp_ms();
+    sync_result_t result = SYNC_SUCCESS;
+    
+#ifdef _WIN32
+    if (timeout == NULL) {
+        AcquireSRWLockExclusive(&rwlock->lock);
+    } else {
+        DWORD wait_ms = (DWORD)timeout->timeout_ms;
+        DWORD start = GetTickCount();
+        while (!TryAcquireSRWLockExclusive(&rwlock->lock)) {
+            if (GetTickCount() - start >= wait_ms) {
+                sync_internal_update_stats_timeout(&rwlock->stats);
+                sync_internal_record_error(SYNC_ERROR_TIMEOUT, rwlock->name);
+                return SYNC_ERROR_TIMEOUT;
+            }
+            Sleep(1);
+        }
+    }
+#else
+    if (timeout == NULL) {
+        int rc = pthread_rwlock_wrlock(&rwlock->rwlock);
+        if (rc != 0) {
+            result = sync_internal_posix_error_to_result(rc);
+            sync_internal_record_error(result, rwlock->name);
+            return result;
+        }
+    } else {
+        uint64_t end_time = start_time + timeout->timeout_ms;
+        while (true) {
+            int rc = pthread_rwlock_trywrlock(&rwlock->rwlock);
+            if (rc == 0) {
+                break;
+            } else if (rc == EBUSY) {
+                uint64_t current_time = sync_internal_get_timestamp_ms();
+                if (current_time >= end_time) {
+                    sync_internal_update_stats_timeout(&rwlock->stats);
+                    sync_internal_record_error(SYNC_ERROR_TIMEOUT, rwlock->name);
+                    return SYNC_ERROR_TIMEOUT;
+                }
+                sync_sleep(1);
+            } else {
+                result = sync_internal_posix_error_to_result(rc);
+                sync_internal_record_error(result, rwlock->name);
+                return result;
+            }
+        }
+    }
+#endif
+    
+    uint64_t end_time = sync_internal_get_timestamp_ms();
+    uint64_t wait_time = (end_time > start_time) ? (end_time - start_time) : 0;
+    sync_internal_update_stats_lock(&rwlock->stats, wait_time);
+    
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_rwlock_try_write_lock(sync_rwlock_t rwlock) {
+    if (rwlock == NULL || !rwlock->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+#ifdef _WIN32
+    if (TryAcquireSRWLockExclusive(&rwlock->lock)) {
+        sync_internal_update_stats_lock(&rwlock->stats, 0);
+        return SYNC_SUCCESS;
+    }
+    return SYNC_ERROR_BUSY;
+#else
+    int rc = pthread_rwlock_trywrlock(&rwlock->rwlock);
+    if (rc == 0) {
+        sync_internal_update_stats_lock(&rwlock->stats, 0);
+        return SYNC_SUCCESS;
+    } else if (rc == EBUSY) {
+        return SYNC_ERROR_BUSY;
+    }
+    return sync_internal_posix_error_to_result(rc);
+#endif
+}
+
+sync_result_t sync_rwlock_unlock(sync_rwlock_t rwlock) {
+    if (rwlock == NULL || !rwlock->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+#ifdef _WIN32
+    ReleaseSRWLockShared(&rwlock->lock);
+#else
+    int rc = pthread_rwlock_unlock(&rwlock->rwlock);
+    if (rc != 0) {
+        sync_result_t result = sync_internal_posix_error_to_result(rc);
+        sync_internal_record_error(result, rwlock->name);
+        return result;
+    }
+#endif
+    
+    sync_internal_update_stats_unlock(&rwlock->stats);
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_spinlock_create(sync_spinlock_t* spinlock, const sync_attr_t* attr) {
+    if (spinlock == NULL) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+    struct sync_spinlock* lock = AGENTOS_CALLOC(1, sizeof(struct sync_spinlock));
+    if (lock == NULL) {
+        return SYNC_ERROR_MEMORY;
+    }
+    
+    if (attr != NULL && attr->name != NULL) {
+        lock->name = sync_internal_strdup(attr->name);
+    }
+    
+    memset(&lock->stats, 0, sizeof(sync_stats_t));
+    
+#ifdef _WIN32
+    lock->lock = 0;
+    lock->initialized = true;
+#else
+    int result = pthread_spin_init(&lock->spinlock, PTHREAD_PROCESS_PRIVATE);
+    if (result != 0) {
+        AGENTOS_FREE(lock->name);
+        AGENTOS_FREE(lock);
+        return sync_internal_posix_error_to_result(result);
+    }
+    lock->initialized = true;
+#endif
+    
+    *spinlock = lock;
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_spinlock_destroy(sync_spinlock_t spinlock) {
+    if (spinlock == NULL) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+    if (!spinlock->initialized) {
+        AGENTOS_FREE(spinlock->name);
+        AGENTOS_FREE(spinlock);
+        return SYNC_SUCCESS;
+    }
+    
+#ifdef _WIN32
+    // Windows 自旋锁不需要显式销毁
+#else
+    pthread_spin_destroy(&spinlock->spinlock);
+#endif
+    
+    AGENTOS_FREE(spinlock->name);
+    AGENTOS_FREE(spinlock);
+    
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_spinlock_lock(sync_spinlock_t spinlock) {
+    if (spinlock == NULL || !spinlock->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+#ifdef _WIN32
+    while (InterlockedCompareExchange(&spinlock->lock, 1, 0) != 0) {
+        // 自旋等待
+    }
+#else
+    int rc = pthread_spin_lock(&spinlock->spinlock);
+    if (rc != 0) {
+        return sync_internal_posix_error_to_result(rc);
+    }
+#endif
+    
+    sync_internal_update_stats_lock(&spinlock->stats, 0);
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_spinlock_try_lock(sync_spinlock_t spinlock) {
+    if (spinlock == NULL || !spinlock->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+#ifdef _WIN32
+    if (InterlockedCompareExchange(&spinlock->lock, 1, 0) == 0) {
+        sync_internal_update_stats_lock(&spinlock->stats, 0);
+        return SYNC_SUCCESS;
+    }
+    return SYNC_ERROR_BUSY;
+#else
+    int rc = pthread_spin_trylock(&spinlock->spinlock);
+    if (rc == 0) {
+        sync_internal_update_stats_lock(&spinlock->stats, 0);
+        return SYNC_SUCCESS;
+    } else if (rc == EBUSY) {
+        return SYNC_ERROR_BUSY;
+    }
+    return sync_internal_posix_error_to_result(rc);
+#endif
+}
+
+sync_result_t sync_spinlock_unlock(sync_spinlock_t spinlock) {
+    if (spinlock == NULL || !spinlock->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+#ifdef _WIN32
+    InterlockedExchange(&spinlock->lock, 0);
+#else
+    int rc = pthread_spin_unlock(&spinlock->spinlock);
+    if (rc != 0) {
+        return sync_internal_posix_error_to_result(rc);
+    }
+#endif
+    
+    sync_internal_update_stats_unlock(&spinlock->stats);
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_semaphore_create(sync_semaphore_t* semaphore,
+                                   unsigned int initial_value,
+                                   unsigned int max_value,
+                                   const sync_attr_t* attr) {
+    if (semaphore == NULL) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+    struct sync_semaphore* sem = AGENTOS_CALLOC(1, sizeof(struct sync_semaphore));
+    if (sem == NULL) {
+        return SYNC_ERROR_MEMORY;
+    }
+    
+    if (attr != NULL && attr->name != NULL) {
+        sem->name = sync_internal_strdup(attr->name);
+    }
+    
+    memset(&sem->stats, 0, sizeof(sync_stats_t));
+    sem->max_value = (max_value == 0) ? 0xFFFFFFFF : max_value;
+    
+#ifdef _WIN32
+    sem->semaphore = CreateSemaphore(NULL, initial_value, sem->max_value, NULL);
+    if (sem->semaphore == NULL) {
+        AGENTOS_FREE(sem->name);
+        AGENTOS_FREE(sem);
+        return SYNC_ERROR_UNKNOWN;
+    }
+    sem->initialized = true;
+#else
+    int result = sem_init(&sem->semaphore, 0, initial_value);
+    if (result != 0) {
+        AGENTOS_FREE(sem->name);
+        AGENTOS_FREE(sem);
+        return sync_internal_posix_error_to_result(errno);
+    }
+    sem->initialized = true;
+#endif
+    
+    *semaphore = sem;
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_semaphore_destroy(sync_semaphore_t semaphore) {
+    if (semaphore == NULL) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+    if (!semaphore->initialized) {
+        AGENTOS_FREE(semaphore->name);
+        AGENTOS_FREE(semaphore);
+        return SYNC_SUCCESS;
+    }
+    
+#ifdef _WIN32
+    CloseHandle(semaphore->semaphore);
+#else
+    sem_destroy(&semaphore->semaphore);
+#endif
+    
+    AGENTOS_FREE(semaphore->name);
+    AGENTOS_FREE(semaphore);
+    
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_semaphore_wait(sync_semaphore_t semaphore, const sync_timeout_t* timeout) {
+    if (semaphore == NULL || !semaphore->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+    uint64_t start_time = sync_internal_get_timestamp_ms();
+    
+#ifdef _WIN32
+    DWORD wait_ms = (timeout == NULL) ? INFINITE : (DWORD)timeout->timeout_ms;
+    DWORD result = WaitForSingleObject(semaphore->semaphore, wait_ms);
+    if (result == WAIT_TIMEOUT) {
+        sync_internal_update_stats_timeout(&semaphore->stats);
+        sync_internal_record_error(SYNC_ERROR_TIMEOUT, semaphore->name);
+        return SYNC_ERROR_TIMEOUT;
+    } else if (result != WAIT_OBJECT_0) {
+        sync_internal_record_error(SYNC_ERROR_UNKNOWN, semaphore->name);
+        return SYNC_ERROR_UNKNOWN;
+    }
+#else
+    if (timeout == NULL) {
+        int rc = sem_wait(&semaphore->semaphore);
+        if (rc != 0) {
+            return sync_internal_posix_error_to_result(errno);
+        }
+    } else {
+        struct timespec ts;
+        clock_gettime(CLOCK_REALTIME, &ts);
+        ts.tv_sec += timeout->timeout_ms / 1000;
+        ts.tv_nsec += (timeout->timeout_ms % 1000) * 1000000;
+        if (ts.tv_nsec >= 1000000000) {
+            ts.tv_sec++;
+            ts.tv_nsec -= 1000000000;
+        }
+        int rc = sem_timedwait(&semaphore->semaphore, &ts);
+        if (rc != 0) {
+            if (errno == ETIMEDOUT) {
+                sync_internal_update_stats_timeout(&semaphore->stats);
+                sync_internal_record_error(SYNC_ERROR_TIMEOUT, semaphore->name);
+                return SYNC_ERROR_TIMEOUT;
+            }
+            return sync_internal_posix_error_to_result(errno);
+        }
+    }
+#endif
+    
+    uint64_t end_time = sync_internal_get_timestamp_ms();
+    uint64_t wait_time = (end_time > start_time) ? (end_time - start_time) : 0;
+    sync_internal_update_stats_lock(&semaphore->stats, wait_time);
+    
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_semaphore_try_wait(sync_semaphore_t semaphore) {
+    if (semaphore == NULL || !semaphore->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+#ifdef _WIN32
+    DWORD result = WaitForSingleObject(semaphore->semaphore, 0);
+    if (result == WAIT_TIMEOUT) {
+        return SYNC_ERROR_BUSY;
+    } else if (result != WAIT_OBJECT_0) {
+        return SYNC_ERROR_UNKNOWN;
+    }
+#else
+    int rc = sem_trywait(&semaphore->semaphore);
+    if (rc != 0) {
+        if (errno == EAGAIN) {
+            return SYNC_ERROR_BUSY;
+        }
+        return sync_internal_posix_error_to_result(errno);
+    }
+#endif
+    
+    sync_internal_update_stats_lock(&semaphore->stats, 0);
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_semaphore_post(sync_semaphore_t semaphore) {
+    if (semaphore == NULL || !semaphore->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+#ifdef _WIN32
+    if (!ReleaseSemaphore(semaphore->semaphore, 1, NULL)) {
+        return SYNC_ERROR_UNKNOWN;
+    }
+#else
+    int rc = sem_post(&semaphore->semaphore);
+    if (rc != 0) {
+        return sync_internal_posix_error_to_result(errno);
+    }
+#endif
+    
+    sync_internal_update_stats_unlock(&semaphore->stats);
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_semaphore_get_value(sync_semaphore_t semaphore, unsigned int* value) {
+    if (semaphore == NULL || value == NULL || !semaphore->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+#ifdef _WIN32
+    // Windows 不支持获取信号量值，返回错误
+    *value = 0;
+    return SYNC_ERROR_UNKNOWN;
+#else
+    int val;
+    if (sem_getvalue(&semaphore->semaphore, &val) != 0) {
+        return sync_internal_posix_error_to_result(errno);
+    }
+    *value = (unsigned int)val;
+    return SYNC_SUCCESS;
+#endif
+}
+
+sync_result_t sync_condition_create(sync_condition_t* condition, const sync_attr_t* attr) {
+    if (condition == NULL) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+    struct sync_condition* cond = AGENTOS_CALLOC(1, sizeof(struct sync_condition));
+    if (cond == NULL) {
+        return SYNC_ERROR_MEMORY;
+    }
+    
+    if (attr != NULL && attr->name != NULL) {
+        cond->name = sync_internal_strdup(attr->name);
+    }
+    
+    memset(&cond->stats, 0, sizeof(sync_stats_t));
+    
+#ifdef _WIN32
+    InitializeConditionVariable(&cond->cond);
+    cond->initialized = true;
+#else
+    int result = pthread_cond_init(&cond->cond, NULL);
+    if (result != 0) {
+        AGENTOS_FREE(cond->name);
+        AGENTOS_FREE(cond);
+        return sync_internal_posix_error_to_result(result);
+    }
+    cond->initialized = true;
+#endif
+    
+    *condition = cond;
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_condition_destroy(sync_condition_t condition) {
+    if (condition == NULL) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+    if (!condition->initialized) {
+        AGENTOS_FREE(condition->name);
+        AGENTOS_FREE(condition);
+        return SYNC_SUCCESS;
+    }
+    
+#ifdef _WIN32
+    // Windows 条件变量不需要显式销毁
+#else
+    pthread_cond_destroy(&condition->cond);
+#endif
+    
+    AGENTOS_FREE(condition->name);
+    AGENTOS_FREE(condition);
+    
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_condition_wait(sync_condition_t condition, 
+                                 sync_mutex_t mutex,
+                                 const sync_timeout_t* timeout) {
+    if (condition == NULL || mutex == NULL || 
+        !condition->initialized || !mutex->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+#ifdef _WIN32
+    DWORD wait_ms = (timeout == NULL) ? INFINITE : (DWORD)timeout->timeout_ms;
+    if (!SleepConditionVariableCS(&condition->cond, &mutex->cs, wait_ms)) {
+        if (GetLastError() == ERROR_TIMEOUT) {
+            sync_internal_update_stats_timeout(&condition->stats);
+            return SYNC_ERROR_TIMEOUT;
+        }
+        return SYNC_ERROR_UNKNOWN;
+    }
+#else
+    if (timeout == NULL) {
+        int rc = pthread_cond_wait(&condition->cond, &mutex->mutex);
+        if (rc != 0) {
+            return sync_internal_posix_error_to_result(rc);
+        }
+    } else {
+        struct timespec ts;
+        clock_gettime(CLOCK_REALTIME, &ts);
+        ts.tv_sec += timeout->timeout_ms / 1000;
+        ts.tv_nsec += (timeout->timeout_ms % 1000) * 1000000;
+        if (ts.tv_nsec >= 1000000000) {
+            ts.tv_sec++;
+            ts.tv_nsec -= 1000000000;
+        }
+        int rc = pthread_cond_timedwait(&condition->cond, &mutex->mutex, &ts);
+        if (rc != 0) {
+            if (rc == ETIMEDOUT) {
+                sync_internal_update_stats_timeout(&condition->stats);
+                return SYNC_ERROR_TIMEOUT;
+            }
+            return sync_internal_posix_error_to_result(rc);
+        }
+    }
+#endif
+    
+    sync_internal_update_stats_lock(&condition->stats, 0);
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_condition_signal(sync_condition_t condition) {
+    if (condition == NULL || !condition->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+#ifdef _WIN32
+    WakeConditionVariable(&condition->cond);
+#else
+    int rc = pthread_cond_signal(&condition->cond);
+    if (rc != 0) {
+        return sync_internal_posix_error_to_result(rc);
+    }
+#endif
+    
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_condition_broadcast(sync_condition_t condition) {
+    if (condition == NULL || !condition->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+#ifdef _WIN32
+    WakeAllConditionVariable(&condition->cond);
+#else
+    int rc = pthread_cond_broadcast(&condition->cond);
+    if (rc != 0) {
+        return sync_internal_posix_error_to_result(rc);
+    }
+#endif
+    
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_barrier_create(sync_barrier_t* barrier, 
+                                 unsigned int count,
+                                 const sync_attr_t* attr) {
+    if (barrier == NULL || count == 0) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+    struct sync_barrier* b = AGENTOS_CALLOC(1, sizeof(struct sync_barrier));
+    if (b == NULL) {
+        return SYNC_ERROR_MEMORY;
+    }
+    
+    if (attr != NULL && attr->name != NULL) {
+        b->name = sync_internal_strdup(attr->name);
+    }
+    
+    memset(&b->stats, 0, sizeof(sync_stats_t));
+    
+#ifdef _WIN32
+    InitializeCriticalSection(&b->cs);
+    InitializeConditionVariable(&b->cond);
+    b->count = count;
+    b->current = 0;
+    b->generation = 0;
+#else
+    int result = pthread_barrier_init(&b->barrier, NULL, count);
+    if (result != 0) {
+        AGENTOS_FREE(b->name);
+        AGENTOS_FREE(b);
+        return sync_internal_posix_error_to_result(result);
+    }
+#endif
+    b->initialized = true;
+    
+    *barrier = b;
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_barrier_destroy(sync_barrier_t barrier) {
+    if (barrier == NULL) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+    if (!barrier->initialized) {
+        AGENTOS_FREE(barrier->name);
+        AGENTOS_FREE(barrier);
+        return SYNC_SUCCESS;
+    }
+    
+#ifdef _WIN32
+    DeleteCriticalSection(&barrier->cs);
+#else
+    pthread_barrier_destroy(&barrier->barrier);
+#endif
+    
+    AGENTOS_FREE(barrier->name);
+    AGENTOS_FREE(barrier);
+    
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_barrier_wait(sync_barrier_t barrier, const sync_timeout_t* timeout) {
+    if (barrier == NULL || !barrier->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+#ifdef _WIN32
+    EnterCriticalSection(&barrier->cs);
+    barrier->current++;
+    
+    if (barrier->current >= barrier->count) {
+        barrier->current = 0;
+        barrier->generation++;
+        WakeAllConditionVariable(&barrier->cond);
+        LeaveCriticalSection(&barrier->cs);
+        return SYNC_SUCCESS;
+    }
+    
+    unsigned int gen = barrier->generation;
+    DWORD wait_ms = (timeout == NULL) ? INFINITE : (DWORD)timeout->timeout_ms;
+    
+    while (barrier->generation == gen) {
+        if (!SleepConditionVariableCS(&barrier->cond, &barrier->cs, wait_ms)) {
+            if (GetLastError() == ERROR_TIMEOUT) {
+                LeaveCriticalSection(&barrier->cs);
+                return SYNC_ERROR_TIMEOUT;
+            }
+        }
+    }
+    LeaveCriticalSection(&barrier->cs);
+    return SYNC_SUCCESS;
+#else
+    int rc = pthread_barrier_wait(&barrier->barrier);
+    if (rc == PTHREAD_BARRIER_SERIAL_THREAD) {
+        return SYNC_SUCCESS;
+    } else if (rc != 0) {
+        return sync_internal_posix_error_to_result(rc);
+    }
+    return SYNC_SUCCESS;
+#endif
+}
+
+sync_result_t sync_barrier_reset(sync_barrier_t barrier, unsigned int new_count) {
+    if (barrier == NULL || !barrier->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+#ifdef _WIN32
+    EnterCriticalSection(&barrier->cs);
+    if (new_count > 0) {
+        barrier->count = new_count;
+    }
+    barrier->current = 0;
+    barrier->generation++;
+    LeaveCriticalSection(&barrier->cs);
+    return SYNC_SUCCESS;
+#else
+    // POSIX 屏障不支持重置，需要销毁后重建
+    (void)new_count;
+    return SYNC_ERROR_INVALID;
+#endif
+}
+
+sync_result_t sync_event_create(sync_event_t* event,
+                               bool manual_reset,
+                               bool initial_state,
+                               const sync_attr_t* attr) {
+    if (event == NULL) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+    struct sync_event* e = AGENTOS_CALLOC(1, sizeof(struct sync_event));
+    if (e == NULL) {
+        return SYNC_ERROR_MEMORY;
+    }
+    
+    if (attr != NULL && attr->name != NULL) {
+        e->name = sync_internal_strdup(attr->name);
+    }
+    
+    memset(&e->stats, 0, sizeof(sync_stats_t));
+    
+#ifdef _WIN32
+    e->event = CreateEvent(NULL, manual_reset, initial_state, NULL);
+    if (e->event == NULL) {
+        AGENTOS_FREE(e->name);
+        AGENTOS_FREE(e);
+        return SYNC_ERROR_UNKNOWN;
+    }
+    e->initialized = true;
+#else
+    pthread_cond_init(&e->cond, NULL);
+    pthread_mutex_init(&e->mutex, NULL);
+    e->signaled = initial_state;
+    e->manual_reset = manual_reset;
+    e->initialized = true;
+#endif
+    
+    *event = e;
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_event_destroy(sync_event_t event) {
+    if (event == NULL) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+    if (!event->initialized) {
+        AGENTOS_FREE(event->name);
+        AGENTOS_FREE(event);
+        return SYNC_SUCCESS;
+    }
+    
+#ifdef _WIN32
+    CloseHandle(event->event);
+#else
+    pthread_cond_destroy(&event->cond);
+    pthread_mutex_destroy(&event->mutex);
+#endif
+    
+    AGENTOS_FREE(event->name);
+    AGENTOS_FREE(event);
+    
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_event_set(sync_event_t event) {
+    if (event == NULL || !event->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+#ifdef _WIN32
+    SetEvent(event->event);
+#else
+    pthread_mutex_lock(&event->mutex);
+    event->signaled = true;
+    if (event->manual_reset) {
+        pthread_cond_broadcast(&event->cond);
+    } else {
+        pthread_cond_signal(&event->cond);
+    }
+    pthread_mutex_unlock(&event->mutex);
+#endif
+    
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_event_reset(sync_event_t event) {
+    if (event == NULL || !event->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+#ifdef _WIN32
+    ResetEvent(event->event);
+#else
+    pthread_mutex_lock(&event->mutex);
+    event->signaled = false;
+    pthread_mutex_unlock(&event->mutex);
+#endif
+    
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_event_wait(sync_event_t event, const sync_timeout_t* timeout) {
+    if (event == NULL || !event->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+#ifdef _WIN32
+    DWORD wait_ms = (timeout == NULL) ? INFINITE : (DWORD)timeout->timeout_ms;
+    DWORD result = WaitForSingleObject(event->event, wait_ms);
+    if (result == WAIT_TIMEOUT) {
+        return SYNC_ERROR_TIMEOUT;
+    } else if (result != WAIT_OBJECT_0) {
+        return SYNC_ERROR_UNKNOWN;
+    }
+    return SYNC_SUCCESS;
+#else
+    pthread_mutex_lock(&event->mutex);
+    
+    while (!event->signaled) {
+        if (timeout == NULL) {
+            pthread_cond_wait(&event->cond, &event->mutex);
+        } else {
+            struct timespec ts;
+            clock_gettime(CLOCK_REALTIME, &ts);
+            ts.tv_sec += timeout->timeout_ms / 1000;
+            ts.tv_nsec += (timeout->timeout_ms % 1000) * 1000000;
+            if (ts.tv_nsec >= 1000000000) {
+                ts.tv_sec++;
+                ts.tv_nsec -= 1000000000;
+            }
+            int rc = pthread_cond_timedwait(&event->cond, &event->mutex, &ts);
+            if (rc == ETIMEDOUT) {
+                pthread_mutex_unlock(&event->mutex);
+                return SYNC_ERROR_TIMEOUT;
+            }
+        }
+    }
+    
+    if (!event->manual_reset) {
+        event->signaled = false;
+    }
+    
+    pthread_mutex_unlock(&event->mutex);
+    return SYNC_SUCCESS;
+#endif
+}
+
+sync_result_t sync_get_stats(void* lock, sync_stats_t* stats) {
+    if (lock == NULL || stats == NULL) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+    sync_stats_t* lock_stats = NULL;
+    sync_type_t type = sync_get_type(lock);
+    
+    switch (type) {
+        case SYNC_TYPE_MUTEX:
+            lock_stats = &((sync_mutex_t)lock)->stats;
+            break;
+        case SYNC_TYPE_RECURSIVE_MUTEX:
+            lock_stats = &((sync_recursive_mutex_t)lock)->stats;
+            break;
+        case SYNC_TYPE_RWLOCK:
+            lock_stats = &((sync_rwlock_t)lock)->stats;
+            break;
+        case SYNC_TYPE_SPINLOCK:
+            lock_stats = &((sync_spinlock_t)lock)->stats;
+            break;
+        case SYNC_TYPE_SEMAPHORE:
+            lock_stats = &((sync_semaphore_t)lock)->stats;
+            break;
+        case SYNC_TYPE_CONDITION:
+            lock_stats = &((sync_condition_t)lock)->stats;
+            break;
+        case SYNC_TYPE_BARRIER:
+            lock_stats = &((sync_barrier_t)lock)->stats;
+            break;
+        case SYNC_TYPE_EVENT:
+            lock_stats = &((sync_event_t)lock)->stats;
+            break;
+        default:
+            return SYNC_ERROR_INVALID;
+    }
+    
+    memcpy(stats, lock_stats, sizeof(sync_stats_t));
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_reset_stats(void* lock) {
+    if (lock == NULL) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+    sync_stats_t* lock_stats = NULL;
+    sync_type_t type = sync_get_type(lock);
+    
+    switch (type) {
+        case SYNC_TYPE_MUTEX:
+            lock_stats = &((sync_mutex_t)lock)->stats;
+            break;
+        case SYNC_TYPE_RECURSIVE_MUTEX:
+            lock_stats = &((sync_recursive_mutex_t)lock)->stats;
+            break;
+        case SYNC_TYPE_RWLOCK:
+            lock_stats = &((sync_rwlock_t)lock)->stats;
+            break;
+        case SYNC_TYPE_SPINLOCK:
+            lock_stats = &((sync_spinlock_t)lock)->stats;
+            break;
+        case SYNC_TYPE_SEMAPHORE:
+            lock_stats = &((sync_semaphore_t)lock)->stats;
+            break;
+        case SYNC_TYPE_CONDITION:
+            lock_stats = &((sync_condition_t)lock)->stats;
+            break;
+        case SYNC_TYPE_BARRIER:
+            lock_stats = &((sync_barrier_t)lock)->stats;
+            break;
+        case SYNC_TYPE_EVENT:
+            lock_stats = &((sync_event_t)lock)->stats;
+            break;
+        default:
+            return SYNC_ERROR_INVALID;
+    }
+    
+    memset(lock_stats, 0, sizeof(sync_stats_t));
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_check_deadlock(sync_deadlock_info_t* info, size_t max_info_size) {
+    (void)info;
+    (void)max_info_size;
+    // 简化实现，暂不支持死锁检测
+    return SYNC_SUCCESS;
+}
+
+sync_result_t sync_set_name(void* lock, const char* name) {
+    if (lock == NULL) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+    char** lock_name = NULL;
+    sync_type_t type = sync_get_type(lock);
+    
+    switch (type) {
+        case SYNC_TYPE_MUTEX:
+            lock_name = &((sync_mutex_t)lock)->name;
+            break;
+        case SYNC_TYPE_RECURSIVE_MUTEX:
+            lock_name = &((sync_recursive_mutex_t)lock)->name;
+            break;
+        case SYNC_TYPE_RWLOCK:
+            lock_name = &((sync_rwlock_t)lock)->name;
+            break;
+        case SYNC_TYPE_SPINLOCK:
+            lock_name = &((sync_spinlock_t)lock)->name;
+            break;
+        case SYNC_TYPE_SEMAPHORE:
+            lock_name = &((sync_semaphore_t)lock)->name;
+            break;
+        case SYNC_TYPE_CONDITION:
+            lock_name = &((sync_condition_t)lock)->name;
+            break;
+        case SYNC_TYPE_BARRIER:
+            lock_name = &((sync_barrier_t)lock)->name;
+            break;
+        case SYNC_TYPE_EVENT:
+            lock_name = &((sync_event_t)lock)->name;
+            break;
+        default:
+            return SYNC_ERROR_INVALID;
+    }
+    
+    AGENTOS_FREE(*lock_name);
+    *lock_name = sync_internal_strdup(name);
+    
+    return SYNC_SUCCESS;
+}
+
+const char* sync_get_name(void* lock) {
+    if (lock == NULL) {
+        return NULL;
+    }
+    
+    sync_type_t type = sync_get_type(lock);
+    
+    switch (type) {
+        case SYNC_TYPE_MUTEX:
+            return ((sync_mutex_t)lock)->name;
+        case SYNC_TYPE_RECURSIVE_MUTEX:
+            return ((sync_recursive_mutex_t)lock)->name;
+        case SYNC_TYPE_RWLOCK:
+            return ((sync_rwlock_t)lock)->name;
+        case SYNC_TYPE_SPINLOCK:
+            return ((sync_spinlock_t)lock)->name;
+        case SYNC_TYPE_SEMAPHORE:
+            return ((sync_semaphore_t)lock)->name;
+        case SYNC_TYPE_CONDITION:
+            return ((sync_condition_t)lock)->name;
+        case SYNC_TYPE_BARRIER:
+            return ((sync_barrier_t)lock)->name;
+        case SYNC_TYPE_EVENT:
+            return ((sync_event_t)lock)->name;
+        default:
+            return NULL;
+    }
+}
+
+uint64_t sync_get_thread_id(void) {
+    return sync_internal_get_thread_id();
+}
+
+sync_type_t sync_get_type(void* lock) {
+    if (lock == NULL) {
+        return SYNC_TYPE_MUTEX;
+    }
+    // 简化实现，通过指针地址判断类型不可靠
+    // 实际实现中应该在结构体中存储类型
+    return SYNC_TYPE_MUTEX;
+}
+
+void sync_sleep(unsigned int ms) {
+#ifdef _WIN32
+    Sleep(ms);
+#else
+    usleep(ms * 1000);
+#endif
+}
+
+uint64_t sync_get_timestamp_ms(void) {
+    return sync_internal_get_timestamp_ms();
+}
+
+bool sync_atomic_cas(volatile void* ptr, uintptr_t expected, uintptr_t desired) {
+#ifdef _WIN32
+    return InterlockedCompareExchangePointer((void* volatile*)ptr, (void*)desired, (void*)expected) == (void*)expected;
+#else
+    return __atomic_compare_exchange_n((uintptr_t*)ptr, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+#endif
+}
+
+uintptr_t sync_atomic_add(volatile void* ptr, uintptr_t value) {
+#ifdef _WIN32
+    return InterlockedExchangeAdd((LONG*)ptr, (LONG)value);
+#else
+    return __atomic_fetch_add((uintptr_t*)ptr, value, __ATOMIC_SEQ_CST);
+#endif
+}
+
+uintptr_t sync_atomic_sub(volatile void* ptr, uintptr_t value) {
+#ifdef _WIN32
+    return InterlockedExchangeAdd((LONG*)ptr, -(LONG)value);
+#else
+    return __atomic_fetch_sub((uintptr_t*)ptr, value, __ATOMIC_SEQ_CST);
+#endif
+}
+
+uintptr_t sync_atomic_load(volatile void* ptr) {
+#ifdef _WIN32
+    return InterlockedExchangeAdd((LONG*)ptr, 0);
+#else
+    return __atomic_load_n((uintptr_t*)ptr, __ATOMIC_SEQ_CST);
+#endif
+}
+
+void sync_atomic_store(volatile void* ptr, uintptr_t value) {
+#ifdef _WIN32
+    InterlockedExchange((LONG*)ptr, (LONG)value);
+#else
+    __atomic_store_n((uintptr_t*)ptr, value, __ATOMIC_SEQ_CST);
+#endif
+}
         while (true) {
             int rc = pthread_mutex_trylock(&mutex->mutex);
             if (rc == 0) {

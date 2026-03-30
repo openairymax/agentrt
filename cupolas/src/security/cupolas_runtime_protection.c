@@ -1,6 +1,6 @@
 /**
  * @file cupolas_runtime_protection.c
- * @brief ÔöÇ¿ÔËĞĞÊ±±£»¤ - seccomp¡¢CFI µÈ¶à²ã·À»¤ÊµÏÖ
+ * @brief å¢å¼ºè¿è¡Œæ—¶ä¿æŠ¤ - seccompã€CFI ç­‰å¤šé˜²å¾¡å®ç°
  * @author Spharx
  * @date 2026
  */

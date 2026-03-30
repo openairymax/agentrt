@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file manager.c
  * @brief 简单配置管理实现（临时存根版本�? * @copyright (c) 2026 SPHARX. All Rights Reserved.
  * 
@@ -10,8 +10,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../commons/utils/memory/include/memory_compat.h"
-#include "../commons/utils/string/include/string_compat.h"
+#include "../../utils/memory/include/memory_compat.h"
+#include "../../utils/string/include/string_compat.h"
 #include <string.h>
 
 /* ==================== 配置结构 ==================== */

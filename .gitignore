@@ -33,6 +33,8 @@ CMakeFiles/
 cmake_install.cmake
 *.cmake
 cmake_install.*
+.gitee/
+.github/
 
 # --- 编译中间文件和输出 ---
 # 目标文件和库

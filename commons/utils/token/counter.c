@@ -257,7 +257,7 @@ char* agentos_token_counter_truncate(agentos_token_counter_t* counter,
         if (result) {
             memcpy(result, text + length - target_chars, target_chars);
             result[target_chars] = '\0';
-            strcpy(result + target_chars, "...");
+            snprintf(result + target_chars, 4, "...");
         }
     } else if (side && strcmp(side, "middle") == 0) {
         size_t half = target_chars / 2;
@@ -265,15 +265,20 @@ char* agentos_token_counter_truncate(agentos_token_counter_t* counter,
         if (result) {
             memcpy(result, text, half);
             result[half] = '\0';
-            strcpy(result + half, "...[truncated]...");
-            strcpy(result + half + 15, text + length - (target_chars - half));
+            snprintf(result + half, target_chars + 8 - half, "...[truncated]...");
+            size_t remaining_space = target_chars + 8 - (half + 15);
+            if (remaining_space > 0) {
+                size_t copy_len = (target_chars - half) < (remaining_space - 1) ? (target_chars - half) : (remaining_space - 1);
+                memcpy(result + half + 15, text + length - (target_chars - half), copy_len);
+                result[half + 15 + copy_len] = '\0';
+            }
         }
     } else {
         result = AGENTOS_MALLOC(target_chars + 4);
         if (result) {
             memcpy(result, text, target_chars);
             result[target_chars] = '\0';
-            strcpy(result + target_chars, "...");
+            snprintf(result + target_chars, 4, "...");
         }
     }
     

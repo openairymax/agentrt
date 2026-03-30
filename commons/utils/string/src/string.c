@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file string.c
  * @brief 统一字符串处理模�?- 核心层实�? * 
  * 实现安全、高效、统一的字符串处理功能，提供完整的字符串操作API�? * 包括字符串复制、连接、比较、查找、分割、格式化等常用功能�? * 
@@ -9,8 +9,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../commons/utils/memory/include/memory_compat.h"
-#include "../commons/utils/string/include/string_compat.h"
+#include "../../utils/memory/include/memory_compat.h"
+#include "../../utils/string/include/string_compat.h"
 #include <string.h>
 #include <ctype.h>
 #include <stdarg.h>

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file heapstore_ipc.c
  * @brief AgentOS 数据分区 IPC 数据存储实现
  *
@@ -8,6 +8,7 @@
 
 #include "heapstore_ipc.h"
 #include "private.h"
+#include "utils.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,28 +45,6 @@ typedef struct {
 
 static ipc_data_t g_ipc_data = {0};
 
-static bool ensure_directory(const char* path) {
-    if (!path) return false;
-
-    char path_copy[512];
-    strncpy(path_copy, path, sizeof(path_copy) - 1);
-    path_copy[sizeof(path_copy) - 1] = '\0';
-
-    size_t len = strlen(path_copy);
-    for (size_t i = 0; i < len; i++) {
-        if (path_copy[i] == '\\' || path_copy[i] == '/') {
-            if (i > 0 && path_copy[i - 1] != ':') {
-                path_copy[i] = '\0';
-                mkdir(path_copy, 0755);
-                path_copy[i] = '/';
-            }
-        }
-    }
-
-    mkdir(path_copy, 0755);
-    return true;
-}
-
 heapstore_error_t heapstore_ipc_init(void) {
     if (g_ipc_data.initialized) {
         return heapstore_ERR_ALREADY_INITIALIZED;
@@ -75,8 +54,8 @@ heapstore_error_t heapstore_ipc_init(void) {
     pthread_mutex_init(&g_ipc_data.lock, NULL);
     g_ipc_data.initialized = true;
 
-    ensure_directory("heapstore/kernel/ipc/channels");
-    ensure_directory("heapstore/kernel/ipc/buffers");
+    heapstore_ensure_directory("heapstore/kernel/ipc/channels");
+    heapstore_ensure_directory("heapstore/kernel/ipc/buffers");
 
     return heapstore_SUCCESS;
 }

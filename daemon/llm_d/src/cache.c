@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file cache.c
  * @brief LRU 缓存实现（双链表 + 哈希表）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -43,6 +43,12 @@ static unsigned int hash_key(const char* key) {
     return h % HASH_SIZE;
 }
 
+/**
+ * @brief 创建缓存条目
+ * @param key 键
+ * @param value 值
+ * @return 新创建的条目，失败返回 NULL
+ */
 static cache_entry_t* entry_create(const char* key, const char* value) {
     cache_entry_t* e = memory_safe_alloc(sizeof(cache_entry_t));
     if (!e) return NULL;
@@ -65,6 +71,10 @@ static cache_entry_t* entry_create(const char* key, const char* value) {
     return e;
 }
 
+/**
+ * @brief 安全释放缓存条目内存
+ * @param e 缓存条目
+ */
 static void entry_memory_safe_free(cache_entry_t* e) {
     if (!e) return;
     memory_safe_free(e->key);
@@ -72,6 +82,11 @@ static void entry_memory_safe_free(cache_entry_t* e) {
     memory_safe_free(e);
 }
 
+/**
+ * @brief 从 LRU 链表中移除条目
+ * @param cache 缓存实例
+ * @param e 要移除的条目
+ */
 static void lru_remove(cache_t* cache, cache_entry_t* e) {
     if (e->prev) e->prev->next = e->next;
     if (e->next) e->next->prev = e->prev;
@@ -80,6 +95,11 @@ static void lru_remove(cache_t* cache, cache_entry_t* e) {
     e->prev = e->next = NULL;
 }
 
+/**
+ * @brief 将条目移动到 LRU 链表头部
+ * @param cache 缓存实例
+ * @param e 要移动的条目
+ */
 static void lru_move_to_head(cache_t* cache, cache_entry_t* e) {
     if (cache->lru_head == e) return;
     lru_remove(cache, e);

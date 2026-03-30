@@ -15,8 +15,6 @@
 
 ## 🎯 智能体超级操作系统
 
-**备选名称**: OpenApex (开源极境 / 极境 OS)
-
 *"From data intelligence emerges 始于数据，终于智能。"*
 
 ---

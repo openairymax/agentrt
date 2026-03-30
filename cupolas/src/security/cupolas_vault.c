@@ -1,6 +1,6 @@
 /**
  * @file cupolas_vault.c
- * @brief °²È«Æ¾Ö¤´æ´¢ÊµÏÖ - ÀàËÆ iOS Keychain
+ * @brief å®‰å…¨å‡­è¯å­˜å‚¨å®ç° - ç±»ä¼¼ iOS Keychain
  * @author Spharx
  * @date 2026
  */
@@ -20,7 +20,7 @@
 #endif
 
 /* ============================================================================
- * ÄÚ²¿³£Á¿
+ * å†…éƒ¨å¸¸é‡
  * ============================================================================ */
 
 #define VAULT_MAGIC 0x564C5453  /* "VLTS" */
@@ -31,7 +31,7 @@
 #define SALT_SIZE 32
 
 /* ============================================================================
- * ÄÚ²¿½á¹¹
+ * å†…éƒ¨ç»“æ„
  * ============================================================================ */
 
 typedef struct {
@@ -53,7 +53,7 @@ struct cupolas_vault {
     size_t entry_count;
     size_t entry_capacity;
     cupolas_rwlock_t lock;
-    cupolas_vault_config_t manager;
+    cupolas_vault_config_t config;
 };
 
 typedef struct {
@@ -65,18 +65,18 @@ typedef struct {
 static vault_global_ctx_t g_vault_ctx = {0};
 
 /* ============================================================================
- * ³õÊ¼»¯/ÇåÀí
+ * åˆå§‹åŒ–/æ¸…ç†
  * ============================================================================ */
 
-int cupolas_vault_init(const cupolas_vault_config_t* manager) {
+int cupolas_vault_init(const cupolas_vault_config_t* config) {
     if (g_vault_ctx.initialized) {
         return 0;
     }
 
     memset(&g_vault_ctx, 0, sizeof(g_vault_ctx));
 
-    if (manager) {
-        memcpy(&g_vault_ctx.default_config, manager, sizeof(cupolas_vault_config_t));
+    if (config) {
+        memcpy(&g_vault_ctx.default_config, config, sizeof(cupolas_vault_config_t));
     } else {
         g_vault_ctx.default_config.enable_audit = true;
         g_vault_ctx.default_config.enable_auto_lock = true;
@@ -120,7 +120,7 @@ int cupolas_vault_open(const char* vault_id, const char* password, cupolas_vault
     v->entry_count = 0;
 
     cupolas_rwlock_init(&v->lock);
-    memcpy(&v->manager, &g_vault_ctx.default_config, sizeof(cupolas_vault_config_t));
+    memcpy(&v->config, &g_vault_ctx.default_config, sizeof(cupolas_vault_config_t));
 
     if (password) {
 #ifdef cupolas_USE_OPENSSL
@@ -128,7 +128,7 @@ int cupolas_vault_open(const char* vault_id, const char* password, cupolas_vault
         PKCS5_PBKDF2_HMAC(password, strlen(password), salt, SALT_SIZE,
                           100000, EVP_sha256(), AES_KEY_SIZE, v->master_key);
 #else
-        cupolas_UNUSED(password);
+        (void)password;
         memset(v->master_key, 0, AES_KEY_SIZE);
 #endif
         v->is_locked = false;
@@ -194,7 +194,7 @@ int cupolas_vault_unlock(cupolas_vault_t* vault, const char* password) {
     PKCS5_PBKDF2_HMAC(password, strlen(password), salt, SALT_SIZE,
                       100000, EVP_sha256(), AES_KEY_SIZE, vault->master_key);
 #else
-    cupolas_UNUSED(password);
+    (void)password;
     memset(vault->master_key, 0, AES_KEY_SIZE);
 #endif
 
@@ -217,7 +217,7 @@ bool cupolas_vault_is_locked(cupolas_vault_t* vault) {
 }
 
 /* ============================================================================
- * Æ¾Ö¤²Ù×÷
+ * å‡­è¯æ“ä½œ
  * ============================================================================ */
 
 static credential_entry_t* find_entry(cupolas_vault_t* vault, const char* cred_id) {
@@ -467,7 +467,7 @@ int cupolas_vault_update(cupolas_vault_t* vault,
 }
 
 /* ============================================================================
- * ·ÃÎÊ¿ØÖÆ
+ * è®¿é—®æ§åˆ¶
  * ============================================================================ */
 
 bool cupolas_vault_check_access(cupolas_vault_t* vault,
@@ -587,7 +587,7 @@ int cupolas_vault_revoke_access(cupolas_vault_t* vault,
 }
 
 /* ============================================================================
- * ÔªÊı¾İ²Ù×÷
+ * å…ƒæ•°æ®æ“ä½œ
  * ============================================================================ */
 
 int cupolas_vault_get_metadata(cupolas_vault_t* vault,
@@ -728,7 +728,7 @@ void cupolas_vault_free_acl(cupolas_vault_acl_t* acl) {
 }
 
 /* ============================================================================
- * ¹¤¾ßº¯Êı
+ * è¾…åŠ©å‡½æ•°
  * ============================================================================ */
 
 const char* cupolas_vault_cred_type_string(cupolas_vault_cred_type_t type) {
@@ -827,10 +827,10 @@ int cupolas_vault_export(cupolas_vault_t* vault,
                         const char* export_path,
                         const char* password,
                         const char* agent_id) {
-    cupolas_UNUSED(vault);
-    cupolas_UNUSED(export_path);
-    cupolas_UNUSED(password);
-    cupolas_UNUSED(agent_id);
+    (void)vault;
+    (void)export_path;
+    (void)password;
+    (void)agent_id;
     return -1;
 }
 
@@ -838,9 +838,9 @@ int cupolas_vault_import(cupolas_vault_t* vault,
                         const char* import_path,
                         const char* password,
                         const char* agent_id) {
-    cupolas_UNUSED(vault);
-    cupolas_UNUSED(import_path);
-    cupolas_UNUSED(password);
-    cupolas_UNUSED(agent_id);
+    (void)vault;
+    (void)import_path;
+    (void)password;
+    (void)agent_id;
     return -1;
 }

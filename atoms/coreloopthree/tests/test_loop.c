@@ -1,4 +1,4 @@
-﻿﻿/**
+﻿﻿﻿﻿/**
  * @file test_loop.c
  * @brief 核心循环单元测试
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file memory.c
  * @brief 统一内存管理模块 - 核心层实�? * 
  * 实现安全、高效、统一的内存管理功能，支持内存分配、释放、调试和统计�? * 
@@ -9,8 +9,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../commons/utils/memory/include/memory_compat.h"
-#include "../commons/utils/string/include/string_compat.h"
+#include "../../utils/memory/include/memory_compat.h"
+#include "../../utils/string/include/string_compat.h"
 #include <string.h>
 #include <stdio.h>
 #include <time.h>

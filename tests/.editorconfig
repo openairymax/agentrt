@@ -1,0 +1,129 @@
+# EditorConfig - AgentOS 统一代码格式配置
+# https://editorconfig.org
+
+root = true
+
+# ============================================================
+# 通用设置
+# ============================================================
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# ============================================================
+# Python 文件
+# ============================================================
+
+[*.py]
+indent_style = space
+indent_size = 4
+max_line_length = 100
+
+# Python 特定文件
+[*.pyw]
+indent_style = space
+indent_size = 4
+
+[*.pyx]
+indent_style = space
+indent_size = 4
+
+[*.pxd]
+indent_style = space
+indent_size = 4
+
+# ============================================================
+# C/C++ 文件
+# ============================================================
+
+[*.{c,h}]
+indent_style = space
+indent_size = 4
+max_line_length = 120
+
+[*.{cpp,hpp,cc,cxx}]
+indent_style = space
+indent_size = 4
+max_line_length = 120
+
+# ============================================================
+# CMake 文件
+# ============================================================
+
+[CMakeLists.txt]
+indent_style = space
+indent_size = 4
+
+[*.cmake]
+indent_style = space
+indent_size = 4
+
+# ============================================================
+# 配置文件
+# ============================================================
+
+[*.{json,yaml,yml,toml}]
+indent_style = space
+indent_size = 2
+
+[*.{xml,config}]
+indent_style = space
+indent_size = 4
+
+# ============================================================
+# Markdown 文件
+# ============================================================
+
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = off
+
+# ============================================================
+# Makefile
+# ============================================================
+
+[Makefile]
+indent_style = tab
+
+[*.mk]
+indent_style = tab
+
+# ============================================================
+# Shell 脚本
+# ============================================================
+
+[*.{sh,bash}]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+
+# ============================================================
+# 特殊文件
+# ============================================================
+
+[*.gitignore]
+trim_trailing_whitespace = false
+
+[.gitattributes]
+trim_trailing_whitespace = false
+
+# ============================================================
+# 测试文件 - 保持一致性
+# ============================================================
+
+[tests/**]
+indent_style = space
+indent_size = 4
+
+[tests/**/*.py]
+indent_style = space
+indent_size = 4
+
+[tests/**/*.{c,h}]
+indent_style = space
+indent_size = 4

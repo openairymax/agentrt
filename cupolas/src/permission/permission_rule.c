@@ -1,6 +1,6 @@
 /**
  * @file permission_rule.c
- * @brief 权限规则管理器实�?
+ * @brief 权限规则管理器实现
  * @author Spharx
  * @date 2024
  */
@@ -13,7 +13,7 @@
 #define MAX_LINE_LENGTH 4096
 #define DEFAULT_PRIORITY 100
 
-static void free_rule(permission_rule_t* rule) {
+static void cupolas_permission_free_rule(permission_rule_t* rule) {
     if (!rule) return;
     cupolas_mem_free(rule->agent_id);
     cupolas_mem_free(rule->action);
@@ -22,15 +22,15 @@ static void free_rule(permission_rule_t* rule) {
     cupolas_mem_free(rule);
 }
 
-static void free_rules(permission_rule_t* rules) {
+static void cupolas_permission_free_rules(permission_rule_t* rules) {
     while (rules) {
         permission_rule_t* next = rules->next;
-        free_rule(rules);
+        cupolas_permission_free_rule(rules);
         rules = next;
     }
 }
 
-static permission_rule_t* create_rule(const char* agent_id, const char* action,
+static permission_rule_t* cupolas_permission_create_rule(const char* agent_id, const char* action,
                                        const char* resource, int allow, int priority) {
     permission_rule_t* rule = (permission_rule_t*)cupolas_mem_alloc(sizeof(permission_rule_t));
     if (!rule) return NULL;
@@ -57,11 +57,11 @@ static permission_rule_t* create_rule(const char* agent_id, const char* action,
     return rule;
     
 error:
-    free_rule(rule);
+    cupolas_permission_free_rule(rule);
     return NULL;
 }
 
-static int match_pattern(const char* pattern, const char* str) {
+static int cupolas_permission_match_pattern(const char* pattern, const char* str) {
     if (!pattern || !str) return 0;
     if (strcmp(pattern, "*") == 0) return 1;
     
@@ -92,7 +92,7 @@ static int match_pattern(const char* pattern, const char* str) {
     return *p == '\0';
 }
 
-static int parse_yaml_line(const char* line, char** agent_id, char** action,
+static int cupolas_permission_parse_yaml_line(const char* line, char** agent_id, char** action,
                            char** resource, int* allow, int* priority) {
     *agent_id = NULL;
     *action = NULL;
@@ -180,7 +180,7 @@ void rule_manager_destroy(rule_manager_t* mgr) {
     if (!mgr) return;
     
     cupolas_rwlock_wrlock(&mgr->rwlock);
-    free_rules(mgr->rules);
+    cupolas_permission_free_rules(mgr->rules);
     mgr->rules = NULL;
     cupolas_rwlock_unlock(&mgr->rwlock);
     
@@ -218,18 +218,18 @@ int rule_manager_reload(rule_manager_t* mgr) {
         int allow = 1;
         int priority = DEFAULT_PRIORITY;
         
-        if (parse_yaml_line(line, &agent_id, &action, &resource, &allow, &priority) != 0) {
+        if (cupolas_permission_parse_yaml_line(line, &agent_id, &action, &resource, &allow, &priority) != 0) {
             continue;
         }
         
-        permission_rule_t* rule = create_rule(agent_id, action, resource, allow, priority);
+        permission_rule_t* rule = cupolas_permission_create_rule(agent_id, action, resource, allow, priority);
         cupolas_mem_free(agent_id);
         cupolas_mem_free(action);
         cupolas_mem_free(resource);
         
         if (!rule) {
             fclose(fp);
-            free_rules(new_rules);
+            cupolas_permission_free_rules(new_rules);
             return cupolas_ERROR_NO_MEMORY;
         }
         
@@ -246,7 +246,7 @@ int rule_manager_reload(rule_manager_t* mgr) {
     cupolas_atomic_inc32(&mgr->version);
     cupolas_rwlock_unlock(&mgr->rwlock);
     
-    free_rules(old_rules);
+    cupolas_permission_free_rules(old_rules);
     
     return cupolas_OK;
 }
@@ -287,7 +287,7 @@ int rule_manager_match(rule_manager_t* mgr,
         }
         
         if (match && rule->resource && resource) {
-            if (!match_pattern(rule->resource, resource)) {
+            if (!cupolas_permission_match_pattern(rule->resource, resource)) {
                 match = 0;
             }
         }
@@ -313,7 +313,7 @@ int rule_manager_add(rule_manager_t* mgr,
                      int priority) {
     if (!mgr) return cupolas_ERROR_INVALID_ARG;
     
-    permission_rule_t* rule = create_rule(agent_id, action, resource, allow, priority);
+    permission_rule_t* rule = cupolas_permission_create_rule(agent_id, action, resource, allow, priority);
     if (!rule) return cupolas_ERROR_NO_MEMORY;
     
     cupolas_rwlock_wrlock(&mgr->rwlock);
@@ -337,7 +337,7 @@ void rule_manager_clear(rule_manager_t* mgr) {
     if (!mgr) return;
     
     cupolas_rwlock_wrlock(&mgr->rwlock);
-    free_rules(mgr->rules);
+    cupolas_permission_free_rules(mgr->rules);
     mgr->rules = NULL;
     cupolas_atomic_inc32(&mgr->version);
     cupolas_rwlock_unlock(&mgr->rwlock);

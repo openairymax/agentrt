@@ -19,44 +19,51 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 64,
-          "description": "Service name"
+          "description": "Service name",
+          "examples": ["tool-daemon", "agentos-tool-service"]
         },
         "version": {
           "type": "string",
           "pattern": "^\\d+\\.\\d+\\.\\d+(\\.\\d+)?$",
-          "description": "Service version"
+          "description": "Service version",
+          "examples": ["1.0.0", "1.2.0", "2.0.0"]
         },
         "enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Whether the service is enabled"
+          "description": "Whether the service is enabled",
+          "examples": [true, false]
         },
         "bind_address": {
           "type": "string",
           "format": "ipv4",
           "default": "127.0.0.1",
-          "description": "Service bind address"
+          "description": "Service bind address",
+          "examples": ["127.0.0.1", "0.0.0.0", "192.168.1.100"]
         },
         "port": {
           "type": "integer",
           "minimum": 1,
           "maximum": 65535,
           "default": 50051,
-          "description": "Service port"
+          "description": "Service port",
+          "examples": [50051, 50052, 8080]
         },
         "max_concurrency": {
           "type": "integer",
           "minimum": 1,
           "maximum": 10000,
           "default": 100,
-          "description": "Maximum concurrent requests"
+          "description": "Maximum concurrent requests",
+          "examples": [50, 100, 200, 500]
         },
         "timeout_sec": {
           "type": "integer",
           "minimum": 1,
           "maximum": 3600,
           "default": 60,
-          "description": "Request timeout in seconds"
+          "description": "Request timeout in seconds",
+          "examples": [30, 60, 120, 300]
         },
         "execution": {
           "type": "object",
@@ -65,29 +72,41 @@
             "mode": {
               "type": "string",
               "enum": ["local", "docker", "wasm", "remote"],
-              "default": "local"
+              "default": "local",
+              "description": "Execution mode",
+              "examples": ["local", "docker", "wasm"]
             },
             "sandbox": {
               "type": "object",
               "properties": {
                 "enabled": {
-                  "type": "boolean"
+                  "type": "boolean",
+                  "description": "Enable sandbox isolation",
+                  "examples": [true, false]
                 },
                 "type": {
                   "type": "string",
-                  "enum": ["process", "container", "wasm"]
+                  "enum": ["process", "container", "wasm"],
+                  "description": "Sandbox type",
+                  "examples": ["process", "container"]
                 },
                 "memory_limit_mb": {
                   "type": "integer",
-                  "minimum": 1
+                  "minimum": 1,
+                  "description": "Memory limit in MB",
+                  "examples": [128, 256, 512, 1024]
                 },
                 "cpu_limit": {
                   "type": "number",
-                  "minimum": 0.1
+                  "minimum": 0.1,
+                  "description": "CPU limit (cores)",
+                  "examples": [0.5, 1.0, 2.0, 4.0]
                 },
                 "timeout_sec": {
                   "type": "integer",
-                  "minimum": 1
+                  "minimum": 1,
+                  "description": "Timeout in seconds",
+                  "examples": [30, 60, 120, 300]
                 }
               }
             },
@@ -138,20 +157,28 @@
           "description": "Cache configuration",
           "properties": {
             "enabled": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Enable caching",
+              "examples": [true, false]
             },
             "type": {
               "type": "string",
-              "enum": ["memory", "redis", "file"]
+              "enum": ["memory", "redis", "file"],
+              "description": "Cache backend type",
+              "examples": ["memory", "redis"]
             },
             "memory": {
               "type": "object",
               "properties": {
                 "max_size_mb": {
-                  "type": "integer"
+                  "type": "integer",
+                  "description": "Max cache size in MB",
+                  "examples": [64, 128, 256, 512]
                 },
                 "ttl_sec": {
-                  "type": "integer"
+                  "type": "integer",
+                  "description": "Cache TTL in seconds",
+                  "examples": [300, 600, 1800, 3600]
                 }
               }
             },
@@ -159,16 +186,24 @@
               "type": "object",
               "properties": {
                 "host": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "Redis host",
+                  "examples": ["localhost", "redis.local", "192.168.1.100"]
                 },
                 "port": {
-                  "type": "integer"
+                  "type": "integer",
+                  "description": "Redis port",
+                  "examples": [6379, 6380]
                 },
                 "db": {
-                  "type": "integer"
+                  "type": "integer",
+                  "description": "Redis database number",
+                  "examples": [0, 1, 2]
                 },
                 "ttl_sec": {
-                  "type": "integer"
+                  "type": "integer",
+                  "description": "Cache TTL in seconds",
+                  "examples": [3600, 7200, 86400]
                 }
               }
             },
@@ -194,13 +229,19 @@
           "properties": {
             "default_rule": {
               "type": "string",
-              "enum": ["allow", "deny"]
+              "enum": ["allow", "deny"],
+              "description": "Default permission rule",
+              "examples": ["deny", "allow"]
             },
             "check_enabled": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Enable permission checking",
+              "examples": [true, false]
             },
             "audit_enabled": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Enable permission audit",
+              "examples": [true, false]
             }
           }
         },
@@ -209,22 +250,32 @@
           "description": "Logging configuration",
           "properties": {
             "enabled": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Enable logging",
+              "examples": [true, false]
             },
             "log_input": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Log input data",
+              "examples": [true, false]
             },
             "log_output": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Log output data",
+              "examples": [true, false]
             },
             "log_duration": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Log execution duration",
+              "examples": [true, false]
             },
             "mask_fields": {
               "type": "array",
               "items": {
                 "type": "string"
-              }
+              },
+              "description": "Fields to mask in logs",
+              "examples": [["password", "token", "api_key"], ["secret"]]
             }
           }
         },
@@ -233,19 +284,27 @@
           "description": "Health check configuration",
           "properties": {
             "enabled": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Enable health checks",
+              "examples": [true, false]
             },
             "interval_sec": {
               "type": "integer",
-              "minimum": 1
+              "minimum": 1,
+              "description": "Health check interval",
+              "examples": [10, 30, 60]
             },
             "timeout_sec": {
               "type": "integer",
-              "minimum": 1
+              "minimum": 1,
+              "description": "Health check timeout",
+              "examples": [5, 10, 30]
             },
             "unhealthy_threshold": {
               "type": "integer",
-              "minimum": 1
+              "minimum": 1,
+              "description": "Unhealthy threshold",
+              "examples": [3, 5, 10]
             }
           }
         },
@@ -254,19 +313,27 @@
           "description": "Rate limiting configuration",
           "properties": {
             "enabled": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Enable rate limiting",
+              "examples": [true, false]
             },
             "requests_per_sec": {
               "type": "integer",
-              "minimum": 1
+              "minimum": 1,
+              "description": "Requests per second",
+              "examples": [10, 50, 100]
             },
             "requests_per_min": {
               "type": "integer",
-              "minimum": 1
+              "minimum": 1,
+              "description": "Requests per minute",
+              "examples": [100, 500, 1000]
             },
             "burst": {
               "type": "integer",
-              "minimum": 1
+              "minimum": 1,
+              "description": "Burst size",
+              "examples": [10, 50, 100]
             }
           }
         },

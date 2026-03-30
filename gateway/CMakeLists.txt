@@ -1,4 +1,4 @@
-﻿# AgentOS gateway Runtime - CMake 构建配置
+# AgentOS gateway Runtime - CMake 构建配置
 # 
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 
@@ -82,10 +82,10 @@ set(COMMON_INCLUDE_DIRS
 )
 
 # 可执行文件
-add_executable(gateway ${DYNAMIC_SOURCES})
+add_executable(gateway ${GATEWAY_SOURCES})
 
 target_include_directories(gateway PRIVATE
-    ${DYNAMIC_INCLUDE_DIRS}
+    ${GATEWAY_INCLUDE_DIRS}
     ${COMMON_INCLUDE_DIRS}
 )
 

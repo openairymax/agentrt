@@ -1,4 +1,4 @@
-﻿﻿#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 安全模块
 # 输入净化、权限管理、安全审计
@@ -338,6 +338,3 @@ def get_security_manager() -> SecurityManager:
     if _global_security_manager is None:
         _global_security_manager = SecurityManager()
     return _global_security_manager
-
-
-from datetime import datetime

@@ -1,4 +1,4 @@
-﻿#include "include/memory_common.h"
+#include "include/memory_common.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -259,7 +259,7 @@ char* memory_safe_strdup(const char* src) {
     size_t len = strlen(src) + 1;
     char* dest = memory_safe_alloc(len);
     if (dest) {
-        strcpy(dest, src);
+        memcpy(dest, src, len);
     }
     
     return dest;

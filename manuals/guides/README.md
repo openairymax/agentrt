@@ -1,17 +1,18 @@
-﻿Copyright (c) 2026 SPHARX. All Rights Reserved.
+Copyright (c) 2026 SPHARX. All Rights Reserved.
 "From data intelligence emerges."
 
 # AgentOS 使用指南
 
-**版本**: Doc V1.5
-**最后更新**: 2026-03-23
+**版本**: Doc V1.7
+**最后更新**: 2026-03-31
 **状态**: 生产就绪
+**作者**: LirenWang
 
 ---
 
 ## 1. 概述
 
-AgentOS 使用指南提供从入门到精通的完整学习路径。所有代码示例基于 **C11 标准**，构建系统为 **CMake**，遵循 AgentOS 微内核架构的设计原则。
+AgentOS 使用指南提供从入门到精通的完整学习路径。AgentOS 基于五维正交系统设计，涵盖系统观、内核观、认知观、工程观和设计美学。所有代码示例基于 **C11 标准**，构建系统为 **CMake**，遵循 AgentOS 微内核架构的设计原则。
 
 ### 1.1 学习路径
 
@@ -426,7 +427,7 @@ WantedBy=multi-user.target
 
 ## 相关文档
 
-- [架构设计原则](../architecture/folder/architectural_design_principles.md) - 系统设计的理论基础
+- [架构设计原则](../architecture/ARCHITECTURAL_PRINCIPLES.md) - 系统设计的理论基础
 - [设计哲学](../philosophy/README.md) - 认知理论、记忆理论、设计原则
 - [API 参考](../api/README.md) - SDK / Syscall / Core 三层 API
 - [规范标准](../specifications/README.md) - 契约规范、编码标准、术语表

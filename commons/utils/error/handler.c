@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file handler.c
  * @brief 统一错误处理模块实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -14,8 +14,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../commons/utils/memory/include/memory_compat.h"
-#include "../commons/utils/string/include/string_compat.h"
+#include "../../utils/memory/include/memory_compat.h"
+#include "../../utils/string/include/string_compat.h"
 #include <time.h>
 
 #ifdef _WIN32
