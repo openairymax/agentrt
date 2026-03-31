@@ -69,12 +69,12 @@ AgentOS 提供完整的国际化支持，确保全球开发者都能获得优质
 resources/
 ├── locales/
 │   ├── en/              # 英语（默认语言）
-│   │   ├── bases.json
+│   │   ├── commons.json
 │   │   ├── ui.json
 │   │   ├── errors.json
 │   │   └── docs.json
 │   ├── zh-CN/           # 简体中文
-│   │   ├── bases.json
+│   │   ├── commons.json
 │   │   ├── ui.json
 │   │   ├── errors.json
 │   │   └── docs.json
@@ -98,7 +98,7 @@ resources/
 
 **本地化示例**:
 ```json
-// resources/locales/en/bases.json
+// resources/locales/en/commons.json
 {
   "welcome": "Welcome to AgentOS",
   "description": "An intelligent agent operating system",
@@ -106,7 +106,7 @@ resources/
   "documentation": "Documentation"
 }
 
-// resources/locales/zh-CN/bases.json
+// resources/locales/zh-CN/commons.json
 {
   "welcome": "欢迎使用 AgentOS",
   "description": "智能代理操作系统",
@@ -114,7 +114,7 @@ resources/
   "documentation": "文档"
 }
 
-// resources/locales/de/bases.json
+// resources/locales/de/commons.json
 {
   "welcome": "Willkommen bei AgentOS",
   "description": "Ein intelligentes Agenten-Betriebssystem",

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file ratelimit.c
  * @brief 请求速率限制器实现
  * 
@@ -11,6 +11,7 @@
 #include "ratelimit.h"
 #include "logger.h"
 #include "platform.h"
+#include "utils/hash.h"
 
 #include <stdatomic.h>
 #include <stdlib.h>
@@ -40,20 +41,13 @@ struct ratelimiter {
     atomic_uint_fast64_t total_denied;     /**< 总拒绝请求数 */
 };
 
-/* ========== 哈希函数 ========== */
+/* ========== 哈希函数（使用公共模块） ========== */
 
 /**
- * @brief FNV-1a 哈希函数
+ * @brief 客户端 ID 哈希函数
  */
 static size_t hash_client_id(const char* id, size_t bucket_count) {
-    size_t hash = 14695981039346656037ULL;
-    
-    while (*id) {
-        hash ^= (uint8_t)(*id++);
-        hash *= 1099511628211ULL;
-    }
-    
-    return hash % bucket_count;
+    return hash_string_mod(id, bucket_count);
 }
 
 /* ========== 公共 API 实现 ========== */

@@ -37,7 +37,8 @@
           "agent_id": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9_]*_v\\d+$",
-            "description": "Unique agent identifier (format: name_vN)"
+            "description": "Unique agent identifier (format: name_vN)",
+            "examples": ["product_manager_v1", "frontend_engineer_v2", "security_auditor_v1"]
           },
           "role": {
             "type": "string",
@@ -46,49 +47,58 @@
               "tester", "devops", "security", "data_engineer",
               "coordinator", "reviewer", "analyst", "custom"
             ],
-            "description": "Agent role type"
+            "description": "Agent role type",
+            "examples": ["product_manager", "frontend", "backend", "security"]
           },
           "source": {
             "type": "string",
             "enum": ["builtin", "community", "custom", "external"],
-            "description": "Agent source type"
+            "description": "Agent source type",
+            "examples": ["builtin", "custom", "community"]
           },
           "version": {
             "type": "string",
             "pattern": "^\\d+\\.\\d+\\.\\d+$",
-            "description": "Agent version in semantic versioning"
+            "description": "Agent version in semantic versioning",
+            "examples": ["1.0.0", "1.2.0", "2.0.0"]
           },
           "enabled": {
             "type": "boolean",
             "default": true,
-            "description": "Whether agent is enabled"
+            "description": "Whether agent is enabled",
+            "examples": [true, false]
           },
           "trust_score": {
             "type": "number",
             "minimum": 0,
             "maximum": 1,
             "default": 0.5,
-            "description": "Default trust score (0-1)"
+            "description": "Default trust score (0-1)",
+            "examples": [0.5, 0.7, 0.9, 1.0]
           },
           "contract_path": {
             "type": "string",
-            "description": "Path to agent contract file (relative to AGENTOS_ROOT)"
+            "description": "Path to agent contract file (relative to AGENTOS_ROOT)",
+            "examples": ["contracts/agents/product_manager.yaml", "contracts/agents/frontend.yaml"]
           },
           "preferred_model": {
             "type": "string",
-            "description": "Preferred LLM model for this agent"
+            "description": "Preferred LLM model for this agent",
+            "examples": ["gpt-4-turbo", "claude-3-opus", "llama-3-70b"]
           },
           "description": {
             "type": "string",
             "maxLength": 500,
-            "description": "Agent description"
+            "description": "Agent description",
+            "examples": ["Product planning and requirements management agent", "Frontend development specialist"]
           },
           "capabilities": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "description": "List of agent capabilities"
+            "description": "List of agent capabilities",
+            "examples": [["code_generation", "code_review"], ["planning", "coordination"], ["security_audit"]]
           },
           "resource_limits": {
             "type": "object",

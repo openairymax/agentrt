@@ -188,21 +188,28 @@ agentos_error_t health_checker_get_report(
     }
     
     char* p = checks_json;
-    p += sprintf(p, "[");
+    size_t remaining = checks_size;
+    
+    p += snprintf(p, remaining, "[");
+    remaining = checks_size - (p - checks_json);
     
     for (size_t i = 0; i < checker->check_count; i++) {
         health_check_t* check = &checker->checks[i];
         if (i > 0) {
-            p += sprintf(p, ",");
+            int written = snprintf(p, remaining, ",");
+            p += written;
+            remaining = checks_size - (p - checks_json);
         }
-        p += sprintf(p, 
+        int written = snprintf(p, remaining,
             "{\"name\":\"%s\",\"status\":%s,\"last_check_ns\":%llu}",
             check->name,
             check->last_result == 0 ? "\"healthy\"" : "\"unhealthy\"",
             (unsigned long long)check->last_check_ns);
+        p += written;
+        remaining = checks_size - (p - checks_json);
     }
     
-    p += sprintf(p, "]");
+    snprintf(p, remaining, "]");
     
     pthread_mutex_unlock(&checker->lock);
     

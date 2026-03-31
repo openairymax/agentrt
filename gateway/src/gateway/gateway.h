@@ -1,12 +1,12 @@
-﻿/**
+/**
  * @file gateway.h
  * @brief 网关抽象接口
- * 
+ *
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#ifndef DYNAMIC_GATEWAY_H
-#define DYNAMIC_GATEWAY_H
+#ifndef GATEWAY_GATEWAY_H
+#define GATEWAY_GATEWAY_H
 
 #include "agentos.h"
 #include <stddef.h>
@@ -26,37 +26,37 @@ typedef struct gateway_ops {
      * @return AGENTOS_SUCCESS 成功
      */
     agentos_error_t (*start)(void* gateway);
-    
+
     /**
      * @brief 停止网关
      * @param gateway 网关实例
      */
     void (*stop)(void* gateway);
-    
+
     /**
      * @brief 销毁网关
      * @param gateway 网关实例
      */
     void (*destroy)(void* gateway);
-    
+
     /**
      * @brief 获取网关名称
      * @param gateway 网关实例
-     * @return 名称字符串
+     * @return 网关名称字符串
      */
     const char* (*get_name)(void* gateway);
-    
+
     /**
      * @brief 获取网关统计信息
      * @param gateway 网关实例
-     * @param out_json 输出 JSON 字符串（需调用者 free）
+     * @param[out] out_json 输出 JSON 字符串（需调用者 free）
      * @return AGENTOS_SUCCESS 成功
      */
     agentos_error_t (*get_stats)(void* gateway, char** out_json);
 } gateway_ops_t;
 
 /**
- * @brief 网关基类结构
+ * @brief 网关抽象结构
  */
 typedef struct gateway {
     const gateway_ops_t*  ops;            /**< 操作表 */
@@ -100,7 +100,7 @@ static inline void gateway_destroy(gateway_t* gateway) {
 /**
  * @brief 获取网关名称
  * @param gateway 网关实例
- * @return 名称字符串
+ * @return 网关名称字符串
  */
 static inline const char* gateway_get_name(gateway_t* gateway) {
     if (!gateway || !gateway->ops || !gateway->ops->get_name) {
@@ -112,7 +112,7 @@ static inline const char* gateway_get_name(gateway_t* gateway) {
 /**
  * @brief 获取网关统计信息
  * @param gateway 网关实例
- * @param out_json 输出 JSON 字符串
+ * @param[out] out_json 输出 JSON 字符串
  * @return AGENTOS_SUCCESS 成功
  */
 static inline agentos_error_t gateway_get_stats(gateway_t* gateway, char** out_json) {
@@ -122,4 +122,4 @@ static inline agentos_error_t gateway_get_stats(gateway_t* gateway, char** out_j
     return gateway->ops->get_stats(gateway->impl, out_json);
 }
 
-#endif /* DYNAMIC_GATEWAY_H */
+#endif /* GATEWAY_GATEWAY_H */

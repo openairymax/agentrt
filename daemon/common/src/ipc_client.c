@@ -242,63 +242,107 @@ static int do_rpc_call(ipc_pool_entry_t* entry,
 
 /* ==================== 公共接口实现 ==================== */
 
+/* 本地错误处理宏 */
+#define SVC_ERROR(code, msg) \
+    do { \
+        agentos_error_push_ex((code), __FILE__, __LINE__, __func__, "%s", (msg)); \
+        return (code); \
+    } while (0)
+
 int svc_ipc_init(const char* baseruntime_url) {
+    int ret = SVC_OK;
+    struct ipc_client* client = NULL;
+    int curl_initialized_here = 0;
+    
     if (!baseruntime_url) {
-        return SVC_ERR_INVALID_PARAM;
+        SVC_ERROR(SVC_ERR_INVALID_PARAM, "baseruntime_url is NULL");
     }
     
     agentos_mutex_lock(&g_init_lock);
     
     /* 初始化 libcurl（仅一次） */
     if (!g_curl_initialized) {
-        curl_global_init(CURL_GLOBAL_ALL);
+        CURLcode curl_res = curl_global_init(CURL_GLOBAL_ALL);
+        if (curl_res != CURLE_OK) {
+            agentos_mutex_unlock(&g_init_lock);
+            SVC_ERROR(SVC_ERR_IO, "Failed to initialize libcurl");
+        }
         g_curl_initialized = 1;
+        curl_initialized_here = 1;
+    }
+    
+    /* 如果已经初始化，直接返回 */
+    if (g_ipc_client) {
+        agentos_mutex_unlock(&g_init_lock);
+        return SVC_OK;
     }
     
     /* 创建客户端上下文 */
-    if (!g_ipc_client) {
-        g_ipc_client = (struct ipc_client*)calloc(1, sizeof(struct ipc_client));
-        if (!g_ipc_client) {
-            agentos_mutex_unlock(&g_init_lock);
-            return SVC_ERR_OUT_OF_MEMORY;
-        }
-        
-        g_ipc_client->base_url = strdup(baseruntime_url);
-        if (!g_ipc_client->base_url) {
-            free(g_ipc_client);
-            g_ipc_client = NULL;
-            agentos_mutex_unlock(&g_init_lock);
-            return SVC_ERR_OUT_OF_MEMORY;
-        }
-        
-        g_ipc_client->default_timeout_ms = IPC_DEFAULT_TIMEOUT_MS;
-        agentos_mutex_init(&g_ipc_client->pool_lock);
-        
-        /* 初始化连接池 */
-        for (int i = 0; i < IPC_POOL_SIZE; i++) {
-            g_ipc_client->pool[i].curl = curl_easy_init();
-            if (!g_ipc_client->pool[i].curl) {
-                /* 清理已创建的连接 */
-                for (int j = 0; j < i; j++) {
-                    curl_easy_cleanup(g_ipc_client->pool[j].curl);
-                }
-                free(g_ipc_client->base_url);
-                free(g_ipc_client);
-                g_ipc_client = NULL;
-                agentos_mutex_unlock(&g_init_lock);
-                return SVC_ERR_OUT_OF_MEMORY;
-            }
-            agentos_mutex_init(&g_ipc_client->pool[i].lock);
-            g_ipc_client->pool[i].in_use = 0;
-            g_ipc_client->pool[i].last_used = 0;
-        }
-        
-        g_ipc_client->initialized = 1;
+    client = (struct ipc_client*)calloc(1, sizeof(struct ipc_client));
+    if (!client) {
+        agentos_mutex_unlock(&g_init_lock);
+        SVC_ERROR(SVC_ERR_OUT_OF_MEMORY, "Failed to allocate IPC client");
     }
+    
+    client->base_url = strdup(baseruntime_url);
+    if (!client->base_url) {
+        free(client);
+        agentos_mutex_unlock(&g_init_lock);
+        SVC_ERROR(SVC_ERR_OUT_OF_MEMORY, "Failed to duplicate base URL");
+    }
+    
+    client->default_timeout_ms = IPC_DEFAULT_TIMEOUT_MS;
+    if (agentos_mutex_init(&client->pool_lock) != 0) {
+        free(client->base_url);
+        free(client);
+        agentos_mutex_unlock(&g_init_lock);
+        SVC_ERROR(SVC_ERR_OUT_OF_MEMORY, "Failed to initialize pool mutex");
+    }
+    
+    /* 初始化连接池 */
+    int i;
+    for (i = 0; i < IPC_POOL_SIZE; i++) {
+        client->pool[i].curl = curl_easy_init();
+        if (!client->pool[i].curl) {
+            /* 记录错误并清理 */
+            agentos_error_push_ex(SVC_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__,
+                                "Failed to initialize CURL handle %d", i);
+            break;
+        }
+        if (agentos_mutex_init(&client->pool[i].lock) != 0) {
+            curl_easy_cleanup(client->pool[i].curl);
+            client->pool[i].curl = NULL;
+            agentos_error_push_ex(SVC_ERR_OUT_OF_MEMORY, __FILE__, __LINE__, __func__,
+                                "Failed to initialize pool entry mutex %d", i);
+            break;
+        }
+        client->pool[i].in_use = 0;
+        client->pool[i].last_used = 0;
+    }
+    
+    /* 检查连接池初始化是否成功 */
+    if (i < IPC_POOL_SIZE) {
+        /* 清理已创建的资源 */
+        for (int j = 0; j < i; j++) {
+            if (client->pool[j].curl) {
+                curl_easy_cleanup(client->pool[j].curl);
+            }
+            agentos_mutex_destroy(&client->pool[j].lock);
+        }
+        agentos_mutex_destroy(&client->pool_lock);
+        free(client->base_url);
+        free(client);
+        agentos_mutex_unlock(&g_init_lock);
+        return SVC_ERR_OUT_OF_MEMORY;
+    }
+    
+    client->initialized = 1;
+    g_ipc_client = client;
     
     agentos_mutex_unlock(&g_init_lock);
     return SVC_OK;
-}
+    
+#undef SVC_ERROR
 
 void svc_ipc_cleanup(void) {
     agentos_mutex_lock(&g_init_lock);

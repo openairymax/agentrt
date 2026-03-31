@@ -1,12 +1,12 @@
-﻿﻿/**
+﻿﻿﻿﻿﻿﻿/**
  * @file circuit_breaker.c
  * @brief 熔断器模式实�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
- * 
+ *
  * @details
  * 熔断器模式用于防止级联故障，当系统调用失败率达到阈值时自动熔断�?
  * 快速失败以保护系统稳定性。支�?9.999%可靠性标准�?
- * 
+ *
  * 核心功能�?
  * 1. 状态机：关闭、打开、半开三种状�?
  * 2. 失败计数：滑动窗口内的失败统�?
@@ -21,8 +21,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h"
-#include "../../../bases/utils/string/include/string_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
@@ -150,7 +150,7 @@ static uint64_t get_timestamp_ns(void) {
 static sliding_window_t* sliding_window_create(size_t capacity) {
     sliding_window_t* window = (sliding_window_t*)AGENTOS_CALLOC(1, sizeof(sliding_window_t));
     if (!window) return NULL;
-    
+
     window->timestamps = (uint64_t*)AGENTOS_CALLOC(capacity, sizeof(uint64_t));
     window->results = (int*)AGENTOS_CALLOC(capacity, sizeof(int));
     if (!window->timestamps || !window->results) {
@@ -159,20 +159,20 @@ static sliding_window_t* sliding_window_create(size_t capacity) {
         AGENTOS_FREE(window);
         return NULL;
     }
-    
+
     window->capacity = capacity;
     window->count = 0;
     window->head = 0;
     window->tail = 0;
     window->lock = agentos_mutex_create();
-    
+
     if (!window->lock) {
         AGENTOS_FREE(window->timestamps);
         AGENTOS_FREE(window->results);
         AGENTOS_FREE(window);
         return NULL;
     }
-    
+
     return window;
 }
 
@@ -192,9 +192,9 @@ static void sliding_window_destroy(sliding_window_t* window) {
  */
 static void sliding_window_push(sliding_window_t* window, uint64_t timestamp, int result) {
     if (!window) return;
-    
+
     agentos_mutex_lock(window->lock);
-    
+
     if (window->count < window->capacity) {
         window->timestamps[window->tail] = timestamp;
         window->results[window->tail] = result;
@@ -206,7 +206,7 @@ static void sliding_window_push(sliding_window_t* window, uint64_t timestamp, in
         window->tail = (window->tail + 1) % window->capacity;
         window->head = (window->head + 1) % window->capacity;
     }
-    
+
     agentos_mutex_unlock(window->lock);
 }
 
@@ -215,21 +215,21 @@ static void sliding_window_push(sliding_window_t* window, uint64_t timestamp, in
  */
 static size_t sliding_window_count_failures(sliding_window_t* window, uint64_t since_ns) {
     if (!window) return 0;
-    
+
     agentos_mutex_lock(window->lock);
-    
+
     size_t failures = 0;
     size_t idx = window->head;
-    
+
     for (size_t i = 0; i < window->count; i++) {
         if (window->timestamps[idx] >= since_ns && window->results[idx] == 1) {
             failures++;
         }
         idx = (idx + 1) % window->capacity;
     }
-    
+
     agentos_mutex_unlock(window->lock);
-    
+
     return failures;
 }
 
@@ -238,21 +238,21 @@ static size_t sliding_window_count_failures(sliding_window_t* window, uint64_t s
  */
 static size_t sliding_window_count_successes(sliding_window_t* window, uint64_t since_ns) {
     if (!window) return 0;
-    
+
     agentos_mutex_lock(window->lock);
-    
+
     size_t successes = 0;
     size_t idx = window->head;
-    
+
     for (size_t i = 0; i < window->count; i++) {
         if (window->timestamps[idx] >= since_ns && window->results[idx] == 0) {
             successes++;
         }
         idx = (idx + 1) % window->capacity;
     }
-    
+
     agentos_mutex_unlock(window->lock);
-    
+
     return successes;
 }
 
@@ -261,22 +261,22 @@ static size_t sliding_window_count_successes(sliding_window_t* window, uint64_t 
  */
 static void cb_change_state(agentos_circuit_breaker_t* cb, circuit_breaker_state_t new_state) {
     if (!cb) return;
-    
+
     circuit_breaker_state_t old_state = cb->state;
     cb->state = new_state;
     cb->stats.state_changes++;
     cb->stats.last_state_change_ns = get_timestamp_ns();
-    
+
     if (new_state == CB_STATE_OPEN) {
         cb->open_time_ns = get_timestamp_ns();
     } else if (new_state == CB_STATE_HALF_OPEN) {
         cb->half_open_success = 0;
         cb->half_open_failure = 0;
     }
-    
-    AGENTOS_LOG_INFO("Circuit breaker '%s' state changed: %d -> %d", 
+
+    AGENTOS_LOG_INFO("Circuit breaker '%s' state changed: %d -> %d",
                      cb->name, old_state, new_state);
-    
+
     if (g_cb_manager) {
         g_cb_manager->total_state_changes++;
     }
@@ -292,13 +292,13 @@ agentos_error_t agentos_circuit_breaker_manager_init(void) {
         AGENTOS_LOG_WARN("Circuit breaker manager already initialized");
         return AGENTOS_SUCCESS;
     }
-    
+
     g_cb_lock = agentos_mutex_create();
     if (!g_cb_lock) {
         AGENTOS_LOG_ERROR("Failed to create circuit breaker lock");
         return AGENTOS_ENOMEM;
     }
-    
+
     g_cb_manager = (cb_manager_t*)AGENTOS_CALLOC(1, sizeof(cb_manager_t));
     if (!g_cb_manager) {
         AGENTOS_LOG_ERROR("Failed to allocate circuit breaker manager");
@@ -306,7 +306,7 @@ agentos_error_t agentos_circuit_breaker_manager_init(void) {
         g_cb_lock = NULL;
         return AGENTOS_ENOMEM;
     }
-    
+
     g_cb_manager->lock = agentos_mutex_create();
     if (!g_cb_manager->lock) {
         AGENTOS_LOG_ERROR("Failed to create manager lock");
@@ -316,11 +316,11 @@ agentos_error_t agentos_circuit_breaker_manager_init(void) {
         g_cb_lock = NULL;
         return AGENTOS_ENOMEM;
     }
-    
+
     g_cb_manager->breaker_count = 0;
     g_cb_manager->total_rejected = 0;
     g_cb_manager->total_state_changes = 0;
-    
+
     AGENTOS_LOG_INFO("Circuit breaker manager initialized");
     return AGENTOS_SUCCESS;
 }
@@ -330,24 +330,24 @@ agentos_error_t agentos_circuit_breaker_manager_init(void) {
  */
 void agentos_circuit_breaker_manager_destroy(void) {
     if (!g_cb_manager) return;
-    
+
     agentos_mutex_lock(g_cb_lock);
-    
+
     for (uint32_t i = 0; i < MAX_CIRCUIT_BREAKERS; i++) {
         if (g_cb_manager->breakers[i]) {
             agentos_circuit_breaker_destroy(g_cb_manager->breakers[i]);
             g_cb_manager->breakers[i] = NULL;
         }
     }
-    
+
     agentos_mutex_destroy(g_cb_manager->lock);
     AGENTOS_FREE(g_cb_manager);
     g_cb_manager = NULL;
-    
+
     agentos_mutex_unlock(g_cb_lock);
     agentos_mutex_destroy(g_cb_lock);
     g_cb_lock = NULL;
-    
+
     AGENTOS_LOG_INFO("Circuit breaker manager destroyed");
 }
 
@@ -358,14 +358,14 @@ agentos_error_t agentos_circuit_breaker_create(const char* name,
                                                const cb_config_t* manager,
                                                agentos_circuit_breaker_t** out_cb) {
     if (!name || !out_cb) return AGENTOS_EINVAL;
-    
+
     if (!g_cb_manager) {
         AGENTOS_LOG_ERROR("Circuit breaker manager not initialized");
         return AGENTOS_ENOTINIT;
     }
-    
+
     agentos_mutex_lock(g_cb_lock);
-    
+
     int slot = -1;
     for (uint32_t i = 0; i < MAX_CIRCUIT_BREAKERS; i++) {
         if (!g_cb_manager->breakers[i]) {
@@ -373,27 +373,27 @@ agentos_error_t agentos_circuit_breaker_create(const char* name,
             break;
         }
     }
-    
+
     if (slot < 0) {
         agentos_mutex_unlock(g_cb_lock);
         AGENTOS_LOG_ERROR("No available circuit breaker slot");
         return AGENTOS_EBUSY;
     }
-    
+
     agentos_circuit_breaker_t* cb = (agentos_circuit_breaker_t*)AGENTOS_CALLOC(1, sizeof(agentos_circuit_breaker_t));
     if (!cb) {
         agentos_mutex_unlock(g_cb_lock);
         AGENTOS_LOG_ERROR("Failed to allocate circuit breaker");
         return AGENTOS_ENOMEM;
     }
-    
+
     cb->id = (uint64_t)slot + 1;
     cb->name = AGENTOS_STRDUP(name);
     cb->state = CB_STATE_CLOSED;
-    
+
     if (manager) {
         cb->manager.name = AGENTOS_STRDUP(manager->name ? manager->name : name);
-        cb->manager.failure_threshold = manager->failure_threshold > 0 ? 
+        cb->manager.failure_threshold = manager->failure_threshold > 0 ?
                                        manager->failure_threshold : DEFAULT_FAILURE_THRESHOLD;
         cb->manager.success_threshold = manager->success_threshold > 0 ?
                                        manager->success_threshold : DEFAULT_SUCCESS_THRESHOLD;
@@ -413,7 +413,7 @@ agentos_error_t agentos_circuit_breaker_create(const char* name,
         cb->manager.half_open_requests = DEFAULT_HALF_OPEN_REQUESTS;
         cb->manager.flags = 0;
     }
-    
+
     cb->lock = agentos_mutex_create();
     if (!cb->lock) {
         if (cb->name) AGENTOS_FREE(cb->name);
@@ -423,7 +423,7 @@ agentos_error_t agentos_circuit_breaker_create(const char* name,
         AGENTOS_LOG_ERROR("Failed to create circuit breaker lock");
         return AGENTOS_ENOMEM;
     }
-    
+
     cb->window = sliding_window_create(cb->manager.window_size);
     if (!cb->window) {
         agentos_mutex_destroy(cb->lock);
@@ -434,23 +434,23 @@ agentos_error_t agentos_circuit_breaker_create(const char* name,
         AGENTOS_LOG_ERROR("Failed to create sliding window");
         return AGENTOS_ENOMEM;
     }
-    
+
     cb->open_time_ns = 0;
     cb->half_open_success = 0;
     cb->half_open_failure = 0;
     cb->fallback_data = NULL;
     cb->fallback_fn = NULL;
-    
+
     g_cb_manager->breakers[slot] = cb;
     g_cb_manager->breaker_count++;
-    
+
     agentos_mutex_unlock(g_cb_lock);
-    
+
     *out_cb = cb;
-    
-    AGENTOS_LOG_INFO("Circuit breaker created: %s (ID: %llu)", 
+
+    AGENTOS_LOG_INFO("Circuit breaker created: %s (ID: %llu)",
                      name, (unsigned long long)cb->id);
-    
+
     return AGENTOS_SUCCESS;
 }
 
@@ -459,9 +459,9 @@ agentos_error_t agentos_circuit_breaker_create(const char* name,
  */
 void agentos_circuit_breaker_destroy(agentos_circuit_breaker_t* cb) {
     if (!cb) return;
-    
+
     AGENTOS_LOG_DEBUG("Destroying circuit breaker: %s", cb->name);
-    
+
     if (g_cb_manager) {
         agentos_mutex_lock(g_cb_lock);
         for (uint32_t i = 0; i < MAX_CIRCUIT_BREAKERS; i++) {
@@ -473,12 +473,12 @@ void agentos_circuit_breaker_destroy(agentos_circuit_breaker_t* cb) {
         }
         agentos_mutex_unlock(g_cb_lock);
     }
-    
+
     if (cb->name) AGENTOS_FREE(cb->name);
     if (cb->manager.name) AGENTOS_FREE(cb->manager.name);
     if (cb->window) sliding_window_destroy(cb->window);
     if (cb->lock) agentos_mutex_destroy(cb->lock);
-    
+
     AGENTOS_FREE(cb);
 }
 
@@ -487,16 +487,16 @@ void agentos_circuit_breaker_destroy(agentos_circuit_breaker_t* cb) {
  */
 int agentos_circuit_breaker_allow(agentos_circuit_breaker_t* cb) {
     if (!cb) return 0;
-    
+
     agentos_mutex_lock(cb->lock);
-    
+
     uint64_t now_ns = get_timestamp_ns();
-    
+
     switch (cb->state) {
         case CB_STATE_CLOSED:
             agentos_mutex_unlock(cb->lock);
             return 1;
-            
+
         case CB_STATE_OPEN:
             if (now_ns - cb->open_time_ns >= (uint64_t)cb->manager.timeout_ms * 1000000ULL) {
                 cb_change_state(cb, CB_STATE_HALF_OPEN);
@@ -507,7 +507,7 @@ int agentos_circuit_breaker_allow(agentos_circuit_breaker_t* cb) {
             if (g_cb_manager) g_cb_manager->total_rejected++;
             agentos_mutex_unlock(cb->lock);
             return 0;
-            
+
         case CB_STATE_HALF_OPEN:
             if (cb->half_open_success + cb->half_open_failure < cb->manager.half_open_requests) {
                 agentos_mutex_unlock(cb->lock);
@@ -517,7 +517,7 @@ int agentos_circuit_breaker_allow(agentos_circuit_breaker_t* cb) {
             if (g_cb_manager) g_cb_manager->total_rejected++;
             agentos_mutex_unlock(cb->lock);
             return 0;
-            
+
         default:
             agentos_mutex_unlock(cb->lock);
             return 0;
@@ -529,22 +529,22 @@ int agentos_circuit_breaker_allow(agentos_circuit_breaker_t* cb) {
  */
 void agentos_circuit_breaker_success(agentos_circuit_breaker_t* cb) {
     if (!cb) return;
-    
+
     agentos_mutex_lock(cb->lock);
-    
+
     uint64_t now_ns = get_timestamp_ns();
-    
+
     sliding_window_push(cb->window, now_ns, 0);
     cb->stats.total_calls++;
     cb->stats.success_calls++;
-    
+
     if (cb->state == CB_STATE_HALF_OPEN) {
         cb->half_open_success++;
         if (cb->half_open_success >= cb->manager.success_threshold) {
             cb_change_state(cb, CB_STATE_CLOSED);
         }
     }
-    
+
     agentos_mutex_unlock(cb->lock);
 }
 
@@ -553,16 +553,16 @@ void agentos_circuit_breaker_success(agentos_circuit_breaker_t* cb) {
  */
 void agentos_circuit_breaker_failure(agentos_circuit_breaker_t* cb) {
     if (!cb) return;
-    
+
     agentos_mutex_lock(cb->lock);
-    
+
     uint64_t now_ns = get_timestamp_ns();
-    
+
     sliding_window_push(cb->window, now_ns, 1);
     cb->stats.total_calls++;
     cb->stats.failed_calls++;
     cb->stats.last_failure_time_ns = now_ns;
-    
+
     if (cb->state == CB_STATE_HALF_OPEN) {
         cb->half_open_failure++;
         if (cb->half_open_failure >= cb->manager.failure_threshold) {
@@ -574,7 +574,7 @@ void agentos_circuit_breaker_failure(agentos_circuit_breaker_t* cb) {
             cb_change_state(cb, CB_STATE_OPEN);
         }
     }
-    
+
     agentos_mutex_unlock(cb->lock);
 }
 
@@ -583,11 +583,11 @@ void agentos_circuit_breaker_failure(agentos_circuit_breaker_t* cb) {
  */
 agentos_error_t agentos_circuit_breaker_force_open(agentos_circuit_breaker_t* cb) {
     if (!cb) return AGENTOS_EINVAL;
-    
+
     agentos_mutex_lock(cb->lock);
     cb_change_state(cb, CB_STATE_OPEN);
     agentos_mutex_unlock(cb->lock);
-    
+
     return AGENTOS_SUCCESS;
 }
 
@@ -596,11 +596,11 @@ agentos_error_t agentos_circuit_breaker_force_open(agentos_circuit_breaker_t* cb
  */
 agentos_error_t agentos_circuit_breaker_force_close(agentos_circuit_breaker_t* cb) {
     if (!cb) return AGENTOS_EINVAL;
-    
+
     agentos_mutex_lock(cb->lock);
     cb_change_state(cb, CB_STATE_CLOSED);
     agentos_mutex_unlock(cb->lock);
-    
+
     return AGENTOS_SUCCESS;
 }
 
@@ -617,15 +617,15 @@ circuit_breaker_state_t agentos_circuit_breaker_state(agentos_circuit_breaker_t*
  */
 agentos_error_t agentos_circuit_breaker_stats(agentos_circuit_breaker_t* cb, char** out_stats) {
     if (!cb || !out_stats) return AGENTOS_EINVAL;
-    
+
     cJSON* stats_json = cJSON_CreateObject();
     if (!stats_json) return AGENTOS_ENOMEM;
-    
+
     agentos_mutex_lock(cb->lock);
-    
+
     cJSON_AddNumberToObject(stats_json, "id", cb->id);
     cJSON_AddStringToObject(stats_json, "name", cb->name);
-    
+
     const char* state_str = "unknown";
     switch (cb->state) {
         case CB_STATE_CLOSED: state_str = "closed"; break;
@@ -633,7 +633,7 @@ agentos_error_t agentos_circuit_breaker_stats(agentos_circuit_breaker_t* cb, cha
         case CB_STATE_HALF_OPEN: state_str = "half_open"; break;
     }
     cJSON_AddStringToObject(stats_json, "state", state_str);
-    
+
     cJSON* stats_obj = cJSON_CreateObject();
     cJSON_AddNumberToObject(stats_obj, "total_calls", cb->stats.total_calls);
     cJSON_AddNumberToObject(stats_obj, "success_calls", cb->stats.success_calls);
@@ -642,21 +642,21 @@ agentos_error_t agentos_circuit_breaker_stats(agentos_circuit_breaker_t* cb, cha
     cJSON_AddNumberToObject(stats_obj, "timeout_calls", cb->stats.timeout_calls);
     cJSON_AddNumberToObject(stats_obj, "state_changes", cb->stats.state_changes);
     cJSON_AddItemToObject(stats_json, "stats", stats_obj);
-    
+
     cJSON* config_obj = cJSON_CreateObject();
     cJSON_AddNumberToObject(config_obj, "failure_threshold", cb->manager.failure_threshold);
     cJSON_AddNumberToObject(config_obj, "success_threshold", cb->manager.success_threshold);
     cJSON_AddNumberToObject(config_obj, "timeout_ms", cb->manager.timeout_ms);
     cJSON_AddNumberToObject(config_obj, "window_size", cb->manager.window_size);
     cJSON_AddItemToObject(stats_json, "manager", config_obj);
-    
+
     agentos_mutex_unlock(cb->lock);
-    
+
     char* stats_str = cJSON_PrintUnformatted(stats_json);
     cJSON_Delete(stats_json);
-    
+
     if (!stats_str) return AGENTOS_ENOMEM;
-    
+
     *out_stats = stats_str;
     return AGENTOS_SUCCESS;
 }
@@ -668,12 +668,12 @@ agentos_error_t agentos_circuit_breaker_set_fallback(agentos_circuit_breaker_t* 
                                                      agentos_error_t (*fallback_fn)(void*),
                                                      void* data) {
     if (!cb) return AGENTOS_EINVAL;
-    
+
     agentos_mutex_lock(cb->lock);
     cb->fallback_fn = fallback_fn;
     cb->fallback_data = data;
     agentos_mutex_unlock(cb->lock);
-    
+
     return AGENTOS_SUCCESS;
 }
 
@@ -682,15 +682,15 @@ agentos_error_t agentos_circuit_breaker_set_fallback(agentos_circuit_breaker_t* 
  */
 agentos_error_t agentos_circuit_breaker_fallback(agentos_circuit_breaker_t* cb) {
     if (!cb) return AGENTOS_EINVAL;
-    
+
     agentos_mutex_lock(cb->lock);
-    
+
     if (cb->fallback_fn) {
         agentos_error_t result = cb->fallback_fn(cb->fallback_data);
         agentos_mutex_unlock(cb->lock);
         return result;
     }
-    
+
     agentos_mutex_unlock(cb->lock);
     return AGENTOS_EUNAVAILABLE;
 }
@@ -700,27 +700,27 @@ agentos_error_t agentos_circuit_breaker_fallback(agentos_circuit_breaker_t* cb) 
  */
 agentos_error_t agentos_circuit_breaker_manager_stats(char** out_stats) {
     if (!out_stats) return AGENTOS_EINVAL;
-    
+
     if (!g_cb_manager) {
         *out_stats = AGENTOS_STRDUP("{\"error\":\"manager not initialized\"}");
         return AGENTOS_ENOTINIT;
     }
-    
+
     cJSON* stats_json = cJSON_CreateObject();
     if (!stats_json) return AGENTOS_ENOMEM;
-    
+
     agentos_mutex_lock(g_cb_lock);
-    
+
     cJSON_AddNumberToObject(stats_json, "breaker_count", g_cb_manager->breaker_count);
     cJSON_AddNumberToObject(stats_json, "total_rejected", g_cb_manager->total_rejected);
     cJSON_AddNumberToObject(stats_json, "total_state_changes", g_cb_manager->total_state_changes);
-    
+
     cJSON* breakers_array = cJSON_CreateArray();
     for (uint32_t i = 0; i < MAX_CIRCUIT_BREAKERS; i++) {
         if (g_cb_manager->breakers[i]) {
             cJSON* breaker_obj = cJSON_CreateObject();
             cJSON_AddStringToObject(breaker_obj, "name", g_cb_manager->breakers[i]->name);
-            
+
             const char* state_str = "unknown";
             switch (g_cb_manager->breakers[i]->state) {
                 case CB_STATE_CLOSED: state_str = "closed"; break;
@@ -732,14 +732,14 @@ agentos_error_t agentos_circuit_breaker_manager_stats(char** out_stats) {
         }
     }
     cJSON_AddItemToObject(stats_json, "breakers", breakers_array);
-    
+
     agentos_mutex_unlock(g_cb_lock);
-    
+
     char* stats_str = cJSON_PrintUnformatted(stats_json);
     cJSON_Delete(stats_json);
-    
+
     if (!stats_str) return AGENTOS_ENOMEM;
-    
+
     *out_stats = stats_str;
     return AGENTOS_SUCCESS;
 }
@@ -749,13 +749,13 @@ agentos_error_t agentos_circuit_breaker_manager_stats(char** out_stats) {
  */
 void agentos_circuit_breaker_reset_stats(agentos_circuit_breaker_t* cb) {
     if (!cb) return;
-    
+
     agentos_mutex_lock(cb->lock);
-    
+
     memset(&cb->stats, 0, sizeof(cb_stats_t));
-    
+
     agentos_mutex_unlock(cb->lock);
-    
+
     AGENTOS_LOG_DEBUG("Circuit breaker %s stats reset", cb->name);
 }
 
@@ -764,49 +764,49 @@ void agentos_circuit_breaker_reset_stats(agentos_circuit_breaker_t* cb) {
  */
 agentos_error_t agentos_circuit_breaker_health_check(agentos_circuit_breaker_t* cb, char** out_json) {
     if (!cb || !out_json) return AGENTOS_EINVAL;
-    
+
     cJSON* health_json = cJSON_CreateObject();
     if (!health_json) return AGENTOS_ENOMEM;
-    
+
     agentos_mutex_lock(cb->lock);
-    
+
     cJSON_AddStringToObject(health_json, "component", "circuit_breaker");
     cJSON_AddNumberToObject(health_json, "id", cb->id);
     cJSON_AddStringToObject(health_json, "name", cb->name);
-    
+
     const char* state_str = "unknown";
     const char* status = "healthy";
-    
+
     switch (cb->state) {
-        case CB_STATE_CLOSED: 
-            state_str = "closed"; 
+        case CB_STATE_CLOSED:
+            state_str = "closed";
             status = "healthy";
             break;
-        case CB_STATE_OPEN: 
-            state_str = "open"; 
+        case CB_STATE_OPEN:
+            state_str = "open";
             status = "unhealthy";
             break;
-        case CB_STATE_HALF_OPEN: 
-            state_str = "half_open"; 
+        case CB_STATE_HALF_OPEN:
+            state_str = "half_open";
             status = "degraded";
             break;
     }
-    
+
     cJSON_AddStringToObject(health_json, "state", state_str);
     cJSON_AddStringToObject(health_json, "status", status);
     cJSON_AddNumberToObject(health_json, "timestamp_ns", get_timestamp_ns());
-    
+
     double failure_rate = cb->stats.total_calls > 0 ?
                          (double)cb->stats.failed_calls / cb->stats.total_calls * 100.0 : 0.0;
     cJSON_AddNumberToObject(health_json, "failure_rate_percent", failure_rate);
-    
+
     agentos_mutex_unlock(cb->lock);
-    
+
     char* health_str = cJSON_PrintUnformatted(health_json);
     cJSON_Delete(health_json);
-    
+
     if (!health_str) return AGENTOS_ENOMEM;
-    
+
     *out_json = health_str;
     return AGENTOS_SUCCESS;
 }

@@ -1,6 +1,6 @@
-﻿/**
+/**
  * @file relation.c
- * @brief L3 结构层关系编码器（支持持久化�?
+ * @brief L3 结构层关系编码器（支持持久化）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -11,8 +11,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h"
-#include "../../../bases/utils/string/include/string_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 #include <math.h>
 
@@ -22,12 +22,13 @@ struct agentos_relation_encoder {
     float* role_subject;
     float* role_predicate;
     float* role_object;
-    // 持久�?
+    // 持久化
     sqlite3* db;
     char* db_path;
 };
 
-// From data intelligence emerges. by spharx
+
+// From data intelligence emerges. by spharx
 static float* random_unit_vector(size_t dim) {
     float* vec = (float*)AGENTOS_MALLOC(dim * sizeof(float));
     if (!vec) return NULL;

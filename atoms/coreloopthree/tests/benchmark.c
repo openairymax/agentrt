@@ -10,8 +10,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h"
-#include "../../../bases/utils/string/include/string_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 #include <time.h>
 
@@ -47,7 +47,7 @@ static void benchmark_task_submit() {
     clock_t end = clock();
     double elapsed = (double)(end - start) / CLOCKS_PER_SEC;
 
-    printf("benchmark_task_submit: %d tasks in %.3f seconds (%.3f tasks/sec)\n", 
+    printf("benchmark_task_submit: %d tasks in %.3f seconds (%.3f tasks/sec)\n",
            num_tasks, elapsed, num_tasks / elapsed);
 
     // 释放任务 ID
@@ -120,7 +120,7 @@ static void benchmark_task_query() {
     clock_t end = clock();
     double elapsed = (double)(end - start) / CLOCKS_PER_SEC;
 
-    printf("benchmark_task_query: %d queries in %.3f seconds (%.3f queries/sec)\n", 
+    printf("benchmark_task_query: %d queries in %.3f seconds (%.3f queries/sec)\n",
            num_tasks, elapsed, num_tasks / elapsed);
 
     // 释放任务 ID
@@ -178,7 +178,7 @@ static void benchmark_memory_write() {
     clock_t end = clock();
     double elapsed = (double)(end - start) / CLOCKS_PER_SEC;
 
-    printf("benchmark_memory_write: %d records in %.3f seconds (%.3f records/sec)\n", 
+    printf("benchmark_memory_write: %d records in %.3f seconds (%.3f records/sec)\n",
            num_records, elapsed, num_records / elapsed);
 
     // 释放记录 ID
@@ -253,7 +253,7 @@ static void benchmark_memory_query() {
     clock_t end = clock();
     double elapsed = (double)(end - start) / CLOCKS_PER_SEC;
 
-    printf("benchmark_memory_query: %d queries in %.3f seconds (%.3f queries/sec)\n", 
+    printf("benchmark_memory_query: %d queries in %.3f seconds (%.3f queries/sec)\n",
            num_queries, elapsed, num_queries / elapsed);
 
     agentos_memory_destroy(engine);

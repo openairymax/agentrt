@@ -1,9 +1,9 @@
 ﻿# MemoryRovol - AgentOS 记忆卷载核心模块
 
-**路径**: `atoms/memoryrovol/`  
-**版本**: v1.0.0.6  
-**最后更新**: 2026-03-26  
-**许可证**: Apache License 2.0  
+**路径**: `atoms/memoryrovol/`
+**版本**: v1.0.0.6
+**最后更新**: 2026-03-26
+**许可证**: Apache License 2.0
 
 ---
 

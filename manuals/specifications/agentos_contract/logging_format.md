@@ -1,9 +1,10 @@
 # AgentOS 日志格式规范
 
-**版本**: Doc V1.6  
+**版本**: Doc V1.7  
 **状态**: 正式发布  
-**备选名称**: OpenApex (开源极境 / 极境OS)  
 **归属**: AgentOS 可观测性核心规范  
+**作者**: LirenWang  
+**最后更新**: 2026-03-31  
 **许可证**: GPL-3.0  
 **理论基础**: 工程两论（控制论与系统工程）、双系统认知理论、微内核哲学、设计美学  
 **关联规范**: [通信协议规范](./protocol_contract.md)、[系统调用 API 规范](./syscall_api_contract.md)、[日志打印规范](../coding_standard/Log_guide.md)
@@ -492,10 +493,10 @@ logging:
 
 ### 4.1 存储路径
 
-日志文件统一存放在 `lodges/logs/` 目录下，按模块分类：
+日志文件统一存放在 `heapstore/logs/` 目录下，按模块分类：
 
 ```
-lodges/logs/
+heapstore/logs/
 ├── kernel/                 # 内核日志 (atoms/ 模块)
 │   ├── core.log
 │   ├── coreloopthree.log
@@ -550,7 +551,7 @@ filebeat.inputs:
 - type: log
   enabled: true
   paths:
-    - lodges/logs/**/*.log
+    - heapstore/logs/**/*.log
   json.keys_under_root: true
   processors:
     - add_host_metadata: ~

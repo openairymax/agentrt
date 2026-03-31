@@ -1,4 +1,4 @@
-﻿﻿#!/usr/bin/env bash
+﻿﻿﻿﻿#!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Shell 脚本测试框架
 # 基于 bats-core 的单元测试库
@@ -11,8 +11,8 @@ AGENTOS_TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENTOS_SCRIPTS_DIR="$(dirname "$AGENTOS_TEST_DIR")"
 
 # 加载依赖
-# shellcheck source=../lib/bases.sh
-source "$AGENTOS_SCRIPTS_DIR/lib/bases.sh"
+# shellcheck source=../lib/commons.sh
+source "$AGENTOS_SCRIPTS_DIR/lib/commons.sh"
 
 ###############################################################################
 # 测试配置

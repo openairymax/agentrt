@@ -24,6 +24,8 @@ import {
   buildListPath,
   parseList,
   listOptionsToParams,
+  validateAndExtractData,
+  validateRequiredString,
 } from '../utils';
 
 
@@ -73,9 +75,7 @@ export class MemoryManager {
     layer: MemoryLayer,
     metadata?: Record<string, unknown>,
   ): Promise<Memory> {
-    if (!content) {
-      throw new AgentOSError('记忆内容不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(content, '记忆内容');
 
     const body: Record<string, unknown> = { content, layer };
     if (metadata) {
@@ -87,10 +87,7 @@ export class MemoryManager {
       body,
     );
 
-    const data = extractDataMap(resp);
-    if (!data) {
-      throw new AgentOSError('记忆写入响应格式异常', ErrorCode.INVALID_RESPONSE);
-    }
+    const data = validateAndExtractData(resp, '记忆写入响应格式异常');
 
     return {
       id: getString(data, 'memory_id'),
@@ -108,15 +105,10 @@ export class MemoryManager {
    * @param memoryId - 记忆 ID
    */
   async get(memoryId: string): Promise<Memory> {
-    if (!memoryId) {
-      throw new AgentOSError('记忆ID不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(memoryId, '记忆ID');
 
     const resp = await this.api.get<APIResponse>(`/api/v1/memories/${memoryId}`);
-    const data = extractDataMap(resp);
-    if (!data) {
-      throw new AgentOSError('记忆详情响应格式异常', ErrorCode.INVALID_RESPONSE);
-    }
+    const data = validateAndExtractData(resp, '记忆详情响应格式异常');
 
     return this.parseMemoryFromMap(data);
   }
@@ -192,9 +184,7 @@ export class MemoryManager {
    * @param memoryId - 记忆 ID
    */
   async delete(memoryId: string): Promise<void> {
-    if (!memoryId) {
-      throw new AgentOSError('记忆ID不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(memoryId, '记忆ID');
     await this.api.delete(`/api/v1/memories/${memoryId}`);
   }
 

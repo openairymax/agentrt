@@ -23,7 +23,6 @@ void tool_validator_destroy(tool_validator_t* val) {
 
 int tool_validator_validate(tool_validator_t* val,
                             const tool_metadata_t* meta,
-                            // From data intelligence emerges. by spharx
                             const char* params_json) {
     (void)val;
     if (!meta || !params_json) return 0;

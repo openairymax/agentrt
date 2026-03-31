@@ -47,7 +47,7 @@ class SDKRestructurer:
             'client': ['__init__.py', 'base.py', 'sync.py', 'async_.py'],
             'utils': ['__init__.py', 'id.py', 'time.py', 'validation.py', 'crypto.py', 'cache.py'],
             'telemetry': ['__init__.py', 'metrics.py', 'tracing.py', 'logging.py'],
-            'types': ['__init__.py', 'bases.py', 'task.py', 'memory.py', 'session.py'],
+            'types': ['__init__.py', 'commons.py', 'task.py', 'memory.py', 'session.py'],
         }
 
         # 需要保留的顶层文件
@@ -185,7 +185,7 @@ except ImportError:
 # Version: 2.0.0.0
 
 """
-bases utility functions and helpers.
+commons utility functions and helpers.
 """
 
 try:
@@ -243,11 +243,11 @@ except ImportError:
 # Version: 2.0.0.0
 
 """
-bases type definitions and enums.
+commons type definitions and enums.
 """
 
 try:
-    from .bases import TaskID, SessionID, MemoryRecordID, SkillID
+    from .commons import TaskID, SessionID, MemoryRecordID, SkillID
     from .task import TaskStatus, TaskResult
     from .memory import MemoryInfo, MemoryRecordType
     from .session import SessionInfo
@@ -617,7 +617,7 @@ agentos/
 │   └── tracing.py      # 分布式追踪
 │
 └── types/               # 类型定义
-    ├── bases.py       # 通用类型
+    ├── commons.py       # 通用类型
     └── task.py         # 任务类型
             """)
 

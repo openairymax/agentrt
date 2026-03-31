@@ -16,7 +16,7 @@
  */
 int test_create_destroy() {
     printf("=== Testing create and destroy ===\n");
-    
+
     sched_config_t manager = {
         .strategy = SCHED_STRATEGY_ROUND_ROBIN,
         .health_check_interval_ms = 5000,
@@ -50,7 +50,7 @@ int test_create_destroy() {
  */
 int test_register_unregister_agent() {
     printf("=== Testing register and unregister agent ===\n");
-    
+
     sched_config_t manager = {
         .strategy = SCHED_STRATEGY_ROUND_ROBIN,
         .health_check_interval_ms = 5000,
@@ -109,7 +109,7 @@ int test_register_unregister_agent() {
  */
 int test_update_agent_status() {
     printf("=== Testing update agent status ===\n");
-    
+
     sched_config_t manager = {
         .strategy = SCHED_STRATEGY_ROUND_ROBIN,
         .health_check_interval_ms = 5000,
@@ -170,7 +170,7 @@ int test_update_agent_status() {
  */
 int test_schedule_task() {
     printf("=== Testing schedule task ===\n");
-    
+
     sched_config_t manager = {
         .strategy = SCHED_STRATEGY_ROUND_ROBIN,
         .health_check_interval_ms = 5000,
@@ -246,7 +246,7 @@ int test_schedule_task() {
  */
 int test_health_check() {
     printf("=== Testing health check ===\n");
-    
+
     sched_config_t manager = {
         .strategy = SCHED_STRATEGY_ROUND_ROBIN,
         .health_check_interval_ms = 5000,
@@ -308,7 +308,7 @@ int test_health_check() {
  */
 int test_get_stats() {
     printf("=== Testing get stats ===\n");
-    
+
     sched_config_t manager = {
         .strategy = SCHED_STRATEGY_ROUND_ROBIN,
         .health_check_interval_ms = 5000,
@@ -397,7 +397,7 @@ int test_get_stats() {
  */
 int test_reload_config() {
     printf("=== Testing reload manager ===\n");
-    
+
     sched_config_t manager = {
         .strategy = SCHED_STRATEGY_ROUND_ROBIN,
         .health_check_interval_ms = 5000,

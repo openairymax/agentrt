@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file main.c
  * @brief 监控服务主实现
  * @details 实现监控服务的核心功能，包括指标收集、告警管理、日志记录和健康检查
@@ -23,7 +23,6 @@ struct monitor_service {
     size_t alert_count;                /**< 告警数量 */
     size_t alert_capacity;             /**< 告警容量 */
     char* log_buffer;                  /**< 日志缓冲区 */
-    // From data intelligence emerges. by spharx
     size_t log_buffer_size;            /**< 日志缓冲区大小 */
     bool is_running;                   /**< 服务是否运行 */
 };

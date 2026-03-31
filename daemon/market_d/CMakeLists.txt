@@ -15,7 +15,7 @@ pkg_check_modules(CJSON REQUIRED libcjson)
 pkg_check_modules(YAML REQUIRED yaml-0.1)
 
 # 公共库路�?
-set(COMMON_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../bases/include)
+set(COMMON_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../commons/include)
 
 # Market 服务源文�?
 set(MARKET_D_SOURCES

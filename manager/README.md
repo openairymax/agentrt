@@ -1,8 +1,8 @@
 # AgentOS Manager 模块
 
-> **版本**: v1.0.0.8  
-> **最后更新**: 2026-03-28  
-> **许可证**: Apache License 2.0  
+> **版本**: v1.0.0.10
+> **最后更新**: 2026-03-30
+> **许可证**: Apache License 2.0
 > **版权**: Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 ---
@@ -87,7 +87,7 @@ manager/
     ├── alerts/
     │   └── domes-alerts.yml    # 安全穹顶告警规则
     └── dashboards/
-        └── domes-dashboard.json # 安全穹顶监控面板
+ │       └── cupolas-dashboard.json # 安全穹顶监控面板
 
 ├── deployment/                 # 部署配置
     └── cupolas/
@@ -1276,13 +1276,13 @@ kernel = Kernel(config=config)
 kernel.start()
 ```
 
-### 与 Backs 模块集成
+### 与 daemon 模块集成
 
-Backs 模块（后端服务）从 Manager 获取配置：
+daemon 模块（后端服务）从 Manager 获取配置：
 
 ```python
 from agentos.manager import ConfigLoader
-from agentos.backs import LLMDaemon
+from agentos.daemon import LLMDaemon
 
 # 加载模型配置
 model_config = ConfigLoader.load('model/model.yaml')
@@ -1292,13 +1292,13 @@ llm_service = LLMDaemon(models=model_config['models'])
 llm_service.run()
 ```
 
-### 与 Domes 模块集成
+### 与 Cupolas 模块集成
 
-Domes 模块（安全穹顶）使用 Manager 的安全配置：
+Cupolas 模块（安全穹顶）使用 Manager 的安全配置：
 
 ```python
 from agentos.manager import ConfigLoader
-from agentos.domes import SecurityManager
+from agentos.cupolas import SecurityManager
 
 # 加载安全配置
 security_config = ConfigLoader.load('security/policy.yaml')
@@ -1328,7 +1328,7 @@ security = SecurityManager(
 
 - **架构设计**: [../partdocs/architecture/](../partdocs/architecture/)
 - **编码规范**: [../partdocs/specifications/](../partdocs/specifications/)
-- **安全策略**: [../domes/](../domes/)
+- **安全策略**: [../cupolas/](../cupolas/)
 - **API 文档**: [../tools/python/](../tools/python/)
 
 ### 社区支持
@@ -1343,6 +1343,9 @@ security = SecurityManager(
 
 | 版本 | 日期 | 变更说明 |
 |------|------|---------|
+| v1.0.0.11 | 2026-03-30 | 完成所有 9 个 Schema 文件的 examples 字段添加，文档完整性提升至 100% |
+| v1.0.0.10 | 2026-03-30 | 为所有 Schema 文件添加 examples 字段，提升文档完整性至 95% |
+| v1.0.0.9 | 2026-03-30 | 修复命名不一致：domes-dashboard.json → cupolas-dashboard.json；Schema 文件添加 examples 字段 |
 | v1.0.0.8 | 2026-03-28 | 补充 example.yaml 和 deployment/cupolas/environments.yaml 配置说明 |
 | v1.0.0.7 | 2026-03-26 | 模块更名为 Manager，完善文档结构 |
 | v1.0.0.6 | 2026-03-26 | 添加监控配置章节 |

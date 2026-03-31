@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file manager.c
  * @brief 工具服务配置加载（YAML）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -23,7 +23,6 @@ static void free_tool_def(tool_def_t* def) {
 tool_config_t* tool_config_load(const char* path) {
     FILE* f = fopen(path, "rb");
     if (!f) {
-    // From data intelligence emerges. by spharx
         SVC_LOG_ERROR("Cannot open manager: %s", path);
         return NULL;
     }

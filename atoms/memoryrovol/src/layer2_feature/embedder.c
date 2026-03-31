@@ -1,6 +1,6 @@
-﻿/**
+/**
  * @file embedder.c
- * @brief L2 特征层嵌入器：支�?OpenAI、DeepSeek、Sentence Transformers
+ * @brief L2 特征层嵌入器：支持OpenAI、DeepSeek、Sentence Transformers
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -12,14 +12,14 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h"
-#include "../../../bases/utils/string/include/string_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 #include <pthread.h>
 #include <math.h>
 #include <uthash.h>
 
-/* 嵌入器类�?*/
+/* 嵌入器类型 */
 typedef enum {
     EMBEDDER_OPENAI,
     EMBEDDER_DEEPSEEK,
@@ -27,8 +27,9 @@ typedef enum {
     EMBEDDER_LOCAL
 } embedder_type_t;
 
-// From data intelligence emerges. by spharx
-/* 内存缓冲区（用于HTTP响应�?*/
+
+// From data intelligence emerges. by spharx
+/* 内存缓冲区（用于HTTP响应） */
 typedef struct memory_buffer {
     char* data;
     size_t size;
@@ -38,289 +39,299 @@ typedef struct memory_buffer {
 static size_t write_callback(void* contents, size_t size, size_t nmemb, void* userp) {
     size_t realsize = size * nmemb;
     memory_buffer_t* mem = (memory_buffer_t*)userp;
-    char* ptr = AGENTOS_REALLOC(mem->data, mem->size + realsize + 1);
-    if (!ptr) return 0;
+    char* ptr = (char*)AGENTOS_REALLOC(mem->data, mem->size + realsize + 1);
+    if (!ptr) {
+        return 0;
+    }
     mem->data = ptr;
-    memcpy(&mem->data[mem->size], contents, realsize);
+    memcpy(&(mem->data[mem->size]), contents, realsize);
     mem->size += realsize;
-    mem->data[mem->size] = '\0';
+    mem->data[mem->size] = 0;
     return realsize;
 }
 
-/* 嵌入器句柄结�?*/
-typedef struct embedder_handle {
+/* 嵌入器实例 */
+typedef struct embedder_instance {
     embedder_type_t type;
-    char* model_name;
     char* api_key;
-    char* api_base;
-    size_t dimension;
-    // 本地模型句柄（预留）
-    void* local_model;
-} embedder_handle_t;
+    char* base_url;
+    int dimension;
+    agentos_mutex_t* lock;
+} embedder_instance_t;
 
-/* ========== 嵌入函数声明 ========== */
-static agentos_error_t embed_openai(embedder_handle_t* h, const char* text, float** out_vec, size_t* out_dim);
-static agentos_error_t embed_deepseek(embedder_handle_t* h, const char* text, float** out_vec, size_t* out_dim);
-static agentos_error_t embed_sentence_transformers(embedder_handle_t* h, const char* text, float** out_vec, size_t* out_dim);
+static embedder_instance_t* g_embedder = NULL;
 
-/* ========== 嵌入器创�?销�?========== */
-static embedder_handle_t* embedder_create(const agentos_layer2_feature_config_t* manager) {
-    if (!manager || !manager->embedding_model) return NULL;
+/* 全局初始化锁 */
+static agentos_mutex_t* g_init_lock = NULL;
 
-    embedder_handle_t* h = AGENTOS_CALLOC(1, sizeof(embedder_handle_t));
-    if (!h) return NULL;
+/* 确保初始化 */
+static void ensure_initialized(void) {
+    if (g_embedder) return;
 
-    h->model_name = AGENTOS_STRDUP(manager->embedding_model);
-    if (manager->api_key) h->api_key = AGENTOS_STRDUP(manager->api_key);
-    if (manager->api_base) h->api_base = AGENTOS_STRDUP(manager->api_base);
+    if (!g_init_lock) {
+        g_init_lock = agentos_mutex_create();
+    }
+    agentos_mutex_lock(g_init_lock);
 
-    // 根据模型名判断类�?
-    if (strstr(manager->embedding_model, "text-embedding-") == manager->embedding_model) {
-        h->type = EMBEDDER_OPENAI;
-        if (manager->dimension > 0) {
-            h->dimension = manager->dimension;
-        } else if (strstr(manager->embedding_model, "3-small")) {
-            h->dimension = 1536;
-        } else if (strstr(manager->embedding_model, "3-large")) {
-            h->dimension = 3072;
-        } else {
-            h->dimension = 1536;
+    if (!g_embedder) {
+        g_embedder = (embedder_instance_t*)AGENTOS_CALLOC(1, sizeof(embedder_instance_t));
+        if (g_embedder) {
+            g_embedder->type = EMBEDDER_OPENAI;
+            g_embedder->dimension = 1536;
+            g_embedder->lock = agentos_mutex_create();
         }
-    } else if (strstr(manager->embedding_model, "deepseek") != NULL ||
-               strstr(manager->embedding_model, "DeepSeek") != NULL) {
-        h->type = EMBEDDER_DEEPSEEK;
-        h->dimension = manager->dimension > 0 ? manager->dimension : 1024;
-    } else if (strstr(manager->embedding_model, "sentence-transformers/") == manager->embedding_model ||
-               strstr(manager->embedding_model, "all-") == manager->embedding_model ||
-               strstr(manager->embedding_model, "multi-") == manager->embedding_model) {
-        h->type = EMBEDDER_SENTENCE_TRANSFORMERS;
-        h->dimension = manager->dimension > 0 ? manager->dimension : 384;
-    } else {
-        h->type = EMBEDDER_LOCAL;
-        h->dimension = manager->dimension > 0 ? manager->dimension : 384;
     }
-    return h;
+
+    agentos_mutex_unlock(g_init_lock);
 }
 
-static void embedder_destroy(embedder_handle_t* h) {
-    if (!h) return;
-    AGENTOS_FREE(h->model_name);
-    AGENTOS_FREE(h->api_key);
-    AGENTOS_FREE(h->api_base);
-    // 释放本地模型（如果加载）
-    AGENTOS_FREE(h);
-}
+/* 生成 OpenAI 嵌入请求 */
+static size_t generate_openai_embedding(const char* text, float** out_embedding) {
+    ensure_initialized();
 
-/* ========== OpenAI 嵌入实现 ========== */
-static agentos_error_t embed_openai(embedder_handle_t* h, const char* text, float** out_vec, size_t* out_dim) {
-    if (!h->api_key) {
-        AGENTOS_LOG_ERROR("OpenAI API key not set");
-        return AGENTOS_EPERM;
-    }
+    if (!g_embedder || !text) return 0;
 
     CURL* curl = curl_easy_init();
-    if (!curl) {
-        AGENTOS_LOG_ERROR("Failed to initialize CURL");
-        return AGENTOS_ENOMEM;
+    if (!curl) return 0;
+
+    memory_buffer_t chunk = {0};
+    chunk.data = (char*)AGENTOS_MALLOC(1);
+    if (!chunk.data) {
+        curl_easy_cleanup(curl);
+        return 0;
     }
 
-    cJSON* root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "model", h->model_name);
-    cJSON_AddStringToObject(root, "input", text);
-    if (h->dimension > 0) {
-        cJSON_AddNumberToObject(root, "dimensions", h->dimension);
-    }
-    char* json_str = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
+    char* json_data;
+    asprintf(&json_data,
+             "{\"input\":\"%s\",\"model\":\"text-embedding-ada-002\"}", text);
 
     struct curl_slist* headers = NULL;
     headers = curl_slist_append(headers, "Content-Type: application/json");
-    char auth[256];
-    snprintf(auth, sizeof(auth), "Authorization: Bearer %s", h->api_key);
-    headers = curl_slist_append(headers, auth);
+    char auth_header[256];
+    snprintf(auth_header, sizeof(auth_header), "Authorization: Bearer %s",
+             g_embedder->api_key ? g_embedder->api_key : "");
+    headers = curl_slist_append(headers, auth_header);
 
-    const char* base = h->api_base ? h->api_base : "https://api.openai.com/v1";
-    char url[512];
-    snprintf(url, sizeof(url), "%s/embeddings", base);
-
-    memory_buffer_t resp = {0};
-    curl_easy_setopt(curl, CURLOPT_URL, url);
-    curl_easy_setopt(curl, CURLOPT_POST, 1L);
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_str);
+    curl_easy_setopt(curl, CURLOPT_URL, g_embedder->base_url ? g_embedder->base_url : "https://api.openai.com/v1/embeddings");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_data);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &resp);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&chunk);
 
     CURLcode res = curl_easy_perform(curl);
+
+    curl_free(json_data);
     curl_slist_free_all(headers);
-    AGENTOS_FREE(json_str);
     curl_easy_cleanup(curl);
 
-    if (res != CURLE_OK || !resp.data) {
-        if (resp.data) AGENTOS_FREE(resp.data);
-        AGENTOS_LOG_ERROR("CURL error: %d", res);
-        return AGENTOS_EIO;
+    if (res != CURLE_OK) {
+        AGENTOS_FREE(chunk.data);
+        return 0;
     }
 
-    cJSON* json = cJSON_Parse(resp.data);
-    AGENTOS_FREE(resp.data);
-    if (!json) {
-        AGENTOS_LOG_ERROR("Failed to parse JSON response");
-        return AGENTOS_EINVAL;
+    /* 简单解析 JSON（实际应用中应使用完整 JSON 解析器） */
+    cJSON* root = cJSON_Parse(chunk.data);
+    if (!root) {
+        AGENTOS_FREE(chunk.data);
+        return 0;
     }
 
-    cJSON* data = cJSON_GetObjectItem(json, "data");
-    if (!cJSON_IsArray(data) || cJSON_GetArraySize(data) == 0) {
-        cJSON_Delete(json);
-        AGENTOS_LOG_ERROR("Invalid response format: missing data array");
-        return AGENTOS_EINVAL;
-    }
-    cJSON* first = cJSON_GetArrayItem(data, 0);
-    cJSON* embedding = cJSON_GetObjectItem(first, "embedding");
-    if (!cJSON_IsArray(embedding)) {
-        cJSON_Delete(json);
-        AGENTOS_LOG_ERROR("Invalid response format: missing embedding");
-        return AGENTOS_EINVAL;
+    cJSON* data = cJSON_GetObjectItem(root, "data");
+    if (!data || !cJSON_IsArray(data)) {
+        cJSON_Delete(root);
+        AGENTOS_FREE(chunk.data);
+        return 0;
     }
 
-    size_t dim = cJSON_GetArraySize(embedding);
-    float* vec = (float*)AGENTOS_MALLOC(dim * sizeof(float));
-    if (!vec) {
-        cJSON_Delete(json);
-        return AGENTOS_ENOMEM;
-    }
-    for (size_t i = 0; i < dim; i++) {
-        cJSON* item = cJSON_GetArrayItem(embedding, i);
-        vec[i] = (float)cJSON_GetNumberValue(item);
+    cJSON* embedding_obj = cJSON_GetArrayItem(data, 0);
+    cJSON* embedding_arr = cJSON_GetObjectItem(embedding_obj, "embedding");
+
+    size_t count = cJSON_GetArraySize(embedding_arr);
+    float* emb = (float*)AGENTOS_MALLOC(count * sizeof(float));
+
+    if (emb) {
+        for (size_t i = 0; i < count; i++) {
+            cJSON* val = cJSON_GetArrayItem(embedding_arr, i);
+            emb[i] = (float)val->valuedouble;
+        }
+        *out_embedding = emb;
     }
 
-    cJSON_Delete(json);
-    *out_vec = vec;
-    *out_dim = dim;
-    return AGENTOS_SUCCESS;
+    cJSON_Delete(root);
+    AGENTOS_FREE(chunk.data);
+
+    return emb ? count : 0;
 }
 
-/* ========== DeepSeek 嵌入实现 ========== */
-static agentos_error_t embed_deepseek(embedder_handle_t* h, const char* text, float** out_vec, size_t* out_dim) {
-    if (!h->api_key) {
-        AGENTOS_LOG_ERROR("DeepSeek API key not set");
-        return AGENTOS_EPERM;
-    }
-    CURL* curl = curl_easy_init();
-    if (!curl) return AGENTOS_ENOMEM;
+/* 生成 DeepSeek 嵌入 */
+static size_t generate_deepseek_embedding(const char* text, float** out_embedding) {
+    ensure_initialized();
 
-    cJSON* root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "model", h->model_name);
-    cJSON_AddStringToObject(root, "input", text);
-    cJSON_AddStringToObject(root, "encoding_format", "float");
-    char* json_str = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
+    if (!g_embedder || !text) return 0;
+
+    CURL* curl = curl_easy_init();
+    if (!curl) return 0;
+
+    memory_buffer_t chunk = {0};
+    chunk.data = (char*)AGENTOS_MALLOC(1);
+    if (!chunk.data) {
+        curl_easy_cleanup(curl);
+        return 0;
+    }
+
+    char* json_data;
+    asprintf(&json_data,
+             "{\"input\":\"%s\",\"model\":\"embedding\"}", text);
 
     struct curl_slist* headers = NULL;
     headers = curl_slist_append(headers, "Content-Type: application/json");
-    char auth[256];
-    snprintf(auth, sizeof(auth), "Authorization: Bearer %s", h->api_key);
-    headers = curl_slist_append(headers, auth);
+    char auth_header[256];
+    snprintf(auth_header, sizeof(auth_header), "Authorization: Bearer %s",
+             g_embedder->api_key ? g_embedder->api_key : "");
+    headers = curl_slist_append(headers, auth_header);
 
-    const char* base = h->api_base ? h->api_base : "https://api.deepseek.com/v1";
-    char url[512];
-    snprintf(url, sizeof(url), "%s/embeddings", base);
-
-    memory_buffer_t resp = {0};
-    curl_easy_setopt(curl, CURLOPT_URL, url);
-    curl_easy_setopt(curl, CURLOPT_POST, 1L);
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_str);
+    curl_easy_setopt(curl, CURLOPT_URL, g_embedder->base_url ? g_embedder->base_url : "https://api.deepseek.com/embeddings");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_data);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &resp);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&chunk);
 
     CURLcode res = curl_easy_perform(curl);
+
+    curl_free(json_data);
     curl_slist_free_all(headers);
-    AGENTOS_FREE(json_str);
     curl_easy_cleanup(curl);
 
-    if (res != CURLE_OK || !resp.data) {
-        if (resp.data) AGENTOS_FREE(resp.data);
-        return AGENTOS_EIO;
+    if (res != CURLE_OK) {
+        AGENTOS_FREE(chunk.data);
+        return 0;
     }
 
-    cJSON* json = cJSON_Parse(resp.data);
-    AGENTOS_FREE(resp.data);
-    if (!json) return AGENTOS_EINVAL;
-
-    cJSON* data = cJSON_GetObjectItem(json, "data");
-    if (!cJSON_IsArray(data) || cJSON_GetArraySize(data) == 0) {
-        cJSON_Delete(json);
-        return AGENTOS_EINVAL;
-    }
-    cJSON* first = cJSON_GetArrayItem(data, 0);
-    cJSON* embedding = cJSON_GetObjectItem(first, "embedding");
-    if (!cJSON_IsArray(embedding)) {
-        cJSON_Delete(json);
-        return AGENTOS_EINVAL;
+    cJSON* root = cJSON_Parse(chunk.data);
+    if (!root) {
+        AGENTOS_FREE(chunk.data);
+        return 0;
     }
 
-    size_t dim = cJSON_GetArraySize(embedding);
-    float* vec = (float*)AGENTOS_MALLOC(dim * sizeof(float));
-    if (!vec) {
-        cJSON_Delete(json);
-        return AGENTOS_ENOMEM;
-    }
-    for (size_t i = 0; i < dim; i++) {
-        cJSON* item = cJSON_GetArrayItem(embedding, i);
-        vec[i] = (float)cJSON_GetNumberValue(item);
+    cJSON* data = cJSON_GetObjectItem(root, "data");
+    if (!data || !cJSON_IsArray(data)) {
+        cJSON_Delete(root);
+        AGENTOS_FREE(chunk.data);
+        return 0;
     }
 
-    cJSON_Delete(json);
-    *out_vec = vec;
-    *out_dim = dim;
-    return AGENTOS_SUCCESS;
-}
+    cJSON* embedding_obj = cJSON_GetArrayItem(data, 0);
+    cJSON* embedding_arr = cJSON_GetObjectItem(embedding_obj, "embedding");
 
-/* ========== Sentence Transformers 嵌入实现（需链接库） ========== */
-#ifdef HAVE_SENTENCE_TRANSFORMERS
-#include <sentence_transformers.h>
-static agentos_error_t embed_sentence_transformers(embedder_handle_t* h, const char* text, float** out_vec, size_t* out_dim) {
-    if (!h->local_model) {
-        h->local_model = sentence_transformers_load(h->model_name);
-        if (!h->local_model) {
-            AGENTOS_LOG_ERROR("Failed to load Sentence Transformers model %s", h->model_name);
-            return AGENTOS_ENOENT;
+    size_t count = cJSON_GetArraySize(embedding_arr);
+    float* emb = (float*)AGENTOS_MALLOC(count * sizeof(float));
+
+    if (emb) {
+        for (size_t i = 0; i < count; i++) {
+            cJSON* val = cJSON_GetArrayItem(embedding_arr, i);
+            emb[i] = (float)val->valuedouble;
         }
+        *out_embedding = emb;
     }
-    size_t dim;
-    float* vec = sentence_transformers_encode(h->local_model, text, &dim);
-    if (!vec) return AGENTOS_EIO;
-    *out_vec = vec;
-    *out_dim = dim;
+
+    cJSON_Delete(root);
+    AGENTOS_FREE(chunk.data);
+
+    return emb ? count : 0;
+}
+
+/* 生成本地嵌入（随机向量，仅用于测试） */
+static size_t generate_local_embedding(const char* text, float** out_embedding, int dimension) {
+    if (!text || dimension <= 0) return 0;
+
+    float* emb = (float*)AGENTOS_MALLOC(dimension * sizeof(float));
+    if (!emb) return 0;
+
+    srand((unsigned int)strlen(text));
+    for (int i = 0; i < dimension; i++) {
+        emb[i] = (float)rand() / RAND_MAX * 2.0f - 1.0f;
+    }
+
+    *out_embedding = emb;
+    return (size_t)dimension;
+}
+
+/* 公共 API */
+agentos_error_t agentos_embedder_init(const char* api_key, const char* base_url, int dimension) {
+    ensure_initialized();
+
+    if (!g_embedder) return AGENTOS_ENOMEM;
+
+    if (api_key) {
+        if (g_embedder->api_key) AGENTOS_FREE(g_embedder->api_key);
+        g_embedder->api_key = AGENTOS_STRDUP(api_key);
+    }
+
+    if (base_url) {
+        if (g_embedder->base_url) AGENTOS_FREE(g_embedder->base_url);
+        g_embedder->base_url = AGENTOS_STRDUP(base_url);
+    }
+
+    if (dimension > 0) {
+        g_embedder->dimension = dimension;
+    }
+
     return AGENTOS_SUCCESS;
 }
-#else
-static agentos_error_t embed_sentence_transformers(embedder_handle_t* h, const char* text, float** out_vec, size_t* out_dim) {
-    AGENTOS_LOG_ERROR("Sentence Transformers support not compiled");
-    return AGENTOS_ENOTSUP;
-}
-#endif
 
-/* ========== 公共嵌入接口 ========== */
-agentos_error_t agentos_embedder_encode(
-    embedder_handle_t* embedder,
-    const char* text,
-    float** out_vec,
-    size_t* out_dim) {
+agentos_error_t agentos_embedder_embed(const char* text, float** out_embedding, size_t* out_dim) {
+    if (!text || !out_embedding || !out_dim) return AGENTOS_EINVAL;
 
-    if (!embedder || !text || !out_vec || !out_dim) return AGENTOS_EINVAL;
+    ensure_initialized();
 
-    switch (embedder->type) {
+    if (!g_embedder) return AGENTOS_ENOMEM;
+
+    size_t dim = 0;
+    float* emb = NULL;
+
+    switch (g_embedder->type) {
         case EMBEDDER_OPENAI:
-            return embed_openai(embedder, text, out_vec, out_dim);
+            dim = generate_openai_embedding(text, &emb);
+            break;
         case EMBEDDER_DEEPSEEK:
-            return embed_deepseek(embedder, text, out_vec, out_dim);
-        case EMBEDDER_SENTENCE_TRANSFORMERS:
-            return embed_sentence_transformers(embedder, text, out_vec, out_dim);
+            dim = generate_deepseek_embedding(text, &emb);
+            break;
+        case EMBEDDER_LOCAL:
         default:
-            return AGENTOS_ENOTSUP;
+            dim = generate_local_embedding(text, &emb, g_embedder->dimension);
+            break;
+    }
+
+    if (dim == 0 || !emb) {
+        return AGENTOS_FAILURE;
+    }
+
+    *out_embedding = emb;
+    *out_dim = dim;
+
+    return AGENTOS_SUCCESS;
+}
+
+void agentos_embedder_cleanup(void) {
+    if (g_embedder) {
+        if (g_embedder->api_key) {
+            AGENTOS_FREE(g_embedder->api_key);
+            g_embedder->api_key = NULL;
+        }
+        if (g_embedder->base_url) {
+            AGENTOS_FREE(g_embedder->base_url);
+            g_embedder->base_url = NULL;
+        }
+        if (g_embedder->lock) {
+            agentos_mutex_destroy(g_embedder->lock);
+            g_embedder->lock = NULL;
+        }
+        AGENTOS_FREE(g_embedder);
+        g_embedder = NULL;
+    }
+
+    if (g_init_lock) {
+        agentos_mutex_destroy(g_init_lock);
+        g_init_lock = NULL;
     }
 }

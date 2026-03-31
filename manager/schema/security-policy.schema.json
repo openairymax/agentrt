@@ -19,7 +19,8 @@
           "type": "string",
           "enum": ["allow", "deny", "audit"],
           "default": "deny",
-          "description": "Default access policy when no rule matches"
+          "description": "Default access policy when no rule matches",
+          "examples": ["deny", "allow", "audit"]
         },
         "rules": {
           "type": "array",
@@ -31,28 +32,33 @@
               "id": {
                 "type": "string",
                 "pattern": "^[a-z][a-z0-9_]*$",
-                "description": "Unique rule identifier"
+                "description": "Unique rule identifier",
+                "examples": ["allow_file_read", "deny_network_access", "audit_sensitive_ops"]
               },
               "resource": {
                 "type": "string",
-                "description": "Resource pattern (e.g., file:read:/tmp/*)"
+                "description": "Resource pattern (e.g., file:read:/tmp/*)",
+                "examples": ["file:read:/tmp/*", "network:connect:*", "process:execute:/usr/bin/*"]
               },
               "action": {
                 "type": "string",
                 "enum": ["read", "write", "delete", "execute", "connect", "all"],
-                "description": "Action type"
+                "description": "Action type",
+                "examples": ["read", "write", "execute", "connect"]
               },
               "effect": {
                 "type": "string",
                 "enum": ["allow", "deny", "allow_with_sandbox", "audit"],
-                "description": "Rule effect"
+                "description": "Rule effect",
+                "examples": ["allow", "deny", "audit"]
               },
               "priority": {
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 1000,
                 "default": 10,
-                "description": "Rule priority (higher = evaluated first)"
+                "description": "Rule priority (higher = evaluated first)",
+                "examples": [10, 50, 100, 500]
               },
               "conditions": {
                 "type": "array",

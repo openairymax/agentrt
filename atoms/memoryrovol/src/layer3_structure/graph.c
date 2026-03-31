@@ -8,14 +8,15 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h"
-#include "../../../bases/utils/string/include/string_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 #include <pthread.h>
 #include <limits.h>
 
 #define INITIAL_CAPACITY 1024
 #define MAX_PATH_LENGTH 100
+#define GROWTH_FACTOR 2
 
 /**
  * @brief 实体节点
@@ -26,6 +27,14 @@ typedef struct entity_node {
     size_t relation_count;
     struct entity_node* next;
 } entity_node_t;
+
+/**
+ * @brief BFS路径节点（用于路径查找）
+ */
+typedef struct {
+    char* id;
+    char* prev;
+} path_node_t;
 
 /**
  * @brief 知识图谱结构
@@ -68,7 +77,7 @@ agentos_error_t agentos_knowledge_graph_create(
 }
 
 /**
- * @brief 销毁知识图�?
+ * @brief 销毁知识图谱
  */
 void agentos_knowledge_graph_destroy(agentos_knowledge_graph_t* kg) {
     if (!kg) return;
@@ -110,6 +119,40 @@ static entity_node_t* find_entity(agentos_knowledge_graph_t* kg, const char* ent
 }
 
 /**
+ * @brief 查找实体索引
+ * @param kg 知识图谱
+ * @param entity_id 实体ID
+ * @return 实体索引，如果未找到返回 SIZE_MAX
+ */
+static size_t find_entity_index(agentos_knowledge_graph_t* kg, const char* entity_id) {
+    for (size_t i = 0; i < kg->entity_count; i++) {
+        if (kg->entities[i] && strcmp(kg->entities[i]->id, entity_id) == 0) {
+            return i;
+        }
+    }
+    return SIZE_MAX;
+}
+
+/**
+ * @brief BFS 搜索核心逻辑
+ */
+static agentos_error_t perform_bfs_search(agentos_knowledge_graph_t* kg,
+                                          size_t start_idx,
+                                          size_t end_idx,
+                                          path_node_t* visited,
+                                          int* in_queue,
+                                          char** queue);
+
+/**
+ * @brief 从BFS结果重构路径
+ */
+static char** reconstruct_path_from_bfs(agentos_knowledge_graph_t* kg,
+                                        size_t start_idx,
+                                        size_t end_idx,
+                                        path_node_t* visited,
+                                        size_t* path_len);
+
+/**
  * @brief 添加实体
  */
 agentos_error_t agentos_knowledge_graph_add_entity(
@@ -125,7 +168,7 @@ agentos_error_t agentos_knowledge_graph_add_entity(
     }
 
     if (kg->entity_count >= kg->capacity) {
-        size_t new_cap = kg->capacity * 2;
+        size_t new_cap = kg->capacity * GROWTH_FACTOR;
         entity_node_t** new_entities = (entity_node_t**)AGENTOS_REALLOC(kg->entities,
             new_cap * sizeof(entity_node_t*));
         if (!new_entities) {
@@ -262,7 +305,7 @@ agentos_error_t agentos_knowledge_graph_query(
 }
 
 /**
- * @brief BFS 查找最短路�?
+ * @brief BFS 查找最短路径
  */
 agentos_error_t agentos_knowledge_graph_find_path(
     agentos_knowledge_graph_t* kg,
@@ -282,18 +325,23 @@ agentos_error_t agentos_knowledge_graph_find_path(
 
     pthread_mutex_lock(&kg->mutex);
 
-    typedef struct {
-        char* id;
-        char* prev;
-    } path_node_t;
+    size_t start_idx = find_entity_index(kg, from_id);
+    size_t end_idx = find_entity_index(kg, to_id);
+
+    if (start_idx == SIZE_MAX || end_idx == SIZE_MAX) {
+        pthread_mutex_unlock(&kg->mutex);
+        return AGENTOS_ENOENT;
+    }
 
     path_node_t* visited = (path_node_t*)AGENTOS_CALLOC(kg->entity_count, sizeof(path_node_t));
     int* in_queue = (int*)AGENTOS_CALLOC(kg->entity_count, sizeof(int));
     char** queue = (char**)AGENTOS_CALLOC(kg->entity_count, sizeof(char*));
-    size_t queue_front = 0, queue_back = 0;
 
     if (!visited || !in_queue || !queue) {
         pthread_mutex_unlock(&kg->mutex);
+        AGENTOS_FREE(visited);
+        AGENTOS_FREE(in_queue);
+        AGENTOS_FREE(queue);
         return AGENTOS_ENOMEM;
     }
 
@@ -303,110 +351,21 @@ agentos_error_t agentos_knowledge_graph_find_path(
         visited[i].prev = NULL;
     }
 
-    size_t start_idx = SIZE_MAX, end_idx = SIZE_MAX;
-    for (size_t i = 0; i < kg->entity_count; i++) {
-        if (kg->entities[i] && strcmp(kg->entities[i]->id, from_id) == 0) {
-            start_idx = i;
+    agentos_error_t err = perform_bfs_search(kg, start_idx, end_idx, visited, in_queue, queue);
+
+    if (err == AGENTOS_SUCCESS) {
+        *out_path = reconstruct_path_from_bfs(kg, start_idx, end_idx, visited, out_path_length);
+        if (!*out_path) {
+            err = AGENTOS_ENOMEM;
         }
-        if (kg->entities[i] && strcmp(kg->entities[i]->id, to_id) == 0) {
-            end_idx = i;
-        }
-    }
-
-    if (start_idx == SIZE_MAX || end_idx == SIZE_MAX) {
-        pthread_mutex_unlock(&kg->mutex);
-        AGENTOS_FREE(visited);
-        AGENTOS_FREE(in_queue);
-        AGENTOS_FREE(queue);
-        return AGENTOS_ENOENT;
-    }
-
-    queue[queue_back++] = AGENTOS_STRDUP(from_id);
-    in_queue[start_idx] = 1;
-    visited[start_idx].id = AGENTOS_STRDUP(from_id);
-
-    int found = 0;
-    while (queue_front < queue_back && !found) {
-        char* current = queue[queue_front++];
-        size_t current_idx = SIZE_MAX;
-        for (size_t i = 0; i < kg->entity_count; i++) {
-            if (kg->entities[i] && strcmp(kg->entities[i]->id, current) == 0) {
-                current_idx = i;
-                break;
-            }
-        }
-
-        if (current_idx == SIZE_MAX) {
-            AGENTOS_FREE(current);
-            continue;
-        }
-
-        entity_node_t* node = kg->entities[current_idx];
-        agentos_relation_t* rel = node->relations;
-        while (rel && !found) {
-            for (size_t i = 0; i < kg->entity_count; i++) {
-                if (kg->entities[i] && strcmp(kg->entities[i]->id, rel->to_id) == 0) {
-                    if (!in_queue[i]) {
-                        queue[queue_back++] = AGENTOS_STRDUP(rel->to_id);
-                        in_queue[i] = 1;
-                        visited[i].id = AGENTOS_STRDUP(rel->to_id);
-                        visited[i].prev = AGENTOS_STRDUP(current);
-                        if (strcmp(rel->to_id, to_id) == 0) {
-                            found = 1;
-                        }
-                    }
-                    break;
-                }
-            }
-            rel = rel->next;
-        }
-        AGENTOS_FREE(current);
-    }
-
-    char** path = NULL;
-    size_t path_len = 0;
-
-    if (found) {
-        char** temp_path = (char**)AGENTOS_CALLOC(MAX_PATH_LENGTH, sizeof(char*));
-        char* current = AGENTOS_STRDUP(to_id);
-        size_t idx = 0;
-
-        while (current && strcmp(current, from_id) != 0) {
-            for (size_t i = 0; i < kg->entity_count; i++) {
-                if (visited[i].id && strcmp(visited[i].id, current) == 0) {
-                    temp_path[idx++] = AGENTOS_STRDUP(current);
-                    if (visited[i].prev) {
-                        AGENTOS_FREE(current);
-                        current = AGENTOS_STRDUP(visited[i].prev);
-                    } else {
-                        AGENTOS_FREE(current);
-                        current = NULL;
-                    }
-                    break;
-                }
-            }
-            if (idx >= MAX_PATH_LENGTH) break;
-        }
-
-        if (current && strcmp(current, from_id) == 0) {
-            temp_path[idx++] = AGENTOS_STRDUP(from_id);
-        }
-
-        path = (char**)AGENTOS_CALLOC(idx, sizeof(char*));
-        for (size_t i = 0; i < idx; i++) {
-            path[i] = temp_path[idx - 1 - i];
-        }
-        path_len = idx;
-        AGENTOS_FREE(temp_path);
-        AGENTOS_FREE(current);
+    } else {
+        *out_path = NULL;
+        *out_path_length = 0;
     }
 
     for (size_t i = 0; i < kg->entity_count; i++) {
         if (visited[i].id) AGENTOS_FREE(visited[i].id);
         if (visited[i].prev) AGENTOS_FREE(visited[i].prev);
-    }
-    for (size_t i = 0; i < queue_back; i++) {
-        if (queue[i]) AGENTOS_FREE(queue[i]);
     }
     AGENTOS_FREE(visited);
     AGENTOS_FREE(in_queue);
@@ -414,8 +373,255 @@ agentos_error_t agentos_knowledge_graph_find_path(
 
     pthread_mutex_unlock(&kg->mutex);
 
-    *out_path = path;
-    *out_path_length = path_len;
+    return err;
+}
 
-    return path ? AGENTOS_SUCCESS : AGENTOS_ENOENT;
+/**
+ * @brief 初始化BFS搜索状态
+ */
+static agentos_error_t initialize_bfs_state(agentos_knowledge_graph_t* kg,
+                                           size_t start_idx,
+                                           char** queue,
+                                           int* in_queue,
+                                           path_node_t* visited) {
+    char* start_id = AGENTOS_STRDUP(kg->entities[start_idx]->id);
+    if (!start_id) {
+        return AGENTOS_ENOMEM;
+    }
+
+    queue[0] = start_id;
+    in_queue[start_idx] = 1;
+
+    visited[start_idx].id = AGENTOS_STRDUP(kg->entities[start_idx]->id);
+    if (!visited[start_idx].id) {
+        AGENTOS_FREE(start_id);
+        return AGENTOS_ENOMEM;
+    }
+
+    return AGENTOS_SUCCESS;
+}
+
+/**
+ * @brief 探索当前节点的邻居
+ */
+static int explore_neighbors(agentos_knowledge_graph_t* kg,
+                            size_t current_idx,
+                            size_t end_idx,
+                            int* in_queue,
+                            path_node_t* visited,
+                            char** queue,
+                            size_t* queue_back,
+                            const char* current) {
+    entity_node_t* node = kg->entities[current_idx];
+    agentos_relation_t* rel = node->relations;
+    int found = 0;
+
+    while (rel && !found) {
+        size_t neighbor_idx = find_entity_index(kg, rel->to_id);
+        if (neighbor_idx != SIZE_MAX && !in_queue[neighbor_idx]) {
+            char* neighbor_id = AGENTOS_STRDUP(rel->to_id);
+            if (!neighbor_id) {
+                rel = rel->next;
+                continue;
+            }
+
+            queue[(*queue_back)++] = neighbor_id;
+            in_queue[neighbor_idx] = 1;
+
+            visited[neighbor_idx].id = AGENTOS_STRDUP(rel->to_id);
+            visited[neighbor_idx].prev = AGENTOS_STRDUP(current);
+
+            if (neighbor_idx == end_idx) {
+                found = 1;
+            }
+        }
+        rel = rel->next;
+    }
+
+    return found;
+}
+
+/**
+ * @brief 处理BFS队列中的当前节点
+ */
+static int process_current_node(agentos_knowledge_graph_t* kg,
+                               size_t end_idx,
+                               int* in_queue,
+                               path_node_t* visited,
+                               char** queue,
+                               size_t* queue_front,
+                               size_t* queue_back,
+                               char* current) {
+    size_t current_idx = find_entity_index(kg, current);
+
+    if (current_idx == SIZE_MAX) {
+        AGENTOS_FREE(current);
+        return 0;
+    }
+
+    int found = explore_neighbors(kg, current_idx, end_idx, in_queue, visited,
+                                 queue, queue_back, current);
+
+    AGENTOS_FREE(current);
+    return found;
+}
+
+/**
+ * @brief BFS 搜索核心逻辑实现
+ */
+static agentos_error_t perform_bfs_search(agentos_knowledge_graph_t* kg,
+                                          size_t start_idx,
+                                          size_t end_idx,
+                                          path_node_t* visited,
+                                          int* in_queue,
+                                          char** queue) {
+    size_t queue_front = 0, queue_back = 0;
+    int found = 0;
+
+    agentos_error_t init_err = initialize_bfs_state(kg, start_idx, queue, in_queue, visited);
+    if (init_err != AGENTOS_SUCCESS) {
+        return init_err;
+    }
+
+    queue_back = 1;
+
+    while (queue_front < queue_back && !found) {
+        char* current = queue[queue_front++];
+        found = process_current_node(kg, end_idx, in_queue, visited,
+                                    queue, &queue_back, current);
+    }
+
+    if (found) {
+        return AGENTOS_SUCCESS;
+    }
+    return AGENTOS_ENOENT;
+}
+
+/**
+ * @brief 从终点回溯提取路径到临时数组
+ */
+static size_t extract_path_to_temp(agentos_knowledge_graph_t* kg,
+                                  size_t start_idx,
+                                  size_t end_idx,
+                                  path_node_t* visited,
+                                  char** temp_path) {
+    char* current = AGENTOS_STRDUP(kg->entities[end_idx]->id);
+    size_t idx = 0;
+
+    if (!current) {
+        return 0;
+    }
+
+    while (current && strcmp(current, kg->entities[start_idx]->id) != 0) {
+        if (idx >= MAX_PATH_LENGTH) {
+            AGENTOS_FREE(current);
+            goto cleanup;
+        }
+
+        size_t current_idx = find_entity_index(kg, current);
+        if (current_idx == SIZE_MAX || !visited[current_idx].id ||
+            strcmp(visited[current_idx].id, current) != 0) {
+            AGENTOS_FREE(current);
+            goto cleanup;
+        }
+
+        char* node_copy = AGENTOS_STRDUP(current);
+        if (!node_copy) {
+            AGENTOS_FREE(current);
+            goto cleanup;
+        }
+        temp_path[idx++] = node_copy;
+
+        char* prev = visited[current_idx].prev;
+        AGENTOS_FREE(current);
+
+        if (prev) {
+            current = AGENTOS_STRDUP(prev);
+            if (!current) {
+                goto cleanup;
+            }
+        } else {
+            current = NULL;
+        }
+    }
+
+    if (current && strcmp(current, kg->entities[start_idx]->id) == 0) {
+        if (idx < MAX_PATH_LENGTH) {
+            char* start_copy = AGENTOS_STRDUP(kg->entities[start_idx]->id);
+            if (!start_copy) {
+                AGENTOS_FREE(current);
+                goto cleanup;
+            }
+            temp_path[idx++] = start_copy;
+        }
+        AGENTOS_FREE(current);
+    } else if (current) {
+        AGENTOS_FREE(current);
+    }
+
+    return idx;
+
+cleanup:
+    /* 清理已分配的字符串 */
+    for (size_t i = 0; i < idx; i++) {
+        if (temp_path[i]) {
+            AGENTOS_FREE(temp_path[i]);
+            temp_path[i] = NULL;
+        }
+    }
+    return 0;
+}
+
+/**
+ * @brief 构建反转后的最终路径
+ */
+static char** build_reversed_path(char** temp_path, size_t idx, size_t* path_len) {
+    if (idx == 0) {
+        *path_len = 0;
+        return NULL;
+    }
+
+    char** path = (char**)AGENTOS_CALLOC(idx, sizeof(char*));
+    if (!path) {
+        *path_len = 0;
+        return NULL;
+    }
+
+    for (size_t i = 0; i < idx; i++) {
+        path[i] = temp_path[idx - 1 - i];
+    }
+
+    *path_len = idx;
+    return path;
+}
+
+
+
+/**
+ * @brief 从BFS结果重构路径实现
+ */
+static char** reconstruct_path_from_bfs(agentos_knowledge_graph_t* kg,
+                                        size_t start_idx,
+                                        size_t end_idx,
+                                        path_node_t* visited,
+                                        size_t* path_len) {
+    char** path = NULL;
+    *path_len = 0;
+
+    char** temp_path = (char**)AGENTOS_CALLOC(MAX_PATH_LENGTH, sizeof(char*));
+    if (!temp_path) {
+        return NULL;
+    }
+
+    size_t idx = extract_path_to_temp(kg, start_idx, end_idx, visited, temp_path);
+    if (idx == 0) {
+        AGENTOS_FREE(temp_path);
+        return NULL;
+    }
+
+    path = build_reversed_path(temp_path, idx, path_len);
+
+    /* 释放temp_path数组，但不释放其中的字符串（已转移到path） */
+    AGENTOS_FREE(temp_path);
+    return path;
 }

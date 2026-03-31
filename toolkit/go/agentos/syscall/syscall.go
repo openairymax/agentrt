@@ -11,7 +11,7 @@
 //   - Mock binding (for testing)
 //
 // The Convenience classes (TaskSyscall, MemorySyscall, SessionSyscall, TelemetrySyscall)
-// provide higher-level APIs for bases operations.
+// provide higher-level APIs for commons operations.
 
 //
 // Design Philosophy:

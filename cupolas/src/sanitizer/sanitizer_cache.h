@@ -5,8 +5,8 @@
  * @date 2024
  */
 
-#ifndef DOMAIN_SANITIZER_CACHE_H
-#define DOMAIN_SANITIZER_CACHE_H
+#ifndef CUPOLAS_SANITIZER_CACHE_H
+#define CUPOLAS_SANITIZER_CACHE_H
 
 #include "../platform/platform.h"
 #include "sanitizer.h"
@@ -28,4 +28,4 @@ void sanitizer_cache_clear(sanitizer_cache_t* cache);
 }
 #endif
 
-#endif /* DOMAIN_SANITIZER_CACHE_H */
+#endif /* CUPOLAS_SANITIZER_CACHE_H */

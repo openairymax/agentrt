@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentos"
-version = "1.0.0.5"
-description = "AgentOS Python SDK"
+version = "3.0.0"
+description = "AgentOS Python SDK - 官方多语言 SDK 集合"
 authors = [
-    { name = "AgentOS Team", email = "team@agentos.com" }
+    { name = "SpharxWorks", email = "team@spharx.com" }
 ]
 license = { file = "LICENSE" }
 readme = "README.md"

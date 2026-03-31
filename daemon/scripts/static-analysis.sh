@@ -56,7 +56,7 @@ run_analysis() {
     CPPCHECK_ARGS="$CPPCHECK_ARGS --inline-suppr"
     
     # 包含目录
-    CPPCHECK_ARGS="$CPPCHECK_ARGS -I ${BACKS_ROOT}/bases/include"
+    CPPCHECK_ARGS="$CPPCHECK_ARGS -I ${BACKS_ROOT}/commons/include"
     CPPCHECK_ARGS="$CPPCHECK_ARGS -I ${BACKS_ROOT}/llm_d/include"
     CPPCHECK_ARGS="$CPPCHECK_ARGS -I ${BACKS_ROOT}/tool_d/include"
     CPPCHECK_ARGS="$CPPCHECK_ARGS -I ${BACKS_ROOT}/market_d/include"
@@ -82,7 +82,7 @@ run_analysis() {
     log_info "分析源代码..."
     cppcheck $CPPCHECK_ARGS \
         --output-file="$XML_REPORT" \
-        "${BACKS_ROOT}/bases/src" \
+        "${BACKS_ROOT}/commons/src" \
         "${BACKS_ROOT}/llm_d/src" \
         "${BACKS_ROOT}/tool_d/src" \
         "${BACKS_ROOT}/market_d/src" \

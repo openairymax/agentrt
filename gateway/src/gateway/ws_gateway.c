@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file ws_gateway.c
  * @brief WebSocket网关实现 - libwebsockets集成
  * 
@@ -16,6 +16,7 @@
 #include "../auth.h"
 #include "../ratelimit.h"
 #include "../platform.h"
+#include "../utils/jsonrpc.h"
 
 #include <libwebsockets.h>
 #include <cJSON.h>
@@ -25,55 +26,8 @@
 #include <pthread.h>
 #include <stdatomic.h>
 
-/* ========== JSON-RPC辅助函数 ========== */
-
-/**
- * @brief 创建JSON-RPC 2.0错误响应
- * @param id 请求ID
- * @param code 错误码
- * @param message 错误消息
- * @param data 错误数据
- * @return JSON字符串，需调用者free
- */
-static char* create_jsonrpc_error_response(cJSON* id, int code, const char* message, cJSON* data) {
-    cJSON* response = cJSON_CreateObject();
-    cJSON* error = cJSON_CreateObject();
-    
-    cJSON_AddNumberToObject(error, "code", code);
-    cJSON_AddStringToObject(error, "message", message ? message : "Internal error");
-    
-    if (data) {
-        cJSON_AddItemToObject(error, "data", data);
-    }
-    
-    cJSON_AddStringToObject(response, "jsonrpc", "2.0");
-    cJSON_AddItemToObject(response, "error", error);
-    cJSON_AddItemToObject(response, "id", id ? cJSON_Duplicate(id, 1) : cJSON_CreateNull());
-    
-    char* json_str = cJSON_PrintUnformatted(response);
-    cJSON_Delete(response);
-    
-    return json_str;
-}
-
-/**
- * @brief 创建JSON-RPC 2.0成功响应
- * @param id 请求ID
- * @param result 结果对象
- * @return JSON字符串，需调用者free
- */
-static char* create_jsonrpc_success_response(cJSON* id, cJSON* result) {
-    cJSON* response = cJSON_CreateObject();
-    
-    cJSON_AddStringToObject(response, "jsonrpc", "2.0");
-    cJSON_AddItemToObject(response, "result", result ? result : cJSON_CreateNull());
-    cJSON_AddItemToObject(response, "id", id ? cJSON_Duplicate(id, 1) : cJSON_CreateNull());
-    
-    char* json_str = cJSON_PrintUnformatted(response);
-    cJSON_Delete(response);
-    
-    return json_str;
-}
+/* ========== JSON-RPC 2.0处理（使用公共模块） ========== */
+/* JSON-RPC 函数已移至 utils/jsonrpc.c */
 
 /* ========== 系统调用处理 ========== */
 
@@ -117,10 +71,10 @@ static char* handle_system_call(ws_connection_context_t* context, const char* me
     }
     else {
         cJSON_Delete(response);
-        return create_jsonrpc_error_response(NULL, -32601, "Method not found", NULL);
+        return jsonrpc_create_error_response(NULL, -32601, "Method not found", NULL);
     }
     
-    return create_jsonrpc_success_response(NULL, response);
+    return jsonrpc_create_success_response(NULL, response);
 }
 
 /* ========== WebSocket网关内部结构 ========== */
@@ -375,12 +329,12 @@ static char* handle_rpc_request(ws_connection_context_t* context, cJSON* request
     cJSON* params = cJSON_GetObjectItem(request, "params");
     
     if (!id || !method || !cJSON_IsString(method)) {
-        return create_jsonrpc_error_response(id, -32600, "Invalid Request", NULL);
+        return jsonrpc_create_error_response(id, -32600, "Invalid Request", NULL);
     }
     
     /* 验证会话（除了创建会话的请求） */
     if (strcmp(method->valuestring, "agentos_sys_session_create") != 0 && !context->session_id) {
-        return create_jsonrpc_error_response(id, -32001, "Authentication required", NULL);
+        return jsonrpc_create_error_response(id, -32001, "Authentication required", NULL);
     }
     
     /* 处理系统调用（与HTTP网关相同的逻辑） */

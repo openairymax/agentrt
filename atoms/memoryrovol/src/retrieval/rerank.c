@@ -1,4 +1,4 @@
-/**
+﻿﻿﻿﻿/**
  * @file rerank.c
  * @brief 检索结果重排序（基于交叉编码器，带降级�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -11,13 +11,13 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h"
-#include "../../../bases/utils/string/include/string_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 #include <errno.h>
 
 struct agentos_reranker {
-    agentos_llm_service_t* llm;          /**< LLM服务，用于交叉编�?*/
+    agentos_llm_service_t* llm;          /**< LLM服务，用于交叉编码器 */
     agentos_layer1_raw_t* layer1;         /**< 原始层，用于获取文档文本 */
     agentos_mutex_t* lock;
     int use_llm;                          /**< 是否使用LLM（降级标志） */

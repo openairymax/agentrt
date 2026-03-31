@@ -6,6 +6,12 @@
   "type": "object",
   "required": ["_config_version", "rules"],
   "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "JSON Schema reference for this configuration file",
+      "examples": ["https://agentos.spharx.ai/schemas/sanitizer-rules-v1.schema.json"]
+    },
     "_config_version": {
       "type": "string",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
@@ -34,39 +40,46 @@
           "rule_id": {
             "type": "string",
             "pattern": "^[A-Z][A-Z0-9_]*_\\d{3}$",
-            "description": "Unique rule identifier (e.g., XSS_SCRIPT_001)"
+            "description": "Unique rule identifier (e.g., XSS_SCRIPT_001)",
+            "examples": ["XSS_SCRIPT_001", "SQL_INJECT_002", "CMD_EXEC_003"]
           },
           "type": {
             "type": "string",
             "enum": ["block", "warn", "sanitize", "audit"],
-            "description": "Rule action type"
+            "description": "Rule action type",
+            "examples": ["block", "sanitize", "warn"]
           },
           "pattern": {
             "type": "string",
-            "description": "Regex pattern to match"
+            "description": "Regex pattern to match",
+            "examples": ["<script[^>]*>.*?</script>", "(\\\\b)(union|select|insert|delete)(\\\\b)", "../"]
           },
           "replace": {
             "type": "string",
-            "description": "Replacement string for sanitize type"
+            "description": "Replacement string for sanitize type",
+            "examples": ["[BLOCKED]", "", "[SANITIZED]"]
           },
           "description": {
             "type": "string",
             "minLength": 10,
             "maxLength": 500,
-            "description": "Human-readable description"
+            "description": "Human-readable description",
+            "examples": ["Block XSS script injection attacks", "Sanitize SQL keywords to prevent injection", "Warn on path traversal attempts"]
           },
           "priority": {
             "type": "integer",
             "minimum": 0,
             "maximum": 1000,
             "default": 50,
-            "description": "Rule evaluation priority"
+            "description": "Rule evaluation priority (higher = evaluated first)",
+            "examples": [10, 50, 100, 500]
           },
           "severity": {
             "type": "string",
             "enum": ["low", "medium", "high", "critical"],
             "default": "medium",
-            "description": "Rule severity level"
+            "description": "Rule severity level",
+            "examples": ["medium", "high", "critical"]
           },
           "category": {
             "type": "string",
@@ -74,21 +87,25 @@
               "xss", "sql_injection", "path_traversal", "command_injection",
               "pii", "sensitive_data", "prompt_injection", "malware", "other"
             ],
-            "description": "Vulnerability category"
+            "description": "Vulnerability category",
+            "examples": ["xss", "sql_injection", "command_injection"]
           },
           "cwe": {
             "type": "string",
             "pattern": "^CWE-\\d+$",
-            "description": "CWE identifier (e.g., CWE-79)"
+            "description": "CWE identifier (e.g., CWE-79)",
+            "examples": ["CWE-79", "CWE-89", "CWE-78"]
           },
           "owasp": {
             "type": "string",
-            "description": "OWASP Top 10 category"
+            "description": "OWASP Top 10 category",
+            "examples": ["A03:2021", "A01:2021", "A10:2021"]
           },
           "enabled": {
             "type": "boolean",
             "default": true,
-            "description": "Whether rule is enabled"
+            "description": "Whether rule is enabled",
+            "examples": [true, false]
           },
           "created_at": {
             "type": "string",
@@ -128,31 +145,36 @@
           "minimum": 100,
           "maximum": 10000000,
           "default": 100000,
-          "description": "Maximum input length in characters"
+          "description": "Maximum input length in characters",
+          "examples": [10000, 100000, 1000000]
         },
         "max_recursion_depth": {
           "type": "integer",
           "minimum": 1,
           "maximum": 100,
           "default": 10,
-          "description": "Maximum recursion depth for nested patterns"
+          "description": "Maximum recursion depth for nested patterns",
+          "examples": [5, 10, 20]
         },
         "timeout_ms": {
           "type": "integer",
           "minimum": 10,
           "maximum": 10000,
           "default": 1000,
-          "description": "Sanitization timeout in milliseconds"
+          "description": "Sanitization timeout in milliseconds",
+          "examples": [100, 500, 1000, 2000]
         },
         "log_all_matches": {
           "type": "boolean",
           "default": false,
-          "description": "Log all pattern matches"
+          "description": "Log all pattern matches",
+          "examples": [true, false]
         },
         "fail_closed": {
           "type": "boolean",
           "default": true,
-          "description": "Block input on sanitization error"
+          "description": "Block input on sanitization error",
+          "examples": [true, false]
         }
       }
     }

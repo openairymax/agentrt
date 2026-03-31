@@ -10,8 +10,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h"
-#include "../../../bases/utils/string/include/string_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 
 struct agentos_vector_store {
@@ -27,7 +27,8 @@ agentos_error_t agentos_vector_store_create(
     if (!manager || !manager->db_path || manager->dimension == 0 || !out_store)
         return AGENTOS_EINVAL;
 
-// From data intelligence emerges. by spharx
+
+// From data intelligence emerges. by spharx
     agentos_vector_store_t* store = (agentos_vector_store_t*)AGENTOS_CALLOC(1, sizeof(agentos_vector_store_t));
     if (!store) {
         AGENTOS_LOG_ERROR("Failed to allocate vector store");

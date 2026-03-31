@@ -58,20 +58,20 @@ class ScanResult:
 class SASTScanner:
     """
     静态应用安全测试扫描器
-    
+
     集成多种SAST工具进行代码安全扫描。
     """
-    
+
     def __init__(self, target_dir: str):
         """
         初始化SAST扫描器
-        
+
         Args:
             target_dir: 扫描目标目录
         """
         self.target_dir = Path(target_dir)
         self.results: List[ScanResult] = []
-        
+
         self.patterns = {
             "hardcoded_password": [
                 (r'password\s*=\s*["\'][^"\']+["\']', "CWE-798", "A07:2021"),
@@ -100,30 +100,30 @@ class SASTScanner:
                 (r'subprocess\.call\s*\([^)]*shell\s*=\s*True', "CWE-78", "A03:2021"),
             ],
         }
-    
+
     def scan_python_file(self, file_path: Path) -> List[Vulnerability]:
         """
         扫描Python文件
-        
+
         Args:
             file_path: 文件路径
-            
+
         Returns:
             发现的漏洞列表
         """
         vulnerabilities = []
-        
+
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 lines = f.readlines()
-            
+
             for line_num, line in enumerate(lines, 1):
                 for vuln_type, patterns in self.patterns.items():
                     for pattern, cwe_id, owasp in patterns:
                         if re.search(pattern, line, re.IGNORECASE):
                             if 'test' in str(file_path).lower():
                                 continue
-                            
+
                             vuln = Vulnerability(
                                 id=f"SAST-{vuln_type.upper()}-{line_num}",
                                 name=f"Potential {vuln_type.replace('_', ' ').title()}",
@@ -141,21 +141,21 @@ class SASTScanner:
                             vulnerabilities.append(vuln)
         except Exception:
             pass
-        
+
         return vulnerabilities
-    
+
     def scan_c_file(self, file_path: Path) -> List[Vulnerability]:
         """
         扫描C文件
-        
+
         Args:
             file_path: 文件路径
-            
+
         Returns:
             发现的漏洞列表
         """
         vulnerabilities = []
-        
+
         c_patterns = {
             "buffer_overflow": [
                 (r'strcpy\s*\(', "CWE-120", "A06:2021"),
@@ -171,18 +171,18 @@ class SASTScanner:
                 (r'malloc\s*\([^)]*\)(?![^;]*free)', "CWE-401", "A06:2021"),
             ],
         }
-        
+
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 lines = f.readlines()
-            
+
             for line_num, line in enumerate(lines, 1):
                 for vuln_type, patterns in c_patterns.items():
                     for pattern, cwe_id, owasp in patterns:
                         if re.search(pattern, line):
                             if 'test' in str(file_path).lower():
                                 continue
-                            
+
                             vuln = Vulnerability(
                                 id=f"SAST-{vuln_type.upper()}-{line_num}",
                                 name=f"Potential {vuln_type.replace('_', ' ').title()}",
@@ -198,9 +198,9 @@ class SASTScanner:
                             vulnerabilities.append(vuln)
         except Exception:
             pass
-        
+
         return vulnerabilities
-    
+
     def _get_recommendation(self, vuln_type: str) -> str:
         """获取修复建议"""
         recommendations = {
@@ -215,27 +215,27 @@ class SASTScanner:
             "memory_leak": "确保每个malloc都有对应的free，考虑使用RAII模式",
         }
         return recommendations.get(vuln_type, "请参考安全编码最佳实践")
-    
+
     def run_full_scan(self) -> ScanResult:
         """
         运行完整扫描
-        
+
         Returns:
             扫描结果
         """
         result = ScanResult(scanner="SAST")
-        
+
         for ext, scanner in [('.py', self.scan_python_file), ('.c', self.scan_c_file)]:
             for file_path in self.target_dir.rglob(f'*{ext}'):
                 vulns = scanner(file_path)
                 result.vulnerabilities.extend(vulns)
-        
+
         result.total_findings = len(result.vulnerabilities)
         result.critical_count = len([v for v in result.vulnerabilities if v.severity == Severity.CRITICAL])
         result.high_count = len([v for v in result.vulnerabilities if v.severity == Severity.HIGH])
         result.medium_count = len([v for v in result.vulnerabilities if v.severity == Severity.MEDIUM])
         result.low_count = len([v for v in result.vulnerabilities if v.severity == Severity.LOW])
-        
+
         self.results.append(result)
         return result
 
@@ -243,41 +243,41 @@ class SASTScanner:
 class DASTScanner:
     """
     动态应用安全测试扫描器
-    
+
     运行时安全测试和依赖漏洞扫描。
     """
-    
+
     def __init__(self, target_dir: str):
         """
         初始化DAST扫描器
-        
+
         Args:
             target_dir: 扫描目标目录
         """
         self.target_dir = Path(target_dir)
         self.results: List[ScanResult] = []
-    
+
     def check_dependency_vulnerabilities(self) -> ScanResult:
         """
         检查依赖漏洞
-        
+
         Returns:
             扫描结果
         """
         result = ScanResult(scanner="DAST-Dependency")
-        
+
         requirements_file = self.target_dir / "requirements.txt"
-        
+
         if requirements_file.exists():
             try:
                 with open(requirements_file, 'r', encoding='utf-8') as f:
                     lines = f.readlines()
-                
+
                 for line_num, line in enumerate(lines, 1):
                     line = line.strip()
                     if not line or line.startswith('#'):
                         continue
-                    
+
                     if '==' not in line:
                         vuln = Vulnerability(
                             id=f"DEP-UNPINNED-{line_num}",
@@ -292,20 +292,20 @@ class DASTScanner:
                         result.vulnerabilities.append(vuln)
             except Exception:
                 pass
-        
+
         result.total_findings = len(result.vulnerabilities)
         self.results.append(result)
         return result
-    
+
     def check_security_headers(self) -> ScanResult:
         """
         检查安全头配置
-        
+
         Returns:
             扫描结果
         """
         result = ScanResult(scanner="DAST-Headers")
-        
+
         recommended_headers = [
             "Content-Security-Policy",
             "X-Content-Type-Options",
@@ -313,26 +313,26 @@ class DASTScanner:
             "Strict-Transport-Security",
             "X-XSS-Protection",
         ]
-        
+
         for file_path in self.target_dir.rglob('*.py'):
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     content = f.read()
-                
+
                 for header in recommended_headers:
                     if header.lower().replace('-', '_') not in content.lower():
                         pass
             except Exception:
                 pass
-        
+
         result.total_findings = len(result.vulnerabilities)
         self.results.append(result)
         return result
-    
+
     def run_full_scan(self) -> List[ScanResult]:
         """
         运行完整DAST扫描
-        
+
         Returns:
             扫描结果列表
         """
@@ -344,31 +344,31 @@ class DASTScanner:
 class SecurityScanOrchestrator:
     """
     安全扫描编排器
-    
+
     协调SAST和DAST扫描，生成综合报告。
     """
-    
+
     def __init__(self, target_dir: str):
         """
         初始化安全扫描编排器
-        
+
         Args:
             target_dir: 扫描目标目录
         """
         self.target_dir = target_dir
         self.sast = SASTScanner(target_dir)
         self.dast = DASTScanner(target_dir)
-    
+
     def run_all_scans(self) -> Dict[str, Any]:
         """
         运行所有安全扫描
-        
+
         Returns:
             综合扫描结果
         """
         sast_result = self.sast.run_full_scan()
         dast_results = self.dast.run_full_scan()
-        
+
         return {
             "timestamp": datetime.now().isoformat(),
             "target": self.target_dir,
@@ -407,14 +407,14 @@ class SecurityScanOrchestrator:
                 "scan_passed": (sast_result.critical_count + sast_result.high_count) == 0
             }
         }
-    
+
     def generate_report(self, results: Dict[str, Any]) -> str:
         """
         生成安全扫描报告
-        
+
         Args:
             results: 扫描结果
-            
+
         Returns:
             Markdown格式报告
         """
@@ -441,7 +441,7 @@ class SecurityScanOrchestrator:
             f"- 低危: {results['sast']['low']}",
             "",
         ]
-        
+
         if results['sast']['vulnerabilities']:
             report.extend([
                 "### 发现的漏洞",
@@ -449,13 +449,13 @@ class SecurityScanOrchestrator:
                 "| ID | 名称 | 严重程度 | 文件 | 行号 |",
                 "|----|----|----------|------|------|",
             ])
-            
+
             for v in results['sast']['vulnerabilities'][:20]:
                 report.append(
                     f"| {v['id']} | {v['name']} | {v['severity'].upper()} | "
                     f"{Path(v['file']).name} | {v['line']} |"
                 )
-        
+
         report.extend([
             "",
             "---",
@@ -463,24 +463,24 @@ class SecurityScanOrchestrator:
             "*报告由 AgentOS 安全扫描框架生成*",
             "*Copyright (c) 2026 SPHARX Ltd.*"
         ])
-        
+
         return "\n".join(report)
 
 
 def run_security_scan(target_dir: str = ".") -> Dict[str, Any]:
     """
     运行安全扫描
-    
+
     Args:
         target_dir: 扫描目标目录
-        
+
     Returns:
         扫描结果
     """
     orchestrator = SecurityScanOrchestrator(target_dir)
     results = orchestrator.run_all_scans()
     report = orchestrator.generate_report(results)
-    
+
     return {
         "results": results,
         "report": report,
@@ -493,11 +493,11 @@ if __name__ == "__main__":
     print("AgentOS SAST/DAST 安全扫描框架")
     print("Copyright (c) 2026 SPHARX Ltd.")
     print("=" * 60)
-    
+
     scan_result = run_security_scan(".")
-    
+
     print("\n" + scan_result["report"])
-    
+
     if not scan_result["passed"]:
         print("\n⚠️ 发现安全漏洞，请修复！")
         exit(1)

@@ -4,9 +4,9 @@
  *
  * 本文件提�?gateway 模块特定的平台实现：
  * - Windows getopt_long 实现
- * - time_ns() 包装函数（映射到 bases 模块�?agentos_time_ns�?
+ * - time_ns() 包装函数（映射到 commons 模块�?agentos_time_ns�?
  *
- * 其他平台功能�?bases/platform/platform.c 提供
+ * 其他平台功能�?commons/platform/platform.c 提供
  *
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
@@ -142,7 +142,7 @@ int getopt_long(int argc, char* const argv[], const char* optstring,
 /**
  * @brief 获取当前时间（纳秒）- 包装函数
  *
- * 此函数映射到 bases 模块�?agentos_time_ns()
+ * 此函数映射到 commons 模块�?agentos_time_ns()
  * 使用 CLOCK_MONOTONIC 保证单调�?
  *
  * @return 当前时间纳秒�?

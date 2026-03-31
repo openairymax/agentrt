@@ -1,4 +1,4 @@
-﻿// AgentOS TypeScript SDK - Task Manager Module
+// AgentOS TypeScript SDK - Task Manager Module
 // Version: 3.0.0
 // Last updated: 2026-03-24
 //
@@ -22,6 +22,8 @@ import {
   parseTime,
   buildListPath,
   parseList,
+  validateAndExtractData,
+  validateRequiredString,
 } from '../utils';
 import { DEFAULT_POLL_INTERVAL_MS } from '../manager';
 
@@ -44,19 +46,14 @@ export class TaskManager {
    * @param description - 任务描述
    */
   async submit(description: string): Promise<Task> {
-    if (!description) {
-      throw new AgentOSError('任务描述不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(description, '任务描述');
 
     const resp = await this.api.post<APIResponse<{ task_id: string }>>(
       '/api/v1/tasks',
       { description },
     );
 
-    const data = extractDataMap(resp);
-    if (!data) {
-      throw new AgentOSError('任务创建响应格式异常', ErrorCode.INVALID_RESPONSE);
-    }
+    const data = validateAndExtractData(resp, '任务创建响应格式异常');
 
     return {
       id: getString(data, 'task_id'),
@@ -79,9 +76,7 @@ export class TaskManager {
     priority: number,
     metadata?: Record<string, unknown>,
   ): Promise<Task> {
-    if (!description) {
-      throw new AgentOSError('任务描述不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(description, '任务描述');
 
     const body: Record<string, unknown> = { description, priority };
     if (metadata) {
@@ -93,10 +88,7 @@ export class TaskManager {
       body,
     );
 
-    const data = extractDataMap(resp);
-    if (!data) {
-      throw new AgentOSError('任务创建响应格式异常', ErrorCode.INVALID_RESPONSE);
-    }
+    const data = validateAndExtractData(resp, '任务创建响应格式异常');
 
     return {
       id: getString(data, 'task_id'),
@@ -114,15 +106,10 @@ export class TaskManager {
    * @param taskId - 任务 ID
    */
   async get(taskId: string): Promise<Task> {
-    if (!taskId) {
-      throw new AgentOSError('任务ID不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(taskId, '任务ID');
 
     const resp = await this.api.get<APIResponse>(`/api/v1/tasks/${taskId}`);
-    const data = extractDataMap(resp);
-    if (!data) {
-      throw new AgentOSError('任务详情响应格式异常', ErrorCode.INVALID_RESPONSE);
-    }
+    const data = validateAndExtractData(resp, '任务详情响应格式异常');
 
     return this.parseTaskFromMap(data);
   }
@@ -177,9 +164,7 @@ export class TaskManager {
    * @param taskId - 任务 ID
    */
   async cancel(taskId: string): Promise<void> {
-    if (!taskId) {
-      throw new AgentOSError('任务ID不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(taskId, '任务ID');
     await this.api.post(`/api/v1/tasks/${taskId}/cancel`);
   }
 
@@ -198,9 +183,7 @@ export class TaskManager {
    * @param taskId - 任务 ID
    */
   async delete(taskId: string): Promise<void> {
-    if (!taskId) {
-      throw new AgentOSError('任务ID不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(taskId, '任务ID');
     await this.api.delete(`/api/v1/tasks/${taskId}`);
   }
 

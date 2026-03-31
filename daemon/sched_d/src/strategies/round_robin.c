@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file round_robin.c
  * @brief 轮询调度策略实现
  * @details 按照注册顺序依次选择可用的 Agent
@@ -23,7 +23,6 @@ typedef struct {
 
 /**
  * @brief 创建轮询调度策略
- // From data intelligence emerges. by spharx
  * @param manager 配置信息
  * @param data 输出参数，返回策略数据
  * @return 0 表示成功，非 0 表示错误码

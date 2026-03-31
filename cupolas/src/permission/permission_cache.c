@@ -30,7 +30,7 @@ static char* build_cache_key(const char* agent_id, const char* action,
     size_t context_len = context ? strlen(context) : 0;
     
     size_t total_len = agent_len + 1 + action_len + 1 + resource_len + 1 + context_len + 1;
-    char* key = (char*)domes_mem_alloc(total_len);
+    char* key = (char*)cupolas_mem_alloc(total_len);
     if (!key) return NULL;
     
     char* p = key;
@@ -71,7 +71,7 @@ cache_manager_t* cache_manager_create(size_t capacity, uint32_t ttl_ms) {
         capacity = 1024;
     }
     
-    cache_manager_t* cm = (cache_manager_t*)domes_mem_alloc(sizeof(cache_manager_t));
+    cache_manager_t* cm = (cache_manager_t*)cupolas_mem_alloc(sizeof(cache_manager_t));
     if (!cm) return NULL;
     
     memset(cm, 0, sizeof(cache_manager_t));
@@ -84,9 +84,9 @@ cache_manager_t* cache_manager_create(size_t capacity, uint32_t ttl_ms) {
         bucket_count = MAX_BUCKET_COUNT;
     }
     
-    cm->buckets = (cache_entry_t**)domes_mem_alloc(bucket_count * sizeof(cache_entry_t*));
+    cm->buckets = (cache_entry_t**)cupolas_mem_alloc(bucket_count * sizeof(cache_entry_t*));
     if (!cm->buckets) {
-        domes_mem_free(cm);
+        cupolas_mem_free(cm);
         return NULL;
     }
     memset(cm->buckets, 0, bucket_count * sizeof(cache_entry_t*));
@@ -95,9 +95,9 @@ cache_manager_t* cache_manager_create(size_t capacity, uint32_t ttl_ms) {
     cm->capacity = capacity;
     cm->ttl_ms = ttl_ms;
     
-    if (domes_mutex_init(&cm->lock) != DOMES_OK) {
-        domes_mem_free(cm->buckets);
-        domes_mem_free(cm);
+    if (cupolas_mutex_init(&cm->lock) != cupolas_OK) {
+        cupolas_mem_free(cm->buckets);
+        cupolas_mem_free(cm);
         return NULL;
     }
     
@@ -107,21 +107,21 @@ cache_manager_t* cache_manager_create(size_t capacity, uint32_t ttl_ms) {
 void cache_manager_destroy(cache_manager_t* cm) {
     if (!cm) return;
     
-    domes_mutex_lock(&cm->lock);
+    cupolas_mutex_lock(&cm->lock);
     
     cache_entry_t* entry = cm->head;
     while (entry) {
         cache_entry_t* next = entry->next;
-        domes_mem_free(entry->key);
-        domes_mem_free(entry);
+        cupolas_mem_free(entry->key);
+        cupolas_mem_free(entry);
         entry = next;
     }
     
-    domes_mem_free(cm->buckets);
+    cupolas_mem_free(cm->buckets);
     
-    domes_mutex_unlock(&cm->lock);
-    domes_mutex_destroy(&cm->lock);
-    domes_mem_free(cm);
+    cupolas_mutex_unlock(&cm->lock);
+    cupolas_mutex_destroy(&cm->lock);
+    cupolas_mem_free(cm);
 }
 
 static void move_to_head(cache_manager_t* cm, cache_entry_t* entry) {
@@ -172,8 +172,8 @@ static void remove_entry(cache_manager_t* cm, cache_entry_t* entry) {
         cm->tail = entry->prev;
     }
     
-    domes_mem_free(entry->key);
-    domes_mem_free(entry);
+    cupolas_mem_free(entry->key);
+    cupolas_mem_free(entry);
     cm->size--;
 }
 
@@ -203,33 +203,33 @@ int cache_manager_get(cache_manager_t* cm,
     
     uint32_t hash = hash_string(key);
     
-    domes_mutex_lock(&cm->lock);
+    cupolas_mutex_lock(&cm->lock);
     
     cache_entry_t* entry = find_entry(cm, hash, key);
     
     if (entry) {
         if (cm->ttl_ms > 0) {
-            uint64_t now = domes_time_ms();
+            uint64_t now = cupolas_time_ms();
             if (now - entry->timestamp_ms > cm->ttl_ms) {
                 remove_entry(cm, entry);
-                domes_atomic_add64(&cm->miss_count, 1);
-                domes_mutex_unlock(&cm->lock);
-                domes_mem_free(key);
+                cupolas_atomic_add64(&cm->miss_count, 1);
+                cupolas_mutex_unlock(&cm->lock);
+                cupolas_mem_free(key);
                 return -1;
             }
         }
         
         move_to_head(cm, entry);
         int result = entry->result;
-        domes_atomic_add64(&cm->hit_count, 1);
-        domes_mutex_unlock(&cm->lock);
-        domes_mem_free(key);
+        cupolas_atomic_add64(&cm->hit_count, 1);
+        cupolas_mutex_unlock(&cm->lock);
+        cupolas_mem_free(key);
         return result;
     }
     
-    domes_atomic_add64(&cm->miss_count, 1);
-    domes_mutex_unlock(&cm->lock);
-    domes_mem_free(key);
+    cupolas_atomic_add64(&cm->miss_count, 1);
+    cupolas_mutex_unlock(&cm->lock);
+    cupolas_mem_free(key);
     return -1;
 }
 
@@ -246,16 +246,16 @@ void cache_manager_put(cache_manager_t* cm,
     
     uint32_t hash = hash_string(key);
     
-    domes_mutex_lock(&cm->lock);
+    cupolas_mutex_lock(&cm->lock);
     
     cache_entry_t* entry = find_entry(cm, hash, key);
     
     if (entry) {
         entry->result = result;
-        entry->timestamp_ms = domes_time_ms();
+        entry->timestamp_ms = cupolas_time_ms();
         move_to_head(cm, entry);
-        domes_mutex_unlock(&cm->lock);
-        domes_mem_free(key);
+        cupolas_mutex_unlock(&cm->lock);
+        cupolas_mem_free(key);
         return;
     }
     
@@ -263,16 +263,16 @@ void cache_manager_put(cache_manager_t* cm,
         remove_entry(cm, cm->tail);
     }
     
-    entry = (cache_entry_t*)domes_mem_alloc(sizeof(cache_entry_t));
+    entry = (cache_entry_t*)cupolas_mem_alloc(sizeof(cache_entry_t));
     if (!entry) {
-        domes_mutex_unlock(&cm->lock);
-        domes_mem_free(key);
+        cupolas_mutex_unlock(&cm->lock);
+        cupolas_mem_free(key);
         return;
     }
     
     entry->key = key;
     entry->result = result;
-    entry->timestamp_ms = domes_time_ms();
+    entry->timestamp_ms = cupolas_time_ms();
     entry->hash = hash;
     entry->prev = NULL;
     entry->next = cm->head;
@@ -292,19 +292,19 @@ void cache_manager_put(cache_manager_t* cm,
     
     cm->size++;
     
-    domes_mutex_unlock(&cm->lock);
+    cupolas_mutex_unlock(&cm->lock);
 }
 
 void cache_manager_clear(cache_manager_t* cm) {
     if (!cm) return;
     
-    domes_mutex_lock(&cm->lock);
+    cupolas_mutex_lock(&cm->lock);
     
     cache_entry_t* entry = cm->head;
     while (entry) {
         cache_entry_t* next = entry->next;
-        domes_mem_free(entry->key);
-        domes_mem_free(entry);
+        cupolas_mem_free(entry->key);
+        cupolas_mem_free(entry);
         entry = next;
     }
     
@@ -313,7 +313,7 @@ void cache_manager_clear(cache_manager_t* cm) {
     cm->tail = NULL;
     cm->size = 0;
     
-    domes_mutex_unlock(&cm->lock);
+    cupolas_mutex_unlock(&cm->lock);
 }
 
 void cache_manager_stats(cache_manager_t* cm, uint64_t* hit_count, uint64_t* miss_count) {
@@ -323,6 +323,6 @@ void cache_manager_stats(cache_manager_t* cm, uint64_t* hit_count, uint64_t* mis
         return;
     }
     
-    if (hit_count) *hit_count = domes_atomic_load64(&cm->hit_count);
-    if (miss_count) *miss_count = domes_atomic_load64(&cm->miss_count);
+    if (hit_count) *hit_count = cupolas_atomic_load64(&cm->hit_count);
+    if (miss_count) *miss_count = cupolas_atomic_load64(&cm->miss_count);
 }

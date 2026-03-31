@@ -1,4 +1,4 @@
-﻿# AgentOS Python SDK - Utilities Module
+# AgentOS Python SDK - Utilities Module
 # Version: 3.0.0
 # Last updated: 2026-03-24
 
@@ -6,7 +6,7 @@
 Utility functions for AgentOS Python SDK.
 
 Provides type-safe map data extraction, API response parsing,
-URL building, and other bases utility functions.
+URL building, and other commons utility functions.
 
 Corresponds to Go SDK: utils/helpers.go
 """
@@ -386,3 +386,113 @@ def append_pagination(params: Optional[Dict[str, str]], page: int, page_size: in
     if page_size > 0:
         params["page_size"] = str(page_size)
     return params
+
+
+# ============================================================
+# 响应验证和提取函数
+# ============================================================
+
+def validate_and_extract_data(
+    resp: Optional[Any],
+    error_msg: str = "响应格式异常",
+    error_code: int = None
+) -> Dict[str, Any]:
+    """
+    验证并提取响应数据，如果数据无效则抛出错误。
+
+    Args:
+        resp: APIResponse 对象
+        error_msg: 错误消息
+        error_code: 错误码（可选）
+
+    Returns:
+        Dict[str, Any]: 提取的数据字典
+
+    Raises:
+        AgentOSError: 响应数据无效
+
+    Example:
+        >>> from agentos.exceptions import CODE_INVALID_RESPONSE
+        >>> data = validate_and_extract_data(resp, "任务创建响应格式异常", CODE_INVALID_RESPONSE)
+    """
+    from ..exceptions import AgentOSError, CODE_INVALID_RESPONSE
+
+    data = extract_data_map(resp)
+    if not data:
+        code = error_code if error_code is not None else CODE_INVALID_RESPONSE
+        raise AgentOSError(error_msg, error_code=code)
+    return data
+
+
+# ============================================================
+# 参数校验函数
+# ============================================================
+
+def validate_required_string(value: Optional[str], param_name: str, error_code: int = None) -> None:
+    """
+    验证字符串参数不为空。
+
+    Args:
+        value: 参数值
+        param_name: 参数名称
+        error_code: 错误码（可选）
+
+    Raises:
+        AgentOSError: 参数为空
+
+    Example:
+        >>> validate_required_string(task_id, "任务ID")
+    """
+    from ..exceptions import AgentOSError, CODE_MISSING_PARAMETER
+
+    if not value or (isinstance(value, str) and value.strip() == ""):
+        code = error_code if error_code is not None else CODE_MISSING_PARAMETER
+        raise AgentOSError(f"{param_name}不能为空", error_code=code)
+
+
+def validate_positive_number(value: number, param_name: str, error_code: int = None) -> None:
+    """
+    验证数字参数为正数。
+
+    Args:
+        value: 参数值
+        param_name: 参数名称
+        error_code: 错误码（可选）
+
+    Raises:
+        AgentOSError: 参数不是正数
+
+    Example:
+        >>> validate_positive_number(timeout, "超时时间")
+    """
+    from ..exceptions import AgentOSError, CODE_INVALID_PARAMETER
+
+    if value <= 0:
+        code = error_code if error_code is not None else CODE_INVALID_PARAMETER
+        raise AgentOSError(f"{param_name}必须为正数", error_code=code)
+
+
+def validate_non_empty_list(value: Optional[List[Any]], param_name: str, error_code: int = None) -> None:
+    """
+    验证列表参数不为空。
+
+    Args:
+        value: 参数值
+        param_name: 参数名称
+        error_code: 错误码（可选）
+
+    Raises:
+        AgentOSError: 参数为空列表
+
+    Example:
+        >>> validate_non_empty_list(task_ids, "任务ID列表")
+    """
+    from ..exceptions import AgentOSError, CODE_MISSING_PARAMETER
+
+    if not value or len(value) == 0:
+        code = error_code if error_code is not None else CODE_MISSING_PARAMETER
+        raise AgentOSError(f"{param_name}不能为空", error_code=code)
+
+
+# 类型别名，用于类型提示
+number = Union[int, float]

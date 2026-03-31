@@ -16,7 +16,7 @@ AGENTOS_SCRIPTS_DIR="$(dirname "$AGENTOS_SCRIPT_DIR")"
 AGENTOS_PROJECT_ROOT="$(dirname "$AGENTOS_SCRIPTS_DIR")"
 AGENTOS_LIB_DIR="$AGENTOS_SCRIPTS_DIR/lib"
 AGENTOS_CONFIG_DIR="$AGENTOS_PROJECT_ROOT/manager"
-AGENTOS_lodges_DIR="$AGENTOS_PROJECT_ROOT/lodges"
+AGENTOS_heapstore_DIR="$AGENTOS_PROJECT_ROOT/heapstore"
 
 ###############################################################################
 # 加载依赖模块

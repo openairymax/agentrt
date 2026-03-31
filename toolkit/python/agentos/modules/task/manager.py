@@ -22,7 +22,8 @@ from ...exceptions import AgentOSError, CODE_MISSING_PARAMETER, CODE_INVALID_RES
 from ...types import Task, TaskResult, TaskStatus, ListOptions
 from ...utils import (
     get_string, get_int, get_dict, get_list,
-    extract_data_map, build_url, parse_time_from_map
+    extract_data_map, build_url, parse_time_from_map,
+    validate_and_extract_data, validate_required_string, validate_non_empty_list,
 )
 
 
@@ -82,15 +83,12 @@ class TaskManager:
             >>> print(task.id)
             'task_123'
         """
-        if not description:
-            raise AgentOSError("任务描述不能为空", error_code=CODE_MISSING_PARAMETER)
+        validate_required_string(description, "任务描述")
 
         body = {"description": description}
         resp = self._api.post("/api/v1/tasks", body)
 
-        data = extract_data_map(resp)
-        if not data:
-            raise AgentOSError("任务创建响应格式异常", error_code=CODE_INVALID_RESPONSE)
+        data = validate_and_extract_data(resp, "任务创建响应格式异常", CODE_INVALID_RESPONSE)
 
         return self._parse_task_from_map(data, description)
 
@@ -121,8 +119,7 @@ class TaskManager:
             ...     metadata={"source": "api"}
             ... )
         """
-        if not description:
-            raise AgentOSError("任务描述不能为空", error_code=CODE_MISSING_PARAMETER)
+        validate_required_string(description, "任务描述")
 
         body = {"description": description, "priority": priority}
         if metadata:
@@ -130,9 +127,7 @@ class TaskManager:
 
         resp = self._api.post("/api/v1/tasks", body)
 
-        data = extract_data_map(resp)
-        if not data:
-            raise AgentOSError("任务创建响应格式异常", error_code=CODE_INVALID_RESPONSE)
+        data = validate_and_extract_data(resp, "任务创建响应格式异常", CODE_INVALID_RESPONSE)
 
         return self._parse_task_from_map(data, description, priority, metadata)
 
@@ -154,14 +149,11 @@ class TaskManager:
             >>> print(task.status)
             <TaskStatus.RUNNING: 'running'>
         """
-        if not task_id:
-            raise AgentOSError("任务ID不能为空", error_code=CODE_MISSING_PARAMETER)
+        validate_required_string(task_id, "任务ID")
 
         resp = self._api.get(f"/api/v1/tasks/{task_id}")
 
-        data = extract_data_map(resp)
-        if not data:
-            raise AgentOSError("任务详情响应格式异常", error_code=CODE_INVALID_RESPONSE)
+        data = validate_and_extract_data(resp, "任务详情响应格式异常", CODE_INVALID_RESPONSE)
 
         return self._parse_task_from_map(data)
 
@@ -243,8 +235,7 @@ class TaskManager:
         Example:
             >>> manager.cancel("task_123")
         """
-        if not task_id:
-            raise AgentOSError("任务ID不能为空", error_code=CODE_MISSING_PARAMETER)
+        validate_required_string(task_id, "任务ID")
 
         self._api.post(f"/api/v1/tasks/{task_id}/cancel", None)
 
@@ -283,8 +274,7 @@ class TaskManager:
         Example:
             >>> manager.delete("task_123")
         """
-        if not task_id:
-            raise AgentOSError("任务ID不能为空", error_code=CODE_MISSING_PARAMETER)
+        validate_required_string(task_id, "任务ID")
 
         self._api.delete(f"/api/v1/tasks/{task_id}")
 
@@ -382,8 +372,7 @@ class TaskManager:
             >>> print(result.id)
             'task1'
         """
-        if not task_ids:
-            raise AgentOSError("任务ID列表不能为空", error_code=CODE_MISSING_PARAMETER)
+        validate_non_empty_list(task_ids, "任务ID列表")
 
         with ThreadPoolExecutor(max_workers=len(task_ids)) as executor:
             futures = {

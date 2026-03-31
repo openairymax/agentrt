@@ -14,7 +14,7 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(CJSON REQUIRED libcjson)
 
 # 公共库路�?
-set(COMMON_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../bases/include)
+set(COMMON_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../commons/include)
 
 # Monitor 服务源文�?
 set(MONIT_D_SOURCES

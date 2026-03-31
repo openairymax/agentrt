@@ -23,7 +23,6 @@ typedef struct {
 typedef struct cost_tracker cost_tracker_t;
 
 cost_tracker_t* cost_tracker_create(const pricing_rule_t* rules, int rule_count);
-// From data intelligence emerges. by spharx
 void cost_tracker_destroy(cost_tracker_t* ct);
 void cost_tracker_add(cost_tracker_t* ct, const char* model,
                       uint32_t prompt_tokens, uint32_t completion_tokens);

@@ -20,7 +20,8 @@ from ...exceptions import AgentOSError, CODE_MISSING_PARAMETER, CODE_INVALID_RES
 from ...types import Memory, MemoryLayer, MemorySearchResult, ListOptions
 from ...utils import (
     get_string, get_int, get_float, get_dict, get_list,
-    extract_data_map, build_url, parse_time_from_map, extract_int_stats
+    extract_data_map, build_url, parse_time_from_map, extract_int_stats,
+    validate_and_extract_data, validate_required_string,
 )
 
 
@@ -110,8 +111,7 @@ class MemoryManager:
             ...     metadata={"source": "user"}
             ... )
         """
-        if not content:
-            raise AgentOSError("记忆内容不能为空", error_code=CODE_MISSING_PARAMETER)
+        validate_required_string(content, "记忆内容")
 
         body = {"content": content, "layer": layer.value}
         if metadata:
@@ -119,9 +119,7 @@ class MemoryManager:
 
         resp = self._api.post("/api/v1/memories", body)
 
-        data = extract_data_map(resp)
-        if not data:
-            raise AgentOSError("记忆写入响应格式异常", error_code=CODE_INVALID_RESPONSE)
+        data = validate_and_extract_data(resp, "记忆写入响应格式异常", CODE_INVALID_RESPONSE)
 
         return Memory(
             id=get_string(data, "memory_id"),
@@ -151,14 +149,11 @@ class MemoryManager:
             >>> print(memory.content)
             'important fact'
         """
-        if not memory_id:
-            raise AgentOSError("记忆ID不能为空", error_code=CODE_MISSING_PARAMETER)
+        validate_required_string(memory_id, "记忆ID")
 
         resp = self._api.get(f"/api/v1/memories/{memory_id}")
 
-        data = extract_data_map(resp)
-        if not data:
-            raise AgentOSError("记忆详情响应格式异常", error_code=CODE_INVALID_RESPONSE)
+        data = validate_and_extract_data(resp, "记忆详情响应格式异常", CODE_INVALID_RESPONSE)
 
         return self._parse_memory_from_map(data)
 
@@ -181,8 +176,7 @@ class MemoryManager:
             >>> print(len(results.memories))
             5
         """
-        if not query:
-            raise AgentOSError("搜索查询不能为空", error_code=CODE_MISSING_PARAMETER)
+        validate_required_string(query, "搜索查询")
 
         if top_k <= 0:
             top_k = 10
@@ -218,8 +212,7 @@ class MemoryManager:
         Example:
             >>> results = manager.search_by_layer("fact", MemoryLayer.L1, top_k=5)
         """
-        if not query:
-            raise AgentOSError("搜索查询不能为空", error_code=CODE_MISSING_PARAMETER)
+        validate_required_string(query, "搜索查询")
 
         if top_k <= 0:
             top_k = 10
@@ -250,14 +243,11 @@ class MemoryManager:
         Example:
             >>> memory = manager.update("mem_123", "updated content")
         """
-        if not memory_id:
-            raise AgentOSError("记忆ID不能为空", error_code=CODE_MISSING_PARAMETER)
+        validate_required_string(memory_id, "记忆ID")
 
         resp = self._api.put(f"/api/v1/memories/{memory_id}", {"content": content})
 
-        data = extract_data_map(resp)
-        if not data:
-            raise AgentOSError("记忆更新响应格式异常", error_code=CODE_INVALID_RESPONSE)
+        data = validate_and_extract_data(resp, "记忆更新响应格式异常", CODE_INVALID_RESPONSE)
 
         return self._parse_memory_from_map(data)
 
@@ -274,8 +264,7 @@ class MemoryManager:
         Example:
             >>> manager.delete("mem_123")
         """
-        if not memory_id:
-            raise AgentOSError("记忆ID不能为空", error_code=CODE_MISSING_PARAMETER)
+        validate_required_string(memory_id, "记忆ID")
 
         self._api.delete(f"/api/v1/memories/{memory_id}")
 

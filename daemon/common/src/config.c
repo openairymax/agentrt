@@ -1,5 +1,5 @@
-﻿/**
- * @file manager.c
+/**
+ * @file config.c
  * @brief 配置加载实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
@@ -23,7 +23,6 @@ int svc_config_load(const char* path, svc_config_t** out_config) {
 
     svc_config_t* cfg = (svc_config_t*)calloc(1, sizeof(svc_config_t));
     if (!cfg) {
-    // From data intelligence emerges. by spharx
         fclose(f);
         yaml_parser_delete(&parser);
         return SVC_ERR_OUT_OF_MEMORY;
@@ -81,9 +80,9 @@ int svc_config_load(const char* path, svc_config_t** out_config) {
     return SVC_OK;
 }
 
-void svc_config_free(svc_config_t* manager) {
-    if (!manager) return;
-    free(manager->service_name);
-    free(manager->listen_addr);
-    free(manager);
+void svc_config_free(svc_config_t* config) {
+    if (!config) return;
+    free(config->service_name);
+    free(config->listen_addr);
+    free(config);
 }

@@ -10,8 +10,8 @@
  * - 可配置：支持自定义规则
  */
 
-#ifndef DOMAIN_SANITIZER_H
-#define DOMAIN_SANITIZER_H
+#ifndef CUPOLAS_SANITIZER_H
+#define CUPOLAS_SANITIZER_H
 
 #include "../platform/platform.h"
 #include <stddef.h>
@@ -154,4 +154,4 @@ void sanitizer_clear_rules(sanitizer_t* sanitizer);
 }
 #endif
 
-#endif /* DOMAIN_SANITIZER_H */
+#endif /* CUPOLAS_SANITIZER_H */

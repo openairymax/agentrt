@@ -1,4 +1,4 @@
-﻿# cupolas 输入净化模块 (Sanitizer)
+﻿﻿﻿﻿﻿﻿# cupolas 输入净化模块 (Sanitizer)
 
 **版本**: v1.0.0.6  
 **最后更新**: 2026-03-25  

@@ -9,8 +9,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h"
-#include "../../../bases/utils/string/include/string_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -27,7 +27,8 @@ agentos_error_t agentos_rule_generator_create(
     agentos_rule_generator_t* gen = (agentos_rule_generator_t*)AGENTOS_CALLOC(1, sizeof(agentos_rule_generator_t));
     if (!gen) return AGENTOS_ENOMEM;
 
-// From data intelligence emerges. by spharx
+
+// From data intelligence emerges. by spharx
     gen->llm = (agentos_llm_service_t*)llm_service;
     gen->lock = agentos_mutex_create();
     if (!gen->lock) {
@@ -69,7 +70,7 @@ agentos_error_t agentos_rule_generator_generate(
     }
     if (offset < sizeof(prompt) - 100) {
         snprintf(prompt + offset, sizeof(prompt) - offset,
-        "\nPlease generate a JSON rule that captures the bases characteristics of this cluster. "
+        "\nPlease generate a JSON rule that captures the commons characteristics of this cluster. "
         "The rule should have fields: 'name', 'description', 'condition', 'action', and 'confidence'. "
         "Output only valid JSON.");
 

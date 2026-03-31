@@ -7,7 +7,7 @@ E-commerce Utility Functions
 
 This module provides utility functions for the openlab E-commerce platform.
 It includes helper functions for validation, formatting, security, and
-bases operations used throughout the e-commerce application.
+commons operations used throughout the e-commerce application.
 
 Features:
 - Data validation and sanitization

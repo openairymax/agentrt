@@ -1,12 +1,13 @@
-﻿Copyright (c) 2026 SPHARX. All Rights Reserved.
+Copyright (c) 2026 SPHARX. All Rights Reserved.
 "From data intelligence emerges."
 
 # AgentOS Skill 创建指南
 
-**版本**: Doc V1.5  
-**最后更新**: 2026-03-23  
+**版本**: Doc V1.7  
+**最后更新**: 2026-03-31  
 **难度**: ⭐⭐ 中级  
-**预计时间**: 25 分钟
+**预计时间**: 25 分钟  
+**作者**: LirenWang
 
 ---
 
@@ -150,7 +151,7 @@ Skill 与 Agent 的关系是**组合而非继承**——一个 Agent 可以动�
 #ifndef AGENTOS_SKILL_H
 #define AGENTOS_SKILL_H
 
-#include <agentos/bases.h>
+#include <agentos/commons.h>
 
 typedef struct agentos_skill agentos_skill_t;
 typedef struct agentos_skill_input agentos_skill_input_t;

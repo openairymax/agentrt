@@ -1,4 +1,4 @@
-﻿// AgentOS TypeScript SDK - HTTP Client
+// AgentOS TypeScript SDK - HTTP Client
 // Version: 3.0.0
 // Last updated: 2026-03-24
 //
@@ -176,6 +176,106 @@ export class Client implements APIClient {
   // ============================================================
 
   /**
+   * 构建请求配置
+   * @param method - HTTP 方法
+   * @param path - 请求路径
+   * @param body - 请求体
+   * @param options - 请求选项
+   */
+  private buildRequestConfig(
+    method: string,
+    path: string,
+    body?: unknown,
+    options?: RequestOptions,
+  ): AxiosRequestConfig {
+    let fullURL = path;
+    if (options?.queryParams && Object.keys(options.queryParams).length > 0) {
+      const params = new URLSearchParams(options.queryParams);
+      fullURL = `${path}?${params.toString()}`;
+    }
+
+    const config: AxiosRequestConfig = {
+      method,
+      url: fullURL,
+      data: body,
+      headers: options?.headers,
+      signal: options?.signal,
+    };
+
+    if (options?.timeout && options.timeout > 0) {
+      config.timeout = options.timeout;
+    }
+
+    return config;
+  }
+
+  /**
+   * 执行单次 HTTP 请求
+   * @param config - Axios 请求配置
+   */
+  private async executeRequest<T>(config: AxiosRequestConfig): Promise<T> {
+    try {
+      const response: AxiosResponse<T> = await this.httpClient.request(config);
+      return response.data;
+    } catch (error) {
+      if (axios.isCancel(error)) {
+        throw new AgentOSError('请求已被取消', ErrorCode.TIMEOUT);
+      }
+      throw this.handleError(error as Error);
+    }
+  }
+
+  /**
+   * 判断是否应该重试请求
+   * @param error - 错误对象
+   */
+  private shouldRetry(error: Error): boolean {
+    if (error instanceof NetworkError || error instanceof TimeoutError) {
+      return true;
+    }
+    if (error instanceof HttpError) {
+      const retryableStatusCodes = [408, 429, 500, 502, 503, 504];
+      return retryableStatusCodes.includes(error.statusCode);
+    }
+    return false;
+  }
+
+  /**
+   * 执行带重试的 HTTP 请求
+   * @param config - Axios 请求配置
+   * @param options - 请求选项
+   */
+  private async executeWithRetry<T>(
+    config: AxiosRequestConfig,
+    options?: RequestOptions,
+  ): Promise<T> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt <= this.manager.maxRetries; attempt++) {
+      if (options?.signal?.aborted) {
+        throw new AgentOSError('请求已被取消', ErrorCode.TIMEOUT);
+      }
+
+      if (attempt > 0) {
+        const delay = this.calculateBackoff(this.manager.retryDelay, attempt);
+        getLogger().warn(`请求失败，${delay}ms 后重试 (尝试 ${attempt}/${this.manager.maxRetries})`);
+        await this.sleep(delay);
+      }
+
+      try {
+        return await this.executeRequest<T>(config);
+      } catch (error) {
+        lastError = error as Error;
+        if (!this.shouldRetry(error as Error)) {
+          throw lastError;
+        }
+      }
+    }
+
+    throw lastError || new AgentOSError('请求失败', ErrorCode.UNKNOWN);
+  }
+
+  /**
    * 执行底层 HTTP 请求，包含序列化、重试和响应解析逻辑
    * @param method - HTTP 方法
    * @param path - 请求路径
@@ -188,7 +288,6 @@ export class Client implements APIClient {
     body?: unknown,
     opts?: RequestOption[],
   ): Promise<T> {
-    // 应用请求选项
     const options: RequestOptions = {};
     if (opts) {
       for (const opt of opts) {
@@ -196,66 +295,12 @@ export class Client implements APIClient {
       }
     }
 
-    // 检查是否已取消
     if (options.signal?.aborted) {
       throw new AgentOSError('请求已被取消', ErrorCode.TIMEOUT);
     }
 
-    // 构建完整 URL
-    let fullURL = path;
-    if (options.queryParams && Object.keys(options.queryParams).length > 0) {
-      const params = new URLSearchParams(options.queryParams);
-      fullURL = `${path}?${params.toString()}`;
-    }
-
-    // 准备请求配置
-    const manager: AxiosRequestConfig = {
-      method,
-      url: fullURL,
-      data: body,
-      headers: options.headers,
-      signal: options.signal, // 添加取消信号支持
-    };
-
-    // 覆盖单次请求超时
-    if (options.timeout && options.timeout > 0) {
-      manager.timeout = options.timeout;
-    }
-
-    let lastError: Error | null = null;
-
-    // 重试循环
-    for (let attempt = 0; attempt <= this.manager.maxRetries; attempt++) {
-      // 每次重试前检查是否已取消
-      if (options.signal?.aborted) {
-        throw new AgentOSError('请求已被取消', ErrorCode.TIMEOUT);
-      }
-
-      if (attempt > 0) {
-        const delay = this.calculateBackoff(this.manager.retryDelay, attempt);
-        getLogger().warn(`请求失败，${delay}ms 后重试 (尝试 ${attempt}/${this.manager.maxRetries})`);
-        await this.sleep(delay);
-      }
-
-      try {
-        const response: AxiosResponse<T> = await this.httpClient.request(manager);
-        return response.data;
-      } catch (error) {
-        // 检查是否是取消错误
-        if (axios.isCancel(error)) {
-          throw new AgentOSError('请求已被取消', ErrorCode.TIMEOUT);
-        }
-
-        lastError = this.handleError(error as Error);
-
-        // 判断是否应该重试
-        if (!this.shouldRetry(error as Error)) {
-          throw lastError;
-        }
-      }
-    }
-
-    throw lastError || new AgentOSError('请求失败', ErrorCode.UNKNOWN);
+    const config = this.buildRequestConfig(method, path, body, options);
+    return this.executeWithRetry<T>(config, options);
   }
 
   /**

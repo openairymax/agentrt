@@ -1,12 +1,13 @@
-﻿Copyright (c) 2026 SPHARX. All Rights Reserved.
+Copyright (c) 2026 SPHARX. All Rights Reserved.
 "From data intelligence emerges."
 
 # AgentOS 内核调优指南
 
-**版本**: Doc V1.5  
-**最后更新**: 2026-03-23  
+**版本**: Doc V1.7  
+**最后更新**: 2026-03-31  
 **难度**: ⭐⭐⭐ 高级  
-**预计时间**: 40 分钟
+**预计时间**: 40 分钟  
+**作者**: LirenWang
 
 ---
 
@@ -750,7 +751,7 @@ agentos-cli manager get corekern.ipc.batch_size
 
 ## 10. 相关文档
 
-- [架构设计原则](../architecture/folder/architectural_design_principles.md)
+- [架构设计原则](../architecture/ARCHITECTURAL_PRINCIPLES.md)
 - [部署指南](deployment.md)
 - [故障排查](troubleshooting.md)
 - [微内核架构](../architecture/folder/microkernel.md)

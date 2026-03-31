@@ -11,7 +11,7 @@
  */
 
 #include "strategy_interface.h"
-#include "../../../bases/utils/strategy/include/strategy_common.h"
+#include "../../../commons/utils/strategy/include/strategy_common.h"
 #include "platform.h"
 #include "error.h"
 #include <stdlib.h>

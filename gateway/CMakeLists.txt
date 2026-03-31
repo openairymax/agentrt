@@ -45,7 +45,7 @@ if(NOT CJSON_LIBRARY)
     message(WARNING "cJSON library not found. Some features may not work.")
 endif()
 
-# 源文件（不包含 agentos.c，使用 bases 模块）
+# 源文件（不包含 agentos.c，使用 commons 模块）
 set(GATEWAY_SOURCES
     src/platform.c
     src/main.c
@@ -56,9 +56,10 @@ set(GATEWAY_SOURCES
     src/telemetry.c
     src/auth.c
     src/ratelimit.c
-    src/manager.c
     src/config_runtime.c
     src/connection_pool.c
+    src/utils/jsonrpc.c
+    src/utils/hash.c
     src/gateway/http_gateway.c
     src/gateway/ws_gateway.c
     src/gateway/stdio_gateway.c
@@ -70,10 +71,10 @@ set(GATEWAY_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-# bases 模块路径
-set(COMMON_MODULE_DIR ${CMAKE_SOURCE_DIR}/../bases)
+# commons 模块路径
+set(COMMON_MODULE_DIR ${CMAKE_SOURCE_DIR}/../commons)
 
-# bases 模块的 include 目录（agentos_common 的 include 是 PRIVATE，需要显式添加）
+# commons 模块的 include 目录（agentos_common 的 include 是 PRIVATE，需要显式添加）
 set(COMMON_INCLUDE_DIRS
     ${COMMON_MODULE_DIR}/platform/include
     ${COMMON_MODULE_DIR}/utils/core/include
@@ -82,10 +83,10 @@ set(COMMON_INCLUDE_DIRS
 )
 
 # 可执行文件
-add_executable(gateway ${DYNAMIC_SOURCES})
+add_executable(gateway ${GATEWAY_SOURCES})
 
 target_include_directories(gateway PRIVATE
-    ${DYNAMIC_INCLUDE_DIRS}
+    ${GATEWAY_INCLUDE_DIRS}
     ${COMMON_INCLUDE_DIRS}
 )
 
@@ -128,9 +129,10 @@ if(NOT BUILD_SHARED_LIBS)
         src/telemetry.c
         src/auth.c
         src/ratelimit.c
-        src/manager.c
         src/config_runtime.c
         src/connection_pool.c
+        src/utils/jsonrpc.c
+        src/utils/hash.c
         src/gateway/http_gateway.c
         src/gateway/ws_gateway.c
         src/gateway/stdio_gateway.c
@@ -203,8 +205,9 @@ if(NOT BUILD_SHARED_LIBS)
         src/telemetry.h
         src/auth.h
         src/ratelimit.h
-        src/manager.h
         src/connection_pool.h
+        src/utils/jsonrpc.h
+        src/utils/hash.h
         DESTINATION include/agentos/gateway
     )
 endif()
