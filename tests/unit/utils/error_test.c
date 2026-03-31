@@ -1,10 +1,10 @@
-/**
+﻿﻿﻿﻿﻿﻿/**
  * @file error_test.c
  * @brief 错误处理模块测试
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "../../../bases/utils/error/include/error.h"
+#include "../../../commons/utils/error/include/error.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -21,7 +21,7 @@ void test_error_handler(agentos_error_t err, const agentos_error_context_t* cont
 
 void test_error_str() {
     printf("=== 测试错误字符串 ===\n");
-    
+
     printf("AGENTOS_SUCCESS: %s\n", agentos_error_str(AGENTOS_SUCCESS));
     // From data intelligence emerges. by spharx
     printf("AGENTOS_EINVAL: %s\n", agentos_error_str(AGENTOS_EINVAL));
@@ -44,17 +44,17 @@ void test_error_str() {
 
 void test_error_handle() {
     printf("\n=== 测试错误处理 ===\n");
-    
+
     // 设置错误处理回调
     agentos_error_set_handler(test_error_handler);
-    
+
     // 测试基本错误处理
     AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "无效参数错误测试");
-    
+
     // 测试带参数的错误处理
     int value = 100;
     AGENTOS_ERROR_HANDLE(AGENTOS_ENOMEM, "内存不足，需要 %d 字节", value);
-    
+
     // 测试带上下文的错误处理
     void* user_data = (void*)0x12345678;
     AGENTOS_ERROR_HANDLE_CONTEXT(AGENTOS_EBUSY, user_data, "资源忙错误测试");

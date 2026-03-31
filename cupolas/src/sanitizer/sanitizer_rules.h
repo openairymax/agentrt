@@ -5,8 +5,8 @@
  * @date 2024
  */
 
-#ifndef DOMAIN_SANITIZER_RULES_H
-#define DOMAIN_SANITIZER_RULES_H
+#ifndef CUPOLAS_SANITIZER_RULES_H
+#define CUPOLAS_SANITIZER_RULES_H
 
 #include "../platform/platform.h"
 #include <stddef.h>
@@ -59,4 +59,4 @@ void sanitizer_rules_clear(sanitizer_rules_t* rules);
 }
 #endif
 
-#endif /* DOMAIN_SANITIZER_RULES_H */
+#endif /* CUPOLAS_SANITIZER_RULES_H */

@@ -1,4 +1,4 @@
-﻿# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Docker .gitignore
 
 # 环境变量文件（包含敏感信息）
@@ -16,8 +16,8 @@ dist/
 # 日志文件
 *.log
 logs/
-lodges/logs/*
-!lodges/logs/.gitkeep
+heapstore/logs/*
+!heapstore/logs/.gitkeep
 
 # 临时文件
 tmp/

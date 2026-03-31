@@ -1,12 +1,13 @@
-﻿Copyright (c) 2026 SPHARX. All Rights Reserved.
+Copyright (c) 2026 SPHARX. All Rights Reserved.
 "From data intelligence emerges."
 
 # AgentOS 部署指南
 
-**版本**: Doc V1.5  
-**最后更新**: 2026-03-23  
+**版本**: Doc V1.7  
+**最后更新**: 2026-03-31  
 **难度**: ⭐⭐⭐ 高级  
-**预计时间**: 45 分钟
+**预计时间**: 45 分钟  
+**作者**: LirenWang
 
 ---
 
@@ -657,7 +658,7 @@ agentos-cli security license --report
 - [快速开始](getting_started.md)
 - [内核调优](kernel_tuning.md)
 - [故障排查](troubleshooting.md)
-- [架构设计原则](../architecture/folder/architectural_design_principles.md)
+- [架构设计原则](../architecture/ARCHITECTURAL_PRINCIPLES.md)
 - [迁移指南](migration_guide.md)
 
 ---

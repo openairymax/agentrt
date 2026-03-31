@@ -1,6 +1,6 @@
-/**
+﻿/**
  * @file shell.c
- * @brief Shell命令执行单元（跨平台�?
+ * @brief Shell命令执行单元（跨平台�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -9,12 +9,12 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h"
-#include "../../../bases/utils/string/include/string_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 #include <stdio.h>
 
-#include "../../../bases/utils/platform/include/platform_adapter.h"\n\n#include "../../../bases/utils/execution/include/execution_common.h"\n\ntypedef struct $1_unit_data {\n    execution_unit_data_t base;\n    char* metadata_json;\n} $1_unit_data_t;
+#include "../../../commons/utils/platform/include/platform_adapter.h"\n\n#include "../../../commons/utils/execution/include/execution_common.h"\n\ntypedef struct $1_unit_data {\n    execution_unit_data_t base;\n    char* metadata_json;\n} $1_unit_data_t;
 
 /**
  * @brief 跨平台执行命令并捕获输出
@@ -174,7 +174,7 @@ static agentos_error_t shell_execute(
 static void shell_destroy(agentos_execution_unit_t* unit) {\n    if (!unit) return;\n    shell_unit_data_t* data = (shell_unit_data_t*)unit->data;\n    if (data) {\n        execution_unit_data_cleanup(&data->base);\n        if (data->metadata_json) AGENTOS_FREE(data->metadata_json);\n        AGENTOS_FREE(data);\n    }\n    AGENTOS_FREE(unit);\n}
 
 /**
- * @brief 获取执行单元元数�?
+ * @brief 获取执行单元元数�?
  */
 static const char* shell_get_metadata(agentos_execution_unit_t* unit) {
     shell_unit_data_t* data = (shell_unit_data_t*)unit->data;

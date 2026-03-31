@@ -1,11 +1,12 @@
-﻿Copyright (c) 2026 SPHARX. All Rights Reserved.
+Copyright (c) 2026 SPHARX. All Rights Reserved.
 "From data intelligence emerges."
 
 # AgentOS 文档体系索引
 
-**版本**: Doc V1.5
-**最后更新**: 2026-03-24
+**版本**: Doc V1.7
+**最后更新**: 2026-03-31
 **状态**: 生产就绪
+**作者**: LirenWang
 
 ---
 
@@ -13,24 +14,24 @@
 
 ### 新人入门
 
-1. [快速开始](guides/folder/getting_started.md) — 环境搭建与 Hello World
-2. [架构设计原则](architecture/folder/architectural_design_principles.md) — 系统设计的理论根基
+1. [快速开始](guides/getting_started.md) — 环境搭建与 Hello World
+2. [架构设计原则](architecture/ARCHITECTURAL_PRINCIPLES.md) — 系统设计的理论根基
 3. [指南总览](guides/README.md) — 完整学习路径
 
 ### 开发者进阶
 
 1. [三层认知运行时](architecture/folder/coreloopthree.md) — CoreLoopThree 架构
 2. [四层记忆系统](architecture/folder/memoryrovol.md) — MemoryRovol 架构
-3. [创建 Agent](guides/folder/create_agent.md) — Agent 生命周期与双系统路径
-4. [创建 Skill](guides/folder/create_skill.md) — Skill 契约与实现模式
+3. [创建 Agent](guides/create_agent.md) — Agent 生命周期与双系统路径
+4. [创建 Skill](guides/create_skill.md) — Skill 契约与实现模式
 5. [C 编码规范](specifications/coding_standard/C_coding_style_guide.md)
 
 ### 运维部署
 
-1. [部署指南](guides/folder/deployment.md) — 多环境部署
-2. [故障排查](guides/folder/troubleshooting.md) — 分层诊断方法论
-3. [内核调优](guides/folder/kernel_tuning.md) — 反馈闭环调优法
-4. [迁移指南](guides/folder/migration_guide.md) — 版本升级策略
+1. [部署指南](guides/deployment.md) — 多环境部署
+2. [故障排查](guides/troubleshooting.md) — 分层诊断方法论
+3. [内核调优](guides/kernel_tuning.md) — 反馈闭环调优法
+4. [迁移指南](guides/migration_guide.md) — 版本升级策略
 
 ---
 
@@ -40,13 +41,13 @@
 manuals/
 │
 ├── 架构文档 (Architecture)
-│   ├── architectural_design_principles.md   # 架构设计原则 v1.5
-│   ├── coreloopthree.md                     # 三层认知运行时 v1.0.0.5
-│   ├── memoryrovol.md                       # 四层记忆系统 v1.0.0.5
-│   ├── microkernel.md                       # 微内核设计 v1.0.0.5
-│   ├── ipc.md                               # IPC Binder 通信 v1.0.0.5
-│   ├── syscall.md                           # 系统调用设计 v1.0.0.5
-│   └── logging_system.md                    # 统一日志系统 v1.0.0.5
+│   ├── ARCHITECTURAL_PRINCIPLES.md   # 架构设计原则 v1.7
+│   ├── folder/coreloopthree.md              # 三层认知运行时 v1.0.0.5
+│   ├── folder/memoryrovol.md                # 四层记忆系统 v1.0.0.5
+│   ├── folder/microkernel.md                # 微内核设计 v1.0.0.5
+│   ├── folder/ipc.md                        # IPC Binder 通信 v1.0.0.5
+│   ├── folder/syscall.md                    # 系统调用设计 v1.0.0.5
+│   └── folder/logging_system.md             # 统一日志系统 v1.0.0.5
 │
 ├── 开发指南 (Guides)
 │   ├── getting_started.md                   # 快速开始 v1.0.0.5
@@ -94,7 +95,7 @@ manuals/
 
 | 文档 | 路径 | 状态 | 版本 |
 |------|------|------|------|
-| 架构设计原则 | architecture/folder/architectural_design_principles.md | 正式发布 | v1.5 |
+| 架构设计原则 | architecture/ARCHITECTURAL_PRINCIPLES.md | 正式发布 | v1.7 |
 | 三层认知运行时 | architecture/folder/coreloopthree.md | 生产就绪 | v1.0.0.5 |
 | 四层记忆系统 | architecture/folder/memoryrovol.md | 生产就绪 | v1.0.0.5 |
 | 微内核设计 | architecture/folder/microkernel.md | 生产就绪 | v1.0.0.5 |
@@ -235,18 +236,19 @@ deployment.md (部署指南)
 
 ## 6. 核心技术特性
 
-### 6.1 四维正交原则体系
+### 6.1 五维正交原则体系
 
-AgentOS 架构设计基于四维正交原则体系，从系统观、内核观、认知观、工程观四个维度定义设计原则：
+AgentOS 架构设计基于五维正交原则体系，从系统观、内核观、认知观、工程观、设计美学五个维度定义设计原则：
 
 | 维度 | 原则数量 | 核心理念 |
 |------|----------|----------|
-| 系统观 (S) | S-1 ~ S-4 | 整体性、层次性、协调性、演化性 |
-| 内核观 (K) | K-1 ~ K-4 | 最小化、正交性、安全性、可验证性 |
-| 认知观 (C) | C-1 ~ C-4 | 双系统协同、渐进式规划、自我纠错、持续学习 |
-| 工程观 (E) | E-1 ~ E-7 | 模块化、可测试性、可观测性、文档化等 |
+| 系统观 (S) | S-1 ~ S-4 | 反馈闭环、层次分解、总体设计部、涌现性管理 |
+| 内核观 (K) | K-1 ~ K-3 | 内核极简、接口契约化、服务隔离 |
+| 认知观 (C) | C-1 ~ C-4 | 双系统分工、记忆持久化、注意力分配、偏差防护 |
+| 工程观 (E) | E-1 ~ E-8 | 安全内生、可观测性、资源确定性、跨平台一致性、错误可追溯、文档即代码、可测试性 |
+| 设计美学 (A) | A-1 ~ A-4 | 极简主义、细节关注、人文关怀、完美主义 |
 
-详细说明请参阅 [架构设计原则 v1.5](architecture/folder/architectural_design_principles.md)。
+详细说明请参阅 [架构设计原则 v1.7](architecture/ARCHITECTURAL_PRINCIPLES.md)。
 
 ### 6.2 三层认知运行时 (CoreLoopThree)
 
@@ -281,20 +283,18 @@ cupolas 是 AgentOS 的多层安全防护体系：
 AgentOS 的设计深受以下理论影响：
 
 ### 7.1 工程两论
-
 - **《工程控制论》**: 反馈闭环理论，控制的核心
 - **《论系统工程》**: 层次分解、综合集成、总体设计部
 
-### 7.2 认知科学
+### 7.2 双系统认知理论
+- **《思考，快与慢》**: System 1 快速直觉与 System 2 深度推理的协同
 
-- **双系统认知理论** (丹尼尔·卡尼曼): System 1 与 System 2 的协同
-- **ACT-R 认知架构**: 模块划分、产生式系统
-- **SOAR 认知架构**: 问题空间假设
+### 7.3 微内核哲学
+- **内核极简**: 机制与策略分离，最小特权原则
+- **接口契约化**: 严格定义接口边界，确保系统可靠性
 
-### 7.3 计算机科学
-
-- **Liedtke 微内核原则**: 机制与策略分离、最小特权
-- **seL4 形式化验证**: 功能正确性、安全性质
+### 7.4 设计美学
+- **乔布斯设计哲学**: 极简主义、极致细节、人文关怀、完美主义
 
 ---
 

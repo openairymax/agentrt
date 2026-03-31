@@ -94,11 +94,11 @@ typedef struct agentos_memory_result {
 
 /**
  * @brief 创建记忆引擎
- * 
+ *
  * @param config_path [in] 配置文件路径（可为NULL）
  * @param out_engine [out] 输出引擎句柄（调用者负责销毁）
  * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
- * 
+ *
  * @ownership out_engine 由调用者负责通过 agentos_memory_destroy() 释放
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
@@ -110,9 +110,9 @@ AGENTOS_API agentos_error_t agentos_memory_create(
 
 /**
  * @brief 销毁记忆引擎
- * 
+ *
  * @param engine [in] 引擎句柄（非NULL）
- * 
+ *
  * @ownership 释放 engine 及其内部所有资源
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
@@ -122,12 +122,12 @@ AGENTOS_API void agentos_memory_destroy(agentos_memory_engine_t* engine);
 
 /**
  * @brief 写入记忆记录
- * 
+ *
  * @param engine [in] 记忆引擎（非NULL）
  * @param record [in] 记忆记录（引擎会复制内部数据，非NULL）
  * @param out_record_id [out] 输出分配的记录ID（调用者负责释放）
  * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
- * 
+ *
  * @ownership out_record_id 由调用者负责释放
  * @threadsafe 是（内部使用互斥锁保护）
  * @reentrant 否
@@ -139,12 +139,12 @@ AGENTOS_API agentos_error_t agentos_memory_write(
 
 /**
  * @brief 查询记忆
- * 
+ *
  * @param engine [in] 记忆引擎（非NULL）
  * @param query [in] 查询条件（非NULL）
  * @param out_result [out] 输出结果（调用者负责释放）
  * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
- * 
+ *
  * @ownership out_result 由调用者负责通过 agentos_memory_result_free() 释放
  * @threadsafe 是（内部使用互斥锁保护）
  * @reentrant 否
@@ -157,23 +157,23 @@ AGENTOS_API agentos_error_t agentos_memory_query(
 
 /**
  * @brief 根据ID获取记忆记录
- * 
+ *
  * @param engine [in] 记忆引擎（非NULL）
  * @param record_id [in] 记录ID（非NULL）
  * @param include_raw [in] 是否加载原始数据
  * @param out_record [out] 输出记录（调用者负责释放）
  * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
- * 
+ *
  * @ownership out_record 由调用者负责通过 agentos_memory_record_free() 释放
  * @threadsafe 是（内部使用互斥锁保护）
  * @reentrant 否
- * 
+ *
  * @concurrency 并发合约：
  * - 该函数是线程安全的，可以在多个线程同时调用
  * - 内部使用互斥锁保护内存访问，避免并发冲突
  * - 调用者无需额外的同步措施
  * - 但返回的记录对象不是线程安全的，需要调用者自行管理其并发访问
- * 
+ *
  * @see agentos_memory_record_free()
  */
 AGENTOS_API agentos_error_t agentos_memory_get(
@@ -184,12 +184,12 @@ AGENTOS_API agentos_error_t agentos_memory_get(
 
 /**
  * @brief 挂载记忆到当前上下文（相当于通知引擎该记忆被使用）
- * 
+ *
  * @param engine [in] 记忆引擎（非NULL）
  * @param record_id [in] 记录ID（非NULL）
  * @param context [in] 当前上下文标识（如任务ID，非NULL）
  * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
- * 
+ *
  * @threadsafe 是（内部使用互斥锁保护）
  * @reentrant 否
  */
@@ -200,9 +200,9 @@ AGENTOS_API agentos_error_t agentos_memory_mount(
 
 /**
  * @brief 释放记忆结果
- * 
+ *
  * @param result [in] 结果对象（可为NULL）
- * 
+ *
  * @ownership 释放 result 及其内部所有资源
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
@@ -212,9 +212,9 @@ AGENTOS_API void agentos_memory_result_free(agentos_memory_result_t* result);
 
 /**
  * @brief 释放单个记忆记录
- * 
+ *
  * @param record [in] 记录对象（可为NULL）
- * 
+ *
  * @ownership 释放 record 及其内部所有资源
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
@@ -224,11 +224,11 @@ AGENTOS_API void agentos_memory_record_free(agentos_memory_record_t* record);
 
 /**
  * @brief 触发记忆进化（模式挖掘）
- * 
+ *
  * @param engine [in] 记忆引擎（非NULL）
  * @param force [in] 是否强制立即执行
  * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
- * 
+ *
  * @threadsafe 否（内部未使用线程安全措施）
  * @reentrant 否
  */
@@ -238,11 +238,11 @@ AGENTOS_API agentos_error_t agentos_memory_evolve(
 
 /**
  * @brief 获取记忆引擎健康状态
- * 
+ *
  * @param engine [in] 记忆引擎句柄（非NULL）
  * @param out_json [out] 输出 JSON 状态字符串（调用者负责释放）
  * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
- * 
+ *
  * @ownership out_json 由调用者负责释放
  * @threadsafe 是（内部使用互斥锁保护）
  * @reentrant 否

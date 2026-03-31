@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file memoryrovol.h
  * @brief MemoryRovol 系统主接口
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -23,8 +23,11 @@ typedef struct agentos_memoryrov_handle agentos_memoryrov_handle_t;
 
 /**
  * @brief 初始化 MemoryRovol 系统
- * @param manager 配置参数（如果为 NULL 则使用默认配置）
- * @param out_handle 输出系统句柄
+ * @param manager [in] 配置参数（如果为 NULL 则使用默认配置）
+ * @param out_handle [out] 输出系统句柄
+ * @ownership 调用者负责释放 out_handle
+ * @threadsafe 是（可多次调用，但建议单次初始化）
+ * @reentrant 否
  * @return agentos_error_t
  */
 agentos_error_t agentos_memoryrov_init(
@@ -33,14 +36,19 @@ agentos_error_t agentos_memoryrov_init(
 
 /**
  * @brief 销毁 MemoryRovol 系统，释放所有资源
- * @param handle 系统句柄
+ * @param handle [in] 系统句柄
+ * @ownership 释放 handle 及其内部所有资源
+ * @threadsafe 否（销毁后不能再使用该句柄）
+ * @reentrant 否
  */
 void agentos_memoryrov_cleanup(agentos_memoryrov_handle_t* handle);
 
 /**
  * @brief 执行记忆进化（模式挖掘、固化等）
- * @param handle 系统句柄
- * @param force 强制立即执行（忽略周期设置）
+ * @param handle [in] 系统句柄（非NULL）
+ * @param force [in] 强制立即执行（忽略周期设置）
+ * @threadsafe 是（内部使用锁保护）
+ * @reentrant 否
  * @return agentos_error_t
  */
 agentos_error_t agentos_memoryrov_evolve(
@@ -49,8 +57,11 @@ agentos_error_t agentos_memoryrov_evolve(
 
 /**
  * @brief 获取系统统计信息（JSON 格式）
- * @param handle 系统句柄
- * @param out_stats 输出 JSON 字符串（需调用者释放）
+ * @param handle [in] 系统句柄（非NULL）
+ * @param out_stats [out] 输出 JSON 字符串（需调用者释放）
+ * @ownership 调用者负责释放 out_stats
+ * @threadsafe 是（内部使用锁保护）
+ * @reentrant 否
  * @return agentos_error_t
  */
 agentos_error_t agentos_memoryrov_stats(
@@ -61,11 +72,14 @@ agentos_error_t agentos_memoryrov_stats(
 
 /**
  * @brief 写入原始记忆数据
- * @param handle 系统句柄
- * @param data 原始数据
- * @param len 数据长度
- * @param metadata 元数据（JSON字符串，可为NULL）
- * @param out_record_id 输出分配的唯一记录ID（需调用者释放）
+ * @param handle [in] 系统句柄（非NULL）
+ * @param data [in] 原始数据（非NULL）
+ * @param len [in] 数据长度
+ * @param metadata [in] 元数据（JSON字符串，可为NULL）
+ * @param out_record_id [out] 输出分配的唯一记录ID
+ * @ownership 调用者负责释放 out_record_id
+ * @threadsafe 是（内部使用锁保护）
+ * @reentrant 否
  * @return agentos_error_t
  */
 agentos_error_t agentos_memoryrov_write_raw(
@@ -77,10 +91,13 @@ agentos_error_t agentos_memoryrov_write_raw(
 
 /**
  * @brief 读取原始记忆数据
- * @param handle 系统句柄
- * @param record_id 记录ID
- * @param out_data 输出数据（需调用者释放）
- * @param out_len 输出数据长度
+ * @param handle [in] 系统句柄（非NULL）
+ * @param record_id [in] 记录ID（非NULL）
+ * @param out_data [out] 输出数据
+ * @param out_len [out] 输出数据长度
+ * @ownership 调用者负责释放 out_data
+ * @threadsafe 是（内部使用锁保护）
+ * @reentrant 否
  * @return agentos_error_t
  */
 agentos_error_t agentos_memoryrov_get_raw(
@@ -91,8 +108,10 @@ agentos_error_t agentos_memoryrov_get_raw(
 
 /**
  * @brief 删除原始记忆数据
- * @param handle 系统句柄
- * @param record_id 记录ID
+ * @param handle [in] 系统句柄（非NULL）
+ * @param record_id [in] 记录ID（非NULL）
+ * @threadsafe 是（内部使用锁保护）
+ * @reentrant 否
  * @return agentos_error_t
  */
 agentos_error_t agentos_memoryrov_delete_raw(
@@ -101,12 +120,15 @@ agentos_error_t agentos_memoryrov_delete_raw(
 
 /**
  * @brief 查询记忆（语义搜索）
- * @param handle 系统句柄
- * @param query 查询字符串
- * @param limit 返回结果数量上限
- * @param out_record_ids 输出记录ID数组（需调用者释放）
- * @param out_scores 输出相关性分数数组（需调用者释放）
- * @param out_count 输出结果数量
+ * @param handle [in] 系统句柄（非NULL）
+ * @param query [in] 查询字符串（非NULL）
+ * @param limit [in] 返回结果数量上限
+ * @param out_record_ids [out] 输出记录ID数组
+ * @param out_scores [out] 输出相关性分数数组
+ * @param out_count [out] 输出结果数量
+ * @ownership 调用者负责释放 out_record_ids 和 out_scores
+ * @threadsafe 是（内部使用锁保护）
+ * @reentrant 否
  * @return agentos_error_t
  */
 agentos_error_t agentos_memoryrov_query(

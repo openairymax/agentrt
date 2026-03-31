@@ -144,7 +144,7 @@ python doctor.py --report > diagnosis_$(date +%Y%m%d).txt
 
 诊断建议:
 1. 启动 market_d 服务：docker-compose up -d market_d
-2. 监控系统日志：tail -f lodges/logs/*.log
+2. 监控系统日志：tail -f heapstore/logs/*.log
 
 总体状态：良好 (2 个警告)
 ```
@@ -256,18 +256,18 @@ sudo swapon -a
 sudo python doctor.py
 
 # 或赋予目录权限
-chmod -R u+rwx lodges/logs
+chmod -R u+rwx heapstore/logs
 ```
 
 #### 2. 日志文件不存在
 
-**警告**: `Log file not found: lodges/logs/agentos.log`
+**警告**: `Log file not found: heapstore/logs/agentos.log`
 
 **解决**:
 ```bash
 # 创建日志目录
-mkdir -p lodges/logs
-touch lodges/logs/agentos.log
+mkdir -p heapstore/logs
+touch heapstore/logs/agentos.log
 ```
 
 ---
@@ -338,8 +338,8 @@ ulimit -v 4194304  # 4GB
 2. **日志保护**:
 ```bash
 # 设置日志权限
-chmod 640 lodges/logs/*.log
-chown agentos:agentos lodges/logs/*.log
+chmod 640 heapstore/logs/*.log
+chown agentos:agentos heapstore/logs/*.log
 ```
 
 ---

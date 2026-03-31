@@ -4,7 +4,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "../../../bases/utils/platform/include/platform_adapter.h"
+#include "../../../commons/utils/platform/include/platform_adapter.h"
 #include "platform.h"
 
 /* ==================== 线程实现 ==================== */
@@ -26,7 +26,7 @@ agentos_thread_t agentos_thread_self(void) {
     return (agentos_thread_t)platform_get_thread_id();
 }
 
-/* ==================== 互斥锁实�?==================== */
+/* ==================== 互斥锁实�?==================== */
 
 int agentos_mutex_init(agentos_mutex_t* mutex) {
     return platform_mutex_init((platform_mutex_t*)mutex);
@@ -37,7 +37,7 @@ int agentos_mutex_lock(agentos_mutex_t* mutex) {
 }
 
 int agentos_mutex_trylock(agentos_mutex_t* mutex) {
-    return platform_mutex_lock((platform_mutex_t*)mutex);
+    return platform_mutex_trylock((platform_mutex_t*)mutex);
 }
 
 int agentos_mutex_unlock(agentos_mutex_t* mutex) {
@@ -216,7 +216,7 @@ uint64_t agentos_time_ms(void) {
     return platform_get_current_time_ms();
 }
 
-/* ==================== 随机数接�?==================== */
+/* ==================== 随机数接�?==================== */
 
 static AGENTOS_THREAD_LOCAL unsigned int g_random_seed = 0;
 static AGENTOS_THREAD_LOCAL int g_random_initialized = 0;
@@ -232,7 +232,16 @@ uint32_t agentos_random_uint32(uint32_t min, uint32_t max) {
     if (!g_random_initialized) {
         agentos_random_init();
     }
-    return min + (uint32_t)((double)rand() / (RAND_MAX + 1.0) * (max - min + 1));
+    if (min >= max) {
+        return min;
+    }
+    uint32_t range = max - min + 1;
+    uint32_t divisor = RAND_MAX / range;
+    uint32_t retval;
+    do {
+        retval = (uint32_t)rand() / divisor;
+    } while (retval >= range);
+    return min + retval;
 }
 
 float agentos_random_float(void) {
@@ -264,7 +273,7 @@ int64_t agentos_file_size(const char* path) {
     return 0;
 }
 
-/* ==================== 字符串工�?==================== */
+/* ==================== 字符串工�?==================== */
 
 char* agentos_strlcpy(char* dest, size_t dest_size, const char* src) {
     if (dest_size == 0) {

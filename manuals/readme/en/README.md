@@ -5,7 +5,7 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-1.0.0.5-blue.svg)](https://gitee.com/spharx/agentos)
+[![Version](https://img.shields.io/badge/version-1.0.0.6-blue.svg)](https://gitee.com/spharx/agentos)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](https://gitee.com/spharx/agentos/blob/main/LICENSE)
 [![Mirror](https://img.shields.io/badge/mirror-GitHub-lightgrey.svg)](https://github.com/SpharxTeam/AgentOS)
 
@@ -186,7 +186,7 @@ AgentOS/
 │   │   └── strategies/         # Community-contributed strategies
 │   └── markets/                # Market infrastructure
 │
-├── lodges/                    # Data partition (runtime data)
+├── heapstore/                    # Data partition (runtime data)
 │   ├── kernel/                 # Kernel data
 │   ├── logs/                   # Log files (centralized storage)
 │   │   ├── apps/               # Application layer logs
@@ -400,12 +400,12 @@ MemoryRovol is AgentOS's kernel-level memory system, implementing full-stack mem
 
 ### Role in State Persistence
 
-#### Integration with lodges/registry
+#### Integration with heapstore/registry
 - **Registry Data**: MemoryRovol provides backing store for agents.db and skills.db
 - **Agent State**: Each agent's runtime state and history stored in L1/L2 layers
 - **Skill Memory**: Skill execution records and feedback stored in L2/L3 layers
 
-#### Integration with lodges/traces/spans
+#### Integration with heapstore/traces/spans
 - **Trace Data**: OpenTelemetry spans stored as raw memory in L1 layer
 - **Context Association**: Automatic memory correlation based on trace ID
 - **Performance Analysis**: L4 layer mines performance bottlenecks and optimization patterns
@@ -557,7 +557,7 @@ AgentOS uses a unified cross-language logging architecture:
 
 #### Log Storage Location
 ```
-lodges/logs/
+heapstore/logs/
 ├── kernel/         # Kernel layer logs → agentos.log
 ├── services/       # Service layer logs → llm_d.log, tool_d.log, etc.
 └── apps/           # Application layer logs → independent logs per app
@@ -645,7 +645,7 @@ Note: Detailed performance data available in [scripts/benchmark.py](scripts/benc
 - [🛠️ Create Skill](manuals/guides/create_skill.md) - Skill development tutorial
 - [📦 Deployment Guide](manuals/guides/deployment.md) - Production deployment
 - [🎛️ Kernel Tuning](manuals/guides/kernel_tuning.md) - Performance optimization guide
-- [🔍 Troubleshooting](manuals/guides/troubleshooting.md) - bases issues
+- [🔍 Troubleshooting](manuals/guides/troubleshooting.md) - commons issues
 
 ### Technical Specifications
 
@@ -729,7 +729,7 @@ Note: Detailed performance data available in [scripts/benchmark.py](scripts/benc
     - `sys_telemetry_traces()` - Get traces
 - ✅ Unified logging system implementation
   - Cross-language logging interface (C/Python/Go/Rust/TS)
-  - Centralized log storage (lodges/logs/)
+  - Centralized log storage (heapstore/logs/)
   - trace_id full-link tracing
   - OpenTelemetry integration
 - 🔲 Complete end-to-end integration testing

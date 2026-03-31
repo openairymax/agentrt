@@ -33,38 +33,45 @@
           "skill_id": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9_]*_skill$",
-            "description": "Unique skill identifier"
+            "description": "Unique skill identifier",
+            "examples": ["file_reader_skill", "web_search_skill", "code_generator_skill"]
           },
           "name": {
             "type": "string",
             "minLength": 1,
             "maxLength": 100,
-            "description": "Human-readable skill name"
+            "description": "Human-readable skill name",
+            "examples": ["File Reader", "Web Search", "Code Generator"]
           },
           "description": {
             "type": "string",
             "maxLength": 500,
-            "description": "Skill description"
+            "description": "Skill description",
+            "examples": ["Reads and parses local files", "Search the web for information", "Generates code from specifications"]
           },
           "version": {
             "type": "string",
             "pattern": "^\\d+\\.\\d+\\.\\d+$",
-            "description": "Skill version"
+            "description": "Skill version",
+            "examples": ["1.0.0", "1.2.0", "2.0.1"]
           },
           "source": {
             "type": "string",
             "enum": ["builtin", "community", "custom", "external"],
-            "description": "Skill source type"
+            "description": "Skill source type",
+            "examples": ["builtin", "custom", "community"]
           },
           "enabled": {
             "type": "boolean",
             "default": true,
-            "description": "Whether skill is enabled"
+            "description": "Whether skill is enabled",
+            "examples": [true, false]
           },
           "unit_type": {
             "type": "string",
             "enum": ["tool", "file", "api", "browser", "db", "code", "shell", "custom"],
-            "description": "Execution unit type"
+            "description": "Execution unit type",
+            "examples": ["tool", "file", "api", "code", "shell"]
           },
           "contract_path": {
             "type": "string",
@@ -75,7 +82,8 @@
             "items": {
               "type": "string"
             },
-            "description": "Required permissions"
+            "description": "Required permissions",
+            "examples": [["file:read", "file:write"], ["network:connect"], ["process:execute"]]
           },
           "dependencies": {
             "type": "array",
@@ -85,16 +93,19 @@
               "properties": {
                 "skill_id": {
                   "type": "string",
-                  "description": "Dependency skill ID"
+                  "description": "Dependency skill ID",
+                  "examples": ["file_reader_skill", "logger_skill"]
                 },
                 "version": {
                   "type": "string",
-                  "description": "Version constraint (e.g., >=1.0.0)"
+                  "description": "Version constraint (e.g., >=1.0.0)",
+                  "examples": [">=1.0.0", "^2.0.0", "~1.5.0"]
                 },
                 "optional": {
                   "type": "boolean",
                   "default": false,
-                  "description": "Whether dependency is optional"
+                  "description": "Whether dependency is optional",
+                  "examples": [true, false]
                 }
               }
             },
@@ -126,16 +137,22 @@
             "properties": {
               "max_memory_mb": {
                 "type": "integer",
-                "minimum": 64
+                "minimum": 64,
+                "description": "Maximum memory in MB",
+                "examples": [128, 256, 512, 1024]
               },
               "timeout_sec": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 86400
+                "maximum": 86400,
+                "description": "Execution timeout in seconds",
+                "examples": [30, 60, 300, 3600]
               },
               "max_file_size_mb": {
                 "type": "integer",
-                "minimum": 1
+                "minimum": 1,
+                "description": "Maximum file size in MB",
+                "examples": [1, 10, 50, 100]
               }
             }
           },
@@ -144,11 +161,15 @@
             "properties": {
               "max_calls_per_minute": {
                 "type": "integer",
-                "minimum": 1
+                "minimum": 1,
+                "description": "Maximum calls per minute",
+                "examples": [10, 30, 60, 120]
               },
               "max_calls_per_hour": {
                 "type": "integer",
-                "minimum": 1
+                "minimum": 1,
+                "description": "Maximum calls per hour",
+                "examples": [100, 500, 1000, 5000]
               }
             }
           },
@@ -157,7 +178,8 @@
             "items": {
               "type": "string"
             },
-            "description": "Tags for categorization"
+            "description": "Tags for categorization",
+            "examples": [["file", "io"], ["web", "api"], ["code", "generation"], ["database", "sql"]]
           },
           "author": {
             "type": "string",

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_market.c
  * @brief 市场服务单元测试
  * @details 测试市场服务的核心功能，包括 Agent 和 Skill 的注册、发现、安装和管理
@@ -23,7 +23,6 @@ int test_service_create_destroy() {
         .storage_path = "./test_market",
         .sync_interval_ms = 60000,
         .cache_ttl_ms = 300000,
-        // From data intelligence emerges. by spharx
         .enable_remote_registry = true,
         .enable_auto_update = true
     };

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file market_service.h
  * @brief 市场服务接口定义
  * @details 负责 Agent 和 Skill 的注册、发现、安装和管理
@@ -23,7 +23,6 @@ typedef struct {
     bool enable_auto_update;         /**< 是否启用自动更新 */
 } market_config_t;
 
-// From data intelligence emerges. by spharx
 /**
  * @brief Agent 类型
  */

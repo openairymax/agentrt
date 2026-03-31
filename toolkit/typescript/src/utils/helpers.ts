@@ -436,3 +436,78 @@ export function buildListPath(basePath: string, opts?: ListOptions): string {
   const params = listOptionsToParams(opts);
   return buildURL(basePath, params);
 }
+
+// ============================================================
+// 响应验证和提取函数
+// ============================================================
+
+/**
+ * 验证并提取响应数据，如果数据无效则抛出错误
+ * @param resp - API 响应
+ * @param errorMsg - 错误消息
+ */
+export function validateAndExtractData(
+  resp: APIResponse | null | undefined,
+  errorMsg: string = '响应格式异常',
+): Record<string, unknown> {
+  const data = extractDataMap(resp);
+  if (!data) {
+    throw new AgentOSError(errorMsg, ErrorCode.INVALID_RESPONSE);
+  }
+  return data;
+}
+
+// ============================================================
+// 参数校验函数
+// ============================================================
+
+/**
+ * 验证字符串参数不为空
+ * @param value - 参数值
+ * @param paramName - 参数名称
+ * @throws AgentOSError 如果参数为空
+ */
+export function validateRequiredString(value: string | undefined | null, paramName: string): void {
+  if (!value || value.trim() === '') {
+    throw new AgentOSError(`${paramName}不能为空`, ErrorCode.MISSING_PARAMETER);
+  }
+}
+
+/**
+ * 验证数字参数为正数
+ * @param value - 参数值
+ * @param paramName - 参数名称
+ * @throws AgentOSError 如果参数不是正数
+ */
+export function validatePositiveNumber(value: number, paramName: string): void {
+  if (value <= 0) {
+    throw new AgentOSError(`${paramName}必须为正数`, ErrorCode.INVALID_PARAMETER);
+  }
+}
+
+/**
+ * 验证对象参数不为空
+ * @param value - 参数值
+ * @param paramName - 参数名称
+ * @throws AgentOSError 如果参数为空
+ */
+export function validateRequiredObject<T extends object>(
+  value: T | undefined | null,
+  paramName: string,
+): void {
+  if (!value || (typeof value === 'object' && Object.keys(value).length === 0)) {
+    throw new AgentOSError(`${paramName}不能为空`, ErrorCode.MISSING_PARAMETER);
+  }
+}
+
+/**
+ * 验证数组参数不为空
+ * @param value - 参数值
+ * @param paramName - 参数名称
+ * @throws AgentOSError 如果参数为空数组
+ */
+export function validateNonEmptyArray<T>(value: T[] | undefined | null, paramName: string): void {
+  if (!value || value.length === 0) {
+    throw new AgentOSError(`${paramName}不能为空数组`, ErrorCode.MISSING_PARAMETER);
+  }
+}

@@ -1,4 +1,4 @@
-﻿# =============================================================================
+# =============================================================================
 # AgentOS .gitignore 文件
 # 版本：2.1.0
 # 最后更新：2026-03-26
@@ -12,11 +12,11 @@
 # - atoms/         : 核心原子模块（C 语言）
 # - atomsmini/     : 轻量级原子模块
 # - daemon/        : 用户态服务模块（C 语言）
-# - bases/         : 统一基础库模块
+# - commons/      : 统一基础库
 # - cupolas/       : 安全穹顶模块
 # - gateway/       : 动态服务模块
 # - openlab/       : Python 应用中心
-# - lodges/      : 数据持久化层
+# - heapstore/   : 数据持久化层
 # - manuals/    : 项目文档
 # - scripts/       : 构建和运维脚本
 # - tests/         : 测试框架
@@ -33,6 +33,8 @@ CMakeFiles/
 cmake_install.cmake
 *.cmake
 cmake_install.*
+.gitee/
+.github/
 
 # --- 编译中间文件和输出 ---
 # 目标文件和库
@@ -260,7 +262,7 @@ nbdist/
 # --- 日志文件 ---
 *.log
 logs/
-lodges/logs/
+heapstore/logs/
 *.logs
 
 # --- 数据库文件 ---
@@ -270,13 +272,13 @@ lodges/logs/
 *.sqlite
 *.sqlite3
 *.db.sqlite
-lodges/registry/*.db
-lodges/registry/*.sqlite
+heapstore/registry/*.db
+heapstore/registry/*.sqlite
 *.db-journal
-lodges/db/
+heapstore/db/
 
 # --- 追踪和性能数据 ---
-lodges/traces/
+heapstore/traces/
 *.trace
 *.spans
 *.prof
@@ -420,17 +422,17 @@ composer.lock
 # =============================================================================
 
 # --- FAISS 索引文件（大型二进制） ---
-lodges/models/*.faiss
-lodges/models/*.index
-lodges/models/*.pkl
-lodges/models/*.pickle
+heapstore/models/*.faiss
+heapstore/models/*.index
+heapstore/models/*.pkl
+heapstore/models/*.pickle
 
 # --- 模型权重（大型文件） ---
-lodges/model/
-lodges/models/*.bin
-lodges/models/*.pth
-lodges/models/*.h5
-lodges/models/*.pt
+heapstore/model/
+heapstore/models/*.bin
+heapstore/models/*.pth
+heapstore/models/*.h5
+heapstore/models/*.pt
 *.onnx
 *.tflite
 
@@ -608,9 +610,9 @@ tmp_*.sh
 *.private
 
 # --- 报告和日志 ---
-reports/*.log
-reports/*.txt
-reports/archive/
+heapstore/reports/*.log
+heapstore/reports/*.txt
+heapstore/reports/archive/
 
 # =============================================================================
 # 16. 必须保留的例外

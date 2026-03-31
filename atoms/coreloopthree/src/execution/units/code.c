@@ -10,8 +10,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h"
-#include "../../../bases/utils/string/include/string_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -23,20 +23,24 @@
 
 #define AGENTOS_MAX_CODE_SIZE (4 * 1024 * 1024)
 
-#include "../../../bases/utils/execution/include/execution_common.h"\n\ntypedef struct $1_unit_data {\n    execution_unit_data_t base;\n    char* metadata_json;\n} $1_unit_data_t;
+#include "../../../commons/utils/execution/include/execution_common.h"\n\ntypedef struct $1_unit_data {\n    execution_unit_data_t base;\n    char* metadata_json;\n} $1_unit_data_t;
 
 /**
  * @brief 创建跨平台临时文件并写入内容
- * @param suffix 文件后缀（如 ".py"�?
+ * @param suffix 文件后缀（如 ".py"�?
  * @param content 要写入的内容
  * @param content_len 内容长度
  * @param out_path 输出临时文件路径（需调用者释放）
  * @return 成功返回 AGENTOS_SUCCESS
  */
-static agentos_error_t create_temp_file(
-    const char* suffix, const char* content, size_t content_len, char** out_path) {
 
 #ifdef _WIN32
+/**
+ * @brief Windows平台创建临时文件实现
+ */
+static agentos_error_t create_temp_file_windows(
+    const char* suffix, const char* content, size_t content_len, char** out_path) {
+
     char temp_dir[MAX_PATH];
     DWORD dir_len = GetTempPathA(MAX_PATH, temp_dir);
     if (dir_len == 0 || dir_len > MAX_PATH) return AGENTOS_EIO;
@@ -45,67 +49,53 @@ static agentos_error_t create_temp_file(
     UINT ret = GetTempFileNameA(temp_dir, "aos", 0, temp_path);
     if (ret == 0) return AGENTOS_EIO;
 
+    // 如果有后缀，重命名文件
     if (suffix) {
         char final_path[MAX_PATH];
         snprintf(final_path, MAX_PATH, "%s%s", temp_path, suffix);
-        if (MoveFileA(temp_path, final_path)) {
-            FILE* f = fopen(final_path, "wb");
-            if (!f) {
-                DeleteFileA(final_path);
-                return AGENTOS_EIO;
-            }
-            size_t written = fwrite(content, 1, content_len, f);
-            if (written != content_len) {
-                fclose(f);
-                DeleteFileA(final_path);
-                return AGENTOS_EIO;
-            }
-            if (fclose(f) != 0) {
-                DeleteFileA(final_path);
-                return AGENTOS_EIO;
-            }
-            *out_path = AGENTOS_STRDUP(final_path);
-            if (!*out_path) {
-                DeleteFileA(final_path);
-                return AGENTOS_ENOMEM;
-            }
-            return AGENTOS_SUCCESS;
+        if (!MoveFileA(temp_path, final_path)) {
+            // 重命名失败，使用原文件名
+        snprintf(final_path, MAX_PATH, "%s", temp_path);
         }
-        FILE* f = fopen(temp_path, "wb");
-        if (!f) return AGENTOS_EIO;
-        size_t written = fwrite(content, 1, content_len, f);
-        if (written != content_len) {
-            fclose(f);
-            return AGENTOS_EIO;
-        }
-        if (fclose(f) != 0) {
-            return AGENTOS_EIO;
-        }
-        *out_path = AGENTOS_STRDUP(temp_path);
-        if (!*out_path) {
-            DeleteFileA(temp_path);
-            return AGENTOS_ENOMEM;
-        }
-        return AGENTOS_SUCCESS;
+        snprintf(temp_path, MAX_PATH, "%s", final_path);
     }
 
+    // 写入文件内容
     FILE* f = fopen(temp_path, "wb");
-    if (!f) return AGENTOS_EIO;
+    if (!f) {
+        DeleteFileA(temp_path);
+        return AGENTOS_EIO;
+    }
+
     size_t written = fwrite(content, 1, content_len, f);
+    int close_result = fclose(f);
+
     if (written != content_len) {
-        fclose(f);
+        DeleteFileA(temp_path);
         return AGENTOS_EIO;
     }
-    if (fclose(f) != 0) {
+
+    if (close_result != 0) {
+        DeleteFileA(temp_path);
         return AGENTOS_EIO;
     }
+
     *out_path = AGENTOS_STRDUP(temp_path);
     if (!*out_path) {
         DeleteFileA(temp_path);
         return AGENTOS_ENOMEM;
     }
+
     return AGENTOS_SUCCESS;
+}
+
 #else
+/**
+ * @brief Unix/Linux平台创建临时文件实现
+ */
+static agentos_error_t create_temp_file_unix(
+    const char* suffix, const char* content, size_t content_len, char** out_path) {
+
     char temp_dir[256];
     if (agentos_core_get_temp_dir(temp_dir, sizeof(temp_dir)) != 0) {
         return AGENTOS_EIO;
@@ -129,34 +119,54 @@ static agentos_error_t create_temp_file(
 
     int fd = mkstemp(temp_filename);
     if (fd == -1) return AGENTOS_EIO;
+
     ssize_t written = write(fd, content, content_len);
+    int close_result = close(fd);
+
     if (written < 0 || (size_t)written != content_len) {
-        close(fd);
         unlink(temp_filename);
         return AGENTOS_EIO;
     }
-    if (close(fd) != 0) {
+
+    if (close_result != 0) {
         unlink(temp_filename);
         return AGENTOS_EIO;
     }
+
     *out_path = AGENTOS_STRDUP(temp_filename);
     if (!*out_path) {
         unlink(temp_filename);
         return AGENTOS_ENOMEM;
     }
+
     return AGENTOS_SUCCESS;
+}
+#endif
+
+/**
+ * @brief 创建跨平台临时文件主函数
+ */
+static agentos_error_t create_temp_file(
+    const char* suffix, const char* content, size_t content_len, char** out_path) {
+
+    if (!content || !out_path) return AGENTOS_EINVAL;
+
+#ifdef _WIN32
+    return create_temp_file_windows(suffix, content, content_len, out_path);
+#else
+    return create_temp_file_unix(suffix, content, content_len, out_path);
 #endif
 }
 
 /**
  * @brief 删除临时文件
- * @param path 文件路径（可为NULL�?
+ * @param path 文件路径（可为NULL�?
  *
  * @details 跨平台删除临时文件：
  * - Windows: 使用 DeleteFileA
  * - POSIX: 使用 unlink
  *
- * @note 此函数不返回错误状态，因为临时文件删除失败不影响系统正确�?
+ * @note 此函数不返回错误状态，因为临时文件删除失败不影响系统正确�?
  */
 static void remove_temp_file(const char* path) {
     if (!path) return;
@@ -277,7 +287,7 @@ static agentos_error_t execute_command_capture(const char* cmd, char** out_outpu
 /**
  * @brief 执行代码的核心逻辑
  * @param unit 执行单元
- * @param input 输入代码字符�?
+ * @param input 输入代码字符�?
  * @param out_output 输出执行结果
  * @return AGENTOS_SUCCESS 或错误码
  */
@@ -340,12 +350,12 @@ static agentos_error_t code_execute(
 }
 
 /**
- * @brief 销毁代码执行单�?
+ * @brief 销毁代码执行单�?
  */
 static void code_destroy(agentos_execution_unit_t* unit) {\n    if (!unit) return;\n    code_unit_data_t* data = (code_unit_data_t*)unit->data;\n    if (data) {\n        execution_unit_data_cleanup(&data->base);\n        if (data->metadata_json) AGENTOS_FREE(data->metadata_json);\n        AGENTOS_FREE(data);\n    }\n    AGENTOS_FREE(unit);\n}
 
 /**
- * @brief 获取执行单元元数�?
+ * @brief 获取执行单元元数�?
  */
 static const char* code_get_metadata(agentos_execution_unit_t* unit) {
     code_unit_data_t* data = (code_unit_data_t*)unit->data;
@@ -354,8 +364,8 @@ static const char* code_get_metadata(agentos_execution_unit_t* unit) {
 
 /**
  * @brief 创建代码执行单元
- * @param language 支持的语言�?python", "javascript", "node"
- * @return 执行单元指针，失败返�?NULL
+ * @param language 支持的语言�?python", "javascript", "node"
+ * @return 执行单元指针，失败返�?NULL
  */
 agentos_execution_unit_t* agentos_code_unit_create(const char* language) {
     if (!language) return NULL;

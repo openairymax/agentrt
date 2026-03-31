@@ -1,6 +1,6 @@
-﻿/**
+/**
  * @file binder.c
- * @brief L3 绑定器实�?
+ * @brief L3 绑定器实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -8,12 +8,12 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h"
-#include "../../../bases/utils/string/include/string_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 
 /**
- * @brief 绑定器配�?
+ * @brief 绑定器配置
  */
 typedef struct binder_config {
     float similarity_threshold;
@@ -21,7 +21,7 @@ typedef struct binder_config {
 } binder_config_t;
 
 /**
- * @brief 绑定上下�?
+ * @brief 绑定上下文
  */
 typedef struct binding_context {
     agentos_knowledge_graph_t* kg;

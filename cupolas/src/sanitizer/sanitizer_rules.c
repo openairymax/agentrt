@@ -18,17 +18,17 @@ struct sanitize_rule {
 struct sanitizer_rules {
     struct sanitize_rule* head;
     size_t count;
-    domes_mutex_t lock;
+    cupolas_mutex_t lock;
 };
 
 sanitizer_rules_t* sanitizer_rules_create(const char* rules_path) {
-    sanitizer_rules_t* rules = (sanitizer_rules_t*)domes_mem_alloc(sizeof(sanitizer_rules_t));
+    sanitizer_rules_t* rules = (sanitizer_rules_t*)cupolas_mem_alloc(sizeof(sanitizer_rules_t));
     if (!rules) return NULL;
     
     memset(rules, 0, sizeof(sanitizer_rules_t));
     
-    if (domes_mutex_init(&rules->lock) != DOMES_OK) {
-        domes_mem_free(rules);
+    if (cupolas_mutex_init(&rules->lock) != cupolas_OK) {
+        cupolas_mem_free(rules);
         return NULL;
     }
     
@@ -38,62 +38,62 @@ sanitizer_rules_t* sanitizer_rules_create(const char* rules_path) {
 void sanitizer_rules_destroy(sanitizer_rules_t* rules) {
     if (!rules) return;
     
-    domes_mutex_lock(&rules->lock);
+    cupolas_mutex_lock(&rules->lock);
     
     struct sanitize_rule* rule = rules->head;
     while (rule) {
         struct sanitize_rule* next = rule->next;
-        domes_mem_free(rule->pattern);
-        domes_mem_free(rule->replacement);
-        domes_mem_free(rule);
+        cupolas_mem_free(rule->pattern);
+        cupolas_mem_free(rule->replacement);
+        cupolas_mem_free(rule);
         rule = next;
     }
     
-    domes_mutex_unlock(&rules->lock);
-    domes_mutex_destroy(&rules->lock);
-    domes_mem_free(rules);
+    cupolas_mutex_unlock(&rules->lock);
+    cupolas_mutex_destroy(&rules->lock);
+    cupolas_mem_free(rules);
 }
 
 int sanitizer_rules_add(sanitizer_rules_t* rules, const char* pattern, const char* replacement) {
-    if (!rules || !pattern) return DOMES_ERROR_INVALID_ARG;
+    if (!rules || !pattern) return cupolas_ERROR_INVALID_ARG;
     
-    struct sanitize_rule* rule = (struct sanitize_rule*)domes_mem_alloc(sizeof(struct sanitize_rule));
-    if (!rule) return DOMES_ERROR_NO_MEMORY;
+    struct sanitize_rule* rule = (struct sanitize_rule*)cupolas_mem_alloc(sizeof(struct sanitize_rule));
+    if (!rule) return cupolas_ERROR_NO_MEMORY;
     
     memset(rule, 0, sizeof(struct sanitize_rule));
     
-    rule->pattern = domes_strdup(pattern);
+    rule->pattern = cupolas_strdup(pattern);
     if (!rule->pattern) {
-        domes_mem_free(rule);
-        return DOMES_ERROR_NO_MEMORY;
+        cupolas_mem_free(rule);
+        return cupolas_ERROR_NO_MEMORY;
     }
     
     if (replacement) {
-        rule->replacement = domes_strdup(replacement);
+        rule->replacement = cupolas_strdup(replacement);
         if (!rule->replacement) {
-            domes_mem_free(rule->pattern);
-            domes_mem_free(rule);
-            return DOMES_ERROR_NO_MEMORY;
+            cupolas_mem_free(rule->pattern);
+            cupolas_mem_free(rule);
+            return cupolas_ERROR_NO_MEMORY;
         }
     }
     
-    domes_mutex_lock(&rules->lock);
+    cupolas_mutex_lock(&rules->lock);
     
     rule->next = rules->head;
     rules->head = rule;
     rules->count++;
     
-    domes_mutex_unlock(&rules->lock);
+    cupolas_mutex_unlock(&rules->lock);
     
-    return DOMES_OK;
+    return cupolas_OK;
 }
 
 int sanitizer_rules_apply(sanitizer_rules_t* rules, const char* input, char* output, size_t output_size) {
     if (!rules || !input || !output || output_size == 0) {
-        return DOMES_ERROR_INVALID_ARG;
+        return cupolas_ERROR_INVALID_ARG;
     }
     
-    domes_mutex_lock(&rules->lock);
+    cupolas_mutex_lock(&rules->lock);
     
     strncpy(output, input, output_size - 1);
     output[output_size - 1] = '\0';
@@ -114,34 +114,34 @@ int sanitizer_rules_apply(sanitizer_rules_t* rules, const char* input, char* out
                     }
                 }
             } else {
-                domes_mutex_unlock(&rules->lock);
-                return DOMES_ERROR_UNKNOWN;
+                cupolas_mutex_unlock(&rules->lock);
+                return cupolas_ERROR_UNKNOWN;
             }
         }
         rule = rule->next;
     }
     
-    domes_mutex_unlock(&rules->lock);
+    cupolas_mutex_unlock(&rules->lock);
     
-    return DOMES_OK;
+    return cupolas_OK;
 }
 
 void sanitizer_rules_clear(sanitizer_rules_t* rules) {
     if (!rules) return;
     
-    domes_mutex_lock(&rules->lock);
+    cupolas_mutex_lock(&rules->lock);
     
     struct sanitize_rule* rule = rules->head;
     while (rule) {
         struct sanitize_rule* next = rule->next;
-        domes_mem_free(rule->pattern);
-        domes_mem_free(rule->replacement);
-        domes_mem_free(rule);
+        cupolas_mem_free(rule->pattern);
+        cupolas_mem_free(rule->replacement);
+        cupolas_mem_free(rule);
         rule = next;
     }
     
     rules->head = NULL;
     rules->count = 0;
     
-    domes_mutex_unlock(&rules->lock);
+    cupolas_mutex_unlock(&rules->lock);
 }

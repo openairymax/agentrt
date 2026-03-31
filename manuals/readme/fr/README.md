@@ -5,7 +5,7 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-1.0.0.5-blue.svg)](https://gitee.com/spharx/agentos)
+[![Version](https://img.shields.io/badge/version-1.0.0.6-blue.svg)](https://gitee.com/spharx/agentos)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](https://gitee.com/spharx/agentos/blob/main/LICENSE)
 [![Mirror](https://img.shields.io/badge/mirror-GitHub-lightgrey.svg)](https://github.com/SpharxTeam/AgentOS)
 
@@ -301,7 +301,7 @@ Voir: [BUILD.md](atoms/BUILD.md)
 ### Système Journalisation
 
 ```
-lodges/logs/
+heapstore/logs/
 ├── kernel/         → agentos.log
 ├── services/       → llm_d.log, tool_d.log, etc.
 └── apps/           → logs indépendants

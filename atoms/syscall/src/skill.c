@@ -1,4 +1,4 @@
-/**
+﻿﻿﻿﻿/**
  * @file skill.c
  * @brief 技能相关系统调用实�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -10,8 +10,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h"
-#include "../../../bases/utils/string/include/string_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 
 typedef struct skill_entry {
@@ -32,7 +32,7 @@ static void ensure_skill_lock(void) {
     if (!current) {
         agentos_mutex_t* new_lock = agentos_mutex_create();
         if (!new_lock) return;
-        
+
         /* 原子比较交换，使�?acquire-release 内存顺序 */
         agentos_mutex_t* expected = NULL;
         if (!__atomic_compare_exchange_n(&skill_lock, &expected, new_lock,

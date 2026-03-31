@@ -1,4 +1,4 @@
-﻿﻿/**
+/**
  * @file test_loop.c
  * @brief 核心循环单元测试
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -10,8 +10,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h"
-#include "../../../bases/utils/string/include/string_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 
 /**
@@ -67,7 +67,7 @@ static void test_loop_get_engines() {
     agentos_execution_engine_t* execution = NULL;
     agentos_memory_engine_t* memory = NULL;
     agentos_loop_get_engines(loop, &cognition, &execution, &memory);
-    printf("test_loop_get_engines: cognition=%p, execution=%p, memory=%p\n", 
+    printf("test_loop_get_engines: cognition=%p, execution=%p, memory=%p\n",
            cognition, execution, memory);
 
     agentos_loop_destroy(loop);

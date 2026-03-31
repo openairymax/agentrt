@@ -1,4 +1,4 @@
-﻿// AgentOS Go SDK - 公共辅助函数模块
+// AgentOS Go SDK - 公共辅助函数模块
 // Version: 3.0.0
 // Last updated: 2026-03-22
 //
@@ -246,5 +246,46 @@ func SanitizeString(s string) string {
 	s = strings.ReplaceAll(s, "\x00", "")
 	s = strings.ReplaceAll(s, "\r\n", "\n")
 	return s
+}
+
+// ============================================================
+// 响应验证和提取函数
+// ============================================================
+
+// ValidateAndExtractData 验证并提取响应数据，如果数据无效则返回错误
+func ValidateAndExtractData(resp *types.APIResponse, errorMsg string) (map[string]interface{}, error) {
+	data, ok := ExtractDataMap(resp)
+	if !ok {
+		return nil, fmt.Errorf("%s", errorMsg)
+	}
+	return data, nil
+}
+
+// ============================================================
+// 参数校验函数
+// ============================================================
+
+// ValidateRequiredString 验证字符串参数不为空
+func ValidateRequiredString(value string, paramName string) error {
+	if value == "" {
+		return fmt.Errorf("%s不能为空", paramName)
+	}
+	return nil
+}
+
+// ValidatePositiveNumber 验证数字参数为正数
+func ValidatePositiveNumber(value int64, paramName string) error {
+	if value <= 0 {
+		return fmt.Errorf("%s必须为正数", paramName)
+	}
+	return nil
+}
+
+// ValidateNonEmptySlice 验证切片参数不为空
+func ValidateNonEmptySlice[T any](value []T, paramName string) error {
+	if len(value) == 0 {
+		return fmt.Errorf("%s不能为空", paramName)
+	}
+	return nil
 }
 

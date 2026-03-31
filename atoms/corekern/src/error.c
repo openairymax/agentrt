@@ -1,6 +1,6 @@
 /**
  * @file error.c
- * @brief 错误码转字符串实�?
+ * @brief 错误码转字符串实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 

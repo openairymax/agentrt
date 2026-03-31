@@ -33,18 +33,21 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 64,
-          "description": "Kernel instance name"
+          "description": "Kernel instance name",
+          "examples": ["AgentOS-Core-01", "agentos-production"]
         },
         "version": {
           "type": "string",
           "pattern": "^\\d+\\.\\d+\\.\\d+(\\.\\d+)?$",
-          "description": "Kernel version in semantic versioning format"
+          "description": "Kernel version in semantic versioning format",
+          "examples": ["1.0.0", "1.0.0.3", "2.1.0"]
         },
         "log_level": {
           "type": "string",
           "enum": ["debug", "info", "warning", "error", "critical", "off"],
           "default": "info",
-          "description": "Global log level for kernel"
+          "description": "Global log level for kernel",
+          "examples": ["info", "debug", "warning"]
         },
         "scheduler": {
           "type": "object",
@@ -54,21 +57,24 @@
               "type": "string",
               "enum": ["round_robin", "weighted", "ml_based", "priority", "fair"],
               "default": "weighted",
-              "description": "Task scheduling algorithm"
+              "description": "Task scheduling algorithm",
+              "examples": ["weighted", "round_robin", "priority"]
             },
             "time_slice_ms": {
               "type": "integer",
               "minimum": 1,
               "maximum": 1000,
               "default": 10,
-              "description": "Time slice per task in milliseconds"
+              "description": "Time slice per task in milliseconds",
+              "examples": [10, 20, 50, 100]
             },
             "max_concurrency": {
               "type": "integer",
               "minimum": 0,
               "maximum": 10000,
               "default": 100,
-              "description": "Maximum concurrent tasks (0 = unlimited)"
+              "description": "Maximum concurrent tasks (0 = unlimited)",
+              "examples": [50, 100, 200, 0]
             },
             "priority_weights": {
               "type": "object",
@@ -123,25 +129,29 @@
               "minimum": 64,
               "maximum": 65536,
               "default": 1024,
-              "description": "Kernel memory pool size in megabytes"
+              "description": "Kernel memory pool size in megabytes",
+              "examples": [512, 1024, 2048, 4096]
             },
             "max_allocation_mb": {
               "type": "integer",
               "minimum": 1,
               "maximum": 65536,
               "default": 2048,
-              "description": "Maximum single allocation size in megabytes"
+              "description": "Maximum single allocation size in megabytes",
+              "examples": [512, 1024, 2048, 4096]
             },
             "guard_enabled": {
               "type": "boolean",
               "default": true,
-              "description": "Enable memory guard boundary checking"
+              "description": "Enable memory guard boundary checking",
+              "examples": [true, false]
             },
             "oom_policy": {
               "type": "string",
               "enum": ["reject", "evict_lru", "evict_low_priority", "crash"],
               "default": "reject",
-              "description": "Policy when out of memory"
+              "description": "Policy when out of memory",
+              "examples": ["reject", "evict_lru", "crash"]
             },
             "alignment_bytes": {
               "type": "integer",

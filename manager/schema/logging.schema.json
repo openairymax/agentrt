@@ -1,4 +1,4 @@
-﻿{
+{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agentos.spharx.ai/schemas/logging-v1.schema.json",
   "title": "AgentOS Logging Configuration Schema",
@@ -19,19 +19,22 @@
           "type": "string",
           "enum": ["trace", "debug", "info", "warning", "error", "critical", "off"],
           "default": "info",
-          "description": "Default log level"
+          "description": "Default log level",
+          "examples": ["info", "debug", "warning", "error"]
         },
         "format": {
           "type": "string",
           "enum": ["json", "text", "color", "structured"],
           "default": "json",
-          "description": "Log output format"
+          "description": "Log output format",
+          "examples": ["json", "text", "color"]
         },
         "output": {
           "type": "string",
           "enum": ["stdout", "stderr", "file", "both", "syslog"],
           "default": "both",
-          "description": "Log output destination"
+          "description": "Log output destination",
+          "examples": ["stdout", "file", "both"]
         },
         "file": {
           "type": "object",

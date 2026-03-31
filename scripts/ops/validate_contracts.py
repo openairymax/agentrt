@@ -1,4 +1,4 @@
-﻿﻿#!/usr/bin/env python3
+﻿﻿﻿﻿#!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 契约验证工具
 # 遵循 AgentOS 架构设计原则：反馈闭环、工程美学

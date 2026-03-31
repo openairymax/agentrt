@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file llm_service.h
  * @brief LLM 服务对外接口
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -23,7 +23,6 @@ typedef struct {
     const char* content;
 } llm_message_t;
 
-// From data intelligence emerges. by spharx
 typedef struct {
     const char* model;
     const llm_message_t* messages;

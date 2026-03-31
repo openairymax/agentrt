@@ -12,8 +12,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h"
-#include "../../../bases/utils/string/include/string_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 #include <stdio.h>
 #include <inttypes.h>
@@ -55,7 +55,7 @@ static void trigger_feedback(
     int level,
     const char* event,
     const char* data) {
-    
+
     if (engine && engine->feedback_cb) {
         engine->feedback_cb(
             level,
@@ -70,13 +70,13 @@ static void trigger_feedback(
 
 /**
  * @brief 创建认知引擎
- * 
+ *
  * @param plan_strategy 规划策略（可为NULL�?
  * @param coord_strategy 协调策略（可为NULL�?
  * @param disp_strategy 分发策略（可为NULL�?
  * @param out_engine 输出认知引擎指针
  * @return agentos_error_t 错误�?
- * 
+ *
  * @note 使用默认配置创建认知引擎，如需自定义配置请使用 agentos_cognition_create_ex
  */
 agentos_error_t agentos_cognition_create(
@@ -90,14 +90,14 @@ agentos_error_t agentos_cognition_create(
 
 /**
  * @brief 创建认知引擎（扩展版本，支持自定义配置）
- * 
+ *
  * @param manager 配置参数（可为NULL，使用默认配置）
  * @param plan_strategy 规划策略（可为NULL�?
  * @param coord_strategy 协调策略（可为NULL�?
  * @param disp_strategy 分发策略（可为NULL�?
  * @param out_engine 输出认知引擎指针
  * @return agentos_error_t 错误�?
- * 
+ *
  * @note 如果config为NULL，将使用默认配置�?
  *       - default_timeout_ms: 30000 (30�?
  *       - max_retries: 3
@@ -148,10 +148,10 @@ agentos_error_t agentos_cognition_create_ex(
     engine->stats_total_retries = 0;
 
     *out_engine = engine;
-    
+
     // 触发引擎创建反馈
     trigger_feedback(engine, 2, "engine_created", "{\"status\":\"initialized\"}");
-    
+
     return AGENTOS_SUCCESS;
 }
 
@@ -193,13 +193,13 @@ void agentos_cognition_set_context(
 
 /**
  * @brief 处理用户输入，生成任务计�?
- * 
+ *
  * @param engine 认知引擎
  * @param input 用户输入文本
  * @param input_len 输入文本长度
  * @param out_plan 输出任务计划指针
  * @return agentos_error_t 错误�?
- * 
+ *
  * @note 处理流程�?
  *       1. 参数验证
  *       2. 构建意图结构
@@ -207,7 +207,7 @@ void agentos_cognition_set_context(
  *       4. 如果主策略失败，尝试回退策略
  *       5. 生成计划ID
  *       6. 更新统计信息
- * 
+ *
  * @warning 调用者负责释放返回的任务计划（使�?agentos_task_plan_free�?
  */
 agentos_error_t agentos_cognition_process(
@@ -217,7 +217,7 @@ agentos_error_t agentos_cognition_process(
     agentos_task_plan_t** out_plan) {
 
     if (!engine || !input || !out_plan) {
-        AGENTOS_LOG_ERROR("Invalid parameters to cognition_process: engine=%p, input=%p, out_plan=%p", 
+        AGENTOS_LOG_ERROR("Invalid parameters to cognition_process: engine=%p, input=%p, out_plan=%p",
                          engine, input, out_plan);
         return AGENTOS_EINVAL;
     }
@@ -252,16 +252,16 @@ agentos_error_t agentos_cognition_process(
 
     // 如果主策略失败，尝试回退策略
     if (err != AGENTOS_SUCCESS) {
-        AGENTOS_LOG_WARN("Primary planning failed: %s (code %d), trying fallback", 
+        AGENTOS_LOG_WARN("Primary planning failed: %s (code %d), trying fallback",
                         agentos_error_string(err), err);
-        
+
         // 触发轮次内反馈：主策略失�?
         char err_buf[256];
         snprintf(err_buf, sizeof(err_buf),
             "{\"error_code\":%d,\"error_msg\":\"%s\",\"stage\":\"primary_planning\"}",
             err, agentos_error_string(err));
         trigger_feedback(engine, 1, "planning_retry", err_buf);
-        
+
         if (fallback_strat && fallback_strat->plan) {
             err = fallback_strat->plan(&intent, fallback_strat->data, &plan);
             if (err == AGENTOS_SUCCESS) {
@@ -270,37 +270,37 @@ agentos_error_t agentos_cognition_process(
                 agentos_mutex_unlock(engine->lock);
             }
         } else {
-            AGENTOS_LOG_ERROR("No fallback planner available, primary error: %s (code %d)", 
+            AGENTOS_LOG_ERROR("No fallback planner available, primary error: %s (code %d)",
                             agentos_error_string(err), err);
-            
+
             // 触发实时反馈：处理失�?
             snprintf(err_buf, sizeof(err_buf),
                 "{\"error_code\":%d,\"error_msg\":\"%s\",\"stage\":\"no_fallback\"}",
                 err, agentos_error_string(err));
             trigger_feedback(engine, 0, "process_failed", err_buf);
-            
+
             agentos_mutex_lock(engine->lock);
             engine->stats_failure_count++;
             agentos_mutex_unlock(engine->lock);
-            
+
             return err;
         }
     }
 
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_LOG_ERROR("Planning failed: %s (code %d)", agentos_error_string(err), err);
-        
+
         // 触发实时反馈：处理失�?
         char err_buf[256];
         snprintf(err_buf, sizeof(err_buf),
             "{\"error_code\":%d,\"error_msg\":\"%s\",\"stage\":\"fallback_failed\"}",
             err, agentos_error_string(err));
         trigger_feedback(engine, 0, "process_failed", err_buf);
-        
+
         agentos_mutex_lock(engine->lock);
         engine->stats_failure_count++;
         agentos_mutex_unlock(engine->lock);
-        
+
         return err;
     }
 
@@ -309,7 +309,7 @@ agentos_error_t agentos_cognition_process(
         agentos_generate_plan_id(id_buf, sizeof(id_buf));
         plan->plan_id = AGENTOS_STRDUP(id_buf);
         if (!plan->plan_id) {
-            AGENTOS_LOG_ERROR("Failed to allocate plan_id: %s (code %d)", 
+            AGENTOS_LOG_ERROR("Failed to allocate plan_id: %s (code %d)",
                             agentos_error_string(AGENTOS_ENOMEM), AGENTOS_ENOMEM);
             agentos_task_plan_free(plan);
             return AGENTOS_ENOMEM;
@@ -340,9 +340,9 @@ agentos_error_t agentos_cognition_process(
 
 /**
  * @brief 释放任务计划及其所有资�?
- * 
+ *
  * @param plan 任务计划指针
- * 
+ *
  * @note 释放以下资源�?
  *       1. 计划ID
  *       2. 所有任务节�?
@@ -411,7 +411,7 @@ agentos_error_t agentos_cognition_health_check(
 
     agentos_mutex_lock(engine->lock);
     cJSON_AddNumberToObject(root, "processed", engine->stats_processed);
-    cJSON_AddNumberToObject(root, "avg_time_ns", 
+    cJSON_AddNumberToObject(root, "avg_time_ns",
         (engine->stats_processed > 0) ? (engine->stats_total_time_ns / engine->stats_processed) : 0);
     agentos_mutex_unlock(engine->lock);
 

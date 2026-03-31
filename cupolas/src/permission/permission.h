@@ -10,8 +10,8 @@
  * - 可扩展：支持动态规则加载
  */
 
-#ifndef DOMAIN_PERMISSION_H
-#define DOMAIN_PERMISSION_H
+#ifndef CUPOLAS_PERMISSION_H
+#define CUPOLAS_PERMISSION_H
 
 #include "../platform/platform.h"
 #include <stddef.h>
@@ -116,4 +116,4 @@ void permission_engine_cache_stats(permission_engine_t* engine,
 }
 #endif
 
-#endif /* DOMAIN_PERMISSION_H */
+#endif /* CUPOLAS_PERMISSION_H */

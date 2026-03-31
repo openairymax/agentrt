@@ -22,6 +22,8 @@ import {
   buildListPath,
   parseList,
   listOptionsToParams,
+  validateAndExtractData,
+  validateRequiredString,
 } from '../utils';
 
 /**
@@ -55,6 +57,8 @@ export class SessionManager {
     userId: string,
     metadata?: Record<string, unknown>,
   ): Promise<Session> {
+    validateRequiredString(userId, '用户ID');
+
     const body: Record<string, unknown> = { user_id: userId };
     if (metadata) {
       body['metadata'] = metadata;
@@ -65,10 +69,7 @@ export class SessionManager {
       body,
     );
 
-    const data = extractDataMap(resp);
-    if (!data) {
-      throw new AgentOSError('会话创建响应格式异常', ErrorCode.INVALID_RESPONSE);
-    }
+    const data = validateAndExtractData(resp, '会话创建响应格式异常');
 
     return {
       id: getString(data, 'session_id'),
@@ -86,15 +87,10 @@ export class SessionManager {
    * @param sessionId - 会话 ID
    */
   async get(sessionId: string): Promise<Session> {
-    if (!sessionId) {
-      throw new AgentOSError('会话ID不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(sessionId, '会话ID');
 
     const resp = await this.api.get<APIResponse>(`/api/v1/sessions/${sessionId}`);
-    const data = extractDataMap(resp);
-    if (!data) {
-      throw new AgentOSError('会话详情响应格式异常', ErrorCode.INVALID_RESPONSE);
-    }
+    const data = validateAndExtractData(resp, '会话详情响应格式异常');
 
     return this.parseSessionFromMap(data);
   }
@@ -110,12 +106,8 @@ export class SessionManager {
     key: string,
     value: unknown,
   ): Promise<void> {
-    if (!sessionId) {
-      throw new AgentOSError('会话ID不能为空', ErrorCode.MISSING_PARAMETER);
-    }
-    if (!key) {
-      throw new AgentOSError('上下文键不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(sessionId, '会话ID');
+    validateRequiredString(key, '上下文键');
 
     await this.api.post(`/api/v1/sessions/${sessionId}/context`, { key, value });
   }
@@ -126,9 +118,7 @@ export class SessionManager {
    * @param key - 键
    */
   async getContext(sessionId: string, key: string): Promise<unknown> {
-    if (!sessionId) {
-      throw new AgentOSError('会话ID不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(sessionId, '会话ID');
 
     const resp = await this.api.get<APIResponse<{ value: unknown }>>(
       `/api/v1/sessions/${sessionId}/context/${key}`,
@@ -146,9 +136,7 @@ export class SessionManager {
    * @param sessionId - 会话 ID
    */
   async getAllContext(sessionId: string): Promise<Record<string, unknown>> {
-    if (!sessionId) {
-      throw new AgentOSError('会话ID不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(sessionId, '会话ID');
 
     const resp = await this.api.get<APIResponse<{ context: Record<string, unknown> }>>(
       `/api/v1/sessions/${sessionId}/context`,
@@ -167,9 +155,7 @@ export class SessionManager {
    * @param key - 键
    */
   async deleteContext(sessionId: string, key: string): Promise<void> {
-    if (!sessionId) {
-      throw new AgentOSError('会话ID不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(sessionId, '会话ID');
     await this.api.delete(`/api/v1/sessions/${sessionId}/context/${key}`);
   }
 
@@ -178,9 +164,7 @@ export class SessionManager {
    * @param sessionId - 会话 ID
    */
   async close(sessionId: string): Promise<void> {
-    if (!sessionId) {
-      throw new AgentOSError('会话ID不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(sessionId, '会话ID');
     await this.api.delete(`/api/v1/sessions/${sessionId}`);
   }
 
@@ -224,19 +208,14 @@ export class SessionManager {
     sessionId: string,
     metadata: Record<string, unknown>,
   ): Promise<Session> {
-    if (!sessionId) {
-      throw new AgentOSError('会话ID不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(sessionId, '会话ID');
 
     const resp = await this.api.put<APIResponse>(
       `/api/v1/sessions/${sessionId}`,
       { metadata },
     );
 
-    const data = extractDataMap(resp);
-    if (!data) {
-      throw new AgentOSError('会话更新响应格式异常', ErrorCode.INVALID_RESPONSE);
-    }
+    const data = validateAndExtractData(resp, '会话更新响应格式异常');
 
     return this.parseSessionFromMap(data);
   }
@@ -246,9 +225,7 @@ export class SessionManager {
    * @param sessionId - 会话 ID
    */
   async refresh(sessionId: string): Promise<void> {
-    if (!sessionId) {
-      throw new AgentOSError('会话ID不能为空', ErrorCode.MISSING_PARAMETER);
-    }
+    validateRequiredString(sessionId, '会话ID');
     await this.api.post(`/api/v1/sessions/${sessionId}/refresh`);
   }
 

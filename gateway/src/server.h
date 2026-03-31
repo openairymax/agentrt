@@ -1,13 +1,13 @@
-﻿/**
+/**
  * @file server.h
- * @brief gateway 服务器内部数据结构声明
- * 
+ * @brief gateway 服务器内部数据结构定义
+ *
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
- * @internal 此头文件仅供 gateway 模块内部使用
+ * @internal 本头文件仅供 gateway 模块内部使用
  */
 
-#ifndef DYNAMIC_SERVER_INTERNAL_H
-#define DYNAMIC_SERVER_INTERNAL_H
+#ifndef GATEWAY_SERVER_INTERNAL_H
+#define GATEWAY_SERVER_INTERNAL_H
 
 #include "gateway.h"
 #include "session.h"
@@ -26,7 +26,7 @@
 
 /* 服务器状态枚举 */
 typedef enum {
-    SERVER_STATE_IDLE = 0,      /**< 已创建，未启动 */
+    SERVER_STATE_IDLE = 0,      /**< 服务器未启动 */
     SERVER_STATE_STARTING,      /**< 正在启动 */
     SERVER_STATE_RUNNING,       /**< 正在运行 */
     SERVER_STATE_STOPPING,      /**< 正在停止 */
@@ -46,37 +46,37 @@ typedef enum {
  */
 struct gateway_server {
     /* 配置 */
-    gateway_config_t      manager;              /**< 运行时配置副本 */
-    
+    gateway_config_t      manager;              /**< 运行时配置拷贝 */
+
     /* 子系统 */
     session_manager_t*    session_mgr;         /**< 会话管理器 */
     health_checker_t*     health;              /**< 健康检查器 */
     telemetry_t*          telemetry;           /**< 可观测性 */
-    
+
     /* 网关 */
     gateway_t*            gateways[GATEWAY_TYPE_COUNT]; /**< 网关实例数组 */
-    size_t                gateway_count;       /**< 活跃网关数量 */
-    
+    size_t                gateway_count;       /**< 已初始化网关数 */
+
     /* 线程控制 */
     pthread_t             main_thread;         /**< 主线程 ID */
-    pthread_mutex_t       state_lock;          /**< 状态变更锁 */
-    pthread_cond_t        state_cond;          /**< 状态变更条件变量 */
-    
+    pthread_mutex_t       state_lock;          /**< 状态锁 */
+    pthread_cond_t        state_cond;          /**< 状态条件变量 */
+
     /* 原子状态 */
-    atomic_int            state;               /**< 服务器状态 */
+    atomic_int            state;               /**< 服务器运行状态 */
     atomic_int            shutdown_requested;  /**< 关闭请求标志 */
-    
+
     /* 统计信息 */
-    atomic_uint_fast64_t  requests_total;      /**< 总请求数 */
+    atomic_uint_fast64_t  requests_total;      /**< 请求总数 */
     atomic_uint_fast64_t  requests_failed;     /**< 失败请求数 */
     atomic_uint_fast64_t  bytes_received;      /**< 接收字节数 */
     atomic_uint_fast64_t  bytes_sent;          /**< 发送字节数 */
-    
+
     /* 启动时间 */
     uint64_t              start_time_ns;       /**< 启动时间（纳秒） */
 };
 
-/* ========== 内部辅助函数 ========== */
+/* ========== 内部函数声明 ========== */
 
 /**
  * @brief 设置默认配置值
@@ -85,7 +85,7 @@ struct gateway_server {
 void server_set_default_config(gateway_config_t* cfg);
 
 /**
- * @brief 验证配置参数
+ * @brief 验证服务器配置
  * @param[in] cfg 配置结构
  * @return AGENTOS_SUCCESS 有效
  * @return AGENTOS_EINVAL 无效
@@ -129,4 +129,4 @@ agentos_error_t server_generate_stats_json(
     const gateway_server_t* server,
     char** out_json);
 
-#endif /* DYNAMIC_SERVER_INTERNAL_H */
+#endif /* GATEWAY_SERVER_INTERNAL_H */

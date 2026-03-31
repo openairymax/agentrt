@@ -29,8 +29,8 @@ message(STATUS "  Build Tests: ${BUILD_TESTS}")
 message(STATUS "  Coverage:    ${BUILD_COVERAGE}")
 message(STATUS "========================================")
 
-# 包含 bases 模块
-add_subdirectory(bases)
+# 包含 commons 模块
+add_subdirectory(commons)
 
 # 包含各个服务模块
 add_subdirectory(llm_d)
@@ -90,7 +90,7 @@ message(STATUS "========================================")
 # 打印所有子项目状�?
 message(STATUS "")
 message(STATUS "Sub-modules:")
-message(STATUS "  - bases    : ${CMAKE_CURRENT_SOURCE_DIR}/bases")
+message(STATUS "  - commons    : ${CMAKE_CURRENT_SOURCE_DIR}/commons")
 message(STATUS "  - llm_d     : ${CMAKE_CURRENT_SOURCE_DIR}/llm_d")
 message(STATUS "  - tool_d    : ${CMAKE_CURRENT_SOURCE_DIR}/tool_d")
 message(STATUS "  - monit_d   : ${CMAKE_CURRENT_SOURCE_DIR}/monit_d")
@@ -99,7 +99,7 @@ message(STATUS "  - market_d  : ${CMAKE_CURRENT_SOURCE_DIR}/market_d")
 message(STATUS "")
 
 # 安装支持
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bases/include/
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/commons/include/
     DESTINATION include/agentos
     FILES_MATCHING PATTERN "*.h"
 )

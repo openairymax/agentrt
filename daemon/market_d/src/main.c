@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file main.c
  * @brief 市场服务主实现
  * @details 实现市场服务的核心功能，包括 Agent 和 Skill 的注册、发现、安装和管理
@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <stdbool.h>
 #include "market_service.h"
 
 /**
@@ -23,7 +24,6 @@ struct market_service {
     size_t skill_count;               /**< Skill 数量 */
     size_t skill_capacity;            /**< Skill 容量 */
     bool is_running;                  /**< 服务是否运行 */
-    // From data intelligence emerges. by spharx
 };
 
 /**
@@ -250,105 +250,143 @@ int market_service_register_skill(market_service_t* service, const skill_info_t*
  * @param count 输出参数，返回 Agent 数量
  * @return 0 表示成功，非 0 表示错误码
  */
-int market_service_search_agents(market_service_t* service, const search_params_t* params, agent_info_t*** agents, size_t* count) {
-    if (!service || !params || !agents || !count) {
-        return -1;
+/**
+ * @brief 检查 Agent 是否匹配搜索条件
+ * @param agent Agent 信息
+ * @param params 搜索参数
+ * @return true 表示匹配，false 表示不匹配
+ */
+static bool is_agent_matched(const agent_info_t* agent, const search_params_t* params) {
+    if (!agent) {
+        return false;
     }
 
-    // 统计匹配的 Agent 数量
+    // 检查是否仅显示已安装的
+    if (params->only_installed && agent->status != AGENT_STATUS_AVAILABLE) {
+        return false;
+    }
+
+    // 检查 Agent 类型
+    if (params->agent_type != AGENT_TYPE_COUNT && agent->type != params->agent_type) {
+        return false;
+    }
+
+    // 检查搜索关键词
+    if (params->query && strstr(agent->name, params->query) == NULL && strstr(agent->description, params->query) == NULL) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * @brief 统计匹配的 Agent 数量
+ * @param service 服务句柄
+ * @param params 搜索参数
+ * @return 匹配的 Agent 数量
+ */
+static size_t count_matching_agents(market_service_t* service, const search_params_t* params) {
     size_t matched_count = 0;
     for (size_t i = 0; i < service->agent_count; i++) {
-        agent_info_t* agent = service->agents[i];
-        if (!agent) {
-            continue;
+        if (is_agent_matched(service->agents[i], params)) {
+            matched_count++;
         }
-
-        // 检查是否仅显示已安装的
-        if (params->only_installed && agent->status != AGENT_STATUS_AVAILABLE) {
-            continue;
-        }
-
-        // 检查 Agent 类型
-        if (params->agent_type != AGENT_TYPE_COUNT && agent->type != params->agent_type) {
-            continue;
-        }
-
-        // 检查搜索关键词
-        if (params->query && strstr(agent->name, params->query) == NULL && strstr(agent->description, params->query) == NULL) {
-            continue;
-        }
-
-        matched_count++;
     }
+    return matched_count;
+}
 
+/**
+ * @brief 收集匹配的 Agent
+ * @param service 服务句柄
+ * @param params 搜索参数
+ * @param matched_count 匹配的 Agent 数量
+ * @return 分配的 Agent 数组，调用者负责释放内存
+ */
+static agent_info_t** collect_matching_agents(market_service_t* service, const search_params_t* params, size_t matched_count) {
     if (matched_count == 0) {
-        *agents = NULL;
-        *count = 0;
-        return 0;
+        return NULL;
     }
 
-    // 分配内存并复制匹配的 Agent
     agent_info_t** matched_agents = (agent_info_t**)malloc(sizeof(agent_info_t*) * matched_count);
     if (!matched_agents) {
-        return -2;
+        return NULL;
     }
 
     size_t index = 0;
     for (size_t i = 0; i < service->agent_count && index < matched_count; i++) {
         agent_info_t* agent = service->agents[i];
-        if (!agent) {
-            continue;
+        if (is_agent_matched(agent, params)) {
+            matched_agents[index++] = agent;
         }
-
-        // 检查是否仅显示已安装的
-        if (params->only_installed && agent->status != AGENT_STATUS_AVAILABLE) {
-            continue;
-        }
-
-        // 检查 Agent 类型
-        if (params->agent_type != AGENT_TYPE_COUNT && agent->type != params->agent_type) {
-            continue;
-        }
-
-        // 检查搜索关键词
-        if (params->query && strstr(agent->name, params->query) == NULL && strstr(agent->description, params->query) == NULL) {
-            continue;
-        }
-
-        matched_agents[index++] = agent;
     }
 
-    // 排序
+    return matched_agents;
+}
+
+/**
+ * @brief 比较函数：按评分降序排序
+ * @param a 第一个 Agent
+ * @param b 第二个 Agent
+ * @return 比较结果
+ */
+static int compare_by_rating(const void* a, const void* b) {
+    const agent_info_t* agent_a = *(const agent_info_t**)a;
+    const agent_info_t* agent_b = *(const agent_info_t**)b;
+    if (agent_b->rating > agent_a->rating) return 1;
+    if (agent_b->rating < agent_a->rating) return -1;
+    return 0;
+}
+
+/**
+ * @brief 比较函数：按下载量降序排序
+ * @param a 第一个 Agent
+ * @param b 第二个 Agent
+ * @return 比较结果
+ */
+static int compare_by_download(const void* a, const void* b) {
+    const agent_info_t* agent_a = *(const agent_info_t**)a;
+    const agent_info_t* agent_b = *(const agent_info_t**)b;
+    if (agent_b->download_count > agent_a->download_count) return 1;
+    if (agent_b->download_count < agent_a->download_count) return -1;
+    return 0;
+}
+
+/**
+ * @brief 对 Agent 数组进行排序
+ * @param agents Agent 数组
+ * @param count Agent 数量
+ * @param params 搜索参数
+ */
+static void sort_agents(agent_info_t** agents, size_t count, const search_params_t* params) {
+    if (!agents || count == 0) {
+        return;
+    }
+
     if (params->sort_by_rating) {
-        // 按评分排序
-        for (size_t i = 0; i < matched_count - 1; i++) {
-            for (size_t j = i + 1; j < matched_count; j++) {
-                if (matched_agents[i]->rating < matched_agents[j]->rating) {
-                    agent_info_t* temp = matched_agents[i];
-                    matched_agents[i] = matched_agents[j];
-                    matched_agents[j] = temp;
-                }
-            }
-        }
+        qsort(agents, count, sizeof(agent_info_t*), compare_by_rating);
     } else if (params->sort_by_download) {
-        // 按下载量排序
-        for (size_t i = 0; i < matched_count - 1; i++) {
-            for (size_t j = i + 1; j < matched_count; j++) {
-                if (matched_agents[i]->download_count < matched_agents[j]->download_count) {
-                    agent_info_t* temp = matched_agents[i];
-                    matched_agents[i] = matched_agents[j];
-                    matched_agents[j] = temp;
-                }
-            }
-        }
+        qsort(agents, count, sizeof(agent_info_t*), compare_by_download);
     }
+}
 
-    // 应用限制和偏移
+/**
+ * @brief 应用分页限制
+ * @param matched_agents 匹配的 Agent 数组
+ * @param matched_count 匹配的 Agent 数量
+ * @param params 搜索参数
+ * @param result_agents 输出参数，返回分页后的 Agent 数组
+ * @param result_count 输出参数，返回分页后的 Agent 数量
+ * @return 0 表示成功，-2 表示内存分配失败
+ */
+static int apply_pagination(agent_info_t** matched_agents, size_t matched_count,
+                           const search_params_t* params,
+                           agent_info_t*** result_agents, size_t* result_count) {
     size_t start = params->offset;
     size_t end = start + params->limit;
+
     if (start >= matched_count) {
-        *agents = NULL;
-        *count = 0;
+        *result_agents = NULL;
+        *result_count = 0;
         free(matched_agents);
         return 0;
     }
@@ -357,19 +395,53 @@ int market_service_search_agents(market_service_t* service, const search_params_
         end = matched_count;
     }
 
-    size_t result_count = end - start;
-    agent_info_t** result_agents = (agent_info_t**)malloc(sizeof(agent_info_t*) * result_count);
-    if (!result_agents) {
+    size_t count = end - start;
+    agent_info_t** agents = (agent_info_t**)malloc(sizeof(agent_info_t*) * count);
+    if (!agents) {
         free(matched_agents);
         return -2;
     }
 
-    memcpy(result_agents, matched_agents + start, sizeof(agent_info_t*) * result_count);
+    memcpy(agents, matched_agents + start, sizeof(agent_info_t*) * count);
     free(matched_agents);
 
-    *agents = result_agents;
-    *count = result_count;
+    *result_agents = agents;
+    *result_count = count;
     return 0;
+}
+
+/**
+ * @brief 搜索 Agent
+ * @param service 服务句柄
+ * @param params 搜索参数
+ * @param agents 输出参数，返回 Agent 信息数组
+ * @param count 输出参数，返回 Agent 数量
+ * @return 0 表示成功，非 0 表示错误码
+ */
+int market_service_search_agents(market_service_t* service, const search_params_t* params, agent_info_t*** agents, size_t* count) {
+    if (!service || !params || !agents || !count) {
+        return -1;
+    }
+
+    // 统计匹配的 Agent 数量
+    size_t matched_count = count_matching_agents(service, params);
+    if (matched_count == 0) {
+        *agents = NULL;
+        *count = 0;
+        return 0;
+    }
+
+    // 收集匹配的 Agent
+    agent_info_t** matched_agents = collect_matching_agents(service, params, matched_count);
+    if (!matched_agents) {
+        return -2;
+    }
+
+    // 排序
+    sort_agents(matched_agents, matched_count, params);
+
+    // 应用分页
+    return apply_pagination(matched_agents, matched_count, params, agents, count);
 }
 
 /**
@@ -537,7 +609,7 @@ int market_service_install_agent(market_service_t* service, const install_reques
         if (strlen(request->install_path) >= sizeof(install_path)) {
             return AGENTOS_ERR_INVALID_PARAM;
         }
-        strcpy(install_path, request->install_path);
+        snprintf(install_path, sizeof(install_path), "%s", request->install_path);
     } else {
         snprintf(install_path, sizeof(install_path), "%s/agents/%s", service->manager.storage_path, agent->agent_id);
     }
@@ -601,7 +673,7 @@ int market_service_install_skill(market_service_t* service, const install_reques
         if (strlen(request->install_path) >= sizeof(install_path)) {
             return AGENTOS_ERR_INVALID_PARAM;
         }
-        strcpy(install_path, request->install_path);
+        snprintf(install_path, sizeof(install_path), "%s", request->install_path);
     } else {
         snprintf(install_path, sizeof(install_path), "%s/skills/%s", service->manager.storage_path, skill->skill_id);
     }

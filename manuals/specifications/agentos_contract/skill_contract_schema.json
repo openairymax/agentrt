@@ -1,8 +1,8 @@
-{
+﻿{
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://agentos.org/schemas/skill_contract.json",
-  "title": "Skill Contract Schema (AgentOS/OpenApex)",
-  "description": "AgentOS (OpenApex) Skill 契约 JSON Schema 规范，基于五维正交设计体系（系统观、内核观、认知观、工程观、设计美学），用于验证技能能力描述文件。理论基础：工程两论、双系统认知、微内核哲学、设计美学。",
+  "title": "Skill Contract Schema (AgentOS/)",
+  "description": "AgentOS Skill 契约 JSON Schema 规范，基于五维正交设计体系（系统观、内核观、认知观、工程观、设计美学），用于验证技能能力描述文件。理论基础：工程两论、双系统认知、微内核哲学、设计美学�?,
   "type": "object",
   "required": [
     "schema_version",
@@ -28,20 +28,20 @@
     },
     "skill_name": {
       "type": "string",
-      "description": "技能可读名称"
+      "description": "技能可读名�?
     },
     "version": {
       "type": "string",
-      "description": "技能自身版本号（语义化版本）",
+      "description": "技能自身版本号（语义化版本�?,
       "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$"
     },
     "description": {
       "type": "string",
-      "description": "技能的简要描述"
+      "description": "技能的简要描�?
     },
     "type": {
       "type": "string",
-      "description": "技能类型",
+      "description": "技能类�?,
       "enum": ["tool", "code", "api", "file", "browser", "db", "shell"]
     },
     "executable": {
@@ -70,11 +70,11 @@
           },
           "input_schema": {
             "$ref": "#/definitions/json_schema",
-            "description": "输入数据的 JSON Schema"
+            "description": "输入数据�?JSON Schema"
           },
           "output_schema": {
             "$ref": "#/definitions/json_schema",
-            "description": "输出数据的 JSON Schema"
+            "description": "输出数据�?JSON Schema"
           },
           "estimated_tokens": {
             "type": "integer",
@@ -90,7 +90,7 @@
             "type": "number",
             "minimum": 0,
             "maximum": 1,
-            "description": "历史成功率（0-1）"
+            "description": "历史成功率（0-1�?
           }
         },
         "additionalProperties": false
@@ -143,7 +143,7 @@
         "token_per_task_avg": {
           "type": "integer",
           "minimum": 0,
-          "description": "单次任务平均 Token 消耗"
+          "description": "单次任务平均 Token 消�?
         },
         "api_cost_per_task": {
           "type": "number",
@@ -171,7 +171,7 @@
           "type": "number",
           "minimum": 0,
           "maximum": 5,
-          "description": "用户评分（1-5）"
+          "description": "用户评分�?-5�?
         },
         "verified_provider": {
           "type": "boolean",
@@ -180,7 +180,7 @@
         "last_audit": {
           "type": "string",
           "format": "date",
-          "description": "上次审计日期（ISO 8601）"
+          "description": "上次审计日期（ISO 8601�?
         }
       },
       "additionalProperties": false
@@ -193,7 +193,7 @@
   },
   "definitions": {
     "json_schema": {
-      "description": "JSON Schema 对象（符合 JSON Schema Draft-07）",
+      "description": "JSON Schema 对象（符�?JSON Schema Draft-07�?,
       "type": "object",
       "properties": {
         "$ref": { "type": "string", "format": "uri" }

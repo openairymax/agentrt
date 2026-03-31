@@ -5,8 +5,8 @@
  * @date 2024
  */
 
-#ifndef DOMAIN_AUDIT_ROTATOR_H
-#define DOMAIN_AUDIT_ROTATOR_H
+#ifndef CUPOLAS_AUDIT_ROTATOR_H
+#define CUPOLAS_AUDIT_ROTATOR_H
 
 #include "../platform/platform.h"
 #include "audit_queue.h"
@@ -63,4 +63,4 @@ size_t audit_rotator_current_size(audit_rotator_t* rotator);
 }
 #endif
 
-#endif /* DOMAIN_AUDIT_ROTATOR_H */
+#endif /* CUPOLAS_AUDIT_ROTATOR_H */

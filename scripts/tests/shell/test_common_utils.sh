@@ -1,4 +1,4 @@
-﻿﻿#!/usr/bin/env bash
+﻿﻿﻿﻿#!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 通用工具函数测试
 
@@ -9,8 +9,8 @@ source "$AGENTOS_TEST_DIR/test_framework.sh"
 
 # 加载被测模块
 AGENTOS_SCRIPTS_DIR="$(dirname "$AGENTOS_TEST_DIR")"
-# shellcheck source=../lib/bases.sh
-source "$AGENTOS_SCRIPTS_DIR/lib/bases.sh"
+# shellcheck source=../lib/commons.sh
+source "$AGENTOS_SCRIPTS_DIR/lib/commons.sh"
 
 ###############################################################################
 # 测试：字符串工具
@@ -168,7 +168,7 @@ run_all_tests() {
     )
 
     echo "=========================================="
-    echo "  AgentOS bases Utils Tests"
+    echo "  AgentOS commons Utils Tests"
     echo "=========================================="
     echo ""
 

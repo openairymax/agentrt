@@ -1,4 +1,4 @@
-﻿Copyright (c) 2026 SPHARX. All Rights Reserved.
+Copyright (c) 2026 SPHARX. All Rights Reserved.
 "From data intelligence emerges."
 
 # AgentOS Go SDK
@@ -13,6 +13,18 @@
 ## 🎯 概述
 
 AgentOS Go SDK 提供对 AgentOS 系统调用 API 的惯用 Go 封装。SDK 遵循 Go 语言习惯，支持 context 传递、错误处理和并发模式，同时保持与底层 C API 的完整功能对应。
+
+### 🧩 五维正交原则体现
+
+Go SDK 将 AgentOS 的五维正交设计原则深度融入 Go 语言特性中：
+
+| 维度 | Go 语言特性体现 | SDK 具体实现 |
+|------|----------------|-------------|
+| **系统观** | Go 的并发模型支持系统级反馈 | Goroutine 并发执行，Channel 用于状态反馈和协调 |
+| **内核观** | 简洁的接口设计体现微内核思想 | 极简的 API 接口，清晰的契约（context, error 返回） |
+| **认知观** | 支持双系统认知的异步处理 | 支持 System 1 快速响应（同步调用）和 System 2 深度处理（异步任务） |
+| **工程观** | Go 的内存安全和并发安全特性 | 自动垃圾回收，race detector 支持，安全的内存访问 |
+| **设计美学** | Go 的简洁优雅语法 | 一致的错误处理模式，清晰的类型系统，优雅的 API 设计 |
 
 ---
 

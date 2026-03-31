@@ -1,11 +1,12 @@
-﻿Copyright (c) 2026 SPHARX. All Rights Reserved.
+Copyright (c) 2026 SPHARX. All Rights Reserved.
 "From data intelligence emerges."
 
 # AgentOS 迁移指南
 
-**版本**: Doc V1.5
-**最后更新**: 2026-03-23
+**版本**: Doc V1.7
+**最后更新**: 2026-03-31
 **适用对象**: 从旧版本迁移的开发者和运维工程师
+**作者**: LirenWang
 
 ---
 
@@ -243,7 +244,7 @@ target_link_libraries(my_agent PRIVATE
 | IPC 通信 | `ctest -R integration --label-regex ipc` | 延迟 < 10μs |
 | 记忆读写 | `ctest -R integration --label-regex memory` | 10k+ entries/sec |
 | 系统调用 | `ctest -R integration --label-regex syscall` | 全部通过 |
-| 日志输出 | 检查 `lodges/logs/` | 格式正确、trace_id 连通 |
+| 日志输出 | 检查 `heapstore/logs/` | 格式正确、trace_id 连通 |
 
 ---
 
@@ -414,7 +415,7 @@ agentos-migrate --report --output=migration_report.md
 
 ## 相关文档
 
-- [架构设计原则](../architecture/folder/architectural_design_principles.md) - 理解版本演进的设计动机
+- [架构设计原则](../architecture/ARCHITECTURAL_PRINCIPLES.md) - 理解版本演进的设计动机
 - [系统调用 API](../api/README.md) - v1.0 新的系统调用接口
 - [编码规范](../specifications/coding_standard/C_coding_style_guide.md) - v1.0 编码标准
 - [故障排查](troubleshooting.md) - 迁移过程中的问题诊断

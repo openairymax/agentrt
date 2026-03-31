@@ -11,7 +11,7 @@ request/response structures.
 Corresponds to Go SDK: types/types.go
 """
 
-from .bases import (
+from .commons import (
     # 枚举类型
     TaskStatus,
     MemoryLayer,

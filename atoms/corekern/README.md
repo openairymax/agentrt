@@ -1,7 +1,7 @@
 ﻿# AgentOS 微内核基础模块 (CoreKern)
 
-**版本**: v1.0.0.6  
-**最后更新**: 2026-03-25  
+**版本**: v1.0.0.6
+**最后更新**: 2026-03-25
 **许可证**: Apache License 2.0
 
 ---
@@ -86,7 +86,7 @@ corekern/
 class EchoService : public IInterface {
 public:
     // 实现接口方法
-    virtual status_t onTransact(uint32_t code, 
+    virtual status_t onTransact(uint32_t code,
                                 const Parcel& data,
                                 Parcel* reply) {
         switch(code) {

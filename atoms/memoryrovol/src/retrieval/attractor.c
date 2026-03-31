@@ -1,6 +1,6 @@
-﻿/**
+/**
  * @file attractor.c
- * @brief 吸引子网络检索实�?
+ * @brief 吸引子网络检索实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -10,15 +10,15 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h"
-#include "../../../bases/utils/string/include/string_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 #include <math.h>
 
 struct agentos_attractor_network {
     agentos_layer2_feature_t* layer2;        /**< 特征层，用于获取向量 */
     agentos_retrieval_config_t manager;        /**< 配置 */
-    agentos_mutex_t* lock;                    /**< 线程�?*/
+    agentos_mutex_t* lock;                    /**< 线程锁 */
 };
 
 agentos_error_t agentos_attractor_network_create(
@@ -26,7 +26,8 @@ agentos_error_t agentos_attractor_network_create(
     const agentos_retrieval_config_t* manager,
     agentos_attractor_network_t** out_net) {
 
-// From data intelligence emerges. by spharx
+
+// From data intelligence emerges. by spharx
     if (!layer2 || !out_net) return AGENTOS_EINVAL;
 
     agentos_attractor_network_t* net = (agentos_attractor_network_t*)AGENTOS_CALLOC(1, sizeof(agentos_attractor_network_t));
@@ -60,7 +61,7 @@ void agentos_attractor_network_destroy(agentos_attractor_network_t* net) {
 }
 
 /**
- * @brief 使用现代Hopfield网络迭代更新状�?
+ * @brief 使用现代Hopfield网络迭代更新状态
  */
 static agentos_error_t attractor_iterate(
     agentos_attractor_network_t* net,

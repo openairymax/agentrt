@@ -1,12 +1,13 @@
 # AgentOS Agent 契约规范
 
-**版本**: Doc V1.6  
+**版本**: Doc V1.7  
 **状态**: 正式发布  
-**备选名称**: OpenApex (开源极境 / 极境OS)  
 **归属**: AgentOS 开放生态核心规范  
+**作者**: LirenWang  
+**最后更新**: 2026-03-31  
 **许可证**: GPL-3.0  
 **理论基础**: 工程两论（控制论与系统工程）、双系统认知理论、微内核哲学、设计美学  
-**关联规范**: [架构设计原则](../架构设计原则.md)、[统一术语表](../TERMINOLOGY.md)
+**关联规范**: [架构设计原则](../architecture/ARCHITECTURAL_PRINCIPLES.md)、[统一术语表](../TERMINOLOGY.md)
 
 ---
 

@@ -1,12 +1,13 @@
-﻿Copyright (c) 2026 SPHARX. All Rights Reserved.
+Copyright (c) 2026 SPHARX. All Rights Reserved.
 "From data intelligence emerges."
 
 # AgentOS Agent 创建指南
 
-**版本**: Doc V1.5  
-**最后更新**: 2026-03-23  
+**版本**: Doc V1.7  
+**最后更新**: 2026-03-31  
 **难度**: ⭐⭐ 中级  
-**预计时间**: 30 分钟
+**预计时间**: 30 分钟  
+**作者**: LirenWang
 
 ---
 
@@ -59,7 +60,7 @@ Agent 以守护进程 (`_d`) 的形式运行在用户态，通过系统调用与
 ### 2.2 知识储备
 
 - 熟悉 C11 语言标准
-- 了解 AgentOS 微内核架构（参见 [architectural_design_principles.md](../architecture/folder/architectural_design_principles.md)）
+- 了解 AgentOS 微内核架构（参见 [ARCHITECTURAL_PRINCIPLES.md](../architecture/ARCHITECTURAL_PRINCIPLES.md)）
 - 理解 Agent Contract 契约（参见 [agent_contract.md](../specifications/agentos_contract/agent/agent_contract.md)）
 
 ---
@@ -664,7 +665,7 @@ if (ret != 0) {
 ## 9. 相关文档
 
 - [Agent 契约规范](../specifications/agentos_contract/agent/agent_contract.md)
-- [架构设计原则](../architecture/folder/architectural_design_principles.md)
+- [架构设计原则](../architecture/ARCHITECTURAL_PRINCIPLES.md)
 - [Skill 创建指南](create_skill.md)
 - [编码规范](../specifications/coding_standard/C_coding_style_guide.md)
 - [系统调用 API](../architecture/folder/syscall.md)

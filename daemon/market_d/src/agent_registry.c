@@ -280,6 +280,123 @@ static int save_to_database(void) {
 }
 
 /**
+ * @brief 读取字符串字段
+ * @param f 文件指针
+ * @param field 输出字段指针
+ * @return 0 成功，非0 失败
+ */
+static int read_string_field(FILE* f, char** field) {
+    size_t len;
+    if (fread(&len, sizeof(size_t), 1, f) != 1) return -1;
+    if (len > 0) {
+        *field = (char*)malloc(len);
+        if (!*field || fread(*field, 1, len, f) != len) return -1;
+    }
+    return 0;
+}
+
+/**
+ * @brief 读取标签数组
+ * @param f 文件指针
+ * @param entry Agent 条目
+ * @return 0 成功，非0 失败
+ */
+static int read_tags(FILE* f, agent_entry_t* entry) {
+    if (fread(&entry->tag_count, sizeof(size_t), 1, f) != 1) return -1;
+    if (entry->tag_count > MAX_TAG_LEN) entry->tag_count = MAX_TAG_LEN;
+    
+    entry->tags = (char**)malloc(sizeof(char*) * entry->tag_count);
+    if (!entry->tags) return -1;
+    
+    for (size_t j = 0; j < entry->tag_count; j++) {
+        size_t len;
+        if (fread(&len, sizeof(size_t), 1, f) != 1) return -1;
+        entry->tags[j] = (char*)malloc(len);
+        if (!entry->tags[j] || fread(entry->tags[j], 1, len, f) != len) return -1;
+    }
+    return 0;
+}
+
+/**
+ * @brief 读取单个版本信息
+ * @param f 文件指针
+ * @param ver 版本信息结构
+ * @return 0 成功，非0 失败
+ */
+static int read_single_version(FILE* f, agent_version_t* ver) {
+    size_t len;
+    
+    if (read_string_field(f, &ver->version) != 0) return -1;
+    if (read_string_field(f, &ver->download_url) != 0) return -1;
+    if (read_string_field(f, &ver->checksum) != 0) return -1;
+    
+    if (fread(&ver->download_count, sizeof(uint64_t), 1, f) != 1) return -1;
+    if (fread(&ver->install_count, sizeof(uint64_t), 1, f) != 1) return -1;
+    if (fread(&ver->created_at, sizeof(uint64_t), 1, f) != 1) return -1;
+    if (fread(&ver->updated_at, sizeof(uint64_t), 1, f) != 1) return -1;
+    if (fread(&ver->deprecated, sizeof(int), 1, f) != 1) return -1;
+    
+    return 0;
+}
+
+/**
+ * @brief 读取版本信息数组
+ * @param f 文件指针
+ * @param entry Agent 条目
+ * @return 0 成功，非0 失败
+ */
+static int read_versions(FILE* f, agent_entry_t* entry) {
+    if (fread(&entry->version_count, sizeof(size_t), 1, f) != 1) return -1;
+    if (entry->version_count > MAX_VERSIONS_PER_AGENT) {
+        entry->version_count = MAX_VERSIONS_PER_AGENT;
+    }
+    
+    for (size_t j = 0; j < entry->version_count; j++) {
+        if (read_single_version(f, &entry->versions[j]) != 0) return -1;
+    }
+    return 0;
+}
+
+/**
+ * @brief 读取条目统计信息
+ * @param f 文件指针
+ * @param entry Agent 条目
+ * @return 0 成功，非0 失败
+ */
+static int read_entry_stats(FILE* f, agent_entry_t* entry) {
+    if (fread(&entry->created_at, sizeof(uint64_t), 1, f) != 1) return -1;
+    if (fread(&entry->updated_at, sizeof(uint64_t), 1, f) != 1) return -1;
+    if (fread(&entry->rating, sizeof(double), 1, f) != 1) return -1;
+    if (fread(&entry->rating_count, sizeof(uint64_t), 1, f) != 1) return -1;
+    if (fread(&entry->verified, sizeof(int), 1, f) != 1) return -1;
+    if (fread(&entry->official, sizeof(int), 1, f) != 1) return -1;
+    return 0;
+}
+
+/**
+ * @brief 读取单个 Agent 条目
+ * @param f 文件指针
+ * @param entry Agent 条目
+ * @return 0 成功，非0 失败
+ */
+static int read_agent_entry(FILE* f, agent_entry_t* entry) {
+    if (read_string_field(f, &entry->id) != 0) return -1;
+    if (read_string_field(f, &entry->name) != 0) return -1;
+    if (read_string_field(f, &entry->description) != 0) return -1;
+    if (read_string_field(f, &entry->author) != 0) return -1;
+    if (read_string_field(f, &entry->license) != 0) return -1;
+    if (read_string_field(f, &entry->homepage) != 0) return -1;
+    if (read_string_field(f, &entry->repository) != 0) return -1;
+    if (read_string_field(f, &entry->latest_version) != 0) return -1;
+    
+    if (read_tags(f, entry) != 0) return -1;
+    if (read_versions(f, entry) != 0) return -1;
+    if (read_entry_stats(f, entry) != 0) return -1;
+    
+    return 0;
+}
+
+/**
  * @brief 从数据库加载
  */
 static int load_from_database(void) {
@@ -289,10 +406,9 @@ static int load_from_database(void) {
     
     FILE* f = fopen(g_registry.db_path, "rb");
     if (!f) {
-        return AGENTOS_OK;  /* 文件不存在，跳过加载 */
+        return AGENTOS_OK;
     }
     
-    /* 读取条目数量 */
     size_t count;
     if (fread(&count, sizeof(size_t), 1, f) != 1) {
         fclose(f);
@@ -303,82 +419,14 @@ static int load_from_database(void) {
         count = MAX_AGENTS;
     }
     
-    /* 读取每个条目 */
     for (size_t i = 0; i < count; i++) {
         agent_entry_t* entry = &g_registry.entries[i];
-        size_t len;
         
-#define READ_STRING(field) \
-        if (fread(&len, sizeof(size_t), 1, f) != 1) goto error; \
-        if (len > 0) { \
-            entry->field = (char*)malloc(len); \
-            if (!entry->field || fread(entry->field, 1, len, f) != len) goto error; \
+        if (read_agent_entry(f, entry) == 0) {
+            g_registry.entry_count++;
+        } else {
+            free_agent_entry(entry);
         }
-        
-        READ_STRING(id);
-        READ_STRING(name);
-        READ_STRING(description);
-        READ_STRING(author);
-        READ_STRING(license);
-        READ_STRING(homepage);
-        READ_STRING(repository);
-        READ_STRING(latest_version);
-        
-#undef READ_STRING
-        
-        /* 读取标签 */
-        if (fread(&entry->tag_count, sizeof(size_t), 1, f) != 1) goto error;
-        if (entry->tag_count > MAX_TAG_LEN) entry->tag_count = MAX_TAG_LEN;
-        
-        entry->tags = (char**)malloc(sizeof(char*) * entry->tag_count);
-        if (!entry->tags) goto error;
-        
-        for (size_t j = 0; j < entry->tag_count; j++) {
-            if (fread(&len, sizeof(size_t), 1, f) != 1) goto error;
-            entry->tags[j] = (char*)malloc(len);
-            if (!entry->tags[j] || fread(entry->tags[j], 1, len, f) != len) goto error;
-        }
-        
-        /* 读取版本信息 */
-        if (fread(&entry->version_count, sizeof(size_t), 1, f) != 1) goto error;
-        if (entry->version_count > MAX_VERSIONS_PER_AGENT) entry->version_count = MAX_VERSIONS_PER_AGENT;
-        
-        for (size_t j = 0; j < entry->version_count; j++) {
-            agent_version_t* ver = &entry->versions[j];
-            
-#define READ_STRING_V(field) \
-            if (fread(&len, sizeof(size_t), 1, f) != 1) goto error; \
-            if (len > 0) { \
-                ver->field = (char*)malloc(len); \
-                if (!ver->field || fread(ver->field, 1, len, f) != len) goto error; \
-            }
-            
-            READ_STRING_V(version);
-            READ_STRING_V(download_url);
-            READ_STRING_V(checksum);
-            
-#undef READ_STRING_V
-            
-            if (fread(&ver->download_count, sizeof(uint64_t), 1, f) != 1) goto error;
-            if (fread(&ver->install_count, sizeof(uint64_t), 1, f) != 1) goto error;
-            if (fread(&ver->created_at, sizeof(uint64_t), 1, f) != 1) goto error;
-            if (fread(&ver->updated_at, sizeof(uint64_t), 1, f) != 1) goto error;
-            if (fread(&ver->deprecated, sizeof(int), 1, f) != 1) goto error;
-        }
-        
-        /* 读取统计信息 */
-        if (fread(&entry->created_at, sizeof(uint64_t), 1, f) != 1) goto error;
-        if (fread(&entry->updated_at, sizeof(uint64_t), 1, f) != 1) goto error;
-        if (fread(&entry->rating, sizeof(double), 1, f) != 1) goto error;
-        if (fread(&entry->rating_count, sizeof(uint64_t), 1, f) != 1) goto error;
-        if (fread(&entry->verified, sizeof(int), 1, f) != 1) goto error;
-        if (fread(&entry->official, sizeof(int), 1, f) != 1) goto error;
-        
-        g_registry.entry_count++;
-        continue;
-        
-    error:
-        free_agent_entry(entry);
     }
     
     fclose(f);

@@ -47,11 +47,11 @@ class TestDataSet:
 
 class TestDataManager:
     """测试数据管理器"""
-    
+
     def __init__(self, data_dir: Optional[Path] = None):
         """
         初始化测试数据管理器。
-        
+
         Args:
             data_dir: 测试数据目录
         """
@@ -59,14 +59,14 @@ class TestDataManager:
         self.cache = {}
         self.fake = faker.Faker('zh_CN')
         self.templates = self._load_templates()
-        
+
         # 确保数据目录存在
         self.data_dir.mkdir(parents=True, exist_ok=True)
-    
+
     def _load_templates(self) -> Dict[str, TestDataTemplate]:
         """加载测试数据模板"""
         templates = {}
-        
+
         # 任务模板
         templates['task'] = TestDataTemplate(
             name="task",
@@ -88,7 +88,7 @@ class TestDataManager:
                 "metadata": lambda: {"source": "test_generator", "version": "1.0"}
             }
         )
-        
+
         # 记忆模板
         templates['memory'] = TestDataTemplate(
             name="memory",
@@ -110,7 +110,7 @@ class TestDataManager:
                 "metadata": lambda: {"category": random.choice(["personal", "work", "learning"]), "confidence": round(random.uniform(0.7, 1.0), 2)}
             }
         )
-        
+
         # 会话模板
         templates['session'] = TestDataTemplate(
             name="session",
@@ -132,7 +132,7 @@ class TestDataManager:
                 "metadata": lambda: {"device": random.choice(["web", "mobile", "api"]), "location": self.fake.city()}
             }
         )
-        
+
         # 技能模板
         templates['skill'] = TestDataTemplate(
             name="skill",
@@ -166,25 +166,25 @@ class TestDataManager:
                 }
             }
         )
-        
+
         return templates
-    
+
     def load_data(self, data_type: str, filename: Optional[str] = None) -> TestDataSet:
         """
         加载测试数据。
-        
+
         Args:
             data_type: 数据类型
             filename: 文件名，如果为None则使用默认文件
-            
+
         Returns:
             测试数据集
         """
         if filename is None:
             filename = f"sample_{data_type}.json"
-        
+
         file_path = self.data_dir / data_type / filename
-        
+
         # 检查缓存
         cache_key = str(file_path)
         if cache_key in self.cache:
@@ -192,18 +192,18 @@ class TestDataManager:
             cache_mtime, cached_data = self.cache[cache_key]
             if file_mtime <= cache_mtime:
                 return cached_data
-        
+
         # 加载数据
         if not file_path.exists():
             # 如果文件不存在，生成默认数据
             dataset = self.generate_data(data_type, count=5)
             self.save_data(dataset, filename)
             return dataset
-        
+
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 raw_data = json.load(f)
-            
+
             # 转换为TestDataSet对象
             if data_type in raw_data:
                 # 兼容旧格式
@@ -217,76 +217,76 @@ class TestDataManager:
                 )
             else:
                 dataset = TestDataSet(**raw_data)
-            
+
             # 缓存数据
             self.cache[cache_key] = (file_path.stat().st_mtime, dataset)
-            
+
             return dataset
-            
+
         except (json.JSONDecodeError, IOError, KeyError) as e:
             # 如果加载失败，生成新数据
             print(f"警告: 加载数据失败 {file_path}: {e}，生成新数据")
             dataset = self.generate_data(data_type, count=5)
             self.save_data(dataset, filename)
             return dataset
-    
+
     def save_data(self, dataset: TestDataSet, filename: Optional[str] = None) -> bool:
         """
         保存测试数据。
-        
+
         Args:
             dataset: 测试数据集
             filename: 文件名
-            
+
         Returns:
             是否保存成功
         """
         if filename is None:
             filename = f"sample_{dataset.name}.json"
-        
+
         file_path = self.data_dir / dataset.name / filename
         file_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         try:
             # 更新时间戳
             dataset.updated_at = datetime.now(timezone.utc).isoformat()
-            
+
             # 转换为字典并保存
             data_dict = asdict(dataset)
-            
+
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(data_dict, f, indent=2, ensure_ascii=False)
-            
+
             # 更新缓存
             self.cache[str(file_path)] = (file_path.stat().st_mtime, dataset)
-            
+
             return True
-            
+
         except (IOError, TypeError) as e:
             print(f"错误: 保存数据失败 {file_path}: {e}")
             return False
-    
+
     def generate_data(self, data_type: str, count: int = 1, **overrides) -> TestDataSet:
         """
         生成测试数据。
-        
+
         Args:
             data_type: 数据类型
             count: 生成数量
             **overrides: 覆盖字段
-            
+
         Returns:
             测试数据集
         """
         if data_type not in self.templates:
             raise ValueError(f"未知的数据类型: {data_type}")
-        
+
         template = self.templates[data_type]
         data_list = []
-        
+
         for _ in range(count):
             item = {}
-            
+
             # 生成字段
             for field_name, field_schema in template.schema.items():
                 if field_name in overrides:
@@ -297,19 +297,19 @@ class TestDataManager:
                     item[field_name] = field_schema['default']
                 elif field_schema.get('required', False):
                     raise ValueError(f"缺少必需字段: {field_name}")
-            
+
             # 应用覆盖
             for key, value in overrides.items():
                 if key not in item:
                     item[key] = value
-            
+
             # 验证数据
             if template.validators:
                 for validator in template.validators:
                     validator(item)
-            
+
             data_list.append(item)
-        
+
         return TestDataSet(
             name=data_type,
             version="1.0.0",
@@ -322,63 +322,63 @@ class TestDataManager:
                 "overrides": overrides
             }
         )
-    
-    def get_data(self, data_type: str, index: Optional[Union[int, str]] = None, 
+
+    def get_data(self, data_type: str, index: Optional[Union[int, str]] = None,
                 filename: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         获取单个数据项。
-        
+
         Args:
             data_type: 数据类型
             index: 索引或ID
             filename: 文件名
-            
+
         Returns:
             数据项
         """
         dataset = self.load_data(data_type, filename)
-        
+
         if index is None:
             return dataset.data[0] if dataset.data else None
-        
+
         if isinstance(index, int):
             if 0 <= index < len(dataset.data):
                 return dataset.data[index]
             return None
-        
+
         # 按ID查找
         for item in dataset.data:
             if item.get(f"{data_type}_id") == index:
                 return item
-        
+
         return None
-    
+
     def validate_data(self, data_type: str, data: Dict[str, Any]) -> List[str]:
         """
         验证数据格式。
-        
+
         Args:
             data_type: 数据类型
             data: 要验证的数据
-            
+
         Returns:
             错误列表
         """
         if data_type not in self.templates:
             return [f"未知的数据类型: {data_type}"]
-        
+
         template = self.templates[data_type]
         errors = []
-        
+
         # 检查必需字段
         for field_name, field_schema in template.schema.items():
             if field_schema.get('required', False) and field_name not in data:
                 errors.append(f"缺少必需字段: {field_name}")
-            
+
             if field_name in data:
                 value = data[field_name]
                 field_type = field_schema.get('type')
-                
+
                 # 类型检查
                 if field_type == 'string' and not isinstance(value, str):
                     errors.append(f"字段 {field_name} 应该是字符串")
@@ -388,57 +388,57 @@ class TestDataManager:
                     errors.append(f"字段 {field_name} 应该是数字")
                 elif field_type == 'object' and not isinstance(value, dict):
                     errors.append(f"字段 {field_name} 应该是对象")
-                
+
                 # 枚举值检查
                 if 'enum' in field_schema and value not in field_schema['enum']:
                     errors.append(f"字段 {field_name} 值 {value} 不在允许的枚举值中: {field_schema['enum']}")
-                
+
                 # 数值范围检查
                 if field_type in ['integer', 'float'] and isinstance(value, (int, float)):
                     if 'min' in field_schema and value < field_schema['min']:
                         errors.append(f"字段 {field_name} 值 {value} 小于最小值 {field_schema['min']}")
                     if 'max' in field_schema and value > field_schema['max']:
                         errors.append(f"字段 {field_name} 值 {value} 大于最大值 {field_schema['max']}")
-        
+
         return errors
-    
+
     def refresh_data(self, data_type: str, count: int = 5) -> TestDataSet:
         """
         刷新测试数据。
-        
+
         Args:
             data_type: 数据类型
             count: 生成数量
-            
+
         Returns:
             新的测试数据集
         """
         dataset = self.generate_data(data_type, count)
         self.save_data(dataset)
         return dataset
-    
+
     def get_data_hash(self, data_type: str, filename: Optional[str] = None) -> str:
         """
         获取数据哈希值。
-        
+
         Args:
             data_type: 数据类型
             filename: 文件名
-            
+
         Returns:
             数据哈希值
         """
         dataset = self.load_data(data_type, filename)
         data_str = json.dumps(dataset.data, sort_keys=True, ensure_ascii=False)
         return hashlib.md5(data_str.encode()).hexdigest()
-    
+
     def list_data_files(self, data_type: Optional[str] = None) -> List[Path]:
         """
         列出数据文件。
-        
+
         Args:
             data_type: 数据类型，如果为None则列出所有
-            
+
         Returns:
             文件路径列表
         """
@@ -453,15 +453,15 @@ class TestDataManager:
                 if type_dir.is_dir():
                     files.extend(type_dir.glob("*.json"))
             return files
-    
+
     def cleanup_cache(self):
         """清理缓存"""
         self.cache.clear()
-    
+
     def get_statistics(self) -> Dict[str, Any]:
         """
         获取数据统计信息。
-        
+
         Returns:
             统计信息
         """
@@ -472,19 +472,19 @@ class TestDataManager:
             "cache_size": len(self.cache),
             "files_by_type": {}
         }
-        
+
         for data_type in self.templates.keys():
             files = self.list_data_files(data_type)
             stats["files_by_type"][data_type] = len(files)
             stats["total_files"] += len(files)
-            
+
             for file_path in files:
                 try:
                     dataset = self.load_data(data_type, file_path.name)
                     stats["total_records"] += len(dataset.data)
                 except Exception:
                     pass
-        
+
         return stats
 
 

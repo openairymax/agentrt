@@ -1,11 +1,12 @@
-﻿Copyright (c) 2026 SPHARX. All Rights Reserved.
+Copyright (c) 2026 SPHARX. All Rights Reserved.
 "From data intelligence emerges."
 
 # manuals 常见问题解决方案
 
-**版本**: v1.0.0.1  
-**最后更新**: 2026-03-23  
-**状态**: 🟢 生产就绪
+**版本**: Doc V1.7  
+**最后更新**: 2026-03-31  
+**状态**: 🟢 生产就绪  
+**作者**: LirenWang
 
 ---
 

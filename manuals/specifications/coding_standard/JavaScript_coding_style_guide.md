@@ -1,8 +1,8 @@
-# AgentOS (OpenApex) JavaScript 编码规范
+# AgentOS JavaScript 编码规范
 
-**版本**: Doc V1.6  
-**备选名称**: OpenApex (开源极境 / 极境OS)  
-**更新日期**: 2026-03-25  
+**版本**: Doc V1.7  
+**更新日期**: 2026-03-31  
+**作者**: LirenWang  
 **适用范围**: AgentOS 所有 JavaScript/TypeScript 代码  
 **理论基础**: 工程两论（反馈闭环）、系统工程（模块化）、五维正交系统（系统观、内核观、认知观、工程观、设计美学）、双系统认知理论  
 **原则映射**: S-1至S-4（系统设计）、C-1至C-4（认知设计）、E-1至E-8（工程设计）、A-1至A-4（设计美学）
@@ -1197,7 +1197,7 @@ export class SecurityPolicyEngine {
 }
 ```
 
-### 14.3 bases（公共库层）TypeScript 实现
+### 14.3 commons（公共库层）TypeScript 实现
 Common模块提供跨层基础设施，强调通用性和性能：
 
 #### 14.3.1 向量数据库客户端（映射原则：E-1 基础设施）

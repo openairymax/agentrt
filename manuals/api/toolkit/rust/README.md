@@ -1,4 +1,4 @@
-﻿Copyright (c) 2026 SPHARX. All Rights Reserved.
+Copyright (c) 2026 SPHARX. All Rights Reserved.
 "From data intelligence emerges."
 
 # AgentOS Rust SDK
@@ -13,6 +13,18 @@
 ## 🎯 概述
 
 AgentOS Rust SDK 提供对 AgentOS 系统调用 API 的安全 Rust 封装。SDK 遵循 Rust 最佳实践，提供零成本抽象、内存安全和线程安全保证，同时保持与底层 C API 的完整功能对应。
+
+### 🧩 五维正交原则体现
+
+Rust SDK 将 AgentOS 的五维正交设计原则深度融入 Rust 语言特性中：
+
+| 维度 | Rust 语言特性体现 | SDK 具体实现 |
+|------|------------------|-------------|
+| **系统观** | Rust 的所有权系统支持确定的资源管理 | 编译时资源管理，无垃圾回收的系统级控制 |
+| **内核观** | 零成本抽象体现微内核效率思想 | 极简的 FFI 封装，编译期优化的接口设计 |
+| **认知观** | 并发安全支持双系统认知协同 | 安全的并发模型，System 1/System 2 任务的安全调度 |
+| **工程观** | Rust 的内存安全和线程安全保证 | 编译时安全检查，无数据竞争，安全的异步编程 |
+| **设计美学** | Rust 的优雅类型系统和模式匹配 | 丰富的类型系统，清晰的错误处理（Result/Option），优雅的 API 设计 |
 
 ---
 

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file scheduler_service.h
  * @brief 调度服务接口定义
  * @details 负责任务调度，选择最合适的 Agent
@@ -23,7 +23,6 @@ typedef enum {
 
 /**
  * @brief 任务优先级
- // From data intelligence emerges. by spharx
  */
 typedef enum {
     TASK_PRIORITY_LOW,     /**< 低优先级 */

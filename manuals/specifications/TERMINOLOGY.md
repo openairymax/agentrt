@@ -1,10 +1,10 @@
-# AgentOS (OpenApex) 统一术语表
+# AgentOS 统一术语表
 
-**版本**: Doc V1.6  
-**备选名称**: OpenApex (开源极境 / 极境OS)  
+**版本**: Doc V1.7  
 **状态**: 正式发布  
 **维护者**: AgentOS 架构委员会  
-**最后更新**: 2026-03-25  
+**作者**: LirenWang  
+**最后更新**: 2026-03-31  
 **理论基础**: 工程两论（工程控制论、系统工程）、五维正交系统（系统观、内核观、认知观、工程观、设计美学）、双系统认知理论、微内核哲学  
 
 ---
@@ -24,11 +24,11 @@
 
 本术语表的术语来源于以下核心文档：
 
-- [Agent 契约规范](./agentos_contract/agent/agent_contract.md)
-- [Skill 契约规范](./agentos_contract/skill/skill_contract.md)
-- [通信协议规范](./agentos_contract/protocol/protocol_contract.md)
-- [系统调用 API 规范](./agentos_contract/syscall/syscall_api_contract.md)
-- [日志格式规范](./agentos_contract/log/logging_format.md)
+- [Agent 契约规范](./agentos_contract/agent_contract.md)
+- [Skill 契约规范](./agentos_contract/skill_contract.md)
+- [通信协议规范](./agentos_contract/protocol_contract.md)
+- [系统调用 API 规范](./agentos_contract/syscall_api_contract.md)
+- [日志格式规范](./agentos_contract/logging_format.md)
 - [架构设计原则](../architecture/folder/architectural_design_principles.md)
 - [认知层理论](./philosophy/Cognition_Theory.md)
 - [设计哲学](./philosophy/Design_Principles.md)

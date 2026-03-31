@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file sequence.c
  * @brief L3 结构层时序编码器
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -8,8 +8,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../bases/utils/memory/include/memory_compat.h"
-#include "../../../bases/utils/string/include/string_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 #include <math.h>
 
@@ -54,7 +54,7 @@ agentos_sequence_encoder_t* agentos_sequence_encoder_create(
 
     enc->binder = binder;
     enc->position_encoding = position_encoding;
-    enc->max_len = 1024;  // 预分配最�?024个位置向�?
+    enc->max_len = 1024;  // 预分配最�?024个位置向�?
     enc->position_vectors = (float**)AGENTOS_CALLOC(enc->max_len, sizeof(float*));
     enc->lock = agentos_mutex_create();
 
@@ -65,7 +65,7 @@ agentos_sequence_encoder_t* agentos_sequence_encoder_create(
         return NULL;
     }
 
-    // 预生成位置向�?
+    // 预生成位置向�?
     size_t dim = binder->dimension;
     for (size_t i = 0; i < enc->max_len; i++) {
         if (position_encoding == 1) {
@@ -123,7 +123,7 @@ agentos_error_t agentos_sequence_encode(
         AGENTOS_FREE(bound);
     }
 
-    // 归一�?
+    // 归一�?
     float norm = 0;
     for (size_t i = 0; i < dim; i++) norm += sum[i] * sum[i];
     if (norm > 0) {

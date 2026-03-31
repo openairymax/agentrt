@@ -7,7 +7,7 @@
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://gitee.com/spharx/agentos)
 [![Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen.svg)](https://gitee.com/spharx/agentos)
 
-**AgentOS 核心服务层 - 提供智能体运行时所需的全部后端服务**
+**AgentOS 核心服务层 - 为智能体提供完整的后端服务支持**
 
 *"Modular services, independent processes, seamless communication."*
 
@@ -15,545 +15,308 @@
 
 ---
 
-## 📋 项目简介
+## 📋 快速导航
 
-`daemon/` 是 AgentOS 的**服务层（Service Layer）**，位于内核层 (`atoms/`) 之上、应用层 (`openlab/`) 之下，为智能体提供完整的后端服务支持。
+- [模块定位](#-模块定位) - daemon 在 AgentOS 中的角色
+- [核心服务](#-核心服务) - 五大服务详解
+- [快速开始](#-快速开始) - 构建和运行
+- [API 概览](#-api-概览) - 主要接口说明
+- [性能指标](#-性能指标) - 性能基准数据
+- [常见问题](#-常见问题) - FAQ
 
-服务层采用**微服务架构**，每个服务以独立进程运行，通过系统调用与内核通信，通过 IPC/RPC 与其他服务协作，实现高度模块化、可扩展和故障隔离。
+---
+
+## 🎯 模块定位
+
+`daemon/` 是 AgentOS 的**服务层（Service Layer）**，位于内核层之上、应用层之下，为智能体运行时提供完整的后端服务支持。
+
+### 架构位置
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              应用层 (openlab/)                           │
+│   文档生成 | 电商客服 | 科研助手 | 视频编辑               │
+└────────────────────┬────────────────────────────────────┘
+                     │ 调用服务 API
+┌────────────────────▼────────────────────────────────────┐
+│         服务层 (daemon/) ← 本层                          │
+│   llm_d | tool_d | market_d | sched_d | monit_d        │
+└────────────────────┬────────────────────────────────────┘
+                     │ 通过 syscall 系统调用
+┌────────────────────▼────────────────────────────────────┐
+│              内核层 (atoms/)                             │
+│   corekern | coreloopthree | memoryrovol | cupolas     │
+└─────────────────────────────────────────────────────────┘
+```
 
 ### 核心价值
 
-- **微服务架构**: 每个服务独立进程，故障隔离，易于维护和扩展
-- **统一接口**: 标准化 RESTful API 和 gRPC 接口，支持跨语言调用
-- **高性能通信**: 基于 libevent 的事件驱动架构，支持高并发请求
-- **可观测性**: 集成 OpenTelemetry，支持全链路追踪和指标监控
-- **热插拔**: 支持服务动态加载和卸载，无需重启系统
-- **多提供者支持**: LLM 服务支持 OpenAI、Anthropic、DeepSeek 等多模型提供商
+| 特性 | 说明 |
+|------|------|
+| **微服务架构** | 每个服务独立进程运行，故障隔离，易于扩展 |
+| **统一接口** | 标准化 RESTful/gRPC API，支持跨语言调用 |
+| **高性能** | 基于 libevent 事件驱动，支持高并发请求 |
+| **可观测性** | OpenTelemetry 集成，全链路追踪和监控 |
+| **热插拔** | 支持服务动态加载/卸载，无需重启系统 |
+| **多提供者** | LLM 服务支持 OpenAI、Anthropic、DeepSeek 等 |
 
 ---
 
-## 🏗️ 架构说明
+## 🏗️ 核心服务
 
-### 服务层在 AgentOS 中的位置
-
-```
-┌────────────────────────────────────────────────────────────────────────────┐
-│                   AgentOS 总体架构                                          │
-└────────────────────────────────────────────────────────────────────────────┘
-│                                                                            │
-│ ┌──────────────────────────────────────────────────────────────────────┐ │
-│ │             应用层 (openlab)                                          │ │
-│ │ docgen | ecommerce | research | videoedit | ...                      │ │
-│ └──────────────────────────────────────────────────────────────────────┘ │
-│                          ↓↑                                              │
-│ ┌──────────────────────────────────────────────────────────────────────┐ │
-│ │            服务层 (daemon)  ← 本层                                      │ │
-│ │ llm_d | market_d | monit_d | sched_d | tool_d                        │ │
-│ └──────────────────────────────────────────────────────────────────────┘ │
-│                          ↓↑                                              │
-│ ┌──────────────────────────────────────────────────────────────────────┐ │
-│ │             内核层 (atoms)                                            │ │
-│ │ corekern | coreloopthree | memoryrovol | syscall | cupolas          │ │
-│ └──────────────────────────────────────────────────────────────────────┘ │
-│                                                                            │
-│ ┌──────────────────────────────────────────────────────────────────────┐ │
-│ │            SDK 层 (toolkit)                                             │ │
-│ │ Go | Python | Rust | TypeScript                                      │ │
-│ └──────────────────────────────────────────────────────────────────────┘ │
-└────────────────────────────────────────────────────────────────────────────┘
-```
-
-### 服务架构图
-
-```
-┌──────────────────────────────────────────────────────────┐
-│              AgentOS daemon (服务层)                       │
-├──────────────────────────────────────────────────────────┤
-│                                                          │
-│ ┌──────────┐ ┌──────────┐ ┌──────────┐                 │
-│ │  llm_d   │ │  tool_d  │ │ market_d │                 │
-│ │  LLM 服务  │ │ 工具服务  │ │ 市场服务  │                 │
-│ └────┬─────┘ └────┬─────┘ └────┬─────┘                 │
-│      │            │            │                        │
-│      └─────────────┼────────────┘                        │
-│                    │                                     │
-│             ┌──────▼──────┐                             │
-│             │  common/    │ │ 公共服务库                 │
-│             │  (IPC/日志/缓存/配置)                      │
-│             └──────┬──────┘                             │
-│                    │                                     │
-│ ┌──────────┐ ┌────▼──────┐ ┌──────────┐                │
-│ │ sched_d  │ │  monit_d  │ │ perm_d*  │                │
-│ │ 调度服务  │ │ 监控服务  │ │ 权限服务  │                │
-│ └──────────┘ └───────────┘ └──────────┘                │
-│                                                          │
-└──────────────────────────────────────────────────────────┘
-                          ↓↑ (通过 syscall 系统调用)
-┌──────────────────────────────────────────────────────────┐
-│          AgentOS Atoms (内核层)                           │
-│     corekern | coreloopthree | memoryrovol              │
-└──────────────────────────────────────────────────────────┘
-```
-
-### 目录结构
+daemon 包含 **5 个核心服务** 和 **1 个公共服务库**：
 
 ```
 daemon/
-├── README.md                 # 本文档
-├── CMakeLists.txt           # 顶层构建文件
-├── Dockerfile.ci            # CI/CD 容器镜像
-├── cppcheck.xml             # 静态分析配置
-├── scripts/                 # 脚本工具
-│   ├── ci.sh               # CI/CD 脚本
-│   ├── local-ci.sh         # 本地 CI 验证
-│   ├── static-analysis.sh  # 静态分析
-│   └── verify-coverage.sh  # 覆盖率验证
-│
-├── common/                  # 公共服务库 ⭐
-│   ├── README.md
-│   ├── CMakeLists.txt
-│   ├── include/
-│   │   ├── compat.h        # 平台兼容头文件
-│   │   ├── error.h         # 错误处理接口
-│   │   ├── platform.h      # 平台抽象接口
-│   │   ├── svc_cache.h     # 通用缓存接口
-│   │   ├── svc_common.h    # 公共服务接口
-│   │   ├── svc_config.h    # 配置管理接口
-│   │   └── svc_logger.h    # 日志记录接口
-│   ├── src/
-│   │   ├── config.c        # YAML 配置解析
-│   │   ├── error.c         # 统一错误处理
-│   │   ├── ipc_client.c    # IPC 客户端
-│   │   ├── logger.c        # 结构化日志
-│   │   ├── platform.c      # 平台抽象实现
-│   │   └── svc_cache.c     # LRU 缓存实现
-│   └── tests/              # 单元测试
-│       ├── test_config.c
-│       ├── test_error.c
-│       ├── test_ipc_client.c
-│       ├── test_logger.c
-│       └── test_platform.c
-│
-├── llm_d/                   # LLM 服务守护进程 ⭐
-│   ├── README.md
-│   ├── CMakeLists.txt
-│   ├── include/
-│   │   └── llm_service.h   # LLM 服务接口
-│   ├── src/
-│   │   ├── main.c          # 程序入口
-│   │   ├── service.c       # 服务主逻辑
-│   │   ├── service.h       # 服务接口
-│   │   ├── cache.c         # 响应缓存 (LRU)
-│   │   ├── cache.h
-│   │   ├── response.c      # 响应处理
-│   │   ├── response.h
-│   │   ├── cost_tracker.c  # 成本追踪
-│   │   ├── token_counter.c # Token 计数
-│   │   └── providers/      # 模型提供商适配器
-│   │       ├── provider.h  # 提供商接口
-│   │       ├── provider.c  # 通用实现
-│   │       ├── openai.c    # OpenAI API
-│   │       ├── anthropic.c # Anthropic API
-│   │       ├── deepseek.c  # DeepSeek API
-│   │       ├── local.c     # 本地模型
-│   │       └── registry.c  # 提供商注册表
-│   └── tests/              # 单元测试
-│       ├── test_llm.c
-│       ├── test_service.c
-│       ├── test_cache.c
-│       ├── test_response.c
-│       ├── test_cost_tracker.c
-│       └── test_token_counter.c
-│
-├── tool_d/                  # 工具服务守护进程
-│   ├── README.md
-│   ├── CMakeLists.txt
-│   ├── include/
-│   │   └── tool_service.h  # 工具服务接口
-│   ├── src/
-│   │   ├── main.c          # 程序入口
-│   │   ├── service.c       # 服务主逻辑
-│   │   ├── service.h
-│   │   ├── registry.c      # 工具注册表
-│   │   ├── registry.h
-│   │   ├── executor.c      # 工具执行器
-│   │   ├── executor.h
-│   │   ├── validator.c     # 参数验证器
-│   │   ├── validator.h
-│   │   ├── cache.c         # 工具缓存
-│   │   ├── cache.h
-│   │   ├── config.c        # 配置管理
-│   │   ├── config.h
-│   │   └── utils/
-│   │       └── tool_errors.h # 工具错误码
-│   └── tests/              # 单元测试
-│       ├── test_tool.c
-│       ├── test_service.c
-│       ├── test_registry.c
-│       ├── test_executor.c
-│       ├── test_validator.c
-│       └── test_cache.c
-│
-├── market_d/                # 市场服务守护进程
-│   ├── README.md
-│   ├── CMakeLists.txt
-│   ├── include/
-│   │   └── market_service.h # 市场服务接口
-│   ├── src/
-│   │   ├── main.c          # 程序入口
-│   │   ├── agent_registry.c # Agent 注册表
-│   │   ├── skill_registry.c # 技能注册表
-│   │   ├── installer.c     # 安装管理器
-│   │   └── publisher.c     # 发布管理器
-│   └── tests/              # 单元测试
-│       ├── test_market.c
-│       ├── test_agent_registry.c
-│       ├── test_skill_registry.c
-│       └── test_installer.c
-│
-├── sched_d/                 # 调度服务守护进程
-│   ├── README.md
-│   ├── CMakeLists.txt
-│   ├── include/
-│   │   ├── scheduler_service.h # 调度服务接口
-│   │   └── strategy_interface.h # 策略接口
-│   ├── src/
-│   │   ├── main.c          # 程序入口
-│   │   ├── monitor.c       # 负载监控
-│   │   └── strategies/     # 调度策略实现
-│   │       ├── round_robin.c # 轮询策略
-│   │       ├── weighted.c    # 加权策略
-│   │       └── ml_based.c    # ML 预测策略
-│   └── tests/              # 单元测试
-│       ├── test_scheduler.c
-│       └── test_strategies.c
-│
-└── monit_d/                 # 监控服务守护进程
-    ├── README.md
-    ├── CMakeLists.txt
-    ├── include/
-    │   └── monitor_service.h # 监控服务接口
-    ├── src/
-    │   ├── main.c          # 程序入口
-    │   ├── metrics.c       # 指标采集
-    │   ├── logging.c       # 日志聚合
-    │   ├── tracing.c       # 链路追踪
-    │   └── alert.c         # 告警管理
-    └── tests/              # 单元测试
-        ├── test_monitor.c
-        ├── test_metrics.c
-        ├── test_logging.c
-        ├── test_tracing.c
-        └── test_alert.c
+├── common/          # 公共服务库（日志、配置、缓存、IPC）
+├── llm_d/          # LLM 推理服务 ⭐
+├── tool_d/         # 工具执行服务
+├── market_d/       # Agent/技能市场服务
+├── sched_d/        # 智能调度服务
+└── monit_d/        # 监控和告警服务
 ```
-
-**注**: `perm_d*` (权限服务) 为规划中服务，当前由 `cupolas/` 安全穹顶提供权限裁决功能。
-
----
-
-## 🔧 核心服务详解
 
 ### 1. LLM 服务 (llm_d) ⭐
 
-**功能**: 提供统一的大模型推理接口，支持多模型提供商和成本控制
+**统一的大模型推理接口**
 
-**核心职责**:
-- 接收认知层 (`coreloopthree/`) 的推理请求
-- 调用合适的模型提供商 API
-- 缓存响应以降低 API 调用成本
-- 追踪 token 消耗和费用
+| 功能 | 说明 |
+|------|------|
+| **多提供商支持** | OpenAI GPT、Anthropic Claude、DeepSeek、本地模型 |
+| **智能缓存** | LRU 响应缓存，降低 API 调用成本（命中率 > 80%） |
+| **成本追踪** | 实时统计 token 消耗和费用 |
+| **流式响应** | 支持 SSE 流式输出 |
+| **自动重试** | 网络错误自动重试机制 |
 
-**核心特性**:
-- ✅ **多提供商支持**: OpenAI GPT、Anthropic Claude、DeepSeek、本地模型
-- ✅ **智能缓存**: LRU 响应缓存，降低 API 调用成本
-- ✅ **成本追踪**: 实时统计 token 消耗和费用
-- ✅ **Token 计数**: 精确计算输入输出 token 数
-- ✅ **流式响应**: 支持 SSE 流式输出
-- ✅ **自动重试**: 网络错误自动重试机制
-- ✅ **Provider 抽象**: 统一的提供商接口，易于扩展新模型
-
-**架构设计**:
-```
-┌──────────────────────────────────────────────────────────┐
-│                    llm_d                                  │
-├──────────────────────────────────────────────────────────┤
-│  ┌────────────────────────────────────────────────────┐ │
-│  │              service.c (服务主逻辑)                 │ │
-│  │  • 请求路由  • 缓存管理  • 成本追踪                │ │
-│  └────────────────────────────────────────────────────┘ │
-│                          ↓                               │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
-│  │ openai.c │ │anthropic.c│ │deepseek.c│ │ local.c  │  │
-│  │          │ │          │ │          │ │          │  │
-│  │ Provider 抽象层 (统一接口)                            │  │
-│  └──────────┴──────────────┴──────────┴──────────────┘  │
-└──────────────────────────────────────────────────────────┘
-```
-
-**API 示例**:
+**快速示例**:
 ```bash
-# 文本生成
+# 启动服务
+export OPENAI_API_KEY="your-key"
+./build/llm_d/agentos-llm-d
+
+# 调用 API
 curl -X POST http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4",
     "messages": [{"role": "user", "content": "Hello!"}]
   }'
-
-# 嵌入向量
-curl -X POST http://localhost:8080/v1/embeddings \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "text-embedding-3-small",
-    "input": "AgentOS is awesome"
-  }'
 ```
+
+**详细文档**: [llm_d/README.md](llm_d/README.md)
 
 ---
 
 ### 2. 工具服务 (tool_d)
 
-**功能**: 提供工具注册、验证和执行服务
+**工具注册、验证和执行引擎**
 
-**核心职责**:
-- 维护可用工具注册表
-- 验证工具调用参数
-- 在沙箱环境中执行工具
-- 缓存工具执行结果
-
-**核心特性**:
-- ✅ **工具注册**: 动态注册/注销工具
-- ✅ **参数验证**: JSON Schema 验证
-- ✅ **沙箱执行**: 安全隔离的工具执行环境
-- ✅ **结果缓存**: 缓存常用工具执行结果
-- ✅ **跨平台**: 支持 Windows/Linux/macOS
+| 功能 | 说明 |
+|------|------|
+| **工具注册** | 动态注册/注销工具，维护工具元数据 |
+| **参数验证** | JSON Schema 验证输入输出 |
+| **沙箱执行** | 安全隔离的工具执行环境 |
+| **结果缓存** | LRU 缓存常用工具执行结果 |
+| **多模式执行** | 同步/异步/沙箱三种执行模式 |
 
 **工具示例**:
 ```json
 {
+  "skill_id": "skill-web-search",
   "name": "web_search",
-  "description": "Search the web",
-  "parameters": {
+  "description": "互联网搜索引擎接口",
+  "input_schema": {
     "type": "object",
     "properties": {
-      "query": {"type": "string"}
-    },
-    "required": ["query"]
+      "query": {"type": "string"},
+      "num_results": {"type": "integer", "default": 10}
+    }
   }
 }
 ```
+
+**详细文档**: [tool_d/README.md](tool_d/README.md)
 
 ---
 
 ### 3. 市场服务 (market_d)
 
-**功能**: Agent 和技能的注册、安装、发布管理
+**Agent 和技能的"应用商店"**
 
-**核心职责**:
-- 维护可用 Agent 注册表
-- 维护可用技能注册表
-- 管理 Agent/技能的安装和卸载
-- 处理版本依赖解析
+| 功能 | 说明 |
+|------|------|
+| **Agent 注册表** | 维护可用 Agent 的元数据和版本 |
+| **技能注册表** | 维护可用技能的详细信息 |
+| **版本管理** | 语义化版本控制（Semantic Versioning） |
+| **依赖解析** | 自动解析和安装依赖关系 |
+| **权限管理** | 基于角色的访问控制 |
 
-**核心特性**:
-- ✅ **Agent 注册表**: 维护可用 Agent 列表
-- ✅ **技能注册表**: 维护可用技能列表
-- ✅ **版本管理**: 语义化版本控制
-- ✅ **依赖解析**: 自动解析和安装依赖
+**安装 Agent 示例**:
+```bash
+# 搜索 Agent
+curl "http://localhost:8082/api/v1/agents/search?keyword=客服"
+
+# 安装 Agent
+curl -X POST http://localhost:8082/api/v1/agents/agent-customer-service/install \
+  -H "Content-Type: application/json" \
+  -d '{"version": "^2.0.0"}'
+```
+
+**详细文档**: [market_d/README.md](market_d/README.md)
 
 ---
 
 ### 4. 调度服务 (sched_d)
 
-**功能**: 任务和资源的智能调度
+**智能任务调度中心**
 
-**核心职责**:
-- 接收行动层 (`coreloopthree/`) 的任务调度请求
-- 根据负载情况选择合适的 Agent
-- 实现多种调度策略
-- 监控服务负载和健康状态
+| 功能 | 说明 |
+|------|------|
+| **多策略调度** | 轮询、加权、ML 预测等多种算法 |
+| **负载均衡** | 基于实时指标的动态资源分配 |
+| **优先级管理** | 支持任务优先级队列和抢占式调度 |
+| **评分函数** | 基于成本、成功率、信任度的综合评分 |
 
-**核心特性**:
-- ✅ **多种策略**: 轮询、加权、ML 预测
-- ✅ **负载均衡**: 基于实时负载的动态分配
-- ✅ **优先级调度**: 支持任务优先级队列
-- ✅ **策略插件**: 可插拔的调度策略
+**评分函数**:
+```
+Score(agent) = w₁·(1/cost) + w₂·success_rate + w₃·trust_score 
+             + w₄·availability + w₅·specialization
+```
+
+**详细文档**: [sched_d/README.md](sched_d/README.md)
 
 ---
 
 ### 5. 监控服务 (monit_d)
 
-**功能**: 系统监控、日志聚合和告警
+**全栈可观测性中心**
 
-**核心职责**:
-- 采集系统指标 (CPU/内存/磁盘/网络)
-- 聚合各服务日志
-- 实现链路追踪 (OpenTelemetry)
-- 管理阈值告警和通知
+| 功能 | 说明 |
+|------|------|
+| **指标采集** | CPU、内存、磁盘、网络等系统指标 |
+| **日志聚合** | 集中式日志管理，结构化查询 |
+| **链路追踪** | OpenTelemetry 集成的全链路追踪 |
+| **智能告警** | 基于阈值的告警，多渠道通知 |
 
-**核心特性**:
-- ✅ **指标采集**: CPU、内存、磁盘、网络
-- ✅ **日志聚合**: 集中式日志管理
-- ✅ **链路追踪**: OpenTelemetry 集成
-- ✅ **告警管理**: 阈值告警和通知
+**AgentOS 特有指标**:
+- `agentos_tasks_total` - 任务总数
+- `agentos_tasks_active` - 活跃任务数
+- `agentos_memory_records` - 记忆记录数
+- `agentos_agents_registered` - 注册 Agent 数
+
+**详细文档**: [monit_d/README.md](monit_d/README.md)
 
 ---
 
-## 🚀 构建指南
+### 6. 公共服务库 (common/)
+
+**所有服务共享的基础设施**
+
+| 模块 | 功能 |
+|------|------|
+| **日志系统** | 统一日志格式，支持 DEBUG/INFO/WARN/ERROR/FATAL |
+| **配置管理** | YAML 配置解析，支持热重载 |
+| **缓存系统** | LRU 缓存实现，线程安全 |
+| **IPC 客户端** | 与内核层通信的 IPC 机制 |
+| **错误处理** | 统一错误码和错误处理逻辑 |
+
+**日志使用示例**:
+```c
+#include "svc_logger.h"
+
+SVC_LOG_INFO("Service started on port %d", port);
+SVC_LOG_ERROR("Failed to connect to database: %s", error_msg);
+```
+
+**详细文档**: [common/README.md](common/README.md)
+
+---
+
+## 🚀 快速开始
 
 ### 环境要求
 
 - **操作系统**: Linux (Ubuntu 22.04+), macOS 13+, Windows 11 (WSL2)
 - **编译器**: GCC 11+ 或 Clang 14+
-- **构建工具**: CMake 3.20+, Ninja 或 Make
-- **依赖库**:
-  - libcurl >= 7.68 (HTTP 客户端)
-  - libcjson >= 1.7.15 (JSON 解析)
-  - libyaml >= 0.2.5 (YAML 解析)
-  - libevent >= 2.1.12 (事件循环)
-  - pthread (线程库)
-  - tiktoken (Token 分词，可选)
+- **构建工具**: CMake 3.20+
+- **依赖库**: libcurl, libcjson, libyaml, libevent, pthread
 
 ### 构建步骤
 
-#### 1. 从项目根目录构建（推荐）
-
 ```bash
-# 在项目根目录 (AgentOS/)
+# 1. 克隆项目
+git clone https://gitee.com/spharx/agentos.git
+cd agentos
+
+# 2. 创建构建目录
 mkdir build && cd build
 
-# 配置 CMake
-cmake .. \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_TESTS=OFF \
-  -DENABLE_TRACING=ON
+# 3. 配置 CMake
+cmake .. -DCMAKE_BUILD_TYPE=Release
 
-# 编译
+# 4. 编译
 cmake --build . --parallel $(nproc)
 
-# 安装 (可选)
-sudo cmake --install .
+# 5. 产物位于 build/daemon/ 目录
 ```
-
-#### 2. 仅构建 daemon 服务层
-
-```bash
-cd daemon
-mkdir build && cd build
-
-# 配置
-cmake .. \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_TESTS=OFF
-
-# 编译
-cmake --build . --parallel $(nproc)
-
-# 产物位于 build/ 目录
-```
-
-### CMake 编译选项
-
-| CMake 变量 | 说明 | 默认值 |
-| :--- | :--- | :--- |
-| `CMAKE_BUILD_TYPE` | Debug/Release/RelWithDebInfo | `Release` |
-| `BUILD_TESTS` | 构建单元测试 | `OFF` |
-| `ENABLE_TRACING` | 启用 OpenTelemetry 追踪 | `OFF` |
-
----
-
-## 💻 使用示例
 
 ### 启动服务
 
-#### 单独启动 LLM 服务
-
 ```bash
-# 设置环境变量
-export OPENAI_API_KEY="your-api-key"
-export ANTHROPIC_API_KEY="your-api-key"
+# 启动 LLM 服务
+export OPENAI_API_KEY="your-key"
+./build/daemon/llm_d/agentos-llm-d
 
-# 启动服务
-./build/llm_d/agentos-llm-d --manager ../manager/service/llm_d/llm.yaml
-```
+# 启动工具服务
+./build/daemon/tool_d/agentos-tool-d
 
-#### 使用 systemd 管理服务（Linux）
-
-```ini
-# /etc/systemd/system/agentos-llm-d.service
-[Unit]
-Description=AgentOS LLM Service
-After=network.target
-
-[Service]
-Type=simple
-User=agentos
-ExecStart=/opt/agentos/bin/agentos-llm-d --manager /etc/agentos/llm_d.yaml
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-# 启用并启动服务
+# 使用 systemd 管理（Linux）
 sudo systemctl enable agentos-llm-d
 sudo systemctl start agentos-llm-d
-sudo systemctl status agentos-llm-d
 ```
 
-### Python SDK 调用示例
+---
 
-```python
-import requests
+## 🌐 API 概览
 
-# LLM 服务调用
-response = requests.post(
-    'http://localhost:8080/v1/chat/completions',
-    json={
-        'model': 'gpt-4',
-        'messages': [{'role': 'user', 'content': 'Hello!'}]
-    }
-)
-print(response.json())
+### RESTful API 端口
 
-# 工具服务调用
-result = requests.post(
-    'http://localhost:8081/v1/toolkit/execute',
-    json={
-        'tool_name': 'web_search',
-        'parameters': {'query': 'AgentOS latest version'}
-    }
-)
-print(result.json())
+| 服务 | 端口 | 主要端点 |
+|------|------|---------|
+| **llm_d** | 8080 | `/v1/chat/completions`, `/v1/embeddings` |
+| **tool_d** | 8081 | `/v1/tools`, `/v1/tools/execute` |
+| **market_d** | 8082 | `/api/v1/agents`, `/api/v1/skills` |
+| **sched_d** | 8083 | `/api/v1/schedule`, `/api/v1/agents/available` |
+| **monit_d** | 9090 | `/api/v1/metrics`, `/api/v1/logs/search` |
+
+### 通用 API 示例
+
+**LLM 服务**:
+```bash
+POST /v1/chat/completions
+{
+  "model": "gpt-4",
+  "messages": [{"role": "user", "content": "Hello!"}]
+}
 ```
 
-### Go SDK 调用示例
+**工具服务**:
+```bash
+POST /v1/tools/execute
+{
+  "tool_id": "web_search",
+  "params_json": "{\"query\": \"AgentOS\"}"
+}
+```
 
-```go
-package main
-
-import (
-    "fmt"
-    "github.com/spharx/agentos-go-toolkit/llm"
-)
-
-func main() {
-    client := llm.NewClient("http://localhost:8080")
-    
-    resp, err := client.ChatCompletion(&llm.ChatRequest{
-        Model: "gpt-4",
-        Messages: []llm.Message{
-            {Role: "user", Content: "Hello!"},
-        },
-    })
-    
-    if err != nil {
-        panic(err)
-    }
-    
-    fmt.Println(resp.Choices[0].Message.Content)
+**调度服务**:
+```bash
+POST /api/v1/schedule
+{
+  "task_id": "task-001",
+  "task_type": "data_analysis",
+  "required_skills": ["python", "pandas"],
+  "priority": "high"
 }
 ```
 
@@ -564,80 +327,128 @@ func main() {
 基于标准测试环境 (Intel i7-12700K, 32GB RAM):
 
 | 服务 | 指标 | 数值 | 测试条件 |
-| :--- | :--- | :--- | :--- |
+|------|------|------|---------|
 | **llm_d** | 请求延迟 | < 50ms | 不含模型推理时间 |
 | | 并发连接 | 1000+ | 每服务实例 |
 | | 缓存命中率 | > 80% | 重复查询场景 |
 | **tool_d** | 执行延迟 | < 10ms | 简单工具 |
 | | 并发执行 | 100+ | 每服务实例 |
 | **sched_d** | 调度延迟 | < 1ms | 单次调度决策 |
-| | 吞吐量 | 10000+ | 任务/秒 |
-| **monit_d** | 指标采集频率 | 1s | 默认间隔 |
+| | 吞吐量 | 10000+ 任务/秒 | 轮询策略 |
+| **monit_d** | 指标采集延迟 | < 10ms | 单次采集 |
 | | 日志写入吞吐 | 50MB/s | 压缩后 |
 
 ---
 
-## 🔒 安全性
+## 🔧 常见问题
 
-### 服务间认证
+### Q1: 如何添加新的 LLM 提供商？
 
-- **mTLS**: 服务间通信使用双向 TLS
-- **JWT**: API 请求使用 JWT 令牌认证
-- **API Key**: 外部访问使用 API Key 鉴权
+在 `llm_d/src/providers/` 目录下创建新的提供商实现：
 
-### 沙箱隔离
+```c
+// providers/my_provider.c
+#include "provider.h"
 
-- **工具沙箱**: 工具在隔离环境中执行
-- **资源限制**: cgroups 限制 CPU/内存使用
-- **网络隔离**: 网络命名空间隔离
+static llm_provider_t my_provider = {
+    .name = "my_provider",
+    .init = my_provider_init,
+    .complete = my_provider_complete,
+    .cleanup = my_provider_cleanup
+};
+```
+
+然后在 `registry.c` 中注册该提供商。
+
+**详细指南**: [llm_d/README.md](llm_d/README.md#添加新提供商)
 
 ---
 
-## 🧪 测试
+### Q2: 如何注册自定义工具？
 
 ```bash
-# 运行服务测试
-cd daemon/build
-ctest --output-on-failure
+curl -X POST http://localhost:8081/v1/tools/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tool_id": "my-tool",
+    "name": "My Custom Tool",
+    "executable": "/path/to/tool",
+    "params": [...],
+    "timeout_sec": 30
+  }'
+```
 
-# 运行特定服务测试
-ctest -R llm_d --verbose
-ctest -R tool_d --verbose
+**详细指南**: [tool_d/README.md](tool_d/README.md#工具注册)
 
-# 集成测试
-../tests/integration/test_services.sh
+---
+
+### Q3: 服务间如何通信？
+
+服务间通过 **IPC（进程间通信）** 和 **RESTful API** 两种方式通信：
+
+- **IPC**: 通过 `svc_ipc_init()` 和 `svc_rpc_call()` 与内核层通信
+- **RESTful API**: 通过 HTTP 调用其他服务
+
+---
+
+### Q4: 如何配置服务？
+
+每个服务都有独立的 YAML 配置文件，位于 `manager/service/<service_name>/`:
+
+```yaml
+# llm.yaml
+server:
+  port: 8080
+  max_connections: 1000
+
+providers:
+  openai:
+    enabled: true
+    api_key_env: OPENAI_API_KEY
+    default_model: gpt-4
+
+cache:
+  enabled: true
+  max_size_mb: 512
+  ttl_sec: 3600
 ```
 
 ---
 
-## 📄 许可证
+### Q5: 如何查看服务日志？
 
-daemon 服务层采用 **Apache License 2.0** 开源协议。
+```bash
+# 查看实时日志
+tail -f /var/agentos/logs/llm_d.log
 
-详见项目根目录的 [LICENSE](../../LICENSE) 文件。
+# 搜索错误日志
+grep "ERROR" /var/agentos/logs/*.log
+
+# 使用 monit_d 查询日志
+curl -X POST http://localhost:9090/api/v1/logs/search \
+  -H "Content-Type: application/json" \
+  -d '{"query": "ERROR", "time_range": {"from": "-1h"}}'
+```
 
 ---
 
 ## 🔗 相关文档
 
-### 项目文档
-
-- [内核层架构](../atoms/README.md)
-- [系统调用规范](../manuals/architecture/folder/syscall.md)
-- [CoreLoopThree 架构](../manuals/architecture/folder/coreloopthree.md)
-- [MemoryRovol 架构](../manuals/architecture/folder/memoryrovol.md)
-- [cupolas 安全穹顶](../cupolas/README.md)
-
 ### 服务详细文档
+- [LLM 服务](llm_d/README.md) - 多模型推理服务
+- [工具服务](tool_d/README.md) - 工具执行引擎
+- [市场服务](market_d/README.md) - Agent/技能市场
+- [调度服务](sched_d/README.md) - 智能调度中心
+- [监控服务](monit_d/README.md) - 全栈监控
+- [公共服务](common/README.md) - 共享基础设施
 
-- [LLM 服务详细设计](llm_d/README.md)
-- [工具服务详细设计](tool_d/README.md)
-- [市场服务详细设计](market_d/README.md)
-- [调度服务详细设计](sched_d/README.md)
-- [监控服务详细设计](monit_d/README.md)
+### 架构文档
+- [内核层架构](../atoms/README.md)
+- [三层认知循环](../manuals/architecture/folder/coreloopthree.md)
+- [四层记忆系统](../manuals/architecture/folder/memoryrovol.md)
+- [安全穹顶](../cupolas/README.md)
 
 ### 开发指南
-
 - [快速开始](../manuals/guides/folder/getting_started.md)
 - [创建 Agent](../manuals/guides/folder/create_agent.md)
 - [创建技能](../manuals/guides/folder/create_skill.md)

@@ -1,9 +1,9 @@
-# Copyright (c) 2026 SPHARX. All Rights Reserved.
+﻿# Copyright (c) 2026 SPHARX. All Rights Reserved.
 # LLM 服务单元测试构建文件
 
 cmake_minimum_required(VERSION 3.20)
 
-# 测试源文�?
+# 测试源文�?
 set(LLM_TEST_SOURCES
     test_service.c
     test_cache.c
@@ -11,10 +11,10 @@ set(LLM_TEST_SOURCES
     test_response.c
 )
 
-# 创建测试可执行文�?
+# 创建测试可执行文�?
 add_executable(test_llm_d ${LLM_TEST_SOURCES})
 
-# 链接�?llm_d 和依�?
+# 链接�?llm_d 和依�?
 target_link_libraries(test_llm_d PRIVATE
     agentos-llm-d
     svc_common
@@ -28,7 +28,7 @@ target_link_libraries(test_llm_d PRIVATE
 target_include_directories(test_llm_d PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
     ${CMAKE_CURRENT_SOURCE_DIR}/../src
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../bases/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/include
     ${CURL_INCLUDE_DIRS}
     ${CJSON_INCLUDE_DIRS}
     ${YAML_INCLUDE_DIRS}
@@ -47,7 +47,7 @@ foreach(test_file ${LLM_TEST_SOURCES})
     add_test(NAME llm_d_${test_name} COMMAND test_llm_d)
 endforeach()
 
-# 可选：只有�?BUILD_COVERAGE 时才收集覆盖�?
+# 可选：只有�?BUILD_COVERAGE 时才收集覆盖�?
 if(BUILD_COVERAGE)
     target_compile_options(test_llm_d PRIVATE
         -fprofile-arcs

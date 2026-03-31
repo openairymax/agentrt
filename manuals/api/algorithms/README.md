@@ -1,17 +1,30 @@
-﻿Copyright (c) 2026 SPHARX. All Rights Reserved.
+Copyright (c) 2026 SPHARX. All Rights Reserved.
 "From data intelligence emerges."
 
 # Manuals 核心算法与实现逻辑
 
-**版本**: v1.0.0.1  
-**最后更新**: 2026-03-23  
-**状态**: 🟢 生产就绪
+**版本**: Doc V1.7  
+**最后更新**: 2026-03-31  
+**状态**: 🟢 生产就绪  
+**作者**: LirenWang
 
 ---
 
 ## 🎯 概述
 
 本文档详细描述了 `manuals` 模块的核心算法与实现逻辑。这些算法支撑着文档管理、生成、验证和发布等核心功能，确保系统的高效性、可靠性和可扩展性。
+
+### 🧩 五维正交原则体现
+
+算法设计深度体现了 AgentOS 的五维正交设计原则，每个维度都在算法实现中得到具体体现：
+
+| 维度 | 算法设计体现 | 具体实现案例 |
+|------|-------------|------------|
+| **系统观** | 算法的反馈闭环和层次分解 | 文档处理流水线设计，多阶段处理（解析→转换→验证→发布） |
+| **内核观** | 算法的极简和模块化设计 | 每个算法独立封装，清晰的输入输出契约，可插拔的算法组件 |
+| **认知观** | 支持双系统认知的算法策略 | System 1 快速算法（简单匹配），System 2 深度算法（语义分析） |
+| **工程观** | 算法的安全、性能和可观测性 | 输入验证，性能优化，详细的指标收集和错误追踪 |
+| **设计美学** | 算法的优雅实现和清晰文档 | 简洁的代码结构，完整的注释，详细的性能基准测试 |
 
 ---
 
@@ -947,7 +960,7 @@ algorithms:
 ## 📚 相关文档
 
 - [API 参考文档](../README.md)
-- [架构设计文档](../../architecture/folder/architectural_design_principles.md)
+- [架构设计文档](../../architecture/ARCHITECTURAL_PRINCIPLES.md)
 - [功能需求文档](../../specifications/manuals_module_requirements.md)
 - [TypeScript SDK 文档](../toolkit/typescript/README.md)
 

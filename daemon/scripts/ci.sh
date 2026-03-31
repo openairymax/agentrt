@@ -229,7 +229,7 @@ generate_report() {
         echo "构建目录: ${BUILD_DIR}"
         echo ""
         echo "--- 模块状态 ---"
-        for module in bases llm_d tool_d market_d monit_d sched_d; do
+        for module in commons llm_d tool_d market_d monit_d sched_d; do
             if [ -f "${BUILD_DIR}/${module}/lib${module}.a" ] || [ -f "${BUILD_DIR}/${module}/agentos-${module}.a" ]; then
                 echo "  ${module}: ✓ 已构建"
             else

@@ -15,7 +15,7 @@ coverage:
   precision: 2
   round: down
   range: "70...100"
-  
+
   status:
     project:
       default:
@@ -36,7 +36,7 @@ coverage:
         target: 90%
         paths:
           - "security/"
-    
+
     patch:
       default:
         target: 80%
@@ -59,10 +59,10 @@ comment:
   require_changes: false
   require_base: false
   require_head: true
-  
+
   # 自定义评论模板
   after_n_builds: 1
-  
+
 ignore:
   - "**/test_*.py"
   - "**/tests/**"

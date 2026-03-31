@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file main.c
  * @brief 调度服务主程序
  * @details 负责初始化和运行调度服务
@@ -23,7 +23,6 @@ typedef struct sched_service {
     const strategy_interface_t* strategy; /**< 策略接口 */
 } sched_service_t;
 
-// From data intelligence emerges. by spharx
 /**
  * @brief 获取策略接口
  * @param strategy 策略类型

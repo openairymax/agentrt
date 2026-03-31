@@ -7,6 +7,7 @@
 
 #include "session.h"
 #include "logger.h"
+#include "utils/hash.h"
 
 #include <pthread.h>
 #include <stdatomic.h>
@@ -83,20 +84,13 @@ static void generate_uuid_v4(char* out) {
         bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]);
 }
 
-/* ========== 哈希函数 ========== */
+/* ========== 哈希函数（使用公共模块） ========== */
 
 /**
- * @brief FNV-1a 哈希函数
+ * @brief 会话 ID 哈希函数
  */
 static size_t hash_session_id(const char* id, size_t bucket_count) {
-    size_t hash = 14695981039346656037ULL;  /* FNV offset basis */
-    
-    while (*id) {
-        hash ^= (uint8_t)(*id++);
-        hash *= 1099511628211ULL;  /* FNV prime */
-    }
-    
-    return hash % bucket_count;
+    return hash_string_mod(id, bucket_count);
 }
 
 /* ========== 清理线程 ========== */

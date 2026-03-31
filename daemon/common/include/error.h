@@ -10,8 +10,8 @@
  * 4. 支持错误上下文信息
  */
 
-#ifndef AGENTOS_BACKS_COMMON_ERROR_H
-#define AGENTOS_BACKS_COMMON_ERROR_H
+#ifndef AGENTOS_DAEMON_COMMON_ERROR_H
+#define AGENTOS_DAEMON_COMMON_ERROR_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -291,4 +291,4 @@ void agentos_error_reset_stats(void);
 }
 #endif
 
-#endif /* AGENTOS_BACKS_COMMON_ERROR_H */
+#endif /* AGENTOS_DAEMON_COMMON_ERROR_H */

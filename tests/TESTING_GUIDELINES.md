@@ -1,7 +1,7 @@
-﻿﻿# AgentOS 测试代码规范
+# AgentOS 测试代码规范
 
-**版本**: 1.0.0  
-**最后更�?*: 2026-03-26  
+**版本**: 1.0.0
+**最后更�?*: 2026-03-26
 **状�?*: 正式发布
 
 ---
@@ -84,11 +84,11 @@ static void test_engine_create_destroy() {
 ```c
 int main() {
     TEST_SUITE_BEGIN("Engine Module Tests");
-    
+
     RUN_TEST(test_create_destroy);
     RUN_TEST(test_process);
     RUN_TEST(test_health_check);
-    
+
     TEST_SUITE_END();
 }
 ```
@@ -128,7 +128,7 @@ TEST_ASSERT_NULL(ptr);
 ```python
 class TestModuleFeature:
     """模块功能测试�?""
-    
+
     @pytest.fixture
     def valid_data(self) -> Dict[str, Any]:
         """提供有效测试数据"""
@@ -136,12 +136,12 @@ class TestModuleFeature:
             .with_field("name", "test") \
             .with_field("value", 100) \
             .build()
-    
+
     @pytest.fixture
     def validator(self) -> Validator:
         """提供验证器实�?""
         return Validator()
-    
+
     def test_valid_data_passes(self, valid_data, validator):
         """测试有效数据通过验证"""
         is_valid = validator.validate(valid_data)
@@ -247,7 +247,7 @@ AgentOS/
 �?  └── <service>/
 �?      └── tests/              # 服务测试
 �?          └── test_*.c
-�?├── bases/
+�?├── commons/
 �?  └── tests/
 �?      ├── unit/               # 工具库单元测�?�?      └── utils/              # 测试工具
 �?          ├── test_macros.h   # C 测试�?�?          └── test_helpers.py # Python 测试辅助
@@ -264,7 +264,7 @@ AgentOS/
 
 | 测试类型 | 位置 | 职责 |
 |---------|------|------|
-| 单元测试 | `atoms/*/tests/`, `daemon/*/tests/`, `bases/tests/unit/` | 测试单个模块/函数 |
+| 单元测试 | `atoms/*/tests/`, `daemon/*/tests/`, `commons/tests/unit/` | 测试单个模块/函数 |
 | 集成测试 | `tests/integration/` | 测试模块间协�?|
 | 契约测试 | `tests/contract/` | 验证接口契约 |
 | 安全测试 | `tests/security/` | 安全漏洞检�?|
@@ -317,10 +317,10 @@ def test_feature():
     # Arrange（准备）
     data = create_test_data()
     validator = Validator()
-    
+
     # Act（执行）
     result = validator.validate(data)
-    
+
     # Assert（断言�?    assert result is True
 ```
 
