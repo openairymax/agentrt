@@ -1,6 +1,6 @@
-﻿/**
+/**
  * @file attractor.c
- * @brief 吸引子网络检索实�?
+ * @brief 吸引子网络检索实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -18,7 +18,7 @@
 struct agentos_attractor_network {
     agentos_layer2_feature_t* layer2;        /**< 特征层，用于获取向量 */
     agentos_retrieval_config_t manager;        /**< 配置 */
-    agentos_mutex_t* lock;                    /**< 线程�?*/
+    agentos_mutex_t* lock;                    /**< 线程锁 */
 };
 
 agentos_error_t agentos_attractor_network_create(
@@ -61,7 +61,7 @@ void agentos_attractor_network_destroy(agentos_attractor_network_t* net) {
 }
 
 /**
- * @brief 使用现代Hopfield网络迭代更新状�?
+ * @brief 使用现代Hopfield网络迭代更新状态
  */
 static agentos_error_t attractor_iterate(
     agentos_attractor_network_t* net,

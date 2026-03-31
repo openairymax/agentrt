@@ -1,6 +1,6 @@
-﻿/**
+/**
  * @file serialization.c
- * @brief L1 记忆记录序列�?反序列化（JSON/二进制）
+ * @brief L1 记忆记录序列化与反序列化（JSON/二进制）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -12,7 +12,7 @@
 #include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 #include <stdio.h>
-#include <cjson/cJSON.h>  // 使用 cJSON �?
+#include <cjson/cJSON.h>  // 使用 cJSON 库cJSON �?
 
 /**
  * @brief 将元数据对象序列化为 JSON 字符�?

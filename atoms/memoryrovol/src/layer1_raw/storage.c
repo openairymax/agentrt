@@ -1,6 +1,6 @@
-﻿/**
+/**
  * @file layer1_raw.c
- * @brief L1 原始卷实�?
+ * @brief L1 原始卷实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -25,7 +25,7 @@
 #define DEFAULT_WORKERS 4
 
 /**
- * @brief L1 原始卷内部结�?
+ * @brief L1 原始卷内部结构
  */
 typedef struct agentos_layer1_raw_inner {
     char storage_path[256];

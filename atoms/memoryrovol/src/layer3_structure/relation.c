@@ -1,6 +1,6 @@
-﻿/**
+/**
  * @file relation.c
- * @brief L3 结构层关系编码器（支持持久化�?
+ * @brief L3 结构层关系编码器（支持持久化）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -22,7 +22,7 @@ struct agentos_relation_encoder {
     float* role_subject;
     float* role_predicate;
     float* role_object;
-    // 持久�?
+    // 持久化
     sqlite3* db;
     char* db_path;
 };

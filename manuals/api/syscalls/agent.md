@@ -1,4 +1,4 @@
-﻿Copyright (c) 2026 SPHARX. All Rights Reserved.
+Copyright (c) 2026 SPHARX. All Rights Reserved.
 "From data intelligence emerges."
 
 # AgentOS Agent 管理 API
@@ -12,6 +12,18 @@
 ## 🎯 概述
 
 Agent 管理 API 提供 AgentOS Agent 实例的完整生命周期管理。每个 Agent 遵循**双系统认知理论**：System 1 快速路径处理简单任务，System 2 深度路径处理复杂任务。Agent 状态机严格定义合法转换，确保系统稳定性。
+
+### 🧩 五维正交原则体现
+
+Agent 管理 API 深度体现了 AgentOS 的五维正交设计原则：
+
+| 维度 | 原则体现 | 具体实现 |
+|------|----------|---------|
+| **系统观** | Agent 生命周期的系统管理 | 创建→配置→运行→销毁的完整状态机 |
+| **内核观** | Agent 资源的标准化契约 | 统一的配置接口，明确的资源隔离边界 |
+| **认知观** | 双系统认知能力配置 | System 1/System 2 协同调度，认知策略可配置 |
+| **工程观** | Agent 安全与可观测性 | 权限控制、资源限制、性能监控、健康检查 |
+| **设计美学** | 优雅的智能体抽象 | 一致的配置模型，灵活的能力组合机制 |
 
 ---
 

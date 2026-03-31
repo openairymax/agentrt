@@ -77,7 +77,7 @@ agentos_error_t agentos_knowledge_graph_create(
 }
 
 /**
- * @brief 销毁知识图�?
+ * @brief 销毁知识图谱
  */
 void agentos_knowledge_graph_destroy(agentos_knowledge_graph_t* kg) {
     if (!kg) return;
@@ -305,7 +305,7 @@ agentos_error_t agentos_knowledge_graph_query(
 }
 
 /**
- * @brief BFS 查找最短路�?
+ * @brief BFS 查找最短路径
  */
 agentos_error_t agentos_knowledge_graph_find_path(
     agentos_knowledge_graph_t* kg,

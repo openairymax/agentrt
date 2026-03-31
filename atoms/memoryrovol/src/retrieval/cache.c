@@ -1,6 +1,6 @@
-﻿/**
+/**
  * @file cache.c
- * @brief 检索缓存（LRU实现�?
+ * @brief 检索缓存（LRU实现）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -17,17 +17,17 @@ typedef struct cache_node {
     char* key;                          /**< 查询键（查询文本的SHA1或其他哈希） */
     char** result_ids;                  /**< 缓存的检索结果ID数组 */
     size_t result_count;                /**< 结果数量 */
-    uint64_t timestamp;                  /**< 最近使用时间戳（纳秒） */
+    uint64_t timestamp;                  /**< 最近使用时间戳（纳秒级） */
     struct cache_node* next;
     struct cache_node* prev;
 } cache_node_t;
 
 struct agentos_retrieval_cache {
-    cache_node_t* head;                  /**< LRU链表头（最近使用） */
-    cache_node_t* tail;                  /**< LRU链表尾（最久未用） */
+    cache_node_t* head;                  /**< LRU 链表头（最近使用） */
+    cache_node_t* tail;                  /**< LRU 链表尾（最久未用） */
     size_t max_size;                     /**< 最大条目数 */
     // From data intelligence emerges. by spharx
-    size_t current_size;                  /**< 当前条目�?*/
+    size_t current_size;                  /**< 当前条目数 */
     agentos_mutex_t* lock;
 };
 

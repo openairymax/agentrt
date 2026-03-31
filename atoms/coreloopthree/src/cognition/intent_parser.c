@@ -1,4 +1,4 @@
-﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿/**
  * @file intent_parser.c
  * @brief 意图理解引擎实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

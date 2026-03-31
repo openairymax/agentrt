@@ -1,19 +1,19 @@
-﻿/**
+/**
  * @file monitoring.c
  * @brief MemoryRovol 监控与可观测性子系统
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * @details
- * MemoryRovol 监控子系统提供四层记忆架构的全面可观测性，支持生产�?
- * 99.999%可靠性标准。实现指标收集、健康检查、性能分析和预警机制�?
+ * MemoryRovol 监控子系统提供四层记忆架构的全面可观测性，支持生产级
+ * 99.999%可靠性标准。实现指标收集、健康检查、性能分析和预警机制。
  *
- * 核心功能�?
- * 1. 分层指标收集：L1-L4各层的读写统计、延迟指标、容量使�?
+ * 核心功能：
+ * 1. 分层指标收集：L1-L4各层的读写统计、延迟指标、容量使用
  * 2. 检索性能监控：查询延迟、召回率、缓存命中率
- * 3. 记忆演化追踪：模式挖掘进度、规则生成统�?
- * 4. 资源使用监控：内存消耗、磁盘使用、线程状�?
- * 5. 健康状态评估：各组件健康度、依赖服务状�?
- * 6. 预警与告警：阈值检测、异常通知、自动恢�?
+ * 3. 记忆演化追踪：模式挖掘进度、规则生成统计
+ * 4. 资源使用监控：内存消耗、磁盘使用、线程状态
+ * 5. 健康状态评估：各组件健康度、依赖服务状态
+ * 6. 预警与告警：阈值检测、异常通知、自动恢复
  * 7. 分布式追踪：跨层调用链追踪、上下文传播
  */
 
@@ -40,25 +40,25 @@
 
 /* ==================== 内部常量定义 ==================== */
 
-/** @brief 最大监控指标数�?*/
+/** @brief 最大监控指标数量 */
 #define MAX_METRICS 256
 
-/** @brief 监控数据保留时长（秒�?*/
+/** @brief 监控数据保留时长（秒） */
 #define MONITORING_RETENTION_SECONDS 3600
 
 /** @brief 默认监控间隔（毫秒） */
 #define DEFAULT_MONITORING_INTERVAL_MS 5000
 
-/** @brief 健康检查超时（毫秒�?*/
+/** @brief 健康检查超时（毫秒） */
 #define HEALTH_CHECK_TIMEOUT_MS 3000
 
-/** @brief 预警阈值：高延迟警告（毫秒�?*/
+/** @brief 预警阈值：高延迟警告（毫秒） */
 #define WARNING_HIGH_LATENCY_MS 1000
 
 /** @brief 预警阈值：错误率警告（百分比） */
 #define WARNING_ERROR_RATE_PERCENT 5.0
 
-/** @brief 预警阈值：内存使用警告（百分比�?*/
+/** @brief 预警阈值：内存使用警告（百分比） */
 #define WARNING_MEMORY_USAGE_PERCENT 80.0
 
 /* ==================== 内部数据结构 ==================== */
@@ -67,10 +67,10 @@
  * @brief 监控指标类型
  */
 typedef enum {
-    METRIC_TYPE_COUNTER = 0,      /**< 计数器（只增不减�?*/
-    METRIC_TYPE_GAUGE,            /**< 仪表盘（可增可减�?*/
-    METRIC_TYPE_HISTOGRAM,        /**< 直方图（分布统计�?*/
-    METRIC_TYPE_SUMMARY           /**< 摘要（分位数统计�?*/
+    METRIC_TYPE_COUNTER = 0,      /**< 计数器（只增不减） */
+    METRIC_TYPE_GAUGE,            /**< 仪表盘（可增可减） */
+    METRIC_TYPE_HISTOGRAM,        /**< 直方图（分布统计） */
+    METRIC_TYPE_SUMMARY           /**< 摘要（分位数统计） */
 } metric_type_t;
 
 /**
@@ -82,21 +82,21 @@ typedef struct monitoring_metric {
     char* description;             /**< 指标描述 */
     char* unit;                    /**< 指标单位 */
     union {
-        uint64_t counter;          /**< 计数器�?*/
-        double gauge;              /**< 仪表盘�?*/
+        uint64_t counter;          /**< 计数器值 */
+        double gauge;              /**< 仪表盘值 */
         struct {
             double sum;            /**< 总和 */
-            uint64_t count;        /**< 计数 */
-            double* buckets;       /**< 桶数�?*/
-            size_t bucket_count;   /**< 桶数�?*/
-        } histogram;               /**< 直方图数�?*/
-    } value;                       /**< 指标�?*/
-    uint64_t timestamp_ns;         /**< 最后更新时间戳 */
-    struct monitoring_metric* next; /**< 下一个指�?*/
+            uint64_t count;       /**< 计数 */
+            double* buckets;      /**< 桶数组 */
+            size_t bucket_count;  /**< 桶数量 */
+        } histogram;               /**< 直方图数据 */
+    } value;                     /**< 指标值 */
+    uint64_t timestamp_ns;        /**< 最后更新时间戳 */
+    struct monitoring_metric* next; /**< 下一个指标 */
 } monitoring_metric_t;
 
 /**
- * @brief 层监控数�?
+ * @brief 层监控数据
  */
 typedef struct layer_monitoring_data {
     uint64_t write_count;          /**< 写入次数 */
@@ -107,24 +107,24 @@ typedef struct layer_monitoring_data {
     uint64_t total_write_time_ns;  /**< 总写入耗时 */
     uint64_t total_read_time_ns;   /**< 总读取耗时 */
     uint64_t error_count;          /**< 错误次数 */
-    uint64_t current_items;        /**< 当前项目�?*/
+    uint64_t current_items;        /**< 当前项目数 */
     uint64_t max_items;            /**< 最大项目数 */
-    uint64_t last_cleanup_ns;      /**< 最后清理时�?*/
+    uint64_t last_cleanup_ns;      /**< 最后清理时间戳 */
 } layer_monitoring_data_t;
 
 /**
- * @brief 检索监控数�?
+ * @brief 检索监控数据
  */
 typedef struct retrieval_monitoring_data {
     uint64_t query_count;          /**< 查询次数 */
     uint64_t cache_hit_count;      /**< 缓存命中次数 */
     uint64_t total_query_time_ns;  /**< 总查询耗时 */
     uint64_t total_recall_items;   /**< 总召回项目数 */
-    uint64_t rerank_count;         /**< 重排序次�?*/
+    uint64_t rerank_count;         /**< 重排序次数 */
     uint64_t mount_count;          /**< 挂载次数 */
-    uint64_t attractor_count;      /**< 吸引子调用次�?*/
-    double avg_precision;          /**< 平均精确�?*/
-    double avg_recall;             /**< 平均召回�?*/
+    uint64_t attractor_count;      /**< 吸引子调用次数 */
+    double avg_precision;          /**< 平均精确度 */
+    double avg_recall;             /**< 平均召回度 */
 } retrieval_monitoring_data_t;
 
 /**
@@ -135,26 +135,26 @@ typedef struct evolution_monitoring_data {
     uint64_t pattern_mined_count;  /**< 模式挖掘次数 */
     uint64_t rules_generated_count; /**< 规则生成次数 */
     uint64_t total_evolve_time_ns; /**< 总演化耗时 */
-    uint64_t last_evolve_ns;       /**< 最后演化时�?*/
+    uint64_t last_evolve_ns;       /**< 最后演化时间戳 */
     uint64_t patterns_current;     /**< 当前模式数量 */
     uint64_t rules_current;        /**< 当前规则数量 */
     uint64_t cluster_count;        /**< 聚类数量 */
-    uint64_t outlier_count;        /**< 异常点数�?*/
+    uint64_t outlier_count;        /**< 异常点数 */
 } evolution_monitoring_data_t;
 
 /**
  * @brief 资源监控数据
  */
 typedef struct resource_monitoring_data {
-    uint64_t memory_usage_bytes;   /**< 内存使用�?*/
-    uint64_t disk_usage_bytes;     /**< 磁盘使用�?*/
-    uint64_t max_memory_bytes;     /**< 最大内存限�?*/
-    uint64_t max_disk_bytes;       /**< 最大磁盘限�?*/
+    uint64_t memory_usage_bytes;   /**< 内存使用量 */
+    uint64_t disk_usage_bytes;     /**< 磁盘使用量 */
+    uint64_t max_memory_bytes;     /**< 最大内存限制 */
+    uint64_t max_disk_bytes;       /**< 最大磁盘限制 */
     uint32_t thread_count;         /**< 线程数量 */
-    uint32_t active_threads;       /**< 活动线程�?*/
-    uint64_t total_allocations;    /**< 总分配次�?*/
-    uint64_t total_deallocations;  /**< 总释放次�?*/
-    uint64_t open_file_handles;    /**< 打开文件句柄�?*/
+    uint32_t active_threads;       /**< 活动线程数 */
+    uint64_t total_allocations;    /**< 总分配次数 */
+    uint64_t total_deallocations;  /**< 总释放次数 */
+    uint64_t open_file_handles;    /**< 打开文件句柄数 */
 } resource_monitoring_data_t;
 
 /**
@@ -163,30 +163,30 @@ typedef struct resource_monitoring_data {
 typedef struct alert_rule {
     char* name;                    /**< 预警规则名称 */
     char* metric_name;             /**< 指标名称 */
-    char* condition;               /**< 条件表达�?*/
+    char* condition;              /**< 条件表达式 */
     char* severity;                /**< 严重程度 */
     char* message_template;        /**< 消息模板 */
-    uint64_t last_triggered_ns;    /**< 最后触发时�?*/
+    uint64_t last_triggered_ns;    /**< 最后触发时间戳 */
     uint32_t cooldown_seconds;     /**< 冷却时间 */
-    struct alert_rule* next;       /**< 下一个规�?*/
+    struct alert_rule* next;       /**< 下一个规则 */
 } alert_rule_t;
 
 /**
- * @brief 监控子系统句�?
+ * @brief 监控子系统句柄
  */
 struct agentos_memoryrov_monitor {
-    agentos_mutex_t* lock;         /**< 线程�?*/
+    agentos_mutex_t* lock;          /**< 线程锁 */
 
     /* 分层监控数据 */
-    layer_monitoring_data_t l1_monitoring;   /**< L1原始层监�?*/
-    layer_monitoring_data_t l2_monitoring;   /**< L2特征层监�?*/
-    layer_monitoring_data_t l3_monitoring;   /**< L3结构层监�?*/
-    layer_monitoring_data_t l4_monitoring;   /**< L4模式层监�?*/
+    layer_monitoring_data_t l1_monitoring;   /**< L1原始层监控数据 */
+    layer_monitoring_data_t l2_monitoring;   /**< L2特征层监控数据 */
+    layer_monitoring_data_t l3_monitoring;   /**< L3结构层监控数据 */
+    layer_monitoring_data_t l4_monitoring;   /**< L4模式层监控数据 */
 
-    /* 子系统监控数�?*/
-    retrieval_monitoring_data_t retrieval_monitoring;   /**< 检索监�?*/
-    evolution_monitoring_data_t evolution_monitoring;   /**< 演化监控 */
-    resource_monitoring_data_t resource_monitoring;     /**< 资源监控 */
+    /* 子系统监控数据 */
+    retrieval_monitoring_data_t retrieval_monitoring;   /**< 检索监控数据 */
+    evolution_monitoring_data_t evolution_monitoring;   /**< 演化监控数据 */
+    resource_monitoring_data_t resource_monitoring;     /**< 资源监控数据 */
 
     /* 指标管理 */
     monitoring_metric_t* metrics;            /**< 指标链表 */
@@ -196,8 +196,8 @@ struct agentos_memoryrov_monitor {
     alert_rule_t* alert_rules;               /**< 预警规则链表 */
     uint32_t alert_count;                    /**< 预警规则数量 */
 
-    /* 可观测性集�?*/
-    agentos_observability_t* obs;            /**< 可观测性句�?*/
+    /* 可观测性集成 */
+    agentos_observability_t* obs;            /**< 可观测性句柄 */
 
     /* 配置 */
     uint32_t monitoring_interval_ms;         /**< 监控间隔 */
@@ -206,7 +206,7 @@ struct agentos_memoryrov_monitor {
 
     /* 时间序列数据 */
     cJSON* timeseries_data;                  /**< 时间序列数据缓存 */
-    uint64_t last_export_ns;                 /**< 最后导出时�?*/
+    uint64_t last_export_ns;                 /**< 最后导出时间戳 */
 };
 
 /* ==================== 内部工具函数 ==================== */
@@ -221,7 +221,7 @@ static uint64_t get_current_timestamp_ns(void) {
 
 /**
  * @brief 格式化时间戳为字符串
- * @param timestamp_ns 时间戳（纳秒�?
+ * @param timestamp_ns 时间戳（纳秒级）
  * @return 格式化后的字符串（需调用者释放）
  */
 static char* format_timestamp(uint64_t timestamp_ns) {

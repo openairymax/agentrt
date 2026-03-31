@@ -1,18 +1,18 @@
-﻿﻿﻿﻿/**
+/**
  * @file memory_optimizer.c
- * @brief MemoryRovol 内存优化器实�?
+ * @brief MemoryRovol 内存优化器实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * @details
- * 内存优化器负责四层记忆系统的内存管理和优化，确保高效的资源利用�?
- * 实现生产级内存管理，支持99.999%可靠性标准�?
+ * 内存优化器负责四层记忆系统的内存管理和优化，确保高效的资源利用。
+ * 实现生产级内存管理，支持99.999%可靠性标准。
  *
- * 核心功能�?
- * 1. 内存池管理：预分配、按需扩展、自动回�?
- * 2. 缓存优化：LRU/LFU策略、分层缓�?
- * 3. 压缩算法：数据压缩、去�?
- * 4. 碎片整理：内存碎片整理、空间回�?
- * 5. 预测加载：基于访问模式的预加�?
+ * 核心功能：
+ * 1. 内存池管理：预分配、按需扩展、自动回收
+ * 2. 缓存优化：LRU/LFU策略、分层缓存
+ * 3. 压缩算法：数据压缩、去重
+ * 4. 碎片整理：内存碎片整理、空间回收
+ * 5. 预测加载：基于访问模式的预加载
  * 6. 监控指标：内存使用、命中率、碎片率
  */
 
@@ -36,10 +36,10 @@
 /** @brief 最大内存池数量 */
 #define MAX_MEMORY_POOLS 16
 
-/** @brief 最大缓存条目数�?*/
+/** @brief 最大缓存条目数 */
 #define MAX_CACHE_ENTRIES 10000
 
-/** @brief 默认内存池大小（字节�?*/
+/** @brief 默认内存池大小（字节） */
 #define DEFAULT_POOL_SIZE (64 * 1024 * 1024)
 
 /** @brief 默认缓存大小（字节） */
@@ -48,67 +48,67 @@
 /** @brief 内存对齐大小 */
 #define MEMORY_ALIGNMENT 64
 
-/** @brief 最小分配单�?*/
+/** @brief 最小分配单元 */
 #define MIN_ALLOCATION_SIZE 64
 
-/** @brief 碎片整理阈�?*/
+/** @brief 碎片整理阈值 */
 #define DEFRAGMENT_THRESHOLD 0.3
 
-/** @brief 缓存过期时间（秒�?*/
+/** @brief 缓存过期时间（秒） */
 #define DEFAULT_CACHE_TTL_SECONDS 3600
 
 /* ==================== 内部数据结构 ==================== */
 
 /**
- * @brief 内存块头�?
+ * @brief 内存块头部
  */
 typedef struct memory_block_header {
-    uint64_t size;                      /**< 块大�?*/
+    uint64_t size;                      /**< 块大小 */
     uint64_t magic;                     /**< 魔数校验 */
     uint8_t in_use;                     /**< 使用标志 */
     uint8_t pool_id;                    /**< 所属池ID */
-    uint16_t flags;                     /**< 标志�?*/
+    uint16_t flags;                     /**< 标志位 */
     uint32_t ref_count;                 /**< 引用计数 */
     uint64_t alloc_time_ns;             /**< 分配时间 */
-    uint64_t last_access_ns;            /**< 最后访问时�?*/
+    uint64_t last_access_ns;            /**< 最后访问时间 */
     struct memory_block_header* next;   /**< 下一个块 */
     struct memory_block_header* prev;   /**< 上一个块 */
 } memory_block_header_t;
 
 /**
- * @brief 内存池结�?
+ * @brief 内存池结构
  */
 typedef struct memory_pool {
     uint8_t pool_id;                    /**< 池ID */
-    char* pool_name;                    /**< 池名�?*/
+    char* pool_name;                    /**< 池名称 */
     uint8_t* base_address;              /**< 基地址 */
-    uint64_t total_size;                /**< 总大�?*/
+    uint64_t total_size;                /**< 总大小 */
     uint64_t used_size;                 /**< 已用大小 */
-    uint64_t peak_size;                 /**< 峰值使�?*/
+    uint64_t peak_size;                 /**< 峰值使用 */
     uint64_t alloc_count;               /**< 分配次数 */
     uint64_t free_count;                /**< 释放次数 */
     uint64_t alloc_failures;            /**< 分配失败次数 */
     memory_block_header_t* free_list;   /**< 空闲链表 */
     memory_block_header_t* used_list;   /**< 使用链表 */
-    agentos_mutex_t* lock;              /**< 线程�?*/
-    uint32_t flags;                     /**< 标志�?*/
+    agentos_mutex_t* lock;              /**< 线程锁 */
+    uint32_t flags;                     /**< 标志位 */
 } memory_pool_t;
 
 /**
  * @brief 缓存条目
  */
 typedef struct cache_entry {
-    char* key;                          /**< �?*/
-    void* value;                        /**< �?*/
-    size_t value_size;                  /**< 值大�?*/
+    char* key;                          /**< 键 */
+    void* value;                        /**< 值 */
+    size_t value_size;                  /**< 值大小 */
     uint64_t access_count;              /**< 访问次数 */
-    uint64_t last_access_ns;            /**< 最后访问时�?*/
+    uint64_t last_access_ns;            /**< 最后访问时间 */
     uint64_t create_time_ns;            /**< 创建时间 */
     uint64_t expire_time_ns;            /**< 过期时间 */
-    uint32_t flags;                     /**< 标志�?*/
+    uint32_t flags;                     /**< 标志位 */
     struct cache_entry* prev;           /**< 前驱 */
     struct cache_entry* next;           /**< 后继 */
-    struct cache_entry* hash_next;      /**< 哈希链表下一�?*/
+    struct cache_entry* hash_next;      /**< 哈希链表下一节点 */
 } cache_entry_t;
 
 /**
@@ -116,17 +116,17 @@ typedef struct cache_entry {
  */
 typedef struct lru_cache {
     char* cache_name;                   /**< 缓存名称 */
-    uint64_t max_size;                  /**< 最大大�?*/
+    uint64_t max_size;                  /**< 最大大小 */
     uint64_t current_size;              /**< 当前大小 */
     uint64_t entry_count;               /**< 条目数量 */
     uint64_t hit_count;                 /**< 命中次数 */
-    uint64_t miss_count;                /**< 未命中次�?*/
-    uint64_t evict_count;               /**< 驱逐次�?*/
-    cache_entry_t** hash_table;         /**< 哈希�?*/
-    size_t hash_table_size;             /**< 哈希表大�?*/
-    cache_entry_t* head;                /**< LRU�?*/
-    cache_entry_t* tail;                /**< LRU�?*/
-    agentos_mutex_t* lock;              /**< 线程�?*/
+    uint64_t miss_count;                /**< 未命中次数 */
+    uint64_t evict_count;               /**< 驱逐次数 */
+    cache_entry_t** hash_table;         /**< 哈希表 */
+    size_t hash_table_size;             /**< 哈希表大小 */
+    cache_entry_t* head;                /**< LRU头 */
+    cache_entry_t* tail;                /**< LRU尾 */
+    agentos_mutex_t* lock;              /**< 线程锁 */
     uint32_t default_ttl_seconds;       /**< 默认TTL */
 } lru_cache_t;
 
@@ -134,31 +134,31 @@ typedef struct lru_cache {
  * @brief 内存统计
  */
 typedef struct memory_stats {
-    uint64_t total_allocated;           /**< 总分�?*/
-    uint64_t total_freed;               /**< 总释�?*/
+    uint64_t total_allocated;           /**< 总分配 */
+    uint64_t total_freed;               /**< 总释放 */
     uint64_t current_usage;             /**< 当前使用 */
-    uint64_t peak_usage;                /**< 峰值使�?*/
-    uint64_t alloc_operations;          /**< 分配操作�?*/
-    uint64_t free_operations;           /**< 释放操作�?*/
+    uint64_t peak_usage;                /**< 峰值使用 */
+    uint64_t alloc_operations;          /**< 分配操作数 */
+    uint64_t free_operations;           /**< 释放操作数 */
     uint64_t cache_hits;                /**< 缓存命中 */
-    uint64_t cache_misses;              /**< 缓存未命�?*/
+    uint64_t cache_misses;              /**< 缓存未命中 */
     uint64_t defrag_operations;         /**< 碎片整理次数 */
-    double fragmentation_ratio;         /**< 碎片�?*/
+    double fragmentation_ratio;         /**< 碎片率 */
 } memory_stats_t;
 
 /**
- * @brief 内存优化器结�?
+ * @brief 内存优化器结构
  */
 struct agentos_memory_optimizer {
     char* optimizer_id;                 /**< 优化器ID */
     memory_pool_t* pools[MAX_MEMORY_POOLS];
-    uint32_t pool_count;                /**< 池数�?*/
+    uint32_t pool_count;                /**< 池数量 */
     lru_cache_t* caches[MAX_MEMORY_POOLS];
     uint32_t cache_count;               /**< 缓存数量 */
     memory_stats_t stats;               /**< 统计 */
-    agentos_mutex_t* lock;              /**< 全局�?*/
-    agentos_observability_t* obs;       /**< 可观测�?*/
-    uint64_t last_defrag_time_ns;       /**< 最后碎片整理时�?*/
+    agentos_mutex_t* lock;              /**< 全局锁 */
+    agentos_observability_t* obs;       /**< 可观测性 */
+    uint64_t last_defrag_time_ns;       /**< 最后碎片整理时间 */
     uint32_t defrag_interval_ms;        /**< 碎片整理间隔 */
     uint8_t auto_defrag;                /**< 自动碎片整理 */
     uint8_t auto_compress;              /**< 自动压缩 */
@@ -171,7 +171,7 @@ static agentos_memory_optimizer_t* g_memory_optimizer = NULL;
 /* ==================== 内部工具函数 ==================== */
 
 /**
- * @brief 获取当前时间戳（纳秒�?
+ * @brief 获取当前时间戳（纳秒级）
  */
 static uint64_t get_timestamp_ns(void) {
     struct timespec ts;
@@ -180,7 +180,7 @@ static uint64_t get_timestamp_ns(void) {
 }
 
 /**
- * @brief 简单哈希函�?
+ * @brief 简单哈希函数
  */
 static uint64_t simple_hash_string(const char* str) {
     if (!str) return 0;
@@ -201,7 +201,7 @@ static size_t align_size(size_t size) {
 }
 
 /**
- * @brief 计算碎片�?
+ * @brief 计算碎片率
  */
 static double calculate_fragmentation_ratio(memory_pool_t* pool) {
     if (!pool || pool->total_size == 0) return 0.0;
@@ -223,7 +223,7 @@ static double calculate_fragmentation_ratio(memory_pool_t* pool) {
 }
 
 /**
- * @brief 创建内存�?
+ * @brief 创建内存池
  */
 static memory_pool_t* create_memory_pool(uint8_t pool_id, const char* name, uint64_t size) {
     memory_pool_t* pool = (memory_pool_t*)AGENTOS_CALLOC(1, sizeof(memory_pool_t));
@@ -285,7 +285,7 @@ static void destroy_memory_pool(memory_pool_t* pool) {
 }
 
 /**
- * @brief 从池中分配内�?
+ * @brief 从池中分配内存
  */
 static void* pool_alloc(memory_pool_t* pool, size_t size) {
     if (!pool || size == 0) return NULL;
@@ -294,7 +294,7 @@ static void* pool_alloc(memory_pool_t* pool, size_t size) {
 
     agentos_mutex_lock(pool->lock);
 
-    // 查找合适的空闲块（首次适应�?
+    // 查找合适的空闲块（首次适应）
     memory_block_header_t* block = pool->free_list;
     memory_block_header_t* prev = NULL;
 
@@ -314,16 +314,16 @@ static void* pool_alloc(memory_pool_t* pool, size_t size) {
         return NULL;
     }
 
-    // 从空闲链表移�?
+    // 从空闲链表移除
     if (prev) {
         prev->next = block->next;
     } else {
         pool->free_list = block->next;
     }
 
-    // 检查是否需要分�?
+    // 检查是否需要分割
     if (block->size > aligned_size + sizeof(memory_block_header_t) + MIN_ALLOCATION_SIZE) {
-        // 分割�?
+        // 分割块
         memory_block_header_t* new_block = (memory_block_header_t*)((uint8_t*)block + aligned_size);
         new_block->size = block->size - aligned_size;
         new_block->magic = 0xDEADBEEF;
@@ -334,7 +334,7 @@ static void* pool_alloc(memory_pool_t* pool, size_t size) {
         new_block->alloc_time_ns = 0;
         new_block->last_access_ns = 0;
 
-        // 将新块加入空闲链�?
+        // 将新块加入空闲链表
         new_block->next = pool->free_list;
         new_block->prev = NULL;
         if (pool->free_list) {
@@ -394,7 +394,7 @@ static void pool_free(memory_pool_t* pool, void* ptr) {
         return;
     }
 
-    // 从使用链表移�?
+    // 从使用链表移除
     if (block->prev) {
         block->prev->next = block->next;
     } else {
@@ -404,7 +404,7 @@ static void pool_free(memory_pool_t* pool, void* ptr) {
         block->next->prev = block->prev;
     }
 
-    // 标记为空�?
+    // 标记为空闲
     block->in_use = 0;
     block->ref_count = 0;
     block->last_access_ns = get_timestamp_ns();
@@ -470,7 +470,7 @@ static void destroy_lru_cache(lru_cache_t* cache) {
 
     agentos_mutex_lock(cache->lock);
 
-    // 释放所有条�?
+    // 释放所有条目
     cache_entry_t* entry = cache->head;
     while (entry) {
         cache_entry_t* next = entry->next;
@@ -490,7 +490,7 @@ static void destroy_lru_cache(lru_cache_t* cache) {
 }
 
 /**
- * @brief 从缓存获�?
+ * @brief 从缓存获取
  */
 static void* cache_get(lru_cache_t* cache, const char* key, size_t* out_size) {
     if (!cache || !key) return NULL;
@@ -503,7 +503,7 @@ static void* cache_get(lru_cache_t* cache, const char* key, size_t* out_size) {
     cache_entry_t* entry = cache->hash_table[index];
     while (entry) {
         if (strcmp(entry->key, key) == 0) {
-            // 检查是否过�?
+            // 检查是否过期
             if (entry->expire_time_ns > 0 && get_timestamp_ns() > entry->expire_time_ns) {
                 break;
             }
@@ -515,7 +515,7 @@ static void* cache_get(lru_cache_t* cache, const char* key, size_t* out_size) {
 
             // 移动到LRU头部
             if (entry != cache->head) {
-                // 从当前位置移�?
+                // 从当前位置移除
                 if (entry->prev) entry->prev->next = entry->next;
                 if (entry->next) entry->next->prev = entry->prev;
                 if (entry == cache->tail) cache->tail = entry->prev;
@@ -542,7 +542,7 @@ static void* cache_get(lru_cache_t* cache, const char* key, size_t* out_size) {
 }
 
 /**
- * @brief 添加到缓�?
+ * @brief 添加到缓存
  */
 static int cache_put(lru_cache_t* cache, const char* key, const void* value,
                      size_t size, uint32_t ttl_seconds) {
@@ -550,7 +550,7 @@ static int cache_put(lru_cache_t* cache, const char* key, const void* value,
 
     agentos_mutex_lock(cache->lock);
 
-    // 检查是否需要驱�?
+    // 检查是否需要驱逐
     while (cache->current_size + size > cache->max_size && cache->tail) {
         cache_entry_t* to_evict = cache->tail;
 
@@ -586,7 +586,7 @@ static int cache_put(lru_cache_t* cache, const char* key, const void* value,
         AGENTOS_FREE(to_evict);
     }
 
-    // 创建新条�?
+    // 创建新条目
     cache_entry_t* new_entry = (cache_entry_t*)AGENTOS_CALLOC(1, sizeof(cache_entry_t));
     if (!new_entry) {
         agentos_mutex_unlock(cache->lock);
@@ -612,7 +612,7 @@ static int cache_put(lru_cache_t* cache, const char* key, const void* value,
                                 new_entry->create_time_ns + (uint64_t)ttl_seconds * 1000000000ULL : 0;
     new_entry->flags = 0;
 
-    // 加入哈希�?
+    // 加入哈希表
     uint64_t hash = simple_hash_string(key);
     size_t index = hash % cache->hash_table_size;
     new_entry->hash_next = cache->hash_table[index];
@@ -636,7 +636,7 @@ static int cache_put(lru_cache_t* cache, const char* key, const void* value,
 /* ==================== 公共API实现 ==================== */
 
 /**
- * @brief 创建内存优化�?
+ * @brief 创建内存优化器
  */
 agentos_error_t agentos_memory_optimizer_create(agentos_memory_optimizer_t** out_optimizer) {
     if (!out_optimizer) return AGENTOS_EINVAL;
@@ -719,7 +719,7 @@ void agentos_memory_optimizer_destroy(agentos_memory_optimizer_t* optimizer) {
 }
 
 /**
- * @brief 创建内存�?
+ * @brief 创建内存池
  */
 agentos_error_t agentos_memory_optimizer_create_pool(agentos_memory_optimizer_t* optimizer,
                                                      const char* name,
@@ -872,7 +872,7 @@ agentos_error_t agentos_memory_optimizer_create_cache(agentos_memory_optimizer_t
 }
 
 /**
- * @brief 从缓存获�?
+ * @brief 从缓存获取
  */
 void* agentos_memory_optimizer_cache_get(agentos_memory_optimizer_t* optimizer,
                                          uint8_t cache_id,
@@ -951,7 +951,7 @@ agentos_error_t agentos_memory_optimizer_get_stats(agentos_memory_optimizer_t* o
     cJSON_AddNumberToObject(stats_obj, "fragmentation_ratio", optimizer->stats.fragmentation_ratio);
     cJSON_AddItemToObject(stats_json, "stats", stats_obj);
 
-    // 池信�?
+    // 池信息
     cJSON* pools_array = cJSON_CreateArray();
     for (uint32_t i = 0; i < MAX_MEMORY_POOLS; i++) {
         if (optimizer->pools[i]) {
@@ -1023,7 +1023,7 @@ agentos_error_t agentos_memory_optimizer_defragment(agentos_memory_optimizer_t* 
 
     agentos_mutex_lock(pool->lock);
 
-    // 简单的碎片整理：合并相邻的空闲�?
+    // 简单的碎片整理：合并相邻的空闲块
     int merged_count = 0;
     memory_block_header_t* block = pool->free_list;
 
@@ -1151,7 +1151,7 @@ agentos_error_t agentos_memory_optimizer_clear_cache(agentos_memory_optimizer_t*
 
     agentos_mutex_lock(cache->lock);
 
-    // 释放所有条�?
+    // 释放所有条目
     cache_entry_t* entry = cache->head;
     while (entry) {
         cache_entry_t* next = entry->next;
@@ -1161,7 +1161,7 @@ agentos_error_t agentos_memory_optimizer_clear_cache(agentos_memory_optimizer_t*
         entry = next;
     }
 
-    // 清空哈希�?
+    // 清空哈希表
     memset(cache->hash_table, 0, cache->hash_table_size * sizeof(cache_entry_t*));
 
     cache->head = NULL;

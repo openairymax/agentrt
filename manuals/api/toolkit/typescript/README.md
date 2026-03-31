@@ -1,4 +1,4 @@
-﻿Copyright (c) 2026 SPHARX. All Rights Reserved.
+Copyright (c) 2026 SPHARX. All Rights Reserved.
 "From data intelligence emerges."
 
 # TypeScript SDK 文档
@@ -12,6 +12,18 @@
 ## 1. 概述
 
 TypeScript SDK 为 AgentOS 提供了完整的 TypeScript/JavaScript 客户端支持，包含文档管理、验证、生成和发布等全套功能。SDK 采用现代化的 TypeScript 开发，提供完整的类型定义和异步 API。
+
+### 🧩 五维正交原则体现
+
+TypeScript SDK 将 AgentOS 的五维正交设计原则深度融入 TypeScript/JavaScript 生态中：
+
+| 维度 | TypeScript/JavaScript 特性体现 | SDK 具体实现 |
+|------|-------------------------------|-------------|
+| **系统观** | JavaScript 的事件驱动模型支持复杂交互 | 异步/同步混合编程，事件驱动的状态管理 |
+| **内核观** | TypeScript 的类型系统提供编译时契约 | 完整的类型定义，编译时接口验证，明确的API契约 |
+| **认知观** | 支持双系统认知的混合执行模型 | System 1 快速响应（同步调用），System 2 深度处理（Promise/Async） |
+| **工程观** | 现代前端工程化工具链支持 | 完整的类型提示，丰富的测试框架，自动化构建和部署 |
+| **设计美学** | TypeScript 的优雅类型语法 | 清晰的类型定义，人性化的API设计，完善的文档生成 |
 
 ---
 

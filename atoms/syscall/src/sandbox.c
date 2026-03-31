@@ -1,4 +1,4 @@
-﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿/**
  * @file sandbox.c
  * @brief 系统调用安全沙箱实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -32,25 +32,25 @@
 
 /* ==================== 内部常量定义 ==================== */
 
-/** @brief 最大沙箱数�?*/
+/** @brief 最大沙箱数量 */
 #define MAX_SANDBOXES 64
 
-/** @brief 最大权限规则数�?*/
+/** @brief 最大权限规则数量 */
 #define MAX_PERMISSION_RULES 256
 
-/** @brief 最大审计日志条�?*/
+/** @brief 最大审计日志条目数 */
 #define MAX_AUDIT_ENTRIES 10000
 
 /** @brief 默认超时（毫秒） */
 #define DEFAULT_SANDBOX_TIMEOUT_MS 30000
 
-/** @brief 最大内存限制（字节�?*/
+/** @brief 最大内存限制（字节） */
 #define DEFAULT_MAX_MEMORY_BYTES (512 * 1024 * 1024)
 
 /** @brief 最大CPU时间（毫秒） */
 #define DEFAULT_MAX_CPU_TIME_MS 60000
 
-/** @brief 最大I/O操作�?*/
+/** @brief 最大I/O操作数 */
 #define DEFAULT_MAX_IO_OPS 10000
 
 /* ==================== 内部数据结构 ==================== */
@@ -79,43 +79,43 @@ typedef enum {
  * @brief 权限规则结构
  */
 typedef struct permission_rule {
-    int syscall_num;              /**< 系统调用�?*/
+    int syscall_num;              /**< 系统调用号 */
     permission_type_t perm_type;  /**< 权限类型 */
-    char* condition;              /**< 条件表达式（JSON�?*/
-    uint32_t flags;               /**< 标志�?*/
-    struct permission_rule* next; /**< 下一个规�?*/
+    char* condition;              /**< 条件表达式（JSON格式） */
+    uint32_t flags;               /**< 标志位 */
+    struct permission_rule* next; /**< 下一个规则 */
 } permission_rule_t;
 
 /**
  * @brief 资源配额结构
  */
 typedef struct resource_quota {
-    uint64_t max_memory_bytes;    /**< 最大内�?*/
+    uint64_t max_memory_bytes;    /**< 最大内存 */
     uint64_t current_memory;      /**< 当前内存使用 */
     uint64_t max_cpu_time_ms;     /**< 最大CPU时间 */
     uint64_t current_cpu_time_ms; /**< 当前CPU时间 */
     uint64_t max_io_ops;          /**< 最大I/O操作 */
     uint64_t current_io_ops;      /**< 当前I/O操作 */
-    uint32_t max_file_size;       /**< 最大文件大小（MB�?*/
-    uint32_t max_network_bytes;   /**< 最大网络传输（MB�?*/
+    uint32_t max_file_size;       /**< 最大文件大小（MB） */
+    uint32_t max_network_bytes;   /**< 最大网络传输（MB） */
 } resource_quota_t;
 
 /**
  * @brief 审计日志条目
  */
 typedef struct audit_entry {
-    uint64_t timestamp_ns;        /**< 时间�?*/
+    uint64_t timestamp_ns;        /**< 时间戳 */
     uint64_t sandbox_id;          /**< 沙箱ID */
-    int syscall_num;              /**< 系统调用�?*/
+    int syscall_num;              /**< 系统调用号 */
     char* caller_id;              /**< 调用者ID */
     char* args_hash;              /**< 参数哈希 */
-    int result_code;              /**< 结果�?*/
+    int result_code;              /**< 结果码 */
     uint64_t duration_ns;         /**< 执行时长 */
     char* details;                /**< 详细信息 */
 } audit_entry_t;
 
 /**
- * @brief 沙箱状态枚�?
+ * @brief 沙箱状态枚举
  */
 typedef enum {
     SANDBOX_STATE_IDLE = 0,       /**< 空闲 */

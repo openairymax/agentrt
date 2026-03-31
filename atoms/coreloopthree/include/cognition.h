@@ -1,4 +1,4 @@
-﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿/**
  * @file cognition.h
  * @brief 认知层公共接口定义
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file loop.c
  * @brief 三层核心运行时主循环实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -24,7 +24,7 @@
 #endif
 
 /**
- * @brief 核心循环结构�?
+ * @brief 核心循环结构体
  */
 struct agentos_core_loop {
     agentos_cognition_engine_t* cognition;
@@ -58,9 +58,9 @@ static void init_default_config(agentos_loop_config_t* manager) {
 
 /**
  * @brief 验证循环创建参数
- * @param manager 配置参数指针（可为NULL�?
+ * @param manager 配置参数指针（可为 NULL）
  * @param out_loop 输出循环指针
- * @return 错误码，成功返回AGENTOS_SUCCESS
+ * @return 错误码，成功返回 AGENTOS_SUCCESS
  */
 static agentos_error_t validate_loop_parameters(const agentos_loop_config_t* manager, agentos_core_loop_t** out_loop)
 {
@@ -88,7 +88,7 @@ static agentos_error_t validate_loop_parameters(const agentos_loop_config_t* man
 
 /**
  * @brief 分配循环内存
- * @return 分配的循环结构体指针，失败返回NULL
+ * @return 分配的循环结构体指针，失败返回 NULL
  */
 static agentos_core_loop_t* allocate_loop_memory(void)
 {
@@ -96,10 +96,10 @@ static agentos_core_loop_t* allocate_loop_memory(void)
 }
 
 /**
- * @brief 初始化循环资源（互斥锁和条件变量�?
- * @param loop 循环结构体指�?
- * @param manager 配置参数指针（可为NULL�?
- * @return 错误码，成功返回AGENTOS_SUCCESS
+ * @brief 初始化循环资源（互斥锁和条件变量）
+ * @param loop 循环结构体指针
+ * @param manager 配置参数指针（可为 NULL）
+ * @return 错误码，成功返回 AGENTOS_SUCCESS
  */
 static agentos_error_t initialize_loop_resources(agentos_core_loop_t* loop, const agentos_loop_config_t* manager)
 {
@@ -123,8 +123,8 @@ static agentos_error_t initialize_loop_resources(agentos_core_loop_t* loop, cons
 
 /**
  * @brief 创建循环引擎（认知、执行、记忆）
- * @param loop 循环结构体指�?
- * @return 错误码，成功返回AGENTOS_SUCCESS
+ * @param loop 循环结构体指针
+ * @return 错误码，成功返回 AGENTOS_SUCCESS
  */
 static agentos_error_t create_loop_engines(agentos_core_loop_t* loop)
 {
@@ -154,7 +154,7 @@ static agentos_error_t create_loop_engines(agentos_core_loop_t* loop)
 
 /**
  * @brief 清理循环资源（反向释放所有资源）
- * @param loop 循环结构体指�?
+ * @param loop 循环结构体指针
  */
 static void cleanup_loop_resources(agentos_core_loop_t* loop)
 {
@@ -188,7 +188,7 @@ static void cleanup_loop_resources(agentos_core_loop_t* loop)
     AGENTOS_FREE(loop);
 }
 
-/* ==================== 公共API函数实现 ==================== */
+/* ==================== 公共 API 函数实现 ==================== */
 
 AGENTOS_API agentos_error_t agentos_loop_create(
     const agentos_loop_config_t* manager,
