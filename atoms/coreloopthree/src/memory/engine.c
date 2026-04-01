@@ -1,6 +1,6 @@
-﻿/**
+/**
  * @file engine.c
- * @brief 记忆引擎实现，封�?MemoryRovol 接口
+ * @brief 记忆引擎实现，封装MemoryRovol接口
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -22,7 +22,7 @@ struct agentos_memory_engine {
 
 /**
  * @brief 创建记忆引擎
- * @param config_path 配置文件路径（可�?NULL�?
+ * @param config_path 配置文件路径（可为NULL）
  * @param out_engine 输出引擎指针
  * @return AGENTOS_SUCCESS 或错误码
  */
@@ -63,7 +63,7 @@ agentos_error_t agentos_memory_create(
 }
 
 /**
- * @brief 销毁记忆引�?
+ * @brief 销毁记忆引擎
  */
 void agentos_memory_destroy(agentos_memory_engine_t* engine) {
     if (!engine) return;
@@ -119,7 +119,7 @@ agentos_error_t agentos_memory_write(
  * @brief 查询记忆
  * @param engine 记忆引擎
  * @param query 查询条件
- * @param out_result 输出查询结果（需调用 agentos_memory_result_free 释放�?
+ * @param out_result 输出查询结果（需调用 agentos_memory_result_free 释放）
  * @return AGENTOS_SUCCESS 或错误码
  */
 agentos_error_t agentos_memory_query(
@@ -190,7 +190,7 @@ agentos_error_t agentos_memory_query(
  * @param engine 记忆引擎
  * @param record_id 记录 ID
  * @param include_raw 是否包含原始数据
- * @param out_record 输出记录（需调用 agentos_memory_record_free 释放�?
+ * @param out_record 输出记录（需调用 agentos_memory_record_free 释放）
  * @return AGENTOS_SUCCESS 或错误码
  */
 agentos_error_t agentos_memory_get(
@@ -287,7 +287,7 @@ agentos_error_t agentos_memory_evolve(
 }
 
 /**
- * @brief 记忆引擎健康检�?
+ * @brief 记忆引擎健康检查
  */
 agentos_error_t agentos_memory_health_check(
     agentos_memory_engine_t* engine,

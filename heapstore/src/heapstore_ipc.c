@@ -2,7 +2,10 @@
  * @file heapstore_ipc.c
  * @brief AgentOS 数据分区 IPC 数据存储实现
  *
- * Copyright (c) 2026 SPHARX. All Rights Reserved.
+ * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * "From data intelligence emerges."
  */
 
@@ -13,7 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
+#include <pthread.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -24,232 +27,225 @@
 #include <sys/stat.h>
 #endif
 
-typedef struct ipc_channel_node {
-    heapstore_ipc_channel_t channel;
-    struct ipc_channel_node* next;
-} ipc_channel_node_t;
+#define heapstore_IPC_MAX_CHANNELS 256
+#define heapstore_IPC_MAX_BUFFERS 1024
+#define heapstore_IPC_MAX_PATH 512
 
-typedef struct ipc_buffer_node {
-    heapstore_ipc_buffer_t buffer;
-    struct ipc_buffer_node* next;
-} ipc_buffer_node_t;
-
-typedef struct {
-    ipc_channel_node_t* channels;
-    ipc_buffer_node_t* buffers;
-    size_t channel_count;
-    size_t buffer_count;
-    pthread_mutex_t lock;
-    bool initialized;
-} ipc_data_t;
-
-static ipc_data_t g_ipc_data = {0};
+static bool s_initialized = false;
+static pthread_mutex_t s_ipc_lock = PTHREAD_MUTEX_INITIALIZER;
+static heapstore_ipc_channel_t s_channels[heapstore_IPC_MAX_CHANNELS];
+static size_t s_channel_count = 0;
+static heapstore_ipc_buffer_t s_buffers[heapstore_IPC_MAX_BUFFERS];
+static size_t s_buffer_count = 0;
+static char s_ipc_path[heapstore_IPC_MAX_PATH] = {0};
 
 heapstore_error_t heapstore_ipc_init(void) {
-    if (g_ipc_data.initialized) {
-        return heapstore_ERR_ALREADY_INITIALIZED;
+    if (s_initialized) {
+        return heapstore_SUCCESS;
     }
 
-    memset(&g_ipc_data, 0, sizeof(g_ipc_data));
-    pthread_mutex_init(&g_ipc_data.lock, NULL);
-    g_ipc_data.initialized = true;
+    const char* base_path = "heapstore/kernel/ipc";
+    strncpy(s_ipc_path, base_path, sizeof(s_ipc_path) - 1);
+    s_ipc_path[sizeof(s_ipc_path) - 1] = '\0';
 
-    heapstore_ensure_directory("heapstore/kernel/ipc/channels");
-    heapstore_ensure_directory("heapstore/kernel/ipc/buffers");
+    heapstore_ensure_directory(s_ipc_path);
+
+    char channels_path[heapstore_IPC_MAX_PATH];
+    snprintf(channels_path, sizeof(channels_path), "%s/channels", s_ipc_path);
+    heapstore_ensure_directory(channels_path);
+
+    char buffers_path[heapstore_IPC_MAX_PATH];
+    snprintf(buffers_path, sizeof(buffers_path), "%s/buffers", s_ipc_path);
+    heapstore_ensure_directory(buffers_path);
+
+    memset(s_channels, 0, sizeof(s_channels));
+    memset(s_buffers, 0, sizeof(s_buffers));
+    s_channel_count = 0;
+    s_buffer_count = 0;
+
+    s_initialized = true;
 
     return heapstore_SUCCESS;
 }
 
 void heapstore_ipc_shutdown(void) {
-    if (!g_ipc_data.initialized) {
+    if (!s_initialized) {
         return;
     }
 
-    pthread_mutex_lock(&g_ipc_data.lock);
+    pthread_mutex_lock(&s_ipc_lock);
 
-    ipc_channel_node_t* ch = g_ipc_data.channels;
-    while (ch) {
-        ipc_channel_node_t* next = ch->next;
-        free(ch);
-        ch = next;
-    }
+    memset(s_channels, 0, sizeof(s_channels));
+    memset(s_buffers, 0, sizeof(s_buffers));
+    s_channel_count = 0;
+    s_buffer_count = 0;
 
-    ipc_buffer_node_t* buf = g_ipc_data.buffers;
-    while (buf) {
-        ipc_buffer_node_t* next = buf->next;
-        free(buf);
-        buf = next;
-    }
-
-    g_ipc_data.channels = NULL;
-    g_ipc_data.buffers = NULL;
-    g_ipc_data.channel_count = 0;
-    g_ipc_data.buffer_count = 0;
-
-    pthread_mutex_unlock(&g_ipc_data.lock);
-    pthread_mutex_destroy(&g_ipc_data.lock);
-
-    g_ipc_data.initialized = false;
+    s_initialized = false;
+    pthread_mutex_unlock(&s_ipc_lock);
 }
 
 heapstore_error_t heapstore_ipc_record_channel(const heapstore_ipc_channel_t* channel) {
-    if (!channel || !channel->channel_id[0]) {
-        return heapstore_ERR_INVALID_PARAM;
-    }
-
-    if (!g_ipc_data.initialized) {
+    if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&g_ipc_data.lock);
+    if (!channel) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
 
-    ipc_channel_node_t* node = (ipc_channel_node_t*)malloc(sizeof(ipc_channel_node_t));
-    if (!node) {
-        pthread_mutex_unlock(&g_ipc_data.lock);
+    pthread_mutex_lock(&s_ipc_lock);
+
+    if (s_channel_count >= heapstore_IPC_MAX_CHANNELS) {
+        pthread_mutex_unlock(&s_ipc_lock);
         return heapstore_ERR_OUT_OF_MEMORY;
     }
 
-    memcpy(&node->channel, channel, sizeof(heapstore_ipc_channel_t));
-    node->next = g_ipc_data.channels;
-    g_ipc_data.channels = node;
-    g_ipc_data.channel_count++;
+    for (size_t i = 0; i < s_channel_count; i++) {
+        if (strcmp(s_channels[i].channel_id, channel->channel_id) == 0) {
+            memcpy(&s_channels[i], channel, sizeof(heapstore_ipc_channel_t));
+            pthread_mutex_unlock(&s_ipc_lock);
+            return heapstore_SUCCESS;
+        }
+    }
 
-    pthread_mutex_unlock(&g_ipc_data.lock);
+    memcpy(&s_channels[s_channel_count], channel, sizeof(heapstore_ipc_channel_t));
+    s_channel_count++;
+
+    pthread_mutex_unlock(&s_ipc_lock);
 
     return heapstore_SUCCESS;
 }
 
 heapstore_error_t heapstore_ipc_get_channel(const char* channel_id, heapstore_ipc_channel_t* channel) {
+    if (!s_initialized) {
+        return heapstore_ERR_NOT_INITIALIZED;
+    }
+
     if (!channel_id || !channel) {
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    if (!g_ipc_data.initialized) {
-        return heapstore_ERR_NOT_INITIALIZED;
-    }
+    pthread_mutex_lock(&s_ipc_lock);
 
-    pthread_mutex_lock(&g_ipc_data.lock);
-
-    ipc_channel_node_t* node = g_ipc_data.channels;
-    while (node) {
-        if (strcmp(node->channel.channel_id, channel_id) == 0) {
-            memcpy(channel, &node->channel, sizeof(heapstore_ipc_channel_t));
-            pthread_mutex_unlock(&g_ipc_data.lock);
+    for (size_t i = 0; i < s_channel_count; i++) {
+        if (strcmp(s_channels[i].channel_id, channel_id) == 0) {
+            memcpy(channel, &s_channels[i], sizeof(heapstore_ipc_channel_t));
+            pthread_mutex_unlock(&s_ipc_lock);
             return heapstore_SUCCESS;
         }
-        node = node->next;
     }
 
-    pthread_mutex_unlock(&g_ipc_data.lock);
-
+    pthread_mutex_unlock(&s_ipc_lock);
     return heapstore_ERR_NOT_FOUND;
 }
 
 heapstore_error_t heapstore_ipc_update_channel_activity(const char* channel_id) {
+    if (!s_initialized) {
+        return heapstore_ERR_NOT_INITIALIZED;
+    }
+
     if (!channel_id) {
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    if (!g_ipc_data.initialized) {
-        return heapstore_ERR_NOT_INITIALIZED;
-    }
+    pthread_mutex_lock(&s_ipc_lock);
 
-    pthread_mutex_lock(&g_ipc_data.lock);
-
-    ipc_channel_node_t* node = g_ipc_data.channels;
-    while (node) {
-        if (strcmp(node->channel.channel_id, channel_id) == 0) {
-            node->channel.last_activity_at = (uint64_t)time(NULL);
-            pthread_mutex_unlock(&g_ipc_data.lock);
+    for (size_t i = 0; i < s_channel_count; i++) {
+        if (strcmp(s_channels[i].channel_id, channel_id) == 0) {
+            s_channels[i].last_activity_at = (uint64_t)time(NULL);
+            pthread_mutex_unlock(&s_ipc_lock);
             return heapstore_SUCCESS;
         }
-        node = node->next;
     }
 
-    pthread_mutex_unlock(&g_ipc_data.lock);
-
+    pthread_mutex_unlock(&s_ipc_lock);
     return heapstore_ERR_NOT_FOUND;
 }
 
 heapstore_error_t heapstore_ipc_record_buffer(const heapstore_ipc_buffer_t* buffer) {
-    if (!buffer || !buffer->buffer_id[0]) {
-        return heapstore_ERR_INVALID_PARAM;
-    }
-
-    if (!g_ipc_data.initialized) {
+    if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&g_ipc_data.lock);
+    if (!buffer) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
 
-    ipc_buffer_node_t* node = (ipc_buffer_node_t*)malloc(sizeof(ipc_buffer_node_t));
-    if (!node) {
-        pthread_mutex_unlock(&g_ipc_data.lock);
+    pthread_mutex_lock(&s_ipc_lock);
+
+    if (s_buffer_count >= heapstore_IPC_MAX_BUFFERS) {
+        pthread_mutex_unlock(&s_ipc_lock);
         return heapstore_ERR_OUT_OF_MEMORY;
     }
 
-    memcpy(&node->buffer, buffer, sizeof(heapstore_ipc_buffer_t));
-    node->next = g_ipc_data.buffers;
-    g_ipc_data.buffers = node;
-    g_ipc_data.buffer_count++;
+    for (size_t i = 0; i < s_buffer_count; i++) {
+        if (strcmp(s_buffers[i].buffer_id, buffer->buffer_id) == 0) {
+            memcpy(&s_buffers[i], buffer, sizeof(heapstore_ipc_buffer_t));
+            pthread_mutex_unlock(&s_ipc_lock);
+            return heapstore_SUCCESS;
+        }
+    }
 
-    pthread_mutex_unlock(&g_ipc_data.lock);
+    memcpy(&s_buffers[s_buffer_count], buffer, sizeof(heapstore_ipc_buffer_t));
+    s_buffer_count++;
+
+    pthread_mutex_unlock(&s_ipc_lock);
 
     return heapstore_SUCCESS;
 }
 
 heapstore_error_t heapstore_ipc_get_buffer(const char* buffer_id, heapstore_ipc_buffer_t* buffer) {
+    if (!s_initialized) {
+        return heapstore_ERR_NOT_INITIALIZED;
+    }
+
     if (!buffer_id || !buffer) {
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    if (!g_ipc_data.initialized) {
-        return heapstore_ERR_NOT_INITIALIZED;
-    }
+    pthread_mutex_lock(&s_ipc_lock);
 
-    pthread_mutex_lock(&g_ipc_data.lock);
-
-    ipc_buffer_node_t* node = g_ipc_data.buffers;
-    while (node) {
-        if (strcmp(node->buffer.buffer_id, buffer_id) == 0) {
-            memcpy(buffer, &node->buffer, sizeof(heapstore_ipc_buffer_t));
-            pthread_mutex_unlock(&g_ipc_data.lock);
+    for (size_t i = 0; i < s_buffer_count; i++) {
+        if (strcmp(s_buffers[i].buffer_id, buffer_id) == 0) {
+            memcpy(buffer, &s_buffers[i], sizeof(heapstore_ipc_buffer_t));
+            pthread_mutex_unlock(&s_ipc_lock);
             return heapstore_SUCCESS;
         }
-        node = node->next;
     }
 
-    pthread_mutex_unlock(&g_ipc_data.lock);
-
+    pthread_mutex_unlock(&s_ipc_lock);
     return heapstore_ERR_NOT_FOUND;
 }
 
 heapstore_error_t heapstore_ipc_get_stats(uint32_t* channel_count, uint32_t* buffer_count, uint64_t* total_size) {
-    if (!g_ipc_data.initialized) {
+    if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&g_ipc_data.lock);
+    pthread_mutex_lock(&s_ipc_lock);
 
     if (channel_count) {
-        *channel_count = (uint32_t)g_ipc_data.channel_count;
+        *channel_count = (uint32_t)s_channel_count;
     }
-
     if (buffer_count) {
-        *buffer_count = (uint32_t)g_ipc_data.buffer_count;
+        *buffer_count = (uint32_t)s_buffer_count;
     }
-
     if (total_size) {
-        *total_size = 0;
-        ipc_buffer_node_t* node = g_ipc_data.buffers;
-        while (node) {
-            *total_size += node->buffer.size;
-            node = node->next;
+        uint64_t size = 0;
+        for (size_t i = 0; i < s_channel_count; i++) {
+            size += s_channels[i].buffer_size;
         }
+        for (size_t i = 0; i < s_buffer_count; i++) {
+            size += s_buffers[i].size;
+        }
+        *total_size = size;
     }
 
-    pthread_mutex_unlock(&g_ipc_data.lock);
+    pthread_mutex_unlock(&s_ipc_lock);
 
     return heapstore_SUCCESS;
 }
 
+bool heapstore_ipc_is_healthy(void) {
+    return s_initialized;
+}

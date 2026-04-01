@@ -176,6 +176,13 @@ else()
         -fstack-protector-strong
         -fstack-clash-protection
         -D_FORTIFY_SOURCE=2
+        -fvisibility=hidden
+    )
+
+    target_link_options(${PROJECT_NAME} PRIVATE
+        -Wl,-z,relro
+        -Wl,-z,now
+        -Wl,-z,noexecstack
     )
 
     if(BUILD_WITH_SANITIZERS)

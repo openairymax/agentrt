@@ -1,13 +1,13 @@
-/**
- * @file sanitizer.h
- * @brief 输入净化器公共接口 - 防止注入攻击
- * @author Spharx
- * @date 2024
- * 
- * 设计原则：
- * - 白名单优先：只允许已知安全的模式
- * - 多层防御：规则 + 长度 + 编码检查
- * - 可配置：支持自定义规则
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * sanitizer.h - Input Sanitizer Public Interface: Injection Attack Prevention
+ *
+ * Design Principles:
+ * - Whitelist First: Only allow known-safe patterns
+ * - Defense in Depth: Rules + length + encoding checks
+ * - Configurable: Custom rules support
  */
 
 #ifndef CUPOLAS_SANITIZER_H
@@ -22,7 +22,7 @@
 extern "C" {
 #endif
 
-/* 净化结果 */
+/* Sanitize Result */
 typedef enum sanitize_result {
     SANITIZE_OK = 0,
     SANITIZE_MODIFIED,
@@ -30,14 +30,14 @@ typedef enum sanitize_result {
     SANITIZE_ERROR
 } sanitize_result_t;
 
-/* 净化级别 */
+/* Sanitize Level */
 typedef enum sanitize_level {
     SANITIZE_LEVEL_STRICT = 0,
     SANITIZE_LEVEL_NORMAL,
     SANITIZE_LEVEL_RELAXED
 } sanitize_level_t;
 
-/* 净化上下文 */
+/* Sanitize Context */
 typedef struct sanitize_context {
     const char* agent_id;
     const char* input_type;
@@ -49,30 +49,42 @@ typedef struct sanitize_context {
     bool allow_path;
 } sanitize_context_t;
 
-/* 净化器句柄 */
+/* Sanitizer Handle */
 typedef struct sanitizer sanitizer_t;
 
 /**
- * @brief 创建净化器
- * @param rules_path 规则文件路径（可选）
- * @return 净化器句柄，失败返回 NULL
+ * @brief Create sanitizer
+ * @param[in] rules_path Rules file path (optional, may be NULL)
+ * @return Sanitizer handle, NULL on failure
+ * @post On success, caller owns the returned handle
+ * @note Thread-safe: Yes
+ * @reentrant No (create/destroy must be paired)
+ * @ownership Returned handle: caller owns, must call sanitizer_destroy
  */
 sanitizer_t* sanitizer_create(const char* rules_path);
 
 /**
- * @brief 销毁净化器
- * @param sanitizer 净化器句柄
+ * @brief Destroy sanitizer
+ * @param[in] sanitizer Sanitizer handle (must not be NULL)
+ * @pre Handle was created by sanitizer_create
+ * @post All resources are released
+ * @note Thread-safe: No, ensure no other threads access sanitizer
+ * @reentrant No
+ * @ownership sanitizer: caller transfers ownership
  */
 void sanitizer_destroy(sanitizer_t* sanitizer);
 
 /**
- * @brief 净化输入
- * @param sanitizer 净化器句柄
- * @param input 输入字符串
- * @param output 输出缓冲区
- * @param output_size 输出缓冲区大小
- * @param ctx 净化上下文
- * @return 净化结果
+ * @brief Sanitize input
+ * @param[in] sanitizer Sanitizer handle (must not be NULL)
+ * @param[in] input Input string to sanitize (must not be NULL)
+ * @param[out] output Output buffer (must not be NULL)
+ * @param[in] output_size Output buffer size in bytes
+ * @param[in] ctx Sanitize context (may be NULL for default)
+ * @return Sanitize result
+ * @note Thread-safe: Yes
+ * @reentrant Yes
+ * @ownership input: caller retains; output: callee writes, caller owns buffer; ctx: caller retains
  */
 sanitize_result_t sanitizer_sanitize(sanitizer_t* sanitizer,
                                       const char* input,
@@ -81,72 +93,96 @@ sanitize_result_t sanitizer_sanitize(sanitizer_t* sanitizer,
                                       const sanitize_context_t* ctx);
 
 /**
- * @brief 检查输入是否安全
- * @param sanitizer 净化器句柄
- * @param input 输入字符串
- * @param ctx 净化上下文
- * @return true 安全，false 不安全
+ * @brief Check if input is safe
+ * @param[in] sanitizer Sanitizer handle (must not be NULL)
+ * @param[in] input Input string to check (must not be NULL)
+ * @param[in] ctx Sanitize context (may be NULL for default)
+ * @return true if safe, false otherwise
+ * @note Thread-safe: Yes
+ * @reentrant Yes
+ * @ownership input, ctx: caller retains ownership
  */
 bool sanitizer_is_safe(sanitizer_t* sanitizer,
                        const char* input,
                        const sanitize_context_t* ctx);
 
 /**
- * @brief 转义 HTML 特殊字符
- * @param input 输入字符串
- * @param output 输出缓冲区
- * @param output_size 输出缓冲区大小
- * @return 0 成功，其他失败
+ * @brief Escape HTML special characters
+ * @param[in] input Input string (must not be NULL)
+ * @param[out] output Output buffer (must not be NULL)
+ * @param[in] output_size Output buffer size in bytes
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Yes
+ * @reentrant Yes
+ * @ownership input: caller retains; output: callee writes, caller owns buffer
  */
 int sanitizer_escape_html(const char* input, char* output, size_t output_size);
 
 /**
- * @brief 转义 SQL 特殊字符
- * @param input 输入字符串
- * @param output 输出缓冲区
- * @param output_size 输出缓冲区大小
- * @return 0 成功，其他失败
+ * @brief Escape SQL special characters
+ * @param[in] input Input string (must not be NULL)
+ * @param[out] output Output buffer (must not be NULL)
+ * @param[in] output_size Output buffer size in bytes
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Yes
+ * @reentrant Yes
+ * @ownership input: caller retains; output: callee writes, caller owns buffer
  */
 int sanitizer_escape_sql(const char* input, char* output, size_t output_size);
 
 /**
- * @brief 转义 Shell 特殊字符
- * @param input 输入字符串
- * @param output 输出缓冲区
- * @param output_size 输出缓冲区大小
- * @return 0 成功，其他失败
+ * @brief Escape Shell special characters
+ * @param[in] input Input string (must not be NULL)
+ * @param[out] output Output buffer (must not be NULL)
+ * @param[in] output_size Output buffer size in bytes
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Yes
+ * @reentrant Yes
+ * @ownership input: caller retains; output: callee writes, caller owns buffer
  */
 int sanitizer_escape_shell(const char* input, char* output, size_t output_size);
 
 /**
- * @brief 转义路径特殊字符
- * @param input 输入字符串
- * @param output 输出缓冲区
- * @param output_size 输出缓冲区大小
- * @return 0 成功，其他失败
+ * @brief Escape path special characters
+ * @param[in] input Input string (must not be NULL)
+ * @param[out] output Output buffer (must not be NULL)
+ * @param[in] output_size Output buffer size in bytes
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Yes
+ * @reentrant Yes
+ * @ownership input: caller retains; output: callee writes, caller owns buffer
  */
 int sanitizer_escape_path(const char* input, char* output, size_t output_size);
 
 /**
- * @brief 获取默认净化上下文
- * @param ctx 上下文输出
+ * @brief Get default sanitize context
+ * @param[out] ctx Context output (must not be NULL)
+ * @note Thread-safe: Yes
+ * @reentrant Yes
+ * @ownership ctx: callee writes, caller owns
  */
 void sanitizer_default_context(sanitize_context_t* ctx);
 
 /**
- * @brief 添加净化规则
- * @param sanitizer 净化器句柄
- * @param pattern 匹配模式（正则表达式）
- * @param replacement 替换字符串（NULL 表示拒绝）
- * @return 0 成功，其他失败
+ * @brief Add sanitization rule
+ * @param[in] sanitizer Sanitizer handle (must not be NULL)
+ * @param[in] pattern Match pattern (regex), must not be NULL
+ * @param[in] replacement Replacement string (NULL to reject)
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Yes
+ * @reentrant Yes
+ * @ownership pattern, replacement: caller retains ownership
  */
 int sanitizer_add_rule(sanitizer_t* sanitizer,
                        const char* pattern,
                        const char* replacement);
 
 /**
- * @brief 清除所有规则
- * @param sanitizer 净化器句柄
+ * @brief Clear all rules
+ * @param[in] sanitizer Sanitizer handle (must not be NULL)
+ * @note Thread-safe: Yes
+ * @reentrant Yes
+ * @post All custom rules are removed, default rules remain
  */
 void sanitizer_clear_rules(sanitizer_t* sanitizer);
 

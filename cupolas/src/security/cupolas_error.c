@@ -1,6 +1,13 @@
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * cupolas_error.c - Unified Error Code Implementation
+ */
+
 /**
  * @file cupolas_error.c
- * @brief 统一错误码实现
+ * @brief Unified Error Code Implementation
  * @author Spharx
  * @date 2026-03-26
  */

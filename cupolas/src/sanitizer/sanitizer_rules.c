@@ -1,6 +1,13 @@
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * sanitizer_rules.c - Sanitizer Rules Manager Implementation
+ */
+
 /**
  * @file sanitizer_rules.c
- * @brief 净化规则管理器实现
+ * @brief Sanitizer Rules Manager Implementation
  * @author Spharx
  * @date 2024
  */

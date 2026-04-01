@@ -1,10 +1,14 @@
-/**
+/*
+ * Copyright (C) 2026 SPHARX. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2026 SPHARX.
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * @file ratelimit.c
  * @brief 请求速率限制器实现
- * 
+ *
  * 使用滑动窗口算法实现请求速率限制，
  * 支持突发流量处理。
- * 
+ *
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 

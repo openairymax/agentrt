@@ -1,219 +1,133 @@
-﻿/**
+/**
  * @file arbiter.c
  * @brief 外部仲裁策略（调用仲裁器模型或人工接口）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "cognition.h
-#include "../../../commons/utils/cognition/include/cognition_common.h""
-#include "llm_client.h
-#include "../../../commons/utils/cognition/include/cognition_common.h""
-#include <stdlib.h
-#include "../../../commons/utils/cognition/include/cognition_common.h">
+#include "strategy.h"
+#include "agentos.h"
+#include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../commons/utils/memory/include/memory_compat.h
-#include "../../../commons/utils/cognition/include/cognition_common.h""
-#include "../../../commons/utils/string/include/string_compat.h
-#include "../../../commons/utils/cognition/include/cognition_common.h""
-#include <string.h
-#include "../../../commons/utils/cognition/include/cognition_common.h">
-#include <stdio.h
-#include "../../../commons/utils/cognition/include/cognition_common.h">
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
+#include <string.h>
+#include <stdio.h>
 
 /**
  * @brief 外部仲裁私有数据
  */
 typedef struct arbiter_data {
-    char* arbiter_model;           /**< 仲裁模型名称（可为NULL，表示人工） */
-    agentos_llm_service_t* llm;    /**< LLM服务（若为NULL则触发人工） */
+    char* arbiter_model;           /**< 仲裁模型名称（可为 NULL，表示人工） */
     agentos_mutex_t* lock;
     void (*human_callback)(const char* question, char* answer, size_t max_len); /**< 人工回调 */
 } arbiter_data_t;
 
-static void arbiter_destroy(agentos_coordinator_strategy_t* strategy) {
-    if (!strategy) return;
-    arbiter_data_t* data = (arbiter_data_t*)strategy->data;
+static void arbiter_destroy(agentos_coordinator_base_t* base) {
+    if (!base) return;
+    arbiter_data_t* data = (arbiter_data_t*)base->data;
     if (data) {
         if (data->arbiter_model) AGENTOS_FREE(data->arbiter_model);
         if (data->lock) agentos_mutex_destroy(data->lock);
         AGENTOS_FREE(data);
     }
-    AGENTOS_FREE(strategy);
+    AGENTOS_FREE(base);
 }
 
 /**
  * @brief 外部仲裁函数
  */
 static agentos_error_t arbiter_coordinate(
-    const char** prompts,
-    size_t count,
-    void* context,
+    agentos_coordinator_base_t* base,
+    const agentos_coordination_context_t* context,
+    const char** inputs,
+    size_t input_count,
     char** out_result) {
+    if (!base || !out_result) return AGENTOS_EINVAL;
 
-    arbiter_data_t* data = (arbiter_data_t*)context;
+    arbiter_data_t* data = (arbiter_data_t*)base->data;
     if (!data) return AGENTOS_EINVAL;
 
-    if (data->arbiter_model && data->llm) {
-        // 使用仲裁模型：将所有prompts拼接，让模型选择
-        // 构造一个综合prompt
-        size_t total_len = 0;
-        for (size_t i = 0; i < count; i++) {
-            total_len += strlen(prompts[i]) + 32;
-        }
-        char* combined_prompt = (char*)AGENTOS_MALLOC(total_len + 1);
-        if (!combined_prompt) return AGENTOS_ENOMEM;
-        combined_prompt[0] = '\0';
-        size_t offset = 0;
+    agentos_mutex_lock(data->lock);
 
-        for (size_t i = 0; i < count; i++) {
-            char buf[64];
-            int len = snprintf(buf, sizeof(buf), "Candidate %zu:\n", i+1);
-            if (offset + len < total_len) {
-                memcpy(combined_prompt + offset, buf, len);
-                offset += len;
-            }
-            size_t prompt_len = strlen(prompts[i]);
-            if (offset + prompt_len + 3 < total_len) {
-                memcpy(combined_prompt + offset, prompts[i], prompt_len);
-                offset += prompt_len;
-                combined_prompt[offset++] = '\n';
-                combined_prompt[offset++] = '\n';
-            }
+    // 如果配置了人工回调，使用人工仲裁
+    if (data->human_callback && input_count > 0) {
+        char question[1024];
+        snprintf(question, sizeof(question), "多个模型输出不一致，请选择最佳结果：\n");
+        
+        for (size_t i = 0; i < input_count && i < 5; i++) {
+            char option[256];
+            snprintf(option, sizeof(option), "%zu. %s\n", i + 1, inputs[i]);
+            strncat(question, option, sizeof(question) - strlen(question) - 1);
         }
-        const char* suffix = "Based on the above candidates, produce the final answer.";
-        size_t suffix_len = strlen(suffix);
-        if (offset + suffix_len + 1 < total_len) {
-            memcpy(combined_prompt + offset, suffix, suffix_len);
-            offset += suffix_len;
-        }
-        combined_prompt[offset] = '\0';
 
-        agentos_llm_request_t req;
-        memset(&req, 0, sizeof(req));
-        req.model = data->arbiter_model;
-        req.prompt = combined_prompt;
-        req.temperature = 0.5;
-        req.max_tokens = 4096;
-
-        agentos_llm_response_t* resp = NULL;
-        agentos_error_t err = agentos_llm_complete(data->llm, &req, &resp);
-        AGENTOS_FREE(combined_prompt);
-        if (err == AGENTOS_SUCCESS && resp) {
-            *out_result = AGENTOS_STRDUP(resp->text);
-            agentos_llm_response_free(resp);
-            return *out_result ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
-        }
-        return err;
-    } else if (data->human_callback) {
-        // 人工仲裁：将问题输出给回调，由外部决�?
-        size_t total_len = 0;
-        for (size_t i = 0; i < count; i++) {
-            total_len += strlen(prompts[i]) + 64;
-        }
-        char* question = (char*)AGENTOS_MALLOC(total_len + 1);
-        if (!question) return AGENTOS_ENOMEM;
-        question[0] = '\0';
-        size_t q_offset = 0;
-        for (size_t i = 0; i < count; i++) {
-            char buf[4096];
-            int len = snprintf(buf, sizeof(buf), "Model %zu output:\n%s\n", i+1, prompts[i]);
-            if (q_offset + len < total_len) {
-                memcpy(question + q_offset, buf, len);
-                q_offset += len;
-            }
-        }
-        const char* final_prompt = "Please provide the final answer:";
-        size_t fp_len = strlen(final_prompt);
-        if (q_offset + fp_len + 1 < total_len) {
-            memcpy(question + q_offset, final_prompt, fp_len);
-            q_offset += fp_len;
-        }
-        question[q_offset] = '\0';
-
-        char answer[4096];
+        char answer[512];
         data->human_callback(question, answer, sizeof(answer));
-        AGENTOS_FREE(question);
-        *out_result = AGENTOS_STRDUP(answer);
-        return *out_result ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
+
+        // 解析用户选择（简单实现）
+        int choice = atoi(answer);
+        if (choice >= 1 && choice <= (int)input_count) {
+            *out_result = AGENTOS_STRDUP(inputs[choice - 1]);
+        } else {
+            *out_result = AGENTOS_STRDUP("invalid_choice");
+        }
+
+        agentos_mutex_unlock(data->lock);
+        return AGENTOS_SUCCESS;
     }
 
-    return AGENTOS_ENOTSUP;
+    // 否则使用第一个模型的结果作为默认仲裁
+    if (input_count > 0) {
+        *out_result = AGENTOS_STRDUP(inputs[0]);
+    } else {
+        *out_result = AGENTOS_STRDUP("no_input");
+    }
+
+    agentos_mutex_unlock(data->lock);
+    return AGENTOS_SUCCESS;
 }
 
 /**
- * @brief 创建外部仲裁策略（模型仲裁）
- * @param arbiter_model 仲裁模型名称
- * @param llm LLM服务客户�?
- * @return 策略对象
+ * @brief 创建外部仲裁协调器
  */
-agentos_coordinator_strategy_t* agentos_arbiter_model_create(
+agentos_error_t agentos_coordinator_arbiter_create(
     const char* arbiter_model,
-    agentos_llm_service_t* llm) {
+    void (*human_callback)(const char* question, char* answer, size_t max_len),
+    agentos_coordinator_base_t** out_base) {
+    if (!out_base) return AGENTOS_EINVAL;
 
-    if (!arbiter_model || !llm) return NULL;
-
-    agentos_coordinator_strategy_t* strat = (agentos_coordinator_strategy_t*)AGENTOS_MALLOC(sizeof(agentos_coordinator_strategy_t));
-    if (!strat) return NULL;
-
-    arbiter_data_t* data = (arbiter_data_t*)AGENTOS_MALLOC(sizeof(arbiter_data_t));
-    if (!data) {
-        AGENTOS_FREE(strat);
-        return NULL;
-    }
-    memset(data, 0, sizeof(arbiter_data_t));
-
-    data->arbiter_model = AGENTOS_STRDUP(arbiter_model);
-    data->llm = llm;
-    data->human_callback = NULL;
-    data->lock = agentos_mutex_create();
-    if (!data->arbiter_model || !data->lock) {
-        if (data->arbiter_model) AGENTOS_FREE(data->arbiter_model);
-        if (data->lock) agentos_mutex_destroy(data->lock);
-        AGENTOS_FREE(data);
-        AGENTOS_FREE(strat);
-        return NULL;
-    }
-
-    strat->coordinate = arbiter_coordinate;
-    strat->destroy = arbiter_destroy;
-    strat->data = data;
-
-    return strat;
-}
-
-/**
- * @brief 创建外部仲裁策略（人工仲裁）
- * @param callback 人工回调函数
- * @return 策略对象
- */
-agentos_coordinator_strategy_t* agentos_arbiter_human_create(
-    void (*callback)(const char* question, char* answer, size_t max_len)) {
-
-    if (!callback) return NULL;
-
-    agentos_coordinator_strategy_t* strat = (agentos_coordinator_strategy_t*)AGENTOS_MALLOC(sizeof(agentos_coordinator_strategy_t));
-    if (!strat) return NULL;
+    agentos_coordinator_base_t* base = (agentos_coordinator_base_t*)AGENTOS_CALLOC(1, sizeof(agentos_coordinator_base_t));
+    if (!base) return AGENTOS_ENOMEM;
 
     arbiter_data_t* data = (arbiter_data_t*)AGENTOS_CALLOC(1, sizeof(arbiter_data_t));
     if (!data) {
-        AGENTOS_FREE(strat);
-        return NULL;
+        AGENTOS_FREE(base);
+        return AGENTOS_ENOMEM;
     }
 
-    data->human_callback = callback;
-    data->arbiter_model = NULL;
-    data->llm = NULL;
     data->lock = agentos_mutex_create();
     if (!data->lock) {
         AGENTOS_FREE(data);
-        AGENTOS_FREE(strat);
-        return NULL;
+        AGENTOS_FREE(base);
+        return AGENTOS_ENOMEM;
     }
 
-    strat->coordinate = arbiter_coordinate;
-    strat->destroy = arbiter_destroy;
-    strat->data = data;
+    if (arbiter_model) {
+        data->arbiter_model = AGENTOS_STRDUP(arbiter_model);
+        if (!data->arbiter_model) {
+            agentos_mutex_destroy(data->lock);
+            AGENTOS_FREE(data);
+            AGENTOS_FREE(base);
+            return AGENTOS_ENOMEM;
+        }
+    }
 
-    return strat;
+    data->human_callback = human_callback;
+
+    base->data = data;
+    base->coordinate = arbiter_coordinate;
+    base->destroy = arbiter_destroy;
+
+    *out_base = base;
+    return AGENTOS_SUCCESS;
 }

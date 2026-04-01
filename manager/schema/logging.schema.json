@@ -2,14 +2,15 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agentos.spharx.ai/schemas/logging-v1.schema.json",
   "title": "AgentOS Logging Configuration Schema",
-  "description": "Configuration schema for logging system settings",
+  "description": "Configuration schema for logging system settings. Based on Log_guide.md specifications.",
   "type": "object",
   "required": ["_config_version", "logging"],
   "properties": {
     "_config_version": {
       "type": "string",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
-      "description": "Configuration file version"
+      "description": "Configuration file version",
+      "examples": ["1.0.0"]
     },
     "logging": {
       "type": "object",
@@ -36,36 +37,112 @@
           "description": "Log output destination",
           "examples": ["stdout", "file", "both"]
         },
+        "domain": {
+          "type": "object",
+          "description": "Domain ID configuration following Log_guide.md Section 5-1",
+          "required": ["enabled", "id"],
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable Domain ID tracking",
+              "examples": [true]
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^0xD[0-9A-F]{5}$",
+              "description": "Domain ID in format 0xD0xxxyy",
+              "examples": ["0xD000100"]
+            },
+            "description": {
+              "type": "string",
+              "description": "Domain description",
+              "examples": ["AgentOS Manager Module Log Domain"]
+            },
+            "allocation": {
+              "type": "object",
+              "description": "Sub-module Domain ID allocation",
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^0xD[0-9A-F]{5}$"
+              },
+              "examples": [{
+                "kernel": "0xD000101",
+                "coreloopthree": "0xD000102",
+                "security": "0xD000109"
+              }]
+            }
+          }
+        },
+        "privacy": {
+          "type": "object",
+          "description": "Privacy markers configuration following Log_guide.md Section 5-4",
+          "required": ["enabled", "marker_format"],
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable privacy markers",
+              "examples": [true]
+            },
+            "marker_format": {
+              "type": "string",
+              "description": "HiLog format with public/private markers",
+              "examples": ["%{public}s / %{private}s"]
+            },
+            "public_fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Fields that should not be masked (public)",
+              "examples": [["user_id", "session_id", "task_id", "request_id", "trace_id"]]
+            },
+            "private_fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Fields that should be masked (private)",
+              "examples": [["api_key", "token", "password", "secret", "authorization"]]
+            }
+          }
+        },
         "file": {
           "type": "object",
           "properties": {
             "base_dir": {
               "type": "string",
-              "description": "Base directory for log files"
+              "description": "Base directory for log files",
+              "examples": ["${AGENTOS_LOG_DIR}"]
             },
             "max_size_mb": {
               "type": "integer",
               "minimum": 1,
               "maximum": 1000,
               "default": 100,
-              "description": "Maximum log file size in MB"
+              "description": "Maximum log file size in MB",
+              "examples": [100]
             },
             "backups": {
               "type": "integer",
               "minimum": 0,
               "maximum": 100,
               "default": 10,
-              "description": "Number of backup files to keep"
+              "description": "Number of backup files to keep",
+              "examples": [10]
             },
             "rotate_daily": {
               "type": "boolean",
               "default": true,
-              "description": "Rotate logs daily"
+              "description": "Rotate logs daily",
+              "examples": [true]
             },
             "compress_rotated": {
               "type": "boolean",
               "default": true,
-              "description": "Compress rotated log files"
+              "description": "Compress rotated log files",
+              "examples": [true]
             }
           }
         },
@@ -76,15 +153,24 @@
             "properties": {
               "level": {
                 "type": "string",
-                "enum": ["trace", "debug", "info", "warning", "error", "critical", "off"]
+                "enum": ["trace", "debug", "info", "warning", "error", "critical", "off"],
+                "examples": ["info", "debug"]
               },
               "file": {
                 "type": "string",
-                "description": "Module-specific log file"
+                "description": "Module-specific log file",
+                "examples": ["kernel/kernel.log"]
               },
               "enabled": {
                 "type": "boolean",
-                "default": true
+                "default": true,
+                "examples": [true]
+              },
+              "domain_id": {
+                "type": "string",
+                "pattern": "^0xD[0-9A-F]{5}$",
+                "description": "Module-specific Domain ID",
+                "examples": ["0xD000101"]
               }
             }
           },
@@ -96,7 +182,8 @@
             "type": "string"
           },
           "default": ["password", "token", "api_key", "secret", "authorization", "credential"],
-          "description": "Fields to mask in logs"
+          "description": "Fields to mask in logs",
+          "examples": [["password", "token", "api_key", "secret", "authorization", "credential", "private_key"]]
         },
         "structured_fields": {
           "type": "array",
@@ -104,7 +191,8 @@
             "type": "string"
           },
           "default": ["trace_id", "span_id", "agent_id", "session_id", "task_id"],
-          "description": "Fields to include in structured logs"
+          "description": "Fields to include in structured logs",
+          "examples": [["trace_id", "span_id", "agent_id", "session_id", "task_id", "request_id"]]
         },
         "sampling": {
           "type": "object",
@@ -112,21 +200,24 @@
             "enabled": {
               "type": "boolean",
               "default": false,
-              "description": "Enable log sampling"
+              "description": "Enable log sampling",
+              "examples": [false]
             },
             "rate": {
               "type": "number",
               "minimum": 0,
               "maximum": 1,
               "default": 0.1,
-              "description": "Sampling rate (0-1)"
+              "description": "Sampling rate (0-1)",
+              "examples": [0.1]
             },
             "threshold_per_sec": {
               "type": "integer",
               "minimum": 1,
               "maximum": 100000,
               "default": 1000,
-              "description": "Threshold to trigger sampling"
+              "description": "Threshold to trigger sampling",
+              "examples": [1000]
             }
           }
         },
@@ -136,14 +227,16 @@
             "enabled": {
               "type": "boolean",
               "default": true,
-              "description": "Enable hot reload of logging manager"
+              "description": "Enable hot reload of logging manager",
+              "examples": [true]
             },
             "check_interval_sec": {
               "type": "integer",
               "minimum": 1,
               "maximum": 300,
               "default": 30,
-              "description": "manager check interval"
+              "description": "manager check interval",
+              "examples": [30]
             }
           }
         },
@@ -153,21 +246,24 @@
             "enabled": {
               "type": "boolean",
               "default": true,
-              "description": "Enable async logging"
+              "description": "Enable async logging",
+              "examples": [true]
             },
             "buffer_size": {
               "type": "integer",
               "minimum": 1000,
               "maximum": 10000000,
               "default": 100000,
-              "description": "Async buffer size"
+              "description": "Async buffer size",
+              "examples": [100000]
             },
             "flush_interval_ms": {
               "type": "integer",
               "minimum": 10,
               "maximum": 10000,
               "default": 100,
-              "description": "Flush interval in milliseconds"
+              "description": "Flush interval in milliseconds",
+              "examples": [100]
             }
           }
         },
@@ -176,19 +272,22 @@
           "properties": {
             "enabled": {
               "type": "boolean",
-              "default": true
+              "default": true,
+              "examples": [true]
             },
             "max_age_days": {
               "type": "integer",
               "minimum": 1,
               "maximum": 365,
-              "default": 30
+              "default": 30,
+              "examples": [30]
             },
             "max_total_size_gb": {
               "type": "integer",
               "minimum": 1,
               "maximum": 1000,
-              "default": 10
+              "default": 10,
+              "examples": [10]
             }
           }
         }

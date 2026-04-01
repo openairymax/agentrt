@@ -1,18 +1,12 @@
-/**
- * @file cupolas_signature.h
- * @brief 代码签名验证 - 确保 Agent 代码的完整性和可信性
- * @author Spharx
- * @date 2026
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
- * 设计原则：
- * - 零信任：所有代码必须验证签名
- * - 多算法支持：RSA、ECDSA、Ed25519
- * - 证书链验证：完整的信任链检查
- * - 防篡改：运行时完整性校验
+ * cupolas_signature.h - Code Signature Verification: Ensure Agent Code Authenticity and Integrity
  */
 
-#ifndef cupolas_SIGNATURE_H
-#define cupolas_SIGNATURE_H
+#ifndef CUPOLAS_SIGNATURE_H
+#define CUPOLAS_SIGNATURE_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -22,108 +16,118 @@
 extern "C" {
 #endif
 
-/* ============================================================================
- * 类型定义
- * ============================================================================ */
-
 /**
- * @brief 签名验证结果
+ * @brief Signature verification result codes
+ * 
+ * Design principles:
+ * - Multi-layer: Verify code signatures from multiple sources
+ * - Algorithm support: RSA, ECDSA, Ed25519
+ * - Certificate chain: Validate certificate hierarchy
+ * - Anti-tampering: Real-time integrity checking
  */
 typedef enum {
-    cupolas_SIG_OK = 0,               /**< 签名有效 */
-    cupolas_SIG_INVALID = -1,         /**< 签名无效 */
-    cupolas_SIG_EXPIRED = -2,         /**< 签名过期 */
-    cupolas_SIG_REVOKED = -3,         /**< 签名吊销 */
-    cupolas_SIG_UNTRUSTED = -4,       /**< 不可信签名者 */
-    cupolas_SIG_TAMPERED = -5,        /**< 代码被篡改 */
-    cupolas_SIG_NO_SIGNATURE = -6,    /**< 无签名 */
-    cupolas_SIG_CERT_INVALID = -7,    /**< 证书无效 */
-    cupolas_SIG_CERT_EXPIRED = -8,    /**< 证书过期 */
-    cupolas_SIG_ALGO_UNSUPPORTED = -9 /**< 算法不支持 */
+    CUPOLAS_SIG_OK = 0,               /**< Signature valid */
+    CUPOLAS_SIG_INVALID = -1,         /**< Signature invalid */
+    CUPOLAS_SIG_EXPIRED = -2,         /**< Signature expired */
+    CUPOLAS_SIG_REVOKED = -3,         /**< Signature revoked */
+    CUPOLAS_SIG_UNTRUSTED = -4,       /**< Untrusted signer */
+    CUPOLAS_SIG_TAMPERED = -5,        /**< Content tampered */
+    CUPOLAS_SIG_NO_SIGNATURE = -6,    /**< No signature present */
+    CUPOLAS_SIG_CERT_INVALID = -7,    /**< Certificate invalid */
+    CUPOLAS_SIG_CERT_EXPIRED = -8,    /**< Certificate expired */
+    CUPOLAS_SIG_ALGO_UNSUPPORTED = -9 /**< Algorithm unsupported */
 } cupolas_sig_result_t;
 
 /**
- * @brief 签名算法类型
+ * @brief Signature algorithm types
  */
 typedef enum {
-    cupolas_SIG_ALGO_RSA_SHA256 = 1,  /**< RSA with SHA-256 */
-    cupolas_SIG_ALGO_RSA_SHA384 = 2,  /**< RSA with SHA-384 */
-    cupolas_SIG_ALGO_RSA_SHA512 = 3,  /**< RSA with SHA-512 */
-    cupolas_SIG_ALGO_ECDSA_P256 = 4,  /**< ECDSA P-256 */
-    cupolas_SIG_ALGO_ECDSA_P384 = 5,  /**< ECDSA P-384 */
-    cupolas_SIG_ALGO_ED25519 = 6      /**< Ed25519 */
+    CUPOLAS_SIG_ALGO_RSA_SHA256 = 1,  /**< RSA with SHA-256 */
+    CUPOLAS_SIG_ALGO_RSA_SHA384 = 2,  /**< RSA with SHA-384 */
+    CUPOLAS_SIG_ALGO_RSA_SHA512 = 3,  /**< RSA with SHA-512 */
+    CUPOLAS_SIG_ALGO_ECDSA_P256 = 4,  /**< ECDSA P-256 */
+    CUPOLAS_SIG_ALGO_ECDSA_P384 = 5,  /**< ECDSA P-384 */
+    CUPOLAS_SIG_ALGO_ED25519 = 6      /**< Ed25519 */
 } cupolas_sig_algo_t;
 
 /**
- * @brief 签名者信息
+ * @brief Signer information structure
  */
 typedef struct {
-    char* subject_cn;               /**< 通用名称 */
-    char* subject_org;              /**< 组织 */
-    char* subject_ou;               /**< 组织单位 */
-    char* issuer_cn;                /**< 颁发者 CN */
-    char* serial_number;            /**< 序列号 */
-    uint64_t not_before;            /**< 有效期起始 */
-    uint64_t not_after;             /**< 有效期截止 */
-    bool is_ca;                     /**< 是否为 CA */
-    uint32_t key_usage;             /**< 密钥用途 */
+    char* subject_cn;               /**< Common name */
+    char* subject_org;              /**< Organization */
+    char* subject_ou;               /**< Organizational unit */
+    char* issuer_cn;                /**< Issuer CN */
+    char* serial_number;            /**< Serial number */
+    uint64_t not_before;            /**< Validity start */
+    uint64_t not_after;             /**< Validity end */
+    bool is_ca;                     /**< Is CA certificate */
+    uint32_t key_usage;             /**< Key usage flags */
 } cupolas_signer_info_t;
 
 /**
- * @brief 代码签名上下文
+ * @brief Code signature verification context (opaque)
  */
 typedef struct cupolas_signature cupolas_signature_t;
 
 /**
- * @brief 签名验证配置
+ * @brief Signature verification configuration
  */
 typedef struct {
-    bool check_cert_chain;          /**< 检查证书链 */
-    bool check_revocation;          /**< 检查吊销状态 */
-    bool check_timestamp;           /**< 检查时间戳 */
-    bool allow_self_signed;         /**< 允许自签名 */
-    bool allow_expired_test;        /**< 允许过期测试证书 */
-    const char* trusted_ca_path;    /**< 受信任 CA 路径 */
-    const char* crl_path;           /**< CRL 路径 */
-    uint32_t max_chain_depth;       /**< 最大证书链深度 */
+    bool check_cert_chain;          /**< Verify certificate chain */
+    bool check_revocation;          /**< Check revocation status */
+    bool check_timestamp;           /**< Verify timestamp */
+    bool allow_self_signed;         /**< Allow self-signed */
+    bool allow_expired_test;        /**< Allow expired for testing */
+    const char* trusted_ca_path;    /**< Trusted CA bundle path */
+    const char* crl_path;           /**< CRL distribution path */
+    uint32_t max_chain_depth;       /**< Maximum chain depth */
 } cupolas_sig_config_t;
 
-/* ============================================================================
- * 核心函数
- * ============================================================================ */
-
 /**
- * @brief 初始化签名验证模块
- * @param manager 配置参数 (NULL 使用默认配置)
- * @return cupolas_SIG_OK 成功，其他失败
+ * @brief Initialize signature verification module
+ * @param[in] config Configuration (NULL for defaults)
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads (initialization only)
+ * @reentrant No
+ * @ownership config: caller retains ownership
  */
-int cupolas_signature_init(const cupolas_sig_config_t* manager);
+int cupolas_signature_init(const cupolas_sig_config_t* config);
 
 /**
- * @brief 清理签名验证模块
+ * @brief Shutdown signature verification module
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
  */
 void cupolas_signature_cleanup(void);
 
 /**
- * @brief 验证文件签名
- * @param file_path 文件路径
- * @param expected_signer 预期签名者 CN (可选，NULL 不检查)
- * @param result 验证结果输出
- * @return cupolas_SIG_OK 成功，其他失败
+ * @brief Verify file signature
+ * @param[in] file_path Path to file
+ * @param[in] expected_signer Expected signer CN (optional, NULL to skip)
+ * @param[out] result Verification result
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership file_path and expected_signer: caller retains ownership
+ * @ownership result: caller provides buffer, function writes to it
  */
 int cupolas_signature_verify_file(const char* file_path,
                                  const char* expected_signer,
                                  cupolas_sig_result_t* result);
 
 /**
- * @brief 验证内存数据签名
- * @param data 数据指针
- * @param data_len 数据长度
- * @param signature 签名数据
- * @param sig_len 签名长度
- * @param algo 签名算法
- * @param public_key 公钥 (PEM 格式)
- * @return cupolas_SIG_OK 成功，其他失败
+ * @brief Verify data signature in memory
+ * @param[in] data Data pointer
+ * @param[in] data_len Data length
+ * @param[in] signature Signature bytes
+ * @param[in] sig_len Signature length
+ * @param[in] algo Signature algorithm
+ * @param[in] public_key Public key (PEM format)
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership All parameters: caller retains ownership
  */
 int cupolas_signature_verify_data(const uint8_t* data, size_t data_len,
                                  const uint8_t* signature, size_t sig_len,
@@ -131,69 +135,85 @@ int cupolas_signature_verify_data(const uint8_t* data, size_t data_len,
                                  const char* public_key);
 
 /**
- * @brief 验证代码完整性
- * @param file_path 文件路径
- * @param expected_hash 预期哈希值 (SHA-256, 32字节)
- * @return cupolas_SIG_OK 成功，其他失败
+ * @brief Verify file integrity (hash check)
+ * @param[in] file_path Path to file
+ * @param[in] expected_hash Expected hash (SHA-256, 32 bytes)
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership file_path and expected_hash: caller retains ownership
  */
 int cupolas_signature_verify_integrity(const char* file_path,
                                       const uint8_t* expected_hash);
 
 /**
- * @brief 计算文件哈希
- * @param file_path 文件路径
- * @param hash_out 哈希输出缓冲区 (32字节)
- * @return cupolas_SIG_OK 成功，其他失败
+ * @brief Compute file hash
+ * @param[in] file_path Path to file
+ * @param[out] hash_out Output buffer (32 bytes)
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership file_path: caller retains ownership
+ * @ownership hash_out: caller provides buffer, function writes to it
  */
 int cupolas_signature_compute_hash(const char* file_path, uint8_t* hash_out);
 
-/* ============================================================================
- * 签名者信息
- * ============================================================================ */
-
 /**
- * @brief 获取签名者信息
- * @param file_path 文件路径
- * @param info 签名者信息输出
- * @return cupolas_SIG_OK 成功，其他失败
+ * @brief Get signer information from file
+ * @param[in] file_path Path to file
+ * @param[out] info Signer info structure
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership file_path: caller retains ownership
+ * @ownership info: caller provides buffer, function writes to it
  */
 int cupolas_signature_get_signer_info(const char* file_path,
                                      cupolas_signer_info_t* info);
 
 /**
- * @brief 释放签名者信息
- * @param info 签名者信息
+ * @brief Free signer info structure
+ * @param[in] info Signer info to free (may be NULL)
+ * @note Thread-safe: Safe to call from multiple threads
+ * @reentrant No
+ * @ownership info: transferred to this function, will be freed
  */
 void cupolas_signature_free_signer_info(cupolas_signer_info_t* info);
 
 /**
- * @brief 检查签名者是否受信任
- * @param signer_cn 签名者 CN
- * @return true 受信任，false 不受信任
+ * @brief Check if signer is in trusted list
+ * @param[in] signer_cn Signer CN
+ * @return true if trusted, false otherwise
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership signer_cn: caller retains ownership
  */
 bool cupolas_signature_is_trusted_signer(const char* signer_cn);
 
 /**
- * @brief 添加受信任签名者
- * @param signer_cn 签名者 CN
- * @param public_key 公钥 (PEM 格式)
- * @return cupolas_SIG_OK 成功，其他失败
+ * @brief Add signer to trusted list
+ * @param[in] signer_cn Signer CN
+ * @param[in] public_key Public key (PEM format)
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
+ * @ownership signer_cn and public_key: caller retains ownership
  */
 int cupolas_signature_add_trusted_signer(const char* signer_cn,
                                         const char* public_key);
 
-/* ============================================================================
- * 签名操作
- * ============================================================================ */
-
 /**
- * @brief 对文件签名
- * @param file_path 文件路径
- * @param private_key 私钥 (PEM 格式)
- * @param algo 签名算法
- * @param signature_out 签名输出缓冲区
- * @param sig_len 缓冲区大小/实际长度
- * @return cupolas_SIG_OK 成功，其他失败
+ * @brief Sign a file
+ * @param[in] file_path Path to file
+ * @param[in] private_key Private key (PEM format)
+ * @param[in] algo Signature algorithm
+ * @param[out] signature_out Output buffer
+ * @param[in,out] sig_len Buffer size / actual length
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
+ * @ownership file_path and private_key: caller retains ownership
+ * @ownership signature_out: caller provides buffer, function writes to it
  */
 int cupolas_signature_sign_file(const char* file_path,
                                const char* private_key,
@@ -202,14 +222,18 @@ int cupolas_signature_sign_file(const char* file_path,
                                size_t* sig_len);
 
 /**
- * @brief 对数据签名
- * @param data 数据指针
- * @param data_len 数据长度
- * @param private_key 私钥 (PEM 格式)
- * @param algo 签名算法
- * @param signature_out 签名输出缓冲区
- * @param sig_len 缓冲区大小/实际长度
- * @return cupolas_SIG_OK 成功，其他失败
+ * @brief Sign data in memory
+ * @param[in] data Data pointer
+ * @param[in] data_len Data length
+ * @param[in] private_key Private key (PEM format)
+ * @param[in] algo Signature algorithm
+ * @param[out] signature_out Output buffer
+ * @param[in,out] sig_len Buffer size / actual length
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
+ * @ownership data and private_key: caller retains ownership
+ * @ownership signature_out: caller provides buffer, function writes to it
  */
 int cupolas_signature_sign_data(const uint8_t* data, size_t data_len,
                                const char* private_key,
@@ -217,35 +241,39 @@ int cupolas_signature_sign_data(const uint8_t* data, size_t data_len,
                                uint8_t* signature_out,
                                size_t* sig_len);
 
-/* ============================================================================
- * 工具函数
- * ============================================================================ */
-
 /**
- * @brief 获取错误描述
- * @param result 错误码
- * @return 错误描述字符串
+ * @brief Get result code string
+ * @param[in] result Result code
+ * @return Result description string (static, do not free)
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
  */
 const char* cupolas_signature_result_string(cupolas_sig_result_t result);
 
 /**
- * @brief 获取算法名称
- * @param algo 算法类型
- * @return 算法名称字符串
+ * @brief Get algorithm name string
+ * @param[in] algo Algorithm type
+ * @return Algorithm name string (static, do not free)
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
  */
 const char* cupolas_signature_algo_string(cupolas_sig_algo_t algo);
 
 /**
- * @brief 获取当前时间戳
- * @return Unix 时间戳 (秒)
+ * @brief Get current timestamp
+ * @return Unix timestamp in seconds
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
  */
 uint64_t cupolas_signature_get_timestamp(void);
 
 /**
- * @brief 检查证书有效期
- * @param not_before 有效期起始
- * @param not_after 有效期截止
- * @return cupolas_SIG_OK 有效，其他无效
+ * @brief Check certificate validity period
+ * @param[in] not_before Validity start
+ * @param[in] not_after Validity end
+ * @return 0 if valid, negative if invalid
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
  */
 int cupolas_signature_check_validity(uint64_t not_before, uint64_t not_after);
 
@@ -253,4 +281,4 @@ int cupolas_signature_check_validity(uint64_t not_before, uint64_t not_after);
 }
 #endif
 
-#endif /* cupolas_SIGNATURE_H */
+#endif /* CUPOLAS_SIGNATURE_H */

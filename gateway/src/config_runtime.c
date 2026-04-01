@@ -1,4 +1,8 @@
-﻿/**
+/*
+ * Copyright (C) 2026 SPHARX. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2026 SPHARX.
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * @file config_runtime.c
  * @brief 运行时配置更新实现
  *

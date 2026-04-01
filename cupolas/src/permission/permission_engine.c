@@ -1,6 +1,13 @@
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * permission_engine.c - Permission Engine Implementation
+ */
+
 /**
  * @file permission_engine.c
- * @brief 权限引擎实现
+ * @brief Permission Engine Implementation
  * @author Spharx
  * @date 2024
  */

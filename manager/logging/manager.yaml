@@ -1,7 +1,7 @@
-﻿# =============================================================================
+# =============================================================================
 # AgentOS 日志配置文件
 # 版本: v1.0.0
-# 最后更�? 2026-03-23
+# 最后更新: 2026-03-23
 # Schema: schema/logging.schema.json
 # =============================================================================
 # Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
@@ -15,12 +15,66 @@ _config_version: "1.0.0"
 logging:
   # 默认日志级别: trace, debug, info, warning, error, critical, off
   level: "info"
-  
+
   # 日志格式: json, text, color, structured
   format: "json"
-  
+
   # 输出目标: stdout, stderr, file, both, syslog
   output: "both"
+
+  # ===========================================================================
+  # Domain ID 配置（按 Log_guide.md 规范 5-1 独立 Domain 原则）
+  # ===========================================================================
+  # 格式: 0xD0xxxyy (D0=domain域标识, xxx=DFX分配值, yy=业务内部分配)
+  # Manager 模块 Domain ID: 0xD000100
+  domain:
+    enabled: true
+    id: "0xD000100"
+    description: "AgentOS Manager 模块日志域"
+
+    # 子模块 Domain ID 层次化分配
+    allocation:
+      kernel: "0xD000101"
+      coreloopthree: "0xD000102"
+      memoryrovol: "0xD000103"
+      syscall: "0xD000104"
+      cupolas: "0xD000105"
+      llm_d: "0xD000106"
+      tool_d: "0xD000107"
+      scheduler: "0xD000108"
+      security: "0xD000109"
+      audit: "0xD00010A"
+
+  # ===========================================================================
+  # 隐私标识配置（按 Log_guide.md 规范 5-4 隐私标识原则）
+  # ===========================================================================
+  privacy:
+    enabled: true
+    # HiLog 格式: %{public}s / %{private}s
+    marker_format: "%{public}s / %{private}s"
+
+    # 公开字段（不脱敏）- 遵循规则 5-4
+    public_fields:
+      - "user_id"
+      - "session_id"
+      - "task_id"
+      - "request_id"
+      - "trace_id"
+      - "span_id"
+      - "agent_id"
+
+    # 私有字段（自动脱敏）- 遵循规则 5-4
+    private_fields:
+      - "api_key"
+      - "token"
+      - "password"
+      - "secret"
+      - "authorization"
+      - "credential"
+      - "private_key"
+      - "access_token"
+      - "refresh_token"
+      - "session_key"
 
   # ===========================================================================
   # 文件输出配置
@@ -28,75 +82,85 @@ logging:
   file:
     # 日志文件基础目录
     base_dir: "${AGENTOS_LOG_DIR}"
-    
-    # 单个日志文件最大大小（MB�?
+
+    # 单个日志文件最大大小（MB）
     max_size_mb: 100
-    
-    # 保留的备份文件数�?
+
+    # 保留的备份文件数
     backups: 10
-    
+
     # 按天轮转
     rotate_daily: true
-    
+
     # 压缩轮转后的日志
     compress_rotated: true
 
   # ===========================================================================
-  # 模块级日志配�?
+  # 模块级日志配置
   # ===========================================================================
   modules:
     kernel:
       level: "info"
       file: "kernel/kernel.log"
       enabled: true
-    
+      domain_id: "0xD000101"
+
     coreloopthree:
       level: "debug"
       file: "coreloopthree/coreloopthree.log"
       enabled: true
-    
+      domain_id: "0xD000102"
+
     memoryrovol:
       level: "info"
       file: "memoryrovol/memoryrovol.log"
       enabled: true
-    
+      domain_id: "0xD000103"
+
     syscall:
       level: "info"
       file: "syscall/syscall.log"
       enabled: true
-    
+      domain_id: "0xD000104"
+
     cupolas:
       level: "info"
       file: "cupolas/cupolas.log"
       enabled: true
-    
+      domain_id: "0xD000105"
+
     llm_d:
       level: "info"
       file: "services/llm_d.log"
       enabled: true
-    
+      domain_id: "0xD000106"
+
     tool_d:
       level: "info"
       file: "services/tool_d.log"
       enabled: true
-    
+      domain_id: "0xD000107"
+
     scheduler:
       level: "warning"
       file: "scheduler/scheduler.log"
       enabled: true
-    
+      domain_id: "0xD000108"
+
     security:
       level: "warning"
       file: "security/security.log"
       enabled: true
-    
+      domain_id: "0xD000109"
+
     audit:
       level: "info"
       file: "audit/audit.log"
       enabled: true
+      domain_id: "0xD00010A"
 
   # ===========================================================================
-  # 敏感字段掩码
+  # 敏感字段掩码（按 Log_guide.md 规则 3-2 禁止隐私信息原则）
   # ===========================================================================
   mask_fields:
     - "password"
@@ -111,7 +175,7 @@ logging:
     - "session_key"
 
   # ===========================================================================
-  # 结构化日志字�?
+  # 结构化日志字段（按 Log_guide.md 原则 1-2 分层观测原则）
   # ===========================================================================
   structured_fields:
     - "trace_id"
@@ -123,7 +187,7 @@ logging:
     - "user_id"
 
   # ===========================================================================
-  # 日志采样（高并发场景�?
+  # 日志采样（高并发场景按 Log_guide.md 规则 4-2 频率限制）
   # ===========================================================================
   sampling:
     enabled: false
@@ -131,14 +195,14 @@ logging:
     threshold_per_sec: 1000
 
   # ===========================================================================
-  # 热更新配�?
+  # 热更新配置（按 Log_guide.md 原则 1-3 自适应调节）
   # ===========================================================================
   hot_reload:
     enabled: true
     check_interval_sec: 30
 
   # ===========================================================================
-  # 异步日志
+  # 异步日志（按 Log_guide.md 规则 4-4 延迟生成原则）
   # ===========================================================================
   async:
     enabled: true
@@ -146,7 +210,7 @@ logging:
     flush_interval_ms: 100
 
   # ===========================================================================
-  # 日志保留
+  # 日志保留（按 Log_guide.md 原则 E-2 可观测性原则）
   # ===========================================================================
   retention:
     enabled: true

@@ -1,9 +1,13 @@
-/**
+/*
+ * Copyright (C) 2026 SPHARX. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2026 SPHARX.
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * @file auth.c
  * @brief API认证模块实现
- * 
+ *
  * 支持API密钥和JWT两种认证方式，提供完整的认证和授权功能。
- * 
+ *
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 

@@ -29,7 +29,7 @@
 - [通信协议规范](./agentos_contract/protocol_contract.md)
 - [系统调用 API 规范](./agentos_contract/syscall_api_contract.md)
 - [日志格式规范](./agentos_contract/logging_format.md)
-- [架构设计原则](../architecture/folder/architectural_design_principles.md)
+- [架构设计原则](../ARCHITECTURAL_PRINCIPLES.md)
 - [认知层理论](./philosophy/Cognition_Theory.md)
 - [设计哲学](./philosophy/Design_Principles.md)
 

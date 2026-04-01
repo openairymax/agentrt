@@ -1,6 +1,13 @@
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * cupolas_runtime_protection.c - Enhanced Runtime Protection: seccomp, CFI Implementation
+ */
+
 /**
  * @file cupolas_runtime_protection.c
- * @brief 增强运行时保护 - seccomp、CFI 等多防御实现
+ * @brief Enhanced Runtime Protection - seccomp, CFI Multi-defense Implementation
  * @author Spharx
  * @date 2026
  */

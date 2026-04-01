@@ -1,9 +1,15 @@
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * sanitizer_core.c - Input Sanitizer Core Implementation
+ */
+
 /**
  * @file sanitizer_core.c
- * @brief 输入净化器核心实现
+ * @brief Input Sanitizer Core Implementation
  * @author Spharx
  * @date 2024
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "sanitizer.h"

@@ -1,8 +1,8 @@
-/**
- * @file audit_rotator.h
- * @brief 审计日志轮转器内部接口
- * @author Spharx
- * @date 2024
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * audit_rotator.h - Audit Log Rotator Internal Interface
  */
 
 #ifndef CUPOLAS_AUDIT_ROTATOR_H
@@ -17,45 +17,67 @@
 extern "C" {
 #endif
 
-/* 审计日志轮转器句柄 */
+/**
+ * @brief Audit log rotator structure
+ * 
+ * Design principles:
+ * - Automatic log rotation based on file size
+ * - Configurable retention policy
+ * - Thread-safe file operations
+ * - Atomic rename for safe rotation
+ */
 typedef struct audit_rotator audit_rotator_t;
 
 /**
- * @brief 创建日志轮转器
- * @param log_dir 日志目录
- * @param log_prefix 日志文件前缀
- * @param max_file_size 单文件最大大小
- * @param max_files 最大文件数
- * @return 轮转器句柄，失败返回 NULL
+ * @brief Create log rotator
+ * @param[in] log_dir Directory for log files
+ * @param[in] log_prefix Prefix for log filenames
+ * @param[in] max_file_size Maximum size per file in bytes
+ * @param[in] max_files Maximum number of files to retain
+ * @return Rotator handle, NULL on failure
+ * @note Thread-safe: Safe to call from multiple threads (initialization only)
+ * @reentrant No
+ * @ownership Returns owned pointer: caller must call audit_rotator_destroy()
+ * @ownership log_dir and log_prefix: caller retains ownership
  */
 audit_rotator_t* audit_rotator_create(const char* log_dir, const char* log_prefix,
                                        size_t max_file_size, int max_files);
 
 /**
- * @brief 销毁日志轮转器
- * @param rotator 轮转器句柄
+ * @brief Destroy log rotator and free resources
+ * @param[in] rotator Rotator handle (may be NULL)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
+ * @ownership rotator: transferred to this function, will be freed
  */
 void audit_rotator_destroy(audit_rotator_t* rotator);
 
 /**
- * @brief 写入审计条目
- * @param rotator 轮转器句柄
- * @param entry 审计条目
- * @return 0 成功，其他失败
+ * @brief Write audit entry to current log file
+ * @param[in] rotator Rotator handle
+ * @param[in] entry Audit entry to write
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant No
+ * @ownership entry: caller retains ownership
  */
 int audit_rotator_write(audit_rotator_t* rotator, const audit_entry_t* entry);
 
 /**
- * @brief 强制轮转
- * @param rotator 轮转器句柄
- * @return 0 成功，其他失败
+ * @brief Force log rotation
+ * @param[in] rotator Rotator handle
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
  */
 int audit_rotator_rotate(audit_rotator_t* rotator);
 
 /**
- * @brief 获取当前文件大小
- * @param rotator 轮转器句柄
- * @return 当前文件大小
+ * @brief Get current log file size
+ * @param[in] rotator Rotator handle
+ * @return Current file size in bytes
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
  */
 size_t audit_rotator_current_size(audit_rotator_t* rotator);
 

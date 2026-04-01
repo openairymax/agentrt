@@ -1,18 +1,12 @@
-/**
- * @file cupolas_runtime_protection.h
- * @brief 增强运行时保护 - seccomp、CFI 等多层防护
- * @author Spharx
- * @date 2026
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
- * 设计原则：
- * - 多层防护：内存保护、控制流保护、系统调用过滤
- * - 零信任：所有操作都必须经过验证
- * - 防篡改：运行时完整性检查
- * - 最小权限：只允许必要的系统调用
+ * cupolas_runtime_protection.h - Runtime Protection: seccomp, CFI, and Multiple Defense Layers
  */
 
-#ifndef cupolas_RUNTIME_PROTECTION_H
-#define cupolas_RUNTIME_PROTECTION_H
+#ifndef CUPOLAS_RUNTIME_PROTECTION_H
+#define CUPOLAS_RUNTIME_PROTECTION_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -22,94 +16,97 @@
 extern "C" {
 #endif
 
-/* ============================================================================
- * 类型定义
- * ============================================================================ */
-
 /**
- * @brief 保护级别
+ * @brief Protection levels
+ * 
+ * Design principles:
+ * - Layered defense: Multiple security layers
+ * - Memory protection: ASLR, DEP, stack canaries
+ * - Control flow integrity: Validate indirect branches
+ * - Anti-tampering: Runtime integrity checks
+ * - Least privilege: Only necessary syscalls allowed
  */
 typedef enum {
-    cupolas_PROTECT_NONE = 0,         /**< 无保护 */
-    cupolas_PROTECT_BASIC = 1,        /**< 基础保护 */
-    cupolas_PROTECT_ENHANCED = 2,     /**< 增强保护 */
-    cupolas_PROTECT_MAXIMUM = 3       /**< 最高保护 */
+    CUPOLAS_PROTECT_NONE = 0,         /**< No protection */
+    CUPOLAS_PROTECT_BASIC = 1,        /**< Basic protection */
+    CUPOLAS_PROTECT_ENHANCED = 2,     /**< Enhanced protection */
+    CUPOLAS_PROTECT_MAXIMUM = 3       /**< Maximum protection */
 } cupolas_protection_level_t;
 
 /**
- * @brief 保护状态
+ * @brief Protection status
  */
 typedef enum {
-    cupolas_PROTECT_STATUS_INACTIVE = 0,
-    cupolas_PROTECT_STATUS_ACTIVE = 1,
-    cupolas_PROTECT_STATUS_VIOLATION = 2,
-    cupolas_PROTECT_STATUS_COMPROMISED = 3
+    CUPOLAS_PROTECT_STATUS_INACTIVE = 0,
+    CUPOLAS_PROTECT_STATUS_ACTIVE = 1,
+    CUPOLAS_PROTECT_STATUS_VIOLATION = 2,
+    CUPOLAS_PROTECT_STATUS_COMPROMISED = 3
 } cupolas_protection_status_t;
 
 /**
- * @brief 违规类型
+ * @brief Violation types
  */
 typedef enum {
-    cupolas_VIOLATION_NONE = 0,
-    cupolas_VIOLATION_SYSCALL = 1,        /**< 非法系统调用 */
-    cupolas_VIOLATION_MEMORY = 2,         /**< 内存访问违规 */
-    cupolas_VIOLATION_CONTROL_FLOW = 3,   /**< 控制流违规 */
-    cupolas_VIOLATION_INTEGRITY = 4,      /**< 完整性违规 */
-    cupolas_VIOLATION_RESOURCE = 5        /**< 资源超限 */
+    CUPOLAS_VIOLATION_NONE = 0,
+    CUPOLAS_VIOLATION_SYSCALL = 1,        /**< Illegal syscall */
+    CUPOLAS_VIOLATION_MEMORY = 2,         /**< Memory violation */
+    CUPOLAS_VIOLATION_CONTROL_FLOW = 3,   /**< CFI violation */
+    CUPOLAS_VIOLATION_INTEGRITY = 4,      /**< Integrity violation */
+    CUPOLAS_VIOLATION_RESOURCE = 5        /**< Resource violation */
 } cupolas_violation_type_t;
 
 /**
- * @brief 内存保护配置
+ * @brief Memory protection configuration
  */
 typedef struct {
-    bool enable_aslr;               /**< 地址空间随机化 */
-    bool enable_dep;                /**< 数据执行保护 (NX bit) */
-    bool enable_stack_protector;    /**< 栈保护 (Stack Canary) */
-    bool enable_heap_guard;         /**< 堆保护 */
-    bool enable_mprotect;           /**< 内存页保护 */
-    bool enable_guard_pages;        /**< 保护页 */
-    uint32_t stack_canary_type;     /**< 栈 Canary 类型 */
+    bool enable_aslr;               /**< Address space layout randomization */
+    bool enable_dep;                /**< Data execution prevention (NX bit) */
+    bool enable_stack_protector;    /**< Stack protector (Stack Canary) */
+    bool enable_heap_guard;         /**< Heap guard pages */
+    bool enable_mprotect;           /**< Memory page protection */
+    bool enable_guard_pages;        /**< Guard pages */
+    uint32_t stack_canary_type;     /**< Stack canary type */
 } cupolas_memory_protect_config_t;
 
 /**
- * @brief 控制流保护配置
+ * @brief Control flow integrity configuration
  */
 typedef struct {
-    bool enable_cfi;                /**< 控制流完整性 */
-    bool enable_safestack;          /**< 安全栈 */
-    bool enable_shadow_stack;       /**< 影子栈 */
-    bool enable_ibt;                /**< 间接分支追踪 */
-    bool enable_cet;                /**< 控制流执行技术 */
-    uint32_t cfi_level;             /**< CFI 级别 (1-3) */
+    bool enable_cfi;                /**< Control flow integrity */
+    bool enable_safestack;          /**< SafeStack */
+    bool enable_shadow_stack;       /**< Shadow stack */
+    bool enable_ibt;                /**< Indirect branch tracking */
+    bool enable_cet;                /**< Control-flow enforcement technology */
+    uint32_t cfi_level;             /**< CFI level (1-3) */
 } cupolas_cfi_config_t;
 
 /**
- * @brief 系统调用过滤配置
+ * @brief Syscall filtering configuration
  */
 typedef struct {
-    bool enable_seccomp;            /**< 启用 seccomp */
-    bool enable_seccomp_bpf;        /**< 启用 BPF 过滤 */
-    int default_action;             /**< 默认动作 (允许/拒绝/杀死) */
-    const char** allowed_syscalls;  /**< 允许的系统调用列表 */
-    size_t syscall_count;           /**< 系统调用数量 */
-    const char** log_syscalls;      /**< 需要记录的系统调用 */
-    size_t log_count;               /**< 记录数量 */
+    bool enable_seccomp;            /**< Enable seccomp */
+    bool enable_seccomp_bpf;        /**< Enable BPF filtering */
+    int default_action;             /**< Default action (allow/deny/kill) */
+    const char** allowed_syscalls;  /**< Allowed syscalls list */
+    size_t syscall_count;           /**< Number of syscalls */
+    const char** log_syscalls;      /**< Syscalls to log */
+    size_t log_count;               /**< Log count */
 } cupolas_seccomp_config_t;
 
 /**
- * @brief 完整性检查配置
+ * @brief Integrity checking configuration
  */
 typedef struct {
-    bool enable_code_integrity;     /**< 代码完整性检查 */
-    bool enable_data_integrity;     /**< 数据完整性检查 */
-    bool enable_ro_sections;        /**< 只读段保护 */
-    bool enable_self_check;         /**< 自检 */
-    uint32_t check_interval_ms;     /**< 检查间隔 (毫秒) */
-    uint32_t hash_algorithm;        /**< 哈希算法 */
+    bool enable_code_integrity;     /**< Enable code integrity */
+    bool enable_data_integrity;     /**< Enable data integrity */
+    bool enable_ro_sections;        /**< Enable read-only sections */
+    bool enable_self_check;         /**< Enable self-check */
+    uint32_t check_interval_ms;     /**< Check interval (milliseconds) */
+    uint32_t hash_algorithm;        /**< Hash algorithm */
 } cupolas_integrity_config_t;
 
 /**
- * @brief 运行时保护完整配置
+ * @brief Runtime protection configuration
  */
 typedef struct {
     cupolas_protection_level_t level;
@@ -119,13 +116,13 @@ typedef struct {
     cupolas_seccomp_config_t seccomp;
     cupolas_integrity_config_t integrity;
     
-    bool enable_audit;              /**< 启用审计 */
-    bool enable_violation_handler;  /**< 启用违规处理 */
+    bool enable_audit;              /**< Enable audit logging */
+    bool enable_violation_handler;  /**< Enable violation handler */
     void (*violation_callback)(cupolas_violation_type_t type, const char* details);
 } cupolas_runtime_protect_config_t;
 
 /**
- * @brief 违规事件
+ * @brief Violation event structure
  */
 typedef struct {
     cupolas_violation_type_t type;
@@ -139,7 +136,7 @@ typedef struct {
 } cupolas_violation_event_t;
 
 /**
- * @brief 保护统计
+ * @brief Protection statistics
  */
 typedef struct {
     uint64_t total_checks;
@@ -152,165 +149,200 @@ typedef struct {
     uint64_t cfi_violations;
 } cupolas_protection_stats_t;
 
-/* ============================================================================
- * 生命周期管理
- * ============================================================================ */
-
 /**
- * @brief 初始化运行时保护模块
- * @param manager 配置参数 (NULL 使用默认配置)
- * @return 0 成功，非0 失败
+ * @brief Initialize runtime protection module
+ * @param[in] config Configuration (NULL for defaults)
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads (initialization only)
+ * @reentrant No
+ * @ownership config: caller retains ownership
  */
-int cupolas_runtime_protect_init(const cupolas_runtime_protect_config_t* manager);
+int cupolas_runtime_protect_init(const cupolas_runtime_protect_config_t* config);
 
 /**
- * @brief 清理运行时保护模块
+ * @brief Shutdown runtime protection module
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
  */
 void cupolas_runtime_protect_cleanup(void);
 
 /**
- * @brief 启用运行时保护
- * @param manager 保护配置
- * @return 0 成功，非0 失败
+ * @brief Enable runtime protection
+ * @param[in] config Protection configuration
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
+ * @ownership config: caller retains ownership
  */
-int cupolas_runtime_protect_enable(const cupolas_runtime_protect_config_t* manager);
+int cupolas_runtime_protect_enable(const cupolas_runtime_protect_config_t* config);
 
 /**
- * @brief 禁用运行时保护
- * @return 0 成功，非0 失败
+ * @brief Disable runtime protection
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
  */
 int cupolas_runtime_protect_disable(void);
 
 /**
- * @brief 获取保护状态
- * @return 保护状态
+ * @brief Get protection status
+ * @return Protection status
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
  */
 cupolas_protection_status_t cupolas_runtime_protect_get_status(void);
 
 /**
- * @brief 获取保护配置
- * @param manager 配置输出
- * @return 0 成功，非0 失败
+ * @brief Get current configuration
+ * @param[out] config Configuration output
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership config: caller provides buffer, function writes to it
  */
-int cupolas_runtime_protect_get_config(cupolas_runtime_protect_config_t* manager);
-
-/* ============================================================================
- * 内存保护
- * ============================================================================ */
+int cupolas_runtime_protect_get_config(cupolas_runtime_protect_config_t* config);
 
 /**
- * @brief 启用内存保护
- * @param manager 内存保护配置
- * @return 0 成功，非0 失败
+ * @brief Enable memory protection
+ * @param[in] config Memory protection configuration
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
+ * @ownership config: caller retains ownership
  */
-int cupolas_memory_protect_enable(const cupolas_memory_protect_config_t* manager);
+int cupolas_memory_protect_enable(const cupolas_memory_protect_config_t* config);
 
 /**
- * @brief 锁定内存页
- * @param addr 内存地址
- * @param len 长度
- * @return 0 成功，非0 失败
+ * @brief Lock memory pages
+ * @param[in] addr Memory address
+ * @param[in] len Length
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads
+ * @reentrant No
  */
 int cupolas_memory_lock(void* addr, size_t len);
 
 /**
- * @brief 解锁内存页
- * @param addr 内存地址
- * @param len 长度
- * @return 0 成功，非0 失败
+ * @brief Unlock memory pages
+ * @param[in] addr Memory address
+ * @param[in] len Length
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads
+ * @reentrant No
  */
 int cupolas_memory_unlock(void* addr, size_t len);
 
 /**
- * @brief 设置内存保护
- * @param addr 内存地址
- * @param len 长度
- * @param prot 保护标志 (PROT_READ | PROT_WRITE | PROT_EXEC)
- * @return 0 成功，非0 失败
+ * @brief Protect memory pages
+ * @param[in] addr Memory address
+ * @param[in] len Length
+ * @param[in] prot Protection flags (PROT_READ | PROT_WRITE | PROT_EXEC)
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads
+ * @reentrant No
  */
 int cupolas_memory_protect(void* addr, size_t len, int prot);
 
 /**
- * @brief 分配保护内存
- * @param size 大小
- * @param prot 保护标志
- * @return 内存指针，NULL 失败
+ * @brief Allocate protected memory
+ * @param[in] size Size
+ * @param[in] prot Protection flags
+ * @return Memory pointer, NULL on failure
+ * @note Thread-safe: Safe to call from multiple threads
+ * @reentrant No
  */
 void* cupolas_memory_alloc_protected(size_t size, int prot);
 
 /**
- * @brief 释放保护内存
- * @param ptr 内存指针
+ * @brief Free protected memory
+ * @param[in] ptr Memory pointer
+ * @note Thread-safe: Safe to call from multiple threads
+ * @reentrant No
  */
 void cupolas_memory_free_protected(void* ptr);
 
-/* ============================================================================
- * 控制流保护
- * ============================================================================ */
-
 /**
- * @brief 启用控制流保护
- * @param manager CFI 配置
- * @return 0 成功，非0 失败
+ * @brief Enable control flow integrity
+ * @param[in] config CFI configuration
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
+ * @ownership config: caller retains ownership
  */
-int cupolas_cfi_enable(const cupolas_cfi_config_t* manager);
+int cupolas_cfi_enable(const cupolas_cfi_config_t* config);
 
 /**
- * @brief 注册有效跳转目标
- * @param source 源地址
- * @param target 目标地址
- * @return 0 成功，非0 失败
+ * @brief Register valid branch target
+ * @param[in] source Source address
+ * @param[in] target Target address
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads
+ * @reentrant No
  */
 int cupolas_cfi_register_target(void* source, void* target);
 
 /**
- * @brief 验证控制流转移
- * @param source 源地址
- * @param target 目标地址
- * @return 1 有效，0 无效
+ * @brief Verify control flow transfer
+ * @param[in] source Source address
+ * @param[in] target Target address
+ * @return 1 if valid, 0 if invalid
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
  */
 int cupolas_cfi_verify_transfer(void* source, void* target);
 
 /**
- * @brief 获取 CFI 统计
- * @param stats 统计输出
- * @return 0 成功，非0 失败
+ * @brief Get CFI statistics
+ * @param[out] checks Number of checks
+ * @param[out] violations Number of violations
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership checks and violations: caller provides buffers, function writes to them
  */
 int cupolas_cfi_get_stats(uint64_t* checks, uint64_t* violations);
 
-/* ============================================================================
- * 系统调用过滤
- * ============================================================================ */
-
 /**
- * @brief 启用系统调用过滤
- * @param manager seccomp 配置
- * @return 0 成功，非0 失败
+ * @brief Enable syscall filtering
+ * @param[in] config Seccomp configuration
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
+ * @ownership config: caller retains ownership
  */
-int cupolas_seccomp_enable(const cupolas_seccomp_config_t* manager);
+int cupolas_seccomp_enable(const cupolas_seccomp_config_t* config);
 
 /**
- * @brief 添加允许的系统调用
- * @param syscall_name 系统调用名称
- * @return 0 成功，非0 失败
+ * @brief Allow a syscall
+ * @param[in] syscall_name Syscall name
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
+ * @ownership syscall_name: caller retains ownership
  */
 int cupolas_seccomp_allow(const char* syscall_name);
 
 /**
- * @brief 添加拒绝的系统调用
- * @param syscall_name 系统调用名称
- * @return 0 成功，非0 失败
+ * @brief Deny a syscall
+ * @param[in] syscall_name Syscall name
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
+ * @ownership syscall_name: caller retains ownership
  */
 int cupolas_seccomp_deny(const char* syscall_name);
 
 /**
- * @brief 添加条件规则
- * @param syscall_name 系统调用名称
- * @param arg_index 参数索引
- * @param op 操作符 (==, !=, <, >, &)
- * @param value 值
- * @param action 动作
- * @return 0 成功，非0 失败
+ * @brief Add syscall rule with argument filtering
+ * @param[in] syscall_name Syscall name
+ * @param[in] arg_index Argument index
+ * @param[in] op Operator (==, !=, <, >, &)
+ * @param[in] value Value
+ * @param[in] action Action
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
+ * @ownership syscall_name and op: caller retains ownership
  */
 int cupolas_seccomp_add_rule(const char* syscall_name, 
                             uint32_t arg_index,
@@ -319,132 +351,165 @@ int cupolas_seccomp_add_rule(const char* syscall_name,
                             int action);
 
 /**
- * @brief 检查系统调用是否允许
- * @param syscall_name 系统调用名称
- * @return 1 允许，0 拒绝
+ * @brief Check if syscall is allowed
+ * @param[in] syscall_name Syscall name
+ * @return 1 if allowed, 0 if denied
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership syscall_name: caller retains ownership
  */
 int cupolas_seccomp_check(const char* syscall_name);
 
 /**
- * @brief 获取 seccomp 统计
- * @param allowed 允许次数输出
- * @param denied 拒绝次数输出
- * @return 0 成功，非0 失败
+ * @brief Get seccomp statistics
+ * @param[out] allowed Number of allowed syscalls
+ * @param[out] denied Number of denied syscalls
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership allowed and denied: caller provides buffers, function writes to them
  */
 int cupolas_seccomp_get_stats(uint64_t* allowed, uint64_t* denied);
 
-/* ============================================================================
- * 完整性检查
- * ============================================================================ */
-
 /**
- * @brief 启用完整性检查
- * @param manager 完整性配置
- * @return 0 成功，非0 失败
+ * @brief Enable integrity checking
+ * @param[in] config Integrity configuration
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
+ * @ownership config: caller retains ownership
  */
-int cupolas_integrity_enable(const cupolas_integrity_config_t* manager);
+int cupolas_integrity_enable(const cupolas_integrity_config_t* config);
 
 /**
- * @brief 执行完整性检查
- * @return 0 完整，非0 被篡改
+ * @brief Perform integrity check
+ * @return 0 if intact, negative if compromised
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
  */
 int cupolas_integrity_check(void);
 
 /**
- * @brief 计算代码段哈希
- * @param hash_out 哈希输出 (32字节)
- * @return 0 成功，非0 失败
+ * @brief Compute code section hash
+ * @param[out] hash_out Hash output (32 bytes)
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads
+ * @reentrant Yes
+ * @ownership hash_out: caller provides buffer, function writes to it
  */
 int cupolas_integrity_compute_code_hash(uint8_t* hash_out);
 
 /**
- * @brief 验证代码段完整性
- * @param expected_hash 预期哈希
- * @return 0 完整，非0 被篡改
+ * @brief Verify code section integrity
+ * @param[in] expected_hash Expected hash
+ * @return 0 if intact, negative if compromised
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership expected_hash: caller retains ownership
  */
 int cupolas_integrity_verify_code(const uint8_t* expected_hash);
 
 /**
- * @brief 验证数据段完整性
- * @param expected_hash 预期哈希
- * @return 0 完整，非0 被篡改
+ * @brief Verify data section integrity
+ * @param[in] expected_hash Expected hash
+ * @return 0 if intact, negative if compromised
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership expected_hash: caller retains ownership
  */
 int cupolas_integrity_verify_data(const uint8_t* expected_hash);
 
 /**
- * @brief 设置完整性检查回调
- * @param callback 回调函数
- * @return 0 成功，非0 失败
+ * @brief Set integrity check callback
+ * @param[in] callback Callback function
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads
+ * @reentrant No
  */
 int cupolas_integrity_set_callback(void (*callback)(int result));
 
-/* ============================================================================
- * 违规处理
- * ============================================================================ */
-
 /**
- * @brief 设置违规处理回调
- * @param callback 回调函数
- * @return 0 成功，非0 失败
+ * @brief Set violation handler callback
+ * @param[in] callback Callback function
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads
+ * @reentrant No
  */
 int cupolas_violation_set_callback(void (*callback)(const cupolas_violation_event_t* event));
 
 /**
- * @brief 获取最近的违规事件
- * @param event 事件输出
- * @return 0 成功，非0 无事件
+ * @brief Get last violation event
+ * @param[out] event Event output
+ * @return 0 on success, negative if no event
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership event: caller provides buffer, function writes to it
  */
 int cupolas_violation_get_last(cupolas_violation_event_t* event);
 
 /**
- * @brief 清除违规事件
+ * @brief Clear violation events
+ * @note Thread-safe: Safe to call from multiple threads
+ * @reentrant No
  */
 void cupolas_violation_clear(void);
 
 /**
- * @brief 获取违规统计
- * @param stats 统计输出
- * @return 0 成功，非0 失败
+ * @brief Get violation statistics
+ * @param[out] stats Statistics output
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership stats: caller provides buffer, function writes to it
  */
 int cupolas_violation_get_stats(cupolas_protection_stats_t* stats);
 
-/* ============================================================================
- * 工具函数
- * ============================================================================ */
-
 /**
- * @brief 获取保护级别名称
- * @param level 保护级别
- * @return 级别名称字符串
+ * @brief Get protection level string
+ * @param[in] level Protection level
+ * @return Level name string (static, do not free)
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
  */
 const char* cupolas_protection_level_string(cupolas_protection_level_t level);
 
 /**
- * @brief 获取保护状态名称
- * @param status 保护状态
- * @return 状态名称字符串
+ * @brief Get protection status string
+ * @param[in] status Protection status
+ * @return Status string (static, do not free)
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
  */
 const char* cupolas_protection_status_string(cupolas_protection_status_t status);
 
 /**
- * @brief 获取违规类型名称
- * @param type 违规类型
- * @return 类型名称字符串
+ * @brief Get violation type string
+ * @param[in] type Violation type
+ * @return Type name string (static, do not free)
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
  */
 const char* cupolas_violation_type_string(cupolas_violation_type_t type);
 
 /**
- * @brief 检查当前系统是否支持保护特性
- * @param feature 特性名称 (aslr, dep, cfi, seccomp, etc.)
- * @return true 支持，false 不支持
+ * @brief Check if protection feature is supported
+ * @param[in] feature Feature name (aslr, dep, cfi, seccomp, etc.)
+ * @return true if supported, false otherwise
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership feature: caller retains ownership
  */
 bool cupolas_protection_is_supported(const char* feature);
 
 /**
- * @brief 获取系统保护能力
- * @param capabilities 能力列表输出
- * @param count 数量输出
- * @return 0 成功，非0 失败
+ * @brief Get system protection capabilities
+ * @param[out] capabilities Capabilities list output
+ * @param[out] count Number of capabilities
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership capabilities: caller provides buffer, function writes to it
+ * @ownership count: caller provides buffer, function writes to it
  */
 int cupolas_protection_get_capabilities(char*** capabilities, size_t* count);
 
@@ -452,4 +517,4 @@ int cupolas_protection_get_capabilities(char*** capabilities, size_t* count);
 }
 #endif
 
-#endif /* cupolas_RUNTIME_PROTECTION_H */
+#endif /* CUPOLAS_RUNTIME_PROTECTION_H */

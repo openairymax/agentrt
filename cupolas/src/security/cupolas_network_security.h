@@ -1,18 +1,12 @@
-/**
- * @file cupolas_network_security.h
- * @brief 网络安全 - TLS 强制、网络过滤
- * @author Spharx
- * @date 2026
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
- * 设计原则：
- * - 强制加密：所有网络通信必须使用 TLS
- * - 证书验证：严格的证书链验证
- * - 网络过滤：基于策略的网络访问控制
- * - 入侵检测：异常流量检测
+ * cupolas_network_security.h - Network Security: TLS, Firewall, and Network Access Control
  */
 
-#ifndef cupolas_NETWORK_SECURITY_H
-#define cupolas_NETWORK_SECURITY_H
+#ifndef CUPOLAS_NETWORK_SECURITY_H
+#define CUPOLAS_NETWORK_SECURITY_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -22,539 +16,478 @@
 extern "C" {
 #endif
 
-/* ============================================================================
- * 类型定义
- * ============================================================================ */
-
 /**
- * @brief TLS 版本
+ * @brief TLS version enumeration
+ * 
+ * Design principles:
+ * - Strong encryption: Only modern TLS versions
+ * - Perfect forward secrecy: Ephemeral key exchange
+ * - Certificate validation: Strict chain verification
+ * - Cipher suite control: Only strong ciphers allowed
  */
 typedef enum {
-    cupolas_TLS_1_0 = 0x0301,
-    cupolas_TLS_1_1 = 0x0302,
-    cupolas_TLS_1_2 = 0x0303,
-    cupolas_TLS_1_3 = 0x0304
+    CUPOLAS_TLS_AUTO = 0,             /**< Auto-negotiate best version */
+    CUPOLAS_TLS_1_2 = 1,              /**< TLS 1.2 */
+    CUPOLAS_TLS_1_3 = 2               /**< TLS 1.3 */
 } cupolas_tls_version_t;
 
 /**
- * @brief 证书验证结果
+ * @brief Certificate validation mode
  */
 typedef enum {
-    cupolas_CERT_OK = 0,
-    cupolas_CERT_INVALID = -1,
-    cupolas_CERT_EXPIRED = -2,
-    cupolas_CERT_REVOKED = -3,
-    cupolas_CERT_UNTRUSTED = -4,
-    cupolas_CERT_HOST_MISMATCH = -5,
-    cupolas_CERT_SELF_SIGNED = -6
-} cupolas_cert_result_t;
+    CUPOLAS_CERT_NONE = 0,            /**< No validation */
+    CUPOLAS_CERT_OPTIONAL,            /**< Optional client cert */
+    CUPOLAS_CERT_REQUIRED             /**< Required client cert */
+} cupolas_cert_mode_t;
 
 /**
- * @brief 网络访问动作
+ * @brief Firewall action
  */
 typedef enum {
-    cupolas_NET_ALLOW = 0,
-    cupolas_NET_DENY = 1,
-    cupolas_NET_LOG = 2,
-    cupolas_NET_RATE_LIMIT = 3
-} cupolas_net_action_t;
+    CUPOLAS_FW_ALLOW = 0,             /**< Allow connection */
+    CUPOLAS_FW_DENY,                  /**< Deny connection */
+    CUPOLAS_FW_LOG,                   /**< Log only */
+    CUPOLAS_FW_RATE_LIMIT             /**< Rate limit */
+} cupolas_fw_action_t;
 
 /**
- * @brief 协议类型
+ * @brief Network protocol
  */
 typedef enum {
-    cupolas_PROTO_TCP = 1,
-    cupolas_PROTO_UDP = 2,
-    cupolas_PROTO_HTTP = 3,
-    cupolas_PROTO_HTTPS = 4,
-    cupolas_PROTO_WEBSOCKET = 5,
-    cupolas_PROTO_DNS = 6
-} cupolas_protocol_t;
+    CUPOLAS_PROTO_ANY = 0,            /**< Any protocol */
+    CUPOLAS_PROTO_TCP,                /**< TCP */
+    CUPOLAS_PROTO_UDP,                /**< UDP */
+    CUPOLAS_PROTO_ICMP                /**< ICMP */
+} cupolas_proto_t;
 
 /**
- * @brief TLS 配置
+ * @brief Connection direction
+ */
+typedef enum {
+    CUPOLAS_DIR_ANY = 0,              /**< Any direction */
+    CUPOLAS_DIR_INBOUND,              /**< Inbound */
+    CUPOLAS_DIR_OUTBOUND              /**< Outbound */
+} cupolas_direction_t;
+
+/**
+ * @brief TLS configuration
  */
 typedef struct {
-    cupolas_tls_version_t min_version;    /**< 最低 TLS 版本 */
-    cupolas_tls_version_t max_version;    /**< 最高 TLS 版本 */
-    const char** cipher_suites;          /**< 允许的加密套件 */
-    size_t cipher_count;
-    const char** curves;                 /**< 允许的椭圆曲线 */
-    size_t curve_count;
-    bool require_cert_verify;            /**< 要求证书验证 */
-    bool allow_self_signed;              /**< 允许自签名证书 */
-    bool check_revocation;               /**< 检查吊销状态 */
-    bool enable_ocsp_stapling;           /**< 启用 OCSP Stapling */
-    bool enable_sni;                     /**< 启用 SNI */
-    const char* ca_bundle_path;          /**< CA 证书包路径 */
-    const char* client_cert_path;        /**< 客户端证书路径 */
-    const char* client_key_path;         /**< 客户端私钥路径 */
+    cupolas_tls_version_t min_version;    /**< Minimum TLS version */
+    cupolas_tls_version_t max_version;    /**< Maximum TLS version */
+    
+    char** cipher_suites;                 /**< Allowed cipher suites */
+    size_t cipher_count;                  /**< Number of ciphers */
+    
+    const char* ca_file;                  /**< CA certificate file */
+    const char* ca_path;                  /**< CA certificate path */
+    const char* cert_file;                /**< Certificate file */
+    const char* key_file;                 /**< Private key file */
+    
+    cupolas_cert_mode_t verify_mode;      /**< Verification mode */
+    bool verify_hostname;                 /**< Verify hostname */
+    bool verify_depth;                    /**< Verification depth */
+    
+    bool enable_ocsp_stapling;            /**< Enable OCSP stapling */
+    bool enable_sct;                      /**< Enable SCT */
+    bool enable_session_tickets;          /**< Enable session tickets */
+    uint32_t session_cache_size;          /**< Session cache size */
+    
+    uint32_t handshake_timeout_ms;        /**< Handshake timeout */
+    uint32_t read_timeout_ms;             /**< Read timeout */
+    uint32_t write_timeout_ms;            /**< Write timeout */
 } cupolas_tls_config_t;
 
 /**
- * @brief 网络过滤规则
+ * @brief Firewall rule structure
  */
 typedef struct {
-    char* rule_id;                       /**< 规则 ID */
-    char* description;                   /**< 描述 */
+    uint32_t rule_id;                   /**< Rule identifier */
+    cupolas_proto_t protocol;             /**< Protocol */
+    cupolas_direction_t direction;        /**< Direction */
     
-    char* src_ip_pattern;                /**< 源 IP 模式 (CIDR) */
-    char* dst_ip_pattern;                /**< 目标 IP 模式 (CIDR) */
-    uint16_t src_port_start;             /**< 源端口范围起始 */
-    uint16_t src_port_end;               /**< 源端口范围结束 */
-    uint16_t dst_port_start;             /**< 目标端口范围起始 */
-    uint16_t dst_port_end;               /**< 目标端口范围结束 */
+    char* src_ip;                       /**< Source IP/CIDR */
+    char* src_port;                     /**< Source port range */
+    char* dst_ip;                       /**< Destination IP/CIDR */
+    char* dst_port;                     /**< Destination port range */
     
-    cupolas_protocol_t protocol;           /**< 协议 */
-    char* host_pattern;                  /**< 主机模式 (支持通配符) */
-    char* url_pattern;                   /**< URL 模式 */
+    cupolas_fw_action_t action;           /**< Action */
+    bool log;                           /**< Enable logging */
+    uint32_t rate_limit;                /**< Rate limit (connections/sec) */
     
-    cupolas_net_action_t action;           /**< 动作 */
-    int priority;                        /**< 优先级 */
-    bool enabled;                        /**< 是否启用 */
+    uint64_t valid_from;                /**< Valid from timestamp */
+    uint64_t valid_until;               /**< Valid until timestamp */
     
-    uint32_t rate_limit;                 /**< 速率限制 (请求/秒) */
-    uint32_t burst_limit;                /**< 突发限制 */
-} cupolas_net_filter_rule_t;
+    char* description;                  /**< Rule description */
+} cupolas_fw_rule_t;
 
 /**
- * @brief HTTP 安全配置
+ * @brief Firewall configuration
  */
 typedef struct {
-    bool enforce_https;                  /**< 强制 HTTPS */
-    bool hsts_enabled;                   /**< 启用 HSTS */
-    uint32_t hsts_max_age;               /**< HSTS 最大年龄 */
-    bool hsts_include_subdomains;        /**< HSTS 包含子域名 */
+    bool enable;                        /**< Enable firewall */
+    cupolas_fw_action_t default_inbound;  /**< Default inbound action */
+    cupolas_fw_action_t default_outbound; /**< Default outbound action */
     
-    const char** allowed_methods;        /**< 允许的 HTTP 方法 */
-    size_t method_count;
+    cupolas_fw_rule_t* rules;           /**< Rules array */
+    size_t rule_count;                  /**< Number of rules */
     
-    const char** required_headers;       /**< 必需的请求头 */
-    size_t header_count;
+    bool enable_logging;                /**< Enable logging */
+    bool enable_rate_limiting;          /**< Enable rate limiting */
     
-    const char** forbidden_headers;      /**< 禁止的请求头 */
-    size_t forbidden_count;
-    
-    uint32_t max_header_size;            /**< 最大请求头大小 */
-    uint32_t max_body_size;              /**< 最大请求体大小 */
-    uint32_t max_url_length;             /**< 最大 URL 长度 */
-    
-    uint32_t request_timeout_ms;         /**< 请求超时 */
-    uint32_t connect_timeout_ms;         /**< 连接超时 */
-} cupolas_http_security_config_t;
+    uint32_t max_connections;           /**< Maximum connections */
+    uint32_t connection_timeout_ms;     /**< Connection timeout */
+} cupolas_firewall_config_t;
 
 /**
- * @brief DNS 安全配置
- */
-typedef struct {
-    bool enable_dnssec;                  /**< 启用 DNSSEC */
-    bool enable_dns_over_https;          /**< 启用 DoH */
-    bool enable_dns_over_tls;            /**< 启用 DoT */
-    const char* doh_server;              /**< DoH 服务器 */
-    const char* dot_server;              /**< DoT 服务器 */
-    const char** allowed_domains;        /**< 允许的域名 */
-    size_t domain_count;
-    const char** blocked_domains;        /**< 阻止的域名 */
-    size_t blocked_count;
-} cupolas_dns_security_config_t;
-
-/**
- * @brief 网络安全完整配置
- */
-typedef struct {
-    cupolas_tls_config_t tls;
-    cupolas_http_security_config_t http;
-    cupolas_dns_security_config_t dns;
-    
-    bool enable_firewall;                /**< 启用防火墙 */
-    bool enable_ids;                     /**< 启用入侵检测 */
-    bool enable_logging;                 /**< 启用日志 */
-    bool enable_audit;                   /**< 启用审计 */
-} cupolas_net_security_config_t;
-
-/**
- * @brief 网络连接信息
- */
-typedef struct {
-    char* local_ip;
-    uint16_t local_port;
-    char* remote_ip;
-    uint16_t remote_port;
-    cupolas_protocol_t protocol;
-    char* hostname;
-    uint64_t bytes_sent;
-    uint64_t bytes_received;
-    uint64_t start_time;
-    uint64_t last_activity;
-    bool is_encrypted;
-    cupolas_tls_version_t tls_version;
-    char* cipher_suite;
-} cupolas_connection_info_t;
-
-/**
- * @brief 网络统计
+ * @brief Network security statistics
  */
 typedef struct {
     uint64_t total_connections;
     uint64_t active_connections;
-    uint64_t blocked_connections;
-    uint64_t tls_connections;
-    uint64_t plaintext_blocked;
-    uint64_t bytes_sent;
-    uint64_t bytes_received;
-    uint64_t dns_queries;
-    uint64_t dns_blocked;
-    uint64_t http_requests;
-    uint64_t https_requests;
+    uint64_t tls_handshakes;
+    uint64_t tls_failures;
+    uint64_t firewall_blocks;
+    uint64_t rate_limit_hits;
+    uint64_t cert_errors;
+    uint64_t hostname_mismatches;
 } cupolas_net_stats_t;
 
-/* ============================================================================
- * 生命周期管理
- * ============================================================================ */
+/**
+ * @brief Initialize network security module
+ * @param[in] config Configuration (NULL for defaults)
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads (initialization only)
+ * @reentrant No
+ * @ownership config: caller retains ownership
+ */
+int cupolas_network_security_init(const cupolas_tls_config_t* config);
 
 /**
- * @brief 初始化网络安全模块
- * @param manager 配置参数 (NULL 使用默认配置)
- * @return 0 成功，非0 失败
+ * @brief Shutdown network security module
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
  */
-int cupolas_net_security_init(const cupolas_net_security_config_t* manager);
+void cupolas_network_security_cleanup(void);
 
 /**
- * @brief 清理网络安全模块
+ * @brief Initialize TLS context
+ * @param[in] config TLS configuration
+ * @return TLS context handle, NULL on failure
+ * @note Thread-safe: Safe to call from multiple threads (initialization only)
+ * @reentrant No
+ * @ownership config: caller retains ownership
  */
-void cupolas_net_security_cleanup(void);
+void* cupolas_tls_context_create(const cupolas_tls_config_t* config);
 
 /**
- * @brief 获取网络安全状态
- * @param manager 配置输出
- * @return 0 成功，非0 失败
+ * @brief Free TLS context
+ * @param[in] ctx TLS context (may be NULL)
+ * @note Thread-safe: Safe to call from multiple threads
+ * @reentrant No
+ * @ownership ctx: transferred to this function, will be freed
  */
-int cupolas_net_security_get_config(cupolas_net_security_config_t* manager);
-
-/* ============================================================================
- * TLS 安全
- * ============================================================================ */
+void cupolas_tls_context_free(void* ctx);
 
 /**
- * @brief 配置 TLS
- * @param manager TLS 配置
- * @return 0 成功，非0 失败
+ * @brief Create TLS client connection
+ * @param[in] ctx TLS context
+ * @param[in] host Hostname
+ * @param[in] port Port number
+ * @param[out] error Error output (may be NULL)
+ * @return TLS connection handle, NULL on failure
+ * @note Thread-safe: Safe to call from multiple threads
+ * @reentrant No
+ * @ownership ctx, host: caller retains ownership
+ * @ownership error: caller provides buffer, function writes to it
  */
-int cupolas_tls_configure(const cupolas_tls_config_t* manager);
+void* cupolas_tls_client_connect(void* ctx, const char* host, uint16_t port, int* error);
 
 /**
- * @brief 验证证书
- * @param cert_path 证书路径
- * @param hostname 主机名 (可选)
- * @param result 验证结果输出
- * @return 0 成功，非0 失败
+ * @brief Create TLS server connection (accept)
+ * @param[in] ctx TLS context
+ * @param[in] socket_fd Server socket file descriptor
+ * @param[out] error Error output (may be NULL)
+ * @return TLS connection handle, NULL on failure
+ * @note Thread-safe: Safe to call from multiple threads
+ * @reentrant No
+ * @ownership ctx: caller retains ownership
+ * @ownership error: caller provides buffer, function writes to it
  */
-int cupolas_tls_verify_cert(const char* cert_path,
-                           const char* hostname,
-                           cupolas_cert_result_t* result);
+void* cupolas_tls_server_accept(void* ctx, int socket_fd, int* error);
 
 /**
- * @brief 验证证书链
- * @param cert_chain 证书链 (PEM 格式)
- * @param chain_len 证书链长度
- * @param result 验证结果输出
- * @return 0 成功，非0 失败
+ * @brief Close TLS connection
+ * @param[in] conn TLS connection (may be NULL)
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads
+ * @reentrant No
+ * @ownership conn: transferred to this function, will be closed
  */
-int cupolas_tls_verify_cert_chain(const char* cert_chain,
-                                  size_t chain_len,
-                                  cupolas_cert_result_t* result);
+int cupolas_tls_close(void* conn);
 
 /**
- * @brief 检查 TLS 连接
- * @param hostname 主机名
- * @param port 端口
- * @param result 验证结果输出
- * @return 0 成功，非0 失败
+ * @brief Read from TLS connection
+ * @param[in] conn TLS connection
+ * @param[out] buf Output buffer
+ * @param[in] len Buffer length
+ * @return Bytes read, negative on error
+ * @note Thread-safe: Safe to call from multiple threads
+ * @reentrant No
+ * @ownership conn: caller retains ownership
+ * @ownership buf: caller provides buffer, function writes to it
  */
-int cupolas_tls_check_connection(const char* hostname,
-                                 uint16_t port,
-                                 cupolas_cert_result_t* result);
+int cupolas_tls_read(void* conn, char* buf, size_t len);
 
 /**
- * @brief 获取支持的加密套件
- * @param suites 加密套件列表输出
- * @param count 数量输出
- * @return 0 成功，非0 失败
+ * @brief Write to TLS connection
+ * @param[in] conn TLS connection
+ * @param[in] buf Input buffer
+ * @param[in] len Buffer length
+ * @return Bytes written, negative on error
+ * @note Thread-safe: Safe to call from multiple threads
+ * @reentrant No
+ * @ownership conn and buf: caller retains ownership
  */
-int cupolas_tls_get_cipher_suites(char*** suites, size_t* count);
+int cupolas_tls_write(void* conn, const char* buf, size_t len);
 
 /**
- * @brief 检查加密套件是否安全
- * @param suite 加密套件名称
- * @return 1 安全，0 不安全
+ * @brief Get peer certificate
+ * @param[in] conn TLS connection
+ * @param[out] cert_out Certificate output (PEM format)
+ * @param[in,out] cert_len Buffer size / actual length
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership conn: caller retains ownership
+ * @ownership cert_out: caller provides buffer, function writes to it
  */
-int cupolas_tls_is_cipher_secure(const char* suite);
-
-/* ============================================================================
- * 网络过滤
- * ============================================================================ */
+int cupolas_tls_get_peer_cert(void* conn, char* cert_out, size_t* cert_len);
 
 /**
- * @brief 添加过滤规则
- * @param rule 过滤规则
- * @return 0 成功，非0 失败
+ * @brief Verify peer certificate
+ * @param[in] conn TLS connection
+ * @param[in] hostname Expected hostname
+ * @return 0 if valid, negative if invalid
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership conn and hostname: caller retains ownership
  */
-int cupolas_net_add_rule(const cupolas_net_filter_rule_t* rule);
+int cupolas_tls_verify_peer(void* conn, const char* hostname);
 
 /**
- * @brief 删除过滤规则
- * @param rule_id 规则 ID
- * @return 0 成功，非0 失败
+ * @brief Get TLS version
+ * @param[in] conn TLS connection
+ * @return TLS version string (static, do not free)
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
  */
-int cupolas_net_remove_rule(const char* rule_id);
+const char* cupolas_tls_get_version(void* conn);
 
 /**
- * @brief 更新过滤规则
- * @param rule_id 规则 ID
- * @param rule 新规则
- * @return 0 成功，非0 失败
+ * @brief Get cipher suite
+ * @param[in] conn TLS connection
+ * @return Cipher suite name (static, do not free)
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
  */
-int cupolas_net_update_rule(const char* rule_id, const cupolas_net_filter_rule_t* rule);
+const char* cupolas_tls_get_cipher(void* conn);
 
 /**
- * @brief 获取过滤规则
- * @param rule_id 规则 ID
- * @param rule 规则输出
- * @return 0 成功，非0 失败
+ * @brief Enable firewall
+ * @param[in] config Firewall configuration
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
+ * @ownership config: caller retains ownership
  */
-int cupolas_net_get_rule(const char* rule_id, cupolas_net_filter_rule_t* rule);
+int cupolas_firewall_enable(const cupolas_firewall_config_t* config);
 
 /**
- * @brief 列出所有规则
- * @param rules 规则数组输出
- * @param count 数量输出
- * @return 0 成功，非0 失败
+ * @brief Disable firewall
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
  */
-int cupolas_net_list_rules(cupolas_net_filter_rule_t** rules, size_t* count);
+int cupolas_firewall_disable(void);
 
 /**
- * @brief 检查网络访问权限
- * @param host 目标主机
- * @param port 端口
- * @param protocol 协议
- * @param direction 方向 (inbound/outbound)
- * @return 1 允许，0 拒绝
+ * @brief Add firewall rule
+ * @param[in] rule Firewall rule
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
+ * @ownership rule: caller retains ownership
  */
-int cupolas_net_check_access(const char* host,
-                            uint16_t port,
-                            cupolas_protocol_t protocol,
-                            const char* direction);
+int cupolas_firewall_add_rule(const cupolas_fw_rule_t* rule);
 
 /**
- * @brief 检查 URL 访问权限
- * @param url URL
- * @param method HTTP 方法
- * @return 1 允许，0 拒绝
+ * @brief Remove firewall rule
+ * @param[in] rule_id Rule identifier
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
  */
-int cupolas_net_check_url(const char* url, const char* method);
-
-/* ============================================================================
- * HTTP 安全
- * ============================================================================ */
+int cupolas_firewall_remove_rule(uint32_t rule_id);
 
 /**
- * @brief 配置 HTTP 安全
- * @param manager HTTP 安全配置
- * @return 0 成功，非0 失败
+ * @brief Check if connection is allowed
+ * @param[in] protocol Protocol
+ * @param[in] direction Direction
+ * @param[in] src_ip Source IP
+ * @param[in] src_port Source port
+ * @param[in] dst_ip Destination IP
+ * @param[in] dst_port Destination port
+ * @return CUPOLAS_FW_ALLOW if allowed, other action if denied
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership src_ip and dst_ip: caller retains ownership
  */
-int cupolas_http_configure(const cupolas_http_security_config_t* manager);
+cupolas_fw_action_t cupolas_firewall_check(const cupolas_proto_t protocol,
+                                          const cupolas_direction_t direction,
+                                          const char* src_ip,
+                                          uint16_t src_port,
+                                          const char* dst_ip,
+                                          uint16_t dst_port);
 
 /**
- * @brief 验证 HTTP 请求
- * @param method HTTP 方法
- * @param url URL
- * @param headers 请求头数组
- * @param header_count 请求头数量
- * @param body_size 请求体大小
- * @return 0 有效，非0 无效
+ * @brief Get firewall rules
+ * @param[out] rules Rules array output
+ * @param[out] count Number of rules
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership rules: caller provides buffer, function writes to it
+ * @ownership count: caller provides buffer, function writes to it
  */
-int cupolas_http_validate_request(const char* method,
-                                  const char* url,
-                                  const char** headers,
-                                  size_t header_count,
-                                  size_t body_size);
+int cupolas_firewall_get_rules(cupolas_fw_rule_t** rules, size_t* count);
 
 /**
- * @brief 添加安全响应头
- * @param headers 响应头数组
- * @param header_count 请求头数量
- * @param max_headers 最大响应头数量
- * @return 0 成功，非0 失败
+ * @brief Clear all firewall rules
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
  */
-int cupolas_http_add_security_headers(const char** headers,
-                                     size_t header_count,
-                                     size_t max_headers);
+int cupolas_firewall_clear_rules(void);
 
 /**
- * @brief 检查 URL 是否安全
- * @param url URL
- * @return 1 安全，0 不安全
+ * @brief Get firewall statistics
+ * @param[out] stats Statistics output
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership stats: caller provides buffer, function writes to it
  */
-int cupolas_http_is_url_safe(const char* url);
-
-/* ============================================================================
- * DNS 安全
- * ============================================================================ */
+int cupolas_firewall_get_stats(cupolas_net_stats_t* stats);
 
 /**
- * @brief 配置 DNS 安全
- * @param manager DNS 安全配置
- * @return 0 成功，非0 失败
+ * @brief Get network security statistics
+ * @param[out] stats Statistics output
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership stats: caller provides buffer, function writes to it
  */
-int cupolas_dns_configure(const cupolas_dns_security_config_t* manager);
+int cupolas_network_security_get_stats(cupolas_net_stats_t* stats);
 
 /**
- * @brief 安全 DNS 解析
- * @param hostname 主机名
- * @param ip_out IP 输出缓冲区
- * @param ip_len 缓冲区长度
- * @return 0 成功，非0 失败
+ * @brief Validate certificate
+ * @param[in] cert_pem Certificate in PEM format
+ * @param[in] ca_file CA bundle file
+ * @param[out] error Error message output (may be NULL)
+ * @return 0 if valid, negative if invalid
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership cert_pem, ca_file, and error: caller retains ownership
  */
-int cupolas_dns_resolve(const char* hostname, char* ip_out, size_t ip_len);
+int cupolas_cert_validate(const char* cert_pem, const char* ca_file, char* error);
 
 /**
- * @brief 检查域名是否允许
- * @param domain 域名
- * @return 1 允许，0 拒绝
+ * @brief Extract certificate subject
+ * @param[in] cert_pem Certificate in PEM format
+ * @param[out] subject Subject output buffer
+ * @param[in] subject_len Buffer length
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership cert_pem: caller retains ownership
+ * @ownership subject: caller provides buffer, function writes to it
  */
-int cupolas_dns_is_domain_allowed(const char* domain);
+int cupolas_cert_get_subject(const char* cert_pem, char* subject, size_t subject_len);
 
 /**
- * @brief 验证 DNSSEC
- * @param domain 域名
- * @return 1 有效，0 无效
+ * @brief Extract certificate issuer
+ * @param[in] cert_pem Certificate in PEM format
+ * @param[out] issuer Issuer output buffer
+ * @param[in] issuer_len Buffer length
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership cert_pem: caller retains ownership
+ * @ownership issuer: caller provides buffer, function writes to it
  */
-int cupolas_dns_verify_dnssec(const char* domain);
-
-/* ============================================================================
- * 连接管理
- * ============================================================================ */
+int cupolas_cert_get_issuer(const char* cert_pem, char* issuer, size_t issuer_len);
 
 /**
- * @brief 获取活动连接列表
- * @param connections 连接信息数组输出
- * @param count 数量输出
- * @return 0 成功，非0 失败
+ * @brief Get certificate validity period
+ * @param[in] cert_pem Certificate in PEM format
+ * @param[out] not_before Validity start timestamp
+ * @param[out] not_after Validity end timestamp
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership cert_pem: caller retains ownership
+ * @ownership not_before and not_after: caller provides buffers, function writes to them
  */
-int cupolas_net_get_connections(cupolas_connection_info_t** connections, size_t* count);
+int cupolas_cert_get_validity(const char* cert_pem, uint64_t* not_before, uint64_t* not_after);
 
 /**
- * @brief 关闭连接
- * @param local_ip 本地 IP
- * @param local_port 本地端口
- * @param remote_ip 远程 IP
- * @param remote_port 远程端口
- * @return 0 成功，非0 失败
+ * @brief Check if certificate is expired
+ * @param[in] cert_pem Certificate in PEM format
+ * @return 1 if expired, 0 if valid
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership cert_pem: caller retains ownership
  */
-int cupolas_net_close_connection(const char* local_ip, uint16_t local_port,
-                                const char* remote_ip, uint16_t remote_port);
+int cupolas_cert_is_expired(const char* cert_pem);
 
 /**
- * @brief 获取网络统计
- * @param stats 统计输出
- * @return 0 成功，非0 失败
+ * @brief Verify hostname against certificate
+ * @param[in] cert_pem Certificate in PEM format
+ * @param[in] hostname Hostname to verify
+ * @return 0 if matches, negative if mismatch
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership cert_pem and hostname: caller retains ownership
  */
-int cupolas_net_get_stats(cupolas_net_stats_t* stats);
+int cupolas_cert_verify_hostname(const char* cert_pem, const char* hostname);
 
 /**
- * @brief 重置网络统计
+ * @brief Load certificate from file
+ * @param[in] cert_path Certificate file path
+ * @param[out] cert_pem Certificate in PEM format output
+ * @param[in,out] pem_len Buffer size / actual length
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership cert_path: caller retains ownership
+ * @ownership cert_pem: caller provides buffer, function writes to it
  */
-void cupolas_net_reset_stats(void);
-
-/* ============================================================================
- * 入侵检测
- * ============================================================================ */
+int cupolas_cert_load_file(const char* cert_path, char* cert_pem, size_t* pem_len);
 
 /**
- * @brief 启用入侵检测
- * @param enabled 是否启用
- * @return 0 成功，非0 失败
+ * @brief Save certificate to file
+ * @param[in] cert_pem Certificate in PEM format
+ * @param[in] cert_path Output file path
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership cert_pem and cert_path: caller retains ownership
  */
-int cupolas_net_ids_enable(bool enabled);
-
-/**
- * @brief 检测异常流量
- * @param connection 连接信息
- * @return 1 异常，0 正常
- */
-int cupolas_net_detect_anomaly(const cupolas_connection_info_t* connection);
-
-/**
- * @brief 设置入侵检测回调
- * @param callback 回调函数
- * @return 0 成功，非0 失败
- */
-int cupolas_net_ids_set_callback(void (*callback)(const char* alert_type,
-                                                 const char* details,
-                                                 const cupolas_connection_info_t* conn));
-
-/* ============================================================================
- * 工具函数
- * ============================================================================ */
-
-/**
- * @brief 获取 TLS 版本名称
- * @param version TLS 版本
- * @return 版本名称字符串
- */
-const char* cupolas_tls_version_string(cupolas_tls_version_t version);
-
-/**
- * @brief 获取协议名称
- * @param protocol 协议类型
- * @return 协议名称字符串
- */
-const char* cupolas_protocol_string(cupolas_protocol_t protocol);
-
-/**
- * @brief 获取证书验证结果描述
- * @param result 验证结果
- * @return 结果描述字符串
- */
-const char* cupolas_cert_result_string(cupolas_cert_result_t result);
-
-/**
- * @brief 解析 URL
- * @param url URL
- * @param scheme 协议输出
- * @param host 主机输出
- * @param port 端口输出
- * @param path 路径输出
- * @return 0 成功，非0 失败
- */
-int cupolas_net_parse_url(const char* url,
-                         char* scheme, char* host,
-                         uint16_t* port, char* path);
-
-/**
- * @brief 检查 IP 是否在 CIDR 范围内
- * @param ip IP 地址
- * @param cidr CIDR 表示法
- * @return 1 在范围内，0 不在
- */
-int cupolas_net_ip_in_cidr(const char* ip, const char* cidr);
-
-/**
- * @brief 验证 IP 地址格式
- * @param ip IP 地址
- * @return 1 有效，0 无效
- */
-int cupolas_net_validate_ip(const char* ip);
-
-/**
- * @brief 验证端口号
- * @param port 端口号
- * @return 1 有效，0 无效
- */
-int cupolas_net_validate_port(uint16_t port);
+int cupolas_cert_save_file(const char* cert_pem, const char* cert_path);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* cupolas_NETWORK_SECURITY_H */
+#endif /* CUPOLAS_NETWORK_SECURITY_H */

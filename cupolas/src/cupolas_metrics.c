@@ -1,13 +1,20 @@
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * cupolas_metrics.c - Metrics Export: Prometheus Format
+ */
+
 /**
  * @file cupolas_metrics.c
- * @brief 性能指标导出 - Prometheus 格式
+ * @brief Metrics Export - Prometheus Format
  * @author Spharx
  * @date 2024
  *
- * 本模块实现指标收集和导出功能：
- * - Prometheus exposition format 支持
- * - 多维度标签支持
- * - 低开销采样
+ * This module implements metrics collection and export:
+ * - Prometheus exposition format support
+ * - Multi-dimensional label support
+ * - Low-overhead sampling
  */
 
 #include "cupolas_metrics.h"

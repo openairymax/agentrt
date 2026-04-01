@@ -1,13 +1,13 @@
-/**
- * @file permission.h
- * @brief 权限裁决引擎公共接口
- * @author Spharx
- * @date 2024
- * 
- * 设计原则：
- * - 最小权限：默认拒绝，显式允许
- * - 高性能：缓存 + 规则优先级排序
- * - 可扩展：支持动态规则加载
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * permission.h - Permission Engine Public Interface
+ *
+ * Design Principles:
+ * - Least Privilege: Default deny, explicit allow
+ * - High Performance: Caching + rule priority sorting
+ * - Extensible: Dynamic rule loading support
  */
 
 #ifndef CUPOLAS_PERMISSION_H
@@ -21,43 +21,60 @@
 extern "C" {
 #endif
 
-/* 权限引擎句柄 */
+/* Permission Engine Handle */
 typedef struct permission_engine permission_engine_t;
 
 /**
- * @brief 创建权限引擎
- * @param rules_path 规则文件路径（YAML格式），NULL表示空规则集
- * @return 引擎句柄，失败返回 NULL
+ * @brief Create permission engine
+ * @param[in] rules_path Rules file path (YAML format), NULL for empty rule set
+ * @return Engine handle, NULL on failure
+ * @post On success, caller owns the returned handle
+ * @note Thread-safe: Yes
+ * @reentrant No (create/destroy must be paired)
+ * @ownership Returned handle: caller owns, must call permission_engine_destroy
  */
 permission_engine_t* permission_engine_create(const char* rules_path);
 
 /**
- * @brief 销毁权限引擎
- * @param engine 引擎句柄
+ * @brief Destroy permission engine
+ * @param[in] engine Engine handle (must not be NULL)
+ * @pre Handle was created by permission_engine_create
+ * @post All resources are released
+ * @note Thread-safe: No, ensure no other threads access engine
+ * @reentrant No
+ * @ownership engine: caller transfers ownership
  */
 void permission_engine_destroy(permission_engine_t* engine);
 
 /**
- * @brief 增加引用计数
- * @param engine 引擎句柄
- * @return 引擎句柄
+ * @brief Increment reference count
+ * @param[in] engine Engine handle (must not be NULL)
+ * @return Engine handle (same as input)
+ * @note Thread-safe: Yes
+ * @reentrant Yes
+ * @ownership engine: caller retains ownership, returns same handle
  */
 permission_engine_t* permission_engine_ref(permission_engine_t* engine);
 
 /**
- * @brief 减少引用计数
- * @param engine 引擎句柄
+ * @brief Decrement reference count
+ * @param[in] engine Engine handle (must not be NULL)
+ * @note Thread-safe: Yes
+ * @reentrant No
  */
 void permission_engine_unref(permission_engine_t* engine);
 
 /**
- * @brief 检查权限
- * @param engine 引擎句柄
- * @param agent_id Agent ID
- * @param action 操作类型（如 "read", "write", "execute"）
- * @param resource 资源路径
- * @param context 上下文信息（可选）
- * @return 1 允许，0 拒绝
+ * @brief Check permission
+ * @param[in] engine Engine handle (must not be NULL)
+ * @param[in] agent_id Agent identifier (must not be NULL)
+ * @param[in] action Action type: "read", "write", "execute" (must not be NULL)
+ * @param[in] resource Resource path (must not be NULL)
+ * @param[in] context Optional context information (may be NULL)
+ * @return 1 allowed, 0 denied, negative on error
+ * @note Thread-safe: Yes
+ * @reentrant Yes, but concurrent calls with same params may race on cache
+ * @ownership All input strings: caller retains ownership
  */
 int permission_engine_check(permission_engine_t* engine,
                             const char* agent_id,
@@ -66,27 +83,35 @@ int permission_engine_check(permission_engine_t* engine,
                             const char* context);
 
 /**
- * @brief 重新加载规则文件
- * @param engine 引擎句柄
- * @return 0 成功，其他失败
+ * @brief Reload rules file
+ * @param[in] engine Engine handle (must not be NULL)
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Yes
+ * @reentrant Yes
  */
 int permission_engine_reload(permission_engine_t* engine);
 
 /**
- * @brief 清空缓存
- * @param engine 引擎句柄
+ * @brief Clear cache
+ * @param[in] engine Engine handle (must not be NULL)
+ * @note Thread-safe: Yes
+ * @reentrant Yes
+ * @post All cached permissions are invalidated
  */
 void permission_engine_clear_cache(permission_engine_t* engine);
 
 /**
- * @brief 添加规则
- * @param engine 引擎句柄
- * @param agent_id Agent ID（NULL 或 "*" 表示通配）
- * @param action 操作（NULL 或 "*" 表示通配）
- * @param resource 资源模式（支持 glob 模式，如 "/data/*"）
- * @param allow 1 允许，0 拒绝
- * @param priority 优先级（数值越大优先级越高）
- * @return 0 成功，其他失败
+ * @brief Add rule
+ * @param[in] engine Engine handle (must not be NULL)
+ * @param[in] agent_id Agent ID pattern (NULL or "*" for wildcard)
+ * @param[in] action Action pattern (NULL or "*" for wildcard)
+ * @param[in] resource Resource pattern with glob support (e.g., "/data/*")
+ * @param[in] allow 1 to allow, 0 to deny
+ * @param[in] priority Higher value = higher priority
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Yes
+ * @reentrant Yes
+ * @ownership All input strings: caller retains ownership
  */
 int permission_engine_add_rule(permission_engine_t* engine,
                                const char* agent_id,
@@ -96,17 +121,22 @@ int permission_engine_add_rule(permission_engine_t* engine,
                                int priority);
 
 /**
- * @brief 获取规则数量
- * @param engine 引擎句柄
- * @return 规则数量
+ * @brief Get rule count
+ * @param[in] engine Engine handle (must not be NULL)
+ * @return Number of rules
+ * @note Thread-safe: Yes
+ * @reentrant Yes
  */
 size_t permission_engine_rule_count(permission_engine_t* engine);
 
 /**
- * @brief 获取缓存统计信息
- * @param engine 引擎句柄
- * @param hit_count 命中次数（输出）
- * @param miss_count 未命中次数（输出）
+ * @brief Get cache statistics
+ * @param[in] engine Engine handle (must not be NULL)
+ * @param[out] hit_count Cache hit count output (may be NULL)
+ * @param[out] miss_count Cache miss count output (may be NULL)
+ * @note Thread-safe: Yes
+ * @reentrant Yes
+ * @ownership hit_count, miss_count: callee writes, caller owns
  */
 void permission_engine_cache_stats(permission_engine_t* engine,
                                    uint64_t* hit_count,

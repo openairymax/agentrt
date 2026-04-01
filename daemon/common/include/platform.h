@@ -1,420 +1,454 @@
+// SPDX-FileCopyrightText: 2026 SPHARX Ltd.
+// SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * @file platform.h
- * @brief 跨平台兼容层 - 统一不同操作系统的API差异
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ * @brief 平台抽象兼容层
  * 
- * 支持平台：
- * - Linux (POSIX)
- * - macOS (Darwin)
- * - Windows (Win32/Win64)
+ * 本文件是 commons/platform 的兼容层，提供向后兼容的 API。
+ * 新代码应直接使用 #include "agentos/platform/platform.h"
+ * 
+ * @see commons/platform/include/platform.h
  */
 
-#ifndef AGENTOS_PLATFORM_H
-#define AGENTOS_PLATFORM_H
+#ifndef AGENTOS_DAEMON_COMMON_PLATFORM_H
+#define AGENTOS_DAEMON_COMMON_PLATFORM_H
 
-#include <stddef.h>
-#include <stdint.h>
+/* 包含 commons 的统一平台抽象层 */
+#include "agentos/platform/platform.h"
 
-#ifdef __cplusplus
-extern "C" {
+/* ==================== 兼容性别名 ==================== */
+
+/* 平台检测宏兼容 */
+#ifndef AGENTOS_PLATFORM_WINDOWS
+#define AGENTOS_PLATFORM_WINDOWS AGENTOS_PLATFORM_WINDOWS
+#endif
+#ifndef AGENTOS_PLATFORM_LINUX
+#define AGENTOS_PLATFORM_LINUX AGENTOS_PLATFORM_LINUX
+#endif
+#ifndef AGENTOS_PLATFORM_MACOS
+#define AGENTOS_PLATFORM_MACOS AGENTOS_PLATFORM_MACOS
 #endif
 
-/* ==================== 平台检测 ==================== */
-#if defined(_WIN32) || defined(_WIN64)
-    #define AGENTOS_PLATFORM_WINDOWS 1
-    #define AGENTOS_PLATFORM_NAME "Windows"
-    #if defined(_WIN64)
-        #define AGENTOS_PLATFORM_BITS 64
-    #else
-        #define AGENTOS_PLATFORM_BITS 32
-    #endif
-#elif defined(__APPLE__) && defined(__MACH__)
-    #define AGENTOS_PLATFORM_MACOS 1
-    #define AGENTOS_PLATFORM_NAME "macOS"
-    #define AGENTOS_PLATFORM_BITS 64
-#elif defined(__linux__)
-    #define AGENTOS_PLATFORM_LINUX 1
-    #define AGENTOS_PLATFORM_NAME "Linux"
-    #if defined(__x86_64__) || defined(__aarch64__)
-        #define AGENTOS_PLATFORM_BITS 64
-    #else
-        #define AGENTOS_PLATFORM_BITS 32
-    #endif
+/* 导出宏兼容 */
+#ifndef AGENTOS_API
+#define AGENTOS_API AGENTOS_API
+#endif
+
+/* 线程本地存储兼容 */
+#ifndef AGENTOS_THREAD_LOCAL
+#define AGENTOS_THREAD_LOCAL AGENTOS_THREAD_LOCAL
+#endif
+
+/* 内联函数兼容 */
+#ifndef AGENTOS_INLINE
+#define AGENTOS_INLINE AGENTOS_INLINE
+#endif
+
+/* 未使用参数标记 */
+#ifndef AGENTOS_UNUSED
+#define AGENTOS_UNUSED(x) AGENTOS_UNUSED(x)
+#endif
+
+/* 路径分隔符兼容 */
+#ifndef AGENTOS_PATH_SEP
+#define AGENTOS_PATH_SEP AGENTOS_PATH_SEP
+#endif
+#ifndef AGENTOS_PATH_SEP_STR
+#define AGENTOS_PATH_SEP_STR AGENTOS_PATH_SEP_STR
+#endif
+#ifndef AGENTOS_PATH_MAX
+#define AGENTOS_PATH_MAX AGENTOS_PATH_MAX
+#endif
+
+/* ==================== 类型兼容 ==================== */
+
+/* commons 使用直接 typedef，daemon 使用句柄类型 */
+/* 为保持兼容，这里提供句柄类型的别名 */
+
+/**
+ * @brief 互斥锁句柄类型（兼容层）
+ * @note commons 使用 agentos_mutex_t 作为直接类型
+ */
+typedef agentos_mutex_t* agentos_mutex_handle_t;
+
+/**
+ * @brief 条件变量句柄类型（兼容层）
+ */
+typedef agentos_cond_t* agentos_cond_handle_t;
+
+/**
+ * @brief 线程句柄类型（兼容层）
+ */
+typedef agentos_thread_t* agentos_thread_handle_t;
+
+/**
+ * @brief 套接字句柄类型（兼容层）
+ */
+typedef agentos_socket_t* agentos_socket_handle_t;
+
+/* ==================== 额外类型定义 ==================== */
+
+/**
+ * @brief 时间戳结构（纳秒精度）
+ * @note commons 使用 uint64_t 毫秒/纳秒，这里提供结构体形式
+ */
+typedef struct {
+    uint64_t seconds;      /**< 秒 */
+    uint32_t nanoseconds;  /**< 纳秒 */
+} agentos_timestamp_t;
+
+/**
+ * @brief 进程退出状态
+ */
+typedef struct {
+    int exit_code;         /**< 退出码 */
+    int signal;            /**< 终止信号（-1表示正常退出） */
+} agentos_process_status_t;
+
+/**
+ * @brief 套接字地址族
+ */
+typedef enum {
+    AGENTOS_AF_INET,    /**< IPv4 */
+    AGENTOS_AF_INET6,   /**< IPv6 */
+    AGENTOS_AF_UNIX     /**< Unix域套接字 */
+} agentos_address_family_t;
+
+/**
+ * @brief 套接字类型
+ */
+typedef enum {
+    AGENTOS_SOCK_STREAM,   /**< 流式套接字（TCP） */
+    AGENTOS_SOCK_DGRAM,    /**< 数据报套接字（UDP） */
+    AGENTOS_SOCK_SEQPACKET /**< 有序数据报 */
+} agentos_socket_type_t;
+
+/**
+ * @brief 套接字地址
+ */
+typedef struct {
+    agentos_address_family_t family;  /**< 地址族 */
+    uint16_t port;                    /**< 端口号 */
+    union {
+        uint8_t ipv4[4];              /**< IPv4 地址 */
+        uint8_t ipv6[16];             /**< IPv6 地址 */
+        char path[108];               /**< Unix 域套接字路径 */
+    } addr;
+} agentos_sockaddr_t;
+
+/* ==================== 兼容性函数包装 ==================== */
+
+/**
+ * @brief 获取当前时间戳
+ * @param ts [out] 时间戳输出
+ * @return 0成功，非0失败
+ */
+static inline int agentos_time_now(agentos_timestamp_t* ts) {
+    if (!ts) return -1;
+    uint64_t ns = agentos_time_ns();
+    ts->seconds = ns / 1000000000ULL;
+    ts->nanoseconds = (uint32_t)(ns % 1000000000ULL);
+    return 0;
+}
+
+/**
+ * @brief 获取单调时间
+ * @param ts [out] 时间戳输出
+ * @return 0成功，非0失败
+ */
+static inline int agentos_time_monotonic(agentos_timestamp_t* ts) {
+    /* 使用 agentos_time_ns 作为单调时间 */
+    return agentos_time_now(ts);
+}
+
+/**
+ * @brief 时间戳转换为毫秒
+ * @param ts [in] 时间戳
+ * @return 毫秒数
+ */
+static inline uint64_t agentos_time_to_ms(const agentos_timestamp_t* ts) {
+    if (!ts) return 0;
+    return ts->seconds * 1000ULL + ts->nanoseconds / 1000000ULL;
+}
+
+/**
+ * @brief 毫秒转换为时间戳
+ * @param ms [in] 毫秒数
+ * @param ts [out] 时间戳输出
+ */
+static inline void agentos_time_from_ms(uint64_t ms, agentos_timestamp_t* ts) {
+    if (!ts) return;
+    ts->seconds = ms / 1000ULL;
+    ts->nanoseconds = (uint32_t)((ms % 1000ULL) * 1000000ULL);
+}
+
+/**
+ * @brief 睡眠指定毫秒
+ * @param ms [in] 毫秒数
+ */
+static inline void agentos_sleep_ms(uint32_t ms) {
+#ifdef _WIN32
+    Sleep(ms);
 #else
-    #error "Unsupported platform"
+    struct timespec ts;
+    ts.tv_sec = ms / 1000;
+    ts.tv_nsec = (ms % 1000) * 1000000L;
+    nanosleep(&ts, NULL);
 #endif
+}
 
-/* ==================== 导出宏定义 ==================== */
-#if defined(_WIN32) || defined(_WIN64)
-    #ifdef AGENTOS_BUILDING_DLL
-        #define AGENTOS_API __declspec(dllexport)
-    #else
-        #define AGENTOS_API __declspec(dllimport)
-    #endif
+/**
+ * @brief 获取当前进程ID
+ * @return 进程ID
+ */
+static inline uint32_t agentos_process_self(void) {
+#ifdef _WIN32
+    return GetCurrentProcessId();
 #else
-    #define AGENTOS_API __attribute__((visibility("default")))
+    return (uint32_t)getpid();
 #endif
-
-/* ==================== 线程局部存储 ==================== */
-#if defined(_WIN32) || defined(_WIN64)
-    #define AGENTOS_THREAD_LOCAL __declspec(thread)
-#else
-    #define AGENTOS_THREAD_LOCAL __thread
-#endif
-
-/* ==================== 内联函数 ==================== */
-#if defined(_WIN32) || defined(_WIN64)
-    #define AGENTOS_INLINE __forceinline
-#else
-    #define AGENTOS_INLINE static inline __attribute__((always_inline))
-#endif
-
-/* ==================== 平台头文件包含 ==================== */
-#if defined(AGENTOS_PLATFORM_WINDOWS)
-    /* Windows 特定头文件 */
-    #define WIN32_LEAN_AND_MEAN
-    #define NOMINMAX
-    #include <windows.h>
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #pragma comment(lib, "ws2_32.lib")
-    
-    /* Windows 下缺少的 POSIX 定义 */
-    typedef HANDLE agentos_thread_t;
-    typedef CRITICAL_SECTION agentos_mutex_t;
-    typedef CONDITION_VARIABLE agentos_cond_t;
-    typedef DWORD agentos_pid_t;
-    
-    /* 路径分隔符 */
-    #define AGENTOS_PATH_SEP '\\'
-    #define AGENTOS_PATH_SEP_STR "\\"
-    
-    /* Socket 类型 */
-    typedef SOCKET agentos_socket_t;
-    #define AGENTOS_INVALID_SOCKET INVALID_SOCKET
-    #define AGENTOS_SOCKET_ERROR SOCKET_ERROR
-    
-    /* 睡眠函数 */
-    #define agentos_sleep_ms(ms) Sleep(ms)
-    
-    /* 进程相关 */
-    #define agentos_getpid() GetCurrentProcessId()
-    
-#else
-    /* POSIX 头文件 */
-    #include <pthread.h>
-    #include <unistd.h>
-    #include <sys/types.h>
-    #include <sys/socket.h>
-    #include <sys/un.h>
-    #include <netinet/in.h>
-    #include <arpa/inet.h>
-    #include <fcntl.h>
-    #include <errno.h>
-    #include <signal.h>
-    
-    /* POSIX 类型定义 */
-    typedef pthread_t agentos_thread_t;
-    typedef pthread_mutex_t agentos_mutex_t;
-    typedef pthread_cond_t agentos_cond_t;
-    typedef pid_t agentos_pid_t;
-    
-    /* 路径分隔符 */
-    #define AGENTOS_PATH_SEP '/'
-    #define AGENTOS_PATH_SEP_STR "/"
-    
-    /* Socket 类型 */
-    typedef int agentos_socket_t;
-    #define AGENTOS_INVALID_SOCKET (-1)
-    #define AGENTOS_SOCKET_ERROR (-1)
-    
-    /* 睡眠函数 */
-    #define agentos_sleep_ms(ms) usleep((ms) * 1000)
-    
-    /* 进程相关 */
-    #define agentos_getpid() getpid()
-#endif
-
-/* ==================== 互斥锁接口 ==================== */
-
-/**
- * @brief 初始化互斥锁
- * @param mutex 互斥锁指针
- * @return 0 成功，非0 失败
- */
-int agentos_mutex_init(agentos_mutex_t* mutex);
-
-/**
- * @brief 销毁互斥锁
- * @param mutex 互斥锁指针
- */
-void agentos_mutex_destroy(agentos_mutex_t* mutex);
-
-/**
- * @brief 加锁
- * @param mutex 互斥锁指针
- * @return 0 成功，非0 失败
- */
-int agentos_mutex_lock(agentos_mutex_t* mutex);
-
-/**
- * @brief 尝试加锁
- * @param mutex 互斥锁指针
- * @return 0 成功，非0 失败或已锁定
- */
-int agentos_mutex_trylock(agentos_mutex_t* mutex);
-
-/**
- * @brief 解锁
- * @param mutex 互斥锁指针
- * @return 0 成功，非0 失败
- */
-int agentos_mutex_unlock(agentos_mutex_t* mutex);
-
-/* ==================== 条件变量接口 ==================== */
-
-/**
- * @brief 初始化条件变量
- * @param cond 条件变量指针
- * @return 0 成功，非0 失败
- */
-int agentos_cond_init(agentos_cond_t* cond);
-
-/**
- * @brief 销毁条件变量
- * @param cond 条件变量指针
- */
-void agentos_cond_destroy(agentos_cond_t* cond);
-
-/**
- * @brief 等待条件变量
- * @param cond 条件变量指针
- * @param mutex 互斥锁指针
- * @return 0 成功，非0 失败
- */
-int agentos_cond_wait(agentos_cond_t* cond, agentos_mutex_t* mutex);
-
-/**
- * @brief 超时等待条件变量
- * @param cond 条件变量指针
- * @param mutex 互斥锁指针
- * @param timeout_ms 超时时间（毫秒）
- * @return 0 成功，非0 失败或超时
- */
-int agentos_cond_timedwait(agentos_cond_t* cond, agentos_mutex_t* mutex, uint32_t timeout_ms);
-
-/**
- * @brief 唤醒一个等待线程
- * @param cond 条件变量指针
- * @return 0 成功，非0 失败
- */
-int agentos_cond_signal(agentos_cond_t* cond);
-
-/**
- * @brief 唤醒所有等待线程
- * @param cond 条件变量指针
- * @return 0 成功，非0 失败
- */
-int agentos_cond_broadcast(agentos_cond_t* cond);
-
-/* ==================== 线程接口 ==================== */
-
-/**
- * @brief 线程函数类型
- */
-typedef void* (*agentos_thread_func_t)(void* arg);
-
-/**
- * @brief 创建线程
- * @param thread 线程句柄指针
- * @param func 线程函数
- * @param arg 线程参数
- * @return 0 成功，非0 失败
- */
-int agentos_thread_create(agentos_thread_t* thread, agentos_thread_func_t func, void* arg);
-
-/**
- * @brief 等待线程结束
- * @param thread 线程句柄
- * @param retval 返回值指针（可为NULL）
- * @return 0 成功，非0 失败
- */
-int agentos_thread_join(agentos_thread_t thread, void** retval);
+}
 
 /**
  * @brief 获取当前线程ID
  * @return 线程ID
  */
-uint64_t agentos_thread_id(void);
-
-/* ==================== Socket 接口 ==================== */
-
-/**
- * @brief 创建 TCP Socket
- * @return Socket 句柄，失败返回 AGENTOS_INVALID_SOCKET
- */
-agentos_socket_t agentos_socket_tcp(void);
+static inline uint64_t agentos_thread_self(void) {
+    return agentos_thread_id();
+}
 
 /**
- * @brief 创建 Unix Domain Socket（仅 POSIX）
- * @return Socket 句柄，失败返回 AGENTOS_INVALID_SOCKET
+ * @brief 设置线程名称
+ * @param name [in] 线程名称
+ * @return 0成功，非0失败
  */
-agentos_socket_t agentos_socket_unix(void);
+static inline int agentos_thread_setname(const char* name) {
+    /* commons 暂不支持，返回成功 */
+    (void)name;
+    return 0;
+}
 
 /**
- * @brief 关闭 Socket
- * @param sock Socket 句柄
+ * @brief 获取线程名称
+ * @param name [out] 名称输出缓冲区
+ * @param size [in] 缓冲区大小
+ * @return 0成功，非0失败
  */
-void agentos_socket_close(agentos_socket_t sock);
+static inline int agentos_thread_getname(char* name, size_t size) {
+    /* commons 暂不支持，返回空字符串 */
+    if (name && size > 0) {
+        name[0] = '\0';
+    }
+    return 0;
+}
 
-/**
- * @brief 设置 Socket 非阻塞模式
- * @param sock Socket 句柄
- * @param nonblock 是否非阻塞
- * @return 0 成功，非0 失败
- */
-int agentos_socket_set_nonblock(agentos_socket_t sock, int nonblock);
-
-/**
- * @brief 设置 Socket 复用地址
- * @param sock Socket 句柄
- * @param reuse 是否复用
- * @return 0 成功，非0 失败
- */
-int agentos_socket_set_reuseaddr(agentos_socket_t sock, int reuse);
-
-/* ==================== 进程接口 ==================== */
-
-/**
- * @brief 进程信息结构
- */
-typedef struct {
-    agentos_pid_t pid;
-    int stdin_fd;
-    int stdout_fd;
-    int stderr_fd;
-} agentos_process_t;
-
-/**
- * @brief 启动进程
- * @param executable 可执行文件路径
- * @param argv 参数数组（以NULL结尾）
- * @param envp 环境变量数组（以NULL结尾，可为NULL）
- * @param proc 输出进程信息
- * @return 0 成功，非0 失败
- */
-int agentos_process_start(const char* executable, char* const argv[], char* const envp[], agentos_process_t* proc);
-
-/**
- * @brief 等待进程结束
- * @param proc 进程信息
- * @param timeout_ms 超时时间（毫秒），0表示无限等待
- * @param exit_code 输出退出码（可为NULL）
- * @return 0 成功，非0 失败或超时
- */
-int agentos_process_wait(agentos_process_t* proc, uint32_t timeout_ms, int* exit_code);
-
-/**
- * @brief 终止进程
- * @param proc 进程信息
- * @return 0 成功，非0 失败
- */
-int agentos_process_kill(agentos_process_t* proc);
-
-/**
- * @brief 关闭进程管道
- * @param proc 进程信息
- */
-void agentos_process_close_pipes(agentos_process_t* proc);
-
-/* ==================== 时间接口 ==================== */
-
-/**
- * @brief 获取高精度时间戳（纳秒）
- * @return 时间戳
- */
-uint64_t agentos_time_ns(void);
-
-/**
- * @brief 获取当前时间戳（毫秒）
- * @return 时间戳
- */
-uint64_t agentos_time_ms(void);
-
-/* ==================== 随机数接口 ==================== */
-
-/**
- * @brief 初始化随机数生成器（线程安全）
- */
-void agentos_random_init(void);
-
-/**
- * @brief 生成随机数（线程安全）
- * @param min 最小值
- * @param max 最大值
- * @return 随机数
- */
-uint32_t agentos_random_uint32(uint32_t min, uint32_t max);
-
-/**
- * @brief 生成随机浮点数（线程安全）
- * @return 0.0 到 1.0 之间的随机数
- */
-float agentos_random_float(void);
-
-/**
- * @brief 生成随机字节（线程安全）
- * @param buf 缓冲区
- * @param len 长度
- * @return 0 成功，非0 失败
- */
-int agentos_random_bytes(void* buf, size_t len);
-
-/* ==================== 文件系统接口 ==================== */
-
-/**
- * @brief 检查文件是否存在
- * @param path 文件路径
- * @return 1 存在，0 不存在
- */
-int agentos_file_exists(const char* path);
+/* ==================== 文件系统兼容 ==================== */
 
 /**
  * @brief 创建目录（递归）
- * @param path 目录路径
- * @return 0 成功，非0 失败
+ * @param path [in] 目录路径
+ * @param recursive [in] 是否递归创建
+ * @return 0成功，非0失败
  */
-int agentos_mkdir_p(const char* path);
-
-/**
- * @brief 获取文件大小
- * @param path 文件路径
- * @return 文件大小，失败返回 -1
- */
-int64_t agentos_file_size(const char* path);
-
-/* ==================== 字符串工具 ==================== */
-
-/**
- * @brief 安全的字符串复制
- * @param dest 目标缓冲区
- * @param dest_size 目标缓冲区大小
- * @param src 源字符串
- * @return 目标字符串指针
- */
-char* agentos_strlcpy(char* dest, size_t dest_size, const char* src);
-
-/**
- * @brief 安全的字符串连接
- * @param dest 目标缓冲区
- * @param dest_size 目标缓冲区大小
- * @param src 源字符串
- * @return 目标字符串指针
- */
-char* agentos_strlcat(char* dest, size_t dest_size, const char* src);
-
-#ifdef __cplusplus
-}
+static inline int agentos_mkdir(const char* path, int recursive) {
+    if (recursive) {
+        return agentos_mkdir_p(path);
+    }
+#ifdef _WIN32
+    return CreateDirectoryA(path, NULL) ? 0 : -1;
+#else
+    return mkdir(path, 0755);
 #endif
+}
 
-#endif /* AGENTOS_PLATFORM_H */
+/* ==================== 动态库兼容 ==================== */
+
+/**
+ * @brief 动态库句柄类型
+ */
+typedef void* agentos_dl_t;
+
+/**
+ * @brief 加载动态库
+ * @param path [in] 库文件路径
+ * @return 动态库句柄，失败返回 NULL
+ */
+static inline agentos_dl_t agentos_dl_open(const char* path) {
+#ifdef _WIN32
+    return LoadLibraryA(path);
+#else
+    return dlopen(path, RTLD_NOW | RTLD_LOCAL);
+#endif
+}
+
+/**
+ * @brief 关闭动态库
+ * @param dl [in] 动态库句柄
+ * @return 0成功，非0失败
+ */
+static inline int agentos_dl_close(agentos_dl_t dl) {
+#ifdef _WIN32
+    return FreeLibrary((HMODULE)dl) ? 0 : -1;
+#else
+    return dlclose(dl);
+#endif
+}
+
+/**
+ * @brief 获取符号地址
+ * @param dl [in] 动态库句柄
+ * @param name [in] 符号名称
+ * @return 符号地址，失败返回 NULL
+ */
+static inline void* agentos_dl_sym(agentos_dl_t dl, const char* name) {
+#ifdef _WIN32
+    return GetProcAddress((HMODULE)dl, name);
+#else
+    return dlsym(dl, name);
+#endif
+}
+
+/**
+ * @brief 获取动态库错误信息
+ * @return 错误信息字符串
+ */
+static inline const char* agentos_dl_error(void) {
+#ifdef _WIN32
+    static char error_buf[256];
+    DWORD err = GetLastError();
+    if (err) {
+        FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, NULL, err, 0, error_buf, sizeof(error_buf), NULL);
+        return error_buf;
+    }
+    return NULL;
+#else
+    return dlerror();
+#endif
+}
+
+/* ==================== 系统信息兼容 ==================== */
+
+/**
+ * @brief 系统信息结构
+ */
+typedef struct {
+    char os_name[64];       /**< 操作系统名称 */
+    char os_version[64];    /**< 操作系统版本 */
+    char hostname[64];      /**< 主机名 */
+    uint32_t cpu_count;     /**< CPU核心数 */
+    uint64_t memory_total;  /**< 总内存（字节） */
+    uint64_t memory_free;   /**< 可用内存（字节） */
+} agentos_sysinfo_t;
+
+/**
+ * @brief 获取系统信息
+ * @param info [out] 系统信息输出
+ * @return 0成功，非0失败
+ */
+static inline int agentos_get_sysinfo(agentos_sysinfo_t* info) {
+    if (!info) return -1;
+    
+    memset(info, 0, sizeof(agentos_sysinfo_t));
+    
+#ifdef _WIN32
+    OSVERSIONINFOA osvi;
+    osvi.dwOSVersionInfoSize = sizeof(osvi);
+#pragma warning(push)
+#pragma warning(disable: 4996)
+    GetVersionExA(&osvi);
+#pragma warning(pop)
+    
+    strncpy(info->os_name, "Windows", sizeof(info->os_name) - 1);
+    snprintf(info->os_version, sizeof(info->os_version), "%lu.%lu", 
+             osvi.dwMajorVersion, osvi.dwMinorVersion);
+    
+    DWORD size = sizeof(info->hostname);
+    GetComputerNameA(info->hostname, &size);
+    
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    info->cpu_count = si.dwNumberOfProcessors;
+    
+    MEMORYSTATUSEX ms;
+    ms.dwLength = sizeof(ms);
+    GlobalMemoryStatusEx(&ms);
+    info->memory_total = ms.ullTotalPhys;
+    info->memory_free = ms.ullAvailPhys;
+#else
+    struct utsname uts;
+    uname(&uts);
+    
+    strncpy(info->os_name, uts.sysname, sizeof(info->os_name) - 1);
+    strncpy(info->os_version, uts.release, sizeof(info->os_version) - 1);
+    gethostname(info->hostname, sizeof(info->hostname) - 1);
+    
+    info->cpu_count = sysconf(_SC_NPROCESSORS_ONLN);
+    
+    struct sysinfo si;
+    if (sysinfo(&si) == 0) {
+        info->memory_total = si.totalram * si.mem_unit;
+        info->memory_free = si.freeram * si.mem_unit;
+    }
+#endif
+    
+    return 0;
+}
+
+/* ==================== 原子操作兼容 ==================== */
+
+/**
+ * @brief 原子整数类型
+ */
+typedef struct {
+    volatile int value;
+} agentos_atomic_int_t;
+
+/**
+ * @brief 原子加载
+ */
+static inline int agentos_atomic_load(agentos_atomic_int_t* atomic) {
+    if (!atomic) return 0;
+#ifdef _WIN32
+    return InterlockedCompareExchange((LONG*)&atomic->value, 0, 0);
+#else
+    return __atomic_load_n(&atomic->value, __ATOMIC_SEQ_CST);
+#endif
+}
+
+/**
+ * @brief 原子存储
+ */
+static inline void agentos_atomic_store(agentos_atomic_int_t* atomic, int value) {
+    if (!atomic) return;
+#ifdef _WIN32
+    InterlockedExchange((LONG*)&atomic->value, value);
+#else
+    __atomic_store_n(&atomic->value, value, __ATOMIC_SEQ_CST);
+#endif
+}
+
+/**
+ * @brief 原子加法
+ */
+static inline int agentos_atomic_fetch_add(agentos_atomic_int_t* atomic, int value) {
+    if (!atomic) return 0;
+#ifdef _WIN32
+    return InterlockedExchangeAdd((LONG*)&atomic->value, value);
+#else
+    return __atomic_fetch_add(&atomic->value, value, __ATOMIC_SEQ_CST);
+#endif
+}
+
+/**
+ * @brief 原子减法
+ */
+static inline int agentos_atomic_fetch_sub(agentos_atomic_int_t* atomic, int value) {
+    if (!atomic) return 0;
+#ifdef _WIN32
+    return InterlockedExchangeAdd((LONG*)&atomic->value, -value);
+#else
+    return __atomic_fetch_sub(&atomic->value, value, __ATOMIC_SEQ_CST);
+#endif
+}
+
+#endif /* AGENTOS_DAEMON_COMMON_PLATFORM_H */

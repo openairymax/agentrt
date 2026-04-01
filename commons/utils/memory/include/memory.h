@@ -1,11 +1,20 @@
-/**
+/*
+ * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ * 
  * @file memory.h
  * @brief 统一内存管理模块 - 核心层API
  * 
  * 提供安全、高效、统一的内存管理接口，支持内存分配、释放、调试和统计功能。
  * 本模块旨在消除项目中分散的内存管理代码，提供一致的内存管理策略。
  * 
- * @copyright Copyright (c) 2026 SPHARX. All Rights Reserved.
+ * @author AgentOS Team
+ * @date 2026-03-30
+ * @version 2.0
+ * 
+ * @note 线程安全：所有公共接口均为线程安全
+ * @see ARCHITECTURAL_PRINCIPLES.md E-3 资源确定性原则
  */
 
 #ifndef AGENTOS_MEMORY_H

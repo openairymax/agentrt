@@ -1,14 +1,8 @@
-/**
- * @file permission_cache.h
- * @brief 权限结果缓存内部接口 - 基于哈希表的高性能实现
- * @author Spharx
- * @date 2024
- * 
- * 设计原则�?
- * - O(1) 查找复杂�?
- * - LRU 淘汰策略
- * - TTL 过期机制
- * - 线程安全
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * permission_cache.h - Permission Cache Internal Interface: Hash-based LRU Implementation
  */
 
 #ifndef CUPOLAS_PERMISSION_CACHE_H
@@ -22,53 +16,77 @@
 extern "C" {
 #endif
 
-/* 缓存条目 */
+/**
+ * @brief Cache entry structure for LRU management
+ * 
+ * Design principles:
+ * - O(1) lookup complexity via hash table
+ * - LRU eviction policy for memory efficiency
+ * - TTL-based expiration for stale data cleanup
+ * - Thread-safe with fine-grained locking
+ */
 typedef struct cache_entry {
-    char* key;
-    int result;
-    uint64_t timestamp_ms;
-    uint32_t hash;
-    struct cache_entry* prev;
-    struct cache_entry* next;
-    struct cache_entry* hnext;
+    char*                   key;            /**< Hash key (agent_id:action:resource:context) */
+    int                     result;         /**< Cached permission result (1=allow, 0=deny) */
+    uint64_t                timestamp_ms;   /**< Creation timestamp (milliseconds) */
+    uint32_t                hash;           /**< Pre-computed hash value */
+    struct cache_entry*     prev;           /**< Previous entry in LRU list */
+    struct cache_entry*     next;           /**< Next entry in LRU list */
+    struct cache_entry*     hnext;          /**< Next entry in hash bucket chain */
 } cache_entry_t;
 
-/* 缓存管理�?*/
+/**
+ * @brief Cache manager structure
+ * 
+ * Provides high-performance permission caching with:
+ * - Configurable capacity limits
+ * - Automatic TTL expiration
+ * - Hit/miss statistics for monitoring
+ */
 typedef struct cache_manager {
-    cache_entry_t** buckets;
-    size_t bucket_count;
-    cache_entry_t* head;
-    cache_entry_t* tail;
-    size_t capacity;
-    size_t size;
-    uint32_t ttl_ms;
-    cupolas_mutex_t lock;
-    cupolas_atomic64_t hit_count;
-    cupolas_atomic64_t miss_count;
+    cache_entry_t**     buckets;        /**< Hash table buckets */
+    size_t              bucket_count;   /**< Number of hash buckets */
+    cache_entry_t*      head;           /**< LRU list head (most recently used) */
+    cache_entry_t*      tail;           /**< LRU list tail (least recently used) */
+    size_t              capacity;       /**< Maximum number of entries */
+    size_t              size;           /**< Current number of entries */
+    uint32_t            ttl_ms;         /**< Time-to-live in milliseconds (0=permanent) */
+    cupolas_mutex_t     lock;           /**< Mutex for thread safety */
+    cupolas_atomic64_t  hit_count;      /**< Cache hit counter */
+    cupolas_atomic64_t  miss_count;     /**< Cache miss counter */
 } cache_manager_t;
 
 /**
- * @brief 创建缓存
- * @param capacity 最大条目数
- * @param ttl_ms TTL（毫秒）�?表示永久
- * @return 缓存句柄，失败返�?NULL
+ * @brief Create permission cache
+ * @param[in] capacity Maximum number of cache entries
+ * @param[in] ttl_ms Time-to-live in milliseconds (0 = permanent/no expiration)
+ * @return Cache manager handle, NULL on failure
+ * @note Thread-safe: Safe to call from multiple threads
+ * @reentrant Yes
+ * @ownership Returns owned pointer: caller must call cache_manager_destroy()
  */
 cache_manager_t* cache_manager_create(size_t capacity, uint32_t ttl_ms);
 
 /**
- * @brief 销毁缓�?
- * @param cm 缓存管理�?
+ * @brief Destroy cache manager and free all resources
+ * @param[in] cm Cache manager handle (may be NULL)
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
+ * @ownership cm: transferred to this function, will be freed
  */
 void cache_manager_destroy(cache_manager_t* cm);
 
 /**
- * @brief 获取缓存结果
- * @param cm 缓存
- * @param agent_id Agent ID
- * @param action 操作
- * @param resource 资源
- * @param context 上下�?
- * @return 1 允许�? 拒绝�?1 未命中或错误
+ * @brief Get cached permission result
+ * @param[in] cm Cache manager handle
+ * @param[in] agent_id Agent identifier
+ * @param[in] action Action being performed
+ * @param[in] resource Resource being accessed
+ * @param[in] context Context information
+ * @return 1=allowed, 0=denied, -1=cache miss or error
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership All parameters: caller retains ownership, may be NULL
  */
 int cache_manager_get(cache_manager_t* cm,
                       const char* agent_id,
@@ -77,13 +95,16 @@ int cache_manager_get(cache_manager_t* cm,
                       const char* context);
 
 /**
- * @brief 存入缓存
- * @param cm 缓存
- * @param agent_id Agent ID
- * @param action 操作
- * @param resource 资源
- * @param context 上下�?
- * @param result 结果�?/0�?
+ * @brief Store permission result in cache
+ * @param[in] cm Cache manager handle
+ * @param[in] agent_id Agent identifier
+ * @param[in] action Action being performed
+ * @param[in] resource Resource being accessed
+ * @param[in] context Context information
+ * @param[in] result Permission result (1=allow, 0=deny)
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ * @ownership All string parameters: caller retains ownership
  */
 void cache_manager_put(cache_manager_t* cm,
                        const char* agent_id,
@@ -93,16 +114,20 @@ void cache_manager_put(cache_manager_t* cm,
                        int result);
 
 /**
- * @brief 清空缓存
- * @param cm 缓存管理�?
+ * @brief Clear all cache entries
+ * @param[in] cm Cache manager handle
+ * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
+ * @reentrant No
  */
 void cache_manager_clear(cache_manager_t* cm);
 
 /**
- * @brief 获取缓存统计信息
- * @param cm 缓存管理�?
- * @param hit_count 命中次数（输出）
- * @param miss_count 未命中次数（输出�?
+ * @brief Get cache statistics
+ * @param[in] cm Cache manager handle
+ * @param[out] hit_count Cache hit counter (may be NULL)
+ * @param[out] miss_count Cache miss counter (may be NULL)
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
  */
 void cache_manager_stats(cache_manager_t* cm, uint64_t* hit_count, uint64_t* miss_count);
 

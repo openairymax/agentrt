@@ -60,6 +60,7 @@ set(GATEWAY_SOURCES
     src/connection_pool.c
     src/utils/jsonrpc.c
     src/utils/hash.c
+    src/utils/secure_mem.c
     src/gateway/http_gateway.c
     src/gateway/ws_gateway.c
     src/gateway/stdio_gateway.c
@@ -133,6 +134,7 @@ if(NOT BUILD_SHARED_LIBS)
         src/connection_pool.c
         src/utils/jsonrpc.c
         src/utils/hash.c
+        src/utils/secure_mem.c
         src/gateway/http_gateway.c
         src/gateway/ws_gateway.c
         src/gateway/stdio_gateway.c
@@ -208,6 +210,7 @@ if(NOT BUILD_SHARED_LIBS)
         src/connection_pool.h
         src/utils/jsonrpc.h
         src/utils/hash.h
+        src/utils/secure_mem.h
         DESTINATION include/agentos/gateway
     )
 endif()

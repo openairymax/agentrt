@@ -1,6 +1,13 @@
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * test_cupolas_core.c - cupolas Module Unit Tests
+ */
+
 /**
  * @file test_cupolas_core.c
- * @brief cupolas 模块单元测试
+ * @brief cupolas Module Unit Tests
  * @author Spharx
  * @date 2024
  */

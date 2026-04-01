@@ -1,6 +1,6 @@
-﻿/**
+/**
  * @file tool.c
- * @brief ���ߵ���ִ�е�Ԫ��������
+ * @brief 工具调用执行单元实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -20,12 +20,12 @@ static agentos_error_t tool_execute(agentos_execution_unit_t* unit, const void* 
     tool_unit_data_t* data = (tool_unit_data_t*)unit->data;
     if (!data || !input) return AGENTOS_EINVAL;
 
-    // ���� input ���ַ�������
+    // 解析 input 为字符串参数
     const char* cmd = (const char*)input;
-    // ģ�⹤��ִ�У�ʵ��Ӧ�����ⲿ�����⣩
+    // 模拟工具执行，实际应调用外部工具接口
     printf("[Tool %s] executing: %s\n", data->tool_name, cmd);
 
-    // �������������򵥵ط����ַ�����
+    // 工具执行成功，简单地返回字符串
     const char* result = "Tool executed successfully";
     *out_output = AGENTOS_STRDUP(result);
     if (!*out_output) return AGENTOS_ENOMEM;

@@ -3,9 +3,12 @@
  * @brief 统一错误处理模块实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
- * 本模块提供统一的错误处理功能，包括�? * - 错误码描述和严重程度管理
- * - 错误链追踪和上下文管�? * - 多语言错误描述支持
- * - 错误统计和报�? */
+ * 本模块提供统一的错误处理功能，包括：
+ * - 错误码描述和严重程度管理
+ * - 错误链追踪和上下文管理
+ * - 多语言错误描述支持
+ * - 错误统计和报告
+ */
 
 #include "error.h"
 #include <stdio.h>
@@ -33,7 +36,7 @@
 #define THREAD_LOCAL __thread
 #endif
 
-/* ==================== 全局状�?==================== */
+/* ==================== 全局状态 ==================== */
 
 /* 当前语言环境 */
 static agentos_language_t g_current_language = AGENTOS_LANG_EN_US;
@@ -45,7 +48,7 @@ static size_t g_i18n_entry_count = 0;
 /* 错误统计信息 */
 static struct {
     uint64_t total_errors;
-    uint64_t errors_by_severity[4]; /* 按严重程度统�?*/
+    uint64_t errors_by_severity[4]; /* 按严重程度统计 */
     uint64_t last_error_time;
     agentos_error_t last_error;
 } g_error_stats;
@@ -85,7 +88,7 @@ static pthread_mutex_t g_error_stats_mutex = PTHREAD_MUTEX_INITIALIZER;
     } while (0)
 #endif
 
-/* ==================== 线程本地错误�?==================== */
+/* ==================== 线程本地错误状态 ==================== */
 
 typedef struct {
     agentos_error_chain_t chain;
@@ -153,68 +156,68 @@ static const error_info_t g_error_info[] = {
     /* 通用基础错误 */
     {AGENTOS_ERR_UNKNOWN, "ERR_UNKNOWN", "Unknown error", "未知错误", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_INVALID_PARAM, "ERR_INVALID_PARAM", "Invalid parameter", "无效参数", AGENTOS_ERR_SEVERITY_ERROR},
-    {AGENTOS_ERR_NULL_POINTER, "ERR_NULL_POINTER", "Null pointer", "空指�?, AGENTOS_ERR_SEVERITY_ERROR},
+    {AGENTOS_ERR_NULL_POINTER, "ERR_NULL_POINTER", "Null pointer", "空指针", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_OUT_OF_MEMORY, "ERR_OUT_OF_MEMORY", "Out of memory", "内存不足", AGENTOS_ERR_SEVERITY_CRITICAL},
-    {AGENTOS_ERR_BUFFER_TOO_SMALL, "ERR_BUFFER_TOO_SMALL", "Buffer too small", "缓冲区太�?, AGENTOS_ERR_SEVERITY_ERROR},
-    {AGENTOS_ERR_NOT_FOUND, "ERR_NOT_FOUND", "Not found", "未找�?, AGENTOS_ERR_SEVERITY_ERROR},
-    {AGENTOS_ERR_ALREADY_EXISTS, "ERR_ALREADY_EXISTS", "Already exists", "已存�?, AGENTOS_ERR_SEVERITY_WARNING},
+    {AGENTOS_ERR_BUFFER_TOO_SMALL, "ERR_BUFFER_TOO_SMALL", "Buffer too small", "缓冲区太小", AGENTOS_ERR_SEVERITY_ERROR},
+    {AGENTOS_ERR_NOT_FOUND, "ERR_NOT_FOUND", "Not found", "未找到", AGENTOS_ERR_SEVERITY_ERROR},
+    {AGENTOS_ERR_ALREADY_EXISTS, "ERR_ALREADY_EXISTS", "Already exists", "已存在", AGENTOS_ERR_SEVERITY_WARNING},
     {AGENTOS_ERR_TIMEOUT, "ERR_TIMEOUT", "Timeout", "超时", AGENTOS_ERR_SEVERITY_WARNING},
-    {AGENTOS_ERR_NOT_SUPPORTED, "ERR_NOT_SUPPORTED", "Not supported", "不支�?, AGENTOS_ERR_SEVERITY_ERROR},
+    {AGENTOS_ERR_NOT_SUPPORTED, "ERR_NOT_SUPPORTED", "Not supported", "不支持", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_PERMISSION_DENIED, "ERR_PERMISSION_DENIED", "Permission denied", "权限不足", AGENTOS_ERR_SEVERITY_ERROR},
-    {AGENTOS_ERR_IO, "ERR_IO", "I/O error", "I/O错误", AGENTOS_ERR_SEVERITY_ERROR},
+    {AGENTOS_ERR_IO, "ERR_IO", "I/O error", "I/O 错误", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_PARSE_ERROR, "ERR_PARSE_ERROR", "Parse error", "解析错误", AGENTOS_ERR_SEVERITY_ERROR},
-    {AGENTOS_ERR_STATE_ERROR, "ERR_STATE_ERROR", "State error", "状态错�?, AGENTOS_ERR_SEVERITY_ERROR},
+    {AGENTOS_ERR_STATE_ERROR, "ERR_STATE_ERROR", "State error", "状态错误", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_OVERFLOW, "ERR_OVERFLOW", "Overflow", "溢出", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_UNDERFLOW, "ERR_UNDERFLOW", "Underflow", "下溢", AGENTOS_ERR_SEVERITY_ERROR},
-    {AGENTOS_ERR_CANCELED, "ERR_CANCELED", "Canceled", "已取�?, AGENTOS_ERR_SEVERITY_INFO},
+    {AGENTOS_ERR_CANCELED, "ERR_CANCELED", "Canceled", "已取消", AGENTOS_ERR_SEVERITY_INFO},
     {AGENTOS_ERR_BUSY, "ERR_BUSY", "Busy", "忙碌", AGENTOS_ERR_SEVERITY_WARNING},
-    {AGENTOS_ERR_WOULD_BLOCK, "ERR_WOULD_BLOCK", "Would block", "将阻�?, AGENTOS_ERR_SEVERITY_WARNING},
-    {AGENTOS_ERR_INTERRUPTED, "ERR_INTERRUPTED", "Interrupted", "被中�?, AGENTOS_ERR_SEVERITY_WARNING},
+    {AGENTOS_ERR_WOULD_BLOCK, "ERR_WOULD_BLOCK", "Would block", "将阻塞", AGENTOS_ERR_SEVERITY_WARNING},
+    {AGENTOS_ERR_INTERRUPTED, "ERR_INTERRUPTED", "Interrupted", "被中断", AGENTOS_ERR_SEVERITY_WARNING},
     
-    /* 系统与平台错�?*/
+    /* 系统与平台错误 */
     {AGENTOS_ERR_SYS_NOT_INIT, "ERR_SYS_NOT_INIT", "System not initialized", "系统未初始化", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_SYS_RESOURCE, "ERR_SYS_RESOURCE", "System resource error", "系统资源错误", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_SYS_DEADLOCK, "ERR_SYS_DEADLOCK", "Deadlock", "死锁", AGENTOS_ERR_SEVERITY_CRITICAL},
     {AGENTOS_ERR_SYS_THREAD, "ERR_SYS_THREAD", "Thread error", "线程错误", AGENTOS_ERR_SEVERITY_ERROR},
-    {AGENTOS_ERR_SYS_MUTEX, "ERR_SYS_MUTEX", "Mutex error", "互斥锁错�?, AGENTOS_ERR_SEVERITY_ERROR},
-    {AGENTOS_ERR_SYS_SEMAPHORE, "ERR_SYS_SEMAPHORE", "Semaphore error", "信号量错�?, AGENTOS_ERR_SEVERITY_ERROR},
+    {AGENTOS_ERR_SYS_MUTEX, "ERR_SYS_MUTEX", "Mutex error", "互斥锁错误", AGENTOS_ERR_SEVERITY_ERROR},
+    {AGENTOS_ERR_SYS_SEMAPHORE, "ERR_SYS_SEMAPHORE", "Semaphore error", "信号量错误", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_SYS_CONDITION, "ERR_SYS_CONDITION", "Condition variable error", "条件变量错误", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_SYS_ATOMIC, "ERR_SYS_ATOMIC", "Atomic operation error", "原子操作错误", AGENTOS_ERR_SEVERITY_ERROR},
-    {AGENTOS_ERR_SYS_SOCKET, "ERR_SYS_SOCKET", "Socket error", "套接字错�?, AGENTOS_ERR_SEVERITY_ERROR},
+    {AGENTOS_ERR_SYS_SOCKET, "ERR_SYS_SOCKET", "Socket error", "套接字错误", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_SYS_PIPE, "ERR_SYS_PIPE", "Pipe error", "管道错误", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_SYS_PROCESS, "ERR_SYS_PROCESS", "Process error", "进程错误", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_SYS_FILE, "ERR_SYS_FILE", "File error", "文件错误", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_SYS_TIME, "ERR_SYS_TIME", "Time error", "时间错误", AGENTOS_ERR_SEVERITY_ERROR},
     
-    /* 内核层错�?*/
-    {AGENTOS_ERR_KERN_IPC, "ERR_KERN_IPC", "IPC error", "IPC错误", AGENTOS_ERR_SEVERITY_ERROR},
+    /* 内核层错误 */
+    {AGENTOS_ERR_KERN_IPC, "ERR_KERN_IPC", "IPC error", "IPC 错误", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_KERN_TASK, "ERR_KERN_TASK", "Task error", "任务错误", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_KERN_SYNC, "ERR_KERN_SYNC", "Synchronization error", "同步错误", AGENTOS_ERR_SEVERITY_ERROR},
-    {AGENTOS_ERR_KERN_LOCK, "ERR_KERN_LOCK", "Lock error", "锁错�?, AGENTOS_ERR_SEVERITY_ERROR},
+    {AGENTOS_ERR_KERN_LOCK, "ERR_KERN_LOCK", "Lock error", "锁错误", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_KERN_MEM, "ERR_KERN_MEM", "Memory error", "内存错误", AGENTOS_ERR_SEVERITY_ERROR},
-    {AGENTOS_ERR_KERN_SCHED, "ERR_KERN_SCHED", "Scheduler error", "调度器错�?, AGENTOS_ERR_SEVERITY_ERROR},
-    {AGENTOS_ERR_KERN_TIMER, "ERR_KERN_TIMER", "Timer error", "定时器错�?, AGENTOS_ERR_SEVERITY_ERROR},
+    {AGENTOS_ERR_KERN_SCHED, "ERR_KERN_SCHED", "Scheduler error", "调度器错误", AGENTOS_ERR_SEVERITY_ERROR},
+    {AGENTOS_ERR_KERN_TIMER, "ERR_KERN_TIMER", "Timer error", "定时器错误", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_KERN_INTERRUPT, "ERR_KERN_INTERRUPT", "Interrupt error", "中断错误", AGENTOS_ERR_SEVERITY_ERROR},
     
-    /* 服务层错�?*/
-    {AGENTOS_ERR_SVC_NOT_READY, "ERR_SVC_NOT_READY", "Service not ready", "服务未就�?, AGENTOS_ERR_SEVERITY_WARNING},
+    /* 服务层错误 */
+    {AGENTOS_ERR_SVC_NOT_READY, "ERR_SVC_NOT_READY", "Service not ready", "服务未就绪", AGENTOS_ERR_SEVERITY_WARNING},
     {AGENTOS_ERR_SVC_BUSY, "ERR_SVC_BUSY", "Service busy", "服务忙碌", AGENTOS_ERR_SEVERITY_WARNING},
-    {AGENTOS_ERR_SVC_STOPPED, "ERR_SVC_STOPPED", "Service stopped", "服务已停�?, AGENTOS_ERR_SEVERITY_ERROR},
+    {AGENTOS_ERR_SVC_STOPPED, "ERR_SVC_STOPPED", "Service stopped", "服务已停止", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_SVC_CONFIG, "ERR_SVC_CONFIG", "Service configuration error", "服务配置错误", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_SVC_DEPENDENCY, "ERR_SVC_DEPENDENCY", "Service dependency error", "服务依赖错误", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_SVC_HEALTH, "ERR_SVC_HEALTH", "Service health error", "服务健康错误", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_SVC_LOADBALANCE, "ERR_SVC_LOADBALANCE", "Load balance error", "负载均衡错误", AGENTOS_ERR_SEVERITY_ERROR},
     
-    /* LLM/AI服务错误 */
-    {AGENTOS_ERR_LLM_NO_PROVIDER, "ERR_LLM_NO_PROVIDER", "No LLM provider", "无LLM提供�?, AGENTOS_ERR_SEVERITY_ERROR},
-    {AGENTOS_ERR_LLM_PROVIDER_FAIL, "ERR_LLM_PROVIDER_FAIL", "LLM provider failure", "LLM提供商失�?, AGENTOS_ERR_SEVERITY_ERROR},
+    /* LLM/AI 服务错误 */
+    {AGENTOS_ERR_LLM_NO_PROVIDER, "ERR_LLM_NO_PROVIDER", "No LLM provider", "无 LLM 提供商", AGENTOS_ERR_SEVERITY_ERROR},
+    {AGENTOS_ERR_LLM_PROVIDER_FAIL, "ERR_LLM_PROVIDER_FAIL", "LLM provider failure", "LLM 提供商失败", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_LLM_RATE_LIMIT, "ERR_LLM_RATE_LIMIT", "Rate limit exceeded", "超出速率限制", AGENTOS_ERR_SEVERITY_WARNING},
-    {AGENTOS_ERR_LLM_CONTEXT_LEN, "ERR_LLM_CONTEXT_LEN", "Context length exceeded", "超出上下文长�?, AGENTOS_ERR_SEVERITY_ERROR},
+    {AGENTOS_ERR_LLM_CONTEXT_LEN, "ERR_LLM_CONTEXT_LEN", "Context length exceeded", "超出上下文长度", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_LLM_INVALID_MODEL, "ERR_LLM_INVALID_MODEL", "Invalid model", "无效模型", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_LLM_AUTH_FAIL, "ERR_LLM_AUTH_FAIL", "Authentication failed", "认证失败", AGENTOS_ERR_SEVERITY_ERROR},
-    {AGENTOS_ERR_LLM_TOKEN_LIMIT, "ERR_LLM_TOKEN_LIMIT", "Token limit exceeded", "超出Token限制", AGENTOS_ERR_SEVERITY_ERROR},
+    {AGENTOS_ERR_LLM_TOKEN_LIMIT, "ERR_LLM_TOKEN_LIMIT", "Token limit exceeded", "超出 Token 限制", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_LLM_PARSE_RESP, "ERR_LLM_PARSE_RESP", "Failed to parse response", "解析响应失败", AGENTOS_ERR_SEVERITY_ERROR},
-    {AGENTOS_ERR_LLM_EMPTY_RESP, "ERR_LLM_EMPTY_RESP", "Empty response", "空响�?, AGENTOS_ERR_SEVERITY_ERROR},
+    {AGENTOS_ERR_LLM_EMPTY_RESP, "ERR_LLM_EMPTY_RESP", "Empty response", "空响应", AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_LLM_COST_EXCEED, "ERR_LLM_COST_EXCEED", "Cost exceeded", "超出成本限制", AGENTOS_ERR_SEVERITY_WARNING},
     
     /* 执行/工具错误 */
@@ -262,6 +265,11 @@ static const size_t g_error_info_count = sizeof(g_error_info) / sizeof(g_error_i
 
 /* ==================== 核心错误处理函数 ==================== */
 
+/**
+ * @brief 获取错误码的英文描述字符串
+ * @param code 错误码
+ * @return 错误描述字符串（英文）
+ */
 const char* agentos_error_str(agentos_error_t code) {
     for (size_t i = 0; i < g_error_info_count; i++) {
         if (g_error_info[i].code == code) {
@@ -271,6 +279,11 @@ const char* agentos_error_str(agentos_error_t code) {
     return "Unknown error";
 }
 
+/**
+ * @brief 获取错误码的严重程度
+ * @param code 错误码
+ * @return 错误严重程度级别
+ */
 agentos_error_severity_t agentos_error_get_severity(agentos_error_t code) {
     for (size_t i = 0; i < g_error_info_count; i++) {
         if (g_error_info[i].code == code) {
@@ -280,6 +293,10 @@ agentos_error_severity_t agentos_error_get_severity(agentos_error_t code) {
     return AGENTOS_ERR_SEVERITY_ERROR;
 }
 
+/**
+ * @brief 获取当前线程的错误链
+ * @return 错误链指针，失败返回 NULL
+ */
 agentos_error_chain_t* agentos_error_get_chain(void) {
     thread_error_state_t* state = get_thread_error_state();
     if (state == NULL || !state->initialized) {
@@ -288,6 +305,9 @@ agentos_error_chain_t* agentos_error_get_chain(void) {
     return &state->chain;
 }
 
+/**
+ * @brief 清除当前线程的错误链
+ */
 void agentos_error_clear(void) {
     thread_error_state_t* state = get_thread_error_state();
     if (state == NULL || !state->initialized) {
@@ -299,6 +319,10 @@ void agentos_error_clear(void) {
 
 /* ==================== 时间获取函数 ==================== */
 
+/**
+ * @brief 获取当前时间（纳秒级）
+ * @return 纳秒级时间戳
+ */
 static uint64_t get_current_time_ns(void) {
 #ifdef _WIN32
     FILETIME ft;
@@ -314,8 +338,17 @@ static uint64_t get_current_time_ns(void) {
 #endif
 }
 
-/* ==================== 错误上下文添加函�?==================== */
+/* ==================== 错误上下文添加函数 ==================== */
 
+/**
+ * @brief 向错误链中添加错误上下文信息（带详细位置）
+ * @param code 错误码
+ * @param file 文件名
+ * @param line 行号
+ * @param func 函数名
+ * @param fmt 错误消息格式字符串
+ * @param ... 可变参数
+ */
 void agentos_error_push_ex(agentos_error_t code,
                            const char* file,
                            int line,
@@ -339,7 +372,7 @@ void agentos_error_push_ex(agentos_error_t code,
     g_error_stats.last_error = code;
     STATS_UNLOCK();
     
-    /* 格式化错误消�?*/
+    /* 格式化错误消息 */
     char message_buffer[1024];
     va_list args;
     va_start(args, fmt);
@@ -352,7 +385,7 @@ void agentos_error_push_ex(agentos_error_t code,
         entry->file = file;
         entry->line = line;
         entry->function = func;
-        entry->message = AGENTOS_STRDUP(message_buffer); /* 需要释放，但错误链生命周期内保�?*/
+        entry->message = AGENTOS_STRDUP(message_buffer); /* 需要释放，但错误链生命周期内保持 */
         entry->error_code = code;
         entry->timestamp_ns = get_current_time_ns();
         chain->depth++;
@@ -375,6 +408,10 @@ void agentos_error_push_ex(agentos_error_t code,
     chain->code = code;
 }
 
+/**
+ * @brief 打印错误链信息到控制台
+ * @param chain 错误链指针
+ */
 void agentos_error_print_chain(const agentos_error_chain_t* chain) {
     if (chain == NULL) {
         printf("Error chain is NULL\n");
@@ -394,6 +431,11 @@ void agentos_error_print_chain(const agentos_error_chain_t* chain) {
     }
 }
 
+/**
+ * @brief 将错误链转换为 JSON 格式
+ * @param chain 错误链指针
+ * @return JSON 字符串（需要调用 AGENTOS_FREE 释放）
+ */
 char* agentos_error_chain_to_json(const agentos_error_chain_t* chain) {
     if (chain == NULL) {
         return AGENTOS_STRDUP("{\"error\": \"null chain\"}");
@@ -403,6 +445,10 @@ char* agentos_error_chain_to_json(const agentos_error_chain_t* chain) {
     return agentos_error_chain_to_json_i18n(chain, -1);
 }
 
+/**
+ * @brief 获取错误统计信息
+ * @param stats 输出统计信息结构
+ */
 void agentos_error_get_stats(agentos_error_stats_t* stats) {
     if (stats == NULL) {
         return;
@@ -418,6 +464,9 @@ void agentos_error_get_stats(agentos_error_stats_t* stats) {
     STATS_UNLOCK();
 }
 
+/**
+ * @brief 重置错误统计信息
+ */
 void agentos_error_reset_stats(void) {
     STATS_LOCK();
     g_error_stats.total_errors = 0;
@@ -431,6 +480,11 @@ void agentos_error_reset_stats(void) {
 
 /* ==================== 多语言支持函数实现 ==================== */
 
+/**
+ * @brief 设置错误描述的语言
+ * @param lang 语言类型
+ * @return 成功返回 AGENTOS_OK，失败返回错误码
+ */
 agentos_error_t agentos_error_set_language(agentos_language_t lang) {
     if ((int)lang < 0 || (int)lang > 7) {
         return AGENTOS_ERR_INVALID_PARAM;
@@ -440,10 +494,20 @@ agentos_error_t agentos_error_set_language(agentos_language_t lang) {
     return AGENTOS_OK;
 }
 
+/**
+ * @brief 获取当前设置的语言
+ * @return 当前语言类型
+ */
 agentos_language_t agentos_error_get_language(void) {
     return g_current_language;
 }
 
+/**
+ * @brief 获取指定语言的错误描述字符串
+ * @param code 错误码
+ * @param lang 语言类型（-1 表示使用当前语言）
+ * @return 错误描述字符串
+ */
 const char* agentos_error_str_i18n(agentos_error_t code, agentos_language_t lang) {
     agentos_language_t use_lang = lang;
     if ((int)lang < 0) {
@@ -454,7 +518,7 @@ const char* agentos_error_str_i18n(agentos_error_t code, agentos_language_t lang
         use_lang = AGENTOS_LANG_EN_US;
     }
     
-    /* 首先检查自定义i18n条目 */
+    /* 首先检查自定义 i18n 条目 */
     for (size_t i = 0; i < g_i18n_entry_count; i++) {
         if (g_i18n_entries[i].error_code == code) {
             const char* desc = g_i18n_entries[i].descriptions[use_lang];
@@ -476,10 +540,16 @@ const char* agentos_error_str_i18n(agentos_error_t code, agentos_language_t lang
         }
     }
     
-    /* 最后回退到默认错误描�?*/
+    /* 最后回退到默认错误描述 */
     return agentos_error_str(code);
 }
 
+/**
+ * @brief 注册自定义多语言错误描述
+ * @param entries 多语言错误描述条目数组
+ * @param count 条目数量
+ * @return 成功返回 AGENTOS_OK，失败返回错误码
+ */
 agentos_error_t agentos_error_register_i18n(
     const agentos_error_i18n_entry_t* entries,
     size_t count) {
@@ -491,14 +561,14 @@ agentos_error_t agentos_error_register_i18n(
     /* 释放现有条目 */
     if (g_i18n_entries != NULL) {
         for (size_t i = 0; i < g_i18n_entry_count; i++) {
-            /* 注意：这里假设descriptions是静态字符串，不需要释�?*/
+            /* 注意：这里假设 descriptions 是静态字符串，不需要释放 */
         }
         AGENTOS_FREE(g_i18n_entries);
         g_i18n_entries = NULL;
         g_i18n_entry_count = 0;
     }
     
-    /* 分配新内�?*/
+    /* 分配新内存 */
     g_i18n_entries = (agentos_error_i18n_entry_t*)AGENTOS_MALLOC(count * sizeof(agentos_error_i18n_entry_t));
     if (g_i18n_entries == NULL) {
         return AGENTOS_ERR_OUT_OF_MEMORY;
@@ -511,6 +581,12 @@ agentos_error_t agentos_error_register_i18n(
     return AGENTOS_OK;
 }
 
+/**
+ * @brief 将错误链转换为多语言 JSON 格式
+ * @param chain 错误链指针
+ * @param lang 语言类型（-1 表示使用当前语言）
+ * @return JSON 字符串（需要调用 AGENTOS_FREE 释放）
+ */
 char* agentos_error_chain_to_json_i18n(
     const agentos_error_chain_t* chain,
     agentos_language_t lang) {
@@ -539,7 +615,7 @@ char* agentos_error_chain_to_json_i18n(
     for (int i = 0; i < chain->depth; i++) {
         const agentos_error_context_entry_t* ctx = &chain->contexts[i];
         
-        /* 转义消息字符�?*/
+        /* 转义消息字符串 */
         char escaped_msg[2048] = {0};
         const char* msg = ctx->message ? ctx->message : "";
         for (size_t j = 0, k = 0; j < strlen(msg) && k < sizeof(escaped_msg) - 1; j++) {
@@ -564,8 +640,13 @@ char* agentos_error_chain_to_json_i18n(
     return buf;
 }
 
-/* ==================== 错误链增强功能实�?==================== */
+/* ==================== 错误链增强功能实现 ==================== */
 
+/**
+ * @brief 初始化错误链迭代器
+ * @param chain 错误链指针
+ * @param iter 迭代器结构
+ */
 void agentos_error_chain_iter_init(
     const agentos_error_chain_t* chain,
     agentos_error_chain_iterator_t* iter) {
@@ -576,6 +657,11 @@ void agentos_error_chain_iter_init(
     iter->current_index = 0;
 }
 
+/**
+ * @brief 迭代器获取下一个错误上下文
+ * @param iter 迭代器指针
+ * @return 错误上下文条目，到达末尾返回 NULL
+ */
 const agentos_error_context_entry_t* agentos_error_chain_iter_next(
     agentos_error_chain_iterator_t* iter) {
     
@@ -593,7 +679,12 @@ const agentos_error_context_entry_t* agentos_error_chain_iter_next(
     return ctx;
 }
 
+/**
+ * @brief 重置迭代器到起始位置
+ * @param iter 迭代器指针
+ */
 void agentos_error_chain_iter_reset(agentos_error_chain_iterator_t* iter) {
     if (!iter) return;
     
-    iter->current_index =
+    iter->current_index = 0;
+}

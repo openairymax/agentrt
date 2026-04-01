@@ -1,14 +1,25 @@
-﻿/**
+/*
+ * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ * 
  * @file config_unified.h
  * @brief 统一配置模块 - 主头文件
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
- *
+ * 
  * 统一配置模块主头文件，包含所有子模块的头文件。
  * 提供统一的分层配置管理：
  * 1. 核心层：统一的配置数据模型和基础接口
  * 2. 源适配层：多种配置源的统一适配
  * 3. 服务层：高级配置功能（验证、热更新、加密等）
  * 4. 兼容层：向后兼容现有配置API
+ * 
+ * @author AgentOS Team
+ * @date 2026-03-30
+ * @version 2.0
+ * 
+ * @note 线程安全：所有公共接口均为线程安全
+ * @see ARCHITECTURAL_PRINCIPLES.md E-2 可观测性原则
+ */
  *
  * 使用示例：
  * 

@@ -1,6 +1,6 @@
-﻿/**
+/**
  * @file memory_service.c
- * @brief 记忆服务高级接口（异步操作、批量处理等�?
+ * @brief 记忆服务高级接口（异步操作、批量处理等）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -33,8 +33,8 @@ static void free_record_copy(agentos_memory_record_t* rec) {
 }
 
 /**
- * @brief 深拷贝记忆记�?
- * @return 成功返回拷贝指针，失败返�?NULL
+ * @brief 深拷贝记忆记录
+ * @return 成功返回拷贝指针，失败返回NULL
  */
 static agentos_memory_record_t* deep_copy_record(const agentos_memory_record_t* record) {
     agentos_memory_record_t* copy = (agentos_memory_record_t*)AGENTOS_CALLOC(1, sizeof(agentos_memory_record_t));
@@ -88,8 +88,8 @@ static void async_write_thread(void* arg) {
 /**
  * @brief 异步写入记忆记录
  * @param engine 记忆引擎
- * @param record 记录数据（函数内部深拷贝，调用者可立即释放�?
- * @param callback 写入完成回调（可�?NULL�?
+ * @param record 记录数据（函数内部深拷贝，调用者可立即释放）
+ * @param callback 写入完成回调（可为NULL）
  * @param userdata 回调用户数据
  * @return AGENTOS_SUCCESS 或错误码
  */

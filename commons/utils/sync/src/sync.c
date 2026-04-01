@@ -33,78 +33,94 @@
  */
 
 /**
- * @brief 互斥锁内部结�? */
+ * @brief 互斥锁内部结构
+ * @note 使用 sync_type_t 类型字段标识锁类型，支持 sync_get_type() 可靠查询
+ */
 struct sync_mutex {
 #ifdef _WIN32
-    CRITICAL_SECTION cs;                 /**< Windows临界�?*/
+    CRITICAL_SECTION cs;                 /**< Windows临界区 */
     bool initialized;                    /**< 是否已初始化 */
 #else
-    pthread_mutex_t mutex;               /**< POSIX互斥�?*/
+    pthread_mutex_t mutex;               /**< POSIX互斥锁 */
     bool initialized;                    /**< 是否已初始化 */
 #endif
-    char* name;                          /**< 锁名�?*/
+    sync_type_t type;                     /**< 锁类型标识 */
+    char* name;                          /**< 锁名称 */
     sync_stats_t stats;                  /**< 统计信息 */
     uint64_t last_lock_time;             /**< 上次加锁时间 */
     uint64_t owner_thread_id;            /**< 拥有者线程ID */
 };
 
 /**
- * @brief 递归互斥锁内部结�? */
+ * @brief 递归互斥锁内部结构
+ * @note 使用 sync_type_t 类型字段标识锁类型，支持 sync_get_type() 可靠查询
+ */
 struct sync_recursive_mutex {
 #ifdef _WIN32
-    CRITICAL_SECTION cs;                 /**< Windows临界区（支持递归�?*/
+    CRITICAL_SECTION cs;                 /**< Windows临界区（支持递归） */
 #else
-    pthread_mutex_t mutex;               /**< POSIX递归互斥�?*/
+    pthread_mutex_t mutex;               /**< POSIX递归互斥锁 */
 #endif
     bool initialized;                    /**< 是否已初始化 */
-    char* name;                          /**< 锁名�?*/
+    sync_type_t type;                     /**< 锁类型标识 */
+    char* name;                          /**< 锁名称 */
     sync_stats_t stats;                  /**< 统计信息 */
     size_t recursion_count;              /**< 递归计数 */
     uint64_t owner_thread_id;            /**< 拥有者线程ID */
 };
 
 /**
- * @brief 读写锁内部结�? */
+ * @brief 读写锁内部结构
+ * @note 使用 sync_type_t 类型字段标识锁类型，支持 sync_get_type() 可靠查询
+ */
 struct sync_rwlock {
 #ifdef _WIN32
-    SRWLOCK lock;                        /**< Windows读写�?*/
+    SRWLOCK lock;                        /**< Windows读写锁 */
 #else
-    pthread_rwlock_t rwlock;             /**< POSIX读写�?*/
+    pthread_rwlock_t rwlock;             /**< POSIX读写锁 */
 #endif
     bool initialized;                    /**< 是否已初始化 */
-    char* name;                          /**< 锁名�?*/
+    sync_type_t type;                     /**< 锁类型标识 */
+    char* name;                          /**< 锁名称 */
     sync_stats_t stats;                  /**< 统计信息 */
 };
 
 /**
- * @brief 自旋锁内部结�? */
+ * @brief 自旋锁内部结构
+ * @note 使用 sync_type_t 类型字段标识锁类型，支持 sync_get_type() 可靠查询
+ */
 struct sync_spinlock {
 #ifdef _WIN32
-    LONG lock;                           /**< Windows自旋�?*/
+    LONG lock;                           /**< Windows自旋锁 */
 #else
-    pthread_spinlock_t spinlock;         /**< POSIX自旋�?*/
+    pthread_spinlock_t spinlock;         /**< POSIX自旋锁 */
 #endif
     bool initialized;                    /**< 是否已初始化 */
-    char* name;                          /**< 锁名�?*/
+    sync_type_t type;                     /**< 锁类型标识 */
+    char* name;                          /**< 锁名称 */
     sync_stats_t stats;                  /**< 统计信息 */
 };
 
 /**
- * @brief 信号量内部结�? */
+ * @brief 信号量内部结构
+ * @note 使用 sync_type_t 类型字段标识锁类型，支持 sync_get_type() 可靠查询
+ */
 struct sync_semaphore {
 #ifdef _WIN32
-    HANDLE semaphore;                    /**< Windows信号量句�?*/
+    HANDLE semaphore;                    /**< Windows信号量句柄 */
 #else
-    sem_t semaphore;                     /**< POSIX信号�?*/
+    sem_t semaphore;                     /**< POSIX信号量 */
 #endif
     bool initialized;                    /**< 是否已初始化 */
-    char* name;                          /**< 锁名�?*/
+    sync_type_t type;                     /**< 锁类型标识 */
+    char* name;                          /**< 锁名称 */
     sync_stats_t stats;                  /**< 统计信息 */
-    unsigned int max_value;              /**< 最大�?*/
+    unsigned int max_value;              /**< 最大值 */
 };
 
 /**
  * @brief 条件变量内部结构
+ * @note 使用 sync_type_t 类型字段标识锁类型，支持 sync_get_type() 可靠查询
  */
 struct sync_condition {
 #ifdef _WIN32
@@ -113,43 +129,48 @@ struct sync_condition {
     pthread_cond_t cond;                 /**< POSIX条件变量 */
 #endif
     bool initialized;                    /**< 是否已初始化 */
-    char* name;                          /**< 锁名�?*/
-    sync_stats_t stats;                  /**< 统计信息 */
+    sync_type_t type;                   /**< 锁类型标识 */
+    char* name;                         /**< 锁名称 */
+    sync_stats_t stats;                 /**< 统计信息 */
 };
 
 /**
  * @brief 屏障内部结构
+ * @note 使用 sync_type_t 类型字段标识锁类型，支持 sync_get_type() 可靠查询
  */
 struct sync_barrier {
 #ifdef _WIN32
-    // Windows没有原生屏障，使用条件变量和互斥锁模�?    CRITICAL_SECTION cs;
-    CONDITION_VARIABLE cond;
-    unsigned int count;
-    unsigned int current;
-    unsigned int generation;
+    CRITICAL_SECTION cs;                /**< Windows临界区（模拟屏障） */
+    CONDITION_VARIABLE cond;            /**< Windows条件变量 */
+    unsigned int count;                  /**< 等待线程数 */
+    unsigned int current;                /**< 当前计数 */
+    unsigned int generation;             /**< 世代计数 */
 #else
     pthread_barrier_t barrier;           /**< POSIX屏障 */
 #endif
     bool initialized;                    /**< 是否已初始化 */
-    char* name;                          /**< 锁名�?*/
-    sync_stats_t stats;                  /**< 统计信息 */
+    sync_type_t type;                   /**< 锁类型标识 */
+    char* name;                         /**< 锁名称 */
+    sync_stats_t stats;                 /**< 统计信息 */
 };
 
 /**
  * @brief 事件内部结构
+ * @note 使用 sync_type_t 类型字段标识锁类型，支持 sync_get_type() 可靠查询
  */
 struct sync_event {
 #ifdef _WIN32
     HANDLE event;                        /**< Windows事件句柄 */
 #else
     pthread_cond_t cond;                 /**< POSIX条件变量（用于模拟事件） */
-    pthread_mutex_t mutex;
-    bool signaled;
-    bool manual_reset;
+    pthread_mutex_t mutex;               /**< POSIX互斥锁 */
+    bool signaled;                       /**< 信号状态 */
+    bool manual_reset;                   /**< 手动重置标志 */
 #endif
     bool initialized;                    /**< 是否已初始化 */
-    char* name;                          /**< 锁名�?*/
-    sync_stats_t stats;                  /**< 统计信息 */
+    sync_type_t type;                   /**< 锁类型标识 */
+    char* name;                         /**< 锁名称 */
+    sync_stats_t stats;                 /**< 统计信息 */
 };
 
 /**
@@ -360,21 +381,25 @@ sync_result_t sync_mutex_create(sync_mutex_t* mutex, const sync_attr_t* attr) {
     if (mutex == NULL) {
         return SYNC_ERROR_INVALID;
     }
-    
+
     struct sync_mutex* m = AGENTOS_CALLOC(1, sizeof(struct sync_mutex));
     if (m == NULL) {
         return SYNC_ERROR_MEMORY;
     }
-    
+
+    // 设置锁类型标识
+    m->type = SYNC_TYPE_MUTEX;
+
     // 设置名称
     if (attr != NULL && attr->name != NULL) {
         m->name = sync_internal_strdup(attr->name);
     }
-    
-    // 初始化统计信�?    memset(&m->stats, 0, sizeof(sync_stats_t));
+
+    // 初始化统计信息
+    memset(&m->stats, 0, sizeof(sync_stats_t));
     m->owner_thread_id = 0;
     m->last_lock_time = 0;
-    
+
 #ifdef _WIN32
     InitializeCriticalSection(&m->cs);
     m->initialized = true;
@@ -387,7 +412,7 @@ sync_result_t sync_mutex_create(sync_mutex_t* mutex, const sync_attr_t* attr) {
     }
     m->initialized = true;
 #endif
-    
+
     *mutex = m;
     return SYNC_SUCCESS;
 }
@@ -539,18 +564,21 @@ sync_result_t sync_rwlock_create(sync_rwlock_t* rwlock, const sync_attr_t* attr)
     if (rwlock == NULL) {
         return SYNC_ERROR_INVALID;
     }
-    
+
     struct sync_rwlock* lock = AGENTOS_CALLOC(1, sizeof(struct sync_rwlock));
     if (lock == NULL) {
         return SYNC_ERROR_MEMORY;
     }
-    
+
+    // 设置锁类型标识
+    lock->type = SYNC_TYPE_RWLOCK;
+
     if (attr != NULL && attr->name != NULL) {
         lock->name = sync_internal_strdup(attr->name);
     }
-    
+
     memset(&lock->stats, 0, sizeof(sync_stats_t));
-    
+
 #ifdef _WIN32
     InitializeSRWLock(&lock->lock);
     lock->initialized = true;
@@ -563,7 +591,7 @@ sync_result_t sync_rwlock_create(sync_rwlock_t* rwlock, const sync_attr_t* attr)
     }
     lock->initialized = true;
 #endif
-    
+
     *rwlock = lock;
     return SYNC_SUCCESS;
 }
@@ -783,18 +811,21 @@ sync_result_t sync_spinlock_create(sync_spinlock_t* spinlock, const sync_attr_t*
     if (spinlock == NULL) {
         return SYNC_ERROR_INVALID;
     }
-    
+
     struct sync_spinlock* lock = AGENTOS_CALLOC(1, sizeof(struct sync_spinlock));
     if (lock == NULL) {
         return SYNC_ERROR_MEMORY;
     }
-    
+
+    // 设置锁类型标识
+    lock->type = SYNC_TYPE_SPINLOCK;
+
     if (attr != NULL && attr->name != NULL) {
         lock->name = sync_internal_strdup(attr->name);
     }
-    
+
     memset(&lock->stats, 0, sizeof(sync_stats_t));
-    
+
 #ifdef _WIN32
     lock->lock = 0;
     lock->initialized = true;
@@ -903,19 +934,22 @@ sync_result_t sync_semaphore_create(sync_semaphore_t* semaphore,
     if (semaphore == NULL) {
         return SYNC_ERROR_INVALID;
     }
-    
+
     struct sync_semaphore* sem = AGENTOS_CALLOC(1, sizeof(struct sync_semaphore));
     if (sem == NULL) {
         return SYNC_ERROR_MEMORY;
     }
-    
+
+    // 设置锁类型标识
+    sem->type = SYNC_TYPE_SEMAPHORE;
+
     if (attr != NULL && attr->name != NULL) {
         sem->name = sync_internal_strdup(attr->name);
     }
-    
+
     memset(&sem->stats, 0, sizeof(sync_stats_t));
     sem->max_value = (max_value == 0) ? 0xFFFFFFFF : max_value;
-    
+
 #ifdef _WIN32
     sem->semaphore = CreateSemaphore(NULL, initial_value, sem->max_value, NULL);
     if (sem->semaphore == NULL) {
@@ -933,7 +967,7 @@ sync_result_t sync_semaphore_create(sync_semaphore_t* semaphore,
     }
     sem->initialized = true;
 #endif
-    
+
     *semaphore = sem;
     return SYNC_SUCCESS;
 }
@@ -1063,9 +1097,16 @@ sync_result_t sync_semaphore_get_value(sync_semaphore_t semaphore, unsigned int*
     if (semaphore == NULL || value == NULL || !semaphore->initialized) {
         return SYNC_ERROR_INVALID;
     }
-    
+
 #ifdef _WIN32
-    // Windows 不支持获取信号量值，返回错误
+    /**
+     * @note Windows平台限制说明：
+     * Windows的信号量API (WaitForSingleObject/ ReleaseSemaphore) 不提供
+     * 获取当前计数器的直接方法。若需要此功能，可考虑：
+     * 1. 使用互斥锁 + 计数器模拟（需自行实现）
+     * 2. 使用条件变量实现更灵活的同步机制
+     * 3. 通过WaitForSingleObject获取等待数间接估算
+     */
     *value = 0;
     return SYNC_ERROR_UNKNOWN;
 #else
@@ -1082,18 +1123,21 @@ sync_result_t sync_condition_create(sync_condition_t* condition, const sync_attr
     if (condition == NULL) {
         return SYNC_ERROR_INVALID;
     }
-    
+
     struct sync_condition* cond = AGENTOS_CALLOC(1, sizeof(struct sync_condition));
     if (cond == NULL) {
         return SYNC_ERROR_MEMORY;
     }
-    
+
+    // 设置锁类型标识
+    cond->type = SYNC_TYPE_CONDITION;
+
     if (attr != NULL && attr->name != NULL) {
         cond->name = sync_internal_strdup(attr->name);
     }
-    
+
     memset(&cond->stats, 0, sizeof(sync_stats_t));
-    
+
 #ifdef _WIN32
     InitializeConditionVariable(&cond->cond);
     cond->initialized = true;
@@ -1215,24 +1259,27 @@ sync_result_t sync_condition_broadcast(sync_condition_t condition) {
     return SYNC_SUCCESS;
 }
 
-sync_result_t sync_barrier_create(sync_barrier_t* barrier, 
+sync_result_t sync_barrier_create(sync_barrier_t* barrier,
                                  unsigned int count,
                                  const sync_attr_t* attr) {
     if (barrier == NULL || count == 0) {
         return SYNC_ERROR_INVALID;
     }
-    
+
     struct sync_barrier* b = AGENTOS_CALLOC(1, sizeof(struct sync_barrier));
     if (b == NULL) {
         return SYNC_ERROR_MEMORY;
     }
-    
+
+    // 设置锁类型标识
+    b->type = SYNC_TYPE_BARRIER;
+
     if (attr != NULL && attr->name != NULL) {
         b->name = sync_internal_strdup(attr->name);
     }
-    
+
     memset(&b->stats, 0, sizeof(sync_stats_t));
-    
+
 #ifdef _WIN32
     InitializeCriticalSection(&b->cs);
     InitializeConditionVariable(&b->cond);
@@ -1248,7 +1295,7 @@ sync_result_t sync_barrier_create(sync_barrier_t* barrier,
     }
 #endif
     b->initialized = true;
-    
+
     *barrier = b;
     return SYNC_SUCCESS;
 }
@@ -1345,18 +1392,21 @@ sync_result_t sync_event_create(sync_event_t* event,
     if (event == NULL) {
         return SYNC_ERROR_INVALID;
     }
-    
+
     struct sync_event* e = AGENTOS_CALLOC(1, sizeof(struct sync_event));
     if (e == NULL) {
         return SYNC_ERROR_MEMORY;
     }
-    
+
+    // 设置锁类型标识
+    e->type = SYNC_TYPE_EVENT;
+
     if (attr != NULL && attr->name != NULL) {
         e->name = sync_internal_strdup(attr->name);
     }
-    
+
     memset(&e->stats, 0, sizeof(sync_stats_t));
-    
+
 #ifdef _WIN32
     e->event = CreateEvent(NULL, manual_reset, initial_state, NULL);
     if (e->event == NULL) {
@@ -1372,7 +1422,7 @@ sync_result_t sync_event_create(sync_event_t* event,
     e->manual_reset = manual_reset;
     e->initialized = true;
 #endif
-    
+
     *event = e;
     return SYNC_SUCCESS;
 }
@@ -1649,13 +1699,38 @@ uint64_t sync_get_thread_id(void) {
     return sync_internal_get_thread_id();
 }
 
-sync_type_t sync_get_type(void* lock) {
+/**
+ * @brief 获取锁类型
+ * @param lock 锁对象指针（可以是任意锁类型）
+ * @param lock_type 锁的实际类型
+ * @return 锁类型标识
+ * @note 调用者必须确保 lock 和 lock_type 匹配，否则行为未定义
+ */
+sync_type_t sync_get_type(void* lock, sync_lock_type_t lock_type) {
     if (lock == NULL) {
-        return SYNC_TYPE_MUTEX;
+        return SYNC_TYPE_UNKNOWN;
     }
-    // 简化实现，通过指针地址判断类型不可靠
-    // 实际实现中应该在结构体中存储类型
-    return SYNC_TYPE_MUTEX;
+
+    switch (lock_type) {
+        case SYNC_LOCK_MUTEX:
+            return ((struct sync_mutex*)lock)->type;
+        case SYNC_LOCK_RECURSIVE_MUTEX:
+            return ((struct sync_recursive_mutex*)lock)->type;
+        case SYNC_LOCK_RWLOCK:
+            return ((struct sync_rwlock*)lock)->type;
+        case SYNC_LOCK_SPINLOCK:
+            return ((struct sync_spinlock*)lock)->type;
+        case SYNC_LOCK_SEMAPHORE:
+            return ((struct sync_semaphore*)lock)->type;
+        case SYNC_LOCK_CONDITION:
+            return ((struct sync_condition*)lock)->type;
+        case SYNC_LOCK_BARRIER:
+            return ((struct sync_barrier*)lock)->type;
+        case SYNC_LOCK_EVENT:
+            return ((struct sync_event*)lock)->type;
+        default:
+            return SYNC_TYPE_UNKNOWN;
+    }
 }
 
 void sync_sleep(unsigned int ms) {
@@ -1709,118 +1784,31 @@ void sync_atomic_store(volatile void* ptr, uintptr_t value) {
     __atomic_store_n((uintptr_t*)ptr, value, __ATOMIC_SEQ_CST);
 #endif
 }
-        while (true) {
-            int rc = pthread_mutex_trylock(&mutex->mutex);
-            if (rc == 0) {
-                break; // 成功获取�?            } else if (rc == EBUSY) {
-                uint64_t current_time = sync_internal_get_timestamp_ms();
-                if (current_time >= end_time) {
-                    sync_internal_update_stats_timeout(&mutex->stats);
-                    sync_internal_record_error(SYNC_ERROR_TIMEOUT, mutex->name);
-                    return SYNC_ERROR_TIMEOUT;
-                }
-                // 短暂休眠后重�?                sync_sleep(1);
-            } else {
-                result = sync_internal_posix_error_to_result(rc);
-                sync_internal_record_error(result, mutex->name);
-                return result;
-            }
-        }
-    }
-#endif
-    
-    uint64_t end_time = sync_internal_get_timestamp_ms();
-    uint64_t wait_time = (end_time > start_time) ? (end_time - start_time) : 0;
-    
-    sync_internal_update_stats_lock(&mutex->stats, wait_time);
-    mutex->owner_thread_id = sync_internal_get_thread_id();
-    mutex->last_lock_time = end_time;
-    
-    return SYNC_SUCCESS;
-}
 
-sync_result_t sync_mutex_try_lock(sync_mutex_t mutex) {
-    if (mutex == NULL || !mutex->initialized) {
-        return SYNC_ERROR_INVALID;
-    }
-    
-#ifdef _WIN32
-    if (TryEnterCriticalSection(&mutex->cs)) {
-        sync_internal_update_stats_lock(&mutex->stats, 0);
-        mutex->owner_thread_id = sync_internal_get_thread_id();
-        mutex->last_lock_time = sync_internal_get_timestamp_ms();
-        return SYNC_SUCCESS;
-    } else {
-        sync_internal_record_error(SYNC_ERROR_BUSY, mutex->name);
-        return SYNC_ERROR_BUSY;
-    }
-#else
-    int rc = pthread_mutex_trylock(&mutex->mutex);
-    if (rc == 0) {
-        sync_internal_update_stats_lock(&mutex->stats, 0);
-        mutex->owner_thread_id = sync_internal_get_thread_id();
-        mutex->last_lock_time = sync_internal_get_timestamp_ms();
-        return SYNC_SUCCESS;
-    } else if (rc == EBUSY) {
-        sync_internal_record_error(SYNC_ERROR_BUSY, mutex->name);
-        return SYNC_ERROR_BUSY;
-    } else {
-        sync_result_t result = sync_internal_posix_error_to_result(rc);
-        sync_internal_record_error(result, mutex->name);
-        return result;
-    }
-#endif
-}
-
-sync_result_t sync_mutex_unlock(sync_mutex_t mutex) {
-    if (mutex == NULL || !mutex->initialized) {
-        return SYNC_ERROR_INVALID;
-    }
-    
-    // 检查是否由当前线程持有
-    uint64_t current_thread_id = sync_internal_get_thread_id();
-    if (mutex->owner_thread_id != 0 && mutex->owner_thread_id != current_thread_id) {
-        sync_internal_record_error(SYNC_ERROR_PERMISSION, mutex->name);
-        return SYNC_ERROR_PERMISSION;
-    }
-    
-#ifdef _WIN32
-    LeaveCriticalSection(&mutex->cs);
-#else
-    int rc = pthread_mutex_unlock(&mutex->mutex);
-    if (rc != 0) {
-        sync_result_t result = sync_internal_posix_error_to_result(rc);
-        sync_internal_record_error(result, mutex->name);
-        return result;
-    }
-#endif
-    
-    sync_internal_update_stats_unlock(&mutex->stats);
-    mutex->owner_thread_id = 0;
-    
-    return SYNC_SUCCESS;
-}
-
-sync_result_t sync_recursive_mutex_create(sync_recursive_mutex_t* mutex, 
+sync_result_t sync_recursive_mutex_create(sync_recursive_mutex_t* mutex,
                                          const sync_attr_t* attr) {
     if (mutex == NULL) {
         return SYNC_ERROR_INVALID;
     }
-    
+
     struct sync_recursive_mutex* m = AGENTOS_CALLOC(1, sizeof(struct sync_recursive_mutex));
     if (m == NULL) {
         return SYNC_ERROR_MEMORY;
     }
-    
+
+    // 设置锁类型标识
+    m->type = SYNC_TYPE_RECURSIVE_MUTEX;
+
     // 设置名称
     if (attr != NULL && attr->name != NULL) {
         m->name = sync_internal_strdup(attr->name);
     }
-    
-    // 初始化统计信�?    memset(&m->stats, 0, sizeof(sync_stats_t));
+
+    // 初始化统计信息
+    memset(&m->stats, 0, sizeof(sync_stats_t));
     m->recursion_count = 0;
     m->owner_thread_id = 0;
-    
+
 #ifdef _WIN32
     InitializeCriticalSection(&m->cs);
     m->initialized = true;
@@ -1828,10 +1816,10 @@ sync_result_t sync_recursive_mutex_create(sync_recursive_mutex_t* mutex,
     pthread_mutexattr_t mutex_attr;
     pthread_mutexattr_init(&mutex_attr);
     pthread_mutexattr_settype(&mutex_attr, PTHREAD_MUTEX_RECURSIVE);
-    
+
     int result = pthread_mutex_init(&m->mutex, &mutex_attr);
     pthread_mutexattr_destroy(&mutex_attr);
-    
+
     if (result != 0) {
         AGENTOS_FREE(m->name);
         AGENTOS_FREE(m);
@@ -1839,7 +1827,7 @@ sync_result_t sync_recursive_mutex_create(sync_recursive_mutex_t* mutex,
     }
     m->initialized = true;
 #endif
-    
+
     *mutex = m;
     return SYNC_SUCCESS;
 }

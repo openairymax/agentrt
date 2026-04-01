@@ -1,14 +1,21 @@
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * cupolas_config.c - Configuration Manager: Runtime Configuration Updates
+ */
+
 /**
  * @file cupolas_config.c
- * @brief 配置管理器 - 运行时配置更新
+ * @brief Configuration Manager - Runtime configuration updates
  * @author Spharx
  * @date 2024
  *
- * 本模块实现配置管理功能：
- * - 配置验证与应用
- * - 版本控制
- * - 观察者模式通知
- * - 自动重载机制
+ * This module implements configuration management:
+ * - Configuration validation and application
+ * - Version control
+ * - Observer pattern notifications
+ * - Auto-reload mechanism
  */
 
 #include "cupolas_config.h"

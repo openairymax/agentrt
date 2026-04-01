@@ -1,6 +1,6 @@
-﻿/**
+/**
  * @file id_utils.c
- * @brief ID���ɹ��ߺ���ʵ��
+ * @brief ID生成工具函数实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -22,7 +22,7 @@
 #include <uuid/uuid.h>
 #endif
 
-// ȫ�ּ�������������������ID
+// 全局计数器用于生成唯一ID
 #ifdef _WIN32
 static volatile LONG task_counter = 0;
 static volatile LONG plan_counter = 0;
@@ -75,7 +75,7 @@ void agentos_generate_record_id(char* buf, size_t len) {
 void agentos_generate_session_id(char* buf, size_t len) {
     if (!buf || len == 0) return;
 
-    // ʹ��ʱ����ͼ��������ɻỰID
+    // 使用时间戳和计数器生成会话ID
     time_t now = time(NULL);
 
 #ifdef _WIN32
@@ -97,7 +97,7 @@ agentos_error_t agentos_generate_uuid(char* buf) {
         return AGENTOS_EINVAL;
     }
 
-    // ת��Ϊ�ַ���
+    // 转换为字符串
     unsigned char* str = NULL;
     status = UuidToStringA(&uuid, &str);
     if (status != RPC_S_OK) {

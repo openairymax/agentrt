@@ -2,7 +2,10 @@
  * @file utils.h
  * @brief AgentOS heapstore 公共工具函数接口
  *
- * Copyright (c) 2026 SPHARX. All Rights Reserved.
+ * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * "From data intelligence emerges."
  */
 
@@ -18,8 +21,14 @@ extern "C" {
 /**
  * @brief 确保目录存在，必要时创建嵌套目录
  *
- * @param path 目录路径
+ * @param path [in] 目录路径
  * @return bool 成功返回 true，失败返回 false
+ *
+ * @ownership 调用者负责 path 的生命周期
+ * @threadsafe 是
+ * @reentrant 是
+ *
+ * @note 支持创建多级嵌套目录
  */
 bool heapstore_ensure_directory(const char* path);
 
