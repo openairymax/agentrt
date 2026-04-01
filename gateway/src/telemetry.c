@@ -1,6 +1,11 @@
-/**
+/*
+ * Copyright (C) 2026 SPHARX. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2026 SPHARX.
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * @file telemetry.c
- * @brief 可观测性实现（Prometheus 格式指标�? * 
+ * @brief 可观测性实现（Prometheus 格式指标）
+ *
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -13,15 +18,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* 最大指标数�?*/
+/* 最大指标数量 */
 #define MAX_METRICS 256
 
-/* 指标值结�?*/
+/* 指标值结构 */
 typedef struct metric_value {
     char*               label_values;
     double              value;
-    uint64_t            count;      /* 用于直方�?*/
-    double              sum;        /* 用于直方�?*/
+    uint64_t            count;      /* 用于直方图 */
+    double              sum;        /* 用于直方图 */
     struct metric_value* next;
 } metric_value_t;
 
@@ -31,11 +36,11 @@ typedef struct metric {
     char                help[256];
     metric_type_t       type;
     char*               labels;         /* 标签名称 */
-    metric_value_t*     values;         /* 值链�?*/
+    metric_value_t*     values;         /* 值链�?*/
     pthread_mutex_t     lock;
 } metric_t;
 
-/* 可观测性结�?*/
+/* 可观测性结构 */
 struct telemetry {
     metric_t            metrics[MAX_METRICS];
     size_t              metric_count;
@@ -45,12 +50,13 @@ struct telemetry {
 /* ========== 辅助函数 ========== */
 
 /**
- * @brief 查找或创建指标�? */
+ * @brief 查找或创建指标值
+ */
 static metric_value_t* get_or_create_value(
     metric_t* m,
     const char* label_values) {
-    
-    /* 查找现有�?*/
+
+    /* 查找现有值 */
     metric_value_t* v = m->values;
     while (v) {
         if (strcmp(v->label_values, label_values ? label_values : "") == 0) {
@@ -58,20 +64,20 @@ static metric_value_t* get_or_create_value(
         }
         v = v->next;
     }
-    
-    /* 创建新�?*/
+
+    /* 创建新值 */
     v = (metric_value_t*)calloc(1, sizeof(metric_value_t));
     if (!v) return NULL;
-    
+
     v->label_values = strdup(label_values ? label_values : "");
     if (!v->label_values) {
         free(v);
         return NULL;
     }
-    
+
     v->next = m->values;
     m->values = v;
-    
+
     return v;
 }
 
@@ -88,6 +94,24 @@ static metric_t* find_metric(telemetry_t* t, const char* name) {
 }
 
 /* ========== 公共 API 实现 ========== */
+
+/**
+ * @brief 计算所需缓冲区大小
+ * @param t 可观测性实例
+ * @return 缓冲区大小
+ */
+static size_t calculate_buffer_size(telemetry_t* t) {
+    size_t size = 1024;  /* 初始大小 */
+
+    for (size_t i = 0; i < t->metric_count; i++) {
+        metric_t* m = &t->metrics[i];
+        size += 256;  /* HELP 和 TYPE 行 */
+        for (metric_value_t* v = m->values; v; v = v->next) {
+            size += 256;
+        }
+    }
+    return size;
+}
 
 telemetry_t* telemetry_create(void) {
     telemetry_t* t = (telemetry_t*)calloc(1, sizeof(telemetry_t));
@@ -282,14 +306,14 @@ agentos_error_t telemetry_export_metrics(
     
     if (!t || !out_metrics) return AGENTOS_EINVAL;
     
-    /* 计算所需缓冲区大�?*/
+    /* 计算所需缓冲区大�?*/
     size_t size = 1024;  /* 初始大小 */
     
     pthread_mutex_lock(&t->lock);
     
     for (size_t i = 0; i < t->metric_count; i++) {
         metric_t* m = &t->metrics[i];
-        size += 256;  /* HELP �?TYPE �?*/
+        size += 256;  /* HELP �?TYPE �?*/
         
         pthread_mutex_lock(&m->lock);
         for (metric_value_t* v = m->values; v; v = v->next) {
@@ -298,26 +322,26 @@ agentos_error_t telemetry_export_metrics(
         pthread_mutex_unlock(&m->lock);
     }
     
-    /* 分配缓冲�?*/
+    /* 分配缓冲区 */
     char* buf = (char*)malloc(size);
     if (!buf) {
         pthread_mutex_unlock(&t->lock);
         return AGENTOS_ENOMEM;
     }
-    
+
     char* p = buf;
     char* end = buf + size;
-    
+
     /* 导出每个指标 */
     for (size_t i = 0; i < t->metric_count; i++) {
         metric_t* m = &t->metrics[i];
-        
-        /* HELP �?*/
+
+        /* HELP 行 */
         if (m->help[0]) {
             p += snprintf(p, end - p, "# HELP %s %s\n", m->name, m->help);
         }
-        
-        /* TYPE �?*/
+
+        /* TYPE 行 */
         const char* type_str = 
             (m->type == METRIC_TYPE_COUNTER) ? "counter" :
             (m->type == METRIC_TYPE_GAUGE) ? "gauge" : "histogram";

@@ -1,7 +1,11 @@
-/**
+/*
+ * Copyright (C) 2026 SPHARX. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2026 SPHARX.
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * @file health.c
  * @brief 健康检查器实现
- * 
+ *
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 

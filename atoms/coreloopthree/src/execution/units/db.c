@@ -1,6 +1,6 @@
-﻿/**
+/**
  * @file db.c
- * @brief 数据库操作单元（模拟�?
+ * @brief 数据库操作单元（模拟）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -17,9 +17,9 @@
 #include "../../../commons/utils/execution/include/execution_common.h"\n\ntypedef struct $1_unit_data {\n    execution_unit_data_t base;\n    char* metadata_json;\n} $1_unit_data_t;
 
 /**
- * @brief 验证SQL查询是否仅包含安全操作（SELECT�?
- * @param query SQL查询字符�?
- * @return 1 安全�? 不安�?
+ * @brief 验证SQL查询是否仅包含安全操作（SELECT）
+ * @param query SQL查询字符串
+ * @return 1 安全，0 不安全
  */
 static int is_safe_query(const char* query) {
     if (!query) return 0;

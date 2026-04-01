@@ -1,9 +1,15 @@
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * platform.c - Cross-platform Abstraction Layer Implementation
+ */
+
 /**
  * @file platform.c
- * @brief 跨平台抽象层实现
+ * @brief Cross-platform Abstraction Layer Implementation
  * @author Spharx
  * @date 2024
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "platform.h"

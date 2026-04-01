@@ -1,4 +1,4 @@
-﻿﻿# Agent OS
+# Agent OS
 
 <div align="center">
 
@@ -43,12 +43,13 @@
 - [📁 项目结构](#-项目结构)
 - [🔄 CoreLoopThree](#-coreloopthree-三层认知循环)
 - [🧠 MemoryRovol](#-memoryrovol-四层记忆系统)
-- [🎨 设计美学“这是工程的艺术”](#-设计美学在工程中的体现)
+- [🎨 工程艺术](#-设计美学在工程中的体现)
 - [🔌 系统调用接口](#-syscall-系统调用接口)
 - [⚙️ 编译指南](#-编译指南)
 - [📊 性能基准](#-性能基准)
 - [📚 文档索引](#-文档索引)
 - [🚀 版本路线](#-版本路线图)
+- [❓ 常见问题](#-常见问题解答-faq)
 - [🌟 生态合作](#-生态合作)
 - [📜 许可证](#-许可证)
 - [🙏 致谢](#-致谢)
@@ -692,6 +693,269 @@ ctest --output-on-failure
 - 成为全球主流 AgentOS 实现标准
 - 构建全球化开源社区
 - 支持量子计算和脑机接口级别应用
+
+---
+
+## ❓ 常见问题解答 (FAQ)
+
+### 📌 基础问题
+
+#### Q1: AgentOS 与传统的 AI Agent 框架有什么区别？
+
+**A**: AgentOS 不是"又一个 Agent 框架"，而是一个**操作系统**。主要区别：
+
+| 维度 | 传统 Agent 框架 | AgentOS |
+|------|----------------|---------|
+| **定位** | 单一智能体实现 | 多智能体协作操作系统 |
+| **架构** | 单体或松耦合模块 | 微内核架构，严格层次分解 |
+| **资源管理** | 无系统级管理 | 内核级任务调度、内存管理 |
+| **安全** | 应用层安全 | 四重安全防护（沙箱/权限/净化/审计） |
+| **记忆** | 简单向量数据库 | 四层记忆卷载系统（L1→L4） |
+| **认知** | 单一模型调用 | 双系统协同 + 多模型投票 |
+| **Token 效率** | 无优化 | 节省约 500% token 消耗 |
+
+#### Q2: AgentOS 适合哪些应用场景？
+
+**A**: AgentOS 特别适合以下场景：
+
+- ✅ **复杂任务编排**: 需要多步骤、多 Agent 协同的工业级任务
+- ✅ **长期记忆需求**: 需要跨会话记忆和知识积累的應用
+- ✅ **高安全性要求**: 需要权限控制、审计追踪的企业应用
+- ✅ **资源受限环境**: atomsmini 轻量级内核支持嵌入式场景
+- ✅ **多语言开发**: Go/Python/Rust/TypeScript 多语言 SDK 支持
+
+**不适合场景**:
+- ❌ 简单单次调用任务（杀鸡用牛刀）
+- ❌ 对延迟极度敏感（<1ms）的实时系统
+- ❌ 已有成熟自研架构，迁移成本高
+
+#### Q3: 学习 AgentOS 需要哪些前置知识？
+
+**A**: 根据角色不同，建议具备：
+
+| 角色 | 建议知识 | 预计学习曲线 |
+|------|---------|-------------|
+| **应用开发者** | Python/Go 基础，了解 Agent 概念 | 1-2 天上手 |
+| **系统开发者** | C/C++，操作系统基础，了解 IPC/内存管理 | 1-2 周深入 |
+| **架构师** | 微内核架构，分布式系统，认知科学基础 | 1 月精通 |
+| **运维人员** | Linux 运维，Docker，监控告警 | 3-5 天熟悉 |
+
+👉 推荐学习路径：[快速开始](manuals/guides/getting_started.md) → [架构设计原则](manuals/ARCHITECTURAL_PRINCIPLES.md) → [CoreLoopThree](manuals/architecture/coreloopthree.md)
+
+---
+
+### 🔧 技术问题
+
+#### Q4: AgentOS 的性能瓶颈在哪里？如何优化？
+
+**A**: 根据性能基准测试，主要瓶颈和优化方向：
+
+| 瓶颈点 | 延迟/吞吐 | 优化方案 | 预期提升 |
+|--------|----------|---------|---------|
+| **L2 向量检索** | <10ms (k=10) | 调整 FAISS IVF 参数，使用 HNSW | 30-50% |
+| **混合检索** | <50ms | 调整权重因子，使用 GPU 加速 | 40-60% |
+| **IPC 通信** | <50μs | 零拷贝优化，共享内存 | 20-30% |
+| **记忆写入** | 10,000 条/秒 | 异步批量写入，增加缓冲区 | 50-100% |
+| **权限检查** | ~5μs (缓存命中) | 增加 LRU 缓存大小 | 10-20% |
+
+**优化建议**:
+1. **优先优化 L2 检索**: 占整体延迟的 60% 以上
+2. **批量操作**: 记忆写入尽量使用批量接口
+3. **缓存策略**: 热点数据使用 L1 缓存
+4. **并行化**: 多路召回使用并发执行
+
+👉 详见 [内核调优指南](manuals/guides/kernel_tuning.md)
+
+#### Q5: 如何保证 AgentOS 的安全性？
+
+**A**: AgentOS 采用**安全内生设计**，四重防护体系：
+
+```
+攻击路径 → 防护层 → 具体机制
+┌─────────────────────────────────────┐
+│ 1. 恶意代码执行 → 虚拟工位          │
+│    - 进程/容器/WASM 沙箱隔离        │
+│    - 最小权限原则                   │
+├─────────────────────────────────────┤
+│ 2. 未授权访问 → 权限裁决            │
+│    - RBAC 权限模型 + YAML 规则引擎   │
+│    - 细粒度访问控制 (读/写/执行/删除)│
+├─────────────────────────────────────┤
+│ 3. 注入攻击 → 输入净化              │
+│    - 正则过滤 + 类型检查            │
+│    - SQL 注入/XSS/命令注入防护       │
+├─────────────────────────────────────┤
+│ 4. 事后追溯 → 审计追踪              │
+│    - 全链路追踪 + 不可篡改日志      │
+│    - 合规审计支持                   │
+└─────────────────────────────────────┘
+```
+
+**安全最佳实践**:
+- ✅ 遵循最小权限原则，仅授予必要权限
+- ✅ 定期更新权限规则和安全策略
+- ✅ 启用审计日志，定期检查异常行为
+- ✅ 使用加密通道传输敏感数据
+- ✅ 定期安全渗透测试
+
+👉 详见 [cupolas 安全穹顶文档](cupolas/README.md)
+
+#### Q6: MemoryRovol 的记忆遗忘机制如何工作？
+
+**A**: MemoryRovol 采用**艾宾浩斯遗忘曲线**模型：
+
+**数学模型**:
+```
+R(t) = e^(-λt / (1 + β·access_count)) · e^(γ·emotional_weight)
+```
+
+其中:
+- `R(t)`: 记忆保留率（1=完全保留，0=完全遗忘）
+- `λ`: 基础遗忘速率常数（默认 0.1）
+- `access_count`: 访问次数（越多越难遗忘）
+- `emotional_weight`: 情感权重（0-1，越高越重要）
+
+**遗忘策略**:
+| 策略 | 触发条件 | 处理方式 |
+|------|---------|---------|
+| **主动遗忘** | R(t) < 0.3 | 从 L2/L3 删除，仅保留 L1 |
+| **归档** | R(t) < 0.5 且 30 天未访问 | 移动到低温存储 |
+| **激活** | 归档记忆被查询 | 重新加载到 L2，R(t) 重置为 0.8 |
+| **巩固** | R(t) > 0.9 且访问>10 次 | 提升到 L4 模式层永久保存 |
+
+**配置示例** (YAML):
+```yaml
+memory:
+  forgetting_curve:
+    base_lambda: 0.1        # 基础遗忘速率
+    access_beta: 0.5        # 访问频率修正系数
+    emotional_gamma: 0.3    # 情感权重系数
+  
+  retention_policy:
+    active_forget_threshold: 0.3    # 主动遗忘阈值
+    archive_threshold: 0.5          # 归档阈值
+    archive_days: 30                # 归档天数
+    consolidate_threshold: 0.9      # 巩固阈值
+    consolidate_access_min: 10      # 最少访问次数
+```
+
+👉 详见 [MemoryRovol 架构文档](manuals/architecture/memoryrovol.md)
+
+---
+
+### 🚀 部署问题
+
+#### Q7: AgentOS 支持哪些部署模式？
+
+**A**: AgentOS 支持 5 种部署模式：
+
+| 模式 | 节点数 | 适用场景 | 资源要求 | 高可用 |
+|------|-------|---------|---------|--------|
+| **开发模式** | 1 | 本地开发调试 | 2GB RAM, 10GB 磁盘 | ❌ |
+| **单机生产** | 1 | 小规模生产 | 4GB RAM, 50GB SSD | ❌ |
+| **集群模式** | 3+ | 中大规模生产 | 8GB+ RAM, 分布式存储 | ✅ |
+| **混合模式** | 2+ | 云 + 边缘协同 | 按需配置 | ✅ |
+| **嵌入式模式** | 1 | IoT/边缘设备 | 512MB RAM, atomsmini | ❌ |
+
+**快速部署命令**:
+```bash
+# Docker 快速部署（开发模式）
+docker run -d --name agentos \
+  -p 8080:8080 \
+  -v ./config:/app/config \
+  -v ./data:/app/data \
+  spharx/agentos:latest
+
+# Kubernetes 部署（集群模式）
+kubectl apply -f deployment/k8s/agentos-cluster.yaml
+```
+
+👉 详见 [部署指南](manuals/guides/deployment.md)
+
+#### Q8: AgentOS 的监控和告警如何配置？
+
+**A**: AgentOS 提供完整的可观测性支持：
+
+**监控指标** (OpenTelemetry 集成):
+```yaml
+# 核心监控指标
+metrics:
+  - agentos_task_total          # 任务总数
+  - agentos_task_duration       # 任务执行时长
+  - agentos_memory_usage        # 内存使用量
+  - agentos_ipc_latency         # IPC 延迟
+  - agentos_memory_query_latency # 记忆检索延迟
+  - agentos_permission_check_latency # 权限检查延迟
+
+# 告警规则示例
+alerts:
+  - name: HighMemoryUsage
+    condition: agentos_memory_usage > 8GB
+    duration: 5m
+    severity: warning
+    
+  - name: HighTaskFailureRate
+    condition: rate(agentos_task_failed[5m]) > 0.1
+    severity: critical
+```
+
+**日志格式** (结构化 JSON):
+```json
+{
+  "timestamp": "2026-03-31T10:30:00.123Z",
+  "level": "ERROR",
+  "trace_id": "abc123def456",
+  "span_id": "span789",
+  "service": "llm_d",
+  "message": "Task execution failed",
+  "error_code": "AGENTOS_ERROR_TASK_FAILED",
+  "context": {
+    "task_id": "task_001",
+    "agent_id": "agent_042"
+  }
+}
+```
+
+👉 详见 [统一日志系统文档](manuals/architecture/logging_system.md)
+
+---
+
+### 💼 商业问题
+
+#### Q9: AgentOS 的开源协议是什么？可以商用吗？
+
+**A**: AgentOS 采用**分层开源协议**：
+
+| 模块 | 协议 | 商用权限 |
+|------|------|---------|
+| **内核层** (atoms/) | Apache 2.0 | ✅ 可商用，可修改，需保留声明 |
+| **安全层** (cupolas/) | Apache 2.0 | ✅ 可商用，可修改，需保留声明 |
+| **生态层** (openlab/) | MIT | ✅ 可商用，可修改，无需开源 |
+
+**商用场景**:
+- ✅ 企业内部使用（无需开源）
+- ✅ 集成到商业产品（需保留版权声明）
+- ✅ 提供 SaaS 服务（无需开源）
+- ✅ 二次开发后闭源发布（Apache 2.0 允许）
+
+**义务**:
+- 保留原始版权声明
+- 保留许可声明
+- 修改后需注明变更（如开源发布）
+
+👉 详见 [LICENSE](LICENSE) | [NOTICE](NOTICE)
+
+#### Q10: 有企业版或商业支持吗？
+
+**A**: 是的，我们提供企业级服务：
+
+| 服务类型 | 内容 | 联系方式 |
+|---------|------|---------|
+| **技术支持** | 7x24 小时技术支持，SLA 保障 | lidecheng@spharx.cn |
+| **定制开发** | 根据企业需求定制功能 | wangliren@spharx.cn |
+| **培训服务** | AgentOS 架构和使用培训 | zhouzhixian@spharx.cn |
+| **安全审计** | 安全渗透测试和代码审计 | security@spharx.cn |
+| **咨询服务** | 架构设计和最佳实践咨询 | consulting@spharx.cn |
 
 ---
 

@@ -3,7 +3,7 @@
  * @brief 跨平台兼容层实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
- * 提供统一的跨平台抽象�?
+ * 提供统一的跨平台抽象层：
  * - 线程与互斥锁
  * - 条件变量
  * - Socket 网络通信
@@ -15,10 +15,6 @@
 #include "platform.h"
 #include <stdio.h>
 #include <stdlib.h>
-
-/* Unified base library compatibility layer */
-#include "../utils/memory/include/memory_compat.h"
-#include "../utils/string/include/string_compat.h"
 #include <string.h>
 #include <time.h>
 
@@ -38,7 +34,7 @@
     #include <errno.h>
 #endif
 
-/* ==================== 网络初始�?==================== */
+/* ==================== 网络初始化 ==================== */
 
 int agentos_network_init(void) {
 #if AGENTOS_PLATFORM_WINDOWS
@@ -104,7 +100,7 @@ int agentos_thread_join(agentos_thread_t thread, void** retval) {
 
 #endif
 
-/* ==================== 互斥锁实�?==================== */
+/* ==================== 互斥锁实现 ==================== */
 
 #if AGENTOS_PLATFORM_WINDOWS
 
@@ -170,7 +166,15 @@ int agentos_cond_wait(agentos_cond_t* cond, agentos_mutex_t* mutex) {
 }
 
 int agentos_cond_timedwait(agentos_cond_t* cond, agentos_mutex_t* mutex, uint32_t timeout_ms) {
-    return SleepConditionVariableCS(cond, mutex, timeout_ms) ? 0 : -1;
+    BOOL result = SleepConditionVariableCS(cond, mutex, timeout_ms);
+    if (!result) {
+        DWORD err = GetLastError();
+        if (err == ERROR_TIMEOUT) {
+            return -2;
+        }
+        return -1;
+    }
+    return 0;
 }
 
 int agentos_cond_signal(agentos_cond_t* cond) {
@@ -207,7 +211,11 @@ int agentos_cond_timedwait(agentos_cond_t* cond, agentos_mutex_t* mutex, uint32_
         ts.tv_sec++;
         ts.tv_nsec -= 1000000000;
     }
-    return pthread_cond_timedwait(cond, mutex, &ts);
+    int ret = pthread_cond_timedwait(cond, mutex, &ts);
+    if (ret == ETIMEDOUT) {
+        return -2;
+    }
+    return ret;
 }
 
 int agentos_cond_signal(agentos_cond_t* cond) {
@@ -298,8 +306,10 @@ int agentos_process_start(const char* executable, char* const argv[],
     char cmdline[4096] = {0};
     snprintf(cmdline, sizeof(cmdline), "\"%s\"", executable);
     for (int i = 1; argv && argv[i]; i++) {
-        snprintf(cmdline + strlen(cmdline), sizeof(cmdline) - strlen(cmdline),
-                 " \"%s\"", argv[i]);
+        size_t remaining = sizeof(cmdline) - strlen(cmdline);
+        if (remaining > 0) {
+            snprintf(cmdline + strlen(cmdline), remaining, " \"%s\"", argv[i]);
+        }
     }
 
     BOOL success = CreateProcessA(
@@ -397,12 +407,10 @@ int agentos_process_start(const char* executable, char* const argv[],
 
 int agentos_process_wait(agentos_process_info_t* proc, uint32_t timeout_ms, int* exit_code) {
     int status;
-    int options = 0;
     pid_t result;
-    int ret = 0;
 
     if (timeout_ms == 0) {
-        result = waitpid(proc->pid, &status, options);
+        result = waitpid(proc->pid, &status, 0);
     } else {
         struct timespec ts;
         ts.tv_sec = timeout_ms / 1000;
@@ -417,7 +425,6 @@ int agentos_process_wait(agentos_process_info_t* proc, uint32_t timeout_ms, int*
             result = waitpid(proc->pid, &status, WNOHANG);
             if (result == 0) {
                 nanosleep(&ts, NULL);
-                result = waitpid(proc->pid, &status, WNOHANG);
             }
         } while (result == 0 && ts.tv_sec > 0);
 
@@ -474,7 +481,7 @@ uint64_t agentos_time_ms(void) {
     return agentos_time_ns() / 1000000ULL;
 }
 
-/* ==================== 随机数接�?==================== */
+/* ==================== 随机数接口 ==================== */
 
 static AGENTOS_THREAD_LOCAL unsigned int g_random_seed = 0;
 static AGENTOS_THREAD_LOCAL int g_random_initialized = 0;
@@ -543,6 +550,7 @@ int agentos_random_bytes(void* buf, size_t len) {
 /* ==================== 文件系统接口 ==================== */
 
 int agentos_file_exists(const char* path) {
+    if (!path) return 0;
 #if AGENTOS_PLATFORM_WINDOWS
     return _access(path, 0) == 0 ? 1 : 0;
 #else
@@ -551,7 +559,9 @@ int agentos_file_exists(const char* path) {
 }
 
 int agentos_mkdir_p(const char* path) {
-    char* tmp = AGENTOS_STRDUP(path);
+    if (!path) return -1;
+
+    char* tmp = strdup(path);
     if (!tmp) return -1;
 
     size_t len = strlen(tmp);
@@ -580,11 +590,12 @@ int agentos_mkdir_p(const char* path) {
     int ret = mkdir(tmp, 0755);
 #endif
 
-    AGENTOS_FREE(tmp);
+    free(tmp);
     return (ret == 0 || errno == EEXIST) ? 0 : -1;
 }
 
 int64_t agentos_file_size(const char* path) {
+    if (!path) return -1;
 #if AGENTOS_PLATFORM_WINDOWS
     struct _stat st;
     if (_stat(path, &st) != 0) {
@@ -600,10 +611,10 @@ int64_t agentos_file_size(const char* path) {
 #endif
 }
 
-/* ==================== 字符串工�?==================== */
+/* ==================== 字符串工具 ==================== */
 
 char* agentos_strlcpy(char* dest, size_t dest_size, const char* src) {
-    if (dest_size == 0) {
+    if (!dest || dest_size == 0 || !src) {
         return dest;
     }
 
@@ -617,7 +628,7 @@ char* agentos_strlcpy(char* dest, size_t dest_size, const char* src) {
 }
 
 char* agentos_strlcat(char* dest, size_t dest_size, const char* src) {
-    if (dest_size == 0) {
+    if (!dest || dest_size == 0 || !src) {
         return dest;
     }
 
@@ -649,6 +660,7 @@ int agentos_get_last_error(void) {
 const char* agentos_strerror(int error) {
 #if AGENTOS_PLATFORM_WINDOWS
     static char msg[256];
+    memset(msg, 0, sizeof(msg));
     FormatMessageA(
         FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
         NULL, (DWORD)error, 0, msg, sizeof(msg), NULL

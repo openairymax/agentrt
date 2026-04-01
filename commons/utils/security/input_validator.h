@@ -1,7 +1,10 @@
-/**
+/*
+ * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ * 
  * @file input_validator.h
  * @brief 输入验证工具库 - 安全内生加固
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
  * 
  * @details
  * 本模块提供统一的输入验证功能，防止注入攻击、路径遍历、缓冲区溢出等安全问题。
@@ -12,6 +15,14 @@
  * 2. 白名单优于黑名单
  * 3. 边界检查必须严格
  * 4. 错误时安全失败
+ * 
+ * @author AgentOS Team
+ * @date 2026-03-30
+ * @version 2.0
+ * 
+ * @note 线程安全：所有公共接口均为线程安全
+ * @see ARCHITECTURAL_PRINCIPLES.md E-1 安全内生原则
+ * @see C_Cpp_secure_coding_guide.md 安全编码指南
  */
 
 #ifndef AGENTOS_INPUT_VALIDATOR_H

@@ -1,11 +1,20 @@
-/**
+/*
+ * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ * 
  * @file sync.h
  * @brief 统一线程同步原语模块 - 核心层API
  * 
  * 提供跨平台、安全、高效的线程同步原语，包括互斥锁、条件变量、信号量、
  * 读写锁、自旋锁、屏障等。支持Windows和POSIX系统。
  * 
- * @copyright Copyright (c) 2026 SPHARX. All Rights Reserved.
+ * @author AgentOS Team
+ * @date 2026-03-30
+ * @version 2.0
+ * 
+ * @note 线程安全：所有公共接口均为线程安全
+ * @see ARCHITECTURAL_PRINCIPLES.md E-3 资源确定性原则
  */
 
 #ifndef AGENTOS_SYNC_H
@@ -28,6 +37,7 @@ extern "C" {
  * @brief 同步原语类型
  */
 typedef enum {
+    SYNC_TYPE_UNKNOWN = 0,               /**< 未知类型 */
     SYNC_TYPE_MUTEX,                     /**< 互斥锁 */
     SYNC_TYPE_RECURSIVE_MUTEX,           /**< 递归互斥锁 */
     SYNC_TYPE_RWLOCK,                    /**< 读写锁 */
@@ -37,6 +47,20 @@ typedef enum {
     SYNC_TYPE_BARRIER,                   /**< 屏障 */
     SYNC_TYPE_EVENT                      /**< 事件 */
 } sync_type_t;
+
+/**
+ * @brief 锁对象类型（用于 sync_get_type 函数的类型安全调用）
+ */
+typedef enum {
+    SYNC_LOCK_MUTEX,                    /**< 互斥锁 */
+    SYNC_LOCK_RECURSIVE_MUTEX,          /**< 递归互斥锁 */
+    SYNC_LOCK_RWLOCK,                    /**< 读写锁 */
+    SYNC_LOCK_SPINLOCK,                  /**< 自旋锁 */
+    SYNC_LOCK_SEMAPHORE,                 /**< 信号量 */
+    SYNC_LOCK_CONDITION,                 /**< 条件变量 */
+    SYNC_LOCK_BARRIER,                   /**< 屏障 */
+    SYNC_LOCK_EVENT                      /**< 事件 */
+} sync_lock_type_t;
 
 /**
  * @brief 锁操作结果
@@ -609,11 +633,13 @@ uint64_t sync_get_thread_id(void);
 
 /**
  * @brief 获取锁类型
- * 
+ *
  * @param[in] lock 锁句柄
- * @return 锁类型
+ * @param[in] lock_type 锁的实际类型（用于安全转换）
+ * @return 锁类型标识
+ * @note 调用者必须确保 lock 和 lock_type 匹配，否则行为未定义
  */
-sync_type_t sync_get_type(void* lock);
+sync_type_t sync_get_type(void* lock, sync_lock_type_t lock_type);
 
 /**
  * @brief 线程休眠

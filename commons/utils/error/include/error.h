@@ -1,14 +1,24 @@
-/**
+/*
+ * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ * 
  * @file error.h
  * @brief 统一错误处理框架
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
- *
+ * 
  * 设计原则：
  * 1. 所有错误码为负值，成功为0
  * 2. 错误码分段管理，避免冲突
  * 3. 支持错误链追踪
  * 4. 线程安全的错误信息存储
  * 5. 支持结构化错误上下文
+ * 
+ * @author AgentOS Team
+ * @date 2026-03-30
+ * @version 2.0
+ * 
+ * @note 线程安全：所有公共接口均为线程安全
+ * @see ARCHITECTURAL_PRINCIPLES.md E-6 错误可追溯原则
  */
 
 #ifndef AGENTOS_UTILS_ERROR_H

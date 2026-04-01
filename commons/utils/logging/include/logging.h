@@ -1,7 +1,10 @@
-﻿/**
+/*
+ * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ * 
  * @file logging.h
  * @brief 统一分层日志系统核心层API
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
  * 
  * @details
  * 本模块提供统一的分层日志系统核心层接口，支持：
@@ -16,6 +19,17 @@
  * 2. 原子层：提供高性能、线程安全的日志写入实现
  * 3. 服务层：提供高级功能（轮转、过滤、传输、监控）
  * 
+ * @author AgentOS Team
+ * @date 2026-03-30
+ * @version 2.0
+ * 
+ * @note 线程安全：所有公共接口均为线程安全
+ * @see ARCHITECTURAL_PRINCIPLES.md E-2 可观测性原则
+ * @see logging_format.md 日志格式规范
+ */
+
+/**
+ * @details
  * 使用示例：
  * @code
  * // 初始化日志系统

@@ -1,6 +1,6 @@
-﻿/**
+/**
  * @file error_utils.c
- * @brief ��������ߺ���ʵ��
+ * @brief 错误处理工具函数实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -16,35 +16,35 @@
 #include <cjson/cJSON.h>
 
 /**
- * @brief �������������Ϣ��ӳ���
+ * @brief 错误码与信息映射表
  */
 static const struct {
     agentos_error_t code;
     const char* name;
     const char* message;
 } error_map[] = {
-    {AGENTOS_SUCCESS, "SUCCESS", "�����ɹ�"},
-    {AGENTOS_EINVAL, "EINVAL", "��Ч����"},
-    {AGENTOS_ENOMEM, "ENOMEM", "�ڴ����ʧ��"},
-    {AGENTOS_ENOTSUP, "ENOTSUP", "��֧�ֵĲ���"},
-    {AGENTOS_EBUSY, "EBUSY", "ϵͳæ"},
-    {AGENTOS_ETIMEDOUT, "ETIMEDOUT", "������ʱ"},
-    {AGENTOS_ENOENT, "ENOENT", "ʵ�岻����"},
-    {AGENTOS_EIO, "EIO", "�����������"},
-    {AGENTOS_EOVERFLOW, "EOVERFLOW", "�������"},
-    {AGENTOS_EEXIST, "EEXIST", "ʵ���Ѵ���"},
-    {AGENTOS_EACCES, "EACCES", "Ȩ�޲���"},
-    {AGENTOS_ECONNREFUSED, "ECONNREFUSED", "���ӱ��ܾ�"},
-    {AGENTOS_ECONNRESET, "ECONNRESET", "���ӱ�����"},
-    {AGENTOS_ENOTCONN, "ENOTCONN", "δ����"},
-    {AGENTOS_EPROTO, "EPROTO", "Э�����"},
-    {AGENTOS_EMSGSIZE, "EMSGSIZE", "��Ϣ����"},
-    {AGENTOS_ENOSPC, "ENOSPC", "�ռ䲻��"},
-    {AGENTOS_ERANGE, "ERANGE", "������Χ"},
-    {AGENTOS_EDEADLK, "EDEADLK", "����"},
-    {AGENTOS_EAGAIN, "EAGAIN", "��Դ��ʱ������"},
-    {AGENTOS_EINTR, "EINTR", "�������ж�"},
-    {AGENTOS_UNKNOWN, "UNKNOWN", "δ֪����"}
+    {AGENTOS_SUCCESS, "SUCCESS", "操作成功"},
+    {AGENTOS_EINVAL, "EINVAL", "无效参数"},
+    {AGENTOS_ENOMEM, "ENOMEM", "内存分配失败"},
+    {AGENTOS_ENOTSUP, "ENOTSUP", "不支持的操作"},
+    {AGENTOS_EBUSY, "EBUSY", "系统忙"},
+    {AGENTOS_ETIMEDOUT, "ETIMEDOUT", "操作超时"},
+    {AGENTOS_ENOENT, "ENOENT", "实体不存在"},
+    {AGENTOS_EIO, "EIO", "输入输出错误"},
+    {AGENTOS_EOVERFLOW, "EOVERFLOW", "缓冲区溢出"},
+    {AGENTOS_EEXIST, "EEXIST", "实体已存在"},
+    {AGENTOS_EACCES, "EACCES", "权限不足"},
+    {AGENTOS_ECONNREFUSED, "ECONNREFUSED", "连接被拒绝"},
+    {AGENTOS_ECONNRESET, "ECONNRESET", "连接被重置"},
+    {AGENTOS_ENOTCONN, "ENOTCONN", "未连接"},
+    {AGENTOS_EPROTO, "EPROTO", "协议错误"},
+    {AGENTOS_EMSGSIZE, "EMSGSIZE", "消息过长"},
+    {AGENTOS_ENOSPC, "ENOSPC", "空间不足"},
+    {AGENTOS_ERANGE, "ERANGE", "数值范围"},
+    {AGENTOS_EDEADLK, "EDEADLK", "死锁"},
+    {AGENTOS_EAGAIN, "EAGAIN", "资源暂时不可用"},
+    {AGENTOS_EINTR, "EINTR", "操作被中断"},
+    {AGENTOS_UNKNOWN, "UNKNOWN", "未知错误"}
 };
 
 #define ERROR_MAP_SIZE (sizeof(error_map) / sizeof(error_map[0]))
@@ -55,7 +55,7 @@ const char* agentos_error_string(agentos_error_t err) {
             return error_map[i].message;
         }
     }
-    return "δ֪����";
+    return "未知错误";
 }
 
 agentos_error_t agentos_error_to_json(
@@ -68,9 +68,9 @@ agentos_error_t agentos_error_to_json(
     cJSON* root = cJSON_CreateObject();
     if (!root) return AGENTOS_ENOMEM;
 
-    // ���Ҵ�����Ϣ
+    // 查找错误信息
     const char* err_name = "UNKNOWN";
-    const char* err_msg = "δ֪����";
+    const char* err_msg = "未知错误";
     for (size_t i = 0; i < ERROR_MAP_SIZE; i++) {
         if (error_map[i].code == err) {
             err_name = error_map[i].name;
@@ -163,9 +163,9 @@ agentos_error_t agentos_error_context_to_json(
     cJSON* root = cJSON_CreateObject();
     if (!root) return AGENTOS_ENOMEM;
 
-    // ���Ҵ�����Ϣ
+    // 查找错误信息
     const char* err_name = "UNKNOWN";
-    const char* err_msg = "δ֪����";
+    const char* err_msg = "未知错误";
     for (size_t i = 0; i < ERROR_MAP_SIZE; i++) {
         if (error_map[i].code == context->code) {
             err_name = error_map[i].name;

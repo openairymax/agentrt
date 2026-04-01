@@ -1,6 +1,13 @@
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * permission_rule.c - Permission Rule Manager Implementation
+ */
+
 /**
  * @file permission_rule.c
- * @brief 权限规则管理器实现
+ * @brief Permission Rule Manager Implementation
  * @author Spharx
  * @date 2024
  */

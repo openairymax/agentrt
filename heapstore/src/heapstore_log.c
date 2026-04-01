@@ -2,7 +2,10 @@
  * @file heapstore_log.c
  * @brief AgentOS 数据分区日志管理实现
  *
- * Copyright (c) 2026 SPHARX. All Rights Reserved.
+ * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * "From data intelligence emerges."
  */
 
@@ -30,11 +33,13 @@
 #define heapstore_LOG_MAX_LINE_LEN 4096
 #define heapstore_LOG_BUFFER_SIZE 8192
 #define heapstore_LOG_MAX_SERVICE_LEN 64
+#define heapstore_LOG_MAX_SERVICES 32
+#define heapstore_LOG_MAX_PATH 512
 
 static heapstore_log_level_t s_log_level = heapstore_LOG_INFO;
 static pthread_mutex_t s_log_lock = PTHREAD_MUTEX_INITIALIZER;
 static FILE* s_main_log_file = NULL;
-static char s_log_root_path[512] = {0};
+static char s_log_root_path[heapstore_LOG_MAX_PATH] = {0};
 static bool s_initialized = false;
 static char s_current_date[16] = {0};
 
@@ -44,17 +49,11 @@ typedef struct {
     pthread_mutex_t lock;
 } service_log_t;
 
-static service_log_t s_service_logs[32];
+static service_log_t s_service_logs[heapstore_LOG_MAX_SERVICES];
 static size_t s_service_log_count = 0;
 
 static pthread_mutex_t s_service_lock = PTHREAD_MUTEX_INITIALIZER;
 
-/**
- * @brief 将日志级别转换为字符串
- *
- * @param level 日志级别
- * @return const char* 级别对应的字符串
- */
 static const char* level_to_string(heapstore_log_level_t level) {
     switch (level) {
         case heapstore_LOG_ERROR: return "ERROR";
@@ -65,19 +64,11 @@ static const char* level_to_string(heapstore_log_level_t level) {
     }
 }
 
-/**
- * @brief 获取日志基础路径
- *
- * @return const char* 日志基础路径
- */
 static const char* get_log_base_path(void) {
     static char base_path[256] = "heapstore/logs";
     return base_path;
 }
 
-/**
- * @brief 更新当前日期缓存
- */
 static void update_current_date(void) {
     time_t now = time(NULL);
     struct tm* tm_info = localtime(&now);
@@ -98,23 +89,17 @@ static FILE* get_main_log_file(void) {
     const char* base = get_log_base_path();
     strncpy(s_log_root_path, base, sizeof(s_log_root_path) - 1);
 
-    char kernel_path[512];
+    char kernel_path[heapstore_LOG_MAX_PATH];
     snprintf(kernel_path, sizeof(kernel_path), "%s/kernel", base);
     heapstore_ensure_directory(kernel_path);
 
-    char filepath[512];
+    char filepath[heapstore_LOG_MAX_PATH];
     snprintf(filepath, sizeof(filepath), "%s/kernel/agentos.log", base);
 
     s_main_log_file = fopen(filepath, "a");
     return s_main_log_file;
 }
 
-/**
- * @brief 获取服务日志文件
- *
- * @param service 服务名称，如果为 NULL 或空则返回主日志文件
- * @return FILE* 日志文件指针
- */
 static FILE* get_service_log_file(const char* service) {
     if (!service || !service[0]) {
         return get_main_log_file();
@@ -130,13 +115,13 @@ static FILE* get_service_log_file(const char* service) {
         }
     }
 
-    if (s_service_log_count < 32) {
+    if (s_service_log_count < heapstore_LOG_MAX_SERVICES) {
         const char* base = get_log_base_path();
-        char service_path[512];
+        char service_path[heapstore_LOG_MAX_PATH];
         snprintf(service_path, sizeof(service_path), "%s/services", base);
         heapstore_ensure_directory(service_path);
 
-        char filepath[512];
+        char filepath[heapstore_LOG_MAX_PATH];
         snprintf(filepath, sizeof(filepath), "%s/services/%s.log", base, service);
 
         FILE* fp = fopen(filepath, "a");
@@ -358,10 +343,10 @@ heapstore_error_t heapstore_log_rotate(void) {
     char timestamp[64];
     strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", tm_info);
 
-    char old_path[512];
+    char old_path[heapstore_LOG_MAX_PATH];
     snprintf(old_path, sizeof(old_path), "heapstore/logs/kernel/agentos.log");
 
-    char new_path[512];
+    char new_path[heapstore_LOG_MAX_PATH];
     snprintf(new_path, sizeof(new_path), "heapstore/logs/kernel/agentos_%s.log", timestamp);
 
     if (rename(old_path, new_path) != 0) {
@@ -392,6 +377,73 @@ heapstore_error_t heapstore_log_cleanup(int days_to_keep, uint64_t* freed_bytes)
         *freed_bytes = 0;
     }
 
+    if (days_to_keep <= 0) {
+        return heapstore_SUCCESS;
+    }
+
+    time_t cutoff_time = time(NULL) - (days_to_keep * 86400);
+
+#ifdef _WIN32
+    WIN32_FIND_DATAA find_data;
+    char search_path[heapstore_LOG_MAX_PATH];
+    
+    snprintf(search_path, sizeof(search_path), "%s/*", get_log_base_path());
+    
+    HANDLE h_find = FindFirstFileA(search_path, &find_data);
+    if (h_find == INVALID_HANDLE_VALUE) {
+        return heapstore_SUCCESS;
+    }
+    
+    do {
+        if (!(find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+            char filepath[heapstore_LOG_MAX_PATH];
+            snprintf(filepath, sizeof(filepath), "%s/%s", get_log_base_path(), find_data.cFileName);
+            
+            FILETIME ft_write = find_data.ftLastWriteTime;
+            ULARGE_INTEGER uli;
+            uli.LowPart = ft_write.dwLowDateTime;
+            uli.HighPart = ft_write.dwHighDateTime;
+            time_t file_time = (time_t)((uli.QuadPart - 116444736000000000ULL) / 10000000);
+            
+            if (file_time < cutoff_time) {
+                uint64_t file_size = ((uint64_t)find_data.nFileSizeHigh << 32) | find_data.nFileSizeLow;
+                if (DeleteFileA(filepath)) {
+                    if (freed_bytes) *freed_bytes += file_size;
+                }
+            }
+        }
+    } while (FindNextFileA(h_find, &find_data));
+    
+    FindClose(h_find);
+#else
+    DIR* dir = opendir(get_log_base_path());
+    if (!dir) {
+        return heapstore_SUCCESS;
+    }
+    
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_type != DT_REG) {
+            continue;
+        }
+        
+        char filepath[heapstore_LOG_MAX_PATH];
+        snprintf(filepath, sizeof(filepath), "%s/%s", get_log_base_path(), entry->d_name);
+        
+        struct stat st;
+        if (stat(filepath, &st) == 0) {
+            if (st.st_mtime < cutoff_time) {
+                uint64_t file_size = (uint64_t)st.st_size;
+                if (unlink(filepath) == 0) {
+                    if (freed_bytes) *freed_bytes += file_size;
+                }
+            }
+        }
+    }
+    
+    closedir(dir);
+#endif
+
     return heapstore_SUCCESS;
 }
 
@@ -403,7 +455,7 @@ heapstore_error_t heapstore_log_get_file_info(const char* service, heapstore_log
 
     memset(info, 0, sizeof(*info));
 
-    char filepath[512];
+    char filepath[heapstore_LOG_MAX_PATH];
     const char* base = get_log_base_path();
 
     if (service && service[0]) {
@@ -444,3 +496,6 @@ heapstore_error_t heapstore_log_get_stats(uint32_t* total_files, uint64_t* total
     return heapstore_SUCCESS;
 }
 
+bool heapstore_log_is_healthy(void) {
+    return s_initialized && s_main_log_file != NULL;
+}

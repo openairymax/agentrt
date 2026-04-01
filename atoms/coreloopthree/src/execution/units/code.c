@@ -27,7 +27,7 @@
 
 /**
  * @brief 创建跨平台临时文件并写入内容
- * @param suffix 文件后缀（如 ".py"�?
+ * @param suffix 文件后缀（如 ".py"）
  * @param content 要写入的内容
  * @param content_len 内容长度
  * @param out_path 输出临时文件路径（需调用者释放）
@@ -160,13 +160,13 @@ static agentos_error_t create_temp_file(
 
 /**
  * @brief 删除临时文件
- * @param path 文件路径（可为NULL�?
+ * @param path 文件路径（可为NULL）
  *
  * @details 跨平台删除临时文件：
  * - Windows: 使用 DeleteFileA
  * - POSIX: 使用 unlink
  *
- * @note 此函数不返回错误状态，因为临时文件删除失败不影响系统正确�?
+ * @note 此函数不返回错误状态，因为临时文件删除失败不影响系统正确性
  */
 static void remove_temp_file(const char* path) {
     if (!path) return;
@@ -287,7 +287,7 @@ static agentos_error_t execute_command_capture(const char* cmd, char** out_outpu
 /**
  * @brief 执行代码的核心逻辑
  * @param unit 执行单元
- * @param input 输入代码字符�?
+ * @param input 输入代码字符串
  * @param out_output 输出执行结果
  * @return AGENTOS_SUCCESS 或错误码
  */
@@ -350,12 +350,12 @@ static agentos_error_t code_execute(
 }
 
 /**
- * @brief 销毁代码执行单�?
+ * @brief 销毁代码执行单元
  */
 static void code_destroy(agentos_execution_unit_t* unit) {\n    if (!unit) return;\n    code_unit_data_t* data = (code_unit_data_t*)unit->data;\n    if (data) {\n        execution_unit_data_cleanup(&data->base);\n        if (data->metadata_json) AGENTOS_FREE(data->metadata_json);\n        AGENTOS_FREE(data);\n    }\n    AGENTOS_FREE(unit);\n}
 
 /**
- * @brief 获取执行单元元数�?
+ * @brief 获取执行单元元数据
  */
 static const char* code_get_metadata(agentos_execution_unit_t* unit) {
     code_unit_data_t* data = (code_unit_data_t*)unit->data;
@@ -364,8 +364,8 @@ static const char* code_get_metadata(agentos_execution_unit_t* unit) {
 
 /**
  * @brief 创建代码执行单元
- * @param language 支持的语言�?python", "javascript", "node"
- * @return 执行单元指针，失败返�?NULL
+ * @param language 支持的语言如"python"、"javascript"、"node"
+ * @return 执行单元指针，失败返回NULL
  */
 agentos_execution_unit_t* agentos_code_unit_create(const char* language) {
     if (!language) return NULL;

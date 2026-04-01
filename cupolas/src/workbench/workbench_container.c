@@ -1,18 +1,25 @@
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * workbench_container.c - Container Mode Implementation: Docker/runc-based Isolated Execution
+ */
+
 /**
  * @file workbench_container.c
- * @brief 容器模式实现 - 基于 Docker/runc 的隔离执行
+ * @brief Container Mode Implementation - Docker/runc-based Isolated Execution
  * @author Spharx
  * @date 2024
  *
- * 本模块实现容器管理功能：
- * - 容器生命周期管理（创建、启动、停止、删除）
- * - 资源限制（内存、CPU、网络等）
- * - 安全隔离
- * - 日志收集
+ * This module implements container management:
+ * - Container lifecycle management (create, start, stop, remove)
+ * - Resource limits (memory, CPU, network, etc.)
+ * - Security isolation
+ * - Log collection
  *
- * 支持的容器运行时：
- * - Docker（优先使用，支持所有功能）
- * - runc（OCI 标准运行时，轻量选择）
+ * Supported container runtimes:
+ * - Docker (preferred, supports all features)
+ * - runc (OCI standard runtime, lightweight option)
  */
 
 #include "workbench_container.h"

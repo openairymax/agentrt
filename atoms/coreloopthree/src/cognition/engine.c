@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file engine.c
  * @brief 认知引擎核心实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -46,9 +46,9 @@ struct agentos_cognition_engine {
 /**
  * @brief 触发反馈回调
  * @param engine 认知引擎
- * @param level 反馈级别�?=实时�?=轮次内，2=跨轮次）
+ * @param level 反馈级别（1=实时，2=轮次内，3=跨轮次）
  * @param event 事件类型
- * @param data 反馈数据（JSON格式�?
+ * @param data 反馈数据（JSON 格式）
  */
 static void trigger_feedback(
     agentos_cognition_engine_t* engine,

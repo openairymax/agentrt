@@ -19,7 +19,7 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 ```
 
 1. **[快速开始](guides/getting_started.md)** — 环境搭建与Hello World示例（5分钟）
-2. **[架构设计原则](architecture/ARCHITECTURAL_PRINCIPLES.md)** — 理解五维正交设计体系
+2. **[架构设计原则](ARCHITECTURAL_PRINCIPLES.md)** — 理解五维正交设计体系
 3. **[创建 Agent](guides/create_agent.md)** — 开发第一个智能体
 4. **[部署指南](guides/deployment.md)** — 部署到生产环境
 
@@ -30,10 +30,10 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 ```
 
 1. **[C 编码规范](specifications/coding_standard/C_coding_style_guide.md)** — 代码风格与最佳实践
-2. **[微内核设计](architecture/folder/microkernel.md)** — CoreKern原子机制
-3. **[三层认知运行时](architecture/folder/coreloopthree.md)** — CoreLoopThree架构
-4. **[四层记忆系统](architecture/folder/memoryrovol.md)** — MemoryRovol架构
-5. **[系统调用设计](architecture/folder/syscall.md)** — Syscall接口契约
+2. **[微内核设计](architecture/microkernel.md)** — CoreKern原子机制
+3. **[三层认知运行时](architecture/coreloopthree.md)** — CoreLoopThree架构
+4. **[四层记忆系统](architecture/memoryrovol.md)** — MemoryRovol架构
+5. **[系统调用设计](architecture/syscall.md)** — Syscall接口契约
 6. **[内核调优](guides/kernel_tuning.md)** — 性能优化实战
 
 ### 架构师视角
@@ -43,9 +43,9 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 ```
 
 1. **[设计哲学总览](philosophy/README.md)** — 理论根基
-2. **[架构设计原则 V1.7](architecture/ARCHITECTURAL_PRINCIPLES.md)** — 五维正交原则体系
-3. **[认知理论](philosophy/folder/Cognition_Theory.md)** — 双系统认知理论
-4. **[记忆理论](philosophy/folder/Memory_Theory.md)** — 记忆分层机制
+2. **[架构设计原则 V1.7](ARCHITECTURAL_PRINCIPLES.md)** — 五维正交原则体系
+3. **[认知理论](philosophy/Cognition_Theory.md)** — 双系统认知理论
+4. **[记忆理论](philosophy/Memory_Theory.md)** — 记忆分层机制
 5. **[契约规范集](specifications/agentos_contract/README.md)** — 接口契约定义
 
 ---

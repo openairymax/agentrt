@@ -1,6 +1,6 @@
-﻿/**
+/**
  * @file test_main.c
- * @brief coreloopthree 测试主程�?
+ * @brief coreloopthree 测试主程序
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -18,15 +18,15 @@ extern int test_majority_edge_cases(void);
 extern int test_coordinator_basic(void);
 
 /**
- * @brief 运行所有测�?
- * @return 0表示成功，非0表示失败
+ * @brief 运行所有测试
+ * @return 0 表示成功，非 0 表示失败
  */
 int main(void) {
-    printf("开始运�?coreloopthree 单元测试...\n");
+    printf("开始运行 coreloopthree 单元测试...\n");
 
     int failures = 0;
 
-    /* 运行多数投票协调器测�?*/
+    /* 运行多数投票协调器测试 */
     if (test_majority_basic() != 0) {
         printf("FAIL: test_majority_basic\n");
         failures++;
@@ -49,7 +49,7 @@ int main(void) {
         printf("PASS: test_coordinator_basic\n");
     }
 
-    /* 汇总结�?*/
+    /* 汇总结果 */
     if (failures == 0) {
         printf("\n所有测试通过！\n");
         return 0;

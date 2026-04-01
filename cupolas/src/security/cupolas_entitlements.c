@@ -1,9 +1,15 @@
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * cupolas_entitlements.c - Entitlements Permission Declarations Implementation
+ */
+
 /**
  * @file cupolas_entitlements.c
- * @brief Entitlements 权限声明 - 细粒度权限声明机制实现
+ * @brief Entitlements Permission Declarations - Fine-grained Permission Mechanism Implementation
  * @author Spharx
  * @date 2026
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "cupolas_entitlements.h"

@@ -2,50 +2,94 @@
  * @file utils.c
  * @brief AgentOS heapstore 公共工具函数实现
  *
- * Copyright (c) 2026 SPHARX. All Rights Reserved.
+ * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * "From data intelligence emerges."
  */
 
 #include "utils.h"
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #ifdef _WIN32
 #include <windows.h>
 #include <direct.h>
-#define mkdir(path, mode) _mkdir(path)
+#include <io.h>
 #else
-#include <unistd.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #endif
 
 bool heapstore_ensure_directory(const char* path) {
-    if (!path || strlen(path) == 0) {
+    if (!path || !path[0]) {
         return false;
     }
 
-    char path_copy[512];
-    strncpy(path_copy, path, sizeof(path_copy) - 1);
-    path_copy[sizeof(path_copy) - 1] = '\0';
+#ifdef _WIN32
+    if (_access(path, 0) == 0) {
+        return true;
+    }
 
-    size_t len = strlen(path_copy);
-    for (size_t i = 0; i < len; i++) {
-        if (path_copy[i] == '\\' || path_copy[i] == '/') {
-            if (i > 0 && path_copy[i - 1] != ':') {
-                path_copy[i] = '\0';
-                if (mkdir(path_copy, 0755) != 0 && errno != EEXIST) {
-                    return false;
-                }
-                path_copy[i] = '/';
+    char tmp[1024];
+    char* p = NULL;
+    size_t len;
+
+    strncpy(tmp, path, sizeof(tmp) - 1);
+    tmp[sizeof(tmp) - 1] = '\0';
+    len = strlen(tmp);
+
+    if (tmp[len - 1] == '/' || tmp[len - 1] == '\\') {
+        tmp[len - 1] = '\0';
+    }
+
+    for (p = tmp + 1; *p; p++) {
+        if (*p == '/' || *p == '\\') {
+            *p = '\0';
+            if (_mkdir(tmp) != 0 && errno != EEXIST) {
             }
+            *p = '/';
         }
     }
 
-    if (mkdir(path_copy, 0755) != 0 && errno != EEXIST) {
+    if (_mkdir(tmp) != 0 && errno != EEXIST) {
         return false;
     }
 
     return true;
+#else
+    struct stat st = {0};
+
+    if (stat(path, &st) == 0) {
+        return S_ISDIR(st.st_mode);
+    }
+
+    char tmp[1024];
+    char* p = NULL;
+    size_t len;
+
+    strncpy(tmp, path, sizeof(tmp) - 1);
+    tmp[sizeof(tmp) - 1] = '\0';
+    len = strlen(tmp);
+
+    if (tmp[len - 1] == '/') {
+        tmp[len - 1] = '\0';
+    }
+
+    for (p = tmp + 1; *p; p++) {
+        if (*p == '/') {
+            *p = '\0';
+            if (mkdir(tmp, 0755) != 0 && errno != EEXIST) {
+            }
+            *p = '/';
+        }
+    }
+
+    if (mkdir(tmp, 0755) != 0 && errno != EEXIST) {
+        return false;
+    }
+
+    return true;
+#endif
 }

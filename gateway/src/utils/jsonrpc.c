@@ -1,4 +1,8 @@
-/**
+/*
+ * Copyright (C) 2026 SPHARX. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2026 SPHARX.
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * @file jsonrpc.c
  * @brief JSON-RPC 2.0 协议工具函数实现
  *

@@ -1,9 +1,15 @@
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * cupolas_network_security.c - Network Security: TLS Hardening and Traffic Implementation
+ */
+
 /**
  * @file cupolas_network_security.c
- * @brief 网络安全 - TLS 强化、流量实现
+ * @brief Network Security - TLS Hardening and Traffic Implementation
  * @author Spharx
  * @date 2026
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "cupolas_network_security.h"

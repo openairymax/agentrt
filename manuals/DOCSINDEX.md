@@ -20,8 +20,8 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 ### 开发者进阶
 
-1. [三层认知运行时](architecture/folder/coreloopthree.md) — CoreLoopThree 架构
-2. [四层记忆系统](architecture/folder/memoryrovol.md) — MemoryRovol 架构
+1. [三层认知运行时](architecture/coreloopthree.md) — CoreLoopThree 架构
+2. [四层记忆系统](architecture/memoryrovol.md) — MemoryRovol 架构
 3. [创建 Agent](guides/create_agent.md) — Agent 生命周期与双系统路径
 4. [创建 Skill](guides/create_skill.md) — Skill 契约与实现模式
 5. [C 编码规范](specifications/coding_standard/C_coding_style_guide.md)
@@ -42,12 +42,12 @@ manuals/
 │
 ├── 架构文档 (Architecture)
 │   ├── ARCHITECTURAL_PRINCIPLES.md   # 架构设计原则 v1.7
-│   ├── folder/coreloopthree.md              # 三层认知运行时 v1.0.0.5
-│   ├── folder/memoryrovol.md                # 四层记忆系统 v1.0.0.5
-│   ├── folder/microkernel.md                # 微内核设计 v1.0.0.5
-│   ├── folder/ipc.md                        # IPC Binder 通信 v1.0.0.5
-│   ├── folder/syscall.md                    # 系统调用设计 v1.0.0.5
-│   └── folder/logging_system.md             # 统一日志系统 v1.0.0.5
+│   ├── coreloopthree.md              # 三层认知运行时 v1.0.0.5
+│   ├── memoryrovol.md                # 四层记忆系统 v1.0.0.5
+│   ├── microkernel.md                # 微内核设计 v1.0.0.5
+│   ├── ipc.md                        # IPC Binder 通信 v1.0.0.5
+│   ├── syscall.md                    # 系统调用设计 v1.0.0.5
+│   └── logging_system.md             # 统一日志系统 v1.0.0.5
 │
 ├── 开发指南 (Guides)
 │   ├── getting_started.md                   # 快速开始 v1.0.0.5
@@ -96,32 +96,32 @@ manuals/
 | 文档 | 路径 | 状态 | 版本 |
 |------|------|------|------|
 | 架构设计原则 | architecture/ARCHITECTURAL_PRINCIPLES.md | 正式发布 | v1.7 |
-| 三层认知运行时 | architecture/folder/coreloopthree.md | 生产就绪 | v1.0.0.5 |
-| 四层记忆系统 | architecture/folder/memoryrovol.md | 生产就绪 | v1.0.0.5 |
-| 微内核设计 | architecture/folder/microkernel.md | 生产就绪 | v1.0.0.5 |
-| IPC 通信 | architecture/folder/ipc.md | 生产就绪 | v1.0.0.5 |
-| 系统调用设计 | architecture/folder/syscall.md | 生产就绪 | v1.0.0.5 |
-| 日志系统 | architecture/folder/logging_system.md | 生产就绪 | v1.0.0.5 |
+| 三层认知运行时 | architecture/coreloopthree.md | 生产就绪 | v1.0.0.5 |
+| 四层记忆系统 | architecture/memoryrovol.md | 生产就绪 | v1.0.0.5 |
+| 微内核设计 | architecture/microkernel.md | 生产就绪 | v1.0.0.5 |
+| IPC 通信 | architecture/ipc.md | 生产就绪 | v1.0.0.5 |
+| 系统调用设计 | architecture/syscall.md | 生产就绪 | v1.0.0.5 |
+| 日志系统 | architecture/logging_system.md | 生产就绪 | v1.0.0.5 |
 
 ### 3.2 开发指南
 
 | 文档 | 路径 | 状态 | 版本 |
 |------|------|------|------|
-| 快速开始 | guides/folder/getting_started.md | 生产就绪 | v1.0.0.5 |
-| 创建 Agent | guides/folder/create_agent.md | 生产就绪 | v1.0.0.5 |
-| 创建 Skill | guides/folder/create_skill.md | 生产就绪 | v1.0.0.5 |
-| 部署指南 | guides/folder/deployment.md | 生产就绪 | v1.0.0.5 |
-| 内核调优 | guides/folder/kernel_tuning.md | 生产就绪 | v1.0.0.5 |
-| 故障排查 | guides/folder/troubleshooting.md | 生产就绪 | v1.0.0.5 |
-| 迁移指南 | guides/folder/migration_guide.md | 生产就绪 | v1.0.0.5 |
+| 快速开始 | guides/getting_started.md | 生产就绪 | v1.0.0.5 |
+| 创建 Agent | guides/create_agent.md | 生产就绪 | v1.0.0.5 |
+| 创建 Skill | guides/create_skill.md | 生产就绪 | v1.0.0.5 |
+| 部署指南 | guides/deployment.md | 生产就绪 | v1.0.0.5 |
+| 内核调优 | guides/kernel_tuning.md | 生产就绪 | v1.0.0.5 |
+| 故障排查 | guides/troubleshooting.md | 生产就绪 | v1.0.0.5 |
+| 迁移指南 | guides/migration_guide.md | 生产就绪 | v1.0.0.5 |
 
 ### 3.3 设计哲学
 
 | 文档 | 路径 | 状态 | 版本 |
 |------|------|------|------|
-| 认知理论 | philosophy/folder/Cognition_Theory.md | 生产就绪 | v1.0 |
-| 设计原则 | philosophy/folder/Design_Principles.md | 生产就绪 | v1.0 |
-| 记忆理论 | philosophy/folder/Memory_Theory.md | 生产就绪 | v1.0 |
+| 认知理论 | philosophy/Cognition_Theory.md | 生产就绪 | v1.0 |
+| 设计原则 | philosophy/Design_Principles.md | 生产就绪 | v1.0 |
+| 记忆理论 | philosophy/Memory_Theory.md | 生产就绪 | v1.0 |
 
 ### 3.4 API 文档
 
@@ -243,9 +243,9 @@ AgentOS 架构设计基于五维正交原则体系，从系统观、内核观、
 | 维度 | 原则数量 | 核心理念 |
 |------|----------|----------|
 | 系统观 (S) | S-1 ~ S-4 | 反馈闭环、层次分解、总体设计部、涌现性管理 |
-| 内核观 (K) | K-1 ~ K-3 | 内核极简、接口契约化、服务隔离 |
-| 认知观 (C) | C-1 ~ C-4 | 双系统分工、记忆持久化、注意力分配、偏差防护 |
-| 工程观 (E) | E-1 ~ E-8 | 安全内生、可观测性、资源确定性、跨平台一致性、错误可追溯、文档即代码、可测试性 |
+| 内核观 (K) | K-1 ~ K-4 | 内核极简、接口契约化、服务隔离、可插拔策略 |
+| 认知观 (C) | C-1 ~ C-4 | 双系统协同、增量演化、记忆卷载、遗忘机制 |
+| 工程观 (E) | E-1 ~ E-8 | 安全内生、可观测性、资源确定性、跨平台一致性、命名语义化、错误可追溯、文档即代码、可测试性 |
 | 设计美学 (A) | A-1 ~ A-4 | 极简主义、细节关注、人文关怀、完美主义 |
 
 详细说明请参阅 [架构设计原则 v1.7](architecture/ARCHITECTURAL_PRINCIPLES.md)。

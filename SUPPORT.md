@@ -1,8 +1,8 @@
-﻿# 支持与支持渠道 SUPPORT
+# 支持与支持渠道 SUPPORT
 
 如果您在使用 AgentOS 过程中遇到问题或需要帮助，请参考以下支持渠道。
 
-## 📋 目录
+## 📑 目录
 
 - [文档资源](#文档资源)
 - [社区支持](#社区支持)
@@ -18,259 +18,157 @@
 ### 官方文档
 
 - **[README.md](README.md)** - 项目概述和快速开始
-- **[快速入门](paper/guides/getting_started.md)** - 新手指南
-- **[架构文档](paper/architecture/)** - 深入理解系统设计
-- **[API 文档](paper/api/)** - 接口参考
-- **[开发指南](paper/guides/)** - 最佳实践
+- **[快速入门](manuals/guides/getting_started.md)** - 新手指南
+- **[架构文档](manuals/architecture/)** - 深入理解系统设计
+- **[API 文档](manuals/api/)** - 接口参考
+- **[开发指南](manuals/guides/)** - 最佳实践
+- **[架构设计原则](manuals/ARCHITECTURAL_PRINCIPLES.md)** - 五维正交原则体系
 
-<!-- From data intelligence emerges. by spharx -->
-### 技术文档
+### 核心技术文档
 
-- **[CoreLoopThree 架构](paper/architecture/coreloopthree.md)** - 三层一体核心运行时
-- **[MemoryRovol 架构](paper/architecture/memoryrovol.md)** - 记忆卷载系统
-- **[IPC 机制](paper/architecture/ipc.md)** - 进程间通信
-- **[微内核设计](paper/architecture/microkernel.md)** - 内核架构
-- **[系统调用](paper/architecture/syscall.md)** - 系统调用接口
+- **[CoreLoopThree 架构](manuals/architecture/coreloopthree.md)** - 三层认知运行时详解
+- **[MemoryRovol 架构](manuals/architecture/memoryrovol.md)** - 四层记忆系统详解
+- **[微内核设计](manuals/architecture/microkernel.md)** - 微内核架构详解
+- **[系统调用](manuals/architecture/syscall.md)** - 系统调用接口规范
+- **[IPC 通信](manuals/architecture/ipc.md)** - 进程间通信机制
+- **[统一日志系统](manuals/architecture/logging_system.md)** - 日志规范
 
-### 外部资源
+### 规范文档
 
-- **[Workshop 文档](../Workshop/README.md)** - 数据采集工厂
-- **[Deepness 文档](../Deepness/README.md)** - 深度加工系统
-- **[Benchmark 指标](../Benchmark/metrics/README.md)** - 性能评测
+- **[编码规范](manuals/specifications/coding_standard/)** - C/C++/Python 编码风格
+- **[术语表](manuals/specifications/TERMINOLOGY.md)** - 统一术语定义
+- **[Agent 契约](manuals/specifications/agentos_contract/agent_contract.md)** - Agent 接口规范
+- **[Skill 契约](manuals/specifications/agentos_contract/skill_contract.md)** - Skill 接口规范
+
+### 多语言文档
+
+- **[简体中文](manuals/readme/README.md)** - 中文文档
+- **[English](manuals/readme/en/README.md)** - English documentation
+- **[Français](manuals/readme/fr/README.md)** - Documentation française
+- **[Deutsch](manuals/readme/de/README.md)** - Deutsche Dokumentation
 
 ---
 
 ## 社区支持
 
-### GitHub Issues（国际镜像）
+### Gitee Issues（官方主仓库）
 
 **适用场景**:
 - 报告 Bug
 - 提出功能建议
 - 询问具体问题
 
-**使用方法**:
-1. 访问 [GitHub Issues](https://github.com/SpharxTeam/AgentOS/issues) (国际镜像)
-   或 [Gitee Issues](https://gitee.com/spharx/agentos/issues) (国内官方，访问更快)
-2. 搜索是否已有类似问题
-3. 创建新 Issue 并选择合适的模板
-4. 提供详细信息（环境、复现步骤、错误日志等）
-
-**响应时间**: 48 小时内
+**链接**: https://gitee.com/spharx/agentos/issues
 
 ### GitHub Discussions（国际镜像）
 
 **适用场景**:
 - 一般性问题讨论
 - 分享使用经验
-- 展示项目案例
-- 社区交流
+- 寻找合作者
 
-**使用方法**:
-1. 访问 [GitHub Discussions](https://github.com/SpharxTeam/AgentOS/discussions)
-2. 选择合适的分类（Q&A、Show and tell、General 等）
-3. 发布讨论帖
+**链接**: https://github.com/SpharxTeam/AgentOS/discussions
 
-**响应时间**: 视社区活跃度而定
+### 技术社区
 
-**注意**: 如果您在中国大陆，访问 Gitee 会更快；如果您在其他地区，建议使用 GitHub。
-
-### 邮件列表
-
-**适用场景**:
-- 安全问题报告
-- 商务合作
-- 其他不适合公开讨论的话题
-
-**邮箱地址**:
-- 技术支持：lidecheng@spharx.cn
-- 安全问题：wangliren@spharx.cn
-- 行为准则：wangliren@spharx.cn
+- **知乎**: 关注 AgentOS 官方账号
+- **CSDN**: 搜索 AgentOS 技术博客
+- **掘金**: 查看 AgentOS 相关文章
 
 ---
 
 ## 商业支持
 
-我们提供专业的商业支持服务，适用于企业用户和生产环境部署。
+我们为企业提供专业的商业支持服务。
 
-### 商业支持内容
+### 支持服务
 
-#### 1. 技术支持服务
+| 服务类型 | 内容 | 响应时间 |
+|---------|------|---------|
+| **技术支持** | 7x24 小时技术支持，SLA 保障 | 2 小时响应 |
+| **定制开发** | 根据企业需求定制功能 | 按需协商 |
+| **培训服务** | AgentOS 架构和使用培训 | 按需安排 |
+| **安全审计** | 安全渗透测试和代码审计 | 5 个工作日 |
+| **咨询服务** | 架构设计和最佳实践咨询 | 3 个工作日 |
 
-- **优先响应**: 工作日 4 小时内响应
-- **专属客服**: 一对一技术支持
-- **远程协助**: 问题排查和解决
-- **定期巡检**: 系统健康检查
+### 企业版特性
 
-#### 2. 定制化开发
+- ✅ 优先技术支持
+- ✅ 专属客户经理
+- ✅ 定制化培训
+- ✅ 定期健康检查
+- ✅ 版本升级保障
+- ✅ 安全补丁优先
 
-- **功能定制**: 根据需求开发特定功能
-- **硬件适配**: 专用硬件集成和优化
-- **性能调优**: 针对业务场景优化性能
-- **系统集成**: 与现有系统集成
+### 联系商业支持
 
-#### 3. 培训服务
-
-- **在线培训**: 远程技术培训
-- **现场培训**: 上门技术指导
-- **文档定制**: 定制化技术文档
-- **认证考试**: 技术人员认证
-
-#### 4. 授权许可
-
-- **商业闭源授权**: 闭源使用和销售许可
-- **企业版授权**: 多用户企业版
-- **OEM 授权**: 嵌入式设备授权
-- **云服务授权**: SaaS 服务授权
-
-### 服务级别
-
-| 服务级别 | 响应时间 | 服务方式 | 适用场景 |
-|---------|---------|---------|---------|
-| **基础版** | 工作日 24h | 邮件/远程 | 中小企业 |
-| **专业版** | 工作日 4h | 专属客服 + 远程 | 生产环境 |
-| **企业版** | 7×24h 4h | 专属团队 + 现场 | 关键业务 |
-
-### 联系我们
-
-**商务咨询**:
-- 邮箱：zhouzhixian@spharx.cn
-- 官网：https://spharx.cn
-- 工作时间：全天 9:00-18:00 (北京时间)
+- **邮箱**: consulting@spharx.cn
+- **电话**: +86-XXX-XXXX-XXXX（工作日 9:00-18:00）
+- **微信**: SpharxOfficial
 
 ---
 
-## 常见问题 FAQ
+## 联系方式
 
-### Q1: 安装时遇到依赖问题怎么办？
+### 技术支持
 
-**A**: 请按以下步骤操作：
+- **邮箱**: lidecheng@spharx.cn
+- **响应时间**: 24 小时内回复
+- **适用场景**: 技术问题、Bug 报告、使用咨询
 
-1. 检查 Python 版本是否为 3.9+
-   ```bash
-   python3 --version
-   ```
+### 安全问题
 
-2. 升级 pip 到最新版本
-   ```bash
-   python3 -m pip install --upgrade pip
-   ```
+- **邮箱**: wangliren@spharx.cn
+- **响应时间**: 24 小时内确认，5 个工作日内提供评估
+- **适用场景**: 安全漏洞报告、安全咨询
+- **加密**: 支持 PGP 加密，密钥可通过邮件索取
 
-3. 使用虚拟环境
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
+### 商务合作
 
-4. 运行环境验证脚本
-   ```bash
-   ./validate.sh
-   ```
+- **邮箱**: zhouzhixian@spharx.cn
+- **响应时间**: 2 个工作日内回复
+- **适用场景**: 商业合作、企业采购、战略合作
 
-### Q2: 如何报告安全漏洞？
+### 官方渠道
 
-**A**: 请遵循 [SECURITY.md](SECURITY.md) 中的流程：
-
-- 发送详细信息至 wangliren@spharx.cn
-- 不要公开披露漏洞细节
-- 给我们合理的时间修复
-
-### Q3: 可以用于商业用途吗？
-
-**A**: 可以，但需要注意：
-
-- **开源用途**: 免费使用，但需遵守 Apache 2.0 协议
-- **商业用途**: 需要申请商业授权
-- 详见 [LICENSE](LICENSE) 文件
-
-### Q4: 支持哪些操作系统？
-
-**A**: AgentOS 支持：
-
-- ✅ Linux (Ubuntu 22.04+, CentOS 8+)
-- ✅ macOS (13.0+)
-- ✅ Windows 11 (WSL2)
-
-### Q5: 如何升级到新版本？
-
-**A**: 升级步骤：
-
-1. 查看 [CHANGELOG.md](CHANGELOG.md) 了解变更
-2. 备份当前版本和数据
-3. 拉取最新代码
-   ```bash
-   git pull origin main
-   ```
-4. 更新依赖
-   ```bash
-   poetry install  # 或 pip install -e .
-   ```
-5. 运行迁移脚本（如有）
-   ```bash
-   python scripts/migrate.py
-   ```
-
-### Q6: 性能不达标怎么办？
-
-**A**: 可以尝试：
-
-1. 查看 [性能基准](paper/specifications/performance.md)
-2. 运行性能诊断工具
-   ```bash
-   make benchmark
-   ```
-3. 调整配置参数（详见内核调优指南）
-4. 联系技术支持获取优化建议
+- **Gitee**: https://gitee.com/spharx/agentos
+- **GitHub**: https://github.com/SpharxTeam/AgentOS
+- **官方网站**: https://spharx.cn
 
 ---
 
-## 反馈与建议
+## 常见问题
 
-我们非常重视您的反馈，无论是对项目的批评还是建议，都能帮助我们变得更好。
+### Q: 我应该在哪里提问？
 
-### 提交反馈
+**A**: 
+- 如果是 Bug 报告或功能建议 → Gitee Issues
+- 如果是使用问题 → GitHub Discussions 或邮件技术支持
+- 如果是紧急问题 → 邮件技术支持并标注 [URGENT]
 
-- 在 GitHub Issue 中描述您的问题
-- 发送邮件至技术支持邮箱
-- 在 Discussions 中发起讨论
+### Q: 提问时应该提供哪些信息？
 
-### 参与改进
+**A**: 为了提高问题解决效率，请提供：
+- AgentOS 版本号
+- 操作系统和版本
+- 详细的错误信息或日志
+- 复现步骤
+- 期望行为和实际行为
 
-- 提交 Pull Request 改进代码
-- 改进和完善文档
-- 分享使用经验和最佳实践
+### Q: 如何获得更快的响应？
 
----
-
-## 社区守则
-
-参与社区讨论时，请遵守：
-
-1. **尊重他人**: 保持礼貌和专业
-2. **建设性**: 提供有建设性的意见
-3. **保密**: 不泄露敏感信息
-4. **合法合规**: 遵守相关法律法规
-
-详见 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+**A**:
+- 确保问题描述清晰完整
+- 提供可复现的示例代码
+- 先查阅文档和现有 Issue
+- 考虑购买商业支持服务
 
 ---
 
 <div align="center">
 
-**感谢您选择 AgentOS！**
-
-如有任何问题，请随时联系我们。
-
-**SPHARX 极光感知科技**
-
-**技术支持**: lidecheng@spharx.cn  
-**安全问题**: wangliren@spharx.cn  
-**商务合作**: zhouzhixian@spharx.cn  
-**官方网站**: https://spharx.cn
-
-</div>
-
----
+**我们在这里帮助您！💪**
 
 © 2026 SPHARX Ltd. All Rights Reserved.
 
+</div>

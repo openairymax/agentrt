@@ -1,14 +1,19 @@
-﻿/**
+/**
  * @file scheduler.c
- * @brief 任务调度器（基于新架构：核心�?+ 平台适配器）
+ * @brief 任务调度器（基于新架构：核心层 + 平台适配器）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * @details
- * 本模块使用新的三层架构实现跨平台线程管理�? * 1. 核心层（platform-agnostic）：任务管理、哈希表、原子操�? * 2. 适配器接口（platform-interface）：统一平台操作定义
+ * 本模块使用新的三层架构实现跨平台线程管理：
+ * 1. 核心层（platform-agnostic）：任务管理、哈希表、原子操作
+ * 2. 适配器接口（platform-interface）：统一平台操作定义
  * 3. 平台适配器（platform-specific）：Windows/POSIX具体实现
  *
- * 优势�? * - 消除Windows/POSIX代码重复
- * - 提高可测试性和可维护�? * - 降低圈复杂度（通过模块分解�? * - 支持未来平台扩展
+ * 优势：
+ * - 消除Windows/POSIX代码重复
+ * - 提高可测试性和可维护性
+ * - 降低圈复杂度（通过模块分解）
+ * - 支持未来平台扩展
  */
 
 #include "task.h"
@@ -26,15 +31,17 @@
 /* ==================== 类型适配辅助 ==================== */
 
 /**
- * @brief 用户线程入口函数适配�? *
- * 将用户提供的 void (*func)(void*) 转换�?void* (*entry)(void*) 格式�? *
+ * @brief 用户线程入口函数适配器
+ *
+ * 将用户提供的 void (*func)(void*) 转换为 void* (*entry)(void*) 格式
+ *
  * @param user_func 用户线程入口函数
  * @param arg 线程参数
  * @return 始终返回NULL（用户函数无返回值）
  */
 static void* user_thread_entry_adapter(void* (*user_func)(void*), void* arg)
 {
-    /* 用户函数�?void (*func)(void*)，我们调用它并返回NULL */
+    /* 用户函数是 void (*func)(void*)，我们调用它并返回NULL */
     user_func(arg);
     return NULL;
 }
@@ -42,7 +49,8 @@ static void* user_thread_entry_adapter(void* (*user_func)(void*), void* arg)
 /**
  * @brief 包装用户线程入口函数
  *
- * 创建适配器函数指针，用于核心层�? *
+ * 创建适配器函数指针，用于核心层调用
+ *
  * @param user_func 用户线程入口函数
  * @return 适配后的函数指针
  */
@@ -57,17 +65,18 @@ static void* (*wrap_user_thread_entry(void (*user_func)(void*)))(void*)
 /**
  * @brief 确保调度器完全初始化
  *
- * 初始化调度器核心层和平台适配器�? *
- * @return 0 成功�?1 失败
+ * 初始化调度器核心层和平台适配器
+ *
+ * @return 0 成功，-1 失败
  */
 static int ensure_scheduler_fully_initialized(void)
 {
-    /* 初始化调度器核心�?*/
+    /* 初始化调度器核心层 */
     if (scheduler_core_init() != 0) {
         return -1;
     }
 
-    /* 初始化平台适配�?*/
+    /* 初始化平台适配器 */
     if (scheduler_platform_auto_init() != 0) {
         return -1;
     }
@@ -78,7 +87,8 @@ static int ensure_scheduler_fully_initialized(void)
 /**
  * @brief 根据平台句柄查找任务信息
  *
- * 通过平台特定句柄查找对应的任务信息结构�? *
+ * 通过平台特定句柄查找对应的任务信息结构
+ *
  * @param platform_handle 平台特定句柄
  * @return 任务信息指针，未找到返回NULL
  */
@@ -96,7 +106,8 @@ static task_info_core_t* find_task_by_platform_handle(void* platform_handle)
 /**
  * @brief 通过任务ID查找任务信息
  *
- * 通过任务ID查找对应的任务信息结构�? *
+ * 通过任务ID查找对应的任务信息结构
+ *
  * @param tid 任务ID
  * @return 任务信息指针，未找到返回NULL
  */
@@ -110,7 +121,7 @@ static task_info_core_t* find_task_by_id(agentos_task_id_t tid)
     /* 获取核心上下文锁 */
     agentos_mutex_lock(ctx->task_table_lock);
 
-    /* 使用核心层哈希查�?*/
+    /* 使用核心层哈希查找 */
     task_info_core_t* info = scheduler_core_hash_find(tid);
 
     agentos_mutex_unlock(ctx->task_table_lock);
@@ -123,7 +134,8 @@ static task_info_core_t* find_task_by_id(agentos_task_id_t tid)
 /**
  * @brief 初始化任务调度器
  *
- * 初始化调度器核心层和平台适配器�? *
+ * 初始化调度器核心层和平台适配器
+ *
  * @return AGENTOS_SUCCESS 成功，错误码 失败
  */
 agentos_error_t agentos_task_init(void)
@@ -138,9 +150,11 @@ agentos_error_t agentos_task_init(void)
 /**
  * @brief 创建线程
  *
- * 使用新的架构创建线程：核心层管理任务信息，平台适配器执行具体线程操作�? *
+ * 使用新的架构创建线程：核心层管理任务信息，平台适配器执行具体线程操作
+ *
  * @param thread 线程句柄输出
- * @param attr 线程属性（名称、优先级、栈大小�? * @param func 线程入口函数
+ * @param attr 线程属性（名称、优先级、栈大小）
+ * @param func 线程入口函数
  * @param arg 线程参数
  * @return AGENTOS_SUCCESS 成功，错误码 失败
  */
@@ -150,12 +164,12 @@ agentos_error_t agentos_thread_create(
     void (*func)(void*),
     void* arg)
 {
-    /* 参数检�?*/
+    /* 参数检查 */
     if (!thread || !func) {
         return AGENTOS_EINVAL;
     }
 
-    /* 确保调度器已初始�?*/
+    /* 确保调度器已初始化 */
     if (ensure_scheduler_fully_initialized() != 0) {
         return AGENTOS_ENOMEM;
     }
@@ -172,7 +186,7 @@ agentos_error_t agentos_thread_create(
         return AGENTOS_ENOMEM;
     }
 
-    /* 解析线程属�?*/
+    /* 解析线程属性 */
     const char* task_name = "unnamed";
     int priority = AGENTOS_TASK_PRIORITY_NORMAL;
     size_t stack_size = 0;
@@ -201,17 +215,17 @@ agentos_error_t agentos_thread_create(
         return AGENTOS_ENOMEM;
     }
 
-    /* 使用平台适配器创建线�?*/
+    /* 使用平台适配器创建线程 */
     void* platform_handle = ops->thread_create(task_info, stack_size);
     if (!platform_handle) {
         scheduler_core_task_info_destroy(task_info);
         return AGENTOS_ENOMEM;
     }
 
-    /* 设置平台句柄到任务信�?*/
+    /* 设置平台句柄到任务信息 */
     task_info->platform_handle = platform_handle;
 
-    /* 获取核心上下�?*/
+    /* 获取核心上下文 */
     scheduler_core_ctx_t* ctx = scheduler_core_get_ctx();
     if (!ctx) {
         ops->cleanup_platform_resources(platform_handle, NULL);
@@ -219,7 +233,7 @@ agentos_error_t agentos_thread_create(
         return AGENTOS_ENOMEM;
     }
 
-    /* 将任务添加到核心层管�?*/
+    /* 将任务添加到核心层管理 */
     agentos_mutex_lock(ctx->task_table_lock);
 
     int add_result = scheduler_core_task_table_add(task_info);
@@ -231,7 +245,7 @@ agentos_error_t agentos_thread_create(
     agentos_mutex_unlock(ctx->task_table_lock);
 
     if (add_result != 0) {
-        /* 添加失败，清理资�?*/
+        /* 添加失败，清理资源 */
         ops->cleanup_platform_resources(platform_handle, NULL);
         scheduler_core_task_info_destroy(task_info);
         return AGENTOS_ENOMEM;
@@ -240,7 +254,7 @@ agentos_error_t agentos_thread_create(
     /* 设置输出线程句柄 */
 #if defined(_WIN32) || defined(_WIN64)
     /* Windows: platform_handle是windows_task_data_t*，需要提取HANDLE */
-    /* 注意：需要从windows_task_data_t中提取线程句�?*/
+    /* 注意：需要从windows_task_data_t中提取线程句柄 */
     /* 简化处理：暂时使用平台句柄作为线程句柄，需要适配 */
     *thread = (agentos_thread_t)platform_handle;
 #else
@@ -255,9 +269,11 @@ agentos_error_t agentos_thread_create(
 /**
  * @brief 等待线程结束
  *
- * 等待指定的线程结束，并获取线程返回值�? *
+ * 等待指定的线程结束，并获取线程返回值
+ *
  * @param thread 线程句柄
- * @param retval 返回值输�? * @return AGENTOS_SUCCESS 成功，错误码 失败
+ * @param retval 返回值输出
+ * @return AGENTOS_SUCCESS 成功，错误码 失败
  */
 agentos_error_t agentos_thread_join(agentos_thread_t thread, void** retval)
 {
@@ -277,7 +293,7 @@ agentos_error_t agentos_thread_join(agentos_thread_t thread, void** retval)
         return AGENTOS_EINVAL;
     }
 
-    /* 使用平台适配器等待线程结�?*/
+    /* 使用平台适配器等待线程结束 */
     int result = ops->thread_join(task_info->platform_handle, retval);
     if (result != 0) {
         return AGENTOS_EINVAL;
@@ -294,8 +310,9 @@ agentos_error_t agentos_thread_join(agentos_thread_t thread, void** retval)
 /**
  * @brief 获取当前任务ID
  *
- * 获取当前执行线程的任务ID�? *
- * @return 当前任务ID，失败返�?
+ * 获取当前执行线程的任务ID
+ *
+ * @return 当前任务ID，失败返回0
  */
 agentos_task_id_t agentos_task_self(void)
 {
@@ -311,13 +328,13 @@ agentos_task_id_t agentos_task_self(void)
         return 0;
     }
 
-    /* 获取核心上下�?*/
+    /* 获取核心上下文 */
     scheduler_core_ctx_t* ctx = scheduler_core_get_ctx();
     if (!ctx) {
         return 0;
     }
 
-    /* 查找匹配的任�?*/
+    /* 查找匹配的任务 */
     agentos_mutex_lock(ctx->task_table_lock);
 
     for (uint32_t i = 0; i < ctx->task_count; i++) {
@@ -343,8 +360,10 @@ agentos_task_id_t agentos_task_self(void)
 /**
  * @brief 线程休眠
  *
- * 使当前线程休眠指定的毫秒数�? *
- * @param ms 休眠毫秒�? */
+ * 使当前线程休眠指定的毫秒数
+ *
+ * @param ms 休眠毫秒数
+ */
 void agentos_task_sleep(uint32_t ms)
 {
     /* 获取平台适配器操作集 */
@@ -362,7 +381,8 @@ void agentos_task_sleep(uint32_t ms)
 /**
  * @brief 线程让出CPU
  *
- * 使当前线程让出CPU，允许其他线程运行�? */
+ * 使当前线程让出CPU，允许其他线程运行
+ */
 void agentos_task_yield(void)
 {
     /* 获取平台适配器操作集 */
@@ -375,14 +395,17 @@ void agentos_task_yield(void)
 }
 
 /**
- * @brief 设置任务优先�? *
- * 设置指定任务的优先级�? *
+ * @brief 设置任务优先级
+ *
+ * 设置指定任务的优先级
+ *
  * @param tid 任务ID
- * @param priority 优先�? * @return AGENTOS_SUCCESS 成功，错误码 失败
+ * @param priority 优先级
+ * @return AGENTOS_SUCCESS 成功，错误码 失败
  */
 agentos_error_t agentos_task_set_priority(agentos_task_id_t tid, int priority)
 {
-    /* 验证优先级范�?*/
+    /* 验证优先级范围 */
     if (priority < AGENTOS_TASK_PRIORITY_MIN ||
         priority > AGENTOS_TASK_PRIORITY_MAX) {
         return AGENTOS_EINVAL;
@@ -406,17 +429,20 @@ agentos_error_t agentos_task_set_priority(agentos_task_id_t tid, int priority)
         return AGENTOS_EINVAL;
     }
 
-    /* 更新任务信息中的优先�?*/
+    /* 更新任务信息中的优先级 */
     task_info->priority = priority;
 
     return AGENTOS_SUCCESS;
 }
 
 /**
- * @brief 获取任务优先�? *
- * 获取指定任务的优先级�? *
+ * @brief 获取任务优先级
+ *
+ * 获取指定任务的优先级
+ *
  * @param tid 任务ID
- * @param out_priority 优先级输�? * @return AGENTOS_SUCCESS 成功，错误码 失败
+ * @param out_priority 优先级输出
+ * @return AGENTOS_SUCCESS 成功，错误码 失败
  */
 agentos_error_t agentos_task_get_priority(agentos_task_id_t tid, int* out_priority)
 {
@@ -436,10 +462,13 @@ agentos_error_t agentos_task_get_priority(agentos_task_id_t tid, int* out_priori
 }
 
 /**
- * @brief 获取任务状�? *
- * 获取指定任务的状态�? *
+ * @brief 获取任务状态
+ *
+ * 获取指定任务的状态
+ *
  * @param tid 任务ID
- * @param out_state 状态输�? * @return AGENTOS_SUCCESS 成功，错误码 失败
+ * @param out_state 状态输出
+ * @return AGENTOS_SUCCESS 成功，错误码 失败
  */
 agentos_error_t agentos_task_get_state(agentos_task_id_t tid, agentos_task_state_t* out_state)
 {
