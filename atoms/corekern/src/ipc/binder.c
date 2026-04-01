@@ -1,15 +1,15 @@
-﻿/**
+/**
  * @file binder.c
  * @brief Binder 风格 IPC 实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * @details
- * 本模块实现高效的进程间通信机制�?
- * - 同步调用（带超时�?
- * - 异步发�?
+ * 本模块实现高效的进程间通信机制：
+ * - 同步调用（带超时）
+ * - 异步发送
  * - 回复机制
  *
- * 使用条件变量优化超时等待，避免忙轮询消耗CPU资源�?
+ * 使用条件变量优化超时等待，避免忙轮询消耗 CPU 资源。
  */
 
 #include "ipc.h"
