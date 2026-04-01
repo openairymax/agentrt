@@ -1,8 +1,11 @@
-﻿/**
+/**
  * @file private.h
  * @brief AgentOS 数据分区内部头文件
  *
- * Copyright (c) 2026 SPHARX. All Rights Reserved.
+ * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * "From data intelligence emerges."
  */
 
@@ -53,4 +56,3 @@ bool heapstore_ipc_is_healthy(void);
 bool heapstore_memory_is_healthy(void);
 
 #endif /* AGENTOS_heapstore_PRIVATE_H */
-

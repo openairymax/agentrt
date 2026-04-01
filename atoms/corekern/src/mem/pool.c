@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file pool.c
  * @brief 内存池分配器
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -16,30 +16,30 @@ typedef struct pool_block {
     struct pool_block* next;
 } pool_block_t;
 
-typedef struct {
+struct agentos_mem_pool {
     pool_block_t* free_list;
     void* raw_memory;
     size_t block_size;
     size_t actual_block_size;
     uint32_t block_count;
     uint32_t free_count;
-} pool_t;
+};
 
-void* agentos_mem_pool_create(size_t block_size, uint32_t block_count) {
+agentos_mem_pool_t* agentos_mem_pool_create(size_t block_size, uint32_t block_count) {
     if (block_size < sizeof(void*) || block_count == 0) return NULL;
 
-    /* 检�?block_size + 7 是否溢出 */
+    /* 检查 block_size + 7 是否溢出 */
     if (block_size > SIZE_MAX - 7) return NULL;
     size_t actual_block_size = (block_size + 7) & ~(size_t)7;
 
-    /* 检�?actual_block_size * block_count 是否溢出 */
+    /* 检查 actual_block_size * block_count 是否溢出 */
     if (block_count > SIZE_MAX / actual_block_size) return NULL;
     size_t total_size = actual_block_size * block_count;
 
     void* raw = agentos_mem_aligned_alloc(total_size, 8);
     if (!raw) return NULL;
 
-    pool_t* pool = (pool_t*)AGENTOS_MALLOC(sizeof(pool_t));
+    agentos_mem_pool_t* pool = (agentos_mem_pool_t*)AGENTOS_MALLOC(sizeof(struct agentos_mem_pool));
     if (!pool) {
         agentos_mem_aligned_free(raw);
         return NULL;
@@ -62,9 +62,9 @@ void* agentos_mem_pool_create(size_t block_size, uint32_t block_count) {
     return pool;
 }
 
-void* agentos_mem_pool_alloc(void* pool_handle) {
+void* agentos_mem_pool_alloc(agentos_mem_pool_t* pool_handle) {
     if (!pool_handle) return NULL;
-    pool_t* pool = (pool_t*)pool_handle;
+    agentos_mem_pool_t* pool = pool_handle;
 
     if (!pool->free_list) return NULL;
 
@@ -76,9 +76,9 @@ void* agentos_mem_pool_alloc(void* pool_handle) {
     return block;
 }
 
-void agentos_mem_pool_free(void* pool_handle, void* ptr) {
+void agentos_mem_pool_free(agentos_mem_pool_t* pool_handle, void* ptr) {
     if (!pool_handle || !ptr) return;
-    pool_t* pool = (pool_t*)pool_handle;
+    agentos_mem_pool_t* pool = pool_handle;
 
     pool_block_t* block = (pool_block_t*)ptr;
     block->next = pool->free_list;
@@ -86,9 +86,9 @@ void agentos_mem_pool_free(void* pool_handle, void* ptr) {
     pool->free_count++;
 }
 
-void agentos_mem_pool_destroy(void* pool_handle) {
+void agentos_mem_pool_destroy(agentos_mem_pool_t* pool_handle) {
     if (!pool_handle) return;
-    pool_t* pool = (pool_t*)pool_handle;
+    agentos_mem_pool_t* pool = pool_handle;
 
     if (pool->raw_memory) {
         agentos_mem_aligned_free(pool->raw_memory);

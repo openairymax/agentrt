@@ -1,26 +1,26 @@
-/**
- * @file cupolas.h
- * @brief cupolas 模块公共接口 - AgentOS 安全穹顶
- * @author Spharx
- * @date 2024
- * 
- * cupolas 是 AgentOS 的安全穹顶模块，提供：
- * - 权限裁决引擎（Permission）：基于规则的访问控制
- * - 输入净化器（Sanitizer）：防止注入攻击
- * - 审计日志（Audit）：操作追踪与合规
- * - 虚拟工位（Workbench）：隔离执行环境
- * 
- * 设计原则：
- * - 安全内生：每个 Agent 都在穹顶内，权限最小化
- * - 高性能：缓存 + 异步写入
- * - 跨平台：Windows/Linux/macOS
- * 
- * 错误处理说明：
- * - 所有函数返回 agentos_error_t 错误代码
- * - 成功返回 AGENTOS_OK (0)
- * - 错误码定义参考 atoms/corekern/include/error.h
- * 
- * @note 为保持向后兼容，cupolas_ERROR_* 别名仍然保留
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * cupolas.h - AgentOS Security Dome Public Interface
+ *
+ * cupolas is AgentOS's security dome module providing:
+ * - Permission裁决引擎 (Permission Engine): Rule-based access control
+ * - 输入净化器 (Sanitizer): Injection attack prevention
+ * - 审计日志 (Audit): Operation tracking and compliance
+ * - 虚拟工位 (Workbench): Isolated execution environment
+ *
+ * Design Principles:
+ * - Security by Default: Every Agent operates within the dome with least privilege
+ * - High Performance: Caching + Async writes
+ * - Cross-Platform: Windows/Linux/macOS
+ *
+ * Error Handling:
+ * - All functions return agentos_error_t error codes
+ * - Success returns AGENTOS_OK (0)
+ * - Error codes are defined in atoms/corekern/include/error.h
+ *
+ * @note For backward compatibility, cupolas_ERROR_* aliases are preserved
  */
 
 #ifndef CUPOLAS_H
@@ -33,7 +33,7 @@ extern "C" {
 #endif
 
 /* ============================================================================
- * 统一错误码（遵循 AgentOS 标准）
+ * Unified Error Codes (Following AgentOS Standard)
  * ============================================================================ */
 
 typedef int agentos_error_t;
@@ -53,7 +53,7 @@ typedef int agentos_error_t;
 #define AGENTOS_ERR_STATE_ERROR      -13
 #define AGENTOS_ERR_OVERFLOW         -14
 
-/* 向后兼容别名 */
+/* Backward Compatibility Aliases */
 #define cupolas_OK                    AGENTOS_OK
 #define cupolas_ERROR_UNKNOWN         AGENTOS_ERR_UNKNOWN
 #define cupolas_ERROR_INVALID_ARG     AGENTOS_ERR_INVALID_PARAM
@@ -68,106 +68,134 @@ typedef int agentos_error_t;
 #define cupolas_ERROR_IO             AGENTOS_ERR_IO
 
 /* ============================================================================
- * 初始化与清理
+ * Initialization and Cleanup
  * ============================================================================ */
 
 /**
- * @brief 初始化 cupolas 模块
- * @param config_path 配置文件路径（可选，NULL 使用默认配置）
- * @return 0 成功，负值失败
+ * @brief Initialize cupolas module
+ * @param[in] config_path Configuration file path (NULL for default config)
+ * @param[out] error Optional error code output
+ * @return 0 on success, negative on failure
+ * @post On success, module is initialized and ready
+ * @note Thread-safe: Multiple threads may call init, only first succeeds
+ * @ownership config_path string: caller retains ownership, may be NULL
  */
-int cupolas_init(const char* config_path);
+int cupolas_init(const char* config_path, agentos_error_t* error);
 
 /**
- * @brief 清理 cupolas 模块
+ * @brief Cleanup cupolas module
+ * @pre cupolas_init() must have been called
+ * @post All resources are released, no further API calls safe except init
+ * @note Thread-safe: Blocks until all operations complete
+ * @reentrant No
  */
 void cupolas_cleanup(void);
 
 /**
- * @brief 获取版本号
- * @return 版本字符串
+ * @brief Get version string
+ * @return Version string (static, do not free)
+ * @note Thread-safe: Always safe to call
+ * @reentrant Yes
  */
 const char* cupolas_version(void);
 
 /* ============================================================================
- * 权限管理
+ * Permission Management
  * ============================================================================ */
 
 /**
- * @brief 检查权限
- * @param agent_id Agent ID
- * @param action 操作类型（如 "read", "write", "execute"）
- * @param resource 资源路径
- * @param context 上下文信息（可选）
- * @return 1 允许，0 拒绝
+ * @brief Check permission for an agent action on a resource
+ * @param[in] agent_id Agent identifier (must not be NULL)
+ * @param[in] action Action type: "read", "write", "execute" (must not be NULL)
+ * @param[in] resource Resource path (must not be NULL)
+ * @param[in] context Optional context information (may be NULL)
+ * @return 1 allowed, 0 denied, negative on error
+ * @note Thread-safe: Yes, uses internal locking
+ * @reentrant Yes, but same agent_id/action/resource from different threads may race
+ * @ownership All input strings: caller retains ownership
  */
 int cupolas_check_permission(const char* agent_id, const char* action,
                            const char* resource, const char* context);
 
 /**
- * @brief 添加权限规则
- * @param agent_id Agent ID（NULL 或 "*" 表示通配）
- * @param action 操作（NULL 或 "*" 表示通配）
- * @param resource 资源模式（支持 glob 模式）
- * @param allow 1 允许，0 拒绝
- * @param priority 优先级（值越高优先级越高）
- * @return 0 成功，负值失败
+ * @brief Add a permission rule
+ * @param[in] agent_id Agent ID pattern (NULL or "*" for wildcard)
+ * @param[in] action Action pattern (NULL or "*" for wildcard)
+ * @param[in] resource Resource pattern with glob support
+ * @param[in] allow 1 to allow, 0 to deny
+ * @param[in] priority Higher value = higher priority
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Yes
+ * @reentrant Yes
+ * @ownership All input strings: caller retains ownership
  */
 int cupolas_add_permission_rule(const char* agent_id, const char* action,
                                const char* resource, int allow, int priority);
 
 /**
- * @brief 清除权限缓存
+ * @brief Clear permission cache
+ * @note Thread-safe: Yes
+ * @reentrant Yes
+ * @post All cached permissions are invalidated
  */
 void cupolas_clear_permission_cache(void);
 
 /* ============================================================================
- * 输入净化
+ * Input Sanitization
  * ============================================================================ */
 
 /**
- * @brief 净化输入
- * @param input 输入字符串
- * @param output 输出缓冲区
- * @param output_size 输出缓冲区大小
- * @return 0 成功，负值失败
+ * @brief Sanitize input string
+ * @param[in] input Input string to sanitize (must not be NULL)
+ * @param[out] output Output buffer (must not be NULL)
+ * @param[in] output_size Size of output buffer in bytes
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Yes
+ * @reentrant Yes
+ * @ownership input: caller retains; output: callee writes, caller owns buffer
  */
 int cupolas_sanitize_input(const char* input, char* output, size_t output_size);
 
 /* ============================================================================
- * 命令执行
+ * Command Execution
  * ============================================================================ */
 
 /**
- * @brief 执行命令
- * @param command 命令路径
- * @param argv 参数数组（以 NULL 结尾）
- * @param exit_code 退出码指针
- * @param stdout_buf 标准输出缓冲区
- * @param stdout_size 标准输出缓冲区大小
- * @param stderr_buf 标准错误缓冲区
- * @param stderr_size 标准错误缓冲区大小
- * @return 0 成功，负值失败
+ * @brief Execute command in isolated workbench
+ * @param[in] command Command path (must not be NULL)
+ * @param[in] argv Argument array (NULL-terminated, must not be NULL)
+ * @param[out] exit_code Exit code output (may be NULL)
+ * @param[out] stdout_buf Standard output buffer (may be NULL)
+ * @param[in] stdout_size Standard output buffer size
+ * @param[out] stderr_buf Standard error buffer (may be NULL)
+ * @param[in] stderr_size Standard error buffer size
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: No, each workbench instance is single-threaded
+ * @reentrant No
+ * @ownership All input strings: caller retains; output buffers: caller owns
  */
 int cupolas_execute_command(const char* command, char* const argv[],
                           int* exit_code, char* stdout_buf, size_t stdout_size,
                           char* stderr_buf, size_t stderr_size);
 
 /* ============================================================================
- * 审计日志
+ * Audit Logging
  * ============================================================================ */
 
 /**
- * @brief 刷新审计日志
+ * @brief Flush audit log
+ * @note Thread-safe: Yes
+ * @reentrant Yes
+ * @post All pending audit entries are written to storage
  */
 void cupolas_flush_audit_log(void);
 
 /* ============================================================================
- * iOS 级安全模块
+ * iOS-Level Security Modules
  * ============================================================================ */
 
-/* Security 子模块头文件 - 位于 src/security/ 目录 */
-/* 用户应直接包含具体头文件：
+/* Security sub-module headers are located in src/security/ directory */
+/* Users should include specific headers:
  * #include "cupolas_signature.h"
  * #include "cupolas_vault.h"
  * #include "cupolas_entitlements.h"

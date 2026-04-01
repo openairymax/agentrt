@@ -1,6 +1,6 @@
-﻿/**
+/**
  * @file file.c
- * @brief 文件操作执行单元（读/�?删除/列表�?
+ * @brief 文件操作执行单元（读/写/删除/列表）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -29,9 +29,9 @@
 /**
  * @brief 构建完整文件路径
  * @param data 文件单元数据
- * @param path 用户提供的相对路�?
- * @param out_full 输出完整路径缓冲�?
- * @param max_len 缓冲区最大长�?
+ * @param path 用户提供的相对路径
+ * @param out_full 输出完整路径缓冲区
+ * @param max_len 缓冲区最大长度
  */
 static agentos_error_t file_build_path(
     file_unit_data_t* data,
@@ -58,7 +58,7 @@ static agentos_error_t file_do_delete(
     void** out_output);
 
 /**
- * @brief 执行目录列表操作（Windows实现�?
+ * @brief 执行目录列表操作（Windows实现）
  * @param full_path 完整目录路径
  * @param out_output 输出列表（调用者负责释放）
  */
@@ -67,7 +67,7 @@ static agentos_error_t file_do_list_win(
     void** out_output);
 
 /**
- * @brief 执行目录列表操作（POSIX实现�?
+ * @brief 执行目录列表操作（POSIX实现）
  * @param full_path 完整目录路径
  * @param out_output 输出列表（调用者负责释放）
  */
@@ -237,7 +237,7 @@ static agentos_error_t file_do_list_posix(
     return AGENTOS_SUCCESS;
 }
 
-/* ==================== 主执行函�?==================== */
+/* ==================== 主执行函数 ==================== */
 
 static agentos_error_t file_execute(agentos_execution_unit_t* unit, const void* input, void** out_output) {
     file_unit_data_t* data = (file_unit_data_t*)unit->data;

@@ -1,6 +1,13 @@
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * audit_rotator.c - Audit Log Rotator Implementation
+ */
+
 /**
  * @file audit_rotator.c
- * @brief 审计日志轮转器实现
+ * @brief Audit Log Rotator Implementation
  * @author Spharx
  * @date 2024
  */

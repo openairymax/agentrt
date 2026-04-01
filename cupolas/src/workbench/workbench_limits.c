@@ -1,10 +1,17 @@
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * workbench_limits.c - Resource Limits Runtime Enforcement: Cross-platform Implementation
+ */
+
 /**
  * @file workbench_limits.c
- * @brief 资源限制运行时强制 - 跨平台实现
+ * @brief Resource Limits Runtime Enforcement - Cross-platform Implementation
  * @author Spharx
  * @date 2024
  *
- * 本模块实现跨平台的资源限制：
+ * This module implements cross-platform resource limits:
  * - Linux: cgroups v2 API
  * - Windows: Job Objects API
  * - macOS: Mach task resource API

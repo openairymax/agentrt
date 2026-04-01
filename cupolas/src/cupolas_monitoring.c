@@ -1,14 +1,21 @@
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * cupolas_monitoring.c - Monitoring Interface: Prometheus / OpenTelemetry
+ */
+
 /**
  * @file cupolas_monitoring.c
- * @brief 监控接口 - Prometheus / OpenTelemetry
+ * @brief Monitoring Interface - Prometheus / OpenTelemetry
  * @author Spharx
  * @date 2024
  *
- * 本模块实现监控接口功能：
- * - Prometheus HTTP 端点（拉取模式）
- * - OpenTelemetry OTLP 推送
- * - StatsD 协议支持
- * - 健康检查端点
+ * This module implements monitoring interface:
+ * - Prometheus HTTP endpoint (pull mode)
+ * - OpenTelemetry OTLP push
+ * - StatsD protocol support
+ * - Health check endpoint
  */
 
 #include "cupolas_monitoring.h"

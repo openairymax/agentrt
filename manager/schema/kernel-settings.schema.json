@@ -2,14 +2,15 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agentos.spharx.ai/schemas/kernel-settings-v1.schema.json",
   "title": "AgentOS Kernel Settings Schema",
-  "description": "Configuration schema for AgentOS microkernel core settings",
+  "description": "Configuration schema for AgentOS microkernel core settings. Based on ARCHITECTURAL_PRINCIPLES.md and error_code_reference.md specifications.",
   "type": "object",
   "required": ["_config_version", "kernel"],
   "properties": {
     "_config_version": {
       "type": "string",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
-      "description": "Configuration file version in semantic versioning format"
+      "description": "Configuration file version in semantic versioning format",
+      "examples": ["1.0.0"]
     },
     "_compatibility": {
       "type": "object",
@@ -17,11 +18,15 @@
       "properties": {
         "min_agentos_version": {
           "type": "string",
-          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "Minimum compatible AgentOS version",
+          "examples": ["1.0.0"]
         },
         "max_agentos_version": {
           "type": "string",
-          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "Maximum compatible AgentOS version",
+          "examples": ["2.0.0"]
         }
       }
     },
@@ -44,7 +49,7 @@
         },
         "log_level": {
           "type": "string",
-          "enum": ["debug", "info", "warning", "error", "critical", "off"],
+          "enum": ["trace", "debug", "info", "warning", "error", "critical", "off"],
           "default": "info",
           "description": "Global log level for kernel",
           "examples": ["info", "debug", "warning"]
@@ -84,39 +89,179 @@
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 1000,
-                  "default": 100
+                  "default": 100,
+                  "examples": [100]
                 },
                 "high": {
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 1000,
-                  "default": 50
+                  "default": 50,
+                  "examples": [50]
                 },
                 "normal": {
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 1000,
-                  "default": 20
+                  "default": 20,
+                  "examples": [20]
                 },
                 "low": {
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 1000,
-                  "default": 10
+                  "default": 10,
+                  "examples": [10]
                 }
               }
             },
             "starvation_prevention": {
               "type": "boolean",
               "default": true,
-              "description": "Enable starvation prevention mechanism"
+              "description": "Enable starvation prevention mechanism",
+              "examples": [true]
             },
             "starvation_threshold_ms": {
               "type": "integer",
               "minimum": 100,
               "maximum": 60000,
               "default": 5000,
-              "description": "Time threshold for starvation detection"
+              "description": "Time threshold for starvation detection",
+              "examples": [5000]
+            },
+            "queue": {
+              "type": "object",
+              "description": "Task queue configuration",
+              "properties": {
+                "max_pending_tasks": {
+                  "type": "integer",
+                  "minimum": 100,
+                  "maximum": 100000,
+                  "default": 10000,
+                  "examples": [10000]
+                },
+                "max_completed_tasks": {
+                  "type": "integer",
+                  "minimum": 100,
+                  "maximum": 100000,
+                  "default": 1000,
+                  "examples": [1000]
+                },
+                "cleanup_interval_sec": {
+                  "type": "integer",
+                  "minimum": 10,
+                  "maximum": 3600,
+                  "default": 60,
+                  "examples": [60]
+                }
+              }
+            },
+            "cognitive_systems": {
+              "type": "object",
+              "description": "Dual cognitive systems configuration following ARCHITECTURAL_PRINCIPLES.md C-4 principle",
+              "properties": {
+                "system1": {
+                  "type": "object",
+                  "description": "Fast Intuition System - for simple, low-latency tasks",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean",
+                      "default": true,
+                      "examples": [true]
+                    },
+                    "name": {
+                      "type": "string",
+                      "examples": ["Fast Intuition System"]
+                    },
+                    "description": {
+                      "type": "string",
+                      "examples": ["Handles simple, low-latency tasks that require quick responses"]
+                    },
+                    "task_types": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": ["simple_query", "pattern_match", "cache_hit", "routine_operation", "status_check"]
+                      },
+                      "examples": [["simple_query", "pattern_match", "cache_hit"]]
+                    },
+                    "max_latency_ms": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1000,
+                      "default": 100,
+                      "examples": [100]
+                    },
+                    "priority_boost": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 10,
+                      "default": 2,
+                      "examples": [2]
+                    }
+                  }
+                },
+                "system2": {
+                  "type": "object",
+                  "description": "Slow Reasoning System - for complex reasoning and analysis",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean",
+                      "default": true,
+                      "examples": [true]
+                    },
+                    "name": {
+                      "type": "string",
+                      "examples": ["Slow Reasoning System"]
+                    },
+                    "description": {
+                      "type": "string",
+                      "examples": ["Handles complex tasks requiring deep reasoning and analysis"]
+                    },
+                    "task_types": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": ["complex_reasoning", "planning", "analysis", "creative_generation", "multi_step_reasoning", "strategy_formation"]
+                      },
+                      "examples": [["complex_reasoning", "planning", "analysis"]]
+                    },
+                    "max_latency_ms": {
+                      "type": "integer",
+                      "minimum": 1000,
+                      "maximum": 60000,
+                      "default": 5000,
+                      "examples": [5000]
+                    },
+                    "max_concurrency": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 100,
+                      "default": 10,
+                      "examples": [10]
+                    },
+                    "reserved_resources": {
+                      "type": "object",
+                      "properties": {
+                        "memory_mb": {
+                          "type": "integer",
+                          "minimum": 64,
+                          "maximum": 8192,
+                          "default": 256,
+                          "examples": [256]
+                        },
+                        "cpu_percent": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100,
+                          "default": 25,
+                          "examples": [25]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         },
@@ -170,18 +315,105 @@
               "properties": {
                 "enabled": {
                   "type": "boolean",
-                  "default": true
+                  "default": true,
+                  "examples": [true]
                 },
                 "check_interval_sec": {
                   "type": "integer",
                   "minimum": 10,
                   "maximum": 3600,
-                  "default": 60
+                  "default": 60,
+                  "examples": [60]
                 },
                 "report_threshold_bytes": {
                   "type": "integer",
                   "minimum": 1024,
-                  "default": 1048576
+                  "default": 1048576,
+                  "examples": [1048576]
+                }
+              }
+            },
+            "pools": {
+              "type": "object",
+              "description": "Memory pool configuration for different block sizes",
+              "properties": {
+                "small": {
+                  "type": "object",
+                  "properties": {
+                    "block_size": {
+                      "type": "integer",
+                      "minimum": 8,
+                      "maximum": 1024,
+                      "default": 64,
+                      "examples": [64]
+                    },
+                    "initial_count": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100000,
+                      "default": 1024,
+                      "examples": [1024]
+                    },
+                    "max_count": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1000000,
+                      "default": 10000,
+                      "examples": [10000]
+                    }
+                  }
+                },
+                "medium": {
+                  "type": "object",
+                  "properties": {
+                    "block_size": {
+                      "type": "integer",
+                      "minimum": 64,
+                      "maximum": 4096,
+                      "default": 256,
+                      "examples": [256]
+                    },
+                    "initial_count": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100000,
+                      "default": 512,
+                      "examples": [512]
+                    },
+                    "max_count": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 500000,
+                      "default": 5000,
+                      "examples": [5000]
+                    }
+                  }
+                },
+                "large": {
+                  "type": "object",
+                  "properties": {
+                    "block_size": {
+                      "type": "integer",
+                      "minimum": 256,
+                      "maximum": 16384,
+                      "default": 1024,
+                      "examples": [1024]
+                    },
+                    "initial_count": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100000,
+                      "default": 128,
+                      "examples": [128]
+                    },
+                    "max_count": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 100000,
+                      "default": 1000,
+                      "examples": [1000]
+                    }
+                  }
                 }
               }
             }
@@ -241,19 +473,49 @@
               "properties": {
                 "enabled": {
                   "type": "boolean",
-                  "default": true
+                  "default": true,
+                  "examples": [true]
                 },
                 "high_watermark_percent": {
                   "type": "integer",
                   "minimum": 50,
                   "maximum": 95,
-                  "default": 80
+                  "default": 80,
+                  "examples": [80]
                 },
                 "low_watermark_percent": {
                   "type": "integer",
                   "minimum": 10,
                   "maximum": 50,
-                  "default": 30
+                  "default": 30,
+                  "examples": [30]
+                }
+              }
+            },
+            "connection_pool": {
+              "type": "object",
+              "description": "Connection pool configuration",
+              "properties": {
+                "min_idle": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000,
+                  "default": 10,
+                  "examples": [10]
+                },
+                "max_idle": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10000,
+                  "default": 100,
+                  "examples": [100]
+                },
+                "idle_timeout_sec": {
+                  "type": "integer",
+                  "minimum": 10,
+                  "maximum": 3600,
+                  "default": 300,
+                  "examples": [300]
                 }
               }
             }
@@ -282,6 +544,24 @@
               "enum": [256, 512, 1024, 2048],
               "default": 512,
               "description": "Timing wheel size for efficient timer management"
+            },
+            "coalescing": {
+              "type": "object",
+              "description": "Timer coalescing for power efficiency",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": true,
+                  "examples": [true]
+                },
+                "slack_ms": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100,
+                  "default": 5,
+                  "examples": [5]
+                }
+              }
             }
           }
         },
@@ -312,6 +592,279 @@
               "maximum": 10000,
               "default": 100,
               "description": "Maximum error logs per second (rate limiting)"
+            },
+            "codes": {
+              "type": "object",
+              "description": "Standard error codes following error_code_reference.md specification. Format: 0xNNNN",
+              "properties": {
+                "success": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535,
+                  "default": 0,
+                  "description": "Success (0x0000)",
+                  "examples": [0]
+                },
+                "unknown": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535,
+                  "default": 1,
+                  "examples": [1]
+                },
+                "out_of_memory": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535,
+                  "default": 2,
+                  "examples": [2]
+                },
+                "invalid_parameter": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535,
+                  "default": 3,
+                  "examples": [3]
+                },
+                "null_pointer": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535,
+                  "default": 4,
+                  "examples": [4]
+                },
+                "timeout": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535,
+                  "default": 5,
+                  "examples": [5]
+                },
+                "not_found": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535,
+                  "default": 6,
+                  "examples": [6]
+                },
+                "permission_denied": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535,
+                  "default": 8,
+                  "examples": [8]
+                },
+                "loop_create_failed": {
+                  "type": "integer",
+                  "minimum": 4096,
+                  "maximum": 8191,
+                  "default": 4097,
+                  "description": "Core loop error (0x1001)",
+                  "examples": [4097]
+                },
+                "task_submit_failed": {
+                  "type": "integer",
+                  "minimum": 4096,
+                  "maximum": 8191,
+                  "default": 4100,
+                  "description": "Core loop error (0x1004)",
+                  "examples": [4100]
+                },
+                "cupola_access_denied": {
+                  "type": "integer",
+                  "minimum": 24576,
+                  "maximum": 28671,
+                  "default": 24579,
+                  "description": "Security domain error (0x6003)",
+                  "examples": [24579]
+                },
+                "cupola_security_violation": {
+                  "type": "integer",
+                  "minimum": 24576,
+                  "maximum": 28671,
+                  "default": 24580,
+                  "description": "Security domain error (0x6004)",
+                  "examples": [24580]
+                }
+              }
+            },
+            "recovery": {
+              "type": "object",
+              "description": "Error recovery configuration",
+              "properties": {
+                "auto_restart": {
+                  "type": "boolean",
+                  "default": true,
+                  "examples": [true]
+                },
+                "max_restart_attempts": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100,
+                  "default": 3,
+                  "examples": [3]
+                },
+                "restart_delay_ms": {
+                  "type": "integer",
+                  "minimum": 100,
+                  "maximum": 60000,
+                  "default": 1000,
+                  "examples": [1000]
+                },
+                "backoff_multiplier": {
+                  "type": "number",
+                  "minimum": 1.0,
+                  "maximum": 10.0,
+                  "default": 2.0,
+                  "examples": [2.0]
+                }
+              }
+            }
+          }
+        },
+        "hot_reload": {
+          "type": "object",
+          "description": "Hot reload configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "examples": [true]
+            },
+            "check_interval_sec": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 30,
+              "examples": [30]
+            },
+            "reload_signal": {
+              "type": "string",
+              "default": "SIGHUP",
+              "examples": ["SIGHUP"]
+            },
+            "supported_configs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "examples": [["log_level", "scheduler.priority_weights", "memory.leak_detection", "error.verbose"]]
+            }
+          }
+        },
+        "monitoring": {
+          "type": "object",
+          "description": "Performance monitoring configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "examples": [true]
+            },
+            "metrics_interval_sec": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3600,
+              "default": 10,
+              "examples": [10]
+            },
+            "metrics": {
+              "type": "object",
+              "properties": {
+                "cpu_usage": {
+                  "type": "boolean",
+                  "default": true,
+                  "examples": [true]
+                },
+                "memory_usage": {
+                  "type": "boolean",
+                  "default": true,
+                  "examples": [true]
+                },
+                "task_latency": {
+                  "type": "boolean",
+                  "default": true,
+                  "examples": [true]
+                },
+                "ipc_throughput": {
+                  "type": "boolean",
+                  "default": true,
+                  "examples": [true]
+                },
+                "timer_accuracy": {
+                  "type": "boolean",
+                  "default": true,
+                  "examples": [true]
+                }
+              }
+            },
+            "alerts": {
+              "type": "object",
+              "properties": {
+                "cpu_threshold_percent": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100,
+                  "default": 80,
+                  "examples": [80]
+                },
+                "memory_threshold_percent": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100,
+                  "default": 85,
+                  "examples": [85]
+                },
+                "task_queue_threshold": {
+                  "type": "integer",
+                  "minimum": 10,
+                  "maximum": 100000,
+                  "default": 500,
+                  "examples": [500]
+                },
+                "ipc_latency_threshold_ms": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10000,
+                  "default": 100,
+                  "examples": [100]
+                }
+              }
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "description": "Resource limits configuration",
+          "properties": {
+            "max_file_descriptors": {
+              "type": "integer",
+              "minimum": 1024,
+              "maximum": 1000000,
+              "default": 65535,
+              "examples": [65535]
+            },
+            "max_threads": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 100000,
+              "default": 1000,
+              "examples": [1000]
+            },
+            "max_open_files": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 1000000,
+              "default": 10000,
+              "examples": [10000]
+            },
+            "cpu_time_limit_sec": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 86400,
+              "default": 0,
+              "description": "CPU time limit in seconds (0 = unlimited)",
+              "examples": [0]
             }
           }
         }

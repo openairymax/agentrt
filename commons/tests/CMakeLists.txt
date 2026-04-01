@@ -1,4 +1,4 @@
-﻿# commons 模块测试 CMakeLists.txt
+# commons 模块测试 CMakeLists.txt
 # 包含单元测试和集成测试
 
 # 测试配置
@@ -16,6 +16,7 @@ set(UNIT_TEST_SOURCES
 
 set(INTEGRATION_TEST_SOURCES
     integration/test_common_integration.c
+    integration/test_unified_modules.c
 )
 
 # 单元测试可执行文件

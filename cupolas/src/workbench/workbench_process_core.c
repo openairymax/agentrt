@@ -1,6 +1,13 @@
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * workbench_process_core.c - Cross-platform Process Management Implementation
+ */
+
 /**
  * @file workbench_process_core.c
- * @brief 跨平台进程管理实现
+ * @brief Cross-platform Process Management Implementation
  * @author Spharx
  * @date 2024
  */

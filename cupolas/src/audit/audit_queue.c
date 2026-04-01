@@ -1,6 +1,13 @@
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * audit_queue.c - Audit Log Queue Implementation: Thread-safe Producer-Consumer Queue
+ */
+
 /**
  * @file audit_queue.c
- * @brief 审计日志队列实现 - 线程安全的生产者消费者队列
+ * @brief Audit Log Queue Implementation - Thread-safe Producer-Consumer Queue
  * @author Spharx
  * @date 2024
  */

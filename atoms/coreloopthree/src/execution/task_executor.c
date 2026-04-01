@@ -1,18 +1,18 @@
-﻿﻿﻿﻿﻿﻿/**
+/**
  * @file task_executor.c
- * @brief 任务执行器实�?
+ * @brief 任务执行器实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * @details
- * 任务执行器负责管理任务的执行生命周期，包括任务调度、状态跟踪�?
- * 超时控制和结果收集。实现生产级任务管理，支�?9.999%可靠性标准�?
+ * 任务执行器负责管理任务的执行生命周期，包括任务调度、状态跟踪、
+ * 超时控制和结果收集。实现生产级任务管理，支持99.999%可靠性标准。
  *
- * 核心功能�?
- * 1. 任务调度：优先级队列、依赖管�?
- * 2. 并发控制：工作线程池、资源限�?
- * 3. 状态管理：状态机、状态转�?
- * 4. 超时控制：任务超时、强制取�?
- * 5. 错误处理：重试机制、错误恢�?
+ * 核心功能：
+ * 1. 任务调度：优先级队列、依赖管理
+ * 2. 并发控制：工作线程池、资源限制
+ * 3. 状态管理：状态机、状态转换
+ * 4. 超时控制：任务超时、强制取消
+ * 5. 错误处理：重试机制、错误恢复
  * 6. 监控指标：执行统计、性能分析
  */
 
@@ -33,7 +33,7 @@
 
 /* ==================== 内部常量定义 ==================== */
 
-/** @brief 最大任务数�?*/
+/** @brief 最大任务数量 */
 #define MAX_TASKS 1024
 
 /** @brief 最大工作线程数 */
@@ -48,44 +48,44 @@
 /** @brief 任务队列容量 */
 #define TASK_QUEUE_CAPACITY 512
 
-/** @brief 优先级队列大�?*/
+/** @brief 优先级队列大小 */
 #define PRIORITY_QUEUE_SIZE 256
 
-/** @brief 任务状态检查间隔（毫秒�?*/
+/** @brief 任务状态检查间隔（毫秒） */
 #define TASK_CHECK_INTERVAL_MS 100
 
 /* ==================== 内部数据结构 ==================== */
 
 /**
- * @brief 任务状态枚�?
+ * @brief 任务状态枚举
  */
 typedef enum {
-    TASK_STATE_PENDING = 0,     /**< 待执�?*/
-    TASK_STATE_QUEUED,          /**< 已入�?*/
-    TASK_STATE_RUNNING,         /**< 执行�?*/
-    TASK_STATE_COMPLETED,       /**< 已完�?*/
+    TASK_STATE_PENDING = 0,     /**< 待执行 */
+    TASK_STATE_QUEUED,          /**< 已入队 */
+    TASK_STATE_RUNNING,         /**< 执行中 */
+    TASK_STATE_COMPLETED,       /**< 已完成 */
     TASK_STATE_FAILED,          /**< 失败 */
-    TASK_STATE_CANCELLED,       /**< 已取�?*/
+    TASK_STATE_CANCELLED,       /**< 已取消 */
     TASK_STATE_TIMEOUT          /**< 超时 */
 } task_state_t;
 
 /**
- * @brief 任务优先�?
+ * @brief 任务优先级
  */
 typedef enum {
     TASK_PRIORITY_LOW = 0,      /**< 低优先级 */
     TASK_PRIORITY_NORMAL,       /**< 普通优先级 */
     TASK_PRIORITY_HIGH,         /**< 高优先级 */
-    TASK_PRIORITY_CRITICAL      /**< 关键优先�?*/
+    TASK_PRIORITY_CRITICAL      /**< 关键优先级 */
 } task_priority_t;
 
 /**
- * @brief 任务依赖�?
+ * @brief 任务依赖项
  */
 typedef struct task_dependency {
     uint64_t task_id;                   /**< 依赖任务ID */
     int satisfied;                      /**< 是否满足 */
-    struct task_dependency* next;       /**< 下一个依�?*/
+    struct task_dependency* next;       /**< 下一个依赖 */
 } task_dependency_t;
 
 /**
@@ -98,11 +98,11 @@ typedef agentos_error_t (*task_callback_fn)(void* input, void** output);
  */
 typedef struct task_config {
     char* task_name;                    /**< 任务名称 */
-    task_priority_t priority;           /**< 优先�?*/
+    task_priority_t priority;           /**< 优先级 */
     uint32_t timeout_ms;                /**< 超时时间 */
-    uint32_t max_retries;               /**< 最大重试次�?*/
+    uint32_t max_retries;               /**< 最大重试次数 */
     uint32_t retry_delay_ms;            /**< 重试延迟 */
-    uint32_t flags;                     /**< 标志�?*/
+    uint32_t flags;                     /**< 标志位 */
 } task_config_t;
 
 /**
@@ -110,7 +110,7 @@ typedef struct task_config {
  */
 typedef struct task_stats {
     uint64_t create_time_ns;            /**< 创建时间 */
-    uint64_t start_time_ns;             /**< 开始时�?*/
+    uint64_t start_time_ns;             /**< 开始时间 */
     uint64_t end_time_ns;               /**< 结束时间 */
     uint64_t duration_ns;               /**< 执行时长 */
     uint32_t retry_count;               /**< 重试次数 */
@@ -123,8 +123,8 @@ typedef struct task_stats {
 struct agentos_task {
     uint64_t task_id;                   /**< 任务ID */
     char* task_name;                    /**< 任务名称 */
-    task_state_t state;                 /**< 状�?*/
-    task_priority_t priority;           /**< 优先�?*/
+    task_state_t state;                 /**< 状态 */
+    task_priority_t priority;           /**< 优先级 */
     task_config_t manager;               /**< 配置 */
     task_stats_t stats;                 /**< 统计 */
     task_dependency_t* dependencies;    /**< 依赖列表 */
@@ -141,7 +141,7 @@ struct agentos_task {
     agentos_error_t result;             /**< 执行结果 */
     char* error_message;                /**< 错误信息 */
 
-    agentos_mutex_t* lock;              /**< 线程�?*/
+    agentos_mutex_t* lock;              /**< 线程锁 */
     agentos_cond_t* cond;               /**< 条件变量 */
 };
 
@@ -150,18 +150,18 @@ struct agentos_task {
  */
 typedef struct task_queue_node {
     agentos_task_t* task;               /**< 任务 */
-    struct task_queue_node* next;       /**< 下一�?*/
+    struct task_queue_node* next;       /**< 下一个 */
 } task_queue_node_t;
 
 /**
- * @brief 优先级队�?
+ * @brief 优先级队列
  */
 typedef struct priority_queue {
-    task_queue_node_t* heads[4];        /**< 各优先级队列�?*/
-    task_queue_node_t* tails[4];        /**< 各优先级队列�?*/
+    task_queue_node_t* heads[4];        /**< 各优先级队列头 */
+    task_queue_node_t* tails[4];        /**< 各优先级队列尾 */
     uint32_t counts[4];                 /**< 各优先级计数 */
-    uint32_t total_count;               /**< 总计�?*/
-    agentos_mutex_t* lock;              /**< 线程�?*/
+    uint32_t total_count;               /**< 总计数 */
+    agentos_mutex_t* lock;              /**< 线程锁 */
     agentos_cond_t* cond;               /**< 条件变量 */
 } priority_queue_t;
 
@@ -170,14 +170,14 @@ typedef struct priority_queue {
  */
 typedef struct worker_thread {
     uint64_t worker_id;                 /**< 工作线程ID */
-    uint64_t tasks_completed;           /**< 完成任务�?*/
-    uint64_t tasks_failed;              /**< 失败任务�?*/
+    uint64_t tasks_completed;           /**< 完成任务数 */
+    uint64_t tasks_failed;              /**< 失败任务数 */
     int is_active;                      /**< 是否活跃 */
     agentos_thread_t* thread;           /**< 线程句柄 */
 } worker_thread_t;
 
 /**
- * @brief 任务执行器结�?
+ * @brief 任务执行器结构
  */
 struct agentos_task_executor {
     char* executor_id;                  /**< 执行器ID */
@@ -188,11 +188,11 @@ struct agentos_task_executor {
     worker_thread_t workers[MAX_WORKERS]; /**< 工作线程 */
     uint32_t worker_count;              /**< 工作线程数量 */
 
-    agentos_mutex_t* lock;              /**< 全局�?*/
+    agentos_mutex_t* lock;              /**< 全局锁 */
     agentos_cond_t* shutdown_cond;      /**< 关闭条件变量 */
     int shutdown;                       /**< 关闭标志 */
 
-    agentos_observability_t* obs;       /**< 可观测�?*/
+    agentos_observability_t* obs;       /**< 可观测性 */
 
     uint64_t total_submitted;           /**< 总提交数 */
     uint64_t total_completed;           /**< 总完成数 */
@@ -207,7 +207,7 @@ static agentos_task_executor_t* g_task_executor = NULL;
 /* ==================== 内部工具函数 ==================== */
 
 /**
- * @brief 获取当前时间戳（纳秒�?
+ * @brief 获取当前时间戳（纳秒）
  */
 static uint64_t get_timestamp_ns(void) {
     struct timespec ts;
@@ -216,7 +216,7 @@ static uint64_t get_timestamp_ns(void) {
 }
 
 /**
- * @brief 创建优先级队�?
+ * @brief 创建优先级队列
  */
 static priority_queue_t* create_priority_queue(void) {
     priority_queue_t* queue = (priority_queue_t*)AGENTOS_CALLOC(1, sizeof(priority_queue_t));
@@ -355,7 +355,7 @@ static agentos_task_t* priority_queue_pop(priority_queue_t* queue, uint32_t time
 }
 
 /**
- * @brief 创建任务依赖�?
+ * @brief 创建任务依赖项
  */
 static task_dependency_t* create_dependency(uint64_t task_id) {
     task_dependency_t* dep = (task_dependency_t*)AGENTOS_CALLOC(1, sizeof(task_dependency_t));
@@ -369,7 +369,7 @@ static task_dependency_t* create_dependency(uint64_t task_id) {
 }
 
 /**
- * @brief 检查任务依赖是否满�?
+ * @brief 检查任务依赖是否满足
  */
 static int check_dependencies(agentos_task_executor_t* executor, agentos_task_t* task) {
     if (!executor || !task) return 0;
@@ -429,7 +429,7 @@ static void* worker_thread_func(void* arg) {
         agentos_task_t* task = priority_queue_pop(executor->task_queue, 100);
         if (!task) continue;
 
-        // 检查依�?
+        // 检查依赖
         int dep_result = check_dependencies(executor, task);
         if (dep_result == 0) {
             // 依赖未满足，重新入队
@@ -461,7 +461,7 @@ static void* worker_thread_func(void* arg) {
             result = task->callback(task->input, &task->output);
         }
 
-        // 更新任务状�?
+        // 更新任务状态
         agentos_mutex_lock(task->lock);
         task->stats.end_time_ns = get_timestamp_ns();
         task->stats.duration_ns = task->stats.end_time_ns - task->stats.start_time_ns;
@@ -479,7 +479,7 @@ static void* worker_thread_func(void* arg) {
         agentos_cond_signal(task->cond);
         agentos_mutex_unlock(task->lock);
 
-        // 更新执行器统�?
+        // 更新执行器统计
         agentos_mutex_lock(executor->lock);
         if (result == AGENTOS_SUCCESS) {
             executor->total_completed++;
@@ -500,7 +500,7 @@ static void* worker_thread_func(void* arg) {
             }
         }
 
-        // 更新可观测�?
+        // 更新可观测性
         if (executor->obs) {
             agentos_observability_increment_counter(executor->obs,
                 result == AGENTOS_SUCCESS ? "task_completed" : "task_failed", 1);
@@ -517,7 +517,7 @@ static void* worker_thread_func(void* arg) {
 /* ==================== 公共API实现 ==================== */
 
 /**
- * @brief 创建任务执行�?
+ * @brief 创建任务执行器
  */
 agentos_error_t agentos_task_executor_create(uint32_t worker_count,
                                              agentos_task_executor_t** out_executor) {
@@ -584,7 +584,7 @@ agentos_error_t agentos_task_executor_create(uint32_t worker_count,
     executor->total_failed = 0;
     executor->total_cancelled = 0;
 
-    // 初始化工作线�?
+    // 初始化工作线程
     for (uint32_t i = 0; i < worker_count; i++) {
         executor->workers[i].worker_id = i + 1;
         executor->workers[i].tasks_completed = 0;
@@ -614,7 +614,7 @@ void agentos_task_executor_destroy(agentos_task_executor_t* executor) {
     executor->shutdown = 1;
     agentos_mutex_unlock(executor->lock);
 
-    // 唤醒所有工作线�?
+    // 唤醒所有工作线程
     agentos_cond_broadcast(executor->task_queue->cond);
 
     // 等待工作线程结束
@@ -625,12 +625,12 @@ void agentos_task_executor_destroy(agentos_task_executor_t* executor) {
         }
     }
 
-    // 销毁任务队�?
+    // 销毁任务队列
     if (executor->task_queue) {
         destroy_priority_queue(executor->task_queue);
     }
 
-    // 销毁所有任�?
+    // 销毁所有任务
     for (uint32_t i = 0; i < MAX_TASKS; i++) {
         if (executor->tasks[i]) {
             agentos_task_destroy(executor->tasks[i]);
@@ -715,7 +715,7 @@ agentos_error_t agentos_task_create(const char* name,
 }
 
 /**
- * @brief 销毁任�?
+ * @brief 销毁任务
  */
 void agentos_task_destroy(agentos_task_t* task) {
     if (!task) return;
@@ -770,7 +770,7 @@ agentos_error_t agentos_task_executor_submit(agentos_task_executor_t* executor,
 
     agentos_mutex_unlock(executor->lock);
 
-    // 更新任务状�?
+    // 更新任务状态
     agentos_mutex_lock(task->lock);
     task->state = TASK_STATE_QUEUED;
     agentos_mutex_unlock(task->lock);
@@ -778,7 +778,7 @@ agentos_error_t agentos_task_executor_submit(agentos_task_executor_t* executor,
     // 加入队列
     priority_queue_push(executor->task_queue, task);
 
-    // 更新可观测�?
+    // 更新可观测性
     if (executor->obs) {
         agentos_observability_increment_counter(executor->obs, "task_submitted", 1);
     }
@@ -861,7 +861,7 @@ agentos_error_t agentos_task_executor_cancel(agentos_task_executor_t* executor,
 }
 
 /**
- * @brief 获取任务状�?
+ * @brief 获取任务状态
  */
 task_state_t agentos_task_get_state(agentos_task_t* task) {
     if (!task) return TASK_STATE_FAILED;
@@ -869,7 +869,7 @@ task_state_t agentos_task_get_state(agentos_task_t* task) {
 }
 
 /**
- * @brief 设置任务优先�?
+ * @brief 设置任务优先级
  */
 agentos_error_t agentos_task_set_priority(agentos_task_t* task, task_priority_t priority) {
     if (!task) return AGENTOS_EINVAL;
@@ -903,7 +903,7 @@ agentos_error_t agentos_task_add_dependency(agentos_task_t* task, uint64_t depen
 }
 
 /**
- * @brief 获取执行器统计信�?
+ * @brief 获取执行器统计信息
  */
 agentos_error_t agentos_task_executor_get_stats(agentos_task_executor_t* executor,
                                                 char** out_stats) {
@@ -958,7 +958,7 @@ agentos_error_t agentos_task_executor_get_stats(agentos_task_executor_t* executo
 }
 
 /**
- * @brief 健康检�?
+ * @brief 健康检查
  */
 agentos_error_t agentos_task_executor_health_check(agentos_task_executor_t* executor,
                                                    char** out_json) {

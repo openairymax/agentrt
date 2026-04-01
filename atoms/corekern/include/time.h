@@ -56,6 +56,8 @@ AGENTOS_API agentos_error_t agentos_event_reset(agentos_event_t* event);
 
 AGENTOS_API void agentos_event_destroy(agentos_event_t* event);
 
+AGENTOS_API void agentos_time_eventloop_cleanup(void);
+
 #ifdef __cplusplus
 }
 #endif

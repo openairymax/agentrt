@@ -2,7 +2,10 @@
  * @file heapstore_memory.c
  * @brief AgentOS 数据分区内存管理数据存储实现
  *
- * Copyright (c) 2026 SPHARX. All Rights Reserved.
+ * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * "From data intelligence emerges."
  */
 
@@ -13,7 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
+#include <pthread.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -24,261 +27,251 @@
 #include <sys/stat.h>
 #endif
 
-typedef struct memory_pool_node {
-    heapstore_memory_pool_t pool;
-    struct memory_pool_node* next;
-} memory_pool_node_t;
+#define heapstore_MEMORY_MAX_POOLS 64
+#define heapstore_MEMORY_MAX_ALLOCATIONS 10000
+#define heapstore_MEMORY_MAX_PATH 512
 
-typedef struct memory_allocation_node {
-    heapstore_memory_allocation_t allocation;
-    struct memory_allocation_node* next;
-} memory_allocation_node_t;
-
-typedef struct {
-    memory_pool_node_t* pools;
-    memory_allocation_node_t* allocations;
-    size_t pool_count;
-    size_t allocation_count;
-    pthread_mutex_t lock;
-    bool initialized;
-} memory_data_t;
-
-static memory_data_t g_memory_data = {0};
+static bool s_initialized = false;
+static pthread_mutex_t s_memory_lock = PTHREAD_MUTEX_INITIALIZER;
+static heapstore_memory_pool_t s_pools[heapstore_MEMORY_MAX_POOLS];
+static size_t s_pool_count = 0;
+static heapstore_memory_allocation_t s_allocations[heapstore_MEMORY_MAX_ALLOCATIONS];
+static size_t s_allocation_count = 0;
+static char s_memory_path[heapstore_MEMORY_MAX_PATH] = {0};
 
 heapstore_error_t heapstore_memory_init(void) {
-    if (g_memory_data.initialized) {
-        return heapstore_ERR_ALREADY_INITIALIZED;
+    if (s_initialized) {
+        return heapstore_SUCCESS;
     }
 
-    memset(&g_memory_data, 0, sizeof(g_memory_data));
-    pthread_mutex_init(&g_memory_data.lock, NULL);
-    g_memory_data.initialized = true;
+    const char* base_path = "heapstore/kernel/memory";
+    strncpy(s_memory_path, base_path, sizeof(s_memory_path) - 1);
+    s_memory_path[sizeof(s_memory_path) - 1] = '\0';
 
-    heapstore_ensure_directory("heapstore/kernel/memory/pools");
-    heapstore_ensure_directory("heapstore/kernel/memory/stats");
-    heapstore_ensure_directory("heapstore/kernel/memory/allocations");
+    heapstore_ensure_directory(s_memory_path);
+
+    char pools_path[heapstore_MEMORY_MAX_PATH];
+    snprintf(pools_path, sizeof(pools_path), "%s/pools", s_memory_path);
+    heapstore_ensure_directory(pools_path);
+
+    char allocations_path[heapstore_MEMORY_MAX_PATH];
+    snprintf(allocations_path, sizeof(allocations_path), "%s/allocations", s_memory_path);
+    heapstore_ensure_directory(allocations_path);
+
+    char stats_path[heapstore_MEMORY_MAX_PATH];
+    snprintf(stats_path, sizeof(stats_path), "%s/stats", s_memory_path);
+    heapstore_ensure_directory(stats_path);
+
+    memset(s_pools, 0, sizeof(s_pools));
+    memset(s_allocations, 0, sizeof(s_allocations));
+    s_pool_count = 0;
+    s_allocation_count = 0;
+
+    s_initialized = true;
 
     return heapstore_SUCCESS;
 }
 
 void heapstore_memory_shutdown(void) {
-    if (!g_memory_data.initialized) {
+    if (!s_initialized) {
         return;
     }
 
-    pthread_mutex_lock(&g_memory_data.lock);
+    pthread_mutex_lock(&s_memory_lock);
 
-    memory_pool_node_t* pool = g_memory_data.pools;
-    while (pool) {
-        memory_pool_node_t* next = pool->next;
-        free(pool);
-        pool = next;
-    }
+    memset(s_pools, 0, sizeof(s_pools));
+    memset(s_allocations, 0, sizeof(s_allocations));
+    s_pool_count = 0;
+    s_allocation_count = 0;
 
-    memory_allocation_node_t* alloc = g_memory_data.allocations;
-    while (alloc) {
-        memory_allocation_node_t* next = alloc->next;
-        free(alloc);
-        alloc = next;
-    }
-
-    g_memory_data.pools = NULL;
-    g_memory_data.allocations = NULL;
-    g_memory_data.pool_count = 0;
-    g_memory_data.allocation_count = 0;
-
-    pthread_mutex_unlock(&g_memory_data.lock);
-    pthread_mutex_destroy(&g_memory_data.lock);
-
-    g_memory_data.initialized = false;
+    s_initialized = false;
+    pthread_mutex_unlock(&s_memory_lock);
 }
 
 heapstore_error_t heapstore_memory_record_pool(const heapstore_memory_pool_t* pool) {
-    if (!pool || !pool->pool_id[0]) {
-        return heapstore_ERR_INVALID_PARAM;
-    }
-
-    if (!g_memory_data.initialized) {
+    if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&g_memory_data.lock);
+    if (!pool) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
 
-    memory_pool_node_t* node = (memory_pool_node_t*)malloc(sizeof(memory_pool_node_t));
-    if (!node) {
-        pthread_mutex_unlock(&g_memory_data.lock);
+    pthread_mutex_lock(&s_memory_lock);
+
+    if (s_pool_count >= heapstore_MEMORY_MAX_POOLS) {
+        pthread_mutex_unlock(&s_memory_lock);
         return heapstore_ERR_OUT_OF_MEMORY;
     }
 
-    memcpy(&node->pool, pool, sizeof(heapstore_memory_pool_t));
-    node->next = g_memory_data.pools;
-    g_memory_data.pools = node;
-    g_memory_data.pool_count++;
+    for (size_t i = 0; i < s_pool_count; i++) {
+        if (strcmp(s_pools[i].pool_id, pool->pool_id) == 0) {
+            memcpy(&s_pools[i], pool, sizeof(heapstore_memory_pool_t));
+            pthread_mutex_unlock(&s_memory_lock);
+            return heapstore_SUCCESS;
+        }
+    }
 
-    pthread_mutex_unlock(&g_memory_data.lock);
+    memcpy(&s_pools[s_pool_count], pool, sizeof(heapstore_memory_pool_t));
+    s_pool_count++;
+
+    pthread_mutex_unlock(&s_memory_lock);
 
     return heapstore_SUCCESS;
 }
 
 heapstore_error_t heapstore_memory_get_pool(const char* pool_id, heapstore_memory_pool_t* pool) {
+    if (!s_initialized) {
+        return heapstore_ERR_NOT_INITIALIZED;
+    }
+
     if (!pool_id || !pool) {
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    if (!g_memory_data.initialized) {
-        return heapstore_ERR_NOT_INITIALIZED;
-    }
+    pthread_mutex_lock(&s_memory_lock);
 
-    pthread_mutex_lock(&g_memory_data.lock);
-
-    memory_pool_node_t* node = g_memory_data.pools;
-    while (node) {
-        if (strcmp(node->pool.pool_id, pool_id) == 0) {
-            memcpy(pool, &node->pool, sizeof(heapstore_memory_pool_t));
-            pthread_mutex_unlock(&g_memory_data.lock);
+    for (size_t i = 0; i < s_pool_count; i++) {
+        if (strcmp(s_pools[i].pool_id, pool_id) == 0) {
+            memcpy(pool, &s_pools[i], sizeof(heapstore_memory_pool_t));
+            pthread_mutex_unlock(&s_memory_lock);
             return heapstore_SUCCESS;
         }
-        node = node->next;
     }
 
-    pthread_mutex_unlock(&g_memory_data.lock);
-
+    pthread_mutex_unlock(&s_memory_lock);
     return heapstore_ERR_NOT_FOUND;
 }
 
 heapstore_error_t heapstore_memory_update_pool_usage(const char* pool_id, size_t used_size, uint32_t free_block_count) {
+    if (!s_initialized) {
+        return heapstore_ERR_NOT_INITIALIZED;
+    }
+
     if (!pool_id) {
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    if (!g_memory_data.initialized) {
-        return heapstore_ERR_NOT_INITIALIZED;
-    }
+    pthread_mutex_lock(&s_memory_lock);
 
-    pthread_mutex_lock(&g_memory_data.lock);
-
-    memory_pool_node_t* node = g_memory_data.pools;
-    while (node) {
-        if (strcmp(node->pool.pool_id, pool_id) == 0) {
-            node->pool.used_size = used_size;
-            node->pool.free_block_count = free_block_count;
-            pthread_mutex_unlock(&g_memory_data.lock);
+    for (size_t i = 0; i < s_pool_count; i++) {
+        if (strcmp(s_pools[i].pool_id, pool_id) == 0) {
+            s_pools[i].used_size = used_size;
+            s_pools[i].free_block_count = free_block_count;
+            pthread_mutex_unlock(&s_memory_lock);
             return heapstore_SUCCESS;
         }
-        node = node->next;
     }
 
-    pthread_mutex_unlock(&g_memory_data.lock);
-
+    pthread_mutex_unlock(&s_memory_lock);
     return heapstore_ERR_NOT_FOUND;
 }
 
 heapstore_error_t heapstore_memory_record_allocation(const heapstore_memory_allocation_t* allocation) {
-    if (!allocation || !allocation->allocation_id[0]) {
-        return heapstore_ERR_INVALID_PARAM;
-    }
-
-    if (!g_memory_data.initialized) {
+    if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&g_memory_data.lock);
+    if (!allocation) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
 
-    memory_allocation_node_t* node = (memory_allocation_node_t*)malloc(sizeof(memory_allocation_node_t));
-    if (!node) {
-        pthread_mutex_unlock(&g_memory_data.lock);
+    pthread_mutex_lock(&s_memory_lock);
+
+    if (s_allocation_count >= heapstore_MEMORY_MAX_ALLOCATIONS) {
+        pthread_mutex_unlock(&s_memory_lock);
         return heapstore_ERR_OUT_OF_MEMORY;
     }
 
-    memcpy(&node->allocation, allocation, sizeof(heapstore_memory_allocation_t));
-    node->next = g_memory_data.allocations;
-    g_memory_data.allocations = node;
-    g_memory_data.allocation_count++;
+    for (size_t i = 0; i < s_allocation_count; i++) {
+        if (strcmp(s_allocations[i].allocation_id, allocation->allocation_id) == 0) {
+            memcpy(&s_allocations[i], allocation, sizeof(heapstore_memory_allocation_t));
+            pthread_mutex_unlock(&s_memory_lock);
+            return heapstore_SUCCESS;
+        }
+    }
 
-    pthread_mutex_unlock(&g_memory_data.lock);
+    memcpy(&s_allocations[s_allocation_count], allocation, sizeof(heapstore_memory_allocation_t));
+    s_allocation_count++;
+
+    pthread_mutex_unlock(&s_memory_lock);
 
     return heapstore_SUCCESS;
 }
 
 heapstore_error_t heapstore_memory_get_allocation(const char* allocation_id, heapstore_memory_allocation_t* allocation) {
+    if (!s_initialized) {
+        return heapstore_ERR_NOT_INITIALIZED;
+    }
+
     if (!allocation_id || !allocation) {
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    if (!g_memory_data.initialized) {
-        return heapstore_ERR_NOT_INITIALIZED;
-    }
+    pthread_mutex_lock(&s_memory_lock);
 
-    pthread_mutex_lock(&g_memory_data.lock);
-
-    memory_allocation_node_t* node = g_memory_data.allocations;
-    while (node) {
-        if (strcmp(node->allocation.allocation_id, allocation_id) == 0) {
-            memcpy(allocation, &node->allocation, sizeof(heapstore_memory_allocation_t));
-            pthread_mutex_unlock(&g_memory_data.lock);
+    for (size_t i = 0; i < s_allocation_count; i++) {
+        if (strcmp(s_allocations[i].allocation_id, allocation_id) == 0) {
+            memcpy(allocation, &s_allocations[i], sizeof(heapstore_memory_allocation_t));
+            pthread_mutex_unlock(&s_memory_lock);
             return heapstore_SUCCESS;
         }
-        node = node->next;
     }
 
-    pthread_mutex_unlock(&g_memory_data.lock);
-
+    pthread_mutex_unlock(&s_memory_lock);
     return heapstore_ERR_NOT_FOUND;
 }
 
 heapstore_error_t heapstore_memory_free_allocation(const char* allocation_id) {
+    if (!s_initialized) {
+        return heapstore_ERR_NOT_INITIALIZED;
+    }
+
     if (!allocation_id) {
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    if (!g_memory_data.initialized) {
-        return heapstore_ERR_NOT_INITIALIZED;
-    }
+    pthread_mutex_lock(&s_memory_lock);
 
-    pthread_mutex_lock(&g_memory_data.lock);
-
-    memory_allocation_node_t* node = g_memory_data.allocations;
-    while (node) {
-        if (strcmp(node->allocation.allocation_id, allocation_id) == 0) {
-            node->allocation.freed_at = (uint64_t)time(NULL);
-            snprintf(node->allocation.status, sizeof(node->allocation.status), "freed");
-            pthread_mutex_unlock(&g_memory_data.lock);
+    for (size_t i = 0; i < s_allocation_count; i++) {
+        if (strcmp(s_allocations[i].allocation_id, allocation_id) == 0) {
+            s_allocations[i].freed_at = (uint64_t)time(NULL);
+            strncpy(s_allocations[i].status, "freed", sizeof(s_allocations[i].status) - 1);
+            pthread_mutex_unlock(&s_memory_lock);
             return heapstore_SUCCESS;
         }
-        node = node->next;
     }
 
-    pthread_mutex_unlock(&g_memory_data.lock);
-
+    pthread_mutex_unlock(&s_memory_lock);
     return heapstore_ERR_NOT_FOUND;
 }
 
 heapstore_error_t heapstore_memory_get_stats(uint32_t* pool_count, uint32_t* total_allocations, uint64_t* total_size) {
-    if (!g_memory_data.initialized) {
+    if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&g_memory_data.lock);
+    pthread_mutex_lock(&s_memory_lock);
 
     if (pool_count) {
-        *pool_count = (uint32_t)g_memory_data.pool_count;
+        *pool_count = (uint32_t)s_pool_count;
     }
-
     if (total_allocations) {
-        *total_allocations = (uint32_t)g_memory_data.allocation_count;
+        *total_allocations = (uint32_t)s_allocation_count;
     }
-
     if (total_size) {
-        *total_size = 0;
-        memory_pool_node_t* node = g_memory_data.pools;
-        while (node) {
-            *total_size += node->pool.total_size;
-            node = node->next;
+        uint64_t size = 0;
+        for (size_t i = 0; i < s_pool_count; i++) {
+            size += s_pools[i].total_size;
         }
+        *total_size = size;
     }
 
-    pthread_mutex_unlock(&g_memory_data.lock);
+    pthread_mutex_unlock(&s_memory_lock);
 
     return heapstore_SUCCESS;
 }
 
+bool heapstore_memory_is_healthy(void) {
+    return s_initialized;
+}

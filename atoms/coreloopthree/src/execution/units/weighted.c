@@ -1,6 +1,6 @@
-﻿/**
+/**
  * @file weighted.c
- * @brief 加权调度策略（基于成本、性能、信任度加权评分�? 可配置权�?
+ * @brief 加权调度策略（基于成本、性能、信任度加权评分），可配置权重
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -80,8 +80,8 @@ static agentos_error_t weighted_dispatch(
 
 /**
  * @brief 创建加权调度策略
- * @param manager 权重配置（若为NULL使用默认�?
- * @param registry_ctx 注册中心上下�?
+ * @param manager 权重配置（若为NULL使用默认值）
+ * @param registry_ctx 注册中心上下文
  * @param get_agents_func 获取Agent列表函数
  * @return 策略对象
  */
@@ -101,7 +101,7 @@ agentos_dispatching_strategy_t* agentos_dispatching_weighted_create(
         return NULL;
     }
 
-    // 从配置读取权重，若未提供则使用默认�?
+    // 从配置读取权重，若未提供则使用默认值
     if (manager) {
         data->cost_weight = manager->cost_weight;
         data->perf_weight = manager->perf_weight;

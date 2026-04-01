@@ -2,12 +2,17 @@
  * @file heapstore_core.c
  * @brief AgentOS 数据分区核心实现
  *
- * Copyright (c) 2026 SPHARX. All Rights Reserved.
+ * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * "From data intelligence emerges."
  */
 
 #include "heapstore.h"
 #include "private.h"
+#include "heapstore_log.h"
+#include "heapstore_trace.h"
 #include "utils.h"
 
 #include <stdio.h>
@@ -17,6 +22,7 @@
 #include <sys/types.h>
 #include <errno.h>
 #include <time.h>
+#include <stdatomic.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -30,12 +36,17 @@
 #include <sys/resource.h>
 #endif
 
-#define MAX_PATH_LEN 512
-#define MAX_SUBPATHS 32
+#define heapstore_MAX_PATH_LEN 512
+#define heapstore_MAX_SUBPATHS 32
+#define heapstore_MAX_SERVICE_LOGS 32
+
+#define heapstore_DEFAULT_CIRCUIT_THRESHOLD 5
+#define heapstore_DEFAULT_CIRCUIT_TIMEOUT_SEC 30
 
 static bool s_initialized = false;
-static char s_root_path[MAX_PATH_LEN];
+static char s_root_path[heapstore_MAX_PATH_LEN];
 static heapstore_config_t s_config;
+
 static heapstore_path_type_t s_path_order[] = {
     heapstore_PATH_KERNEL,
     heapstore_PATH_LOGS,
@@ -56,7 +67,7 @@ static const char* s_path_names[] = {
     "kernel/memory"
 };
 
-static const char* s_subpath_map[][MAX_SUBPATHS] = {
+static const char* s_subpath_map[][heapstore_MAX_SUBPATHS] = {
     {NULL},
     {"apps", "kernel", "services", NULL},
     {NULL},
@@ -68,6 +79,44 @@ static const char* s_subpath_map[][MAX_SUBPATHS] = {
 
 static const char* s_default_root = "heapstore";
 
+typedef struct {
+    atomic_uint_fast32_t state;
+    atomic_uint_fast32_t failure_count;
+    atomic_uint_fast64_t last_failure_time;
+    uint32_t threshold;
+    uint32_t timeout_sec;
+} heapstore_circuit_breaker_t;
+
+typedef struct {
+    atomic_uint_fast64_t total_operations;
+    atomic_uint_fast64_t failed_operations;
+    atomic_uint_fast64_t fast_path_operations;
+    atomic_uint_fast64_t slow_path_operations;
+    atomic_uint_fast64_t circuit_breaker_trips;
+    atomic_uint_fast64_t total_operation_time_ns;
+    atomic_uint_fast64_t peak_concurrent_ops;
+    atomic_uint_fast32_t current_concurrent_ops;
+} heapstore_metrics_t;
+
+static heapstore_circuit_breaker_t s_circuit_breaker = {
+    .state = 0,
+    .failure_count = 0,
+    .last_failure_time = 0,
+    .threshold = heapstore_DEFAULT_CIRCUIT_THRESHOLD,
+    .timeout_sec = heapstore_DEFAULT_CIRCUIT_TIMEOUT_SEC
+};
+
+static heapstore_metrics_t s_metrics = {
+    .total_operations = 0,
+    .failed_operations = 0,
+    .fast_path_operations = 0,
+    .slow_path_operations = 0,
+    .circuit_breaker_trips = 0,
+    .total_operation_time_ns = 0,
+    .peak_concurrent_ops = 0,
+    .current_concurrent_ops = 0
+};
+
 static void set_default_config(void) {
     memset(&s_config, 0, sizeof(s_config));
     s_config.root_path = s_default_root;
@@ -78,6 +127,66 @@ static void set_default_config(void) {
     s_config.enable_log_rotation = true;
     s_config.enable_trace_export = true;
     s_config.db_vacuum_interval_days = 7;
+    s_config.circuit_breaker_threshold = heapstore_DEFAULT_CIRCUIT_THRESHOLD;
+    s_config.circuit_breaker_timeout_sec = heapstore_DEFAULT_CIRCUIT_TIMEOUT_SEC;
+}
+
+static inline void circuit_breaker_record_success(void) {
+    atomic_store(&s_circuit_breaker.failure_count, 0);
+    atomic_store(&s_circuit_breaker.state, 0);
+}
+
+static inline void circuit_breaker_record_failure(void) {
+    uint32_t count = atomic_fetch_add(&s_circuit_breaker.failure_count, 1) + 1;
+    uint64_t now = (uint64_t)time(NULL);
+    atomic_store(&s_circuit_breaker.last_failure_time, now);
+
+    if (count >= s_circuit_breaker.threshold) {
+        atomic_store(&s_circuit_breaker.state, 1);
+        atomic_fetch_add(&s_metrics.circuit_breaker_trips, 1);
+    }
+}
+
+static inline bool circuit_breaker_is_open(void) {
+    uint32_t state = atomic_load(&s_circuit_breaker.state);
+    if (state == 0) {
+        return false;
+    }
+    if (state == 2) {
+        return false;
+    }
+
+    uint64_t last_failure = atomic_load(&s_circuit_breaker.last_failure_time);
+    uint64_t now = (uint64_t)time(NULL);
+    if (now - last_failure >= s_circuit_breaker.timeout_sec) {
+        atomic_store(&s_circuit_breaker.state, 2);
+        return false;
+    }
+    return true;
+}
+
+static inline void update_metrics(uint64_t elapsed_ns, bool is_fast_path, bool is_failed) {
+    atomic_fetch_add(&s_metrics.total_operations, 1);
+    atomic_fetch_add(&s_metrics.total_operation_time_ns, elapsed_ns);
+
+    uint32_t current_ops = atomic_fetch_add(&s_metrics.current_concurrent_ops, 1) + 1;
+    uint64_t peak = atomic_load(&s_metrics.peak_concurrent_ops);
+    while (current_ops > peak) {
+        if (atomic_compare_exchange_weak(&s_metrics.peak_concurrent_ops, &peak, current_ops)) {
+            break;
+        }
+    }
+    atomic_fetch_sub(&s_metrics.current_concurrent_ops, 1);
+
+    if (is_fast_path) {
+        atomic_fetch_add(&s_metrics.fast_path_operations, 1);
+    } else {
+        atomic_fetch_add(&s_metrics.slow_path_operations, 1);
+    }
+
+    if (is_failed) {
+        atomic_fetch_add(&s_metrics.failed_operations, 1);
+    }
 }
 
 heapstore_error_t heapstore_init(const heapstore_config_t* manager) {
@@ -104,6 +213,14 @@ heapstore_error_t heapstore_init(const heapstore_config_t* manager) {
         if (manager->db_vacuum_interval_days > 0) {
             s_config.db_vacuum_interval_days = manager->db_vacuum_interval_days;
         }
+        if (manager->circuit_breaker_threshold > 0) {
+            s_config.circuit_breaker_threshold = manager->circuit_breaker_threshold;
+            s_circuit_breaker.threshold = manager->circuit_breaker_threshold;
+        }
+        if (manager->circuit_breaker_timeout_sec > 0) {
+            s_config.circuit_breaker_timeout_sec = manager->circuit_breaker_timeout_sec;
+            s_circuit_breaker.timeout_sec = manager->circuit_breaker_timeout_sec;
+        }
     }
 
     strncpy(s_root_path, s_config.root_path, sizeof(s_root_path) - 1);
@@ -114,7 +231,7 @@ heapstore_error_t heapstore_init(const heapstore_config_t* manager) {
     }
 
     for (size_t i = 0; i < sizeof(s_path_order) / sizeof(s_path_order[0]); i++) {
-        char full_path[MAX_PATH_LEN];
+        char full_path[heapstore_MAX_PATH_LEN];
         snprintf(full_path, sizeof(full_path), "%s/%s", s_root_path, s_path_names[i]);
 
         if (!heapstore_ensure_directory(full_path)) {
@@ -124,7 +241,7 @@ heapstore_error_t heapstore_init(const heapstore_config_t* manager) {
         size_t subpath_idx = (size_t)s_path_order[i];
         if (subpath_idx < sizeof(s_subpath_map) / sizeof(s_subpath_map[0])) {
             for (size_t j = 0; s_subpath_map[subpath_idx][j] != NULL; j++) {
-                char sub_path[MAX_PATH_LEN];
+                char sub_path[heapstore_MAX_PATH_LEN];
                 snprintf(sub_path, sizeof(sub_path), "%s/%s", full_path, s_subpath_map[subpath_idx][j]);
                 if (!heapstore_ensure_directory(sub_path)) {
                     return heapstore_ERR_DIR_CREATE_FAILED;
@@ -133,13 +250,60 @@ heapstore_error_t heapstore_init(const heapstore_config_t* manager) {
         }
     }
 
+    atomic_init(&s_circuit_breaker.state, 0);
+    atomic_init(&s_circuit_breaker.failure_count, 0);
+    atomic_init(&s_circuit_breaker.last_failure_time, 0);
+
+    atomic_init(&s_metrics.total_operations, 0);
+    atomic_init(&s_metrics.failed_operations, 0);
+    atomic_init(&s_metrics.fast_path_operations, 0);
+    atomic_init(&s_metrics.slow_path_operations, 0);
+    atomic_init(&s_metrics.circuit_breaker_trips, 0);
+    atomic_init(&s_metrics.total_operation_time_ns, 0);
+    atomic_init(&s_metrics.peak_concurrent_ops, 0);
+    atomic_init(&s_metrics.current_concurrent_ops, 0);
+
     s_initialized = true;
 
-    heapstore_registry_init();
-    heapstore_trace_init();
-    heapstore_ipc_init();
-    heapstore_memory_init();
-    heapstore_log_init();
+    heapstore_error_t err = heapstore_registry_init();
+    if (err != heapstore_SUCCESS) {
+        s_initialized = false;
+        return err;
+    }
+
+    err = heapstore_trace_init();
+    if (err != heapstore_SUCCESS) {
+        heapstore_registry_shutdown();
+        s_initialized = false;
+        return err;
+    }
+
+    err = heapstore_ipc_init();
+    if (err != heapstore_SUCCESS) {
+        heapstore_trace_shutdown();
+        heapstore_registry_shutdown();
+        s_initialized = false;
+        return err;
+    }
+
+    err = heapstore_memory_init();
+    if (err != heapstore_SUCCESS) {
+        heapstore_ipc_shutdown();
+        heapstore_trace_shutdown();
+        heapstore_registry_shutdown();
+        s_initialized = false;
+        return err;
+    }
+
+    err = heapstore_log_init();
+    if (err != heapstore_SUCCESS) {
+        heapstore_memory_shutdown();
+        heapstore_ipc_shutdown();
+        heapstore_trace_shutdown();
+        heapstore_registry_shutdown();
+        s_initialized = false;
+        return err;
+    }
 
     return heapstore_SUCCESS;
 }
@@ -199,9 +363,6 @@ heapstore_error_t heapstore_get_stats(heapstore_stats_t* stats) {
     memset(stats, 0, sizeof(*stats));
 
     for (size_t i = 0; i < sizeof(s_path_order) / sizeof(s_path_order[0]); i++) {
-        char full_path[MAX_PATH_LEN];
-        snprintf(full_path, sizeof(full_path), "%s/%s", s_root_path, s_path_names[i]);
-
         uint64_t dir_size = 0;
         uint32_t file_count = 0;
 
@@ -232,24 +393,63 @@ heapstore_error_t heapstore_get_stats(heapstore_stats_t* stats) {
     return heapstore_SUCCESS;
 }
 
-/**
- * @brief 计算文件年龄（天数）
- *
- * @note 此函数目前未被使用，保留作为未来日志清理功能的预留接口
- *       计划在 heapstore_log_cleanup 完整实现时使用
- *
- * @param filepath 文件路径
- * @return uint64_t 文件年龄（天数），如果文件不存在或获取失败返回 0
- */
-static uint64_t get_file_age_days(const char* filepath) {
-    struct stat st;
-    if (stat(filepath, &st) != 0) {
-        return 0;
+heapstore_error_t heapstore_log_write_fast(const char* service, int level, const char* message) {
+    if (!s_initialized) {
+        return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    time_t now = time(NULL);
-    double seconds = difftime(now, st.st_mtime);
-    return (uint64_t)(seconds / 86400.0);
+    if (!message) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+
+    if (circuit_breaker_is_open()) {
+        return heapstore_ERR_CIRCUIT_OPEN;
+    }
+
+    uint64_t start_time = 0;
+    bool is_failed = false;
+
+    heapstore_error_t result = heapstore_log_write(level, service, NULL, NULL, 0, message);
+
+    if (result != heapstore_SUCCESS) {
+        is_failed = true;
+        circuit_breaker_record_failure();
+    } else {
+        circuit_breaker_record_success();
+    }
+
+    update_metrics(0, true, is_failed);
+
+    return result;
+}
+
+heapstore_error_t heapstore_log_write_slow(const char* service, int level, const char* message, const char* trace_id, uint32_t timeout_ms) {
+    if (!s_initialized) {
+        return heapstore_ERR_NOT_INITIALIZED;
+    }
+
+    if (!message) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+
+    if (circuit_breaker_is_open()) {
+        return heapstore_ERR_CIRCUIT_OPEN;
+    }
+
+    bool is_failed = false;
+
+    heapstore_error_t result = heapstore_log_write(level, service, trace_id, NULL, 0, message);
+
+    if (result != heapstore_SUCCESS) {
+        is_failed = true;
+        circuit_breaker_record_failure();
+    } else {
+        circuit_breaker_record_success();
+    }
+
+    update_metrics(0, false, is_failed);
+
+    return result;
 }
 
 heapstore_error_t heapstore_cleanup(bool dry_run, uint64_t* freed_bytes) {
@@ -258,24 +458,38 @@ heapstore_error_t heapstore_cleanup(bool dry_run, uint64_t* freed_bytes) {
     }
 
     if (!s_config.enable_auto_cleanup) {
+        if (freed_bytes) {
+            *freed_bytes = 0;
+        }
         return heapstore_SUCCESS;
     }
 
+    uint64_t total_freed = 0;
+    heapstore_error_t result = heapstore_SUCCESS;
+
+    uint64_t log_freed = 0;
+    heapstore_error_t log_err = heapstore_log_cleanup(s_config.log_retention_days, &log_freed);
+    if (log_err == heapstore_SUCCESS) {
+        total_freed += log_freed;
+    } else {
+        result = log_err;
+    }
+
+    uint64_t trace_freed = 0;
+    heapstore_error_t trace_err = heapstore_trace_cleanup(s_config.trace_retention_days, &trace_freed);
+    if (trace_err == heapstore_SUCCESS) {
+        total_freed += trace_freed;
+    } else {
+        if (result == heapstore_SUCCESS) {
+            result = trace_err;
+        }
+    }
+
     if (freed_bytes) {
-        *freed_bytes = 0;
+        *freed_bytes = dry_run ? 0 : total_freed;
     }
 
-    char log_path[MAX_PATH_LEN];
-    snprintf(log_path, sizeof(log_path), "%s/%s", s_root_path, s_path_names[heapstore_PATH_LOGS]);
-
-    char trace_path[MAX_PATH_LEN];
-    snprintf(trace_path, sizeof(trace_path), "%s/%s", s_root_path, s_path_names[heapstore_PATH_TRACES]);
-
-    if (!dry_run && freed_bytes) {
-        *freed_bytes = 0;
-    }
-
-    return heapstore_SUCCESS;
+    return result;
 }
 
 const char* heapstore_strerror(heapstore_error_t err) {
@@ -304,6 +518,16 @@ const char* heapstore_strerror(heapstore_error_t err) {
             return "Failed to open file";
         case heapstore_ERR_CONFIG_INVALID:
             return "Invalid configuration";
+        case heapstore_ERR_FILE_OPERATION_FAILED:
+            return "File operation failed";
+        case heapstore_ERR_FILE_NOT_FOUND:
+            return "File not found";
+        case heapstore_ERR_NOT_FOUND:
+            return "Not found";
+        case heapstore_ERR_CIRCUIT_OPEN:
+            return "Circuit breaker is open";
+        case heapstore_ERR_TIMEOUT:
+            return "Operation timeout";
         case heapstore_ERR_INTERNAL:
             return "Internal error";
         default:
@@ -335,6 +559,14 @@ heapstore_error_t heapstore_reload_config(const heapstore_config_t* manager) {
     if (manager->db_vacuum_interval_days > 0) {
         s_config.db_vacuum_interval_days = manager->db_vacuum_interval_days;
     }
+    if (manager->circuit_breaker_threshold > 0) {
+        s_config.circuit_breaker_threshold = manager->circuit_breaker_threshold;
+        s_circuit_breaker.threshold = manager->circuit_breaker_threshold;
+    }
+    if (manager->circuit_breaker_timeout_sec > 0) {
+        s_config.circuit_breaker_timeout_sec = manager->circuit_breaker_timeout_sec;
+        s_circuit_breaker.timeout_sec = manager->circuit_breaker_timeout_sec;
+    }
 
     return heapstore_SUCCESS;
 }
@@ -343,6 +575,12 @@ heapstore_error_t heapstore_flush(void) {
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
+
+    heapstore_error_t err = heapstore_trace_flush();
+    if (err != heapstore_SUCCESS) {
+        return err;
+    }
+
     return heapstore_SUCCESS;
 }
 
@@ -351,42 +589,115 @@ heapstore_error_t heapstore_health_check(bool* registry_ok,
                                        bool* log_ok, 
                                        bool* ipc_ok, 
                                        bool* memory_ok) {
+    if (!s_initialized) {
+        if (registry_ok) *registry_ok = false;
+        if (trace_ok) *trace_ok = false;
+        if (log_ok) *log_ok = false;
+        if (ipc_ok) *ipc_ok = false;
+        if (memory_ok) *memory_ok = false;
+        return heapstore_ERR_NOT_INITIALIZED;
+    }
+
     bool all_healthy = true;
-    
+
     if (registry_ok) {
-        *registry_ok = s_initialized;
-        if (!*registry_ok) {
-            all_healthy = false;
-        }
+        *registry_ok = heapstore_registry_is_healthy();
+        if (!*registry_ok) all_healthy = false;
     }
     
     if (trace_ok) {
-        *trace_ok = s_initialized;
-        if (!*trace_ok) {
-            all_healthy = false;
-        }
+        *trace_ok = heapstore_trace_is_healthy();
+        if (!*trace_ok) all_healthy = false;
     }
     
     if (log_ok) {
-        *log_ok = s_initialized;
-        if (!*log_ok) {
-            all_healthy = false;
-        }
+        *log_ok = heapstore_log_is_healthy();
+        if (!*log_ok) all_healthy = false;
     }
     
     if (ipc_ok) {
-        *ipc_ok = s_initialized;
-        if (!*ipc_ok) {
-            all_healthy = false;
-        }
+        *ipc_ok = heapstore_ipc_is_healthy();
+        if (!*ipc_ok) all_healthy = false;
     }
     
     if (memory_ok) {
-        *memory_ok = s_initialized;
-        if (!*memory_ok) {
-            all_healthy = false;
-        }
+        *memory_ok = heapstore_memory_is_healthy();
+        if (!*memory_ok) all_healthy = false;
+    }
+
+    if (circuit_breaker_is_open()) {
+        all_healthy = false;
     }
     
-    return all_healthy ? heapstore_SUCCESS : heapstore_ERR_NOT_INITIALIZED;
+    return all_healthy ? heapstore_SUCCESS : heapstore_ERR_INTERNAL;
+}
+
+heapstore_error_t heapstore_get_metrics(heapstore_metrics_t* metrics) {
+    if (!s_initialized) {
+        return heapstore_ERR_NOT_INITIALIZED;
+    }
+
+    if (!metrics) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+
+    metrics->total_operations = atomic_load(&s_metrics.total_operations);
+    metrics->failed_operations = atomic_load(&s_metrics.failed_operations);
+    metrics->fast_path_operations = atomic_load(&s_metrics.fast_path_operations);
+    metrics->slow_path_operations = atomic_load(&s_metrics.slow_path_operations);
+    metrics->circuit_breaker_trips = atomic_load(&s_metrics.circuit_breaker_trips);
+    metrics->peak_concurrent_ops = atomic_load(&s_metrics.peak_concurrent_ops);
+
+    uint64_t total_ops = atomic_load(&s_metrics.total_operations);
+    uint64_t total_time = atomic_load(&s_metrics.total_operation_time_ns);
+    metrics->avg_operation_time_ns = (total_ops > 0) ? (double)total_time / total_ops : 0.0;
+
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_reset_metrics(void) {
+    if (!s_initialized) {
+        return heapstore_ERR_NOT_INITIALIZED;
+    }
+
+    atomic_store(&s_metrics.total_operations, 0);
+    atomic_store(&s_metrics.failed_operations, 0);
+    atomic_store(&s_metrics.fast_path_operations, 0);
+    atomic_store(&s_metrics.slow_path_operations, 0);
+    atomic_store(&s_metrics.circuit_breaker_trips, 0);
+    atomic_store(&s_metrics.total_operation_time_ns, 0);
+    atomic_store(&s_metrics.peak_concurrent_ops, 0);
+
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_get_circuit_state(heapstore_circuit_info_t* info) {
+    if (!s_initialized) {
+        return heapstore_ERR_NOT_INITIALIZED;
+    }
+
+    if (!info) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+
+    uint32_t state = atomic_load(&s_circuit_breaker.state);
+    info->state = (heapstore_circuit_state_t)state;
+    info->failure_count = atomic_load(&s_circuit_breaker.failure_count);
+    info->last_failure_time = atomic_load(&s_circuit_breaker.last_failure_time);
+    info->threshold = s_circuit_breaker.threshold;
+    info->timeout_sec = s_circuit_breaker.timeout_sec;
+
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_reset_circuit(void) {
+    if (!s_initialized) {
+        return heapstore_ERR_NOT_INITIALIZED;
+    }
+
+    atomic_store(&s_circuit_breaker.state, 0);
+    atomic_store(&s_circuit_breaker.failure_count, 0);
+    atomic_store(&s_circuit_breaker.last_failure_time, 0);
+
+    return heapstore_SUCCESS;
 }

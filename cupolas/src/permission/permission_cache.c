@@ -1,6 +1,13 @@
+/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * permission_cache.c - Permission Cache Implementation: Hash-based LRU Cache
+ */
+
 /**
  * @file permission_cache.c
- * @brief 权限结果缓存实现 - 基于哈希表的高性能 LRU 缓存
+ * @brief Permission Cache Implementation - High-performance LRU cache based on hash table
  * @author Spharx
  * @date 2024
  */

@@ -1,7 +1,11 @@
-/**
+/*
+ * Copyright (C) 2026 SPHARX. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2026 SPHARX.
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * @file session.c
  * @brief 会话管理器实现
- * 
+ *
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 

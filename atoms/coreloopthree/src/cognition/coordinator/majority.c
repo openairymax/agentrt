@@ -1,23 +1,17 @@
-﻿/**
+/**
  * @file majority.c
- * @brief 多数投票协调器实�?
+ * @brief 多数投票协调器实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "strategy.h
-#include "../../../commons/utils/cognition/include/cognition_common.h""
-#include "agentos.h
-#include "../../../commons/utils/cognition/include/cognition_common.h""
-#include <stdlib.h
-#include "../../../commons/utils/cognition/include/cognition_common.h">
+#include "strategy.h"
+#include "agentos.h"
+#include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../commons/utils/memory/include/memory_compat.h
-#include "../../../commons/utils/cognition/include/cognition_common.h""
-#include "../../../commons/utils/string/include/string_compat.h
-#include "../../../commons/utils/cognition/include/cognition_common.h""
-#include <string.h
-#include "../../../commons/utils/cognition/include/cognition_common.h">
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
+#include <string.h>
 
 /**
  * @brief 多数投票协调器上下文
@@ -85,25 +79,32 @@ static agentos_error_t majority_coordinate(
         }
     }
 
-    char* winner = NULL;
-    int max_count = 0;
+    // 找出得票最多的选项
+    char* best_result = NULL;
+    int max_votes = 0;
+
     for (size_t i = 0; i < unique_count; i++) {
-        if (votes[i].count > max_count) {
-            max_count = votes[i].count;
-            if (winner) AGENTOS_FREE(winner);
-            winner = votes[i].result ? AGENTOS_STRDUP(votes[i].result) : NULL;
+        if (votes[i].count > max_votes) {
+            if (best_result) AGENTOS_FREE(best_result);
+            best_result = AGENTOS_STRDUP(votes[i].result);
+            max_votes = votes[i].count;
         }
+    }
+
+    // 检查是否达到阈值
+    float vote_ratio = (float)max_votes / (float)input_count;
+    if (vote_ratio >= coordinator->threshold) {
+        *out_result = best_result;
+    } else {
+        *out_result = AGENTOS_STRDUP("no_majority");
+        if (best_result) AGENTOS_FREE(best_result);
+    }
+
+    // 清理
+    for (size_t i = 0; i < unique_count; i++) {
         if (votes[i].result) AGENTOS_FREE(votes[i].result);
     }
     AGENTOS_FREE(votes);
-
-    float vote_ratio = (float)max_count / input_count;
-    if (vote_ratio < coordinator->threshold) {
-        if (winner) AGENTOS_FREE(winner);
-        *out_result = AGENTOS_STRDUP("no_majority");
-    } else {
-        *out_result = winner ? winner : AGENTOS_STRDUP("no_result");
-    }
 
     return AGENTOS_SUCCESS;
 }
@@ -117,23 +118,21 @@ static void majority_destroy(agentos_coordinator_base_t* base) {
 }
 
 /**
- * @brief 创建多数投票协调�?
+ * @brief 创建多数投票协调器
  */
-agentos_error_t agentos_coordinator_majority_create(
-    size_t min_voters,
-    float threshold,
-    agentos_coordinator_base_t** out_coordinator) {
-    if (!out_coordinator) return AGENTOS_EINVAL;
+agentos_error_t agentos_coordinator_majority_create(size_t min_voters, float threshold,
+                                                    agentos_coordinator_base_t** out_base) {
+    if (!out_base) return AGENTOS_EINVAL;
 
-    majority_coordinator_t* coordinator = (majority_coordinator_t*)
-        AGENTOS_CALLOC(1, sizeof(majority_coordinator_t));
+    majority_coordinator_t* coordinator = (majority_coordinator_t*)AGENTOS_CALLOC(1, sizeof(majority_coordinator_t));
     if (!coordinator) return AGENTOS_ENOMEM;
+
+    coordinator->min_voters = min_voters;
+    coordinator->threshold = threshold;
 
     coordinator->base.coordinate = majority_coordinate;
     coordinator->base.destroy = majority_destroy;
-    coordinator->min_voters = min_voters > 0 ? min_voters : 3;
-    coordinator->threshold = (threshold > 0 && threshold <= 1.0f) ? threshold : 0.5f;
 
-    *out_coordinator = &coordinator->base;
+    *out_base = &coordinator->base;
     return AGENTOS_SUCCESS;
 }

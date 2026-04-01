@@ -2,7 +2,10 @@
  * @file heapstore_registry.c
  * @brief AgentOS 数据分区注册表实现
  *
- * Copyright (c) 2026 SPHARX. All Rights Reserved.
+ * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * "From data intelligence emerges."
  */
 
@@ -191,38 +194,9 @@ void heapstore_registry_shutdown(void) {
     pthread_mutex_destroy(&s_registry.lock);
 }
 
-/* ============================================================================
- * SQL 操作辅助函数
- * ============================================================================ */
-
-/**
- * @brief 执行带锁的 SQL 语句
- * @param sql SQL 语句
- * @param bind_func 绑定参数的回调函数（可为 NULL）
- * @param bind_data 绑定参数的数据
- * @return 错误码
- */
 static heapstore_error_t execute_sql_with_lock(const char* sql, 
                                                heapstore_error_t (*bind_func)(sqlite3_stmt*, void*),
                                                void* bind_data) {
-    // 调用扩展版本，不传递结果处理回调
-    return execute_sql_with_lock_ex(sql, bind_func, bind_data, NULL, NULL);
-}
-
-/**
- * @brief 执行带锁的 SQL 语句（扩展版本，支持结果处理）
- * @param sql SQL 语句
- * @param bind_func 绑定参数的回调函数（可为 NULL）
- * @param bind_data 绑定参数的数据
- * @param result_func 处理结果的回调函数（可为 NULL）
- * @param result_data 传递给结果回调的数据
- * @return 错误码
- */
-static heapstore_error_t execute_sql_with_lock_ex(const char* sql,
-                                                  heapstore_error_t (*bind_func)(sqlite3_stmt*, void*),
-                                                  void* bind_data,
-                                                  heapstore_error_t (*result_func)(sqlite3_stmt*, void*),
-                                                  void* result_data) {
     if (!s_registry.initialized || !s_registry.db) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -236,7 +210,6 @@ static heapstore_error_t execute_sql_with_lock_ex(const char* sql,
         return heapstore_ERR_DB_QUERY_FAILED;
     }
 
-    // 绑定参数（如果有）
     if (bind_func) {
         heapstore_error_t err = bind_func(stmt, bind_data);
         if (err != heapstore_SUCCESS) {
@@ -246,48 +219,17 @@ static heapstore_error_t execute_sql_with_lock_ex(const char* sql,
         }
     }
 
-    // 执行语句并处理结果
-    heapstore_error_t result = heapstore_SUCCESS;
-    int rows_processed = 0;
-    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-        rows_processed++;
-        // 如果有结果处理回调，调用它
-        if (result_func) {
-            heapstore_error_t err = result_func(stmt, result_data);
-            if (err != heapstore_SUCCESS) {
-                result = err;
-                break;
-            }
-        } else {
-            // 没有结果处理回调，但查询返回了行，这可能是错误的
-            // 对于 SELECT 查询，应该有结果处理回调
-            // 我们继续处理，但记录这种情况
-        }
-    }
-
+    rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
     pthread_mutex_unlock(&s_registry.lock);
 
-    if (rc == SQLITE_DONE) {
-        // 如果期望结果但没有处理任何行，返回未找到错误
-        if (result_func != NULL && rows_processed == 0) {
-            return heapstore_ERR_NOT_FOUND;
-        }
-        return result;  // 返回可能的结果处理错误或成功
-    } else if (rc == SQLITE_ROW) {
-        // 不应该到达这里，因为我们在 while 循环中处理了所有行
-        return heapstore_SUCCESS;
-    } else {
+    if (rc != SQLITE_DONE && rc != SQLITE_ROW) {
         return heapstore_ERR_DB_QUERY_FAILED;
     }
+
+    return heapstore_SUCCESS;
 }
 
-/**
- * @brief 绑定 Agent 记录参数
- * @param stmt SQLite 语句
- * @param data Agent 记录数据
- * @return 错误码
- */
 static heapstore_error_t bind_agent_record(sqlite3_stmt* stmt, void* data) {
     const heapstore_agent_record_t* record = (const heapstore_agent_record_t*)data;
     
@@ -303,61 +245,11 @@ static heapstore_error_t bind_agent_record(sqlite3_stmt* stmt, void* data) {
     return heapstore_SUCCESS;
 }
 
-/**
- * @brief 绑定 Agent ID 参数
- * @param stmt SQLite 语句
- * @param data Agent ID 字符串
- * @return 错误码
- */
 static heapstore_error_t bind_agent_id(sqlite3_stmt* stmt, void* data) {
     const char* agent_id = (const char*)data;
     sqlite3_bind_text(stmt, 1, agent_id, -1, SQLITE_STATIC);
     return heapstore_SUCCESS;
 }
-
-/**
- * @brief 从查询结果中提取 Agent 记录
- * @param stmt SQLite 语句
- * @param data 指向 heapstore_agent_record_t 的指针
- * @return 错误码
- */
-static heapstore_error_t extract_agent_record(sqlite3_stmt* stmt, void* data) {
-    heapstore_agent_record_t* record = (heapstore_agent_record_t*)data;
-    
-    const char* text;
-    text = (const char*)sqlite3_column_text(stmt, 0);
-    if (text) strncpy(record->id, text, sizeof(record->id) - 1);
-    else record->id[0] = '\0';
-    
-    text = (const char*)sqlite3_column_text(stmt, 1);
-    if (text) strncpy(record->name, text, sizeof(record->name) - 1);
-    else record->name[0] = '\0';
-    
-    text = (const char*)sqlite3_column_text(stmt, 2);
-    if (text) strncpy(record->type, text, sizeof(record->type) - 1);
-    else record->type[0] = '\0';
-    
-    text = (const char*)sqlite3_column_text(stmt, 3);
-    if (text) strncpy(record->version, text, sizeof(record->version) - 1);
-    else record->version[0] = '\0';
-    
-    text = (const char*)sqlite3_column_text(stmt, 4);
-    if (text) strncpy(record->status, text, sizeof(record->status) - 1);
-    else record->status[0] = '\0';
-    
-    text = (const char*)sqlite3_column_text(stmt, 5);
-    if (text) strncpy(record->config_path, text, sizeof(record->config_path) - 1);
-    else record->config_path[0] = '\0';
-    
-    record->created_at = sqlite3_column_int64(stmt, 6);
-    record->updated_at = sqlite3_column_int64(stmt, 7);
-    
-    return heapstore_SUCCESS;
-}
-
-/* ============================================================================
- * 公共接口函数
- * ============================================================================ */
 
 heapstore_error_t heapstore_registry_add_agent(const heapstore_agent_record_t* record) {
     if (!record || !record->id[0]) {
@@ -372,17 +264,66 @@ heapstore_error_t heapstore_registry_add_agent(const heapstore_agent_record_t* r
     return execute_sql_with_lock(sql, bind_agent_record, (void*)record);
 }
 
-
-
 heapstore_error_t heapstore_registry_get_agent(const char* id, heapstore_agent_record_t* record) {
     if (!id || !record) {
         return heapstore_ERR_INVALID_PARAM;
     }
 
+    if (!s_registry.initialized || !s_registry.db) {
+        return heapstore_ERR_NOT_INITIALIZED;
+    }
+
+    pthread_mutex_lock(&s_registry.lock);
+
     const char* sql = "SELECT id, name, type, version, status, config_path, created_at, updated_at FROM agents WHERE id = ?;";
-    
-    // 使用扩展的 SQL 执行函数，支持结果处理
-    return execute_sql_with_lock_ex(sql, bind_agent_id, (void*)id, extract_agent_record, record);
+    sqlite3_stmt* stmt;
+
+    int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        pthread_mutex_unlock(&s_registry.lock);
+        return heapstore_ERR_DB_QUERY_FAILED;
+    }
+
+    sqlite3_bind_text(stmt, 1, id, -1, SQLITE_STATIC);
+
+    rc = sqlite3_step(stmt);
+    if (rc == SQLITE_ROW) {
+        const char* text;
+        text = (const char*)sqlite3_column_text(stmt, 0);
+        if (text) strncpy(record->id, text, sizeof(record->id) - 1);
+        else record->id[0] = '\0';
+        
+        text = (const char*)sqlite3_column_text(stmt, 1);
+        if (text) strncpy(record->name, text, sizeof(record->name) - 1);
+        else record->name[0] = '\0';
+        
+        text = (const char*)sqlite3_column_text(stmt, 2);
+        if (text) strncpy(record->type, text, sizeof(record->type) - 1);
+        else record->type[0] = '\0';
+        
+        text = (const char*)sqlite3_column_text(stmt, 3);
+        if (text) strncpy(record->version, text, sizeof(record->version) - 1);
+        else record->version[0] = '\0';
+        
+        text = (const char*)sqlite3_column_text(stmt, 4);
+        if (text) strncpy(record->status, text, sizeof(record->status) - 1);
+        else record->status[0] = '\0';
+        
+        text = (const char*)sqlite3_column_text(stmt, 5);
+        if (text) strncpy(record->config_path, text, sizeof(record->config_path) - 1);
+        else record->config_path[0] = '\0';
+        
+        record->created_at = sqlite3_column_int64(stmt, 6);
+        record->updated_at = sqlite3_column_int64(stmt, 7);
+        
+        sqlite3_finalize(stmt);
+        pthread_mutex_unlock(&s_registry.lock);
+        return heapstore_SUCCESS;
+    }
+
+    sqlite3_finalize(stmt);
+    pthread_mutex_unlock(&s_registry.lock);
+    return heapstore_ERR_NOT_FOUND;
 }
 
 heapstore_error_t heapstore_registry_update_agent(const heapstore_agent_record_t* record) {
@@ -458,6 +399,13 @@ heapstore_error_t heapstore_registry_delete_agent(const char* id) {
     }
 
     return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_registry_query_agents(const char* filter_type, const char* filter_status, heapstore_registry_iter_t** iter) {
+    (void)filter_type;
+    (void)filter_status;
+    (void)iter;
+    return heapstore_ERR_NOT_INITIALIZED;
 }
 
 heapstore_error_t heapstore_registry_add_skill(const heapstore_skill_record_t* record) {
@@ -735,13 +683,6 @@ heapstore_error_t heapstore_registry_delete_session(const char* id) {
     return heapstore_SUCCESS;
 }
 
-heapstore_error_t heapstore_registry_query_agents(const char* filter_type, const char* filter_status, heapstore_registry_iter_t** iter) {
-    (void)filter_type;
-    (void)filter_status;
-    (void)iter;
-    return heapstore_ERR_NOT_INITIALIZED;
-}
-
 heapstore_error_t heapstore_registry_query_skills(heapstore_registry_iter_t** iter) {
     (void)iter;
     return heapstore_ERR_NOT_INITIALIZED;
@@ -769,5 +710,8 @@ heapstore_error_t heapstore_registry_vacuum(void) {
     return heapstore_SUCCESS;
 }
 
-#endif
+bool heapstore_registry_is_healthy(void) {
+    return s_registry.initialized && s_registry.db != NULL;
+}
 
+#endif

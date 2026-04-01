@@ -1,12 +1,16 @@
-﻿/**
+/*
+ * Copyright (C) 2026 SPHARX. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2026 SPHARX.
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * @file platform.c
  * @brief 跨平台兼容层实现
  *
- * 本文件提�?gateway 模块特定的平台实现：
+ * 本文件提供 gateway 模块特定的平台实现：
  * - Windows getopt_long 实现
- * - time_ns() 包装函数（映射到 commons 模块�?agentos_time_ns�?
+ * - time_ns() 包装函数（映射到 commons 模块的 agentos_time_ns）
  *
- * 其他平台功能�?commons/platform/platform.c 提供
+ * 其他平台功能由 commons/platform/platform.c 提供
  *
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
@@ -142,23 +146,23 @@ int getopt_long(int argc, char* const argv[], const char* optstring,
 /**
  * @brief 获取当前时间（纳秒）- 包装函数
  *
- * 此函数映射到 commons 模块�?agentos_time_ns()
- * 使用 CLOCK_MONOTONIC 保证单调�?
+ * 此函数映射到 commons 模块的 agentos_time_ns()
+ * 使用 CLOCK_MONOTONIC 保证单调性
  *
- * @return 当前时间纳秒�?
+ * @return 当前时间纳秒数
  */
 uint64_t time_ns(void) {
     return agentos_time_ns();
 }
 
-/* ========== 时间函数扩展（gateway 特定�?========== */
+/* ========== 时间函数扩展（gateway 特定的） ========== */
 
 /**
  * @brief 获取当前时间（纳秒）- 墙钟时间
  *
- * 使用 CLOCK_REALTIME，返回自 Unix 纪元以来的时�?
+ * 使用 CLOCK_REALTIME，返回自 Unix 纪元以来的时间
  *
- * @return 当前时间纳秒�?
+ * @return 当前时间纳秒数
  */
 uint64_t agentos_time_current_ns(void) {
 #if defined(_WIN32)
@@ -175,7 +179,7 @@ uint64_t agentos_time_current_ns(void) {
 }
 
 /**
- * @brief 纳秒级睡�?
+ * @brief 纳秒级睡眠
  *
  * @param ns 睡眠时间（纳秒）
  * @return AGENTOS_SUCCESS 成功

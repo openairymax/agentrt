@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿/**
+/**
  * @file observability.h
  * @brief AgentOS 微内核可观测性子系统
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

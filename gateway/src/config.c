@@ -1,10 +1,14 @@
-﻿/**
- * @file manager.c
+/*
+ * Copyright (C) 2026 SPHARX. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2026 SPHARX.
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * @file config.c
  * @brief 配置管理器实现
- * 
+ *
  * 实现配置文件解析、环境变量覆盖、运行时更新等功能。
- * 支持JSON格式配置文件，支持热重载。
- * 
+ * 支持 JSON 格式配置文件，支持热重载。
+ *
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 

@@ -1,18 +1,20 @@
 # =============================================================================
 # AgentOS Agent 注册表配置文件
-# 版本: v1.0.0
-# 最后更新: 2026-03-23
+# 版本: v1.1.0
+# 最后更新: 2026-04-01
 # Schema: schema/agent-registry.schema.json
+# 规范依据: specifications/agentos_contract/agent_contract.md
 # =============================================================================
 # Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
 
 # 配置版本
-_config_version: "1.0.0"
+_config_version: "1.1.0"
 
 # 注册表元数据
 _metadata:
-  last_updated: "2026-03-23T00:00:00Z"
+  last_updated: "2026-04-01T00:00:00Z"
   total_agents: 12
+  schema_version: "1.0.0"
 
 # =============================================================================
 # Agent 注册列表
@@ -26,29 +28,117 @@ agents:
     source: "builtin"
     version: "1.0.0"
     enabled: true
-    trust_score: 0.8
     contract_path: "openlab/contrib/agents/product_manager/contract.json"
-    preferred_model: "gpt-4"
     description: "负责产品规划、需求分析和项目协调的智能体"
+
+    # =========================================================================
+    # 能力定义（按 agent_contract.md 第 2.3 节）
+    # =========================================================================
     capabilities:
-      - "requirement_analysis"
-      - "project_planning"
-      - "stakeholder_communication"
-      - "roadmap_creation"
+      - name: "requirement_analysis"
+        description: "将用户模糊需求转化为结构化需求文档"
+        input_schema:
+          type: "object"
+          properties:
+            goal:
+              type: "string"
+              description: "用户目标描述"
+            context:
+              type: "object"
+              description: "业务上下文信息"
+          required: ["goal"]
+        output_schema:
+          type: "object"
+          properties:
+            prd:
+              type: "string"
+              description: "产品需求文档"
+            user_stories:
+              type: "array"
+              items:
+                type: "string"
+              description: "用户故事列表"
+        estimated_tokens: 5000
+        avg_duration_ms: 3000
+        success_rate: 0.92
+      - name: "project_planning"
+        description: "制定项目计划和里程碑"
+        estimated_tokens: 3000
+        avg_duration_ms: 2000
+      - name: "stakeholder_communication"
+        description: "与利益相关者沟通协调"
+        estimated_tokens: 2000
+        avg_duration_ms: 1500
+      - name: "roadmap_creation"
+        description: "创建产品路线图"
+        estimated_tokens: 4000
+        avg_duration_ms: 2500
+
+    # =========================================================================
+    # 双系统模型配置（按 agent_contract.md 第 2.4 节）
+    # =========================================================================
+    models:
+      system1:
+        model_id: "gpt-4-turbo"
+        purpose: "快速响应、简单查询、模式匹配"
+        max_tokens: 4096
+        temperature: 0.3
+        priority: 1
+      system2:
+        model_id: "gpt-4"
+        purpose: "深度推理、复杂分析、规划决策"
+        max_tokens: 8192
+        temperature: 0.7
+        priority: 2
+
+    # =========================================================================
+    # 权限声明（按 agent_contract.md 第 2.5 节）
+    # =========================================================================
+    required_permissions:
+      - "file:read:${AGENTOS_ROOT}/docs/*"
+      - "file:write:${AGENTOS_DATA_DIR}/workspace/docs/*"
+      - "agent:invoke:architect_v1"
+      - "agent:invoke:coordinator_v1"
+
+    # =========================================================================
+    # 成本概览（按 agent_contract.md 第 2.6 节）
+    # =========================================================================
+    cost_profile:
+      input_token_cost_per_1k: 0.03
+      output_token_cost_per_1k: 0.06
+      avg_tokens_per_task: 5000
+      estimated_cost_per_task_usd: 0.15
+      monthly_budget_usd: 100.0
+      cost_center: "product-team"
+
+    # =========================================================================
+    # 信任指标（按 agent_contract.md 第 2.7 节）
+    # =========================================================================
+    trust_metrics:
+      trust_score: 0.85
+      reliability_score: 0.90
+      quality_score: 0.88
+      security_score: 0.95
+      total_tasks_completed: 1250
+      success_rate: 0.92
+      avg_user_rating: 4.5
+      last_evaluation: "2026-03-15T00:00:00Z"
+
+    # =========================================================================
+    # 资源限制
+    # =========================================================================
     resource_limits:
       max_memory_mb: 512
       max_cpu_percent: 50
       timeout_sec: 300
       max_concurrent_tasks: 3
-    permissions:
-      - "file:read:${AGENTOS_ROOT}/docs/*"
-      - "file:write:${AGENTOS_DATA_DIR}/workspace/docs/*"
+
     tags:
       - "planning"
       - "coordination"
       - "analysis"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-03-23T00:00:00Z"
+    updated_at: "2026-04-01T00:00:00Z"
 
   # ===========================================================================
   # 架构师 Agent
@@ -58,29 +148,77 @@ agents:
     source: "builtin"
     version: "1.0.0"
     enabled: true
-    trust_score: 0.9
     contract_path: "openlab/contrib/agents/architect/contract.json"
-    preferred_model: "gpt-4"
     description: "负责系统架构设计和技术决策的智能体"
+
     capabilities:
-      - "architecture_design"
-      - "technology_selection"
-      - "code_review"
-      - "performance_analysis"
+      - name: "architecture_design"
+        description: "设计系统整体架构和技术方案"
+        estimated_tokens: 8000
+        avg_duration_ms: 5000
+        success_rate: 0.95
+      - name: "technology_selection"
+        description: "评估和选择技术栈"
+        estimated_tokens: 5000
+        avg_duration_ms: 3000
+      - name: "code_review"
+        description: "审查代码质量和架构符合性"
+        estimated_tokens: 4000
+        avg_duration_ms: 2500
+      - name: "performance_analysis"
+        description: "分析系统性能瓶颈"
+        estimated_tokens: 6000
+        avg_duration_ms: 4000
+
+    models:
+      system1:
+        model_id: "gpt-4-turbo"
+        purpose: "快速代码审查、模式识别"
+        max_tokens: 4096
+        temperature: 0.3
+        priority: 1
+      system2:
+        model_id: "gpt-4"
+        purpose: "架构设计、技术决策、复杂分析"
+        max_tokens: 16384
+        temperature: 0.5
+        priority: 2
+
+    required_permissions:
+      - "file:read:${AGENTOS_ROOT}/**/*"
+      - "file:write:${AGENTOS_DATA_DIR}/workspace/architecture/*"
+      - "agent:invoke:*"
+
+    cost_profile:
+      input_token_cost_per_1k: 0.03
+      output_token_cost_per_1k: 0.06
+      avg_tokens_per_task: 8000
+      estimated_cost_per_task_usd: 0.25
+      monthly_budget_usd: 200.0
+      cost_center: "architecture-team"
+
+    trust_metrics:
+      trust_score: 0.95
+      reliability_score: 0.96
+      quality_score: 0.94
+      security_score: 0.98
+      total_tasks_completed: 890
+      success_rate: 0.95
+      avg_user_rating: 4.8
+      last_evaluation: "2026-03-15T00:00:00Z"
+
     resource_limits:
       max_memory_mb: 1024
       max_cpu_percent: 75
       timeout_sec: 600
       max_concurrent_tasks: 2
-    permissions:
-      - "file:read:${AGENTOS_ROOT}/**/*"
-      - "file:write:${AGENTOS_DATA_DIR}/workspace/architecture/*"
+
     tags:
       - "architecture"
       - "design"
       - "review"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-03-23T00:00:00Z"
+    updated_at: "2026-04-01T00:00:00Z"
 
   # ===========================================================================
   # 前端开发 Agent
@@ -90,29 +228,78 @@ agents:
     source: "builtin"
     version: "1.0.0"
     enabled: true
-    trust_score: 0.75
     contract_path: "openlab/contrib/agents/frontend/contract.json"
-    preferred_model: "gpt-4-turbo"
     description: "负责前端界面开发和用户体验优化的智能体"
+
     capabilities:
-      - "ui_development"
-      - "css_styling"
-      - "javascript_coding"
-      - "responsive_design"
+      - name: "ui_development"
+        description: "开发用户界面组件"
+        estimated_tokens: 4000
+        avg_duration_ms: 2500
+        success_rate: 0.88
+      - name: "css_styling"
+        description: "编写CSS样式和响应式布局"
+        estimated_tokens: 2000
+        avg_duration_ms: 1500
+      - name: "javascript_coding"
+        description: "编写JavaScript/TypeScript代码"
+        estimated_tokens: 5000
+        avg_duration_ms: 3000
+      - name: "responsive_design"
+        description: "实现响应式设计"
+        estimated_tokens: 3000
+        avg_duration_ms: 2000
+
+    models:
+      system1:
+        model_id: "gpt-4-turbo"
+        purpose: "快速代码生成、样式调整"
+        max_tokens: 4096
+        temperature: 0.4
+        priority: 1
+      system2:
+        model_id: "gpt-4"
+        purpose: "复杂交互逻辑、性能优化"
+        max_tokens: 8192
+        temperature: 0.6
+        priority: 2
+
+    required_permissions:
+      - "file:read:${AGENTOS_ROOT}/**/*.{js,jsx,ts,tsx,css,html}"
+      - "file:write:${AGENTOS_DATA_DIR}/workspace/frontend/*"
+      - "skill:invoke:filesystem_skill"
+      - "skill:invoke:http_skill"
+
+    cost_profile:
+      input_token_cost_per_1k: 0.01
+      output_token_cost_per_1k: 0.03
+      avg_tokens_per_task: 4000
+      estimated_cost_per_task_usd: 0.08
+      monthly_budget_usd: 80.0
+      cost_center: "frontend-team"
+
+    trust_metrics:
+      trust_score: 0.78
+      reliability_score: 0.85
+      quality_score: 0.82
+      security_score: 0.88
+      total_tasks_completed: 2100
+      success_rate: 0.88
+      avg_user_rating: 4.3
+      last_evaluation: "2026-03-15T00:00:00Z"
+
     resource_limits:
       max_memory_mb: 512
       max_cpu_percent: 50
       timeout_sec: 300
       max_concurrent_tasks: 5
-    permissions:
-      - "file:read:${AGENTOS_ROOT}/**/*.{js,jsx,ts,tsx,css,html}"
-      - "file:write:${AGENTOS_DATA_DIR}/workspace/frontend/*"
+
     tags:
       - "frontend"
       - "ui"
       - "javascript"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-03-23T00:00:00Z"
+    updated_at: "2026-04-01T00:00:00Z"
 
   # ===========================================================================
   # 后端开发 Agent
@@ -122,30 +309,79 @@ agents:
     source: "builtin"
     version: "1.0.0"
     enabled: true
-    trust_score: 0.75
     contract_path: "openlab/contrib/agents/backend/contract.json"
-    preferred_model: "gpt-4-turbo"
     description: "负责后端服务开发和API设计的智能体"
+
     capabilities:
-      - "api_development"
-      - "database_design"
-      - "server_coding"
-      - "performance_optimization"
+      - name: "api_development"
+        description: "开发RESTful API和微服务"
+        estimated_tokens: 6000
+        avg_duration_ms: 4000
+        success_rate: 0.90
+      - name: "database_design"
+        description: "设计数据库模式和优化查询"
+        estimated_tokens: 5000
+        avg_duration_ms: 3000
+      - name: "server_coding"
+        description: "编写服务端代码"
+        estimated_tokens: 5000
+        avg_duration_ms: 3500
+      - name: "performance_optimization"
+        description: "优化系统性能"
+        estimated_tokens: 7000
+        avg_duration_ms: 5000
+
+    models:
+      system1:
+        model_id: "gpt-4-turbo"
+        purpose: "快速API实现、代码生成"
+        max_tokens: 4096
+        temperature: 0.3
+        priority: 1
+      system2:
+        model_id: "gpt-4"
+        purpose: "架构设计、性能优化、复杂逻辑"
+        max_tokens: 12288
+        temperature: 0.5
+        priority: 2
+
+    required_permissions:
+      - "file:read:${AGENTOS_ROOT}/**/*.{py,go,rs,java,c,cpp,h}"
+      - "file:write:${AGENTOS_DATA_DIR}/workspace/backend/*"
+      - "network:connect:*.googleapis.com:443"
+      - "skill:invoke:database_skill"
+      - "skill:invoke:http_skill"
+
+    cost_profile:
+      input_token_cost_per_1k: 0.01
+      output_token_cost_per_1k: 0.03
+      avg_tokens_per_task: 5000
+      estimated_cost_per_task_usd: 0.10
+      monthly_budget_usd: 100.0
+      cost_center: "backend-team"
+
+    trust_metrics:
+      trust_score: 0.80
+      reliability_score: 0.88
+      quality_score: 0.85
+      security_score: 0.90
+      total_tasks_completed: 1850
+      success_rate: 0.90
+      avg_user_rating: 4.4
+      last_evaluation: "2026-03-15T00:00:00Z"
+
     resource_limits:
       max_memory_mb: 512
       max_cpu_percent: 50
       timeout_sec: 300
       max_concurrent_tasks: 5
-    permissions:
-      - "file:read:${AGENTOS_ROOT}/**/*.{py,go,rs,java,c,cpp,h}"
-      - "file:write:${AGENTOS_DATA_DIR}/workspace/backend/*"
-      - "network:connect:*.googleapis.com:443"
+
     tags:
       - "backend"
       - "api"
       - "database"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-03-23T00:00:00Z"
+    updated_at: "2026-04-01T00:00:00Z"
 
   # ===========================================================================
   # 测试 Agent
@@ -155,29 +391,78 @@ agents:
     source: "builtin"
     version: "1.0.0"
     enabled: true
-    trust_score: 0.7
     contract_path: "openlab/contrib/agents/tester/contract.json"
-    preferred_model: "gpt-4-turbo"
     description: "负责测试用例编写和质量保证的智能体"
+
     capabilities:
-      - "test_case_design"
-      - "automated_testing"
-      - "bug_detection"
-      - "quality_assurance"
+      - name: "test_case_design"
+        description: "设计测试用例和测试计划"
+        estimated_tokens: 3000
+        avg_duration_ms: 2000
+        success_rate: 0.92
+      - name: "automated_testing"
+        description: "编写自动化测试脚本"
+        estimated_tokens: 4000
+        avg_duration_ms: 3000
+      - name: "bug_detection"
+        description: "检测和报告软件缺陷"
+        estimated_tokens: 2000
+        avg_duration_ms: 1500
+      - name: "quality_assurance"
+        description: "执行质量保证流程"
+        estimated_tokens: 3000
+        avg_duration_ms: 2500
+
+    models:
+      system1:
+        model_id: "gpt-4-turbo"
+        purpose: "快速测试用例生成、简单验证"
+        max_tokens: 4096
+        temperature: 0.3
+        priority: 1
+      system2:
+        model_id: "gpt-4"
+        purpose: "复杂测试策略、边缘案例分析"
+        max_tokens: 8192
+        temperature: 0.6
+        priority: 2
+
+    required_permissions:
+      - "file:read:${AGENTOS_ROOT}/**/*"
+      - "code:execute:*"
+      - "skill:invoke:shell_skill"
+      - "skill:invoke:python_skill"
+
+    cost_profile:
+      input_token_cost_per_1k: 0.01
+      output_token_cost_per_1k: 0.03
+      avg_tokens_per_task: 3500
+      estimated_cost_per_task_usd: 0.07
+      monthly_budget_usd: 60.0
+      cost_center: "qa-team"
+
+    trust_metrics:
+      trust_score: 0.75
+      reliability_score: 0.82
+      quality_score: 0.88
+      security_score: 0.85
+      total_tasks_completed: 3200
+      success_rate: 0.92
+      avg_user_rating: 4.2
+      last_evaluation: "2026-03-15T00:00:00Z"
+
     resource_limits:
       max_memory_mb: 512
       max_cpu_percent: 50
       timeout_sec: 600
       max_concurrent_tasks: 5
-    permissions:
-      - "file:read:${AGENTOS_ROOT}/**/*"
-      - "code:execute:*"
+
     tags:
       - "testing"
       - "qa"
       - "automation"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-03-23T00:00:00Z"
+    updated_at: "2026-04-01T00:00:00Z"
 
   # ===========================================================================
   # DevOps Agent
@@ -187,29 +472,79 @@ agents:
     source: "builtin"
     version: "1.0.0"
     enabled: true
-    trust_score: 0.85
     contract_path: "openlab/contrib/agents/devops/contract.json"
-    preferred_model: "gpt-4-turbo"
     description: "负责部署运维和基础设施管理的智能体"
+
     capabilities:
-      - "deployment"
-      - "ci_cd"
-      - "monitoring"
-      - "infrastructure_management"
+      - name: "deployment"
+        description: "执行应用部署和发布"
+        estimated_tokens: 4000
+        avg_duration_ms: 5000
+        success_rate: 0.95
+      - name: "ci_cd"
+        description: "配置和管理CI/CD流水线"
+        estimated_tokens: 5000
+        avg_duration_ms: 4000
+      - name: "monitoring"
+        description: "配置监控和告警系统"
+        estimated_tokens: 3000
+        avg_duration_ms: 2500
+      - name: "infrastructure_management"
+        description: "管理基础设施资源"
+        estimated_tokens: 6000
+        avg_duration_ms: 4500
+
+    models:
+      system1:
+        model_id: "gpt-4-turbo"
+        purpose: "快速部署脚本、配置生成"
+        max_tokens: 4096
+        temperature: 0.2
+        priority: 1
+      system2:
+        model_id: "gpt-4"
+        purpose: "架构规划、故障排查、安全配置"
+        max_tokens: 8192
+        temperature: 0.4
+        priority: 2
+
+    required_permissions:
+      - "file:read:${AGENTOS_ROOT}/**/*"
+      - "code:execute:shell"
+      - "network:connect:*"
+      - "skill:invoke:shell_skill"
+      - "skill:invoke:git_skill"
+
+    cost_profile:
+      input_token_cost_per_1k: 0.01
+      output_token_cost_per_1k: 0.03
+      avg_tokens_per_task: 4500
+      estimated_cost_per_task_usd: 0.09
+      monthly_budget_usd: 80.0
+      cost_center: "devops-team"
+
+    trust_metrics:
+      trust_score: 0.88
+      reliability_score: 0.92
+      quality_score: 0.90
+      security_score: 0.95
+      total_tasks_completed: 1560
+      success_rate: 0.95
+      avg_user_rating: 4.6
+      last_evaluation: "2026-03-15T00:00:00Z"
+
     resource_limits:
       max_memory_mb: 512
       max_cpu_percent: 50
       timeout_sec: 300
       max_concurrent_tasks: 3
-    permissions:
-      - "file:read:${AGENTOS_ROOT}/**/*"
-      - "code:execute:shell"
+
     tags:
       - "devops"
       - "deployment"
       - "infrastructure"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-03-23T00:00:00Z"
+    updated_at: "2026-04-01T00:00:00Z"
 
   # ===========================================================================
   # 安全审计 Agent
@@ -219,29 +554,78 @@ agents:
     source: "builtin"
     version: "1.0.0"
     enabled: true
-    trust_score: 0.95
     contract_path: "openlab/contrib/agents/security/contract.json"
-    preferred_model: "gpt-4"
     description: "负责安全审计和漏洞检测的智能体"
+
     capabilities:
-      - "security_audit"
-      - "vulnerability_detection"
-      - "compliance_check"
-      - "penetration_testing"
+      - name: "security_audit"
+        description: "执行全面的安全审计"
+        estimated_tokens: 8000
+        avg_duration_ms: 6000
+        success_rate: 0.98
+      - name: "vulnerability_detection"
+        description: "检测代码和配置中的安全漏洞"
+        estimated_tokens: 6000
+        avg_duration_ms: 4000
+      - name: "compliance_check"
+        description: "检查合规性和安全策略"
+        estimated_tokens: 5000
+        avg_duration_ms: 3500
+      - name: "penetration_testing"
+        description: "执行渗透测试"
+        estimated_tokens: 10000
+        avg_duration_ms: 8000
+
+    models:
+      system1:
+        model_id: "gpt-4-turbo"
+        purpose: "快速漏洞扫描、模式匹配"
+        max_tokens: 4096
+        temperature: 0.2
+        priority: 1
+      system2:
+        model_id: "gpt-4"
+        purpose: "深度安全分析、渗透测试、合规评估"
+        max_tokens: 16384
+        temperature: 0.3
+        priority: 2
+
+    required_permissions:
+      - "file:read:${AGENTOS_DATA_DIR}/logs/*"
+      - "file:read:/var/log/*"
+      - "network:connect:*"
+      - "code:execute:*"
+
+    cost_profile:
+      input_token_cost_per_1k: 0.03
+      output_token_cost_per_1k: 0.06
+      avg_tokens_per_task: 7000
+      estimated_cost_per_task_usd: 0.20
+      monthly_budget_usd: 150.0
+      cost_center: "security-team"
+
+    trust_metrics:
+      trust_score: 0.98
+      reliability_score: 0.97
+      quality_score: 0.96
+      security_score: 0.99
+      total_tasks_completed: 680
+      success_rate: 0.98
+      avg_user_rating: 4.9
+      last_evaluation: "2026-03-15T00:00:00Z"
+
     resource_limits:
       max_memory_mb: 512
       max_cpu_percent: 50
       timeout_sec: 600
       max_concurrent_tasks: 2
-    permissions:
-      - "file:read:${AGENTOS_DATA_DIR}/logs/*"
-      - "file:read:/var/log/*"
+
     tags:
       - "security"
       - "audit"
       - "compliance"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-03-23T00:00:00Z"
+    updated_at: "2026-04-01T00:00:00Z"
 
   # ===========================================================================
   # 数据工程师 Agent
@@ -251,29 +635,78 @@ agents:
     source: "builtin"
     version: "1.0.0"
     enabled: true
-    trust_score: 0.75
     contract_path: "openlab/contrib/agents/data_engineer/contract.json"
-    preferred_model: "gpt-4-turbo"
     description: "负责数据处理和管道构建的智能体"
+
     capabilities:
-      - "data_pipeline"
-      - "etl_development"
-      - "data_modeling"
-      - "analytics"
+      - name: "data_pipeline"
+        description: "设计和实现数据管道"
+        estimated_tokens: 6000
+        avg_duration_ms: 4500
+        success_rate: 0.90
+      - name: "etl_development"
+        description: "开发ETL流程"
+        estimated_tokens: 5000
+        avg_duration_ms: 4000
+      - name: "data_modeling"
+        description: "设计数据模型"
+        estimated_tokens: 7000
+        avg_duration_ms: 5000
+      - name: "analytics"
+        description: "执行数据分析"
+        estimated_tokens: 4000
+        avg_duration_ms: 3000
+
+    models:
+      system1:
+        model_id: "gpt-4-turbo"
+        purpose: "快速数据处理、简单查询"
+        max_tokens: 4096
+        temperature: 0.3
+        priority: 1
+      system2:
+        model_id: "gpt-4"
+        purpose: "复杂数据建模、优化分析"
+        max_tokens: 12288
+        temperature: 0.5
+        priority: 2
+
+    required_permissions:
+      - "file:read:${AGENTOS_DATA_DIR}/*"
+      - "file:write:${AGENTOS_DATA_DIR}/workspace/*"
+      - "skill:invoke:database_skill"
+      - "skill:invoke:python_skill"
+
+    cost_profile:
+      input_token_cost_per_1k: 0.01
+      output_token_cost_per_1k: 0.03
+      avg_tokens_per_task: 5500
+      estimated_cost_per_task_usd: 0.11
+      monthly_budget_usd: 100.0
+      cost_center: "data-team"
+
+    trust_metrics:
+      trust_score: 0.80
+      reliability_score: 0.85
+      quality_score: 0.88
+      security_score: 0.82
+      total_tasks_completed: 1420
+      success_rate: 0.90
+      avg_user_rating: 4.3
+      last_evaluation: "2026-03-15T00:00:00Z"
+
     resource_limits:
       max_memory_mb: 1024
       max_cpu_percent: 75
       timeout_sec: 600
       max_concurrent_tasks: 3
-    permissions:
-      - "file:read:${AGENTOS_DATA_DIR}/*"
-      - "file:write:${AGENTOS_DATA_DIR}/workspace/*"
+
     tags:
       - "data"
       - "etl"
       - "analytics"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-03-23T00:00:00Z"
+    updated_at: "2026-04-01T00:00:00Z"
 
   # ===========================================================================
   # 协调者 Agent
@@ -283,29 +716,77 @@ agents:
     source: "builtin"
     version: "1.0.0"
     enabled: true
-    trust_score: 0.9
     contract_path: "openlab/contrib/agents/coordinator/contract.json"
-    preferred_model: "gpt-4"
     description: "负责多Agent协调和任务分配的智能体"
+
     capabilities:
-      - "task_coordination"
-      - "resource_allocation"
-      - "conflict_resolution"
-      - "progress_tracking"
+      - name: "task_coordination"
+        description: "协调多个Agent执行任务"
+        estimated_tokens: 3000
+        avg_duration_ms: 2000
+        success_rate: 0.94
+      - name: "resource_allocation"
+        description: "分配系统资源"
+        estimated_tokens: 2000
+        avg_duration_ms: 1500
+      - name: "conflict_resolution"
+        description: "解决Agent间的冲突"
+        estimated_tokens: 4000
+        avg_duration_ms: 3000
+      - name: "progress_tracking"
+        description: "跟踪任务进度"
+        estimated_tokens: 2000
+        avg_duration_ms: 1000
+
+    models:
+      system1:
+        model_id: "gpt-4-turbo"
+        purpose: "快速任务分配、状态检查"
+        max_tokens: 2048
+        temperature: 0.3
+        priority: 1
+      system2:
+        model_id: "gpt-4"
+        purpose: "复杂协调、冲突解决、策略规划"
+        max_tokens: 8192
+        temperature: 0.5
+        priority: 2
+
+    required_permissions:
+      - "agent:invoke:*"
+      - "task:manage:*"
+      - "resource:allocate:*"
+
+    cost_profile:
+      input_token_cost_per_1k: 0.01
+      output_token_cost_per_1k: 0.03
+      avg_tokens_per_task: 2500
+      estimated_cost_per_task_usd: 0.05
+      monthly_budget_usd: 50.0
+      cost_center: "core-team"
+
+    trust_metrics:
+      trust_score: 0.92
+      reliability_score: 0.95
+      quality_score: 0.93
+      security_score: 0.96
+      total_tasks_completed: 5600
+      success_rate: 0.94
+      avg_user_rating: 4.7
+      last_evaluation: "2026-03-15T00:00:00Z"
+
     resource_limits:
       max_memory_mb: 256
       max_cpu_percent: 25
       timeout_sec: 180
       max_concurrent_tasks: 10
-    permissions:
-      - "agent:invoke:*"
-      - "task:manage:*"
+
     tags:
       - "coordination"
       - "management"
       - "orchestration"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-03-23T00:00:00Z"
+    updated_at: "2026-04-01T00:00:00Z"
 
   # ===========================================================================
   # 代码审查 Agent
@@ -315,28 +796,76 @@ agents:
     source: "builtin"
     version: "1.0.0"
     enabled: true
-    trust_score: 0.85
     contract_path: "openlab/contrib/agents/reviewer/contract.json"
-    preferred_model: "gpt-4"
     description: "负责代码审查和质量把控的智能体"
+
     capabilities:
-      - "code_review"
-      - "best_practices"
-      - "refactoring_suggestions"
-      - "documentation_review"
+      - name: "code_review"
+        description: "审查代码质量和最佳实践"
+        estimated_tokens: 5000
+        avg_duration_ms: 3500
+        success_rate: 0.93
+      - name: "best_practices"
+        description: "检查代码是否符合最佳实践"
+        estimated_tokens: 3000
+        avg_duration_ms: 2000
+      - name: "refactoring_suggestions"
+        description: "提供重构建议"
+        estimated_tokens: 4000
+        avg_duration_ms: 3000
+      - name: "documentation_review"
+        description: "审查文档质量"
+        estimated_tokens: 2000
+        avg_duration_ms: 1500
+
+    models:
+      system1:
+        model_id: "gpt-4-turbo"
+        purpose: "快速代码扫描、风格检查"
+        max_tokens: 4096
+        temperature: 0.3
+        priority: 1
+      system2:
+        model_id: "gpt-4"
+        purpose: "深度代码分析、架构评审"
+        max_tokens: 12288
+        temperature: 0.4
+        priority: 2
+
+    required_permissions:
+      - "file:read:${AGENTOS_ROOT}/**/*"
+      - "skill:invoke:git_skill"
+
+    cost_profile:
+      input_token_cost_per_1k: 0.01
+      output_token_cost_per_1k: 0.03
+      avg_tokens_per_task: 3500
+      estimated_cost_per_task_usd: 0.07
+      monthly_budget_usd: 70.0
+      cost_center: "quality-team"
+
+    trust_metrics:
+      trust_score: 0.88
+      reliability_score: 0.90
+      quality_score: 0.92
+      security_score: 0.90
+      total_tasks_completed: 2400
+      success_rate: 0.93
+      avg_user_rating: 4.5
+      last_evaluation: "2026-03-15T00:00:00Z"
+
     resource_limits:
       max_memory_mb: 512
       max_cpu_percent: 50
       timeout_sec: 300
       max_concurrent_tasks: 5
-    permissions:
-      - "file:read:${AGENTOS_ROOT}/**/*"
+
     tags:
       - "review"
       - "quality"
       - "best_practices"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-03-23T00:00:00Z"
+    updated_at: "2026-04-01T00:00:00Z"
 
   # ===========================================================================
   # 分析师 Agent
@@ -346,29 +875,78 @@ agents:
     source: "builtin"
     version: "1.0.0"
     enabled: true
-    trust_score: 0.8
     contract_path: "openlab/contrib/agents/analyst/contract.json"
-    preferred_model: "claude-3-opus"
     description: "负责数据分析和洞察提取的智能体"
+
     capabilities:
-      - "data_analysis"
-      - "trend_detection"
-      - "report_generation"
-      - "visualization"
+      - name: "data_analysis"
+        description: "执行数据分析"
+        estimated_tokens: 6000
+        avg_duration_ms: 4000
+        success_rate: 0.91
+      - name: "trend_detection"
+        description: "检测数据趋势"
+        estimated_tokens: 4000
+        avg_duration_ms: 3000
+      - name: "report_generation"
+        description: "生成分析报告"
+        estimated_tokens: 5000
+        avg_duration_ms: 3500
+      - name: "visualization"
+        description: "创建数据可视化"
+        estimated_tokens: 3000
+        avg_duration_ms: 2500
+
+    models:
+      system1:
+        model_id: "claude-3-sonnet"
+        purpose: "快速数据查询、简单分析"
+        max_tokens: 4096
+        temperature: 0.3
+        priority: 1
+      system2:
+        model_id: "claude-3-opus"
+        purpose: "深度数据分析、复杂洞察提取"
+        max_tokens: 16384
+        temperature: 0.5
+        priority: 2
+
+    required_permissions:
+      - "file:read:${AGENTOS_DATA_DIR}/*"
+      - "file:write:${AGENTOS_DATA_DIR}/reports/*"
+      - "skill:invoke:database_skill"
+      - "skill:invoke:python_skill"
+
+    cost_profile:
+      input_token_cost_per_1k: 0.015
+      output_token_cost_per_1k: 0.075
+      avg_tokens_per_task: 4500
+      estimated_cost_per_task_usd: 0.12
+      monthly_budget_usd: 100.0
+      cost_center: "analytics-team"
+
+    trust_metrics:
+      trust_score: 0.85
+      reliability_score: 0.88
+      quality_score: 0.90
+      security_score: 0.85
+      total_tasks_completed: 1680
+      success_rate: 0.91
+      avg_user_rating: 4.4
+      last_evaluation: "2026-03-15T00:00:00Z"
+
     resource_limits:
       max_memory_mb: 512
       max_cpu_percent: 50
       timeout_sec: 300
       max_concurrent_tasks: 3
-    permissions:
-      - "file:read:${AGENTOS_DATA_DIR}/*"
-      - "file:write:${AGENTOS_DATA_DIR}/reports/*"
+
     tags:
       - "analysis"
       - "insights"
       - "reporting"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-03-23T00:00:00Z"
+    updated_at: "2026-04-01T00:00:00Z"
 
   # ===========================================================================
   # 自定义 Agent 模板
@@ -378,21 +956,61 @@ agents:
     source: "custom"
     version: "1.0.0"
     enabled: false
-    trust_score: 0.5
     contract_path: "openlab/contrib/agents/custom/contract.json"
-    preferred_model: "gpt-4-turbo"
     description: "自定义Agent模板，可根据需要配置"
+
     capabilities:
-      - "custom_capability_1"
-      - "custom_capability_2"
+      - name: "custom_capability_1"
+        description: "自定义能力1"
+        estimated_tokens: 2000
+        avg_duration_ms: 1500
+      - name: "custom_capability_2"
+        description: "自定义能力2"
+        estimated_tokens: 2000
+        avg_duration_ms: 1500
+
+    models:
+      system1:
+        model_id: "gpt-4-turbo"
+        purpose: "快速响应"
+        max_tokens: 2048
+        temperature: 0.5
+        priority: 1
+      system2:
+        model_id: "gpt-4"
+        purpose: "深度处理"
+        max_tokens: 4096
+        temperature: 0.7
+        priority: 2
+
+    required_permissions: []
+
+    cost_profile:
+      input_token_cost_per_1k: 0.01
+      output_token_cost_per_1k: 0.03
+      avg_tokens_per_task: 2000
+      estimated_cost_per_task_usd: 0.04
+      monthly_budget_usd: 20.0
+      cost_center: "custom"
+
+    trust_metrics:
+      trust_score: 0.50
+      reliability_score: 0.50
+      quality_score: 0.50
+      security_score: 0.50
+      total_tasks_completed: 0
+      success_rate: 0.0
+      avg_user_rating: 0.0
+      last_evaluation: "2026-01-01T00:00:00Z"
+
     resource_limits:
       max_memory_mb: 256
       max_cpu_percent: 25
       timeout_sec: 180
       max_concurrent_tasks: 1
-    permissions: []
+
     tags:
       - "custom"
       - "template"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-03-23T00:00:00Z"
+    updated_at: "2026-04-01T00:00:00Z"

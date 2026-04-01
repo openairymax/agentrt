@@ -1,294 +1,132 @@
+// SPDX-FileCopyrightText: 2026 SPHARX Ltd.
+// SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * @file error.h
- * @brief 统一错误处理框架
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ * @brief 错误处理兼容层
  * 
- * 设计原则：
- * 1. 所有错误码为负值，成功为0
- * 2. 支持错误链追踪
- * 3. 线程安全的错误信息存储
- * 4. 支持错误上下文信息
+ * 本文件是 commons/utils/error 的兼容层，提供向后兼容的 API。
+ * 新代码应直接使用 #include "agentos/utils/error/error.h"
+ * 
+ * @see commons/utils/error/include/error.h
  */
 
 #ifndef AGENTOS_DAEMON_COMMON_ERROR_H
 #define AGENTOS_DAEMON_COMMON_ERROR_H
 
-#include <stdint.h>
-#include <stddef.h>
+/* 包含 commons 的统一错误处理框架 */
+#include "agentos/utils/error/error.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+/* ==================== 兼容性别名 ==================== */
 
-/* ==================== 错误码定义 ==================== */
+/* 旧的错误码名称映射到新的名称 */
+#define AGENTOS_SUCCESS                    AGENTOS_OK
+#define AGENTOS_ERROR_UNKNOWN              AGENTOS_ERR_UNKNOWN
+#define AGENTOS_ERROR_OUT_OF_MEMORY        AGENTOS_ERR_OUT_OF_MEMORY
+#define AGENTOS_ERROR_INVALID_PARAMETER    AGENTOS_ERR_INVALID_PARAM
+#define AGENTOS_ERROR_NULL_POINTER         AGENTOS_ERR_NULL_POINTER
+#define AGENTOS_ERROR_BUFFER_TOO_SMALL     AGENTOS_ERR_BUFFER_TOO_SMALL
+#define AGENTOS_ERROR_NOT_FOUND            AGENTOS_ERR_NOT_FOUND
+#define AGENTOS_ERROR_ALREADY_EXISTS       AGENTOS_ERR_ALREADY_EXISTS
+#define AGENTOS_ERROR_TIMEOUT              AGENTOS_ERR_TIMEOUT
+#define AGENTOS_ERROR_NOT_SUPPORTED        AGENTOS_ERR_NOT_SUPPORTED
+#define AGENTOS_ERROR_PERMISSION_DENIED    AGENTOS_ERR_PERMISSION_DENIED
+#define AGENTOS_ERROR_IO_ERROR             AGENTOS_ERR_IO
+#define AGENTOS_ERROR_PARSE_ERROR          AGENTOS_ERR_PARSE_ERROR
+#define AGENTOS_ERROR_STATE_ERROR          AGENTOS_ERR_STATE_ERROR
+#define AGENTOS_ERROR_OVERFLOW             AGENTOS_ERR_OVERFLOW
+#define AGENTOS_ERROR_UNDERFLOW            AGENTOS_ERR_UNDERFLOW
+#define AGENTOS_ERROR_BUSY                 AGENTOS_ERR_BUSY
+#define AGENTOS_ERROR_CORRUPTED_DATA       AGENTOS_ERR_MEM_CORRUPT
+#define AGENTOS_ERROR_INTERNAL             AGENTOS_ERR_UNKNOWN
 
-/**
- * @brief 错误码类型
- */
-typedef int agentos_error_t;
+/* 核心循环错误码兼容 */
+#define AGENTOS_ERROR_LOOP_BASE            AGENTOS_ERR_KERN_BASE
+#define AGENTOS_ERROR_LOOP_CREATE_FAILED   AGENTOS_ERR_KERN_TASK
+#define AGENTOS_ERROR_LOOP_RUN_FAILED      AGENTOS_ERR_KERN_TASK
+#define AGENTOS_ERROR_LOOP_STOP_FAILED     AGENTOS_ERR_KERN_TASK
+#define AGENTOS_ERROR_TASK_SUBMIT_FAILED   AGENTOS_ERR_KERN_TASK
+#define AGENTOS_ERROR_TASK_WAIT_FAILED     AGENTOS_ERR_KERN_TASK
 
-/* 成功 */
-#define AGENTOS_OK                     0
+/* 服务层错误码兼容 */
+#define AGENTOS_ERROR_SERVICE_BASE         AGENTOS_ERR_SVC_BASE
+#define AGENTOS_ERROR_SERVICE_NOT_READY    AGENTOS_ERR_SVC_NOT_READY
+#define AGENTOS_ERROR_SERVICE_BUSY         AGENTOS_ERR_SVC_BUSY
+#define AGENTOS_ERROR_SERVICE_STOPPED      AGENTOS_ERR_SVC_STOPPED
+#define AGENTOS_ERROR_SERVICE_CONFIG       AGENTOS_ERR_SVC_CONFIG
 
-/* 通用错误 (1-999) */
-#define AGENTOS_ERR_UNKNOWN            (-1)
-#define AGENTOS_ERR_INVALID_PARAM      (-2)
-#define AGENTOS_ERR_NULL_POINTER       (-3)
-#define AGENTOS_ERR_OUT_OF_MEMORY      (-4)
-#define AGENTOS_ERR_BUFFER_TOO_SMALL   (-5)
-#define AGENTOS_ERR_NOT_FOUND          (-6)
-#define AGENTOS_ERR_ALREADY_EXISTS     (-7)
-#define AGENTOS_ERR_TIMEOUT            (-8)
-#define AGENTOS_ERR_NOT_SUPPORTED      (-9)
-#define AGENTOS_ERR_PERMISSION_DENIED  (-10)
-#define AGENTOS_ERR_IO                 (-11)
-#define AGENTOS_ERR_PARSE_ERROR        (-12)
-#define AGENTOS_ERR_STATE_ERROR        (-13)
-#define AGENTOS_ERR_OVERFLOW           (-14)
-#define AGENTOS_ERR_UNDERFLOW          (-15)
+/* IPC 错误码兼容 */
+#define AGENTOS_ERROR_IPC_BASE             AGENTOS_ERR_KERN_BASE
+#define AGENTOS_ERROR_IPC_CONNECT          AGENTOS_ERR_KERN_IPC
+#define AGENTOS_ERROR_IPC_DISCONNECT       AGENTOS_ERR_KERN_IPC
+#define AGENTOS_ERROR_IPC_TIMEOUT          AGENTOS_ERR_TIMEOUT
+#define AGENTOS_ERROR_IPC_INVALID_MSG      AGENTOS_ERR_KERN_IPC
+#define AGENTOS_ERROR_IPC_BUFFER_FULL      AGENTOS_ERR_BUFFER_TOO_SMALL
 
-/* 服务层错误 (1000-1999) */
-#define AGENTOS_ERR_SERVICE_BASE       (-1000)
-#define AGENTOS_ERR_SERVICE_NOT_READY  (-1001)
-#define AGENTOS_ERR_SERVICE_BUSY       (-1002)
-#define AGENTOS_ERR_SERVICE_STOPPED    (-1003)
-#define AGENTOS_ERR_SERVICE_CONFIG     (-1004)
+/* LLM 服务错误码兼容 */
+#define AGENTOS_ERROR_LLM_BASE             AGENTOS_ERR_LLM_BASE
+#define AGENTOS_ERROR_LLM_NO_PROVIDER      AGENTOS_ERR_LLM_NO_PROVIDER
+#define AGENTOS_ERROR_LLM_PROVIDER_FAIL    AGENTOS_ERR_LLM_PROVIDER_FAIL
+#define AGENTOS_ERROR_LLM_RATE_LIMIT       AGENTOS_ERR_LLM_RATE_LIMIT
+#define AGENTOS_ERROR_LLM_CONTEXT_LEN      AGENTOS_ERR_LLM_CONTEXT_LEN
+#define AGENTOS_ERROR_LLM_INVALID_MODEL    AGENTOS_ERR_LLM_INVALID_MODEL
+#define AGENTOS_ERROR_LLM_AUTH_FAIL        AGENTOS_ERR_LLM_AUTH_FAIL
 
-/* IPC 错误 (2000-2999) */
-#define AGENTOS_ERR_IPC_BASE           (-2000)
-#define AGENTOS_ERR_IPC_CONNECT        (-2001)
-#define AGENTOS_ERR_IPC_DISCONNECT     (-2002)
-#define AGENTOS_ERR_IPC_TIMEOUT        (-2003)
-#define AGENTOS_ERR_IPC_INVALID_MSG    (-2004)
-#define AGENTOS_ERR_IPC_BUFFER_FULL    (-2005)
+/* 工具服务错误码兼容 */
+#define AGENTOS_ERROR_TOOL_BASE            AGENTOS_ERR_EXEC_BASE
+#define AGENTOS_ERROR_TOOL_NOT_FOUND       AGENTOS_ERR_EXEC_NOT_FOUND
+#define AGENTOS_ERROR_TOOL_EXEC_FAIL       AGENTOS_ERR_EXEC_FAIL
+#define AGENTOS_ERROR_TOOL_TIMEOUT         AGENTOS_ERR_EXEC_TIMEOUT
+#define AGENTOS_ERROR_TOOL_VALIDATION      AGENTOS_ERR_EXEC_VALIDATION
+#define AGENTOS_ERROR_TOOL_SANDBOX         AGENTOS_ERR_EXEC_SANDBOX
 
-/* LLM 服务错误 (3000-3999) */
-#define AGENTOS_ERR_LLM_BASE           (-3000)
-#define AGENTOS_ERR_LLM_NO_PROVIDER    (-3001)
-#define AGENTOS_ERR_LLM_PROVIDER_FAIL  (-3002)
-#define AGENTOS_ERR_LLM_RATE_LIMIT     (-3003)
-#define AGENTOS_ERR_LLM_CONTEXT_LEN    (-3004)
-#define AGENTOS_ERR_LLM_INVALID_MODEL  (-3005)
-#define AGENTOS_ERR_LLM_AUTH_FAIL      (-3006)
+/* 调度服务错误码兼容 */
+#define AGENTOS_ERROR_SCHED_BASE           AGENTOS_ERR_KERN_BASE
+#define AGENTOS_ERROR_SCHED_NO_AGENT       AGENTOS_ERR_KERN_SCHED
+#define AGENTOS_ERROR_SCHED_AGENT_BUSY     AGENTOS_ERR_SVC_BUSY
+#define AGENTOS_ERROR_SCHED_STRATEGY       AGENTOS_ERR_KERN_SCHED
+#define AGENTOS_ERROR_SCHED_AGENT_NOT_FOUND AGENTOS_ERR_NOT_FOUND
+#define AGENTOS_ERROR_SCHED_NO_AVAILABLE   AGENTOS_ERR_KERN_SCHED
 
-/* 工具服务错误 (4000-4999) */
-#define AGENTOS_ERR_TOOL_BASE          (-4000)
-#define AGENTOS_ERR_TOOL_NOT_FOUND     (-4001)
-#define AGENTOS_ERR_TOOL_EXEC_FAIL     (-4002)
-#define AGENTOS_ERR_TOOL_TIMEOUT       (-4003)
-#define AGENTOS_ERR_TOOL_VALIDATION    (-4004)
-#define AGENTOS_ERR_TOOL_SANDBOX       (-4005)
+/* 市场服务错误码兼容 */
+#define AGENTOS_ERROR_MARKET_BASE          AGENTOS_ERR_SVC_BASE
+#define AGENTOS_ERROR_MARKET_NOT_FOUND     AGENTOS_ERR_NOT_FOUND
+#define AGENTOS_ERROR_MARKET_INSTALL       AGENTOS_ERR_EXEC_FAIL
+#define AGENTOS_ERROR_MARKET_DEPENDENCY    AGENTOS_ERR_SVC_DEPENDENCY
 
-/* 调度服务错误 (5000-5999) */
-#define AGENTOS_ERR_SCHED_BASE         (-5000)
-#define AGENTOS_ERR_SCHED_NO_AGENT     (-5001)
-#define AGENTOS_ERR_SCHED_AGENT_BUSY   (-5002)
-#define AGENTOS_ERR_SCHED_STRATEGY     (-5003)
+/* 监控服务错误码兼容 */
+#define AGENTOS_ERROR_MONITOR_BASE         AGENTOS_ERR_SVC_BASE
+#define AGENTOS_ERROR_MONITOR_METRIC       AGENTOS_ERR_SYS_RESOURCE
+#define AGENTOS_ERROR_MONITOR_TRACE        AGENTOS_ERR_SYS_RESOURCE
+#define AGENTOS_ERROR_MONITOR_ALERT        AGENTOS_ERR_SYS_RESOURCE
 
-/* 市场服务错误 (6000-6999) */
-#define AGENTOS_ERR_MARKET_BASE        (-6000)
-#define AGENTOS_ERR_MARKET_NOT_FOUND   (-6001)
-#define AGENTOS_ERR_MARKET_INSTALL     (-6002)
-#define AGENTOS_ERR_MARKET_DEPENDENCY  (-6003)
-
-/* 监控服务错误 (7000-7999) */
-#define AGENTOS_ERR_MONITOR_BASE       (-7000)
-#define AGENTOS_ERR_MONITOR_METRIC     (-7001)
-#define AGENTOS_ERR_MONITOR_TRACE      (-7002)
-#define AGENTOS_ERR_MONITOR_ALERT      (-7003)
-
-/* ==================== 错误上下文 ==================== */
-
-/**
- * @brief 错误上下文最大深度
- */
-#define AGENTOS_ERROR_CONTEXT_MAX_DEPTH 8
+/* ==================== 兼容性函数别名 ==================== */
 
 /**
- * @brief 错误上下文条目
+ * @brief 兼容旧函数名
+ * @deprecated 请使用 agentos_error_str
  */
-typedef struct {
-    const char* file;           /**< 源文件名 */
-    int line;                   /**< 行号 */
-    const char* function;       /**< 函数名 */
-    const char* message;        /**< 错误消息 */
-    agentos_error_t error_code; /**< 错误码 */
-} agentos_error_context_t;
+#define agentos_strerror(code) agentos_error_str(code)
 
 /**
- * @brief 错误链结构
+ * @brief 兼容旧函数名
+ * @deprecated 请使用 agentos_error_str
  */
-typedef struct {
-    agentos_error_t code;                               /**< 主错误码 */
-    int depth;                                          /**< 上下文深度 */
-    agentos_error_context_t contexts[AGENTOS_ERROR_CONTEXT_MAX_DEPTH];
-} agentos_error_chain_t;
+#define agentos_error_name(code) agentos_error_str(code)
 
-/* ==================== 错误处理接口 ==================== */
+/* ==================== 兼容性宏 ==================== */
 
 /**
- * @brief 获取错误码的可读描述
- * @param code 错误码
- * @return 错误描述字符串
+ * @brief 错误码检查宏（兼容旧代码）
  */
-const char* agentos_strerror(agentos_error_t code);
+#define AGENTOS_IS_ERROR(code)              ((code) != AGENTOS_OK)
+#define AGENTOS_IS_SUCCESS(code)            ((code) == AGENTOS_OK)
+
+/* ==================== 兼容性类型别名 ==================== */
 
 /**
- * @brief 获取当前线程的错误链
- * @return 错误链指针
+ * @brief 兼容旧的错误上下文类型名
+ * @deprecated 请使用 agentos_error_context_entry_t
  */
-agentos_error_chain_t* agentos_error_get_chain(void);
-
-/**
- * @brief 清除当前线程的错误链
- */
-void agentos_error_clear(void);
-
-/**
- * @brief 添加错误上下文
- * @param code 错误码
- * @param file 源文件名
- * @param line 行号
- * @param func 函数名
- * @param fmt 格式化消息
- * @param ... 可变参数
- */
-void agentos_error_push_ex(agentos_error_t code, 
-                           const char* file, 
-                           int line, 
-                           const char* func,
-                           const char* fmt, ...);
-
-/**
- * @brief 设置错误并返回
- * @param code 错误码
- * @param msg 错误消息
- * @return 错误码
- */
-#define AGENTOS_ERROR(code, msg) \
-    do { \
-        agentos_error_push_ex((code), __FILE__, __LINE__, __func__, "%s", (msg)); \
-        return (code); \
-    } while (0)
-
-/**
- * @brief 设置格式化错误并返回
- * @param code 错误码
- * @param fmt 格式化消息
- * @param ... 可变参数
- */
-#define AGENTOS_ERROR_FMT(code, fmt, ...) \
-    do { \
-        agentos_error_push_ex((code), __FILE__, __LINE__, __func__, (fmt), __VA_ARGS__); \
-        return (code); \
-    } while (0)
-
-/**
- * @brief 条件检查，失败时返回错误
- * @param cond 条件
- * @param code 错误码
- * @param msg 错误消息
- */
-#define AGENTOS_CHECK(cond, code, msg) \
-    do { \
-        if (!(cond)) { \
-            AGENTOS_ERROR((code), (msg)); \
-        } \
-    } while (0)
-
-/**
- * @brief 空指针检查
- * @param ptr 指针
- * @param name 参数名
- */
-#define AGENTOS_CHECK_NULL(ptr, name) \
-    AGENTOS_CHECK((ptr) != NULL, AGENTOS_ERR_NULL_POINTER, name " is NULL")
-
-/**
- * @brief 内存分配检查
- * @param ptr 指针
- */
-#define AGENTOS_CHECK_ALLOC(ptr) \
-    AGENTOS_CHECK((ptr) != NULL, AGENTOS_ERR_OUT_OF_MEMORY, "Memory allocation failed")
-
-/**
- * @brief 错误传播宏
- * @param expr 表达式
- */
-#define AGENTOS_PROPAGATE(expr) \
-    do { \
-        agentos_error_t __err = (expr); \
-        if (__err != AGENTOS_OK) { \
-            agentos_error_push_ex(__err, __FILE__, __LINE__, __func__, "Propagated from %s", #expr); \
-            return __err; \
-        } \
-    } while (0)
-
-/**
- * @brief 带清理的错误传播
- * @param expr 表达式
- * @param cleanup 清理代码块
- */
-#define AGENTOS_PROPAGATE_CLEANUP(expr, cleanup) \
-    do { \
-        agentos_error_t __err = (expr); \
-        if (__err != AGENTOS_OK) { \
-            agentos_error_push_ex(__err, __FILE__, __LINE__, __func__, "Propagated from %s", #expr); \
-            { cleanup; } \
-            return __err; \
-        } \
-    } while (0)
-
-/**
- * @brief 打印错误链（用于调试）
- * @param chain 错误链
- */
-void agentos_error_print_chain(const agentos_error_chain_t* chain);
-
-/**
- * @brief 将错误链转换为 JSON 字符串
- * @param chain 错误链
- * @return JSON 字符串（需调用者释放）
- */
-char* agentos_error_chain_to_json(const agentos_error_chain_t* chain);
-
-/* ==================== 结果包装器 ==================== */
-
-/**
- * @brief 结果包装器（用于返回值或错误）
- * @tparam T 值类型
- */
-#define AGENTOS_RESULT_DECL(name, type) \
-    typedef struct { \
-        agentos_error_t error; \
-        type value; \
-    } name
-
-/* ==================== 错误统计 ==================== */
-
-/**
- * @brief 错误统计信息
- */
-typedef struct {
-    uint64_t total_errors;          /**< 总错误数 */
-    uint64_t errors_by_code[100];   /**< 按错误码统计 */
-    uint64_t last_error_time;       /**< 最后错误时间 */
-    agentos_error_t last_error;     /**< 最后错误码 */
-} agentos_error_stats_t;
-
-/**
- * @brief 获取错误统计
- * @param stats 统计信息输出
- */
-void agentos_error_get_stats(agentos_error_stats_t* stats);
-
-/**
- * @brief 重置错误统计
- */
-void agentos_error_reset_stats(void);
-
-#ifdef __cplusplus
-}
-#endif
+typedef agentos_error_context_entry_t agentos_error_context_t;
 
 #endif /* AGENTOS_DAEMON_COMMON_ERROR_H */

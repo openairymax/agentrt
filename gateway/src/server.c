@@ -1,7 +1,11 @@
-﻿/**
+/*
+ * Copyright (C) 2026 SPHARX. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2026 SPHARX.
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * @file server.c
  * @brief gateway 服务器核心控制器实现
- * 
+ *
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 

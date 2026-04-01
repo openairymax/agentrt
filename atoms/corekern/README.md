@@ -1,4 +1,4 @@
-﻿# AgentOS 微内核基础模块 (CoreKern)
+# AgentOS 微内核基础模块 (CoreKern)
 
 **版本**: v1.0.0.6
 **最后更新**: 2026-03-25
@@ -25,31 +25,50 @@
 corekern/
 ├── README.md                 # 本文档
 ├── CMakeLists.txt            # 编译配置
-├── include/
+├── .clang-format             # 代码格式化配置
+├── .clang-tidy               # 代码静态分析配置
+├── include/                  # 公共头文件
 │   ├── agentos.h             # 统一头文件（对外接口）
 │   ├── ipc.h                 # IPC 接口定义
 │   ├── mem.h                 # 内存接口定义
 │   ├── task.h                # 任务接口定义
 │   ├── time.h                # 时间接口定义
-│   └── error.h               # 错误码定义
-└── src/
-    ├── ipc/                  # IPC 实现
-    │   ├── binder.c          # Binder 驱动模拟
-    │   ├── service.c         # 服务管理器
-    │   └── proxy.c           # 代理对象
-    ├── mem/                  # 内存实现
-    │   ├── phys_alloc.c      # 物理内存分配器
-    │   ├── mem_pool.c        # 内存池
-    │   └── boundary.c        # 边界保护
-    ├── task/                 # 任务实现
-    │   ├── scheduler.c       # 调度器 (CFS/RR)
-    │   ├── thread.c          # 线程管理
-    │   └── sync.c            # 同步原语 (mutex/semaphore)
-    ├── time/                 # 时间实现
-    │   ├── clock.c           # 系统时钟
-    │   ├── timer.c           # 定时器
-    │   └── event_loop.c      # 事件循环
-    └── main.c                # 内核入口
+│   ├── error.h               # 错误码定义
+│   ├── export.h              # 跨平台导出宏
+│   └── observability.h       # 可观测性接口定义
+├── src/                      # 核心实现
+│   ├── main.c                # 内核入口点
+│   ├── error.c               # 错误处理实现
+│   ├── ipc/                  # IPC 实现
+│   │   ├── binder.c          # Binder 驱动模拟
+│   │   ├── buffer.c          # 缓冲区管理
+│   │   └── channel.c         # 通信通道管理
+│   ├── mem/                  # 内存管理实现
+│   │   ├── alloc.c           # 物理内存分配器（带追踪）
+│   │   ├── guard.c           # 内存边界保护
+│   │   └── pool.c            # 内存池分配器
+│   ├── task/                 # 任务调度实现
+│   │   ├── scheduler.c       # 调度器核心逻辑
+│   │   ├── scheduler_core.c  # 跨平台调度算法
+│   │   ├── scheduler_platform.c # 平台抽象层
+│   │   ├── scheduler_posix.c # POSIX 平台实现
+│   │   ├── scheduler_windows.c # Windows 平台实现
+│   │   ├── sync.c            # 同步原语
+│   │   └── thread.c          # 线程管理
+│   ├── time/                 # 时间服务实现
+│   │   ├── clock.c           # 系统时钟
+│   │   ├── event.c           # 事件管理
+│   │   └── timer.c           # 定时器
+│   └── observability/        # 可观测性实现
+│       └── observability.c   # 指标收集与追踪
+└── tests/                    # 单元测试
+    ├── CMakeLists.txt        # 测试编译配置
+    ├── test_main.c           # 测试主入口
+    ├── test_error.c          # 错误处理测试
+    ├── test_ipc.c            # IPC 功能测试
+    ├── test_mem.c            # 内存管理测试
+    ├── test_task.c           # 任务调度测试
+    └── test_time.c           # 时间服务测试
 ```
 
 ---
