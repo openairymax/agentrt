@@ -701,3 +701,521 @@ heapstore_error_t heapstore_reset_circuit(void) {
 
     return heapstore_SUCCESS;
 }
+
+/* ==================== 批量写入实现 ==================== */
+
+#define HEAPSTORE_BATCH_MAX_ITEMS 1024
+
+typedef enum {
+    HEAPSTORE_BATCH_ITEM_LOG,
+    HEAPSTORE_BATCH_ITEM_SPAN,
+    HEAPSTORE_BATCH_ITEM_SESSION,
+    HEAPSTORE_BATCH_ITEM_AGENT,
+    HEAPSTORE_BATCH_ITEM_SKILL,
+    HEAPSTORE_BATCH_ITEM_MEMORY_POOL,
+    HEAPSTORE_BATCH_ITEM_MEMORY_ALLOC,
+    HEAPSTORE_BATCH_ITEM_IPC_CHANNEL,
+    HEAPSTORE_BATCH_ITEM_IPC_BUFFER
+} heapstore_batch_item_type_t;
+
+typedef struct heapstore_batch_item {
+    heapstore_batch_item_type_t type;
+    union {
+        struct {
+            char service[128];
+            int level;
+            char trace_id[64];
+            char message[1024];
+        } log;
+        struct {
+            char trace_id[64];
+            char span_id[64];
+            char parent_span_id[64];
+            char name[256];
+            int64_t start_time_us;
+            int64_t end_time_us;
+            int status;
+            char attributes[2048];
+        } span;
+        heapstore_session_record_t session;
+        heapstore_agent_record_t agent;
+        heapstore_skill_record_t skill;
+        heapstore_memory_pool_t memory_pool;
+        heapstore_memory_allocation_t memory_alloc;
+        heapstore_ipc_channel_t ipc_channel;
+        heapstore_ipc_buffer_t ipc_buffer;
+    } data;
+    struct heapstore_batch_item* next;
+} heapstore_batch_item_t;
+
+struct heapstore_batch_context {
+    size_t capacity;
+    size_t count;
+    heapstore_batch_item_t* head;
+    heapstore_batch_item_t* tail;
+#ifdef _WIN32
+    CRITICAL_SECTION lock;
+#else
+    pthread_mutex_t lock;
+#endif
+};
+
+heapstore_batch_context_t* heapstore_batch_begin(size_t batch_size) {
+    heapstore_batch_context_t* ctx = (heapstore_batch_context_t*)malloc(sizeof(heapstore_batch_context_t));
+    if (!ctx) {
+        return NULL;
+    }
+    memset(ctx, 0, sizeof(heapstore_batch_context_t));
+    ctx->capacity = (batch_size > 0) ? batch_size : HEAPSTORE_BATCH_MAX_ITEMS;
+    if (ctx->capacity > HEAPSTORE_BATCH_MAX_ITEMS) {
+        ctx->capacity = HEAPSTORE_BATCH_MAX_ITEMS;
+    }
+#ifdef _WIN32
+    InitializeCriticalSection(&ctx->lock);
+#else
+    pthread_mutex_init(&ctx->lock, NULL);
+#endif
+    return ctx;
+}
+
+heapstore_error_t heapstore_batch_add_log(
+    heapstore_batch_context_t* ctx,
+    const char* service,
+    int level,
+    const char* message) {
+    if (!ctx || !service || !message) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+    if (ctx->count >= ctx->capacity) {
+        return heapstore_ERR_OUT_OF_MEMORY;
+    }
+
+    heapstore_batch_item_t* item = (heapstore_batch_item_t*)malloc(sizeof(heapstore_batch_item_t));
+    if (!item) {
+        return heapstore_ERR_OUT_OF_MEMORY;
+    }
+    memset(item, 0, sizeof(heapstore_batch_item_t));
+    item->type = HEAPSTORE_BATCH_ITEM_LOG;
+    strncpy(item->data.log.service, service, sizeof(item->data.log.service) - 1);
+    item->data.log.level = level;
+    if (message) {
+        strncpy(item->data.log.message, message, sizeof(item->data.log.message) - 1);
+    }
+
+    if (ctx->tail) {
+        ctx->tail->next = item;
+        ctx->tail = item;
+    } else {
+        ctx->head = ctx->tail = item;
+    }
+    ctx->count++;
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_batch_add_log_with_trace(
+    heapstore_batch_context_t* ctx,
+    const char* service,
+    int level,
+    const char* trace_id,
+    const char* message) {
+    if (!ctx || !service || !message) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+    if (ctx->count >= ctx->capacity) {
+        return heapstore_ERR_OUT_OF_MEMORY;
+    }
+
+    heapstore_batch_item_t* item = (heapstore_batch_item_t*)malloc(sizeof(heapstore_batch_item_t));
+    if (!item) {
+        return heapstore_ERR_OUT_OF_MEMORY;
+    }
+    memset(item, 0, sizeof(heapstore_batch_item_t));
+    item->type = HEAPSTORE_BATCH_ITEM_LOG;
+    strncpy(item->data.log.service, service, sizeof(item->data.log.service) - 1);
+    item->data.log.level = level;
+    if (trace_id) {
+        strncpy(item->data.log.trace_id, trace_id, sizeof(item->data.log.trace_id) - 1);
+    }
+    if (message) {
+        strncpy(item->data.log.message, message, sizeof(item->data.log.message) - 1);
+    }
+
+    if (ctx->tail) {
+        ctx->tail->next = item;
+        ctx->tail = item;
+    } else {
+        ctx->head = ctx->tail = item;
+    }
+    ctx->count++;
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_batch_add_trace(
+    heapstore_batch_context_t* ctx,
+    const char* trace_id,
+    const char* span_id,
+    const char* parent_span_id,
+    const char* name,
+    int64_t start_time_us,
+    int64_t end_time_us,
+    int status,
+    const char* attributes) {
+    if (!ctx || !trace_id || !span_id || !name) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+    if (ctx->count >= ctx->capacity) {
+        return heapstore_ERR_OUT_OF_MEMORY;
+    }
+
+    heapstore_batch_item_t* item = (heapstore_batch_item_t*)malloc(sizeof(heapstore_batch_item_t));
+    if (!item) {
+        return heapstore_ERR_OUT_OF_MEMORY;
+    }
+    memset(item, 0, sizeof(heapstore_batch_item_t));
+    item->type = HEAPSTORE_BATCH_ITEM_SPAN;
+    strncpy(item->data.span.trace_id, trace_id, sizeof(item->data.span.trace_id) - 1);
+    strncpy(item->data.span.span_id, span_id, sizeof(item->data.span.span_id) - 1);
+    if (parent_span_id) {
+        strncpy(item->data.span.parent_span_id, parent_span_id, sizeof(item->data.span.parent_span_id) - 1);
+    }
+    strncpy(item->data.span.name, name, sizeof(item->data.span.name) - 1);
+    item->data.span.start_time_us = start_time_us;
+    item->data.span.end_time_us = end_time_us;
+    item->data.span.status = status;
+    if (attributes) {
+        strncpy(item->data.span.attributes, attributes, sizeof(item->data.span.attributes) - 1);
+    }
+
+    if (ctx->tail) {
+        ctx->tail->next = item;
+        ctx->tail = item;
+    } else {
+        ctx->head = ctx->tail = item;
+    }
+    ctx->count++;
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_batch_add_session(
+    heapstore_batch_context_t* ctx,
+    const heapstore_session_record_t* record) {
+    if (!ctx || !record) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+    if (ctx->count >= ctx->capacity) {
+        return heapstore_ERR_OUT_OF_MEMORY;
+    }
+
+    heapstore_batch_item_t* item = (heapstore_batch_item_t*)malloc(sizeof(heapstore_batch_item_t));
+    if (!item) {
+        return heapstore_ERR_OUT_OF_MEMORY;
+    }
+    memset(item, 0, sizeof(heapstore_batch_item_t));
+    item->type = HEAPSTORE_BATCH_ITEM_SESSION;
+    memcpy(&item->data.session, record, sizeof(heapstore_session_record_t));
+
+    if (ctx->tail) {
+        ctx->tail->next = item;
+        ctx->tail = item;
+    } else {
+        ctx->head = ctx->tail = item;
+    }
+    ctx->count++;
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_batch_add_agent(
+    heapstore_batch_context_t* ctx,
+    const heapstore_agent_record_t* record) {
+    if (!ctx || !record) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+    if (ctx->count >= ctx->capacity) {
+        return heapstore_ERR_OUT_OF_MEMORY;
+    }
+
+    heapstore_batch_item_t* item = (heapstore_batch_item_t*)malloc(sizeof(heapstore_batch_item_t));
+    if (!item) {
+        return heapstore_ERR_OUT_OF_MEMORY;
+    }
+    memset(item, 0, sizeof(heapstore_batch_item_t));
+    item->type = HEAPSTORE_BATCH_ITEM_AGENT;
+    memcpy(&item->data.agent, record, sizeof(heapstore_agent_record_t));
+
+    if (ctx->tail) {
+        ctx->tail->next = item;
+        ctx->tail = item;
+    } else {
+        ctx->head = ctx->tail = item;
+    }
+    ctx->count++;
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_batch_add_skill(
+    heapstore_batch_context_t* ctx,
+    const heapstore_skill_record_t* record) {
+    if (!ctx || !record) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+    if (ctx->count >= ctx->capacity) {
+        return heapstore_ERR_OUT_OF_MEMORY;
+    }
+
+    heapstore_batch_item_t* item = (heapstore_batch_item_t*)malloc(sizeof(heapstore_batch_item_t));
+    if (!item) {
+        return heapstore_ERR_OUT_OF_MEMORY;
+    }
+    memset(item, 0, sizeof(heapstore_batch_item_t));
+    item->type = HEAPSTORE_BATCH_ITEM_SKILL;
+    memcpy(&item->data.skill, record, sizeof(heapstore_skill_record_t));
+
+    if (ctx->tail) {
+        ctx->tail->next = item;
+        ctx->tail = item;
+    } else {
+        ctx->head = ctx->tail = item;
+    }
+    ctx->count++;
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_batch_add_memory_pool(
+    heapstore_batch_context_t* ctx,
+    const heapstore_memory_pool_t* pool) {
+    if (!ctx || !pool) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+    if (ctx->count >= ctx->capacity) {
+        return heapstore_ERR_OUT_OF_MEMORY;
+    }
+
+    heapstore_batch_item_t* item = (heapstore_batch_item_t*)malloc(sizeof(heapstore_batch_item_t));
+    if (!item) {
+        return heapstore_ERR_OUT_OF_MEMORY;
+    }
+    memset(item, 0, sizeof(heapstore_batch_item_t));
+    item->type = HEAPSTORE_BATCH_ITEM_MEMORY_POOL;
+    memcpy(&item->data.memory_pool, pool, sizeof(heapstore_memory_pool_t));
+
+    if (ctx->tail) {
+        ctx->tail->next = item;
+        ctx->tail = item;
+    } else {
+        ctx->head = ctx->tail = item;
+    }
+    ctx->count++;
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_batch_add_allocation(
+    heapstore_batch_context_t* ctx,
+    const heapstore_memory_allocation_t* allocation) {
+    if (!ctx || !allocation) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+    if (ctx->count >= ctx->capacity) {
+        return heapstore_ERR_OUT_OF_MEMORY;
+    }
+
+    heapstore_batch_item_t* item = (heapstore_batch_item_t*)malloc(sizeof(heapstore_batch_item_t));
+    if (!item) {
+        return heapstore_ERR_OUT_OF_MEMORY;
+    }
+    memset(item, 0, sizeof(heapstore_batch_item_t));
+    item->type = HEAPSTORE_BATCH_ITEM_MEMORY_ALLOC;
+    memcpy(&item->data.memory_alloc, allocation, sizeof(heapstore_memory_allocation_t));
+
+    if (ctx->tail) {
+        ctx->tail->next = item;
+        ctx->tail = item;
+    } else {
+        ctx->head = ctx->tail = item;
+    }
+    ctx->count++;
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_batch_add_ipc_channel(
+    heapstore_batch_context_t* ctx,
+    const heapstore_ipc_channel_t* channel) {
+    if (!ctx || !channel) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+    if (ctx->count >= ctx->capacity) {
+        return heapstore_ERR_OUT_OF_MEMORY;
+    }
+
+    heapstore_batch_item_t* item = (heapstore_batch_item_t*)malloc(sizeof(heapstore_batch_item_t));
+    if (!item) {
+        return heapstore_ERR_OUT_OF_MEMORY;
+    }
+    memset(item, 0, sizeof(heapstore_batch_item_t));
+    item->type = HEAPSTORE_BATCH_ITEM_IPC_CHANNEL;
+    memcpy(&item->data.ipc_channel, channel, sizeof(heapstore_ipc_channel_t));
+
+    if (ctx->tail) {
+        ctx->tail->next = item;
+        ctx->tail = item;
+    } else {
+        ctx->head = ctx->tail = item;
+    }
+    ctx->count++;
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_batch_add_ipc_buffer(
+    heapstore_batch_context_t* ctx,
+    const heapstore_ipc_buffer_t* buffer) {
+    if (!ctx || !buffer) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+    if (ctx->count >= ctx->capacity) {
+        return heapstore_ERR_OUT_OF_MEMORY;
+    }
+
+    heapstore_batch_item_t* item = (heapstore_batch_item_t*)malloc(sizeof(heapstore_batch_item_t));
+    if (!item) {
+        return heapstore_ERR_OUT_OF_MEMORY;
+    }
+    memset(item, 0, sizeof(heapstore_batch_item_t));
+    item->type = HEAPSTORE_BATCH_ITEM_IPC_BUFFER;
+    memcpy(&item->data.ipc_buffer, buffer, sizeof(heapstore_ipc_buffer_t));
+
+    if (ctx->tail) {
+        ctx->tail->next = item;
+        ctx->tail = item;
+    } else {
+        ctx->head = ctx->tail = item;
+    }
+    ctx->count++;
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_batch_add_span(
+    heapstore_batch_context_t* ctx,
+    const heapstore_span_t* span) {
+    if (!ctx || !span) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+    return heapstore_batch_add_trace(ctx, span->trace_id, span->span_id,
+        span->parent_span_id, span->name, span->start_time_ns,
+        span->end_time_ns, 0, span->attributes);
+}
+
+heapstore_error_t heapstore_batch_commit(heapstore_batch_context_t* ctx) {
+    if (!ctx) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+
+    heapstore_error_t result = heapstore_SUCCESS;
+    heapstore_batch_item_t* item = ctx->head;
+
+    while (item) {
+        heapstore_batch_item_t* next = item->next;
+        heapstore_error_t err = heapstore_SUCCESS;
+
+        switch (item->type) {
+            case HEAPSTORE_BATCH_ITEM_LOG:
+                err = heapstore_log_write(item->data.log.level, item->data.log.service,
+                    item->data.log.trace_id[0] ? item->data.log.trace_id : NULL,
+                    NULL, 0, item->data.log.message);
+                break;
+            case HEAPSTORE_BATCH_ITEM_SPAN: {
+                heapstore_span_record_t span_rec;
+                memset(&span_rec, 0, sizeof(span_rec));
+                strncpy(span_rec.trace_id, item->data.span.trace_id, sizeof(span_rec.trace_id) - 1);
+                strncpy(span_rec.span_id, item->data.span.span_id, sizeof(span_rec.span_id) - 1);
+                if (item->data.span.parent_span_id[0]) {
+                    strncpy(span_rec.parent_span_id, item->data.span.parent_span_id, sizeof(span_rec.parent_span_id) - 1);
+                }
+                strncpy(span_rec.name, item->data.span.name, sizeof(span_rec.name) - 1);
+                span_rec.start_time_us = item->data.span.start_time_us;
+                span_rec.end_time_us = item->data.span.end_time_us;
+                span_rec.status = item->data.span.status;
+                if (item->data.span.attributes[0]) {
+                    strncpy(span_rec.attributes, item->data.span.attributes, sizeof(span_rec.attributes) - 1);
+                }
+                err = heapstore_trace_write_span(&span_rec);
+                break;
+            }
+            case HEAPSTORE_BATCH_ITEM_SESSION:
+                err = heapstore_registry_add_session(&item->data.session);
+                break;
+            case HEAPSTORE_BATCH_ITEM_AGENT:
+                err = heapstore_registry_add_agent(&item->data.agent);
+                break;
+            case HEAPSTORE_BATCH_ITEM_SKILL:
+                err = heapstore_registry_add_skill(&item->data.skill);
+                break;
+            case HEAPSTORE_BATCH_ITEM_MEMORY_POOL:
+                err = heapstore_memory_record_pool(&item->data.memory_pool);
+                break;
+            case HEAPSTORE_BATCH_ITEM_MEMORY_ALLOC:
+                err = heapstore_memory_record_allocation(&item->data.memory_alloc);
+                break;
+            case HEAPSTORE_BATCH_ITEM_IPC_CHANNEL:
+                err = heapstore_ipc_record_channel(&item->data.ipc_channel);
+                break;
+            case HEAPSTORE_BATCH_ITEM_IPC_BUFFER:
+                err = heapstore_ipc_record_buffer(&item->data.ipc_buffer);
+                break;
+        }
+
+        if (err != heapstore_SUCCESS && result == heapstore_SUCCESS) {
+            result = err;
+        }
+
+        free(item);
+        item = next;
+    }
+
+    ctx->head = ctx->tail = NULL;
+    ctx->count = 0;
+
+    return result;
+}
+
+void heapstore_batch_rollback(heapstore_batch_context_t* ctx) {
+    if (!ctx) {
+        return;
+    }
+
+    heapstore_batch_item_t* item = ctx->head;
+    while (item) {
+        heapstore_batch_item_t* next = item->next;
+        free(item);
+        item = next;
+    }
+
+    ctx->head = ctx->tail = NULL;
+    ctx->count = 0;
+}
+
+void heapstore_batch_context_destroy(heapstore_batch_context_t* ctx) {
+    if (!ctx) {
+        return;
+    }
+
+    heapstore_batch_rollback(ctx);
+#ifdef _WIN32
+    DeleteCriticalSection(&ctx->lock);
+#else
+    pthread_mutex_destroy(&ctx->lock);
+#endif
+    free(ctx);
+}
+
+size_t heapstore_batch_get_count(const heapstore_batch_context_t* ctx) {
+    if (!ctx) {
+        return 0;
+    }
+    return ctx->count;
+}
+
+size_t heapstore_batch_get_capacity(const heapstore_batch_context_t* ctx) {
+    if (!ctx) {
+        return 0;
+    }
+    return ctx->capacity;
+}

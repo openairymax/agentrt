@@ -1,0 +1,102 @@
+# Gateway Daemon - AgentOS 网关守护进程
+# Copyright (C) 2026 SPHARX. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+cmake_minimum_required(VERSION 3.20)
+
+project(gateway_d VERSION 1.0.0 LANGUAGES C)
+
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+
+# 查找依赖
+find_package(Threads REQUIRED)
+find_package(PkgConfig REQUIRED)
+
+pkg_check_modules(CJSON REQUIRED libcjson)
+
+# ==================== 路径设置 ====================
+# daemon/common 兼容层路径
+set(DAEMON_COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../common)
+set(DAEMON_COMMON_INCLUDE_DIR ${DAEMON_COMMON_DIR}/include)
+
+# commons 统一基础库路径
+set(COMMONS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../commons)
+set(COMMONS_INCLUDE_DIR ${COMMONS_DIR})
+
+# 源文件
+set(GATEWAY_D_SOURCES
+    src/main.c
+    src/service.c
+)
+
+# 可执行文件
+add_executable(gateway_d ${GATEWAY_D_SOURCES})
+
+# 平台特定配置
+if(WIN32)
+    target_compile_definitions(gateway_d PRIVATE
+        AGENTOS_PLATFORM_WINDOWS=1
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+        _CRT_SECURE_NO_WARNINGS
+    )
+    target_link_libraries(gateway_d PRIVATE
+        ws2_32
+        bcrypt
+    )
+elseif(UNIX)
+    target_link_libraries(gateway_d PRIVATE
+        pthread
+        rt
+    )
+endif()
+
+# 包含目录 - 兼容层和 commons
+target_include_directories(gateway_d PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${DAEMON_COMMON_INCLUDE_DIR}
+    ${COMMONS_INCLUDE_DIR}
+    ${COMMONS_INCLUDE_DIR}/platform/include
+    ${COMMONS_INCLUDE_DIR}/utils/error/include
+    ${COMMONS_INCLUDE_DIR}/utils/logging/include
+    ${COMMONS_INCLUDE_DIR}/utils/config_unified/include
+    ${COMMONS_INCLUDE_DIR}/utils/memory/include
+    ${COMMONS_INCLUDE_DIR}/utils/string/include
+    ${COMMONS_INCLUDE_DIR}/utils/sync/include
+    ${CJSON_INCLUDE_DIRS}
+)
+
+# 链接库
+target_link_libraries(gateway_d PRIVATE
+    svc_common
+    Threads::Threads
+    ${CJSON_LIBRARIES}
+)
+
+# 编译选项
+target_compile_options(gateway_d PRIVATE
+    -Wall
+    -Wextra
+    -Wpedantic
+    -Werror=implicit-function-declaration
+    -Werror=return-type
+    $<$<CONFIG:Debug>:-g -O0>
+    $<$<CONFIG:Release>:-O3 -DNDEBUG>
+)
+
+# 安装
+install(TARGETS gateway_d
+    RUNTIME DESTINATION bin
+)
+
+install(FILES
+    include/gateway_service.h
+    DESTINATION include/agentos/daemon/gateway_d
+)
+
+# 测试
+if(BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()

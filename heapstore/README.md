@@ -1,8 +1,8 @@
 # AgentOS heapstore - 数据分区存储系统
 
-**版本**: v1.0.0  
-**最后更新**: 2026-03-28  
-**开发语言**: C11  
+**版本**: v1.0.0.6
+**最后更新**: 2026-04-01
+**开发语言**: C11
 **许可证**: Apache License 2.0
 
 ---
@@ -10,6 +10,8 @@
 ## 📖 概述
 
 `heapstore` 是 AgentOS 的**数据分区存储系统**，为整个系统提供统一、可靠、高性能的持久化存储解决方案。它管理所有运行时产生的数据，包括日志、注册表、追踪数据、IPC 通信数据和内存管理数据。
+
+> **注意**: heapstore 由早期的 `data` 模块更名而来，定位为 AgentOS 的底层存储引擎。
 
 ### 核心特性
 
@@ -19,18 +21,144 @@
 - 🔄 **自动管理**: 数据生命周期管理、自动清理、日志轮转
 - 📊 **可观测性**: 完整的统计信息和健康检查接口
 - 🛡️ **数据安全**: 参数验证、SQL 注入防护、资源隔离
+- ⚡ **批量写入**: 支持批量操作，减少 I/O 开销
 
 ### 在 AgentOS 中的位置
 
 ```
 AgentOS 架构
-├── corekern/          # 纯净微内核 (IPC/Mem/Task/Time)
-├── coreloopthree/     # 三层认知运行时
-├── memoryrovol/       # 四层记忆系统
-├── syscall/           # 系统调用接口
-├── cupolas/           # 安全穹顶
-└── heapstore/ ⭐      # 数据分区存储（本模块）
+┌──────────────────────────────────────────────────────────────────────┐
+│                           服务层 (daemon)                             │
+│              llm_d | market_d | monit_d | sched_d | tool_d          │
+└──────────────────────────────────────────────────────────────────────┘
+                                    ↓↑
+┌──────────────────────────────────────────────────────────────────────┐
+│                            内核层 (atoms)                             │
+│  ┌────────────────┐ ┌────────────────┐ ┌────────────────┐           │
+│  │    corekern    │ │ coreloopthree  │ │  memoryrovol   │           │
+│  │    微内核基础   │ │  三层认知运行时  │ │   四层记忆系统   │           │
+│  │  IPC · Mem · Task │ │ 认知 / 行动 / 记忆  │ │   L1/L2/L3/L4   │           │
+│  └────────────────┘ └────────────────┘ └────────────────┘           │
+│  ┌────────────────┐ ┌────────────────┐                             │
+│  │    syscall     │ │     utils      │                             │
+│  │   系统调用接口   │ │    公共工具库    │                             │
+│  └────────────────┘ └────────────────┘                             │
+└──────────────────────────────────────────────────────────────────────┘
+                                    ↓↑
+┌──────────────────────────────────────────────────────────────────────┐
+│                         heapstore ⭐                                  │
+│                    数据分区存储系统（底层存储引擎）                      │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │  syscall 层调用 ──▶ heapstore ──▶ 文件系统                    │   │
+│  │  memoryrovol ──▶ heapstore ──▶ 文件系统（记忆持久化）         │   │
+│  │  日志/注册表/追踪/IPC/内存 ──▶ heapstore ──▶ 文件系统        │   │
+│  └──────────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## 🏗️ 架构设计
+
+### 设计原则
+
+heapstore 遵循 AgentOS 五维正交架构原则：
+
+| 维度 | 原则 | 实现 |
+|------|------|------|
+| **S-2 层次分解** | 用户态程序通过系统调用与内核交互 | heapstore 作为底层存储引擎，被 syscall 层调用 |
+| **K-2 接口契约化** | 所有 API 有完整契约定义 | @ownership/@threadsafe/@reentrant 注解完整 |
+| **E-2 可观测性** | 指标、追踪、日志完整 | 健康检查、统计接口、熔断器机制 |
+| **E-3 资源确定性** | 资源管理清晰 | 所有输出参数有明确所有权语义 |
+
+### 模块架构
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    heapstore 公共 API                        │
+│  heapstore_init() | shutdown() | health_check() | ...      │
+└─────────────────────────────────────────────────────────────┘
+                            │
+        ┌───────────────────┼───────────────────┐
+        │                   │                   │
+┌───────▼────────┐ ┌────────▼────────┐ ┌───────▼────────┐
+│ heapstore_core │ │ heapstore_integ│ │   private.h    │
+│ - 目录管理     │ │   ration.c     │ │  - 内部接口    │
+│ - 配置管理     │ │ - syscall 集成  │ │  - 模块声明    │
+│ - 熔断器       │ │ - 批量写入     │ │                │
+│ - 性能指标     │ │ - 健康检查     │ │                │
+└───────┬────────┘ └────────┬────────┘ └─────────────────┘
+        │                   │
+        ├──────────┬──────────┬──────────┬──────────┬──────────┐
+        │          │          │          │          │          │
+┌───────▼──┐  ┌───▼────┐  ┌──▼─────┐  ┌─▼──────┐  ┌─▼──────┐
+│heapstore │  │heapstore│  │heapstore│  │heapstore│  │heapstore│
+│ _log.c   │  │_regist.│  │ _trace.│  │ _ipc.c │  │_memory.│
+│          │  │  .c    │  │  .c    │  │        │  │  .c    │
+├──────────┤  ├────────┤  ├────────┤  ├────────┤  ├────────┤
+│ 日志管理 │  │注册表  │  │追踪管理│  │IPC 管理 │  │内存管理│
+│ - 轮转   │  │- SQLite│  │- Span  │  │- 通道   │  │- 内存池│
+│ - 快慢路径│ │- WAL   │  │- 导出  │  │- 缓冲区 │  │- 分配  │
+└──────────┘  └────────┘  └────────┘  └────────┘  └────────┘
+```
+
+### 线程安全设计
+
+所有子模块都使用独立的互斥锁保护：
+
+```c
+pthread_mutex_t g_registry.lock;    // 注册表锁
+pthread_mutex_t g_log_lock;        // 日志锁
+pthread_mutex_t g_trace_queue.lock;// 追踪锁
+pthread_mutex_t g_ipc_data.lock;   // IPC 锁
+pthread_mutex_t g_memory_data.lock; // 内存锁
+```
+
+---
+
+## 🔗 AgentOS 集成
+
+heapstore 作为底层存储引擎，被 AgentOS 核心模块调用：
+
+### 集成架构
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     heapstore 集成数据流                             │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│   daemon/llm_d ──────┐                                               │
+│   daemon/market_d ───┼──▶ syscall/session.c ──▶ heapstore_syscall  │
+│   daemon/tool_d ─────┘                           _session_save()   │
+│                                                      │               │
+│                                                      ▼               │
+│   coreloopthree ──────────────────────────────▶ heapstore_registry │
+│                                                      │               │
+│   memoryrovol ───────────────────────────────▶ heapstore_memoryrovol │
+│                                                      │               │
+│   corekern/ipc ─────────────────────────────────▶ heapstore_ipc    │
+│                                                      │               │
+│   commons/logging ─────────────────────────────▶ heapstore_logging  │
+│                                                      │               │
+│   syscall/telemetry ───────────────────────────▶ heapstore_trace     │
+│                                                      │               │
+│                                                      ▼               │
+│                                              ┌─────────────┐        │
+│                                              │  文件系统   │        │
+│                                              └─────────────┘        │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 集成接口
+
+| 调用模块 | 接口函数 | 数据类型 |
+|----------|----------|----------|
+| syscall/session.c | `heapstore_syscall_session_save/load/delete` | 会话数据 |
+| syscall/telemetry.c | `heapstore_syscall_trace_export` | 追踪数据 |
+| memoryrovol | `heapstore_memoryrovol_save/load/delete` | 记忆数据 |
+| corekern/ipc | `heapstore_ipc_channel_save/load` | IPC 通道 |
+| commons/logging | `heapstore_logging_write` | 日志数据 |
 
 ---
 
@@ -44,70 +172,43 @@ AgentOS 架构
 - **构建系统**: CMake 3.10+
 - **操作系统**: Linux / macOS / Windows
 
-### 构建安装
-
-```bash
-# 1. 进入模块目录
-cd AgentOS/heapstore
-
-# 2. 创建构建目录
-mkdir build && cd build
-
-# 3. 配置 CMake
-cmake .. -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
-
-# 4. 编译
-make -j$(nproc)
-
-# 5. 运行测试（可选）
-ctest --output-on-failure
-
-# 6. 安装（可选）
-sudo make install
-```
-
 ### 基本使用
 
 ```c
 #include <heapstore.h>
-#include <heapstore_log.h>
+#include <heapstore_integration.h>
 #include <stdio.h>
 
 int main(void) {
-    // 1. 配置
-    heapstore_config_t config = {
-        .root_path = "heapstore_data",
-        .max_log_size_mb = 100,
-        .log_retention_days = 7,
-        .enable_auto_cleanup = true,
-        .enable_log_rotation = true
-    };
-
-    // 2. 初始化
-    heapstore_error_t err = heapstore_init(&config);
-    if (err != heapstore_SUCCESS) {
-        fprintf(stderr, "初始化失败：%s\n", heapstore_strerror(err));
+    /* 1. 初始化 heapstore 集成 */
+    agentos_error_t err = heapstore_integration_init("/var/lib/agentos/heapstore");
+    if (err != AGENTOS_SUCCESS) {
+        fprintf(stderr, "初始化失败：%d\n", err);
         return 1;
     }
 
-    // 3. 写入日志
-    heapstore_LOG_INFO("my_service", "trace_001", "服务启动成功");
+    /* 2. 批量写入示例 */
+    heapstore_batch_context_t* ctx = heapstore_batch_begin(100);
+    if (ctx) {
+        for (int i = 0; i < 50; i++) {
+            heapstore_batch_add_log(ctx, "my_service", 2, "批量日志消息 %d", i);
+        }
+        heapstore_batch_commit(ctx);
+        heapstore_batch_context_destroy(ctx);
+    }
 
-    // 4. 健康检查
-    bool registry_ok, log_ok;
-    heapstore_health_check(&registry_ok, NULL, &log_ok, NULL, NULL);
+    /* 3. 健康检查 */
+    char* health_json = NULL;
+    heapstore_integration_health_check(&health_json);
+    if (health_json) {
+        printf("Health: %s\n", health_json);
+        free(health_json);
+    }
 
-    // 5. 关闭系统
-    heapstore_shutdown();
+    /* 4. 关闭 */
+    heapstore_integration_shutdown();
     return 0;
 }
-```
-
-### 编译示例
-
-```bash
-gcc -o example example.c -lheapstore -lsqlite3 -lpthread
-./example
 ```
 
 ---
@@ -123,14 +224,7 @@ gcc -o example example.c -lheapstore -lsqlite3 -lpthread
 - 支持 Trace ID 追踪
 - 自动日志轮转（可配置大小和时间）
 - 线程安全的日志写入
-
-**示例**:
-```c
-heapstore_LOG_INFO("llm_d", "trace_123", "LLM 服务启动成功");
-heapstore_LOG_ERROR("tool_d", NULL, "工具执行失败：%s", error_msg);
-```
-
----
+- **快慢路径双模式**: 快速路径用于高频日志，慢速路径用于重要日志
 
 ### 2. SQLite 注册表 🗄️
 
@@ -142,13 +236,6 @@ heapstore_LOG_ERROR("tool_d", NULL, "工具执行失败：%s", error_msg);
 - 自动 Vacuum 优化数据库
 - 完整的 CRUD 操作接口
 
-**数据表**:
-- `agents` - Agent 注册信息
-- `skills` - 技能库注册信息
-- `sessions` - 会话状态管理
-
----
-
 ### 3. OpenTelemetry 追踪 📊
 
 存储分布式追踪数据（Span），支持 OpenTelemetry 标准格式。
@@ -159,8 +246,6 @@ heapstore_LOG_ERROR("tool_d", NULL, "工具执行失败：%s", error_msg);
 - 支持 Trace-Span 层级关系
 - 自动过期清理
 
----
-
 ### 4. IPC 数据存储 🔗
 
 管理进程间通信（IPC）的通道和缓冲区数据。
@@ -169,8 +254,6 @@ heapstore_LOG_ERROR("tool_d", NULL, "工具执行失败：%s", error_msg);
 - Binder 通道状态记录
 - 共享内存缓冲区管理
 - 线程安全的读写操作
-
----
 
 ### 5. 内存管理数据 🧠
 
@@ -182,59 +265,111 @@ heapstore_LOG_ERROR("tool_d", NULL, "工具执行失败：%s", error_msg);
 - 实时统计信息
 - 内存泄漏检测支持
 
----
+### 6. 熔断器机制 ⚡
 
-## 🏗️ 架构设计
+防止级联失败的熔断器实现。
 
-### 模块架构
-
+**状态机**:
 ```
-┌─────────────────────────────────────────┐
-│          heapstore 公共 API              │
-│  heapstore_init() | shutdown() | ...    │
-└─────────────────────────────────────────┘
-                    │
-        ┌───────────┴───────────┐
-        │                       │
-┌───────▼────────┐     ┌────────▼────────┐
-│ heapstore_core.c│     │   private.h     │
-│ - 目录管理     │     │  - 内部接口     │
-│ - 配置管理     │     │  - 模块声明     │
-└────────────────┘     └─────────────────┘
-        │
-        ├──────────┬──────────┬──────────┬──────────┬──────────┐
-        │          │          │          │          │          │
-┌───────▼──┐  ┌───▼────┐  ┌──▼─────┐  ┌─▼──────┐  ┌─▼──────┐
-│heapstore │  │heapstore│  │heapstore│  │heapstore│  │heapstore│
-│ _log.c   │  │_regist.│  │ _trace.│  │ _ipc.c │  │_memory.│
-│          │  │  .c    │  │  .c    │  │        │  │  .c    │
-├──────────┤  ├────────┤  ├────────┤  ├────────┤  ├────────┤
-│ 日志管理 │  │注册表  │  │追踪管理│  │IPC 管理 │  │内存管理│
-└──────────┘  └────────┘  └────────┘  └────────┘  └────────┘
+        ┌─────────────────────────────────────┐
+        │                                     │
+        ▼                                     │
+    ┌───────┐    失败 >= 阈值    ┌───────┐   │
+    │ CLOSED │ ────────────────▶ │ OPEN  │   │
+    │ 正常   │                   │ 熔断  │   │
+    └───────┘ ◀───────────────  └───────┘   │
+        │      超时恢复              │        │
+        │      (timeout_sec)        │        │
+        │                           │        │
+        │                           ▼        │
+        │                       ┌─────────┐ │
+        │                       │HALF_OPEN│ │
+        │                       │ 半开    │ │
+        │                       └─────────┘ │
+        │                           │        │
+        └───────────────────────────┘        │
+              成功 < threshold               │
 ```
 
-### 线程安全设计
+### 7. 批量写入支持 📦
 
-所有子模块都使用独立的互斥锁保护：
+高效的批量写入接口，减少 I/O 操作。
 
 ```c
-pthread_mutex_t g_registry.lock;    // 注册表锁
-pthread_mutex_t g_log_lock;         // 日志锁
-pthread_mutex_t g_trace_queue.lock; // 追踪锁
-pthread_mutex_t g_ipc_data.lock;    // IPC 锁
-pthread_mutex_t g_memory_data.lock; // 内存锁
+/* 创建批量上下文 */
+heapstore_batch_context_t* ctx = heapstore_batch_begin(100);
+
+/* 添加各种类型的数据 */
+heapstore_batch_add_log(ctx, "service", 2, "message");
+heapstore_batch_add_trace(ctx, trace_id, span_id, NULL, "op", t1, t2, 0, NULL);
+heapstore_batch_add_session(ctx, &session_record);
+
+/* 提交或回滚 */
+heapstore_batch_commit(ctx);    /* 全部提交 */
+heapstore_batch_rollback(ctx);  /* 或全部回滚 */
+
+/* 销毁上下文 */
+heapstore_batch_context_destroy(ctx);
 ```
 
 ---
 
 ## 📂 目录结构
 
+### 代码结构
+
+```
+heapstore/
+├── CMakeLists.txt                  # CMake 构建配置
+├── README.md                       # 本文档
+│
+├── include/                        # 公共头文件
+│   ├── heapstore.h                 # 核心接口（含批量写入）
+│   ├── heapstore_integration.h     # AgentOS 集成接口
+│   ├── heapstore_log.h             # 日志接口
+│   ├── heapstore_registry.h        # 注册表接口
+│   ├── heapstore_trace.h           # 追踪接口
+│   ├── heapstore_ipc.h             # IPC 接口
+│   ├── heapstore_memory.h          # 内存接口
+│   └── utils.h                     # 工具函数接口
+│
+├── src/                            # 源代码
+│   ├── heapstore_core.c            # 核心实现（含批量写入）
+│   ├── heapstore_integration.c     # AgentOS 集成实现
+│   ├── heapstore_log.c             # 日志实现
+│   ├── heapstore_registry.c        # 注册表实现
+│   ├── heapstore_trace.c           # 追踪实现
+│   ├── heapstore_ipc.c             # IPC 实现
+│   ├── heapstore_memory.c          # 内存实现
+│   ├── utils.c                     # 工具函数实现
+│   └── private.h                   # 内部头文件
+│
+├── tests/                          # 测试代码
+│   ├── test_heapstore_core.c       # 核心测试
+│   ├── test_heapstore_log.c        # 日志测试
+│   ├── test_heapstore_registry.c   # 注册表测试
+│   ├── test_heapstore_trace.c      # 追踪测试
+│   ├── test_heapstore_ipc.c        # IPC 测试
+│   ├── test_heapstore_memory.c     # 内存测试
+│   ├── test_heapstore_integration.c# 集成测试
+│   └── benchmark_heapstore.c        # 性能基准测试
+│
+└── kernel/                         # 运行时数据目录
+    ├── ipc/                        # IPC 通信数据
+    │   ├── channels/              # Binder 通道状态
+    │   └── buffers/               # 共享内存缓冲区
+    └── memory/                     # 内存管理数据
+        ├── pools/                 # 内存池状态
+        ├── allocations/           # 分配记录
+        └── stats/                 # 统计信息
+```
+
 ### 运行时目录
 
 ```
 heapstore/                          # 数据分区根目录
 ├── kernel/                         # 内核数据
-│   ├── ipc/                        # IPC 通信数据
+│   ├── ipc/                       # IPC 通信数据
 │   │   ├── channels/              # Binder 通道状态
 │   │   └── buffers/               # 共享内存缓冲区
 │   └── memory/                     # 内存管理数据
@@ -259,47 +394,6 @@ heapstore/                          # 数据分区根目录
 │
 └── traces/                         # 追踪数据
     └── spans/                     # Span 数据
-        ├── trace_abc123.json
-        └── trace_def456.json
-```
-
-### 代码结构
-
-```
-heapstore/
-├── CMakeLists.txt                  # CMake 构建配置
-├── README.md                       # 本文档
-├── include/                        # 公共头文件
-│   ├── heapstore.h                 # 核心接口
-│   ├── heapstore_log.h             # 日志接口
-│   ├── heapstore_registry.h        # 注册表接口
-│   ├── heapstore_trace.h           # 追踪接口
-│   ├── heapstore_ipc.h             # IPC 接口
-│   └── heapstore_memory.h          # 内存接口
-│
-├── src/                            # 源代码
-│   ├── heapstore_core.c            # 核心实现
-│   ├── heapstore_log.c             # 日志实现
-│   ├── heapstore_registry.c        # 注册表实现
-│   ├── heapstore_trace.c           # 追踪实现
-│   ├── heapstore_ipc.c             # IPC 实现
-│   ├── heapstore_memory.c          # 内存实现
-│   └── private.h                   # 内部头文件
-│
-├── tests/                          # 测试代码
-│   ├── test_heapstore_core.c       # 核心测试
-│   ├── test_heapstore_log.c        # 日志测试
-│   ├── test_heapstore_registry.c   # 注册表测试
-│   ├── test_heapstore_trace.c      # 追踪测试
-│   ├── test_heapstore_ipc.c        # IPC 测试
-│   ├── test_heapstore_memory.c     # 内存测试
-│   ├── test_heapstore_integration.c# 集成测试
-│   └── benchmark_heapstore.c       # 性能基准测试
-│
-└── scripts/                        # 辅助脚本
-    ├── build.sh                    # Linux/macOS 构建
-    ├── build.bat                   # Windows 构建
-    └── deploy.sh                   # 部署脚本
 ```
 
 ---
@@ -308,142 +402,41 @@ heapstore/
 
 ### 核心 API
 
-#### heapstore_init()
+| 函数 | 说明 |
+|------|------|
+| `heapstore_init()` | 初始化数据分区系统 |
+| `heapstore_shutdown()` | 关闭系统并清理资源 |
+| `heapstore_health_check()` | 健康检查接口 |
+| `heapstore_get_stats()` | 获取系统统计信息 |
+| `heapstore_get_metrics()` | 获取性能指标 |
+| `heapstore_reset_circuit()` | 重置熔断器 |
+| `heapstore_reload_config()` | 热重载配置 |
+| `heapstore_flush()` | 刷新所有缓冲区 |
 
-初始化数据分区系统。
+### 批量写入 API
 
-```c
-heapstore_error_t heapstore_init(const heapstore_config_t* config);
-```
+| 函数 | 说明 |
+|------|------|
+| `heapstore_batch_begin()` | 创建批量上下文 |
+| `heapstore_batch_add_log()` | 添加日志 |
+| `heapstore_batch_add_trace()` | 添加追踪数据 |
+| `heapstore_batch_add_session()` | 添加会话 |
+| `heapstore_batch_add_agent()` | 添加 Agent |
+| `heapstore_batch_add_skill()` | 添加技能 |
+| `heapstore_batch_commit()` | 提交批量 |
+| `heapstore_batch_rollback()` | 回滚批量 |
+| `heapstore_batch_context_destroy()` | 销毁上下文 |
 
-**参数**:
-- `config`: 配置结构指针，可为 NULL（使用默认配置）
+### AgentOS 集成 API
 
-**返回值**:
-- `heapstore_SUCCESS`: 成功
-- `heapstore_ERR_INVALID_PARAM`: 参数无效
-- `heapstore_ERR_ALREADY_INITIALIZED`: 已初始化
-- `heapstore_ERR_DIR_CREATE_FAILED`: 目录创建失败
-
----
-
-#### heapstore_shutdown()
-
-关闭数据分区系统并清理所有资源。
-
-```c
-void heapstore_shutdown(void);
-```
-
----
-
-#### heapstore_health_check()
-
-健康检查接口，检查各子系统状态。
-
-```c
-heapstore_error_t heapstore_health_check(
-    bool* registry_ok,
-    bool* trace_ok,
-    bool* log_ok,
-    bool* ipc_ok,
-    bool* memory_ok
-);
-```
-
-**参数**: 所有参数均为输出参数，可为 NULL
-
-**返回值**: `heapstore_SUCCESS` 表示所有子系统健康
-
----
-
-#### heapstore_get_stats()
-
-获取系统统计信息。
-
-```c
-heapstore_error_t heapstore_get_stats(heapstore_stats_t* stats);
-```
-
-**统计信息结构**:
-```c
-typedef struct {
-    uint64_t total_disk_usage_bytes;  // 总磁盘使用量
-    uint64_t log_usage_bytes;         // 日志使用量
-    uint64_t registry_usage_bytes;    // 注册表使用量
-    uint64_t trace_usage_bytes;       // 追踪数据使用量
-    uint64_t ipc_usage_bytes;         // IPC 数据使用量
-    uint64_t memory_usage_bytes;      // 内存数据使用量
-    uint32_t log_file_count;          // 日志文件数量
-    uint32_t trace_file_count;        // 追踪文件数量
-} heapstore_stats_t;
-```
-
----
-
-### 配置结构
-
-```c
-typedef struct heapstore_config {
-    const char* root_path;            // 数据分区根路径
-    size_t max_log_size_mb;           // 最大日志文件大小 (MB)
-    int log_retention_days;           // 日志保留天数
-    int trace_retention_days;         // 追踪数据保留天数
-    bool enable_auto_cleanup;         // 启用自动清理
-    bool enable_log_rotation;         // 启用日志轮转
-    bool enable_trace_export;         // 启用追踪导出
-    int db_vacuum_interval_days;      // 数据库 Vacuum 间隔 (天)
-} heapstore_config_t;
-```
-
----
-
-## ⚙️ 配置说明
-
-### 默认配置
-
-```c
-heapstore_config_t default_config = {
-    .root_path = "heapstore",
-    .max_log_size_mb = 100,
-    .log_retention_days = 7,
-    .trace_retention_days = 3,
-    .enable_auto_cleanup = true,
-    .enable_log_rotation = true,
-    .enable_trace_export = true,
-    .db_vacuum_interval_days = 7
-};
-```
-
-### 生产环境配置
-
-```c
-heapstore_config_t prod_config = {
-    .root_path = "/var/lib/agentos/heapstore",
-    .max_log_size_mb = 500,          // 500MB
-    .log_retention_days = 30,        // 保留 30 天
-    .trace_retention_days = 7,       // 保留 7 天
-    .enable_auto_cleanup = true,
-    .enable_log_rotation = true,
-    .enable_trace_export = true,
-    .db_vacuum_interval_days = 7     // 每周优化
-};
-```
-
-### 开发环境配置
-
-```c
-heapstore_config_t dev_config = {
-    .root_path = ".heapstore_dev",
-    .max_log_size_mb = 10,           // 小文件，方便调试
-    .log_retention_days = 1,         // 只保留 1 天
-    .trace_retention_days = 1,
-    .enable_auto_cleanup = true,
-    .enable_log_rotation = false,    // 开发环境不轮转
-    .enable_trace_export = true,
-    .db_vacuum_interval_days = 0     // 禁用优化
-};
-```
+| 函数 | 说明 |
+|------|------|
+| `heapstore_integration_init()` | 初始化集成 |
+| `heapstore_integration_shutdown()` | 关闭集成 |
+| `heapstore_syscall_session_save()` | 会话持久化 |
+| `heapstore_syscall_trace_export()` | 追踪导出 |
+| `heapstore_memoryrovol_save()` | 记忆持久化 |
+| `heapstore_integration_health_check()` | 集成健康检查 |
 
 ---
 
@@ -478,74 +471,38 @@ heapstore_config_t dev_config = {
 
 ## ✅ 最佳实践
 
-### 1. 日志使用规范
+### 1. 批量写入优化
 
-**推荐做法**:
 ```c
-// ✅ 使用宏，自动填充文件和行号
-heapstore_LOG_INFO("service_name", trace_id, "操作成功");
+/* ✅ 推荐：批量写入减少锁竞争 */
+heapstore_batch_context_t* ctx = heapstore_batch_begin(100);
+for (int i = 0; i < 100; i++) {
+    heapstore_batch_add_log(ctx, "service", 2, "批量消息 %d", i);
+}
+heapstore_batch_commit(ctx);
+heapstore_batch_context_destroy(ctx);
 
-// ✅ 包含关键上下文信息
-heapstore_LOG_INFO("llm_d", task_id, "任务完成，耗时 %dms, token 数 %d", 
-                   duration, token_count);
-
-// ✅ 使用合适的日志级别
-heapstore_LOG_ERROR("auth", NULL, "认证失败");  // 错误
-heapstore_LOG_WARN("cache", NULL, "缓存未命中"); // 警告
-heapstore_LOG_INFO("startup", NULL, "服务启动");  // 信息
-heapstore_LOG_DEBUG("perf", trace_id, "性能数据：%f", perf_data); // 调试
-```
-
-**避免做法**:
-```c
-// ❌ 记录敏感信息
-heapstore_LOG_INFO("auth", NULL, "密码：%s", password);
-
-// ❌ 过多调试日志
-for (int i = 0; i < 10000; i++) {
-    heapstore_LOG_DEBUG("loop", NULL, "i=%d", i);
+/* ❌ 避免：频繁单条写入 */
+for (int i = 0; i < 100; i++) {
+    heapstore_LOG_INFO("service", NULL, "单条消息 %d", i);
 }
 ```
 
 ### 2. 错误处理规范
 
 ```c
-// ✅ 检查所有返回值
-heapstore_error_t err = heapstore_init(&config);
-if (err != heapstore_SUCCESS) {
-    fprintf(stderr, "初始化失败：%s\n", heapstore_strerror(err));
+/* ✅ 检查所有返回值 */
+agentos_error_t err = heapstore_integration_init("/path");
+if (err != AGENTOS_SUCCESS) {
+    fprintf(stderr, "初始化失败：%d\n", err);
     return 1;
 }
 
-// ✅ 优雅降级
-err = heapstore_registry_add_agent(&agent);
-if (err == heapstore_ERR_DB_QUERY_FAILED) {
-    // 数据库失败，尝试重试
-    usleep(100000);  // 100ms
-    err = heapstore_registry_add_agent(&agent);
+/* ✅ 使用熔断器提供的容错能力 */
+heapstore_circuit_state_t state = heapstore_get_circuit_state();
+if (state == HEAPSTORE_CIRCUIT_OPEN) {
+    /* 熔断中，使用内存降级 */
 }
-
-// ✅ 资源清理
-if (initialization_failed) {
-    heapstore_shutdown();  // 确保调用
-}
-```
-
-### 3. 性能优化建议
-
-```c
-// ✅ 批量写入日志（减少锁竞争）
-for (int i = 0; i < 100; i++) {
-    heapstore_LOG_INFO("batch", trace_id, "消息 %d", i);
-}
-
-// ✅ 定期刷新（避免缓冲区过大）
-heapstore_flush();  // 每 1000 次操作后调用
-
-// ✅ 合理使用日志级别（减少 DEBUG 日志）
-heapstore_log_set_level(heapstore_LOG_INFO);  // 生产环境使用 INFO 级别
-
-// ✅ 健康检查避免频繁调用（每 5-10 秒调用一次即可）
 ```
 
 ---
@@ -558,115 +515,42 @@ heapstore_log_set_level(heapstore_LOG_INFO);  // 生产环境使用 INFO 级别
 
 **错误**: `heapstore_ERR_DIR_CREATE_FAILED`
 
-**原因**:
-- 目录权限不足
-- 磁盘空间不足
-- 路径不存在
-
 **解决方案**:
 ```bash
 # 检查权限
 ls -la /var/lib/agentos/
-
 # 修复权限
 sudo chown -R $USER:$USER /var/lib/agentos/
-sudo chmod -R 755 /var/lib/agentos/
-
-# 检查磁盘空间
-df -h
-
-# 创建目录
-mkdir -p /var/lib/agentos/heapstore
 ```
-
----
 
 #### 问题 2: 数据库锁定
 
 **错误**: `heapstore_ERR_DB_QUERY_FAILED`
 
-**原因**:
-- 多线程并发写入
-- 事务未提交
-- 数据库损坏
-
 **解决方案**:
 ```bash
 # 检查数据库状态
 sqlite3 heapstore/registry/agents.db "PRAGMA integrity_check;"
-
 # 修复数据库
 sqlite3 heapstore/registry/agents.db "VACUUM;"
 ```
 
 ---
 
-#### 问题 3: 日志文件过大
-
-**现象**: 单个日志文件超过配置大小
-
-**解决方案**:
-```c
-// 启用日志轮转
-config.enable_log_rotation = true;
-config.max_log_size_mb = 100;
-
-// 提高日志级别
-heapstore_log_set_level(heapstore_LOG_WARN);  // 只记录 WARN 及以上
-```
-
----
-
 ## 📖 相关文档
 
-### 项目内部文档
-
-- [AgentOS 架构设计](../manuals/architecture/ARCHITECTURAL_PRINCIPLES.md)
+- [AgentOS 架构设计](../manuals/ARCHITECTURAL_PRINCIPLES.md)
 - [C 语言编码规范](../manuals/specifications/coding_standard/C_coding_style_guide.md)
-- [部署指南](../manuals/guides/deployment.md)
-
-### 外部资源
-
-- [SQLite 官方文档](https://www.sqlite.org/docs.html)
-- [OpenTelemetry 规范](https://opentelemetry.io/docs/)
-- [POSIX 线程编程](https://man7.org/linux/man-pages/man7/pthreads.7.html)
-
----
-
-## 🤝 贡献指南
-
-### 报告问题
-
-发现 Bug 或有功能建议？请创建 Issue 并包含：
-
-1. 问题描述
-2. 复现步骤
-3. 环境信息（OS、编译器版本）
-4. 错误日志
-
-### 提交代码
-
-1. Fork 仓库
-2. 创建特性分支 (`git checkout -b feature/amazing-feature`)
-3. 提交更改 (`git commit -m 'Add amazing feature'`)
-4. 推送到分支 (`git push origin feature/amazing-feature`)
-5. 创建 Pull Request
+- [CoreLoopThree 架构](../manuals/architecture/coreloopthree.md)
+- [MemoryRovol 架构](../manuals/architecture/memoryrovol.md)
 
 ---
 
 ## 📄 许可证
 
-Copyright © 2026 SPHARX
+Copyright © 2026 SPHARX Ltd. All Rights Reserved.
 
 根据 **Apache License 2.0** 授权。
-
----
-
-## 📬 联系方式
-
-- **项目主页**: https://github.com/spharx/agentos
-- **问题反馈**: https://github.com/spharx/agentos/issues
-- **技术讨论**: https://github.com/spharx/agentos/discussions
 
 ---
 
@@ -674,5 +558,5 @@ Copyright © 2026 SPHARX
 
 ---
 
-*最后更新*: 2026-03-28  
+*最后更新*: 2026-04-01
 *维护者*: AgentOS Architecture Team

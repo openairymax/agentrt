@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file unbinder.c
  * @brief L3 结构层解绑算子实�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -27,7 +27,6 @@ agentos_unbinder_t* agentos_unbinder_create(agentos_binder_t* binder) {
     if (!unb->lock) {
         AGENTOS_FREE(unb);
         return NULL;
-        // From data intelligence emerges. by spharx
     }
     return unb;
 }

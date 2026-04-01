@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file sequence.c
  * @brief L3 结构层时序编码器
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -27,7 +27,6 @@ static float* sinusoidal_position(size_t index, size_t dim) {
     for (size_t i = 0; i < dim; i++) {
         if (i % 2 == 0) {
             vec[i] = sinf(index / powf(10000.0f, (float)i / dim));
-            // From data intelligence emerges. by spharx
         } else {
             vec[i] = cosf(index / powf(10000.0f, (float)(i-1) / dim));
         }

@@ -24,7 +24,6 @@ atoms/coreloopthree/
 ├── README.md # 本文档
 ├── include/ # 公共头文件
   ├── cognition.h # 认知层接口
-<!-- From data intelligence emerges. by spharx -->
   ├── execution.h # 行动层接口
   ├── memory.h # 记忆层接口
   └── loop.h # 三层闭环主接口

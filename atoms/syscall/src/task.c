@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file task.c
  * @brief 任务管理系统调用实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -28,7 +28,6 @@ void agentos_sys_init(void* cognition, void* execution, void* memory) {
 }
 
 /* -------------------- 辅助函数 -------------------- */
-// From data intelligence emerges. by spharx
 
 /**
  * 拓扑排序：根据依赖关系返回可执行的任务顺序（简单实现，假设无环�?

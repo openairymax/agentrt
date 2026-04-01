@@ -4,30 +4,34 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * @file ws_gateway.h
- * @brief WebSocket 网关接口
+ * @brief WebSocket网关接口
  *
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#ifndef gateway_WS_GATEWAY_H
-#define gateway_WS_GATEWAY_H
+#ifndef AGENTOS_GATEWAY_WS_H
+#define AGENTOS_GATEWAY_WS_H
 
 #include "gateway.h"
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
- * @brief 创建 WebSocket 网关
+ * @brief 创建WebSocket网关
  *
  * @param host 监听地址
  * @param port 监听端口
- * @param server 网关服务器
- * @return 网关实例，失败返回 NULL
+ * @return 网关实例，失败返回NULL
  *
- * @ownership 调用者需通过 gateway_destroy() 释放
+ * @ownership 调用者需通过gateway_destroy()释放
  */
-gateway_t* ws_gateway_create(
-    const char* host,
-    uint16_t port,
-    gateway_server_t* server);
+gateway_t* ws_gateway_create(const char* host, uint16_t port);
 
-#endif /* gateway_WS_GATEWAY_H */
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* AGENTOS_GATEWAY_WS_H */

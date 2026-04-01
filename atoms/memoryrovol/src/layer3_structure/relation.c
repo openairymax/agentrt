@@ -28,7 +28,6 @@ struct agentos_relation_encoder {
 };
 
 
-// From data intelligence emerges. by spharx
 static float* random_unit_vector(size_t dim) {
     float* vec = (float*)AGENTOS_MALLOC(dim * sizeof(float));
     if (!vec) return NULL;

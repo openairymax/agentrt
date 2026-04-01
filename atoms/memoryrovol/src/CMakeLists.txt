@@ -29,7 +29,10 @@ add_library(agentos_memoryrovol STATIC
     retrieval/mount.c
     retrieval/rerank.c
     memory_optimizer.c
+    memoryrovol.c
     monitoring.c
+    vector_store.c
+    llm_client.c
 )
 
 target_include_directories(agentos_memoryrovol PRIVATE

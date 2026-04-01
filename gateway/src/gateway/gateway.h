@@ -1,20 +1,33 @@
-/**
+/*
+ * Copyright (C) 2026 SPHARX. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2026 SPHARX.
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * @file gateway.h
- * @brief 网关抽象接口
+ * @brief 网关抽象接口 - 内部使用
  *
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#ifndef GATEWAY_GATEWAY_H
-#define GATEWAY_GATEWAY_H
+#ifndef AGENTOS_GATEWAY_INTERNAL_H
+#define AGENTOS_GATEWAY_INTERNAL_H
 
 #include "agentos.h"
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 
-/* 前向声明 */
-struct gateway_server;
-typedef struct gateway_server gateway_server_t;
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief 请求处理回调函数类型
+ * @param request JSON请求对象
+ * @param user_data 用户数据
+ * @return JSON响应字符串
+ */
+typedef char* (*gateway_request_handler_t)(void* request, void* user_data);
 
 /**
  * @brief 网关操作表
@@ -49,7 +62,7 @@ typedef struct gateway_ops {
     /**
      * @brief 获取网关统计信息
      * @param gateway 网关实例
-     * @param[out] out_json 输出 JSON 字符串（需调用者 free）
+     * @param[out] out_json 输出JSON字符串（需调用者free）
      * @return AGENTOS_SUCCESS 成功
      */
     agentos_error_t (*get_stats)(void* gateway, char** out_json);
@@ -59,9 +72,8 @@ typedef struct gateway_ops {
  * @brief 网关抽象结构
  */
 typedef struct gateway {
-    const gateway_ops_t*  ops;            /**< 操作表 */
-    gateway_server_t*     server;         /**< 服务器引用 */
-    void*                 impl;           /**< 具体实现数据 */
+    const gateway_ops_t* ops;       /**< 操作表 */
+    void* impl;                     /**< 具体实现数据 */
 } gateway_t;
 
 /**
@@ -112,7 +124,7 @@ static inline const char* gateway_get_name(gateway_t* gateway) {
 /**
  * @brief 获取网关统计信息
  * @param gateway 网关实例
- * @param[out] out_json 输出 JSON 字符串
+ * @param[out] out_json 输出JSON字符串
  * @return AGENTOS_SUCCESS 成功
  */
 static inline agentos_error_t gateway_get_stats(gateway_t* gateway, char** out_json) {
@@ -122,4 +134,8 @@ static inline agentos_error_t gateway_get_stats(gateway_t* gateway, char** out_j
     return gateway->ops->get_stats(gateway->impl, out_json);
 }
 
-#endif /* GATEWAY_GATEWAY_H */
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* AGENTOS_GATEWAY_INTERNAL_H */

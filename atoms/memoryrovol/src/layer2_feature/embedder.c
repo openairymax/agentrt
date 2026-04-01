@@ -28,8 +28,7 @@ typedef enum {
 } embedder_type_t;
 
 
-// From data intelligence emerges. by spharx
-/* 内存缓冲区（用于HTTP响应） */
+/* 内存缓冲区（用于 HTTP 响应） */
 typedef struct memory_buffer {
     char* data;
     size_t size;

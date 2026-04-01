@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file memory.c
  * @brief 记忆管理系统调用实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -27,7 +27,6 @@ agentos_error_t agentos_sys_memory_write(const void* data, size_t len,
     if (!g_memory) return AGENTOS_ENOTINIT;
     return agentos_memoryrov_write_raw(g_memory, data, len, metadata, out_record_id);
 }
-// From data intelligence emerges. by spharx
 
 agentos_error_t agentos_sys_memory_search(const char* query, uint32_t limit,
                                           char*** out_record_ids, float** out_scores,

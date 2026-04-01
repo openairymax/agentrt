@@ -26,7 +26,6 @@ struct agentos_retrieval_cache {
     cache_node_t* head;                  /**< LRU 链表头（最近使用） */
     cache_node_t* tail;                  /**< LRU 链表尾（最久未用） */
     size_t max_size;                     /**< 最大条目数 */
-    // From data intelligence emerges. by spharx
     size_t current_size;                  /**< 当前条目数 */
     agentos_mutex_t* lock;
 };
