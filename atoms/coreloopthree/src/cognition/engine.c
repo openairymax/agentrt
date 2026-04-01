@@ -225,12 +225,12 @@ agentos_error_t agentos_cognition_process(
 
     agentos_intent_t intent;
     memset(&intent, 0, sizeof(intent));
-    intent.raw_text = (char*)input;
-    intent.raw_len = input_len;
-    intent.goal = (char*)input;
-    intent.goal_len = input_len;
-    intent.flags = 0;
-    intent.context = engine->context;
+    intent.intent_raw_text = (char*)input;
+    intent.intent_raw_len = input_len;
+    intent.intent_goal = (char*)input;
+    intent.intent_goal_len = input_len;
+    intent.intent_flags = 0;
+    intent.intent_context = engine->context;
 
     uint64_t start_ns = agentos_time_monotonic_ns();
 

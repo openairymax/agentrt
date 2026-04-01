@@ -1,4 +1,4 @@
-﻿# Copyright (c) 2026 SPHARX. All Rights Reserved.
+# Copyright (c) 2026 SPHARX. All Rights Reserved.
 # Tool 服务构建文件
 
 cmake_minimum_required(VERSION 3.20)
@@ -14,10 +14,16 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(CJSON REQUIRED libcjson)
 pkg_check_modules(YAML REQUIRED yaml-0.1)
 
-# 公共库路�?
-set(COMMON_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../commons/include)
+# ==================== 路径设置 ====================
+# daemon/common 兼容层路径
+set(DAEMON_COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../common)
+set(DAEMON_COMMON_INCLUDE_DIR ${DAEMON_COMMON_DIR}/include)
 
-# Tool 服务源文�?
+# commons 统一基础库路径
+set(COMMONS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../commons)
+set(COMMONS_INCLUDE_DIR ${COMMONS_DIR})
+
+# Tool 服务源文件
 set(TOOL_D_SOURCES
     src/main.c
     src/service.c
@@ -25,11 +31,10 @@ set(TOOL_D_SOURCES
     src/executor.c
     src/validator.c
     src/cache.c
-    src/manager.c
     src/utils/tool_helpers.c
 )
 
-# 创建可执行文�?
+# 创建可执行文件
 add_executable(agentos-tool-d ${TOOL_D_SOURCES})
 
 # 平台特定配置
@@ -51,20 +56,29 @@ elseif(UNIX)
     )
 endif()
 
-# 包含目录
+# 包含目录 - 兼容层和 commons
 target_include_directories(agentos-tool-d PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${COMMON_INCLUDE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${DAEMON_COMMON_INCLUDE_DIR}
+    ${COMMONS_INCLUDE_DIR}
+    ${COMMONS_INCLUDE_DIR}/platform/include
+    ${COMMONS_INCLUDE_DIR}/utils/error/include
+    ${COMMONS_INCLUDE_DIR}/utils/logging/include
+    ${COMMONS_INCLUDE_DIR}/utils/config_unified/include
+    ${COMMONS_INCLUDE_DIR}/utils/memory/include
+    ${COMMONS_INCLUDE_DIR}/utils/string/include
+    ${COMMONS_INCLUDE_DIR}/utils/sync/include
     ${CJSON_INCLUDE_DIRS}
     ${YAML_INCLUDE_DIRS}
 )
 
-# 链接�?
+# 链接库
 target_link_libraries(agentos-tool-d PRIVATE
+    svc_common
     Threads::Threads
     ${CJSON_LIBRARIES}
     ${YAML_LIBRARIES}
-    svc_common
 )
 
 # 编译选项
@@ -74,9 +88,15 @@ target_compile_options(agentos-tool-d PRIVATE
     -Wpedantic
     -Werror=implicit-function-declaration
     -Werror=return-type
-    $<$<manager:Debug>:-g -O0>
-    $<$<manager:Release>:-O3 -DNDEBUG>
+    $<$<CONFIG:Debug>:-g -O0>
+    $<$<CONFIG:Release>:-O3 -DNDEBUG>
 )
+
+# 测试支持
+if(BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
 
 # 安装规则
 install(TARGETS agentos-tool-d DESTINATION bin)

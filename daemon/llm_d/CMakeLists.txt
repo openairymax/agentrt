@@ -1,4 +1,4 @@
-﻿# Copyright (c) 2026 SPHARX. All Rights Reserved.
+# Copyright (c) 2026 SPHARX. All Rights Reserved.
 # LLM 服务构建文件
 
 cmake_minimum_required(VERSION 3.20)
@@ -19,11 +19,16 @@ pkg_check_modules(CURL REQUIRED libcurl)
 pkg_check_modules(CJSON REQUIRED libcjson)
 pkg_check_modules(YAML REQUIRED yaml-0.1)
 
-# 公共库路�?
-set(COMMON_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../commons/include)
-set(COMMON_LIB_DIR ${CMAKE_CURRENT_BINARY_DIR}/../commons)
+# ==================== 路径设置 ====================
+# daemon/common 兼容层路径
+set(DAEMON_COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../common)
+set(DAEMON_COMMON_INCLUDE_DIR ${DAEMON_COMMON_DIR}/include)
 
-# LLM 服务源文�?
+# commons 统一基础库路径
+set(COMMONS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../commons)
+set(COMMONS_INCLUDE_DIR ${COMMONS_DIR})
+
+# LLM 服务源文件
 set(LLM_D_SOURCES
     src/main.c
     src/service.c
@@ -39,7 +44,7 @@ set(LLM_D_SOURCES
     src/response.c
 )
 
-# 创建可执行文�?
+# 创建可执行文件
 add_executable(agentos-llm-d ${LLM_D_SOURCES})
 
 # 平台特定配置
@@ -61,22 +66,31 @@ elseif(UNIX)
     )
 endif()
 
-# 包含目录
+# 包含目录 - 兼容层和 commons
 target_include_directories(agentos-llm-d PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${COMMON_INCLUDE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${DAEMON_COMMON_INCLUDE_DIR}
+    ${COMMONS_INCLUDE_DIR}
+    ${COMMONS_INCLUDE_DIR}/platform/include
+    ${COMMONS_INCLUDE_DIR}/utils/error/include
+    ${COMMONS_INCLUDE_DIR}/utils/logging/include
+    ${COMMONS_INCLUDE_DIR}/utils/config_unified/include
+    ${COMMONS_INCLUDE_DIR}/utils/memory/include
+    ${COMMONS_INCLUDE_DIR}/utils/string/include
+    ${COMMONS_INCLUDE_DIR}/utils/sync/include
     ${CURL_INCLUDE_DIRS}
     ${CJSON_INCLUDE_DIRS}
     ${YAML_INCLUDE_DIRS}
 )
 
-# 链接�?
+# 链接库
 target_link_libraries(agentos-llm-d PRIVATE
+    svc_common
     Threads::Threads
     ${CURL_LIBRARIES}
     ${CJSON_LIBRARIES}
     ${YAML_LIBRARIES}
-    svc_common
 )
 
 # 编译选项
@@ -100,8 +114,8 @@ else()
         -Wpedantic
         -Werror=implicit-function-declaration
         -Werror=return-type
-        $<$<manager:Debug>:-g -O0>
-        $<$<manager:Release>:-O3 -DNDEBUG>
+        $<$<CONFIG:Debug>:-g -O0>
+        $<$<CONFIG:Release>:-O3 -DNDEBUG>
     )
 endif()
 

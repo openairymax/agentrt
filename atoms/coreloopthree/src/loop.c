@@ -297,24 +297,79 @@ AGENTOS_API agentos_error_t agentos_loop_submit(
     char** out_task_id)
 {
     if (!loop || !input || !out_task_id) return AGENTOS_EINVAL;
-    if (!loop->cognition || !loop->execution) return AGENTOS_ENOTINIT;
+    if (!loop->cognition || !loop->execution || !loop->memory) return AGENTOS_ENOTINIT;
 
+    /* 步骤 1: 从记忆中检索相关上下文 */
+    agentos_memory_t* memories = NULL;
+    size_t memory_count = 0;
+    agentos_error_t err = agentos_memory_retrieve(loop->memory, input, input_len, 5, &memories, &memory_count);
+    
+    /* 构建增强输入（如果有相关记忆） */
+    char* enhanced_input = NULL;
+    if (err == AGENTOS_SUCCESS && memory_count > 0) {
+        /* 分配足够空间：原始输入 + 记忆内容 + 格式标记 */
+        size_t total_len = input_len + 1024;
+        for (size_t i = 0; i < memory_count; i++) {
+            if (memories[i].content) {
+                total_len += memories[i].content_len + 64;
+            }
+        }
+        
+        enhanced_input = (char*)AGENTOS_MALLOC(total_len);
+        if (enhanced_input) {
+            /* 构建带上下文的输入 */
+            size_t pos = 0;
+            pos += snprintf(enhanced_input + pos, total_len - pos, 
+                "[上下文增强]\n相关记忆数量：%zu\n\n", memory_count);
+            
+            for (size_t i = 0; i < memory_count && i < 5; i++) {
+                if (memories[i].content) {
+                    pos += snprintf(enhanced_input + pos, total_len - pos,
+                        "记忆 %zu: %.*s\n", i + 1, (int)memories[i].content_len, memories[i].content);
+                }
+            }
+            
+            pos += snprintf(enhanced_input + pos, total_len - pos,
+                "\n[用户输入]\n%.*s", (int)input_len, input);
+            
+            /* 释放记忆结果 */
+            for (size_t i = 0; i < memory_count; i++) {
+                if (memories[i].content) {
+                    AGENTOS_FREE(memories[i].content);
+                }
+            }
+            AGENTOS_FREE(memories);
+        }
+    }
+    
+    /* 步骤 2: 认知层处理（带上下文增强） */
+    const char* process_input = enhanced_input ? enhanced_input : input;
+    size_t process_len = enhanced_input ? strlen(enhanced_input) : input_len;
+    
     agentos_task_plan_t* plan = NULL;
-    agentos_error_t err = agentos_cognition_process(loop->cognition, input, input_len, &plan);
-    if (err != AGENTOS_SUCCESS) return err;
+    err = agentos_cognition_process(loop->cognition, process_input, process_len, &plan);
+    if (err != AGENTOS_SUCCESS) {
+        if (enhanced_input) AGENTOS_FREE(enhanced_input);
+        return err;
+    }
 
     if (!plan || plan->task_plan_node_count == 0) {
         agentos_task_plan_free(plan);
+        if (enhanced_input) AGENTOS_FREE(enhanced_input);
         return AGENTOS_EINVAL;
     }
 
+    /* 步骤 3: 执行层提交任务 */
     agentos_task_t task;
     memset(&task, 0, sizeof(task));
-    task.task_input = (void*)input;
+    task.task_input = (void*)process_input;
     task.task_timeout_ms = 30000;
 
     err = agentos_execution_submit(loop->execution, &task, out_task_id);
+    
+    /* 清理临时资源 */
     agentos_task_plan_free(plan);
+    if (enhanced_input) AGENTOS_FREE(enhanced_input);
 
     return err;
 }
@@ -327,12 +382,14 @@ AGENTOS_API agentos_error_t agentos_loop_wait(
     size_t* out_result_len)
 {
     if (!loop || !task_id || !out_result || !out_result_len) return AGENTOS_EINVAL;
-    if (!loop->execution) return AGENTOS_ENOTINIT;
+    if (!loop->execution || !loop->memory) return AGENTOS_ENOTINIT;
 
+    /* 等待执行完成 */
     agentos_task_t* result_task = NULL;
     agentos_error_t err = agentos_execution_wait(loop->execution, task_id, timeout_ms, &result_task);
 
     if (err == AGENTOS_SUCCESS && result_task) {
+        /* 提取输出结果 */
         if (result_task->task_output) {
             size_t len = 0;
             const char* output = (const char*)result_task->task_output;
@@ -343,6 +400,22 @@ AGENTOS_API agentos_error_t agentos_loop_wait(
             *out_result = AGENTOS_STRDUP("");
             *out_result_len = 0;
         }
+        
+        /* 步骤 4: 将执行结果存储到记忆中（形成闭环） */
+        if (*out_result && *out_result_len > 0) {
+            agentos_error_t store_err = agentos_memory_store(
+                loop->memory,
+                *out_result,
+                *out_result_len,
+                0.7f
+            );
+            if (store_err != AGENTOS_SUCCESS) {
+                AGENTOS_LOG_WARN("Failed to store execution result to memory: %d", store_err);
+            } else {
+                AGENTOS_LOG_INFO("Successfully stored execution result to memory");
+            }
+        }
+        
         agentos_task_free(result_task);
 
         if (!*out_result) return AGENTOS_ENOMEM;

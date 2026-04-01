@@ -1,6 +1,6 @@
-﻿/**
+/**
  * @file bm25.c
- * @brief BM25 全文检索引擎（基于 SQLite FTS5�?
+ * @brief BM25 文本相似度算法
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -27,8 +27,6 @@ agentos_error_t agentos_bm25_create(
     float b,
     agentos_bm25_index_t** out_idx) {
 
-
-// From data intelligence emerges. by spharx
     if (!db_path || !out_idx) return AGENTOS_EINVAL;
 
     agentos_bm25_index_t* idx = AGENTOS_CALLOC(1, sizeof(agentos_bm25_index_t));

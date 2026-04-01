@@ -1,6 +1,6 @@
 /**
  * @file memoryrovol.h
- * @brief MemoryRovol 系统主接口
+ * @brief MemoryRovol 系统主接口头文件
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -18,7 +18,6 @@ extern "C" {
 /**
  * @brief MemoryRovol 系统句柄（不透明指针）
  */
- // From data intelligence emerges. by spharx
 typedef struct agentos_memoryrov_handle agentos_memoryrov_handle_t;
 
 /**

@@ -1,11 +1,15 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
-# daemon 公共库构建文件 - 兼容层
+# daemon 公共库构建文件 - 最小兼容层
 #
 # 本模块现在作为 commons 统一基础库的兼容层，
 # 提供向后兼容的 API，实际实现来自 commons。
+#
+# 保留的 daemon 特有模块：
+# - svc_common.h: 服务框架接口
+# - ipc_client.c: IPC 客户端实现
 
 cmake_minimum_required(VERSION 3.20)
-project(agentos-svc-commons VERSION 3.1.0 LANGUAGES C)
+project(agentos-svc-commons VERSION 3.2.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -36,11 +40,16 @@ if(NOT TARGET agentos_common)
 endif()
 
 # ==================== daemon 特有源文件 ====================
-# 只保留 daemon 特有的实现文件，不再包含重复的 error.c, platform.c, logger.c
+# 只保留 daemon 特有的实现文件
+# 已迁移到 commons:
+# - error.c -> commons/utils/error
+# - platform.c -> commons/platform
+# - logger.c -> commons/utils/logging
+# - config.c -> commons/utils/config_unified
+# - svc_cache.c -> commons/utils/cache
+
 set(SVC_COMMON_SOURCES
     src/ipc_client.c
-    src/config.c
-    src/svc_cache.c
 )
 
 # 创建静态库
@@ -97,6 +106,8 @@ target_include_directories(svc_common PUBLIC
     ${COMMONS_DIR}/utils/observability/include
     ${COMMONS_DIR}/utils/io/include
     ${COMMONS_DIR}/utils/types/include
+    ${COMMONS_DIR}/utils/cache/include
+    ${COMMONS_DIR}/utils/compat/include
 )
 
 target_include_directories(svc_common PRIVATE
@@ -167,6 +178,7 @@ install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/include/error.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/svc_logger.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/svc_config.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/svc_cache.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/compat.h
     DESTINATION include/agentos
 )
