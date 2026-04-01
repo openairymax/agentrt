@@ -1,19 +1,19 @@
-# AgentOS 公共基础库 (commons)
+# AgentOS 统一基础库 (commons)
 
 **版本**: v1.0.0.6  
-**最后更新**: 2026-03-29  
+**最后更新**: 2026-04-01  
 **许可证**: Apache License 2.0
 
 ---
 
 ## 🎯 模块定位
 
-`commons/` 是 AgentOS 的**统一公共基础库**，提供跨模块共享的通用工具和基础设施能力。作为整个系统的底层依赖，commons 为 atoms（内核层）、daemon（服务层）、cupolas（安全层）等所有上层模块提供标准化的基础服务。
+`commons/` 是 AgentOS 的**统一基础库**，提供跨模块共享的通用工具和基础设施能力。作为整个系统的底层依赖，commons 为 atoms（内核层）、daemon（服务层）、cupolas（安全层）等所有上层模块提供标准化的基础服务。
 
 **核心职责**:
 - **平台抽象**: 屏蔽 Linux、macOS、Windows 三平台差异，提供统一的系统 API
-- **通用工具集**: 15+ 功能模块覆盖日志、配置、错误处理、内存管理等常用需求
-- **基础设施**: 提供线程同步、网络通信、文件操作等底层能力
+- **通用工具集**: 19+ 功能模块覆盖日志、配置、错误处理、内存管理、类型定义、IPC 通信等常用需求
+- **基础设施**: 提供线程同步、网络通信、文件操作、测试框架等底层能力
 - **零循环依赖**: 不依赖任何上层模块，仅使用标准库和第三方库
 
 ---
@@ -31,7 +31,7 @@ commons/
 │   │   └── platform.h        # 跨平台 API 统一接口
 │   └── platform.c            # 平台适配实现
 │
-└── utils/                    # 通用工具集 (15 个子模块)
+└── utils/                    # 通用工具集 (19+ 个子模块)
     │
     ├── cache/                # 缓存工具
     │   ├── include/cache_common.h
@@ -171,9 +171,13 @@ commons/
     │   ├── counter.c         # Token 计数器
     │   └── budget.c          # Token 预算管理
     │
-    └── types/                # 类型定义
+    ├── types/                # 统一类型定义
+    │   └── include/
+    │       └── types.h       # AgentOS 核心基础类型定义（~550 行）
+    │
+    └── ipc/                  # 进程间通信抽象层
         └── include/
-            └── types.h       # 通用类型定义
+            └── ipc_common.h  # IPC 通信 API（~450 行，支持 Pipe/Socket/SHM/MQ/RPC）
 ```
 
 ---
@@ -475,7 +479,104 @@ if (token_budget_exceeded(budget)) {
 double cost = cost_estimator_estimate(count, "gpt-4");
 ```
 
-### 8. 同步原语 (sync/)
+### 8. 统一类型定义 (types/)
+
+**功能**: 提供 AgentOS 全系统统一的类型定义系统
+
+**核心特性**:
+- 9 大类类型定义：基础类型、任务类型、记忆类型、会话类型、Agent 类型、可观测性类型、IPC 类型、网络类型、辅助宏
+- 遵循 K-2 接口契约化原则，所有类型都有明确的语义和所有权规则
+- 符合 syscall_api_contract.md 和 agent_contract.md 规范
+
+**类型分类**:
+```c
+#include <types.h>
+
+// 1. 基础类型
+agentos_error_t err;           // 错误码类型
+agentos_timestamp_t ts;        // 时间戳（纳秒精度）
+agentos_uuid_t uuid;           // 唯一标识符
+
+// 2. 任务类型
+agentos_task_config_t config;  // 任务配置
+agentos_task_result_t result;  // 任务结果
+
+// 3. 记忆类型
+agentos_memory_entry_t entry;  // 记忆存储结构
+agentos_memory_level_t level;  // 记忆层级（L1/L2/L3/L4）
+
+// 4. Agent 类型
+agentos_agent_contract_t contract;  // Agent 契约定义
+agentos_agent_capability_t caps;    // Agent 能力
+
+// 5. IPC 类型
+ipc_message_header_t header;   // IPC 消息头
+ipc_channel_config_t ipc_cfg;  // IPC 通道配置
+
+// 6. 网络类型
+network_socket_config_t sock_cfg;  // 套接字配置
+network_http_request_t http_req;   // HTTP 请求
+```
+
+**设计原则**:
+- 值类型优先：所有类型均为值类型或不可变类型，线程安全
+- 命名语义化：类型名称精确表达其用途（E-5 原则）
+- 跨模块一致：全系统使用统一类型，避免重复定义
+
+### 9. 进程间通信 (ipc/)
+
+**功能**: 提供跨平台的进程间通信抽象层
+
+**支持的 IPC 类型**:
+```c
+#include <ipc_common.h>
+
+// 1. 管道 (Pipe)
+ipc_channel_t* pipe = ipc_pipe_create(IPC_MODE_READ_WRITE);
+
+// 2. 命名管道 (Named Pipe)
+ipc_channel_t* named_pipe = ipc_named_pipe_create("/tmp/agentos.sock");
+
+// 3. Unix Domain Socket / Windows Named Pipe
+ipc_channel_t* socket = ipc_socket_create(AF_UNIX, SOCK_STREAM);
+
+// 4. 共享内存 (Shared Memory)
+ipc_shm_t* shm = ipc_shm_create("agentos_shm", 1024 * 1024);
+
+// 5. 消息队列 (Message Queue)
+ipc_mq_t* mq = ipc_mq_create("/agentos_mq", IPC_MODE_READ_WRITE);
+
+// 6. RPC 调用框架
+ipc_rpc_client_t* rpc = ipc_rpc_client_create("tcp://localhost:8080");
+```
+
+**统一消息格式**:
+```c
+typedef struct {
+    uint32_t magic;              // 魔数 (0x49504300)
+    uint32_t version;            // 协议版本
+    ipc_type_t type;             // IPC 类型
+    ipc_mode_t mode;             // 读写模式
+    uint32_t payload_size;       // 载荷大小
+    uint64_t message_id;         // 消息 ID
+    uint64_t correlation_id;     // 关联 ID（请求 - 响应模式）
+    uint64_t timestamp_ns;       // 时间戳
+} ipc_message_header_t;
+```
+
+**核心 API**:
+- 服务端 API：`ipc_server_create()`, `ipc_server_accept()`, `ipc_server_close()`
+- 客户端 API：`ipc_client_connect()`, `ipc_client_send()`, `ipc_client_recv()`
+- 共享内存 API：`ipc_shm_create()`, `ipc_shm_map()`, `ipc_shm_unmap()`
+- 消息队列 API：`ipc_mq_send()`, `ipc_mq_recv()`, `ipc_mq_close()`
+
+**设计原则**:
+- 统一的消息格式和协议
+- 支持同步和异步通信模式
+- 内置超时和重试机制
+- 线程安全设计
+
+### 10. 同步原语 (sync/)
 
 **功能**: 跨平台线程同步工具
 
@@ -512,6 +613,48 @@ sync_sem_wait(&sem);
 sync_sem_post(&sem);
 sync_sem_destroy(&sem);
 ```
+
+### 11. 网络工具 (network/)
+
+**功能**: 提供完整的网络通信功能
+
+**核心接口**:
+```c
+#include <network_common.h>
+
+// 1. TCP/UDP Socket
+network_socket_t* tcp_sock = network_socket_tcp_create();
+network_socket_connect(tcp_sock, "localhost", 8080);
+network_socket_send(tcp_sock, data, len);
+network_socket_recv(tcp_sock, buffer, buffer_size);
+network_socket_close(tcp_sock);
+
+// 2. HTTP 客户端（支持 GET/POST/PUT/DELETE）
+http_response_t* resp = http_get("http://api.example.com/data");
+http_response_free(resp);
+
+// 3. 连接池管理
+network_conn_pool_t* pool = network_conn_pool_create("localhost", 8080, 10);
+network_socket_t* conn = network_conn_pool_get(pool);
+// 使用连接...
+network_conn_pool_release(pool, conn);
+
+// 4. DNS 解析
+network_addr_info_t* addr = network_dns_resolve("example.com");
+network_addr_info_free(addr);
+
+// 5. SSL/TLS 支持
+network_socket_t* ssl_sock = network_socket_ssl_create();
+network_socket_ssl_connect(ssl_sock, "https://api.example.com", 443);
+```
+
+**新增功能** (v1.0.0.6):
+- ✅ 完整的 TCP/UDP Socket API
+- ✅ HTTP 客户端（支持持久连接）
+- ✅ 连接池管理（提升性能）
+- ✅ DNS 解析功能
+- ✅ SSL/TLS 加密支持
+- ✅ 网络统计和事件回调
 
 ---
 
@@ -687,6 +830,58 @@ target_include_directories(myapp
 
 ## 🧪 测试
 
+### CMocka 测试框架
+
+commons 集成了 **CMocka** 测试框架，提供：
+- 20+ 扩展断言宏（`AGENTOS_TEST_ASSERT_*`）
+- 测试夹具（Fixture）支持
+- 内存泄漏检测
+- 参数化测试支持
+- 性能测试宏（`AGENTOS_PERF_BEGIN()`, `AGENTOS_PERF_END()`）
+
+**使用示例**:
+```c
+#include "test_framework.h"
+
+// 测试夹具设置
+static int setup_test(void **state) {
+    *state = malloc(sizeof(test_data_t));
+    return 0;
+}
+
+// 测试夹具清理
+static int teardown_test(void **state) {
+    free(*state);
+    return 0;
+}
+
+// 测试用例
+static void test_example(void **state) {
+    AGENTOS_TEST_ASSERT_SUCCESS(my_function(42));
+    AGENTOS_TEST_ASSERT_PTR_NOT_NULL(malloc(10));
+    AGENTOS_TEST_ASSERT_STRING_EQUAL("hello", "hello");
+}
+
+// 参数化测试
+static void test_parametrized(void **state) {
+    int input = (int)((intptr_t)*state);
+    AGENTOS_TEST_ASSERT_EQUAL(input * 2, input + input);
+}
+
+int main(void) {
+    // 标准测试
+    const struct CMUnitTest tests[] = {
+        cmocka_unit_test_setup_teardown(test_example, setup_test, teardown_test),
+        
+        // 参数化测试
+        cmocka_unit_test(test_parametrized),
+        cmocka_unit_test(test_parametrized),
+    };
+    
+    return cmocka_run_group_tests(tests, NULL, NULL);
+}
+```
+
 ### 运行测试
 
 ```bash
@@ -702,6 +897,9 @@ ctest -R test_memory --verbose
 ctest -R test_config --verbose
 ctest -R test_error --verbose
 ctest -R test_sync --verbose
+ctest -R test_types --verbose      # 类型定义测试
+ctest -R test_ipc --verbose        # IPC 通信测试
+ctest -R test_network --verbose    # 网络功能测试
 
 # 运行集成测试
 ctest -R test_common_integration --verbose
@@ -764,7 +962,45 @@ agentos_error_t func() {
 }
 ```
 
-### 2. 日志使用
+### 2. 类型定义使用
+
+```c
+// ✅ 推荐：使用统一类型定义
+#include <types.h>
+
+agentos_task_config_t task_cfg = {
+    .task_id = "task_001",
+    .priority = AGENTOS_PRIORITY_NORMAL,
+    .timeout_ms = 5000
+};
+
+// ❌ 避免：自定义类型
+typedef struct {
+    char id[32];
+    int priority;
+    int timeout;
+} my_task_config_t;  // 与系统类型不兼容
+```
+
+### 3. IPC 通信使用
+
+```c
+// ✅ 推荐：使用统一 IPC 接口
+#include <ipc_common.h>
+
+ipc_channel_t* channel = ipc_named_pipe_create("/tmp/agentos.sock");
+ipc_message_header_t header = {
+    .magic = IPC_MAGIC,
+    .type = IPC_TYPE_NAMED_PIPE,
+    .message_id = 12345
+};
+ipc_send(channel, &header, sizeof(header), data, data_size);
+
+// ❌ 避免：直接使用平台相关 API
+int fd = socket(AF_UNIX, SOCK_STREAM, 0);  // 不可移植
+```
+
+### 4. 日志使用
 
 ```c
 // ✅ 推荐：结构化日志
@@ -777,7 +1013,7 @@ LOG_INFO("User login",
 LOG_INFO("User %d logged in from %s, took %d ms", user_id, ip, duration);
 ```
 
-### 3. 内存管理
+### 5. 内存管理
 
 ```c
 // ✅ 推荐：使用内存池（频繁分配场景）
@@ -794,7 +1030,7 @@ for (int i = 0; i < 1000; i++) {
 }
 ```
 
-### 4. 配置管理
+### 6. 配置管理
 
 ```c
 // ✅ 推荐：使用统一配置框架
@@ -804,6 +1040,28 @@ const char* value = core_config_get_string(config, "key", "default");
 // ❌ 避免：手动解析配置文件
 FILE* f = fopen("config.yaml", "r");
 // 手动解析 YAML...
+```
+
+### 7. 测试框架使用
+
+```c
+// ✅ 推荐：使用 CMocka 测试框架
+#include "test_framework.h"
+
+static void test_example(void **state) {
+    AGENTOS_TEST_ASSERT_SUCCESS(my_function(42));
+    AGENTOS_TEST_ASSERT_PTR_NOT_NULL(malloc(10));
+}
+
+int main(void) {
+    const struct CMUnitTest tests[] = {
+        cmocka_unit_test(test_example),
+    };
+    return cmocka_run_group_tests(tests, NULL, NULL);
+}
+
+// ❌ 避免：自定义测试框架
+// 缺少标准断言、内存检测、覆盖率支持
 ```
 
 ---
@@ -821,7 +1079,7 @@ FILE* f = fopen("config.yaml", "r");
 
 ## 📄 许可证
 
-commons 公共基础库采用 **Apache License 2.0** 开源协议。
+commons 统一基础库采用 **Apache License 2.0** 开源协议。
 
 详见项目根目录的 [LICENSE](../LICENSE) 文件。
 
@@ -829,9 +1087,16 @@ commons 公共基础库采用 **Apache License 2.0** 开源协议。
 
 <div align="center">
 
-**commons - AgentOS 的通用工具基础设施**
+**commons - AgentOS 的统一基础库**
 
-[返回顶部](#agentos-公共基础库 -commons)
+[返回顶部](#agentos-统一基础库 -commons)
+
+**核心模块**:
+- ✅ types/ - 统一类型定义系统（~550 行，9 大类类型）
+- ✅ ipc/ - 进程间通信抽象层（~450 行，支持 6 种 IPC 机制）
+- ✅ network/ - 完整网络 API（TCP/UDP/HTTP/SSL/DNS/连接池）
+- ✅ test_framework.h - CMocka 测试框架集成（20+ 断言宏）
+- ✅ 15+ 经典工具模块（logging/error/config/memory/sync 等）
 
 © 2026 SPHARX Ltd. All Rights Reserved.
 

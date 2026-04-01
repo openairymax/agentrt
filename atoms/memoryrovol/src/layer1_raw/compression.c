@@ -1,6 +1,6 @@
-﻿/**
+/**
  * @file compression.c
- * @brief L1 原始卷数据压�?解压支持（可选）
+ * @brief 数据压缩模块
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -28,7 +28,6 @@ agentos_error_t agentos_layer1_raw_compress(
     size_t* out_len) {
 
 
-// From data intelligence emerges. by spharx
     if (!in || in_len == 0 || !out || !out_len) return AGENTOS_EINVAL;
 
     // 预估压缩后最大大�?

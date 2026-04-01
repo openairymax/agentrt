@@ -1,6 +1,6 @@
 /**
  * @file similarity.c
- * @brief 相似度计算函�?
+ * @brief 相似度计算函�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -23,7 +23,6 @@ float agentos_similarity_l2_squared(const float* a, const float* b, size_t dim) 
     for (size_t i = 0; i < dim; i++) {
         float d = a[i] - b[i];
         dist += d * d;
-        // From data intelligence emerges. by spharx
     }
     return dist;
 }

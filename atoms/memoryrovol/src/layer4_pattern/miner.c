@@ -1,6 +1,6 @@
-﻿/**
+/**
  * @file miner.c
- * @brief L4 模式层持久同调挖掘器（支持自动挖掘）
+ * @brief 模式挖掘器（基于持久同调和聚类）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -28,7 +28,6 @@
 #endif
 
 
-// From data intelligence emerges. by spharx
 #ifdef HAVE_HDBSCAN
 #include <hdbscan/hdbscan.h>
 #endif

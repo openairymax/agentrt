@@ -1,7 +1,7 @@
 # cupolas – AgentOS 安全穹顶
 
-**版本**: 1.0.0.6  
-**最后更新**: 2026-03-29  
+**版本**: 1.0.0.7  
+**最后更新**: 2026-04-01  
 **许可证**: Apache License 2.0  
 **模块定位**: AgentOS 核心安全隔离与权限控制模块  
 
@@ -42,13 +42,15 @@
 
 ### 设计原则
 
+遵循 [AgentOS 架构设计原则 Doc V1.7](../../manuals/ARCHITECTURAL_PRINCIPLES.md)：
+
 | 原则 | 说明 | 实现方式 |
 |------|------|----------|
-| **安全内生** | 安全机制内置于架构 | 默认拒绝、最小权限 |
+| **安全内生 (E-1)** | 安全机制内置于架构 | 默认拒绝，最小权限 |
 | **纵深防御** | 多层防护体系 | 权限 + 净化 + 审计 + 隔离 |
 | **零信任** | 永不信任，始终验证 | 所有请求必须经过权限检查 |
-| **可追溯** | 完整审计追踪 | 所有操作记录日志 |
-| **跨平台** | Windows/Linux/macOS | 统一 API，平台适配 |
+| **可追溯 (E-6)** | 完整审计追踪 | 所有操作记录日志 |
+| **跨平台一致 (E-4)** | Windows/Linux/macOS | 统一 API，平台适配 |
 
 ### 技术特性
 
@@ -57,6 +59,8 @@
 - ✅ **高性能**：异步日志、缓存优化
 - ✅ **可扩展**：插件化规则引擎
 - ✅ **生产就绪**：完整的错误处理和日志
+- ✅ **SPDX 合规**：所有源文件包含标准 SPDX 版权头
+- ✅ **完整 API 契约**：Doxygen 注释包含 @ownership/@threadsafe/@reentrant
 
 ---
 
@@ -81,13 +85,13 @@ rules:
     resource: "/data/*"
     allow: true
     priority: 100
-  
+
   - agent_id: "*"
     action: "write"
     resource: "/tmp/**"
     allow: true
     priority: 50
-  
+
   - agent_id: "*"
     action: "execute"
     resource: "/bin/*"
@@ -100,7 +104,7 @@ rules:
 #include "cupolas.h"
 
 // 初始化模块
-cupolas_init("/etc/cupolas/config.yaml");
+cupolas_init("/etc/cupolas/config.yaml", NULL);
 
 // 检查权限
 int allowed = cupolas_check_permission(
@@ -147,12 +151,12 @@ filters:
     action: "replace"
     replacement: "[FILTERED]"
     risk_level: "high"
-  
+
   - name: "path_traversal"
     pattern: "\\.\\./"
     action: "reject"
     risk_level: "critical"
-  
+
   - name: "xss_script"
     pattern: "<script.*?>.*?</script>"
     action: "remove"
@@ -169,7 +173,8 @@ const char* user_input = "<script>alert('xss')</script>Hello";
 int ret = cupolas_sanitize_input(
     user_input,        // 原始输入
     sanitized,         // 输出缓冲区
-    sizeof(sanitized)  // 缓冲区大小
+    sizeof(sanitized),  // 缓冲区大小
+    SANITIZE_LEVEL_NORMAL
 );
 
 if (ret == 0) {
@@ -202,7 +207,7 @@ if (ret == 0) {
 **日志格式** (JSON)：
 ```json
 {
-  "timestamp": "2026-03-29T10:30:00Z",
+  "timestamp": "2026-04-01T10:30:00Z",
   "agent_id": "agent-001",
   "action": "file.read",
   "resource": "/data/config.yaml",
@@ -557,37 +562,66 @@ cupolas/
 │   │   └── platform.h
 │   ├── permission/
 │   │   ├── permission_engine.c  # 权限引擎
+│   │   ├── permission_engine.h
 │   │   ├── permission_rule.c    # 规则管理
-│   │   └── permission_cache.c   # 权限缓存
+│   │   ├── permission_rule.h
+│   │   ├── permission_cache.c   # 权限缓存
+│   │   └── permission_cache.h
 │   ├── sanitizer/
 │   │   ├── sanitizer_core.c     # 净化核心
+│   │   ├── sanitizer_core.h
 │   │   ├── sanitizer_rules.c    # 规则管理
-│   │   └── sanitizer_cache.c    # 规则缓存
+│   │   ├── sanitizer_rules.h
+│   │   ├── sanitizer_cache.c    # 规则缓存
+│   │   └── sanitizer_cache.h
 │   ├── audit/
+│   │   ├── audit.h              # 审计接口
 │   │   ├── audit_logger.c       # 日志记录器
 │   │   ├── audit_queue.c        # 异步队列
-│   │   └── audit_rotator.c      # 日志轮转
+│   │   ├── audit_queue.h
+│   │   ├── audit_rotator.c      # 日志轮转
+│   │   └── audit_rotator.h
 │   ├── workbench/
-│   │   ├── workbench.c          # 工位核心
-│   │   ├── workbench_process.c  # 进程管理
+│   │   ├── workbench.h          # 工位接口
+│   │   ├── workbench.c
+│   │   ├── workbench_process.h  # 进程管理
+│   │   ├── workbench_process_core.c
 │   │   ├── workbench_container.c # 容器管理
-│   │   └── workbench_limits.c   # 资源限制
+│   │   ├── workbench_container.h
+│   │   ├── workbench_limits.c   # 资源限制
+│   │   └── workbench_limits.h
 │   ├── security/
-│   │   ├── cupolas_signature.c        # 代码签名
-│   │   ├── cupolas_vault.c          # 凭证库
+│   │   ├── cupolas_error.h      # 统一错误码
+│   │   ├── cupolas_error.c
+│   │   ├── cupolas_signature.c   # 代码签名
+│   │   ├── cupolas_signature.h
+│   │   ├── cupolas_vault.c      # 凭证库
+│   │   ├── cupolas_vault.h
 │   │   ├── cupolas_entitlements.c   # Entitlements
+│   │   ├── cupolas_entitlements.h
 │   │   ├── cupolas_runtime_protection.c  # 运行时保护
+│   │   ├── cupolas_runtime_protection.h
 │   │   ├── cupolas_network_security.c    # 网络安全
-│   │   └── cupolas_error.c        # 错误处理
+│   │   └── cupolas_network_security.h
 │   ├── cupolas_config.c         # 配置管理
+│   ├── cupolas_config.h
 │   ├── cupolas_metrics.c        # 指标收集
-│   └── cupolas_monitoring.c     # 监控
+│   ├── cupolas_metrics.h
+│   ├── cupolas_monitoring.c     # 监控
+│   └── cupolas_monitoring.h
 ├── tests/
 │   ├── unit/                    # 单元测试
+│   │   ├── test_cupolas_core.c
+│   │   ├── test_cupolas_config.c
+│   │   ├── test_cupolas_metrics.c
+│   │   └── test_cupolas_workbench.c
 │   ├── integration/             # 集成测试
+│   │   └── test_cupolas_integration.c
 │   └── fuzz/                    # 模糊测试
-└── config/
-    └── *.yaml                   # 配置示例
+│       ├── fuzz_sanitizer.c
+│       └── fuzz_permission.c
+├── CMakeLists.txt
+└── README.md
 ```
 
 ### 数据流
@@ -648,15 +682,16 @@ cupolas/
 
 int main(int argc, char* argv[]) {
     int ret = 0;
-    
+    agentos_error_t error = {0};
+
     // 1. 初始化模块
     printf("Initializing cupolas...\n");
-    ret = cupolas_init("/etc/cupolas/config.yaml");
+    ret = cupolas_init("/etc/cupolas/config.yaml", &error);
     if (ret != 0) {
-        fprintf(stderr, "Failed to initialize cupolas: %d\n", ret);
+        fprintf(stderr, "Failed to initialize cupolas: %s\n", error.message);
         return 1;
     }
-    
+
     // 2. 检查权限
     printf("Checking permission...\n");
     int allowed = cupolas_check_permission(
@@ -665,40 +700,41 @@ int main(int argc, char* argv[]) {
         "/data/config.yaml",
         NULL
     );
-    
+
     if (!allowed) {
         fprintf(stderr, "Permission denied\n");
         ret = 1;
         goto cleanup;
     }
-    
+
     // 3. 输入净化
     printf("Sanitizing input...\n");
     char sanitized[1024];
     const char* user_input = "SELECT * FROM users";
-    
+
     ret = cupolas_sanitize_input(
         user_input,
         sanitized,
-        sizeof(sanitized)
+        sizeof(sanitized),
+        SANITIZE_LEVEL_NORMAL
     );
-    
+
     if (ret != 0) {
         fprintf(stderr, "Input sanitization failed\n");
         ret = 1;
         goto cleanup;
     }
-    
+
     printf("Sanitized: %s\n", sanitized);
-    
+
     // 4. 执行命令（在隔离环境中）
     printf("Executing command...\n");
     int exit_code;
     char stdout_buf[4096];
     char stderr_buf[4096];
-    
+
     char* cmd_argv[] = {"/bin/echo", "Hello from sandbox", NULL};
-    
+
     ret = cupolas_execute_command(
         "/bin/echo",
         cmd_argv,
@@ -708,20 +744,20 @@ int main(int argc, char* argv[]) {
         stderr_buf,
         sizeof(stderr_buf)
     );
-    
+
     if (ret == 0) {
         printf("Command output: %s\n", stdout_buf);
     }
-    
+
     // 5. 刷新审计日志
     printf("Flushing audit log...\n");
     cupolas_flush_audit_log();
-    
+
 cleanup:
     // 6. 清理
     printf("Cleaning up...\n");
     cupolas_cleanup();
-    
+
     return ret;
 }
 ```
@@ -789,24 +825,24 @@ security:
     trusted_ca_path: "/etc/cupolas/ca"
     check_cert_chain: true
     check_revocation: true
-  
+
   # 凭证库
   vault:
     enable: true
     storage_path: "/var/lib/cupolas/vault"
     enable_audit: true
     auto_lock_seconds: 300
-  
+
   # Entitlements
   entitlements:
     enable: true
     rules_file: "/etc/cupolas/entitlements.yaml"
-  
+
   # 运行时保护
   runtime_protection:
     enable_seccomp: true
     enable_cfi: false  # 仅 Linux
-  
+
   # 网络安全
   network_security:
     enable_tls_enforcement: true
@@ -852,7 +888,7 @@ platform:
 
 | 函数 | 说明 | 返回值 |
 |------|------|--------|
-| `cupolas_init(config_path)` | 初始化模块 | 0=成功 |
+| `cupolas_init(config_path, error)` | 初始化模块 | 0=成功 |
 | `cupolas_cleanup()` | 清理模块 | - |
 | `cupolas_version()` | 获取版本号 | 版本字符串 |
 | `cupolas_execute_command(...)` | 执行命令 | 0=成功 |
@@ -876,18 +912,21 @@ platform:
 
 | 错误码 | 值 | 说明 |
 |--------|-----|------|
-| `cupolas_OK` | 0 | 成功 |
-| `cupolas_ERROR_UNKNOWN` | -1 | 未知错误 |
-| `cupolas_ERROR_INVALID_ARG` | -2 | 无效参数 |
-| `cupolas_ERROR_NO_MEMORY` | -3 | 内存不足 |
-| `cupolas_ERROR_NOT_FOUND` | -4 | 未找到 |
-| `cupolas_ERROR_PERMISSION` | -5 | 权限拒绝 |
-| `cupolas_ERROR_BUSY` | -6 | 忙 |
-| `cupolas_ERROR_TIMEOUT` | -7 | 超时 |
-| `cupolas_ERROR_WOULD_BLOCK` | -8 | 会阻塞 |
-| `cupolas_ERROR_OVERFLOW` | -9 | 溢出 |
-| `cupolas_ERROR_NOT_SUPPORTED` | -10 | 不支持 |
-| `cupolas_ERROR_IO` | -11 | IO 错误 |
+| `cupolas_ERR_OK` | 0 | 成功 |
+| `cupolas_ERR_UNKNOWN` | -1 | 未知错误 |
+| `cupolas_ERR_INVALID_PARAM` | -2 | 无效参数 |
+| `cupolas_ERR_NULL_POINTER` | -3 | 空指针 |
+| `cupolas_ERR_OUT_OF_MEMORY` | -4 | 内存不足 |
+| `cupolas_ERR_BUFFER_TOO_SMALL` | -5 | 缓冲区太小 |
+| `cupolas_ERR_NOT_FOUND` | -6 | 未找到 |
+| `cupolas_ERR_ALREADY_EXISTS` | -7 | 已存在 |
+| `cupolas_ERR_TIMEOUT` | -8 | 超时 |
+| `cupolas_ERR_NOT_SUPPORTED` | -9 | 不支持 |
+| `cupolas_ERR_PERMISSION_DENIED` | -10 | 权限拒绝 |
+| `cupolas_ERR_IO` | -11 | IO 错误 |
+| `cupolas_ERR_STATE_ERROR` | -13 | 状态错误 |
+| `cupolas_ERR_OVERFLOW` | -14 | 溢出 |
+| `cupolas_ERR_TRY_AGAIN` | -15 | 重试 |
 
 ---
 
@@ -903,6 +942,21 @@ platform:
 - ✅ 错误处理使用统一错误码
 - ✅ 内存分配必须检查返回值
 - ✅ 所有资源必须显式释放
+- ✅ 所有源文件包含 SPDX 版权头
+
+### API 契约注释示例
+
+```c
+/**
+ * @brief Initialize cupolas module
+ * @param[in] config_path Configuration file path (NULL for default config)
+ * @param[out] error Optional error code output
+ * @return 0 on success, negative on failure
+ * @note Thread-safe: Multiple threads may call init, only first succeeds
+ * @ownership config_path string: caller retains ownership, may be NULL
+ */
+int cupolas_init(const char* config_path, agentos_error_t* error);
+```
 
 ### 添加新功能
 
@@ -973,7 +1027,7 @@ security:
 
 ### Q5: 性能如何？
 
-**A**: 
+**A**:
 - 权限检查：<50μs（缓存命中 <5μs）
 - 输入净化：<100μs
 - 审计日志写入：<1ms（异步）
@@ -983,17 +1037,18 @@ security:
 **A**: 所有 API 返回 0 表示成功，负值表示失败。使用错误码判断具体错误类型。
 
 ```c
-int ret = cupolas_init(NULL);
+agentos_error_t error = {0};
+int ret = cupolas_init(NULL, &error);
 if (ret != 0) {
     switch (ret) {
-        case cupolas_ERROR_NO_MEMORY:
+        case cupolas_ERR_OUT_OF_MEMORY:
             fprintf(stderr, "Out of memory\n");
             break;
-        case cupolas_ERROR_IO:
-            fprintf(stderr, "IO error\n");
+        case cupolas_ERR_IO:
+            fprintf(stderr, "IO error: %s\n", error.message);
             break;
         default:
-            fprintf(stderr, "Unknown error: %d\n", ret);
+            fprintf(stderr, "Unknown error: %s\n", error.message);
     }
 }
 ```
@@ -1072,19 +1127,19 @@ Layer 4: 审计追踪  ← 事后追溯
 
 Copyright © 2026 SPHARX Ltd.
 
-采用 [Apache License 2.0](LICENSE) 许可证。
+采用 [Apache License 2.0](../../LICENSE) 许可证。
 
 ---
 
 ## 🔗 相关链接
 
 - [AgentOS 官方文档](https://agentos.dev)
-- [架构设计原则](../../manuals/architecture/ARCHITECTURAL_PRINCIPLES.md)
+- [架构设计原则](../../manuals/ARCHITECTURAL_PRINCIPLES.md)
 - [C 语言编码规范](../../manuals/specifications/coding_standard/C_coding_style_guide.md)
 - [问题反馈](https://github.com/spharx/agentos/issues)
 
 ---
 
-**最后更新**: 2026-03-29  
+**最后更新**: 2026-04-01  
 **维护者**: SPHARX AgentOS Team  
 **联系方式**: support@spharx.com

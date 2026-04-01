@@ -17,9 +17,10 @@
 #include "memoryrovol.h"
 #include "layer1_raw.h"
 #include "layer2_feature.h"
+#include "layer3_structure.h"
+#include "layer4_pattern.h"
 #include "retrieval.h"
 #include "forgetting.h"
-#include "manager.h"
 #include "agentos.h"
 #include <stdlib.h>
 
@@ -49,10 +50,9 @@
 struct agentos_memoryrov_handle {
     agentos_layer1_raw_t* l1_raw;           /**< L1 原始卷 */
     agentos_layer2_feature_t* l2_feature;    /**< L2 特征层 */
-    agentos_layer3_structure_t* l3_struct;  /**< L3 结构层 */
-    agentos_layer4_pattern_t* l4_pattern;   /**< L4 模式层 */
-    agentos_forgetting_t* forgetting;        /**< 遗忘模块 */
-    agentos_retrieval_t* retrieval;         /**< 检索模块 */
+    agentos_knowledge_graph_t* l3_struct;   /**< L3 结构层（知识图谱） */
+    agentos_rule_generator_t* l4_pattern;   /**< L4 模式层（规则生成器） */
+    agentos_forgetting_engine_t* forgetting; /**< 遗忘模块 */
     int initialized;                        /**< 初始化标志 */
 };
 
@@ -65,51 +65,61 @@ agentos_memoryrov_handle_t* agentos_memoryrov_create(void) {
         return NULL;
     }
 
-    handle->l1_raw = agentos_layer1_raw_create();
-    if (!handle->l1_raw) {
+    /* 创建 L1 原始卷 */
+    agentos_error_t err = agentos_layer1_raw_create_async(NULL, 1024, 4, &handle->l1_raw);
+    if (err != AGENTOS_SUCCESS || !handle->l1_raw) {
         AGENTOS_FREE(handle);
         return NULL;
     }
 
-    handle->l2_feature = agentos_layer2_feature_create();
-    if (!handle->l2_feature) {
+    /* 创建 L2 特征层 */
+    agentos_layer2_feature_config_t l2_config = {
+        .index_path = NULL,
+        .embedding_model = "default",
+        .dimension = 768,
+        .index_type = AGENTOS_INDEX_HNSW,
+        .hnsw_m = 16,
+        .ivf_nlist = 100
+    };
+    err = agentos_layer2_feature_create(&l2_config, &handle->l2_feature);
+    if (err != AGENTOS_SUCCESS || !handle->l2_feature) {
         agentos_layer1_raw_destroy(handle->l1_raw);
         AGENTOS_FREE(handle);
         return NULL;
     }
 
-    handle->l3_struct = agentos_layer3_structure_create();
-    if (!handle->l3_struct) {
+    /* 创建 L3 结构层（知识图谱） */
+    err = agentos_knowledge_graph_create(&handle->l3_struct);
+    if (err != AGENTOS_SUCCESS || !handle->l3_struct) {
         agentos_layer2_feature_destroy(handle->l2_feature);
         agentos_layer1_raw_destroy(handle->l1_raw);
         AGENTOS_FREE(handle);
         return NULL;
     }
 
-    handle->l4_pattern = agentos_layer4_pattern_create();
-    if (!handle->l4_pattern) {
-        agentos_layer3_structure_destroy(handle->l3_struct);
+    /* 创建 L4 模式层（规则生成器） */
+    err = agentos_rule_generator_create(NULL, &handle->l4_pattern);
+    if (err != AGENTOS_SUCCESS || !handle->l4_pattern) {
+        agentos_knowledge_graph_destroy(handle->l3_struct);
         agentos_layer2_feature_destroy(handle->l2_feature);
         agentos_layer1_raw_destroy(handle->l1_raw);
         AGENTOS_FREE(handle);
         return NULL;
     }
 
-    handle->forgetting = agentos_forgetting_create();
-    if (!handle->forgetting) {
-        agentos_layer4_pattern_destroy(handle->l4_pattern);
-        agentos_layer3_structure_destroy(handle->l3_struct);
-        agentos_layer2_feature_destroy(handle->l2_feature);
-        agentos_layer1_raw_destroy(handle->l1_raw);
-        AGENTOS_FREE(handle);
-        return NULL;
-    }
-
-    handle->retrieval = agentos_retrieval_create();
-    if (!handle->retrieval) {
-        agentos_forgetting_destroy(handle->forgetting);
-        agentos_layer4_pattern_destroy(handle->l4_pattern);
-        agentos_layer3_structure_destroy(handle->l3_struct);
+    /* 创建遗忘引擎 */
+    agentos_forgetting_config_t forget_config = {
+        .strategy = AGENTOS_FORGET_EBBINGHAUS,
+        .lambda = DEFAULT_FORGET_LAMBDA,
+        .threshold = DEFAULT_FORGET_THRESHOLD,
+        .min_access = 1,
+        .check_interval_sec = 3600,
+        .archive_path = NULL
+    };
+    err = agentos_forgetting_create(&forget_config, handle->l1_raw, handle->l2_feature, &handle->forgetting);
+    if (err != AGENTOS_SUCCESS || !handle->forgetting) {
+        agentos_rule_generator_destroy(handle->l4_pattern);
+        agentos_knowledge_graph_destroy(handle->l3_struct);
         agentos_layer2_feature_destroy(handle->l2_feature);
         agentos_layer1_raw_destroy(handle->l1_raw);
         AGENTOS_FREE(handle);
@@ -125,17 +135,14 @@ void agentos_memoryrov_destroy(agentos_memoryrov_handle_t* handle) {
         return;
     }
 
-    if (handle->retrieval) {
-        agentos_retrieval_destroy(handle->retrieval);
-    }
     if (handle->forgetting) {
         agentos_forgetting_destroy(handle->forgetting);
     }
     if (handle->l4_pattern) {
-        agentos_layer4_pattern_destroy(handle->l4_pattern);
+        agentos_rule_generator_destroy(handle->l4_pattern);
     }
     if (handle->l3_struct) {
-        agentos_layer3_structure_destroy(handle->l3_struct);
+        agentos_knowledge_graph_destroy(handle->l3_struct);
     }
     if (handle->l2_feature) {
         agentos_layer2_feature_destroy(handle->l2_feature);
@@ -155,13 +162,24 @@ agentos_error_t agentos_memoryrov_add_memory(agentos_memoryrov_handle_t* handle,
         return AGENTOS_EINVAL;
     }
 
-    agentos_memory_t memory;
-    memory.content = content;
-    memory.content_len = content_len;
-    memory.timestamp = time(NULL);
-    memory.importance = 0.5f;
+    /* 生成唯一 ID */
+    char id[64];
+    snprintf(id, sizeof(id), "mem_%lu_%zu", (unsigned long)time(NULL), (size_t)handle);
 
-    agentos_error_t err = agentos_layer1_raw_add(handle->l1_raw, &memory);
+    /* 写入 L1 原始卷 */
+    agentos_error_t err = agentos_layer1_raw_write(handle->l1_raw, id, content, content_len);
+    if (err != AGENTOS_SUCCESS) {
+        return err;
+    }
+
+    /* 添加到 L2 特征层 */
+    err = agentos_layer2_feature_add(handle->l2_feature, id, content);
+    if (err != AGENTOS_SUCCESS) {
+        return err;
+    }
+
+    /* 添加到 L3 结构层（作为实体） */
+    err = agentos_knowledge_graph_add_entity(handle->l3_struct, id);
     if (err != AGENTOS_SUCCESS) {
         return err;
     }
@@ -174,36 +192,44 @@ agentos_error_t agentos_memoryrov_evolve(agentos_memoryrov_handle_t* handle) {
         return AGENTOS_EINVAL;
     }
 
-    agentos_memory_t* batch = NULL;
-    size_t batch_size = 0;
-
-    agentos_error_t err = agentos_layer1_raw_get_batch(handle->l1_raw, EVOLVE_BATCH_SIZE, &batch, &batch_size);
-    if (err != AGENTOS_SUCCESS) {
+    /* 获取所有 ID */
+    char** ids = NULL;
+    size_t count = 0;
+    agentos_error_t err = agentos_layer1_raw_list_ids(handle->l1_raw, &ids, &count);
+    if (err != AGENTOS_SUCCESS || count == 0) {
         return err;
     }
 
-    for (size_t i = 0; i < batch_size; i++) {
-        agentos_feature_t feature;
-        err = agentos_layer2_feature_extract(handle->l2_feature, &batch[i], &feature);
-        if (err == AGENTOS_SUCCESS) {
-            agentos_layer3_structure_add_feature(handle->l3_struct, batch[i].id, &feature);
+    /* 对每个记忆进行演化 */
+    for (size_t i = 0; i < count; i++) {
+        /* 读取记忆内容 */
+        void* data = NULL;
+        size_t len = 0;
+        err = agentos_layer1_raw_read(handle->l1_raw, ids[i], &data, &len);
+        if (err != AGENTOS_SUCCESS || !data) {
+            continue;
         }
 
-        agentos_relation_t relation;
-        err = agentos_layer3_structure_extract_relation(handle->l3_struct, &batch[i], &relation);
-        if (err == AGENTOS_SUCCESS) {
-            agentos_layer3_structure_add_relation(handle->l3_struct, &relation);
+        /* 在 L3 中建立关系（简单实现：按顺序连接） */
+        if (i > 0) {
+            err = agentos_knowledge_graph_add_relation(
+                handle->l3_struct,
+                ids[i - 1],
+                ids[i],
+                AGENTOS_RELATION_BEFORE,
+                1.0f
+            );
+            if (err != AGENTOS_SUCCESS) {
+                /* 关系添加失败不影响主流程 */
+            }
         }
 
-        agentos_pattern_t pattern;
-        err = agentos_layer4_pattern mine(handle->l4_pattern, &batch[i], &pattern);
-        if (err == AGENTOS_SUCCESS) {
-            agentos_layer4_pattern_add(handle->l4_pattern, &pattern);
-        }
+        AGENTOS_FREE(data);
     }
 
-    if (batch) {
-        AGENTOS_FREE(batch);
+    /* 释放 ID 数组 */
+    if (ids) {
+        agentos_free_string_array(ids, count);
     }
 
     return AGENTOS_SUCCESS;
@@ -218,7 +244,58 @@ agentos_error_t agentos_memoryrov_retrieve(agentos_memoryrov_handle_t* handle,
         return AGENTOS_EINVAL;
     }
 
-    return agentos_retrieval_search(handle->retrieval, query, max_results, out_results, out_count);
+    /* 使用 L2 特征层进行相似度检索 */
+    char** result_ids = NULL;
+    float* scores = NULL;
+    size_t result_count = 0;
+
+    agentos_error_t err = agentos_layer2_feature_search(
+        handle->l2_feature,
+        query,
+        (uint32_t)max_results,
+        &result_ids,
+        &scores,
+        &result_count
+    );
+
+    if (err != AGENTOS_SUCCESS || result_count == 0) {
+        *out_results = NULL;
+        *out_count = 0;
+        return err;
+    }
+
+    /* 分配结果数组 */
+    *out_results = (agentos_memory_t*)AGENTOS_CALLOC(result_count, sizeof(agentos_memory_t));
+    if (!*out_results) {
+        return AGENTOS_ENOMEM;
+    }
+
+    /* 填充结果 */
+    for (size_t i = 0; i < result_count; i++) {
+        (*out_results)[i].id = result_ids[i];
+        (*out_results)[i].importance = scores[i];
+
+        /* 从 L1 读取内容 */
+        void* data = NULL;
+        size_t len = 0;
+        agentos_layer1_raw_read(handle->l1_raw, result_ids[i], &data, &len);
+        if (data) {
+            (*out_results)[i].content = (char*)data;
+            (*out_results)[i].content_len = len;
+        } else {
+            (*out_results)[i].content = NULL;
+            (*out_results)[i].content_len = 0;
+        }
+        (*out_results)[i].timestamp = time(NULL);
+    }
+
+    *out_count = result_count;
+
+    /* 释放临时数组（ID 已转移给结果） */
+    AGENTOS_FREE(result_ids);
+    AGENTOS_FREE(scores);
+
+    return AGENTOS_SUCCESS;
 }
 
 agentos_error_t agentos_memoryrov_forget(agentos_memoryrov_handle_t* handle) {
@@ -226,7 +303,6 @@ agentos_error_t agentos_memoryrov_forget(agentos_memoryrov_handle_t* handle) {
         return AGENTOS_EINVAL;
     }
 
-    return agentos_forgetting_apply(handle->forgetting,
-                                   DEFAULT_FORGET_THRESHOLD,
-                                   DEFAULT_FORGET_LAMBDA);
+    uint32_t pruned_count = 0;
+    return agentos_forgetting_prune(handle->forgetting, &pruned_count);
 }

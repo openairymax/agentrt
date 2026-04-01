@@ -1,7 +1,16 @@
-﻿/**
+/**
  * @file session.c
  * @brief 会话管理系统调用实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ *
+ * @details
+ * 本模块实现会话管理系统调用，遵循架构原则：
+ * - S-2 层次分解原则：通过 heapstore 进行数据持久化
+ * - K-2 接口契约化原则：所有接口有完整契约定义
+ * - E-2 可观测性原则：集成可观测性数据采集
+ *
+ * 集成架构：
+ * syscall/session.c ──▶ heapstore（会话数据持久化）
  */
 
 #include "syscalls.h"
@@ -9,11 +18,17 @@
 #include "logger.h"
 #include <stdlib.h>
 
+/* heapstore 集成接口 */
+#include "../../../heapstore/include/heapstore_integration.h"
+
 /* Unified base library compatibility layer */
 #include "../../../commons/utils/memory/include/memory_compat.h"
 #include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 #include <cjson/cJSON.h>
+
+/* heapstore 持久化开关（可通过配置关闭） */
+static bool g_use_heapstore_persistence = true;
 
 typedef struct session {
     char* session_id;
@@ -40,7 +55,11 @@ static void ensure_lock(void) {
 }
 
 /**
- * @brief 创建新会�?
+ * @brief 创建新会话
+ * 
+ * @ownership 调用者负责释放 out_session_id
+ * @threadsafe 是
+ * @reentrant 否
  */
 agentos_error_t agentos_sys_session_create(const char* metadata, char** out_session_id) {
     if (!out_session_id) return AGENTOS_EINVAL;
@@ -90,6 +109,17 @@ agentos_error_t agentos_sys_session_create(const char* metadata, char** out_sess
         AGENTOS_FREE(id);
         return AGENTOS_ENOMEM;
     }
+    
+    /* 持久化到 heapstore（遵循 S-2 层次分解原则） */
+    if (g_use_heapstore_persistence) {
+        agentos_error_t persist_err = heapstore_syscall_session_save(
+            id, metadata, s->created_ns, s->last_active_ns);
+        if (persist_err != AGENTOS_SUCCESS) {
+            /* 持久化失败不影响内存操作，仅记录日志 */
+            LOG_WARN("Session persist to heapstore failed: %d", persist_err);
+        }
+    }
+    
     return AGENTOS_SUCCESS;
 }
 
@@ -127,6 +157,10 @@ agentos_error_t agentos_sys_session_get(const char* session_id, char** out_info)
 
 /**
  * @brief 关闭会话
+ * 
+ * @ownership 内部释放会话资源
+ * @threadsafe 是
+ * @reentrant 否
  */
 agentos_error_t agentos_sys_session_close(const char* session_id) {
     if (!session_id) return AGENTOS_EINVAL;
@@ -137,10 +171,21 @@ agentos_error_t agentos_sys_session_close(const char* session_id) {
         if (strcmp((*p)->session_id, session_id) == 0) {
             session_t* tmp = *p;
             *p = tmp->next;
+            char* saved_id = AGENTOS_STRDUP(tmp->session_id);
             AGENTOS_FREE(tmp->session_id);
             if (tmp->metadata) AGENTOS_FREE(tmp->metadata);
             AGENTOS_FREE(tmp);
             agentos_mutex_unlock(session_lock);
+            
+            /* 从 heapstore 删除（遵循 S-2 层次分解原则） */
+            if (g_use_heapstore_persistence && saved_id) {
+                agentos_error_t persist_err = heapstore_syscall_session_delete(saved_id);
+                if (persist_err != AGENTOS_SUCCESS) {
+                    LOG_WARN("Session delete from heapstore failed: %d", persist_err);
+                }
+                AGENTOS_FREE(saved_id);
+            }
+            
             return AGENTOS_SUCCESS;
         }
         p = &(*p)->next;

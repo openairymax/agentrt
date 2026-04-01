@@ -1,6 +1,6 @@
-﻿﻿﻿﻿﻿﻿/**
+/**
  * @file layer4_pattern.c
- * @brief L4 模式层实�?
+ * @brief L4 模式层实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -20,7 +20,7 @@ struct agentos_rule_generator {
 };
 
 /**
- * @brief 创建规则生成�?
+ * @brief 创建规则生成器
  */
 agentos_error_t agentos_rule_generator_create(
     void* llm_service,
@@ -51,7 +51,7 @@ void agentos_rule_generator_destroy(agentos_rule_generator_t* gen) {
 }
 
 /**
- * @brief 从聚类生成规�?
+ * @brief 从聚类生成规则
  */
 agentos_error_t agentos_rule_generator_from_cluster(
     agentos_rule_generator_t* gen,
@@ -63,7 +63,7 @@ agentos_error_t agentos_rule_generator_from_cluster(
     char prompt[4096] = {0};
     size_t pos = 0;
 
-    /* 安全构建提示字符串，使用 snprintf 确保不溢�?*/
+    /* 安全构建提示字符串，使用 snprintf 确保不溢出 */
     int written = snprintf(prompt + pos, sizeof(prompt) - pos, "Cluster IDs:\n");
     if (written < 0 || (size_t)written >= sizeof(prompt) - pos) {
         return AGENTOS_EOVERFLOW;

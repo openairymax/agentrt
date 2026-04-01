@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file prune.c
  * @brief 遗忘裁剪实现（联�?L2 删除�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -27,7 +27,6 @@ agentos_error_t agentos_forgetting_prune(
     uint32_t pruned = 0;
     for (size_t i = 0; i < count; i++) {
         float weight = 0.0f;
-        // From data intelligence emerges. by spharx
         if (agentos_forgetting_get_weight(engine, all_ids[i], &weight) == AGENTOS_SUCCESS) {
             if (weight < engine->manager.threshold) {
                 // 先删�?L2 向量

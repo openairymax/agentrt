@@ -1,6 +1,6 @@
-﻿/**
+/**
  * @file agent.c
- * @brief Agent相关系统调用实现
+ * @brief Agent 相关系统调用实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -24,7 +24,7 @@ static agent_instance_t* agents = NULL;
 static agentos_mutex_t* agent_lock = NULL;
 
 /**
- * @brief 线程安全地确�?agent 锁已初始�?
+ * @brief 线程安全地确保 agent 锁已初始化
  */
 static void ensure_agent_lock(void) {
     if (!agent_lock) {
@@ -66,75 +66,147 @@ agentos_error_t agentos_sys_agent_spawn(const char* agent_spec, char** out_agent
 
     *out_agent_id = AGENTOS_STRDUP(inst->agent_id);
     if (!*out_agent_id) {
-        agentos_mutex_lock(agent_lock);
-        agent_instance_t** pp = &agents;
-        while (*pp) {
-            if (*pp == inst) { *pp = inst->next; break; }
-            pp = &(*pp)->next;
-        }
-        agentos_mutex_unlock(agent_lock);
-        AGENTOS_FREE(inst->agent_id);
-        AGENTOS_FREE(inst->spec);
-        AGENTOS_FREE(inst);
         return AGENTOS_ENOMEM;
     }
+
+    AGENTOS_LOG_INFO("Agent spawned: %s", *out_agent_id);
     return AGENTOS_SUCCESS;
 }
 
 /**
- * @brief 销�?Agent 实例
+ * @brief 销毁 Agent 实例
  */
-agentos_error_t agentos_sys_agent_kill(const char* agent_id) {
+agentos_error_t agentos_sys_agent_terminate(const char* agent_id) {
     if (!agent_id) return AGENTOS_EINVAL;
     ensure_agent_lock();
+
     agentos_mutex_lock(agent_lock);
-    agent_instance_t** p = &agents;
-    while (*p) {
-        if (strcmp((*p)->agent_id, agent_id) == 0) {
-            agent_instance_t* tmp = *p;
-            *p = tmp->next;
-            AGENTOS_FREE(tmp->agent_id);
-            AGENTOS_FREE(tmp->spec);
-            AGENTOS_FREE(tmp);
+    agent_instance_t** prev = &agents;
+    agent_instance_t* curr = agents;
+
+    while (curr) {
+        if (strcmp(curr->agent_id, agent_id) == 0) {
+            *prev = curr->next;
+            AGENTOS_FREE(curr->agent_id);
+            AGENTOS_FREE(curr->spec);
+            AGENTOS_FREE(curr);
             agentos_mutex_unlock(agent_lock);
+            AGENTOS_LOG_INFO("Agent terminated: %s", agent_id);
             return AGENTOS_SUCCESS;
         }
-        p = &(*p)->next;
+        prev = &curr->next;
+        curr = curr->next;
     }
+
     agentos_mutex_unlock(agent_lock);
-    return AGENTOS_ENOENT;
+    AGENTOS_LOG_WARN("Agent not found: %s", agent_id);
+    return AGENTOS_ENOTFOUND;
 }
 
 /**
- * @brief 列出所�?Agent 实例
+ * @brief 调用 Agent 执行任务
  */
-agentos_error_t agentos_sys_agent_list(char*** out_agents, size_t* out_count) {
-    if (!out_agents || !out_count) return AGENTOS_EINVAL;
+agentos_error_t agentos_sys_agent_invoke(const char* agent_id, const char* input,
+                                         size_t input_len, char** out_output) {
+    if (!agent_id || !input || !out_output) return AGENTOS_EINVAL;
     ensure_agent_lock();
+
+    // 查找 Agent
     agentos_mutex_lock(agent_lock);
+    agent_instance_t* inst = agents;
+    while (inst) {
+        if (strcmp(inst->agent_id, agent_id) == 0) break;
+        inst = inst->next;
+    }
+    agentos_mutex_unlock(agent_lock);
+
+    if (!inst) {
+        AGENTOS_LOG_WARN("Agent not found: %s", agent_id);
+        return AGENTOS_ENOTFOUND;
+    }
+
+    // 简单实现：回显输入
+    // 生产环境应调用 Agent 的实际执行逻辑
+    *out_output = AGENTOS_STRDUP(input);
+    if (!*out_output) return AGENTOS_ENOMEM;
+
+    AGENTOS_LOG_DEBUG("Agent invoked: %s", agent_id);
+    return AGENTOS_SUCCESS;
+}
+
+/**
+ * @brief 列出所有 Agent
+ */
+agentos_error_t agentos_sys_agent_list(char*** out_agent_ids, size_t* out_count) {
+    if (!out_agent_ids || !out_count) return AGENTOS_EINVAL;
+    ensure_agent_lock();
+
+    agentos_mutex_lock(agent_lock);
+
+    // 计数
     size_t count = 0;
-    agent_instance_t* a = agents;
-    while (a) { count++; a = a->next; }
-    char** list = (char**)AGENTOS_CALLOC(count, sizeof(char*));
-    if (!list) {
+    agent_instance_t* inst = agents;
+    while (inst) {
+        count++;
+        inst = inst->next;
+    }
+
+    if (count == 0) {
+        agentos_mutex_unlock(agent_lock);
+        *out_agent_ids = NULL;
+        *out_count = 0;
+        return AGENTOS_SUCCESS;
+    }
+
+    // 分配数组
+    char** ids = (char**)AGENTOS_CALLOC(count, sizeof(char*));
+    if (!ids) {
         agentos_mutex_unlock(agent_lock);
         return AGENTOS_ENOMEM;
     }
-    a = agents;
-    size_t i = 0;
-    while (a) {
-        list[i] = AGENTOS_STRDUP(a->agent_id);
-        if (!list[i]) {
-            for (size_t j = 0; j < i; j++) AGENTOS_FREE(list[j]);
-            AGENTOS_FREE(list);
+
+    // 填充数组
+    inst = agents;
+    for (size_t i = 0; i < count; i++) {
+        ids[i] = AGENTOS_STRDUP(inst->agent_id);
+        if (!ids[i]) {
+            for (size_t j = 0; j < i; j++) {
+                AGENTOS_FREE(ids[j]);
+            }
+            AGENTOS_FREE(ids);
             agentos_mutex_unlock(agent_lock);
             return AGENTOS_ENOMEM;
         }
-        i++;
-        a = a->next;
+        inst = inst->next;
     }
+
     agentos_mutex_unlock(agent_lock);
-    *out_agents = list;
+
+    *out_agent_ids = ids;
     *out_count = count;
     return AGENTOS_SUCCESS;
+}
+
+/**
+ * @brief 清理 Agent 系统调用资源
+ */
+void agentos_sys_agent_cleanup(void) {
+    if (!agent_lock) return;
+
+    agentos_mutex_lock(agent_lock);
+    agent_instance_t* inst = agents;
+    while (inst) {
+        agent_instance_t* next = inst->next;
+        AGENTOS_FREE(inst->agent_id);
+        AGENTOS_FREE(inst->spec);
+        AGENTOS_FREE(inst);
+        inst = next;
+    }
+    agents = NULL;
+    agentos_mutex_unlock(agent_lock);
+
+    agentos_mutex_destroy(agent_lock);
+    agent_lock = NULL;
+
+    AGENTOS_LOG_INFO("Agent syscall cleanup completed");
 }

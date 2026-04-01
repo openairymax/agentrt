@@ -38,7 +38,7 @@ static void test_error_chain(void) {
     assert(chain->depth == 1);
 
     agentos_error_clear();
-    assert(agentos_get_chain()->code == AGENTOS_OK);
+    assert(agentos_error_get_chain()->code == AGENTOS_OK);
 
     printf("    PASSED\n");
 }

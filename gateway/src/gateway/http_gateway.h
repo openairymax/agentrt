@@ -4,30 +4,34 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * @file http_gateway.h
- * @brief HTTP 网关接口
+ * @brief HTTP网关接口
  *
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#ifndef gateway_HTTP_GATEWAY_H
-#define gateway_HTTP_GATEWAY_H
+#ifndef AGENTOS_GATEWAY_HTTP_H
+#define AGENTOS_GATEWAY_HTTP_H
 
 #include "gateway.h"
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
- * @brief 创建 HTTP 网关
+ * @brief 创建HTTP网关
  *
  * @param host 监听地址
  * @param port 监听端口
- * @param server 网关服务器
- * @return 网关实例，失败返回 NULL
+ * @return 网关实例，失败返回NULL
  *
- * @ownership 调用者需通过 gateway_destroy() 释放
+ * @ownership 调用者需通过gateway_destroy()释放
  */
-gateway_t* http_gateway_create(
-    const char* host,
-    uint16_t port,
-    gateway_server_t* server);
+gateway_t* http_gateway_create(const char* host, uint16_t port);
 
-#endif /* gateway_HTTP_GATEWAY_H */
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* AGENTOS_GATEWAY_HTTP_H */

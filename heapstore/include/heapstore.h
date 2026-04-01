@@ -374,6 +374,98 @@ heapstore_error_t heapstore_get_circuit_state(heapstore_circuit_info_t* info);
  */
 heapstore_error_t heapstore_reset_circuit(void);
 
+/* ==================== 批量写入支持 ==================== */
+
+/**
+ * @brief 批量写入上下文
+ */
+typedef struct heapstore_batch_context heapstore_batch_context_t;
+
+/**
+ * @brief 创建批量写入上下文
+ *
+ * @param batch_size [in] 批量大小（默认 100）
+ * @return heapstore_batch_context_t* 批量写入上下文指针
+ *
+ * @ownership 调用者负责释放返回的上下文
+ * @threadsafe 是
+ * @reentrant 是
+ */
+heapstore_batch_context_t* heapstore_batch_begin(size_t batch_size);
+
+/**
+ * @brief 添加日志到批量写入缓冲区
+ *
+ * @param ctx [in] 批量写入上下文
+ * @param service [in] 服务名称
+ * @param level [in] 日志级别
+ * @param message [in] 日志消息
+ * @return heapstore_error_t 错误码
+ *
+ * @ownership 调用者负责所有参数的生命周期
+ * @threadsafe 是
+ * @reentrant 是
+ */
+heapstore_error_t heapstore_batch_add_log(
+    heapstore_batch_context_t* ctx,
+    const char* service,
+    int level,
+    const char* message);
+
+heapstore_error_t heapstore_batch_add_log_with_trace(
+    heapstore_batch_context_t* ctx,
+    const char* service,
+    int level,
+    const char* trace_id,
+    const char* message);
+
+heapstore_error_t heapstore_batch_add_trace(
+    heapstore_batch_context_t* ctx,
+    const char* trace_id,
+    const char* span_id,
+    const char* parent_id,
+    const char* name,
+    int64_t start_time_us,
+    int64_t end_time_us,
+    int status,
+    const char* attributes);
+
+heapstore_error_t heapstore_batch_add_session(
+    heapstore_batch_context_t* ctx,
+    const heapstore_session_record_t* record);
+heapstore_error_t heapstore_batch_add_agent(
+    heapstore_batch_context_t* ctx,
+    const heapstore_agent_record_t* record);
+heapstore_error_t heapstore_batch_add_skill(
+    heapstore_batch_context_t* ctx,
+    const heapstore_skill_record_t* record);
+heapstore_error_t heapstore_batch_add_memory_pool(
+    heapstore_batch_context_t* ctx,
+    const heapstore_memory_pool_t* pool);
+heapstore_error_t heapstore_batch_add_allocation(
+    heapstore_batch_context_t* ctx,
+    const heapstore_memory_allocation_t* allocation);
+heapstore_error_t heapstore_batch_add_ipc_channel(
+    heapstore_batch_context_t* ctx,
+    const heapstore_channel_record_t* channel);
+heapstore_error_t heapstore_batch_add_ipc_buffer(
+    heapstore_batch_context_t* ctx,
+    const heapstore_buffer_record_t* buffer);
+heapstore_error_t heapstore_batch_add_span(
+    heapstore_batch_context_t* ctx,
+    const heapstore_span_record_t* span);
+
+heapstore_error_t heapstore_batch_commit(
+    heapstore_batch_context_t* ctx);
+void heapstore_batch_rollback(
+    heapstore_batch_context_t* ctx);
+void heapstore_batch_context_destroy(
+    heapstore_batch_context_t* ctx);
+size_t heapstore_batch_get_count(
+    const heapstore_batch_context_t* ctx);
+size_t heapstore_batch_get_capacity(
+    const heapstore_batch_context_t* ctx);
+
 #ifdef __cplusplus
 }
 #endif

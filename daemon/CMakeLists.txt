@@ -1,4 +1,4 @@
-﻿# Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+# Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
 # AgentOS Daemon 模块顶层构建文件
 
 cmake_minimum_required(VERSION 3.20)
@@ -29,10 +29,11 @@ message(STATUS "  Build Tests: ${BUILD_TESTS}")
 message(STATUS "  Coverage:    ${BUILD_COVERAGE}")
 message(STATUS "========================================")
 
-# 包含 commons 模块
-add_subdirectory(commons)
+# 包含 common 模块（兼容层）
+add_subdirectory(common)
 
 # 包含各个服务模块
+add_subdirectory(gateway_d)
 add_subdirectory(llm_d)
 add_subdirectory(tool_d)
 add_subdirectory(monit_d)
@@ -87,10 +88,10 @@ endif()
 
 message(STATUS "========================================")
 
-# 打印所有子项目状�?
+# 打印所有子项目状态
 message(STATUS "")
 message(STATUS "Sub-modules:")
-message(STATUS "  - commons    : ${CMAKE_CURRENT_SOURCE_DIR}/commons")
+message(STATUS "  - gateway_d : ${CMAKE_CURRENT_SOURCE_DIR}/gateway_d")
 message(STATUS "  - llm_d     : ${CMAKE_CURRENT_SOURCE_DIR}/llm_d")
 message(STATUS "  - tool_d    : ${CMAKE_CURRENT_SOURCE_DIR}/tool_d")
 message(STATUS "  - monit_d   : ${CMAKE_CURRENT_SOURCE_DIR}/monit_d")
@@ -99,7 +100,12 @@ message(STATUS "  - market_d  : ${CMAKE_CURRENT_SOURCE_DIR}/market_d")
 message(STATUS "")
 
 # 安装支持
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/commons/include/
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/common/include/
+    DESTINATION include/agentos
+    FILES_MATCHING PATTERN "*.h"
+)
+
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/gateway_d/include/
     DESTINATION include/agentos
     FILES_MATCHING PATTERN "*.h"
 )
@@ -130,7 +136,7 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/market_d/include/
 )
 
 # 导出项目配置
-export(TARGETS svc_common agentos-llm-d agentos-tool-d 
+export(TARGETS svc_common agentos-gateway-d agentos-llm-d agentos-tool-d 
               agentos-monit-d agentos-sched-d agentos-market-d
     FILE "${CMAKE_CURRENT_BINARY_DIR}/agentos-daemon-targets.cmake"
 )

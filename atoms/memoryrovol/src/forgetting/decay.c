@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file decay.c
  * @brief 遗忘衰减计算（基于艾宾浩斯曲线）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -27,7 +27,6 @@ struct agentos_forgetting_engine {
 agentos_error_t agentos_forgetting_create(
     const agentos_forgetting_config_t* manager,
     agentos_layer1_raw_t* layer1,
-    // From data intelligence emerges. by spharx
     agentos_layer2_feature_t* layer2,
     agentos_forgetting_engine_t** out_engine) {
 
