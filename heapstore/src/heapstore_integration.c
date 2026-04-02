@@ -261,18 +261,32 @@ agentos_error_t heapstore_syscall_trace_save(
         return AGENTOS_EINVAL;
     }
     
-    heapstore_span_record_t record = {
-        .trace_id = (char*)trace_id,
-        .span_id = (char*)span_id,
-        .parent_span_id = (char*)parent_id,
-        .name = (char*)name,
-        .start_time_us = start_time_us,
-        .end_time_us = end_time_us,
-        .status = status,
-        .attributes = (char*)events_json
-    };
+    heapstore_span_t record;
+    memset(&record, 0, sizeof(record));
+    
+    strncpy(record.trace_id, trace_id, sizeof(record.trace_id) - 1);
+    strncpy(record.span_id, span_id, sizeof(record.span_id) - 1);
+    if (parent_id) {
+        strncpy(record.parent_span_id, parent_id, sizeof(record.parent_span_id) - 1);
+    }
+    strncpy(record.name, name, sizeof(record.name) - 1);
+    record.start_time_ns = (uint64_t)start_time_us * 1000;
+    record.end_time_ns = (uint64_t)end_time_us * 1000;
+    snprintf(record.status, sizeof(record.status), "%d", status);
+    if (events_json) {
+        /* attributes 是 void*，这里简化处理 */
+        if (strlen(events_json) > 0) {
+            record.attributes = strdup(events_json);
+            record.attribute_count = 1;
+        }
+    }
     
     heapstore_error_t err = heapstore_trace_write_span(&record);
+    
+    if (record.attributes) {
+        free(record.attributes);
+    }
+    
     return (err == heapstore_SUCCESS) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 }
 
@@ -388,15 +402,17 @@ agentos_error_t heapstore_ipc_channel_save(
         return AGENTOS_EINVAL;
     }
     
-    heapstore_channel_record_t record = {
-        .channel_id = (char*)channel_id,
-        .name = (char*)channel_id,
-        .state = heapstore_CHANNEL_STATE_ACTIVE,
-        .message_count = 0,
-        .total_bytes = 0
-    };
+    heapstore_ipc_channel_t record;
+    memset(&record, 0, sizeof(record));
     
-    heapstore_error_t err = heapstore_ipc_write_channel(&record);
+    strncpy(record.channel_id, channel_id, sizeof(record.channel_id) - 1);
+    strncpy(record.name, channel_id, sizeof(record.name) - 1);
+    strncpy(record.type, "binder", sizeof(record.type) - 1);
+    record.created_at = (uint64_t)time(NULL);
+    record.last_activity_at = (uint64_t)time(NULL);
+    strncpy(record.status, "active", sizeof(record.status) - 1);
+    
+    heapstore_error_t err = heapstore_ipc_record_channel(&record);
     return (err == heapstore_SUCCESS) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 }
 
@@ -411,7 +427,7 @@ agentos_error_t heapstore_ipc_channel_load(
         return AGENTOS_EINVAL;
     }
     
-    heapstore_channel_record_t record;
+    heapstore_ipc_channel_t record;
     memset(&record, 0, sizeof(record));
     
     heapstore_error_t err = heapstore_ipc_get_channel(channel_id, &record);
@@ -421,16 +437,16 @@ agentos_error_t heapstore_ipc_channel_load(
     
     char buffer[512];
     snprintf(buffer, sizeof(buffer), 
-        "{\"channel_id\":\"%s\",\"state\":%d,\"message_count\":%llu,\"total_bytes\":%llu}",
-        record.channel_id ? record.channel_id : "",
-        record.state,
-        (unsigned long long)record.message_count,
-        (unsigned long long)record.total_bytes);
+        "{\"channel_id\":\"%s\",\"name\":\"%s\",\"type\":\"%s\",\"status\":\"%s\","
+        "\"buffer_size\":%llu,\"current_usage\":%llu}",
+        record.channel_id,
+        record.name,
+        record.type,
+        record.status,
+        (unsigned long long)record.buffer_size,
+        (unsigned long long)record.current_usage);
     
     *out_state = strdup(buffer);
-    
-    if (record.channel_id) free(record.channel_id);
-    if (record.name) free(record.name);
     
     return *out_state ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
 }

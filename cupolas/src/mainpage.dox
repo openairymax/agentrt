@@ -1,0 +1,268 @@
+/**
+ * @mainpage cupolas - AgentOS 安全穹顶
+ *
+ * @section intro_sec 概述
+ *
+ * <b>cupolas</b> 是 AgentOS 的安全穹顶模块，为整个系统提供四重纵深防护：
+ *
+ * - **虚拟工位 (workbench/)**: 进程/容器/WASM 沙箱隔离，资源限额
+ * - **权限裁决 (permission/)**: YAML 规则引擎，基于角色的访问控制 (RBAC)
+ * - **输入净化 (sanitizer/)**: 正则过滤、长度限制、类型检查
+ * - **审计追踪 (audit/)**: 全链路追踪，不可篡改的审计日志
+ *
+ * @section architecture_sec 架构设计
+ *
+ * cupolas 模块遵循 AgentOS 五维正交架构体系：
+ *
+ * @subsection arch_system 系统观 (S-1~S-4)
+ * - S-1 反馈闭环: 审计日志 → 权限规则动态更新 → 安全事件反馈回路
+ * - S-2 层次分解: 安全层独立于内核和服务层，严格单向依赖
+ * - S-3 总体设计部: 安全裁决只做决策不执行，通过标准化接口提供服务
+ * - S-4 涌现性管理: 四重防护协同产生超越单层防护的安全效应
+ *
+ * @subsection arch_kernel 内核观 (K-1~K-4)
+ * - K-1 内核极简: 安全逻辑完全在用户态实现，不污染微内核
+ * - K-2 接口契约化: 所有公共 API 包含完整 Doxygen 契约注释
+ * - K-3 服务隔离: 各守护进程通过统一安全接口访问 cupolas
+ * - K-4 可插拔策略: 净化规则、权限策略、审计格式均可运行时替换
+ *
+ * @subsection arch_cognition 认知观 (C-1~C-4)
+ * - C-1 双系统协同: 快速路径（规则过滤）+ 深度路径（策略推理）
+ * - C-2 增量演化: 安全规则支持热更新，无需重启服务
+ * - C-3 记忆卷载: 审计日志分层存储（L1原始→L4模式）
+ * - C-4 遗忘机制: 日志自动归档和清理策略
+ *
+ * @subsection arch_engineering 工程观 (E-1~E-8)
+ * - E-1 安全内生: 安全是默认行为，非附加功能
+ * - E-2 可观测性: 完整的 Prometheus/OpenTelemetry 指标导出
+ * - E-3 资源确定性: 所有资源生命周期明确可追踪
+ * - E-4 跨平台一致性: Windows/Linux/macOS 三平台一致行为
+ * - E-5 命名语义化: 函数名精确表达语义（如 `cupolas_sanitize_llm_input`）
+ * - E-6 错误可追溯: 统一错误码 + 错误链 + 结构化日志
+ * - E-7 文档即代码: 本文档由源代码 Doxygen 注释自动生成
+ * - E-8 可测试性: 单元测试覆盖率 ≥90%
+ *
+ * @subsection arch_aesthetics 设计美学 (A-1~A-4)
+ * - A-1 简约至上: 最小接口集提供最大安全价值
+ * - A-2 极致细节: 每个错误消息包含上下文和修复建议
+ * - A-3 人文关怀: 开发者友好的 API 设计和详细示例
+ * - A-4 完美主义: 零警告编译、100% 关键路径测试覆盖
+ *
+ * @section modules_sec 模块组成
+ *
+ * @subsection module_core 核心模块
+ *
+ * - cupolas.h: 主入口头文件，统一初始化/清理接口
+ * - cupolas_config.c/h: 配置管理（YAML 解析、默认值、验证）
+ * - cupolas_error.c/h: 统一错误码体系和错误链机制
+ * - cupolas_metrics.c/h: 性能指标收集与导出
+ * - cupolas_monitoring.c/h: 监控接口（Prometheus/OpenTelemetry/StatsD）
+ * - platform.c/h: 平台抽象层（线程、同步原语、时间）
+ *
+ * @subsection module_workbench 虚拟工位 (workbench/)
+ *
+ * - workbench.c/h: 工位管理器主接口
+ * - workbench_container.c/h: 容器/WASM 隔离实现
+ * - workbench_limits.c/h: 资源限额（CPU/内存/网络/文件描述符）
+ * - workbench_process.h: 进程抽象定义
+ * - workbench_process_core.c: 进程生命周期管理
+ *
+ * @subsection module_permission 权限裁决 (permission/)
+ *
+ * - permission.h: 权限子系统主入口
+ * - permission_engine.c/h: RBAC 规则引擎核心
+ * - permission_rule.c/h: YAML 规则解析与管理
+ * - permission_cache.c/h: 权限决策缓存（LRU）
+ *
+ * @subsection module_sanitizer 输入净化 (sanitizer/)
+ *
+ * - sanitizer.h: 净化子系统主入口
+ * - sanitizer_core.c/h: 核心净化算法（正则/类型/长度）
+ * - sanitizer_rules.c/h: 净化规则配置与管理
+ * - sanitizer_cache.c/h: 净化结果缓存
+ *
+ * @subsection module_audit 审计追踪 (audit/)
+ *
+ * - audit.h: 审计子系统主入口
+ * - audit_logger.c/h: 审计日志记录器
+ * - audit_queue.c/h: 异步日志队列
+ * - audit_rotator.c/h: 日志轮转与归档
+ *
+ * @subsection module_security 安全增强 (security/)
+ *
+ * - cupolas_signature.c/h: 数字签名验证（iOS 级别代码签名）
+ * - cupolas_vault.c/h: 安全凭证存储（Keychain Vault）
+ * - cupolas_entitlements.c/h: 权限声明验证（Entitlements）
+ * - cupolas_runtime_protection.c/h: 运行时保护（ASLR/Stack Canary/DEP）
+ * - cupolas_network_security.c/h: 网络安全（TLS/Certificate Pinning/App Transport Security）
+ * - cupolas_error.c/h: 安全子模块专用错误码
+ *
+ * @section quickstart_sec 快速开始
+ *
+ * @code{.c}
+ * #include "cupolas.h"
+ *
+ * int main(void) {
+ *     // 1. 初始化 cupolas
+ *     cupolas_config_t config;
+ *     cupolas_config_init_defaults(&config);
+ *
+ *     agentos_error_t error;
+ *     if (cupolas_init(&config, &error) != CUPOLAS_OK) {
+ *         fprintf(stderr, "Failed to initialize cupolas: %s\n",
+ *                 agentos_error_get_message(error));
+ *         return 1;
+ *     }
+ *
+ *     // 2. 净化用户输入
+ *     char sanitized[1024];
+ *     if (cupolas_sanitize_input(user_input, sanitized,
+ *                                 sizeof(sanitized), NULL) != CUPOLAS_OK) {
+ *         // 处理净化失败
+ *     }
+ *
+ *     // 3. 检查权限
+ *     if (cupolas_check_permission(agent_id, resource, action) != CUPOLAS_ALLOWED) {
+ *         // 权限不足
+ *     }
+ *
+ *     // 4. 在沙箱中执行任务
+ *     cupolas_workbench_t* wb = cupolas_workbench_create(&wb_config);
+ *     cupolas_workbench_execute(wb, task, &result);
+ *     cupolas_workbench_destroy(wb);
+ *
+ *     // 5. 记录审计日志
+ *     cupolas_audit_log("tool_d", "execute_task", task_id,
+ *                       result.status, agent_id);
+ *
+ *     // 6. 清理资源
+ *     cupolas_cleanup();
+ *     return 0;
+ * }
+ * @endcode
+ *
+ * @section security_sec 安全特性
+ *
+ * @subsection sec_ios_level iOS 级别安全
+ *
+ * cupolas 实现了媲美 iOS 操作系统的安全机制：
+ *
+ * | 安全维度 | iOS 机制 | cupolas 实现 |
+ * |---------|----------|--------------|
+ * | 代码签名 | Mandatory Code Signing | cupolas_signature_verify() |
+ * | 密钥存储 | Keychain Services | cupolas_vault_store/retrieve() |
+ * | 权限声明 | Entitlements System | cupolas_entitlements_check() |
+ * | 运行保护 | ASLR/Stack Canary/DEP | cupolas_runtime_protect() |
+ * | 网络安全 | App Transport Security | cupolas_network_secure_connect() |
+ *
+ * @subsection sec_zero_trust 零信任架构
+ *
+ * - 默认拒绝所有请求（Deny by Default）
+ * - 每个请求必须经过身份验证和授权
+ * - 最小权限原则（Least Privilege）
+ * - 持续验证（Continuous Verification）
+ *
+ * @subsection sec_defense_in_depth 纵深防御
+ *
+ * ```
+ * ┌─────────────────────────────────────────────┐
+ │              用户输入 (User Input)             │
+ └─────────────────┬───────────────────────────┘
+                   ▼
+ ┌─────────────────────────────────────────────┐
+ │          第1层: 输入净化 (Sanitizer)           │
+ │    · 正则过滤  · 类型检查  · 长度限制        │
+ └─────────────────┬───────────────────────────┘
+                   ▼
+ ┌─────────────────────────────────────────────┐
+ │          第2层: 权限裁决 (Permission)         │
+ │    · RBAC引擎  · 规则缓存  · 动态更新        │
+ └─────────────────┬───────────────────────────┘
+                   ▼
+ ┌─────────────────────────────────────────────┐
+ │          第3层: 虚拟工位 (Workbench)          │
+ │    · 沙箱隔离  · 资源限额  · 网络控制        │
+ └─────────────────┬───────────────────────────┘
+                   ▼
+ ┌─────────────────────────────────────────────┐
+ │          第4层: 审计追踪 (Audit)              │
+ │    · 全链路日志  · 不可篡改  · 自动归档      │
+ └─────────────────────────────────────────────┘
+ ```
+ *
+ * @section monitoring_sec 监控与可观测性
+ *
+ * cupolas 提供完整的可观测性支持：
+ *
+ * @subsection mon_metrics 指标 (Metrics)
+ *
+ * 支持三种后端：
+ * - **Prometheus** (Pull): HTTP /metrics 端点，标准 exposition format
+ * - **OpenTelemetry** (Push): OTLP JSON 格式，推送至 Collector
+ * - **StatsD**: 传统指标收集协议
+ *
+ * 关键指标：
+ * - `cupolas_permission_checks_total`: 权限检查总数
+ * - `cupolas_sanitize_operations_total`: 净化操作总数
+ * - `cupolas_audit_events_total`: 审计事件总数
+ * - `cupolas_workbench_active_count`: 活跃工位数量
+ *
+ * @subsection mon_health 健康检查 (Health Checks)
+ *
+ * 支持注册自定义健康检查回调：
+ * @code{.c}
+ * bool check_sanitizer_rules_loaded(void) {
+ *     return cupolas_sanitize_is_initialized();
+ * }
+ *
+ * cupolas_monitoring_register_health_check(mgr,
+ *     "sanitizer_rules", check_sanitizer_rules_loaded);
+ * @endcode
+ *
+ * @section testing_sec 测试覆盖
+ *
+ * | 测试类型 | 文件位置 | 覆盖率目标 |
+ * |---------|----------|-----------|
+ * | 单元测试 | tests/unit/ | ≥90% 行覆盖率 |
+ * | 集成测试 | tests/integration/ | ≥80% 接口覆盖率 |
+ * | 模糊测试 | tests/fuzz/ | 关键路径 100% |
+ *
+ * 测试套件：
+ * - test_cupolas_core.c: 核心功能测试
+ * - test_cupolas_config.c: 配置管理测试
+ * - test_cupolas_metrics.c: 指标收集测试
+ * - test_cupolas_security.c: 安全子模块测试
+ * - test_cupolas_workbench.c: 虚拟工位测试
+ * - fuzz_permission.c: 权限引擎模糊测试
+ * - fuzz_sanitizer.c: 净化器模糊测试
+ *
+ * @section compliance_sec 合规性
+ *
+ * @subsection license 许可证
+ *
+ * SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause
+ *
+ * @copyright Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * @subsection standards 符合标准
+ *
+ * - OWASP Top 10 防护
+ * - CIS Benchmark
+ * - NIST Cybersecurity Framework
+ * - PCI DSS v4.0 (如适用)
+ * - GDPR 第32条 (数据处理安全)
+ *
+ * @section references_sec 参考资料
+ *
+ * - AgentOS 架构设计原则: manuals/ARCHITECTURAL_PRINCIPLES.md
+ * - 代码注释规范: manuals/specifications/coding_standard/Code_comment_template.md
+ * - 安全设计指南: manuals/specifications/coding_standard/Security_design_guide.md
+ * - C 安全编码指南: manuals/specifications/coding_standard/C_Cpp_secure_coding_guide.md
+ *
+ * @author SPHARX Ltd. - AgentOS Team
+ * @version 1.0.0
+ * @date 2026-04-02
+ *
+ * @note 线程安全: 所有公共 API 均为线程安全（除非特别标注）
+ * @see https://github.com/spharx/AgentOS
+ */

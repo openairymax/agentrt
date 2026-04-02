@@ -1,0 +1,427 @@
+# Doxyfile - cupolas 模块 API 文档生成配置
+#
+# SPDX-FileCopyrightText: 2026 SPHARX Ltd.
+# SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause
+#
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+#
+# 基于 AgentOS 架构设计原则 (E-7: 文档即代码)
+# 参考: manuals/ARCHITECTURAL_PRINCIPLES.md
+# 参考: manuals/specifications/coding_standard/Code_comment_template.md
+#
+
+#---------------------------------------------------------------------------
+# 项目相关配置 (Project related configuration options)
+#---------------------------------------------------------------------------
+
+# 项目名称
+PROJECT_NAME           = "cupolas - AgentOS 安全穹顶"
+
+# 项目版本号
+PROJECT_NUMBER         = "1.0.0"
+
+# 项目简要描述
+PROJECT_BRIEF          = "四重防护安全子系统：虚拟工位 · 权限裁决 · 输入净化 · 审计追踪"
+
+# 项目 Logo（如果存在）
+# PROJECT_LOGO           =
+
+# 输出目录
+OUTPUT_DIRECTORY       = docs/api
+
+# 创建子目录
+CREATE_SUBDIRS         = YES
+
+# 输出语言（支持中文）
+OUTPUT_LANGUAGE        = Chinese
+
+# 缩写（用于生成简短描述）
+ABBREVIATE_BRIEF       = "The $name class" \
+                         "The $name widget" \
+                         "The $name file" \
+                         is \
+                         provides \
+                         specifies \
+                         contains \
+                         represents \
+                         a \
+                         an \
+                         the
+
+# 总是生成详细说明
+ALWAYS_DETAILED_SEC    = YES
+
+# 完整路径名
+FULL_PATH_NAMES        = YES
+
+# 路径前缀缩写
+STRIP_FROM_PATH        = .
+
+# 缩进
+STRIP_FROM_INC_PATH    = .
+
+#---------------------------------------------------------------------------
+# 构建相关配置 (Build related configuration options)
+#---------------------------------------------------------------------------
+
+# 提取所有实体
+EXTRACT_ALL            = YES
+
+# 提取私有类成员
+EXTRACT_PRIVATE        = YES
+
+# 提取静态成员
+EXTRACT_STATIC         = YES
+
+# 提取本地类和结构体
+EXTRACT_LOCAL_CLASSES  = YES
+
+# 提取匿名命名空间
+EXTRACT_ANON_NSPACES   = YES
+
+# 隐藏未文档化的成员
+HIDE_UNDOC_MEMBERS     = NO
+
+# 隐藏未文档化的类
+HIDE_UNDOC_CLASSES     = NO
+
+# 友元类隐藏
+HIDE_FRIEND_COMPOUNDS  = NO
+
+# 内部文档隐藏
+HIDE_IN_BODY_DOCS      = NO
+
+# 内部文档隐藏
+INTERNAL_DOCS          = NO
+
+# Case 敏感（Windows 下通常为 NO）
+CASE_SENSE_NAMES       = NO
+
+# 短名称隐藏
+HIDE_SCOPE_NAMES       = NO
+
+# 显示包含文件
+SHOW_INCLUDE_FILES     = YES
+
+# 显示分组文档
+SHOW_GROUPED_DOC_INC   = YES
+
+# 强制信息包含在详细信息中
+FORCE_INFO_INCLUDES    = YES
+
+# 生成源代码列表
+GENERATE_SOURCELIST    = YES
+
+# 源代码中内联信息
+SOURCE_BROWSER         = YES
+
+# 行号显示
+INLINE_SOURCES         = YES
+
+# Stripping code from source listings
+STRIP_CODE_COMMENTS    = YES
+
+# Referenced source code relation
+REFERENCED_BY_RELATION = YES
+REFERENCES_RELATION    = YES
+
+#---------------------------------------------------------------------------
+# 与消息相关的配置 (Messages related configuration options)
+#---------------------------------------------------------------------------
+
+# 显示警告
+WARNINGS               = YES
+
+# Warn if undocumented
+WARN_IF_UNDOCUMENTED   = YES
+
+# Warning log file
+WARN_LOGFILE           = docs/doxygen_warnings.log
+
+# Warning format
+WARN_FORMAT            = "$file:$line: $text"
+
+#---------------------------------------------------------------------------
+# 与输入相关的配置 (Input related configuration options)
+#---------------------------------------------------------------------------
+
+# Input encoding
+INPUT_ENCODING         = UTF-8
+
+# File encoding
+FILE_PATTERNS          = *.c \
+                         *.h \
+                         *.md
+
+# Recursive search
+RECURSIVE              = YES
+
+# Source directories
+INPUT                  = src \
+                         include
+
+# Exclude patterns
+EXCLUDE_PATTERNS       = */tests/* \
+                         */fuzz/* \
+                         */CMakeFiles/*
+
+# Example paths
+# EXAMPLE_PATH          =
+# EXAMPLE_PATTERNS      = *
+# EXAMPLE_RECURSIVE     = YES
+
+# Image paths
+IMAGE_PATH             =
+
+# Input filter
+# INPUT_FILTER          =
+
+# Filter patterns
+FILTER_PATTERNS        =
+
+#---------------------------------------------------------------------------
+# 与源浏览器相关的配置 (Source Browser related configuration options)
+#---------------------------------------------------------------------------
+
+# Source code inclusion
+INCLUDE_GRAPH          = YES
+INCLUDED_BY_GRAPH      = YES
+CALL_GRAPH             = YES
+CALLER_GRAPH           = YES
+GRAPHICAL_HIERARCHY    = YES
+DIRECTORY_GRAPH        = YES
+DOT_IMAGE_FORMAT       = svg
+INTERACTIVE_SVG        = YES
+
+#---------------------------------------------------------------------------
+# 与索引相关的配置 (Index related configuration options)
+#---------------------------------------------------------------------------
+
+# Generate index
+GENERATE_TREEVIEW      = YES
+
+# Enum values in index
+ENUM_VALUES_PER_LINE   = 4
+
+#---------------------------------------------------------------------------
+# 与 HTML 相关的配置 (HTML related configuration options)
+#---------------------------------------------------------------------------
+
+# Generate HTML
+GENERATE_HTML          = YES
+
+# HTML output
+HTML_OUTPUT            = html
+
+# HTML file extension
+HTML_FILE_EXTENSION    = .html
+
+# HTML header
+HTML_HEADER            =
+
+# HTML footer
+HTML_FOOTER            =
+
+# HTML stylesheet
+HTML_STYLESHEET        =
+
+# Extra stylesheet
+HTML_EXTRA_STYLESHEET  =
+
+# Extra files
+HTML_EXTRA_FILES       =
+
+# Color syntax highlighting for code fragments
+HTML_COLORSTYLE_HUE    = 220
+HTML_COLORSTYLE_SAT    = 100
+HTML_COLORSTYLE_GAMMA  = 80
+
+# If the GENERATE_HTMLHELP tag is set to YES then doxygen generates
+# three additional HTML index files: index.hhp, index.hhc, and index.hhk.
+# The index.hhp is a project file that can be read by Microsoft's HTML Help Workshop
+GENERATE_HTMLHELP      = NO
+
+# If the GENERATE_CHI tag is set to YES then a single .chi file is generated,
+# which contains all information about all files in the project in a compressed form.
+GENERATE_CHI           = NO
+
+# If the BINARY_TOC tag is set to YES, a binary table of contents is generated
+BINARY_TOC             = NO
+
+# The TOC_EXPAND tag can be set to YES to add extra items for group members
+TOC_EXPAND             = NO
+
+# Disable index
+DISABLE_INDEX          = NO
+
+# Generate treeview sidebar
+GENERATE_TREEVIEW      = YES
+
+# Hide forward declarations
+HIDE_FORWARD_DECLARATIONS = NO
+
+#---------------------------------------------------------------------------
+# 与 LaTeX 相关的配置 (LaTeX related configuration options)
+#---------------------------------------------------------------------------
+
+# Generate LaTeX
+GENERATE_LATEX         = NO
+
+#---------------------------------------------------------------------------
+# 与 RTF 相关的配置 (RTF related configuration options)
+#---------------------------------------------------------------------------
+
+# Generate RTF
+GENERATE_RTF           = NO
+
+#---------------------------------------------------------------------------
+# 与 MAN page 相关的配置 (MAN page related configuration options)
+#---------------------------------------------------------------------------
+
+# Generate MAN pages
+GENERATE_MAN           = NO
+
+#---------------------------------------------------------------------------
+# 与 XML 相关的配置 (XML related configuration options)
+#---------------------------------------------------------------------------
+
+# Generate XML
+GENERATE_XML           = NO
+
+#---------------------------------------------------------------------------
+# 与 autogen 相关的配置 (autogen related configuration options)
+#---------------------------------------------------------------------------
+
+# Enable preprocessing
+ENABLE_PREPROCESSING   = YES
+
+# Macro expansion
+MACRO_EXPANSION        = YES
+
+# Only expand predefined macros
+EXPAND_ONLY_PREDEF     = YES
+
+# Search includes
+SEARCH_INCLUDES        = YES
+
+# Include path
+INCLUDE_PATH           = include
+
+# Predefined macros
+PREDEFINED             = __cplusplus \
+                         cupolas_PLATFORM_WINDOWS= \
+                         cupolas_PLATFORM_LINUX= \
+                         cupols_PLATFORM_MACOS=
+
+# Expand as defined
+EXPAND_AS_DEFINED      =
+
+# Skip function macros
+SKIP_FUNCTION_MACROS   = YES
+
+#---------------------------------------------------------------------------
+# 与 Dot 相关的配置 (Dot related configuration options)
+#---------------------------------------------------------------------------
+
+# Class diagrams
+CLASS_DIAGRAMS         = YES
+
+# Collaboration graphs
+COLLABORATION_GRAPH    = YES
+
+# Group graphs
+GROUP_GRAPHS           = YES
+
+# UML look
+UML_LOOK               = YES
+
+# Template relations
+TEMPLATE_RELATIONS     = YES
+
+# Include graph
+INCLUDE_GRAPH          = YES
+
+# Included by graph
+INCLUDED_BY_GRAPH      = YES
+
+# Call graph
+CALL_GRAPH             = YES
+
+# Caller graph
+CALLER_GRAPH           = YES
+
+# Graphical hierarchy
+GRAPHICAL_HIERARCHY    = YES
+
+# Directory graph
+DIRECTORY_GRAPH        =YES
+
+# Dot image format
+DOT_IMAGE_FORMAT       = svg
+
+# Interactive SVG
+INTERACTIVE_SVG        = YES
+
+# Dot path
+DOT_PATH               =
+
+# Dot file name
+DOTFILE_NAMES          = dot
+
+# Max dot graph depth
+MAX_DOT_GRAPH_DEPTH    = 3
+
+# Max dot graph nodes
+MAX_DOT_GRAPH_NODES    = 100
+
+# Dot clean up
+DOT_CLEANUP            = YES
+
+#---------------------------------------------------------------------------
+# 特殊配置 (Special configuration options)
+#---------------------------------------------------------------------------
+
+# Algorithm documentation
+ALGORITHMS             = YES
+
+# Inline inherited members
+INLINE_INHERITED_MEMB  = YES
+
+# Sort member documentation
+SORT_MEMBER_DOCS       = YES
+
+# Sort brief documentation
+SORT_BRIEF_DOCS        = NO
+
+# Sort alphabetically
+SORT_MEMBERS_CTORS_1ST = NO
+SORT_GROUP_NAMES       = YES
+
+# Tab size
+TAB_SIZE               = 4
+
+# Optimization for Java or C
+OPTIMIZE_OUTPUT_FOR_C  = YES
+
+# Subgrouping
+SUBGROUPING            = YES
+
+# TypeDEFS struct/union/class
+TYPEDEF_HIDES_STRUCT   = YES
+
+# Symbolic links
+SYMBOL_CACHE_SIZE      = 0
+
+#---------------------------------------------------------------------------
+# 日志与调试 (Logging & Debugging)
+#---------------------------------------------------------------------------
+
+# Timestamps for messages
+TIMESTAMP              = YES
+
+# Verbose output
+VERBOSE                = YES
+
+#---------------------------------------------------------------------------
+# 配置文件结束
+#---------------------------------------------------------------------------
