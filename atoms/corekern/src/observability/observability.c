@@ -16,6 +16,7 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <psapi.h>
+#include <tlhelp32.h>
 #else
 #include <sys/time.h>
 #include <sys/resource.h>
@@ -25,6 +26,30 @@
 #define MAX_METRICS 1024
 #define MAX_HEALTH_CHECKS 64
 #define MAX_TRACE_SPANS 256
+
+/* 参数检查宏定义 */
+#define AGENTOS_CHECK_NULL(ptr, name) \
+    do { \
+        if (!(ptr)) { \
+            return AGENTOS_EINVAL; \
+        } \
+    } while(0)
+
+#define AGENTOS_CHECK_ALLOC(ptr) \
+    do { \
+        if (!(ptr)) { \
+            return AGENTOS_ENOMEM; \
+        } \
+    } while(0)
+
+/* 错误推送函数（简化实现） */
+static void agentos_error_push_ex(int err, const char* file, int line, const char* func, const char* msg) {
+    (void)err;
+    (void)file;
+    (void)line;
+    (void)func;
+    (void)msg;
+}
 
 typedef struct metric_entry {
     char name[128];
@@ -350,22 +375,18 @@ int agentos_observability_init(const agentos_observability_config_t* manager) {
 
     /* 创建指标收集线程（如启用） */
     if (manager->enable_metrics && manager->metrics_interval_ms > 0) {
-        state->metrics_thread = agentos_thread_create(metrics_collection_thread, NULL);
-        if (!state->metrics_thread) {
+        agentos_error_t err = agentos_thread_create(&state->metrics_thread, NULL, metrics_collection_thread, NULL);
+        if (err != AGENTOS_SUCCESS) {
             ret = AGENTOS_ENOMEM;
-            agentos_error_push_ex(ret, __FILE__, __LINE__, __func__,
-                                "Failed to create metrics collection thread");
             goto error;
         }
     }
 
     /* 创建健康检查线程（如启用） */
     if (manager->enable_health_check && manager->health_check_interval_ms > 0) {
-        state->health_check_thread = agentos_thread_create(health_check_thread, NULL);
-        if (!state->health_check_thread) {
+        agentos_error_t err = agentos_thread_create(&state->health_check_thread, NULL, health_check_thread, NULL);
+        if (err != AGENTOS_SUCCESS) {
             ret = AGENTOS_ENOMEM;
-            agentos_error_push_ex(ret, __FILE__, __LINE__, __func__,
-                                "Failed to create health check thread");
             goto error;
         }
     }

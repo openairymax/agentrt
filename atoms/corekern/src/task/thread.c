@@ -23,39 +23,23 @@
 #endif
 
 /**
- * @brief 线程内部结构（跨平台包装）
- */
-struct agentos_thread {
-#ifdef _WIN32
-    HANDLE handle;
-    DWORD id;
-#else
-    pthread_t thread;
-#endif
-    agentos_thread_func_t func;
-    void* arg;
-    int started;
-};
-
-/**
  * @brief 线程函数包装器
  */
 #ifdef _WIN32
 static unsigned __stdcall thread_wrapper(void* arg) {
+    void (*func)(void*) = (void (*)(void*))((void**)arg)[0];
+    void* arg_val = ((void**)arg)[1];
+    free(arg);
+    func(arg_val);
+    return 0;
 #else
 static void* thread_wrapper(void* arg) {
+    void (*func)(void*) = (void (*)(void*))((void**)arg)[0];
+    void* arg_val = ((void**)arg)[1];
+    free(arg);
+    func(arg_val);
+    return NULL;
 #endif
-    agentos_thread_t* thread = (agentos_thread_t*)arg;
-    if (!thread || !thread->func) {
-#ifdef _WIN32
-        return 1;
-#else
-        return NULL;
-#endif
-    }
-
-    void* result = thread->func(thread->arg);
-    return result;
 }
 
 /**
@@ -64,31 +48,35 @@ static void* thread_wrapper(void* arg) {
 agentos_error_t agentos_thread_create(
     agentos_thread_t* thread,
     const agentos_thread_attr_t* attr,
-    agentos_thread_func_t func,
+    void (*func)(void*),
     void* arg) {
     if (!thread || !func) {
         return AGENTOS_EINVAL;
     }
 
-    thread->func = func;
-    thread->arg = arg;
-    thread->started = 0;
-
 #ifdef _WIN32
+    void** thread_args = (void**)malloc(2 * sizeof(void*));
+    if (!thread_args) {
+        return AGENTOS_ENOMEM;
+    }
+    thread_args[0] = (void*)func;
+    thread_args[1] = arg;
+
     HANDLE hThread = (HANDLE)_beginthreadex(
         NULL,
-        attr ? attr->stack_size : 0,
+        (unsigned)(attr ? attr->stack_size : 0),
         thread_wrapper,
-        thread,
+        thread_args,
         0,
-        &thread->id
+        NULL
     );
 
     if (hThread == NULL) {
-        return AGENTOS_EAGAIN;
+        free(thread_args);
+        return AGENTOS_ERESOURCE;
     }
 
-    thread->handle = hThread;
+    *thread = hThread;
 #else
     pthread_attr_t pthread_attr;
     pthread_attr_init(&pthread_attr);
@@ -101,15 +89,23 @@ agentos_error_t agentos_thread_create(
             attr->detach_state ? PTHREAD_CREATE_DETACHED : PTHREAD_CREATE_JOINABLE);
     }
 
-    int ret = pthread_create(&thread->thread, &pthread_attr, thread_wrapper, thread);
+    void** thread_args = (void**)malloc(2 * sizeof(void*));
+    if (!thread_args) {
+        pthread_attr_destroy(&pthread_attr);
+        return AGENTOS_ENOMEM;
+    }
+    thread_args[0] = (void*)func;
+    thread_args[1] = arg;
+
+    int ret = pthread_create(thread, &pthread_attr, thread_wrapper, thread_args);
     pthread_attr_destroy(&pthread_attr);
 
     if (ret != 0) {
-        return AGENTOS_EAGAIN;
+        free(thread_args);
+        return AGENTOS_ERESOURCE;
     }
 #endif
 
-    thread->started = 1;
     return AGENTOS_SUCCESS;
 }
 
@@ -117,23 +113,19 @@ agentos_error_t agentos_thread_create(
  * @brief 等待线程结束
  */
 agentos_error_t agentos_thread_join(agentos_thread_t thread, void** retval) {
-    if (!thread.started) {
-        return AGENTOS_EINVAL;
-    }
-
 #ifdef _WIN32
-    if (WaitForSingleObject(thread.handle, INFINITE) != WAIT_OBJECT_0) {
-        return AGENTOS_ERROR;
+    if (WaitForSingleObject(thread, INFINITE) != WAIT_OBJECT_0) {
+        return AGENTOS_ERESOURCE;
     }
-    CloseHandle(thread.handle);
+    CloseHandle(thread);
     if (retval) {
         *retval = NULL;
     }
 #else
     void* thread_retval = NULL;
-    int ret = pthread_join(thread.thread, &thread_retval);
+    int ret = pthread_join(thread, &thread_retval);
     if (ret != 0) {
-        return AGENTOS_ERROR;
+        return AGENTOS_ERESOURCE;
     }
     if (retval) {
         *retval = thread_retval;

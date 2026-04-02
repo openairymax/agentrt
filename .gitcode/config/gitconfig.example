@@ -1,0 +1,120 @@
+# AgentOS Git 配置文件示例
+# 将此配置添加到您的全局或本地 Git 配置中
+
+[core]
+    # 自动转换换行符（Windows 为 true，Linux/macOS 为 input）
+    autocrlf = true
+    # 排除文件大小写敏感
+    ignorecase = false
+    # 排除文件使用 UTF-8 编码
+    precomposeunicode = true
+
+[commit]
+    # 提交模板
+    template = .gitcode/templates/commit-template
+    # 详细的提交信息
+    verbose = true
+
+[push]
+    # 推送默认行为
+    default = current
+    # 自动设置上游分支
+    autoSetupRemote = true
+
+[pull]
+    # 拉取策略
+    rebase = true
+    # 自动储藏更改
+    autostash = true
+
+[merge]
+    # 合并工具
+    tool = vimdiff
+    # 合并提交信息
+    log = true
+    # 冲突样式
+    conflictstyle = diff3
+
+[diff]
+    # 差异工具
+    tool = vimdiff
+    # 显示重命名
+    renames = true
+    # 算法
+    algorithm = histogram
+
+[alias]
+    # 常用别名
+    co = checkout
+    br = branch
+    ci = commit
+    st = status
+    lg = log --graph --pretty=format:'%C(yellow)%h%Creset -%C(red)%d%Creset %s %C(green)(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
+    lol = log --graph --decorate --pretty=oneline --abbrev-commit --all
+    lola = log --graph --decorate --pretty=oneline --abbrev-commit
+    unstage = reset HEAD --
+    last = log -1 HEAD
+    undo = reset --soft HEAD^
+    amend = commit --amend
+    who = shortlog -s --
+    wip = commit -a -m "WIP"
+    unwip = reset HEAD~
+    cleanup = "!git branch --merged | grep -v '\\*\\|main\\|master\\|develop' | xargs -n 1 git branch -d"
+    
+    # AgentOS 特定别名
+    atom = "!f() { cd atoms/$1 && make; }; f"
+    daemon = "!f() { cd daemon && mkdir -p build && cd build && cmake .. && make; }; f"
+    test-all = "!f() { cd $1 && ctest --output-on-failure; }; f"
+    format = "!f() { find $1 -name '*.c' -o -name '*.h' | xargs clang-format -i; }; f"
+    
+    # 统计相关
+    stats = "!git log --author=\"$(git config user.name)\" --pretty=tformat: --numstat | awk '{ add += $1; subs += $2; loc += $1 - $2 } END { printf \"added lines: %s, removed lines: %s, total lines: %s\\n\", add, subs, loc }'"
+    count = "!git shortlog -s -n"
+
+[color]
+    # 颜色配置
+    ui = auto
+    branch = auto
+    diff = auto
+    status = auto
+    interactive = auto
+
+[filter "lfs"]
+    # Git LFS 配置
+    clean = git-lfs clean -- %f
+    smudge = git-lfs smudge -- %f
+    process = git-lfs filter-process
+    required = true
+
+[init]
+    # 初始化模板目录
+    templateDir = .gitcode/templates
+
+[rerere]
+    # 重用冲突解决方案
+    enabled = true
+    autoupdate = true
+
+[grep]
+    # 搜索配置
+    lineNumber = true
+    extendRegexp = true
+
+[tag]
+    # 标签配置
+    sort = version:refname
+
+[transfer]
+    # 传输配置
+    fsckObjects = true
+
+[receive]
+    # 接收配置
+    fsckObjects = true
+    denyNonFastForwards = true
+
+[advice]
+    # 建议配置
+    statusHints = true
+    pushNonFastForward = true
+    detachedHead = true
