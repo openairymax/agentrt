@@ -22,7 +22,7 @@ struct agentos_ipc_channel {
     int fd;                     /**< 文件描述符 */
     agentos_ipc_port_t port;    /**< 端口号 */
     int is_server;              /**< 是否为服务器端 */
-    agentos_mutex_t lock;       /**< 锁 */
+    agentos_mutex_t* lock;      /**< 锁（指针） */
 };
 
 /**
@@ -45,9 +45,14 @@ agentos_error_t agentos_ipc_create_channel(
     channel->port = port;
     channel->is_server = is_server;
     channel->fd = -1;
+    channel->lock = NULL;
 
-    /* 初始化锁 */
-    agentos_mutex_init(&channel->lock, NULL);
+    /* 创建锁 */
+    channel->lock = agentos_mutex_create();
+    if (!channel->lock) {
+        AGENTOS_FREE(channel);
+        return AGENTOS_ENOMEM;
+    }
 
     *out_channel = channel;
     return AGENTOS_SUCCESS;
@@ -61,11 +66,14 @@ agentos_error_t agentos_ipc_close(agentos_ipc_channel_t* channel) {
         return AGENTOS_EINVAL;
     }
 
-    agentos_mutex_lock(&channel->lock);
-    channel->fd = -1;
-    agentos_mutex_unlock(&channel->lock);
+    if (channel->lock) {
+        agentos_mutex_lock(channel->lock);
+        channel->fd = -1;
+        agentos_mutex_unlock(channel->lock);
 
-    agentos_mutex_destroy(&channel->lock);
+        agentos_mutex_destroy(channel->lock);
+        channel->lock = NULL;
+    }
     AGENTOS_FREE(channel);
 
     return AGENTOS_SUCCESS;
