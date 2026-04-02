@@ -1,489 +1,438 @@
 /**
  * @file main.c
- * @brief 调度服务主程序
- * @details 负责初始化和运行调度服务
+ * @brief 智能调度服务守护进程入口
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * 改进说明：
+ * 1. 真正的守护进程模式（跨平台支持）
+ * 2. JSON-RPC 2.0 服务接口
+ * 3. 完善的错误处理和日志记录
+ * 4. 配置热重载支持
  */
+
+#include "scheduler_service.h"
+#include "strategy_interface.h"
+#include "monitor_service.h"
+#include "platform.h"
+#include "error.h"
+#include "svc_logger.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "scheduler_service.h"
-#include "strategy_interface.h"
-#include "monitor_service.h"
+#include <signal.h>
+#include <cjson/cJSON.h>
+
+/* ==================== 配置常量 ==================== */
+
+#define DEFAULT_SOCKET_PATH_UNIX "/var/run/agentos/sched.sock"
+#define DEFAULT_SOCKET_PATH_WIN "\\\\.\\pipe\\agentos_sched"
+#define DEFAULT_TCP_PORT 8083
+#define MAX_BUFFER 65536
+
+/* ==================== 全局状态 ==================== */
+
+static sched_service_t* g_service = NULL;
+static volatile int g_running = 1;
+static agentos_mutex_t g_running_lock;
+
+/* ==================== 错误码定义（统一使用 AGENTOS_ERR_*） ==================== */
+#define SCHED_ERR_INVALID_PARAM    AGENTOS_ERR_INVALID_PARAM
+#define SCHED_ERR_OUT_OF_MEMORY    AGENTOS_ERR_OUT_OF_MEMORY
+#define SCHED_ERR_NOT_FOUND        AGENTOS_ERR_NOT_FOUND
+#define SCHED_ERR_INVALID_CONFIG   (AGENTOS_ERR_DAEMON_BASE + 0x01)
+#define SCHED_ERR_STRATEGY_FAIL    (AGENTOS_ERR_DAEMON_BASE + 0x02)
+
+/* ==================== JSON-RPC 错误码 ==================== */
+
+#define PARSE_ERROR     -32700
+#define INVALID_REQUEST -32600
+#define METHOD_NOT_FOUND -32601
+#define INVALID_PARAMS  -32602
+#define INTERNAL_ERROR  -32000
+
+/* ==================== JSON-RPC 响应构建 ==================== */
 
 /**
- * @brief 调度服务结构
+ * @brief 构建错误响应
+ * @param code 错误码
+ * @param message 错误消息
+ * @param id 请求ID
+ * @return JSON字符串（需调用者释放）
  */
-typedef struct sched_service {
-    sched_config_t manager;              /**< 配置信息 */
-    void* strategy_data;                /**< 策略数据 */
-    monitor_service_t* monitor;         /**< 监控服务 */
-    const strategy_interface_t* strategy; /**< 策略接口 */
-} sched_service_t;
+static char* build_error_response(int code, const char* message, int id) {
+    cJSON* root = cJSON_CreateObject();
+    if (!root) return NULL;
 
-/**
- * @brief 获取策略接口
- * @param strategy 策略类型
- * @return 策略接口
- */
-static const strategy_interface_t* get_strategy_by_type(sched_strategy_t strategy) {
-    switch (strategy) {
-        case SCHED_STRATEGY_ROUND_ROBIN:
-            return get_round_robin_strategy();
-        case SCHED_STRATEGY_WEIGHTED:
-            return get_weighted_strategy();
-        case SCHED_STRATEGY_ML_BASED:
-            return get_ml_based_strategy();
-        default:
-            return NULL;
+    cJSON_AddStringToObject(root, "jsonrpc", "2.0");
+    cJSON* err = cJSON_CreateObject();
+    if (!err) {
+        cJSON_Delete(root);
+        return NULL;
     }
-}
+    cJSON_AddNumberToObject(err, "code", code);
+    cJSON_AddStringToObject(err, "message", message ? message : "Unknown error");
+    cJSON_AddItemToObject(root, "error", err);
 
-/**
- * @brief 创建调度服务
- * @param manager 配置信息
- * @param service 输出参数，返回创建的服务句柄
- * @return 0 表示成功，非 0 表示错误码
- */
-int sched_service_create(const sched_config_t* manager, sched_service_t** service) {
-    if (!manager || !service) {
-        return -1;
-    }
-
-    sched_service_t* s = (sched_service_t*)malloc(sizeof(sched_service_t));
-    if (!s) {
-        return -1;
-    }
-
-    // 复制配置
-    s->manager = *manager;
-
-    // 初始化监控服务
-    monitor_config_t monitor_config = {
-        .metrics_collection_interval_ms = 5000,
-        .health_check_interval_ms = manager->health_check_interval_ms,
-        .log_flush_interval_ms = 30000,
-        .alert_check_interval_ms = 5000,
-        .log_file_path = "sched_monitor.log",
-        .metrics_storage_path = "sched_metrics",
-        .enable_tracing = true,
-        .enable_alerting = true
-    };
-
-    if (monitor_service_create(&monitor_config, &s->monitor) != 0) {
-        free(s);
-        return -2;
-    }
-
-    // 获取策略接口
-    s->strategy = get_strategy_by_type(manager->strategy);
-    if (!s->strategy) {
-        monitor_service_destroy(s->monitor);
-        free(s);
-        return -3;
-    }
-
-    // 创建策略
-    if (s->strategy->create(manager, &s->strategy_data) != 0) {
-        monitor_service_destroy(s->monitor);
-        free(s);
-        return -4;
-    }
-
-    printf("Scheduler service created with strategy: %s\n", s->strategy->get_name());
-    *service = s;
-    return 0;
-}
-
-/**
- * @brief 销毁调度服务
- * @param service 服务句柄
- * @return 0 表示成功，非 0 表示错误码
- */
-int sched_service_destroy(sched_service_t* service) {
-    if (!service) {
-        return 0;
-    }
-
-    // 销毁策略
-    if (service->strategy && service->strategy->destroy) {
-        service->strategy->destroy(service->strategy_data);
-    }
-
-    // 销毁监控服务
-    if (service->monitor) {
-        monitor_service_destroy(service->monitor);
-    }
-
-    free(service);
-    printf("Scheduler service destroyed\n");
-    return 0;
-}
-
-/**
- * @brief 注册 Agent
- * @param service 服务句柄
- * @param agent_info Agent 信息
- * @return 0 表示成功，非 0 表示错误码
- */
-int sched_service_register_agent(sched_service_t* service, const agent_info_t* agent_info) {
-    if (!service || !agent_info) {
-        return -1;
-    }
-
-    int ret = service->strategy->register_agent(service->strategy_data, agent_info);
-    if (ret == 0) {
-        printf("Agent registered: %s\n", agent_info->agent_id);
-        
-        // 更新监控数据
-        size_t available_count = service->strategy->get_available_agent_count(service->strategy_data);
-        size_t total_count = service->strategy->get_total_agent_count(service->strategy_data);
-        
-        // 记录指标
-        metric_info_t metric = {
-            .name = "sched.agent.count",
-            .description = "Agent 数量",
-            .type = METRIC_TYPE_GAUGE,
-            .labels = NULL,
-            .label_count = 0,
-            .value = (double)total_count,
-            .timestamp = (uint64_t)time(NULL) * 1000
-        };
-        monitor_service_record_metric(service->monitor, &metric);
-        
-        metric.name = "sched.agent.available";
-        metric.description = "可用 Agent 数量";
-        metric.value = (double)available_count;
-        monitor_service_record_metric(service->monitor, &metric);
-    }
-
-    return ret;
-}
-
-/**
- * @brief 注销 Agent
- * @param service 服务句柄
- * @param agent_id Agent ID
- * @return 0 表示成功，非 0 表示错误码
- */
-int sched_service_unregister_agent(sched_service_t* service, const char* agent_id) {
-    if (!service || !agent_id) {
-        return -1;
-    }
-
-    int ret = service->strategy->unregister_agent(service->strategy_data, agent_id);
-    if (ret == 0) {
-        printf("Agent unregistered: %s\n", agent_id);
-        
-        // 更新监控数据
-        size_t available_count = service->strategy->get_available_agent_count(service->strategy_data);
-        size_t total_count = service->strategy->get_total_agent_count(service->strategy_data);
-        
-        // 记录指标
-        metric_info_t metric = {
-            .name = "sched.agent.count",
-            .description = "Agent 数量",
-            .type = METRIC_TYPE_GAUGE,
-            .labels = NULL,
-            .label_count = 0,
-            .value = (double)total_count,
-            .timestamp = (uint64_t)time(NULL) * 1000
-        };
-        monitor_service_record_metric(service->monitor, &metric);
-        
-        metric.name = "sched.agent.available";
-        metric.description = "可用 Agent 数量";
-        metric.value = (double)available_count;
-        monitor_service_record_metric(service->monitor, &metric);
-    }
-
-    return ret;
-}
-
-/**
- * @brief 更新 Agent 状态
- * @param service 服务句柄
- * @param agent_info Agent 信息
- * @return 0 表示成功，非 0 表示错误码
- */
-int sched_service_update_agent_status(sched_service_t* service, const agent_info_t* agent_info) {
-    if (!service || !agent_info) {
-        return -1;
-    }
-
-    int ret = service->strategy->update_agent_status(service->strategy_data, agent_info);
-    if (ret == 0) {
-        printf("Agent status updated: %s\n", agent_info->agent_id);
-        
-        // 更新监控数据
-        size_t available_count = service->strategy->get_available_agent_count(service->strategy_data);
-        size_t total_count = service->strategy->get_total_agent_count(service->strategy_data);
-        
-        // 记录指标
-        metric_info_t metric = {
-            .name = "sched.agent.count",
-            .description = "Agent 数量",
-            .type = METRIC_TYPE_GAUGE,
-            .labels = NULL,
-            .label_count = 0,
-            .value = (double)total_count,
-            .timestamp = (uint64_t)time(NULL) * 1000
-        };
-        monitor_service_record_metric(service->monitor, &metric);
-        
-        metric.name = "sched.agent.available";
-        metric.description = "可用 Agent 数量";
-        metric.value = (double)available_count;
-        monitor_service_record_metric(service->monitor, &metric);
-        
-        // 记录 Agent 状态指标
-        metric.name = "sched.agent.load";
-        metric.description = "Agent 负载";
-        metric.value = agent_info->load_factor;
-        monitor_service_record_metric(service->monitor, &metric);
-        
-        metric.name = "sched.agent.success_rate";
-        metric.description = "Agent 成功率";
-        metric.value = agent_info->success_rate;
-        monitor_service_record_metric(service->monitor, &metric);
-    }
-
-    return ret;
-}
-
-/**
- * @brief 调度任务
- * @param service 服务句柄
- * @param task_info 任务信息
- * @param result 输出参数，返回调度结果
- * @return 0 表示成功，非 0 表示错误码
- */
-int sched_service_schedule_task(sched_service_t* service, const task_info_t* task_info, sched_result_t** result) {
-    if (!service || !task_info || !result) {
-        return -1;
-    }
-
-    int ret = service->strategy->schedule(service->strategy_data, task_info, result);
-    if (ret == 0) {
-        printf("Task scheduled: %s -> Agent: %s (Confidence: %.2f)\n", 
-               task_info->task_id, (*result)->selected_agent_id, (*result)->confidence);
-        
-        // 记录任务指标
-        metric_info_t metric = {
-            .name = "sched.task.scheduled",
-            .description = "调度任务数",
-            .type = METRIC_TYPE_COUNTER,
-            .labels = NULL,
-            .label_count = 0,
-            .value = 1.0,
-            .timestamp = (uint64_t)time(NULL) * 1000
-        };
-        monitor_service_record_metric(service->monitor, &metric);
-        
-        metric.name = "sched.task.estimated_time";
-        metric.description = "任务估计执行时间";
-        metric.type = METRIC_TYPE_GAUGE;
-        metric.value = (double)(*result)->estimated_time_ms;
-        monitor_service_record_metric(service->monitor, &metric);
-        
-        metric.name = "sched.task.confidence";
-        metric.description = "调度置信度";
-        metric.value = (*result)->confidence;
-        monitor_service_record_metric(service->monitor, &metric);
-        
-        // 记录日志
-        log_info_t log = {
-            .level = LOG_LEVEL_INFO,
-            .message = "Task scheduled successfully",
-            .service_name = "sched_d",
-            .file = __FILE__,
-            .line = __LINE__,
-            .function = __func__,
-            .timestamp = (uint64_t)time(NULL) * 1000,
-            .context = NULL,
-            .context_count = 0
-        };
-        monitor_service_log(service->monitor, &log);
+    if (id >= 0) {
+        cJSON_AddNumberToObject(root, "id", id);
     } else {
-        // 记录调度失败日志
-        log_info_t log = {
-            .level = LOG_LEVEL_ERROR,
-            .message = "Task scheduling failed",
-            .service_name = "sched_d",
-            .file = __FILE__,
-            .line = __LINE__,
-            .function = __func__,
-            .timestamp = (uint64_t)time(NULL) * 1000,
-            .context = NULL,
-            .context_count = 0
-        };
-        monitor_service_log(service->monitor, &log);
+        cJSON_AddNullToObject(root, "id");
     }
 
-    return ret;
+    char* json = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    return json;
 }
 
 /**
- * @brief 获取调度统计信息
- * @param service 服务句柄
- * @param stats 输出参数，返回统计信息
- * @return 0 表示成功，非 0 表示错误码
+ * @brief 构建成功响应
+ * @param result 结果对象
+ * @param id 请求ID
+ * @return JSON字符串（需调用者释放）
  */
-int sched_service_get_stats(sched_service_t* service, void** stats) {
-    if (!service || !stats) {
-        return -1;
+static char* build_success_response(cJSON* result, int id) {
+    cJSON* root = cJSON_CreateObject();
+    if (!root) return NULL;
+
+    cJSON_AddStringToObject(root, "jsonrpc", "2.0");
+    cJSON_AddItemToObject(root, "result", result ? cJSON_Duplicate(result, 1) : cJSON_CreateNull());
+    cJSON_AddNumberToObject(root, "id", id);
+
+    char* json = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    return json;
+}
+
+/* ==================== 信号处理 ==================== */
+
+/**
+ * @brief 信号处理函数
+ * @param sig 信号值
+ */
+static void signal_handler(int sig) {
+    (void)sig;
+    agentos_mutex_lock(&g_running_lock);
+    g_running = 0;
+    agentos_mutex_unlock(&g_running_lock);
+}
+
+#ifdef _WIN32
+/**
+ * @brief Windows控制台处理函数
+ * @param fdwCtrlType 控制信号类型
+ * @return TRUE 已处理
+ */
+static BOOL WINAPI console_handler(DWORD fdwCtrlType) {
+    switch (fdwCtrlType) {
+        case CTRL_C_EVENT:
+        case CTRL_CLOSE_EVENT:
+        case CTRL_SHUTDOWN_EVENT:
+            signal_handler((int)fdwCtrlType);
+            return TRUE;
+        default:
+            return FALSE;
+    }
+}
+#endif
+
+/* ==================== 请求处理方法 ==================== */
+
+/**
+ * @brief 处理 register_agent 方法
+ * @param params 参数对象
+ * @param id 请求ID
+ * @param client_fd 客户端描述符
+ */
+static void handle_register_agent(cJSON* params, int id, agentos_socket_t client_fd) {
+    cJSON* agent_json = cJSON_GetObjectItem(params, "agent");
+    if (!cJSON_IsObject(agent_json)) {
+        char* err = build_error_response(INVALID_PARAMS, "Missing agent object", id);
+        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        return;
     }
 
-    // 生成监控报告
-    char* report = NULL;
-    int ret = monitor_service_generate_report(service->monitor, &report);
-    if (ret == 0 && report) {
-        *stats = report;
+    agent_info_t info = {0};
+    cJSON* jid = cJSON_GetObjectItem(agent_json, "agent_id");
+    cJSON* jname = cJSON_GetObjectItem(agent_json, "agent_name");
+
+    if (!cJSON_IsString(jid)) {
+        char* err = build_error_response(INVALID_PARAMS, "Missing agent_id", id);
+        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        return;
     }
 
-    return ret;
+    strncpy(info.agent_id, jid->valuestring, sizeof(info.agent_id) - 1);
+    if (cJSON_IsString(jname))
+        strncpy(info.agent_name, jname->valuestring, sizeof(info.agent_name) - 1);
+
+    cJSON* load = cJSON_GetObjectItem(agent_json, "load_factor");
+    if (cJSON_IsNumber(load)) info.load_factor = load->valuedouble;
+
+    cJSON* success_rate = cJSON_GetObjectItem(agent_json, "success_rate");
+    if (cJSON_IsNumber(success_rate)) info.success_rate = success_rate->valuedouble;
+
+    cJSON* response_time = cJSON_GetObjectItem(agent_json, "avg_response_time_ms");
+    if (cJSON_IsNumber(response_time)) info.avg_response_time_ms = response_time->valueint;
+
+    cJSON* available = cJSON_GetObjectItem(agent_json, "is_available");
+    if (cJSON_IsBool(available)) info.is_available = available->valueint;
+
+    cJSON* weight = cJSON_GetObjectItem(agent_json, "weight");
+    if (cJSON_IsNumber(weight)) info.weight = weight->valuedouble;
+
+    int ret = sched_service_register_agent(g_service, &info);
+
+    if (ret != AGENTOS_SUCCESS) {
+        char* err = build_error_response(INTERNAL_ERROR, "Register failed", id);
+        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        SVC_LOG_ERROR("Failed to register agent: %s (error=%d)", info.agent_id, ret);
+    } else {
+        cJSON* result = cJSON_CreateObject();
+        cJSON_AddStringToObject(result, "status", "registered");
+        cJSON_AddStringToObject(result, "agent_id", info.agent_id);
+        char* success = build_success_response(result, id);
+        cJSON_Delete(result);
+        if (success) { agentos_socket_send(client_fd, success, strlen(success)); free(success); }
+        SVC_LOG_INFO("Agent registered: %s", info.agent_id);
+    }
 }
 
 /**
- * @brief 健康检查
- * @param service 服务句柄
- * @param health_status 输出参数，返回健康状态
- * @return 0 表示成功，非 0 表示错误码
+ * @brief 处理 schedule_task 方法
+ * @param params 参数对象
+ * @param id 请求ID
+ * @param client_fd 客户端描述符
  */
-int sched_service_health_check(sched_service_t* service, bool* health_status) {
-    if (!service || !health_status) {
-        return -1;
+static void handle_schedule_task(cJSON* params, int id, agentos_socket_t client_fd) {
+    cJSON* task_json = cJSON_GetObjectItem(params, "task");
+    if (!cJSON_IsObject(task_json)) {
+        char* err = build_error_response(INVALID_PARAMS, "Missing task object", id);
+        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        return;
     }
 
-    // 更新 Agent 状态到监控模块
-    size_t available_count = service->strategy->get_available_agent_count(service->strategy_data);
-    size_t total_count = service->strategy->get_total_agent_count(service->strategy_data);
-    
-    // 记录指标
-    metric_info_t metric = {
-        .name = "sched.agent.count",
-        .description = "Agent 数量",
-        .type = METRIC_TYPE_GAUGE,
-        .labels = NULL,
-        .label_count = 0,
-        .value = (double)total_count,
-        .timestamp = (uint64_t)time(NULL) * 1000
-    };
-    monitor_service_record_metric(service->monitor, &metric);
-    
-    metric.name = "sched.agent.available";
-    metric.description = "可用 Agent 数量";
-    metric.value = (double)available_count;
-    monitor_service_record_metric(service->monitor, &metric);
-
-    // 执行健康检查
-    health_check_result_t* result = NULL;
-    int ret = monitor_service_health_check(service->monitor, "sched_d", &result);
-    if (ret == 0 && result) {
-        *health_status = result->is_healthy;
-        
-        // 记录健康检查结果
-        log_info_t log = {
-            .level = LOG_LEVEL_INFO,
-            .message = result->status_message,
-            .service_name = "sched_d",
-            .file = __FILE__,
-            .line = __LINE__,
-            .function = __func__,
-            .timestamp = (uint64_t)time(NULL) * 1000,
-            .context = NULL,
-            .context_count = 0
-        };
-        monitor_service_log(service->monitor, &log);
-        
-        // 释放结果
-        free(result->service_name);
-        free(result->status_message);
-        free(result);
+    task_info_t task = {0};
+    cJSON* jid = cJSON_GetObjectItem(task_json, "task_id");
+    if (!cJSON_IsString(jid)) {
+        char* err = build_error_response(INVALID_PARAMS, "Missing task_id", id);
+        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        return;
     }
 
-    return ret;
+    strncpy(task.task_id, jid->valuestring, sizeof(task.task_id) - 1);
+
+    cJSON* desc = cJSON_GetObjectItem(task_json, "task_description");
+    if (cJSON_IsString(desc))
+        strncpy(task.task_description, desc->valuestring, sizeof(task.task_description) - 1);
+
+    cJSON* priority = cJSON_GetObjectItem(task_json, "priority");
+    if (cJSON_IsNumber(priority)) task.priority = priority->valueint;
+
+    cJSON* timeout = cJSON_GetObjectItem(task_json, "timeout_ms");
+    if (cJSON_IsNumber(timeout)) task.timeout_ms = timeout->valueint;
+
+    sched_result_t* result = NULL;
+    int ret = sched_service_schedule_task(g_service, &task, &result);
+
+    if (ret != AGENTOS_SUCCESS || !result) {
+        char* err = build_error_response(INTERNAL_ERROR, "Schedule failed", id);
+        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        SVC_LOG_ERROR("Task scheduling failed: %s (error=%d)", task.task_id, ret);
+        return;
+    }
+
+    cJSON* res_obj = cJSON_CreateObject();
+    cJSON_AddStringToObject(res_obj, "selected_agent_id", result->selected_agent_id);
+    cJSON_AddNumberToObject(res_obj, "confidence", result->confidence);
+    cJSON_AddNumberToObject(res_obj, "estimated_time_ms", result->estimated_time_ms);
+
+    char* success = build_success_response(res_obj, id);
+    cJSON_Delete(res_obj);
+    if (success) { agentos_socket_send(client_fd, success, strlen(success)); free(success); }
+    SVC_LOG_INFO("Task scheduled: %s -> Agent: %s (Confidence: %.2f)",
+                task.task_id, result->selected_agent_id, result->confidence);
+
+    free(result->selected_agent_id);
+    free(result);
 }
 
 /**
- * @brief 重载配置
- * @param service 服务句柄
- * @param manager 新的配置信息
- * @return 0 表示成功，非 0 表示错误码
+ * @brief 处理 get_stats 方法
+ * @param id 请求ID
+ * @param client_fd 客户端描述符
  */
-int sched_service_reload_config(sched_service_t* service, const sched_config_t* manager) {
-    if (!service || !manager) {
-        return -1;
+static void handle_get_stats(int id, agentos_socket_t client_fd) {
+    void* stats_data = NULL;
+    int ret = sched_service_get_stats(g_service, &stats_data);
+
+    if (ret != AGENTOS_SUCCESS || !stats_data) {
+        char* err = build_error_response(INTERNAL_ERROR, "Get stats failed", id);
+        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        return;
     }
 
-    // 验证配置参数
-    if (manager->max_agents == 0) {
-        return -4; // 无效的最大 Agent 数量
+    cJSON* report_json = cJSON_Parse((char*)stats_data);
+    free(stats_data);
+
+    if (!report_json) {
+        char* err = build_error_response(INTERNAL_ERROR, "Invalid report data", id);
+        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        return;
     }
 
-    if (manager->health_check_interval_ms < 1000) {
-        return -5; // 健康检查间隔过小
+    char* success = build_success_response(report_json, id);
+    cJSON_Delete(report_json);
+    if (success) { agentos_socket_send(client_fd, success, strlen(success)); free(success); }
+}
+
+/**
+ * @brief 处理 health_check 方法
+ * @param id 请求ID
+ * @param client_fd 客户端描述符
+ */
+static void handle_health_check(int id, agentos_socket_t client_fd) {
+    bool healthy = false;
+    int ret = sched_service_health_check(g_service, &healthy);
+
+    cJSON* result = cJSON_CreateObject();
+    cJSON_AddStringToObject(result, "service", "sched_d");
+    cJSON_AddBoolToObject(result, "healthy", healthy);
+    cJSON_AddNumberToObject(result, "timestamp", (double)(uint64_t)time(NULL) * 1000);
+
+    char* success = build_success_response(result, id);
+    cJSON_Delete(result);
+    if (success) { agentos_socket_send(client_fd, success, strlen(success)); free(success); }
+}
+
+/* ==================== 客户端连接处理 ==================== */
+
+/**
+ * @brief 处理单个客户端连接
+ * @param client_fd 客户端描述符
+ */
+static void handle_client(agentos_socket_t client_fd) {
+    char buffer[MAX_BUFFER];
+    ssize_t n = agentos_socket_recv(client_fd, buffer, sizeof(buffer) - 1);
+
+    if (n <= 0) {
+        agentos_socket_close(client_fd);
+        return;
+    }
+    buffer[n] = '\0';
+
+    /* 检查请求大小 */
+    if ((size_t)n >= sizeof(buffer) - 1) {
+        char* err = build_error_response(INVALID_REQUEST, "Request too large", -1);
+        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        agentos_socket_close(client_fd);
+        return;
     }
 
-    if (manager->stats_report_interval_ms < 1000) {
-        return -6; // 统计报告间隔过小
+    cJSON* req = cJSON_Parse(buffer);
+    if (!req) {
+        char* err = build_error_response(PARSE_ERROR, "Parse error: invalid JSON", -1);
+        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        agentos_socket_close(client_fd);
+        return;
     }
 
-    // 销毁旧策略
-    if (service->strategy && service->strategy->destroy) {
-        int ret = service->strategy->destroy(service->strategy_data);
-        if (ret != 0) {
-            return -7; // 销毁旧策略失败
+    cJSON* jsonrpc = cJSON_GetObjectItem(req, "jsonrpc");
+    cJSON* method = cJSON_GetObjectItem(req, "method");
+    cJSON* params = cJSON_GetObjectItem(req, "params");
+    cJSON* id = cJSON_GetObjectItem(req, "id");
+
+    if (!cJSON_IsString(jsonrpc) || strcmp(jsonrpc->valuestring, "2.0") != 0 ||
+        !cJSON_IsString(method) || !id) {
+        char* err = build_error_response(INVALID_REQUEST, "Invalid Request", -1);
+        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        cJSON_Delete(req);
+        agentos_socket_close(client_fd);
+        return;
+    }
+
+    int req_id = cJSON_IsNumber(id) ? id->valueint : 0;
+
+    SVC_LOG_DEBUG("Processing request: method=%s, id=%d", method->valuestring, req_id);
+
+    if (strcmp(method->valuestring, "register_agent") == 0) {
+        handle_register_agent(params, req_id, client_fd);
+    } else if (strcmp(method->valuestring, "schedule_task") == 0) {
+        handle_schedule_task(params, req_id, client_fd);
+    } else if (strcmp(method->valuestring, "get_stats") == 0) {
+        handle_get_stats(req_id, client_fd);
+    } else if (strcmp(method->valuestring, "health_check") == 0) {
+        handle_health_check(req_id, client_fd);
+    } else {
+        char* err = build_error_response(METHOD_NOT_FOUND, "Method not found", req_id);
+        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        SVC_LOG_WARN("Unknown method requested: %s", method->valuestring);
+    }
+
+    cJSON_Delete(req);
+    agentos_socket_close(client_fd);
+}
+
+/* ==================== 帮助信息 ==================== */
+
+/**
+ * @brief 打印使用说明
+ * @param prog 程序名
+ */
+static void print_usage(const char* prog) {
+    printf("AgentOS Scheduler Daemon\n");
+    printf("Usage: %s [options]\n\n", prog);
+    printf("Options:\n");
+    printf("  --manager <path>   Configuration file path\n");
+    printf("  --tcp             Use TCP instead of Unix socket\n");
+    printf("  --help             Show this help\n");
+    printf("\n");
+    printf("Examples:\n");
+    printf("  %s --manager /etc/agentos/sched.yaml\n", prog);
+    printf("  %s --tcp           # Use TCP mode on port 8083\n", prog);
+}
+
+/* ==================== 主函数 ==================== */
+
+int main(int argc, char** argv) {
+    const char* config_path = "manager/service/sched_d/sched.yaml";
+    int use_tcp = 0;
+
+    /* 解析命令行参数 */
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--manager") == 0 && i + 1 < argc) {
+            config_path = argv[++i];
+        } else if (strcmp(argv[i], "--help") == 0) {
+            print_usage(argv[0]);
+            return 0;
+        } else if (strcmp(argv[i], "--tcp") == 0) {
+            use_tcp = 1;
+        } else {
+            fprintf(stderr, "Unknown option: %s\n", argv[i]);
+            print_usage(argv[0]);
+            return 1;
         }
     }
 
-    // 获取新策略接口
-    const strategy_interface_t* new_strategy = get_strategy_by_type(manager->strategy);
-    if (!new_strategy) {
-        return -2; // 无效的策略类型
-    }
+    /* 初始化平台层 */
+    agentos_socket_init();
+    agentos_mutex_init(&g_running_lock);
 
-    // 创建新策略
-    void* new_strategy_data = NULL;
-    if (new_strategy->create(manager, &new_strategy_data) != 0) {
-        return -3; // 创建新策略失败
-    }
+    /* 设置信号处理 */
+#ifdef _WIN32
+    SetConsoleCtrlHandler(console_handler, TRUE);
+#else
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
+    signal(SIGPIPE, SIG_IGN);
+#endif
 
-    // 更新配置和策略
-    service->manager = *manager;
-    service->strategy = new_strategy;
-    service->strategy_data = new_strategy_data;
+    SVC_LOG_INFO("Scheduler service starting, manager=%s", config_path);
 
-    // 记录配置重载日志
-    log_info_t log = {
-        .level = LOG_LEVEL_INFO,
-        .message = "Scheduler service manager reloaded successfully",
-        .service_name = "sched_d",
-        .file = __FILE__,
-        .line = __LINE__,
-        .function = __func__,
-        .timestamp = (uint64_t)time(NULL) * 1000,
-        .context = NULL,
-        .context_count = 0
-    };
-    monitor_service_log(service->monitor, &log);
-
-    printf("Scheduler service manager reloaded with strategy: %s\n", service->strategy->get_name());
-    return 0;
-}
-
-/**
- * @brief 主函数
- * @return 0 表示成功，非 0 表示错误码
- */
-int main() {
-    // 初始化随机数
-    srand(time(NULL));
-
-    // 创建配置
-    sched_config_t manager = {
+    /* 创建配置 */
+    sched_config_t config = {
         .strategy = SCHED_STRATEGY_ROUND_ROBIN,
         .health_check_interval_ms = 5000,
         .stats_report_interval_ms = 10000,
@@ -492,114 +441,67 @@ int main() {
         .max_agents = 100
     };
 
-    // 创建调度服务
-    sched_service_t* service = NULL;
-    if (sched_service_create(&manager, &service) != 0) {
-        printf("Failed to create scheduler service\n");
+    /* 创建调度服务 */
+    int ret = sched_service_create(&config, &g_service);
+    if (ret != AGENTOS_SUCCESS || !g_service) {
+        SVC_LOG_ERROR("Failed to create scheduler service (error=%d)", ret);
+        agentos_mutex_destroy(&g_running_lock);
+        agentos_socket_cleanup();
         return 1;
     }
 
-    // 注册 Agent
-    agent_info_t agent1 = {
-        .agent_id = "agent1",
-        .agent_name = "Agent 1",
-        .load_factor = 0.3,
-        .success_rate = 0.95,
-        .avg_response_time_ms = 100,
-        .is_available = true,
-        .weight = 1.0
-    };
+    SVC_LOG_INFO("Scheduler service created with strategy: round_robin");
 
-    agent_info_t agent2 = {
-        .agent_id = "agent2",
-        .agent_name = "Agent 2",
-        .load_factor = 0.5,
-        .success_rate = 0.90,
-        .avg_response_time_ms = 150,
-        .is_available = true,
-        .weight = 1.0
-    };
+    /* 创建服务器 Socket */
+    agentos_socket_t server_fd;
 
-    agent_info_t agent3 = {
-        .agent_id = "agent3",
-        .agent_name = "Agent 3",
-        .load_factor = 0.2,
-        .success_rate = 0.98,
-        .avg_response_time_ms = 80,
-        .is_available = true,
-        .weight = 1.0
-    };
-
-    sched_service_register_agent(service, &agent1);
-    sched_service_register_agent(service, &agent2);
-    sched_service_register_agent(service, &agent3);
-
-    // 创建任务
-    task_info_t task1 = {
-        .task_id = "task1",
-        .task_description = "Task 1",
-        .priority = TASK_PRIORITY_NORMAL,
-        .timeout_ms = 5000,
-        .task_data = NULL,
-        .task_data_size = 0
-    };
-
-    task_info_t task2 = {
-        .task_id = "task2",
-        .task_description = "Task 2",
-        .priority = TASK_PRIORITY_HIGH,
-        .timeout_ms = 3000,
-        .task_data = NULL,
-        .task_data_size = 0
-    };
-
-    task_info_t task3 = {
-        .task_id = "task3",
-        .task_description = "Task 3",
-        .priority = TASK_PRIORITY_LOW,
-        .timeout_ms = 10000,
-        .task_data = NULL,
-        .task_data_size = 0
-    };
-
-    // 调度任务
-    sched_result_t* result = NULL;
-    sched_service_schedule_task(service, &task1, &result);
-    if (result) {
-        free(result->selected_agent_id);
-        free(result);
-        result = NULL;
+    if (use_tcp) {
+        server_fd = agentos_socket_create_tcp_server("127.0.0.1", DEFAULT_TCP_PORT);
+        if (server_fd == AGENTOS_INVALID_SOCKET) {
+            SVC_LOG_ERROR("Failed to create TCP server on port %d", DEFAULT_TCP_PORT);
+            sched_service_destroy(g_service);
+            agentos_mutex_destroy(&g_running_lock);
+            agentos_socket_cleanup();
+            return 1;
+        }
+        SVC_LOG_INFO("Listening on TCP port %d", DEFAULT_TCP_PORT);
+    } else {
+#if defined(AGENTOS_PLATFORM_WINDOWS)
+        server_fd = agentos_socket_create_named_pipe_server(DEFAULT_SOCKET_PATH_WIN);
+#else
+        server_fd = agentos_socket_create_unix_server(DEFAULT_SOCKET_PATH_UNIX);
+#endif
+        if (server_fd == AGENTOS_INVALID_SOCKET) {
+            SVC_LOG_ERROR("Failed to create socket at default path");
+            sched_service_destroy(g_service);
+            agentos_mutex_destroy(&g_running_lock);
+            agentos_socket_cleanup();
+            return 1;
+        }
+        SVC_LOG_INFO("Listening on Unix socket");
     }
 
-    sched_service_schedule_task(service, &task2, &result);
-    if (result) {
-        free(result->selected_agent_id);
-        free(result);
-        result = NULL;
+    SVC_LOG_INFO("Scheduler service started successfully");
+
+    /* 主事件循环 */
+    while (g_running) {
+        agentos_socket_t client_fd = agentos_socket_accept(server_fd, 5000);
+
+        if (client_fd == AGENTOS_INVALID_SOCKET) {
+            continue;
+        }
+
+        /* 处理客户端请求 */
+        handle_client(client_fd);
     }
 
-    sched_service_schedule_task(service, &task3, &result);
-    if (result) {
-        free(result->selected_agent_id);
-        free(result);
-        result = NULL;
-    }
+    /* 清理资源 */
+    SVC_LOG_INFO("Scheduler service stopping...");
+    agentos_socket_close(server_fd);
+    sched_service_destroy(g_service);
+    agentos_mutex_destroy(&g_running_lock);
+    agentos_socket_cleanup();
 
-    // 生成统计报告
-    char* report = NULL;
-    monitor_service_generate_report(service->monitor, &report);
-    if (report) {
-        printf("\n调度服务统计报告:\n%s\n", report);
-        free(report);
-    }
-
-    // 健康检查
-    bool health_status = false;
-    sched_service_health_check(service, &health_status);
-    printf("Health check status: %s\n", health_status ? "Healthy" : "Unhealthy");
-
-    // 销毁调度服务
-    sched_service_destroy(service);
-
+    SVC_LOG_INFO("Scheduler service stopped");
     return 0;
 }

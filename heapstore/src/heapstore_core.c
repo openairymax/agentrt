@@ -1122,7 +1122,7 @@ heapstore_error_t heapstore_batch_commit(heapstore_batch_context_t* ctx) {
                     NULL, 0, item->data.log.message);
                 break;
             case HEAPSTORE_BATCH_ITEM_SPAN: {
-                heapstore_span_record_t span_rec;
+                heapstore_span_t span_rec;
                 memset(&span_rec, 0, sizeof(span_rec));
                 strncpy(span_rec.trace_id, item->data.span.trace_id, sizeof(span_rec.trace_id) - 1);
                 strncpy(span_rec.span_id, item->data.span.span_id, sizeof(span_rec.span_id) - 1);
@@ -1130,13 +1130,18 @@ heapstore_error_t heapstore_batch_commit(heapstore_batch_context_t* ctx) {
                     strncpy(span_rec.parent_span_id, item->data.span.parent_span_id, sizeof(span_rec.parent_span_id) - 1);
                 }
                 strncpy(span_rec.name, item->data.span.name, sizeof(span_rec.name) - 1);
-                span_rec.start_time_us = item->data.span.start_time_us;
-                span_rec.end_time_us = item->data.span.end_time_us;
-                span_rec.status = item->data.span.status;
+                span_rec.start_time_ns = (uint64_t)item->data.span.start_time_us * 1000ULL;
+                span_rec.end_time_ns = (uint64_t)item->data.span.end_time_us * 1000ULL;
+                snprintf(span_rec.status, sizeof(span_rec.status), "%d", item->data.span.status);
                 if (item->data.span.attributes[0]) {
-                    strncpy(span_rec.attributes, item->data.span.attributes, sizeof(span_rec.attributes) - 1);
+                    span_rec.attributes = strdup(item->data.span.attributes);
+                    span_rec.attribute_count = 1;
                 }
                 err = heapstore_trace_write_span(&span_rec);
+                if (span_rec.attributes) {
+                    free(span_rec.attributes);
+                    span_rec.attributes = NULL;
+                }
                 break;
             }
             case HEAPSTORE_BATCH_ITEM_SESSION:

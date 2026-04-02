@@ -447,13 +447,13 @@ heapstore_error_t heapstore_batch_add_allocation(
     const heapstore_memory_allocation_t* allocation);
 heapstore_error_t heapstore_batch_add_ipc_channel(
     heapstore_batch_context_t* ctx,
-    const heapstore_channel_record_t* channel);
+    const heapstore_ipc_channel_t* channel);
 heapstore_error_t heapstore_batch_add_ipc_buffer(
     heapstore_batch_context_t* ctx,
-    const heapstore_buffer_record_t* buffer);
+    const heapstore_ipc_buffer_t* buffer);
 heapstore_error_t heapstore_batch_add_span(
     heapstore_batch_context_t* ctx,
-    const heapstore_span_record_t* span);
+    const heapstore_span_t* span);
 
 heapstore_error_t heapstore_batch_commit(
     heapstore_batch_context_t* ctx);

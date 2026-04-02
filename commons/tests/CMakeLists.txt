@@ -33,6 +33,12 @@ foreach(test_source ${UNIT_TEST_SOURCES})
         ${CMAKE_SOURCE_DIR}/utils/manager/include
         ${CMAKE_SOURCE_DIR}/utils/token/include
         ${CMAKE_SOURCE_DIR}/utils/cost/include
+        # 新增模块包含路径
+        ${CMAKE_SOURCE_DIR}/utils/types/include
+        ${CMAKE_SOURCE_DIR}/utils/ipc/include
+        ${CMAKE_SOURCE_DIR}/utils/network/include
+        # 测试框架
+        ${CMAKE_CURRENT_SOURCE_DIR}/utils
     )
     
     target_link_libraries(${test_name} PRIVATE
@@ -60,6 +66,12 @@ foreach(test_source ${INTEGRATION_TEST_SOURCES})
         ${CMAKE_SOURCE_DIR}/utils/manager/include
         ${CMAKE_SOURCE_DIR}/utils/token/include
         ${CMAKE_SOURCE_DIR}/utils/cost/include
+        # 新增模块包含路径
+        ${CMAKE_SOURCE_DIR}/utils/types/include
+        ${CMAKE_SOURCE_DIR}/utils/ipc/include
+        ${CMAKE_SOURCE_DIR}/utils/network/include
+        # 测试框架
+        ${CMAKE_CURRENT_SOURCE_DIR}/utils
     )
     
     target_link_libraries(${test_name} PRIVATE
