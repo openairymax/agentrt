@@ -7,29 +7,24 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 **更新**: 2026-04-02  
 **状态**: 正式发布  
 **路径**: `manuals/ARCHITECTURAL_PRINCIPLES.md`  
-**作者**: 
-- Zhixian Zhou | Spharx Ltd. zhouzhixian@spharx.cn
-- Liren Wang | Spharx Ltd. wangliren@spharx.cn
-- Chen Zhang | SJTU CSC Lab. yoyoke@sjtu.edu.cn
-- Yunwen Xu | SJTU CSC Lab. willing419@sjtu.edu.cn
-- Daxiang Zhu | IndieBros. zdxever@sina.com
+**作者**: AgentOS Team
+  - Zhixian Zhou | Spharx Ltd. zhouzhixian@spharx.cn
+  - Liren Wang | Spharx Ltd. wangliren@spharx.cn
+  - Chen Zhang | SJTU CSC Lab. yoyoke@sjtu.edu.cn
+  - Yunwen Xu | SJTU CSC Lab. willing419@sjtu.edu.cn
+  - Daxiang Zhu | IndieBros. zdxever@sina.com
 
 ---
 
 ## 目录
 
 - [五维正交系统核心原则概览](#核心原则概览)
-- [第 1 章 引言](#第-1-章-引言)
-  - [1.1 编制目的](#11-编制目的)
-  - [1.2 设计起源](#12-设计起源)
-  - [1.3 理论根基](#13-理论根基)
-  - [1.4 术语定义](#14-术语定义)
-  - [1.5 原则体系结构](#15-原则体系结构)
-- [第 2 章 维度一：系统观](#第-2-章-维度一系统观)
-- [第 3 章 维度二：内核观](#第-3-章-维度二内核观)
-- [第 4 章 维度三：认知观](#第-4-章-维度三认知观)
-- [第 5 章 维度四：工程观](#第-5-章-维度四工程观)
-- [第 6 章 维度五：设计美学](#第-6-章-维度五设计美学)
+- [第 1 章 引  言](#第-1-章-引言)
+- [第 2 章 系统观](#第-2-章-维度一系统观)
+- [第 3 章 内核观](#第-3-章-维度二内核观)
+- [第 4 章 认知观](#第-4-章-维度三认知观)
+- [第 5 章 工程观](#第-5-章-维度四工程观)
+- [第 6 章 设计美学](#第-6-章-维度五设计美学)
 - [第 7 章 原则应用案例](#第-7-章-原则应用案例)
 - [第 8 章 原则验证方法](#第-8-章-原则验证方法)
 - [第 9 章 参考资料](#第-9-章-参考资料)
@@ -134,7 +129,7 @@ AgentOS 架构设计经历了三个主要阶段的演进：
 
 从实际代码中反向提炼设计原则，形成五维正交体系。核心成果：
 
-- 20 条核心原则覆盖系统观、内核观、认知观、工程观、设计美学
+- 24 条核心原则覆盖系统观、内核观、认知观、工程观、设计美学
 - 每条原则都有明确的实施规则和验证方法
 
 #### 1.2.3 设计决策记录
@@ -1539,20 +1534,6 @@ python scripts/check_error_i18n.py --lang zh-CN,en-US
 | [系统调用规范](./syscall.md) | 原则 K-2、K-3 的接口规范 |
 | [C 安全编程指南](../../specifications/coding_standard/C&Cpp-secure-coding-guide.md) | 原则 E-1、E-3 的编码落实 |
 | [统一术语表](../../specifications/TERMINOLOGY.md) | 本文档使用的术语定义 |
-
----
-
-**版本历史**
-
-| 版本 | 日期 | 作者 | 变更说明 |
-|------|------|------|----------|
-| Doc V1.8 | 2026-04-02 | SpharxTeam | 采纳十条工程化改进建议，强化原则可操作性、可验证性、与代码演进衔接 |
-| Doc V1.6 | 2026-03-25 | DechengLi | 深度优化理论基础 |
-| Doc V1.5 | 2026-03-24 | DechengLi | 增加起源章节 |
-| Doc V1.4 | 2026-03-24 | LirenWang | 按规范重新编写 |
-| Doc V1.3 | 2026-03-23 | Chenzhang | 基于项目实际架构全面重构 |
-| Doc V1.2 | 2026-03-21 | DechengLi | 基于系统工程理论重构 |
-| Doc V1.1 | 2026-02-01 | DechengLi | 原始架构设计原则 |
 
 ---
 
