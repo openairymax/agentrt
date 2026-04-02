@@ -18,7 +18,14 @@
 
 #include "task.h"
 #include <stddef.h>
+
+#ifdef _WIN32
+#include <windows.h>
+/* Windows 平台的原子操作替代实现 */
+#define _Atomic volatile
+#else
 #include <stdatomic.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {

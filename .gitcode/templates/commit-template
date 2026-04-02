@@ -1,0 +1,29 @@
+# AgentOS 提交消息模板
+# 使用方法：git config commit.template .gitcode/templates/commit-template
+
+# <type>(<scope>): <subject>
+#
+# <body>
+#
+# <footer>
+
+# 类型说明:
+# feat:     新功能
+# fix:      Bug 修复
+# docs:     文档变更
+# style:    代码格式（不影响功能）
+# refactor: 代码重构（不是新功能也不是 bug 修复）
+# perf:     性能优化
+# test:     测试相关
+# build:    构建系统或依赖变更
+# ci:       CI/CD 配置变更
+# chore:    杂项（不影响源码和测试）
+# revert:   回滚提交
+
+# 示例:
+# feat(gateway): add JWT authentication middleware
+#
+# Implement JWT-based authentication for the gateway service.
+# This includes token generation, validation, and refresh logic.
+#
+# Closes #123

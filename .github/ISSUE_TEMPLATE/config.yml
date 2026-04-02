@@ -1,0 +1,15 @@
+# Issue Template Configuration
+blank_issues_enabled: false
+contact_links:
+  - name: Gitee Official Repository
+    url: https://gitee.com/spharx/agentos
+    about: AgentOS official repository on Gitee (preferred for Chinese community)
+  - name: Discussions
+    url: https://github.com/SpharxTeam/AgentOS/discussions
+    about: Discuss questions and ideas on GitHub Discussions
+  - name: Contributing Guide
+    url: ../CONTRIBUTING.md
+    about: Please read the contributing guide first
+  - name: Code of Conduct
+    url: ../CODE_OF_CONDUCT.md
+    about: Please adhere to our code of conduct

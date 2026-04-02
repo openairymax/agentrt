@@ -100,10 +100,16 @@ if(ENABLE_COVERAGE)
 endif()
 
 # 查找依赖
-find_package(OpenSSL REQUIRED)
+find_package(OpenSSL QUIET)
+if(OpenSSL_FOUND)
+    message(STATUS "OpenSSL found: ${OpenSSL_VERSION}")
+    add_definitions(-DAGENTOS_HAS_OPENSSL=1)
+else()
+    message(WARNING "OpenSSL not found, some security features may be limited")
+endif()
 find_package(Threads REQUIRED)
 
-# libevent 是核心依赖（用于事件驱动模块）
+# libevent 是可选依赖（用于事件驱动模块）
 if(WIN32)
     # Windows平台：尝试通过CMake查找或vcpkg
     find_package(libevent CONFIG QUIET)
@@ -119,18 +125,26 @@ if(WIN32)
                 message(STATUS "libevent found via pkg-config: ${LIBEVENT_VERSION}")
                 add_definitions(-DAGENTOS_HAS_LIBEVENT=1)
             else()
-                message(FATAL_ERROR "libevent not found on Windows. Please install via vcpkg: vcpkg install libevent")
+                message(WARNING "libevent not found on Windows. Event-driven features may be limited")
             endif()
         else()
-            message(FATAL_ERROR "libevent not found on Windows. Please install via vcpkg: vcpkg install libevent")
+            message(WARNING "libevent not found on Windows. Event-driven features may be limited")
         endif()
     endif()
 else()
     # Unix-like平台：使用pkg-config
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(LIBEVENT REQUIRED libevent)
-    message(STATUS "libevent found: ${LIBEVENT_VERSION}")
-    add_definitions(-DAGENTOS_HAS_LIBEVENT=1)
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(LIBEVENT QUIET libevent)
+        if(LIBEVENT_FOUND)
+            message(STATUS "libevent found: ${LIBEVENT_VERSION}")
+            add_definitions(-DAGENTOS_HAS_LIBEVENT=1)
+        else()
+            message(WARNING "libevent not found on Unix-like platforms. Event-driven features may be limited")
+        endif()
+    else()
+        message(WARNING "PkgConfig not found, cannot check for libevent. Event-driven features may be limited")
+    endif()
 endif()
 
 # 可选依赖
@@ -239,7 +253,7 @@ add_subdirectory(syscall)
 
 # 安装配置
 # 库文件安装
-install(TARGETS agentos_core agentos_coreloopthree agentos_memoryrovol agentos_syscall
+install(TARGETS agentos_core agentos_coreloopthree agentos_memoryrovol agentos_syscall agentos_cognition agentos_execution
     EXPORT AgentOSTargets
     ARCHIVE DESTINATION lib/agentos
     LIBRARY DESTINATION lib/agentos
