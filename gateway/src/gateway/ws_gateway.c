@@ -497,6 +497,12 @@ static const char* ws_gateway_get_name(void* gateway_impl) {
     return "WebSocket Gateway";
 }
 
+static bool ws_gateway_is_running(void* gateway_impl) {
+    ws_gateway_t* gateway = (ws_gateway_t*)gateway_impl;
+    if (!gateway) return false;
+    return atomic_load(&gateway->running);
+}
+
 static agentos_error_t ws_gateway_get_stats(void* gateway_impl, char** out_json) {
     ws_gateway_t* gateway = (ws_gateway_t*)gateway_impl;
     
@@ -519,7 +525,8 @@ static const gateway_ops_t ws_gateway_ops = {
     .stop = ws_gateway_stop,
     .destroy = ws_gateway_destroy,
     .get_name = ws_gateway_get_name,
-    .get_stats = ws_gateway_get_stats
+    .get_stats = ws_gateway_get_stats,
+    .is_running = ws_gateway_is_running
 };
 
 /* ========== 公共接口 ========== */
@@ -560,6 +567,7 @@ gateway_t* ws_gateway_create(const char* host, uint16_t port) {
     
     gw->ops = &ws_gateway_ops;
     gw->impl = gateway;
+    gw->type = GATEWAY_TYPE_WS;
     
     return gw;
 }

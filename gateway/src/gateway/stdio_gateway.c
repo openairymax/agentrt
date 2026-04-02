@@ -424,6 +424,12 @@ static const char* stdio_gateway_get_name(void* gateway_impl) {
     return "Stdio Gateway";
 }
 
+static bool stdio_gateway_is_running(void* gateway_impl) {
+    stdio_gateway_t* gateway = (stdio_gateway_t*)gateway_impl;
+    if (!gateway) return false;
+    return atomic_load(&gateway->running);
+}
+
 static agentos_error_t stdio_gateway_get_stats(void* gateway_impl, char** out_json) {
     stdio_gateway_t* gateway = (stdio_gateway_t*)gateway_impl;
     
@@ -445,7 +451,8 @@ static const gateway_ops_t stdio_gateway_ops = {
     .stop = stdio_gateway_stop,
     .destroy = stdio_gateway_destroy,
     .get_name = stdio_gateway_get_name,
-    .get_stats = stdio_gateway_get_stats
+    .get_stats = stdio_gateway_get_stats,
+    .is_running = stdio_gateway_is_running
 };
 
 /* ========== 公共接口 ========== */
@@ -470,6 +477,7 @@ gateway_t* stdio_gateway_create(void) {
     
     gw->ops = &stdio_gateway_ops;
     gw->impl = gateway;
+    gw->type = GATEWAY_TYPE_STDIO;
     
     return gw;
 }
