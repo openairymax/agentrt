@@ -2,14 +2,15 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-1.0.0.6-blue.svg)](https://gitee.com/spharx/agentos)
-[![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](https://gitee.com/spharx/agentos/blob/main/LICENSE)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/SpharxTeam/AgentOS/actions)
-[![Documentation Status](https://img.shields.io/badge/docs-Doc%20V1.7-blue)](manuals/README.md)
+[![Version](https://img.shields.io/badge/version-1.0.0.8-blue.svg)](https://atomgit.com/spharx/agentos)
+[![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](https://atomgit.com/spharx/agentos/blob/main/LICENSE)
 [![Docker](https://img.shields.io/badge/docker-supported-blue.svg?logo=docker&logoColor=white)](https://www.docker.com/)
 [![C/C++](https://img.shields.io/badge/C%2FC%2B%2B-11%2F17-blue.svg?logo=c%2B%2B&logoColor=white)](https://isocpp.org/)
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![Star](https://atomgit.com/spharx/agentos/star/badge.svg)](https://atomgit.com/spharx/agentos)
 [![Mirror](https://img.shields.io/badge/mirror-GitHub-lightgrey.svg)](https://github.com/SpharxTeam/AgentOS)
+[![Mirror](https://img.shields.io/badge/mirror-Gitee-orange.svg)](https://gitee.com/spharx/agentos)
+
 
 ---
 
@@ -58,7 +59,7 @@
 
 ## 🚀 项目简介
 
-AgentOS 是 [SpharxWorks](https://gitee.com/spharx/spharxhub) 数据生产线的核心环节的核心产品
+AgentOS 是 [SpharxWorks](https://atomgit.com/spharx/spharxhub) 数据生产线的核心环节的核心产品
 
 是一个完全自研架构的**生产就绪的智能体操作系统**
 
@@ -94,7 +95,7 @@ AgentOS 的设计在于理论成果工程化，形成完整的科学支撑体系
 - **微内核的新使用**：从传统 OS 的微内核扩展为"操作系统即内核"的新使用方法
 - **美感哲学的引入**：将设计美学提升到架构原则高度，强调人文关怀和美学追求
 
-👉 详见 [架构设计原则 Doc V1.7](manuals/ARCHITECTURAL_PRINCIPLES.md)
+👉 详见 [架构设计原则 Doc V1.8](manuals/ARCHITECTURAL_PRINCIPLES.md)
 
 ---
 
@@ -513,8 +514,11 @@ AGENTOS_API agentos_error_t agentos_sys_memory_write(
 ### 🚀 快速开始
 
 ```bash
-# 克隆项目
-git clone https://gitee.com/spharx/agentos.git
+# 克隆项目（主仓库）
+git clone https://atomgit.com/spharx/agentos.git
+# 或者使用镜像仓库
+# git clone https://gitee.com/spharx/agentos.git
+# git clone https://github.com/SpharxTeam/AgentOS.git
 cd agentos
 
 # 初始化配置
@@ -598,7 +602,7 @@ ctest --output-on-failure
 
 | 文档 | 说明 |
 |------|------|
-| [架构设计原则 Doc V1.7](manuals/ARCHITECTURAL_PRINCIPLES.md) | **五维正交原则体系**: 系统观/内核观/认知观/工程观/设计美学 |
+| [架构设计原则 Doc V1.8](manuals/ARCHITECTURAL_PRINCIPLES.md) | **五维正交原则体系**: 系统观/内核观/认知观/工程观/设计美学 |
 | [CoreLoopThree 架构](manuals/architecture/coreloopthree.md) | 三层认知循环：认知→规划→行动 |
 | [MemoryRovol 架构](manuals/architecture/memoryrovol.md) | 四层记忆系统：L1→L2→L3→L4 |
 | [微内核架构](manuals/architecture/microkernel.md) | corekern 原子内核：IPC/Mem/Task/Time |
@@ -1030,11 +1034,12 @@ AgentOS 采用**商业友好、生态友好的分层开源协议**。
 **技术支持**: lidecheng@spharx.cn  
 **安全报告**: wangliren@spharx.cn  
 **商业咨询**: zhouzhixian@spharx.cn  
-**官方网站**: https://spharx.cn
+
 
 <p>
-  <a href="https://gitee.com/spharx/agentos">Gitee（官方主仓库）</a> ·
-  <a href="https://github.com/SpharxTeam/AgentOS">GitHub（镜像仓库）</a> ·
+  <a href="https://atomgit.com/spharx/agentos">AtomGit</a> ·
+  <a href="https://gitee.com/spharx/agentos">Gitee</a> ·
+  <a href="https://github.com/SpharxTeam/AgentOS">GitHub</a> ·
   <a href="https://spharx.cn">官方网站</a>
 </p>
 
