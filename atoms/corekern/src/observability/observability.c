@@ -97,8 +97,8 @@ typedef struct {
     size_t health_checks_count;
     histogram_entry_t* histograms_head;
     size_t histograms_count;
-    agentos_thread_t* metrics_thread;
-    agentos_thread_t* health_check_thread;
+    agentos_thread_t metrics_thread;  /* 线程句柄（Windows: HANDLE, POSIX: pthread_t） */
+    agentos_thread_t health_check_thread;  /* 线程句柄 */
     int shutdown_requested;
     uint64_t start_time_ns;
     uint64_t total_metrics_collected;
@@ -199,7 +199,7 @@ static histogram_entry_t* create_histogram_locked(const char* name, const char* 
     return entry;
 }
 
-static void* metrics_collection_thread(void* arg) {
+static void metrics_collection_thread(void* arg) {
     (void)arg;
     while (!g_state->shutdown_requested) {
         agentos_mutex_lock(g_state->lock);
@@ -207,10 +207,9 @@ static void* metrics_collection_thread(void* arg) {
         agentos_mutex_unlock(g_state->lock);
         agentos_task_sleep(g_state->manager.metrics_interval_ms);
     }
-    return NULL;
 }
 
-static void* health_check_thread(void* arg) {
+static void health_check_thread(void* arg) {
     (void)arg;
     while (!g_state->shutdown_requested) {
         agentos_mutex_lock(g_state->lock);
@@ -226,7 +225,6 @@ static void* health_check_thread(void* arg) {
         agentos_mutex_unlock(g_state->lock);
         agentos_task_sleep(g_state->manager.health_check_interval_ms);
     }
-    return NULL;
 }
 
 static double get_cpu_usage(void) {
@@ -377,7 +375,7 @@ int agentos_observability_init(const agentos_observability_config_t* manager) {
     if (manager->enable_metrics && manager->metrics_interval_ms > 0) {
         agentos_error_t err = agentos_thread_create(&state->metrics_thread, NULL, metrics_collection_thread, NULL);
         if (err != AGENTOS_SUCCESS) {
-            ret = AGENTOS_ENOMEM;
+            ret = err;  // 使用实际的错误码而非硬编码 ENOMEM
             goto error;
         }
     }
@@ -386,7 +384,7 @@ int agentos_observability_init(const agentos_observability_config_t* manager) {
     if (manager->enable_health_check && manager->health_check_interval_ms > 0) {
         agentos_error_t err = agentos_thread_create(&state->health_check_thread, NULL, health_check_thread, NULL);
         if (err != AGENTOS_SUCCESS) {
-            ret = AGENTOS_ENOMEM;
+            ret = err;  // 使用实际的错误码而非硬编码 ENOMEM
             goto error;
         }
     }
@@ -420,12 +418,23 @@ void agentos_observability_shutdown(void) {
     agentos_mutex_lock(g_state->lock);
     g_state->shutdown_requested = 1;
     agentos_mutex_unlock(g_state->lock);
+#ifdef _WIN32
+    if (g_state->metrics_thread != NULL) {
+        agentos_thread_join(g_state->metrics_thread, NULL);
+        g_state->metrics_thread = NULL;
+    }
+    if (g_state->health_check_thread != NULL) {
+        agentos_thread_join(g_state->health_check_thread, NULL);
+        g_state->health_check_thread = NULL;
+    }
+#else
     if (g_state->metrics_thread) {
         agentos_thread_join(g_state->metrics_thread, NULL);
     }
     if (g_state->health_check_thread) {
         agentos_thread_join(g_state->health_check_thread, NULL);
     }
+#endif
     agentos_mutex_lock(g_state->lock);
     metric_entry_t* m = g_state->metrics_head;
     while (m) {
