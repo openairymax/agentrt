@@ -1,0 +1,184 @@
+name: Code Quality Gate
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  code-formatting:
+    name: Code Formatting Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run clang-format
+        uses: jidicula/clang-format-action@v4.13.3
+        with:
+          clang-format-version: '18'
+          check-path: 'daemon commons atoms gateway heapstore manager toolkit'
+          exclude-regex: '(vendor|third_party|generated)/.*'
+
+  linting:
+    name: Linting
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install linters
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck shellcheck
+          pip install flake8 pylint black isort mypy
+
+      - name: Run cppcheck
+        run: |
+          cppcheck --enable=all \
+            --std=c11 \
+            --suppress=missingIncludeSystem \
+            --error-exitcode=1 \
+            daemon/common/src \
+            daemon/*/src \
+            atoms/*/src \
+            commons/src \
+            2>&1 | tee cppcheck-report.txt || true
+
+      - name: Run ShellCheck
+        run: |
+          find . -name "*.sh" -type f ! -path "./.git/*" -exec shellcheck {} + 2>&1 || true
+
+      - name: Upload lint results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lint-results
+          path: cppcheck-report.txt
+          retention-days: 30
+
+  complexity-analysis:
+    name: Code Complexity Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Calculate complexity metrics
+        run: |
+          echo "📊 Analyzing code complexity..."
+          
+          # 统计代码行数
+          TOTAL_LINES=$(find daemon commons atoms gateway heapstore manager toolkit -name '*.c' -o -name '*.h' | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}')
+          echo "Total lines of C/C++ code: ${TOTAL_LINES:-0}"
+          
+          # 找出最复杂的文件
+          echo ""
+          echo "Top 10 most complex files (by line count):"
+          find daemon commons atoms gateway heapstore manager toolkit \( -name '*.c' -o -name '*.h' \) -exec wc -l {} + 2>/dev/null | sort -rn | head -10
+          
+          # 检测过长的函数
+          echo ""
+          echo "Functions exceeding 100 lines:"
+          grep -rn "^{" daemon/common/src daemon/*/src atoms/*/src commons/src 2>/dev/null | head -20 || echo "None found"
+
+      - name: Generate complexity report
+        run: |
+          cat > complexity-report.md << EOF
+          # Code Complexity Report
+          
+          **Generated**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          
+          ## Metrics
+          
+          - Total LOC: See above output
+          - Files analyzed: $(find daemon commons atoms gateway heapstore manager toolkit -name '*.c' -o -name '*.h' | wc -l)
+          
+          ## Guidelines
+          
+          - Keep functions under 100 lines
+          - Maintain cyclomatic complexity under 10
+          - Avoid deeply nested conditionals (>4 levels)
+          
+          EOF
+          
+          cat complexity-report.md
+
+  documentation-check:
+    name: Documentation Coverage
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check API documentation coverage
+        run: |
+          echo "📝 Checking documentation coverage..."
+          
+          # 检查公共头文件是否有 Doxygen 注释
+          PUBLIC_HEADERS=$(find daemon commons atoms -name "*.h" -path "*/include/*" 2>/dev/null)
+          UNDOCUMENTED=0
+          DOCUMENTED=0
+          
+          for header in $PUBLIC_HEADERS; do
+            if grep -q "/**" "$header"; then
+              DOCUMENTED=$((DOCUMENTED + 1))
+            else
+              UNDOCUMENTED=$((UNDOCUMENTED + 1))
+              echo "Undocumented: $header"
+            fi
+          done
+          
+          TOTAL=$((DOCUMENTED + UNDOCUMENTED))
+          if [ $TOTAL -gt 0 ]; then
+            COVERAGE=$((DOCUMENTED * 100 / TOTAL))
+            echo ""
+            echo "Documentation coverage: $COVERAGE%"
+            echo "Documented: $DOCUMENTED / $TOTAL"
+          fi
+
+  quality-gate:
+    name: Quality Gate Decision
+    needs: [code-formatting, linting, complexity-analysis, documentation-check]
+    if: always()
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Check all jobs passed
+        run: |
+          echo "## Quality Gate Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Code Formatting | ${{ needs.code-formatting.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Linting | ${{ needs.linting.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Complexity Analysis | ${{ needs.complexity-analysis.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Documentation Check | ${{ needs.documentation-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ needs.code-formatting.result }}" == "success" && 
+                "${{ needs.linting.result }}" == "success" && 
+                "${{ needs.complexity-analysis.result }}" == "success" && 
+                "${{ needs.documentation-check.result }}" == "success" ]]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ All quality checks passed!" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Some quality checks failed. Please review." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi

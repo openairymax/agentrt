@@ -54,8 +54,8 @@ target_link_libraries(agentos_memoryrovol
     ${YAML_LIBRARIES}
     ${SQLITE3_LIBRARIES}
     Threads::Threads
-    OpenSSL::SSL
-    OpenSSL::Crypto
+    $<$<BOOL:${OpenSSL_FOUND}>:OpenSSL::SSL>
+    $<$<BOOL:${OpenSSL_FOUND}>:OpenSSL::Crypto>
 )
 
 # 如果使用 Sentence Transformers，添加链接

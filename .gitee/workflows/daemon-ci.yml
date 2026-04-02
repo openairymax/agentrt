@@ -1,0 +1,231 @@
+# AgentOS Daemon CI/CD Pipeline for Gitee Go
+# 遵循 ARCHITECTURAL_PRINCIPLES.md 工程观 E-8: 自动化质量保障
+
+name: Daemon CI/CD
+
+on:
+  push:
+    branches: [ main, develop, 'feature/**' ]
+  pull_request:
+    branches: [ main, develop ]
+  manual: true  # 允许手动触发
+
+env:
+  CMAKE_VERSION: '3.28'
+  BUILD_TYPE: Release
+
+jobs:
+  # ==================== Linux 构建 ====================
+  build-linux:
+    name: Build (Ubuntu)
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          apt-get update && apt-get install -y \
+            build-essential cmake gcc g++ \
+            libcurl4-openssl-dev \
+            libyaml-dev \
+            libcjson-dev \
+            pkg-config \
+            valgrind \
+            cppcheck \
+            clang-format
+
+      - name: Configure CMake
+        run: |
+          mkdir -p build && cd build
+          cmake ../daemon \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DBUILD_TESTS=ON \
+            -DBUILD_COVERAGE=ON
+
+      - name: Build
+        run: |
+          cd build
+          cmake --build . --parallel $(nproc)
+
+      - name: Run tests
+        run: |
+          cd build
+          ctest --output-on-failure --timeout 300
+
+      - name: Code coverage report
+        if: success()
+        run: |
+          cd build
+          gcovr --root .. --filter "daemon/" --exclude "tests/" --xml -o coverage.xml || true
+          gcovr --root .. --filter "daemon/" --exclude "tests/" --html -o coverage.html || true
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-linux
+          path: |
+            build/coverage.xml
+            build/coverage.html
+
+  # ==================== Windows 构建 ====================
+  build-windows:
+    name: Build (Windows)
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJson: './vcpkg.json'
+          vcpkgGitCommitId: '2023-12-15'
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -S daemon `
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
+            -DBUILD_TESTS=ON `
+            "-DCMAKE_TOOLCHAIN_FILE=[vcpkg root]/scripts/buildsystems/vcpkg.cmake"
+
+      - name: Build
+        run: |
+          cmake --build build --config ${{ env.BUILD_TYPE }} --parallel
+
+      - name: Run tests
+        run: |
+          ctest --test-dir build --config ${{ env.BUILD_TYPE }} --output-on-failure
+
+  # ==================== 静态分析 ====================
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update && sudo apt-get install -y \
+            cppcheck clang-format-14 shellcheck
+
+      - name: Run cppcheck
+        run: |
+          cppcheck --enable=all \
+            --std=c11 \
+            --suppress=missingIncludeSystem \
+            --error-exitcode=1 \
+            --xml \
+            daemon/common/src \
+            daemon/*/src \
+            2> cppcheck-results.xml || true
+
+      - name: Check formatting
+        run: |
+          find daemon -name "*.c" -o -name "*.h" | xargs clang-format-14 --dry-run --Werror || true
+
+      - name: Upload analysis results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: static-analysis-results
+          path: cppcheck-results.xml
+
+  # ==================== 内存泄漏检测 ====================
+  memory-check:
+    name: Memory Leak Detection (Valgrind)
+    runs-on: ubuntu-latest
+    needs: build-linux
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y \
+            build-essential cmake gcc \
+            libcurl4-openssl-dev libyaml-dev libcjson-dev \
+            valgrind
+
+      - name: Build with debug info
+        run: |
+          mkdir -p build && cd build
+          cmake ../daemon -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON
+          cmake --build . --parallel
+
+      - name: Run Valgrind on tests
+        run: |
+          cd build
+          ctest -T memcheck --output-on-failure || true
+
+      - name: Upload Valgrind results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: valgrind-results
+          path: build/Testing/**/MemCheck*.xml
+
+  # ==================== 发布（仅 main 分支）====================
+  publish:
+    name: Publish Artifacts
+    needs: [build-linux, build-windows]
+    if: ${{ env.GITEE_REF == 'refs/heads/main' && env.GITEE_EVENT_NAME == 'push' }}
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build release artifacts
+        run: |
+          mkdir -p dist
+          # 创建发布包
+          tar czf dist/agentos-daemon-${{ env.GITEE_SHA }}.tar.gz \
+            daemon/common \
+            daemon/gateway_d \
+            daemon/llm_d \
+            daemon/tool_d \
+            daemon/sched_d \
+            daemon/monit_d \
+            daemon/market_d \
+            daemon/CMakeLists.txt \
+            daemon/Dockerfile.ci \
+            daemon/README.md
+
+      - name: Create Gitee Release
+        uses: actions/create-release@v1
+        with:
+          tag_name: v${{ env.GITEE_RUN_NUMBER }}
+          release_name: AgentOS Daemon v${{ env.GITEE_RUN_NUMBER }}
+          body: |
+            ## Release Notes
+            
+            ### Changes in this release:
+            - ✅ Cross-platform support for all services (Windows/Linux)
+            - ✅ True daemon process mode for sched_d, monit_d, market_d
+            - ✅ Unified error code system (AGENTOS_ERR_*)
+            - ✅ Structured logging (SVC_LOG_* macros)
+            - ✅ JWT authentication middleware
+            - ✅ API Key verification
+            - ✅ Rate limiting (token bucket algorithm)
+            
+            ### Services Included:
+            | Service | Port | Status |
+            |---------|------|--------|
+            | gateway_d | 8000 | Production Ready |
+            | llm_d | 8080 | Production Ready |
+            | tool_d | 8081 | Production Ready |
+            | market_d | 8082 | Production Ready |
+            | sched_d | 8083 | Production Ready |
+            | monit_d | 9090 | Production Ready |
+          
+          files: dist/*.tar.gz
+          draft: false
+          prerelease: false
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}

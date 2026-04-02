@@ -27,6 +27,26 @@ else()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wpedantic")
 endif()
 
+# 包含头文件路径
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../corekern/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../memoryrovol/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../..
+)
+
+# 添加子目录
+add_subdirectory(src/cognition)
+add_subdirectory(src/execution)
+
+# 创建主库
+add_library(agentos_coreloopthree STATIC
+    src/loop.c
+    src/config_loader.c
+    src/utils/error_utils.c
+    src/utils/id_utils.c
+)
+
 # 安全编译选项（基于AgentOS C编码风格指南附录A）
 if(MSVC)
     target_compile_options(agentos_coreloopthree PRIVATE /W4 /WX)
@@ -52,42 +72,16 @@ elseif(APPLE)
     target_link_options(agentos_coreloopthree PRIVATE -Wl,-dead_strip -pie)
 endif()
 
-# 包含头文件路径
-include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../corekern/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../memoryrovol/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../..
-)
-
-# 添加子目录
-add_subdirectory(src/cognition)
-add_subdirectory(src/execution)
-add_subdirectory(src/memory)
-
-# 创建主库
-add_library(agentos_coreloopthree STATIC
-    src/loop.c
-    src/config_loader.c
-    src/utils/error_utils.c
-    src/utils/id_utils.c
-)
-
 target_include_directories(agentos_coreloopthree PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(agentos_coreloopthree
+target_link_libraries(agentos_coreloopthree PRIVATE
     agentos_cognition
     agentos_execution
-    agentos_memory
     agentos_core
+    ws2_32
 )
-
-# 跨平台链接库
-if(WIN32)
-    target_link_libraries(agentos_coreloopthree PRIVATE ws2_32)
-endif()
 
 # 安装头文件
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/

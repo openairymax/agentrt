@@ -1,0 +1,71 @@
+# AgentOS Code Owners File
+# This file defines code owners for each module
+# Syntax: pattern owner1 owner2 ...
+
+# Kernel Layer
+/atoms/ @lidecheng @wangliren
+/atoms/corekern/ @lidecheng
+/atoms/coreloopthree/ @lidecheng
+/atoms/memoryrovol/ @lidecheng
+/atoms/syscall/ @wangliren
+
+# Lightweight Kernel
+/atomslite/ @lidecheng
+
+# Unified Base Library
+/commons/ @wangliren
+
+# Security Cupolas
+/cupolas/ @wangliren
+
+# User-space Services
+/daemon/ @wangliren
+/daemon/common/ @wangliren
+/daemon/llm_d/ @lidecheng
+/daemon/tool_d/ @wangliren
+/daemon/market_d/ @lidecheng
+/daemon/sched_d/ @wangliren
+/daemon/monit_d/ @wangliren
+
+# Gateway Layer
+/gateway/ @wangliren
+
+# Data Storage
+/heapstore/ @lidecheng
+
+# Configuration Management
+/manager/ @wangliren
+
+# Open Ecosystem Laboratory
+/openlab/ @lidecheng @wangliren
+
+# Multi-language SDKs
+/toolkit/ @lidecheng
+/toolkit/python/ @lidecheng
+/toolkit/go/ @wangliren
+/toolkit/rust/ @lidecheng
+/toolkit/typescript/ @wangliren
+
+# Documentation
+/manuals/ @lidecheng @wangliren
+
+# Testing
+/tests/ @lidecheng @wangliren
+
+# Scripts
+/scripts/ @wangliren
+
+# Configuration Files
+/.github/ @lidecheng @wangliren
+/.gitee/ @lidecheng @wangliren
+/.gitcode/ @lidecheng @wangliren
+
+# Root Directory Files
+/LICENSE @lidecheng
+/README.md @lidecheng
+/CONTRIBUTING.md @lidecheng
+/CODE_OF_CONDUCT.md @lidecheng
+/SECURITY.md @wangliren
+/CHANGELOG.md @lidecheng
+/AUTHORS.md @lidecheng
+/ACKNOWLEDGMENTS.md @lidecheng
