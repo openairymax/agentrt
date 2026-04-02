@@ -7,10 +7,12 @@
 [![GitHub](https://img.shields.io/github/stars/SpharxTeam/AgentOS?style=social)](https://github.com/SpharxTeam/AgentOS)  
 
 
-[![Version](https://img.shields.io/badge/version-1.0.0.8-blue.svg)](https://atomgit.com/spharx/agentos)
+[![Version](https://img.shields.io/badge/version-1.0.0.8-blue.svg)](https://atomgit.com/spharx/agentos)  
+[![Documentation Status](https://img.shields.io/badge/docs-Doc%20V1.8-blue)](manuals/ARCHITECTURAL_PRINCIPLES.md)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](https://atomgit.com/spharx/agentos/blob/main/LICENSE)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/SpharxTeam/AgentOS/actions)
-[![Documentation Status](https://img.shields.io/badge/docs-Doc%20V1.8-blue)](manuals/README.md)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/SpharxTeam/AgentOS/actions)  
+
+
 [![Docker](https://img.shields.io/badge/docker-supported-blue.svg?logo=docker&logoColor=white)](https://www.docker.com/)
 [![C/C++](https://img.shields.io/badge/C%2FC%2B%2B-11%2F17-blue.svg?logo=c%2B%2B&logoColor=white)](https://isocpp.org/)
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg?logo=python&logoColor=white)](https://www.python.org/)

@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * @file rerank.c
  * @brief 检索结果重排序（基于交叉编码器，带降级�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

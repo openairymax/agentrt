@@ -27,17 +27,21 @@ static void* g_ctx_init_lock = NULL;
 #define atomic_store(ptr, val) (*(ptr) = (val))
 #define atomic_load(ptr) (*(ptr))
 
-static inline int atomic_compare_exchange(volatile void* ptr, void* expected, void* desired) {
-    void* old = InterlockedCompareExchangePointer((volatile LONG_PTR*)ptr, (LONG_PTR)desired, *(LONG_PTR*)expected);
-    if (old == *(void**)expected) {
+static inline int atomic_compare_exchange(void** ptr, void** expected, void* desired) {
+#ifdef _WIN64
+    void* old = InterlockedCompareExchangePointer(ptr, desired, *expected);
+#else
+    void* old = (void*)InterlockedCompareExchange((volatile LONG*)ptr, (LONG)desired, *(LONG*)expected);
+#endif
+    if (old == *expected) {
         return 1;
     }
-    *(void**)expected = old;
+    *expected = old;
     return 0;
 }
 
 static inline uint64_t atomic_fetch_add_64(volatile uint64_t* ptr, uint64_t val) {
-    return InterlockedExchangeAdd64((volatile LONGLONG*)ptr, (LONGLONG)val);
+    return (uint64_t)InterlockedExchangeAdd64((volatile LONGLONG*)ptr, (LONGLONG)val);
 }
 #endif
 

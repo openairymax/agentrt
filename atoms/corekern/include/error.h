@@ -147,6 +147,13 @@ typedef int32_t agentos_error_t;
 #define AGENTOS_ERESOURCE              -15
 
 /**
+ * @brief 功能未实现
+ *
+ * 请求的功能未在此平台实现
+ */
+#define AGENTOS_ENOSYS                 -16
+
+/**
  * @brief 获取错误码对应的描述字符串
  *
  * @param err [in] 错误码
