@@ -172,7 +172,7 @@ install(TARGETS svc_common
 )
 
 # 安装兼容层头文件
-install(FILES 
+install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/include/svc_common.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/platform.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/error.h
@@ -180,6 +180,8 @@ install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/include/svc_config.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/svc_cache.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/compat.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/svc_auth.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/daemon_security.h
     DESTINATION include/agentos
 )
 

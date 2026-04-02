@@ -142,3 +142,61 @@ void* sys_telemetry_traces(void** args, int argc) {
     intptr_t res = agentos_sys_telemetry_traces(out_traces);
     return (void*)res;
 }
+
+/* ==================== Agent 系统调用 ==================== */
+
+void* sys_agent_spawn(void** args, int argc) {
+    if (argc != 2) return (void*)(intptr_t)AGENTOS_EINVAL;
+    const char* agent_spec = (const char*)args[0];
+    char** out_agent_id = (char**)args[1];
+    intptr_t res = agentos_sys_agent_spawn(agent_spec, out_agent_id);
+    return (void*)res;
+}
+
+void* sys_agent_terminate(void** args, int argc) {
+    if (argc != 1) return (void*)(intptr_t)AGENTOS_EINVAL;
+    const char* agent_id = (const char*)args[0];
+    intptr_t res = agentos_sys_agent_terminate(agent_id);
+    return (void*)res;
+}
+
+void* sys_agent_invoke(void** args, int argc) {
+    if (argc != 4) return (void*)(intptr_t)AGENTOS_EINVAL;
+    const char* agent_id = (const char*)args[0];
+    const char* input = (const char*)args[1];
+    size_t input_len = (size_t)(intptr_t)args[2];
+    char** out_output = (char**)args[3];
+    intptr_t res = agentos_sys_agent_invoke(agent_id, input, input_len, out_output);
+    return (void*)res;
+}
+
+void* sys_agent_list(void** args, int argc) {
+    if (argc != 2) return (void*)(intptr_t)AGENTOS_EINVAL;
+    char*** out_agent_ids = (char***)args[0];
+    size_t* out_count = (size_t*)args[1];
+    intptr_t res = agentos_sys_agent_list(out_agent_ids, out_count);
+    return (void*)res;
+}
+
+/* ==================== 系统初始化 ==================== */
+
+agentos_error_t agentos_syscalls_init(void) {
+    /* 系统调用层初始化
+     * 当前实现：各个模块使用惰性初始化，无需显式初始化
+     * 未来扩展：可在此初始化全局资源、注册信号处理器等
+     */
+    return AGENTOS_SUCCESS;
+}
+
+void agentos_syscalls_cleanup(void) {
+    /* 系统调用层资源清理
+     * 当前实现：各个模块自行管理资源清理
+     * 未来扩展：可在此释放全局资源、注销信号处理器等
+     */
+    
+    /* 清理 Agent 资源 */
+    extern void agentos_sys_agent_cleanup(void);
+    agentos_sys_agent_cleanup();
+    
+    /* 其他模块的清理函数可在未来添加 */
+}

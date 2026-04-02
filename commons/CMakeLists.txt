@@ -1,8 +1,8 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
-# commons 模块构建文件 - 从 atoms/utils 迁移而来
+# commons 模块构建文件 - 统一基础库
 
 cmake_minimum_required(VERSION 3.20)
-project(agentos-commons VERSION 1.0.0.5 LANGUAGES C)
+project(agentos-commons VERSION 1.0.0.6 LANGUAGES C)
 
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
@@ -48,6 +48,10 @@ set(SOURCES
     utils/cache/cache_common.c
     # 兼容性模块
     utils/compat/src/compat.c
+    # 网络通信模块
+    utils/network/network_common.c
+    # 进程间通信模块
+    utils/ipc/ipc_common.c
 )
 
 add_library(agentos_common STATIC ${SOURCES})
@@ -73,6 +77,10 @@ target_include_directories(agentos_common PRIVATE
     # 缓存和兼容性模块
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/cache/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/compat/include
+    # 网络通信模块
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils/network/include
+    # 进程间通信模块
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils/ipc/include
     ${TIKTOKEN_INCLUDE_DIRS}
     ${YAML_INCLUDE_DIRS}
     ${CJSON_INCLUDE_DIRS}
@@ -106,6 +114,10 @@ install(DIRECTORY utils/sync/include/ DESTINATION include/agentos/utils/sync)
 # 缓存和兼容性模块安装目录
 install(DIRECTORY utils/cache/include/ DESTINATION include/agentos/utils/cache)
 install(DIRECTORY utils/compat/include/ DESTINATION include/agentos/utils/compat)
+# 网络通信模块安装目录
+install(DIRECTORY utils/network/include/ DESTINATION include/agentos/utils/network)
+# 进程间通信模块安装目录
+install(DIRECTORY utils/ipc/include/ DESTINATION include/agentos/utils/ipc)
 
 # 测试配置
 if(BUILD_TESTS)

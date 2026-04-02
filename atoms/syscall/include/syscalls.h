@@ -56,22 +56,23 @@ AGENTOS_API agentos_error_t agentos_sys_task_submit(const char* input, size_t in
  * @param out_status 输出状态
  * @return agentos_error_t
  */
-AGENTOS_API agentos_error_t agentos_sys_task_query(uint64_t task_id, int* out_status);
+AGENTOS_API agentos_error_t agentos_sys_task_query(const char* task_id, int* out_status);
 
 /**
  * @brief 等待任务完成
  * @param task_id 任务 ID
  * @param timeout_ms 超时时间
+ * @param out_result 输出结果
  * @return agentos_error_t
  */
-AGENTOS_API agentos_error_t agentos_sys_task_wait(uint64_t task_id, uint32_t timeout_ms);
+AGENTOS_API agentos_error_t agentos_sys_task_wait(const char* task_id, uint32_t timeout_ms, char** out_result);
 
 /**
  * @brief 取消任务
  * @param task_id 任务 ID
  * @return agentos_error_t
  */
-AGENTOS_API agentos_error_t agentos_sys_task_cancel(uint64_t task_id);
+AGENTOS_API agentos_error_t agentos_sys_task_cancel(const char* task_id);
 
 /* ==================== 内存管理 ==================== */
 
