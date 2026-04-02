@@ -1,0 +1,72 @@
+name: Daemon CI / 守护进程持续集成
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        compiler: [gcc, clang]
+        exclude:
+          - os: windows-latest
+            compiler: gcc
+          - os: windows-latest
+            compiler: clang
+
+    steps:
+    - name: Checkout code / 检出代码
+      uses: actions/checkout@v4
+
+    - name: Install dependencies / 安装依赖
+      run: |
+        if [ "$RUNNER_OS" == "Linux" ]; then
+          sudo apt-get update && sudo apt-get install -y cmake libcurl4-openssl-dev libcjson-dev libyaml-cpp-dev
+        elif [ "$RUNNER_OS" == "macOS" ]; then
+          brew install cmake curl cjson yaml-cpp
+        fi
+      shell: bash
+
+    - name: Configure CMake / 配置 CMake
+      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build / 构建
+      run: cmake --build ${{github.workspace}}/build --config Release
+
+    - name: Test / 测试
+      run: ctest --test-dir ${{github.workspace}}/build --output-on-failure
+
+  code-quality:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code / 检出代码
+      uses: actions/checkout@v4
+
+    - name: Install tools / 安装工具
+      run: sudo apt-get install -y clang-format clang-tidy
+
+    - name: Check code format / 检查代码格式
+      run: |
+        find . -name "*.c" -o -name "*.h" | xargs clang-format --dry-run --Werror
+
+    - name: Static analysis / 静态分析
+      run: |
+        clang-tidy src/**/*.c -- -Iinclude
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code / 检出代码
+      uses: actions/checkout@v4
+
+    - name: Run security scan / 运行安全扫描
+      run: |
+        echo "Running security scan..."
+        # Add security scanning tools here
+        # 在此添加安全扫描工具

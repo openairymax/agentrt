@@ -21,7 +21,8 @@
 #include <string.h>
 #include <stdio.h>
 #ifdef _WIN32
-/* Windows 平台不直接支持 stdatomic.h，使用 Interlocked API */
+/* Windows 平台原子操作兼容层 */
+#include "../../../commons/utils/include/atomic_compat.h"
 #else
 #include <stdatomic.h>
 #endif
