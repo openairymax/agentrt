@@ -35,6 +35,8 @@ add_library(agentos_core STATIC ${COREKERN_SOURCES})
 
 target_include_directories(agentos_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/memory/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/string/include
 )
 
 # 安全编译选项（基于AgentOS C编码风格指南附录A）

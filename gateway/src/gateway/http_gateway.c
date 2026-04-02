@@ -304,20 +304,12 @@ static char* handle_system_call(const char* method, cJSON* params, cJSON* reques
         }
     }
     else if (strcmp(method, "agentos_sys_session_list") == 0) {
-        char** sessions = NULL;
-        size_t count = 0;
-        err = agentos_sys_session_list(&sessions, &count);
+        char* sessions_json = NULL;
+        err = agentos_sys_session_list(&sessions_json);
         
-        if (err == AGENTOS_SUCCESS) {
-            result = cJSON_CreateObject();
-            cJSON* arr = cJSON_CreateArray();
-            for (size_t i = 0; i < count; i++) {
-                cJSON_AddItemToArray(arr, cJSON_CreateString(sessions[i]));
-                free(sessions[i]);
-            }
-            cJSON_AddItemToObject(result, "sessions", arr);
-            cJSON_AddNumberToObject(result, "count", count);
-            free(sessions);
+        if (err == AGENTOS_SUCCESS && sessions_json) {
+            result = cJSON_Parse(sessions_json);
+            free(sessions_json);
         }
     }
     /* 可观测性 */
@@ -331,8 +323,10 @@ static char* handle_system_call(const char* method, cJSON* params, cJSON* reques
         }
     }
     else if (strcmp(method, "agentos_sys_telemetry_traces") == 0) {
+        cJSON* trace_id = cJSON_GetObjectItem(params, "trace_id");
+        const char* tid = (trace_id && cJSON_IsString(trace_id)) ? trace_id->valuestring : NULL;
         char* out_traces = NULL;
-        err = agentos_sys_telemetry_traces(&out_traces);
+        err = agentos_sys_telemetry_traces(tid, &out_traces);
         
         if (err == AGENTOS_SUCCESS && out_traces) {
             result = cJSON_Parse(out_traces);
@@ -666,7 +660,8 @@ static const gateway_ops_t http_gateway_ops = {
     .stop = http_gateway_stop,
     .destroy = http_gateway_destroy,
     .get_name = http_gateway_get_name,
-    .get_stats = http_gateway_get_stats
+    .get_stats = http_gateway_get_stats,
+    .is_running = http_gateway_is_running
 };
 /* ========== 公共接口 ========== */
 gateway_t* http_gateway_create(const char* host, uint16_t port) {
@@ -704,6 +699,7 @@ gateway_t* http_gateway_create(const char* host, uint16_t port) {
     
     gw->ops = &http_gateway_ops;
     gw->impl = gateway;
+    gw->type = GATEWAY_TYPE_HTTP;
     
     return gw;
 }

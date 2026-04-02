@@ -43,6 +43,10 @@ extern void* sys_session_close(void** args, int argc);
 extern void* sys_session_list(void** args, int argc);
 extern void* sys_telemetry_metrics(void** args, int argc);
 extern void* sys_telemetry_traces(void** args, int argc);
+extern void* sys_agent_spawn(void** args, int argc);
+extern void* sys_agent_terminate(void** args, int argc);
+extern void* sys_agent_invoke(void** args, int argc);
+extern void* sys_agent_list(void** args, int argc);
 
 static syscall_func_t syscall_table[SYS_MAX] = {
     [SYS_TASK_SUBMIT] = sys_task_submit,
@@ -59,6 +63,10 @@ static syscall_func_t syscall_table[SYS_MAX] = {
     [SYS_SESSION_LIST] = sys_session_list,
     [SYS_TELEMETRY_METRICS] = sys_telemetry_metrics,
     [SYS_TELEMETRY_TRACES] = sys_telemetry_traces,
+    [SYS_AGENT_SPAWN] = sys_agent_spawn,
+    [SYS_AGENT_TERMINATE] = sys_agent_terminate,
+    [SYS_AGENT_INVOKE] = sys_agent_invoke,
+    [SYS_AGENT_LIST] = sys_agent_list,
 };
 
 void* agentos_syscall_invoke(int syscall_num, void** args, int argc) {

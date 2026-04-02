@@ -54,6 +54,7 @@ static agentos_error_t vector_store_init_schema(agentos_vector_store_t* store) {
         sqlite3_free(err_msg);
         return AGENTOS_ERROR;
     }
+    sqlite3_free(err_msg); /* 成功时也需要释放，sqlite3_free(NULL)是安全的 */
 
     return AGENTOS_SUCCESS;
 }
@@ -154,6 +155,7 @@ agentos_error_t agentos_vector_store_put(
     int rc = sqlite3_prepare_v2(store->db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
         AGENTOS_LOG_ERROR("Failed to prepare statement: %s", sqlite3_errmsg(store->db));
+        sqlite3_finalize(stmt); /* 即使stmt为NULL也是安全的 */
         return AGENTOS_ERROR;
     }
 
@@ -198,6 +200,7 @@ agentos_error_t agentos_vector_store_get(
     int rc = sqlite3_prepare_v2(store->db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
         AGENTOS_LOG_ERROR("Failed to prepare statement: %s", sqlite3_errmsg(store->db));
+        sqlite3_finalize(stmt); /* 即使stmt为NULL也是安全的 */
         return AGENTOS_ERROR;
     }
 
@@ -252,6 +255,7 @@ agentos_error_t agentos_vector_store_delete(
     int rc = sqlite3_prepare_v2(store->db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
         AGENTOS_LOG_ERROR("Failed to prepare statement: %s", sqlite3_errmsg(store->db));
+        sqlite3_finalize(stmt); /* 即使stmt为NULL也是安全的 */
         return AGENTOS_ERROR;
     }
 
@@ -292,6 +296,7 @@ agentos_error_t agentos_vector_store_exists(
     int rc = sqlite3_prepare_v2(store->db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
         AGENTOS_LOG_ERROR("Failed to prepare statement: %s", sqlite3_errmsg(store->db));
+        sqlite3_finalize(stmt); /* 即使stmt为NULL也是安全的 */
         return AGENTOS_ERROR;
     }
 
@@ -329,6 +334,7 @@ agentos_error_t agentos_vector_store_list_ids(
     int rc = sqlite3_prepare_v2(store->db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
         AGENTOS_LOG_ERROR("Failed to prepare statement: %s", sqlite3_errmsg(store->db));
+        sqlite3_finalize(stmt); /* 即使stmt为NULL也是安全的 */
         return AGENTOS_ERROR;
     }
 
@@ -382,6 +388,7 @@ agentos_error_t agentos_vector_store_clear(agentos_vector_store_t* store) {
         sqlite3_free(err_msg);
         return AGENTOS_ERROR;
     }
+    sqlite3_free(err_msg); /* 成功时也需要释放，sqlite3_free(NULL)是安全的 */
 
     return AGENTOS_SUCCESS;
 }

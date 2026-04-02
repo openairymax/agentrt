@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file guard.c
  * @brief 内存守卫（边界检测，Debug 构建使用�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -8,8 +8,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../commons/utils/memory/include/memory_compat.h"
-#include "../../../commons/utils/string/include/string_compat.h"
+#include "memory_compat.h"
+#include "string_compat.h"
 #include <string.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -56,12 +56,16 @@ static void validate_guard(guard_block_t* block, const char* operation) {
     if (!block) return;
 
     if (!check_guard(block->front)) {
+#ifdef AGENTOS_ENABLE_MEMORY_DEBUG
         printf("GUARD VIOLATION [%s]: front guard corrupted (underflow) at %p\n",
                operation, (void*)block);
+#endif
     }
     if (!check_guard(block->back)) {
+#ifdef AGENTOS_ENABLE_MEMORY_DEBUG
         printf("GUARD VIOLATION [%s]: back guard corrupted (overflow) at %p, size=%zu\n",
                operation, (void*)block, block->user_size);
+#endif
     }
 }
 
