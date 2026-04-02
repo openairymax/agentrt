@@ -79,6 +79,11 @@ target_include_directories(agentos-llm-d PRIVATE
     ${COMMONS_INCLUDE_DIR}/utils/memory/include
     ${COMMONS_INCLUDE_DIR}/utils/string/include
     ${COMMONS_INCLUDE_DIR}/utils/sync/include
+    ${COMMONS_INCLUDE_DIR}/utils/cache/include
+    ${COMMONS_INCLUDE_DIR}/utils/compat/include
+    # 新增网络和IPC模块
+    ${COMMONS_INCLUDE_DIR}/utils/network/include
+    ${COMMONS_INCLUDE_DIR}/utils/ipc/include
     ${CURL_INCLUDE_DIRS}
     ${CJSON_INCLUDE_DIRS}
     ${YAML_INCLUDE_DIRS}

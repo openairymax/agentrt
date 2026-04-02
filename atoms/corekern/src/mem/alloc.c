@@ -16,11 +16,15 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "memory_compat.h"
-#include "string_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 #include <stdio.h>
+#ifdef _WIN32
+/* Windows 平台不直接支持 stdatomic.h，使用 Interlocked API */
+#else
 #include <stdatomic.h>
+#endif
 
 /* ==================== 全局状态 ==================== */
 

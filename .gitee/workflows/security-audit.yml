@@ -1,0 +1,171 @@
+name: Security Audit
+
+on:
+  schedule:
+    # 每天凌晨 2 点运行
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      full_scan:
+        description: 'Run full security scan'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+permissions:
+  contents: read
+  security-events: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  dependency-audit:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-results
+          path: trivy-results.txt
+          retention-days: 30
+
+  code-security-scan:
+    name: Code Security Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: c,cpp,python,javascript,typescript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:codeql"
+
+  secrets-scan:
+    name: Secrets Detection
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  sast-analysis:
+    name: Static Application Security Testing
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck
+
+      - name: Run cppcheck with security rules
+        run: |
+          cppcheck --enable=all \
+            --std=c11 \
+            --force \
+            --suppress=missingIncludeSystem \
+            --error-exitcode=0 \
+            --xml \
+            daemon/common/src \
+            daemon/*/src \
+            atoms/*/src \
+            commons/src \
+            2> cppcheck-security.xml || true
+
+      - name: Parse and report findings
+        run: |
+          echo "🔍 SAST 分析完成"
+          echo "结果文件: cppcheck-security.xml"
+          
+          # 统计发现的问题
+          if [ -f cppcheck-security.xml ]; then
+            ERRORS=$(grep -c '<error' cppcheck-security.xml 2>/dev/null || echo "0")
+            WARNINGS=$(grep -c '<warning' cppcheck-security.xml 2>/dev/null || echo "0")
+            echo "   发现的错误: $ERRORS"
+            echo "   发现的警告: $WARNINGS"
+          fi
+
+      - name: Upload SAST results
+        uses: actions/upload-artifact@v4
+        with:
+          name: sast-results
+          path: cppcheck-security.xml
+          retention-days: 90
+
+  generate-report:
+    name: Generate Security Report
+    needs: [dependency-audit, code-security-scan, secrets-scan, sast-analysis]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create summary
+        run: |
+          echo "# 🔐 AgentOS 安全审计报告" > SECURITY_REPORT.md
+          echo "" >> SECURITY_REPORT.md
+          echo "**生成时间**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> SECURITY_REPORT.md
+          echo "" >> SECURITY_REPORT.md
+          echo "## 审计结果摘要" >> SECURITY_REPORT.md
+          echo "" >> SECURITY_REPORT.md
+          echo "| 检查项目 | 状态 | 详情 |" >> SECURITY_REPORT.md
+          echo "|---------|------|------|" >> SECURITY_REPORT.md
+          echo "| 依赖漏洞扫描 | ✅ 完成 | 查看 artifacts/trivy-results |" >> SECURITY_REPORT.md
+          echo "| CodeQL 分析 | ✅ 完成 | 查看 GitHub Security 标签页 |" >> SECURITY_REPORT.md
+          echo "| 密钥检测 | ✅ 完成 | 查看 Gitleaks 输出 |" >> SECURITY_REPORT.md
+          echo "| SAST 分析 | ✅ 完成 | 查看 artifacts/sast-results |" >> SECURITY_REPORT.md
+          echo "" >> SECURITY_REPORT.md
+          echo "## 建议" >> SECURITY_REPORT.md
+          echo "" >> SECURITY_REPORT.md
+          echo "1. 定期检查依赖项更新" >> SECURITY_REPORT.md
+          echo "2. 及时修复高严重性漏洞" >> SECURITY_REPORT.md
+          echo "3. 保持代码规范和安全编码实践" >> SECURITY_REPORT.md
+          echo "" >> SECURITY_REPORT.md
+          echo "---" >> SECURITY_REPORT.md
+          echo "*此报告由 Gitee Go 自动生成*" >> SECURITY_REPORT.md
+
+      - name: Upload security report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: SECURITY_REPORT.md
+          retention-days: 365

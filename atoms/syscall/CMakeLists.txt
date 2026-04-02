@@ -5,7 +5,13 @@ cmake_minimum_required(VERSION 3.20)
 project(agentos-syscall VERSION 1.0.0.5 LANGUAGES C)
 
 find_package(Threads REQUIRED)
-find_package(CJSON REQUIRED)
+find_package(CJSON QUIET)
+if(CJSON_FOUND)
+    message(STATUS "CJSON found: ${CJSON_VERSION}")
+    add_definitions(-DAGENTOS_HAS_CJSON=1)
+else()
+    message(WARNING "CJSON not found, JSON functionality may be limited")
+endif()
 
 # 符号导出管理
 set(CMAKE_C_VISIBILITY_PRESET hidden)
@@ -38,7 +44,7 @@ target_include_directories(agentos_syscall PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../memoryrovol/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../utils/observability/include
-    ${CJSON_INCLUDE_DIRS}
+    $<$<BOOL:${CJSON_FOUND}>:${CJSON_INCLUDE_DIRS}>
 )
 
 # 安全编译选项（基于AgentOS C编码风格指南附录A）
@@ -68,9 +74,8 @@ target_link_libraries(agentos_syscall
     agentos_core
     agentos_coreloopthree
     agentos_memoryrovol
-    agentos_common
     Threads::Threads
-    ${CJSON_LIBRARIES}
+    $<$<BOOL:${CJSON_FOUND}>:${CJSON_LIBRARIES}>
 )
 
 install(TARGETS agentos_syscall DESTINATION lib)
