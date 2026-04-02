@@ -2,19 +2,26 @@
 
 <div align="center">
 
+[![AtomGit](https://atomgit.com/spharx/agentos/badge/star.svg)](https://atomgit.com/spharx/agentos)
+[![Gitee](https://gitee.com/spharx/agentos/badge/star.svg)](https://gitee.com/spharx/agentos)
+[![GitHub](https://img.shields.io/github/stars/SpharxTeam/AgentOS?style=social)](https://github.com/SpharxTeam/AgentOS)  
+
+
 [![Version](https://img.shields.io/badge/version-1.0.0.8-blue.svg)](https://atomgit.com/spharx/agentos)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](https://atomgit.com/spharx/agentos/blob/main/LICENSE)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/SpharxTeam/AgentOS/actions)
+[![Documentation Status](https://img.shields.io/badge/docs-Doc%20V1.8-blue)](manuals/README.md)
 [![Docker](https://img.shields.io/badge/docker-supported-blue.svg?logo=docker&logoColor=white)](https://www.docker.com/)
 [![C/C++](https://img.shields.io/badge/C%2FC%2B%2B-11%2F17-blue.svg?logo=c%2B%2B&logoColor=white)](https://isocpp.org/)
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
-[![Star](https://atomgit.com/spharx/agentos/star/badge.svg)](https://atomgit.com/spharx/agentos)
-[![Mirror](https://img.shields.io/badge/mirror-GitHub-lightgrey.svg)](https://github.com/SpharxTeam/AgentOS)
-[![Mirror](https://img.shields.io/badge/mirror-Gitee-orange.svg)](https://gitee.com/spharx/agentos)
 
+</div>
 
 ---
 
-## 🎯 超级智能体操作系统
+<div align="center">
+
+## 🎯 智能体驱动操作系统
 
 *"From data intelligence emerges 始于数据，终于智能。"*
 
@@ -514,10 +521,11 @@ AGENTOS_API agentos_error_t agentos_sys_memory_write(
 ### 🚀 快速开始
 
 ```bash
-# 克隆项目（主仓库）
+# 克隆项目
 git clone https://atomgit.com/spharx/agentos.git
-# 或者使用镜像仓库
+# 或使用 Gitee 镜像
 # git clone https://gitee.com/spharx/agentos.git
+# 或使用 GitHub 镜像
 # git clone https://github.com/SpharxTeam/AgentOS.git
 cd agentos
 
@@ -1034,6 +1042,7 @@ AgentOS 采用**商业友好、生态友好的分层开源协议**。
 **技术支持**: lidecheng@spharx.cn  
 **安全报告**: wangliren@spharx.cn  
 **商业咨询**: zhouzhixian@spharx.cn  
+**官方网站**: https://spharx.cn  
 
 
 <p>
