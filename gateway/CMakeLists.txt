@@ -55,6 +55,7 @@ set(GATEWAY_HEADERS
     src/gateway/ws_gateway.h
     src/gateway/stdio_gateway.h
     src/utils/jsonrpc.h
+    src/utils/syscall_router.h
 )
 
 # ========== 库目标 ==========
@@ -93,6 +94,7 @@ install(FILES
     src/gateway/ws_gateway.h
     src/gateway/stdio_gateway.h
     src/utils/jsonrpc.h
+    src/utils/syscall_router.h
     DESTINATION include/agentos/gateway
 )
 

@@ -9,15 +9,76 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type" FORCE)
 endif()
 
+# 库构建选项
+option(BUILD_SHARED_LIBS "Build shared libraries instead of static libraries" ON)
+option(WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
+
 # 编译选项
 set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# 全局安全编译选项（基于AgentOS C编码风格指南附录A）
+if(MSVC)
+    # MSVC安全选项
+    add_compile_options(/W4)  # 最高警告级别
+    if(WARNINGS_AS_ERRORS)
+        add_compile_options(/WX)  # 警告视为错误
+    endif()
+    add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
+    add_compile_options(/GS)      # 缓冲区安全检查
+    add_compile_options(/sdl)     # 启用额外安全检查
+    add_compile_options(/guard:cf) # 控制流防护
+else()
+    # GCC/Clang安全选项
+    add_compile_options(-Wall -Wextra -Wpedantic)
+    if(WARNINGS_AS_ERRORS)
+        add_compile_options(-Werror)
+    endif()
+    add_compile_options(-fstack-protector-strong)
+    add_compile_definitions(-D_FORTIFY_SOURCE=2)
+    add_compile_options(-fPIE)
+    add_compile_options(-Wformat -Wformat-security)
+    add_compile_options(-fno-omit-frame-pointer)
+endif()
+
+# 调试符号（由构建类型控制）
+if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+    if(MSVC)
+        add_compile_options(/Zi)  # 调试信息
+        add_link_options(/DEBUG)
+    else()
+        add_compile_options(-g)
+    endif()
+endif()
+
+# 链接器安全选项
+if(MSVC)
+    # Windows链接器安全选项
+    add_link_options(/DYNAMICBASE)      # ASLR支持
+    add_link_options(/NXCOMPAT)         # 数据执行保护
+    add_link_options(/GUARD:CF)         # 控制流防护
+elseif(UNIX AND NOT APPLE)
+    # Linux安全选项
+    add_link_options(-Wl,-z,relro -Wl,-z,now -pie)
+elseif(APPLE)
+    # macOS安全选项
+    add_link_options(-Wl,-dead_strip -pie)
+endif()
+
+# 发布构建的优化选项
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)  # 链接时优化
 
 # 全局定义
 add_definitions(-D_GNU_SOURCE -DAGENTOS_VERSION="${PROJECT_VERSION}")
 
+# CMake包配置支持
+include(CMakePackageConfigHelpers)
+
 # 代码覆盖率支持
+option(ENABLE_COVERAGE "Enable code coverage reporting" OFF)
 if(ENABLE_COVERAGE)
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         # 添加覆盖率编译和链接标志
@@ -25,24 +86,149 @@ if(ENABLE_COVERAGE)
         add_link_options(-fprofile-arcs -ftest-coverage -lgcov)
         
         # 确保调试符号开启
-        string(REPLACE "-O2" "-O0" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
-        string(REPLACE "-O3" "-O0" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
+        set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0 -g")
+        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g")
         
         message(STATUS "Code coverage enabled for GCC/Clang")
+    elseif(MSVC)
+        message(WARNING "Code coverage for MSVC requires Visual Studio professional edition")
+        # MSVC覆盖率选项（需要专业版）
+        add_compile_options(/DEBUG)
     else()
-        message(WARNING "Code coverage only supported for GCC/Clang compilers")
+        message(WARNING "Code coverage only supported for GCC/Clang and MSVC compilers")
     endif()
 endif()
 
 # 查找依赖
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
-find_package(PkgConfig REQUIRED)
 
 # libevent 是核心依赖（用于事件驱动模块）
-pkg_check_modules(LIBEVENT REQUIRED libevent)
-message(STATUS "libevent found: ${LIBEVENT_VERSION}")
-add_definitions(-DAGENTOS_HAS_LIBEVENT=1)
+if(WIN32)
+    # Windows平台：尝试通过CMake查找或vcpkg
+    find_package(libevent CONFIG QUIET)
+    if(libevent_FOUND)
+        message(STATUS "libevent found via CMake config: ${libevent_VERSION}")
+        add_definitions(-DAGENTOS_HAS_LIBEVENT=1)
+    else()
+        # 尝试通过pkg-config（如果使用MSYS2或Cygwin）
+        find_package(PkgConfig QUIET)
+        if(PkgConfig_FOUND)
+            pkg_check_modules(LIBEVENT QUIET libevent)
+            if(LIBEVENT_FOUND)
+                message(STATUS "libevent found via pkg-config: ${LIBEVENT_VERSION}")
+                add_definitions(-DAGENTOS_HAS_LIBEVENT=1)
+            else()
+                message(FATAL_ERROR "libevent not found on Windows. Please install via vcpkg: vcpkg install libevent")
+            endif()
+        else()
+            message(FATAL_ERROR "libevent not found on Windows. Please install via vcpkg: vcpkg install libevent")
+        endif()
+    endif()
+else()
+    # Unix-like平台：使用pkg-config
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(LIBEVENT REQUIRED libevent)
+    message(STATUS "libevent found: ${LIBEVENT_VERSION}")
+    add_definitions(-DAGENTOS_HAS_LIBEVENT=1)
+endif()
+
+# 可选依赖
+# SQLite3（用于向量存储）
+find_package(SQLite3 QUIET)
+if(SQLite3_FOUND)
+    message(STATUS "SQLite3 found: ${SQLite3_VERSION}")
+    add_definitions(-DAGENTOS_HAS_SQLITE3=1)
+else()
+    # 尝试通过pkg-config查找（Unix-like平台）
+    if(PkgConfig_FOUND OR NOT WIN32)
+        if(NOT PkgConfig_FOUND)
+            find_package(PkgConfig QUIET)
+        endif()
+        if(PkgConfig_FOUND)
+            pkg_check_modules(SQLITE3 QUIET sqlite3)
+            if(SQLITE3_FOUND)
+                message(STATUS "SQLite3 found via pkg-config: ${SQLITE3_VERSION}")
+                add_definitions(-DAGENTOS_HAS_SQLITE3=1)
+            else()
+                message(WARNING "SQLite3 not found, vector store functionality may be limited")
+            endif()
+        else()
+            message(WARNING "SQLite3 not found, vector store functionality may be limited")
+        endif()
+    else()
+        message(WARNING "SQLite3 not found, vector store functionality may be limited")
+    endif()
+endif()
+
+# cJSON（用于JSON解析）
+find_package(cJSON QUIET)
+if(cJSON_FOUND)
+    message(STATUS "cJSON found: ${cJSON_VERSION}")
+    add_definitions(-DAGENTOS_HAS_CJSON=1)
+else()
+    # 尝试通过pkg-config查找
+    if(PkgConfig_FOUND OR NOT WIN32)
+        if(NOT PkgConfig_FOUND)
+            find_package(PkgConfig QUIET)
+        endif()
+        if(PkgConfig_FOUND)
+            pkg_check_modules(CJSON QUIET libcjson)
+            if(CJSON_FOUND)
+                message(STATUS "cJSON found via pkg-config: ${CJSON_VERSION}")
+                add_definitions(-DAGENTOS_HAS_CJSON=1)
+            else()
+                message(WARNING "cJSON not found, JSON functionality may be limited")
+            endif()
+        else()
+            message(WARNING "cJSON not found, JSON functionality may be limited")
+        endif()
+    else()
+        message(WARNING "cJSON not found, JSON functionality may be limited")
+    endif()
+endif()
+
+# 测试支持
+option(BUILD_TESTS "Build unit tests" OFF)
+if(BUILD_TESTS)
+    enable_testing()
+    message(STATUS "Unit tests enabled")
+    
+    # 查找测试框架依赖
+    if(WIN32)
+        # Windows平台：尝试查找Google Test
+        find_package(GTest QUIET)
+        if(GTest_FOUND)
+            message(STATUS "Google Test found: ${GTest_VERSION}")
+            add_definitions(-DAGENTOS_HAS_GTEST=1)
+        else()
+            # 尝试查找CUnit（如果通过vcpkg安装）
+            find_package(CUnit QUIET)
+            if(CUNIT_FOUND)
+                message(STATUS "CUnit found: ${CUNIT_VERSION}")
+                add_definitions(-DAGENTOS_HAS_CUNIT=1)
+            else()
+                message(WARNING "No test framework found on Windows. Please install GTest via vcpkg: vcpkg install gtest")
+                message(WARNING "Tests will be built but may not run properly without a test framework")
+            endif()
+        endif()
+    else()
+        # Unix-like平台：使用CUnit
+        find_package(CUnit QUIET)
+        if(CUNIT_FOUND)
+            message(STATUS "CUnit found: ${CUNIT_VERSION}")
+            add_definitions(-DAGENTOS_HAS_CUNIT=1)
+        else()
+            message(WARNING "CUnit not found, some tests may be disabled")
+            # 尝试查找Check作为备选
+            find_package(Check QUIET)
+            if(Check_FOUND)
+                message(STATUS "Check found: ${Check_VERSION}")
+                add_definitions(-DAGENTOS_HAS_CHECK=1)
+            endif()
+        endif()
+    endif()
+endif()
 
 # 包含子目录
 # Kernel subdirectories
@@ -52,4 +238,51 @@ add_subdirectory(memoryrovol)
 add_subdirectory(syscall)
 
 # 安装配置
-install(DIRECTORY include/ DESTINATION include/agentos)
+# 库文件安装
+install(TARGETS agentos_core agentos_coreloopthree agentos_memoryrovol agentos_syscall
+    EXPORT AgentOSTargets
+    ARCHIVE DESTINATION lib/agentos
+    LIBRARY DESTINATION lib/agentos
+    RUNTIME DESTINATION bin
+)
+
+# 子模块头文件安装
+install(DIRECTORY corekern/include/ DESTINATION include/agentos/corekern)
+install(DIRECTORY coreloopthree/include/ DESTINATION include/agentos/coreloopthree)
+install(DIRECTORY memoryrovol/include/ DESTINATION include/agentos/memoryrovol)
+install(DIRECTORY syscall/include/ DESTINATION include/agentos/syscall)
+
+# 创建目标导出集
+install(EXPORT AgentOSTargets
+    FILE AgentOSTargets.cmake
+    NAMESPACE AgentOS::
+    DESTINATION lib/cmake/AgentOS
+)
+
+# 创建版本配置文件
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/AgentOSConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/AgentOSConfigVersion.cmake
+    DESTINATION lib/cmake/AgentOS
+)
+
+# 文档安装（如果存在）
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+    install(FILES README.md DESTINATION share/doc/agentos)
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/BUILD.md")
+    install(FILES BUILD.md DESTINATION share/doc/agentos)
+endif()
+
+# 许可证文件安装（如果存在）
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+    install(FILES LICENSE DESTINATION share/licenses/agentos)
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt")
+    install(FILES LICENSE.txt DESTINATION share/licenses/agentos)
+endif()

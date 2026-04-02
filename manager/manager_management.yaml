@@ -1,9 +1,17 @@
-﻿# =============================================================================
+# =============================================================================
 # AgentOS 配置管理配置文件
 # 版本: v1.0.0
-# 最后更新: 2026-03-23
+# 最后更新: 2026-04-02
+# Schema: schema/config-management.schema.json
 # =============================================================================
 # Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+
+# 配置归属（按双重责任模型）
+_owner:
+  module: "manager"
+  contact: "manager-team@spharx.cn"
+  path: "AgentOS/manager"
+  description: "内容定义责任和管理责任均归属 Manager 模块（自管理配置）"
 
 _config_version: "1.0.0"
 
