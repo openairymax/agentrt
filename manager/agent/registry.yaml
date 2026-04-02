@@ -1,18 +1,25 @@
 # =============================================================================
 # AgentOS Agent 注册表配置文件
 # 版本: v1.1.0
-# 最后更新: 2026-04-01
+# 最后更新: 2026-04-02
 # Schema: schema/agent-registry.schema.json
 # 规范依据: specifications/agentos_contract/agent_contract.md
 # =============================================================================
 # Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+
+# 配置归属（按双重责任模型）
+_owner:
+  module: "cupolas"
+  contact: "cupolas-team@spharx.cn"
+  path: "AgentOS/cupolas"
+  description: "内容定义责任归属 cupolas 模块，管理责任归属 Manager 模块"
 
 # 配置版本
 _config_version: "1.1.0"
 
 # 注册表元数据
 _metadata:
-  last_updated: "2026-04-01T00:00:00Z"
+  last_updated: "2026-04-02T00:00:00Z"
   total_agents: 12
   schema_version: "1.0.0"
 
@@ -138,7 +145,7 @@ agents:
       - "coordination"
       - "analysis"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-04-01T00:00:00Z"
+    updated_at: "2026-04-02T00:00:00Z"
 
   # ===========================================================================
   # 架构师 Agent
@@ -218,7 +225,7 @@ agents:
       - "design"
       - "review"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-04-01T00:00:00Z"
+    updated_at: "2026-04-02T00:00:00Z"
 
   # ===========================================================================
   # 前端开发 Agent
@@ -299,7 +306,7 @@ agents:
       - "ui"
       - "javascript"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-04-01T00:00:00Z"
+    updated_at: "2026-04-02T00:00:00Z"
 
   # ===========================================================================
   # 后端开发 Agent
@@ -381,7 +388,7 @@ agents:
       - "api"
       - "database"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-04-01T00:00:00Z"
+    updated_at: "2026-04-02T00:00:00Z"
 
   # ===========================================================================
   # 测试 Agent
@@ -462,7 +469,7 @@ agents:
       - "qa"
       - "automation"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-04-01T00:00:00Z"
+    updated_at: "2026-04-02T00:00:00Z"
 
   # ===========================================================================
   # DevOps Agent
@@ -544,7 +551,7 @@ agents:
       - "deployment"
       - "infrastructure"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-04-01T00:00:00Z"
+    updated_at: "2026-04-02T00:00:00Z"
 
   # ===========================================================================
   # 安全审计 Agent
@@ -625,7 +632,7 @@ agents:
       - "audit"
       - "compliance"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-04-01T00:00:00Z"
+    updated_at: "2026-04-02T00:00:00Z"
 
   # ===========================================================================
   # 数据工程师 Agent
@@ -706,7 +713,7 @@ agents:
       - "etl"
       - "analytics"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-04-01T00:00:00Z"
+    updated_at: "2026-04-02T00:00:00Z"
 
   # ===========================================================================
   # 协调者 Agent
@@ -786,7 +793,7 @@ agents:
       - "management"
       - "orchestration"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-04-01T00:00:00Z"
+    updated_at: "2026-04-02T00:00:00Z"
 
   # ===========================================================================
   # 代码审查 Agent
@@ -865,7 +872,7 @@ agents:
       - "quality"
       - "best_practices"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-04-01T00:00:00Z"
+    updated_at: "2026-04-02T00:00:00Z"
 
   # ===========================================================================
   # 分析师 Agent
@@ -946,7 +953,7 @@ agents:
       - "insights"
       - "reporting"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-04-01T00:00:00Z"
+    updated_at: "2026-04-02T00:00:00Z"
 
   # ===========================================================================
   # 自定义 Agent 模板
@@ -1013,4 +1020,4 @@ agents:
       - "custom"
       - "template"
     created_at: "2026-01-01T00:00:00Z"
-    updated_at: "2026-04-01T00:00:00Z"
+    updated_at: "2026-04-02T00:00:00Z"

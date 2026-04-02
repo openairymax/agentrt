@@ -50,6 +50,8 @@ endif()
 
 set(SVC_COMMON_SOURCES
     src/ipc_client.c
+    src/svc_auth.c
+    src/daemon_security.c
 )
 
 # 创建静态库
@@ -108,6 +110,9 @@ target_include_directories(svc_common PUBLIC
     ${COMMONS_DIR}/utils/types/include
     ${COMMONS_DIR}/utils/cache/include
     ${COMMONS_DIR}/utils/compat/include
+    # 新增网络和IPC模块
+    ${COMMONS_DIR}/utils/network/include
+    ${COMMONS_DIR}/utils/ipc/include
 )
 
 target_include_directories(svc_common PRIVATE

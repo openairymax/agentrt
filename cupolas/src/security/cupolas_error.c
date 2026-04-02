@@ -16,32 +16,37 @@
 #include <string.h>
 
 /* ============================================================================
- * 错误码字符串映射
+ * Error Code String Mapping Table
  * ============================================================================ */
 
 static const char* g_error_strings[] = {
     [0 - cupolas_ERR_OK]               = "Success",
     [0 - cupolas_ERR_UNKNOWN]          = "Unknown error",
     [0 - cupolas_ERR_INVALID_PARAM]    = "Invalid parameter",
-    [0 - cupolas_ERR_NULL_POINTER]    = "Null pointer",
-    [0 - cupolas_ERR_OUT_OF_MEMORY]   = "Out of memory",
+    [0 - cupolas_ERR_NULL_POINTER]     = "Null pointer",
+    [0 - cupolas_ERR_OUT_OF_MEMORY]    = "Out of memory",
     [0 - cupolas_ERR_BUFFER_TOO_SMALL] = "Buffer too small",
     [0 - cupolas_ERR_NOT_FOUND]        = "Not found",
-    [0 - cupolas_ERR_ALREADY_EXISTS]  = "Already exists",
-    [0 - cupolas_ERR_TIMEOUT]          = "Timeout",
-    [0 - cupolas_ERR_NOT_SUPPORTED]   = "Not supported",
+    [0 - cupolas_ERR_ALREADY_EXISTS]   = "Already exists",
+    [0 - cupolas_ERR_TIMEOUT]           = "Timeout",
+    [0 - cupolas_ERR_NOT_SUPPORTED]    = "Not supported",
     [0 - cupolas_ERR_PERMISSION_DENIED] = "Permission denied",
-    [0 - cupolas_ERR_IO]              = "I/O error",
-    [0 - cupolas_ERR_STATE_ERROR]     = "State error",
-    [0 - cupolas_ERR_OVERFLOW]        = "Overflow",
-    [0 - cupolas_ERR_TRY_AGAIN]       = "Try again",
-    [0 - cupolas_ERR_AUTH_FAILED]     = "Authentication failed",
-    [0 - cupolas_ERR_CERT_INVALID]    = "Certificate invalid",
-    [0 - cupolas_ERR_CERT_EXPIRED]    = "Certificate expired",
+    [0 - cupolas_ERR_IO]               = "I/O error",
+    [0 - cupolas_ERR_STATE_ERROR]      = "State error",
+    [0 - cupolas_ERR_OVERFLOW]         = "Overflow",
+    [0 - cupolas_ERR_TRY_AGAIN]        = "Try again",
+    [0 - cupolas_ERR_AUTH_FAILED]      = "Authentication failed",
+    [0 - cupolas_ERR_CERT_INVALID]     = "Certificate invalid",
+    [0 - cupolas_ERR_CERT_EXPIRED]     = "Certificate expired",
     [0 - cupolas_ERR_SIGNATURE_INVALID] = "Signature invalid",
-    [0 - cupolas_ERR_TAMPERED]        = "Data tampered"
+    [0 - cupolas_ERR_TAMPERED]         = "Data tampered"
 };
 
+/**
+ * @brief Convert error code to human-readable string
+ * @param[in] error Error code value
+ * @return Static string describing the error, or "Unknown error" if not found
+ */
 const char* cupolas_error_string(cupolas_error_t error) {
     int index = 0 - error;
     if (index < 0 || (size_t)index >= sizeof(g_error_strings) / sizeof(g_error_strings[0])) {
@@ -54,15 +59,21 @@ const char* cupolas_error_string(cupolas_error_t error) {
 }
 
 /* ============================================================================
- * 错误码映射宏 - 减少重复代码
+ * Error Code Mapping Macros - Reduce Code Duplication
  * ============================================================================ */
 
 #define ERROR_MAP(from, to) case from: return to
 #define ERROR_MAP_DEFAULT return cupolas_ERR_UNKNOWN
 
 /* ============================================================================
- * 模块错误�?-> 统一错误�? * ============================================================================ */
+ * Module Error Code -> Unified Error Code Conversion Functions
+ * ============================================================================ */
 
+/**
+ * @brief Convert signature module error to unified error code
+ * @param[in] sig_error Signature module specific error
+ * @return Corresponding unified error code
+ */
 cupolas_error_t cupolas_error_from_sig(cupolas_sig_error_t sig_error) {
     switch (sig_error) {
         ERROR_MAP(cupolas_SIG_ERR_OK, cupolas_ERR_OK);
@@ -79,6 +90,11 @@ cupolas_error_t cupolas_error_from_sig(cupolas_sig_error_t sig_error) {
     }
 }
 
+/**
+ * @brief Convert entitlements module error to unified error code
+ * @param[in] ent_error Entitlements module specific error
+ * @return Corresponding unified error code
+ */
 cupolas_error_t cupolas_error_from_ent(cupolas_ent_error_t ent_error) {
     switch (ent_error) {
         ERROR_MAP(cupolas_ENT_ERR_OK, cupolas_ERR_OK);
@@ -92,6 +108,11 @@ cupolas_error_t cupolas_error_from_ent(cupolas_ent_error_t ent_error) {
     }
 }
 
+/**
+ * @brief Convert vault module error to unified error code
+ * @param[in] vault_error Vault module specific error
+ * @return Corresponding unified error code
+ */
 cupolas_error_t cupolas_error_from_vault(cupolas_vault_error_t vault_error) {
     switch (vault_error) {
         ERROR_MAP(cupolas_VAULT_ERR_OK, cupolas_ERR_OK);
@@ -107,6 +128,11 @@ cupolas_error_t cupolas_error_from_vault(cupolas_vault_error_t vault_error) {
     }
 }
 
+/**
+ * @brief Convert network security module error to unified error code
+ * @param[in] net_error Network module specific error
+ * @return Corresponding unified error code
+ */
 cupolas_error_t cupolas_error_from_net(cupolas_net_error_t net_error) {
     switch (net_error) {
         ERROR_MAP(cupolas_NET_ERR_OK, cupolas_ERR_OK);
@@ -122,6 +148,11 @@ cupolas_error_t cupolas_error_from_net(cupolas_net_error_t net_error) {
     }
 }
 
+/**
+ * @brief Convert runtime protection module error to unified error code
+ * @param[in] runtime_error Runtime protection module specific error
+ * @return Corresponding unified error code
+ */
 cupolas_error_t cupolas_error_from_runtime(cupolas_runtime_error_t runtime_error) {
     switch (runtime_error) {
         ERROR_MAP(cupolas_RUNTIME_ERR_OK, cupolas_ERR_OK);
@@ -134,7 +165,8 @@ cupolas_error_t cupolas_error_from_runtime(cupolas_runtime_error_t runtime_error
 }
 
 /* ============================================================================
- * 统一错误�?-> 模块错误�? * ============================================================================ */
+ * Unified Error Code -> Module Error Code Conversion Functions
+ * ============================================================================ */
 
 #undef ERROR_MAP
 #undef ERROR_MAP_DEFAULT
@@ -142,6 +174,11 @@ cupolas_error_t cupolas_error_from_runtime(cupolas_runtime_error_t runtime_error
 #define ERROR_MAP(to, from) case from: return to
 #define ERROR_MAP_DEFAULT(to) default: return to
 
+/**
+ * @brief Convert unified error code to signature module error
+ * @param[in] error Unified error code
+ * @return Corresponding signature module error code
+ */
 cupolas_sig_error_t cupolas_error_to_sig(cupolas_error_t error) {
     switch (error) {
         ERROR_MAP(cupolas_SIG_ERR_OK, cupolas_ERR_OK);
@@ -156,6 +193,11 @@ cupolas_sig_error_t cupolas_error_to_sig(cupolas_error_t error) {
     }
 }
 
+/**
+ * @brief Convert unified error code to entitlements module error
+ * @param[in] error Unified error code
+ * @return Corresponding entitlements module error code
+ */
 cupolas_ent_error_t cupolas_error_to_ent(cupolas_error_t error) {
     switch (error) {
         ERROR_MAP(cupolas_ENT_ERR_OK, cupolas_ERR_OK);
@@ -168,6 +210,11 @@ cupolas_ent_error_t cupolas_error_to_ent(cupolas_error_t error) {
     }
 }
 
+/**
+ * @brief Convert unified error code to vault module error
+ * @param[in] error Unified error code
+ * @return Corresponding vault module error code
+ */
 cupolas_vault_error_t cupolas_error_to_vault(cupolas_error_t error) {
     switch (error) {
         ERROR_MAP(cupolas_VAULT_ERR_OK, cupolas_ERR_OK);
@@ -181,6 +228,11 @@ cupolas_vault_error_t cupolas_error_to_vault(cupolas_error_t error) {
     }
 }
 
+/**
+ * @brief Convert unified error code to network security module error
+ * @param[in] error Unified error code
+ * @return Corresponding network module error code
+ */
 cupolas_net_error_t cupolas_error_to_net(cupolas_error_t error) {
     switch (error) {
         ERROR_MAP(cupolas_NET_ERR_OK, cupolas_ERR_OK);
@@ -193,6 +245,11 @@ cupolas_net_error_t cupolas_error_to_net(cupolas_error_t error) {
     }
 }
 
+/**
+ * @brief Convert unified error code to runtime protection module error
+ * @param[in] error Unified error code
+ * @return Corresponding runtime protection module error code
+ */
 cupolas_runtime_error_t cupolas_error_to_runtime(cupolas_error_t error) {
     switch (error) {
         ERROR_MAP(cupolas_RUNTIME_ERR_OK, cupolas_ERR_OK);

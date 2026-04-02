@@ -432,6 +432,7 @@ size_t agentos_mem_check_leaks(void) {
     }
 
     agentos_mem_alloc_info_t* info = alloc_list;
+#ifdef AGENTOS_ENABLE_MEMORY_DEBUG
     while (info) {
         leak_count++;
         leak_size += info->size;
@@ -445,6 +446,14 @@ size_t agentos_mem_check_leaks(void) {
     } else {
         printf("No memory leaks detected\n");
     }
+#else
+    /* 无调试输出，但仍计数 */
+    while (info) {
+        leak_count++;
+        leak_size += info->size;
+        info = info->next;
+    }
+#endif
 
     if (atomic_load_explicit(&mem_initialized, memory_order_acquire) == 1 && mem_stats_mutex) {
         agentos_mutex_unlock(mem_stats_mutex);

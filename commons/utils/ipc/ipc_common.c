@@ -56,6 +56,19 @@ struct ipc_channel {
     ipc_message_callback_t msg_cb; /**< 消息回调 */
     void* msg_user_data;           /**< 消息回调用户数据 */
     char error_msg[256];           /**< 错误消息缓冲区 */
+    
+    /* 平台特定句柄 */
+#ifdef _WIN32
+    HANDLE hPipe;                  /**< Windows 管道句柄或 Socket 句柄 */
+    HANDLE hReadEvent;             /**< 读事件对象 */
+    HANDLE hWriteEvent;            /**< 写事件对象 */
+#else
+    int fd_read;                   /**< 读端文件描述符 */
+    int fd_write;                  /**< 写端文件描述符 */
+    int socket_fd;                 /**< Socket 文件描述符 */
+#endif
+    void* internal_buffer;         /**< 内部缓冲区（用于非阻塞模式） */
+    size_t buffer_used;            /**< 缓冲区已使用大小 */
 };
 
 /**
@@ -201,6 +214,19 @@ ipc_channel_t* ipc_channel_create(const ipc_config_t* config) {
     channel->msg_user_data = NULL;
     memset(channel->error_msg, 0, sizeof(channel->error_msg));
     
+    /* 初始化平台特定句柄为无效值 */
+#ifdef _WIN32
+    channel->hPipe = INVALID_HANDLE_VALUE;
+    channel->hReadEvent = NULL;
+    channel->hWriteEvent = NULL;
+#else
+    channel->fd_read = -1;
+    channel->fd_write = -1;
+    channel->socket_fd = -1;
+#endif
+    channel->internal_buffer = NULL;
+    channel->buffer_used = 0;
+    
     return channel;
 }
 
@@ -231,17 +257,93 @@ agentos_error_t ipc_channel_open(ipc_channel_t* channel) {
     
     switch (channel->config.type) {
         case IPC_TYPE_PIPE:
-        case IPC_TYPE_NAMED_PIPE:
-        case IPC_TYPE_SOCKET:
-        case IPC_TYPE_SHM:
-        case IPC_TYPE_MQ:
-        case IPC_TYPE_RPC:
+            /* 创建匿名管道 */
+#ifdef _WIN32
+            {
+                SECURITY_ATTRIBUTES sa = {0};
+                sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+                sa.bInheritHandle = TRUE;
+                
+                HANDLE hReadPipe, hWritePipe;
+                if (!CreatePipe(&hReadPipe, &hWritePipe, &sa, 0)) {
+                    snprintf(channel->error_msg, sizeof(channel->error_msg),
+                             "CreatePipe failed: %lu", GetLastError());
+                    channel->state = IPC_STATE_ERROR;
+                    return AGENTOS_EUNKNOWN;
+                }
+                
+                /* 设置非阻塞模式（如果需要） */
+                if (channel->config.nonblocking) {
+                    DWORD mode = PIPE_NOWAIT;
+                    SetNamedPipeHandleState(hReadPipe, &mode, NULL, NULL);
+                    SetNamedPipeHandleState(hWritePipe, &mode, NULL, NULL);
+                }
+                
+                channel->hPipe = hWritePipe; /* 写端作为主句柄 */
+                channel->hReadEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+                channel->hWriteEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+            }
+#else
+            {
+                int pipefd[2];
+                if (pipe(pipefd) != 0) {
+                    snprintf(channel->error_msg, sizeof(channel->error_msg),
+                             "pipe() failed: %s", strerror(errno));
+                    channel->state = IPC_STATE_ERROR;
+                    return AGENTOS_EUNKNOWN;
+                }
+                
+                channel->fd_read = pipefd[0];
+                channel->fd_write = pipefd[1];
+                
+                /* 设置非阻塞模式（如果需要） */
+                if (channel->config.nonblocking) {
+                    int flags = fcntl(channel->fd_read, F_GETFL, 0);
+                    fcntl(channel->fd_read, F_SETFL, flags | O_NONBLOCK);
+                    flags = fcntl(channel->fd_write, F_GETFL, 0);
+                    fcntl(channel->fd_write, F_SETFL, flags | O_NONBLOCK);
+                }
+            }
+#endif
             break;
+            
+        case IPC_TYPE_NAMED_PIPE:
+            /* 命名管道在服务端/客户端 API 中处理 */
+            break;
+            
+        case IPC_TYPE_SOCKET:
+            /* Socket 在服务端/客户端 API 中处理 */
+            break;
+            
+        case IPC_TYPE_SHM:
+            /* 共享内存通过专用 API 处理 */
+            break;
+            
+        case IPC_TYPE_MQ:
+            /* 消息队列通过专用 API 处理 */
+            break;
+            
+        case IPC_TYPE_RPC:
+            /* RPC 通过专用客户端/服务端 API 处理 */
+            break;
+            
         default:
             snprintf(channel->error_msg, sizeof(channel->error_msg),
                      "Unknown IPC type: %d", channel->config.type);
             channel->state = IPC_STATE_ERROR;
             return AGENTOS_EINVAL;
+    }
+    
+    /* 分配内部缓冲区 */
+    if (channel->config.buffer_size > 0) {
+        channel->internal_buffer = malloc(channel->config.buffer_size);
+        if (!channel->internal_buffer) {
+            snprintf(channel->error_msg, sizeof(channel->error_msg),
+                     "Failed to allocate internal buffer");
+            /* 清理已创建的资源 */
+            ipc_channel_close(channel);
+            return AGENTOS_ENOMEM;
+        }
     }
     
     channel->state = IPC_STATE_OPEN;
@@ -264,9 +366,46 @@ agentos_error_t ipc_channel_close(ipc_channel_t* channel) {
     
     channel->state = IPC_STATE_CLOSING;
     
+    /* 触发断开事件 */
     if (channel->event_cb) {
         channel->event_cb(channel, IPC_EVENT_DISCONNECTED, NULL, 0, channel->event_user_data);
     }
+    
+    /* 清理平台特定资源 */
+#ifdef _WIN32
+    if (channel->hPipe != INVALID_HANDLE_VALUE) {
+        CloseHandle(channel->hPipe);
+        channel->hPipe = INVALID_HANDLE_VALUE;
+    }
+    if (channel->hReadEvent) {
+        CloseHandle(channel->hReadEvent);
+        channel->hReadEvent = NULL;
+    }
+    if (channel->hWriteEvent) {
+        CloseHandle(channel->hWriteEvent);
+        channel->hWriteEvent = NULL;
+    }
+#else
+    if (channel->fd_read >= 0) {
+        close(channel->fd_read);
+        channel->fd_read = -1;
+    }
+    if (channel->fd_write >= 0) {
+        close(channel->fd_write);
+        channel->fd_write = -1;
+    }
+    if (channel->socket_fd >= 0) {
+        close(channel->socket_fd);
+        channel->socket_fd = -1;
+    }
+#endif
+    
+    /* 释放内部缓冲区 */
+    if (channel->internal_buffer) {
+        free(channel->internal_buffer);
+        channel->internal_buffer = NULL;
+    }
+    channel->buffer_used = 0;
     
     channel->state = IPC_STATE_CLOSED;
     
@@ -358,8 +497,61 @@ agentos_error_t ipc_send(ipc_channel_t* channel, const ipc_message_t* message) {
         return AGENTOS_EOVERFLOW;
     }
     
+    /* 序列化消息并写入管道/Socket */
+    size_t total_size = sizeof(ipc_message_header_t) + message->payload_size;
+    void* send_buffer = malloc(total_size);
+    if (!send_buffer) {
+        return AGENTOS_ENOMEM;
+    }
+    
+    /* 复制消息头 */
+    memcpy(send_buffer, &message->header, sizeof(ipc_message_header_t));
+    
+    /* 复制负载（如果有） */
+    if (message->payload && message->payload_size > 0) {
+        memcpy((char*)send_buffer + sizeof(ipc_message_header_t), 
+               message->payload, message->payload_size);
+    }
+    
+    /* 使用平台特定的写操作 */
+#ifdef _WIN32
+    DWORD bytes_written = 0;
+    BOOL success = FALSE;
+    
+    if (channel->hPipe != INVALID_HANDLE_VALUE) {
+        success = WriteFile(channel->hPipe, send_buffer, (DWORD)total_size, 
+                           &bytes_written, NULL);
+    }
+#else
+    ssize_t bytes_written = 0;
+    int fd = (channel->fd_write >= 0) ? channel->fd_write : channel->socket_fd;
+    
+    if (fd >= 0) {
+        bytes_written = write(fd, send_buffer, total_size);
+    }
+#endif
+    
+    free(send_buffer);
+    
+    /* 检查写入结果 */
+#ifdef _WIN32
+    if (!success || bytes_written < total_size) {
+        snprintf(channel->error_msg, sizeof(channel->error_msg),
+                 "Write failed: %lu", GetLastError());
+        channel->stats.errors++;
+        return AGENTOS_EUNKNOWN;
+    }
+#else
+    if (bytes_written < 0 || (size_t)bytes_written < total_size) {
+        snprintf(channel->error_msg, sizeof(channel->error_msg),
+                 "write() failed: %s", strerror(errno));
+        channel->stats.errors++;
+        return AGENTOS_EUNKNOWN;
+    }
+#endif
+    
     channel->stats.messages_sent++;
-    channel->stats.bytes_sent += message->header.payload_len + sizeof(ipc_message_header_t);
+    channel->stats.bytes_sent += bytes_written;
     
     return AGENTOS_SUCCESS;
 }
@@ -475,14 +667,115 @@ agentos_error_t ipc_receive(
     
     memset(message, 0, sizeof(ipc_message_t));
     
-    channel->stats.messages_received++;
+    /* 首先读取消息头 */
+#ifdef _WIN32
+    DWORD bytes_read = 0;
+    BOOL success = FALSE;
     
+    if (channel->hPipe != INVALID_HANDLE_VALUE) {
+        /* Windows: 使用 ReadFile 读取 */
+        success = ReadFile(channel->hPipe, &message->header, 
+                          sizeof(ipc_message_header_t), &bytes_read, NULL);
+        
+        if (!success || bytes_read < sizeof(ipc_message_header_t)) {
+            if (GetLastError() == ERROR_BROKEN_PIPE) {
+                snprintf(channel->error_msg, sizeof(channel->error_msg),
+                         "Pipe broken");
+            } else {
+                snprintf(channel->error_msg, sizeof(channel->error_msg),
+                         "ReadFile failed: %lu", GetLastError());
+            }
+            channel->stats.errors++;
+            return AGENTOS_EUNKNOWN;
+        }
+    }
+#else
+    ssize_t bytes_read = 0;
+    int fd = (channel->fd_read >= 0) ? channel->fd_read : channel->socket_fd;
+    
+    if (fd >= 0) {
+        /* Unix: 使用 read() 读取 */
+        bytes_read = read(fd, &message->header, sizeof(ipc_message_header_t));
+        
+        if (bytes_read <= 0) {
+            if (bytes_read == 0) {
+                snprintf(channel->error_msg, sizeof(channel->error_msg),
+                         "EOF - pipe closed");
+            } else {
+                snprintf(channel->error_msg, sizeof(channel->error_msg),
+                         "read() failed: %s", strerror(errno));
+            }
+            channel->stats.errors++;
+            return AGENTOS_EUNKNOWN;
+        }
+        
+        if ((size_t)bytes_read < sizeof(ipc_message_header_t)) {
+            /* 不完整的消息头 */
+            snprintf(channel->error_msg, sizeof(channel->error_msg),
+                     "Incomplete header: got %zd bytes", bytes_read);
+            return AGENTOS_EINVAL;
+        }
+    }
+#endif
+    
+    /* 验证魔数 */
+    if (message->header.magic != IPC_MAGIC) {
+        snprintf(channel->error_msg, sizeof(channel->error_msg),
+                 "Invalid magic: 0x%08X", message->header.magic);
+        channel->stats.errors++;
+        return AGENTOS_EINVAL;
+    }
+    
+    /* 如果有负载，继续读取负载 */
+    if (message->header.payload_len > 0 && 
+        message->header.payload_len <= channel->config.max_message_size) {
+        
+        message->payload = malloc(message->header.payload_len);
+        if (!message->payload) {
+            return AGENTOS_ENOMEM;
+        }
+        
+#ifdef _WIN32
+        DWORD payload_read = 0;
+        if (channel->hPipe != INVALID_HANDLE_VALUE) {
+            success = ReadFile(channel->hPipe, message->payload,
+                             message->header.payload_len, &payload_read, NULL);
+            
+            if (!success || payload_read < message->header.payload_len) {
+                free(message->payload);
+                message->payload = NULL;
+                channel->stats.errors++;
+                return AGENTOS_EUNKNOWN;
+            }
+        }
+#else
+        ssize_t payload_read = 0;
+        if (fd >= 0) {
+            payload_read = read(fd, message->payload, message->header.payload_len);
+            
+            if (payload_read <= 0 || (uint32_t)payload_read < message->header.payload_len) {
+                free(message->payload);
+                message->payload = NULL;
+                channel->stats.errors++;
+                return AGENTOS_EUNKNOWN;
+            }
+        }
+#endif
+        
+        message->payload_size = message->header.payload_len;
+    }
+    
+    /* 调用消息回调（如果设置） */
     if (channel->msg_cb) {
         int result = channel->msg_cb(channel, message, channel->msg_user_data);
         if (result != 0) {
+            /* 回调拒绝了消息，但数据已接收 */
             return AGENTOS_ECANCELLED;
         }
     }
+    
+    channel->stats.messages_received++;
+    channel->stats.bytes_received += sizeof(ipc_message_header_t) + message->payload_size;
     
     return AGENTOS_SUCCESS;
 }

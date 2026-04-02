@@ -54,6 +54,19 @@ permission_engine_t* permission_engine_create(const char* rules_path) {
     return engine;
 }
 
+/**
+ * @brief Destroy permission engine and release all resources
+ * @param[in] engine Permission engine to destroy (may be NULL, safe to call)
+ * @note Thread-safe: Uses reference counting, safe for multiple callers
+ * @reentrant No
+ * @ownership Transfers ownership: engine will be freed when ref_count reaches 0
+ *
+ * @details
+ * This function uses reference counting. The engine is only actually destroyed
+ * when the last reference is released (ref_count reaches 0). If other components
+ * still hold references via permission_engine_ref(), this call simply decrements
+ * the counter.
+ */
 void permission_engine_destroy(permission_engine_t* engine) {
     if (!engine) return;
     
@@ -80,6 +93,18 @@ void permission_engine_destroy(permission_engine_t* engine) {
     cupolas_mem_free(engine);
 }
 
+/**
+ * @brief Acquire a new reference to the permission engine
+ * @param[in] engine Permission engine to reference (may be NULL)
+ * @return Same engine pointer with incremented ref_count, or NULL if input is NULL
+ * @note Thread-safe: Uses atomic increment operation
+ * @reentrant Yes
+ * @ownership Caller receives shared ownership, must call unref when done
+ *
+ * @details
+ * Use this function when multiple components need to share the same engine instance.
+ * Each call to ref() must be balanced with a corresponding call to unref().
+ */
 permission_engine_t* permission_engine_ref(permission_engine_t* engine) {
     if (!engine) return NULL;
     
@@ -87,10 +112,59 @@ permission_engine_t* permission_engine_ref(permission_engine_t* engine) {
     return engine;
 }
 
+/**
+ * @brief Release a reference to the permission engine (alias for destroy)
+ * @param[in] engine Permission engine to unreference
+ * @note Thread-safe: Uses atomic decrement operation
+ * @reentrant No
+ * @ownership Releases shared ownership
+ *
+ * @details
+ * Convenience wrapper around permission_engine_destroy(). Prefer using this
+ * name when you acquired the reference via permission_engine_ref() for clarity.
+ */
 void permission_engine_unref(permission_engine_t* engine) {
     permission_engine_destroy(engine);
 }
 
+/**
+ * @brief Check if an agent is permitted to perform an action on a resource
+ * @param[in] engine Permission engine instance
+ * @param[in] agent_id Agent identifier (e.g., "tool_d", "llm_d", "agent_123")
+ * @param[in] action Action to perform (e.g., "read", "write", "execute", "delete")
+ * @param[in] resource Resource being accessed (e.g., "/api/users", "database:production")
+ * @param[in] context Additional context for policy evaluation (can be NULL)
+ * @return Non-zero if allowed, 0 if denied, negative on error
+ * @note Thread-safe: Safe to call from multiple threads concurrently
+ * @reentrant Yes
+ *
+ * @details
+ * This is the core RBAC decision function. It implements:
+ * 1. Cache lookup: Checks LRU cache first for fast path
+ * 2. Rule matching: Evaluates YAML rules against request parameters
+ * 3. Cache update: Stores decision in cache for future requests
+ *
+ * Performance characteristics:
+ * - Cache hit: O(1) average case
+ * - Cache miss: O(n) where n = number of rules (typically < 1000)
+ *
+ * Example:
+ * @code
+ * int result = permission_engine_check(engine,
+ *     "tool_d",          // agent_id
+ *     "execute",         // action
+ *     "/bin/bash",       // resource
+ *     "task_456");       // context
+ *
+ * if (result > 0) {
+ *     // Permission granted
+ * } else if (result == 0) {
+ *     // Permission denied
+ * } else {
+ *     // Error occurred
+ * }
+ * @endcode
+ */
 int permission_engine_check(permission_engine_t* engine,
                             const char* agent_id,
                             const char* action,

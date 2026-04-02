@@ -27,8 +27,8 @@
  * - 线程安全设计
  * 
  * @author AgentOS Team
- * @date 2026-04-01
- * @version 1.0
+ * @date 2026-04-02
+ * @version 1.0.0.6
  * 
  * @note 线程安全：所有公共接口均为线程安全
  * @see ARCHITECTURAL_PRINCIPLES.md E-4 跨平台一致性原则
@@ -43,6 +43,28 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* ============================================================================
+ * 类型系统说明
+ * ============================================================================
+ * 
+ * 本模块（ipc_common.h）定义了两套类型系统：
+ * 
+ * 1. IPC 模块内部类型（本文件定义，使用 ipc_ 前缀）
+ *    - 用于 IPC 模块的内部实现
+ *    - 提供更细粒度的控制（如 IPC_TYPE_NAMED_PIPE 单独类型）
+ *    - 包含完整的 IPC 功能（服务端/客户端/SHM/MQ）
+ * 
+ * 2. AgentOS 统一类型（types.h 定义，使用 agentos_ 前缀）
+ *    - 用于跨模块接口契约
+ *    - 提供简化的抽象层
+ *    - 与其他 AgentOS 组件保持一致
+ * 
+ * 使用建议：
+ * - 在 IPC 模块内部实现中使用 ipc_* 类型
+ * - 在跨模块接口中使用 agentos_ipc_* 类型
+ * - 两者可通过转换函数互转（见文件末尾的转换 API）
+ */
 
 /* ============================================================================
  * 常量定义
@@ -801,6 +823,43 @@ bool ipc_is_valid(const ipc_channel_t* channel);
  * @return 错误码
  */
 agentos_error_t ipc_flush(ipc_channel_t* channel);
+
+/* ============================================================================
+ * 类型转换 API（IPC 内部类型 ↔ AgentOS 统一类型）
+ * ============================================================================ */
+
+/**
+ * @brief 将 AgentOS 统一 IPC 类型转换为 IPC 模块内部类型
+ * @param agentos_type AgentOS 统一 IPC 类型
+ * @return IPC 模块内部类型
+ */
+static inline ipc_type_t ipc_type_from_agentos(agentos_ipc_type_t agentos_type) {
+    switch (agentos_type) {
+        case AGENTOS_IPC_PIPE:   return IPC_TYPE_PIPE;
+        case AGENTOS_IPC_SOCKET: return IPC_TYPE_SOCKET;
+        case AGENTOS_IPC_SHM:    return IPC_TYPE_SHM;
+        case AGENTOS_IPC_MQ:     return IPC_TYPE_MQ;
+        case AGENTOS_IPC_RPC:    return IPC_TYPE_RPC;
+        default:                 return IPC_TYPE_PIPE;
+    }
+}
+
+/**
+ * @brief 将 IPC 模块内部类型转换为 AgentOS 统一 IPC 类型
+ * @param ipc_type IPC 模块内部类型
+ * @return AgentOS 统一 IPC 类型
+ */
+static inline agentos_ipc_type_t ipc_type_to_agentos(ipc_type_t ipc_type) {
+    switch (ipc_type) {
+        case IPC_TYPE_PIPE:       return AGENTOS_IPC_PIPE;
+        case IPC_TYPE_NAMED_PIPE: return AGENTOS_IPC_SOCKET; /* 命名管道映射到 Socket */
+        case IPC_TYPE_SOCKET:     return AGENTOS_IPC_SOCKET;
+        case IPC_TYPE_SHM:        return AGENTOS_IPC_SHM;
+        case IPC_TYPE_MQ:         return AGENTOS_IPC_MQ;
+        case IPC_TYPE_RPC:        return AGENTOS_IPC_RPC;
+        default:                  return AGENTOS_IPC_PIPE;
+    }
+}
 
 #ifdef __cplusplus
 }
