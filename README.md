@@ -3,7 +3,7 @@
 <div align="center">
 
 [![star](https://atomgit.com/spharx/agentos/star/badge.svg)](https://atomgit.com/spharx/agentos)
-[![star](https://gitee.com/spharx/agentos/badge/star.svg?theme=gray)](https://gitee.com/spharx/agentos/stargazers)
+[![star](https://gitee.com/spharx/agentos/badge/star.svg?theme=dark)](https://gitee.com/spharx/agentos)
 [![GitHub](https://img.shields.io/github/stars/SpharxTeam/AgentOS?style=social)](https://github.com/SpharxTeam/AgentOS)  
 
 
