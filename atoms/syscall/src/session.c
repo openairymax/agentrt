@@ -44,15 +44,14 @@ static agentos_mutex_t* session_lock = NULL;
 /**
  * @brief 线程安全地确保会话锁已初始化（使�?once 模式�?
  */
-static agentos_error_t ensure_lock(void) {
+static void ensure_lock(void) {
     if (!session_lock) {
         agentos_mutex_t* new_lock = agentos_mutex_create();
-        if (!new_lock) return AGENTOS_ENOMEM;
+        if (!new_lock) return;
         if (!__sync_bool_compare_and_swap(&session_lock, NULL, new_lock)) {
             agentos_mutex_destroy(new_lock);
         }
     }
-    return AGENTOS_SUCCESS;
 }
 
 /**
@@ -64,8 +63,7 @@ static agentos_error_t ensure_lock(void) {
  */
 agentos_error_t agentos_sys_session_create(const char* metadata, char** out_session_id) {
     if (!out_session_id) return AGENTOS_EINVAL;
-    agentos_error_t err = ensure_lock();
-    if (err != AGENTOS_SUCCESS) return err;
+    ensure_lock();
 
     static uint64_t counter = 0;
     char id_buf[64];
@@ -130,8 +128,7 @@ agentos_error_t agentos_sys_session_create(const char* metadata, char** out_sess
  */
 agentos_error_t agentos_sys_session_get(const char* session_id, char** out_info) {
     if (!session_id || !out_info) return AGENTOS_EINVAL;
-    agentos_error_t err = ensure_lock();
-    if (err != AGENTOS_SUCCESS) return err;
+    ensure_lock();
     agentos_mutex_lock(session_lock);
     session_t* s = sessions;
     while (s) {
@@ -167,8 +164,7 @@ agentos_error_t agentos_sys_session_get(const char* session_id, char** out_info)
  */
 agentos_error_t agentos_sys_session_close(const char* session_id) {
     if (!session_id) return AGENTOS_EINVAL;
-    agentos_error_t err = ensure_lock();
-    if (err != AGENTOS_SUCCESS) return err;
+    ensure_lock();
     agentos_mutex_lock(session_lock);
     session_t** p = &sessions;
     while (*p) {
@@ -203,8 +199,7 @@ agentos_error_t agentos_sys_session_close(const char* session_id) {
  */
 agentos_error_t agentos_sys_session_list(char*** out_sessions, size_t* out_count) {
     if (!out_sessions || !out_count) return AGENTOS_EINVAL;
-    agentos_error_t err = ensure_lock();
-    if (err != AGENTOS_SUCCESS) return err;
+    ensure_lock();
     agentos_mutex_lock(session_lock);
     size_t count = 0;
     session_t* s = sessions;

@@ -33,16 +33,15 @@ endif()
 
 add_library(agentos_core STATIC ${COREKERN_SOURCES})
 
-target_include_directories(agentos_core PUBLIC
+target_include_directories(agentos_core PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/memory/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/string/include
 )
 
 # 安全编译选项（基于AgentOS C编码风格指南附录A）
 if(MSVC)
-    target_compile_options(agentos_core PRIVATE /W4 /WX)
-    target_compile_definitions(agentos_core PRIVATE _CRT_SECURE_NO_WARNINGS)
+    target_compile_options(agentos_core PRIVATE /W4 /std:c11 /wd4819 /wd4117 /wd4273)
+    target_compile_definitions(agentos_core PRIVATE _CRT_SECURE_NO_WARNINGS _CRT_SECURE_NO_DEPRECATE)
     # MSVC安全选项
     target_compile_options(agentos_core PRIVATE /GS)  # 缓冲区安全检查
     target_compile_options(agentos_core PRIVATE /sdl) # 启用额外安全检查

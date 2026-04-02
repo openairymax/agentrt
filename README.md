@@ -2,8 +2,8 @@
 
 <div align="center">
 
-[![AtomGit](https://atomgit.com/spharx/agentos/badge/star.svg)](https://atomgit.com/spharx/agentos)
-[![Gitee](https://gitee.com/spharx/agentos/badge/star.svg)](https://gitee.com/spharx/agentos)
+[![star](https://atomgit.com/spharx/agentos/star/badge.svg)](https://atomgit.com/spharx/agentos)
+[![star](https://gitee.com/spharx/agentos/badge/star.svg?theme=gray)](https://gitee.com/spharx/agentos/stargazers)
 [![GitHub](https://img.shields.io/github/stars/SpharxTeam/AgentOS?style=social)](https://github.com/SpharxTeam/AgentOS)  
 
 
@@ -14,6 +14,8 @@
 [![Docker](https://img.shields.io/badge/docker-supported-blue.svg?logo=docker&logoColor=white)](https://www.docker.com/)
 [![C/C++](https://img.shields.io/badge/C%2FC%2B%2B-11%2F17-blue.svg?logo=c%2B%2B&logoColor=white)](https://isocpp.org/)
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![Go](https://img.shields.io/badge/Go-1.21+-blue.svg?logo=go&logoColor=white)](https://go.dev/)
+[![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg?logo=rust&logoColor=white)](https://www.rust-lang.org/)
 
 </div>
 

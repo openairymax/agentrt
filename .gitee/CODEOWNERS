@@ -1,0 +1,71 @@
+# AgentOS 代码所有者文件
+# 此文件定义了各个模块的代码负责人
+# 语法：pattern owner1 owner2 ...
+
+# 内核层
+/atoms/ @lidecheng @wangliren
+/atoms/corekern/ @lidecheng
+/atoms/coreloopthree/ @lidecheng
+/atoms/memoryrovol/ @lidecheng
+/atoms/syscall/ @wangliren
+
+# 轻量级内核
+/atomslite/ @lidecheng
+
+# 统一基础库
+/commons/ @wangliren
+
+# 安全穹顶
+/cupolas/ @wangliren
+
+# 用户态服务
+/daemon/ @wangliren
+/daemon/common/ @wangliren
+/daemon/llm_d/ @lidecheng
+/daemon/tool_d/ @wangliren
+/daemon/market_d/ @lidecheng
+/daemon/sched_d/ @wangliren
+/daemon/monit_d/ @wangliren
+
+# 网关层
+/gateway/ @wangliren
+
+# 数据存储
+/heapstore/ @lidecheng
+
+# 配置管理
+/manager/ @wangliren
+
+# 开放生态实验室
+/openlab/ @lidecheng @wangliren
+
+# 多语言 SDK
+/toolkit/ @lidecheng
+/toolkit/python/ @lidecheng
+/toolkit/go/ @wangliren
+/toolkit/rust/ @lidecheng
+/toolkit/typescript/ @wangliren
+
+# 文档
+/manuals/ @lidecheng @wangliren
+
+# 测试
+/tests/ @lidecheng @wangliren
+
+# 脚本
+/scripts/ @wangliren
+
+# 配置文件
+/.github/ @lidecheng @wangliren
+/.gitee/ @lidecheng @wangliren
+/.gitcode/ @lidecheng @wangliren
+
+# 根目录文件
+/LICENSE @lidecheng
+/README.md @lidecheng
+/CONTRIBUTING.md @lidecheng
+/CODE_OF_CONDUCT.md @lidecheng
+/SECURITY.md @wangliren
+/CHANGELOG.md @lidecheng
+/AUTHORS.md @lidecheng
+/ACKNOWLEDGMENTS.md @lidecheng

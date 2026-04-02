@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file scheduler_core.c
  * @brief 调度器核心层实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -13,13 +13,33 @@
 #include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 
-/* ==================== 静态全局状�?==================== */
+/* ==================== 静态全局状态 ==================== */
 
 /** @brief 调度器核心上下文（单例） */
 static scheduler_core_ctx_t* g_core_ctx = NULL;
 
-/** @brief 上下文初始化锁（用于双重检查锁�?*/
+/** @brief 上下文初始化锁（用于双重检查锁定） */
 static void* g_ctx_init_lock = NULL;
+
+#ifdef _WIN32
+/* Windows 平台原子操作替代实现 */
+#define atomic_init(ptr, val) (*(ptr) = (val))
+#define atomic_store(ptr, val) (*(ptr) = (val))
+#define atomic_load(ptr) (*(ptr))
+
+static inline int atomic_compare_exchange(volatile void* ptr, void* expected, void* desired) {
+    void* old = InterlockedCompareExchangePointer((volatile LONG_PTR*)ptr, (LONG_PTR)desired, *(LONG_PTR*)expected);
+    if (old == *(void**)expected) {
+        return 1;
+    }
+    *(void**)expected = old;
+    return 0;
+}
+
+static inline uint64_t atomic_fetch_add_64(volatile uint64_t* ptr, uint64_t val) {
+    return InterlockedExchangeAdd64((volatile LONGLONG*)ptr, (LONGLONG)val);
+}
+#endif
 
 /* ==================== 内部辅助函数 ==================== */
 
@@ -37,7 +57,7 @@ static scheduler_core_ctx_t* create_core_ctx(void) {
         return NULL;
     }
 
-    /* 初始化原子状�?*/
+    /* 初始化原子状态 */
     atomic_init(&ctx->initialized, 0);
     ctx->next_task_id = 1;
     ctx->task_count = 0;
@@ -95,10 +115,14 @@ int scheduler_core_init(void) {
         void* new_lock = agentos_mutex_create();
         if (!new_lock) return -1;
 
-        /* CAS操作设置�?*/
+        /* CAS操作设置锁 */
         void* expected = NULL;
+#ifdef _WIN32
+        if (!atomic_compare_exchange(&g_ctx_init_lock, &expected, new_lock)) {
+#else
         if (!__atomic_compare_exchange_n(&g_ctx_init_lock, &expected, new_lock,
                                          0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+#endif
             /* 其他线程已经设置了锁 */
             agentos_mutex_destroy(new_lock);
         }
@@ -120,7 +144,7 @@ int scheduler_core_init(void) {
         return -1;
     }
 
-    /* 标记为已初始�?*/
+    /* 标记为已初始化 */
     atomic_store(&g_core_ctx->initialized, 1);
 
     agentos_mutex_unlock(g_ctx_init_lock);
@@ -151,7 +175,11 @@ int scheduler_core_is_initialized(void) {
 uint64_t scheduler_core_fetch_add_task_id(void) {
     if (!g_core_ctx) return 0;
 
+#ifdef _WIN32
+    return atomic_fetch_add_64(&g_core_ctx->next_task_id, 1);
+#else
     return __atomic_fetch_add(&g_core_ctx->next_task_id, 1, __ATOMIC_SEQ_CST);
+#endif
 }
 
 void scheduler_core_hash_insert(agentos_task_id_t id, task_info_core_t* info) {

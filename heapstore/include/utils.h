@@ -32,6 +32,22 @@ extern "C" {
  */
 bool heapstore_ensure_directory(const char* path);
 
+/**
+ * @brief 计算目录的总大小和文件数量
+ *
+ * @param path [in] 目录路径
+ * @param out_size [out] 输出总大小（字节）
+ * @param out_count [out] 输出文件数量
+ * @return bool 成功返回 true，失败返回 false
+ *
+ * @ownership 调用者负责 path 的生命周期
+ * @threadsafe 是
+ * @reentrant 是
+ *
+ * @note 递归计算子目录大小
+ */
+bool heapstore_calculate_directory_size(const char* path, uint64_t* out_size, uint32_t* out_count);
+
 #ifdef __cplusplus
 }
 #endif

@@ -1,9 +1,11 @@
-﻿/**
+/**
  * @file scheduler_windows.c
  * @brief Windows平台调度器适配器实�? * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * @details
  * 本模块实现Windows平台的线程操作适配器，提供与平台无关核心层的接口�? * 通过实现scheduler_platform_ops_t中定义的所有操作，将Windows API封装为统一接口�? */
+
+#define __STDC_NO_ATOMICS__
 
 #include "scheduler_platform.h"
 #include "scheduler_core.h"
@@ -12,7 +14,6 @@
 
 /* Unified base library compatibility layer */
 #include "../../../commons/utils/memory/include/memory_compat.h"
-#include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 
 /* ==================== 内部类型定义 ==================== */

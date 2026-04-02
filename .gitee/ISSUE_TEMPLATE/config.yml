@@ -1,0 +1,15 @@
+# Issue 模板配置
+blank_issues_enabled: false
+contact_links:
+  - name: GitHub 镜像仓库
+    url: https://github.com/SpharxTeam/AgentOS
+    about: AgentOS 的 GitHub 镜像仓库（用于国际社区）
+  - name: 问题讨论
+    url: https://github.com/SpharxTeam/AgentOS/discussions
+    about: 在 GitHub Discussions 中进行问题讨论
+  - name: 贡献指南
+    url: ../CONTRIBUTING.md
+    about: 请先阅读贡献指南
+  - name: 行为准则
+    url: ../CODE_OF_CONDUCT.md
+    about: 请遵守我们的行为准则

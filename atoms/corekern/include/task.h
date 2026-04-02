@@ -29,6 +29,11 @@ extern "C" {
 typedef uint64_t agentos_task_id_t;
 
 /**
+ * @brief 线程 ID 类型
+ */
+typedef uint64_t agentos_thread_id_t;
+
+/**
  * @brief 互斥锁类型（不透明指针）
  */
 typedef struct agentos_mutex agentos_mutex_t;
@@ -72,12 +77,18 @@ typedef enum {
 } agentos_task_state_t;
 
 /**
+ * @brief 线程函数类型
+ */
+typedef void* (*agentos_thread_func_t)(void*);
+
+/**
  * @brief 线程属性结构
  */
 typedef struct {
     const char* name;      /**< 线程名称 */
     int priority;          /**< 线程优先级 */
     size_t stack_size;    /**< 栈大小 */
+    int detach_state;     /**< 分离状态 */
 } agentos_thread_attr_t;
 
 /**
