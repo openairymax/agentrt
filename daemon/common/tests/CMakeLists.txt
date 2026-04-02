@@ -1,4 +1,4 @@
-﻿# Copyright (c) 2026 SPHARX. All Rights Reserved.
+# Copyright (c) 2026 SPHARX. All Rights Reserved.
 # daemon/commons 单元测试
 
 cmake_minimum_required(VERSION 3.20)
@@ -9,6 +9,7 @@ set(TEST_SOURCES
     test_platform.c
     test_logger.c
     test_config.c
+    test_svc_auth.c
 )
 
 # 创建测试可执行文件

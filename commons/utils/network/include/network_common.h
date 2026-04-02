@@ -20,8 +20,8 @@
  * - macOS (POSIX Socket)
  * 
  * @author AgentOS Team
- * @date 2026-04-01
- * @version 2.0
+ * @date 2026-04-02
+ * @version 1.0.0.6
  * 
  * @note 线程安全：所有公共接口均为线程安全
  * @see ARCHITECTURAL_PRINCIPLES.md E-4 跨平台一致性原则

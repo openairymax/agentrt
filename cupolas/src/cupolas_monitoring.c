@@ -291,7 +291,9 @@ size_t cupolas_monitoring_export_otlp(cupolas_monitoring_t* mgr, char* buffer, s
                         size_t name_len = (size_t)(space_pos - line);
                         if (name_len < sizeof(metric_name)) {
                             strncpy(metric_name, line, name_len);
-                            strcpy(metric_value, space_pos + 1);
+                            metric_name[name_len] = '\0';
+                            strncpy(metric_value, space_pos + 1, sizeof(metric_value) - 1);
+                            metric_value[sizeof(metric_value) - 1] = '\0';
 
                             if (!first_metric) {
                                 written += snprintf(buffer + written, size - written,

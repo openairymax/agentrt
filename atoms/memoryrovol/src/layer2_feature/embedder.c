@@ -101,8 +101,13 @@ static size_t generate_openai_embedding(const char* text, float** out_embedding)
     }
 
     char* json_data;
-    asprintf(&json_data,
+    int ret = asprintf(&json_data,
              "{\"input\":\"%s\",\"model\":\"text-embedding-ada-002\"}", text);
+    if (ret < 0) {
+        AGENTOS_FREE(chunk.data);
+        curl_easy_cleanup(curl);
+        return 0;
+    }
 
     struct curl_slist* headers = NULL;
     headers = curl_slist_append(headers, "Content-Type: application/json");
@@ -179,8 +184,13 @@ static size_t generate_deepseek_embedding(const char* text, float** out_embeddin
     }
 
     char* json_data;
-    asprintf(&json_data,
+    int ret = asprintf(&json_data,
              "{\"input\":\"%s\",\"model\":\"embedding\"}", text);
+    if (ret < 0) {
+        AGENTOS_FREE(chunk.data);
+        curl_easy_cleanup(curl);
+        return 0;
+    }
 
     struct curl_slist* headers = NULL;
     headers = curl_slist_append(headers, "Content-Type: application/json");
