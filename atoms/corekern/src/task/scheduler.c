@@ -26,7 +26,12 @@
 #include "../../../commons/utils/memory/include/memory_compat.h"
 #include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
+#ifdef _WIN32
+/* Windows 平台原子操作兼容层 */
+#include "../../../commons/utils/include/atomic_compat.h"
+#else
 #include <stdatomic.h>
+#endif
 
 /* ==================== 类型适配辅助 ==================== */
 

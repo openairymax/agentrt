@@ -44,6 +44,11 @@ typedef struct agentos_ipc_channel agentos_ipc_channel_t;
 typedef struct agentos_ipc_buffer agentos_ipc_buffer_t;
 
 /**
+ * @brief IPC 端口号类型
+ */
+typedef uint16_t agentos_ipc_port_t;
+
+/**
  * @brief IPC 消息结构
  */
 typedef struct {

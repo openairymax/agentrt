@@ -15,6 +15,7 @@
 #include "ipc.h"
 #include "task.h"
 #include "mem.h"
+#include "time.h"  /* 提供 agentos_time_monotonic_ms() 函数 */
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
@@ -395,9 +396,9 @@ agentos_error_t agentos_ipc_call(
     /* 使用条件变量等待，避免忙轮询 */
     agentos_mutex_lock(pc->cond_lock);
 
-    uint64_t start_time = agentos_time_ms();
+    uint64_t start_time = agentos_time_monotonic_ms();
     while (!ATOMIC_LOAD(&pc->completed)) {
-        uint64_t elapsed = agentos_time_ms() - start_time;
+        uint64_t elapsed = agentos_time_monotonic_ms() - start_time;
         if (elapsed >= timeout_ms) {
             agentos_mutex_unlock(pc->cond_lock);
 
@@ -494,9 +495,10 @@ agentos_error_t agentos_ipc_reply(
 /**
  * @brief 关闭通道
  * @param channel 通道
+ * @return agentos_error_t 错误码
  */
-void agentos_ipc_close(agentos_ipc_channel_t* channel) {
-    if (!channel) return;
+agentos_error_t agentos_ipc_close(agentos_ipc_channel_t* channel) {
+    if (!channel) return AGENTOS_EINVAL;
 
     if (channel->remote_target) {
         if (ATOMIC_SUB(&channel->remote_target->ref_count, 1) == 0) {
@@ -520,4 +522,5 @@ void agentos_ipc_close(agentos_ipc_channel_t* channel) {
     }
 
     AGENTOS_FREE(channel);
+    return AGENTOS_SUCCESS;
 }

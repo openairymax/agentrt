@@ -1,0 +1,53 @@
+name: Security Audit / 安全审计
+
+on:
+  schedule:
+    # Run daily at 2:00 AM UTC
+    # 每天 UTC 时间 2:00 运行
+    - cron: '0 2 * * *'
+  push:
+    paths:
+      - '**/package.json'
+      - '**/requirements.txt'
+      - '**/CMakeLists.txt'
+      - '.gitcode/workflows/**'
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code / 检出代码
+      uses: actions/checkout@v4
+
+    - name: Audit dependencies / 审计依赖
+      run: |
+        echo "Auditing dependencies..."
+        # Add dependency auditing commands
+        # 添加依赖审计命令
+
+  static-analysis:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code / 检出代码
+      uses: actions/checkout@v4
+
+    - name: Install tools / 安装工具
+      run: |
+        sudo apt-get install -y clang-tidy cppcheck
+
+    - name: Run static analysis / 运行静态分析
+      run: |
+        cppcheck --enable=all --inconclusive --error-exitcode=1 src/
+        clang-tidy src/**/*.c -- -Iinclude
+
+  compliance-check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code / 检出代码
+      uses: actions/checkout@v4
+
+    - name: Check security compliance / 检查安全合规
+      run: |
+        echo "Checking security compliance..."
+        # Verify security policies
+        # 验证安全策略
