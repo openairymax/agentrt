@@ -2,21 +2,22 @@
 
 <div align="center">
 
-[![star](https://atomgit.com/spharx/agentos/star/badge.svg)](https://atomgit.com/spharx/agentos)
-[![star](https://gitee.com/spharx/agentos/badge/star.svg?theme=dark)](https://gitee.com/spharx/agentos)
-[![GitHub](https://img.shields.io/github/stars/SpharxTeam/AgentOS?style=social)](https://github.com/SpharxTeam/AgentOS)  
+[![AtomGit](https://atomgit.com/spharx/agentos/star/badge.svg)](https://atomgit.com/spharx/agentos)
+[![Gitee](https://gitee.com/spharx/agentos/badge/star.svg)](https://gitee.com/spharx/agentos)
+[![GitHub](https://img.shields.io/github/stars/SpharxTeam/AgentOS)](https://github.com/SpharxTeam/AgentOS)  
 
-[![Version](https://img.shields.io/badge/version-1.0.0.8-blue.svg)](https://atomgit.com/spharx/agentos)
-[![Documentation Status](https://img.shields.io/badge/docs-Doc%20V1.8-blue)](manuals/ARCHITECTURAL_PRINCIPLES.md)  
 
-[![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](https://atomgit.com/spharx/agentos/blob/main/LICENSE)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/SpharxTeam/AgentOS/actions)  
+[![Version](https://img.shields.io/badge/version-1.0.0.9-blue.svg)](https://atomgit.com/spharx/agentos)
+[![Documentation Status](https://img.shields.io/badge/docs-Doc%20V1.8-blue)](manuals/ARCHITECTURAL_PRINCIPLES.md)
+[![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](https://atomgit.com/spharx/agentos/blob/main/LICENSE)  
 
+
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/SpharxTeam/AgentOS/actions)
 [![Docker](https://img.shields.io/badge/docker-supported-blue.svg?logo=docker&logoColor=white)](https://www.docker.com/)
 [![C/C++](https://img.shields.io/badge/C%2FC%2B%2B-11%2F17-blue.svg?logo=c%2B%2B&logoColor=white)](https://isocpp.org/)
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Go](https://img.shields.io/badge/Go-1.21+-blue.svg?logo=go&logoColor=white)](https://go.dev/)
-[![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg?logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg?logo=rust&logoColor=white)](https://www.rust-lang.org/)  
 
 </div>
 
