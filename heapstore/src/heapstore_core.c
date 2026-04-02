@@ -366,6 +366,35 @@ heapstore_error_t heapstore_get_stats(heapstore_stats_t* stats) {
         uint64_t dir_size = 0;
         uint32_t file_count = 0;
 
+        /* 获取对应路径的完整路径 */
+        char full_path[512];
+        const char* path_name = NULL;
+        
+        switch (s_path_order[i]) {
+            case heapstore_PATH_LOGS:
+                path_name = "logs";
+                break;
+            case heapstore_PATH_REGISTRY:
+                path_name = "registry";
+                break;
+            case heapstore_PATH_TRACES:
+                path_name = "traces";
+                break;
+            case heapstore_PATH_KERNEL_IPC:
+                path_name = "kernel/ipc";
+                break;
+            case heapstore_PATH_KERNEL_MEMORY:
+                path_name = "kernel/memory";
+                break;
+            default:
+                continue;
+        }
+        
+        snprintf(full_path, sizeof(full_path), "%s/%s", s_root_path, path_name);
+        
+        /* 计算目录大小 */
+        heapstore_calculate_directory_size(full_path, &dir_size, &file_count);
+
         switch (s_path_order[i]) {
             case heapstore_PATH_LOGS:
                 stats->log_usage_bytes += dir_size;

@@ -17,9 +17,11 @@
 #ifdef _WIN32
 #include <direct.h>
 #include <io.h>
+#define PATH_SEPARATOR "\\"
 #else
 #include <unistd.h>
 #include <dirent.h>
+#define PATH_SEPARATOR "/"
 #endif
 
 #include "../../../commons/utils/execution/include/execution_common.h"\n\ntypedef struct $1_unit_data {\n    execution_unit_data_t base;\n    char* metadata_json;\n} $1_unit_data_t;
@@ -152,7 +154,7 @@ static agentos_error_t file_do_list_win(
 
     WIN32_FIND_DATAA find_data;
     char search_path[PATH_MAX];
-    snprintf(search_path, sizeof(search_path), "%s\\*", full_path);
+    snprintf(search_path, sizeof(search_path), "%s" PATH_SEPARATOR "*", full_path);
 
     HANDLE hFind = FindFirstFileA(search_path, &find_data);
     if (hFind == INVALID_HANDLE_VALUE) return AGENTOS_ENOENT;

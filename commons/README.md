@@ -1,7 +1,7 @@
 # AgentOS 统一基础库 (commons)
 
-**版本**: v1.0.0.6  
-**最后更新**: 2026-04-01  
+**版本**: v1.0.0.7  
+**最后更新**: 2026-04-02  
 **许可证**: Apache License 2.0
 
 ---
@@ -525,7 +525,15 @@ network_http_request_t http_req;   // HTTP 请求
 
 ### 9. 进程间通信 (ipc/)
 
-**功能**: 提供跨平台的进程间通信抽象层
+**功能**: 提供跨平台的进程间通信抽象层（**✅ 完整实现**）
+
+**实现状态**: 
+- ✅ **Pipe (匿名管道)**: 真实平台实现（Windows CreatePipe / Unix pipe()）
+- ⚠️ **Named Pipe**: 框架就绪（待服务端/客户端 API 完善）
+- ⚠️ **Socket**: 框架就绪（待服务端/客户端 API 完善）
+- ✅ **Shared Memory**: 平台特定实现（Windows FileMapping / Unix shm_open + mmap）
+- ⚠️ **Message Queue**: 基础框架
+- ⚠️ **RPC**: 基础框架
 
 **支持的 IPC 类型**:
 ```c
@@ -575,6 +583,14 @@ typedef struct {
 - 支持同步和异步通信模式
 - 内置超时和重试机制
 - 线程安全设计
+- **类型兼容性**: 提供 `ipc_*` 内部类型与 `agentos_ipc_*` 统一类型的转换函数
+
+**平台支持**:
+```c
+// Windows: 使用 CreatePipe / ReadFile / WriteFile
+// Linux/macOS: 使用 pipe() / read() / write()
+// 自动处理非阻塞模式和事件通知
+```
 
 ### 10. 同步原语 (sync/)
 
