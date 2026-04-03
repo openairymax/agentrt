@@ -40,6 +40,33 @@
 #define CONTAINER_ID_LENGTH 64
 #define CONTAINER_NAME_PREFIX "cupolas_"
 #define MAX_COMMAND_LENGTH 4096
+#define MAX_IMAGE_NAME_LEN 256
+
+/**
+ * @brief Validate container image name for safe shell command construction
+ * @param[in] image Image name string from user input
+ * @return true if safe, false if potentially dangerous
+ * @note Rejects characters that could enable command injection:
+ *       ; | & ` $ ( ) < > { } [ ] ! # ~ \ ' " and non-printable chars
+ */
+static bool is_safe_image_name(const char* image) {
+    if (!image || !*image || strlen(image) > MAX_IMAGE_NAME_LEN) {
+        return false;
+    }
+
+    const char* unsafe_chars = ";|&`$()<>{}[]!#~\\'\"\n\r\t";
+    for (const char* p = image; *p; p++) {
+        unsigned char c = (unsigned char)*p;
+        if (c < 0x20 || c > 0x7E) return false;
+        if (strchr(unsafe_chars, c)) return false;
+    }
+
+    if (strchr(image, ' ') && (strstr(image, "$(") || strstr(image, "`"))) {
+        return false;
+    }
+
+    return true;
+}
 
 typedef struct container_handle {
     container_config_t manager;
@@ -179,6 +206,17 @@ static int execute_command(const char* cmd, int timeout_ms, char* output, size_t
     return result;
 }
 
+/**
+ * @brief Build docker command string from handle configuration
+ * @param[in] handle Container handle with configuration
+ * @param[in] action Docker action (run, create, etc.)
+ * @return Static buffer containing command string
+ * @warning SECURITY: Callers MUST validate all user-supplied fields
+ *          (image, command, args[], workdir, network_mode, env_vars[])
+ *          via is_safe_image_name() before using the returned command.
+ * @note Currently unused (dead code) — container_start() uses inline snprintf.
+ *       If re-activated, add is_safe_image_name checks for each field.
+ */
 static char* build_docker_command(container_handle_t* handle, const char* action) {
     static char cmd[MAX_COMMAND_LENGTH];
     size_t pos = 0;
@@ -258,6 +296,10 @@ static char* build_docker_command(container_handle_t* handle, const char* action
 int container_pull_image(void* mgr, const char* image) {
     if (!mgr || !image) return cupolas_ERROR_INVALID_ARG;
 
+    if (!is_safe_image_name(image)) {
+        return cupolas_ERR_PERMISSION_DENIED;
+    }
+
     container_handle_t* handle = (container_handle_t*)mgr;
     char cmd[MAX_COMMAND_LENGTH];
     snprintf(cmd, MAX_COMMAND_LENGTH, "docker pull %s", image);
@@ -277,7 +319,23 @@ int container_start(void* mgr, const char* name, container_result_t* result) {
         return cupolas_ERROR_INVALID_ARG;
     }
 
+    /* 安全验证: 防止通过 image/command/args 注入命令 */
+    if (!is_safe_image_name(handle->manager.image)) {
+        return cupolas_ERR_PERMISSION_DENIED;
+    }
+    if (!is_safe_image_name(handle->manager.command)) {
+        return cupolas_ERR_PERMISSION_DENIED;
+    }
+    for (size_t i = 0; i < handle->manager.args_count && handle->manager.args; i++) {
+        if (!is_safe_image_name(handle->manager.args[i])) {
+            return cupolas_ERR_PERMISSION_DENIED;
+        }
+    }
+
     if (name) {
+        if (!is_safe_image_name(name)) {
+            return cupolas_ERR_PERMISSION_DENIED;
+        }
         snprintf(handle->container_name, sizeof(handle->container_name), "%s%s",
                  CONTAINER_NAME_PREFIX, name);
     } else {
@@ -462,6 +520,16 @@ int container_exec(void* mgr, const char* command, const char** args,
 
     if (!handle->is_running) {
         return cupolas_ERROR_INVALID_ARG;
+    }
+
+    /* 安全验证: 防止通过 command/args 注入命令 */
+    if (!is_safe_image_name(command)) {
+        return cupolas_ERR_PERMISSION_DENIED;
+    }
+    for (size_t i = 0; i < arg_count && args; i++) {
+        if (!is_safe_image_name(args[i])) {
+            return cupolas_ERR_PERMISSION_DENIED;
+        }
     }
 
     char cmd[MAX_COMMAND_LENGTH * 2];

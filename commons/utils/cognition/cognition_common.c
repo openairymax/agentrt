@@ -8,9 +8,9 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "include/cognition_common.h"
-#include "../../memory/include/memory_common.h"
-#include "../../platform/platform.h"
+#include "cognition_common.h"
+#include <memory_common.h>
+#include <platform.h>
 
 #include <stdio.h>
 #include <string.h>

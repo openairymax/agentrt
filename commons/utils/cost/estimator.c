@@ -12,13 +12,27 @@
 
 #include "cost.h"
 #include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
+#ifdef _WIN32
+    #include "../../platform/include/platform.h"
+#else
+    #include <pthread.h>
+#endif
 
 /* Unified base library compatibility layer */
-#include "../../utils/memory/include/memory_compat.h"
-#include "../../utils/string/include/string_compat.h"
-#include <string.h>
-#include <pthread.h>
-#include <ctype.h>
+#include <memory_compat.h>
+#include <string_compat.h>
+
+#ifdef _WIN32
+    /* Windows: 使用 agentos_mutex_t 替代 pthread_mutex_t */
+    #define pthread_mutex_t   agentos_mutex_t
+    #define pthread_mutex_init(m, a)  agentos_mutex_init(m)
+    #define pthread_mutex_destroy(m)  agentos_mutex_destroy(m)
+    #define pthread_mutex_lock(m)     agentos_mutex_lock(m)
+    #define pthread_mutex_unlock(m)   agentos_mutex_unlock(m)
+#endif
 
 #define MAX_MODEL_NAME 64
 #define MAX_CONFIG_ENTRIES 16

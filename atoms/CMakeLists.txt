@@ -110,7 +110,14 @@ if(OpenSSL_FOUND)
 else()
     message(WARNING "OpenSSL not found, some security features may be limited")
 endif()
-find_package(Threads REQUIRED)
+# 查找线程库（Windows平台使用原生线程支持）
+if(WIN32)
+    message(STATUS "Using Windows built-in thread support (no external Threads package needed)")
+    add_definitions(-DAGENTOS_HAS_THREADS=1)
+else()
+    find_package(Threads REQUIRED)
+    message(STATUS "Threads found: ${CMAKE_THREAD_LIBS_INIT}")
+endif()
 
 # libevent 是可选依赖（用于事件驱动模块）
 if(WIN32)
