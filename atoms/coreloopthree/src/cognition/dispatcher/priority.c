@@ -1,111 +1,65 @@
-﻿/**
+/**
  * @file priority.c
- * @brief ���ȼ����Ȳ��ԣ�ѡ�����ȼ���ߵ�Agent��
+ * @brief 优先级调度策略，选择优先级最高的Agent
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "cognition.h
-#include "../../../commons/utils/cognition/include/cognition_common.h""
-#include "agent_registry.h
-#include "../../../commons/utils/cognition/include/cognition_common.h""
-#include <stdlib.h
-#include "../../../commons/utils/cognition/include/cognition_common.h">
+#include "cognition.h"
+#include "agent_registry.h"
+#include "strategy.h"
+#include <stdlib.h>
+#include <string.h>
 
 /* Unified base library compatibility layer */
-#include "../../../commons/utils/memory/include/memory_compat.h
-#include "../../../commons/utils/cognition/include/cognition_common.h""
-#include "../../../commons/utils/string/include/string_compat.h
-#include "../../../commons/utils/cognition/include/cognition_common.h""
-#include <string.h
-#include "../../../commons/utils/cognition/include/cognition_common.h">
+#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/string/include/string_compat.h"
 
-typedef struct priority_data {
-    void* registry_ctx;
-    agent_registry_get_agents_func get_agents;
-    agentos_mutex_t* lock;
-} priority_data_t;
+/**
+ * @brief 优先级调度策略内部结构
+ */
+struct agentos_priority_dispatch {
+    void* registry_ctx;                          /**< 注册中心上下文 */
+    agent_registry_get_agents_func get_agents;   /**< 获取候选Agent列表的函数 */
+};
 
-static void priority_destroy(agentos_dispatching_strategy_t* strategy) {
-    if (!strategy) return;
-    priority_data_t* data = (priority_data_t*)strategy->data;
-    if (data) {
-        if (data->lock) agentos_mutex_destroy(data->lock);
-        AGENTOS_FREE(data);
-    }
-    AGENTOS_FREE(strategy);
-}
-
-static agentos_error_t priority_dispatch(
-    const agentos_task_node_t* task,
-    const void** candidates,
-    size_t count,
-    void* context,
-    char** out_agent_id) {
-
-    priority_data_t* data = (priority_data_t*)context;
-    if (!data || !task || !out_agent_id) return AGENTOS_EINVAL;
-
-    agent_info_t** agents = NULL;
-    size_t agent_count = 0;
-    agentos_error_t err;
-
-    if (candidates && count > 0) {
-        agents = (agent_info_t**)candidates;
-        agent_count = count;
-    } else {
-        err = data->get_agents(data->registry_ctx, task->agent_role, &agents, &agent_count);
-        if (err != AGENTOS_SUCCESS) return err;
-        if (agent_count == 0) return AGENTOS_ENOENT;
-    }
-
-    int highest_priority = -1;
-    int best_index = -1;
-
-    for (size_t i = 0; i < agent_count; i++) {
-        agent_info_t* agent = agents[i];
-        if (agent->priority > highest_priority) {
-            highest_priority = agent->priority;
-            best_index = i;
-        }
-    }
-
-    if (best_index >= 0) {
-        agent_info_t* best = agents[best_index];
-        *out_agent_id = AGENTOS_STRDUP(best->agent_id);
-        if (!*out_agent_id) return AGENTOS_ENOMEM;
-        return AGENTOS_SUCCESS;
-    }
-
-    return AGENTOS_ENOENT;
-}
-
-agentos_dispatching_strategy_t* agentos_dispatching_priority_create(
+/**
+ * @brief 创建优先级调度策略实例
+ *
+ * @param registry_ctx [in] 注册中心上下文（非NULL）
+ * @param get_agents_func [in] 获取候选Agent列表的函数指针（非NULL）
+ * @param out_strategy [out] 输出策略实例
+ * @return AGENTOS_SUCCESS 成功
+ * @return AGENTOS_EINVAL 参数无效
+ * @return AGENTOS_ENOMEM 内存分配失败
+ */
+agentos_error_t agentos_dispatching_priority_create(
     void* registry_ctx,
-    agent_registry_get_agents_func get_agents_func) {
-
-    if (!get_agents_func) return NULL;
-
-    agentos_dispatching_strategy_t* strat = (agentos_dispatching_strategy_t*)AGENTOS_MALLOC(sizeof(agentos_dispatching_strategy_t));
-    if (!strat) return NULL;
-
-    priority_data_t* data = (priority_data_t*)AGENTOS_MALLOC(sizeof(priority_data_t));
-    if (!data) {
-        AGENTOS_FREE(strat);
-        return NULL;
+    agent_registry_get_agents_func get_agents_func,
+    agentos_dispatching_strategy_t** out_strategy)
+{
+    if (!registry_ctx || !get_agents_func || !out_strategy) {
+        return AGENTOS_EINVAL;
     }
 
-    data->registry_ctx = registry_ctx;
-    data->get_agents = get_agents_func;
-    data->lock = agentos_mutex_create();
-    if (!data->lock) {
-        AGENTOS_FREE(data);
-        AGENTOS_FREE(strat);
-        return NULL;
+    struct agentos_priority_dispatch* priority =
+        (struct agentos_priority_dispatch*)AGENTOS_CALLOC(1, sizeof(*priority));
+    if (!priority) {
+        return AGENTOS_ENOMEM;
     }
 
-    strat->dispatch = priority_dispatch;
-    strat->destroy = priority_destroy;
-    strat->data = data;
+    priority->registry_ctx = registry_ctx;
+    priority->get_agents = get_agents_func;
 
-    return strat;
+    agentos_dispatching_strategy_t* strategy =
+        (agentos_dispatching_strategy_t*)AGENTOS_CALLOC(1, sizeof(*strategy));
+    if (!strategy) {
+        AGENTOS_FREE(priority);
+        return AGENTOS_ENOMEM;
+    }
+
+    strategy->context = priority;
+    strategy->select_agent = NULL; /* TODO: 实现选择逻辑 */
+
+    *out_strategy = strategy;
+    return AGENTOS_SUCCESS;
 }

@@ -1,7 +1,7 @@
-﻿#ifndef LOGGING_COMMON_H
+#ifndef LOGGING_COMMON_H
 #define LOGGING_COMMON_H
 
-#include "../../../../corekern/include/error.h"
+#include <error.h>
 
 /**
  * @brief 日志级别枚举

@@ -23,6 +23,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdarg.h>
 
 #ifdef _WIN32
     #include <BaseTsd.h>

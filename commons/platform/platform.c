@@ -1,4 +1,4 @@
-﻿﻿﻿﻿/**
+/**
  * @file platform.c
  * @brief 跨平台兼容层实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -22,7 +22,11 @@
     #include <io.h>
     #include <direct.h>
     #include <process.h>
+    #include <sys/stat.h>
     #include <bcrypt.h>
+    #ifndef EEXIST
+        #define EEXIST 17
+    #endif
     #pragma comment(lib, "bcrypt.lib")
 #else
     #include <unistd.h>
