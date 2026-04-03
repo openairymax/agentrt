@@ -29,10 +29,14 @@
 
 ## 快速导航
 
+- 🐛 [报告 Bug (AtomGit 官方)](https://atomgit.com/spharx/agentos/issues)
 - 🐛 [报告 Bug (Gitee 官方)](https://gitee.com/spharx/agentos/issues)
+- 🐛 [报告 Bug (GitHub 官方)](https://github.com/SpharxTeam/AgentOS/issues)
+- 💡 [提出功能建议 (AtomGit 官方)](https://atomgit.com/spharx/agentos/issues)
 - 💡 [提出功能建议 (Gitee 官方)](https://gitee.com/spharx/agentos/issues)
+- 💡 [提出功能建议 (GitHub 官方)](https://github.com/SpharxTeam/AgentOS/issues)
 - 📖 [查看文档](./manuals/)
-- 💬 [参与讨论 (GitHub 镜像)](https://github.com/SpharxTeam/AgentOS/discussions)
+- 💬 [参与讨论 (GitHub 官方)](https://github.com/SpharxTeam/AgentOS/discussions)
 - 📐 [编码规范](./manuals/specifications/coding_standard/)
 - 🧪 [测试指南](./tests/README.md)
 
@@ -57,22 +61,29 @@
 ### 2. Fork 和克隆项目
 
 ```bash
-# 1. 在 Gitee/GitHub 上 Fork 本项目
-#    官方主仓库：https://gitee.com/spharx/agentos
-#    GitHub 镜像：https://github.com/SpharxTeam/AgentOS
+# 1. 在 AtomGit/Gitee/GitHub 上 Fork 本项目
+#    AtomGit 官方仓库（推荐）：https://atomgit.com/spharx/agentos
+#    Gitee 官方仓库：https://gitee.com/spharx/agentos
+#    GitHub 官方仓库：https://github.com/SpharxTeam/AgentOS
 #
 # 2. 克隆您的 fork
-git clone https://gitee.com/YOUR_USERNAME/agentos.git
+git clone https://atomgit.com/YOUR_USERNAME/agentos.git
 cd agentos
 
-# 或克隆 GitHub 镜像
-git clone https://github.com/YOUR_USERNAME/AgentOS.git
-cd AgentOS
+# 或克隆 Gitee fork
+# git clone https://gitee.com/YOUR_USERNAME/agentos.git
+# cd agentos
 
-# 3. 添加上游仓库（二选一）
-git remote add upstream https://gitee.com/spharx/agentos.git
+# 或克隆 GitHub fork
+# git clone https://github.com/YOUR_USERNAME/AgentOS.git
+# cd AgentOS
+
+# 3. 添加上游仓库（三选一）
+git remote add upstream https://atomgit.com/spharx/agentos.git
 # 或
-git remote add upstream https://github.com/SpharxTeam/AgentOS.git
+# git remote add upstream https://gitee.com/spharx/agentos.git
+# 或
+# git remote add upstream https://github.com/SpharxTeam/AgentOS.git
 ```
 
 ### 3. 安装依赖
@@ -360,7 +371,9 @@ Closes #123
 
 - **技术支持**: lidecheng@spharx.cn
 - **安全报告**: wangliren@spharx.cn
+- **AtomGit Issues**: https://atomgit.com/spharx/agentos/issues
 - **Gitee Issues**: https://gitee.com/spharx/agentos/issues
+- **GitHub Issues**: https://github.com/SpharxTeam/AgentOS/issues
 - **GitHub Discussions**: https://github.com/SpharxTeam/AgentOS/discussions
 
 ---

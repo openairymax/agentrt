@@ -20,7 +20,6 @@
 #include "config.h"
 #include "agentos.h"
 #include "logger.h"
-#include "observability.h"
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
@@ -29,7 +28,36 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+
+/* JSON解析库 - 条件编译 */
+#ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
+#else
+/* cJSON stub定义（简化版，仅用于编译通过） */
+typedef struct cJSON {
+    int type;
+    char* valuestring;
+    double valuedouble;
+    int valueint;
+    struct cJSON* child;
+    struct cJSON* next;
+    struct cJSON* prev;
+} cJSON;
+
+#define cJSON_NULL 0
+#define cJSON_False 1
+#define cJSON_True 2
+#define cJSON_Number 3
+#define cJSON_String 4
+#define cJSON_Array 5
+#define cJSON_Object 6
+
+static inline cJSON* cJSON_CreateObject(void) { return NULL; }
+static inline void cJSON_Delete(cJSON* item) { (void)item; }
+static inline char* cJSON_PrintUnformatted(const cJSON* item) { (void)item; return NULL; }
+static inline void cJSON_AddStringToObject(cJSON* obj, const char* key, const char* val) { (void)obj; (void)key; (void)val; }
+static inline void cJSON_AddNumberToObject(cJSON* obj, const char* key, double val) { (void)obj; (void)key; (void)val; }
+#endif /* AGENTOS_HAS_CJSON */
 
 /* ==================== 内部常量定义 ==================== */
 
