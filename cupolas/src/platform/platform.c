@@ -2,18 +2,14 @@
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
- * platform.c - Cross-platform Abstraction Layer Implementation
- */
-
-/**
- * @file platform.c
- * @brief Cross-platform Abstraction Layer Implementation
- * @author Spharx
- * @date 2024
+ * platform.c - Cross-Platform Abstraction Layer Implementation
+ *
+ * Self-contained implementation using OS primitives directly.
+ * No dependency on commons/platform_adapter (which only provides
+ * high-level file/path/env utilities, not sync primitives).
  */
 
 #include "platform.h"
-#include "../../../commons/utils/platform/include/platform_adapter.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -23,6 +19,7 @@
     #include <io.h>
     #include <direct.h>
     #include <process.h>
+    #include <windows.h>
     #define getcwd _getcwd
     #define rmdir _rmdir
     #define unlink _unlink
@@ -37,741 +34,974 @@
     #include <signal.h>
     #include <time.h>
     #include <fcntl.h>
+    #include <pthread.h>
 #endif
 
 /* ============================================================================
  * Mutex Implementation
  * ============================================================================ */
 
-/**
- * @brief Initialize mutex
- * @param[in] mutex Mutex handle to initialize
- * @return 0 on success, negative on failure
- */
 int cupolas_mutex_init(cupolas_mutex_t* mutex) {
-    return platform_mutex_init((platform_mutex_t*)mutex);
+#if cupolas_PLATFORM_WINDOWS
+    InitializeCriticalSection(mutex);
+    return 0;
+#else
+    return pthread_mutex_init(mutex, NULL) == 0 ? 0 : -1;
+#endif
 }
 
-/**
- * @brief Destroy mutex
- * @param[in] mutex Mutex handle to destroy
- * @return 0 on success, negative on failure
- */
 int cupolas_mutex_destroy(cupolas_mutex_t* mutex) {
-    return platform_mutex_destroy((platform_mutex_t*)mutex);
+#if cupolas_PLATFORM_WINDOWS
+    DeleteCriticalSection(mutex);
+    return 0;
+#else
+    return pthread_mutex_destroy(mutex) == 0 ? 0 : -1;
+#endif
 }
 
-/**
- * @brief Lock mutex
- * @param[in] mutex Mutex handle to lock
- * @return 0 on success, negative on failure
- */
 int cupolas_mutex_lock(cupolas_mutex_t* mutex) {
-    return platform_mutex_lock((platform_mutex_t*)mutex);
+#if cupolas_PLATFORM_WINDOWS
+    EnterCriticalSection(mutex);
+    return 0;
+#else
+    return pthread_mutex_lock(mutex) == 0 ? 0 : -1;
+#endif
 }
 
-/**
- * @brief Try lock mutex (non-blocking)
- * @param[in] mutex Mutex handle
- * @return 0 on success, cupolas_ERROR_BUSY if locked, negative on failure
- */
 int cupolas_mutex_trylock(cupolas_mutex_t* mutex) {
-    return platform_mutex_trylock((platform_mutex_t*)mutex);
+#if cupolas_PLATFORM_WINDOWS
+    return TryEnterCriticalSection(mutex) ? 0 : cupolas_ERROR_BUSY;
+#else
+    int ret = pthread_mutex_trylock(mutex);
+    if (ret == 0) return 0;
+    if (ret == EBUSY) return cupolas_ERROR_BUSY;
+    return -1;
+#endif
 }
 
-/**
- * @brief Unlock mutex
- * @param[in] mutex Mutex handle to unlock
- * @return 0 on success, negative on failure
- */
 int cupolas_mutex_unlock(cupolas_mutex_t* mutex) {
-    return platform_mutex_unlock((platform_mutex_t*)mutex);
+#if cupolas_PLATFORM_WINDOWS
+    LeaveCriticalSection(mutex);
+    return 0;
+#else
+    return pthread_mutex_unlock(mutex) == 0 ? 0 : -1;
+#endif
 }
 
 /* ============================================================================
  * Read-Write Lock Implementation
  * ============================================================================ */
 
-/**
- * @brief Initialize read-write lock
- * @param[in] rwlock Read-write lock handle to initialize
- * @return 0 on success, negative on failure
- */
 int cupolas_rwlock_init(cupolas_rwlock_t* rwlock) {
-    return platform_rwlock_init((platform_rwlock_t*)rwlock);
+#if cupolas_PLATFORM_WINDOWS
+    InitializeSRWLock(rwlock);
+    return 0;
+#else
+    return pthread_rwlock_init(rwlock, NULL) == 0 ? 0 : -1;
+#endif
 }
 
-/**
- * @brief Destroy read-write lock
- * @param[in] rwlock Read-write lock handle to destroy
- * @return 0 on success, negative on failure
- */
 int cupolas_rwlock_destroy(cupolas_rwlock_t* rwlock) {
-    return platform_rwlock_destroy((platform_rwlock_t*)rwlock);
+#if cupolas_PLATFORM_WINDOWS
+    /* SRWLOCK does not need explicit destruction */
+    (void)rwlock;
+    return 0;
+#else
+    return pthread_rwlock_destroy(rwlock) == 0 ? 0 : -1;
+#endif
 }
 
-/**
- * @brief Acquire read lock
- * @param[in] rwlock Read-write lock handle
- * @return 0 on success, negative on failure
- */
 int cupolas_rwlock_rdlock(cupolas_rwlock_t* rwlock) {
-    return platform_rwlock_rdlock((platform_rwlock_t*)rwlock);
+#if cupolas_PLATFORM_WINDOWS
+    AcquireSRWLockShared(rwlock);
+    return 0;
+#else
+    return pthread_rwlock_rdlock(rwlock) == 0 ? 0 : -1;
+#endif
 }
 
-/**
- * @brief Acquire write lock
- * @param[in] rwlock Read-write lock handle
- * @return 0 on success, negative on failure
- */
 int cupolas_rwlock_wrlock(cupolas_rwlock_t* rwlock) {
-    return platform_rwlock_wrlock((platform_rwlock_t*)rwlock);
+#if cupolas_PLATFORM_WINDOWS
+    AcquireSRWLockExclusive(rwlock);
+    return 0;
+#else
+    return pthread_rwlock_wrlock(rwlock) == 0 ? 0 : -1;
+#endif
 }
 
-/**
- * @brief Try acquire read lock (non-blocking)
- * @param[in] rwlock Read-write lock handle
- * @return 0 on success, cupolas_ERROR_BUSY if locked, negative on failure
- */
 int cupolas_rwlock_tryrdlock(cupolas_rwlock_t* rwlock) {
-    return platform_rwlock_tryrdlock((platform_rwlock_t*)rwlock);
+#if cupolas_PLATFORM_WINDOWS
+    if (!TryAcquireSRWLockShared(rwlock)) return cupolas_ERROR_BUSY;
+    return 0;
+#else
+    int ret = pthread_rwlock_tryrdlock(rwlock);
+    if (ret == 0) return 0;
+    if (ret == EBUSY) return cupolas_ERROR_BUSY;
+    return -1;
+#endif
 }
 
-/**
- * @brief Try acquire write lock (non-blocking)
- * @param[in] rwlock Read-write lock handle
- * @return 0 on success, cupolas_ERROR_BUSY if locked, negative on failure
- */
 int cupolas_rwlock_trywrlock(cupolas_rwlock_t* rwlock) {
-    return platform_rwlock_trywrlock((platform_rwlock_t*)rwlock);
+#if cupolas_PLATFORM_WINDOWS
+    if (!TryAcquireSRWLockExclusive(rwlock)) return cupolas_ERROR_BUSY;
+    return 0;
+#else
+    int ret = pthread_rwlock_trywrlock(rwlock);
+    if (ret == 0) return 0;
+    if (ret == EBUSY) return cupolas_ERROR_BUSY;
+    return -1;
+#endif
 }
 
-/**
- * @brief Unlock read-write lock
- * @param[in] rwlock Read-write lock handle to unlock
- * @return 0 on success, negative on failure
- */
 int cupolas_rwlock_unlock(cupolas_rwlock_t* rwlock) {
-    return platform_rwlock_unlock((platform_rwlock_t*)rwlock);
+#if cupolas_PLATFORM_WINDOWS
+    ReleaseSRWLockShared(rwlock);
+    return 0;
+#else
+    return pthread_rwlock_unlock(rwlock) == 0 ? 0 : -1;
+#endif
 }
 
 /* ============================================================================
  * Condition Variable Implementation
  * ============================================================================ */
 
-/**
- * @brief Initialize condition variable
- * @param[in] cond Condition variable to initialize
- * @return 0 on success, negative on failure
- */
 int cupolas_cond_init(cupolas_cond_t* cond) {
-    return platform_cond_init((platform_cond_t*)cond);
+#if cupolas_PLATFORM_WINDOWS
+    InitializeConditionVariable(cond);
+    return 0;
+#else
+    return pthread_cond_init(cond, NULL) == 0 ? 0 : -1;
+#endif
 }
 
-/**
- * @brief Destroy condition variable
- * @param[in] cond Condition variable to destroy
- * @return 0 on success, negative on failure
- */
 int cupolas_cond_destroy(cupolas_cond_t* cond) {
-    return platform_cond_destroy((platform_cond_t*)cond);
+#if cupolas_PLATFORM_WINDOWS
+    /* CONDITION_VARIABLE does not need destruction */
+    (void)cond;
+    return 0;
+#else
+    return pthread_cond_destroy(cond) == 0 ? 0 : -1;
+#endif
 }
 
-/**
- * @brief Wait for condition variable
- * @param[in] cond Condition variable handle
- * @param[in] mutex Associated mutex handle
- * @return 0 on success, negative on failure
- */
 int cupolas_cond_wait(cupolas_cond_t* cond, cupolas_mutex_t* mutex) {
-    return platform_cond_wait((platform_cond_t*)cond, (platform_mutex_t*)mutex);
+#if cupolas_PLATFORM_WINDOWS
+    SleepConditionVariableCS(cond, mutex, INFINITE) ? 0 : -1;
+#else
+    return pthread_cond_wait(cond, mutex) == 0 ? 0 : -1;
+#endif
 }
 
-/**
- * @brief Wait for condition with timeout
- * @param[in] cond Condition variable handle
- * @param[in] mutex Associated mutex handle
- * @param[in] timeout_ms Timeout in milliseconds
- * @return 0 on success, cupolas_ERROR_TIMEOUT on timeout, negative on failure
- */
-int cupolas_cond_timedwait(cupolas_cond_t* cond, cupolas_mutex_t* mutex, uint32_t timeout_ms) {
-    return platform_cond_timedwait((platform_cond_t*)cond, (platform_mutex_t*)mutex, timeout_ms);
+int cupolas_cond_timedwait(cupolas_cond_t* cond, cupolas_mutex_t* mutex,
+                           uint32_t timeout_ms) {
+#if cupolas_PLATFORM_WINDOWS
+    if (!SleepConditionVariableCS(cond, mutex, timeout_ms))
+        return cupolas_ERROR_TIMEOUT;
+    return 0;
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += (timeout_ms / 1000);
+    ts.tv_nsec += ((timeout_ms % 1000) * 1000000);
+    if (ts.tv_nsec >= 1000000000) {
+        ts.tv_nsec -= 1000000000;
+        ts.tv_sec++;
+    }
+    int ret = pthread_cond_timedwait(cond, mutex, &ts);
+    if (ret == 0) return 0;
+    if (ret == ETIMEDOUT) return cupolas_ERROR_TIMEOUT;
+    return -1;
+#endif
 }
 
-/**
- * @brief Signal condition variable (wake one thread)
- * @param[in] cond Condition variable handle
- * @return 0 on success, negative on failure
- */
 int cupolas_cond_signal(cupolas_cond_t* cond) {
-    return platform_cond_signal((platform_cond_t*)cond);
+#if cupolas_PLATFORM_WINDOWS
+    WakeConditionVariable(cond);
+    return 0;
+#else
+    return pthread_cond_signal(cond) == 0 ? 0 : -1;
+#endif
 }
 
-/**
- * @brief Broadcast condition variable (wake all threads)
- * @param[in] cond Condition variable handle
- * @return 0 on success, negative on failure
- */
 int cupolas_cond_broadcast(cupolas_cond_t* cond) {
-    return platform_cond_broadcast((platform_cond_t*)cond);
+#if cupolas_PLATFORM_WINDOWS
+    WakeAllConditionVariable(cond);
+    return 0;
+#else
+    return pthread_cond_broadcast(cond) == 0 ? 0 : -1;
+#endif
 }
 
 /* ============================================================================
  * Thread Implementation
  * ============================================================================ */
 
-/**
- * @brief Create new thread
- * @param[out] thread Thread handle output
- * @param[in] func Thread function to execute
- * @param[in] arg Argument to pass to thread function
- * @return 0 on success, negative on failure
- */
+typedef struct thread_wrapper_arg {
+    cupolas_thread_func_t func;
+    void* arg;
+} thread_wrapper_arg_t;
+
+#if !cupolas_PLATFORM_WINDOWS
+static void* thread_wrapper(void* arg) {
+    thread_wrapper_arg_t* wrapper = (thread_wrapper_arg_t*)arg;
+    cupolas_thread_func_t func = wrapper->func;
+    void* user_arg = wrapper->arg;
+    free(wrapper);
+    return func(user_arg);
+}
+#endif
+
 int cupolas_thread_create(cupolas_thread_t* thread, cupolas_thread_func_t func, void* arg) {
-    return platform_thread_create((platform_thread_t*)thread, func, arg);
+#if cupolas_PLATFORM_WINDOWS
+    thread_wrapper_arg_t* wrapper = (thread_wrapper_arg_t*)malloc(sizeof(thread_wrapper_arg_t));
+    if (!wrapper) return cupolas_ERROR_NO_MEMORY;
+    wrapper->func = func;
+    wrapper->arg = arg;
+
+    *thread = CreateThread(NULL, 0,
+                          (LPTHREAD_START_ROUTINE)(void(*)(void*))func,
+                          arg, 0, NULL);
+    if (*thread == NULL) { free(wrapper); return cupolas_ERROR_UNKNOWN; }
+    free(wrapper);
+    return 0;
+#else
+    thread_wrapper_arg_t* wrapper = (thread_wrapper_arg_t*)malloc(sizeof(thread_wrapper_arg_t));
+    if (!wrapper) return cupolas_ERROR_NO_MEMORY;
+    wrapper->func = func;
+    wrapper->arg = arg;
+
+    int ret = pthread_create(thread, NULL, thread_wrapper, wrapper);
+    if (ret != 0) { free(wrapper); return -1; }
+    return 0;
+#endif
 }
 
-/**
- * @brief Join thread (wait for completion)
- * @param[in] thread Thread handle to join
- * @param[out] retval Return value from thread function
- * @return 0 on success, negative on failure
- */
 int cupolas_thread_join(cupolas_thread_t thread, void** retval) {
-    return platform_thread_join((platform_thread_t)thread, retval);
+#if cupolas_PLATFORM_WINDOWS
+    WaitForSingleObject(thread, INFINITE);
+    DWORD exit_code;
+    GetExitCodeThread(thread, &exit_code);
+    CloseHandle(thread);
+    if (retval) *retval = (void*)(uintptr_t)exit_code;
+    return 0;
+#else
+    return pthread_join(thread, retval) == 0 ? 0 : -1;
+#endif
 }
 
-/**
- * @brief Detach thread (allow independent execution)
- * @param[in] thread Thread handle to detach
- * @return 0 on success, negative on failure
- */
 int cupolas_thread_detach(cupolas_thread_t thread) {
-    return platform_thread_detach((platform_thread_t)thread);
+#if cupolas_PLATFORM_WINDOWS
+    CloseHandle(thread);
+    return 0;
+#else
+    return pthread_detach(thread) == 0 ? 0 : -1;
+#endif
 }
 
-/**
- * @brief Get current thread ID
- * @return Current thread ID
- */
 cupolas_thread_id_t cupolas_thread_self(void) {
-    return platform_thread_self();
+#if cupolas_PLATFORM_WINDOWS
+    return GetCurrentThreadId();
+#else
+    return pthread_self();
+#endif
 }
 
-/**
- * @brief Compare two thread IDs
- * @param[in] t1 First thread ID
- * @param[in] t2 Second thread ID
- * @return true if equal, false otherwise
- */
 bool cupolas_thread_equal(cupolas_thread_id_t t1, cupolas_thread_id_t t2) {
-    return platform_thread_equal(t1, t2);
+#if cupolas_PLATFORM_WINDOWS
+    return t1 == t2;
+#else
+    return pthread_equal(t1, t2);
+#endif
 }
 
 /* ============================================================================
  * Process Implementation
  * ============================================================================ */
 
-/**
- * @brief Spawn child process
- * @param[out] proc Process handle output
- * @param[in] path Path to executable
- * @param[in] argv Argument vector (NULL-terminated)
- * @param[in] attr Process attributes (may be NULL)
- * @return 0 on success, negative on failure
- */
 int cupolas_process_spawn(cupolas_process_t* proc,
                         const char* path,
                         char* const argv[],
                         const cupolas_process_attr_t* attr) {
-    return platform_process_spawn((platform_process_t*)proc, path, argv,
-                                  (const platform_process_attr_t*)attr);
+    if (!proc || !path || !argv) return cupolas_ERROR_INVALID_ARG;
+    (void)attr;
+
+#if cupolas_PLATFORM_WINDOWS
+    STARTUPINFOA si = { 0 };
+    si.cb = sizeof(si);
+
+    PROCESS_INFORMATION pi = { 0 };
+    char cmdLine[4096] = { 0 };
+    size_t offset = 0;
+
+    for (int i = 0; argv[i] != NULL; i++) {
+        size_t len = strlen(argv[i]);
+        if (offset + len + 2 > sizeof(cmdLine)) return cupolas_ERROR_OVERFLOW;
+        if (i > 0) cmdLine[offset++] = ' ';
+        memcpy(cmdLine + offset, argv[i], len);
+        offset += len;
+    }
+    cmdLine[offset] = '\0';
+
+    BOOL ok = CreateProcessA(NULL, cmdLine, NULL, NULL, FALSE,
+                              CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
+    if (!ok) return cupolas_ERROR_IO;
+
+    *proc = pi.hProcess;
+    CloseHandle(pi.hThread);
+    return 0;
+#else
+    pid_t pid = fork();
+    if (pid < 0) return cupolas_ERROR_IO;
+    if (pid == 0) {
+        execvp(path, argv);
+        _exit(127);
+    }
+    *proc = pid;
+    return 0;
+#endif
 }
 
-/**
- * @brief Wait for process completion
- * @param[in] proc Process handle
- * @param[out] status Exit status output
- * @param[in] timeout_ms Timeout in milliseconds (0 = infinite)
- * @return 0 on success, cupolas_ERROR_TIMEOUT on timeout, negative on failure
- */
-int cupolas_process_wait(cupolas_process_t proc, cupolas_exit_status_t* status, uint32_t timeout_ms) {
-    return platform_process_wait((platform_process_t)proc,
-                                 (platform_exit_status_t*)status, timeout_ms);
+int cupolas_process_wait(cupolas_process_t proc, cupolas_exit_status_t* status,
+                        uint32_t timeout_ms) {
+    if (!status) return cupolas_ERROR_INVALID_ARG;
+
+#if cupolas_PLATFORM_WINDOWS
+    DWORD ms = (timeout_ms == 0) ? INFINITE : (DWORD)timeout_ms;
+    DWORD result = WaitForSingleObject(proc, ms);
+    if (result == WAIT_TIMEOUT) return cupolas_ERROR_TIMEOUT;
+    if (result != WAIT_OBJECT_0) return cupolas_ERROR_IO;
+
+    DWORD exit_code;
+    GetExitCodeProcess(proc, &exit_code);
+    status->code = (int)exit_code;
+    status->signaled = false;
+    status->signal = 0;
+    return 0;
+#else
+    if (timeout_ms == 0) {
+        int s;
+        pid_t ret = waitpid(proc, &s, 0);
+        if (ret < 0) return cupolas_ERROR_IO;
+        status->signaled = WIFSIGNALED(s);
+        status->signal = WTERMSIG(s);
+        status->code = WEXITSTATUS(s);
+        return 0;
+    } else {
+        for (uint32_t elapsed = 0; elapsed < timeout_ms; elapsed += 10) {
+            int s;
+            pid_t ret = waitpid(proc, &s, WNOHANG);
+            if (ret > 0) {
+                status->signaled = WIFSIGNALED(s);
+                status->signal = WTERMSIG(s);
+                status->code = WEXITSTATUS(s);
+                return 0;
+            }
+            if (ret < 0 && errno != ECHILD) return cupolas_ERROR_IO;
+            usleep(10000);
+        }
+        return cupolas_ERROR_TIMEOUT;
+    }
+#endif
 }
 
-/**
- * @brief Terminate process
- * @param[in] proc Process handle
- * @param[in] signal Signal number (platform-specific)
- * @return 0 on success, negative on failure
- */
 int cupolas_process_terminate(cupolas_process_t proc, int signal) {
-    return platform_process_terminate((platform_process_t)proc, signal);
+#if cupolas_PLATFORM_WINDOWS
+    (void)signal;
+    return TerminateProcess(proc, 1) ? 0 : -1;
+#else
+    return kill(proc, signal) == 0 ? 0 : -1;
+#endif
 }
 
-/**
- * @brief Close process handle
- * @param[in] proc Process handle to close
- * @return 0 on success, negative on failure
- */
 int cupolas_process_close(cupolas_process_t proc) {
-    return platform_process_close((platform_process_t)proc);
+#if cupolas_PLATFORM_WINDOWS
+    return CloseHandle(proc) ? 0 : -1;
+#else
+    (void)proc;
+    return 0;
+#endif
 }
 
-/**
- * @brief Get process ID
- * @param[in] proc Process handle
- * @return Process ID
- */
 cupolas_pid_t cupolas_process_getpid(cupolas_process_t proc) {
-    return platform_process_getpid((platform_process_t)proc);
+#if cupolas_PLATFORM_WINDOWS
+    return GetProcessId(proc);
+#else
+    return proc;
+#endif
 }
 
 /* ============================================================================
  * Pipe Implementation
  * ============================================================================ */
 
-/**
- * @brief Create pipe
- * @param[out] pipe Pipe handles output
- * @return 0 on success, negative on failure
- */
 int cupolas_pipe_create(cupolas_pipe_t* pipe) {
-    return platform_pipe_create((platform_pipe_t*)pipe);
+#if cupolas_PLATFORM_WINDOWS
+    HANDLE readHandle, writeHandle;
+    SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
+
+    if (!CreatePipe(&readHandle, &writeHandle, &sa, 0)) return cupolas_ERROR_IO;
+    pipe[0] = readHandle;
+    pipe[1] = writeHandle;
+    return 0;
+#else
+    return pipe(pipe) == 0 ? 0 : cupolas_ERROR_IO;
+#endif
 }
 
-/**
- * @brief Close pipe
- * @param[in] pipe Pipe handles to close
- * @return 0 on success, negative on failure
- */
 int cupolas_pipe_close(cupolas_pipe_t* pipe) {
-    return platform_pipe_close((platform_pipe_t*)pipe);
+#if cupolas_PLATFORM_WINDOWS
+    CloseHandle(pipe[0]);
+    CloseHandle(pipe[1]);
+    return 0;
+#else
+    close(pipe[0]);
+    close(pipe[1]);
+    return 0;
+#endif
 }
 
-/**
- * @brief Read from pipe
- * @param[in] pipe Pipe handle
- * @param[out] buf Buffer to read into
- * @param[in] count Number of bytes to read
- * @param[out] bytes_read Actual bytes read
- * @return 0 on success, negative on failure
- */
-int cupolas_pipe_read(cupolas_pipe_t* pipe, void* buf, size_t count, size_t* bytes_read) {
-    return platform_pipe_read((platform_pipe_t*)pipe, buf, count, bytes_read);
+int cupolas_pipe_read(cupolas_pipe_t* pipe, void* buf, size_t count,
+                     size_t* bytes_read) {
+#if cupolas_PLATFORM_WINDOWS
+    DWORD bytesRead = 0;
+    BOOL ok = ReadFile(pipe[0], buf, (DWORD)count, &bytesRead, NULL);
+    if (bytes_read) *bytes_read = bytesRead;
+    return ok ? 0 : cupolas_ERROR_IO;
+#else
+    ssize_t n = read(pipe[0], buf, count);
+    if (n < 0) return cupolas_ERROR_IO;
+    if (bytes_read) *bytes_read = (size_t)n;
+    return 0;
+#endif
 }
 
-/**
- * @brief Write to pipe
- * @param[in] pipe Pipe handle
- * @param[in] buf Data buffer to write
- * @param[in] count Number of bytes to write
- * @param[out] bytes_written Actual bytes written
- * @return 0 on success, negative on failure
- */
-int cupolas_pipe_write(cupolas_pipe_t* pipe, const void* buf, size_t count, size_t* bytes_written) {
-    return platform_pipe_write((platform_pipe_t*)pipe, buf, count, bytes_written);
+int cupolas_pipe_write(cupolas_pipe_t* pipe, const void* buf, size_t count,
+                      size_t* bytes_written) {
+#if cupolas_PLATFORM_WINDOWS
+    DWORD written = 0;
+    BOOL ok = WriteFile(pipe[1], buf, (DWORD)count, &written, NULL);
+    if (bytes_written) *bytes_written = written;
+    return ok ? 0 : cupolas_ERROR_IO;
+#else
+    ssize_t n = write(pipe[1], buf, count);
+    if (n < 0) return cupolas_ERROR_IO;
+    if (bytes_written) *bytes_written = (size_t)n;
+    return 0;
+#endif
 }
 
 /* ============================================================================
  * Time Implementation
  * ============================================================================ */
 
-/**
- * @brief Get current wall clock timestamp
- * @param[out] ts Timestamp output
- * @return 0 on success, negative on failure
- */
 int cupolas_time_now(cupolas_timestamp_t* ts) {
-    return platform_time_now((platform_timestamp_t*)ts);
+    if (!ts) return cupolas_ERROR_INVALID_ARG;
+#if cupolas_PLATFORM_WINDOWS
+    FILETIME ft;
+    GetSystemTimeAsFileTime(&ft);
+    ULARGE_INTEGER uli;
+    uli.LowPart = ft.dwLowDateTime;
+    uli.HighPart = ft.dwHighDateTime;
+    uint64_t ns100 = uli.QuadPart;
+    ts->sec = (int64_t)(ns100 / 10000000ULL - 11644473600ULL);
+    ts->nsec = (int32_t)((ns100 % 10000000ULL) * 100);
+    return 0;
+#else
+    struct timespec tp;
+    if (clock_gettime(CLOCK_REALTIME, &tp) != 0) return cupolas_ERROR_IO;
+    ts->sec = tp.tv_sec;
+    ts->nsec = tp.tv_nsec;
+    return 0;
+#endif
 }
 
-/**
- * @brief Get monotonic timestamp
- * @param[out] ts Timestamp output
- * @return 0 on success, negative on failure
- */
 int cupolas_time_mono(cupolas_timestamp_t* ts) {
-    return platform_time_mono((platform_timestamp_t*)ts);
+    if (!ts) return cupolas_ERROR_INVALID_ARG;
+#if cupolas_PLATFORM_WINDOWS
+    LARGE_INTEGER freq, counter;
+    QueryPerformanceFrequency(&freq);
+    QueryPerformanceCounter(&counter);
+    uint64_t ns = (uint64_t)(counter.QuadPart * 1000000000ULL / freq.QuadPart);
+    ts->sec = (int64_t)(ns / 1000000000ULL);
+    ts->nsec = (int32_t)(ns % 1000000000ULL);
+    return 0;
+#else
+    struct timespec tp;
+    if (clock_gettime(CLOCK_MONOTONIC, &tp) != 0) return cupolas_ERROR_IO;
+    ts->sec = tp.tv_sec;
+    ts->nsec = tp.tv_nsec;
+    return 0;
+#endif
 }
 
-/**
- * @brief Get current time in milliseconds since epoch
- * @return Time in milliseconds
- */
 uint64_t cupolas_time_ms(void) {
-    return platform_get_current_time_ms();
+#if cupolas_PLATFORM_WINDOWS
+    FILETIME ft;
+    GetSystemTimeAsFileTime(&ft);
+    ULARGE_INTEGER uli;
+    uli.LowPart = ft.dwLowDateTime;
+    uli.HighPart = ft.dwHighDateTime;
+    return (uint64_t)((uli.QuadPart / 10000ULL) - 11644473600000ULL);
+#else
+    struct timespec tp;
+    clock_gettime(CLOCK_REALTIME, &tp);
+    return (uint64_t)tp.tv_sec * 1000ULL + (uint64_t)tp.tv_nsec / 1000000ULL;
+#endif
 }
 
-/**
- * @brief Sleep for specified milliseconds
- * @param[in] ms Milliseconds to sleep
- */
 void cupolas_sleep_ms(uint32_t ms) {
-    platform_sleep_ms(ms);
+#if cupolas_PLATFORM_WINDOWS
+    Sleep(ms);
+#else
+    usleep(ms * 1000);
+#endif
 }
 
-/**
- * @brief Sleep for specified microseconds
- * @param[in] us Microseconds to sleep
- */
 void cupolas_sleep_us(uint32_t us) {
-    platform_sleep_us(us);
+#if cupolas_PLATFORM_WINDOWS
+    if (us < 1000) {
+        Sleep(1);
+    } else {
+        Sleep(us / 1000);
+    }
+#else
+    usleep(us);
+#endif
 }
 
 /* ============================================================================
  * File System Implementation
  * ============================================================================ */
 
-/**
- * @brief Get file statistics
- * @param[in] path File path
- * @param[out] stat Statistics output
- * @return 0 on success, negative on failure
- */
 int cupolas_file_stat(const char* path, cupolas_file_stat_t* stat) {
-    return platform_file_stat(path, (platform_file_stat_t*)stat);
+    if (!path || !stat) return cupolas_ERROR_INVALID_ARG;
+    memset(stat, 0, sizeof(*stat));
+
+#if cupolas_PLATFORM_WINDOWS
+    WIN32_FILE_ATTRIBUTE_DATA fad;
+    if (!GetFileAttributesExA(path, GetFileExInfoStandard, &fad)) {
+        if (GetLastError() == ERROR_FILE_NOT_FOUND ||
+            GetLastError() == ERROR_PATH_NOT_FOUND) {
+            stat->exists = false;
+            return 0;
+        }
+        return cupolas_ERROR_IO;
+    }
+
+    stat->exists = true;
+    stat->is_dir = (fad.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+    stat->is_regular = !stat->is_dir;
+    stat->size = ((uint64_t)fad.nFileSizeHigh << 32) | fad.nFileSizeLow;
+
+    ULARGE_INTEGER uli;
+    uli.LowPart = fad.ftLastWriteTime.dwLowDateTime;
+    uli.HighPart = fad.ftLastWriteTime.dwHighDateTime;
+    uint64_t ns100 = uli.QuadPart;
+    stat->mtime.sec = (int64_t)(ns100 / 10000000ULL - 11644473600ULL);
+    stat->mtime.nsec = (int32_t)((ns100 % 10000000ULL) * 100);
+    return 0;
+#else
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        if (errno == ENOENT) { stat->exists = false; return 0; }
+        return cupolas_ERROR_IO;
+    }
+
+    stat->exists = true;
+    stat->is_dir = S_ISDIR(st.st_mode) != 0;
+    stat->is_regular = S_ISREG(st.st_mode) != 0;
+    stat->size = (uint64_t)st.st_size;
+    stat->mtime.sec = st.st_mtime;
+    stat->mtime.nsec = 0;
+    return 0;
+#endif
 }
 
-/**
- * @brief Check if file exists
- * @param[in] path File path
- * @return Non-zero if exists, 0 otherwise
- */
 int cupolas_file_exists(const char* path) {
-    return platform_file_exists(path);
+    if (!path) return 0;
+#if cupolas_PLATFORM_WINDOWS
+    DWORD attrs = GetFileAttributesA(path);
+    return (attrs != INVALID_FILE_ATTRIBUTES) ? 1 : 0;
+#else
+    struct stat st;
+    return (stat(path, &st) == 0) ? 1 : 0;
+#endif
 }
 
-/**
- * @brief Create directory
- * @param[in] path Directory path
- * @param[in] recursive Create parent directories if needed
- * @return 0 on success, negative on failure
- */
 int cupolas_file_mkdir(const char* path, bool recursive) {
-    return platform_file_mkdir(path, recursive);
+    if (!path) return cupolas_ERROR_INVALID_ARG;
+#if cupolas_PLATFORM_WINDOWS
+    if (recursive) {
+        char tmp[cupolas_PATH_MAX];
+        strncpy(tmp, path, sizeof(tmp) - 1);
+        tmp[sizeof(tmp) - 1] = '\0';
+        for (char* p = tmp + 1; *p; p++) {
+            if (*p == '\\' || *p == '/') {
+                *p = '\0';
+                CreateDirectoryA(tmp, NULL);
+                *p = '\\';
+            }
+        }
+    }
+    return CreateDirectoryA(path, NULL) ? 0 : cupolas_ERROR_IO;
+#else
+    if (recursive) {
+        char tmp[cupolas_PATH_MAX];
+        strncpy(tmp, path, sizeof(tmp) - 1);
+        tmp[sizeof(tmp) - 1] = '\0';
+        for (char* p = tmp + 1; *p; p++) {
+            if (*p == '/') {
+                *p = '\0';
+                mkdir(tmp, 0755);
+                *p = '/';
+            }
+        }
+    }
+    return mkdir(path, 0755) == 0 ? 0 : cupolas_ERROR_IO;
+#endif
 }
 
-/**
- * @brief Remove file or empty directory
- * @param[in] path Path to remove
- * @return 0 on success, negative on failure
- */
 int cupolas_file_remove(const char* path) {
-    return platform_file_remove(path);
+    if (!path) return cupolas_ERROR_INVALID_ARG;
+#if cupolas_PLATFORM_WINDOWS
+    DWORD attrs = GetFileAttributesA(path);
+    if (attrs == INVALID_FILE_ATTRIBUTES) return cupolas_ERROR_NOT_FOUND;
+    if (attrs & FILE_ATTRIBUTE_DIRECTORY)
+        return RemoveDirectoryA(path) ? 0 : cupolas_ERROR_IO;
+    return DeleteFileA(path) ? 0 : cupolas_ERROR_IO;
+#else
+    return unlink(path) == 0 ? 0 : cupolas_ERROR_IO;
+#endif
 }
 
-/**
- * @brief Rename file
- * @param[in] old_path Original path
- * @param[in] new_path New path
- * @return 0 on success, negative on failure
- */
 int cupolas_file_rename(const char* old_path, const char* new_path) {
-    return platform_file_rename(old_path, new_path);
+    if (!old_path || !new_path) return cupolas_ERROR_INVALID_ARG;
+#if cupolas_PLATFORM_WINDOWS
+    return MoveFileExA(old_path, new_path, MOVEFILE_REPLACE_EXISTING) ? 0 : cupolas_ERROR_IO;
+#else
+    return rename(old_path, new_path) == 0 ? 0 : cupolas_ERROR_IO;
+#endif
 }
 
-/**
- * @brief Get absolute path
- * @param[in] path Input path
- * @param[out] buf Output buffer
- * @param[in] size Buffer size
- * @return Pointer to buffer on success, NULL on failure
- */
 char* cupolas_file_abspath(const char* path, char* buf, size_t size) {
-    return platform_file_abspath(path, buf, size);
+    if (!path || !buf || size == 0) return NULL;
+#if cupolas_PLATFORM_WINDOWS
+    DWORD ret = GetFullPathNameA(path, (DWORD)size, buf, NULL);
+    return (ret > 0 && ret < size) ? buf : NULL;
+#else
+    if (realpath(path, buf)) return buf;
+    if (strlen(path) < size) {
+        strncpy(buf, path, size - 1);
+        buf[size - 1] = '\0';
+        return buf;
+    }
+    return NULL;
+#endif
 }
 
-/**
- * @brief Get directory name from path
- * @param[in] path Input path
- * @param[out] buf Output buffer
- * @param[in] size Buffer size
- * @return Pointer to buffer on success, NULL on failure
- */
 char* cupolas_file_dirname(const char* path, char* buf, size_t size) {
-    return platform_file_dirname(path, buf, size);
+    if (!path || !buf || size == 0) return NULL;
+
+    size_t len = strlen(path);
+    if (len >= size) return NULL;
+
+    strncpy(buf, path, size);
+    buf[size - 1] = '\0';
+
+    char* last_slash = strrchr(buf, '/');
+#if cupolas_PLATFORM_WINDOWS
+    char* last_bs = strrchr(buf, '\\');
+    if (last_bs > last_slash) last_slash = last_bs;
+#endif
+
+    if (last_slash) {
+        *last_slash = '\0';
+    } else {
+        buf[0] = '.';
+        buf[1] = '\0';
+    }
+    return buf;
 }
 
 /* ============================================================================
  * Memory Implementation
  * ============================================================================ */
 
-/**
- * @brief Allocate memory
- * @param[in] size Number of bytes to allocate
- * @return Pointer to allocated memory, NULL on failure
- */
 void* cupolas_mem_alloc(size_t size) {
-    return platform_mem_alloc(size);
+    if (size == 0) return NULL;
+#if cupolas_PLATFORM_WINDOWS
+    return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
+#else
+    void* ptr = malloc(size);
+    if (ptr) memset(ptr, 0, size);
+    return ptr;
+#endif
 }
 
-/**
- * @brief Allocate aligned memory
- * @param[in] size Number of bytes
- * @param[in] alignment Alignment requirement (power of 2)
- * @return Pointer to allocated memory, NULL on failure
- */
 void* cupolas_mem_alloc_aligned(size_t size, size_t alignment) {
-    return platform_mem_alloc_aligned(size, alignment);
+    if (size == 0 || alignment == 0) return NULL;
+#if cupolas_PLATFORM_WINDOWS
+    return _aligned_malloc(size, alignment);
+#else
+    void* ptr = NULL;
+    posix_memalign(&ptr, alignment, size);
+    return ptr;
+#endif
 }
 
-/**
- * @brief Free memory
- * @param[in] ptr Pointer to free (NULL safe)
- */
 void cupolas_mem_free(void* ptr) {
-    platform_mem_free(ptr);
+    if (!ptr) return;
+#if cupolas_PLATFORM_WINDOWS
+    HeapFree(GetProcessHeap(), 0, ptr);
+#else
+    free(ptr);
+#endif
 }
 
-/**
- * @brief Reallocate memory
- * @param[in] ptr Original pointer (NULL safe for alloc)
- * @param[in] size New size
- * @return Pointer to reallocated memory, NULL on failure
- */
 void* cupolas_mem_realloc(void* ptr, size_t size) {
-    return platform_mem_realloc(ptr, size);
+#if cupolas_PLATFORM_WINDOWS
+    return HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, ptr, size);
+#else
+    return realloc(ptr, size);
+#endif
 }
 
-/**
- * @brief Zero memory securely
- * @param[in] ptr Memory pointer
- * @param[in] size Number of bytes to zero
- */
 void cupolas_mem_zero(void* ptr, size_t size) {
-    platform_mem_zero(ptr, size);
+    if (!ptr || size == 0) return;
+#if cupolas_PLATFORM_WINDOWS
+    SecureZeroMemory(ptr, size);
+#else
+    volatile unsigned char* p = (volatile unsigned char*)ptr;
+    while (size--) *p++ = 0;
+#endif
 }
 
-/**
- * @brief Lock memory (prevent swapping)
- * @param[in] ptr Memory pointer
- * @param[in] size Number of bytes
- */
 void cupolas_mem_lock(void* ptr, size_t size) {
-    platform_mem_lock(ptr, size);
+    (void)ptr;
+    (void)size;
+#if cupolas_PLATFORM_WINDOWS
+    VirtualLock(ptr, size);
+#endif
 }
 
-/**
- * @brief Unlock memory
- * @param[in] ptr Memory pointer
- * @param[in] size Number of bytes
- */
 void cupolas_mem_unlock(void* ptr, size_t size) {
-    platform_mem_unlock(ptr, size);
+    (void)ptr;
+    (void)size;
+#if cupolas_PLATFORM_WINDOWS
+    VirtualUnlock(ptr, size);
+#endif
 }
 
 /* ============================================================================
  * Atomic Operations Implementation
  * ============================================================================ */
 
-/**
- * @brief Load 32-bit atomic value
- * @param[in] ptr Atomic variable
- * @return Value at ptr
- */
-int32_t cupolas_atomic_load32(cupolas_atomic32_t* ptr) {
-    return platform_atomic_load32((platform_atomic32_t*)ptr);
+int32_t cupolas_atomic_load32(volatile int32_t* ptr) {
+#if cupolas_PLATFORM_WINDOWS
+    return InterlockedCompareExchange((volatile LONG*)ptr, 0, 0);
+#elif defined(__GNUC__) || defined(__clang__)
+    return __atomic_load_n(ptr, __ATOMIC_SEQ_CST);
+#else
+    return *ptr;
+#endif
 }
 
-/**
- * @brief Store 32-bit atomic value
- * @param[out] ptr Atomic variable
- * @param[in] val Value to store
- */
-void cupolas_atomic_store32(cupolas_atomic32_t* ptr, int32_t val) {
-    platform_atomic_store32((platform_atomic32_t*)ptr, val);
+void cupolas_atomic_store32(volatile int32_t* ptr, int32_t val) {
+#if cupolas_PLATFORM_WINDOWS
+    InterlockedExchange((volatile LONG*)ptr, val);
+#elif defined(__GNUC__) || defined(__clang__)
+    __atomic_store_n(ptr, val, __ATOMIC_SEQ_CST);
+#else
+    *ptr = val;
+#endif
 }
 
-/**
- * @brief Add to 32-bit atomic value
- * @param[inout] ptr Atomic variable
- * @param[in] delta Value to add
- * @return New value after addition
- */
-int32_t cupolas_atomic_add32(cupolas_atomic32_t* ptr, int32_t delta) {
-    return platform_atomic_add32((platform_atomic32_t*)ptr, delta);
+int32_t cupolas_atomic_add32(volatile int32_t* ptr, int32_t delta) {
+#if cupolas_PLATFORM_WINDOWS
+    return InterlockedExchangeAdd((volatile LONG*)ptr, delta) + delta;
+#elif defined(__GNUC__) || defined(__clang__)
+    return __atomic_add_fetch(ptr, delta, __ATOMIC_SEQ_CST);
+#else
+    return (*ptr += delta);
+#endif
 }
 
-/**
- * @brief Subtract from 32-bit atomic value
- * @param[inout] ptr Atomic variable
- * @param[in] delta Value to subtract
- * @return New value after subtraction
- */
-int32_t cupolas_atomic_sub32(cupolas_atomic32_t* ptr, int32_t delta) {
-    return platform_atomic_sub32((platform_atomic32_t*)ptr, delta);
+int32_t cupolas_atomic_sub32(volatile int32_t* ptr, int32_t delta) {
+    return cupolas_atomic_add32(ptr, -delta);
 }
 
-/**
- * @brief Increment 32-bit atomic value
- * @param[inout] ptr Atomic variable
- * @return Value after increment
- */
-int32_t cupolas_atomic_inc32(cupolas_atomic32_t* ptr) {
-    return platform_atomic_inc32((platform_atomic32_t*)ptr);
+int32_t cupolas_atomic_inc32(volatile int32_t* ptr) {
+    return cupolas_atomic_add32(ptr, 1);
 }
 
-/**
- * @brief Decrement 32-bit atomic value
- * @param[inout] ptr Atomic variable
- * @return Value after decrement
- */
-int32_t cupolas_atomic_dec32(cupolas_atomic32_t* ptr) {
-    return platform_atomic_dec32((platform_atomic32_t*)ptr);
+int32_t cupolas_atomic_dec32(volatile int32_t* ptr) {
+    return cupolas_atomic_sub32(ptr, 1);
 }
 
-/**
- * @brief Compare and swap 32-bit atomic value
- * @param[inout] ptr Atomic variable
- * @param[in] expected Expected current value
- * @param[in] desired Desired new value
- * @return true if swapped, false otherwise
- */
-bool cupolas_atomic_cas32(cupolas_atomic32_t* ptr, int32_t expected, int32_t desired) {
-    return platform_atomic_cas32((platform_atomic32_t*)ptr, expected, desired);
+bool cupolas_atomic_cas32(volatile int32_t* ptr, int32_t expected, int32_t desired) {
+#if cupolas_PLATFORM_WINDOWS
+    return InterlockedCompareExchange((volatile LONG*)ptr, desired, expected) == expected;
+#elif defined(__GNUC__) || defined(__clang__)
+    return __atomic_compare_exchange_n(ptr, &expected, desired, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+#else
+    if (*ptr == expected) { *ptr = desired; return true; }
+    return false;
+#endif
 }
 
-/**
- * @brief Load 64-bit atomic value
- * @param[in] ptr Atomic variable
- * @return Value at ptr
- */
-int64_t cupolas_atomic_load64(cupolas_atomic64_t* ptr) {
-    return platform_atomic_load64((platform_atomic64_t*)ptr);
+int64_t cupolas_atomic_load64(volatile int64_t* ptr) {
+#if cupolas_PLATFORM_WINDOWS
+    return InterlockedCompareExchange64((volatile LONGLONG*)ptr, 0, 0);
+#elif defined(__GNUC__) || defined(__clang__)
+    return __atomic_load_n(ptr, __ATOMIC_SEQ_CST);
+#else
+    return *ptr;
+#endif
 }
 
-/**
- * @brief Store 64-bit atomic value
- * @param[out] ptr Atomic variable
- * @param[in] val Value to store
- */
-void cupolas_atomic_store64(cupolas_atomic64_t* ptr, int64_t val) {
-    platform_atomic_store64((platform_atomic64_t*)ptr, val);
+void cupolas_atomic_store64(volatile int64_t* ptr, int64_t val) {
+#if cupolas_PLATFORM_WINDOWS
+    InterlockedExchange64((volatile LONGLONG*)ptr, val);
+#elif defined(__GNUC__) || defined(__clang__)
+    __atomic_store_n(ptr, val, __ATOMIC_SEQ_CST);
+#else
+    *ptr = val;
+#endif
 }
 
-/**
- * @brief Add to 64-bit atomic value
- * @param[inout] ptr Atomic variable
- * @param[in] delta Value to add
- * @return New value after addition
- */
-int64_t cupolas_atomic_add64(cupolas_atomic64_t* ptr, int64_t delta) {
-    return platform_atomic_add64((platform_atomic64_t*)ptr, delta);
+int64_t cupolas_atomic_add64(volatile int64_t* ptr, int64_t delta) {
+#if cupolas_PLATFORM_WINDOWS
+    return InterlockedExchangeAdd64((volatile LONGLONG*)ptr, delta) + delta;
+#elif defined(__GNUC__) || defined(__clang__)
+    return __atomic_add_fetch(ptr, delta, __ATOMIC_SEQ_CST);
+#else
+    return (*ptr += delta);
+#endif
 }
 
-/**
- * @brief Subtract from 64-bit atomic value
- * @param[inout] ptr Atomic variable
- * @param[in] delta Value to subtract
- * @return New value after subtraction
- */
-int64_t cupolas_atomic_sub64(cupolas_atomic64_t* ptr, int64_t delta) {
-    return platform_atomic_sub64((platform_atomic64_t*)ptr, delta);
+int64_t cupolas_atomic_sub64(volatile int64_t* ptr, int64_t delta) {
+    return cupolas_atomic_add64(ptr, -delta);
 }
 
-/**
- * @brief Compare and swap 64-bit atomic value
- * @param[inout] ptr Atomic variable
- * @param[in] expected Expected current value
- * @param[in] desired Desired new value
- * @return true if swapped, false otherwise
- */
-bool cupolas_atomic_cas64(cupolas_atomic64_t* ptr, int64_t expected, int64_t desired) {
-    return platform_atomic_cas64((platform_atomic64_t*)ptr, expected, desired);
+bool cupolas_atomic_cas64(volatile int64_t* ptr, int64_t expected, int64_t desired) {
+#if cupolas_PLATFORM_WINDOWS
+    return InterlockedCompareExchange64((volatile LONGLONG*)ptr, desired, expected) == expected;
+#elif defined(__GNUC__) || defined(__clang__)
+    return __atomic_compare_exchange_n(ptr, &expected, desired, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+#else
+    if (*ptr == expected) { *ptr = desired; return true; }
+    return false;
+#endif
 }
 
-/**
- * @brief Load pointer atomic value
- * @param[in] ptr Atomic pointer variable
- * @return Value at ptr
- */
-void* cupolas_atomic_load_ptr(cupolas_atomic_ptr_t* ptr) {
-    return platform_atomic_load_ptr((platform_atomic_ptr_t*)ptr);
+void* cupolas_atomic_load_ptr(volatile void** ptr) {
+#if cupolas_PLATFORM_WINDOWS
+    return InterlockedCompareExchangePointer((volatile PVOID*)ptr, NULL, NULL);
+#elif defined(__GNUC__) || defined(__clang__)
+    return __atomic_load_n(ptr, __ATOMIC_SEQ_CST);
+#else
+    return *(void**)ptr;
+#endif
 }
 
-/**
- * @brief Store pointer atomic value
- * @param[out] ptr Atomic pointer variable
- * @param[in] val Value to store
- */
-void cupolas_atomic_store_ptr(cupolas_atomic_ptr_t* ptr, void* val) {
-    platform_atomic_store_ptr((platform_atomic_ptr_t*)ptr, val);
+void cupolas_atomic_store_ptr(volatile void** ptr, void* val) {
+#if cupolas_PLATFORM_WINDOWS
+    InterlockedExchangePointer((volatile PVOID*)ptr, val);
+#elif defined(__GNUC__) || defined(__clang__)
+    __atomic_store_n(ptr, val, __ATOMIC_SEQ_CST);
+#else
+    *(void**)ptr = val;
+#endif
 }
 
-/**
- * @brief Compare and swap pointer atomic value
- * @param[inout] ptr Atomic pointer variable
- * @param[in] expected Expected current value
- * @param[in] desired Desired new value
- * @return true if swapped, false otherwise
- */
-bool cupolas_atomic_cas_ptr(cupolas_atomic_ptr_t* ptr, void* expected, void* desired) {
-    return platform_atomic_cas_ptr((platform_atomic_ptr_t*)ptr, expected, desired);
-}
-
-/* ============================================================================
- * String Utilities Implementation
- * ============================================================================ */
-
-/**
- * @brief Duplicate string
- * @param[in] str String to duplicate
- * @return Duplicated string (caller owns), NULL on failure
- */
-char* cupolas_strdup(const char* str) {
-    return platform_strdup(str);
-}
-
-/**
- * @brief Duplicate string with length limit
- * @param[in] str String to duplicate
- * @param[in] n Maximum length
- * @return Duplicated string (caller owns), NULL on failure
- */
-char* cupolas_strndup(const char* str, size_t n) {
-    return platform_strndup(str, n);
-}
-
-/**
- * @brief Case-insensitive string comparison
- * @param[in] s1 First string
- * @param[in] s2 Second string
- * @return Comparison result (like strcmp)
- */
-int cupolas_strcasecmp(const char* s1, const char* s2) {
-    return platform_strcasecmp(s1, s2);
-}
-
-/**
- * @brief Case-insensitive string comparison with length limit
- * @param[in] s1 First string
- * @param[in] s2 Second string
- * @param[in] n Maximum length to compare
- * @return Comparison result (like strncmp)
- */
-int cupolas_strncasecmp(const char* s1, const char* s2, size_t n) {
-    return platform_strncasecmp(s1, s2, n);
+bool cupolas_atomic_cas_ptr(volatile void** ptr, void* expected, void* desired) {
+#if cupolas_PLATFORM_WINDOWS
+    return InterlockedCompareExchangePointer((volatile PVOID*)ptr, desired, expected) == expected;
+#elif defined(__GNUC__) || defined(__clang__)
+    return __atomic_compare_exchange_n(ptr, &expected, desired, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+#else
+    if (*(void**)ptr == expected) { *(void**)ptr = desired; return true; }
+    return false;
+#endif
 }
 
 /* ============================================================================
  * Error Handling Implementation
  * ============================================================================ */
 
-/**
- * @brief Get last error code (per-thread)
- * @return Last error code
- */
 int cupolas_get_last_error(void) {
-    return platform_get_last_error();
+#if cupolas_PLATFORM_WINDOWS
+    return (int)GetLastError();
+#else
+    return errno;
+#endif
 }
 
-/**
- * @brief Get error description string
- * @param[in] error Error code
- * @return Static error description string
- */
 const char* cupolas_strerror(int error) {
-    return platform_strerror(error);
+    switch (error) {
+        case 0:              return "Success";
+        case cupolas_ERROR_UNKNOWN:      return "Unknown error";
+        case cupolas_ERROR_INVALID_ARG:  return "Invalid argument";
+        case cupolas_ERROR_NO_MEMORY:    return "Out of memory";
+        case cupolas_ERROR_NOT_FOUND:    return "Not found";
+        case cupolas_ERROR_PERMISSION:   return "Permission denied";
+        case cupolas_ERROR_BUSY:         return "Resource busy";
+        case cupolas_ERROR_TIMEOUT:      return "Operation timed out";
+        case cupolas_ERROR_WOULD_BLOCK:   return "Operation would block";
+        case cupolas_ERROR_OVERFLOW:     return "Overflow";
+        case cupolas_ERROR_NOT_SUPPORTED: return "Not supported";
+        case cupolas_ERROR_IO:           return "I/O error";
+        default:
+#if cupolas_PLATFORM_WINDOWS
+            static char msg[256];
+            FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, NULL, (DWORD)error,
+                         0, msg, sizeof(msg), NULL);
+            return msg;
+#else
+            return strerror(error);
+#endif
+    }
+}
+
+/* ============================================================================
+ * String Utilities Implementation
+ * ============================================================================ */
+
+char* cupolas_strdup(const char* str) {
+    if (!str) return NULL;
+    size_t len = strlen(str) + 1;
+    char* dup = (char*)cupolas_mem_alloc(len);
+    if (dup) memcpy(dup, str, len);
+    return dup;
+}
+
+char* cupolas_strndup(const char* str, size_t n) {
+    if (!str) return NULL;
+    size_t len = strlen(str);
+    if (len > n) len = n;
+    char* dup = (char*)cupolas_mem_alloc(len + 1);
+    if (dup) {
+        memcpy(dup, str, len);
+        dup[len] = '\0';
+    }
+    return dup;
+}
+
+int cupolas_strcasecmp(const char* s1, const char* s2) {
+    if (!s1 || !s2) return (s1 ? 1 : (s2 ? -1 : 0));
+#if cupolas_PLATFORM_WINDOWS
+    return _stricmp(s1, s2);
+#else
+    return strcasecmp(s1, s2);
+#endif
+}
+
+int cupolas_strncasecmp(const char* s1, const char* s2, size_t n) {
+    if (!s1 || !s2) return (s1 ? 1 : (s2 ? -1 : 0));
+#if cupolas_PLATFORM_WINDOWS
+    return _strnicmp(s1, s2, n);
+#else
+    return strncasecmp(s1, s2, n);
+#endif
 }

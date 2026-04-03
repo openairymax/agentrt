@@ -34,6 +34,9 @@
 
 #ifdef _WIN32
     #include <windows.h>
+    #ifndef MAP_FAILED
+        #define MAP_FAILED ((void*)-1)
+    #endif
 #else
     #include <unistd.h>
     #include <sys/time.h>
@@ -494,8 +497,8 @@ agentos_error_t ipc_send(ipc_channel_t* channel, const ipc_message_t* message) {
     
     if (message->header.payload_len > channel->config.max_message_size) {
         snprintf(channel->error_msg, sizeof(channel->error_msg),
-                 "Message too large: %zu > %u", 
-                 message->header.payload_len, channel->config.max_message_size);
+                 "Message too large: %u > %u", 
+                 (unsigned int)message->header.payload_len, (unsigned int)channel->config.max_message_size);
         return AGENTOS_EOVERFLOW;
     }
     
@@ -1022,7 +1025,7 @@ agentos_error_t ipc_client_connect(ipc_client_t* client, uint32_t timeout_ms) {
         return AGENTOS_EBUSY;
     }
     
-    client->state = IPC_STATE_CONNECTING;
+    client->state = IPC_STATE_OPENING;
     
     client->channel = ipc_channel_create(&client->config);
     if (!client->channel) {

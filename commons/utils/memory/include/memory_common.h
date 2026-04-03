@@ -1,8 +1,8 @@
-﻿#ifndef MEMORY_COMMON_H
+#ifndef MEMORY_COMMON_H
 #define MEMORY_COMMON_H
 
-#include "../../../../corekern/include/error.h"
-#include "../../../../corekern/include/mem.h"
+#include <error.h>
+#include <memory_compat.h>
 
 /**
  * @brief 内存分配策略枚举

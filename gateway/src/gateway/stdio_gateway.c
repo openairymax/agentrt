@@ -63,10 +63,11 @@ typedef struct stdio_gateway {
  * @brief 处理系统调用请求（使用公共路由器）
  * @param method 方法名
  * @param params 参数对象
- * @return JSON响应字符串
+ * @param request_id 请求ID（可为 NULL，Stdio 模式下通常为 NULL）
+ * @return JSON 响应字符串
  */
-static char* handle_system_call(const char* method, cJSON* params) {
-    return gateway_syscall_route(method, params, NULL);
+static char* handle_system_call(const char* method, cJSON* params, cJSON* request_id) {
+    return gateway_syscall_route(method, params, request_id);
 }
 
 /* ========== 命令处理 ========== */
