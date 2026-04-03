@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file platform.c
  * @brief 跨平台兼容层实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
