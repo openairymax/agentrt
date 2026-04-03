@@ -1,20 +1,18 @@
 <div align="center">
 
-# Agent OS
-by OpenAgent  
-</div>
+<img src="tests/images/OpenAgent-logo.jpg" alt="OpenAgent Logo" style="width: 100%; max-width: 800px; height: auto; margin: 20px 0 30px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.15);" />
 
-<div align="center">
+# Agent OS
 
 [![AtomGit](https://atomgit.com/spharx/agentos/star/badge.svg)](https://atomgit.com/spharx/agentos)
 [![star](https://gitee.com/spharx/agentos/badge/star.svg?theme=gray)](https://gitee.com/spharx/agentos)
-[![GitHub](https://img.shields.io/github/stars/SpharxTeam/AgentOS)](https://github.com/SpharxTeam/AgentOS)  
+[![GitHub](https://img.shields.io/github/stars/SpharxTeam/AgentOS)](https://github.com/SpharxTeam/AgentOS)
 
 [![Version](https://img.shields.io/badge/version-1.0.0.9-5a6b7e)](https://atomgit.com/spharx/agentos)
-[![Documentation](https://img.shields.io/badge/docs-Doc%20V1.8-64748b)](manuals/ARCHITECTURAL_PRINCIPLES.md)  
+[![Documentation](https://img.shields.io/badge/docs-Doc%20V1.8-64748b)](manuals/ARCHITECTURAL_PRINCIPLES.md)
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-71897b)](https://atomgit.com/spharx/agentos/blob/main/LICENSE)
-[![Build Status](https://img.shields.io/badge/build-passing-7a9c8c)](https://github.com/SpharxTeam/AgentOS/actions)  
+[![Build Status](https://img.shields.io/badge/build-passing-7a9c8c)](https://github.com/SpharxTeam/AgentOS/actions)
 
 [![Docker](https://img.shields.io/badge/docker-supported-4a7baf?logo=docker&logoColor=white)](https://www.docker.com)
 [![C/C++](https://img.shields.io/badge/C%2FC%2B%2B-11%2F17-708cb8?logo=c%2B%2B&logoColor=white)](https://isocpp.org)
@@ -22,14 +20,9 @@ by OpenAgent
 [![Go](https://img.shields.io/badge/Go-1.21+-529ccb?logo=go&logoColor=white)](https://go.dev)
 [![Rust](https://img.shields.io/badge/Rust-1.70+-b08968?logo=rust&logoColor=white)](https://www.rust-lang.org)
 
-
-</div>  
-
-<div align="center">
-
-<img src="tests/images/OpenAgent-logo.jpg" alt="OpenAgent Logo" style="width: 100%; max-width: 800px; height: auto; margin: 30px 0; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.15);" />
-
 </div>
+
+---
 
 <div align="center">
 
