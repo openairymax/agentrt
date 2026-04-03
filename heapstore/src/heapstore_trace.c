@@ -403,3 +403,97 @@ heapstore_error_t heapstore_trace_cleanup(int days_to_keep, uint64_t* freed_byte
 bool heapstore_trace_is_healthy(void) {
     return s_initialized && s_span_buffer != NULL;
 }
+
+/**
+ * @brief 将所有追踪数据导出为 JSON 字符串
+ *
+ * 生成符合 OpenTelemetry 兼容格式的 JSON 数组
+ */
+heapstore_error_t heapstore_trace_export_to_json(char** out_json, bool include_events) {
+    if (!s_initialized) {
+        return heapstore_ERR_NOT_INITIALIZED;
+    }
+
+    if (!out_json) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+
+    (void)include_events; /* 预留参数，当前版本不使用 */
+
+    pthread_mutex_lock(&s_trace_lock);
+
+    if (s_span_count == 0) {
+        *out_json = strdup("[]");
+        pthread_mutex_unlock(&s_trace_lock);
+        return (*out_json != NULL) ? heapstore_SUCCESS : heapstore_ERR_OUT_OF_MEMORY;
+    }
+
+    /* 计算预估的 JSON 大小（每个 span 约 500 字节） */
+    size_t estimated_size = s_span_count * 512 + 64;
+    char* json_buffer = (char*)malloc(estimated_size);
+    if (!json_buffer) {
+        pthread_mutex_unlock(&s_trace_lock);
+        return heapstore_ERR_OUT_OF_MEMORY;
+    }
+
+    /* 构建 JSON 数组 */
+    size_t pos = 0;
+    pos += snprintf(json_buffer + pos, estimated_size - pos, "[\n");
+
+    for (size_t i = 0; i < s_span_count; i++) {
+        const heapstore_span_t* span = &s_span_buffer[i];
+
+        /* 转义字符串中的特殊字符 */
+        char escaped_name[256];
+        size_t name_idx = 0;
+        for (size_t j = 0; span->name[j] && j < sizeof(span->name) - 1 && name_idx < sizeof(escaped_name) - 1; j++) {
+            if (span->name[j] == '"' || span->name[j] == '\\') {
+                escaped_name[name_idx++] = '\\';
+            }
+            escaped_name[name_idx++] = span->name[j];
+        }
+        escaped_name[name_idx] = '\0';
+
+        /* 写入单个 span 的 JSON 对象 */
+        pos += snprintf(json_buffer + pos, estimated_size - pos,
+            "  {\n"
+            "    \"traceId\": \"%s\",\n"
+            "    \"spanId\": \"%s\",\n"
+            "    \"parentSpanId\": \"%s\",\n"
+            "    \"name\": \"%s\",\n"
+            "    \"startTimeNs\": %llu,\n"
+            "    \"endTimeNs\": %llu,\n"
+            "    \"status\": \"%s\",\n"
+            "    \"attributeCount\": %zu\n"
+            "  }%s\n",
+            span->trace_id,
+            span->span_id,
+            span->parent_span_id[0] ? span->parent_span_id : "",
+            escaped_name,
+            (unsigned long long)span->start_time_ns,
+            (unsigned long long)span->end_time_ns,
+            span->status,
+            span->attribute_count,
+            (i < s_span_count - 1) ? "," : "");
+
+        /* 检查缓冲区是否足够 */
+        if (pos >= estimated_size - 512) {
+            estimated_size *= 2;
+            char* new_buffer = (char*)realloc(json_buffer, estimated_size);
+            if (!new_buffer) {
+                free(json_buffer);
+                pthread_mutex_unlock(&s_trace_lock);
+                return heapstore_ERR_OUT_OF_MEMORY;
+            }
+            json_buffer = new_buffer;
+        }
+    }
+
+    pos += snprintf(json_buffer + pos, estimated_size - pos, "]");
+
+    pthread_mutex_unlock(&s_trace_lock);
+
+    *out_json = json_buffer;
+
+    return heapstore_SUCCESS;
+}
