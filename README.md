@@ -23,7 +23,7 @@
 
 <div align="center">
 
-<img src="tests/images/OpenAgent-logo.jpg" alt="OpenAgent Logo" style="width: 100vw; margin-left: calc(-50vw + 50%); height: auto; max-height: 400px; object-fit: contain;" />
+<img src="tests/images/OpenAgent-logo.jpg" alt="OpenAgent Logo" style="width: 100%; max-width: 800px; height: auto; margin: 30px 0; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.15);" />
 
 </div>
 
