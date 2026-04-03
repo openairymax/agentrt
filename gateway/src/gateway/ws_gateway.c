@@ -15,6 +15,7 @@
 #include "ws_gateway.h"
 #include "../utils/jsonrpc.h"
 #include "../utils/syscall_router.h"
+#include "../utils/gateway_utils.h"
 
 #include <libwebsockets.h>
 #include <cJSON.h>
@@ -49,26 +50,11 @@ static const struct lws_protocols ws_protocols[] = {
     { NULL, NULL, 0, 0 }
 };
 
-/* ========== 辅助函数 ========== */
+/* ========== 辅助函数（使用 gateway_utils.h 中的公共实现） ========== */
 
-/**
- * @brief 获取当前时间（纳秒）
- * @return 当前时间戳
+/*
+ * time_ns() 已迁移至 gateway_utils.h (gateway_time_ns)
  */
-static uint64_t time_ns(void) {
-#ifdef _WIN32
-    FILETIME ft;
-    ULARGE_INTEGER uli;
-    GetSystemTimeAsFileTime(&ft);
-    uli.LowPart = ft.dwLowDateTime;
-    uli.HighPart = ft.dwHighDateTime;
-    return (uli.QuadPart - 116444736000000000ULL) * 100;
-#else
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
-#endif
-}
 
 /* ========== WebSocket网关内部结构 ========== */
 
@@ -157,7 +143,7 @@ static ws_message_t* ws_message_create(ws_message_type_t type, const char* sessi
     msg->type = type;
     msg->session_id = session_id ? strdup(session_id) : NULL;
     msg->payload = payload ? cJSON_Duplicate(payload, 1) : NULL;
-    msg->timestamp_ns = time_ns();
+    msg->timestamp_ns = gateway_time_ns();
     
     return msg;
 }
@@ -197,7 +183,7 @@ static char* ws_message_to_json(ws_message_t* msg) {
     cJSON_AddNumberToObject(json, "timestamp", msg->timestamp_ns / 1000000000.0);
     
     if (msg->payload) {
-        cJSON_AddItemToObject(json, "payload", msg->payload);
+        cJSON_AddItemToObject(json, "payload", cJSON_Duplicate(msg->payload, 1));
     }
     
     char* json_str = cJSON_PrintUnformatted(json);
@@ -238,8 +224,8 @@ static int ws_callback(struct lws* wsi, enum lws_callback_reasons reason, void* 
             if (!context) return -1;
             
             context->wsi = wsi;
-            context->connect_time_ns = time_ns();
-            context->last_activity_ns = time_ns();
+            context->connect_time_ns = gateway_time_ns();
+            context->last_activity_ns = gateway_time_ns();
             
             *(void**)user = context;
             
@@ -250,7 +236,7 @@ static int ws_callback(struct lws* wsi, enum lws_callback_reasons reason, void* 
         case LWS_CALLBACK_RECEIVE:
             if (!context) return -1;
             
-            context->last_activity_ns = time_ns();
+            context->last_activity_ns = gateway_time_ns();
             context->messages_received++;
             context->bytes_received += len;
             atomic_fetch_add(&gateway->messages_total, 1);

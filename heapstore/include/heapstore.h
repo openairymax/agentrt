@@ -16,6 +16,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+/* 子模块头文件 - 提供批量写入 API 所需的类型定义 */
+#include "heapstore_registry.h"
+#include "heapstore_trace.h"
+#include "heapstore_ipc.h"
+#include "heapstore_memory.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

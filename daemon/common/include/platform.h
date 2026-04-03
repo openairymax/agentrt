@@ -16,37 +16,43 @@
 /* 包含 commons 的统一平台抽象层 */
 #include "agentos/platform/platform.h"
 
+/* 系统头文件 - 用于服务器端 Socket 函数 */
+#if AGENTOS_PLATFORM_POSIX
+#include <sys/un.h>      /* Unix Domain Socket */
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#elif AGENTOS_PLATFORM_WINDOWS
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#endif
+
 /* ==================== 兼容性别名 ==================== */
 
-/* 平台检测宏兼容 */
-#ifndef AGENTOS_PLATFORM_WINDOWS
-#define AGENTOS_PLATFORM_WINDOWS AGENTOS_PLATFORM_WINDOWS
-#endif
-#ifndef AGENTOS_PLATFORM_LINUX
-#define AGENTOS_PLATFORM_LINUX AGENTOS_PLATFORM_LINUX
-#endif
-#ifndef AGENTOS_PLATFORM_MACOS
-#define AGENTOS_PLATFORM_MACOS AGENTOS_PLATFORM_MACOS
-#endif
-
-/* 导出宏兼容 */
-#ifndef AGENTOS_API
-#define AGENTOS_API AGENTOS_API
-#endif
+/*
+ * 平台检测宏兼容层
+ * 注意: 这些宏由 commons/platform 平台检测系统定义。
+ * 此处仅提供向后兼容的守卫，防止重定义警告。
+ * 实际值来自 commons 的编译器定义 (-DAGENTOS_PLATFORM_xxx)。
+ */
 
 /* 线程本地存储兼容 */
 #ifndef AGENTOS_THREAD_LOCAL
-#define AGENTOS_THREAD_LOCAL AGENTOS_THREAD_LOCAL
+#define AGENTOS_THREAD_LOCAL _Thread_local
 #endif
 
 /* 内联函数兼容 */
 #ifndef AGENTOS_INLINE
-#define AGENTOS_INLINE AGENTOS_INLINE
+#define AGENTOS_INLINE inline
 #endif
 
 /* 未使用参数标记 */
 #ifndef AGENTOS_UNUSED
-#define AGENTOS_UNUSED(x) AGENTOS_UNUSED(x)
+#define AGENTOS_UNUSED(x) (void)(x)
 #endif
 
 /* 路径分隔符兼容 */
@@ -448,6 +454,224 @@ static inline int agentos_atomic_fetch_sub(agentos_atomic_int_t* atomic, int val
     return InterlockedExchangeAdd((LONG*)&atomic->value, -value);
 #else
     return __atomic_fetch_sub(&atomic->value, value, __ATOMIC_SEQ_CST);
+#endif
+}
+
+/* ==================== 服务器端 Socket 兼容 ==================== */
+
+/**
+ * @brief 初始化网络库（Windows 需要）
+ * @return 0 成功，非0 失败
+ *
+ * @note 在使用任何 socket 函数前必须调用此函数
+ */
+static inline int agentos_socket_init(void) {
+#if AGENTOS_PLATFORM_WINDOWS
+    WSADATA wsaData;
+    int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    return result == 0 ? 0 : -1;
+#elif AGENTOS_PLATFORM_POSIX
+    /* POSIX 不需要初始化 */
+    (void)0;
+    return 0;
+#else
+    return -1;
+#endif
+}
+
+/**
+ * @brief 清理网络库（Windows 需要）
+ */
+static inline void agentos_socket_cleanup(void) {
+#if AGENTOS_PLATFORM_WINDOWS
+    WSACleanup();
+#endif
+    (void)0;
+}
+
+/**
+ * @brief 创建 TCP 服务器 Socket
+ * @param host 绑定地址（NULL 表示 INADDR_ANY）
+ * @param port 监听端口
+ * @return Socket 句柄，失败返回 AGENTOS_INVALID_SOCKET
+ */
+static inline agentos_socket_t agentos_socket_create_tcp_server(const char* host, uint16_t port) {
+    agentos_socket_t sock = agentos_socket_tcp();
+    if (sock == AGENTOS_INVALID_SOCKET) return AGENTOS_INVALID_SOCKET;
+
+    /* 设置 SO_REUSEADDR */
+    agentos_socket_set_reuseaddr(sock, 1);
+
+    /* 绑定地址 */
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+
+    if (host && strlen(host) > 0) {
+        inet_pton(AF_INET, host, &addr.sin_addr);
+    } else {
+        addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    }
+
+    if (bind(sock, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
+        agentos_socket_close(sock);
+        return AGENTOS_INVALID_SOCKET;
+    }
+
+    /* 开始监听 */
+    if (listen(sock, SOMAXCONN) != 0) {
+        agentos_socket_close(sock);
+        return AGENTOS_INVALID_SOCKET;
+    }
+
+    return sock;
+}
+
+/**
+ * @brief 创建 Unix Domain Socket 服务器（仅 POSIX）
+ * @param path Socket 路径
+ * @return Socket 句柄，失败返回 AGENTOS_INVALID_SOCKET
+ */
+static inline agentos_socket_t agentos_socket_create_unix_server(const char* path) {
+#if AGENTOS_PLATFORM_POSIX
+    agentos_socket_t sock = agentos_socket_unix();
+    if (sock == AGENTOS_INVALID_SOCKET) return AGENTOS_INVALID_SOCKET;
+
+    /* 删除已存在的 socket 文件 */
+    unlink(path);
+
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
+
+    if (bind(sock, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
+        agentos_socket_close(sock);
+        return AGENTOS_INVALID_SOCKET;
+    }
+
+    if (listen(sock, SOMAXCONN) != 0) {
+        agentos_socket_close(sock);
+        return AGENTOS_INVALID_SOCKET;
+    }
+
+    return sock;
+#else
+    (void)path;
+    return AGENTOS_INVALID_SOCKET;
+#endif
+}
+
+/**
+ * @brief 创建 Windows Named Pipe 服务器（仅 Windows）
+ * @param pipe_path 管道路径
+ * @return Socket/句柄，失败返回 AGENTOS_INVALID_SOCKET
+ */
+static inline agentos_socket_t agentos_socket_create_named_pipe_server(const char* pipe_path) {
+#if AGENTOS_PLATFORM_WINDOWS
+    HANDLE hPipe = CreateNamedPipeA(
+        pipe_path,
+        PIPE_ACCESS_DUPLEX,
+        PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_NOWAIT,
+        PIPE_UNLIMITED_INSTANCES,
+        4096,
+        4096,
+        0,
+        NULL
+    );
+
+    if (hPipe == INVALID_HANDLE_VALUE) {
+        return AGENTOS_INVALID_SOCKET;
+    }
+    return (agentos_socket_t)hPipe;
+#else
+    (void)pipe_path;
+    return AGENTOS_INVALID_SOCKET;
+#endif
+}
+
+/**
+ * @brief 等待并接受客户端连接
+ * @param server_fd 服务器 Socket
+ * @param timeout_ms 超时时间（毫秒），0 表示无限等待
+ * @return 客户端 Socket，超时或错误返回 AGENTOS_INVALID_SOCKET
+ */
+static inline agentos_socket_t agentos_socket_accept(agentos_socket_t server_fd, uint32_t timeout_ms) {
+#if AGENTOS_PLATFORM_WINDOWS
+    /* Named Pipe 使用 ConnectNamedPipe */
+    if (!ConnectNamedPipe((HANDLE)server_fd, NULL)) {
+        DWORD err = GetLastError();
+        if (err == ERROR_PIPE_LISTENING && timeout_ms > 0) {
+            Sleep(timeout_ms);
+            if (ConnectNamedPipe((HANDLE)server_fd, NULL)) {
+                return server_fd;  /* 对于 Named Pipe，返回同一个句柄 */
+            }
+        }
+        return AGENTOS_INVALID_SOCKET;
+    }
+    return server_fd;
+#else
+    if (timeout_ms == 0) {
+        return accept(server_fd, NULL, NULL);
+    }
+
+    fd_set read_fds;
+    FD_ZERO(&read_fds);
+    FD_SET(server_fd, &read_fds);
+
+    struct timeval tv;
+    tv.tv_sec = timeout_ms / 1000;
+    tv.tv_usec = (timeout_ms % 1000) * 1000;
+
+    int sel = select((int)(server_fd + 1), &read_fds, NULL, NULL, 
+                     timeout_ms > 0 ? &tv : NULL);
+    
+    if (sel <= 0) {
+        return AGENTOS_INVALID_SOCKET;
+    }
+
+    return accept(server_fd, NULL, NULL);
+#endif
+}
+
+/**
+ * @brief 从 Socket 接收数据
+ * @param sock Socket 句柄
+ * @param buf 缓冲区
+ * @param len 缓冲区长度
+ * @return 接收的字节数，错误返回负值或 0
+ */
+static inline ssize_t agentos_socket_recv(agentos_socket_t sock, void* buf, size_t len) {
+#if AGENTOS_PLATFORM_WINDOWS
+    if (GetFileType((HANDLE)sock) == FILE_TYPE_PIPE) {
+        DWORD bytesRead = 0;
+        BOOL success = ReadFile((HANDLE)sock, buf, (DWORD)len, &bytesRead, NULL);
+        return success ? (ssize_t)bytesRead : -1;
+    }
+    return recv(sock, (char*)buf, (int)len, 0);
+#else
+    return recv(sock, buf, len, 0);
+#endif
+}
+
+/**
+ * @brief 向 Socket 发送数据
+ * @param sock Socket 句柄
+ * @param buf 数据缓冲区
+ * @param len 数据长度
+ * @return 发送的字节数，错误返回负值或 0
+ */
+static inline ssize_t agentos_socket_send(agentos_socket_t sock, const void* buf, size_t len) {
+#if AGENTOS_PLATFORM_WINDOWS
+    if (GetFileType((HANDLE)sock) == FILE_TYPE_PIPE) {
+        DWORD bytesWritten = 0;
+        BOOL success = WriteFile((HANDLE)sock, buf, (DWORD)len, &bytesWritten, NULL);
+        return success ? (ssize_t)bytesWritten : -1;
+    }
+    return send(sock, (const char*)buf, (int)len, 0);
+#else
+    return send(sock, buf, len, 0);
 #endif
 }
 

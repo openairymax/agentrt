@@ -19,6 +19,7 @@
  */
 
 #include "cupolas_monitoring.h"
+#include "cupolas_metrics.h"
 #include "../platform/platform.h"
 #include <stdlib.h>
 #include <string.h>

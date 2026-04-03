@@ -1,0 +1,38 @@
+# AgentOS Linux 依赖清单
+# 用于 Ubuntu 22.04 / 24.04 CI 环境
+# 格式: package_name=version 或仅包名（使用默认最新）
+
+# ===== 构建工具链 =====
+build-essential
+cmake (=3.28.3-1*) | cmake
+gcc (=13.*) | gcc
+g++ | g++
+pkg-config
+git
+wget
+curl
+
+# ===== 核心依赖 (Tier 2: REQUIRED) =====
+libcurl4-openssl-dev (=7.88.*) | libcurl4-openssl-dev
+libyaml-dev (=0.2.5.*) | libyaml-dev
+libcjson-dev (=1.7.15*) | libcjson-dev
+libssl-dev (=3.*) | libssl-dev
+
+# ===== Gateway 模块依赖 (Tier 3) =====
+libmicrohttpd-dev (=0.9.77*) | libmicrohttpd-dev
+libwebsockets-dev (=4.3.3*) | libwebsockets-dev
+
+# ===== 可选依赖 (Tier 4) =====
+libsqlite3-dev (=3.44.*) | libsqlite3-dev
+libevent-dev (=2.1.12*) | libevent-dev
+
+# ===== 测试与分析工具 (CI Only) =====
+valgrind (=3.22*)
+gcovr (=6.2*)
+cppcheck (=2.14*)
+clang-format (=18*)
+
+# ===== Python 工具链 (用于 tiktoken stub) =====
+python3
+python3-pip
+python3-venv

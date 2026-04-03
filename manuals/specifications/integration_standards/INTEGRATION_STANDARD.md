@@ -4,6 +4,7 @@
 **最后更新**: 2026-04-01  
 **适用范围**: AgentOS/manager 模块与 commons/utils/config_unified 的集成  
 **理论基础**: 工程两论（接口契约化）、五维正交设计（内核观K-2、工程观E-4/E-8）  
+**当前位置**: `manuals/specifications/integration_standards/` (从 `manager/` 迁移)
 
 ---
 
@@ -591,15 +592,27 @@ export AGENTOS_DEBUG=1
 | 版本 | 日期 | 变更说明 |
 |------|------|---------|
 | v1.0.0 | 2026-04-01 | 初始版本，定义集成标准和最佳实践 |
+| v1.0.1 | 2026-04-03 | 文档迁移至 manuals/specifications/integration_standards/ |
 
 ---
 
 ## 十、参考文档
 
-- [ARCHITECTURAL_PRINCIPLES.md](../../manuals/ARCHITECTURAL_PRINCIPLES.md)
+- [ARCHITECTURAL_PRINCIPLES.md](../ARCHITECTURAL_PRINCIPLES.md)
 - [config_unified README.md](../../../commons/utils/config_unified/README.md)
-- [CONFIG_CHANGE_PROCESS.md](../CONFIG_CHANGE_PROCESS.md)
-- [error_code_reference.md](../../manuals/specifications/project_erp/error_code_reference.md)
+- [CONFIG_CHANGE_PROCESS.md](../../../manager/CONFIG_CHANGE_PROCESS.md)
+- [error_code_reference.md](../project_erp/error_code_reference.md)
+- [Integration Standards README](./README.md)
+
+---
+
+## 📝 迁移记录 / Migration Record
+
+| 日期 | 操作 | 原位置 | 新位置 |
+|------|------|--------|--------|
+| 2026-04-03 | 移动文档 | `manager/INTEGRATION_STANDARD.md` | `manuals/specifications/integration_standards/INTEGRATION_STANDARD.md` |
+
+**迁移原因**: 集成标准属于项目级规范文档，应集中管理在 `manuals/specifications/` 下，便于跨模块查阅和维护。
 
 ---
 
