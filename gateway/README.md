@@ -2,11 +2,14 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://gitee.com/spharx/agentos)
+[![Version](https://img.shields.io/badge/version-1.0.0.7-blue.svg)](https://gitee.com/spharx/agentos)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](https://gitee.com/spharx/agentos/blob/main/LICENSE)
 [![C11](https://img.shields.io/badge/C-11-blue.svg)](https://en.cppreference.com/w/c/11)
 
 **协议转换层：连接内核与外部世界的桥梁**
+
+**版本**: v1.0.0.7 | **最后更新**: 2026-04-03
+**生产级状态**: ✅ 生产就绪 (Production Ready)
 
 </div>
 
@@ -72,28 +75,36 @@
 ```
 gateway/
 ├── include/
-│   └── gateway.h              # 统一公共接口
+│   └── gateway.h              # 统一公共接口 (12个API)
 ├── src/
 │   ├── gateway/
-│   │   ├── gateway.h          # 内部抽象接口
+│   │   ├── gateway.h          # 内部抽象接口 (ops表+inline)
+│   │   ├── gateway_api.c      # 公共API包装函数
 │   │   ├── http_gateway.c     # HTTP 协议转换实现
-│   │   ├── http_gateway.h     # HTTP 接口
+│   │   ├── http_gateway.h
 │   │   ├── ws_gateway.c       # WebSocket 协议转换实现
-│   │   ├── ws_gateway.h       # WebSocket 接口
+│   │   ├── ws_gateway.h
 │   │   ├── stdio_gateway.c    # Stdio 协议转换实现
-│   │   └── stdio_gateway.h    # Stdio 接口
+│   │   └── stdio_gateway.h
 │   └── utils/
-│       ├── jsonrpc.c          # JSON-RPC 2.0 工具实现
-│       └── jsonrpc.h          # JSON-RPC 2.0 工具接口
+│       ├── jsonrpc.c/h        # JSON-RPC 2.0 工具
+│       ├── syscall_router.c/h # 系统调用路由器 (5类×18方法)
+│       └── gateway_utils.h    # 公共工具函数 (time_ns/sleep)
 ├── tests/
-│   └── test_gateway.c         # 单元测试
+│   └── test_gateway.c         # 单元测试 (11个测试用例)
 ├── CMakeLists.txt             # 构建配置
+├── .clang-format              # 代码格式规范
+├── .clang-tidy                # 静态分析配置
 └── README.md                  # 本文档
 ```
 
 ---
 
 ## 🔌 API 接口
+
+> **注意**: 以下为当前已实现的公共 API。网关层遵循 K-1 内核极简原则，
+> 只提供协议转换所需的**最小接口集**（12 个函数）。
+> TLS 配置、路由注册、事件回调等高级功能属于 daemon 层或未来扩展。
 
 ### 创建网关
 
@@ -114,8 +125,8 @@ gateway_t* stdio_gw = gateway_stdio_create();
 
 ```c
 /* 启动网关 */
-gateway_error_t err = gateway_start(gw);
-if (err != GATEWAY_SUCCESS) {
+agentos_error_t err = gateway_start(gw);
+if (err != AGENTOS_SUCCESS) {
     fprintf(stderr, "Failed to start gateway: %d\n", err);
     return;
 }
@@ -133,14 +144,89 @@ gateway_destroy(gw);
 
 ```c
 char* stats_json = NULL;
-gateway_get_stats(gw, &stats_json);
-printf("Gateway stats: %s\n", stats_json);
-free(stats_json);
+agentos_error_t err = gateway_get_stats(gw, &stats_json);
+if (err == AGENTOS_SUCCESS && stats_json) {
+    printf("Gateway stats: %s\n", stats_json);
+    free(stats_json);
+}
+```
+
+### 设置自定义请求处理回调
+
+```c
+/**
+ * 自定义请求处理器示例
+ * @param request_json JSON-RPC 请求字符串（只读）
+ * @param response_json 输出响应字符串（由回调分配，调用者释放）
+ * @param user_data 用户数据
+ * @return 0 成功，非0 失败（返回 GATEWAY_ERROR_* 负值）
+ */
+int my_handler(const char* request_json, char** response_json, void* user_data) {
+    (void)user_data;
+
+    /* 解析并处理请求... */
+    cJSON* req = cJSON_Parse(request_json);
+    if (!req) return GATEWAY_ERROR_PROTOCOL;
+
+    /* 构造响应 */
+    cJSON* resp = cJSON_CreateObject();
+    cJSON_AddStringToObject(resp, "result", "custom handler processed");
+    *response_json = cJSON_PrintUnformatted(resp);
+    cJSON_Delete(resp);
+    cJSON_Delete(req);
+
+    return (*response_json) ? GATEWAY_SUCCESS : GATEWAY_ERROR_MEMORY;
+}
+
+/* 设置回调 */
+gateway_set_handler(gw, my_handler, &my_context);
+
+/* 清除回调（恢复默认 syscall 路由） */
+gateway_set_handler(gw, NULL, NULL);
+```
+
+### 查询操作
+
+```c
+/* 获取网关类型 */
+gateway_type_t type = gateway_get_type(gw);  // GATEWAY_TYPE_HTTP / WS / STDIO
+
+/* 检查运行状态 */
+if (gateway_is_running(gw)) {
+    printf("Gateway is running\n");
+}
+
+/* 获取网关名称 */
+const char* name = gateway_get_name(gw);  // "HTTP Gateway" / "WebSocket Gateway" / "Stdio Gateway"
+```
+
+### 完整 API 清单
+
+| 函数 | 说明 | 返回类型 |
+|------|------|---------|
+| `gateway_http_create(host, port)` | 创建 HTTP 网关 | `gateway_t*` |
+| `gateway_ws_create(host, port)` | 创建 WebSocket 网关 | `gateway_t*` |
+| `gateway_stdio_create()` | 创建 Stdio 网关 | `gateway_t*` |
+| `gateway_start(gw)` | 启动网关 | `agentos_error_t` |
+| `gateway_stop(gw)` | 停止网关 | `agentos_error_t` |
+| `gateway_destroy(gw)` | 销毁网关 | `void` |
+| `gateway_set_handler(gw, fn, data)` | 设置自定义回调 | `agentos_error_t` |
+| `gateway_get_type(gw)` | 获取网关类型 | `gateway_type_t` |
+| `gateway_is_running(gw)` | 检查是否运行中 | `bool` |
+| `gateway_get_stats(gw, &json)` | 获取统计信息 | `agentos_error_t` |
+| `gateway_get_name(gw)` | 获取网关名称 | `const char*` |
+
+### HTTP 端点
+
+```
+POST /              # JSON-RPC 2.0 请求 → 系统调用
+GET  /health        # 健康检查 → {"status":"healthy"}
+GET  /metrics       # Prometheus 指标导出
+OPTIONS /           # CORS 预检
+其他路径             # 404 Not Found
 ```
 
 ---
-
-## 📡 支持的系统调用
 
 网关层通过系统调用接口与内核通信，支持以下 syscall：
 
@@ -369,20 +455,26 @@ cmake --build . --target test_gateway
 | `utils/hash.c/h` | 错位功能 | `commons/utils/` |
 | `utils/secure_mem.c/h` | 错位功能 | `commons/utils/` |
 
-**保留的文件**（8 个，核心功能）：
+**保留并持续完善的文件**（核心功能）：
 
-| 文件 | 功能 |
-|------|------|
-| `include/gateway.h` | 统一公共接口 |
-| `src/gateway/gateway.h` | 内部抽象接口 |
-| `src/gateway/http_gateway.c/h` | HTTP 协议转换 |
-| `src/gateway/ws_gateway.c/h` | WebSocket 协议转换 |
-| `src/gateway/stdio_gateway.c/h` | Stdio 协议转换 |
-| `src/utils/jsonrpc.c/h` | JSON-RPC 工具 |
+| 文件 | 功能 | 状态 |
+|------|------|------|
+| `include/gateway.h` | 统一公共接口 (12 API) | ✅ 生产级 |
+| `src/gateway/gateway.h` | 内部抽象接口 (ops表+inline) | ✅ 生产级 |
+| `src/gateway/gateway_api.c` | 公共API包装函数 | ✅ 新增 |
+| `src/gateway/http_gateway.c/h` | HTTP 协议转换 (libmicrohttpd) | ✅ 生产级 |
+| `src/gateway/ws_gateway.c/h` | WebSocket 协议转换 (libwebsockets) | ✅ 生产级 |
+| `src/gateway/stdio_gateway.c/h` | Stdio 协议转换 (REPL) | ✅ 生产级 |
+| `src/utils/jsonrpc.c/h` | JSON-RPC 2.0 工具 | ✅ 完整 |
+| `src/utils/syscall_router.c/h` | 系统调用路由器 (5类×18方法) | ✅ 新增 |
+| `src/utils/gateway_utils.h` | 公共工具函数 | ✅ 新增 |
 
-**新增**：
+**新增（本轮修复）**：
 
 - `daemon/gateway_d/` - 用户态守护进程服务
+- `gateway_api.c` - 公共 API 符号导出
+- `syscall_router.c/h` - 集中式 syscall 路由
+- `gateway_utils.h` - 跨网关公共工具
 
 ---
 

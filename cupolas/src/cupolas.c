@@ -48,7 +48,7 @@ static struct {
     cupolas_config_t config;     /**< Active configuration */
     permission_engine_t* perm;   /**< Permission engine instance */
     sanitizer_t* san;            /**< Sanitizer instance */
-    cupolas_workbench_t* wb;     /**< Workbench instance */
+    workbench_t* wb;             /**< Workbench instance */
     audit_logger_t* audit;       /**< Audit logger instance */
     cupolas_mutex_t lock;         /**< State protection mutex */
 } g_cupolas = {0};

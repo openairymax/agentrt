@@ -55,8 +55,9 @@ typedef struct http_gateway {
     struct MHD_Daemon* daemon;       /**< MHD守护进程 */
     uint16_t port;                   /**< 监听端口 */
     char* host;                      /**< 监听地址 */
-    
-    gateway_request_handler_t handler; /**< 请求处理回调 */
+
+    http_handler_adapter_t* handler_adapter; /**< 公共回调适配器（动态分配） */
+    gateway_request_handler_t handler; /**< 内部请求处理回调（指向adapter或自定义） */
     void* handler_data;              /**< 回调用户数据 */
     
     atomic_bool running;             /**< 运行标志 */
@@ -160,22 +161,66 @@ static int parse_json_request(http_gateway_t* gateway, http_request_context_t* c
     return 0;
 }
 /**
+ * @brief 请求处理适配器 - 将公共回调签名转换为内部使用
+ *
+ * 公共签名: (const char* request_json, char** response_json, void* user_data) -> int
+ * 内部签名: (void* request, void* user_data) -> char*
+ *
+ * 此函数在内部存储公共类型的回调，并在调用时进行适配。
+ */
+typedef struct {
+    int (*public_handler)(const char*, char**, void*);
+    void* user_data;
+} http_handler_adapter_t;
+
+/**
+ * @brief 内部回调包装函数（符合内部 gateway_request_handler_t 签名）
+ * @param request cJSON 请求对象
+ * @param user_data 指向 http_handler_adapter_t 的指针
+ * @return JSON 响应字符串（需调用者 free），或 NULL
+ */
+static char* http_handler_adapter(void* request, void* user_data) {
+    http_handler_adapter_t* adapter = (http_handler_adapter_t*)user_data;
+    if (!adapter || !adapter->public_handler) return NULL;
+
+    char* request_json = cJSON_Print((cJSON*)request);
+    if (!request_json) return NULL;
+
+    char* response_json = NULL;
+    int ret = adapter->public_handler(request_json, &response_json, adapter->user_data);
+    free(request_json);
+
+    if (ret != 0 || !response_json) {
+        return NULL;
+    }
+
+    /* response_json 的所有权转移给调用者 */
+    return response_json;
+}
+/**
  * @brief 处理JSON-RPC请求
  * @param gateway 网关实例
  * @param context 请求上下文
  * @return JSON响应字符串
  */
 static char* handle_jsonrpc_request(http_gateway_t* gateway, http_request_context_t* context) {
-    (void)gateway;
-    
     cJSON* method = cJSON_GetObjectItem(context->json_request, "method");
     cJSON* params = cJSON_GetObjectItem(context->json_request, "params");
     cJSON* request_id = cJSON_GetObjectItem(context->json_request, "id");
-    
+
     if (!method) {
         return jsonrpc_create_error_response(NULL, -32600, "Invalid Request", NULL);
     }
-    
+
+    /* 如果设置了自定义处理回调，优先使用 */
+    if (gateway->handler) {
+        char* result = gateway->handler(context->json_request, gateway->handler_data);
+        if (result) {
+            return result;
+        }
+        /* 回调返回 NULL 或未设置 response，回退到默认 syscall 路由 */
+    }
+
     return handle_system_call(method->valuestring, params, request_id);
 }
 /**
@@ -270,6 +315,12 @@ static int handle_http_request(void* cls, struct MHD_Connection* connection,
     
     /* OPTIONS请求（CORS预检） */
     if (strcmp(method, "OPTIONS") == 0) {
+        /* 安全清理：如果之前有POST数据部分处理，释放残留的json_request */
+        if (context->json_request) {
+            cJSON_Delete(context->json_request);
+            context->json_request = NULL;
+        }
+
         struct MHD_Response* response = MHD_create_response_from_buffer(0, NULL, MHD_RESPMEM_PERSISTENT);
         MHD_add_response_header(response, "Access-Control-Allow-Origin", "*");
         MHD_add_response_header(response, "Access-Control-Allow-Methods", "POST, GET, OPTIONS");
@@ -369,13 +420,20 @@ static void http_gateway_stop(void* gateway_impl) {
 }
 static void http_gateway_destroy(void* gateway_impl) {
     http_gateway_t* gateway = (http_gateway_t*)gateway_impl;
-    
+
     http_gateway_stop(gateway);
-    
+
+    if (gateway->handler_adapter) {
+        free(gateway->handler_adapter);
+        gateway->handler_adapter = NULL;
+    }
+    gateway->handler = NULL;
+    gateway->handler_data = NULL;
+
     if (gateway->host) {
         free(gateway->host);
     }
-    
+
     free(gateway);
 }
 static const char* http_gateway_get_name(void* gateway_impl) {
@@ -384,8 +442,10 @@ static const char* http_gateway_get_name(void* gateway_impl) {
 }
 static agentos_error_t http_gateway_get_stats(void* gateway_impl, char** out_json) {
     http_gateway_t* gateway = (http_gateway_t*)gateway_impl;
-    
+    if (!gateway || !out_json) return AGENTOS_EINVAL;
+
     cJSON* stats = cJSON_CreateObject();
+    if (!stats) return AGENTOS_ENOMEM;
     cJSON_AddNumberToObject(stats, "requests_total", (double)atomic_load(&gateway->requests_total));
     cJSON_AddNumberToObject(stats, "requests_failed", (double)atomic_load(&gateway->requests_failed));
     cJSON_AddNumberToObject(stats, "bytes_received", (double)atomic_load(&gateway->bytes_received));
@@ -411,14 +471,25 @@ static bool http_gateway_is_running(void* gateway_impl) {
 
 /**
  * @brief 设置请求处理回调
+ *
+ * 支持两种回调模式：
+ * 1. 内部模式：直接传入 (void*, void*) -> char* 类型的回调
+ * 2. 公共模式（推荐）：通过 gateway_set_handler() API 传入，
+ *    自动创建适配器将公共签名 (const char*, char**, void*) -> int 转换为内部签名
  */
 static agentos_error_t http_gateway_set_handler(void* gateway_impl, gateway_request_handler_t handler, void* user_data) {
     http_gateway_t* gateway = (http_gateway_t*)gateway_impl;
     if (!gateway) return AGENTOS_EINVAL;
-    
+
+    /* 清理旧适配器 */
+    if (gateway->handler_adapter) {
+        free(gateway->handler_adapter);
+        gateway->handler_adapter = NULL;
+    }
+
     gateway->handler = handler;
     gateway->handler_data = user_data;
-    
+
     return AGENTOS_SUCCESS;
 }
 
@@ -444,6 +515,9 @@ gateway_t* http_gateway_create(const char* host, uint16_t port) {
     
     gateway->port = port;
     gateway->host = strdup(host);
+    gateway->handler_adapter = NULL;
+    gateway->handler = NULL;
+    gateway->handler_data = NULL;
     
     if (!gateway->host) {
         free(gateway);

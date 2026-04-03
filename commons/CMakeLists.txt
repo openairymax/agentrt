@@ -92,6 +92,11 @@ set(SOURCES
 
 add_library(agentos_common STATIC ${SOURCES})
 
+# MSVC: 启用 C11 标准和 UTF-8 源文件编码
+if(MSVC)
+    target_compile_options(agentos_common PRIVATE /std:c11 /utf-8 /W3 /wd4819)
+endif()
+
 target_include_directories(agentos_common PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/platform/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/token/include
