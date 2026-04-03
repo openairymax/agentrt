@@ -87,6 +87,15 @@ typedef struct {
     int initialized;
 } registry_db_t;
 
+/**
+ * @brief 注册表迭代器内部结构
+ */
+struct heapstore_registry_iter {
+    sqlite3_stmt* stmt;           /* SQLite 预编译语句 */
+    int current_type;             /* 当前遍历的类型 (agents/skills/sessions) */
+    int has_more;                 /* 是否还有更多记录 */
+};
+
 static registry_db_t s_registry = {0};
 
 static heapstore_error_t init_database(sqlite3* db) {
@@ -684,18 +693,188 @@ heapstore_error_t heapstore_registry_delete_session(const char* id) {
 }
 
 heapstore_error_t heapstore_registry_query_skills(heapstore_registry_iter_t** iter) {
-    (void)iter;
-    return heapstore_ERR_NOT_INITIALIZED;
+    if (!iter) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+
+    if (!s_registry.initialized || !s_registry.db) {
+        return heapstore_ERR_NOT_INITIALIZED;
+    }
+
+    pthread_mutex_lock(&s_registry.lock);
+
+    const char* sql = "SELECT id, name, version, library_path, manifest_path, installed_at FROM skills ORDER BY installed_at DESC;";
+    sqlite3_stmt* stmt;
+
+    int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        pthread_mutex_unlock(&s_registry.lock);
+        return heapstore_ERR_DB_QUERY_FAILED;
+    }
+
+    heapstore_registry_iter_t* new_iter = (heapstore_registry_iter_t*)malloc(sizeof(heapstore_registry_iter_t));
+    if (!new_iter) {
+        sqlite3_finalize(stmt);
+        pthread_mutex_unlock(&s_registry.lock);
+        return heapstore_ERR_NO_MEMORY;
+    }
+
+    new_iter->stmt = stmt;
+    new_iter->current_type = 1; /* skills */
+    new_iter->has_more = 1;
+
+    *iter = new_iter;
+    pthread_mutex_unlock(&s_registry.lock);
+
+    return heapstore_SUCCESS;
 }
 
+/**
+ * @brief 查询会话记录
+ *
+ * @param filter_status [in] 按状态过滤（NULL 表示不过滤）
+ * @param iter [out] 输出迭代器
+ * @return heapstore_error_t 错误码
+ */
+heapstore_error_t heapstore_registry_query_sessions(const char* filter_status, heapstore_registry_iter_t** iter) {
+    if (!iter) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+
+    if (!s_registry.initialized || !s_registry.db) {
+        return heapstore_ERR_NOT_INITIALIZED;
+    }
+
+    pthread_mutex_lock(&s_registry.lock);
+
+    const char* sql;
+    sqlite3_stmt* stmt;
+
+    if (filter_status && filter_status[0]) {
+        sql = "SELECT id, user_id, created_at, last_active_at, ttl_seconds, status FROM sessions WHERE status = ? ORDER BY last_active_at DESC;";
+    } else {
+        sql = "SELECT id, user_id, created_at, last_active_at, ttl_seconds, status FROM sessions ORDER BY last_active_at DESC;";
+    }
+
+    int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        pthread_mutex_unlock(&s_registry.lock);
+        return heapstore_ERR_DB_QUERY_FAILED;
+    }
+
+    if (filter_status && filter_status[0]) {
+        sqlite3_bind_text(stmt, 1, filter_status, -1, SQLITE_STATIC);
+    }
+
+    heapstore_registry_iter_t* new_iter = (heapstore_registry_iter_t*)malloc(sizeof(heapstore_registry_iter_t));
+    if (!new_iter) {
+        sqlite3_finalize(stmt);
+        pthread_mutex_unlock(&s_registry.lock);
+        return heapstore_ERR_NO_MEMORY;
+    }
+
+    new_iter->stmt = stmt;
+    new_iter->current_type = 2; /* sessions */
+    new_iter->has_more = 1;
+
+    *iter = new_iter;
+    pthread_mutex_unlock(&s_registry.lock);
+
+    return heapstore_SUCCESS;
+}
+
+/**
+ * @brief 遍历下一条记录
+ *
+ * 根据迭代器的 current_type 自动判断返回哪种类型的记录
+ */
 heapstore_error_t heapstore_registry_iter_next(heapstore_registry_iter_t* iter, void* record) {
-    (void)iter;
-    (void)record;
-    return heapstore_ERR_NOT_FOUND;
+    if (!iter || !record) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+    if (!iter->stmt || !iter->has_more) {
+        return heapstore_ERR_NOT_FOUND;
+    }
+
+    int rc = sqlite3_step(iter->stmt);
+    if (rc != SQLITE_ROW) {
+        iter->has_more = 0;
+        return heapstore_ERR_NOT_FOUND;
+    }
+
+    const char* text;
+
+    switch (iter->current_type) {
+        case 0: { /* agents */
+            heapstore_agent_record_t* agent_rec = (heapstore_agent_record_t*)record;
+            memset(agent_rec, 0, sizeof(*agent_rec));
+
+            text = (const char*)sqlite3_column_text(iter->stmt, 0);
+            if (text) strncpy(agent_rec->id, text, sizeof(agent_rec->id) - 1);
+            text = (const char*)sqlite3_column_text(iter->stmt, 1);
+            if (text) strncpy(agent_rec->name, text, sizeof(agent_rec->name) - 1);
+            text = (const char*)sqlite3_column_text(iter->stmt, 2);
+            if (text) strncpy(agent_rec->type, text, sizeof(agent_rec->type) - 1);
+            text = (const char*)sqlite3_column_text(iter->stmt, 3);
+            if (text) strncpy(agent_rec->version, text, sizeof(agent_rec->version) - 1);
+            text = (const char*)sqlite3_column_text(iter->stmt, 4);
+            if (text) strncpy(agent_rec->status, text, sizeof(agent_rec->status) - 1);
+            text = (const char*)sqlite3_column_text(iter->stmt, 5);
+            if (text) strncpy(agent_rec->config_path, text, sizeof(agent_rec->config_path) - 1);
+            agent_rec->created_at = sqlite3_column_int64(iter->stmt, 6);
+            agent_rec->updated_at = sqlite3_column_int64(iter->stmt, 7);
+            break;
+        }
+        case 1: { /* skills */
+            heapstore_skill_record_t* skill_rec = (heapstore_skill_record_t*)record;
+            memset(skill_rec, 0, sizeof(*skill_rec));
+
+            text = (const char*)sqlite3_column_text(iter->stmt, 0);
+            if (text) strncpy(skill_rec->id, text, sizeof(skill_rec->id) - 1);
+            text = (const char*)sqlite3_column_text(iter->stmt, 1);
+            if (text) strncpy(skill_rec->name, text, sizeof(skill_rec->name) - 1);
+            text = (const char*)sqlite3_column_text(iter->stmt, 2);
+            if (text) strncpy(skill_rec->version, text, sizeof(skill_rec->version) - 1);
+            text = (const char*)sqlite3_column_text(iter->stmt, 3);
+            if (text) strncpy(skill_rec->library_path, text, sizeof(skill_rec->library_path) - 1);
+            text = (const char*)sqlite3_column_text(iter->stmt, 4);
+            if (text) strncpy(skill_rec->manifest_path, text, sizeof(skill_rec->manifest_path) - 1);
+            skill_rec->installed_at = sqlite3_column_int64(iter->stmt, 5);
+            break;
+        }
+        case 2: { /* sessions */
+            heapstore_session_record_t* session_rec = (heapstore_session_record_t*)record;
+            memset(session_rec, 0, sizeof(*session_rec));
+
+            text = (const char*)sqlite3_column_text(iter->stmt, 0);
+            if (text) strncpy(session_rec->id, text, sizeof(session_rec->id) - 1);
+            text = (const char*)sqlite3_column_text(iter->stmt, 1);
+            if (text) strncpy(session_rec->user_id, text, sizeof(session_rec->user_id) - 1);
+            session_rec->created_at = sqlite3_column_int64(iter->stmt, 2);
+            session_rec->last_active_at = sqlite3_column_int64(iter->stmt, 3);
+            session_rec->ttl_seconds = sqlite3_column_int(iter->stmt, 4);
+            text = (const char*)sqlite3_column_text(iter->stmt, 5);
+            if (text) strncpy(session_rec->status, text, sizeof(session_rec->status) - 1);
+            break;
+        }
+        default:
+            return heapstore_ERR_INVALID_PARAM;
+    }
+
+    return heapstore_SUCCESS;
 }
 
 void heapstore_registry_iter_destroy(heapstore_registry_iter_t* iter) {
-    (void)iter;
+    if (!iter) {
+        return;
+    }
+
+    if (iter->stmt) {
+        sqlite3_finalize(iter->stmt);
+        iter->stmt = NULL;
+    }
+
+    free(iter);
 }
 
 heapstore_error_t heapstore_registry_vacuum(void) {

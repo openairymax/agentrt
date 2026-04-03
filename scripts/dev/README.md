@@ -1,4 +1,4 @@
-﻿﻿# AgentOS 开发辅助脚本
+﻿# AgentOS 开发辅助脚本
 
 **版本**: v1.0.0.6  
 **最后更新**: 2026-03-21  
@@ -13,11 +13,26 @@
 
 ## 📁 文件清单
 
+### 开发脚本
+
 | 文件 | 说明 | 类型 | 状态 |
 |------|------|------|------|
-| `generate_docs.py` | 文档生成工具 | Python | ✅ 生产就绪 |
-| `update_registry.py` | 注册表更新工具 | Python | 🟡 测试阶段 |
-| `run_example.sh` | 示例运行脚本 | Bash | ✅ 生产就绪 |
+| `quickstart.sh` | 一键快速启动脚本 | Bash | ✅ 生产就绪 |
+| `validate.sh` | 环境验证脚本 | Bash | ✅ 生产就绪 |
+
+### 开发配置
+
+| 文件 | 说明 | 类型 | 状态 |
+|------|------|------|------|
+| `config/.clang-format` | C/C++ 代码格式化配置 | Config | ✅ 生产就绪 |
+| `config/.clangd` | Clangd 语言服务器配置 | Config | ✅ 生产就绪 |
+| `config/.editorconfig` | 编辑器统一配置 | Config | ✅ 生产就绪 |
+| `config/.lizardrc` | 圈复杂度检查配置 | Config | ✅ 生产就绪 |
+| `config/.jscpd.json` | 重复代码检测配置 | Config | ✅ 生产就绪 |
+| `config/.pre-commit-config.yaml` | Git 钩子配置 | Config | ✅ 生产就绪 |
+| `config/vcpkg.json` | C++ 依赖配置 (Windows) | Config | ✅ 生产就绪 |
+
+> 📌 **注意**: 这些配置文件原位于项目根目录，已统一迁移到 `scripts/dev/config/` 目录，以便保持根目录整洁。
 
 ---
 

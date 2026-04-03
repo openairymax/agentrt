@@ -11,7 +11,6 @@
  */
 
 #include "cost.h"
-#include "core.h"
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
