@@ -9,6 +9,10 @@
 
 #include "cognition.h"
 
+/* 前向声明：LLM 服务类型（定义在 daemon/llm_d/include/llm_service.h） */
+struct llm_service;
+typedef struct llm_service agentos_llm_service_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif

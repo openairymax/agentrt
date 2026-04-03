@@ -78,9 +78,17 @@ scripts/
 ### 1. 环境准备
 
 ```bash
-# 克隆仓库
-git clone https://github.com/SpharxTeam/AgentOS.git
-cd AgentOS
+# 克隆仓库（推荐 AtomGit 官方仓库）
+git clone https://atomgit.com/spharx/agentos.git
+cd agentos
+
+# 或 Gitee 官方仓库
+# git clone https://gitee.com/spharx/agentos.git
+# cd agentos
+
+# 或 GitHub 官方仓库
+# git clone https://github.com/SpharxTeam/AgentOS.git
+# cd AgentOS
 
 # 运行初始化向导
 cd scripts/init

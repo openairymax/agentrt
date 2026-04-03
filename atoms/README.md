@@ -114,9 +114,17 @@ atoms/
 ### 构建步骤
 
 ```bash
-# 1. 克隆项目
-git clone https://gitee.com/spharx/agentos.git
+# 1. 克隆项目（推荐 AtomGit 官方仓库）
+git clone https://atomgit.com/spharx/agentos.git
 cd agentos
+
+# 或 Gitee 官方仓库
+# git clone https://gitee.com/spharx/agentos.git
+# cd agentos
+
+# 或 GitHub 官方仓库
+# git clone https://github.com/SpharxTeam/AgentOS.git
+# cd AgentOS
 
 # 2. 创建构建目录
 mkdir build && cd build

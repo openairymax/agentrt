@@ -36,43 +36,43 @@ issue_templates:
 labels:
   - name: bug
     color: d73a4a
-    description: Something isn't working / Something isn't working
+    description: Something isn't working / 有问题的功能
   
   - name: enhancement
     color: a2eeef
-    description: New feature or request / New feature or request
+    description: New feature or request / 新功能或请求
   
   - name: documentation
     color: 0075ca
-    description: Improvements or additions to documentation / Improvements or additions to documentation
+    description: Improvements or additions to documentation / 文档改进或补充
   
   - name: security
     color: d93f0b
-    description: Security-related issues / Security-related issues
+    description: Security-related issues / 安全相关问题
   
   - name: performance
     color: 0e8a16
-    description: Performance improvements / Performance improvements
+    description: Performance improvements / 性能改进
   
   - name: refactoring
     color: 5319e7
-    description: Code refactoring / Code refactoring
+    description: Code refactoring / 代码重构
   
   - name: testing
     color: 0075ca
-    description: Testing improvements / Testing improvements
+    description: Testing improvements / 测试改进
   
   - name: architecture
     color: fbca04
-    description: Architecture-related issues / Architecture-related issues
+    description: Architecture-related issues / 架构相关问题
   
   - name: good first issue
     color: 7057ff
-    description: Good for newcomers / Good for newcomers
+    description: Good for newcomers / 适合新手
   
   - name: help wanted
     color: 008672
-    description: Extra attention is needed / Extra attention is needed
+    description: Extra attention is needed / 需要额外关注
 
 # Auto-Assignment Rules / 自动分配规则
 auto_assign:
