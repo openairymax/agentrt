@@ -81,8 +81,9 @@ struct ws_gateway {
     struct lws_context* context;     /**< LWS上下文 */
     uint16_t port;                   /**< 监听端口 */
     char* host;                      /**< 监听地址 */
-    
-    gateway_request_handler_t handler; /**< 请求处理回调 */
+
+    void* handler_adapter;           /**< 公共回调适配器（动态分配） */
+    gateway_request_handler_t handler; /**< 内部请求处理回调 */
     void* handler_data;              /**< 回调用户数据 */
     
     atomic_bool running;             /**< 运行标志 */
@@ -197,15 +198,24 @@ static char* ws_message_to_json(ws_message_t* msg) {
 /**
  * @brief 处理RPC请求
  */
-static char* handle_rpc_request(cJSON* request) {
+static char* handle_rpc_request(ws_gateway_t* gateway, cJSON* request) {
     cJSON* id = cJSON_GetObjectItem(request, "id");
     cJSON* method = cJSON_GetObjectItem(request, "method");
     cJSON* params = cJSON_GetObjectItem(request, "params");
-    
+
     if (!method || !cJSON_IsString(method)) {
         return jsonrpc_create_error_response(id, -32600, "Invalid Request", NULL);
     }
-    
+
+    /* 如果设置了自定义处理回调，优先使用 */
+    if (gateway->handler) {
+        char* result = gateway->handler(request, gateway->handler_data);
+        if (result) {
+            return result;
+        }
+        /* 回调返回 NULL，回退到默认 syscall 路由 */
+    }
+
     return handle_system_call(method->valuestring, params, id);
 }
 
@@ -262,7 +272,7 @@ static int ws_callback(struct lws* wsi, enum lws_callback_reasons reason, void* 
                     ws_message_t* pong_msg = ws_message_create(WS_MSG_TYPE_PONG, context->session_id, NULL);
                     char* pong_json = ws_message_to_json(pong_msg);
                     ws_message_destroy(pong_msg);
-                    
+
                     size_t out_len = strlen(pong_json);
                     lws_write(wsi, (unsigned char*)pong_json, out_len, LWS_WRITE_TEXT);
                     free(pong_json);
@@ -270,21 +280,35 @@ static int ws_callback(struct lws* wsi, enum lws_callback_reasons reason, void* 
                 else if (strcmp(type->valuestring, "rpc_request") == 0) {
                     cJSON* rpc_request = cJSON_GetObjectItem(json, "payload");
                     if (rpc_request) {
-                        char* response = handle_rpc_request(rpc_request);
+                        char* response = handle_rpc_request(gateway, rpc_request);
                         if (response) {
                             ws_message_t* response_msg = ws_message_create(
                                 WS_MSG_TYPE_RPC_RESPONSE, context->session_id, cJSON_Parse(response));
                             char* response_json = ws_message_to_json(response_msg);
                             ws_message_destroy(response_msg);
                             free(response);
-                            
+
                             size_t out_len = strlen(response_json);
                             lws_write(wsi, (unsigned char*)response_json, out_len, LWS_WRITE_TEXT);
                             free(response_json);
-                            
+
                             atomic_fetch_add(&gateway->bytes_sent, out_len);
                         }
                     }
+                }
+                else {
+                    /* 未知消息类型，返回错误 */
+                    char err_buf[128];
+                    snprintf(err_buf, sizeof(err_buf), "Unknown message type: %s", type->valuestring);
+                    char* error_resp = jsonrpc_create_error_response(NULL, -32600, err_buf, NULL);
+                    ws_message_t* error_msg = ws_message_create(WS_MSG_TYPE_ERROR, NULL, cJSON_Parse(error_resp));
+                    char* error_json = ws_message_to_json(error_msg);
+                    ws_message_destroy(error_msg);
+                    free(error_resp);
+
+                    size_t out_len = strlen(error_json);
+                    lws_write(wsi, (unsigned char*)error_json, out_len, LWS_WRITE_TEXT);
+                    free(error_json);
                 }
             }
             
@@ -344,13 +368,20 @@ static void ws_gateway_stop(void* gateway_impl) {
 
 static void ws_gateway_destroy(void* gateway_impl) {
     ws_gateway_t* gateway = (ws_gateway_t*)gateway_impl;
-    
+
     ws_gateway_stop(gateway);
-    
+
+    if (gateway->handler_adapter) {
+        free(gateway->handler_adapter);
+        gateway->handler_adapter = NULL;
+    }
+    gateway->handler = NULL;
+    gateway->handler_data = NULL;
+
     if (gateway->host) {
         free(gateway->host);
     }
-    
+
     free(gateway);
 }
 
@@ -367,8 +398,10 @@ static bool ws_gateway_is_running(void* gateway_impl) {
 
 static agentos_error_t ws_gateway_get_stats(void* gateway_impl, char** out_json) {
     ws_gateway_t* gateway = (ws_gateway_t*)gateway_impl;
-    
+    if (!gateway || !out_json) return AGENTOS_EINVAL;
+
     cJSON* stats = cJSON_CreateObject();
+    if (!stats) return AGENTOS_ENOMEM;
     cJSON_AddNumberToObject(stats, "connections_total", (double)atomic_load(&gateway->connections_total));
     cJSON_AddNumberToObject(stats, "connections_active", (double)atomic_load(&gateway->connections_active));
     cJSON_AddNumberToObject(stats, "messages_total", (double)atomic_load(&gateway->messages_total));
@@ -388,10 +421,15 @@ static agentos_error_t ws_gateway_get_stats(void* gateway_impl, char** out_json)
 static agentos_error_t ws_gateway_set_handler(void* gateway_impl, gateway_request_handler_t handler, void* user_data) {
     ws_gateway_t* gateway = (ws_gateway_t*)gateway_impl;
     if (!gateway) return AGENTOS_EINVAL;
-    
+
+    if (gateway->handler_adapter) {
+        free(gateway->handler_adapter);
+        gateway->handler_adapter = NULL;
+    }
+
     gateway->handler = handler;
     gateway->handler_data = user_data;
-    
+
     return AGENTOS_SUCCESS;
 }
 
@@ -419,6 +457,9 @@ gateway_t* ws_gateway_create(const char* host, uint16_t port) {
     
     gateway->port = port;
     gateway->host = strdup(host);
+    gateway->handler_adapter = NULL;
+    gateway->handler = NULL;
+    gateway->handler_data = NULL;
     
     if (!gateway->host) {
         free(gateway);

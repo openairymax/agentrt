@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file strategy.h
  * @brief 调度策略创建函数的统一声明
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -10,6 +10,10 @@
 #include "cognition.h"
 #include "agent_registry.h"
 #include <stddef.h>
+
+/* Forward declarations for dispatcher base types */
+struct agentos_dispatcher_base;
+typedef struct agentos_dispatcher_base agentos_dispatcher_base_t;
 
 #ifdef __cplusplus
 extern "C" {

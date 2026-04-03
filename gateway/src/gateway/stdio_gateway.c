@@ -99,21 +99,39 @@ static char* show_help(void) {
  * @param json_str JSON字符串
  * @return 响应字符串
  */
-static char* handle_jsonrpc(const char* json_str) {
+static char* handle_jsonrpc(stdio_gateway_t* gateway, const char* json_str) {
     cJSON* request = cJSON_Parse(json_str);
     if (!request) {
         return jsonrpc_create_error_response(NULL, -32700, "Parse error", NULL);
     }
-    
+
     if (jsonrpc_validate_request(request) != 0) {
         cJSON_Delete(request);
         return jsonrpc_create_error_response(NULL, -32600, "Invalid Request", NULL);
     }
-    
+
     const char* method = jsonrpc_get_method(request);
     const cJSON* params = jsonrpc_get_params(request);
     const cJSON* id = jsonrpc_get_id(request);
-    
+
+    /* 如果设置了自定义处理回调，优先使用 */
+    if (gateway->handler) {
+        char* result = gateway->handler(request, gateway->handler_data);
+        if (result) {
+            if (id && result) {
+                cJSON* parsed = cJSON_Parse(result);
+                if (parsed) {
+                    cJSON_AddItemToObject(parsed, "id", cJSON_Duplicate(id, 1));
+                    free(result);
+                    result = cJSON_PrintUnformatted(parsed);
+                    cJSON_Delete(parsed);
+                }
+            }
+            cJSON_Delete(request);
+            return result;
+        }
+    }
+
     char* response = handle_system_call(method, (cJSON*)params, (cJSON*)id);
     
     if (id && response) {
@@ -173,7 +191,7 @@ static char* process_command(stdio_gateway_t* gateway, const char* input) {
     }
     else if (strncmp(start, "rpc ", 4) == 0) {
         const char* json_str = start + 4;
-        response = handle_jsonrpc(json_str);
+        response = handle_jsonrpc(gateway, json_str);
     }
     else {
         response = strdup("Unknown command. Type 'help' for available commands.\n");
@@ -270,6 +288,13 @@ static void stdio_gateway_destroy(void* gateway_impl) {
 
     stdio_gateway_stop(gateway);
 
+    if (gateway->handler_adapter) {
+        free(gateway->handler_adapter);
+        gateway->handler_adapter = NULL;
+    }
+    gateway->handler = NULL;
+    gateway->handler_data = NULL;
+
     free(gateway);
 }
 
@@ -308,10 +333,15 @@ static agentos_error_t stdio_gateway_get_stats(void* gateway_impl, char** out_js
 static agentos_error_t stdio_gateway_set_handler(void* gateway_impl, gateway_request_handler_t handler, void* user_data) {
     stdio_gateway_t* gateway = (stdio_gateway_t*)gateway_impl;
     if (!gateway) return AGENTOS_EINVAL;
-    
+
+    if (gateway->handler_adapter) {
+        free(gateway->handler_adapter);
+        gateway->handler_adapter = NULL;
+    }
+
     gateway->handler = handler;
     gateway->handler_data = user_data;
-    
+
     return AGENTOS_SUCCESS;
 }
 
@@ -332,6 +362,10 @@ gateway_t* stdio_gateway_create(void) {
     if (!gateway) {
         return NULL;
     }
+
+    gateway->handler_adapter = NULL;
+    gateway->handler = NULL;
+    gateway->handler_data = NULL;
     
     atomic_init(&gateway->running, false);
     atomic_init(&gateway->commands_total, 0);

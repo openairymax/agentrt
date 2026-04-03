@@ -2,10 +2,10 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v1.0.0.6-blue.svg)](../../README.md)
+[![Version](https://img.shields.io/badge/version-v1.0.0.7-blue.svg)](../../README.md)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](../../../LICENSE)
 
-**版本**: v1.0.0.6 | **最后更新**: 2026-03-25
+**版本**: v1.0.0.7 | **最后更新**: 2026-04-03
 
 </div>
 

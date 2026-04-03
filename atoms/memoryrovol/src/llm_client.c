@@ -19,12 +19,12 @@
 #include <string.h>
 #include <stdio.h>
 
-/* CURL HTTP 客户端 */
-#ifdef AGENTOS_HAS_CURL
+/* CURL HTTP 客户端（与 CMakeLists.txt 中的 HAVE_LIBCURL 保持一致） */
+#ifdef HAVE_LIBCURL
 #include <curl/curl.h>
 #else
 #include "../include/curl_stub.h"
-#endif /* AGENTOS_HAS_CURL */
+#endif /* HAVE_LIBCURL */
 
 /* JSON 解析 */
 #ifdef AGENTOS_HAS_CJSON

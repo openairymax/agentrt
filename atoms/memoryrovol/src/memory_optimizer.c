@@ -675,7 +675,16 @@ agentos_error_t agentos_memory_optimizer_create(agentos_memory_optimizer_t** out
         return AGENTOS_ENOMEM;
     }
 
-    optimizer->optimizer_id = agentos_generate_uuid();
+    // Generate unique ID based on timestamp and counter
+    {
+        static volatile LONG s_opt_counter = 0;
+        char id_buf[64];
+        uint64_t ts = get_timestamp_ns();
+        LONG cnt = InterlockedIncrement(&s_opt_counter);
+        _snprintf_s(id_buf, sizeof(id_buf), _TRUNCATE, "opt_%llu_%lu",
+                     (unsigned long long)ts, (unsigned long)cnt);
+        optimizer->optimizer_id = AGENTOS_STRDUP(id_buf);
+    }
     if (!optimizer->optimizer_id) {
         optimizer->optimizer_id = AGENTOS_STRDUP("memory_optimizer_default");
     }
@@ -688,17 +697,8 @@ agentos_error_t agentos_memory_optimizer_create(agentos_memory_optimizer_t** out
         return AGENTOS_ENOMEM;
     }
 
-    optimizer->obs = agentos_observability_create();
-    if (optimizer->obs) {
-        agentos_observability_register_metric(optimizer->obs, "memory_total_allocated",
-                                             AGENTOS_METRIC_GAUGE, "Total memory allocated");
-        agentos_observability_register_metric(optimizer->obs, "memory_current_usage",
-                                             AGENTOS_METRIC_GAUGE, "Current memory usage");
-        agentos_observability_register_metric(optimizer->obs, "memory_cache_hits",
-                                             AGENTOS_METRIC_COUNTER, "Cache hit count");
-        agentos_observability_register_metric(optimizer->obs, "memory_cache_misses",
-                                             AGENTOS_METRIC_COUNTER, "Cache miss count");
-    }
+    // corekern observability is a global singleton; do not create per-instance
+    optimizer->obs = NULL;
 
     optimizer->pool_count = 0;
     optimizer->cache_count = 0;
@@ -739,7 +739,7 @@ void agentos_memory_optimizer_destroy(agentos_memory_optimizer_t* optimizer) {
         }
     }
 
-    if (optimizer->obs) agentos_observability_destroy(optimizer->obs);
+    (void)optimizer->obs; /* obs is global singleton, no per-instance destroy */
     if (optimizer->lock) agentos_mutex_destroy(optimizer->lock);
     if (optimizer->optimizer_id) AGENTOS_FREE(optimizer->optimizer_id);
 
@@ -815,10 +815,7 @@ void* agentos_memory_optimizer_alloc(agentos_memory_optimizer_t* optimizer,
         }
         agentos_mutex_unlock(optimizer->lock);
 
-        if (optimizer->obs) {
-            agentos_observability_set_gauge(optimizer->obs, "memory_current_usage",
-                                           optimizer->stats.current_usage);
-        }
+        /* gauge metric: memory_current_usage deferred to corekern singleton */
     }
 
     return ptr;
@@ -846,10 +843,7 @@ void agentos_memory_optimizer_free(agentos_memory_optimizer_t* optimizer,
     optimizer->stats.free_operations++;
     agentos_mutex_unlock(optimizer->lock);
 
-    if (optimizer->obs) {
-        agentos_observability_set_gauge(optimizer->obs, "memory_current_usage",
-                                       optimizer->stats.current_usage);
-    }
+    /* gauge metric: memory_current_usage deferred (pool_free path) */
 }
 
 /**
@@ -921,10 +915,7 @@ void* agentos_memory_optimizer_cache_get(agentos_memory_optimizer_t* optimizer,
     }
     agentos_mutex_unlock(optimizer->lock);
 
-    if (optimizer->obs) {
-        agentos_observability_increment_counter(optimizer->obs,
-                                               value ? "memory_cache_hits" : "memory_cache_misses", 1);
-    }
+    /* counter metric: cache hit/miss deferred to corekern singleton */
 
     return value;
 }
