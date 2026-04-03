@@ -2,7 +2,13 @@
 
 <img src="tests/images/OpenAgent-logo.jpg" alt="OpenAgent Logo" style="width: 100%; max-width: 800px; height: auto; margin: 20px 0 30px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.15);" />
 
-# Agent OS
+# Agent OS  
+
+
+</div>
+
+<div align="center">
+
 
 [![AtomGit](https://atomgit.com/spharx/agentos/star/badge.svg)](https://atomgit.com/spharx/agentos)
 [![star](https://gitee.com/spharx/agentos/badge/star.svg?theme=gray)](https://gitee.com/spharx/agentos)
