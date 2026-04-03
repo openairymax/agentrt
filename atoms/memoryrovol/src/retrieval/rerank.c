@@ -1,20 +1,25 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * @file rerank.c
- * @brief 检索结果重排序（基于交叉编码器，带降级�?
+ * @brief 检索结果重排序（基于交叉编码器，带降级）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+/* 确保标准库头文件在最前面包含 */
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdarg.h>
+#include <string.h>
+#include <errno.h>
+
+/* 项目头文件 */
 #include "../include/retrieval.h"
 #include "../include/llm_client.h"
 #include "../include/layer1_raw.h"
 #include "agentos.h"
-#include <stdlib.h>
 
 /* Unified base library compatibility layer */
 #include "../../../commons/utils/memory/include/memory_compat.h"
 #include "../../../commons/utils/string/include/string_compat.h"
-#include <string.h>
-#include <errno.h>
 
 struct agentos_reranker {
     agentos_llm_service_t* llm;          /**< LLM服务，用于交叉编码器 */

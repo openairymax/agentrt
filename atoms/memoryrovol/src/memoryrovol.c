@@ -23,6 +23,7 @@
 #include "forgetting.h"
 #include "agentos.h"
 #include <stdlib.h>
+#include <time.h>  /* time()函数 */
 
 /* Unified base library compatibility layer */
 #include "../../../commons/utils/memory/include/memory_compat.h"
