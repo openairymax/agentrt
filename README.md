@@ -23,11 +23,13 @@
 
 <div align="center">
 
-<img src="tests/images/OpenAgent-logo.jpg" alt="OpenAgent Logo" style="border-radius: 16px; max-width: min(400px, 80vw); width: 100%; height: auto; margin: 24px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
+<img src="tests/images/OpenAgent-logo.jpg" alt="OpenAgent Logo" style="width: 100vw; margin-left: calc(-50vw + 50%); height: auto; max-height: 400px; object-fit: contain;" />
 
 </div>
 
-## 🎯 驱动智能体团队的操作系统  
+<div align="center">
+
+## 🎯 驱动智能体团队的操作系统
 
 *"From data intelligence emerges"*
 
