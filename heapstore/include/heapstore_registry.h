@@ -256,6 +256,19 @@ heapstore_error_t heapstore_registry_update_session(const heapstore_session_reco
 heapstore_error_t heapstore_registry_delete_session(const char* id);
 
 /**
+ * @brief 查询会话记录
+ *
+ * @param filter_status [in] 按状态过滤（NULL 表示不过滤）
+ * @param iter [out] 输出迭代器
+ * @return heapstore_error_t 错误码
+ *
+ * @ownership 调用者负责调用 heapstore_registry_iter_destroy 释放迭代器
+ * @threadsafe 是
+ * @reentrant 否
+ */
+heapstore_error_t heapstore_registry_query_sessions(const char* filter_status, heapstore_registry_iter_t** iter);
+
+/**
  * @brief 遍历下一条记录
  *
  * @param iter [in] 迭代器
