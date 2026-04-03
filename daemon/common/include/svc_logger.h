@@ -447,6 +447,32 @@ static inline void agentos_logger_log_with_trace(agentos_logger_t logger,
         } \
     } while (0)
 
+/* ==================== SVC_ 前缀日志宏（Daemon 服务层专用） ==================== */
+
+/**
+ * @brief SVC_ 前缀日志宏 - 与 LOG_* 完全等价
+ * @note Daemon 服务层统一使用 SVC_ 前缀，避免与其他模块命名冲突
+ *       这些宏直接映射到 commons 的 log_write() 函数
+ */
+
+/** SVC 跟踪级别日志（调试追踪） */
+#define SVC_LOG_TRACE(...)   LOG_DEBUG(__VA_ARGS__)
+
+/** SVC 调试级别日志 */
+#define SVC_LOG_DEBUG(...)   LOG_DEBUG(__VA_ARGS__)
+
+/** SVC 信息级别日志 */
+#define SVC_LOG_INFO(...)    LOG_INFO(__VA_ARGS__)
+
+/** SVC 警告级别日志 */
+#define SVC_LOG_WARN(...)    LOG_WARN(__VA_ARGS__)
+
+/** SVC 错误级别日志 */
+#define SVC_LOG_ERROR(...)   LOG_ERROR(__VA_ARGS__)
+
+/** SVC 致命错误级别日志 */
+#define SVC_LOG_FATAL(...)   LOG_FATAL(__VA_ARGS__)
+
 /* ==================== 日志级别字符串转换 ==================== */
 
 /**

@@ -17,7 +17,7 @@
  */
 
 #include "memoryrovol.h"
-#include "manager.h"
+#include "config.h"
 #include "agentos.h"
 #include "logger.h"
 #include "observability.h"

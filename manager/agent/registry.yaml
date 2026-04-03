@@ -17,6 +17,9 @@ _owner:
 # 配置版本
 _config_version: "1.1.0"
 
+# Schema 引用
+_schema: "schema/agent-registry.schema.json"
+
 # 注册表元数据
 _metadata:
   last_updated: "2026-04-02T00:00:00Z"

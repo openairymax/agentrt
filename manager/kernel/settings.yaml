@@ -16,6 +16,9 @@ _owner:
 # 配置版本
 _config_version: "1.0.0"
 
+# Schema 引用
+_schema: "schema/kernel-settings.schema.json"
+
 # 版本兼容性
 _compatibility:
   min_agentos_version: "1.0.0"

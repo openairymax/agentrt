@@ -1,4 +1,6 @@
 # src/CMakeLists.txt
+# MemoryRovol 模块源文件列表
+# 注意：部分高级功能文件（mount.c/rerank.c等）因依赖问题暂时排除
 add_library(agentos_memoryrovol STATIC
     forgetting/archive.c
     forgetting/decay.c
@@ -26,8 +28,8 @@ add_library(agentos_memoryrovol STATIC
     retrieval/attractor.c
     retrieval/cache.c
     retrieval/energy.c
-    retrieval/mount.c
-    retrieval/rerank.c
+    # retrieval/mount.c          # 暂时排除：agentos_token_counter_t类型未定义
+    # retrieval/rerank.c         # 暂时排除：类型定义冲突
     memory_optimizer.c
     memoryrovol.c
     monitoring.c

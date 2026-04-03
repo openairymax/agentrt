@@ -15,12 +15,12 @@
 #include "stdio_gateway.h"
 #include "../utils/jsonrpc.h"
 #include "../utils/syscall_router.h"
+#include "../utils/gateway_utils.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdatomic.h>
-#include <time.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -30,38 +30,12 @@
 #include <sys/select.h>
 #endif
 
-/* ========== 辅助函数 ========== */
+/* ========== 辅助函数（使用 gateway_utils.h 中的公共实现） ========== */
 
-/**
- * @brief 获取当前时间（纳秒）
- * @return 当前时间戳
+/*
+ * time_ns() 已迁移至 gateway_utils.h (gateway_time_ns)
+ * portable_sleep() 已迁移至 gateway_utils.h (gateway_sleep)
  */
-static uint64_t time_ns(void) {
-#ifdef _WIN32
-    FILETIME ft;
-    ULARGE_INTEGER uli;
-    GetSystemTimeAsFileTime(&ft);
-    uli.LowPart = ft.dwLowDateTime;
-    uli.HighPart = ft.dwHighDateTime;
-    return (uli.QuadPart - 116444736000000000ULL) * 100;
-#else
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
-#endif
-}
-
-/**
- * @brief 跨平台sleep函数
- * @param seconds 秒数
- */
-static void portable_sleep(unsigned int seconds) {
-#ifdef _WIN32
-    Sleep(seconds * 1000);
-#else
-    sleep(seconds);
-#endif
-}
 
 /* ========== Stdio网关内部结构 ========== */
 
@@ -139,7 +113,7 @@ static char* handle_jsonrpc(const char* json_str) {
     const cJSON* params = jsonrpc_get_params(request);
     const cJSON* id = jsonrpc_get_id(request);
     
-    char* response = handle_system_call(method, (cJSON*)params);
+    char* response = handle_system_call(method, (cJSON*)params, (cJSON*)id);
     
     if (id && response) {
         cJSON* parsed = cJSON_Parse(response);
@@ -291,6 +265,10 @@ static void stdio_gateway_stop(void* gateway_impl) {
 
 static void stdio_gateway_destroy(void* gateway_impl) {
     stdio_gateway_t* gateway = (stdio_gateway_t*)gateway_impl;
+    if (!gateway) return;
+
+    stdio_gateway_stop(gateway);
+
     free(gateway);
 }
 
@@ -307,8 +285,10 @@ static bool stdio_gateway_is_running(void* gateway_impl) {
 
 static agentos_error_t stdio_gateway_get_stats(void* gateway_impl, char** out_json) {
     stdio_gateway_t* gateway = (stdio_gateway_t*)gateway_impl;
-    
+    if (!gateway || !out_json) return AGENTOS_EINVAL;
+
     cJSON* stats = cJSON_CreateObject();
+    if (!stats) return AGENTOS_ENOMEM;
     cJSON_AddNumberToObject(stats, "commands_total", (double)atomic_load(&gateway->commands_total));
     cJSON_AddNumberToObject(stats, "commands_failed", (double)atomic_load(&gateway->commands_failed));
     cJSON_AddNumberToObject(stats, "bytes_received", (double)atomic_load(&gateway->bytes_received));

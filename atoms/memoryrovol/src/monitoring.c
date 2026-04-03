@@ -18,7 +18,7 @@
  */
 
 #include "memoryrovol.h"
-#include "manager.h"
+#include "config.h"
 #include "layer1_raw.h"
 #include "layer2_feature.h"
 #include "layer3_structure.h"
