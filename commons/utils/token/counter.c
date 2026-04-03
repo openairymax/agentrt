@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include "../../platform/include/platform.h"
 
 /* 统一基础库兼容层 */
 #include "../../memory/include/memory_compat.h"
@@ -26,7 +27,7 @@
  */
 struct agentos_token_counter {
     char model_name[MAX_MODEL_NAME];      /**< 模型名称 */
-    token_mutex_t mutex;                  /**< 互斥锁，保证线程安全 */
+    agentos_mutex_t mutex;                /**< 互斥锁，保证线程安全 */
     size_t total_count;                   /**< 历史累计Token数 */
     uint64_t request_count;               /**< 请求计数 */
     size_t max_token_length;             /**< 最大Token长度 */
@@ -34,13 +35,6 @@ struct agentos_token_counter {
 
 /**
  * @brief 简化的中文字符Token估算
- * 
- * 根据OpenAI的tiktoken规则，中文每个字符约1.3-2个Token
- * 这里使用简化模型：每个CJK字符按2个Token计算
- * 
- * @param text 文本
- * @param length 文本长度
- * @return 估算的Token数
  */
 static size_t estimate_cjk_tokens(const char* text, size_t length) {
     size_t count = 0;
@@ -150,7 +144,7 @@ agentos_token_counter_t* agentos_token_counter_create(const char* model_name) {
     strncpy(counter->model_name, model_name, MAX_MODEL_NAME - 1);
     counter->model_name[MAX_MODEL_NAME - 1] = '\0';
     
-    if (token_mutex_init(&counter->mutex) != 0) {
+    if (agentos_mutex_init(&counter->mutex) != 0) {
         AGENTOS_FREE(counter);
         return NULL;
     }
@@ -167,7 +161,7 @@ void agentos_token_counter_destroy(agentos_token_counter_t* counter) {
         return;
     }
     
-    token_mutex_destroy(&counter->mutex);
+    agentos_mutex_destroy(&counter->mutex);
     AGENTOS_FREE(counter);
 }
 
@@ -181,13 +175,13 @@ size_t agentos_token_counter_count(agentos_token_counter_t* counter, const char*
         return 0;
     }
     
-    token_mutex_lock(&counter->mutex);
+    agentos_mutex_lock(&counter->mutex);
     
     size_t token_count = count_tokens_by_model(counter->model_name, text, length);
     counter->total_count += token_count;
     counter->request_count++;
     
-    token_mutex_unlock(&counter->mutex);
+    agentos_mutex_unlock(&counter->mutex);
     
     return token_count;
 }
@@ -200,7 +194,7 @@ size_t agentos_token_counter_count_batch(agentos_token_counter_t* counter,
         return (size_t)-1;
     }
     
-    token_mutex_lock(&counter->mutex);
+    agentos_mutex_lock(&counter->mutex);
     
     size_t total = 0;
     for (size_t i = 0; i < count; i++) {
@@ -216,7 +210,7 @@ size_t agentos_token_counter_count_batch(agentos_token_counter_t* counter,
     counter->total_count += total;
     counter->request_count += count;
     
-    token_mutex_unlock(&counter->mutex);
+    agentos_mutex_unlock(&counter->mutex);
     
     return 0;
 }
@@ -234,12 +228,12 @@ char* agentos_token_counter_truncate(agentos_token_counter_t* counter,
         return AGENTOS_STRDUP("");
     }
     
-    token_mutex_lock(&counter->mutex);
+    agentos_mutex_lock(&counter->mutex);
     
     size_t current_tokens = count_tokens_by_model(counter->model_name, text, length);
     
     if (current_tokens <= max_tokens) {
-        token_mutex_unlock(&counter->mutex);
+        agentos_mutex_unlock(&counter->mutex);
         return AGENTOS_STRDUP(text);
     }
     
@@ -280,7 +274,7 @@ char* agentos_token_counter_truncate(agentos_token_counter_t* counter,
         }
     }
     
-    token_mutex_unlock(&counter->mutex);
+    agentos_mutex_unlock(&counter->mutex);
     
     return result;
 }

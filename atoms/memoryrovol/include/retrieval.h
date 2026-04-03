@@ -33,6 +33,14 @@ typedef struct agentos_retrieval_config {
     int enable_attractor;
 } agentos_retrieval_config_t;
 
+/* 前向声明：吸引子网络类型（定义在 retrieval/attractor.c） */
+struct agentos_attractor_network;
+typedef struct agentos_attractor_network agentos_attractor_network_t;
+
+/* 前向声明：检索缓存类型（定义在 retrieval/cache.c） */
+struct agentos_retrieval_cache;
+typedef struct agentos_retrieval_cache agentos_retrieval_cache_t;
+
 /**
  * @brief 执行检索
  */

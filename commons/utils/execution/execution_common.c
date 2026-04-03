@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file execution_common.c
  * @brief 执行单元通用功能实现
  * 
@@ -8,10 +8,10 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "include/execution_common.h"
-#include "../../../platform/platform.h"
-#include "../../../utils/memory/include/memory_common.h"
-#include "../../../utils/logging/include/logging_common.h"
+#include "execution_common.h"
+#include <platform.h>
+#include <memory_common.h>
+#include <logging_common.h>
 
 #include <stdio.h>
 #include <string.h>

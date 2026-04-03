@@ -4,9 +4,6 @@
 
 # Agent OS  
 
-
-
-
 </div>
 
 <div align="center">
