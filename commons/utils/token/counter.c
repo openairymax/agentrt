@@ -11,10 +11,8 @@
  */
 
 #include "token.h"
-#include "core.h"
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
 #include <ctype.h>
 
 /* 统一基础库兼容层 */

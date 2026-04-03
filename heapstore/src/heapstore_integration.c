@@ -331,8 +331,8 @@ agentos_error_t heapstore_syscall_trace_export(char** out_traces) {
         return AGENTOS_EINVAL;
     }
 
-    *out_traces = strdup("[]");
-    return *out_traces ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
+    heapstore_error_t err = heapstore_trace_export_to_json(out_traces, true);
+    return (err == heapstore_SUCCESS) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 }
 
 agentos_error_t heapstore_memoryrovol_save(
