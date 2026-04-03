@@ -2,13 +2,28 @@
 # commons 模块构建文件 - 统一基础库
 
 cmake_minimum_required(VERSION 3.20)
-project(agentos-commons VERSION 1.0.0.6 LANGUAGES C)
+project(agentos-commons VERSION 1.0.0.7 LANGUAGES C)
 
-find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
-pkg_check_modules(TIKTOKEN REQUIRED tiktoken)
-pkg_check_modules(YAML REQUIRED yaml-0.1)
-pkg_check_modules(CJSON REQUIRED libcjson)
+
+# 可选依赖：pkg-config 支持的库（Windows 上可能不可用）
+find_package(PkgConfig QUIET)
+if(PkgConfig_FOUND)
+    pkg_check_modules(TIKTOKEN QUIET tiktoken)
+    pkg_check_modules(YAML QUIET yaml-0.1)
+    pkg_check_modules(CJSON QUIET libcjson)
+endif()
+
+# 如果 pkg-config 未找到，尝试标准 find_package
+if(NOT TIKTOKEN_FOUND)
+    find_package(tiktoken QUIET)
+endif()
+if(NOT YAML_FOUND)
+    find_package(YAML QUIET)
+endif()
+if(NOT CJSON_FOUND)
+    find_package(cJSON QUIET)
+endif()
 
 set(SOURCES
     platform/platform.c
@@ -81,17 +96,25 @@ target_include_directories(agentos_common PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/network/include
     # 进程间通信模块
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/ipc/include
-    ${TIKTOKEN_INCLUDE_DIRS}
-    ${YAML_INCLUDE_DIRS}
-    ${CJSON_INCLUDE_DIRS}
 )
 
 target_link_libraries(agentos_common
-    ${TIKTOKEN_LIBRARIES}
-    ${YAML_LIBRARIES}
-    ${CJSON_LIBRARIES}
     Threads::Threads
 )
+
+# 链接可选依赖（如果找到）
+if(TIKTOKEN_FOUND)
+    target_link_libraries(agentos_common PRIVATE ${TIKTOKEN_LIBRARIES})
+    target_include_directories(agentos_common PRIVATE ${TIKTOKEN_INCLUDE_DIRS})
+endif()
+if(YAML_FOUND)
+    target_link_libraries(agentos_common PRIVATE ${YAML_LIBRARIES})
+    target_include_directories(agentos_common PRIVATE ${YAML_INCLUDE_DIRS})
+endif()
+if(CJSON_FOUND)
+    target_link_libraries(agentos_common PRIVATE ${CJSON_LIBRARIES})
+    target_include_directories(agentos_common PRIVATE ${CJSON_INCLUDE_DIRS})
+endif()
 
 install(TARGETS agentos_common DESTINATION lib)
 install(DIRECTORY platform/include/ DESTINATION include/agentos/platform)

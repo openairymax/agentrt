@@ -1,0 +1,35 @@
+# AgentOS macOS 依赖清单
+# 使用 Homebrew 安装
+# 格式: package_name@version 或仅包名
+
+# ===== 构建工具链 =====
+cmake
+gcc
+pkg-config
+git
+wget
+curl
+
+# ===== 核心依赖 (Tier 2: REQUIRED) =====
+curl
+openssl@3
+yaml-cpp
+cjson
+
+# ===== Gateway 模块依赖 (Tier 3) =====
+libmicrohttpd
+libwebsockets
+
+# ===== 可选依赖 (Tier 4) =====
+sqlite
+libevent
+
+# ===== 测试与分析工具 (CI Only) =====
+valgrind
+gcovr
+cppcheck
+clang-format
+
+# ===== Python 工具链 =====
+python@3.11
+pipx

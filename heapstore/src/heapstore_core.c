@@ -13,6 +13,9 @@
 #include "private.h"
 #include "heapstore_log.h"
 #include "heapstore_trace.h"
+#include "heapstore_registry.h"
+#include "heapstore_ipc.h"
+#include "heapstore_memory.h"
 #include "utils.h"
 
 #include <stdio.h>

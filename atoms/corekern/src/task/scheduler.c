@@ -375,8 +375,8 @@ void agentos_task_sleep(uint32_t ms)
     const scheduler_platform_ops_t* ops = scheduler_platform_get_ops();
     if (!ops || !ops->thread_sleep) {
         /* 如果没有平台适配器，使用简单循环等待（仅用于紧急情况） */
-        volatile int i;
-        for (i = 0; i < 1000 * ms; i++);
+        volatile uint32_t i;
+        for (i = 0; i < (uint32_t)(1000 * ms); i++);
         return;
     }
 

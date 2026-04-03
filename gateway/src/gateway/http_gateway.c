@@ -15,6 +15,7 @@
 #include "http_gateway.h"
 #include "../utils/jsonrpc.h"
 #include "../utils/syscall_router.h"
+#include "../utils/gateway_utils.h"
 
 #include <microhttpd.h>
 #include <cJSON.h>
@@ -68,26 +69,12 @@ typedef struct http_gateway {
     size_t max_request_size;         /**< 最大请求大小 */
 } http_gateway_t;
 
-/* ========== 辅助函数 ========== */
+/* ========== 辅助函数（使用 gateway_utils.h 中的公共实现） ========== */
 
-/**
- * @brief 获取当前时间（纳秒）
- * @return 当前时间戳
+/*
+ * time_ns() 已迁移至 gateway_utils.h (gateway_time_ns)
+ * 本文件统一使用 gateway_time_ns()
  */
-static uint64_t time_ns(void) {
-#ifdef _WIN32
-    FILETIME ft;
-    ULARGE_INTEGER uli;
-    GetSystemTimeAsFileTime(&ft);
-    uli.LowPart = ft.dwLowDateTime;
-    uli.HighPart = ft.dwHighDateTime;
-    return (uli.QuadPart - 116444736000000000ULL) * 100;
-#else
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
-#endif
-}
 
 /* ========== 系统调用路由 ========== */
 
@@ -212,7 +199,7 @@ static int handle_http_request(void* cls, struct MHD_Connection* connection,
         }
         context->method = method;
         context->url = url;
-        context->start_time_ns = time_ns();
+        context->start_time_ns = gateway_time_ns();
         *con_cls = context;
         
         MHD_get_connection_values(connection, MHD_HEADER_KIND, parse_headers, context);
@@ -266,7 +253,7 @@ static int handle_http_request(void* cls, struct MHD_Connection* connection,
         char* json_response = handle_jsonrpc_request(gateway, context);
         struct MHD_Response* response = create_http_response(200, json_response, strlen(json_response));
         
-        uint64_t response_time_ns = time_ns() - context->start_time_ns;
+        uint64_t response_time_ns = gateway_time_ns() - context->start_time_ns;
         atomic_fetch_add(&gateway->requests_total, 1);
         atomic_fetch_add(&gateway->bytes_received, context->upload_data_size);
         atomic_fetch_add(&gateway->bytes_sent, strlen(json_response));
@@ -409,6 +396,17 @@ static agentos_error_t http_gateway_get_stats(void* gateway_impl, char** out_jso
     
     *out_json = json_str;
     return AGENTOS_SUCCESS;
+}
+
+/**
+ * @brief 检查 HTTP 网关是否运行中
+ * @param gateway_impl 网关实现指针
+ * @return true 运行中，false 已停止或无效
+ */
+static bool http_gateway_is_running(void* gateway_impl) {
+    http_gateway_t* gateway = (http_gateway_t*)gateway_impl;
+    if (!gateway) return false;
+    return atomic_load(&gateway->running);
 }
 
 /**

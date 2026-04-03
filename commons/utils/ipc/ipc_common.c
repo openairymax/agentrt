@@ -26,7 +26,7 @@
  * @see ARCHITECTURAL_PRINCIPLES.md E-4/E-5/E-6/E-8 原则
  */
 
-#include "include/ipc_common.h"
+#include "ipc_common.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,6 +37,8 @@
 #else
     #include <unistd.h>
     #include <sys/time.h>
+    #include <fcntl.h>
+    #include <errno.h>
 #endif
 
 /* ============================================================================

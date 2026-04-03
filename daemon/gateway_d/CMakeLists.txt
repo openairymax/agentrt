@@ -55,6 +55,7 @@ endif()
 # 包含目录 - 兼容层和 commons
 target_include_directories(gateway_d PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${DAEMON_COMMON_INCLUDE_DIR}
     ${COMMONS_INCLUDE_DIR}
     ${COMMONS_INCLUDE_DIR}/platform/include
@@ -64,6 +65,11 @@ target_include_directories(gateway_d PRIVATE
     ${COMMONS_INCLUDE_DIR}/utils/memory/include
     ${COMMONS_INCLUDE_DIR}/utils/string/include
     ${COMMONS_INCLUDE_DIR}/utils/sync/include
+    ${COMMONS_INCLUDE_DIR}/utils/cache/include
+    ${COMMONS_INCLUDE_DIR}/utils/compat/include
+    # 网络和IPC模块
+    ${COMMONS_INCLUDE_DIR}/utils/network/include
+    ${COMMONS_INCLUDE_DIR}/utils/ipc/include
     ${CJSON_INCLUDE_DIRS}
 )
 

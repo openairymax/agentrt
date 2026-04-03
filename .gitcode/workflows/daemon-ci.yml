@@ -26,10 +26,17 @@ jobs:
 
     - name: Install dependencies / 安装依赖
       run: |
-        if [ "$RUNNER_OS" == "Linux" ]; then
-          sudo apt-get update && sudo apt-get install -y cmake libcurl4-openssl-dev libcjson-dev libyaml-cpp-dev
-        elif [ "$RUNNER_OS" == "macOS" ]; then
-          brew install cmake curl cjson yaml-cpp
+        # 使用统一的依赖安装脚本（从 scripts/ci/ 目录）
+        if [ -f "scripts/ci/install-deps.sh" ]; then
+          chmod +x scripts/ci/install-deps.sh
+          ./scripts/ci/install-deps.sh
+        else
+          echo "Fallback to direct package installation"
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            sudo apt-get update && sudo apt-get install -y cmake libcurl4-openssl-dev libcjson-dev libyaml-cpp-dev
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            brew install cmake curl cjson yaml-cpp
+          fi
         fi
       shell: bash
 
