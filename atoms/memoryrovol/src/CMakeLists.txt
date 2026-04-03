@@ -55,7 +55,7 @@ target_link_libraries(agentos_memoryrovol
     ${CJSON_LIBRARIES}
     ${YAML_LIBRARIES}
     ${SQLITE3_LIBRARIES}
-    Threads::Threads
+    $<$<NOT:$<BOOL:${WIN32}>>:Threads::Threads>
     $<$<BOOL:${OpenSSL_FOUND}>:OpenSSL::SSL>
     $<$<BOOL:${OpenSSL_FOUND}>:OpenSSL::Crypto>
 )
