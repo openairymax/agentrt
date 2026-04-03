@@ -37,8 +37,8 @@
 #ifndef AGENTOS_IPC_COMMON_H
 #define AGENTOS_IPC_COMMON_H
 
-#include "../../../utils/error/include/error.h"
-#include "../../../utils/types/include/types.h"
+#include <error.h>
+#include <types.h>
 
 #ifdef __cplusplus
 extern "C" {

@@ -21,8 +21,8 @@
  * 6. 可观测性类型：指标、追踪、日志
  * 
  * @author AgentOS Team
- * @date 2026-04-01
- * @version 1.0
+ * @date 2026-04-03
+ * @version 1.0.0.7
  * 
  * @note 线程安全：本文件定义的类型均为值类型或不可变类型，线程安全
  * @see ARCHITECTURAL_PRINCIPLES.md K-2 接口契约化原则
@@ -80,6 +80,7 @@ typedef int32_t agentos_error_t;
 #define AGENTOS_EPROTO         (-13)   /**< 协议错误 */
 #define AGENTOS_ENOTCONN       (-14)   /**< 未连接 */
 #define AGENTOS_ECONNRESET     (-15)   /**< 连接重置 */
+#define AGENTOS_EUNKNOWN       (-99)   /**< 未知错误 */
 
 /**
  * @brief 时间戳类型（纳秒）

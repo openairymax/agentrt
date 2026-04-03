@@ -1,13 +1,23 @@
 # =============================================================================
 # AgentOS 日志配置文件
 # 版本: v1.0.0
-# 最后更新: 2026-03-23
+# 最后更新: 2026-04-02
 # Schema: schema/logging.schema.json
 # =============================================================================
 # Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
 
+# 配置归属（按双重责任模型）
+_owner:
+  module: "commons"
+  contact: "commons-team@spharx.cn"
+  path: "AgentOS/commons"
+  description: "内容定义责任归属 commons 模块，管理责任归属 Manager 模块"
+
 # 配置版本
 _config_version: "1.0.0"
+
+# Schema 引用
+_schema: "schema/logging.schema.json"
 
 # =============================================================================
 # 日志配置

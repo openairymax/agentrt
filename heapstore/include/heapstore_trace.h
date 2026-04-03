@@ -195,6 +195,19 @@ heapstore_error_t heapstore_trace_cleanup(int days_to_keep, uint64_t* freed_byte
  */
 bool heapstore_trace_is_healthy(void);
 
+/**
+ * @brief 将所有追踪数据导出为 JSON 字符串
+ *
+ * @param out_json [out] 输出的 JSON 字符串（需调用者释放）
+ * @param include_events [in] 是否包含事件信息（预留参数）
+ * @return heapstore_error_t 错误码
+ *
+ * @ownership 调用者负责调用 free() 释放 out_json
+ * @threadsafe 是
+ * @reentrant 否
+ */
+heapstore_error_t heapstore_trace_export_to_json(char** out_json, bool include_events);
+
 #ifdef __cplusplus
 }
 #endif

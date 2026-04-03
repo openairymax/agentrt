@@ -480,3 +480,200 @@ int daemon_security_get_status(int* sanitizer_status, int* permission_status,
 
     return 0;
 }
+
+/* ==================== Cupolas 不可用时的存根实现 ==================== */
+
+#else /* CUPOLAS_AVAILABLE == 0 */
+
+/**
+ * @brief 存根模式: 安全初始化（无 cupolas 时返回成功，功能降级）
+ */
+int daemon_security_init(const daemon_security_config_t* config, agentos_error_t* error) {
+    (void)config;
+    (void)error;
+
+    SVC_LOG_WARN("Daemon security: running in STUB mode (cupolas not available)");
+    SVC_LOG_WARN("Security features (sanitization/permission/signature/vault) are DISABLED");
+    return 0;
+}
+
+/**
+ * @brief 存根模式: 安全关闭
+ */
+void daemon_security_shutdown(void) {
+    SVC_LOG_INFO("Daemon security stub shutdown");
+}
+
+/**
+ * @brief 存根模式: LLM 输入净化（仅做基本长度检查）
+ */
+int daemon_sanitize_llm_input(const char* input, char* output, size_t output_size) {
+    if (!input || !output || output_size == 0) {
+        return AGENTOS_ERR_INVALID_PARAM;
+    }
+
+    /* 基本复制: 无 cupolas 时仅做截断保护 */
+    size_t len = strlen(input);
+    if (len >= output_size) {
+        len = output_size - 1;
+        SVC_LOG_WARN("LLM input truncated in stub mode (no sanitizer available)");
+    }
+    memcpy(output, input, len);
+    output[len] = '\0';
+    return 0;
+}
+
+/**
+ * @brief 存根模式: 工具参数净化
+ */
+int daemon_sanitize_tool_params(const char* tool_name, const char* params,
+                                  char* sanitized_tool, size_t tool_buf_size,
+                                  char* sanitized_params, size_t param_buf_size) {
+    if (!tool_name || !params || !sanitized_tool || !sanitized_params) {
+        return AGENTOS_ERR_INVALID_PARAM;
+    }
+
+    /* 基本截断复制 */
+    size_t tlen = strlen(tool_name);
+    size_t plen = strlen(params);
+
+    if (tlen >= tool_buf_size) tlen = tool_buf_size - 1;
+    if (plen >= param_buf_size) plen = param_buf_size - 1;
+
+    memcpy(sanitized_tool, tool_name, tlen);
+    sanitized_tool[tlen] = '\0';
+
+    memcpy(sanitized_params, params, plen);
+    sanitized_params[plen] = '\0';
+
+    SVC_LOG_WARN("Tool params sanitized in STUB mode (no cupolas sanitizer)");
+    return 0;
+}
+
+/**
+ * @brief 存根模式: 工具权限检查（默认允许，记录警告）
+ */
+int daemon_check_tool_permission(const char* agent_id, const char* tool_name,
+                                 const char* action) {
+    (void)agent_id;
+    (void)tool_name;
+    (void)action;
+
+    SVC_LOG_WARN("[STUB] Tool permission check BYPASSED: tool=%s (no cupolas)", 
+                tool_name ? tool_name : "unknown");
+    return 1;  /* 默认允许 */
+}
+
+/**
+ * @brief 存根模式: LLM 权限检查
+ */
+int daemon_check_llm_permission(const char* agent_id, const char* model_name,
+                                 const char* action) {
+    (void)agent_id;
+    (void)model_name;
+    (void)action;
+
+    SVC_LOG_WARN("[STUB] LLM permission check BYPASSED: model=%s (no cupolas)",
+                model_name ? model_name : "unknown");
+    return 1;  /* 默认允许 */
+}
+
+/**
+ * @brief 存根模式: 包签名验证
+ */
+int daemon_verify_package_signature(const char* package_path, bool* is_valid,
+                                     cupolas_signer_info_t* signer_info) {
+    (void)signer_info;
+
+    if (!package_path || !is_valid) {
+        return AGENTOS_ERR_INVALID_PARAM;
+    }
+
+#ifdef DEBUG
+    *is_valid = true;  /* 调试模式允许未签名包 */
+#else
+    *is_valid = false; /* 生产环境拒绝未签名包 */
+#endif
+
+    SVC_LOG_WARN("[STUB] Package signature verification SKIPPED: %s (no cupolas)", package_path);
+    return 0;
+}
+
+/**
+ * @brief 存根模式: 凭据存储
+ */
+int daemon_store_credential(const char* cred_id, cupolas_vault_cred_type_t cred_type,
+                           const uint8_t* data, size_t data_len,
+                           const char* agent_id) {
+    (void)cred_id;
+    (void)cred_type;
+    (void)data;
+    (void)data_len;
+    (void)agent_id;
+
+    SVC_LOG_ERROR("[STUB] Credential storage FAILED: no vault available (id=%s)", 
+                 cred_id ? cred_id : "unknown");
+    return AGENTOS_ERR_NOT_SUPPORTED;
+}
+
+/**
+ * @brief 存根模式: 凭据检索
+ */
+int daemon_retrieve_credential(const char* cred_id, const char* agent_id,
+                                uint8_t* data, size_t* data_len) {
+    (void)cred_id;
+    (void)agent_id;
+    (void)data;
+    (void)data_len;
+
+    SVC_LOG_ERROR("[STUB] Credential retrieval FAILED: no vault available (id=%s)",
+                 cred_id ? cred_id : "unknown");
+    return AGENTOS_ERR_NOT_SUPPORTED;
+}
+
+/**
+ * @brief 存根模式: 审计日志
+ */
+int daemon_audit_log_event(const char* service_name, const char* operation,
+                             const char* resource, int result,
+                             const char* agent_id) {
+    if (!service_name || !operation) {
+        return AGENTOS_ERR_INVALID_PARAM;
+    }
+
+    /* 降级到标准日志输出 */
+    if (result == 0) {
+        SVC_LOG_INFO("[AUDIT-STUB] [%s] %s on %s by %s - SUCCESS",
+                    service_name, operation,
+                    resource ? resource : "N/A",
+                    agent_id ? agent_id : "system");
+    } else {
+        SVC_LOG_WARN("[AUDIT-STUB] [%s] %s on %s by %s - FAILED (code=%d)",
+                     service_name, operation,
+                     resource ? resource : "N/A",
+                     agent_id ? agent_id : "system", result);
+    }
+    return 0;
+}
+
+/**
+ * @brief 存根模式: 状态查询
+ */
+int daemon_security_get_status(int* sanitizer_status, int* permission_status,
+                               int* signature_status, int* vault_status,
+                               int* audit_status) {
+    if (!sanitizer_status || !permission_status || !signature_status ||
+        !vault_status || !audit_status) {
+        return AGENTOS_ERR_INVALID_PARAM;
+    }
+
+    *sanitizer_status = 0;   /* 存根模式下不可用 */
+    *permission_status = 0;
+    *signature_status = 0;
+    *vault_status = 0;
+    *audit_status = 1;       /* 审计降级到日志，始终可用 */
+
+    return 0;
+}
+
+#endif /* CUPOLAS_AVAILABLE */

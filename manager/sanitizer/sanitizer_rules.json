@@ -7,6 +7,7 @@
     "path": "AgentOS/cupolas/sanitizer",
     "description": "内容定义责任归属 cupolas 模块，管理责任归属 Manager 模块"
   },
+  "_schema": "schema/sanitizer-rules.schema.json",
   "_metadata": {
     "last_updated": "2026-04-02T00:00:00Z",
     "source": "OWASP_TOP_10 + Custom",

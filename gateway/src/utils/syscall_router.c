@@ -331,6 +331,102 @@ static char* route_telemetry_methods(const char* method, cJSON* params, cJSON* r
     return jsonrpc_create_success_response(request_id, result);
 }
 
+/**
+ * @brief 路由 Agent 管理相关系统调用
+ */
+static char* route_agent_methods(const char* method, cJSON* params, cJSON* request_id) {
+    cJSON* result = NULL;
+    agentos_error_t err = AGENTOS_SUCCESS;
+
+    if (strcmp(method, "agentos_sys_agent_spawn") == 0) {
+        cJSON* spec = cJSON_GetObjectItem(params, "agent_spec");
+
+        if (!spec || !cJSON_IsString(spec)) {
+            return jsonrpc_create_error_response(request_id, -32602,
+                "Invalid params: agent_spec required", NULL);
+        }
+
+        char* out_agent_id = NULL;
+        const char* spec_str = cJSON_PrintUnformatted(spec);
+        err = agentos_sys_agent_spawn(spec_str, &out_agent_id);
+
+        if (spec_str) free((void*)spec_str);
+
+        if (err == AGENTOS_SUCCESS && out_agent_id) {
+            result = cJSON_CreateObject();
+            cJSON_AddStringToObject(result, "agent_id", out_agent_id);
+            free(out_agent_id);
+        }
+    }
+    else if (strcmp(method, "agentos_sys_agent_terminate") == 0) {
+        cJSON* agent_id = cJSON_GetObjectItem(params, "agent_id");
+
+        if (!agent_id || !cJSON_IsString(agent_id)) {
+            return jsonrpc_create_error_response(request_id, -32602,
+                "Invalid params: agent_id required", NULL);
+        }
+
+        err = agentos_sys_agent_terminate(agent_id->valuestring);
+        if (err == AGENTOS_SUCCESS) {
+            result = cJSON_CreateObject();
+            cJSON_AddBoolToObject(result, "terminated", true);
+        }
+    }
+    else if (strcmp(method, "agentos_sys_agent_invoke") == 0) {
+        cJSON* agent_id = cJSON_GetObjectItem(params, "agent_id");
+        cJSON* input = cJSON_GetObjectItem(params, "input");
+
+        if (!agent_id || !cJSON_IsString(agent_id)) {
+            return jsonrpc_create_error_response(request_id, -32602,
+                "Invalid params: agent_id required", NULL);
+        }
+
+        const char* input_str = input && cJSON_IsString(input)
+            ? input->valuestring : "";
+        char* out_output = NULL;
+
+        err = agentos_sys_agent_invoke(
+            agent_id->valuestring,
+            input_str,
+            strlen(input_str),
+            &out_output);
+
+        if (err == AGENTOS_SUCCESS && out_output) {
+            result = cJSON_CreateObject();
+            cJSON_AddStringToObject(result, "output", out_output);
+            free(out_output);
+        }
+    }
+    else if (strcmp(method, "agentos_sys_agent_list") == 0) {
+        char** agent_ids = NULL;
+        size_t count = 0;
+
+        err = agentos_sys_agent_list(&agent_ids, &count);
+
+        if (err == AGENTOS_SUCCESS) {
+            result = cJSON_CreateObject();
+            cJSON* ids = cJSON_CreateArray();
+            for (size_t i = 0; i < count; i++) {
+                cJSON_AddItemToArray(ids, cJSON_CreateString(agent_ids[i]));
+                free(agent_ids[i]);
+            }
+            cJSON_AddItemToObject(result, "agent_ids", ids);
+            cJSON_AddNumberToObject(result, "total", count);
+            free(agent_ids);
+        }
+    }
+
+    /* 处理错误 */
+    if (err != AGENTOS_SUCCESS) {
+        cJSON_Delete(result);
+        char err_msg[64];
+        snprintf(err_msg, sizeof(err_msg), "System call failed: %d", err);
+        return jsonrpc_create_error_response(request_id, -32000, err_msg, NULL);
+    }
+
+    return jsonrpc_create_success_response(request_id, result);
+}
+
 /* ========== 公共接口 ========== */
 
 /**
@@ -353,6 +449,9 @@ char* gateway_syscall_route(const char* method, cJSON* params, cJSON* request_id
     }
     else if (strncmp(method, "agentos_sys_telemetry_", 22) == 0) {
         return route_telemetry_methods(method, params, request_id);
+    }
+    else if (strncmp(method, "agentos_sys_agent_", 18) == 0) {
+        return route_agent_methods(method, params, request_id);
     }
     
     /* 方法未找到 */

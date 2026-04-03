@@ -12,6 +12,10 @@ set(UNIT_TEST_SOURCES
     unit/test_config.c
     unit/test_token.c
     unit/test_cost.c
+    # 新增模块单元测试
+    unit/test_types.c
+    unit/test_ipc.c
+    unit/test_network.c
 )
 
 set(INTEGRATION_TEST_SOURCES

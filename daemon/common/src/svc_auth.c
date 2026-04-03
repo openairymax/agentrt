@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <cjson/cJSON.h>
 
 /* ==================== 内部常量 ==================== */
 
@@ -40,6 +41,8 @@
 static struct {
     jwt_config_t config;
     int initialized;
+    char subject_buf[MAX_SUBJECT_SIZE];  /**< JWT 验证结果字符串缓冲 */
+    char role_buf[MAX_ROLE_SIZE];        /**< JWT 验证角色缓冲 */
 } g_jwt = { .initialized = 0 };
 
 /* ==================== API Key 内部状态 ==================== */
@@ -108,8 +111,8 @@ static int base64_encode(const uint8_t* data, size_t len,
         }
     }
 
-    /* 填充 */
-    while (j % 3 != 0 && j + 1 < *out_len) {
+    /* 填充 - Base64 编码输出长度必须是4的倍数 */
+    while (j % 4 != 0 && j + 1 < *out_len) {
         output[j++] = '=';
     }
     output[j] = '\0';
@@ -121,16 +124,32 @@ static int base64_encode(const uint8_t* data, size_t len,
 /* ==================== HMAC-SHA256 简化实现 ==================== */
 
 /**
- * @brief 简化的 HMAC 计算（生产环境应使用 OpenSSL）
- * @note 这是一个简化实现，用于演示。生产环境应使用成熟的加密库。
+ * @brief 简化的 HMAC 计算（仅用于开发/测试环境）
+ * @warning ⚠️ 安全警告: 此函数不是真正的 HMAC-SHA256 实现！
+ *          生产环境必须链接 OpenSSL 或 mbedTLS 等成熟加密库。
+ *          当前实现使用简单的 XOR+位移模拟，不提供任何密码学安全性。
+ *
+ * 编译期安全检查:
+ * - DEBUG 模式下允许编译（开发/测试）
+ * - RELEASE/NDEBUG 模式下如果未定义 AUTH_ALLOW_INSECURE_HMAC 则编译失败
  */
+#if defined(NDEBUG) && !defined(AUTH_ALLOW_INSECURE_HMAC)
+    #error "SECURITY: simple_hmac is not cryptographically secure! " \
+           "Define AUTH_ALLOW_INSECURE_HMAC to acknowledge this risk, " \
+           "or link against a proper crypto library (OpenSSL/mbedTLS)."
+#endif
+
 static void simple_hmac(const char* key, const char* message,
                         uint8_t* output, size_t* out_len) {
-    /* 简化哈希：实际应使用 HMAC-SHA256 */
+    /*
+     * 开发环境简化哈希实现。
+     * 注意：此函数输出是确定性的但不具备密码学安全性，
+     * 仅用于单元测试和本地开发验证 JWT 流程。
+     */
     (void)key;
     (void)message;
 
-    /* 使用简单的 XOR 和位移模拟 */
+    /* 使用简单的 XOR 和位移模拟（非安全哈希） */
     size_t key_len = strlen(key);
     size_t msg_len = strlen(message);
 
@@ -259,13 +278,21 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
         return AUTH_TOKEN_INVALID;
     }
 
-    /* 提取字段 */
+    /* 提取字段 - 必须在 cJSON_Delete 前复制字符串 */
     cJSON* sub = cJSON_GetObjectItem(payload, "sub");
     cJSON* role = cJSON_GetObjectItem(payload, "role");
     cJSON* exp = cJSON_GetObjectItem(payload, "exp");
 
-    if (cJSON_IsString(sub)) result->subject = sub->valuestring;
-    if (cJSON_IsString(role)) result->role = role->valuestring;
+    if (cJSON_IsString(sub)) {
+        strncpy(g_jwt.subject_buf, sub->valuestring, MAX_SUBJECT_SIZE - 1);
+        g_jwt.subject_buf[MAX_SUBJECT_SIZE - 1] = '\0';
+        result->subject = g_jwt.subject_buf;
+    }
+    if (cJSON_IsString(role)) {
+        strncpy(g_jwt.role_buf, role->valuestring, MAX_ROLE_SIZE - 1);
+        g_jwt.role_buf[MAX_ROLE_SIZE - 1] = '\0';
+        result->role = g_jwt.role_buf;
+    }
 
     /* 检查过期时间 */
     if (cJSON_IsNumber(exp)) {
@@ -423,10 +450,11 @@ int auth_apikey_remove(const char* key) {
             free(g_apikey.keys[i]);
             g_apikey.keys[i] = NULL;
 
-            /* 移动数组元素 */
+            /* 压缩数组: 将后续元素前移，消除空洞 */
             for (size_t j = i; j < g_apikey.config.key_count - 1; j++) {
                 g_apikey.keys[j] = g_apikey.keys[j + 1];
             }
+            g_apikey.keys[g_apikey.config.key_count - 1] = NULL;
             g_apikey.config.key_count--;
 
             agentos_mutex_unlock(&g_apikey.lock);
@@ -520,10 +548,27 @@ int auth_ratelimit_check(const char* client_id) {
         entry->active = true;
     }
 
+    /* LRU 驱逐策略: 当所有槽位占用时，驱逐最久未使用的条目 */
     if (!entry) {
-        agentos_mutex_unlock(&g_ratelimit.lock);
-        SVC_LOG_WARN("Rate limit: too many clients, rejecting %s", client_id);
-        return AUTH_RATE_LIMIT_EXCEEDED;
+        time_t oldest_time = now;
+        size_t oldest_idx = 0;
+
+        for (size_t i = 0; i < g_ratelimit.config.max_clients; i++) {
+            if (g_ratelimit.entries[i].active &&
+                g_ratelimit.entries[i].last_update < oldest_time) {
+                oldest_time = g_ratelimit.entries[i].last_update;
+                oldest_idx = i;
+            }
+        }
+
+        /* 复用最老条目 */
+        entry = &g_ratelimit.entries[oldest_idx];
+        SVC_LOG_DEBUG("Rate limit: evicting stale client: %s", entry->client_id);
+        strncpy(entry->client_id, client_id, sizeof(entry->client_id) - 1);
+        entry->max_tokens = (double)g_ratelimit.config.burst_size;
+        entry->tokens = entry->max_tokens;  /* 重置令牌，不继承旧值 */
+        entry->refill_rate = (double)g_ratelimit.config.requests_per_sec;
+        entry->last_update = now;
     }
 
     /* 补充令牌 */

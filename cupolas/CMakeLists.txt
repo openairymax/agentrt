@@ -69,6 +69,7 @@ else()
 endif()
 
 set(CUPOLAS_SOURCES
+    src/cupolas.c
     src/platform/platform.c
     src/cupolas_metrics.c
     src/cupolas_config.c
@@ -220,8 +221,6 @@ if(BUILD_TESTS)
     add_test(NAME cupolas_core_tests COMMAND test_cupolas_core)
     add_test(NAME cupolas_integration_tests COMMAND test_cupolas_integration)
 endif()
-
-configure_file(config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h @ONLY)
 
 install(TARGETS ${PROJECT_NAME}
     EXPORT cupolas-targets

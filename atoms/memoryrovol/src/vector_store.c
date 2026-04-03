@@ -20,7 +20,11 @@
 #include <stdio.h>
 
 /* SQLite 集成 */
+#ifdef AGENTOS_HAS_SQLITE3
 #include <sqlite3.h>
+#else
+#include "../include/sqlite3_stub.h"
+#endif /* AGENTOS_HAS_SQLITE3 */
 
 /**
  * @brief 向量存储内部结构
