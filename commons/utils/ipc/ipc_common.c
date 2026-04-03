@@ -597,7 +597,7 @@ agentos_error_t ipc_send_data(
 
 agentos_error_t ipc_send_request(
     ipc_channel_t* channel,
-    const ipc_message_t* request,
+    ipc_message_t* request,
     ipc_message_t* response,
     uint32_t timeout_ms
 ) {

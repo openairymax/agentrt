@@ -1,5 +1,8 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
 # MemoryRovol 模块顶层构建文件
+# 
+# 注意：本文件中的宏定义与顶层 atoms/CMakeLists.txt 保持一致，
+#       统一使用 AGENTOS_HAS_* 前缀
 
 cmake_minimum_required(VERSION 3.20)
 project(agentos-memoryrovol VERSION 1.0.0.5 LANGUAGES C)
@@ -14,12 +17,12 @@ find_package(PkgConfig QUIET)
 find_package(OpenSSL QUIET)
 find_package(Threads REQUIRED)
 
-# 查找 FAISS
+# 查找 FAISS（与顶层 CMakeLists.txt 保持一致的宏命名）
 if(PkgConfig_FOUND)
     pkg_check_modules(FAISS QUIET faiss)
     if(FAISS_FOUND)
         message(STATUS "FAISS found: ${FAISS_VERSION}")
-        add_definitions(-DHAVE_FAISS)
+        add_definitions(-DAGENTOS_HAS_FAISS=1)
     else()
         message(WARNING "FAISS not found, some vector search features may be limited")
     endif()
@@ -27,12 +30,12 @@ else()
     message(WARNING "PkgConfig not found, cannot check for FAISS")
 endif()
 
-# 查找 libcurl
+# 查找 libcurl（与顶层 CMakeLists.txt 保持一致的宏命名）
 if(PkgConfig_FOUND)
     pkg_check_modules(LIBCURL QUIET libcurl)
     if(LIBCURL_FOUND)
         message(STATUS "libcurl found: ${LIBCURL_VERSION}")
-        add_definitions(-DHAVE_LIBCURL)
+        add_definitions(-DAGENTOS_HAS_CURL=1)
     else()
         message(WARNING "libcurl not found, network features may be limited")
     endif()
@@ -40,12 +43,12 @@ else()
     message(WARNING "PkgConfig not found, cannot check for libcurl")
 endif()
 
-# 查找 cJSON
+# 查找 cJSON（与顶层 CMakeLists.txt 保持一致的宏命名）
 if(PkgConfig_FOUND)
     pkg_check_modules(CJSON QUIET libcjson)
     if(CJSON_FOUND)
         message(STATUS "cJSON found: ${CJSON_VERSION}")
-        add_definitions(-DHAVE_CJSON)
+        add_definitions(-DAGENTOS_HAS_CJSON=1)
     else()
         message(WARNING "cJSON not found, JSON features may be limited")
     endif()
@@ -53,12 +56,12 @@ else()
     message(WARNING "PkgConfig not found, cannot check for cJSON")
 endif()
 
-# 查找 libyaml
+# 查找 libyaml（与顶层 CMakeLists.txt 保持一致的宏命名）
 if(PkgConfig_FOUND)
     pkg_check_modules(YAML QUIET yaml-0.1)
     if(YAML_FOUND)
         message(STATUS "libyaml found: ${YAML_VERSION}")
-        add_definitions(-DHAVE_YAML)
+        add_definitions(-DAGENTOS_HAS_YAML=1)
     else()
         message(WARNING "libyaml not found, YAML features may be limited")
     endif()
@@ -66,12 +69,12 @@ else()
     message(WARNING "PkgConfig not found, cannot check for libyaml")
 endif()
 
-# 查找 SQLite3
+# 查找 SQLite3（与顶层 CMakeLists.txt 保持一致的宏命名）
 if(PkgConfig_FOUND)
     pkg_check_modules(SQLITE3 QUIET sqlite3)
     if(SQLITE3_FOUND)
         message(STATUS "SQLite3 found: ${SQLITE3_VERSION}")
-        add_definitions(-DHAVE_SQLITE3)
+        add_definitions(-DAGENTOS_HAS_SQLITE3=1)
     else()
         message(WARNING "SQLite3 not found, storage features may be limited")
     endif()
@@ -83,7 +86,7 @@ endif()
 if(USE_SENTENCE_TRANSFORMERS AND PkgConfig_FOUND)
     pkg_check_modules(SENTENCE_TRANSFORMERS sentence_transformers)
     if(SENTENCE_TRANSFORMERS_FOUND)
-        add_definitions(-DHAVE_SENTENCE_TRANSFORMERS)
+        add_definitions(-DAGENTOS_HAS_SENTENCE_TRANSFORMERS=1)
     else()
         message(WARNING "Sentence Transformers not found, disabling support")
     endif()

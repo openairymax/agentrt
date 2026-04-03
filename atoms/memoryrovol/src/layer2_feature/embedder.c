@@ -14,7 +14,7 @@
 #endif /* AGENTOS_HAS_CURL */
 #ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
-#else
+else
 /* cJSON stub - 简化实现（仅用于编译通过） */
 typedef struct cJSON {
     int type;
