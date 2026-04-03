@@ -1,4 +1,8 @@
+<div align="center">
+
 # Agent OS
+by OpenAgent  
+</div>
 
 <div align="center">
 
