@@ -1,21 +1,22 @@
 /**
  * @file memory.c
- * @brief 统一内存管理模块 - 核心层实�? * 
- * 实现安全、高效、统一的内存管理功能，支持内存分配、释放、调试和统计�? * 
+ * @brief 统一内存管理模块 - 核心层实现
+ * 
+ * 实现安全、高效、统一的内存管理功能，支持内存分配、释放、调试和统计功能
+ * 
  * @copyright Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "memory.h"
 #include <stdlib.h>
+#include <string.h>
 
 /* Unified base library compatibility layer */
-#include "../../utils/memory/include/memory_compat.h"
-#include "../../utils/string/include/string_compat.h"
-#include <string.h>
+#include "../include/memory_compat.h"
 #include <stdio.h>
 #include <time.h>
 
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #else
 #include <pthread.h>
@@ -23,7 +24,8 @@
 #endif
 
 /**
- * @brief 模块内部状�? */
+ * @brief 模块内部状态
+ */
 typedef struct {
     bool initialized;                     /**< 模块是否已初始化 */
     bool debug_enabled;                   /**< 调试功能是否启用 */
@@ -34,12 +36,13 @@ typedef struct {
     
     // 线程同步
 #ifdef _WIN32
-    CRITICAL_SECTION lock;                /**< Windows临界�?*/
+    CRITICAL_SECTION lock;                /**< Windows临界区 */
 #else
-    pthread_mutex_t lock;                 /**< POSIX互斥�?*/
+    pthread_mutex_t lock;                 /**< POSIX互斥锁 */
 #endif
     
-    // 调试信息链表�?    memory_debug_info_t* debug_list_head; /**< 调试信息链表�?*/
+    // 调试信息链表头
+    struct memory_debug_info* debug_list_head; /**< 调试信息链表头*/
     
     // 分配失败回调
     void (*fail_callback)(size_t size, const char* tag, void* user_data);
@@ -47,7 +50,8 @@ typedef struct {
 } memory_state_t;
 
 /**
- * @brief 全局模块状态实�? */
+ * @brief 全局模块状态实例
+ */
 static memory_state_t g_state = {
     .initialized = false,
     .debug_enabled = false,
@@ -85,7 +89,8 @@ static bool memory_lock_init(void) {
 }
 
 /**
- * @brief 内部锁销�? */
+ * @brief 内部锁销毁
+ */
 static void memory_lock_destroy(void) {
 #ifdef _WIN32
     DeleteCriticalSection(&g_state.lock);
@@ -117,14 +122,16 @@ static void memory_unlock(void) {
 }
 
 /**
- * @brief 获取当前时间戳（毫秒�? * 
- * @return 时间�? */
+ * @brief 获取当前时间戳（毫秒）
+ * 
+ * @return 时间戳 */
 static uint64_t memory_get_timestamp(void) {
 #ifdef _WIN32
     FILETIME ft;
     GetSystemTimeAsFileTime(&ft);
     uint64_t ts = ((uint64_t)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
-    return ts / 10000; // 转换为毫�?#else
+    return ts / 10000; // 转换为毫秒
+#else
     struct timeval tv;
     gettimeofday(&tv, NULL);
     return (uint64_t)tv.tv_sec * 1000 + tv.tv_usec / 1000;
@@ -134,7 +141,8 @@ static uint64_t memory_get_timestamp(void) {
 /**
  * @brief 处理内存分配失败
  * 
- * @param[in] size 请求分配的大�? * @param[in] tag 分配标签
+ * @param[in] size 请求分配的大小
+ * @param[in] tag 分配标签
  */
 static void memory_handle_fail(size_t size, const char* tag) {
     // 调用用户回调
@@ -176,7 +184,7 @@ static void memory_add_debug_info(void* addr, size_t size, const char* tag,
         return;
     }
     
-    memory_debug_info_t* info = AGENTOS_MALLOC(sizeof(memory_debug_info_t));
+    struct memory_debug_info* info = AGENTOS_MALLOC(sizeof(struct memory_debug_info));
     if (info == NULL) {
         return;
     }
@@ -202,8 +210,8 @@ static void memory_remove_debug_info(void* addr) {
         return;
     }
     
-    memory_debug_info_t** prev = &g_state.debug_list_head;
-    memory_debug_info_t* current = g_state.debug_list_head;
+    struct memory_debug_info** prev = &g_state.debug_list_head;
+    struct memory_debug_info* current = g_state.debug_list_head;
     
     while (current != NULL) {
         if (current->address == addr) {
@@ -228,12 +236,12 @@ static void memory_remove_debug_info(void* addr) {
  * @param[in] addr 内存地址
  * @return 调试信息指针，未找到返回NULL
  */
-static memory_debug_info_t* memory_find_debug_info(void* addr) {
+static struct memory_debug_info* memory_find_debug_info(void* addr) {
     if (!g_state.debug_enabled || addr == NULL) {
         return NULL;
     }
     
-    memory_debug_info_t* current = g_state.debug_list_head;
+    struct memory_debug_info* current = g_state.debug_list_head;
     while (current != NULL) {
         if (current->address == addr) {
             return current;
@@ -357,10 +365,11 @@ void memory_cleanup(void) {
     
     memory_lock();
     
-    // 检查内存泄�?    if (g_state.debug_enabled && g_state.debug_list_head != NULL) {
+    // 检查内存泄漏
+    if (g_state.debug_enabled && g_state.debug_list_head != NULL) {
         fprintf(stderr, "警告：内存清理时发现未释放的内存块\n");
         
-        memory_debug_info_t* current = g_state.debug_list_head;
+        struct memory_debug_info* current = g_state.debug_list_head;
         size_t leak_count = 0;
         size_t leak_size = 0;
         
@@ -374,7 +383,7 @@ void memory_cleanup(void) {
             // 释放泄漏的内存（可选）
             // AGENTOS_FREE(current->address);
             
-            memory_debug_info_t* next = current->next;
+            struct memory_debug_info* next = current->next;
             
             if (current->tag) AGENTOS_FREE((void*)current->tag);
             if (current->file) AGENTOS_FREE((void*)current->file);
@@ -398,8 +407,9 @@ void memory_cleanup(void) {
 
 void* memory_alloc(size_t size, const char* tag) {
     if (!g_state.initialized) {
-        // 如果模块未初始化，使用系统默认分�?        void* ptr = AGENTOS_MALLOC(size);
-        if (ptr != NULL && g_state.options.zero_memory) {
+        // 如果模块未初始化，使用系统默认分配
+        void* ptr = AGENTOS_MALLOC(size);
+        if (ptr != NULL) {
             memset(ptr, 0, size);
         }
         return ptr;
@@ -414,7 +424,8 @@ void* memory_alloc(size_t size, const char* tag) {
 
 void* memory_calloc(size_t size, const char* tag) {
     if (!g_state.initialized) {
-        // 如果模块未初始化，使用系统默认分�?        return AGENTOS_CALLOC(1, size);
+        // 如果模块未初始化，使用系统默认分配
+        return AGENTOS_CALLOC(1, size);
     }
     
     memory_lock();
@@ -426,14 +437,19 @@ void* memory_calloc(size_t size, const char* tag) {
 
 void* memory_aligned_alloc(size_t alignment, size_t size, const char* tag) {
     if (!g_state.initialized) {
-        // 如果模块未初始化，使用系统默认分�?#ifdef _WIN32
-        return _aligned_malloc(size, alignment);
+        // 如果模块未初始化，使用系统默认分配
+#ifdef _WIN32
+        void* ptr = _aligned_malloc(size, alignment);
+        if (ptr != NULL) {
+            memset(ptr, 0, size);
+        }
+        return ptr;
 #else
         void* ptr = NULL;
         if (posix_memalign(&ptr, alignment, size) != 0) {
             return NULL;
         }
-        if (ptr != NULL && g_state.options.zero_memory) {
+        if (ptr != NULL) {
             memset(ptr, 0, size);
         }
         return ptr;
@@ -465,7 +481,7 @@ void* memory_realloc(void* ptr, size_t new_size, const char* tag) {
     memory_lock();
     
     // 查找原始分配信息
-    memory_debug_info_t* debug_info = memory_find_debug_info(ptr);
+    struct memory_debug_info* debug_info = memory_find_debug_info(ptr);
     size_t old_size = debug_info ? debug_info->size : 0;
     
     // 使用系统realloc
@@ -478,7 +494,8 @@ void* memory_realloc(void* ptr, size_t new_size, const char* tag) {
     
     // 更新统计信息
     if (new_ptr != ptr) {
-        // 释放旧指针，分配新指�?        if (old_size > 0) {
+        // 释放旧指针，分配新指针
+        if (old_size > 0) {
             memory_update_stats_free(old_size);
         }
         memory_update_stats_alloc(new_size);
@@ -489,7 +506,8 @@ void* memory_realloc(void* ptr, size_t new_size, const char* tag) {
             memory_add_debug_info(new_ptr, new_size, tag, __FILE__, __LINE__, __func__);
         }
     } else {
-        // 同一地址，大小可能改�?        if (new_size > old_size) {
+        // 同一地址，大小可能改变
+        if (new_size > old_size) {
             memory_update_stats_alloc(new_size - old_size);
             
             // 更新调试信息大小
@@ -517,14 +535,15 @@ void memory_free(void* ptr) {
     }
     
     if (!g_state.initialized) {
-        // 如果模块未初始化，使用系统默认释�?        AGENTOS_FREE(ptr);
+        // 如果模块未初始化，使用系统默认释放
+        AGENTOS_FREE(ptr);
         return;
     }
     
     memory_lock();
     
     // 查找分配信息
-    memory_debug_info_t* debug_info = memory_find_debug_info(ptr);
+    struct memory_debug_info* debug_info = memory_find_debug_info(ptr);
     size_t size = debug_info ? debug_info->size : 0;
     
     // 释放内存
@@ -567,7 +586,7 @@ bool memory_get_stats(memory_stats_t* stats) {
     
     // 计算泄漏次数
     if (g_state.debug_enabled) {
-        memory_debug_info_t* current = g_state.debug_list_head;
+        struct memory_debug_info* current = g_state.debug_list_head;
         size_t leak_count = 0;
         while (current != NULL) {
             leak_count++;
@@ -605,10 +624,11 @@ bool memory_debug_enable(bool enable) {
     
     g_state.debug_enabled = enable;
     
-    // 如果禁用调试，清理现有调试信�?    if (!enable && g_state.debug_list_head != NULL) {
-        memory_debug_info_t* current = g_state.debug_list_head;
+    // 如果禁用调试，清理现有调试信息
+    if (!enable && g_state.debug_list_head != NULL) {
+        struct memory_debug_info* current = g_state.debug_list_head;
         while (current != NULL) {
-            memory_debug_info_t* next = current->next;
+            struct memory_debug_info* next = current->next;
             
             if (current->tag) AGENTOS_FREE((void*)current->tag);
             if (current->file) AGENTOS_FREE((void*)current->file);
@@ -633,7 +653,7 @@ size_t memory_check_leaks(bool dump_to_stderr) {
     memory_lock();
     
     size_t leak_size = 0;
-    memory_debug_info_t* current = g_state.debug_list_head;
+    struct memory_debug_info* current = g_state.debug_list_head;
     
     if (dump_to_stderr && current != NULL) {
         fprintf(stderr, "=== 内存泄漏检测报�?===\n");
@@ -686,7 +706,7 @@ void memory_dump_debug_info(const char* file) {
     fprintf(output, "时间�?llu\n", (unsigned long long)memory_get_timestamp());
     fprintf(output, "当前分配块数：\n");
     
-    memory_debug_info_t* current = g_state.debug_list_head;
+    struct memory_debug_info* current = g_state.debug_list_head;
     size_t count = 0;
     
     while (current != NULL) {

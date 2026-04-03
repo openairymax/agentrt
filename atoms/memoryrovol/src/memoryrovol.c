@@ -273,21 +273,25 @@ agentos_error_t agentos_memoryrov_retrieve(agentos_memoryrov_handle_t* handle,
 
     /* 填充结果 */
     for (size_t i = 0; i < result_count; i++) {
-        (*out_results)[i].id = result_ids[i];
-        (*out_results)[i].importance = scores[i];
+        /* 使用新的结构体字段名（record_id/score/data/data_len/metadata） */
+        (*out_results)[i].record_id = AGENTOS_STRDUP(result_ids[i]);
+        (*out_results)[i].score = scores[i];
+        (*out_results)[i].created_at = time(NULL);
+        (*out_results)[i].updated_at = time(NULL);
 
         /* 从 L1 读取内容 */
         void* data = NULL;
         size_t len = 0;
-        agentos_layer1_raw_read(handle->l1_raw, result_ids[i], &data, &len);
-        if (data) {
-            (*out_results)[i].content = (char*)data;
-            (*out_results)[i].content_len = len;
+        agentos_error_t read_err = agentos_layer1_raw_read(handle->l1_raw, result_ids[i], &data, &len);
+        if (read_err == AGENTOS_SUCCESS && data) {
+            (*out_results)[i].data = data;
+            (*out_results)[i].data_len = len;
+            (*out_results)[i].metadata = NULL;
         } else {
-            (*out_results)[i].content = NULL;
-            (*out_results)[i].content_len = 0;
+            (*out_results)[i].data = NULL;
+            (*out_results)[i].data_len = 0;
+            (*out_results)[i].metadata = NULL;
         }
-        (*out_results)[i].timestamp = time(NULL);
     }
 
     *out_count = result_count;
