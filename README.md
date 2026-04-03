@@ -1,16 +1,22 @@
-# Agent OS
+<div align="center">
+
+<img src="tests/images/OpenAgent-logo.jpg" alt="OpenAgent Logo" style="width: 100%; max-width: 800px; height: auto; margin: 20px 0 30px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.15);" />
+
+# Agent OS  
+
+</div>
 
 <div align="center">
 
 [![AtomGit](https://atomgit.com/spharx/agentos/star/badge.svg)](https://atomgit.com/spharx/agentos)
-[![Gitee](https://gitee.com/spharx/agentos/badge/star.svg)](https://gitee.com/spharx/agentos)
-[![GitHub](https://img.shields.io/github/stars/SpharxTeam/AgentOS)](https://github.com/SpharxTeam/AgentOS)  
+[![star](https://gitee.com/spharx/agentos/badge/star.svg?theme=gray)](https://gitee.com/spharx/agentos)
+[![GitHub](https://img.shields.io/github/stars/SpharxTeam/AgentOS)](https://github.com/SpharxTeam/AgentOS)
 
 [![Version](https://img.shields.io/badge/version-1.0.0.9-5a6b7e)](https://atomgit.com/spharx/agentos)
-[![Documentation](https://img.shields.io/badge/docs-Doc%20V1.8-64748b)](manuals/ARCHITECTURAL_PRINCIPLES.md)  
+[![Documentation](https://img.shields.io/badge/docs-Doc%20V1.8-64748b)](manuals/ARCHITECTURAL_PRINCIPLES.md)
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-71897b)](https://atomgit.com/spharx/agentos/blob/main/LICENSE)
-[![Build Status](https://img.shields.io/badge/build-passing-7a9c8c)](https://github.com/SpharxTeam/AgentOS/actions)  
+[![Build Status](https://img.shields.io/badge/build-passing-7a9c8c)](https://github.com/SpharxTeam/AgentOS/actions)
 
 [![Docker](https://img.shields.io/badge/docker-supported-4a7baf?logo=docker&logoColor=white)](https://www.docker.com)
 [![C/C++](https://img.shields.io/badge/C%2FC%2B%2B-11%2F17-708cb8?logo=c%2B%2B&logoColor=white)](https://isocpp.org)
@@ -18,16 +24,15 @@
 [![Go](https://img.shields.io/badge/Go-1.21+-529ccb?logo=go&logoColor=white)](https://go.dev)
 [![Rust](https://img.shields.io/badge/Rust-1.70+-b08968?logo=rust&logoColor=white)](https://www.rust-lang.org)
 
-
 </div>
 
 ---
 
 <div align="center">
 
-## 🎯 智能体驱动操作系统
+## 🎯 驱动智能体团队的操作系统
 
-*"From data intelligence emerges 始于数据，终于智能。"*
+*"From data intelligence emerges"*
 
 **🌐 Language / 语言**:  
 [简体中文 (当前)](README.md) | [English](manuals/readme/en/README.md) | [Français](manuals/readme/fr/README.md) | [Deutsch](manuals/readme/de/README.md)
@@ -126,62 +131,75 @@ AgentOS 的设计在于理论成果工程化，形成完整的科学支撑体系
 
 ## 🏗️ 系统架构
 
+### 总体架构图
+
 ```
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃                          AgentOS 总体架构                                     ┃
+┃                          AgentOS 总体架构 (V1.0.0.9)                         ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                           应用层 (openlab)                                    │
-│               docgen | ecommerce | research | videoedit | ...                │
-└──────────────────────────────────────────────────────────────────────────────┘
-                                    ↓↑
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                           服务层 (daemon)                                     │
-│              llm_d | market_d | monit_d | sched_d | tool_d                   │
-└──────────────────────────────────────────────────────────────────────────────┘
-                                    ↓↑
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                            内核层 (atoms)                                     │
-│  ┌────────────────┐ ┌────────────────┐ ┌────────────────┐                    │
-│  │    corekern    │ │ coreloopthree  │ │  memoryrovol   │                    │
-│  │    微内核基础   │ │  三层认知运行时  │ │   四层记忆系统   │                    │
-│  │  IPC · Mem · Task │ │ 认知 / 行动 / 记忆  │ │   L1/L2/L3/L4   │                    │
-│  └────────────────┘ └────────────────┘ └────────────────┘                    │
-│  ┌────────────────┐ ┌────────────────┐ ┌────────────────┐                    │
-│  │    syscall     │ │    cupolas     │ │     utils      │                    │
-│  │   系统调用接口   │ │     安全穹顶     │ │    公共工具库    │                    │
-│  └────────────────┘ └────────────────┘ └────────────────┘                    │
-└──────────────────────────────────────────────────────────────────────────────┘
-                                    ↓↑
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                        基础支撑层 (commons)                                   │
-│         platform | utils (logging, config, error, memory, sync, etc.)        │
-└──────────────────────────────────────────────────────────────────────────────┘
-                                    ↓↑
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                           SDK 层 (toolkit)                                    │
-│                   Go | Python | Rust | TypeScript                            │
-└──────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                         🖥️ 应用层 (openlab)                                 │
+│         docgen · ecommerce · research · videoedit · codegen · ...          │
+└────────────────────────────────────────────────────────────────────────────┘
+                                    ↕
+┌────────────────────────────────────────────────────────────────────────────┐
+│                         🛠️ 服务层 (daemon)                                  │
+│    llm_d · market_d · monit_d · sched_d · tool_d · gateway_d · auditor_d   │
+└────────────────────────────────────────────────────────────────────────────┘
+                                    ↕
+┌────────────────────────────────────────────────────────────────────────────┐
+│                          ⚙️ 内核层 (atoms)                                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                      │
+│  │  corekern    │  │coreloopthree │  │ memoryrovol  │                      │
+│  │  微内核基础   │  │ 三层认知循环  │  │ 四层记忆系统  │                      │
+│  │ IPC·Mem·Task │  │ 认知/行动/记忆│  │  L1/L2/L3/L4 │                      │
+│  └──────────────┘  └──────────────┘  └──────────────┘                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                      │
+│  │   syscall    │  │   cupolas    │  │   utils      │                      │
+│  │ 系统调用接口  │  │   安全穹顶    │  │  公共工具库   │                      │
+│  └──────────────┘  └──────────────┘  └──────────────┘                      │
+└────────────────────────────────────────────────────────────────────────────┘
+                                    ↕
+┌────────────────────────────────────────────────────────────────────────────┐
+│                       🧩 基础支撑层 (commons)                               │
+│      platform · utils (logging/config/error/memory/sync/network/...)       │
+└────────────────────────────────────────────────────────────────────────────┘
+                                    ↕
+┌────────────────────────────────────────────────────────────────────────────┐
+│                         🔌 SDK 层 (toolkit)                                 │
+│              Go · Python · Rust · TypeScript · FFI                         │
+└────────────────────────────────────────────────────────────────────────────┘
 ```
+
+### 架构分层说明
+
+| 层级 | 模块 | 核心功能 | 代码规模 |
+|------|------|---------|---------|
+| **应用层** | openlab | Agent 应用生态 | 可变 |
+| **服务层** | daemon/* | 7 大守护进程 | ~25K LOC |
+| **内核层** | atoms/* | 6 个核心模块 | ~15K LOC |
+| **支撑层** | commons/* | 19 个工具模块 | ~12K LOC |
+| **SDK 层** | toolkit/* | 4 语言 SDK | ~8K LOC |
 
 ### 📐 架构设计原则（五维正交体系）
 
-👉 详见 [架构设计原则 Doc V1.7](manuals/ARCHITECTURAL_PRINCIPLES.md)
+👉 详见 [架构设计原则 Doc V1.8](manuals/ARCHITECTURAL_PRINCIPLES.md)
 
 ```
 维度一：系统观 (S-1~S-4) → 工程控制论 & 系统工程
   反馈闭环 → 层次分解 → 总体设计部 → 涌现性管理
-  
+
 维度二：内核观 (K-1~K-4) → 微内核理论
   内核极简 → 接口契约 → 服务隔离 → 可插拔策略
-  
+
 维度三：认知观 (C-1~C-4) → 双系统认知理论
   双系统协同 → 增量演化 → 记忆卷载 → 遗忘机制
-  
+
 维度四：工程观 (E-1~E-8) → 工程实践准则
   安全内生 → 可观测性 → 资源确定性 → 跨平台一致
   命名语义化 → 错误可追溯 → 文档即代码 → 可测试性
-  
+
 维度五：设计美学 (A-1~A-4) → 工程哲学
   简约至上 → 极致细节 → 人文关怀 → 完美主义
 ```
@@ -190,32 +208,106 @@ AgentOS 的设计在于理论成果工程化，形成完整的科学支撑体系
 
 ## 📁 项目结构
 
+### 目录结构
+
 ```
 AgentOS/
-├── atoms/                      # 内核层（微内核架构）v1.0.0.6
-├── atomsmini/                  # 轻量级内核（嵌入式场景）v1.0.0.6
-├── commons/                    # 统一基础库 v1.0.0.6
-├── cupolas/                    # 安全穹顶 v1.0.0.6
-├── daemon/                     # 用户态服务 v1.0.0.6
-├── gateway/                    # 网关层 v1.1.0
-├── heapstore/                  # 运行时数据存储
-├── manager/                    # 配置管理中心
-├── openlab/                    # 开放生态实验室
-├── toolkit/                    # 多语言 SDK v3.0.0
-├── manuals/                    # 文档体系 Doc V1.7
-├── scripts/                    # 脚本工具集
-├── tests/                      # 测试中心
-└── reports/                    # 报告中心
+├── 🏛️ 内核层
+│   ├── atoms/              # 微内核架构 v1.0.0.6
+│   │   ├── corekern/       # 四大原子机制 (IPC/Mem/Task/Time)
+│   │   ├── coreloopthree/  # 三层认知循环运行时
+│   │   ├── memoryrovol/    # 四层记忆系统
+│   │   ├── syscall/        # 系统调用接口
+│   │   └── utils/          # 公共工具库
+│   │
+├── 🛡️ 安全层
+│   ├── cupolas/            # 安全穹顶 v1.0.0.6
+│   │   ├── sanitizer/      # 输入净化
+│   │   ├── permission/     # 权限裁决
+│   │   ├── audit/          # 审计追踪
+│   │   └── workbench/      # 沙箱隔离
+│   │
+├── 🏗️ 基础层
+│   ├── commons/            # 统一基础库 v1.0.0.6
+│   │   ├── platform/       # 跨平台抽象
+│   │   └── utils/          # 19 个核心工具模块
+│   │
+├── 🛠️ 服务层
+│   ├── daemon/             # 守护进程服务 v1.0.0.6
+│   │   ├── llm_d/          # LLM 服务
+│   │   ├── market_d/       # Agent 市场
+│   │   ├── monit_d/        # 监控服务
+│   │   ├── sched_d/        # 调度服务
+│   │   ├── tool_d/         # 工具服务
+│   │   ├── gateway_d/      # 网关服务
+│   │   └── auditor_d/      # 审计服务
+│   │
+├── 🔌 SDK 层
+│   ├── toolkit/            # 多语言 SDK v3.0.0
+│   │   ├── go/             # Go SDK
+│   │   ├── python/         # Python SDK
+│   │   ├── rust/           # Rust SDK
+│   │   └── typescript/     # TypeScript SDK
+│   │
+├── 🖥️ 应用层
+│   ├── openlab/            # 开放生态实验室
+│   │   ├── markets/        # Agent/Skill 市场
+│   │   └── templates/      # 应用模板
+│   │
+├── 🧪 轻量版本
+│   ├── atomsmini/          # 轻量级内核 v1.0.0.6
+│   │   ├── corekernlite/   # 轻量内核核心
+│   │   ├── coreloopthreelite/  # 轻量三层循环
+│   │   └── memoryrovollite/    # 轻量记忆系统
+│   │
+├── 📚 文档与工具
+│   ├── manuals/            # 文档体系 Doc V1.8
+│   │   ├── architecture/   # 架构文档
+│   │   ├── api/            # API 文档
+│   │   ├── guides/         # 使用指南
+│   │   └── specifications/ # 规范文档
+│   │
+│   ├── scripts/            # 脚本工具集 v1.0.0.6
+│   │   ├── build/          # 构建脚本
+│   │   ├── dev/            # 开发工具
+│   │   ├── ops/            # 运维工具
+│   │   └── tests/          # 测试框架
+│   │
+│   ├── tests/              # 测试中心
+│   │   ├── unit/           # 单元测试
+│   │   ├── integration/    # 集成测试
+│   │   ├── contract/       # 契约测试
+│   │   └── security/       # 安全测试
+│   │
+│   └── reports/            # 报告中心
+│       ├── coverage/       # 测试覆盖率
+│       └── benchmark/      # 性能基准
+│
+└── manager/                # 配置管理中心
+    ├── k8s/                # Kubernetes 配置
+    └── docker/             # Docker 配置
 ```
 
-**🔑 关键模块说明**:
-- **两大核心**: CoreLoopThree（三层认知循环）、MemoryRovol（四层记忆系统）
-- **纯净内核**: 约 9,000 行代码，提供 IPC Binder、内存管理（RAII）、任务调度（加权轮询）、高精度时间四大原子机制
-- **内核隔离**: 所有服务运行在用户态，通过 syscall 与内核通信，严格接口约束
-- **系统调用**: 用户态与内核通信的唯一通道，严格的接口约束（Doxygen 注释）
-- **统一日志**: 跨语言日志接口（C/Python/Go/Rust/TS），trace_id 全链路追踪，OpenTelemetry 集成
-- **统一基础库**: commons 提供 19 个核心工具模块（cache/cognition/config/error/logging/memory/network/security 等），跨平台抽象（Linux/macOS/Windows）
-- **轻量级内核**: atomsmini 为嵌入式场景优化，资源占用降低 70%，包含 corekernlite/coreloopthreelite/memoryrovollite
+### 🔑 关键模块说明
+
+| 模块 | 版本 | 代码规模 | 核心功能 |
+|------|------|---------|---------|
+| **corekern** | v1.0.0.6 | ~9K LOC | IPC Binder、内存管理 (RAII)、任务调度 (加权轮询)、高精度时间 |
+| **coreloopthree** | v1.0.0.6 | ~15K LOC | 认知层 (意图识别/任务规划/Agent 调度)、行动层 (状态机/补偿事务)、记忆层 FFI |
+| **memoryrovol** | v1.0.0.6 | ~20K LOC | L1-L4 全栈实现、FAISS 集成、遗忘曲线、多模态检索 |
+| **syscall** | v1.0.0.6 | ~3K LOC | 任务/记忆/会话/可观测性/Agent 全接口、Doxygen 约束 |
+| **cupolas** | v1.0.0.6 | ~12K LOC | 虚拟工位、权限裁决、输入净化、审计追踪 |
+| **daemon** | v1.0.0.6 | ~25K LOC | 7 大守护进程完整实现 |
+| **commons** | v1.0.0.6 | ~12K LOC | 19 个核心工具模块、跨平台抽象 |
+| **toolkit** | v3.0.0 | ~8K LOC | 4 语言 SDK、异步支持 |
+| **atomsmini** | v1.0.0.6 | ~12K LOC | 轻量级内核、资源占用降低 70% |
+
+**✨ 核心特性**:
+- ✅ **微内核架构**: 纯净内核仅提供 4 个原子机制，所有服务运行在用户态
+- ✅ **系统调用**: 用户态与内核通信的唯一通道，严格的接口约束
+- ✅ **统一日志**: 跨语言日志接口、trace_id 全链路追踪、OpenTelemetry 集成
+- ✅ **多语言支持**: C/Python/Go/Rust/TypeScript 原生 SDK
+- ✅ **轻量版本**: atomsmini 为嵌入式场景优化，资源占用降低 70%
 
 ---
 
@@ -233,32 +325,64 @@ CoreLoopThree 是 AgentOS 的核心执行架构，将智能体运行时分为三
 ### 🏛️ 架构总览
 
 ```
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃                       认知层 (Cognition Layer)                                ┃
-┃           System 2 慢思考：深谋远虑、战略规划、复杂决策                         ┃
-┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
-┃           意图识别 → 任务规划 (DAG) → Agent 调度 → 模型协同                    ┃
-┃                              ↑                                          │    ┃
-┃                              └───────── 反馈优化 ─────────┘                 ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃                    CoreLoopThree 三层认知循环架构                           ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│              🧠 认知层 (Cognition Layer) - System 2 慢思考                  │
+│         意图识别 → 任务规划 (DAG) → Agent 调度 → 模型协同 → 反思优化        │
+│                                                                            │
+│  核心功能：                                                                │
+│  • 意图识别：解析用户输入，Intent 结构化                                    │
+│  • 任务规划：DAG 分解、动态调整、依赖管理                                    │
+│  • Agent 调度：多目标优化、负载均衡、效用函数计算                            │
+│  • 模型协同：多模型投票、加权融合、交叉验证                                 │
+└────────────────────────────────────────────────────────────────────────────┘
                                    ↓ 任务分发
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃                       行动层 (Execution Layer)                                ┃
-┃           System 1 快思考：模式匹配、自动化执行、异常恢复                       ┃
-┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
-┃           状态机管理 → 补偿事务 → 可追溯执行 → 元动作注册                      ┃
-┃                              ↑                                          │    ┃
-┃                              └───────── 执行反馈 ─────────┘                 ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+┌────────────────────────────────────────────────────────────────────────────┐
+│              ⚡ 行动层 (Execution Layer) - System 1 快思考                  │
+│         状态机管理 → 补偿事务 → 可追溯执行 → 元动作注册 → 异常恢复          │
+│                                                                            │
+│  核心功能：                                                                │
+│  • 状态机管理：Pending/Running/Succeeded/Failed/Cancelled/Retrying         │
+│  • 补偿事务：Saga 模式、正向操作 + 逆向补偿、自动回滚                        │
+│  • 可追溯执行：TraceID 关联、OpenTelemetry、全链路追踪                      │
+│  • 元动作注册：原子执行单元、热插拔、API/DB/File/Shell/Network             │
+└────────────────────────────────────────────────────────────────────────────┘
                                    ↓ 记忆存取
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃                        记忆层 (Memory Layer)                                  ┃
-┃           MemoryRovol 四层记忆系统：L1→L2→L3→L4 逐级巩固                        ┃
-┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
-┃           MemoryRovol FFI → 多层记忆管理 → LRU 缓存 → 遗忘曲线                ┃
-┃                              ↑                                          │    ┃
-┃                              └───────── 记忆巩固 ─────────┘                 ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+┌────────────────────────────────────────────────────────────────────────────┐
+│           🧬 记忆层 (Memory Layer) - MemoryRovol 四层记忆系统               │
+│         L1 原始层 → L2 特征层 → L3 结构层 → L4 模式层 → 涌现智慧            │
+│                                                                            │
+│  核心功能：                                                                │
+│  • L1 原始层：文件系统存储、分片压缩、SQLite 索引、版本控制                  │
+│  • L2 特征层：FAISS 向量检索、嵌入模型、混合检索 (稀疏+BM25)                │
+│  • L3 结构层：知识图谱、关系抽取、时空索引、因果推理                        │
+│  • L4 模式层：持久同调分析、HDBSCAN 聚类、行为模式发现                      │
+│  • 遗忘曲线：艾宾浩斯模型、LRU 缓存、记忆巩固、睡眠回放                     │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 层级数据流
+
+```
+用户请求
+    ↓
+┌─────────────────┐
+│   认知层处理     │ ← 反馈优化闭环
+│  (System 2)     │
+└────────┬────────┘
+         ↓ 任务分发
+┌─────────────────┐
+│   行动层执行     │ ← 执行反馈
+│  (System 1)     │
+└────────┬────────┘
+         ↓ 记忆存取
+┌─────────────────┐
+│   记忆层存储     │ ← 记忆巩固
+│  (L1→L2→L3→L4)  │
+└─────────────────┘
 ```
 
 ### 层级详解
@@ -513,33 +637,63 @@ AGENTOS_API agentos_error_t agentos_sys_memory_write(
 
 ### 🛠️ 环境要求
 
-| 类别 | 要求 |
-|------|------|
-| **操作系统** | Linux (Ubuntu 22.04+), macOS 13+, Windows 11 (WSL2) |
-| **编译器** | GCC 11+ / Clang 14+ / MSVC 2022+ |
-| **构建工具** | CMake 3.20+, Ninja 或 Make |
-| **系统依赖** | OpenSSL, libevent, pthread, SQLite3, libcurl, cJSON |
-| **可选依赖** | FAISS >= 1.7.0（IVF/HNSW 索引） |
-| **可选依赖** | Ripser (持久同调), HDBSCAN (聚类分析), libyaml (配置解析), libcjson (JSON 处理) |
+#### 必需环境
+
+| 类别 | 要求 | 说明 |
+|------|------|------|
+| **操作系统** | Linux/macOS/Windows | Ubuntu 22.04+, macOS 13+, Windows 11 (WSL2) |
+| **编译器** | GCC 11+ / Clang 14+ / MSVC 2022+ | 支持 C11/C++17 标准 |
+| **构建工具** | CMake 3.20+, Ninja/Make | CMake 跨平台构建系统 |
+| **系统依赖** | OpenSSL, SQLite3, libcurl, cJSON | 通过系统包管理器安装 |
+
+#### 可选依赖
+
+| 依赖 | 版本 | 用途 |
+|------|------|------|
+| **FAISS** | >= 1.7.0 | 向量检索 (IVF/HNSW 索引) |
+| **Ripser** | latest | 持久同调分析 (L4 模式层) |
+| **HDBSCAN** | latest | 聚类分析 (L4 模式层) |
+| **libyaml** | >= 0.2 | YAML 配置解析 |
 
 ### 🚀 快速开始
 
+#### 1. 克隆项目
+
 ```bash
-# 克隆项目
+# 推荐 AtomGit 官方仓库（国内访问最快）
 git clone https://atomgit.com/spharx/agentos.git
-# 或使用 Gitee 镜像
-# git clone https://gitee.com/spharx/agentos.git
-# 或使用 GitHub 镜像
-# git clone https://github.com/SpharxTeam/AgentOS.git
 cd agentos
 
-# 初始化配置
-cp .env.example .env
-python scripts/init_config.py
+# 或 Gitee 官方仓库
+# git clone https://gitee.com/spharx/agentos.git
 
-# 构建内核
+# 或 GitHub 官方仓库
+# git clone https://github.com/SpharxTeam/AgentOS.git
+```
+
+#### 2. 初始化配置
+
+```bash
+# 复制环境变量模板
+cp .env.example .env
+
+# 运行初始化向导
+python scripts/init_config.py
+```
+
+#### 3. 构建内核
+
+```bash
+# 创建构建目录
 mkdir build && cd build
-cmake ../atoms -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
+
+# 配置 CMake（生产环境）
+cmake ../atoms \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_TESTS=ON \
+  -DENABLE_LOGGING=ON
+
+# 并行编译
 cmake --build . --parallel $(nproc)
 
 # 运行测试
@@ -548,13 +702,13 @@ ctest --output-on-failure
 
 ### ⚙️ CMake 配置选项
 
-| 选项 | 说明 | 默认值 |
-|------|------|--------|
-| `CMAKE_BUILD_TYPE` | Debug/Release/RelWithDebInfo | `Release` |
-| `BUILD_TESTS` | 构建单元测试 | `OFF` |
-| `ENABLE_TRACING` | 启用 OpenTelemetry 追踪 | `OFF` |
-| `ENABLE_ASAN` | 启用 AddressSanitizer | `OFF` |
-| `ENABLE_LOGGING` | 启用统一日志系统 | `ON` |
+| 选项 | 默认值 | 说明 | 推荐值 |
+|------|--------|------|--------|
+| `CMAKE_BUILD_TYPE` | Release | 构建类型 (Debug/Release) | Release |
+| `BUILD_TESTS` | OFF | 构建单元测试 | ON (开发) |
+| `ENABLE_TRACING` | OFF | OpenTelemetry 追踪 | OFF (生产) |
+| `ENABLE_ASAN` | OFF | AddressSanitizer | ON (调试) |
+| `ENABLE_LOGGING` | ON | 统一日志系统 | ON |
 
 👉 详见 [BUILD.md](atoms/BUILD.md)
 
@@ -562,7 +716,7 @@ ctest --output-on-failure
 
 ## 📊 性能基准
 
-### 🖥️ 测试环境配置
+### 🖥️ 测试环境
 
 | 组件 | 配置 |
 |------|------|
@@ -571,30 +725,50 @@ ctest --output-on-failure
 | **存储** | Samsung 980 PRO 1TB NVMe SSD |
 | **操作系统** | Ubuntu 22.04 LTS (Kernel 5.15) |
 | **编译器** | GCC 11.4.0, CMake 3.22.1 |
-| **FAISS 版本** | 1.7.4 (IVF1024,PQ64) |
-| **测试方法** | 每个场景重复测试 10 次，取平均值 |
+| **FAISS** | 1.7.4 (IVF1024,PQ64) |
 
-### ⚡ 核心性能
+### ⚡ 核心性能指标
+
+#### 记忆系统性能
 
 | 指标 | 数值 | 测试条件 |
 |------|------|---------|
-| 记忆写入吞吐 | 10,000+ 条/秒 | L1 层，异步批量写入，每批 100 条，单条 1KB |
-| 记忆检索延迟 | < 10ms | FAISS IVF1024,PQ64, k=10, nprobe=32 |
-| 混合检索召回 | < 50ms | 向量+BM25, top-100 结果，并发度 4 |
-| IPC 吞吐量 | >10,000 次/秒 | Binder IPC 单次调用延迟 <50μs |
-| 权限检查延迟 | ~5μs | LRU 缓存命中，规则集 1,000 条 |
-| 权限检查延迟 | ~50μs | 首次加载，无缓存 |
-| 输入净化延迟 | <100μs | PCRE 正则过滤，规则集 500 条 |
-| 审计日志写入 | <1ms | 异步双缓冲，批量提交 |
-| Agent 调用映射 | < 5ms | 带缓存查询，Agent 数量 100+ |
-| L2→L3 迁移速度 | 100 条/秒 | 批量后台迁移，特征提取 |
-| L4 模式挖掘速度 | 10 万条/分钟 | 持久同调分析，HDBSCAN 聚类 |
-| 代码签名验证 | <10ms | RSA-SHA256, 1MB 二进制文件 |
-| 安全凭证读写 | <50μs | AES-256-GCM 加密，HSM 集成 |
+| **L1 写入吞吐** | 10,000+ 条/秒 | 异步批量写入，每批 100 条，单条 1KB |
+| **L2 检索延迟** | < 10ms | FAISS IVF1024,PQ64, k=10, nprobe=32 |
+| **混合检索召回** | < 50ms | 向量+BM25, top-100 结果，并发度 4 |
+| **L2→L3 迁移** | 100 条/秒 | 批量后台迁移，特征提取 |
+| **L4 模式挖掘** | 10 万条/分钟 | 持久同调分析，HDBSCAN 聚类 |
+
+#### 内核性能
+
+| 指标 | 数值 | 测试条件 |
+|------|------|---------|
+| **IPC 吞吐量** | >10,000 次/秒 | Binder IPC 单次调用延迟 <50μs |
+| **权限检查** | ~5μs / ~50μs | LRU 缓存命中 / 首次加载 |
+| **输入净化** | <100μs | PCRE 正则过滤，规则集 500 条 |
+| **审计日志** | <1ms | 异步双缓冲，批量提交 |
+| **Agent 映射** | < 5ms | 带缓存查询，Agent 数量 100+ |
+
+#### 安全性能
+
+| 指标 | 数值 | 测试条件 |
+|------|------|---------|
+| **代码签名验证** | <10ms | RSA-SHA256, 1MB 二进制文件 |
+| **安全凭证读写** | <50μs | AES-256-GCM 加密，HSM 集成 |
 
 ### 💾 资源占用
 
-| 场景 | CPU 占用 | 内存占用 | 磁盘 IO | 网络 IO |
+| 场景 | CPU | 内存 | 磁盘 IO | 网络 IO |
+|------|-----|------|--------|--------|
+| **空闲状态** | < 5% | 200MB | < 1MB/s | < 0.1Mbps |
+| **中等负载** | 30-50% | 1-2GB | 10-50MB/s | 1-10Mbps |
+| **高负载** | 80-100% | 4-8GB | 100-500MB/s | 50-100Mbps |
+| **检索峰值** | 60-80% | 2-4GB | 200-400MB/s | < 1Mbps |
+| **模式挖掘** | 90-100% | 6-12GB | 300-600MB/s | < 1Mbps |
+
+**备注**: 数据基于默认配置，实际值可能因工作负载、并发度、数据集大小而异。
+
+👉 详见 [benchmark.py](scripts/ops/benchmark.py) | [性能指标文档](manuals/specifications/README.md)
 |------|---------|---------|----------|----------|
 | 空闲状态 | < 5% | 200MB | < 1MB/s | < 0.1Mbps |
 | 中等负载 | 30-50% | 1-2GB | 10-50MB/s | 1-10Mbps |
@@ -610,24 +784,149 @@ ctest --output-on-failure
 
 ## 📚 文档索引
 
-### 🏛️ 架构文档
+### 🏛️ 核心架构文档
 
-| 文档 | 说明 |
-|------|------|
-| [架构设计原则 Doc V1.8](manuals/ARCHITECTURAL_PRINCIPLES.md) | **五维正交原则体系**: 系统观/内核观/认知观/工程观/设计美学 |
-| [CoreLoopThree 架构](manuals/architecture/coreloopthree.md) | 三层认知循环：认知→规划→行动 |
-| [MemoryRovol 架构](manuals/architecture/memoryrovol.md) | 四层记忆系统：L1→L2→L3→L4 |
-| [微内核架构](manuals/architecture/microkernel.md) | corekern 原子内核：IPC/Mem/Task/Time |
-| [系统调用规范](manuals/architecture/syscall.md) | syscall 接口约束 |
-| [IPC 通信机制](manuals/architecture/ipc.md) | Binder 跨进程通信 |
-| [统一日志系统](manuals/architecture/logging_system.md) | trace_id 全链路追踪 |
-| [cupolas 安全穹顶](cupolas/README.md) | 安全四大组件详解 |
+| 文档 | 说明 | 关键内容 |
+|------|------|---------|
+| [架构设计原则 Doc V1.8](manuals/ARCHITECTURAL_PRINCIPLES.md) | **五维正交原则体系** | 系统观/内核观/认知观/工程观/设计美学 |
+| [CoreLoopThree 架构](manuals/architecture/coreloopthree.md) | 三层认知循环 | 认知→规划→行动 |
+| [MemoryRovol 架构](manuals/architecture/memoryrovol.md) | 四层记忆系统 | L1→L2→L3→L4 涌现智慧 |
+| [微内核架构](manuals/architecture/microkernel.md) | corekern 原子内核 | IPC/Mem/Task/Time |
+| [系统调用规范](manuals/architecture/syscall.md) | syscall 接口约束 | 用户态与内核通信唯一通道 |
+| [IPC 通信机制](manuals/architecture/ipc.md) | Binder 跨进程通信 | 高性能进程间通信 |
+| [统一日志系统](manuals/architecture/logging_system.md) | trace_id 全链路追踪 | OpenTelemetry 集成 |
+| [cupolas 安全穹顶](cupolas/README.md) | 安全四大组件 | 净化/权限/审计/沙箱 |
 
-### 🧠 哲学文档
+### 🧠 哲学与理论
 
 | 文档 | 说明 |
 |------|------|
 | [认知理论](manuals/philosophy/Cognition_Theory.md) | 双系统认知模型在 AgentOS 中的应用 |
+| [工程两论](manuals/philosophy/Engineering_Theory.md) | 工程实践的方法论基础 |
+| [设计美学](manuals/philosophy/Design_Aesthetics.md) | 乔布斯设计哲学在工程中的体现 |
+
+### 🛠️ 开发指南
+
+| 文档 | 说明 |
+|------|------|
+| [快速开始](manuals/guides/quickstart.md) | 5 分钟上手指南 |
+| [编译指南](manuals/guides/build.md) | 详细编译步骤和配置 |
+| [调试指南](manuals/guides/debugging.md) | GDB/LLDB 调试技巧 |
+| [测试指南](manuals/guides/testing.md) | 单元测试/集成测试/契约测试 |
+| [部署指南](manuals/guides/deployment.md) | Docker/Kubernetes 部署 |
+
+### 📖 API 文档
+
+| 文档 | 说明 |
+|------|------|
+| [C API](manuals/api/c/README.md) | C 语言接口文档 |
+| [Python SDK](manuals/api/python/README.md) | Python 开发指南 |
+| [Go SDK](manuals/api/go/README.md) | Go 语言开发指南 |
+| [Rust SDK](manuals/api/rust/README.md) | Rust 开发指南 |
+| [TypeScript SDK](manuals/api/typescript/README.md) | TypeScript 开发指南 |
+
+### 📋 规范文档
+
+| 文档 | 说明 |
+|------|------|
+| [编码规范](manuals/specifications/coding_standard.md) | C/C++/Python/Go/Rust 编码规范 |
+| [命名规范](manuals/specifications/naming_convention.md) | 语义化命名规则 |
+| [注释规范](manuals/specifications/comment_style.md) | Doxygen 注释标准 |
+| [错误处理规范](manuals/specifications/error_handling.md) | 错误链模式 |
+| [日志规范](manuals/specifications/logging_standard.md) | 统一日志格式 |
+
+👉 详见 [完整文档索引](manuals/README.md)
+
+---
+
+## 🤝 参与贡献
+
+### 贡献方式
+
+1. **报告问题**: 发现 Bug 或有功能建议？[提交 Issue](https://atomgit.com/spharx/agentos/issues)
+2. **提交代码**: 修复 Bug 或添加新功能？[提交 Pull Request](https://atomgit.com/spharx/agentos/pulls)
+3. **完善文档**: 改进文档或添加示例？[编辑文档](manuals/)
+4. **分享经验**: 使用心得或最佳实践？[参与讨论](https://github.com/SpharxTeam/AgentOS/discussions)
+
+### 贡献流程
+
+```
+1. Fork 仓库 → 2. 创建分支 → 3. 开发测试 → 4. 提交 PR → 5. 代码审查 → 6. 合并入主分支
+```
+
+👉 详见 [贡献指南](CONTRIBUTING.md)
+
+---
+
+## 📞 联系方式
+
+### 官方仓库
+
+| 平台 | 链接 | 特点 |
+|------|------|------|
+| **AtomGit** (推荐) | https://atomgit.com/spharx/agentos | 国内访问最快，官方主仓库 |
+| **Gitee** | https://gitee.com/spharx/agentos | 国内镜像，同步更新 |
+| **GitHub** | https://github.com/SpharxTeam/AgentOS | 国际镜像，全球访问 |
+
+### 联系邮箱
+
+| 类型 | 邮箱 | 响应时间 |
+|------|------|---------|
+| **技术支持** | lidecheng@spharx.cn | 48 小时内 |
+| **安全报告** | wangliren@spharx.cn | 24 小时内 |
+| **商业咨询** | zhouzhixian@spharx.cn | 3 个工作日内 |
+
+### 社区渠道
+
+- **Issues**: [AtomGit](https://atomgit.com/spharx/agentos/issues) | [Gitee](https://gitee.com/spharx/agentos/issues) | [GitHub](https://github.com/SpharxTeam/AgentOS/issues)
+- **Discussions**: [GitHub](https://github.com/SpharxTeam/AgentOS/discussions)
+- **官方网站**: https://spharx.cn
+
+---
+
+## 📜 许可证
+
+- **Apache License 2.0**: 详见 [LICENSE](LICENSE)
+- **版权声明**: Copyright © 2024 SpharxTeam. All rights reserved.
+
+---
+
+## 🙏 致谢
+
+感谢所有为 AgentOS 项目做出贡献的开发者和社区成员！
+
+---
+
+<div align="center">
+
+### 🌟 核心愿景
+
+> **"From data intelligence emerges."**  
+> **始于数据，终于智能。**
+
+> 🎉  
+> Thank you again for your contribution!  
+> Intelligence emergence, and nothing less, is the ultimate sublimation of AI.  
+> 🎉  
+> 再次感谢您的贡献！  
+> 让我们一起见证 AI 智能涌现的极尽升华时刻。
+
+---
+
+<p>
+  <a href="#-agentos-人工智能操作系统">⬆️ 返回顶部</a>
+</p>
+
+<p>
+  <a href="https://atomgit.com/spharx/agentos">AtomGit</a> ·
+  <a href="https://gitee.com/spharx/agentos">Gitee</a> ·
+  <a href="https://github.com/SpharxTeam/AgentOS">GitHub</a> ·
+  <a href="https://spharx.cn">官方网站</a>
+</p>
+
+**AgentOS V1.0.0.9** | 基于 ARCHITECTURAL_PRINCIPLES.md V1.8 构建
+
+</div>
 | [记忆理论](manuals/philosophy/Memory_Theory.md) | 四层记忆系统的神经科学和心理学基础 |
 | [设计原则](manuals/philosophy/Design_Principles.md) | "少即是多"的架构哲学 |
 
@@ -1046,7 +1345,6 @@ AgentOS 采用**商业友好、生态友好的分层开源协议**。
 **技术支持**: lidecheng@spharx.cn  
 **安全报告**: wangliren@spharx.cn  
 **商业咨询**: zhouzhixian@spharx.cn  
-**官方网站**: https://spharx.cn  
 
 
 <p>

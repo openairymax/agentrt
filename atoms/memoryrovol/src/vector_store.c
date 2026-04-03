@@ -165,7 +165,7 @@ agentos_error_t agentos_vector_store_put(
 
     /* 绑定参数 */
     sqlite3_bind_text(stmt, 1, record_id, -1, SQLITE_STATIC);
-    sqlite3_bind_blob(stmt, 2, vector, dim * sizeof(float), SQLITE_STATIC);
+    sqlite3_bind_blob(stmt, 2, vector, (int)(dim * sizeof(float)), SQLITE_STATIC);
     sqlite3_bind_int(stmt, 3, (int)dim);
 
     /* 执行 */
