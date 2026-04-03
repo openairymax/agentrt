@@ -3,8 +3,9 @@
 <img src="tests/images/OpenAgent-logo.jpg" alt="OpenAgent Logo" style="width: 100%; max-width: 800px; height: auto; margin: 20px 0 30px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.15);" />
 
 # Agent OS  
-
-</div>
+by  
+OpenAgent 开源极境  
+</div>  
 
 <div align="center">
 

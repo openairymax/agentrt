@@ -14,11 +14,41 @@
 #ifndef DAEMON_SECURITY_H
 #define DAEMON_SECURITY_H
 
-#include "../../cupolas/include/cupolas.h"
-#include "../../cupolas/src/sanitizer/sanitizer.h"
-#include "../../cupolas/src/permission/permission.h"
-#include "../../cupolas/src/security/cupolas_signature.h"
-#include "../../cupolas/src/security/cupolas_vault.h"
+/*
+ * External Dependency Guard (E-1 安全内生 + E-3 资源确定性 + S-2 层次分解)
+ *
+ * daemon_security 依赖 cupolas 安全框架。提供两种编译模式:
+ * 1. 正常模式 (默认): 直接包含 cupolas 头文件
+ * 2. 存根模式 (DAEMON_SECURITY_STUB_MODE): 不链接 cupolas，函数降级为安全默认值
+ *
+ * 设计决策依据 ARCHITECTURAL_PRINCIPLES.md:
+ * - K-4 零信任: 即使 cupolas 不可用也不应导致编译失败
+ * - E-6 错误可追溯: 存根模式下记录明确的降级警告日志
+ */
+#ifdef DAEMON_SECURITY_STUB_MODE
+    #define CUPOLAS_AVAILABLE 0
+#else
+    #ifdef __has_include
+        #if __has_include("../../../cupolas/include/cupolas.h")
+            #define CUPOLAS_AVAILABLE 1
+            #include "../../../cupolas/include/cupolas.h"
+            #include "../../../cupolas/src/sanitizer/sanitizer.h"
+            #include "../../../cupolas/src/permission/permission.h"
+            #include "../../../cupolas/src/security/cupolas_signature.h"
+            #include "../../../cupolas/src/security/cupolas_vault.h"
+        #else
+            #define CUPOLAS_AVAILABLE 0
+            #warning "daemon_security: cupolas headers not found, degraded mode"
+        #endif
+    #else
+        #define CUPOLAS_AVAILABLE 1
+        #include "../../cupolas/include/cupolas.h"
+        #include "../../cupolas/src/sanitizer/sanitizer.h"
+        #include "../../cupolas/src/permission/permission.h"
+        #include "../../cupolas/src/security/cupolas_signature.h"
+        #include "../../cupolas/src/security/cupolas_vault.h"
+    #endif
+#endif
 
 #ifdef __cplusplus
 extern "C" {

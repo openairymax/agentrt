@@ -37,6 +37,7 @@ typedef struct {
 /**
  * @brief 内存分配统计信息
  */
+#ifndef memory_stats_t
 typedef struct {
     size_t total_allocated;
     size_t total_freed;
@@ -45,6 +46,7 @@ typedef struct {
     size_t allocation_count;
     size_t free_count;
 } memory_stats_t;
+#endif
 
 /**
  * @brief 创建默认内存池配置

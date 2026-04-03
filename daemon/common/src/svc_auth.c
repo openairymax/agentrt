@@ -121,52 +121,113 @@ static int base64_encode(const uint8_t* data, size_t len,
     return AGENTOS_SUCCESS;
 }
 
-/* ==================== HMAC-SHA256 简化实现 ==================== */
+/* ==================== HMAC-SHA256 实现（三模式条件编译） ==================== */
 
 /**
- * @brief 简化的 HMAC 计算（仅用于开发/测试环境）
+ * @brief HMAC-SHA256 计算函数指针类型
+ */
+typedef void (*hmac_fn_t)(const char* key, const char* message,
+                         uint8_t* output, size_t* out_len);
+
+/**
+ * @brief 当前使用的 HMAC 实现指针（运行时选择）
+ */
+static hmac_fn_t g_hmac_impl = NULL;
+
+/*
+ * ═══════════════════════════════════════════════════════════════
+ * 模式 1: OpenSSL HMAC-SHA256 (生产环境推荐)
+ * ═══════════════════════════════════════════════════════════════
+ */
+#if defined(AUTH_USE_OPENSSL)
+#include <openssl/hmac.h>
+#include <openssl/evp.h>
+
+static void hmac_openssl(const char* key, const char* message,
+                        uint8_t* output, size_t* out_len) {
+    unsigned int len = 0;
+    unsigned int max_len = (unsigned int)(*out_len);
+    HMAC(EVP_sha256(), (const unsigned char*)key, (int)strlen(key),
+         (const unsigned char*)message, strlen(message),
+         output, &len);
+    *out_len = (size_t)(len < max_len ? len : max_len);
+}
+#define HMAC_IMPL_NAME "OpenSSL"
+
+/*
+ * ═══════════════════════════════════════════════════════════════
+ * 模式 2: mbedTLS HMAC-SHA256 (嵌入式环境)
+ * ═══════════════════════════════════════════════════════════════
+ */
+#elif defined(AUTH_USE_MBEDTLS)
+#include <mbedtls/md.h>
+
+static void hmac_mbedtls(const char* key, const char* message,
+                        uint8_t* output, size_t* out_len) {
+    mbedtls_md_context_t ctx;
+    mbedtls_md_init(&ctx);
+    mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
+    mbedtls_md_hmac_starts(&ctx,
+        (const unsigned char*)key, strlen(key));
+    mbedtls_md_hmac_update(&ctx,
+        (const unsigned char*)message, strlen(message));
+    mbedtls_md_hmac_finish(ctx, output);
+    mbedtls_md_free(ctx);
+    if (*out_len > 32) *out_len = 32;
+}
+#define HMAC_IMPL_NAME "mbedTLS"
+
+/*
+ * ═══════════════════════════════════════════════════════════════
+ * 模式 3: 内置简化实现（仅开发/测试，有 #error 保护）
+ * ═══════════════════════════════════════════════════════════════
+ */
+#else
+
+/**
  * @warning ⚠️ 安全警告: 此函数不是真正的 HMAC-SHA256 实现！
  *          生产环境必须链接 OpenSSL 或 mbedTLS 等成熟加密库。
- *          当前实现使用简单的 XOR+位移模拟，不提供任何密码学安全性。
  *
- * 编译期安全检查:
+ * 编译期安全门禁:
  * - DEBUG 模式下允许编译（开发/测试）
  * - RELEASE/NDEBUG 模式下如果未定义 AUTH_ALLOW_INSECURE_HMAC 则编译失败
  */
 #if defined(NDEBUG) && !defined(AUTH_ALLOW_INSECURE_HMAC)
     #error "SECURITY: simple_hmac is not cryptographically secure! " \
-           "Define AUTH_ALLOW_INSECURE_HMAC to acknowledge this risk, " \
-           "or link against a proper crypto library (OpenSSL/mbedTLS)."
+           "Define AUTH_ALLOW_INSECURE_HMAC to acknowledge risk, " \
+           "or define AUTH_USE_OPENSSL / AUTH_USE_MBEDTLS for production."
 #endif
 
-static void simple_hmac(const char* key, const char* message,
-                        uint8_t* output, size_t* out_len) {
-    /*
-     * 开发环境简化哈希实现。
-     * 注意：此函数输出是确定性的但不具备密码学安全性，
-     * 仅用于单元测试和本地开发验证 JWT 流程。
-     */
+static void hmac_builtin(const char* key, const char* message,
+                       uint8_t* output, size_t* out_len) {
+    /* 开发环境简化哈希：XOR+位移模拟（不具备密码学安全性）*/
     (void)key;
     (void)message;
-
-    /* 使用简单的 XOR 和位移模拟（非安全哈希） */
     size_t key_len = strlen(key);
     size_t msg_len = strlen(message);
-
     for (size_t i = 0; i < 32 && i < *out_len; i++) {
         output[i] = (uint8_t)((i ^ key_len) + (msg_len * (i + 1)) +
                     (message[i % msg_len] ^ key[i % key_len]));
     }
     *out_len = 32;
 }
+#define HMAC_IMPL_NAME "builtin-INSECURE"
+
+#endif /* AUTH_USE_OPENSSL / AUTH_USE_MBEDTLS / builtin */
 
 /* ==================== JWT 实现 ==================== */
 
 int auth_jwt_init(const jwt_config_t* config) {
-    if (g_jwt.initialized) return AGENTOS_ERR_ALREADY_INIT;
+    agentos_mutex_lock(&g_jwt.lock);
+
+    if (g_jwt.initialized) {
+        agentos_mutex_unlock(&g_jwt.lock);
+        return AGENTOS_ERR_ALREADY_INIT;
+    }
 
     if (!config || !config->secret || config->secret_len == 0) {
         SVC_LOG_ERROR("JWT init: invalid config");
+        agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
     }
 
@@ -177,9 +238,20 @@ int auth_jwt_init(const jwt_config_t* config) {
     if (g_jwt.config.refresh_threshold_sec == 0)
         g_jwt.config.refresh_threshold_sec = DEFAULT_REFRESH_THRESHOLD;
 
+    /* 选择 HMAC 实现模式（运行时绑定）*/
+#if defined(AUTH_USE_OPENSSL)
+    g_hmac_impl = hmac_openssl;
+#elif defined(AUTH_USE_MBEDTLS)
+    g_hmac_impl = hmac_mbedtls;
+#else
+    g_hmac_impl = hmac_builtin;
+#endif
+
     g_jwt.initialized = 1;
-    SVC_LOG_INFO("JWT authentication module initialized (TTL=%llu sec)",
-                (unsigned long long)g_jwt.config.token_ttl_sec);
+    SVC_LOG_INFO("JWT authentication module initialized (TTL=%llu sec, HMAC=%s)",
+                (unsigned long long)g_jwt.config.token_ttl_sec,
+                HMAC_IMPL_NAME);
+    agentos_mutex_unlock(&g_jwt.lock);
     return AUTH_SUCCESS;
 }
 
@@ -188,8 +260,11 @@ int auth_jwt_generate_token(const char* subject, const char* role, char** out_to
         return AUTH_TOKEN_INVALID;
     }
 
+    agentos_mutex_lock(&g_jwt.lock);
+
     if (strlen(subject) > MAX_SUBJECT_SIZE) {
         SVC_LOG_ERROR("JWT generate: subject too long");
+        agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
     }
 
@@ -226,7 +301,7 @@ int auth_jwt_generate_token(const char* subject, const char* role, char** out_to
 
     uint8_t hmac_output[32];
     size_t hmac_len = sizeof(hmac_output);
-    simple_hmac(g_jwt.config.secret, sign_input, hmac_output, &hmac_len);
+    g_hmac_impl(g_jwt.config.secret, sign_input, hmac_output, &hmac_len);
 
     size_t sig_b64_size = 128;
     char* sig_b64 = (char*)malloc(sig_b64_size);
@@ -242,6 +317,7 @@ int auth_jwt_generate_token(const char* subject, const char* role, char** out_to
     free(sig_b64);
 
     SVC_LOG_DEBUG("JWT token generated for subject=%s", subject);
+    agentos_mutex_unlock(&g_jwt.lock);
     return AUTH_SUCCESS;
 }
 
@@ -249,6 +325,8 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
     if (!g_jwt.initialized || !token || !result) {
         return AUTH_TOKEN_INVALID;
     }
+
+    agentos_mutex_lock(&g_jwt.lock);
 
     memset(result, 0, sizeof(auth_result_t));
     result->status = AUTH_FAILED;
@@ -259,6 +337,7 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
     const char* dot2 = dot1 ? strchr(dot1 + 1, '.') : NULL;
     if (!dot1 || !dot2) {
         result->error_message = "Invalid token format";
+        agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
     }
 
@@ -275,6 +354,7 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
 
     if (!payload) {
         result->error_message = "Invalid token payload";
+        agentos_mutex_unlock(&g_jwt.lock);
         return AUTH_TOKEN_INVALID;
     }
 
@@ -304,6 +384,7 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
             result->status = AUTH_TOKEN_EXPIRED;
             result->error_message = "Token has expired";
             cJSON_Delete(payload);
+            agentos_mutex_unlock(&g_jwt.lock);
             return AUTH_TOKEN_EXPIRED;
         }
     }
@@ -314,6 +395,7 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
 
     SVC_LOG_DEBUG("JWT token verified for subject=%s",
                   result->subject ? result->subject : "unknown");
+    agentos_mutex_unlock(&g_jwt.lock);
     return AUTH_SUCCESS;
 }
 
@@ -331,10 +413,16 @@ int auth_jwt_refresh_token(const char* old_token, char** out_new_token) {
 }
 
 void auth_jwt_cleanup(void) {
+    agentos_mutex_lock(&g_jwt.lock);
     if (g_jwt.initialized) {
-        memset(&g_jwt, 0, sizeof(g_jwt));
+        g_hmac_impl = NULL;
+        g_jwt.initialized = 0;
+        memset(&g_jwt.config, 0, sizeof(jwt_config_t));
+        memset(g_jwt.subject_buf, 0, sizeof(g_jwt.subject_buf));
+        memset(g_jwt.role_buf, 0, sizeof(g_jwt.role_buf));
         SVC_LOG_INFO("JWT authentication module cleaned up");
     }
+    agentos_mutex_unlock(&g_jwt.lock);
 }
 
 /* ==================== API Key 实现 ==================== */
