@@ -123,9 +123,8 @@ int agentos_mutex_unlock(agentos_mutex_t* mutex) {
     return 0;
 }
 
-int agentos_mutex_destroy(agentos_mutex_t* mutex) {
+void agentos_mutex_destroy(agentos_mutex_t* mutex) {
     DeleteCriticalSection(mutex);
-    return 0;
 }
 
 #else
@@ -146,8 +145,8 @@ int agentos_mutex_unlock(agentos_mutex_t* mutex) {
     return pthread_mutex_unlock(mutex);
 }
 
-int agentos_mutex_destroy(agentos_mutex_t* mutex) {
-    return pthread_mutex_destroy(mutex);
+void agentos_mutex_destroy(agentos_mutex_t* mutex) {
+    pthread_mutex_destroy(mutex);
 }
 
 #endif
@@ -187,9 +186,8 @@ int agentos_cond_broadcast(agentos_cond_t* cond) {
     return 0;
 }
 
-int agentos_cond_destroy(agentos_cond_t* cond) {
+void agentos_cond_destroy(agentos_cond_t* cond) {
     (void)cond;
-    return 0;
 }
 
 #else
@@ -226,8 +224,8 @@ int agentos_cond_broadcast(agentos_cond_t* cond) {
     return pthread_cond_broadcast(cond);
 }
 
-int agentos_cond_destroy(agentos_cond_t* cond) {
-    return pthread_cond_destroy(cond);
+void agentos_cond_destroy(agentos_cond_t* cond) {
+    pthread_cond_destroy(cond);
 }
 
 #endif

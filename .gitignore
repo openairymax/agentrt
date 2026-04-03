@@ -1,55 +1,62 @@
 # =============================================================================
 # AgentOS .gitignore 文件
-# 版本：2.2.0
-# 最后更新：2026-03-31
+# 版本：4.0.0
+# 最后更新：2026-04-03
 # 说明：规范化排除所有不应纳入版本控制的文件和目录
-# 重要更新：.gitee/ 和 .github/ 目录不再纳入版本控制
-# =============================================================================
-
-# =============================================================================
-# 目录结构说明
-# =============================================================================
-# 本项目包含以下主要模块：
-# - atoms/         : 核心原子模块（C 语言）
-# - atomsmini/     : 轻量级原子模块
-# - daemon/        : 用户态服务模块（C 语言）
-# - commons/      : 统一基础库
-# - cupolas/       : 安全穹顶模块
-# - gateway/       : 动态服务模块
-# - openlab/       : Python 应用中心
-# - heapstore/   : 数据持久化层
-# - manuals/    : 项目文档
-# - scripts/       : 构建和运维脚本
-# - tests/         : 测试框架
-# - toolkit/          : 多语言 SDK 工具
-# - manager/       : 配置管理器
 #
-# 注意：.gitee/ 和 .github/ 目录不纳入版本控制
-# 这些目录包含平台特定的 CI/CD 配置和工作流
+# 设计原则：
+# 1. 构建产物一律排除（CMake 缓存、编译产物等）
+# 2. 运行时生成的文件一律排除（数据库、日志、模型等）
+# 3. 本地开发配置一律排除（.env.local、IDE 配置等）
+# 4. 空目录通过 .gitkeep 保留，但排除目录内容
+# 5. 项目必需文件使用否定规则明确保留
+#
+# 项目模块结构：
+# - atoms/           : 核心原子模块（C 语言，内核级）
+# - atomslite/       : 轻量级原子模块
+# - commons/         : 统一基础库
+# - cupolas/         : 安全穹顶模块
+# - daemon/          : 用户态服务模块
+# - gateway/         : 动态服务模块
+# - heapstore/       : 数据持久化层（运行时生成）
+# - manager/         : 配置管理器
+# - openlab/         : Python 应用中心
+# - toolkit/         : 多语言 SDK 工具
+# - scripts/         : 构建和运维脚本
+# - tests/           : 测试框架
+# - manuals/         : 项目文档
+# =============================================================================
 
 # =============================================================================
-# 1. 构建系统和编译产物
+# 1. CMake 构建系统（构建产物，不追踪）
 # =============================================================================
 
-# --- CMake 构建系统 ---
+# CMake 缓存文件（构建时生成）
 CMakeCache.txt
+
+# CMake 临时文件和生成文件
 CMakeFiles/
 cmake_install.cmake
-*.cmake
 cmake_install.*
+CMakeUserPresets.json
+
+# CMake 构建目录
+build/
+_build/
+cmake-build-*/
+cmake-build-debug/
+cmake-build-release/
+cmake-build-coverage/
+
+# 编译器数据库（IDE 工具生成）
+compile_commands.json
+compile_flags.txt
 
 # =============================================================================
-# 1.1 CI/CD 配置目录（不纳入版本控制）
+# 2. 编译产物（构建时生成，不追踪）
 # =============================================================================
 
-# --- Gitee CI/CD 配置（不纳入版本控制）---
-
-
-# --- GitHub CI/CD 配置（不纳入版本控制）---
-
-
-# --- 编译中间文件和输出 ---
-# 目标文件和库
+# 目标文件
 *.o
 *.obj
 *.so
@@ -61,6 +68,7 @@ cmake_install.*
 *.a
 *.la
 *.lai
+*.d
 
 # 可执行文件
 *.exe
@@ -74,28 +82,11 @@ cmake_install.*
 *.gch
 *.pch.gch
 
-# --- 构建目录（允许 build 目录存在但不提交内容）---
-# 注意：scripts/build/ 和 scripts/deploy/ 是脚本目录，必须保留
-build/
-_build/
-cmake-build-*/
-cmake-build-debug/
-cmake-build-release/
-cmake-build-coverage/
-
-# 部署产物目录（非脚本）
-deploy/artifacts/
-deploy/packages/
-
-# --- 编译器数据库 ---
-compile_commands.json
-compile_flags.txt
-
 # =============================================================================
-# 2. Python 相关 (openlab/, scripts/, tests/, toolkit/python/)
+# 3. Python 相关（运行时生成，不追踪）
 # =============================================================================
 
-# --- Python 缓存 ---
+# Python 缓存
 __pycache__/
 *.py[cod]
 *$py.class
@@ -103,15 +94,16 @@ __pycache__/
 *.pyd
 .Python
 *.pyc
+*.pyc.*
 
-# --- 虚拟环境 ---
+# 虚拟环境
 venv/
 env/
 ENV/
 .venv/
 .python-version
 
-# --- Python 包管理 ---
+# Python 包管理产物
 *.egg-info/
 *.egg
 *.dist-info/
@@ -120,49 +112,77 @@ dist/
 wheels/
 *.whl
 
-# setuptoolkit/buildutils 构建产物
-build/bdist.*/
-build/lib/
-build/scripts-*/
-build/lib.*/
-
-# Poetry 特定
+# Poetry
 .poetry/
 poetry.lock
 
-# --- 测试和覆盖率 ---
+# Pipenv
+Pipfile.lock
+
+# 测试和覆盖率
 .pytest_cache/
 .coverage
+.coverage.*
 coverage/
 htmlcov/
-.xml
+*.xml
 coverage.xml
-.coverage.*
 .tox/
 .nox/
 
-# --- Jupyter Notebook ---
-.ipynb_checkpoints
-*.ipynb
-
-# --- IPython ---
+# Jupyter
+.ipynb_checkpoints/
 profile_default/
 ipython_config.py
 ipython_kernel_config.py
 
-# --- mypy 类型检查 ---
+# 类型检查缓存
 .mypy_cache/
 .dmypy.json
 dmypy.json
-
-# --- Ruff ---
 .ruff_cache/
 
 # =============================================================================
-# 3. 环境变量和敏感配置
+# 4. Go 语言 SDK（构建产物，不追踪）
 # =============================================================================
 
-# --- 环境文件 ---
+toolkit/go/vendor/
+toolkit/go/go.sum
+toolkit/go/*.exe
+toolkit/go/testsuite/
+toolkit/go/coverage/
+*.test
+cover.out
+cover.html
+
+# =============================================================================
+# 5. Rust 语言 SDK（构建产物，不追踪）
+# =============================================================================
+
+toolkit/rust/target/
+Cargo.lock
+toolkit/rust/debug/
+toolkit/rust/release/
+toolkit/rust/doc/
+toolkit/rust/target/doc/
+
+# =============================================================================
+# 6. TypeScript/JavaScript SDK（构建产物，不追踪）
+# =============================================================================
+
+toolkit/typescript/node_modules/
+toolkit/typescript/dist/
+toolkit/typescript/build/
+toolkit/typescript/coverage/
+toolkit/typescript/.tsbuildinfo
+toolkit/typescript/.pnpm-store/
+toolkit/typescript/tsbuildinfo/
+
+# =============================================================================
+# 7. 环境变量和敏感配置（本地配置，不追踪）
+# =============================================================================
+
+# 环境文件
 .env
 .env.local
 .env.*.local
@@ -171,7 +191,7 @@ dmypy.json
 .env.production
 *.env
 
-# --- 密钥和证书 ---
+# 密钥和证书
 *.pem
 *.key
 *.crt
@@ -179,62 +199,63 @@ dmypy.json
 *.der
 *.p12
 *.pfx
+*.jks
 secrets.json
 secrets.yaml
 secrets.yml
 credentials.json
 service_account.json
 *.keystore
-*.jks
+oauth/
+.token
 
-# --- 本地配置覆盖 ---
+# 本地配置覆盖
 manager.local.yaml
 manager.local.yml
 manager.*.local.yaml
+manager.*.local.yml
 settings.local.py
 local_settings.py
+override.yaml
 
 # =============================================================================
-# 4. IDE 和编辑器配置
+# 8. IDE 和编辑器配置（本地开发配置，不追踪）
 # =============================================================================
 
-# --- Visual Studio Code ---
+# Visual Studio Code
 .vscode/
 *.code-workspace
 *.code-snippets
 .vscode-test/
 
-# --- JetBrains 系列 (CLion, IntelliJ, PyCharm) ---
+# JetBrains 系列
 .idea/
 *.iml
 *.ipr
 *.iws
-*.idea/
 out/
 *.hprof
-
-# --- CLion 特定 ---
+*.heap
+*.snap
 .clion/
-# 注意：cmake-build-*/已在上面定义
 
-# --- Vim ---
+# Vim
 *.swp
 *.swo
 *~
 .netrwhist
 *.un~
 
-# --- Emacs ---
+# Emacs
 \#*\#
 .\#*
-*~
 *.elc
 
-# --- Sublime Text ---
+# Sublime Text
 *.sublime-project
 *.sublime-workspace
 
-# --- Xcode ---
+# Xcode
 *.xcodeproj/
 *.xcworkspace/
 *.xcuserstate
@@ -242,7 +263,7 @@ out/
 *.pbxuser
 *.perspectivev3
 
-# --- Visual Studio ---
+# Visual Studio
 *.suo
 *.user
 *.userosscache
@@ -255,41 +276,37 @@ bld/
 [Bb]in/
 [Oo]bj/
 
-# --- Eclipse ---
+# Eclipse
 .classpath
 .project
 .settings/
 bin/
 
-# --- NetBeans ---
-nbproject/private/
-nbbuild/
-dist/
-nbdist/
-
 # =============================================================================
-# 5. 日志、缓存和临时文件
+# 9. 日志、数据库和运行时文件（运行时生成，不追踪）
 # =============================================================================
 
-# --- 日志文件 ---
+# 日志文件
 *.log
 logs/
-heapstore/logs/
 *.logs
+heapstore/logs/
 
-# --- 数据库文件 ---
+# 数据库文件
 *.db
 *.db-shm
 *.db-wal
 *.sqlite
 *.sqlite3
 *.db.sqlite
+*.db-journal
 heapstore/registry/*.db
 heapstore/registry/*.sqlite
-*.db-journal
 heapstore/db/
+registry.db
+registry.sqlite
 
-# --- 追踪和性能数据 ---
+# 追踪和性能数据
 heapstore/traces/
 *.trace
 *.spans
@@ -298,27 +315,60 @@ heapstore/traces/
 *.gcda
 *.gcno
 
-# --- 缓存目录 ---
+# 缓存
 .cache/
 *.cache
 tmp/
 temp/
-*.tmp
-*.temp
 *.bak
 *.backup
 *.orig
 
-# --- 本地开发目录 ---
-.local/
-local/
-.dev/
-
 # =============================================================================
-# 6. 测试相关
+# 10. heapstore/ 运行时目录（运行时生成，仅保留空路径）
 # =============================================================================
 
-# --- 测试结果和报告 ---
+# kernel/ 子目录（排除内容，保留 .gitkeep）
+heapstore/kernel/ipc/binder/*
+!heapstore/kernel/ipc/binder/.gitkeep
+heapstore/kernel/ipc/channels/*
+!heapstore/kernel/ipc/channels/.gitkeep
+heapstore/kernel/memory/index/*
+!heapstore/kernel/memory/index/.gitkeep
+heapstore/kernel/memory/meta/*
+!heapstore/kernel/memory/meta/.gitkeep
+heapstore/kernel/memory/raw/*
+!heapstore/kernel/memory/raw/.gitkeep
+heapstore/kernel/memory/patterns/*
+!heapstore/kernel/memory/patterns/.gitkeep
+
+# services/ 子目录（排除内容，保留 .gitkeep）
+heapstore/services/llm_d/*
+!heapstore/services/llm_d/.gitkeep
+heapstore/services/market_d/*
+!heapstore/services/market_d/.gitkeep
+heapstore/services/tool_d/*
+!heapstore/services/tool_d/.gitkeep
+
+# models/ 子目录（排除内容，保留 .gitkeep）
+heapstore/models/*
+!heapstore/models/.gitkeep
+
+# 其他运行时目录
+heapstore/logs/*
+heapstore/traces/*
+heapstore/registry/*
+heapstore/db/*
+!heapstore/logs/.gitkeep
+!heapstore/traces/.gitkeep
+!heapstore/registry/.gitkeep
+!heapstore/db/.gitkeep
+
+# =============================================================================
+# 11. 测试相关（测试结果不追踪，测试代码保留）
+# =============================================================================
+
+# 测试结果和报告
 test-results/
 test_output/
 *.test
@@ -326,143 +376,124 @@ test_output/
 *.snap
 *.snapshot
 
-# --- 测试覆盖率 ---
+# 测试覆盖率
 coverage/
 htmlcov/
-.coverage
 *.gcov
 
-# --- 测试数据 ---
+# 测试数据（运行时生成）
 test_data/generated/
 *.test.data
+tests/fuzz/*.fuzz
+tests/fuzz/corpus/
+tests/fuzz/seeds/
+tests/fuzz/hangs/
+
+# 基准测试结果
+tests/benchmarks/**/results/
+tests/benchmarks/**/plots/
+tests/benchmarks/**/reports/
+*.benchmark
+benchmark_results/
+perf_results/
+
+# tests/benchmarks/concurrency/report/（排除内容，保留 .gitkeep）
+tests/benchmarks/concurrency/report/*
+!tests/benchmarks/concurrency/report/.gitkeep
 
 # =============================================================================
-# 7. 文档生成
+# 12. 文档生成（构建产物，不追踪）
 # =============================================================================
 
-# --- Sphinx 文档 ---
 manuals/_build/
 manuals/.doctrees/
-
-# --- Doxygen ---
+manuals/doctrees/
 doxygen/
 xml/
 html/
 latex/
 man/
-
-# --- MkDocs ---
 site/
-
-# --- JSDoc ---
-docs/api/
+manuals/architecture/diagrams/*.svg
+manuals/architecture/diagrams/*.png
+manuals/architecture/diagrams/*.pdf
+toolkit/go/doc/
 
 # =============================================================================
-# 8. 操作系统文件
+# 13. 操作系统文件（系统生成，不追踪）
 # =============================================================================
 
-# --- macOS ---
+# macOS
 .DS_Store
 .AppleDouble
 .LSOverride
 ._*
-.DocumentRevisions-V100
 .fseventsd
 .Spotlight-V100
 .TemporaryItems
 .Trashes
 .VolumeIcon.icns
-.com.apple.timemachine.donotpresent
-.AppleDB
-.AppleDesktop
-Network Trash Folder
-Temporary Items
 .apdisk
 
-# --- Windows ---
+# Windows
 Thumbs.db
 ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 @eaDir/
-*.cab
-*.msi
-*.msix
-*.msm
-*.msp
 *.lnk
 *.url
-*.ini
 
-# --- Linux ---
-*~
+# Linux
 .fuse_hidden*
 .Trash-*
 .nfs-*
 
 # =============================================================================
-# 9. 依赖管理
+# 14. 依赖管理（本地安装，不追踪）
 # =============================================================================
 
-# --- Node.js (TypeScript SDK) ---
-toolkit/typescript/node_modules/
-toolkit/typescript/npm-debug.log
-toolkit/typescript/yarn-error.log
-toolkit/typescript/.npm
-toolkit/typescript/.yarn
-
-# --- Rust (Rust SDK) ---
-toolkit/rust/target/
-toolkit/rust/Cargo.lock
-
-# --- Go (Go SDK) ---
-toolkit/go/go.sum
-toolkit/go/vendor/
-
-# --- Ruby ---
-*.gem
-*.bundle/
+vendor/
 vendor/bundle/
 Gemfile.lock
-
-# --- PHP ---
-vendor/
 composer.lock
+Carthage/Build/
+.swiftpm/
 
 # =============================================================================
-# 10. 项目特定文件
+# 15. 大型文件和二进制文件（运行时生成，不追踪）
 # =============================================================================
 
-# --- FAISS 索引文件（大型二进制） ---
+# FAISS 索引
 heapstore/models/*.faiss
 heapstore/models/*.index
 heapstore/models/*.pkl
 heapstore/models/*.pickle
 
-# --- 模型权重（大型文件） ---
+# 模型权重
 heapstore/model/
 heapstore/models/*.bin
 heapstore/models/*.pth
 heapstore/models/*.h5
 heapstore/models/*.pt
-*.onnx
+heapstore/models/*.onnx
 *.tflite
 
-# --- 向量和嵌入 ---
+# 向量和嵌入
 *.npy
 *.npz
 *.parquet
 *.arrow
 *.feather
 
-# --- 大型数据集 ---
+# 数据集
 /data/
 /datasets/
 *.csv
 *.tsv
 *.jsonl
 
-# --- 归档和压缩包 ---
+# 压缩包
 *.tar.gz
 *.tar.bz2
 *.tar.xz
@@ -473,177 +504,103 @@ heapstore/models/*.pt
 *.bz2
 *.xz
 
-# --- Docker 相关 ---
+# Docker 和 Kubernetes
 deploy/docker/*.tar
 deploy/docker/*.tar.gz
 deploy/docker/.docker-*/
 docker-compose.override.yml
 .docker/
-
-# --- Kubernetes ---
 *.kubeconfig
 .kube/
 
 # =============================================================================
-# 11. 脚本和工具生成
+# 16. 部署和安装（构建产物，不追踪）
 # =============================================================================
 
-# --- 构建脚本生成 ---
-# 注意：scripts/build/ 是源码目录，必须保留
-build/artifacts/
-build/packages/
-build/dist/
-
-# --- 安装脚本生成 ---
+deploy/artifacts/
+deploy/packages/
+scripts/deploy/artifacts/
+scripts/deploy/packages/
 install/
 installed/
-
-# --- 版本控制 ---
 VERSION
 version.txt
 build_version.txt
 
 # =============================================================================
-# 12. 本地开发和调试
+# 17. 代码质量工具缓存（运行时生成，不追踪）
 # =============================================================================
 
-# --- 本地文档 ---
-.本地/
-.local/
-local-docs/
-
-# --- 本地总结 ---
-.本地总结/
-
-# --- 调试配置 ---
-*.launch
-*.run.xml
-*.debug.xml
-
-# --- 性能分析 ---
-*.prof
-*.profraw
-*.profdata
-perf.data
-perf.data.old
-profile.data
-
-# --- 核心转储 ---
-core
-core.*
-*.core
-*.dmp
-hs_err_pid*
-replay_pid*
-
-# =============================================================================
-# 13. CI/CD 和自动化
-# =============================================================================
-
-# --- GitHub Actions ---
-
-
-# --- Jenkins ---
-.Jenkinsfile.swp
-
-# --- Travis CI ---
-.travis.local.yml
-
-# =============================================================================
-# 14. 代码质量工具
-# =============================================================================
-
-# --- Pre-commit ---
 .pre-commit-manager.local.yaml
-
-# --- ESLint ---
 .eslintcache
-
-# --- Prettier ---
+tools/eslint/.eslintcache
 .prettierrc.local
 .prettierignore.local
-
-# --- Black (Python) ---
-.cache/
-
-# --- Flake8 ---
 .flake8
 *.flake8
-
-# --- Pylint ---
 .pylintrc.local
 .pylint.d/
-
-# --- ClangFormat ---
-.clang-format.local
-
-# --- ClangTidy ---
-.clang-tidy.local
-
-# --- Cppcheck ---
 cppcheck.local.xml
-
-# --- Semgrep ---
 .semgrep.local.yaml
-
-# --- Ruff ---
-.ruff_cache/
-.ruff.toml.local
+.lizard.out
+.jscpd/
+.jscpd-store/
+.scannerwork/
+sonar-report.json
 
 # =============================================================================
-# 15. 其他
+# 18. 本地开发文档（临时文件，不追踪）
 # =============================================================================
 
-# --- Patch 文件 ---
-*.patch
-*.diff
-PATCHES.txt
-
-# --- 临时脚本 ---
-fix_*.sh
-temp_*.sh
-tmp_*.sh
-*_temp.sh
-*_temp.bat
-*_temp.ps1
-
-# --- 笔记和草稿 ---
-*.md.bak
-*.md.backup
 *.draft
 *.todo
 *.notes
-
-# --- 个人配置 ---
+DRAFT*
+NOTES*
+TODO*
+CHANGELOG.local.md
+CHANGELOG.local
+*.md.bak
+*.md.backup
+README.local.md
+README.local
+*.tmp
+*.temp
+*.tmp.sh
+*.tmp.bat
+*.tmp.ps1
+temp_*
+tmp_*
 *.personal
 *.private
-
-# --- 报告和日志 ---
-heapstore/reports/*.log
-heapstore/reports/*.txt
-heapstore/reports/archive/
+*.local
+settings.local
+override.local
+docs/local/
+docs/private/
+wiki/
+heapstore/reports/
+reports/
+test_reports/
+coverage_reports/
 
 # =============================================================================
-# 16. 必须保留的例外
+# 19. 必须保留的例外（项目必需文件）
 # =============================================================================
 
-# 以下文件虽然符合上述模式，但必须保留
+# 版本控制配置
 !.gitignore
 !.gitattributes
-!.editorconfig
-!.pre-commit-manager.yaml
-!.clang-format
-!.clang-tidy
-!.lizardrc
-!.jscpd.json
-!.semgrep.yml
 
-# 配置文件模板
+# 环境模板
 !.env.example
+
+# manager/ 配置文件
 !manager/*.yaml
 !manager/*.yml
 !manager/*.template
 !manager/*.schema.json
+!manager/.env.template
 
 # 关键文档
 !manuals/**/*.md
@@ -658,13 +615,25 @@ heapstore/reports/archive/
 !NOTICE
 !ACKNOWLEDGMENTS.md
 
-# 构建脚本（注意：scripts/build/ 和 scripts/deploy/ 是脚本目录）
+# 构建和运维脚本
 !scripts/**/*.sh
 !scripts/**/*.py
 !scripts/**/*.bat
 !scripts/**/*.ps1
 !scripts/**/*.yml
 !scripts/**/*.yaml
+!scripts/deploy/docker/.gitignore
+
+# scripts/dev/ 开发配置
+!scripts/dev/config/.clang-format
+!scripts/dev/config/.clangd
+!scripts/dev/config/.editorconfig
+!scripts/dev/config/.lizardrc
+!scripts/dev/config/.jscpd.json
+!scripts/dev/config/.pre-commit-config.yaml
+!scripts/dev/config/vcpkg.json
+!scripts/dev/quickstart.sh
+!scripts/dev/validate.sh
 
 # 测试框架
 !tests/**/*.py
@@ -673,23 +642,63 @@ heapstore/reports/archive/
 !tests/**/*.yml
 !tests/**/*.c
 !tests/**/*.h
+!tests/**/*.go
+!tests/**/*.rs
+!tests/.coveragerc
+!tests/.gitkeep
+!tests/benchmarks/**/*.gitkeep
+!tests/benchmarks/concurrency/report/.gitkeep
+!tests/unit/sdk/python/.gitkeep
+!tests/unit/sdk/rust/.gitkeep
+!tests/unit/services/llm_d/.gitkeep
+!tests/unit/services/tool_d/.gitkeep
 
 # Docker 配置
 !Dockerfile*
 !docker-compose*.yml
 !deploy/docker/Dockerfile*
+!gateway/docker/Dockerfile*
+!openlab/Dockerfile
+!daemon/Dockerfile.ci
+!scripts/deploy/docker/Dockerfile*
 
-# 根目录脚本
-!quickstart.sh
-!validate.sh
+# CMake 构建配置
+!atoms/**/CMakeLists.txt
+!atomslite/**/CMakeLists.txt
+!commons/**/CMakeLists.txt
+!commons/tests/CMakeLists.txt
+!cupolas/CMakeLists.txt
+!daemon/**/CMakeLists.txt
+!gateway/CMakeLists.txt
+!heapstore/**/CMakeLists.txt
+!tests/unit/**/CMakeLists.txt
+
+# 根目录项目配置
 !Makefile
 !pyproject.toml
+
+# toolkit/ 配置文件
+!toolkit/python/pyproject.toml
+!toolkit/python/setup.py
+!toolkit/go/go.mod
+!toolkit/rust/Cargo.toml
+!toolkit/typescript/package.json
+!toolkit/typescript/tsconfig.json
+!toolkit/typescript/jest.config.js
+
+# openlab/ 配置文件
+!openlab/pyproject.toml
+!openlab/requirements.txt
+
+# 空目录 .gitkeep
+!commons/utils/types/.gitkeep
+
+# =============================================================================
+# 20. 平台模板目录（项目必需，保留）
+# =============================================================================
+
+# .gitcode/, .gitee/, .github/ 是平台模板目录，随仓库同步
 
 # =============================================================================
 # 结束
 # =============================================================================
-
-
-
-
-

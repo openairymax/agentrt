@@ -154,6 +154,86 @@ typedef int32_t agentos_error_t;
 #define AGENTOS_ENOSYS                 -16
 
 /**
+ * @brief 通用错误
+ *
+ * 用于表示未分类的运行时错误
+ */
+#define AGENTOS_ERROR                  -99
+
+/* ==================== 日志宏定义 ==================== */
+
+/**
+ * @brief 日志级别枚举
+ */
+typedef enum {
+    AGENTOS_LOG_LEVEL_DEBUG = 0,
+    AGENTOS_LOG_LEVEL_INFO  = 1,
+    AGENTOS_LOG_LEVEL_WARN  = 2,
+    AGENTOS_LOG_LEVEL_ERROR = 3
+} agentos_log_level_t;
+
+#ifdef _WIN32
+#include <windows.h>
+
+/**
+ * @brief 输出调试日志
+ * @param fmt 格式字符串
+ * @param ... 可变参数
+ */
+#define AGENTOS_LOG_DEBUG(fmt, ...) \
+    do { \
+        OutputDebugStringA("[DEBUG] " fmt "\n"); \
+    } while(0)
+
+/**
+ * @brief 输出信息日志
+ * @param fmt 格式字符串
+ * @param ... 可变参数
+ */
+#define AGENTOS_LOG_INFO(fmt, ...) \
+    do { \
+        OutputDebugStringA("[INFO] " fmt "\n"); \
+    } while(0)
+
+/**
+ * @brief 输出警告日志
+ * @param fmt 格式字符串
+ * @param ... 可变参数
+ */
+#define AGENTOS_LOG_WARN(fmt, ...) \
+    do { \
+        OutputDebugStringA("[WARN] " fmt "\n"); \
+    } while(0)
+
+/**
+ * @brief 输出错误日志
+ * @param fmt 格式字符串
+ * @param ... 可变参数
+ */
+#define AGENTOS_LOG_ERROR(fmt, ...) \
+    do { \
+        OutputDebugStringA("[ERROR] " fmt "\n"); \
+    } while(0)
+
+#else /* POSIX */
+
+#include <stdio.h>
+
+#define AGENTOS_LOG_DEBUG(fmt, ...) \
+    fprintf(stderr, "[DEBUG] " fmt "\n", ##__VA_ARGS__)
+
+#define AGENTOS_LOG_INFO(fmt, ...) \
+    fprintf(stderr, "[INFO] " fmt "\n", ##__VA_ARGS__)
+
+#define AGENTOS_LOG_WARN(fmt, ...) \
+    fprintf(stderr, "[WARN] " fmt "\n", ##__VA_ARGS__)
+
+#define AGENTOS_LOG_ERROR(fmt, ...) \
+    fprintf(stderr, "[ERROR] " fmt "\n", ##__VA_ARGS__)
+
+#endif /* _WIN32 */
+
+/**
  * @brief 获取错误码对应的描述字符串
  *
  * @param err [in] 错误码

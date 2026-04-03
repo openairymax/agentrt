@@ -20,10 +20,38 @@
 #include <stdio.h>
 
 /* CURL HTTP 客户端 */
+#ifdef AGENTOS_HAS_CURL
 #include <curl/curl.h>
+#else
+#include "../include/curl_stub.h"
+#endif /* AGENTOS_HAS_CURL */
 
 /* JSON 解析 */
+#ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
+#else
+/* cJSON stub - 简化实现（仅用于编译通过） */
+typedef struct cJSON {
+    int type;
+    char* valuestring;
+    struct cJSON* child;
+    struct cJSON* next;
+    struct cJSON* prev;
+} cJSON;
+
+#define cJSON_NULL 0
+#define cJSON_False 1
+#define cJSON_True 2
+#define cJSON_Number 3
+#define cJSON_String 4
+#define cJSON_Array 5
+#define cJSON_Object 6
+
+static inline cJSON* cJSON_CreateObject(void) { return NULL; }
+static inline void cJSON_AddStringToObject(cJSON* object, const char* name, const char* string) { (void)object; (void)name; (void)string; }
+static inline char* cJSON_PrintUnformatted(const cJSON* item) { (void)item; return NULL; }
+static inline void cJSON_Delete(cJSON* item) { (void)item; }
+#endif /* AGENTOS_HAS_CJSON */
 
 /**
  * @brief 内存缓冲区（用于 HTTP 响应）

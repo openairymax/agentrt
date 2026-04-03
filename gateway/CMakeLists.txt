@@ -28,24 +28,32 @@ find_package(cJSON REQUIRED)
 find_package(libmicrohttpd REQUIRED)
 find_package(libwebsockets REQUIRED)
 
-# commons 模块
-set(COMMONS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../commons")
-include_directories(${COMMONS_DIR}/include)
+# 核心头文件路径
+set(COREKERN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../atoms/corekern")
+include_directories(${COREKERN_DIR}/include)
 
 # syscall 模块
 set(SYSCALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../atoms/syscall")
 include_directories(${SYSCALL_DIR}/include)
 
-# cupolas 模块
-set(CUPOLAS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../cupolas")
-include_directories(${CUPOLAS_DIR}/include)
+# commons 模块（基础工具库）
+set(COMMONS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../commons")
+include_directories(
+    ${COMMONS_DIR}
+    ${COMMONS_DIR}/utils/error/include
+    ${COMMONS_DIR}/utils/logging/include
+    ${COMMONS_DIR}/utils/memory/include
+    ${COMMONS_DIR}/utils/sync/include
+)
 
 # ========== 源文件 ==========
 set(GATEWAY_SOURCES
+    src/gateway/gateway_api.c
     src/gateway/http_gateway.c
     src/gateway/ws_gateway.c
     src/gateway/stdio_gateway.c
     src/utils/jsonrpc.c
+    src/utils/syscall_router.c
 )
 
 # ========== 头文件 ==========
@@ -56,6 +64,7 @@ set(GATEWAY_HEADERS
     src/gateway/stdio_gateway.h
     src/utils/jsonrpc.h
     src/utils/syscall_router.h
+    src/utils/gateway_utils.h
 )
 
 # ========== 库目标 ==========

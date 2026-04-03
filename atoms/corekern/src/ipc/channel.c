@@ -29,21 +29,32 @@ struct agentos_ipc_channel {
  * @brief 创建 IPC 通道
  */
 agentos_error_t agentos_ipc_create_channel(
-    agentos_ipc_port_t port,
-    int is_server,
+    const char* name,
+    agentos_ipc_callback_t callback,
+    void* userdata,
     agentos_ipc_channel_t** out_channel) {
-    if (!out_channel) {
+    if (!name || !out_channel) {
         return AGENTOS_EINVAL;
     }
 
-    agentos_ipc_channel_t* channel = 
+    (void)callback;  /* 回调函数暂未使用 */
+    (void)userdata;   /* 用户数据暂未使用 */
+
+    agentos_ipc_channel_t* channel =
         (agentos_ipc_channel_t*)AGENTOS_CALLOC(1, sizeof(agentos_ipc_channel_t));
     if (!channel) {
         return AGENTOS_ENOMEM;
     }
 
-    channel->port = port;
-    channel->is_server = is_server;
+    /* 使用名称的哈希值作为端口号（简化实现） */
+    unsigned int hash = 0;
+    const char* p = name;
+    while (*p) {
+        hash = hash * 31 + (unsigned char)*p;
+        p++;
+    }
+    channel->port = (agentos_ipc_port_t)(hash % 65535);
+    channel->is_server = 1;
     channel->fd = -1;
     channel->lock = NULL;
 
@@ -84,16 +95,14 @@ agentos_error_t agentos_ipc_close(agentos_ipc_channel_t* channel) {
  */
 agentos_error_t agentos_ipc_send(
     agentos_ipc_channel_t* channel,
-    const void* data,
-    size_t len,
-    uint32_t timeout_ms) {
-    if (!channel || !data || len == 0) {
+    const agentos_ipc_message_t* msg) {
+    if (!channel || !msg) {
         return AGENTOS_EINVAL;
     }
 
     /* TODO: 实现实际的 IPC 发送逻辑 */
-    (void)timeout_ms;
-    
+    (void)msg;
+
     return AGENTOS_SUCCESS;
 }
 
@@ -102,19 +111,16 @@ agentos_error_t agentos_ipc_send(
  */
 agentos_error_t agentos_ipc_recv(
     agentos_ipc_channel_t* channel,
-    void* buffer,
-    size_t buf_len,
-    size_t* out_len,
-    uint32_t timeout_ms) {
-    if (!channel || !buffer || !out_len) {
+    uint32_t timeout_ms,
+    agentos_ipc_message_t* out_msg) {
+    if (!channel || !out_msg) {
         return AGENTOS_EINVAL;
     }
 
     /* TODO: 实现实际的 IPC 接收逻辑 */
-    (void)buf_len;
     (void)timeout_ms;
-    *out_len = 0;
-    
+    (void)out_msg;
+
     return AGENTOS_SUCCESS;
 }
 

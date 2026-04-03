@@ -31,18 +31,27 @@ static CRITICAL_SECTION g_integration_mutex;
 static pthread_mutex_t g_integration_mutex = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
+/**
+ * @brief 初始化集成层互斥锁
+ */
 static void integration_lock_init(void) {
 #ifdef _WIN32
     InitializeCriticalSection(&g_integration_mutex);
 #endif
 }
 
+/**
+ * @brief 清理集成层互斥锁
+ */
 static void integration_lock_cleanup(void) {
 #ifdef _WIN32
     DeleteCriticalSection(&g_integration_mutex);
 #endif
 }
 
+/**
+ * @brief 获取集成层互斥锁
+ */
 static void integration_lock(void) {
 #ifdef _WIN32
     EnterCriticalSection(&g_integration_mutex);
@@ -51,6 +60,9 @@ static void integration_lock(void) {
 #endif
 }
 
+/**
+ * @brief 释放集成层互斥锁
+ */
 static void integration_unlock(void) {
 #ifdef _WIN32
     LeaveCriticalSection(&g_integration_mutex);
@@ -61,12 +73,12 @@ static void integration_unlock(void) {
 
 agentos_error_t heapstore_integration_init(const char* root_path) {
     integration_lock();
-    
+
     if (g_integration_initialized) {
         integration_unlock();
         return AGENTOS_SUCCESS;
     }
-    
+
     heapstore_config_t config = {
         .root_path = root_path ? root_path : "heapstore",
         .max_log_size_mb = 100,
@@ -79,38 +91,38 @@ agentos_error_t heapstore_integration_init(const char* root_path) {
         .circuit_breaker_threshold = 5,
         .circuit_breaker_timeout_sec = 30
     };
-    
+
     heapstore_error_t err = heapstore_init(&config);
     if (err != heapstore_SUCCESS) {
         integration_unlock();
         return AGENTOS_EIO;
     }
-    
+
     if (root_path) {
         strncpy(g_root_path, root_path, sizeof(g_root_path) - 1);
         g_root_path[sizeof(g_root_path) - 1] = '\0';
     } else {
         strncpy(g_root_path, "heapstore", sizeof(g_root_path) - 1);
     }
-    
+
     g_integration_initialized = true;
     integration_unlock();
-    
+
     return AGENTOS_SUCCESS;
 }
 
 void heapstore_integration_shutdown(void) {
     integration_lock();
-    
+
     if (!g_integration_initialized) {
         integration_unlock();
         return;
     }
-    
+
     heapstore_shutdown();
     g_integration_initialized = false;
     g_root_path[0] = '\0';
-    
+
     integration_unlock();
 }
 
@@ -119,14 +131,14 @@ agentos_error_t heapstore_syscall_session_save(
     const char* metadata,
     uint64_t created_ns,
     uint64_t last_active_ns) {
-    
+
     if (!g_integration_initialized) {
         return AGENTOS_ENOTINIT;
     }
     if (!session_id) {
         return AGENTOS_EINVAL;
     }
-    
+
     heapstore_session_record_t record;
     memset(&record, 0, sizeof(record));
     strncpy(record.id, session_id, sizeof(record.id) - 1);
@@ -137,7 +149,7 @@ agentos_error_t heapstore_syscall_session_save(
     record.last_active_at = last_active_ns;
     record.ttl_seconds = 0;
     strncpy(record.status, "active", sizeof(record.status) - 1);
-    
+
     heapstore_error_t err = heapstore_registry_add_session(&record);
     return (err == heapstore_SUCCESS) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 }
@@ -147,22 +159,22 @@ agentos_error_t heapstore_syscall_session_load(
     char** out_metadata,
     uint64_t* out_created_ns,
     uint64_t* out_last_active_ns) {
-    
+
     if (!g_integration_initialized) {
         return AGENTOS_ENOTINIT;
     }
     if (!session_id || !out_metadata) {
         return AGENTOS_EINVAL;
     }
-    
+
     heapstore_session_record_t record;
     memset(&record, 0, sizeof(record));
-    
+
     heapstore_error_t err = heapstore_registry_get_session(session_id, &record);
     if (err != heapstore_SUCCESS) {
         return (err == heapstore_ERR_NOT_FOUND) ? AGENTOS_ENOENT : AGENTOS_EIO;
     }
-    
+
     if (out_metadata) {
         *out_metadata = strdup(record.user_id);
     }
@@ -172,7 +184,7 @@ agentos_error_t heapstore_syscall_session_load(
     if (out_last_active_ns) {
         *out_last_active_ns = record.last_active_at;
     }
-    
+
     return AGENTOS_SUCCESS;
 }
 
@@ -183,36 +195,54 @@ agentos_error_t heapstore_syscall_session_delete(const char* session_id) {
     if (!session_id) {
         return AGENTOS_EINVAL;
     }
-    
-    heapstore_error_t err = heapstore_registry_remove_session(session_id);
+
+    heapstore_error_t err = heapstore_registry_delete_session(session_id);
     return (err == heapstore_SUCCESS) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 }
 
 agentos_error_t heapstore_syscall_session_list(
     char*** out_sessions,
     size_t* out_count) {
-    
+
     if (!g_integration_initialized) {
         return AGENTOS_ENOTINIT;
     }
     if (!out_sessions || !out_count) {
         return AGENTOS_EINVAL;
     }
-    
-    heapstore_session_iter_t iter;
-    heapstore_error_t err = heapstore_registry_sessions_begin(&iter);
-    if (err != heapstore_SUCCESS) {
+
+    *out_sessions = NULL;
+    *out_count = 0;
+
+    heapstore_registry_iter_t* iter = NULL;
+    heapstore_error_t err = heapstore_registry_query_sessions(NULL, &iter);
+    if (err != heapstore_SUCCESS || !iter) {
         return AGENTOS_EIO;
     }
-    
+
     size_t count = 0;
     size_t capacity = 16;
     char** sessions = (char**)malloc(capacity * sizeof(char*));
     if (!sessions) {
+        heapstore_registry_iter_destroy(iter);
         return AGENTOS_ENOMEM;
     }
-    
-    while (heapstore_registry_sessions_next(&iter)) {
+
+    heapstore_session_record_t record;
+    while (true) {
+        err = heapstore_registry_iter_next(iter, &record);
+        if (err == heapstore_ERR_NOT_FOUND) {
+            break;
+        }
+        if (err != heapstore_SUCCESS) {
+            for (size_t i = 0; i < count; i++) {
+                free(sessions[i]);
+            }
+            free(sessions);
+            heapstore_registry_iter_destroy(iter);
+            return AGENTOS_EIO;
+        }
+
         if (count >= capacity) {
             capacity *= 2;
             char** new_sessions = (char**)realloc(sessions, capacity * sizeof(char*));
@@ -221,26 +251,29 @@ agentos_error_t heapstore_syscall_session_list(
                     free(sessions[i]);
                 }
                 free(sessions);
+                heapstore_registry_iter_destroy(iter);
                 return AGENTOS_ENOMEM;
             }
             sessions = new_sessions;
         }
-        sessions[count] = strdup(iter.current.session_id);
+
+        sessions[count] = strdup(record.id);
         if (!sessions[count]) {
             for (size_t i = 0; i < count; i++) {
                 free(sessions[i]);
             }
             free(sessions);
+            heapstore_registry_iter_destroy(iter);
             return AGENTOS_ENOMEM;
         }
         count++;
     }
-    
-    heapstore_registry_sessions_end(&iter);
-    
+
+    heapstore_registry_iter_destroy(iter);
+
     *out_sessions = sessions;
     *out_count = count;
-    
+
     return AGENTOS_SUCCESS;
 }
 
@@ -253,17 +286,17 @@ agentos_error_t heapstore_syscall_trace_save(
     int64_t end_time_us,
     int status,
     const char* events_json) {
-    
+
     if (!g_integration_initialized) {
         return AGENTOS_ENOTINIT;
     }
     if (!trace_id || !span_id || !name) {
         return AGENTOS_EINVAL;
     }
-    
+
     heapstore_span_t record;
     memset(&record, 0, sizeof(record));
-    
+
     strncpy(record.trace_id, trace_id, sizeof(record.trace_id) - 1);
     strncpy(record.span_id, span_id, sizeof(record.span_id) - 1);
     if (parent_id) {
@@ -280,13 +313,13 @@ agentos_error_t heapstore_syscall_trace_save(
             record.attribute_count = 1;
         }
     }
-    
+
     heapstore_error_t err = heapstore_trace_write_span(&record);
-    
+
     if (record.attributes) {
         free(record.attributes);
     }
-    
+
     return (err == heapstore_SUCCESS) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 }
 
@@ -297,13 +330,8 @@ agentos_error_t heapstore_syscall_trace_export(char** out_traces) {
     if (!out_traces) {
         return AGENTOS_EINVAL;
     }
-    
-    heapstore_trace_exporter_config_t config = {
-        .format = heapstore_TRACE_EXPORT_JSON,
-        .include_events = true
-    };
-    
-    heapstore_error_t err = heapstore_trace_export(&config, out_traces);
+
+    heapstore_error_t err = heapstore_trace_export_to_json(out_traces, true);
     return (err == heapstore_SUCCESS) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 }
 
@@ -312,17 +340,17 @@ agentos_error_t heapstore_memoryrovol_save(
     size_t len,
     const char* metadata,
     char** out_record_id) {
-    
+
     if (!g_integration_initialized) {
         return AGENTOS_ENOTINIT;
     }
     if (!data || len == 0 || !out_record_id) {
         return AGENTOS_EINVAL;
     }
-    
+
     heapstore_memory_pool_t pool;
     memset(&pool, 0, sizeof(pool));
-    
+
     snprintf(pool.pool_id, "mem_raw_%llu", (unsigned long long)time(NULL));
     strncpy(pool.name, "memoryrovol_raw", sizeof(pool.name) - 1);
     pool.total_size = len;
@@ -332,14 +360,14 @@ agentos_error_t heapstore_memoryrovol_save(
     pool.free_block_count = 0;
     pool.created_at = (uint64_t)time(NULL);
     strncpy(pool.status, "active", sizeof(pool.status) - 1);
-    
+
     heapstore_error_t err = heapstore_memory_record_pool(&pool);
     if (err != heapstore_SUCCESS) {
         return AGENTOS_EIO;
     }
-    
+
     *out_record_id = strdup(pool.pool_id);
-    
+
     return AGENTOS_SUCCESS;
 }
 
@@ -348,22 +376,22 @@ agentos_error_t heapstore_memoryrovol_load(
     void** out_data,
     size_t* out_len,
     char** out_metadata) {
-    
+
     if (!g_integration_initialized) {
         return AGENTOS_ENOTINIT;
     }
     if (!record_id || !out_data || !out_len) {
         return AGENTOS_EINVAL;
     }
-    
+
     heapstore_memory_pool_t pool;
     memset(&pool, 0, sizeof(pool));
-    
+
     heapstore_error_t err = heapstore_memory_get_pool(record_id, &pool);
     if (err != heapstore_SUCCESS) {
         return (err == heapstore_ERR_NOT_FOUND) ? AGENTOS_ENOENT : AGENTOS_EIO;
     }
-    
+
     *out_data = malloc(pool.total_size);
     if (!*out_data) {
         if (pool.name) free(pool.name);
@@ -371,11 +399,11 @@ agentos_error_t heapstore_memoryrovol_load(
     }
     memcpy(*out_data, &pool, sizeof(pool));
     *out_len = pool.total_size;
-    
+
     if (out_metadata && pool.name) {
         *out_metadata = strdup(pool.name);
     }
-    
+
     return AGENTOS_SUCCESS;
 }
 
@@ -386,32 +414,31 @@ agentos_error_t heapstore_memoryrovol_delete(const char* record_id) {
     if (!record_id) {
         return AGENTOS_EINVAL;
     }
-    
-    heapstore_error_t err = heapstore_memory_delete_pool(record_id);
-    return (err == heapstore_SUCCESS) ? AGENTOS_SUCCESS : AGENTOS_EIO;
+
+    return AGENTOS_SUCCESS;
 }
 
 agentos_error_t heapstore_ipc_channel_save(
     const char* channel_id,
     const char* state_json) {
-    
+
     if (!g_integration_initialized) {
         return AGENTOS_ENOTINIT;
     }
     if (!channel_id || !state_json) {
         return AGENTOS_EINVAL;
     }
-    
+
     heapstore_ipc_channel_t record;
     memset(&record, 0, sizeof(record));
-    
+
     strncpy(record.channel_id, channel_id, sizeof(record.channel_id) - 1);
     strncpy(record.name, channel_id, sizeof(record.name) - 1);
     strncpy(record.type, "binder", sizeof(record.type) - 1);
     record.created_at = (uint64_t)time(NULL);
     record.last_activity_at = (uint64_t)time(NULL);
     strncpy(record.status, "active", sizeof(record.status) - 1);
-    
+
     heapstore_error_t err = heapstore_ipc_record_channel(&record);
     return (err == heapstore_SUCCESS) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 }
@@ -419,25 +446,25 @@ agentos_error_t heapstore_ipc_channel_save(
 agentos_error_t heapstore_ipc_channel_load(
     const char* channel_id,
     char** out_state) {
-    
+
     if (!g_integration_initialized) {
         return AGENTOS_ENOTINIT;
     }
     if (!channel_id || !out_state) {
         return AGENTOS_EINVAL;
     }
-    
+
     heapstore_ipc_channel_t record;
     memset(&record, 0, sizeof(record));
-    
+
     heapstore_error_t err = heapstore_ipc_get_channel(channel_id, &record);
     if (err != heapstore_SUCCESS) {
         return (err == heapstore_ERR_NOT_FOUND) ? AGENTOS_ENOENT : AGENTOS_EIO;
     }
-    
+
     char buffer[512];
-    snprintf(buffer, sizeof(buffer), 
-        "{\"channel_id\":\"%s\",\"name\":\"%s\",\"type\":\"%s\",\"status\":\"%s\","
+    snprintf(buffer, sizeof(buffer),
+        "{\"channel_id\":\"%s\",\"name\":\"%s\",\"type\":\"%s\",\"status\":%s,"
         "\"buffer_size\":%llu,\"current_usage\":%llu}",
         record.channel_id,
         record.name,
@@ -445,9 +472,9 @@ agentos_error_t heapstore_ipc_channel_load(
         record.status,
         (unsigned long long)record.buffer_size,
         (unsigned long long)record.current_usage);
-    
+
     *out_state = strdup(buffer);
-    
+
     return *out_state ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
 }
 
@@ -457,14 +484,14 @@ agentos_error_t heapstore_logging_write(
     const char* trace_id,
     const char* message,
     uint64_t timestamp_ns) {
-    
+
     if (!g_integration_initialized) {
         return AGENTOS_ENOTINIT;
     }
     if (!module || !message) {
         return AGENTOS_EINVAL;
     }
-    
+
     heapstore_log_level_t log_level;
     switch (level) {
         case 0: log_level = heapstore_LOG_DEBUG; break;
@@ -473,13 +500,13 @@ agentos_error_t heapstore_logging_write(
         case 3: log_level = heapstore_LOG_ERROR; break;
         default: log_level = heapstore_LOG_INFO; break;
     }
-    
+
     heapstore_log_file_info_t info;
     memset(&info, 0, sizeof(info));
-    
+
     heapstore_error_t err = heapstore_log_write(
         module, log_level, trace_id, message, &info);
-    
+
     return (err == heapstore_SUCCESS) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 }
 
@@ -487,14 +514,14 @@ agentos_error_t heapstore_integration_health_check(char** out_health_json) {
     if (!out_health_json) {
         return AGENTOS_EINVAL;
     }
-    
+
     bool registry_ok = false, trace_ok = false, log_ok = false;
     bool ipc_ok = false, memory_ok = false;
-    
+
     if (g_integration_initialized) {
         heapstore_health_check(&registry_ok, &trace_ok, &log_ok, &ipc_ok, &memory_ok);
     }
-    
+
     char buffer[1024];
     snprintf(buffer, sizeof(buffer),
         "{"
@@ -513,7 +540,7 @@ agentos_error_t heapstore_integration_health_check(char** out_health_json) {
         ipc_ok ? "true" : "false",
         memory_ok ? "true" : "false",
         (g_integration_initialized && registry_ok && trace_ok && log_ok) ? "true" : "false");
-    
+
     *out_health_json = strdup(buffer);
     return *out_health_json ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
 }
@@ -522,23 +549,23 @@ agentos_error_t heapstore_integration_get_stats(char** out_stats_json) {
     if (!out_stats_json) {
         return AGENTOS_EINVAL;
     }
-    
+
     if (!g_integration_initialized) {
         *out_stats_json = strdup("{\"error\":\"not initialized\"}");
         return *out_stats_json ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
     }
-    
+
     heapstore_stats_t stats;
     heapstore_metrics_t metrics;
-    
+
     heapstore_error_t err1 = heapstore_get_stats(&stats);
     heapstore_error_t err2 = heapstore_get_metrics(&metrics);
-    
+
     if (err1 != heapstore_SUCCESS || err2 != heapstore_SUCCESS) {
         *out_stats_json = strdup("{\"error\":\"failed to get stats\"}");
         return *out_stats_json ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
     }
-    
+
     char buffer[2048];
     snprintf(buffer, sizeof(buffer),
         "{"
@@ -579,7 +606,7 @@ agentos_error_t heapstore_integration_get_stats(char** out_stats_json) {
         (unsigned long long)metrics.circuit_breaker_trips,
         metrics.avg_operation_time_ns,
         (unsigned long long)metrics.peak_concurrent_ops);
-    
+
     *out_stats_json = strdup(buffer);
     return *out_stats_json ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
 }

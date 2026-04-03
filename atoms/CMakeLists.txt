@@ -31,6 +31,9 @@ if(MSVC)
     add_compile_options(/GS)      # 缓冲区安全检查
     add_compile_options(/sdl)     # 启用额外安全检查
     add_compile_options(/guard:cf) # 控制流防护
+    add_compile_options(/utf-8)   # 强制UTF-8源文件编码（解决C4819中文注释警告，同时设置source-charset和execution-charset）
+    # 禁用一些过于严格的编码相关警告（源文件可能有混合编码的注释字符）
+    add_compile_options(/wd4828)  # 禁用"文件包含在当前源字符集中无效的字符"警告
 else()
     # GCC/Clang安全选项
     add_compile_options(-Wall -Wextra -Wpedantic)

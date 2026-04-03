@@ -8,7 +8,7 @@
 #define AGENTOS_MEMORYROV_H
 
 #include "agentos.h"
-#include "manager.h"
+#include "config.h"
 #include "forgetting.h"
 
 #ifdef __cplusplus
@@ -19,6 +19,22 @@ extern "C" {
  * @brief MemoryRovol 系统句柄（不透明指针）
  */
 typedef struct agentos_memoryrov_handle agentos_memoryrov_handle_t;
+
+/**
+ * @brief 记忆记录结构体
+ *
+ * 表示从记忆系统中检索到的一条记忆记录，
+ * 包含原始数据、元数据和相关性分数。
+ */
+typedef struct agentos_memory {
+    char* record_id;          /**< 记录唯一标识符 */
+    void* data;               /**< 原始数据指针 */
+    size_t data_len;          /**< 数据长度 */
+    char* metadata;           /**< 元数据（JSON格式） */
+    float score;              /**< 相关性分数（0.0-1.0） */
+    time_t created_at;        /**< 创建时间戳 */
+    time_t updated_at;        /**< 最后更新时间戳 */
+} agentos_memory_t;
 
 /**
  * @brief 初始化 MemoryRovol 系统
