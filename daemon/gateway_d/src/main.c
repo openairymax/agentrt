@@ -4,37 +4,37 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * @file main.c
- * @brief Gateway守护进程主入口（遵循 daemon 模块统一规范）
+ * @brief Gateway守护进程主入口
  *
  * gateway_d 是 AgentOS 的网关守护进程，负责管理多个网关实例
  * 并提供统一的服务入口。
  *
- * 规范遵循:
- * - ARCHITECTURAL_PRINCIPLES.md E-4 跨平台一致性
- * - C_coding_style_guide.md 命名/可见性/错误处理规范
- * - protocol_contract.md JSON-RPC 2.0 协议
- * - logging_format.md 结构化日志 (SVC_LOG_* 宏)
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "gateway_service.h"
 #include "svc_common.h"
 #include "svc_logger.h"
 #include "svc_config.h"
-#include "platform.h"
-#include "error.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
 
-/* ==================== 全局状态 ==================== */
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#endif
 
+/* 全局服务句柄 */
 static gateway_service_t g_service = NULL;
-static volatile int g_running = 1;
-static agentos_mutex_t g_running_lock;
 
-/* ==================== 信号处理 ==================== */
+/* 运行标志 */
+static volatile int g_running = 1;
 
 /**
  * @brief 信号处理函数
@@ -42,10 +42,8 @@ static agentos_mutex_t g_running_lock;
  */
 static void signal_handler(int sig) {
     (void)sig;
-    agentos_mutex_lock(&g_running_lock);
     g_running = 0;
-    agentos_mutex_unlock(&g_running_lock);
-
+    
     if (g_service) {
         gateway_service_stop(g_service, false);
     }
@@ -70,8 +68,6 @@ static BOOL WINAPI console_handler(DWORD fdwCtrlType) {
 }
 #endif
 
-/* ==================== 帮助信息 ==================== */
-
 /**
  * @brief 打印使用说明
  * @param prog 程序名
@@ -95,18 +91,16 @@ static void print_usage(const char* prog) {
     printf("  %s -s  # Enable stdio mode for CLI\n", prog);
 }
 
-/* ==================== 参数解析 ==================== */
-
 /**
  * @brief 解析命令行参数
  * @param argc 参数数量
  * @param argv 参数数组
  * @param config 配置输出
- * @return 0 成功，非0 失败
+ * @return 0 成功
  */
 static int parse_args(int argc, char* argv[], gateway_service_config_t* config) {
     gateway_service_get_default_config(config);
-
+    
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0) {
             print_usage(argv[0]);
@@ -115,7 +109,7 @@ static int parse_args(int argc, char* argv[], gateway_service_config_t* config) 
         else if (strcmp(argv[i], "-c") == 0 && i + 1 < argc) {
             agentos_error_t err = gateway_service_load_config(config, argv[++i]);
             if (err != AGENTOS_SUCCESS) {
-                SVC_LOG_ERROR("Failed to load config: %s", argv[i]);
+                fprintf(stderr, "Failed to load config: %s\n", argv[i]);
                 return -1;
             }
         }
@@ -141,7 +135,7 @@ static int parse_args(int argc, char* argv[], gateway_service_config_t* config) 
             /* Unix daemon mode */
             pid_t pid = fork();
             if (pid < 0) {
-                SVC_LOG_ERROR("Failed to fork daemon process");
+                fprintf(stderr, "Failed to fork\n");
                 return -1;
             }
             if (pid > 0) {
@@ -153,30 +147,32 @@ static int parse_args(int argc, char* argv[], gateway_service_config_t* config) 
             fclose(stdin);
             fclose(stdout);
             fclose(stderr);
-            SVC_LOG_INFO("Gateway daemonized successfully");
-#else
-            SVC_LOG_WARN("-d (daemon mode) is not supported on Windows");
 #endif
         }
         else {
-            SVC_LOG_ERROR("Unknown option: %s", argv[i]);
+            fprintf(stderr, "Unknown option: %s\n", argv[i]);
             print_usage(argv[0]);
             return -1;
         }
     }
-
+    
     return 0;
 }
 
-/* ==================== 主函数 ==================== */
-
+/**
+ * @brief 主函数
+ * @param argc 参数数量
+ * @param argv 参数数组
+ * @return 0 成功
+ */
 int main(int argc, char* argv[]) {
     gateway_service_config_t config;
-
-    /* 初始化平台层 */
-    agentos_socket_init();
-    agentos_mutex_init(&g_running_lock);
-
+    
+    /* 解析命令行参数 */
+    if (parse_args(argc, argv, &config) != 0) {
+        return 1;
+    }
+    
     /* 设置信号处理 */
 #ifdef _WIN32
     SetConsoleCtrlHandler(console_handler, TRUE);
@@ -184,72 +180,57 @@ int main(int argc, char* argv[]) {
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
     signal(SIGHUP, SIG_IGN);
-    signal(SIGPIPE, SIG_IGN);
 #endif
-
-    /* 解析命令行参数 */
-    if (parse_args(argc, argv, &config) != 0) {
-        agentos_mutex_destroy(&g_running_lock);
-        agentos_socket_cleanup();
-        return 1;
-    }
-
-    SVC_LOG_INFO("Gateway service starting...");
-
+    
     /* 创建服务 */
     agentos_error_t err = gateway_service_create(&g_service, &config);
     if (err != AGENTOS_SUCCESS) {
-        SVC_LOG_ERROR("Failed to create gateway service (error=%d)", err);
-        agentos_mutex_destroy(&g_running_lock);
-        agentos_socket_cleanup();
+        fprintf(stderr, "Failed to create gateway service: %d\n", err);
         return 1;
     }
-
+    
     /* 初始化服务 */
     err = gateway_service_init(g_service);
     if (err != AGENTOS_SUCCESS) {
-        SVC_LOG_ERROR("Failed to initialize gateway service (error=%d)", err);
+        fprintf(stderr, "Failed to initialize gateway service: %d\n", err);
         gateway_service_destroy(g_service);
-        agentos_mutex_destroy(&g_running_lock);
-        agentos_socket_cleanup();
         return 1;
     }
-
+    
     /* 启动服务 */
     err = gateway_service_start(g_service);
     if (err != AGENTOS_SUCCESS) {
-        SVC_LOG_ERROR("Failed to start gateway service (error=%d)", err);
+        fprintf(stderr, "Failed to start gateway service: %d\n", err);
         gateway_service_destroy(g_service);
-        agentos_mutex_destroy(&g_running_lock);
-        agentos_socket_cleanup();
         return 1;
     }
-
-    SVC_LOG_INFO("AgentOS Gateway Daemon started");
-    SVC_LOG_INFO("  HTTP:     %s:%d %s",
-                config.http.host, config.http.port,
-                config.http.enabled ? "[enabled]" : "[disabled]");
-    SVC_LOG_INFO("  WebSocket: %s:%d %s",
-                config.ws.host, config.ws.port,
-                config.ws.enabled ? "[enabled]" : "[disabled]");
-    SVC_LOG_INFO("  Stdio:    %s",
-                config.stdio.enabled ? "[enabled]" : "[disabled]");
-
+    
+    printf("AgentOS Gateway Daemon started\n");
+    printf("  HTTP:    %s:%d %s\n", 
+           config.http.host, config.http.port,
+           config.http.enabled ? "[enabled]" : "[disabled]");
+    printf("  WebSocket: %s:%d %s\n",
+           config.ws.host, config.ws.port,
+           config.ws.enabled ? "[enabled]" : "[disabled]");
+    printf("  Stdio:   %s\n",
+           config.stdio.enabled ? "[enabled]" : "[disabled]");
+    
     /* 主循环 */
     while (g_running && gateway_service_is_running(g_service)) {
-        agentos_sleep_ms(1000);
+#ifdef _WIN32
+        Sleep(1000);
+#else
+        sleep(1);
+#endif
     }
-
+    
     /* 停止服务 */
-    SVC_LOG_INFO("Gateway service shutting down...");
+    printf("Shutting down...\n");
     gateway_service_stop(g_service, false);
-
+    
     /* 清理 */
     gateway_service_destroy(g_service);
-
-    agentos_mutex_destroy(&g_running_lock);
-    agentos_socket_cleanup();
-
-    SVC_LOG_INFO("Gateway daemon stopped");
+    
+    printf("Gateway daemon stopped\n");
     return 0;
 }

@@ -265,6 +265,10 @@ static void stdio_gateway_stop(void* gateway_impl) {
 
 static void stdio_gateway_destroy(void* gateway_impl) {
     stdio_gateway_t* gateway = (stdio_gateway_t*)gateway_impl;
+    if (!gateway) return;
+
+    stdio_gateway_stop(gateway);
+
     free(gateway);
 }
 
@@ -281,8 +285,10 @@ static bool stdio_gateway_is_running(void* gateway_impl) {
 
 static agentos_error_t stdio_gateway_get_stats(void* gateway_impl, char** out_json) {
     stdio_gateway_t* gateway = (stdio_gateway_t*)gateway_impl;
-    
+    if (!gateway || !out_json) return AGENTOS_EINVAL;
+
     cJSON* stats = cJSON_CreateObject();
+    if (!stats) return AGENTOS_ENOMEM;
     cJSON_AddNumberToObject(stats, "commands_total", (double)atomic_load(&gateway->commands_total));
     cJSON_AddNumberToObject(stats, "commands_failed", (double)atomic_load(&gateway->commands_failed));
     cJSON_AddNumberToObject(stats, "bytes_received", (double)atomic_load(&gateway->bytes_received));

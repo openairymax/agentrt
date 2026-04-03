@@ -47,12 +47,10 @@ scripts/
 │   ├── cicd.sh              # CI/CD 入口（代码检查、测试、安全扫描）
 │   ├── rollback.sh          # 版本回滚（历史记录、蓝绿切换）
 │   └── buildlog.sh          # 构建日志管理（收集、分析、报告）
-│
-├── deploy/                   # 部署配置
-│   └── docker/
-│       ├── build.sh         # Docker 镜像构建（内核/服务/全量）
-│       ├── quickstart.sh    # 快速入门（环境检查、一键部署）
-│       └── check_config.sh  # 配置检查
+│   ├── dev/                   # 开发辅助
+│   │   ├── config/           # 开发配置（clang-format, vcpkg.json 等）
+│   │   ├── quickstart.sh     # 快速入门（一键启动）
+│   │   └── validate.sh       # 环境验证
 │
 ├── ops/                      # 运维工具
 │   ├── doctor.py            # 健康检查（系统/依赖/网络/Docker）

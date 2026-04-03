@@ -214,6 +214,66 @@ agentos_error_t heapstore_syscall_session_list(
     *out_sessions = NULL;
     *out_count = 0;
 
+    heapstore_registry_iter_t* iter = NULL;
+    heapstore_error_t err = heapstore_registry_query_sessions(NULL, &iter);
+    if (err != heapstore_SUCCESS || !iter) {
+        return AGENTOS_EIO;
+    }
+
+    size_t count = 0;
+    size_t capacity = 16;
+    char** sessions = (char**)malloc(capacity * sizeof(char*));
+    if (!sessions) {
+        heapstore_registry_iter_destroy(iter);
+        return AGENTOS_ENOMEM;
+    }
+
+    heapstore_session_record_t record;
+    while (true) {
+        err = heapstore_registry_iter_next(iter, &record);
+        if (err == heapstore_ERR_NOT_FOUND) {
+            break;
+        }
+        if (err != heapstore_SUCCESS) {
+            for (size_t i = 0; i < count; i++) {
+                free(sessions[i]);
+            }
+            free(sessions);
+            heapstore_registry_iter_destroy(iter);
+            return AGENTOS_EIO;
+        }
+
+        if (count >= capacity) {
+            capacity *= 2;
+            char** new_sessions = (char**)realloc(sessions, capacity * sizeof(char*));
+            if (!new_sessions) {
+                for (size_t i = 0; i < count; i++) {
+                    free(sessions[i]);
+                }
+                free(sessions);
+                heapstore_registry_iter_destroy(iter);
+                return AGENTOS_ENOMEM;
+            }
+            sessions = new_sessions;
+        }
+
+        sessions[count] = strdup(record.id);
+        if (!sessions[count]) {
+            for (size_t i = 0; i < count; i++) {
+                free(sessions[i]);
+            }
+            free(sessions);
+            heapstore_registry_iter_destroy(iter);
+            return AGENTOS_ENOMEM;
+        }
+        count++;
+    }
+
+    heapstore_registry_iter_destroy(iter);
+
+    *out_sessions = sessions;
+    *out_count = count;
+
     return AGENTOS_SUCCESS;
 }
 
@@ -271,8 +331,8 @@ agentos_error_t heapstore_syscall_trace_export(char** out_traces) {
         return AGENTOS_EINVAL;
     }
 
-    *out_traces = strdup("[]");
-    return *out_traces ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
+    heapstore_error_t err = heapstore_trace_export_to_json(out_traces, true);
+    return (err == heapstore_SUCCESS) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 }
 
 agentos_error_t heapstore_memoryrovol_save(

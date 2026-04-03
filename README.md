@@ -6,18 +6,18 @@
 [![Gitee](https://gitee.com/spharx/agentos/badge/star.svg)](https://gitee.com/spharx/agentos)
 [![GitHub](https://img.shields.io/github/stars/SpharxTeam/AgentOS)](https://github.com/SpharxTeam/AgentOS)  
 
+[![Version](https://img.shields.io/badge/version-1.0.0.9-5a6b7e)](https://atomgit.com/spharx/agentos)
+[![Documentation](https://img.shields.io/badge/docs-Doc%20V1.8-64748b)](manuals/ARCHITECTURAL_PRINCIPLES.md)  
 
-[![Version](https://img.shields.io/badge/version-1.0.0.9-blue.svg)](https://atomgit.com/spharx/agentos)
-[![Documentation Status](https://img.shields.io/badge/docs-Doc%20V1.8-blue)](manuals/ARCHITECTURAL_PRINCIPLES.md)
-[![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](https://atomgit.com/spharx/agentos/blob/main/LICENSE)  
+[![License](https://img.shields.io/badge/license-Apache--2.0-71897b)](https://atomgit.com/spharx/agentos/blob/main/LICENSE)
+[![Build Status](https://img.shields.io/badge/build-passing-7a9c8c)](https://github.com/SpharxTeam/AgentOS/actions)  
 
+[![Docker](https://img.shields.io/badge/docker-supported-4a7baf?logo=docker&logoColor=white)](https://www.docker.com)
+[![C/C++](https://img.shields.io/badge/C%2FC%2B%2B-11%2F17-708cb8?logo=c%2B%2B&logoColor=white)](https://isocpp.org)
+[![Python](https://img.shields.io/badge/python-3.10+-6b93d6?logo=python&logoColor=white)](https://www.python.org)
+[![Go](https://img.shields.io/badge/Go-1.21+-529ccb?logo=go&logoColor=white)](https://go.dev)
+[![Rust](https://img.shields.io/badge/Rust-1.70+-b08968?logo=rust&logoColor=white)](https://www.rust-lang.org)
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/SpharxTeam/AgentOS/actions)
-[![Docker](https://img.shields.io/badge/docker-supported-blue.svg?logo=docker&logoColor=white)](https://www.docker.com/)
-[![C/C++](https://img.shields.io/badge/C%2FC%2B%2B-11%2F17-blue.svg?logo=c%2B%2B&logoColor=white)](https://isocpp.org/)
-[![Python](https://img.shields.io/badge/python-3.10+-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
-[![Go](https://img.shields.io/badge/Go-1.21+-blue.svg?logo=go&logoColor=white)](https://go.dev/)
-[![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg?logo=rust&logoColor=white)](https://www.rust-lang.org/)  
 
 </div>
 

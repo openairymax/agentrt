@@ -22,6 +22,7 @@
 
 #include <stddef.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -70,7 +71,7 @@ typedef struct {
 /**
  * @brief 内存调试信息
  */
-typedef struct {
+typedef struct memory_debug_info {
     void* address;                       /**< 内存地址 */
     size_t size;                         /**< 分配大小 */
     const char* tag;                     /**< 分配标签 */
