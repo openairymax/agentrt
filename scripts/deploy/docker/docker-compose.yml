@@ -1,4 +1,4 @@
-﻿# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Docker Compose 配置文件
 # 用于编排内核和服务容器
 
@@ -41,6 +41,10 @@ services:
       - ./heapstore/registry:/var/lib/agentos/registry:rw
       # 追踪数据
       - ./heapstore/traces:/var/lib/agentos/traces:rw
+      # 检查点数据（长时间任务支持）
+      - ./heapstore/checkpoints:/var/lib/agentos/checkpoints:rw
+      # Token 统计和预算数据
+      - ./heapstore/token_stats:/var/lib/agentos/token_stats:rw
       # 配置文件（可选覆盖）
       - ../../manager/kernel:/etc/agentos/kernel:ro
 

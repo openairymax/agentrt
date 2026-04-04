@@ -2,11 +2,11 @@
 
 <div align="center">
 
-**版本**: v1.0.0.6  
+**版本**: v1.0.0.9  
 **最后更新**: 2026-03-29  
 **许可证**: Apache License 2.0
 
-[![Version](https://img.shields.io/badge/version-v1.0.0.6-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-v1.0.0.9-blue.svg)]()
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)]()
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)]()
 [![Status](https://img.shields.io/badge/status-production%20ready-green.svg)]()

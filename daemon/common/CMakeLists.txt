@@ -52,6 +52,7 @@ set(SVC_COMMON_SOURCES
     src/ipc_client.c
     src/svc_auth.c
     src/daemon_security.c
+    src/jsonrpc_helpers.c
 )
 
 # 创建静态库
@@ -187,6 +188,7 @@ install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/include/compat.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/svc_auth.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/daemon_security.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/jsonrpc_helpers.h
     DESTINATION include/agentos
 )
 

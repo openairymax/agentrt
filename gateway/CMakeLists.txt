@@ -50,6 +50,7 @@ include_directories(
 set(GATEWAY_SOURCES
     src/gateway/gateway_api.c
     src/gateway/http_gateway.c
+    src/gateway/http_gateway_routes.c
     src/gateway/ws_gateway.c
     src/gateway/stdio_gateway.c
     src/utils/jsonrpc.c
@@ -111,9 +112,21 @@ install(FILES
 option(BUILD_TESTS "Build tests" ON)
 if(BUILD_TESTS)
     enable_testing()
+    
+    # 主网关测试
     add_executable(test_gateway tests/test_gateway.c)
     target_link_libraries(test_gateway gateway)
     add_test(NAME gateway_test COMMAND test_gateway)
+    
+    # syscall_router 测试
+    add_executable(test_syscall_router tests/test_syscall_router.c)
+    target_link_libraries(test_syscall_router gateway)
+    add_test(NAME syscall_router_test COMMAND test_syscall_router)
+    
+    # jsonrpc 协议测试
+    add_executable(test_jsonrpc tests/test_jsonrpc.c)
+    target_link_libraries(test_jsonrpc gateway)
+    add_test(NAME jsonrpc_test COMMAND test_jsonrpc)
 endif()
 
 # ========== 格式化 ==========

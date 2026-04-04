@@ -7,7 +7,7 @@
 # Application Settings
 app:
   name: "OpenLab"
-  version: "1.0.0.6"
+  version: "1.0.0.9"
   environment: "development"
   debug: true
 
