@@ -121,3 +121,16 @@ target_link_libraries(test_full_workflow
     Threads::Threads
 )
 add_test(NAME test_full_workflow COMMAND test_full_workflow)
+
+# 扩展单元测试
+add_executable(test_syscall_extended tests/unit/test_syscall_extended.c)
+target_include_directories(test_syscall_extended PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../corekern/include
+)
+target_link_libraries(test_syscall_extended
+    agentos_syscall
+    agentos_core
+    Threads::Threads
+)
+add_test(NAME test_syscall_extended COMMAND test_syscall_extended)

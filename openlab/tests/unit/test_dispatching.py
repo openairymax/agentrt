@@ -2,210 +2,273 @@
 # "From data intelligence emerges."
 
 """
-Unit Tests for Dispatching Strategy
-=================================
+Unit Tests for Dispatching Strategies
+====================================
 """
 
 import pytest
+from typing import Dict, List, Optional
 import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 
-class TestDispatchingStrategy:
-    """Tests for dispatching strategy."""
+class TestAgentMetrics:
+    """Tests for AgentMetrics dataclass."""
 
-    def test_strategy_initialization(self):
-        """Test strategy can be initialized."""
-        from contrib.strategies.dispatching import DispatchingStrategy
+    def test_agent_metrics_creation(self):
+        """Test AgentMetrics can be created."""
+        from openlab.contrib.strategies.dispatching import AgentMetrics
 
-        strategy = DispatchingStrategy()
-        assert strategy is not None
-        assert strategy.capability_weight == 0.4
-        assert strategy.priority_weight == 0.3
-        assert strategy.load_weight == 0.3
+        metrics = AgentMetrics(agent_id="agent-001")
+        assert metrics.agent_id == "agent-001"
+        assert metrics.weight == 1.0
+        assert metrics.current_load == 0.0
+        assert metrics.success_rate == 1.0
 
-    def test_register_agent(self):
-        """Test agent registration."""
-        from contrib.strategies.dispatching import DispatchingStrategy, AgentInfo, Capability
+    def test_agent_metrics_with_values(self):
+        """Test AgentMetrics with custom values."""
+        from openlab.contrib.strategies.dispatching import AgentMetrics
 
-        strategy = DispatchingStrategy()
-        agent = AgentInfo(
-            agent_id="agent-001",
-            name="TestAgent",
-            capabilities=[Capability(name="coding", level=0.9)]
-        )
-
-        success = strategy.register_agent(agent)
-        assert success is True
-
-    def test_unregister_agent(self):
-        """Test agent unregistration."""
-        from contrib.strategies.dispatching import DispatchingStrategy, AgentInfo, Capability
-
-        strategy = DispatchingStrategy()
-        agent = AgentInfo(
+        metrics = AgentMetrics(
             agent_id="agent-002",
-            name="TestAgent2",
-            capabilities=[Capability(name="testing", level=0.8)]
+            weight=2.0,
+            current_load=0.5,
+            avg_response_time=1.5,
+            success_rate=0.95,
+            priority=10,
+            capabilities=["coding", "testing"]
         )
 
-        strategy.register_agent(agent)
-        success = strategy.unregister_agent("agent-002")
-        assert success is True
+        assert metrics.weight == 2.0
+        assert metrics.current_load == 0.5
+        assert metrics.avg_response_time == 1.5
+        assert metrics.success_rate == 0.95
+        assert metrics.priority == 10
+        assert len(metrics.capabilities) == 2
 
-    def test_select_agent_with_no_agents(self):
-        """Test agent selection with no registered agents."""
-        from contrib.strategies.dispatching import DispatchingStrategy, TaskRequirements
 
-        strategy = DispatchingStrategy()
-        requirements = TaskRequirements(required_capabilities=["coding"])
+class TestTaskContext:
+    """Tests for TaskContext dataclass."""
 
-        selected = strategy.select_agent(requirements)
-        assert selected is None
+    def test_task_context_creation(self):
+        """Test TaskContext can be created."""
+        from openlab.contrib.strategies.dispatching import TaskContext
 
-    def test_select_agent_by_capability(self):
-        """Test agent selection by capability."""
-        from contrib.strategies.dispatching import (
-            DispatchingStrategy, AgentInfo, Capability, TaskRequirements
+        context = TaskContext(task_id="task-001")
+        assert context.task_id == "task-001"
+        assert context.task_type == "default"
+        assert context.priority == 0
+
+    def test_task_context_with_requirements(self):
+        """Test TaskContext with requirements."""
+        from openlab.contrib.strategies.dispatching import TaskContext
+
+        context = TaskContext(
+            task_id="task-002",
+            task_type="coding",
+            priority=5,
+            required_capabilities=["python", "testing"],
+            estimated_duration=3600.0,
+            deadline=1234567890.0
         )
 
-        strategy = DispatchingStrategy()
+        assert context.task_type == "coding"
+        assert context.priority == 5
+        assert "python" in context.required_capabilities
+        assert context.estimated_duration == 3600.0
+        assert context.deadline == 1234567890.0
 
-        agent1 = AgentInfo(
-            agent_id="cap-agent-001",
-            name="CodingAgent",
-            capabilities=[Capability(name="coding", level=0.9)]
-        )
 
-        agent2 = AgentInfo(
-            agent_id="cap-agent-002",
-            name="DesignAgent",
-            capabilities=[Capability(name="design", level=0.8)]
-        )
+class TestDispatchStrategy:
+    """Tests for DispatchStrategy base class."""
 
-        strategy.register_agent(agent1)
-        strategy.register_agent(agent2)
+    def test_strategy_stats(self):
+        """Test strategy statistics tracking."""
+        from openlab.contrib.strategies.dispatching import WeightedRoundRobinStrategy
 
-        requirements = TaskRequirements(required_capabilities=["coding"])
-        selected = strategy.select_agent(requirements)
+        strategy = WeightedRoundRobinStrategy()
+        stats = strategy.get_stats()
+
+        assert stats["strategy"] == "weighted_round_robin"
+        assert stats["total_selections"] == 0
+        assert isinstance(stats["selection_distribution"], dict)
+
+
+class TestWeightedRoundRobinStrategy:
+    """Tests for WeightedRoundRobinStrategy class."""
+
+    @pytest.fixture
+    def strategy(self):
+        """Create a test strategy."""
+        from openlab.contrib.strategies.dispatching import WeightedRoundRobinStrategy
+        return WeightedRoundRobinStrategy()
+
+    def test_strategy_creation(self, strategy):
+        """Test strategy can be created."""
+        assert strategy.name == "weighted_round_robin"
+
+    def test_select_single_candidate(self, strategy):
+        """Test selecting from single candidate."""
+        from openlab.contrib.strategies.dispatching import AgentMetrics
+
+        candidates = [AgentMetrics(agent_id="agent-001")]
+        selected = strategy.select(candidates)
 
         assert selected is not None
-        assert selected.name == "CodingAgent"
+        assert selected.agent_id == "agent-001"
 
-    def test_dispatch_task(self):
-        """Test task dispatching."""
-        from contrib.strategies.dispatching import (
-            DispatchingStrategy, AgentInfo, Capability, TaskRequirements, Priority
+    def test_select_empty_candidates(self, strategy):
+        """Test selecting from empty candidates."""
+        selected = strategy.select([])
+        assert selected is None
+
+    def test_select_multiple_candidates(self, strategy):
+        """Test selecting from multiple candidates."""
+        from openlab.contrib.strategies.dispatching import AgentMetrics
+
+        candidates = [
+            AgentMetrics(agent_id="agent-001", weight=1.0),
+            AgentMetrics(agent_id="agent-002", weight=2.0),
+        ]
+
+        selected = strategy.select(candidates)
+        assert selected is not None
+        assert selected.agent_id in ["agent-001", "agent-002"]
+
+    def test_select_with_weights(self):
+        """Test selection with custom weights."""
+        from openlab.contrib.strategies.dispatching import (
+            WeightedRoundRobinStrategy,
+            AgentMetrics
         )
 
-        strategy = DispatchingStrategy()
-
-        agent = AgentInfo(
-            agent_id="dispatch-agent-001",
-            name="DispatchAgent",
-            capabilities=[Capability(name="coding", level=0.9)]
+        strategy = WeightedRoundRobinStrategy(
+            weights={"agent-001": 10.0, "agent-002": 1.0}
         )
 
-        strategy.register_agent(agent)
+        candidates = [
+            AgentMetrics(agent_id="agent-001"),
+            AgentMetrics(agent_id="agent-002"),
+        ]
 
-        task_data = {
-            "id": "task-001",
-            "description": "Test task",
-            "type": "code_generation",
-            "metadata": {
-                "required_capabilities": ["coding"],
-                "priority": "high"
-            }
-        }
+        # Run multiple selections and count
+        counts = {"agent-001": 0, "agent-002": 0}
+        for _ in range(100):
+            selected = strategy.select(candidates)
+            if selected:
+                counts[selected.agent_id] += 1
 
-        result = strategy.dispatch(task_data)
+        # Agent with higher weight should be selected more often
+        assert counts["agent-001"] > counts["agent-002"]
 
-        assert result.success is True
-        assert result.agent_id == "dispatch-agent-001"
+    def test_stats_update(self, strategy):
+        """Test statistics are updated after selection."""
+        from openlab.contrib.strategies.dispatching import AgentMetrics
 
-    def test_dispatch_with_no_suitable_agent(self):
-        """Test dispatching when no suitable agent exists."""
-        from contrib.strategies.dispatching import DispatchingStrategy, TaskRequirements
+        candidates = [AgentMetrics(agent_id="agent-001")]
+        strategy.select(candidates)
 
-        strategy = DispatchingStrategy()
-        task_data = {
-            "id": "task-002",
-            "description": "Test task",
-            "metadata": {"required_capabilities": ["quantum_computing"]}
-        }
-
-        result = strategy.dispatch(task_data)
-
-        assert result.success is False
-        assert result.error is not None
+        stats = strategy.get_stats()
+        assert stats["total_selections"] == 1
+        assert stats["selection_distribution"]["agent-001"] == 1
 
 
-class TestTaskRequirements:
-    """Tests for task requirements."""
+class TestPriorityBasedStrategy:
+    """Tests for PriorityBasedStrategy class."""
 
-    def test_task_requirements_creation(self):
-        """Test creating task requirements."""
-        from contrib.strategies.dispatching import TaskRequirements, Priority
+    @pytest.fixture
+    def strategy(self):
+        """Create a test strategy."""
+        from openlab.contrib.strategies.dispatching import PriorityBasedStrategy
+        return PriorityBasedStrategy()
 
-        requirements = TaskRequirements(
-            required_capabilities=["coding", "testing"],
-            preferred_agent="agent-001",
-            priority=Priority.HIGH,
-            estimated_complexity=7.0
-        )
+    def test_strategy_creation(self, strategy):
+        """Test strategy can be created."""
+        assert strategy.name == "priority_based"
 
-        assert len(requirements.required_capabilities) == 2
-        assert requirements.priority == Priority.HIGH
-        assert requirements.estimated_complexity == 7.0
+    def test_select_highest_priority(self, strategy):
+        """Test selecting agent with highest priority."""
+        from openlab.contrib.strategies.dispatching import AgentMetrics
+
+        candidates = [
+            AgentMetrics(agent_id="agent-001", priority=5),
+            AgentMetrics(agent_id="agent-002", priority=10),
+            AgentMetrics(agent_id="agent-003", priority=3),
+        ]
+
+        selected = strategy.select(candidates)
+        assert selected is not None
+        assert selected.agent_id == "agent-002"
 
 
-class TestAgentInfo:
-    """Tests for agent info."""
+class TestLeastLoadedStrategy:
+    """Tests for LeastLoadedStrategy class."""
 
-    def test_agent_info_creation(self):
-        """Test creating agent info."""
-        from contrib.strategies.dispatching import AgentInfo, Capability
+    @pytest.fixture
+    def strategy(self):
+        """Create a test strategy."""
+        from openlab.contrib.strategies.dispatching import LeastLoadedStrategy
+        return LeastLoadedStrategy()
 
-        agent = AgentInfo(
-            agent_id="info-agent-001",
-            name="InfoTestAgent",
-            capabilities=[Capability(name="design", level=0.85)]
-        )
+    def test_strategy_creation(self, strategy):
+        """Test strategy can be created."""
+        assert strategy.name == "least_loaded"
 
-        assert agent.agent_id == "info-agent-001"
-        assert agent.available_slots == 5
+    def test_select_least_loaded(self, strategy):
+        """Test selecting agent with least load."""
+        from openlab.contrib.strategies.dispatching import AgentMetrics
 
-    def test_has_capability(self):
-        """Test capability checking."""
-        from contrib.strategies.dispatching import AgentInfo, Capability
+        candidates = [
+            AgentMetrics(agent_id="agent-001", current_load=0.8),
+            AgentMetrics(agent_id="agent-002", current_load=0.2),
+            AgentMetrics(agent_id="agent-003", current_load=0.5),
+        ]
 
-        agent = AgentInfo(
-            agent_id="cap-check-001",
-            name="CapabilityCheckAgent",
-            capabilities=[
-                Capability(name="coding", level=0.9),
-                Capability(name="testing", level=0.6)
-            ]
-        )
+        selected = strategy.select(candidates)
+        assert selected is not None
+        assert selected.agent_id == "agent-002"
+        assert selected.current_load == 0.2
 
-        assert agent.has_capability("coding", min_level=0.8) is True
-        assert agent.has_capability("coding", min_level=0.95) is False
-        assert agent.has_capability("design", min_level=0.5) is False
 
-    def test_get_capability_level(self):
-        """Test getting capability level."""
-        from contrib.strategies.dispatching import AgentInfo, Capability
+class TestAdaptiveMLStrategy:
+    """Tests for AdaptiveMLStrategy class."""
 
-        agent = AgentInfo(
-            agent_id="level-agent-001",
-            name="LevelTestAgent",
-            capabilities=[Capability(name="analysis", level=0.75)]
-        )
+    @pytest.fixture
+    def strategy(self):
+        """Create a test strategy."""
+        from openlab.contrib.strategies.dispatching import AdaptiveMLStrategy
+        return AdaptiveMLStrategy()
 
-        assert agent.get_capability_level("analysis") == 0.75
-        assert agent.get_capability_level("unknown") == 0.0
+    def test_strategy_creation(self, strategy):
+        """Test strategy can be created."""
+        assert strategy.name == "adaptive_ml"
+
+    def test_select_adaptive(self, strategy):
+        """Test adaptive selection."""
+        from openlab.contrib.strategies.dispatching import AgentMetrics, TaskContext
+
+        candidates = [
+            AgentMetrics(
+                agent_id="agent-001",
+                current_load=0.5,
+                success_rate=0.9,
+                avg_response_time=1.0
+            ),
+            AgentMetrics(
+                agent_id="agent-002",
+                current_load=0.3,
+                success_rate=0.7,
+                avg_response_time=2.0
+            ),
+        ]
+
+        context = TaskContext(task_id="task-001", task_type="coding")
+        selected = strategy.select(candidates, context)
+
+        assert selected is not None
+        assert selected.agent_id in ["agent-001", "agent-002"]
 
 
 if __name__ == "__main__":

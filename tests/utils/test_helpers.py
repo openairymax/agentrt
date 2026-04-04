@@ -1,16 +1,24 @@
 """
 AgentOS 公共测试工具模块
 Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-Version: 1.0.0
+Version: 1.0.0.9
 
 提供统一的测试辅助函数，减少重复代码
 """
 
 import pytest
-from typing import Any, Dict, List, Optional, Callable
-from unittest.mock import Mock, MagicMock, patch
+import json
+import hashlib
+import secrets
+import string
+import re
+from typing import Any, Dict, List, Optional, Callable, Type, Union
+from unittest.mock import Mock, MagicMock, patch, AsyncMock
 from functools import wraps
 import time
+import tracemalloc
+import asyncio
+from contextlib import contextmanager
 
 
 # ============================================================
@@ -354,18 +362,430 @@ class TestIsolation:
 
 
 # ============================================================
+# 异步测试辅助
+# ============================================================
+
+def async_test(func: Callable) -> Callable:
+    """
+    装饰器：标记异步测试函数
+
+    用法:
+        @async_test
+        async def test_async():
+            result = await some_async_function()
+            assert result is not None
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        loop = asyncio.new_event_loop()
+        try:
+            return loop.run_until_complete(func(*args, **kwargs))
+        finally:
+            loop.close()
+    return wrapper
+
+
+@contextmanager
+def async_timeout(seconds: float):
+    """
+    上下文管理器：异步超时控制
+
+    用法:
+        async with async_timeout(5.0):
+            await long_running_operation()
+
+    Raises:
+        asyncio.TimeoutError: 操作超时
+    """
+    async def _timeout():
+        await asyncio.sleep(seconds)
+        raise asyncio.TimeoutError(f"Operation timed out after {seconds}s")
+
+    async def _run_with_timeout(coro):
+        task = asyncio.create_task(coro)
+        timeout_task = asyncio.create_task(_timeout())
+        try:
+            result = await asyncio.shield(asyncio.gather(task, timeout_task, return_exceptions=True))[0]
+            return result
+        except asyncio.TimeoutError:
+            task.cancel()
+            raise
+        finally:
+            timeout_task.cancel()
+
+    loop = asyncio.new_event_loop()
+    try:
+        yield _run_with_timeout
+    finally:
+        loop.close()
+
+
+# ============================================================
+# 内存分析辅助
+# ============================================================
+
+@contextmanager
+def memory_profile():
+    """
+    上下文管理器：内存使用分析
+
+    用法:
+        with memory_profile() as mp:
+            # 执行代码
+            data = process_large_data()
+        print(f"峰值内存: {mp.peak_mb:.2f} MB")
+        print(f"当前内存: {mp.current_mb:.2f} MB")
+
+    Yields:
+        MemorySnapshot: 内存快照对象
+    """
+    class MemorySnapshot:
+        def __init__(self):
+            self.start_mb = 0
+            self.peak_mb = 0
+            self.current_mb = 0
+
+        def update(self):
+            tracemalloc.stop()
+            tracemalloc.start()
+            snapshot = tracemalloc.take_snapshot()
+            stats = snapshot.statistics('lineno')
+            total = sum(stat.size for stat in stats)
+            self.current_mb = total / 1024 / 1024
+            if self.current_mb > self.peak_mb:
+                self.peak_mb = self.current_mb
+
+    snapshot = MemorySnapshot()
+    snapshot.start_mb = 0
+    tracemalloc.start()
+    try:
+        yield snapshot
+    finally:
+        snapshot.update()
+        tracemalloc.stop()
+
+
+# ============================================================
+# 随机数据生成器
+# ============================================================
+
+class RandomDataGenerator:
+    """
+    随机数据生成器
+
+    用于生成各种测试数据
+    """
+
+    @staticmethod
+    def random_string(length: int = 10, include_special: bool = False) -> str:
+        """生成随机字符串"""
+        chars = string.ascii_letters + string.digits
+        if include_special:
+            chars += "!@#$%^&*()_+-=[]{}|;:,.<>?"
+        return ''.join(secrets.choice(chars) for _ in range(length))
+
+    @staticmethod
+    def random_email() -> str:
+        """生成随机邮箱"""
+        username = RandomDataGenerator.random_string(8).lower()
+        domain = secrets.choice(['gmail.com', 'outlook.com', 'test.com'])
+        return f"{username}@{domain}"
+
+    @staticmethod
+    def random_url() -> str:
+        """生成随机URL"""
+        scheme = secrets.choice(['http', 'https'])
+        domain = RandomDataGenerator.random_string(10).lower()
+        path = '/'.join(RandomDataGenerator.random_string(5).lower() for _ in range(3))
+        return f"{scheme}://{domain}.com/{path}"
+
+    @staticmethod
+    def random_json(depth: int = 3, max_items: int = 5) -> Dict[str, Any]:
+        """生成随机JSON结构"""
+        if depth <= 0:
+            return {"value": RandomDataGenerator.random_string(10)}
+
+        result = {}
+        num_items = secrets.randbelow(max_items) + 1
+
+        for i in range(num_items):
+            key = f"field_{i}"
+            choice = secrets.randbelow(4)
+
+            if choice == 0:
+                result[key] = RandomDataGenerator.random_string(20)
+            elif choice == 1:
+                result[key] = secrets.randbelow(10000)
+            elif choice == 2:
+                result[key] = secrets.choice([True, False])
+            else:
+                result[key] = RandomDataGenerator.random_json(depth - 1, max_items)
+
+        return result
+
+    @staticmethod
+    def random_ip() -> str:
+        """生成随机IP地址"""
+        return ".".join(str(secrets.randbelow(256)) for _ in range(4))
+
+
+# ============================================================
+# JSON Schema 验证辅助（简化版）
+# ============================================================
+
+class JSONSchemaValidator:
+    """
+    简化的 JSON Schema 验证器
+
+    支持常用验证规则
+    """
+
+    @staticmethod
+    def validate(data: Any, schema: Dict[str, Any]) -> List[str]:
+        """
+        验证数据是否符合 Schema
+
+        Args:
+            data: 要验证的数据
+            schema: JSON Schema 定义
+
+        Returns:
+            错误列表，空表示验证通过
+        """
+        errors = []
+        JSONSchemaValidator._validate_recursive(data, schema, "", errors)
+        return errors
+
+    @staticmethod
+    def _validate_recursive(data: Any, schema: Dict[str, Any], path: str, errors: List[str]):
+        """递归验证"""
+        if "type" in schema:
+            expected_type = schema["type"]
+            if expected_type == "object" and not isinstance(data, dict):
+                errors.append(f"{path}: expected object, got {type(data).__name__}")
+                return
+            elif expected_type == "string" and not isinstance(data, str):
+                errors.append(f"{path}: expected string, got {type(data).__name__}")
+                return
+            elif expected_type == "number" and not isinstance(data, (int, float)):
+                errors.append(f"{path}: expected number, got {type(data).__name__}")
+                return
+            elif expected_type == "boolean" and not isinstance(data, bool):
+                errors.append(f"{path}: expected boolean, got {type(data).__name__}")
+                return
+            elif expected_type == "array" and not isinstance(data, list):
+                errors.append(f"{path}: expected array, got {type(data).__name__}")
+                return
+
+        if "required" in schema and isinstance(data, dict):
+            for field in schema["required"]:
+                if field not in data:
+                    errors.append(f"{path}.{field}: required field missing")
+
+        if "properties" in schema and isinstance(data, dict):
+            for key, field_schema in schema["properties"].items():
+                if key in data:
+                    JSONSchemaValidator._validate_recursive(
+                        data[key], field_schema,
+                        f"{path}.{key}" if path else key,
+                        errors
+                    )
+
+        if "items" in schema and isinstance(data, list):
+            for i, item in enumerate(data):
+                JSONSchemaValidator._validate_recursive(
+                    item, schema["items"],
+                    f"{path}[{i}]",
+                    errors
+                )
+
+
+# ============================================================
+# 性能基准测试辅助
+# ============================================================
+
+class PerformanceBenchmark:
+    """
+    性能基准测试类
+
+    用于测量和比较性能
+    """
+
+    def __init__(self, name: str = "Benchmark"):
+        self.name = name
+        self.results = []
+        self._start_time = None
+
+    def start(self):
+        """开始计时"""
+        self._start_time = time.perf_counter()
+
+    def stop(self) -> float:
+        """停止计时并记录结果"""
+        if self._start_time is None:
+            raise RuntimeError("Benchmark not started")
+        elapsed = time.perf_counter() - self._start_time
+        self.results.append(elapsed)
+        self._start_time = None
+        return elapsed
+
+    def run(self, func: Callable, iterations: int = 100, warmup: int = 10) -> Dict[str, float]:
+        """
+        运行基准测试
+
+        Args:
+            func: 要测试的函数
+            iterations: 测试迭代次数
+            warmup: 预热迭代次数
+
+        Returns:
+            性能统计字典
+        """
+        for _ in range(warmup):
+            func()
+
+        self.results = []
+        for _ in range(iterations):
+            start = time.perf_counter()
+            func()
+            self.results.append(time.perf_counter() - start)
+
+        return self.get_stats()
+
+    def get_stats(self) -> Dict[str, float]:
+        """获取性能统计"""
+        if not self.results:
+            return {}
+
+        sorted_results = sorted(self.results)
+        return {
+            "name": self.name,
+            "iterations": len(self.results),
+            "min": min(self.results) * 1000,
+            "max": max(self.results) * 1000,
+            "mean": sum(self.results) / len(self.results) * 1000,
+            "median": sorted_results[len(sorted_results) // 2] * 1000,
+            "p95": sorted_results[int(len(sorted_results) * 0.95)] * 1000,
+            "p99": sorted_results[int(len(sorted_results) * 0.99)] * 1000,
+        }
+
+
+# ============================================================
+# 边界条件测试辅助
+# ============================================================
+
+class BoundaryTestCases:
+    """
+    边界条件测试用例生成器
+
+    生成各种边界条件测试数据
+    """
+
+    @staticmethod
+    def get_string_boundaries() -> List[str]:
+        """获取字符串边界值"""
+        return [
+            "",  # 空字符串
+            "a",  # 单字符
+            "a" * 255,  # 最大短字符串
+            "a" * 1000,  # 长字符串
+            "\0",  # null字符
+            "\n\t\r",  # 空白字符
+            "<script>alert('xss')</script>",  # XSS攻击
+            "' OR '1'='1",  # SQL注入
+            "../../../etc/passwd",  # 路径遍历
+            "\u0000",  # Unicode null
+            "\uFFFD",  # Unicode替换字符
+        ]
+
+    @staticmethod
+    def get_number_boundaries() -> List[Union[int, float]]:
+        """获取数字边界值"""
+        return [
+            0,
+            -1,
+            1,
+            127,  # 8位最大值
+            128,  # 8位溢出
+            255,  # 无符号8位最大值
+            256,  # 8位溢出
+            32767,  # 16位有符号最大值
+            -32768,  # 16位有符号最小值
+            2147483647,  # 32位有符号最大值
+            -2147483648,  # 32位有符号最小值
+            0.0,
+            -0.0,
+            float('inf'),
+            float('-inf'),
+            float('nan'),
+            1e308,  # 接近浮点数最大值
+            1e-308,  # 接近浮点数最小值
+        ]
+
+    @staticmethod
+    def get_collection_boundaries() -> List[Any]:
+        """获取集合边界值"""
+        return [
+            [],  # 空列表
+            [None],  # 单元素列表
+            [{}],  # 嵌套空字典
+            [{"a": None}],  # 深层嵌套
+            list(range(1000)),  # 大列表
+            {chr(i): i for i in range(100)},  # 大字典
+        ]
+
+    @staticmethod
+    def get_json_boundaries() -> List[Dict[str, Any]]:
+        """获取JSON边界值"""
+        return [
+            {},  # 空对象
+            {"key": ""},  # 空字符串值
+            {"key": None},  # null值
+            {"key": [None, {}, {"nested": ""}]},  # 深层嵌套
+            {"key": "value" * 1000},  # 长字符串值
+            {f"key_{i}": i for i in range(100)},  # 大对象
+        ]
+
+
+# ============================================================
 # 导出公共 API
 # ============================================================
 
 __all__ = [
+    # Mock 工厂
     'create_mock_response',
     'create_mock_session',
+
+    # 装饰器
     'with_mock_session',
     'performance_test',
+    'async_test',
+
+    # 上下文管理器
+    'async_timeout',
+    'memory_profile',
+
+    # 参数化测试
     'parametrize_validation',
+
+    # 断言辅助
     'assert_dict_contains',
     'assert_error_contains',
+
+    # 数据构建器
     'TestDataBuilder',
+    'RandomDataGenerator',
+    'BoundaryTestCases',
+
+    # 契约测试
     'ContractTestHelper',
+
+    # 验证器
+    'JSONSchemaValidator',
+
+    # 性能测试
+    'PerformanceBenchmark',
+
+    # 测试隔离
     'TestIsolation',
 ]

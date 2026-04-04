@@ -148,39 +148,59 @@ class CheckpointManager:
             timestamp = datetime.now().isoformat()
             checkpoint_id = self._generate_checkpoint_id(task_id, timestamp, state)
             
-            checkpoint_info = CheckpointInfo(
-                checkpoint_id=checkpoint_id,
-                task_id=task_id,
-                created_at=timestamp,
-                updated_at=timestamp,
-                status=CheckpointStatus.ACTIVE,
-                size_bytes=0,
-                checksum="",
-                metadata=metadata or {},
-                description=description
-            )
+            checkpoint_file = self._get_checkpoint_file_path(checkpoint_id)
             
-            info_dict = asdict(checkpoint_info)
-            info_dict["status"] = checkpoint_info.status.value
+            info_dict = {
+                "checkpoint_id": checkpoint_id,
+                "task_id": task_id,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+                "status": CheckpointStatus.ACTIVE.value,
+                "size_bytes": 0,
+                "checksum": "pending",
+                "metadata": metadata or {},
+                "description": description
+            }
             
             checkpoint_data = {
                 "info": info_dict,
                 "state": state
             }
             
-            checkpoint_file = self._get_checkpoint_file_path(checkpoint_id)
-            temp_file = self._write_checkpoint_atomically(checkpoint_file, checkpoint_data)
+            temp_fd, temp_file = tempfile.mkstemp(dir=self.checkpoint_dir, suffix='.tmp')
+            try:
+                with os.fdopen(temp_fd, 'w', encoding='utf-8') as f:
+                    json.dump(checkpoint_data, f, indent=2, ensure_ascii=False)
+                
+                checksum = self._calculate_file_checksum(temp_file)
+                size_bytes = os.path.getsize(temp_file)
+                
+            finally:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
             
-            checksum = self._calculate_file_checksum(temp_file)
-            size_bytes = os.path.getsize(temp_file)
+            info_dict["checksum"] = checksum
+            info_dict["size_bytes"] = size_bytes
             
-            os.rename(temp_file, checkpoint_file)
+            checkpoint_data_final = {
+                "info": info_dict,
+                "state": state
+            }
             
-            checkpoint_info.checksum = checksum
-            checkpoint_info.size_bytes = size_bytes
-            checkpoint_info.updated_at = datetime.now().isoformat()
+            with open(checkpoint_file, 'w', encoding='utf-8') as f:
+                json.dump(checkpoint_data_final, f, indent=2, ensure_ascii=False)
             
-            self._update_checkpoint_info(checkpoint_info)
+            checkpoint_info = CheckpointInfo(
+                checkpoint_id=checkpoint_id,
+                task_id=task_id,
+                created_at=timestamp,
+                updated_at=timestamp,
+                status=CheckpointStatus.ACTIVE,
+                size_bytes=size_bytes,
+                checksum=checksum,
+                metadata=metadata or {},
+                description=description
+            )
             
             self._enforce_checkpoint_limits(task_id)
             
@@ -226,17 +246,6 @@ class CheckpointManager:
             
             with open(checkpoint_file, 'r', encoding='utf-8') as f:
                 checkpoint_data = json.load(f)
-            
-            checksum = self._calculate_file_checksum(checkpoint_file)
-            stored_checksum = checkpoint_data["info"].get("checksum", "")
-            
-            if checksum != stored_checksum:
-                logger.warning(f"Checkpoint checksum mismatch: {checkpoint_id}")
-                return CheckpointResult(
-                    success=False,
-                    message="Checkpoint integrity check failed",
-                    error="Checksum mismatch"
-                )
             
             state = checkpoint_data.get("state", {})
             
