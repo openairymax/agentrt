@@ -6,6 +6,7 @@ add_executable(coreloopthree_tests
     test_main.c
     test_majority.c
     test_coordinator.c
+    test_coordinator_extended.c
     test_cognition.c
     test_execution.c
     test_loop.c

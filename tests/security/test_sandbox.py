@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿# AgentOS 沙箱安全测试
+﻿﻿﻿﻿﻿# AgentOS 沙箱安全测试
 # Version: 1.0.0.6
 # Last updated: 2026-03-23
 
@@ -22,7 +22,7 @@ from enum import Enum
 from pathlib import Path
 from contextlib import contextmanager
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'tools', 'python')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'toolkit', 'python')))
 
 
 # ============================================================

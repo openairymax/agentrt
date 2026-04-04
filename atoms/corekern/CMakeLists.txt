@@ -22,6 +22,7 @@ set(COREKERN_SOURCES
     src/time/timer.c
     src/time/event.c
     src/observability/observability.c
+    src/checkpoint.c
 )
 
 # 平台特定调度器文件

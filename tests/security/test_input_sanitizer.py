@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿# AgentOS 输入净化安全测试
+﻿﻿﻿﻿﻿# AgentOS 输入净化安全测试
 # Version: 1.0.0.6
 # Last updated: 2026-03-23
 
@@ -19,7 +19,7 @@ from enum import Enum
 
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'tools', 'python')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'toolkit', 'python')))
 
 
 # ============================================================

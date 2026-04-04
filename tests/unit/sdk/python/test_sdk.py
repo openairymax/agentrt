@@ -16,7 +16,7 @@ from typing import Dict, Any, List
 
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'tools', 'python')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'toolkit', 'python')))
 
 from agentos import AgentOS, AsyncAgentOS
 from agentos.exceptions import (
