@@ -19,7 +19,7 @@ AgentOS Python SDK - AgentOS 系统的生产级 Python 接口
     >>> result = task.wait(timeout=30)
 """
 
-__version__ = "3.0.0"
+__version__ = "1.0.0.9"
 __author__ = "SpharxWorks"
 __license__ = "MIT"
 

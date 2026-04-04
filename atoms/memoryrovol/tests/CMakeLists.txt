@@ -5,6 +5,9 @@ cmake_minimum_required(VERSION 3.15)
 add_executable(memoryrovol_tests
     test_main.c
     test_advanced_storage.c
+    test_layer2_feature.c
+    test_layer3_structure.c
+    test_layer4_pattern.c
 )
 
 # 链接核心库

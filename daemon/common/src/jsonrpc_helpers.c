@@ -176,6 +176,58 @@ int jsonrpc_validate_request(cJSON* req) {
     return 0;
 }
 
+int jsonrpc_parse_request_ptr(cJSON* req, 
+                              char** out_method, 
+                              cJSON** out_params, 
+                              int* out_id) {
+    if (!req || !out_method || !out_params || !out_id) {
+        SVC_LOG_ERROR("Invalid parameters for jsonrpc_parse_request_ptr");
+        return -1;
+    }
+    
+    *out_method = NULL;
+    *out_params = NULL;
+    *out_id = 0;
+    
+    if (jsonrpc_validate_request(req) != 0) {
+        return JSONRPC_INVALID_REQUEST;
+    }
+    
+    cJSON* method_obj = cJSON_GetObjectItem(req, "method");
+    if (method_obj && cJSON_IsString(method_obj)) {
+        *out_method = strdup(method_obj->valuestring);
+        if (!*out_method) {
+            SVC_LOG_ERROR("Failed to duplicate method name");
+            return JSONRPC_INTERNAL_ERROR;
+        }
+    }
+    
+    cJSON* params_obj = cJSON_GetObjectItem(req, "params");
+    if (params_obj) {
+        *out_params = cJSON_Duplicate(params_obj, 1);
+        if (!*out_params) {
+            SVC_LOG_ERROR("Failed to duplicate params");
+            free(*out_method);
+            *out_method = NULL;
+            return JSONRPC_INTERNAL_ERROR;
+        }
+    }
+    
+    cJSON* id_obj = cJSON_GetObjectItem(req, "id");
+    if (id_obj) {
+        if (cJSON_IsNumber(id_obj)) {
+            *out_id = id_obj->valueint;
+        } else if (cJSON_IsString(id_obj)) {
+            *out_id = atoi(id_obj->valuestring);
+        }
+    }
+    
+    SVC_LOG_DEBUG("Parsed JSON-RPC request: method=%s, id=%d", 
+                  *out_method ? *out_method : "NULL", *out_id);
+    
+    return 0;
+}
+
 /* ==================== 参数提取函数 ==================== */
 
 const char* jsonrpc_get_string_param(cJSON* params, 
