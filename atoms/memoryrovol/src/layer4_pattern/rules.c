@@ -1,6 +1,6 @@
 /**
  * @file rules.c
- * @brief L4 模式层规则生成器（集成LLM服务�?
+ * @brief L4 Pattern layer rule generator (with LLM service integration)
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 

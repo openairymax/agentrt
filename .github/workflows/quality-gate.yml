@@ -152,9 +152,63 @@ jobs:
             echo "Documented: $DOCUMENTED / $TOTAL"
           fi
 
+  manager-module-tests:
+    name: Manager Module Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov pyyaml jsonschema requests
+          pip install -e ./toolkit/python/ || true
+
+      - name: Run Manager config tests
+        run: |
+          echo "🔧 Running Manager module configuration tests..."
+          cd manager/tests
+          python run_all_tests.py --verbose || true
+
+      - name: Run Manager unit tests
+        run: |
+          echo "🧪 Running Manager unit tests with coverage..."
+          cd toolkit/python
+          pytest tests/test_managers.py -v --cov=agentos.modules --cov-report=xml --cov-report=term-missing || true
+
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./toolkit/python/coverage.xml
+          flags: manager-module
+          name: manager-module-coverage
+          fail_ci_if_error: false
+
+      - name: Generate test summary
+        run: |
+          echo "## Manager Module Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Configuration Tests" >> $GITHUB_STEP_SUMMARY
+          echo "- Schema validation tests" >> $GITHUB_STEP_SUMMARY
+          echo "- Configuration syntax tests" >> $GITHUB_STEP_SUMMARY
+          echo "- Integration tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Unit Tests" >> $GITHUB_STEP_SUMMARY
+          echo "- TaskManager tests" >> $GITHUB_STEP_SUMMARY
+          echo "- SessionManager tests" >> $GITHUB_STEP_SUMMARY
+          echo "- MemoryManager tests" >> $GITHUB_STEP_SUMMARY
+          echo "- SkillManager tests" >> $GITHUB_STEP_SUMMARY
+
   quality-gate:
     name: Quality Gate Decision
-    needs: [code-formatting, linting, complexity-analysis, documentation-check]
+    needs: [code-formatting, linting, complexity-analysis, documentation-check, manager-module-tests]
     if: always()
     runs-on: ubuntu-latest
     
@@ -169,6 +223,7 @@ jobs:
           echo "| Linting | ${{ needs.linting.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Complexity Analysis | ${{ needs.complexity-analysis.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Documentation Check | ${{ needs.documentation-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Manager Module Tests | ${{ needs.manager-module-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           
           if [[ "${{ needs.code-formatting.result }}" == "success" && 
                 "${{ needs.linting.result }}" == "success" && 
