@@ -1,6 +1,6 @@
 # AgentOS Python SDK Exceptions
-# Version: 2.0.0
-# Last updated: 2026-03-23
+# Version: 3.0.0
+# Last updated: 2026-04-04
 
 """
 Exception classes for the AgentOS Python SDK.
@@ -83,6 +83,42 @@ def http_status_to_code(status: int) -> str:
         504: CODE_TIMEOUT,
     }
     return mapping.get(status, CODE_UNKNOWN)
+
+
+def http_status_to_error(status: int, details: str = "") -> "AgentOSError":
+    """
+    将 HTTP 状态码转换为对应的异常实例，与 Go SDK HTTPStatusToError 一致。
+    
+    Args:
+        status: HTTP 状态码
+        details: 错误详细信息
+        
+    Returns:
+        对应的异常实例
+    """
+    error_code = http_status_to_code(status)
+    
+    # 根据状态码返回对应的异常类型
+    if status == 400:
+        return ValidationError(f"请求参数无效：{details}")
+    elif status == 401:
+        return AuthenticationError(f"未授权：{details}")
+    elif status == 403:
+        return AuthenticationError(f"禁止访问：{details}")
+    elif status == 404:
+        return AgentOSError(message=f"资源不存在：{details}", error_code=error_code)
+    elif status == 408:
+        return AgentOSTimeoutError(operation="请求")
+    elif status == 409:
+        return AgentOSError(message=f"资源冲突：{details}", error_code=error_code)
+    elif status == 429:
+        return RateLimitError(f"请求频率超限：{details}")
+    elif status == 422:
+        return ValidationError(f"验证失败：{details}")
+    elif status >= 500:
+        return ServerError(f"服务器错误 ({status}): {details}")
+    else:
+        return AgentOSError(message=f"HTTP 错误 ({status}): {details}", error_code=error_code)
 
 
 class AgentOSError(Exception):
@@ -225,6 +261,20 @@ class RateLimitError(AgentOSError):
     
     def __init__(self, message: str = "Rate limit exceeded", **kwargs):
         super().__init__(message=message, error_code=CODE_RATE_LIMITED, **kwargs)
+
+
+class InvalidResponseError(AgentOSError):
+    """Exception raised when the server response is invalid or malformed."""
+    
+    def __init__(self, message: str = "Invalid response from server", **kwargs):
+        super().__init__(message=message, error_code=CODE_INVALID_RESPONSE, **kwargs)
+
+
+class ServerError(AgentOSError):
+    """Exception raised for server-side errors."""
+    
+    def __init__(self, message: str = "", **kwargs):
+        super().__init__(message=message, error_code=CODE_SERVER_ERROR, **kwargs)
 
 
 # 向后兼容别名（不推荐使用，将在未来版本中移除）

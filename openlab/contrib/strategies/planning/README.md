@@ -2,11 +2,11 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v1.0.0.6-blue.svg)](../../../README.md)
+[![Version](https://img.shields.io/badge/version-v1.0.0.9-blue.svg)](../../../README.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](../../../../LICENSE)
 [![Status](https://img.shields.io/badge/status-active%20development-yellow.svg)](../../../README.md)
 
-**版本**: v1.0.0.6 | **更新日期**: 2026-03-25
+**版本**: v1.0.0.9 | **更新日期**: 2026-03-25
 
 </div>
 
@@ -29,7 +29,7 @@ Planning Strategies 是 openlab 的任务规划策略包，提供多种智能规
 - **DAG 规划**: 有向无环图依赖管理
 - **增量规划**: 动态扩展任务图
 
-## 🛠️ 主要变更 (v1.0.0.6)
+## 🛠️ 主要变更 (v1.0.0.9)
 
 - ✨ **新增**: 基于思维链（CoT）的规划器
 - ✨ **新增**: 任务依赖关系自动推断

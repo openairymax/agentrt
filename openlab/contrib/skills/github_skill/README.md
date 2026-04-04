@@ -2,11 +2,11 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v1.0.0.6-blue.svg)](../../../README.md)
+[![Version](https://img.shields.io/badge/version-v1.0.0.9-blue.svg)](../../../README.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](../../../../LICENSE)
 [![Status](https://img.shields.io/badge/status-active%20development-yellow.svg)](../../../README.md)
 
-**版本**: v1.0.0.6 | **更新日期**: 2026-03-25
+**版本**: v1.0.0.9 | **更新日期**: 2026-03-25
 
 </div>
 
@@ -29,7 +29,7 @@ GitHub Skill 是 openlab 的 GitHub API 集成技能包，提供仓库管理、I
 - **代码搜索**: 跨仓库代码检索
 - **CI/CD 集成**: 工作流触发和状态监控
 
-## 🛠️ 主要变更 (v1.0.0.6)
+## 🛠️ 主要变更 (v1.0.0.9)
 
 - ✨ **新增**: GitHub Actions 工作流触发
 - ✨ **新增**: 自动 PR 审查建议生成

@@ -2,11 +2,11 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v1.0.0.6-blue.svg)](../../README.md)
+[![Version](https://img.shields.io/badge/version-v1.0.0.9-blue.svg)](../../README.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](../../../LICENSE)
 [![Status](https://img.shields.io/badge/status-active%20development-yellow.svg)](../../README.md)
 
-**版本**: v1.0.0.6 | **更新日期**: 2026-03-25
+**版本**: v1.0.0.9 | **更新日期**: 2026-03-25
 
 </div>
 
@@ -29,7 +29,7 @@ Research 是基于 AgentOS 的科研智能体应用，为科研人员提供文�
 - **论文写作**: 语法检查、格式规范、引用管理
 - **趋势预测**: 研究热点分析和趋势预测
 
-## 🛠️ 主要变更 (v1.0.0.6)
+## 🛠️ 主要变更 (v1.0.0.9)
 
 - ✨ **新增**: 文献检索 API 集成（arXiv/PubMed/IEEE）
 - ✨ **新增**: 实验方案模板库

@@ -140,7 +140,6 @@ static void test_http_gateway_create(void) {
     ASSERT_NULL(gw_null);
 
     /* 有效参数（需要运行环境才能成功创建） */
-#if 0
     gateway_t* gw = gateway_http_create("127.0.0.1", 18080);
     if (gw) {
         ASSERT_EQ(gateway_get_type(gw), GATEWAY_TYPE_HTTP);
@@ -152,7 +151,6 @@ static void test_http_gateway_create(void) {
 
         gateway_destroy(gw);
     }
-#endif
 
     TEST_PASS();
 }
@@ -168,7 +166,6 @@ static void test_ws_gateway_create(void) {
     gateway_t* gw_null = gateway_ws_create(NULL, 8081);
     ASSERT_NULL(gw_null);
 
-#if 0
     gateway_t* gw = gateway_ws_create("127.0.0.1", 18081);
     if (gw) {
         ASSERT_EQ(gateway_get_type(gw), GATEWAY_TYPE_WS);
@@ -179,7 +176,6 @@ static void test_ws_gateway_create(void) {
 
         gateway_destroy(gw);
     }
-#endif
 
     TEST_PASS();
 }
@@ -192,7 +188,6 @@ static void test_ws_gateway_create(void) {
 static void test_stdio_gateway_create(void) {
     TEST_BEGIN("stdio_gateway_create_interface");
 
-#if 0
     gateway_t* gw = gateway_stdio_create();
     if (gw) {
         ASSERT_EQ(gateway_get_type(gw), GATEWAY_TYPE_STDIO);
@@ -203,7 +198,6 @@ static void test_stdio_gateway_create(void) {
 
         gateway_destroy(gw);
     }
-#endif
 
     TEST_PASS();
 }
