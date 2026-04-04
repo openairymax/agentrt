@@ -2,11 +2,11 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v1.0.0.6-blue.svg)](../../README.md)
+[![Version](https://img.shields.io/badge/version-v1.0.0.9-blue.svg)](../../README.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](../../../LICENSE)
 [![Status](https://img.shields.io/badge/status-active%20development-yellow.svg)](../../README.md)
 
-**版本**: v1.0.0.6 | **更新日期**: 2026-03-25
+**版本**: v1.0.0.9 | **更新日期**: 2026-03-25
 
 </div>
 
@@ -29,7 +29,7 @@ VideoEdit 是基于 AgentOS 的智能视频编辑应用，利用 AI 技术实现
 - **场景检测**: 自动识别场景转换
 - **音频处理**: 降噪、配乐、音量平衡
 
-## 🛠️ 主要变更 (v1.0.0.6)
+## 🛠️ 主要变更 (v1.0.0.9)
 
 - ✨ **新增**: 语音识别字幕生成（支持中英双语）
 - ✨ **新增**: 场景转换自动检测

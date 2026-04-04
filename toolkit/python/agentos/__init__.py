@@ -39,7 +39,10 @@ from .exceptions import (
     SessionError,
     SkillError,
     AuthenticationError,
+    InvalidResponseError,
+    ServerError,
     http_status_to_code,
+    http_status_to_error,
     CODE_SUCCESS,
     CODE_UNKNOWN,
     CODE_INVALID_PARAMETER,
@@ -227,6 +230,8 @@ __all__ = [
     "SessionError",
     "SkillError",
     "AuthenticationError",
+    "InvalidResponseError",
+    "ServerError",
     # 向后兼容别名
     "TimeoutError",
     "MemoryError",
@@ -235,6 +240,7 @@ __all__ = [
     # 错误码常量
     # ============================================================
     "http_status_to_code",
+    "http_status_to_error",
     "CODE_SUCCESS",
     "CODE_UNKNOWN",
     "CODE_INVALID_PARAMETER",

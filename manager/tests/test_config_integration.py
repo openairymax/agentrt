@@ -479,6 +479,186 @@ class ConfigIntegrationTester:
             severity="warning" if not is_pass else "info"
         )
     
+    def test_audit_log_configuration(self) -> IntegrationTestResult:
+        """
+        测试审计日志配置完整性
+        
+        验证 manager_management.yaml 中审计配置是否完整
+        """
+        management_config = self.configs_cache.get('management')
+        
+        if management_config is None:
+            return IntegrationTestResult(
+                test_name="审计日志配置完整性 (E-2 原则)",
+                passed=False,
+                details="无法加载 manager_management.yaml",
+                severity="error"
+            )
+        
+        audit_config = management_config.get('audit', {})
+        
+        issues = []
+        
+        if not audit_config.get('enabled'):
+            issues.append("审计未启用 (audit.enabled)")
+        else:
+            if not audit_config.get('log_path'):
+                issues.append("缺少审计日志路径 (audit.log_path)")
+            
+            events = audit_config.get('events', [])
+            expected_events = ['config.load', 'config.reload', 'config.change', 'config.rollback']
+            missing_events = [e for e in expected_events if e not in events]
+            if missing_events:
+                issues.append(f"缺少审计事件类型: {', '.join(missing_events)}")
+            
+            if not audit_config.get('retention_days'):
+                issues.append("缺少审计保留天数 (audit.retention_days)")
+        
+        is_pass = len(issues) == 0
+        
+        return IntegrationTestResult(
+            test_name="审计日志配置完整性 (E-2 原则)",
+            passed=is_pass,
+            details=f"审计启用: {'✅' if audit_config.get('enabled') else '❌'}" +
+                   (f"\n问题: {'; '.join(issues)}" if issues else ""),
+            severity="error" if not is_pass else "info"
+        )
+    
+    def test_hot_reload_configuration(self) -> IntegrationTestResult:
+        """
+        测试热更新配置完整性
+        
+        验证 manager_management.yaml 中热更新配置是否完整
+        """
+        management_config = self.configs_cache.get('management')
+        
+        if management_config is None:
+            return IntegrationTestResult(
+                test_name="热更新配置完整性 (S-1 原则)",
+                passed=False,
+                details="无法加载 manager_management.yaml",
+                severity="error"
+            )
+        
+        hot_reload = management_config.get('hot_reload', {})
+        
+        issues = []
+        
+        if not hot_reload.get('enabled'):
+            issues.append("热更新未启用 (hot_reload.enabled)")
+        else:
+            if not hot_reload.get('check_interval_sec'):
+                issues.append("缺少检查间隔 (hot_reload.check_interval_sec)")
+            
+            watch_files = hot_reload.get('watch_files', [])
+            if not watch_files:
+                issues.append("缺少监控文件列表 (hot_reload.watch_files)")
+            
+            supported_paths = hot_reload.get('supported_paths', [])
+            if not supported_paths:
+                issues.append("缺少支持热更新的配置路径 (hot_reload.supported_paths)")
+        
+        is_pass = len(issues) == 0
+        
+        return IntegrationTestResult(
+            test_name="热更新配置完整性 (S-1 原则)",
+            passed=is_pass,
+            details=f"热更新启用: {'✅' if hot_reload.get('enabled') else '❌'}" +
+                   (f"\n问题: {'; '.join(issues)}" if issues else ""),
+            severity="warning" if not is_pass else "info"
+        )
+    
+    def test_encryption_configuration(self) -> IntegrationTestResult:
+        """
+        测试加密配置完整性
+        
+        验证 manager_management.yaml 中加密配置是否完整
+        """
+        management_config = self.configs_cache.get('management')
+        
+        if management_config is None:
+            return IntegrationTestResult(
+                test_name="加密配置完整性 (E-1 原则)",
+                passed=False,
+                details="无法加载 manager_management.yaml",
+                severity="error"
+            )
+        
+        encryption = management_config.get('encryption', {})
+        
+        issues = []
+        
+        if not encryption.get('enabled'):
+            issues.append("加密未启用 (encryption.enabled)")
+        else:
+            if not encryption.get('algorithm'):
+                issues.append("缺少加密算法 (encryption.algorithm)")
+            elif encryption.get('algorithm') != 'aes-256-gcm':
+                issues.append(f"加密算法不推荐: {encryption.get('algorithm')} (推荐: aes-256-gcm)")
+            
+            if not encryption.get('key_source'):
+                issues.append("缺少密钥来源 (encryption.key_source)")
+            
+            if not encryption.get('key_env_var'):
+                issues.append("缺少密钥环境变量名 (encryption.key_env_var)")
+            
+            encrypted_fields = encryption.get('encrypted_fields', [])
+            if not encrypted_fields:
+                issues.append("缺少加密字段列表 (encryption.encrypted_fields)")
+        
+        is_pass = len(issues) == 0
+        
+        return IntegrationTestResult(
+            test_name="加密配置完整性 (E-1 原则)",
+            passed=is_pass,
+            details=f"加密启用: {'✅' if encryption.get('enabled') else '❌'}" +
+                   (f"\n问题: {'; '.join(issues)}" if issues else ""),
+            severity="warning" if not is_pass else "info"
+        )
+    
+    def test_rollback_configuration(self) -> IntegrationTestResult:
+        """
+        测试回滚配置完整性
+        
+        验证 manager_management.yaml 中回滚配置是否完整
+        """
+        management_config = self.configs_cache.get('management')
+        
+        if management_config is None:
+            return IntegrationTestResult(
+                test_name="回滚配置完整性 (S-1 原则)",
+                passed=False,
+                details="无法加载 manager_management.yaml",
+                severity="error"
+            )
+        
+        rollback = management_config.get('rollback', {})
+        
+        issues = []
+        
+        if not rollback.get('enabled'):
+            issues.append("回滚未启用 (rollback.enabled)")
+        else:
+            if not rollback.get('max_steps'):
+                issues.append("缺少最大回滚步数 (rollback.max_steps)")
+            
+            auto_rollback = rollback.get('auto_rollback', {})
+            if auto_rollback:
+                if auto_rollback.get('on_load_failure') is None:
+                    issues.append("缺少加载失败自动回滚配置 (rollback.auto_rollback.on_load_failure)")
+                if auto_rollback.get('on_validation_failure') is None:
+                    issues.append("缺少验证失败自动回滚配置 (rollback.auto_rollback.on_validation_failure)")
+        
+        is_pass = len(issues) == 0
+        
+        return IntegrationTestResult(
+            test_name="回滚配置完整性 (S-1 原则)",
+            passed=is_pass,
+            details=f"回滚启用: {'✅' if rollback.get('enabled') else '❌'}" +
+                   (f"\n问题: {'; '.join(issues)}" if issues else ""),
+            severity="warning" if not is_pass else "info"
+        )
+    
     def run_all_tests(self) -> Tuple[int, int, int]:
         """
         运行所有集成测试
@@ -513,6 +693,10 @@ class ConfigIntegrationTester:
             self.test_security_default_policy_deny,
             self.test_logging_domain_id_format,
             self.test_model_fallback_configuration,
+            self.test_audit_log_configuration,
+            self.test_hot_reload_configuration,
+            self.test_encryption_configuration,
+            self.test_rollback_configuration,
         ]
         
         # 执行所有测试

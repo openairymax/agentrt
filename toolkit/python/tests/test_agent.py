@@ -1,6 +1,6 @@
 # AgentOS Python SDK Tests
-# Version: 1.0.0.5
-# Last updated: 2026-03-21
+# Version: 3.0.0
+# Last updated: 2026-04-04
 
 import unittest
 from unittest.mock import Mock, patch

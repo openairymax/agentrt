@@ -2,11 +2,11 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v1.0.0.6-blue.svg)](../../../README.md)
+[![Version](https://img.shields.io/badge/version-v1.0.0.9-blue.svg)](../../../README.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](../../../../LICENSE)
 [![Status](https://img.shields.io/badge/status-active%20development-yellow.svg)](../../../README.md)
 
-**版本**: v1.0.0.6 | **更新日期**: 2026-03-25
+**版本**: v1.0.0.9 | **更新日期**: 2026-03-25
 
 </div>
 
@@ -30,9 +30,9 @@ Python Agent Template 是 openlab 市场提供的 Python 语言 Agent 开发模�
 - **测试框架**: pytest 单元测试集成
 - **CI/CD**: GitHub Actions 配置示例
 
-## 🛠️ 主要变更 (v1.0.0.6)
+## 🛠️ 主要变更 (v1.0.0.9)
 
-- ✨ **新增**: AgentOS SDK v1.0.0.6 集成
+- ✨ **新增**: AgentOS SDK v1.0.0.9 集成
 - ✨ **新增**: 异步编程模型支持
 - 🚀 **优化**: 项目初始化速度提升 60%
 - 🚀 **优化**: 依赖管理优化

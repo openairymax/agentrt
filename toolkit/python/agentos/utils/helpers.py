@@ -450,7 +450,7 @@ def validate_required_string(value: Optional[str], param_name: str, error_code: 
         raise AgentOSError(f"{param_name}不能为空", error_code=code)
 
 
-def validate_positive_number(value: number, param_name: str, error_code: int = None) -> None:
+def validate_positive_number(value: "int | float", param_name: str, error_code: int = None) -> None:
     """
     验证数字参数为正数。
 
