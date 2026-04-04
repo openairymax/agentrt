@@ -23,7 +23,7 @@ import pytest
 
 # 添加项目根目录到路径
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "python"))
+sys.path.insert(0, str(PROJECT_ROOT / "toolkit" / "python"))
 
 
 # ============================================================
