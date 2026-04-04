@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentos-openlab"
-version = "1.0.0"
+version = "1.0.0.9"
 description = "OpenLab - Agent Operating System for intelligent agent management"
 readme = "README.md"
 license = {text = "MIT"}

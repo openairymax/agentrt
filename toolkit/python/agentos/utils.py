@@ -1,6 +1,6 @@
-﻿# AgentOS Python SDK Utilities
-# Version: 1.0.0.7
-# Last updated: 2026-03-21
+# AgentOS Python SDK Utilities
+# Version: 3.0.0
+# Last updated: 2026-04-04
 
 """
 Utility functions and helpers for the AgentOS Python SDK.

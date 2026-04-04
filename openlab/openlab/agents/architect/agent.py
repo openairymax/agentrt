@@ -1,4 +1,4 @@
-﻿"""
+"""
 Copyright (c) 2026 SPHARX. All Rights Reserved.
 "From data intelligence emerges."
 
@@ -121,59 +121,111 @@ class FileReadTool(Tool):
     Tool for reading files from the filesystem.
 
     Capabilities:
-    - Read file contents
+    - Read text files
     - List directory contents
-    - Check file existence
+    - Get file metadata
+
+    Security:
+    - Path whitelist enforcement
+    - Workspace sandbox isolation
+    - Sensitive file access prevention
     """
 
-    CAPABILITIES = {ToolCapability.FILE_READ, ToolCapability.FILE_LIST}
+    CAPABILITIES = {ToolCapability.FILE_READ}
     INPUT_SCHEMA = {
         "type": "object",
         "properties": {
             "path": {"type": "string", "description": "File or directory path"},
-            "max_size": {"type": "integer", "default": 1048576, "description": "Max file size to read"},
+            "max_depth": {"type": "integer", "default": 1, "description": "Maximum directory traversal depth"},
         },
         "required": ["path"],
     }
+    
+    # 安全配置
+    ALLOWED_EXTENSIONS = {'.txt', '.md', '.py', '.js', '.ts', '.json', '.yaml', '.yml', '.xml', '.html', '.css', '.c', '.cpp', '.h', '.java', '.go', '.rs'}
+    FORBIDDEN_PATHS = {'/etc', '/proc', '/sys', '/dev', '/boot', '/root', '/home'}
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
+    def __init__(self, workspace_path: Optional[str] = None):
+        """
+        初始化文件读取工具
+        
+        Args:
+            workspace_path: 工作空间路径（沙箱根目录）
+        """
+        super().__init__()
+        self.workspace_path = Path(workspace_path).resolve() if workspace_path else Path.cwd()
+    
     def _do_validate_input(self, parameters: Dict[str, Any]) -> None:
-        """Validate file path parameters."""
-        path = Path(parameters["path"])
-        max_size = parameters.get("max_size", 1048576)
+        """Validate read parameters with security checks."""
+        path = Path(parameters["path"]).resolve()
 
-        if not path.exists():
-            raise ValueError(f"Path does not exist: {path}")
+        # 安全检查 1: 路径必须在工作空间内
+        if not self._is_in_workspace(path):
+            raise ValueError(f"Path is outside workspace: {path}")
+        
+        # 安全检查 2: 禁止访问敏感路径
+        if self._is_forbidden_path(path):
+            raise ValueError(f"Access to sensitive path is forbidden: {path}")
+        
+        # 安全检查 3: 文件扩展名白名单
+        if path.is_file() and not self._is_allowed_extension(path):
+            raise ValueError(f"File extension not allowed: {path.suffix}")
+        
+        # 安全检查 4: 文件大小限制
+        if path.is_file():
+            file_size = path.stat().st_size
+            if file_size > self.MAX_FILE_SIZE:
+                raise ValueError(f"File too large: {file_size} bytes (max: {self.MAX_FILE_SIZE})")
 
-        if path.is_file() and path.stat().st_size > max_size:
-            raise ValueError(
-                f"File too large: {path.stat().st_size} > {max_size}")
+    def _is_in_workspace(self, path: Path) -> bool:
+        """检查路径是否在工作空间内"""
+        try:
+            path.relative_to(self.workspace_path)
+            return True
+        except ValueError:
+            return False
+    
+    def _is_forbidden_path(self, path: Path) -> bool:
+        """检查路径是否在禁止列表中"""
+        path_str = str(path)
+        for forbidden in self.FORBIDDEN_PATHS:
+            if path_str.startswith(forbidden):
+                return True
+        return False
+    
+    def _is_allowed_extension(self, path: Path) -> bool:
+        """检查文件扩展名是否在白名单中"""
+        return path.suffix.lower() in self.ALLOWED_EXTENSIONS
 
     async def _do_execute(
         self, parameters: Dict[str, Any], context: Dict[str, Any]
     ) -> Any:
-        """Execute file read operation."""
-        path = Path(parameters["path"])
+        """Execute file read operation with security checks."""
+        path = Path(parameters["path"]).resolve()
 
         if path.is_file():
             content = path.read_text(encoding="utf-8")
             return {
                 "type": "file",
-                "path": str(path),
+                "path": str(path.relative_to(self.workspace_path)),
                 "size": path.stat().st_size,
                 "content": content,
             }
         elif path.is_dir():
             items = []
+            max_depth = parameters.get("max_depth", 1)
             for item in path.iterdir():
                 items.append({
                     "name": item.name,
                     "type": "directory" if item.is_dir() else "file",
-                    "path": str(item),
+                    "path": str(item.relative_to(self.workspace_path)),
                 })
             return {
                 "type": "directory",
-                "path": str(path),
+                "path": str(path.relative_to(self.workspace_path)),
                 "items": items,
+                "max_depth": max_depth,
             }
 
         raise ValueError(f"Unsupported path type: {path}")
@@ -187,6 +239,11 @@ class FileWriteTool(Tool):
     - Create new files
     - Overwrite existing files
     - Create directories
+
+    Security:
+    - Path whitelist enforcement
+    - Workspace sandbox isolation
+    - Dangerous file type prevention
     """
 
     CAPABILITIES = {ToolCapability.FILE_WRITE}
@@ -199,29 +256,92 @@ class FileWriteTool(Tool):
         },
         "required": ["path", "content"],
     }
+    
+    # 安全配置
+    ALLOWED_EXTENSIONS = {'.txt', '.md', '.py', '.js', '.ts', '.json', '.yaml', '.yml', '.xml', '.html', '.css', '.c', '.cpp', '.h', '.java', '.go', '.rs', '.log', '.tmp'}
+    FORBIDDEN_PATHS = {'/etc', '/proc', '/sys', '/dev', '/boot', '/root', '/home', '/bin', '/sbin', '/usr'}
+    FORBIDDEN_EXTENSIONS = {'.exe', '.sh', '.bat', '.cmd', '.ps1', '.dll', '.so'}
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
+    def __init__(self, workspace_path: Optional[str] = None):
+        """
+        初始化文件写入工具
+        
+        Args:
+            workspace_path: 工作空间路径（沙箱根目录）
+        """
+        super().__init__()
+        self.workspace_path = Path(workspace_path).resolve() if workspace_path else Path.cwd()
+    
     def _do_validate_input(self, parameters: Dict[str, Any]) -> None:
-        """Validate write parameters."""
-        path = Path(parameters["path"])
+        """Validate write parameters with security checks."""
+        path = Path(parameters["path"]).resolve()
+        content = parameters.get("content", "")
 
+        # 安全检查 1: 路径必须在工作空间内
+        if not self._is_in_workspace(path):
+            raise ValueError(f"Path is outside workspace: {path}")
+        
+        # 安全检查 2: 禁止写入敏感路径
+        if self._is_forbidden_path(path):
+            raise ValueError(f"Writing to sensitive path is forbidden: {path}")
+        
+        # 安全检查 3: 文件扩展名白名单
+        if not self._is_allowed_extension(path):
+            raise ValueError(f"File extension not allowed: {path.suffix}")
+        
+        # 安全检查 4: 禁止危险文件类型
+        if self._is_forbidden_extension(path):
+            raise ValueError(f"Dangerous file type forbidden: {path.suffix}")
+        
+        # 安全检查 5: 文件大小限制
+        if len(content.encode('utf-8')) > self.MAX_FILE_SIZE:
+            raise ValueError(f"Content too large: {len(content)} bytes (max: {self.MAX_FILE_SIZE})")
+        
+        # 安全检查 6: 路径存在性检查
         if path.exists() and not path.is_file():
             raise ValueError(f"Path exists and is not a file: {path}")
 
-        if parameters.get("create_dirs", True):
-            path.parent.mkdir(parents=True, exist_ok=True)
+    def _is_in_workspace(self, path: Path) -> bool:
+        """检查路径是否在工作空间内"""
+        try:
+            path.relative_to(self.workspace_path)
+            return True
+        except ValueError:
+            return False
+    
+    def _is_forbidden_path(self, path: Path) -> bool:
+        """检查路径是否在禁止列表中"""
+        path_str = str(path)
+        for forbidden in self.FORBIDDEN_PATHS:
+            if path_str.startswith(forbidden):
+                return True
+        return False
+    
+    def _is_allowed_extension(self, path: Path) -> bool:
+        """检查文件扩展名是否在白名单中"""
+        return path.suffix.lower() in self.ALLOWED_EXTENSIONS
+    
+    def _is_forbidden_extension(self, path: Path) -> bool:
+        """检查文件扩展名是否在危险类型列表中"""
+        return path.suffix.lower() in self.FORBIDDEN_EXTENSIONS
 
     async def _do_execute(
         self, parameters: Dict[str, Any], context: Dict[str, Any]
     ) -> Any:
-        """Execute file write operation."""
-        path = Path(parameters["path"])
+        """Execute file write operation with security checks."""
+        path = Path(parameters["path"]).resolve()
         content = parameters["content"]
+        create_dirs = parameters.get("create_dirs", True)
+
+        if create_dirs:
+            path.parent.mkdir(parents=True, exist_ok=True)
 
         path.write_text(content, encoding="utf-8")
 
         return {
             "type": "file_written",
-            "path": str(path),
+            "path": str(path.relative_to(self.workspace_path)),
             "size": len(content),
         }
 

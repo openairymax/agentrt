@@ -10,6 +10,7 @@ set(TEST_SOURCES
     test_logger.c
     test_config.c
     test_svc_auth.c
+    test_jsonrpc_helpers.c
 )
 
 # 创建测试可执行文件

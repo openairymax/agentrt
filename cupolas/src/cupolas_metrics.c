@@ -97,30 +97,32 @@ typedef struct metrics_state {
 } metrics_state_t;
 
 static metrics_state_t g_metrics = {0};
-static bool g_initialized = false;
-
+static volatile cupolas_atomic32_t g_init_state = 0;
 static cupolas_rwlock_t g_metrics_lock = {0};
+static cupolas_once_t g_metrics_once = CUPOLAS_ONCE_INIT;
 
 static const double DEFAULT_BUCKETS[] = {0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0};
 static const size_t DEFAULT_BUCKET_COUNT = 11;
 
-int metrics_init(uint32_t sampling_interval_ms) {
-    if (g_initialized) {
-        return 0;
-    }
-
+static void metrics_init_once(void) {
     memset(&g_metrics, 0, sizeof(g_metrics));
-    g_metrics.sampling_interval_ms = sampling_interval_ms > 0 ? sampling_interval_ms : 1000;
-
+    g_metrics.sampling_interval_ms = 1000;
     cupolas_rwlock_init(&g_metrics_lock);
+    g_init_state = 1;
+}
 
-    g_initialized = true;
-
+int metrics_init(uint32_t sampling_interval_ms) {
+    cupolas_call_once(&g_metrics_once, metrics_init_once);
+    
+    if (sampling_interval_ms > 0) {
+        g_metrics.sampling_interval_ms = sampling_interval_ms;
+    }
+    
     return 0;
 }
 
 void metrics_shutdown(void) {
-    if (!g_initialized) {
+    if (g_init_state == 0) {
         return;
     }
 
@@ -128,7 +130,7 @@ void metrics_shutdown(void) {
 
     cupolas_rwlock_destroy(&g_metrics_lock);
 
-    g_initialized = false;
+    g_init_state = 0;
 }
 
 static metric_entry_t* find_or_create_entry(const char* name) {

@@ -1,6 +1,6 @@
 # AgentOS Python SDK Telemetry
-# Version: 1.0.0.7
-# Last updated: 2026-03-21
+# Version: 3.0.0
+# Last updated: 2026-04-04
 
 """
 Telemetry module for observability and monitoring.

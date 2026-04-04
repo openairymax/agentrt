@@ -1,6 +1,6 @@
 // AgentOS TypeScript SDK Skill
-// Version: 2.0.0
-// Last updated: 2026-03-23
+// Version: 3.0.0
+// Last updated: 2026-04-04
 
 import { SkillInfo, SkillResult } from './types';
 import { SkillError } from './errors';
