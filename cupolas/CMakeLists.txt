@@ -80,6 +80,7 @@ set(CUPOLAS_SOURCES
     src/audit/audit_logger.c
     src/audit/audit_queue.c
     src/audit/audit_rotator.c
+    src/audit/audit_overflow.c
     src/sanitizer/sanitizer_core.c
     src/sanitizer/sanitizer_rules.c
     src/sanitizer/sanitizer_cache.c
@@ -93,6 +94,7 @@ set(CUPOLAS_SOURCES
     src/security/cupolas_runtime_protection.c
     src/security/cupolas_network_security.c
     src/security/cupolas_error.c
+    src/circuit_breaker.c
 )
 
 set(CUPOLAS_HEADERS
@@ -108,6 +110,7 @@ set(CUPOLAS_HEADERS
     src/audit/audit.h
     src/audit/audit_queue.h
     src/audit/audit_rotator.h
+    src/audit/audit_overflow.h
     src/sanitizer/sanitizer.h
     src/sanitizer/sanitizer_rules.h
     src/sanitizer/sanitizer_cache.h
@@ -121,6 +124,7 @@ set(CUPOLAS_HEADERS
     src/security/cupolas_runtime_protection.h
     src/security/cupolas_network_security.h
     src/security/cupolas_error.h
+    src/circuit_breaker.h
 )
 
 # commons 模块路径

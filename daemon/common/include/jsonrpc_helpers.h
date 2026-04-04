@@ -126,6 +126,20 @@ AGENTOS_API int jsonrpc_parse_request(const char* raw,
  */
 AGENTOS_API int jsonrpc_validate_request(cJSON* req);
 
+/**
+ * @brief 从已解析的JSON对象解析请求（便捷函数）
+ * 
+ * @param req 已解析的JSON对象
+ * @param out_method [out] 方法名指针（需调用者free()）
+ * @param out_params [out] 参数对象（需调用者cJSON_Delete()）
+ * @param out_id [out] 请求ID
+ * @return int 0成功，非0失败
+ */
+AGENTOS_API int jsonrpc_parse_request_ptr(cJSON* req, 
+                                        char** out_method, 
+                                        cJSON** out_params, 
+                                        int* out_id);
+
 /* ==================== 参数提取函数 ==================== */
 
 /**

@@ -1,10 +1,14 @@
-﻿// AgentOS Go SDK - 统一错误体系
+// AgentOS Go SDK - 统一错误体系
 // Version: 3.0.0
-// Last updated: 2026-03-22
+// Last updated: 2026-04-04
 //
 // 定义 SDK 的完整错误类型层级、错误码枚举、哨兵错误和 HTTP 状态码映射。
 // 所有异常继承自 AgentOSError，支持 errors.Is/As 链式追踪。
 // 对应 Python SDK: exceptions.py
+//
+// Public API Versioning:
+//   Since: 3.0.0 - 所有公共 API 均从 v3.0.0 开始版本化
+//   遵循 ARCHITECTURAL_PRINCIPLES.md K-2 接口契约化原则
 
 package agentos
 
@@ -15,9 +19,11 @@ import (
 )
 
 // ErrorCode 表示 AgentOS SDK 的错误码类型
+// Since: 3.0.0
 type ErrorCode string
 
 // AgentOSError 是 SDK 所有错误的统一基类
+// Since: 3.0.0
 type AgentOSError struct {
 	Code    ErrorCode
 	Message string
@@ -25,6 +31,7 @@ type AgentOSError struct {
 }
 
 // Error 实现 error 接口
+// Since: 3.0.0
 func (e *AgentOSError) Error() string {
 	if e.Cause != nil {
 		return fmt.Sprintf("[%s] %s: %v", e.Code, e.Message, e.Cause)
@@ -33,11 +40,13 @@ func (e *AgentOSError) Error() string {
 }
 
 // Unwrap 支持错误链追踪
+// Since: 3.0.0
 func (e *AgentOSError) Unwrap() error {
 	return e.Cause
 }
 
 // Is 实现错误匹配，支持 errors.Is 语义
+// Since: 3.0.0
 func (e *AgentOSError) Is(target error) bool {
 	t, ok := target.(*AgentOSError)
 	if !ok {
@@ -47,21 +56,25 @@ func (e *AgentOSError) Is(target error) bool {
 }
 
 // NewError 创建指定错误码的新错误
+// Since: 3.0.0
 func NewError(code ErrorCode, message string, cause error) *AgentOSError {
 	return &AgentOSError{Code: code, Message: message, Cause: cause}
 }
 
 // NewErrorf 格式化创建指定错误码的新错误
+// Since: 3.0.0
 func NewErrorf(code ErrorCode, format string, args ...interface{}) *AgentOSError {
 	return &AgentOSError{Code: code, Message: fmt.Sprintf(format, args...)}
 }
 
 // WrapError 包装已有错误并附加 SDK 错误码
+// Since: 3.0.0
 func WrapError(code ErrorCode, message string, cause error) *AgentOSError {
 	return &AgentOSError{Code: code, Message: message, Cause: cause}
 }
 
 // IsErrorCode 判断错误是否匹配指定错误码
+// Since: 3.0.0
 func IsErrorCode(err error, code ErrorCode) bool {
 	var agentErr *AgentOSError
 	if errors.As(err, &agentErr) {
@@ -71,6 +84,7 @@ func IsErrorCode(err error, code ErrorCode) bool {
 }
 
 // IsNetworkError 判断是否为网络相关错误
+// Since: 3.0.0
 func IsNetworkError(err error) bool {
 	var agentErr *AgentOSError
 	if errors.As(err, &agentErr) {
@@ -82,6 +96,7 @@ func IsNetworkError(err error) bool {
 }
 
 // IsServerError 判断是否为服务端错误
+// Since: 3.0.0
 func IsServerError(err error) bool {
 	var agentErr *AgentOSError
 	if errors.As(err, &agentErr) {
@@ -95,6 +110,7 @@ func IsServerError(err error) bool {
 
 // HTTPStatusToError 将 HTTP 状态码映射为 SDK 错误
 // 对于 2xx 成功状态码返回 nil
+// Since: 3.0.0
 func HTTPStatusToError(statusCode int, message string) *AgentOSError {
 	// 2xx 状态码表示成功，不应转换为错误
 	if statusCode >= 200 && statusCode < 300 {
