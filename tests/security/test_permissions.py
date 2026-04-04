@@ -1,4 +1,4 @@
-﻿# AgentOS 安全测试模块
+# AgentOS 安全测试模块
 # Version: 1.0.0.6
 # Last updated: 2026-03-22
 
@@ -17,7 +17,7 @@ from typing import Dict, Any, List, Optional
 from unittest.mock import Mock, MagicMock, patch
 
 import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'tools', 'python')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'toolkit', 'python')))
 
 
 # ============================================================

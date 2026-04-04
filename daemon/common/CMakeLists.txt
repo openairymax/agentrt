@@ -53,6 +53,7 @@ set(SVC_COMMON_SOURCES
     src/svc_auth.c
     src/daemon_security.c
     src/jsonrpc_helpers.c
+    src/method_dispatcher.c
 )
 
 # 创建静态库
@@ -189,6 +190,7 @@ install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/include/svc_auth.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/daemon_security.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/jsonrpc_helpers.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/method_dispatcher.h
     DESTINATION include/agentos
 )
 
