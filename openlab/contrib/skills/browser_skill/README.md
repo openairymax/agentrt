@@ -2,11 +2,11 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v1.0.0.6-blue.svg)](../../../README.md)
+[![Version](https://img.shields.io/badge/version-v1.0.0.9-blue.svg)](../../../README.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](../../../../LICENSE)
 [![Status](https://img.shields.io/badge/status-active%20development-yellow.svg)](../../../README.md)
 
-**版本**: v1.0.0.6 | **更新日期**: 2026-03-26
+**版本**: v1.0.0.9 | **更新日期**: 2026-03-26
 
 </div>
 
@@ -29,7 +29,7 @@ Browser Skill 是 openlab 的浏览器自动化技能包，提供网页浏览、
 - **截图功能**: 整页/区域截图
 - **JavaScript执行**: 自定义脚本注入和执行
 
-## 🛠️ 主要变更 (v1.0.0.6)
+## 🛠️ 主要变更 (v1.0.0.9)
 
 - ✨ **新增**: 无头浏览器集成（Playwright/Selenium）
 - ✨ **新增**: 智能反爬虫策略

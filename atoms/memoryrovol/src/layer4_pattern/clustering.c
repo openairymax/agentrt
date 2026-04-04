@@ -1,6 +1,6 @@
 /**
  * @file clustering.c
- * @brief L4 模式层聚类引擎（使用HDBSCAN�?
+ * @brief L4 Pattern layer clustering engine (using HDBSCAN algorithm)
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -39,8 +39,8 @@ agentos_error_t agentos_clustering_engine_create(
         return AGENTOS_ENOMEM;
     }
 
-    // 解析配置（这里简单处理，实际可用cJSON�?
-    eng->params = AGENTOS_MALLOC(8); // 占位
+    // Parse config (simplified, could use cJSON for full parsing)
+    eng->params = AGENTOS_MALLOC(8); /* placeholder */
     if (!eng->params) {
         agentos_mutex_destroy(eng->lock);
         AGENTOS_FREE(eng);
@@ -72,7 +72,7 @@ agentos_error_t agentos_clustering_engine_cluster(
     size_t dim = 384; // 实际应从参数获取
 
 #ifdef HAVE_HDBSCAN
-    // 使用HDBSCAN�?
+    // Use HDBSCAN for clustering
     hdbscan_input input;
     input.data = (double*)vectors; // 假设可以转换
     input.num_points = count;
@@ -96,7 +96,7 @@ agentos_error_t agentos_clustering_engine_cluster(
 
     hdbscan_free_output(&output);
 #else
-    // 无HDBSCAN时，返回�?标签（单聚类�?
+    // Without HDBSCAN, return single-cluster labels (fallback)
     int* labels = (int*)AGENTOS_MALLOC(count * sizeof(int));
     if (!labels) return AGENTOS_ENOMEM;
     for (size_t i = 0; i < count; i++) labels[i] = 0;

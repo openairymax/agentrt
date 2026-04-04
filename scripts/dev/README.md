@@ -1,13 +1,45 @@
-﻿# AgentOS 开发辅助脚本
+# AgentOS 开发辅助脚本
 
-**版本**: v1.0.0.6  
-**最后更新**: 2026-03-21  
+**版本**: v1.0.0.7  
+**最后更新**: 2026-04-04  
 
 ---
 
 ## 📋 概述
 
-`scripts/dev/` 目录包含 AgentOS 开发过程中的辅助工具，提供文档生成、注册表更新和示例运行等功能。
+`scripts/dev/` 目录包含 AgentOS 开发过程中的辅助工具，提供文档生成、注册表更新、示例运行等功能。
+
+### 配置管理架构
+
+本项目采用**配置分离管理**原则：
+
+```
+AgentOS/
+├── manager/                    # ✅ 运行时业务配置中心
+│   ├── kernel/settings.yaml    # 内核配置
+│   ├── model/model.yaml        # 模型配置
+│   ├── security/policy.yaml    # 安全配置
+│   └── ...                     # 所有运行时配置
+│
+├── scripts/dev/config/         # ✅ 开发工具统一配置
+│   ├── .clang-format           # C/C++ 代码格式化
+│   ├── .clang-tidy             # C/C++ 静态分析
+│   ├── .clangd                 # clangd 语言服务器
+│   ├── .editorconfig           # 编辑器配置
+│   ├── .lizardrc               # 圈复杂度检查
+│   ├── .jscpd.json             # 代码重复检测
+│   └── .pre-commit-config.yaml # git pre-commit 钩子
+│
+└── cupolas/                    # ✅ 模块特定工具
+    ├── Doxyfile                # API 文档生成配置
+    └── generate_api_docs.bat   # Windows 一键生成脚本
+```
+
+**重要说明**：
+- ❌ **模块根目录不再保留开发工具配置**（如 `atoms/.clang-format`、`gateway/.clang-tidy`）
+- ✅ **所有开发工具配置统一到 `scripts/dev/config/`**，避免重复和冲突
+- ✅ **Manager 模块只管理运行时业务配置**（YAML/JSON 格式）
+- ✅ **模块特定工具保留在模块内**（如 cupolas 的 Doxygen 配置）
 
 ---
 
@@ -25,6 +57,7 @@
 | 文件 | 说明 | 类型 | 状态 |
 |------|------|------|------|
 | `config/.clang-format` | C/C++ 代码格式化配置 | Config | ✅ 生产就绪 |
+| `config/.clang-tidy` | C/C++ 静态分析配置 | Config | ✅ 生产就绪 |
 | `config/.clangd` | Clangd 语言服务器配置 | Config | ✅ 生产就绪 |
 | `config/.editorconfig` | 编辑器统一配置 | Config | ✅ 生产就绪 |
 | `config/.lizardrc` | 圈复杂度检查配置 | Config | ✅ 生产就绪 |
@@ -32,7 +65,242 @@
 | `config/.pre-commit-config.yaml` | Git 钩子配置 | Config | ✅ 生产就绪 |
 | `config/vcpkg.json` | C++ 依赖配置 (Windows) | Config | ✅ 生产就绪 |
 
-> 📌 **注意**: 这些配置文件原位于项目根目录，已统一迁移到 `scripts/dev/config/` 目录，以便保持根目录整洁。
+> 📌 **注意**: 
+> - 这些配置文件原位于项目根目录或模块根目录，已统一迁移到 `scripts/dev/config/` 目录
+> - **模块根目录（如 atoms/、gateway/）不再保留 .clang-format 和 .clang-tidy**
+> - 使用工具时，工具会自动从 `scripts/dev/config/` 读取配置
+
+---
+
+## 🔧 开发工具配置使用指南
+
+### 统一配置说明
+
+所有开发工具配置统一位于 `scripts/dev/config/` 目录，各工具会自动从该目录读取配置。
+
+#### 1. clang-format - 代码格式化
+
+**用途**: 统一 C/C++ 代码格式，保持代码风格一致
+
+**使用方法**:
+```bash
+# 格式化单个文件
+clang-format -i --style=file:scripts/dev/config/.clang-format src/main.c
+
+# 格式化整个目录
+find atoms/ -name "*.c" -o -name "*.h" | xargs clang-format -i --style=file:scripts/dev/config/.clang-format
+
+# 检查格式（不修改）
+clang-format --dry-run --Werror --style=file:scripts/dev/config/.clang-format src/main.c
+```
+
+**VS Code 集成**:
+```json
+// .vscode/settings.json
+{
+  "C_Cpp.formatting": "clangFormat",
+  "C_Cpp.clang_format_fallbackStyle": "file:scripts/dev/config/.clang-format"
+}
+```
+
+**配置说明**:
+```yaml
+# scripts/dev/config/.clang-format
+Language: Cpp
+BasedOnStyle: LLVM
+IndentWidth: 4              # 缩进 4 空格
+ColumnLimit: 120            # 每行最大 120 字符
+BreakBeforeBraces: Attach   # 大括号风格
+PointerAlignment: Right     # 指针右对齐
+```
+
+#### 2. clang-tidy - 静态分析
+
+**用途**: 检查代码质量问题、安全隐患、现代化建议
+
+**使用方法**:
+```bash
+# 分析单个文件
+clang-tidy src/main.c -- -I include -std=c11
+
+# 分析整个项目（使用 compile_commands.json）
+clang-tidy -p build src/main.c
+
+# 自动修复问题
+clang-tidy -fix src/main.c -- -I include -std=c11
+```
+
+**配置说明**:
+```yaml
+# scripts/dev/config/.clang-tidy
+Checks: >
+  -*,
+  bugprone-*,
+  cert-*,
+  cppcoreguidelines-*,
+  modernize-*,
+  performance-*,
+  readability-*
+CheckOptions:
+  - key: readability-identifier-naming.NamespaceCase
+    value: lower_case
+  - key: readability-function-size.LineThreshold
+    value: 100
+```
+
+#### 3. clangd - 语言服务器
+
+**用途**: 提供代码补全、跳转、诊断等 IDE 功能
+
+**使用方法**:
+```bash
+# 生成 compile_commands.json（clangd 必需）
+cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -B build
+
+# 复制 compile_commands.json 到项目根目录
+cp build/compile_commands.json .
+
+# clangd 会自动读取 scripts/dev/config/.clangd 配置
+```
+
+**VS Code 集成**:
+```json
+// .vscode/settings.json
+{
+  "clangd.path": "clangd",
+  "clangd.arguments": [
+    "--config=scripts/dev/config/.clangd"
+  ]
+}
+```
+
+#### 4. EditorConfig - 编辑器统一配置
+
+**用途**: 统一不同编辑器的代码风格（缩进、编码、换行等）
+
+**使用方法**:
+```bash
+# VS Code 安装 EditorConfig 插件后自动生效
+
+# 检查配置
+editorconfig-checker
+```
+
+**配置说明**:
+```ini
+# scripts/dev/config/.editorconfig
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.md]
+trim_trailing_whitespace = false
+```
+
+#### 5. lizard - 圈复杂度检查
+
+**用途**: 检测函数复杂度，确保代码可维护性
+
+**使用方法**:
+```bash
+# 检查单个文件
+lizard src/main.c
+
+# 检查整个项目
+lizard atoms/ gateway/ commons/
+
+# 生成 XML 报告
+lizard --xml > lizard-report.xml
+
+# 使用项目配置
+lizard -c scripts/dev/config/.lizardrc atoms/
+```
+
+**配置说明**:
+```json
+# scripts/dev/config/.lizardrc
+{
+  "CCN": 15,              // 最大圈复杂度
+  "length": 50,           // 最大函数行数
+  "arguments": 5          // 最大参数数量
+}
+```
+
+#### 6. jscpd - 代码重复检测
+
+**用途**: 检测代码重复率，避免复制粘贴代码
+
+**使用方法**:
+```bash
+# 检查重复代码
+jscpd --config scripts/dev/config/.jscpd.json
+
+# 指定目录
+jscpd "atoms/**/*.c" "gateway/**/*.c" --config scripts/dev/config/.jscpd.json
+
+# 生成 HTML 报告
+jscpd --report html --config scripts/dev/config/.jscpd.json
+```
+
+**配置说明**:
+```json
+# scripts/dev/config/.jscpd.json
+{
+  "threshold": 15,        // 重复率阈值（%）
+  "reporters": ["html", "console"],
+  "ignore": [
+    "**/tests/**",
+    "**/build/**"
+  ]
+}
+```
+
+#### 7. pre-commit - Git 钩子
+
+**用途**: 在 commit 前自动执行代码检查
+
+**使用方法**:
+```bash
+# 安装 pre-commit 钩子
+pre-commit install --config scripts/dev/config/.pre-commit-config.yaml
+
+# 手动运行所有检查
+pre-commit run --all-files --config scripts/dev/config/.pre-commit-config.yaml
+
+# 检查特定文件
+pre-commit run --files src/main.c --config scripts/dev/config/.pre-commit-config.yaml
+```
+
+**配置说明**:
+```yaml
+# scripts/dev/config/.pre-commit-config.yaml
+repos:
+  - repo: local
+    hooks:
+      - id: clang-format
+        name: clang-format
+        entry: clang-format -i
+        language: system
+        files: \.(c|h|cpp|hpp)$
+      
+      - id: clang-tidy
+        name: clang-tidy
+        entry: clang-tidy
+        language: system
+        files: \.(c|h|cpp|hpp)$
+      
+      - id: lizard
+        name: lizard
+        entry: lizard
+        language: system
+        files: \.(c|h|cpp|hpp)$
+```
 
 ---
 

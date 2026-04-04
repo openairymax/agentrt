@@ -1,6 +1,6 @@
-﻿// AgentOS TypeScript SDK Task
-// Version: 2.0.0
-// Last updated: 2026-03-23
+// AgentOS TypeScript SDK Task
+// Version: 3.0.0
+// Last updated: 2026-04-04
 
 import { TaskStatus, TaskResult } from './types';
 import { TaskError, TimeoutError } from './errors';

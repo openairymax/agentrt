@@ -2,11 +2,11 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v1.0.0.6-blue.svg)](../../../README.md)
+[![Version](https://img.shields.io/badge/version-v1.0.0.9-blue.svg)](../../../README.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](../../../../LICENSE)
 [![Status](https://img.shields.io/badge/status-active%20development-yellow.svg)](../../../README.md)
 
-**版本**: v1.0.0.6 | **更新日期**: 2026-03-25
+**版本**: v1.0.0.9 | **更新日期**: 2026-03-25
 
 </div>
 
@@ -29,9 +29,9 @@ Rust Skill Template 是 openlab 市场提供的 Rust 语言 Skill 开发模板�
 - **FFI 集成**: 与 AgentOS C 内核高效交互
 - **错误处理**: Result<T,E> 类型安全错误处理
 
-## 🛠️ 主要变更 (v1.0.0.6)
+## 🛠️ 主要变更 (v1.0.0.9)
 
-- ✨ **新增**: AgentOS FFI 绑定 v1.0.0.6
+- ✨ **新增**: AgentOS FFI 绑定 v1.0.0.9
 - ✨ **新增**: Async/Await异步支持
 - 🚀 **优化**: 编译速度提升 40%
 - 🚀 **优化**: 运行时性能提升 25%

@@ -16,7 +16,22 @@
 #include "../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 #include <errno.h>
+
+/* JSON解析库 - 条件编译 */
+#ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
+#else
+typedef struct cJSON { int type; char* valuestring; double valuedouble; struct cJSON* child; struct cJSON* next; } cJSON;
+#define cJSON_NULL 0 cJSON_False 1 cJSON_True 2 cJSON_Number 3 cJSON_String 4 cJSON_Array 5 cJSON_Object 6
+static inline cJSON* cJSON_CreateObject(void) { return NULL; }
+static inline cJSON* cJSON_CreateArray(void) { return NULL; }
+static inline void cJSON_Delete(cJSON* item) { (void)item; }
+static inline void cJSON_AddItemToArray(cJSON* a, cJSON* i) { (void)a;(void)i; }
+static inline void cJSON_AddItemToObject(cJSON* o, const char* k, cJSON* i) { (void)o;(void)k;(void)i; }
+static inline void cJSON_AddStringToObject(cJSON* o, const char* k, const char* v) { (void)o;(void)k;(void)v; }
+static inline void cJSON_AddNumberToObject(cJSON* o, const char* k, double v) { (void)o;(void)k;(void)v; }
+static inline char* cJSON_PrintUnformatted(const cJSON* i) { (void)i; return NULL; }
+#endif /* AGENTOS_HAS_CJSON */
 
 static agentos_cognition_engine_t* g_cognition = NULL;
 static agentos_execution_engine_t* g_execution = NULL;
