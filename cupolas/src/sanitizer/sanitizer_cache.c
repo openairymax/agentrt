@@ -22,7 +22,11 @@ typedef struct cache_entry {
     char* key;
     char* value;
     uint64_t timestamp_ms;
+    uint64_t last_access_ms;
     struct cache_entry* next;
+    struct cache_entry* prev;
+    struct cache_entry* lru_next;
+    struct cache_entry* lru_prev;
 } cache_entry_t;
 
 struct sanitizer_cache {
@@ -30,6 +34,8 @@ struct sanitizer_cache {
     size_t bucket_count;
     size_t size;
     size_t capacity;
+    cache_entry_t lru_head;
+    cache_entry_t lru_tail;
     cupolas_mutex_t lock;
 };
 
@@ -49,13 +55,59 @@ static char* build_key(const char* input, sanitize_level_t level) {
     return key;
 }
 
+static void lru_init(sanitizer_cache_t* cache) {
+    cache->lru_head.lru_next = &cache->lru_tail;
+    cache->lru_head.lru_prev = NULL;
+    cache->lru_tail.lru_next = NULL;
+    cache->lru_tail.lru_prev = &cache->lru_head;
+}
+
+static void lru_add(sanitizer_cache_t* cache, cache_entry_t* entry) {
+    entry->lru_next = cache->lru_head.lru_next;
+    entry->lru_prev = &cache->lru_head;
+    cache->lru_head.lru_next->lru_prev = entry;
+    cache->lru_head.lru_next = entry;
+}
+
+static void lru_remove(cache_entry_t* entry) {
+    entry->lru_prev->lru_next = entry->lru_next;
+    entry->lru_next->lru_prev = entry->lru_prev;
+}
+
+static void lru_touch(sanitizer_cache_t* cache, cache_entry_t* entry) {
+    lru_remove(entry);
+    lru_add(cache, entry);
+}
+
+static void lru_evict(sanitizer_cache_t* cache) {
+    while (cache->size >= cache->capacity && cache->lru_tail.lru_prev != &cache->lru_head) {
+        cache_entry_t* victim = cache->lru_tail.lru_prev;
+        lru_remove(victim);
+        
+        uint32_t hash = hash_key(victim->key);
+        size_t idx = hash % cache->bucket_count;
+        cache_entry_t** ptr = &cache->buckets[idx];
+        while (*ptr && *ptr != victim) {
+            ptr = &(*ptr)->next;
+        }
+        if (*ptr == victim) {
+            *ptr = victim->next;
+        }
+        
+        cupolas_mem_free(victim->key);
+        cupolas_mem_free(victim->value);
+        cupolas_mem_free(victim);
+        cache->size--;
+    }
+}
+
 sanitizer_cache_t* sanitizer_cache_create(size_t capacity) {
     sanitizer_cache_t* cache = (sanitizer_cache_t*)cupolas_mem_alloc(sizeof(sanitizer_cache_t));
     if (!cache) return NULL;
     
     memset(cache, 0, sizeof(sanitizer_cache_t));
-    cache->capacity = capacity;
-    cache->bucket_count = capacity > 0 ? capacity / 4 : 64;
+    cache->capacity = capacity > 0 ? capacity : 1024;
+    cache->bucket_count = cache->capacity / 4;
     if (cache->bucket_count < 16) cache->bucket_count = 16;
     
     cache->buckets = (cache_entry_t**)cupolas_mem_alloc(cache->bucket_count * sizeof(cache_entry_t*));
@@ -64,6 +116,8 @@ sanitizer_cache_t* sanitizer_cache_create(size_t capacity) {
         return NULL;
     }
     memset(cache->buckets, 0, cache->bucket_count * sizeof(cache_entry_t*));
+    
+    lru_init(cache);
     
     if (cupolas_mutex_init(&cache->lock) != cupolas_OK) {
         cupolas_mem_free(cache->buckets);
@@ -97,6 +151,28 @@ void sanitizer_cache_destroy(sanitizer_cache_t* cache) {
     cupolas_mem_free(cache);
 }
 
+void sanitizer_cache_clear(sanitizer_cache_t* cache) {
+    if (!cache) return;
+    
+    cupolas_mutex_lock(&cache->lock);
+    
+    for (size_t i = 0; i < cache->bucket_count; i++) {
+        cache_entry_t* entry = cache->buckets[i];
+        while (entry) {
+            cache_entry_t* next = entry->next;
+            cupolas_mem_free(entry->key);
+            cupolas_mem_free(entry->value);
+            cupolas_mem_free(entry);
+            entry = next;
+        }
+        cache->buckets[i] = NULL;
+    }
+    cache->size = 0;
+    lru_init(cache);
+    
+    cupolas_mutex_unlock(&cache->lock);
+}
+
 char* sanitizer_cache_get(sanitizer_cache_t* cache, const char* input, sanitize_level_t level) {
     if (!cache || !input) return NULL;
     
@@ -117,6 +193,8 @@ char* sanitizer_cache_get(sanitizer_cache_t* cache, const char* input, sanitize_
                 cupolas_mem_free(key);
                 return NULL;
             }
+            entry->last_access_ms = now;
+            lru_touch(cache, entry);
             char* result = cupolas_strdup(entry->value);
             cupolas_mutex_unlock(&cache->lock);
             cupolas_mem_free(key);
@@ -138,16 +216,29 @@ void sanitizer_cache_put(sanitizer_cache_t* cache, const char* input, const char
     
     cupolas_mutex_lock(&cache->lock);
     
-    if (cache->size >= cache->capacity) {
-        cupolas_mutex_unlock(&cache->lock);
-        cupolas_mem_free(key);
-        return;
-    }
-    
     uint32_t hash = hash_key(key);
     size_t idx = hash % cache->bucket_count;
     
-    cache_entry_t* entry = (cache_entry_t*)cupolas_mem_alloc(sizeof(cache_entry_t));
+    cache_entry_t* entry = cache->buckets[idx];
+    while (entry) {
+        if (strcmp(entry->key, key) == 0) {
+            cupolas_mem_free(entry->value);
+            entry->value = cupolas_strdup(output);
+            entry->timestamp_ms = cupolas_time_ms();
+            entry->last_access_ms = entry->timestamp_ms;
+            lru_touch(cache, entry);
+            cupolas_mutex_unlock(&cache->lock);
+            cupolas_mem_free(key);
+            return;
+        }
+        entry = entry->next;
+    }
+    
+    if (cache->size >= cache->capacity) {
+        lru_evict(cache);
+    }
+    
+    entry = (cache_entry_t*)cupolas_mem_alloc(sizeof(cache_entry_t));
     if (!entry) {
         cupolas_mutex_unlock(&cache->lock);
         cupolas_mem_free(key);
@@ -157,30 +248,14 @@ void sanitizer_cache_put(sanitizer_cache_t* cache, const char* input, const char
     entry->key = key;
     entry->value = cupolas_strdup(output);
     entry->timestamp_ms = cupolas_time_ms();
+    entry->last_access_ms = entry->timestamp_ms;
     entry->next = cache->buckets[idx];
+    entry->prev = NULL;
     cache->buckets[idx] = entry;
+    lru_add(cache, entry);
     cache->size++;
     
     cupolas_mutex_unlock(&cache->lock);
 }
 
-void sanitizer_cache_clear(sanitizer_cache_t* cache) {
-    if (!cache) return;
-    
-    cupolas_mutex_lock(&cache->lock);
-    
-    for (size_t i = 0; i < cache->bucket_count; i++) {
-        cache_entry_t* entry = cache->buckets[i];
-        while (entry) {
-            cache_entry_t* next = entry->next;
-            cupolas_mem_free(entry->key);
-            cupolas_mem_free(entry->value);
-            cupolas_mem_free(entry);
-            entry = next;
-        }
-        cache->buckets[i] = NULL;
-    }
-    cache->size = 0;
-    
-    cupolas_mutex_unlock(&cache->lock);
-}
+

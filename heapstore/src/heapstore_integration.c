@@ -177,6 +177,9 @@ agentos_error_t heapstore_syscall_session_load(
 
     if (out_metadata) {
         *out_metadata = strdup(record.user_id);
+        if (!*out_metadata) {
+            return AGENTOS_ENOMEM;
+        }
     }
     if (out_created_ns) {
         *out_created_ns = record.created_at;
@@ -310,6 +313,9 @@ agentos_error_t heapstore_syscall_trace_save(
         /* attributes 是 void*，这里简化处理 */
         if (strlen(events_json) > 0) {
             record.attributes = strdup(events_json);
+            if (!record.attributes) {
+                return AGENTOS_ENOMEM;
+            }
             record.attribute_count = 1;
         }
     }
@@ -367,6 +373,9 @@ agentos_error_t heapstore_memoryrovol_save(
     }
 
     *out_record_id = strdup(pool.pool_id);
+    if (!*out_record_id) {
+        return AGENTOS_ENOMEM;
+    }
 
     return AGENTOS_SUCCESS;
 }
@@ -402,6 +411,9 @@ agentos_error_t heapstore_memoryrovol_load(
 
     if (out_metadata && pool.name) {
         *out_metadata = strdup(pool.name);
+        if (!*out_metadata) {
+            return AGENTOS_ENOMEM;
+        }
     }
 
     return AGENTOS_SUCCESS;
@@ -415,7 +427,19 @@ agentos_error_t heapstore_memoryrovol_delete(const char* record_id) {
         return AGENTOS_EINVAL;
     }
 
-    return AGENTOS_SUCCESS;
+    // 尝试删除内存池记录
+    heapstore_error_t err = heapstore_memory_free_allocation(record_id);
+    if (err == heapstore_ERR_NOT_FOUND) {
+        // 如果不是分配记录，可能是内存池记录
+        // 通过更新内存池使用量来实现逻辑删除
+        heapstore_memory_pool_t pool;
+        memset(&pool, 0, sizeof(pool));
+        strncpy(pool.pool_id, record_id, sizeof(pool.pool_id) - 1);
+        strncpy(pool.status, "deleted", sizeof(pool.status) - 1);
+        err = heapstore_memory_record_pool(&pool);
+    }
+
+    return (err == heapstore_SUCCESS) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 }
 
 agentos_error_t heapstore_ipc_channel_save(

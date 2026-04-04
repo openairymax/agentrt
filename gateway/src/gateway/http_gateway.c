@@ -90,14 +90,21 @@ static char* handle_system_call(const char* method, cJSON* params, cJSON* reques
     return gateway_syscall_route(method, params, request_id);
 }
 
-/* ========== HTTP响应生成 ========== */
+/* ========== 路由处理函数前向声明 ========== */
+/* 实现在 http_gateway_routes.c 中 */
+static int handle_http_request(void* cls, struct MHD_Connection* connection,
+                               const char* url, const char* method,
+                               const char* version, const char* upload_data,
+                               size_t* upload_data_size, void** con_cls);
+
+/* ========== HTTP 响应生成 ========== */
 
 /**
- * @brief 生成HTTP响应
- * @param status_code HTTP状态码
+ * @brief 生成 HTTP 响应
+ * @param status_code HTTP 状态码
  * @param content 响应内容
  * @param content_len 内容长度
- * @return MHD响应对象
+ * @return MHD 响应对象
  */
 static struct MHD_Response* create_http_response(int status_code, const char* content, size_t content_len) {
     (void)status_code;
@@ -223,168 +230,7 @@ static char* handle_jsonrpc_request(http_gateway_t* gateway, http_request_contex
 
     return handle_system_call(method->valuestring, params, request_id);
 }
-/**
- * @brief HTTP请求处理器
- */
-static int handle_http_request(void* cls, struct MHD_Connection* connection,
-                                   const char* url, const char* method,
-                                   const char* version, const char* upload_data,
-                                   size_t* upload_data_size, void** con_cls) {
-    http_gateway_t* gateway = (http_gateway_t*)cls;
-    http_request_context_t* context = (http_request_context_t*)*con_cls;
-    
-    (void)connection;
-    (void)version;
-    
-    /* 初始化请求上下文 */
-    if (!context) {
-        context = calloc(1, sizeof(http_request_context_t));
-        if (!context) {
-            return MHD_NO;
-        }
-        context->method = method;
-        context->url = url;
-        context->start_time_ns = gateway_time_ns();
-        *con_cls = context;
-        
-        MHD_get_connection_values(connection, MHD_HEADER_KIND, parse_headers, context);
-        
-        return MHD_YES;
-    }
-    
-    /* 处理POST数据 */
-    if (strcmp(method, "POST") == 0 && upload_data && *upload_data_size > 0) {
-        if (*upload_data_size > gateway->max_request_size) {
-            char* error_response = jsonrpc_create_error_response(NULL, -413, "Request too large", NULL);
-            struct MHD_Response* response = create_http_response(413, error_response, strlen(error_response));
-            free(error_response);
-            
-            atomic_fetch_add(&gateway->requests_failed, 1);
-            atomic_fetch_add(&gateway->bytes_received, *upload_data_size);
-            
-            int ret = MHD_queue_response(connection, 413, response);
-            MHD_destroy_response(response);
-            free(context);
-            *con_cls = NULL;
-            
-            return ret;
-        }
-        
-        context->upload_data = upload_data;
-        context->upload_data_size = *upload_data_size;
-        
-        if (parse_json_request(gateway, context, upload_data, *upload_data_size) != 0) {
-            char* error_response = jsonrpc_create_error_response(NULL, -32700, "Parse error", NULL);
-            struct MHD_Response* response = create_http_response(400, error_response, strlen(error_response));
-            free(error_response);
-            
-            atomic_fetch_add(&gateway->requests_failed, 1);
-            atomic_fetch_add(&gateway->bytes_received, *upload_data_size);
-            
-            int ret = MHD_queue_response(connection, 400, response);
-            MHD_destroy_response(response);
-            free(context);
-            *con_cls = NULL;
-            
-            return ret;
-        }
-        
-        *upload_data_size = 0;
-        return MHD_YES;
-    }
-    
-    /* 完整请求处理 */
-    if (strcmp(method, "POST") == 0 && context->json_request) {
-        char* json_response = handle_jsonrpc_request(gateway, context);
-        struct MHD_Response* response = create_http_response(200, json_response, strlen(json_response));
-        
-        uint64_t response_time_ns = gateway_time_ns() - context->start_time_ns;
-        atomic_fetch_add(&gateway->requests_total, 1);
-        atomic_fetch_add(&gateway->bytes_received, context->upload_data_size);
-        atomic_fetch_add(&gateway->bytes_sent, strlen(json_response));
-        
-        int ret = MHD_queue_response(connection, 200, response);
-        MHD_destroy_response(response);
-        free(json_response);
-        cJSON_Delete(context->json_request);
-        free(context);
-        *con_cls = NULL;
-        
-        return ret;
-    }
-    
-    /* OPTIONS请求（CORS预检） */
-    if (strcmp(method, "OPTIONS") == 0) {
-        /* 安全清理：如果之前有POST数据部分处理，释放残留的json_request */
-        if (context->json_request) {
-            cJSON_Delete(context->json_request);
-            context->json_request = NULL;
-        }
-
-        struct MHD_Response* response = MHD_create_response_from_buffer(0, NULL, MHD_RESPMEM_PERSISTENT);
-        MHD_add_response_header(response, "Access-Control-Allow-Origin", "*");
-        MHD_add_response_header(response, "Access-Control-Allow-Methods", "POST, GET, OPTIONS");
-        MHD_add_response_header(response, "Access-Control-Allow-Headers", "Content-Type, Authorization");
-        
-        int ret = MHD_queue_response(connection, 200, response);
-        MHD_destroy_response(response);
-        free(context);
-        *con_cls = NULL;
-        
-        return ret;
-    }
-    
-    /* GET请求 - 健康检查 */
-    if (strcmp(method, "GET") == 0 && strcmp(url, "/health") == 0) {
-        const char* health_json = "{\"status\":\"healthy\",\"service\":\"gateway\"}";
-        struct MHD_Response* response = create_http_response(200, health_json, strlen(health_json));
-        
-        atomic_fetch_add(&gateway->requests_total, 1);
-        
-        int ret = MHD_queue_response(connection, 200, response);
-        MHD_destroy_response(response);
-        free(context);
-        *con_cls = NULL;
-        
-        return ret;
-    }
-    
-    /* GET请求 - 指标导出 */
-    if (strcmp(method, "GET") == 0 && strcmp(url, "/metrics") == 0) {
-        char* metrics_json = NULL;
-        agentos_error_t err = agentos_sys_telemetry_metrics(&metrics_json);
-        
-        if (err != AGENTOS_SUCCESS || !metrics_json) {
-            metrics_json = strdup("{\"error\":\"failed to get metrics\"}");
-        }
-        
-        struct MHD_Response* response = create_http_response(200, metrics_json, strlen(metrics_json));
-        free(metrics_json);
-        
-        atomic_fetch_add(&gateway->requests_total, 1);
-        
-        int ret = MHD_queue_response(connection, 200, response);
-        MHD_destroy_response(response);
-        free(context);
-        *con_cls = NULL;
-        
-        return ret;
-    }
-    
-    /* 404 Not Found */
-    char* error_response = jsonrpc_create_error_response(NULL, -32601, "Not Found", NULL);
-    struct MHD_Response* response = create_http_response(404, error_response, strlen(error_response));
-    free(error_response);
-    
-    atomic_fetch_add(&gateway->requests_failed, 1);
-    
-    int ret = MHD_queue_response(connection, 404, response);
-    MHD_destroy_response(response);
-    free(context);
-    *con_cls = NULL;
-    
-    return ret;
-}
+/* handle_http_request() 函数已迁移至 http_gateway_routes.c */
 /* ========== 网关操作表 ========== */
 
 static agentos_error_t http_gateway_start(void* gateway_impl) {

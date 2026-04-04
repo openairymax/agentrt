@@ -1258,6 +1258,9 @@ static heapstore_error_t heapstore_batch_commit_span(const heapstore_trace_entry
     /* 属性处理：需要深拷贝 */
     if (trace_entry->attributes[0]) {
         span_rec.attributes = strdup(trace_entry->attributes);
+        if (!span_rec.attributes) {
+            return heapstore_ERR_OUT_OF_MEMORY;
+        }
         span_rec.attribute_count = 1;
     }
 

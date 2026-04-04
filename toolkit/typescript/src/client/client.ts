@@ -233,10 +233,13 @@ export class Client implements APIClient {
     if (error instanceof NetworkError || error instanceof TimeoutError) {
       return true;
     }
+    
     if (error instanceof HttpError) {
-      const retryableStatusCodes = [408, 429, 500, 502, 503, 504];
-      return retryableStatusCodes.includes(error.statusCode);
+      const status = error.statusCode;
+      // 408 Request Timeout, 429 Too Many Requests, 5xx Server Errors
+      return status === 408 || status === 429 || status >= 500;
     }
+    
     return false;
   }
 
@@ -333,23 +336,6 @@ export class Client implements APIClient {
     }
 
     return new AgentOSError(error.message || '未知错误', ErrorCode.UNKNOWN);
-  }
-
-  /**
-   * 判断是否应该重试请求
-   * @param error - 错误对象
-   */
-  private shouldRetry(error: Error): boolean {
-    if (error instanceof NetworkError || error instanceof TimeoutError) {
-      return true;
-    }
-
-    if (error instanceof HttpError) {
-      const status = error.statusCode;
-      return status >= 500 || status === 429;
-    }
-
-    return false;
   }
 
   /**

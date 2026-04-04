@@ -2,11 +2,11 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-v1.0.0.6-blue.svg)](../../../README.md)
+[![Version](https://img.shields.io/badge/version-v1.0.0.9-blue.svg)](../../../README.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](../../../../LICENSE)
 [![Status](https://img.shields.io/badge/status-active%20development-yellow.svg)](../../../README.md)
 
-**版本**: v1.0.0.6 | **更新日期**: 2026-03-25
+**版本**: v1.0.0.9 | **更新日期**: 2026-03-25
 
 </div>
 
@@ -29,7 +29,7 @@ Dispatching Strategies 是 openlab 的任务调度策略包，提供多种智能
 - **自适应调度**: 根据历史表现调整策略
 - **多目标优化**: 成本、延迟、成功率综合考量
 
-## 🛠️ 主要变更 (v1.0.0.6)
+## 🛠️ 主要变更 (v1.0.0.9)
 
 - ✨ **新增**: 机器学习驱动的自适应调度
 - ✨ **新增**: 多目标优化评分函数
