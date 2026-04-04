@@ -2,249 +2,282 @@
 # "From data intelligence emerges."
 
 """
-Unit Tests for Planning Strategy
-=============================
+Unit Tests for Planning Strategies
+==================================
 """
 
 import pytest
+from typing import Dict, List, Set
 import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 
-class TestPlanningStrategy:
-    """Tests for planning strategy."""
+class TestTaskNode:
+    """Tests for TaskNode dataclass."""
 
-    def test_strategy_initialization(self):
-        """Test strategy can be initialized."""
-        from contrib.strategies.planning import PlanningStrategy
+    def test_task_node_creation(self):
+        """Test TaskNode can be created."""
+        from openlab.contrib.strategies.planning import TaskNode
 
-        strategy = PlanningStrategy()
-        assert strategy is not None
-        assert strategy.max_subtasks == 20
-        assert strategy.complexity_threshold == 7.0
-
-    def test_create_simple_plan(self):
-        """Test creating a simple execution plan."""
-        from contrib.strategies.planning import PlanningStrategy, Task, TaskCategory
-
-        strategy = PlanningStrategy()
-        task = Task(
-            id="plan-test-001",
-            description="Test task for planning",
-            complexity=5.0
+        node = TaskNode(
+            id="task-001",
+            name="Design Database",
+            description="Design the database schema"
         )
+        assert node.id == "task-001"
+        assert node.name == "Design Database"
+        assert node.status == "pending"
+        assert node.priority == 50
 
-        plan = strategy.create_plan(task)
+    def test_task_node_with_dependencies(self):
+        """Test TaskNode with dependencies."""
+        from openlab.contrib.strategies.planning import TaskNode
 
-        assert plan is not None
-        assert plan.task_id == "plan-test-001"
-        assert len(plan.subtasks) > 0
-
-    def test_create_plan_with_category(self):
-        """Test creating a plan with specific category."""
-        from contrib.strategies.planning import PlanningStrategy, Task, TaskCategory
-
-        strategy = PlanningStrategy()
-        task = Task(
-            id="plan-test-002",
-            description="Implementation task",
-            category=TaskCategory.IMPLEMENTATION,
-            complexity=8.0
+        node = TaskNode(
+            id="task-002",
+            name="Implement API",
+            dependencies={"task-001"}  # Depends on Design Database
         )
+        assert "task-001" in node.dependencies
+        assert len(node.dependencies) == 1
 
-        plan = strategy.create_plan(task)
+    def test_task_node_hash(self):
+        """Test TaskNode can be hashed."""
+        from openlab.contrib.strategies.planning import TaskNode
 
-        assert plan is not None
-        assert len(plan.subtasks) > 0
-        assert plan.estimated_complexity > 0
+        node1 = TaskNode(id="task-001", name="Task 1")
+        node2 = TaskNode(id="task-001", name="Task 1")
 
-    def test_get_next_executable(self):
-        """Test getting next executable subtasks."""
-        from contrib.strategies.planning import PlanningStrategy, Task
+        assert hash(node1) == hash(node2)
 
-        strategy = PlanningStrategy()
-        task = Task(id="exec-test-001", description="Execution test", complexity=5.0)
+    def test_task_node_equality(self):
+        """Test TaskNode equality comparison."""
+        from openlab.contrib.strategies.planning import TaskNode
 
-        plan = strategy.create_plan(task)
-        next_tasks = strategy.get_next_executable(plan)
+        node1 = TaskNode(id="task-001", name="Task 1")
+        node2 = TaskNode(id="task-001", name="Different Name")
+        node3 = TaskNode(id="task-002", name="Task 1")
 
-        assert isinstance(next_tasks, list)
-
-
-class TestTaskDecomposition:
-    """Tests for task decomposition."""
-
-    def test_decompose_simple_task(self):
-        """Test decomposing a simple task."""
-        from contrib.strategies.planning import TaskDecomposer, Task, TaskCategory
-
-        decomposer = TaskDecomposer(max_subtasks=20)
-        task = Task(
-            id="decomp-test-001",
-            description="Test decomposition",
-            complexity=5.0
-        )
-
-        subtasks = decomposer.decompose(task)
-
-        assert len(subtasks) > 0
-        assert len(subtasks) <= 20
-
-    def test_decompose_complex_task(self):
-        """Test decomposing a complex task."""
-        from contrib.strategies.planning import TaskDecomposer, Task, TaskCategory
-
-        decomposer = TaskDecomposer(max_subtasks=20)
-        task = Task(
-            id="decomp-test-002",
-            description="Complex implementation",
-            category=TaskCategory.IMPLEMENTATION,
-            complexity=10.0
-        )
-
-        subtasks = decomposer.decompose(task)
-
-        assert len(subtasks) > 0
-        for subtask in subtasks:
-            assert subtask.category == TaskCategory.IMPLEMENTATION
+        assert node1 == node2  # Same ID
+        assert node1 != node3  # Different ID
 
 
-class TestDependencyAnalysis:
-    """Tests for dependency analysis."""
+class TestTaskDAG:
+    """Tests for TaskDAG class."""
 
-    def test_analyze_dependencies(self):
-        """Test analyzing dependencies between subtasks."""
-        from contrib.strategies.planning import DependencyAnalyzer, SubTask, TaskCategory
+    def test_dag_creation(self):
+        """Test TaskDAG can be created."""
+        from openlab.contrib.strategies.planning import TaskDAG
 
-        analyzer = DependencyAnalyzer()
+        dag = TaskDAG(root_goal="Build a web app")
+        assert dag.root_goal == "Build a web app"
+        assert len(dag.nodes) == 0
+        assert len(dag.edges) == 0
 
-        subtask1 = SubTask(
-            id="dep-001",
-            description="First task",
-            category=TaskCategory.RESEARCH
-        )
+    def test_add_node(self):
+        """Test adding nodes to DAG."""
+        from openlab.contrib.strategies.planning import TaskDAG, TaskNode
 
-        subtask2 = SubTask(
-            id="dep-002",
-            description="Second task",
-            category=TaskCategory.DESIGN,
-            dependencies=["dep-001"]
-        )
+        dag = TaskDAG(root_goal="Build a web app")
+        node = TaskNode(id="task-001", name="Design")
+        dag.add_node(node)
 
-        subtasks = analyzer.analyze([subtask1, subtask2])
+        assert "task-001" in dag.nodes
+        assert len(dag.edges) == 0  # No dependencies
 
-        assert len(subtasks) == 2
+    def test_add_node_with_dependencies(self):
+        """Test adding node with dependencies."""
+        from openlab.contrib.strategies.planning import TaskDAG, TaskNode
+
+        dag = TaskDAG(root_goal="Build a web app")
+
+        # Add parent node first
+        parent = TaskNode(id="task-001", name="Design")
+        dag.add_node(parent)
+
+        # Add child node with dependency
+        child = TaskNode(id="task-002", name="Implement", dependencies={"task-001"})
+        dag.add_node(child)
+
+        assert len(dag.edges) == 1
+        assert ("task-001", "task-002") in dag.edges
 
     def test_get_execution_order(self):
-        """Test getting execution order."""
-        from contrib.strategies.planning import DependencyAnalyzer, SubTask, TaskCategory
+        """Test topological sort for execution order."""
+        from openlab.contrib.strategies.planning import TaskDAG, TaskNode
 
-        analyzer = DependencyAnalyzer()
+        dag = TaskDAG(root_goal="Build a web app")
 
-        subtask1 = SubTask(id="order-001", description="First", category=TaskCategory.RESEARCH)
-        subtask2 = SubTask(
-            id="order-002",
-            description="Second",
-            category=TaskCategory.DESIGN,
-            dependencies=["order-001"]
-        )
+        # Create dependency chain: design -> implement -> test
+        design = TaskNode(id="design", name="Design")
+        implement = TaskNode(id="implement", name="Implement", dependencies={"design"})
+        test = TaskNode(id="test", name="Test", dependencies={"implement"})
 
-        subtasks = analyzer.analyze([subtask1, subtask2])
-        execution_order = analyzer.get_execution_order(subtasks)
+        dag.add_node(design)
+        dag.add_node(implement)
+        dag.add_node(test)
 
-        assert len(execution_order) > 0
-        assert execution_order[0][0].id == "order-001"
+        layers = dag.get_execution_order()
 
+        assert len(layers) == 3
+        assert layers[0][0].id == "design"
+        assert layers[1][0].id == "implement"
+        assert layers[2][0].id == "test"
 
-class TestRiskAssessment:
-    """Tests for risk assessment."""
+    def test_get_ready_tasks(self):
+        """Test getting ready tasks."""
+        from openlab.contrib.strategies.planning import TaskDAG, TaskNode
 
-    def test_assess_low_risk_subtask(self):
-        """Test assessing low risk subtask."""
-        from contrib.strategies.planning import RiskAssessor, SubTask, TaskCategory, RiskLevel
+        dag = TaskDAG(root_goal="Build a web app")
 
-        assessor = RiskAssessor()
-        subtask = SubTask(
-            id="risk-001",
-            description="Low risk task",
-            category=TaskCategory.DOCUMENTATION,
-            estimated_complexity=3.0
-        )
+        design = TaskNode(id="design", name="Design")
+        implement = TaskNode(id="implement", name="Implement", dependencies={"design"})
 
-        risk_level, factors = assessor.assess_subtask(subtask)
+        dag.add_node(design)
+        dag.add_node(implement)
 
-        assert risk_level in [RiskLevel.LOW, RiskLevel.MEDIUM]
+        # Initially only design is ready
+        ready = dag.get_ready_tasks(set())
+        assert len(ready) == 1
+        assert ready[0].id == "design"
 
-    def test_assess_high_risk_subtask(self):
-        """Test assessing high risk subtask."""
-        from contrib.strategies.planning import RiskAssessor, SubTask, TaskCategory, RiskLevel
+        # After design is done, implement is ready
+        ready = dag.get_ready_tasks({"design"})
+        assert len(ready) == 1
+        assert ready[0].id == "implement"
 
-        assessor = RiskAssessor()
-        subtask = SubTask(
-            id="risk-002",
-            description="High risk task",
-            category=TaskCategory.IMPLEMENTATION,
-            estimated_complexity=9.0,
-            estimated_duration=300.0,
-            dependencies=["dep-001", "dep-002", "dep-003", "dep-004"]
-        )
+    def test_validate_dag_no_cycle(self):
+        """Test DAG validation with no cycles."""
+        from openlab.contrib.strategies.planning import TaskDAG, TaskNode
 
-        risk_level, factors = assessor.assess_subtask(subtask)
+        dag = TaskDAG(root_goal="Build a web app")
+        node1 = TaskNode(id="task-001", name="Task 1")
+        node2 = TaskNode(id="task-002", name="Task 2", dependencies={"task-001"})
+        dag.add_node(node1)
+        dag.add_node(node2)
 
-        assert risk_level in [RiskLevel.HIGH, RiskLevel.CRITICAL]
-
-
-class TestMilestoneBuilder:
-    """Tests for milestone building."""
-
-    def test_build_milestones(self):
-        """Test building milestones from subtasks."""
-        from contrib.strategies.planning import MilestoneBuilder, SubTask, TaskCategory
-
-        builder = MilestoneBuilder()
-
-        subtasks = [
-            SubTask(id="ms-001", description="Research task", category=TaskCategory.RESEARCH),
-            SubTask(id="ms-002", description="Design task", category=TaskCategory.DESIGN),
-            SubTask(id="ms-003", description="Implementation task", category=TaskCategory.IMPLEMENTATION),
-        ]
-
-        milestones = builder.build(subtasks)
-
-        assert len(milestones) > 0
-        milestone_names = [m.name for m in milestones]
-        assert "Research Phase" in milestone_names
-
-
-class TestPlanValidation:
-    """Tests for plan validation."""
-
-    def test_validate_valid_plan(self):
-        """Test validating a valid plan."""
-        from contrib.strategies.planning import PlanningStrategy, Task, TaskStatus
-
-        strategy = PlanningStrategy()
-        task = Task(id="val-test-001", description="Validation test", complexity=5.0)
-
-        plan = strategy.create_plan(task)
-        is_valid, errors = strategy.validate_plan(plan)
-
+        is_valid, errors = dag.validate()
         assert is_valid is True
         assert len(errors) == 0
 
-    def test_validate_empty_plan(self):
-        """Test validating an empty plan."""
-        from contrib.strategies.planning import PlanningStrategy, ExecutionPlan
 
-        strategy = PlanningStrategy()
-        plan = ExecutionPlan(id="empty-plan", task_id="empty-task", description="Empty plan")
+class TestPlanningContext:
+    """Tests for PlanningContext dataclass."""
 
-        is_valid, errors = strategy.validate_plan(plan)
+    def test_context_creation(self):
+        """Test PlanningContext can be created."""
+        from openlab.contrib.strategies.planning import PlanningContext
 
-        assert is_valid is False
-        assert len(errors) > 0
+        context = PlanningContext(
+            goal="Build a web app",
+            max_depth=5,
+            timeout=60.0
+        )
+        assert context.goal == "Build a web app"
+        assert context.max_depth == 5
+        assert context.timeout == 60.0
+
+    def test_context_with_constraints(self):
+        """Test PlanningContext with constraints."""
+        from openlab.contrib.strategies.planning import PlanningContext
+
+        context = PlanningContext(
+            goal="Build a web app",
+            constraints={"budget": "medium", "timeline": 12}
+        )
+        assert context.constraints["budget"] == "medium"
+        assert context.constraints["timeline"] == 12
+
+
+class TestHierarchicalPlanner:
+    """Tests for HierarchicalPlanner class."""
+
+    @pytest.fixture
+    def planner(self):
+        """Create a test planner."""
+        from openlab.contrib.strategies.planning import HierarchicalPlanner
+        return HierarchicalPlanner(max_depth=3)
+
+    def test_planner_creation(self, planner):
+        """Test planner can be created."""
+        assert planner.max_depth == 3
+        assert planner.name == "HierarchicalPlanner"
+
+    def test_simple_planning(self, planner):
+        """Test simple goal planning."""
+        from openlab.contrib.strategies.planning import PlanningContext
+
+        context = PlanningContext(
+            goal="Build a simple web app",
+            max_depth=2
+        )
+
+        dag = planner.plan("Build a simple web app", context)
+
+        assert dag is not None
+        assert dag.root_goal == "Build a simple web app"
+        assert len(dag.nodes) > 0
+
+    def test_plan_returns_dag(self, planner):
+        """Test plan() returns TaskDAG."""
+        from openlab.contrib.strategies.planning import TaskDAG
+
+        dag = planner.plan("Test goal")
+
+        assert isinstance(dag, TaskDAG)
+
+    def test_planner_counts_plans(self, planner):
+        """Test planner tracks number of plans."""
+        initial_count = planner._plan_count
+
+        planner.plan("Goal 1")
+        assert planner._plan_count == initial_count + 1
+
+        planner.plan("Goal 2")
+        assert planner._plan_count == initial_count + 2
+
+
+class TestReactivePlanner:
+    """Tests for ReactivePlanner class."""
+
+    @pytest.fixture
+    def planner(self):
+        """Create a test planner."""
+        from openlab.contrib.strategies.planning import ReactivePlanner
+        return ReactivePlanner()
+
+    def test_planner_creation(self, planner):
+        """Test planner can be created."""
+        assert planner.name == "ReactivePlanner"
+
+    def test_reactive_planning(self, planner):
+        """Test reactive goal planning."""
+        dag = planner.plan("Handle user request")
+
+        assert dag is not None
+        assert isinstance(dag.root_goal, str)
+
+
+class TestReflectivePlanner:
+    """Tests for ReflectivePlanner class."""
+
+    @pytest.fixture
+    def planner(self):
+        """Create a test planner."""
+        from openlab.contrib.strategies.planning import ReflectivePlanner
+        return ReflectivePlanner()
+
+    def test_planner_creation(self, planner):
+        """Test planner can be created."""
+        assert planner.name == "ReflectivePlanner"
+
+    def test_reflective_planning(self, planner):
+        """Test reflective goal planning."""
+        dag = planner.plan("Complex system design")
+
+        assert dag is not None
 
 
 if __name__ == "__main__":

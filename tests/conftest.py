@@ -1,6 +1,6 @@
 # AgentOS 测试夹具和共享配置
-# Version: 1.0.0.6
-# Last updated: 2026-03-22
+# Version: 1.0.0.9
+# Last updated: 2026-04-04
 
 """
 测试夹具和共享配置模块。
@@ -14,16 +14,19 @@ import json
 import time
 import tempfile
 import shutil
+import logging
+import tracemalloc
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Generator
+from typing import Dict, Any, List, Optional, Generator, Callable
 from dataclasses import dataclass, field
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock, MagicMock, patch, AsyncMock
+from contextlib import contextmanager
 
 import pytest
 
 # 添加项目根目录到路径
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "python"))
+sys.path.insert(0, str(PROJECT_ROOT / "toolkit" / "python"))
 
 
 # ============================================================
@@ -379,3 +382,224 @@ except ImportError:
         "pytest-asyncio not installed. Async tests will be skipped. "
         "Install with: pip install pytest-asyncio"
     )
+
+
+# ============================================================
+# 增强的 Fixture
+# ============================================================
+
+@pytest.fixture(scope="function")
+def isolated_logger():
+    """
+    提供隔离的日志记录器。
+
+    用法:
+        def test_logging(isolated_logger):
+            isolated_logger.info("Test message")
+            assert "Test message" in isolated_logger.output
+    """
+    class IsolatedLogger:
+        def __init__(self):
+            self.output = []
+            self._handler = logging.Handler()
+
+        def debug(self, msg):
+            self.output.append(f"DEBUG: {msg}")
+
+        def info(self, msg):
+            self.output.append(f"INFO: {msg}")
+
+        def warning(self, msg):
+            self.output.append(f"WARNING: {msg}")
+
+        def error(self, msg):
+            self.output.append(f"ERROR: {msg}")
+
+    return IsolatedLogger()
+
+
+@pytest.fixture(scope="function")
+def mock_async_client():
+    """
+    提供模拟的异步HTTP客户端。
+
+    Returns:
+        AsyncMock: 模拟的异步客户端
+    """
+    client = AsyncMock()
+    client.get = AsyncMock()
+    client.post = AsyncMock()
+    client.put = AsyncMock()
+    client.delete = AsyncMock()
+    client.patch = AsyncMock()
+    return client
+
+
+@pytest.fixture(scope="function")
+def cache_dir(temp_dir):
+    """
+    提供测试缓存目录。
+
+    Args:
+        temp_dir: 临时目录fixture
+
+    Returns:
+        Path: 缓存目录路径
+    """
+    cache_path = temp_dir / "cache"
+    cache_path.mkdir(parents=True, exist_ok=True)
+    return cache_path
+
+
+@pytest.fixture(scope="function")
+def sample_contract_data():
+    """
+    提供示例合约数据。
+
+    Returns:
+        Dict: 示例合约数据
+    """
+    return {
+        "schema_version": "1.0.0",
+        "agent_id": "com.agentos.test.v1",
+        "agent_name": "Test Agent",
+        "version": "1.0.0",
+        "role": "software_engineer",
+        "description": "测试 Agent",
+        "capabilities": [
+            {
+                "name": "test_capability",
+                "description": "测试能力",
+                "input_schema": {"type": "object"},
+                "output_schema": {"type": "object"}
+            }
+        ],
+        "models": {
+            "system1": "gpt-3.5-turbo",
+            "system2": "gpt-4"
+        },
+        "required_permissions": ["read_project_context"],
+        "cost_profile": {
+            "token_per_task_avg": 1000,
+            "api_cost_per_task": 0.01,
+            "maintenance_level": "community"
+        },
+        "trust_metrics": {
+            "install_count": 0,
+            "rating": 3.0,
+            "verified_provider": False,
+            "last_audit": "2026-03-01"
+        }
+    }
+
+
+@pytest.fixture(scope="function")
+def memory_profile():
+    """
+    提供内存分析上下文管理器。
+
+    用法:
+        def test_memory(memory_profile):
+            with memory_profile as mp:
+                # 执行代码
+                data = [i for i in range(10000)]
+            print(f"峰值内存: {mp.peak_mb:.2f} MB")
+
+    Yields:
+        MemorySnapshot: 内存快照对象
+    """
+    class MemorySnapshot:
+        def __init__(self):
+            self.start_mb = 0
+            self.peak_mb = 0
+            self.current_mb = 0
+
+        def update(self):
+            snapshot = tracemalloc.take_snapshot()
+            stats = snapshot.statistics('lineno')
+            total = sum(stat.size for stat in stats)
+            self.current_mb = total / 1024 / 1024
+            if self.current_mb > self.peak_mb:
+                self.peak_mb = self.current_mb
+
+    snapshot = MemorySnapshot()
+    tracemalloc.start()
+    try:
+        yield snapshot
+    finally:
+        snapshot.update()
+        tracemalloc.stop()
+
+
+@contextmanager
+@pytest.fixture(scope="function")
+def temp_file(temp_dir):
+    """
+    提供临时文件。
+
+    用法:
+        def test_file(temp_file):
+            with temp_file() as f:
+                f.write("test content")
+            # 文件自动清理
+
+    Yields:
+        Path: 临时文件路径
+    """
+    fd, path = tempfile.mkstemp(dir=temp_dir)
+    os.close(fd)
+
+    yield Path(path)
+
+    try:
+        os.unlink(path)
+    except FileNotFoundError:
+        pass
+
+
+@pytest.fixture(scope="function")
+def retry_counter():
+    """
+    提供重试计数器。
+
+    用法:
+        def test_retry(retry_counter):
+            retry_counter.increment()
+            retry_counter.increment()
+            assert retry_counter.count == 2
+
+    Returns:
+        RetryCounter: 重试计数器对象
+    """
+    class RetryCounter:
+        def __init__(self):
+            self._count = 0
+
+        @property
+        def count(self):
+            return self._count
+
+        def increment(self):
+            self._count += 1
+
+        def reset(self):
+            self._count = 0
+
+    return RetryCounter()
+
+
+@pytest.fixture(scope="session")
+def project_info():
+    """
+    提供项目信息。
+
+    Returns:
+        Dict: 项目信息字典
+    """
+    return {
+        "name": "AgentOS",
+        "version": "1.0.0.9",
+        "root": PROJECT_ROOT,
+        "tests_dir": PROJECT_ROOT / "tests",
+        "toolkit_dir": PROJECT_ROOT / "toolkit" / "python",
+    }
