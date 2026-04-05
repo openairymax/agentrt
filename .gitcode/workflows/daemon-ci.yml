@@ -112,7 +112,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.os }}-failure-logs
-          path: build-daemon/CMakeFiles/*.log
+          path: build-agentos/daemon/CMakeFiles/*.log
           retention-days: 7
           if-no-files-found: ignore
 
@@ -275,7 +275,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-failure-logs
-          path: build-daemon/CMakeFiles/**/*.log
+          path: build-agentos/daemon/CMakeFiles/**/*.log
           retention-days: 7
           if-no-files-found: ignore
 
@@ -356,7 +356,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: macos-failure-logs
-          path: build-daemon/CMakeFiles/*.log
+          path: build-agentos/daemon/CMakeFiles/*.log
           retention-days: 7
           if-no-files-found: ignore
 
@@ -386,17 +386,17 @@ jobs:
             --suppress=unknownMacro \
             --error-exitcode=0 \
             --quiet \
-            daemon/common/src \
-            daemon/gateway_d/src \
-            daemon/llm_d/src \
-            daemon/tool_d/src \
-            daemon/sched_d/src \
-            daemon/monit_d/src \
-            daemon/market_d/src \
-            atoms/corekern/src \
-            atoms/coreloopthree/src \
-            atoms/memoryrovol/src \
-            commons/utils \
+            agentos/daemon/common/src \
+            agentos/daemon/gateway_d/src \
+            agentos/daemon/llm_d/src \
+            agentos/daemon/tool_d/src \
+            agentos/daemon/sched_d/src \
+            agentos/daemon/monit_d/src \
+            agentos/daemon/market_d/src \
+            agentos/atoms/corekern/src \
+            agentos/atoms/coreloopthree/src \
+            agentos/atoms/memoryrovol/src \
+            agentos/commons/utils \
             2> cppcheck-report.xml || true
           
           echo "Static analysis completed"

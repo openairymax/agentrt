@@ -1,7 +1,7 @@
-﻿﻿﻿﻿﻿﻿"""
+"""
 AgentOS 模糊测试框架
 Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-Version: 1.0.0
+Version: 1.0.0.9
 
 基于 Hypothesis 和 Atheris 的模糊测试框架
 用于测试解析器和输入处理模块的健壮性
@@ -67,7 +67,7 @@ class FuzzTestFramework:
         """
         results = {
             "framework": "AgentOS Fuzz Test Framework",
-            "version": "1.0.0",
+            "version": "1.0.0.9",
             "tests": [],
             "summary": {
                 "total_tests": 0,
@@ -136,7 +136,7 @@ if HYPOTHESIS_AVAILABLE:
         base_payloads = [
             "<script>alert('XSS')</script>",
             "<img src=x onerror=alert('XSS')>",
-            "javascript:alert('XSS')",
+            "javascript:alert('XSS')>",
             "<svg onload=alert('XSS')>",
             "'\"><script>alert('XSS')</script>",
             "<body onload=alert('XSS')>",

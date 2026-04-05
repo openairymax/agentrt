@@ -1,7 +1,7 @@
 # =============================================================================
 # AgentOS .gitignore 文件
-# 版本：4.0.0
-# 最后更新：2026-04-03
+# 版本：5.0.0
+# 最后更新：2026-04-05
 # 说明：规范化排除所有不应纳入版本控制的文件和目录
 #
 # 设计原则：
@@ -11,22 +11,27 @@
 # 4. 空目录通过 .gitkeep 保留，但排除目录内容
 # 5. 项目必需文件使用否定规则明确保留
 #
-# 项目模块结构：
+# 项目模块结构（2026-04-05 重大重构后）：
 .bendiwenjian/
 
-# - atoms/           : 核心原子模块（C 语言，内核级）
-# - atomslite/       : 轻量级原子模块
-# - commons/         : 统一基础库
-# - cupolas/         : 安全穹顶模块
-# - daemon/          : 用户态服务模块
-# - gateway/         : 动态服务模块
-# - heapstore/       : 数据持久化层（运行时生成）
-# - manager/         : 配置管理器
-# - openlab/         : Python 应用中心
-# - toolkit/         : 多语言 SDK 工具
-# - scripts/         : 构建和运维脚本
-# - tests/           : 测试框架
-# - manuals/         : 项目文档
+# 核心模块集合 (agentos/)
+# - agentos/atoms/       : 核心原子模块（C 语言，内核级）
+# - agentos/atomslite/   : 轻量级原子模块
+# - agentos/commons/     : 统一基础库
+# - agentos/cupolas/     : 安全穹顶模块
+# - agentos/daemon/      : 用户态服务模块
+# - agentos/gateway/     : 网关服务模块
+# - agentos/heapstore/   : 数据持久化层（运行时生成）
+# - agentos/manager/     : 配置管理器
+# - agentos/toolkit/     : 多语言 SDK 工具
+# - agentos/manuals/     : 项目文档
+#
+# 辅助模块
+# - openlab/             : Python 应用中心
+# - scripts/             : 构建和运维脚本
+# - tests/               : 测试框架
+# - docker/              : 容器化配置
+# - docs/                : 额外文档
 # =============================================================================
 
 # =============================================================================
@@ -148,11 +153,11 @@ dmypy.json
 # 4. Go 语言 SDK（构建产物，不追踪）
 # =============================================================================
 
-toolkit/go/vendor/
-toolkit/go/go.sum
-toolkit/go/*.exe
-toolkit/go/testsuite/
-toolkit/go/coverage/
+agentos/toolkit/go/vendor/
+agentos/toolkit/go/go.sum
+agentos/toolkit/go/*.exe
+agentos/toolkit/go/testsuite/
+agentos/toolkit/go/coverage/
 *.test
 cover.out
 cover.html
@@ -161,24 +166,24 @@ cover.html
 # 5. Rust 语言 SDK（构建产物，不追踪）
 # =============================================================================
 
-toolkit/rust/target/
+agentos/toolkit/rust/target/
 Cargo.lock
-toolkit/rust/debug/
-toolkit/rust/release/
-toolkit/rust/doc/
-toolkit/rust/target/doc/
+agentos/toolkit/rust/debug/
+agentos/toolkit/rust/release/
+agentos/toolkit/rust/doc/
+agentos/toolkit/rust/target/doc/
 
 # =============================================================================
 # 6. TypeScript/JavaScript SDK（构建产物，不追踪）
 # =============================================================================
 
-toolkit/typescript/node_modules/
-toolkit/typescript/dist/
-toolkit/typescript/build/
-toolkit/typescript/coverage/
-toolkit/typescript/.tsbuildinfo
-toolkit/typescript/.pnpm-store/
-toolkit/typescript/tsbuildinfo/
+agentos/toolkit/typescript/node_modules/
+agentos/toolkit/typescript/dist/
+agentos/toolkit/typescript/build/
+agentos/toolkit/typescript/coverage/
+agentos/toolkit/typescript/.tsbuildinfo
+agentos/toolkit/typescript/.pnpm-store/
+agentos/toolkit/typescript/tsbuildinfo/
 
 # =============================================================================
 # 7. 环境变量和敏感配置（本地配置，不追踪）
@@ -292,7 +297,7 @@ bin/
 *.log
 logs/
 *.logs
-heapstore/logs/
+agentos/heapstore/logs/
 
 # 数据库文件
 *.db
@@ -302,14 +307,14 @@ heapstore/logs/
 *.sqlite3
 *.db.sqlite
 *.db-journal
-heapstore/registry/*.db
-heapstore/registry/*.sqlite
-heapstore/db/
+agentos/heapstore/registry/*.db
+agentos/heapstore/registry/*.sqlite
+agentos/heapstore/db/
 registry.db
 registry.sqlite
 
 # 追踪和性能数据
-heapstore/traces/
+agentos/heapstore/traces/
 *.trace
 *.spans
 *.prof
@@ -327,44 +332,44 @@ temp/
 *.orig
 
 # =============================================================================
-# 10. heapstore/ 运行时目录（运行时生成，仅保留空路径）
+# 10. agentos/heapstore/ 运行时目录（运行时生成，仅保留空路径）
 # =============================================================================
 
 # kernel/ 子目录（排除内容，保留 .gitkeep）
-heapstore/kernel/ipc/binder/*
-!heapstore/kernel/ipc/binder/.gitkeep
-heapstore/kernel/ipc/channels/*
-!heapstore/kernel/ipc/channels/.gitkeep
-heapstore/kernel/memory/index/*
-!heapstore/kernel/memory/index/.gitkeep
-heapstore/kernel/memory/meta/*
-!heapstore/kernel/memory/meta/.gitkeep
-heapstore/kernel/memory/raw/*
-!heapstore/kernel/memory/raw/.gitkeep
-heapstore/kernel/memory/patterns/*
-!heapstore/kernel/memory/patterns/.gitkeep
+agentos/heapstore/kernel/ipc/binder/*
+!agentos/heapstore/kernel/ipc/binder/.gitkeep
+agentos/heapstore/kernel/ipc/channels/*
+!agentos/heapstore/kernel/ipc/channels/.gitkeep
+agentos/heapstore/kernel/memory/index/*
+!agentos/heapstore/kernel/memory/index/.gitkeep
+agentos/heapstore/kernel/memory/meta/*
+!agentos/heapstore/kernel/memory/meta/.gitkeep
+agentos/heapstore/kernel/memory/raw/*
+!agentos/heapstore/kernel/memory/raw/.gitkeep
+agentos/heapstore/kernel/memory/patterns/*
+!agentos/heapstore/kernel/memory/patterns/.gitkeep
 
 # services/ 子目录（排除内容，保留 .gitkeep）
-heapstore/services/llm_d/*
-!heapstore/services/llm_d/.gitkeep
-heapstore/services/market_d/*
-!heapstore/services/market_d/.gitkeep
-heapstore/services/tool_d/*
-!heapstore/services/tool_d/.gitkeep
+agentos/heapstore/services/llm_d/*
+!agentos/heapstore/services/llm_d/.gitkeep
+agentos/heapstore/services/market_d/*
+!agentos/heapstore/services/market_d/.gitkeep
+agentos/heapstore/services/tool_d/*
+!agentos/heapstore/services/tool_d/.gitkeep
 
 # models/ 子目录（排除内容，保留 .gitkeep）
-heapstore/models/*
-!heapstore/models/.gitkeep
+agentos/heapstore/models/*
+!agentos/heapstore/models/.gitkeep
 
 # 其他运行时目录
-heapstore/logs/*
-heapstore/traces/*
-heapstore/registry/*
-heapstore/db/*
-!heapstore/logs/.gitkeep
-!heapstore/traces/.gitkeep
-!heapstore/registry/.gitkeep
-!heapstore/db/.gitkeep
+agentos/heapstore/logs/*
+agentos/heapstore/traces/*
+agentos/heapstore/registry/*
+agentos/heapstore/db/*
+!agentos/heapstore/logs/.gitkeep
+!agentos/heapstore/traces/.gitkeep
+!agentos/heapstore/registry/.gitkeep
+!agentos/heapstore/db/.gitkeep
 
 # =============================================================================
 # 11. 测试相关（测试结果不追踪，测试代码保留）
@@ -467,18 +472,18 @@ Carthage/Build/
 # =============================================================================
 
 # FAISS 索引
-heapstore/models/*.faiss
-heapstore/models/*.index
-heapstore/models/*.pkl
-heapstore/models/*.pickle
+agentos/heapstore/models/*.faiss
+agentos/heapstore/models/*.index
+agentos/heapstore/models/*.pkl
+agentos/heapstore/models/*.pickle
 
 # 模型权重
-heapstore/model/
-heapstore/models/*.bin
-heapstore/models/*.pth
-heapstore/models/*.h5
-heapstore/models/*.pt
-heapstore/models/*.onnx
+agentos/heapstore/model/
+agentos/heapstore/models/*.bin
+agentos/heapstore/models/*.pth
+agentos/heapstore/models/*.h5
+agentos/heapstore/models/*.pt
+agentos/heapstore/models/*.onnx
 *.tflite
 
 # 向量和嵌入
@@ -581,13 +586,38 @@ override.local
 docs/local/
 docs/private/
 wiki/
-heapstore/reports/
+agentos/heapstore/reports/
 reports/
 test_reports/
 coverage_reports/
 
 # =============================================================================
-# 19. 必须保留的例外（项目必需文件）
+# 19. 新增目录（docker/ 和 docs/）
+# =============================================================================
+
+# docker/ 目录（保留配置文件，排除运行时产物）
+docker/*.log
+docker/*.tar
+docker/*.tar.gz
+docker/volumes/
+docker/.docker-*/
+
+# docs/ 目录（保留源文件，排除构建产物）
+docs/_build/
+docs/.doctrees/
+docs/doctrees/
+docs/html/
+docs/latex/
+docs/man/
+docs/site/
+docs/*.svg
+docs/*.png
+docs/*.pdf
+docs/local/
+docs/private/
+
+# =============================================================================
+# 20. 必须保留的例外（项目必需文件）
 # =============================================================================
 
 # 版本控制配置
@@ -597,15 +627,15 @@ coverage_reports/
 # 环境模板
 !.env.example
 
-# manager/ 配置文件
-!manager/*.yaml
-!manager/*.yml
-!manager/*.template
-!manager/*.schema.json
-!manager/.env.template
+# agentos/manager/ 配置文件
+!agentos/manager/*.yaml
+!agentos/manager/*.yml
+!agentos/manager/*.template
+!agentos/manager/*.schema.json
+!agentos/manager/.env.template
 
 # 关键文档
-!manuals/**/*.md
+!agentos/manuals/**/*.md
 !README.md
 !LICENSE
 !CHANGELOG.md
@@ -659,47 +689,49 @@ coverage_reports/
 !Dockerfile*
 !docker-compose*.yml
 !deploy/docker/Dockerfile*
-!gateway/docker/Dockerfile*
+!agentos/gateway/docker/Dockerfile*
 !openlab/Dockerfile
-!daemon/Dockerfile.ci
+!agentos/daemon/Dockerfile.ci
 !scripts/deploy/docker/Dockerfile*
+!docker/Dockerfile*
+!docker/docker-compose*.yml
 
 # CMake 构建配置
-!atoms/**/CMakeLists.txt
-!atomslite/**/CMakeLists.txt
-!commons/**/CMakeLists.txt
-!commons/tests/CMakeLists.txt
-!cupolas/CMakeLists.txt
-!daemon/**/CMakeLists.txt
-!gateway/CMakeLists.txt
-!heapstore/**/CMakeLists.txt
+!agentos/atoms/**/CMakeLists.txt
+!agentos/atomslite/**/CMakeLists.txt
+!agentos/commons/**/CMakeLists.txt
+!agentos/commons/tests/CMakeLists.txt
+!agentos/cupolas/CMakeLists.txt
+!agentos/daemon/**/CMakeLists.txt
+!agentos/gateway/CMakeLists.txt
+!agentos/heapstore/**/CMakeLists.txt
 !tests/unit/**/CMakeLists.txt
 
 # 根目录项目配置
 !Makefile
 !pyproject.toml
 
-# toolkit/ 配置文件
-!toolkit/python/pyproject.toml
-!toolkit/python/setup.py
-!toolkit/go/go.mod
-!toolkit/rust/Cargo.toml
-!toolkit/typescript/package.json
-!toolkit/typescript/tsconfig.json
-!toolkit/typescript/jest.config.js
+# agentos/toolkit/ 配置文件
+!agentos/toolkit/python/pyproject.toml
+!agentos/toolkit/python/setup.py
+!agentos/toolkit/go/go.mod
+!agentos/toolkit/rust/Cargo.toml
+!agentos/toolkit/typescript/package.json
+!agentos/toolkit/typescript/tsconfig.json
+!agentos/toolkit/typescript/jest.config.js
 
 # openlab/ 配置文件
 !openlab/pyproject.toml
 !openlab/requirements.txt
 
 # 空目录 .gitkeep
-!commons/utils/types/.gitkeep
+!agentos/commons/utils/types/.gitkeep
 
 # =============================================================================
-# 20. 平台模板目录（项目必需，保留）
+# 21. 平台模板目录（项目必需，保留）
 # =============================================================================
 
-# .gitcode/, .gitee/, .github/ 是平台模板目录，随仓库同步
+# .gitcode/是平台模板目录，随仓库同步
 
 # =============================================================================
 # 结束

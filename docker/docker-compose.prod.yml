@@ -1,0 +1,404 @@
+version: '3.8'
+
+# =============================================================================
+# AgentOS Docker Compose - 生产环境
+# 版本: 1.0.0
+# 用途: 生产部署（高可用、安全加固）
+#
+# 使用方法:
+#   docker compose -f docker/docker-compose.prod.yml up -d
+#   docker compose -f docker/docker-compose.prod.yml scale kernel=3
+#
+# 设计原则:
+# 1. 安全第一：最小权限、只读文件系统、禁止特权模式
+# 2. 高可用：多实例部署、健康检查、自动重启
+# 3. 可观测性：Prometheus + Grafana 监控栈
+# 4. 资源限制：CPU/内存限制，防止资源耗尽
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # 内核服务集群 (Kernel Cluster)
+  # ===========================================================================
+  kernel:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.kernel
+      target: runtime
+      args:
+        BUILD_TYPE: Release
+        ENABLE_TESTS: OFF
+    image: spharx/agentos:${AGENTOS_VERSION:-latest}
+    container_name: agentos-kernel-prod
+    hostname: agentos-kernel
+    restart: always
+    ports:
+      - "${KERNEL_IPC_PORT:-8080}:8080"
+      - "${KERNEL_METRICS_PORT:-9090}:9090"
+    volumes:
+      # 配置文件（只读）
+      - ./config:/app/config:ro
+      # 数据持久化
+      - kernel-data:/app/data
+      # 日志输出
+      - kernel-logs:/app/logs
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - AGENTOS_CUPOLAS_ENABLED=true
+      - AGENTOS_PERMISSION_MODE=strict
+      - AGENTOS_SANITIZER_MODE=strict
+      - AGENTOS_AUDIT_ENABLED=true
+      - TZ=Asia/Shanghai
+      # 生产环境特有配置
+      - AGENTOS_MAX_CONNECTIONS=${MAX_CONNECTIONS:-10000}
+      - AGENTOS_MEMORY_LIMIT=${MEMORY_LIMIT:-8192}
+      - AGENTOS_CPU_CORES=${CPU_CORES:-8}
+    networks:
+      - agentos-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '${CPU_LIMIT:-4}'
+          memory: ${MEMORY_LIMIT:-4G}
+        reservations:
+          cpus: '${CPU_RESERVATION:-2}'
+          memory: ${MEMORY_RESERVATION:-2G}
+      replicas: ${KERNEL_REPLICAS:-1}
+    # 安全加固
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=512M,mode=1777
+      - /run:size=64M,mode=1755
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # ===========================================================================
+  # 守护进程服务层 (Daemon Layer)
+  # ===========================================================================
+  daemon:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.daemon
+    image: spharx/agentos-daemon:${AGENTOS_VERSION:-latest}
+    container_name: agentos-daemon-prod
+    hostname: agentos-daemon
+    restart: always
+    volumes:
+      - ./config:/app/config:ro
+      - daemon-data:/app/data
+      - daemon-logs:/app/logs
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - AGENTOS_KERNEL_URL=http://kernel:8080
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379/0
+      - TZ=Asia/Shanghai
+    networks:
+      - agentos-network
+    depends_on:
+      kernel:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+      replicas: ${DAEMON_REPLICAS:-1}
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ===========================================================================
+  # PostgreSQL 数据库（高可用配置）
+  # ===========================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: agentos-postgres-prod
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-agentos}
+      POSTGRES_USER: ${POSTGRES_USER:-agentos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请设置POSTGRES_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    networks:
+      - agentos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agentos}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # 安全配置
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=${PG_MAX_CONNECTIONS:-200}"
+      - "-c"
+      - "shared_buffers=${PG_SHARED_BUFFERS:-256MB}"
+      - "-c"
+      - "effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE:-1GB}"
+      - "-c"
+      - "work_mem=${PG_WORK_MEM:-4MB}"
+      - "-c"
+      - "maintenance_work_mem=${PG_MAINTENANCE_WORK_MEM:-64MB}"
+      - "-c"
+      - "log_statement=all"
+      - "-c"
+      - "log_min_duration_statement=1000"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # ===========================================================================
+  # Redis 缓存（持久化+安全配置）
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: agentos-redis-prod
+    restart: always
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory ${REDIS_MAX_MEMORY:-512mb}
+      --maxmemory-policy allkeys-lru
+      --requirepass ${REDIS_PASSWORD:?请设置REDIS_PASSWORD}
+      --bind 0.0.0.0
+      --port 6379
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+    volumes:
+      - redis-data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - agentos-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # ===========================================================================
+  # OpenLab 应用服务（生产模式）
+  # ===========================================================================
+  openlab:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.openlab
+      target: production
+    image: spharx/agentos-openlab:${AGENTOS_VERSION:-latest}
+    container_name: agentos-openlab-prod
+    restart: always
+    ports:
+      - "${OPENLAB_WEB_PORT:-443}:443"
+      - "${OPENLAB_API_PORT:-8000}:8000"
+    volumes:
+      - openlab-data:/app/data
+      - openlab-ssl:/etc/nginx/ssl:ro
+    environment:
+      - OPENLAB_DEBUG=false
+      - OPENLAB_PORT=443
+      - AGENTOS_IPC_URL=http://kernel:8080
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379/0
+      - OPENLAB_SECRET_KEY=${OPENLAB_SECRET_KEY:?请设置OPENLAB_SECRET_KEY}
+      - OPENLAB_SESSION_TIMEOUT=${SESSION_TIMEOUT:-3600}
+      - TZ=Asia/Shanghai
+    networks:
+      - agentos-network
+    depends_on:
+      kernel:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ===========================================================================
+  # Prometheus 监控（生产配置）
+  # ===========================================================================
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: agentos-prometheus-prod
+    restart: always
+    ports:
+      - "${PROMETHEUS_PORT:-9091}:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--tsdb.path=/prometheus'
+      - '--tsdb.retention.time=${PROMETHEUS_RETENTION:-30d}'
+      - '--storage.tsdb.retention.size=${PROMETHEUS_RETENTION_SIZE:-20GB}'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/console_templates'
+      - '--web.enable-lifecycle'
+    networks:
+      - agentos-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # ===========================================================================
+  # Grafana 可视化（生产配置）
+  # ===========================================================================
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: agentos-grafana-prod
+    restart: always
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?请设置GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP=false
+      GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s:%(http_port)s/grafana/
+      GF_SERVER_SERVE_FROM_SUB_PATH=true
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - agentos-network
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.125'
+          memory: 128M
+
+# =============================================================================
+# 网络配置（生产环境使用自定义子网）
+# =============================================================================
+networks:
+  agentos-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${DOCKER_NETWORK_SUBNET:-172.28.0.0/16}
+
+# =============================================================================
+# 卷定义（数据持久化）
+# =============================================================================
+volumes:
+  kernel-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_VOLUME_PATH:-./data/kernel}
+  kernel-logs:
+    driver: local
+  daemon-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_VOLUME_PATH:-./data/daemon}
+  daemon-logs:
+    driver: local
+  postgres-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_VOLUME_PATH:-./data/postgres}
+  redis-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_VOLUME_PATH:-./data/redis}
+  openlab-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_VOLUME_PATH:-./data/openlab}
+  openlab-ssl:
+    driver: local
+  prometheus-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_VOLUME_PATH:-./data/prometheus}
+  grafana-data:
+    driver: local

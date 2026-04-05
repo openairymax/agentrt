@@ -575,10 +575,10 @@ git push origin feature/my-contribution
 ## 📖 相关文档
 
 - **[AgentOS 主文档](../README.md)** - AgentOS 总体介绍
-- **[核心服务层文档](../daemon/README.md)** - Daemon 服务层详解
-- **[内核架构文档](../atoms/README.md)** - Atoms 内核架构
-- **[SDK 使用指南](../toolkit/README.md)** - 开发 SDK 使用
-- **[架构设计原则](../manuals/architecture/ARCHITECTURAL_PRINCIPLES.md)** - 五维正交体系
+- **[核心服务层文档](../agentos/daemon/README.md)** - Daemon 服务层详解
+- **[内核架构文档](../agentos/atoms/README.md)** - Atoms 内核架构
+- **[SDK 使用指南](../agentos/toolkit/README.md)** - 开发 SDK 使用
+- **[架构设计原则](../agentos/manuals/architecture/ARCHITECTURAL_PRINCIPLES.md)** - 五维正交体系
 
 ---
 

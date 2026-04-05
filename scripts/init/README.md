@@ -117,11 +117,11 @@ API Base URL [https://api.openai.com/v1]:
 ```
 创建项目目录结构...
 
-✓ heapstore/kernel/
-✓ heapstore/logs/
-✓ heapstore/services/
-✓ heapstore/models/
-✓ manager/cache/
+✓ agentos/heapstore/kernel/
+✓ agentos/heapstore/logs/
+✓ agentos/heapstore/services/
+✓ agentos/heapstore/models/
+✓ agentos/manager/cache/
 
 目录结构创建完成！
 ```
@@ -132,9 +132,9 @@ API Base URL [https://api.openai.com/v1]:
 生成配置文件...
 
 ✓ .env                    # 环境变量
-✓ manager/kernel/settings.yaml    # 内核配置
-✓ manager/security/policy.yaml    # 安全策略
-✓ manager/logging/manager.yaml     # 日志配置
+✓ agentos/manager/kernel/settings.yaml    # 内核配置
+✓ agentos/manager/security/policy.yaml    # 安全策略
+✓ agentos/manager/logging/manager.yaml     # 日志配置
 
 配置文件生成完成！
 ```
@@ -173,7 +173,7 @@ HTTP_PORT=8080
 GRPC_PORT=9090
 ```
 
-### manager/kernel/settings.yaml - 内核配置
+### agentos/manager/kernel/settings.yaml - 内核配置
 
 ```yaml
 # AgentOS 内核配置
@@ -204,7 +204,7 @@ time:
   ntp_server: pool.ntp.org
 ```
 
-### manager/security/policy.yaml - 安全策略
+### agentos/manager/security/policy.yaml - 安全策略
 
 ```yaml
 # AgentOS 安全策略
@@ -224,7 +224,7 @@ security:
   # 审计日志
   audit:
     enabled: true
-    log_file: heapstore/logs/audit.log
+    log_file: agentos/heapstore/logs/audit.log
     rotation:
       max_size_mb: 100
       max_files: 10
@@ -237,7 +237,7 @@ security:
       memory_mb: 1024
 ```
 
-### manager/logging/manager.yaml - 日志配置
+### agentos/manager/logging/manager.yaml - 日志配置
 
 ```yaml
 # AgentOS 日志配置
@@ -259,7 +259,7 @@ logging:
       
     file:
       class: logging.handlers.RotatingFileHandler
-      filename: heapstore/logs/agentos.log
+      filename: agentos/heapstore/logs/agentos.log
       level: DEBUG
       maxBytes: 10485760  # 10MB
       backupCount: 5
@@ -374,11 +374,11 @@ security:
 ```bash
 # 设置配置文件权限
 chmod 600 .env
-chmod 600 manager/security/*.yaml
-chown $USER:$USER .env manager/
+chmod 600 agentos/manager/security/*.yaml
+chown $USER:$USER .env agentos/manager/
 
 # 验证权限
-ls -la .env manager/
+ls -la .env agentos/manager/
 ```
 
 ---
@@ -402,7 +402,7 @@ source .env.$AGENTOS_ENV
 
 ```bash
 # 跟踪配置变更
-git add manager/
+git add agentos/manager/
 git commit -m "chore: 初始化配置文件"
 
 # 使用 Git hooks 验证配置
@@ -443,7 +443,7 @@ jobs:
     
     - name: Verify manager
       run: |
-        python -c "import yaml; yaml.safe_load(open('manager/kernel/settings.yaml'))"
+        python -c "import yaml; yaml.safe_load(open('agentos/manager/kernel/settings.yaml'))"
 ```
 
 ---

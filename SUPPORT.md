@@ -18,34 +18,34 @@
 ### 官方文档
 
 - **[README.md](README.md)** - 项目概述和快速开始
-- **[快速入门](manuals/guides/getting_started.md)** - 新手指南
-- **[架构文档](manuals/architecture/)** - 深入理解系统设计
-- **[API 文档](manuals/api/)** - 接口参考
-- **[开发指南](manuals/guides/)** - 最佳实践
-- **[架构设计原则](manuals/ARCHITECTURAL_PRINCIPLES.md)** - 五维正交原则体系
+- **[快速入门](agentos/manuals/guides/getting_started.md)** - 新手指南
+- **[架构文档](agentos/manuals/architecture/)** - 深入理解系统设计
+- **[API 文档](agentos/manuals/api/)** - 接口参考
+- **[开发指南](agentos/manuals/guides/)** - 最佳实践
+- **[架构设计原则](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md)** - 五维正交原则体系
 
 ### 核心技术文档
 
-- **[CoreLoopThree 架构](manuals/architecture/coreloopthree.md)** - 三层认知运行时详解
-- **[MemoryRovol 架构](manuals/architecture/memoryrovol.md)** - 四层记忆系统详解
-- **[微内核设计](manuals/architecture/microkernel.md)** - 微内核架构详解
-- **[系统调用](manuals/architecture/syscall.md)** - 系统调用接口规范
-- **[IPC 通信](manuals/architecture/ipc.md)** - 进程间通信机制
-- **[统一日志系统](manuals/architecture/logging_system.md)** - 日志规范
+- **[CoreLoopThree 架构](agentos/manuals/architecture/coreloopthree.md)** - 三层认知运行时详解
+- **[MemoryRovol 架构](agentos/manuals/architecture/memoryrovol.md)** - 四层记忆系统详解
+- **[微内核设计](agentos/manuals/architecture/microkernel.md)** - 微内核架构详解
+- **[系统调用](agentos/manuals/architecture/syscall.md)** - 系统调用接口规范
+- **[IPC 通信](agentos/manuals/architecture/ipc.md)** - 进程间通信机制
+- **[统一日志系统](agentos/manuals/architecture/logging_system.md)** - 日志规范
 
 ### 规范文档
 
-- **[编码规范](manuals/specifications/coding_standard/)** - C/C++/Python 编码风格
-- **[术语表](manuals/specifications/TERMINOLOGY.md)** - 统一术语定义
-- **[Agent 契约](manuals/specifications/agentos_contract/agent_contract.md)** - Agent 接口规范
-- **[Skill 契约](manuals/specifications/agentos_contract/skill_contract.md)** - Skill 接口规范
+- **[编码规范](agentos/manuals/specifications/coding_standard/)** - C/C++/Python 编码风格
+- **[术语表](agentos/manuals/specifications/TERMINOLOGY.md)** - 统一术语定义
+- **[Agent 契约](agentos/manuals/specifications/agentos_contract/agent_contract.md)** - Agent 接口规范
+- **[Skill 契约](agentos/manuals/specifications/agentos_contract/skill_contract.md)** - Skill 接口规范
 
 ### 多语言文档
 
-- **[简体中文](manuals/readme/README.md)** - 中文文档
-- **[English](manuals/readme/en/README.md)** - English documentation
-- **[Français](manuals/readme/fr/README.md)** - Documentation française
-- **[Deutsch](manuals/readme/de/README.md)** - Deutsche Dokumentation
+- **[简体中文](agentos/manuals/readme/README.md)** - 中文文档
+- **[English](agentos/manuals/readme/en/README.md)** - English documentation
+- **[Français](agentos/manuals/readme/fr/README.md)** - Documentation française
+- **[Deutsch](agentos/manuals/readme/de/README.md)** - Deutsche Dokumentation
 
 ---
 

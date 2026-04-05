@@ -1,0 +1,147 @@
+name: Rust SDK CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'agentos/toolkit/rust/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'agentos/toolkit/rust/**'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fmt:
+    name: Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+        working-directory: agentos/toolkit/rust
+
+  clippy:
+    name: Clippy Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+        working-directory: agentos/toolkit/rust
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Run tests
+        run: cargo test --all-features --verbose
+        working-directory: agentos/toolkit/rust
+
+      - name: Generate coverage
+        run: |
+          cargo install cargo-tarpaulin
+          cargo tarpaulin --out Xml --output-dir .
+        working-directory: agentos/toolkit/rust
+        continue-on-error: true
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./agentos/toolkit/rust/cobertura.xml
+          flags: rust
+          name: codecov-rust
+        continue-on-error: true
+
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    needs: [fmt, clippy, test]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Build
+        run: cargo build --release --verbose
+        working-directory: agentos/toolkit/rust
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-dist
+          path: agentos/toolkit/rust/target/release
+          retention-days: 7
+
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Run security audit
+        run: cargo audit
+        working-directory: agentos/toolkit/rust
+        continue-on-error: true
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Build documentation
+        run: cargo doc --no-deps --release
+        working-directory: agentos/toolkit/rust
+
+      - name: Upload documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-docs
+          path: agentos/toolkit/rust/target/doc
+          retention-days: 7

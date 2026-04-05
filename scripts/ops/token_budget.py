@@ -213,6 +213,54 @@ class TokenBudget:
             logger.error(f"Failed to set budget: {e}")
             return False
     
+    def _calculate_usage_percentages(
+        self,
+        config: BudgetConfig,
+        usage: BudgetUsage
+    ) -> tuple:
+        """计算使用百分比"""
+        token_pct = (usage.used_tokens / config.max_tokens * 100) if config.max_tokens > 0 else 0
+        cost_pct = (usage.used_cost_usd / config.max_cost_usd * 100) if config.max_cost_usd > 0 else 0
+        return token_pct, cost_pct
+    
+    def _determine_budget_status(
+        self,
+        percentage: float,
+        config: BudgetConfig
+    ) -> tuple:
+        """确定预算状态（简化条件逻辑）"""
+        thresholds = [
+            (config.hard_limit_percentage, BudgetStatus.EXHAUSTED, True, "Budget exhausted (100% used)"),
+            (config.soft_limit_percentage, BudgetStatus.OVER_BUDGET, True, f"Budget exceeded ({percentage:.1f}% used)"),
+            (config.warning_threshold_percentage, BudgetStatus.WARNING, False, f"Budget warning ({percentage:.1f}% used)")
+        ]
+        
+        for threshold, status, over_budget, msg in thresholds:
+            if percentage >= threshold:
+                return status, over_budget, msg
+        
+        return BudgetStatus.WITHIN_BUDGET, False, f"Budget OK ({percentage:.1f}% used)"
+    
+    def _handle_budget_alerts(
+        self,
+        task_id: str,
+        status: BudgetStatus,
+        percentage: float,
+        config: BudgetConfig
+    ) -> None:
+        """处理预算告警"""
+        if not self.enable_alerts:
+            return
+        
+        alert_type = None
+        if status in (BudgetStatus.OVER_BUDGET, BudgetStatus.EXHAUSTED):
+            alert_type = "over_budget"
+        elif status == BudgetStatus.WARNING:
+            alert_type = "warning"
+        
+        if alert_type:
+            self._trigger_alert(task_id, alert_type, percentage, config)
+    
     def check_budget(self, task_id: str) -> BudgetCheckResult:
         """
         检查预算使用情况
@@ -225,20 +273,7 @@ class TokenBudget:
         """
         with self._lock:
             if task_id not in self._budgets:
-                return BudgetCheckResult(
-                    task_id=task_id,
-                    status=BudgetStatus.WITHIN_BUDGET,
-                    used_tokens=0,
-                    max_tokens=0,
-                    used_cost_usd=0.0,
-                    max_cost_usd=0.0,
-                    remaining_tokens=0,
-                    remaining_cost_usd=0.0,
-                    remaining_percentage=100.0,
-                    is_over_budget=False,
-                    is_warning=False,
-                    message="No budget configured for this task"
-                )
+                return self._create_empty_result(task_id)
             
             config = self._budgets[task_id]
             usage = self._usage.get(task_id, BudgetUsage(task_id=task_id))
@@ -246,38 +281,12 @@ class TokenBudget:
             remaining_tokens = max(0, config.max_tokens - usage.used_tokens)
             remaining_cost_usd = max(0.0, config.max_cost_usd - usage.used_cost_usd)
             
-            token_percentage = (
-                (usage.used_tokens / config.max_tokens * 100)
-                if config.max_tokens > 0 else 0
-            )
-            cost_percentage = (
-                (usage.used_cost_usd / config.max_cost_usd * 100)
-                if config.max_cost_usd > 0 else 0
-            )
+            token_pct, cost_pct = self._calculate_usage_percentages(config, usage)
+            max_percentage = max(token_pct, cost_pct)
             
-            max_percentage = max(token_percentage, cost_percentage)
+            status, is_over_budget, message = self._determine_budget_status(max_percentage, config)
             
-            if max_percentage >= config.hard_limit_percentage:
-                status = BudgetStatus.EXHAUSTED
-                is_over_budget = True
-                message = "Budget exhausted (100% used)"
-            elif max_percentage >= config.soft_limit_percentage:
-                status = BudgetStatus.OVER_BUDGET
-                is_over_budget = True
-                message = f"Budget exceeded ({max_percentage:.1f}% used)"
-            elif max_percentage >= config.warning_threshold_percentage:
-                status = BudgetStatus.WARNING
-                is_over_budget = False
-                message = f"Budget warning ({max_percentage:.1f}% used)"
-            else:
-                status = BudgetStatus.WITHIN_BUDGET
-                is_over_budget = False
-                message = f"Budget OK ({max_percentage:.1f}% used)"
-            
-            if is_over_budget and self.enable_alerts:
-                self._trigger_alert(task_id, "over_budget", max_percentage, config)
-            elif status == BudgetStatus.WARNING and self.enable_alerts:
-                self._trigger_alert(task_id, "warning", max_percentage, config)
+            self._handle_budget_alerts(task_id, status, max_percentage, config)
             
             return BudgetCheckResult(
                 task_id=task_id,
@@ -442,6 +451,24 @@ class TokenBudget:
                     "total_cost_usd": total_cost,
                     "total_requests": total_requests
                 }
+    
+    @staticmethod
+    def _create_empty_result(task_id: str) -> BudgetCheckResult:
+        """创建空预算结果"""
+        return BudgetCheckResult(
+            task_id=task_id,
+            status=BudgetStatus.WITHIN_BUDGET,
+            used_tokens=0,
+            max_tokens=0,
+            used_cost_usd=0.0,
+            max_cost_usd=0.0,
+            remaining_tokens=0,
+            remaining_cost_usd=0.0,
+            remaining_percentage=100.0,
+            is_over_budget=False,
+            is_warning=False,
+            message="No budget configured for this task"
+        )
     
     def _trigger_alert(
         self,
