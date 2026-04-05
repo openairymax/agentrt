@@ -57,6 +57,7 @@ static int g_tests_passed = 0;
 #define ASSERT_NULL(ptr) ASSERT_TRUE((ptr) == NULL)
 #define ASSERT_NOT_NULL(ptr) ASSERT_TRUE((ptr) != NULL)
 #define ASSERT_EQ(a, b) ASSERT_TRUE((a) == (b))
+#define ASSERT_NEQ(a, b) ASSERT_TRUE((a) != (b))
 #define ASSERT_STR_EQ(a, b) ASSERT_TRUE(strcmp((a), (b)) == 0)
 
 /* ========== 辅助函数 ========== */
@@ -274,21 +275,24 @@ static void test_custom_handler_invocation(void) {
 }
 
 /**
+ * @brief 错误Handler回调函数
+ */
+static int error_handler_func(const char* req, char** resp, void* data) {
+    (void)req; (void)resp; (void)data;
+    return -1;  /* 返回错误 */
+}
+
+/**
  * @brief 测试Handler返回错误
  */
 static void test_custom_handler_error(void) {
     TEST_BEGIN("custom_handler_error");
 
-    static int error_handler(const char* req, char** resp, void* data) {
-        (void)req; (void)resp; (void)data;
-        return -1;  /* 返回错误 */
-    }
-
     cJSON* request = create_valid_request("test_method", 11);
     ASSERT_NOT_NULL(request);
 
     rpc_result_t result = gateway_rpc_handle_request(
-        request, error_handler, NULL);
+        request, error_handler_func, NULL);
 
     ASSERT_NOT_NULL(result.response_json);
     ASSERT_NEQ(result.error_code, 0);
@@ -364,7 +368,7 @@ static void test_resource_cleanup_safety(void) {
     /* 测试重复释放 */
     rpc_result_t result = gateway_rpc_create_error(-32000, "test");
     gateway_rpc_free(&result);
-    gateway_rpc_free(&result);  /* 重复释放不应崩溃
+    gateway_rpc_free(&result);  /* 重复释放不应崩溃 */
 
     TEST_PASS();
 }

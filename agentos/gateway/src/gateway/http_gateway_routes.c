@@ -16,6 +16,7 @@
 #include "jsonrpc.h"
 #include "syscall_router.h"
 #include "gateway_utils.h"
+#include "syscalls.h"
 
 #include <microhttpd.h>
 #include <cJSON.h>
@@ -236,10 +237,10 @@ static int (*find_http_route(const char* method, const char* path))(http_gateway
  * 
  * 圈复杂度从~25 降至~8
  */
-static int handle_http_request(void* cls, struct MHD_Connection* connection,
-                               const char* url, const char* method,
-                               const char* version, const char* upload_data,
-                               size_t* upload_data_size, void** con_cls) {
+int handle_http_request(void* cls, struct MHD_Connection* connection,
+                        const char* url, const char* method,
+                        const char* version, const char* upload_data,
+                        size_t* upload_data_size, void** con_cls) {
     http_gateway_t* gateway = (http_gateway_t*)cls;
     http_request_context_t* context = (http_request_context_t*)*con_cls;
     

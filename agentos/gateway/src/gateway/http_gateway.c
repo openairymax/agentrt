@@ -35,40 +35,7 @@
 
 /* ========== HTTP网关内部结构 ========== */
 
-/**
- * @brief HTTP请求上下文
- */
-typedef struct http_request_context {
-    const char* method;              /**< HTTP方法 */
-    const char* url;                 /**< 请求URL */
-    const char* upload_data;         /**< 上传数据 */
-    size_t upload_data_size;         /**< 上传数据大小 */
-    
-    cJSON* json_request;             /**< JSON请求对象 */
-    uint64_t start_time_ns;          /**< 请求开始时间 */
-} http_request_context_t;
-
-/**
- * @brief HTTP网关内部结构
- */
-typedef struct http_gateway {
-    struct MHD_Daemon* daemon;       /**< MHD守护进程 */
-    uint16_t port;                   /**< 监听端口 */
-    char* host;                      /**< 监听地址 */
-
-    http_handler_adapter_t* handler_adapter; /**< 公共回调适配器（动态分配） */
-    gateway_request_handler_t handler; /**< 内部请求处理回调（指向adapter或自定义） */
-    void* handler_data;              /**< 回调用户数据 */
-    
-    atomic_bool running;             /**< 运行标志 */
-    
-    atomic_uint_fast64_t requests_total;    /**< 总请求数 */
-    atomic_uint_fast64_t requests_failed;   /**< 失败请求数 */
-    atomic_uint_fast64_t bytes_received;    /**< 接收字节数 */
-    atomic_uint_fast64_t bytes_sent;        /**< 发送字节数 */
-    
-    size_t max_request_size;         /**< 最大请求大小 */
-} http_gateway_t;
+/* http_request_context_t 和 http_gateway_t 已移至 http_gateway.h */
 
 /* ========== 辅助函数（使用 gateway_utils.h 中的公共实现） ========== */
 
@@ -89,13 +56,6 @@ typedef struct http_gateway {
 static char* handle_system_call(const char* method, cJSON* params, cJSON* request_id) {
     return gateway_syscall_route(method, params, request_id);
 }
-
-/* ========== 路由处理函数前向声明 ========== */
-/* 实现在 http_gateway_routes.c 中 */
-static int handle_http_request(void* cls, struct MHD_Connection* connection,
-                               const char* url, const char* method,
-                               const char* version, const char* upload_data,
-                               size_t* upload_data_size, void** con_cls);
 
 /* ========== HTTP 响应生成 ========== */
 

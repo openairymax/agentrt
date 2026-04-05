@@ -43,6 +43,7 @@
  * @brief Stdio网关内部结构
  */
 typedef struct stdio_gateway {
+    void* handler_adapter;           /**< 公共回调适配器（动态分配） */
     gateway_request_handler_t handler; /**< 请求处理回调 */
     void* handler_data;              /**< 回调用户数据 */
     

@@ -29,11 +29,11 @@ find_package(libmicrohttpd REQUIRED)
 find_package(libwebsockets REQUIRED)
 
 # 核心头文件路径
-set(COREKERN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../agentos/atoms/corekern")
+set(COREKERN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../atoms/corekern")
 include_directories(${COREKERN_DIR}/include)
 
 # syscall 模块
-set(SYSCALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../agentos/atoms/syscall")
+set(SYSCALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../atoms/syscall")
 include_directories(${SYSCALL_DIR}/include)
 
 # commons 模块（基础工具库）
@@ -48,22 +48,22 @@ include_directories(
 
 # ========== 源文件 ==========
 set(GATEWAY_SOURCES
-    src/agentos/gateway/gateway_api.c
-    src/agentos/gateway/http_gateway.c
-    src/agentos/gateway/http_gateway_routes.c
-    src/agentos/gateway/ws_gateway.c
-    src/agentos/gateway/stdio_gateway.c
+    src/gateway/gateway_api.c
+    src/gateway/http_gateway.c
+    src/gateway/http_gateway_routes.c
+    src/gateway/ws_gateway.c
+    src/gateway/stdio_gateway.c
     src/utils/jsonrpc.c
     src/utils/syscall_router.c
-    src/utils/gateway_rpc_handler.c  # 统一RPC处理模块 (DRY重构)
+    src/utils/gateway_rpc_handler.c
 )
 
 # ========== 头文件 ==========
 set(GATEWAY_HEADERS
-    src/agentos/gateway/gateway.h
-    src/agentos/gateway/http_gateway.h
-    src/agentos/gateway/ws_gateway.h
-    src/agentos/gateway/stdio_gateway.h
+    src/gateway/gateway.h
+    src/gateway/http_gateway.h
+    src/gateway/ws_gateway.h
+    src/gateway/stdio_gateway.h
     src/utils/jsonrpc.h
     src/utils/syscall_router.h
     src/utils/gateway_utils.h
@@ -100,10 +100,10 @@ install(FILES
 )
 
 install(FILES
-    src/agentos/gateway/gateway.h
-    src/agentos/gateway/http_gateway.h
-    src/agentos/gateway/ws_gateway.h
-    src/agentos/gateway/stdio_gateway.h
+    src/gateway/gateway.h
+    src/gateway/http_gateway.h
+    src/gateway/ws_gateway.h
+    src/gateway/stdio_gateway.h
     src/utils/jsonrpc.h
     src/utils/syscall_router.h
     DESTINATION include/agentos/gateway

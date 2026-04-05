@@ -35,9 +35,9 @@ static int validate_rpc_request(const cJSON* request) {
     if (!method || !cJSON_IsString(method)) return -1;
 
     const cJSON* id = cJSON_GetObjectItem(request, "id");
-    if (!id && id->type != cJSON_NULL) return -1;
+    if (id && !cJSON_IsNumber(id) && !cJSON_IsString(id) && !cJSON_IsNull(id)) return -1;
 
-    return 0;  /* 有效请求 */
+    return 0;
 }
 
 /**

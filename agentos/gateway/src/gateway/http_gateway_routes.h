@@ -19,7 +19,7 @@
 #include "http_gateway.h"
 #include "jsonrpc.h"
 #include "syscall_router.h"
-#include "agentos.h"
+#include "syscalls.h"
 
 /* ========== 路由处理函数声明 ========== */
 
@@ -84,6 +84,8 @@ typedef struct {
     const char* path;             /**< URL 路径 */
     int (*handler)(http_gateway_t*, struct MHD_Connection*, http_request_context_t*);
 } http_route_t;
+
+typedef int (*http_route_handler_t)(http_gateway_t*, struct MHD_Connection*, http_request_context_t*);
 
 /* ========== 路由表 ========== */
 
