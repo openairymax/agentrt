@@ -1,0 +1,188 @@
+# =============================================================================
+# AgentOS cupolas Module Deployment Configuration
+# Version: 1.0.0
+# Description: Multi-environment deployment configuration
+# =============================================================================
+
+environments:
+  development:
+    name: development
+    description: "Local development environment"
+    deploy_on:
+      - branch: develop
+      - manual: true
+    
+    manager:
+      debug: true
+      log_level: DEBUG
+      metrics_enabled: true
+      tracing_enabled: true
+    
+    resources:
+      cpu_limit: "500m"
+      memory_limit: "512Mi"
+    
+    endpoints:
+      api: "http://localhost:8080"
+      metrics: "http://localhost:9090/metrics"
+    
+    notifications:
+      slack: false
+      email: false
+
+  staging:
+    name: staging
+    description: "Pre-production staging environment"
+    deploy_on:
+      - branch: main
+      - manual: true
+    
+    manager:
+      debug: false
+      log_level: INFO
+      metrics_enabled: true
+      tracing_enabled: true
+    
+    resources:
+      cpu_limit: "1000m"
+      memory_limit: "1Gi"
+    
+    endpoints:
+      api: "https://staging.agentos.spharx.cn/cupolas"
+      metrics: "https://staging.agentos.spharx.cn/agentos/cupolas/metrics"
+    
+    notifications:
+      slack: true
+      slack_channel: "#agentos-staging"
+      email: true
+      email_recipients:
+        - "team@spharx.cn"
+
+  production:
+    name: production
+    description: "Production environment"
+    deploy_on:
+      - tag: "cupolas-v*"
+      - manual: true
+    
+    approval:
+      required: true
+      approvers:
+        - "cto"
+        - "release-manager"
+      timeout_minutes: 60
+    
+    manager:
+      debug: false
+      log_level: WARNING
+      metrics_enabled: true
+      tracing_enabled: true
+    
+    resources:
+      cpu_limit: "2000m"
+      memory_limit: "2Gi"
+      replicas: 3
+    
+    endpoints:
+      api: "https://agentos.spharx.cn/cupolas"
+      metrics: "https://agentos.spharx.cn/agentos/cupolas/metrics"
+    
+    notifications:
+      slack: true
+      slack_channel: "#agentos-production"
+      email: true
+      email_recipients:
+        - "oncall@spharx.cn"
+        - "team@spharx.cn"
+    
+    rollback:
+      enabled: true
+      automatic_on_failure: false
+      keep_versions: 5
+
+deployment:
+  strategy:
+    type: "rolling"
+    rolling:
+      max_unavailable: 0
+      max_surge: 1
+  
+  health_check:
+    initial_delay_seconds: 10
+    period_seconds: 10
+    timeout_seconds: 5
+    success_threshold: 1
+    failure_threshold: 3
+    endpoint: "/health"
+  
+  readiness_check:
+    initial_delay_seconds: 5
+    period_seconds: 5
+    timeout_seconds: 3
+    success_threshold: 1
+    failure_threshold: 3
+    endpoint: "/ready"
+
+artifacts:
+  naming_convention: "agentos-cupolas-{version}-{os}-{arch}"
+  
+  formats:
+    linux:
+      - "tar.gz"
+    windows:
+      - "zip"
+    macos:
+      - "tar.gz"
+  
+  storage:
+    type: "github-releases"
+    retention_days: 90
+  
+  signing:
+    enabled: false
+    algorithm: "sha256"
+
+security:
+  scan_before_deploy: true
+  block_on_vulnerabilities:
+    - "CRITICAL"
+    - "HIGH"
+  
+  secrets:
+    provider: "github-secrets"
+    required:
+      - "DEPLOY_KEY"
+      - "API_TOKEN"
+
+monitoring:
+  provider: "prometheus"
+  
+  metrics:
+    - name: "cupolas_requests_total"
+      type: "counter"
+      description: "Total number of requests"
+    
+    - name: "cupolas_request_duration_seconds"
+      type: "histogram"
+      description: "Request duration in seconds"
+    
+    - name: "cupolas_errors_total"
+      type: "counter"
+      description: "Total number of errors"
+    
+    - name: "cupolas_active_sandboxes"
+      type: "gauge"
+      description: "Number of active sandboxes"
+
+  alerts:
+    - name: "HighErrorRate"
+      expr: "rate(cupolas_errors_total[5m]) > 0.1"
+      severity: "warning"
+    
+    - name: "HighLatency"
+      expr: "histogram_quantile(0.95, rate(domes_request_duration_seconds_bucket[5m])) > 1"
+      severity: "warning"
+    
+    - name: "ServiceDown"
+      expr: "up{job='cupolas'} == 0"
+      severity: "critical"

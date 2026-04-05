@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../../../../daemon/sched_d/include/scheduler_service.h"
+#include "../../../../agentos/daemon/sched_d/include/scheduler_service.h"
 
 /**
  * @brief 测试创建和销毁调度服�?

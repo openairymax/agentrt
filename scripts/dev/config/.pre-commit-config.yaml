@@ -110,14 +110,14 @@ repos:
           - --use-current-year
 
   # 提交信息格式检查（可选）
-  # - repo: https://github.com/commitizen-toolkit/commitizen
+  # - repo: https://github.com/commitizen-agentos/toolkit/commitizen
   #   rev: v2.38.0
   #   hooks:
   #     - id: commitizen
   #       stages: [commit-msg]
 
 # 跳过某些文件的检查
-exclude: ^(heapstore/|build/|dist/|\.venv/|node_modules/|vendor/)
+exclude: ^(agentos/heapstore/|build/|dist/|\.venv/|node_modules/|vendor/)
 
 # 默认语言版本
 default_language_version:

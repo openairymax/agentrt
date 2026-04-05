@@ -159,8 +159,8 @@ logging:
 ## 📖 学习资源
 
 - [AgentOS 核心概念](../paper/guides/)
-- [系统调用参考](../atoms/syscall/README.md)
-- [SDK 使用指南](../../toolkit/README.md)
+- [系统调用参考](../agentos/atoms/syscall/README.md)
+- [SDK 使用指南](../../agentos/toolkit/README.md)
 
 ## 🤝 贡献
 
