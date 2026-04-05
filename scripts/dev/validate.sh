@@ -278,7 +278,7 @@ show_summary() {
         echo "您现在可以："
         echo "  1. 运行 ./quickstart.sh 快速体验"
         echo "  2. 运行 make build 构建项目"
-        echo "  3. 查看 manuals/ 中的文档"
+        echo "  3. 查看 agentos/manuals/ 中的文档"
         echo ""
         exit 0
     fi

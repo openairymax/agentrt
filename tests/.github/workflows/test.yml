@@ -406,7 +406,7 @@ jobs:
         run: |
           cd tests
           pytest unit/ -v --tb=short -m unit \
-            --cov=../toolkit/python/agentos \
+            --cov=../agentos/toolkit/python/agentos \
             --cov-report=xml:reports/coverage/coverage.xml \
             --cov-report=html:reports/coverage/html \
             --cov-report=term \
@@ -522,7 +522,7 @@ jobs:
         run: |
           cd tests
           pytest integration/ -v --tb=short -m integration \
-            --cov=../toolkit/python/agentos \
+            --cov=../agentos/toolkit/python/agentos \
             --cov-report=xml:reports/coverage/coverage_integration.xml \
             --junitxml=reports/junit_integration.xml \
             --html=reports/test_integration_report.html --self-contained-html

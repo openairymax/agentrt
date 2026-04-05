@@ -214,6 +214,46 @@ class MemoryManager:
             
             return self._stats
     
+    @staticmethod
+    def _is_memory_expired(
+        memory: MemoryInfo,
+        cutoff_date: datetime,
+        level: Optional[MemoryLevel]
+    ) -> bool:
+        """判断记忆是否过期"""
+        try:
+            created_at = datetime.fromisoformat(memory.created_at)
+            if created_at >= cutoff_date:
+                return False
+            if level and memory.level != level:
+                return False
+            return True
+        except (ValueError, TypeError):
+            return False
+    
+    def _process_single_cleanup(
+        self,
+        memory: MemoryInfo,
+        cutoff_date: datetime,
+        level: Optional[MemoryLevel],
+        dry_run: bool,
+        memory_api
+    ) -> bool:
+        """处理单个记忆的清理"""
+        if not self._is_memory_expired(memory, cutoff_date, level):
+            return False
+        
+        try:
+            if not dry_run:
+                memory_api.delete(memory.memory_id)
+            
+            logger.debug(f"Cleaned up memory: {memory.memory_id}")
+            return True
+            
+        except Exception as e:
+            logger.warning(f"Failed to process memory {memory.memory_id}: {e}")
+            return False
+    
     def cleanup_expired_memories(
         self,
         days: Optional[int] = None,
@@ -245,24 +285,8 @@ class MemoryManager:
                 memories = self.search_memories(limit=1000)
                 
                 for memory in memories:
-                    try:
-                        created_at = datetime.fromisoformat(memory.created_at)
-                        
-                        if created_at < cutoff_date:
-                            if level and memory.level != level:
-                                continue
-                            
-                            if not dry_run:
-                                memory_api.delete(memory.memory_id)
-                            
-                            cleaned_count += 1
-                            logger.debug(
-                                f"Cleaned up memory: {memory.memory_id}, "
-                                f"age: {(datetime.now() - created_at).days} days"
-                            )
-                            
-                    except Exception as e:
-                        logger.warning(f"Failed to process memory {memory.memory_id}: {e}")
+                    if self._process_single_cleanup(memory, cutoff_date, level, dry_run, memory_api):
+                        cleaned_count += 1
                 
                 logger.info(f"Cleaned up {cleaned_count} expired memories")
                 

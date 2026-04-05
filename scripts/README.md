@@ -574,9 +574,9 @@ python init_config.py --force
 
 **生成的配置文件**：
 - `.env` - 环境变量
-- `manager/kernel/settings.yaml` - 内核配置
-- `manager/security/policy.yaml` - 安全策略
-- `manager/logging/manager.yaml` - 日志配置
+- `agentos/manager/kernel/settings.yaml` - 内核配置
+- `agentos/manager/security/policy.yaml` - 安全策略
+- `agentos/manager/logging/manager.yaml` - 日志配置
 
 ---
 
@@ -611,7 +611,7 @@ safety check --json
 2. **配置文件权限**
    ```bash
    chmod 600 .env
-   chmod 600 manager/security/*.yaml
+   chmod 600 agentos/manager/security/*.yaml
    ```
 
 3. **定期轮换密钥**
@@ -802,10 +802,10 @@ fi
 
 ## 📞 相关文档
 
-- [架构设计原则](../manuals/architecture/ARCHITECTURAL_PRINCIPLES.md)
+- [架构设计原则](../agentos/manuals/architecture/ARCHITECTURAL_PRINCIPLES.md)
 - [快速入门](../paper/guides/getting_started.md)
 - [API 文档](../apis/README.md)
-- [运维手册](../manuals/ops/README.md)
+- [运维手册](../agentos/manuals/ops/README.md)
 
 ---
 

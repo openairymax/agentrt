@@ -209,7 +209,7 @@ class UnitTestRunner:
         try:
             result = subprocess.run([
                 sys.executable, '-m', 'pytest',
-                'unit/toolkit/python/test_sdk.py',
+                'unit/agentos/toolkit/python/test_sdk.py',
                 '-v', '--tb=short'
             ], cwd=self.test_dir, capture_output=True, text=True, timeout=60)
 

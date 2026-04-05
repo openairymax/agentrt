@@ -1,0 +1,68 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'agentos-monitor'
+    environment: '${ENVIRONMENT:-development}'
+
+scrape_configs:
+  # AgentOS 内核指标
+  - job_name: 'agentos-kernel'
+    static_configs:
+      - targets: ['kernel:9090']
+        labels:
+          service: 'kernel'
+          component: 'core'
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+
+  # AgentOS 守护进程指标
+  - job_name: 'agentos-daemon'
+    static_configs:
+      - targets: ['daemon:8001', 'daemon:8002', 'daemon:8003',
+                   'daemon:8004', 'daemon:8005', 'daemon:8006']
+        labels:
+          service: 'daemon'
+          component: 'services'
+    scrape_interval: 15s
+
+  # PostgreSQL 指标（使用postgres_exporter时启用）
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          service: 'database'
+          component: 'postgresql'
+    scrape_interval: 30s
+
+  # Redis 指标（使用redis_exporter时启用）
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+        labels:
+          service: 'cache'
+          component: 'redis'
+    scrape_interval: 15s
+
+  # OpenLab 应用指标
+  - job_name: 'openlab'
+    static_configs:
+      - targets: ['openlab:8000']
+        labels:
+          service: 'openlab'
+          component: 'application'
+    scrape_interval: 15s
+
+  # Prometheus 自监控
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+          # alertmanager:9093 (如果部署了AlertManager)
+
+rule_files:
+  # - 'alert_rules.yml'  (告警规则文件，按需启用)

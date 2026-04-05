@@ -68,7 +68,7 @@ my-agent/
 ├── tests/
 │   ├── __init__.py
 │   └── test_agent.py     # 单元测试
-├── manager/
+├── agentos/manager/
 │   ├── manager.yaml       # 主配置文件
 │   └── skills.yaml       # 技能配置
 ├── requirements.txt      # Python 依赖

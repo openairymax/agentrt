@@ -1,0 +1,244 @@
+# Codeowners for AgentOS
+
+# =============================================================================
+# AgentOS 代码所有权声明
+# 版本: 1.0.0
+# 最后更新: 2026-04-05
+#
+# 设计原则:
+# 1. 明确责任边界，确保每个模块都有明确的维护者
+# 2. 支持团队协作，允许代码审查和共同维护
+# 3. 遵循五维正交原则，保持层次清晰
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 全局默认规则
+# -----------------------------------------------------------------------------
+
+# 默认所有者（未匹配时使用）
+* @spharx-team/core
+
+# -----------------------------------------------------------------------------
+# 核心内核层 (agentos/atoms/)
+# -----------------------------------------------------------------------------
+# 微内核核心 (corekern)
+/agentos/atoms/corekern/ @spharx-team/kernel @spharx-team/architecture
+
+# 三层认知循环 (coreloopthree)
+/agentos/atoms/coreloopthree/ @spharx-team/cognition @spharx-team/architecture
+
+# 四层记忆系统 (memoryrovol)
+/agentos/atoms/memoryrovol/ @spharx-team/memory @spharx-team/cognition
+
+# 系统调用层 (syscall)
+/agentos/atoms/syscall/ @spharx-team/kernel @spharx-team/api
+
+# 轻量级内核 (atomslite)
+/agentos/atomslite/ @spharx-team/kernel @spharx-team/embedded
+
+# -----------------------------------------------------------------------------
+# 安全穹顶 (agentos/cupolas/)
+# -----------------------------------------------------------------------------
+/agentos/cupolas/ @spharx-team/security
+
+# 具体安全组件
+/agentos/cupolas/src/workbench/ @spharx-team/security @spharx-team/sandbox
+/agentos/cupolas/src/permission/ @spharx-team/security @spharx-team/rbac
+/agentos/cupolas/src/sanitizer/ @spharx-team/security @spharx-team/input-validation
+/agentos/cupolas/src/audit/ @spharx-team/security @spharx-team/compliance
+
+# -----------------------------------------------------------------------------
+# 服务层 (agentos/daemon/)
+# -----------------------------------------------------------------------------
+/agentos/daemon/ @spharx-team/services
+
+# LLM服务
+/agentos/daemon/llm_d/ @spharx-team/services @spharx-team/llm
+
+# 市场服务
+/agentos/daemon/market_d/ @spharx-team/services @spharx-team/marketplace
+
+# 监控服务
+/agentos/daemon/monit_d/ @spharx-team/services @spharx-team/observability
+
+# 调度服务
+/agentos/daemon/sched_d/ @spharx-team/services @spharx-team/scheduler
+
+# 工具服务
+/agentos/daemon/tool_d/ @spharx-team/services @spharx-team/tools
+
+# 公共代码
+/agentos/daemon/common/ @spharx-team/services @spharx-team/foundation
+
+# -----------------------------------------------------------------------------
+# 基础支撑层 (agentos/commons/)
+# -----------------------------------------------------------------------------
+/agentos/commons/ @spharx-team/commons
+
+# 平台抽象
+/agentos/commons/platform/ @spharx-team/platform
+
+# 工具模块
+/agentos/commons/utils/ @spharx-team/commons @spharx-team/tools
+
+# -----------------------------------------------------------------------------
+# 网关服务 (agentos/gateway/)
+# -----------------------------------------------------------------------------
+/agentos/gateway/ @spharx-team/gateway @spharx-team/networking
+
+# -----------------------------------------------------------------------------
+# 存储层 (agentos/heapstore/)
+# -----------------------------------------------------------------------------
+/agentos/heapstore/ @spharx-team/storage @spharx-team/database
+
+# -----------------------------------------------------------------------------
+# 配置管理 (agentos/manager/)
+# -----------------------------------------------------------------------------
+/agentos/manager/ @spharx-team/config @spharx-team/ops
+
+# -----------------------------------------------------------------------------
+# 多语言SDK (agentos/toolkit/)
+# -----------------------------------------------------------------------------
+/agentos/toolkit/ @spharx-team/sdk
+
+# Python SDK
+/agentos/toolkit/python/ @spharx-team/sdk-python
+
+# Go SDK
+/agentos/toolkit/go/ @spharx-team/sdk-go
+
+# Rust SDK
+/agentos/toolkit/rust/ @spharx-team/sdk-rust
+
+# TypeScript SDK
+/agentos/toolkit/typescript/ @spharx-team/sdk-typescript
+
+# -----------------------------------------------------------------------------
+# 文档体系 (agentos/manuals/)
+# -----------------------------------------------------------------------------
+/agentos/manuals/ @spharx-team/docs @spharx-team/architecture
+
+# 架构文档
+/agentos/manuals/architecture/ @spharx-team/architecture
+
+# 开发指南
+/agentos/manuals/guides/ @spharx-team/docs
+
+# API文档
+/agentos/manuals/api/ @spharx-team/api
+
+# 规范文档
+/agentos/manuals/specifications/ @spharx-team/standards
+
+# 教程文档
+/agentos/manuals/tutorials/ @spharx-team/docs
+
+# -----------------------------------------------------------------------------
+# 开放生态 (openlab/)
+# -----------------------------------------------------------------------------
+/openlab/ @spharx-team/ecosystem @spharx-team/applications
+
+# 核心模块
+/openlab/openlab/ @spharx-team/ecosystem-core
+
+# 应用示例
+/openlab/app/ @spharx-team/applications
+
+# 技能市场
+/openlab/contrib/ @spharx-team/skills @spharx-team/marketplace
+
+# 测试套件
+/openlab/tests/ @spharx-team/testing
+
+# -----------------------------------------------------------------------------
+# 构建与部署脚本 (scripts/)
+# -----------------------------------------------------------------------------
+/scripts/ @spharx-team/devops @spharx-team/build
+
+# 构建脚本
+/scripts/build/ @spharx-team/build
+
+# 部署脚本
+/scripts/deploy/ @spharx-team/devops @spharx-team/deployment
+
+# 开发工具
+/scripts/dev/ @spharx-team/devtools
+
+# -----------------------------------------------------------------------------
+# 测试套件 (tests/)
+# -----------------------------------------------------------------------------
+/tests/ @spharx-team/testing
+
+# 单元测试
+/tests/unit/ @spharx-team/unit-testing
+
+# 集成测试
+/tests/integration/ @spharx-team/integration-testing
+
+# 性能测试
+/tests/perf/ @spharx-team/performance-testing
+
+# 合约测试
+/tests/contract/ @spharx-team/contract-testing
+
+# 安全测试
+/tests/security/ @spharx-team/security-testing
+
+# -----------------------------------------------------------------------------
+# CI/CD 配置
+# -----------------------------------------------------------------------------
+/.gitcode/ @spharx-team/devops @spharx-team/ci-cd
+/.github/ @spharx-team/devops @spharx-team/ci-cd
+/.gitee/ @spharx-team/devops @spharx-team/ci-cd
+
+# -----------------------------------------------------------------------------
+# 项目根目录文件
+# -----------------------------------------------------------------------------
+/CMakeLists.txt @spharx-team/build-system
+/Makefile @spharx-team/build-system
+/pyproject.toml @spharx-team/python-build
+/LICENSE @spharx-team/legal
+/README.md @spharx-team/docs @spharx-team/community
+/CHANGELOG.md @spharx-team/release-management
+/CONTRIBUTING.md @spharx-team/community
+/SECURITY.md @spharx-team/security
+/.gitignore @spharx-team/devops
+
+# -----------------------------------------------------------------------------
+# 新增目录 (docker/, docs/)
+# -----------------------------------------------------------------------------
+/docker/ @spharx-team/devops @spharx-team/containerization
+/docs/ @spharx-team/docs @spharx-team/community
+
+# =============================================================================
+# 特殊规则
+# =============================================================================
+
+# 紧急修复 - 所有团队成员可审查
+/hotfix/** @spharx-team/core @spharx-team/security @spharx-team/ops
+
+# 文档更新 - 社区贡献者可提交
+/**/*.md @spharx-team/community @spharx-team/docs
+
+# 配置文件变更 - 需要运维团队审查
+/*.yaml @spharx-team/config @spharx-team/ops
+/*.yml @spharx-team/config @spharx-team/ops
+*.json @spharx-team/config
+
+# =============================================================================
+# 说明
+# =============================================================================
+#
+# 1. 此文件定义了AgentOS项目中各文件/目录的代码所有权
+# 2. 当PR涉及特定文件时，对应的所有者会自动被添加为审查者
+# 3. 支持通配符 (*) 匹配，优先级从上到下递减
+# 4. 更具体的规则优先于更宽泛的规则
+#
+# 五维正交原则体现:
+# - 系统观: 清晰的层次结构，避免跨层依赖
+# - 内核观: 核心模块有专门的架构团队维护
+# - 认知观: 认知相关模块有专业团队负责
+# - 工程观: 各工程领域有对应的专家团队
+# - 设计美学: 规则简洁清晰，易于理解和维护
+#
+# =============================================================================

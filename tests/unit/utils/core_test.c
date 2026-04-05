@@ -4,7 +4,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "../../../commons/utils/core/include/core.h"
+#include "../../../agentos/commons/utils/core/include/core.h"
 #include <stdio.h>
 #include <stdlib.h>
 
