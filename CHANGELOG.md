@@ -59,7 +59,7 @@
 - **新增**: 安全策略详细文档（漏洞报告、响应时间、CVSS 分级）
 - **新增**: 支持渠道文档（社区支持、商业支持、联系方式）
 - **优化**: DOCSINDEX.md 路径标准化，移除错误目录层级
-- **优化**: manuals/README.md 链接一致性修复
+- **优化**: agentos/manuals/README.md 链接一致性修复
 - **优化**: TERMINOLOGY.md 架构原则引用更新
 
 #### Manager 模块

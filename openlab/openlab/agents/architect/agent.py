@@ -526,45 +526,64 @@ class ArchitectureDesignTool(Tool):
     def _design_components(
         self, project_name: str, requirements: List[str], arch_type: DesignPattern
     ) -> List[Dict[str, Any]]:
-        """Design system components."""
-        base_components = [
-            {
-                "name": f"{project_name}-api-gateway",
-                "type": "gateway",
-                "responsibility": "Request routing, authentication, rate limiting",
-                "dependencies": [],
-            },
-            {
-                "name": f"{project_name}-core-service",
-                "type": "service",
-                "responsibility": "Core business logic",
-                "dependencies": ["database"],
-            },
-            {
-                "name": f"{project_name}-database",
-                "type": "data_store",
-                "responsibility": "Persistent data storage",
-                "dependencies": [],
-            },
+        """Design system components using strategy pattern."""
+        base_components = self._create_base_components(project_name)
+        
+        if self._needs_distributed_components(arch_type):
+            base_components.extend(self._create_distributed_components(project_name))
+        
+        return base_components
+
+    def _create_base_components(self, project_name: str) -> List[Dict[str, Any]]:
+        """Create base architecture components."""
+        return [
+            self._create_component(
+                project_name, "api-gateway", "gateway",
+                "Request routing, authentication, rate limiting", []
+            ),
+            self._create_component(
+                project_name, "core-service", "service",
+                "Core business logic", ["database"]
+            ),
+            self._create_component(
+                project_name, "database", "data_store",
+                "Persistent data storage", []
+            ),
         ]
 
-        if arch_type in (DesignPattern.MICROSERVICES, DesignPattern.EVENT_DRIVEN):
-            base_components.extend([
-                {
-                    "name": f"{project_name}-event-bus",
-                    "type": "messaging",
-                    "responsibility": "Async event distribution",
-                    "dependencies": [],
-                },
-                {
-                    "name": f"{project_name}-cache",
-                    "type": "cache",
-                    "responsibility": "High-speed data caching",
-                    "dependencies": [],
-                },
-            ])
+    def _create_component(
+        self, 
+        project_name: str, 
+        suffix: str, 
+        comp_type: str,
+        responsibility: str, 
+        dependencies: List[str]
+    ) -> Dict[str, Any]:
+        """Create a component dictionary with standardized structure."""
+        return {
+            "name": f"{project_name}-{suffix}",
+            "type": comp_type,
+            "responsibility": responsibility,
+            "dependencies": dependencies,
+        }
 
-        return base_components
+    def _needs_distributed_components(self, arch_type: DesignPattern) -> bool:
+        """Check if architecture type needs distributed components."""
+        distributed_patterns = {DesignPattern.MICROSERVICES, DesignPattern.EVENT_DRIVEN}
+        return arch_type in distributed_patterns
+
+    def _create_distributed_components(self, project_name: str) -> List[Dict[str, Any]]:
+        """Create components for distributed architectures."""
+        return [
+            self._create_component(
+                project_name, "event-bus", "messaging",
+                "Async event distribution", []
+            ),
+            self._create_component(
+                project_name, "cache", "cache",
+                "High-speed data caching", []
+            ),
+        ]
 
     def _recommend_technology(
         self,
@@ -792,62 +811,112 @@ class ArchitectAgent(Agent):
     async def _do_execute(
         self, context: AgentContext, input_data: Any
     ) -> TaskResult:
-        """
-        Execute architecture design task.
-
-        Args:
-            context: Execution context.
-            input_data: Task input containing architecture requirements.
-
-        Returns:
-            TaskResult with architecture design output.
-        """
+        """Execute architecture design task with low complexity."""
         start_time = time.time()
-
+        
         try:
-            arch_input = self._parse_input(input_data)
-
-            if self._verbose:
-                logger.info(
-                    f"Processing architecture task",
-                    extra={
-                        "project_name": arch_input.project_name,
-                        "num_requirements": len(arch_input.requirements),
-                    },
-                )
-
-            design = await self._generate_architecture_design(arch_input)
-
+            arch_input = self._parse_and_validate(input_data)
+            self._log_task_start(arch_input)
+            
+            design = await self._execute_design_pipeline(arch_input)
             output = self._format_output(design)
+            
+            return self._build_success_result(start_time, design, output)
+            
+        except ValueError as e:
+            return self._create_error_result("INVALID_INPUT", str(e))
+        except Exception as e:
+            return self._create_error_result("DESIGN_ERROR", str(e))
 
-            execution_time = (time.time() - start_time) * 1000
+    def _parse_and_validate(self, input_data: Any) -> ArchitectureInput:
+        """Parse and validate input data with detailed error messages."""
+        if not isinstance(input_data, dict):
+            raise ValueError(f"Invalid input type: {type(input_data).__name__}, expected dict")
+        
+        required_fields = ["project_name"]
+        for field in required_fields:
+            if field not in input_data or not input_data[field]:
+                raise ValueError(f"Missing required field: {field}")
+        
+        return ArchitectureInput(
+            project_name=input_data["project_name"],
+            project_type=input_data.get("project_type", "web_app"),
+            requirements=input_data.get("requirements", []),
+            constraints=input_data.get("constraints", {}),
+            quality_attributes=input_data.get("quality_attributes", {}),
+        )
 
-            return TaskResult(
-                success=True,
-                output=output,
-                metrics={
-                    "execution_time_ms": execution_time,
-                    "num_components": len(design.component_diagram.get("components", [])),
-                    "num_risks": len(design.risks),
-                    "complexity": design.estimated_complexity,
+    def _log_task_start(self, arch_input: ArchitectureInput) -> None:
+        """Log task start information if verbose mode is enabled."""
+        if self._verbose:
+            logger.info(
+                "Processing architecture task",
+                extra={
+                    "project_name": arch_input.project_name,
+                    "num_requirements": len(arch_input.requirements),
+                    "project_type": arch_input.project_type,
                 },
             )
 
-        except ValueError as e:
-            logger.warning(f"Invalid input: {e}")
-            return TaskResult(
-                success=False,
-                error=str(e),
-                error_code="INVALID_INPUT",
-            )
+    async def _execute_design_pipeline(self, arch_input: ArchitectureInput) -> ArchitectureOutput:
+        """Execute the full design pipeline with error handling."""
+        if self._design_tool is None:
+            raise RuntimeError("Design tool not initialized")
+        
+        result = await self._design_tool.execute({
+            "project_name": arch_input.project_name,
+            "project_type": arch_input.project_type,
+            "requirements": arch_input.requirements,
+            "constraints": arch_input.constraints,
+            "quality_attributes": arch_input.quality_attributes,
+        })
+        
+        if not result.success:
+            raise RuntimeError(f"Design tool execution failed: {result.error}")
+        
+        design_data = result.result
+        return ArchitectureOutput(
+            architecture_type=DesignPattern(design_data["architecture_type"]),
+            component_diagram=design_data["component_diagram"],
+            technology_stack=design_data["technology_stack"],
+            deployment_model=design_data["deployment_model"],
+            tradeoffs=design_data["tradeoffs"],
+            risks=design_data["risks"],
+            estimated_complexity=design_data["estimated_complexity"],
+            recommended_iterations=design_data["recommended_iterations"],
+        )
 
-        except Exception as e:
-            logger.error(f"Architecture design failed: {e}")
-            return TaskResult(
-                success=False,
-                error=f"Architecture design failed: {str(e)}",
-                error_code="DESIGN_ERROR",
-            )
+    def _build_success_result(
+        self, 
+        start_time: float, 
+        design: ArchitectureOutput, 
+        output: Dict[str, Any]
+    ) -> TaskResult:
+        """Build successful task result with metrics."""
+        execution_time = (time.time() - start_time) * 1000
+        
+        return TaskResult(
+            success=True,
+            output=output,
+            metrics={
+                "execution_time_ms": round(execution_time, 2),
+                "num_components": len(design.component_diagram.get("components", [])),
+                "num_risks": len(design.risks),
+                "complexity": design.estimated_complexity,
+                "architecture_type": design.architecture_type.value,
+            },
+        )
+
+    def _create_error_result(self, error_code: str, message: str) -> TaskResult:
+        """Create standardized error result."""
+        log_method = logger.warning if error_code == "INVALID_INPUT" else logger.error
+        log_method(f"Task failed [{error_code}]: {message}")
+        
+        return TaskResult(
+            success=False,
+            error=message,
+            error_code=error_code,
+        )
 
     async def _do_shutdown(self) -> None:
         """Cleanup agent resources."""

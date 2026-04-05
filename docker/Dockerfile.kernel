@@ -1,0 +1,123 @@
+# =============================================================================
+# AgentOS 内核 Dockerfile
+# 版本: 1.0.0
+# 最后更新: 2026-04-05
+#
+# 设计原则:
+# 1. 多阶段构建，减小最终镜像大小
+# 2. 安全默认配置（非root用户运行）
+# 3. 最小权限原则
+# 4. 健康检查和监控支持
+# =============================================================================
+
+# =============================================================================
+# 阶段1: 构建环境 (Builder)
+# =============================================================================
+FROM ubuntu:22.04 AS builder
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG BUILD_TYPE=Release
+ARG ENABLE_TESTS=OFF
+
+# 安装构建依赖
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    ninja-build \
+    gcc \
+    g++ \
+    git \
+    libssl-dev \
+    libyaml-dev \
+    libcjson-dev \
+    pkg-config \
+    valgrind \
+    clang-tools \
+    cppcheck \
+    python3 \
+    python3-pip \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# 设置工作目录
+WORKDIR /build
+
+# 复制源代码
+COPY agentos/ ./agentos/
+COPY CMakeLists.txt ./
+COPY Makefile* ./
+
+# 配置CMake
+RUN cmake .. \
+    -G Ninja \
+    -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+    -DBUILD_TESTS=${ENABLE_TESTS} \
+    -DBUILD_WITH_SANITIZERS=ON \
+    -DBUILD_WITH_LOGGING=ON \
+    -DCMAKE_INSTALL_PREFIX=/usr/local
+
+# 构建项目
+RUN cmake --build . --parallel $(nproc)
+
+# 运行测试（如果启用）
+RUN if [ "${ENABLE_TESTS}" = "ON" ]; then ctest --output-on-failure; fi
+
+# =============================================================================
+# 阶段2: 运行时环境 (Runtime)
+# =============================================================================
+FROM ubuntu:22.04 AS runtime
+
+LABEL maintainer="SPHARX Ltd. <devops@spharx.cn>"
+LABEL org.opencontainers.image.title="AgentOS Kernel"
+LABEL org.opencontainers.image.description="AgentOS智能体操作系统内核层"
+LABEL org.opencontainers.image.version="1.0.0"
+LABEL org.opencontainers.image.source="https://gitcode.com/spharx/agentos"
+
+# 安装运行时依赖
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    libyaml-0-2 \
+    libcjson4 \
+    curl \
+    procps \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean \
+    && groupadd -r agentos \
+    && useradd -r -g agentos -d /app -s /bin/bash agentos
+
+# 创建应用目录结构
+RUN mkdir -p /app/{bin,config,data,logs,lib} \
+    && chown -R agentos:agentos /app
+
+# 从构建阶段复制产物
+COPY --from=builder /build/bin/ /app/bin/
+COPY --from=builder /build/lib/ /app/lib/
+
+# 复制配置文件模板
+COPY docker/config/ /app/config/
+
+# 设置工作目录
+WORKDIR /app
+
+# 切换到非root用户
+USER agentos
+
+# 暴露端口
+EXPOSE 8080 9090
+
+# 环境变量
+ENV AGENTOS_HOME=/app \
+    AGENTOS_CONFIG_DIR=/app/config \
+    AGENTOS_DATA_DIR=/app/data \
+    AGENTOS_LOG_DIR=/app/logs \
+    AGENTOS_IPC_BIND_ADDR=0.0.0.0 \
+    AGENTOS_IPC_BIND_PORT=8080 \
+    LOG_LEVEL=INFO
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# 启动命令
+CMD ["./bin/agentos-kernel"]

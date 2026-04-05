@@ -4,7 +4,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "../../../commons/utils/observability/include/logger.h"
+#include "../../../agentos/commons/utils/observability/include/logger.h"
 #include <stdio.h>
 #include <stdlib.h>
 
