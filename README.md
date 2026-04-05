@@ -7,7 +7,7 @@
 [English](README_EN.md) | 简体中文
 
 [![AtomGit](https://atomgit.com/spharx/agentos/star/badge.svg)](https://atomgit.com/spharx/agentos)
-[![Gitee](https://gitee.com/spharx/agentos/badge/star.svg?theme=gray)](https://gitee.com/spharx/agentos)
+[![star](https://gitee.com/spharx/agentos/badge/star.svg?theme=dark)](https://gitee.com/spharx/agentos)
 [![GitHub](https://img.shields.io/github/stars/SpharxTeam/AgentOS?style=social)](https://github.com/SpharxTeam/AgentOS)
 
 [![Version](https://img.shields.io/badge/version-1.0.0.9-5a6b7e)](https://atomgit.com/spharx/agentos)
@@ -38,12 +38,15 @@
 ## 🎯 基本理念
 
 - **驱动团队**：精准协调多 Agent 协作，高效完成复杂任务编排与资源调度。  
-- **自主演进**：具备自我进化能力，动态调整策略，持续优化执行效果。  
+- **自主演进**：具备自我进化能力，动态调整策略，持续优化执行效果。
 
-<p align="center">  
-  <strong>✨ 全新架构 · 安全内生 · 智能涌现 ✨</strong>
+<br><br>
+
+<p align="center">
+  <strong>✨ 自主可控 · 全新架构 · 安全内生 · 智能涌现 ✨</strong>
 </p>
 
+<br><br>
 
 ## 🏗️ 系统架构
 
