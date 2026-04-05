@@ -4,6 +4,8 @@
 
 > 成为人类计算科学工程史上，第四个"操作系统哲学"
 
+[English](README_EN.md) | 简体中文
+
 [![AtomGit](https://atomgit.com/spharx/agentos/star/badge.svg)](https://atomgit.com/spharx/agentos)
 [![Gitee](https://gitee.com/spharx/agentos/badge/star.svg?theme=gray)](https://gitee.com/spharx/agentos)
 [![GitHub](https://img.shields.io/github/stars/SpharxTeam/AgentOS?style=social)](https://github.com/SpharxTeam/AgentOS)
