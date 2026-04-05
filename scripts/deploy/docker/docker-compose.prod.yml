@@ -1,4 +1,4 @@
-﻿# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Docker Compose Configuration - Production Environment
 # Version: 1.0.0
 # Description: Production-grade deployment with high availability, security, and monitoring
@@ -47,11 +47,11 @@ services:
       - AGENTOS_SECURITY_LEVEL=high
       - AGENTOS_ENABLE_METRICS=true
 
-    # 端口映射 (仅内�?
+    # 端口映射 (仅内部)
     ports:
       - "127.0.0.1:8091:8091"
 
-    # 数据�?(持久�?
+    # 数据卷(持久化)
     volumes:
       - prod-atoms-logs:/var/log/agentos
       - prod-atoms-data:/var/lib/agentos
@@ -62,7 +62,7 @@ services:
       - agentos-production-network
       - agentos-internal-network
 
-    # 健康检�?(生产�?
+    # 健康检查(生产级)
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8091/health" ]
       interval: 30s
@@ -85,7 +85,7 @@ services:
         max-file: "10"
         labels: "production"
 
-    # 安全性配�?
+    # 安全性配置
     security_opt:
       - no-new-privileges:true
     read_only: false
