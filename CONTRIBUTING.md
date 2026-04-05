@@ -35,9 +35,9 @@
 - 💡 [提出功能建议 (AtomGit 官方)](https://atomgit.com/spharx/agentos/issues)
 - 💡 [提出功能建议 (Gitee 官方)](https://gitee.com/spharx/agentos/issues)
 - 💡 [提出功能建议 (GitHub 官方)](https://github.com/SpharxTeam/AgentOS/issues)
-- 📖 [查看文档](./manuals/)
+- 📖 [查看文档](./agentos/manuals/)
 - 💬 [参与讨论 (GitHub 官方)](https://github.com/SpharxTeam/AgentOS/discussions)
-- 📐 [编码规范](./manuals/specifications/coding_standard/)
+- 📐 [编码规范](./agentos/manuals/specifications/coding_standard/)
 - 🧪 [测试指南](./tests/README.md)
 
 ---
@@ -220,7 +220,7 @@ git push origin feature/your-feature-name
 
 ### C/C++ 代码
 
-- 遵循 [C/C++ 编码规范](./manuals/specifications/coding_standard/C_coding_style_guide.md)
+- 遵循 [C/C++ 编码规范](./agentos/manuals/specifications/coding_standard/C_coding_style_guide.md)
 - 使用 `.clang-format` 和 `.clang-tidy` 进行代码格式化
 - 所有公共 API 必须有 Doxygen 注释
 

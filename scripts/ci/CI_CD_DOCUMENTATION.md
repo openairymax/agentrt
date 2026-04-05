@@ -113,7 +113,7 @@ Tier 3: Tooling (仅CI使用)
 
 ### 2.2 tiktoken 特殊处理方案
 
-**问题**: tiktoken 是 Python 库，没有 C 语言原生接口，但 `commons/CMakeLists.txt` 通过 `pkg_check_modules(TIKTOKEN REQUIRED tiktoken)` 强制要求。
+**问题**: tiktoken 是 Python 库，没有 C 语言原生接口，但 `agentos/commons/CMakeLists.txt` 通过 `pkg_check_modules(TIKTOKEN REQUIRED tiktoken)` 强制要求。
 
 **解决方案**: 在 CI 中创建 **pkg-config 存根 (Stub)**
 
@@ -137,7 +137,7 @@ echo 'void tiktoken_init(void) {}' | gcc -c - -o /tmp/tiktoken_stub.o
 ar rcs /usr/local/lib/libtiktoken.a /tmp/tiktoken_stub.o
 ```
 
-**长期建议**: 将 `commons/CMakeLists.txt` 中的 `REQUIRED` 改为 `QUIET`，并提供内置 fallback 实现：
+**长期建议**: 将 `agentos/commons/CMakeLists.txt` 中的 `REQUIRED` 改为 `QUIET`，并提供内置 fallback 实现：
 
 ```cmake
 pkg_check_modules(TIKTOKEN QUIET tiktoken)
@@ -154,7 +154,7 @@ endif()
 | Threads | find_package | ✅ | 全部 | 内置 | 内置 | 内置 |
 | PkgConfig | find_package | ✅ | daemon, commons | pkg-config | pkg-config | - |
 | cJSON | pkg_check_modules | ✅ | daemon*, gateway, commons | libcjson-dev | cjson | cjson |
-| libcurl | pkg_check_modules | ✅ | daemon/common, llm_d | libcurl4-openssl-dev | curl | curl |
+| libcurl | pkg_check_modules | ✅ | agentos/daemon/common, llm_d | libcurl4-openssl-dev | curl | curl |
 | yaml/libyaml | pkg_check_modules | ✅ | commons, daemon*, llm_d, tool_d, market_d | libyaml-dev | yaml-cpp | yaml-cpp |
 | OpenSSL | find_package | ✅ | cupolas | libssl-dev | openssl@3 | openssl |
 | tiktoken* | pkg_check_modules | ⚠️ Stub | commons | (Stub) | (Stub) | (Stub) |
@@ -338,9 +338,9 @@ return FAILURE
 
 **运行条件**: PR 或 main 分支推送  
 **检查范围**:
-- `daemon/common/src`, `daemon/*/src` (服务层)
-- `atoms/corekern/src`, `atoms/coreloopthree/src`, `atoms/memoryrovol/src` (内核层)
-- `commons/utils` (工具库)
+- `agentos/daemon/common/src`, `agentos/daemon/*/src` (服务层)
+- `agentos/atoms/corekern/src`, `agentos/atoms/coreloopthree/src`, `agentos/atoms/memoryrovol/src` (内核层)
+- `agentos/commons/utils` (工具库)
 
 **参数**:
 ```bash

@@ -36,17 +36,17 @@ services:
     # 数据卷挂载
     volumes:
       # 日志目录
-      - ./heapstore/logs:/var/log/agentos:rw
+      - ./agentos/heapstore/logs:/var/log/agentos:rw
       # 注册表数据
-      - ./heapstore/registry:/var/lib/agentos/registry:rw
+      - ./agentos/heapstore/registry:/var/lib/agentos/registry:rw
       # 追踪数据
-      - ./heapstore/traces:/var/lib/agentos/traces:rw
+      - ./agentos/heapstore/traces:/var/lib/agentos/traces:rw
       # 检查点数据（长时间任务支持）
-      - ./heapstore/checkpoints:/var/lib/agentos/checkpoints:rw
+      - ./agentos/heapstore/checkpoints:/var/lib/agentos/checkpoints:rw
       # Token 统计和预算数据
-      - ./heapstore/token_stats:/var/lib/agentos/token_stats:rw
+      - ./agentos/heapstore/token_stats:/var/lib/agentos/token_stats:rw
       # 配置文件（可选覆盖）
-      - ../../manager/kernel:/etc/agentos/kernel:ro
+      - ../../agentos/manager/kernel:/etc/agentos/kernel:ro
 
     # 网络配置
     networks:
@@ -116,11 +116,11 @@ services:
     # 数据卷挂载
     volumes:
       # 日志目录
-      - ./heapstore/logs/services:/var/log/agentos/services:rw
+      - ./agentos/heapstore/logs/services:/var/log/agentos/services:rw
       # 服务配置
-      - ../../manager/services:/etc/agentos/services:ro
+      - ../../agentos/manager/services:/etc/agentos/services:ro
       # 技能市场数据
-      - ./heapstore/services/market:/var/lib/agentos/market:rw
+      - ./agentos/heapstore/services/market:/var/lib/agentos/market:rw
 
     # 网络配置
     networks:
@@ -199,7 +199,7 @@ services:
     # 数据持久化
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./heapstore/registry/sessions.db:/docker-entrypoint-initdb.d/sessions.db:ro
+      - ./agentos/heapstore/registry/sessions.db:/docker-entrypoint-initdb.d/sessions.db:ro
 
     # 网络配置
     networks:
@@ -221,7 +221,7 @@ services:
 
     # 配置文件
     volumes:
-      - ./manager/otel-collector-manager.yaml:/etc/otelcol-contrib/manager.yaml:ro
+      - ./agentos/manager/otel-collector-manager.yaml:/etc/otelcol-contrib/manager.yaml:ro
 
     # 网络配置
     networks:

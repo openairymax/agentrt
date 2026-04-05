@@ -1,0 +1,67 @@
+name: Stale Issues and PRs
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # 每天UTC 00:00运行
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check for stale issues and PRs
+      uses: actions/stale@v9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        stale-issue-message: |
+          🤖 **这个Issue已经30天没有活动了，可能已经过时**
+          
+          为了保持Issue列表的整洁，我们将其标记为**陈旧（Stale）**。
+          
+          如果您认为这个问题仍然相关，请：
+          1. 回复此Issue说明情况
+          2. 或者直接关闭它
+          
+          我们会在7天后自动关闭没有回复的Stale Issue。
+          
+          ---
+          
+          感谢您对AgentOS的贡献！🙏
+          
+          > *"From data intelligence emerges."*
+        stale-pr-message: |
+          🤖 **这个PR已经60天没有活动了，可能已经被遗忘**
+          
+          为了保持PR列表的整洁，我们将其标记为**陈旧（Stale）**。
+          
+          如果您仍在积极开发，请：
+          1. 推送新的commit或回复此PR
+          2. 或者关闭它（如果不再需要）
+          
+          我们将在14天后自动关闭没有活动的Stale PR。
+          
+          ---
+          
+          感谢您的贡献！🙏
+          
+          > *"From data intelligence emerges."*
+        days-before-issue-stale: 30
+        days-before-pr-stale: 60
+        days-before-close: 7
+        days-before-pr-close: 14
+        stale-issue-label: '🤖 Stale'
+        stale-pr-label: '🤖 Stale'
+        exempt-issue-labels: '🔒 Pinned,🚨 Critical,🎯 In Progress'
+        exempt-pr-labels: '🔒 Pinned,🚨 Critical,🎯 In Progress'
+        operations-per-run: 100
+        remove-stale-when-updated: true
+
+    - name: Delete expired stale items
+      if: always()
+      run: |
+        echo "✅ Stale check completed"
+        echo "ℹ️ Items marked as stale will be closed in 7/14 days if no activity"

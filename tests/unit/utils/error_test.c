@@ -4,7 +4,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "../../../commons/utils/error/include/error.h"
+#include "../../../agentos/commons/utils/error/include/error.h"
 #include <stdio.h>
 #include <stdlib.h>
 

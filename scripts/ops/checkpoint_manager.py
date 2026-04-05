@@ -273,6 +273,48 @@ class CheckpointManager:
                 error=str(e)
             )
     
+    @staticmethod
+    def _parse_checkpoint_info(checkpoint_data: dict, checkpoint_id: str) -> Optional[CheckpointInfo]:
+        """解析检查点数据为 CheckpointInfo 对象"""
+        info = checkpoint_data.get("info", {})
+        return CheckpointInfo(
+            checkpoint_id=info.get("checkpoint_id", checkpoint_id),
+            task_id=info.get("task_id", ""),
+            created_at=info.get("created_at", ""),
+            updated_at=info.get("updated_at", ""),
+            status=CheckpointStatus(info.get("status", "active")),
+            size_bytes=info.get("size_bytes", 0),
+            checksum=info.get("checksum", ""),
+            metadata=info.get("metadata", {}),
+            description=info.get("description", "")
+        )
+    
+    def _load_checkpoint_from_file(self, filepath: str) -> Optional[CheckpointInfo]:
+        """从文件加载检查点信息"""
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            return self._parse_checkpoint_info(data, filepath[:-5])
+        except Exception as e:
+            logger.warning(f"Failed to load checkpoint {filepath}: {e}")
+            return None
+    
+    def _should_include_checkpoint(self, checkpoint_id: str, task_id: Optional[str]) -> bool:
+        """判断是否应包含该检查点"""
+        if not task_id:
+            return True
+        return checkpoint_id.startswith(f"{task_id}_")
+    
+    def _filter_checkpoint(
+        self,
+        checkpoint_info: CheckpointInfo,
+        status: Optional[CheckpointStatus]
+    ) -> bool:
+        """过滤检查点"""
+        if status and checkpoint_info.status != status:
+            return False
+        return True
+    
     def list_checkpoints(
         self,
         task_id: Optional[str] = None,
@@ -293,43 +335,19 @@ class CheckpointManager:
         checkpoints = []
         
         try:
-            for filename in os.listdir(self.checkpoint_dir):
-                if not filename.endswith(".json"):
-                    continue
-                
+            json_files = [f for f in os.listdir(self.checkpoint_dir) if f.endswith(".json")]
+            
+            for filename in json_files:
                 checkpoint_id = filename[:-5]
                 
-                if task_id:
-                    if not checkpoint_id.startswith(f"{task_id}_"):
-                        continue
+                if not self._should_include_checkpoint(checkpoint_id, task_id):
+                    continue
                 
                 checkpoint_file = os.path.join(self.checkpoint_dir, filename)
+                checkpoint_info = self._load_checkpoint_from_file(checkpoint_file)
                 
-                try:
-                    with open(checkpoint_file, 'r', encoding='utf-8') as f:
-                        checkpoint_data = json.load(f)
-                    
-                    info = checkpoint_data.get("info", {})
-                    checkpoint_info = CheckpointInfo(
-                        checkpoint_id=info.get("checkpoint_id", checkpoint_id),
-                        task_id=info.get("task_id", ""),
-                        created_at=info.get("created_at", ""),
-                        updated_at=info.get("updated_at", ""),
-                        status=CheckpointStatus(info.get("status", "active")),
-                        size_bytes=info.get("size_bytes", 0),
-                        checksum=info.get("checksum", ""),
-                        metadata=info.get("metadata", {}),
-                        description=info.get("description", "")
-                    )
-                    
-                    if status and checkpoint_info.status != status:
-                        continue
-                    
+                if checkpoint_info and self._filter_checkpoint(checkpoint_info, status):
                     checkpoints.append(checkpoint_info)
-                    
-                except Exception as e:
-                    logger.warning(f"Failed to load checkpoint {checkpoint_id}: {e}")
-                    continue
             
             checkpoints.sort(key=lambda x: x.created_at, reverse=True)
             

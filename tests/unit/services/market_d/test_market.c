@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "../../../../daemon/market_d/include/market_service.h"
+#include "../../../../agentos/daemon/market_d/include/market_service.h"
 
 /**
  * @brief 测试服务创建和销�?

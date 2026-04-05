@@ -1,0 +1,164 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          cmake \
+          ninja-build \
+          gcc \
+          g++ \
+          libssl-dev \
+          libyaml-dev \
+          libcjson-dev
+
+    - name: Build kernel (Release)
+      run: |
+        mkdir -p build && cd build
+        cmake .. \
+          -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_TESTS=OFF \
+          -DBUILD_WITH_SANITIZERS=OFF
+        cmake --build . --parallel $(nproc)
+
+    - name: Build Python SDK
+      run: |
+        cd agentos/toolkit/python
+        pip install build twine
+        python -m build
+
+    - name: Build Go SDK
+      run: |
+        cd agentos/toolkit/go
+        go mod tidy
+        go build ./...
+
+    - name: Build Rust SDK
+      run: |
+        cd agentos/toolkit/rust
+        cargo build --release
+
+    - name: Run tests
+      run: |
+        cd build
+        ctest --output-on-failure
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # 提取版本号
+        VERSION=${GITHUB_REF#refs/tags/v}
+        echo "VERSION=${VERSION}" >> $GITHUB_ENV
+        
+        # 创建发布说明
+        cat > release_notes.md << EOF
+        ## AgentOS ${VERSION}
+        
+        ### 🎉 发布亮点
+        
+        ### ✨ 新功能
+        
+        ### 🔧 改进
+        
+        ### 🐛 Bug修复
+        
+        ### ⚠️ 破坏性变更
+        
+        ---
+        
+        **完整变更日志**: [CHANGELOG.md](../CHANGELOG.md)
+        
+        **安装方式**:
+        \`\`\`bash
+        # 从源码构建
+        git clone https://gitcode.com/spharx/agentos.git -b v${VERSION}
+        cd agentos
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+        cmake --build . --parallel $(nproc)
+        \`\`\`
+        
+        **Docker**:
+        \`\`\`bash
+        docker pull spharx/agentos:${VERSION}
+        docker run -d --name agentos -p 8080:8080 spharx/agentos:${VERSION}
+        \`\`\`
+        EOF
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          build/agentos-*.tar.gz
+          agentos/toolkit/python/dist/*.whl
+        body_path: release_notes.md
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Publish to PyPI
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+      run: |
+        cd agentos/toolkit/python
+        twine upload dist/*
+
+    - name: Docker Build and Push
+      if: success()
+      run: |
+        # 登录Docker Hub
+        echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login -u spharx --password-stdin
+        
+        # 构建镜像
+        docker build -t spharx/agentos:${{ env.VERSION }} -f docker/Dockerfile.kernel .
+        docker tag spharx/agentos:${{ env.VERSION }} spharx/agentos:latest
+        
+        # 推送镜像
+        docker push spharx/agentos:${{ env.VERSION }}
+        docker push spharx/agentos:latest
+
+    - name: Notify team
+      if: always()
+      run: |
+        echo "✅ Release ${VERSION} created successfully!"
+        echo "📦 Artifacts:"
+        echo "  - Source tarball"
+        echo "  - Python wheel (.whl)"
+        echo "  - Docker image (spharx/agentos:${VERSION})"
