@@ -14,41 +14,39 @@
     <img src="https://gitee.com/spharx/agentos/badge/star.svg?theme=gray" alt="Gitee">
   </a>
   <a href="https://github.com/SpharxTeam/AgentOS">
-    <img src="https://img.shields.io/github/stars/SpharxTeam/AgentOS" alt="GitHub">
+    <img src="https://img.shields.io/github/stars/SpharxTeam/AgentOS?style=social" alt="GitHub">
   </a>
 </p>
 
-
 <p align="center">
   <a href="https://atomgit.com/spharx/agentos">
-    <img src="https://img.shields.io/badge/version-1.0.0.9-5a6b7e?style=flat-square&logo=atom" alt="Version">
+    <img src="https://img.shields.io/badge/version-1.0.0.9-5a6b7e" alt="Version">
   </a>
   <a href="LICENSE">
-    <img src="https://img.shields.io/badge/license-Apache--2.0-4a90d9?style=flat-square" alt="License">
+    <img src="https://img.shields.io/badge/license-Apache--2.0-4a90d9" alt="License">
   </a>
   <a href="https://atomgit.com/spharx/agentos">
-    <img src="https://img.shields.io/badge/build-passing-2ea44f?style=flat-square" alt="Build">
+    <img src="https://img.shields.io/badge/build-passing-2ea44f" alt="Build">
   </a>
 </p>
 
 <p align="center">
   <a href="https://isocpp.org">
-    <img src="https://img.shields.io/badge/C%2FC%2B%2B-11%2F17-00599C?style=flat-square&logo=c%2B%2B&logoColor=white" alt="C/C++">
+    <img src="https://img.shields.io/badge/C%2FC%2B%2B-11%2F17-00599C?logo=c%2B%2B&logoColor=white" alt="C/C++">
   </a>
   <a href="https://www.python.org">
-    <img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python">
+    <img src="https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white" alt="Python">
   </a>
   <a href="https://go.dev">
-    <img src="https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square&logo=go&logoColor=white" alt="Go">
+    <img src="https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go&logoColor=white" alt="Go">
   </a>
   <a href="https://www.rust-lang.org">
-    <img src="https://img.shields.io/badge/Rust-1.70+-DEA584?style=flat-square&logo=rust&logoColor=white" alt="Rust">
+    <img src="https://img.shields.io/badge/Rust-1.70+-DEA584?logo=rust&logoColor=white" alt="Rust">
   </a>
   <a href="https://www.typescriptlang.org">
-    <img src="https://img.shields.io/badge/TypeScript-4.9+-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript">
+    <img src="https://img.shields.io/badge/TypeScript-4.9+-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
   </a>
 </p>
-
 
 </div>
 
@@ -60,12 +58,12 @@
 
 ## 💡 核心功能
 
-- **🧠 纯净内核** · 内核仅提供 IPC/Mem/Task/Time 四大原子机制，纯净高效
-- **🔄 认知循环** · 认知 → 规划 → 行动，双系统协同（System 1 + System 2）
-- **💾 记忆卷载** · L1 原始层 → L2 特征层 → L3 结构层 → L4 模式层，涌现智慧
-- **🛡️ 安全内生** · 四重防护：沙箱隔离 / 权限裁决 / 输入净化 / 审计追踪
-- **⚡ 高效 Token** · 相比传统框架节省约 **500%** Token 消耗
-- **🌐 丰富 SDK** · Go / Python / Rust / TypeScript 原生支持
+1. 纯净内核：内核仅提供 IPC/Mem/Task/Time 四大原子机制，纯净高效
+2. 认知循环：认知 → 规划 → 行动，双系统协同（System 1 + System 2）
+3. 记忆卷载：L1 原始层 → L2 特征层 → L3 结构层 → L4 模式层，涌现智慧
+4. 安全内生：四重防护：沙箱隔离 / 权限裁决 / 输入净化 / 审计追踪
+5. 高效 Token：相比传统框架节省约 **500%** Token 消耗
+6. 丰富 SDK：Go / Python / Rust / TypeScript 原生支持
 
 ## 🎯 基石思想
 
@@ -95,22 +93,22 @@
 SDK 层 (toolkit) — Go / Python / Rust / TypeScript
 ```
 
-**📐 设计原则** · 基于 [ARCHITECTURAL_PRINCIPLES.md V1.8](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) 构建：  
+**📐 设计原则** · 基于 [ARCHITECTURAL_PRINCIPLES.md V1.8](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) 构建：
 
-1.系统观：反馈闭环 · 层次分解 · 总体设计部 · 涌现管理 → 实时响应 <10ms
-2.内核观：内核极简 · 接口契约化 · 服务隔离 · 可插拔策略 → 内核 ~25K LOC
-3.认知观：双系统协同 · 增量演化 · 记忆卷载 · 遗忘机制 → Token 节省 500%
-4.工程观：安全内生 · 可观测性 · 资源确定性 · 跨平台一致 → 测试覆盖 >90%
-5.设计美学：简约至上 · 极致细节 · 人文关怀 · 完美主义 → API <50 个/模块
+1. 系统观：反馈闭环 · 层次分解 · 总体设计部 · 涌现管理 → 实时响应 <10ms
+2. 内核观：内核极简 · 接口契约化 · 服务隔离 · 可插拔策略 → 内核 ~25K LOC
+3. 认知观：双系统协同 · 增量演化 · 记忆卷载 · 遗忘机制 → Token 节省 500%
+4. 工程观：安全内生 · 可观测性 · 资源确定性 · 跨平台一致 → 测试覆盖 >90%
+5. 设计美学：简约至上 · 极致细节 · 人文关怀 · 完美主义 → API <50 个/模块
 
 ## 🚀 快速上手
 
 ### 📦 环境要求
 
-- **操作系统**: Ubuntu 22.04+ / macOS 13+ / Windows 11 (WSL2)
-- **编译器**: GCC 11+ / Clang 14+ (C11/C++17)
-- **构建工具**: CMake 3.20+, Ninja
-- **Python**: 3.10+ (OpenLab 需要)
+1. 操作系统：Ubuntu 22.04+ / macOS 13+ / Windows 11 (WSL2)
+2. 编译器：GCC 11+ / Clang 14+ (C11/C++17)
+3. 构建工具：CMake 3.20+, Ninja
+4. Python：3.10+ (OpenLab 需要)
 
 ### 🔨 安装与构建
 
@@ -142,28 +140,28 @@ docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
 
 ### 💻 使用方式
 
-- **C/C++**：通过 `syscalls.h` 系统调用接口开发
-- **Python**：通过 `pip install agentos` 后直接 import
-- **Go**：通过 `import "github.com/spharx/agentos/toolkit/go"`
-- **Rust**：通过 `use agentos_toolkit::prelude::*;`
-- **TypeScript**：通过 `npm install @spharx/agentos-toolkit` 后直接 import
+1. C/C++：通过 `syscalls.h` 系统调用接口开发
+2. Python：通过 `pip install agentos` 后直接 import
+3. Go：通过 `import "github.com/spharx/agentos/toolkit/go"`
+4. Rust：通过 `use agentos_toolkit::prelude::*;`
+5. TypeScript：通过 `npm install @spharx/agentos-toolkit` 后直接 import
 
 ### 📖 核心文档
 
-- [📘 架构设计原则 V1.8](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) 五维正交体系，24 条核心原则
-- [🔄 CoreLoopThree 架构](agentos/manuals/architecture/coreloopthree.md) 三层认知循环详解
-- [🧠 MemoryRovol 架构](agentos/manuals/architecture/memoryrovol.md) 四层记忆卷载实现
-- [⚙️ 编译指南](agentos/manuals/guides/build.md) 详细构建步骤和选项
-- [🚀 快速开始](agentos/manuals/guides/quickstart.md) 5 分钟上手指南
+1. [📘 架构设计原则 V1.8](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) · 五维正交体系，24 条核心原则
+2. [🔄 CoreLoopThree 架构](agentos/manuals/architecture/coreloopthree.md) · 三层认知循环详解
+3. [🧠 MemoryRovol 架构](agentos/manuals/architecture/memoryrovol.md) · 四层记忆卷载实现
+4. [⚙️ 编译指南](agentos/manuals/guides/build.md) · 详细构建步骤和选项
+5. [🚀 快速开始](agentos/manuals/guides/quickstart.md) · 5 分钟上手指南
 
 ### 🛠️ 开发指南
 
-- [🧪 测试指南](agentos/manuals/guides/testing.md) 单元/集成/契约测试
-- [🐳 部署指南](agentos/manuals/guides/deployment.md) Docker/Kubernetes 部署
-- [🔌 C API 文档](agentos/manuals/api/c/README.md) C 语言接口规范
-- [🐍 Python SDK](agentos/toolkit/python/README.md) Python 开发指南
-- [🦀 Rust SDK](agentos/toolkit/rust/README.md) Rust 开发指南
-- [📝 TypeScript SDK](agentos/toolkit/typescript/README.md) TypeScript 开发指南
+1. [测试指南](agentos/manuals/guides/testing.md) · 单元/集成/契约测试
+2. [部署指南](agentos/manuals/guides/deployment.md) · Docker/Kubernetes 部署
+3. [C API 文档](agentos/manuals/api/c/README.md) · C 语言接口规范
+4. [Python SDK](agentos/toolkit/python/README.md) · Python 开发指南
+5. [Rust SDK](agentos/toolkit/rust/README.md) · Rust 开发指南
+6. [TypeScript SDK](agentos/toolkit/typescript/README.md) · TypeScript 开发指南
 
 ## ❔ 常见问题
 
@@ -228,11 +226,14 @@ AgentOS 是**操作系统级**产品，而非单一框架：
 
 ## 🤝 参与贡献
 
-我们热烈欢迎社区贡献！无论是提交 Bug、提出新功能建议，还是完善文档，都是对项目的宝贵支持。  
+我们热烈欢迎社区贡献！无论是提交 Bug、提出新功能建议，还是完善文档，都是对项目的宝贵支持。
 
-1.Fork → 创建分支 (feature/xxx)  
-2.开发测试 → 提交 PR  
-3.代码审查 → 合并主分支  
+1. Fork 项目 [AtomGit](https://atomgit.com/spharx/agentos)  
+2. 创建分支 (feature/xxx)
+3. 开发测试
+4. 提交 PR
+5. 代码审查
+6. 合并主分支
 
 详见 [贡献指南](CONTRIBUTING.md)
 
