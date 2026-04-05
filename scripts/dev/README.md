@@ -15,7 +15,7 @@
 
 ```
 AgentOS/
-├── manager/                    # ✅ 运行时业务配置中心
+├── agentos/manager/                    # ✅ 运行时业务配置中心
 │   ├── kernel/settings.yaml    # 内核配置
 │   ├── model/model.yaml        # 模型配置
 │   ├── security/policy.yaml    # 安全配置
@@ -30,13 +30,13 @@ AgentOS/
 │   ├── .jscpd.json             # 代码重复检测
 │   └── .pre-commit-config.yaml # git pre-commit 钩子
 │
-└── cupolas/                    # ✅ 模块特定工具
+└── agentos/cupolas/                    # ✅ 模块特定工具
     ├── Doxyfile                # API 文档生成配置
     └── generate_api_docs.bat   # Windows 一键生成脚本
 ```
 
 **重要说明**：
-- ❌ **模块根目录不再保留开发工具配置**（如 `atoms/.clang-format`、`gateway/.clang-tidy`）
+- ❌ **模块根目录不再保留开发工具配置**（如 `agentos/atoms/.clang-format`、`agentos/gateway/.clang-tidy`）
 - ✅ **所有开发工具配置统一到 `scripts/dev/config/`**，避免重复和冲突
 - ✅ **Manager 模块只管理运行时业务配置**（YAML/JSON 格式）
 - ✅ **模块特定工具保留在模块内**（如 cupolas 的 Doxygen 配置）
@@ -67,7 +67,7 @@ AgentOS/
 
 > 📌 **注意**: 
 > - 这些配置文件原位于项目根目录或模块根目录，已统一迁移到 `scripts/dev/config/` 目录
-> - **模块根目录（如 atoms/、gateway/）不再保留 .clang-format 和 .clang-tidy**
+> - **模块根目录（如 agentos/atoms/、agentos/gateway/）不再保留 .clang-format 和 .clang-tidy**
 > - 使用工具时，工具会自动从 `scripts/dev/config/` 读取配置
 
 ---
@@ -88,7 +88,7 @@ AgentOS/
 clang-format -i --style=file:scripts/dev/config/.clang-format src/main.c
 
 # 格式化整个目录
-find atoms/ -name "*.c" -o -name "*.h" | xargs clang-format -i --style=file:scripts/dev/config/.clang-format
+find agentos/atoms/ -name "*.c" -o -name "*.h" | xargs clang-format -i --style=file:scripts/dev/config/.clang-format
 
 # 检查格式（不修改）
 clang-format --dry-run --Werror --style=file:scripts/dev/config/.clang-format src/main.c
@@ -213,13 +213,13 @@ trim_trailing_whitespace = false
 lizard src/main.c
 
 # 检查整个项目
-lizard atoms/ gateway/ commons/
+lizard agentos/atoms/ agentos/gateway/ agentos/commons/
 
 # 生成 XML 报告
 lizard --xml > lizard-report.xml
 
 # 使用项目配置
-lizard -c scripts/dev/config/.lizardrc atoms/
+lizard -c scripts/dev/config/.lizardrc agentos/atoms/
 ```
 
 **配置说明**:
@@ -242,7 +242,7 @@ lizard -c scripts/dev/config/.lizardrc atoms/
 jscpd --config scripts/dev/config/.jscpd.json
 
 # 指定目录
-jscpd "atoms/**/*.c" "gateway/**/*.c" --config scripts/dev/config/.jscpd.json
+jscpd "agentos/atoms/**/*.c" "agentos/gateway/**/*.c" --config scripts/dev/config/.jscpd.json
 
 # 生成 HTML 报告
 jscpd --report html --config scripts/dev/config/.jscpd.json
@@ -405,7 +405,7 @@ python update_registry.py --verify
 **注册表结构**:
 
 ```yaml
-# manager/agent/registry.yaml
+# agentos/manager/agent/registry.yaml
 agents:
   - id: agent_architect_001
     name: 架构师智能体
@@ -423,7 +423,7 @@ agents:
       - skill_testing
     status: active
 
-# manager/skill/registry.yaml
+# agentos/manager/skill/registry.yaml
 skills:
   - id: skill_design_pattern
     name: 设计模式
@@ -568,7 +568,7 @@ cd ../dev
 **解决**:
 ```bash
 # 设置配置文件路径
-export AGENTOS_CONFIG=$(pwd)/manager/kernel/settings.yaml
+export AGENTOS_CONFIG=$(pwd)/agentos/manager/kernel/settings.yaml
 
 # 或添加到 ~/.bashrc
 echo 'export AGENTOS_CONFIG=/path/to/manager.yaml' >> ~/.bashrc
@@ -659,8 +659,8 @@ find openlab/contrib/skills -name "skill.json" | while read file; do
 done
 
 # 提交变更
-git add manager/agent/registry.yaml
-git add manager/skill/registry.yaml
+git add agentos/manager/agent/registry.yaml
+git add agentos/manager/skill/registry.yaml
 git commit -m "chore: 更新组件注册表 $(date +%Y-%m-%d)"
 ```
 

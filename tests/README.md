@@ -114,10 +114,10 @@ AgentOS 采用**分布式测试架构**：
                       ↓
 ┌─────────────────────────────────────────────────┐
 │  子模块内部 tests/                               │
-│  ├── atoms/corekern/tests/ (内核单元测试)       │
-│  ├── atoms/coreloopthree/tests/ (认知引擎测试)  │
-│  ├── atoms/memoryrovol/tests/ (记忆系统测试)    │
-│  └── daemon/*/tests/ (服务层测试)               │
+│  ├── agentos/atoms/corekern/tests/ (内核单元测试)       │
+│  ├── agentos/atoms/coreloopthree/tests/ (认知引擎测试)  │
+│  ├── agentos/atoms/memoryrovol/tests/ (记忆系统测试)    │
+│  └── agentos/daemon/*/tests/ (服务层测试)               │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -883,7 +883,7 @@ pip install -r requirements.txt
 
 ```bash
 # 检查 CMake 配置
-cd atoms/corekern
+cd agentos/atoms/corekern
 cat tests/CMakeLists.txt
 
 # 重新构建

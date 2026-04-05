@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentos.spharx.ai/schemas/_metadata.schema.json",
+  "title": "AgentOS Configuration Metadata Schema",
+  "description": "Common metadata properties for AgentOS configuration files. This schema defines the standard metadata attributes used across all configuration files.",
+  "type": "object",
+  "properties": {
+    "_owner": {
+      "type": "object",
+      "description": "Configuration ownership metadata following dual responsibility model",
+      "properties": {
+        "module": {
+          "type": "string",
+          "description": "Owning module name",
+          "examples": ["manager", "corekern", "daemon", "cupolas"]
+        },
+        "contact": {
+          "type": "string",
+          "format": "email",
+          "description": "Contact email for the owning team",
+          "examples": ["manager-team@spharx.cn"]
+        },
+        "path": {
+          "type": "string",
+          "description": "File path within the module",
+          "examples": ["AgentOS/manager", "AgentOS/atoms/corekern"]
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of configuration ownership and responsibility"
+        }
+      },
+      "required": ["module", "contact", "path", "description"]
+    },
+    "_schema": {
+      "type": "string",
+      "description": "JSON Schema reference path",
+      "pattern": "^schema/[a-z0-9-]+\\.schema\\.json$",
+      "examples": ["schema/kernel-settings.schema.json"]
+    },
+    "_config_version": {
+      "type": "string",
+      "pattern": "^v?\\d+\\.\\d+\\.\\d+$",
+      "description": "Configuration file version in semantic versioning format",
+      "examples": ["1.0.0", "v1.2.3"]
+    },
+    "_compatibility": {
+      "type": "object",
+      "description": "Version compatibility constraints for this configuration",
+      "properties": {
+        "min_agentos_version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "Minimum compatible AgentOS version"
+        },
+        "max_agentos_version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "Maximum compatible AgentOS version"
+        },
+        "deprecated": {
+          "type": "boolean",
+          "description": "Whether this configuration is deprecated"
+        },
+        "deprecation_message": {
+          "type": "string",
+          "description": "Message explaining deprecation and migration path"
+        }
+      }
+    },
+    "_generated": {
+      "type": "object",
+      "description": "Auto-generated field tracking",
+      "properties": {
+        "at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the configuration was generated"
+        },
+        "by": {
+          "type": "string",
+          "description": "Tool or process that generated the configuration"
+        }
+      }
+    },
+    "_last_modified": {
+      "type": "object",
+      "description": "Last modification tracking",
+      "properties": {
+        "at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last modification timestamp"
+        },
+        "by": {
+          "type": "string",
+          "description": "User or process that made the last modification"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Reason for the last modification"
+        }
+      }
+    }
+  }
+}

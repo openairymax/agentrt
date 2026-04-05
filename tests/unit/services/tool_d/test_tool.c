@@ -16,7 +16,7 @@
 int test_create_destroy() {
     printf("=== Testing create and destroy ===\n");
     
-    const char* config_path = "manager/service/tool_d/tool.yaml";
+    const char* config_path = "agentos/manager/service/tool_d/tool.yaml";
     tool_service_t* service = tool_service_create(config_path);
     if (!service) {
         printf("Failed to create tool service\n");
@@ -40,7 +40,7 @@ int test_create_destroy() {
 int test_register_tool() {
     printf("=== Testing register tool ===\n");
     
-    const char* config_path = "manager/service/tool_d/tool.yaml";
+    const char* config_path = "agentos/manager/service/tool_d/tool.yaml";
     tool_service_t* service = tool_service_create(config_path);
     if (!service) {
         printf("Failed to create tool service\n");
@@ -83,7 +83,7 @@ int test_register_tool() {
 int test_list_tools() {
     printf("=== Testing list tools ===\n");
     
-    const char* config_path = "manager/service/tool_d/tool.yaml";
+    const char* config_path = "agentos/manager/service/tool_d/tool.yaml";
     tool_service_t* service = tool_service_create(config_path);
     if (!service) {
         printf("Failed to create tool service\n");
@@ -136,7 +136,7 @@ int test_list_tools() {
 int test_execute_tool() {
     printf("=== Testing execute tool ===\n");
     
-    const char* config_path = "manager/service/tool_d/tool.yaml";
+    const char* config_path = "agentos/manager/service/tool_d/tool.yaml";
     tool_service_t* service = tool_service_create(config_path);
     if (!service) {
         printf("Failed to create tool service\n");

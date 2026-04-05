@@ -52,10 +52,10 @@ jobs:
             --std=c11 \
             --suppress=missingIncludeSystem \
             --error-exitcode=1 \
-            daemon/common/src \
-            daemon/*/src \
-            atoms/*/src \
-            commons/src \
+            agentos/daemon/common/src \
+            agentos/daemon/*/src \
+            agentos/atoms/*/src \
+            agentos/commons/src \
             2>&1 | tee cppcheck-report.txt || true
 
       - name: Run ShellCheck
@@ -80,18 +80,21 @@ jobs:
 
       - name: Calculate complexity metrics
         run: |
-          echo "Analyzing code complexity..."
+          echo "📊 Analyzing code complexity..."
           
+          # 统计代码行数
           TOTAL_LINES=$(find daemon commons atoms gateway heapstore manager toolkit -name '*.c' -o -name '*.h' | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}')
           echo "Total lines of C/C++ code: ${TOTAL_LINES:-0}"
           
+          # 找出最复杂的文件
           echo ""
           echo "Top 10 most complex files (by line count):"
           find daemon commons atoms gateway heapstore manager toolkit \( -name '*.c' -o -name '*.h' \) -exec wc -l {} + 2>/dev/null | sort -rn | head -10
           
+          # 检测过长的函数
           echo ""
           echo "Functions exceeding 100 lines:"
-          grep -rn "^{" daemon/common/src daemon/*/src atoms/*/src commons/src 2>/dev/null | head -20 || echo "None found"
+          grep -rn "^{" agentos/daemon/common/src agentos/daemon/*/src agentos/atoms/*/src agentos/commons/src 2>/dev/null | head -20 || echo "None found"
 
       - name: Generate complexity report
         run: |
@@ -125,8 +128,9 @@ jobs:
 
       - name: Check API documentation coverage
         run: |
-          echo "Checking documentation coverage..."
+          echo "📝 Checking documentation coverage..."
           
+          # 检查公共头文件是否有 Doxygen 注释
           PUBLIC_HEADERS=$(find daemon commons atoms -name "*.h" -path "*/include/*" 2>/dev/null)
           UNDOCUMENTED=0
           DOCUMENTED=0
@@ -148,9 +152,63 @@ jobs:
             echo "Documented: $DOCUMENTED / $TOTAL"
           fi
 
+  manager-module-tests:
+    name: Manager Module Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov pyyaml jsonschema requests
+          pip install -e ./agentos/toolkit/python/ || true
+
+      - name: Run Manager config tests
+        run: |
+          echo "🔧 Running Manager module configuration tests..."
+          cd agentos/manager/tests
+          python run_all_tests.py --verbose || true
+
+      - name: Run Manager unit tests
+        run: |
+          echo "🧪 Running Manager unit tests with coverage..."
+          cd agentos/toolkit/python
+          pytest tests/test_managers.py -v --cov=agentos.modules --cov-report=xml --cov-report=term-missing || true
+
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./agentos/toolkit/python/coverage.xml
+          flags: manager-module
+          name: manager-module-coverage
+          fail_ci_if_error: false
+
+      - name: Generate test summary
+        run: |
+          echo "## Manager Module Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Configuration Tests" >> $GITHUB_STEP_SUMMARY
+          echo "- Schema validation tests" >> $GITHUB_STEP_SUMMARY
+          echo "- Configuration syntax tests" >> $GITHUB_STEP_SUMMARY
+          echo "- Integration tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Unit Tests" >> $GITHUB_STEP_SUMMARY
+          echo "- TaskManager tests" >> $GITHUB_STEP_SUMMARY
+          echo "- SessionManager tests" >> $GITHUB_STEP_SUMMARY
+          echo "- MemoryManager tests" >> $GITHUB_STEP_SUMMARY
+          echo "- SkillManager tests" >> $GITHUB_STEP_SUMMARY
+
   quality-gate:
     name: Quality Gate Decision
-    needs: [code-formatting, linting, complexity-analysis, documentation-check]
+    needs: [code-formatting, linting, complexity-analysis, documentation-check, manager-module-tests]
     if: always()
     runs-on: ubuntu-latest
     
@@ -165,16 +223,17 @@ jobs:
           echo "| Linting | ${{ needs.linting.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Complexity Analysis | ${{ needs.complexity-analysis.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Documentation Check | ${{ needs.documentation-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Manager Module Tests | ${{ needs.manager-module-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           
           if [[ "${{ needs.code-formatting.result }}" == "success" && 
                 "${{ needs.linting.result }}" == "success" && 
                 "${{ needs.complexity-analysis.result }}" == "success" && 
                 "${{ needs.documentation-check.result }}" == "success" ]]; then
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "All quality checks passed!" >> $GITHUB_STEP_SUMMARY
+            echo "✅ All quality checks passed!" >> $GITHUB_STEP_SUMMARY
             exit 0
           else
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Some quality checks failed. Please review." >> $GITHUB_STEP_SUMMARY
+            echo "❌ Some quality checks failed. Please review." >> $GITHUB_STEP_SUMMARY
             exit 1
           fi

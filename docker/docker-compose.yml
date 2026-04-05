@@ -1,0 +1,212 @@
+version: '3.8'
+
+# =============================================================================
+# AgentOS Docker Compose - 开发环境
+# 版本: 1.0.0
+# 用途: 本地开发和测试
+#
+# 使用方法:
+#   docker compose -f docker/docker-compose.yml up -d
+#   docker compose -f docker/docker-compose.yml logs -f
+#   docker compose -f docker/docker-compose.yml down
+#
+# 设计原则:
+# 1. 模块化设计，每个服务独立可扩展
+# 2. 开发友好，支持热重载和调试
+# 3. 安全默认配置
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # 内核服务 (Kernel)
+  # ===========================================================================
+  kernel:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.kernel
+      target: development
+      args:
+        BUILD_TYPE: Debug
+        ENABLE_TESTS: ON
+    container_name: agentos-kernel-dev
+    hostname: agentos-kernel
+    restart: unless-stopped
+    ports:
+      - "8080:8080"       # IPC API端口
+      - "9090:9090"       # Prometheus监控端口
+    volumes:
+      # 源码挂载（开发时热重载）
+      - ../agentos:/app/source:ro
+      # 构建产物持久化
+      - kernel-build:/app/build
+      # 配置文件
+      - ../config:/app/config:ro
+      # 数据目录（持久化）
+      - kernel-data:/app/data
+      # 日志目录
+      - kernel-logs:/app/logs
+    environment:
+      - LOG_LEVEL=DEBUG
+      - AGENTOS_CUPOLAS_ENABLED=true
+      - AGENTOS_PERMISSION_MODE=relaxed
+      - AGENTOS_SANITIZER_MODE=strict
+      - AGENTOS_AUDIT_ENABLED=true
+      - TZ=Asia/Shanghai
+    networks:
+      - agentos-network
+    depends_on:
+      - postgres
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ===========================================================================
+  # PostgreSQL 数据库（用于heapstore）
+  # ===========================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: agentos-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: agentos
+      POSTGRES_USER: agentos
+      POSTGRES_PASSWORD: agentos_dev_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - agentos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentos"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================================================
+  # Redis 缓存（用于IPC和权限缓存）
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: agentos-redis-dev
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - agentos-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================================================
+  # OpenLab 应用服务
+  # ===========================================================================
+  openlab:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.openlab
+    container_name: agentos-openlab-dev
+    restart: unless-stopped
+    ports:
+      - "5173:5173"       # Web前端
+      - "8000:8000"       # API后端
+    volumes:
+      - ../openlab:/app/openlab:ro
+      - openlab-data:/app/data
+    environment:
+      - OPENLAB_DEBUG=true
+      - OPENLAB_PORT=5173
+      - AGENTOS_IPC_URL=http://kernel:8080
+      - DATABASE_URL=postgresql://agentos:agentos_dev_password@postgres:5432/agentos
+      - REDIS_URL=redis://redis:6379/0
+    networks:
+      - agentos-network
+    depends_on:
+      - kernel
+      - postgres
+      - redis
+
+  # ===========================================================================
+  # Prometheus 监控
+  # ===========================================================================
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: agentos-prometheus-dev
+    restart: unless-stopped
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/console_templates'
+    networks:
+      - agentos-network
+    profiles:
+      - monitoring
+
+  # ===========================================================================
+  # Grafana 可视化
+  # ===========================================================================
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: agentos-grafana-dev
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD=admin
+      GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - agentos-network
+    depends_on:
+      - prometheus
+    profiles:
+      - monitoring
+
+# =============================================================================
+# 网络配置
+# =============================================================================
+networks:
+  agentos-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+# =============================================================================
+# 卷定义
+# =============================================================================
+volumes:
+  kernel-data:
+    driver: local
+  kernel-build:
+    driver: local
+  kernel-logs:
+    driver: local
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  openlab-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local

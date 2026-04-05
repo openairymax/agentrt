@@ -1,0 +1,385 @@
+# =============================================================================
+# AgentOS 内核配置文件
+# 版本: v1.0.0
+# 最后更新: 2026-04-01
+# Schema: schema/kernel-settings.schema.json
+# =============================================================================
+# Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
+
+# 配置归属（按双重责任模型）
+_owner:
+  module: "corekern"
+  contact: "corekern-team@spharx.cn"
+  path: "AgentOS/agentos/atoms/corekern"
+  description: "内容定义责任归属 corekern 模块，管理责任归属 Manager 模块"
+
+# 配置版本
+_config_version: "1.0.0"
+
+# Schema 引用
+_schema: "schema/kernel-settings.schema.json"
+
+# 版本兼容性
+_compatibility:
+  min_agentos_version: "1.0.0"
+  max_agentos_version: "2.0.0"
+
+# =============================================================================
+# 内核基础设置
+# =============================================================================
+kernel:
+  # 内核名称和版本标识
+  name: "AgentOS Core"
+  version: "1.0.0.3"
+
+  # 日志级别: trace, debug, info, warning, error, critical, off
+  log_level: "info"
+
+  # ===========================================================================
+  # 调度器设置
+  # ===========================================================================
+  scheduler:
+    # 调度策略: round_robin, weighted, ml_based, priority, fair
+    policy: "weighted"
+
+    # 时间片（毫秒）
+    time_slice_ms: 10
+
+    # 最大并发任务数（0 表示无限制）
+    max_concurrency: 100
+
+    # 优先级权重配置
+    priority_weights:
+      realtime: 100
+      high: 50
+      normal: 20
+      low: 10
+
+    # 防止任务饥饿
+    starvation_prevention: true
+    starvation_threshold_ms: 5000
+
+    # 任务队列配置
+    queue:
+      max_pending_tasks: 10000
+      max_completed_tasks: 1000
+      cleanup_interval_sec: 60
+
+    # ===========================================================================
+    # 双系统认知配置（按 ARCHITECTURAL_PRINCIPLES.md C-4 双系统协同原则）
+    # ===========================================================================
+    cognitive_systems:
+      # System 1: 快速直觉系统 - 用于简单查询、模式匹配、缓存命中等低延迟任务
+      system1:
+        enabled: true
+        name: "Fast Intuition System"
+        description: "Handles simple, low-latency tasks that require quick responses"
+        # 适用任务类型
+        task_types:
+          - "simple_query"
+          - "pattern_match"
+          - "cache_hit"
+          - "routine_operation"
+          - "status_check"
+        # 最大延迟阈值（毫秒）
+        max_latency_ms: 100
+        # 优先级提升
+        priority_boost: 2
+
+      # System 2: 慢速推理系统 - 用于复杂推理、规划、分析等需要深度处理的任务
+      system2:
+        enabled: true
+        name: "Slow Reasoning System"
+        description: "Handles complex tasks requiring deep reasoning and analysis"
+        # 适用任务类型
+        task_types:
+          - "complex_reasoning"
+          - "planning"
+          - "analysis"
+          - "creative_generation"
+          - "multi_step_reasoning"
+          - "strategy_formation"
+        # 最大延迟阈值（毫秒）
+        max_latency_ms: 5000
+        # 最大并发数限制
+        max_concurrency: 10
+        # 资源预留
+        reserved_resources:
+          memory_mb: 256
+          cpu_percent: 25
+
+  # ===========================================================================
+  # 内存管理
+  # ===========================================================================
+  memory:
+    # 内核内存池大小（MB）
+    pool_size_mb: 1024
+
+    # 单次最大分配大小（MB）
+    max_allocation_mb: 2048
+
+    # 启用内存保护边界检查
+    guard_enabled: true
+
+    # OOM 策略: reject, evict_lru, evict_low_priority, crash
+    oom_policy: "reject"
+
+    # 内存对齐（字节，用于缓存行优化）
+    alignment_bytes: 64
+
+    # NUMA 感知分配
+    numa_aware: false
+
+    # 内存泄漏检测
+    leak_detection:
+      enabled: true
+      check_interval_sec: 60
+      report_threshold_bytes: 1048576  # 1MB
+
+    # 内存池配置
+    pools:
+      small:
+        block_size: 64
+        initial_count: 1024
+        max_count: 10000
+      medium:
+        block_size: 256
+        initial_count: 512
+        max_count: 5000
+      large:
+        block_size: 1024
+        initial_count: 128
+        max_count: 1000
+
+  # ===========================================================================
+  # 进程间通信（IPC）
+  # ===========================================================================
+  ipc:
+    # Binder 最大并发连接数
+    max_connections: 1024
+
+    # 共享缓冲区大小（KB）
+    buffer_size_kb: 64
+
+    # 超时时间（毫秒）
+    timeout_ms: 5000
+
+    # 认证要求
+    auth_required: true
+
+    # 加密方式: none, tls12, tls13, aes256-gcm
+    encryption: "tls13"
+
+    # 速率限制（每秒消息数）
+    rate_limit_per_sec: 1000
+
+    # 零拷贝优化
+    zero_copy_enabled: true
+
+    # 背压控制
+    backpressure:
+      enabled: true
+      high_watermark_percent: 80
+      low_watermark_percent: 30
+
+    # 连接池配置
+    connection_pool:
+      min_idle: 10
+      max_idle: 100
+      idle_timeout_sec: 300
+
+  # ===========================================================================
+  # 定时器与事件
+  # ===========================================================================
+  timer:
+    # 系统时钟精度（毫秒）
+    precision_ms: 1
+
+    # 最大定时器数量
+    max_timers: 10000
+
+    # 时间轮大小（用于高效定时器管理）
+    wheel_size: 512
+
+    # 定时器精度优化
+    coalescing:
+      enabled: true
+      slack_ms: 5
+
+  # ===========================================================================
+  # 错误处理（按 error_code_reference.md 规范）
+  # ===========================================================================
+  error:
+    # 是否启用详细错误信息（生产环境建议 false）
+    verbose: false
+
+    # 错误日志保留天数
+    retention_days: 30
+
+    # 启用堆栈跟踪
+    stack_trace_enabled: true
+
+    # 错误日志速率限制（每秒最大数量）
+    max_error_per_sec: 100
+
+    # =========================================================================
+    # 标准错误码引用（按 error_code_reference.md 错误码分类规范）
+    # =========================================================================
+    # 错误码格式: 0xNNNN
+    # 范围定义:
+    #   0x0000-0x0FFF: 通用错误
+    #   0x1000-0x1FFF: 核心循环错误
+    #   0x2000-0x2FFF: 认知层错误
+    #   0x3000-0x3FFF: 执行层错误
+    #   0x4000-0x4FFF: 记忆层错误
+    #   0x5000-0x5FFF: 系统调用错误
+    #   0x6000-0x6FFF: 安全域错误
+    #   0x7000-0x7FFF: 动态模块错误
+    codes:
+      # 通用错误码 (0x0000-0x0FFF)
+      success: 0x0000
+      unknown: 0x0001
+      out_of_memory: 0x0002
+      invalid_parameter: 0x0003
+      null_pointer: 0x0004
+      timeout: 0x0005
+      not_found: 0x0006
+      already_exists: 0x0007
+      permission_denied: 0x0008
+      io_error: 0x0009
+      not_supported: 0x000A
+      busy: 0x000B
+      internal: 0x000C
+      corrupted_data: 0x000D
+      overflow: 0x000E
+      underflow: 0x000F
+
+      # 核心循环错误码 (0x1000-0x1FFF)
+      loop_create_failed: 0x1001
+      loop_run_failed: 0x1002
+      loop_stop_failed: 0x1003
+      task_submit_failed: 0x1004
+      task_wait_failed: 0x1005
+      engine_create_failed: 0x1006
+      engine_destroy_failed: 0x1007
+      engine_not_initialized: 0x1008
+
+      # 认知层错误码 (0x2000-0x2FFF)
+      cognition_create_failed: 0x2001
+      cognition_process_failed: 0x2002
+      cognition_plan_failed: 0x2003
+      cognition_reason_failed: 0x2004
+      cognition_learn_failed: 0x2005
+      cognition_memory_failed: 0x2006
+      cognition_context_failed: 0x2007
+      cognition_priority_failed: 0x2008
+
+      # 执行层错误码 (0x3000-0x3FFF)
+      execution_create_failed: 0x3001
+      execution_submit_failed: 0x3002
+      execution_execute_failed: 0x3003
+      execution_monitor_failed: 0x3004
+      execution_recover_failed: 0x3005
+      compensation_create_failed: 0x3006
+      compensation_execute_failed: 0x3007
+      compensation_queue_full: 0x3008
+
+      # 记忆层错误码 (0x4000-0x4FFF)
+      memory_create_failed: 0x4001
+      memory_write_failed: 0x4002
+      memory_query_failed: 0x4003
+      memory_get_failed: 0x4004
+      memory_mount_failed: 0x4005
+      memory_evolve_failed: 0x4006
+      memory_corrupted: 0x4007
+      memory_full: 0x4008
+
+      # 系统调用错误码 (0x5000-0x5FFF)
+      syscall_table_create_failed: 0x5001
+      syscall_entry_create_failed: 0x5002
+      syscall_register_failed: 0x5003
+      syscall_execute_failed: 0x5004
+      syscall_not_found: 0x5005
+      syscall_permission_denied: 0x5006
+      syscall_timeout: 0x5007
+      syscall_invalid_parameter: 0x5008
+
+      # 安全域错误码 (0x6000-0x6FFF)
+      cupolas_create_failed: 0x6001
+      cupola_create_failed: 0x6002
+      cupola_access_denied: 0x6003
+      cupola_security_violation: 0x6004
+      cupola_isolation_failed: 0x6005
+      cupola_monitor_failed: 0x6006
+      cupola_policy_violation: 0x6007
+      cupola_resource_exhausted: 0x6008
+
+      # 动态模块错误码 (0x7000-0x7FFF)
+      dynamic_create_failed: 0x7001
+      dynamic_load_failed: 0x7002
+      dynamic_unload_failed: 0x7003
+      dynamic_symbol_not_found: 0x7004
+      dynamic_version_mismatch: 0x7005
+      dynamic_init_failed: 0x7006
+      dynamic_deinit_failed: 0x7007
+      dynamic_resource_leak: 0x7008
+
+    # 错误恢复配置
+    recovery:
+      auto_restart: true
+      max_restart_attempts: 3
+      restart_delay_ms: 1000
+      backoff_multiplier: 2.0
+
+  # ===========================================================================
+  # 热更新配置
+  # ===========================================================================
+  hot_reload:
+    enabled: true
+    check_interval_sec: 30
+    reload_signal: "SIGHUP"
+
+    # 支持热更新的配置项
+    supported_configs:
+      - "log_level"
+      - "scheduler.priority_weights"
+      - "memory.leak_detection"
+      - "error.verbose"
+
+  # ===========================================================================
+  # 性能监控
+  # ===========================================================================
+  monitoring:
+    enabled: true
+    metrics_interval_sec: 10
+
+    # 性能指标收集
+    metrics:
+      cpu_usage: true
+      memory_usage: true
+      task_latency: true
+      ipc_throughput: true
+      timer_accuracy: true
+
+    # 告警阈值
+    alerts:
+      cpu_threshold_percent: 80
+      memory_threshold_percent: 85
+      task_queue_threshold: 500
+      ipc_latency_threshold_ms: 100
+
+  # ===========================================================================
+  # 资源限制
+  # ===========================================================================
+  limits:
+    # 文件描述符限制
+    max_file_descriptors: 65535
+
+    # 线程限制
+    max_threads: 1000
+
+    # 打开文件限制
+    max_open_files: 10000
+
+    # CPU 时间限制（秒，0 表示无限制）
+    cpu_time_limit_sec: 0
