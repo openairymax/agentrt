@@ -13,7 +13,7 @@ contact_links:
       请参阅 SECURITY.md 了解正确的报告流程。
   
   - name: Architecture Questions / 架构问题
-    url: https://gitcode.com/spharx/agentos/blob/main/manuals/ARCHITECTURAL_PRINCIPLES.md
+    url: https://gitcode.com/spharx/agentos/blob/main/agentos/manuals/ARCHITECTURAL_PRINCIPLES.md
     about: |
       Read our ARCHITECTURAL_PRINCIPLES.md for design principles.
       阅读我们的 ARCHITECTURAL_PRINCIPLES.md 了解设计原则。

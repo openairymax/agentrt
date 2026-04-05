@@ -135,7 +135,7 @@ Paste the complete error messages here using code blocks.
 Thread 0 (main):
   #0 agentos_syscall_dispatch() at syscall/dispatch.c:234
   #1 coreloopthree_plan_execute() at coreloopthree/planning.c:89
-  #2 daemon_sched_main() at daemon/sched_d/main.c:45
+  #2 daemon_sched_main() at agentos/daemon/sched_d/main.c:45
   #3 main() at main.c:12
 ```
 
@@ -205,11 +205,11 @@ Based on **ARCHITECTURAL_PRINCIPLES.md V1.8** Five-Dimensional Orthogonal System
 - [ ] `corekern/` - Core kernel / 核心内核
 - [ ] `coreloopthree/` - Cognitive loop / 认知循环
 - [ ] `memoryrovol/` - Memory system / 记忆系统
-- [ ] `cupolas/` - Security dome / 安全穹顶
+- [ ] `agentos/cupolas/` - Security dome / 安全穹顶
 - [ ] `syscall/` - Syscalls / 系统调用
-- [ ] `commons/` - Common libraries / 公共库
-- [ ] `daemon/*/` - Daemons / 守护进程
-- [ ] `gateway/` - Gateways / 网关
+- [ ] `agentos/commons/` - Common libraries / 公共库
+- [ ] `agentos/daemon/*/` - Daemons / 守护进程
+- [ ] `agentos/gateway/` - Gateways / 网关
 - [ ] Other / 其他：
 
 ## 🛠️ Proposed Fix / 建议修复方案

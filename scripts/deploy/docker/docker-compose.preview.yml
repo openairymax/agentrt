@@ -82,7 +82,7 @@ services:
     restart: unless-stopped
 
     volumes:
-      - ./manager/otel-collector-preview.yaml:/etc/otelcol-contrib/manager.yaml:ro
+      - ./agentos/manager/otel-collector-preview.yaml:/etc/otelcol-contrib/manager.yaml:ro
 
     networks:
       - agentos-preview-network

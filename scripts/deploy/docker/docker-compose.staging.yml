@@ -44,7 +44,7 @@ services:
     volumes:
       - staging-logs:/var/log/agentos:rw
       - staging-data:/var/lib/agentos:rw
-      - ../../manager/staging:/etc/agentos:ro
+      - ../../agentos/manager/staging:/etc/agentos:ro
 
     # 网络配置
     networks:
@@ -141,7 +141,7 @@ services:
 
     # 配置文件
     volumes:
-      - ./manager/otel-collector-staging.yaml:/etc/otelcol-contrib/manager.yaml:ro
+      - ./agentos/manager/otel-collector-staging.yaml:/etc/otelcol-contrib/manager.yaml:ro
 
     # 网络配置
     networks:

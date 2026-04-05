@@ -4,7 +4,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "../../../commons/utils/token/include/token.h"
+#include "../../../agentos/commons/utils/token/include/token.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
