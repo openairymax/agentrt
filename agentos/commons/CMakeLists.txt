@@ -119,7 +119,6 @@ target_include_directories(agentos_common PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/platform/include
     # 配置模块
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/config_unified/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/utils/config/include
     # 认知模块
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/cognition/include
     # 执行模块

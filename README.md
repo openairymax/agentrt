@@ -1,52 +1,22 @@
 <div align="center">
 
-# Agent OS  
+# Agent OS
 
-<p align="center">
-  成为人类计算科学工程史上，第四个"操作系统哲学"  
-</p>  
+> 成为人类计算科学工程史上，第四个"操作系统哲学"
 
-<p align="center">
-  <a href="https://atomgit.com/spharx/agentos">
-    <img src="https://atomgit.com/spharx/agentos/star/badge.svg" alt="AtomGit">
-  </a>
-  <a href="https://gitee.com/spharx/agentos">
-    <img src="https://gitee.com/spharx/agentos/badge/star.svg?theme=gray" alt="Gitee">
-  </a>
-  <a href="https://github.com/SpharxTeam/AgentOS">
-    <img src="https://img.shields.io/github/stars/SpharxTeam/AgentOS?style=social" alt="GitHub">
-  </a>
-</p>
+[![AtomGit](https://atomgit.com/spharx/agentos/star/badge.svg)](https://atomgit.com/spharx/agentos)
+[![Gitee](https://gitee.com/spharx/agentos/badge/star.svg?theme=gray)](https://gitee.com/spharx/agentos)
+[![GitHub](https://img.shields.io/github/stars/SpharxTeam/AgentOS?style=social)](https://github.com/SpharxTeam/AgentOS)
 
-<p align="center">
-  <a href="https://atomgit.com/spharx/agentos">
-    <img src="https://img.shields.io/badge/version-1.0.0.9-5a6b7e" alt="Version">
-  </a>
-  <a href="LICENSE">
-    <img src="https://img.shields.io/badge/license-Apache--2.0-4a90d9" alt="License">
-  </a>
-  <a href="https://atomgit.com/spharx/agentos">
-    <img src="https://img.shields.io/badge/build-passing-2ea44f" alt="Build">
-  </a>
-</p>
+[![Version](https://img.shields.io/badge/version-1.0.0.9-5a6b7e)](https://atomgit.com/spharx/agentos)
+[![License](https://img.shields.io/badge/license-Apache--2.0-4a90d9)](LICENSE)
+[![Build](https://img.shields.io/badge/build-passing-2ea44f)](https://atomgit.com/spharx/agentos)
 
-<p align="center">
-  <a href="https://isocpp.org">
-    <img src="https://img.shields.io/badge/C%2FC%2B%2B-11%2F17-00599C?logo=c%2B%2B&logoColor=white" alt="C/C++">
-  </a>
-  <a href="https://www.python.org">
-    <img src="https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white" alt="Python">
-  </a>
-  <a href="https://go.dev">
-    <img src="https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go&logoColor=white" alt="Go">
-  </a>
-  <a href="https://www.rust-lang.org">
-    <img src="https://img.shields.io/badge/Rust-1.70+-DEA584?logo=rust&logoColor=white" alt="Rust">
-  </a>
-  <a href="https://www.typescriptlang.org">
-    <img src="https://img.shields.io/badge/TypeScript-4.9+-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
-  </a>
-</p>
+[![C/C++](https://img.shields.io/badge/C%2FC%2B%2B-11%2F17-00599C?logo=c%2B%2B&logoColor=white)](https://isocpp.org)
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org)
+[![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go&logoColor=white)](https://go.dev)
+[![Rust](https://img.shields.io/badge/Rust-1.70+-DEA584?logo=rust&logoColor=white)](https://www.rust-lang.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-4.9+-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
 </div>
 
@@ -54,26 +24,24 @@
 
 **AgentOS** 是一个智能体操作系统，为驱动智能体团队提供完整的操作系统级支持。  
 
-> "Intelligence emergence, and nothing less, is the ultimate sublimation of AI."  
+## 💡 创新要点
 
-## 💡 核心功能
+- **纯净内核**：内核仅提供 IPC/Mem/Task/Time 四大原子机制，纯净高效
+- **认知循环**：认知 → 规划 → 行动，双系统协同（System 1 + System 2）
+- **记忆卷载**：L1 原始层 → L2 特征层 → L3 结构层 → L4 模式层，涌现智慧
+- **安全内生**：四重防护：沙箱隔离 / 权限裁决 / 输入净化 / 审计追踪
+- **高效 Token**：相比传统框架节省约 **500%** Token 消耗
+- **丰富 SDK**：Go / Python / Rust / TypeScript 原生支持
 
-1. 纯净内核：内核仅提供 IPC/Mem/Task/Time 四大原子机制，纯净高效
-2. 认知循环：认知 → 规划 → 行动，双系统协同（System 1 + System 2）
-3. 记忆卷载：L1 原始层 → L2 特征层 → L3 结构层 → L4 模式层，涌现智慧
-4. 安全内生：四重防护：沙箱隔离 / 权限裁决 / 输入净化 / 审计追踪
-5. 高效 Token：相比传统框架节省约 **500%** Token 消耗
-6. 丰富 SDK：Go / Python / Rust / TypeScript 原生支持
+## 🎯 基本理念
 
-## 🎯 基石思想
+- **驱动团队**：精准协调多 Agent 协作，高效完成复杂任务编排与资源调度。  
+- **自主演进**：具备自我进化能力，动态调整策略，持续优化执行效果。  
 
-**🤝 驱动团队** · 面对复杂的多 Agent 协作场景——任务编排、资源调度、冲突消解、异常恢复，AgentOS 都能精准调度，有条不紊地完成工业级任务。
-
-**🔄 自主演进** · 当任务失败或环境变化时，系统自动触发补偿事务、重新规划 DAG、调整策略参数，持续优化执行效果。
-
-<p align="center">
-  <strong>✨ 全新架构 · 自主可控 · 安全内生 · 智能涌现 ✨</strong>
+<p align="center">  
+  <strong>✨ 全新架构 · 安全内生 · 智能涌现 ✨</strong>
 </p>
+
 
 ## 🏗️ 系统架构
 
@@ -95,20 +63,21 @@ SDK 层 (toolkit) — Go / Python / Rust / TypeScript
 
 **📐 设计原则** · 基于 [ARCHITECTURAL_PRINCIPLES.md V1.8](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) 构建：
 
-1. 系统观：反馈闭环 · 层次分解 · 总体设计部 · 涌现管理 → 实时响应 <10ms
-2. 内核观：内核极简 · 接口契约化 · 服务隔离 · 可插拔策略 → 内核 ~25K LOC
-3. 认知观：双系统协同 · 增量演化 · 记忆卷载 · 遗忘机制 → Token 节省 500%
-4. 工程观：安全内生 · 可观测性 · 资源确定性 · 跨平台一致 → 测试覆盖 >90%
-5. 设计美学：简约至上 · 极致细节 · 人文关怀 · 完美主义 → API <50 个/模块
+- **系统观**：反馈闭环 · 层次分解 · 总体设计部 · 涌现管理 → 实时响应 <10ms
+- **内核观**：内核极简 · 接口契约化 · 服务隔离 · 可插拔策略 → 内核 ~25K LOC
+- **认知观**：双系统协同 · 增量演化 · 记忆卷载 · 遗忘机制 → Token 节省 500%
+- **工程观**：安全内生 · 可观测性 · 资源确定性 · 跨平台一致 → 测试覆盖 >90%
+- **设计美学**：简约至上 · 极致细节 · 人文关怀 · 完美主义 → API <50 个/模块
+
 
 ## 🚀 快速上手
 
 ### 📦 环境要求
 
-1. 操作系统：Ubuntu 22.04+ / macOS 13+ / Windows 11 (WSL2)
-2. 编译器：GCC 11+ / Clang 14+ (C11/C++17)
-3. 构建工具：CMake 3.20+, Ninja
-4. Python：3.10+ (OpenLab 需要)
+- **操作系统**：Ubuntu 22.04+ / macOS 13+ / Windows 11 (WSL2)
+- **编译器**：GCC 11+ / Clang 14+ (C11/C++17)
+- **构建工具**：CMake 3.20+, Ninja
+- **Python**：3.10+ (OpenLab 需要)
 
 ### 🔨 安装与构建
 
@@ -140,33 +109,29 @@ docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
 
 ### 💻 使用方式
 
-1. C/C++：通过 `syscalls.h` 系统调用接口开发
-2. Python：通过 `pip install agentos` 后直接 import
-3. Go：通过 `import "github.com/spharx/agentos/toolkit/go"`
-4. Rust：通过 `use agentos_toolkit::prelude::*;`
-5. TypeScript：通过 `npm install @spharx/agentos-toolkit` 后直接 import
+| 语言 | 使用方式 |
+|:-----|:---------|
+| C/C++ | 通过 `syscalls.h` 系统调用接口开发 |
+| Python | 通过 `pip install agentos` 后直接 import |
+| Go | 通过 `import "github.com/spharx/agentos/toolkit/go"` |
+| Rust | 通过 `use agentos_toolkit::prelude::*;` |
+| TypeScript | 通过 `npm install @spharx/agentos-toolkit` 后直接 import |
 
-### 📖 核心文档
+### 📚 阅读导航
 
-1. [📘 架构设计原则 V1.8](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) · 五维正交体系，24 条核心原则
-2. [🔄 CoreLoopThree 架构](agentos/manuals/architecture/coreloopthree.md) · 三层认知循环详解
-3. [🧠 MemoryRovol 架构](agentos/manuals/architecture/memoryrovol.md) · 四层记忆卷载实现
-4. [⚙️ 编译指南](agentos/manuals/guides/build.md) · 详细构建步骤和选项
-5. [🚀 快速开始](agentos/manuals/guides/quickstart.md) · 5 分钟上手指南
+| 文档 | 核心内容 |
+|:-----|:---------|
+| [📘 架构设计原则 V1.8](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) | 五维正交体系，24 条核心原则 |
+| [🚀 快速开始](agentos/manuals/guides/quickstart.md) | 5 分钟上手指南 |
+| [⚙️ 编译指南](agentos/manuals/guides/build.md) | 详细构建步骤和选项 |
+| [🧪 测试指南](agentos/manuals/guides/testing.md) | 单元/集成/契约测试 |
+| [🐳 部署指南](agentos/manuals/guides/deployment.md) | Docker/Kubernetes 部署 |
 
-### 🛠️ 开发指南
-
-1. [测试指南](agentos/manuals/guides/testing.md) · 单元/集成/契约测试
-2. [部署指南](agentos/manuals/guides/deployment.md) · Docker/Kubernetes 部署
-3. [C API 文档](agentos/manuals/api/c/README.md) · C 语言接口规范
-4. [Python SDK](agentos/toolkit/python/README.md) · Python 开发指南
-5. [Rust SDK](agentos/toolkit/rust/README.md) · Rust 开发指南
-6. [TypeScript SDK](agentos/toolkit/typescript/README.md) · TypeScript 开发指南
 
 ## ❔ 常见问题
 
 <details>
-<summary><b> Q1: AgentOS 与传统 AI Agent 框架有什么区别？</b></summary>
+<summary><b>Q1: AgentOS 与传统 AI Agent 框架有什么区别？</b></summary>
 
 AgentOS 是**操作系统级**产品，而非单一框架：
 
@@ -181,7 +146,7 @@ AgentOS 是**操作系统级**产品，而非单一框架：
 </details>
 
 <details>
-<summary><b> Q2: 适合哪些应用场景？</b></summary>
+<summary><b>Q2: 适合哪些应用场景？</b></summary>
 
 **✅ 特别适合**
 - 🎯 复杂多步骤任务编排
@@ -196,7 +161,7 @@ AgentOS 是**操作系统级**产品，而非单一框架：
 </details>
 
 <details>
-<summary><b> Q3: 如何保证安全性？</b></summary> 
+<summary><b>Q3: 如何保证安全性？</b></summary>
 
 **安全内生设计，四重防护**
 
@@ -212,7 +177,7 @@ AgentOS 是**操作系统级**产品，而非单一框架：
 </details>
 
 <details>
-<summary><b> Q4: 学习需要哪些前置知识？</b></summary>
+<summary><b>Q4: 学习需要哪些前置知识？</b></summary>
 
 | 角色 | 前置知识 | 上手时间 |
 |------|---------|----------|
@@ -224,19 +189,42 @@ AgentOS 是**操作系统级**产品，而非单一框架：
 
 </details>
 
+
 ## 🤝 参与贡献
 
-我们热烈欢迎社区贡献！无论是提交 Bug、提出新功能建议，还是完善文档，都是对项目的宝贵支持。
+> "Intelligence emergence, and nothing less, is the ultimate sublimation of AI."
 
-1. Fork 项目 [AtomGit](https://atomgit.com/spharx/agentos)  
-2. 创建分支 (feature/xxx)
-3. 开发测试
-4. 提交 PR
-5. 代码审查
-6. 合并主分支
+这是一个正在走进的**未来**。
+
+### 🚩 相信的力量
+
+**因为相信**：
+- 智能体的未来不应该被单一框架所定义
+- 开源社区的力量可以推动技术边界的拓展
+
+**见证未来**：
+- 参与构建一个从内核到应用的完整技术栈
+- 见证四层记忆系统如何涌现出真正的智慧
+
+### 💫 可以贡献的方式
+
+无论你是经验丰富的开发者，还是刚刚起步的新手：
+- 🐛 **发现问题** → 报告 Bug，帮助我们改进质量
+- 💡 **提出想法** → 新功能建议，让项目更加强大
+- 📝 **分享知识** → 完善文档，帮助更多人了解 AgentOS
+- 🔧 **编写代码** → 提交 PR，共同打造更好的智能体操作系统
+
+### 📝 贡献流程
 
 详见 [贡献指南](CONTRIBUTING.md)
 
+```bash
+Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 → 合并主分支
+```
+
+**主要平台**：[AtomGit](https://atomgit.com/spharx/agentos)（推荐） · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)
+
+> 每一个问题的解决，都是在为人类的未来点亮一盏明灯。  
 
 ## 📜 许可证
 
@@ -249,12 +237,10 @@ AgentOS 是**操作系统级**产品，而非单一框架：
 **"From data intelligence emerges."**  
 **始于数据，终于智能。**  
 
-<p align="center">
-  <a href="https://atomgit.com/spharx/agentos">AtomGit</a> ·
-  <a href="https://gitee.com/spharx/agentos">Gitee</a> ·
-  <a href="https://github.com/SpharxTeam/AgentOS">GitHub</a> ·
-  <a href="https://spharx.cn">官方网站</a>
-</p>
+<a href="https://atomgit.com/spharx/agentos">AtomGit</a> ·
+<a href="https://gitee.com/spharx/agentos">Gitee</a> ·
+<a href="https://github.com/SpharxTeam/AgentOS">GitHub</a> ·
+<a href="https://spharx.cn">官方网站</a>
 
 © 2026 SPHARX Ltd. All Rights Reserved.
 

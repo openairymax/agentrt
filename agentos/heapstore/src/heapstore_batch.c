@@ -13,6 +13,7 @@
  */
 
 #include "heapstore.h"
+#include "heapstore_batch.h"
 #include "private.h"
 #include <stdlib.h>
 #include <string.h>

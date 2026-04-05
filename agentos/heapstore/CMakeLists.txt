@@ -23,6 +23,8 @@ set(heapstore_SOURCES
     src/heapstore_log.c
     src/heapstore_ipc.c
     src/heapstore_memory.c
+    src/heapstore_batch.c
+    src/heapstore_token.c
     src/heapstore_integration.c
     src/utils.c
 )
@@ -34,6 +36,8 @@ set(heapstore_HEADERS
     include/heapstore_log.h
     include/heapstore_ipc.h
     include/heapstore_memory.h
+    include/heapstore_batch.h
+    include/heapstore_token.h
     include/heapstore_integration.h
     include/utils.h
     src/private.h

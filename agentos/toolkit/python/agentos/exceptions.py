@@ -48,16 +48,24 @@ CODE_AGENT_DISPATCH_FAILED = "0x2003"
 CODE_INTENT_PARSE_FAILED = "0x2004"
 
 CODE_TASK_FAILED = "0x3001"
-CODE_TASK_CANCELLED = "0x3002"
-CODE_TASK_TIMEOUT = "0x3003"
+CODE_TASK_TIMEOUT = "0x3002"
+CODE_TASK_CANCELLED = "0x3003"
+CODE_TASK_NOT_FOUND = "0x3004"
 
 CODE_MEMORY_NOT_FOUND = "0x4001"
-CODE_MEMORY_EVOLVE_FAILED = "0x4002"
-CODE_MEMORY_SEARCH_FAILED = "0x4003"
+CODE_MEMORY_WRITE_FAILED = "0x4002"
+CODE_MEMORY_EVOLVE_FAILED = "0x4003"
+CODE_MEMORY_SEARCH_FAILED = "0x4004"
+CODE_MEMORY_LEVEL_INVALID = "0x4005"
+
 CODE_SESSION_NOT_FOUND = "0x4004"
 CODE_SESSION_EXPIRED = "0x4005"
 CODE_SKILL_NOT_FOUND = "0x4006"
 CODE_SKILL_EXECUTION_FAILED = "0x4007"
+
+CODE_SYSCALL_FAILED = "0x5001"
+CODE_SYSCALL_TIMEOUT = "0x5002"
+CODE_SYSCALL_INVALID_PARAMS = "0x5003"
 
 CODE_TELEMETRY_ERROR = "0x5001"
 CODE_SYSCALL_ERROR = "0x5002"
@@ -67,7 +75,15 @@ CODE_CORRUPTED_DATA = "0x6002"
 
 
 def http_status_to_code(status: int) -> str:
-    """将 HTTP 状态码映射到 AgentOS 错误码，与 Go SDK HTTPStatusToError 一致。"""
+    """
+    将 HTTP 状态码映射为对应的错误码。
+
+    Args:
+        status: HTTP 状态码
+
+    Returns:
+        对应的十六进制错误码字符串
+    """
     mapping = {
         400: CODE_INVALID_PARAMETER,
         401: CODE_UNAUTHORIZED,
@@ -75,8 +91,8 @@ def http_status_to_code(status: int) -> str:
         404: CODE_NOT_FOUND,
         408: CODE_TIMEOUT,
         409: CODE_CONFLICT,
-        429: CODE_RATE_LIMITED,
         422: CODE_VALIDATION_ERROR,
+        429: CODE_RATE_LIMITED,
         500: CODE_SERVER_ERROR,
         502: CODE_SERVER_ERROR,
         503: CODE_SERVER_ERROR,
@@ -88,17 +104,16 @@ def http_status_to_code(status: int) -> str:
 def http_status_to_error(status: int, details: str = "") -> "AgentOSError":
     """
     将 HTTP 状态码转换为对应的异常实例，与 Go SDK HTTPStatusToError 一致。
-    
+
     Args:
         status: HTTP 状态码
         details: 错误详细信息
-        
+
     Returns:
         对应的异常实例
     """
     error_code = http_status_to_code(status)
-    
-    # 根据状态码返回对应的异常类型
+
     if status == 400:
         return ValidationError(f"请求参数无效：{details}")
     elif status == 401:
@@ -124,159 +139,154 @@ def http_status_to_error(status: int, details: str = "") -> "AgentOSError":
 class AgentOSError(Exception):
     """
     Base exception class for all AgentOS errors.
-    
+
     Attributes:
         error_code (str): The hexadecimal error code (e.g., "0x0001")
         message (str): Human-readable error description
-        details (Optional[Dict]): Additional error context
+        cause (Exception): The underlying cause of this error, if any
     """
-    
+
     def __init__(
         self,
         message: str = "",
         error_code: str = CODE_UNKNOWN,
-        details: Optional[Dict[str, Any]] = None
+        cause: Optional[Exception] = None,
     ):
+        super().__init__(message)
         self.error_code = error_code
         self.message = message
-        self.details = details or {}
-        super().__init__(self._format_message())
-    
-    def _format_message(self) -> str:
-        """Format the error message with error code and details."""
-        base_msg = f"[{self.error_code}] {self.message}"
-        
-        if self.details:
-            details_str = ", ".join(f"{k}={v}" for k, v in self.details.items())
-            return f"{base_msg} ({details_str})"
-        
-        return base_msg
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert exception to dictionary for serialization."""
-        return {
-            "error_code": self.error_code,
-            "message": self.message,
-            "details": self.details,
-            "type": self.__class__.__name__
-        }
+        self.cause = cause
 
+    def __str__(self) -> str:
+        if self.cause:
+            return f"[{self.error_code}] {self.message}: {self.cause}"
+        return f"[{self.error_code}] {self.message}"
 
-class TaskError(AgentOSError):
-    """Exception raised for task-related errors."""
-    
-    def __init__(self, message: str = "", **kwargs):
-        super().__init__(message=message, error_code=CODE_TASK_FAILED, **kwargs)
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(error_code={self.error_code!r}, message={self.message!r})"
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, AgentOSError):
+            return NotImplemented
+        return self.error_code == other.error_code
 
-class AgentOSMemoryError(AgentOSError):
-    """Exception raised for memory operation errors."""
-    
-    def __init__(self, message: str = "", **kwargs):
-        super().__init__(message=message, error_code=CODE_MEMORY_NOT_FOUND, **kwargs)
-
-
-class SessionError(AgentOSError):
-    """Exception raised for session management errors."""
-    
-    def __init__(self, message: str = "", **kwargs):
-        super().__init__(message=message, error_code=CODE_SESSION_NOT_FOUND, **kwargs)
-
-
-class SkillError(AgentOSError):
-    """Exception raised for skill loading and execution errors."""
-    
-    def __init__(self, message: str = "", **kwargs):
-        super().__init__(message=message, error_code=CODE_SKILL_EXECUTION_FAILED, **kwargs)
-
-
-class TelemetryError(AgentOSError):
-    """Exception raised for telemetry and observability errors."""
-    
-    def __init__(self, message: str = "", **kwargs):
-        super().__init__(message=message, error_code=CODE_TELEMETRY_ERROR, **kwargs)
-
-
-class InitializationError(AgentOSError):
-    """Exception raised when SDK initialization fails."""
-    pass
-
-
-class AgentOSTimeoutError(AgentOSError):
-    """
-    Exception raised when an operation times out.
-    
-    Attributes:
-        timeout_ms (int): The timeout value that was exceeded
-        operation (str): The operation that timed out
-    """
-    
-    def __init__(self, timeout_ms: int = 0, operation: str = "operation", **kwargs):
-        super().__init__(
-            message=f"{operation.capitalize()} timed out after {timeout_ms}ms",
-            error_code=CODE_TIMEOUT,
-            **kwargs
-        )
-        self.timeout_ms = timeout_ms
-        self.operation = operation
-
-
-class ValidationError(AgentOSError):
-    """Exception raised when input validation fails."""
-    
-    def __init__(self, message: str = "", **kwargs):
-        super().__init__(message=message, error_code=CODE_VALIDATION_ERROR, **kwargs)
+    def __hash__(self) -> int:
+        return hash(self.error_code)
 
 
 class NetworkError(AgentOSError):
-    """Exception raised for network-related errors."""
-    
-    def __init__(self, message: str = "", **kwargs):
-        super().__init__(message=message, error_code=CODE_NETWORK_ERROR, **kwargs)
+    """Network communication error."""
+
+    def __init__(self, message: str = "网络连接失败", cause: Optional[Exception] = None):
+        super().__init__(message=message, error_code=CODE_NETWORK_ERROR, cause=cause)
+
+
+class TimeoutError(AgentOSError):
+    """Operation timeout error."""
+
+    def __init__(self, message: str = "操作超时", cause: Optional[Exception] = None):
+        super().__init__(message=message, error_code=CODE_TIMEOUT, cause=cause)
+
+
+class ValidationError(AgentOSError):
+    """Input validation error."""
+
+    def __init__(self, message: str = "输入验证失败", cause: Optional[Exception] = None):
+        super().__init__(message=message, error_code=CODE_VALIDATION_ERROR, cause=cause)
 
 
 class AuthenticationError(AgentOSError):
-    """Exception raised for authentication errors."""
-    
-    def __init__(self, message: str = "", **kwargs):
-        super().__init__(message=message, error_code=CODE_UNAUTHORIZED, **kwargs)
+    """Authentication error."""
 
-
-class ConfigError(AgentOSError):
-    """Exception raised for configuration errors."""
-    
-    def __init__(self, message: str = "", **kwargs):
-        super().__init__(message=message, error_code=CODE_INVALID_CONFIG, **kwargs)
-
-
-class SyscallError(AgentOSError):
-    """Exception raised for system call errors."""
-    
-    def __init__(self, message: str = "", **kwargs):
-        super().__init__(message=message, error_code=CODE_SYSCALL_ERROR, **kwargs)
-
-
-class RateLimitError(AgentOSError):
-    """Exception raised when rate limit is exceeded."""
-    
-    def __init__(self, message: str = "Rate limit exceeded", **kwargs):
-        super().__init__(message=message, error_code=CODE_RATE_LIMITED, **kwargs)
-
-
-class InvalidResponseError(AgentOSError):
-    """Exception raised when the server response is invalid or malformed."""
-    
-    def __init__(self, message: str = "Invalid response from server", **kwargs):
-        super().__init__(message=message, error_code=CODE_INVALID_RESPONSE, **kwargs)
+    def __init__(self, message: str = "认证失败", cause: Optional[Exception] = None):
+        super().__init__(message=message, error_code=CODE_UNAUTHORIZED, cause=cause)
 
 
 class ServerError(AgentOSError):
-    """Exception raised for server-side errors."""
-    
-    def __init__(self, message: str = "", **kwargs):
-        super().__init__(message=message, error_code=CODE_SERVER_ERROR, **kwargs)
+    """Server-side error."""
+
+    def __init__(self, message: str = "服务器错误", cause: Optional[Exception] = None):
+        super().__init__(message=message, error_code=CODE_SERVER_ERROR, cause=cause)
 
 
-# 向后兼容别名（不推荐使用，将在未来版本中移除）
-MemoryError = AgentOSMemoryError
-TimeoutError = AgentOSTimeoutError
+class RateLimitError(AgentOSError):
+    """Rate limit exceeded error."""
+
+    def __init__(self, message: str = "请求频率超限", cause: Optional[Exception] = None):
+        super().__init__(message=message, error_code=CODE_RATE_LIMITED, cause=cause)
+
+
+class TaskError(AgentOSError):
+    """Task-related error."""
+
+    def __init__(self, message: str = "", cause: Optional[Exception] = None):
+        super().__init__(message=message, error_code=CODE_TASK_FAILED, cause=cause)
+
+
+class MemoryError(AgentOSError):
+    """Memory-related error."""
+
+    def __init__(self, message: str = "", cause: Optional[Exception] = None):
+        super().__init__(message=message, error_code=CODE_MEMORY_NOT_FOUND, cause=cause)
+
+
+class SessionError(AgentOSError):
+    """Session-related error."""
+
+    def __init__(self, message: str = "", cause: Optional[Exception] = None):
+        super().__init__(message=message, error_code=CODE_SESSION_NOT_FOUND, cause=cause)
+
+
+class AgentOSTimeoutError(TimeoutError):
+    """AgentOS-specific timeout error with operation context."""
+
+    def __init__(self, operation: str = "", cause: Optional[Exception] = None):
+        message = f"操作超时：{operation}" if operation else "操作超时"
+        super().__init__(message=message, cause=cause)
+        self.operation = operation
+
+
+class ConfigurationError(AgentOSError):
+    """Configuration error."""
+
+    def __init__(self, message: str = "配置错误", cause: Optional[Exception] = None):
+        super().__init__(message=message, error_code=CODE_INVALID_CONFIG, cause=cause)
+
+
+class InitializationError(AgentOSError):
+    """Initialization error."""
+
+    def __init__(self, message: str = "初始化失败", cause: Optional[Exception] = None):
+        super().__init__(message=message, error_code=CODE_INTERNAL, cause=cause)
+
+
+class TelemetryError(AgentOSError):
+    """Telemetry-related error."""
+
+    def __init__(self, message: str = "遥测错误", cause: Optional[Exception] = None):
+        super().__init__(message=message, error_code=CODE_TELEMETRY_ERROR, cause=cause)
+
+
+class SyscallError(AgentOSError):
+    """System call error."""
+
+    def __init__(self, message: str = "系统调用失败", cause: Optional[Exception] = None):
+        super().__init__(message=message, error_code=CODE_SYSCALL_FAILED, cause=cause)
+
+
+class SkillError(AgentOSError):
+    """Skill-related error."""
+
+    def __init__(self, message: str = "", cause: Optional[Exception] = None):
+        super().__init__(message=message, error_code=CODE_SKILL_EXECUTION_FAILED, cause=cause)
+
+
+class InvalidResponseError(AgentOSError):
+    """Invalid response error."""
+
+    def __init__(self, message: str = "响应格式异常", cause: Optional[Exception] = None):
+        super().__init__(message=message, error_code=CODE_INVALID_RESPONSE, cause=cause)
+
+
+AgentOSMemoryError = MemoryError
+ConfigError = ConfigurationError

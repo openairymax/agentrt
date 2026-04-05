@@ -2,8 +2,6 @@
  * @file safe_string_utils.c
  * @brief 安全字符串处理工具实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
- * @version 1.0.0
- * @date 2026-04-04
  */
 
 #include "safe_string_utils.h"
@@ -11,82 +9,59 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
-#include <ctype.h>
 
 int safe_strcpy(char* dest, const char* src, size_t dest_size) {
-    if (!dest || !src || dest_size == 0) {
-        SVC_LOG_ERROR("safe_strcpy: invalid parameters");
-        return -1;
-    }
-
+    if (!dest || !src || dest_size == 0) return -1;
+    
     size_t src_len = strlen(src);
     if (src_len >= dest_size) {
-        SVC_LOG_WARN("safe_strcpy: source too long (%zu >= %zu)", src_len, dest_size);
         memcpy(dest, src, dest_size - 1);
         dest[dest_size - 1] = '\0';
         return -2;
     }
-
+    
     memcpy(dest, src, src_len + 1);
     return 0;
 }
 
 int safe_strcat(char* dest, const char* src, size_t dest_size) {
-    if (!dest || !src || dest_size == 0) {
-        SVC_LOG_ERROR("safe_strcat: invalid parameters");
-        return -1;
-    }
-
+    if (!dest || !src || dest_size == 0) return -1;
+    
     size_t dest_len = strlen(dest);
     size_t src_len = strlen(src);
-
+    
     if (dest_len + src_len >= dest_size) {
-        SVC_LOG_WARN("safe_strcat: result would overflow");
         size_t remaining = dest_size - dest_len - 1;
         memcpy(dest + dest_len, src, remaining);
         dest[dest_len + remaining] = '\0';
         return -2;
     }
-
+    
     memcpy(dest + dest_len, src, src_len + 1);
     return 0;
 }
 
 int safe_sprintf(char* dest, size_t dest_size, const char* fmt, ...) {
-    if (!dest || !fmt || dest_size == 0) {
-        SVC_LOG_ERROR("safe_sprintf: invalid parameters");
-        return -1;
-    }
-
+    if (!dest || !fmt || dest_size == 0) return -1;
+    
     va_list args;
     va_start(args, fmt);
-
     int written = vsnprintf(dest, dest_size, fmt, args);
     va_end(args);
-
-    if (written < 0) {
-        SVC_LOG_ERROR("safe_sprintf: format error");
-        dest[0] = '\0';
+    
+    if (written < 0 || (size_t)written >= dest_size) {
+        dest[dest_size - 1] = '\0';
         return -1;
     }
-
-    if ((size_t)written >= dest_size) {
-        SVC_LOG_WARN("safe_sprintf: output truncated (needed %d)", written);
-        dest[dest_size - 1] = '\0';
-    }
-
+    
     return written;
 }
 
 size_t safe_strlen(const char* str, size_t max_len) {
     if (!str) return 0;
-
     for (size_t i = 0; i < max_len; i++) {
-        if (str[i] == '\0') {
-            return i;
-        }
+        if (str[i] == '\0') return i;
     }
-
     return max_len;
 }
 
@@ -94,59 +69,33 @@ int safe_strcmp(const char* str1, const char* str2, size_t max_len) {
     if (!str1 && !str2) return 0;
     if (!str1) return -1;
     if (!str2) return 1;
-
+    
     for (size_t i = 0; i < max_len; i++) {
-        unsigned char c1 = (unsigned char)str1[i];
-        unsigned char c2 = (unsigned char)str2[i];
-
-        if (c1 == '\0' && c2 == '\0') return 0;
-        if (c1 == '\0') return -1;
-        if (c2 == '\0') return 1;
-
-        int diff = c1 - c2;
+        if (str1[i] == '\0' && str2[i] == '\0') return 0;
+        if (str1[i] == '\0') return -1;
+        if (str2[i] == '\0') return 1;
+        int diff = (unsigned char)str1[i] - (unsigned char)str2[i];
         if (diff != 0) return diff;
     }
-
     return 0;
 }
 
 char* safe_strdup_with_limit(const char* str, size_t max_copy_len) {
     if (!str) return NULL;
-
+    
     size_t len = strlen(str);
-    if (max_copy_len > 0 && len > max_copy_len) {
-        len = max_copy_len;
-    }
-
+    if (max_copy_len > 0 && len > max_copy_len) len = max_copy_len;
+    
     char* copy = (char*)malloc(len + 1);
-    if (!copy) {
-        SVC_LOG_ERROR("safe_strdup_with_limit: allocation failed");
-        return NULL;
-    }
-
+    if (!copy) return NULL;
+    
     memcpy(copy, str, len);
     copy[len] = '\0';
     return copy;
 }
 
-int is_valid_ascii(const char* str, size_t len) {
-    if (!str) return 0;
-
-    for (size_t i = 0; i < len; i++) {
-        if (str[i] == '\0') break;
-        if (!isprint((unsigned char)str[i]) && !isspace((unsigned char)str[i])) {
-            return 0;
-        }
-    }
-
-    return 1;
-}
-
 void secure_clear(void* buf, size_t size) {
     if (!buf || size == 0) return;
-
     volatile unsigned char* p = (volatile unsigned char*)buf;
-    for (size_t i = 0; i < size; i++) {
-        p[i] = 0;
-    }
+    for (size_t i = 0; i < size; i++) p[i] = 0;
 }
