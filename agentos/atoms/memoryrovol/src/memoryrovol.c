@@ -257,8 +257,9 @@ agentos_error_t agentos_memoryrov_retrieve(agentos_memoryrov_handle_t* handle,
     char** result_ids = NULL;
     float* scores = NULL;
     size_t result_count = 0;
+    agentos_error_t err = AGENTOS_SUCCESS;
 
-    agentos_error_t err = agentos_layer2_feature_search(
+    err = agentos_layer2_feature_search(
         handle->l2_feature,
         query,
         (uint32_t)max_results,
@@ -270,12 +271,18 @@ agentos_error_t agentos_memoryrov_retrieve(agentos_memoryrov_handle_t* handle,
     if (err != AGENTOS_SUCCESS || result_count == 0) {
         *out_results = NULL;
         *out_count = 0;
+        /* 释放临时数组（如果已分配） */
+        if (result_ids) AGENTOS_FREE(result_ids);
+        if (scores) AGENTOS_FREE(scores);
         return err;
     }
 
     /* 分配结果数组 */
     *out_results = (agentos_memory_t*)AGENTOS_CALLOC(result_count, sizeof(agentos_memory_t));
     if (!*out_results) {
+        /* 释放临时数组 */
+        if (result_ids) AGENTOS_FREE(result_ids);
+        if (scores) AGENTOS_FREE(scores);
         return AGENTOS_ENOMEM;
     }
 

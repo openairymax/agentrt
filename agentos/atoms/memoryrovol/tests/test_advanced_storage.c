@@ -1,4 +1,4 @@
-﻿﻿﻿﻿/**
+﻿﻿/**
  * @file test_advanced_storage.c
  * @brief 高级存储单元测试
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -18,6 +18,33 @@
 #include "agentos.h"
 
 /**
+ * @brief 获取测试临时目录路径
+ * @return 临时目录路径，调用者不应释放
+ */
+static const char* get_test_temp_dir(void) {
+    static char temp_dir[256] = {0};
+    if (temp_dir[0] == '\0') {
+        const char* env_tmp = getenv("AGENTOS_TEST_TMPDIR");
+        if (env_tmp && env_tmp[0] != '\0') {
+            snprintf(temp_dir, sizeof(temp_dir), "%s", env_tmp);
+        } else {
+            // 默认使用 /tmp，在Windows上使用 C:\Windows\Temp
+            #ifdef _WIN32
+            const char* win_tmp = getenv("TEMP");
+            if (win_tmp && win_tmp[0] != '\0') {
+                snprintf(temp_dir, sizeof(temp_dir), "%s", win_tmp);
+            } else {
+                snprintf(temp_dir, sizeof(temp_dir), "C:\\Windows\\Temp");
+            }
+            #else
+            snprintf(temp_dir, sizeof(temp_dir), "/tmp");
+            #endif
+        }
+    }
+    return temp_dir;
+}
+
+/**
  * @brief 测试高级存储基本功能
  * @return 0表示成功，非0表示失败
  */
@@ -26,7 +53,9 @@ int test_advanced_storage_basic(void) {
 
     /* 创建一个简单的存储引擎 */
     agentos_layer1_raw_t* engine = NULL;
-    agentos_error_t err = agentos_layer1_raw_create("/tmp/test_storage", 1024 * 1024, &engine);
+    char base_path[512];
+    snprintf(base_path, sizeof(base_path), "%s/test_storage", get_test_temp_dir());
+    agentos_error_t err = agentos_layer1_raw_create(base_path, 1024 * 1024, &engine);
 
     if (err != AGENTOS_SUCCESS) {
         printf("    创建存储引擎失败: %d\n", err);
