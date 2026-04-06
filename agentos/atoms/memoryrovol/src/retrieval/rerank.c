@@ -126,7 +126,7 @@ agentos_error_t agentos_reranker_rerank(
 
     /* 尝试使用LLM进行语义重排序 */
     if (reranker->use_llm && reranker->llm) {
-        /* TODO: 实现基于交叉编码器的语义重排序 */
+        /* FUTURE: 实现基于交叉编码器的语义重排序 - 参见memoryrovol设计文档第4.2节 */
         /* 当前暂时跳过，使用默认排序 */
         AGENTOS_LOG_INFO("LLM reranking not yet implemented, using default order");
     }

@@ -61,7 +61,7 @@ provider_registry_t* provider_registry_create(const service_config_t* cfg) {
         size_t model_cnt = 0;
         if (pcfg->models) {
             while (pcfg->models[model_cnt]) model_cnt++;
-            models = calloc(model_cnt + 1, sizeof(char*));
+            models = calloc(model_cnt + 1, sizeof(*models));
             if (models) {
                 for (size_t j = 0; j < model_cnt; ++j)
                     models[j] = strdup(pcfg->models[j]);
