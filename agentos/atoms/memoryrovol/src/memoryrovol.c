@@ -163,9 +163,17 @@ agentos_error_t agentos_memoryrov_add_memory(agentos_memoryrov_handle_t* handle,
         return AGENTOS_EINVAL;
     }
 
-    /* 生成唯一 ID */
+    /* 生成唯一 ID - 使用 UUID 生成器 */
     char id[64];
+    
+#ifdef AGENTOS_HAS_UUID
+    agentos_uuid_error_t uuid_err = agentos_uuid_with_prefix("mem_", id, sizeof(id));
+    if (uuid_err != AGENTOS_UUID_SUCCESS) {
+        snprintf(id, sizeof(id), "mem_%lu_%zu", (unsigned long)time(NULL), (size_t)handle);
+    }
+#else
     snprintf(id, sizeof(id), "mem_%lu_%zu", (unsigned long)time(NULL), (size_t)handle);
+#endif
 
     /* 写入 L1 原始卷 */
     agentos_error_t err = agentos_layer1_raw_write(handle->l1_raw, id, content, content_len);

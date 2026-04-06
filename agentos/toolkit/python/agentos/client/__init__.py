@@ -1,4 +1,4 @@
-﻿# AgentOS Python SDK - Client Layer
+# AgentOS Python SDK - Client Layer
 # Version: 3.0.0
 # Last updated: 2026-03-24
 

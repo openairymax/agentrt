@@ -34,9 +34,11 @@ endif()
 
 add_library(agentos_core STATIC ${COREKERN_SOURCES})
 
-target_include_directories(agentos_core PRIVATE
+# 使用统一的头文件路径管理
+target_link_libraries(agentos_core PUBLIC agentos_atoms)
+
+target_include_directories(agentos_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../agentos/commons/utils/memory/include
 )
 
 # 安全编译选项（基于AgentOS C编码风格指南附录A）

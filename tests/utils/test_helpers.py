@@ -540,6 +540,14 @@ class JSONSchemaValidator:
     支持常用验证规则
     """
 
+    TYPE_MAP = {
+        "object": dict,
+        "string": str,
+        "number": (int, float),
+        "boolean": bool,
+        "array": list,
+    }
+
     @staticmethod
     def validate(data: Any, schema: Dict[str, Any]) -> List[str]:
         """
@@ -557,47 +565,110 @@ class JSONSchemaValidator:
         return errors
 
     @staticmethod
-    def _validate_recursive(data: Any, schema: Dict[str, Any], path: str, errors: List[str]):
-        """递归验证"""
+    def _validate_type(data: Any, expected_type: str, path: str, errors: List[str]) -> bool:
+        """
+        验证数据类型是否匹配。
+
+        Args:
+            data: 要验证的数据
+            expected_type: 期望的类型
+            path: 字段路径
+            errors: 错误列表
+
+        Returns:
+            bool: 类型是否匹配
+        """
+        if expected_type not in JSONSchemaValidator.TYPE_MAP:
+            return True
+
+        expected_python_type = JSONSchemaValidator.TYPE_MAP[expected_type]
+        if not isinstance(data, expected_python_type):
+            errors.append(f"{path}: expected {expected_type}, got {type(data).__name__}")
+            return False
+        return True
+
+    @staticmethod
+    def _validate_required_fields(data: Dict, required: List[str], path: str, errors: List[str]) -> None:
+        """
+        验证必需字段。
+
+        Args:
+            data: 数据字典
+            required: 必需字段列表
+            path: 字段路径
+            errors: 错误列表
+        """
+        for field in required:
+            if field not in data:
+                errors.append(f"{path}.{field}: required field missing")
+
+    @staticmethod
+    def _validate_properties(data: Dict, properties: Dict, path: str, errors: List[str]) -> None:
+        """
+        验证对象属性。
+
+        Args:
+            data: 数据字典
+            properties: 属性schema定义
+            path: 字段路径
+            errors: 错误列表
+        """
+        for key, field_schema in properties.items():
+            if key in data:
+                JSONSchemaValidator._validate_recursive(
+                    data[key], field_schema,
+                    f"{path}.{key}" if path else key,
+                    errors
+                )
+
+    @staticmethod
+    def _validate_items(data: List, items_schema: Dict, path: str, errors: List[str]) -> None:
+        """
+        验证数组元素。
+
+        Args:
+            data: 数据列表
+            items_schema: 元素schema定义
+            path: 字段路径
+            errors: 错误列表
+        """
+        for i, item in enumerate(data):
+            JSONSchemaValidator._validate_recursive(
+                item, items_schema,
+                f"{path}[{i}]",
+                errors
+            )
+
+    @staticmethod
+    def _validate_recursive(data: Any, schema: Dict[str, Any], path: str, errors: List[str]) -> None:
+        """
+        递归验证数据。
+
+        Args:
+            data: 要验证的数据
+            schema: JSON Schema 定义
+            path: 字段路径
+            errors: 错误列表
+        """
         if "type" in schema:
             expected_type = schema["type"]
-            if expected_type == "object" and not isinstance(data, dict):
-                errors.append(f"{path}: expected object, got {type(data).__name__}")
-                return
-            elif expected_type == "string" and not isinstance(data, str):
-                errors.append(f"{path}: expected string, got {type(data).__name__}")
-                return
-            elif expected_type == "number" and not isinstance(data, (int, float)):
-                errors.append(f"{path}: expected number, got {type(data).__name__}")
-                return
-            elif expected_type == "boolean" and not isinstance(data, bool):
-                errors.append(f"{path}: expected boolean, got {type(data).__name__}")
-                return
-            elif expected_type == "array" and not isinstance(data, list):
-                errors.append(f"{path}: expected array, got {type(data).__name__}")
+            if not JSONSchemaValidator._validate_type(data, expected_type, path, errors):
                 return
 
         if "required" in schema and isinstance(data, dict):
-            for field in schema["required"]:
-                if field not in data:
-                    errors.append(f"{path}.{field}: required field missing")
+            JSONSchemaValidator._validate_required_fields(
+                data, schema["required"], path, errors
+            )
 
         if "properties" in schema and isinstance(data, dict):
-            for key, field_schema in schema["properties"].items():
-                if key in data:
-                    JSONSchemaValidator._validate_recursive(
-                        data[key], field_schema,
-                        f"{path}.{key}" if path else key,
-                        errors
-                    )
+            JSONSchemaValidator._validate_properties(
+                data, schema["properties"], path, errors
+            )
 
         if "items" in schema and isinstance(data, list):
-            for i, item in enumerate(data):
-                JSONSchemaValidator._validate_recursive(
-                    item, schema["items"],
-                    f"{path}[{i}]",
-                    errors
-                )
+            JSONSchemaValidator._validate_items(
+                data, schema["items"], path, errors
+            )
 
 
 # ============================================================

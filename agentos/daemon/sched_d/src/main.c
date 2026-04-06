@@ -1,14 +1,16 @@
-/**
- * @file main.c
- * @brief 智能调度服务守护进程入口
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
+/*
+ * Copyright (C) 2026 SPHARX. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2026 SPHARX.
  * SPDX-License-Identifier: Apache-2.0
  *
- * 改进说明：
- * 1. 真正的守护进程模式（跨平台支持）
- * 2. JSON-RPC 2.0 服务接口
- * 3. 完善的错误处理和日志记录
- * 4. 配置热重载支持
+ * @file main.c
+ * @brief 调度服务守护进程主入口（遵循 daemon 模块统一规范）
+ *
+ * 规范遵循:
+ * - ARCHITECTURAL_PRINCIPLES.md E-3 资源确定性(成对管理)
+ * - ARCHITECTURAL_PRINCIPLES.md E-4 跨平台一致性(platform.h)
+ * - ARCHITECTURAL_PRINCIPLES.md E-5 命名语义化(SVC_LOG_*)
+ * - ARCHITECTURAL_PRINCIPLES.md E-6 错误可追溯(AGENTOS_ERR_*)
  */
 
 #include "scheduler_service.h"
@@ -17,7 +19,9 @@
 #include "platform.h"
 #include "error.h"
 #include "svc_logger.h"
-
+#include "jsonrpc_helpers.h"
+#include "method_dispatcher.h"
+#include "param_validator.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,6 +41,7 @@
 static sched_service_t* g_service = NULL;
 static volatile int g_running = 1;
 static agentos_mutex_t g_running_lock;
+static method_dispatcher_t* g_dispatcher = NULL;  /* 方法分发器 */
 
 /* ==================== 错误码定义（统一使用 AGENTOS_ERR_*） ==================== */
 #define SCHED_ERR_INVALID_PARAM    AGENTOS_ERR_INVALID_PARAM
@@ -53,149 +58,96 @@ static agentos_mutex_t g_running_lock;
 #define INVALID_PARAMS  -32602
 #define INTERNAL_ERROR  -32000
 
-/* ==================== JSON-RPC 响应构建 ==================== */
-
-/**
- * @brief 构建错误响应
- * @param code 错误码
- * @param message 错误消息
- * @param id 请求ID
- * @return JSON字符串（需调用者释放）
- */
-static char* build_error_response(int code, const char* message, int id) {
-    cJSON* root = cJSON_CreateObject();
-    if (!root) return NULL;
-
-    cJSON_AddStringToObject(root, "jsonrpc", "2.0");
-    cJSON* err = cJSON_CreateObject();
-    if (!err) {
-        cJSON_Delete(root);
-        return NULL;
-    }
-    cJSON_AddNumberToObject(err, "code", code);
-    cJSON_AddStringToObject(err, "message", message ? message : "Unknown error");
-    cJSON_AddItemToObject(root, "error", err);
-
-    if (id >= 0) {
-        cJSON_AddNumberToObject(root, "id", id);
-    } else {
-        cJSON_AddNullToObject(root, "id");
-    }
-
-    char* json = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
-    return json;
-}
-
-/**
- * @brief 构建成功响应
- * @param result 结果对象
- * @param id 请求ID
- * @return JSON字符串（需调用者释放）
- */
-static char* build_success_response(cJSON* result, int id) {
-    cJSON* root = cJSON_CreateObject();
-    if (!root) return NULL;
-
-    cJSON_AddStringToObject(root, "jsonrpc", "2.0");
-    cJSON_AddItemToObject(root, "result", result ? cJSON_Duplicate(result, 1) : cJSON_CreateNull());
-    cJSON_AddNumberToObject(root, "id", id);
-
-    char* json = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
-    return json;
-}
-
-/* ==================== 信号处理 ==================== */
-
-/**
- * @brief 信号处理函数
- * @param sig 信号值
- */
-static void signal_handler(int sig) {
-    (void)sig;
-    agentos_mutex_lock(&g_running_lock);
-    g_running = 0;
-    agentos_mutex_unlock(&g_running_lock);
-}
-
-#ifdef _WIN32
-/**
- * @brief Windows控制台处理函数
- * @param fdwCtrlType 控制信号类型
- * @return TRUE 已处理
- */
-static BOOL WINAPI console_handler(DWORD fdwCtrlType) {
-    switch (fdwCtrlType) {
-        case CTRL_C_EVENT:
-        case CTRL_CLOSE_EVENT:
-        case CTRL_SHUTDOWN_EVENT:
-            signal_handler((int)fdwCtrlType);
-            return TRUE;
-        default:
-            return FALSE;
-    }
-}
-#endif
-
-/* ==================== 请求处理方法 ==================== */
 
 /**
  * @brief 处理 register_agent 方法
  * @param params 参数对象
- * @param id 请求ID
+ * @param id 请求 ID
  * @param client_fd 客户端描述符
  */
+static void on_register_agent_method(cJSON* params, int id, void* user_data) {
+    (void)user_data;
+    handle_register_agent(params, id, *(agentos_socket_t*)user_data);
+}
+
+/**
+ * @brief 处理 schedule_task 方法
+ */
+static void on_schedule_task_method(cJSON* params, int id, void* user_data) {
+    (void)user_data;
+    handle_schedule_task(params, id, *(agentos_socket_t*)user_data);
+}
+
+/**
+ * @brief 处理 get_stats 方法
+ */
+static void on_get_stats_method(cJSON* params, int id, void* user_data) {
+    (void)user_data;
+    handle_get_stats(id, *(agentos_socket_t*)user_data);
+}
+
+/**
+ * @brief 处理 health_check 方法
+ */
+static void on_health_check_method(cJSON* params, int id, void* user_data) {
+    (void)user_data;
+    handle_health_check(id, *(agentos_socket_t*)user_data);
+}
+
+/**
+ * @brief 注册所有 JSON-RPC 方法
+ */
+static int register_rpc_methods(void) {
+    g_dispatcher = method_dispatcher_create(16);
+    if (!g_dispatcher) {
+        SVC_LOG_ERROR("Failed to create method dispatcher");
+        return -1;
+    }
+    
+    method_dispatcher_register(g_dispatcher, "register_agent", on_register_agent_method, NULL);
+    method_dispatcher_register(g_dispatcher, "schedule_task", on_schedule_task_method, NULL);
+    method_dispatcher_register(g_dispatcher, "get_stats", on_get_stats_method, NULL);
+    method_dispatcher_register(g_dispatcher, "health_check", on_health_check_method, NULL);
+    
+    SVC_LOG_INFO("Registered %d RPC methods", 4);
+    return 0;
+}
+
 static void handle_register_agent(cJSON* params, int id, agentos_socket_t client_fd) {
-    cJSON* agent_json = cJSON_GetObjectItem(params, "agent");
-    if (!cJSON_IsObject(agent_json)) {
-        char* err = build_error_response(INVALID_PARAMS, "Missing agent object", id);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+    cJSON* agent_json = jsonrpc_get_object_param(params, "agent");
+    if (!agent_json) {
+        JSONRPC_SEND_ERROR(client_fd, INVALID_PARAMS, "Missing agent object", id);
         return;
     }
 
     agent_info_t info = {0};
-    cJSON* jid = cJSON_GetObjectItem(agent_json, "agent_id");
-    cJSON* jname = cJSON_GetObjectItem(agent_json, "agent_name");
-
-    if (!cJSON_IsString(jid)) {
-        char* err = build_error_response(INVALID_PARAMS, "Missing agent_id", id);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+    const char* aid = get_string_field(agent_json, "agent_id", NULL);
+    if (!aid) {
+        JSONRPC_SEND_ERROR(client_fd, INVALID_PARAMS, "Missing agent_id", id);
         return;
     }
 
-    strncpy(info.agent_id, jid->valuestring, sizeof(info.agent_id) - 1);
-    if (cJSON_IsString(jname))
-        strncpy(info.agent_name, jname->valuestring, sizeof(info.agent_name) - 1);
+    strncpy(info.agent_id, aid, sizeof(info.agent_id) - 1);
+    const char* aname = get_string_field(agent_json, "agent_name", NULL);
+    if (aname)
+        strncpy(info.agent_name, aname, sizeof(info.agent_name) - 1);
 
-    cJSON* load = cJSON_GetObjectItem(agent_json, "load_factor");
-    if (cJSON_IsNumber(load)) info.load_factor = load->valuedouble;
-
-    cJSON* success_rate = cJSON_GetObjectItem(agent_json, "success_rate");
-    if (cJSON_IsNumber(success_rate)) info.success_rate = success_rate->valuedouble;
-
-    cJSON* response_time = cJSON_GetObjectItem(agent_json, "avg_response_time_ms");
-    if (cJSON_IsNumber(response_time)) info.avg_response_time_ms = response_time->valueint;
-
-    cJSON* available = cJSON_GetObjectItem(agent_json, "is_available");
-    if (cJSON_IsBool(available)) info.is_available = available->valueint;
-
-    cJSON* weight = cJSON_GetObjectItem(agent_json, "weight");
-    if (cJSON_IsNumber(weight)) info.weight = weight->valuedouble;
+    info.load_factor = get_double_field(agent_json, "load_factor", 0.0);
+    info.success_rate = get_double_field(agent_json, "success_rate", 0.0);
+    info.avg_response_time_ms = get_int_field(agent_json, "avg_response_time_ms", 0);
+    info.is_available = get_bool_field(agent_json, "is_available", false);
+    info.weight = get_double_field(agent_json, "weight", 1.0);
 
     int ret = sched_service_register_agent(g_service, &info);
 
     if (ret != AGENTOS_SUCCESS) {
-        char* err = build_error_response(INTERNAL_ERROR, "Register failed", id);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Register failed", id);
         SVC_LOG_ERROR("Failed to register agent: %s (error=%d)", info.agent_id, ret);
     } else {
         cJSON* result = cJSON_CreateObject();
         cJSON_AddStringToObject(result, "status", "registered");
         cJSON_AddStringToObject(result, "agent_id", info.agent_id);
-        char* success = build_success_response(result, id);
-        cJSON_Delete(result);
-        if (success) { agentos_socket_send(client_fd, success, strlen(success)); free(success); }
+        JSONRPC_SEND_SUCCESS(client_fd, result, id);
         SVC_LOG_INFO("Agent registered: %s", info.agent_id);
     }
 }
@@ -207,39 +159,33 @@ static void handle_register_agent(cJSON* params, int id, agentos_socket_t client
  * @param client_fd 客户端描述符
  */
 static void handle_schedule_task(cJSON* params, int id, agentos_socket_t client_fd) {
-    cJSON* task_json = cJSON_GetObjectItem(params, "task");
-    if (!cJSON_IsObject(task_json)) {
-        char* err = build_error_response(INVALID_PARAMS, "Missing task object", id);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+    cJSON* task_json = jsonrpc_get_object_param(params, "task");
+    if (!task_json) {
+        JSONRPC_SEND_ERROR(client_fd, INVALID_PARAMS, "Missing task object", id);
         return;
     }
 
     task_info_t task = {0};
-    cJSON* jid = cJSON_GetObjectItem(task_json, "task_id");
-    if (!cJSON_IsString(jid)) {
-        char* err = build_error_response(INVALID_PARAMS, "Missing task_id", id);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+    const char* tid = get_string_field(task_json, "task_id", NULL);
+    if (!tid) {
+        JSONRPC_SEND_ERROR(client_fd, INVALID_PARAMS, "Missing task_id", id);
         return;
     }
 
-    strncpy(task.task_id, jid->valuestring, sizeof(task.task_id) - 1);
+    strncpy(task.task_id, tid, sizeof(task.task_id) - 1);
 
-    cJSON* desc = cJSON_GetObjectItem(task_json, "task_description");
-    if (cJSON_IsString(desc))
-        strncpy(task.task_description, desc->valuestring, sizeof(task.task_description) - 1);
+    const char* desc = get_string_field(task_json, "task_description", NULL);
+    if (desc)
+        strncpy(task.task_description, desc, sizeof(task.task_description) - 1);
 
-    cJSON* priority = cJSON_GetObjectItem(task_json, "priority");
-    if (cJSON_IsNumber(priority)) task.priority = priority->valueint;
-
-    cJSON* timeout = cJSON_GetObjectItem(task_json, "timeout_ms");
-    if (cJSON_IsNumber(timeout)) task.timeout_ms = timeout->valueint;
+    task.priority = get_int_field(task_json, "priority", 0);
+    task.timeout_ms = get_int_field(task_json, "timeout_ms", 30000);
 
     sched_result_t* result = NULL;
     int ret = sched_service_schedule_task(g_service, &task, &result);
 
     if (ret != AGENTOS_SUCCESS || !result) {
-        char* err = build_error_response(INTERNAL_ERROR, "Schedule failed", id);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Schedule failed", id);
         SVC_LOG_ERROR("Task scheduling failed: %s (error=%d)", task.task_id, ret);
         return;
     }
@@ -249,9 +195,7 @@ static void handle_schedule_task(cJSON* params, int id, agentos_socket_t client_
     cJSON_AddNumberToObject(res_obj, "confidence", result->confidence);
     cJSON_AddNumberToObject(res_obj, "estimated_time_ms", result->estimated_time_ms);
 
-    char* success = build_success_response(res_obj, id);
-    cJSON_Delete(res_obj);
-    if (success) { agentos_socket_send(client_fd, success, strlen(success)); free(success); }
+    JSONRPC_SEND_SUCCESS(client_fd, res_obj, id);
     SVC_LOG_INFO("Task scheduled: %s -> Agent: %s (Confidence: %.2f)",
                 task.task_id, result->selected_agent_id, result->confidence);
 
@@ -269,8 +213,7 @@ static void handle_get_stats(int id, agentos_socket_t client_fd) {
     int ret = sched_service_get_stats(g_service, &stats_data);
 
     if (ret != AGENTOS_SUCCESS || !stats_data) {
-        char* err = build_error_response(INTERNAL_ERROR, "Get stats failed", id);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Get stats failed", id);
         return;
     }
 
@@ -278,14 +221,11 @@ static void handle_get_stats(int id, agentos_socket_t client_fd) {
     free(stats_data);
 
     if (!report_json) {
-        char* err = build_error_response(INTERNAL_ERROR, "Invalid report data", id);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Invalid report data", id);
         return;
     }
 
-    char* success = build_success_response(report_json, id);
-    cJSON_Delete(report_json);
-    if (success) { agentos_socket_send(client_fd, success, strlen(success)); free(success); }
+    JSONRPC_SEND_SUCCESS(client_fd, report_json, id);
 }
 
 /**
@@ -302,9 +242,7 @@ static void handle_health_check(int id, agentos_socket_t client_fd) {
     cJSON_AddBoolToObject(result, "healthy", healthy);
     cJSON_AddNumberToObject(result, "timestamp", (double)(uint64_t)time(NULL) * 1000);
 
-    char* success = build_success_response(result, id);
-    cJSON_Delete(result);
-    if (success) { agentos_socket_send(client_fd, success, strlen(success)); free(success); }
+    JSONRPC_SEND_SUCCESS(client_fd, result, id);
 }
 
 /* ==================== 客户端连接处理 ==================== */
@@ -323,18 +261,15 @@ static void handle_client(agentos_socket_t client_fd) {
     }
     buffer[n] = '\0';
 
-    /* 检查请求大小 */
     if ((size_t)n >= sizeof(buffer) - 1) {
-        char* err = build_error_response(INVALID_REQUEST, "Request too large", -1);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        JSONRPC_SEND_ERROR(client_fd, INVALID_REQUEST, "Request too large", -1);
         agentos_socket_close(client_fd);
         return;
     }
 
     cJSON* req = cJSON_Parse(buffer);
     if (!req) {
-        char* err = build_error_response(PARSE_ERROR, "Parse error: invalid JSON", -1);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        JSONRPC_SEND_ERROR(client_fd, PARSE_ERROR, "Parse error: invalid JSON", -1);
         agentos_socket_close(client_fd);
         return;
     }
@@ -346,8 +281,7 @@ static void handle_client(agentos_socket_t client_fd) {
 
     if (!cJSON_IsString(jsonrpc) || strcmp(jsonrpc->valuestring, "2.0") != 0 ||
         !cJSON_IsString(method) || !id) {
-        char* err = build_error_response(INVALID_REQUEST, "Invalid Request", -1);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        JSONRPC_SEND_ERROR(client_fd, INVALID_REQUEST, "Invalid Request", -1);
         cJSON_Delete(req);
         agentos_socket_close(client_fd);
         return;
@@ -357,19 +291,7 @@ static void handle_client(agentos_socket_t client_fd) {
 
     SVC_LOG_DEBUG("Processing request: method=%s, id=%d", method->valuestring, req_id);
 
-    if (strcmp(method->valuestring, "register_agent") == 0) {
-        handle_register_agent(params, req_id, client_fd);
-    } else if (strcmp(method->valuestring, "schedule_task") == 0) {
-        handle_schedule_task(params, req_id, client_fd);
-    } else if (strcmp(method->valuestring, "get_stats") == 0) {
-        handle_get_stats(req_id, client_fd);
-    } else if (strcmp(method->valuestring, "health_check") == 0) {
-        handle_health_check(req_id, client_fd);
-    } else {
-        char* err = build_error_response(METHOD_NOT_FOUND, "Method not found", req_id);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
-        SVC_LOG_WARN("Unknown method requested: %s", method->valuestring);
-    }
+    method_dispatcher_dispatch(g_dispatcher, req, jsonrpc_build_error, &client_fd);
 
     cJSON_Delete(req);
     agentos_socket_close(client_fd);
@@ -449,7 +371,16 @@ int main(int argc, char** argv) {
         agentos_socket_cleanup();
         return 1;
     }
-
+    
+    /* 注册 RPC 方法 */
+    if (register_rpc_methods() != 0) {
+        SVC_LOG_ERROR("Failed to register RPC methods");
+        sched_service_destroy(g_service);
+        agentos_mutex_destroy(&g_running_lock);
+        agentos_socket_cleanup();
+        return 1;
+    }
+    
     SVC_LOG_INFO("Scheduler service created with strategy: round_robin");
 
     /* 创建服务器 Socket */
@@ -499,6 +430,7 @@ int main(int argc, char** argv) {
     SVC_LOG_INFO("Scheduler service stopping...");
     agentos_socket_close(server_fd);
     sched_service_destroy(g_service);
+    if (g_dispatcher) method_dispatcher_destroy(g_dispatcher);
     agentos_mutex_destroy(&g_running_lock);
     agentos_socket_cleanup();
 

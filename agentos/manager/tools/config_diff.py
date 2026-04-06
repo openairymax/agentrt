@@ -93,7 +93,7 @@ class DiffResult:
     @property
     def has_changes(self) -> bool:
         """是否存在变更"""
-        return self.added_count > 0 or self.remained_count > 0 or self.modified_count > 0
+        return self.added_count > 0 or self.removed_count > 0 or self.modified_count > 0
 
 
 def detect_value_type(value: Any) -> ValueType:

@@ -32,7 +32,7 @@
 #include "sanitizer/sanitizer.h"
 #include "workbench/workbench.h"
 #include "audit/audit.h"
-#include "platform/platform.h"
+#include "../utils/cupolas_utils.h"
 
 #include <stdlib.h>
 #include <string.h>

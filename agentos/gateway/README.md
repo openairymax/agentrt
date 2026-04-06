@@ -8,7 +8,7 @@
 
 **协议转换层：连接内核与外部世界的桥梁**
 
-**版本**: v1.0.0.7 | **最后更新**: 2026-04-03
+**版本**: v1.1.0 | **最后更新**: 2026-04-06
 **生产级状态**: ✅ 生产就绪 (Production Ready)
 
 </div>
@@ -77,25 +77,44 @@ agentos/gateway/
 ├── include/
 │   └── gateway.h              # 统一公共接口 (12个API)
 ├── src/
-│   ├── agentos/gateway/
+│   ├── gateway/               # 核心网关实现
 │   │   ├── gateway.h          # 内部抽象接口 (ops表+inline)
 │   │   ├── gateway_api.c      # 公共API包装函数
-│   │   ├── http_gateway.c     # HTTP 协议转换实现
-│   │   ├── http_gateway.h
-│   │   ├── ws_gateway.c       # WebSocket 协议转换实现
-│   │   ├── ws_gateway.h
-│   │   ├── stdio_gateway.c    # Stdio 协议转换实现
-│   │   └── stdio_gateway.h
-│   └── utils/
-│       ├── jsonrpc.c/h        # JSON-RPC 2.0 工具
+│   │   ├── http_gateway.c/h   # HTTP 协议转换 (libmicrohttpd)
+│   │   ├── http_gateway_routes.c/h  # HTTP 路由处理 (路由表模式)
+│   │   ├── ws_gateway.c/h     # WebSocket 协议转换 (libwebsockets)
+│   │   └── stdio_gateway.c/h  # Stdio 协议转换 (REPL)
+│   └── utils/                 # 共享工具模块
+│       ├── jsonrpc.c/h        # JSON-RPC 2.0 工具 (标准+自定义错误码)
 │       ├── syscall_router.c/h # 系统调用路由器 (5类×18方法)
-│       └── gateway_utils.h    # 公共工具函数 (time_ns/sleep)
-├── tests/
-│   └── test_gateway.c         # 单元测试 (11个测试用例)
-├── CMakeLists.txt             # 构建配置
+│       ├── gateway_utils.h    # 公共工具函数 (time_ns/sleep/elapsed)
+│       ├── gateway_rpc_handler.c/h  # 统一RPC处理器 (DRY核心)
+│       └── gateway_rate_limiter.c/h # 令牌桶速率限制器 (DoS防护)
+├── tests/                     # 单元测试 (4套×50+用例)
+│   ├── test_gateway.c         # 网关生命周期测试 (7用例)
+│   ├── test_jsonrpc.c         # JSON-RPC协议测试 (17用例)
+│   ├── test_syscall_router.c  # 路由器测试 (8用例)
+│   └── test_gateway_rpc_handler.c  # RPC处理器测试 (14用例)
+├── docker/                    # Docker容器化配置
+│   ├── Dockerfile             # 多阶段构建
+│   ├── docker-compose.yml     # 编排配置
+│   ├── docker-compose.dev.yml # 开发环境
+│   ├── docker-compose.prod.yml# 生产环境
+│   └── monitoring/            # Prometheus监控栈
+├── deploy/                    # K8s部署配置
+│   ├── README.md              # 部署指南
+│   └── k8s/
+│       ├── configmap.yaml     # 配置映射
+│       ├── deployment.yaml    # 部署清单
+│       ├── namespace.yaml     # 命名空间
+│       └── service.yaml       # 服务暴露
+├── config/
+│   └── cppcheck.cfg           # 静态分析配置
+├── CMakeLists.txt             # CMake构建配置
 ├── .clang-format              # 代码格式规范
-├── .clang-tidy                # 静态分析配置
-└── README.md                  # 本文档
+├── .clang-tidy                # 静态分析规则
+├── README.md                  # 模块文档 (本文件)
+└── SECURITY.md                # 安全最佳实践
 ```
 
 ---
@@ -266,18 +285,9 @@ OPTIONS /           # CORS 预检
 
 ---
 
-## 🔧 HTTP 端点
+## 🌐 WebSocket 消息协议
 
-### JSON-RPC 端点
-
-```
-POST /              # JSON-RPC 2.0 请求
-GET  /health        # 健康检查
-GET  /metrics       # Prometheus 指标导出
-OPTIONS /           # CORS 预检
-```
-
-### JSON-RPC 请求示例
+### 消息类型
 
 ```json
 {

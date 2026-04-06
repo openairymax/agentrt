@@ -1,6 +1,6 @@
-﻿# AgentOS Python SDK - Client Implementation
+# AgentOS Python SDK - Client Implementation
 # Version: 3.0.0
-# Last updated: 2026-03-24
+# Last updated: 2026-04-05
 
 """
 HTTP client implementation following Go SDK architecture.
@@ -27,7 +27,7 @@ from urllib3.util.retry import Retry
 from ..exceptions import (
     AgentOSError,
     NetworkError,
-    AgentOSTimeoutError,  # 使用明确的类名避免与内置 TimeoutError 冲突
+    AgentOSTimeoutError,
     InvalidResponseError,
     ServerError,
     RateLimitError,
@@ -37,7 +37,14 @@ from ..exceptions import (
 T = TypeVar('T')
 logger = logging.getLogger(__name__)
 
-MAX_RESPONSE_BODY_SIZE = 10 * 1024 * 1024  # 10MB
+MAX_RESPONSE_BODY_SIZE = 10 * 1024 * 1024
+
+
+class _RetryableError(Exception):
+    """内部异常，标记可重试的错误"""
+    def __init__(self, original_error: Exception):
+        self.original_error = original_error
+        super().__init__(str(original_error))
 
 
 @dataclass
@@ -58,12 +65,7 @@ class manager:
     headers: Dict[str, str] = field(default_factory=dict)
 
     def validate(self) -> None:
-        """
-        验证配置有效性
-        
-        Raises:
-            AgentOSError: 配置无效时抛出
-        """
+        """验证配置有效性"""
         if not self.endpoint:
             raise AgentOSError("端点地址不能为空")
         if not self.endpoint.startswith(("http://", "https://")):
@@ -74,12 +76,7 @@ class manager:
             raise AgentOSError("最大重试次数不能为负数")
 
     def clone(self) -> 'manager':
-        """
-        创建配置副本
-        
-        Returns:
-            manager: 配置副本
-        """
+        """创建配置副本"""
         return manager(
             endpoint=self.endpoint,
             timeout=self.timeout,
@@ -95,11 +92,7 @@ class manager:
 
 @dataclass
 class RequestOptions:
-    """
-    单次请求的可选参数
-    
-    对应 Go SDK: types/types.go RequestOptions
-    """
+    """单次请求的可选参数"""
     timeout: Optional[float] = None
     headers: Dict[str, str] = field(default_factory=dict)
     query_params: Dict[str, str] = field(default_factory=dict)
@@ -107,26 +100,14 @@ class RequestOptions:
 
 @dataclass
 class APIResponse:
-    """
-    通用 API 响应结构
-    
-    对应 Go SDK: types/types.go APIResponse
-    """
+    """通用 API 响应结构"""
     success: bool
     data: Any = None
     message: str = ""
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> 'APIResponse':
-        """
-        从字典创建响应对象
-        
-        Args:
-            d: 响应字典
-            
-        Returns:
-            APIResponse: 响应对象
-        """
+        """从字典创建响应对象"""
         return cls(
             success=d.get("success", False),
             data=d.get("data"),
@@ -136,11 +117,7 @@ class APIResponse:
 
 @dataclass
 class HealthStatus:
-    """
-    健康检查返回状态
-    
-    对应 Go SDK: types/types.go HealthStatus
-    """
+    """健康检查返回状态"""
     status: str
     version: str
     uptime: int
@@ -150,11 +127,7 @@ class HealthStatus:
 
 @dataclass
 class Metrics:
-    """
-    系统运行指标快照
-    
-    对应 Go SDK: types/types.go Metrics
-    """
+    """系统运行指标快照"""
     tasks_total: int = 0
     tasks_completed: int = 0
     tasks_failed: int = 0
@@ -168,95 +141,34 @@ class Metrics:
 
 
 class APIClient(ABC):
-    """
-    APIClient 接口定义
-    
-    对应 Go SDK: client/client.go APIClient interface
-    
-    所有 Manager 共同依赖的 HTTP 通信接口，实现依赖倒转。
-    """
+    """APIClient 接口定义"""
 
     @abstractmethod
     def get(self, path: str, opts: Optional[RequestOptions] = None) -> APIResponse:
-        """
-        执行 HTTP GET 请求
-        
-        Args:
-            path: API 路径
-            opts: 请求选项
-            
-        Returns:
-            APIResponse: API 响应
-        """
+        """执行 HTTP GET 请求"""
         pass
 
     @abstractmethod
     def post(self, path: str, body: Any = None, opts: Optional[RequestOptions] = None) -> APIResponse:
-        """
-        执行 HTTP POST 请求
-        
-        Args:
-            path: API 路径
-            body: 请求体
-            opts: 请求选项
-            
-        Returns:
-            APIResponse: API 响应
-        """
+        """执行 HTTP POST 请求"""
         pass
 
     @abstractmethod
     def put(self, path: str, body: Any = None, opts: Optional[RequestOptions] = None) -> APIResponse:
-        """
-        执行 HTTP PUT 请求
-        
-        Args:
-            path: API 路径
-            body: 请求体
-            opts: 请求选项
-            
-        Returns:
-            APIResponse: API 响应
-        """
+        """执行 HTTP PUT 请求"""
         pass
 
     @abstractmethod
     def delete(self, path: str, opts: Optional[RequestOptions] = None) -> APIResponse:
-        """
-        执行 HTTP DELETE 请求
-        
-        Args:
-            path: API 路径
-            opts: 请求选项
-            
-        Returns:
-            APIResponse: API 响应
-        """
+        """执行 HTTP DELETE 请求"""
         pass
 
 
 class Client(APIClient):
-    """
-    AgentOS Python SDK 核心客户端
-    
-    对应 Go SDK: client/client.go Client
-    
-    Features:
-        - Connection pooling with configurable limits
-        - Automatic retry with exponential backoff
-        - Request timeout management
-        - API Key authentication
-        - Health check and metrics endpoints
-    """
+    """AgentOS Python SDK 核心客户端"""
 
     def __init__(self, manager: Optional[manager] = None, **kwargs):
-        """
-        初始化客户端
-        
-        Args:
-            manager: 配置对象，如果为 None 则使用默认配置
-            **kwargs: 配置参数，会覆盖 manager 中的对应字段
-        """
+        """初始化客户端"""
         if manager is None:
             manager = manager()
 
@@ -269,12 +181,7 @@ class Client(APIClient):
         self._session = self._create_session()
 
     def _create_session(self) -> requests.Session:
-        """
-        创建带重试策略的 Session
-        
-        Returns:
-            requests.Session: 配置好的 Session 对象
-        """
+        """创建带重试策略的 Session"""
         session = requests.Session()
 
         retry_strategy = Retry(
@@ -308,34 +215,16 @@ class Client(APIClient):
 
     @property
     def manager(self) -> manager:
-        """
-        获取配置副本
-        
-        Returns:
-            manager: 配置副本
-        """
+        """获取配置副本"""
         return self._config.clone()
 
     @property
     def endpoint(self) -> str:
-        """
-        获取端点地址
-        
-        Returns:
-            str: 端点地址
-        """
+        """获取端点地址"""
         return self._config.endpoint
 
     def health(self) -> HealthStatus:
-        """
-        检查 AgentOS 服务的健康状态
-        
-        Returns:
-            HealthStatus: 健康状态对象
-            
-        Raises:
-            InvalidResponseError: 响应格式异常
-        """
+        """检查 AgentOS 服务的健康状态"""
         resp = self.get("/api/v1/health")
         if not resp.success or not isinstance(resp.data, dict):
             raise InvalidResponseError("健康检查响应格式异常")
@@ -350,15 +239,7 @@ class Client(APIClient):
         )
 
     def metrics(self) -> Metrics:
-        """
-        获取 AgentOS 系统运行指标
-        
-        Returns:
-            Metrics: 指标对象
-            
-        Raises:
-            InvalidResponseError: 响应格式异常
-        """
+        """获取 AgentOS 系统运行指标"""
         resp = self.get("/api/v1/metrics")
         if not resp.success or not isinstance(resp.data, dict):
             raise InvalidResponseError("指标响应格式异常")
@@ -378,9 +259,7 @@ class Client(APIClient):
         )
 
     def close(self) -> None:
-        """
-        关闭客户端，释放连接池资源
-        """
+        """关闭客户端"""
         if self._session:
             self._session.close()
 
@@ -394,16 +273,7 @@ class Client(APIClient):
         return f"AgentOS Client[endpoint={self._config.endpoint}, timeout={self._config.timeout}]"
 
     def _build_url(self, path: str, query_params: Optional[Dict[str, str]] = None) -> str:
-        """
-        构建完整 URL
-        
-        Args:
-            path: API 路径
-            query_params: 查询参数
-            
-        Returns:
-            str: 完整 URL
-        """
+        """构建完整 URL"""
         url = self._config.endpoint.rstrip('/') + path
         if query_params:
             params = "&".join(f"{k}={v}" for k, v in query_params.items())
@@ -411,39 +281,17 @@ class Client(APIClient):
         return url
 
     def _calculate_backoff(self, attempt: int) -> float:
-        """
-        计算指数退避延迟（含抖动）
-        
-        Args:
-            attempt: 重试次数
-            
-        Returns:
-            float: 延迟秒数
-        """
+        """计算指数退避延迟"""
         backoff = self._config.retry_delay * (2 ** (attempt - 1))
         jitter = random.uniform(0, backoff)
         return backoff + jitter
 
     def _should_retry(self, status_code: int) -> bool:
-        """
-        判断是否应重试
-        
-        Args:
-            status_code: HTTP 状态码
-            
-        Returns:
-            bool: 是否应重试
-        """
+        """判断是否应重试"""
         return status_code >= 500 or status_code == 429
 
     def _generate_request_id(self) -> str:
-        """
-        生成唯一的请求 ID
-        
-        Returns:
-            str: 请求 ID
-        """
-        import time
+        """生成唯一的请求 ID"""
         timestamp = int(time.time() * 1000000)
         random_suffix = random.randint(0, 999999)
         return f"req-{timestamp}-{random_suffix:06d}"
@@ -455,128 +303,114 @@ class Client(APIClient):
         body: Any = None,
         opts: Optional[RequestOptions] = None
     ) -> APIResponse:
-        """
-        执行底层 HTTP 请求
-        
-        Args:
-            method: HTTP 方法
-            path: API 路径
-            body: 请求体
-            opts: 请求选项
-            
-        Returns:
-            APIResponse: API 响应
-            
-        Raises:
-            NetworkError: 网络错误
-            TimeoutError: 超时错误
-            InvalidResponseError: 响应格式错误
-        """
-        opts = opts or RequestOptions()
-        url = self._build_url(path, opts.query_params)
-
-        headers = dict(opts.headers) if opts.headers else {}
-        timeout = opts.timeout if opts.timeout else self._config.timeout
-        
-        # 添加请求 ID 追踪
-        request_id = self._generate_request_id()
-        headers["X-Request-ID"] = request_id
-
-        json_body = json.dumps(body) if body is not None else None
-
+        """执行底层 HTTP 请求"""
+        request_config = self._prepare_request_config(method, path, body, opts)
         last_error = None
+        
         for attempt in range(self._config.max_retries + 1):
             if attempt > 0:
-                delay = self._calculate_backoff(attempt)
-                logger.warning(f"请求失败，{delay:.2f}s 后重试 (尝试 {attempt}/{self._config.max_retries})")
-                time.sleep(delay)
-
+                self._handle_retry_delay(attempt)
+            
             try:
-                response = self._session.request(
-                    method=method,
-                    url=url,
-                    data=json_body,
-                    headers=headers if headers else None,
-                    timeout=timeout,
-                )
-
-                if response.status_code >= 400:
-                    error = http_status_to_error(response.status_code, response.text)
-                    if not self._should_retry(response.status_code):
-                        raise error
-                    last_error = error
-                    continue
-
-                if len(response.content) > MAX_RESPONSE_BODY_SIZE:
-                    raise InvalidResponseError("响应体超过最大限制")
-
-                data = response.json()
-                return APIResponse.from_dict(data)
-
-            except requests.Timeout:
-                last_error = AgentOSTimeoutError(timeout_ms=self.manager.timeout * 1000, operation=f"{method} {path}")
-            except requests.ConnectionError as e:
-                last_error = NetworkError(f"连接错误: {e}")
-            except requests.RequestException as e:
-                last_error = NetworkError(f"请求错误: {e}")
-            except json.JSONDecodeError:
-                last_error = InvalidResponseError("响应 JSON 解析失败")
-
-        if last_error:
-            raise last_error
-        raise NetworkError("未知网络错误")
+                return self._execute_single_request(request_config)
+            except Exception as e:
+                last_error = self._classify_request_error(e, request_config)
+                if not self._is_retryable_error(last_error):
+                    raise last_error
+        
+        raise last_error or NetworkError("未知网络错误")
+    
+    def _prepare_request_config(
+        self,
+        method: str,
+        path: str,
+        body: Any,
+        opts: Optional[RequestOptions]
+    ) -> Dict[str, Any]:
+        """准备请求配置"""
+        opts = opts or RequestOptions()
+        url = self._build_url(path, opts.query_params)
+        timeout = opts.timeout if opts.timeout else self._config.timeout
+        
+        headers = dict(opts.headers) if opts.headers else {}
+        headers["X-Request-ID"] = self._generate_request_id()
+        
+        json_body = json.dumps(body) if body is not None else None
+        
+        return {
+            'method': method,
+            'path': path,
+            'url': url,
+            'headers': headers,
+            'timeout': timeout,
+            'json_body': json_body,
+        }
+    
+    def _handle_retry_delay(self, attempt: int):
+        """处理重试延迟"""
+        delay = self._calculate_backoff(attempt)
+        logger.warning(
+            f"请求失败，{delay:.2f}s 后重试 (尝试 {attempt}/{self._config.max_retries})"
+        )
+        time.sleep(delay)
+    
+    def _execute_single_request(self, request_config: Dict[str, Any]) -> APIResponse:
+        """执行单次请求"""
+        response = self._session.request(
+            method=request_config['method'],
+            url=request_config['url'],
+            data=request_config['json_body'],
+            headers=request_config['headers'] if request_config['headers'] else None,
+            timeout=request_config['timeout'],
+        )
+        
+        if response.status_code >= 400:
+            error = http_status_to_error(response.status_code, response.text)
+            if not self._should_retry(response.status_code):
+                raise error
+            raise _RetryableError(error)
+        
+        if len(response.content) > MAX_RESPONSE_BODY_SIZE:
+            raise InvalidResponseError("响应体超过最大限制")
+        
+        try:
+            data = response.json()
+        except json.JSONDecodeError as e:
+            raise InvalidResponseError("响应 JSON 解析失败") from e
+        
+        return APIResponse.from_dict(data)
+    
+    def _classify_request_error(self, error: Exception, request_config: Dict[str, Any]) -> Exception:
+        """分类请求错误"""
+        if isinstance(error, requests.Timeout):
+            return AgentOSTimeoutError(
+                timeout_ms=int(request_config['timeout'] * 1000),
+                operation=f"{request_config['method']} {request_config['path']}"
+            )
+        elif isinstance(error, requests.ConnectionError):
+            return NetworkError(f"连接错误：{error}")
+        elif isinstance(error, requests.RequestException):
+            return NetworkError(f"请求错误：{error}")
+        elif isinstance(error, _RetryableError):
+            return error.original_error
+        return error
+    
+    def _is_retryable_error(self, error: Exception) -> bool:
+        """判断错误是否可重试"""
+        return isinstance(error, _RetryableError)
 
     def get(self, path: str, opts: Optional[RequestOptions] = None) -> APIResponse:
-        """
-        执行 HTTP GET 请求
-        
-        Args:
-            path: API 路径
-            opts: 请求选项
-            
-        Returns:
-            APIResponse: API 响应
-        """
+        """执行 HTTP GET 请求"""
         return self._request("GET", path, None, opts)
 
     def post(self, path: str, body: Any = None, opts: Optional[RequestOptions] = None) -> APIResponse:
-        """
-        执行 HTTP POST 请求
-        
-        Args:
-            path: API 路径
-            body: 请求体
-            opts: 请求选项
-            
-        Returns:
-            APIResponse: API 响应
-        """
+        """执行 HTTP POST 请求"""
         return self._request("POST", path, body, opts)
 
     def put(self, path: str, body: Any = None, opts: Optional[RequestOptions] = None) -> APIResponse:
-        """
-        执行 HTTP PUT 请求
-        
-        Args:
-            path: API 路径
-            body: 请求体
-            opts: 请求选项
-            
-        Returns:
-            APIResponse: API 响应
-        """
+        """执行 HTTP PUT 请求"""
         return self._request("PUT", path, body, opts)
 
     def delete(self, path: str, opts: Optional[RequestOptions] = None) -> APIResponse:
-        """
-        执行 HTTP DELETE 请求
-        
-        Args:
-            path: API 路径
-            opts: 请求选项
-            
-        Returns:
-            APIResponse: API 响应
-        """
+        """执行 HTTP DELETE 请求"""
         return self._request("DELETE", path, None, opts)
-
