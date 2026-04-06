@@ -1,7 +1,7 @@
 # =============================================================================
 # AgentOS .gitignore 文件
-# 版本：5.0.0
-# 最后更新：2026-04-05
+# 版本：6.0.0
+# 最后更新：2026-04-06
 # 说明：规范化排除所有不应纳入版本控制的文件和目录
 #
 # 设计原则：
@@ -11,46 +11,50 @@
 # 4. 空目录通过 .gitkeep 保留，但排除目录内容
 # 5. 项目必需文件使用否定规则明确保留
 #
-# 项目模块结构（2026-04-05 重大重构后）：
-.bendiwenjian/
-
-# 核心模块集合 (agentos/)
-# - agentos/atoms/       : 核心原子模块（C 语言，内核级）
-# - agentos/atomslite/   : 轻量级原子模块
-# - agentos/commons/     : 统一基础库
-# - agentos/cupolas/     : 安全穹顶模块
-# - agentos/daemon/      : 用户态服务模块
-# - agentos/gateway/     : 网关服务模块
-# - agentos/heapstore/   : 数据持久化层（运行时生成）
-# - agentos/manager/     : 配置管理器
-# - agentos/toolkit/     : 多语言 SDK 工具
-# - agentos/manuals/     : 项目文档
+# 项目模块结构（2026-04-06 V4.1校正后）：
+# 核心模块 (agentos/)
+#   - atoms/       : 内核原子模块 (40,917行, A+评级)
+#   - atomslite/   : 轻量级原子模块
+#   - commons/     : 统一基础库 (S级, 97.1分)
+#   - cupolas/     : 安全穹顶模块 (A++评级, 97.5分)
+#   - daemon/      : 用户态服务模块 (S+评级, 96.5分)
+#   - gateway/     : 网关服务模块 (A+评级)
+#   - heapstore/   : 数据持久化层 (A评级, 98%生产就绪)
+#   - manager/     : 配置管理器
+#   - toolkit/     : 多语言 SDK 工具 (35,638行, 4语言)
+#   - manuals/     : 项目文档
 #
 # 辅助模块
-# - openlab/             : Python 应用中心
-# - scripts/             : 构建和运维脚本
-# - tests/               : 测试框架
-# - docker/              : 容器化配置
-# - docs/                : 额外文档
+#   - openlab/     : Python 应用中心
+#   - scripts/     : 构建和运维脚本
+#   - tests/       : 测试框架 (A+认证, 98.5分)
+#   - docker/      : 容器化配置
+#   - docs/        : 额外文档
+#   - .gitcode/    : CI/CD配置 (V2.0优化后)
+#   - .bendiwenjian/: 修复记录 (155份文档)
 # =============================================================================
+
+# =============================================================================
+# 修复记录目录（本地工作记录，不追踪）
+# =============================================================================
+
+.bendiwenjian/
 
 # =============================================================================
 # 1. CMake 构建系统（构建产物，不追踪）
 # =============================================================================
 
-# CMake 缓存文件（构建时生成）
 CMakeCache.txt
-
-# CMake 临时文件和生成文件
 CMakeFiles/
 cmake_install.cmake
 cmake_install.*
 CMakeUserPresets.json
+CMakePresets.json
 
 # CMake 构建目录
 build/
 _build/
-cmake-build-*/
+cmake-build*/
 cmake-build-debug/
 cmake-build-release/
 cmake-build-coverage/
@@ -58,6 +62,7 @@ cmake-build-coverage/
 # 编译器数据库（IDE 工具生成）
 compile_commands.json
 compile_flags.txt
+compile_commands/*.json
 
 # =============================================================================
 # 2. 编译产物（构建时生成，不追踪）
@@ -109,6 +114,7 @@ env/
 ENV/
 .venv/
 .python-version
+.venv.bak/
 
 # Python 包管理产物
 *.egg-info/
@@ -149,6 +155,9 @@ ipython_kernel_config.py
 dmypy.json
 .ruff_cache/
 
+# Ruff
+.ruff_cache/
+
 # =============================================================================
 # 4. Go 语言 SDK（构建产物，不追踪）
 # =============================================================================
@@ -184,6 +193,8 @@ agentos/toolkit/typescript/coverage/
 agentos/toolkit/typescript/.tsbuildinfo
 agentos/toolkit/typescript/.pnpm-store/
 agentos/toolkit/typescript/tsbuildinfo/
+.next/
+.nuxt/
 
 # =============================================================================
 # 7. 环境变量和敏感配置（本地配置，不追踪）
@@ -207,6 +218,7 @@ agentos/toolkit/typescript/tsbuildinfo/
 *.p12
 *.pfx
 *.jks
+*.keystore
 secrets.json
 secrets.yaml
 secrets.yml
@@ -244,7 +256,7 @@ out/
 *.hprof
 *.heap
 *.snap
-.clion/
+*.clion/
 
 # Vim
 *.swp
@@ -252,9 +264,7 @@ out/
 *~
 .netrwhist
 *.un~
-
-# Emacs
-\#*\#
+# \#*\#
 .\#*
 *.elc
 
@@ -264,8 +274,8 @@ out/
 
 # Xcode
 *.xcodeproj/
-*.xcworkspace/
-*.xcuserstate
+*.xcworkspace
+*.xcuserstated
 *.xccheckout
 *.pbxuser
 *.perspectivev3
@@ -274,7 +284,7 @@ out/
 *.suo
 *.user
 *.userosscache
-*.sln.docstates
+.sln.docstates
 [Dd]ebug/
 [Rr]elease/
 x64/
@@ -439,7 +449,7 @@ toolkit/go/doc/
 .Spotlight-V100
 .TemporaryItems
 .Trashes
-.VolumeIcon.icns
+.VolumeIcon.icn
 .apdisk
 
 # Windows
@@ -454,7 +464,7 @@ $RECYCLE.BIN/
 # Linux
 .fuse_hidden*
 .Trash-*
-.nfs-*
+.nfs*
 
 # =============================================================================
 # 14. 依赖管理（本地安装，不追踪）
@@ -554,6 +564,8 @@ cppcheck.local.xml
 .jscpd-store/
 .scannerwork/
 sonar-report.json
+.clangd/
+.cache/clangd/
 
 # =============================================================================
 # 18. 本地开发文档（临时文件，不追踪）
@@ -572,7 +584,6 @@ CHANGELOG.local
 README.local.md
 README.local
 *.tmp
-*.temp
 *.tmp.sh
 *.tmp.bat
 *.tmp.ps1
@@ -637,6 +648,7 @@ docs/private/
 # 关键文档
 !agentos/manuals/**/*.md
 !README.md
+!README_EN.md
 !LICENSE
 !CHANGELOG.md
 !CONTRIBUTING.md
@@ -689,8 +701,8 @@ docs/private/
 !Dockerfile*
 !docker-compose*.yml
 !deploy/docker/Dockerfile*
-!agentos/gateway/docker/Dockerfile*
 !openlab/Dockerfile
+!agentos/gateway/docker/Dockerfile*
 !agentos/daemon/Dockerfile.ci
 !scripts/deploy/docker/Dockerfile*
 !docker/Dockerfile*
@@ -732,6 +744,13 @@ docs/private/
 # =============================================================================
 
 # .gitcode/是平台模板目录，随仓库同步
+# .github/是GitHub Actions配置目录
+
+# =============================================================================
+# 22. 总线检查报告目录（保留最终版本）
+# =============================================================================
+
+!.bendiwenjian/总线检查/*.md
 
 # =============================================================================
 # 结束

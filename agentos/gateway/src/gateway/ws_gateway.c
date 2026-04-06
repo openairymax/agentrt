@@ -21,6 +21,7 @@
 #include "../utils/jsonrpc.h"
 #include "../utils/syscall_router.h"
 #include "../utils/gateway_utils.h"
+#include "../utils/gateway_rpc_handler.h"
 
 #include <libwebsockets.h>
 #include <cJSON.h>
@@ -208,65 +209,41 @@ static int ws_send_message(struct lws* wsi, ws_message_t* msg) {
     return result;
 }
 
-/**
- * @brief 创建错误响应JSON字符串
- * @param code 错误码
- * @param message 错误消息
- * @return JSON字符串，需调用者free()
- */
-static char* create_error_json(int code, const char* message) {
-    cJSON* error = cJSON_CreateObject();
-    if (!error) return NULL;
-
-    cJSON_AddNumberToObject(error, "code", code);
-    cJSON_AddStringToObject(error, "message", message ? message : "Unknown error");
-
-    cJSON* response = cJSON_CreateObject();
-    if (!response) {
-        cJSON_Delete(error);
-        return NULL;
-    }
-
-    cJSON_AddStringToObject(response, "jsonrpc", "2.0");
-    cJSON_AddItemToObject(response, "error", error);
-
-    char* json_str = cJSON_Print(response);
-    cJSON_Delete(response);
-
-    return json_str;
-}
-
-/* ========== RPC处理 ========== */
+/* ========== RPC处理（使用统一处理器） ========== */
 
 /**
- * @brief 处理RPC请求
+ * @brief 处理RPC请求（使用统一RPC处理器）
+ *
+ * 通过 gateway_rpc_handle_request() 实现统一的请求处理流程，
+ * 消除与 HTTP/Stdio 网关的代码重复。
+ *
  * @param gateway 网关实例
  * @param request JSON-RPC请求对象
  * @return JSON响应字符串，需调用者free()
  */
 static char* handle_rpc_request(ws_gateway_t* gateway, cJSON* request) {
     if (!gateway || !request) {
-        return create_error_json(-32600, "Invalid request");
+        return jsonrpc_create_error_response(NULL, -32600, "Invalid request", NULL);
     }
 
-    cJSON* id = cJSON_GetObjectItem(request, "id");
-    cJSON* method = cJSON_GetObjectItem(request, "method");
-    cJSON* params = cJSON_GetObjectItem(request, "params");
+    rpc_result_t result = gateway_rpc_handle_request(
+        request,
+        (int (*)(const char*, char**, void*))gateway->handler,
+        gateway->handler_data
+    );
 
-    if (!method || !cJSON_IsString(method)) {
-        return create_error_json(-32600, "Invalid Request: method required");
+    if (result.error_code != 0 || !result.response_json) {
+        char* error_resp = result.response_json ? result.response_json :
+                          jsonrpc_create_error_response(NULL, -32603, "Internal error", NULL);
+        if (result.response_json) result.response_json = NULL;
+        gateway_rpc_free(&result);
+        return error_resp;
     }
 
-    /* 如果设置了自定义处理回调，优先使用 */
-    if (gateway->handler) {
-        char* result = gateway->handler(request, gateway->handler_data);
-        if (result) {
-            return result;
-        }
-    }
-
-    /* 默认：路由到系统调用 */
-    return handle_system_call(method->valuestring, params, id);
+    char* success_resp = result.response_json;
+    result.response_json = NULL;
+    gateway_rpc_free(&result);
+    return success_resp;
 }
 
 /* ========== 路由处理函数（降低圈复杂度） ========== */
@@ -353,12 +330,11 @@ static int handle_ws_unknown_message(struct lws* wsi, const char* unknown_type) 
     snprintf(err_buf, sizeof(err_buf), "Unknown message type: %s",
              unknown_type ? unknown_type : "null");
 
-    char* error_json = create_error_json(-32600, err_buf);
+    char* error_json = jsonrpc_create_error_response(NULL, -32600, err_buf, NULL);
     if (!error_json) return -1;
 
     ws_message_t* error_msg = ws_message_create(WS_MSG_TYPE_ERROR, NULL, NULL);
     if (error_msg) {
-        /* 将错误信息放入payload */
         cJSON* payload = cJSON_CreateObject();
         if (payload) {
             cJSON_AddStringToObject(payload, "error", err_buf);
@@ -430,7 +406,7 @@ static int ws_callback(struct lws* wsi, enum lws_callback_reasons reason, void* 
             cJSON* json = cJSON_Parse((const char*)in);
             if (!json) {
                 /* 解析失败，发送错误响应 */
-                char* error_json = create_error_json(-32700, "Parse error");
+                char* error_json = jsonrpc_create_error_response(NULL, -32700, "Parse error", NULL);
                 if (error_json) {
                     ws_message_t* error_msg = ws_message_create(
                         WS_MSG_TYPE_ERROR, NULL, cJSON_Parse(error_json));

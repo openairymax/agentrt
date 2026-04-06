@@ -56,6 +56,7 @@ set(GATEWAY_SOURCES
     src/utils/jsonrpc.c
     src/utils/syscall_router.c
     src/utils/gateway_rpc_handler.c
+    src/utils/gateway_rate_limiter.c
 )
 
 # ========== 头文件 ==========
@@ -67,6 +68,7 @@ set(GATEWAY_HEADERS
     src/utils/jsonrpc.h
     src/utils/syscall_router.h
     src/utils/gateway_utils.h
+    src/utils/gateway_rate_limiter.h
 )
 
 # ========== 库目标 ==========

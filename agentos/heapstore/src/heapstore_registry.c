@@ -192,18 +192,18 @@ void heapstore_registry_shutdown(void) {
     }
 
     pthread_mutex_lock(&s_registry.lock);
-    
+
     if (s_registry.db) {
         sqlite3_close(s_registry.db);
         s_registry.db = NULL;
     }
-    
+
     s_registry.initialized = false;
     pthread_mutex_unlock(&s_registry.lock);
     pthread_mutex_destroy(&s_registry.lock);
 }
 
-static heapstore_error_t execute_sql_with_lock(const char* sql, 
+static heapstore_error_t execute_sql_with_lock(const char* sql,
                                                heapstore_error_t (*bind_func)(sqlite3_stmt*, void*),
                                                void* bind_data) {
     if (!s_registry.initialized || !s_registry.db) {
@@ -211,7 +211,7 @@ static heapstore_error_t execute_sql_with_lock(const char* sql,
     }
 
     pthread_mutex_lock(&s_registry.lock);
-    
+
     sqlite3_stmt* stmt = NULL;
     int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
@@ -241,7 +241,7 @@ static heapstore_error_t execute_sql_with_lock(const char* sql,
 
 static heapstore_error_t bind_agent_record(sqlite3_stmt* stmt, void* data) {
     const heapstore_agent_record_t* record = (const heapstore_agent_record_t*)data;
-    
+
     sqlite3_bind_text(stmt, 1, record->id, -1, SQLITE_STATIC);
     sqlite3_bind_text(stmt, 2, record->name, -1, SQLITE_STATIC);
     sqlite3_bind_text(stmt, 3, record->type, -1, SQLITE_STATIC);
@@ -250,7 +250,7 @@ static heapstore_error_t bind_agent_record(sqlite3_stmt* stmt, void* data) {
     sqlite3_bind_text(stmt, 6, record->config_path, -1, SQLITE_STATIC);
     sqlite3_bind_int64(stmt, 7, record->created_at);
     sqlite3_bind_int64(stmt, 8, record->updated_at);
-    
+
     return heapstore_SUCCESS;
 }
 
@@ -265,11 +265,11 @@ heapstore_error_t heapstore_registry_add_agent(const heapstore_agent_record_t* r
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    const char* sql = 
+    const char* sql =
         "INSERT INTO agents "
         "(id, name, type, version, status, config_path, created_at, updated_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?);";
-    
+
     return execute_sql_with_lock(sql, bind_agent_record, (void*)record);
 }
 
@@ -301,30 +301,30 @@ heapstore_error_t heapstore_registry_get_agent(const char* id, heapstore_agent_r
         text = (const char*)sqlite3_column_text(stmt, 0);
         if (text) strncpy(record->id, text, sizeof(record->id) - 1);
         else record->id[0] = '\0';
-        
+
         text = (const char*)sqlite3_column_text(stmt, 1);
         if (text) strncpy(record->name, text, sizeof(record->name) - 1);
         else record->name[0] = '\0';
-        
+
         text = (const char*)sqlite3_column_text(stmt, 2);
         if (text) strncpy(record->type, text, sizeof(record->type) - 1);
         else record->type[0] = '\0';
-        
+
         text = (const char*)sqlite3_column_text(stmt, 3);
         if (text) strncpy(record->version, text, sizeof(record->version) - 1);
         else record->version[0] = '\0';
-        
+
         text = (const char*)sqlite3_column_text(stmt, 4);
         if (text) strncpy(record->status, text, sizeof(record->status) - 1);
         else record->status[0] = '\0';
-        
+
         text = (const char*)sqlite3_column_text(stmt, 5);
         if (text) strncpy(record->config_path, text, sizeof(record->config_path) - 1);
         else record->config_path[0] = '\0';
-        
+
         record->created_at = sqlite3_column_int64(stmt, 6);
         record->updated_at = sqlite3_column_int64(stmt, 7);
-        
+
         sqlite3_finalize(stmt);
         pthread_mutex_unlock(&s_registry.lock);
         return heapstore_SUCCESS;
@@ -346,7 +346,7 @@ heapstore_error_t heapstore_registry_update_agent(const heapstore_agent_record_t
 
     pthread_mutex_lock(&s_registry.lock);
 
-    const char* sql = 
+    const char* sql =
         "UPDATE agents SET "
         "name = ?, type = ?, version = ?, status = ?, config_path = ?, updated_at = ? "
         "WHERE id = ?;";
@@ -428,7 +428,7 @@ heapstore_error_t heapstore_registry_add_skill(const heapstore_skill_record_t* r
 
     pthread_mutex_lock(&s_registry.lock);
 
-    const char* sql = 
+    const char* sql =
         "INSERT INTO skills "
         "(id, name, version, library_path, manifest_path, installed_at) "
         "VALUES (?, ?, ?, ?, ?, ?);";
@@ -548,7 +548,7 @@ heapstore_error_t heapstore_registry_add_session(const heapstore_session_record_
 
     pthread_mutex_lock(&s_registry.lock);
 
-    const char* sql = 
+    const char* sql =
         "INSERT INTO sessions "
         "(id, user_id, created_at, last_active_at, ttl_seconds, status) "
         "VALUES (?, ?, ?, ?, ?, ?);";
@@ -885,8 +885,202 @@ heapstore_error_t heapstore_registry_vacuum(void) {
     pthread_mutex_lock(&s_registry.lock);
     sqlite3_exec(s_registry.db, "VACUUM;", NULL, NULL, NULL);
     pthread_mutex_unlock(&s_registry.lock);
-    
+
     return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_registry_batch_insert_agents(const heapstore_agent_record_t* records, size_t count) {
+    if (!records || count == 0) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+
+    if (!s_registry.initialized || !s_registry.db) {
+        return heapstore_ERR_NOT_INITIALIZED;
+    }
+
+    const char* sql =
+        "INSERT INTO agents "
+        "(id, name, type, version, status, config_path, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?);";
+
+    pthread_mutex_lock(&s_registry.lock);
+
+    sqlite3_stmt* stmt = NULL;
+    int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        pthread_mutex_unlock(&s_registry.lock);
+        return heapstore_ERR_DB_QUERY_FAILED;
+    }
+
+    rc = sqlite3_exec(s_registry.db, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+    if (rc != SQLITE_OK) {
+        sqlite3_finalize(stmt);
+        pthread_mutex_unlock(&s_registry.lock);
+        return heapstore_ERR_DB_QUERY_FAILED;
+    }
+
+    heapstore_error_t result = heapstore_SUCCESS;
+    for (size_t i = 0; i < count; i++) {
+        const heapstore_agent_record_t* record = &records[i];
+
+        sqlite3_bind_text(stmt, 1, record->id, -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 2, record->name, -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 3, record->type, -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 4, record->version, -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 5, record->status, -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 6, record->config_path, -1, SQLITE_STATIC);
+        sqlite3_bind_int64(stmt, 7, record->created_at);
+        sqlite3_bind_int64(stmt, 8, record->updated_at);
+
+        rc = sqlite3_step(stmt);
+        if (rc != SQLITE_DONE) {
+            result = heapstore_ERR_DB_QUERY_FAILED;
+            sqlite3_exec(s_registry.db, "ROLLBACK;", NULL, NULL, NULL);
+            break;
+        }
+
+        sqlite3_reset(stmt);
+    }
+
+    if (result == heapstore_SUCCESS) {
+        rc = sqlite3_exec(s_registry.db, "COMMIT;", NULL, NULL, NULL);
+        if (rc != SQLITE_OK) {
+            result = heapstore_ERR_DB_QUERY_FAILED;
+        }
+    }
+
+    sqlite3_finalize(stmt);
+    pthread_mutex_unlock(&s_registry.lock);
+
+    return result;
+}
+
+heapstore_error_t heapstore_registry_batch_insert_sessions(const heapstore_session_record_t* records, size_t count) {
+    if (!records || count == 0) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+
+    if (!s_registry.initialized || !s_registry.db) {
+        return heapstore_ERR_NOT_INITIALIZED;
+    }
+
+    const char* sql =
+        "INSERT INTO sessions "
+        "(id, user_id, created_at, last_active_at, ttl_seconds, status) "
+        "VALUES (?, ?, ?, ?, ?, ?);";
+
+    pthread_mutex_lock(&s_registry.lock);
+
+    sqlite3_stmt* stmt = NULL;
+    int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        pthread_mutex_unlock(&s_registry.lock);
+        return heapstore_ERR_DB_QUERY_FAILED;
+    }
+
+    rc = sqlite3_exec(s_registry.db, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+    if (rc != SQLITE_OK) {
+        sqlite3_finalize(stmt);
+        pthread_mutex_unlock(&s_registry.lock);
+        return heapstore_ERR_DB_QUERY_FAILED;
+    }
+
+    heapstore_error_t result = heapstore_SUCCESS;
+    for (size_t i = 0; i < count; i++) {
+        const heapstore_session_record_t* record = &records[i];
+
+        sqlite3_bind_text(stmt, 1, record->id, -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 2, record->user_id, -1, SQLITE_STATIC);
+        sqlite3_bind_int64(stmt, 3, record->created_at);
+        sqlite3_bind_int64(stmt, 4, record->last_active_at);
+        sqlite3_bind_int(stmt, 5, record->ttl_seconds);
+        sqlite3_bind_text(stmt, 6, record->status, -1, SQLITE_STATIC);
+
+        rc = sqlite3_step(stmt);
+        if (rc != SQLITE_DONE) {
+            result = heapstore_ERR_DB_QUERY_FAILED;
+            sqlite3_exec(s_registry.db, "ROLLBACK;", NULL, NULL, NULL);
+            break;
+        }
+
+        sqlite3_reset(stmt);
+    }
+
+    if (result == heapstore_SUCCESS) {
+        rc = sqlite3_exec(s_registry.db, "COMMIT;", NULL, NULL, NULL);
+        if (rc != SQLITE_OK) {
+            result = heapstore_ERR_DB_QUERY_FAILED;
+        }
+    }
+
+    sqlite3_finalize(stmt);
+    pthread_mutex_unlock(&s_registry.lock);
+
+    return result;
+}
+
+heapstore_error_t heapstore_registry_batch_insert_skills(const heapstore_skill_record_t* records, size_t count) {
+    if (!records || count == 0) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+
+    if (!s_registry.initialized || !s_registry.db) {
+        return heapstore_ERR_NOT_INITIALIZED;
+    }
+
+    const char* sql =
+        "INSERT INTO skills "
+        "(id, name, version, library_path, manifest_path, installed_at) "
+        "VALUES (?, ?, ?, ?, ?, ?);";
+
+    pthread_mutex_lock(&s_registry.lock);
+
+    sqlite3_stmt* stmt = NULL;
+    int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        pthread_mutex_unlock(&s_registry.lock);
+        return heapstore_ERR_DB_QUERY_FAILED;
+    }
+
+    rc = sqlite3_exec(s_registry.db, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+    if (rc != SQLITE_OK) {
+        sqlite3_finalize(stmt);
+        pthread_mutex_unlock(&s_registry.lock);
+        return heapstore_ERR_DB_QUERY_FAILED;
+    }
+
+    heapstore_error_t result = heapstore_SUCCESS;
+    for (size_t i = 0; i < count; i++) {
+        const heapstore_skill_record_t* record = &records[i];
+
+        sqlite3_bind_text(stmt, 1, record->id, -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 2, record->name, -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 3, record->version, -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 4, record->library_path, -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 5, record->manifest_path, -1, SQLITE_STATIC);
+        sqlite3_bind_int64(stmt, 6, record->installed_at);
+
+        rc = sqlite3_step(stmt);
+        if (rc != SQLITE_DONE) {
+            result = heapstore_ERR_DB_QUERY_FAILED;
+            sqlite3_exec(s_registry.db, "ROLLBACK;", NULL, NULL, NULL);
+            break;
+        }
+
+        sqlite3_reset(stmt);
+    }
+
+    if (result == heapstore_SUCCESS) {
+        rc = sqlite3_exec(s_registry.db, "COMMIT;", NULL, NULL, NULL);
+        if (rc != SQLITE_OK) {
+            result = heapstore_ERR_DB_QUERY_FAILED;
+        }
+    }
+
+    sqlite3_finalize(stmt);
+    pthread_mutex_unlock(&s_registry.lock);
+
+    return result;
 }
 
 bool heapstore_registry_is_healthy(void) {

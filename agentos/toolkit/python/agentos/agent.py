@@ -68,17 +68,7 @@ class AgentOS:
         """
         url = f"{self.endpoint}{path}"
         try:
-            if method == "GET":
-                response = self.session.get(url, timeout=self.timeout)
-            elif method == "POST":
-                response = self.session.post(url, json=data, timeout=self.timeout)
-            elif method == "PUT":
-                response = self.session.put(url, json=data, timeout=self.timeout)
-            elif method == "DELETE":
-                response = self.session.delete(url, timeout=self.timeout)
-            else:
-                raise AgentOSError(f"Unsupported HTTP method: {method}")
-            
+            response = self._execute_http_method(method, url, data)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.Timeout:
@@ -87,6 +77,19 @@ class AgentOS:
             raise NetworkError(f"Network error: {str(e)}")
         except json.JSONDecodeError:
             raise AgentOSError("Invalid JSON response from server")
+    
+    def _execute_http_method(self, method: str, url: str, data: Optional[Dict[str, Any]]) -> requests.Response:
+        """Execute the appropriate HTTP method"""
+        if method == "GET":
+            return self.session.get(url, timeout=self.timeout)
+        elif method == "POST":
+            return self.session.post(url, json=data, timeout=self.timeout)
+        elif method == "PUT":
+            return self.session.put(url, json=data, timeout=self.timeout)
+        elif method == "DELETE":
+            return self.session.delete(url, timeout=self.timeout)
+        else:
+            raise AgentOSError(f"Unsupported HTTP method: {method}")
     
     def submit_task(self, task_description: str) -> Task:
         """
@@ -248,37 +251,38 @@ class AsyncAgentOS:
         """
         url = f"{self.endpoint}{path}"
         try:
-            if self.session is None:
-                headers = {"Content-Type": "application/json"}
-                if self.api_key:
-                    headers["Authorization"] = f"Bearer {self.api_key}"
-                self.session = aiohttp.ClientSession(headers=headers)
-            
+            await self._ensure_session()
             timeout = aiohttp.ClientTimeout(total=self.timeout)
-            if method == "GET":
-                async with self.session.get(url, timeout=timeout) as response:
-                    response.raise_for_status()
-                    return await response.json()
-            elif method == "POST":
-                async with self.session.post(url, json=data, timeout=timeout) as response:
-                    response.raise_for_status()
-                    return await response.json()
-            elif method == "PUT":
-                async with self.session.put(url, json=data, timeout=timeout) as response:
-                    response.raise_for_status()
-                    return await response.json()
-            elif method == "DELETE":
-                async with self.session.delete(url, timeout=timeout) as response:
-                    response.raise_for_status()
-                    return await response.json()
-            else:
-                raise AgentOSError(f"Unsupported HTTP method: {method}")
+            response_data = await self._execute_async_http_method(method, url, data, timeout)
+            response_data.raise_for_status()
+            return await response_data.json()
         except asyncio.TimeoutError:
             raise TimeoutError(f"Request timed out after {self.timeout} seconds")
         except aiohttp.ClientError as e:
             raise NetworkError(f"Network error: {str(e)}")
         except json.JSONDecodeError:
             raise AgentOSError("Invalid JSON response from server")
+    
+    async def _ensure_session(self):
+        """Ensure session is initialized"""
+        if self.session is None:
+            headers = {"Content-Type": "application/json"}
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
+            self.session = aiohttp.ClientSession(headers=headers)
+    
+    async def _execute_async_http_method(self, method: str, url: str, data: Optional[Dict[str, Any]], timeout) -> aiohttp.ClientResponse:
+        """Execute the appropriate async HTTP method"""
+        if method == "GET":
+            return self.session.get(url, timeout=timeout)
+        elif method == "POST":
+            return self.session.post(url, json=data, timeout=timeout)
+        elif method == "PUT":
+            return self.session.put(url, json=data, timeout=timeout)
+        elif method == "DELETE":
+            return self.session.delete(url, timeout=timeout)
+        else:
+            raise AgentOSError(f"Unsupported HTTP method: {method}")
     
     async def submit_task(self, task_description: str) -> Task:
         """

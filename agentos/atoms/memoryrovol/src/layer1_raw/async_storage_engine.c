@@ -26,6 +26,7 @@
 #include "logger.h"
 #include "observability.h"
 #include "manager.h"
+#include "../../../corekern/include/resource_quota.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -66,6 +67,7 @@ typedef struct storage_engine_inner {
     char* last_error;
     uint64_t last_error_time_ns;
     agentos_observability_t* obs;
+    agentos_resource_manager_t* resource_manager;
     char* engine_id;
 
 #ifdef _WIN32
@@ -377,6 +379,19 @@ agentos_error_t agentos_layer1_raw_write_async_production(
 
     if (!engine->inner->healthy) {
         return AGENTOS_EIO;
+    }
+
+    /* 资源配额检查 - I/O 操作 */
+    if (engine->inner->resource_manager) {
+        agentos_error_t quota_err = agentos_resource_check_memory(
+            engine->inner->resource_manager, len);
+        if (quota_err != AGENTOS_SUCCESS) {
+            AGENTOS_LOG_WARN("Resource quota exceeded for write: %zu bytes requested", len);
+            return AGENTOS_EDQUOT;
+        }
+        
+        /* 记录 I/O 使用 */
+        agentos_resource_record_io(engine->inner->resource_manager);
     }
 
     write_request_t* request = (write_request_t*)AGENTOS_CALLOC(1, sizeof(write_request_t));

@@ -79,6 +79,7 @@ typedef struct {
  * @reentrant 是
  *
  * @see heapstore_token_shutdown()
+ * @since v1.0.0.6
  */
 heapstore_error_t heapstore_token_init(void);
 
@@ -91,6 +92,7 @@ heapstore_error_t heapstore_token_init(void);
  * @reentrant 是
  *
  * @see heapstore_token_init()
+ * @since v1.0.0.6
  */
 heapstore_error_t heapstore_token_shutdown(void);
 
@@ -106,6 +108,7 @@ heapstore_error_t heapstore_token_shutdown(void);
  * @reentrant 是
  *
  * @see heapstore_token_get_stats()
+ * @since v1.0.0.6
  */
 heapstore_error_t heapstore_token_record(
     heapstore_token_type_t type,
@@ -122,6 +125,7 @@ heapstore_error_t heapstore_token_record(
  * @reentrant 是
  *
  * @see heapstore_token_record()
+ * @since v1.0.0.6
  */
 heapstore_error_t heapstore_token_get_stats(heapstore_token_stats_t* out_stats);
 
@@ -146,6 +150,7 @@ heapstore_error_t heapstore_token_reset_stats(void);
  * @reentrant 是
  *
  * @see heapstore_token_check_budget()
+ * @since v1.0.0.6
  */
 heapstore_error_t heapstore_token_set_budget(
     const char* task_id,
@@ -163,6 +168,7 @@ heapstore_error_t heapstore_token_set_budget(
  * @reentrant 是
  *
  * @see heapstore_token_set_budget()
+ * @since v1.0.0.6
  */
 heapstore_error_t heapstore_token_check_budget(
     const char* task_id,

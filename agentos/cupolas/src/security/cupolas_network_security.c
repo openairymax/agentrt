@@ -13,7 +13,7 @@
  */
 
 #include "cupolas_network_security.h"
-#include "../platform/platform.h"
+#include "../utils/cupolas_utils.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -94,12 +94,10 @@ int cupolas_net_security_init(const cupolas_net_security_config_t* manager) {
     
     memset(&g_net_security, 0, sizeof(g_net_security));
     
+    CUPOLAS_MUTEX_INIT(&g_net_security.lock);
 #ifdef _WIN32
-    InitializeCriticalSection(&g_net_security.lock);
     WSADATA wsa_data;
     WSAStartup(MAKEWORD(2, 2), &wsa_data);
-#else
-    pthread_mutex_init(&g_net_security.lock, NULL);
 #endif
     
     SSL_library_init();
@@ -150,11 +148,9 @@ void cupolas_net_security_cleanup(void) {
     EVP_cleanup();
     ERR_free_strings();
     
+    CUPOLAS_MUTEX_DESTROY(&g_net_security.lock);
 #ifdef _WIN32
-    DeleteCriticalSection(&g_net_security.lock);
     WSACleanup();
-#else
-    pthread_mutex_destroy(&g_net_security.lock);
 #endif
     
     memset(&g_net_security, 0, sizeof(g_net_security));
