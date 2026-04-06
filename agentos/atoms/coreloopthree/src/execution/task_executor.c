@@ -1,11 +1,16 @@
 /**
  * @file task_executor.c
- * @brief 任务执行器 - 精简版
+ * @brief 任务执行器 - 精简版 (DEPRECATED)
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * @details
  * 任务执行器负责管理任务的执行生命周期，包括任务调度、状态跟踪、
  * 超时控制和结果收集。基于 task_executor_utils 模块构建。
+ *
+ * @deprecated 此模块为精简版实现，工作线程未实际创建。
+ *            推荐使用 execution/engine.c 中的 agentos_execution_engine_t，
+ *            它提供了完整的线程池、哈希表O(1)查找和引用计数TCB管理。
+ *            计划在未来版本中移除此文件。
  */
 
 #include "execution.h"
@@ -253,6 +258,8 @@ void agentos_task_executor_destroy(agentos_task_executor_t* executor) {
 agentos_error_t agentos_task_executor_start(agentos_task_executor_t* executor) {
     if (!executor) return AGENTOS_EINVAL;
 
+    AGENTOS_LOG_WARN("task_executor_start: DEPRECATED - use agentos_execution_create from execution/engine.c for full thread pool support");
+
     agentos_mutex_lock(executor->lock);
     
     for (uint32_t i = 0; i < executor->worker_count; i++) {
@@ -261,12 +268,12 @@ agentos_error_t agentos_task_executor_start(agentos_task_executor_t* executor) {
         executor->workers[i].tasks_completed = 0;
         executor->workers[i].tasks_failed = 0;
         
-        /* 简化实现：不实际创建工作线程 */
+        /* 精简版：不实际创建工作线程（同步模式） */
         executor->workers[i].thread = NULL;
     }
 
     agentos_mutex_unlock(executor->lock);
-    AGENTOS_LOG_INFO("Task executor started");
+    AGENTOS_LOG_INFO("Task executor started (synchronous mode, no worker threads)");
     return AGENTOS_SUCCESS;
 }
 
@@ -347,21 +354,22 @@ agentos_error_t agentos_task_executor_get_stats(agentos_task_executor_t* executo
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t agentos_task_executor_cancel_task(agentos_task_executor_t* executor, uint64_t task_id) {
+agentos_error_t agentos_task_executor_cancel_task(agentos_task_executor_t* executor, const char* task_id) {
     if (!executor) return AGENTOS_EINVAL;
 
     agentos_mutex_lock(executor->lock);
-    
+
     for (uint32_t i = 0; i < executor->task_count; i++) {
-        if (executor->tasks[i] && executor->tasks[i]->task_id == task_id) {
+        if (executor->tasks[i] && executor->tasks[i]->task_id && task_id &&
+            strcmp(executor->tasks[i]->task_id, task_id) == 0) {
             executor->tasks[i]->state = TASK_STATE_CANCELLED;
             executor->total_cancelled++;
             agentos_mutex_unlock(executor->lock);
-            AGENTOS_LOG_INFO("Task %llu cancelled", (unsigned long long)task_id);
+            AGENTOS_LOG_INFO("Task %s cancelled", task_id);
             return AGENTOS_SUCCESS;
         }
     }
 
     agentos_mutex_unlock(executor->lock);
-    return AGENTOS_ENOTFOUND;
+    return AGENTOS_NOTFOUND;
 }

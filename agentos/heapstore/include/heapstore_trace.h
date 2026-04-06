@@ -57,6 +57,7 @@ typedef struct heapstore_trace_exporter_config {
  * @reentrant 否
  *
  * @see heapstore_trace_shutdown()
+ * @since v1.0.0
  */
 heapstore_error_t heapstore_trace_init(void);
 
@@ -68,6 +69,7 @@ heapstore_error_t heapstore_trace_init(void);
  * @reentrant 否
  *
  * @see heapstore_trace_init()
+ * @since v1.0.0
  */
 void heapstore_trace_shutdown(void);
 
@@ -93,7 +95,8 @@ heapstore_error_t heapstore_trace_write_span(const heapstore_span_t* span);
  * @ownership 调用者负责 spans 的生命周期
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_trace_write_spans_batch(const heapstore_span_t* spans, size_t count);
 
 /**
@@ -107,7 +110,8 @@ heapstore_error_t heapstore_trace_write_spans_batch(const heapstore_span_t* span
  * @ownership 调用者负责调用 heapstore_trace_free_spans 释放 spans
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_trace_query_by_trace(const char* trace_id, heapstore_span_t** spans, size_t* count);
 
 /**
@@ -122,7 +126,8 @@ heapstore_error_t heapstore_trace_query_by_trace(const char* trace_id, heapstore
  * @ownership 调用者负责调用 heapstore_trace_free_spans 释放 spans
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_trace_query_by_time_range(uint64_t start_time, uint64_t end_time, heapstore_span_t** spans, size_t* count);
 
 /**
@@ -133,7 +138,8 @@ heapstore_error_t heapstore_trace_query_by_time_range(uint64_t start_time, uint6
  * @ownership 调用者负责传入有效的 spans 指针
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 void heapstore_trace_free_spans(heapstore_span_t* spans);
 
 /**
@@ -145,7 +151,8 @@ void heapstore_trace_free_spans(heapstore_span_t* spans);
  * @ownership 调用者负责 manager 的生命周期
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_trace_config_exporter(const heapstore_trace_exporter_config_t* manager);
 
 /**
@@ -155,7 +162,8 @@ heapstore_error_t heapstore_trace_config_exporter(const heapstore_trace_exporter
  *
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_trace_flush(void);
 
 /**
@@ -169,7 +177,8 @@ heapstore_error_t heapstore_trace_flush(void);
  * @ownership 调用者负责所有输出参数的分配和释放
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_trace_get_stats(uint64_t* total_spans, uint64_t* pending_spans, uint64_t* total_size_bytes);
 
 /**
@@ -182,7 +191,8 @@ heapstore_error_t heapstore_trace_get_stats(uint64_t* total_spans, uint64_t* pen
  * @ownership 调用者负责 freed_bytes 的分配和释放
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_trace_cleanup(int days_to_keep, uint64_t* freed_bytes);
 
 /**
@@ -192,7 +202,8 @@ heapstore_error_t heapstore_trace_cleanup(int days_to_keep, uint64_t* freed_byte
  *
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 bool heapstore_trace_is_healthy(void);
 
 /**
@@ -205,7 +216,8 @@ bool heapstore_trace_is_healthy(void);
  * @ownership 调用者负责调用 free() 释放 out_json
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_trace_export_to_json(char** out_json, bool include_events);
 
 #ifdef __cplusplus

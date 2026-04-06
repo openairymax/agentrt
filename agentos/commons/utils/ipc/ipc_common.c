@@ -115,12 +115,34 @@ struct ipc_shm {
 };
 
 /**
+ * @brief 消息队列内部消息结构
+ */
+typedef struct ipc_mq_message {
+    void* data;                       /**< 消息数据 */
+    size_t len;                       /**< 消息长度 */
+    unsigned int priority;            /**< 优先级 */
+    uint64_t timestamp;               /**< 时间戳 */
+    struct ipc_mq_message* next;      /**< 下一个消息指针 */
+} ipc_mq_message_t;
+
+/**
  * @brief 消息队列内部结构
  */
 struct ipc_mq {
-    ipc_mq_config_t config;       /**< 配置信息 */
-    size_t current_count;          /**< 当前消息数 */
-    char error_msg[256];           /**< 错误消息缓冲区 */
+    ipc_mq_config_t config;           /**< 配置信息 */
+    size_t current_count;             /**< 当前消息数 */
+    size_t total_enqueued;            /**< 总入队消息数 */
+    size_t total_dequeued;            /**< 总出队消息数 */
+    ipc_mq_message_t* head;           /**< 队列头（高优先级） */
+    ipc_mq_message_t* tail;           /**< 队列尾（低优先级） */
+#ifdef _WIN32
+    HANDLE hMutex;                    /**< Windows 互斥锁 */
+    HANDLE hNotEmpty;                 /**< 非空条件变量 */
+#else
+    pthread_mutex_t mutex;            /**< POSIX 互斥锁 */
+    pthread_cond_t not_empty;         /**< 非空条件变量 */
+#endif
+    char error_msg[256];              /**< 错误消息缓冲区 */
 };
 
 /* ============================================================================
@@ -146,9 +168,37 @@ static uint64_t ipc_get_timestamp_ns(void) {
 
 /**
  * @brief 计算 CRC32 校验和
+ * 
+ * @algorithm CRC-32 (IEEE 802.3)
+ * 
+ * @details
+ * 本函数使用标准的CRC-32算法计算数据的校验和，用于：
+ * - 消息完整性验证（检测传输错误）
+ * - 数据损坏检测（内存/存储错误）
+ * 
+ * 算法特征:
+ * - 多项式: 0xEDB88320 (反射形式)
+ * - 初始值: 0xFFFFFFFF
+ * - 最终异或: 0xFFFFFFFF
+ * - 输入反射: 是
+ * - 输出反射: 是
+ * 
+ * 实现方式:
+ * - 使用查表法（Table-driven）的简化版本
+ * - 逐位计算（bit-by-bit computation）
+ * - 时间复杂度: O(n) 其中n为数据长度（字节）
+ * 
+ * 应用场景:
+ * 1. IPC消息校验 - 确保消息在进程间传输未损坏
+ * 2. 数据一致性检查 - 检测内存映射区域的意外修改
+ * 3. 调试辅助 - 快速识别数据是否被篡改
+ * 
+ * @note 此实现针对正确性优化，未针对性能优化
+ *       如需高性能场景，建议使用查表法（256条目查找表）
+ * 
  * @param data 数据指针
- * @param len 数据长度
- * @return CRC32 值
+ * @param len 数据长度（字节）
+ * @return CRC32 校验值（32位无符号整数）
  */
 static uint32_t ipc_calc_crc32(const void* data, size_t len) {
     const uint8_t* buf = (const uint8_t*)data;
@@ -1235,7 +1285,148 @@ agentos_error_t ipc_shm_sync(ipc_shm_t* shm) {
 }
 
 /* ============================================================================
- * 消息队列 API 实现
+ * 消息队列内部辅助函数（用于降低圈复杂度）
+ * ============================================================================ */
+
+/**
+ * @brief 获取消息队列互斥锁（带超时支持）
+ * @param mq 消息队列指针
+ * @param timeout_ms 超时时间（毫秒），0表示无限等待
+ * @return 0成功，ETIMEDOUT超时，其他值表示错误
+ */
+static int ipc_mq_lock(ipc_mq_t* mq, uint32_t timeout_ms) {
+#ifdef _WIN32
+    DWORD wait_result = WaitForSingleObject(mq->hMutex, timeout_ms);
+    return (wait_result == WAIT_TIMEOUT) ? ETIMEDOUT : 0;
+#else
+    if (timeout_ms == 0) {
+        return pthread_mutex_lock(&mq->mutex);
+    } else {
+        struct timespec ts;
+        clock_gettime(CLOCK_REALTIME, &ts);
+        ts.tv_sec += timeout_ms / 1000;
+        ts.tv_nsec += (timeout_ms % 1000) * 1000000;
+        if (ts.tv_nsec >= 1000000000) {
+            ts.tv_sec++;
+            ts.tv_nsec -= 1000000000;
+        }
+        return pthread_mutex_timedlock(&mq->mutex, &ts);
+    }
+#endif
+}
+
+/**
+ * @brief 释放消息队列互斥锁
+ * @param mq 消息队列指针
+ */
+static void ipc_mq_unlock(ipc_mq_t* mq) {
+#ifdef _WIN32
+    ReleaseMutex(mq->hMutex);
+#else
+    pthread_mutex_unlock(&mq->mutex);
+#endif
+}
+
+/**
+ * @brief 等待消息队列非空（带超时）
+ * @param mq 消息队列指针（已持有锁）
+ * @param timeout_ms 超时时间（毫秒）
+ * @return true表示有消息可用，false表示超时或错误
+ */
+static bool ipc_mq_wait_for_message(ipc_mq_t* mq, uint32_t timeout_ms) {
+    if (mq->current_count > 0) {
+        return true;  // 已有消息，无需等待
+    }
+    
+    if (timeout_ms == 0) {
+        return false;  // 非阻塞模式，立即返回
+    }
+    
+    // 释放锁并等待新消息通知
+    ipc_mq_unlock(mq);
+    
+#ifdef _WIN32
+    DWORD wait_result = WaitForSingleObject(mq->hNotEmpty, timeout_ms);
+    if (wait_result == WAIT_TIMEOUT) {
+        return false;
+    }
+    // 重新获取锁
+    WaitForSingleObject(mq->hMutex, INFINITE);
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += timeout_ms / 1000;
+    ts.tv_nsec += (timeout_ms % 1000) * 1000000;
+    if (ts.tv_nsec >= 1000000000) {
+        ts.tv_sec++;
+        ts.tv_nsec -= 1000000000;
+    }
+    
+    // 使用条件变量等待
+    pthread_mutex_lock(&mq->mutex);  // 重新获取锁
+    while (mq->current_count == 0) {
+        int wait_result = pthread_cond_timedwait(&mq->not_empty, &mq->mutex, &ts);
+        if (wait_result == ETIMEDOUT) {
+            pthread_mutex_unlock(&mq->mutex);
+            return false;
+        }
+    }
+#endif
+    
+    return (mq->current_count > 0);
+}
+
+/**
+ * @brief 从队头取出最高优先级消息
+ * @param mq 消息队列指针（已持有锁）
+ * @param buffer 输出缓冲区
+ * @param len 缓冲区大小
+ * @param received [out] 实际接收的字节数
+ * @param priority [out] 消息优先级
+ * @return AGENTOS_SUCCESS 成功，AGENTOS_EINVAL 参数无效
+ */
+static agentos_error_t ipc_mq_dequeue_message(
+    ipc_mq_t* mq,
+    void* buffer,
+    size_t len,
+    size_t* received,
+    unsigned int* priority
+) {
+    ipc_mq_message_t* msg = mq->head;
+    if (!msg) {
+        return AGENTOS_EINVAL;
+    }
+    
+    // 复制数据到缓冲区（截断保护）
+    size_t copy_len = (len < msg->len) ? len : msg->len;
+    memcpy(buffer, msg->data, copy_len);
+    
+    if (received) {
+        *received = copy_len;
+    }
+    
+    if (priority) {
+        *priority = msg->priority;
+    }
+    
+    // 更新队列头指针
+    mq->head = msg->next;
+    if (mq->head == NULL) {
+        mq->tail = NULL;
+    }
+    
+    mq->current_count--;
+    mq->total_dequeued++;
+    
+    // 释放消息内存
+    free(msg->data);
+    free(msg);
+    
+    return AGENTOS_SUCCESS;
+}
+
+/* ============================================================================
+ * 消息队列 API 实现（重构后 - 低圈复杂度版本）
  * ============================================================================ */
 
 ipc_mq_t* ipc_mq_create(const ipc_mq_config_t* config) {
@@ -1250,7 +1441,39 @@ ipc_mq_t* ipc_mq_create(const ipc_mq_config_t* config) {
     
     mq->config = *config;
     mq->current_count = 0;
+    mq->total_enqueued = 0;
+    mq->total_dequeued = 0;
+    mq->head = NULL;
+    mq->tail = NULL;
     memset(mq->error_msg, 0, sizeof(mq->error_msg));
+    
+    // 初始化同步原语
+#ifdef _WIN32
+    mq->hMutex = CreateMutex(NULL, FALSE, NULL);
+    mq->hNotEmpty = CreateEvent(NULL, FALSE, FALSE, NULL);
+    if (!mq->hMutex || !mq->hNotEmpty) {
+        snprintf(mq->error_msg, sizeof(mq->error_msg),
+                 "Failed to create synchronization objects");
+        if (mq->hMutex) CloseHandle(mq->hMutex);
+        if (mq->hNotEmpty) CloseHandle(mq->hNotEmpty);
+        free(mq);
+        return NULL;
+    }
+#else
+    if (pthread_mutex_init(&mq->mutex, NULL) != 0) {
+        snprintf(mq->error_msg, sizeof(mq->error_msg),
+                 "Failed to initialize mutex");
+        free(mq);
+        return NULL;
+    }
+    if (pthread_cond_init(&mq->not_empty, NULL) != 0) {
+        snprintf(mq->error_msg, sizeof(mq->error_msg),
+                 "Failed to initialize condition variable");
+        pthread_mutex_destroy(&mq->mutex);
+        free(mq);
+        return NULL;
+    }
+#endif
     
     return mq;
 }
@@ -1259,6 +1482,18 @@ void ipc_mq_destroy(ipc_mq_t* mq) {
     if (!mq) {
         return;
     }
+    
+    // 清空所有消息
+    ipc_mq_clear(mq);
+    
+    // 销毁同步原语
+#ifdef _WIN32
+    if (mq->hMutex) CloseHandle(mq->hMutex);
+    if (mq->hNotEmpty) CloseHandle(mq->hNotEmpty);
+#else
+    pthread_mutex_destroy(&mq->mutex);
+    pthread_cond_destroy(&mq->not_empty);
+#endif
     
     free(mq);
 }
@@ -1269,20 +1504,134 @@ agentos_error_t ipc_mq_send(
     size_t len,
     unsigned int priority
 ) {
-    if (!mq || !data) {
+    if (!mq || !data || len == 0) {
         return AGENTOS_EINVAL;
     }
     
+#ifdef _WIN32
+    WaitForSingleObject(mq->hMutex, INFINITE);
+#else
+    pthread_mutex_lock(&mq->mutex);
+#endif
+    
+    // 检查队列是否已满
     if (mq->current_count >= mq->config.max_messages) {
         snprintf(mq->error_msg, sizeof(mq->error_msg),
-                 "Message queue full");
+                 "Message queue full (count=%zu, max=%zu)",
+                 mq->current_count, mq->config.max_messages);
+#ifdef _WIN32
+        ReleaseMutex(mq->hMutex);
+#else
+        pthread_mutex_unlock(&mq->mutex);
+#endif
         return AGENTOS_EBUSY;
     }
     
-    (void)priority;
-    (void)len;
+    // 创建新消息
+    ipc_mq_message_t* msg = (ipc_mq_message_t*)malloc(sizeof(ipc_mq_message_t));
+    if (!msg) {
+        snprintf(mq->error_msg, sizeof(mq->error_msg),
+                 "Failed to allocate memory for message");
+#ifdef _WIN32
+        ReleaseMutex(mq->hMutex);
+#else
+        pthread_mutex_unlock(&mq->mutex);
+#endif
+        return AGENTOS_ENOMEM;
+    }
+    
+    msg->data = malloc(len);
+    if (!msg->data) {
+        snprintf(mq->error_msg, sizeof(mq->error_msg),
+                 "Failed to allocate memory for message data");
+        free(msg);
+#ifdef _WIN32
+        ReleaseMutex(mq->hMutex);
+#else
+        pthread_mutex_unlock(&mq->mutex);
+#endif
+        return AGENTOS_ENOMEM;
+    }
+    
+    memcpy(msg->data, data, len);
+    msg->len = len;
+    msg->priority = priority;
+    msg->timestamp = ipc_get_timestamp_ns();
+    msg->next = NULL;
+    
+    /*
+     * ════════════════════════════════════════════════════════════════
+     * 优先级队列插入算法（Priority Queue Insertion）
+     * ════════════════════════════════════════════════════════════════
+     * 
+     * 算法类型: 有序链表插入（Sorted Linked List Insertion）
+     * 时间复杂度: O(n) - 最坏情况下需遍历整个队列
+     * 空间复杂度: O(1) - 仅使用固定数量的指针
+     * 
+     * 优先级规则:
+     *   - 数值越大，优先级越高（priority值大的先出队）
+     *   - 相同优先级按FIFO顺序排列
+     *   - 队列头（head）始终是最高优先级的消息
+     *   - 队列尾（tail）始终是最低优先级的消息
+     * 
+     * 插入策略（4种情况）:
+     * 
+     *   情况1: 空队列
+     *     [空] → [new_msg]
+     *     head = tail = new_msg
+     *     
+     *   情况2: 新消息优先级 ≤ 队尾（最低优先级）
+     *     [high] → ... → [tail] → [new_msg]
+     *     直接追加到队尾，O(1)
+     *     
+     *   情况3: 新消息优先级 > 队头（最高优先级）
+     *     [new_msg] → [old_head] → ...
+     *     插入到队头，O(1)
+     *     
+     *   情况4: 新消息优先级在中间
+     *     [...] → [prev] → [new_msg] → [next] → [...]
+     *     遍历查找合适位置，O(k) 其中k为插入位置
+     * 
+     * 性能优化:
+     *   - 情况1/2/3 的常见场景都是O(1)
+     *   - 只有情况4需要遍历，但平均只需检查少数节点
+     *   - 对于实时系统，建议控制队列长度以避免O(n)延迟
+     * 
+     * 线程安全: 调用者必须持有mq->mutex锁
+     * ════════════════════════════════════════════════════════════════
+     */
+    if (mq->tail == NULL) {
+        // 空队列
+        mq->head = mq->tail = msg;
+    } else if (priority >= mq->tail->priority) {
+        // 插入队尾（优先级最低）
+        mq->tail->next = msg;
+        mq->tail = msg;
+    } else if (priority > mq->head->priority) {
+        // 插入队头（优先级最高）
+        msg->next = mq->head;
+        mq->head = msg;
+    } else {
+        // 在中间查找合适位置
+        ipc_mq_message_t* current = mq->head;
+        while (current->next && current->next->priority > priority) {
+            current = current->next;
+        }
+        msg->next = current->next;
+        current->next = msg;
+    }
     
     mq->current_count++;
+    mq->total_enqueued++;
+    
+    // 通知等待的消费者
+#ifdef _WIN32
+    SetEvent(mq->hNotEmpty);
+    ReleaseMutex(mq->hMutex);
+#else
+    pthread_cond_signal(&mq->not_empty);
+    pthread_mutex_unlock(&mq->mutex);
+#endif
     
     return AGENTOS_SUCCESS;
 }
@@ -1299,20 +1648,33 @@ agentos_error_t ipc_mq_receive(
         return AGENTOS_EINVAL;
     }
     
-    (void)timeout_ms;
-    (void)priority;
+    // 步骤1: 获取互斥锁（带超时）
+    int lock_result = ipc_mq_lock(mq, timeout_ms);
+    if (lock_result == ETIMEDOUT) {
+        snprintf(mq->error_msg, sizeof(mq->error_msg),
+                 "Receive timeout after %u ms", timeout_ms);
+        return AGENTOS_ETIMEOUT;
+    }
+    if (lock_result != 0) {
+        snprintf(mq->error_msg, sizeof(mq->error_msg),
+                 "Failed to acquire mutex");
+        return AGENTOS_EUNKNOWN;
+    }
     
-    if (mq->current_count == 0) {
+    // 步骤2: 等待消息可用（处理空队列情况）
+    if (!ipc_mq_wait_for_message(mq, timeout_ms)) {
+        snprintf(mq->error_msg, sizeof(mq->error_msg),
+                 "No message available after timeout");
         return AGENTOS_EBUSY;
     }
     
-    mq->current_count--;
+    // 步骤3: 从队头取出消息（最高优先级）
+    agentos_error_t err = ipc_mq_dequeue_message(mq, buffer, len, received, priority);
     
-    if (received) {
-        *received = 0;
-    }
+    // 步骤4: 释放锁并返回结果
+    ipc_mq_unlock(mq);
     
-    return AGENTOS_SUCCESS;
+    return err;
 }
 
 size_t ipc_mq_count(const ipc_mq_t* mq) {
@@ -1327,7 +1689,32 @@ agentos_error_t ipc_mq_clear(ipc_mq_t* mq) {
         return AGENTOS_EINVAL;
     }
     
+#ifdef _WIN32
+    WaitForSingleObject(mq->hMutex, INFINITE);
+#else
+    pthread_mutex_lock(&mq->mutex);
+#endif
+    
+    // 释放所有消息
+    ipc_mq_message_t* current = mq->head;
+    while (current != NULL) {
+        ipc_mq_message_t* next = current->next;
+        if (current->data) {
+            free(current->data);
+        }
+        free(current);
+        current = next;
+    }
+    
+    mq->head = NULL;
+    mq->tail = NULL;
     mq->current_count = 0;
+    
+#ifdef _WIN32
+    ReleaseMutex(mq->hMutex);
+#else
+    pthread_mutex_unlock(&mq->mutex);
+#endif
     
     return AGENTOS_SUCCESS;
 }

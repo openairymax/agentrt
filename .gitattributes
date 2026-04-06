@@ -1,56 +1,139 @@
 # Auto detect text files and perform LF normalization
 * text=auto
 
-# Source code
+# =============================================================================
+# Source Code - C/C++ (AgentOS Core)
+# =============================================================================
+
 *.c text eol=lf
 *.h text eol=lf
-*.cpp text eol=lf
 *.hpp text eol=lf
+*.cpp text eol=lf
 *.cc text eol=lf
 *.cxx text eol=lf
 
-# Python
+# CMake build system
+CMakeLists.txt text eol=lf
+*.cmake text eol=lf
+*.cmake.in text eol=lf
+
+# =============================================================================
+# Python (Toolkit SDK & OpenLab)
+# =============================================================================
+
 *.py text eol=lf
 *.pyx text eol=lf
 *.pyd text eol=lf
 *.pyw text eol=lf
+*.pyi text eol=lf
+requirements*.txt text eol=lf
+Pipfile text eol=lf
+setup.py text eol=lf
+setup.cfg text eol=lf
 
-# Go
+# =============================================================================
+# Go (Toolkit SDK)
+# =============================================================================
+
 *.go text eol=lf
+go.mod text eol=lf
+go.sum text=binary
+*.s text eol=lf
 
-# Rust
+# =============================================================================
+# Rust (Toolkit SDK)
+# =============================================================================
+
 *.rs text eol=lf
+Cargo.toml text eol=lf
+Cargo.lock text=eol=lf
 
-# TypeScript/JavaScript
+# =============================================================================
+# TypeScript/JavaScript (Toolkit SDK)
+# =============================================================================
+
 *.ts text eol=lf
 *.tsx text eol=lf
 *.js text eol=lf
 *.jsx text eol=lf
-*.json text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
+*.d.ts text eol=lf
+package.json text eol=lf
+package-lock.json text=eol=lf
+tsconfig.json text eol=lf
+*.map text eol=lf
 
-# Shell scripts
+# =============================================================================
+# Shell Scripts (DevOps & CI/CD)
+# =============================================================================
+
 *.sh text eol=lf
 *.bash text eol=lf
+*.zsh text eol=lf
+*.fish text eol=lf
+Makefile text eol=lf
+*.mk text eol=lf
+Dockerfile text eol=lf
+docker-compose*.yml text eol=lf
+docker-compose*.yaml text eol=lf
 
-# Configuration files
+# =============================================================================
+# Configuration Files
+# =============================================================================
+
 *.yml text eol=lf
 *.yaml text eol=lf
 *.toml text eol=lf
 *.ini text eol=lf
 *.cfg text eol=lf
 *.conf text eol=lf
-*.md text eol=lf
-Makefile text eol=lf
-CMakeLists.txt text eol=lf
-*.cmake text eol=lf
-Dockerfile text eol=lf
-.dockerignore text eol=lf
-.gitignore text eol=lf
-.gitattributes text eol=lf
+*.properties text eol=lf
 .env.example text eol=lf
 .editorconfig text eol=lf
 
-# Binary files
+# AgentOS specific configs
+manager.yaml text eol=lf
+policy.yaml text eol=lf
+schema.json text eol=lf
+
+# =============================================================================
+# Documentation
+# =============================================================================
+
+*.md text eol=lf
+*.mdown text eol=lf
+*.markdown text eol=lf
+*.rst text eol=lf
+*.adoc text eol=lf
+*.txt text eol=lf
+LICENSE* text eol=lf
+AUTHORS* text eol=lf
+CHANGELOG* text eol=lf
+CONTRIBUTING* text eol=lf
+NOTICE text eol=lf
+ACKNOWLEDGMENTS* text eol=lf
+CODE_OF_CONDUCT* text eol=lf
+
+# =============================================================================
+# Data Formats
+# =============================================================================
+
+*.json text eol=lf
+*.xml text eol=lf
+*.svg text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.scss text eol=lf
+*.less text eol=lf
+*.graphql text eol=lf
+*.proto text eol=lf
+
+# =============================================================================
+# Binary Files (DO NOT normalize)
+# =============================================================================
+
+# Compiled objects
 *.so binary
 *.dll binary
 *.dylib binary
@@ -58,16 +141,104 @@ Dockerfile text eol=lf
 *.lib binary
 *.o binary
 *.obj binary
+
+# Executables
 *.exe binary
 *.bin binary
-*.png binary
-*.jpg binary
-*.jpeg binary
-*.gif binary
-*.ico binary
-*.pdf binary
+*.out binary
+*.app binary
+
+# Precompiled headers
+*.pch binary
+*.gch binary
+
+# Archives
 *.zip binary
 *.tar binary
 *.gz binary
 *.bz2 binary
 *.7z binary
+*.rar binary
+*.xz binary
+
+# Images
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.bmp binary
+*.tiff binary
+*.tif binary
+*.svgz binary
+
+# Fonts
+*.ttf binary
+*.otf binary
+*.eot binary
+*.woff binary
+*.woff2 binary
+
+# Documents
+*.pdf binary
+*.doc binary
+*.docx binary
+*.xls binary
+*.xlsx binary
+*.ppt binary
+*.pptx binary
+
+# Data files (large/generated)
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+*.faiss binary
+*.pkl binary
+*.pickle binary
+*.npy binary
+*.npz binary
+*.parquet binary
+*.arrow binary
+*.feather binary
+*.h5 binary
+*.pt binary
+*.onnx binary
+*.tflite binary
+*.bin binary
+*.pth binary
+*.model binary
+
+# Keys and certificates
+*.pem binary
+*.key binary
+*.crt binary
+*.cer binary
+*.der binary
+*.p12 binary
+*.pfx binary
+*.jks binary
+*.keystore binary
+
+# Lock files (language-specific)
+poetry.lock text=eol=lf
+Cargo.lock text=eol=lf
+yarn.lock text=eol=lf
+pnpm-lock.yaml text=eol=lf
+Package.lock text=eol=lf
+Gopkg.lock text=eol=lf
+
+# =============================================================================
+# AgentOS Project Specific
+# =============================================================================
+
+# CI/CD workflows
+.github/** text=eol=lf auto
+.gitcode/** text=eol=lf auto
+
+# vcpkg
+vcpkg.json text=eol=lf
+
+# Test fixtures
+tests/fuzz/** -text
+tests/benchmarks/** -text

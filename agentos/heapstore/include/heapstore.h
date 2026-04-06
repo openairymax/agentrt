@@ -140,6 +140,7 @@ typedef struct heapstore_circuit_info {
  * @note 必须在使用其他 API 前调用此函数
  *
  * @see heapstore_shutdown()
+ * @since v1.0.0
  */
 heapstore_error_t heapstore_init(const heapstore_config_t* manager);
 
@@ -153,6 +154,7 @@ heapstore_error_t heapstore_init(const heapstore_config_t* manager);
  * @note 调用后所有 API 将返回 heapstore_ERR_NOT_INITIALIZED
  *
  * @see heapstore_init()
+ * @since v1.0.0
  */
 void heapstore_shutdown(void);
 
@@ -163,6 +165,7 @@ void heapstore_shutdown(void);
  *
  * @threadsafe 是
  * @reentrant 是
+ * @since v1.0.0
  */
 bool heapstore_is_initialized(void);
 
@@ -176,6 +179,7 @@ bool heapstore_is_initialized(void);
  * @reentrant 是
  *
  * @note 未初始化时返回空字符串
+ * @since v1.0.0
  */
 const char* heapstore_get_root(void);
 
@@ -258,6 +262,7 @@ heapstore_error_t heapstore_log_write_fast(const char* service, int level, const
  * @note 包含完整的参数验证和错误处理
  *
  * @see heapstore_log_write_fast()
+ * @since v1.0.0
  */
 heapstore_error_t heapstore_log_write_slow(const char* service, int level, const char* message, const char* trace_id, uint32_t timeout_ms);
 
@@ -328,10 +333,10 @@ heapstore_error_t heapstore_flush(void);
  *
  * @note 所有输出参数均为可选，传入 NULL 表示不检查该子系统
  */
-heapstore_error_t heapstore_health_check(bool* registry_ok, 
-                                       bool* trace_ok, 
-                                       bool* log_ok, 
-                                       bool* ipc_ok, 
+heapstore_error_t heapstore_health_check(bool* registry_ok,
+                                       bool* trace_ok,
+                                       bool* log_ok,
+                                       bool* ipc_ok,
                                        bool* memory_ok);
 
 /**
@@ -343,7 +348,8 @@ heapstore_error_t heapstore_health_check(bool* registry_ok,
  * @ownership 调用者负责 metrics 的分配和释放
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_get_metrics(heapstore_metrics_t* metrics);
 
 /**
@@ -353,7 +359,8 @@ heapstore_error_t heapstore_get_metrics(heapstore_metrics_t* metrics);
  *
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_reset_metrics(void);
 
 /**
@@ -365,7 +372,8 @@ heapstore_error_t heapstore_reset_metrics(void);
  * @ownership 调用者负责 info 的分配和释放
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_get_circuit_state(heapstore_circuit_info_t* info);
 
 /**
@@ -411,7 +419,8 @@ heapstore_batch_context_t* heapstore_batch_begin(size_t batch_size);
  * @ownership 调用者负责所有参数的生命周期
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_batch_add_log(
     heapstore_batch_context_t* ctx,
     const char* service,

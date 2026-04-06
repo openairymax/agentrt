@@ -1,16 +1,50 @@
 /**
  * @file platform_adapter.h
- * @brief 平台适配器 - 消除平台相关代码重复
+ * @brief 平台适配器 - 高级跨平台工具集
  * 
- * 提供统一的跨平台抽象层，包括：
- * - 进程管理（跨平台执行命令）
- * - 文件系统操作
- * - 网络操作
- * - 系统时间
- * - 环境变量
- * - 路径处理
+ * @module_positioning 模块定位说明
+ * 
+ * 本模块位于 AgentOS commons 的 utils/platform/ 目录下，
+ * 提供面向应用层的高级跨平台工具功能。
+ * 
+ * ## 与顶层 platform/ 模块的区别
+ * 
+ * | 维度 | 本模块 (utils/platform/) | 顶层模块 (platform/) |
+ * |------|------------------------|---------------------|
+ * | **位置** | utils/platform/ | platform/ |
+ * | **抽象层级** | 应用层 (High-Level) | 系统层 (Low-Level) |
+ * | **核心功能** | 文件系统、环境变量、进程管理 | 线程原语、Socket、时间 |
+ * | **使用场景** | 业务逻辑代码 | 基础设施代码 |
+ * | **性能要求** | 一般 | 关键路径优化 |
+ * | **典型用户** | cognition, execution 等业务模块 | sync, ipc 等底层模块 |
+ * 
+ * ## 设计理念
+ * 
+ * 遵循 AgentOS 五维正交体系中的"工程维度"原则：
+ * - ✅ 统一接口: 所有平台差异通过本模块透明处理
+ * - ✅ 最小惊讶: API 设计符合直觉，参数语义清晰
+ * - ✅ 渐进式迁移: 可逐步替换原有平台相关代码
+ * 
+ * ## 主要功能分类
+ * 
+ * ### 1. 进程管理
+ * - platform_exec() - 跨平台命令执行
+ * - 支持超时控制和输出捕获
+ * 
+ * ### 2. 文件系统操作  
+ * - platform_mkdir(), platform_unlink(), platform_copy_file()
+ * - 递归目录创建、文件信息查询
+ * 
+ * ### 3. 环境与路径
+ * - platform_get_env(), platform_set_env()
+ * - platform_path_join(), platform_path_normalize()
+ * 
+ * ### 4. 系统服务
+ * - platform_get_timestamp_ms/us()
+ * - platform_sleep_ms()
  * 
  * @copyright Copyright (c) 2026 SPHARX. All Rights Reserved.
+ * @see platform.h (顶层系统抽象层)
  */
 
 #ifndef AGENTOS_PLATFORM_ADAPTER_H
