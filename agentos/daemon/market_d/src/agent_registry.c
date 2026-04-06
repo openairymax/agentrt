@@ -305,7 +305,7 @@ static int read_tags(FILE* f, agent_entry_t* entry) {
     if (fread(&entry->tag_count, sizeof(size_t), 1, f) != 1) return -1;
     if (entry->tag_count > MAX_TAG_LEN) entry->tag_count = MAX_TAG_LEN;
     
-    entry->tags = (char**)malloc(sizeof(char*) * entry->tag_count);
+    entry->tags = (char**)malloc(sizeof(*entry->tags) * entry->tag_count);
     if (!entry->tags) return -1;
     
     for (size_t j = 0; j < entry->tag_count; j++) {
@@ -525,7 +525,7 @@ int agent_registry_register(const agent_registration_t* reg) {
     
     /* 复制标签 */
     if (reg->tags && reg->tag_count > 0) {
-        entry->tags = (char**)malloc(sizeof(char*) * reg->tag_count);
+        entry->tags = (char**)malloc(sizeof(*entry->tags) * reg->tag_count);
         if (entry->tags) {
             entry->tag_count = reg->tag_count;
             for (size_t i = 0; i < reg->tag_count; i++) {

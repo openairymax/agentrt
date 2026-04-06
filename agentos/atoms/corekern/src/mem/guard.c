@@ -16,6 +16,8 @@
 
 #define GUARD_SIZE     16
 #define GUARD_PATTERN  0xDEADBEEFU
+#define MAX_REASONABLE_SIZE (1024 * 1024 * 1024) /* 1GB */
+#define ALIGNMENT_MASK (sizeof(uintptr_t) - 1)
 
 typedef struct {
     uint8_t front[GUARD_SIZE];
@@ -74,6 +76,27 @@ static void validate_guard(guard_block_t* block, const char* operation) {
     }
 }
 
+static int is_valid_guard_block(guard_block_t* block, void* user_ptr) {
+    if (!block) return 0;
+    
+    /* 检查指针对齐 */
+    if (((uintptr_t)block & ALIGNMENT_MASK) != 0) {
+        return 0;
+    }
+    
+    /* 检查用户指针一致性 */
+    if ((uint8_t*)user_ptr != (uint8_t*)block + sizeof(guard_block_t)) {
+        return 0;
+    }
+    
+    /* 检查大小合理性 */
+    if (block->user_size > MAX_REASONABLE_SIZE) {
+        return 0;
+    }
+    
+    return 1;
+}
+
 void* agentos_mem_guard_alloc(size_t size) {
     guard_block_t* block = create_guarded_block(size);
     return block ? block->user_ptr : NULL;
@@ -88,6 +111,12 @@ void* agentos_mem_guard_alloc_check(size_t size, void** out_block) {
 void agentos_mem_guard_free(void* ptr) {
     if (!ptr) return;
     guard_block_t* block = (guard_block_t*)((uint8_t*)ptr - sizeof(guard_block_t));
+    
+    /* 验证 guard block 的合理性 */
+    if (!is_valid_guard_block(block, ptr)) {
+        return;
+    }
+    
     validate_guard(block, "free");
     AGENTOS_FREE(block);
 }
@@ -95,11 +124,23 @@ void agentos_mem_guard_free(void* ptr) {
 int agentos_mem_guard_check(void* ptr) {
     if (!ptr) return 0;
     guard_block_t* block = (guard_block_t*)((uint8_t*)ptr - sizeof(guard_block_t));
+    
+    /* 验证 guard block 的合理性 */
+    if (!is_valid_guard_block(block, ptr)) {
+        return 0;
+    }
+    
     return check_guard(block->front) && check_guard(block->back);
 }
 
 size_t agentos_mem_guard_usable_size(void* ptr) {
     if (!ptr) return 0;
     guard_block_t* block = (guard_block_t*)((uint8_t*)ptr - sizeof(guard_block_t));
+    
+    /* 验证 guard block 的合理性 */
+    if (!is_valid_guard_block(block, ptr)) {
+        return 0;
+    }
+    
     return block->user_size;
 }
