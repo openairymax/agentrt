@@ -37,18 +37,14 @@ add_library(agentos_memoryrovol STATIC
     llm_client.c
 )
 
-target_include_directories(agentos_memoryrovol PRIVATE
+# 使用统一的头文件路径管理
+target_link_libraries(agentos_memoryrovol PUBLIC agentos_atoms)
+
+target_include_directories(agentos_memoryrovol PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../corekern/include
-    ${FAISS_INCLUDE_DIRS}
-    ${LIBCURL_INCLUDE_DIRS}
-    ${CJSON_INCLUDE_DIRS}
-    ${YAML_INCLUDE_DIRS}
-    ${SQLITE3_INCLUDE_DIRS}
-    ${SENTENCE_TRANSFORMERS_INCLUDE_DIRS}
 )
 
-target_link_libraries(agentos_memoryrovol
+target_link_libraries(agentos_memoryrovol PRIVATE
     agentos_core
     ${FAISS_LIBRARIES}
     ${LIBCURL_LIBRARIES}

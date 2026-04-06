@@ -16,6 +16,14 @@
 #include <stdio.h>
 
 /**
+ * @brief IPC 消息队列节点
+ */
+typedef struct ipc_message_node {
+    agentos_ipc_message_t msg;
+    struct ipc_message_node* next;
+} ipc_message_node_t;
+
+/**
  * @brief IPC 通道内部结构
  */
 struct agentos_ipc_channel {
@@ -23,6 +31,9 @@ struct agentos_ipc_channel {
     agentos_ipc_port_t port;    /**< 端口号 */
     int is_server;              /**< 是否为服务器端 */
     agentos_mutex_t* lock;      /**< 锁（指针） */
+    agentos_cond_t* cond;       /**< 条件变量 */
+    ipc_message_node_t* queue;  /**< 消息队列 */
+    size_t queue_size;          /**< 队列大小 */
 };
 
 /**
@@ -65,6 +76,18 @@ agentos_error_t agentos_ipc_create_channel(
         return AGENTOS_ENOMEM;
     }
 
+    /* 创建条件变量 */
+    channel->cond = agentos_cond_create();
+    if (!channel->cond) {
+        agentos_mutex_destroy(channel->lock);
+        AGENTOS_FREE(channel);
+        return AGENTOS_ENOMEM;
+    }
+
+    /* 初始化消息队列 */
+    channel->queue = NULL;
+    channel->queue_size = 0;
+
     *out_channel = channel;
     return AGENTOS_SUCCESS;
 }
@@ -79,9 +102,25 @@ agentos_error_t agentos_ipc_close(agentos_ipc_channel_t* channel) {
 
     if (channel->lock) {
         agentos_mutex_lock(channel->lock);
+        
+        /* 清理消息队列 */
+        ipc_message_node_t* node = channel->queue;
+        while (node) {
+            ipc_message_node_t* next = node->next;
+            AGENTOS_FREE(node);
+            node = next;
+        }
+        channel->queue = NULL;
+        channel->queue_size = 0;
+        
         channel->fd = -1;
         agentos_mutex_unlock(channel->lock);
 
+        if (channel->cond) {
+            agentos_cond_destroy(channel->cond);
+            channel->cond = NULL;
+        }
+        
         agentos_mutex_destroy(channel->lock);
         channel->lock = NULL;
     }
@@ -100,8 +139,35 @@ agentos_error_t agentos_ipc_send(
         return AGENTOS_EINVAL;
     }
 
-    /* TODO: 实现实际的 IPC 发送逻辑 */
-    (void)msg;
+    agentos_mutex_lock(channel->lock);
+
+    /* 创建消息节点 */
+    ipc_message_node_t* node = (ipc_message_node_t*)AGENTOS_CALLOC(1, sizeof(ipc_message_node_t));
+    if (!node) {
+        agentos_mutex_unlock(channel->lock);
+        return AGENTOS_ENOMEM;
+    }
+
+    /* 复制消息内容 */
+    memcpy(&node->msg, msg, sizeof(agentos_ipc_message_t));
+    node->next = NULL;
+
+    /* 添加到队列尾部 */
+    if (!channel->queue) {
+        channel->queue = node;
+    } else {
+        ipc_message_node_t* tail = channel->queue;
+        while (tail->next) {
+            tail = tail->next;
+        }
+        tail->next = node;
+    }
+    channel->queue_size++;
+
+    /* 通知等待的接收者 */
+    agentos_cond_signal(channel->cond);
+
+    agentos_mutex_unlock(channel->lock);
 
     return AGENTOS_SUCCESS;
 }
@@ -117,9 +183,28 @@ agentos_error_t agentos_ipc_recv(
         return AGENTOS_EINVAL;
     }
 
-    /* TODO: 实现实际的 IPC 接收逻辑 */
-    (void)timeout_ms;
-    (void)out_msg;
+    agentos_mutex_lock(channel->lock);
+
+    /* 等待消息到达 */
+    if (!channel->queue && timeout_ms > 0) {
+        agentos_cond_wait_timeout(channel->cond, channel->lock, timeout_ms);
+    }
+
+    /* 检查队列 */
+    if (!channel->queue) {
+        agentos_mutex_unlock(channel->lock);
+        return AGENTOS_ETIMEDOUT;
+    }
+
+    /* 从队列头部取出消息 */
+    ipc_message_node_t* node = channel->queue;
+    memcpy(out_msg, &node->msg, sizeof(agentos_ipc_message_t));
+    
+    channel->queue = node->next;
+    channel->queue_size--;
+    AGENTOS_FREE(node);
+
+    agentos_mutex_unlock(channel->lock);
 
     return AGENTOS_SUCCESS;
 }

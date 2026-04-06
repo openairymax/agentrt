@@ -1,0 +1,280 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "config-audit-log.schema.json",
+  "title": "ConfigAuditLogEntry",
+  "description": "AgentOS配置变更审计日志条目Schema定义",
+  "type": "object",
+  "required": [
+    "timestamp",
+    "action",
+    "config_file",
+    "operator",
+    "checksum"
+  ],
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601格式的UTC时间戳",
+      "examples": [
+        "2026-04-05T10:30:00.123456Z"
+      ]
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "LOAD",
+        "RELOAD",
+        "CHANGE",
+        "ROLLBACK",
+        "VALIDATE",
+        "EXPORT",
+        "IMPORT"
+      ],
+      "description": "审计动作类型",
+      "$comment": "LOAD: 配置加载; RELOAD: 热更新重载; CHANGE: 配置变更; ROLLBACK: 回滚; VALIDATE: Schema验证; EXPORT: 导出; IMPORT: 导入"
+    },
+    "config_file": {
+      "type": "string",
+      "pattern": "^.*\\.(ya?ml|json)$",
+      "description": "配置文件相对路径（相对于manager目录）",
+      "examples": [
+        "kernel/settings.yaml",
+        "model/model.yaml",
+        "security/policy.yaml"
+      ]
+    },
+    "operator": {
+      "type": "object",
+      "required": [
+        "type",
+        "identity"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "user",
+            "system",
+            "ci_cd"
+          ],
+          "description": "操作者类型: user(用户), system(系统自动), ci_cd(CI/CD流水线)"
+        },
+        "identity": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "description": "操作者标识: 用户名/系统组件名/CI Job名",
+          "examples": [
+            "admin",
+            "config-manager",
+            "github-actions"
+          ]
+        },
+        "ip_address": {
+          "type": "string",
+          "format": "ipv4",
+          "description": "操作者IP地址（仅user类型）"
+        },
+        "session_id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$",
+          "description": "会话ID（UUID格式）"
+        }
+      },
+      "additionalProperties": false
+    },
+    "changes": {
+      "type": "array",
+      "description": "配置变更详情列表",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "old_value",
+          "new_value"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "YAML/JSON路径表达式（点号分隔）",
+            "examples": [
+              "kernel.log_level",
+              "model.primary.provider",
+              "security.rules[0].action"
+            ]
+          },
+          "old_value": {
+            "description": "变更前的值（任意类型，null表示新增字段）"
+          },
+          "new_value": {
+            "description": "变更后的值（任意类型，null表示删除字段）"
+          },
+          "field_type": {
+            "type": "string",
+            "description": "字段类型提示",
+            "enum": [
+              "string",
+              "number",
+              "integer",
+              "boolean",
+              "array",
+              "object",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "minItems": 0
+    },
+    "checksum": {
+      "type": "object",
+      "required": [
+        "algorithm",
+        "before",
+        "after"
+      ],
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "const": "sha256",
+          "description": "校验和算法（固定为SHA-256）"
+        },
+        "before": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "变更前的文件SHA-256哈希值（64位十六进制）",
+          "examples": [
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          ]
+        },
+        "after": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "变更后的文件SHA-256哈希值（64位十六进制）",
+          "examples": [
+            "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "metadata": {
+      "type": "object",
+      "description": "扩展元数据",
+      "properties": {
+        "environment": {
+          "type": "string",
+          "enum": [
+            "development",
+            "staging",
+            "production"
+          ],
+          "description": "运行环境"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+(\\.\\d+)?$",
+          "description": "Manager模块版本号",
+          "examples": [
+            "1.0.0.14"
+          ]
+        },
+        "correlation_id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$",
+          "description": "关联ID（用于跨系统追踪，UUID格式）"
+        },
+        "source": {
+          "type": "string",
+          "description": "变更来源",
+          "examples": [
+            "manual",
+            "api",
+            "file_watcher",
+            "git_hook"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 1024,
+          "description": "变更原因说明"
+        },
+        "approved_by": {
+          "type": "string",
+          "description": "审批人（如适用）"
+        },
+        "ticket_id": {
+          "type": "string",
+          "description": "关联工单ID"
+        }
+      },
+      "additionalProperties": true
+    },
+    "result": {
+      "type": "object",
+      "description": "操作结果",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "操作是否成功"
+        },
+        "error_code": {
+          "type": "string",
+          "description": "错误码（失败时）"
+        },
+        "error_message": {
+          "type": "string",
+          "description": "错误消息（失败时）"
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "操作耗时（毫秒）"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "timestamp": "2026-04-05T10:30:00.123456Z",
+      "action": "CHANGE",
+      "config_file": "kernel/settings.yaml",
+      "operator": {
+        "type": "user",
+        "identity": "admin",
+        "ip_address": "192.168.1.100",
+        "session_id": "550e8400-e29b-41d4-a716-446655440000"
+      },
+      "changes": [
+        {
+          "path": "kernel.log_level",
+          "old_value": "info",
+          "new_value": "debug",
+          "field_type": "string"
+        }
+      ],
+      "checksum": {
+        "algorithm": "sha256",
+        "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after": "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a"
+      },
+      "metadata": {
+        "environment": "production",
+        "version": "1.0.0.14",
+        "correlation_id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+        "source": "manual",
+        "reason": "调试生产环境问题",
+        "approved_by": "tech_lead",
+        "ticket_id": "OPS-2026-0425"
+      },
+      "result": {
+        "success": true,
+        "duration_ms": 45
+      }
+    }
+  ]
+}

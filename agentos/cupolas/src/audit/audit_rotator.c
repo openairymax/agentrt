@@ -13,6 +13,7 @@
  */
 
 #include "audit_rotator.h"
+#include "../../utils/cupolas_utils.h"
 #include <stdlib.h>
 #include <string.h>
 

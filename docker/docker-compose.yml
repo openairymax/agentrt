@@ -1,212 +1,614 @@
 version: '3.8'
 
 # =============================================================================
-# AgentOS Docker Compose - 开发环境
-# 版本: 1.0.0
-# 用途: 本地开发和测试
+# AgentOS Docker Compose - 开发环境 (Development)
+# 版本: 2.0.0 (Production-Grade Dev Environment)
+# 最后更新: 2026-04-06
 #
-# 使用方法:
+# 🎯 设计原则:
+# ✅ 与生产环境保持一致的架构（便于迁移）
+# ✅ 开发友好（热重载、调试工具、详细日志）
+# ✅ 安全默认配置（非 root、最小权限、网络隔离）
+# ✅ 可观测性内置（健康检查、结构化日志、监控就绪）
+#
+# 📋 使用方法:
+#   # 启动所有核心服务（不含监控）
 #   docker compose -f docker/docker-compose.yml up -d
-#   docker compose -f docker/docker-compose.yml logs -f
-#   docker compose -f docker/docker-compose.yml down
 #
-# 设计原则:
-# 1. 模块化设计，每个服务独立可扩展
-# 2. 开发友好，支持热重载和调试
-# 3. 安全默认配置
+#   # 启动完整栈（含 Prometheus + Grafana）
+#   docker compose -f docker/docker-compose.yml --profile monitoring up -d
+#
+#   # 查看日志
+#   docker compose -f docker/docker-compose.yml logs -f kernel gateway
+#
+#   # 进入容器调试
+#   docker compose -f docker/docker-compose.yml exec kernel bash
+#
+#   # 停止并清理
+#   docker compose -f docker/docker-compose.yml down -v
+#
+# 🔗 架构拓扑:
+#   [OpenLab] ←→ [Gateway:18789] ←→ [Kernel:18080]
+#                    ↓                ↓
+#               [Redis:6379]    [PostgreSQL:5432]
+#                    ↓
+#              [Prometheus:9091] → [Grafana:3000]
 # =============================================================================
 
 services:
   # ===========================================================================
-  # 内核服务 (Kernel)
+  # 内核服务 (Kernel) - AgentOS 微内核核心
+  # 基于: Dockerfile.kernel (target: runtime)
+  # 源码位置: agentos/atoms/corekern/
+  # 端口: 18080 (IPC API) + 9090 (Prometheus Metrics)
   # ===========================================================================
   kernel:
     build:
       context: ..
       dockerfile: docker/Dockerfile.kernel
-      target: development
+      target: runtime                    # ✅ 使用 runtime target（非 development）
       args:
-        BUILD_TYPE: Debug
-        ENABLE_TESTS: ON
+        BUILD_TYPE: Debug                 # 开发模式启用调试符号
+        ENABLE_TESTS: ON                  # 开发模式启用测试
+    image: spharx/agentos-kernel:dev-latest
     container_name: agentos-kernel-dev
     hostname: agentos-kernel
     restart: unless-stopped
+
+    # 端口映射（仅开发环境暴露，生产通过 Gateway 访问）
     ports:
-      - "8080:8080"       # IPC API端口
-      - "9090:9090"       # Prometheus监控端口
+      - "18080:18080"                     # 内核 IPC API（与源码 syscalls.h 一致）
+      - "9090:9090"                       # Prometheus /metrics 端点
+
+    # 卷挂载（开发环境支持源码热重载）
     volumes:
-      # 源码挂载（开发时热重载）
+      # 源码挂载（只读，用于开发时实时查看源码）
       - ../agentos:/app/source:ro
-      # 构建产物持久化
-      - kernel-build:/app/build
-      # 配置文件
+      # 构建产物持久化（避免重复编译）
+      - kernel-build-cache:/app/build:rw
+      # 配置文件（从 config 目录挂载）
       - ../config:/app/config:ro
-      # 数据目录（持久化）
-      - kernel-data:/app/data
-      # 日志目录
-      - kernel-logs:/app/logs
+      # HeapStore 六大数据分区（基于 heapstore.h path_type_t 定义）
+      - heapstore-kernel-data:/var/lib/agentos/data:rw       # PATH_KERNEL
+      - heapstore-logs:/var/lib/agentos/logs:rw              # PATH_LOGS
+      - heapstore-registry:/var/lib/agentos/registry:rw       # PATH_REGISTRY
+      - heapstore-traces:/var/lib/agentos/traces:rw          # PATH_TRACES
+      - heapstore-ipc:/var/lib/agentos/ipc:rw                # PATH_KERNEL_IPC
+      - heapstore-memory:/var/lib/agentos/memory:rw          # PATH_KERNEL_MEMORY
+
+    # 环境变量（开发模式配置）
     environment:
+      # 日志级别（开发时使用 DEBUG 获取详细信息）
       - LOG_LEVEL=DEBUG
+      # Cupolas 安全框架（开发模式使用宽松权限）
       - AGENTOS_CUPOLAS_ENABLED=true
-      - AGENTOS_PERMISSION_MODE=relaxed
-      - AGENTOS_SANITIZER_MODE=strict
-      - AGENTOS_AUDIT_ENABLED=true
+      - AGENTOS_PERMISSION_MODE=relaxed     # 宽松权限（允许更多操作）
+      - AGENTOS_SANITIZER_MODE=strict       # 严格输入校验
+      - AGENTOS_AUDIT_ENABLED=true          # 启用审计日志
+      # HeapStore 数据分区配置（与 heapstore_config_t 结构体一致）
+      - HEAPSTORE_ROOT_PATH=/var/lib/agentos/data
+      - HEAPSTORE_MAX_LOG_SIZE_MB=100
+      - HEAPSTORE_LOG_RETENTION_DAYS=30
+      - HEAPSTORE_TRACE_RETENTION_DAYS=7
+      - HEAPSTORE_AUTO_CLEANUP=true
+      - HEAPSTORE_CIRCUIT_THRESHOLD=5       # 熔断阈值（连续失败次数）
+      - HEAPSTORE_CIRCUIT_TIMEOUT_SEC=30    # 熔断恢复超时
+      # 时区配置
       - TZ=Asia/Shanghai
+      - LANG=C.UTF-8
+      - LC_ALL=C.UTF-8
+
+    # 网络配置（隔离内部网络）
     networks:
-      - agentos-network
+      - agentos-backend                   # 后端服务网络（Kernel + DB + Cache）
+
+    # 服务依赖（确保数据库先启动并通过健康检查）
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    # 健康检查（多层检测：HTTP API + 进程存活）
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      test: ["CMD", "curl", "-f", "http://localhost:18080/api/v1/health"]
+      interval: 30s                        # 检查间隔
+      timeout: 10s                         # 超时时间
+      retries: 3                           # 失败重试次数
+      start_period: 40s                     # 容器启动后等待时间
+
+    # 资源限制（防止开发环境资源耗尽）
+    deploy:
+      resources:
+        limits:
+          cpus: '4'                        # 最大 CPU 核心数
+          memory: 4G                       # 最大内存
+        reservations:
+          cpus: '1'                        # 保留 CPU 核心数
+          memory: 512M                     # 保留内存
+
+    # 安全加固（开发环境适度放宽，但仍遵循最佳实践）
+    security_opt:
+      - no-new-privileges:true             # 禁止获取新权限（CIS 5.11）
+
+    # 日志配置（JSON 格式 + 自动轮转）
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"                    # 单个日志文件最大 50MB
+        max-file: "5"                      # 最多保留 5 个日志文件
+        labels: "service,environment"
+        tag: "{{.Name}}"
 
   # ===========================================================================
-  # PostgreSQL 数据库（用于heapstore）
+  # Gateway 网关服务 - 统一 API 入口（HTTP + WebSocket + stdio）
+  # 基于: Dockerfile.daemon (target: gateway)
+  # 源码位置: agentos/gateway/
+  # 端口: 18789 (主 API) + 18790 (管理 API)
+  #
+  # 📌 关键说明:
+  # - 所有外部请求应通过 Gateway 访问 Kernel（不直接暴露 18080）
+  # - 支持 Python SDK v3.0.0 默认连接 http://localhost:18789
+  # - 三协议支持：HTTP REST、WebSocket 实时通信、stdio 管道
+  # ===========================================================================
+  gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.daemon
+      target: gateway                      # ✅ 使用 gateway target（含 HTTP/WS/stdio）
+    image: spharx/agentos-gateway:dev-latest
+    container_name: agentos-gateway-dev
+    hostname: agentos-gateway
+    restart: unless-stopped
+
+    # 端口映射（对外统一入口）
+    ports:
+      - "18789:18789"                      # 主端口：HTTP API + WebSocket（Python SDK 默认端口）
+      - "18790:18790"                      # 管理端口：Gateway Admin API
+
+    # 卷挂载
+    volumes:
+      # Gateway 源码（只读，用于开发调试）
+      - ../agentos/gateway:/app/gateway:ro
+      # Gateway 配置文件（YAML 格式，含 CORS、限流、JWT 等配置）
+      - ./config/gateway.yaml:/app/config/gateway.yaml:ro
+
+    # 环境变量
+    environment:
+      # Gateway 基础配置
+      - GATEWAY_BIND_ADDRESS=0.0.0.0
+      - GATEWAY_PORT=18789
+      - GATEWAY_ADMIN_PORT=18790
+      # 上游连接（指向 Kernel IPC）
+      - GATEWAY_UPSTREAM_URL=http://kernel:18080
+      # 协议启用（三协议全开）
+      - GATEWAY_PROTOCOLS=http,websocket,stdio
+      # 速率限制（开发环境适当放宽）
+      - GATEWAY_GLOBAL_QPS=10000           # 全局 QPS 上限
+      - GATEWAY_PER_IP_QPS=100            # 单 IP QPS 上限
+      # JWT 密钥（开发环境使用固定值，生产必须用 secrets）
+      - GATEWAY_JWT_SECRET=dev_jwt_secret_change_in_production_2024
+      # 时区
+      - TZ=Asia/Shanghai
+      - LANG=C.UTF-8
+
+    # 网络（同时连接后端和前端网络）
+    networks:
+      - agentos-backend                   # 连接 Kernel、Redis、PostgreSQL
+      - agentos-frontend                  # 连接 OpenLab、外部客户端
+
+    # 依赖关系（Gateway 必须在 Kernel 就绪后才启动）
+    depends_on:
+      kernel:
+        condition: service_healthy
+
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:18789/api/v1/health"]
+      interval: 15s                        # 更频繁的检查（网关是关键路径）
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+    # 安全加固
+    security_opt:
+      - no-new-privileges:true
+
+    # 日志配置
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+        tag: "{{.Name}}"
+
+  # ===========================================================================
+  # PostgreSQL 关系型数据库（HeapStore 慢速存储层）
+  # 用途: 持久化存储、事务性数据、结构化查询
+  # 版本: PostgreSQL 15 Alpine（轻量级镜像）
   # ===========================================================================
   postgres:
     image: postgres:15-alpine
     container_name: agentos-postgres-dev
+    hostname: agentos-postgres
     restart: unless-stopped
+
+    # 端口映射（开发环境可直连调试）
+    ports:
+      - "5432:5432"
+
+    # 卷挂载（数据持久化）
+    volumes:
+      - postgres-data:/var/lib/postgresql/data:rw
+
+    # 环境变量（开发环境使用默认密码）
     environment:
       POSTGRES_DB: agentos
       POSTGRES_USER: agentos
-      POSTGRES_PASSWORD: agentos_dev_password
-      PGDATA: /var/lib/postgresql/data/pgdata
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+      POSTGRES_PASSWORD: agentos_dev_password_2024  # ⚠️ 仅用于开发！
+      PGDATA: /var/lib/postgresql/data/pgdata       # 数据目录（优化性能）
+      # PostgreSQL 性能调优（开发环境适中配置）
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+
+    # 网络
     networks:
-      - agentos-network
+      - agentos-backend
+
+    # 健康检查（PostgreSQL 特有检测方式）
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U agentos"]
+      test: ["CMD-SHELL", "pg_isready -U agentos -d agentos"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s                    # PostgreSQL 启动较慢
+
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+    # 日志配置
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+        tag: "{{.Name}}"
 
   # ===========================================================================
-  # Redis 缓存（用于IPC和权限缓存）
+  # Redis 内存缓存（IPC 快速通道 + 权限缓存 + 会话存储）
+  # 用途: 高速键值存储、发布订阅、分布式锁
+  # 版本: Redis 7 Alpine（最新稳定版）
   # ===========================================================================
   redis:
     image: redis:7-alpine
     container_name: agentos-redis-dev
+    hostname: agentos-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 256mb
-    volumes:
-      - redis-data:/data
+
+    # 端口映射（开发环境可直连调试）
     ports:
       - "6379:6379"
+
+    # 卷挂载（AOF 持久化数据）
+    volumes:
+      - redis-data:/data:rw
+
+    # 启动命令（开启 AOF 持久化 + 内存限制）
+    command: >
+      redis-server
+      --appendonly yes                     # AOF 持久化（防止数据丢失）
+      --appendfsync everysec               # 每秒同步（性能与安全的平衡）
+      --maxmemory 256mb                    # 最大内存 256MB（开发环境）
+      --maxmemory-policy allkeys-lru       # 内存满时淘汰 LRU 键
+      --save ""                            # 禁用 RDB（仅使用 AOF）
+      --loglevel notice                    # 日志级别
+      --timeout 300                        # 空闲连接超时
+
+    # 网络
     networks:
-      - agentos-network
+      - agentos-backend
+
+    # 健康检查
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries:5
+      start_period: 10s
+
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+    # 日志配置
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "{{.Name}}"
 
   # ===========================================================================
-  # OpenLab 应用服务
+  # OpenLab 应用服务（Web UI + API Backend）
+  # 用途: AgentOS 可视化管理界面和交互式实验平台
+  # 注意: 此服务为可选组件，如未实现可注释掉
   # ===========================================================================
   openlab:
     build:
       context: ..
-      dockerfile: docker/Dockerfile.openlab
+      dockerfile: docker/Dockerfile.openlab  # ⚠️ 需要创建此文件或替换为实际镜像
+      target: development
+    image: spharx/agentos-openlab:dev-latest
     container_name: agentos-openlab-dev
+    hostname: agentos-openlab
     restart: unless-stopped
+    profiles:
+      - openlab                          # 使用 profile 按需启动（默认不启动）
+
+    # 端口映射
     ports:
-      - "5173:5173"       # Web前端
-      - "8000:8000"       # API后端
+      - "5173:5173"                       # Web 前端（Vite 开发服务器）
+      - "8000:8000"                       # API 后端（Python FastAPI/Django）
+
+    # 卷挂载
     volumes:
-      - ../openlab:/app/openlab:ro
-      - openlab-data:/app/data
+      - ../openlab:/app/openlab:ro         # 源码挂载（热重载）
+      - openlab-data:/app/data:rw          # 用户数据持久化
+
+    # 环境变量
     environment:
-      - OPENLAB_DEBUG=true
+      # OpenLab 自身配置
+      - OPENLAB_DEBUG=true                 # 开发模式（热重载 + 详细错误）
       - OPENLAB_PORT=5173
-      - AGENTOS_IPC_URL=http://kernel:8080
-      - DATABASE_URL=postgresql://agentos:agentos_dev_password@postgres:5432/agentos
+      # 连接 Gateway 作为统一 API 入口（推荐方式）
+      - AGENTOS_GATEWAY_URL=http://gateway:18789
+      # 直接连接 Kernel IPC（备用通道，用于低延迟场景）
+      - AGENTOS_IPC_URL=http://kernel:18080
+      # 数据库连接
+      - DATABASE_URL=postgresql://agentos:agentos_dev_password_2024@postgres:5432/agentos
       - REDIS_URL=redis://redis:6379/0
+      # 时区
+      - TZ=Asia/Shanghai
+
+    # 网络（仅需访问前端网络 + 通过 Gateway 访问后端）
     networks:
-      - agentos-network
+      - agentos-frontend                  # 直接连接 Gateway
+
+    # 依赖关系
     depends_on:
-      - kernel
-      - postgres
-      - redis
+      - gateway                           # 通过 Gateway 间接依赖 Kernel
+
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+    # 日志配置
+    logging:
+      driver: json-file
+      options:
+        max-size: "30m"
+        max-file: "3"
+        tag: "{{.Name}}"
 
   # ===========================================================================
-  # Prometheus 监控
+  # Prometheus 监控系统（指标采集 + 告警引擎）
+  # 用途: 收集所有服务的 metrics、可视化查询、告警规则评估
+  # 版本: Prometheus v2.45.0
+  # 启动方式: docker compose --profile monitoring up -d
   # ===========================================================================
   prometheus:
     image: prom/prometheus:v2.45.0
     container_name: agentos-prometheus-dev
+    hostname: agentos-prometheus
     restart: unless-stopped
+    profiles:
+      - monitoring                       # 使用 profile 按需启动
+
+    # 端口映射
     ports:
-      - "9091:9090"
+      - "9091:9090"                       # Web UI（偏移到 9091 避免冲突）
+
+    # 卷挂载
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus-data:/prometheus
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro  # 配置文件
+      - ./monitoring/rules:/etc/prometheus/rules:ro                   # 告警规则
+      - prometheus-data:/prometheus:rw                               # TSDB 数据
+
+    # 启动参数
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--tsdb.path=/prometheus'
+      - '--tsdb.retention.time=7d'            # 开发环境保留 7 天数据
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/console_templates'
+      - '--web.enable-lifecycle'              # 允许热加载配置
+
+    # 网络
     networks:
-      - agentos-network
-    profiles:
-      - monitoring
+      - agentos-backend                     # 需要拉取所有服务的 metrics
+
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+    # 日志配置
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+        tag: "{{.Name}}"
 
   # ===========================================================================
-  # Grafana 可视化
+  # Grafana 可视化平台（仪表盘 + 告警通知）
+  # 用途: 基于 Prometheus 数据构建可视化仪表盘、告警通知
+  # 版本: Grafana 10.2.0
+  # 启动方式: docker compose --profile monitoring up -d
   # ===========================================================================
   grafana:
     image: grafana/grafana:10.2.0
     container_name: agentos-grafana-dev
+    hostname: agentos-grafana
     restart: unless-stopped
+    profiles:
+      - monitoring                       # 使用 profile 按需启动
+
+    # 端口映射
     ports:
-      - "3000:3000"
+      - "3000:3000"                       # Web UI
+
+    # 环境变量
     environment:
-      GF_SECURITY_ADMIN_PASSWORD=admin
-      GF_USERS_ALLOW_SIGN_UP=false
+      GF_SECURITY_ADMIN_USER: admin       # 管理员账号
+      GF_SECURITY_ADMIN_PASSWORD: admin_dev_2024  # ⚠️ 仅用于开发！
+      GF_USERS_ALLOW_SIGN_UP: false       # 禁止自助注册
+      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s:%(http_port)s/"
+      GF_AUTH_ANONYMOUS_ENABLED: true     # 开发环境允许匿名访问（方便调试）
+
+    # 卷挂载
     volumes:
-      - grafana-data:/var/lib/grafana
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana:rw                              # 数据持久化
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro  # 数据源/仪表盘自动配置
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro   # 自定义仪表盘 JSON
+
+    # 网络
     networks:
-      - agentos-network
+      - agentos-frontend                  # 外部可直接访问
+
+    # 依赖关系
     depends_on:
       - prometheus
-    profiles:
-      - monitoring
+
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.125'
+          memory: 128M
+
+    # 日志配置
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "{{.Name}}"
 
 # =============================================================================
-# 网络配置
+# 网络配置（双层隔离架构）
 # =============================================================================
 networks:
-  agentos-network:
+  # 后端网络：Kernel + Database + Cache + Monitoring（不对外暴露）
+  agentos-backend:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.28.0.0/16
+        - subnet: 172.28.0.0/16           # 后端子网（16位掩码，支持 65534 主机）
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+
+  # 前端网络：Gateway + OpenLab + Grafana（可对外暴露）
+  agentos-frontend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.29.0.0/16           # 前端子网（独立于后端）
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "true"
 
 # =============================================================================
-# 卷定义
+# 卷定义（基于 heapstore.h path_type_t 枚举 + 数据持久化需求）
 # =============================================================================
 volumes:
-  kernel-data:
+  # ---------------------------------------------------------------------------
+  # HeapStore 数据分区（对应 heapstore_path_type_t 定义）
+  # ---------------------------------------------------------------------------
+  heapstore-kernel-data:
+    name: agentos_heapstore_data          # PATH_KERNEL - 核心数据存储
     driver: local
-  kernel-build:
+  heapstore-logs:
+    name: agentos_heapstore_logs          # PATH_LOGS - 运行日志
     driver: local
-  kernel-logs:
+  heapstore-registry:
+    name: agentos_heapstore_registry      # PATH_REGISTRY - 注册表/元数据
     driver: local
+  heapstore-traces:
+    name: agentos_heapstore_traces        # PATH_TRACES - 分布式追踪数据
+    driver: local
+  heapstore-ipc:
+    name: agentos_heapstore_ipc           # PATH_KERNEL_IPC - IPC 通信缓存
+    driver: local
+  heapstore-memory:
+    name: agentos_heapstore_memory        # PATH_KERNEL_MEMORY - 内存快照/转储
+    driver: local
+
+  # ---------------------------------------------------------------------------
+  # 构建和运行时缓存
+  # ---------------------------------------------------------------------------
+  kernel-build-cache:
+    name: agentos_kernel_build_cache      # CMake/Ninja 构建缓存（加速增量编译）
+    driver: local
+
+  # ---------------------------------------------------------------------------
+  # 数据库持久化（ACID 事务保证）
+  # ---------------------------------------------------------------------------
   postgres-data:
+    name: agentos_postgres_data           # PostgreSQL 数据目录
     driver: local
   redis-data:
+    name: agentos_redis_data              # Redis AOF 持久化数据
     driver: local
+
+  # ---------------------------------------------------------------------------
+  # 应用数据
+  # ---------------------------------------------------------------------------
   openlab-data:
+    name: agentos_openlab_data            # OpenLab 用户数据/配置
     driver: local
+
+  # ---------------------------------------------------------------------------
+  # 监控数据（时序数据库）
+  # ---------------------------------------------------------------------------
   prometheus-data:
+    name: agentos_prometheus_tsdb         # Prometheus TSDB 时序数据
     driver: local
   grafana-data:
+    name: agentos_grafana_data            # Grafana 仪表盘/用户配置
     driver: local

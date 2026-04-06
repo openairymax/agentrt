@@ -23,6 +23,10 @@
 #include "id_utils.h"
 #include "error_utils.h"
 #include "observability.h"
+
+/* 辅助模块（已拆分，以下内部函数为历史遗留副本，计划在未来版本移除） */
+#include "intent_utils.h"      /* to_lowercase, contains_ignore_case, string_similarity 等 */
+#include "entity_extractor.h"  /* 实体提取功能 */
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
@@ -103,6 +107,13 @@ struct agentos_intent_parser {
  * @param str 输入字符串
  * @return 转换后的字符串
  */
+/* ==================== [LEGACY] 工具函数 ====================
+ * 以下函数与 intent_utils.c 中的实现重复。
+ * 保留原因：确保向后兼容，避免破坏现有调用方。
+ * 计划在 v2.0 统一为 intent_utils 模块的公开API。
+ * 新代码请使用 intent_utils.h 中声明的函数。
+ * ============================================================ */
+
 static char* to_lowercase(char* str) {
     if (!str) return NULL;
     for (char* p = str; *p; ++p) {
@@ -366,8 +377,14 @@ static agentos_error_t match_intent_by_rules(agentos_intent_parser_t* parser,
  * @param max_entities 最大实体数
  * @return 提取的实体数量
  */
+/* ==================== [LEGACY] 实体提取函数 ====================
+ * 以下函数与 entity_extractor.c 中的实现重复。
+ * 保留原因：确保向后兼容。
+ * 计划在 v2.0 统一为 entity_extractor 模块的公开API。
+ * ============================================================ */
+
 static size_t extract_entities_from_text(const char* text, extracted_entity_t* entities,
-                                         size_t max_entities) {
+                                         size_t max_entries) {
     if (!text || !entities || max_entities == 0) return 0;
 
     // 简单实现：基于关键词的实体提取

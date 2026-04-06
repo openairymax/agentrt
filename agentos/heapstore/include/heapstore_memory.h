@@ -58,6 +58,7 @@ typedef struct {
  * @reentrant 否
  *
  * @see heapstore_memory_shutdown()
+ * @since v1.0.0
  */
 heapstore_error_t heapstore_memory_init(void);
 
@@ -69,6 +70,7 @@ heapstore_error_t heapstore_memory_init(void);
  * @reentrant 否
  *
  * @see heapstore_memory_init()
+ * @since v1.0.0
  */
 void heapstore_memory_shutdown(void);
 
@@ -94,7 +96,8 @@ heapstore_error_t heapstore_memory_record_pool(const heapstore_memory_pool_t* po
  * @ownership 调用者负责 pool 的分配和释放
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_memory_get_pool(const char* pool_id, heapstore_memory_pool_t* pool);
 
 /**
@@ -107,7 +110,8 @@ heapstore_error_t heapstore_memory_get_pool(const char* pool_id, heapstore_memor
  *
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_memory_update_pool_usage(const char* pool_id, size_t used_size, uint32_t free_block_count);
 
 /**
@@ -119,7 +123,8 @@ heapstore_error_t heapstore_memory_update_pool_usage(const char* pool_id, size_t
  * @ownership 调用者负责 allocation 的生命周期
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_memory_record_allocation(const heapstore_memory_allocation_t* allocation);
 
 /**
@@ -132,7 +137,8 @@ heapstore_error_t heapstore_memory_record_allocation(const heapstore_memory_allo
  * @ownership 调用者负责 allocation 的分配和释放
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_memory_get_allocation(const char* allocation_id, heapstore_memory_allocation_t* allocation);
 
 /**
@@ -143,7 +149,8 @@ heapstore_error_t heapstore_memory_get_allocation(const char* allocation_id, hea
  *
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_memory_free_allocation(const char* allocation_id);
 
 /**
@@ -157,7 +164,8 @@ heapstore_error_t heapstore_memory_free_allocation(const char* allocation_id);
  * @ownership 调用者负责所有输出参数的分配和释放
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_memory_get_stats(uint32_t* pool_count, uint32_t* total_allocations, uint64_t* total_size);
 
 /**
@@ -167,7 +175,8 @@ heapstore_error_t heapstore_memory_get_stats(uint32_t* pool_count, uint32_t* tot
  *
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 bool heapstore_memory_is_healthy(void);
 
 #ifdef __cplusplus

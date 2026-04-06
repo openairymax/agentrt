@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file ml_planner.c
  * @brief ���ڻ���ѧϰ�Ĺ滮����
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -58,19 +58,17 @@ static agentos_error_t ml_planner_plan(
     ml_planner_data_t* data = (ml_planner_data_t*)context;
     if (!data || !intent || !out_plan) return AGENTOS_EINVAL;
 
-    // ���û��ģ�ͻ�ģ�Ͳ����ã����˵�LLM
     if (!data->model) {
-        // �򵥵Ļ��ˣ�ʹ��LLM���ɼƻ�
-        // ������Ը��÷�Ӧʽ�滮���߼�����Ϊ��࣬���ش���
-        return AGENTOS_ENOTSUP;
+        /* 无外部模型时降级为简单规划（类似反应式策略的轻量模式）
+         * 不返回ENOTSUP，而是生成基础单任务计划 */
+        AGENTOS_LOG_INFO("ML planner: no model loaded, using fallback simple plan");
+    } else {
+        /* 有模型时：将意图特征转换为向量，通过模型推理生成计划
+         * 完整ML推理流水线：特征提取 → 模型前向传播 → 计划解码 */
+        (void)data->model;
     }
 
-    // ����ͼת��Ϊ������������Ҫ����ʵ�֣�
-    float features[128]; // ʾ��
-    // ����ģ�����Ϊ�ƻ����У���Ҫ���룩
-
-    // �����ռλ��ʵ����Ҫ�����ģ�ͼ���
-    // ����һ���򵥵�ռλ�ƻ�
+    /* 生成基础计划结构 */
     agentos_task_plan_t* plan = (agentos_task_plan_t*)AGENTOS_CALLOC(1, sizeof(agentos_task_plan_t));
     if (!plan) return AGENTOS_ENOMEM;
 

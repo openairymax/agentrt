@@ -1,632 +1,457 @@
-# AgentOS Python SDK Telemetry
+# AgentOS Python SDK - OpenTelemetry 集成
 # Version: 3.0.0
-# Last updated: 2026-04-04
-
-"""
-Telemetry module for observability and monitoring.
-
-This module provides classes for collecting metrics, traces, and logs
-with enhanced precision timing, multi-dimensional labels, and runtime health monitoring.
-
-Example:
-    >>> from agentos import Telemetry, SpanStatus
-    >>> telemetry = Telemetry(service_name="my_service")
-    >>> 
-    >>> # Record metrics with labels
-    >>> telemetry.record_metric("request_count", 1, labels={"method": "POST", "status": "200"})
-    >>> 
-    >>> # Create trace span
-    >>> with telemetry.span("process_request") as span:
-    ...     process_data()
-    ...     span.set_attribute("data_size", 1024)
-    >>> 
-    >>> # Export data
-    >>> export_data = telemetry.export_all()
-"""
+# Last updated: 2026-04-05
+#
+# OpenTelemetry 可观测性集成
+# 提供：分布式追踪、指标收集、日志关联
+# 遵循 ARCHITECTURAL_PRINCIPLES.md E-2（可观测性）
 
 import time
-import json
-import os
-import threading
-import logging
-from typing import Optional, Dict, Any, List, Callable
-from dataclasses import dataclass, field, asdict
-from enum import Enum
+import contextlib
+from typing import Any, Dict, Optional, Callable
 from functools import wraps
-from contextlib import contextmanager
-import timeit
-
-from .exceptions import TelemetryError
+import logging
 
 logger = logging.getLogger(__name__)
 
 
-class SpanStatus(Enum):
-    """Status of a trace span."""
-    OK = "ok"
-    ERROR = "error"
-    UNSET = "unset"
-
-
-@dataclass
-class MetricPoint:
-    """A single metric data point with multi-dimensional labels.
-
-    Attributes:
-        name: Metric name
-        value: Metric value (float for counters and gauges)
-        timestamp: Unix timestamp in seconds (high precision)
-        labels: Multi-dimensional labels for slicing/dicing
-        service_name: Service that recorded this metric
-        method_name: Optional method/function name
-        status_code: Optional HTTP/gRPC status code
-
-    Example:
-        >>> point = MetricPoint(
-        ...     name="request_latency_ms",
-        ...     value=150.5,
-        ...     labels={"endpoint": "/api/users", "method": "GET"},
-        ...     status_code=200
-        ... )
+class TelemetryConfig:
     """
-    name: str
-    value: float
-    timestamp: float = field(default_factory=lambda: time.time())
-    labels: Optional[Dict[str, str]] = None
-    service_name: Optional[str] = None
-    method_name: Optional[str] = None
-    status_code: Optional[int] = None
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary with full context."""
-        return {
-            "name": self.name,
-            "value": self.value,
-            "timestamp": self.timestamp,
-            "labels": self.labels or {},
-            "service_name": self.service_name,
-            "method_name": self.method_name,
-            "status_code": self.status_code
-        }
-
-    def __post_init__(self):
-        """Validate metric point."""
-        if not self.name or not isinstance(self.name, str):
-            raise ValueError("Metric name must be a non-empty string")
-        if not isinstance(self.value, (int, float)):
-            raise ValueError("Metric value must be numeric")
+    遥测配置
+    
+    Attributes:
+        service_name: 服务名称
+        service_version: 服务版本
+        enabled: 是否启用
+        export_endpoint: 导出端点
+        sample_rate: 采样率 (0.0-1.0)
+    """
+    
+    def __init__(
+        self,
+        service_name: str = "agentos-toolkit",
+        service_version: str = "3.0.0",
+        enabled: bool = True,
+        export_endpoint: Optional[str] = None,
+        sample_rate: float = 1.0
+    ):
+        self.service_name = service_name
+        self.service_version = service_version
+        self.enabled = enabled
+        self.export_endpoint = export_endpoint
+        self.sample_rate = sample_rate
 
 
-@dataclass
 class Span:
-    """A trace span representing an operation with high-precision timing.
-
-    Attributes:
-        trace_id: Unique trace identifier
-        span_id: Unique span identifier
-        name: Span name (operation/method)
-        start_time: Start timestamp (seconds since epoch)
-        end_time: End timestamp (None if not ended)
-        status: Span status (OK/ERROR/UNSET)
-        attributes: Custom key-value pairs
-        parent_span_id: Parent span ID for nested traces
-        duration_ns: Duration in nanoseconds (high precision)
-
-    Example:
-        >>> span = Span(trace_id="abc123", span_id="span456", name="process_data")
-        >>> span.start()
-        >>> # ... do work ...
-        >>> span.end()
-        >>> print(f"Duration: {span.duration_ns / 1e6:.2f} ms")
     """
-    trace_id: str
-    span_id: str
-    name: str
-    start_time: float
-    end_time: Optional[float] = None
-    status: SpanStatus = SpanStatus.UNSET
-    attributes: Optional[Dict[str, Any]] = None
-    parent_span_id: Optional[str] = None
-    duration_ns: Optional[int] = None  # Nanosecond precision
-
-    def __post_init__(self):
-        if self.attributes is None:
-            self.attributes = {}
-
-    def set_attribute(self, key: str, value: Any):
-        """Set a span attribute."""
-        self.attributes[key] = value
-
+    追踪 Span
+    
+    表示一个操作或请求的生命周期
+    
+    Attributes:
+        name: Span 名称
+        kind: Span 类型
+        start_time: 开始时间
+        end_time: 结束时间
+        attributes: 属性
+        events: 事件列表
+        status: 状态
+    """
+    
+    def __init__(
+        self,
+        name: str,
+        kind: str = "internal",
+        parent: Optional['Span'] = None
+    ):
+        self.name = name
+        self.kind = kind
+        self.parent = parent
+        self.start_time: Optional[float] = None
+        self.end_time: Optional[float] = None
+        self.attributes: Dict[str, Any] = {}
+        self.events: list = []
+        self.status: str = "unset"
+        self.span_id: str = f"span-{time.time_ns()}"
+        self.trace_id: str = parent.trace_id if parent else f"trace-{time.time_ns()}"
+    
     def start(self):
-        """Start the span with high-precision timing."""
+        """启动 Span"""
         self.start_time = time.time()
-        # Use timeit.default_timer for high-precision duration measurement
-        self._start_perf_counter = timeit.default_timer()
-
+        self.add_event("span_started")
+        return self
+    
     def end(self):
-        """End the span and calculate duration."""
+        """结束 Span"""
         self.end_time = time.time()
-        # Calculate duration in nanoseconds using perf_counter
-        end_perf = timeit.default_timer()
-        self.duration_ns = int((end_perf - self._start_perf_counter) * 1e9)
-
+        self.add_event("span_ended")
+        self.status = "ok"
+    
+    def set_attribute(self, key: str, value: Any):
+        """
+        设置属性
+        
+        Args:
+            key: 属性键
+            value: 属性值
+        """
+        self.attributes[key] = value
+    
+    def add_event(self, name: str, attributes: Optional[Dict] = None):
+        """
+        添加事件
+        
+        Args:
+            name: 事件名称
+            attributes: 事件属性
+        """
+        self.events.append({
+            "name": name,
+            "timestamp": time.time(),
+            "attributes": attributes or {}
+        })
+    
+    def set_status(self, status: str):
+        """
+        设置状态
+        
+        Args:
+            status: 状态 (ok/error/unset)
+        """
+        self.status = status
+    
+    def record_exception(self, exception: Exception):
+        """
+        记录异常
+        
+        Args:
+            exception: 异常对象
+        """
+        self.set_attribute("error.type", type(exception).__name__)
+        self.set_attribute("error.message", str(exception))
+        self.set_status("error")
+        self.add_event("exception", {
+            "type": type(exception).__name__,
+            "message": str(exception)
+        })
+    
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary with full timing information."""
+        """转换为字典"""
         return {
-            "trace_id": self.trace_id,
             "span_id": self.span_id,
+            "trace_id": self.trace_id,
             "name": self.name,
+            "kind": self.kind,
             "start_time": self.start_time,
             "end_time": self.end_time,
-            "status": self.status.value,
+            "duration_ms": (self.end_time - self.start_time) * 1000 if self.end_time and self.start_time else None,
             "attributes": self.attributes,
-            "parent_span_id": self.parent_span_id,
-            "duration_ns": self.duration_ns,
-            "duration_ms": self.duration_ns / 1e6 if self.duration_ns else None
+            "events": self.events,
+            "status": self.status,
+            "parent_span_id": self.parent.span_id if self.parent else None
         }
-
-
-class Meter:
-    """Metrics collector for recording measurements with multi-dimensional labels.
-
-    Attributes:
-        service_name: Name of the service
-        metrics: List of recorded metric points
-        _lock: Thread lock for thread-safe recording
-        max_metrics: Maximum number of metrics to store (default: 1000)
-
-    Example:
-        >>> meter = Meter(service_name="api_gateway")
-        >>> meter.record("request_count", 1, labels={"method": "POST", "status": "200"})
-        >>> meter.record("latency_ms", 150.5, labels={"endpoint": "/users"})
-    """
-
-    DEFAULT_MAX_METRICS = 1000
-
-    def __init__(self, service_name: str, max_metrics: int = DEFAULT_MAX_METRICS):
-        """
-        Initialize a meter.
-
-        Args:
-            service_name: Name of the service
-            max_metrics: Maximum number of metrics to store (prevents memory overflow)
-        """
-        self.service_name = service_name
-        self.metrics: List[MetricPoint] = []
-        self._lock = threading.Lock()
-        self.max_metrics = max_metrics
-
-    def record(self, name: str, value: float, labels: Optional[Dict[str, str]] = None,
-               method_name: Optional[str] = None, status_code: Optional[int] = None):
-        """
-        Record a metric value with multi-dimensional labels.
-
-        Args:
-            name: Metric name
-            value: Metric value
-            labels: Optional labels for slicing/dicing
-            method_name: Optional method/function name
-            status_code: Optional HTTP/gRPC status code
-
-        Raises:
-            TelemetryError: If metrics limit exceeded
-
-        Example:
-            >>> meter.record(
-            ...     name="request_duration_ms",
-            ...     value=125.3,
-            ...     labels={"endpoint": "/api/users", "method": "GET"},
-            ...     status_code=200
-            ... )
-        """
-        point = MetricPoint(
-            name=name,
-            value=value,
-            labels=labels or {},
-            service_name=self.service_name,
-            method_name=method_name,
-            status_code=status_code
-        )
-
-        with self._lock:
-            if len(self.metrics) >= self.max_metrics:
-                logger.warning(
-                    f"Metrics limit ({self.max_metrics}) reached, dropping oldest metric")
-                self.metrics.pop(0)
-            self.metrics.append(point)
-
-        logger.debug(
-            f"Recorded metric: {name}={value} (service={self.service_name})")
-
-    def get_metrics(self) -> List[MetricPoint]:
-        """Get all recorded metrics."""
-        with self._lock:
-            return list(self.metrics)
-
-    def clear(self):
-        """Clear all metrics."""
-        with self._lock:
-            self.metrics.clear()
-
-    def export(self) -> str:
-        """
-        Export metrics as JSON.
-
-        Returns:
-            JSON string of metrics with full context
-        """
-        data = {
-            "service_name": self.service_name,
-            "recorded_at": time.time(),
-            "metric_count": len(self.metrics),
-            "metrics": [m.to_dict() for m in self.metrics]
-        }
-        return json.dumps(data, indent=2)
 
 
 class Tracer:
-    """Tracer for creating and managing spans.
-
-    Attributes:
-        service_name: Name of the service
-        spans: List of recorded spans
-        max_spans: Maximum number of spans to store (default: 500)
     """
-
-    DEFAULT_MAX_SPANS = 500
-
-    def __init__(self, service_name: str, max_spans: int = DEFAULT_MAX_SPANS):
-        """
-        Initialize a tracer.
-
-        Args:
-            service_name: Name of the service
-            max_spans: Maximum number of spans to store (prevents memory overflow)
-        """
-        self.service_name = service_name
-        self.spans: List[Span] = []
-        self.max_spans = max_spans
-
+    追踪器
+    
+    创建和管理 Span
+    
+    Example:
+        >>> tracer = Tracer()
+        >>> with tracer.start_span("operation") as span:
+        ...     # 执行业务逻辑
+        ...     span.set_attribute("key", "value")
+    """
+    
+    def __init__(self, config: TelemetryConfig):
+        self.config = config
+        self.active_span: Optional[Span] = None
+        self.exported_spans: list = []
+    
+    @contextlib.contextmanager
     def start_span(
         self,
         name: str,
-        trace_id: Optional[str] = None,
-        parent_span_id: Optional[str] = None
-    ) -> Span:
+        kind: str = "internal",
+        parent: Optional[Span] = None
+    ):
         """
-        Start a new span.
-
-        Args:
-            name: Span name
-            trace_id: Trace ID (auto-generated if not provided)
-            parent_span_id: Parent span ID
-
-        Returns:
-            The created span
-        """
-        import uuid
-
-        if trace_id is None:
-            trace_id = str(uuid.uuid4())
-
-        span_id = str(uuid.uuid4())
-        span = Span(
-            trace_id=trace_id,
-            span_id=span_id,
-            name=name,
-            start_time=time.time(),
-            parent_span_id=parent_span_id
-        )
-        span.start()
+        创建并启动 Span
         
-        if len(self.spans) >= self.max_spans:
-            logger.warning(
-                f"Spans limit ({self.max_spans}) reached, dropping oldest span")
-            self.spans.pop(0)
+        Args:
+            name: Span 名称
+            kind: Span 类型
+            parent: 父 Span
         
-        self.spans.append(span)
-        return span
-
-    def end_span(self, span: Span, status: SpanStatus = SpanStatus.OK):
-        """
-        End a span.
-
-        Args:
-            span: The span to end
-            status: Span status
-        """
-        span.end()
-        span.status = status
-
-    def get_spans(self) -> List[Span]:
-        """Get all recorded spans."""
-        return self.spans
-
-    def clear(self):
-        """Clear all spans."""
-        self.spans.clear()
-
-    def export(self) -> str:
-        """
-        Export traces as JSON.
-
-        Returns:
-            JSON string of traces
-        """
-        data = {
-            "service_name": self.service_name,
-            "traces": [s.to_dict() for s in self.spans]
-        }
-        return json.dumps(data)
-
-
-class Telemetry:
-    """Main telemetry coordinator combining metrics and traces.
-
-    This class provides comprehensive observability with:
-    - Multi-dimensional metrics collection
-    - High-precision distributed tracing
-    - Runtime health monitoring (memory, GC, CPU)
-    - Thread-safe operations
-
-    Attributes:
-        service_name: Name of the service
-        meter: Metrics collector
-        tracer: Distributed tracer
-        _runtime_monitoring: Whether runtime monitoring is enabled
-        _monitor_thread: Background monitoring thread (if enabled)
-
-    Example:
-        >>> telemetry = Telemetry(service_name="my_app", enable_runtime_monitoring=True)
-        >>> 
-        >>> # Record custom metrics
-        >>> telemetry.record_metric("business_events", 1, labels={"type": "order"})
-        >>> 
-        >>> # Use context manager for spans
-        >>> with telemetry.span("process_order") as span:
-        ...     process_order()
-        ...     span.set_attribute("order_id", "12345")
-        >>> 
-        >>> # Get runtime health
-        >>> health = telemetry.get_runtime_health()
-        >>> print(f"Memory: {health['memory_mb']:.1f} MB, GC count: {health['gc_count']}")
-    """
-
-    def __init__(self, service_name: str, enable_runtime_monitoring: bool = False,
-                 max_metrics: int = Meter.DEFAULT_MAX_METRICS, max_spans: int = Tracer.DEFAULT_MAX_SPANS):
-        """
-        Initialize telemetry.
-
-        Args:
-            service_name: Name of the service
-            enable_runtime_monitoring: Enable automatic runtime metrics collection
-            max_metrics: Maximum number of metrics to store (default: 1000)
-            max_spans: Maximum number of spans to store (default: 500)
-
-        Example:
-            >>> telemetry = Telemetry("api_gateway", enable_runtime_monitoring=True)
-        """
-        self.service_name = service_name
-        self.meter = Meter(service_name, max_metrics=max_metrics)
-        self.tracer = Tracer(service_name, max_spans=max_spans)
-        self._runtime_monitoring = enable_runtime_monitoring
-        self._monitor_thread: Optional[threading.Thread] = None
-        self._stop_monitoring = threading.Event()
-
-        if enable_runtime_monitoring:
-            self._start_runtime_monitoring()
-
-    def _start_runtime_monitoring(self):
-        """Start background runtime health monitoring."""
-        self._runtime_metrics: Dict[str, Any] = {}
-        self._monitor_thread = threading.Thread(
-            target=self._runtime_monitor_loop,
-            daemon=True,
-            name="TelemetryRuntimeMonitor"
-        )
-        self._monitor_thread.start()
-        logger.info("Runtime health monitoring started")
-
-    def _runtime_monitor_loop(self):
-        """Background loop to collect runtime metrics."""
-        import gc
-
-        while not self._stop_monitoring.is_set():
-            try:
-                # Collect Python runtime metrics
-                import sys
-                self._runtime_metrics = {
-                    "timestamp": time.time(),
-                    "memory_mb": self._get_memory_usage_mb(),
-                    "gc_count": len(gc.get_count()),
-                    "gc_objects": len(gc.get_objects()),
-                    "thread_count": threading.active_count(),
-                }
-
-                # Record as metrics
-                self.meter.record("runtime.memory_mb",
-                                  self._runtime_metrics["memory_mb"])
-                self.meter.record("runtime.gc_objects",
-                                  self._runtime_metrics["gc_objects"])
-                self.meter.record("runtime.thread_count",
-                                  self._runtime_metrics["thread_count"])
-
-                logger.debug(
-                    f"Runtime metrics collected: {self._runtime_metrics}")
-
-            except Exception as e:
-                logger.error(f"Error collecting runtime metrics: {e}")
-
-            # Collect every 5 seconds
-            self._stop_monitoring.wait(timeout=5.0)
-
-    @staticmethod
-    def _get_memory_usage_mb() -> float:
-        """Get current memory usage in MB."""
-        try:
-            import resource
-            # Get resident set size in KB, convert to MB
-            return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
-        except ImportError:
-            # Fallback for Windows
-            import psutil
-            process = psutil.Process(os.getpid())
-            return process.memory_info().rss / (1024.0 * 1024.0)
-
-    def get_runtime_health(self) -> Dict[str, Any]:
-        """
-        Get current runtime health metrics.
-
-        Returns:
-            Dictionary with memory, GC, and thread information
-
-        Example:
-            >>> health = telemetry.get_runtime_health()
-            >>> print(f"Memory: {health['memory_mb']:.1f} MB")
-        """
-        if not self._runtime_monitoring:
-            return {
-                "enabled": False,
-                "message": "Runtime monitoring is disabled"
-            }
-
-        return {
-            "enabled": True,
-            **getattr(self, '_runtime_metrics', {})
-        }
-
-    def record_metric(self, name: str, value: float, labels: Optional[Dict[str, str]] = None,
-                      method_name: Optional[str] = None, status_code: Optional[int] = None):
-        """
-        Record a metric with multi-dimensional labels.
-
-        Args:
-            name: Metric name
-            value: Metric value
-            labels: Optional labels
-            method_name: Optional method name
-            status_code: Optional status code
-        """
-        self.meter.record(name, value, labels, method_name, status_code)
-
-    def start_span(self, name: str, **kwargs) -> Span:
-        """
-        Start a trace span.
-
-        Args:
-            name: Span name
-            **kwargs: Additional arguments (trace_id, parent_span_id)
-
-        Returns:
-            The created span (already started)
-
-        Example:
-            >>> span = telemetry.start_span("process_data")
-            >>> try:
-            ...     do_work()
-            ...     telemetry.end_span(span, SpanStatus.OK)
-            ... except Exception as e:
-            ...     telemetry.end_span(span, SpanStatus.ERROR)
-        """
-        span = self.tracer.start_span(name, **kwargs)
-        span.start()  # Start high-precision timing
-        return span
-
-    def end_span(self, span: Span, status: SpanStatus = SpanStatus.OK):
-        """
-        End a trace span.
-
-        Args:
-            span: The span to end
-            status: Span status (OK/ERROR/UNSET)
-        """
-        self.tracer.end_span(span, status)
-
-    @contextmanager
-    def span(self, name: str, **kwargs):
-        """
-        Context manager for automatic span lifecycle management.
-
-        Args:
-            name: Span name
-            **kwargs: Additional arguments
-
         Yields:
-            Span object with active timing
-
+            Span: Span 对象
+        
         Example:
-            >>> with telemetry.span("database_query") as span:
-            ...     result = db.query(sql)
-            ...     span.set_attribute("query_length", len(sql))
+            >>> tracer = Tracer(config)
+            >>> with tracer.start_span("task_submit") as span:
+            ...     result = submit_task()
+            ...     span.set_attribute("task_id", result.id)
         """
-        span = self.start_span(name, **kwargs)
+        if not self.config.enabled:
+            yield None
+            return
+        
+        span = Span(name, kind, parent or self.active_span)
+        old_active = self.active_span
+        self.active_span = span
+        
         try:
+            span.start()
             yield span
-            self.end_span(span, SpanStatus.OK)
         except Exception as e:
-            span.set_attribute("error.message", str(e))
-            span.set_attribute("error.type", type(e).__name__)
-            self.end_span(span, SpanStatus.ERROR)
+            span.record_exception(e)
             raise
-
-    def timed(self, metric_name: str, labels: Optional[Dict[str, str]] = None):
+        finally:
+            span.end()
+            self.active_span = old_active
+            self.export_span(span)
+    
+    def export_span(self, span: Span):
         """
-        Decorator to time function execution and record as metric.
-
+        导出 Span
+        
         Args:
-            metric_name: Metric name for timing
-            labels: Optional labels
+            span: Span 对象
+        """
+        if not self.config.enabled:
+            return
+        
+        self.exported_spans.append(span.to_dict())
+        
+        # 实际应用中这里会发送到 OpenTelemetry Collector
+        logger.debug(f"Export span: {span.name} ({span.span_id})")
+    
+    def get_exported_spans(self) -> list:
+        """获取已导出的 Span"""
+        return self.exported_spans
+    
+    def clear_spans(self):
+        """清除 Span"""
+        self.exported_spans.clear()
 
+
+class Metrics:
+    """
+    指标收集器
+    
+    收集和导出性能指标
+    
+    Example:
+        >>> metrics = Metrics()
+        >>> metrics.record("task_latency", 150.5)
+        >>> stats = metrics.get_stats("task_latency")
+    """
+    
+    def __init__(self):
+        self.counters: Dict[str, int] = {}
+        self.gauges: Dict[str, float] = {}
+        self.histograms: Dict[str, list] = {}
+    
+    def increment_counter(self, name: str, value: int = 1):
+        """
+        增加计数器
+        
+        Args:
+            name: 计数器名称
+            value: 增量
+        """
+        if name not in self.counters:
+            self.counters[name] = 0
+        self.counters[name] += value
+    
+    def set_gauge(self, name: str, value: float):
+        """
+        设置仪表值
+        
+        Args:
+            name: 仪表名称
+            value: 值
+        """
+        self.gauges[name] = value
+    
+    def record_histogram(self, name: str, value: float):
+        """
+        记录直方图值
+        
+        Args:
+            name: 直方图名称
+            value: 观测值
+        """
+        if name not in self.histograms:
+            self.histograms[name] = []
+        self.histograms[name].append(value)
+    
+    def get_stats(self, name: str) -> Dict[str, Any]:
+        """
+        获取统计信息
+        
+        Args:
+            name: 指标名称
+        
         Returns:
-            Decorated function
+            dict: 统计信息
+        """
+        if name in self.histograms:
+            import statistics
+            data = self.histograms[name]
+            return {
+                "count": len(data),
+                "min": min(data),
+                "max": max(data),
+                "avg": statistics.mean(data),
+                "median": statistics.median(data)
+            }
+        elif name in self.counters:
+            return {"value": self.counters[name]}
+        elif name in self.gauges:
+            return {"value": self.gauges[name]}
+        return {}
+    
+    def export_metrics(self) -> Dict[str, Any]:
+        """导出所有指标"""
+        return {
+            "counters": self.counters.copy(),
+            "gauges": self.gauges.copy(),
+            "histograms": {
+                name: self.get_stats(name)
+                for name in self.histograms
+            }
+        }
 
+
+class TelemetryManager:
+    """
+    遥测管理器（统一管理）
+    
+    整合 Tracer 和 Metrics
+    
+    Example:
+        >>> telemetry = TelemetryManager()
+        >>> 
+        >>> # 追踪操作
+        >>> @telemetry.trace("submit_task")
+        >>> def submit_task(content):
+        ...     # 业务逻辑
+        ...     pass
+        >>> 
+        >>> # 记录指标
+        >>> telemetry.metrics.increment_counter("tasks_submitted")
+    """
+    
+    def __init__(self, config: Optional[TelemetryConfig] = None):
+        self.config = config or TelemetryConfig()
+        self.tracer = Tracer(self.config)
+        self.metrics = Metrics()
+        
+        # 设置全局日志处理器
+        self._setup_logging()
+    
+    def trace(self, operation_name: str):
+        """
+        装饰器：追踪函数调用
+        
+        Args:
+            operation_name: 操作名称
+        
+        Returns:
+            decorator: 装饰器函数
+        
         Example:
-            >>> @telemetry.timed("function_duration_ms", labels={"function": "process"})
-            ... def process_data():
-            ...     time.sleep(0.1)
+            >>> @telemetry.trace("memory_write")
+            >>> def write_memory(content, level="L1"):
+            ...     return memory_mgr.write(content, level)
         """
         def decorator(func: Callable):
             @wraps(func)
             def wrapper(*args, **kwargs):
-                start_time = timeit.default_timer()
-                try:
-                    result = func(*args, **kwargs)
-                    self.meter.record(
-                        f"{metric_name}.success",
-                        1,
-                        labels=labels,
-                        method_name=func.__qualname__,
-                        status_code=200
-                    )
-                    return result
-                except Exception as e:
-                    self.meter.record(
-                        f"{metric_name}.error",
-                        1,
-                        labels=labels,
-                        method_name=func.__qualname__,
-                        status_code=500
-                    )
-                    raise
-                finally:
-                    duration_ms = (timeit.default_timer() - start_time) * 1000
-                    self.meter.record(
-                        metric_name,
-                        duration_ms,
-                        labels=labels,
-                        method_name=func.__qualname__
-                    )
+                with self.tracer.start_span(f"{func.__name__}") as span:
+                    if span:
+                        span.set_attribute("function", func.__name__)
+                        span.set_attribute("args", str(args)[:200])
+                        span.set_attribute("kwargs", str(kwargs)[:200])
+                    
+                    try:
+                        result = func(*args, **kwargs)
+                        if span:
+                            span.set_attribute("success", True)
+                        return result
+                    except Exception as e:
+                        if span:
+                            span.record_exception(e)
+                        raise
+            
             return wrapper
         return decorator
-
-    def export_all(self) -> Dict[str, str]:
+    
+    def _setup_logging(self):
+        """设置日志处理"""
+        class TelemetryHandler(logging.Handler):
+            def __init__(self, telemetry_manager):
+                super().__init__()
+                self.telemetry = telemetry_manager
+            
+            def emit(self, record):
+                log_entry = self.format(record)
+                self.telemetry.metrics.increment_counter(f"log_{record.levelname.lower()}")
+        
+        handler = TelemetryHandler(self)
+        handler.setLevel(logging.INFO)
+        logging.getLogger("agentos").addHandler(handler)
+    
+    def get_health_status(self) -> Dict[str, Any]:
         """
-        Export all telemetry data.
-
+        获取健康状态
+        
         Returns:
-            Dictionary with metrics and traces JSON
+            dict: 健康状态
         """
         return {
-            "metrics": self.meter.export(),
-            "traces": self.tracer.export()
+            "status": "healthy",
+            "telemetry_enabled": self.config.enabled,
+            "spans_exported": len(self.tracer.get_exported_spans()),
+            "metrics": self.metrics.export_metrics()
         }
+    
+    def export_all(self) -> Dict[str, Any]:
+        """
+        导出所有遥测数据
+        
+        Returns:
+            dict: 遥测数据
+        """
+        return {
+            "traces": self.tracer.get_exported_spans(),
+            "metrics": self.metrics.export_metrics(),
+            "timestamp": time.time()
+        }
+
+
+# 全局遥测实例
+_telemetry_instance: Optional[TelemetryManager] = None
+
+
+def get_telemetry() -> TelemetryManager:
+    """获取全局遥测实例"""
+    global _telemetry_instance
+    if _telemetry_instance is None:
+        _telemetry_instance = TelemetryManager()
+    return _telemetry_instance
+
+
+def init_telemetry(config: Optional[TelemetryConfig] = None):
+    """
+    初始化遥测
+    
+    Args:
+        config: 遥测配置
+    """
+    global _telemetry_instance
+    _telemetry_instance = TelemetryManager(config or TelemetryConfig())
+    return _telemetry_instance

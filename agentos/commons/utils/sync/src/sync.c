@@ -97,7 +97,32 @@ const char* sync_get_name(void* lock) {
     if (lock == NULL) {
         return NULL;
     }
-    return NULL;
+    
+    struct sync_mutex* base = (struct sync_mutex*)lock;
+    
+    if (!base->initialized) {
+        return NULL;
+    }
+    
+    switch (base->type) {
+        case SYNC_TYPE_MUTEX:
+        case SYNC_TYPE_RECURSIVE_MUTEX:
+            return ((struct sync_mutex*)lock)->name;
+        case SYNC_TYPE_RWLOCK:
+            return ((struct sync_rwlock*)lock)->name;
+        case SYNC_TYPE_SPINLOCK:
+            return ((struct sync_spinlock*)lock)->name;
+        case SYNC_TYPE_SEMAPHORE:
+            return ((struct sync_semaphore*)lock)->name;
+        case SYNC_TYPE_CONDITION:
+            return ((struct sync_condition*)lock)->name;
+        case SYNC_TYPE_BARRIER:
+            return ((struct sync_barrier*)lock)->name;
+        case SYNC_TYPE_EVENT:
+            return ((struct sync_event*)lock)->name;
+        default:
+            return NULL;
+    }
 }
 
 /**
@@ -107,7 +132,15 @@ sync_result_t sync_get_stats(void* lock, sync_stats_t* stats) {
     if (lock == NULL || stats == NULL) {
         return SYNC_ERROR_INVALID;
     }
-    memset(stats, 0, sizeof(sync_stats_t));
+    
+    struct sync_mutex* base = (struct sync_mutex*)lock;
+    if (!base->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+    // 复制实际统计信息
+    *stats = base->stats;
+    
     return SYNC_SUCCESS;
 }
 
@@ -118,11 +151,27 @@ sync_result_t sync_reset_stats(void* lock) {
     if (lock == NULL) {
         return SYNC_ERROR_INVALID;
     }
+    
+    struct sync_mutex* base = (struct sync_mutex*)lock;
+    if (!base->initialized) {
+        return SYNC_ERROR_INVALID;
+    }
+    
+    // 实际重置统计信息
+    memset(&base->stats, 0, sizeof(sync_stats_t));
+    
     return SYNC_SUCCESS;
 }
 
 /**
  * @brief 设置锁的选项
+ * 
+ * @note TODO: 当前为预留接口，暂不支持任何选项配置
+ *       未来可扩展支持：
+ *       - 默认超时时间设置
+ *       - 调试级别配置
+ *       - 优先级继承设置
+ *       - 健壮锁配置
  */
 sync_result_t sync_set_option(void* lock, int option, void* value) {
     if (lock == NULL) {
@@ -135,6 +184,8 @@ sync_result_t sync_set_option(void* lock, int option, void* value) {
 
 /**
  * @brief 获取锁的选项
+ * 
+ * @note TODO: 当前为预留接口，暂不支持任何选项查询
  */
 sync_result_t sync_get_option(void* lock, int option, void* value) {
     if (lock == NULL || value == NULL) {
@@ -158,6 +209,38 @@ sync_result_t sync_debug(void* lock) {
     if (lock == NULL) {
         return SYNC_ERROR_INVALID;
     }
+    
+    struct sync_mutex* base = (struct sync_mutex*)lock;
+    
+    fprintf(stderr, "\n[SYNC DEBUG] ====================\n");
+    fprintf(stderr, "[SYNC DEBUG] Lock at: %p\n", (void*)lock);
+    fprintf(stderr, "[SYNC DEBUG] Type: %d\n", base->type);
+    fprintf(stderr, "[SYNC DEBUG] Initialized: %s\n", 
+            base->initialized ? "true" : "false");
+    
+    const char* name = sync_get_name(lock);
+    if (name != NULL) {
+        fprintf(stderr, "[SYNC DEBUG] Name: %s\n", name);
+    } else {
+        fprintf(stderr, "[SYNC DEBUG] Name: (unnamed)\n");
+    }
+    
+    sync_stats_t stats;
+    if (sync_get_stats(lock, &stats) == SYNC_SUCCESS) {
+        fprintf(stderr, "[SYNC DEBUG] --- Statistics ---\n");
+        fprintf(stderr, "[SYNC DEBUG] Lock count: %zu\n", stats.lock_count);
+        fprintf(stderr, "[SYNC DEBUG] Unlock count: %zu\n", stats.unlock_count);
+        fprintf(stderr, "[SYNC DEBUG] Wait count: %zu\n", stats.wait_count);
+        fprintf(stderr, "[SYNC DEBUG] Timeout count: %zu\n", stats.timeout_count);
+        fprintf(stderr, "[SYNC DEBUG] Deadlock count: %zu\n", stats.deadlock_count);
+        fprintf(stderr, "[SYNC DEBUG] Total wait time: %lu ms\n", 
+                (unsigned long)stats.total_wait_time_ms);
+        fprintf(stderr, "[SYNC DEBUG] Max wait time: %lu ms\n", 
+                (unsigned long)stats.max_wait_time_ms);
+    }
+    
+    fprintf(stderr, "[SYNC DEBUG] ====================\n\n");
+    
     return SYNC_SUCCESS;
 }
 

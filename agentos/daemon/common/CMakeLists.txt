@@ -56,6 +56,8 @@ set(SVC_COMMON_SOURCES
     src/method_dispatcher.c
     src/safe_string_utils.c
     src/input_validator.c
+    src/param_validator.c     # JSON-RPC 参数验证工具
+    src/log_sanitizer.c       # 日志脱敏过滤器
 )
 
 # 创建静态库
@@ -195,6 +197,8 @@ install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/include/method_dispatcher.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/safe_string_utils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/input_validator.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/param_validator.h  # JSON-RPC 参数验证
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/log_sanitizer.h    # 日志脱敏过滤器
     DESTINATION include/agentos
 )
 

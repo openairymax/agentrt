@@ -12,6 +12,7 @@
 #include "utils.h"
 
 #include <string.h>
+#include <ctype.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -125,7 +126,7 @@ bool heapstore_calculate_directory_size(const char* path, uint64_t* out_size, ui
             /* 递归计算子目录 */
             char sub_path[MAX_PATH];
             snprintf(sub_path, sizeof(sub_path), "%s\\%s", path, find_data.cFileName);
-            
+
             uint64_t sub_size = 0;
             uint32_t sub_count = 0;
             if (heapstore_calculate_directory_size(sub_path, &sub_size, &sub_count)) {
@@ -179,6 +180,78 @@ bool heapstore_calculate_directory_size(const char* path, uint64_t* out_size, ui
 
     closedir(dir);
 #endif
+
+    return true;
+}
+
+int heapstore_sanitize_path_component(char* output, const char* input, size_t size) {
+    if (!output || !input || size == 0) {
+        return -1;
+    }
+
+    size_t input_len = strlen(input);
+    if (input_len == 0 || input_len >= size) {
+        return -1;
+    }
+
+    if (strstr(input, "..") != NULL) {
+        return -1;
+    }
+
+    if (strchr(input, '/') != NULL) {
+        return -1;
+    }
+
+    if (strchr(input, '\\') != NULL) {
+        return -1;
+    }
+
+    for (size_t i = 0; i < input_len; i++) {
+        if (input[i] == '\0') {
+            return -1;
+        }
+    }
+
+    for (size_t i = 0; i < input_len; i++) {
+        unsigned char c = (unsigned char)input[i];
+        if (isalnum(c) || c == '_' || c == '-' || c == '.') {
+            output[i] = input[i];
+        } else {
+            output[i] = '_';
+        }
+    }
+    output[input_len] = '\0';
+
+    return 0;
+}
+
+bool heapstore_is_safe_identifier(const char* input) {
+    if (!input || !input[0]) {
+        return false;
+    }
+
+    if (strstr(input, "..") != NULL) {
+        return false;
+    }
+
+    if (strchr(input, '/') != NULL) {
+        return false;
+    }
+
+    if (strchr(input, '\\') != NULL) {
+        return false;
+    }
+
+    size_t len = strlen(input);
+    for (size_t i = 0; i < len; i++) {
+        if (input[i] == '\0') {
+            return false;
+        }
+        unsigned char c = (unsigned char)input[i];
+        if (!(isalnum(c) || c == '_' || c == '-' || c == '.')) {
+            return false;
+        }
+    }
 
     return true;
 }

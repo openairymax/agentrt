@@ -88,8 +88,66 @@ typedef struct embedder_instance {
 
 static embedder_instance_t* g_embedder = NULL;
 
-/* 全局初始化锁 */
 static agentos_mutex_t* g_init_lock = NULL;
+
+/**
+ * @brief JSON字符串转义（防止注入）
+ *
+ * 转义字符：", \, /, 退格, 换页, 换行, 回车, 制表符, 控制字符(0x00-0x1F)
+ * @param src 原始字符串
+ * @param out 输出缓冲区（需由调用者释放）
+ * @return 转义后的字符串长度，失败返回 -1
+ */
+static ssize_t json_escape_string(const char* src, char** out) {
+    if (!src || !out) return -1;
+
+    size_t len = strlen(src);
+    size_t escaped_len = 0;
+
+    for (size_t i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)src[i];
+        switch (c) {
+            case '"':  escaped_len += 2; break;
+            case '\\': escaped_len += 2; break;
+            case '\b': escaped_len += 2; break;
+            case '\f': escaped_len += 2; break;
+            case '\n': escaped_len += 2; break;
+            case '\r': escaped_len += 2; break;
+            case '\t': escaped_len += 2; break;
+            default:
+                if (c < 0x20) escaped_len += 6;
+                else escaped_len += 1;
+                break;
+        }
+    }
+
+    char* escaped = (char*)AGENTOS_MALLOC(escaped_len + 1);
+    if (!escaped) return -1;
+
+    size_t pos = 0;
+    for (size_t i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)src[i];
+        switch (c) {
+            case '"':  escaped[pos++] = '\\'; escaped[pos++] = '"'; break;
+            case '\\': escaped[pos++] = '\\'; escaped[pos++] = '\\'; break;
+            case '\b': escaped[pos++] = '\\'; escaped[pos++] = 'b'; break;
+            case '\f': escaped[pos++] = '\\'; escaped[pos++] = 'f'; break;
+            case '\n': escaped[pos++] = '\\'; escaped[pos++] = 'n'; break;
+            case '\r': escaped[pos++] = '\\'; escaped[pos++] = 'r'; break;
+            case '\t': escaped[pos++] = '\\'; escaped[pos++] = 't'; break;
+            default:
+                if (c < 0x20) {
+                    pos += snprintf(escaped + pos, 7, "\\u%04x", c);
+                } else {
+                    escaped[pos++] = (char)c;
+                }
+                break;
+        }
+    }
+    escaped[pos] = '\0';
+    *out = = escaped;
+    return (ssize_t)pos;
+}
 
 /* 确保初始化 */
 static void ensure_initialized(void) {
@@ -128,9 +186,17 @@ static size_t generate_openai_embedding(const char* text, float** out_embedding)
         return 0;
     }
 
+    char* escaped_text = NULL;
+    if (json_escape_string(text, &escaped_text) < 0) {
+        AGENTOS_FREE(chunk.data);
+        curl_easy_cleanup(curl);
+        return 0;
+    }
+
     char* json_data;
     int ret = asprintf(&json_data,
-             "{\"input\":\"%s\",\"model\":\"text-embedding-ada-002\"}", text);
+             "{\"input\":\"%s\",\"model\":\"text-embedding-ada-002\"}", escaped_text);
+    AGENTOS_FREE(escaped_text);
     if (ret < 0) {
         AGENTOS_FREE(chunk.data);
         curl_easy_cleanup(curl);
@@ -211,9 +277,17 @@ static size_t generate_deepseek_embedding(const char* text, float** out_embeddin
         return 0;
     }
 
+    char* escaped_text = NULL;
+    if (json_escape_string(text, &escaped_text) < 0) {
+        AGENTOS_FREE(chunk.data);
+        curl_easy_cleanup(curl);
+        return 0;
+    }
+
     char* json_data;
     int ret = asprintf(&json_data,
-             "{\"input\":\"%s\",\"model\":\"embedding\"}", text);
+             "{\"input\":\"%s\",\"model\":\"embedding\"}", escaped_text);
+    AGENTOS_FREE(escaped_text);
     if (ret < 0) {
         AGENTOS_FREE(chunk.data);
         curl_easy_cleanup(curl);
