@@ -1,0 +1,275 @@
+# =============================================================================
+# AgentOS 生产环境告警规则 (Production Alert Rules)
+# 版本: 2.0.0
+# 用途: 定义关键服务的告警阈值和通知策略
+#
+# 📌 告警级别:
+#   - critical: 立即处理（服务宕机、数据丢失风险）
+#   - warning: 尽快处理（性能下降、资源紧张）
+#   - info: 信息通知（容量规划、趋势预警）
+#
+# 🔔 通知渠道 (需在 AlertManager 中配置):
+#   - critical: PagerDuty + SMS + 电话
+#   - warning: Slack + Email
+#   - info: 仅 Slack 频道
+#
+# 使用方法:
+#   此文件自动被 Prometheus 加载 (通过 rule_files: 'rules/*.yml')
+# =============================================================================
+
+groups:
+  # ===========================================================================
+  # 组 1: AgentOS 内核服务告警 (Kernel Service Alerts)
+  # ===========================================================================
+  - name: agentos-kernel-alerts
+    interval: 30s
+    rules:
+
+    # 内核服务宕机 (CRITICAL)
+    - alert: KernelServiceDown
+      expr: up{job="agentos-kernel"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        team: platform
+        service: kernel
+      annotations:
+        summary: "AgentOS Kernel 服务宕机 (实例: {{ $labels.instance }})"
+        description: "Kernel 服务已停止运行超过 1 分钟。当前所有 API 请求将失败。\n\n**影响范围:** 所有依赖 Kernel IPC 的服务\n**立即行动:** 检查容器日志: docker logs agentos-kernel-prod"
+
+    # 内核 HTTP 错误率过高 (WARNING)
+    - alert: KernelHighErrorRate
+      expr: |
+        (
+          sum(rate(http_requests_total{job="agentos-kernel", status=~"5.."}[5m]))
+          /
+          sum(rate(http_requests_total{job="agentos-kernel"}[5m]))
+        ) * 100 > 5
+      for: 5m
+      labels:
+        severity: warning
+        team: platform
+        service: kernel
+      annotations:
+        summary: "Kernel HTTP 5xx 错误率超过 5% (当前: {{ $value }}%)"
+        description: "过去 5 分钟内 Kernel 返回的 5xx 错误超过阈值。\n\n**可能原因:** 数据库连接失败、内存不足、内部错误\n**排查步骤:**\n1. 检查数据库连接池状态\n2. 查看 Kernel 日志中的异常堆栈\n3. 确认资源使用情况 (CPU/Memory)"
+
+    # Syscall 延迟过高 (WARNING)
+    - alert: KernelHighSyscallLatency
+      expr: histogram_quantile(0.99, rate(syscall_duration_seconds_bucket{job="agentos-kernel"}[5m])) > 1
+      for: 5m
+      labels:
+        severity: warning
+        team: platform
+        service: kernel
+      annotations:
+        summary: "Kernel Syscall P99 延迟超过 1 秒 (当前: {{ $value }}s)"
+        description: "内核系统调用响应时间过长，可能影响用户体验。\n\n**可能原因:** 数据库慢查询、锁竞争、GC 压力\n**优化建议:**\n1. 检查 PostgreSQL 慢查询日志\n2. 审查 HeapStore 读写模式\n3. 考虑增加 Kernel 实例数"
+
+    # 内存使用接近上限 (WARNING)
+    - alert: KernelHighMemoryUsage
+      expr: process_resident_memory_bytes{job="agentos-kernel"} / (1024*1024*1024) > 3.5
+      for: 10m
+      labels:
+        severity: warning
+        team: platform
+        service: kernel
+      annotations:
+        summary: "Kernel 内存使用超过 3.5GB (限制: 4GB)"
+        description: "Kernel 进程内存使用接近 cgroups 上限，存在 OOM 风险。\n\n**当前值:** {{ $value }} GB\n**建议操作:**\n1. 检查是否存在内存泄漏\n2. 增加 MEMORY_LIMIT 配置\n3. 重启 Kernel 以释放碎片化内存"
+
+  # ===========================================================================
+  # 组 2: Gateway 网关服务告警 (Gateway Service Alerts)
+  # ===========================================================================
+  - name: agentos-gateway-alerts
+    interval: 30s
+    rules:
+
+    # Gateway 宕机 (CRITICAL)
+    - alert: GatewayServiceDown
+      expr: up{job="agentos-gateway"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        team: platform
+        service: gateway
+      annotations:
+        summary: "AgentOS Gateway 服务宕机"
+        description: "Gateway 是唯一对外入口，宕机将导致所有外部访问中断！\n\n**立即行动:**\n1. docker restart agentos-gateway-prod\n2. 检查日志: docker logs --tail 100 agentos-gateway-prod\n3. 确认上游 Kernel 是否正常"
+
+    # Gateway 高延迟 (WARNING)
+    - alert: GatewayHighLatency
+      expr: histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{job="agentos-gateway"}[5m])) > 2
+      for: 5m
+      labels:
+        severity: warning
+        team: platform
+        service: gateway
+      annotations:
+        summary: "Gateway P99 延迟超过 2 秒 (当前: {{ $value }}s)"
+        description: "网关响应时间过长，用户感知明显变慢。\n\n**可能原因:**\n- Kernel 后端响应慢\n- 连接池耗尽\n- 网络拥塞\n- SSL/TLS 握手开销"
+
+    # Gateway 速率限制触发频繁 (INFO)
+    - alert: GatewayRateLimitingActive
+      expr: rate(gateway_rate_limited_requests_total{job="agentos-gateway"}[5m]) > 10
+      for: 5m
+      labels:
+        severity: info
+        team: security
+        service: gateway
+      annotations:
+        summary: "Gateway 速率限制频繁触发 ({{ $value }} req/s 被拒绝)"
+        description: "大量请求因超出 QPS 限制而被拒绝。\n\n**可能原因:**\n- 正常流量突增（营销活动？）\n- DDoS 攻击\n- 客户端 bug 导致重试风暴\n\n**建议:** 检查 IP 分布，确认是否需要调整 GATEWAY_GLOBAL_QPS"
+
+  # ===========================================================================
+  # 组 3: PostgreSQL 数据库告警 (Database Alerts)
+  # ===========================================================================
+  - name: database-alerts
+    interval: 60s
+    rules:
+
+    # PostgreSQL 连接池耗尽 (CRITICAL)
+    - alert: PostgresConnectionPoolExhausted
+      expr: pg_stat_activity_count{state="active"} / pg_settings_max_connections * 100 > 90
+      for: 2m
+      labels:
+        severity: critical
+        team: database
+        service: postgresql
+      annotations:
+        summary: "PostgreSQL 活跃连接超过 90% ({{ $value }}%)"
+        description: "数据库连接池即将耗尽，新连接将被拒绝！\n\n**立即行动:**\n1. 检查是否有慢查询阻塞连接\n2. 确认应用是否正确释放连接\n3. 考虑增加 PG_MAX_CONNECTIONS"
+
+    # PostgreSQL 慢查询增多 (WARNING)
+    - alert: PostgresSlowQueriesIncreasing
+      expr: increase(pg_stat_statements_total_exec_time[1h]) / increase(pg_stat_statements_calls[1h]) > 0.5
+      for: 15m
+      labels:
+        severity: warning
+        team: database
+        service: postgresql
+      annotations:
+        summary: "PostgreSQL 平均查询执行时间超过 500ms"
+        description: "数据库查询性能下降，可能存在未优化的 SQL。\n\n**排查步骤:**\n1. 查看 pg_stat_statements 视图找出最慢的 SQL\n2. 检查缺失索引\n3. 分析 EXPLAIN ANALYZE 输出"
+
+    # PostgreSQL 复制延迟 (WARNING) [仅主从复制时有效]
+    - alert: PostgresReplicationLag
+      expr: pg_replication_lag_seconds > 300
+      for: 5m
+      labels:
+        severity: warning
+        team: database
+        service: postgresql
+      annotations:
+        summary: "PostgreSQL 复制延迟超过 5 分钟 ({{ $value }}s)"
+        description: "从库同步落后主库过多，存在数据丢失风险。\n\n**可能原因:**\n- 从库负载过高\n- 网络带宽不足\n- WAL 发送进程问题"
+
+    # 磁盘空间不足 (CRITICAL)
+    - alert: PostgresDiskSpaceCritical
+      expr: pg_disk_usage_percent > 85
+      for: 5m
+      labels:
+        severity: critical
+        team: database
+        service: postgresql
+      annotations:
+        summary: "PostgreSQL 数据目录磁盘使用超过 85% ({{ $value }}%)"
+        description: "磁盘空间即将耗尽，可能导致数据库崩溃！\n\n**紧急措施:**\n1. 清理旧备份和 WAL 归档\n2. 删除不需要的数据/表\n3. 扩展磁盘容量 (LVM/云盘)"
+
+  # ===========================================================================
+  # 组 4: Redis 缓存告警 (Redis Cache Alerts)
+  # ===========================================================================
+  - name: redis-alerts
+    interval: 30s
+    rules:
+
+    # Redis 宕机 (CRITICAL)
+    - alert: RedisServiceDown
+      expr: up{job="redis"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        team: platform
+        service: redis
+      annotations:
+        summary: "Redis 缓存服务宕机"
+        description: "Redis 停止运行，将导致：\n- 会话丢失（用户强制重新登录）\n- Rate Limiting 失效（DDoS 风险）\n- 权限缓存失效（性能大幅下降）\n\n**立即重启:** docker restart agentos-redis-prod"
+
+    # Redis 内存使用过高 (WARNING)
+    - alert: RedisHighMemoryUsage
+      expr: redis_memory_used_bytes / redis_memory_max_bytes * 100 > 80
+      for: 10m
+      labels:
+        severity: warning
+        team: platform
+        service: redis
+      annotations:
+        summary: "Redis 内存使用超过 80% ({{ $value }}%)"
+        description: "Redis 接近 maxmemory 限制，将开始淘汰键。\n\n**当前淘汰策略:** allkeys-lru\n**影响:** 最近最少使用的缓存将被删除，可能导致缓存穿透\n**建议:**\n1. 分析大键 (redis-cli --bigkeys)\n2. 增加 REDIS_MAX_MEMORY\n3. 优化缓存 TTL 策略"
+
+    # Redis 命中率过低 (WARNING)
+    - alert: RedisLowHitRate
+      expr: (rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))) * 100 < 70
+      for: 15m
+      labels:
+        severity: warning
+        team: platform
+        service: redis
+      annotations:
+        summary: "Redis 缓存命中率低于 70% (当前: {{ $value }}%)"
+        description: "大量缓存未命中，后端数据库压力增大。\n\n**可能原因:**\n- 缓存过期时间设置过短\n- 冷数据未被预热\n- 缓存 key 设计不合理\n- 内存不足导致频繁淘汰"
+
+    # Redis AOF 重写失败 (WARNING)
+    - alert: RedisAOFRewriteFailed
+      expr: redis_aof_last_rewrite_time_sec == -1 and redis_aof_enabled == 1
+      for: 5m
+      labels:
+        severity: warning
+        team: platform
+        service: redis
+      annotations:
+        summary: "Redis AOF 重写失败或长时间未执行"
+        description: "AOF 文件可能过大，影响恢复时间和性能。\n\n**手动触发:** redis-cli BGREWRITEAOF"
+
+  # ===========================================================================
+  # 组 5: 容器和基础设施告警 (Infrastructure Alerts)
+  # ===========================================================================
+  - name: infrastructure-alerts
+    interval: 60s
+    rules:
+
+    # 容器 OOMKilled (CRITICAL)
+    - alert: ContainerOOMKilled
+      expr: time() - container_start_time_seconds{container_state="OOMKilled"} < 300
+      for: 0m
+      labels:
+        severity: critical
+        team: platform
+        service: '{{ $labels.service }}'
+      annotations:
+        summary: "容器 {{ $labels.name }} 因 OOM 被 Kill"
+        description: "容器因超出内存限制被 Linux OOM Killer 终止。\n\n**立即行动:**\n1. 检查应用内存泄漏\n2. 增加 memory limit\n3. 检查是否有异常流量导致内存激增"
+
+    # 主机磁盘空间不足 (WARNING)
+    - alert: HostDiskSpaceWarning
+      expr: (node_filesystem_avail_bytes{mountpoint="/", fstype!="tmpfs"} / node_filesystem_size_bytes{mountpoint="/", fstype!="tmpfs"}) * 100 < 20
+      for: 30m
+      labels:
+        severity: warning
+        team: sre
+        service: host
+      annotations:
+        summary: "主机根分区剩余空间低于 20% ({{ $value }}%)"
+        description: "Docker Host 磁盘空间不足，可能影响容器写入和新镜像拉取。\n\n**清理建议:**\n1. docker system prune -a (清理无用镜像/容器/卷)\n2. 清理旧日志和备份文件\n3. 扩展磁盘容量"
+
+    # Docker 容器频繁重启 (WARNING)
+    - alert: ContainerRestartingFrequently
+      expr: increase(container_restart_count[1h]) > 5
+      for: 15m
+      labels:
+        severity: warning
+        team: platform
+        service: '{{ $labels.service }}'
+      annotations:
+        summary: "容器 {{ $labels.name }} 在 1 小时内重启超过 5 次"
+        description: "容器不稳定，可能存在配置错误或应用崩溃。\n\n**排查步骤:**\n1. docker logs --tail 200 <container_name>\n2. 检查健康检查端点是否正常\n3. 确认资源限制是否合理"

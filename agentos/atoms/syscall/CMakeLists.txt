@@ -38,16 +38,14 @@ set(SOURCES
 
 add_library(agentos_syscall STATIC ${SOURCES})
 
-target_include_directories(agentos_syscall PRIVATE
+# 使用统一的头文件路径管理
+target_link_libraries(agentos_syscall PUBLIC agentos_atoms)
+
+target_include_directories(agentos_syscall PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../corekern/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../memoryrovol/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../utils/observability/include
-    $<$<BOOL:${CJSON_FOUND}>:${CJSON_INCLUDE_DIRS}>
 )
 
-# 安全编译选项（基于AgentOS C编码风格指南附录A）
+# 安全编译选项（基于 AgentOS C 编码风格指南附录 A）
 if(MSVC)
     target_compile_options(agentos_syscall PRIVATE /W4 /WX)
     target_compile_definitions(agentos_syscall PRIVATE _CRT_SECURE_NO_WARNINGS)

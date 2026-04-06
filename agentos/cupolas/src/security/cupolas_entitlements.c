@@ -13,7 +13,7 @@
  */
 
 #include "cupolas_entitlements.h"
-#include "../platform/platform.h"
+#include "../utils/cupolas_utils.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -344,11 +344,7 @@ int cupolas_entitlements_load_string(const char* yaml_content, cupolas_entitleme
     *entitlements = (cupolas_entitlements_t*)calloc(1, sizeof(cupolas_entitlements_t));
     if (!*entitlements) return cupolas_ENT_PARSE_ERROR;
     
-#ifdef _WIN32
-    InitializeCriticalSection(&(*entitlements)->lock);
-#else
-    pthread_mutex_init(&(*entitlements)->lock, NULL);
-#endif
+    CUPOLAS_MUTEX_INIT(&(*entitlements)->lock);
     
     (*entitlements)->raw_content = cupolas_strdup(yaml_content);
     (*entitlements)->load_time = cupolas_get_time_ms();

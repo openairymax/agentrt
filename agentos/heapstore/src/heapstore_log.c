@@ -105,10 +105,16 @@ static FILE* get_service_log_file(const char* service) {
         return get_main_log_file();
     }
 
+    char safe_service[heapstore_LOG_MAX_SERVICE_LEN];
+    if (heapstore_sanitize_path_component(safe_service, service, sizeof(safe_service)) != 0) {
+        fprintf(stderr, "[heapstore_LOG SECURITY] Rejected unsafe service name: %s\n", service);
+        return NULL;
+    }
+
     pthread_mutex_lock(&s_service_lock);
 
     for (size_t i = 0; i < s_service_log_count; i++) {
-        if (strcmp(s_service_logs[i].service_name, service) == 0) {
+        if (strcmp(s_service_logs[i].service_name, safe_service) == 0) {
             FILE* fp = s_service_logs[i].file;
             pthread_mutex_unlock(&s_service_lock);
             return fp;
@@ -122,11 +128,11 @@ static FILE* get_service_log_file(const char* service) {
         heapstore_ensure_directory(service_path);
 
         char filepath[heapstore_LOG_MAX_PATH];
-        snprintf(filepath, sizeof(filepath), "%s/services/%s.log", base, service);
+        snprintf(filepath, sizeof(filepath), "%s/services/%s.log", base, safe_service);
 
         FILE* fp = fopen(filepath, "a");
         if (fp) {
-            strncpy(s_service_logs[s_service_log_count].service_name, service, heapstore_LOG_MAX_SERVICE_LEN - 1);
+            strncpy(s_service_logs[s_service_log_count].service_name, safe_service, heapstore_LOG_MAX_SERVICE_LEN - 1);
             s_service_logs[s_service_log_count].file = fp;
             pthread_mutex_init(&s_service_logs[s_service_log_count].lock, NULL);
             s_service_log_count++;
@@ -386,25 +392,25 @@ heapstore_error_t heapstore_log_cleanup(int days_to_keep, uint64_t* freed_bytes)
 #ifdef _WIN32
     WIN32_FIND_DATAA find_data;
     char search_path[heapstore_LOG_MAX_PATH];
-    
+
     snprintf(search_path, sizeof(search_path), "%s/*", get_log_base_path());
-    
+
     HANDLE h_find = FindFirstFileA(search_path, &find_data);
     if (h_find == INVALID_HANDLE_VALUE) {
         return heapstore_SUCCESS;
     }
-    
+
     do {
         if (!(find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
             char filepath[heapstore_LOG_MAX_PATH];
             snprintf(filepath, sizeof(filepath), "%s/%s", get_log_base_path(), find_data.cFileName);
-            
+
             FILETIME ft_write = find_data.ftLastWriteTime;
             ULARGE_INTEGER uli;
             uli.LowPart = ft_write.dwLowDateTime;
             uli.HighPart = ft_write.dwHighDateTime;
             time_t file_time = (time_t)((uli.QuadPart - 116444736000000000ULL) / 10000000);
-            
+
             if (file_time < cutoff_time) {
                 uint64_t file_size = ((uint64_t)find_data.nFileSizeHigh << 32) | find_data.nFileSizeLow;
                 if (DeleteFileA(filepath)) {
@@ -413,23 +419,23 @@ heapstore_error_t heapstore_log_cleanup(int days_to_keep, uint64_t* freed_bytes)
             }
         }
     } while (FindNextFileA(h_find, &find_data));
-    
+
     FindClose(h_find);
 #else
     DIR* dir = opendir(get_log_base_path());
     if (!dir) {
         return heapstore_SUCCESS;
     }
-    
+
     struct dirent* entry;
     while ((entry = readdir(dir)) != NULL) {
         if (entry->d_type != DT_REG) {
             continue;
         }
-        
+
         char filepath[heapstore_LOG_MAX_PATH];
         snprintf(filepath, sizeof(filepath), "%s/%s", get_log_base_path(), entry->d_name);
-        
+
         struct stat st;
         if (stat(filepath, &st) == 0) {
             if (st.st_mtime < cutoff_time) {
@@ -440,7 +446,7 @@ heapstore_error_t heapstore_log_cleanup(int days_to_keep, uint64_t* freed_bytes)
             }
         }
     }
-    
+
     closedir(dir);
 #endif
 

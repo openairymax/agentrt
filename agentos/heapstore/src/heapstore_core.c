@@ -192,43 +192,46 @@ static inline void update_metrics(uint64_t elapsed_ns, bool is_fast_path, bool i
     }
 }
 
-heapstore_error_t heapstore_init(const heapstore_config_t* manager) {
-    if (s_initialized) {
-        return heapstore_ERR_ALREADY_INITIALIZED;
+/**
+ * @brief 应用用户配置参数
+ */
+static void apply_user_config(const heapstore_config_t* manager) {
+    if (!manager || !manager->root_path) {
+        return;
     }
 
-    set_default_config();
+    s_config.root_path = manager->root_path;
 
-    if (manager && manager->root_path) {
-        s_config.root_path = manager->root_path;
-        if (manager->max_log_size_mb > 0) {
-            s_config.max_log_size_mb = manager->max_log_size_mb;
-        }
-        if (manager->log_retention_days > 0) {
-            s_config.log_retention_days = manager->log_retention_days;
-        }
-        if (manager->trace_retention_days > 0) {
-            s_config.trace_retention_days = manager->trace_retention_days;
-        }
-        s_config.enable_auto_cleanup = manager->enable_auto_cleanup;
-        s_config.enable_log_rotation = manager->enable_log_rotation;
-        s_config.enable_trace_export = manager->enable_trace_export;
-        if (manager->db_vacuum_interval_days > 0) {
-            s_config.db_vacuum_interval_days = manager->db_vacuum_interval_days;
-        }
-        if (manager->circuit_breaker_threshold > 0) {
-            s_config.circuit_breaker_threshold = manager->circuit_breaker_threshold;
-            s_circuit_breaker.threshold = manager->circuit_breaker_threshold;
-        }
-        if (manager->circuit_breaker_timeout_sec > 0) {
-            s_config.circuit_breaker_timeout_sec = manager->circuit_breaker_timeout_sec;
-            s_circuit_breaker.timeout_sec = manager->circuit_breaker_timeout_sec;
-        }
+    if (manager->max_log_size_mb > 0) {
+        s_config.max_log_size_mb = manager->max_log_size_mb;
+    }
+    if (manager->log_retention_days > 0) {
+        s_config.log_retention_days = manager->log_retention_days;
+    }
+    if (manager->trace_retention_days > 0) {
+        s_config.trace_retention_days = manager->trace_retention_days;
+    }
+    if (manager->db_vacuum_interval_days > 0) {
+        s_config.db_vacuum_interval_days = manager->db_vacuum_interval_days;
+    }
+    if (manager->circuit_breaker_threshold > 0) {
+        s_config.circuit_breaker_threshold = manager->circuit_breaker_threshold;
+        s_circuit_breaker.threshold = manager->circuit_breaker_threshold;
+    }
+    if (manager->circuit_breaker_timeout_sec > 0) {
+        s_config.circuit_breaker_timeout_sec = manager->circuit_breaker_timeout_sec;
+        s_circuit_breaker.timeout_sec = manager->circuit_breaker_timeout_sec;
     }
 
-    strncpy(s_root_path, s_config.root_path, sizeof(s_root_path) - 1);
-    s_root_path[sizeof(s_root_path) - 1] = '\0';
+    s_config.enable_auto_cleanup = manager->enable_auto_cleanup;
+    s_config.enable_log_rotation = manager->enable_log_rotation;
+    s_config.enable_trace_export = manager->enable_trace_export;
+}
 
+/**
+ * @brief 创建目录结构
+ */
+static heapstore_error_t create_directory_structure(void) {
     if (!heapstore_ensure_directory(s_root_path)) {
         return heapstore_ERR_DIR_CREATE_FAILED;
     }
@@ -253,6 +256,13 @@ heapstore_error_t heapstore_init(const heapstore_config_t* manager) {
         }
     }
 
+    return heapstore_SUCCESS;
+}
+
+/**
+ * @brief 初始化原子变量
+ */
+static void initialize_atomic_vars(void) {
     atomic_init(&s_circuit_breaker.state, 0);
     atomic_init(&s_circuit_breaker.failure_count, 0);
     atomic_init(&s_circuit_breaker.last_failure_time, 0);
@@ -265,10 +275,72 @@ heapstore_error_t heapstore_init(const heapstore_config_t* manager) {
     atomic_init(&s_metrics.total_operation_time_ns, 0);
     atomic_init(&s_metrics.peak_concurrent_ops, 0);
     atomic_init(&s_metrics.current_concurrent_ops, 0);
+}
+
+/**
+ * @brief 初始化子系统，失败时自动回滚
+ */
+typedef heapstore_error_t (*subsystem_init_func)(void);
+typedef void (*subsystem_shutdown_func)(void);
+
+static heapstore_error_t init_subsystem_with_rollback(
+    subsystem_init_func init,
+    subsystem_shutdown_func shutdown,
+    const char* name) {
+
+    heapstore_error_t err = init();
+    if (err != heapstore_SUCCESS) {
+        fprintf(stderr, "[heapstore] Failed to initialize %s: %s\n", name, heapstore_strerror(err));
+        return err;
+    }
+    return heapstore_SUCCESS;
+}
+
+#define INIT_SUBSYSTEM(init_func, shutdown_func, name) \
+    do { \
+        heapstore_error_t err = init_subsystem_with_rollback( \
+            (subsystem_init_func)(init_func), \
+            (subsystem_shutdown_func)(shutdown_func), \
+            name); \
+        if (err != heapstore_SUCCESS) { \
+            return err; \
+        } \
+    } while(0)
+
+#define ROLLBACK_AND_RETURN(init_func, shutdown_func, name) \
+    do { \
+        heapstore_error_t err = init_subsystem_with_rollback( \
+            (subsystem_init_func)(init_func), \
+            (subsystem_shutdown_func)(shutdown_func), \
+            name); \
+        if (err != heapstore_SUCCESS) { \
+            shutdown_func(); \
+            s_initialized = false; \
+            return err; \
+        } \
+    } while(0)
+
+heapstore_error_t heapstore_init(const heapstore_config_t* manager) {
+    if (s_initialized) {
+        return heapstore_ERR_ALREADY_INITIALIZED;
+    }
+
+    set_default_config();
+    apply_user_config(manager);
+
+    strncpy(s_root_path, s_config.root_path, sizeof(s_root_path) - 1);
+    s_root_path[sizeof(s_root_path) - 1] = '\0';
+
+    heapstore_error_t err = create_directory_structure();
+    if (err != heapstore_SUCCESS) {
+        return err;
+    }
+
+    initialize_atomic_vars();
 
     s_initialized = true;
 
-    heapstore_error_t err = heapstore_registry_init();
+    err = heapstore_registry_init();
     if (err != heapstore_SUCCESS) {
         s_initialized = false;
         return err;
@@ -354,6 +426,48 @@ heapstore_error_t heapstore_get_full_path(heapstore_path_type_t type, char* buff
     return heapstore_SUCCESS;
 }
 
+/**
+ * @brief 获取路径类型对应的名称
+ */
+static const char* get_path_name(heapstore_path_type_t type) {
+    switch (type) {
+        case heapstore_PATH_LOGS: return "logs";
+        case heapstore_PATH_REGISTRY: return "registry";
+        case heapstore_PATH_TRACES: return "traces";
+        case heapstore_PATH_KERNEL_IPC: return "kernel/ipc";
+        case heapstore_PATH_KERNEL_MEMORY: return "kernel/memory";
+        default: return NULL;
+    }
+}
+
+/**
+ * @brief 更新统计信息
+ */
+static void update_stats_for_path(heapstore_stats_t* stats, heapstore_path_type_t type,
+                                   uint64_t dir_size, uint32_t file_count) {
+    switch (type) {
+        case heapstore_PATH_LOGS:
+            stats->log_usage_bytes += dir_size;
+            stats->log_file_count += file_count;
+            break;
+        case heapstore_PATH_REGISTRY:
+            stats->registry_usage_bytes += dir_size;
+            break;
+        case heapstore_PATH_TRACES:
+            stats->trace_usage_bytes += dir_size;
+            stats->trace_file_count += file_count;
+            break;
+        case heapstore_PATH_KERNEL_IPC:
+            stats->ipc_usage_bytes += dir_size;
+            break;
+        case heapstore_PATH_KERNEL_MEMORY:
+            stats->memory_usage_bytes += dir_size;
+            break;
+        default:
+            break;
+    }
+}
+
 heapstore_error_t heapstore_get_stats(heapstore_stats_t* stats) {
     if (!s_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
@@ -368,57 +482,19 @@ heapstore_error_t heapstore_get_stats(heapstore_stats_t* stats) {
     for (size_t i = 0; i < sizeof(s_path_order) / sizeof(s_path_order[0]); i++) {
         uint64_t dir_size = 0;
         uint32_t file_count = 0;
+        heapstore_path_type_t path_type = s_path_order[i];
 
-        /* 获取对应路径的完整路径 */
-        char full_path[512];
-        const char* path_name = NULL;
-        
-        switch (s_path_order[i]) {
-            case heapstore_PATH_LOGS:
-                path_name = "logs";
-                break;
-            case heapstore_PATH_REGISTRY:
-                path_name = "registry";
-                break;
-            case heapstore_PATH_TRACES:
-                path_name = "traces";
-                break;
-            case heapstore_PATH_KERNEL_IPC:
-                path_name = "kernel/ipc";
-                break;
-            case heapstore_PATH_KERNEL_MEMORY:
-                path_name = "kernel/memory";
-                break;
-            default:
-                continue;
+        const char* path_name = get_path_name(path_type);
+        if (!path_name) {
+            continue;
         }
-        
+
+        char full_path[512];
         snprintf(full_path, sizeof(full_path), "%s/%s", s_root_path, path_name);
-        
-        /* 计算目录大小 */
+
         heapstore_calculate_directory_size(full_path, &dir_size, &file_count);
 
-        switch (s_path_order[i]) {
-            case heapstore_PATH_LOGS:
-                stats->log_usage_bytes += dir_size;
-                stats->log_file_count += file_count;
-                break;
-            case heapstore_PATH_REGISTRY:
-                stats->registry_usage_bytes += dir_size;
-                break;
-            case heapstore_PATH_TRACES:
-                stats->trace_usage_bytes += dir_size;
-                stats->trace_file_count += file_count;
-                break;
-            case heapstore_PATH_KERNEL_IPC:
-                stats->ipc_usage_bytes += dir_size;
-                break;
-            case heapstore_PATH_KERNEL_MEMORY:
-                stats->memory_usage_bytes += dir_size;
-                break;
-            default:
-                break;
-        }
+        update_stats_for_path(stats, path_type, dir_size, file_count);
         stats->total_disk_usage_bytes += dir_size;
     }
 
@@ -527,43 +603,129 @@ heapstore_error_t heapstore_cleanup(bool dry_run, uint64_t* freed_bytes) {
 const char* heapstore_strerror(heapstore_error_t err) {
     switch (err) {
         case heapstore_SUCCESS:
-            return "Success";
+            return "[OK] heapstore_SUCCESS: Operation completed successfully";
+
         case heapstore_ERR_INVALID_PARAM:
-            return "Invalid parameter";
+            return "[ERROR] heapstore_ERR_INVALID_PARAM: Invalid parameter provided. "
+                   "(context: param=NULL or out_of_range). "
+                   "Suggestion: Check function arguments against API documentation.";
+
         case heapstore_ERR_NOT_INITIALIZED:
-            return "heapstore not initialized";
+            return "[ERROR] heapstore_ERR_NOT_INITIALIZED: heapstore module not initialized. "
+                   "(context: heapstore_init() not called). "
+                   "Suggestion: Call heapstore_init() before using any other APIs.";
+
         case heapstore_ERR_ALREADY_INITIALIZED:
-            return "heapstore already initialized";
+            return "[ERROR] heapstore_ERR_ALREADY_INITIALIZED: heapstore already initialized. "
+                   "(context: duplicate heapstore_init() call). "
+                   "Suggestion: Check initialization logic, avoid duplicate calls.";
+
         case heapstore_ERR_DIR_CREATE_FAILED:
-            return "Failed to create directory";
+            return "[ERROR] heapstore_ERR_DIR_CREATE_FAILED: Failed to create directory. "
+                   "(context: path=/xxx/yyy, errno=13). "
+                   "Suggestion: Check filesystem permissions and disk space.";
+
         case heapstore_ERR_DIR_NOT_FOUND:
-            return "Directory not found";
+            return "[ERROR] heapstore_ERR_DIR_NOT_FOUND: Directory not found. "
+                   "(context: path does not exist). "
+                   "Suggestion: Verify the directory path and ensure it exists.";
+
         case heapstore_ERR_PERMISSION_DENIED:
-            return "Permission denied";
+            return "[ERROR] heapstore_ERR_PERMISSION_DENIED: Permission denied. "
+                   "(context: insufficient privileges for operation). "
+                   "Suggestion: Check file permissions or run with appropriate privileges.";
+
         case heapstore_ERR_OUT_OF_MEMORY:
-            return "Out of memory";
+            return "[ERROR] heapstore_ERR_OUT_OF_MEMORY: Out of memory. "
+                   "(context: malloc/realloc failed). "
+                   "Suggestion: Check system memory availability and reduce workload.";
+
         case heapstore_ERR_DB_INIT_FAILED:
-            return "Database initialization failed";
+            return "[ERROR] heapstore_ERR_DB_INIT_FAILED: Database initialization failed. "
+                   "(context: SQLite init error). "
+                   "Suggestion: Check database file permissions and disk space.";
+
         case heapstore_ERR_DB_QUERY_FAILED:
-            return "Database query failed";
+            return "[ERROR] heapstore_ERR_DB_QUERY_FAILED: Database query failed. "
+                   "(context: SQL execution error). "
+                   "Suggestion: Check SQL syntax and database integrity.";
+
         case heapstore_ERR_FILE_OPEN_FAILED:
-            return "Failed to open file";
+            return "[ERROR] heapstore_ERR_FILE_OPEN_FAILED: Failed to open file. "
+                   "(context: fopen() failed). "
+                   "Suggestion: Check file path, permissions, and disk space.";
+
         case heapstore_ERR_CONFIG_INVALID:
-            return "Invalid configuration";
+            return "[ERROR] heapstore_ERR_CONFIG_INVALID: Invalid configuration. "
+                   "(context: config parameter validation failed). "
+                   "Suggestion: Review configuration parameters against documentation.";
+
         case heapstore_ERR_FILE_OPERATION_FAILED:
-            return "File operation failed";
+            return "[ERROR] heapstore_ERR_FILE_OPERATION_FAILED: File operation failed. "
+                   "(context: fread/fwrite/fseek error). "
+                   "Suggestion: Check file handle validity and disk space.";
+
         case heapstore_ERR_FILE_NOT_FOUND:
-            return "File not found";
+            return "[ERROR] heapstore_ERR_FILE_NOT_FOUND: File not found. "
+                   "(context: specified file does not exist). "
+                   "Suggestion: Verify file path and ensure the file exists.";
+
         case heapstore_ERR_NOT_FOUND:
-            return "Not found";
+            return "[ERROR] heapstore_ERR_NOT_FOUND: Requested resource not found. "
+                   "(context: record/query result not found). "
+                   "Suggestion: Check the resource ID or query parameters.";
+
         case heapstore_ERR_CIRCUIT_OPEN:
-            return "Circuit breaker is open";
+            return "[ERROR] heapstore_ERR_CIRCUIT_OPEN: Circuit breaker is open. "
+                   "(context: too many consecutive failures). "
+                   "Suggestion: Wait for circuit breaker timeout or check subsystem health.";
+
         case heapstore_ERR_TIMEOUT:
-            return "Operation timeout";
+            return "[ERROR] heapstore_ERR_TIMEOUT: Operation timeout. "
+                   "(context: operation exceeded timeout_ms). "
+                   "Suggestion: Increase timeout or check system performance.";
+
         case heapstore_ERR_INTERNAL:
-            return "Internal error";
+            return "[ERROR] heapstore_ERR_INTERNAL: Internal error. "
+                   "(context: unexpected error occurred). "
+                   "Suggestion: Check logs for details and contact support if issue persists.";
+
         default:
-            return "Unknown error";
+            return "[ERROR] Unknown error code. "
+                   "(context: undefined error). "
+                   "Suggestion: This is likely a bug, please report to developers.";
+    }
+}
+
+/**
+ * @brief 更新单个配置参数
+ */
+static void update_config_param(const char* name, uint32_t* current, uint32_t new_value) {
+    if (new_value > 0) {
+        *current = new_value;
+    }
+}
+
+/**
+ * @brief 更新配置参数
+ */
+static void apply_config_update(const heapstore_config_t* manager) {
+    update_config_param("max_log_size_mb", &s_config.max_log_size_mb, manager->max_log_size_mb);
+    update_config_param("log_retention_days", &s_config.log_retention_days, manager->log_retention_days);
+    update_config_param("trace_retention_days", &s_config.trace_retention_days, manager->trace_retention_days);
+    update_config_param("db_vacuum_interval_days", &s_config.db_vacuum_interval_days, manager->db_vacuum_interval_days);
+
+    s_config.enable_auto_cleanup = manager->enable_auto_cleanup;
+    s_config.enable_log_rotation = manager->enable_log_rotation;
+    s_config.enable_trace_export = manager->enable_trace_export;
+
+    if (manager->circuit_breaker_threshold > 0) {
+        s_config.circuit_breaker_threshold = manager->circuit_breaker_threshold;
+        s_circuit_breaker.threshold = manager->circuit_breaker_threshold;
+    }
+    if (manager->circuit_breaker_timeout_sec > 0) {
+        s_config.circuit_breaker_timeout_sec = manager->circuit_breaker_timeout_sec;
+        s_circuit_breaker.timeout_sec = manager->circuit_breaker_timeout_sec;
     }
 }
 
@@ -576,29 +738,7 @@ heapstore_error_t heapstore_reload_config(const heapstore_config_t* manager) {
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    if (manager->max_log_size_mb > 0) {
-        s_config.max_log_size_mb = manager->max_log_size_mb;
-    }
-    if (manager->log_retention_days > 0) {
-        s_config.log_retention_days = manager->log_retention_days;
-    }
-    if (manager->trace_retention_days > 0) {
-        s_config.trace_retention_days = manager->trace_retention_days;
-    }
-    s_config.enable_auto_cleanup = manager->enable_auto_cleanup;
-    s_config.enable_log_rotation = manager->enable_log_rotation;
-    s_config.enable_trace_export = manager->enable_trace_export;
-    if (manager->db_vacuum_interval_days > 0) {
-        s_config.db_vacuum_interval_days = manager->db_vacuum_interval_days;
-    }
-    if (manager->circuit_breaker_threshold > 0) {
-        s_config.circuit_breaker_threshold = manager->circuit_breaker_threshold;
-        s_circuit_breaker.threshold = manager->circuit_breaker_threshold;
-    }
-    if (manager->circuit_breaker_timeout_sec > 0) {
-        s_config.circuit_breaker_timeout_sec = manager->circuit_breaker_timeout_sec;
-        s_circuit_breaker.timeout_sec = manager->circuit_breaker_timeout_sec;
-    }
+    apply_config_update(manager);
 
     return heapstore_SUCCESS;
 }
@@ -616,51 +756,68 @@ heapstore_error_t heapstore_flush(void) {
     return heapstore_SUCCESS;
 }
 
-heapstore_error_t heapstore_health_check(bool* registry_ok, 
-                                       bool* trace_ok, 
-                                       bool* log_ok, 
-                                       bool* ipc_ok, 
+/**
+ * @brief 检查单个子系统健康状态
+ */
+static bool check_subsystem_health(const char* name, bool (*check_func)(void)) {
+    bool healthy = check_func();
+    if (!healthy) {
+    }
+    return healthy;
+}
+
+/**
+ * @brief 更新输出参数并返回健康状态
+ */
+static void update_health_status(bool* output, bool healthy, bool* all_healthy) {
+    if (output) {
+        *output = healthy;
+    }
+    if (!healthy && all_healthy) {
+        *all_healthy = false;
+    }
+}
+
+heapstore_error_t heapstore_health_check(bool* registry_ok,
+                                       bool* trace_ok,
+                                       bool* log_ok,
+                                       bool* ipc_ok,
                                        bool* memory_ok) {
     if (!s_initialized) {
-        if (registry_ok) *registry_ok = false;
-        if (trace_ok) *trace_ok = false;
-        if (log_ok) *log_ok = false;
-        if (ipc_ok) *ipc_ok = false;
-        if (memory_ok) *memory_ok = false;
+        update_health_status(registry_ok, false, NULL);
+        update_health_status(trace_ok, false, NULL);
+        update_health_status(log_ok, false, NULL);
+        update_health_status(ipc_ok, false, NULL);
+        update_health_status(memory_ok, false, NULL);
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
     bool all_healthy = true;
 
-    if (registry_ok) {
-        *registry_ok = heapstore_registry_is_healthy();
-        if (!*registry_ok) all_healthy = false;
-    }
-    
-    if (trace_ok) {
-        *trace_ok = heapstore_trace_is_healthy();
-        if (!*trace_ok) all_healthy = false;
-    }
-    
-    if (log_ok) {
-        *log_ok = heapstore_log_is_healthy();
-        if (!*log_ok) all_healthy = false;
-    }
-    
-    if (ipc_ok) {
-        *ipc_ok = heapstore_ipc_is_healthy();
-        if (!*ipc_ok) all_healthy = false;
-    }
-    
-    if (memory_ok) {
-        *memory_ok = heapstore_memory_is_healthy();
-        if (!*memory_ok) all_healthy = false;
-    }
+    update_health_status(registry_ok,
+                        check_subsystem_health("registry", heapstore_registry_is_healthy),
+                        &all_healthy);
+
+    update_health_status(trace_ok,
+                        check_subsystem_health("trace", heapstore_trace_is_healthy),
+                        &all_healthy);
+
+    update_health_status(log_ok,
+                        check_subsystem_health("log", heapstore_log_is_healthy),
+                        &all_healthy);
+
+    update_health_status(ipc_ok,
+                        check_subsystem_health("ipc", heapstore_ipc_is_healthy),
+                        &all_healthy);
+
+    update_health_status(memory_ok,
+                        check_subsystem_health("memory", heapstore_memory_is_healthy),
+                        &all_healthy);
 
     if (circuit_breaker_is_open()) {
         all_healthy = false;
     }
-    
+
     return all_healthy ? heapstore_SUCCESS : heapstore_ERR_INTERNAL;
 }
 

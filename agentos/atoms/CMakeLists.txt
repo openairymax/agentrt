@@ -254,6 +254,34 @@ if(BUILD_TESTS)
     endif()
 endif()
 
+# 统一的头文件路径管理
+# 定义全局包含目录，避免使用相对路径
+set(AGENTOS_INCLUDE_DIRS
+    ${CMAKE_CURRENT_SOURCE_DIR}/corekern/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/coreloopthree/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/memoryrovol/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/syscall/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/memory/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/string/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/logging/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/sync/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/platform/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/error/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/types/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/config/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/observability/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/ipc/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/io/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/cache/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/cost/include
+)
+
+# 创建接口库来管理公共依赖
+add_library(agentos_atoms INTERFACE)
+target_include_directories(agentos_atoms INTERFACE
+    ${AGENTOS_INCLUDE_DIRS}
+)
+
 # 包含子目录
 # Kernel subdirectories
 add_subdirectory(corekern)

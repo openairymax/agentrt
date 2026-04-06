@@ -40,9 +40,16 @@ English | [简体中文](README.md)
 - **Team Orchestration**: Precisely coordinate multi-agent collaboration. Efficient task orchestration and resource scheduling.
 - **Autonomous Evolution**: Self-evolving capability. Dynamic strategy adjustment. Continuous optimization.
 
-<p align="center">  
-  <strong>✨ New Architecture · Security Built-in · Intelligence Emerges ✨</strong>
+
+<br><br>
+
+
+<p align="center">
+  <strong>✨ Autonomous Controllable · New Architecture · Security Built-in · Intelligence Emerges ✨</strong>
 </p>
+
+
+<br><br>
 
 
 ## 🏗️ System Architecture

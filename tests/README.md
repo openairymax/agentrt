@@ -157,8 +157,7 @@ tests/
 │   │   ├── test_memory.c          # 记忆引擎 C 测试
 │   │   └── benchmark.c            # 性能基准 C 测试
 │   ├── sdk/python/                # Python SDK 测试
-│   │   ├── test_sdk.py            # SDK 基础测试
-│   │   └── test_sdk_refactored.py # 重构版测试
+│   │   └── test_sdk.py            # SDK 测试（V2.0 重构版，基类复用+参数化）
 │   └── services/                  # 服务层测试
 │       ├── llm_d/test_llm.c       # LLM 服务测试
 │       ├── market_d/test_market.c # 市场服务测试
@@ -176,9 +175,8 @@ tests/
 │       └── test_syscalls.py       # syscall 集成测试
 │
 ├── contract/                      # 契约测试
-│   ├── test_agent_contracts.py          # Agent 契约测试
-│   ├── test_agent_contracts_refactored.py # 优化版 Agent 契约
-│   └── test_skill_contracts.py          # Skill 契约测试
+│   ├── test_agent_contracts.py    # Agent 契约测试（V2.0 策略模式+参数化）
+│   └── test_skill_contracts.py    # Skill 契约测试
 │
 ├── benchmarks/                    # 性能基准测试
 │   ├── concurrency/               # 并发性能测试

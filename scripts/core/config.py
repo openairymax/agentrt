@@ -1,4 +1,4 @@
-﻿﻿﻿﻿#!/usr/bin/env python3
+﻿﻿﻿#!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 配置模板引擎
 # 基于 Jinja2 的配置生成系统

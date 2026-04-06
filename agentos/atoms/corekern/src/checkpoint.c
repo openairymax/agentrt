@@ -25,6 +25,9 @@
 #include <time.h>
 #include <stdio.h>
 
+/* Unified base library compatibility layer */
+#include "../../../agentos/commons/utils/memory/include/memory_compat.h"
+
 #ifdef _WIN32
 #include <windows.h>
 #include <direct.h>
@@ -121,7 +124,7 @@ static char* safe_strdup(const char* src) {
     }
 
     size_t len = strlen(src);
-    char* dest = (char*)malloc(len + 1);
+    char* dest = (char*)AGENTOS_MALLOC(len + 1);
     if (!dest) {
         return NULL;
     }
@@ -141,7 +144,7 @@ static char** safe_str_array_dup(char** src, size_t count) {
         return NULL;
     }
 
-    char** dest = (char**)malloc(sizeof(char*) * count);
+    char** dest = (char**)AGENTOS_MALLOC(sizeof(char*) * count);
     if (!dest) {
         return NULL;
     }
@@ -152,9 +155,9 @@ static char** safe_str_array_dup(char** src, size_t count) {
         dest[i] = safe_strdup(src[i]);
         if (!dest[i] && src[i]) {
             for (size_t j = 0; j < i; j++) {
-                free(dest[j]);
+                AGENTOS_FREE(dest[j]);
             }
-            free(dest);
+            AGENTOS_FREE(dest);
             return NULL;
         }
     }
@@ -241,10 +244,9 @@ static heapos_error_t copy_node_lists(
         if (!cp->pending_nodes) {
             if (cp->completed_nodes) {
                 for (size_t i = 0; i < completed_count; i++) {
-                    free(cp->completed_nodes[i]);
+                    AGENTOS_FREE(cp->completed_nodes[i]);
                 }
-                free(cp->completed_nodes);
-                cp->completed_nodes = NULL;
+                AGENTOS_FREE(cp->completed_nodes);
             }
             return AGENTOS_ENOMEM;
         }
@@ -313,7 +315,7 @@ agentos_error_t agentos_checkpoint_create(
     }
 
     agentos_task_checkpoint_t* cp = (agentos_task_checkpoint_t*)
-        calloc(1, sizeof(agentos_task_checkpoint_t));
+        AGENTOS_CALLOC(1, sizeof(agentos_task_checkpoint_t));
     if (!cp) {
         return AGENTOS_ENOMEM;
     }
@@ -322,7 +324,7 @@ agentos_error_t agentos_checkpoint_create(
 
     cp->state_json = safe_strdup(state_json);
     if (!cp->state_json) {
-        free(cp);
+        AGENTOS_FREE(cp);
         return AGENTOS_ENOMEM;
     }
     cp->state_size = strlen(state_json);
@@ -334,8 +336,8 @@ agentos_error_t agentos_checkpoint_create(
     );
 
     if (err != AGENTOS_SUCCESS) {
-        free(cp->state_json);
-        free(cp);
+        AGENTOS_FREE(cp->state_json);
+        AGENTOS_FREE(cp);
         return err;
     }
 
@@ -424,7 +426,7 @@ agentos_error_t agentos_checkpoint_restore(
     }
 
     agentos_task_checkpoint_t* cp = (agentos_task_checkpoint_t*)
-        calloc(1, sizeof(agentos_task_checkpoint_t));
+        AGENTOS_CALLOC(1, sizeof(agentos_task_checkpoint_t));
     if (!cp) {
         fclose(fp);
         return AGENTOS_ENOMEM;
@@ -506,7 +508,7 @@ agentos_error_t agentos_checkpoint_list(
         return err;
     }
 
-    *out_cps = (agentos_task_checkpoint_t**)malloc(sizeof(agentos_task_checkpoint_t*));
+    *out_cps = (agentos_task_checkpoint_t**)AGENTOS_MALLOC(sizeof(agentos_task_checkpoint_t*));
     if (!*out_cps) {
         agentos_checkpoint_destroy(cp);
         return AGENTOS_ENOMEM;
@@ -561,27 +563,27 @@ agentos_error_t agentos_checkpoint_destroy(agentos_task_checkpoint_t* cp) {
     }
 
     if (cp->state_json) {
-        free(cp->state_json);
+        AGENTOS_FREE(cp->state_json);
         cp->state_json = NULL;
     }
 
     if (cp->completed_nodes) {
         for (size_t i = 0; i < cp->completed_count; i++) {
-            free(cp->completed_nodes[i]);
+            AGENTOS_FREE(cp->completed_nodes[i]);
         }
-        free(cp->completed_nodes);
+        AGENTOS_FREE(cp->completed_nodes);
         cp->completed_nodes = NULL;
     }
 
     if (cp->pending_nodes) {
         for (size_t i = 0; i < cp->pending_count; i++) {
-            free(cp->pending_nodes[i]);
+            AGENTOS_FREE(cp->pending_nodes[i]);
         }
-        free(cp->pending_nodes);
+        AGENTOS_FREE(cp->pending_nodes);
         cp->pending_nodes = NULL;
     }
 
-    free(cp);
+    AGENTOS_FREE(cp);
     return AGENTOS_SUCCESS;
 }
 

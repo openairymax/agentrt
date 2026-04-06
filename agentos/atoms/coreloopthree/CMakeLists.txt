@@ -27,14 +27,6 @@ else()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wpedantic")
 endif()
 
-# 包含头文件路径
-include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../corekern/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../memoryrovol/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../..
-)
-
 # 添加子目录
 add_subdirectory(src/cognition)
 add_subdirectory(src/execution)
@@ -47,7 +39,14 @@ add_library(agentos_coreloopthree STATIC
     src/utils/id_utils.c
 )
 
-# 安全编译选项（基于AgentOS C编码风格指南附录A）
+# 使用统一的头文件路径管理
+target_link_libraries(agentos_coreloopthree PUBLIC agentos_atoms)
+
+target_include_directories(agentos_coreloopthree PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+# 安全编译选项（基于 AgentOS C 编码风格指南附录 A）
 if(MSVC)
     target_compile_options(agentos_coreloopthree PRIVATE /W4 /WX)
     target_compile_definitions(agentos_coreloopthree PRIVATE _CRT_SECURE_NO_WARNINGS)

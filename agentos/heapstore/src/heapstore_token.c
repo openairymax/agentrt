@@ -124,7 +124,6 @@ heapstore_error_t heapstore_token_init(void) {
     }
 
     token_mutex_init();
-
     memset(g_budget_table, 0, sizeof(g_budget_table));
     g_budget_count = 0;
 
@@ -139,7 +138,6 @@ heapstore_error_t heapstore_token_init(void) {
     atomic_init(&g_last_operation_time, 0);
 
     g_token_initialized = 1;
-
     return heapstore_SUCCESS;
 }
 
@@ -154,17 +152,15 @@ heapstore_error_t heapstore_token_shutdown(void) {
     token_mutex_unlock();
 
     token_mutex_destroy();
-
     g_token_initialized = 0;
-
     return heapstore_SUCCESS;
 }
 
 heapstore_error_t heapstore_token_record(
     heapstore_token_type_t type,
     uint64_t count,
-    heapstore_token_operation_t operation) {
-
+    heapstore_token_operation_t operation
+) {
     if (!g_token_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -208,7 +204,6 @@ heapstore_error_t heapstore_token_record(
     }
 
     atomic_store(&g_last_operation_time, (uint64_t)time(NULL));
-
     return heapstore_SUCCESS;
 }
 
@@ -222,8 +217,8 @@ heapstore_error_t heapstore_token_get_stats(heapstore_token_stats_t* out_stats) 
     }
 
     uint64_t total_ops = atomic_load(&g_total_write_ops) +
-                          atomic_load(&g_total_read_ops) +
-                          atomic_load(&g_total_batch_ops);
+        atomic_load(&g_total_read_ops) +
+        atomic_load(&g_total_batch_ops);
 
     out_stats->total_prompt_tokens = atomic_load(&g_total_prompt_tokens);
     out_stats->total_completion_tokens = atomic_load(&g_total_completion_tokens);
@@ -236,9 +231,9 @@ heapstore_error_t heapstore_token_get_stats(heapstore_token_stats_t* out_stats) 
     out_stats->last_operation_time = atomic_load(&g_last_operation_time);
 
     uint64_t total_tokens = out_stats->total_prompt_tokens +
-                            out_stats->total_completion_tokens +
-                            out_stats->total_system_tokens +
-                            out_stats->total_user_tokens;
+        out_stats->total_completion_tokens +
+        out_stats->total_system_tokens +
+        out_stats->total_user_tokens;
 
     if (total_ops > 0) {
         out_stats->average_tokens_per_operation = (double)total_tokens / (double)total_ops;
@@ -255,7 +250,6 @@ heapstore_error_t heapstore_token_reset_stats(void) {
     }
 
     token_mutex_lock();
-
     atomic_store(&g_total_prompt_tokens, 0);
     atomic_store(&g_total_completion_tokens, 0);
     atomic_store(&g_total_system_tokens, 0);
@@ -265,7 +259,6 @@ heapstore_error_t heapstore_token_reset_stats(void) {
     atomic_store(&g_total_read_ops, 0);
     atomic_store(&g_total_batch_ops, 0);
     atomic_store(&g_last_operation_time, 0);
-
     token_mutex_unlock();
 
     return heapstore_SUCCESS;
@@ -273,8 +266,8 @@ heapstore_error_t heapstore_token_reset_stats(void) {
 
 heapstore_error_t heapstore_token_set_budget(
     const char* task_id,
-    const heapstore_token_budget_t* budget) {
-
+    const heapstore_token_budget_t* budget
+) {
     if (!g_token_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -286,7 +279,6 @@ heapstore_error_t heapstore_token_set_budget(
     token_mutex_lock();
 
     int entry_idx = find_budget_entry(task_id);
-
     if (entry_idx < 0) {
         entry_idx = allocate_budget_entry();
         if (entry_idx < 0) {
@@ -304,15 +296,14 @@ heapstore_error_t heapstore_token_set_budget(
     entry->active = 1;
 
     token_mutex_unlock();
-
     return heapstore_SUCCESS;
 }
 
 heapstore_error_t heapstore_token_check_budget(
     const char* task_id,
     uint64_t requested_tokens,
-    bool* allowed) {
-
+    bool* allowed
+) {
     if (!g_token_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -326,10 +317,8 @@ heapstore_error_t heapstore_token_check_budget(
     token_mutex_lock();
 
     int entry_idx = find_budget_entry(task_id);
-
     if (entry_idx >= 0) {
         task_budget_entry_t* entry = &g_budget_table[entry_idx];
-
         if (entry->budget.enable_budget_enforcement) {
             uint64_t used = atomic_load(&entry->used_tokens);
             uint64_t max_tokens = entry->budget.max_tokens_per_task;
@@ -339,7 +328,6 @@ heapstore_error_t heapstore_token_check_budget(
             }
 
             uint64_t used_percent = (used * 100) / max_tokens;
-
             if (used_percent >= entry->budget.critical_threshold_percent) {
                 *allowed = false;
             } else if (used_percent >= entry->budget.warning_threshold_percent) {
@@ -349,14 +337,13 @@ heapstore_error_t heapstore_token_check_budget(
     }
 
     token_mutex_unlock();
-
     return heapstore_SUCCESS;
 }
 
 heapstore_error_t heapstore_token_get_task_usage(
     const char* task_id,
-    uint64_t* out_used) {
-
+    uint64_t* out_used
+) {
     if (!g_token_initialized) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
@@ -368,13 +355,10 @@ heapstore_error_t heapstore_token_get_task_usage(
     *out_used = 0;
 
     token_mutex_lock();
-
     int entry_idx = find_budget_entry(task_id);
-
     if (entry_idx >= 0) {
         *out_used = atomic_load(&g_budget_table[entry_idx].used_tokens);
     }
-
     token_mutex_unlock();
 
     return heapstore_SUCCESS;

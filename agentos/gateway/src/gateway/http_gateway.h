@@ -17,12 +17,31 @@
 #include <stdatomic.h>
 #include <cJSON.h>
 
+/* 前向声明 */
+struct gateway_rate_limiter;
+typedef struct gateway_rate_limiter gateway_rate_limiter_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 struct MHD_Connection;
 struct MHD_Response;
+
+/**
+ * @brief CORS 配置结构
+ *
+ * 用于控制跨源资源共享(CORS)的安全设置。
+ * 生产环境应配置白名单，开发环境可允许所有来源。
+ */
+typedef struct {
+    bool allow_all_origins;           /**< 开发模式：允许所有来源（默认false） */
+    char** allowed_origins;           /**< 生产模式：允许的来源白名单 */
+    size_t allowed_origins_count;     /**< 白名单数量 */
+    char* allowed_methods;            /**< 允许的HTTP方法（如"POST, GET, OPTIONS"） */
+    char* allowed_headers;            /**< 允许的请求头（如"Content-Type, Authorization"） */
+    int max_age;                      /**< 预检请求缓存时间（秒） */
+} cors_config_t;
 
 typedef struct http_request_context {
     const char* method;              /**< HTTP方法 */
@@ -51,6 +70,8 @@ typedef struct http_gateway {
     atomic_uint_fast64_t bytes_sent;        /**< 发送字节数 */
     
     size_t max_request_size;         /**< 最大请求大小 */
+    cors_config_t cors;              /**< CORS配置 */
+    gateway_rate_limiter_t* rate_limiter; /**< 速率限制器 */
 } http_gateway_t;
 
 /**

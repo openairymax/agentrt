@@ -6,6 +6,7 @@
  */
 
 #include "audit_overflow.h"
+#include "../../utils/cupolas_utils.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

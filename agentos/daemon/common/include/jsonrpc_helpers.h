@@ -40,6 +40,34 @@ AGENTOS_API const char* jsonrpc_get_error_message(int code);
 AGENTOS_API char* jsonrpc_build_error_with_data(int code, const char* message, cJSON* data, int id);
 AGENTOS_API int jsonrpc_is_batch_request(const char* raw);
 
+/* ==================== 响应发送辅助宏（消除重复代码） ==================== */
+
+/**
+ * @brief 发送 JSON-RPC 错误响应到客户端（自动构建+发送+释放）
+ * @param socket 客户端 socket 描述符
+ * @param error_code 错误码
+ * @param message 错误消息
+ * @param id 请求 ID
+ * @note 替代手动: build_error → send → free 三行组合
+ */
+#define JSONRPC_SEND_ERROR(socket, error_code, message, id) do { \
+    char* _err = jsonrpc_build_error((error_code), (message), (id)); \
+    if (_err) { agentos_socket_send((socket), _err, strlen(_err)); free(_err); } \
+} while(0)
+
+/**
+ * @brief 发送 JSON-RPC 成功响应到客户端（自动构建+发送+释放）
+ * @param socket 客户端 socket 描述符
+ * @param result cJSON 结果对象（函数会自动 Delete）
+ * @param id 请求 ID
+ * @note 替代手动: build_success → send → delete → free 四行组合
+ */
+#define JSONRPC_SEND_SUCCESS(socket, result, id) do { \
+    char* _success = jsonrpc_build_success((result), (id)); \
+    cJSON_Delete((result)); \
+    if (_success) { agentos_socket_send((socket), _success, strlen(_success)); free(_success); } \
+} while(0)
+
 #ifdef __cplusplus
 }
 #endif
