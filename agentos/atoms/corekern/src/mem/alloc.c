@@ -57,10 +57,10 @@ static agentos_mutex_t* init_lock = NULL;
  * @note 必须在持有 mem_stats_mutex 时调用，使用 relaxed 内存顺序
  */
 static void update_peak_unlocked(void) {
-    size_t current = atomic_load_explicit(&used_allocated, memory_order_relaxed);
-    size_t peak = atomic_load_explicit(&peak_allocated, memory_order_relaxed);
+    size_t current = atomic_load_explicit(&used_allocated, memory_order_acquire);
+    size_t peak = atomic_load_explicit(&peak_allocated, memory_order_acquire);
     if (current > peak) {
-        atomic_store_explicit(&peak_allocated, current, memory_order_relaxed);
+        atomic_store_explicit(&peak_allocated, current, memory_order_release);
     }
 }
 
@@ -240,8 +240,8 @@ void* agentos_mem_alloc_ex(size_t size, const char* file, int line) {
     }
 
     agentos_mutex_lock(mem_stats_mutex);
-    atomic_fetch_add_explicit(&total_allocated, size, memory_order_relaxed);
-    atomic_fetch_add_explicit(&used_allocated, size, memory_order_relaxed);
+    atomic_fetch_add_explicit(&total_allocated, size, memory_order_acq_rel);
+    atomic_fetch_add_explicit(&used_allocated, size, memory_order_acq_rel);
     update_peak_unlocked();
     add_alloc_info_unlocked(ptr, size, file, line);
     agentos_mutex_unlock(mem_stats_mutex);
@@ -282,8 +282,8 @@ void* agentos_mem_aligned_alloc_ex(size_t size, size_t alignment, const char* fi
     }
 
     agentos_mutex_lock(mem_stats_mutex);
-    atomic_fetch_add_explicit(&total_allocated, size, memory_order_relaxed);
-    atomic_fetch_add_explicit(&used_allocated, size, memory_order_relaxed);
+    atomic_fetch_add_explicit(&total_allocated, size, memory_order_acq_rel);
+    atomic_fetch_add_explicit(&used_allocated, size, memory_order_acq_rel);
     update_peak_unlocked();
     add_alloc_info_unlocked(ptr, size, file, line);
     agentos_mutex_unlock(mem_stats_mutex);
@@ -313,7 +313,7 @@ void agentos_mem_free(void* ptr) {
         agentos_mem_alloc_info_t* info = alloc_list;
         while (info) {
             if (info->ptr == ptr) {
-                atomic_fetch_sub_explicit(&used_allocated, info->size, memory_order_relaxed);
+                atomic_fetch_sub_explicit(&used_allocated, info->size, memory_order_acq_rel);
                 remove_alloc_info_unlocked(ptr);
                 break;
             }
@@ -336,7 +336,7 @@ void agentos_mem_aligned_free(void* ptr) {
         agentos_mem_alloc_info_t* info = alloc_list;
         while (info) {
             if (info->ptr == ptr) {
-                atomic_fetch_sub_explicit(&used_allocated, info->size, memory_order_relaxed);
+                atomic_fetch_sub_explicit(&used_allocated, info->size, memory_order_acq_rel);
                 remove_alloc_info_unlocked(ptr);
                 break;
             }
@@ -384,9 +384,9 @@ void* agentos_mem_realloc_ex(void* ptr, size_t new_size, const char* file, int l
     void* new_ptr = AGENTOS_REALLOC(ptr, new_size);
     if (new_ptr && atomic_load_explicit(&mem_initialized, memory_order_acquire) == 1 && mem_stats_mutex) {
         agentos_mutex_lock(mem_stats_mutex);
-        atomic_fetch_sub_explicit(&used_allocated, old_size, memory_order_relaxed);
-        atomic_fetch_add_explicit(&used_allocated, new_size, memory_order_relaxed);
-        atomic_fetch_add_explicit(&total_allocated, new_size, memory_order_relaxed);
+        atomic_fetch_sub_explicit(&used_allocated, old_size, memory_order_acq_rel);
+        atomic_fetch_add_explicit(&used_allocated, new_size, memory_order_acq_rel);
+        atomic_fetch_add_explicit(&total_allocated, new_size, memory_order_acq_rel);
         update_peak_unlocked();
         add_alloc_info_unlocked(new_ptr, new_size, file, line);
         agentos_mutex_unlock(mem_stats_mutex);
@@ -416,9 +416,9 @@ void agentos_mem_stats(size_t* out_total, size_t* out_used, size_t* out_peak) {
     if (atomic_load_explicit(&mem_initialized, memory_order_acquire) == 1 && mem_stats_mutex) {
         agentos_mutex_lock(mem_stats_mutex);
     }
-    if (out_total) *out_total = atomic_load_explicit(&total_allocated, memory_order_relaxed);
-    if (out_used) *out_used = atomic_load_explicit(&used_allocated, memory_order_relaxed);
-    if (out_peak) *out_peak = atomic_load_explicit(&peak_allocated, memory_order_relaxed);
+    if (out_total) *out_total = atomic_load_explicit(&total_allocated, memory_order_acquire);
+    if (out_used) *out_used = atomic_load_explicit(&used_allocated, memory_order_acquire);
+    if (out_peak) *out_peak = atomic_load_explicit(&peak_allocated, memory_order_acquire);
     if (atomic_load_explicit(&mem_initialized, memory_order_acquire) == 1 && mem_stats_mutex) {
         agentos_mutex_unlock(mem_stats_mutex);
     }

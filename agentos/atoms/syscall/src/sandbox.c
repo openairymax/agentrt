@@ -31,6 +31,11 @@
 #define DEFAULT_MAX_CPU_TIME_MS 60000
 #define DEFAULT_MAX_IO_OPS 10000
 
+/* 缓冲区大小常量 */
+#define STATS_BUFFER_SIZE 1024
+#define MANAGER_STATS_BUFFER_SIZE 512
+#define HEALTH_CHECK_BUFFER_SIZE 512
+
 /* ==================== 数据结构 ==================== */
 
 /**
@@ -335,10 +340,10 @@ agentos_error_t agentos_sandbox_add_rule(agentos_sandbox_t* sandbox, int syscall
 agentos_error_t agentos_sandbox_get_stats(agentos_sandbox_t* sandbox, char** out_stats) {
     if (!sandbox || !out_stats) return AGENTOS_EINVAL;
 
-    char* stats = (char*)AGENTOS_MALLOC(1024);
+    char* stats = (char*)AGENTOS_MALLOC(STATS_BUFFER_SIZE);
     if (!stats) return AGENTOS_ENOMEM;
 
-    snprintf(stats, 1024,
+    snprintf(stats, STATS_BUFFER_SIZE,
              "{\"sandbox_id\":%llu,\"calls\":%llu,\"violations\":%llu,"
              "\"memory_usage\":%.2f,\"cpu_usage\":%.2f,\"io_usage\":%.2f}",
              (unsigned long long)sandbox->sandbox_id,
@@ -360,10 +365,10 @@ agentos_error_t agentos_sandbox_manager_get_stats(char** out_stats) {
         return AGENTOS_ENOTINIT;
     }
 
-    char* stats = (char*)AGENTOS_MALLOC(512);
+    char* stats = (char*)AGENTOS_MALLOC(MANAGER_STATS_BUFFER_SIZE);
     if (!stats) return AGENTOS_ENOMEM;
 
-    snprintf(stats, 512,
+    snprintf(stats, MANAGER_STATS_BUFFER_SIZE,
              "{\"sandboxes\":%u,\"total_calls\":%llu,\"total_violations\":%llu}",
              g_sandbox_manager->sandbox_count,
              (unsigned long long)g_sandbox_manager->total_calls,
@@ -427,10 +432,10 @@ agentos_error_t agentos_sandbox_health_check(agentos_sandbox_t* sandbox, char** 
         case SANDBOX_STATE_TERMINATED: state_str = "terminated"; break;
     }
 
-    char* json = (char*)AGENTOS_MALLOC(512);
+    char* json = (char*)AGENTOS_MALLOC(HEALTH_CHECK_BUFFER_SIZE);
     if (!json) return AGENTOS_ENOMEM;
 
-    snprintf(json, 512,
+    snprintf(json, HEALTH_CHECK_BUFFER_SIZE,
              "{\"id\":%llu,\"state\":\"%s\",\"healthy\":%s}",
              (unsigned long long)sandbox->sandbox_id,
              state_str,

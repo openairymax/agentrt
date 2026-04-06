@@ -45,28 +45,27 @@ void agentos_sys_init(void* cognition, void* execution, void* memory) {
 /* -------------------- 辅助函数 -------------------- */
 
 /**
- * 拓扑排序：根据依赖关系返回可执行的任务顺序（简单实现，假设无环�?
- * 返回节点索引数组，需调用�?free
+ * 构建节点名到索引的映射表
  */
-static int* topological_sort(agentos_task_plan_t* plan, size_t* out_count) {
-    size_t n = plan->task_plan_node_count;
-    int* order = (int*)AGENTOS_MALLOC(n * sizeof(int));
-    if (!order) return NULL;
-    int* indeg = (int*)AGENTOS_CALLOC(n, sizeof(int));
-    if (!indeg) {
-        AGENTOS_FREE(order);
-        return NULL;
-    }
-
-    // 建立节点名到索引的映�?
+static cJSON* build_name_to_index_map(agentos_task_plan_t* plan, size_t n) {
     cJSON* name_to_idx = cJSON_CreateObject();
+    if (!name_to_idx) return NULL;
+    
     for (size_t i = 0; i < n; i++) {
         char idx_str[16];
         snprintf(idx_str, sizeof(idx_str), "%zu", i);
         cJSON_AddStringToObject(name_to_idx, plan->task_plan_nodes[i]->task_node_id, idx_str);
     }
+    return name_to_idx;
+}
 
-    // 计算入度
+/**
+ * 计算每个节点的入度
+ */
+static int* calculate_indegrees(cJSON* name_to_idx, agentos_task_plan_t* plan, size_t n) {
+    int* indeg = (int*)AGENTOS_CALLOC(n, sizeof(int));
+    if (!indeg) return NULL;
+    
     for (size_t i = 0; i < n; i++) {
         agentos_task_node_t* node = plan->task_plan_nodes[i];
         for (size_t j = 0; j < node->task_node_depends_count; j++) {
@@ -79,24 +78,27 @@ static int* topological_sort(agentos_task_plan_t* plan, size_t* out_count) {
             }
         }
     }
+    return indeg;
+}
 
-    // Kahn 算法
-    size_t pos = 0;
+/**
+ * 执行Kahn拓扑排序算法
+ * 返回队列指针（需要释放），失败时返回NULL
+ */
+static int* kahn_algorithm(cJSON* name_to_idx, int* indeg, agentos_task_plan_t* plan, size_t n, int* order, size_t* pos) {
     int* queue = (int*)AGENTOS_MALLOC(n * sizeof(int));
-    if (!queue) {
-        cJSON_Delete(name_to_idx);
-        AGENTOS_FREE(indeg);
-        AGENTOS_FREE(order);
-        return NULL;
-    }
+    if (!queue) return NULL;
+    
     int qhead = 0, qtail = 0;
     for (size_t i = 0; i < n; i++) {
         if (indeg[i] == 0) queue[qtail++] = i;
     }
+    
     while (qhead < qtail) {
         int u = queue[qhead++];
-        order[pos++] = u;
+        order[(*pos)++] = u;
         agentos_task_node_t* node = plan->task_plan_nodes[u];
+        
         for (size_t j = 0; j < node->task_node_depends_count; j++) {
             cJSON* dep_idx = cJSON_GetObjectItem(name_to_idx, node->task_node_depends_on[j]);
             if (dep_idx && cJSON_IsString(dep_idx)) {
@@ -108,12 +110,8 @@ static int* topological_sort(agentos_task_plan_t* plan, size_t* out_count) {
                     int v = (int)v_val;
                     if (--indeg[v] == 0) {
                         if (qtail >= (int)n) {
-                            // 队列溢出，图有问题（可能有环或无效依赖）
                             AGENTOS_LOG_ERROR("Topological sort queue overflow during processing");
                             AGENTOS_FREE(queue);
-                            cJSON_Delete(name_to_idx);
-                            AGENTOS_FREE(indeg);
-                            AGENTOS_FREE(order);
                             return NULL;
                         }
                         queue[qtail++] = v;
@@ -124,10 +122,44 @@ static int* topological_sort(agentos_task_plan_t* plan, size_t* out_count) {
             }
         }
     }
+    return queue;
+}
+
+/**
+ * 拓扑排序：根据依赖关系返回可执行的任务顺序（简单实现，假设无环）
+ * 返回节点索引数组，需调用者释放
+ */
+static int* topological_sort(agentos_task_plan_t* plan, size_t* out_count) {
+    size_t n = plan->task_plan_node_count;
+    int* order = (int*)AGENTOS_MALLOC(n * sizeof(int));
+    if (!order) return NULL;
+    
+    cJSON* name_to_idx = build_name_to_index_map(plan, n);
+    if (!name_to_idx) {
+        AGENTOS_FREE(order);
+        return NULL;
+    }
+    
+    int* indeg = calculate_indegrees(name_to_idx, plan, n);
+    if (!indeg) {
+        cJSON_Delete(name_to_idx);
+        AGENTOS_FREE(order);
+        return NULL;
+    }
+    
+    size_t pos = 0;
+    int* queue = kahn_algorithm(name_to_idx, indeg, plan, n, order, &pos);
+    if (!queue) {
+        cJSON_Delete(name_to_idx);
+        AGENTOS_FREE(indeg);
+        AGENTOS_FREE(order);
+        return NULL;
+    }
+    
     AGENTOS_FREE(queue);
     cJSON_Delete(name_to_idx);
     AGENTOS_FREE(indeg);
-
+    
     if (pos != n) {
         // 有环
         AGENTOS_FREE(order);

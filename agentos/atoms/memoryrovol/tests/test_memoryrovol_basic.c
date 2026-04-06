@@ -14,6 +14,33 @@
 static int tests_passed = 0;
 static int tests_failed = 0;
 
+/**
+ * @brief 获取测试临时目录路径
+ * @return 临时目录路径，调用者不应释放
+ */
+static const char* get_test_temp_dir(void) {
+    static char temp_dir[256] = {0};
+    if (temp_dir[0] == '\0') {
+        const char* env_tmp = getenv("AGENTOS_TEST_TMPDIR");
+        if (env_tmp && env_tmp[0] != '\0') {
+            snprintf(temp_dir, sizeof(temp_dir), "%s", env_tmp);
+        } else {
+            // 默认使用 /tmp，在Windows上使用 C:\Windows\Temp
+            #ifdef _WIN32
+            const char* win_tmp = getenv("TEMP");
+            if (win_tmp && win_tmp[0] != '\0') {
+                snprintf(temp_dir, sizeof(temp_dir), "%s", win_tmp);
+            } else {
+                snprintf(temp_dir, sizeof(temp_dir), "C:\\Windows\\Temp");
+            }
+            #else
+            snprintf(temp_dir, sizeof(temp_dir), "/tmp");
+            #endif
+        }
+    }
+    return temp_dir;
+}
+
 #define TEST_ASSERT(condition, msg) do { \
     if (condition) { \
         printf("  ✅ PASS: %s\n", msg); \
@@ -27,8 +54,10 @@ static int tests_failed = 0;
 static void test_memoryrov_create_destroy(void) {
     printf("\n=== 测试记忆系统创建和销毁 ===\n");
     
+    char base_path[512];
+    snprintf(base_path, sizeof(base_path), "%s/test_memory", get_test_temp_dir());
     agentos_memoryrov_config_t config = {
-        .base_path = "/tmp/test_memory",
+        .base_path = base_path,
         .max_size_mb = 100,
         .l1_enabled = true,
         .l2_enabled = false,
@@ -59,8 +88,10 @@ static void test_memoryrov_null_params(void) {
 static void test_memoryrov_add_retrieve_l1(void) {
     printf("\n=== 测试 L1 记忆添加和检索 ===\n");
     
+    char base_path[512];
+    snprintf(base_path, sizeof(base_path), "%s/test_memory_l1", get_test_temp_dir());
     agentos_memoryrov_config_t config = {
-        .base_path = "/tmp/test_memory_l1",
+        .base_path = base_path,
         .max_size_mb = 50,
         .l1_enabled = true,
         .l2_enabled = false,
@@ -99,8 +130,10 @@ static void test_memoryrov_add_retrieve_l1(void) {
 static void test_memoryrov_forget(void) {
     printf("\n=== 测试遗忘机制 ===\n");
     
+    char base_path[512];
+    snprintf(base_path, sizeof(base_path), "%s/test_memory_forget", get_test_temp_dir());
     agentos_memoryrov_config_t config = {
-        .base_path = "/tmp/test_memory_forget",
+        .base_path = base_path,
         .max_size_mb = 50,
         .l1_enabled = true,
         .l2_enabled = false,
@@ -144,8 +177,10 @@ static void test_memoryrov_forget(void) {
 static void test_memoryrov_evolve(void) {
     printf("\n=== 测试记忆演化 ===\n");
     
+    char base_path[512];
+    snprintf(base_path, sizeof(base_path), "%s/test_memory_evolve", get_test_temp_dir());
     agentos_memoryrov_config_t config = {
-        .base_path = "/tmp/test_memory_evolve",
+        .base_path = base_path,
         .max_size_mb = 50,
         .l1_enabled = true,
         .l2_enabled = false,
@@ -177,8 +212,10 @@ static void test_memoryrov_evolve(void) {
 static void test_memoryrov_query_stats(void) {
     printf("\n=== 测试记忆统计查询 ===\n");
     
+    char base_path[512];
+    snprintf(base_path, sizeof(base_path), "%s/test_memory_stats", get_test_temp_dir());
     agentos_memoryrov_config_t config = {
-        .base_path = "/tmp/test_memory_stats",
+        .base_path = base_path,
         .max_size_mb = 50,
         .l1_enabled = true,
         .l2_enabled = false,

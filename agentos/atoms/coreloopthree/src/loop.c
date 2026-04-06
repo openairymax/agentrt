@@ -331,15 +331,15 @@ AGENTOS_API agentos_error_t agentos_loop_submit(
             
             pos += snprintf(enhanced_input + pos, total_len - pos,
                 "\n[用户输入]\n%.*s", (int)input_len, input);
-            
-            /* 释放记忆结果 */
-            for (size_t i = 0; i < memory_count; i++) {
-                if (memories[i].content) {
-                    AGENTOS_FREE(memories[i].content);
-                }
-            }
-            AGENTOS_FREE(memories);
         }
+        
+        /* 无论enhanced_input是否分配成功，都释放记忆结果 */
+        for (size_t i = 0; i < memory_count; i++) {
+            if (memories[i].content) {
+                AGENTOS_FREE(memories[i].content);
+            }
+        }
+        AGENTOS_FREE(memories);
     }
     
     /* 步骤 2: 认知层处理（带上下文增强） */
