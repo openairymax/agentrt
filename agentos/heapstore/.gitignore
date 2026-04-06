@@ -1,0 +1,198 @@
+# =============================================================================
+# heapstore - AgentOS 数据分区核心模块
+# Git 忽略规则配置
+# =============================================================================
+
+# ---------- 编译产物 ----------
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+
+# ---------- CMake 构建目录 ----------
+build/
+CMakeFiles/
+cmake_install.cmake
+CMakeCache.txt
+*.cmake
+Makefile
+CTestTestfile.cmake
+_deps/
+
+# ---------- 大型二进制文件 (防止误提交) ----------
+*.tar.gz
+*.tar.bz2
+*.zip
+*.rar
+*.7z
+
+# 超过 1MB 的文件（除非明确需要）
+# 注意：此规则需配合 git hooks 使用
+
+# ---------- IDE 和编辑器 ----------
+#
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docx
+
+# JetBrains (CLion, IntelliJ)
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# VS Code
+.vscode/
+!vscode/settings.json
+!vscode/tasks.json
+!vscode/launch.json
+!vscode/extensions.json
+
+# Vim
+*.swp
+*.swo
+*~
+~*
+.*.swp
+.*.swo
+
+# Emacs
+*\#
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# ---------- 操作系统生成文件 ----------
+#
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ---------- 日志和调试文件 ----------
+*.log
+logs/
+debug.log
+error.log
+
+# ---------- 测试覆盖率 ----------
+coverage/
+*.gcda
+*.gcno
+*.info
+lcov/
+
+# ---------- 依赖管理 ----------
+vendor/
+node_modules/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+eggs/
+.eggs/
+
+# ---------- 文档生成 ----------
+docs/_build/
+doxygen/html/
+doxygen/latex/
+doxygen/xml/
+
+# ---------- 临时文件 ----------
+*.tmp
+*.bak
+*.temp
+*.cache
+*.pid
+*.seed
+*.pid.lock
+
+# ---------- 性能分析 ----------
+perf.data*
+*.prof
+gmon.out
+callgrind.out.*
+
+# ---------- 安全敏感文件 ----------
+.env
+.env.local
+.env.production
+*.pem
+*.key
+config.local.json
+secrets.yml
+
+# ---------- 数据库文件 (开发用) ----------
+*.db
+*.sqlite
+*.sqlite3
+!tests/fixtures/*.db
+!tests/fixtures/*.sqlite
+
+# ---------- 特定于 heapstore 模块 ----------
+#
+# 测试输出
+test_output/
+test_results.xml
+junit.xml
+
+# 基准测试结果
+benchmark_results/
+performance_report.md
+
+# 自动生成的代码
+generated/
+autogen/
+
+# 备份文件
+backup/
+*.backup
+*.orig
+
+# =============================================================================
+# 自定义钩子说明:
+#
+# 1. pre-commit: 检查大文件(>1MB)和行尾空格
+# 2. pre-push: 运行快速测试套件
+# 3. commit-msg: 验证消息格式
+#
+# 安装方式:
+#   cp .git/hooks/pre-commit .git/hooks/pre-commit.sample
+#   chmod +x .git/hooks/pre-commit
+#
+# =============================================================================

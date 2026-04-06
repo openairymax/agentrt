@@ -71,6 +71,7 @@ endif()
 set(CUPOLAS_SOURCES
     src/cupolas.c
     src/platform/platform.c
+    src/utils/cupolas_utils.c
     src/cupolas_metrics.c
     src/cupolas_config.c
     src/cupolas_monitoring.c
@@ -94,11 +95,17 @@ set(CUPOLAS_SOURCES
     src/security/cupolas_runtime_protection.c
     src/security/cupolas_network_security.c
     src/security/cupolas_error.c
+    src/security/network/tls_security.c
+    src/security/network/http_security.c
+    src/security/network/dns_security.c
+    src/security/network/network_filter.c
+    src/security/network/network_utils.c
     src/circuit_breaker.c
 )
 
 set(CUPOLAS_HEADERS
     include/cupolas.h
+    src/utils/cupolas_utils.h
     src/cupolas_metrics.h
     src/cupolas_config.h
     src/cupolas_monitoring.h
@@ -124,6 +131,11 @@ set(CUPOLAS_HEADERS
     src/security/cupolas_runtime_protection.h
     src/security/cupolas_network_security.h
     src/security/cupolas_error.h
+    src/security/network/tls_security.h
+    src/security/network/http_security.h
+    src/security/network/dns_security.h
+    src/security/network/network_filter.h
+    src/security/network/network_utils.h
     src/circuit_breaker.h
 )
 
@@ -218,12 +230,24 @@ if(BUILD_TESTS)
     add_executable(test_cupolas_integration tests/integration/test_cupolas_integration.c)
     target_link_libraries(test_cupolas_integration ${PROJECT_NAME})
 
+    add_executable(test_cupolas_signature tests/unit/test_cupolas_signature.c)
+    target_link_libraries(test_cupolas_signature ${PROJECT_NAME})
+
+    add_executable(test_cupolas_vault tests/unit/test_cupolas_vault.c)
+    target_link_libraries(test_cupolas_vault ${PROJECT_NAME})
+
+    add_executable(test_stress_concurrent tests/stress/test_stress_concurrent.c)
+    target_link_libraries(test_stress_concurrent ${PROJECT_NAME})
+
     if(MSVC)
         add_custom_command(TARGET test_cupolas_core POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE> $<TARGET_FILE_DIR>)
     endif()
 
     add_test(NAME cupolas_core_tests COMMAND test_cupolas_core)
     add_test(NAME cupolas_integration_tests COMMAND test_cupolas_integration)
+    add_test(NAME cupolas_signature_tests COMMAND test_cupolas_signature)
+    add_test(NAME cupolas_vault_tests COMMAND test_cupolas_vault)
+    add_test(NAME cupolas_stress_tests COMMAND test_stress_concurrent)
 endif()
 
 install(TARGETS ${PROJECT_NAME}

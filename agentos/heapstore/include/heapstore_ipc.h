@@ -56,6 +56,7 @@ typedef struct {
  * @reentrant 否
  *
  * @see heapstore_ipc_shutdown()
+ * @since v1.0.0
  */
 heapstore_error_t heapstore_ipc_init(void);
 
@@ -67,6 +68,7 @@ heapstore_error_t heapstore_ipc_init(void);
  * @reentrant 否
  *
  * @see heapstore_ipc_init()
+ * @since v1.0.0
  */
 void heapstore_ipc_shutdown(void);
 
@@ -92,7 +94,8 @@ heapstore_error_t heapstore_ipc_record_channel(const heapstore_ipc_channel_t* ch
  * @ownership 调用者负责 channel 的分配和释放
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_ipc_get_channel(const char* channel_id, heapstore_ipc_channel_t* channel);
 
 /**
@@ -103,7 +106,8 @@ heapstore_error_t heapstore_ipc_get_channel(const char* channel_id, heapstore_ip
  *
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_ipc_update_channel_activity(const char* channel_id);
 
 /**
@@ -115,7 +119,8 @@ heapstore_error_t heapstore_ipc_update_channel_activity(const char* channel_id);
  * @ownership 调用者负责 buffer 的生命周期
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_ipc_record_buffer(const heapstore_ipc_buffer_t* buffer);
 
 /**
@@ -128,7 +133,8 @@ heapstore_error_t heapstore_ipc_record_buffer(const heapstore_ipc_buffer_t* buff
  * @ownership 调用者负责 buffer 的分配和释放
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_ipc_get_buffer(const char* buffer_id, heapstore_ipc_buffer_t* buffer);
 
 /**
@@ -142,7 +148,8 @@ heapstore_error_t heapstore_ipc_get_buffer(const char* buffer_id, heapstore_ipc_
  * @ownership 调用者负责所有输出参数的分配和释放
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_ipc_get_stats(uint32_t* channel_count, uint32_t* buffer_count, uint64_t* total_size);
 
 /**
@@ -152,7 +159,8 @@ heapstore_error_t heapstore_ipc_get_stats(uint32_t* channel_count, uint32_t* buf
  *
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 bool heapstore_ipc_is_healthy(void);
 
 #ifdef __cplusplus

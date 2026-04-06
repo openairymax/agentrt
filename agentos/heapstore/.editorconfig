@@ -1,0 +1,107 @@
+# =============================================================================
+# EditorConfig - 统一编辑器格式配置
+# https://editorconfig.org
+#
+# 此文件确保所有开发者在不同编辑器/IDE中使用一致的代码格式
+# 支持的编辑器: VS Code, JetBrains, Vim, Emacs, Sublime Text 等
+# =============================================================================
+
+# ---------- 根配置 (适用于所有文件) ----------
+root = true
+
+# ---------- 默认规则 ----------
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+max_line_length = 120
+
+# ---------- C/C++ 源代码 ----------
+[*.{c,h,cpp,hpp,cc,cxx}]
+indent_style = space
+indent_size = 4
+tab_width = 4
+
+# ---------- Makefile / CMake ----------
+*.{make,Makefile,cmake}
+indent_style = tab
+indent_size = 4
+tab_width = 4
+
+# ---------- Markdown 文档 ----------
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = off
+
+# ---------- YAML 配置文件 ----------
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# ---------- JSON 文件 ----------
+[*.json]
+indent_style = space
+indent_size = 2
+
+# ---------- Python 脚本 ----------
+[*.py]
+indent_style = space
+indent_size = 4
+
+# ---------- Shell 脚本 ----------
+[*.sh]
+end_of_line = lf
+indent_style = space
+indent_size = 4
+
+# ---------- XML / HTML ----------
+[*.{xml,html,xhtml}]
+indent_style = space
+indent_size = 2
+
+# ---------- CSS / JavaScript ----------
+[*.{css,js,ts}]
+indent_style = space
+indent_size = 2
+
+# ---------- Doxygen 文档 ----------
+[Doxyfile]
+indent_style = space
+indent_size = 4
+
+# ---------- .gitignore ----------
+[.gitignore]
+indent_style = space
+indent_size = 4
+
+# =============================================================================
+# 特定文件覆盖规则
+# =============================================================================
+
+# CMakeLists.txt 使用 Tab 缩进（CMake 惯例）
+[CMakeLists.txt]
+indent_style = tab
+indent_size = 4
+tab_width = 4
+
+# =============================================================================
+# 说明:
+#
+# 1. charset: 文件编码，统一使用 UTF-8
+# 2. end_of_line: 换行符风格，LF (Unix/Linux/macOS 标准)
+# 3. insert_final_newline: 文件末尾插入空行
+# 4. trim_trailing_whitespace: 自动删除行尾空格
+# 5. indent_style: 缩进方式 (space/tab)
+# 6. indent_size: 缩进宽度 (空格数)
+# 7. max_line_length: 最大行宽限制
+#
+# 安装 EditorConfig 插件:
+# - VS Code: 已内置支持
+# - JetBrains: Settings → Plugins → EditorConfig
+# - Vim: https://github.com/editorconfig/editorconfig-vim
+# - Emacs: https://github.com/editorconfig/editorconfig-emacs
+#
+# =============================================================================

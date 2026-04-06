@@ -13,7 +13,7 @@
  */
 
 #include "cupolas_runtime_protection.h"
-#include "../platform/platform.h"
+#include "../utils/cupolas_utils.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -122,9 +122,9 @@ static void cupolas_record_violation(cupolas_violation_type_t type, const char* 
     event->timestamp = cupolas_get_time_ms();
     event->pid = cupolas_get_pid();
     event->tid = cupolas_get_tid();
-    free(event->details);
+    if (event->details) { free(event->details); event->details = NULL; }
     event->details = details ? cupolas_strdup(details) : NULL;
-    free(event->syscall_name);
+    if (event->syscall_name) { free(event->syscall_name); event->syscall_name = NULL; }
     event->syscall_name = syscall_name ? cupolas_strdup(syscall_name) : NULL;
     event->fault_address = NULL;
     event->error_code = 0;
@@ -176,11 +176,7 @@ void cupolas_runtime_protect_cleanup(void) {
         free(g_runtime_protect.violations.events[i].syscall_name);
     }
     
-#ifdef _WIN32
-    DeleteCriticalSection(&g_runtime_protect.lock);
-#else
-    pthread_mutex_destroy(&g_runtime_protect.lock);
-#endif
+    CUPOLAS_MUTEX_DESTROY(&g_runtime_protect.lock);
     
     memset(&g_runtime_protect, 0, sizeof(g_runtime_protect));
 }

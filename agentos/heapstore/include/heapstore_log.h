@@ -60,6 +60,7 @@ typedef struct {
  * @reentrant 否
  *
  * @see heapstore_log_shutdown()
+ * @since v1.0.0
  */
 heapstore_error_t heapstore_log_init(void);
 
@@ -71,6 +72,7 @@ heapstore_error_t heapstore_log_init(void);
  * @reentrant 否
  *
  * @see heapstore_log_init()
+ * @since v1.0.0
  */
 void heapstore_log_shutdown(void);
 
@@ -117,7 +119,8 @@ void heapstore_log_writev(heapstore_log_level_t level, const char* service, cons
  *
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 heapstore_log_level_t heapstore_log_get_level(void);
 
 /**
@@ -127,7 +130,8 @@ heapstore_log_level_t heapstore_log_get_level(void);
  *
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 void heapstore_log_set_level(heapstore_log_level_t level);
 
 /**
@@ -141,7 +145,8 @@ void heapstore_log_set_level(heapstore_log_level_t level);
  * @ownership 调用者负责 buffer 的分配和释放
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_log_get_service_path(const char* service, char* buffer, size_t buffer_size);
 
 /**
@@ -151,7 +156,8 @@ heapstore_error_t heapstore_log_get_service_path(const char* service, char* buff
  *
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_log_rotate(void);
 
 /**
@@ -164,7 +170,8 @@ heapstore_error_t heapstore_log_rotate(void);
  * @ownership 调用者负责 freed_bytes 的分配和释放
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_log_cleanup(int days_to_keep, uint64_t* freed_bytes);
 
 /**
@@ -177,7 +184,8 @@ heapstore_error_t heapstore_log_cleanup(int days_to_keep, uint64_t* freed_bytes)
  * @ownership 调用者负责 info 的分配和释放
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_log_get_file_info(const char* service, heapstore_log_file_info_t* info);
 
 /**
@@ -191,7 +199,8 @@ heapstore_error_t heapstore_log_get_file_info(const char* service, heapstore_log
  * @ownership 调用者负责所有输出参数的分配和释放
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_log_get_stats(uint32_t* total_files, uint64_t* total_size_bytes, time_t* oldest_timestamp);
 
 /**
@@ -201,7 +210,8 @@ heapstore_error_t heapstore_log_get_stats(uint32_t* total_files, uint64_t* total
  *
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 bool heapstore_log_is_healthy(void);
 
 #define heapstore_LOG_ERROR(service, trace_id, fmt, ...) \

@@ -52,7 +52,7 @@
   "DerivePointerAlignment": false,
   "DisableFormat": false,
   "ExperimentalAutoDetectBinPacking": false,
-  "ForEachMacros": [ "foreach", "Q_FOREACH", "BOOST_FOREACH" ],
+  "ForEachMacros": [ "foreach", "Q_FOREACH", "BOOST_FOREACH", "AGENTOS_FOREACH", "MEMORYROVOL_FOR_EACH" ],
   "IncludeCategories": {
     "1": {
       "Priority": 1,
@@ -106,5 +106,5 @@
   "SpacesInSquareBrackets": false,
   "Standard": "c11",
   "TabWidth": 4,
-  "UseTab": "Never"
+  "UseTab": "False"
 }

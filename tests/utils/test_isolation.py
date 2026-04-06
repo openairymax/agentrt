@@ -1,4 +1,4 @@
-﻿# AgentOS 测试隔离和并行执行工具
+# AgentOS 测试隔离和并行执行工具
 # Version: 1.0.0.6
 # Last updated: 2026-03-22
 

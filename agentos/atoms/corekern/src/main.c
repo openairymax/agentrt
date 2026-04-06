@@ -7,26 +7,35 @@
 #include "agentos.h"
 
 int agentos_core_init(void) {
-    agentos_error_t err;
+    int ret = 0;
 
-    err = agentos_mem_init(0);
-    if (err != AGENTOS_SUCCESS) return (int)err;
+    ret = agentos_mem_init(0);
+    if (ret != 0) goto fail;
 
-    err = agentos_task_init();
-    if (err != AGENTOS_SUCCESS) return (int)err;
+    ret = agentos_task_init();
+    if (ret != 0) goto cleanup_mem;
 
-    err = agentos_ipc_init();
-    if (err != AGENTOS_SUCCESS) return (int)err;
+    ret = agentos_ipc_init();
+    if (ret != 0) goto cleanup_task;
 
-    err = agentos_time_eventloop_init();
-    if (err != AGENTOS_SUCCESS) return (int)err;
+    ret = agentos_time_eventloop_init();
+    if (ret != 0) goto cleanup_ipc;
 
     return 0;
+
+cleanup_ipc:
+    agentos_ipc_cleanup();
+cleanup_task:
+    agentos_task_cleanup();
+cleanup_mem:
+    agentos_mem_cleanup();
+fail:
+    return ret;
 }
 
 void agentos_core_shutdown(void) {
-    agentos_ipc_cleanup();
-    agentos_mem_cleanup();
-    agentos_task_cleanup();
     agentos_time_eventloop_cleanup();
+    agentos_ipc_cleanup();
+    agentos_task_cleanup();
+    agentos_mem_cleanup();
 }

@@ -74,31 +74,36 @@ CODE_PERMISSION_DENIED = "0x6001"
 CODE_CORRUPTED_DATA = "0x6002"
 
 
+HTTP_STATUS_TO_ERROR_MAP = {
+    400: lambda details: ValidationError(f"请求参数无效：{details}"),
+    401: lambda details: AuthenticationError(f"未授权：{details}"),
+    403: lambda details: AuthenticationError(f"禁止访问：{details}"),
+    404: lambda details: AgentOSError(message=f"资源不存在：{details}", error_code=CODE_NOT_FOUND),
+    408: lambda details: AgentOSTimeoutError(operation="请求"),
+    409: lambda details: AgentOSError(message=f"资源冲突：{details}", error_code=CODE_CONFLICT),
+    422: lambda details: ValidationError(f"验证失败：{details}"),
+    429: lambda details: RateLimitError(f"请求频率超限：{details}"),
+}
+
+HTTP_STATUS_TO_CODE_MAP = {
+    400: CODE_INVALID_PARAMETER,
+    401: CODE_UNAUTHORIZED,
+    403: CODE_FORBIDDEN,
+    404: CODE_NOT_FOUND,
+    408: CODE_TIMEOUT,
+    409: CODE_CONFLICT,
+    422: CODE_VALIDATION_ERROR,
+    429: CODE_RATE_LIMITED,
+    500: CODE_SERVER_ERROR,
+    502: CODE_SERVER_ERROR,
+    503: CODE_SERVER_ERROR,
+    504: CODE_TIMEOUT,
+}
+
+
 def http_status_to_code(status: int) -> str:
-    """
-    将 HTTP 状态码映射为对应的错误码。
-
-    Args:
-        status: HTTP 状态码
-
-    Returns:
-        对应的十六进制错误码字符串
-    """
-    mapping = {
-        400: CODE_INVALID_PARAMETER,
-        401: CODE_UNAUTHORIZED,
-        403: CODE_FORBIDDEN,
-        404: CODE_NOT_FOUND,
-        408: CODE_TIMEOUT,
-        409: CODE_CONFLICT,
-        422: CODE_VALIDATION_ERROR,
-        429: CODE_RATE_LIMITED,
-        500: CODE_SERVER_ERROR,
-        502: CODE_SERVER_ERROR,
-        503: CODE_SERVER_ERROR,
-        504: CODE_TIMEOUT,
-    }
-    return mapping.get(status, CODE_UNKNOWN)
+    """将 HTTP 状态码映射为对应的错误码"""
+    return HTTP_STATUS_TO_CODE_MAP.get(status, CODE_UNKNOWN)
 
 
 def http_status_to_error(status: int, details: str = "") -> "AgentOSError":
@@ -112,28 +117,14 @@ def http_status_to_error(status: int, details: str = "") -> "AgentOSError":
     Returns:
         对应的异常实例
     """
-    error_code = http_status_to_code(status)
-
-    if status == 400:
-        return ValidationError(f"请求参数无效：{details}")
-    elif status == 401:
-        return AuthenticationError(f"未授权：{details}")
-    elif status == 403:
-        return AuthenticationError(f"禁止访问：{details}")
-    elif status == 404:
-        return AgentOSError(message=f"资源不存在：{details}", error_code=error_code)
-    elif status == 408:
-        return AgentOSTimeoutError(operation="请求")
-    elif status == 409:
-        return AgentOSError(message=f"资源冲突：{details}", error_code=error_code)
-    elif status == 429:
-        return RateLimitError(f"请求频率超限：{details}")
-    elif status == 422:
-        return ValidationError(f"验证失败：{details}")
-    elif status >= 500:
+    if status >= 500:
         return ServerError(f"服务器错误 ({status}): {details}")
-    else:
-        return AgentOSError(message=f"HTTP 错误 ({status}): {details}", error_code=error_code)
+    
+    error_factory = HTTP_STATUS_TO_ERROR_MAP.get(status)
+    if error_factory:
+        return error_factory(details)
+    
+    return AgentOSError(message=f"HTTP 错误 ({status}): {details}", error_code=http_status_to_code(status))
 
 
 class AgentOSError(Exception):
