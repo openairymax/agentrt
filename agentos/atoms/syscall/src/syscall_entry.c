@@ -164,7 +164,7 @@ void* sys_agent_invoke(void** args, int argc) {
     if (argc != 4) return (void*)(intptr_t)AGENTOS_EINVAL;
     const char* agent_id = (const char*)args[0];
     const char* input = (const char*)args[1];
-    size_t input_len = (size_t)(intptr_t)args[2];
+    size_t input_len = (size_t)(uintptr_t)args[2];
     char** out_output = (char**)args[3];
     intptr_t res = agentos_sys_agent_invoke(agent_id, input, input_len, out_output);
     return (void*)res;

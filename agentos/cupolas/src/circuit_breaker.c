@@ -123,6 +123,7 @@ circuit_breaker_t* circuit_breaker_create(const circuit_breaker_config_t* config
 void circuit_breaker_destroy(circuit_breaker_t* breaker) {
     if (!breaker) return;
     
+    cupolas_mutex_unlock(&breaker->lock);
     cupolas_mutex_destroy(&breaker->lock);
     cupolas_mem_free(breaker);
 }
