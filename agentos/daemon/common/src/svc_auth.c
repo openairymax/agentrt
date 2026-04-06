@@ -438,7 +438,7 @@ int auth_apikey_init(const apikey_config_t* config) {
         /* 复制允许的 Key 列表 */
         if (config->allowed_keys && config->key_count > 0) {
             g_apikey.capacity = config->key_count + 10;
-            g_apikey.keys = (char**)calloc(g_apikey.capacity, sizeof(char*));
+            g_apikey.keys = (char**)calloc(g_apikey.capacity, sizeof(*g_apikey.keys));
             if (g_apikey.keys) {
                 for (size_t i = 0; i < config->key_count; i++) {
                     if (config->allowed_keys[i]) {
@@ -452,7 +452,7 @@ int auth_apikey_init(const apikey_config_t* config) {
         /* 默认空配置 */
         memset(&g_apikey.config, 0, sizeof(apikey_config_t));
         g_apikey.capacity = 10;
-        g_apikey.keys = (char**)calloc(g_apikey.capacity, sizeof(char*));
+        g_apikey.keys = (char**)calloc(g_apikey.capacity, sizeof(*g_apikey.keys));
     }
 
     g_apikey.initialized = 1;
@@ -510,7 +510,7 @@ int auth_apikey_add(const char* new_key) {
     /* 扩容检查 */
     if (g_apikey.config.key_count >= g_apikey.capacity) {
         size_t new_cap = g_apikey.capacity * 2;
-        char** new_keys = (char**)realloc(g_apikey.keys, new_cap * sizeof(char*));
+        char** new_keys = (char**)realloc(g_apikey.keys, new_cap * sizeof(*g_apikey.keys));
         if (!new_keys) {
             agentos_mutex_unlock(&g_apikey.lock);
             return AGENTOS_ERR_OUT_OF_MEMORY;

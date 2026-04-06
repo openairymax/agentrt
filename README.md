@@ -38,9 +38,9 @@
 ## 🎯 基本理念
 
 - **驱动团队**：精准协调多 Agent 协作，高效完成复杂任务编排与资源调度。  
-- **自主演进**：具备自我进化能力，动态调整策略，持续优化执行效果。
+- **自主演进**：具备自我进化能力，动态调整策略，持续优化执行效果。  
 
-<br>
+<br> 
 
 <p align="center">
   <strong>✨ 全新架构 · 安全内生 · 智能涌现 ✨</strong>
@@ -227,12 +227,14 @@ AgentOS 是**操作系统级**产品，而非单一框架：
 Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 → 合并主分支
 ```
 
-**主要平台**：[AtomGit](https://atomgit.com/spharx/agentos)（推荐） · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)
+**主要平台**：[AtomGit](https://atomgit.com/spharx/agentos)（推荐） · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)  
  
 <br>
 
 <p align="center">
-  <strong>每解决一个问题，都是在为人类的未来点亮一盏明灯</strong>
+  <strong>我们所解决的每一个问题，都是为人类未来点亮的一盏灯</strong>  
+   <p align="center">
+  <strong>“微微的灯火照不亮前行的路，但能指引前行的方向”</strong>
 </p>
 
 <br>
@@ -255,4 +257,16 @@ Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 →
 
 © 2026 SPHARX Ltd. All Rights Reserved.
 
-</div>
+</div>  
+
+---
+
+## ⭐️ Github Star History
+
+<a href="https://www.star-history.com/">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&type=date&legend=top-left" />
+ </picture>
+</a>

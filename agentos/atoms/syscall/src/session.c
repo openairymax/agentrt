@@ -68,52 +68,56 @@ agentos_error_t agentos_sys_session_create(const char* metadata, char** out_sess
     static uint64_t counter = 0;
     char id_buf[64];
     snprintf(id_buf, sizeof(id_buf), "sess_%llu", (unsigned long long)__sync_fetch_and_add(&counter, 1));
-    char* id = AGENTOS_STRDUP(id_buf);
-    if (!id) return AGENTOS_ENOMEM;
-
-    session_t* s = (session_t*)AGENTOS_CALLOC(1, sizeof(session_t));
-    if (!s) {
-        AGENTOS_FREE(id);
-        return AGENTOS_ENOMEM;
+    
+    char* id = NULL;
+    session_t* s = NULL;
+    char* out_id_copy = NULL;
+    agentos_error_t ret = AGENTOS_SUCCESS;
+    
+    id = AGENTOS_STRDUP(id_buf);
+    if (!id) {
+        ret = AGENTOS_ENOMEM;
+        goto cleanup;
     }
-    s->session_id = id;
+    
+    s = (session_t*)AGENTOS_CALLOC(1, sizeof(session_t));
+    if (!s) {
+        ret = AGENTOS_ENOMEM;
+        goto cleanup;
+    }
+    s->session_id = id;  // 转移id的所有权给session对象
+    id = NULL;  // 防止重复释放
+    
     if (metadata) {
         s->metadata = AGENTOS_STRDUP(metadata);
         if (!s->metadata) {
-            AGENTOS_FREE(s->session_id);
-            AGENTOS_FREE(s);
-            AGENTOS_FREE(id);
-            return AGENTOS_ENOMEM;
+            ret = AGENTOS_ENOMEM;
+            goto cleanup;
         }
     }
     s->created_ns = agentos_time_monotonic_ns();
     s->last_active_ns = s->created_ns;
 
+    // 插入到全局链表
     agentos_mutex_lock(session_lock);
     s->next = sessions;
     sessions = s;
     agentos_mutex_unlock(session_lock);
-
-    *out_session_id = AGENTOS_STRDUP(id);
-    if (!*out_session_id) {
-        agentos_mutex_lock(session_lock);
-        session_t** pp = &sessions;
-        while (*pp) {
-            if (*pp == s) { *pp = s->next; break; }
-            pp = &(*pp)->next;
-        }
-        agentos_mutex_unlock(session_lock);
-        AGENTOS_FREE(s->session_id);
-        AGENTOS_FREE(s->metadata);
-        AGENTOS_FREE(s);
-        AGENTOS_FREE(id);
-        return AGENTOS_ENOMEM;
+    s = NULL;  // 所有权已转移给全局链表
+    
+    out_id_copy = AGENTOS_STRDUP(s->session_id);  // 注意：此时s已被插入链表，通过sessions访问
+    if (!out_id_copy) {
+        ret = AGENTOS_ENOMEM;
+        goto cleanup_linked;
     }
+    
+    *out_session_id = out_id_copy;
+    out_id_copy = NULL;  // 所有权已转移给调用者
     
     /* 持久化到 heapstore（遵循 S-2 层次分解原则） */
     if (g_use_heapstore_persistence) {
         agentos_error_t persist_err = heapstore_syscall_session_save(
-            id, metadata, s->created_ns, s->last_active_ns);
+            s->session_id, metadata, s->created_ns, s->last_active_ns);
         if (persist_err != AGENTOS_SUCCESS) {
             /* 持久化失败不影响内存操作，仅记录日志 */
             LOG_WARN("Session persist to heapstore failed: %d", persist_err);
@@ -121,6 +125,29 @@ agentos_error_t agentos_sys_session_create(const char* metadata, char** out_sess
     }
     
     return AGENTOS_SUCCESS;
+
+cleanup_linked:
+    // 从链表中移除（如果已经插入）
+    agentos_mutex_lock(session_lock);
+    session_t** pp = &sessions;
+    while (*pp) {
+        if (*pp == s) {
+            *pp = s->next;
+            break;
+        }
+        pp = &(*pp)->next;
+    }
+    agentos_mutex_unlock(session_lock);
+    
+cleanup:
+    if (out_id_copy) AGENTOS_FREE(out_id_copy);
+    if (s) {
+        AGENTOS_FREE(s->metadata);
+        AGENTOS_FREE(s->session_id);
+        AGENTOS_FREE(s);
+    }
+    if (id) AGENTOS_FREE(id);
+    return ret;
 }
 
 /**

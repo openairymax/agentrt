@@ -47,6 +47,13 @@ static inline void cJSON_Delete(cJSON* item) { (void)item; }
 #include <math.h>
 #include <uthash.h>
 
+/* ==================== 常量定义 ==================== */
+
+/* JSON转义相关常量 */
+#define ESCAPE_TABLE_SIZE 256
+#define UNICODE_ESCAPE_LEN 6      /* \uXXXX 的长度 */
+#define UNICODE_SNPRINTF_BUF 7    /* snprintf缓冲区大小（6+1） */
+
 /* 嵌入器类型 */
 typedef enum {
     EMBEDDER_OPENAI,
@@ -101,23 +108,36 @@ static agentos_mutex_t* g_init_lock = NULL;
 static ssize_t json_escape_string(const char* src, char** out) {
     if (!src || !out) return -1;
 
+    // 转义查找表：每个字符的转义长度和转义字符串
+    static const struct {
+        const char* escape;  // 转义序列，NULL表示直接复制或Unicode转义
+        int len;             // 转义后的长度
+    } escape_table[ESCAPE_TABLE_SIZE] = {
+        ['"']  = {"\\\"", 2},
+        ['\\'] = {"\\\\", 2},
+        ['\b'] = {"\\b", 2},
+        ['\f'] = {"\\f", 2},
+        ['\n'] = {"\\n", 2},
+        ['\r'] = {"\\r", 2},
+        ['\t'] = {"\\t", 2},
+        // 控制字符(0x00-0x1F)由特殊逻辑处理，len=6, escape=NULL
+    };
+
     size_t len = strlen(src);
     size_t escaped_len = 0;
 
+    // 第一阶段：计算转义后的总长度
     for (size_t i = 0; i < len; i++) {
         unsigned char c = (unsigned char)src[i];
-        switch (c) {
-            case '"':  escaped_len += 2; break;
-            case '\\': escaped_len += 2; break;
-            case '\b': escaped_len += 2; break;
-            case '\f': escaped_len += 2; break;
-            case '\n': escaped_len += 2; break;
-            case '\r': escaped_len += 2; break;
-            case '\t': escaped_len += 2; break;
-            default:
-                if (c < 0x20) escaped_len += 6;
-                else escaped_len += 1;
-                break;
+        if (c < 0x20) {
+            // 控制字符使用Unicode转义：\uXXXX (6个字符)
+            escaped_len += UNICODE_ESCAPE_LEN;
+        } else if (escape_table[c].len > 0) {
+            // 特殊转义字符
+            escaped_len += escape_table[c].len;
+        } else {
+            // 普通字符直接复制
+            escaped_len += 1;
         }
     }
 
@@ -125,27 +145,26 @@ static ssize_t json_escape_string(const char* src, char** out) {
     if (!escaped) return -1;
 
     size_t pos = 0;
+    // 第二阶段：填充转义后的字符串
     for (size_t i = 0; i < len; i++) {
         unsigned char c = (unsigned char)src[i];
-        switch (c) {
-            case '"':  escaped[pos++] = '\\'; escaped[pos++] = '"'; break;
-            case '\\': escaped[pos++] = '\\'; escaped[pos++] = '\\'; break;
-            case '\b': escaped[pos++] = '\\'; escaped[pos++] = 'b'; break;
-            case '\f': escaped[pos++] = '\\'; escaped[pos++] = 'f'; break;
-            case '\n': escaped[pos++] = '\\'; escaped[pos++] = 'n'; break;
-            case '\r': escaped[pos++] = '\\'; escaped[pos++] = 'r'; break;
-            case '\t': escaped[pos++] = '\\'; escaped[pos++] = 't'; break;
-            default:
-                if (c < 0x20) {
-                    pos += snprintf(escaped + pos, 7, "\\u%04x", c);
-                } else {
-                    escaped[pos++] = (char)c;
-                }
-                break;
+        if (c < 0x20) {
+            // 控制字符：生成Unicode转义序列
+            pos += snprintf(escaped + pos, UNICODE_SNPRINTF_BUF, "\\u%04x", c);
+        } else if (escape_table[c].len > 0 && escape_table[c].escape != NULL) {
+            // 特殊转义字符：复制转义序列
+            const char* esc = escape_table[c].escape;
+            size_t esc_len = escape_table[c].len;
+            for (size_t j = 0; j < esc_len; j++) {
+                escaped[pos++] = esc[j];
+            }
+        } else {
+            // 普通字符：直接复制
+            escaped[pos++] = (char)c;
         }
     }
     escaped[pos] = '\0';
-    *out = = escaped;
+    *out = escaped;
     return (ssize_t)pos;
 }
 

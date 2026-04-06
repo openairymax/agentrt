@@ -22,13 +22,17 @@ static const char* error_strings[] = {
     /* AGENTOS_EOVERFLOW (-12) */       "Value overflow",
     /* AGENTOS_EBADF (-13) */           "Bad file descriptor",
     /* AGENTOS_ENOTINIT (-14) */        "Not initialized",
-    /* AGENTOS_ERESOURCE (-15) */       "Resource exhausted"
+    /* AGENTOS_ERESOURCE (-15) */       "Resource exhausted",
+    /* AGENTOS_ENOSYS (-16) */           "Function not implemented"
 };
 
 #define ERROR_COUNT (sizeof(error_strings) / sizeof(error_strings[0]))
 
 const char* agentos_strerror(agentos_error_t err) {
-    if (err > 0 || err <= -(agentos_error_t)ERROR_COUNT) {
+    if (err == AGENTOS_ERROR) {
+        return "Generic error";
+    }
+    if (err > 0 || err < -(agentos_error_t)ERROR_COUNT) {
         return "Unknown error";
     }
     return error_strings[-err];
