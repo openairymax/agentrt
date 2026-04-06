@@ -9,8 +9,8 @@
  */
 
 #include "resource_quota.h"
-#include "agentos.h"
-#include "logger.h"
+#include "../../atoms/corekern/include/agentos.h"
+#include "../../utils/observability/include/logger.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
