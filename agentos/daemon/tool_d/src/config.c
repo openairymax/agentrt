@@ -78,7 +78,7 @@ tool_config_t* tool_config_load(const char* path) {
                     const char* param = (const char*)event.data.scalar.value;
                     if (params_cnt + 1 >= params_cap) {
                         params_cap = params_cap ? params_cap * 2 : 4;
-                        char** new_params = realloc(params, params_cap * sizeof(char*));
+                        char** new_params = realloc(params, params_cap * sizeof(*params));
                         if (!new_params) {
                             SVC_LOG_ERROR("Out of memory");
                             goto error;
