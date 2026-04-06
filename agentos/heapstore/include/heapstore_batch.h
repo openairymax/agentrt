@@ -96,7 +96,8 @@ heapstore_batch_context_t* heapstore_batch_begin(size_t batch_size);
  * @ownership 调用者负责所有参数的生命周期
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0.5*/
 heapstore_error_t heapstore_batch_add_log(
     heapstore_batch_context_t* ctx,
     const char* service,
@@ -191,7 +192,8 @@ heapstore_error_t heapstore_batch_add_span(
  *
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0.5*/
 heapstore_error_t heapstore_batch_commit(heapstore_batch_context_t* ctx);
 
 /**
@@ -201,7 +203,8 @@ heapstore_error_t heapstore_batch_commit(heapstore_batch_context_t* ctx);
  *
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0.5*/
 void heapstore_batch_rollback(heapstore_batch_context_t* ctx);
 
 /**
@@ -211,7 +214,8 @@ void heapstore_batch_rollback(heapstore_batch_context_t* ctx);
  *
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0.5*/
 void heapstore_batch_context_destroy(heapstore_batch_context_t* ctx);
 
 /**

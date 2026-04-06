@@ -1,0 +1,327 @@
+[
+  {
+    "timestamp": "2026-04-05T10:00:00.123456Z",
+    "action": "LOAD",
+    "config_file": "kernel/settings.yaml",
+    "operator": {
+      "type": "system",
+      "identity": "config-manager"
+    },
+    "changes": [],
+    "checksum": {
+      "algorithm": "sha256",
+      "before": "",
+      "after": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "metadata": {
+      "environment": "production",
+      "version": "1.0.0.14",
+      "correlation_id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+      "source": "system_startup"
+    },
+    "result": {
+      "success": true,
+      "duration_ms": 23
+    }
+  },
+  {
+    "timestamp": "2026-04-05T10:15:30.456789Z",
+    "action": "CHANGE",
+    "config_file": "kernel/settings.yaml",
+    "operator": {
+      "type": "user",
+      "identity": "admin",
+      "ip_address": "192.168.1.100",
+      "session_id": "550e8400-e29b-41d4-a716-446655440000"
+    },
+    "changes": [
+      {
+        "path": "kernel.log_level",
+        "old_value": "info",
+        "new_value": "debug",
+        "field_type": "string"
+      }
+    ],
+    "checksum": {
+      "algorithm": "sha256",
+      "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a"
+    },
+    "metadata": {
+      "environment": "production",
+      "version": "1.0.0.14",
+      "correlation_id": "7ba7b810-9dad-11d1-80b4-00c04fd430c9",
+      "source": "manual",
+      "reason": "调试生产环境问题",
+      "approved_by": "tech_lead",
+      "ticket_id": "OPS-2026-0425"
+    },
+    "result": {
+      "success": true,
+      "duration_ms": 45
+    }
+  },
+  {
+    "timestamp": "2026-04-05T10:20:15.789012Z",
+    "action": "RELOAD",
+    "config_file": "kernel/settings.yaml",
+    "operator": {
+      "type": "system",
+      "identity": "file-watcher"
+    },
+    "changes": [
+      {
+        "path": "kernel.log_level",
+        "old_value": "debug",
+        "new_value": "info",
+        "field_type": "string"
+      }
+    ],
+    "checksum": {
+      "algorithm": "sha256",
+      "before": "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a",
+      "after": "b7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434b"
+    },
+    "metadata": {
+      "environment": "production",
+      "version": "1.0.0.14",
+      "correlation_id": "8ba7b810-9dad-11d1-80b4-00c04fd430ca",
+      "source": "file_watcher"
+    },
+    "result": {
+      "success": true,
+      "duration_ms": 12
+    }
+  },
+  {
+    "timestamp": "2026-04-05T10:30:00.111222Z",
+    "action": "VALIDATE",
+    "config_file": "model/model.yaml",
+    "operator": {
+      "type": "ci_cd",
+      "identity": "github-actions"
+    },
+    "changes": [],
+    "checksum": {
+      "algorithm": "sha256",
+      "before": "c7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434c",
+      "after": "c7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434c"
+    },
+    "metadata": {
+      "environment": "staging",
+      "version": "1.0.0.14",
+      "correlation_id": "9ba7b810-9dad-11d1-80b4-00c04fd430cb",
+      "source": "pre_commit_hook"
+    },
+    "result": {
+      "success": true,
+      "duration_ms": 156
+    }
+  },
+  {
+    "timestamp": "2026-04-05T10:45:00.333444Z",
+    "action": "CHANGE",
+    "config_file": "security/policy.yaml",
+    "operator": {
+      "type": "user",
+      "identity": "security_admin",
+      "ip_address": "10.0.0.50",
+      "session_id": "660e8400-e29b-41d4-a716-446655440001"
+    },
+    "changes": [
+      {
+        "path": "security.sandbox.default_isolation",
+        "old_value": "process",
+        "new_value": "container",
+        "field_type": "string"
+      },
+      {
+        "path": "security.audit.retention_days",
+        "old_value": 30,
+        "new_value": 90,
+        "field_type": "integer"
+      }
+    ],
+    "checksum": {
+      "algorithm": "sha256",
+      "before": "d7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434d",
+      "after": "e7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434e"
+    },
+    "metadata": {
+      "environment": "production",
+      "version": "1.0.0.14",
+      "correlation_id": "aba7b810-9dad-11d1-80b4-00c04fd430cc",
+      "source": "manual",
+      "reason": "提升生产环境安全隔离级别",
+      "approved_by": "ciso",
+      "ticket_id": "SEC-2026-0128"
+    },
+    "result": {
+      "success": true,
+      "duration_ms": 78
+    }
+  },
+  {
+    "timestamp": "2026-04-05T11:00:00.555666Z",
+    "action": "ROLLBACK",
+    "config_file": "kernel/settings.yaml",
+    "operator": {
+      "type": "system",
+      "identity": "auto-rollback"
+    },
+    "changes": [
+      {
+        "path": "kernel.log_level",
+        "old_value": "debug",
+        "new_value": "info",
+        "field_type": "string"
+      }
+    ],
+    "checksum": {
+      "algorithm": "sha256",
+      "before": "f7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434f",
+      "after": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "metadata": {
+      "environment": "production",
+      "version": "1.0.0.14",
+      "correlation_id": "bba7b810-9dad-11d1-80b4-00c04fd430cd",
+      "source": "validation_failure",
+      "reason": "Schema验证失败，自动回滚"
+    },
+    "result": {
+      "success": true,
+      "duration_ms": 34
+    }
+  },
+  {
+    "timestamp": "2026-04-05T11:15:00.777888Z",
+    "action": "EXPORT",
+    "config_file": "environment/production.yaml",
+    "operator": {
+      "type": "user",
+      "identity": "devops_engineer",
+      "ip_address": "172.16.0.100",
+      "session_id": "770e8400-e29b-41d4-a716-446655440002"
+    },
+    "changes": [],
+    "checksum": {
+      "algorithm": "sha256",
+      "before": "g7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434g",
+      "after": "g7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434g"
+    },
+    "metadata": {
+      "environment": "production",
+      "version": "1.0.0.14",
+      "correlation_id": "cba7b810-9dad-11d1-80b4-00c04fd430ce",
+      "source": "manual",
+      "reason": "备份生产环境配置"
+    },
+    "result": {
+      "success": true,
+      "duration_ms": 89
+    }
+  },
+  {
+    "timestamp": "2026-04-05T11:30:00.999000Z",
+    "action": "IMPORT",
+    "config_file": "model/model.yaml",
+    "operator": {
+      "type": "ci_cd",
+      "identity": "jenkins"
+    },
+    "changes": [
+      {
+        "path": "model.primary.provider",
+        "old_value": "openai",
+        "new_value": "anthropic",
+        "field_type": "string"
+      },
+      {
+        "path": "model.primary.model_name",
+        "old_value": "gpt-4-turbo",
+        "new_value": "claude-3-opus",
+        "field_type": "string"
+      }
+    ],
+    "checksum": {
+      "algorithm": "sha256",
+      "before": "h7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434h",
+      "after": "i7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434i"
+    },
+    "metadata": {
+      "environment": "staging",
+      "version": "1.0.0.14",
+      "correlation_id": "dba7b810-9dad-11d1-80b4-00c04fd430cf",
+      "source": "deployment_pipeline",
+      "ticket_id": "DEPLOY-2026-0456"
+    },
+    "result": {
+      "success": true,
+      "duration_ms": 234
+    }
+  },
+  {
+    "timestamp": "2026-04-05T11:45:00.111333Z",
+    "action": "CHANGE",
+    "config_file": "agent/registry.yaml",
+    "operator": {
+      "type": "user",
+      "identity": "agent_developer",
+      "ip_address": "192.168.2.200",
+      "session_id": "880e8400-e29b-41d4-a716-446655440003"
+    },
+    "changes": [
+      {
+        "path": "agents[0].max_concurrent_tasks",
+        "old_value": 5,
+        "new_value": 10,
+        "field_type": "integer"
+      }
+    ],
+    "checksum": {
+      "algorithm": "sha256",
+      "before": "j7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434j",
+      "after": "k7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434k"
+    },
+    "metadata": {
+      "environment": "production",
+      "version": "1.0.0.14",
+      "correlation_id": "eba7b810-9dad-11d1-80b4-00c04fd430d0",
+      "source": "manual",
+      "reason": "提升Agent并发处理能力",
+      "approved_by": "architect"
+    },
+    "result": {
+      "success": true,
+      "duration_ms": 56
+    }
+  },
+  {
+    "timestamp": "2026-04-05T12:00:00.222444Z",
+    "action": "VALIDATE",
+    "config_file": "security/policy.yaml",
+    "operator": {
+      "type": "system",
+      "identity": "schema-validator"
+    },
+    "changes": [],
+    "checksum": {
+      "algorithm": "sha256",
+      "before": "l7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434l",
+      "after": "l7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434l"
+    },
+    "metadata": {
+      "environment": "production",
+      "version": "1.0.0.14",
+      "correlation_id": "fba7b810-9dad-11d1-80b4-00c04fd430d1",
+      "source": "periodic_check"
+    },
+    "result": {
+      "success": false,
+      "error_code": "SCHEMA_VIOLATION",
+      "error_message": "Field 'security.sandbox.invalid_field' is not allowed by schema",
+      "duration_ms": 23
+    }
+  }
+]

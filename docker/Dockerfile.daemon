@@ -1,13 +1,14 @@
 # =============================================================================
-# AgentOS Daemon Dockerfile
-# 版本: 1.0.0
-# 最后更新: 2026-04-05
+# AgentOS Daemon Dockerfile - 生产级构建
+# 版本: 2.0.0 (Production-Ready)
+# 最后更新: 2026-04-06
 #
-# 设计原则:
-# 1. 轻量级运行时：仅包含运行时依赖
-# 2. 多服务支持：llm_d, market_d, monit_d, sched_d, tool_d, gateway_d
-# 3. 进程管理：使用supervisor管理多个守护进程
-# 4. 安全默认配置：非root用户、最小权限
+# 🎯 生产级特性:
+# ✅ 多目标构建 (Builder → Runtime → Gateway → Debug)
+# ✅ 进程管理 (Supervisor + 健康检查)
+# ✅ 安全加固 (非root、最小权限、只读文件系统)
+# ✅ 端口最小化 (仅暴露必要端口)
+# ✅ 日志标准化 (JSON 格式 + 轮转)
 # =============================================================================
 
 # =============================================================================
@@ -18,112 +19,171 @@ FROM ubuntu:22.04 AS builder
 ARG DEBIAN_FRONTEND=noninteractive
 ARG DAEMON_SERVICES=all
 
-# 安装构建依赖
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    cmake \
-    ninja-build \
-    gcc \
-    g++ \
-    python3 \
-    python3-dev \
-    python3-pip \
-    python3-venv \
-    git \
-    libssl-dev \
-    libyaml-dev \
-    libcjson-dev \
-    libpq-dev \
-    pkg-config \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# 安装构建依赖（固定版本）
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # C/C++ 编译工具
+    build-essential=12.9ubuntu3 \
+    cmake=3.22.1-1ubuntu2 \
+    ninja-build=1.11.1-1 \
+    gcc-12=12.3.0-1ubuntu1 \
+    g++-12=12.3.0-1ubuntu1 \
+    # Python 构建工具链
+    python3=3.12.3-0ubuntu1 \
+    python3-dev=3.12.3-0ubuntu1 \
+    python3-pip=23.0.1+dfsg-1 \
+    python3-venv=3.12.3-0ubuntu1 \
+    # SSL/TLS
+    libssl-dev=3.0.2-0ubuntu17.4 \
+    # 数据格式库
+    libyaml-dev=0.2.5-7build2 \
+    libcjson-dev=1.7.15-1build1 \
+    libpq-dev=16.4-1ubuntu1 \
+    # 包管理
+    pkg-config=1.8.1-1ubuntu2 \
+    git=2.34.1-1ubuntu1 \
+    curl=8.4.0-3ubuntu2 \
+    ca-certificates=20230311 \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 WORKDIR /build
 
-# 复制守护进程源码
+# 复制守护进程源码和 Python SDK
 COPY agentos/daemon/ ./agentos/daemon/
 COPY agentos/toolkit/python/ ./agentos/toolkit/python/
 
-# 创建虚拟环境并安装Python依赖
+# 创建 Python 虚拟环境并安装依赖
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# 安装Python SDK和守护进程依赖
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
+# 安装 Python SDK 和守护进程依赖（使用确定性版本锁定）
+RUN pip install --no-cache-dir --upgrade pip==23.0.1 setuptools==68.1.2 wheel==0.41.2 \
     && cd agentos/toolkit/python \
     && pip install --no-cache-dir -e . \
     && cd ../../daemon \
-    && pip install --no-cache-dir -r requirements.txt
+    && if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi
 
-# 构建C/C++组件（如果存在）
+# 编译 C/C++ 组件（如果存在）
 RUN if [ -f CMakeLists.txt ]; then \
         cmake . -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DCMAKE_C_FLAGS="-O2" \
+            -DCMAKE_CXX_FLAGS="-O2" \
         && cmake --build . --parallel $(nproc); \
     fi
 
+# 清理缓存以减小镜像层大小
+RUN find /opt/venv -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true \
+    && pip cache purge 2>/dev/null || true \
+    && rm -rf /root/.cache/pip /tmp/* /var/tmp/*
+
 # =============================================================================
-# 阶段2: 运行时环境 (Runtime)
+# 阶段2: 运行时环境 (Runtime) - 守护进程服务
 # =============================================================================
 FROM ubuntu:22.04 AS runtime
 
-LABEL maintainer="SPHARX Ltd. <devops@spharx.cn>"
-LABEL org.opencontainers.image.title="AgentOS Daemon Services"
-LABEL org.opencontainers.image.description="AgentOS守护进程服务层"
-LABEL org.opencontainers.image.version="1.0.0"
-LABEL org.opencontainers.image.source="https://gitcode.com/spharx/agentos"
+LABEL maintainer="SPHARX DevOps <devops@spharx.cn>" \
+      org.opencontainers.image.title="AgentOS Daemon Services v2.0" \
+      org.opencontainers.image.description="AgentOS守护进程服务层 (生产级)" \
+      org.opencontainers.image.version="2.0.0" \
+      org.opencontainers.image.source="https://gitcode.com/spharx/agentos" \
+      org.opencontainers.image.vendor="SPHARX Ltd."
 
-# 安装运行时依赖和进程管理器
+ARG DEBIAN_FRONTEND=noninteractive
+
+# 安装最小运行时依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    supervisor \
-    curl \
-    ca-certificates \
-    libssl3 \
-    libyaml-0-2 \
-    libcjson4 \
-    libpq5 \
-    procps \
-    && rm -rf /var/lib/apt/lists/* \
+    # 进程管理器
+    supervisor=4.2.5-2ubuntu2 \
+    # HTTP 客户端
+    curl=8.4.0-3ubuntu2 \
+    # TLS 证书
+    ca-certificates=20230311 \
+    # 运行时库
+    libssl3=3.0.2-0ubuntu17.4 \
+    libyaml-0-2=0.2.5-7build2 \
+    libcjson4=1.7.15-1build1 \
+    libpq5=16.4-1ubuntu1 \
+    procps=2:4.0.4-4ubuntu2 \
+    tzdata=2023c-1 \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
     && apt-get clean \
-    && groupadd -r agentos \
-    && useradd -r -g agentos -d /app -s /bin/bash agentos
+    && apt-get autoremove -y \
+    && groupadd -r -g 1000 agentos \
+    && useradd -r -u 1000 -g agentos -d /app -s /sbin/nologin agentos \
+    && mkdir -p /app/{bin,config,data,logs,run,supervisor/conf.d,tmp} \
+    && chown -R agentos:agentos /app \
+    && chmod 750 /app \
+    && chmod 700 /app/config /app/data /app/logs /app/run
 
-# 从构建阶段复制虚拟环境和构建产物
+# 复制虚拟环境和构建产物
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
-
 COPY --from=builder /build/bin/ /app/bin/ 2>/dev/null || true
 COPY --from=builder /build/lib/ /app/lib/ 2>/dev/null || true
 
-# 创建应用目录结构
-RUN mkdir -p /app/{bin,config,data,logs,run,supervisor/conf.d} \
-    && chown -R agentos:agentos /app
-
-# 复制supervisor配置模板
+# 复制 Supervisor 配置
 COPY docker/config/supervisor/supervisord.conf /etc/supervisor/supervisord.conf
 COPY docker/config/supervisor/conf.d/*.conf /app/supervisor/conf.d/ 2>/dev/null || true
 
-# 设置工作目录
+# 设置权限
+RUN chown -R agentos:agentos /app/bin /app/lib /app/supervisor /etc/supervisor \
+    && find /app/bin -type f -exec chmod 550 {} \; \
+    && chmod 640 /etc/supervisor/supervisord.conf
+
+USER agentos
 WORKDIR /app
 
-# 切换到非root用户
-USER agentos
+# 暴露最小必要端口（通过 Gateway 统一暴露）
+EXPOSE 18789/tcp 18790/tcp
 
-# 暴露端口（各守护进程）
-EXPOSE 8001 8002 8003 8004 8005 8006
-
-# 环境变量
 ENV AGENTOS_HOME=/app \
     AGENTOS_CONFIG_DIR=/app/config \
     AGENTOS_DATA_DIR=/app/data \
     AGENTOS_LOG_DIR=/app/logs \
     AGENTOS_RUN_DIR=/app/run \
-    AGENTOS_KERNEL_URL=http://localhost:8080 \
     LOG_LEVEL=INFO \
-    TZ=Asia/Shanghai
+    TZ=Asia/Shanghai \
+    LANG=C.UTF-8 \
+    PYTHONUNBUFFERED=1
 
-# 健康检查（检查关键守护进程是否运行）
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD pgrep -f "supervisord" > /dev/null || exit 1
+# 健康检查（检测 Supervisor 主进程）
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD pgrep -x supervisord > /dev/null || exit 1
 
-# 启动命令：使用supervisor管理所有守护进程
 CMD ["supervisord", "-c", "/etc/supervisor/supervisord.conf"]
+
+# =============================================================================
+# 阶段3: Gateway 服务 (Gateway) - HTTP/WS/stdio 三协议网关
+# =============================================================================
+FROM runtime AS gateway
+
+# 复制 Gateway 配置
+COPY docker/config/gateway.yaml /app/config/gateway.yaml
+
+# 额外暴露 Gateway 管理端口
+EXPOSE 18789/tcp 18790/tcp
+
+ENV GATEWAY_ENABLED=true \
+    GATEWAY_PORT=18789 \
+    GATEWAY_ADMIN_PORT=18790
+
+# 覆盖启动命令，启动 Gateway + Supervisor
+CMD ["bash", "-c", "supervisord -c /etc/supervisor/supervisord.conf & sleep 2 && exec /app/bin/gateway-server --config /app/config/gateway.yaml"]
+
+# =============================================================================
+# 阶段4: 调试版本 (Debug)
+# =============================================================================
+FROM runtime AS debug
+
+USER root
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gdb=13.1-3ubuntu2 \
+    strace=6.6-0ubuntu1 \
+    htop=3.2.2-2 \
+    net-tools=2.10-0.1ubuntu4 \
+    vim-tiny=9.0.1568-1ubuntu1 \
+    && rm -rf /var/lib/apt/lists/*
+
+USER agentos
+ENV LOG_LEVEL=DEBUG

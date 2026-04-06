@@ -384,7 +384,8 @@ class RateLimiter:
 
         return False
 
-    def validate_string(value: Any, name: str = "value", max_length: int = 10000, allow_empty: bool = False) -> str:
+
+def validate_string(value: Any, name: str = "value", max_length: int = 10000, allow_empty: bool = False) -> str:
     """
     Validate and sanitize string input with comprehensive checks.
 
@@ -478,10 +479,10 @@ def validate_url(url: Any, name: str = "url") -> str:
     from urllib.parse import urlparse
 
     parsed = urlparse(url)
-    
+
     if not parsed.scheme or not parsed.netloc:
         raise ValueError(f"{name} must be a valid URL with scheme and host")
-    
+
     if parsed.scheme not in ('http', 'https', 'ws', 'wss'):
         raise ValueError(f"{name} has unsupported scheme '{parsed.scheme}'")
     

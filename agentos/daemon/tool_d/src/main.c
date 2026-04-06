@@ -1,21 +1,25 @@
-/**
- * @file main.c
- * @brief 工具服务守护进程入口（跨平台、线程安全版本）
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
+/*
+ * Copyright (C) 2026 SPHARX. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2026 SPHARX.
  * SPDX-License-Identifier: Apache-2.0
  *
- * 改进说明：
- * 1. 跨平台支持（Linux/macOS/Windows）
- * 2. 线程安全的请求处理
- * 3. 配置文件驱动的 Socket 路径
- * 4. 完善的错误处理和日志
+ * @file main.c
+ * @brief Tool 服务守护进程主入口（遵循 daemon 模块统一规范）
+ *
+ * 规范遵循:
+ * - ARCHITECTURAL_PRINCIPLES.md E-3 资源确定性(成对管理)
+ * - ARCHITECTURAL_PRINCIPLES.md E-4 跨平台一致性(platform.h)
+ * - ARCHITECTURAL_PRINCIPLES.md E-5 命名语义化(SVC_LOG_*)
+ * - ARCHITECTURAL_PRINCIPLES.md E-6 错误可追溯(AGENTOS_ERR_*)
  */
 
 #include "tool_service.h"
 #include "platform.h"
 #include "error.h"
 #include "svc_logger.h"
-
+#include "jsonrpc_helpers.h"
+#include "method_dispatcher.h"
+#include "param_validator.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,6 +39,7 @@
 static tool_service_t* g_service = NULL;
 static volatile int g_running = 1;
 static agentos_mutex_t g_running_lock;
+static method_dispatcher_t* g_dispatcher = NULL;  /* 方法分发器 */
 
 /* 服务配置 */
 typedef struct {
@@ -87,109 +92,94 @@ static BOOL WINAPI console_handler(DWORD fdwCtrlType) {
 #define INVALID_PARAMS  -32602
 #define INTERNAL_ERROR  -32000
 
-/* ==================== JSON-RPC 响应构建 ==================== */
-
-/**
- * @brief 构建错误响应
- * @param code 错误码
- * @param message 错误消息
- * @param id 请求ID
- * @return JSON字符串（需调用者释放）
- */
-static char* build_error_response(int code, const char* message, int id) {
-    cJSON* root = cJSON_CreateObject();
-    if (!root) return NULL;
-
-    cJSON_AddStringToObject(root, "jsonrpc", "2.0");
-    cJSON* err = cJSON_CreateObject();
-    if (!err) {
-        cJSON_Delete(root);
-        return NULL;
-    }
-    cJSON_AddNumberToObject(err, "code", code);
-    cJSON_AddStringToObject(err, "message", message ? message : "Unknown error");
-    cJSON_AddItemToObject(root, "error", err);
-
-    if (id >= 0) {
-        cJSON_AddNumberToObject(root, "id", id);
-    } else {
-        cJSON_AddNullToObject(root, "id");
-    }
-
-    char* json = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
-    return json;
-}
-
-/**
- * @brief 构建成功响应
- * @param result 结果对象
- * @param id 请求ID
- * @return JSON字符串（需调用者释放）
- */
-static char* build_success_response(cJSON* result, int id) {
-    cJSON* root = cJSON_CreateObject();
-    if (!root) return NULL;
-
-    cJSON_AddStringToObject(root, "jsonrpc", "2.0");
-    cJSON_AddItemToObject(root, "result", result ? cJSON_Duplicate(result, 1) : cJSON_CreateNull());
-    cJSON_AddNumberToObject(root, "id", id);
-
-    char* json = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
-    return json;
-}
-
 /* ==================== 请求处理方法 ==================== */
 
 /**
- * @brief 处理 register_tool 方法
+ * @brief 方法处理器包装函数
+ */
+
+/**
+ * @brief register 方法的包装器
+ */
+static void on_register_method(cJSON* params, int id, void* user_data) {
+    (void)user_data;
+    handle_register(params, id, *(agentos_socket_t*)user_data);
+}
+
+/**
+ * @brief list 方法的包装器
+ */
+static void on_list_method(cJSON* params, int id, void* user_data) {
+    (void)user_data;
+    handle_list(id, *(agentos_socket_t*)user_data);
+}
+
+/**
+ * @brief get 方法的包装器
+ */
+static void on_get_method(cJSON* params, int id, void* user_data) {
+    (void)user_data;
+    handle_get(params, id, *(agentos_socket_t*)user_data);
+}
+
+/**
+ * @brief execute 方法的包装器
+ */
+static void on_execute_method(cJSON* params, int id, void* user_data) {
+    (void)user_data;
+    handle_execute(params, id, *(agentos_socket_t*)user_data);
+}
+
+/**
+ * @brief 注册所有 JSON-RPC 方法
+ */
+static int register_rpc_methods(void) {
+    g_dispatcher = method_dispatcher_create(16);
+    if (!g_dispatcher) {
+        SVC_LOG_ERROR("Failed to create method dispatcher");
+        return -1;
+    }
+    
+    method_dispatcher_register(g_dispatcher, "register", on_register_method, NULL);
+    method_dispatcher_register(g_dispatcher, "list_tools", on_list_method, NULL);
+    method_dispatcher_register(g_dispatcher, "get_tool", on_get_method, NULL);
+    method_dispatcher_register(g_dispatcher, "execute_tool", on_execute_method, NULL);
+    
+    SVC_LOG_INFO("Registered %d RPC methods", 4);
+    return 0;
+}
+
+/**
+ * @brief 处理 register 方法
  * @param params 参数对象
- * @param id 请求ID
+ * @param id 请求 ID
  * @param client_fd 客户端描述符
  */
 static void handle_register(cJSON* params, int id, agentos_socket_t client_fd) {
-    /* 解析参数：需要 tool 对象 */
-    cJSON* tool = cJSON_GetObjectItem(params, "tool");
-    if (!cJSON_IsObject(tool)) {
-        char* err = build_error_response(INVALID_PARAMS, "Missing tool object", id);
-        if (err) {
-            agentos_socket_send(client_fd, err, strlen(err));
-            free(err);
-        }
+    cJSON* tool = jsonrpc_get_object_param(params, "tool");
+    if (!tool) {
+        JSONRPC_SEND_ERROR(client_fd, INVALID_PARAMS, "Missing tool object", id);
         return;
     }
 
     tool_metadata_t meta = {0};
-    cJSON* jid = cJSON_GetObjectItem(tool, "id");
-    cJSON* jname = cJSON_GetObjectItem(tool, "name");
-    cJSON* jexec = cJSON_GetObjectItem(tool, "executable");
+    const char* tid = get_string_field(tool, "id", NULL);
+    const char* tname = get_string_field(tool, "name", NULL);
+    const char* texec = get_string_field(tool, "executable", NULL);
 
-    if (!cJSON_IsString(jid) || !cJSON_IsString(jname) || !cJSON_IsString(jexec)) {
-        char* err = build_error_response(INVALID_PARAMS, "Invalid tool fields: id, name, executable required", id);
-        if (err) {
-            agentos_socket_send(client_fd, err, strlen(err));
-            free(err);
-        }
+    if (!tid || !tname || !texec) {
+        JSONRPC_SEND_ERROR(client_fd, INVALID_PARAMS, "Invalid tool fields: id, name, executable required", id);
         return;
     }
 
-    meta.id = jid->valuestring;
-    meta.name = jname->valuestring;
-    meta.executable = jexec->valuestring;
+    meta.id = tid;
+    meta.name = tname;
+    meta.executable = texec;
 
-    /* 其他字段可选 */
-    cJSON* desc = cJSON_GetObjectItem(tool, "description");
-    if (cJSON_IsString(desc)) meta.description = desc->valuestring;
-
-    cJSON* timeout = cJSON_GetObjectItem(tool, "timeout_sec");
-    if (cJSON_IsNumber(timeout)) meta.timeout_sec = timeout->valueint;
-
-    cJSON* cacheable = cJSON_GetObjectItem(tool, "cacheable");
-    if (cJSON_IsBool(cacheable)) meta.cacheable = cacheable->valueint;
-
-    cJSON* rule = cJSON_GetObjectItem(tool, "permission_rule");
-    if (cJSON_IsString(rule)) meta.permission_rule = rule->valuestring;
+    meta.description = get_string_field(tool, "description", NULL);
+    meta.timeout_sec = get_int_field(tool, "timeout_sec", 0);
+    meta.cacheable = get_bool_field(tool, "cacheable", false);
+    meta.permission_rule = get_string_field(tool, "permission_rule", NULL);
 
     /* 参数列表 */
     cJSON* params_arr = cJSON_GetObjectItem(tool, "params");
@@ -210,21 +200,13 @@ static void handle_register(cJSON* params, int id, agentos_socket_t client_fd) {
     }
 
     int ret = tool_service_register(g_service, &meta);
-    free((void*)meta.params); /* params 是临时分配，注册内部会复制 */
+    free((void*)meta.params);
 
     if (ret != AGENTOS_SUCCESS) {
-        char* err = build_error_response(INTERNAL_ERROR, "Register failed", id);
-        if (err) {
-            agentos_socket_send(client_fd, err, strlen(err));
-            free(err);
-        }
+        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Register failed", id);
         SVC_LOG_ERROR("Failed to register tool: %s (error=%d)", meta.id, ret);
     } else {
-        char* success = build_success_response(NULL, id);
-        if (success) {
-            agentos_socket_send(client_fd, success, strlen(success));
-            free(success);
-        }
+        JSONRPC_SEND_SUCCESS(client_fd, NULL, id);
         SVC_LOG_INFO("Tool registered successfully: %s", meta.id);
     }
 }
@@ -237,11 +219,7 @@ static void handle_register(cJSON* params, int id, agentos_socket_t client_fd) {
 static void handle_list(int id, agentos_socket_t client_fd) {
     char* list_json = tool_service_list(g_service);
     if (!list_json) {
-        char* err = build_error_response(INTERNAL_ERROR, "List failed", id);
-        if (err) {
-            agentos_socket_send(client_fd, err, strlen(err));
-            free(err);
-        }
+        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "List failed", id);
         return;
     }
 
@@ -249,20 +227,11 @@ static void handle_list(int id, agentos_socket_t client_fd) {
     free(list_json);
 
     if (!result) {
-        char* err = build_error_response(INTERNAL_ERROR, "Invalid JSON from list", id);
-        if (err) {
-            agentos_socket_send(client_fd, err, strlen(err));
-            free(err);
-        }
+        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Invalid JSON from list", id);
         return;
     }
 
-    char* success = build_success_response(result, id);
-    cJSON_Delete(result);
-    if (success) {
-        agentos_socket_send(client_fd, success, strlen(success));
-        free(success);
-    }
+    JSONRPC_SEND_SUCCESS(client_fd, result, id);
 }
 
 /**
@@ -272,27 +241,18 @@ static void handle_list(int id, agentos_socket_t client_fd) {
  * @param client_fd 客户端描述符
  */
 static void handle_get(cJSON* params, int id, agentos_socket_t client_fd) {
-    cJSON* jid = cJSON_GetObjectItem(params, "tool_id");
-    if (!cJSON_IsString(jid)) {
-        char* err = build_error_response(INVALID_PARAMS, "Missing tool_id", id);
-        if (err) {
-            agentos_socket_send(client_fd, err, strlen(err));
-            free(err);
-        }
+    const char* tid = get_string_field(params, "tool_id", NULL);
+    if (!tid) {
+        JSONRPC_SEND_ERROR(client_fd, INVALID_PARAMS, "Missing tool_id", id);
         return;
     }
 
-    tool_metadata_t* meta = tool_service_get(g_service, jid->valuestring);
+    tool_metadata_t* meta = tool_service_get(g_service, tid);
     if (!meta) {
-        char* err = build_error_response(METHOD_NOT_FOUND, "Tool not found", id);
-        if (err) {
-            agentos_socket_send(client_fd, err, strlen(err));
-            free(err);
-        }
+        JSONRPC_SEND_ERROR(client_fd, METHOD_NOT_FOUND, "Tool not found", id);
         return;
     }
 
-    /* 转换为 JSON */
     cJSON* obj = cJSON_CreateObject();
     cJSON_AddStringToObject(obj, "id", meta->id);
     cJSON_AddStringToObject(obj, "name", meta->name);
@@ -313,12 +273,7 @@ static void handle_get(cJSON* params, int id, agentos_socket_t client_fd) {
         cJSON_AddItemToObject(obj, "params", params_arr);
     }
 
-    char* success = build_success_response(obj, id);
-    cJSON_Delete(obj);
-    if (success) {
-        agentos_socket_send(client_fd, success, strlen(success));
-        free(success);
-    }
+    JSONRPC_SEND_SUCCESS(client_fd, obj, id);
     tool_metadata_free(meta);
 }
 
@@ -329,30 +284,22 @@ static void handle_get(cJSON* params, int id, agentos_socket_t client_fd) {
  * @param client_fd 客户端描述符
  */
 static void handle_execute(cJSON* params, int id, agentos_socket_t client_fd) {
-    cJSON* jid = cJSON_GetObjectItem(params, "tool_id");
-    cJSON* jparams = cJSON_GetObjectItem(params, "params");
+    const char* tid = get_string_field(params, "tool_id", NULL);
+    cJSON* jparams = jsonrpc_get_object_param(params, "params");
 
-    if (!cJSON_IsString(jid) || !cJSON_IsObject(jparams)) {
-        char* err = build_error_response(INVALID_PARAMS, "Invalid execute params: tool_id and params required", id);
-        if (err) {
-            agentos_socket_send(client_fd, err, strlen(err));
-            free(err);
-        }
+    if (!tid || !jparams) {
+        JSONRPC_SEND_ERROR(client_fd, INVALID_PARAMS, "Invalid execute params: tool_id and params required", id);
         return;
     }
 
     char* params_json = cJSON_PrintUnformatted(jparams);
     if (!params_json) {
-        char* err = build_error_response(INTERNAL_ERROR, "JSON serialization failed", id);
-        if (err) {
-            agentos_socket_send(client_fd, err, strlen(err));
-            free(err);
-        }
+        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "JSON serialization failed", id);
         return;
     }
 
     tool_execute_request_t req = {
-        .tool_id = jid->valuestring,
+        .tool_id = tid,
         .params_json = params_json,
         .stream = 0
     };
@@ -362,12 +309,8 @@ static void handle_execute(cJSON* params, int id, agentos_socket_t client_fd) {
     free((void*)params_json);
 
     if (ret != AGENTOS_SUCCESS || !res) {
-        char* err = build_error_response(INTERNAL_ERROR, "Execution failed", id);
-        if (err) {
-            agentos_socket_send(client_fd, err, strlen(err));
-            free(err);
-        }
-        SVC_LOG_ERROR("Tool execution failed: %s (error=%d)", jid->valuestring, ret);
+        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Execution failed", id);
+        SVC_LOG_ERROR("Tool execution failed: %s (error=%d)", tid, ret);
         return;
     }
 
@@ -378,12 +321,7 @@ static void handle_execute(cJSON* params, int id, agentos_socket_t client_fd) {
     if (res->error) cJSON_AddStringToObject(result, "error", res->error);
     cJSON_AddNumberToObject(result, "exit_code", res->exit_code);
 
-    char* success = build_success_response(result, id);
-    cJSON_Delete(result);
-    if (success) {
-        agentos_socket_send(client_fd, success, strlen(success));
-        free(success);
-    }
+    JSONRPC_SEND_SUCCESS(client_fd, result, id);
     tool_result_free(res);
 }
 
@@ -403,24 +341,15 @@ static void handle_client(agentos_socket_t client_fd) {
     }
     buffer[n] = '\0';
 
-    /* 检查请求大小 */
     if ((size_t)n >= sizeof(buffer) - 1) {
-        char* err = build_error_response(INVALID_REQUEST, "Request too large", -1);
-        if (err) {
-            agentos_socket_send(client_fd, err, strlen(err));
-            free(err);
-        }
+        JSONRPC_SEND_ERROR(client_fd, INVALID_REQUEST, "Request too large", -1);
         agentos_socket_close(client_fd);
         return;
     }
 
     cJSON* req = cJSON_Parse(buffer);
     if (!req) {
-        char* err = build_error_response(PARSE_ERROR, "Parse error: invalid JSON", -1);
-        if (err) {
-            agentos_socket_send(client_fd, err, strlen(err));
-            free(err);
-        }
+        JSONRPC_SEND_ERROR(client_fd, PARSE_ERROR, "Parse error: invalid JSON", -1);
         agentos_socket_close(client_fd);
         return;
     }
@@ -432,11 +361,7 @@ static void handle_client(agentos_socket_t client_fd) {
 
     if (!cJSON_IsString(jsonrpc) || strcmp(jsonrpc->valuestring, "2.0") != 0 ||
         !cJSON_IsString(method) || !id) {
-        char* err = build_error_response(INVALID_REQUEST, "Invalid Request: missing jsonrpc/method/id", -1);
-        if (err) {
-            agentos_socket_send(client_fd, err, strlen(err));
-            free(err);
-        }
+        JSONRPC_SEND_ERROR(client_fd, INVALID_REQUEST, "Invalid Request: missing jsonrpc/method/id", -1);
         cJSON_Delete(req);
         agentos_socket_close(client_fd);
         return;
@@ -446,22 +371,7 @@ static void handle_client(agentos_socket_t client_fd) {
 
     SVC_LOG_DEBUG("Processing request: method=%s, id=%d", method->valuestring, req_id);
 
-    if (strcmp(method->valuestring, "register_tool") == 0) {
-        handle_register(params, req_id, client_fd);
-    } else if (strcmp(method->valuestring, "list_tools") == 0) {
-        handle_list(req_id, client_fd);
-    } else if (strcmp(method->valuestring, "get_tool") == 0) {
-        handle_get(params, req_id, client_fd);
-    } else if (strcmp(method->valuestring, "execute_tool") == 0) {
-        handle_execute(params, req_id, client_fd);
-    } else {
-        char* err = build_error_response(METHOD_NOT_FOUND, "Method not found", req_id);
-        if (err) {
-            agentos_socket_send(client_fd, err, strlen(err));
-            free(err);
-        }
-        SVC_LOG_WARN("Unknown method requested: %s", method->valuestring);
-    }
+    method_dispatcher_dispatch(g_dispatcher, req, jsonrpc_build_error, &client_fd);
 
     cJSON_Delete(req);
     agentos_socket_close(client_fd);
@@ -611,6 +521,16 @@ int main(int argc, char** argv) {
         agentos_socket_cleanup();
         return 1;
     }
+    
+    /* 注册 RPC 方法 */
+    if (register_rpc_methods() != 0) {
+        SVC_LOG_ERROR("Failed to register RPC methods");
+        tool_service_destroy(g_service);
+        free_daemon_config();
+        agentos_mutex_destroy(&g_running_lock);
+        agentos_socket_cleanup();
+        return 1;
+    }
 
     /* 创建服务器 Socket */
     agentos_socket_t server_fd;
@@ -662,6 +582,7 @@ int main(int argc, char** argv) {
     SVC_LOG_INFO("Tool service stopping...");
     agentos_socket_close(server_fd);
     tool_service_destroy(g_service);
+    if (g_dispatcher) method_dispatcher_destroy(g_dispatcher);
     free_daemon_config();
     agentos_mutex_destroy(&g_running_lock);
     agentos_socket_cleanup();

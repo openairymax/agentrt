@@ -29,14 +29,14 @@
 static unsigned __stdcall thread_wrapper(void* arg) {
     void (*func)(void*) = (void (*)(void*))((void**)arg)[0];
     void* arg_val = ((void**)arg)[1];
-    free(arg);
+    AGENTOS_FREE(arg);
     func(arg_val);
     return 0;
 #else
 static void* thread_wrapper(void* arg) {
     void (*func)(void*) = (void (*)(void*))((void**)arg)[0];
     void* arg_val = ((void**)arg)[1];
-    free(arg);
+    AGENTOS_FREE(arg);
     func(arg_val);
     return NULL;
 #endif
@@ -55,7 +55,7 @@ agentos_error_t agentos_thread_create(
     }
 
 #ifdef _WIN32
-    void** thread_args = (void**)malloc(2 * sizeof(void*));
+    void** thread_args = (void**)AGENTOS_MALLOC(2 * sizeof(void*));
     if (!thread_args) {
         return AGENTOS_ENOMEM;
     }
@@ -72,7 +72,7 @@ agentos_error_t agentos_thread_create(
     );
 
     if (hThread == NULL) {
-        free(thread_args);
+        AGENTOS_FREE(thread_args);
         return AGENTOS_ERESOURCE;
     }
 
@@ -89,7 +89,7 @@ agentos_error_t agentos_thread_create(
             attr->detach_state ? PTHREAD_CREATE_DETACHED : PTHREAD_CREATE_JOINABLE);
     }
 
-    void** thread_args = (void**)malloc(2 * sizeof(void*));
+    void** thread_args = (void**)AGENTOS_MALLOC(2 * sizeof(void*));
     if (!thread_args) {
         pthread_attr_destroy(&pthread_attr);
         return AGENTOS_ENOMEM;
@@ -101,7 +101,7 @@ agentos_error_t agentos_thread_create(
     pthread_attr_destroy(&pthread_attr);
 
     if (ret != 0) {
-        free(thread_args);
+        AGENTOS_FREE(thread_args);
         return AGENTOS_ERESOURCE;
     }
 #endif

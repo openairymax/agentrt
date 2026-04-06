@@ -29,9 +29,25 @@ if(NOT CJSON_FOUND)
 endif()
 
 set(SOURCES
-    # 平台基础层
+    # ════════════════════════════════════════════════════════════════
+    # 平台基础层 (Platform Abstraction Layer)
+    # 位置: platform/
+    # 职责: 底层系统原语抽象（线程、socket、时间等）
+    # 特点: 接近操作系统内核接口，性能关键路径
+    # ════════════════════════════════════════════════════════════════
     platform/platform.c
-    # 平台适配层
+    
+    # ════════════════════════════════════════════════════════════════
+    # 平台适配器层 (Platform Adapter Layer)  
+    # 位置: utils/platform/ (注意: 与顶层 platform/ 功能不同)
+    # 职责: 高级平台工具（文件系统、环境变量、进程管理等）
+    # 特点: 面向应用层的跨平台工具集，封装常见操作
+    # 
+    # ⚠️ 命名说明:
+    #   - platform/        → 系统级抽象（线程同步、网络socket）
+    #   - utils/platform/  → 应用级工具（文件操作、命令执行）
+    #   两者互补但职责不同，保持此设计以符合分层架构原则
+    # ════════════════════════════════════════════════════════════════
     utils/platform/platform_adapter.c
     # 统一类型定义模块（纯头文件库，无 .c 源文件）
     # 统一令牌管理模块
@@ -115,7 +131,8 @@ target_include_directories(agentos_common PRIVATE
     # 缓存和兼容性模块
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/cache/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/compat/include
-    # 平台适配层
+    # 平台适配层应用级工具 (utils/platform/)
+    # 提供文件系统、环境变量、进程管理等高级跨平台功能
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/platform/include
     # 配置模块
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/config_unified/include
@@ -172,7 +189,7 @@ install(DIRECTORY utils/compat/include/ DESTINATION include/agentos/utils/compat
 install(DIRECTORY utils/network/include/ DESTINATION include/agentos/utils/network)
 # 进程间通信模块安装目录
 install(DIRECTORY utils/ipc/include/ DESTINATION include/agentos/utils/ipc)
-# 平台适配层安装目录
+# 平台适配层安装目录 (应用级跨平台工具)
 install(DIRECTORY utils/platform/include/ DESTINATION include/agentos/utils/platform)
 # 认知模块安装目录
 install(DIRECTORY utils/cognition/include/ DESTINATION include/agentos/utils/cognition)

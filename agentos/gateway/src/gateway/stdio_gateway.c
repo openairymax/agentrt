@@ -16,6 +16,7 @@
 #include "../utils/jsonrpc.h"
 #include "../utils/syscall_router.h"
 #include "../utils/gateway_utils.h"
+#include "../utils/gateway_rpc_handler.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,24 +59,11 @@ typedef struct stdio_gateway {
     size_t input_buffer_pos;         /**< 输入缓冲区位置 */
 } stdio_gateway_t;
 
-/* ========== 系统调用路由 ========== */
-
-/**
- * @brief 处理系统调用请求（使用公共路由器）
- * @param method 方法名
- * @param params 参数对象
- * @param request_id 请求ID（可为 NULL，Stdio 模式下通常为 NULL）
- * @return JSON 响应字符串
- */
-static char* handle_system_call(const char* method, cJSON* params, cJSON* request_id) {
-    return gateway_syscall_route(method, params, request_id);
-}
-
-/* ========== 命令处理 ========== */
+/* ========== 命令处理（使用统一RPC处理器） ========== */
 
 /**
  * @brief 显示帮助信息
- * @return 帮助字符串
+ * @return 帮助字符串（需调用者free）
  */
 static char* show_help(void) {
     return strdup(
@@ -96,7 +84,12 @@ static char* show_help(void) {
 }
 
 /**
- * @brief 处理JSON-RPC请求
+ * @brief 处理JSON-RPC请求（使用统一RPC处理器）
+ *
+ * 通过 gateway_rpc_handle_request() 实现统一的请求处理流程，
+ * 消除与 HTTP/WS 网关的代码重复。
+ *
+ * @param gateway 网关实例
  * @param json_str JSON字符串
  * @return 响应字符串
  */
@@ -106,47 +99,26 @@ static char* handle_jsonrpc(stdio_gateway_t* gateway, const char* json_str) {
         return jsonrpc_create_error_response(NULL, -32700, "Parse error", NULL);
     }
 
-    if (jsonrpc_validate_request(request) != 0) {
+    rpc_result_t result = gateway_rpc_handle_request(
+        request,
+        (int (*)(const char*, char**, void*))gateway->handler,
+        gateway->handler_data
+    );
+
+    if (result.error_code != 0 || !result.response_json) {
+        char* error_resp = result.response_json ? result.response_json :
+                          jsonrpc_create_error_response(NULL, -32603, "Internal error", NULL);
+        if (result.response_json) result.response_json = NULL;
+        gateway_rpc_free(&result);
         cJSON_Delete(request);
-        return jsonrpc_create_error_response(NULL, -32600, "Invalid Request", NULL);
+        return error_resp;
     }
 
-    const char* method = jsonrpc_get_method(request);
-    const cJSON* params = jsonrpc_get_params(request);
-    const cJSON* id = jsonrpc_get_id(request);
-
-    /* 如果设置了自定义处理回调，优先使用 */
-    if (gateway->handler) {
-        char* result = gateway->handler(request, gateway->handler_data);
-        if (result) {
-            if (id && result) {
-                cJSON* parsed = cJSON_Parse(result);
-                if (parsed) {
-                    cJSON_AddItemToObject(parsed, "id", cJSON_Duplicate(id, 1));
-                    free(result);
-                    result = cJSON_PrintUnformatted(parsed);
-                    cJSON_Delete(parsed);
-                }
-            }
-            cJSON_Delete(request);
-            return result;
-        }
-    }
-
-    char* response = handle_system_call(method, (cJSON*)params, (cJSON*)id);
-    
-    if (id && response) {
-        cJSON* parsed = cJSON_Parse(response);
-        if (parsed) {
-            cJSON_AddItemToObject(parsed, "id", cJSON_Duplicate(id, 1));
-            free(response);
-            response = cJSON_PrintUnformatted(parsed);
-            cJSON_Delete(parsed);
-        }
-    }
-    
+    char* success_resp = result.response_json;
+    result.response_json = NULL;
+    gateway_rpc_free(&result);
     cJSON_Delete(request);
-    return response;
+    return success_resp;
 }
 
 /**
