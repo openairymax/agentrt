@@ -153,7 +153,7 @@ static char** build_argv(const tool_meta_t* meta, int* out_argc) {
         for (int i = 0; meta->args[i]; i++) argc++;
     }
 
-    char** argv = (char**)malloc(sizeof(char*) * argc);
+    char** argv = (char**)malloc(sizeof(*argv) * argc);
     if (!argv) {
         *out_argc = 0;
         return NULL;
@@ -469,7 +469,7 @@ int tool_executor_run_async(tool_executor_t* exec,
     if (meta->args) {
         int argc = 0;
         while (meta->args[argc]) argc++;
-        ctx->meta_copy.args = (char**)calloc((size_t)argc + 1, sizeof(char*));
+        ctx->meta_copy.args = (char**)calloc((size_t)argc + 1, sizeof(*ctx->meta_copy.args));
         for (int i = 0; i < argc; i++) {
             ctx->meta_copy.args[i] = strdup(meta->args[i]);
         }
