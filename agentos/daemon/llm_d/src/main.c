@@ -1,19 +1,25 @@
-﻿/**
+/*
+ * Copyright (C) 2026 SPHARX. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2026 SPHARX.
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * @file main.c
- * @brief LLM 服务守护进程入口（跨平台、线程安全版本）
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
- * 
- * 改进：
- * 1. 跨平台支持（Linux/macOS/Windows）
- * 2. 线程安全的请求处理
- * 3. 配置文件驱动的 Socket 路径
- * 4. 完善的错误处理和日志
+ * @brief LLM 服务守护进程主入口（遵循 daemon 模块统一规范）
+ *
+ * 规范遵循:
+ * - ARCHITECTURAL_PRINCIPLES.md E-3 资源确定性(成对管理)
+ * - ARCHITECTURAL_PRINCIPLES.md E-4 跨平台一致性(platform.h)
+ * - ARCHITECTURAL_PRINCIPLES.md E-5 命名语义化(SVC_LOG_*)
+ * - ARCHITECTURAL_PRINCIPLES.md E-6 错误可追溯(AGENTOS_ERR_*)
  */
 
 #include "llm_service.h"
 #include "platform.h"
 #include "error.h"
 #include "response.h"
+#include "jsonrpc_helpers.h"
+#include "method_dispatcher.h"
+#include "param_validator.h"
 #include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -36,6 +42,7 @@
 static llm_service_t* g_service = NULL;
 static volatile int g_running = 1;
 static agentos_mutex_t g_running_lock;
+static method_dispatcher_t* g_dispatcher = NULL;  /* 方法分发器 */
 
 /* 服务配置 */
 typedef struct {
@@ -109,41 +116,6 @@ static void request_context_destroy(request_context_t* ctx) {
     
     free(ctx->response_buffer);
     free(ctx);
-}
-
-/* ==================== JSON-RPC 响应构建 ==================== */
-
-/**
- * @brief 构建错误响应
- */
-static char* build_error_response(int code, const char* message, int id) {
-    cJSON* root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "jsonrpc", "2.0");
-    cJSON* err = cJSON_CreateObject();
-    cJSON_AddNumberToObject(err, "code", code);
-    cJSON_AddStringToObject(err, "message", message);
-    cJSON_AddItemToObject(root, "error", err);
-    if (id >= 0) {
-        cJSON_AddNumberToObject(root, "id", id);
-    } else {
-        cJSON_AddNullToObject(root, "id");
-    }
-    char* json = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
-    return json;
-}
-
-/**
- * @brief 构建成功响应
- */
-static char* build_success_response(cJSON* result, int id) {
-    cJSON* root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "jsonrpc", "2.0");
-    cJSON_AddItemToObject(root, "result", result ? cJSON_Duplicate(result, 1) : cJSON_CreateNull());
-    cJSON_AddNumberToObject(root, "id", id);
-    char* json = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
-    return json;
 }
 
 /* ==================== 参数解析（线程安全） ==================== */
@@ -230,6 +202,51 @@ static int parse_params(cJSON* params, request_context_t* ctx, llm_request_confi
     return 0;
 }
 
+/* ==================== 方法处理器包装函数 ==================== */
+
+/**
+ * @brief complete 方法的包装器（适配 method_dispatcher 接口）
+ */
+static void on_complete_method(cJSON* params, int id, void* user_data) {
+    (void)user_data;
+    char* response = handle_complete(params, id);
+    if (response) {
+        agentos_socket_t client_fd = *(agentos_socket_t*)user_data;
+        agentos_socket_send(client_fd, response, strlen(response));
+        free(response);
+    }
+}
+
+/**
+ * @brief complete_stream 方法的包装器
+ */
+static void on_complete_stream_method(cJSON* params, int id, void* user_data) {
+    (void)user_data;
+    agentos_socket_t client_fd = *(agentos_socket_t*)user_data;
+    char* response = handle_complete_stream(params, id, client_fd);
+    if (response) {
+        agentos_socket_send(client_fd, response, strlen(response));
+        free(response);
+    }
+}
+
+/**
+ * @brief 注册所有 JSON-RPC 方法
+ */
+static int register_rpc_methods(void) {
+    g_dispatcher = method_dispatcher_create(16);  /* 预留 16 个方法 */
+    if (!g_dispatcher) {
+        SVC_LOG_ERROR("Failed to create method dispatcher");
+        return -1;
+    }
+    
+    method_dispatcher_register(g_dispatcher, "complete", on_complete_method, NULL);
+    method_dispatcher_register(g_dispatcher, "complete_stream", on_complete_stream_method, NULL);
+    
+    SVC_LOG_INFO("Registered %d RPC methods", 2);
+    return 0;
+}
+
 /* ==================== 请求处理 ==================== */
 
 /**
@@ -238,13 +255,13 @@ static int parse_params(cJSON* params, request_context_t* ctx, llm_request_confi
 static char* handle_complete(cJSON* params, int id) {
     request_context_t* ctx = request_context_create();
     if (!ctx) {
-        return build_error_response(INTERNAL_ERROR, "Out of memory", id);
+        return jsonrpc_build_error(INTERNAL_ERROR, "Out of memory", id);
     }
     
     llm_request_config_t cfg;
     if (parse_params(params, ctx, &cfg) != 0) {
         request_context_destroy(ctx);
-        return build_error_response(INVALID_PARAMS, "Invalid params", id);
+        return jsonrpc_build_error(INVALID_PARAMS, "Invalid params", id);
     }
     
     uint64_t start_time = agentos_time_ms();
@@ -257,7 +274,7 @@ static char* handle_complete(cJSON* params, int id) {
     
     if (ret != 0) {
         request_context_destroy(ctx);
-        return build_error_response(INTERNAL_ERROR, "Service error", id);
+        return jsonrpc_build_error(INTERNAL_ERROR, "Service error", id);
     }
     
     char* resp_json = response_to_json(resp);
@@ -265,7 +282,7 @@ static char* handle_complete(cJSON* params, int id) {
     
     if (!resp_json) {
         request_context_destroy(ctx);
-        return build_error_response(INTERNAL_ERROR, "Failed to serialize response", id);
+        return jsonrpc_build_error(INTERNAL_ERROR, "Failed to serialize response", id);
     }
     
     cJSON* result = cJSON_Parse(resp_json);
@@ -273,10 +290,10 @@ static char* handle_complete(cJSON* params, int id) {
     
     if (!result) {
         request_context_destroy(ctx);
-        return build_error_response(INTERNAL_ERROR, "Invalid response format", id);
+        return jsonrpc_build_error(INTERNAL_ERROR, "Invalid response format", id);
     }
     
-    char* success = build_success_response(result, id);
+    char* success = jsonrpc_build_success(result, id);
     cJSON_Delete(result);
     
     request_context_destroy(ctx);
@@ -289,13 +306,13 @@ static char* handle_complete(cJSON* params, int id) {
 static char* handle_complete_stream(cJSON* params, int id, agentos_socket_t client_fd) {
     request_context_t* ctx = request_context_create();
     if (!ctx) {
-        return build_error_response(INTERNAL_ERROR, "Out of memory", id);
+        return jsonrpc_build_error(INTERNAL_ERROR, "Out of memory", id);
     }
     
     llm_request_config_t cfg;
     if (parse_params(params, ctx, &cfg) != 0) {
         request_context_destroy(ctx);
-        return build_error_response(INVALID_PARAMS, "Invalid params", id);
+        return jsonrpc_build_error(INVALID_PARAMS, "Invalid params", id);
     }
     
     cfg.stream = 1;
@@ -315,7 +332,7 @@ static char* handle_complete_stream(cJSON* params, int id, agentos_socket_t clie
     
     if (ret != 0) {
         request_context_destroy(ctx);
-        return build_error_response(INTERNAL_ERROR, "Service error", id);
+        return jsonrpc_build_error(INTERNAL_ERROR, "Service error", id);
     }
     
     if (resp) {
@@ -334,53 +351,41 @@ static char* handle_complete_stream(cJSON* params, int id, agentos_socket_t clie
 static void handle_client(agentos_socket_t client_fd) {
     char buffer[MAX_BUFFER];
     ssize_t n = agentos_socket_recv(client_fd, buffer, sizeof(buffer) - 1);
-    
+
     if (n <= 0) {
         agentos_socket_close(client_fd);
         return;
     }
     buffer[n] = '\0';
-    
-    cJSON* req = cJSON_Parse(buffer);
-    if (!req) {
-        char* err = build_error_response(PARSE_ERROR, "Parse error", -1);
-        agentos_socket_send(client_fd, err, strlen(err));
-        free(err);
+
+    if ((size_t)n >= sizeof(buffer) - 1) {
+        JSONRPC_SEND_ERROR(client_fd, INVALID_REQUEST, "Request too large", -1);
         agentos_socket_close(client_fd);
         return;
     }
-    
+
+    cJSON* req = cJSON_Parse(buffer);
+    if (!req) {
+        JSONRPC_SEND_ERROR(client_fd, PARSE_ERROR, "Parse error", -1);
+        agentos_socket_close(client_fd);
+        return;
+    }
+
     cJSON* jsonrpc = cJSON_GetObjectItem(req, "jsonrpc");
     cJSON* method = cJSON_GetObjectItem(req, "method");
     cJSON* params = cJSON_GetObjectItem(req, "params");
     cJSON* id = cJSON_GetObjectItem(req, "id");
-    
+
     if (!cJSON_IsString(jsonrpc) || strcmp(jsonrpc->valuestring, "2.0") != 0 ||
         !cJSON_IsString(method) || !params || !id) {
-        char* err = build_error_response(INVALID_REQUEST, "Invalid Request", -1);
-        agentos_socket_send(client_fd, err, strlen(err));
-        free(err);
+        JSONRPC_SEND_ERROR(client_fd, INVALID_REQUEST, "Invalid Request", -1);
         cJSON_Delete(req);
         agentos_socket_close(client_fd);
         return;
     }
-    
-    int req_id = cJSON_IsNumber(id) ? id->valueint : 0;
-    char* response = NULL;
-    
-    if (strcmp(method->valuestring, "complete") == 0) {
-        response = handle_complete(params, req_id);
-    } else if (strcmp(method->valuestring, "complete_stream") == 0) {
-        response = handle_complete_stream(params, req_id, client_fd);
-    } else {
-        response = build_error_response(METHOD_NOT_FOUND, "Method not found", req_id);
-    }
-    
-    if (response) {
-        agentos_socket_send(client_fd, response, strlen(response));
-        free(response);
-    }
-    
+
+    method_dispatcher_dispatch(g_dispatcher, req, jsonrpc_build_error, &client_fd);
+
     cJSON_Delete(req);
     agentos_socket_close(client_fd);
 }
@@ -506,6 +511,15 @@ int main(int argc, char** argv) {
         return 1;
     }
     
+    /* 注册 RPC 方法 */
+    if (register_rpc_methods() != 0) {
+        fprintf(stderr, "Failed to register RPC methods\n");
+        llm_service_destroy(g_service);
+        free_daemon_config();
+        agentos_socket_cleanup();
+        return 1;
+    }
+    
     /* 创建服务器 Socket */
     agentos_socket_t server_fd;
     
@@ -552,6 +566,7 @@ int main(int argc, char** argv) {
     printf("LLM service stopping...\n");
     agentos_socket_close(server_fd);
     llm_service_destroy(g_service);
+    if (g_dispatcher) method_dispatcher_destroy(g_dispatcher);
     free_daemon_config();
     agentos_mutex_destroy(&g_running_lock);
     agentos_socket_cleanup();

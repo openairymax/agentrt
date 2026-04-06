@@ -16,6 +16,8 @@
 #include "../utils/jsonrpc.h"
 #include "../utils/syscall_router.h"
 #include "../utils/gateway_utils.h"
+#include "../utils/gateway_rate_limiter.h"
+#include "../utils/gateway_rpc_handler.h"
 
 #include <microhttpd.h>
 #include <cJSON.h>
@@ -44,29 +46,49 @@
  * 本文件统一使用 gateway_time_ns()
  */
 
-/* ========== 系统调用路由 ========== */
-
-/**
- * @brief 处理系统调用请求（使用公共路由器）
- * @param method 方法名
- * @param params 参数对象
- * @param request_id 请求ID
- * @return JSON响应字符串
- */
-static char* handle_system_call(const char* method, cJSON* params, cJSON* request_id) {
-    return gateway_syscall_route(method, params, request_id);
-}
-
 /* ========== HTTP 响应生成 ========== */
 
 /**
- * @brief 生成 HTTP 响应
+ * @brief 检查 Origin 是否在 CORS 白名单中
+ * @param gateway HTTP网关实例
+ * @param origin 请求头中的Origin值
+ * @return true 允许访问，false 拒绝访问
+ */
+static bool is_cors_origin_allowed(const http_gateway_t* gateway, const char* origin) {
+    if (!origin || !gateway) return false;
+    
+    /* 开发模式：允许所有来源 */
+    if (gateway->cors.allow_all_origins) {
+        return true;
+    }
+    
+    /* 生产模式：白名单匹配 */
+    for (size_t i = 0; i < gateway->cors.allowed_origins_count; i++) {
+        if (gateway->cors.allowed_origins[i] &&
+            strcmp(origin, gateway->cors.allowed_origins[i]) == 0) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+/**
+ * @brief 生成 HTTP 响应（安全CORS版本）
+ * @param gateway HTTP网关实例
+ * @param connection MHD连接对象
  * @param status_code HTTP 状态码
  * @param content 响应内容
  * @param content_len 内容长度
  * @return MHD 响应对象
  */
-static struct MHD_Response* create_http_response(int status_code, const char* content, size_t content_len) {
+static struct MHD_Response* create_http_response_ex(
+    http_gateway_t* gateway,
+    struct MHD_Connection* connection,
+    int status_code, 
+    const char* content, 
+    size_t content_len
+) {
     (void)status_code;
     
     struct MHD_Response* response = MHD_create_response_from_buffer(
@@ -77,10 +99,52 @@ static struct MHD_Response* create_http_response(int status_code, const char* co
     }
     
     MHD_add_response_header(response, "Content-Type", "application/json");
-    MHD_add_response_header(response, "Server", "AgentOS-agentos/gateway/1.0");
-    MHD_add_response_header(response, "Access-Control-Allow-Origin", "*");
-    MHD_add_response_header(response, "Access-Control-Allow-Methods", "POST, GET, OPTIONS");
-    MHD_add_response_header(response, "Access-Control-Allow-Headers", "Content-Type, Authorization");
+    MHD_add_response_header(response, "Server", "AgentOS-gateway/1.0");
+    
+    /* 安全的 CORS 头设置 */
+    const char* origin = MHD_lookup_connection_value(connection, MHD_HEADER_KIND, "Origin");
+    if (is_cors_origin_allowed(gateway, origin)) {
+        MHD_add_response_header(response, "Access-Control-Allow-Origin", origin);
+        
+        if (gateway->cors.allowed_methods) {
+            MHD_add_response_header(response, "Access-Control-Allow-Methods", 
+                                    gateway->cors.allowed_methods);
+        }
+        
+        if (gateway->cors.allowed_headers) {
+            MHD_add_response_header(response, "Access-Control-Allow-Headers", 
+                                    gateway->cors.allowed_headers);
+        }
+        
+        if (gateway->cors.max_age > 0) {
+            char max_age_str[16];
+            snprintf(max_age_str, sizeof(max_age_str), "%d", gateway->cors.max_age);
+            MHD_add_response_header(response, "Access-Control-Max-Age", max_age_str);
+        }
+    }
+    
+    return response;
+}
+
+/**
+ * @brief 生成 HTTP 响应（兼容旧版本）
+ * @param status_code HTTP 状态码
+ * @param content 响应内容
+ * @param content_len 内容长度
+ * @return MHD 响应对象
+ * @deprecated 请使用 create_http_response_ex() 以获得安全的CORS处理
+ */
+static struct MHD_Response* create_http_response(int status_code, const char* content, size_t content_len) {
+    struct MHD_Response* response = MHD_create_response_from_buffer(
+        content_len, (void*)content, MHD_RESPMEM_MUST_COPY);
+    
+    if (!response) {
+        return NULL;
+    }
+    
+    MHD_add_response_header(response, "Content-Type", "application/json");
+    MHD_add_response_header(response, "Server", "AgentOS-gateway/1.0");
+    /* 注意：此函数不设置CORS头，请使用create_http_response_ex() */
     
     return response;
 }
@@ -100,6 +164,7 @@ static int parse_headers(void* cls, enum MHD_ValueKind kind, const char* key, co
 
 /**
  * @brief 解析JSON请求体
+ * @param gateway 网关实例
  * @param context 请求上下文
  * @param data 请求体数据
  * @param size 数据大小
@@ -110,7 +175,10 @@ static int parse_json_request(http_gateway_t* gateway, http_request_context_t* c
         return -1;
     }
     
+    /* 强化大小限制检查 */
     if (size > gateway->max_request_size) {
+        /* 记录安全事件（如果有日志系统） */
+        atomic_fetch_add(&gateway->requests_failed, 1);
         return -1;
     }
     
@@ -165,30 +233,36 @@ static char* http_handler_adapter(void* request, void* user_data) {
     return response_json;
 }
 /**
- * @brief 处理JSON-RPC请求
+ * @brief 处理JSON-RPC请求（使用统一RPC处理器）
  * @param gateway 网关实例
  * @param context 请求上下文
  * @return JSON响应字符串
  */
 static char* handle_jsonrpc_request(http_gateway_t* gateway, http_request_context_t* context) {
-    cJSON* method = cJSON_GetObjectItem(context->json_request, "method");
-    cJSON* params = cJSON_GetObjectItem(context->json_request, "params");
-    cJSON* request_id = cJSON_GetObjectItem(context->json_request, "id");
+    /* 使用统一的 RPC 处理器 */
+    rpc_result_t result = gateway_rpc_handle_request(
+        context->json_request,
+        gateway->handler,
+        gateway->handler_data
+    );
 
-    if (!method) {
-        return jsonrpc_create_error_response(NULL, -32600, "Invalid Request", NULL);
-    }
-
-    /* 如果设置了自定义处理回调，优先使用 */
-    if (gateway->handler) {
-        char* result = gateway->handler(context->json_request, gateway->handler_data);
-        if (result) {
-            return result;
+    if (result.error_code != 0 || !result.response_json) {
+        /* 错误情况：返回错误响应 */
+        char* error_resp = result.response_json ? result.response_json : 
+                          jsonrpc_create_error_response(NULL, -32603, "Internal error", NULL);
+        if (result.response_json) {
+            result.response_json = NULL;  /* 防止 gateway_rpc_free 释放 */
         }
-        /* 回调返回 NULL 或未设置 response，回退到默认 syscall 路由 */
+        gateway_rpc_free(&result);
+        return error_resp;
     }
 
-    return handle_system_call(method->valuestring, params, request_id);
+    /* 成功情况：提取响应并清理 */
+    char* success_resp = result.response_json;
+    result.response_json = NULL;  /* 防止 gateway_rpc_free 释放 */
+    gateway_rpc_free(&result);
+    
+    return success_resp;
 }
 /* handle_http_request() 函数已迁移至 http_gateway_routes.c */
 /* ========== 网关操作表 ========== */
@@ -238,6 +312,27 @@ static void http_gateway_destroy(void* gateway_impl) {
 
     if (gateway->host) {
         free(gateway->host);
+    }
+    
+    /* 清理 CORS 配置资源 */
+    if (gateway->cors.allowed_methods) {
+        free(gateway->cors.allowed_methods);
+    }
+    if (gateway->cors.allowed_headers) {
+        free(gateway->cors.allowed_headers);
+    }
+    if (gateway->cors.allowed_origins) {
+        for (size_t i = 0; i < gateway->cors.allowed_origins_count; i++) {
+            if (gateway->cors.allowed_origins[i]) {
+                free(gateway->cors.allowed_origins[i]);
+            }
+        }
+        free(gateway->cors.allowed_origins);
+    }
+    
+    /* 清理速率限制器 */
+    if (gateway->rate_limiter) {
+        gateway_rate_limiter_destroy(gateway->rate_limiter);
     }
 
     free(gateway);
@@ -336,7 +431,79 @@ gateway_t* http_gateway_create(const char* host, uint16_t port) {
     atomic_init(&gateway->bytes_received, 0);
     atomic_init(&gateway->bytes_sent, 0);
     
-    gateway->max_request_size = 10 * 1024 * 1024; /* 10MB */
+    /* 设置最大请求体大小（默认1MB，更安全） */
+    gateway->max_request_size = 1 * 1024 * 1024; /* 1MB */
+    
+    /* 从环境变量读取最大请求体大小 */
+    const char* env_max_size = getenv("GATEWAY_MAX_REQUEST_SIZE");
+    if (env_max_size) {
+        long size = strtol(env_max_size, NULL, 10);
+        if (size > 0 && size <= 100 * 1024 * 1024) {  /* 最大100MB */
+            gateway->max_request_size = (size_t)size;
+        }
+    }
+    
+    /* 初始化 CORS 配置（默认生产模式） */
+    gateway->cors.allow_all_origins = false;
+    gateway->cors.allowed_origins = NULL;
+    gateway->cors.allowed_origins_count = 0;
+    gateway->cors.allowed_methods = strdup("POST, GET, OPTIONS");
+    gateway->cors.allowed_headers = strdup("Content-Type, Authorization");
+    gateway->cors.max_age = 3600;  /* 1小时缓存 */
+    
+    /* 从环境变量读取 CORS 模式 */
+    const char* cors_mode = getenv("GATEWAY_CORS_MODE");
+    if (cors_mode && strcmp(cors_mode, "dev") == 0) {
+        gateway->cors.allow_all_origins = true;
+        /* 开发模式日志（如果有日志系统） */
+    }
+    
+    /* 从环境变量读取允许的来源列表 */
+    const char* cors_origins = getenv("GATEWAY_CORS_ORIGINS");
+    if (cors_origins && !gateway->cors.allow_all_origins) {
+        /* 简单解析逗号分隔的来源列表 */
+        char* origins_copy = strdup(cors_origins);
+        if (origins_copy) {
+            size_t count = 1;
+            for (char* p = origins_copy; *p; p++) {
+                if (*p == ',') count++;
+            }
+            
+            gateway->cors.allowed_origins = malloc(count * sizeof(char*));
+            if (gateway->cors.allowed_origins) {
+                char* token = strtok(origins_copy, ",");
+                size_t i = 0;
+                while (token && i < count) {
+                    gateway->cors.allowed_origins[i++] = strdup(token);
+                    token = strtok(NULL, ",");
+                }
+                gateway->cors.allowed_origins_count = i;
+            }
+            free(origins_copy);
+        }
+    }
+    
+    /* 初始化速率限制器（默认禁用） */
+    gateway->rate_limiter = NULL;
+    const char* rate_limit_enabled = getenv("GATEWAY_RATE_LIMIT_ENABLED");
+    if (rate_limit_enabled && strcmp(rate_limit_enabled, "true") == 0) {
+        gateway_rate_limit_config_t rl_config;
+        gateway_rate_limiter_get_default_config(&rl_config);
+        rl_config.enabled = true;
+        
+        /* 从环境变量读取配置 */
+        const char* rps = getenv("GATEWAY_RATE_LIMIT_RPS");
+        if (rps) {
+            rl_config.requests_per_second = (uint32_t)strtol(rps, NULL, 10);
+        }
+        
+        const char* rpm = getenv("GATEWAY_RATE_LIMIT_RPM");
+        if (rpm) {
+            rl_config.requests_per_minute = (uint32_t)strtol(rpm, NULL, 10);
+        }
+        
+        gateway->rate_limiter = gateway_rate_limiter_create(&rl_config);
+    }
     
     gateway_t* gw = malloc(sizeof(gateway_t));
     if (!gw) {

@@ -1,21 +1,25 @@
-/**
- * @file main.c
- * @brief 监控服务守护进程入口
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
+/*
+ * Copyright (C) 2026 SPHARX. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2026 SPHARX.
  * SPDX-License-Identifier: Apache-2.0
  *
- * 改进说明：
- * 1. 真正的守护进程模式（跨平台支持）
- * 2. JSON-RPC 2.0 服务接口
- * 3. 完善的错误处理和日志记录（替换 printf）
- * 4. OpenTelemetry 兼容的指标导出格式
+ * @file main.c
+ * @brief 监控服务守护进程主入口（遵循 daemon 模块统一规范）
+ *
+ * 规范遵循:
+ * - ARCHITECTURAL_PRINCIPLES.md E-3 资源确定性(成对管理)
+ * - ARCHITECTURAL_PRINCIPLES.md E-4 跨平台一致性(platform.h)
+ * - ARCHITECTURAL_PRINCIPLES.md E-5 命名语义化(SVC_LOG_*)
+ * - ARCHITECTURAL_PRINCIPLES.md E-6 错误可追溯(AGENTOS_ERR_*)
  */
 
 #include "monitor_service.h"
 #include "platform.h"
 #include "error.h"
 #include "svc_logger.h"
-
+#include "jsonrpc_helpers.h"
+#include "method_dispatcher.h"
+#include "param_validator.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,6 +39,7 @@
 static monitor_service_t* g_service = NULL;
 static volatile int g_running = 1;
 static agentos_mutex_t g_running_lock;
+static method_dispatcher_t* g_dispatcher = NULL;  /* 方法分发器 */
 
 /* ==================== 错误码定义（统一使用 AGENTOS_ERR_*） ==================== */
 #define MONIT_ERR_INVALID_PARAM   AGENTOS_ERR_INVALID_PARAM
@@ -51,143 +56,109 @@ static agentos_mutex_t g_running_lock;
 #define INVALID_PARAMS  -32602
 #define INTERNAL_ERROR  -32000
 
-/* ==================== JSON-RPC 响应构建 ==================== */
+/* ==================== 方法处理器包装函数 ==================== */
+
+/* 前向声明 */
+static void handle_record_metric(cJSON* params, int id, agentos_socket_t client_fd);
+static void handle_get_metrics(cJSON* params, int id, agentos_socket_t client_fd);
+static void handle_trigger_alert(cJSON* params, int id, agentos_socket_t client_fd);
+static void handle_get_alerts(int id, agentos_socket_t client_fd);
+static void handle_health_check(cJSON* params, int id, agentos_socket_t client_fd);
+static void handle_generate_report(int id, agentos_socket_t client_fd);
 
 /**
- * @brief 构建错误响应
- * @param code 错误码
- * @param message 错误消息
- * @param id 请求ID
- * @return JSON字符串（需调用者释放）
+ * @brief 方法处理器包装函数
  */
-static char* build_error_response(int code, const char* message, int id) {
-    cJSON* root = cJSON_CreateObject();
-    if (!root) return NULL;
+static void on_record_metric_method(cJSON* params, int id, void* user_data) {
+    (void)user_data;
+    handle_record_metric(params, id, *(agentos_socket_t*)user_data);
+}
 
-    cJSON_AddStringToObject(root, "jsonrpc", "2.0");
-    cJSON* err = cJSON_CreateObject();
-    if (!err) { cJSON_Delete(root); return NULL; }
-    cJSON_AddNumberToObject(err, "code", code);
-    cJSON_AddStringToObject(err, "message", message ? message : "Unknown error");
-    cJSON_AddItemToObject(root, "error", err);
+static void on_get_metrics_method(cJSON* params, int id, void* user_data) {
+    (void)user_data;
+    handle_get_metrics(params, id, *(agentos_socket_t*)user_data);
+}
 
-    if (id >= 0) {
-        cJSON_AddNumberToObject(root, "id", id);
-    } else {
-        cJSON_AddNullToObject(root, "id");
+static void on_trigger_alert_method(cJSON* params, int id, void* user_data) {
+    (void)user_data;
+    handle_trigger_alert(params, id, *(agentos_socket_t*)user_data);
+}
+
+static void on_get_alerts_method(cJSON* params, int id, void* user_data) {
+    (void)user_data;
+    handle_get_alerts(id, *(agentos_socket_t*)user_data);
+}
+
+static void on_health_check_method(cJSON* params, int id, void* user_data) {
+    (void)user_data;
+    handle_health_check(params, id, *(agentos_socket_t*)user_data);
+}
+
+static void on_generate_report_method(cJSON* params, int id, void* user_data) {
+    (void)user_data;
+    handle_generate_report(id, *(agentos_socket_t*)user_data);
+}
+
+static int register_rpc_methods(void) {
+    g_dispatcher = method_dispatcher_create(16);
+    if (!g_dispatcher) {
+        SVC_LOG_ERROR("Failed to create method dispatcher");
+        return -1;
     }
-
-    char* json = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
-    return json;
+    
+    method_dispatcher_register(g_dispatcher, "record_metric", on_record_metric_method, NULL);
+    method_dispatcher_register(g_dispatcher, "get_metrics", on_get_metrics_method, NULL);
+    method_dispatcher_register(g_dispatcher, "trigger_alert", on_trigger_alert_method, NULL);
+    method_dispatcher_register(g_dispatcher, "get_alerts", on_get_alerts_method, NULL);
+    method_dispatcher_register(g_dispatcher, "health_check", on_health_check_method, NULL);
+    method_dispatcher_register(g_dispatcher, "generate_report", on_generate_report_method, NULL);
+    
+    SVC_LOG_INFO("Registered %d RPC methods", 6);
+    return 0;
 }
-
-/**
- * @brief 构建成功响应
- * @param result 结果对象
- * @param id 请求ID
- * @return JSON字符串（需调用者释放）
- */
-static char* build_success_response(cJSON* result, int id) {
-    cJSON* root = cJSON_CreateObject();
-    if (!root) return NULL;
-
-    cJSON_AddStringToObject(root, "jsonrpc", "2.0");
-    cJSON_AddItemToObject(root, "result", result ? cJSON_Duplicate(result, 1) : cJSON_CreateNull());
-    cJSON_AddNumberToObject(root, "id", id);
-
-    char* json = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
-    return json;
-}
-
-/* ==================== 信号处理 ==================== */
-
-/**
- * @brief 信号处理函数
- * @param sig 信号值
- */
-static void signal_handler(int sig) {
-    (void)sig;
-    agentos_mutex_lock(&g_running_lock);
-    g_running = 0;
-    agentos_mutex_unlock(&g_running_lock);
-}
-
-#ifdef _WIN32
-/**
- * @brief Windows控制台处理函数
- * @param fdwCtrlType 控制信号类型
- * @return TRUE 已处理
- */
-static BOOL WINAPI console_handler(DWORD fdwCtrlType) {
-    switch (fdwCtrlType) {
-        case CTRL_C_EVENT:
-        case CTRL_CLOSE_EVENT:
-        case CTRL_SHUTDOWN_EVENT:
-            signal_handler((int)fdwCtrlType);
-            return TRUE;
-        default:
-            return FALSE;
-    }
-}
-#endif
 
 /* ==================== 请求处理方法 ==================== */
 
 /**
  * @brief 处理 record_metric 方法
  * @param params 参数对象
- * @param id 请求ID
+ * @param id 请求 ID
  * @param client_fd 客户端描述符
  */
 static void handle_record_metric(cJSON* params, int id, agentos_socket_t client_fd) {
-    cJSON* metric_json = cJSON_GetObjectItem(params, "metric");
-    if (!cJSON_IsObject(metric_json)) {
-        char* err = build_error_response(INVALID_PARAMS, "Missing metric object", id);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+    cJSON* metric_json = jsonrpc_get_object_param(params, "metric");
+    if (!metric_json) {
+        JSONRPC_SEND_ERROR(client_fd, INVALID_PARAMS, "Missing metric object", id);
         return;
     }
 
     metric_info_t metric = {0};
-    cJSON* jname = cJSON_GetObjectItem(metric_json, "name");
-    if (!cJSON_IsString(jname)) {
-        char* err = build_error_response(INVALID_PARAMS, "Missing metric name", id);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+    const char* mname = get_string_field(metric_json, "name", NULL);
+    if (!mname) {
+        JSONRPC_SEND_ERROR(client_fd, INVALID_PARAMS, "Missing metric name", id);
         return;
     }
 
-    /* 注意：这里需要深拷贝名称，因为 monitor_service_record_metric 会保存指针 */
-    metric.name = strdup(jname->valuestring);
-
-    cJSON* jdesc = cJSON_GetObjectItem(metric_json, "description");
-    if (cJSON_IsString(jdesc)) metric.description = jdesc->valuestring;
-
-    cJSON* jtype = cJSON_GetObjectItem(metric_json, "type");
-    if (cJSON_IsNumber(jtype)) metric.type = (metric_type_t)jtype->valueint;
-
-    cJSON* jval = cJSON_GetObjectItem(metric_json, "value");
-    if (cJSON_IsNumber(jval)) metric.value = jval->valuedouble;
+    metric.name = strdup(mname);
+    metric.description = get_string_field(metric_json, "description", NULL);
+    metric.type = (metric_type_t)get_int_field(metric_json, "type", 0);
+    metric.value = get_double_field(metric_json, "value", 0.0);
 
     metric.timestamp = (uint64_t)time(NULL) * 1000;
 
     int ret = monitor_service_record_metric(g_service, &metric);
 
-    /* 释放临时分配的内存 */
     free((void*)metric.name);
 
     if (ret != AGENTOS_SUCCESS) {
-        char* err = build_error_response(INTERNAL_ERROR, "Record metric failed", id);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
-        SVC_LOG_ERROR("Failed to record metric: %s (error=%d)", jname->valuestring, ret);
+        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Record metric failed", id);
+        SVC_LOG_ERROR("Failed to record metric: %s (error=%d)", mname, ret);
     } else {
         cJSON* result = cJSON_CreateObject();
         cJSON_AddStringToObject(result, "status", "recorded");
-        cJSON_AddStringToObject(result, "metric_name", jname->valuestring);
-        char* success = build_success_response(result, id);
-        cJSON_Delete(result);
-        if (success) { agentos_socket_send(client_fd, success, strlen(success)); free(success); }
-        SVC_LOG_DEBUG("Metric recorded: %s", jname->valuestring);
+        cJSON_AddStringToObject(result, "metric_name", mname);
+        JSONRPC_SEND_SUCCESS(client_fd, result, id);
+        SVC_LOG_DEBUG("Metric recorded: %s", mname);
     }
 }
 
@@ -198,20 +169,17 @@ static void handle_record_metric(cJSON* params, int id, agentos_socket_t client_
  * @param client_fd 客户端描述符
  */
 static void handle_get_metrics(cJSON* params, int id, agentos_socket_t client_fd) {
-    cJSON* jfilter = cJSON_GetObjectItem(params, "metric_name");
-    const char* filter = cJSON_IsString(jfilter) ? jfilter->valuestring : NULL;
+    const char* filter = get_string_field(params, "metric_name", NULL);
 
     metric_info_t** metrics = NULL;
     size_t count = 0;
     int ret = monitor_service_get_metrics(g_service, filter, &metrics, &count);
 
     if (ret != AGENTOS_SUCCESS) {
-        char* err = build_error_response(INTERNAL_ERROR, "Get metrics failed", id);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Get metrics failed", id);
         return;
     }
 
-    /* 构建 OpenTelemetry 格式的指标数组 */
     cJSON* arr = cJSON_CreateArray();
     for (size_t i = 0; i < count && metrics && metrics[i]; i++) {
         cJSON* m = cJSON_CreateObject();
@@ -224,12 +192,9 @@ static void handle_get_metrics(cJSON* params, int id, agentos_socket_t client_fd
         cJSON_AddItemToArray(arr, m);
     }
 
-    /* 释放获取到的指标数组（不释放内部数据） */
     free(metrics);
 
-    char* success = build_success_response(arr, id);
-    cJSON_Delete(arr);
-    if (success) { agentos_socket_send(client_fd, success, strlen(success)); free(success); }
+    JSONRPC_SEND_SUCCESS(client_fd, arr, id);
 }
 
 /**
@@ -239,48 +204,34 @@ static void handle_get_metrics(cJSON* params, int id, agentos_socket_t client_fd
  * @param client_fd 客户端描述符
  */
 static void handle_trigger_alert(cJSON* params, int id, agentos_socket_t client_fd) {
-    cJSON* alert_json = cJSON_GetObjectItem(params, "alert");
-    if (!cJSON_IsObject(alert_json)) {
-        char* err = build_error_response(INVALID_PARAMS, "Missing alert object", id);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+    cJSON* alert_json = jsonrpc_get_object_param(params, "alert");
+    if (!alert_json) {
+        JSONRPC_SEND_ERROR(client_fd, INVALID_PARAMS, "Missing alert object", id);
         return;
     }
 
     alert_info_t alert = {0};
-
-    cJSON* jid = cJSON_GetObjectItem(alert_json, "alert_id");
-    if (cJSON_IsString(jid)) alert.alert_id = jid->valuestring;
-
-    cJSON* jmsg = cJSON_GetObjectItem(alert_json, "message");
-    if (cJSON_IsString(jmsg)) alert.message = jmsg->valuestring;
-
-    cJSON* jlevel = cJSON_GetObjectItem(alert_json, "level");
-    if (cJSON_IsNumber(jlevel)) alert.level = (alert_level_t)jlevel->valueint;
-
-    cJSON* jservice = cJSON_GetObjectItem(alert_json, "service_name");
-    if (cJSON_IsString(jservice)) alert.service_name = jservice->valuestring;
-
-    cJSON* jresource = cJSON_GetObjectItem(alert_json, "resource_id");
-    if (cJSON_IsString(jresource)) alert.resource_id = jresource->valuestring;
+    alert.alert_id = get_string_field(alert_json, "alert_id", NULL);
+    alert.message = get_string_field(alert_json, "message", NULL);
+    alert.level = (alert_level_t)get_int_field(alert_json, "level", 0);
+    alert.service_name = get_string_field(alert_json, "service_name", NULL);
+    alert.resource_id = get_string_field(alert_json, "resource_id", NULL);
 
     alert.timestamp = (uint64_t)time(NULL) * 1000;
     alert.is_resolved = false;
 
     int ret = monitor_service_trigger_alert(g_service, &alert);
+    const char* alert_id = alert.alert_id ? alert.alert_id : "unknown";
 
     if (ret != AGENTOS_SUCCESS) {
-        char* err = build_error_response(INTERNAL_ERROR, "Trigger alert failed", id);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
-        SVC_LOG_ERROR("Failed to trigger alert: %s (error=%d)", 
-                     jid ? jid->valuestring : "unknown", ret);
+        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Trigger alert failed", id);
+        SVC_LOG_ERROR("Failed to trigger alert: %s (error=%d)", alert_id, ret);
     } else {
         cJSON* result = cJSON_CreateObject();
         cJSON_AddStringToObject(result, "status", "triggered");
-        if (jid) cJSON_AddStringToObject(result, "alert_id", jid->valuestring);
-        char* success = build_success_response(result, id);
-        cJSON_Delete(result);
-        if (success) { agentos_socket_send(client_fd, success, strlen(success)); free(success); }
-        SVC_LOG_INFO("Alert triggered: %s", jid ? jid->valuestring : "unknown");
+        if (alert.alert_id) cJSON_AddStringToObject(result, "alert_id", alert.alert_id);
+        JSONRPC_SEND_SUCCESS(client_fd, result, id);
+        SVC_LOG_INFO("Alert triggered: %s", alert_id);
     }
 }
 
@@ -295,8 +246,7 @@ static void handle_get_alerts(int id, agentos_socket_t client_fd) {
     int ret = monitor_service_get_alerts(g_service, &alerts, &count);
 
     if (ret != AGENTOS_SUCCESS) {
-        char* err = build_error_response(INTERNAL_ERROR, "Get alerts failed", id);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Get alerts failed", id);
         return;
     }
 
@@ -314,9 +264,7 @@ static void handle_get_alerts(int id, agentos_socket_t client_fd) {
 
     free(alerts);
 
-    char* success = build_success_response(arr, id);
-    cJSON_Delete(arr);
-    if (success) { agentos_socket_send(client_fd, success, strlen(success)); free(success); }
+    JSONRPC_SEND_SUCCESS(client_fd, arr, id);
 }
 
 /**
@@ -326,15 +274,13 @@ static void handle_get_alerts(int id, agentos_socket_t client_fd) {
  * @param client_fd 客户端描述符
  */
 static void handle_health_check(cJSON* params, int id, agentos_socket_t client_fd) {
-    cJSON* jservice = cJSON_GetObjectItem(params, "service_name");
-    const char* service_name = cJSON_IsString(jservice) ? jservice->valuestring : "unknown";
+    const char* service_name = get_string_field(params, "service_name", "unknown");
 
     health_check_result_t* result = NULL;
     int ret = monitor_service_health_check(g_service, service_name, &result);
 
     if (ret != AGENTOS_SUCCESS || !result) {
-        char* err = build_error_response(INTERNAL_ERROR, "Health check failed", id);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Health check failed", id);
         return;
     }
 
@@ -345,11 +291,8 @@ static void handle_health_check(cJSON* params, int id, agentos_socket_t client_f
         cJSON_AddStringToObject(res_obj, "status_message", result->status_message);
     cJSON_AddNumberToObject(res_obj, "timestamp", (double)result->timestamp);
 
-    char* success = build_success_response(res_obj, id);
-    cJSON_Delete(res_obj);
-    if (success) { agentos_socket_send(client_fd, success, strlen(success)); free(success); }
+    JSONRPC_SEND_SUCCESS(client_fd, res_obj, id);
 
-    /* 释放健康检查结果 */
     free(result->service_name);
     free(result->status_message);
     free(result);
@@ -365,8 +308,7 @@ static void handle_generate_report(int id, agentos_socket_t client_fd) {
     int ret = monitor_service_generate_report(g_service, &report);
 
     if (ret != AGENTOS_SUCCESS || !report) {
-        char* err = build_error_response(INTERNAL_ERROR, "Generate report failed", id);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Generate report failed", id);
         return;
     }
 
@@ -375,9 +317,7 @@ static void handle_generate_report(int id, agentos_socket_t client_fd) {
     cJSON_AddNumberToObject(result, "generated_at", (double)(uint64_t)time(NULL) * 1000);
     free(report);
 
-    char* success = build_success_response(result, id);
-    cJSON_Delete(result);
-    if (success) { agentos_socket_send(client_fd, success, strlen(success)); free(success); }
+    JSONRPC_SEND_SUCCESS(client_fd, result, id);
 }
 
 /* ==================== 客户端连接处理 ==================== */
@@ -394,16 +334,14 @@ static void handle_client(agentos_socket_t client_fd) {
     buffer[n] = '\0';
 
     if ((size_t)n >= sizeof(buffer) - 1) {
-        char* err = build_error_response(INVALID_REQUEST, "Request too large", -1);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        JSONRPC_SEND_ERROR(client_fd, INVALID_REQUEST, "Request too large", -1);
         agentos_socket_close(client_fd);
         return;
     }
 
     cJSON* req = cJSON_Parse(buffer);
     if (!req) {
-        char* err = build_error_response(PARSE_ERROR, "Parse error: invalid JSON", -1);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        JSONRPC_SEND_ERROR(client_fd, PARSE_ERROR, "Parse error: invalid JSON", -1);
         agentos_socket_close(client_fd);
         return;
     }
@@ -415,8 +353,7 @@ static void handle_client(agentos_socket_t client_fd) {
 
     if (!cJSON_IsString(jsonrpc) || strcmp(jsonrpc->valuestring, "2.0") != 0 ||
         !cJSON_IsString(method) || !id) {
-        char* err = build_error_response(INVALID_REQUEST, "Invalid Request", -1);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
+        JSONRPC_SEND_ERROR(client_fd, INVALID_REQUEST, "Invalid Request", -1);
         cJSON_Delete(req);
         agentos_socket_close(client_fd);
         return;
@@ -426,23 +363,7 @@ static void handle_client(agentos_socket_t client_fd) {
 
     SVC_LOG_DEBUG("Processing request: method=%s, id=%d", method->valuestring, req_id);
 
-    if (strcmp(method->valuestring, "record_metric") == 0) {
-        handle_record_metric(params, req_id, client_fd);
-    } else if (strcmp(method->valuestring, "get_metrics") == 0) {
-        handle_get_metrics(params, req_id, client_fd);
-    } else if (strcmp(method->valuestring, "trigger_alert") == 0) {
-        handle_trigger_alert(params, req_id, client_fd);
-    } else if (strcmp(method->valuestring, "get_alerts") == 0) {
-        handle_get_alerts(req_id, client_fd);
-    } else if (strcmp(method->valuestring, "health_check") == 0) {
-        handle_health_check(params, req_id, client_fd);
-    } else if (strcmp(method->valuestring, "generate_report") == 0) {
-        handle_generate_report(req_id, client_fd);
-    } else {
-        char* err = build_error_response(METHOD_NOT_FOUND, "Method not found", req_id);
-        if (err) { agentos_socket_send(client_fd, err, strlen(err)); free(err); }
-        SVC_LOG_WARN("Unknown method requested: %s", method->valuestring);
-    }
+    method_dispatcher_dispatch(g_dispatcher, req, jsonrpc_build_error, &client_fd);
 
     cJSON_Delete(req);
     agentos_socket_close(client_fd);
@@ -522,7 +443,16 @@ int main(int argc, char** argv) {
         agentos_socket_cleanup();
         return 1;
     }
-
+    
+    /* 注册 RPC 方法 */
+    if (register_rpc_methods() != 0) {
+        SVC_LOG_ERROR("Failed to register RPC methods");
+        monitor_service_destroy(g_service);
+        agentos_mutex_destroy(&g_running_lock);
+        agentos_socket_cleanup();
+        return 1;
+    }
+    
     SVC_LOG_INFO("Monitor service created successfully");
 
     /* 创建服务器 Socket */
@@ -567,6 +497,7 @@ int main(int argc, char** argv) {
     SVC_LOG_INFO("Monitor service stopping...");
     agentos_socket_close(server_fd);
     monitor_service_destroy(g_service);
+    if (g_dispatcher) method_dispatcher_destroy(g_dispatcher);
     agentos_mutex_destroy(&g_running_lock);
     agentos_socket_cleanup();
 

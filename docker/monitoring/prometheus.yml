@@ -1,68 +1,198 @@
+# =============================================================================
+# AgentOS Prometheus 监控配置 (Prometheus Monitoring Configuration)
+# 版本: 2.0.0 (Production-Grade)
+# 最后更新: 2026-04-06
+#
+# 📊 监控架构:
+#   [Prometheus] → pull metrics from:
+#     - Kernel (port 9090) - 内核指标
+#     - Gateway (port 18789/metrics) - 网关指标（如果启用）
+#     - PostgreSQL Exporter (9187) - 数据库指标
+#     - Redis Exporter (9121) - 缓存指标
+#     - Node Exporter (9100) - 系统指标（可选）
+#
+# 🔗 关联文件:
+#   - docker-compose.yml / docker-compose.prod.yml (Prometheus 服务定义)
+#   - monitoring/rules/agentos_alerts.yml (告警规则)
+#   - monitoring/grafana/provisioning/datasources/ (Grafana 数据源配置)
+#
+# 使用方法:
+#   此文件通过 docker-compose 挂载到 Prometheus 容器:
+#   ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+# =============================================================================
+
 global:
+  # 全局抓取间隔（生产环境建议 15 秒）
   scrape_interval: 15s
+  # 规则评估间隔（应 <= scrape_interval）
   evaluation_interval: 15s
+  # 超时时间
+  scrape_timeout: 10s
+  # 外部标签（添加到所有时序数据）
   external_labels:
     monitor: 'agentos-monitor'
-    environment: '${ENVIRONMENT:-development}'
+    environment: '${ENVIRONMENT:-production}'
+    cluster: 'agentos-prod'
 
+# 告警管理器配置 (AlertManager 集成，可选)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+          # 取消注释以启用 AlertManager:
+          # - 'alertmanager:9093'
+        timeout: 10s
+
+# 告警规则文件路径 (相对于 Prometheus 配置目录)
+rule_files:
+  - 'rules/*.yml'
+
+# 抓取配置 (Scrape Configurations)
 scrape_configs:
-  # AgentOS 内核指标
+  
+  # ===========================================================================
+  # 1. AgentOS 内核服务 (Kernel Service)
+  #    源码位置: agentos/atoms/corekern/
+  #    端口: 9090 (/metrics endpoint)
+  #    指标类型: IPC 性能、Syscall 延迟、内存使用、任务调度
+  # ===========================================================================
   - job_name: 'agentos-kernel'
     static_configs:
-      - targets: ['kernel:9090']
+      - targets: ['kernel:9090']            # Docker DNS 解析
         labels:
           service: 'kernel'
-          component: 'core'
-    scrape_interval: 10s
+          component: 'microkernel'
+          tier: 'core'
+          env: 'production'
+    scrape_interval: 10s                    # 核心服务更频繁采集
+    scrape_timeout: 5s
     metrics_path: '/metrics'
+    # 重试配置
+    sample_limit: 10000                     # 单次抓取最大样本数
 
-  # AgentOS 守护进程指标
-  - job_name: 'agentos-daemon'
+  # ===========================================================================
+  # 2. Gateway 网关服务 (Gateway Service)
+  #    源码位置: agentos/gateway/
+  #    端口: 18789 (/metrics endpoint, 如果启用 Prometheus exporter)
+  #    指标类型: HTTP QPS、延迟分布、错误率、连接池状态
+  # ===========================================================================
+  - job_name: 'agentos-gateway'
     static_configs:
-      - targets: ['daemon:8001', 'daemon:8002', 'daemon:8003',
-                   'daemon:8004', 'daemon:8005', 'daemon:8006']
+      - targets: ['gateway:18789']
         labels:
-          service: 'daemon'
-          component: 'services'
-    scrape_interval: 15s
+          service: 'gateway'
+          component: 'api-gateway'
+          tier: 'edge'
+          env: 'production'
+    scrape_interval: 10s                    # 网关是关键路径，高频采集
+    scrape_timeout: 5s
+    metrics_path: '/metrics'                # Gateway 的 Prometheus 端点
+    # 如果 Gateway 使用不同的 metrics 路径，修改此处:
+    # metrics_path: '/api/v1/metrics'
 
-  # PostgreSQL 指标（使用postgres_exporter时启用）
-  - job_name: 'postgres'
+  # ===========================================================================
+  # 3. PostgreSQL 数据库 (PostgreSQL Database)
+  #    需要: postgres_exporter sidecar 或独立容器
+  #    默认端口: 9187
+  #    指标类型: 连接数、查询性能、锁等待、复制延迟、WAL 大小
+  # ===========================================================================
+  - job_name: 'postgresql'
     static_configs:
-      - targets: ['postgres-exporter:9187']
+      - targets: ['postgres-exporter:9187'] # PostgreSQL Exporter
         labels:
           service: 'database'
           component: 'postgresql'
-    scrape_interval: 30s
+          tier: 'data'
+          env: 'production'
+    scrape_interval: 30s                   # 数据库指标不需要太频繁
+    scrape_timeout: 10s
 
-  # Redis 指标（使用redis_exporter时启用）
+  # ===========================================================================
+  # 4. Redis 缓存 (Redis Cache)
+  #    需要: redis_exporter sidecar 或独立容器
+  #    默认端口: 9121
+  #    指标类型: 内存使用、命中率、连接数、键空间、持久化状态
+  # ===========================================================================
   - job_name: 'redis'
     static_configs:
-      - targets: ['redis-exporter:9121']
+      - targets: ['redis-exporter:9121']    # Redis Exporter
         labels:
           service: 'cache'
           component: 'redis'
+          tier: 'data'
+          env: 'production'
     scrape_interval: 15s
+    scrape_timeout: 5s
 
-  # OpenLab 应用指标
+  # ===========================================================================
+  # 5. OpenLab 应用服务 (OpenLab Application) [可选]
+  #    端口: 8000 (/metrics endpoint, 如果启用)
+  #    指标类型: HTTP 请求、业务指标、自定义监控
+  # ===========================================================================
   - job_name: 'openlab'
     static_configs:
       - targets: ['openlab:8000']
         labels:
           service: 'openlab'
           component: 'application'
+          tier: 'frontend'
+          env: 'production'
     scrape_interval: 15s
+    scrape_timeout: 5s
 
-  # Prometheus 自监控
+  # ===========================================================================
+  # 6. Node Exporter (系统级指标) [可选但推荐]
+  #    用于监控 Docker Host 的 CPU/Memory/Disk/Network
+  #    默认端口: 9100
+  # ===========================================================================
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: 'infrastructure'
+          component: 'host-metrics'
+          tier: 'platform'
+          env: 'production'
+    scrape_interval: 30s                   # 系统指标低频即可
+
+  # ===========================================================================
+  # 7. Docker Daemon Metrics (Docker 引擎指标) [可选]
+  #    需要: cAdvisor 或 Docker Metric Exporter
+  #    默认端口: 9323 (cAdvisor) 或 9417 (Docker Exporter)
+  # ===========================================================================
+  - job_name: 'docker'
+    static_configs:
+      - targets: ['cadvisor:9323']           # Google cAdvisor
+        labels:
+          service: 'infrastructure'
+          component: 'container-metrics'
+          tier: 'platform'
+          env: 'production'
+    scrape_interval: 30s
+
+  # ===========================================================================
+  # 8. Prometheus 自监控 (Self-Monitoring)
+  #    用于监控 Prometheus 自身的健康和性能
+  # ===========================================================================
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
+        labels:
+          service: 'monitoring'
+          component: 'prometheus'
+          tier: 'observability'
+          env: 'production'
 
-alerting:
-  alertmanagers:
-    - static_configs:
-        - targets: []
-          # alertmanager:9093 (如果部署了AlertManager)
+# 远程写入配置 (Remote Write, 可选 - 用于长期存储或聚合)
+# remote_write:
+#   - url: 'http://victoriametrics:8428/api/v1/write'
+#     queue_config:
+#       max_samples_per_send: 10000
+#       batch_send_deadline: 5s
+#       capacity: 25000
+#       max_shards: 200
 
-rule_files:
-  # - 'alert_rules.yml'  (告警规则文件，按需启用)
+# 远程读取配置 (Remote Read, 可选)
+# remote_read:
+#   - url: 'http://victoriametrics:8428/api/v1/read'
+#     read_recent: true

@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "../../utils/cupolas_utils.h"
 
 #define DEFAULT_QUEUE_SIZE 10000
 #define DEFAULT_BATCH_SIZE 100

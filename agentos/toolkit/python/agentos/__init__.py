@@ -1,6 +1,6 @@
 # AgentOS Python SDK
-# Version: 2.0.0
-# Last updated: 2026-03-23
+# Version: 3.0.0
+# Last updated: 2026-04-06
 
 """
 AgentOS Python SDK - AgentOS 系统的生产级 Python 接口
@@ -11,15 +11,37 @@ AgentOS Python SDK - AgentOS 系统的生产级 Python 接口
     - 跨平台支持（Linux、macOS、Windows）
     - 异步编程支持
     - 上下文管理器（with/async with）
+    - Checkpoint 断点续传机制
+    - Token 使用效率优化（LRU 缓存）
+    - OpenTelemetry 可观测性集成
+    - EventEmitter 事件驱动架构
 
 快速入门：
     >>> from agentos import AgentOS
     >>> client = AgentOS(endpoint="http://localhost:18789")
     >>> task = client.submit_task('{"input": "analyze this data"}')
     >>> result = task.wait(timeout=30)
+
+架构设计：
+    遵循 ARCHITECTURAL_PRINCIPLES.md 五维正交设计体系：
+    - K-1 (内核最小化): 仅保留核心通信能力
+    - K-2 (接口契约化): 明确的 API 接口定义
+    - E-3 (资源确定性): 资源生命周期明确
+    - A-1 (简约至上): 最小化公共接口
+    - S-1 (安全默认): 安全配置优先
+
+对应关系：
+    - Go SDK: agentos/client/*.go, agentos/modules/*.go
+    - Rust SDK: src/client/*.rs, src/modules/*.rs
+    - TypeScript SDK: src/client/*.ts, src/modules/*.ts
+
+Version History:
+    v1.0.0 (2026-03-23): 初始版本
+    v2.0.0 (2026-03-24): 模块化重构
+    v3.0.0 (2026-04-05): 全面优化，生产就绪
 """
 
-__version__ = "1.0.0.9"
+__version__ = "3.0.0"
 __author__ = "SpharxWorks"
 __license__ = "MIT"
 

@@ -1,4 +1,4 @@
-﻿# AgentOS Python SDK - Types Module Entry
+# AgentOS Python SDK - Types Module Entry
 # Version: 3.0.0
 # Last updated: 2026-03-24
 
@@ -11,7 +11,7 @@ request/response structures.
 Corresponds to Go SDK: types/types.go
 """
 
-from .commons import (
+from .common import (
     # 枚举类型
     TaskStatus,
     MemoryLayer,

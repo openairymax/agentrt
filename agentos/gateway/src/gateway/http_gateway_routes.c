@@ -16,6 +16,7 @@
 #include "jsonrpc.h"
 #include "syscall_router.h"
 #include "gateway_utils.h"
+#include "gateway_rate_limiter.h"
 #include "syscalls.h"
 
 #include <microhttpd.h>
@@ -27,9 +28,9 @@
 /* ========== 路由处理函数实现 ========== */
 
 /**
- * @brief 处理 JSON-RPC POST 请求
+ * @brief 处理 JSON-RPC POST 请求 (CC=3)
  */
-static int handle_post_jsonrpc(http_gateway_t* gateway, 
+int handle_post_jsonrpc(http_gateway_t* gateway,
                                 struct MHD_Connection* connection,
                                 http_request_context_t* context) {
     (void)connection;
@@ -54,9 +55,9 @@ static int handle_post_jsonrpc(http_gateway_t* gateway,
 }
 
 /**
- * @brief 处理 OPTIONS 请求（CORS 预检）
+ * @brief 处理 OPTIONS 请求（CORS 预检）(CC=2)
  */
-static int handle_options_preflight(http_gateway_t* gateway,
+int handle_options_preflight(http_gateway_t* gateway,
                                      struct MHD_Connection* connection,
                                      http_request_context_t* context) {
     (void)gateway;
@@ -80,9 +81,9 @@ static int handle_options_preflight(http_gateway_t* gateway,
 }
 
 /**
- * @brief 处理 GET /health 健康检查
+ * @brief 处理 GET /health 健康检查 (CC=2)
  */
-static int handle_health_check(http_gateway_t* gateway,
+int handle_health_check(http_gateway_t* gateway,
                                 struct MHD_Connection* connection,
                                 http_request_context_t* context) {
     (void)context;
@@ -100,9 +101,9 @@ static int handle_health_check(http_gateway_t* gateway,
 }
 
 /**
- * @brief 处理 GET /metrics 指标导出
+ * @brief 处理 GET /metrics 指标导出 (CC=3)
  */
-static int handle_metrics_export(http_gateway_t* gateway,
+int handle_metrics_export(http_gateway_t* gateway,
                                   struct MHD_Connection* connection,
                                   http_request_context_t* context) {
     (void)context;
@@ -127,9 +128,9 @@ static int handle_metrics_export(http_gateway_t* gateway,
 }
 
 /**
- * @brief 处理 404 Not Found
+ * @brief 处理 404 Not Found (CC=2)
  */
-static int handle_not_found(http_gateway_t* gateway,
+int handle_not_found(http_gateway_t* gateway,
                              struct MHD_Connection* connection,
                              http_request_context_t* context) {
     (void)gateway;
@@ -148,9 +149,9 @@ static int handle_not_found(http_gateway_t* gateway,
 }
 
 /**
- * @brief 处理请求大小超限错误
+ * @brief 处理请求大小超限错误 (CC=2)
  */
-static int handle_request_too_large(http_gateway_t* gateway,
+int handle_request_too_large(http_gateway_t* gateway,
                                      struct MHD_Connection* connection,
                                      http_request_context_t* context,
                                      size_t data_size) {
@@ -171,9 +172,9 @@ static int handle_request_too_large(http_gateway_t* gateway,
 }
 
 /**
- * @brief 处理 JSON 解析错误
+ * @brief 处理 JSON 解析错误 (CC=2)
  */
-static int handle_parse_error(http_gateway_t* gateway,
+int handle_parse_error(http_gateway_t* gateway,
                                struct MHD_Connection* connection,
                                http_request_context_t* context,
                                size_t data_size) {
@@ -193,7 +194,7 @@ static int handle_parse_error(http_gateway_t* gateway,
     return ret;
 }
 
-/* ========== 路由表定义 ========== */
+/* ========== 路由表定义（唯一实现） ========== */
 
 /**
  * @brief HTTP 路由条目
@@ -205,23 +206,31 @@ typedef struct {
 } http_route_t;
 
 /**
- * @brief HTTP 路由表
+ * @brief HTTP 路由表（按优先级排序）
+ *
+ * 路由匹配规则：
+ * 1. 先匹配 HTTP 方法
+ * 2. 再匹配路径（支持通配符 "*"）
+ * 3. 未匹配则走默认路由 (handle_not_found)
  */
 static const http_route_t http_routes[] = {
     {"POST", "/", handle_post_jsonrpc},
     {"OPTIONS", "*", handle_options_preflight},
     {"GET", "/health", handle_health_check},
     {"GET", "/metrics", handle_metrics_export},
-    {NULL, NULL, handle_not_found}  /* 默认路由 */
+    {NULL, NULL, handle_not_found}  /* 默认路由（必须最后） */
 };
 
 /**
- * @brief 查找匹配的路由
+ * @brief 查找匹配的路由处理函数 (CC=2)
+ *
+ * @param method HTTP 方法（如 "POST", "GET"）
+ * @param path URL 路径（如 "/", "/health"）
+ * @return 匹配的路由处理函数
  */
-static int (*find_http_route(const char* method, const char* path))(http_gateway_t*, struct MHD_Connection*, http_request_context_t*) {
+static http_route_handler_t find_http_route(const char* method, const char* path) {
     for (const http_route_t* route = http_routes; route->method != NULL; route++) {
         if (strcmp(method, route->method) == 0) {
-            /* 通配符路由或精确路径匹配 */
             if (strcmp(route->path, "*") == 0 || strcmp(path, route->path) == 0) {
                 return route->handler;
             }
@@ -230,12 +239,16 @@ static int (*find_http_route(const char* method, const char* path))(http_gateway
     return handle_not_found;
 }
 
-/* ========== 重构后的主请求处理函数 ========== */
+/* ========== 重构后的主请求处理函数 (CC=8) ========== */
 
 /**
- * @brief HTTP 请求处理主函数（重构后版本）
- * 
- * 圈复杂度从~25 降至~8
+ * @brief HTTP 请求处理主函数
+ *
+ * 处理流程（4个阶段）：
+ * 阶段1: 初始化请求上下文（首次调用）
+ * 阶段2: 接收 POST 数据体
+ * 阶段3: 处理完整 JSON-RPC 请求
+ * 阶段4: 路由到其他端点（OPTIONS/GET等）
  */
 int handle_http_request(void* cls, struct MHD_Connection* connection,
                         const char* url, const char* method,
@@ -244,8 +257,32 @@ int handle_http_request(void* cls, struct MHD_Connection* connection,
     http_gateway_t* gateway = (http_gateway_t*)cls;
     http_request_context_t* context = (http_request_context_t*)*con_cls;
     
-    (void)connection;
     (void)version;
+    
+    /* 速率限制检查（在早期阶段进行） */
+    if (gateway->rate_limiter) {
+        /* 获取客户端 IP 地址 */
+        const char* client_ip = MHD_lookup_connection_value(connection, MHD_HEADER_KIND, "X-Forwarded-For");
+        if (!client_ip) {
+            client_ip = MHD_lookup_connection_value(connection, MHD_HEADER_KIND, "X-Real-IP");
+        }
+        if (!client_ip) {
+            /* 尝试从连接获取 IP（简化实现） */
+            client_ip = "unknown";
+        }
+        
+        if (!gateway_rate_limiter_allow(gateway->rate_limiter, client_ip)) {
+            /* 返回 429 Too Many Requests */
+            const char* error_response = "{\"error\":{\"code\":-32004,\"message\":\"Rate limit exceeded\"}}";
+            struct MHD_Response* response = MHD_create_response_from_buffer(
+                strlen(error_response), (void*)error_response, MHD_RESPMEM_PERSISTENT);
+            MHD_add_response_header(response, "Content-Type", "application/json");
+            MHD_add_response_header(response, "Server", "AgentOS-gateway/1.0");
+            int ret = MHD_queue_response(connection, 429, response);
+            MHD_destroy_response(response);
+            return ret;
+        }
+    }
     
     /* 阶段 1: 初始化请求上下文 */
     if (!context) {

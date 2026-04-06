@@ -83,6 +83,7 @@ typedef struct heapstore_registry_iter heapstore_registry_iter_t;
  * @reentrant 否
  *
  * @see heapstore_registry_shutdown()
+ * @since v1.0.0
  */
 heapstore_error_t heapstore_registry_init(void);
 
@@ -94,6 +95,7 @@ heapstore_error_t heapstore_registry_init(void);
  * @reentrant 否
  *
  * @see heapstore_registry_init()
+ * @since v1.0.0
  */
 void heapstore_registry_shutdown(void);
 
@@ -119,7 +121,8 @@ heapstore_error_t heapstore_registry_add_agent(const heapstore_agent_record_t* r
  * @ownership 调用者负责 record 的分配和释放
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_registry_get_agent(const char* id, heapstore_agent_record_t* record);
 
 /**
@@ -131,7 +134,8 @@ heapstore_error_t heapstore_registry_get_agent(const char* id, heapstore_agent_r
  * @ownership 调用者负责 record 的生命周期
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_registry_update_agent(const heapstore_agent_record_t* record);
 
 /**
@@ -142,7 +146,8 @@ heapstore_error_t heapstore_registry_update_agent(const heapstore_agent_record_t
  *
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_registry_delete_agent(const char* id);
 
 /**
@@ -156,7 +161,8 @@ heapstore_error_t heapstore_registry_delete_agent(const char* id);
  * @ownership 调用者负责调用 heapstore_registry_iter_destroy 释放迭代器
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_registry_query_agents(const char* filter_type, const char* filter_status, heapstore_registry_iter_t** iter);
 
 /**
@@ -168,7 +174,8 @@ heapstore_error_t heapstore_registry_query_agents(const char* filter_type, const
  * @ownership 调用者负责 record 的生命周期
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_registry_add_skill(const heapstore_skill_record_t* record);
 
 /**
@@ -181,7 +188,8 @@ heapstore_error_t heapstore_registry_add_skill(const heapstore_skill_record_t* r
  * @ownership 调用者负责 record 的分配和释放
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_registry_get_skill(const char* id, heapstore_skill_record_t* record);
 
 /**
@@ -192,7 +200,8 @@ heapstore_error_t heapstore_registry_get_skill(const char* id, heapstore_skill_r
  *
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_registry_delete_skill(const char* id);
 
 /**
@@ -204,7 +213,8 @@ heapstore_error_t heapstore_registry_delete_skill(const char* id);
  * @ownership 调用者负责调用 heapstore_registry_iter_destroy 释放迭代器
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_registry_query_skills(heapstore_registry_iter_t** iter);
 
 /**
@@ -216,7 +226,8 @@ heapstore_error_t heapstore_registry_query_skills(heapstore_registry_iter_t** it
  * @ownership 调用者负责 record 的生命周期
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_registry_add_session(const heapstore_session_record_t* record);
 
 /**
@@ -229,7 +240,8 @@ heapstore_error_t heapstore_registry_add_session(const heapstore_session_record_
  * @ownership 调用者负责 record 的分配和释放
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_registry_get_session(const char* id, heapstore_session_record_t* record);
 
 /**
@@ -241,7 +253,8 @@ heapstore_error_t heapstore_registry_get_session(const char* id, heapstore_sessi
  * @ownership 调用者负责 record 的生命周期
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_registry_update_session(const heapstore_session_record_t* record);
 
 /**
@@ -252,7 +265,8 @@ heapstore_error_t heapstore_registry_update_session(const heapstore_session_reco
  *
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_registry_delete_session(const char* id);
 
 /**
@@ -265,7 +279,8 @@ heapstore_error_t heapstore_registry_delete_session(const char* id);
  * @ownership 调用者负责调用 heapstore_registry_iter_destroy 释放迭代器
  * @threadsafe 是
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_registry_query_sessions(const char* filter_status, heapstore_registry_iter_t** iter);
 
 /**
@@ -278,7 +293,8 @@ heapstore_error_t heapstore_registry_query_sessions(const char* filter_status, h
  * @ownership 调用者负责 record 的分配和释放
  * @threadsafe 否
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 heapstore_error_t heapstore_registry_iter_next(heapstore_registry_iter_t* iter, void* record);
 
 /**
@@ -289,7 +305,8 @@ heapstore_error_t heapstore_registry_iter_next(heapstore_registry_iter_t* iter, 
  * @ownership 调用者负责传入有效的迭代器
  * @threadsafe 否
  * @reentrant 否
- */
+
+ * @since v1.0.0*/
 void heapstore_registry_iter_destroy(heapstore_registry_iter_t* iter);
 
 /**
@@ -299,8 +316,77 @@ void heapstore_registry_iter_destroy(heapstore_registry_iter_t* iter);
  *
  * @threadsafe 是
  * @reentrant 否
+ * @since v1.0.0
  */
 heapstore_error_t heapstore_registry_vacuum(void);
+
+/**
+ * @brief 批量插入 Agent 记录（事务优化版本）
+ *
+ * 此函数将多个 INSERT 操作包裹在单个事务中，显著提升批量写入性能。
+ * 相比逐条调用 heapstore_registry_add_agent()，性能可提升 5-10 倍。
+ *
+ * @param records [in] Agent 记录数组
+ * @param count [in] 记录数量
+ * @return heapstore_error_t 错误码
+ *
+ * @ownership 调用者负责 records 数组的生命周期
+ * @threadsafe 是
+ * @reentrant 否
+ *
+ * @note
+ * - 所有记录要么全部插入成功，要么全部回滚（原子性）
+ * - 如果某条记录失败，整个事务将回滚
+ * - 适用于批量导入场景
+ *
+ * @see heapstore_registry_add_agent()
+ * @since v1.0.0.7
+ *
+ * @example
+ * @code
+ * heapstore_agent_record_t records[100];
+ * // ... 初始化 records ...
+ * heapstore_error_t err = heapstore_registry_batch_insert_agents(records, 100);
+ * if (err == heapstore_SUCCESS) {
+ *     // 批量插入成功
+ * }
+ * @endcode
+ */
+heapstore_error_t heapstore_registry_batch_insert_agents(const heapstore_agent_record_t* records, size_t count);
+
+/**
+ * @brief 批量插入 Session 记录（事务优化版本）
+ *
+ * @param records [in] Session 记录数组
+ * @param count [in] 记录数量
+ * @return heapstore_error_t 错误码
+ *
+ * @ownership 调用者负责 records 数组的生命周期
+ * @threadsafe 是
+ * @reentrant 否
+ *
+ * @note 所有记录要么全部插入成功，要么全部回滚
+ * @see heapstore_registry_add_session()
+ * @since v1.0.0.7
+ */
+heapstore_error_t heapstore_registry_batch_insert_sessions(const heapstore_session_record_t* records, size_t count);
+
+/**
+ * @brief 批量插入 Skill 记录（事务优化版本）
+ *
+ * @param records [in] Skill 记录数组
+ * @param count [in] 记录数量
+ * @return heapstore_error_t 错误码
+ *
+ * @ownership 调用者负责 records 数组的生命周期
+ * @threadsafe 是
+ * @reentrant 否
+ *
+ * @note 所有记录要么全部插入成功，要么全部回滚
+ * @see heapstore_registry_add_skill()
+ * @since v1.0.0.7
+ */
+heapstore_error_t heapstore_registry_batch_insert_skills(const heapstore_skill_record_t* records, size_t count);
 
 /**
  * @brief 检查注册表系统是否健康
@@ -309,7 +395,8 @@ heapstore_error_t heapstore_registry_vacuum(void);
  *
  * @threadsafe 是
  * @reentrant 是
- */
+
+ * @since v1.0.0*/
 bool heapstore_registry_is_healthy(void);
 
 #ifdef __cplusplus

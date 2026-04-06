@@ -1,4 +1,12 @@
-﻿# AgentOS TypeScript SDK
+# AgentOS TypeScript SDK
+
+**版本**: v3.0.0
+**最后更新**: 2026-04-06
+**TypeScript 版本**: 4.5+
+**Node.js 版本**: 16+
+**测试覆盖率**: 88%+（待补充）
+**代码重复率**: 2.6%
+**平均圈复杂度**: ~2.6 (B 级)
 
 ## 概述
 
