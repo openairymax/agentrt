@@ -1,9 +1,9 @@
-﻿# Copyright (c) 2026 SPHARX. All Rights Reserved.
+# Copyright (c) 2026 SPHARX. All Rights Reserved.
 # Tool 服务单元测试构建文件
 
 cmake_minimum_required(VERSION 3.20)
 
-# 测试源文�?
+# 测试源文件
 set(TOOL_TEST_SOURCES
     test_service.c
     test_cache.c
@@ -12,10 +12,10 @@ set(TOOL_TEST_SOURCES
     test_registry.c
 )
 
-# 创建测试可执行文�?
+# 创建测试可执行文件
 add_executable(test_tool_d ${TOOL_TEST_SOURCES})
 
-# 链接�?tool_d 和依�?
+# 链接到 tool_d 和依赖
 target_link_libraries(test_tool_d PRIVATE
     agentos-tool-d
     svc_common
@@ -43,7 +43,7 @@ target_compile_options(test_tool_d PRIVATE
 # 注册测试
 add_test(NAME tool_d_all COMMAND test_tool_d)
 
-# 可选：只有�?BUILD_COVERAGE 时才收集覆盖�?
+# 可选：只有当 BUILD_COVERAGE 时才收集覆盖率
 if(BUILD_COVERAGE)
     target_compile_options(test_tool_d PRIVATE
         -fprofile-arcs

@@ -68,7 +68,7 @@ elseif(APPLE)
     target_link_options(agentos_syscall PRIVATE -Wl,-dead_strip -pie)
 endif()
 
-target_link_libraries(agentos_syscall
+target_link_libraries(agentos_syscall PUBLIC
     agentos_core
     agentos_coreloopthree
     agentos_memoryrovol

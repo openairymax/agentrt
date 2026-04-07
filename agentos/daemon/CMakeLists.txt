@@ -45,7 +45,7 @@ if(BUILD_TESTS)
     enable_testing()
     message(STATUS "  Unit tests:  ENABLED")
     
-    # 收集所有测�?
+    # 收集所有测试
     find_package(GTest QUIET)
     if(NOT GTest_FOUND)
         message(STATUS "  GTest:       NOT FOUND (tests may use custom framework)")
@@ -60,12 +60,12 @@ if(BUILD_COVERAGE)
     message(STATUS "  Coverage Target: ${COVERAGE_TARGET}%")
     message(STATUS "  Note: Use 'make coverage' to generate coverage reports")
     
-    # 查找覆盖率工�?
+    # 查找覆盖率工具
     find_program(LCOV NAMES lcov)
     find_program(GENHTML NAMES genhtml)
     
     if(LCOV AND GENHTML)
-        # 添加覆盖率报告目�?
+        # 添加覆盖率报告目标
         add_custom_target(coverage
             COMMAND ${LCOV} --capture --directory ${CMAKE_BINARY_DIR} --output-file coverage.info
             COMMAND ${LCOV} --remove coverage.info '/usr/*' --output-file coverage.info
@@ -74,7 +74,7 @@ if(BUILD_COVERAGE)
             COMMENT "Generating coverage report..."
         )
         
-        # 添加覆盖率清理目�?
+        # 添加覆盖率清理目标
         add_custom_target(coverage-clean
             COMMAND ${CMAKE_COMMAND} -E remove -f *.gcda *.gcno coverage.info
             COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/coverage_report
