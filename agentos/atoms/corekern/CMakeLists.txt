@@ -21,7 +21,6 @@ set(COREKERN_SOURCES
     src/time/clock.c
     src/time/timer.c
     src/time/event.c
-    src/observability/observability.c
 )
 
 # 平台特定调度器文件

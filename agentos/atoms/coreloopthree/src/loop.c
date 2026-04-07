@@ -44,6 +44,11 @@ static agentos_error_t initialize_loop_resources(agentos_core_loop_t* loop, cons
 static agentos_error_t create_loop_engines(agentos_core_loop_t* loop);
 static void cleanup_loop_resources(agentos_core_loop_t* loop);
 
+/* 提取的辅助函数 - 降低 agentos_loop_submit 圈复杂度 */
+static char* build_enhanced_input(const char* input, size_t input_len, 
+                                   agentos_memory_t* memories, size_t memory_count);
+static void free_memories(agentos_memory_t* memories, size_t memory_count);
+
 /* 默认配置 */
 static void init_default_config(agentos_loop_config_t* manager) {
     memset(manager, 0, sizeof(agentos_loop_config_t));
@@ -188,6 +193,65 @@ static void cleanup_loop_resources(agentos_core_loop_t* loop)
     AGENTOS_FREE(loop);
 }
 
+/**
+ * @brief 释放记忆结果数组
+ * @param memories 记忆数组指针
+ * @param memory_count 记忆数量
+ */
+static void free_memories(agentos_memory_t* memories, size_t memory_count)
+{
+    if (!memories) return;
+    
+    for (size_t i = 0; i < memory_count; i++) {
+        if (memories[i].content) {
+            AGENTOS_FREE(memories[i].content);
+        }
+    }
+    AGENTOS_FREE(memories);
+}
+
+/**
+ * @brief 构建增强输入（带记忆上下文）
+ * @param input 原始输入
+ * @param input_len 原始输入长度
+ * @param memories 记忆数组
+ * @param memory_count 记忆数量
+ * @return 增强后的输入字符串，需调用者释放；失败返回NULL
+ */
+static char* build_enhanced_input(const char* input, size_t input_len, 
+                                   agentos_memory_t* memories, size_t memory_count)
+{
+    if (!input || memory_count == 0 || !memories) return NULL;
+    
+    /* 分配足够空间：原始输入 + 记忆内容 + 格式标记 */
+    size_t total_len = input_len + 1024;
+    for (size_t i = 0; i < memory_count; i++) {
+        if (memories[i].content) {
+            total_len += memories[i].content_len + 64;
+        }
+    }
+    
+    char* enhanced_input = (char*)AGENTOS_MALLOC(total_len);
+    if (!enhanced_input) return NULL;
+    
+    /* 构建带上下文的输入 */
+    size_t pos = 0;
+    pos += snprintf(enhanced_input + pos, total_len - pos, 
+        "[上下文增强]\n相关记忆数量：%zu\n\n", memory_count);
+    
+    for (size_t i = 0; i < memory_count && i < 5; i++) {
+        if (memories[i].content) {
+            pos += snprintf(enhanced_input + pos, total_len - pos,
+                "记忆 %zu: %.*s\n", i + 1, (int)memories[i].content_len, memories[i].content);
+        }
+    }
+    
+    pos += snprintf(enhanced_input + pos, total_len - pos,
+        "\n[用户输入]\n%.*s", (int)input_len, input);
+    
+    return enhanced_input;
+}
+
 /* ==================== 公共 API 函数实现 ==================== */
 
 AGENTOS_API agentos_error_t agentos_loop_create(
@@ -304,45 +368,16 @@ AGENTOS_API agentos_error_t agentos_loop_submit(
     size_t memory_count = 0;
     agentos_error_t err = agentos_memory_retrieve(loop->memory, input, input_len, 5, &memories, &memory_count);
     
-    /* 构建增强输入（如果有相关记忆） */
+    /* 步骤 2: 构建增强输入（如果有相关记忆） */
     char* enhanced_input = NULL;
     if (err == AGENTOS_SUCCESS && memory_count > 0) {
-        /* 分配足够空间：原始输入 + 记忆内容 + 格式标记 */
-        size_t total_len = input_len + 1024;
-        for (size_t i = 0; i < memory_count; i++) {
-            if (memories[i].content) {
-                total_len += memories[i].content_len + 64;
-            }
-        }
-        
-        enhanced_input = (char*)AGENTOS_MALLOC(total_len);
-        if (enhanced_input) {
-            /* 构建带上下文的输入 */
-            size_t pos = 0;
-            pos += snprintf(enhanced_input + pos, total_len - pos, 
-                "[上下文增强]\n相关记忆数量：%zu\n\n", memory_count);
-            
-            for (size_t i = 0; i < memory_count && i < 5; i++) {
-                if (memories[i].content) {
-                    pos += snprintf(enhanced_input + pos, total_len - pos,
-                        "记忆 %zu: %.*s\n", i + 1, (int)memories[i].content_len, memories[i].content);
-                }
-            }
-            
-            pos += snprintf(enhanced_input + pos, total_len - pos,
-                "\n[用户输入]\n%.*s", (int)input_len, input);
-        }
-        
-        /* 无论enhanced_input是否分配成功，都释放记忆结果 */
-        for (size_t i = 0; i < memory_count; i++) {
-            if (memories[i].content) {
-                AGENTOS_FREE(memories[i].content);
-            }
-        }
-        AGENTOS_FREE(memories);
+        enhanced_input = build_enhanced_input(input, input_len, memories, memory_count);
     }
     
-    /* 步骤 2: 认知层处理（带上下文增强） */
+    /* 释放记忆结果（无论是否构建了增强输入） */
+    free_memories(memories, memory_count);
+    
+    /* 步骤 3: 认知层处理（带上下文增强） */
     const char* process_input = enhanced_input ? enhanced_input : input;
     size_t process_len = enhanced_input ? strlen(enhanced_input) : input_len;
     
@@ -359,7 +394,7 @@ AGENTOS_API agentos_error_t agentos_loop_submit(
         return AGENTOS_EINVAL;
     }
 
-    /* 步骤 3: 执行层提交任务 */
+    /* 步骤 4: 执行层提交任务 */
     agentos_task_t task;
     memset(&task, 0, sizeof(task));
     task.task_input = (void*)process_input;
