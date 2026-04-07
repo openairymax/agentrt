@@ -12,6 +12,107 @@ from collections import OrderedDict
 from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from enum import IntEnum
+
+
+class TokenModelType(IntEnum):
+    """Token 计算模型类型（与 C 语言 token_standard.h 保持一致）"""
+    GENERIC = 0      # 通用模型（默认）
+    GPT4 = 1         # GPT-4 系列模型
+    GPT35 = 2        # GPT-3.5 系列模型
+    CLAUDE = 3       # Claude 系列模型
+    LLAMA = 4        # LLaMA 系列模型
+    CUSTOM = 5       # 自定义模型
+
+
+class TokenPrecision(IntEnum):
+    """Token 计算精度级别"""
+    LOW = 0          # 低精度（快速估算）
+    MEDIUM = 1       # 中等精度
+    HIGH = 2         # 高精度（准确但较慢）
+
+
+def standard_token_count(
+    text: str,
+    model_type: TokenModelType = TokenModelType.GENERIC,
+    precision: TokenPrecision = TokenPrecision.LOW
+) -> int:
+    """
+    标准化 Token 计算函数（与 C 语言实现保持一致）
+    
+    Args:
+        text: 输入文本
+        model_type: 模型类型
+        precision: 计算精度
+    
+    Returns:
+        Token 数量
+    """
+    if not text:
+        return 0
+    
+    # 分析文本特征
+    cjk_chars = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
+    alpha_chars = sum(1 for c in text if c.isalpha())
+    total_chars = len(text)
+    
+    # 计算 CJK 和字母字符比例
+    cjk_ratio = cjk_chars / total_chars if total_chars > 0 else 0
+    alpha_ratio = alpha_chars / total_chars if total_chars > 0 else 0
+    
+    # 根据精度设置阈值
+    if precision == TokenPrecision.LOW:
+        cjk_threshold = 0.3
+        alpha_threshold = 0.5
+    elif precision == TokenPrecision.MEDIUM:
+        cjk_threshold = 0.2
+        alpha_threshold = 0.4
+    else:  # HIGH precision
+        cjk_threshold = 0.1
+        alpha_threshold = 0.3
+    
+    # 根据模型类型和精度选择计算策略
+    token_count = 0
+    
+    if precision == TokenPrecision.HIGH:
+        # 高精度模式：根据模型类型使用不同算法
+        if model_type in (TokenModelType.GPT4, TokenModelType.GPT35):
+            # GPT 系列：中文字符 1.5 字符/Token，英文 4 字符/Token
+            token_count = int(cjk_chars / 1.5 + (total_chars - cjk_chars) / 4.0)
+        elif model_type == TokenModelType.CLAUDE:
+            # Claude 系列：统一 3.5 字符/Token
+            token_count = int(total_chars / 3.5)
+        elif model_type == TokenModelType.LLAMA:
+            # LLaMA 系列：中文字符 2 字符/Token，英文 4 字符/Token
+            token_count = int(cjk_chars / 2.0 + (total_chars - cjk_chars) / 4.0)
+        else:
+            # 通用模型：自适应算法
+            if cjk_ratio > cjk_threshold:
+                # 主要为中文文本
+                token_count = int(cjk_chars / 1.5 + (total_chars - cjk_chars) / 4.0)
+            elif alpha_ratio > alpha_threshold:
+                # 主要为英文文本
+                token_count = int(total_chars / 4.0)
+            else:
+                # 混合文本
+                token_count = int(total_chars / 3.0)
+    else:
+        # 估算模式（低/中精度）：快速估算
+        if cjk_ratio > cjk_threshold:
+            # 主要为中文文本：1.5 字符/Token
+            token_count = int(total_chars / 1.5)
+        elif alpha_ratio > alpha_threshold:
+            # 主要为英文文本：4 字符/Token
+            token_count = int(total_chars / 4.0)
+        else:
+            # 混合文本：3 字符/Token
+            token_count = int(total_chars / 3.0)
+    
+    # 确保至少返回 1 个 Token
+    if token_count == 0 and total_chars > 0:
+        token_count = 1
+    
+    return token_count
 
 
 @dataclass
@@ -477,20 +578,25 @@ class ContextCompressor:
     
     def estimate_tokens(self, text: str) -> int:
         """
-        估算 Token 数量
+        估算 Token 数量（使用标准化算法）
         
         Args:
             text: 文本
         
         Returns:
             int: Token 数量（估算）
-        """
-        # 中文：1 token ≈ 1.5 字符
-        # 英文：1 token ≈ 4 字符
-        chinese_chars = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
-        other_chars = len(text) - chinese_chars
         
-        return int(chinese_chars / 1.5 + other_chars / 4)
+        Note:
+            使用与 C 语言实现相同的标准化算法，确保跨语言一致性。
+            默认使用通用模型和中等精度，提供合理的估算结果。
+        """
+        # 使用标准化 Token 计算函数
+        # 默认使用通用模型和中等精度
+        return standard_token_count(
+            text=text,
+            model_type=TokenModelType.GENERIC,
+            precision=TokenPrecision.MEDIUM
+        )
 
 
 class TokenOptimizer:
