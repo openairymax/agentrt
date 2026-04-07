@@ -25,6 +25,9 @@
 /* Unified base library compatibility layer */
 #include "../../../agentos/commons/utils/memory/include/memory_compat.h"
 #include "../../../agentos/commons/utils/string/include/string_compat.h"
+
+/* Check macros for unified error handling */
+#include "../../../agentos/commons/utils/include/check.h"
 #include <string.h>
 #ifdef _WIN32
 /* Windows 平台原子操作兼容层 */
@@ -77,12 +80,12 @@ static void* (*wrap_user_thread_entry(void (*user_func)(void*)))(void*)
 static int ensure_scheduler_fully_initialized(void)
 {
     /* 初始化调度器核心层 */
-    if (scheduler_core_init() != 0) {
+    CHECK_COND(scheduler_core_init() == 0) {
         return -1;
     }
 
     /* 初始化平台适配器 */
-    if (scheduler_platform_auto_init() != 0) {
+    CHECK_COND(scheduler_platform_auto_init() == 0) {
         return -1;
     }
 
