@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿"""
+﻿﻿﻿﻿"""
 AgentOS 契约测试用例自动生成器
 Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 Version: 1.0.0
@@ -480,11 +480,13 @@ class TestCodeGenerator:
                 f'        input_data = {json.dumps(tc.input_data, indent=12, ensure_ascii=False)}',
                 f'        expected = {json.dumps(tc.expected_result, indent=12, ensure_ascii=False)}',
                 '',
-                f'        # TODO: 实现验证逻辑',
-                f'        # result = validate_contract(input_data)',
-                f'        # assert result == expected',
+                f'        # @future 验证逻辑实现要点：',
+                f'        # 1. 调用合约验证器：result = validate_contract(input_data)',
+                f'        # 2. 验证返回值：assert result == expected',
+                f'        # 3. 验证错误处理：对于预期失败的测试用例，验证异常类型和消息',
+                f'        # 4. 验证边界条件：输入数据的边界值和异常情况',
                 '',
-                '        # 临时断言',
+                '        # 临时断言（占位符）',
                 f'        assert isinstance(input_data, dict)',
                 '',
                 '',

@@ -6,6 +6,7 @@
 
 #include "layer2_feature.h"
 #include <stdlib.h>
+#include "../../../agentos/commons/utils/include/check.h"
 
 /* Unified base library compatibility layer */
 #include "../../../agentos/commons/utils/memory/include/memory_compat.h"
@@ -40,8 +41,12 @@ agentos_error_t agentos_hybrid_search_weighted(
     float** out_scores,
     size_t* out_count) {
 
-    if (!layer || !bm25_idx || !query || !out_record_ids || !out_scores || !out_count)
-        return AGENTOS_EINVAL;
+    CHECK_NULL(layer);
+    CHECK_NULL(bm25_idx);
+    CHECK_NULL(query);
+    CHECK_NULL(out_record_ids);
+    CHECK_NULL(out_scores);
+    CHECK_NULL(out_count);
 
     // 获取向量搜索结果（取2倍候选）
     char** vec_ids = NULL;
@@ -157,8 +162,12 @@ agentos_error_t agentos_hybrid_search_rrf(
     float** out_scores,
     size_t* out_count) {
 
-    if (!layer || !bm25_idx || !query || !out_record_ids || !out_scores || !out_count)
-        return AGENTOS_EINVAL;
+    CHECK_NULL(layer);
+    CHECK_NULL(bm25_idx);
+    CHECK_NULL(query);
+    CHECK_NULL(out_record_ids);
+    CHECK_NULL(out_scores);
+    CHECK_NULL(out_count);
 
     // 获取向量�?BM25 结果
     char** vec_ids = NULL;
