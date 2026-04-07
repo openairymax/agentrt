@@ -1,8 +1,8 @@
 # AgentOS 测试代码规范
 
 **版本**: 1.0.0
-**最后更�?*: 2026-03-26
-**状�?*: 正式发布
+**最后更新**: 2026-03-26
+**状态**: 正式发布
 
 ---
 
@@ -13,14 +13,14 @@
 3. [Python 测试规范](#python-测试规范)
 4. [测试组织结构](#测试组织结构)
 5. [代码质量标准](#代码质量标准)
-6. [最佳实践](#最佳实�?
+6. [最佳实践](#最佳实践)
 7. [代码审查清单](#代码审查清单)
 
 ---
 
 ## 概述
 
-本文档定义了 AgentOS 项目测试代码的编写规范，旨在�?- 提高测试代码的可维护�?- 减少代码重复
+本文档定义了 AgentOS 项目测试代码的编写规范，旨在：- 提高测试代码的可维护性- 减少代码重复
 - 确保测试质量
 - 统一编码风格
 
@@ -54,9 +54,9 @@
 // 4. 测试工具头文�?#include "test_macros.h"
 ```
 
-### 2. 使用测试�?
-#### 2.1 推荐使用测试宏减少样板代�?
-**�?不推�?*:
+### 2. 使用测试宏
+#### 2.1 推荐使用测试宏减少样板代码
+**❌ 不推荐**:
 ```c
 static void test_engine_create_destroy() {
     engine_t* engine = NULL;
@@ -68,7 +68,7 @@ static void test_engine_create_destroy() {
 }
 ```
 
-**�?推荐**:
+**✅ 推荐**:
 ```c
 static void test_engine_create_destroy() {
     TEST_ENGINE_CREATE_DESTROY(
@@ -167,7 +167,7 @@ def test_missing_field_c(self, validator):
     assert not validator.validate(data)
 ```
 
-**�?推荐**:
+**✅ 推荐**:
 ```python
 @pytest.mark.parametrize("missing_field", ["field_a", "field_b", "field_c"])
 def test_missing_required_field(self, validator, missing_field):

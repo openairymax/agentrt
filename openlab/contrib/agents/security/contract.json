@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_version": "1.0.0",
+  "agent_id": "security",
+  "agent_name": "Security Agent",
+  "description": "安全审计智能体，负责安全评估、漏洞扫描和安全策略制定",
+  "version": "1.0.0.9",
+  "author": "SPHARX Team",
+  "license": "Apache-2.0",
+  
+  "capabilities": [
+    {
+      "name": "debugging",
+      "description": "安全调试能力"
+    },
+    {
+      "name": "optimization",
+      "description": "安全优化能力"
+    }
+  ],
+  
+  "metadata": {
+    "created_at": "2026-04-07T00:00:00Z",
+    "tags": ["security", "vulnerability", "threat-modeling", "compliance"],
+    "category": "security",
+    "maturity": "production"
+  }
+}
