@@ -96,37 +96,31 @@ static size_t estimate_english_tokens(const char* text, size_t length) {
  * @brief 根据模型名称选择计数策略
  */
 static size_t count_tokens_by_model(const char* model_name, const char* text, size_t length) {
-    if (strstr(model_name, "gpt-4") || strstr(model_name, "gpt-4o") || strstr(model_name, "gpt-35")) {
-        size_t cjk_count = 0;
-        size_t i = 0;
-        
-        while (i < length) {
-            unsigned char c = (unsigned char)text[i];
-            if (c >= 0xE0 && c <= 0xEF) {
-                cjk_count++;
-            }
-            i++;
-        }
-        
-        if (cjk_count > length / 3) {
-            return estimate_cjk_tokens(text, length);
-        }
+    // 映射模型名称到标准化模型类型
+    agentos_token_config_t config = AGENTOS_TOKEN_CONFIG_DEFAULT;
+    
+    if (strstr(model_name, "gpt-4") || strstr(model_name, "gpt-4o")) {
+        config.model_type = AGENTOS_TOKEN_MODEL_GPT4;
+    } else if (strstr(model_name, "gpt-35") || strstr(model_name, "gpt-3.5")) {
+        config.model_type = AGENTOS_TOKEN_MODEL_GPT35;
+    } else if (strstr(model_name, "claude")) {
+        config.model_type = AGENTOS_TOKEN_MODEL_CLAUDE;
+    } else if (strstr(model_name, "llama") || strstr(model_name, "vicuna") || strstr(model_name, "alpaca")) {
+        config.model_type = AGENTOS_TOKEN_MODEL_LLAMA;
+    } else {
+        config.model_type = AGENTOS_TOKEN_MODEL_GENERIC;
     }
     
-    size_t alpha_count = 0;
-    size_t i = 0;
-    while (i < length) {
-        if (isalpha((unsigned char)text[i])) {
-            alpha_count++;
-        }
-        i++;
+    // 使用标准化 Token 计算函数
+    size_t token_count = agentos_token_standard_count(text, length, &config);
+    
+    // 如果标准化函数出错，回退到原始算法
+    if (token_count == (size_t)-1) {
+        // 回退到原始简单估算
+        return (length * 3) / 4;
     }
     
-    if (alpha_count > length / 2) {
-        return estimate_english_tokens(text, length);
-    }
-    
-    return (length * 3) / 4;
+    return token_count;
 }
 
 agentos_token_counter_t* agentos_token_counter_create(const char* model_name) {
