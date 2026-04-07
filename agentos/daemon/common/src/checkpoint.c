@@ -18,7 +18,7 @@
  */
 
 #include "../include/checkpoint.h"
-#include "agentos.h"
+#include "../../../../agentos/atoms/corekern/include/agentos.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -26,7 +26,7 @@
 #include <stdio.h>
 
 /* Unified base library compatibility layer */
-#include "../../../agentos/commons/utils/memory/include/memory_compat.h"
+#include "../../../../agentos/commons/utils/memory/include/memory_compat.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -144,7 +144,7 @@ static char** safe_str_array_dup(char** src, size_t count) {
         return NULL;
     }
 
-    char** dest = (char**)AGENTOS_MALLOC(sizeof(char*) * count);
+    char** dest = (char**)AGENTOS_CALLOC(1, sizeof(char*) * count);
     if (!dest) {
         return NULL;
     }
@@ -219,7 +219,7 @@ static void init_checkpoint_fields(
  *
  * 圈复杂度: 4 (<7)
  */
-static heapos_error_t copy_node_lists(
+static agentos_error_t copy_node_lists(
     agentos_task_checkpoint_t* cp,
     char** completed_nodes,
     size_t completed_count,

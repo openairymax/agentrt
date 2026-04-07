@@ -198,6 +198,13 @@ See [cupolas security documentation](agentos/cupolas/README.md)
 
 </details>
 
+<br><br>
+
+<p align="center">
+  <strong>☀️ Every problem solved illuminates humanity's path forward ☀️</strong>
+</p>
+
+<br>
 
 ## 🤝 Contributing
 
@@ -207,13 +214,15 @@ This is a **future** being written.
 
 ### 🚩 The Power of Belief
 
-**Because we believe**:
-- The future of intelligent agents should not be defined by a single framework
-- The power of open source can push the boundaries of technology
+**We believe**:
+- The future of intelligence should not be defined by a single framework
+- The spirit of open source maximizes collective wisdom, elevating humanity to new heights
 
-**Witness the future**:
-- Participate in building a complete technology stack from kernel to application
-- Witness how the four-layer memory system emerges true intelligence
+**We witness**:
+- Every line of code we write will be etched into the monument of civilization
+- The emergence of true intelligence
+
+**This is not humanity's sunset, but the dawn of a new world.**
 
 ### 💫 Ways to Contribute
 
@@ -233,7 +242,13 @@ Fork Project → Create Branch → Develop & Test → Submit PR → Code Review 
 
 **Main Platforms**: [AtomGit](https://atomgit.com/spharx/agentos) (Recommended) · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)
 
-> Every problem solved is a light for humanity's future.
+<br><br>
+
+<p align="center">
+  <strong>🔥 "A faint light cannot illuminate the entire path, yet it guides our direction forward." 🔥</strong>
+</p>
+
+<br><br>
 
 ## 📜 License
 
@@ -252,4 +267,16 @@ This project is licensed under the **Apache License 2.0**. See [LICENSE](LICENSE
 
 © 2026 SPHARX Ltd. All Rights Reserved.
 
-</div>
+</div>  
+
+---
+
+## ⭐️ Github Star History
+
+<a href="https://www.star-history.com/">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&type=date&legend=top-left" />
+ </picture>
+</a>

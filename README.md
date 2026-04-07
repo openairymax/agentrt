@@ -194,22 +194,32 @@ AgentOS 是**操作系统级**产品，而非单一框架：
 
 </details>
 
+<br><br>
+
+<p align="center">
+  <strong>☀️ 每解决一个问题，都是为人类点亮一盏灯 ☀️</strong>  
+</p>
+
+<br>
 
 ## 🤝 参与贡献
 
+这是我们正在走进的未来。  
+
 > "Intelligence emergence, and nothing less, is the ultimate sublimation of AI."
 
-这是一个正在走进的**未来**。
 
-### 🚩 相信的力量
+### 🎏 相信的力量
 
-**因为相信**：
-- 智能体的未来不应该被单一框架所定义
-- 开源社区的力量可以推动技术边界的拓展
+**相信**：
+- 智能的未来，不应该被单一框架所定义  
+- 开源的精神，能最大发挥群体的智慧，推动人类族群走上新的高度  
 
-**见证未来**：
-- 参与构建一个从内核到应用的完整技术栈
-- 见证四层记忆系统如何涌现出真正的智慧
+**见证**：
+- 我们每一天的工作，都将铭刻在人类文明发展的丰碑上   
+- 见证真正智慧的涌现  
+
+**这不是人类的日落，而是新世界的曙光**  
 
 ### 💫 可以贡献的方式
 
@@ -227,17 +237,15 @@ AgentOS 是**操作系统级**产品，而非单一框架：
 Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 → 合并主分支
 ```
 
-**主要平台**：[AtomGit](https://atomgit.com/spharx/agentos)（推荐） · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)  
- 
-<br>
+**主要平台**：[AtomGit](https://atomgit.com/spharx/agentos)（推荐） · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)   
 
-<p align="center">
-  <strong>我们所解决的每一个问题，都是为人类未来点亮的一盏灯</strong>  
-   <p align="center">
-  <strong>“微微的灯火照不亮前行的路，但能指引前行的方向”</strong>
+<br><br>
+
+<p align="center">  
+  <strong>🔥 “微微的灯火照不亮前路，但能指引我们前行的方向” 🔥</strong>
 </p>
 
-<br>
+<br><br>
 
 ## 📜 许可证
 
