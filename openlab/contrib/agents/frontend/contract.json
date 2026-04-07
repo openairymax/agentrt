@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_version": "1.0.0",
+  "agent_id": "frontend",
+  "agent_name": "Frontend Agent",
+  "description": "前端开发智能体，负责UI开发、用户体验优化和组件设计",
+  "version": "1.0.0.9",
+  "author": "SPHARX Team",
+  "license": "Apache-2.0",
+  
+  "capabilities": [
+    {
+      "name": "code_generation",
+      "description": "代码生成能力"
+    },
+    {
+      "name": "documentation",
+      "description": "文档生成能力"
+    }
+  ],
+  
+  "performance": {
+    "response_time": {
+      "p50": 200,
+      "p95": 1000,
+      "p99": 2000,
+      "unit": "ms"
+    }
+  },
+  
+  "metadata": {
+    "created_at": "2026-04-07T00:00:00Z",
+    "tags": ["frontend", "ui", "ux"],
+    "category": "software_engineering",
+    "maturity": "production"
+  }
+}

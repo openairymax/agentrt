@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_version": "1.0.0",
+  "agent_id": "devops",
+  "agent_name": "DevOps Agent",
+  "description": "运维部署智能体，负责CI/CD、容器化部署、基础设施管理和监控告警",
+  "version": "1.0.0.9",
+  "author": "SPHARX Team",
+  "license": "Apache-2.0",
+  
+  "capabilities": [
+    {
+      "name": "code_generation",
+      "description": "配置代码生成能力"
+    },
+    {
+      "name": "debugging",
+      "description": "问题诊断能力"
+    }
+  ],
+  
+  "metadata": {
+    "created_at": "2026-04-07T00:00:00Z",
+    "tags": ["devops", "cicd", "containerization", "monitoring"],
+    "category": "operations",
+    "maturity": "production"
+  }
+}
