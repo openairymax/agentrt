@@ -26,7 +26,7 @@
 #include "logger.h"
 #include "observability.h"
 #include "manager.h"
-#include "../../../corekern/include/resource_quota.h"
+#include "../../../../commons/utils/resource/resource_quota.h"
 #include <stdlib.h>
 #include <string.h>
 
