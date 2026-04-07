@@ -7,6 +7,7 @@
 #include "time.h"
 #include "error.h"
 #include <stdio.h>
+#include <inttypes.h>
 
 int test_time_monotonic() {
     printf("Testing monotonic time functions...\n");
@@ -104,7 +105,7 @@ int test_time_sleep() {
 
     // 允许一定的误差（最�?50ms�?
     if (elapsed < 50000000ULL || elapsed > 150000000ULL) {
-        printf("Sleep duration incorrect: %llu ns\n", elapsed);
+        printf("Sleep duration incorrect: %" PRIu64 " ns\n", elapsed);
         return 1;
     }
 
