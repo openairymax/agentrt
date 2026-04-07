@@ -386,7 +386,7 @@ void agentos_sandbox_reset_quota(agentos_sandbox_t* sandbox) {
 }
 
 agentos_error_t agentos_sandbox_suspend(agentos_sandbox_t* sandbox) {
-    if (!sandbox) return AGENTOS_EINVAL;
+    CHECK_NULL(sandbox);
 
     agentos_mutex_lock(sandbox->lock);
     if (sandbox->state != SANDBOX_STATE_ACTIVE) {
@@ -399,7 +399,7 @@ agentos_error_t agentos_sandbox_suspend(agentos_sandbox_t* sandbox) {
 }
 
 agentos_error_t agentos_sandbox_resume(agentos_sandbox_t* sandbox) {
-    if (!sandbox) return AGENTOS_EINVAL;
+    CHECK_NULL(sandbox);
 
     agentos_mutex_lock(sandbox->lock);
     if (sandbox->state == SANDBOX_STATE_SUSPENDED) {
@@ -412,7 +412,7 @@ agentos_error_t agentos_sandbox_resume(agentos_sandbox_t* sandbox) {
 }
 
 agentos_error_t agentos_sandbox_terminate(agentos_sandbox_t* sandbox) {
-    if (!sandbox) return AGENTOS_EINVAL;
+    CHECK_NULL(sandbox);
 
     agentos_mutex_lock(sandbox->lock);
     sandbox->state = SANDBOX_STATE_TERMINATED;
