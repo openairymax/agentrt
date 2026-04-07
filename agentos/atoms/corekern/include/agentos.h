@@ -55,10 +55,6 @@
  * @brief 时间管理接口
  */
 #include "time.h"
-/**
- * @brief 可观测性接口
- */
-#include "observability.h"
 
 #ifdef __cplusplus
 extern "C" {
