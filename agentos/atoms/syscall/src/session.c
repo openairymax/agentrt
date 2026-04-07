@@ -24,6 +24,7 @@
 /* Unified base library compatibility layer */
 #include "../../../agentos/commons/utils/memory/include/memory_compat.h"
 #include "../../../agentos/commons/utils/string/include/string_compat.h"
+#include "../../../agentos/commons/utils/include/check.h"
 #include <string.h>
 #include <cjson/cJSON.h>
 
@@ -62,7 +63,7 @@ static void ensure_lock(void) {
  * @reentrant 否
  */
 agentos_error_t agentos_sys_session_create(const char* metadata, char** out_session_id) {
-    if (!out_session_id) return AGENTOS_EINVAL;
+    CHECK_NULL(out_session_id);
     ensure_lock();
 
     static uint64_t counter = 0;
@@ -74,26 +75,16 @@ agentos_error_t agentos_sys_session_create(const char* metadata, char** out_sess
     char* out_id_copy = NULL;
     agentos_error_t ret = AGENTOS_SUCCESS;
     
-    id = AGENTOS_STRDUP(id_buf);
-    if (!id) {
-        ret = AGENTOS_ENOMEM;
-        goto cleanup;
-    }
+    STRDUP_CHECK_ERR(id, id_buf, cleanup, ret, AGENTOS_ENOMEM);
     
     s = (session_t*)AGENTOS_CALLOC(1, sizeof(session_t));
-    if (!s) {
-        ret = AGENTOS_ENOMEM;
-        goto cleanup;
-    }
+    CHECK_NULL_GOTO_ERR(s, cleanup, ret, AGENTOS_ENOMEM);
     s->session_id = id;  // 转移id的所有权给session对象
     id = NULL;  // 防止重复释放
     
     if (metadata) {
         s->metadata = AGENTOS_STRDUP(metadata);
-        if (!s->metadata) {
-            ret = AGENTOS_ENOMEM;
-            goto cleanup;
-        }
+        CHECK_NULL_GOTO_ERR(s->metadata, cleanup, ret, AGENTOS_ENOMEM);
     }
     s->created_ns = agentos_time_monotonic_ns();
     s->last_active_ns = s->created_ns;
@@ -105,11 +96,7 @@ agentos_error_t agentos_sys_session_create(const char* metadata, char** out_sess
     agentos_mutex_unlock(session_lock);
     s = NULL;  // 所有权已转移给全局链表
     
-    out_id_copy = AGENTOS_STRDUP(s->session_id);  // 注意：此时s已被插入链表，通过sessions访问
-    if (!out_id_copy) {
-        ret = AGENTOS_ENOMEM;
-        goto cleanup_linked;
-    }
+    STRDUP_CHECK_ERR(out_id_copy, s->session_id, cleanup_linked, ret, AGENTOS_ENOMEM);
     
     *out_session_id = out_id_copy;
     out_id_copy = NULL;  // 所有权已转移给调用者
@@ -154,7 +141,8 @@ cleanup:
  * @brief 获取会话信息
  */
 agentos_error_t agentos_sys_session_get(const char* session_id, char** out_info) {
-    if (!session_id || !out_info) return AGENTOS_EINVAL;
+    CHECK_NULL(session_id);
+    CHECK_NULL(out_info);
     ensure_lock();
     agentos_mutex_lock(session_lock);
     session_t* s = sessions;
@@ -190,7 +178,7 @@ agentos_error_t agentos_sys_session_get(const char* session_id, char** out_info)
  * @reentrant 否
  */
 agentos_error_t agentos_sys_session_close(const char* session_id) {
-    if (!session_id) return AGENTOS_EINVAL;
+    CHECK_NULL(session_id);
     ensure_lock();
     agentos_mutex_lock(session_lock);
     session_t** p = &sessions;

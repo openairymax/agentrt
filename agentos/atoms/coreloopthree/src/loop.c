@@ -14,6 +14,7 @@
 /* Unified base library compatibility layer */
 #include "../../../agentos/commons/utils/memory/include/memory_compat.h"
 #include "../../../agentos/commons/utils/string/include/string_compat.h"
+#include "../../../agentos/commons/utils/include/check.h"
 #include <string.h>
 
 #ifdef _WIN32
@@ -69,7 +70,7 @@ static void init_default_config(agentos_loop_config_t* manager) {
  */
 static agentos_error_t validate_loop_parameters(const agentos_loop_config_t* manager, agentos_core_loop_t** out_loop)
 {
-    if (!out_loop) return AGENTOS_EINVAL;
+    CHECK_NULL(out_loop);
 
     if (manager) {
         if (manager->loop_config_cognition_threads > 1024 ||
@@ -315,7 +316,7 @@ AGENTOS_API void agentos_loop_destroy(agentos_core_loop_t* loop)
 
 AGENTOS_API agentos_error_t agentos_loop_run(agentos_core_loop_t* loop)
 {
-    if (!loop) return AGENTOS_EINVAL;
+    CHECK_NULL(loop);
 
     agentos_mutex_lock(loop->lock);
     loop->running = 1;
