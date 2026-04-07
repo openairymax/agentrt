@@ -11,6 +11,7 @@
  */
 
 #include "token.h"
+#include "token_standard.h"
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
