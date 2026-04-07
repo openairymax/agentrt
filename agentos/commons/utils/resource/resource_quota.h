@@ -11,7 +11,7 @@
 #ifndef RESOURCE_QUOTA_H
 #define RESOURCE_QUOTA_H
 
-#include "../../../agentos/commons/utils/memory/include/memory_compat.h"
+#include "../../../../agentos/commons/utils/memory/include/memory_compat.h"
 #include <stddef.h>
 #include <stdint.h>
 

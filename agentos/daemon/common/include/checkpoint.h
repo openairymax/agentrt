@@ -16,7 +16,10 @@
 #ifndef AGENTOS_ATOMS_CHECKPOINT_H
 #define AGENTOS_ATOMS_CHECKPOINT_H
 
-#include "agentos.h"
+#include "../../../../agentos/commons/utils/error/include/error.h"
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
