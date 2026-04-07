@@ -813,8 +813,10 @@ class DocumentationGenerator:
             # Simplified: just collect all files
             pass
 
-        # TODO: Implement proper navigation generation
-        # This is a simplified version
+        # @future 完整的导航生成实现要点：
+        # 1. 支持多级嵌套目录结构
+        # 2. 自动生成面包屑导航
+        # 3. 支持侧边栏动态展开/折叠
 
         return navigation
 
@@ -845,8 +847,10 @@ class DocumentationGenerator:
 
             index['files'].append(file_entry)
 
-            # Add to search index (simplified)
-            # TODO: Implement full-text search indexing
+            # @future 全文搜索索引实现要点：
+            # 1. 集成Elasticsearch/Meilisearch引擎
+            # 2. 支持中文分词和同义词扩展
+            # 3. 实现相关性排序和模糊匹配
 
         return index
 

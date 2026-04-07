@@ -87,6 +87,82 @@ const char* agentos_intent_type_name(agentos_intent_type_t type) {
     }
 }
 
+static agentos_intent_type_t check_greeting(const char* lower_input, float* score) {
+    for (int i = 0; g_greet_keywords[i]; i++) {
+        if (intent_contains_ignore_case(lower_input, g_greet_keywords[i])) {
+            *score = 0.95f;
+            return AGENTOS_INTENT_GREETING;
+        }
+    }
+    return AGENTOS_INTENT_UNKNOWN;
+}
+
+static agentos_intent_type_t check_farewell(const char* lower_input, float* score) {
+    for (int i = 0; g_farewell_keywords[i]; i++) {
+        if (intent_contains_ignore_case(lower_input, g_farewell_keywords[i])) {
+            *score = 0.95f;
+            return AGENTOS_INTENT_FAREWELL;
+        }
+    }
+    return AGENTOS_INTENT_UNKNOWN;
+}
+
+static agentos_intent_type_t check_query(const char* lower_input, float* score) {
+    int query_count = 0;
+    for (int i = 0; g_query_keywords[i]; i++) {
+        if (intent_contains_ignore_case(lower_input, g_query_keywords[i])) {
+            query_count++;
+        }
+    }
+    if (query_count > 0) {
+        *score = 0.8f + (query_count > 2 ? 0.15f : 0.05f);
+        return AGENTOS_INTENT_QUERY;
+    }
+    return AGENTOS_INTENT_UNKNOWN;
+}
+
+static agentos_intent_type_t check_command(const char* lower_input, float* score) {
+    int cmd_count = 0;
+    for (int i = 0; g_command_keywords[i]; i++) {
+        if (intent_contains_ignore_case(lower_input, g_command_keywords[i])) {
+            cmd_count++;
+        }
+    }
+    if (cmd_count > 0) {
+        *score = 0.85f + (cmd_count > 2 ? 0.10f : 0.05f);
+        agentos_intent_type_t base_type = AGENTOS_INTENT_COMMAND;
+        
+        if (intent_contains_ignore_case(lower_input, "create") ||
+            intent_contains_ignore_case(lower_input, "创建")) {
+            base_type = AGENTOS_INTENT_CREATION;
+        } else if (intent_contains_ignore_case(lower_input, "delete") ||
+                   intent_contains_ignore_case(lower_input, "删除")) {
+            base_type = AGENTOS_INTENT_DELETION;
+        } else if (intent_contains_ignore_case(lower_input, "modify") ||
+                   intent_contains_ignore_case(lower_input, "修改")) {
+            base_type = AGENTOS_INTENT_MODIFICATION;
+        }
+        return base_type;
+    }
+    return AGENTOS_INTENT_UNKNOWN;
+}
+
+static agentos_intent_type_t check_confirmation_negation(const char* lower_input, float* score) {
+    for (int i = 0; g_confirm_keywords[i]; i++) {
+        if (intent_contains_ignore_case(lower_input, g_confirm_keywords[i])) {
+            *score = 0.90f;
+            return AGENTOS_INTENT_CONFIRMATION;
+        }
+    }
+    for (int i = 0; g_negate_keywords[i]; i++) {
+        if (intent_contains_ignore_case(lower_input, g_negate_keywords[i])) {
+            *score = 0.90f;
+            return AGENTOS_INTENT_NEGATION;
+        }
+    }
+    return AGENTOS_INTENT_UNKNOWN;
+}
+
 int agentos_intent_classify(const char* input, size_t input_len,
                             agentos_intent_classification_t* result) {
     if (!input || !result || input_len == 0) {
@@ -97,7 +173,6 @@ int agentos_intent_classify(const char* input, size_t input_len,
         agentos_intent_classifier_init();
     }
     
-    /* 创建输入副本并转小写 */
     char* lower_input = (char*)AGENTOS_MALLOC(input_len + 1);
     if (!lower_input) {
         return -1;
@@ -107,99 +182,36 @@ int agentos_intent_classify(const char* input, size_t input_len,
     lower_input[input_len] = '\0';
     intent_to_lowercase(lower_input);
     
-    /* 初始化结果 */
     memset(result, 0, sizeof(*result));
     result->type = AGENTOS_INTENT_UNKNOWN;
     result->confidence = 0.0f;
     
-    /* 检查各类关键词 */
     float max_score = 0.0f;
     agentos_intent_type_t detected_type = AGENTOS_INTENT_UNKNOWN;
     
-    /* 检查问候 */
-    for (int i = 0; g_greet_keywords[i]; i++) {
-        if (intent_contains_ignore_case(lower_input, g_greet_keywords[i])) {
-            detected_type = AGENTOS_INTENT_GREETING;
-            max_score = 0.95f;
+    typedef agentos_intent_type_t (*intent_checker_t)(const char*, float*);
+    static const intent_checker_t checkers[] = {
+        check_greeting,
+        check_farewell,
+        check_query,
+        check_command,
+        check_confirmation_negation,
+        NULL
+    };
+    
+    for (int i = 0; checkers[i]; i++) {
+        float current_score = 0.0f;
+        agentos_intent_type_t current_type = checkers[i](lower_input, &current_score);
+        
+        if (current_type != AGENTOS_INTENT_UNKNOWN) {
+            detected_type = current_type;
+            max_score = current_score;
             break;
         }
     }
     
-    /* 检查告别 */
-    if (detected_type == AGENTOS_INTENT_UNKNOWN) {
-        for (int i = 0; g_farewell_keywords[i]; i++) {
-            if (intent_contains_ignore_case(lower_input, g_farewell_keywords[i])) {
-                detected_type = AGENTOS_INTENT_FAREWELL;
-                max_score = 0.95f;
-                break;
-            }
-        }
-    }
-    
-    /* 检查查询 */
-    if (detected_type == AGENTOS_INTENT_UNKNOWN) {
-        int query_count = 0;
-        for (int i = 0; g_query_keywords[i]; i++) {
-            if (intent_contains_ignore_case(lower_input, g_query_keywords[i])) {
-                query_count++;
-            }
-        }
-        if (query_count > 0) {
-            detected_type = AGENTOS_INTENT_QUERY;
-            max_score = 0.8f + (query_count > 2 ? 0.15f : 0.05f);
-        }
-    }
-    
-    /* 检查命令 */
-    if (detected_type == AGENTOS_INTENT_UNKNOWN) {
-        int cmd_count = 0;
-        for (int i = 0; g_command_keywords[i]; i++) {
-            if (intent_contains_ignore_case(lower_input, g_command_keywords[i])) {
-                cmd_count++;
-            }
-        }
-        if (cmd_count > 0) {
-            detected_type = AGENTOS_INTENT_COMMAND;
-            max_score = 0.85f + (cmd_count > 2 ? 0.10f : 0.05f);
-            
-            /* 区分创建/修改/删除 */
-            if (intent_contains_ignore_case(lower_input, "create") ||
-                intent_contains_ignore_case(lower_input, "创建")) {
-                detected_type = AGENTOS_INTENT_CREATION;
-            } else if (intent_contains_ignore_case(lower_input, "delete") ||
-                       intent_contains_ignore_case(lower_input, "删除")) {
-                detected_type = AGENTOS_INTENT_DELETION;
-            } else if (intent_contains_ignore_case(lower_input, "modify") ||
-                       intent_contains_ignore_case(lower_input, "修改")) {
-                detected_type = AGENTOS_INTENT_MODIFICATION;
-            }
-        }
-    }
-    
-    /* 检查确认/否定 */
-    if (detected_type == AGENTOS_INTENT_UNKNOWN) {
-        for (int i = 0; g_confirm_keywords[i]; i++) {
-            if (intent_contains_ignore_case(lower_input, g_confirm_keywords[i])) {
-                detected_type = AGENTOS_INTENT_CONFIRMATION;
-                max_score = 0.90f;
-                break;
-            }
-        }
-        
-        if (detected_type == AGENTOS_INTENT_UNKNOWN) {
-            for (int i = 0; g_negate_keywords[i]; i++) {
-                if (intent_contains_ignore_case(lower_input, g_negate_keywords[i])) {
-                    detected_type = AGENTOS_INTENT_NEGATION;
-                    max_score = 0.90f;
-                    break;
-                }
-            }
-        }
-    }
-    
-    /* 填充结果 */
     result->type = detected_type;
-    result->confidence = max_score > 0 ? max_score : 0.3f; /* 默认低置信度 */
+    result->confidence = max_score > 0 ? max_score : 0.3f;
     result->type_name = agentos_intent_type_name(detected_type);
     
     AGENTOS_FREE(lower_input);
