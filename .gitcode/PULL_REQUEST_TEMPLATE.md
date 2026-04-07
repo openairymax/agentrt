@@ -1,4 +1,4 @@
-# 🚀 Pull Request Template
+# 🚀 AgentOS Pull Request Template (V4.0)
 
 <!-- 
 感谢您为 AgentOS 做出贡献！
@@ -6,22 +6,39 @@ Thank you for contributing to AgentOS!
 
 📋 提交前请阅读：Please read before submitting:
 - [贡献指南](../CONTRIBUTING.md) / Contributing Guide
-- [架构原则](../agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) / Architecture Principles (V1.8)
+- [架构原则 V1.8](../agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) / Architecture Principles (V1.8)
 - [代码规范](../agentos/manuals/CODING_STANDARDS.md) / Coding Standards
+- [CI/CD 文档](../scripts/ci/README.md) / CI/CD Documentation
 
 💡 提示：使用 Ctrl+Enter 快速提交 PR！
 Tip: Use Ctrl+Enter to submit PR quickly!
+
+🔄 版本：V4.0 (2026-04-07) - 全面重构，深度集成五维正交原则 V1.8
 -->
+
+## 🎯 快速导航 / Quick Navigation
+
+| 部分 | 描述 | 预计用时 |
+|------|------|----------|
+| [📌 核心信息](#-核心信息--core-information) | PR 基本信息、类型、优先级 | 2分钟 |
+| [📋 变更详情](#-变更详情--change-details) | 问题背景、解决方案、技术方案 | 5分钟 |
+| [✅ 质量检查](#-质量检查--quality-checks) | 代码质量、测试覆盖、安全合规 | 3分钟 |
+| [🏗️ 架构原则](#️-架构原则检查--architecture-principles-check) | 五维正交原则 V1.8 检查 | 5分钟 |
+| [🧪 测试说明](#-测试说明--testing-instructions) | 手动测试、自动化测试 | 3分钟 |
+| [📊 变更统计](#-变更统计--change-statistics) | 代码统计、复杂度指标 | 2分钟 |
+| [🤖 AI辅助审查](#-ai辅助审查--ai-assisted-review) | AI分析、建议 | 自动 |
+| [⚡ 性能基准](#-性能基准--performance-benchmarks) | 性能测试结果 | 可选 |
+| [🔒 安全审查](#-安全审查--security-review) | 安全扫描结果 | 自动 |
 
 ---
 
-## 📌 PR 概览 / PR Overview
+## 📌 核心信息 / Core Information
 
 ### 基本信息 / Basic Information
 
 | 项目 | 内容 | 说明 |
 |------|------|------|
-| **PR 类型** | - [ ] Bug 修复 🔧 | - [ ] 新功能 ✨ | - [ ] 性能优化 ⚡ | - [ ] 重构 ♻️ | - [ ] 文档 📝 | - [ ] 安全 🔒 | - [ ] 架构改进 🏗️ | | 选择最符合的类型 |
+| **PR 类型** | - [ ] Bug 修复 🔧 | - [ ] 新功能 ✨ | - [ ] 性能优化 ⚡ | - [ ] 重构 ♻️ | - [ ] 文档 📝 | - [ ] 安全 🔒 | - [ ] 架构改进 🏗️ | - [ ] 依赖更新 📦 | 选择最符合的类型 |
 | **关联 Issue** | Closes #___, Fixes #___, Related #___ | 格式参考右侧示例 |
 | **优先级** | - [ ] 紧急 (P0) | - [ ] 高 (P1) | - [ ] 中 (P2) | - [ ] 低 (P3) | | 根据影响范围选择 |
 | **目标分支** | `main` / `develop` | 通常合并到 main |
@@ -36,7 +53,7 @@ Tip: Use Ctrl+Enter to submit PR quickly!
 
 ---
 
-## 🎯 变更详情 / Change Details
+## 📋 变更详情 / Change Details
 
 ### 问题背景 / Problem Background
 
@@ -53,6 +70,7 @@ Tip: Use Ctrl+Enter to submit PR quickly!
 - 用户数：-
 - 性能影响：-
 - 安全影响：-
+- 复杂度变化：-
 
 ### 解决方案 / Solution
 
@@ -67,15 +85,16 @@ Tip: Use Ctrl+Enter to submit PR quickly!
 
 **关键设计决策 / Key Design Decisions:**
 
-| 决策点 | 选择 | 原因 |
-|--------|------|------|
-| 方案A vs 方案B | | |
-| 性能 vs 可读性 | | |
-| 兼容性策略 | | |
+| 决策点 | 选择 | 原因 | 架构原则对齐 |
+|--------|------|------|--------------|
+| 方案A vs 方案B | | | |
+| 性能 vs 可读性 | | | |
+| 兼容性策略 | | | |
+| 扩展性考虑 | | | |
 
 ---
 
-## 📦 变更清单 / Change Checklist
+## ✅ 质量检查 / Quality Checks
 
 ### 模块选择 / Module Selection
 
@@ -103,18 +122,30 @@ Tip: Use Ctrl+Enter to submit PR quickly!
 #### 测试与文档 / Test & Documentation
 - [ ] **测试套件 / Test Suite**: tests/*
 - [ ] **文档 / Documentation**: agentos/manuals/*
-- [ ] **CI/CD 配置**: .github/*, .gitcode/*, .gitee/*
+- [ ] **CI/CD 配置**: .gitcode/*, .github/*, .gitee/*
 - [ ] **构建配置 / Build Config**: CMakeLists.txt, vcpkg.json
 
 </details>
 
-### 质量检查 / Quality Checks
+### 自动化检查结果 / Automated Check Results
+
+<!-- 以下内容将由 CI/CD 自动填充 -->
+<!-- The following will be auto-populated by CI/CD -->
+
+| 检查项 | 状态 | 详情 | 时间戳 |
+|--------|------|------|--------|
+| **基础 CI** | ✅/❌ | [查看结果]() | - |
+| **质量门禁** | ✅/❌ | [查看结果]() | - |
+| **安全扫描** | ✅/❌ | [查看结果]() | - |
+| **代码覆盖率** | ✅/❌ | [查看结果]() | - |
+
+### 代码质量 / Code Quality
 
 <details>
-<summary>✅ 点击展开质量检查项 / Click to expand quality checks</summary>
+<summary>✅ 点击展开详细检查项 / Click to expand detailed checks</summary>
 
-#### 代码质量 / Code Quality
-- [ ] **编码规范**: 遵循 C/C++11-17, Python 3.10+, Go 1.21+, Rust 1.70+ 规范
+#### 编码规范 / Coding Standards
+- [ ] **语言规范**: 遵循 C/C++11-17, Python 3.10+, Go 1.21+, Rust 1.70+ 规范
 - [ ] **格式化**: 已运行 `clang-format` / `black` / `gofmt` / `rustfmt`
 - [ ] **注释**: 新增公共 API 有完整 Doxygen 注释（含 @brief/@param/@return）
 - [ ] **编译**: 无编译器警告 (`-Wall -Wextra -Werror`)
@@ -123,11 +154,18 @@ Tip: Use Ctrl+Enter to submit PR quickly!
   - 类型: `agentos_type_t`
   - 常量: `AGENTOS_CONSTANT`
 
+#### 复杂度控制 / Complexity Control
+- [ ] **圈复杂度**: 新增函数 CC ≤ 10，关键函数 CC ≤ 5
+- [ ] **函数长度**: 新增函数 ≤ 100 行，关键函数 ≤ 50 行
+- [ ] **嵌套深度**: 条件嵌套 ≤ 4 层
+- [ ] **认知复杂度**: 新增代码易于理解，无过度复杂逻辑
+
 #### 测试覆盖 / Test Coverage
 - [ ] **单元测试**: 新增代码有单元测试（目标 ≥90% 覆盖率）
 - [ ] **回归测试**: 所有现有测试通过
 - [ ] **覆盖率**: 测试覆盖率未下降
 - [ ] **性能测试**: 性能优化提供基准测试对比（before/after）
+- [ ] **契约测试**: API 契约测试已更新
 
 #### 文档更新 / Documentation Updates
 - [ ] **API 文档**: 更新相关 API 文档
@@ -140,18 +178,21 @@ Tip: Use Ctrl+Enter to submit PR quickly!
 - [ ] **消息格式**: `[ERROR] CODE: message (context). Suggestion: <action>`
 - [ ] **错误链**: 使用错误链模式，包含完整上下文
 - [ ] **日志**: 结构化日志，便于排查
+- [ ] **资源清理**: RAII 模式或明确清理路径
 
 #### 安全与合规 / Security & Compliance
 - [ ] **输入净化**: 所有外部输入已净化
 - [ ] **权限检查**: 遵循最小权限原则
 - [ ] **沙箱隔离**: 危险操作在沙箱中执行
 - [ ] **敏感数据**: 无敏感数据泄露（密钥、密码等）
+- [ ] **合规检查**: 符合 OWASP Top 10, CWE Top 25
 
 #### 工程实践 / Engineering Practices
 - [ ] **资源管理**: 内存/文件句柄正确释放（RAII模式）
 - [ ] **跨平台**: Linux/macOS/Windows 兼容性验证
 - [ ] **分支命名**: `feature/xxx`, `bugfix/xxx`, `refactor/xxx`, `hotfix/xxx`
 - [ ] **提交消息**: `type(scope): description` (遵循 Conventional Commits)
+- [ ] **原子提交**: 每个提交是独立可测试的变更
 
 </details>
 
@@ -160,7 +201,7 @@ Tip: Use Ctrl+Enter to submit PR quickly!
 ## 🏗️ 架构原则检查 / Architecture Principles Check
 
 <details>
-<summary>🔍 五维正交系统检查 / Five-Dimensional Orthogonal System Check</summary>
+<summary>🔍 五维正交系统检查 V1.8 / Five-Dimensional Orthogonal System Check V1.8</summary>
 
 基于 **[ARCHITECTURAL_PRINCIPLES.md](../agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) V1.8**
 
@@ -201,7 +242,10 @@ Tip: Use Ctrl+Enter to submit PR quickly!
 **统计 / Statistics:**
 - 已检查原则: __/24
 - 符合原则: __/24
-- 不符合原因:
+- 不符合原则: __/24
+- 不适用原则: __/24
+
+**不符合原因 / Non-compliance Reasons:**
 
 </details>
 
@@ -213,9 +257,10 @@ Tip: Use Ctrl+Enter to submit PR quickly!
 
 ```markdown
 # 环境准备 / Environment Setup
-- 操作系统: Ubuntu 22.04 LTS
-- 编译器: GCC 11.4
+- 操作系统: Ubuntu 22.04 LTS / Windows 11 / macOS 14
+- 编译器: GCC 11.4 / MSVC 2022 / Apple Clang 18
 - 构建类型: Release
+- 依赖版本: 参考 `vcpkg.json` 和 `requirements.txt`
 
 # 测试步骤 / Test Steps
 1. 克隆仓库并切换到本分支
@@ -241,17 +286,18 @@ Tip: Use Ctrl+Enter to submit PR quickly!
 - [ ] **集成测试**: `ctest --test-dir build -I <integration_test>`
 - [ ] **契约测试**: `./tests/contract/test_<module>_contract`
 - [ ] **性能测试**: `./tests/perf/benchmark_<module>`
+- [ ] **端到端测试**: `./tests/e2e/test_<scenario>`
 
 ### 测试环境信息 / Test Environment
 
-| 项目 | 版本 |
-|------|------|
-| OS | Ubuntu 22.04 / macOS 14 / Windows 11 |
-| Compiler | GCC 11.4 / Clang 18 / MSVC 2022 |
-| CMake | 3.28+ |
-| Python | 3.11+ |
-| Go | 1.22+ |
-| Rust | 1.77+ |
+| 项目 | 版本 | 状态 |
+|------|------|------|
+| OS | Ubuntu 22.04 / macOS 14 / Windows 11 | |
+| Compiler | GCC 11.4 / Clang 18 / MSVC 2022 | |
+| CMake | 3.28+ | |
+| Python | 3.11+ | |
+| Go | 1.22+ | |
+| Rust | 1.77+ | |
 
 ---
 
@@ -297,14 +343,123 @@ int agentos_new_api(int param, int new_option);
 - **删除行数**: -___ 行
 - **净变化**: ±___ 行
 - **文件变更**: ___ 个文件
+- **模块分布**: ___
 
 ### 复杂度指标 / Complexity Metrics
 
-| 指标 | 修改前 | 修改后 | 变化 |
-|------|--------|--------|------|
-| 圈复杂度 (平均) | - | - | - |
-| 代码重复率 | - | - | - |
-| 测试覆盖率 | - | - | - |
+| 指标 | 修改前 | 修改后 | 变化 | 目标 |
+|------|--------|--------|------|------|
+| 平均圈复杂度 | - | - | - | < 5.0 |
+| 最大圈复杂度 | - | - | - | < 15 |
+| 代码重复率 | - | - | - | < 3% |
+| 测试覆盖率 | - | - | - | ≥ 90% |
+| 认知复杂度 | - | - | - | < 10 |
+
+---
+
+## 🤖 AI辅助审查 / AI-Assisted Review
+
+<!-- 此部分可由 AI 工具自动生成 -->
+<!-- This section can be auto-generated by AI tools -->
+
+### 代码分析 / Code Analysis
+
+**架构一致性检查 / Architecture Consistency Check:**
+- [ ] 符合五维正交原则
+- [ ] 无跨层依赖
+- [ ] 接口契约完整
+
+**复杂度评估 / Complexity Assessment:**
+- 圈复杂度趋势: ⬆️/⬇️/➡️
+- 认知复杂度: 高/中/低
+- 可维护性评分: __/10
+
+**潜在问题 / Potential Issues:**
+1. 
+2. 
+3. 
+
+### 改进建议 / Improvement Suggestions
+
+**立即改进项 / Immediate Improvements:**
+1. 
+2. 
+
+**长期优化项 / Long-term Optimizations:**
+1. 
+2. 
+
+---
+
+## ⚡ 性能基准 / Performance Benchmarks
+
+<!-- 性能优化相关的 PR 需要填写此部分 -->
+<!-- This section is required for performance-related PRs -->
+
+### 测试环境 / Test Environment
+
+| 项目 | 配置 |
+|------|------|
+| CPU | |
+| 内存 | |
+| 存储 | |
+| 网络 | |
+
+### 基准测试结果 / Benchmark Results
+
+| 测试场景 | 修改前 | 修改后 | 提升 | 单位 |
+|----------|--------|--------|------|------|
+| 内存占用 | | | | MB |
+| 响应时间 | | | | ms |
+| 吞吐量 | | | | ops/s |
+| CPU 使用率 | | | | % |
+
+### 性能分析 / Performance Analysis
+
+**瓶颈识别 / Bottleneck Identification:**
+1. 
+2. 
+
+**优化策略 / Optimization Strategy:**
+1. 
+2. 
+
+---
+
+## 🔒 安全审查 / Security Review
+
+<!-- 安全相关的 PR 需要填写此部分 -->
+<!-- This section is required for security-related PRs -->
+
+### 安全扫描结果 / Security Scan Results
+
+| 扫描工具 | 结果 | 关键问题 | 状态 |
+|----------|------|----------|------|
+| **Trivy** | ✅/❌ | | |
+| **CodeQL** | ✅/❌ | | |
+| **Gitleaks** | ✅/❌ | | |
+| **SAST (cppcheck)** | ✅/❌ | | |
+
+### 安全影响分析 / Security Impact Analysis
+
+**攻击面变化 / Attack Surface Changes:**
+- [ ] 新增攻击面
+- [ ] 减少攻击面
+- [ ] 无变化
+
+**安全控制 / Security Controls:**
+- [ ] 输入验证
+- [ ] 输出编码
+- [ ] 访问控制
+- [ ] 审计日志
+- [ ] 加密存储
+
+### 合规性检查 / Compliance Check
+
+- [ ] OWASP Top 10
+- [ ] CWE Top 25
+- [ ] GDPR 相关
+- [ ] 其他合规要求
 
 ---
 
@@ -318,6 +473,8 @@ int agentos_new_api(int param, int new_option);
 - [ ] 文档已更新
 - [ ] 无敏感信息泄露
 - [ ] 分支命名规范
+- [ ] 提交消息规范
+- [ ] 架构原则检查完成
 
 ### 审查者注意事项 / Reviewer Notes
 
@@ -331,6 +488,22 @@ int agentos_new_api(int param, int new_option);
 - 
 - 
 
+**测试建议 / Testing Suggestions:**
+- 
+- 
+- 
+
+### 审查状态跟踪 / Review Status Tracking
+
+| 审查者 | 状态 | 意见 | 时间 |
+|--------|------|------|------|
+| @___ | ⬜ 未开始 | | |
+| @___ | ⬜ 未开始 | | |
+| @___ | ⬜ 未开始 | | |
+
+**预计合并日期 / Estimated Merge Date:**  
+**PR 编号 / PR Number:** #___
+
 ---
 
 ## 📞 其他信息 / Additional Information
@@ -340,12 +513,12 @@ int agentos_new_api(int param, int new_option);
 - 设计文档: 
 - Issue 讨论: 
 - 参考资料: 
+- 相关 PR: 
 
 ### 截图或演示 / Screenshots or Demos
 
 <!-- 如果适用，请添加截图或录屏 -->
 <!-- Add screenshots or recordings if applicable -->
-
 
 ---
 
@@ -355,6 +528,7 @@ int agentos_new_api(int param, int new_option);
 - @___ for code review suggestions
 - @___ for testing assistance
 - @___ for documentation improvements
+- @___ for architecture guidance
 
 ---
 
@@ -362,6 +536,7 @@ int agentos_new_api(int param, int new_option);
 
 > *"From data intelligence emerges."*  
 > *"始于数据，终于智能。"*
+> *"Every contribution makes our system more robust and intelligent."*
 
 ---
 
@@ -376,8 +551,8 @@ int agentos_new_api(int param, int new_option);
 | Merged | ⬜ | | 已合并 |
 
 **审查者 / Reviewers:** @___ @___  
-**预计合并日期 / Estimated Merge Date:**  
-**PR 编号 / PR Number:** #___
+**合并权限 / Merge Permission:** @spharx-team/core  
+**质量门禁 / Quality Gate:** ✅/❌  
 
 ---
 
