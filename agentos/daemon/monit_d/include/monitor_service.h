@@ -209,4 +209,212 @@ int monitor_service_reload_config(monitor_service_t* service, const monitor_conf
  */
 int monitor_service_generate_report(monitor_service_t* service, char** report);
 
+/* ===================== Agent 状态监控增强 ===================== */
+
+/**
+ * @brief Agent 执行状态
+ */
+typedef enum {
+    AGENT_STATE_CREATED = 0,     /**< 已创建 */
+    AGENT_STATE_INITIALIZING,    /**< 初始化中 */
+    AGENT_STATE_READY,           /**< 就绪 */
+    AGENT_STATE_EXECUTING,       /**< 执行中 */
+    AGENT_STATE_PAUSED,          /**< 暂停 */
+    AGENT_STATE_COMPLETED,       /**< 完成 */
+    AGENT_STATE_FAILED,          /**< 失败 */
+    AGENT_STATE_CANCELLED,       /**< 已取消 */
+    AGENT_STATE_STUCK,           /**< 卡住（可能死循环） */
+    AGENT_STATE_COUNT
+} agent_execution_state_t;
+
+/**
+ * @brief 死循环检测模式
+ */
+typedef enum {
+    LOOP_DETECTION_TIME_BASED = 0,   /**< 基于时间检测 */
+    LOOP_DETECTION_PATTERN_BASED,    /**< 基于模式检测 */
+    LOOP_DETECTION_RESOURCE_BASED,   /**< 基于资源检测 */
+    LOOP_DETECTION_HYBRID            /**< 混合检测 */
+} loop_detection_mode_t;
+
+/**
+ * @brief Agent 执行轨迹点
+ */
+typedef struct {
+    uint64_t timestamp;          /**< 时间戳（微秒） */
+    agent_execution_state_t state; /**< 状态 */
+    char* location;              /**< 位置（函数/模块） */
+    size_t loop_count;           /**< 循环计数 */
+    size_t memory_usage;         /**< 内存使用（字节） */
+    double cpu_usage;            /**< CPU 使用率 */
+} agent_trace_point_t;
+
+/**
+ * @brief Agent 执行轨迹
+ */
+typedef struct {
+    char* agent_id;              /**< Agent ID */
+    char* task_id;               /**< 任务 ID */
+    agent_execution_state_t current_state; /**< 当前状态 */
+    uint64_t start_time;         /**< 开始时间 */
+    uint64_t last_update_time;   /**< 最后更新时间 */
+    agent_trace_point_t* trace_points; /**< 轨迹点数组 */
+    size_t trace_point_count;    /**< 轨迹点数量 */
+    size_t trace_point_capacity; /**< 轨迹点容量 */
+    size_t loop_detection_count; /**< 循环检测计数 */
+    bool is_suspected_loop;      /**< 是否疑似死循环 */
+} agent_execution_trace_t;
+
+/**
+ * @brief 死循环检测配置
+ */
+typedef struct {
+    loop_detection_mode_t mode;  /**< 检测模式 */
+    uint64_t max_execution_time_ms; /**< 最大执行时间（毫秒） */
+    size_t max_loop_iterations;  /**< 最大循环迭代次数 */
+    size_t pattern_window_size;  /**< 模式窗口大小 */
+    double resource_threshold;   /**< 资源阈值 */
+    bool enable_auto_recovery;   /**< 是否启用自动恢复 */
+    bool enable_alerting;        /**< 是否启用告警 */
+} loop_detection_config_t;
+
+/**
+ * @brief 默认死循环检测配置
+ */
+#define LOOP_DETECTION_CONFIG_DEFAULT { \
+    .mode = LOOP_DETECTION_HYBRID, \
+    .max_execution_time_ms = 30000, \
+    .max_loop_iterations = 1000, \
+    .pattern_window_size = 10, \
+    .resource_threshold = 0.9, \
+    .enable_auto_recovery = true, \
+    .enable_alerting = true \
+}
+
+/**
+ * @brief 开始监控 Agent 执行
+ * 
+ * @param service 监控服务句柄
+ * @param agent_id Agent ID
+ * @param task_id 任务 ID
+ * @param loop_config 死循环检测配置（可为 NULL 使用默认配置）
+ * @param trace 输出参数，返回执行轨迹句柄
+ * @return 0 表示成功，非 0 表示错误码
+ */
+int monitor_service_start_agent_trace(
+    monitor_service_t* service,
+    const char* agent_id,
+    const char* task_id,
+    const loop_detection_config_t* loop_config,
+    agent_execution_trace_t** trace
+);
+
+/**
+ * @brief 更新 Agent 执行状态
+ * 
+ * @param service 监控服务句柄
+ * @param trace 执行轨迹句柄
+ * @param new_state 新状态
+ * @param location 位置信息
+ * @return 0 表示成功，非 0 表示错误码
+ */
+int monitor_service_update_agent_state(
+    monitor_service_t* service,
+    agent_execution_trace_t* trace,
+    agent_execution_state_t new_state,
+    const char* location
+);
+
+/**
+ * @brief 检查死循环
+ * 
+ * @param service 监控服务句柄
+ * @param trace 执行轨迹句柄
+ * @param is_loop 输出参数，是否为死循环
+ * @param confidence 输出参数，检测置信度（0.0-1.0）
+ * @return 0 表示成功，非 0 表示错误码
+ */
+int monitor_service_check_loop(
+    monitor_service_t* service,
+    agent_execution_trace_t* trace,
+    bool* is_loop,
+    double* confidence
+);
+
+/**
+ * @brief 结束 Agent 执行监控
+ * 
+ * @param service 监控服务句柄
+ * @param trace 执行轨迹句柄
+ * @param final_state 最终状态
+ * @return 0 表示成功，非 0 表示错误码
+ */
+int monitor_service_end_agent_trace(
+    monitor_service_t* service,
+    agent_execution_trace_t* trace,
+    agent_execution_state_t final_state
+);
+
+/**
+ * @brief 获取 Agent 执行摘要
+ * 
+ * @param service 监控服务句柄
+ * @param agent_id Agent ID（可为 NULL 获取所有）
+ * @param start_time 开始时间（可为 0）
+ * @param end_time 结束时间（可为 0）
+ * @param summary 输出参数，返回摘要信息
+ * @return 0 表示成功，非 0 表示错误码
+ */
+int monitor_service_get_agent_summary(
+    monitor_service_t* service,
+    const char* agent_id,
+    uint64_t start_time,
+    uint64_t end_time,
+    char** summary
+);
+
+/**
+ * @brief 导出 Agent 执行轨迹
+ * 
+ * @param service 监控服务句柄
+ * @param trace 执行轨迹句柄
+ * @param format 导出格式（"json", "csv", "text"）
+ * @param data 输出参数，返回导出数据
+ * @param size 输出参数，返回数据大小
+ * @return 0 表示成功，非 0 表示错误码
+ */
+int monitor_service_export_agent_trace(
+    monitor_service_t* service,
+    agent_execution_trace_t* trace,
+    const char* format,
+    char** data,
+    size_t* size
+);
+
+/**
+ * @brief 获取活跃 Agent 列表
+ * 
+ * @param service 监控服务句柄
+ * @param agent_ids 输出参数，返回 Agent ID 数组
+ * @param count 输出参数，返回 Agent 数量
+ * @return 0 表示成功，非 0 表示错误码
+ */
+int monitor_service_get_active_agents(
+    monitor_service_t* service,
+    char*** agent_ids,
+    size_t* count
+);
+
+/**
+ * @brief 重置死循环检测
+ * 
+ * @param service 监控服务句柄
+ * @param trace 执行轨迹句柄
+ * @return 0 表示成功，非 0 表示错误码
+ */
+int monitor_service_reset_loop_detection(
+    monitor_service_t* service,
+    agent_execution_trace_t* trace
+);
+
 #endif /* AGENTOS_MONITOR_SERVICE_H */
