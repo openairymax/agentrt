@@ -2,7 +2,7 @@
 
 # Agent OS
 
-> 成为人类计算科学工程史上，第四个"操作系统哲学"
+> 成为人类计算工程史上，第四个"操作系统哲学"
 
 中文 | [English](README_EN.md)  
 
@@ -29,10 +29,10 @@
 ## 💡 创新要点
 
 - **纯净内核**：内核仅提供 IPC/Mem/Task/Time 四大原子机制，纯净高效
-- **认知循环**：认知 → 规划 → 行动，双系统协同（System 1 + System 2）
-- **记忆卷载**：L1 原始层 → L2 特征层 → L3 结构层 → L4 模式层，涌现智慧
-- **安全内生**：四重防护：沙箱隔离 / 权限裁决 / 输入净化 / 审计追踪
-- **高效 Token**：相比传统框架节省约 **500%** Token 消耗
+- **认知循环**：认知，规划，行动，双系统协同（System1+System2）
+- **记忆卷载**：L1原始层→L2特征层→L3结构层→L4模式层，涌现智慧
+- **安全内生**：四重防护：沙箱隔离，权限裁决，输入净化，审计追踪
+- **高效 Token**：工程级相比传统框架节省约 **500%** Token 消耗
 - **丰富 SDK**：Go / Python / Rust / TypeScript 原生支持
 
 ## 🎯 基本理念
@@ -40,14 +40,9 @@
 - **驱动团队**：精准协调多 Agent 协作，高效完成复杂任务编排与资源调度。  
 - **自主演进**：具备自我进化能力，动态调整策略，持续优化执行效果。    
 
-
-<br> 
-
 <p align="center">
-  <strong>✨ 全新架构 · 安全内生 · 智能涌现 ✨</strong>
+  <strong>✨ 全新架构 · 安全内生 · 智能涌现 ✨</strong>  
 </p>
-
-<br>
 
 ## 🏗️ 系统架构
 
@@ -191,17 +186,14 @@ AgentOS 是**操作系统级**产品，而非单一框架：
 | **系统开发者** | C/C++, 操作系统基础 | 1-2 周深入 |
 | **架构师** | 微内核，分布式系统 | 1 月精通 |
 
-**推荐路径**：[快速开始](agentos/manuals/guides/quickstart.md) → [架构原则](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) → [CoreLoopThree](agentos/manuals/architecture/coreloopthree.md)
+**推荐路径**：[快速开始](agentos/manuals/guides/quickstart.md) → [架构原则](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) → [CoreLoopThree](agentos/manuals/architecture/coreloopthree.md)  
 
-</details>
-
-<br><br>
+</details>  
 
 <p align="center">
-  <strong>☀️ 每解决一个问题，都是为人类点亮一盏灯 ☀️</strong>  
+  <strong>💡 每解决一个问题，都是为人类点亮一盏灯 💡</strong>  
 </p>
 
-<br>
 
 ## 🤝 参与贡献
 
@@ -212,15 +204,12 @@ AgentOS 是**操作系统级**产品，而非单一框架：
 
 ### 🎏 相信的力量
 
-**相信**：
-- 智能的未来，不应该被单一框架所定义  
-- 开源的精神，能最大发挥群体的智慧，推动人类族群走上新的高度  
+**相信**：智能的未来，不应该被单一框架所定义。开源的精神，能最大发挥群体的智慧，推动人类族群走上新的高度。   
 
-**见证**：
-- 我们每一天的工作，都将铭刻在人类文明发展的丰碑上   
-- 见证真正智慧的涌现  
+**见证**：我们每一天的工作，都将铭刻在人类文明发展的丰碑上，见证真正智慧的涌现。  
 
-**这不是人类的日落，而是新世界的曙光**  
+**这不是人类的日落，而是新世界的曙光 ☀️**   
+
 
 ### 💫 可以贡献的方式
 
@@ -240,13 +229,10 @@ Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 →
 
 **主要平台**：[AtomGit](https://atomgit.com/spharx/agentos)（推荐） · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)   
 
-<br><br>
 
 <p align="center">  
-  <strong>🔥 “微微的灯火照不亮前路，但能指引我们前行的方向” 🔥</strong>
-</p>
-
-<br><br>
+  <strong>🔥 “微微的灯火，照不亮前路，但能指引前行的方向” 🔥</strong>
+</p>  
 
 ## 📜 许可证
 
@@ -256,8 +242,8 @@ Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 →
 
 <div align="center">
 
-**"From data intelligence emerges."**  
-**始于数据，终于智能。**  
+"From data intelligence emerges."  
+始于数据，终于智能。  
 
 <a href="https://atomgit.com/spharx/agentos">AtomGit</a> ·
 <a href="https://gitee.com/spharx/agentos">Gitee</a> ·

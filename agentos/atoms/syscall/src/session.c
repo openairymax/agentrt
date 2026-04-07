@@ -39,8 +39,137 @@ typedef struct session {
     struct session* next;
 } session_t;
 
+/* 持久化配置 */
+static session_persist_config_t g_persist_config = {
+    .enabled = true,
+    .max_retries = 3,
+    .initial_delay_ms = 100,
+    .max_delay_ms = 5000,
+    .backoff_multiplier = 2,
+    .fail_fast = true  /* 保持向后兼容：持久化失败不影响内存操作 */
+};
+
 static session_t* sessions = NULL;
 static agentos_mutex_t* session_lock = NULL;
+
+/**
+ * @brief 从环境变量加载持久化配置（仅加载一次）
+ */
+static void load_persist_config(void) {
+    static bool loaded = false;
+    if (loaded) return;
+    
+    char* env_val;
+    
+    env_val = getenv("AGENTOS_SESSION_PERSIST_ENABLED");
+    if (env_val) g_persist_config.enabled = (strcmp(env_val, "true") == 0);
+    
+    env_val = getenv("AGENTOS_SESSION_PERSIST_MAX_RETRIES");
+    if (env_val) g_persist_config.max_retries = atoi(env_val);
+    
+    env_val = getenv("AGENTOS_SESSION_PERSIST_INITIAL_DELAY_MS");
+    if (env_val) g_persist_config.initial_delay_ms = (uint32_t)atoi(env_val);
+    
+    env_val = getenv("AGENTOS_SESSION_PERSIST_MAX_DELAY_MS");
+    if (env_val) g_persist_config.max_delay_ms = (uint32_t)atoi(env_val);
+    
+    env_val = getenv("AGENTOS_SESSION_PERSIST_BACKOFF_MULTIPLIER");
+    if (env_val) g_persist_config.backoff_multiplier = (uint32_t)atoi(env_val);
+    
+    env_val = getenv("AGENTOS_SESSION_PERSIST_FAIL_FAST");
+    if (env_val) g_persist_config.fail_fast = (strcmp(env_val, "true") == 0);
+    
+    LOG_INFO("Session persist config: enabled=%d, max_retries=%d, fail_fast=%d",
+             g_persist_config.enabled, g_persist_config.max_retries, 
+             g_persist_config.fail_fast);
+    
+    loaded = true;
+}
+
+/* 辅助函数：最小值 */
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+
+/**
+ * @brief 带重试的会话持久化操作
+ */
+static agentos_error_t persist_session_with_retry(
+    const char* session_id,
+    const char* metadata,
+    uint64_t created_ns,
+    uint64_t last_active_ns) {
+    
+    load_persist_config();
+    if (!g_persist_config.enabled) {
+        return AGENTOS_SUCCESS;  /* 持久化禁用时视为成功 */
+    }
+    
+    int retry_count = 0;
+    agentos_error_t last_err = AGENTOS_SUCCESS;
+    uint32_t delay_ms = g_persist_config.initial_delay_ms;
+    
+    while (retry_count <= g_persist_config.max_retries) {
+        last_err = heapstore_syscall_session_save(
+            session_id, metadata, created_ns, last_active_ns);
+        
+        if (last_err == AGENTOS_SUCCESS) {
+            if (retry_count > 0) {
+                LOG_INFO("Session persist succeeded after %d retries", retry_count);
+            }
+            return AGENTOS_SUCCESS;
+        }
+        
+        retry_count++;
+        if (retry_count <= g_persist_config.max_retries) {
+            LOG_WARN("Session persist attempt %d failed: %d, retrying in %d ms",
+                     retry_count, last_err, delay_ms);
+            agentos_sleep_ms(delay_ms);
+            delay_ms = MIN(delay_ms * g_persist_config.backoff_multiplier, 
+                          g_persist_config.max_delay_ms);
+        }
+    }
+    
+    LOG_ERROR("Session persist failed after %d attempts: %d", 
+              retry_count, last_err);
+    return last_err;
+}
+
+/**
+ * @brief 带重试的会话删除操作
+ */
+static agentos_error_t persist_delete_with_retry(const char* session_id) {
+    load_persist_config();
+    if (!g_persist_config.enabled) {
+        return AGENTOS_SUCCESS;  /* 持久化禁用时视为成功 */
+    }
+    
+    int retry_count = 0;
+    agentos_error_t last_err = AGENTOS_SUCCESS;
+    uint32_t delay_ms = g_persist_config.initial_delay_ms;
+    
+    while (retry_count <= g_persist_config.max_retries) {
+        last_err = heapstore_syscall_session_delete(session_id);
+        
+        if (last_err == AGENTOS_SUCCESS) {
+            if (retry_count > 0) {
+                LOG_INFO("Session delete succeeded after %d retries", retry_count);
+            }
+            return AGENTOS_SUCCESS;
+        }
+        
+        retry_count++;
+        if (retry_count <= g_persist_config.max_retries) {
+            LOG_WARN("Session delete attempt %d failed: %d, retrying in %d ms",
+                     retry_count, last_err, delay_ms);
+            agentos_sleep_ms(delay_ms);
+            delay_ms = MIN(delay_ms * g_persist_config.backoff_multiplier, 
+                          g_persist_config.max_delay_ms);
+        }
+    }
+    
+    LOG_ERROR("Session delete failed after %d attempts: %d", 
+              retry_count, last_err);
+    return last_err;
+}
 
 /**
  * @brief 线程安全地确保会话锁已初始化（使�?once 模式�?
@@ -81,6 +210,8 @@ agentos_error_t agentos_sys_session_create(const char* metadata, char** out_sess
     CHECK_NULL_GOTO_ERR(s, cleanup, ret, AGENTOS_ENOMEM);
     s->session_id = id;  // 转移id的所有权给session对象
     id = NULL;  // 防止重复释放
+    s->persist_status = SESSION_PERSIST_UNKNOWN;
+    s->persist_error = AGENTOS_SUCCESS;
     
     if (metadata) {
         s->metadata = AGENTOS_STRDUP(metadata);
@@ -94,21 +225,58 @@ agentos_error_t agentos_sys_session_create(const char* metadata, char** out_sess
     s->next = sessions;
     sessions = s;
     agentos_mutex_unlock(session_lock);
-    s = NULL;  // 所有权已转移给全局链表
+    
+    /* 保存会话指针用于后续操作 */
+    session_t* session_for_persist = s;
     
     STRDUP_CHECK_ERR(out_id_copy, s->session_id, cleanup_linked, ret, AGENTOS_ENOMEM);
+    s = NULL;  // 所有权已转移给全局链表（防止重复释放）
     
     *out_session_id = out_id_copy;
     out_id_copy = NULL;  // 所有权已转移给调用者
     
     /* 持久化到 heapstore（遵循 S-2 层次分解原则） */
     if (g_use_heapstore_persistence) {
-        agentos_error_t persist_err = heapstore_syscall_session_save(
-            s->session_id, metadata, s->created_ns, s->last_active_ns);
-        if (persist_err != AGENTOS_SUCCESS) {
-            /* 持久化失败不影响内存操作，仅记录日志 */
-            LOG_WARN("Session persist to heapstore failed: %d", persist_err);
+        session_for_persist->persist_status = SESSION_PERSIST_PENDING;
+        agentos_error_t persist_err = persist_session_with_retry(
+            session_for_persist->session_id, metadata, 
+            session_for_persist->created_ns, session_for_persist->last_active_ns);
+        
+        if (persist_err == AGENTOS_SUCCESS) {
+            session_for_persist->persist_status = SESSION_PERSIST_SUCCESS;
+        } else {
+            session_for_persist->persist_status = SESSION_PERSIST_FAILED;
+            session_for_persist->persist_error = persist_err;
+            
+            load_persist_config();
+            if (!g_persist_config.fail_fast) {
+                /* 持久化失败，回滚内存操作 */
+                LOG_ERROR("Session creation failed due to persistence error: %d", persist_err);
+                // 回滚：从链表中移除并释放资源
+                agentos_mutex_lock(session_lock);
+                session_t** pp = &sessions;
+                while (*pp) {
+                    if (*pp == session_for_persist) {
+                        *pp = session_for_persist->next;
+                        break;
+                    }
+                    pp = &(*pp)->next;
+                }
+                agentos_mutex_unlock(session_lock);
+                
+                AGENTOS_FREE(session_for_persist->metadata);
+                AGENTOS_FREE(session_for_persist->session_id);
+                AGENTOS_FREE(session_for_persist);
+                AGENTOS_FREE(out_id_copy);
+                return persist_err;  /* 返回持久化错误 */
+            } else {
+                /* 快速失败模式：仅记录状态，不回滚 */
+                LOG_WARN("Session created but persistence failed: %d (fail_fast mode)", 
+                         persist_err);
+            }
         }
+    } else {
+        session_for_persist->persist_status = SESSION_PERSIST_DISABLED;
     }
     
     return AGENTOS_SUCCESS;
@@ -194,9 +362,9 @@ agentos_error_t agentos_sys_session_close(const char* session_id) {
             
             /* 从 heapstore 删除（遵循 S-2 层次分解原则） */
             if (g_use_heapstore_persistence && saved_id) {
-                agentos_error_t persist_err = heapstore_syscall_session_delete(saved_id);
+                agentos_error_t persist_err = persist_delete_with_retry(saved_id);
                 if (persist_err != AGENTOS_SUCCESS) {
-                    LOG_WARN("Session delete from heapstore failed: %d", persist_err);
+                    LOG_WARN("Session delete from heapstore failed after retries: %d", persist_err);
                 }
                 AGENTOS_FREE(saved_id);
             }
@@ -204,6 +372,33 @@ agentos_error_t agentos_sys_session_close(const char* session_id) {
             return AGENTOS_SUCCESS;
         }
         p = &(*p)->next;
+    }
+    agentos_mutex_unlock(session_lock);
+    return AGENTOS_ENOENT;
+}
+
+/**
+ * @brief 获取会话持久化状态
+ */
+agentos_error_t agentos_sys_session_get_persist_status(
+    const char* session_id,
+    session_persist_status_t* out_status,
+    agentos_error_t* out_error) {
+    
+    CHECK_NULL(session_id);
+    CHECK_NULL(out_status);
+    ensure_lock();
+    
+    agentos_mutex_lock(session_lock);
+    session_t* s = sessions;
+    while (s) {
+        if (strcmp(s->session_id, session_id) == 0) {
+            *out_status = s->persist_status;
+            if (out_error) *out_error = s->persist_error;
+            agentos_mutex_unlock(session_lock);
+            return AGENTOS_SUCCESS;
+        }
+        s = s->next;
     }
     agentos_mutex_unlock(session_lock);
     return AGENTOS_ENOENT;
