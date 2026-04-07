@@ -165,13 +165,20 @@ sync_result_t sync_reset_stats(void* lock) {
 
 /**
  * @brief 设置锁的选项
- * 
- * @note TODO: 当前为预留接口，暂不支持任何选项配置
- *       未来可扩展支持：
+ *
+ * @note 当前为预留接口，暂不支持任何选项配置
+ * @future 可扩展支持：
  *       - 默认超时时间设置
  *       - 调试级别配置
  *       - 优先级继承设置
  *       - 健壮锁配置
+ *
+ * @param lock 锁对象指针（不能为NULL）
+ * @param option 选项标识符
+ * @param value 选项值指针
+ * @return sync_result_t 成功返回SYNC_SUCCESS，参数无效返回SYNC_ERROR_INVALID
+ *
+ * @threadsafe 是（内部使用互斥锁保护）
  */
 sync_result_t sync_set_option(void* lock, int option, void* value) {
     if (lock == NULL) {
@@ -184,8 +191,15 @@ sync_result_t sync_set_option(void* lock, int option, void* value) {
 
 /**
  * @brief 获取锁的选项
- * 
- * @note TODO: 当前为预留接口，暂不支持任何选项查询
+ *
+ * @note 当前为预留接口，暂不支持任何选项查询
+ *
+ * @param lock 锁对象指针（不能为NULL）
+ * @param option 选项标识符
+ * @param[out] value 输出选项值的缓冲区（不能为NULL）
+ * @return sync_result_t 成功返回SYNC_SUCCESS，参数无效返回SYNC_ERROR_INVALID
+ *
+ * @threadsafe 是
  */
 sync_result_t sync_get_option(void* lock, int option, void* value) {
     if (lock == NULL || value == NULL) {
