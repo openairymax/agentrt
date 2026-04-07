@@ -12,6 +12,9 @@
 /* Unified base library compatibility layer */
 #include "../../../agentos/commons/utils/memory/include/memory_compat.h"
 #include "../../../agentos/commons/utils/string/include/string_compat.h"
+
+/* Check macros for unified error handling */
+#include "../../../agentos/commons/utils/include/check.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -44,18 +47,13 @@ agentos_error_t agentos_ipc_create_channel(
     agentos_ipc_callback_t callback,
     void* userdata,
     agentos_ipc_channel_t** out_channel) {
-    if (!name || !out_channel) {
-        return AGENTOS_EINVAL;
-    }
+    CHECK_NULL(name);
+    CHECK_NULL(out_channel);
 
     (void)callback;  /* 回调函数暂未使用 */
     (void)userdata;   /* 用户数据暂未使用 */
 
-    agentos_ipc_channel_t* channel =
-        (agentos_ipc_channel_t*)AGENTOS_CALLOC(1, sizeof(agentos_ipc_channel_t));
-    if (!channel) {
-        return AGENTOS_ENOMEM;
-    }
+    CALLOC_CHECK(channel, 1, sizeof(agentos_ipc_channel_t), error_return);
 
     /* 使用名称的哈希值作为端口号（简化实现） */
     unsigned int hash = 0;
@@ -71,18 +69,11 @@ agentos_error_t agentos_ipc_create_channel(
 
     /* 创建锁 */
     channel->lock = agentos_mutex_create();
-    if (!channel->lock) {
-        AGENTOS_FREE(channel);
-        return AGENTOS_ENOMEM;
-    }
+    CHECK_NULL_GOTO(channel->lock, cleanup);
 
     /* 创建条件变量 */
     channel->cond = agentos_cond_create();
-    if (!channel->cond) {
-        agentos_mutex_destroy(channel->lock);
-        AGENTOS_FREE(channel);
-        return AGENTOS_ENOMEM;
-    }
+    CHECK_NULL_GOTO(channel->cond, cleanup);
 
     /* 初始化消息队列 */
     channel->queue = NULL;
@@ -90,6 +81,19 @@ agentos_error_t agentos_ipc_create_channel(
 
     *out_channel = channel;
     return AGENTOS_SUCCESS;
+
+cleanup:
+    if (channel->cond) {
+        agentos_cond_destroy(channel->cond);
+    }
+    if (channel->lock) {
+        agentos_mutex_destroy(channel->lock);
+    }
+    AGENTOS_FREE(channel);
+    return AGENTOS_ENOMEM;
+
+error_return:
+    return AGENTOS_ENOMEM;
 }
 
 /**
