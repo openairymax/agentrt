@@ -13,7 +13,9 @@
 
 /* Unified base library compatibility layer */
 #include "../../../agentos/commons/utils/memory/include/memory_compat.h"
+#include "../../../agentos/commons/utils/memory/include/memory_pool.h"
 #include "../../../agentos/commons/utils/string/include/string_compat.h"
+#include "../../../agentos/commons/utils/include/check.h"
 #include <string.h>
 
 #ifdef _WIN32
@@ -37,12 +39,18 @@ struct agentos_core_loop {
     agentos_cond_t* cond;
 };
 
+/* 内存池优化 - 用于循环结构体分配 */
+static memory_pool_t* g_loop_memory_pool = NULL;
+static agentos_mutex_t* g_pool_mutex = NULL;
+
 /* 辅助函数声明 - 用于重构降低圈复杂度 */
 static agentos_error_t validate_loop_parameters(const agentos_loop_config_t* manager, agentos_core_loop_t** out_loop);
+static memory_pool_t* get_loop_memory_pool(void);
 static agentos_core_loop_t* allocate_loop_memory(void);
 static agentos_error_t initialize_loop_resources(agentos_core_loop_t* loop, const agentos_loop_config_t* manager);
 static agentos_error_t create_loop_engines(agentos_core_loop_t* loop);
 static void cleanup_loop_resources(agentos_core_loop_t* loop);
+static void free_loop_memory(agentos_core_loop_t* loop);
 
 /* 提取的辅助函数 - 降低 agentos_loop_submit 圈复杂度 */
 static char* build_enhanced_input(const char* input, size_t input_len, 
@@ -69,7 +77,7 @@ static void init_default_config(agentos_loop_config_t* manager) {
  */
 static agentos_error_t validate_loop_parameters(const agentos_loop_config_t* manager, agentos_core_loop_t** out_loop)
 {
-    if (!out_loop) return AGENTOS_EINVAL;
+    CHECK_NULL(out_loop);
 
     if (manager) {
         if (manager->loop_config_cognition_threads > 1024 ||
@@ -92,12 +100,61 @@ static agentos_error_t validate_loop_parameters(const agentos_loop_config_t* man
 }
 
 /**
- * @brief 分配循环内存
+ * @brief 获取循环结构体的内存池（线程安全）
+ * @return 内存池指针，失败返回 NULL
+ */
+static memory_pool_t* get_loop_memory_pool(void)
+{
+    if (g_loop_memory_pool != NULL) {
+        return g_loop_memory_pool;
+    }
+    
+    if (g_pool_mutex == NULL) {
+        agentos_mutex_t* new_mutex = agentos_mutex_create();
+        if (new_mutex == NULL) {
+            return NULL;
+        }
+        if (__sync_bool_compare_and_swap(&g_pool_mutex, NULL, new_mutex)) {
+            g_pool_mutex = new_mutex;
+        } else {
+            agentos_mutex_destroy(new_mutex);
+        }
+    }
+    
+    agentos_mutex_lock(g_pool_mutex);
+    if (g_loop_memory_pool == NULL) {
+        memory_pool_options_t options = {
+            .block_size = sizeof(agentos_core_loop_t),
+            .initial_blocks = 8,
+            .max_blocks = 64,
+            .expansion_size = 4,
+            .thread_safe = true,
+            .name = "coreloop_pool"
+        };
+        g_loop_memory_pool = memory_pool_create(&options);
+    }
+    agentos_mutex_unlock(g_pool_mutex);
+    return g_loop_memory_pool;
+}
+
+/**
+ * @brief 分配循环内存（使用内存池）
  * @return 分配的循环结构体指针，失败返回 NULL
  */
 static agentos_core_loop_t* allocate_loop_memory(void)
 {
-    return (agentos_core_loop_t*)AGENTOS_CALLOC(1, sizeof(agentos_core_loop_t));
+    memory_pool_t* pool = get_loop_memory_pool();
+    if (pool == NULL) {
+        return (agentos_core_loop_t*)AGENTOS_CALLOC(1, sizeof(agentos_core_loop_t));
+    }
+    
+    agentos_core_loop_t* loop = (agentos_core_loop_t*)memory_pool_alloc(pool);
+    if (loop == NULL) {
+        return (agentos_core_loop_t*)AGENTOS_CALLOC(1, sizeof(agentos_core_loop_t));
+    }
+    
+    memset(loop, 0, sizeof(agentos_core_loop_t));
+    return loop;
 }
 
 /**
@@ -158,6 +215,24 @@ static agentos_error_t create_loop_engines(agentos_core_loop_t* loop)
 }
 
 /**
+ * @brief 释放循环结构体内存（支持内存池和传统分配）
+ * @param loop 循环结构体指针
+ */
+static void free_loop_memory(agentos_core_loop_t* loop)
+{
+    if (loop == NULL) {
+        return;
+    }
+    
+    memory_pool_t* pool = get_loop_memory_pool();
+    if (pool != NULL) {
+        memory_pool_free(pool, loop);
+    } else {
+        AGENTOS_FREE(loop);
+    }
+}
+
+/**
  * @brief 清理循环资源（反向释放所有资源）
  * @param loop 循环结构体指针
  */
@@ -190,7 +265,7 @@ static void cleanup_loop_resources(agentos_core_loop_t* loop)
         loop->lock = NULL;
     }
 
-    AGENTOS_FREE(loop);
+    free_loop_memory(loop);
 }
 
 /**
@@ -310,12 +385,12 @@ AGENTOS_API void agentos_loop_destroy(agentos_core_loop_t* loop)
         agentos_mutex_destroy(loop->lock);
     }
 
-    AGENTOS_FREE(loop);
+    free_loop_memory(loop);
 }
 
 AGENTOS_API agentos_error_t agentos_loop_run(agentos_core_loop_t* loop)
 {
-    if (!loop) return AGENTOS_EINVAL;
+    CHECK_NULL(loop);
 
     agentos_mutex_lock(loop->lock);
     loop->running = 1;

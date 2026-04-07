@@ -22,6 +22,7 @@
 /* 基础库兼容性层 */
 #include "../../../agentos/commons/utils/memory/include/memory_compat.h"
 #include "../../../agentos/commons/utils/string/include/string_compat.h"
+#include "../../../agentos/commons/utils/include/check.h"
 
 /* ==================== 常量定义 ==================== */
 
@@ -358,7 +359,7 @@ agentos_error_t agentos_sandbox_get_stats(agentos_sandbox_t* sandbox, char** out
 }
 
 agentos_error_t agentos_sandbox_manager_get_stats(char** out_stats) {
-    if (!out_stats) return AGENTOS_EINVAL;
+    CHECK_NULL(out_stats);
 
     if (!g_sandbox_manager) {
         *out_stats = AGENTOS_STRDUP("{\"error\":\"Manager not initialized\"}");
@@ -385,7 +386,7 @@ void agentos_sandbox_reset_quota(agentos_sandbox_t* sandbox) {
 }
 
 agentos_error_t agentos_sandbox_suspend(agentos_sandbox_t* sandbox) {
-    if (!sandbox) return AGENTOS_EINVAL;
+    CHECK_NULL(sandbox);
 
     agentos_mutex_lock(sandbox->lock);
     if (sandbox->state != SANDBOX_STATE_ACTIVE) {
@@ -398,7 +399,7 @@ agentos_error_t agentos_sandbox_suspend(agentos_sandbox_t* sandbox) {
 }
 
 agentos_error_t agentos_sandbox_resume(agentos_sandbox_t* sandbox) {
-    if (!sandbox) return AGENTOS_EINVAL;
+    CHECK_NULL(sandbox);
 
     agentos_mutex_lock(sandbox->lock);
     if (sandbox->state == SANDBOX_STATE_SUSPENDED) {
@@ -411,7 +412,7 @@ agentos_error_t agentos_sandbox_resume(agentos_sandbox_t* sandbox) {
 }
 
 agentos_error_t agentos_sandbox_terminate(agentos_sandbox_t* sandbox) {
-    if (!sandbox) return AGENTOS_EINVAL;
+    CHECK_NULL(sandbox);
 
     agentos_mutex_lock(sandbox->lock);
     sandbox->state = SANDBOX_STATE_TERMINATED;
