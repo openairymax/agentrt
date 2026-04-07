@@ -18,6 +18,9 @@
 /* Unified base library compatibility layer */
 #include "../../../agentos/commons/utils/memory/include/memory_compat.h"
 #include "../../../agentos/commons/utils/string/include/string_compat.h"
+
+/* Check macros for unified error handling */
+#include "../../../agentos/commons/utils/include/check.h"
 #include <string.h>
 #include <stdio.h>
 #ifdef _WIN32
@@ -85,13 +88,13 @@ static int ensure_initialized(void) {
                                                     memory_order_acquire)) {
             /* 当前线程获得初始化权 */
             init_lock = agentos_mutex_create();
-            if (!init_lock) {
+            CHECK_NULL(init_lock) {
                 atomic_store_explicit(&mem_initialized, 0, memory_order_release);
                 return -1;
             }
 
             mem_stats_mutex = agentos_mutex_create();
-            if (!mem_stats_mutex) {
+            CHECK_NULL(mem_stats_mutex) {
                 agentos_mutex_destroy(init_lock);
                 init_lock = NULL;
                 atomic_store_explicit(&mem_initialized, 0, memory_order_release);
