@@ -1,13 +1,28 @@
-﻿Copyright (c) 2026 SPHARX. All Rights Reserved.
-"From data intelligence emerges."
+---
+copyright: "Copyright (c) 2026 SPHARX. All Rights Reserved."
+slogan: "From data intelligence emerges."
+title: "AgentOS 多语言 README"
+version: "Doc V1.5"
+last_updated: "2026-03-23"
+author: "AgentOS 国际化团队"
+status: "production_ready"
+review_due: "2026-06-23"
+theoretical_basis: "工程两论、五维正交系统、双系统认知理论"
+target_audience: "翻译者/国际化专家/社区贡献者"
+prerequisites: "了解Markdown语法，熟悉翻译工作流程"
+estimated_reading_time: "2小时"
+core_concepts: "国际化, 本地化, 翻译流程, 术语管理, 质量保证"
+---
 
 # AgentOS 多语言 README
 
-**版本**: Doc V1.5  
-**最后更新**: 2026-03-23  
-**状态**: 🟢 生产就绪
-
----
+## 📋 文档信息卡
+- **目标读者**: 翻译者/国际化专家/社区贡献者
+- **前置知识**: 了解Markdown语法，熟悉翻译工作流程
+- **预计阅读时间**: 2小时
+- **核心概念**: 国际化, 本地化, 翻译流程, 术语管理, 质量保证
+- **文档状态**: 🟢 生产就绪
+- **复杂度标识**: ⭐⭐ 中级
 
 ## 🎯 概述
 
