@@ -1,3 +1,19 @@
+---
+copyright: "Copyright (c) 2026 SPHARX. All Rights Reserved."
+slogan: "From data intelligence emerges 始于数据，终于智能。"
+title: "AgentOS 官方技术白皮书"
+version: "Doc V1.7"
+last_updated: "2026-03-31"
+author: "LirenWang"
+status: "production_ready"
+review_due: "2026-06-30"
+theoretical_basis: "工程两论、五维正交系统、双系统认知理论"
+target_audience: "技术决策者/架构师/开发者/研究人员"
+prerequisites: "了解操作系统基础，熟悉分布式系统概念"
+estimated_reading_time: "30分钟"
+core_concepts: "白皮书体系, 技术架构, 性能指标, 开源生态"
+---
+
 # AgentOS 官方技术白皮书
 
 <div align="center">
@@ -6,11 +22,15 @@
 
 *"From data intelligence emerges 始于数据，终于智能。"*
 
----
-
-版本：**Doc V1.7** | 发布日期：**2026-03-31** | 状态：**正式开源** | 作者：**LirenWang**
-
 </div>
+
+## 📋 文档信息卡
+- **目标读者**: 技术决策者/架构师/开发者/研究人员
+- **前置知识**: 了解操作系统基础，熟悉分布式系统概念
+- **预计阅读时间**: 30分钟
+- **核心概念**: 白皮书体系, 技术架构, 性能指标, 开源生态
+- **文档状态**: 🟢 生产就绪
+- **复杂度标识**: ⭐⭐ 中级
 
 ---
 
@@ -235,6 +255,14 @@ white_paper/
 ### "Intelligence emergence, and nothing less, is the ultimate sublimation of AI."
 
 ### "智能涌现，舍我其谁。"
+
+---
+
+## 📝 版本历史
+
+| 版本 | 日期 | 作者 | 变更说明 |
+|------|------|------|----------|
+| Doc V1.7 | 2026-03-31 | LirenWang | 初始版本，建立白皮书发布体系 |
 
 ---
 

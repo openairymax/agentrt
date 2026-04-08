@@ -1,18 +1,28 @@
-Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.  
-"From data intelligence emerges."  
+---
+copyright: "Copyright (c) 2026 SPHARX Ltd. All Rights Reserved."
+slogan: "From data intelligence emerges."
+title: "AgentOS 架构设计原则"
+version: "Doc V1.8"
+last_updated: "2026-04-02"
+author: "AgentOS Team (Zhixian Zhou, Liren Wang, Chen Zhang, Yunwen Xu, Daxiang Zhu)"
+status: "production_ready"
+review_due: "2026-07-02"
+theoretical_basis: "工程两论、五维正交系统、双系统认知理论"
+target_audience: "架构师/开发者"
+prerequisites: "了解软件架构基础、熟悉系统工程概念"
+estimated_reading_time: "2小时"
+core_concepts: "五维正交系统, 工程两论, 微内核哲学, 双系统认知理论"
+---
 
 # AgentOS 架构设计原则
 
-**版本**: V1.8  
-**更新**: 2026-04-02  
-**状态**: 正式发布  
-**路径**: `agentos/manuals/ARCHITECTURAL_PRINCIPLES.md`  
-**作者**: AgentOS Team
-  - Zhixian Zhou | Spharx Ltd. zhouzhixian@spharx.cn
-  - Liren Wang | Spharx Ltd. wangliren@spharx.cn
-  - Chen Zhang | SJTU CSC Lab. yoyoke@sjtu.edu.cn
-  - Yunwen Xu | SJTU CSC Lab. willing419@sjtu.edu.cn
-  - Daxiang Zhu | IndieBros. zdxever@sina.com
+## 📋 文档信息卡
+- **目标读者**: 架构师/开发者
+- **前置知识**: 了解软件架构基础、熟悉系统工程概念
+- **预计阅读时间**: 2小时
+- **核心概念**: 五维正交系统, 工程两论, 微内核哲学, 双系统认知理论
+- **文档状态**: 🟢 生产就绪
+- **复杂度标识**: ⭐⭐⭐ 高级
 
 ---
 
@@ -31,19 +41,7 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 
 ---
 
-## 版本信息
 
-| 版本 | 日期 | 作者 | 变更说明 |
-|------|------|------|----------|
-| Doc V1.8 | 2026-04-02 | DechengLi | 工程化改进 |
-| Doc V1.6 | 2026-03-25 | DechengLi | 优化理论基础 |
-| Doc V1.5 | 2026-03-24 | DechengLi | 增加起源章节 |
-| Doc V1.4 | 2026-03-24 | LirenWang | 按规范重新编写 |
-| Doc V1.3 | 2026-03-23 | Chenzhang | 基于实际架构编写 |
-| Doc V1.2 | 2026-03-21 | DechengLi | 基于系统工程理论编写 |
-| Doc V1.1 | 2026-02-01 | DechengLi | 原始架构设计原则 |
-
----
 
 ## 五维正交系统核心原则概览
 
@@ -1534,6 +1532,20 @@ python scripts/check_error_i18n.py --lang zh-CN,en-US
 | [系统调用规范](./syscall.md) | 原则 K-2、K-3 的接口规范 |
 | [C 安全编程指南](../../specifications/coding_standard/C&Cpp-secure-coding-guide.md) | 原则 E-1、E-3 的编码落实 |
 | [统一术语表](../../specifications/TERMINOLOGY.md) | 本文档使用的术语定义 |
+
+---
+
+## 📝 版本历史
+
+| 版本 | 日期 | 作者 | 变更说明 |
+|------|------|------|----------|
+| Doc V1.8 | 2026-04-02 | DechengLi | 工程化改进 |
+| Doc V1.6 | 2026-03-25 | DechengLi | 优化理论基础 |
+| Doc V1.5 | 2026-03-24 | DechengLi | 增加起源章节 |
+| Doc V1.4 | 2026-03-24 | LirenWang | 按规范重新编写 |
+| Doc V1.3 | 2026-03-23 | Chenzhang | 基于实际架构编写 |
+| Doc V1.2 | 2026-03-21 | DechengLi | 基于系统工程理论编写 |
+| Doc V1.1 | 2026-02-01 | DechengLi | 原始架构设计原则 |
 
 ---
 

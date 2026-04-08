@@ -1,14 +1,28 @@
-Copyright (c) 2026 SPHARX. All Rights Reserved.
-"From data intelligence emerges."
+---
+copyright: "Copyright (c) 2026 SPHARX. All Rights Reserved."
+slogan: "From data intelligence emerges."
+title: "AgentOS API 参考文档"
+version: "Doc V1.7"
+last_updated: "2026-03-31"
+author: "LirenWang"
+status: "production_ready"
+review_due: "2026-06-30"
+theoretical_basis: "工程两论、五维正交系统、双系统认知理论"
+target_audience: "开发者/架构师"
+prerequisites: "熟悉至少一种编程语言，了解API设计基础"
+estimated_reading_time: "45分钟"
+core_concepts: "系统调用, API设计, 契约编程, 错误处理, 多语言SDK"
+---
 
 # AgentOS API 参考文档
 
-**版本**: Doc V1.7  
-**最后更新**: 2026-03-31  
-**状态**: 🟢 生产就绪  
-**作者**: LirenWang
-
----
+## 📋 文档信息卡
+- **目标读者**: 开发者/架构师
+- **前置知识**: 熟悉至少一种编程语言，了解API设计基础
+- **预计阅读时间**: 45分钟
+- **核心概念**: 系统调用, API设计, 契约编程, 错误处理, 多语言SDK
+- **文档状态**: 🟢 生产就绪
+- **复杂度标识**: ⭐⭐ 中级
 
 ## 🎯 概述
 
@@ -455,6 +469,14 @@ AGENTOS_API int agentos_module_function(
 - [系统调用规范](../architecture/folder/syscall.md)
 - [编码规范](../specifications/coding_standard/C_coding_style_guide.md)
 - [术语表](../specifications/TERMINOLOGY.md)
+
+---
+
+## 📝 版本历史
+
+| 版本 | 日期 | 作者 | 变更说明 |
+|------|------|------|----------|
+| Doc V1.7 | 2026-03-31 | LirenWang | 初始版本，建立完整API文档体系 |
 
 ---
 

@@ -1,14 +1,28 @@
-Copyright (c) 2026 SPHARX. All Rights Reserved.
-"From data intelligence emerges."
+---
+copyright: "Copyright (c) 2026 SPHARX. All Rights Reserved."
+slogan: "From data intelligence emerges."
+title: "AgentOS 技术规范"
+version: "Doc V1.7"
+last_updated: "2026-03-31"
+author: "LirenWang"
+status: "production_ready"
+review_due: "2026-06-30"
+theoretical_basis: "工程两论、五维正交系统、双系统认知理论"
+target_audience: "开发者/架构师/安全专家"
+prerequisites: "了解软件开发流程，熟悉技术规范概念"
+estimated_reading_time: "1小时"
+core_concepts: "契约规范, 编码标准, 项目管理, 术语统一, 安全合规"
+---
 
 # AgentOS 技术规范
 
-**版本**: Doc V1.7  
-**更新**: 2026-03-31  
-**作者**: LirenWang  
-**状态**: 🟢 生产就绪
-
----
+## 📋 文档信息卡
+- **目标读者**: 开发者/架构师/安全专家
+- **前置知识**: 了解软件开发流程，熟悉技术规范概念
+- **预计阅读时间**: 1小时
+- **核心概念**: 契约规范, 编码标准, 项目管理, 术语统一, 安全合规
+- **文档状态**: 🟢 生产就绪
+- **复杂度标识**: ⭐⭐ 中级
 
 ## 🎯 概述
 
@@ -398,6 +412,15 @@ python scripts/license_compliance.py --report
 - [编码规范总览](../coding_standard/README.md)
 - [术语表](TERMINOLOGY.md)
 - [API 参考](../api/README.md)
+
+---
+
+## 📝 版本历史
+
+| 版本 | 日期 | 作者 | 变更说明 |
+|------|------|------|----------|
+| Doc V1.7 | 2026-03-31 | LirenWang | 更新规范版本，完善内容结构 |
+| Doc V1.6 | 2026-03-23 | AgentOS 规范委员会 | 初始版本，建立技术规范体系 |
 
 ---
 

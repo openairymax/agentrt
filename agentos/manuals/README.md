@@ -1,14 +1,28 @@
-Copyright (c) 2026 SPHARX. All Rights Reserved.
-"From data intelligence emerges."
+---
+copyright: "Copyright (c) 2026 SPHARX. All Rights Reserved."
+slogan: "From data intelligence emerges."
+title: "AgentOS 技术文档中心"
+version: "Doc V1.7"
+last_updated: "2026-03-31"
+author: "LirenWang"
+status: "production_ready"
+review_due: "2026-06-30"
+theoretical_basis: "工程两论、五维正交系统、双系统认知理论"
+target_audience: "架构师/开发者/运维/初学者"
+prerequisites: "无"
+estimated_reading_time: "30分钟"
+core_concepts: "文档体系, 学习路径, 架构导航, 开发指南"
+---
 
 # AgentOS 技术文档中心
 
-**版本**: Doc V1.7  
-**最后更新**: 2026-03-31  
-**状态**: 生产就绪  
-**作者**: LirenWang
-
----
+## 📋 文档信息卡
+- **目标读者**: 架构师/开发者/运维/初学者
+- **前置知识**: 无
+- **预计阅读时间**: 30分钟
+- **核心概念**: 文档体系, 学习路径, 架构导航, 开发指南
+- **文档状态**: 🟢 生产就绪
+- **复杂度标识**: ⭐ 初学者友好
 
 ## 🎯 快速导航
 
@@ -541,6 +555,14 @@ graph LR
 - **安全问题**: wangliren@spharx.cn
 - **问题反馈**: https://github.com/SpharxTeam/AgentOS/issues
 - **项目主页**: https://gitee.com/spharx/agentos
+
+---
+
+## 📝 版本历史
+
+| 版本 | 日期 | 作者 | 变更说明 |
+|------|------|------|----------|
+| Doc V1.7 | 2026-03-31 | LirenWang | 初始版本，建立完整文档体系 |
 
 ---
 
