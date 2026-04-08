@@ -28,61 +28,62 @@
 
 ## 💡 创新要点
 
-- **纯净内核**：内核仅提供 IPC/Mem/Task/Time 四大原子机制，纯净高效
-- **认知循环**：认知，规划，行动，双系统协同（System1+System2）
-- **记忆卷载**：L1原始层→L2特征层→L3结构层→L4模式层，涌现智慧
-- **安全内生**：四重防护：沙箱隔离，权限裁决，输入净化，审计追踪
-- **高效 Token**：工程级相比传统框架节省约 **500%** Token 消耗
-- **丰富 SDK**：Go / Python / Rust / TypeScript 原生支持
+- **纯净内核**：内核仅提供原子机制，纯净高效
+- **认知循环**：认知，规划，行动
+- **记忆卷载**：原始层，特征层，结构层，模式层
+- **安全内生**：沙箱隔离，权限裁决，输入净化，审计追踪
+- **高效 Token**：工程级比传统框架节省约**500%**
+- **丰富 SDK**：原生支持 Go 、Python 、Rust 、TypeScript
 
 ## 🎯 基本理念
 
-- **驱动团队**：精准协调多 Agent 协作，高效完成复杂任务编排与资源调度。  
-- **自主演进**：具备自我进化能力，动态调整策略，持续优化执行效果。    
+**驱动团队**
+- 精准协调多 Agent 协作
+- 高效完成复杂任务编排与资源调度  
+
+**自主演进**：
+- 具备自我进化能力
+- 动态调整策略
+- 持续优化执行效果  
 
 <p align="center">
-  <strong>✨ 全新架构 · 安全内生 · 智能涌现 ✨</strong>  
+  <strong>✨ 全新架构 · 安全内生 · 智能涌现</strong>  
 </p>
 
 ## 🏗️ 系统架构
 
-**架构设计** · 从内核到应用的完整技术栈
+**架构设计**  
+  从内核到应用的完整架构：
 
 ```
-应用层 (openlab)
-    ↕
-服务层 (daemon) — gateway_d · llm_d · market_d · monit_d · sched_d · tool_d
-    ↕
-内核层 (atoms) — corekern · coreloopthree · memoryrovol · syscall
-    ↕
-安全层 (cupolas) — 净化 / 权限 / 审计 / 沙箱
-    ↕
-支撑层 (commons) — platform · utils (19 个模块)
-    ↕
-SDK 层 (toolkit) — Go / Python / Rust / TypeScript
+⬇️ 应用层 (openlab)
+⇅ 服务层 (daemon)
+⇅ 内核层 (atoms)
+⇅ 安全层 (cupolas)
+⇅ 支撑层 (commons)
+⬆️ SDK 层 (toolkit)  
 ```
 
-**📐 设计原则** · 基于 [ARCHITECTURAL_PRINCIPLES.md V1.8](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) 构建：
-
+** 设计原则**  
+  基于 [ARCHITECTURAL_PRINCIPLES.md V1.8](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) 构建：
 - **系统观**：反馈闭环 · 层次分解 · 总体设计部 · 涌现管理 → 实时响应 <10ms
 - **内核观**：内核极简 · 接口契约化 · 服务隔离 · 可插拔策略 → 内核 ~25K LOC
 - **认知观**：双系统协同 · 增量演化 · 记忆卷载 · 遗忘机制 → Token 节省 500%
 - **工程观**：安全内生 · 可观测性 · 资源确定性 · 跨平台一致 → 测试覆盖 >90%
-- **设计美学**：简约至上 · 极致细节 · 人文关怀 · 完美主义 → API <50 个/模块
-
+- **设计美学**：简约至上 · 极致细节 · 人文关怀 · 完美主义 → API <50 个/模块  
 
 ## 🚀 快速上手
 
-### 📦 环境要求
+### 环境要求
 
 - **操作系统**：Ubuntu 22.04+ / macOS 13+ / Windows 11 (WSL2)
 - **编译器**：GCC 11+ / Clang 14+ (C11/C++17)
 - **构建工具**：CMake 3.20+, Ninja
 - **Python**：3.10+ (OpenLab 需要)
 
-### 🔨 安装与构建
+### 安装与构建
 
-```bash
+```ctext
 # 1. 克隆仓库
 git clone https://atomgit.com/spharx/agentos.git && cd agentos
 
@@ -98,9 +99,9 @@ cmake --build . --parallel $(nproc)
 ctest --output-on-failure
 ```
 
-### 🐳 Docker 快速启动
+### Docker快速启动
 
-```bash
+```text
 # 构建镜像
 docker build -f scripts/deploy/docker/Dockerfile.kernel -t agentos:latest .
 
@@ -108,8 +109,9 @@ docker build -f scripts/deploy/docker/Dockerfile.kernel -t agentos:latest .
 docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
 ```
 
-### 💻 使用方式
+### 使用方式  
 
+```
 | 语言 | 使用方式 |
 |:-----|:---------|
 | C/C++ | 通过 `syscalls.h` 系统调用接口开发 |
@@ -117,8 +119,8 @@ docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
 | Go | 通过 `import "github.com/spharx/agentos/toolkit/go"` |
 | Rust | 通过 `use agentos_toolkit::prelude::*;` |
 | TypeScript | 通过 `npm install @spharx/agentos-toolkit` 后直接 import |
-
-### 📚 阅读导航
+```
+### 阅读导航
 
 | 文档 | 核心内容 |
 |:-----|:---------|
@@ -129,10 +131,10 @@ docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
 | [🐳 部署指南](agentos/manuals/guides/deployment.md) | Docker/Kubernetes 部署 |
 
 
-## ❔ 常见问题
+### 常见问题
 
 <details>
-<summary><b>Q1: AgentOS 与传统 AI Agent 框架有什么区别？</b></summary>
+<summary>👉 Q1: AgentOS 与传统 AI Agent 框架有什么区别？</summary>
 
 AgentOS 是**操作系统级**产品，而非单一框架：
 
@@ -147,7 +149,7 @@ AgentOS 是**操作系统级**产品，而非单一框架：
 </details>
 
 <details>
-<summary><b>Q2: 适合哪些应用场景？</b></summary>
+<summary>👉 Q2: 适合哪些应用场景？</summary>
 
 **✅ 特别适合**
 - 🎯 复杂多步骤任务编排
@@ -162,7 +164,7 @@ AgentOS 是**操作系统级**产品，而非单一框架：
 </details>
 
 <details>
-<summary><b>Q3: 如何保证安全性？</b></summary>
+<summary>👉 Q3: 如何保证安全性？</summary>
 
 **安全内生设计，四重防护**
 
@@ -178,7 +180,7 @@ AgentOS 是**操作系统级**产品，而非单一框架：
 </details>
 
 <details>
-<summary><b>Q4: 学习需要哪些前置知识？</b></summary>
+<summary>👉 Q4: 学习需要哪些前置知识？</summary>
 
 | 角色 | 前置知识 | 上手时间 |
 |------|---------|----------|
@@ -190,36 +192,47 @@ AgentOS 是**操作系统级**产品，而非单一框架：
 
 </details>  
 
+## 🎏 参与贡献
+
+我们正在走进未来："Intelligence emergence, and nothing less, is the ultimate sublimation of AI"。   
+
+### 相信的力量  
+
 <p align="center">
-  <strong>💡 每解决一个问题，都是为人类点亮一盏灯 💡</strong>  
-</p>
+  <strong>☀️ 这不是人类的日落，而是新世界的曙光</strong>  
+</p>  
 
+**相信**  
 
-## 🤝 参与贡献
+  开源的精神能最大发挥群体的智慧；  
+  协作，推动人类族群走上新的高度。    
 
-这是我们正在走进的未来。  
+**见证**  
 
-> "Intelligence emergence, and nothing less, is the ultimate sublimation of AI."
+  我们每一天的工作都是历史的一部分；  
+  必将铭刻在人类文明发展史的丰碑上。   
 
-
-### 🎏 相信的力量
-
-**相信**：智能的未来，不应该被单一框架所定义。开源的精神，能最大发挥群体的智慧，推动人类族群走上新的高度。   
-
-**见证**：我们每一天的工作，都将铭刻在人类文明发展的丰碑上，见证真正智慧的涌现。  
-
-**这不是人类的日落，而是新世界的曙光 ☀️**   
-
-
-### 💫 可以贡献的方式
+### 贡献的方式
 
 无论你是经验丰富的开发者，还是刚刚起步的新手：
-- 🐛 **发现问题** → 报告 Bug，帮助我们改进质量
-- 💡 **提出想法** → 新功能建议，让项目更加强大
-- 📝 **分享知识** → 完善文档，帮助更多人了解 AgentOS
-- 🔧 **编写代码** → 提交 PR，共同打造更好的智能体操作系统
+ 
+**发现问题**  
+报告 Bug，帮助我们改进质量  
 
-### 📝 贡献流程
+**提出想法** 
+新功能建议，让项目更加强大  
+
+**分享知识** 
+完善文档，帮助更多人了解 AgentOS  
+
+**编写代码**  
+提交 PR，共同创造历史   
+
+<p align="center">  
+  <strong>🔥 “微微的灯火，照不亮前路，但能指引前行的方向”</strong>
+</p>  
+
+### 贡献流程
 
 详见 [贡献指南](CONTRIBUTING.md)
 
@@ -227,12 +240,8 @@ AgentOS 是**操作系统级**产品，而非单一框架：
 Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 → 合并主分支
 ```
 
-**主要平台**：[AtomGit](https://atomgit.com/spharx/agentos)（推荐） · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)   
+**主要平台**：[AtomGit](https://atomgit.com/spharx/agentos)（推荐） · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)    
 
-
-<p align="center">  
-  <strong>🔥 “微微的灯火，照不亮前路，但能指引前行的方向” 🔥</strong>
-</p>  
 
 ## 📜 许可证
 
