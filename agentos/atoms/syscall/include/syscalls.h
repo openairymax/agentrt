@@ -120,12 +120,23 @@ AGENTOS_API agentos_error_t agentos_sys_memory_delete(const char* record_id);
 /* ==================== 会话管理 ==================== */
 
 /**
+ * @brief 会话持久化状态
+ */
+typedef enum {
+    SESSION_PERSIST_UNKNOWN = 0,    /**< 未知状态 */
+    SESSION_PERSIST_PENDING,        /**< 等待持久化 */
+    SESSION_PERSIST_SUCCESS,        /**< 持久化成功 */
+    SESSION_PERSIST_FAILED,         /**< 持久化失败 */
+    SESSION_PERSIST_DISABLED        /**< 持久化禁用 */
+} session_persist_status_t;
+
+/**
  * @brief 创建会话
- * @param user_id 用户 ID
+ * @param metadata 会话元数据（JSON 格式，可为 NULL）
  * @param out_session_id 输出会话 ID
  * @return agentos_error_t
  */
-AGENTOS_API agentos_error_t agentos_sys_session_create(const char* user_id, char** out_session_id);
+AGENTOS_API agentos_error_t agentos_sys_session_create(const char* metadata, char** out_session_id);
 
 /**
  * @brief 获取会话信息
@@ -144,10 +155,23 @@ AGENTOS_API agentos_error_t agentos_sys_session_close(const char* session_id);
 
 /**
  * @brief 列出所有会话
- * @param out_sessions 输出会话列表（JSON 数组）
+ * @param out_sessions 输出会话 ID 数组（需调用者释放）
+ * @param out_count 输出会话数量
  * @return agentos_error_t
  */
-AGENTOS_API agentos_error_t agentos_sys_session_list(char** out_sessions);
+AGENTOS_API agentos_error_t agentos_sys_session_list(char*** out_sessions, size_t* out_count);
+
+/**
+ * @brief 获取会话持久化状态
+ * @param session_id 会话 ID
+ * @param out_status 输出持久化状态
+ * @param out_error 输出持久化错误码（可为 NULL）
+ * @return agentos_error_t
+ */
+AGENTOS_API agentos_error_t agentos_sys_session_get_persist_status(
+    const char* session_id,
+    session_persist_status_t* out_status,
+    agentos_error_t* out_error);
 
 /* ==================== 可观测性 ==================== */
 
