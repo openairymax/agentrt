@@ -74,16 +74,17 @@
 - **工程观**：安全内生 · 可观测性 · 资源确定性 · 跨平台一致 → 测试覆盖 >90%
 - **设计美学**：简约至上 · 极致细节 · 人文关怀 · 完美主义 → API <50 个/模块  
 
+
 ## 🚀 快速上手
 
-### 环境要求
+### 环境要求  
 
 - **操作系统**：Ubuntu 22.04+ / macOS 13+ / Windows 11 (WSL2)
 - **编译器**：GCC 11+ / Clang 14+ (C11/C++17)
 - **构建工具**：CMake 3.20+, Ninja
-- **Python**：3.10+ (OpenLab 需要)
+- **Python**：3.10+ (OpenLab 需要)  
 
-### 安装与构建
+### 安装与构建  
 
 ```ctext
 # 1. 克隆仓库
@@ -98,10 +99,10 @@ cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
 cmake --build . --parallel $(nproc)
 
 # 4. 运行测试
-ctest --output-on-failure
+ctest --output-on-failure  
 ```
 
-### Docker快速启动
+### Docker快速启动  
 
 ```text
 # 构建镜像
@@ -111,7 +112,7 @@ docker build -f scripts/deploy/docker/Dockerfile.kernel -t agentos:latest .
 docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
 ```
 
-### 使用方式  
+### 使用方式   
 
 ```
 | 语言 | 使用方式 |
@@ -122,18 +123,18 @@ docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
 | Rust | 通过 `use agentos_toolkit::prelude::*;` |
 | TypeScript | 通过 `npm install @spharx/agentos-toolkit` 后直接 import |
 ```
-### 阅读导航
+### 阅读导航  
 
 | 文档 | 核心内容 |
 |:-----|:---------|
-| [📘 架构设计原则 V1.8](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) | 五维正交体系，24 条核心原则 |
+| [📘 架构原则](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) | 五维正交体系，24 条核心原则 |
 | [🚀 快速开始](agentos/manuals/guides/quickstart.md) | 5 分钟上手指南 |
 | [⚙️ 编译指南](agentos/manuals/guides/build.md) | 详细构建步骤和选项 |
 | [🧪 测试指南](agentos/manuals/guides/testing.md) | 单元/集成/契约测试 |
 | [🐳 部署指南](agentos/manuals/guides/deployment.md) | Docker/Kubernetes 部署 |
 
 
-### 常见问题
+### 常见问题  
 
 <details>
 <summary>👉 Q1: AgentOS 与传统 AI Agent 框架有什么区别？</summary>
@@ -194,11 +195,13 @@ AgentOS 是**操作系统级**产品，而非单一框架：
 
 </details>  
 
-## 🎏 参与贡献
+
+
+## 🎏 参与贡献  
 
 我们正在走进未来："Intelligence emergence, and nothing less, is the ultimate sublimation of AI"。   
 
-### 相信的力量  
+### 相信的力量   
 
 <p align="center">
   <strong>☀️ 这不是人类的日落，而是新世界的曙光</strong>  
@@ -214,7 +217,7 @@ AgentOS 是**操作系统级**产品，而非单一框架：
   我们每一天的工作都是历史的一部分；  
   必将铭刻在人类文明发展史的丰碑上。   
 
-### 贡献的方式
+### 贡献的方式  
 
 无论你是经验丰富的开发者，还是刚刚起步的新手：
  
@@ -234,7 +237,7 @@ AgentOS 是**操作系统级**产品，而非单一框架：
   <strong>🔥 “微微的灯火，照不亮前路，但能指引前行的方向”</strong>
 </p>  
 
-### 贡献流程
+### 贡献流程  
 
 详见 [贡献指南](CONTRIBUTING.md)
 
@@ -245,7 +248,7 @@ Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 →
 **主要平台**：[AtomGit](https://atomgit.com/spharx/agentos)（推荐） · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)    
 
 
-## 📜 许可证
+## 📜 许可证  
 
 本项目采用 **Apache License 2.0** 开源许可，详情参阅 [LICENSE](LICENSE) 文件。
 
