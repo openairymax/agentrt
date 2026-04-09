@@ -15,7 +15,7 @@
 
 **Technical White Paper for Intelligent Agent Super Operating System**
 
-*"From data intelligence emerges. 濮嬩簬鏁版嵁锛岀粓浜庢櫤鑳?"*
+*"From data intelligence emerges. 始于数据，终于智能."*
 
 ---
 
@@ -191,8 +191,19 @@ Through in-depth analysis of industry status, we identify five core pain points:
 The essence of an operating system is **resource management** and **abstraction encapsulation**:
 
 ```
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?         Application Layer (Agent Apps)  鈹?鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?     OS Layer (Resource Mgmt + Abstraction)
-鈹? - Process Mgmt 鈫?Agent Lifecycle Mgmt   鈹?鈹? - Memory Mgmt 鈫?Memory System           鈹?鈹? - File System 鈫?Persistent Storage      鈹?鈹? - Device Drivers 鈫?LLM/Tool/Skill       鈹?鈹? - Security 鈫?Permission Control/Sandbox 鈹?鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?         Hardware Layer (CPU/GPU/RAM)    鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
+┌─────────────────────────────────────────┐
+│          Application Layer (Agent Apps)  │
+├─────────────────────────────────────────┤
+│      OS Layer (Resource Mgmt + Abstraction)
+│  - Process Mgmt → Agent Lifecycle Mgmt   │
+│  - Memory Mgmt → Memory System           │
+│  - File System → Persistent Storage      │
+│  - Device Drivers → LLM/Tool/Skill       │
+│  - Security → Permission Control/Sandbox │
+├─────────────────────────────────────────┤
+│          Hardware Layer (CPU/GPU/RAM)    │
+└─────────────────────────────────────────┘
+```
 
 AgentOS's positioning: **Building the first cornerstone of an operating system for agent civilization**.
 
@@ -204,7 +215,7 @@ AgentOS's positioning: **Building the first cornerstone of an operating system f
 
 > "Intelligence emergence, and nothing less, is the ultimate sublimation of AI."
 >
-> "濮嬩簬鏁版嵁锛岀粓浜庢櫤鑳姐€?
+> "始于数据，终于智能。"
 
 The ultimate goal of AgentOS is to achieve **the leap from data to wisdom**, enabling agents to evolve from solo instruction executors into an agent civilization capable of forming teams and self-evolving.
 
@@ -231,7 +242,7 @@ The ultimate goal of AgentOS is to achieve **the leap from data to wisdom**, ena
    - Strict separation between decision and execution layers
 
 3. **Memory Rollover System**
-   - L1鈫扡2鈫扡3鈫扡4 progressive wisdom extraction
+   - L1→L2→L3→L4 progressive wisdom extraction
    - Forgetting mechanism based on Ebbinghaus curve
    - Retrieval dynamics based on Hopfield network
 
@@ -271,9 +282,11 @@ Advantages:
 **Innovation 2: Three-Layer Cognitive Loop**
 
 ```
-Cognition Layer: Intention Understanding 鈫?Task Planning 鈫?Agent Scheduling
-   鈫?Execution Layer: Execution Engine 鈫?Compensating Transactions 鈫?Chain of Responsibility Tracing
-   鈫?Memory Layer: FFI Encapsulation 鈫?Context Mounting 鈫?Evolution Triggering
+Cognition Layer: Intention Understanding → Task Planning → Agent Scheduling
+   ↓
+Execution Layer: Execution Engine → Compensating Transactions → Chain of Responsibility Tracing
+   ↓
+Memory Layer: FFI Encapsulation → Context Mounting → Evolution Triggering
 ```
 
 Each layer has independent feedback loops:
@@ -356,10 +369,10 @@ This document is part of the AgentOS documentation system, recommended to read i
 
 | Document Type | Document Name | Purpose |
 |--------------|--------------|---------|
-| **Getting Started** | [Quick Start Guide](agentos/docs/guides/getting_started.md) | Environment setup and first Agent |
-| **Architecture Details** | [Architectural Design Principles](agentos/docs/architecture/architectural_design_principles.md) | In-depth interpretation of four-dimensional principles |
-| **API Reference** | [System Call API Specification](agentos/docs/api/syscalls/README.md) | Complete API documentation |
-| **Best Practices** | [Development Guide](agentos/docs/guides/create_agent.md) | Agent/Skill development tutorials |
+| **Getting Started** | [Quick Start Guide](agentos/manuals/guides/getting_started.md) | Environment setup and first Agent |
+| **Architecture Details** | [Architectural Design Principles](agentos/manuals/architecture/architectural_design_principles.md) | In-depth interpretation of four-dimensional principles |
+| **API Reference** | [System Call API Specification](agentos/manuals/api/syscalls/README.md) | Complete API documentation |
+| **Best Practices** | [Development Guide](agentos/manuals/guides/create_agent.md) | Agent/Skill development tutorials |
 
 ---
 
@@ -367,10 +380,10 @@ This document is part of the AgentOS documentation system, recommended to read i
 
 This chapter introduced the technical background, vision, goals, and core innovations of AgentOS. Key points:
 
-鉁?**Paradigm Shift**: From "framework era" to "operating system era"  
-鉁?**Theoretical Foundations**: Engineering Cybernetics + Systems Engineering + Dual-System Cognitive Theory  
-鉁?**Core Innovations**: Microkernel architecture, three-layer cognitive loop, four-layer memory rollover  
-鉁?**Performance Leadership**: Token efficiency improved 2-3 times  
+✅ **Paradigm Shift**: From "framework era" to "operating system era"  
+✅ **Theoretical Foundations**: Engineering Cybernetics + Systems Engineering + Dual-System Cognitive Theory  
+✅ **Core Innovations**: Microkernel architecture, three-layer cognitive loop, four-layer memory rollover  
+✅ **Performance Leadership**: Token efficiency improved 2-3 times  
 
 Next, [Chapter 2 System Architecture](#chapter-2-system-architecture) will delve into the overall architecture design principles and technology stack selection of AgentOS.
 
@@ -385,7 +398,40 @@ Next, [Chapter 2 System Architecture](#chapter-2-system-architecture) will delve
 AgentOS adopts a classic layered architecture design, divided into four layers from top to bottom:
 
 ```
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?                   AgentOS Overall Architecture              鈹?鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?                                                            鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹?鈹? 鈹?             Application Layer (openlab)               鈹? 鈹?鈹? 鈹? docgen | ecommerce | research | videoedit | ...      鈹? 鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹?鈹?                          鈫?                                鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹?鈹? 鈹?          Backend Services Layer (daemon)               鈹? 鈹?鈹? 鈹? llm_d | market_d | monit_d | sched_d | tool_d        鈹? 鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹?鈹?                          鈫?                                鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹?鈹? 鈹?           Kernel Layer (atoms)                        鈹? 鈹?鈹? 鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹? 鈹?鈹? 鈹? 鈹?  corekern  鈹? 鈹俢oreloopthree 鈹? 鈹俶emoryrovol  鈹?  鈹? 鈹?鈹? 鈹? 鈹?Microkernel 鈹? 鈹?-layer cogn. 鈹? 鈹?-layer mem. 鈹?  鈹? 鈹?鈹? 鈹? 鈹侷PC路Mem路Task 鈹? 鈹侰ogn鈫扨lan鈫扙xec鈹? 鈹侺1鈫扡2鈫扡3鈫扡4  鈹?  鈹? 鈹?鈹? 鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹? 鈹?鈹? 鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹? 鈹?鈹? 鈹? 鈹?  syscall    鈹? 鈹?   cupolas     鈹? 鈹?  utils     鈹? 鈹? 鈹?鈹? 鈹? 鈹?Syscall API  鈹? 鈹?Security Dome鈹? 鈹?Public Utils鈹? 鈹? 鈹?鈹? 鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹? 鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹?鈹?                          鈫?                                鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹?鈹? 鈹?          SDK Layer (toolkit)                            鈹? 鈹?鈹? 鈹? Go | Python | Rust | TypeScript                      鈹? 鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹?鈹?                                                            鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
+┌─────────────────────────────────────────────────────────────┐
+│                    AgentOS Overall Architecture              │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │              Application Layer (openlab)               │  │
+│  │  docgen | ecommerce | research | videoedit | ...      │  │
+│  └───────────────────────────────────────────────────────┘  │
+│                           ↕                                 │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │           Backend Services Layer (daemon)               │  │
+│  │  llm_d | market_d | monit_d | sched_d | tool_d        │  │
+│  └───────────────────────────────────────────────────────┘  │
+│                           ↕                                 │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │            Kernel Layer (atoms)                        │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐  │  │
+│  │  │   corekern  │  │coreloopthree │  │memoryrovol  │   │  │
+│  │  │ Microkernel │  │3-layer cogn. │  │4-layer mem. │   │  │
+│  │  │IPC·Mem·Task │  │Cogn→Plan→Exec│  │L1→L2→L3→L4  │   │  │
+│  │  └──────────────┘  └──────────────┘  └─────────────┘  │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐  │  │
+│  │  │   syscall    │  │    cupolas     │  │   utils     │  │  │
+│  │  │ Syscall API  │  │ Security Dome│  │ Public Utils│  │  │
+│  │  └──────────────┘  └──────────────┘  └─────────────┘  │  │
+│  └───────────────────────────────────────────────────────┘  │
+│                           ↕                                 │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │           SDK Layer (toolkit)                            │  │
+│  │  Go | Python | Rust | TypeScript                      │  │
+│  └───────────────────────────────────────────────────────┘  │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
 
 **Figure 2-1**: AgentOS Overall Architecture Diagram (Layered Design)
 
@@ -398,20 +444,44 @@ AgentOS adopts a classic layered architecture design, divided into four layers f
 | **Kernel** | `agentos/atoms/` | Microkernel, cognitive loop, memory system | ~20,095 | 165 |
 | **SDK** | `agentos/toolkit/` | Multi-language SDKs (Go/Python/Rust/TS) | Varies | - |
 
-**Table 2-1**: AgentOS Layer Responsibilities and Scale (Data source: [Code Stats Report](.鏈湴鎬荤粨/CODE_STATS_REPORT.md))
+**Table 2-1**: AgentOS Layer Responsibilities and Scale (Data source: [Code Stats Report](.本地总结/CODE_STATS_REPORT.md))
 
 #### 2.1.3 Data Flow and Control Flow
 
 ```
 User Request
-   鈫?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹? HTTP/WebSocket  鈹?鈫?Gateway Layer (agentos/gateway/)
-鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?         鈫?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?Authentication & 鈹?鈫?cupolas Security Layer
-鈹?Authorization    鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?         鈫?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?Intention        鈹?鈫?CoreLoopThree Cognition Layer
-鈹?Understanding &  鈹?鈹?Planning         鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?         鈫?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?Task Scheduling  鈹?鈫?Scheduler (sched_d)
-鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?         鈫?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?Execution Engine 鈹?鈫?Execution Layer
-鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?         鈫?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?LLM/Tool/Skill   鈹?鈫?daemon Services Layer
-鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?         鈫?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?Memory Writing   鈹?鈫?MemoryRovol
-鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
+   ↓
+┌──────────────────┐
+│  HTTP/WebSocket  │ ← Gateway Layer (agentos/gateway/)
+└────────┬─────────┘
+         ↓
+┌──────────────────┐
+│ Authentication & │ ← cupolas Security Layer
+│ Authorization    │
+└────────┬─────────┘
+         ↓
+┌──────────────────┐
+│ Intention        │ ← CoreLoopThree Cognition Layer
+│ Understanding &  │
+│ Planning         │
+└────────┬─────────┘
+         ↓
+┌──────────────────┐
+│ Task Scheduling  │ ← Scheduler (sched_d)
+└────────┬─────────┘
+         ↓
+┌──────────────────┐
+│ Execution Engine │ ← Execution Layer
+└────────┬─────────┘
+         ↓
+┌──────────────────┐
+│ LLM/Tool/Skill   │ ← daemon Services Layer
+└────────┬─────────┘
+         ↓
+┌──────────────────┐
+│ Memory Writing   │ ← MemoryRovol
+└──────────────────┘
+```
 
 **Figure 2-2**: AgentOS Data Flow and Control Flow Diagram
 
@@ -422,10 +492,10 @@ User Request
 AgentOS design follows a complete principle system composed of four dimensions:
 
 ```
-Dimension 1: System View 鈫?Cybernetics & Systems Engineering (S-1~S-4)
-Dimension 2: Kernel View 鈫?Microkernel Philosophy (K-1~K-4)
-Dimension 3: Cognitive View 鈫?Dual-System Theory (C-1~C-4)
-Dimension 4: Engineering View 鈫?Jobs Aesthetics (E-1~E-7)
+Dimension 1: System View ← Cybernetics & Systems Engineering (S-1~S-4)
+Dimension 2: Kernel View ← Microkernel Philosophy (K-1~K-4)
+Dimension 3: Cognitive View ← Dual-System Theory (C-1~C-4)
+Dimension 4: Engineering View ← Jobs Aesthetics (E-1~E-7)
 ```
 
 #### 2.2.1 Dimension 1: System View
@@ -452,7 +522,7 @@ typedef struct {
 
 > "The only antidote to complex systems is hierarchicalization."
 
-- Application Layer 鈫?Services Layer 鈫?Kernel Layer 鈫?SDK Layer
+- Application Layer → Services Layer → Kernel Layer → SDK Layer
 - Each layer has single responsibility, clear interfaces
 - Cross-layer calls prohibited (must go through well-defined interfaces)
 
@@ -472,7 +542,7 @@ In AgentOS, this is embodied as:
 AgentOS achieves intelligence emergence through:
 - Multi-Agent collaboration (discovery and composition via `market_d`)
 - Model collaboration (primary-auxiliary model cross-validation)
-- Memory evolution (L1鈫扡2鈫扡3鈫扡4 progressive abstraction)
+- Memory evolution (L1→L2→L3→L4 progressive abstraction)
 
 #### 2.2.2 Dimension 2: Kernel View
 
@@ -547,15 +617,15 @@ The following components support runtime replacement:
 
 > "Memory is the cornerstone of wisdom."
 
-L1鈫扡2鈫扡3鈫扡4 progressive abstraction process:
+L1→L2→L3→L4 progressive abstraction process:
 
 ```
 L1 Raw Data (100GB)
-   鈫?Feature Extraction (Compression 10:1)
+   ↓ Feature Extraction (Compression 10:1)
 L2 Feature Vectors (10GB)
-   鈫?Relation Binding (Compression 5:1)
+   ↓ Relation Binding (Compression 5:1)
 L3 Structural Relations (2GB)
-   鈫?Pattern Mining (Compression 10:1)
+   ↓ Pattern Mining (Compression 10:1)
 L4 Behavioral Patterns (200MB)
 ```
 
@@ -667,7 +737,30 @@ Engineering cybernetics studies how to control and regulate complex systems thro
 **Application in AgentOS**:
 
 ```
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?     Three-Layer Nested Feedback System 鈹?鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?                                        鈹?鈹? Cross-round Feedback (Hour/Day-level)  鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?  鈹?鈹? 鈹?Memory Evolution 路 Pattern      鈹?  鈹?鈹? 鈹?Mining 路 Strategy Optimization  鈹?  鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?  鈹?鈹?              鈫?                        鈹?鈹? Intra-round Feedback (Second-level)    鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?  鈹?鈹? 鈹?Task Coordination 路 Resource    鈹?  鈹?鈹? 鈹?Scheduling 路 Conflict Resolution鈹?  鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?  鈹?鈹?              鈫?                        鈹?鈹? Real-time Feedback (Millisecond-level) 鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?  鈹?鈹? 鈹?Execution Correction 路 Error    鈹?  鈹?鈹? 鈹?Recovery 路 Compensating Tasks   鈹?  鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?  鈹?鈹?                                        鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
+┌─────────────────────────────────────────┐
+│      Three-Layer Nested Feedback System │
+├─────────────────────────────────────────┤
+│                                         │
+│  Cross-round Feedback (Hour/Day-level)  │
+│  ┌─────────────────────────────────┐   │
+│  │ Memory Evolution · Pattern      │   │
+│  │ Mining · Strategy Optimization  │   │
+│  └────────────┬────────────────────┘   │
+│               ↓                         │
+│  Intra-round Feedback (Second-level)    │
+│  ┌─────────────────────────────────┐   │
+│  │ Task Coordination · Resource    │   │
+│  │ Scheduling · Conflict Resolution│   │
+│  └────────────┬────────────────────┘   │
+│               ↓                         │
+│  Real-time Feedback (Millisecond-level) │
+│  ┌─────────────────────────────────┐   │
+│  │ Execution Correction · Error    │   │
+│  │ Recovery · Compensating Tasks   │   │
+│  └─────────────────────────────────┘   │
+│                                         │
+└─────────────────────────────────────────┘
+```
 
 **Figure 2-3**: Three-Layer Nested Feedback System Architecture Diagram
 
@@ -692,8 +785,8 @@ In AgentOS, feedback gain $K$ is dynamically adjusted through reinforcement lear
 
 Systems engineering methodology emphasizes handling complex systems from three dimensions:
 
-1. **Time Dimension**: Planning 鈫?Design 鈫?Manufacturing 鈫?Installation 鈫?Operation 鈫?Update
-2. **Logic Dimension**: Problem Definition 鈫?Objective Selection 鈫?System Synthesis 鈫?Analysis 鈫?Optimization 鈫?Decision
+1. **Time Dimension**: Planning → Design → Manufacturing → Installation → Operation → Update
+2. **Logic Dimension**: Problem Definition → Objective Selection → System Synthesis → Analysis → Optimization → Decision
 3. **Knowledge Dimension**: Engineering, Economics, Management, Social Sciences, etc.
 
 **Application in AgentOS**:
@@ -704,7 +797,7 @@ Systems engineering methodology emphasizes handling complex systems from three d
 | **Objective Selection** | Determine design goals (see Section 1.2.2) | Technical Roadmap |
 | **System Synthesis** | Layered architecture design (see Section 2.1) | Architecture Design Document |
 | **Analysis** | Performance modeling and simulation | Performance Forecast Report |
-| **Optimization** | Iterative improvement (v1.0鈫抳1.x) | Version Evolution Record |
+| **Optimization** | Iterative improvement (v1.0→v1.x) | Version Evolution Record |
 | **Decision** | Architecture Committee Review | Technical Decision Record |
 
 #### 2.3.3 Dual-System Cognitive Theory (Thinking, Fast and Slow)
@@ -723,12 +816,12 @@ Human cognition is divided into two systems:
 **Mapping in AgentOS**:
 
 ```
-System 1 鈫?Execution Layer
+System 1 → Execution Layer
 - Execution Engine: State machine fast transitions
 - Compensating Transactions: Automated rollback
 - Chain of Responsibility Tracing: Non-intrusive monitoring
 
-System 2 鈫?Cognition Layer
+System 2 → Cognition Layer
 - Intention Understanding: Deep semantic analysis
 - Task Planning: DAG generation and expansion
 - Agent Scheduling: Multi-objective optimization
@@ -738,10 +831,11 @@ System 2 鈫?Cognition Layer
 
 ```
 User Request
-   鈫?[System 2] Cognition Layer: Deep Analysis and Planning
-   鈫?(Generate DAG Task Graph)
+   ↓
+[System 2] Cognition Layer: Deep Analysis and Planning
+   ↓ (Generate DAG Task Graph)
 [System 1] Execution Layer: Fast Execution and Feedback
-   鈫?(Execution Results)
+   ↓ (Execution Results)
 [System 2] Cognition Layer: Reflection and Optimization
 ```
 
@@ -819,10 +913,10 @@ This design enables AgentOS to respond quickly to routine requests (System 1) wh
 
 This chapter deeply explored the system architecture of AgentOS, including:
 
-鉁?**Layered Architecture**: Application 鈫?Services 鈫?Kernel 鈫?SDK  
-鉁?**Four-Dimensional Design Principles**: System View, Kernel View, Cognitive View, Engineering View  
-鉁?**Three Theoretical Foundations**: Engineering Cybernetics, Systems Engineering, Dual-System Cognitive Theory  
-鉁?**Technology Stack Selection**: C language as core, multi-language SDK support  
+✅ **Layered Architecture**: Application → Services → Kernel → SDK  
+✅ **Four-Dimensional Design Principles**: System View, Kernel View, Cognitive View, Engineering View  
+✅ **Three Theoretical Foundations**: Engineering Cybernetics, Systems Engineering, Dual-System Cognitive Theory  
+✅ **Technology Stack Selection**: C language as core, multi-language SDK support  
 
 Next, [Chapter 3 Microkernel Architecture (Atoms)](#chapter-3-microkernel-architecture-atoms) will provide detailed analysis of CoreKern implementation details, including IPC Binder, memory management, task scheduling and other core mechanisms.
 
@@ -847,7 +941,22 @@ CoreKern is the microkernel implementation of AgentOS, following the "minimalist
 #### 3.1.2 Four Atomic Mechanisms
 
 ```
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?         CoreKern Microkernel            鈹?鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?                                        鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?           鈹?鈹? 鈹?  IPC    鈹? 鈹?  Mem    鈹?           鈹?鈹? 鈹? Binder  鈹? 鈹? Manager 鈹?           鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?           鈹?鈹?                                        鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?           鈹?鈹? 鈹?  Task   鈹? 鈹?  Time   鈹?           鈹?鈹? 鈹?Scheduler鈹? 鈹? Service 鈹?           鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?           鈹?鈹?                                        鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
+┌─────────────────────────────────────────┐
+│          CoreKern Microkernel            │
+├─────────────────────────────────────────┤
+│                                         │
+│  ┌──────────┐  ┌──────────┐            │
+│  │   IPC    │  │   Mem    │            │
+│  │  Binder  │  │  Manager │            │
+│  └──────────┘  └──────────┘            │
+│                                         │
+│  ┌──────────┐  ┌──────────┐            │
+│  │   Task   │  │   Time   │            │
+│  │ Scheduler│  │  Service │            │
+│  └──────────┘  └──────────┘            │
+│                                         │
+└─────────────────────────────────────────┘
+```
 
 **Table 3-1**: CoreKern Four Atomic Mechanisms Overview
 
@@ -970,9 +1079,9 @@ agentos_error_t agentos_ipc_receive(
 
 | Metric | Value | Description |
 |--------|-------|-------------|
-| **Zero-copy latency** | <1渭s | Kernel-user space transition |
+| **Zero-copy latency** | <1μs | Kernel-user space transition |
 | **Message throughput** | 10M+ msg/s | Single channel |
-| **Channel creation** | <10渭s | Cold start |
+| **Channel creation** | <10μs | Cold start |
 | **Shared memory efficiency** | 95% | vs. traditional IPC |
 
 ---
@@ -1059,12 +1168,26 @@ The task scheduler implements weighted round-robin scheduling:
 #### 3.4.2 Task States
 
 ```
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?             Task State Machine          鈹?鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?                                        鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?                         鈹?鈹? 鈹? READY   鈹傗啇鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹愨攤
-鈹? 鈹斺攢鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹?                         鈹傗攤
-鈹?      鈹?spawn                         鈹傗攤
-鈹?      鈻?                               鈹傗攤
-鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?    schedule      鈹屸攢鈹€鈹€鈹€鈹€鈹€鈻尖攢鈹€鈹€鈹€鈹€鈹€鈹?   鈹?鈹? 鈹?RUNNING  鈹傗攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈫掆攤   BLOCKED    鈹?   鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹?                 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?   鈹?鈹?      鈹?exit                                    鈹?鈹?      鈻?                                         鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?                                   鈹?鈹? 鈹俆ERMINATED鈹傗攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?wakeup
-鈹?                                        鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
+┌─────────────────────────────────────────┐
+│              Task State Machine          │
+├─────────────────────────────────────────┤
+│                                         │
+│  ┌──────────┐                          │
+│  │  READY   │←─────────────────────────┐│
+│  └────┬─────┘                          ││
+│       │ spawn                         ││
+│       ▼                                ││
+│  ┌──────────┐     schedule      ┌──────▼──────┐    │
+│  │ RUNNING  │─────────────────→│   BLOCKED    │    │
+│  └────┬─────┘                  └─────────────┘    │
+│       │ exit                                    │
+│       ▼                                          │
+│  ┌──────────┐                                    │
+│  │TERMINATED│────────────────────────────────────┘
+│  └──────────┘ wakeup
+│                                         │
+└─────────────────────────────────────────┘
+```
 
 **Figure 3-2**: Task State Machine
 
@@ -1088,9 +1211,9 @@ agentos_error_t agentos_task_cancel(
 
 | Metric | Value | Description |
 |--------|-------|-------------|
-| **Task creation** | <50渭s | Cold start |
+| **Task creation** | <50μs | Cold start |
 | **Context switch** | <100ns | Between tasks |
-| **Scheduling latency** | <10渭s | Worst case |
+| **Scheduling latency** | <10μs | Worst case |
 | **Throughput** | 100K tasks/s | Per core |
 
 ---
@@ -1100,7 +1223,7 @@ agentos_error_t agentos_task_cancel(
 #### 3.5.1 Design Objectives
 
 - **High precision**: Nanosecond-level accuracy
-- **Low jitter**: <1渭s scheduling jitter
+- **Low jitter**: <1μs scheduling jitter
 - **Monotonic clock**: Unaffected by system time changes
 - **Event timing**: Precise delayed execution
 
@@ -1129,10 +1252,10 @@ agentos_error_t agentos_timer_start(
 
 | Metric | Value | Description |
 |--------|-------|-------------|
-| **Clock precision** | 卤10ns | Hardware timestamp |
-| **Sleep precision** | 卤100ns | Against requested |
+| **Clock precision** | ±10ns | Hardware timestamp |
+| **Sleep precision** | ±100ns | Against requested |
 | **Timer resolution** | 1ns | Theoretical minimum |
-| **Jitter** | <1渭s | Event delivery |
+| **Jitter** | <1μs | Event delivery |
 
 ---
 
@@ -1140,11 +1263,11 @@ agentos_error_t agentos_timer_start(
 
 This chapter deeply explored the CoreKern microkernel implementation:
 
-鉁?**Design Philosophy**: ~9,000 lines, <100KB, <1ms startup  
-鉁?**IPC Binder**: Zero-copy, 10M+ msg/s throughput  
-鉁?**Memory Management**: Pool-based, <100ns allocation  
-鉁?**Task Scheduler**: Weighted round-robin, 100K tasks/s  
-鉁?**Time Service**: Nanosecond precision, <1渭s jitter  
+✅ **Design Philosophy**: ~9,000 lines, <100KB, <1ms startup  
+✅ **IPC Binder**: Zero-copy, 10M+ msg/s throughput  
+✅ **Memory Management**: Pool-based, <100ns allocation  
+✅ **Task Scheduler**: Weighted round-robin, 100K tasks/s  
+✅ **Time Service**: Nanosecond precision, <1μs jitter  
 
 Next, [Chapter 4 Three-Layer Cognitive Loop (CoreLoopThree)](#chapter-4-three-layer-cognitive-loop-coreloopthree) will detail the CoreLoopThree runtime architecture.
 
@@ -1218,7 +1341,27 @@ intent = {
 
 **Intent Classification System**:
 ```
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?        Intent Classification Hierarchy    鈹?鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?                                        鈹?鈹? ROOT                                   鈹?鈹? 鈹溾攢鈹€ QUERY                              鈹?鈹? 鈹?  鈹溾攢鈹€ SIMPLE_QUERY                   鈹?鈹? 鈹?  鈹斺攢鈹€ COMPLEX_QUERY                  鈹?鈹? 鈹溾攢鈹€ ANALYZE                            鈹?鈹? 鈹?  鈹溾攢鈹€ DESCRIPTIVE                    鈹?鈹? 鈹?  鈹溾攢鈹€ DIAGNOSTIC                     鈹?鈹? 鈹?  鈹斺攢鈹€ PREDICTIVE                     鈹?鈹? 鈹溾攢鈹€ CREATE                             鈹?鈹? 鈹?  鈹溾攢鈹€ DOCUMENT                       鈹?鈹? 鈹?  鈹斺攢鈹€ CODE                           鈹?鈹? 鈹斺攢鈹€ EXECUTE                            鈹?鈹?     鈹溾攢鈹€ SINGLE_STEP                    鈹?鈹?     鈹斺攢鈹€ MULTI_STEP                     鈹?鈹?                                        鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
+┌─────────────────────────────────────────┐
+│         Intent Classification Hierarchy    │
+├─────────────────────────────────────────┤
+│                                         │
+│  ROOT                                   │
+│  ├── QUERY                              │
+│  │   ├── SIMPLE_QUERY                   │
+│  │   └── COMPLEX_QUERY                  │
+│  ├── ANALYZE                            │
+│  │   ├── DESCRIPTIVE                    │
+│  │   ├── DIAGNOSTIC                     │
+│  │   └── PREDICTIVE                     │
+│  ├── CREATE                             │
+│  │   ├── DOCUMENT                       │
+│  │   └── CODE                           │
+│  └── EXECUTE                            │
+│      ├── SINGLE_STEP                    │
+│      └── MULTI_STEP                     │
+│                                         │
+└─────────────────────────────────────────┘
+```
 
 **Figure 4-1**: Intent Classification Hierarchy
 
@@ -1265,18 +1408,64 @@ The Execution Layer is the "System 1" (fast thinking) part of AgentOS, responsib
 
 **Core Components**:
 ```
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?        Execution Layer Engine             鈹?鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?                                        鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?   鈹?鈹? 鈹?  Task Queue Manager             鈹?   鈹?鈹? 鈹? - Priority queue               鈹?   鈹?鈹? 鈹? - Delay queue                  鈹?   鈹?鈹? 鈹? - Dead letter queue            鈹?   鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?   鈹?鈹?          鈫?                            鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?   鈹?鈹? 鈹?  Execution Engine Core          鈹?   鈹?鈹? 鈹? - State machine management      鈹?   鈹?鈹? 鈹? - Concurrency control           鈹?   鈹?鈹? 鈹? - Error handling                鈹?   鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?   鈹?鈹?          鈫?                            鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?   鈹?鈹? 鈹?  Agent Executor                 鈹?   鈹?鈹? 鈹? - LLM invocation               鈹?   鈹?鈹? 鈹? - Tool invocation              鈹?   鈹?鈹? 鈹? - Skill invocation             鈹?   鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?   鈹?鈹?                                        鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
+┌─────────────────────────────────────────┐
+│         Execution Layer Engine             │
+├─────────────────────────────────────────┤
+│                                         │
+│  ┌─────────────────────────────────┐    │
+│  │   Task Queue Manager             │    │
+│  │  - Priority queue               │    │
+│  │  - Delay queue                  │    │
+│  │  - Dead letter queue            │    │
+│  └─────────────────────────────────┘    │
+│           ↓                             │
+│  ┌─────────────────────────────────┐    │
+│  │   Execution Engine Core          │    │
+│  │  - State machine management      │    │
+│  │  - Concurrency control           │    │
+│  │  - Error handling                │    │
+│  └─────────────────────────────────┘    │
+│           ↓                             │
+│  ┌─────────────────────────────────┐    │
+│  │   Agent Executor                 │    │
+│  │  - LLM invocation               │    │
+│  │  - Tool invocation              │    │
+│  │  - Skill invocation             │    │
+│  └─────────────────────────────────┘    │
+│                                         │
+└─────────────────────────────────────────┘
+```
 
 **Figure 4-3**: Execution Layer Architecture
 
 #### 4.2.2 Task State Machine
 
 ```
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?          Task State Machine               鈹?鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?                                        鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?                         鈹?鈹? 鈹?PENDING  鈹傗啇鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹愨攤
-鈹? 鈹斺攢鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹?                         鈹傗攤
-鈹?      鈹?schedule                       鈹傗攤
-鈹?      鈻?                               鈹傗攤
-鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?    complete      鈹屸攢鈹€鈹€鈹€鈹€鈹€鈻尖攢鈹€鈹€鈹€鈹€鈹€鈹?   鈹?鈹? 鈹?RUNNING  鈹傗攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈫掆攤   SUCCESS    鈹?   鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹?                 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?   鈹?鈹?      鈹?error                                    鈹?鈹?      鈻?                                         鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?    retry         鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?鈹? 鈹? RETRY   鈹傗攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈫掆攤   RUNNING    鈹?鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹?                 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?鈹?      鈹?max retries                            鈹?鈹?      鈻?                                         鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?                                  鈹?鈹? 鈹?FAILED   鈹傗攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?                                  鈹?鈹?                                        鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
+┌─────────────────────────────────────────┐
+│           Task State Machine               │
+├─────────────────────────────────────────┤
+│                                         │
+│  ┌──────────┐                          │
+│  │ PENDING  │←─────────────────────────┐│
+│  └────┬─────┘                          ││
+│       │ schedule                       ││
+│       ▼                                ││
+│  ┌──────────┐     complete      ┌──────▼──────┐    │
+│  │ RUNNING  │─────────────────→│   SUCCESS    │    │
+│  └────┬─────┘                  └─────────────┘    │
+│       │ error                                    │
+│       ▼                                          │
+│  ┌──────────┐     retry         ┌─────────────┐ │
+│  │  RETRY   │─────────────────→│   RUNNING    │ │
+│  └────┬─────┘                  └─────────────┘ │
+│       │ max retries                            │
+│       ▼                                          │
+│  ┌──────────┐                                   │
+│  │ FAILED   │──────────────────────────────────┘
+│  └──────────┘                                   │
+│                                         │
+└─────────────────────────────────────────┘
+```
 
 **Figure 4-4**: Task State Machine
 
@@ -1334,7 +1523,31 @@ agentos_error_t agentos_memory_read_ffi(
 AgentOS supports multi-model coordination:
 
 ```
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?        Model Coordination Architecture    鈹?鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?                                        鈹?鈹? Primary Model (Primary Model)          鈹?鈹? - GPT-4 / Claude / Self-developed LLM 鈹?鈹? - Responsibilities: Deep reasoning,    鈹?鈹?   complex planning                     鈹?鈹?                                        鈹?鈹? 鈫?Coordination                         鈹?鈹?                                        鈹?鈹? Secondary Model 1    Secondary Model 2 鈹?鈹? - GPT-3.5           - Llama-3          鈹?鈹? - Responsibilities: Fast response,      鈹?鈹?   routine tasks                        鈹?鈹?                                        鈹?鈹? 鈫?Arbitration                          鈹?鈹?                                        鈹?鈹? Arbiter (Arbiter)                     鈹?鈹? - Cross-validation                     鈹?鈹? - Conflict resolution                  鈹?鈹? - Quality assessment                   鈹?鈹?                                        鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
+┌─────────────────────────────────────────┐
+│         Model Coordination Architecture    │
+├─────────────────────────────────────────┤
+│                                         │
+│  Primary Model (Primary Model)          │
+│  - GPT-4 / Claude / Self-developed LLM │
+│  - Responsibilities: Deep reasoning,    │
+│    complex planning                     │
+│                                         │
+│  ↓ Coordination                         │
+│                                         │
+│  Secondary Model 1    Secondary Model 2 │
+│  - GPT-3.5           - Llama-3          │
+│  - Responsibilities: Fast response,      │
+│    routine tasks                        │
+│                                         │
+│  ↓ Arbitration                          │
+│                                         │
+│  Arbiter (Arbiter)                     │
+│  - Cross-validation                     │
+│  - Conflict resolution                  │
+│  - Quality assessment                   │
+│                                         │
+└─────────────────────────────────────────┘
+```
 
 **Figure 4-5**: Primary-Secondary Model Coordination Architecture
 
@@ -1375,10 +1588,10 @@ class CrossValidator:
 
 This chapter deeply explored the CoreLoopThree three-layer cognitive architecture:
 
-鉁?**Cognition Layer**: Intent understanding, task planning, Agent scheduling  
-鉁?**Execution Layer**: Task engine, DAG execution, compensation transactions  
-鉁?**Memory Layer**: FFI encapsulation, shared memory, async operations  
-鉁?**Model Coordination**: Primary-secondary architecture, cross-validation  
+✅ **Cognition Layer**: Intent understanding, task planning, Agent scheduling  
+✅ **Execution Layer**: Task engine, DAG execution, compensation transactions  
+✅ **Memory Layer**: FFI encapsulation, shared memory, async operations  
+✅ **Model Coordination**: Primary-secondary architecture, cross-validation  
 
 Next, [Chapter 5 Four-Layer Memory System (MemoryRovol)](#chapter-5-four-layer-memory-system-memoryrovol) will detail the MemoryRovol memory architecture.
 
@@ -1393,10 +1606,33 @@ MemoryRovol is the kernel-level memory system of AgentOS, implementing full-stac
 #### 5.1.1 Design Philosophy
 
 ```
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?      L4 Pattern Layer                   鈹?鈹? 鈥?Persistent homology analysis         鈹?鈹? 鈥?Stable pattern mining                鈹?鈹? 鈥?HDBSCAN clustering 鈥?Rule generation 鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈫戔攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?                鈫?Abstract evolution
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?      L3 Structure Layer                鈹?鈹? 鈥?Binding/unbinding operators         鈹?鈹? 鈥?Relation encoding                    鈹?鈹? 鈥?Temporal encoding 鈥?GNN encoding    鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈫戔攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?                鈫?Feature extraction
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?      L2 Feature Layer                  鈹?鈹? 鈥?Embedding models (OpenAI/DeepSeek)  鈹?鈹? 鈥?FAISS vector index 鈥?Hybrid search  鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈫戔攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?                鈫?Data compression
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?      L1 Raw Layer                      鈹?鈹? 鈥?File system storage                 鈹?鈹? 鈥?Shard management                    鈹?鈹? 鈥?Metadata index 鈥?Version control    鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
+┌─────────────────────────────────────────┐
+│       L4 Pattern Layer                   │
+│  • Persistent homology analysis         │
+│  • Stable pattern mining                │
+│  • HDBSCAN clustering • Rule generation │
+└───────────────↑─────────────────────────┘
+                ↓ Abstract evolution
+┌─────────────────────────────────────────┐
+│       L3 Structure Layer                │
+│  • Binding/unbinding operators         │
+│  • Relation encoding                    │
+│  • Temporal encoding • GNN encoding    │
+└───────────────↑─────────────────────────┘
+                ↓ Feature extraction
+┌─────────────────────────────────────────┐
+│       L2 Feature Layer                  │
+│  • Embedding models (OpenAI/DeepSeek)  │
+│  • FAISS vector index • Hybrid search  │
+└───────────────↑─────────────────────────┘
+                ↓ Data compression
+┌─────────────────────────────────────────┐
+│       L1 Raw Layer                      │
+│  • File system storage                 │
+│  • Shard management                    │
+│  • Metadata index • Version control    │
+└─────────────────────────────────────────┘
+```
 
 **Figure 5-1**: MemoryRovol Four-Layer Architecture
 
@@ -1404,7 +1640,7 @@ MemoryRovol is the kernel-level memory system of AgentOS, implementing full-stac
 
 | Feature | Description |
 |---------|-------------|
-| **Progressive abstraction** | L1鈫扡2鈫扡3鈫扡4 four-layer architecture, from raw data to advanced patterns |
+| **Progressive abstraction** | L1→L2→L3→L4 four-layer architecture, from raw data to advanced patterns |
 | **Bidirectional mechanism** | Retrieval (attractor dynamics) + Forgetting (Ebbinghaus decay) |
 | **Efficient retrieval** | FAISS vector index + Hybrid search + Reranking |
 | **Intelligent forgetting** | Auto-pruning based on forgetting curve |
@@ -1561,10 +1797,14 @@ Attractor network is a retrieval mechanism based on dynamics, finding the best-m
 
 ```
 Initial state (query vector)
-   鈫?[Energy function minimization]
-   鈫?[State evolution]
-   鈫?Converge to attractor basin
-   鈫?Output best match
+   ↓
+[Energy function minimization]
+   ↓
+[State evolution]
+   ↓
+Converge to attractor basin
+   ↓
+Output best match
 ```
 
 #### 5.6.2 Forgetting Mechanism
@@ -1594,11 +1834,11 @@ $$R(t) = e^{-t/\tau} \cdot (1 + \alpha \cdot \text{access\_count})$$
 
 This chapter deeply explored the MemoryRovol four-layer memory system implementation:
 
-鉁?**L1 Raw Layer**: File system storage, async writes, SQLite metadata  
-鉁?**L2 Feature Layer**: Embedding models, FAISS vector index, LRU cache  
-鉁?**L3 Structure Layer**: Binding operators, relation encoding, temporal encoding  
-鉁?**L4 Pattern Layer**: Persistent homology analysis, HDBSCAN clustering, rule generation  
-鉁?**Retrieval and Forgetting**: Attractor networks, Ebbinghaus forgetting curve  
+✅ **L1 Raw Layer**: File system storage, async writes, SQLite metadata  
+✅ **L2 Feature Layer**: Embedding models, FAISS vector index, LRU cache  
+✅ **L3 Structure Layer**: Binding operators, relation encoding, temporal encoding  
+✅ **L4 Pattern Layer**: Persistent homology analysis, HDBSCAN clustering, rule generation  
+✅ **Retrieval and Forgetting**: Attractor networks, Ebbinghaus forgetting curve  
 
 Next, [Chapter 6 Security Dome (cupolas)](#chapter-6-security-dome-cupolas) will detail the AgentOS security architecture.
 
@@ -1608,12 +1848,37 @@ Next, [Chapter 6 Security Dome (cupolas)](#chapter-6-security-dome-cupolas) will
 
 ### 6.1 Overview
 
-cupolas is the security core module of AgentOS, providing production-grade security isolation and permission control for agents. Its name comes from the "under the dome" design concept鈥攁s the Earth's atmosphere protects life on Earth, cupolas provides comprehensive security protection for agents on AgentOS.
+cupolas is the security core module of AgentOS, providing production-grade security isolation and permission control for agents. Its name comes from the "under the dome" design concept—as the Earth's atmosphere protects life on Earth, cupolas provides comprehensive security protection for agents on AgentOS.
 
 #### 6.1.1 Design Philosophy
 
 ```
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?           cupolas Security Dome            鈹?鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?                                        鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?  鈹?鈹? 鈹?    Virtual Workbench            鈹?  鈹?鈹? 鈹?    Process/container isolation   鈹?  鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?  鈹?鈹?          鈫?                            鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?  鈹?鈹? 鈹?    Input Sanitizer              鈹?  鈹?鈹? 鈹?    Regex filtering 鈥?Risk eval  鈹?  鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?  鈹?鈹?          鈫?                            鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?  鈹?鈹? 鈹?    Permission Engine            鈹?  鈹?鈹? 鈹?    Rule engine 鈥?Cache 鈥?Hot    鈹?  鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?  鈹?鈹?          鈫?                            鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?  鈹?鈹? 鈹?    Audit Log                    鈹?  鈹?鈹? 鈹?    Async write 鈥?Log rotation   鈹?  鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?  鈹?鈹?                                        鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
+┌─────────────────────────────────────────┐
+│            cupolas Security Dome            │
+├─────────────────────────────────────────┤
+│                                         │
+│  ┌─────────────────────────────────┐   │
+│  │     Virtual Workbench            │   │
+│  │     Process/container isolation   │   │
+│  └─────────────────────────────────┘   │
+│           ↑                             │
+│  ┌─────────────────────────────────┐   │
+│  │     Input Sanitizer              │   │
+│  │     Regex filtering • Risk eval  │   │
+│  └─────────────────────────────────┘   │
+│           ↑                             │
+│  ┌─────────────────────────────────┐   │
+│  │     Permission Engine            │   │
+│  │     Rule engine • Cache • Hot    │   │
+│  └─────────────────────────────────┘   │
+│           ↑                             │
+│  ┌─────────────────────────────────┐   │
+│  │     Audit Log                    │   │
+│  │     Async write • Log rotation   │   │
+│  └─────────────────────────────────┘   │
+│                                         │
+└─────────────────────────────────────────┘
+```
 
 **Figure 6-1**: cupolas Security Architecture
 
@@ -1661,7 +1926,7 @@ typedef struct workbench_config {
 | **Process creation latency** | <10ms | Cold start |
 | **Container creation latency** | <100ms | Including image loading |
 | **Memory isolation effect** | 100% | Inter-process memory invisible |
-| **CPU limit precision** | 卤5% | cgroups limit |
+| **CPU limit precision** | ±5% | cgroups limit |
 
 ---
 
@@ -1710,7 +1975,7 @@ rules:
 
 | Metric | Value | Description |
 |--------|-------|-------------|
-| **Permission check latency** | <100渭s | Cache hit |
+| **Permission check latency** | <100μs | Cache hit |
 | **Rule loading time** | <500ms | 1000 rules |
 | **Cache hit rate** | >90% | Hot data |
 | **Max rule count** | 100,000 | Per instance |
@@ -1811,11 +2076,11 @@ AgentOS adopts zero-trust security model:
 
 | Scenario | Risk Level | Protection Measures |
 |----------|-----------|---------------------|
-| **SQL injection** | 馃敶 Critical | Input sanitization + Parameterized queries |
-| **Privilege escalation** | 馃敶 Critical | Least privilege + Permission checks |
-| **Data leakage** | 馃煚 High | Workbench isolation + Audit logging |
-| **Denial of service** | 馃煚 High | Resource limits + Rate limiting |
-| **Information gathering** | 馃煛 Medium | Network isolation + Input sanitization |
+| **SQL injection** | 🔴 Critical | Input sanitization + Parameterized queries |
+| **Privilege escalation** | 🔴 Critical | Least privilege + Permission checks |
+| **Data leakage** | 🟠 High | Workbench isolation + Audit logging |
+| **Denial of service** | 🟠 High | Resource limits + Rate limiting |
+| **Information gathering** | 🟡 Medium | Network isolation + Input sanitization |
 
 ---
 
@@ -1823,11 +2088,11 @@ AgentOS adopts zero-trust security model:
 
 This chapter deeply explored the cupolas security dome implementation:
 
-鉁?**Virtual Workbench**: Process/container isolation, resource limits, security boundary  
-鉁?**Permission Engine**: YAML rule engine, caching, hot-reload  
-鉁?**Input Sanitizer**: Regex filtering, risk assessment, sensitive content replacement  
-鉁?**Audit Tracking**: Async write, log rotation, complete event records  
-鉁?**Security Practices**: Zero-trust architecture, least privilege, continuous verification
+✅ **Virtual Workbench**: Process/container isolation, resource limits, security boundary  
+✅ **Permission Engine**: YAML rule engine, caching, hot-reload  
+✅ **Input Sanitizer**: Regex filtering, risk assessment, sensitive content replacement  
+✅ **Audit Tracking**: Async write, log rotation, complete event records  
+✅ **Security Practices**: Zero-trust architecture, least privilege, continuous verification
 
 Next, [Chapter 7 Backend Service Layer (daemon)](#chapter-7-backend-service-layer-daemon) will detail the AgentOS backend service architecture.
 
@@ -1842,7 +2107,32 @@ daemon is the service layer of AgentOS, providing core services such as LLM infe
 #### 7.1.1 Design Philosophy
 
 ```
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?             AgentOS daemon (Service Layer)                 鈹?鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?                                                        鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?           鈹?鈹? 鈹? llm_d   鈹? 鈹? tool_d  鈹? 鈹?market_d 鈹?           鈹?鈹? 鈹?LLM Svc   鈹? 鈹?Tool Svc  鈹? 鈹?Market Svc鈹?           鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹? 鈹斺攢鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹? 鈹斺攢鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹?           鈹?鈹?      鈹?            鈹?            鈹?                   鈹?鈹?      鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹尖攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?                   鈹?鈹?                    鈹?                                 鈹?鈹?             鈹屸攢鈹€鈹€鈹€鈹€鈹€鈻尖攢鈹€鈹€鈹€鈹€鈹€鈹?                       鈹?鈹?             鈹?commons libs 鈹?鈫?Shared libs (IPC/Log/manager) 鈹?鈹?             鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹€鈹?                       鈹?鈹?                    鈹?                                 鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹屸攢鈹€鈹€鈹€鈻尖攢鈹€鈹€鈹€鈹€鈹€鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?        鈹?鈹? 鈹?sched_d  鈹? 鈹?monit_d   鈹? 鈹?perm_d* 鈹?        鈹?鈹? 鈹?Sched Svc 鈹? 鈹?Monit Svc  鈹? 鈹?Perm Svc  鈹?        鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?        鈹?鈹?                                                        鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?                          鈫?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?          AgentOS Atoms (Kernel Layer) via Syscall     鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
+┌─────────────────────────────────────────────────────────┐
+│              AgentOS daemon (Service Layer)                 │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
+│  │  llm_d   │  │  tool_d  │  │ market_d │            │
+│  │ LLM Svc   │  │ Tool Svc  │  │ Market Svc│            │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘            │
+│       │             │             │                    │
+│       └─────────────┼─────────────┘                    │
+│                     │                                  │
+│              ┌──────▼──────┐                        │
+│              │ commons libs │ ← Shared libs (IPC/Log/manager) │
+│              └──────┬──────┘                        │
+│                     │                                  │
+│  ┌──────────┐  ┌────▼──────┐  ┌──────────┐         │
+│  │ sched_d  │  │ monit_d   │  │ perm_d* │         │
+│  │ Sched Svc │  │ Monit Svc  │  │ Perm Svc  │         │
+│  └──────────┘  └───────────┘  └──────────┘         │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+                          ↕
+┌─────────────────────────────────────────────────────────┐
+│           AgentOS Atoms (Kernel Layer) via Syscall     │
+└─────────────────────────────────────────────────────────┘
+```
 
 **Figure 7-1**: daemon Service Layer Architecture
 
@@ -1930,11 +2220,11 @@ monit_d provides metrics collection, log aggregation, trace tracking, and alerti
 
 **Chapter 7 Summary**
 
-鉁?**llm_d**: Multi-model support, cost tracking, response caching  
-鉁?**tool_d**: Tool registration, parameter verification, sandbox execution  
-鉁?**market_d**: Agent/Skill registry, installation management  
-鉁?**sched_d**: Multi-strategy scheduling, load monitoring  
-鉁?**monit_d**: Metrics collection, log aggregation, trace tracking  
+✅ **llm_d**: Multi-model support, cost tracking, response caching  
+✅ **tool_d**: Tool registration, parameter verification, sandbox execution  
+✅ **market_d**: Agent/Skill registry, installation management  
+✅ **sched_d**: Multi-strategy scheduling, load monitoring  
+✅ **monit_d**: Metrics collection, log aggregation, trace tracking  
 
 Next, [Chapter 8 System Call Interface (Syscall)](#chapter-8-system-call-interface-syscall) will detail the AgentOS system call interface design.
 
@@ -1978,8 +2268,8 @@ AGENTOS_API agentos_error_t agentos_syscall_invoke(
 
 | Metric | Value | Description |
 |--------|-------|-------------|
-| **Syscall idle latency** | <5渭s | Without parameter validation |
-| **Task submission latency** | <50渭s | Including JSON parsing |
+| **Syscall idle latency** | <5μs | Without parameter validation |
+| **Task submission latency** | <50μs | Including JSON parsing |
 | **Memory write latency** | <10ms | L1 sync write |
 | **Memory search latency** | <50ms | Top-100 reranking |
 
@@ -1987,11 +2277,11 @@ AGENTOS_API agentos_error_t agentos_syscall_invoke(
 
 **Chapter 8 Summary**
 
-鉁?**Unified entry**: Single entry `agentos_syscall_invoke()`  
-鉁?**Namespace separation**: task, memory, session, telemetry  
-鉁?**JSON parameters**: Easy debugging and extension  
-鉁?**Error handling**: Standardized error code system  
-鉁?**Performance metrics**: Microsecond-level latency  
+✅ **Unified entry**: Single entry `agentos_syscall_invoke()`  
+✅ **Namespace separation**: task, memory, session, telemetry  
+✅ **JSON parameters**: Easy debugging and extension  
+✅ **Error handling**: Standardized error code system  
+✅ **Performance metrics**: Microsecond-level latency  
 
 Next, [Chapter 9 Multi-language SDK](#chapter-9-multi-language-sdk) will detail the AgentOS multi-language SDK design.
 
@@ -2007,10 +2297,10 @@ AgentOS provides multi-language SDKs including Go, Python, Rust, and TypeScript.
 
 | SDK | Language Version | Status | Performance | Applicable Scenario |
 |-----|-----------------|--------|-------------|-------------------|
-| **Go SDK** | Go 1.21+ | 馃煝 Stable | 猸愨瓙猸愨瓙猸?| Cloud-native, Microservices |
-| **Python SDK** | Python 3.10+ | 馃煝 Stable | 猸愨瓙猸愨瓙 | Data science, AI integration |
-| **Rust SDK** | Rust 1.75+ | 馃煝 Stable | 猸愨瓙猸愨瓙猸?| High performance, Embedded |
-| **TypeScript SDK** | TypeScript 5.0+ | 馃煛 Testing | 猸愨瓙猸愨瓙 | Web apps, Edge computing |
+| **Go SDK** | Go 1.21+ | 🟢 Stable | ⭐⭐⭐⭐⭐ | Cloud-native, Microservices |
+| **Python SDK** | Python 3.10+ | 🟢 Stable | ⭐⭐⭐⭐ | Data science, AI integration |
+| **Rust SDK** | Rust 1.75+ | 🟢 Stable | ⭐⭐⭐⭐⭐ | High performance, Embedded |
+| **TypeScript SDK** | TypeScript 5.0+ | 🟡 Testing | ⭐⭐⭐⭐ | Web apps, Edge computing |
 
 ---
 
@@ -2125,10 +2415,10 @@ main();
 
 **Chapter 9 Summary**
 
-鉁?**Go SDK**: High performance, cloud-native scenarios  
-鉁?**Python SDK**: AI integration, data science scenarios  
-鉁?**Rust SDK**: Extreme performance, embedded scenarios  
-鉁?**TypeScript SDK**: Web apps, edge computing scenarios  
+✅ **Go SDK**: High performance, cloud-native scenarios  
+✅ **Python SDK**: AI integration, data science scenarios  
+✅ **Rust SDK**: Extreme performance, embedded scenarios  
+✅ **TypeScript SDK**: Web apps, edge computing scenarios  
 
 Next, [Chapter 10 Performance Analysis](#chapter-10-performance-analysis) will detail the AgentOS performance test results.
 
@@ -2145,7 +2435,7 @@ This chapter details AgentOS performance testing methodology, test environment, 
 - **Benchmark testing**: Standard workload evaluation
 - **Stress testing**: Load increase until system limit
 - **Soak testing**: Long-term stability observation
-- **Isolation testing**: Component performance鍗曠嫭娴嬭瘯
+- **Isolation testing**: Component performance单独测试
 
 #### 10.1.2 Test Environment
 
@@ -2162,9 +2452,9 @@ This chapter details AgentOS performance testing methodology, test environment, 
 
 | Metric | Value | Description |
 |--------|-------|-------------|
-| **P50** | 3渭s | Median latency |
-| **P95** | 5渭s | 95th percentile latency |
-| **P99** | 8渭s | 99th percentile latency |
+| **P50** | 3μs | Median latency |
+| **P95** | 5μs | 95th percentile latency |
+| **P99** | 8μs | 99th percentile latency |
 
 #### 10.2.2 Memory System Performance
 
@@ -2179,9 +2469,9 @@ This chapter details AgentOS performance testing methodology, test environment, 
 
 | Concurrent Connections | Throughput (RPS) | P99 Latency |
 |----------------------|------------------|-------------|
-| **1** | 100,000 | 15渭s |
-| **100** | 5,000,000 | 35渭s |
-| **1000** | 10,000,000 | 150渭s |
+| **1** | 100,000 | 15μs |
+| **100** | 5,000,000 | 35μs |
+| **1000** | 10,000,000 | 150μs |
 
 ### 10.3 Token Efficiency Comparison
 
@@ -2194,10 +2484,10 @@ This chapter details AgentOS performance testing methodology, test environment, 
 
 **Chapter 10 Summary**
 
-鉁?**Testing methodology**: Benchmark, stress, soak, isolation testing  
-鉁?**Test environment**: AMD EPYC, 512GB memory, 100GbE network  
-鉁?**Benchmark results**: Syscall <5渭s, memory write <10ms  
-鉁?**Token efficiency**: 10x compression ratio, 98% recall  
+✅ **Testing methodology**: Benchmark, stress, soak, isolation testing  
+✅ **Test environment**: AMD EPYC, 512GB memory, 100GbE network  
+✅ **Benchmark results**: Syscall <5μs, memory write <10ms  
+✅ **Token efficiency**: 10x compression ratio, 98% recall  
 
 Next, [Chapter 11 Application Scenarios](#chapter-11-application-scenarios) will showcase AgentOS practical application cases.
 
@@ -2229,11 +2519,16 @@ Intelligent document generation system automatically generates high-quality tech
 **Architecture**:
 ```
 User request
-    鈫?[Cognition Layer] Intent understanding 鈫?Document type and structure
-    鈫?[Memory Layer] Retrieve related memories and materials
-    鈫?[Execution Layer] Call LLM to generate document
-    鈫?[Cognition Layer] Quality assessment 鈫?Revision needed?
-    鈫?Output final document
+    ↓
+[Cognition Layer] Intent understanding → Document type and structure
+    ↓
+[Memory Layer] Retrieve related memories and materials
+    ↓
+[Execution Layer] Call LLM to generate document
+    ↓
+[Cognition Layer] Quality assessment → Revision needed?
+    ↓
+Output final document
 ```
 
 #### 11.2.2 Core Code
@@ -2281,11 +2576,16 @@ E-commerce automation system automatically processes orders, replies to customer
 **Architecture**:
 ```
 User message
-    鈫?[Cognition Layer] Intent classification 鈫?Order processing/Customer service/Inventory query
-    鈫?[Execution Layer] Execute corresponding Skill
-    鈫?[Responsibility Chain] Order Skill 鈫?Inventory Skill 鈫?Logistics Skill
-    鈫?[Memory Layer] Record operation history
-    鈫?Respond to user
+    ↓
+[Cognition Layer] Intent classification → Order processing/Customer service/Inventory query
+    ↓
+[Execution Layer] Execute corresponding Skill
+    ↓
+[Responsibility Chain] Order Skill → Inventory Skill → Logistics Skill
+    ↓
+[Memory Layer] Record operation history
+    ↓
+Respond to user
 ```
 
 #### 11.3.2 Performance Metrics
@@ -2308,12 +2608,18 @@ Intelligent research assistant automatically retrieves literature, analyzes data
 **Architecture**:
 ```
 Research question
-    鈫?[Cognition Layer] Problem decomposition 鈫?Sub-question list
-    鈫?[Memory Layer] L4 pattern mining 鈫?Discover related knowledge
-    鈫?[Execution Layer] Multi-Agent parallel retrieval
-    鈫?[Cognition Layer] Comprehensive analysis 鈫?Generate report
-    鈫?[Memory Layer] Update knowledge base
-    鈫?Output research report
+    ↓
+[Cognition Layer] Problem decomposition → Sub-question list
+    ↓
+[Memory Layer] L4 pattern mining → Discover related knowledge
+    ↓
+[Execution Layer] Multi-Agent parallel retrieval
+    ↓
+[Cognition Layer] Comprehensive analysis → Generate report
+    ↓
+[Memory Layer] Update knowledge base
+    ↓
+Output research report
 ```
 
 #### 11.4.2 Performance Metrics
@@ -2346,10 +2652,10 @@ Video editing workflow system automatically completes video clipping, effects ad
 
 **Chapter 11 Summary**
 
-鉁?**Intelligent document generation**: High quality, long context, 10x Token efficiency  
-鉁?**E-commerce automation**: 85% automation rate, <0.1% error rate  
-鉁?**Intelligent research assistant**: 98% recall rate, 10x research efficiency  
-鉁?**Video editing workflow**: 70% automation rate, 2x real-time processing  
+✅ **Intelligent document generation**: High quality, long context, 10x Token efficiency  
+✅ **E-commerce automation**: 85% automation rate, <0.1% error rate  
+✅ **Intelligent research assistant**: 98% recall rate, 10x research efficiency  
+✅ **Video editing workflow**: 70% automation rate, 2x real-time processing  
 
 Next, [Chapter 12 Deployment and Operations](#chapter-12-deployment-and-operations) will introduce AgentOS deployment and operations solutions.
 
@@ -2365,10 +2671,10 @@ This chapter introduces AgentOS deployment architecture, configuration managemen
 
 | Mode | Applicable Scenario | Complexity | Scalability |
 |------|-------------------|------------|-------------|
-| **Single-machine** | Development debugging | 猸?| None |
-| **Docker Compose** | Small-scale production | 猸愨瓙 | Limited |
-| **Kubernetes** | Large-scale production | 猸愨瓙猸?| Elastic |
-| **Hybrid cloud** | Enterprise | 猸愨瓙猸愨瓙 | High |
+| **Single-machine** | Development debugging | ⭐ | None |
+| **Docker Compose** | Small-scale production | ⭐⭐ | Limited |
+| **Kubernetes** | Large-scale production | ⭐⭐⭐ | Elastic |
+| **Hybrid cloud** | Enterprise | ⭐⭐⭐⭐ | High |
 
 ---
 
@@ -2486,10 +2792,10 @@ curl http://localhost:8080/admin/agentos/manager/status
 
 **Chapter 12 Summary**
 
-鉁?**Docker deployment**: Containerization, fast startup  
-鉁?**Kubernetes**: Elastic scaling, high availability  
-鉁?**Configuration hot update**: gateway reload, no restart required  
-鉁?**Monitoring alerting**: Full-chain tracing, threshold alerting  
+✅ **Docker deployment**: Containerization, fast startup  
+✅ **Kubernetes**: Elastic scaling, high availability  
+✅ **Configuration hot update**: gateway reload, no restart required  
+✅ **Monitoring alerting**: Full-chain tracing, threshold alerting  
 
 Next, [Chapter 13 Security and Compliance](#chapter-13-security-and-compliance) will introduce AgentOS security architecture.
 
@@ -2511,7 +2817,23 @@ Next, [Chapter 13 Security and Compliance](#chapter-13-security-and-compliance) 
 #### 13.1.2 Security Architecture Layers
 
 ```
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?         Layer 1: Network Security        鈹?鈹?   Network isolation, Firewall, DDoS protection 鈹?鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?         Layer 2: Identity Authentication 鈹?鈹?   API key, OAuth 2.0, JWT             鈹?鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?         Layer 3: Permission Control       鈹?鈹?   cupolas permission arbitration, RBAC    鈹?鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?         Layer 4: Data Security           鈹?鈹?   Encrypted storage, Transmission encryption, Key management 鈹?鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?         Layer 5: Audit Tracking          鈹?鈹?   Complete logs, Operation audit, Intrusion detection 鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
+┌─────────────────────────────────────────┐
+│          Layer 1: Network Security        │
+│    Network isolation, Firewall, DDoS protection │
+├─────────────────────────────────────────┤
+│          Layer 2: Identity Authentication │
+│    API key, OAuth 2.0, JWT             │
+├─────────────────────────────────────────┤
+│          Layer 3: Permission Control       │
+│    cupolas permission arbitration, RBAC    │
+├─────────────────────────────────────────┤
+│          Layer 4: Data Security           │
+│    Encrypted storage, Transmission encryption, Key management │
+├─────────────────────────────────────────┤
+│          Layer 5: Audit Tracking          │
+│    Complete logs, Operation audit, Intrusion detection │
+└─────────────────────────────────────────┘
+```
 
 ---
 
@@ -2540,10 +2862,10 @@ Next, [Chapter 13 Security and Compliance](#chapter-13-security-and-compliance) 
 
 | Standard | Description | Certification Status |
 |----------|-------------|----------------------|
-| **GDPR** | General Data Protection Regulation | 鉁?Supported |
-| **CCPA** | California Consumer Privacy Act | 鉁?Supported |
-| **SOC 2** | Service Organization Control | 馃煛 Under audit |
-| **ISO 27001** | Information Security Management | 馃煛 Under certification |
+| **GDPR** | General Data Protection Regulation | ✅ Supported |
+| **CCPA** | California Consumer Privacy Act | ✅ Supported |
+| **SOC 2** | Service Organization Control | 🟡 Under audit |
+| **ISO 27001** | Information Security Management | 🟡 Under certification |
 
 #### 13.3.2 Compliance Features
 
@@ -2581,10 +2903,10 @@ Next, [Chapter 13 Security and Compliance](#chapter-13-security-and-compliance) 
 
 **Chapter 13 Summary**
 
-鉁?**Zero-trust architecture**: Multi-layer protection, default deny  
-鉁?**Data encryption**: Transmission encryption, storage encryption, field-level encryption  
-鉁?**Compliance framework**: GDPR, CCPA, SOC 2, ISO 27001  
-鉁?**Security audit**: Complete logs, real-time alerts, regular audits  
+✅ **Zero-trust architecture**: Multi-layer protection, default deny  
+✅ **Data encryption**: Transmission encryption, storage encryption, field-level encryption  
+✅ **Compliance framework**: GDPR, CCPA, SOC 2, ISO 27001  
+✅ **Security audit**: Complete logs, real-time alerts, regular audits  
 
 Next, [Chapter 14 Ecosystem and Extensions](#chapter-14-ecosystem-and-extensions) will introduce the AgentOS ecosystem.
 
@@ -2597,7 +2919,20 @@ Next, [Chapter 14 Ecosystem and Extensions](#chapter-14-ecosystem-and-extensions
 #### 14.1.1 Ecosystem Architecture
 
 ```
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?           openlab Application Market      鈹?鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹? Agent Market     鈹?   Skill Market     鈹?鈹? 鈥?Official Agent 鈹?   鈥?Official Skill 鈹?鈹? 鈥?Community Agent鈹?   鈥?Community Skill鈹?鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?           SDK Ecosystem                  鈹?鈹? Go / Python / Rust / TypeScript        鈹?鈹溾攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?           Plugin System                  鈹?鈹? Auth / Log / Storage / Monitoring      鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
+┌─────────────────────────────────────────┐
+│            openlab Application Market      │
+├─────────────────────────────────────────┤
+│  Agent Market     │    Skill Market     │
+│  • Official Agent │    • Official Skill │
+│  • Community Agent│    • Community Skill│
+├─────────────────────────────────────────┤
+│            SDK Ecosystem                  │
+│  Go / Python / Rust / TypeScript        │
+├─────────────────────────────────────────┤
+│            Plugin System                  │
+│  Auth / Log / Storage / Monitoring      │
+└─────────────────────────────────────────┘
+```
 
 #### 14.1.2 Community Contributions
 
@@ -2667,10 +3002,10 @@ plugin.Register(&MyPlugin{})
 
 **Chapter 14 Summary**
 
-鉁?**openlab**: Agent/Skill marketplace, community contribution  
-鉁?**Plugin system**: Standardized interfaces, rich ecosystem  
-鉁?**Multi-language SDK**: Go/Python/Rust/TypeScript  
-鉁?**Version roadmap**: Continuous iteration, open evolution  
+✅ **openlab**: Agent/Skill marketplace, community contribution  
+✅ **Plugin system**: Standardized interfaces, rich ecosystem  
+✅ **Multi-language SDK**: Go/Python/Rust/TypeScript  
+✅ **Version roadmap**: Continuous iteration, open evolution  
 
 Next, [Chapter 15 Conclusion](#chapter-15-conclusion) will summarize the full text and look forward to the future.
 
@@ -2693,7 +3028,7 @@ AgentOS represents the development direction of a new generation of Agent Operat
 
 #### 15.1.2 Technical Advantages
 
-- **High performance**: Syscall <5渭s, 10M+ RPS
+- **High performance**: Syscall <5μs, 10M+ RPS
 - **High reliability**: 99.99% availability, auto-recovery
 - **High security**: Zero-trust architecture, end-to-end encryption
 - **Easy scaling**: Microservice architecture, horizontal scaling
@@ -2731,10 +3066,10 @@ AgentOS represents the development direction of a new generation of Agent Operat
 
 **Chapter 15 Summary**
 
-鉁?**Architecture innovation**: Microkernel, three-layer loop, four-layer memory  
-鉁?**Technical advantages**: High performance, high reliability, high security  
-鉁?**Future outlook**: Distributed intelligence, self-learning, consciousness emergence  
-鉁?**Research challenges**: Explainability, security, energy efficiency, general intelligence  
+✅ **Architecture innovation**: Microkernel, three-layer loop, four-layer memory  
+✅ **Technical advantages**: High performance, high reliability, high security  
+✅ **Future outlook**: Distributed intelligence, self-learning, consciousness emergence  
+✅ **Research challenges**: Explainability, security, energy efficiency, general intelligence  
 
 ---
 
@@ -2762,7 +3097,7 @@ AgentOS represents the development direction of a new generation of Agent Operat
 
 ### Microkernel and Operating Systems
 
-[9] Liedtke, J. (1995). On 渭-kernel construction. *Proceedings of the 15th ACM Symposium on Operating Systems Principles*, 237-250.
+[9] Liedtke, J. (1995). On μ-kernel construction. *Proceedings of the 15th ACM Symposium on Operating Systems Principles*, 237-250.
 
 [10] Klein, G., et al. (2009). seL4: Formal verification of an OS kernel. *Proceedings of the 22nd ACM Symposium on Operating Systems Principles*, 207-220.
 
@@ -2879,22 +3214,22 @@ cache:
 
 | English | Chinese | Description |
 |---------|---------|-------------|
-| **Agent** | 鏅鸿兘浣?| Software entity capable of autonomous decision-making and execution |
-| **Microkernel** | 寰唴鏍?| Minimal kernel providing only core functions |
-| **IPC** | 杩涚▼闂撮€氫俊 | Mechanism for exchanging data between processes |
-| **Syscall** | 绯荤粺璋冪敤 | Interface for user mode to access kernel services |
-| **MemoryRovol** | 璁板繂鍗疯浇 | AgentOS four-layer memory system |
-| **CoreLoopThree** | 涓夊眰璁ょ煡寰幆 | Cognition-action-memory closed-loop mechanism |
-| **cupolas** | 瀹夊叏绌归《 | AgentOS security protection system |
-| **Skill** | 鎶€鑳?| Agent's ability to execute specific tasks |
-| **Intent** | 鎰忓浘 | User's description of the goal to be achieved |
-| **Attractor** | 鍚稿紩瀛?| Stable state in a dynamical system |
+| **Agent** | 智能体 | Software entity capable of autonomous decision-making and execution |
+| **Microkernel** | 微内核 | Minimal kernel providing only core functions |
+| **IPC** | 进程间通信 | Mechanism for exchanging data between processes |
+| **Syscall** | 系统调用 | Interface for user mode to access kernel services |
+| **MemoryRovol** | 记忆卷载 | AgentOS four-layer memory system |
+| **CoreLoopThree** | 三层认知循环 | Cognition-action-memory closed-loop mechanism |
+| **cupolas** | 安全穹顶 | AgentOS security protection system |
+| **Skill** | 技能 | Agent's ability to execute specific tasks |
+| **Intent** | 意图 | User's description of the goal to be achieved |
+| **Attractor** | 吸引子 | Stable state in a dynamical system |
 
 ---
 
 <div align="center">
 
-**漏 2026 SPHARX Ltd. All Rights Reserved.**
+**© 2026 SPHARX Ltd. All Rights Reserved.**
 
 *From data intelligence emerges. Starting from data, ending in intelligence.*
 
