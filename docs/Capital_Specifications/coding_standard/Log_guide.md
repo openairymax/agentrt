@@ -1,7 +1,10 @@
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+"From data intelligence emerges."
+
 # AgentOS 日志打印规范
 
-**版本**: Doc V1.7  
-**更新日期**: 2026-03-31  
+**版本**: Doc V1.8  
+**最后更新**: 2026-04-09  
 **作者**: LirenWang  
 **适用范围**: AgentOS 所有模块的日志打印活动  
 **理论基础**: 工程两论（《工程控制论》反馈理论、《论系统工程》可观测性）、五维正交系统（系统观、内核观、认知观、工程观、设计美学）、双系统认知理论  

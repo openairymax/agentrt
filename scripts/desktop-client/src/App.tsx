@@ -20,42 +20,47 @@ import Config from "./pages/Config";
 import Logs from "./pages/Logs";
 import TerminalPage from "./pages/Terminal";
 import Settings from "./pages/Settings";
+import { useI18n } from "./i18n";
 
-const navItems = [
-  { section: "Main", items: [
-    { path: "/", icon: LayoutDashboard, label: "Dashboard" },
-    { path: "/services", icon: Server, label: "Services" },
-    { path: "/agents", icon: Users, label: "Agents" },
-    { path: "/tasks", icon: ClipboardList, label: "Tasks" },
+const navConfig = [
+  { section: "nav.main", items: [
+    { path: "/", icon: LayoutDashboard, labelKey: "nav.dashboard" },
+    { path: "/services", icon: Server, labelKey: "nav.services" },
+    { path: "/agents", icon: Users, labelKey: "nav.agents" },
+    { path: "/tasks", icon: ClipboardList, labelKey: "nav.tasks" },
   ]},
-  { section: "System", items: [
-    { path: "/config", icon: SettingsIcon, label: "Configuration" },
-    { path: "/logs", icon: FileText, label: "Logs" },
-    { path: "/terminal", icon: Terminal, label: "Terminal" },
-    { path: "/settings", icon: Cog, label: "Settings" },
+  { section: "nav.system", items: [
+    { path: "/config", icon: SettingsIcon, labelKey: "nav.config" },
+    { path: "/logs", icon: FileText, labelKey: "nav.logs" },
+    { path: "/terminal", icon: Terminal, labelKey: "nav.terminal" },
+    { path: "/settings", icon: Cog, labelKey: "nav.settings" },
   ]},
 ];
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const { t } = useI18n();
+
+  const getNestedValue = (obj: any, path: string): string => {
+    return path.split('.').reduce((acc, part) => acc?.[part], obj) || path;
+  };
 
   return (
     <Router>
       <div className="app-layout">
-        {/* Sidebar */}
         <aside className="sidebar">
           <div className="sidebar-header">
             <div className="sidebar-logo">A</div>
             <div>
               <div className="sidebar-title">AgentOS</div>
-              <div className="sidebar-subtitle">Desktop Client v0.1</div>
+              <div className="sidebar-subtitle">Desktop Client v0.2</div>
             </div>
           </div>
 
           <nav className="nav-menu">
-            {navItems.map((section) => (
+            {navConfig.map((section) => (
               <div key={section.section} className="nav-section">
-                <div className="nav-section-title">{section.section}</div>
+                <div className="nav-section-title">{getNestedValue(t, section.section)}</div>
                 {section.items.map((item) => (
                   <NavLink
                     key={item.path}
@@ -65,7 +70,7 @@ function App() {
                     }
                   >
                     <item.icon size={20} />
-                    <span>{item.label}</span>
+                    <span>{getNestedValue(t, item.labelKey)}</span>
                   </NavLink>
                 ))}
               </div>
@@ -75,17 +80,16 @@ function App() {
           <div style={{ padding: "16px", borderTop: "1px solid var(--border-color)" }}>
             <div className="nav-item" style={{ justifyContent: "center", fontSize: "12px" }}>
               <Activity size={16} />
-              <span>System Connected</span>
+              <span>{t.common.systemConnected}</span>
             </div>
           </div>
         </aside>
 
-        {/* Main Content */}
         <main className="main-content">
           <header className="header">
-            <h1 className="header-title">AgentOS Desktop</h1>
+            <h1 className="header-title">{t.app.title}</h1>
             <div className="header-actions">
-              <button className="btn btn-secondary" title="Refresh">
+              <button className="btn btn-secondary" title={t.common.refresh}>
                 <Activity size={18} />
               </button>
               <button className="btn btn-primary" title="Quick Deploy">

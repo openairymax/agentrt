@@ -1,13 +1,18 @@
-Copyright (c) 2026 SPHARX. All Rights Reserved.
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 "From data intelligence emerges."
 
 # CoreLoopThree：三层一体核心运行时架构详解
 
-**版本**: Doc V1.7    
-**更新日期**: 2026-03-31  
-**作者**: LirenWang  
-**状态**: 优化发布  
-**原则映射**: 系统观(S)、内核观(K)、认知观(C)、工程观(E)、设计美学(A)  
+**版本**: Doc V1.8
+**更新日期**: 2026-04-09
+**作者**: Team
+  - Zhixian Zhou | Spharx Ltd. zhouzhixian@spharx.cn
+  - Liren Wang | Spharx Ltd. wangliren@spharx.cn
+  - Chen Zhang | SJTU CSC Lab. yoyoke@sjtu.edu.cn
+  - Yunwen Xu | SJTU CSC Lab. willing419@sjtu.edu.cn
+  - Daxiang Zhu | IndieBros. zdxever@sina.com
+**状态**: 正式发布
+**理论依据**: 体系并行论 (MCIS) → 五维正交系统
 **路径**: `agentos/atoms/coreloopthree/`  
 
 ---

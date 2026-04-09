@@ -1,6 +1,9 @@
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+"From data intelligence emerges."
+
 # AgentOS 资源管理表
 
-**版本**: Doc V1.7  
+**版本**: Doc V1.8  
 **作者**: LirenWang  
 **理论基础**: 工程两论（反馈闭环）、系统工程（层次分解）、五维正交系统（工程观E-3资源确定性原则、E-8可测试性原则）
 

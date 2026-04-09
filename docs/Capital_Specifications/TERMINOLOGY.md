@@ -1,10 +1,13 @@
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+"From data intelligence emerges."
+
 # AgentOS 统一术语表
 
-**版本**: Doc V1.7  
+**版本**: Doc V1.8  
 **状态**: 正式发布  
 **维护者**: AgentOS 架构委员会  
 **作者**: LirenWang  
-**最后更新**: 2026-03-31  
+**最后更新**: 2026-04-09  
 **理论基础**: 工程两论（工程控制论、系统工程）、五维正交系统（系统观、内核观、认知观、工程观、设计美学）、双系统认知理论、微内核哲学  
 
 ---

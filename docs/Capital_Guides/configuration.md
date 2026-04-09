@@ -1,8 +1,12 @@
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+"From data intelligence emerges."
+
 # 配置指南
 
-**版本**: 1.0.0  
-**最后更新**: 2026-04-05  
-**适用范围**: 所有部署环境  
+**版本**: Doc V1.8
+**最后更新**: 2026-04-09
+**适用范围**: 所有部署环境
+**作者**: Team  
 
 ---
 

@@ -1,10 +1,10 @@
-Copyright (c) 2026 SPHARX. All Rights Reserved.
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 "From data intelligence emerges."
 
 # AgentOS 故障诊断指南
 
-**版本**: 1.0.0
-**最后更新**: 2026-04-06
+**版本**: Doc V1.8
+**最后更新**: 2026-04-09
 **状态**: 生产就绪
 
 ---

@@ -1,7 +1,10 @@
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+"From data intelligence emerges."
+
 # Kubernetes 部署指南
 
-**版本**: 1.0.0  
-**最后更新**: 2026-04-05  
+**版本**: Doc V1.8  
+**最后更新**: 2026-04-09  
 **适用场景**: 中大规模生产环境、高可用部署  
 
 ---

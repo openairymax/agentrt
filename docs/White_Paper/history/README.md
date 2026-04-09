@@ -1,3 +1,6 @@
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+"From data intelligence emerges."
+
 # AgentOS 白皮书历史版本归档
 
 本目录用于归档 AgentOS 技术白皮书的所有历史正式版本，确保项目演进全程可追溯。
@@ -146,5 +149,5 @@ AgentOS_技术白皮书_V{version}.pdf
 
 ---
 
-**最后更新**: 2026-03-23  
+**最后更新**: 2026-04-09  
 **维护者**: AgentOS 架构委员会
