@@ -226,7 +226,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Category | Count | Percentage |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|------------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Fully Documented | $DOCUMENTED | $([ $TOTAL -gt 0 ] && echo $(( DOCUMENTD * 100 / TOTAL )) || echo 'N/A')% |" >> $GITHUB_STEP_SUMMARY
+          echo "| Fully Documented | $DOCUMENTED | $([ $TOTAL -gt 0 ] && echo $(( DOCUMENTED * 100 / TOTAL )) || echo 'N/A')% |" >> $GITHUB_STEP_SUMMARY
           echo "| Partially Documented | $PARTIAL | $([ $TOTAL -gt 0 ] && echo $(( PARTIAL * 100 / TOTAL )) || echo 'N/A')% |" >> $GITHUB_STEP_SUMMARY
           echo "| Undocumented | $UNDOCUMENTED | $([ $TOTAL -gt 0 ] && echo $(( UNDOCUMENTED * 100 / TOTAL )) || echo 'N/A')% |" >> $GITHUB_STEP_SUMMARY
           echo "| **Total** | **$TOTAL** | **100%** |" >> $GITHUB_STEP_SUMMARY
@@ -237,7 +237,7 @@ jobs:
           
           if [ "$EFFECTIVE_COVERAGE" -lt 75 ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "�️ Documentation coverage below recommended threshold (75%)" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ Documentation coverage below recommended threshold (75%)" >> $GITHUB_STEP_SUMMARY
             if [ -n "$UNDOCUMENTED_LIST" ]; then
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "### Undocumented Files:" >> $GITHUB_STEP_SUMMARY
@@ -245,7 +245,7 @@ jobs:
             fi
           else
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "✅ Documentation coverage meets threshold (≥75%)"
+            echo "✅ Documentation coverage meets threshold (≥75%)" >> $GITHUB_STEP_SUMMARY
           fi
 
   # ================================================================

@@ -1,3 +1,6 @@
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+"From data intelligence emerges."
+
 # Manager 妯″潡涓庣粺涓€閰嶇疆搴撻泦鎴愭爣鍑?
 **鐗堟湰**: v1.0.0  
 **鏈€鍚庢洿鏂?*: 2026-04-01  

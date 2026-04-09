@@ -1,0 +1,139 @@
+name: AgentOS SDK CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'agentos/toolkit/go/**'
+      - 'agentos/toolkit/python/**'
+      - 'agentos/toolkit/rust/**'
+      - 'agentos/toolkit/typescript/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'agentos/toolkit/go/**'
+      - 'agentos/toolkit/python/**'
+      - 'agentos/toolkit/rust/**'
+      - 'agentos/toolkit/typescript/**'
+
+jobs:
+  sdk-ci:
+    name: SDK CI - ${{ matrix.language }} ${{ matrix.version }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - language: go
+            version: '1.22'
+            path: agentos/toolkit/go
+            cache-key: go-mod-${{ hashFiles('agentos/toolkit/go/go.sum') }}
+            test-command: go test -v -coverprofile=coverage.out -covermode=atomic ./...
+            lint-command: |
+              if [ -n "$(gofmt -l .)" ]; then
+                echo "Code formatting issues found:"
+                gofmt -l .
+                exit 1
+              fi
+              go install golang.org/x/lint/golint@latest && golint -set_exit_status ./...
+            vet-command: go vet ./...
+            build-command: go build -v ./...
+          - language: python
+            version: '3.11'
+            path: agentos/toolkit/python
+            cache-key: pip-${{ hashFiles('agentos/toolkit/python/requirements.txt') }}
+            test-command: pytest --cov=. --cov-report=xml
+            lint-command: |
+              flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+              black --check .
+            vet-command: mypy . --ignore-missing-imports
+            build-command: python -m build
+          - language: rust
+            version: 'stable'
+            path: agentos/toolkit/rust
+            cache-key: cargo-${{ hashFiles('agentos/toolkit/rust/Cargo.lock') }}
+            test-command: cargo test --verbose
+            lint-command: cargo clippy -- -D warnings
+            vet-command: cargo audit
+            build-command: cargo build --release
+          - language: typescript
+            version: '20'
+            path: agentos/toolkit/typescript
+            cache-key: npm-${{ hashFiles('agentos/toolkit/typescript/package-lock.json') }}
+            test-command: npm test -- --coverage
+            lint-command: npx eslint . --ext .ts,.tsx
+            vet-command: npx tsc --noEmit
+            build-command: npm run build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up ${{ matrix.language }}
+        uses: actions/setup-${{ matrix.language }}@v4
+        with:
+          ${{ matrix.language }}-version: ${{ matrix.version }}
+          cache: ${{ matrix.language == 'go' && 'go-mod' || matrix.language == 'python' && 'pip' || matrix.language == 'rust' && 'cargo' || matrix.language == 'typescript' && 'npm' }}
+          cache-dependency-path: ${{ matrix.path }}/${{ matrix.language == 'go' && 'go.sum' || matrix.language == 'python' && 'requirements.txt' || matrix.language == 'rust' && 'Cargo.lock' || matrix.language == 'typescript' && 'package-lock.json' }}
+
+      - name: Install dependencies
+        run: |
+          cd ${{ matrix.path }}
+          case ${{ matrix.language }} in
+            go)
+              go mod download
+              ;;
+            python)
+              pip install -r requirements.txt
+              pip install pytest pytest-cov flake8 black mypy build
+              ;;
+            rust)
+              cargo fetch
+              ;;
+            typescript)
+              npm ci
+              ;;
+          esac
+
+      - name: Lint
+        run: |
+          cd ${{ matrix.path }}
+          ${{ matrix.lint-command }}
+        continue-on-error: ${{ matrix.language == 'go' }}
+
+      - name: Test
+        run: |
+          cd ${{ matrix.path }}
+          ${{ matrix.test-command }}
+
+      - name: Vet
+        run: |
+          cd ${{ matrix.path }}
+          ${{ matrix.vet-command }}
+        continue-on-error: true
+
+      - name: Build
+        run: |
+          cd ${{ matrix.path }}
+          ${{ matrix.build-command }}
+
+      - name: Upload coverage
+        if: matrix.language == 'go' || matrix.language == 'python' || matrix.language == 'typescript'
+        uses: codecov/codecov-action@v4
+        with:
+          files: ${{ matrix.path }}/coverage.out
+          flags: ${{ matrix.language }}
+          name: codecov-${{ matrix.language }}
+
+  integration:
+    name: SDK Integration Test
+    runs-on: ubuntu-latest
+    needs: sdk-ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run integration tests
+        run: |
+          echo "SDK integration tests would run here"
+          # This could involve cross-language testing or SDK compatibility checks

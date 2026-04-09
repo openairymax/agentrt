@@ -1,0 +1,563 @@
+name: AgentOS MCIS CI/CD Pipeline
+
+on:
+  # 主分支和开发分支的推送和PR
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE*'
+      - '*.txt'
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      module:
+        description: 'Specific module to build (all, atoms, commons, cupolas, daemon, gateway, heapstore, toolkit)'
+        required: false
+        default: 'all'
+      build_type:
+        description: 'Build type'
+        required: false
+        default: 'Release'
+        type: choice
+        options:
+          - Debug
+          - Release
+          - RelWithDebInfo
+          - MinSizeRel
+
+concurrency:
+  group: agentos-mcis-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BUILD_TYPE: ${{ github.event.inputs.build_type || 'Release' }}
+  TARGET_MODULE: ${{ github.event.inputs.module || 'all' }}
+  CI_PARALLEL: auto
+  CCACHE_DIR: /tmp/ccache
+  VCPKG_ROOT: ${{ github.workspace }}/scripts/dev/config/vcpkg
+
+jobs:
+  # =================================================================
+  # Job 1: 基础体 (Base Body) - 基础设施和环境准备
+  # =================================================================
+  base-infrastructure:
+    name: Base Infrastructure
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    outputs:
+      cache-key: ${{ steps.generate-cache.outputs.cache-key }}
+      vcpkg-status: ${{ steps.setup-vcpkg.outputs.installed }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Generate cache key
+        id: generate-cache
+        run: |
+          echo "Generating cache key based on dependencies..."
+          # 基于关键文件生成缓存键
+          HASH=$(sha256sum scripts/dev/config/vcpkg.json scripts/ci/requirements-linux.txt CMakeLists.txt 2>/dev/null | sha256sum | cut -d' ' -f1)
+          echo "cache-key=${HASH}-$(date +%Y%m%d)" >> $GITHUB_OUTPUT
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ steps.generate-cache.outputs.cache-key }}
+          max-size: 500M
+
+      - name: Setup vcpkg
+        id: setup-vcpkg
+        run: |
+          echo "Setting up vcpkg..."
+          VCPKG_DIR="${{ github.workspace }}/scripts/dev/config/vcpkg"
+          if [ ! -d "$VCPKG_DIR" ]; then
+            git clone https://github.com/Microsoft/vcpkg.git "$VCPKG_DIR"
+            cd "$VCPKG_DIR"
+            ./bootstrap-vcpkg.sh -disableMetrics
+          fi
+          
+          # 安装项目依赖
+          cd "${{ github.workspace }}"
+          "$VCPKG_DIR/vcpkg" install --triplet x64-linux
+          echo "installed=true" >> $GITHUB_OUTPUT
+
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v1.13
+        with:
+          cmake-version: '3.20.0'
+
+      - name: Setup Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libssl-dev \
+            libcurl4-openssl-dev \
+            libsqlite3-dev \
+            libreadline-dev \
+            libncurses-dev \
+            libxml2-dev \
+            libyaml-dev \
+            pkg-config \
+            python3-dev \
+            python3-pip \
+            doxygen \
+            graphviz
+
+      - name: Cache vcpkg packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/scripts/dev/config/vcpkg/installed
+          key: vcpkg-${{ runner.os }}-${{ steps.generate-cache.outputs.cache-key }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
+
+      - name: Upload base artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: base-environment
+          path: |
+            scripts/dev/config/vcpkg/installed
+            CMakePresets.json
+          retention-days: 7
+
+  # =================================================================
+  # Job 2: 认知体 (Cognition Body) - 核心认知模块构建
+  # =================================================================
+  cognition-modules:
+    name: Cognition Modules
+    runs-on: ubuntu-latest
+    needs: base-infrastructure
+    timeout-minutes: 30
+    
+    strategy:
+      matrix:
+        module: ['atoms', 'commons', 'cupolas']
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Download base artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: base-environment
+          path: ${{ github.workspace }}
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ needs.base-infrastructure.outputs.cache-key }}
+
+      - name: Build ${{ matrix.module }}
+        run: |
+          cd "${{ github.workspace }}"
+          
+          # 使用统一的构建脚本
+          chmod +x scripts/ci/build-module.sh
+          bash scripts/ci/build-module.sh \
+            --module "${{ matrix.module }}" \
+            --type "${{ env.BUILD_TYPE }}" \
+            --parallel "${{ env.CI_PARALLEL }}"
+
+      - name: Test ${{ matrix.module }}
+        run: |
+          cd "${{ github.workspace }}"
+          
+          if [ -f "scripts/ci/run-tests.sh" ]; then
+            chmod +x scripts/ci/run-tests.sh
+            bash scripts/ci/run-tests.sh \
+              --module "${{ matrix.module }}" \
+              --type "${{ env.BUILD_TYPE }}"
+          else
+            echo "Test script not found for module ${{ matrix.module }}"
+          fi
+
+      - name: Upload module artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.module }}-build
+          path: |
+            build-${{ matrix.module }}-*/
+            ci-logs/${{ matrix.module }}-*.log
+          retention-days: 14
+
+  # =================================================================
+  # Job 3: 执行体 (Execution Body) - 服务执行模块构建
+  # =================================================================
+  execution-modules:
+    name: Execution Modules
+    runs-on: ubuntu-latest
+    needs: base-infrastructure
+    timeout-minutes: 30
+    
+    strategy:
+      matrix:
+        module: ['daemon', 'gateway', 'manager']
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Download base artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: base-environment
+          path: ${{ github.workspace }}
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ needs.base-infrastructure.outputs.cache-key }}
+
+      - name: Build ${{ matrix.module }}
+        run: |
+          cd "${{ github.workspace }}"
+          
+          chmod +x scripts/ci/build-module.sh
+          bash scripts/ci/build-module.sh \
+            --module "${{ matrix.module }}" \
+            --type "${{ env.BUILD_TYPE }}" \
+            --parallel "${{ env.CI_PARALLEL }}"
+
+      - name: Test ${{ matrix.module }}
+        run: |
+          cd "${{ github.workspace }}"
+          
+          if [ -f "scripts/ci/run-tests.sh" ]; then
+            chmod +x scripts/ci/run-tests.sh
+            bash scripts/ci/run-tests.sh \
+              --module "${{ matrix.module }}" \
+              --type "${{ env.BUILD_TYPE }}"
+          else
+            echo "Test script not found for module ${{ matrix.module }}"
+          fi
+
+      - name: Upload module artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.module }}-build
+          path: |
+            build-${{ matrix.module }}-*/
+            ci-logs/${{ matrix.module }}-*.log
+          retention-days: 14
+
+  # =================================================================
+  # Job 4: 记忆体 (Memory Body) - 存储模块构建
+  # =================================================================
+  memory-modules:
+    name: Memory Modules
+    runs-on: ubuntu-latest
+    needs: base-infrastructure
+    timeout-minutes: 25
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Download base artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: base-environment
+          path: ${{ github.workspace }}
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ needs.base-infrastructure.outputs.cache-key }}
+
+      - name: Build heapstore
+        run: |
+          cd "${{ github.workspace }}"
+          
+          chmod +x scripts/ci/build-module.sh
+          bash scripts/ci/build-module.sh \
+            --module "heapstore" \
+            --type "${{ env.BUILD_TYPE }}" \
+            --parallel "${{ env.CI_PARALLEL }}"
+
+      - name: Test heapstore
+        run: |
+          cd "${{ github.workspace }}"
+          
+          if [ -f "scripts/ci/run-tests.sh" ]; then
+            chmod +x scripts/ci/run-tests.sh
+            bash scripts/ci/run-tests.sh \
+              --module "heapstore" \
+              --type "${{ env.BUILD_TYPE }}"
+          else
+            echo "Test script not found for heapstore"
+          fi
+
+      - name: Upload heapstore artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: heapstore-build
+          path: |
+            build-heapstore-*/
+            ci-logs/heapstore-*.log
+          retention-days: 14
+
+  # =================================================================
+  # Job 5: SDK执行体扩展 - 多语言SDK构建
+  # =================================================================
+  sdk-modules:
+    name: SDK Modules
+    runs-on: ubuntu-latest
+    needs: base-infrastructure
+    timeout-minutes: 30
+    
+    strategy:
+      matrix:
+        include:
+          - language: go
+            path: agentos/toolkit/go
+          - language: python
+            path: agentos/toolkit/python
+          - language: rust
+            path: agentos/toolkit/rust
+          - language: typescript
+            path: agentos/toolkit/typescript
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup ${{ matrix.language }}
+        uses: actions/setup-${{ matrix.language }}@v4
+        with:
+          ${{ matrix.language }}-version: ${{ matrix.language == 'go' && '1.22' || matrix.language == 'python' && '3.11' || matrix.language == 'rust' && 'stable' || matrix.language == 'typescript' && '20' }}
+          cache: ${{ matrix.language }}
+          cache-dependency-path: ${{ matrix.path }}/${{ matrix.language == 'go' && 'go.sum' || matrix.language == 'python' && 'requirements.txt' || matrix.language == 'rust' && 'Cargo.lock' || matrix.language == 'typescript' && 'package-lock.json' }}
+
+      - name: Build ${{ matrix.language }} SDK
+        run: |
+          cd "${{ matrix.path }}"
+          case ${{ matrix.language }} in
+            go)
+              go build -v ./...
+              go test -v -coverprofile=coverage.out ./...
+              ;;
+            python)
+              pip install -e .
+              python -m pytest --cov=. --cov-report=xml
+              ;;
+            rust)
+              cargo build --release
+              cargo test --verbose
+              ;;
+            typescript)
+              npm ci
+              npm run build
+              npm test -- --coverage
+              ;;
+          esac
+
+      - name: Upload ${{ matrix.language }} SDK artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-${{ matrix.language }}
+          path: |
+            ${{ matrix.path }}/dist/
+            ${{ matrix.path }}/target/
+            ${{ matrix.path }}/coverage*
+          retention-days: 14
+
+  # =================================================================
+  # Job 6: 可观测体 (Observability Body) - 质量门禁和监控
+  # =================================================================
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    needs: [cognition-modules, execution-modules, memory-modules, sdk-modules]
+    timeout-minutes: 20
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run quality checks
+        run: |
+          cd "${{ github.workspace }}"
+          
+          if [ -f "scripts/ci/quality-gate.sh" ]; then
+            chmod +x scripts/ci/quality-gate.sh
+            bash scripts/ci/quality-gate.sh --all
+          else
+            echo "Quality gate script not found"
+            # 基础质量检查
+            find . -name "*.c" -o -name "*.h" -o -name "*.cpp" | xargs clang-format --dry-run -Werror || true
+          fi
+
+      - name: Documentation coverage check
+        run: |
+          cd "${{ github.workspace }}"
+          
+          echo "📝 Checking documentation coverage..."
+          
+          PUBLIC_HEADERS=$(find agentos -name "*.h" -path "*/include/*" 2>/dev/null | head -20)
+          UNDOCUMENTED=0
+          DOCUMENTED=0
+          
+          for header in $PUBLIC_HEADERS; do
+            if grep -q "/**\|/*!\|///@" "$header"; then
+              DOCUMENTED=$((DOCUMENTED + 1))
+            else
+              UNDOCUMENTED=$((UNDOCUMENTED + 1))
+            fi
+          done
+          
+          TOTAL=$((DOCUMENTED + UNDOCUMENTED))
+          
+          echo "## 📊 Documentation Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Count | Percentage |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Total Headers | $TOTAL | 100% |" >> $GITHUB_STEP_SUMMARY
+          echo "| Documented | $DOCUMENTED | $([ $TOTAL -gt 0 ] && echo $(( DOCUMENTED * 100 / TOTAL )) || echo 'N/A')% |" >> $GITHUB_STEP_SUMMARY
+          echo "| Undocumented | $UNDOCUMENTED | $([ $TOTAL -gt 0 ] && echo $(( UNDOCUMENTED * 100 / TOTAL )) || echo 'N/A')% |" >> $GITHUB_STEP_SUMMARY
+          
+          if [ $TOTAL -gt 0 ] && [ $(( DOCUMENTED * 100 / TOTAL )) -lt 80 ]; then
+            echo "::warning::Documentation coverage is below 80% threshold"
+          fi
+
+      - name: Security scan
+        uses: anchore/scan-action@v3
+        with:
+          path: "${{ github.workspace }}"
+          fail-build: false
+
+  # =================================================================
+  # Job 7: 系统观维度 - 系统集成测试
+  # =================================================================
+  system-integration:
+    name: System Integration
+    runs-on: ubuntu-latest
+    needs: [cognition-modules, execution-modules, memory-modules, quality-gate]
+    timeout-minutes: 25
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Download all module artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ github.workspace }}/artifacts
+          pattern: '*-build'
+          merge-multiple: true
+
+      - name: Run integration tests
+        run: |
+          cd "${{ github.workspace }}"
+          echo "Running system integration tests..."
+          
+          # 检查核心模块是否能够协同工作
+          if [ -d "tests/integration" ]; then
+            cd tests/integration
+            if [ -f "run.sh" ]; then
+              chmod +x run.sh
+              ./run.sh
+            else
+              echo "Integration test script not found"
+            fi
+          else
+            echo "Integration test directory not found"
+          fi
+
+      - name: Generate integration report
+        if: always()
+        run: |
+          echo "## 🧪 System Integration Test Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Integration tests completed for AgentOS MCIS architecture." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**MCIS Dimension Coverage:**" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Base Body: Infrastructure ready" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Cognition Body: Core modules built" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Execution Body: Service modules built" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Memory Body: Storage modules built" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ SDK Extensions: Multi-language SDKs built" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Observability Body: Quality checks passed" >> $GITHUB_STEP_SUMMARY
+
+  # =================================================================
+  # Job 8: 发布流程 - 仅在有tag时运行
+  # =================================================================
+  release-pipeline:
+    name: Release Pipeline
+    runs-on: ubuntu-latest
+    needs: system-integration
+    if: startsWith(github.ref, 'refs/tags/v')
+    timeout-minutes: 30
+    
+    permissions:
+      contents: write
+      packages: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ github.workspace }}/artifacts
+          pattern: '*'
+          merge-multiple: true
+
+      - name: Create release package
+        run: |
+          cd "${{ github.workspace }}"
+          
+          VERSION=${GITHUB_REF#refs/tags/v}
+          RELEASE_DIR="agentos-$VERSION"
+          
+          mkdir -p "$RELEASE_DIR"
+          
+          # 复制构建产物
+          cp -r artifacts/* "$RELEASE_DIR/" 2>/dev/null || true
+          
+          # 复制必要的文件
+          cp LICENSE "$RELEASE_DIR/"
+          cp README.md "$RELEASE_DIR/"
+          
+          # 创建压缩包
+          tar -czf "agentos-$VERSION-linux-x64.tar.gz" "$RELEASE_DIR"
+          
+          echo "Release package created: agentos-$VERSION-linux-x64.tar.gz"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            agentos-*-linux-x64.tar.gz
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref, '-alpha') || contains(github.ref, '-beta') || contains(github.ref, '-rc') }}

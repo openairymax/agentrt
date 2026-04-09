@@ -1,5 +1,8 @@
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+"From data intelligence emerges."
+
 ---
-copyright: "Copyright (c) 2026 SPHARX. All Rights Reserved."
+copyright: "Copyright (c) 2026 SPHARX Ltd. All Rights Reserved."
 slogan: "From data intelligence emerges."
 title: "[API名称] API"
 version: "Doc V1.0"

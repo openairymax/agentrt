@@ -1,3 +1,6 @@
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+"From data intelligence emerges."
+
 # AgentOS 错误码参考文档
 
 ## 1. 概述
