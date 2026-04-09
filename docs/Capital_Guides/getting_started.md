@@ -1,13 +1,18 @@
-Copyright (c) 2026 SPHARX. All Rights Reserved.
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 "From data intelligence emerges."
 
 # AgentOS 快速入门指南
 
-**版本**: Doc V1.7  
-**最后更新**: 2026-03-31  
-**难度**: ⭐ 初学者友好  
-**预计时间**: 15 分钟  
-**作者**: LirenWang
+**版本**: Doc V1.8
+**最后更新**: 2026-04-09
+**难度**: ⭐ 初学者友好
+**预计时间**: 15 分钟
+**作者**: Team
+  - Zhixian Zhou | Spharx Ltd. zhouzhixian@spharx.cn
+  - Liren Wang | Spharx Ltd. wangliren@spharx.cn
+  - Chen Zhang | SJTU CSC Lab. yoyoke@sjtu.edu.cn
+  - Yunwen Xu | SJTU CSC Lab. willing419@sjtu.edu.cn
+  - Daxiang Zhu | IndieBros. zdxever@sina.com
 
 ## 版本历史
 

@@ -34,6 +34,7 @@
   },
   "services": {
     "title": "服务管理",
+    "subtitle": "管理您的 AgentOS 容器化服务",
     "status": "状态",
     "running": "运行中",
     "stopped": "已停止",
@@ -42,6 +43,9 @@
     "start": "启动",
     "stop": "停止",
     "restart": "重启",
+    "startAll": "全部启动",
+    "stopAll": "全部停止",
+    "restartAll": "全部重启",
     "viewDetails": "查看详情",
     "openInBrowser": "在浏览器中打开",
     "port": "端口",
@@ -49,7 +53,15 @@
     "mode": "模式",
     "devMode": "开发模式",
     "prodMode": "生产模式",
-    "switchMode": "切换模式"
+    "switchMode": "切换模式",
+    "serviceName": "服务名称",
+    "actions": "操作",
+    "activeServices": "活跃服务",
+    "noRunningServices": "没有运行中的服务",
+    "noRunningServicesHint": "点击\"全部启动\"以启动 AgentOS 服务",
+    "confirmStopAll": "确定要停止所有服务吗？",
+    "devModeInfo": "开发模式",
+    "prodModeInfo": "生产模式"
   },
   "agents": {
     "title": "智能体管理",
@@ -63,7 +75,12 @@
     "error": "错误",
     "submitTask": "提交任务",
     "viewDetails": "查看详情",
-    "noAgents": "没有注册的智能体"
+    "noAgents": "没有注册的智能体",
+    "noAgentsHint": "注册一个 AI 智能体以开始使用",
+    "registerAgent": "注册智能体",
+    "agentDetails": "智能体详情",
+    "tasksCompleted": "已完成任务",
+    "capabilities": "能力"
   },
   "tasks": {
     "title": "任务管理",

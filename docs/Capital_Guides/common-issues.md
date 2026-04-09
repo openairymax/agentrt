@@ -1,7 +1,10 @@
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+"From data intelligence emerges."
+
 # 常见问题 FAQ
 
-**版本**: 1.0.0  
-**最后更新**: 2026-04-05  
+**版本**: Doc V1.8  
+**最后更新**: 2026-04-09  
 **维护者**: @spharx-team/support  
 
 ---
