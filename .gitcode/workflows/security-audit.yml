@@ -203,46 +203,58 @@ jobs:
           severity: ${{ env.SEVERITY_THRESHOLD }}
           output: 'trivy-results.json'
 
+      - name: Write vulnerability analysis Python script
+        uses: actions/write-file@v1
+        with:
+          path: analyze_vulns.py
+          content: |
+            #!/usr/bin/env python3
+            import json, sys
+
+            try:
+                with open('trivy-results.json') as f:
+                    data = json.load(f)
+
+                severity_counts = {'CRITICAL': 0, 'HIGH': 0, 'MEDIUM': 0, 'LOW': 0, 'UNKNOWN': 0}
+
+                for result in data.get('Results', []):
+                    for vuln in result.get('Vulnerabilities', []):
+                        severity = vuln.get('Severity', 'UNKNOWN')
+                        if severity in severity_counts:
+                            severity_counts[severity] += 1
+
+                total_vulns = sum(severity_counts.values())
+                if total_vulns == 0:
+                    score = 100
+                else:
+                    weighted_score = (
+                        severity_counts['CRITICAL'] * 100 +
+                        severity_counts['HIGH'] * 70 +
+                        severity_counts['MEDIUM'] * 30 +
+                        severity_counts['LOW'] * 10 +
+                        severity_counts['UNKNOWN'] * 50
+                    )
+                    score = max(0, 100 - (weighted_score / max(total_vulns, 1)))
+
+                crit_count = severity_counts['CRITICAL']
+                high_count = severity_counts['HIGH']
+                med_count = severity_counts['MEDIUM']
+                low_count = severity_counts['LOW']
+                unknown_count = severity_counts['UNKNOWN']
+
+                print('{},{},{},{},{},{}'.format(crit_count, high_count, med_count, low_count, unknown_count, score))
+            except Exception as e:
+                print('0,0,0,0,0,100.0')
+          write-mode: overwrite
+
       - name: Analyze and report vulnerability findings
         if: always()
         run: |
-          echo "## 🔍 Dependency Vulnerability Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "## Dependency Vulnerability Analysis" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           if [ -f trivy-results.json ]; then
-            ANALYSIS=$(python3 -c "
-import json, sys
-try:
-    with open('trivy-results.json') as f:
-        data = json.load(f)
-
-    severity_counts = {'CRITICAL': 0, 'HIGH': 0, 'MEDIUM': 0, 'LOW': 0, 'UNKNOWN': 0}
-
-    for result in data.get('Results', []):
-        for vuln in result.get('Vulnerabilities', []):
-            severity = vuln.get('Severity', 'UNKNOWN')
-            if severity in severity_counts:
-                severity_counts[severity] += 1
-
-    # 计算安全评分 (0-100, 越高越好)
-    total_vulns = sum(severity_counts.values())
-    if total_vulns == 0:
-        score = 100
-    else:
-        # 权重: CRITICAL=100, HIGH=70, MEDIUM=30, LOW=10, UNKNOWN=50
-        weighted_score = (
-            severity_counts['CRITICAL'] * 100 +
-            severity_counts['HIGH'] * 70 +
-            severity_counts['MEDIUM'] * 30 +
-            severity_counts['LOW'] * 10 +
-            severity_counts['UNKNOWN'] * 50
-        )
-        score = max(0, 100 - (weighted_score / max(total_vulns, 1)))
-
-    print(f'{severity_counts[\"CRITICAL\"]},{severity_counts[\"HIGH\"]},{severity_counts[\"MEDIUM\"]},{severity_counts[\"LOW\"]},{severity_counts[\"UNKNOWN\"]},{score:.1f}')
-except Exception as e:
-    print('0,0,0,0,0,100.0')
-" 2>/dev/null || echo "0,0,0,0,0,100.0")
+            ANALYSIS=$(python3 analyze_vulns.py) || ANALYSIS="0,0,0,0,0,100.0"
 
             CRIT_COUNT=$(echo $ANALYSIS | cut -d',' -f1)
             HIGH_COUNT=$(echo $ANALYSIS | cut -d',' -f2)
@@ -253,24 +265,24 @@ except Exception as e:
 
             echo "| Severity | Count | Impact Weight |" >> $GITHUB_STEP_SUMMARY
             echo "|----------|-------|---------------|" >> $GITHUB_STEP_SUMMARY
-            echo "| 🔴 Critical | $CRIT_COUNT | 100 |" >> $GITHUB_STEP_SUMMARY
-            echo "| 🟠 High | $HIGH_COUNT | 70 |" >> $GITHUB_STEP_SUMMARY
-            echo "| 🟡 Medium | $MED_COUNT | 30 |" >> $GITHUB_STEP_SUMMARY
-            echo "| 🟢 Low | $LOW_COUNT | 10 |" >> $GITHUB_STEP_SUMMARY
-            echo "| ⚪ Unknown | $UNKNOWN_COUNT | 50 |" >> $GITHUB_STEP_SUMMARY
+            echo "| Critical | $CRIT_COUNT | 100 |" >> $GITHUB_STEP_SUMMARY
+            echo "| High | $HIGH_COUNT | 70 |" >> $GITHUB_STEP_SUMMARY
+            echo "| Medium | $MED_COUNT | 30 |" >> $GITHUB_STEP_SUMMARY
+            echo "| Low | $LOW_COUNT | 10 |" >> $GITHUB_STEP_SUMMARY
+            echo "| Unknown | $UNKNOWN_COUNT | 50 |" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**Total Vulnerabilities**: $((CRIT_COUNT + HIGH_COUNT + MED_COUNT + LOW_COUNT + UNKNOWN_COUNT))" >> $GITHUB_STEP_SUMMARY
             echo "**Security Score**: $SCORE/100" >> $GITHUB_STEP_SUMMARY
 
-            # MCIS安全负反馈：发现严重漏洞时发出警告
+            # MCIS security negative feedback: warn when critical/high vulns found
             if [ "$CRIT_COUNT" -gt 0 ] || [ "$HIGH_COUNT" -gt 5 ]; then
               echo "::warning::MCIS Security Negative Feedback: Critical/High vulnerabilities detected"
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "### 🚨 MCIS Security Alert" >> $GITHUB_STEP_SUMMARY
+              echo "### MCIS Security Alert" >> $GITHUB_STEP_SUMMARY
               echo "High severity vulnerabilities require immediate attention." >> $GITHUB_STEP_SUMMARY
             fi
           else
-            echo "⚠️ Unable to parse Trivy results" >> $GITHUB_STEP_SUMMARY
+            echo "::notice::Unable to parse Trivy results" >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Upload Trivy results
@@ -417,15 +429,9 @@ except Exception as e:
           echo "" >> $GITHUB_STEP_SUMMARY
 
           if [ -f gitleaks-report.json ]; then
-            SECRETS_COUNT=$(python3 -c "
-import json
-try:
-    with open('gitleaks-report.json') as f:
-        data = json.load(f)
-    print(len(data) if isinstance(data, list) else 0)
-except:
-    print(0)
-" 2>/dev/null || echo "0")
+            # Use write-file action to create Python script (avoid heredoc in YAML)
+            # The Python script will be created in a separate step
+            SECRETS_COUNT=$(python3 -c "import json; f=open('gitleaks-report.json'); d=json.load(f); print(len(d) if isinstance(d,list) else 0); f.close()" 2>/dev/null || echo "0")
 
             echo "**Potential Secrets Found**: $SECRETS_COUNT" >> $GITHUB_STEP_SUMMARY
 

@@ -12,14 +12,14 @@ import {
   Rocket,
   Brain,
   ChevronRight,
-  Bell,
-  Search,
   PanelLeftClose,
   PanelLeftOpen,
   CircleDot,
   GitBranch,
   Cpu,
   Wifi,
+  HelpCircle,
+  Keyboard,
 } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
 import Services from "./pages/Services";
@@ -32,6 +32,11 @@ import Settings from "./pages/Settings";
 import LLMConfig from "./pages/LLMConfig";
 import WelcomeWizard from "./components/WelcomeWizard";
 import ErrorBoundary from "./components/ErrorBoundary";
+import NotificationCenter from "./components/NotificationCenter";
+import GlobalSearch from "./components/GlobalSearch";
+import KeyboardShortcutsModal, { useKeyboardShortcuts } from "./components/KeyboardShortcuts";
+import CommandPalette from "./components/CommandPalette";
+import { ToastProvider } from "./components/Toast";
 import { useI18n } from "./i18n";
 
 const navConfig = [
@@ -86,16 +91,13 @@ function TitleBarContent() {
         </div>
       </div>
 
-      <div className="titlebar-center">
-        <button className="icon-btn" title="Search">
-          <Search size={17} />
-        </button>
+      <div className="titlebar-center" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <GlobalSearch />
+        <CommandPalette />
       </div>
 
       <div className="titlebar-actions">
-        <button className="icon-btn" title={t.common.notifications || "Notifications"}>
-          <Bell size={17} />
-        </button>
+        <NotificationCenter />
         <div className="avatar" title="User">U</div>
       </div>
     </div>
@@ -128,9 +130,13 @@ function StatusBar() {
         </div>
       </div>
       <div className="statusbar-right">
+        <div className="statusbar-item clickable" style={{ cursor: 'pointer' }} data-tooltip="Keyboard Shortcuts (?)">
+          <Keyboard size={13} />
+          <span style={{ marginLeft: '4px' }}>⌘K</span>
+        </div>
         <div className="statusbar-item">
           <Cpu size={13} />
-          <span>v0.3.0</span>
+          <span>v0.3.1</span>
         </div>
         <div className="statusbar-item number-display">
           {time.toLocaleTimeString('en-US', { hour12: false })}
@@ -143,6 +149,7 @@ function StatusBar() {
 function AppContent() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { t } = useI18n();
+  const { showShortcuts, setShowShortcuts } = useKeyboardShortcuts();
 
   const getNestedValue = (obj: any, path: string): string => {
     return path.split('.').reduce((acc, part) => acc?.[part], obj) || path;
@@ -150,10 +157,10 @@ function AppContent() {
 
   return (
     <div className="app-layout">
-      {/* Activity Bar - Left narrow icon strip */}
+      {/* Activity Bar */}
       <aside className="activity-bar">
         <div className="activity-bar-logo" title="AgentOS">A</div>
-        
+
         <div className="activity-bar-items">
           {navConfig[0].items.map((item) => (
             <NavLink
@@ -194,27 +201,22 @@ function AppContent() {
           >
             <SettingsIcon size={22} />
           </NavLink>
-          
+
           <button
             className="activity-bar-item"
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            title={sidebarOpen ? "Close Sidebar" : "Open Sidebar"}
+            title={sidebarOpen ? "Close Sidebar (Ctrl+B)" : "Open Sidebar"}
           >
             {sidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
           </button>
         </div>
       </aside>
 
-      {/* Sidebar Panel - Expandable navigation panel */}
+      {/* Sidebar Panel */}
       <aside className={`sidebar-panel ${!sidebarOpen ? 'collapsed' : ''}`}>
         <div className="sidebar-panel-header">
           <span className="sidebar-panel-title">{t.app.title}</span>
-          <button
-            className="sidebar-panel-close"
-            onClick={() => setSidebarOpen(false)}
-          >
-            ✕
-          </button>
+          <button className="sidebar-panel-close" onClick={() => setSidebarOpen(false)}>✕</button>
         </div>
 
         <nav className="nav-menu">
@@ -249,7 +251,7 @@ function AppContent() {
       <main className="main-workspace">
         <TitleBarContent />
 
-        <div className="content-area">
+        <div className="content-area stagger-enter">
           <ErrorBoundary>
             <Routes>
               <Route path="/" element={<Dashboard />} />
@@ -267,6 +269,9 @@ function AppContent() {
 
         <StatusBar />
       </main>
+
+      {/* Modals */}
+      <KeyboardShortcutsModal isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
     </div>
   );
 }
@@ -281,9 +286,11 @@ function App() {
   }
 
   return (
-    <Router>
-      <AppContent />
-    </Router>
+    <ToastProvider>
+      <Router>
+        <AppContent />
+      </Router>
+    </ToastProvider>
   );
 }
 
