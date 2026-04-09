@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file deepseek.c
  * @brief DeepSeek 适配器（兼容 OpenAI 格式）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

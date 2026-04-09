@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file trace.c
  * @brief 责任链追踪器实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

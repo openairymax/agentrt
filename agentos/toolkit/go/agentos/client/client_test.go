@@ -1,4 +1,4 @@
-﻿// AgentOS Go SDK - 客户端模块单元测试
+// AgentOS Go SDK - 客户端模块单元测试
 // Version: 3.0.0
 
 package client

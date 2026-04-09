@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file memory.h
  * @brief 记忆层公共接口定义
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

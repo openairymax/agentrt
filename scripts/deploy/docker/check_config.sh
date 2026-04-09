@@ -1,4 +1,4 @@
-﻿# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Docker 配置检查脚�?
 # 验证所有配置文件和环境的正确�?
 

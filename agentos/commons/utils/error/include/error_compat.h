@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file error_compat.h
  * @brief 错误处理模块向后兼容层
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

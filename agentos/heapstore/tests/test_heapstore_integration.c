@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_heapstore_integration.c
  * @brief AgentOS 数据分区集成测试
  *

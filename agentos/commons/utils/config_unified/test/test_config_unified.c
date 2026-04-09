@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_config_unified.c
  * @brief 统一配置模块单元测试
  * 

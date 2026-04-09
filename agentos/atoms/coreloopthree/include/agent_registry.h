@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file agent_registry.h
  * @brief Agent 注册中心接口
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

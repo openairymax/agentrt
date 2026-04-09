@@ -7,7 +7,10 @@
 ### Python 工具
 - **analyze_quality.py** - 代码质量分析（复杂度、重复率、风格检查）
 - **enhance_coverage.py** - 测试覆盖率增强工具
-- **remove_bom.py** - BOM (Byte Order Mark) 清理工具
+
+### 编码工具
+- **encoding/check_encoding.py** - 文件编码检查和转换工具
+- **encoding/fix_bom.py** - BOM (Byte Order Mark) 修复工具
 
 ### Shell 工具
 - **check-quality.sh** - 快速质量检查入口脚本
@@ -31,8 +34,14 @@ cd scripts/tools
 
 ### 清理BOM标记
 ```bash
-cd scripts/tools
-python remove_bom.py --directory ../../agentos/manuals/
+cd scripts/tools/encoding
+python fix_bom.py --fix
+```
+
+### 编码检查
+```bash
+cd scripts/tools/encoding
+python check_encoding.py --convert
 ```
 
 ## 🔧 依赖安装

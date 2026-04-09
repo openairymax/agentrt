@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file layer2_feature.c
  * @brief L2 特征层实�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

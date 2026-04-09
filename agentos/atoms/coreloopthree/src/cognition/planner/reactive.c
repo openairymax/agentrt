@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file reactive.c
  * @brief 反应式规划策略：快速生成单步或简单计�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

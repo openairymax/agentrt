@@ -122,7 +122,9 @@ scripts/
 │   ├── analyze_quality.py           # 代码质量分析
 │   ├── check-quality.sh             # 质量检查入口
 │   ├── enhance_coverage.py           # 覆盖率增强
-│   ├── remove_bom.py                # BOM清理
+│   ├── encoding/                    # 编码工具目录
+│   │   ├── check_encoding.py        # 编码检查
+│   │   └── fix_bom.py               # BOM修复
 │   ├── requirements.txt             # Python依赖
 │   └── README.md                   # 工具文档
 │

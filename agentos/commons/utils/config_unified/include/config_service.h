@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file config_service.h
  * @brief 统一配置模块 - 服务层接口
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

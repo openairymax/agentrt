@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file rov_ffi.h
  * @brief MemoryRovol 对外 C 接口（由 memoryrovol 模块实现）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

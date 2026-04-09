@@ -1,4 +1,4 @@
-﻿﻿﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Scripts 测试套件
 # pytest 配置文件

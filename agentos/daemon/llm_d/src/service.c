@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file service.c
  * @brief LLM 服务核心逻辑实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file metrics.c
  * @brief 监控指标采集实现（生产级版本）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

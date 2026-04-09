@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_syscall_table.c
  * @brief 系统调用表单元测�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

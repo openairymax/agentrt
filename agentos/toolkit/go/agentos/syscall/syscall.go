@@ -1,4 +1,4 @@
-﻿// AgentOS Go SDK Syscall Module
+// AgentOS Go SDK Syscall Module
 // Version: 2.0.0
 // Last updated: 2026-03-23
 //

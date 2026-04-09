@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file weighted.c
  * @brief 加权调度策略实现（线程安全版本）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

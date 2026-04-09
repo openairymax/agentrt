@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file provider.c
  * @brief 提供商通用工具实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
