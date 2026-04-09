@@ -2,132 +2,141 @@
 * text=auto
 
 # =============================================================================
-# Source Code - C/C++ (AgentOS Core)
+# Git Configuration Files - UTF-8 Encoding Enforcement
 # =============================================================================
 
-*.c text eol=lf
-*.h text eol=lf
-*.hpp text eol=lf
-*.cpp text eol=lf
-*.cc text eol=lf
-*.cxx text eol=lf
+.gitignore text working-tree-encoding=UTF-8 eol=lf
+.gitattributes text working-tree-encoding=UTF-8 eol=lf
+.gitmodules text working-tree-encoding=UTF-8 eol=lf
+.mailmap text working-tree-encoding=UTF-8 eol=lf
+
+# =============================================================================
+# Source Code - C/C++ (AgentOS Core) - UTF-8 Encoding Enforcement
+# =============================================================================
+
+*.c text working-tree-encoding=UTF-8 eol=lf
+*.h text working-tree-encoding=UTF-8 eol=lf
+*.hpp text working-tree-encoding=UTF-8 eol=lf
+*.cpp text working-tree-encoding=UTF-8 eol=lf
+*.cc text working-tree-encoding=UTF-8 eol=lf
+*.cxx text working-tree-encoding=UTF-8 eol=lf
 
 # CMake build system
-CMakeLists.txt text eol=lf
-*.cmake text eol=lf
-*.cmake.in text eol=lf
+CMakeLists.txt text working-tree-encoding=UTF-8 eol=lf
+*.cmake text working-tree-encoding=UTF-8 eol=lf
+*.cmake.in text working-tree-encoding=UTF-8 eol=lf
 
 # =============================================================================
-# Python (Toolkit SDK & OpenLab)
+# Python (Toolkit SDK & OpenLab) - UTF-8 Encoding Enforcement
 # =============================================================================
 
-*.py text eol=lf
-*.pyx text eol=lf
-*.pyd text eol=lf
-*.pyw text eol=lf
-*.pyi text eol=lf
-requirements*.txt text eol=lf
-Pipfile text eol=lf
-setup.py text eol=lf
-setup.cfg text eol=lf
+*.py text working-tree-encoding=UTF-8 eol=lf
+*.pyx text working-tree-encoding=UTF-8 eol=lf
+*.pyd text working-tree-encoding=UTF-8 eol=lf
+*.pyw text working-tree-encoding=UTF-8 eol=lf
+*.pyi text working-tree-encoding=UTF-8 eol=lf
+requirements*.txt text working-tree-encoding=UTF-8 eol=lf
+Pipfile text working-tree-encoding=UTF-8 eol=lf
+setup.py text working-tree-encoding=UTF-8 eol=lf
+setup.cfg text working-tree-encoding=UTF-8 eol=lf
 
 # =============================================================================
-# Go (Toolkit SDK)
+# Go (Toolkit SDK) - UTF-8 Encoding Enforcement
 # =============================================================================
 
-*.go text eol=lf
-go.mod text eol=lf
+*.go text working-tree-encoding=UTF-8 eol=lf
+go.mod text working-tree-encoding=UTF-8 eol=lf
 go.sum text=binary
-*.s text eol=lf
+*.s text working-tree-encoding=UTF-8 eol=lf
 
 # =============================================================================
-# Rust (Toolkit SDK)
+# Rust (Toolkit SDK) - UTF-8 Encoding Enforcement
 # =============================================================================
 
-*.rs text eol=lf
-Cargo.toml text eol=lf
-Cargo.lock text=eol=lf
+*.rs text working-tree-encoding=UTF-8 eol=lf
+Cargo.toml text working-tree-encoding=UTF-8 eol=lf
+Cargo.lock text working-tree-encoding=UTF-8 eol=lf
 
 # =============================================================================
-# TypeScript/JavaScript (Toolkit SDK)
+# TypeScript/JavaScript (Toolkit SDK) - UTF-8 Encoding Enforcement
 # =============================================================================
 
-*.ts text eol=lf
-*.tsx text eol=lf
-*.js text eol=lf
-*.jsx text eol=lf
-*.mjs text eol=lf
-*.cjs text eol=lf
-*.d.ts text eol=lf
-package.json text eol=lf
-package-lock.json text=eol=lf
-tsconfig.json text eol=lf
-*.map text eol=lf
+*.ts text working-tree-encoding=UTF-8 eol=lf
+*.tsx text working-tree-encoding=UTF-8 eol=lf
+*.js text working-tree-encoding=UTF-8 eol=lf
+*.jsx text working-tree-encoding=UTF-8 eol=lf
+*.mjs text working-tree-encoding=UTF-8 eol=lf
+*.cjs text working-tree-encoding=UTF-8 eol=lf
+*.d.ts text working-tree-encoding=UTF-8 eol=lf
+package.json text working-tree-encoding=UTF-8 eol=lf
+package-lock.json text working-tree-encoding=UTF-8 eol=lf
+tsconfig.json text working-tree-encoding=UTF-8 eol=lf
+*.map text working-tree-encoding=UTF-8 eol=lf
 
 # =============================================================================
-# Shell Scripts (DevOps & CI/CD)
+# Shell Scripts (DevOps & CI/CD) - UTF-8 Encoding Enforcement
 # =============================================================================
 
-*.sh text eol=lf
-*.bash text eol=lf
-*.zsh text eol=lf
-*.fish text eol=lf
-Makefile text eol=lf
-*.mk text eol=lf
-Dockerfile text eol=lf
-docker-compose*.yml text eol=lf
-docker-compose*.yaml text eol=lf
+*.sh text working-tree-encoding=UTF-8 eol=lf
+*.bash text working-tree-encoding=UTF-8 eol=lf
+*.zsh text working-tree-encoding=UTF-8 eol=lf
+*.fish text working-tree-encoding=UTF-8 eol=lf
+Makefile text working-tree-encoding=UTF-8 eol=lf
+*.mk text working-tree-encoding=UTF-8 eol=lf
+Dockerfile text working-tree-encoding=UTF-8 eol=lf
+docker-compose*.yml text working-tree-encoding=UTF-8 eol=lf
+docker-compose*.yaml text working-tree-encoding=UTF-8 eol=lf
 
 # =============================================================================
-# Configuration Files
+# Configuration Files - UTF-8 Encoding Enforcement
 # =============================================================================
 
-*.yml text eol=lf
-*.yaml text eol=lf
-*.toml text eol=lf
-*.ini text eol=lf
-*.cfg text eol=lf
-*.conf text eol=lf
-*.properties text eol=lf
-.env.example text eol=lf
-.editorconfig text eol=lf
+*.yml text working-tree-encoding=UTF-8 eol=lf
+*.yaml text working-tree-encoding=UTF-8 eol=lf
+*.toml text working-tree-encoding=UTF-8 eol=lf
+*.ini text working-tree-encoding=UTF-8 eol=lf
+*.cfg text working-tree-encoding=UTF-8 eol=lf
+*.conf text working-tree-encoding=UTF-8 eol=lf
+*.properties text working-tree-encoding=UTF-8 eol=lf
+.env.example text working-tree-encoding=UTF-8 eol=lf
+.editorconfig text working-tree-encoding=UTF-8 eol=lf
 
 # AgentOS specific configs
-manager.yaml text eol=lf
-policy.yaml text eol=lf
-schema.json text eol=lf
+manager.yaml text working-tree-encoding=UTF-8 eol=lf
+policy.yaml text working-tree-encoding=UTF-8 eol=lf
+schema.json text working-tree-encoding=UTF-8 eol=lf
 
 # =============================================================================
-# Documentation
+# Documentation - UTF-8 Encoding Enforcement
 # =============================================================================
 
-*.md text eol=lf
-*.mdown text eol=lf
-*.markdown text eol=lf
-*.rst text eol=lf
-*.adoc text eol=lf
-*.txt text eol=lf
-LICENSE* text eol=lf
-AUTHORS* text eol=lf
-CHANGELOG* text eol=lf
-CONTRIBUTING* text eol=lf
-NOTICE text eol=lf
-ACKNOWLEDGMENTS* text eol=lf
-CODE_OF_CONDUCT* text eol=lf
+*.md text working-tree-encoding=UTF-8 eol=lf
+*.mdown text working-tree-encoding=UTF-8 eol=lf
+*.markdown text working-tree-encoding=UTF-8 eol=lf
+*.rst text working-tree-encoding=UTF-8 eol=lf
+*.adoc text working-tree-encoding=UTF-8 eol=lf
+*.txt text working-tree-encoding=UTF-8 eol=lf
+LICENSE* text working-tree-encoding=UTF-8 eol=lf
+AUTHORS* text working-tree-encoding=UTF-8 eol=lf
+CHANGELOG* text working-tree-encoding=UTF-8 eol=lf
+CONTRIBUTING* text working-tree-encoding=UTF-8 eol=lf
+NOTICE text working-tree-encoding=UTF-8 eol=lf
+ACKNOWLEDGMENTS* text working-tree-encoding=UTF-8 eol=lf
+CODE_OF_CONDUCT* text working-tree-encoding=UTF-8 eol=lf
 
 # =============================================================================
-# Data Formats
+# Data Formats - UTF-8 Encoding Enforcement
 # =============================================================================
 
-*.json text eol=lf
-*.xml text eol=lf
-*.svg text eol=lf
-*.html text eol=lf
-*.css text eol=lf
-*.scss text eol=lf
-*.less text eol=lf
-*.graphql text eol=lf
-*.proto text eol=lf
+*.json text working-tree-encoding=UTF-8 eol=lf
+*.xml text working-tree-encoding=UTF-8 eol=lf
+*.svg text working-tree-encoding=UTF-8 eol=lf
+*.html text working-tree-encoding=UTF-8 eol=lf
+*.css text working-tree-encoding=UTF-8 eol=lf
+*.scss text working-tree-encoding=UTF-8 eol=lf
+*.less text working-tree-encoding=UTF-8 eol=lf
+*.graphql text working-tree-encoding=UTF-8 eol=lf
+*.proto text working-tree-encoding=UTF-8 eol=lf
 
 # =============================================================================
 # Binary Files (DO NOT normalize)
@@ -220,13 +229,13 @@ CODE_OF_CONDUCT* text eol=lf
 *.jks binary
 *.keystore binary
 
-# Lock files (language-specific)
-poetry.lock text=eol=lf
-Cargo.lock text=eol=lf
-yarn.lock text=eol=lf
-pnpm-lock.yaml text=eol=lf
-Package.lock text=eol=lf
-Gopkg.lock text=eol=lf
+# Lock files (language-specific) - UTF-8 Encoding Enforcement
+poetry.lock text working-tree-encoding=UTF-8 eol=lf
+Cargo.lock text working-tree-encoding=UTF-8 eol=lf
+yarn.lock text working-tree-encoding=UTF-8 eol=lf
+pnpm-lock.yaml text working-tree-encoding=UTF-8 eol=lf
+Package.lock text working-tree-encoding=UTF-8 eol=lf
+Gopkg.lock text working-tree-encoding=UTF-8 eol=lf
 
 # =============================================================================
 # AgentOS Project Specific
@@ -247,7 +256,7 @@ Gopkg.lock text=eol=lf
 .gitcode/workflows/*.yaml text working-tree-encoding=UTF-8 eol=lf
 
 # vcpkg
-vcpkg.json text=eol=lf
+vcpkg.json text working-tree-encoding=UTF-8 eol=lf
 
 # Test fixtures
 tests/fuzz/** -text
