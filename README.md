@@ -28,6 +28,8 @@
 
 ## 💡 创新要点
 
+**基石思想**👉 **[《体系并行论》](docs/Basic_Theories/CN_01_体系并行论.md)**  
+
 - **纯净内核**：内核仅提供原子机制，纯净高效
 - **认知循环**：认知，规划，行动
 - **记忆卷载**：原始层，特征层，结构层，模式层
@@ -64,8 +66,8 @@
 ⬆️ SDK 层 (toolkit)  
 ```
 
-** 设计原则**  
-  基于 [ARCHITECTURAL_PRINCIPLES.md V1.8](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) 构建：
+**设计原则**  
+  基于 [ARCHITECTURAL_PRINCIPLES](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) 构建：
 - **系统观**：反馈闭环 · 层次分解 · 总体设计部 · 涌现管理 → 实时响应 <10ms
 - **内核观**：内核极简 · 接口契约化 · 服务隔离 · 可插拔策略 → 内核 ~25K LOC
 - **认知观**：双系统协同 · 增量演化 · 记忆卷载 · 遗忘机制 → Token 节省 500%

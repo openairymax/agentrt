@@ -42,7 +42,7 @@
 
 ### 设计原则
 
-遵循 [AgentOS 架构设计原则 Doc V1.7](../../agentos/manuals/ARCHITECTURAL_PRINCIPLES.md)：
+遵循 [AgentOS 架构设计原则 Doc V1.7](../../../docs/ARCHITECTURAL_PRINCIPLES.md)：
 
 | 原则 | 说明 | 实现方式 |
 |------|------|----------|
@@ -934,7 +934,7 @@ platform:
 
 ### 代码风格
 
-遵循 [AgentOS C 语言编码规范](../../agentos/manuals/specifications/coding_standard/C_coding_style_guide.md)
+遵循 [AgentOS C 语言编码规范](../../../docs/Capital_Specifications/)
 
 **关键要求**：
 - ✅ 使用 `cupolas_` 前缀命名所有公共 API
