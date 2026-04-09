@@ -28,6 +28,8 @@ English | [简体中文](README.md)
 
 ## 💡 Innovation Highlights
 
+**Foundational Theory** 👉 **[Multibody Cybernetic Intelligent System](docs/Basic_Theories/EN_01_MCIS.md)**  
+
 - **Pure Kernel**: Only IPC/Mem/Task/Time atomic mechanisms, ensuring purity and efficiency.
 - **Cognitive Loop**: Perception → Planning → Action, with dual-system synergy (System 1 + System 2).
 - **Memory Stratification**: L1 Raw → L2 Features → L3 Structures → L4 Patterns, enabling intelligence emergence.
@@ -62,7 +64,7 @@ Support Layer (commons) — platform · utils (19 modules)
 SDK Layer (toolkit) — Go / Python / Rust / TypeScript
 ```
 
-**📐 Design Principles** · Built upon [ARCHITECTURAL_PRINCIPLES.md V1.8](docs/ARCHITECTURAL_PRINCIPLES.md):
+**📐 Design Principles** · Built upon the Multibody Cybernetic Intelligent System (Five‑dimensional orthogonal instance) [ARCHITECTURAL_PRINCIPLES](docs/ARCHITECTURAL_PRINCIPLES.md):
 
 - **System Perspective**: Feedback loops · Layered decomposition · Holistic design · Emergence management → Response <10ms
 - **Kernel Perspective**: Minimalist kernel · Contractual interfaces · Service isolation · Pluggable strategies → Kernel ~25K LOC
@@ -121,7 +123,7 @@ docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
 
 | Document | Core Content |
 |:-----|:---------|
-| [📘 Architectural Principles V1.8](docs/ARCHITECTURAL_PRINCIPLES.md) | Five‑dimensional orthogonal system, 24 core principles |
+| [📘 Architectural Principles V1.9](docs/ARCHITECTURAL_PRINCIPLES.md) | Multibody Cybernetic Intelligent System (Five‑dimensional orthogonal instance), 24 core principles |
 | [🚀 Quick Start](docs/Capital_Guides/getting_started.md) | 5‑minute getting‑started guide |
 | [⚙️ Build Guide](docs/Capital_Guides/installation.md) | Detailed build steps and options |
 | [🧪 Testing Guide](docs/Capital_Guides/testing.md) | Unit/Integration/Contract testing |

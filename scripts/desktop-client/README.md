@@ -12,6 +12,9 @@ Official cross-platform desktop application for AgentOS - built with [Tauri](htt
 - 📄 **Log Viewer** - Real-time log streaming with filtering and search
 - 💻 **Integrated Terminal** - Execute CLI commands directly from the UI
 - 🔄 **Auto-refresh** - Automatic status updates for real-time monitoring
+- 🌐 **Multi-language** - Support for English and Simplified Chinese
+- 🔄 **Auto-update** - Automatic update checking and installation
+- 🎨 **Welcome Wizard** - First-time setup guide for new users
 
 ## Tech Stack
 
@@ -20,6 +23,7 @@ Official cross-platform desktop application for AgentOS - built with [Tauri](htt
 - **Styling**: CSS Variables (Dark Theme)
 - **Icons**: Lucide React
 - **State**: React Hooks + Tauri Commands
+- **i18n**: Custom lightweight internationalization
 
 ## Prerequisites
 
@@ -41,6 +45,12 @@ npm install
 # Install Tauri CLI
 npm install -g @tauri-apps/cli@latest
 
+# Generate icons (first time only)
+cd src-tauri/icons
+pip install Pillow
+python generate_icons.py
+cd ../..
+
 # Run in development mode
 npm run tauri dev
 ```
@@ -52,9 +62,9 @@ npm run tauri dev
 npm run tauri build
 
 # Output location:
-#   Windows: src-tauri/target/release/bundle/
-#   macOS:   src-tauri/target/release/bundle/macos/
-#   Linux:   src-tauri/target/release/release/bundle/linux/
+#   Windows: src-tauri/target/release/bundle/msi/
+#   macOS:   src-tauri/target/release/bundle/dmg/
+#   Linux:   src-tauri/target/release/bundle/deb/
 ```
 
 ## Project Structure
@@ -67,11 +77,19 @@ desktop-client/
 │   │   ├── lib.rs          # Tauri setup & commands registration
 │   │   ├── commands.rs     # All Tauri commands (API layer)
 │   │   └── cli.rs          # CLI wrapper utilities
+│   ├── icons/              # Application icons
+│   │   └── generate_icons.py
 │   ├── Cargo.toml          # Rust dependencies
 │   └── tauri.conf.json     # Tauri configuration
 ├── src/                    # Frontend (React)
 │   ├── main.tsx            # React entry point
 │   ├── App.tsx             # Main app with routing
+│   ├── i18n/               # Internationalization
+│   │   ├── index.tsx       # i18n provider
+│   │   ├── en.json         # English translations
+│   │   └── zh.json         # Chinese translations
+│   ├── components/         # Reusable components
+│   │   └── WelcomeWizard.tsx
 │   ├── styles/
 │   │   └── globals.css     # Global styles & theme
 │   └── pages/
@@ -86,7 +104,8 @@ desktop-client/
 ├── package.json            # Frontend dependencies
 ├── tsconfig.json           # TypeScript config
 ├── vite.config.ts          # Vite build config
-└── README.md               # This file
+├── README.md               # This file
+└── INSTALLATION.md         # Detailed installation guide
 ```
 
 ## Available Pages/Routes
@@ -144,6 +163,17 @@ desktop-client/
 - Preset quick commands for common operations
 - Copy/clear output functionality
 
+### Multi-language Support
+- English (default)
+- Simplified Chinese (简体中文)
+- Auto-detect system language
+- Persist language preference
+
+### Auto-update
+- Check for updates on startup
+- Download and install updates
+- Restart to complete installation
+
 ## Tauri Commands (Rust Backend)
 
 The following commands are exposed to the frontend:
@@ -181,6 +211,7 @@ execute_cli_command(command: String, args: Vec<String>) -> CliCommandResult
 open_terminal(working_dir: Option<String>)
 open_browser(url: String)
 check_for_updates() -> UpdateInfo
+download_and_install_update() -> Result<(), String>
 ```
 
 ## Development Tips
@@ -199,6 +230,11 @@ check_for_updates() -> UpdateInfo
 2. Add route in `src/App.tsx`
 3. Add nav item to `navItems` array
 4. Register Tauri command if needed
+
+### Adding New Translations
+1. Add keys to `src/i18n/en.json`
+2. Add corresponding keys to `src/i18n/zh.json`
+3. Use `const { t } = useI18n()` in components
 
 ## Platform Support
 
@@ -223,7 +259,7 @@ check_for_updates() -> UpdateInfo
 
 ## Future Enhancements (Roadmap)
 
-- [ ] Multi-language support (i18n)
+- [x] Multi-language support (i18n)
 - [ ] Dark/Light theme toggle
 - [ ] Plugin system for custom agents
 - [ ] Real-time notifications
@@ -232,6 +268,10 @@ check_for_updates() -> UpdateInfo
 - [ ] Export/import configurations
 - [ ] Team collaboration features
 - [ ] Advanced metrics dashboard (charts/graphs)
+
+## Installation for End Users
+
+See [INSTALLATION.md](./INSTALLATION.md) for detailed installation instructions for end users.
 
 ## Contributing
 
