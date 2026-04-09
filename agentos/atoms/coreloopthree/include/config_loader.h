@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file config_loader.h
  * @brief 配置加载器接口
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

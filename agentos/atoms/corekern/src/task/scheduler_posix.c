@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file scheduler_posix.c
  * @brief POSIX平台调度器适配器实�? * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *

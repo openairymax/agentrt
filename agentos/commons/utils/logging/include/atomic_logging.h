@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file atomic_logging.h
  * @brief 统一分层日志系统原子层API
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

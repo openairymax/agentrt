@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file manager.h
  * @brief 简单配置管理接�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

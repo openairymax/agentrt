@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file compensation.c
  * @brief 补偿事务管理器实�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

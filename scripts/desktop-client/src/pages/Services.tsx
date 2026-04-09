@@ -10,7 +10,7 @@ import {
   Loader2,
   ExternalLink,
 } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../utils/tauriCompat";
 
 interface ServiceStatus {
   name: string;
@@ -90,7 +90,6 @@ const Services: React.FC = () => {
 
   return (
     <div>
-      {/* Header Actions */}
       <div
         className="card"
         style={{ marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}
@@ -127,7 +126,6 @@ const Services: React.FC = () => {
         </div>
       </div>
 
-      {/* Control Buttons */}
       <div className="card" style={{ marginBottom: "20px" }}>
         <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
           <button
@@ -171,7 +169,6 @@ const Services: React.FC = () => {
         </div>
       </div>
 
-      {/* Service List */}
       <div className="card">
         <h3 className="card-title">
           Active Services ({services.length})
@@ -285,7 +282,6 @@ const Services: React.FC = () => {
         )}
       </div>
 
-      {/* Service Info */}
       <div className="grid-2">
         <div className="card">
           <h3 className="card-title">Development Mode</h3>

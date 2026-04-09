@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_full_workflow.c
  * @brief 系统调用完整工作流集成测�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

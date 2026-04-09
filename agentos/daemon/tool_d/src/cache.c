@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file cache.c
  * @brief 工具结果缓存实现（LRU�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

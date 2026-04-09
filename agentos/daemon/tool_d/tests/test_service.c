@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_service.c
  * @brief Tool 服务核心功能单元测试
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

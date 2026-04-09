@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file service.h
  * @brief 工具服务内部结构声明
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

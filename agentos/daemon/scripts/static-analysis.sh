@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 # 静态分析脚本
 # 使用 cppcheck 进行代码静态分析

@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS 通用工具函数模块
 # 遵循 AgentOS 架构设计原则：接口最小化原则 (E-5)
