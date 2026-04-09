@@ -108,7 +108,7 @@ jobs:
           echo "📝 Checking documentation coverage..."
           
           # 查找所有公共头文件
-          PUBLIC_HEADERS=$(find daemon commons atoms gateway heapstore -name "*.h" -path "*/include/*" 2>/dev/null)
+          PUBLIC_HEADERS=$(find agentos/daemon agentos/commons agentos/atoms agentos/gateway agentos/heapstore -name "*.h" -path "*/include/*" 2>/dev/null)
           UNDOCUMENTED=0
           DOCUMENTED=0
           UNDOCUMENTED_FILES=""

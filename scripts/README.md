@@ -1,820 +1,552 @@
-# AgentOS Scripts - 开发与运维工具集
+# AgentOS Scripts - 开发与运维工具集 V2.0
 
-**版本**: v1.0.0.6  
-**最后更新**: 2026-03-29  
+**版本**: v2.0.0  
+**最后更新**: 2026-04-08  
+**整理状态**: ✅ 已完成全面重组
 
 ---
 
 ## 📋 概述
 
-`scripts/` 模块是 AgentOS 的开发、构建、部署和运维工具集，提供全生命周期的自动化脚本支持。遵循 AgentOS 架构设计原则，实现**反馈闭环**、**安全内生**、**工程美学**和**跨平台一致性**。
+`scripts/` 模块是 AgentOS 的**统一工具平台**，提供从开发构建到生产部署的全生命周期自动化支持。经过V2.0全面重组，现已实现：
 
-### 核心能力
+- 🎯 **清晰的模块化架构** - 10个功能子目录，职责明确
+- 🌍 **完整的跨平台支持** - Windows/macOS/Linux 原生脚本
+- 🖥️ **桌面客户端集成** - Tauri GUI应用，可视化操作
+- 🔧 **统一的入口点** - install.sh / install.ps1 一键部署
+- 📚 **完善的文档体系** - 每个子目录独立README
 
-- 🏗️ **构建自动化** - CMake 构建、Docker 镜像打包、多环境配置
-- 🧪 **测试框架** - Shell/Python 双语言测试、CI/CD 集成、覆盖率统计
-- 🚀 **部署工具** - 多环境部署、蓝绿发布、一键回滚
-- 🔍 **运维监控** - 健康检查、性能基准、日志管理、安全扫描
-- 🔌 **插件系统** - 动态插件加载、事件总线、可扩展架构
-- 🌍 **跨平台支持** - Windows/macOS/Linux/WSL 全平台兼容
+### 核心能力矩阵
+
+| 能力域 | 支持程度 | 主要工具 |
+|--------|---------|----------|
+| **跨平台部署** | ✅✅✅ 完整 | `install.sh` + `install.ps1` |
+| **Docker管理** | ✅✅✅ 完整 | `deploy/docker/` |
+| **桌面客户端** | ✅✅✅ 新增 | `desktop-client/` (Tauri) |
+| **CI/CD流水线** | ✅✅ 成熟 | `ci/` (GitHub Actions) |
+| **开发辅助** | ✅✅ 完善 | `dev/` + `tools/` |
+| **运维监控** | ✅✅ 完善 | `ops/` (doctor/benchmark) |
+| **测试框架** | ✅✅ 成熟 | `tests/` (Shell+Python) |
+| **核心库** | ✅✅ 稳定 | `lib/` (Shell) + `core/` (Python) |
 
 ---
 
-## 📁 模块结构
+## 📁 V2.0 模块结构
 
 ```
 scripts/
-├── lib/                      # Shell 核心库
-│   ├── common.sh            # 通用工具函数（路径、字符串、数组）
-│   ├── log.sh               # 统一日志系统（颜色、级别、TraceID）
-│   ├── error.sh             # 错误码定义（通用/构建/安装/Docker）
-│   └── platform.sh          # 跨平台检测（系统识别、架构检测）
 │
-├── core/                     # Python 核心模块
-│   ├── __init__.py          # 模块入口（版本：1.0.0.6）
-│   ├── plugin.py            # 插件系统（动态加载、元数据管理）
-│   ├── events.py            # 事件总线（同步/异步、优先级、追踪）
-│   ├── security.py          # 安全管理（输入验证、权限控制）
-│   ├── telemetry.py         # 遥测收集（指标、追踪、日志）
-│   ├── config.py            # 配置管理（多环境、热加载）
-│   └── cli.py               # 命令行接口（参数解析、帮助生成）
+├── 📜 README.md                    # 本文档（模块总览）
+├── 🚀 install.sh                   # [入口] 跨平台部署脚本 (Unix/Linux/macOS)
+├── 🚀 install.ps1                  # [入口] 跨平台部署脚本 (Windows PowerShell)
 │
-├── build/                    # 构建脚本
-│   ├── build.sh             # 核心构建（CMake 配置、并行构建）
-│   └── ...
+├── 📂 desktop-client/              # [新增] Tauri 桌面客户端应用
+│   ├── src-tauri/                  #   Rust 后端 (18个Tauri命令)
+│   ├── src/                        #   React 前端 (7个页面)
+│   │   ├── pages/
+│   │   │   ├── Dashboard.tsx       #     系统仪表盘
+│   │   │   ├── Services.tsx        #     Docker服务管理
+│   │   │   ├── Agents.tsx          #     AI Agent管理
+│   │   │   ├── Tasks.tsx           #     任务提交/跟踪
+│   │   │   ├── Config.tsx          #     配置文件编辑器
+│   │   │   ├── Logs.tsx            #     日志查看器
+│   │   │   └── Terminal.tsx        #     集成终端
+│   ├── package.json                #   前端依赖
+│   └── README.md                   #   客户端使用文档
 │
-├── dev/                      # 开发工具
-│   ├── cicd.sh              # CI/CD 入口（代码检查、测试、安全扫描）
-│   ├── rollback.sh          # 版本回滚（历史记录、蓝绿切换）
-│   └── buildlog.sh          # 构建日志管理（收集、分析、报告）
-│   ├── dev/                   # 开发辅助
-│   │   ├── config/           # 开发配置（clang-format, vcpkg.json 等）
-│   │   ├── quickstart.sh     # 快速入门（一键启动）
-│   │   └── validate.sh       # 环境验证
+├── 📂 lib/                         # Shell 核心库（基础设施层）
+│   ├── common.sh                   # 通用工具函数
+│   ├── log.sh                      # 统一日志系统
+│   ├── error.sh                    # 错误码定义
+│   └── platform.sh                 # 跨平台检测
 │
-├── ops/                      # 运维工具
-│   ├── doctor.py            # 健康检查（系统/依赖/网络/Docker）
-│   ├── benchmark.py         # 性能基准（IPC/内存/上下文切换）
-│   └── validate_contracts.py # 契约验证
+├── 📂 core/                        # Python 核心模块（业务逻辑层）
+│   ├── __init__.py                 # 模块入口
+│   ├── cli.py                      # 命令行接口
+│   ├── config.py                   # 配置管理
+│   ├── events.py                   # 事件总线
+│   ├── plugin.py                   # 插件系统
+│   ├── security.py                 # 安全管理
+│   └── telemetry.py                # 遥测收集
 │
-├── tests/                    # 测试框架
-│   ├── shell/               # Shell 测试
-│   │   ├── test_framework.sh    # 测试框架（断言函数）
-│   │   └── test_common_utils.sh # 工具测试
-│   ├── python/              # Python 测试
-│   │   ├── conftest.py          # pytest 配置
-│   │   └── test_core.py         # 核心模块测试
-│   └── README.md            # 测试指南
+├── 📂 deploy/                      # 部署配置（Docker编排层）
+│   ├── docker/                     # Docker 相关
+│   │   ├── docker-compose.yml      #     开发环境
+│   │   ├── docker-compose.prod.yml #     生产环境
+│   │   ├── Dockerfile.kernel       #     内核镜像
+│   │   ├── Dockerfile.service      #     服务镜像
+│   │   └── quickstart.sh           #     快速启动
+│   └── deploy_config.py            # 配置部署工具
 │
-└── init/                     # 初始化配置
-    ├── init_config.py       # 配置初始化（环境检测、模板渲染）
-    └── README.md            # 初始化指南
+├── 📂 ci/                          # CI/CD 流水线（持续集成层）
+│   ├── ci-run.sh                   # 主流水线入口
+│   ├── build-module.sh             # 模块构建
+│   ├── run-tests.sh                # 测试执行
+│   ├── quality-gate.sh             # 质量门禁
+│   ├── install-deps.sh             # 依赖安装
+│   ├── deploy-artifacts.sh         # 制品部署
+│   └── CI_CD_DOCUMENTATION.md       # CI/CD文档
+│
+├── 📂 dev/                         # 开发工具（开发环境层）
+│   ├── config/                     # 开发配置文件
+│   │   ├── .clang-format           # C/C++格式化
+│   │   ├── .editorconfig          # 编辑器配置
+│   │   ├── .pre-commit-config.yaml # Git钩子
+│   │   └── vcpkg.json             # 包管理
+│   ├── quickstart.sh               # 快速入门
+│   └── validate.sh                 # 环境验证
+│
+├── 📂 ops/                         # 运维工具（生产运维层）
+│   ├── doctor.py                   # 系统健康检查
+│   ├── benchmark.py                # 性能基准测试
+│   ├── token_counter.py             # Token统计
+│   ├── token_budget.py              # Token配额
+│   ├── memory_manager.py            # 内存管理
+│   ├── checkpoint_manager.py        # 检查点管理
+│   └── validate_contracts.py        # 契约验证
+│
+├── 📂 tests/                       # 测试框架（质量保障层）
+│   ├── shell/                      # Shell测试
+│   │   ├── test_framework.sh        # 测试框架
+│   │   └── test_common_utils.sh     # 工具测试
+│   ├── python/                     # Python测试
+│   │   ├── conftest.py             # pytest配置
+│   │   ├── test_core.py            # 核心测试
+│   │   ├── test_token_counter.py    # Token测试
+│   │   ├── test_token_budget.py     # 配额测试
+│   │   ├── test_memory_manager.py   # 内存测试
+│   │   └── test_checkpoint_manager.py # 检查点测试
+│   └── README.md                   # 测试指南
+│
+├── 📂 tools/                        # [新增] 通用工具集（辅助工具层）
+│   ├── analyze_quality.py           # 代码质量分析
+│   ├── check-quality.sh             # 质量检查入口
+│   ├── enhance_coverage.py           # 覆盖率增强
+│   ├── remove_bom.py                # BOM清理
+│   ├── requirements.txt             # Python依赖
+│   └── README.md                   # 工具文档
+│
+├── 📂 init/                        # 初始化配置（项目初始化层）
+│   ├── init_config.py              # 配置向导
+│   └── README.md                   # 初始化指南
+│
+└── 📂 archive/                     # [新增] 历史归档（废弃代码层）
+    ├── deploy.sh.v1.0-legacy       # 旧版部署脚本（已被install.sh替代）
+    └── README.md                   # 归档说明
 ```
 
 ---
 
 ## 🚀 快速开始
 
-### 1. 环境准备
+### 方式一：命令行一键部署（推荐）
 
+#### Unix/Linux/macOS
 ```bash
-# 克隆仓库（推荐 AtomGit 官方仓库）
-git clone https://atomgit.com/spharx/agentos.git
-cd agentos
+cd scripts
 
-# 或 Gitee 官方仓库
-# git clone https://gitee.com/spharx/agentos.git
-# cd agentos
+# 交互式部署（推荐新手）
+chmod +x install.sh
+./install.sh
 
-# 或 GitHub 官方仓库
-# git clone https://github.com/SpharxTeam/AgentOS.git
-# cd AgentOS
+# 一键部署开发环境
+./install.sh --mode dev --auto
 
-# 运行初始化向导
-cd scripts/init
-python init_config.py
+# 一键部署生产环境
+./install.sh --mode prod --auto
+
+# 仅检查环境
+./install.sh --check-only
 ```
 
-### 2. 构建项目
+#### Windows PowerShell
+```powershell
+cd scripts
 
-```bash
-# 开发构建
-cd scripts/build
-bash build.sh dev
+# 交互式部署
+.\install.ps1
 
-# 生产构建
-bash build.sh release
+# 一键部署（推荐）
+.\install.ps1 -Mode dev -Auto
 
-# 查看构建选项
-bash build.sh --help
+# 以管理员身份运行
+.\install.ps1 -Mode prod -Auto -AsAdmin
+
+# 仅检查环境
+.\install.ps1 -CheckOnly
 ```
 
-### 3. 运行测试
+### 方式二：桌面客户端GUI（推荐新手）
 
 ```bash
-# Python 测试
-cd scripts/tests/python
+cd scripts/desktop-client
+
+# 安装前端依赖
+npm install
+
+# 启动开发模式（热重载）
+npm run tauri dev
+
+# 构建生产版本
+npm run tauri build
+```
+
+**桌面客户端功能：**
+- 📊 **Dashboard** - 实时系统监控仪表盘
+- 🐳 **Services** - 可视化Docker服务管理
+- 🤖 **Agents** - AI Agent注册与管理
+- 📋 **Tasks** - 任务提交与跟踪
+- ⚙️ **Config** - 配置文件编辑器
+- 📄 **Logs** - 实时日志查看器
+- 💻 **Terminal** - 集成命令行终端
+
+---
+
+## 📖 详细文档导航
+
+### 📘 核心文档
+
+| 文档 | 路径 | 说明 |
+|------|------|------|
+| **本文档** | `scripts/README.md` | 模块总览和快速开始 |
+| **部署指南** | `scripts/install.sh --help` | 部署脚本详细参数 |
+| **桌面客户端** | `scripts/desktop-client/README.md` | GUI应用完整文档 |
+| **CI/CD文档** | `scripts/ci/CI_CD_DOCUMENTATION.md` | 流水线配置说明 |
+| **测试指南** | `scripts/tests/README.md` | 测试框架使用方法 |
+| **归档说明** | `scripts/archive/README.md` | 历史版本参考 |
+
+### 🛠️ 子模块文档
+
+每个子模块都有独立的README文档，可通过以下方式访问：
+
+```bash
+# Shell库文档
+cat scripts/lib/README.md  # 或查看各文件的注释头
+
+# Python核心模块
+cat scripts/core/README.md
+
+# 运维工具
+cat scripts/ops/README.md
+
+# 通用工具
+cat scripts/tools/README.md
+```
+
+---
+
+## 🏗️ 架构设计原则
+
+### 分层架构（5层模型）
+
+```
+┌─────────────────────────────────────────┐
+│         入口层 (Entry Points)           │
+│   install.sh / install.ps1 / desktop    │
+├─────────────────────────────────────────┤
+│       应用层 (Application)              │
+│   deploy/ ops/ init/ tools/             │
+├─────────────────────────────────────────┤
+│       业务逻辑层 (Business Logic)       │
+│   core/ (Python)                       │
+├─────────────────────────────────────────┤
+│       基础设施层 (Infrastructure)        │
+│   lib/ (Shell)                         │
+├─────────────────────────────────────────┤
+│       质量保障层 (Quality Assurance)     │
+│   tests/ ci/                           │
+└─────────────────────────────────────────┘
+```
+
+### 设计原则遵循
+
+✅ **E-4 跨平台一致性** - 三平台统一接口  
+✅ **E-5 接口最小化** - 精简的API设计  
+✅ **Cognitive View** - 直观的用户体验  
+✅ **Engineering View** - 模块化可维护  
+✅ **Aesthetics View** - 专业的暗色UI设计  
+
+---
+
+## 📊 使用场景矩阵
+
+### 场景1：首次部署AgentOS
+
+```bash
+# 步骤1: 克隆项目
+git clone https://github.com/SpharxTeam/AgentOS.git
+cd AgentOS/scripts
+
+# 步骤2: 一键部署（自动检测环境、安装依赖、启动服务）
+# Unix:
+./install.sh --mode dev --auto
+
+# Windows:
+.\install.ps1 -Mode dev -Auto
+
+# 步骤3: 访问服务
+# Gateway: http://localhost:18789
+# OpenLab: http://localhost:3000
+```
+
+**预计时间**: < 10分钟（含Docker镜像拉取）
+
+---
+
+### 场景2：日常开发工作流
+
+```bash
+# 1. 启动开发环境
+./install.sh --mode dev --auto
+
+# 2. 代码质量检查
+cd tools
+python analyze_quality.py --path ../../agentos/
+
+# 3. 运行测试
+cd ../tests/python
 pytest -v
 
-# Shell 测试
-cd scripts/tests/shell
-for test in test_*.sh; do bash "$test"; done
-```
-
-### 4. Docker 部署
-
-```bash
-# 快速入门（一键完成）
-cd scripts/deploy/docker
-bash quickstart.sh
-
-# 手动构建镜像
-bash build.sh all release
-
-# 启动服务
-docker-compose up -d
+# 4. 启动桌面客户端进行可视化管理
+cd ../../desktop-client
+npm run tauri dev
 ```
 
 ---
 
-## 📚 核心功能详解
-
-### 🔧 lib/ - Shell 核心库
-
-#### common.sh - 通用工具
-
-提供路径管理、依赖加载、字符串处理等基础函数：
+### 场景3：生产环境部署
 
 ```bash
-# 加载库文件
-source "$AGENTOS_SCRIPTS_DIR/lib/common.sh"
-agentos_load_libs  # 自动加载 log.sh, error.sh, platform.sh
+# 1. 环境准备（生产服务器）
+./install.sh --check-only
 
-# 路径常量
-AGENTOS_SCRIPT_DIR        # 当前脚本目录
-AGENTOS_SCRIPTS_DIR       # scripts 模块目录
-AGENTOS_PROJECT_ROOT      # 项目根目录
-```
+# 2. 编辑敏感配置
+nano .env.production  # 或使用桌面客户端Config页面
 
-#### log.sh - 统一日志
+# 3. 部署生产环境
+./install.sh --mode prod --auto
 
-```bash
-# 日志级别
-LOG_LEVEL_DEBUG=0
-LOG_LEVEL_INFO=1
-LOG_LEVEL_WARN=2
-LOG_LEVEL_ERROR=3
+# 4. 健康验证
+./install.sh --health
 
-# 日志函数
-log_info "这是一条信息"
-log_error "发生错误"
-log_debug "调试信息（仅 DEBUG 级别显示）"
-
-# 带 TraceID 的日志
-export AGENTOS_TRACE_ID="build-12345"
-log_info "构建开始"  # 自动附加 TraceID
-```
-
-#### error.sh - 错误码体系
-
-```bash
-# 通用错误码
-AGENTOS_ERR_GENERAL=1000
-AGENTOS_ERR_INVALID_ARGS=1001
-
-# 构建错误码
-AGENTOS_ERR_BUILD_FAILED=2001
-AGENTOS_ERR_CMAKE_NOT_FOUND=2002
-
-# Docker 错误码
-AGENTOS_ERR_DOCKER_NOT_FOUND=4001
-AGENTOS_ERR_DOCKER_NOT_RUNNING=4002
-```
-
-#### platform.sh - 跨平台检测
-
-```bash
-# 平台识别
-detect_platform  # 返回：linux/macos/windows/wsl
-
-# 架构检测
-detect_arch  # 返回：x86_64/aarch64/x86_32
-
-# 平台特定逻辑
-case "$(detect_platform)" in
-    linux)
-        # Linux 特定操作
-        ;;
-    windows)
-        # Windows 特定操作
-        ;;
-esac
+# 5. 监控日志
+./install.sh --logs
 ```
 
 ---
 
-### 🐍 core/ - Python 核心模块
-
-#### plugin.py - 插件系统
-
-支持动态插件发现、加载和执行：
-
-```python
-from scripts.core import PluginRegistry, Plugin, PluginMetadata
-
-# 获取全局注册表
-registry = get_registry()
-
-# 发现插件
-plugins = registry.discover_plugins("./plugins")
-
-# 加载插件
-plugin = registry.load_plugin_from_module("my_plugin.py", "MyPlugin")
-
-# 执行插件
-result = registry.execute_plugin("my_plugin", {"param": "value"})
-
-# 注册钩子
-registry.register_hook("pre_execute", lambda p, ctx: print(f"执行前：{p.name}"))
-```
-
-#### events.py - 事件总线
-
-统一的事件处理架构，支持同步/异步、优先级、分布式追踪：
-
-```python
-from scripts.core import EventBus, Event, EventType, EventPriority
-
-# 获取全局事件总线
-bus = get_event_bus()
-
-# 创建事件处理器
-class BuildHandler(EventHandler):
-    def __init__(self):
-        super().__init__("build_monitor", [EventType.BUILD_COMPLETED])
-    
-    def handle(self, event: Event) -> bool:
-        print(f"构建完成：{event.data.get('version')}")
-        return True
-
-# 订阅事件
-bus.subscribe(BuildHandler())
-
-# 发布事件
-event = Event(
-    type=EventType.BUILD_COMPLETED,
-    source="build.sh",
-    data={"version": "1.0.0.6", "status": "success"},
-    priority=EventPriority.HIGH
-)
-bus.publish(event)
-
-# 查询事件历史
-history = bus.get_history(EventType.BUILD_COMPLETED, limit=10)
-```
-
----
-
-### 🏗️ dev/ - 开发工具
-
-#### cicd.sh - CI/CD 入口
-
-统一触发 CI/CD 各阶段任务：
-
-```bash
-# 运行完整 CI 流程
-bash cicd.sh ci
-
-# 只运行测试
-bash cicd.sh test
-
-# 安全扫描
-bash cicd.sh security
-
-# 构建
-bash cicd.sh build --version v1.0.0 --type release
-
-# 部署到 staging 环境
-bash cicd.sh deploy staging
-
-# 回滚生产环境
-bash cicd.sh rollback production --version v1.0.0
-```
-
-**CI 流程包含**：
-1. 代码质量检查（Shell/Python 语法）
-2. ShellCheck 静态分析
-3. Python Lint（Ruff/Flake8）
-4. 单元测试（Shell/Python）
-5. 安全扫描（Bandit/TruffleHog）
-
-#### rollback.sh - 版本回滚
-
-提供版本回滚和部署历史管理：
-
-```bash
-# 查看部署历史
-bash rollback.sh history
-
-# 回滚到指定版本
-bash rollback.sh rollback --version v1.0.0 --environment production
-
-# 清理旧版本（保留最近 5 个）
-bash rollback.sh cleanup --keep 5
-
-# 验证当前版本
-bash rollback.sh verify --version v1.0.0
-```
-
-#### buildlog.sh - 构建日志管理
-
-统一收集、分析和报告构建日志：
-
-```bash
-# 收集构建日志
-bash buildlog.sh collect --build-id 12345
-
-# 分析错误日志
-bash buildlog.sh analyze --level error --file build.log
-
-# 生成 HTML 报告
-bash buildlog.sh report --output build-report.html
-
-# 归档日志
-bash buildlog.sh archive --build-id 12345
-
-# 清理过期日志（30 天前）
-bash buildlog.sh cleanup --days 30
-
-# 实时查看日志
-bash buildlog.sh tail --file build.log
-
-# 搜索日志
-bash buildlog.sh search --pattern "ERROR.*timeout"
-```
-
----
-
-### 🚀 deploy/ - 部署配置
-
-#### docker/build.sh - Docker 镜像构建
-
-```bash
-# 构建内核镜像（生产版）
-bash build.sh kernel release
-
-# 构建服务镜像（开发版）
-bash build.sh service dev
-
-# 构建所有镜像
-bash build.sh all release
-
-# 清理旧镜像
-bash build.sh --cleanup
-```
-
-**镜像类型**：
-- `spharx/agentos-kernel` - 微内核镜像（最小化运行时）
-- `spharx/agentos-services` - 服务层镜像（包含所有服务）
-
-#### docker/quickstart.sh - 快速入门
-
-一键完成环境检查、镜像构建和服务启动：
-
-```bash
-bash quickstart.sh
-```
-
-**自动完成**：
-1. ✅ Docker 环境检查
-2. ✅ Docker Compose 检查
-3. ✅ 端口占用检查（8080-8084）
-4. ✅ 环境变量配置（.env 文件）
-5. ✅ 镜像构建（生产版/开发版可选）
-6. ✅ 服务启动
-7. ✅ 健康检查
-8. ✅ 显示访问信息
-
-**服务访问**：
-- LLM 服务：http://localhost:8080
-- 工具服务：http://localhost:8081
-- 市场服务：http://localhost:8082
-- 调度服务：http://localhost:8083
-- 监控服务：http://localhost:8084
-- Jaeger UI：http://localhost:16686
-- Prometheus：http://localhost:8888/metrics
-
----
-
-### 🔍 ops/ - 运维工具
-
-#### doctor.py - 系统健康检查
-
-全面检查 AgentOS 运行环境：
-
-```bash
-# 运行完整检查
-python doctor.py
-
-# 详细输出
-python doctor.py --verbose
-
-# 输出 JSON 格式
-python doctor.py --output json
-
-# 只检查特定项
-python doctor.py --check docker,network,disk
-
-# 自动修复可修复的问题
-python doctor.py --fix
-```
-
-**检查项目**：
-- ✅ 系统信息（OS、架构）
-- ✅ Python 版本（最低 3.8）
-- ✅ 依赖命令（bash, cmake, make, gcc）
-- ✅ 网络连接（DNS、互联网）
-- ✅ 磁盘空间（最低 1GB）
-- ✅ 配置文件（agentos.conf 等）
-- ✅ Docker 环境（可选）
-- ✅ 安全扫描（敏感文件）
-
-#### benchmark.py - 性能基准测试
-
-测试 AgentOS 核心组件性能：
-
-```bash
-# 运行完整基准测试
-python benchmark.py
-
-# 自定义迭代次数
-python benchmark.py --iterations 10000
-
-# 只运行 IPC 测试
-python benchmark.py --suite ipc
-
-# 输出 JSON 结果
-python benchmark.py --format json --output results.json
-
-# 输出 CSV 结果
-python benchmark.py --format csv --output results.csv
-```
-
-**测试套件**：
-- IPC 延迟测试
-- 内存分配性能（1KB/10KB）
-- 上下文切换（深度 10/50）
-- 任务调度（100/1000 任务）
-- 字符串操作
-- JSON 解析
-
----
-
-### 🧪 tests/ - 测试框架
-
-#### Shell 测试框架
-
-提供丰富的断言函数：
-
-```bash
-#!/usr/bin/env bash
-source "../lib/test_framework.sh"
-
-# 断言函数
-assert_true "$result" "结果应为真"
-assert_false "$result" "结果应为假"
-assert_equal "$actual" "$expected" "值应相等"
-assert_contains "$string" "$substring" "字符串应包含子串"
-assert_file_exists "/path/to/file" "文件应存在"
-assert_dir_exists "/path/to/dir" "目录应存在"
-assert_command_exists "docker" "命令应存在"
-assert_not_empty "$array" "数组不应为空"
-
-# 运行测试
-test_example() {
-    local result=$(my_function)
-    assert_equal "$result" "expected" "函数返回值正确"
-}
-
-# 执行测试套件
-run_tests
-```
-
-#### Python 测试框架
-
-使用 pytest，支持 fixtures、parametrize、async：
-
-```python
-# conftest.py
-import pytest
-
-@pytest.fixture
-def sample_data():
-    return {"key": "value"}
-
-@pytest.fixture
-def plugin_registry():
-    return get_registry()
-
-# test_core.py
-def test_plugin_loading(plugin_registry):
-    plugin = plugin_registry.load_plugin("test_plugin")
-    assert plugin is not None
-    assert plugin.state == PluginState.LOADED
-
-@pytest.mark.asyncio
-async def test_async_event_bus():
-    bus = get_event_bus()
-    bus.start_async_processing()
-    # ... 测试异步逻辑
-```
-
-**运行测试**：
-```bash
-# 运行所有测试
-pytest scripts/tests/python/ -v
-
-# 带覆盖率
-pytest scripts/tests/python/ --cov=scripts/core --cov-report=html
-
-# 只运行特定测试
-pytest scripts/tests/python/test_core.py::TestPluginRegistry -v
-```
-
----
-
-### ⚙️ init/ - 初始化配置
-
-#### init_config.py - 配置初始化
-
-交互式配置向导，生成所有必需配置文件：
-
-```bash
-# 交互式初始化
-python init_config.py
-
-# 非交互式（使用默认配置）
-python init_config.py --non-interactive
-
-# 指定配置模板
-python init_config.py --template production
-
-# 强制覆盖现有配置
-python init_config.py --force
-```
-
-**配置流程**：
-1. 环境检测（OS、Python、CMake）
-2. 选择配置模板（development/production/testing）
-3. 数据库配置（SQLite/PostgreSQL/MySQL）
-4. LLM 服务配置（OpenAI/Anthropic/DeepSeek/本地）
-5. 安全配置（JWT Secret、Session Key、Encryption Key）
-6. 目录结构创建
-7. 配置文件生成
-
-**生成的配置文件**：
-- `.env` - 环境变量
-- `agentos/manager/kernel/settings.yaml` - 内核配置
-- `agentos/manager/security/policy.yaml` - 安全策略
-- `agentos/manager/logging/manager.yaml` - 日志配置
-
----
-
-## 🛡️ 安全特性
-
-### 安全扫描集成
-
-```bash
-# Bandit Python 代码扫描
-bandit -r scripts/core/ -f json -o security-report.json
-
-# ShellCheck Shell 脚本扫描
-shellcheck scripts/**/*.sh -S warning
-
-# TruffleHog 秘钥扫描
-trufflehog filesystem scripts/ --json > secrets-report.json
-
-# Safety 依赖漏洞扫描
-safety check --json
-```
-
-### 安全最佳实践
-
-1. **敏感信息保护**
-   ```bash
-   # .gitignore 配置
-   echo ".env" >> .gitignore
-   echo "*.key" >> .gitignore
-   echo "*.pem" >> .gitignore
-   ```
-
-2. **配置文件权限**
-   ```bash
-   chmod 600 .env
-   chmod 600 agentos/manager/security/*.yaml
-   ```
-
-3. **定期轮换密钥**
-   ```bash
-   # 每季度轮换
-   ./rotate_keys.sh --quarterly
-   ```
-
----
-
-## 📊 CI/CD 集成
-
-### GitHub Actions 工作流
-
-`.github/workflows/scripts-ci.yml` 包含：
+### 场景4：CI/CD集成（GitHub Actions）
 
 ```yaml
-name: Scripts CI/CD
+# .github/workflows/agentos-ci.yml
+name: AgentOS CI/CD Pipeline
 
 on: [push, pull_request]
 
 jobs:
-  ci:
+  quality-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
+      - name: Code Quality Analysis
+        run: |
+          cd scripts/tools
+          python analyze_quality.py --path ../..
       
-      - name: Code Quality
-        run: bash scripts/dev/cicd.sh ci
-      
-      - name: Security Scan
-        run: bash scripts/dev/cicd.sh security
-      
-      - name: Build
-        run: bash scripts/dev/cicd.sh build
-      
-      - name: Test
-        run: bash scripts/dev/cicd.sh test
-```
-
-### 部署流程
-
-```bash
-# 开发环境
-bash cicd.sh deploy dev
-
-# 预发布环境
-bash cicd.sh deploy staging
-
-# PR 预览环境
-bash cicd.sh deploy preview
-
-# 生产环境（蓝绿部署）
-bash cicd.sh deploy production
+      - name: Run Tests
+        run: |
+          cd scripts/tests/python
+          pytest -v
+  
+  deployment:
+    needs: quality-check
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Staging
+        run: |
+          cd scripts
+          ./install.sh --mode prod --auto
 ```
 
 ---
 
-## 🔍 故障排查
+## 🔧 高级用法
 
-### 常见问题
+### 自定义部署配置
 
-#### 1. Shell 脚本权限问题
-
-**错误**: `Permission denied`
-
-**解决**:
 ```bash
-chmod +x scripts/**/*.sh
+# 使用自定义配置文件
+./install.sh --mode prod --env-file my-custom.env
+
+# 指定Docker Compose文件
+./install.sh --compose-file docker/my-compose.yml
+
+# 跳过健康检查
+./install.sh --skip-health-check
 ```
 
-#### 2. Python 依赖缺失
+### 桌面客户端高级操作
 
-**错误**: `ModuleNotFoundError`
+```typescript
+// 在浏览器开发者工具中调用Tauri命令
+const { invoke } = window.__TAURI__.core;
 
-**解决**:
-```bash
-pip install -r requirements.txt
-```
+// 获取系统信息
+const sysInfo = await invoke('get_system_info');
 
-#### 3. Docker 构建失败
+// 执行CLI命令
+const result = await invoke('execute_cli_command', {
+  command: 'docker',
+  args: ['ps', '--format', 'json']
+});
 
-**错误**: `Docker not found` 或 `Docker not running`
-
-**解决**:
-```bash
-# 检查 Docker
-docker --version
-docker info
-
-# 启动 Docker（Linux）
-sudo systemctl start docker
-
-# 启动 Docker Desktop（macOS/Windows）
-```
-
-#### 4. 跨平台路径问题
-
-**错误**: 路径分隔符不正确
-
-**解决**:
-```bash
-# 使用 platform.sh 自动检测
-source scripts/lib/platform.sh
-case "$(detect_platform)" in
-    windows) PATH_SEP="\\" ;;
-    *) PATH_SEP="/" ;;
-esac
+// 提交任务给Agent
+const task = await invoke('submit_task', {
+  agentId: 'agent-001',
+  taskDescription: 'Analyze code quality',
+  priority: 'high'
+});
 ```
 
 ---
 
-## 📝 最佳实践
+## 🛡️ 安全最佳实践
 
-### 1. 脚本开发规范
-
-```bash
-#!/usr/bin/env bash
-# 所有 Shell 脚本应包含：
-# - Shebang 行
-# - Copyright 声明
-# - set -euo pipefail（严格模式）
-# - 帮助信息函数
-# - 错误处理
-
-set -euo pipefail
-
-# 加载库
-source "$(dirname "$0")/lib/common.sh"
-
-# 主函数
-main() {
-    log_info "脚本开始"
-    # ... 逻辑
-    log_success "脚本完成"
-}
-
-main "$@"
-```
-
-### 2. Python 代码规范
-
-```python
-#!/usr/bin/env python3
-# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-"""模块文档字符串"""
-
-import ...
-
-def main():
-    """主函数文档"""
-    # ... 逻辑
-    pass
-
-if __name__ == "__main__":
-    sys.exit(main())
-```
-
-### 3. 日志记录
+### 1. 敏感信息保护
 
 ```bash
-# 使用统一日志系统
-source scripts/lib/log.sh
+# 确保配置文件权限正确
+chmod 600 .env.production
 
-log_info "信息级别"
-log_warn "警告级别"
-log_error "错误级别"
-log_debug "调试级别（仅 DEBUG 模式显示）"
+# 不将敏感文件提交到Git
+echo ".env*" >> .gitignore
+echo "*.key" >> .gitignore
+echo "*.pem" >> .gitignore
 ```
 
-### 4. 错误处理
+### 2. 生产环境加固
 
 ```bash
-# 使用统一错误码
-source scripts/lib/error.sh
+# 使用非root用户运行Docker容器
+# 已在docker-compose.prod.yml中配置
 
-if ! command -v docker &> /dev/null; then
-    agentos_exit "$AGENTOS_ERR_DOCKER_NOT_FOUND" "Docker 未安装"
-fi
+# 启用TLS加密
+# 在config/agentos.yaml中配置network.tls.enabled: true
+
+# 定期轮换密钥
+./ops/rotate_keys.sh --quarterly  # 如有此脚本
+```
+
+### 3. 安全扫描
+
+```bash
+# Python代码安全扫描
+bandit -r core/ -f json -o security-report.json
+
+# Shell脚本安全扫描
+shellcheck lib/**/*.sh ops/**/*.sh
+
+# 依赖漏洞检查
+safety check -r tools/requirements.txt
 ```
 
 ---
 
-## 📞 相关文档
+## ❓ 故障排查
 
-- [架构设计原则](../agentos/manuals/architecture/ARCHITECTURAL_PRINCIPLES.md)
-- [快速入门](../paper/guides/getting_started.md)
-- [API 文档](../apis/README.md)
-- [运维手册](../agentos/manuals/ops/README.md)
+### 常见问题快速诊断
+
+| 问题 | 可能原因 | 解决方案 |
+|------|---------|----------|
+| `Permission denied` | 脚本无执行权限 | `chmod +x install.sh` |
+| `Docker not found` | 未安装Docker | 访问 https://docs.docker.com/get-docker/ |
+| `ModuleNotFoundError` | Python依赖缺失 | `pip install -r tools/requirements.txt` |
+| `port already in use` | 端口被占用 | `./install.sh --stop` 或修改端口配置 |
+| 内存不足 | 系统资源不够 | 关闭其他应用或增加swap空间 |
+
+### 获取帮助
+
+```bash
+# 查看详细帮助
+./install.sh --help
+.\install.ps1 -Help
+
+# 运行诊断
+./install.sh --check-only
+.\install.ps1 -CheckOnly
+
+# 收集日志用于问题报告
+./install.sh --logs
+.\install.ps1 -Logs
+```
 
 ---
 
-## 🤝 贡献
+## 📈 版本历史
+
+### V2.0.0 (2026-04-08) - 重大重组
+
+**新特性:**
+- ✅ 新增跨平台部署脚本 (`install.sh` + `install.ps1`)
+- ✅ 新增Tauri桌面客户端 (`desktop-client/`)
+- ✅ 新增通用工具集目录 (`tools/`)
+- ✅ 新增历史归档目录 (`archive/`)
+- ✅ 全面重组目录结构，提升可维护性
+- ✅ 更新所有文档，反映最新架构
+
+**变更:**
+- 🔄 将 `deploy.sh` 归档为 `archive/deploy.sh.v1.0-legacy`
+- 🔄 将根目录散落脚本迁移至 `tools/`
+- 🔄 重写主README，采用分层架构说明
+
+**移除:**
+- ❌ 废弃旧的单一平台部署方案
+
+---
+
+### V1.0.6 (2026-03-29) - 之前版本
+
+详见 `archive/README.md`
+
+---
+
+## 🤝 贡献指南
 
 欢迎提交改进建议和新功能！
 
-**Issue 追踪**: https://github.com/SpharxTeam/AgentOS/issues  
-**讨论区**: https://github.com/SpharxTeam/AgentOS/discussions
+### 开发流程
+
+1. Fork 本仓库
+2. 创建特性分支: `git checkout -b feature/amazing-feature`
+3. 提交更改: `git commit -m 'Add amazing feature'`
+4. 推送分支: `git push origin feature/amazing-feature`
+5. 提交Pull Request
+
+### 代码规范
+
+- **Shell脚本**: 遵循 `lib/common.sh` 中的函数命名规范
+- **Python代码**: 遵循 `core/` 模块的类型注解风格
+- **React组件**: 参考 `desktop-client/src/pages/` 的组件结构
+- **Rust后端**: 参考 `desktop-client/src-tauri/src/commands.rs` 的命令注册方式
+
+---
+
+## 📞 支持与反馈
+
+- **Issue追踪**: https://github.com/SpharxTeam/AgentOS/issues  
+- **讨论区**: https://github.com/SpharxTeam/AgentOS/discussions  
+- **在线文档**: https://docs.agentos.io  
+
+---
+
+## 📚 相关资源
+
+- **架构设计**: [`agentos/manuals/ARCHITECTURAL_PRINCIPLES.md`](../agentos/manuals/ARCHITECTURAL_PRINCIPLES.md)
+- **部署指南**: [`agentos/manuals/guides/deployment.md`](../agentos/manuals/guides/deployment.md)
+- **API文档**: [`apis/README.md`](../apis/README.md)
+- **运维手册**: [`agentos/manuals/guides/troubleshooting.md`](../agentos/manuals/guides/troubleshooting.md)
 
 ---
 

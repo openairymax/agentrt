@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_version": "1.0.0",
+  "agent_id": "tester",
+  "agent_name": "Tester Agent",
+  "description": "璐ㄩ噺娴嬭瘯鏅鸿兘浣擄紝璐熻矗娴嬭瘯绛栫暐鍒跺畾銆佽嚜鍔ㄥ寲娴嬭瘯鍜岃川閲忎繚璇?,
+  "version": "1.0.0.9",
+  "author": "SPHARX Team",
+  "license": "Apache-2.0",
+  
+  "capabilities": [
+    {
+      "name": "code_generation",
+      "description": "娴嬭瘯浠ｇ爜鐢熸垚鑳藉姏"
+    },
+    {
+      "name": "debugging",
+      "description": "闂璇婃柇鑳藉姏"
+    }
+  ],
+  
+  "metadata": {
+    "created_at": "2026-04-07T00:00:00Z",
+    "tags": ["testing", "quality-assurance", "automation", "performance"],
+    "category": "quality_assurance",
+    "maturity": "production"
+  }
+}
