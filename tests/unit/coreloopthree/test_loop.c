@@ -1,4 +1,4 @@
-﻿#include "loop.h"
+#include "loop.h"
 #include "agentos.h"
 #include <stdio.h>
 #include <stdlib.h>

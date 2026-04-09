@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file shell.c
  * @brief Shell命令执行单元（跨平台�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

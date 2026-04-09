@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file event.c
  * @brief 事件同步与事件循环实�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

@@ -1,4 +1,4 @@
-﻿# Copyright (c) 2026 SPHARX. All Rights Reserved.
+# Copyright (c) 2026 SPHARX. All Rights Reserved.
 # Dockerfile for AgentOS gateway Module
 # Version: 1.0.0
 #

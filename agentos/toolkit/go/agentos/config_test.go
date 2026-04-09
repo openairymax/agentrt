@@ -1,4 +1,4 @@
-﻿// AgentOS Go SDK - 配置管理模块单元测试
+// AgentOS Go SDK - 配置管理模块单元测试
 // Version: 3.0.0
 
 package agentos
