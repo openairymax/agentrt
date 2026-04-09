@@ -369,7 +369,7 @@ CONFIG_SCHEMA_MAP = {
 
 ## 十、参考文档
 
-- [ARCHITECTURAL_PRINCIPLES.md](../../agentos/manuals/ARCHITECTURAL_PRINCIPLES.md)
+- [ARCHITECTURAL_PRINCIPLES.md](../../../docs/ARCHITECTURAL_PRINCIPLES.md)
 - [INTEGRATION_STANDARD.md](../INTEGRATION_STANDARD.md)
 - [CONFIG_CHANGE_PROCESS.md](../CONFIG_CHANGE_PROCESS.md)
 - [config_unified README](../../../agentos/commons/utils/config_unified/README.md)

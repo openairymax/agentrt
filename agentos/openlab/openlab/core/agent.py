@@ -1,7 +1,7 @@
 """
 OpenLab Core Agent Module
 
-Agent 绠＄悊涓庣敓鍛藉懆鏈熸牳蹇冩ā鍧?閬靛惊 AgentOS 鏋舵瀯璁捐鍘熷垯 V1.8
+Agent 管理与生命周期核心模块 遵循 AgentOS 架构设计原则 V1.8
 """
 
 from abc import ABC, abstractmethod
@@ -13,7 +13,7 @@ import time
 
 
 class AgentStatus(Enum):
-    """Agent 鐘舵€佹灇涓?""
+    """Agent 状态枚举"""
     CREATED = "created"
     INITIALIZING = "initializing"
     READY = "ready"
@@ -25,7 +25,7 @@ class AgentStatus(Enum):
 
 
 class AgentCapability(Enum):
-    """Agent 鑳藉姏鏋氫妇"""
+    """Agent 能力枚举"""
     ARCHITECTURE_DESIGN = "architecture_design"
     CODE_GENERATION = "code_generation"
     TEST_GENERATION = "test_generation"
@@ -36,7 +36,7 @@ class AgentCapability(Enum):
 
 @dataclass
 class AgentContext:
-    """Agent 鎵ц涓婁笅鏂?""
+    """Agent 执行上下文"""
     agent_id: str
     task_id: Optional[str] = None
     session_id: Optional[str] = None
@@ -47,7 +47,7 @@ class AgentContext:
 
 @dataclass
 class TaskResult:
-    """浠诲姟鎵ц缁撴灉"""
+    """任务执行结果"""
     success: bool
     output: Optional[Any] = None
     error: Optional[str] = None
@@ -113,18 +113,18 @@ class Agent(ABC):
     
     @property
     def status(self) -> AgentStatus:
-        """鑾峰彇 Agent 褰撳墠鐘舵€?""
+        """获取 Agent 当前状态"""
         return self._status
     
     @status.setter
     def status(self, value: AgentStatus) -> None:
-        """璁剧疆 Agent 鐘舵€?""
+        """设置 Agent 状态"""
         self._status = value
         self._last_activity = time.time()
     
     @property
     def context(self) -> Optional[AgentContext]:
-        """鑾峰彇褰撳墠鎵ц涓婁笅鏂?""
+        """获取当前执行上下文"""
         return self._context
     
     @abstractmethod
@@ -208,8 +208,9 @@ class Agent(ABC):
 
 class AgentRegistry:
     """
-    Agent 娉ㄥ唽琛?    
-    绾跨▼瀹夊叏鐨?Agent 娉ㄥ唽涓庣鐞?    """
+    Agent 注册表
+    线程安全的 Agent 注册与管理
+    """
     
     def __init__(self):
         self._agents: Dict[str, Agent] = {}
@@ -217,13 +218,13 @@ class AgentRegistry:
     
     async def register(self, agent: Agent) -> bool:
         """
-        娉ㄥ唽 Agent
+        注册 Agent
         
         Args:
-            agent: Agent 瀹炰緥
+            agent: Agent 实例
             
         Returns:
-            bool: 娉ㄥ唽鏄惁鎴愬姛
+            bool: 注册是否成功
         """
         async with self._lock:
             if agent.agent_id in self._agents:
@@ -233,13 +234,13 @@ class AgentRegistry:
     
     async def unregister(self, agent_id: str) -> bool:
         """
-        娉ㄩ攢 Agent
+        注销 Agent
         
         Args:
             agent_id: Agent ID
             
         Returns:
-            bool: 娉ㄩ攢鏄惁鎴愬姛
+            bool: 注销是否成功
         """
         async with self._lock:
             if agent_id not in self._agents:
@@ -249,33 +250,33 @@ class AgentRegistry:
     
     async def get(self, agent_id: str) -> Optional[Agent]:
         """
-        鑾峰彇 Agent
+        获取 Agent
         
         Args:
             agent_id: Agent ID
             
         Returns:
-            Optional[Agent]: Agent 瀹炰緥
+            Optional[Agent]: Agent 实例
         """
         async with self._lock:
             return self._agents.get(agent_id)
     
     async def list_agents(self) -> List[Agent]:
         """
-        鍒楀嚭鎵€鏈?Agent
+        列出所有 Agent
         
         Returns:
-            List[Agent]: Agent 鍒楄〃
+            List[Agent]: Agent 列表
         """
         async with self._lock:
             return list(self._agents.values())
     
     async def count(self) -> int:
         """
-        鑾峰彇 Agent 鏁伴噺
+        获取 Agent 数量
         
         Returns:
-            int: Agent 鏁伴噺
+            int: Agent 数量
         """
         async with self._lock:
             return len(self._agents)
