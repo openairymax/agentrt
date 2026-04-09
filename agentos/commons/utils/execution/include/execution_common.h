@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file execution_common.h
  * @brief 执行单元通用功能定义
  * 

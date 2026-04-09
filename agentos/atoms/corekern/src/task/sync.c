@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file sync.c
  * @brief 同步原语实现（基于平台原生线程原语）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file cache_common.c
  * @brief 通用缓存库实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

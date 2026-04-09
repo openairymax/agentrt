@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_heapstore_trace.c
  * @brief AgentOS 数据分区追踪存储单元测试
  *

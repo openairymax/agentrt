@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_market.c
  * @brief 市场服务单元测试
  * @details 测试市场服务的核心功能，包括 Agent �?Skill 的注册、发现、安装和管理

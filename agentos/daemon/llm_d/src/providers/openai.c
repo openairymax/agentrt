@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file openai.c
  * @brief OpenAI 适配器实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

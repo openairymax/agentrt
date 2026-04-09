@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file registry.c
  * @brief 执行单元注册表独立实�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

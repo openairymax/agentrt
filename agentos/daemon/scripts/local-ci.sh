@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 # AgentOS daemon CI/CD 本地验证脚本
 # 用于本地验证 CI/CD 流程

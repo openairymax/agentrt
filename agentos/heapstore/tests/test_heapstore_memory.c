@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_heapstore_memory.c
  * @brief AgentOS 数据分区内存管理数据存储单元测试
  *
