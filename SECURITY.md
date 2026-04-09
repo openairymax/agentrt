@@ -156,7 +156,7 @@ cargo audit
 go list -m all | nancy sleuth
 ```
 
-- ✅ 遵循 [安全编码规范](./agentos/manuals/specifications/coding_standard/C_Cpp_secure_coding_guide.md)
+- ✅ 遵循 [安全编码规范](./docs/Capital_Specifications/)
 - ✅ 启用编译器安全选项（`-fstack-protector`, `-D_FORTIFY_SOURCE=2`）
 - ✅ 使用静态分析工具（clang-tidy, cppcheck）
 - ✅ 进行代码审查和安全审计
@@ -368,10 +368,10 @@ AgentOS 采用**内生安全设计**理念，实现四重防护：
 ## 相关文档
 
 - [cupolas 安全穹顶文档](./agentos/cupolas/README.md)
-- [安全编码规范](./agentos/manuals/specifications/coding_standard/C_Cpp_secure_coding_guide.md)
+- [安全编码规范](./docs/Capital_Specifications/)
 - [权限配置指南](./agentos/manager/security/policy.yaml)
-- [审计日志规范](./agentos/manuals/specifications/agentos_contract/logging_format.md)
-- [ARCHITECTURAL_PRINCIPLES.md](./agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) - 工程观章节
+- [审计日志规范](./docs/Capital_Specifications/)
+- [ARCHITECTURAL_PRINCIPLES.md](./docs/ARCHITECTURAL_PRINCIPLES.md) - 工程观章节
 - [CONTRIBUTING.md](./CONTRIBUTING.md) - 安全相关贡献规范
 - [CHANGELOG.md](./CHANGELOG.md) - 安全更新记录
 

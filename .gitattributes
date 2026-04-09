@@ -236,6 +236,16 @@ Gopkg.lock text=eol=lf
 .github/** text=eol=lf auto
 .gitcode/** text=eol=lf auto
 
+# .gitcode module - UTF-8 encoding enforcement
+.gitcode/*.md text working-tree-encoding=UTF-8 eol=lf
+.gitcode/*.yml text working-tree-encoding=UTF-8 eol=lf
+.gitcode/*.yaml text working-tree-encoding=UTF-8 eol=lf
+.gitcode/CODEOWNERS text working-tree-encoding=UTF-8 eol=lf
+.gitcode/ISSUE_TEMPLATE/*.md text working-tree-encoding=UTF-8 eol=lf
+.gitcode/ISSUE_TEMPLATE/*.yml text working-tree-encoding=UTF-8 eol=lf
+.gitcode/workflows/*.yml text working-tree-encoding=UTF-8 eol=lf
+.gitcode/workflows/*.yaml text working-tree-encoding=UTF-8 eol=lf
+
 # vcpkg
 vcpkg.json text=eol=lf
 

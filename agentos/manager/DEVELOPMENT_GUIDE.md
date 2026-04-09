@@ -468,7 +468,7 @@ cat agentos/manager/.gitignore
 
 - **技术支持**: lidecheng@spharx.cn
 - **问题反馈**: https://github.com/SpharxTeam/AgentOS/issues
-- **架构文档**: [ARCHITECTURAL_PRINCIPLES.md](../../agentos/manuals/ARCHITECTURAL_PRINCIPLES.md)
+- **架构文档**: [ARCHITECTURAL_PRINCIPLES.md](../../../docs/ARCHITECTURAL_PRINCIPLES.md)
 
 ---
 
