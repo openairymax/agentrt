@@ -453,7 +453,7 @@ phase_deploy() {
     local deploy_script="${CI_DIR}/deploy-artifacts.sh"
     if [[ -f "$deploy_script" ]]; then
         chmod +x "$deploy_script"
-        bash "$deploy-script" --output "$CI_ARTIFACT_DIR" || true
+        bash "$deploy_script" --output "$CI_ARTIFACT_DIR" || true
     else
         package_artifacts_fallback
     fi

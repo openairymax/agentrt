@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { BrowserRouter as Router, Routes, Route, NavLink } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { BrowserRouter as Router, Routes, Route, NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Server,
@@ -10,7 +10,16 @@ import {
   Terminal,
   Activity,
   Rocket,
-  Cog,
+  Brain,
+  ChevronRight,
+  Bell,
+  Search,
+  PanelLeftClose,
+  PanelLeftOpen,
+  CircleDot,
+  GitBranch,
+  Cpu,
+  Wifi,
 } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
 import Services from "./pages/Services";
@@ -20,6 +29,7 @@ import Config from "./pages/Config";
 import Logs from "./pages/Logs";
 import TerminalPage from "./pages/Terminal";
 import Settings from "./pages/Settings";
+import LLMConfig from "./pages/LLMConfig";
 import WelcomeWizard from "./components/WelcomeWizard";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { useI18n } from "./i18n";
@@ -32,12 +42,103 @@ const navConfig = [
     { path: "/tasks", icon: ClipboardList, labelKey: "nav.tasks" },
   ]},
   { section: "nav.system", items: [
+    { path: "/llm-config", icon: Brain, labelKey: "nav.llmConfig" },
     { path: "/config", icon: SettingsIcon, labelKey: "nav.config" },
     { path: "/logs", icon: FileText, labelKey: "nav.logs" },
     { path: "/terminal", icon: Terminal, labelKey: "nav.terminal" },
-    { path: "/settings", icon: Cog, labelKey: "nav.settings" },
+    { path: "/settings", icon: SettingsIcon, labelKey: "nav.settings" },
   ]},
 ];
+
+function TitleBarContent() {
+  const location = useLocation();
+  const { t } = useI18n();
+
+  const routeLabels: Record<string, string> = {
+    "/": t.nav.dashboard,
+    "/services": t.nav.services,
+    "/agents": t.nav.agents,
+    "/tasks": t.nav.tasks,
+    "/llm-config": t.nav.llmConfig,
+    "/config": t.nav.config,
+    "/logs": t.nav.logs,
+    "/terminal": t.nav.terminal,
+    "/settings": t.nav.settings,
+  };
+
+  const currentLabel = routeLabels[location.pathname] || "AgentOS";
+  const breadcrumbs = [t.app.title, currentLabel];
+
+  return (
+    <div className="titlebar">
+      <div className="titlebar-left">
+        <div className="titlebar-breadcrumbs">
+          {breadcrumbs.map((crumb, idx) => (
+            <React.Fragment key={idx}>
+              <span className={`titlebar-breadcrumb-item ${idx === breadcrumbs.length - 1 ? '' : ''}`}>
+                {crumb}
+              </span>
+              {idx < breadcrumbs.length - 1 && (
+                <ChevronRight size={14} className="titlebar-breadcrumb-separator" />
+              )}
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
+
+      <div className="titlebar-center">
+        <button className="icon-btn" title="Search">
+          <Search size={17} />
+        </button>
+      </div>
+
+      <div className="titlebar-actions">
+        <button className="icon-btn" title={t.common.notifications || "Notifications"}>
+          <Bell size={17} />
+        </button>
+        <div className="avatar" title="User">U</div>
+      </div>
+    </div>
+  );
+}
+
+function StatusBar() {
+  const { t } = useI18n();
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="statusbar">
+      <div className="statusbar-left">
+        <div className="statusbar-item clickable">
+          <GitBranch size={13} />
+          <span>main</span>
+        </div>
+        <div className="statusbar-item clickable">
+          <CircleDot size={13} />
+          <span>0 problems</span>
+        </div>
+        <div className="statusbar-item">
+          <Wifi size={13} />
+          <span>{t.common.systemConnected}</span>
+        </div>
+      </div>
+      <div className="statusbar-right">
+        <div className="statusbar-item">
+          <Cpu size={13} />
+          <span>v0.3.0</span>
+        </div>
+        <div className="statusbar-item number-display">
+          {time.toLocaleTimeString('en-US', { hour12: false })}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function AppContent() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -49,30 +150,77 @@ function AppContent() {
 
   return (
     <div className="app-layout">
-      <aside className={`sidebar ${sidebarOpen ? '' : 'sidebar-collapsed'}`}>
-        <div className="sidebar-header">
-          <div className="sidebar-logo">A</div>
-          {sidebarOpen && (
-            <div>
-              <div className="sidebar-title">AgentOS</div>
-              <div className="sidebar-subtitle">Desktop Client v0.2</div>
-            </div>
-          )}
-          <button
-            className="sidebar-toggle"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            title={sidebarOpen ? 'Collapse' : 'Expand'}
+      {/* Activity Bar - Left narrow icon strip */}
+      <aside className="activity-bar">
+        <div className="activity-bar-logo" title="AgentOS">A</div>
+        
+        <div className="activity-bar-items">
+          {navConfig[0].items.map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={({ isActive }) =>
+                `activity-bar-item ${isActive ? "active" : ""}`
+              }
+              title={getNestedValue(t, item.labelKey)}
+            >
+              <item.icon size={22} />
+            </NavLink>
+          ))}
+
+          <div style={{ height: 8 }} />
+
+          {navConfig[1].items.slice(0, 4).map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={({ isActive }) =>
+                `activity-bar-item ${isActive ? "active" : ""}`
+              }
+              title={getNestedValue(t, item.labelKey)}
+            >
+              <item.icon size={22} />
+            </NavLink>
+          ))}
+        </div>
+
+        <div className="activity-bar-bottom">
+          <NavLink
+            to="/settings"
+            className={({ isActive }) =>
+              `activity-bar-item ${isActive ? "active" : ""}`
+            }
+            title={getNestedValue(t, navConfig[1].items[4].labelKey)}
           >
-            {sidebarOpen ? '◀' : '▶'}
+            <SettingsIcon size={22} />
+          </NavLink>
+          
+          <button
+            className="activity-bar-item"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            title={sidebarOpen ? "Close Sidebar" : "Open Sidebar"}
+          >
+            {sidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
+          </button>
+        </div>
+      </aside>
+
+      {/* Sidebar Panel - Expandable navigation panel */}
+      <aside className={`sidebar-panel ${!sidebarOpen ? 'collapsed' : ''}`}>
+        <div className="sidebar-panel-header">
+          <span className="sidebar-panel-title">{t.app.title}</span>
+          <button
+            className="sidebar-panel-close"
+            onClick={() => setSidebarOpen(false)}
+          >
+            ✕
           </button>
         </div>
 
         <nav className="nav-menu">
           {navConfig.map((section) => (
             <div key={section.section} className="nav-section">
-              {sidebarOpen && (
-                <div className="nav-section-title">{getNestedValue(t, section.section)}</div>
-              )}
+              <div className="nav-section-title">{getNestedValue(t, section.section)}</div>
               {section.items.map((item) => (
                 <NavLink
                   key={item.path}
@@ -80,37 +228,26 @@ function AppContent() {
                   className={({ isActive }) =>
                     `nav-item ${isActive ? "active" : ""}`
                   }
-                  title={getNestedValue(t, item.labelKey)}
                 >
-                  <item.icon size={20} />
-                  {sidebarOpen && <span>{getNestedValue(t, item.labelKey)}</span>}
+                  <item.icon size={18} />
+                  <span>{getNestedValue(t, item.labelKey)}</span>
                 </NavLink>
               ))}
             </div>
           ))}
         </nav>
 
-        <div style={{ padding: "16px", borderTop: "1px solid var(--border-color)" }}>
-          <div className="nav-item" style={{ justifyContent: "center", fontSize: "12px" }}>
+        <div style={{ padding: "16px", borderTop: "1px solid var(--border-subtle)" }}>
+          <div className="nav-item" style={{ justifyContent: "flex-start", fontSize: "12px" }}>
             <Activity size={16} />
-            {sidebarOpen && <span>{t.common.systemConnected}</span>}
+            <span>{t.common.systemConnected}</span>
           </div>
         </div>
       </aside>
 
-      <main className="main-content">
-        <header className="header">
-          <h1 className="header-title">{t.app.title}</h1>
-          <div className="header-actions">
-            <button className="btn btn-secondary" title={t.common.refresh}>
-              <Activity size={18} />
-            </button>
-            <button className="btn btn-primary" title={t.app.quickDeploy}>
-              <Rocket size={18} />
-              {t.app.quickDeploy}
-            </button>
-          </div>
-        </header>
+      {/* Main Workspace */}
+      <main className="main-workspace">
+        <TitleBarContent />
 
         <div className="content-area">
           <ErrorBoundary>
@@ -119,6 +256,7 @@ function AppContent() {
               <Route path="/services" element={<Services />} />
               <Route path="/agents" element={<Agents />} />
               <Route path="/tasks" element={<Tasks />} />
+              <Route path="/llm-config" element={<LLMConfig />} />
               <Route path="/config" element={<Config />} />
               <Route path="/logs" element={<Logs />} />
               <Route path="/terminal" element={<TerminalPage />} />
@@ -126,6 +264,8 @@ function AppContent() {
             </Routes>
           </ErrorBoundary>
         </div>
+
+        <StatusBar />
       </main>
     </div>
   );

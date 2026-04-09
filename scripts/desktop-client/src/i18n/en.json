@@ -14,7 +14,8 @@
     "config": "Configuration",
     "logs": "Logs",
     "terminal": "Terminal",
-    "settings": "Settings"
+    "settings": "Settings",
+    "llmConfig": "AI Models"
   },
   "dashboard": {
     "title": "System Overview",
@@ -191,7 +192,11 @@
     "dockerComposeDev": "Docker Compose (Dev)",
     "dockerComposeDevDesc": "Development environment service definitions",
     "dockerComposeProd": "Docker Compose (Prod)",
-    "dockerComposeProdDesc": "Production environment service definitions"
+    "dockerComposeProdDesc": "Production environment service definitions",
+    "saveFailed": "Failed to save configuration",
+    "discardConfirm": "Are you sure you want to discard all changes?",
+    "warning": "Warning",
+    "warningMessage": "Modifying configuration files can affect system behavior. Make sure to backup before making changes."
   },
   "logs": {
     "title": "Log Viewer",
@@ -255,7 +260,10 @@
     "showLogsTail": "Show Logs (Tail)",
     "healthCheck": "Health Check",
     "stopAllServices": "Stop All Services",
-    "cleanUpResources": "Clean Up Resources"
+    "cleanUpResources": "Clean Up Resources",
+    "welcomeMessage": "Welcome to AgentOS Terminal",
+    "enterCommandHint": "Type a command and press Enter to execute",
+    "enterCommand": "Enter command..."
   },
   "common": {
     "loading": "Loading...",
@@ -274,7 +282,8 @@
     "retry": "Retry",
     "connected": "Connected",
     "disconnected": "Disconnected",
-    "systemConnected": "System Connected"
+    "systemConnected": "System Connected",
+    "notifications": "Notifications"
   },
   "update": {
     "available": "Update Available",
@@ -317,6 +326,7 @@
     "platform": "Platform",
     "architecture": "Architecture",
     "version": "Version",
+    "cpuCores": "CPU Cores",
     "loadingSystemInfo": "Loading system information...",
     "actions": "Actions",
     "save": "Save Settings",
@@ -333,5 +343,47 @@
     "projectPath": "Project Path",
     "minimizeToTray": "Minimize to System Tray",
     "checkUpdatesOnStartup": "Check for Updates on Startup"
+  },
+  "llmConfig": {
+    "title": "AI Model Configuration",
+    "description": "Configure your AI model API keys and settings. AgentOS supports multiple providers.",
+    "providers": "Configured Providers",
+    "addProvider": "Add Provider",
+    "selectProvider": "Select AI Provider",
+    "noProviders": "No AI providers configured",
+    "noProvidersHint": "Click \"Add Provider\" to configure your first AI model",
+    "activeProviders": "Active AI Providers",
+    "enabled": "Enabled",
+    "model": "Model",
+    "apiKey": "API Key",
+    "apiKeyPlaceholder": "sk-...",
+    "baseUrl": "API Base URL",
+    "testConnection": "Test Connection",
+    "testing": "Testing...",
+    "connectionSuccess": "{provider} connection successful!",
+    "connectionFailed": "Connection failed: {error}",
+    "connected": "Connected",
+    "failed": "Failed",
+    "notTested": "Not tested",
+    "lastTested": "Last tested",
+    "enterApiKey": "Please enter an API key first",
+    "deleteConfirm": "Are you sure you want to delete this provider?",
+    "pricing": "Pricing",
+    "perMillion": "per 1M tokens (in/out)",
+    "localModel": "Free local model",
+    "modelsAvailable": "models available",
+    "customApi": "Custom API endpoint",
+    "help": "Help & Documentation",
+    "helpOpenai": "Get your API key from platform.openai.com. Supports GPT-4, GPT-3.5, and O1 series models.",
+    "helpAzure": "Use Azure OpenAI Service with your deployment URL and API key. Enterprise-grade with regional availability.",
+    "helpAnthropic": "Get your API key from console.anthropic.com. Supports Claude 3.5 Sonnet, Haiku, and Opus models.",
+    "helpLocal": "Run models locally with Ollama. Install from ollama.ai, then run 'ollama pull llama3.2' to download models.",
+    "recommended": "Recommended",
+    "fastest": "Fastest",
+    "mostCapable": "Most Capable",
+    "costEffective": "Cost Effective",
+    "usageEstimate": "Estimated Monthly Cost",
+    "tokensUsed": "Tokens Used",
+    "resetUsage": "Reset Usage Stats"
   }
 }

@@ -143,7 +143,7 @@ jobs:
               echo -e "$UNDOCUMENTED_FILES" >> $GITHUB_STEP_SUMMARY
             else
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "✅ Documentation coverage meets threshold (≥80%)"
+              echo "✅ Documentation coverage meets threshold (≥80%)" >> $GITHUB_STEP_SUMMARY
             fi
           fi
 
