@@ -9,7 +9,8 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../utils/tauriCompat";
+import { useI18n } from "../i18n";
 
 interface TaskInfo {
   id: string;
@@ -21,6 +22,7 @@ interface TaskInfo {
 }
 
 const Tasks: React.FC = () => {
+  const { t } = useI18n();
   const [taskDescription, setTaskDescription] = useState("");
   const [selectedAgent, setSelectedAgent] = useState("");
   const [priority, setPriority] = useState("normal");
@@ -32,12 +34,12 @@ const Tasks: React.FC = () => {
     e.preventDefault();
 
     if (!taskDescription.trim()) {
-      alert("Please enter a task description");
+      alert(t.tasks.enterDescription);
       return;
     }
 
     if (!selectedAgent) {
-      alert("Please select an agent");
+      alert(t.tasks.selectAgentFirst);
       return;
     }
 
@@ -54,23 +56,23 @@ const Tasks: React.FC = () => {
       setActiveTab("history");
     } catch (error) {
       console.error("Failed to submit task:", error);
-      alert(`Failed to submit task: ${error}`);
+      alert(`${t.tasks.failedToSubmit}: ${error}`);
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleCancelTask = async (taskId: string) => {
-    if (!confirm("Are you sure you want to cancel this task?")) return;
+    if (!confirm(t.tasks.cancelConfirm)) return;
 
     try {
       await invoke("cancel_task", { taskId });
-      setTasks(tasks.map((t) =>
-        t.id === taskId ? { ...t, status: "cancelled" } : t
+      setTasks(tasks.map((tk) =>
+        tk.id === taskId ? { ...tk, status: "cancelled" } : tk
       ));
     } catch (error) {
       console.error("Failed to cancel task:", error);
-      alert(`Failed to cancel task: ${error}`);
+      alert(`${t.tasks.failedToCancel}: ${error}`);
     }
   };
 
@@ -89,17 +91,26 @@ const Tasks: React.FC = () => {
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "completed": return t.tasks.completed;
+      case "running": return t.tasks.running;
+      case "failed": return t.tasks.failed;
+      case "cancelled": return t.tasks.cancelled;
+      case "pending": return t.tasks.pending;
+      default: return status;
+    }
+  };
+
   return (
     <div>
-      {/* Header */}
       <div className="card" style={{ marginBottom: "20px" }}>
         <h3 className="card-title" style={{ marginBottom: 0 }}>
           <ClipboardList size={20} />
-          Task Management
+          {t.tasks.title}
         </h3>
       </div>
 
-      {/* Tabs */}
       <div
         style={{
           display: "flex",
@@ -125,7 +136,7 @@ const Tasks: React.FC = () => {
           }}
         >
           <Plus size={16} style={{ display: "inline", marginRight: 6 }} />
-          Submit Task
+          {t.tasks.submitTask}
         </button>
         <button
           onClick={() => setActiveTab("history")}
@@ -141,17 +152,16 @@ const Tasks: React.FC = () => {
           }}
         >
           <Clock size={16} style={{ display: "inline", marginRight: 6 }} />
-          Task History ({tasks.length})
+          {t.tasks.taskHistory} ({tasks.length})
         </button>
       </div>
 
       {activeTab === "submit" ? (
-        /* Submit Task Form */
         <div className="grid-2">
           <div className="card">
             <h3 className="card-title">
               <Send size={20} />
-              New Task
+              {t.tasks.newTask}
             </h3>
 
             <form onSubmit={handleSubmitTask}>
@@ -165,7 +175,7 @@ const Tasks: React.FC = () => {
                     color: "var(--text-secondary)",
                   }}
                 >
-                  Select Agent *
+                  {t.tasks.selectAgent} *
                 </label>
                 <select
                   className="input-field"
@@ -173,7 +183,7 @@ const Tasks: React.FC = () => {
                   onChange={(e) => setSelectedAgent(e.target.value)}
                   required
                 >
-                  <option value="">Choose an agent...</option>
+                  <option value="">{t.tasks.chooseAgent}</option>
                   <option value="agent-001">Research Assistant</option>
                   <option value="agent-002">Code Reviewer</option>
                   <option value="agent-003">Data Analyst</option>
@@ -190,17 +200,17 @@ const Tasks: React.FC = () => {
                     color: "var(--text-secondary)",
                   }}
                 >
-                  Priority Level
+                  {t.tasks.priorityLevel}
                 </label>
                 <select
                   className="input-field"
                   value={priority}
                   onChange={(e) => setPriority(e.target.value)}
                 >
-                  <option value="low">Low</option>
-                  <option value="normal">Normal (Default)</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
+                  <option value="low">{t.tasks.low}</option>
+                  <option value="normal">{t.tasks.normal}</option>
+                  <option value="high">{t.tasks.high}</option>
+                  <option value="urgent">{t.tasks.urgent}</option>
                 </select>
               </div>
 
@@ -214,13 +224,13 @@ const Tasks: React.FC = () => {
                     color: "var(--text-secondary)",
                   }}
                 >
-                  Task Description *
+                  {t.tasks.taskDescription} *
                 </label>
                 <textarea
                   className="textarea-field"
                   value={taskDescription}
                   onChange={(e) => setTaskDescription(e.target.value)}
-                  placeholder="Describe what you want the agent to do...&#10;&#10;Example: Analyze the latest sales data and generate a summary report with key insights and recommendations."
+                  placeholder={t.tasks.descriptionPlaceholder}
                   required
                   rows={6}
                 />
@@ -235,12 +245,12 @@ const Tasks: React.FC = () => {
                 {submitting ? (
                   <>
                     <Loader2 size={16} className="spin" />
-                    Submitting...
+                    {t.tasks.submitting}
                   </>
                 ) : (
                   <>
                     <Send size={16} />
-                    Submit Task
+                    {t.tasks.submitTask}
                   </>
                 )}
               </button>
@@ -250,21 +260,21 @@ const Tasks: React.FC = () => {
           <div className="card">
             <h3 className="card-title">
               <AlertCircle size={20} />
-              Guidelines
+              {t.tasks.guidelines}
             </h3>
             <div style={{ color: "var(--text-secondary)", lineHeight: "1.8", fontSize: "14px" }}>
               <p style={{ marginBottom: "12px" }}>
-                <strong>Best Practices:</strong>
+                <strong>{t.tasks.bestPractices}</strong>
               </p>
               <ul style={{ paddingLeft: "20px", marginBottom: "12px" }}>
-                <li>Be specific and clear in your task descriptions</li>
-                <li>Include expected output format if needed</li>
-                <li>Set appropriate priority levels</li>
-                <li>Provide context and constraints</li>
+                <li>{t.tasks.beSpecific}</li>
+                <li>{t.tasks.includeFormat}</li>
+                <li>{t.tasks.setPriority}</li>
+                <li>{t.tasks.provideContext}</li>
               </ul>
 
               <p style={{ marginBottom: "12px" }}>
-                <strong>Example Tasks:</strong>
+                <strong>{t.tasks.exampleTasks}</strong>
               </p>
               <ul style={{ paddingLeft: "20px" }}>
                 <li>"Review PR #123 for code quality issues"</li>
@@ -276,19 +286,18 @@ const Tasks: React.FC = () => {
           </div>
         </div>
       ) : (
-        /* Task History */
         <div className="card">
           <h3 className="card-title">
             <Clock size={20} />
-            Recent Tasks ({tasks.length})
+            {t.tasks.recentTasks} ({tasks.length})
           </h3>
 
           {tasks.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">📋</div>
-              <div className="empty-state-text">No tasks submitted yet</div>
+              <div className="empty-state-text">{t.tasks.noTasksYet}</div>
               <div className="empty-state-hint">
-                Switch to "Submit Task" tab to create a new task
+                {t.tasks.switchToSubmit}
               </div>
             </div>
           ) : (
@@ -329,12 +338,12 @@ const Tasks: React.FC = () => {
                             : "status-stopped"
                         }`}
                       >
-                        {task.status}
+                        {getStatusLabel(task.status)}
                       </span>
                     </div>
 
                     <div style={{ fontSize: "13px", color: "var(--text-muted)", marginLeft: "26px" }}>
-                      Agent: {task.agent_id} • Created: {new Date(task.created_at).toLocaleString()}
+                      {t.tasks.agent}: {task.agent_id} • {t.tasks.created}: {new Date(task.created_at).toLocaleString()}
                     </div>
 
                     {task.status === "running" && (
@@ -359,7 +368,7 @@ const Tasks: React.FC = () => {
                           />
                         </div>
                         <span style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px", display: "inline-block" }}>
-                          {Math.round(task.progress)}% complete
+                          {Math.round(task.progress)}% {t.tasks.complete}
                         </span>
                       </div>
                     )}
@@ -372,7 +381,7 @@ const Tasks: React.FC = () => {
                       onClick={() => handleCancelTask(task.id)}
                     >
                       <XCircle size={14} />
-                      Cancel
+                      {t.tasks.cancel}
                     </button>
                   )}
                 </div>

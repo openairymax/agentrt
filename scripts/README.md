@@ -1,18 +1,20 @@
-# AgentOS Scripts - 开发与运维工具集 V2.0
+# AgentOS Scripts - 开发与运维工具集 V2.1
 
-**版本**: v2.0.0  
-**最后更新**: 2026-04-08  
-**整理状态**: ✅ 已完成全面重组
+**版本**: v2.1.0  
+**最后更新**: 2026-04-09  
+**整理状态**: ✅ 已完成全面重组 + i18n 国际化
 
 ---
 
 ## 📋 概述
 
-`scripts/` 模块是 AgentOS 的**统一工具平台**，提供从开发构建到生产部署的全生命周期自动化支持。经过V2.0全面重组，现已实现：
+`scripts/` 模块是 AgentOS 的**统一工具平台**，提供从开发构建到生产部署的全生命周期自动化支持。经过V2.1全面重组，现已实现：
 
 - 🎯 **清晰的模块化架构** - 10个功能子目录，职责明确
 - 🌍 **完整的跨平台支持** - Windows/macOS/Linux 原生脚本
 - 🖥️ **桌面客户端集成** - Tauri GUI应用，可视化操作
+- 🌐 **中英文国际化** - 全页面 i18n 支持，实时语言切换
+- 🎨 **明暗主题切换** - Dark/Light/Auto 三种主题模式
 - 🔧 **统一的入口点** - install.sh / install.ps1 一键部署
 - 📚 **完善的文档体系** - 每个子目录独立README
 
@@ -22,7 +24,8 @@
 |--------|---------|----------|
 | **跨平台部署** | ✅✅✅ 完整 | `install.sh` + `install.ps1` |
 | **Docker管理** | ✅✅✅ 完整 | `deploy/docker/` |
-| **桌面客户端** | ✅✅✅ 新增 | `desktop-client/` (Tauri) |
+| **桌面客户端** | ✅✅✅ 完善 | `desktop-client/` (Tauri + i18n) |
+| **国际化** | ✅✅✅ 新增 | `desktop-client/src/i18n/` (中/英) |
 | **CI/CD流水线** | ✅✅ 成熟 | `ci/` (GitHub Actions) |
 | **开发辅助** | ✅✅ 完善 | `dev/` + `tools/` |
 | **运维监控** | ✅✅ 完善 | `ops/` (doctor/benchmark) |
@@ -31,7 +34,7 @@
 
 ---
 
-## 📁 V2.0 模块结构
+## 📁 V2.1 模块结构
 
 ```
 scripts/
@@ -40,9 +43,9 @@ scripts/
 ├── 🚀 install.sh                   # [入口] 跨平台部署脚本 (Unix/Linux/macOS)
 ├── 🚀 install.ps1                  # [入口] 跨平台部署脚本 (Windows PowerShell)
 │
-├── 📂 desktop-client/              # [新增] Tauri 桌面客户端应用
+├── 📂 desktop-client/              # Tauri 桌面客户端应用
 │   ├── src-tauri/                  #   Rust 后端 (18个Tauri命令)
-│   ├── src/                        #   React 前端 (7个页面)
+│   ├── src/                        #   React 前端 (8个页面)
 │   │   ├── pages/
 │   │   │   ├── Dashboard.tsx       #     系统仪表盘
 │   │   │   ├── Services.tsx        #     Docker服务管理
@@ -50,7 +53,16 @@ scripts/
 │   │   │   ├── Tasks.tsx           #     任务提交/跟踪
 │   │   │   ├── Config.tsx          #     配置文件编辑器
 │   │   │   ├── Logs.tsx            #     日志查看器
-│   │   │   └── Terminal.tsx        #     集成终端
+│   │   │   ├── Terminal.tsx        #     集成终端
+│   │   │   └── Settings.tsx        #     设置（主题/语言/连接）
+│   │   ├── i18n/                   #   国际化模块
+│   │   │   ├── index.tsx           #     I18n Provider + Hook
+│   │   │   ├── en.json             #     英文翻译 (220+ 键)
+│   │   │   └── zh.json             #     中文翻译 (220+ 键)
+│   │   ├── utils/
+│   │   │   └── tauriCompat.ts      #     Tauri API 兼容层
+│   │   └── styles/
+│   │       └── globals.css         #     全局样式 + 主题变量
 │   ├── package.json                #   前端依赖
 │   └── README.md                   #   客户端使用文档
 │
@@ -118,13 +130,15 @@ scripts/
 │   │   └── test_checkpoint_manager.py # 检查点测试
 │   └── README.md                   # 测试指南
 │
-├── 📂 tools/                        # [新增] 通用工具集（辅助工具层）
+├── 📂 tools/                        # 通用工具集（辅助工具层）
 │   ├── analyze_quality.py           # 代码质量分析
 │   ├── check-quality.sh             # 质量检查入口
 │   ├── enhance_coverage.py           # 覆盖率增强
-│   ├── encoding/                    # 编码工具目录
-│   │   ├── check_encoding.py        # 编码检查
-│   │   └── fix_bom.py               # BOM修复
+│   ├── encoding/                    # 编码工具
+│   │   ├── check_encoding.py        #   编码检查
+│   │   └── fix_bom.py               #   BOM修复
+│   ├── docs/                        # 文档工具
+│   │   └── verify_consistency.py    #   文档一致性验证
 │   ├── requirements.txt             # Python依赖
 │   └── README.md                   # 工具文档
 │
@@ -132,7 +146,7 @@ scripts/
 │   ├── init_config.py              # 配置向导
 │   └── README.md                   # 初始化指南
 │
-└── 📂 archive/                     # [新增] 历史归档（废弃代码层）
+└── 📂 archive/                     # 历史归档（废弃代码层）
     ├── deploy.sh.v1.0-legacy       # 旧版部署脚本（已被install.sh替代）
     └── README.md                   # 归档说明
 ```
@@ -156,6 +170,15 @@ chmod +x install.sh
 
 # 一键部署生产环境
 ./install.sh --mode prod --auto
+
+# 仅部署后端服务
+./install.sh --mode dev --target backend
+
+# 仅构建桌面客户端
+./install.sh --target client
+
+# 全部部署（后端+客户端）
+./install.sh --target all
 
 # 仅检查环境
 ./install.sh --check-only
@@ -186,7 +209,10 @@ cd scripts/desktop-client
 # 安装前端依赖
 npm install
 
-# 启动开发模式（热重载）
+# 启动开发模式（浏览器预览，热重载）
+npm run dev
+
+# 启动Tauri开发模式（完整桌面应用）
 npm run tauri dev
 
 # 构建生产版本
@@ -195,12 +221,23 @@ npm run tauri build
 
 **桌面客户端功能：**
 - 📊 **Dashboard** - 实时系统监控仪表盘
-- 🐳 **Services** - 可视化Docker服务管理
+- 🐳 **Services** - 可视化Docker服务管理（开发/生产模式切换）
 - 🤖 **Agents** - AI Agent注册与管理
 - 📋 **Tasks** - 任务提交与跟踪
-- ⚙️ **Config** - 配置文件编辑器
-- 📄 **Logs** - 实时日志查看器
-- 💻 **Terminal** - 集成命令行终端
+- ⚙️ **Config** - 配置文件编辑器（含安全警告）
+- 📄 **Logs** - 实时日志查看器（彩色高亮）
+- 💻 **Terminal** - 集成命令行终端（快捷命令）
+- 🔧 **Settings** - 主题/语言/连接配置
+
+**国际化支持：**
+- 🇺🇸 English - 完整英文界面
+- 🇨🇳 简体中文 - 完整中文界面
+- 实时切换，无需重启
+
+**主题模式：**
+- 🌙 Dark - 深色主题（默认）
+- ☀️ Light - 浅色主题
+- 🔄 Auto - 跟随系统
 
 ---
 
@@ -223,7 +260,7 @@ npm run tauri build
 
 ```bash
 # Shell库文档
-cat scripts/lib/README.md  # 或查看各文件的注释头
+cat scripts/lib/README.md
 
 # Python核心模块
 cat scripts/core/README.md
@@ -258,6 +295,25 @@ cat scripts/tools/README.md
 │       质量保障层 (Quality Assurance)     │
 │   tests/ ci/                           │
 └─────────────────────────────────────────┘
+```
+
+### 桌面客户端架构
+
+```
+desktop-client/
+├── src/
+│   ├── main.tsx          → I18nProvider 包裹 App
+│   ├── App.tsx           → 路由 + 侧边栏导航 (i18n)
+│   ├── pages/            → 8个页面组件 (全部 i18n)
+│   ├── i18n/             → 国际化系统
+│   │   ├── index.tsx     → Context + Hook + Provider
+│   │   ├── en.json       → 英文翻译
+│   │   └── zh.json       → 中文翻译
+│   ├── utils/
+│   │   └── tauriCompat.ts → Tauri API 兼容层 (Mock)
+│   └── styles/
+│       └── globals.css   → CSS 变量 + 主题 + 工具类
+└── src-tauri/            → Rust 后端 (Tauri Commands)
 ```
 
 ### 设计原则遵循
@@ -337,39 +393,16 @@ nano .env.production  # 或使用桌面客户端Config页面
 
 ---
 
-### 场景4：CI/CD集成（GitHub Actions）
+### 场景4：仅构建桌面客户端
 
-```yaml
-# .github/workflows/agentos-ci.yml
-name: AgentOS CI/CD Pipeline
+```bash
+# 仅构建客户端（不部署后端）
+./install.sh --target client
 
-on: [push, pull_request]
-
-jobs:
-  quality-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Code Quality Analysis
-        run: |
-          cd scripts/tools
-          python analyze_quality.py --path ../..
-      
-      - name: Run Tests
-        run: |
-          cd scripts/tests/python
-          pytest -v
-  
-  deployment:
-    needs: quality-check
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to Staging
-        run: |
-          cd scripts
-          ./install.sh --mode prod --auto
+# 或手动构建
+cd desktop-client
+npm install
+npm run tauri build
 ```
 
 ---
@@ -411,6 +444,17 @@ const task = await invoke('submit_task', {
   priority: 'high'
 });
 ```
+
+### 浏览器开发模式
+
+桌面客户端支持纯浏览器开发模式，无需 Tauri 运行时：
+
+```bash
+cd desktop-client
+npm run dev    # 启动 Vite 开发服务器 (http://localhost:1420)
+```
+
+浏览器模式下，`tauriCompat.ts` 会自动提供 Mock 数据，所有页面功能均可预览。
 
 ---
 
@@ -467,6 +511,7 @@ safety check -r tools/requirements.txt
 | `ModuleNotFoundError` | Python依赖缺失 | `pip install -r tools/requirements.txt` |
 | `port already in use` | 端口被占用 | `./install.sh --stop` 或修改端口配置 |
 | 内存不足 | 系统资源不够 | 关闭其他应用或增加swap空间 |
+| 客户端白屏 | Tauri未安装 | 使用 `npm run dev` 浏览器模式预览 |
 
 ### 获取帮助
 
@@ -487,6 +532,23 @@ safety check -r tools/requirements.txt
 ---
 
 ## 📈 版本历史
+
+### V2.1.0 (2026-04-09) - 国际化与完善
+
+**新特性:**
+- ✅ 全页面 i18n 国际化支持（中/英 220+ 翻译键）
+- ✅ 新增 Settings 页面（主题/语言/连接/系统信息）
+- ✅ Dark/Light/Auto 三种主题模式切换
+- ✅ Tauri API 兼容层（浏览器开发模式 Mock）
+- ✅ install.sh 新增 `--target` 参数（backend/client/all）
+- ✅ 编码工具迁移至 `tools/encoding/`
+- ✅ 文档工具迁移至 `tools/docs/`
+
+**变更:**
+- 🔄 所有8个页面完成 i18n 集成
+- 🔄 tauriCompat.ts 改用动态 import 加载 Tauri API
+- 🔄 globals.css 新增 50+ CSS 工具类
+- 🔄 清理根目录非必要脚本文件
 
 ### V2.0.0 (2026-04-08) - 重大重组
 
@@ -532,6 +594,7 @@ safety check -r tools/requirements.txt
 - **Python代码**: 遵循 `core/` 模块的类型注解风格
 - **React组件**: 参考 `desktop-client/src/pages/` 的组件结构
 - **Rust后端**: 参考 `desktop-client/src-tauri/src/commands.rs` 的命令注册方式
+- **国际化**: 新增文本必须在 `en.json` 和 `zh.json` 中同时添加
 
 ---
 

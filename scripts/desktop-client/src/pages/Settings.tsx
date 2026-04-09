@@ -23,7 +23,7 @@ const Settings: React.FC = () => {
           setNotificationEnabled(settings.notificationEnabled !== false);
         }
       } catch (error) {
-        console.error('加载设置失败:', error);
+        console.error('Failed to load settings:', error);
       }
     };
 
@@ -36,7 +36,7 @@ const Settings: React.FC = () => {
         const info = await invoke<{ platform: string; arch: string; version: string }>('get_system_info');
         setSystemInfo(info);
       } catch (error) {
-        console.error('获取系统信息失败:', error);
+        console.error('Failed to load system info:', error);
       }
     };
 
@@ -86,7 +86,7 @@ const Settings: React.FC = () => {
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (error) {
-      console.error('保存设置失败:', error);
+      console.error('Failed to save settings:', error);
       setSaveStatus('error');
     }
   };
@@ -95,17 +95,17 @@ const Settings: React.FC = () => {
     try {
       const result = await invoke<{ success: boolean; message: string }>('test_backend_connection', { url: backendUrl });
       if (result.success) {
-        alert(t('settings.connectionSuccess', { url: backendUrl }));
+        alert(t.settings.connectionSuccess.replace('{url}', backendUrl));
       } else {
-        alert(t('settings.connectionFailed', { error: result.message }));
+        alert(t.settings.connectionFailed.replace('{error}', result.message));
       }
     } catch (error) {
-      alert(t('settings.connectionError', { error: String(error) }));
+      alert(t.settings.connectionError.replace('{error}', String(error)));
     }
   };
 
   const handleResetSettings = () => {
-    if (confirm(t('settings.resetConfirm'))) {
+    if (confirm(t.settings.resetConfirm)) {
       localStorage.removeItem('agentos_settings');
       setBackendUrl('http://localhost:18789');
       setTheme('dark');
@@ -118,16 +118,16 @@ const Settings: React.FC = () => {
   return (
     <div className="page-container">
       <div className="page-header">
-        <h1>{t('settings.title')}</h1>
-        <p className="text-muted">{t('settings.description')}</p>
+        <h1>{t.settings.title}</h1>
+        <p className="text-muted">{t.settings.description}</p>
       </div>
 
       <div className="grid-2 gap-6">
         <div className="card">
-          <h2 className="card-title">{t('settings.general')}</h2>
+          <h2 className="card-title">{t.settings.general}</h2>
 
           <div className="form-group">
-            <label htmlFor="language">{t('settings.language')}</label>
+            <label htmlFor="language">{t.settings.language}</label>
             <select
               id="language"
               className="form-select"
@@ -140,22 +140,22 @@ const Settings: React.FC = () => {
                 </option>
               ))}
             </select>
-            <p className="form-help">{t('settings.languageHelp')}</p>
+            <p className="form-help">{t.settings.languageHelp}</p>
           </div>
 
           <div className="form-group">
-            <label htmlFor="theme">{t('settings.theme')}</label>
+            <label htmlFor="theme">{t.settings.theme}</label>
             <select
               id="theme"
               className="form-select"
               value={theme}
               onChange={(e) => setTheme(e.target.value as 'light' | 'dark' | 'auto')}
             >
-              <option value="dark">{t('settings.themeDark')}</option>
-              <option value="light">{t('settings.themeLight')}</option>
-              <option value="auto">{t('settings.themeAuto')}</option>
+              <option value="dark">{t.settings.themeDark}</option>
+              <option value="light">{t.settings.themeLight}</option>
+              <option value="auto">{t.settings.themeAuto}</option>
             </select>
-            <p className="form-help">{t('settings.themeHelp')}</p>
+            <p className="form-help">{t.settings.themeHelp}</p>
           </div>
 
           <div className="form-group">
@@ -165,9 +165,9 @@ const Settings: React.FC = () => {
                 checked={autoStart}
                 onChange={(e) => setAutoStart(e.target.checked)}
               />
-              <span>{t('settings.autoStart')}</span>
+              <span>{t.settings.autoStart}</span>
             </label>
-            <p className="form-help">{t('settings.autoStartHelp')}</p>
+            <p className="form-help">{t.settings.autoStartHelp}</p>
           </div>
 
           <div className="form-group">
@@ -177,17 +177,17 @@ const Settings: React.FC = () => {
                 checked={notificationEnabled}
                 onChange={(e) => setNotificationEnabled(e.target.checked)}
               />
-              <span>{t('settings.notifications')}</span>
+              <span>{t.settings.notifications}</span>
             </label>
-            <p className="form-help">{t('settings.notificationsHelp')}</p>
+            <p className="form-help">{t.settings.notificationsHelp}</p>
           </div>
         </div>
 
         <div className="card">
-          <h2 className="card-title">{t('settings.connection')}</h2>
+          <h2 className="card-title">{t.settings.connection}</h2>
 
           <div className="form-group">
-            <label htmlFor="backendUrl">{t('settings.backendUrl')}</label>
+            <label htmlFor="backendUrl">{t.settings.backendUrl}</label>
             <input
               id="backendUrl"
               type="text"
@@ -196,7 +196,7 @@ const Settings: React.FC = () => {
               onChange={(e) => setBackendUrl(e.target.value)}
               placeholder="http://localhost:18789"
             />
-            <p className="form-help">{t('settings.backendUrlHelp')}</p>
+            <p className="form-help">{t.settings.backendUrlHelp}</p>
           </div>
 
           <div className="form-group">
@@ -205,37 +205,37 @@ const Settings: React.FC = () => {
               onClick={handleTestConnection}
               disabled={saveStatus === 'saving'}
             >
-              {t('settings.testConnection')}
+              {t.settings.testConnection}
             </button>
-            <p className="form-help">{t('settings.testConnectionHelp')}</p>
+            <p className="form-help">{t.settings.testConnectionHelp}</p>
           </div>
         </div>
 
         <div className="card">
-          <h2 className="card-title">{t('settings.system')}</h2>
+          <h2 className="card-title">{t.settings.system}</h2>
 
           {systemInfo ? (
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-muted">{t('settings.platform')}:</span>
+                <span className="text-muted">{t.settings.platform}:</span>
                 <span>{systemInfo.platform}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted">{t('settings.architecture')}:</span>
+                <span className="text-muted">{t.settings.architecture}:</span>
                 <span>{systemInfo.arch}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted">{t('settings.version')}:</span>
+                <span className="text-muted">{t.settings.version}:</span>
                 <span>{systemInfo.version}</span>
               </div>
             </div>
           ) : (
-            <p>{t('settings.loadingSystemInfo')}</p>
+            <p>{t.settings.loadingSystemInfo}</p>
           )}
         </div>
 
         <div className="card">
-          <h2 className="card-title">{t('settings.actions')}</h2>
+          <h2 className="card-title">{t.settings.actions}</h2>
 
           <div className="flex gap-3">
             <button
@@ -243,47 +243,47 @@ const Settings: React.FC = () => {
               onClick={handleSaveSettings}
               disabled={saveStatus === 'saving'}
             >
-              {saveStatus === 'saving' ? t('settings.saving') : t('settings.save')}
+              {saveStatus === 'saving' ? t.settings.saving : t.settings.save}
             </button>
 
             <button
               className="btn btn-secondary"
               onClick={handleResetSettings}
             >
-              {t('settings.reset')}
+              {t.settings.reset}
             </button>
 
             <button
               className="btn btn-danger"
               onClick={() => {
-                if (confirm(t('settings.clearCacheConfirm'))) {
+                if (confirm(t.settings.clearCacheConfirm)) {
                   localStorage.clear();
-                  alert(t('settings.cacheCleared'));
+                  alert(t.settings.cacheCleared);
                 }
               }}
             >
-              {t('settings.clearCache')}
+              {t.settings.clearCache}
             </button>
           </div>
 
           {saveStatus === 'saved' && (
             <div className="mt-3 p-2 bg-success/10 text-success rounded">
-              {t('settings.savedSuccess')}
+              {t.settings.savedSuccess}
             </div>
           )}
 
           {saveStatus === 'error' && (
             <div className="mt-3 p-2 bg-error/10 text-error rounded">
-              {t('settings.saveError')}
+              {t.settings.saveError}
             </div>
           )}
         </div>
       </div>
 
       <div className="mt-8 text-center text-sm text-muted">
-        <p>{t('settings.footer')}</p>
+        <p>{t.settings.footer}</p>
         <p className="mt-2">
-          {t('settings.documentation')}:{' '}
+          {t.settings.documentation}:{' '}
           <a
             href="https://docs.agentos.io"
             className="text-primary hover:underline"
