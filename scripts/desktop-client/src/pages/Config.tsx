@@ -1,354 +1,252 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
-  Settings,
+  Settings as SettingsIcon,
   Save,
+  RotateCcw,
+  FileText,
   FolderOpen,
-  RefreshCw,
-  FileJson,
   AlertTriangle,
   CheckCircle2,
+  Copy,
+  Download,
 } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../utils/tauriCompat";
+import { useI18n } from "../i18n";
 
 const CONFIG_FILES = [
-  {
-    name: "Environment Variables",
-    path: ".env.production",
-    description: "Database, Redis, JWT, and API configuration",
-    icon: "🔐",
-    sensitive: true,
-  },
-  {
-    name: "Main Configuration",
-    path: "config/agentos.yaml",
-    description: "Core AgentOS settings and parameters",
-    icon: "⚙️",
-    sensitive: false,
-  },
-  {
-    name: "Docker Compose (Dev)",
-    path: "docker/docker-compose.yml",
-    description: "Development environment service definitions",
-    icon: "🐳",
-    sensitive: false,
-  },
-  {
-    name: "Docker Compose (Prod)",
-    path: "docker/docker-compose.prod.yml",
-    description: "Production environment service definitions",
-    icon: "🏭",
-    sensitive: false,
-  },
+  { id: "docker-compose", name: "docker-compose.yml", path: "config/docker-compose.yml", icon: "🐳" },
+  { id: "env", name: ".env", path: "config/.env", icon: "⚙️" },
+  { id: "kernel", name: "kernel-config.yaml", path: "config/kernel-config.yaml", icon: "🔧" },
+  { id: "gateway", name: "gateway.yaml", path: "config/gateway.yaml", icon: "🌐" },
 ];
 
 const Config: React.FC = () => {
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [fileContent, setFileContent] = useState("");
+  const { t } = useI18n();
+  const [selectedFile, setSelectedFile] = useState("docker-compose");
+  const [content, setContent] = useState("");
   const [originalContent, setOriginalContent] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error" | "warning"; text: string } | null>(null);
+  const [hasChanges, setHasChanges] = useState(false);
 
-  useEffect(() => {
-    if (CONFIG_FILES.length > 0 && !selectedFile) {
-      setSelectedFile(CONFIG_FILES[0].path);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (selectedFile) {
-      loadConfigFile(selectedFile);
-    }
-  }, [selectedFile]);
-
-  const loadConfigFile = async (filePath: string) => {
+  const loadConfig = async (fileId?: string) => {
+    const targetId = fileId || selectedFile;
     setLoading(true);
-    setMessage(null);
     try {
-      const content = await invoke<string>("read_config_file", { path: filePath });
-      setFileContent(content);
-      setOriginalContent(content);
+      const file = CONFIG_FILES.find(f => f.id === targetId) || CONFIG_FILES[0];
+      const configContent = await invoke<string>("read_config_file", { filePath: file.path });
+      setContent(configContent);
+      setOriginalContent(configContent);
+      setSelectedFile(targetId);
+      setHasChanges(false);
     } catch (error) {
-      console.error("Failed to load config file:", error);
-      setFileContent("");
-      setOriginalContent("");
-      setMessage({ type: "error", text: `Failed to load file: ${error}` });
+      console.error("Failed to load config:", error);
+      setContent(`# Failed to load configuration\n# Error: ${error}\n`);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSaveFile = async () => {
-    if (!selectedFile) return;
-
+  const handleSaveConfig = async () => {
+    if (!hasChanges) return;
     setSaving(true);
-    setMessage(null);
-
     try {
-      await invoke("write_config_file", {
-        path: selectedFile,
-        content: fileContent,
-      });
-
-      setOriginalContent(fileContent);
-      setMessage({ type: "success", text: "Configuration saved successfully!" });
+      const file = CONFIG_FILES.find(f => f.id === selectedFile) || CONFIG_FILES[0];
+      await invoke("write_config_file", { filePath: file.path, content });
+      setOriginalContent(content);
+      setHasChanges(false);
     } catch (error) {
-      console.error("Failed to save config file:", error);
-      setMessage({ type: "error", text: `Failed to save: ${error}` });
+      console.error("Failed to save config:", error);
+      alert(`${t.config.saveFailed}: ${error}`);
     } finally {
       setSaving(false);
-      setTimeout(() => setMessage(null), 3000);
     }
   };
 
   const handleDiscardChanges = () => {
-    setFileContent(originalContent);
-    setMessage({ type: "warning", text: "Changes discarded" });
-    setTimeout(() => setMessage(null), 2000);
+    if (confirm(t.config.discardConfirm)) {
+      setContent(originalContent);
+      setHasChanges(false);
+    }
   };
 
-  const hasUnsavedChanges = fileContent !== originalContent;
-  const selectedConfig = CONFIG_FILES.find((f) => f.path === selectedFile);
+  const handleContentChange = (newContent: string) => {
+    setContent(newContent);
+    setHasChanges(newContent !== originalContent);
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(content);
+  };
 
   return (
-    <div>
-      {/* Header */}
-      <div className="card" style={{ marginBottom: "20px" }}>
-        <h3 className="card-title" style={{ marginBottom: 0 }}>
-          <Settings size={20} />
-          Configuration Management
-        </h3>
+    <div className="page-container">
+      {/* Page Header */}
+      <div className="page-header">
+        <h1>{t.config.title}</h1>
+        <p style={{ color: "var(--text-secondary)", fontSize: "15px" }}>
+          Edit and manage system configuration files
+        </p>
       </div>
 
-      {/* Message Banner */}
-      {message && (
-        <div
-          style={{
-            padding: "12px 20px",
-            borderRadius: "8px",
-            marginBottom: "20px",
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            background:
-              message.type === "success"
-                ? "rgba(16, 185, 129, 0.15)"
-                : message.type === "error"
-                ? "rgba(239, 68, 68, 0.15)"
-                : "rgba(245, 158, 11, 0.15)",
-            border: `1px solid ${
-              message.type === "success"
-                ? "#10b981"
-                : message.type === "error"
-                ? "#ef4444"
-                : "#f59e0b"
-            }`,
-          }}
-        >
-          {message.type === "success" && <CheckCircle2 size={18} color="#10b981" />}
-          {message.type === "error" && <AlertTriangle size={18} color="#ef4444" />}
-          {message.type === "warning" && <AlertTriangle size={18} color="#f59e0b" />}
-          <span>{message.text}</span>
-        </div>
-      )}
-
-      <div className="grid-2">
-        {/* File List */}
-        <div className="card">
-          <h3 className="card-title">
-            <FolderOpen size={20} />
+      {/* Main Layout */}
+      <div style={{ display: "flex", gap: "16px", height: "calc(100vh - 220px)" }}>
+        {/* File Tree Sidebar */}
+        <div className="card card-elevated" style={{
+          width: "260px", flexShrink: 0,
+          display: "flex", flexDirection: "column",
+          overflow: "hidden"
+        }}>
+          <h3 className="card-title" style={{ padding: "16px 16px 12px", margin: 0 }}>
+            <FolderOpen size={16} />
             Configuration Files
           </h3>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <div style={{ flex: 1, overflowY: "auto", padding: "0 8px 8px" }}>
             {CONFIG_FILES.map((file) => (
-              <div
-                key={file.path}
-                onClick={() => setSelectedFile(file.path)}
+              <button
+                key={file.id}
+                onClick={() => loadConfig(file.id)}
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  padding: "14px",
-                  background:
-                    selectedFile === file.path
-                      ? "rgba(59, 130, 246, 0.1)"
-                      : "var(--bg-tertiary)",
-                  borderRadius: "10px",
-                  cursor: "pointer",
-                  border: selectedFile === file.path
-                    ? "1px solid var(--primary-color)"
-                    : "1px solid transparent",
-                  transition: "all 0.2s ease",
+                  display: "flex", alignItems: "center", gap: "10px",
+                  width: "100%", padding: "10px 14px",
+                  borderRadius: "var(--radius-md)",
+                  border: "none", background: selectedFile === file.id ? "var(--primary-light)" : "transparent",
+                  cursor: "pointer", transition: "all var(--transition-fast)",
+                  textAlign: "left", marginBottom: "2px"
                 }}
+                onMouseEnter={(e) => { if (selectedFile !== file.id) e.currentTarget.style.background = "var(--bg-tertiary)" }}
+                onMouseLeave={(e) => { if (selectedFile !== file.id) e.currentTarget.style.background = "transparent" }}
               >
-                <span style={{ fontSize: "24px" }}>{file.icon}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: "14px" }}>{file.name}</div>
-                  <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                    {file.description}
+                <span style={{ fontSize: "18px" }}>{file.icon}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontWeight: selectedFile === file.id ? 600 : 400,
+                    fontSize: "13.5px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
+                  }}>
+                    {file.name}
+                  </div>
+                  <div style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>
+                    {file.path}
                   </div>
                 </div>
-                {file.sensitive && (
-                  <span
-                    className="status-badge status-warning"
-                    style={{ fontSize: "11px" }}
-                  >
-                    Sensitive
-                  </span>
-                )}
-              </div>
+              </button>
             ))}
           </div>
         </div>
 
-        {/* Editor */}
-        <div className="card">
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "16px",
-            }}
-          >
-            <h3 className="card-title" style={{ marginBottom: 0 }}>
-              <FileJson size={20} />
-              {selectedConfig?.name || "Select a file"}
-            </h3>
-
-            <div style={{ display: "flex", gap: "8px" }}>
-              <button
-                className="btn btn-secondary"
-                onClick={() => selectedFile && loadConfigFile(selectedFile)}
-                disabled={loading}
-              >
-                <RefreshCw size={16} />
-                Reload
-              </button>
-
-              {hasUnsavedChanges && (
-                <button
-                  className="btn btn-secondary"
-                  onClick={handleDiscardChanges}
-                >
-                  Discard
-                </button>
+        {/* Editor Area */}
+        <div className="card card-elevated" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          {/* Editor Header */}
+          <div style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            padding: "10px 16px", background: "var(--bg-secondary)",
+            borderBottom: "1px solid var(--border-subtle)",
+            flexShrink: 0
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <FileText size={15} />
+              <span style={{ fontWeight: 500, fontSize: "13.5px", fontFamily: "'JetBrains Mono', monospace" }}>
+                {CONFIG_FILES.find(f => f.id === selectedFile)?.name}
+              </span>
+              {hasChanges && (
+                <span className="tag" style={{ background: "#f59e0b20", color: "#f59e0b", fontSize: "11px" }}>Modified</span>
               )}
-
-              <button
-                className="btn btn-primary"
-                onClick={handleSaveFile}
-                disabled={saving || !hasUnsavedChanges}
-              >
-                {saving ? (
-                  <>
-                    <span className="loading-spinner" style={{ width: 16, height: 16 }} />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save size={16} />
-                    Save
-                  </>
-                )}
+            </div>
+            <div style={{ display: "flex", gap: "6px" }}>
+              <button className="btn btn-ghost btn-sm" onClick={copyToClipboard} title="Copy">
+                <Copy size={13} />Copy
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={() => loadConfig()} disabled={loading} title="Reload">
+                <RotateCcw size={13} />Reload
+              </button>
+              <button className="btn btn-danger btn-sm" onClick={handleDiscardChanges} disabled={!hasChanges}>
+                Discard
+              </button>
+              <button className="btn btn-primary btn-sm" onClick={handleSaveConfig} disabled={!hasChanges || saving}>
+                {saving ? <><span className="loading-spinner" style={{ width: 13, height: 13, borderWidth: "2px", margin: 0 }} /></> : <><Save size={13} />Save</>}
               </button>
             </div>
           </div>
 
-          {/* Unsaved Changes Indicator */}
-          {hasUnsavedChanges && (
-            <div
-              style={{
-                padding: "8px 12px",
-                background: "rgba(245, 158, 11, 0.15)",
-                border: "1px solid #f59e0b",
-                borderRadius: "6px",
-                marginBottom: "12px",
-                fontSize: "13px",
-                color: "#f59e0b",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-              }}
-            >
-              <AlertTriangle size={14} />
-              You have unsaved changes
-            </div>
-          )}
+          {/* Code Editor */}
+          <div style={{ flex: 1, overflow: "auto", position: "relative" }}>
+            {loading ? (
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
+                <div className="loading-spinner" />
+              </div>
+            ) : (
+              <>
+                {/* Line Numbers + Content */}
+                <div style={{
+                  display: "flex", minHeight: "100%",
+                  fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
+                  fontSize: "13px", lineHeight: "1.7"
+                }}>
+                  {/* Line Numbers */}
+                  <div style={{
+                    padding: "16px 8px", background: "var(--bg-secondary)",
+                    textAlign: "right", userSelect: "none",
+                    color: "var(--text-muted)", opacity: 0.4,
+                    borderRight: "1px solid var(--border-subtle)"
+                  }}>
+                    {content.split("\n").map((_, i) => (
+                      <div key={i} style={{ height: "22px" }}>{i + 1}</div>
+                    ))}
+                  </div>
 
-          {/* Editor Area */}
-          {loading ? (
-            <div style={{ textAlign: "center", padding: "60px" }}>
-              <div className="loading-spinner" />
-            </div>
-          ) : (
-            <textarea
-              className="textarea-field"
-              value={fileContent}
-              onChange={(e) => setFileContent(e.target.value)}
-              style={{
-                minHeight: "450px",
-                fontFamily: "'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace",
-                fontSize: "13px",
-                lineHeight: "1.6",
-                tabSize: 2,
-              }}
-              placeholder="Select a configuration file to edit..."
-            />
-          )}
+                  {/* Textarea */}
+                  <textarea
+                    value={content}
+                    onChange={(e) => handleContentChange(e.target.value)}
+                    spellCheck={false}
+                    style={{
+                      flex: 1, padding: "16px", resize: "none",
+                      background: "var(--bg-primary)", color: "var(--text-secondary)",
+                      border: "none", outline: "none", caretColor: "var(--primary-color)",
+                      fontFamily: "inherit", fontSize: "inherit", lineHeight: "inherit",
+                      tabSize: 2
+                    }}
+                  />
+                </div>
 
-          {/* File Info */}
-          {selectedFile && !loading && (
-            <div
-              style={{
-                marginTop: "12px",
-                paddingTop: "12px",
-                borderTop: "1px solid var(--border-color)",
-                display: "flex",
-                justifyContent: "space-between",
-                fontSize: "12px",
-                color: "var(--text-muted)",
-              }}
-            >
-              <span>Path: {selectedFile}</span>
-              <span>
-                Lines: {fileContent.split("\n").length} • Size:{" "}
-                {(new TextEncoder().encode(fileContent).length / 1024).toFixed(1)} KB
-              </span>
-            </div>
-          )}
+                {/* Save Status Indicator */}
+                {!hasChanges && content && (
+                  <div style={{
+                    position: "absolute", bottom: "12px", right: "12px",
+                    display: "flex", alignItems: "center", gap: "6px",
+                    padding: "6px 12px", borderRadius: "var(--radius-md)",
+                    background: "rgba(34, 197, 94, 0.1)", color: "#22c55e",
+                    fontSize: "12px", fontWeight: 500
+                  }}>
+                    <CheckCircle2 size={13} />Saved
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Warning for sensitive files */}
-      {selectedConfig?.sensitive && (
-        <div
-          className="card"
-          style={{
-            marginTop: "20px",
-            background: "rgba(245, 158, 11, 0.08)",
-            borderColor: "#f59e0b",
-          }}
-        >
-          <div style={{ display: "flex", gap: "12px", alignItems: "start" }}>
-            <AlertTriangle size={24} color="#f59e0b" style={{ flexShrink: 0 }} />
-            <div>
-              <h4 style={{ color: "#f59e0b", marginBottom: "8px" }}>Security Notice</h4>
-              <p style={{ color: "var(--text-secondary)", fontSize: "14px", lineHeight: "1.6" }}>
-                This configuration file contains sensitive information such as passwords,
-                API keys, and secret tokens. Please ensure you:
-              </p>
-              <ul style={{ color: "var(--text-secondary)", paddingLeft: "20px", marginTop: "8px" }}>
-                <li>Do not commit this file to version control</li>
-                <li>Use strong, unique passwords</li>
-                <li>Rotate secrets regularly in production</li>
-                <li>Never share these values publicly</li>
-              </ul>
-            </div>
+      {/* Info Card */}
+      <div className="card card-elevated" style={{ marginTop: "16px" }}>
+        <div style={{ display: "flex", gap: "24px", alignItems: "start" }}>
+          <div style={{ flex: 1 }}>
+            <h3 className="card-title"><AlertTriangle size={18} />{t.config.warning}</h3>
+            <p style={{ color: "var(--text-secondary)", fontSize: "13.5px", lineHeight: "1.7", margin: 0 }}>
+              {t.config.warningMessage}
+            </p>
+          </div>
+          <div style={{ flex: 1 }}>
+            <h3 className="card-title"><SettingsIcon size={18} />Tips</h3>
+            <ul style={{ color: "var(--text-secondary)", fontSize: "13.5px", lineHeight: "1.9", paddingLeft: "20px", margin: 0 }}>
+              <li>Use YAML syntax highlighting for .yaml files</li>
+              <li>Environment variables in .env should be KEY=VALUE format</li>
+              <li>Docker Compose files support service definitions</li>
+              <li>Always backup before making changes</li>
+            </ul>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };

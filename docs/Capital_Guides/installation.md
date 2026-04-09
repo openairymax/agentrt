@@ -1,8 +1,13 @@
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+"From data intelligence emerges."
+
 # 安装指南
 
-**版本**: 1.0.0  
-**难度**: ⭐⭐ 基础  
-**预计时间**: 15-30分钟（取决于安装方式）  
+**版本**: Doc V1.8
+**最后更新**: 2026-04-09
+**难度**: ⭐⭐ 基础
+**预计时间**: 15-30分钟（取决于安装方式）
+**作者**: Team  
 
 ---
 

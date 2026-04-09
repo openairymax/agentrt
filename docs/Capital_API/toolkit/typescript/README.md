@@ -1,10 +1,10 @@
-Copyright (c) 2026 SPHARX. All Rights Reserved.
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 "From data intelligence emerges."
 
 # TypeScript SDK 文档
 
 **版本**: v1.0.0.7  
-**最后更新**: 2026-03-23  
+**最后更新**: 2026-04-09  
 **状态**: 生产就绪
 
 ---
