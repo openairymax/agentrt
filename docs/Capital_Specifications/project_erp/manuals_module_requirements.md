@@ -1,10 +1,10 @@
-Copyright (c) 2026 SPHARX. All Rights Reserved.
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 "From data intelligence emerges."
 
 # manuals 模块功能需求与技术规范
 
-**版本**: Doc V1.7  
-**最后更新**: 2026-03-31  
+**版本**: Doc V1.8  
+**最后更新**: 2026-04-09  
 **作者**: LirenWang  
 **状态**: 需求分析阶段  
 **理论基础**: 工程两论（反馈闭环）、系统工程（层次分解）、五维正交系统（系统观、内核观、认知观、工程观、设计美学）  

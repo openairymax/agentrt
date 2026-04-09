@@ -6,8 +6,8 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 **版本**: V1.9  
 **更新**: 2026-04-09  
 **状态**: 正式发布  
-**路径**: `docs/ARCHITECTURAL_PRINCIPLES.md` (原路径: `agentos/manuals/ARCHITECTURAL_PRINCIPLES.md`)
-**作者**: AgentOS Team
+**路径**: `docs/ARCHITECTURAL_PRINCIPLES.md`  
+**作者**: Team  
   - Zhixian Zhou | Spharx Ltd. zhouzhixian@spharx.cn
   - Liren Wang | Spharx Ltd. wangliren@spharx.cn
   - Chen Zhang | SJTU CSC Lab. yoyoke@sjtu.edu.cn
@@ -35,7 +35,7 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 
 | 版本 | 日期 | 作者 | 变更说明 |
 |------|------|------|----------|
-| Doc V1.9 | 2026-04-09 | AgentOS Team | 引入体系并行论作为核心理论框架，将五维正交系统定位为其具体实例 |
+| Doc V1.9 | 2026-04-09 | ZhixianZhou | 引入体系并行论 |
 | Doc V1.8 | 2026-04-02 | DechengLi | 工程化改进 |
 | Doc V1.6 | 2026-03-25 | DechengLi | 优化理论基础 |
 | Doc V1.5 | 2026-03-24 | DechengLi | 增加起源章节 |
