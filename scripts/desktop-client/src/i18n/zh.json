@@ -14,7 +14,8 @@
     "config": "配置",
     "logs": "日志",
     "terminal": "终端",
-    "settings": "设置"
+    "settings": "设置",
+    "llmConfig": "AI 模型"
   },
   "dashboard": {
     "title": "系统概览",
@@ -191,7 +192,11 @@
     "dockerComposeDev": "Docker Compose（开发）",
     "dockerComposeDevDesc": "开发环境服务定义",
     "dockerComposeProd": "Docker Compose（生产）",
-    "dockerComposeProdDesc": "生产环境服务定义"
+    "dockerComposeProdDesc": "生产环境服务定义",
+    "saveFailed": "保存配置失败",
+    "discardConfirm": "确定要放弃所有更改吗？",
+    "warning": "警告",
+    "warningMessage": "修改配置文件可能会影响系统行为。请确保在更改前进行备份。"
   },
   "logs": {
     "title": "日志查看器",
@@ -255,7 +260,10 @@
     "showLogsTail": "查看日志（尾部）",
     "healthCheck": "健康检查",
     "stopAllServices": "停止所有服务",
-    "cleanUpResources": "清理资源"
+    "cleanUpResources": "清理资源",
+    "welcomeMessage": "欢迎使用 AgentOS 终端",
+    "enterCommandHint": "输入命令并按 Enter 执行",
+    "enterCommand": "输入命令..."
   },
   "common": {
     "loading": "加载中...",
@@ -274,7 +282,8 @@
     "retry": "重试",
     "connected": "已连接",
     "disconnected": "已断开",
-    "systemConnected": "系统已连接"
+    "systemConnected": "系统已连接",
+    "notifications": "通知"
   },
   "update": {
     "available": "有可用更新",
@@ -317,6 +326,7 @@
     "platform": "平台",
     "architecture": "架构",
     "version": "版本",
+    "cpuCores": "CPU 核心数",
     "loadingSystemInfo": "正在加载系统信息...",
     "actions": "操作",
     "save": "保存设置",
@@ -333,5 +343,47 @@
     "projectPath": "项目路径",
     "minimizeToTray": "最小化到系统托盘",
     "checkUpdatesOnStartup": "启动时检查更新"
+  },
+  "llmConfig": {
+    "title": "AI 模型配置",
+    "description": "配置您的 AI 模型 API 密钥和设置。AgentOS 支持多个提供商。",
+    "providers": "已配置的提供商",
+    "addProvider": "添加提供商",
+    "selectProvider": "选择 AI 提供商",
+    "noProviders": "未配置 AI 提供商",
+    "noProvidersHint": "点击\"添加提供商\"配置您的第一个 AI 模型",
+    "activeProviders": "已启用的 AI 提供商",
+    "enabled": "启用",
+    "model": "模型",
+    "apiKey": "API 密钥",
+    "apiKeyPlaceholder": "sk-...",
+    "baseUrl": "API 基础地址",
+    "testConnection": "测试连接",
+    "testing": "测试中...",
+    "connectionSuccess": "{provider} 连接成功！",
+    "connectionFailed": "连接失败：{error}",
+    "connected": "已连接",
+    "failed": "失败",
+    "notTested": "未测试",
+    "lastTested": "上次测试",
+    "enterApiKey": "请先输入 API 密钥",
+    "deleteConfirm": "确定要删除此提供商吗？",
+    "pricing": "定价",
+    "perMillion": "每百万 Token（输入/输出）",
+    "localModel": "免费本地模型",
+    "modelsAvailable": "个模型可用",
+    "customApi": "自定义 API 端点",
+    "help": "帮助与文档",
+    "helpOpenai": "从 platform.openai.com 获取 API 密钥。支持 GPT-4、GPT-3.5 和 O1 系列模型。",
+    "helpAzure": "使用 Azure OpenAI 服务，需要部署 URL 和 API 密钥。企业级服务，区域可用。",
+    "helpAnthropic": "从 console.anthropic.com 获取 API 密钥。支持 Claude 3.5 Sonnet、Haiku 和 Opus 模型。",
+    "helpLocal": "使用 Ollama 在本地运行模型。从 ollama.ai 安装，然后运行 'ollama pull llama3.2' 下载模型。",
+    "recommended": "推荐",
+    "fastest": "最快",
+    "mostCapable": "最强大",
+    "costEffective": "高性价比",
+    "usageEstimate": "预估月费用",
+    "tokensUsed": "已使用 Token",
+    "resetUsage": "重置使用统计"
   }
 }

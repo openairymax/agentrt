@@ -8,6 +8,8 @@ import {
   CheckCircle2,
   Loader2,
   AlertCircle,
+  Zap,
+  ListTodo,
 } from "lucide-react";
 import { invoke } from "../utils/tauriCompat";
 import { useI18n } from "../i18n";
@@ -24,7 +26,7 @@ interface TaskInfo {
 const Tasks: React.FC = () => {
   const { t } = useI18n();
   const [taskDescription, setTaskDescription] = useState("");
-  const [selectedAgent, setSelectedAgent] = useState("");
+  const [selectedAgent, setSelectedAgent] = useState("agent-001");
   const [priority, setPriority] = useState("normal");
   const [tasks, setTasks] = useState<TaskInfo[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -79,15 +81,15 @@ const Tasks: React.FC = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "completed":
-        return <CheckCircle2 size={16} color="#10b981" />;
+        return <CheckCircle2 size={16} color="#22c55e" />;
       case "running":
-        return <Loader2 size={16} color="#3b82f6" className="spin" />;
+        return <Loader2 size={16} color="#6366f1" className="spin" />;
       case "failed":
         return <XCircle size={16} color="#ef4444" />;
       case "cancelled":
         return <XCircle size={16} color="#f59e0b" />;
       default:
-        return <Clock size={16} color="#94a3b8" />;
+        return <Clock size={16} color="#9ca3af" />;
     }
   };
 
@@ -102,40 +104,55 @@ const Tasks: React.FC = () => {
     }
   };
 
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case "completed": return "status-running";
+      case "running": return "status-warning";
+      case "failed": return "status-error";
+      case "cancelled": return "status-stopped";
+      default: return "status-idle";
+    }
+  };
+
   return (
-    <div>
-      <div className="card" style={{ marginBottom: "20px" }}>
-        <h3 className="card-title" style={{ marginBottom: 0 }}>
-          <ClipboardList size={20} />
-          {t.tasks.title}
-        </h3>
+    <div className="page-container">
+      {/* Page Header */}
+      <div className="page-header">
+        <h1>{t.tasks.title}</h1>
+        <p style={{ color: "var(--text-secondary)", fontSize: "15px" }}>
+          Submit and manage AI agent tasks
+        </p>
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          gap: "4px",
-          marginBottom: "20px",
-          background: "var(--bg-secondary)",
-          padding: "4px",
-          borderRadius: "10px",
-          width: "fit-content",
-        }}
-      >
+      {/* Tab Navigation */}
+      <div style={{
+        display: "flex",
+        gap: "4px",
+        marginBottom: "24px",
+        background: "var(--bg-secondary)",
+        padding: "4px",
+        borderRadius: "var(--radius-lg)",
+        width: "fit-content",
+        border: "1px solid var(--border-subtle)",
+      }}>
         <button
           onClick={() => setActiveTab("submit")}
           style={{
             padding: "10px 24px",
             border: "none",
-            borderRadius: "8px",
+            borderRadius: "var(--radius-md)",
             background: activeTab === "submit" ? "var(--primary-color)" : "transparent",
             color: activeTab === "submit" ? "white" : "var(--text-secondary)",
             cursor: "pointer",
             fontWeight: 500,
-            transition: "all 0.2s ease",
+            transition: "all var(--transition-fast)",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            fontSize: "13.5px",
           }}
         >
-          <Plus size={16} style={{ display: "inline", marginRight: 6 }} />
+          <Plus size={16} />
           {t.tasks.submitTask}
         </button>
         <button
@@ -143,42 +160,37 @@ const Tasks: React.FC = () => {
           style={{
             padding: "10px 24px",
             border: "none",
-            borderRadius: "8px",
+            borderRadius: "var(--radius-md)",
             background: activeTab === "history" ? "var(--primary-color)" : "transparent",
             color: activeTab === "history" ? "white" : "var(--text-secondary)",
             cursor: "pointer",
             fontWeight: 500,
-            transition: "all 0.2s ease",
+            transition: "all var(--transition-fast)",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            fontSize: "13.5px",
           }}
         >
-          <Clock size={16} style={{ display: "inline", marginRight: 6 }} />
+          <Clock size={16} />
           {t.tasks.taskHistory} ({tasks.length})
         </button>
       </div>
 
       {activeTab === "submit" ? (
         <div className="grid-2">
-          <div className="card">
+          {/* Submit Form */}
+          <div className="card card-elevated">
             <h3 className="card-title">
-              <Send size={20} />
+              <Zap size={18} />
               {t.tasks.newTask}
             </h3>
 
             <form onSubmit={handleSubmitTask}>
-              <div style={{ marginBottom: "20px" }}>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "8px",
-                    fontSize: "14px",
-                    fontWeight: 500,
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  {t.tasks.selectAgent} *
-                </label>
+              <div className="form-group">
+                <label className="form-label">{t.tasks.selectAgent} *</label>
                 <select
-                  className="input-field"
+                  className="form-select"
                   value={selectedAgent}
                   onChange={(e) => setSelectedAgent(e.target.value)}
                   required
@@ -190,20 +202,10 @@ const Tasks: React.FC = () => {
                 </select>
               </div>
 
-              <div style={{ marginBottom: "20px" }}>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "8px",
-                    fontSize: "14px",
-                    fontWeight: 500,
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  {t.tasks.priorityLevel}
-                </label>
+              <div className="form-group">
+                <label className="form-label">{t.tasks.priorityLevel}</label>
                 <select
-                  className="input-field"
+                  className="form-select"
                   value={priority}
                   onChange={(e) => setPriority(e.target.value)}
                 >
@@ -214,31 +216,21 @@ const Tasks: React.FC = () => {
                 </select>
               </div>
 
-              <div style={{ marginBottom: "20px" }}>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "8px",
-                    fontSize: "14px",
-                    fontWeight: 500,
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  {t.tasks.taskDescription} *
-                </label>
+              <div className="form-group">
+                <label className="form-label">{t.tasks.taskDescription} *</label>
                 <textarea
                   className="textarea-field"
                   value={taskDescription}
                   onChange={(e) => setTaskDescription(e.target.value)}
                   placeholder={t.tasks.descriptionPlaceholder}
                   required
-                  rows={6}
+                  rows={5}
                 />
               </div>
 
               <button
                 type="submit"
-                className="btn btn-primary"
+                className="btn btn-primary btn-lg"
                 disabled={submitting || !selectedAgent || !taskDescription.trim()}
                 style={{ width: "100%" }}
               >
@@ -257,38 +249,39 @@ const Tasks: React.FC = () => {
             </form>
           </div>
 
-          <div className="card">
+          {/* Guidelines */}
+          <div className="card card-elevated">
             <h3 className="card-title">
-              <AlertCircle size={20} />
+              <AlertCircle size={18} />
               {t.tasks.guidelines}
             </h3>
-            <div style={{ color: "var(--text-secondary)", lineHeight: "1.8", fontSize: "14px" }}>
-              <p style={{ marginBottom: "12px" }}>
-                <strong>{t.tasks.bestPractices}</strong>
+            <div style={{ color: "var(--text-secondary)", lineHeight: "1.9", fontSize: "14px" }}>
+              <p style={{ marginBottom: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
+                {t.tasks.bestPractices}
               </p>
-              <ul style={{ paddingLeft: "20px", marginBottom: "12px" }}>
-                <li>{t.tasks.beSpecific}</li>
-                <li>{t.tasks.includeFormat}</li>
-                <li>{t.tasks.setPriority}</li>
+              <ul style={{ paddingLeft: "20px", marginBottom: "16px" }}>
+                <li style={{ marginBottom: "6px" }}>{t.tasks.beSpecific}</li>
+                <li style={{ marginBottom: "6px" }}>{t.tasks.includeFormat}</li>
+                <li style={{ marginBottom: "6px" }}>{t.tasks.setPriority}</li>
                 <li>{t.tasks.provideContext}</li>
               </ul>
 
-              <p style={{ marginBottom: "12px" }}>
-                <strong>{t.tasks.exampleTasks}</strong>
+              <p style={{ marginBottom: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
+                {t.tasks.exampleTasks}
               </p>
               <ul style={{ paddingLeft: "20px" }}>
-                <li>"Review PR #123 for code quality issues"</li>
-                <li>"Generate unit tests for auth module"</li>
-                <li>"Analyze Q4 performance metrics"</li>
+                <li style={{ marginBottom: "6px" }}>"Review PR #123 for code quality issues"</li>
+                <li style={{ marginBottom: "6px" }}>"Generate unit tests for auth module"</li>
+                <li style={{ marginBottom: "6px" }}>"Analyze Q4 performance metrics"</li>
                 <li>"Research latest trends in microservices architecture"</li>
               </ul>
             </div>
           </div>
         </div>
       ) : (
-        <div className="card">
+        <div className="card card-elevated">
           <h3 className="card-title">
-            <Clock size={20} />
+            <ListTodo size={18} />
             {t.tasks.recentTasks} ({tasks.length})
           </h3>
 
@@ -299,6 +292,9 @@ const Tasks: React.FC = () => {
               <div className="empty-state-hint">
                 {t.tasks.switchToSubmit}
               </div>
+              <button className="btn btn-primary mt-8" onClick={() => setActiveTab("submit")}>
+                <Plus size={16} /> {t.tasks.submitTask}
+              </button>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -309,65 +305,45 @@ const Tasks: React.FC = () => {
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    padding: "16px",
+                    padding: "18px 20px",
                     background: "var(--bg-tertiary)",
-                    borderRadius: "10px",
+                    borderRadius: "var(--radius-lg)",
                     borderLeft: `4px solid ${
                       task.status === "completed"
-                        ? "#10b981"
+                        ? "#22c55e"
                         : task.status === "running"
-                        ? "#3b82f6"
+                        ? "#6366f1"
                         : task.status === "failed"
                         ? "#ef4444"
-                        : "#94a3b8"
+                        : "#9ca3af"
                     }`,
+                    transition: "all var(--transition-fast)",
                   }}
                 >
                   <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
                       {getStatusIcon(task.status)}
                       <span style={{ fontWeight: 600, fontSize: "15px" }}>
                         Task #{task.id.substring(0, 8)}...
                       </span>
-                      <span
-                        className={`status-badge ${
-                          task.status === "completed"
-                            ? "status-running"
-                            : task.status === "running"
-                            ? "status-warning"
-                            : "status-stopped"
-                        }`}
-                      >
+                      <span className={`badge ${getStatusBadgeClass(task.status)}`}>
                         {getStatusLabel(task.status)}
                       </span>
                     </div>
 
-                    <div style={{ fontSize: "13px", color: "var(--text-muted)", marginLeft: "26px" }}>
+                    <div style={{ fontSize: "13px", color: "var(--text-muted)", marginLeft: "28px" }}>
                       {t.tasks.agent}: {task.agent_id} • {t.tasks.created}: {new Date(task.created_at).toLocaleString()}
                     </div>
 
                     {task.status === "running" && (
-                      <div style={{ marginTop: "8px", marginLeft: "26px" }}>
-                        <div
-                          style={{
-                            height: "6px",
-                            background: "var(--bg-primary)",
-                            borderRadius: "3px",
-                            overflow: "hidden",
-                            maxWidth: "300px",
-                          }}
-                        >
+                      <div style={{ marginTop: "10px", marginLeft: "28px" }}>
+                        <div className="progress-bar" style={{ maxWidth: "320px" }}>
                           <div
-                            style={{
-                              width: `${task.progress}%`,
-                              height: "100%",
-                              background: "linear-gradient(90deg, #3b82f6, #8b5cf6)",
-                              borderRadius: "3px",
-                              transition: "width 0.3s ease",
-                            }}
+                            className="progress-bar-fill"
+                            style={{ width: `${task.progress}%` }}
                           />
                         </div>
-                        <span style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px", display: "inline-block" }}>
+                        <span style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "6px", display: "inline-block" }}>
                           {Math.round(task.progress)}% {t.tasks.complete}
                         </span>
                       </div>
@@ -376,8 +352,8 @@ const Tasks: React.FC = () => {
 
                   {(task.status === "pending" || task.status === "running") && (
                     <button
-                      className="btn btn-danger"
-                      style={{ padding: "6px 12px", fontSize: "13px", marginLeft: "16px" }}
+                      className="btn btn-danger btn-sm"
+                      style={{ marginLeft: "16px" }}
                       onClick={() => handleCancelTask(task.id)}
                     >
                       <XCircle size={14} />

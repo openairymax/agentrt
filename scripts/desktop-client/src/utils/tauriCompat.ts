@@ -58,7 +58,11 @@ const mockInvoke = async <T = unknown>(cmd: string, args?: Record<string, unknow
       exit_code: 0,
       duration_ms: 150
     },
-    test_backend_connection: { success: true, message: "Connection successful" }
+    test_backend_connection: { success: true, message: "Connection successful" },
+    test_llm_connection: { success: true, message: "API connection successful", models: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"] },
+    save_settings: { success: true, message: "Settings saved" },
+    select_directory: "C:\\Users\\Developer\\AgentOS",
+    get_llm_usage: { total_tokens: 125000, input_tokens: 85000, output_tokens: 40000, estimated_cost: 2.15 }
   };
 
   if (cmd === "read_config_file") {

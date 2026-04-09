@@ -19,7 +19,7 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 BLUE='\033[0;34m'; MAGENTA='\033[0;35m'; NC='\033[0m'
 
-log_info()  { echo -e "${BLUE][QG]${NC}   $*"; }
+log_info()  { echo -e "${BLUE}[QG]${NC}   $*"; }
 log_ok()    { echo -e "${GREEN}[QG-OK]${NC}  $*"; }
 log_warn()  { echo -e "${YELLOW}[QG-WARN]${NC} $*"; }
 log_error() { echo -e "${RED}[QG-ERR]${NC}  $*" >&2; }
