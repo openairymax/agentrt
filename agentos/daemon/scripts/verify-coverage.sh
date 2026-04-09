@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 # 代码覆盖率验证脚本
 # 用于验证代码覆盖率是否达到目标值

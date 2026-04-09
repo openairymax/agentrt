@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file strategy_common.h
  * @brief 策略模式共享工具 - 消除策略相关代码重复
  * 

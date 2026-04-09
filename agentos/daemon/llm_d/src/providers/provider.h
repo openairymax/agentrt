@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file provider.h
  * @brief 提供商适配器接口定义
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

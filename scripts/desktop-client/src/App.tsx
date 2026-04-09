@@ -5,11 +5,12 @@ import {
   Server,
   Users,
   ClipboardList,
-  Settings,
+  Settings as SettingsIcon,
   FileText,
   Terminal,
   Activity,
   Rocket,
+  Cog,
 } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
 import Services from "./pages/Services";
@@ -18,6 +19,7 @@ import Tasks from "./pages/Tasks";
 import Config from "./pages/Config";
 import Logs from "./pages/Logs";
 import TerminalPage from "./pages/Terminal";
+import Settings from "./pages/Settings";
 
 const navItems = [
   { section: "Main", items: [
@@ -27,9 +29,10 @@ const navItems = [
     { path: "/tasks", icon: ClipboardList, label: "Tasks" },
   ]},
   { section: "System", items: [
-    { path: "/config", icon: Settings, label: "Configuration" },
+    { path: "/config", icon: SettingsIcon, label: "Configuration" },
     { path: "/logs", icon: FileText, label: "Logs" },
     { path: "/terminal", icon: Terminal, label: "Terminal" },
+    { path: "/settings", icon: Cog, label: "Settings" },
   ]},
 ];
 
@@ -101,6 +104,7 @@ function App() {
               <Route path="/config" element={<Config />} />
               <Route path="/logs" element={<Logs />} />
               <Route path="/terminal" element={<TerminalPage />} />
+              <Route path="/settings" element={<Settings />} />
             </Routes>
           </div>
         </main>

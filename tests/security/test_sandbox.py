@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿# AgentOS 沙箱安全测试
+# AgentOS 沙箱安全测试
 # Version: 1.0.0.6
 # Last updated: 2026-03-23
 

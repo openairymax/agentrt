@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file executor.c
  * @brief 工具执行器实现（跨平台、安全版本）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

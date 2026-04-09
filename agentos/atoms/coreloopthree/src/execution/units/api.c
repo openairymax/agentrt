@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file api.c
  * @brief API调用执行单元实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

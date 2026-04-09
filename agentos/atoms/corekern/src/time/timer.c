@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file timer.c
  * @brief 定时器实�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

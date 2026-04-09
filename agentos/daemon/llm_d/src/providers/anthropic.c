@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file anthropic.c
  * @brief Anthropic 适配器实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

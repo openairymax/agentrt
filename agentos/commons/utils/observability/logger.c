@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file logger.c
  * @brief 日志实现（基于统一分层日志系统�? * @copyright (c) 2026 SPHARX. All Rights Reserved.
  * 
