@@ -1,3 +1,6 @@
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+"From data intelligence emerges."
+
 # AgentOS 软件物料清单 (SBOM)
 
 ## 1. 概述

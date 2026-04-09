@@ -1,5 +1,8 @@
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+"From data intelligence emerges."
+
 ---
-copyright: "Copyright (c) 2026 SPHARX. All Rights Reserved."
+copyright: "Copyright (c) 2026 SPHARX Ltd. All Rights Reserved."
 slogan: "From data intelligence emerges."
 title: "AgentOS API 参考文档"
 version: "Doc V1.7"
@@ -480,7 +483,7 @@ AGENTOS_API int agentos_module_function(
 
 ---
 
-**最后更新**: 2026-03-31  
+**最后更新**: 2026-04-09  
 **维护者**: AgentOS API 委员会 (作者: LirenWang)
 
 ---

@@ -8,40 +8,62 @@ import {
   AlertCircle,
   Info,
   Trash2,
+  Pause,
+  Play,
+  Clock,
 } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../utils/tauriCompat";
+import { useI18n } from "../i18n";
+
+const SERVICES = [
+  { value: "", label: "All Services" },
+  { value: "kernel", label: "Kernel" },
+  { value: "gateway", label: "Gateway" },
+  { value: "postgres", label: "PostgreSQL" },
+  { value: "redis", label: "Redis" },
+  { value: "openlab", label: "OpenLab" },
+  { value: "prometheus", label: "Prometheus" },
+  { value: "grafana", label: "Grafana" },
+];
+
+const LOG_LEVELS = [
+  { value: "", label: "All Levels", color: "#9ca3af" },
+  { value: "error", label: "Error", color: "#ef4444" },
+  { value: "warn", label: "Warning", color: "#f59e0b" },
+  { value: "info", label: "Info", color: "#6366f1" },
+  { value: "debug", label: "Debug", color: "#22c55e" },
+];
 
 const Logs: React.FC = () => {
+  const { t } = useI18n();
   const [logs, setLogs] = useState("");
-  const [selectedService, setSelectedService] = useState<string>("");
+  const [selectedService, setSelectedService] = useState("");
   const [tailCount, setTailCount] = useState(100);
   const [loading, setLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [logLevel, setLogLevel] = useState("");
   const logContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadLogs();
-  }, []);
+    const interval = setInterval(loadLogs, autoRefresh ? 5000 : 0);
+    return () => clearInterval(interval);
+  }, [autoRefresh, selectedService, tailCount]);
 
   useEffect(() => {
-    if (autoRefresh) {
-      const interval = setInterval(loadLogs, 5000);
-      return () => clearInterval(interval);
+    if (logContainerRef.current && autoRefresh) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
-  }, [autoRefresh, selectedService, tailCount]);
+  }, [logs, autoRefresh]);
 
   const loadLogs = async () => {
     setLoading(true);
     try {
-      const logContent = await invoke<string>("get_logs", {
-        service: selectedService || null,
-        tail: tailCount,
-      });
-      setLogs(logContent);
+      const content = await invoke<string>("get_logs", { service: selectedService || null, tail: tailCount });
+      setLogs(content);
     } catch (error) {
-      console.error("Failed to load logs:", error);
-      setLogs(`Error loading logs: ${error}`);
+      setLogs(`${t.common.error}: ${error}`);
     } finally {
       setLoading(false);
     }
@@ -49,273 +71,162 @@ const Logs: React.FC = () => {
 
   const handleDownloadLogs = async () => {
     try {
-      await invoke("get_logs", {
-        service: selectedService || null,
-        tail: 1000,
-      }).then((content) => {
-        const blob = new Blob([content as string], { type: "text/plain" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `agentos-logs-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.log`;
-        a.click();
-        URL.revokeObjectURL(url);
-      });
+      const content = await invoke<string>("get_logs", { service: selectedService || null, tail: 1000 });
+      const blob = new Blob([content], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `agentos-logs-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.log`;
+      a.click();
+      URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("Failed to download logs:", error);
+      console.error("Download failed:", error);
     }
   };
 
-  const clearLogs = () => {
-    if (confirm("Are you sure you want to clear the displayed logs?")) {
-      setLogs("");
+  const filteredLogs = (() => {
+    let result = logs;
+    if (logLevel) {
+      result = result.split("\n").filter(line => line.toLowerCase().includes(logLevel.toLowerCase())).join("\n");
     }
+    if (searchTerm) {
+      result = result.split("\n").filter(line => line.toLowerCase().includes(searchTerm.toLowerCase())).join("\n");
+    }
+    return result;
+  })();
+
+  const getLineColor = (line: string) => {
+    const lower = line.toLowerCase();
+    if (lower.includes("error") || lower.includes("fatal")) return { color: "#ef4444", weight: "600" };
+    if (lower.includes("warn")) return { color: "#f59e0b", weight: "500" };
+    if (lower.includes("info")) return { color: "#6366f1", weight: "400" };
+    if (lower.includes("debug")) return { color: "#22c55e", weight: "400" };
+    return { color: "var(--text-secondary)", weight: "400" };
   };
-
-  const filteredLogs = searchTerm
-    ? logs
-        .split("\n")
-        .filter((line) => line.toLowerCase().includes(searchTerm.toLowerCase()))
-        .join("\n")
-    : logs;
-
-  const logLines = filteredLogs.split("\n").length;
-
-  useEffect(() => {
-    if (logContainerRef.current && autoRefresh) {
-      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
-    }
-  }, [filteredLogs, autoRefresh]);
 
   return (
-    <div>
-      {/* Header */}
-      <div className="card" style={{ marginBottom: "20px" }}>
-        <h3 className="card-title" style={{ marginBottom: 0 }}>
-          <FileText size={20} />
-          System Logs Viewer
-        </h3>
+    <div className="page-container">
+      {/* Page Header */}
+      <div className="page-header">
+        <h1>{t.logs.systemLogsViewer}</h1>
+        <p style={{ color: "var(--text-secondary)", fontSize: "15px" }}>
+          Real-time system logs with syntax highlighting
+        </p>
       </div>
 
-      {/* Controls */}
-      <div className="card" style={{ marginBottom: "20px" }}>
-        <div
-          style={{
-            display: "flex",
-            gap: "12px",
-            alignItems: "center",
-            flexWrap: "wrap",
-          }}
-        >
+      {/* Control Panel */}
+      <div className="card card-elevated" style={{ marginBottom: "20px" }}>
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "end" }}>
           {/* Service Filter */}
-          <div style={{ flex: 1, minWidth: "200px" }}>
-            <label style={{ fontSize: "12px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
-              Service Filter
-            </label>
-            <select
-              className="input-field"
-              value={selectedService}
-              onChange={(e) => setSelectedService(e.target.value)}
-            >
-              <option value="">All Services</option>
-              <option value="kernel">Kernel</option>
-              <option value="gateway">Gateway</option>
-              <option value="postgres">PostgreSQL</option>
-              <option value="redis">Redis</option>
-              <option value="openlab">OpenLab</option>
-              <option value="prometheus">Prometheus</option>
-              <option value="grafana">Grafana</option>
+          <div style={{ minWidth: "160px" }}>
+            <label className="form-label">{t.logs.serviceFilter}</label>
+            <select className="form-select" value={selectedService} onChange={(e) => setSelectedService(e.target.value)}>
+              {SERVICES.map(s => <option key={s.value || 'all'} value={s.value}>{s.label}</option>)}
             </select>
           </div>
 
-          {/* Tail Count */}
-          <div style={{ width: "150px" }}>
-            <label style={{ fontSize: "12px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
-              Show Last N Lines
+          {/* Line Count */}
+          <div style={{ width: "130px" }}>
+            <label className="form-label">
+              <Clock size={13} style={{ display: "inline", marginRight: "4px", verticalAlign: "middle" }} />
+              {t.logs.showLastLines}
             </label>
-            <select
-              className="input-field"
-              value={tailCount}
-              onChange={(e) => setTailCount(Number(e.target.value))}
-            >
-              <option value={50}>Last 50 lines</option>
-              <option value={100}>Last 100 lines</option>
-              <option value={250}>Last 250 lines</option>
-              <option value={500}>Last 500 lines</option>
-              <option value={1000}>Last 1000 lines</option>
+            <select className="form-select" value={tailCount} onChange={(e) => setTailCount(Number(e.target.value))}>
+              {[50, 100, 250, 500, 1000].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+
+          {/* Log Level */}
+          <div style={{ minWidth: "140px" }}>
+            <label className="form-label">Log Level</label>
+            <select className="form-select" value={logLevel} onChange={(e) => setLogLevel(e.target.value)}>
+              {LOG_LEVELS.map(l => (
+                <option key={l.value} value={l.value}>{l.label}</option>
+              ))}
             </select>
           </div>
 
           {/* Search */}
           <div style={{ flex: 1, minWidth: "200px" }}>
-            <label style={{ fontSize: "12px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
-              Search Logs
-            </label>
+            <label className="form-label">{t.logs.searchLogs}</label>
             <div style={{ position: "relative" }}>
-              <Search
-                size={16}
-                style={{
-                  position: "absolute",
-                  left: "12px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "var(--text-muted)",
-                }}
-              />
-              <input
-                type="text"
-                className="input-field"
-                placeholder="Filter logs..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ paddingLeft: "36px" }}
-              />
+              <Search size={15} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
+              <input type="text" className="form-input" placeholder={t.logs.filterLogs} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ paddingLeft: "36px" }} />
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div style={{ display: "flex", gap: "8px", alignItems: "end" }}>
+          <div style={{ display: "flex", gap: "8px" }}>
             <button className="btn btn-secondary" onClick={loadLogs} disabled={loading}>
-              <RefreshCw size={16} />
-              Refresh
+              <RefreshCw size={16} />{t.logs.refresh}
             </button>
-
-            <button
-              className={`btn ${autoRefresh ? "btn-primary" : "btn-secondary"}`}
-              onClick={() => setAutoRefresh(!autoRefresh)}
-            >
-              {autoRefresh ? "⏸ Auto-refresh ON" : "▶ Auto-refresh OFF"}
+            <button className={`btn ${autoRefresh ? "btn-primary" : "btn-secondary"}`} onClick={() => setAutoRefresh(!autoRefresh)}>
+              {autoRefresh ? <><Pause size={16} />Pause</> : <><Play size={16} />Auto</>}
             </button>
-
             <button className="btn btn-secondary" onClick={handleDownloadLogs}>
-              <Download size={16} />
-              Export
+              <Download size={16} />{t.logs.export}
             </button>
-
-            <button className="btn btn-danger" onClick={clearLogs} disabled={!logs}>
+            <button className="btn btn-danger" onClick={() => { if (confirm(t.logs.clearConfirm)) setLogs(""); }} disabled={!logs}>
               <Trash2 size={16} />
-              Clear
             </button>
           </div>
         </div>
       </div>
 
-      {/* Log Stats */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "8px 0",
-          marginBottom: "12px",
-          fontSize: "13px",
-          color: "var(--text-muted)",
-        }}
-      >
-        <span>
-          Showing {logLines} lines{searchTerm && ` (filtered by "${searchTerm}")`}
-        </span>
-        <span>{selectedService ? `Service: ${selectedService}` : "All services"}</span>
+      {/* Log Stats Bar */}
+      <div style={{
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        padding: "10px 16px", background: "var(--bg-secondary)", borderRadius: "var(--radius-md)",
+        fontSize: "12.5px", color: "var(--text-muted)", marginBottom: "12px", border: "1px solid var(--border-subtle)"
+      }}>
+        <span>Showing <strong>{filteredLogs.split("\n").length}</strong> lines</span>
+        <div style={{ display: "flex", gap: "16px" }}>
+          {LOG_LEVELS.slice(1).map(lvl => (
+              <span key={lvl.value}><span style={{ color: lvl.color }}>●</span> {lvl.label}</span>
+          ))}
+          <span>{autoRefresh ? "● Auto-refresh ON (5s)" : "○ Auto-refresh OFF"}</span>
+        </div>
       </div>
 
       {/* Log Viewer */}
       <div
         ref={logContainerRef}
         style={{
-          background: "#0d1117",
-          border: "1px solid var(--border-color)",
-          borderRadius: "10px",
-          overflow: "auto",
-          height: "calc(100vh - 380px)",
-          minHeight: "400px",
-          fontFamily: "'Fira Code', 'Cascadia Code', monospace",
-          fontSize: "13px",
-          lineHeight: "1.6",
-          padding: "16px",
+          background: "var(--bg-primary)", border: "1px solid var(--border-color)",
+          borderRadius: "var(--radius-lg)", overflow: "auto", height: "calc(100vh - 380px)",
+          minHeight: "420px", fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+          fontSize: "12.5px", lineHeight: "1.7", padding: "16px"
         }}
       >
         {loading ? (
-          <div style={{ textAlign: "center", padding: "60px", color: "#94a3b8" }}>
-            <div className="loading-spinner" />
-            <p style={{ marginTop: "16px" }}>Loading logs...</p>
+          <div style={{ textAlign: "center", padding: "80px 0", color: "var(--text-muted)" }}>
+            <div className="loading-spinner" style={{ margin: "0 auto 16px" }} />
+            <p>{t.logs.loadingLogs}</p>
           </div>
         ) : !filteredLogs ? (
-          <div style={{ textAlign: "center", padding: "60px", color: "#94a3b8" }}>
-            <Info size={48} style={{ opacity: 0.5 }} />
-            <p style={{ marginTop: "16px" }}>No logs available</p>
-            <p style={{ fontSize: "13px", marginTop: "8px" }}>
-              Start services to generate logs
-            </p>
+          <div className="empty-state">
+            <Info size={48} style={{ opacity: 0.3 }} />
+            <div className="empty-state-text">{t.logs.noLogsAvailable}</div>
+            <div className="empty-state-hint">{t.logs.startServicesForLogs}</div>
           </div>
         ) : (
-          <pre
-            style={{
-              margin: 0,
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-all",
-              color: "#c9d1d9",
-            }}
-          >
-            {filteredLogs.split("\n").map((line, index) => {
-              let color = "#c9d1d9";
-              let fontWeight = "normal";
-
-              if (line.toLowerCase().includes("error") || line.toLowerCase().includes("fatal")) {
-                color = "#f85149";
-                fontWeight = "600";
-              } else if (line.toLowerCase().includes("warn")) {
-                color = "#d29922";
-              } else if (line.toLowerCase().includes("info")) {
-                color="#58a6ff";
-              }
-
+          <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+            {filteredLogs.split("\n").map((line, i) => {
+              const { color, weight } = getLineColor(line);
               return (
                 <div
-                  key={index}
+                  key={i}
                   style={{
-                    color,
-                    fontWeight,
-                    padding: "2px 4px",
-                    borderRadius: "2px",
-                    transition: "background 0.15s ease",
+                    color, fontWeight: weight, padding: "1px 6px", borderRadius: "3px",
+                    transition: "background var(--transition-fast)"
                   }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = "rgba(255,255,255,0.05)")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.background = "transparent")
-                  }
-                >
-                  {line || "\u00A0"}
-                </div>
+                  onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
+                  onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                >{line || "\u00A0"}</div>
               );
             })}
           </pre>
         )}
-      </div>
-
-      {/* Footer */}
-      <div
-        style={{
-          marginTop: "12px",
-          padding: "12px 16px",
-          background: "var(--bg-secondary)",
-          borderRadius: "8px",
-          fontSize: "12px",
-          color: "var(--text-muted)",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <div style={{ display: "flex", gap: "20px" }}>
-          <span><span style={{ color: "#f85149" }}>●</span> Error</span>
-          <span><span style={{ color: "#d29922" }}>●</span> Warning</span>
-          <span><span style={{ color: "#58a6ff" }}>●</span> Info</span>
-        </div>
-        <span>
-          Auto-refresh: {autoRefresh ? "ON (5s)" : "OFF"}
-        </span>
       </div>
     </div>
   );
