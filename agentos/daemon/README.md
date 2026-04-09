@@ -598,18 +598,18 @@ cache:
 - [公共服务](common/README.md) - 兼容层和 IPC 客户端
 
 ### 架构文档
-- [架构设计原则 Doc V1.7](../agentos/manuals/ARCHITECTURAL_PRINCIPLES.md)
+- [架构设计原则 Doc V1.7](../../docs/ARCHITECTURAL_PRINCIPLES.md)
 - [内核层架构](../agentos/atoms/README.md)
 - [统一基础库](../agentos/commons/README.md)
-- [三层认知循环](../agentos/manuals/architecture/coreloopthree.md)
-- [四层记忆系统](../agentos/manuals/architecture/memoryrovol.md)
-- [系统调用规范](../agentos/manuals/architecture/syscall.md)
+- [三层认知循环](../agentos/atoms/coreloopthree/README.md)
+- [四层记忆系统](../agentos/atoms/memoryrovol/README.md)
+- [系统调用规范](../../docs/Capital_Architecture/syscall.md)
 
 ### 开发指南
-- [快速开始](../agentos/manuals/guides/getting_started.md)
-- [创建 Agent](../agentos/manuals/guides/create_agent.md)
-- [创建技能](../agentos/manuals/guides/create_skill.md)
-- [部署指南](../agentos/manuals/guides/deployment.md)
+- [快速开始](../../docs/Capital_Guides/getting_started.md)
+- [创建 Agent](../../docs/Capital_Guides/create_agent.md)
+- [创建技能](../../docs/Capital_Guides/create_skill.md)
+- [部署指南](../../docs/Capital_Guides/deployment.md)
 
 ---
 

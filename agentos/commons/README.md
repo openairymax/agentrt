@@ -1087,9 +1087,9 @@ int main(void) {
 - [内核层架构](../agentos/atoms/README.md) - Atoms 模块文档
 - [服务层架构](../agentos/daemon/README.md) - Daemon 模块文档
 - [安全穹顶](../agentos/cupolas/README.md) - Cupolas 模块文档
-- [配置管理规范](../agentos/manuals/guides/configuration.md) - 配置最佳实践
-- [日志规范](../agentos/manuals/specifications/logging.md) - 日志编写标准
-- [错误处理规范](../agentos/manuals/specifications/error_handling.md) - 错误处理指南
+- [配置管理规范](../../../docs/Capital_Guides/configuration.md) - 配置最佳实践
+- [日志规范](../../../docs/Capital_Specifications/) - 日志编写标准
+- [错误处理规范](../../../docs/Capital_Specifications/) - 错误处理指南
 
 ---
 
