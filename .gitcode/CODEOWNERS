@@ -114,41 +114,41 @@
 /agentos/toolkit/typescript/ @spharx-team/sdk-typescript
 
 # -----------------------------------------------------------------------------
-# 文档体系 (agentos/manuals/)
+# 文档体系 (docs/)
 # -----------------------------------------------------------------------------
-/agentos/manuals/ @spharx-team/docs @spharx-team/architecture
+/docs/ @spharx-team/docs @spharx-team/architecture
 
 # 架构文档
-/agentos/manuals/architecture/ @spharx-team/architecture
+/docs/Capital_Architecture/ @spharx-team/architecture
 
 # 开发指南
-/agentos/manuals/guides/ @spharx-team/docs
+/docs/Capital_Guides/ @spharx-team/docs
 
 # API文档
-/agentos/manuals/api/ @spharx-team/api
+/docs/Capital_API/ @spharx-team/api
 
 # 规范文档
-/agentos/manuals/specifications/ @spharx-team/standards
+/docs/Capital_Specifications/ @spharx-team/standards
 
-# 教程文档
-/agentos/manuals/tutorials/ @spharx-team/docs
+# 基础理论
+/docs/Basic_Theories/ @spharx-team/architecture @spharx-team/research
 
 # -----------------------------------------------------------------------------
-# 开放生态 (openlab/)
+# 开放生态 (agentos/openlab/)
 # -----------------------------------------------------------------------------
-/openlab/ @spharx-team/ecosystem @spharx-team/applications
+/agentos/openlab/ @spharx-team/ecosystem @spharx-team/applications
 
 # 核心模块
-/openlab/openlab/ @spharx-team/ecosystem-core
+/agentos/openlab/openlab/ @spharx-team/ecosystem-core
 
 # 应用示例
-/openlab/app/ @spharx-team/applications
+/agentos/openlab/app/ @spharx-team/applications
 
 # 技能市场
-/openlab/contrib/ @spharx-team/skills @spharx-team/marketplace
+/agentos/openlab/contrib/ @spharx-team/skills @spharx-team/marketplace
 
 # 测试套件
-/openlab/tests/ @spharx-team/testing
+/agentos/openlab/tests/ @spharx-team/testing
 
 # -----------------------------------------------------------------------------
 # 构建与部署脚本 (scripts/)

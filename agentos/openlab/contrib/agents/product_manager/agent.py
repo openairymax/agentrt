@@ -1,0 +1,177 @@
+"""
+Product Manager Agent Implementation
+====================================
+
+浜у搧瑙勫垝鏅鸿兘浣?- 璐熻矗浜у搧闇€姹傚垎鏋愩€佽矾绾垮浘瑙勫垝鍜岀敤鎴风爺绌?
+Copyright (c) 2026 SPHARX. All Rights Reserved.
+"""
+
+import asyncio
+import json
+import logging
+import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set
+
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "openlab"))
+
+from openlab.core.agent import Agent, AgentCapability, AgentContext, AgentStatus, TaskResult
+
+
+logger = logging.getLogger(__name__)
+
+
+class ProductManagerAgent(Agent):
+    """
+    浜у搧瑙勫垝鏅鸿兘浣?    
+    鏍稿績鑱岃矗:
+    1. 闇€姹傚垎鏋?- 鐢ㄦ埛闇€姹傛敹闆嗐€佷紭鍏堢骇鎺掑簭
+    2. 璺嚎鍥捐鍒?- 浜у搧杩唬璁″垝銆侀噷绋嬬绠＄悊
+    3. 鐢ㄦ埛鐮旂┒ - 鐢ㄦ埛鐢诲儚銆佺敤鎴锋梾绋嬭璁?    4. 鏁版嵁鍒嗘瀽 - 浜у搧鎸囨爣銆丄/B娴嬭瘯
+    
+    鑳藉姏:
+    - DOCUMENTATION: 鏂囨。鐢熸垚鑳藉姏
+    - OPTIMIZATION: 浼樺寲鑳藉姏
+    """
+    
+    def __init__(
+        self,
+        agent_id: str = "product_manager-001",
+        capabilities: Optional[Set[AgentCapability]] = None,
+        manager: Optional[Any] = None,
+        workbench_id: Optional[str] = None
+    ):
+        default_capabilities = {
+            AgentCapability.DOCUMENTATION,
+            AgentCapability.OPTIMIZATION
+        }
+        
+        super().__init__(
+            agent_id=agent_id,
+            capabilities=capabilities or default_capabilities,
+            manager=manager,
+            workbench_id=workbench_id
+        )
+        
+        self._prompts_dir = Path(__file__).parent / "prompts"
+        logger.info(f"ProductManagerAgent initialized with ID: {agent_id}")
+    
+    async def initialize(self) -> None:
+        """鍒濆鍖栦骇鍝佽鍒掓櫤鑳戒綋"""
+        self.status = AgentStatus.INITIALIZING
+        
+        try:
+            await self._load_prompts()
+            self.status = AgentStatus.READY
+            logger.info(f"ProductManagerAgent {self.agent_id} initialized successfully")
+        except Exception as e:
+            self.status = AgentStatus.ERROR
+            raise e
+    
+    async def _load_prompts(self) -> None:
+        """鍔犺浇鎻愮ず璇嶆ā鏉?""
+        system1_path = self._prompts_dir / "system1.md"
+        system2_path = self._prompts_dir / "system2.md"
+        
+        if system1_path.exists():
+            with open(system1_path, 'r', encoding='utf-8') as f:
+                pass
+        
+        if system2_path.exists():
+            with open(system2_path, 'r', encoding='utf-8') as f:
+                pass
+    
+    async def execute(self, input_data: Any, context: AgentContext) -> TaskResult:
+        """鎵ц浜у搧瑙勫垝浠诲姟"""
+        self.status = AgentStatus.RUNNING
+        start_time = time.time()
+        
+        try:
+            if not isinstance(input_data, dict):
+                raise ValueError("input_data must be a dictionary")
+            
+            task_type = input_data.get("task_type", "requirement_analysis")
+            
+            if task_type == "requirement_analysis":
+                result = await self._analyze_requirements(input_data)
+            elif task_type == "roadmap_planning":
+                result = await self._plan_roadmap(input_data)
+            elif task_type == "user_research":
+                result = await self._conduct_user_research(input_data)
+            else:
+                raise ValueError(f"Unknown task type: {task_type}")
+            
+            execution_time = time.time() - start_time
+            
+            return TaskResult(
+                success=True,
+                output=result,
+                metrics={"execution_time": execution_time}
+            )
+            
+        except Exception as e:
+            return TaskResult(
+                success=False,
+                error=str(e),
+                error_code="PRODUCT_MANAGER_EXECUTION_ERROR"
+            )
+    
+    async def _analyze_requirements(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """鍒嗘瀽闇€姹?""
+        return {
+            "requirements": [
+                {"id": "REQ-001", "title": "User Authentication", "priority": "high"},
+                {"id": "REQ-002", "title": "Dashboard", "priority": "medium"}
+            ],
+            "user_stories": ["As a user, I want to login securely"],
+            "acceptance_criteria": ["Given user credentials, When login Then access granted"]
+        }
+    
+    async def _plan_roadmap(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """瑙勫垝璺嚎鍥?""
+        return {
+            "phases": [
+                {"name": "Phase 1", "duration": "Q1 2026", "features": ["MVP"]},
+                {"name": "Phase 2", "duration": "Q2 2026", "features": ["Advanced features"]}
+            ],
+            "milestones": ["Alpha release", "Beta release", "GA release"]
+        }
+    
+    async def _conduct_user_research(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """杩涜鐢ㄦ埛鐮旂┒"""
+        return {
+            "personas": [{"name": "Developer", "goals": ["Build faster"]}],
+            "journey_maps": ["Discovery 鈫?Evaluation 鈫?Adoption"],
+            "feedback_channels": ["Surveys", "Interviews"]
+        }
+    
+    async def shutdown(self) -> None:
+        """鍏抽棴鏅鸿兘浣?""
+        self.status = AgentStatus.SHUTTING_DOWN
+        self.status = AgentStatus.SHUTDOWN
+
+
+def create_product_manager_agent(
+    agent_id: str = "product_manager-001",
+    manager: Optional[Any] = None,
+    workbench_id: Optional[str] = None
+) -> ProductManagerAgent:
+    """鍒涘缓浜у搧瑙勫垝鏅鸿兘浣撳疄渚?""
+    return ProductManagerAgent(
+        agent_id=agent_id,
+        manager=manager,
+        workbench_id=workbench_id
+    )
+
+
+if __name__ == "__main__":
+    async def test_product_manager_agent():
+        agent = create_product_manager_agent()
+        await agent.initialize()
+        context = AgentContext(agent_id=agent.agent_id)
+        result = await agent.execute({"task_type": "requirement_analysis"}, context)
+        print(json.dumps(result.output, indent=2))
+        await agent.shutdown()
+    
+    asyncio.run(test_product_manager_agent())

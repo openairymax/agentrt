@@ -104,7 +104,7 @@ agentos/toolkit/
 
 ### 设计原则
 
-遵循 [AgentOS 架构设计原则](../agentos/manuals/architecture/ARCHITECTURAL_PRINCIPLES.md)：
+遵循 [AgentOS 架构设计原则](../../docs/ARCHITECTURAL_PRINCIPLES.md)：
 
 - ✅ **依赖倒转**: Manager 依赖 APIClient 接口而非具体实现
 - ✅ **单一职责**: 每个 Manager 只负责一个功能域
@@ -560,7 +560,7 @@ mkdir -p <language>/{client,modules,types,utils,errors,config}
 ## 📚 相关文档
 
 - [DESIGN.md](./DESIGN.md) - Toolkit 模块整体设计
-- [架构设计原则](../agentos/manuals/architecture/ARCHITECTURAL_PRINCIPLES.md) - AgentOS 五维正交系统
+- [架构设计原则](../../docs/ARCHITECTURAL_PRINCIPLES.md) - AgentOS 五维正交系统
 - [模块结构检查报告](../.本地/agentos/toolkit/20260326-02 次模块结构检查报告.md) - 模块结构完整性检查
 
 ## 🤝 贡献

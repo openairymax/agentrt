@@ -39,9 +39,9 @@
 - 💡 [提出功能建议 (AtomGit 官方)](https://atomgit.com/spharx/agentos/issues)
 - 💡 [提出功能建议 (Gitee 官方)](https://gitee.com/spharx/agentos/issues)
 - 💡 [提出功能建议 (GitHub 官方)](https://github.com/SpharxTeam/AgentOS/issues)
-- 📖 [查看文档](./agentos/manuals/)
+- 📖 [查看文档](./docs/)
 - 💬 [参与讨论 (GitHub 官方)](https://github.com/SpharxTeam/AgentOS/discussions)
-- 📐 [编码规范](./agentos/manuals/specifications/coding_standard/)
+- 📐 [编码规范](./docs/Capital_Specifications/)
 - 🧪 [测试指南](./tests/README.md)
 
 ---
@@ -51,11 +51,11 @@
 ### 贡献前必读文档
 
 **核心文档**：
-- [📘 架构设计原则 V1.8](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) - 五维正交体系
-- [🔄 CoreLoopThree 架构](agentos/manuals/architecture/coreloopthree.md) - 三层认知循环
-- [🧠 MemoryRovol 架构](agentos/manuals/architecture/memoryrovol.md) - 四层记忆系统
+- [📘 架构设计原则 V1.8](docs/ARCHITECTURAL_PRINCIPLES.md) - 五维正交体系
+- [🔄 CoreLoopThree 架构](agentos/atoms/coreloopthree/README.md) - 三层认知循环
+- [🧠 MemoryRovol 架构](agentos/atoms/memoryrovol/README.md) - 四层记忆系统
 - [🛡️ cupolas 安全穹顶](agentos/cupolas/README.md) - 安全机制
-- [⚙️ 编译指南](agentos/manuals/guides/build.md) - 构建步骤
+- [⚙️ 编译指南](docs/Capital_Guides/installation.md) - 构建步骤
 
 ### 1. 基础要求
 
@@ -102,14 +102,14 @@ git remote add upstream https://atomgit.com/spharx/agentos.git
 
 ```bash
 curl -sSL https://install.python-poetry.org | python3 -
-cd openlab && poetry install && poetry shell
+cd agentos/openlab && poetry install && poetry shell
 ```
 
 #### 使用 pip
 
 ```bash
 python3 -m venv venv && source venv/bin/activate
-cd openlab && pip install -r requirements.txt
+cd agentos/openlab && pip install -r requirements.txt
 ```
 
 #### 系统依赖（Ubuntu）
@@ -306,7 +306,7 @@ AGENTOS_EXPORT int agentos_memory_write(
     char** record_id);
 ```
 
-- 遵循 [C/C++ 编码规范](./agentos/manuals/specifications/coding_standard/C_coding_style_guide.md)
+- 遵循 [C/C++ 编码规范](./docs/Capital_Specifications/)
 - 使用 `.clang-format` 和 `.clang-tidy` 进行代码格式化
 
 ### Python 规范
@@ -558,7 +558,7 @@ Closes #123
 ### Q1: 我是新手，可以从哪里开始？
 
 **A**: 欢迎！建议从以下任务开始：
-1. 阅读[快速开始指南](agentos/manuals/guides/quickstart.md)
+1. 阅读[快速开始指南](docs/Capital_Guides/getting_started.md)
 2. 选择一个标记为 `good first issue` 的任务
 3. 加入我们的开发者社区获取帮助
 

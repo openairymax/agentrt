@@ -319,8 +319,8 @@ git commit -m "docs: update API documentation"
 ## 参考资料
 
 - **Doxygen 官方手册**: https://www.doxygen.nl/manual/
-- **AgentOS 架构原则**: ../../agentos/manuals/ARCHITECTURAL_PRINCIPLES.md
-- **代码注释规范**: ../../agentos/manuals/specifications/coding_standard/Code_comment_template.md
+- **AgentOS 架构原则**: ../../../docs/ARCHITECTURAL_PRINCIPLES.md
+- **代码注释规范**: ../../../docs/Capital_Specifications/
 - **Doxygen 特殊命令**: https://www.doxygen.nl/manual/commands.html
 
 ---

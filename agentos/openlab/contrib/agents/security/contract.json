@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_version": "1.0.0",
+  "agent_id": "security",
+  "agent_name": "Security Agent",
+  "description": "瀹夊叏瀹¤鏅鸿兘浣擄紝璐熻矗瀹夊叏璇勪及銆佹紡娲炴壂鎻忓拰瀹夊叏绛栫暐鍒跺畾",
+  "version": "1.0.0.9",
+  "author": "SPHARX Team",
+  "license": "Apache-2.0",
+  
+  "capabilities": [
+    {
+      "name": "debugging",
+      "description": "瀹夊叏璋冭瘯鑳藉姏"
+    },
+    {
+      "name": "optimization",
+      "description": "瀹夊叏浼樺寲鑳藉姏"
+    }
+  ],
+  
+  "metadata": {
+    "created_at": "2026-04-07T00:00:00Z",
+    "tags": ["security", "vulnerability", "threat-modeling", "compliance"],
+    "category": "security",
+    "maturity": "production"
+  }
+}
