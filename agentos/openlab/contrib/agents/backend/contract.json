@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_version": "1.0.0",
+  "agent_id": "backend",
+  "agent_name": "Backend Agent",
+  "description": "鍚庣寮€鍙戞櫤鑳戒綋锛岃礋璐PI璁捐銆佹暟鎹簱寮€鍙戙€佹湇鍔℃灦鏋勮璁″拰鎬ц兘浼樺寲",
+  "version": "1.0.0.9",
+  "author": "SPHARX Team",
+  "license": "Apache-2.0",
+  
+  "capabilities": [
+    {
+      "name": "code_generation",
+      "description": "浠ｇ爜鐢熸垚鑳藉姏"
+    },
+    {
+      "name": "debugging",
+      "description": "璋冭瘯鑳藉姏"
+    },
+    {
+      "name": "optimization",
+      "description": "浼樺寲鑳藉姏"
+    }
+  ],
+  
+  "performance": {
+    "response_time": {
+      "p50": 300,
+      "p95": 1500,
+      "p99": 3000,
+      "unit": "ms"
+    },
+    "throughput": {
+      "min": 20,
+      "target": 150,
+      "max": 500,
+      "unit": "requests_per_minute"
+    },
+    "availability": {
+      "target": 0.98,
+      "min": 0.95
+    }
+  },
+  
+  "resources": {
+    "cpu": {
+      "min": 1.0,
+      "max": 6.0,
+      "unit": "cores"
+    },
+    "memory": {
+      "min": 1024,
+      "max": 8192,
+      "unit": "MB"
+    },
+    "storage": {
+      "min": 200,
+      "max": 20480,
+      "unit": "MB"
+    }
+  },
+  
+  "dependencies": [
+    {
+      "name": "openlab.core.agent",
+      "version": ">=1.0.0",
+      "required": true
+    },
+    {
+      "name": "fastapi",
+      "version": ">=0.100.0",
+      "required": false
+    },
+    {
+      "name": "sqlalchemy",
+      "version": ">=2.0.0",
+      "required": false
+    }
+  ],
+  
+  "security": {
+    "authentication": "required",
+    "authorization": "RBAC",
+    "encryption": "TLS_1_3",
+    "audit": true,
+    "data_classification": "internal"
+  },
+  
+  "monitoring": {
+    "metrics": [
+      "api_response_time",
+      "db_query_time",
+      "error_rate",
+      "throughput"
+    ],
+    "logging": {
+      "level": "DEBUG",
+      "format": "json",
+      "retention_days": 30
+    },
+    "alerting": {
+      "enabled": true,
+      "channels": ["email", "slack", "pagerduty"]
+    }
+  },
+  
+  "lifecycle": {
+    "initialization_timeout": 45,
+    "shutdown_timeout": 15,
+    "health_check_interval": 30,
+    "max_retries": 3
+  },
+  
+  "metadata": {
+    "created_at": "2026-04-07T00:00:00Z",
+    "updated_at": "2026-04-07T00:00:00Z",
+    "tags": ["backend", "api", "database", "performance"],
+    "category": "software_engineering",
+    "maturity": "production"
+  }
+}
