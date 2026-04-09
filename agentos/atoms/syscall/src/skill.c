@@ -1,4 +1,4 @@
-﻿﻿﻿﻿/**
+/**
  * @file skill.c
  * @brief 技能相关系统调用实�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

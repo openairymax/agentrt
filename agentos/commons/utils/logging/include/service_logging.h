@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file service_logging.h
  * @brief 统一分层日志系统服务层API
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

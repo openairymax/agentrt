@@ -1,4 +1,4 @@
-﻿// AgentOS TypeScript SDK Tests
+// AgentOS TypeScript SDK Tests
 // Version: 1.0.0.5
 // Last updated: 2026-03-21
 

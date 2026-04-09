@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file config_loader.c
  * @brief 配置加载器实�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

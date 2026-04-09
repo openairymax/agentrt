@@ -10,16 +10,18 @@ import {
   AlertTriangle,
   TrendingUp,
   Clock,
+  Terminal,
+  FileText,
 } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../utils/tauriCompat";
 
 interface SystemInfo {
   os: string;
   os_version: string;
   architecture: string;
-  cpu_cores: usize;
-  total_memory_gb: f64;
-  free_memory_gb: f64;
+  cpu_cores: number;
+  total_memory_gb: number;
+  free_memory_gb: number;
   hostname: string;
 }
 
@@ -37,7 +39,7 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     loadDashboardData();
-    const interval = setInterval(loadDashboardData, 30000); // Auto-refresh every 30s
+    const interval = setInterval(loadDashboardData, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -72,7 +74,6 @@ const Dashboard: React.FC = () => {
   return (
     <div>
       <div className="grid-4" style={{ marginBottom: "24px" }}>
-        {/* CPU Cores */}
         <div className="stat-card">
           <div className="stat-icon" style={{ background: "rgba(59, 130, 246, 0.15)" }}>
             <Cpu size={24} color="#3b82f6" />
@@ -81,7 +82,6 @@ const Dashboard: React.FC = () => {
           <div className="stat-label">CPU Cores</div>
         </div>
 
-        {/* Memory */}
         <div className="stat-card">
           <div className="stat-icon" style={{ background: "rgba(16, 185, 129, 0.15)" }}>
             <HardDrive size={24} color="#10b981" />
@@ -94,7 +94,6 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Services */}
         <div className="stat-card">
           <div className="stat-icon" style={{ background: "rgba(139, 92, 246, 0.15)" }}>
             <Server size={24} color="#8b5cf6" />
@@ -103,7 +102,6 @@ const Dashboard: React.FC = () => {
           <div className="stat-label">Services Running</div>
         </div>
 
-        {/* Health */}
         <div className="stat-card">
           <div
             className="stat-icon"
@@ -133,7 +131,6 @@ const Dashboard: React.FC = () => {
       </div>
 
       <div className="grid-2">
-        {/* System Information */}
         <div className="card">
           <h3 className="card-title">
             <Cpu size={20} />
@@ -151,7 +148,6 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Service Status */}
         <div className="card">
           <h3 className="card-title">
             <Server size={20} />
@@ -208,7 +204,6 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Quick Actions */}
       <div className="card">
         <h3 className="card-title">
           <TrendingUp size={20} />
@@ -218,7 +213,7 @@ const Dashboard: React.FC = () => {
           <button className="btn btn-success" onClick={() => window.location.href = "/services"}>
             ▶ Start All Services
           </button>
-          <button className="btn btn-danger" onClick={() => window.location.href = "/services">
+          <button className="btn btn-danger" onClick={() => window.location.href = "/services"}>
             ⏹ Stop All Services
           </button>
           <button className="btn btn-secondary" onClick={() => window.location.href = "/terminal"}>

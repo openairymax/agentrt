@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_heapstore_ipc.c
  * @brief AgentOS 数据分区 IPC 数据存储单元测试
  *

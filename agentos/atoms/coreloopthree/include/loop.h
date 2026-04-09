@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file loop.h
  * @brief 三层核心运行时主循环接口
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

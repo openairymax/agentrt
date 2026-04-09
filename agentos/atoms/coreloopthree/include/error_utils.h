@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file error_utils.h
  * @brief 错误处理工具函数
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

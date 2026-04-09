@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_executor.c
  * @brief Tool 执行器单元测试
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
