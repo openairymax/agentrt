@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 # AgentOS Backs模块CI/CD脚本
 # 包含：构建、测试、静态分析、代码覆盖率

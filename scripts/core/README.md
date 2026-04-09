@@ -1,4 +1,4 @@
-﻿﻿﻿﻿# AgentOS Scripts Core 模块
+# AgentOS Scripts Core 模块
 
 ## 模块概述
 

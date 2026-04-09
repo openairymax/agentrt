@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_scheduler.c
  * @brief 调度服务单元测试
  * @details 测试调度服务的各个功能模�?

@@ -1,4 +1,4 @@
-﻿// AgentOS Go SDK - 遥测模块
+// AgentOS Go SDK - 遥测模块
 // Version: 3.0.0
 // Last updated: 2026-03-22
 //

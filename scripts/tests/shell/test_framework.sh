@@ -1,4 +1,4 @@
-﻿﻿﻿﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentOS Shell 脚本测试框架
 # 基于 bats-core 的单元测试库

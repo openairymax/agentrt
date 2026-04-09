@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_heapstore_log.c
  * @brief AgentOS 数据分区日志管理单元测试
  *

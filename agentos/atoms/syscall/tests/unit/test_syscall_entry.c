@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_syscall_entry.c
  * @brief 系统调用入口单元测试
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

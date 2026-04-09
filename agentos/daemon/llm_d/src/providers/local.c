@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file local.c
  * @brief 本地模型适配器（兼容 OpenAI 格式）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
