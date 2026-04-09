@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿/**
+/**
  * @file core_test.c
  * @brief 核心模块测试
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

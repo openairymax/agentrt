@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿/**
+/**
  * @file test_llm.c
  * @brief LLM Service 单元测试
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

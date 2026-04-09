@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_coordinator.c
  * @brief 协调器基础单元测试
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

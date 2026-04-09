@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file llm_client.h
  * @brief LLM客户端接口（简化版）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

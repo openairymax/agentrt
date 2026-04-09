@@ -1,4 +1,4 @@
-﻿// AgentOS TypeScript SDK Agent
+// AgentOS TypeScript SDK Agent
 // Version: 2.0.0
 // Last updated: 2026-03-23
 

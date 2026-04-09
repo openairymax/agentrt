@@ -1,4 +1,4 @@
-﻿# Copyright (c) 2026 SPHARX. All Rights Reserved.
+# Copyright (c) 2026 SPHARX. All Rights Reserved.
 # Market 服务测试构建文件
 
 cmake_minimum_required(VERSION 3.20)

@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿/**
+/**
  * @file logger_test.c
  * @brief 日志模块测试
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

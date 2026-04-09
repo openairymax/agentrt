@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file config_compat.h
  * @brief 统一配置模块 - 向后兼容层接�? * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *

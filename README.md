@@ -2,9 +2,9 @@
 
 # Agent OS
 
-> 成为人类计算工程史上，第四个"操作系统哲学"
+> The seminal fourth "Operating System Philosophy" in human computing history.
 
-中文 | [English](README_EN.md)  
+English | [简体中文](README_CN.md)
 
 [![AtomGit](https://atomgit.com/spharx/agentos/star/badge.svg)](https://atomgit.com/spharx/agentos)
 [![star](https://gitee.com/spharx/agentos/badge/star.svg?theme=dark)](https://gitee.com/spharx/agentos)
@@ -22,251 +22,241 @@
 
 </div>
 
-## 🌟 项目简介
+## 🌟 Introduction
 
-**AgentOS** 是一个智能体操作系统，为驱动智能体团队提供完整的操作系统级支持。  
+**AgentOS** is an intelligent agent operating system that provides comprehensive OS-level support for orchestrating agent teams.
 
-## 💡 创新要点
+## 💡 Innovation Highlights
 
-**基石思想**👉 **[《体系并行论》](docs/Basic_Theories/CN_01_体系并行论.md)**  
+**Foundational Theory** 👉 **[Multibody Cybernetic Intelligent System](docs/Basic_Theories/EN_01_MCIS.md)**  
 
-- **纯净内核**：内核仅提供原子机制，纯净高效
-- **认知循环**：认知，规划，行动
-- **记忆卷载**：原始层，特征层，结构层，模式层
-- **安全内生**：沙箱隔离，权限裁决，输入净化，审计追踪
-- **高效 Token**：工程级比传统框架节省约**500%**
-- **丰富 SDK**：原生支持 Go 、Python 、Rust 、TypeScript
+- **Pure Kernel**: Only atomic mechanisms (IPC/Mem/Task/Time), ensuring purity and efficiency.
+- **Cognitive Loop**: Perception → Planning → Action, with dual-system synergy (System 1 + System 2).
+- **Memory Stratification**: L1 Raw → L2 Features → L3 Structures → L4 Patterns, enabling intelligence emergence.
+- **Inherent Security**: Four-layer protection: Sandbox Isolation, Permission Arbitration, Input Sanitization, Audit Trail.
+- **Token Efficiency**: Saves approximately **500%** tokens compared to traditional frameworks.
+- **Comprehensive SDKs**: Native support for Go / Python / Rust / TypeScript.
 
-## 🎯 基本理念
+## 🎯 Core Philosophy
 
-**驱动团队**
-- 精准协调多 Agent 协作
-- 高效完成复杂任务编排与资源调度  
+**Team Orchestration**  
+- Precisely coordinates multi‑agent collaboration  
+- Enables efficient task orchestration and resource scheduling  
 
-**自主演进**：
-- 具备自我进化能力
-- 动态调整策略
-- 持续优化执行效果  
+**Autonomous Evolution**  
+- Self‑evolving capability  
+- Dynamically adjusts strategies  
+- Continuously optimizes execution effectiveness  
 
 <p align="center">
-  <strong>✨ 全新架构 · 安全内生 · 智能涌现</strong>  
+  <strong>✨ Groundbreaking Architecture · Inherent Security · Intelligence Emergence ✨</strong>
 </p>
 
-## 🏗️ 系统架构
+## 🏗️ System Architecture
 
-**架构设计**  
-  从内核到应用的完整架构：
+**Architecture Design**  
+  Complete architecture from kernel to application:
 
 ```
-⬇️ 应用层 (openlab)
-⇅ 服务层 (daemon)
-⇅ 内核层 (atoms)
-⇅ 安全层 (cupolas)
-⇅ 支撑层 (commons)
-⬆️ SDK 层 (toolkit)  
+Application Layer (openlab)
+    ⇅
+Service Layer (daemon)
+    ⇅
+Kernel Layer (atoms)
+    ⇅
+Security Layer (cupolas)
+    ⇅
+Support Layer (commons)
+    ⇅
+SDK Layer (toolkit)
 ```
 
-**设计原则**  
-  基于 [ARCHITECTURAL_PRINCIPLES](docs/ARCHITECTURAL_PRINCIPLES.md) 构建：
-- **系统观**：反馈闭环 · 层次分解 · 总体设计部 · 涌现管理 → 实时响应 <10ms
-- **内核观**：内核极简 · 接口契约化 · 服务隔离 · 可插拔策略 → 内核 ~25K LOC
-- **认知观**：双系统协同 · 增量演化 · 记忆卷载 · 遗忘机制 → Token 节省 500%
-- **工程观**：安全内生 · 可观测性 · 资源确定性 · 跨平台一致 → 测试覆盖 >90%
-- **设计美学**：简约至上 · 极致细节 · 人文关怀 · 完美主义 → API <50 个/模块  
+**Design Principles**  
+  Built upon [ARCHITECTURAL_PRINCIPLES](docs/ARCHITECTURAL_PRINCIPLES.md):
+- **System Perspective**: Feedback loops · Layered decomposition · Holistic design · Emergence management → Response <10ms
+- **Kernel Perspective**: Minimalist kernel · Contractual interfaces · Service isolation · Pluggable strategies → Kernel ~25K LOC
+- **Cognitive Perspective**: Dual‑system synergy · Incremental evolution · Memory stratification · Forgetting mechanism → Token savings 500%
+- **Engineering Perspective**: Security built‑in · Observability · Resource determinism · Cross‑platform consistency → Test coverage >90%
+- **Design Aesthetics**: Simplicity first · Extreme attention to detail · Human‑centric · Perfectionism → API <50 per module
 
+## 🚀 Quick Start
 
-## 🚀 快速上手
+### 📦 Requirements
 
-### 环境要求  
+- **OS**: Ubuntu 22.04+ / macOS 13+ / Windows 11 (WSL2)
+- **Compiler**: GCC 11+ / Clang 14+ (C11/C++17)
+- **Build Tools**: CMake 3.20+, Ninja
+- **Python**: 3.10+ (Required for OpenLab)
 
-- **操作系统**：Ubuntu 22.04+ / macOS 13+ / Windows 11 (WSL2)
-- **编译器**：GCC 11+ / Clang 14+ (C11/C++17)
-- **构建工具**：CMake 3.20+, Ninja
-- **Python**：3.10+ (OpenLab 需要)  
+### 🔨 Installation & Build
 
-### 安装与构建  
-
-```ctext
-# 1. 克隆仓库
+```bash
+# 1. Clone repository
 git clone https://atomgit.com/spharx/agentos.git && cd agentos
 
-# 2. 安装依赖（Ubuntu）
+# 2. Install dependencies (Ubuntu)
 sudo apt install -y build-essential cmake gcc g++ libssl-dev libsqlite3-dev ninja-build
 
-# 3. 构建内核
+# 3. Build kernel
 mkdir build && cd build
 cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
 cmake --build . --parallel $(nproc)
 
-# 4. 运行测试
-ctest --output-on-failure  
+# 4. Run tests
+ctest --output-on-failure
 ```
 
-### Docker快速启动  
+### 🐳 Docker Quick Start
 
-```text
-# 构建镜像
+```bash
+# Build image
 docker build -f scripts/deploy/docker/Dockerfile.kernel -t agentos:latest .
 
-# 运行容器
+# Run container
 docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
 ```
 
-### 使用方式   
+### 💻 Usage
 
-```
-| 语言 | 使用方式 |
+| Language | Usage |
 |:-----|:---------|
-| C/C++ | 通过 `syscalls.h` 系统调用接口开发 |
-| Python | 通过 `pip install agentos` 后直接 import |
-| Go | 通过 `import "github.com/spharx/agentos/toolkit/go"` |
-| Rust | 通过 `use agentos_toolkit::prelude::*;` |
-| TypeScript | 通过 `npm install @spharx/agentos-toolkit` 后直接 import |
-```
-### 阅读导航  
+| C/C++ | Develop via `syscalls.h` system call interface |
+| Python | Install via `pip install agentos` then import directly |
+| Go | Use `import "github.com/spharx/agentos/toolkit/go"` |
+| Rust | Use `use agentos_toolkit::prelude::*;` |
+| TypeScript | Install via `npm install @spharx/agentos-toolkit` then import directly |
 
-| 文档 | 核心内容 |
+### 📚 Documentation
+
+| Document | Core Content |
 |:-----|:---------|
-| [📘 架构原则](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) | 五维正交体系，24 条核心原则 |
-| [🚀 快速开始](agentos/manuals/guides/quickstart.md) | 5 分钟上手指南 |
-| [⚙️ 编译指南](agentos/manuals/guides/build.md) | 详细构建步骤和选项 |
-| [🧪 测试指南](agentos/manuals/guides/testing.md) | 单元/集成/契约测试 |
-| [🐳 部署指南](agentos/manuals/guides/deployment.md) | Docker/Kubernetes 部署 |
+| [📘 Architectural Principles](docs/ARCHITECTURAL_PRINCIPLES.md) | Multibody Cybernetic Intelligent System, 24 core principles |
+| [🚀 Quick Start](docs/Capital_Guides/getting_started.md) | 5‑minute getting‑started guide |
+| [⚙️ Build Guide](docs/Capital_Guides/installation.md) | Detailed build steps and options |
+| [🧪 Testing Guide](docs/Capital_Guides/testing.md) | Unit/Integration/Contract testing |
+| [🐳 Deployment Guide](docs/Capital_Guides/deployment.md) | Docker/Kubernetes deployment |
 
-
-### 常见问题  
+## ❔ FAQ
 
 <details>
-<summary>👉 Q1: AgentOS 与传统 AI Agent 框架有什么区别？</summary>
+<summary><b>Q1: How does AgentOS differ from traditional AI Agent frameworks?</b></summary>
 
-AgentOS 是**操作系统级**产品，而非单一框架：
+AgentOS is an **operating‑system‑level** product, not merely a framework:
 
-| 维度 | AgentOS | 传统框架 |
+| Dimension | AgentOS | Traditional Frameworks |
 |------|---------|----------|
-| **定位** | 多智能体协作 OS | 单一智能体 |
-| **架构** | 微内核 + 严格分层 | 松耦合模块 |
-| **安全** | 四重内生安全 | 应用层防护 |
-| **记忆** | 四层卷载系统 | 向量数据库 |
-| **Token 效率** | 节省约 500% | 无优化 |
+| **Positioning** | Multi‑agent collaboration OS | Single agent |
+| **Architecture** | Microkernel + strict layering | Loosely coupled modules |
+| **Security** | Four‑layer inherent security | Application‑level protection |
+| **Memory** | Four‑layer stratification system | Vector database |
+| **Token Efficiency** | Saves ~500% | No optimization |
 
 </details>
 
 <details>
-<summary>👉 Q2: 适合哪些应用场景？</summary>
+<summary><b>Q2: What scenarios is it suitable for?</b></summary>
 
-**✅ 特别适合**
-- 🎯 复杂多步骤任务编排
-- 🧠 长期记忆与知识积累需求
-- 🔒 高安全性企业应用
-- 💾 资源受限嵌入式场景 (atomslite)
-- 🌐 多语言开发团队
+**✅ Perfect for**
+- 🎯 Complex multi‑step task orchestration
+- 🧠 Long‑term memory and knowledge accumulation
+- 🔒 High‑security enterprise applications
+- 💾 Resource‑constrained embedded scenarios (atomslite)
+- 🌐 Multi‑language development teams
 
-**❌ 不适合**
-- 🚫 简单单次调用任务（杀鸡用牛刀）
+**❌ Not suitable for**
+- 🚫 Simple single‑call tasks (overkill)
 
 </details>
 
 <details>
-<summary>👉 Q3: 如何保证安全性？</summary>
+<summary><b>Q3: How is security guaranteed?</b></summary>
 
-**安全内生设计，四重防护**
+**Security built‑in design, four‑layer protection**
 
-| 防护层级 | 实现方式 |
+| Protection Layer | Implementation |
 |---------|---------|
-| **虚拟工位** | 进程/容器/WASM 沙箱隔离 |
-| **权限裁决** | RBAC + YAML 规则引擎 |
-| **输入净化** | 正则过滤 + 类型检查 |
-| **审计追踪** | 全链路不可篡改日志 |
+| **Virtual Workspace** | Process/Container/WASM sandbox isolation |
+| **Permission Arbitration** | RBAC + YAML rule engine |
+| **Input Sanitization** | Regex filtering + Type checking |
+| **Audit Trail** | Full‑chain tamper‑proof logging |
 
-详见 [cupolas 安全穹顶文档](agentos/cupolas/README.md)
+See [cupolas security documentation](agentos/cupolas/README.md)
 
 </details>
 
 <details>
-<summary>👉 Q4: 学习需要哪些前置知识？</summary>
+<summary><b>Q4: What prerequisites are needed?</b></summary>
 
-| 角色 | 前置知识 | 上手时间 |
+| Role | Prerequisites | Time to Get Started |
 |------|---------|----------|
-| **应用开发者** | Python/Go 基础 | 1-2 天上手 |
-| **系统开发者** | C/C++, 操作系统基础 | 1-2 周深入 |
-| **架构师** | 微内核，分布式系统 | 1 月精通 |
+| **Application Developer** | Python/Go basics | 1‑2 days |
+| **System Developer** | C/C++, OS fundamentals | 1‑2 weeks |
+| **Architect** | Microkernel, distributed systems | 1 month |
 
-**推荐路径**：[快速开始](agentos/manuals/guides/quickstart.md) → [架构原则](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) → [CoreLoopThree](agentos/manuals/architecture/coreloopthree.md)  
+**Recommended Path**: [Quick Start](docs/Capital_Guides/getting_started.md) → [Architectural Principles](docs/ARCHITECTURAL_PRINCIPLES.md) → [CoreLoopThree](agentos/atoms/coreloopthree/README.md)
 
-</details>  
-
-
-
-## 🎏 参与贡献  
-
-我们正在走进未来："Intelligence emergence, and nothing less, is the ultimate sublimation of AI"。   
-
-### 相信的力量   
+</details>
 
 <p align="center">
-  <strong>☀️ 这不是人类的日落，而是新世界的曙光</strong>  
-</p>  
+  <strong>☀️ This is not humanity's sunset, but the dawn of a new world ☀️</strong>
+</p>
 
-**相信**  
+## 🤝 Contributing
 
-  开源的精神能最大发挥群体的智慧；  
-  协作，推动人类族群走上新的高度。    
+> "Intelligence emergence, and nothing less, is the ultimate sublimation of AI."
 
-**见证**  
+This is the future we are stepping into.
 
-  我们每一天的工作都是历史的一部分；  
-  必将铭刻在人类文明发展史的丰碑上。   
+### 🚩 The Power of Belief
 
-### 贡献的方式  
+**Believe**  
+The spirit of open source can unleash the collective wisdom of the community, propelling humanity to new heights.
 
-无论你是经验丰富的开发者，还是刚刚起步的新手：
- 
-**发现问题**  
-报告 Bug，帮助我们改进质量  
+**Witness**  
+Every day of our work is part of history, destined to be engraved on the monument of human civilization, witnessing the true emergence of intelligence.
 
-**提出想法** 
-新功能建议，让项目更加强大  
+**This is not humanity's sunset, but the dawn of a new world.**
 
-**分享知识** 
-完善文档，帮助更多人了解 AgentOS  
+### 💫 Ways to Contribute
 
-**编写代码**  
-提交 PR，共同创造历史   
+Whether you are an experienced developer or just starting out:
+- 🐛 **Find Issues** → Report bugs, help us improve quality
+- 💡 **Share Ideas** → Suggest new features, make the project stronger
+- 📝 **Share Knowledge** → Improve documentation, help more people understand AgentOS
+- 🔧 **Write Code** → Submit PRs, jointly build a better intelligent agent OS
 
-<p align="center">  
-  <strong>🔥 “微微的灯火，照不亮前路，但能指引前行的方向”</strong>
-</p>  
+### 📝 Contribution Process
 
-### 贡献流程  
-
-详见 [贡献指南](CONTRIBUTING.md)
+See [Contributing Guide](CONTRIBUTING.md)
 
 ```bash
-Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 → 合并主分支
+Fork Project → Create Branch → Develop & Test → Submit PR → Code Review → Merge to Main
 ```
 
-**主要平台**：[AtomGit](https://atomgit.com/spharx/agentos)（推荐） · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)    
+**Main Platforms**: [AtomGit](https://atomgit.com/spharx/agentos) (Recommended) · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)
 
+<p align="center">
+  <strong>🔥 "A faint light cannot illuminate the entire path, yet it guides our direction forward." 🔥</strong>
+</p>
 
-## 📜 许可证  
+## 📜 License
 
-本项目采用 **Apache License 2.0** 开源许可，详情参阅 [LICENSE](LICENSE) 文件。
+This project is licensed under the **Apache License 2.0**. See [LICENSE](LICENSE) file for details.
 
 ---
 
 <div align="center">
 
-"From data intelligence emerges."  
-始于数据，终于智能。  
+**"From data intelligence emerges."**
 
 <a href="https://atomgit.com/spharx/agentos">AtomGit</a> ·
 <a href="https://gitee.com/spharx/agentos">Gitee</a> ·
 <a href="https://github.com/SpharxTeam/AgentOS">GitHub</a> ·
-<a href="https://spharx.cn">官方网站</a>
+<a href="https://spharx.cn">Official Website</a>
 
 © 2026 SPHARX Ltd. All Rights Reserved.
 
-</div>  
+</div>
 
 ---
 

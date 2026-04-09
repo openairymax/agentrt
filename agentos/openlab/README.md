@@ -1,4 +1,4 @@
-﻿# OpenLab - AgentOS 寮€鏀剧敓鎬佷笌搴旂敤涓績
+# OpenLab - AgentOS 寮€鏀剧敓鎬佷笌搴旂敤涓績
 
 <div align="center">
 

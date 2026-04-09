@@ -1,4 +1,4 @@
-﻿// AgentOS TypeScript SDK - Logger Module
+// AgentOS TypeScript SDK - Logger Module
 // Version: 3.0.0
 // Last updated: 2026-03-25
 //

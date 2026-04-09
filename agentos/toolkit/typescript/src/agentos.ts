@@ -1,4 +1,4 @@
-﻿// AgentOS TypeScript SDK - Main Entry
+// AgentOS TypeScript SDK - Main Entry
 // Version: 3.0.0
 // Last updated: 2026-03-24
 //

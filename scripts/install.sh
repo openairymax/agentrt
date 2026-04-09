@@ -1197,6 +1197,7 @@ ${CYAN}用法:${NC}
 
 ${CYAN}选项:${NC}
   --mode MODE        部署模式: dev|prod (默认: dev)
+  --target TARGET    部署目标: backend|client|all (默认: all)
   --auto             非交互模式（使用默认配置）
   --check-only       仅检查环境和项目结构
   --status           显示当前运行状态
@@ -1247,12 +1248,102 @@ show_version() {
     echo "Copyright (c) 2026 SPHARX Ltd. All Rights Reserved."
 }
 
+deploy_client() {
+    log_info "开始部署 AgentOS 桌面客户端..."
+    
+    local client_dir="${PROJECT_ROOT}/scripts/desktop-client"
+    if [[ ! -d "${client_dir}" ]]; then
+        log_error "桌面客户端目录不存在: ${client_dir}"
+        return 1
+    fi
+    
+    cd "${client_dir}" || {
+        log_error "无法进入桌面客户端目录: ${client_dir}"
+        return 1
+    }
+    
+    # 检查 Node.js 和 npm
+    if ! command -v node &> /dev/null; then
+        log_error "Node.js 未安装，请先安装 Node.js >= 18.x"
+        return 1
+    fi
+    
+    if ! command -v npm &> /dev/null; then
+        log_error "npm 未安装，请先安装 npm"
+        return 1
+    fi
+    
+    # 检查 Rust 和 Cargo (Tauri 需要)
+    if ! command -v cargo &> /dev/null; then
+        log_warning "Rust 未安装，桌面客户端构建需要 Rust 工具链"
+        if [[ "${AUTO_MODE}" == "true" ]] || confirm_action "是否尝试安装 Rust？"; then
+            log_info "正在安装 Rust 工具链..."
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            source "$HOME/.cargo/env" || true
+        else
+            log_warning "跳过 Rust 安装，桌面客户端构建可能失败"
+        fi
+    fi
+    
+    # 安装依赖
+    log_info "安装 Node.js 依赖..."
+    if ! npm install; then
+        log_error "Node.js 依赖安装失败"
+        return 1
+    fi
+    
+    # 生成图标
+    log_info "生成应用图标..."
+    if [[ -f "src-tauri/icons/generate_icons.py" ]]; then
+        cd src-tauri/icons
+        if command -v python3 &> /dev/null; then
+            python3 generate_icons.py
+        elif command -v python &> /dev/null; then
+            python generate_icons.py
+        else
+            log_warning "Python 未安装，跳过图标生成"
+        fi
+        cd ../..
+    fi
+    
+    # 构建客户端
+    log_info "构建桌面客户端..."
+    if ! npm run tauri build; then
+        log_error "桌面客户端构建失败"
+        return 1
+    fi
+    
+    log_success "桌面客户端构建成功！"
+    log_info "构建产物位置: ${client_dir}/src-tauri/target/release/bundle/"
+    
+    # 根据平台提示安装方式
+    case "$(uname -s)" in
+        Linux*)
+            log_info "Linux 安装方式:"
+            log_info "  DEB 包: ${client_dir}/src-tauri/target/release/bundle/deb/*.deb"
+            log_info "  AppImage: ${client_dir}/src-tauri/target/release/bundle/appimage/*.AppImage"
+            ;;
+        Darwin*)
+            log_info "macOS 安装方式:"
+            log_info "  DMG: ${client_dir}/src-tauri/target/release/bundle/dmg/*.dmg"
+            ;;
+        MINGW*|MSYS*|CYGWIN*)
+            log_info "Windows 安装方式:"
+            log_info "  MSI: ${client_dir}/src-tauri/target/release/bundle/msi/*.msi"
+            log_info "  EXE: ${client_dir}/src-tauri/target/release/bundle/nsis/*.exe"
+            ;;
+    esac
+    
+    return 0
+}
+
 # =============================================================================
 # 主程序
 # =============================================================================
 
 main() {
     local mode="dev"
+    local target="all"
     local action="deploy"
     AUTO_MODE="false"
 
@@ -1261,6 +1352,10 @@ main() {
         case "$1" in
             --mode)
                 mode="$2"
+                shift 2
+                ;;
+            --target)
+                target="$2"
                 shift 2
                 ;;
             --auto)
@@ -1344,6 +1439,20 @@ main() {
             ;;
 
         deploy)
+            # 根据部署目标执行相应操作
+            if [[ "$target" == "client" ]]; then
+                # 仅部署客户端
+                init_progress 1
+                show_progress "部署桌面客户端"
+                if ! deploy_client; then
+                    log_error "桌面客户端部署失败"
+                    ERROR_COUNT=$((ERROR_COUNT + 1))
+                fi
+                complete_progress
+                return 0
+            fi
+            
+            # 部署后端服务（backend 或 all）
             init_progress 7
 
             # 如果是交互模式，让用户选择部署模式
@@ -1395,6 +1504,15 @@ main() {
 
             show_progress "健康检查与验证"
             # 健康检查已在 start_*_environment 中调用
+
+            # 部署桌面客户端（如果目标包含 client）
+            if [[ "$target" == "client" || "$target" == "all" ]]; then
+                show_progress "部署桌面客户端"
+                if ! deploy_client; then
+                    log_error "桌面客户端部署失败"
+                    ERROR_COUNT=$((ERROR_COUNT + 1))
+                fi
+            fi
 
             complete_progress
 

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file logging_compat.h
  * @brief 统一分层日志系统向后兼容�? * @copyright (c) 2026 SPHARX. All Rights Reserved.
  * 

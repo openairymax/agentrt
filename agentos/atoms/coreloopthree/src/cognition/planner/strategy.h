@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file strategy.h
  * @brief 规划策略创建函数的统一声明
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
