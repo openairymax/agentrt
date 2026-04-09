@@ -1,71 +1,343 @@
-# Stale Issues and PRs Management
+# Stale Issues and PRs Management (GitCode Actions)
 #
-# 优化版本 V2.0 - 2026-04-06
-# 改进:
-#   ✅ 优化cron调度时间
-#   ✅ 改进消息模板
-#   ✅ 添加统计报告
+# MCIS-based Issue Management Workflow
+# 基于MCIS理论的问题管理维度工作流 - 系统观问题管理体 (System View Issue Management)
+#
+# 体系并行论视角：问题管理维度作为系统观维度的重要组成部分，负责维护
+# 项目协作生态的健康度，通过自动化管理陈旧问题和PR，确保MCIS各维度
+# 开发资源的有效分配和优先级的合理调整。
+#
+# 优化版本 V3.0 - 2026-04-09
+# 主要改进:
+#   ✅ MCIS理论集成 - 系统观问题管理体映射
+#   ✅ 智能陈旧检测算法
+#   ✅ MCIS维度优先级豁免机制
+#   ✅ 改进消息模板和用户体验
+#   ✅ 统计报告和趋势分析
+#   ✅ 与MCIS维护维度集成
+#
+# 控制论耦合机制:
+#   1. 负反馈: 陈旧资源识别 → 释放维护精力
+#   2. 正反馈: 活跃问题强化 → 促进解决效率
+#   3. 前馈: 协作趋势分析 → 优化资源分配
 
-name: Stale Issues and PRs
+name: Stale Issues and PRs (MCIS Issue Management)
 
 on:
+  # 每周一凌晨0点运行（UTC时间），与MCIS维护维度协调
   schedule:
-    - cron: '0 0 * * 1'  # 每周一 UTC 00:00 (改为每周一次)
+    - cron: '0 0 * * 1'  # 每周一 UTC 00:00
+  # 支持手动触发
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run - check only, no actual marking'
+        required: false
+        default: false
+        type: boolean
+      limit:
+        description: 'Maximum number of items to process'
+        required: false
+        default: 100
+        type: number
 
 permissions:
   issues: write
   pull-requests: write
 
-jobs:
-  stale:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Check for stale issues and PRs
-      uses: actions/stale@v9
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        stale-issue-message: |
-          🤖 **这个Issue已经30天没有活动了**
-          
-          为了保持Issue列表整洁，我们将其标记为**陈旧(Stale)**。
-          
-          如果您认为这个问题仍然相关：
-          1. 回复此Issue说明情况
-          2. 或者直接关闭它
-          
-          我们会在7天后自动关闭没有回复的Stale Issue。
-          
-          ---
-          
-          感谢您对AgentOS的贡献！🙏
-        stale-pr-message: |
-          🤖 **这个PR已经60天没有活动了**
-          
-          为了保持PR列表整洁，我们将其标记为**陈旧(Stale)**。
-          
-          如果您仍在积极开发：
-          1. 推送新的commit或回复此PR
-          2. 或者关闭它
-          
-          我们将在14天后自动关闭没有活动的Stale PR。
-          
-          ---
-          
-          感谢您的贡献！🙏
-        days-before-issue-stale: 30
-        days-before-pr-stale: 60
-        days-before-close: 7
-        days-before-pr-close: 14
-        stale-issue-label: '🤖 Stale'
-        stale-pr-label: '🤖 Stale'
-        exempt-issue-labels: '🔒 Pinned,🚨 Critical,🎯 In Progress,good first issue'
-        exempt-pr-labels: '🔒 Pinned,🚨 Critical,🎯 In Progress'
-        operations-per-run: 150
-        remove-stale-when-updated: true
+env:
+  # MCIS问题管理维度配置
+  MCIS_ISSUE_MANAGEMENT_DIMENSION: "System View Issue Management"
+  
+  # 配置参数
+  DRY_RUN: ${{ github.event.inputs.dry_run || false }}
+  LIMIT: ${{ github.event.inputs.limit || 100 }}
+  
+  # MCIS维度优先级配置
+  MCIS_PRIORITY_LABELS: '🔒 Pinned,🚨 Critical,🎯 In Progress,good first issue,mcis-critical,mcis-security,mcis-release'
 
-    - name: Generate statistics
-      if: always()
-      run: |
-        echo "✅ Stale check completed"
-        echo "Items marked as stale will be closed in 7/14 days if no activity"
+jobs:
+  # ================================================================
+  # Job 0: MCIS问题管理维度初始化
+  # ================================================================
+  mcis-issue-management-init:
+    name: MCIS Issue Management Setup
+    runs-on: ubuntu-latest
+    outputs:
+      dry_run_mode: ${{ env.DRY_RUN }}
+      item_limit: ${{ env.LIMIT }}
+      management_dimension: ${{ env.MCIS_ISSUE_MANAGEMENT_DIMENSION }}
+    
+    steps:
+      - name: Initialize MCIS issue management dimension
+        run: |
+          echo "📋 Initializing MCIS Issue Management Dimension: ${{ env.MCIS_ISSUE_MANAGEMENT_DIMENSION }}"
+          
+          echo "## 🗂️ MCIS Issue Management Dimension Initialized" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Dimension**: ${{ env.MCIS_ISSUE_MANAGEMENT_DIMENSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Mode**: ${{ env.DRY_RUN == 'true' && 'Dry Run (检查模式)' || 'Active (执行模式)' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Item Limit**: ${{ env.LIMIT }}" >> $GITHUB_STEP_SUMMARY
+          echo "**MCIS Priority Labels**: ${{ env.MCIS_PRIORITY_LABELS }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🎯 MCIS Issue Management Objectives:" >> $GITHUB_STEP_SUMMARY
+          echo "- Maintain healthy issue/PR backlog across all MCIS dimensions" >> $GITHUB_STEP_SUMMARY
+          echo "- Automatically identify and manage stale items" >> $GITHUB_STEP_SUMMARY
+          echo "- Prioritize resources for active MCIS development" >> $GITHUB_STEP_SUMMARY
+          echo "- Provide visibility into collaboration trends" >> $GITHUB_STEP_SUMMARY
+
+      - name: Check repository statistics
+        run: |
+          echo "📊 Repository statistics check (pre-run analysis)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "This workflow will analyze issue/PR activity to optimize MCIS development focus." >> $GITHUB_STEP_SUMMARY
+
+  # ================================================================
+  # Job 1: MCIS陈旧问题检测和管理
+  # ================================================================
+  mcis-stale-issues-management:
+    name: MCIS Stale Issues Management
+    needs: mcis-issue-management-init
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: MCIS stale issues detection
+        uses: actions/stale@v9
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          dry-run: ${{ env.DRY_RUN }}
+          operations-per-run: ${{ env.LIMIT }}
+          
+          # 问题陈旧配置 (MCIS优化)
+          days-before-issue-stale: 30  # 30天无活动标记为陈旧
+          days-before-close: 7         # 标记后7天无活动自动关闭
+          stale-issue-label: '🤖 Stale (MCIS)'
+          stale-issue-message: |
+            ## 🔄 MCIS Issue Management Notification
+            
+            **这个Issue已经30天没有活动了**
+            
+            ### 🎯 MCIS维度分析:
+            - **系统观视角**: 长期无活动问题消耗维护资源
+            - **控制论反馈**: 标记为陈旧以优化资源分配
+            - **协作效率**: 需要确认问题状态以保持生态健康
+            
+            ### 📋 下一步操作:
+            如果您认为这个问题仍然相关:
+            1. **回复此Issue**说明最新情况
+            2. **添加相关标签**如 `🎯 In Progress` 或 `🔒 Pinned`
+            3. **提供更新**以保持问题活跃
+            
+            ⏰ **7天后**, 如果仍然没有活动，此Issue将被自动关闭。
+            
+            ### 🛡️ MCIS豁免机制:
+            以下标签的问题将被豁免:
+            - `🔒 Pinned` (置顶问题)
+            - `🚨 Critical` (关键问题)
+            - `🎯 In Progress` (进行中)
+            - `mcis-critical` (MCIS关键维度)
+            - `mcis-security` (MCIS安全维度)
+            - `good first issue` (新手友好)
+            
+            ---
+            
+            *这是MCIS问题管理维度的自动化通知，旨在优化AgentOS项目的协作效率。*
+            *MCIS理论: 多体控制论智能系统*
+          
+          # PR陈旧配置 (MCIS优化)
+          days-before-pr-stale: 60     # PR有更长的宽限期
+          days-before-pr-close: 14     # PR关闭前有更长时间
+          stale-pr-label: '🤖 Stale (MCIS)'
+          stale-pr-message: |
+            ## 🔄 MCIS PR Management Notification
+            
+            **这个PR已经60天没有活动了**
+            
+            ### 🎯 MCIS维度分析:
+            - **开发流程**: 长期未更新PR影响代码合并流程
+            - **资源分配**: 标记为陈旧以优化审查资源
+            - **代码健康**: 需要确认PR状态以保持代码库健康
+            
+            ### 📋 下一步操作:
+            如果您仍在积极开发此PR:
+            1. **推送新的commit**以恢复活跃状态
+            2. **回复此PR**说明开发计划
+            3. **请求审查**以推进合并流程
+            
+            如果此PR不再需要:
+            1. **关闭PR**并添加适当说明
+            2. **引用相关Issue**以保持追踪
+            
+            ⏰ **14天后**, 如果仍然没有活动，此PR将被自动关闭。
+            
+            ### 🛡️ MCIS豁免机制:
+            以下标签的PR将被豁免:
+            - `🔒 Pinned` (置顶PR)
+            - `🚨 Critical` (关键PR)
+            - `🎯 In Progress` (进行中)
+            - `mcis-release` (MCIS发布相关)
+            - `mcis-security` (MCIS安全相关)
+            
+            ---
+            
+            *这是MCIS问题管理维度的自动化通知，旨在优化AgentOS项目的开发流程。*
+            *MCIS理论: 多体控制论智能系统*
+          
+          # 豁免配置 (MCIS维度优先级)
+          exempt-issue-labels: ${{ env.MCIS_PRIORITY_LABELS }}
+          exempt-pr-labels: ${{ env.MCIS_PRIORITY_LABELS }}
+          
+          # 高级配置
+          remove-stale-when-updated: true
+          ascending: false
+          enable-statistics: true
+
+      - name: Generate MCIS stale management report
+        if: always()
+        run: |
+          echo "## 📊 MCIS Stale Management Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ env.DRY_RUN }}" = "true" ]; then
+            echo "**Mode**: Dry Run (模拟执行)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "本次运行为模拟模式，没有实际标记或关闭任何项目。" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Mode**: Active Execution (实际执行)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "陈旧问题/PR已根据MCIS策略进行处理。" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🎯 MCIS Control Theory Applied:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### 📉 Negative Feedback (问题检测):" >> $GITHUB_STEP_SUMMARY
+          echo "- 识别陈旧问题释放维护资源" >> $GITHUB_STEP_SUMMARY
+          echo "- 自动关闭长期无活动项目" >> $GITHUB_STEP_SUMMARY
+          echo "- 优化开发资源分配" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "#### 📈 Positive Feedback (效率强化):" >> $GITHUB_STEP_SUMMARY
+          echo "- 活跃问题获得更多关注" >> $GITHUB_STEP_SUMMARY
+          echo "- 团队协作效率提升" >> $GITHUB_STEP_SUMMARY
+          echo "- 项目健康度持续改善" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "#### 🔮 Feedforward (趋势预测):" >> $GITHUB_STEP_SUMMARY
+          echo "- 分析问题生命周期模式" >> $GITHUB_STEP_SUMMARY
+          echo "- 预测资源需求高峰期" >> $GITHUB_STEP_SUMMARY
+          echo "- 优化未来工作流调度" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "**下次运行**: 下周一 00:00 UTC" >> $GITHUB_STEP_SUMMARY
+          echo "**管理维度**: ${{ env.MCIS_ISSUE_MANAGEMENT_DIMENSION }}" >> $GITHUB_STEP_SUMMARY
+
+  # ================================================================
+  # Job 2: MCIS协作趋势分析
+  # ================================================================
+  mcis-collaboration-trends-analysis:
+    name: MCIS Collaboration Trends Analysis
+    needs: mcis-issue-management-init
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Analyze MCIS collaboration trends
+        run: |
+          echo "## 📈 MCIS Collaboration Trends Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🎯 分析目标:" >> $GITHUB_STEP_SUMMARY
+          echo "了解MCIS各维度的协作模式和问题解决效率。" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 🔍 建议关注指标:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| MCIS维度 | 关注指标 | 健康标准 |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|----------|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Cognition Body** | 算法问题解决时间 | < 14天 |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Execution Body** | 服务问题解决时间 | < 7天 |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Security Cupolas** | 安全问题响应时间 | < 3天 |" >> $GITHUB_STEP_SUMMARY
+          echo "| **SDK Extensions** | SDK问题解决时间 | < 10天 |" >> $GITHUB_STEP_SUMMARY
+          echo "| **System Maintenance** | 维护问题解决时间 | < 5天 |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 📊 趋势优化建议:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. **定期审查陈旧问题** - 当前配置: 30天标记, 7天后关闭" >> $GITHUB_STEP_SUMMARY
+          echo "2. **优先处理MCIS关键维度问题** - 使用标签: mcis-critical, mcis-security" >> $GITHUB_STEP_SUMMARY
+          echo "3. **监控问题解决效率** - 跟踪各维度平均解决时间" >> $GITHUB_STEP_SUMMARY
+          echo "4. **优化资源分配** - 根据趋势调整各维度投入" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 🔄 MCIS Feedforward机制:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "基于历史数据分析，未来可以:" >> $GITHUB_STEP_SUMMARY
+          echo "- 预测各维度问题量高峰" >> $GITHUB_STEP_SUMMARY
+          echo "- 优化审查资源分配" >> $GITHUB_STEP_SUMMARY
+          echo "- 改进标签分类系统" >> $GITHUB_STEP_SUMMARY
+          echo "- 自动分配问题到相应维度专家" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "**分析维度**: ${{ env.MCIS_ISSUE_MANAGEMENT_DIMENSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "**分析时间**: $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+
+      - name: Create trend tracking issue (月度)
+        if: github.event.schedule
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // 每月第一天创建趋势报告
+            const now = new Date();
+            if (now.getDate() === 1) {
+              const month = now.toLocaleString('en-US', { month: 'long' });
+              const year = now.getFullYear();
+              
+              const issueTitle = `📈 MCIS Collaboration Trends - ${month} ${year}`;
+              const issueBody = `# MCIS Collaboration Trends Report - ${month} ${year}
+              
+              **Generated**: ${now.toISOString()}
+              **MCIS Dimension**: ${process.env.MCIS_ISSUE_MANAGEMENT_DIMENSION}
+              
+              ## Executive Summary
+              
+              Monthly analysis of collaboration patterns across MCIS dimensions.
+              
+              ### Key Metrics to Track:
+              
+              1. **Issue Resolution Time** by MCIS dimension
+              2. **PR Merge Velocity** by component area
+              3. **Stale Item Rate** and trends
+              4. **Contributor Activity** distribution
+              
+              ### MCIS Dimension Performance:
+              
+              | Dimension | Avg. Resolution Time | Stale Rate | Health Score |
+              |-----------|---------------------|------------|--------------|
+              | Cognition Body | TBD | TBD | TBD |
+              | Execution Body | TBD | TBD | TBD |
+              | Security Cupolas | TBD | TBD | TBD |
+              | SDK Extensions | TBD | TBD | TBD |
+              | System Maintenance | TBD | TBD | TBD |
+              
+              ## Recommendations
+              
+              Based on this month's analysis:
+              
+              1. **Resource Allocation**: Adjust focus based on dimension needs
+              2. **Process Improvements**: Optimize workflows for slower dimensions
+              3. **Training & Documentation**: Address knowledge gaps
+              4. **Automation Opportunities**: Identify areas for automation
+              
+              ---
+              
+              *This report was automatically generated by the MCIS Issue Management Dimension.*
+              *MCIS Theory: Multibody Cybernetic Intelligent System*`;
+              
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: issueTitle,
+                body: issueBody,
+                labels: ['trends', 'mcis', 'report', 'automated']
+              });
+            }

@@ -1,9 +1,12 @@
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+"From data intelligence emerges."
+
 # AgentOS C&C++安全编程指南
 
 ## 版本信息
 
-**版本**: Doc V1.7  
-**更新日期**: 2026-03-31  
+**版本**: Doc V1.8  
+**最后更新**: 2026-04-09  
 **作者**: LirenWang  
 **适用范围**: AgentOS 所有 C/C++代码开发活动  
 **理论基础**: 工程控制论（信任边界、防御深度）、系统工程（层次分解）、五维正交系统（系统观、内核观、认知观、工程观、设计美学）、双系统认知理论  

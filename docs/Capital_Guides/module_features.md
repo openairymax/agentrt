@@ -1,12 +1,17 @@
-Copyright (c) 2026 SPHARX. All Rights Reserved.
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 "From data intelligence emerges."
 
 # manuals 模块功能说明
 
-**版本**: Doc V1.7  
-**最后更新**: 2026-03-31  
+**版本**: Doc V1.8  
+**最后更新**: 2026-04-09  
 **状态**: 🟢 生产就绪  
-**作者**: LirenWang
+**作者**: Team
+  - Zhixian Zhou | Spharx Ltd. zhouzhixian@spharx.cn
+  - Liren Wang | Spharx Ltd. wangliren@spharx.cn
+  - Chen Zhang | SJTU CSC Lab. yoyoke@sjtu.edu.cn
+  - Yunwen Xu | SJTU CSC Lab. willing419@sjtu.edu.cn
+  - Daxiang Zhu | IndieBros. zdxever@sina.com
 
 ---
 
@@ -478,7 +483,7 @@ security:
 
 ---
 
-**最后更新**: 2026-03-23  
+**最后更新**: 2026-04-09  
 **维护者**: AgentOS 产品团队
 
 ---

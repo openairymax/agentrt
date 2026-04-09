@@ -1,7 +1,10 @@
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+"From data intelligence emerges."
+
 # AgentOS C++ 编码规范
 
-**版本**: Doc V1.7  
-**更新日期**: 2026-03-31  
+**版本**: Doc V1.8  
+**最后更新**: 2026-04-09  
 **作者**: LirenWang  
 **适用范围**: AgentOS 所有 C++ 代码模块  
 **理论基础**: 工程两论（反馈闭环）、系统工程（层次分解）、五维正交系统（系统观、内核观、认知观、工程观、设计美学）、双系统认知理论、微内核哲学  
@@ -83,7 +86,7 @@ agentos/atoms/corekern/
 ### 2.2 头文件结构
 
 ```cpp
-// Copyright (c) 2026 SPHARX. All Rights Reserved.
+// Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 
 #ifndef AGENTOS_MODULE_NAME_H
 #define AGENTOS_MODULE_NAME_H

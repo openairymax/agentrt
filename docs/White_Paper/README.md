@@ -1,5 +1,8 @@
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+"From data intelligence emerges."
+
 ---
-copyright: "Copyright (c) 2026 SPHARX. All Rights Reserved."
+copyright: "Copyright (c) 2026 SPHARX Ltd. All Rights Reserved."
 slogan: "From data intelligence emerges 始于数据，终于智能。"
 title: "AgentOS 官方技术白皮书"
 version: "Doc V1.7"
