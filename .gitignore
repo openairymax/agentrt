@@ -1,47 +1,39 @@
-# =============================================================================
-# AgentOS .gitignore 文件
-# 版本：6.0.0
-# 最后更新：2026-04-06
-# 说明：规范化排除所有不应纳入版本控制的文件和目录
+﻿# =============================================================================
+# AgentOS .gitignore 鏂囦欢
+# 鐗堟湰锛?.0.0
+# 鏈€鍚庢洿鏂帮細2026-04-09
+# 璇存槑锛氳鑼冨寲鎺掗櫎鎵€鏈変笉搴旂撼鍏ョ増鏈帶鍒剁殑鏂囦欢鍜岀洰褰?#
+# 璁捐鍘熷垯锛?# 1. 鏋勫缓浜х墿涓€寰嬫帓闄わ紙CMake 缂撳瓨銆佺紪璇戜骇鐗╃瓑锛?# 2. 杩愯鏃剁敓鎴愮殑鏂囦欢涓€寰嬫帓闄わ紙鏁版嵁搴撱€佹棩蹇椼€佹ā鍨嬬瓑锛?# 3. 鏈湴寮€鍙戦厤缃竴寰嬫帓闄わ紙.env.local銆両DE 閰嶇疆绛夛級
+# 4. 绌虹洰褰曢€氳繃 .gitkeep 淇濈暀锛屼絾鎺掗櫎鐩綍鍐呭
+# 5. 椤圭洰蹇呴渶鏂囦欢浣跨敤鍚﹀畾瑙勫垯鏄庣‘淇濈暀
 #
-# 设计原则：
-# 1. 构建产物一律排除（CMake 缓存、编译产物等）
-# 2. 运行时生成的文件一律排除（数据库、日志、模型等）
-# 3. 本地开发配置一律排除（.env.local、IDE 配置等）
-# 4. 空目录通过 .gitkeep 保留，但排除目录内容
-# 5. 项目必需文件使用否定规则明确保留
+# 椤圭洰妯″潡缁撴瀯锛?026-04-09 V5.0 鏍℃鍚庯級锛?# 鏍稿績妯″潡 (agentos/)
+#   - atoms/       : 鍐呮牳鍘熷瓙妯″潡 (40,917琛? A+璇勭骇)
+#   - atomslite/   : 杞婚噺绾у師瀛愭ā鍧?#   - commons/     : 缁熶竴鍩虹搴?(S绾? 97.1鍒?
+#   - cupolas/     : 瀹夊叏绌归《妯″潡 (A++璇勭骇, 97.5鍒?
+#   - daemon/      : 鐢ㄦ埛鎬佹湇鍔℃ā鍧?(S+璇勭骇, 96.5鍒?
+#   - gateway/     : 缃戝叧鏈嶅姟妯″潡 (A+璇勭骇)
+#   - heapstore/   : 鏁版嵁鎸佷箙鍖栧眰 (A璇勭骇, 98%鐢熶骇灏辩华)
+#   - manager/     : 閰嶇疆绠＄悊鍣?#   - toolkit/     : 澶氳瑷€ SDK 宸ュ叿 (35,638琛? 4璇█)
+#   - openlab/     : Python 搴旂敤涓績 (宸茬Щ鍔ㄥ埌 agentos/)
 #
-# 项目模块结构（2026-04-06 V4.1校正后）：
-# 核心模块 (agentos/)
-#   - atoms/       : 内核原子模块 (40,917行, A+评级)
-#   - atomslite/   : 轻量级原子模块
-#   - commons/     : 统一基础库 (S级, 97.1分)
-#   - cupolas/     : 安全穹顶模块 (A++评级, 97.5分)
-#   - daemon/      : 用户态服务模块 (S+评级, 96.5分)
-#   - gateway/     : 网关服务模块 (A+评级)
-#   - heapstore/   : 数据持久化层 (A评级, 98%生产就绪)
-#   - manager/     : 配置管理器
-#   - toolkit/     : 多语言 SDK 工具 (35,638行, 4语言)
-#   - manuals/     : 项目文档
+# 鏂囨。妯″潡
+#   - docs/        : 椤圭洰鏂囨。 (鍘?manuals/)
 #
-# 辅助模块
-#   - openlab/     : Python 应用中心
-#   - scripts/     : 构建和运维脚本
-#   - tests/       : 测试框架 (A+认证, 98.5分)
-#   - docker/      : 容器化配置
-#   - docs/        : 额外文档
-#   - .gitcode/    : CI/CD配置 (V2.0优化后)
-#   - .bendiwenjian/: 修复记录 (155份文档)
+# 杈呭姪妯″潡
+#   - scripts/     : 鏋勫缓鍜岃繍缁磋剼鏈?#     - desktop-client/ : 妗岄潰瀹㈡埛绔?(Tauri)
+#   - tests/       : 娴嬭瘯妗嗘灦 (A+璁よ瘉, 98.5鍒?
+#   - .gitcode/    : CI/CD閰嶇疆 (V3.0浼樺寲鍚庯紝缁熶竴绠＄悊)
 # =============================================================================
 
 # =============================================================================
-# 修复记录目录（本地工作记录，不追踪）
+# 1. 淇璁板綍鐩綍锛堟湰鍦板伐浣滆褰曪紝涓嶈拷韪級
 # =============================================================================
 
-.bendiwenjian/
+# .bendiwenjian/ 宸茬Щ鍔ㄥ埌椤圭洰鏍圭洰褰曞 (D:\SPHARX-CN\)
 
 # =============================================================================
-# 1. CMake 构建系统（构建产物，不追踪）
+# 2. CMake 鏋勫缓绯荤粺锛堟瀯寤轰骇鐗╋紝涓嶈拷韪級
 # =============================================================================
 
 CMakeCache.txt
@@ -51,7 +43,7 @@ cmake_install.*
 CMakeUserPresets.json
 CMakePresets.json
 
-# CMake 构建目录
+# CMake 鏋勫缓鐩綍
 build/
 _build/
 cmake-build*/
@@ -59,16 +51,14 @@ cmake-build-debug/
 cmake-build-release/
 cmake-build-coverage/
 
-# 编译器数据库（IDE 工具生成）
-compile_commands.json
+# 缂栬瘧鍣ㄦ暟鎹簱锛圛DE 宸ュ叿鐢熸垚锛?compile_commands.json
 compile_flags.txt
 compile_commands/*.json
 
 # =============================================================================
-# 2. 编译产物（构建时生成，不追踪）
-# =============================================================================
+# 3. 缂栬瘧浜х墿锛堟瀯寤烘椂鐢熸垚锛屼笉杩借釜锛?# =============================================================================
 
-# 目标文件
+# 鐩爣鏂囦欢
 *.o
 *.obj
 *.so
@@ -82,23 +72,21 @@ compile_commands/*.json
 *.lai
 *.d
 
-# 可执行文件
-*.exe
+# 鍙墽琛屾枃浠?*.exe
 *.exe.manifest
 *.out
 *.app
 *.bin
 
-# 预编译头
+# 棰勭紪璇戝ご
 *.pch
 *.gch
 *.pch.gch
 
 # =============================================================================
-# 3. Python 相关（运行时生成，不追踪）
-# =============================================================================
+# 4. Python 鐩稿叧锛堣繍琛屾椂鐢熸垚锛屼笉杩借釜锛?# =============================================================================
 
-# Python 缓存
+# Python 缂撳瓨
 __pycache__/
 *.py[cod]
 *$py.class
@@ -108,7 +96,7 @@ __pycache__/
 *.pyc
 *.pyc.*
 
-# 虚拟环境
+# 铏氭嫙鐜
 venv/
 env/
 ENV/
@@ -116,8 +104,7 @@ ENV/
 .python-version
 .venv.bak/
 
-# Python 包管理产物
-*.egg-info/
+# Python 鍖呯鐞嗕骇鐗?*.egg-info/
 *.egg
 *.dist-info/
 *.pydist-info/
@@ -132,7 +119,7 @@ poetry.lock
 # Pipenv
 Pipfile.lock
 
-# 测试和覆盖率
+# 娴嬭瘯鍜岃鐩栫巼
 .pytest_cache/
 .coverage
 .coverage.*
@@ -149,8 +136,7 @@ profile_default/
 ipython_config.py
 ipython_kernel_config.py
 
-# 类型检查缓存
-.mypy_cache/
+# 绫诲瀷妫€鏌ョ紦瀛?.mypy_cache/
 .dmypy.json
 dmypy.json
 .ruff_cache/
@@ -159,7 +145,7 @@ dmypy.json
 .ruff_cache/
 
 # =============================================================================
-# 4. Go 语言 SDK（构建产物，不追踪）
+# 5. Go 璇█ SDK锛堟瀯寤轰骇鐗╋紝涓嶈拷韪級
 # =============================================================================
 
 agentos/toolkit/go/vendor/
@@ -172,7 +158,7 @@ cover.out
 cover.html
 
 # =============================================================================
-# 5. Rust 语言 SDK（构建产物，不追踪）
+# 6. Rust 璇█ SDK锛堟瀯寤轰骇鐗╋紝涓嶈拷韪級
 # =============================================================================
 
 agentos/toolkit/rust/target/
@@ -183,7 +169,7 @@ agentos/toolkit/rust/doc/
 agentos/toolkit/rust/target/doc/
 
 # =============================================================================
-# 6. TypeScript/JavaScript SDK（构建产物，不追踪）
+# 7. TypeScript/JavaScript SDK锛堟瀯寤轰骇鐗╋紝涓嶈拷韪級
 # =============================================================================
 
 agentos/toolkit/typescript/node_modules/
@@ -197,10 +183,9 @@ agentos/toolkit/typescript/tsbuildinfo/
 .nuxt/
 
 # =============================================================================
-# 7. 环境变量和敏感配置（本地配置，不追踪）
-# =============================================================================
+# 8. 鐜鍙橀噺鍜屾晱鎰熼厤缃紙鏈湴閰嶇疆锛屼笉杩借釜锛?# =============================================================================
 
-# 环境文件
+# 鐜鏂囦欢
 .env
 .env.local
 .env.*.local
@@ -209,8 +194,7 @@ agentos/toolkit/typescript/tsbuildinfo/
 .env.production
 *.env
 
-# 密钥和证书
-*.pem
+# 瀵嗛挜鍜岃瘉涔?*.pem
 *.key
 *.crt
 *.cer
@@ -228,7 +212,7 @@ service_account.json
 oauth/
 .token
 
-# 本地配置覆盖
+# 鏈湴閰嶇疆瑕嗙洊
 manager.local.yaml
 manager.local.yml
 manager.*.local.yaml
@@ -238,7 +222,7 @@ local_settings.py
 override.yaml
 
 # =============================================================================
-# 8. IDE 和编辑器配置（本地开发配置，不追踪）
+# 9. IDE 鍜岀紪杈戝櫒閰嶇疆锛堟湰鍦板紑鍙戦厤缃紝涓嶈拷韪級
 # =============================================================================
 
 # Visual Studio Code
@@ -247,7 +231,7 @@ override.yaml
 *.code-snippets
 .vscode-test/
 
-# JetBrains 系列
+# JetBrains 绯诲垪
 .idea/
 *.iml
 *.ipr
@@ -300,17 +284,15 @@ bld/
 bin/
 
 # =============================================================================
-# 9. 日志、数据库和运行时文件（运行时生成，不追踪）
-# =============================================================================
+# 10. 鏃ュ織銆佹暟鎹簱鍜岃繍琛屾椂鏂囦欢锛堣繍琛屾椂鐢熸垚锛屼笉杩借釜锛?# =============================================================================
 
-# 日志文件
+# 鏃ュ織鏂囦欢
 *.log
 logs/
 *.logs
 agentos/heapstore/logs/
 
-# 数据库文件
-*.db
+# 鏁版嵁搴撴枃浠?*.db
 *.db-shm
 *.db-wal
 *.sqlite
@@ -323,7 +305,7 @@ agentos/heapstore/db/
 registry.db
 registry.sqlite
 
-# 追踪和性能数据
+# 杩借釜鍜屾€ц兘鏁版嵁
 agentos/heapstore/traces/
 *.trace
 *.spans
@@ -332,7 +314,7 @@ agentos/heapstore/traces/
 *.gcda
 *.gcno
 
-# 缓存
+# 缂撳瓨
 .cache/
 *.cache
 tmp/
@@ -342,11 +324,9 @@ temp/
 *.orig
 
 # =============================================================================
-# 10. agentos/heapstore/ 运行时目录（运行时生成，仅保留空路径）
-# =============================================================================
+# 11. agentos/heapstore/ 杩愯鏃剁洰褰曪紙杩愯鏃剁敓鎴愶紝浠呬繚鐣欑┖璺緞锛?# =============================================================================
 
-# kernel/ 子目录（排除内容，保留 .gitkeep）
-agentos/heapstore/kernel/ipc/binder/*
+# kernel/ 瀛愮洰褰曪紙鎺掗櫎鍐呭锛屼繚鐣?.gitkeep锛?agentos/heapstore/kernel/ipc/binder/*
 !agentos/heapstore/kernel/ipc/binder/.gitkeep
 agentos/heapstore/kernel/ipc/channels/*
 !agentos/heapstore/kernel/ipc/channels/.gitkeep
@@ -359,20 +339,17 @@ agentos/heapstore/kernel/memory/raw/*
 agentos/heapstore/kernel/memory/patterns/*
 !agentos/heapstore/kernel/memory/patterns/.gitkeep
 
-# services/ 子目录（排除内容，保留 .gitkeep）
-agentos/heapstore/services/llm_d/*
+# services/ 瀛愮洰褰曪紙鎺掗櫎鍐呭锛屼繚鐣?.gitkeep锛?agentos/heapstore/services/llm_d/*
 !agentos/heapstore/services/llm_d/.gitkeep
 agentos/heapstore/services/market_d/*
 !agentos/heapstore/services/market_d/.gitkeep
 agentos/heapstore/services/tool_d/*
 !agentos/heapstore/services/tool_d/.gitkeep
 
-# models/ 子目录（排除内容，保留 .gitkeep）
-agentos/heapstore/models/*
+# models/ 瀛愮洰褰曪紙鎺掗櫎鍐呭锛屼繚鐣?.gitkeep锛?agentos/heapstore/models/*
 !agentos/heapstore/models/.gitkeep
 
-# 其他运行时目录
-agentos/heapstore/logs/*
+# 鍏朵粬杩愯鏃剁洰褰?agentos/heapstore/logs/*
 agentos/heapstore/traces/*
 agentos/heapstore/registry/*
 agentos/heapstore/db/*
@@ -382,31 +359,28 @@ agentos/heapstore/db/*
 !agentos/heapstore/db/.gitkeep
 
 # =============================================================================
-# 11. 测试相关（测试结果不追踪，测试代码保留）
+# 12. 娴嬭瘯鐩稿叧锛堟祴璇曠粨鏋滀笉杩借釜锛屾祴璇曚唬鐮佷繚鐣欙級
 # =============================================================================
 
-# 测试结果和报告
-test-results/
+# 娴嬭瘯缁撴灉鍜屾姤鍛?test-results/
 test_output/
 *.test
 *.spec
 *.snap
 *.snapshot
 
-# 测试覆盖率
-coverage/
+# 娴嬭瘯瑕嗙洊鐜?coverage/
 htmlcov/
 *.gcov
 
-# 测试数据（运行时生成）
-test_data/generated/
+# 娴嬭瘯鏁版嵁锛堣繍琛屾椂鐢熸垚锛?test_data/generated/
 *.test.data
 tests/fuzz/*.fuzz
 tests/fuzz/corpus/
 tests/fuzz/seeds/
 tests/fuzz/hangs/
 
-# 基准测试结果
+# 鍩哄噯娴嬭瘯缁撴灉
 tests/benchmarks/**/results/
 tests/benchmarks/**/plots/
 tests/benchmarks/**/reports/
@@ -414,30 +388,29 @@ tests/benchmarks/**/reports/
 benchmark_results/
 perf_results/
 
-# tests/benchmarks/concurrency/report/（排除内容，保留 .gitkeep）
-tests/benchmarks/concurrency/report/*
+# tests/benchmarks/concurrency/report/锛堟帓闄ゅ唴瀹癸紝淇濈暀 .gitkeep锛?tests/benchmarks/concurrency/report/*
 !tests/benchmarks/concurrency/report/.gitkeep
 
 # =============================================================================
-# 12. 文档生成（构建产物，不追踪）
+# 13. 鏂囨。鐢熸垚锛堟瀯寤轰骇鐗╋紝涓嶈拷韪級
 # =============================================================================
 
-manuals/_build/
-manuals/.doctrees/
-manuals/doctrees/
-doxygen/
-xml/
-html/
-latex/
-man/
-site/
-manuals/architecture/diagrams/*.svg
-manuals/architecture/diagrams/*.png
-manuals/architecture/diagrams/*.pdf
+docs/_build/
+docs/.doctrees/
+docs/doctrees/
+docs/html/
+docs/latex/
+docs/man/
+docs/site/
+docs/architecture/diagrams/*.svg
+docs/architecture/diagrams/*.png
+docs/architecture/diagrams/*.pdf
 toolkit/go/doc/
 
+# 鍘?manuals 鐩綍宸茶縼绉诲埌 docs/
+
 # =============================================================================
-# 13. 操作系统文件（系统生成，不追踪）
+# 14. 鎿嶄綔绯荤粺鏂囦欢锛堢郴缁熺敓鎴愶紝涓嶈拷韪級
 # =============================================================================
 
 # macOS
@@ -467,7 +440,7 @@ $RECYCLE.BIN/
 .nfs*
 
 # =============================================================================
-# 14. 依赖管理（本地安装，不追踪）
+# 15. 渚濊禆绠＄悊锛堟湰鍦板畨瑁咃紝涓嶈拷韪級
 # =============================================================================
 
 vendor/
@@ -478,16 +451,15 @@ Carthage/Build/
 .swiftpm/
 
 # =============================================================================
-# 15. 大型文件和二进制文件（运行时生成，不追踪）
-# =============================================================================
+# 16. 澶у瀷鏂囦欢鍜屼簩杩涘埗鏂囦欢锛堣繍琛屾椂鐢熸垚锛屼笉杩借釜锛?# =============================================================================
 
-# FAISS 索引
+# FAISS 绱㈠紩
 agentos/heapstore/models/*.faiss
 agentos/heapstore/models/*.index
 agentos/heapstore/models/*.pkl
 agentos/heapstore/models/*.pickle
 
-# 模型权重
+# 妯″瀷鏉冮噸
 agentos/heapstore/model/
 agentos/heapstore/models/*.bin
 agentos/heapstore/models/*.pth
@@ -496,22 +468,19 @@ agentos/heapstore/models/*.pt
 agentos/heapstore/models/*.onnx
 *.tflite
 
-# 向量和嵌入
-*.npy
+# 鍚戦噺鍜屽祵鍏?*.npy
 *.npz
 *.parquet
 *.arrow
 *.feather
 
-# 数据集
-/data/
+# 鏁版嵁闆?/data/
 /datasets/
 *.csv
 *.tsv
 *.jsonl
 
-# 压缩包
-*.tar.gz
+# 鍘嬬缉鍖?*.tar.gz
 *.tar.bz2
 *.tar.xz
 *.zip
@@ -521,7 +490,7 @@ agentos/heapstore/models/*.onnx
 *.bz2
 *.xz
 
-# Docker 和 Kubernetes
+# Docker 鍜?Kubernetes
 deploy/docker/*.tar
 deploy/docker/*.tar.gz
 deploy/docker/.docker-*/
@@ -531,8 +500,7 @@ docker-compose.override.yml
 .kube/
 
 # =============================================================================
-# 16. 部署和安装（构建产物，不追踪）
-# =============================================================================
+# 17. 閮ㄧ讲鍜屽畨瑁咃紙鏋勫缓浜х墿锛屼笉杩借釜锛?# =============================================================================
 
 deploy/artifacts/
 deploy/packages/
@@ -545,8 +513,7 @@ version.txt
 build_version.txt
 
 # =============================================================================
-# 17. 代码质量工具缓存（运行时生成，不追踪）
-# =============================================================================
+# 18. 浠ｇ爜璐ㄩ噺宸ュ叿缂撳瓨锛堣繍琛屾椂鐢熸垚锛屼笉杩借釜锛?# =============================================================================
 
 .pre-commit-manager.local.yaml
 .eslintcache
@@ -568,8 +535,7 @@ sonar-report.json
 .cache/clangd/
 
 # =============================================================================
-# 18. 本地开发文档（临时文件，不追踪）
-# =============================================================================
+# 19. 鏈湴寮€鍙戞枃妗ｏ紙涓存椂鏂囦欢锛屼笉杩借釜锛?# =============================================================================
 
 *.draft
 *.todo
@@ -603,17 +569,32 @@ test_reports/
 coverage_reports/
 
 # =============================================================================
-# 19. 新增目录（docker/ 和 docs/）
-# =============================================================================
+# 20. 妗岄潰瀹㈡埛绔紙Tauri 鏋勫缓浜х墿锛屼笉杩借釜锛?# =============================================================================
 
-# docker/ 目录（保留配置文件，排除运行时产物）
+# Tauri 鏋勫缓浜х墿
+scripts/desktop-client/src-tauri/target/
+scripts/desktop-client/dist/
+scripts/desktop-client/node_modules/
+
+# 鍓嶇鏋勫缓缂撳瓨
+scripts/desktop-client/.vite/
+scripts/desktop-client/.turbo/
+
+# Tauri 閰嶇疆缂撳瓨
+scripts/desktop-client/src-tauri/WixTools/
+scripts/desktop-client/src-tauri/Cargo.lock
+
+# =============================================================================
+# 21. 鏂板鐩綍锛坉ocker/ 鍜?docs/锛?# =============================================================================
+
+# docker/ 鐩綍锛堜繚鐣欓厤缃枃浠讹紝鎺掗櫎杩愯鏃朵骇鐗╋級
 docker/*.log
 docker/*.tar
 docker/*.tar.gz
 docker/volumes/
 docker/.docker-*/
 
-# docs/ 目录（保留源文件，排除构建产物）
+# docs/ 鐩綍锛堜繚鐣欐簮鏂囦欢锛屾帓闄ゆ瀯寤轰骇鐗╋級
 docs/_build/
 docs/.doctrees/
 docs/doctrees/
@@ -628,25 +609,24 @@ docs/local/
 docs/private/
 
 # =============================================================================
-# 20. 必须保留的例外（项目必需文件）
-# =============================================================================
+# 22. 蹇呴』淇濈暀鐨勪緥澶栵紙椤圭洰蹇呴渶鏂囦欢锛?# =============================================================================
 
-# 版本控制配置
+# 鐗堟湰鎺у埗閰嶇疆
 !.gitignore
 !.gitattributes
 
-# 环境模板
+# 鐜妯℃澘
 !.env.example
 
-# agentos/manager/ 配置文件
+# agentos/manager/ 閰嶇疆鏂囦欢
 !agentos/manager/*.yaml
 !agentos/manager/*.yml
 !agentos/manager/*.template
 !agentos/manager/*.schema.json
 !agentos/manager/.env.template
 
-# 关键文档
-!agentos/manuals/**/*.md
+# 鍏抽敭鏂囨。
+!docs/**/*.md
 !README.md
 !README_EN.md
 !LICENSE
@@ -659,8 +639,7 @@ docs/private/
 !NOTICE
 !ACKNOWLEDGMENTS.md
 
-# 构建和运维脚本
-!scripts/**/*.sh
+# 鏋勫缓鍜岃繍缁磋剼鏈?!scripts/**/*.sh
 !scripts/**/*.py
 !scripts/**/*.bat
 !scripts/**/*.ps1
@@ -668,8 +647,7 @@ docs/private/
 !scripts/**/*.yaml
 !scripts/deploy/docker/.gitignore
 
-# scripts/dev/ 开发配置
-!scripts/dev/config/.clang-format
+# scripts/dev/ 寮€鍙戦厤缃?!scripts/dev/config/.clang-format
 !scripts/dev/config/.clangd
 !scripts/dev/config/.editorconfig
 !scripts/dev/config/.lizardrc
@@ -679,7 +657,7 @@ docs/private/
 !scripts/dev/quickstart.sh
 !scripts/dev/validate.sh
 
-# 测试框架
+# 娴嬭瘯妗嗘灦
 !tests/**/*.py
 !tests/**/*.sh
 !tests/**/*.yaml
@@ -697,18 +675,18 @@ docs/private/
 !tests/unit/services/llm_d/.gitkeep
 !tests/unit/services/tool_d/.gitkeep
 
-# Docker 配置
+# Docker 閰嶇疆
 !Dockerfile*
 !docker-compose*.yml
 !deploy/docker/Dockerfile*
-!openlab/Dockerfile
+!agentos/openlab/Dockerfile
 !agentos/gateway/docker/Dockerfile*
 !agentos/daemon/Dockerfile.ci
 !scripts/deploy/docker/Dockerfile*
 !docker/Dockerfile*
 !docker/docker-compose*.yml
 
-# CMake 构建配置
+# CMake 鏋勫缓閰嶇疆
 !agentos/atoms/**/CMakeLists.txt
 !agentos/atomslite/**/CMakeLists.txt
 !agentos/commons/**/CMakeLists.txt
@@ -719,11 +697,10 @@ docs/private/
 !agentos/heapstore/**/CMakeLists.txt
 !tests/unit/**/CMakeLists.txt
 
-# 根目录项目配置
-!Makefile
+# 鏍圭洰褰曢」鐩厤缃?!Makefile
 !pyproject.toml
 
-# agentos/toolkit/ 配置文件
+# agentos/toolkit/ 閰嶇疆鏂囦欢
 !agentos/toolkit/python/pyproject.toml
 !agentos/toolkit/python/setup.py
 !agentos/toolkit/go/go.mod
@@ -732,26 +709,35 @@ docs/private/
 !agentos/toolkit/typescript/tsconfig.json
 !agentos/toolkit/typescript/jest.config.js
 
-# openlab/ 配置文件
-!openlab/pyproject.toml
-!openlab/requirements.txt
+# openlab/ 閰嶇疆鏂囦欢
+!agentos/openlab/pyproject.toml
+!agentos/openlab/requirements.txt
 
-# 空目录 .gitkeep
+# 妗岄潰瀹㈡埛绔厤缃枃浠?!scripts/desktop-client/package.json
+!scripts/desktop-client/tsconfig.json
+!scripts/desktop-client/tsconfig.node.json
+!scripts/desktop-client/vite.config.ts
+!scripts/desktop-client/src-tauri/Cargo.toml
+!scripts/desktop-client/src-tauri/tauri.conf.json
+!scripts/desktop-client/src-tauri/build.rs
+!scripts/desktop-client/src-tauri/src/**/*.rs
+!scripts/desktop-client/src/**/*.{tsx,ts,css}
+!scripts/desktop-client/index.html
+
+# 绌虹洰褰?.gitkeep
 !agentos/commons/utils/types/.gitkeep
 
 # =============================================================================
-# 21. 平台模板目录（项目必需，保留）
+# 23. 骞冲彴妯℃澘鐩綍锛堥」鐩繀闇€锛屼繚鐣欙級
 # =============================================================================
 
-# .gitcode/是平台模板目录，随仓库同步
-# .github/是GitHub Actions配置目录
-
+# .gitcode/ 鏄钩鍙版ā鏉跨洰褰曪紝闅忎粨搴撳悓姝?# 鍖呭惈 CI/CD 宸ヤ綔娴併€両ssue 妯℃澘銆丳R 妯℃澘绛?
 # =============================================================================
-# 22. 总线检查报告目录（保留最终版本）
+# 24. 鎬荤嚎妫€鏌ユ姤鍛婄洰褰曪紙淇濈暀鏈€缁堢増鏈級
 # =============================================================================
 
-!.bendiwenjian/总线检查/*.md
+!.bendiwenjian/鎬荤嚎妫€鏌?*.md
 
 # =============================================================================
-# 结束
+# 缁撴潫
 # =============================================================================
