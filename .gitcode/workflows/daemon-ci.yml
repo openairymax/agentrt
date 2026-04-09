@@ -104,7 +104,7 @@ jobs:
 
           mkdir -p build-daemon
           cd build-daemon
-          cmake ../daemon \
+          cmake ../agentos/daemon \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTS=ON \
             -DPKG_CONFIG_PATH=/usr/local/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}
@@ -228,7 +228,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Continue"
           
-          cmake -B build-daemon -S daemon `
+          cmake -B build-daemon -S agentos/daemon `
             -DCMAKE_BUILD_TYPE="Release" `
             -DBUILD_TESTS=ON `
             "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
@@ -305,7 +305,7 @@ jobs:
           
           mkdir -p build-daemon
           cd build-daemon
-          cmake ../daemon \
+          cmake ../agentos/daemon \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTS=ON \
             -DOPENSSL_ROOT_DIR="$OPENSSL_DIR" \
