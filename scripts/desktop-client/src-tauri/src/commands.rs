@@ -457,10 +457,10 @@ pub struct UpdateInfo {
 pub async fn get_version_info(_state: State<'_, AppState>) -> Result<VersionInfo, String> {
     Ok(VersionInfo {
         app_version: env!("CARGO_PKG_VERSION").to_string(),
-        build_time: env!("VERGEN_BUILD_TIMESTAMP").to_string(),
+        build_time: option_env!("VERGEN_BUILD_TIMESTAMP").unwrap_or("unknown").to_string(),
         git_commit: option_env!("VERGEN_GIT_SHA").unwrap_or("unknown").to_string(),
-        rust_version: env!("RUSTC_VERSION").to_string(),
-        tauri_version: env!("TAURI_VERSION").to_string(),
+        rust_version: option_env!("RUSTC_VERSION").unwrap_or("unknown").to_string(),
+        tauri_version: option_env!("TAURI_VERSION").unwrap_or("unknown").to_string(),
     })
 }
 
@@ -471,4 +471,36 @@ pub struct VersionInfo {
     pub git_commit: String,
     pub rust_version: String,
     pub tauri_version: String,
+}
+
+#[tauri::command]
+pub async fn download_and_install_update(
+    app: tauri::AppHandle,
+    _state: State<'_, AppState>,
+) -> Result<(), String> {
+    use tauri_plugin_updater::UpdaterExt;
+    
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    
+    let update = updater.check().await.map_err(|e| e.to_string())?
+        .ok_or("No update available")?;
+    
+    log::info!("Downloading update {}...", update.version);
+    
+    let mut downloaded = 0;
+    let total = update.content_length.unwrap_or(0);
+    
+    update.download_and_install(
+        |chunk_length, content_length| {
+            downloaded += chunk_length;
+            log::info!("Downloaded {} of {} bytes", downloaded, content_length.unwrap_or(0));
+        },
+        || {
+            log::info!("Download complete, installing...");
+        },
+    ).await.map_err(|e| e.to_string())?;
+    
+    log::info!("Update installed successfully");
+    
+    Ok(())
 }

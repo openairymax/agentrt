@@ -67,7 +67,7 @@
 ```
 
 **设计原则**  
-  基于 [ARCHITECTURAL_PRINCIPLES](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) 构建：
+  基于 [ARCHITECTURAL_PRINCIPLES](docs/ARCHITECTURAL_PRINCIPLES.md) 构建：
 - **系统观**：反馈闭环 · 层次分解 · 总体设计部 · 涌现管理 → 实时响应 <10ms
 - **内核观**：内核极简 · 接口契约化 · 服务隔离 · 可插拔策略 → 内核 ~25K LOC
 - **认知观**：双系统协同 · 增量演化 · 记忆卷载 · 遗忘机制 → Token 节省 500%
