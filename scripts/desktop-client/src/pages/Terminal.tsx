@@ -9,7 +9,8 @@ import {
   Play,
   History,
 } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../utils/tauriCompat";
+import { useI18n } from "../i18n";
 
 interface CommandHistory {
   command: string;
@@ -17,18 +18,8 @@ interface CommandHistory {
   success: boolean;
 }
 
-const PRESET_COMMANDS = [
-  { name: "Check Environment", command: "./install.sh --check-only" },
-  { name: "Start Dev Services", command: "docker compose up -d" },
-  { name: "View Container Status", command: "docker compose ps" },
-  { name: "View Resource Usage", command: "docker stats --no-stream" },
-  { name: "Show Logs (Tail)", command: "docker compose logs --tail=50" },
-  { name: "Health Check", command: "curl -sf http://localhost:18789/api/v1/health" },
-  { name: "Stop All Services", command: "docker compose down" },
-  { name: "Clean Up Resources", command: "docker system prune -f" },
-];
-
 const TerminalPage: React.FC = () => {
+  const { t } = useI18n();
   const [currentCommand, setCurrentCommand] = useState("");
   const [output, setOutput] = useState<string[]>([]);
   const [commandHistory, setCommandHistory] = useState<CommandHistory[]>([]);
@@ -38,6 +29,17 @@ const TerminalPage: React.FC = () => {
 
   const inputRef = useRef<HTMLInputElement>(null);
   const outputRef = useRef<HTMLDivElement>(null);
+
+  const PRESET_COMMANDS = [
+    { name: t.terminal.checkEnvironment, command: "./install.sh --check-only" },
+    { name: t.terminal.startDevServices, command: "docker compose up -d" },
+    { name: t.terminal.viewContainerStatus, command: "docker compose ps" },
+    { name: t.terminal.viewResourceUsage, command: "docker stats --no-stream" },
+    { name: t.terminal.showLogsTail, command: "docker compose logs --tail=50" },
+    { name: t.terminal.healthCheck, command: "curl -sf http://localhost:18789/api/v1/health" },
+    { name: t.terminal.stopAllServices, command: "docker compose down" },
+    { name: t.terminal.cleanUpResources, command: "docker system prune -f" },
+  ];
 
   useEffect(() => {
     if (outputRef.current) {
@@ -99,7 +101,7 @@ const TerminalPage: React.FC = () => {
       }
 
       addOutputLine(
-        `[Exit code: ${result.exit_code}] Completed in ${result.duration_ms}ms`,
+        `[${t.terminal.exitCode}: ${result.exit_code}] ${t.terminal.completedIn} ${result.duration_ms}ms`,
         result.success ? "success" : "error"
       );
 
@@ -108,7 +110,7 @@ const TerminalPage: React.FC = () => {
         ...prev.slice(0, 49),
       ]);
     } catch (error) {
-      addOutputLine(`Error: ${error}`, "error");
+      addOutputLine(`${t.common.error}: ${error}`, "error");
       setCommandHistory((prev) => [
         { command: commandToExecute, timestamp, success: false },
         ...prev.slice(0, 49),
@@ -170,7 +172,7 @@ const TerminalPage: React.FC = () => {
       .join("\n");
 
     navigator.clipboard.writeText(text).then(() => {
-      addOutputLine("[Copied to clipboard]", "info");
+      addOutputLine(t.terminal.copiedToClipboard, "info");
     });
   };
 
@@ -211,30 +213,28 @@ const TerminalPage: React.FC = () => {
 
   return (
     <div>
-      {/* Header */}
       <div className="card" style={{ marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h3 className="card-title" style={{ marginBottom: 0 }}>
           <Terminal size={20} />
-          Integrated Terminal
+          {t.terminal.title}
         </h3>
 
         <div style={{ display: "flex", gap: "8px" }}>
           <button className="btn btn-secondary" onClick={copyOutput} disabled={output.length === 0}>
             <Copy size={16} />
-            Copy
+            {t.terminal.copy}
           </button>
           <button className="btn btn-secondary" onClick={clearTerminal} disabled={output.length === 0}>
             <Trash2 size={16} />
-            Clear
+            {t.terminal.clear}
           </button>
         </div>
       </div>
 
-      {/* Preset Commands */}
       <div className="card" style={{ marginBottom: "20px" }}>
         <h4 style={{ fontSize: "14px", fontWeight: 600, marginBottom: "12px", color: "var(--text-secondary)" }}>
           <Play size={16} style={{ display: "inline", marginRight: 6 }} />
-          Quick Commands
+          {t.terminal.quickCommands}
         </h4>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           {PRESET_COMMANDS.map((preset) => (
@@ -252,7 +252,6 @@ const TerminalPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Terminal Window */}
       <div
         style={{
           background: "#0d1117",
@@ -265,7 +264,6 @@ const TerminalPage: React.FC = () => {
           flexDirection: "column",
         }}
       >
-        {/* Terminal Header Bar */}
         <div
           style={{
             background: "#161b22",
@@ -293,11 +291,10 @@ const TerminalPage: React.FC = () => {
           </div>
 
           <div style={{ fontSize: "12px", color: "#8b949e" }}>
-            {executing ? "● Running..." : "● Ready"}
+            {executing ? `● ${t.terminal.running}` : `● ${t.terminal.ready}`}
           </div>
         </div>
 
-        {/* Output Area */}
         <div
           ref={outputRef}
           style={{
@@ -310,9 +307,9 @@ const TerminalPage: React.FC = () => {
           {output.length === 0 && (
             <div style={{ textAlign: "center", color: "#484f58", padding: "40px 0" }}>
               <Terminal size={48} style={{ opacity: 0.3 }} />
-              <p style={{ marginTop: "12px" }}>AgentOS Terminal Ready</p>
+              <p style={{ marginTop: "12px" }}>{t.terminal.terminalReady}</p>
               <p style={{ fontSize: "12px", marginTop: "4px" }}>
-                Type a command or click a quick command above to get started
+                {t.terminal.terminalReadyHint}
               </p>
             </div>
           )}
@@ -332,7 +329,6 @@ const TerminalPage: React.FC = () => {
           )}
         </div>
 
-        {/* Input Area */}
         <div
           style={{
             padding: "12px 16px",
@@ -354,7 +350,7 @@ const TerminalPage: React.FC = () => {
             value={currentCommand}
             onChange={(e) => setCurrentCommand(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a command and press Enter..."
+            placeholder={t.terminal.placeholder}
             disabled={executing}
             style={{
               flex: 1,
@@ -384,12 +380,11 @@ const TerminalPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Command History Sidebar */}
       {commandHistory.length > 0 && (
         <div className="card" style={{ marginTop: "20px" }}>
           <h4 style={{ fontSize: "14px", fontWeight: 600, marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
             <History size={16} />
-            Recent Commands ({commandHistory.length})
+            {t.terminal.recentCommands} ({commandHistory.length})
           </h4>
 
           <div

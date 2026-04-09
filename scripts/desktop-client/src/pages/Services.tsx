@@ -11,6 +11,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { invoke } from "../utils/tauriCompat";
+import { useI18n } from "../i18n";
 
 interface ServiceStatus {
   name: string;
@@ -20,6 +21,7 @@ interface ServiceStatus {
 }
 
 const Services: React.FC = () => {
+  const { t } = useI18n();
   const [services, setServices] = useState<ServiceStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -48,14 +50,14 @@ const Services: React.FC = () => {
       await loadServiceStatus();
     } catch (error) {
       console.error("Failed to start services:", error);
-      alert(`Failed to start services: ${error}`);
+      alert(`${t.services.failedToStart}: ${error}`);
     } finally {
       setActionLoading(null);
     }
   };
 
   const handleStopAll = async () => {
-    if (!confirm("Are you sure you want to stop all services?")) return;
+    if (!confirm(t.services.confirmStopAll)) return;
 
     setActionLoading("stop");
     try {
@@ -63,7 +65,7 @@ const Services: React.FC = () => {
       setServices([]);
     } catch (error) {
       console.error("Failed to stop services:", error);
-      alert(`Failed to stop services: ${error}`);
+      alert(`${t.services.failedToStop}: ${error}`);
     } finally {
       setActionLoading(null);
     }
@@ -76,7 +78,7 @@ const Services: React.FC = () => {
       await loadServiceStatus();
     } catch (error) {
       console.error("Failed to restart services:", error);
-      alert(`Failed to restart services: ${error}`);
+      alert(`${t.services.failedToRestart}: ${error}`);
     } finally {
       setActionLoading(null);
     }
@@ -97,10 +99,10 @@ const Services: React.FC = () => {
         <div>
           <h3 className="card-title" style={{ marginBottom: 0 }}>
             <Server size={20} />
-            Docker Services Management
+            {t.services.title}
           </h3>
           <p style={{ color: "var(--text-secondary)", fontSize: "14px", marginTop: "4px" }}>
-            Manage your AgentOS containerized services
+            {t.services.subtitle}
           </p>
         </div>
 
@@ -111,8 +113,8 @@ const Services: React.FC = () => {
             onChange={(e) => setDeployMode(e.target.value as "dev" | "prod")}
             style={{ width: "auto", padding: "8px 12px" }}
           >
-            <option value="dev">Development</option>
-            <option value="prod">Production</option>
+            <option value="dev">{t.services.devMode}</option>
+            <option value="prod">{t.services.prodMode}</option>
           </select>
 
           <button
@@ -121,7 +123,7 @@ const Services: React.FC = () => {
             disabled={loading}
           >
             <RefreshCw size={16} />
-            Refresh
+            {t.services.refresh}
           </button>
         </div>
       </div>
@@ -138,7 +140,7 @@ const Services: React.FC = () => {
             ) : (
               <Play size={16} />
             )}
-            Start All ({deployMode})
+            {t.services.startAll} ({deployMode})
           </button>
 
           <button
@@ -151,7 +153,7 @@ const Services: React.FC = () => {
             ) : (
               <Square size={16} />
             )}
-            Stop All
+            {t.services.stopAll}
           </button>
 
           <button
@@ -164,14 +166,14 @@ const Services: React.FC = () => {
             ) : (
               <RotateCcw size={16} />
             )}
-            Restart All
+            {t.services.restartAll}
           </button>
         </div>
       </div>
 
       <div className="card">
         <h3 className="card-title">
-          Active Services ({services.length})
+          {t.services.activeServices} ({services.length})
         </h3>
 
         {loading ? (
@@ -181,9 +183,9 @@ const Services: React.FC = () => {
         ) : services.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-icon">🐳</div>
-            <div className="empty-state-text">No running services</div>
+            <div className="empty-state-text">{t.services.noRunningServices}</div>
             <div className="empty-state-hint">
-              Click "Start All" to launch AgentOS services in {deployMode} mode
+              {t.services.noRunningServicesHint} ({deployMode === "dev" ? t.services.devMode : t.services.prodMode})
             </div>
           </div>
         ) : (
@@ -199,7 +201,7 @@ const Services: React.FC = () => {
                       fontWeight: 600,
                     }}
                   >
-                    Service Name
+                    {t.services.serviceName}
                   </th>
                   <th
                     style={{
@@ -209,7 +211,7 @@ const Services: React.FC = () => {
                       fontWeight: 600,
                     }}
                   >
-                    Status
+                    {t.services.status}
                   </th>
                   <th
                     style={{
@@ -219,7 +221,7 @@ const Services: React.FC = () => {
                       fontWeight: 600,
                     }}
                   >
-                    Port
+                    {t.services.port}
                   </th>
                   <th
                     style={{
@@ -229,7 +231,7 @@ const Services: React.FC = () => {
                       fontWeight: 600,
                     }}
                   >
-                    Actions
+                    {t.services.actions}
                   </th>
                 </tr>
               </thead>
@@ -270,7 +272,7 @@ const Services: React.FC = () => {
                           title={`Open http://localhost:${service.port}`}
                         >
                           <ExternalLink size={14} />
-                          Open
+                          {t.services.open}
                         </button>
                       )}
                     </td>
@@ -284,22 +286,22 @@ const Services: React.FC = () => {
 
       <div className="grid-2">
         <div className="card">
-          <h3 className="card-title">Development Mode</h3>
+          <h3 className="card-title">{t.services.devModeInfo}</h3>
           <ul style={{ color: "var(--text-secondary)", lineHeight: "1.8", paddingLeft: "20px" }}>
-            <li>Gateway API: <code>http://localhost:18789</code></li>
-            <li>Kernel IPC: <code>http://localhost:18080</code></li>
-            <li>OpenLab UI: <code>http://localhost:3000</code></li>
-            <li>Grafana: <code>http://localhost:3001</code></li>
+            <li>{t.services.devGatewayApi}: <code>http://localhost:18789</code></li>
+            <li>{t.services.devKernelIpc}: <code>http://localhost:18080</code></li>
+            <li>{t.services.devOpenLabUi}: <code>http://localhost:3000</code></li>
+            <li>{t.services.devGrafana}: <code>http://localhost:3001</code></li>
           </ul>
         </div>
 
         <div className="card">
-          <h3 className="card-title">Production Mode</h3>
+          <h3 className="card-title">{t.services.prodModeInfo}</h3>
           <ul style={{ color: "var(--text-secondary)", lineHeight: "1.8", paddingLeft: "20px" }}>
-            <li>Gateway: <code>:18789</code> (HTTPS via reverse proxy)</li>
-            <li>Auto-scaling enabled</li>
-            <li>Health checks active</li>
-            <li>Monitoring & logging integrated</li>
+            <li>Gateway: <code>:18789</code> ({t.services.prodHttpsProxy})</li>
+            <li>{t.services.prodAutoScaling}</li>
+            <li>{t.services.prodHealthChecks}</li>
+            <li>{t.services.prodMonitoring}</li>
           </ul>
         </div>
       </div>

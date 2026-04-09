@@ -9,9 +9,11 @@ import {
   Info,
   Trash2,
 } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../utils/tauriCompat";
+import { useI18n } from "../i18n";
 
 const Logs: React.FC = () => {
+  const { t } = useI18n();
   const [logs, setLogs] = useState("");
   const [selectedService, setSelectedService] = useState<string>("");
   const [tailCount, setTailCount] = useState(100);
@@ -41,7 +43,7 @@ const Logs: React.FC = () => {
       setLogs(logContent);
     } catch (error) {
       console.error("Failed to load logs:", error);
-      setLogs(`Error loading logs: ${error}`);
+      setLogs(`${t.common.error}: ${error}`);
     } finally {
       setLoading(false);
     }
@@ -67,7 +69,7 @@ const Logs: React.FC = () => {
   };
 
   const clearLogs = () => {
-    if (confirm("Are you sure you want to clear the displayed logs?")) {
+    if (confirm(t.logs.clearConfirm)) {
       setLogs("");
     }
   };
@@ -89,15 +91,13 @@ const Logs: React.FC = () => {
 
   return (
     <div>
-      {/* Header */}
       <div className="card" style={{ marginBottom: "20px" }}>
         <h3 className="card-title" style={{ marginBottom: 0 }}>
           <FileText size={20} />
-          System Logs Viewer
+          {t.logs.systemLogsViewer}
         </h3>
       </div>
 
-      {/* Controls */}
       <div className="card" style={{ marginBottom: "20px" }}>
         <div
           style={{
@@ -107,17 +107,16 @@ const Logs: React.FC = () => {
             flexWrap: "wrap",
           }}
         >
-          {/* Service Filter */}
           <div style={{ flex: 1, minWidth: "200px" }}>
             <label style={{ fontSize: "12px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
-              Service Filter
+              {t.logs.serviceFilter}
             </label>
             <select
               className="input-field"
               value={selectedService}
               onChange={(e) => setSelectedService(e.target.value)}
             >
-              <option value="">All Services</option>
+              <option value="">{t.logs.allServices}</option>
               <option value="kernel">Kernel</option>
               <option value="gateway">Gateway</option>
               <option value="postgres">PostgreSQL</option>
@@ -128,28 +127,26 @@ const Logs: React.FC = () => {
             </select>
           </div>
 
-          {/* Tail Count */}
           <div style={{ width: "150px" }}>
             <label style={{ fontSize: "12px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
-              Show Last N Lines
+              {t.logs.showLastLines}
             </label>
             <select
               className="input-field"
               value={tailCount}
               onChange={(e) => setTailCount(Number(e.target.value))}
             >
-              <option value={50}>Last 50 lines</option>
-              <option value={100}>Last 100 lines</option>
-              <option value={250}>Last 250 lines</option>
-              <option value={500}>Last 500 lines</option>
-              <option value={1000}>Last 1000 lines</option>
+              <option value={50}>{t.logs.last50}</option>
+              <option value={100}>{t.logs.last100}</option>
+              <option value={250}>{t.logs.last250}</option>
+              <option value={500}>{t.logs.last500}</option>
+              <option value={1000}>{t.logs.last1000}</option>
             </select>
           </div>
 
-          {/* Search */}
           <div style={{ flex: 1, minWidth: "200px" }}>
             <label style={{ fontSize: "12px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>
-              Search Logs
+              {t.logs.searchLogs}
             </label>
             <div style={{ position: "relative" }}>
               <Search
@@ -165,7 +162,7 @@ const Logs: React.FC = () => {
               <input
                 type="text"
                 className="input-field"
-                placeholder="Filter logs..."
+                placeholder={t.logs.filterLogs}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{ paddingLeft: "36px" }}
@@ -173,34 +170,32 @@ const Logs: React.FC = () => {
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div style={{ display: "flex", gap: "8px", alignItems: "end" }}>
             <button className="btn btn-secondary" onClick={loadLogs} disabled={loading}>
               <RefreshCw size={16} />
-              Refresh
+              {t.logs.refresh}
             </button>
 
             <button
               className={`btn ${autoRefresh ? "btn-primary" : "btn-secondary"}`}
               onClick={() => setAutoRefresh(!autoRefresh)}
             >
-              {autoRefresh ? "⏸ Auto-refresh ON" : "▶ Auto-refresh OFF"}
+              {autoRefresh ? `⏸ ${t.logs.autoRefreshOn}` : `▶ ${t.logs.autoRefreshOff}`}
             </button>
 
             <button className="btn btn-secondary" onClick={handleDownloadLogs}>
               <Download size={16} />
-              Export
+              {t.logs.export}
             </button>
 
             <button className="btn btn-danger" onClick={clearLogs} disabled={!logs}>
               <Trash2 size={16} />
-              Clear
+              {t.logs.clear}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Log Stats */}
       <div
         style={{
           display: "flex",
@@ -213,12 +208,11 @@ const Logs: React.FC = () => {
         }}
       >
         <span>
-          Showing {logLines} lines{searchTerm && ` (filtered by "${searchTerm}")`}
+          {t.logs.showing} {logLines} {searchTerm ? `(${t.logs.filteredBy} "${searchTerm}")` : ""}
         </span>
-        <span>{selectedService ? `Service: ${selectedService}` : "All services"}</span>
+        <span>{selectedService ? `${t.logs.service}: ${selectedService}` : t.logs.allServices}</span>
       </div>
 
-      {/* Log Viewer */}
       <div
         ref={logContainerRef}
         style={{
@@ -237,14 +231,14 @@ const Logs: React.FC = () => {
         {loading ? (
           <div style={{ textAlign: "center", padding: "60px", color: "#94a3b8" }}>
             <div className="loading-spinner" />
-            <p style={{ marginTop: "16px" }}>Loading logs...</p>
+            <p style={{ marginTop: "16px" }}>{t.logs.loadingLogs}</p>
           </div>
         ) : !filteredLogs ? (
           <div style={{ textAlign: "center", padding: "60px", color: "#94a3b8" }}>
             <Info size={48} style={{ opacity: 0.5 }} />
-            <p style={{ marginTop: "16px" }}>No logs available</p>
+            <p style={{ marginTop: "16px" }}>{t.logs.noLogsAvailable}</p>
             <p style={{ fontSize: "13px", marginTop: "8px" }}>
-              Start services to generate logs
+              {t.logs.startServicesForLogs}
             </p>
           </div>
         ) : (
@@ -266,7 +260,7 @@ const Logs: React.FC = () => {
               } else if (line.toLowerCase().includes("warn")) {
                 color = "#d29922";
               } else if (line.toLowerCase().includes("info")) {
-                color="#58a6ff";
+                color = "#58a6ff";
               }
 
               return (
@@ -294,7 +288,6 @@ const Logs: React.FC = () => {
         )}
       </div>
 
-      {/* Footer */}
       <div
         style={{
           marginTop: "12px",
@@ -309,12 +302,12 @@ const Logs: React.FC = () => {
         }}
       >
         <div style={{ display: "flex", gap: "20px" }}>
-          <span><span style={{ color: "#f85149" }}>●</span> Error</span>
-          <span><span style={{ color: "#d29922" }}>●</span> Warning</span>
-          <span><span style={{ color: "#58a6ff" }}>●</span> Info</span>
+          <span><span style={{ color: "#f85149" }}>●</span> {t.logs.error}</span>
+          <span><span style={{ color: "#d29922" }}>●</span> {t.logs.warn}</span>
+          <span><span style={{ color: "#58a6ff" }}>●</span> {t.logs.info}</span>
         </div>
         <span>
-          Auto-refresh: {autoRefresh ? "ON (5s)" : "OFF"}
+          {t.logs.autoRefresh}: {autoRefresh ? `ON (5s)` : "OFF"}
         </span>
       </div>
     </div>

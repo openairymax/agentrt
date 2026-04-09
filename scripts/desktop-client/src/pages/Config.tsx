@@ -8,40 +8,43 @@ import {
   AlertTriangle,
   CheckCircle2,
 } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
-
-const CONFIG_FILES = [
-  {
-    name: "Environment Variables",
-    path: ".env.production",
-    description: "Database, Redis, JWT, and API configuration",
-    icon: "🔐",
-    sensitive: true,
-  },
-  {
-    name: "Main Configuration",
-    path: "config/agentos.yaml",
-    description: "Core AgentOS settings and parameters",
-    icon: "⚙️",
-    sensitive: false,
-  },
-  {
-    name: "Docker Compose (Dev)",
-    path: "docker/docker-compose.yml",
-    description: "Development environment service definitions",
-    icon: "🐳",
-    sensitive: false,
-  },
-  {
-    name: "Docker Compose (Prod)",
-    path: "docker/docker-compose.prod.yml",
-    description: "Production environment service definitions",
-    icon: "🏭",
-    sensitive: false,
-  },
-];
+import { invoke } from "../utils/tauriCompat";
+import { useI18n } from "../i18n";
 
 const Config: React.FC = () => {
+  const { t } = useI18n();
+
+  const CONFIG_FILES = [
+    {
+      name: t.config.envVariables,
+      path: ".env.production",
+      description: t.config.envVariablesDesc,
+      icon: "🔐",
+      sensitive: true,
+    },
+    {
+      name: t.config.mainConfig,
+      path: "config/agentos.yaml",
+      description: t.config.mainConfigDesc,
+      icon: "⚙️",
+      sensitive: false,
+    },
+    {
+      name: t.config.dockerComposeDev,
+      path: "docker/docker-compose.yml",
+      description: t.config.dockerComposeDevDesc,
+      icon: "🐳",
+      sensitive: false,
+    },
+    {
+      name: t.config.dockerComposeProd,
+      path: "docker/docker-compose.prod.yml",
+      description: t.config.dockerComposeProdDesc,
+      icon: "🏭",
+      sensitive: false,
+    },
+  ];
+
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState("");
   const [originalContent, setOriginalContent] = useState("");
@@ -72,7 +75,7 @@ const Config: React.FC = () => {
       console.error("Failed to load config file:", error);
       setFileContent("");
       setOriginalContent("");
-      setMessage({ type: "error", text: `Failed to load file: ${error}` });
+      setMessage({ type: "error", text: `${t.config.failedToLoad}: ${error}` });
     } finally {
       setLoading(false);
     }
@@ -91,10 +94,10 @@ const Config: React.FC = () => {
       });
 
       setOriginalContent(fileContent);
-      setMessage({ type: "success", text: "Configuration saved successfully!" });
+      setMessage({ type: "success", text: t.config.saveSuccess });
     } catch (error) {
       console.error("Failed to save config file:", error);
-      setMessage({ type: "error", text: `Failed to save: ${error}` });
+      setMessage({ type: "error", text: `${t.config.failedToSave}: ${error}` });
     } finally {
       setSaving(false);
       setTimeout(() => setMessage(null), 3000);
@@ -103,7 +106,7 @@ const Config: React.FC = () => {
 
   const handleDiscardChanges = () => {
     setFileContent(originalContent);
-    setMessage({ type: "warning", text: "Changes discarded" });
+    setMessage({ type: "warning", text: t.config.changesDiscarded });
     setTimeout(() => setMessage(null), 2000);
   };
 
@@ -112,15 +115,13 @@ const Config: React.FC = () => {
 
   return (
     <div>
-      {/* Header */}
       <div className="card" style={{ marginBottom: "20px" }}>
         <h3 className="card-title" style={{ marginBottom: 0 }}>
           <Settings size={20} />
-          Configuration Management
+          {t.config.managementTitle}
         </h3>
       </div>
 
-      {/* Message Banner */}
       {message && (
         <div
           style={{
@@ -153,11 +154,10 @@ const Config: React.FC = () => {
       )}
 
       <div className="grid-2">
-        {/* File List */}
         <div className="card">
           <h3 className="card-title">
             <FolderOpen size={20} />
-            Configuration Files
+            {t.config.configurationFiles}
           </h3>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -194,7 +194,7 @@ const Config: React.FC = () => {
                     className="status-badge status-warning"
                     style={{ fontSize: "11px" }}
                   >
-                    Sensitive
+                    {t.config.sensitive}
                   </span>
                 )}
               </div>
@@ -202,7 +202,6 @@ const Config: React.FC = () => {
           </div>
         </div>
 
-        {/* Editor */}
         <div className="card">
           <div
             style={{
@@ -214,7 +213,7 @@ const Config: React.FC = () => {
           >
             <h3 className="card-title" style={{ marginBottom: 0 }}>
               <FileJson size={20} />
-              {selectedConfig?.name || "Select a file"}
+              {selectedConfig?.name || t.config.selectFile}
             </h3>
 
             <div style={{ display: "flex", gap: "8px" }}>
@@ -224,7 +223,7 @@ const Config: React.FC = () => {
                 disabled={loading}
               >
                 <RefreshCw size={16} />
-                Reload
+                {t.config.reload}
               </button>
 
               {hasUnsavedChanges && (
@@ -232,7 +231,7 @@ const Config: React.FC = () => {
                   className="btn btn-secondary"
                   onClick={handleDiscardChanges}
                 >
-                  Discard
+                  {t.config.discard}
                 </button>
               )}
 
@@ -244,19 +243,18 @@ const Config: React.FC = () => {
                 {saving ? (
                   <>
                     <span className="loading-spinner" style={{ width: 16, height: 16 }} />
-                    Saving...
+                    {t.config.saving}
                   </>
                 ) : (
                   <>
                     <Save size={16} />
-                    Save
+                    {t.config.save}
                   </>
                 )}
               </button>
             </div>
           </div>
 
-          {/* Unsaved Changes Indicator */}
           {hasUnsavedChanges && (
             <div
               style={{
@@ -273,11 +271,10 @@ const Config: React.FC = () => {
               }}
             >
               <AlertTriangle size={14} />
-              You have unsaved changes
+              {t.config.youHaveUnsavedChanges}
             </div>
           )}
 
-          {/* Editor Area */}
           {loading ? (
             <div style={{ textAlign: "center", padding: "60px" }}>
               <div className="loading-spinner" />
@@ -294,11 +291,10 @@ const Config: React.FC = () => {
                 lineHeight: "1.6",
                 tabSize: 2,
               }}
-              placeholder="Select a configuration file to edit..."
+              placeholder={t.config.selectFileToEdit}
             />
           )}
 
-          {/* File Info */}
           {selectedFile && !loading && (
             <div
               style={{
@@ -311,9 +307,9 @@ const Config: React.FC = () => {
                 color: "var(--text-muted)",
               }}
             >
-              <span>Path: {selectedFile}</span>
+              <span>{t.config.path}: {selectedFile}</span>
               <span>
-                Lines: {fileContent.split("\n").length} • Size:{" "}
+                {t.config.lines}: {fileContent.split("\n").length} • {t.config.size}:{" "}
                 {(new TextEncoder().encode(fileContent).length / 1024).toFixed(1)} KB
               </span>
             </div>
@@ -321,7 +317,6 @@ const Config: React.FC = () => {
         </div>
       </div>
 
-      {/* Warning for sensitive files */}
       {selectedConfig?.sensitive && (
         <div
           className="card"
@@ -334,16 +329,15 @@ const Config: React.FC = () => {
           <div style={{ display: "flex", gap: "12px", alignItems: "start" }}>
             <AlertTriangle size={24} color="#f59e0b" style={{ flexShrink: 0 }} />
             <div>
-              <h4 style={{ color: "#f59e0b", marginBottom: "8px" }}>Security Notice</h4>
+              <h4 style={{ color: "#f59e0b", marginBottom: "8px" }}>{t.config.securityNotice}</h4>
               <p style={{ color: "var(--text-secondary)", fontSize: "14px", lineHeight: "1.6" }}>
-                This configuration file contains sensitive information such as passwords,
-                API keys, and secret tokens. Please ensure you:
+                {t.config.securityNoticeDesc}
               </p>
               <ul style={{ color: "var(--text-secondary)", paddingLeft: "20px", marginTop: "8px" }}>
-                <li>Do not commit this file to version control</li>
-                <li>Use strong, unique passwords</li>
-                <li>Rotate secrets regularly in production</li>
-                <li>Never share these values publicly</li>
+                <li>{t.config.doNotCommit}</li>
+                <li>{t.config.useStrongPasswords}</li>
+                <li>{t.config.rotateSecrets}</li>
+                <li>{t.config.neverShare}</li>
               </ul>
             </div>
           </div>

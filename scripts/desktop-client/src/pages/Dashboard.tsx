@@ -4,16 +4,13 @@ import {
   Cpu,
   HardDrive,
   Activity,
-  Users,
   CheckCircle2,
   XCircle,
-  AlertTriangle,
-  TrendingUp,
-  Clock,
   Terminal,
   FileText,
 } from "lucide-react";
 import { invoke } from "../utils/tauriCompat";
+import { useI18n } from "../i18n";
 
 interface SystemInfo {
   os: string;
@@ -33,6 +30,7 @@ interface ServiceStatus {
 }
 
 const Dashboard: React.FC = () => {
+  const { t } = useI18n();
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [services, setServices] = useState<ServiceStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,7 +77,7 @@ const Dashboard: React.FC = () => {
             <Cpu size={24} color="#3b82f6" />
           </div>
           <div className="stat-value">{systemInfo?.cpu_cores || 0}</div>
-          <div className="stat-label">CPU Cores</div>
+          <div className="stat-label">{t.dashboard.cpuCores}</div>
         </div>
 
         <div className="stat-card">
@@ -90,7 +88,7 @@ const Dashboard: React.FC = () => {
             {systemInfo ? `${systemInfo.total_memory_gb.toFixed(1)}GB` : "0GB"}
           </div>
           <div className="stat-label">
-            Total Memory ({systemInfo ? `${systemInfo.free_memory_gb.toFixed(1)}GB free` : ""})
+            {t.dashboard.totalMemory} ({systemInfo ? `${systemInfo.free_memory_gb.toFixed(1)}GB ${t.dashboard.freeMemory}` : ""})
           </div>
         </div>
 
@@ -99,7 +97,7 @@ const Dashboard: React.FC = () => {
             <Server size={24} color="#8b5cf6" />
           </div>
           <div className="stat-value">{runningServices}/{totalServices}</div>
-          <div className="stat-label">Services Running</div>
+          <div className="stat-label">{t.dashboard.servicesRunning}</div>
         </div>
 
         <div className="stat-card">
@@ -126,7 +124,7 @@ const Dashboard: React.FC = () => {
             />
           </div>
           <div className="stat-value">{healthPercentage}%</div>
-          <div className="stat-label">System Health</div>
+          <div className="stat-label">{t.dashboard.systemHealth}</div>
         </div>
       </div>
 
@@ -134,13 +132,13 @@ const Dashboard: React.FC = () => {
         <div className="card">
           <h3 className="card-title">
             <Cpu size={20} />
-            System Information
+            {t.dashboard.systemInfo}
           </h3>
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <InfoRow label="Operating System" value={`${systemInfo?.os || "Unknown"} ${systemInfo?.os_version || ""}`} />
-            <InfoRow label="Architecture" value={systemInfo?.architecture || "Unknown"} />
-            <InfoRow label="Hostname" value={systemInfo?.hostname || "Unknown"} />
-            <InfoRow label="Memory Usage" value={
+            <InfoRow label={t.dashboard.os} value={`${systemInfo?.os || "Unknown"} ${systemInfo?.os_version || ""}`} />
+            <InfoRow label={t.dashboard.architecture} value={systemInfo?.architecture || "Unknown"} />
+            <InfoRow label={t.dashboard.hostname} value={systemInfo?.hostname || "Unknown"} />
+            <InfoRow label={t.dashboard.memoryUsage} value={
               systemInfo
                 ? `${((1 - systemInfo.free_memory_gb / systemInfo.total_memory_gb) * 100).toFixed(1)}%`
                 : "N/A"
@@ -151,14 +149,14 @@ const Dashboard: React.FC = () => {
         <div className="card">
           <h3 className="card-title">
             <Server size={20} />
-            Service Status
+            {t.dashboard.serviceHealth}
           </h3>
           {services.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">🐳</div>
-              <div className="empty-state-text">No services detected</div>
+              <div className="empty-state-text">{t.dashboard.noServices}</div>
               <div className="empty-state-hint">
-                Start services from the Services page or use Deploy button
+                {t.dashboard.noServicesHint}
               </div>
             </div>
           ) : (
@@ -206,21 +204,21 @@ const Dashboard: React.FC = () => {
 
       <div className="card">
         <h3 className="card-title">
-          <TrendingUp size={20} />
-          Quick Actions
+          <Activity size={20} />
+          {t.dashboard.quickActions}
         </h3>
         <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
           <button className="btn btn-success" onClick={() => window.location.href = "/services"}>
-            ▶ Start All Services
+            ▶ {t.dashboard.startServices}
           </button>
           <button className="btn btn-danger" onClick={() => window.location.href = "/services"}>
-            ⏹ Stop All Services
+            ⏹ {t.dashboard.stopServices}
           </button>
           <button className="btn btn-secondary" onClick={() => window.location.href = "/terminal"}>
-            <Terminal size={16} /> Open Terminal
+            <Terminal size={16} /> {t.dashboard.openTerminal}
           </button>
           <button className="btn btn-secondary" onClick={() => window.location.href = "/logs"}>
-            <FileText size={16} /> View Logs
+            <FileText size={16} /> {t.dashboard.viewLogs}
           </button>
         </div>
       </div>

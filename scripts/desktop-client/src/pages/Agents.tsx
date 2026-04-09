@@ -9,6 +9,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { invoke } from "../utils/tauriCompat";
+import { useI18n } from "../i18n";
 
 interface AgentInfo {
   id: string;
@@ -19,6 +20,7 @@ interface AgentInfo {
 }
 
 const Agents: React.FC = () => {
+  const { t } = useI18n();
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<AgentInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,20 +64,20 @@ const Agents: React.FC = () => {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
           <h3 className="card-title" style={{ marginBottom: 0 }}>
             <Users size={20} />
-            AI Agents
+            {t.agents.title}
           </h3>
           <button className="btn btn-primary">
             <Plus size={16} />
-            Register Agent
+            {t.agents.registerAgent}
           </button>
         </div>
 
         {agents.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-icon">🤖</div>
-            <div className="empty-state-text">No agents registered</div>
+            <div className="empty-state-text">{t.agents.noAgents}</div>
             <div className="empty-state-hint">
-              Register an AI agent to get started
+              {t.agents.noAgentsHint}
             </div>
           </div>
         ) : (
@@ -119,7 +121,7 @@ const Agents: React.FC = () => {
                   <div>
                     <div style={{ fontWeight: 600, fontSize: "16px" }}>{agent.name}</div>
                     <div style={{ color: "var(--text-secondary)", fontSize: "14px" }}>
-                      ID: {agent.id} • Tasks: {agent.task_count}
+                      {t.agents.id}: {agent.id} • {t.agents.tasks}: {agent.task_count}
                     </div>
                   </div>
                 </div>
@@ -133,11 +135,11 @@ const Agents: React.FC = () => {
                         : "status-error"
                     }`}
                   >
-                    {agent.status}
+                    {agent.status === "running" ? t.agents.running : agent.status === "idle" ? t.agents.idle : t.agents.error}
                   </span>
                   <button className="btn btn-secondary" style={{ padding: "6px 12px" }}>
                     <Eye size={14} />
-                    View
+                    {t.agents.view}
                   </button>
                 </div>
               </div>
@@ -150,15 +152,15 @@ const Agents: React.FC = () => {
         <div className="card">
           <h3 className="card-title">
             <UserCheck size={20} />
-            Agent Details: {selectedAgent.name}
+            {t.agents.agentDetails}: {selectedAgent.name}
           </h3>
           <div style={{ display: "grid", gap: "12px" }}>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ color: "var(--text-secondary)" }}>ID:</span>
+              <span style={{ color: "var(--text-secondary)" }}>{t.agents.id}:</span>
               <span style={{ fontWeight: 500 }}>{selectedAgent.id}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ color: "var(--text-secondary)" }}>Status:</span>
+              <span style={{ color: "var(--text-secondary)" }}>{t.agents.status}:</span>
               <span className={`status-badge ${
                 selectedAgent.status === "running"
                   ? "status-running"
@@ -166,16 +168,16 @@ const Agents: React.FC = () => {
                   ? "status-idle"
                   : "status-error"
               }`}>
-                {selectedAgent.status}
+                {selectedAgent.status === "running" ? t.agents.running : selectedAgent.status === "idle" ? t.agents.idle : t.agents.error}
               </span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ color: "var(--text-secondary)" }}>Tasks Completed:</span>
+              <span style={{ color: "var(--text-secondary)" }}>{t.agents.tasksCompleted}:</span>
               <span style={{ fontWeight: 500 }}>{selectedAgent.task_count}</span>
             </div>
             {selectedAgent.last_active && (
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "var(--text-secondary)" }}>Last Active:</span>
+                <span style={{ color: "var(--text-secondary)" }}>{t.agents.lastActive}:</span>
                 <span style={{ fontWeight: 500 }}>
                   {new Date(selectedAgent.last_active).toLocaleString()}
                 </span>

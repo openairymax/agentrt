@@ -20,6 +20,8 @@ import Config from "./pages/Config";
 import Logs from "./pages/Logs";
 import TerminalPage from "./pages/Terminal";
 import Settings from "./pages/Settings";
+import WelcomeWizard from "./components/WelcomeWizard";
+import ErrorBoundary from "./components/ErrorBoundary";
 import { useI18n } from "./i18n";
 
 const navConfig = [
@@ -37,7 +39,7 @@ const navConfig = [
   ]},
 ];
 
-function App() {
+function AppContent() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { t } = useI18n();
 
@@ -46,60 +48,72 @@ function App() {
   };
 
   return (
-    <Router>
-      <div className="app-layout">
-        <aside className="sidebar">
-          <div className="sidebar-header">
-            <div className="sidebar-logo">A</div>
+    <div className="app-layout">
+      <aside className={`sidebar ${sidebarOpen ? '' : 'sidebar-collapsed'}`}>
+        <div className="sidebar-header">
+          <div className="sidebar-logo">A</div>
+          {sidebarOpen && (
             <div>
               <div className="sidebar-title">AgentOS</div>
               <div className="sidebar-subtitle">Desktop Client v0.2</div>
             </div>
-          </div>
+          )}
+          <button
+            className="sidebar-toggle"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            title={sidebarOpen ? 'Collapse' : 'Expand'}
+          >
+            {sidebarOpen ? '◀' : '▶'}
+          </button>
+        </div>
 
-          <nav className="nav-menu">
-            {navConfig.map((section) => (
-              <div key={section.section} className="nav-section">
+        <nav className="nav-menu">
+          {navConfig.map((section) => (
+            <div key={section.section} className="nav-section">
+              {sidebarOpen && (
                 <div className="nav-section-title">{getNestedValue(t, section.section)}</div>
-                {section.items.map((item) => (
-                  <NavLink
-                    key={item.path}
-                    to={item.path}
-                    className={({ isActive }) =>
-                      `nav-item ${isActive ? "active" : ""}`
-                    }
-                  >
-                    <item.icon size={20} />
-                    <span>{getNestedValue(t, item.labelKey)}</span>
-                  </NavLink>
-                ))}
-              </div>
-            ))}
-          </nav>
-
-          <div style={{ padding: "16px", borderTop: "1px solid var(--border-color)" }}>
-            <div className="nav-item" style={{ justifyContent: "center", fontSize: "12px" }}>
-              <Activity size={16} />
-              <span>{t.common.systemConnected}</span>
+              )}
+              {section.items.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={({ isActive }) =>
+                    `nav-item ${isActive ? "active" : ""}`
+                  }
+                  title={getNestedValue(t, item.labelKey)}
+                >
+                  <item.icon size={20} />
+                  {sidebarOpen && <span>{getNestedValue(t, item.labelKey)}</span>}
+                </NavLink>
+              ))}
             </div>
+          ))}
+        </nav>
+
+        <div style={{ padding: "16px", borderTop: "1px solid var(--border-color)" }}>
+          <div className="nav-item" style={{ justifyContent: "center", fontSize: "12px" }}>
+            <Activity size={16} />
+            {sidebarOpen && <span>{t.common.systemConnected}</span>}
           </div>
-        </aside>
+        </div>
+      </aside>
 
-        <main className="main-content">
-          <header className="header">
-            <h1 className="header-title">{t.app.title}</h1>
-            <div className="header-actions">
-              <button className="btn btn-secondary" title={t.common.refresh}>
-                <Activity size={18} />
-              </button>
-              <button className="btn btn-primary" title="Quick Deploy">
-                <Rocket size={18} />
-                Deploy
-              </button>
-            </div>
-          </header>
+      <main className="main-content">
+        <header className="header">
+          <h1 className="header-title">{t.app.title}</h1>
+          <div className="header-actions">
+            <button className="btn btn-secondary" title={t.common.refresh}>
+              <Activity size={18} />
+            </button>
+            <button className="btn btn-primary" title={t.app.quickDeploy}>
+              <Rocket size={18} />
+              {t.app.quickDeploy}
+            </button>
+          </div>
+        </header>
 
-          <div className="content-area">
+        <div className="content-area">
+          <ErrorBoundary>
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/services" element={<Services />} />
@@ -110,9 +124,25 @@ function App() {
               <Route path="/terminal" element={<TerminalPage />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>
-          </div>
-        </main>
-      </div>
+          </ErrorBoundary>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function App() {
+  const [wizardCompleted, setWizardCompleted] = useState(() => {
+    return localStorage.getItem('agentos-wizard-completed') === 'true';
+  });
+
+  if (!wizardCompleted) {
+    return <WelcomeWizard onComplete={() => setWizardCompleted(true)} />;
+  }
+
+  return (
+    <Router>
+      <AppContent />
     </Router>
   );
 }
