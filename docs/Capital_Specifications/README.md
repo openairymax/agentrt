@@ -1,5 +1,8 @@
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+"From data intelligence emerges."
+
 ---
-copyright: "Copyright (c) 2026 SPHARX. All Rights Reserved."
+copyright: "Copyright (c) 2026 SPHARX Ltd. All Rights Reserved."
 slogan: "From data intelligence emerges."
 title: "AgentOS 技术规范"
 version: "Doc V1.7"
@@ -424,7 +427,7 @@ python scripts/license_compliance.py --report
 
 ---
 
-**最后更新**: 2026-03-23  
+**最后更新**: 2026-04-09  
 **维护者**: AgentOS 规范委员会
 
 ---

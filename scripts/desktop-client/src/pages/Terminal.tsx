@@ -1,41 +1,34 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
-  Terminal,
-  Send,
+  Terminal as TerminalIcon,
+  Play,
   Trash2,
+  Copy,
   ChevronUp,
   ChevronDown,
-  Copy,
-  Play,
   History,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../utils/tauriCompat";
+import { useI18n } from "../i18n";
 
-interface CommandHistory {
-  command: string;
-  timestamp: string;
-  success: boolean;
-}
-
-const PRESET_COMMANDS = [
-  { name: "Check Environment", command: "./install.sh --check-only" },
-  { name: "Start Dev Services", command: "docker compose up -d" },
-  { name: "View Container Status", command: "docker compose ps" },
-  { name: "View Resource Usage", command: "docker stats --no-stream" },
-  { name: "Show Logs (Tail)", command: "docker compose logs --tail=50" },
-  { name: "Health Check", command: "curl -sf http://localhost:18789/api/v1/health" },
-  { name: "Stop All Services", command: "docker compose down" },
-  { name: "Clean Up Resources", command: "docker system prune -f" },
+const COMMAND_HISTORY: string[] = [
+  "docker ps",
+  "docker compose up -d",
+  "docker logs --tail 50 kernel",
+  "systemctl status agentos-kernel",
+  "curl -s http://localhost:18789/health | jq .",
 ];
 
-const TerminalPage: React.FC = () => {
-  const [currentCommand, setCurrentCommand] = useState("");
+const Terminal: React.FC = () => {
+  const { t } = useI18n();
+  const [command, setCommand] = useState("");
   const [output, setOutput] = useState<string[]>([]);
-  const [commandHistory, setCommandHistory] = useState<CommandHistory[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
-  const [workingDir, setWorkingDir] = useState("");
-  const [executing, setExecuting] = useState(false);
-
+  const [loading, setLoading] = useState(false);
+  const [history, setHistory] = useState<string[]>(COMMAND_HISTORY);
+  const [showHistory, setShowHistory] = useState(false);
+  const [activeTab, setActiveTab] = useState<"shell" | "kernel" | "gateway">("shell");
   const inputRef = useRef<HTMLInputElement>(null);
   const outputRef = useRef<HTMLDivElement>(null);
 
@@ -46,110 +39,33 @@ const TerminalPage: React.FC = () => {
   }, [output]);
 
   useEffect(() => {
-    loadWorkingDirectory();
+    inputRef.current?.focus();
   }, []);
 
-  const loadWorkingDirectory = async () => {
-    try {
-      const dir = await invoke<string>("read_config_file", { path: "." });
-      setWorkingDir(dir || "~");
-    } catch {
-      setWorkingDir("~");
-    }
-  };
+  const handleExecuteCommand = async (cmd?: string) => {
+    const cmdToExecute = cmd || command.trim();
+    if (!cmdToExecute) return;
 
-  const executeCommand = async (cmd?: string) => {
-    const commandToExecute = cmd || currentCommand.trim();
-    if (!commandToExecute) return;
-
-    setCurrentCommand("");
-    setHistoryIndex(-1);
-    setExecuting(true);
-
+    setLoading(true);
     const timestamp = new Date().toLocaleTimeString();
-
-    addOutputLine(`$ ${commandToExecute}`, "input");
+    setOutput(prev => [...prev, `$ ${cmdToExecute}`, `[${timestamp}] Executing...`]);
 
     try {
-      const parts = commandToExecute.split(" ");
-      const program = parts[0];
-      const args = parts.slice(1);
-
-      const result = await invoke<{
-        success: boolean;
-        stdout: string;
-        stderr: string;
-        exit_code: number;
-        duration_ms: number;
-      }>("execute_cli_command", {
-        command: program,
-        args,
-      });
-
-      if (result.stdout) {
-        result.stdout.split("\n").forEach((line) => {
-          addOutputLine(line, "stdout");
-        });
-      }
-
-      if (result.stderr) {
-        result.stderr.split("\n").forEach((line) => {
-          addOutputLine(line, "stderr");
-        });
-      }
-
-      addOutputLine(
-        `[Exit code: ${result.exit_code}] Completed in ${result.duration_ms}ms`,
-        result.success ? "success" : "error"
-      );
-
-      setCommandHistory((prev) => [
-        { command: commandToExecute, timestamp, success: result.success },
-        ...prev.slice(0, 49),
-      ]);
+      const result = await invoke<string>("execute_command", { command: cmdToExecute });
+      setOutput(prev => [...prev.slice(-100), result]);
+      setHistory([cmdToExecute, ...history.filter(h => h !== cmdToExecute).slice(0, 49)]);
     } catch (error) {
-      addOutputLine(`Error: ${error}`, "error");
-      setCommandHistory((prev) => [
-        { command: commandToExecute, timestamp, success: false },
-        ...prev.slice(0, 49),
-      ]);
+      setOutput(prev => [...prev.slice(-100), `Error: ${error}`]);
     } finally {
-      setExecuting(false);
-      inputRef.current?.focus();
+      setCommand("");
+      setLoading(false);
     }
-  };
-
-  const addOutputLine = (text: string, type: "input" | "stdout" | "stderr" | "error" | "success" | "info") => {
-    setOutput((prev) => [...prev, JSON.stringify({ text, type })]);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter") {
       e.preventDefault();
-      executeCommand();
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      if (commandHistory.length > 0) {
-        const newIndex =
-          historyIndex === -1
-            ? 0
-            : Math.min(historyIndex + 1, commandHistory.length - 1);
-        setHistoryIndex(newIndex);
-        setCurrentCommand(commandHistory[newIndex].command);
-      }
-    } else if (e.key === "ArrowDown") {
-      e.preventDefault();
-      if (historyIndex > 0) {
-        const newIndex = historyIndex - 1;
-        setHistoryIndex(newIndex);
-        setCurrentCommand(commandHistory[newIndex].command);
-      } else if (historyIndex === 0) {
-        setHistoryIndex(-1);
-        setCurrentCommand("");
-      }
-    } else if (e.key === "l" && e.ctrlKey) {
-      e.preventDefault();
-      clearTerminal();
+      handleExecuteCommand();
     }
   };
 
@@ -158,142 +74,73 @@ const TerminalPage: React.FC = () => {
   };
 
   const copyOutput = () => {
-    const text = output
-      .map((line) => {
-        try {
-          const parsed = JSON.parse(line);
-          return parsed.text;
-        } catch {
-          return line;
-        }
-      })
-      .join("\n");
-
-    navigator.clipboard.writeText(text).then(() => {
-      addOutputLine("[Copied to clipboard]", "info");
-    });
-  };
-
-  const renderOutputLine = (line: string, index: number) => {
-    let parsed: { text: string; type: string };
-    try {
-      parsed = JSON.parse(line);
-    } catch {
-      parsed = { text: line, type: "stdout" };
-    }
-
-    const colorMap: Record<string, string> = {
-      input: "#58a6ff",
-      stdout: "#c9d1d9",
-      stderr: "#d29922",
-      error: "#f85149",
-      success: "#3fb950",
-      info: "#8b949e",
-    };
-
-    return (
-      <div
-        key={index}
-        style={{
-          color: colorMap[parsed.type] || "#c9d1d9",
-          fontFamily: "'Fira Code', monospace",
-          fontSize: "13px",
-          lineHeight: "1.6",
-          padding: "2px 4px",
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-all",
-        }}
-      >
-        {parsed.text}
-      </div>
-    );
+    navigator.clipboard.writeText(output.join("\n"));
   };
 
   return (
-    <div>
-      {/* Header */}
-      <div className="card" style={{ marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h3 className="card-title" style={{ marginBottom: 0 }}>
-          <Terminal size={20} />
-          Integrated Terminal
-        </h3>
-
-        <div style={{ display: "flex", gap: "8px" }}>
-          <button className="btn btn-secondary" onClick={copyOutput} disabled={output.length === 0}>
-            <Copy size={16} />
-            Copy
-          </button>
-          <button className="btn btn-secondary" onClick={clearTerminal} disabled={output.length === 0}>
-            <Trash2 size={16} />
-            Clear
-          </button>
-        </div>
+    <div className="page-container">
+      {/* Page Header */}
+      <div className="page-header">
+        <h1>{t.terminal.title}</h1>
+        <p style={{ color: "var(--text-secondary)", fontSize: "15px" }}>
+          Execute system commands and monitor output
+        </p>
       </div>
 
-      {/* Preset Commands */}
-      <div className="card" style={{ marginBottom: "20px" }}>
-        <h4 style={{ fontSize: "14px", fontWeight: 600, marginBottom: "12px", color: "var(--text-secondary)" }}>
-          <Play size={16} style={{ display: "inline", marginRight: 6 }} />
-          Quick Commands
-        </h4>
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          {PRESET_COMMANDS.map((preset) => (
-            <button
-              key={preset.name}
-              className="btn btn-secondary"
-              style={{ padding: "6px 14px", fontSize: "13px" }}
-              onClick={() => executeCommand(preset.command)}
-              disabled={executing}
-              title={preset.command}
-            >
-              {preset.name}
-            </button>
-          ))}
-        </div>
+      {/* Tab Bar */}
+      <div style={{
+        display: "flex", gap: "4px", marginBottom: "16px",
+        background: "var(--bg-secondary)", padding: "4px", borderRadius: "var(--radius-lg)",
+        width: "fit-content", border: "1px solid var(--border-subtle)"
+      }}>
+        {[
+          { id: "shell" as const, label: "Shell (Bash)" },
+          { id: "kernel" as const, label: "Kernel IPC" },
+          { id: "gateway" as const, label: "Gateway API" },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              padding: "8px 20px", border: "none", borderRadius: "var(--radius-md)",
+              background: activeTab === tab.id ? "var(--primary-color)" : "transparent",
+              color: activeTab === tab.id ? "white" : "var(--text-secondary)",
+              cursor: "pointer", fontWeight: 500, fontSize: "13px",
+              transition: "all var(--transition-fast)"
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* Terminal Window */}
-      <div
-        style={{
-          background: "#0d1117",
-          border: "1px solid var(--border-color)",
-          borderRadius: "10px",
-          overflow: "hidden",
-          height: "calc(100vh - 420px)",
-          minHeight: "400px",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        {/* Terminal Header Bar */}
-        <div
-          style={{
-            background: "#161b22",
-            padding: "10px 16px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            borderBottom: "1px solid #30363d",
-          }}
-        >
+      {/* Main Terminal Card */}
+      <div className="card card-elevated" style={{
+        background: "#0a0a0f", borderColor: "#1e1e2e",
+        overflow: "hidden"
+      }}>
+        {/* Terminal Header */}
+        <div style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          padding: "12px 16px", background: "#111118", borderBottom: "1px solid #1e1e2e"
+        }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ff5f56" }} />
-            <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ffbd2e" }} />
-            <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#27c93f" }} />
-            <span
-              style={{
-                marginLeft: "12px",
-                fontFamily: "'Fira Code', monospace",
-                fontSize: "13px",
-                color: "#8b949e",
-              }}
-            >
-              agentos@desktop:~{workingDir}$
+            <div style={{ display: "flex", gap: "6px" }}>
+              <span style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#ef4444" }} />
+              <span style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#f59e0b" }} />
+              <span style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#22c55e" }} />
+            </div>
+            <span style={{ fontSize: "13px", color: "#9ca3af", fontFamily: "'JetBrains Mono', monospace" }}>
+              user@agentos ~ {activeTab === 'shell' ? 'bash' : activeTab === 'kernel' ? 'kernel-ipc' : 'gateway-api'}
             </span>
           </div>
-
-          <div style={{ fontSize: "12px", color: "#8b949e" }}>
-            {executing ? "● Running..." : "● Ready"}
+          <div style={{ display: "flex", gap: "6px" }}>
+            <button className="icon-btn" onClick={copyOutput} title="Copy Output" style={{ width: "28px", height: "28px", background: "transparent", color: "#9ca3af" }}>
+              <Copy size={14} />
+            </button>
+            <button className="icon-btn" onClick={clearTerminal} title="Clear" style={{ width: "28px", height: "28px", background: "transparent", color: "#ef4444" }}>
+              <Trash2 size={14} />
+            </button>
           </div>
         </div>
 
@@ -301,153 +148,136 @@ const TerminalPage: React.FC = () => {
         <div
           ref={outputRef}
           style={{
-            flex: 1,
-            overflowY: "auto",
-            padding: "16px",
-            fontFamily: "'Fira Code', 'Cascadia Code', monospace",
+            minHeight: "360px", maxHeight: "calc(100vh - 380px)",
+            overflowY: "auto", padding: "16px",
+            fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
+            fontSize: "13px", lineHeight: "1.7", color: "#e5e7eb"
           }}
         >
-          {output.length === 0 && (
-            <div style={{ textAlign: "center", color: "#484f58", padding: "40px 0" }}>
-              <Terminal size={48} style={{ opacity: 0.3 }} />
-              <p style={{ marginTop: "12px" }}>AgentOS Terminal Ready</p>
-              <p style={{ fontSize: "12px", marginTop: "4px" }}>
-                Type a command or click a quick command above to get started
-              </p>
+          {output.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "60px 0", color: "#4b5563" }}>
+              <TerminalIcon size={48} style={{ opacity: 0.3, margin: "0 auto 16px" }} />
+              <p>{t.terminal.welcomeMessage}</p>
+              <p style={{ marginTop: "8px", fontSize: "12px", opacity: 0.6 }}>{t.terminal.enterCommandHint}</p>
             </div>
-          )}
-
-          {output.map((line, index) => renderOutputLine(line, index))}
-
-          {executing && (
-            <div
-              style={{
-                color: "#8b949e",
-                fontFamily: "'Fira Code', monospace",
-                animation: "blink 1s infinite",
-              }}
-            >
-              ▌
-            </div>
+          ) : (
+            output.map((line, i) => (
+              <div
+                key={i}
+                style={{
+                  whiteSpace: "pre-wrap", wordBreak: "break-all",
+                  color: line.startsWith("$") ? "#22c55e" :
+                        line.startsWith("Error:") ? "#ef4444" :
+                        line.startsWith("[") ? "#6366f1" :
+                        line.includes("✓") ? "#22c55e" :
+                        line.includes("✗") ? "#ef4444" :
+                        "#e5e7eb",
+                  animation: i === output.length - 1 ? "fadeIn 0.3s ease" : undefined,
+                }}
+              >{line}</div>
+            ))
           )}
         </div>
 
-        {/* Input Area */}
-        <div
-          style={{
-            padding: "12px 16px",
-            borderTop: "1px solid #30363d",
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            background: "#161b22",
-          }}
-        >
-          <span style={{ color: "#58a6ff", fontFamily: "'Fira Code', monospace", fontSize: "14px" }}>
-            $
-          </span>
+        {/* Command Input */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: "10px",
+          padding: "12px 16px", borderTop: "1px solid #1e1e2e", background: "#111118"
+        }}>
+          <span style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            color: "#22c55e", fontWeight: 600, fontSize: "14px",
+            minWidth: "fit-content"
+          }}>❯</span>
 
           <input
             ref={inputRef}
             type="text"
-            className="input-field"
-            value={currentCommand}
-            onChange={(e) => setCurrentCommand(e.target.value)}
+            className="form-input"
+            value={command}
+            onChange={(e) => setCommand(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a command and press Enter..."
-            disabled={executing}
-            style={{
-              flex: 1,
-              background: "transparent",
-              border: "none",
-              outline: "none",
-              color: "#c9d1d9",
-              fontFamily: "'Fira Code', monospace",
-              fontSize: "14px",
-              padding: 0,
-            }}
+            placeholder={t.terminal.enterCommand}
+            disabled={loading}
             autoFocus
+            style={{
+              flex: 1, background: "transparent", border: "none",
+              color: "#e5e7eb", outline: "none", boxShadow: "none",
+              fontFamily: "'JetBrains Mono', monospace", fontSize: "13px",
+              caretColor: "#6366f1"
+            }}
           />
 
           <button
-            className="btn btn-primary"
-            onClick={() => executeCommand()}
-            disabled={!currentCommand.trim() || executing}
-            style={{ padding: "6px 16px" }}
+            className="btn btn-primary btn-sm"
+            onClick={() => handleExecuteCommand()}
+            disabled={loading || !command.trim()}
+            style={{ minWidth: "80px" }}
           >
-            {executing ? (
-              <span className="loading-spinner" style={{ width: 16, height: 16 }} />
+            {loading ? (
+              <><span className="loading-spinner" style={{ width: 14, height: 14, borderWidth: "2px", margin: 0 }} /></>
             ) : (
-              <Send size={16} />
+              <><Play size={14} />Run</>
             )}
+          </button>
+
+          <button
+            className={`btn btn-sm ${showHistory ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => setShowHistory(!showHistory)}
+            title="Command History"
+          >
+            <History size={14} />
           </button>
         </div>
       </div>
 
-      {/* Command History Sidebar */}
-      {commandHistory.length > 0 && (
-        <div className="card" style={{ marginTop: "20px" }}>
-          <h4 style={{ fontSize: "14px", fontWeight: 600, marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <History size={16} />
-            Recent Commands ({commandHistory.length})
-          </h4>
+      {/* Quick Commands */}
+      <div className="card card-elevated" style={{ marginTop: "16px" }}>
+        <h3 className="card-title"><TerminalIcon size={18} />{t.terminal.quickCommands}</h3>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+          {["docker ps -a", "docker stats --no-stream", "curl -s localhost:18789/health", "df -h", "free -h"].map(cmd => (
+            <button
+              key={cmd}
+              className="tag"
+              onClick={() => { setCommand(cmd); inputRef.current?.focus(); }}
+              style={{
+                cursor: "pointer", transition: "all var(--transition-fast)",
+                fontFamily: "'JetBrains Mono', monospace", fontSize: "12px",
+                padding: "6px 12px", borderRadius: "var(--radius-md)"
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = "var(--primary-light)"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "rgba(99,102,241,0.1)"}
+            >
+              {cmd}
+            </button>
+          ))}
+        </div>
+      </div>
 
-          <div
-            style={{
-              maxHeight: "200px",
-              overflowY: "auto",
-              display: "flex",
-              flexDirection: "column",
-              gap: "6px",
-            }}
-          >
-            {commandHistory.map((item, index) => (
+      {/* Command History Panel */}
+      {showHistory && (
+        <div className="card card-elevated" style={{ marginTop: "16px", animation: "slideDown 0.25s ease" }}>
+          <h3 className="card-title">
+            <History size={18} />
+            Command History ({history.length})
+          </h3>
+          <div style={{ maxHeight: "200px", overflowY: "auto" }}>
+            {history.map((cmd, idx) => (
               <div
-                key={index}
-                onClick={() => {
-                  setCurrentCommand(item.command);
-                  inputRef.current?.focus();
-                }}
+                key={idx}
+                onClick={() => { setCommand(cmd); setShowHistory(false); inputRef.current?.focus(); }}
                 style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "8px 12px",
-                  background: "var(--bg-tertiary)",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                  fontSize: "13px",
-                  fontFamily: "'Fira Code', monospace",
-                  transition: "background 0.15s ease",
+                  padding: "8px 12px", borderBottom: "1px solid var(--border-subtle)",
+                  cursor: "pointer", fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: "12.5px", color: "var(--text-secondary)",
+                  transition: "background var(--transition-fast)",
+                  display: "flex", justifyContent: "space-between", alignItems: "center"
                 }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = "rgba(59, 130, 246, 0.15)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = "var(--bg-tertiary)")
-                }
+                onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-primary)"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
               >
-                <span
-                  style={{
-                    flex: 1,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {item.command}
-                </span>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "12px" }}>
-                  <span
-                    style={{
-                      fontSize: "11px",
-                      color: item.success ? "#3fb950" : "#f85149",
-                    }}
-                  >
-                    {item.success ? "✓" : "✗"}
-                  </span>
-                  <span style={{ fontSize: "11px", color: "#8b949e" }}>{item.timestamp}</span>
-                </div>
+                <span>$ {cmd}</span>
+                <ChevronUp size={14} style={{ opacity: 0.4 }} />
               </div>
             ))}
           </div>
@@ -457,4 +287,4 @@ const TerminalPage: React.FC = () => {
   );
 };
 
-export default TerminalPage;
+export default Terminal;

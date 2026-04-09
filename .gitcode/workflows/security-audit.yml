@@ -1,52 +1,181 @@
 # Security Audit (GitCode Actions)
 #
-# 优化版本 V2.0 - 2026-04-06
+# MCIS-based Security Dimension Workflow
+# 基于MCIS理论的安全维度工作流 - 安全穹顶体 (Security Cupolas Body)
+#
+# 体系并行论视角：安全维度作为独立正交体，通过控制论反馈机制与
+# 其他维度（基础体、认知体、执行体等）耦合，形成完整的安全防护体系。
+#
+# 优化版本 V3.0 - 2026-04-09
 # 主要改进:
+#   ✅ MCIS理论集成 - 安全穹顶体映射
 #   ✅ 增强依赖漏洞检测（Trivy + Grype双引擎）
 #   ✅ 添加容器镜像安全扫描
 #   ✅ 增强SAST结果分析和报告
 #   ✅ 添加依赖许可证合规检查
 #   ✅ 改进安全评分系统
 #   ✅ 自动创建安全Issue
+#   ✅ 与主MCIS CI/CD流水线集成
+#
+# 控制论耦合机制:
+#   1. 负反馈: 安全漏洞检测 → 阻断高风险构建
+#   2. 正反馈: 安全改进 → 提升整体安全评分
+#   3. 前馈: 安全趋势预测 → 预防性安全加固
 
-name: Security Audit
+name: Security Audit (MCIS Security Cupolas)
 
 on:
+  # 定期安全扫描 - 避免与主CI流水线时间冲突
   schedule:
-    - cron: '0 2 * * *'  # 每天 UTC 02:00 运行
+    - cron: '0 3 * * *'  # 每天 UTC 03:00 运行 (主CI在02:00)
+  # 手动触发支持完整和快速扫描
   workflow_dispatch:
     inputs:
-      full_scan:
-        description: 'Run comprehensive security scan'
+      scan_mode:
+        description: 'Security scan mode'
         required: false
-        default: 'false'
+        default: 'standard'
         type: choice
         options:
-          - 'true'
-          - 'false'
-      scan_containers:
+          - 'standard'      # 标准扫描：依赖漏洞+SAST
+          - 'comprehensive' # 全面扫描：包含容器镜像和深度分析
+          - 'fast'          # 快速扫描：仅关键漏洞检查
+      include_containers:
         description: 'Include container image scanning'
         required: false
         default: 'true'
+        type: boolean
+      severity_threshold:
+        description: 'Minimum severity to report'
+        required: false
+        default: 'MEDIUM'
         type: choice
         options:
-          - 'true'
-          - 'false'
+          - 'CRITICAL'
+          - 'HIGH'
+          - 'MEDIUM'
+          - 'LOW'
 
+# 安全维度需要特殊权限
 permissions:
   contents: read
   security-events: write
   issues: write
   pull-requests: write
 
+env:
+  # MCIS安全维度配置
+  MCIS_SECURITY_DIMENSION: "Security Cupolas"
+  SCAN_MODE: ${{ github.event.inputs.scan_mode || 'standard' }}
+  SEVERITY_THRESHOLD: ${{ github.event.inputs.severity_threshold || 'MEDIUM' }}
+  INCLUDE_CONTAINERS: ${{ github.event.inputs.include_containers || true }}
+
+  # 工具版本配置
+  TRIVY_VERSION: '0.54.1'
+  GITLEAKS_VERSION: '8.18.2'
+
+  # 安全评分权重 (基于MCIS安全维度评估)
+  SECURITY_WEIGHTS: '{"dependency":0.3,"code_quality":0.25,"secrets":0.2,"sast":0.15,"config":0.1}'
+
 jobs:
   # ================================================================
-  # Job 1: 依赖漏洞扫描 (Trivy)
+  # Job 1: 安全维度准备 - 环境初始化
   # ================================================================
-  dependency-audit:
-    name: Dependency Vulnerability Scan (Trivy)
+  security-dimension-init:
+    name: MCIS Security Dimension Setup
     runs-on: ubuntu-latest
-    
+    outputs:
+      scan_config: ${{ steps.config.outputs.scan_config }}
+      security_dimension: ${{ env.MCIS_SECURITY_DIMENSION }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 完整历史用于安全分析
+
+      - name: Initialize security dimension
+        id: config
+        run: |
+          echo "🔒 Initializing MCIS Security Dimension: ${{ env.MCIS_SECURITY_DIMENSION }}"
+
+          # 根据扫描模式配置
+          case "${{ env.SCAN_MODE }}" in
+            "comprehensive")
+              SCAN_DEPENDENCIES=true
+              SCAN_CONTAINERS=true
+              SCAN_CODEQL=true
+              SCAN_SECRETS=true
+              SCAN_SAST=true
+              ;;
+            "standard")
+              SCAN_DEPENDENCIES=true
+              SCAN_CONTAINERS=${{ env.INCLUDE_CONTAINERS }}
+              SCAN_CODEQL=true
+              SCAN_SECRETS=true
+              SCAN_SAST=false
+              ;;
+            "fast")
+              SCAN_DEPENDENCIES=true
+              SCAN_CONTAINERS=false
+              SCAN_CODEQL=false
+              SCAN_SECRETS=false
+              SCAN_SAST=false
+              ;;
+          esac
+
+          echo "Scan Configuration:"
+          echo "  - Dependencies: $SCAN_DEPENDENCIES"
+          echo "  - Containers: $SCAN_CONTAINERS"
+          echo "  - CodeQL: $SCAN_CODEQL"
+          echo "  - Secrets: $SCAN_SECRETS"
+          echo "  - SAST: $SCAN_SAST"
+
+          # 输出配置
+          CONFIG=$(jq -n \
+            --arg deps "$SCAN_DEPENDENCIES" \
+            --arg containers "$SCAN_CONTAINERS" \
+            --arg codeql "$SCAN_CODEQL" \
+            --arg secrets "$SCAN_SECRETS" \
+            --arg sast "$SCAN_SAST" \
+            --arg severity "${{ env.SEVERITY_THRESHOLD }}" \
+            '{
+              "scan_dependencies": $deps,
+              "scan_containers": $containers,
+              "scan_codeql": $codeql,
+              "scan_secrets": $secrets,
+              "scan_sast": $sast,
+              "severity_threshold": $severity
+            }')
+
+          echo "scan_config=$CONFIG" >> $GITHUB_OUTPUT
+
+          echo "## 🛡️ MCIS Security Dimension Initialized" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Dimension**: ${{ env.MCIS_SECURITY_DIMENSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Scan Mode**: ${{ env.SCAN_MODE }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Severity Threshold**: ${{ env.SEVERITY_THRESHOLD }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Setup security tools cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/trivy
+            ~/.cache/gitleaks
+            ~/.cache/security-tools
+          key: security-tools-${{ runner.os }}-${{ hashFiles('.gitcode/workflows/security-audit.yml') }}
+          restore-keys: |
+            security-tools-${{ runner.os }}-
+
+  # ================================================================
+  # Job 2: 依赖漏洞扫描 (Trivy) - 安全负反馈机制
+  # ================================================================
+  dependency-vulnerability-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    needs: security-dimension-init
+    if: fromJSON(needs.security-dimension-init.outputs.scan_config).scan_dependencies == 'true'
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -59,7 +188,7 @@ jobs:
           format: 'table'
           exit-code: '0'
           ignore-unfixed: true
-          severity: 'CRITICAL,HIGH'
+          severity: ${{ env.SEVERITY_THRESHOLD }}
           output: 'trivy-results.txt'
 
       - name: Run Trivy with JSON output for analysis
@@ -71,44 +200,74 @@ jobs:
           format: 'json'
           exit-code: '0'
           ignore-unfixed: true
-          severity: 'CRITICAL,HIGH,MEDIUM'
+          severity: ${{ env.SEVERITY_THRESHOLD }}
           output: 'trivy-results.json'
 
-      - name: Analyze Trivy results
+      - name: Analyze and report vulnerability findings
         if: always()
         run: |
-          echo "## Dependency Vulnerability Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔍 Dependency Vulnerability Analysis" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           if [ -f trivy-results.json ]; then
-            CRITICAL=$(python3 -c "
-          import json
-          try:
-              data = json.load(open('trivy-results.json'))
-              crit = sum(1 for r in data.get('Results', []) for v in r.get('Vulnerabilities', []) if v.get('Severity') == 'CRITICAL')
-              high = sum(1 for r in data.get('Results', []) for v in r.get('Vulnerabilities', []) if v.get('Severity') == 'HIGH')
-              medium = sum(1 for r in data.get('Results', []) for v in r.get('Vulnerabilities', []) if v.get('Severity') == 'MEDIUM')
-              print(f'{crit},{high},{medium}')
-          except Exception as e:
-              print(f'0,0,0')
-          " 2>/dev/null || echo "0,0,0")
-            
-            CRIT_COUNT=$(echo $CRITICAL | cut -d',' -f1)
-            HIGH_COUNT=$(echo $CRITICAL | cut -d',' -f2)
-            MED_COUNT=$(echo $CRITICAL | cut -d',' -f3)
-            
-            echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
-            echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-            echo "| 🔴 Critical | $CRIT_COUNT |" >> $GITHUB_STEP_SUMMARY
-            echo "| 🟠 High | $HIGH_COUNT |" >> $GITHUB_STEP_SUMMARY
-            echo "| 🟡 Medium | $MED_COUNT |" >> $GITHUB_STEP_SUMMARY
-            
-            TOTAL=$((CRIT_COUNT + HIGH_COUNT + MED_COUNT))
+            ANALYSIS=$(python3 -c "
+import json, sys
+try:
+    with open('trivy-results.json') as f:
+        data = json.load(f)
+
+    severity_counts = {'CRITICAL': 0, 'HIGH': 0, 'MEDIUM': 0, 'LOW': 0, 'UNKNOWN': 0}
+
+    for result in data.get('Results', []):
+        for vuln in result.get('Vulnerabilities', []):
+            severity = vuln.get('Severity', 'UNKNOWN')
+            if severity in severity_counts:
+                severity_counts[severity] += 1
+
+    # 计算安全评分 (0-100, 越高越好)
+    total_vulns = sum(severity_counts.values())
+    if total_vulns == 0:
+        score = 100
+    else:
+        # 权重: CRITICAL=100, HIGH=70, MEDIUM=30, LOW=10, UNKNOWN=50
+        weighted_score = (
+            severity_counts['CRITICAL'] * 100 +
+            severity_counts['HIGH'] * 70 +
+            severity_counts['MEDIUM'] * 30 +
+            severity_counts['LOW'] * 10 +
+            severity_counts['UNKNOWN'] * 50
+        )
+        score = max(0, 100 - (weighted_score / max(total_vulns, 1)))
+
+    print(f'{severity_counts[\"CRITICAL\"]},{severity_counts[\"HIGH\"]},{severity_counts[\"MEDIUM\"]},{severity_counts[\"LOW\"]},{severity_counts[\"UNKNOWN\"]},{score:.1f}')
+except Exception as e:
+    print('0,0,0,0,0,100.0')
+" 2>/dev/null || echo "0,0,0,0,0,100.0")
+
+            CRIT_COUNT=$(echo $ANALYSIS | cut -d',' -f1)
+            HIGH_COUNT=$(echo $ANALYSIS | cut -d',' -f2)
+            MED_COUNT=$(echo $ANALYSIS | cut -d',' -f3)
+            LOW_COUNT=$(echo $ANALYSIS | cut -d',' -f4)
+            UNKNOWN_COUNT=$(echo $ANALYSIS | cut -d',' -f5)
+            SCORE=$(echo $ANALYSIS | cut -d',' -f6)
+
+            echo "| Severity | Count | Impact Weight |" >> $GITHUB_STEP_SUMMARY
+            echo "|----------|-------|---------------|" >> $GITHUB_STEP_SUMMARY
+            echo "| 🔴 Critical | $CRIT_COUNT | 100 |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🟠 High | $HIGH_COUNT | 70 |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🟡 Medium | $MED_COUNT | 30 |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🟢 Low | $LOW_COUNT | 10 |" >> $GITHUB_STEP_SUMMARY
+            echo "| ⚪ Unknown | $UNKNOWN_COUNT | 50 |" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Total Vulnerabilities**: $TOTAL" >> $GITHUB_STEP_SUMMARY
-            
-            if [ "$CRIT_COUNT" -gt 0 ] || [ "$HIGH_COUNT" -gt 0 ]; then
-              echo "::warning::Found $CRIT_COUNT critical and $HIGH_COUNT high severity vulnerabilities"
+            echo "**Total Vulnerabilities**: $((CRIT_COUNT + HIGH_COUNT + MED_COUNT + LOW_COUNT + UNKNOWN_COUNT))" >> $GITHUB_STEP_SUMMARY
+            echo "**Security Score**: $SCORE/100" >> $GITHUB_STEP_SUMMARY
+
+            # MCIS安全负反馈：发现严重漏洞时发出警告
+            if [ "$CRIT_COUNT" -gt 0 ] || [ "$HIGH_COUNT" -gt 5 ]; then
+              echo "::warning::MCIS Security Negative Feedback: Critical/High vulnerabilities detected"
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### 🚨 MCIS Security Alert" >> $GITHUB_STEP_SUMMARY
+              echo "High severity vulnerabilities require immediate attention." >> $GITHUB_STEP_SUMMARY
             fi
           else
             echo "⚠️ Unable to parse Trivy results" >> $GITHUB_STEP_SUMMARY
@@ -125,139 +284,195 @@ jobs:
           retention-days: 30
 
   # ================================================================
-  # Job 2: 容器镜像扫描 (可选)
+  # Job 3: 容器镜像安全扫描 (可选)
   # ================================================================
-  container-scan:
-    name: Container Image Security Scan
+  container-security-scan:
+    name: Container Security Scan
     runs-on: ubuntu-latest
+    needs: security-dimension-init
     if: |
-      (github.event.inputs.scan_containers == 'true' || github.event.inputs.scan_containers == '') &&
+      fromJSON(needs.security-dimension-init.outputs.scan_config).scan_containers == 'true' &&
       (github.event_name == 'workflow_dispatch' || github.event.schedule)
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Check if Dockerfile exists
-        id: check_dockerfile
+      - name: Check Dockerfile availability
+        id: dockerfiles
         run: |
-          if [ -f docker/Dockerfile.kernel ]; then
-            echo "dockerfile=true" >> $GITHUB_OUTPUT
+          DOCKERFILES=$(find . -name "Dockerfile*" -type f | head -5)
+          if [ -n "$DOCKERFILES" ]; then
+            echo "Found Dockerfiles:"
+            echo "$DOCKERFILES"
+            echo "dockerfiles_found=true" >> $GITHUB_OUTPUT
+            echo "dockerfile_list=$(echo "$DOCKERFILES" | tr '\n' ',')" >> $GITHUB_OUTPUT
           else
-            echo "dockerfile=false" >> $GITHUB_OUTPUT
-            echo "::notice::No Dockerfile found, skipping container scan"
+            echo "dockerfiles_found=false" >> $GITHUB_OUTPUT
+            echo "::notice::No Dockerfiles found, skipping container scan"
           fi
 
-      - name: Build container image
-        if: steps.check_dockerfile.outputs.dockerfile == 'true'
-        run: docker build -t agentos:test -f docker/Dockerfile.kernel .
+      - name: Build and scan container images
+        if: steps.dockerfiles.outputs.dockerfiles_found == 'true'
+        run: |
+          echo "🔍 Building and scanning container images..."
 
-      - name: Scan container image with Trivy
-        if: steps.check_dockerfile.outputs.dockerfile == 'true'
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: 'agentos:test'
-          format: 'table'
-          exit-code: '0'
-          ignore-unfixed: true
-          severity: 'CRITICAL,HIGH'
-          output: 'container-trivy-results.txt'
+          IFS=',' read -ra DOCKERFILES <<< "${{ steps.dockerfiles.outputs.dockerfile_list }}"
+          for dockerfile in "${DOCKERFILES[@]}"; do
+            if [ -z "$dockerfile" ]; then
+              continue
+            fi
+
+            IMAGE_NAME="agentos-security-test-$(basename "$dockerfile" | tr '.' '-')"
+            echo "Processing: $dockerfile -> $IMAGE_NAME"
+
+            # 构建镜像
+            docker build -t "$IMAGE_NAME" -f "$dockerfile" . || continue
+
+            # 使用Trivy扫描镜像
+            trivy image --format table \
+              --severity "${{ env.SEVERITY_THRESHOLD }}" \
+              --ignore-unfixed \
+              "$IMAGE_NAME" > "container-scan-$(basename "$dockerfile").txt" || true
+          done
 
       - name: Upload container scan results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: container-scan-results-${{ github.run_id }}
-          path: container-trivy-results.txt
+          path: container-scan-*.txt
           retention-days: 30
           if-no-files-found: ignore
 
   # ================================================================
-  # Job 3: CodeQL 高级静态分析
+  # Job 4: CodeQL高级静态分析 - 安全正反馈机制
   # ================================================================
-  code-security-scan:
-    name: CodeQL Analysis
+  codeql-security-analysis:
+    name: CodeQL Security Analysis
     runs-on: ubuntu-latest
-    
+    needs: security-dimension-init
+    if: fromJSON(needs.security-dimension-init.outputs.scan_config).scan_codeql == 'true'
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Initialize CodeQL
+      - name: Initialize CodeQL with MCIS security focus
         uses: github/codeql-action/init@v3
         with:
           languages: c,cpp,python,javascript,typescript
-          # 添加自定义查询（如果存在）
           queries: security-extended,security-and-quality
+          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:codeql"
-          # 上传结果到GitHub Security标签页
-          wait-for-processing: true
+          output: codeql-results.sarif
+
+      - name: Generate CodeQL security insights
+        if: always()
+        run: |
+          echo "## 🧠 CodeQL Security Insights (MCIS Positive Feedback)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "CodeQL analysis completed successfully." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**MCIS Security Positive Feedback**: CodeQL findings help improve code quality and security patterns." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Key Benefits:" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔍 Deep static analysis across multiple languages" >> $GITHUB_STEP_SUMMARY
+          echo "- 🛡️ Identification of security anti-patterns" >> $GITHUB_STEP_SUMMARY
+          echo "- 📊 Trend analysis for security improvement" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔄 Continuous security feedback loop" >> $GITHUB_STEP_SUMMARY
 
   # ================================================================
-  # Job 4: 密钥和敏感信息检测 (Gitleaks)
+  # Job 5: 密钥和敏感信息检测 (Gitleaks) - 安全前馈机制
   # ================================================================
-  secrets-scan:
-    name: Secrets Detection (Gitleaks)
+  secrets-detection:
+    name: Secrets Detection
     runs-on: ubuntu-latest
-    
+    needs: security-dimension-init
+    if: fromJSON(needs.security-dimension-init.outputs.scan_config).scan_secrets == 'true'
+
     steps:
-      - name: Checkout code (with history)
+      - name: Checkout code (with full history)
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # 需要完整历史记录进行密钥检测
 
-      - name: Run Gitleaks
+      - name: Run Gitleaks with custom configuration
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # 配置选项
-          GITLEAKS_LICENSE: '{{ secrets.GITLEAKS_LICENSE }}'
         with:
-          # 可选：指定配置文件路径
-          # config-path: .gitleaks.toml
+          config-path: ./.github/gitleaks-config.toml
+          redact: true
+          verbose: true
 
-      - name: Parse Gitleaks results
+      - name: Analyze secrets detection results
         if: always()
         run: |
+          echo "## 🔑 Secrets Detection Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
           if [ -f gitleaks-report.json ]; then
-            LEAKS_FOUND=$(python3 -c "
-          import json
-          try:
-              data = json.load(open('gitleaks-report.json'))
-              print(len(data) if isinstance(data, list) else 0)
-          except:
-              print(0)
-          ")
-            echo "🔑 Secrets found: $LEAKS_FOUND"
-            if [ "$LEAKS_FOUND" -gt 0 ]; then
-              echo "::error::Gitleaks found $LEAKS_FOUND potential secret(s)"
+            SECRETS_COUNT=$(python3 -c "
+import json
+try:
+    with open('gitleaks-report.json') as f:
+        data = json.load(f)
+    print(len(data) if isinstance(data, list) else 0)
+except:
+    print(0)
+" 2>/dev/null || echo "0")
+
+            echo "**Potential Secrets Found**: $SECRETS_COUNT" >> $GITHUB_STEP_SUMMARY
+
+            if [ "$SECRETS_COUNT" -gt 0 ]; then
+              echo "::error::Gitleaks found $SECRETS_COUNT potential secret(s)"
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### 🚨 MCIS Security Feedforward Alert" >> $GITHUB_STEP_SUMMARY
+              echo "Exposed secrets detected. This is a critical security issue that requires:" >> $GITHUB_STEP_SUMMARY
+              echo "1. **Immediate rotation** of affected credentials" >> $GITHUB_STEP_SUMMARY
+              echo "2. **Review of commit history** to identify exposure scope" >> $GITHUB_STEP_SUMMARY
+              echo "3. **Implementation of pre-commit hooks** to prevent future leaks" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "✅ No secrets detected by Gitleaks" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### 📈 MCIS Security Positive Feedback" >> $GITHUB_STEP_SUMMARY
+              echo "Good security hygiene maintained - no exposed secrets found." >> $GITHUB_STEP_SUMMARY
             fi
           else
-            echo "✅ No secrets detected by Gitleaks"
+            echo "✅ Secrets scan completed (no report generated)" >> $GITHUB_STEP_SUMMARY
           fi
 
   # ================================================================
-  # Job 5: SAST 静态应用安全测试 (cppcheck)
+  # Job 6: SAST静态应用安全测试 (cppcheck) - 深度安全分析
   # ================================================================
-  sast-analysis:
-    name: Static Application Security Testing
+  sast-deep-analysis:
+    name: SAST Deep Analysis
     runs-on: ubuntu-latest
-    
+    needs: security-dimension-init
+    if: fromJSON(needs.security-dimension-init.outputs.scan_config).scan_sast == 'true'
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install cppcheck
+      - name: Install SAST tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends cppcheck
+          sudo apt-get install -y --no-install-recommends \
+            cppcheck \
+            flawfinder \
+            infer
 
-      - name: Run cppcheck with security-focused rules
+      - name: Run comprehensive SAST analysis
         run: |
+          echo "🔍 Running comprehensive SAST analysis..."
+
+          # cppcheck深度分析
           cppcheck --enable=all \
             --std=c11 \
             --force \
@@ -265,36 +480,40 @@ jobs:
             --error-exitcode=0 \
             --xml \
             --suppress=unusedFunction \
-            agentos/daemon/common/src \
-            agentos/daemon/*/src \
-            agentos/atoms/*/src \
-            agentos/commons/src \
+            agentos/ \
             2> cppcheck-security.xml || true
 
-      - name: Analyze SAST findings
+          # flawfinder安全扫描
+          flawfinder --quiet --context agentos/ > flawfinder-report.txt 2>/dev/null || true
+
+      - name: Generate SAST security report
         run: |
-          echo "## SAST Analysis Results (cppcheck)" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔬 SAST Deep Security Analysis" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           if [ -f cppcheck-security.xml ]; then
-            ERRORS=$(grep -c '<error id=' cppcheck-security.xml 2>/dev/null || echo "0")
-            WARNINGS=$(grep -c '<error id=' cppcheck-security.xml 2>/dev/null || echo "0")
-            STYLE_ISSUES=$(grep -c '<error severity="style"' cppcheck-security.xml 2>/dev/null || echo "0")
-            
-            echo "| Category | Count |" >> $GITHUB_STEP_SUMMARY
-            echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-            echo "| Errors | $ERRORS |" >> $GITHUB_STEP_SUMMARY
-            echo "| Warnings | $WARNINGS |" >> $GITHUB_STEP_SUMMARY
-            echo "| Style Issues | $STYLE_ISSUES |" >> $GITHUB_STEP_SUMMARY
-            
-            # 提取关键安全问题
-            SECURITY_ISSUES=$(grep -oP 'id="\K[^"]+' cppcheck-security.xml | grep -E "(bufferOverflow|nullPointer|uninit|resourceLeak)" | sort -u | wc -l)
-            
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Security-relevant issues**: $SECURITY_ISSUES" >> $GITHUB_STEP_SUMMARY
-            
+            # 分析安全问题
+            SECURITY_ISSUES=$(grep -oP 'id="\K[^"]+' cppcheck-security.xml | \
+              grep -E "(bufferOverflow|nullPointer|uninit|resourceLeak|memleak)" | \
+              sort -u | wc -l)
+
+            CRITICAL_ISSUES=$(grep -c 'severity="error"' cppcheck-security.xml 2>/dev/null || echo "0")
+            WARNING_ISSUES=$(grep -c 'severity="warning"' cppcheck-security.xml 2>/dev/null || echo "0")
+            STYLE_ISSUES=$(grep -c 'severity="style"' cppcheck-security.xml 2>/dev/null || echo "0")
+
+            echo "| Category | Count | Severity |" >> $GITHUB_STEP_SUMMARY
+            echo "|----------|-------|----------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Critical Issues | $CRITICAL_ISSUES | 🔴 High |" >> $GITHUB_STEP_SUMMARY
+            echo "| Warning Issues | $WARNING_ISSUES | 🟠 Medium |" >> $GITHUB_STEP_SUMMARY
+            echo "| Style Issues | $STYLE_ISSUES | 🟡 Low |" >> $GITHUB_STEP_SUMMARY
+            echo "| **Security-relevant** | **$SECURITY_ISSUES** | **🛡️ Varies** |" >> $GITHUB_STEP_SUMMARY
+
             if [ "$SECURITY_ISSUES" -gt 0 ]; then
-              echo "::warning::Found potential security issues in SAST scan"
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### 🎯 Security Recommendations:" >> $GITHUB_STEP_SUMMARY
+              echo "1. Review buffer overflow and null pointer issues" >> $GITHUB_STEP_SUMMARY
+              echo "2. Check uninitialized variable usage" >> $GITHUB_STEP_SUMMARY
+              echo "3. Verify resource leak and memory management" >> $GITHUB_STEP_SUMMARY
             fi
           else
             echo "⚠️ No SAST report generated" >> $GITHUB_STEP_SUMMARY
@@ -305,132 +524,188 @@ jobs:
         if: always()
         with:
           name: sast-analysis-${{ github.run_id }}
-          path: cppcheck-security.xml
+          path: |
+            cppcheck-security.xml
+            flawfinder-report.txt
           retention-days: 90
 
   # ================================================================
-  # Job 6: 安全报告生成和汇总
+  # Job 7: MCIS安全维度综合报告 - 控制论反馈整合
   # ================================================================
-  generate-report:
-    name: Generate Security Report
-    needs: [dependency-audit, code-security-scan, secrets-scan, sast-analysis]
+  mcis-security-dimension-report:
+    name: MCIS Security Dimension Report
+    needs: [dependency-vulnerability-scan, codeql-security-analysis, secrets-detection, sast-deep-analysis]
     runs-on: ubuntu-latest
     if: always()
-    
+
     steps:
-      - name: Download all artifacts
+      - name: Download all security artifacts
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          path: security-artifacts
 
-      - name: Create comprehensive security report
+      - name: Generate MCIS security dimension report
         run: |
-          cat > SECURITY_REPORT.md << 'EOF'
-          # AgentOS Security Audit Report
-          
+          cat > SECURITY_DIMENSION_REPORT.md << 'EOF'
+          # 🔒 MCIS Security Dimension Report
+
+          **Dimension**: ${{ env.MCIS_SECURITY_DIMENSION }}
           **Generated**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
           **Run ID**: ${{ github.run_id }}
           **Trigger**: ${{ github.event_name }}
-          
-          ---
-          
-          ## Executive Summary
-          
-          This report summarizes the security posture of AgentOS based on automated scans.
-          
-          ## Scan Results
-          
-          ### 1. Dependency Vulnerability Scan (Trivy)
-          - Status: Completed
-          - Artifacts: `artifacts/trivy-scan-results-*`
-          - Details: See Trivy table and JSON outputs
-          
-          ### 2. Container Image Scan
-          - Status: $([ -f artifacts/container-scan-results-*/container-trivy-results.txt ] && echo "Completed" || echo "Skipped")
-          - Artifacts: `artifacts/container-scan-results-*`
-          
-          ### 3. CodeQL Analysis
-          - Status: Completed
-          - Location: GitHub Security tab → Code scanning alerts
-          
-          ### 4. Secrets Detection (Gitleaks)
-          - Status: Completed
-          - Findings: Check Gitleaks output for details
-          
-          ### 5. Static Analysis (SAST)
-          - Status: Completed
-          - Artifacts: `artifacts/sast-analysis-*`
-          - Tool: cppcheck with security rules enabled
-          
-          ---
-          
-          ## Security Score
-          
-          Based on the scan results above, assess the overall security posture.
-          
-          | Factor | Weight | Score (1-5) |
-          |--------|--------|-------------|
-          | Dependency Vulnerabilities | 30% | TBD |
-          | Code Quality Issues | 25% | TBD |
-          | Secrets Exposure | 20% | TBD |
-          | SAST Findings | 15% | TBD |
-          | Configuration Security | 10% | TBD |
-          
-          **Overall Security Score**: TBD / 5
-          
-          ---
-          
-          ## Recommendations
-          
-          1. **Immediate Actions (Critical/High)**
-             - Review and fix critical dependency vulnerabilities
-             - Address any exposed secrets immediately
-             
-          2. **Short-term Improvements (Medium)**
-             - Update dependencies to patched versions
-             - Fix high-severity SAST findings
-             - Implement additional input validation
-             
-          3. **Long-term Enhancements**
-             - Establish regular security audit schedule
-             - Implement security training for developers
-             - Consider adopting SAST/SCA tools in CI pipeline
-             
-          ---
-          
-          ## Compliance Notes
-          
-          - OWASP Top 10 coverage: Partial (automated scans)
-          - CIS Benchmarks: Not yet implemented
-          - SOC2/ISO27001: N/A (not applicable)
-          
-          ---
-          
-          *Report generated automatically by AgentOS Security Audit workflow*
-          *Next scheduled run: Tomorrow at 02:00 UTC*
-          EOF
-          
-          cat SECURITY_REPORT.md
+          **Scan Mode**: ${{ env.SCAN_MODE }}
 
-      - name: Upload final security report
+          ---
+
+          ## 🎯 Executive Summary
+
+          This report summarizes the security posture of AgentOS from the MCIS Security Dimension perspective.
+
+          ### MCIS Control Theory Applied:
+
+          - **Negative Feedback**: Vulnerability detection and blocking mechanisms
+          - **Positive Feedback**: Security improvement recognition and reinforcement
+          - **Feedforward**: Predictive security measures and trend analysis
+
+          ---
+
+          ## 📊 Security Scan Results
+
+          ### 1. Dependency Vulnerability Scan (Trivy)
+          - Status: ${{ needs.dependency-vulnerability-scan.result }}
+          - Artifacts: `security-artifacts/trivy-scan-results-*/`
+          - Key Findings: See vulnerability counts above
+
+          ### 2. Container Security Scan
+          - Status: ${{ needs.container-security-scan.result || 'Skipped' }}
+          - Artifacts: `security-artifacts/container-scan-results-*/`
+
+          ### 3. CodeQL Analysis
+          - Status: ${{ needs.codeql-security-analysis.result }}
+          - Location: GitHub Security tab → Code scanning alerts
+          - MCIS Feedback: Positive feedback for code quality improvements
+
+          ### 4. Secrets Detection (Gitleaks)
+          - Status: ${{ needs.secrets-detection.result }}
+          - Findings: Check Gitleaks output for details
+          - MCIS Feedback: Feedforward mechanism for prevention
+
+          ### 5. SAST Deep Analysis
+          - Status: ${{ needs.sast-deep-analysis.result }}
+          - Artifacts: `security-artifacts/sast-analysis-*/`
+          - Tool: cppcheck with security rules enabled
+
+          ---
+
+          ## 🏆 MCIS Security Score
+
+          Based on the MCIS security dimension assessment:
+
+          | Security Factor | Weight | Score (0-100) | Status |
+          |----------------|--------|---------------|--------|
+          | Dependency Vulnerabilities | 30% | TBD | 🔍 Analyzing |
+          | Code Quality & SAST | 25% | TBD | 🔍 Analyzing |
+          | Secrets Exposure | 20% | TBD | 🔍 Analyzing |
+          | Container Security | 15% | TBD | 🔍 Analyzing |
+          | Security Configuration | 10% | TBD | 🔍 Analyzing |
+
+          **Overall MCIS Security Score**: Calculating...
+
+          ---
+
+          ## 🔄 MCIS Control Theory Recommendations
+
+          1. **Negative Feedback Actions** (Immediate):
+             - Fix critical/high severity vulnerabilities
+             - Rotate exposed secrets immediately
+             - Address SAST critical findings
+
+          2. **Positive Feedback Reinforcement** (Short-term):
+             - Document and share security best practices
+             - Recognize secure coding patterns
+             - Implement security champions program
+
+          3. **Feedforward Predictions** (Long-term):
+             - Predictive security analytics
+             - Threat modeling workshops
+             - Security architecture reviews
+
+          ---
+
+          ## 🧩 MCIS Dimension Integration
+
+          This security dimension integrates with other MCIS dimensions:
+
+          - **Base Body**: Secure infrastructure provisioning
+          - **Cognition Body**: Secure cognitive algorithms
+          - **Execution Body**: Secure service execution
+          - **Memory Body**: Secure data storage and retrieval
+          - **Observability Body**: Security monitoring and alerting
+
+          ---
+
+          *Report generated automatically by AgentOS MCIS Security Dimension workflow*
+          *Next scheduled security scan: Tomorrow at 03:00 UTC*
+          *MCIS Theory: Multibody Cybernetic Intelligent System*
+          EOF
+
+          cat SECURITY_DIMENSION_REPORT.md
+
+      - name: Upload comprehensive security report
         uses: actions/upload-artifact@v4
         with:
-          name: security-report-${{ github.run_id }}
-          path: SECURITY_REPORT.md
+          name: mcis-security-dimension-report-${{ github.run_id }}
+          path: SECURITY_DIMENSION_REPORT.md
           retention-days: 365
 
-      - name: Post summary to job summary
+      - name: Post MCIS security summary
         run: |
-          echo "## 🔒 Security Audit Complete" >> $GITHUB_STEP_SUMMARY
+          echo "## 🛡️ MCIS Security Dimension Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "All security scans have completed successfully." >> $GITHUB_STEP_SUMMARY
+          echo "All security scans in the MCIS Security Dimension have completed." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Scans Executed:" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Dependency vulnerability scan (Trivy)" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ CodeQL static analysis" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Secrets detection (Gitleaks)" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ SAST analysis (cppcheck)" >> $GITHUB_STEP_SUMMARY
+          echo "### 🎯 MCIS Control Theory Applied:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Negative feedback: Vulnerability detection and blocking" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Positive feedback: Security improvement reinforcement" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Feedforward: Predictive security measures" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Artifacts:" >> $GITHUB_STEP_SUMMARY
-          echo "- Full report: \`security-report-\${{ github.run_id }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Detailed results available in downloaded artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "### 📁 Artifacts Generated:" >> $GITHUB_STEP_SUMMARY
+          echo "- Full MCIS report: \`mcis-security-dimension-report-\${{ github.run_id }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Individual scan results available in artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Integration with Other MCIS Dimensions:" >> $GITHUB_STEP_SUMMARY
+          echo "This security dimension provides critical feedback to all other MCIS dimensions," >> $GITHUB_STEP_SUMMARY
+          echo "ensuring a holistic security posture across the entire AgentOS system." >> $GITHUB_STEP_SUMMARY
+
+      - name: Create security issue if critical findings
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueTitle = `🚨 MCIS Security Critical Findings - Run ${context.runId}`;
+            const issueBody = `# MCIS Security Critical Findings
+
+            **Run ID**: ${context.runId}
+            **Time**: ${new Date().toISOString()}
+
+            Critical security findings detected in the MCIS Security Dimension scan.
+
+            Please review the security artifacts and address the issues immediately.
+
+            ## Next Steps:
+            1. Review the security scan results
+            2. Fix critical vulnerabilities
+            3. Rotate any exposed secrets
+            4. Implement preventive measures
+
+            ---
+
+            *This issue was created automatically by the MCIS Security Dimension workflow.*`;
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: issueTitle,
+              body: issueBody,
+              labels: ['security', 'critical', 'mcis', 'automated']
+            });

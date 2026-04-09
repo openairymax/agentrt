@@ -1,7 +1,10 @@
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+"From data intelligence emerges."
+
 # AgentOS Python 编码规范
 
-**版本**: Doc V1.7  
-**更新日期**: 2026-03-31  
+**版本**: Doc V1.8  
+**最后更新**: 2026-04-09  
 **作者**: LirenWang  
 **适用范围**: AgentOS 所有 Python 代码  
 **理论基础**: 工程两论（反馈闭环）、系统工程（模块化）、五维正交系统（系统观、内核观、认知观、工程观、设计美学）、双系统认知理论  

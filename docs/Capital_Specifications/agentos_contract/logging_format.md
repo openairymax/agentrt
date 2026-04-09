@@ -1,10 +1,13 @@
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+"From data intelligence emerges."
+
 # AgentOS 日志格式规范
 
-**版本**: Doc V1.7  
+**版本**: Doc V1.8  
 **状态**: 正式发布  
 **归属**: AgentOS 可观测性核心规范  
 **作者**: LirenWang  
-**最后更新**: 2026-03-31  
+**最后更新**: 2026-04-09  
 **许可证**: GPL-3.0  
 **理论基础**: 工程两论（控制论与系统工程）、双系统认知理论、微内核哲学、设计美学  
 **关联规范**: [通信协议规范](./protocol_contract.md)、[系统调用 API 规范](./syscall_api_contract.md)、[日志打印规范](../coding_standard/Log_guide.md)
@@ -960,5 +963,5 @@ class BatchHandler:
 
 ---
 
-**最后更新**: 2026-03-25  
+**最后更新**: 2026-04-09  
 **维护者**: AgentOS 架构委员会

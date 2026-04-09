@@ -51,6 +51,9 @@ param(
     [ValidateSet("dev", "prod")]
     [string]$Mode = "dev",
 
+    [ValidateSet("backend", "client", "all")]
+    [string]$Target = "all",
+
     [switch]$Auto,
 
     [switch]$CheckOnly,
@@ -1098,6 +1101,99 @@ Invoke-CleanupResources {
 }
 
 # =============================================================================
+# 桌面客户端构建
+# =============================================================================
+
+function Deploy-DesktopClient {
+    Write-LogStep "构建桌面客户端"
+
+    $clientDir = Join-Path $PSScriptRoot "desktop-client"
+
+    if (-not (Test-Path $clientDir)) {
+        Write-LogError "桌面客户端目录不存在: $clientDir"
+        return $false
+    }
+
+    Push-Location $clientDir
+
+    try {
+        $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+        $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
+
+        if (-not $nodeCmd) {
+            Write-LogError "未安装 Node.js，无法构建桌面客户端"
+            Write-Host "  安装方法: winget install OpenJS.NodeJS.LTS"
+            Pop-Location
+            return $false
+        }
+
+        if (-not $npmCmd) {
+            Write-LogError "未安装 npm，无法构建桌面客户端"
+            Pop-Location
+            return $false
+        }
+
+        $nodeVersion = (& node --version 2>&1) -replace 'v', ''
+        Write-LogInfo "Node.js: v${nodeVersion}"
+
+        Write-LogInfo "安装前端依赖..."
+        npm install --prefer-offend 2>&1 | Out-Null
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-LogWarn "npm install 遇到问题，尝试清理缓存重试..."
+            npm install 2>&1 | Out-Null
+        }
+
+        $rustCmd = Get-Command rustc -ErrorAction SilentlyContinue
+        $cargoCmd = Get-Command cargo -ErrorAction SilentlyContinue
+
+        if (-not $rustCmd -or -not $cargoCmd) {
+            Write-LogWarn "未安装 Rust 工具链，仅构建前端预览版本"
+            Write-LogInfo "安装 Rust: https://rustup.rs/"
+
+            Write-LogInfo "启动 Vite 开发服务器..."
+            Start-Process -FilePath "npm" -ArgumentList "run", "dev" -NoNewWindow
+            Write-LogInfo "前端开发服务器已启动: http://localhost:1420"
+        } else {
+            $rustVersion = (& rustc --version 2>&1)
+            Write-LogInfo "Rust: $rustVersion"
+
+            Write-LogInfo "构建 Tauri 桌面应用..."
+            npm run tauri build 2>&1 | Out-Null
+
+            if ($LASTEXITCODE -eq 0) {
+                Write-LogInfo "桌面客户端构建成功！"
+
+                $releaseDir = Join-Path $clientDir "src-tauri\target\release"
+                if (Test-Path $releaseDir) {
+                    $msiFiles = Get-ChildItem -Path (Join-Path $releaseDir "bundle\msi") -Filter "*.msi" -ErrorAction SilentlyContinue
+                    $exeFiles = Get-ChildItem -Path $releaseDir -Filter "agentos-desktop.exe" -ErrorAction SilentlyContinue
+
+                    if ($msiFiles) {
+                        Write-LogInfo "安装包: $($msiFiles[0].FullName)"
+                    }
+                    if ($exeFiles) {
+                        Write-LogInfo "可执行文件: $($exeFiles[0].FullName)"
+                    }
+                }
+            } else {
+                Write-LogError "桌面客户端构建失败"
+                Pop-Location
+                return $false
+            }
+        }
+    }
+    catch {
+        Write-LogError "桌面客户端构建出错: $_"
+        Pop-Location
+        return $false
+    }
+
+    Pop-Location
+    return $true
+}
+
+# =============================================================================
 # 用户交互
 # =============================================================================
 
@@ -1132,6 +1228,7 @@ ${CYAN}用法:${NC}
 
 ${CYAN}参数:${NC}
   -Mode <mode>       部署模式: dev|prod (默认: dev)
+  -Target <target>   部署目标: backend|client|all (默认: all)
   -Auto              非交互模式（使用默认配置）
   -CheckOnly         仅检查环境和项目结构
   -Status            显示当前运行状态
@@ -1148,6 +1245,9 @@ ${CYAN}示例:${NC}
   .\install.ps1                      # 交互式部署（开发环境）
   .\install.ps1 -Mode dev -Auto      # 一键部署开发环境
   .\install.ps1 -Mode prod -Auto     # 一键部署生产环境
+  .\install.ps1 -Target backend      # 仅部署后端服务
+  .\install.ps1 -Target client       # 仅构建桌面客户端
+  .\install.ps1 -Target all          # 全部部署（后端+客户端）
   .\install.ps1 -CheckOnly           # 仅检查环境
   .\install.ps1 -Status              # 查看运行状态
   .\install.ps1 -Stop                # 停止服务
@@ -1255,11 +1355,15 @@ function Main {
     }
 
     # 默认操作：部署
-    Initialize-Progress 7
+    $totalSteps = 7
+    if ($Target -eq "client") { $totalSteps = 3 }
+    if ($Target -eq "backend") { $totalSteps = 6 }
+    Initialize-Progress $totalSteps
 
     # 选择部署模式
     $deployMode = Select-DeploymentMode
     Write-LogInfo "部署模式: $deployMode"
+    Write-LogInfo "部署目标: $Target"
 
     # 步骤1：平台检测
     Show-Progress "平台与环境检测"
@@ -1272,48 +1376,60 @@ function Main {
     $dockerOk = Test-DockerInstallation
     Test-CoreDependencies | Out-Null
 
-    if (-not $dockerOk) {
-        if ($Auto) {
-            Install-DockerDesktop
-            $dockerOk = Test-DockerInstallation
-        } else {
-            $response = Read-Host "  是否尝试自动安装 Docker Desktop? [y/N]"
-            if ($response -eq 'y' -or $response -eq 'Y') {
+    if ($Target -ne "client") {
+        if (-not $dockerOk) {
+            if ($Auto) {
                 Install-DockerDesktop
                 $dockerOk = Test-DockerInstallation
+            } else {
+                $response = Read-Host "  是否尝试自动安装 Docker Desktop? [y/N]"
+                if ($response -eq 'y' -or $response -eq 'Y') {
+                    Install-DockerDesktop
+                    $dockerOk = Test-DockerInstallation
+                }
+            }
+        }
+
+        if (-not $dockerOk) {
+            Write-LogError "Docker 环境不可用，无法继续部署后端"
+            if ($Target -eq "backend") {
+                Complete-Progress
+                exit 1
             }
         }
     }
 
-    if (-not $dockerOk) {
-        Write-LogError "Docker 环境不可用，无法继续部署"
-        Complete-Progress
-        exit 1
-    }
+    if ($Target -ne "client") {
+        # 步骤3：项目验证
+        Show-Progress "项目结构验证"
+        Confirm-ProjectStructure | Out-Null
 
-    # 步骤3：项目验证
-    Show-Progress "项目结构验证"
-    Confirm-ProjectStructure | Out-Null
+        # 步骤4：配置生成
+        Show-Progress "配置文件生成"
+        New-EnvironmentConfig
 
-    # 步骤4：配置生成
-    Show-Progress "配置文件生成"
-    New-EnvironmentConfig
+        # 步骤5：启动服务
+        Show-Progress "启动服务 (${deployMode} 模式)"
+        $startSuccess = $false
 
-    # 步骤5：启动服务
-    Show-Progress "启动服务 (${deployMode} 模式)"
-    $startSuccess = $false
-
-    switch ($deployMode) {
-        "dev" { $startSuccess = Start-DevEnvironment }
-        "prod" { $startSuccess = Start-ProdEnvironment }
-        default {
-            Write-LogError "未知部署模式: $deployMode"
-            Complete-Progress
-            exit 1
+        if ($dockerOk) {
+            switch ($deployMode) {
+                "dev" { $startSuccess = Start-DevEnvironment }
+                "prod" { $startSuccess = Start-ProdEnvironment }
+                default {
+                    Write-LogError "未知部署模式: $deployMode"
+                }
+            }
+        } else {
+            Write-LogWarn "跳过后端部署（Docker 不可用）"
         }
     }
 
-    # 步骤6：健康检查（已在 start 函数中调用）
+    if ($Target -ne "backend") {
+        # 构建桌面客户端
+        Show-Progress "构建桌面客户端"
+        Deploy-DesktopClient | Out-Null
+    }
 
     # 完成
     Complete-Progress

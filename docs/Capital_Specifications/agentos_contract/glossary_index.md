@@ -1,10 +1,13 @@
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+"From data intelligence emerges."
+
 # AgentOS 规范集术语表与快速索引
 
-**版本**: Doc V1.7  
+**版本**: Doc V1.8  
 **状态**: 正式发布  
 **维护者**: AgentOS 架构委员会  
 **作者**: LirenWang  
-**最后更新**: 2026-03-31  
+**最后更新**: 2026-04-09  
 
 ---
 
@@ -207,4 +210,4 @@
 
 ---
 **维护者**: AgentOS 架构委员会  
-**最后更新**: 2026-03-25
+**最后更新**: 2026-04-09
