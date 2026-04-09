@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_version": "1.0.0",
+  "agent_id": "product_manager",
+  "agent_name": "Product Manager Agent",
+  "description": "浜у搧瑙勫垝鏅鸿兘浣擄紝璐熻矗闇€姹傚垎鏋愩€佽矾绾垮浘瑙勫垝鍜岀敤鎴风爺绌?,
+  "version": "1.0.0.9",
+  "author": "SPHARX Team",
+  "license": "Apache-2.0",
+  
+  "capabilities": [
+    {
+      "name": "documentation",
+      "description": "鏂囨。鐢熸垚鑳藉姏"
+    },
+    {
+      "name": "optimization",
+      "description": "浼樺寲鑳藉姏"
+    }
+  ],
+  
+  "metadata": {
+    "created_at": "2026-04-07T00:00:00Z",
+    "tags": ["product", "requirements", "roadmap", "user-research"],
+    "category": "product_management",
+    "maturity": "production"
+  }
+}

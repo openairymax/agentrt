@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_version": "1.0.0",
+  "agent_id": "devops",
+  "agent_name": "DevOps Agent",
+  "description": "杩愮淮閮ㄧ讲鏅鸿兘浣擄紝璐熻矗CI/CD銆佸鍣ㄥ寲閮ㄧ讲銆佸熀纭€璁炬柦绠＄悊鍜岀洃鎺у憡璀?,
+  "version": "1.0.0.9",
+  "author": "SPHARX Team",
+  "license": "Apache-2.0",
+  
+  "capabilities": [
+    {
+      "name": "code_generation",
+      "description": "閰嶇疆浠ｇ爜鐢熸垚鑳藉姏"
+    },
+    {
+      "name": "debugging",
+      "description": "闂璇婃柇鑳藉姏"
+    }
+  ],
+  
+  "metadata": {
+    "created_at": "2026-04-07T00:00:00Z",
+    "tags": ["devops", "cicd", "containerization", "monitoring"],
+    "category": "operations",
+    "maturity": "production"
+  }
+}

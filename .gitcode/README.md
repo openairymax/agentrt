@@ -53,7 +53,17 @@
     ├── 📄 security-audit.yml      # 安全审计 (V2.0)
     ├── 📄 dependency-update.yml   # 依赖更新 (V1.0)
     ├── 📄 manager-enhanced-tests.yml # Manager 增强测试
-    └── 📄 stale.yml               # 陈旧 Issue/PR 管理 (V2.0)
+    ├── 📄 stale.yml               # 陈旧 Issue/PR 管理 (V2.0)
+    ├── 📄 build-desktop.yml       # 桌面客户端构建
+    ├── 📄 heapstore-ci.yml        # Heapstore 模块 CI
+    ├── 📄 openlab-ci.yml          # OpenLab 模块 CI
+    ├── 📄 toolkit-go-ci.yml       # Go SDK CI
+    ├── 📄 toolkit-python-ci.yml   # Python SDK CI
+    ├── 📄 toolkit-rust-ci.yml     # Rust SDK CI
+    ├── 📄 toolkit-typescript-ci.yml # TypeScript SDK CI
+    ├── 📄 tests-deploy.yml        # 测试部署
+    ├── 📄 tests-release.yml       # 测试发布
+    └── 📄 tests-test.yml          # 测试流程
 ```
 
 ---
@@ -382,8 +392,8 @@ curl -X POST \
 
 ### 贡献指南
 
-1. **代码规范**: 遵循 [CODING_STANDARDS.md](../agentos/manuals/CODING_STANDARDS.md)
-2. **架构原则**: 遵循 [ARCHITECTURAL_PRINCIPLES.md](../agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) V1.8
+1. **代码规范**: 遵循 [CODING_STANDARDS.md](../docs/Capital_Specifications/)
+2. **架构原则**: 遵循 [ARCHITECTURAL_PRINCIPLES.md](../docs/ARCHITECTURAL_PRINCIPLES.md) V1.8
 3. **提交 PR**: 使用 [PR 模板](./PULL_REQUEST_TEMPLATE.md)
 4. **代码审查**: 遵循 [审查流程](../CONTRIBUTING.md#code-review)
 

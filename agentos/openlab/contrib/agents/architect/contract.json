@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_version": "1.0.0",
+  "agent_id": "architect",
+  "agent_name": "Architect Agent",
+  "description": "绯荤粺鏋舵瀯璁捐涓庤瘎瀹℃櫤鑳戒綋锛岃礋璐ｆ灦鏋勮璁°€佹妧鏈€夊瀷寤鸿鍜屾灦鏋勮瘎瀹?,
+  "version": "1.0.0.9",
+  "author": "SPHARX Team",
+  "license": "Apache-2.0",
+  
+  "capabilities": [
+    {
+      "name": "architecture_design",
+      "description": "绯荤粺鏋舵瀯璁捐鑳藉姏",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "task_type": {
+            "type": "string",
+            "enum": ["design", "review", "tech_selection"],
+            "description": "浠诲姟绫诲瀷"
+          },
+          "requirements": {
+            "type": "object",
+            "properties": {
+              "scale": {
+                "type": "string",
+                "enum": ["small", "medium", "large"],
+                "description": "绯荤粺瑙勬ā"
+              },
+              "features": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "鎵€闇€鍔熻兘鍒楄〃"
+              },
+              "performance": {
+                "type": "string",
+                "enum": ["low", "medium", "high"],
+                "description": "鎬ц兘瑕佹眰"
+              }
+            },
+            "required": ["scale", "features"]
+          },
+          "constraints": {
+            "type": "object",
+            "description": "绾︽潫鏉′欢"
+          }
+        },
+        "required": ["task_type", "requirements"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "鎵ц鏄惁鎴愬姛"
+          },
+          "output": {
+            "type": "object",
+            "description": "鎵ц缁撴灉"
+          },
+          "error": {
+            "type": "string",
+            "description": "閿欒淇℃伅"
+          },
+          "metrics": {
+            "type": "object",
+            "description": "鎵ц鎸囨爣"
+          }
+        },
+        "required": ["success"]
+      }
+    },
+    {
+      "name": "documentation",
+      "description": "鏂囨。鐢熸垚鑳藉姏"
+    },
+    {
+      "name": "optimization",
+      "description": "鏋舵瀯浼樺寲鑳藉姏"
+    }
+  ],
+  
+  "performance": {
+    "response_time": {
+      "p50": 500,
+      "p95": 2000,
+      "p99": 5000,
+      "unit": "ms"
+    },
+    "throughput": {
+      "min": 10,
+      "target": 100,
+      "max": 1000,
+      "unit": "requests_per_minute"
+    },
+    "availability": {
+      "target": 0.99,
+      "min": 0.95
+    }
+  },
+  
+  "resources": {
+    "cpu": {
+      "min": 0.5,
+      "max": 4.0,
+      "unit": "cores"
+    },
+    "memory": {
+      "min": 512,
+      "max": 4096,
+      "unit": "MB"
+    },
+    "storage": {
+      "min": 100,
+      "max": 10240,
+      "unit": "MB"
+    }
+  },
+  
+  "dependencies": [
+    {
+      "name": "openlab.core.agent",
+      "version": ">=1.0.0",
+      "required": true
+    },
+    {
+      "name": "logging",
+      "version": ">=3.10",
+      "required": true
+    }
+  ],
+  
+  "security": {
+    "authentication": "required",
+    "authorization": "RBAC",
+    "encryption": "TLS_1_3",
+    "audit": true,
+    "data_classification": "internal"
+  },
+  
+  "monitoring": {
+    "metrics": [
+      "execution_time",
+      "success_rate",
+      "error_rate",
+      "resource_usage"
+    ],
+    "logging": {
+      "level": "INFO",
+      "format": "json",
+      "retention_days": 30
+    },
+    "alerting": {
+      "enabled": true,
+      "channels": ["email", "slack"]
+    }
+  },
+  
+  "lifecycle": {
+    "initialization_timeout": 30,
+    "shutdown_timeout": 10,
+    "health_check_interval": 60,
+    "max_retries": 3
+  },
+  
+  "examples": [
+    {
+      "name": "鏋舵瀯璁捐绀轰緥",
+      "input": {
+        "task_type": "design",
+        "requirements": {
+          "scale": "medium",
+          "features": ["api", "data_processing"],
+          "performance": "high"
+        }
+      },
+      "expected_output": {
+        "success": true,
+        "output": {
+          "architecture_type": "modular_monolith",
+          "components": [],
+          "tech_stack": {}
+        }
+      }
+    },
+    {
+      "name": "鏋舵瀯璇勫绀轰緥",
+      "input": {
+        "task_type": "review",
+        "architecture": {
+          "type": "microservices",
+          "components": []
+        }
+      },
+      "expected_output": {
+        "success": true,
+        "output": {
+          "overall_score": 0.85,
+          "strengths": [],
+          "weaknesses": []
+        }
+      }
+    }
+  ],
+  
+  "metadata": {
+    "created_at": "2026-04-07T00:00:00Z",
+    "updated_at": "2026-04-07T00:00:00Z",
+    "tags": ["architecture", "design", "review", "tech-selection"],
+    "category": "software_engineering",
+    "maturity": "production"
+  }
+}
