@@ -27,32 +27,32 @@ typedef struct curl_slist {
 #define CURLE_FAILED_INIT            2  /* 初始化失败 */
 #define CURLE_URL_MALFORMAT          3  /* URL格式错误 */
 #define CURLE_NOT_BUILT_IN           4  /* 功能未编译进库 */
-#define CURLE_COULDNT_RESOLVE_PROXY  5  ** 无法解析代理主机 */
-#define CURLE_COULDNT_RESOLVE_HOST   6  ** 无法解析主机 */
-#define CURLE_COULDNT_CONNECT        7  ** 无法连接到服务器 */
-#define CURLE_FTP_WEIRD_SERVER_REPLY 8  ** FTP服务器返回意外响应 */
-#define CURLE_REMOTE_ACCESS_DENIED   9  ** 访问被拒绝 */
-#define CURLE_FTP_ACCEPT_FAILED      10 ** FTP接受失败 */
-#define CURLE_FTP_WEIRD_PASS_REPLY   11 ** FTP密码响应异常 */
-#define CURLE_FTP_ACCEPT_TIMEOUT     12 ** FTP接受超时 */
-#define CURLE_FTP_WEIRD_PASV_REPLY   13 ** FTP PASV响应异常 */
-#define CURLE_FTP_WEIRD_227_FORMAT   14 ** FTP 227格式错误 */
-#define CURLE_FTP_CANT_GET_HOST      15 ** 无法获取FTP主机 */
-#define CURLE_HTTP2                  16 ** HTTP/2层问题 */
-#define CURLE_SSL_CONNECT_ERROR       17 ** SSL连接错误 */
-#define CURLE_BAD_DOWNLOAD_RESUME    18 ** 无法恢复下载 */
-#define CURLE_FILE_COULDNT_READ_FILE 19 ** 无法读取文件 */
-#define CURLE_LDAP_INVALID_URL       20 ** LDAP URL无效 */
-#define CURLE_TFTP_ILLEGAL           21 ** TFTP操作非法 */
-#define CURLE_TFTP_NOSUCHSERVER      22 ** TFTP服务器不存在 */
-#define CURLE_PARTIAL_FILE           23 ** 文件传输不完整 */
-#define CURLE_NO_DATA_AVAILABLE      24 ** 无可用数据 */
-#define CURLE_QUOTE_ERROR            25 ** 引号命令失败 */
-#define CURLE_WRITE_ERROR            26 ** 写入本地数据失败 */
-#define CURLE_UPLOAD_FAILED          27 ** 上传失败 */
-#define CURLE_READ_ERROR             28 ** 读取本地数据失败 */
-#define CURLE_OUT_OF_MEMORY          29 ** 内存不足 */
-#define CURLE_OPERATION_TIMEDOUT     30 ** 操作超时 */
+#define CURLE_COULDNT_RESOLVE_PROXY  5  /* 无法解析代理主机 */
+#define CURLE_COULDNT_RESOLVE_HOST   6  /* 无法解析主机 */
+#define CURLE_COULDNT_CONNECT        7  /* 无法连接到服务器 */
+#define CURLE_FTP_WEIRD_SERVER_REPLY 8  /* FTP服务器返回意外响应 */
+#define CURLE_REMOTE_ACCESS_DENIED   9  /* 访问被拒绝 */
+#define CURLE_FTP_ACCEPT_FAILED      10 /* FTP接受失败 */
+#define CURLE_FTP_WEIRD_PASS_REPLY   11 /* FTP密码响应异常 */
+#define CURLE_FTP_ACCEPT_TIMEOUT     12 /* FTP接受超时 */
+#define CURLE_FTP_WEIRD_PASV_REPLY   13 /* FTP PASV响应异常 */
+#define CURLE_FTP_WEIRD_227_FORMAT   14 /* FTP 227格式错误 */
+#define CURLE_FTP_CANT_GET_HOST      15 /* 无法获取FTP主机 */
+#define CURLE_HTTP2                  16 /* HTTP/2层问题 */
+#define CURLE_SSL_CONNECT_ERROR      17 /* SSL连接错误 */
+#define CURLE_BAD_DOWNLOAD_RESUME    18 /* 无法恢复下载 */
+#define CURLE_FILE_COULDNT_READ_FILE 19 /* 无法读取文件 */
+#define CURLE_LDAP_INVALID_URL       20 /* LDAP URL无效 */
+#define CURLE_TFTP_ILLEGAL           21 /* TFTP操作非法 */
+#define CURLE_TFTP_NOSUCHSERVER      22 /* TFTP服务器不存在 */
+#define CURLE_PARTIAL_FILE           23 /* 文件传输不完整 */
+#define CURLE_NO_DATA_AVAILABLE      24 /* 无可用数据 */
+#define CURLE_QUOTE_ERROR            25 /* 引号命令失败 */
+#define CURLE_WRITE_ERROR            26 /* 写入本地数据失败 */
+#define CURLE_UPLOAD_FAILED          27 /* 上传失败 */
+#define CURLE_READ_ERROR             28 /* 读取本地数据失败 */
+#define CURLE_OUT_OF_MEMORY          29 /* 内存不足 */
+#define CURLE_OPERATION_TIMEDOUT     30 /* 操作超时 */
 
 /* CURL 选项常量 */
 typedef int CURLoption;  /* CURL选项类型 */

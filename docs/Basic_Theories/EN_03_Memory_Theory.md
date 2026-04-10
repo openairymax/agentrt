@@ -1,10 +1,10 @@
-Copyright (c) 2026 SPHARX. All Rights Reserved.  
+Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.  
 "From data intelligence emerges."
 
 # AgentOS Memory Layer Theory
 
-**Version**: Doc V1.7  
-**Last Updated**: 2026-03-31  
+**Version**: Doc V1.8  
+**Last Updated**: 2026-04-10  
 **Author**: LirenWang
 
 ## 1. Introduction

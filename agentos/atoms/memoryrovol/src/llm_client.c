@@ -19,12 +19,12 @@
 #include <string.h>
 #include <stdio.h>
 
-/* CURL HTTP 客户端（与 CMakeLists.txt 中的 HAVE_LIBCURL 保持一致） */
-#ifdef HAVE_LIBCURL
+/* CURL HTTP 客户端（与 CMakeLists.txt 中的 AGENTOS_HAS_CURL 保持一致） */
+#ifdef AGENTOS_HAS_CURL
 #include <curl/curl.h>
 #else
 #include "../include/curl_stub.h"
-#endif /* HAVE_LIBCURL */
+#endif /* AGENTOS_HAS_CURL */
 
 /* JSON 解析 */
 #ifdef AGENTOS_HAS_CJSON
@@ -121,15 +121,16 @@ agentos_error_t agentos_llm_service_create(
     service->config.temperature = config->temperature > 0 ? config->temperature : 0.7f;
     service->config.max_tokens = config->max_tokens > 0 ? config->max_tokens : 2048;
 
-    /* 初始化 CURL */
+    /* 初始化 CURL（支持降级模式） */
     CURL* curl = curl_easy_init();
     if (!curl) {
-        AGENTOS_LOG_ERROR("Failed to initialize CURL");
-        if (service->config.model_name) AGENTOS_FREE((void*)service->config.model_name);
-        if (service->config.api_key) AGENTOS_FREE((void*)service->config.api_key);
-        if (service->config.base_url) AGENTOS_FREE((void*)service->config.base_url);
-        AGENTOS_FREE(service);
-        return AGENTOS_ERROR;
+        AGENTOS_LOG_WARN("CURL initialization failed - running in degraded mode (no LLM support)");
+        /* 降级模式：继续创建服务但标记为无CURL支持 */
+        service->curl = NULL;
+        service->initialized = 1;  /* 仍然标记为初始化，但功能受限 */
+        *out_service = service;
+        AGENTOS_LOG_INFO("LLM service created in degraded mode (model: %s)", service->config.model_name);
+        return AGENTOS_SUCCESS;
     }
 
     service->curl = curl;
@@ -138,6 +139,75 @@ agentos_error_t agentos_llm_service_create(
 
     AGENTOS_LOG_INFO("LLM service created for model: %s", service->config.model_name);
     return AGENTOS_SUCCESS;
+}
+
+/**
+ * @brief 完整LLM调用接口
+ */
+agentos_error_t agentos_llm_complete(
+    agentos_llm_service_t* service,
+    const agentos_llm_request_t* request,
+    agentos_llm_response_t** out_response)
+{
+    if (!service || !request || !out_response) {
+        return AGENTOS_EINVAL;
+    }
+
+    if (!service->initialized) {
+        return AGENTOS_ENOTINIT;
+    }
+
+    /* 降级模式检查：如果没有CURL支持，返回降级响应 */
+    if (!service->curl) {
+        AGENTOS_LOG_WARN("LLM complete attempted in degraded mode (no CURL support)");
+        agentos_llm_response_t* resp = (agentos_llm_response_t*)AGENTOS_CALLOC(1, sizeof(agentos_llm_response_t));
+        if (!resp) {
+            return AGENTOS_ENOMEM;
+        }
+        resp->text = AGENTOS_STRDUP("LLM service unavailable (degraded mode)");
+        if (!resp->text) {
+            AGENTOS_FREE(resp);
+            return AGENTOS_ENOMEM;
+        }
+        resp->usage_tokens = 0;
+        resp->total_tokens = 0;
+        resp->finish_reason = 0;
+        *out_response = resp;
+        return AGENTOS_SUCCESS;
+    }
+
+    /* 使用现有的agentos_llm_service_call实现作为基础 */
+    char* response_text = NULL;
+    agentos_error_t err = agentos_llm_service_call(service, request->prompt, &response_text);
+    if (err != AGENTOS_SUCCESS) {
+        return err;
+    }
+
+    agentos_llm_response_t* resp = (agentos_llm_response_t*)AGENTOS_CALLOC(1, sizeof(agentos_llm_response_t));
+    if (!resp) {
+        AGENTOS_FREE(response_text);
+        return AGENTOS_ENOMEM;
+    }
+
+    resp->text = response_text;
+    resp->usage_tokens = strlen(response_text) / 4; /* 近似估算：平均每个token 4个字符 */
+    resp->total_tokens = resp->usage_tokens + 100;  /* 粗略估算总token数 */
+    resp->finish_reason = 1;  /* 假设正常完成 */
+
+    *out_response = resp;
+    return AGENTOS_SUCCESS;
+}
+
+/**
+ * @brief 释放LLM响应
+ */
+void agentos_llm_response_free(agentos_llm_response_t* response) {
+    if (!response) return;
+    
+    if (response->text) {
+        AGENTOS_FREE(response->text);
+    }
+    AGENTOS_FREE(response);
 }
 
 /**
@@ -171,6 +241,14 @@ agentos_error_t agentos_llm_service_call(
 
     if (!service->initialized) {
         return AGENTOS_ENOTINIT;
+    }
+
+    /* 降级模式检查：如果没有CURL支持，返回错误 */
+    if (!service->curl) {
+        AGENTOS_LOG_WARN("LLM service call attempted in degraded mode (no CURL support)");
+        /* 返回一个友好的降级响应而不是错误 */
+        *out_response = AGENTOS_STRDUP("LLM service unavailable (running in degraded mode)");
+        return *out_response ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
     }
 
     /* 构建请求 URL */

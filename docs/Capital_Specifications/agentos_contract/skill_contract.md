@@ -1,7 +1,7 @@
 Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 "From data intelligence emerges."
 
-# AgentOS Skill 契约规范
+# AgentOS 技能 (Skill) 契约规范
 
 **版本**: Doc V1.8  
 **状态**: 正式发布  
@@ -10,7 +10,7 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 **最后更新**: 2026-04-09  
 **许可证**: GPL-3.0  
 **理论基础**: 工程两论（控制论与系统工程）、双系统认知理论、微内核哲学、设计美学  
-**关联规范**: [Agent 契约规范](./agent_contract.md)、[架构设计原则](../architecture/ARCHITECTURAL_PRINCIPLES.md)、[统一术语表](../TERMINOLOGY.md)
+**关联规范**: [Agent 契约规范](./agent_contract.md)、[架构设计原则](../../ARCHITECTURAL_PRINCIPLES.md)、[统一术语表](../TERMINOLOGY.md)
 
 ---
 
@@ -18,7 +18,7 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 
 ### 本文档定位
 
-Skill 契约规范是 AgentOS 规范体系的核心组成部分，属于**操作层规范**。本规范定义了技能 (Skill) 的标准化能力描述格式，指导技能开发者如何封装、发布和共享可复用的执行单元，是技能市场、工具服务和权限裁决的技术依据。
+技能 (Skill) 契约规范是 AgentOS 规范体系的核心组成部分，属于**操作层规范**。本规范定义了技能 (Skill) 的标准化能力描述格式，指导技能开发者如何封装、发布和共享可复用的执行单元，是技能市场、工具服务和权限裁决的技术依据。
 
 ### 与设计哲学的关系
 
@@ -34,8 +34,8 @@ Skill 契约规范是 AgentOS 规范体系的核心组成部分，属于**操作
 
 本规范适用于以下场景：
 
-1. **Skill 开发者**: 编写符合 AgentOS 标准的 Skill 契约文件
-2. **工具服务 (`tool_d`)**: 解析和验证 Skill 契约，加载和执行技能
+1. **技能 (Skill) 开发者**: 编写符合 AgentOS 标准的技能 (Skill) 契约文件
+2. **工具服务 (`tool_d`)**: 解析和验证技能 (Skill) 契约，加载和执行技能
 3. **市场服务 (`market_d`)**: 存储和管理技能注册信息，提供安装和分发功能
 4. **权限引擎 (`domain`)**: 根据契约声明进行权限裁决和资源分配
 
@@ -45,8 +45,8 @@ Skill 契约规范是 AgentOS 规范体系的核心组成部分，属于**操作
 
 | 术语 | 简要定义 | 来源 |
 |------|---------|------|
-| Skill(技能) | 可复用的执行单元，为 Agent 提供具体能力 | [Design_Principles.md](../../philosophy/Design_Principles.md) |
-| 执行单元 (Execution Unit) | 行动层的基本执行单位，如工具、代码、API 等 | [Cognition_Theory.md](../../philosophy/Cognition_Theory.md) |
+| 技能 (Skill) | 可复用的执行单元，为智能体 (Agent) 提供具体能力 | [设计原则](../../Basic_Theories/CN_04_设计原则.md) |
+| 执行单元 (Execution Unit) | 行动层的基本执行单位，如工具、代码、API 等 | [认知层理论](../../Basic_Theories/CN_02_认知层理论.md) |
 | 契约 (Contract) | 机器可读的能力描述文件 | 本规范 |
 | 工具服务 (`tool_d`) | 负责加载和执行技能的守护进程 | 本规范 |
 
@@ -999,18 +999,18 @@ Skill 契约涉及两个版本概念，需明确区分：
 | 引用规范 | 关系说明 |
 |---------|---------||
 | [Agent 契约规范](./agent_contract.md) | 本规范与 Agent 契约规范结构相似，两者共同构成 AgentOS 的能力描述体系 |
-| [架构设计原则](../../architecture/架构设计原则.md) | 本规范是架构原则在技能管理方面的具体实现，特别是微内核思想和模块化原则 |
+| [架构设计原则](../../ARCHITECTURAL_PRINCIPLES.md) | 本规范是架构原则在技能管理方面的具体实现，特别是微内核思想和模块化原则 |
 | [统一术语表](../TERMINOLOGY.md) | 本规范使用的术语定义和解释，如 Skill、执行单元、契约等 |
-| [C&C++ 安全编程指南](../../specifications/coding_standard/C&Cpp-secure-coding-guide.md) | 编译型技能的实现应遵循安全编程指南，特别是在内存管理和错误处理方面 |
-| [日志打印规范](../../specifications/coding_standard/Log_guide.md) | 技能运行时应遵循日志规范，记录关键操作和异常情况 |
+| [C&C++ 安全编程指南](../coding_standard/C_Cpp_secure_coding_guide.md) | 编译型技能的实现应遵循安全编程指南，特别是在内存管理和错误处理方面 |
+| [日志打印规范](../coding_standard/Log_guide.md) | 技能运行时应遵循日志规范，记录关键操作和异常情况 |
 
 ---
 
 ## 参考文献
 
-[1] AgentOS 设计哲学。../../philosophy/Design_Principles.md  
-[2] AgentOS 认知层理论。../../philosophy/Cognition_Theory.md  
-[3] 架构设计原则。../架构设计原则.md  
+[1] AgentOS 设计哲学。../../Basic_Theories/CN_04_设计原则.md  
+[2] AgentOS 认知层理论。../../Basic_Theories/CN_02_认知层理论.md  
+[3] 架构设计原则。../../ARCHITECTURAL_PRINCIPLES.md  
 [4] 统一术语表。../TERMINOLOGY.md  
 [5] JSON Schema Draft-07 Specification. https://json-schema.org/draft-07/json-schema-release.html  
 [6] Semantic Versioning 2.0.0. https://semver.org/  

@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="zh-CN" class="dark">
+<html lang="zh-CN" class="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
     <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#0a0a0f" />
+    <meta name="theme-color" content="#f8fafc" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="AgentOS" />
     <meta name="description" content="Industrial-grade AI Agent Operating System - Desktop Client" />
     <meta name="application-name" content="AgentOS" />
@@ -41,13 +41,13 @@
       }
     </script>
 
-    <!-- Prevent flash of wrong theme -->
+    <!-- Prevent flash of wrong theme - default light -->
     <script>
       (function() {
-        const savedTheme = localStorage.getItem('agentos_settings');
-        let theme = 'dark';
+        var savedTheme = localStorage.getItem('agentos_settings');
+        var theme = 'light';
         if (savedTheme) {
-          try { theme = JSON.parse(savedTheme).theme || 'dark'; } catch(e) {}
+          try { theme = JSON.parse(savedTheme).theme || 'light'; } catch(e) {}
         }
         document.documentElement.classList.remove('dark', 'light');
         document.documentElement.classList.add(theme);

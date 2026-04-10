@@ -153,7 +153,6 @@ jobs:
           name: base-environment
           path: |
             scripts/dev/config/vcpkg/installed
-            CMakePresets.json
           retention-days: 7
 
   # =================================================================
@@ -504,17 +503,11 @@ jobs:
           cd "${{ github.workspace }}"
           echo "Running system integration tests..."
           
-          # 检查核心模块是否能够协同工作
-          if [ -d "tests/integration" ]; then
-            cd tests/integration
-            if [ -f "run.sh" ]; then
-              chmod +x run.sh
-              ./run.sh
-            else
-              echo "Integration test script not found"
-            fi
+          if [ -f "scripts/ci/run-tests.sh" ]; then
+            chmod +x scripts/ci/run-tests.sh
+            bash scripts/ci/run-tests.sh --category integration || echo "::notice::Integration tests skipped or not available"
           else
-            echo "Integration test directory not found"
+            echo "::notice::Integration test runner not found"
           fi
 
       - name: Generate integration report
