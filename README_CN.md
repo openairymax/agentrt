@@ -30,7 +30,7 @@
 个人用户客户端预告  
 
 <div align="center">
-<img src="docs/Other_Source/AgentOS桌面版预览2.gif" alt="AgentOS 预览" width="800">
+<img src="docs/Other_Source/AgentOS-desktop-preview.gif" alt="AgentOS 预览" width="800">
 </div>
 
 ## 💡 创新要点
@@ -134,11 +134,11 @@ docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
 
 | 文档 | 核心内容 |
 |:-----|:---------|
-| [📘 架构原则](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) | 五维正交体系，24 条核心原则 |
-| [🚀 快速开始](agentos/manuals/guides/quickstart.md) | 5 分钟上手指南 |
-| [⚙️ 编译指南](agentos/manuals/guides/build.md) | 详细构建步骤和选项 |
-| [🧪 测试指南](agentos/manuals/guides/testing.md) | 单元/集成/契约测试 |
-| [🐳 部署指南](agentos/manuals/guides/deployment.md) | Docker/Kubernetes 部署 |
+| [📘 架构原则](docs/ARCHITECTURAL_PRINCIPLES.md) | 五维正交体系，24 条核心原则 |
+| [🚀 快速开始](docs/guides/quickstart.md) | 5 分钟上手指南 |
+| [⚙️ 编译指南](docs/guides/build.md) | 详细构建步骤和选项 |
+| [🧪 测试指南](docs/guides/testing.md) | 单元/集成/契约测试 |
+| [🐳 部署指南](docs/guides/deployment.md) | Docker/Kubernetes 部署 |
 
 
 ### 常见问题  
