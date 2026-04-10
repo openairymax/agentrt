@@ -58,6 +58,7 @@ typedef struct {
 /**
  * @brief 内存统计信息
  */
+#define AGENTOS_MEMORY_STATS_T_DEFINED
 typedef struct {
     size_t total_allocated;              /**< 总分配内存（字节） */
     size_t total_freed;                  /**< 总释放内存（字节） */

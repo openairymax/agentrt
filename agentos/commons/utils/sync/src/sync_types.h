@@ -19,6 +19,11 @@
 #include "sync.h"
 #include "memory_compat.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#include <synchapi.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

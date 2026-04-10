@@ -21,7 +21,11 @@
 #include "network_common.h"
 #include <stdio.h>
 #include <stdlib.h>
+#define _CRT_NONSTDC_NO_DEPRECATE
 #include <string.h>
+#ifdef _WIN32
+#define strdup _strdup
+#endif
 #include <stdarg.h>
 
 #ifdef _WIN32
@@ -172,8 +176,10 @@ static int parse_url(const char* url, char* host, int* port, char* path) {
         strncpy(path, slash, path_len);
         path[path_len] = '\0';
     } else {
-        strcpy(host, start);
-        strcpy(path, "/");
+        strncpy(host, start, 255);
+        host[255] = '\0';
+        strncpy(path, "/", 511);
+        path[511] = '\0';
     }
 
     /* 检查端口（主机:端口 格式） */
@@ -1318,7 +1324,8 @@ agentos_error_t network_dns_resolve(
             inet_ntop(AF_INET6, &addr_in6->sin6_addr, ip_str, sizeof(ip_str));
             result->ports[i] = ntohs(addr_in6->sin6_port);
         } else {
-            strcpy(ip_str, "unknown");
+            strncpy(ip_str, "unknown", INET6_ADDRSTRLEN - 1);
+            ip_str[INET6_ADDRSTRLEN - 1] = '\0';
             result->ports[i] = 0;
         }
 

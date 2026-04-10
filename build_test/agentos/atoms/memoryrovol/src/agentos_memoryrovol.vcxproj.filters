@@ -1,0 +1,106 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\forgetting\archive.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\forgetting\decay.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\forgetting\prune.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\forgetting\revive.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\layer1_raw\compression.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\layer1_raw\metadata.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\layer1_raw\serialization.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\layer1_raw\storage.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\layer2_feature\bm25.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\layer2_feature\embedder.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\layer2_feature\hybrid.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\layer2_feature\index.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\layer2_feature\similarity.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\layer3_structure\binder.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\layer3_structure\graph.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\layer3_structure\relation.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\layer3_structure\sequence.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\layer3_structure\unbinder.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\layer4_pattern\clustering.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\layer4_pattern\miner.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\layer4_pattern\persistence.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\layer4_pattern\rules.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\layer4_pattern\validator.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\retrieval\attractor.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\retrieval\cache.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\retrieval\energy.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\memory_optimizer.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\memoryrovol.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\monitoring.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\vector_store.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\llm_client.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\src\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{853EC8F3-7AF6-3373-B1A3-A80B3E87B0A2}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

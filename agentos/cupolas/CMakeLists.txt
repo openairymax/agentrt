@@ -5,30 +5,8 @@ project(cupolas C)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 11)
 
-if(MSVC)
-    set(CMAKE_C_FLAGS "/W4 /WX- /D_CRT_SECURE_NO_DEPRECATE /D_SCL_SECURE_NO_WARNINGS")
-    set(CMAKE_C_FLAGS_DEBUG "/Zi /Od /RTC1")
-    set(CMAKE_C_FLAGS_RELEASE "/O2 /GL /DNDEBUG")
-    add_definitions(-DCUPOLAS_PLATFORM_WINDOWS=1)
-    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-    add_definitions(-DNOMINMAX)
-    add_definitions(-D_WIN32_WINNT=0x0601)
-else()
-    set(CMAKE_C_FLAGS "-Wall -Wextra -Wpedantic -Wno-unused-parameter -fPIC")
-    set(CMAKE_C_FLAGS_DEBUG "-g -O0 -DDEBUG")
-    set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG")
-    add_definitions(-DCUPOLAS_PLATFORM_POSIX=1)
-    if(APPLE)
-        add_definitions(-DCUPOLAS_PLATFORM_MACOS=1)
-        add_definitions(-DCUPOLAS_PLATFORM_64BIT=1)
-    elseif(CMAKE_SIZEOF_VOID_P EQUAL 8)
-        add_definitions(-DCUPOLAS_PLATFORM_LINUX=1)
-        add_definitions(-DCUPOLAS_PLATFORM_64BIT=1)
-    endif()
-
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pie")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pie")
-endif()
+# 使用父项目的全局编译选项，避免重复设置
+# 父项目已设置全局安全编译选项
 
 option(BUILD_TESTS "Build tests" OFF)
 option(BUILD_WITH_SANITIZERS "Enable sanitizers (ASAN/MSAN/TSAN)" OFF)
@@ -45,11 +23,14 @@ if(PKG_CONFIG_FOUND)
     pkg_check_modules(CJSON QUIET libcjson)
 endif()
 
-find_package(OpenSSL REQUIRED)
+# OpenSSL查找（与根项目保持一致）
+find_package(OpenSSL QUIET)
 if(OpenSSL_FOUND)
-    message(STATUS "Found OpenSSL: ${OPENSSL_VERSION}")
+    message(STATUS "Found OpenSSL: ${OpenSSL_VERSION}")
+    add_definitions(-DCUPOLAS_HAS_OPENSSL=1)
 else()
-    message(FATAL_ERROR "OpenSSL is required for security modules")
+    message(WARNING "OpenSSL not found, some security features may be limited")
+    # 在没有OpenSSL的情况下，可以编译但某些功能受限
 endif()
 
 if(YAML_FOUND OR YAML_LIBRARIES)
@@ -162,11 +143,20 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${COMMON_INCLUDE_DIRS}
-    ${OPENSSL_INCLUDE_DIR}
 )
 
+# 条件包含OpenSSL目录
+if(OpenSSL_FOUND)
+    target_include_directories(${PROJECT_NAME} PRIVATE ${OPENSSL_INCLUDE_DIR})
+endif()
+
 # 链接 commons 模块
-target_link_libraries(${PROJECT_NAME} PRIVATE agentos_common ${OPENSSL_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} PRIVATE agentos_common)
+
+# 条件链接OpenSSL库
+if(OpenSSL_FOUND)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${OPENSSL_LIBRARIES})
+endif()
 
 if(YAML_FOUND)
     target_include_directories(${PROJECT_NAME} PRIVATE ${YAML_INCLUDE_DIRS})
@@ -257,10 +247,10 @@ install(TARGETS ${PROJECT_NAME}
     ARCHIVE DESTINATION lib/static
 )
 
-install(EXPORT cupolas-targets
-    FILE cupolas-targets.cmake
-    DESTINATION lib/cmake
-)
+# install(EXPORT cupolas-targets
+#     FILE cupolas-targets.cmake
+#     DESTINATION lib/cmake
+# )
 
 install(FILES ${CUPOLAS_HEADERS}
     DESTINATION include/cupolas
