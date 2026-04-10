@@ -17,7 +17,7 @@ Usage:
 """
 
 __version__ = "1.0.0.6"
-__author__ = "SPHARX Ltd."
+__author__ = "Spharx AgentOS Team"
 
 from .plugin import PluginRegistry, Plugin, PluginMetadata
 from .events import EventBus, Event, EventHandler

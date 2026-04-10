@@ -1,7 +1,7 @@
 Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 "From data intelligence emerges."
 
-# AgentOS Agent 契约规范
+# AgentOS 智能体 (Agent) 契约规范
 
 **版本**: Doc V1.8  
 **状态**: 正式发布  
@@ -10,7 +10,7 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 **最后更新**: 2026-04-09  
 **许可证**: GPL-3.0  
 **理论基础**: 工程两论（控制论与系统工程）、双系统认知理论、微内核哲学、设计美学  
-**关联规范**: [架构设计原则](../architecture/ARCHITECTURAL_PRINCIPLES.md)、[统一术语表](../TERMINOLOGY.md)
+**关联规范**: [架构设计原则](../../ARCHITECTURAL_PRINCIPLES.md)、[统一术语表](../TERMINOLOGY.md)
 
 ---
 
@@ -18,15 +18,15 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 
 ### 本文档定位
 
-Agent 契约规范是 AgentOS 规范体系的核心组成部分，属于**操作层规范**。本规范直接指导 Agent 开发者和生态贡献者如何定义和实现符合 AgentOS 标准的智能体，是 Agent 注册、发现、调度和评估的技术依据。
+智能体 (Agent) 契约规范是 AgentOS 规范体系的核心组成部分，属于**操作层规范**。本规范直接指导智能体 (Agent) 开发者和生态贡献者如何定义和实现符合 AgentOS 标准的智能体，是智能体 (Agent) 注册、发现、调度和评估的技术依据。
 
 ### 与设计哲学的关系
 
 本规范根植于 AgentOS 五维正交设计体系，是架构设计原则在契约层的具体体现：
 
-- **系统观（S维度）**: Agent 契约通过层次分解方法体现系统工程思想，从顶层结构到能力细节逐层展开，符合"从定性到定量的综合集成"理念
+- **系统观（S维度）**: 智能体 (Agent) 契约通过层次分解方法体现系统工程思想，从顶层结构到能力细节逐层展开，符合"从定性到定量的综合集成"理念
 - **内核观（K维度）**: 契约设计遵循微内核"最小信息原则"，只包含系统决策所必需的信息，保证内核纯净和服务外置
-- **认知观（C维度）**: Agent 契约体现了"双系统认知模型"，通过 `models` 字段明确区分 System 1（快系统）和 System 2（慢系统）的配置，支持认知层的策略选择和资源匹配
+- **认知观（C维度）**: 智能体 (Agent) 契约体现了"双系统认知模型"，通过 `models` 字段明确区分 System 1（快系统）和 System 2（慢系统）的配置，支持认知层的策略选择和资源匹配
 - **工程观（E维度）**: 通过 `required_permissions` 字段将安全机制内嵌于契约定义中，体现安全内生原则；通过结构化错误码支持错误可追溯原则
 - **设计美学（A维度）**: 契约 JSON 结构遵循简约、对称、自解释的美学原则，确保人类可读性和机器可处理性的平衡
 
@@ -34,10 +34,10 @@ Agent 契约规范是 AgentOS 规范体系的核心组成部分，属于**操作
 
 本规范适用于以下场景：
 
-1. **Agent 开发者**: 编写符合 AgentOS 标准的 Agent 契约文件
-2. **市场服务**: 解析和验证 Agent 契约，提供发现和推荐功能
-3. **调度官组件**: 基于契约信息进行多目标优化和 Agent 选择
-4. **进化委员会**: 根据契约指标评估 Agent 质量和进化方向
+1. **智能体 (Agent) 开发者**: 编写符合 AgentOS 标准的智能体 (Agent) 契约文件
+2. **市场服务**: 解析和验证智能体 (Agent) 契约，提供发现和推荐功能
+3. **调度官组件**: 基于契约信息进行多目标优化和智能体 (Agent) 选择
+4. **进化委员会**: 根据契约指标评估智能体 (Agent) 质量和进化方向
 
 ### 术语定义
 
@@ -45,10 +45,10 @@ Agent 契约规范是 AgentOS 规范体系的核心组成部分，属于**操作
 
 | 术语 | 简要定义 | 来源 |
 |------|---------|------|
-| Agent | 具有认知能力的智能体 | [Cognition_Theory.md](../../philosophy/Cognition_Theory.md) |
+| 智能体 (Agent) | 具有认知能力的智能体 | [认知层理论](../../Basic_Theories/CN_02_认知层理论.md) |
 | 契约 (Contract) | 机器可读的能力描述文件 | 本规范 |
-| 调度官 (Dispatcher) | 负责选择 Agent 执行任务的组件 | [Cognition_Theory.md](../../philosophy/Cognition_Theory.md) |
-| 信任边界 (Trust Boundary) | 区分可信与不可信数据的界限 | [架构设计原则.md](../架构设计原则.md) |
+| 调度官 (Dispatcher) | 负责选择智能体 (Agent) 执行任务的组件 | [认知层理论](../../Basic_Theories/CN_02_认知层理论.md) |
+| 信任边界 (Trust Boundary) | 区分可信与不可信数据的界限 | [架构设计原则](../../ARCHITECTURAL_PRINCIPLES.md) |
 
 ### 理论基础：MCIS视角的契约规范
 

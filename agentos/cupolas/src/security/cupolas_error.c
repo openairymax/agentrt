@@ -8,7 +8,7 @@
 /**
  * @file cupolas_error.c
  * @brief Unified Error Code Implementation
- * @author Spharx
+ * @author Spharx AgentOS Team
  * @date 2026-03-26
  */
 

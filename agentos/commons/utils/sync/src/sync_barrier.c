@@ -6,7 +6,7 @@
  * @file sync_barrier.c
  * @brief 屏障实现
  *
- * @author AgentOS Team
+ * @author Spharx AgentOS Team
  * @date 2026-04-05
  */
 

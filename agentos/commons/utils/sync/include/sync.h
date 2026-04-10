@@ -9,7 +9,7 @@
  * 提供跨平台、安全、高效的线程同步原语，包括互斥锁、条件变量、信号量、
  * 读写锁、自旋锁、屏障等。支持Windows和POSIX系统。
  * 
- * @author AgentOS Team
+ * @author Spharx AgentOS Team
  * @date 2026-03-30
  * @version 2.0
  * 

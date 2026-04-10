@@ -26,7 +26,7 @@
  * - 内置超时和重试机制
  * - 线程安全设计
  * 
- * @author AgentOS Team
+ * @author Spharx AgentOS Team
  * @date 2026-04-02
  * @version 1.0.0.6
  * 

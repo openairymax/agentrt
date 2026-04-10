@@ -26,6 +26,17 @@ English | [简体中文](README_CN.md)
 
 **AgentOS** is an intelligent agent operating system that provides comprehensive OS-level support for orchestrating agent teams.
 
+### 🎥 Project Preview
+
+<div align="center">
+<video src="docs/Other_Source/Spharx AgentOS 客户端演示.mp4" controls="controls" width="800"></video>
+</div>
+
+> 💡 **Tip**: 
+> - If video doesn't play, ensure you have [Git LFS](https://git-lfs.github.com/) installed and run `git lfs pull`
+> - Or directly access [docs/Other_Source/Spharx AgentOS 客户端演示.mp4](docs/Other_Source/Spharx%20AgentOS%20客户端演示.mp4) to view
+> - For detailed instructions, see [docs/Other_Source/README_VIDEO.md](docs/Other_Source/README_VIDEO.md)
+
 ## 💡 Innovation Highlights
 
 **Foundational Theory** 👉 **[Multibody Cybernetic Intelligent System](docs/Basic_Theories/EN_01_MCIS.md)**  

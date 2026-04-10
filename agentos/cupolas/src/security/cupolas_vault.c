@@ -8,7 +8,7 @@
 /**
  * @file cupolas_vault.c
  * @brief Secure Credential Storage - iOS Keychain-like Implementation
- * @author Spharx
+ * @author Spharx AgentOS Team
  * @date 2026
  */
 
