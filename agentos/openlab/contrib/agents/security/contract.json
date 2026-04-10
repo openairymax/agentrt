@@ -3,7 +3,7 @@
   "contract_version": "1.0.0",
   "agent_id": "security",
   "agent_name": "Security Agent",
-  "description": "瀹夊叏瀹¤鏅鸿兘浣擄紝璐熻矗瀹夊叏璇勪及銆佹紡娲炴壂鎻忓拰瀹夊叏绛栫暐鍒跺畾",
+  "description": "安全审计智能体，负责安全评估、漏洞扫描和安全策略制定",
   "version": "1.0.0.9",
   "author": "Spharx AgentOS Team",
   "license": "Apache-2.0",
@@ -11,11 +11,11 @@
   "capabilities": [
     {
       "name": "debugging",
-      "description": "瀹夊叏璋冭瘯鑳藉姏"
+      "description": "安全调试能力"
     },
     {
       "name": "optimization",
-      "description": "瀹夊叏浼樺寲鑳藉姏"
+      "description": "安全优化能力"
     }
   ],
   
