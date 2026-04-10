@@ -4,7 +4,7 @@
 
 > 成为人类计算工程史上，第四个"操作系统哲学"
 
-中文 | [English](README_EN.md)  
+中文 | [English](README.md)  
 
 [![AtomGit](https://atomgit.com/spharx/agentos/star/badge.svg)](https://atomgit.com/spharx/agentos)
 [![star](https://gitee.com/spharx/agentos/badge/star.svg?theme=dark)](https://gitee.com/spharx/agentos)
