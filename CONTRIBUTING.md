@@ -1,7 +1,7 @@
 # 贡献指南 CONTRIBUTING GUIDE
 
 **版本**: v1.1.0  
-**最后更新**: 2026-04-06  
+**最后更新**: 2026-04-10  
 **状态**: 活跃
 
 > 本文件合并自 `.gitcode/CONTRIBUTING.md` 与根目录 `CONTRIBUTING.md`，消除重复并整合双版本独有内容。
