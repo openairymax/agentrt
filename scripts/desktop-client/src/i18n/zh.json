@@ -17,6 +17,7 @@
   "settings": "设置",
   "llmConfig": "AI 模型",
     "agentRuntime": "运行时",
+    "systemMonitor": "系统监控",
     "aiChat": "AI 助手"
 },
 "dashboard": {

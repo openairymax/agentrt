@@ -25,7 +25,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import sdk from "../services/agentos-sdk";
-import type { SystemInfo, ServiceStatus } from "../services/agentos-sdk";
+import type { SystemInfo, ServiceStatus, SystemMonitorData } from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
 import { PageLoader } from "../components/Skeleton";
 
@@ -136,40 +136,26 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [services, setServices] = useState<ServiceStatus[]>([]);
+  const [monitorData, setMonitorData] = useState<SystemMonitorData | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [liveCpu, setLiveCpu] = useState(47);
-  const [liveMem, setLiveMem] = useState(68);
-
-  const cpuHistory = [32, 45, 38, 52, 41, 55, 48, 62, 45, 50, 43, 47];
-  const memHistory = [60, 62, 65, 63, 68, 70, 72, 69, 71, 73, 70, 68];
-  const netHistory = [12, 18, 8, 25, 15, 30, 22, 35, 28, 20, 16, 24];
-  const diskHistory = [45, 45, 46, 46, 47, 47, 48, 48, 49, 49, 50, 50];
-
-  const timelineEvents: TimelineEvent[] = [
-    { id: '1', type: 'success', title: '系统启动完成', desc: '所有核心服务已成功启动并运行正常', time: '2 分钟前' },
-    { id: '2', type: 'info', title: 'AI 模型已连接', desc: 'GPT-4o 模型连接成功，延迟 120ms', time: '5 分钟前' },
-    { id: '3', type: 'success', title: '智能体注册成功', desc: 'Research Assistant 智能体已上线', time: '8 分钟前' },
-    { id: '4', type: 'warning', title: '内存使用率较高', desc: '当前内存使用率达到 68%，建议关注', time: '12 分钟前' },
-    { id: '5', type: 'info', title: '配置文件已更新', desc: 'kernel-config.yaml 配置已自动重载', time: '15 分钟前' },
-  ];
 
   useEffect(() => {
     loadDashboardData();
     const interval = setInterval(loadDashboardData, 30000);
-    const liveInterval = setInterval(() => {
-      setLiveCpu(prev => Math.max(10, Math.min(95, prev + (Math.random() - 0.5) * 8)));
-      setLiveMem(prev => Math.max(40, Math.min(90, prev + (Math.random() - 0.5) * 4)));
-    }, 3000);
-    return () => { clearInterval(interval); clearInterval(liveInterval); };
+    return () => { clearInterval(interval); };
   }, []);
 
   const loadDashboardData = async () => {
     try {
-      const sysInfo = await sdk.getSystemInfo();
+      const [sysInfo, svcStatus, monData] = await Promise.all([
+        sdk.getSystemInfo(),
+        sdk.getServiceStatus().catch(() => []),
+        sdk.getSystemMonitorData().catch(() => null),
+      ]);
       setSystemInfo(sysInfo);
-      const svcStatus = await sdk.getServiceStatus().catch(() => []);
       setServices(svcStatus);
+      setMonitorData(monData);
     } catch (error) {
       console.error("Failed to load dashboard data:", error);
     } finally {
@@ -180,9 +166,10 @@ const Dashboard: React.FC = () => {
   const runningServices = services.filter((s) => s.healthy).length;
   const totalServices = services.length;
   const healthPercentage = totalServices > 0 ? Math.round((runningServices / totalServices) * 100) : 0;
-  const memUsage = systemInfo && systemInfo.total_memory_gb > 0
+  const cpuPct = monitorData ? Math.round(monitorData.cpu.usagePercent) : systemInfo ? (systemInfo.cpu_cores > 0 ? 25 : 0) : 0;
+  const memPct = monitorData ? Math.round(monitorData.memory.percent) : systemInfo && systemInfo.total_memory_gb > 0
     ? Math.round((1 - systemInfo.free_memory_gb / systemInfo.total_memory_gb) * 100)
-    : liveMem;
+    : 55;
 
   const handleQuickAction = async (action: string) => {
     switch (action) {

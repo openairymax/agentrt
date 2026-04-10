@@ -32,6 +32,7 @@ import TerminalPage from "./pages/Terminal";
 import Settings from "./pages/Settings";
 import LLMConfig from "./pages/LLMConfig";
 import AgentRuntime from "./pages/AgentRuntime";
+import SystemMonitor from "./pages/SystemMonitor";
 import AIChat from "./components/AIChat";
 import WelcomeWizard from "./components/WelcomeWizard";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -51,6 +52,7 @@ const navConfig = [
   ]},
   { section: "nav.system", items: [
     { path: "/agent-runtime", icon: Cpu, labelKey: "nav.agentRuntime" },
+    { path: "/system-monitor", icon: Activity, labelKey: "nav.systemMonitor" },
     { path: "/ai-chat", icon: Brain, labelKey: "nav.aiChat" },
     { path: "/llm-config", icon: Sparkles, labelKey: "nav.llmConfig" },
     { path: "/config", icon: SettingsIcon, labelKey: "nav.config" },
@@ -314,6 +316,7 @@ function AppContent() {
               <Route path="/agents" element={<Agents />} />
               <Route path="/tasks" element={<Tasks />} />
               <Route path="/agent-runtime" element={<AgentRuntime />} />
+              <Route path="/system-monitor" element={<SystemMonitor />} />
               <Route path="/ai-chat" element={<AIChatPage />} />
               <Route path="/llm-config" element={<LLMConfig />} />
               <Route path="/config" element={<Config />} />
