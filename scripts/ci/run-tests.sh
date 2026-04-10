@@ -171,9 +171,23 @@ run_ctest() {
         local test_exit_code=0
         test_output=$(ctest "${ctest_args[@]}" 2>&1) || test_exit_code=$?
 
-        # 解析结果
-        local passed=$(echo "$test_output" | grep -c "[0-9]*% tests passed" || echo "0")
-        local failed=$(echo "$test_output" | grep -c "[0-9]*% tests FAILED" || echo "0")
+        # 解析结果 - 从ctest输出的总结行提取
+        local passed=0
+        local failed=0
+        local total=0
+
+        # 尝试从 "X% tests passed, Y tests failed out of Z" 格式解析
+        local summary_line
+        summary_line=$(echo "$test_output" | grep -E "[0-9]+% tests passed" | tail -1 || true)
+        if [[ -n "$summary_line" ]]; then
+            total=$(echo "$summary_line" | grep -oP 'out of \K[0-9]+' || echo "0")
+            failed=$(echo "$summary_line" | grep -oP '[0-9]+ tests failed' | grep -oP '[0-9]+' || echo "0")
+            passed=$((total - failed))
+        else
+            # 回退：从 "tests passed" 和 "tests failed" 行计数
+            passed=$(echo "$test_output" | grep -oP '\d+(?= tests? passed)' | tail -1 || echo "0")
+            failed=$(echo "$test_output" | grep -oP '\d+(?= tests? failed)' | tail -1 || echo "0")
+        fi
 
         if [[ "$test_exit_code" -eq 0 ]]; then
             ((TOTAL_PASSED += passed))

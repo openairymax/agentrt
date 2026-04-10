@@ -333,7 +333,7 @@ TZ=Asia/Shanghai  # 所有容器统一时区
 
 ### ARCHIVED-001 ~ ARCHIVED-012
 
-详见 [CHANGELOG](../references/changelog.md) 的 Fixed Bugs 章节。
+详见 [CHANGELOG](../../CHANGELOG.md) 的 Fixed Bugs 章节。
 
 ---
 

@@ -375,7 +375,6 @@ jobs:
         with:
           languages: c,cpp,python,javascript,typescript
           queries: security-extended,security-and-quality
-          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v3
@@ -413,12 +412,11 @@ jobs:
         with:
           fetch-depth: 0  # 需要完整历史记录进行密钥检测
 
-      - name: Run Gitleaks with custom configuration
+      - name: Run Gitleaks secret detection
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          config-path: ./.github/gitleaks-config.toml
           redact: true
           verbose: true
 

@@ -1,55 +1,49 @@
 import React, { useState, useEffect } from "react";
 import {
-  Users,
-  Plus,
-  Eye,
-  Play,
-  UserCheck,
-  Clock,
-  AlertCircle,
-  X,
   Bot,
+  Plus,
+  Search,
+  Filter,
+  Cpu,
+  Globe,
   Code2,
-  FlaskConical,
-  BarChart3,
+  Brain,
+  Sparkles,
+  Zap,
+  Shield,
+  ChevronRight,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  ExternalLink,
+  Clock,
+  Activity,
+  Star,
 } from "lucide-react";
 import { invoke } from "../utils/tauriCompat";
 import { useI18n } from "../i18n";
 
 interface AgentInfo {
-  id: string;
   name: string;
   type: string;
   status: string;
-  capabilities: string[];
-  task_count: number;
-  created_at: string;
-  last_active?: string;
+  description: string;
 }
 
-const typeIcons: Record<string, React.ElementType> = {
-  coding: Code2,
-  research: FlaskConical,
-  analysis: BarChart3,
-  custom: Bot,
-};
-
-const typeColors: Record<string, { bg: string; color: string }> = {
-  coding: { bg: "rgba(99, 102, 241, 0.15)", color: "#6366f1" },
-  research: { bg: "rgba(168, 85, 247, 0.15)", color: "#a855f7" },
-  analysis: { bg: "rgba(34, 197, 94, 0.15)", color: "#22c55e" },
-  custom: { bg: "rgba(245, 158, 11, 0.15)", color: "#f59e0b" },
+const agentTypeConfig: Record<string, { icon: typeof Bot; color: string; gradient: string; bgLight: string; label: string }> = {
+  research: { icon: Brain, color: "#6366f1", gradient: "linear-gradient(135deg, #6366f1, #818cf8)", bgLight: "rgba(99,102,241,0.08)", label: "研究型" },
+  coding: { icon: Code2, color: "#22c55e", gradient: "linear-gradient(135deg, #22c55e, #4ade80)", bgLight: "rgba(34,197,94,0.08)", label: "编码型" },
+  assistant: { icon: Sparkles, color: "#a855f7", gradient: "linear-gradient(135deg, #a855f7, #c084fc)", bgLight: "rgba(168,85,247,0.08)", label: "助手型" },
+  system: { icon: Shield, color: "#f59e0b", gradient: "linear-gradient(135deg, #f59e0b, #fbbf24)", bgLight: "rgba(245,158,11,0.08)", label: "系统型" },
 };
 
 const Agents: React.FC = () => {
   const { t } = useI18n();
   const [agents, setAgents] = useState<AgentInfo[]>([]);
-  const [selectedAgent, setSelectedAgent] = useState<AgentInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedAgent, setSelectedAgent] = useState<AgentInfo | null>(null);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
-  const [newAgentName, setNewAgentName] = useState("");
-  const [newAgentType, setNewAgentType] = useState("coding");
-  const [registering, setRegistering] = useState(false);
 
   useEffect(() => {
     loadAgents();
@@ -58,8 +52,8 @@ const Agents: React.FC = () => {
   const loadAgents = async () => {
     setLoading(true);
     try {
-      const agentList = await invoke<AgentInfo[]>("list_agents");
-      setAgents(agentList);
+      const data = await invoke<AgentInfo[]>("list_agents");
+      setAgents(data || []);
     } catch (error) {
       console.error("Failed to load agents:", error);
     } finally {
@@ -67,325 +61,461 @@ const Agents: React.FC = () => {
     }
   };
 
-  const viewAgentDetails = (agentId: string) => {
-    const agent = agents.find((a) => a.id === agentId);
-    if (agent) setSelectedAgent(agent);
-  };
-
-  const handleRegisterAgent = async () => {
-    if (!newAgentName.trim()) {
-      alert(t.agents.name + " " + t.common.error);
-      return;
-    }
-    setRegistering(true);
+  const handleRegister = async (name: string, type: string) => {
     try {
-      const newAgent = await invoke<AgentInfo>("submit_task", {
-        agentId: `agent-new-${Date.now()}`,
-        taskDescription: JSON.stringify({
-          action: 'register_agent',
-          name: newAgentName,
-          type: newAgentType
-        }),
-        priority: "high"
-      }).catch(() => ({
-        id: `agent-${Date.now()}`,
-        name: newAgentName,
-        type: newAgentType,
-        status: "idle",
-        capabilities: ["code_generation", "debugging"],
-        task_count: 0,
-        created_at: new Date().toISOString()
-      }));
-
-      setAgents([...agents, newAgent as AgentInfo]);
+      await invoke("register_agent", { agent_name: name, agent_type: type });
       setShowRegisterModal(false);
-      setNewAgentName("");
-      setNewAgentType("coding");
-      alert(t.agents.registerAgent + " OK!");
+      loadAgents();
     } catch (error) {
-      console.error("Failed to register agent:", error);
-      alert(`${t.agents.registerAgent}: ${error}`);
-    } finally {
-      setRegistering(false);
+      alert(`${t.agents.registerFailed}: ${error}`);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="page-container">
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "400px" }}>
-          <div className="loading-spinner" />
-        </div>
-      </div>
-    );
-  }
+  const filteredAgents = agents.filter(
+    (agent) =>
+      agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      agent.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (agent.description && agent.description.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  const getAgentConfig = (type: string) => {
+    return agentTypeConfig[type] || { icon: Bot, color: "#94a3b8", gradient: "linear-gradient(135deg, #94a3b8, #cbd5e1)", bgLight: "rgba(148,163,184,0.08)", label: type };
+  };
 
   return (
     <div className="page-container">
       {/* Page Header */}
-      <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div>
+      <div className="page-header">
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <h1>{t.agents.title}</h1>
-          <p style={{ color: "var(--text-secondary)", fontSize: "15px" }}>
-            {agents.length} agents registered
-          </p>
+          <span className={`badge ${agents.length > 0 ? 'status-running' : 'status-stopped'}`}>
+            {agents.length} {t.agents.activeAgents.toLowerCase()}
+          </span>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowRegisterModal(true)}>
-          <Plus size={16} />
-          {t.agents.registerAgent}
-        </button>
+        <p style={{ color: "var(--text-secondary)", fontSize: "15px" }}>
+          {t.agents.subtitle}
+        </p>
       </div>
 
-      {/* Agents Grid */}
-      {agents.length === 0 ? (
-        <div className="card card-elevated">
-          <div className="empty-state">
-            <div className="empty-state-icon">🤖</div>
-            <div className="empty-state-text">{t.agents.noAgents}</div>
-            <div className="empty-state-hint">{t.agents.noAgentsHint}</div>
-            <button className="btn btn-primary mt-8" onClick={() => setShowRegisterModal(true)}>
-              <Plus size={16} /> {t.agents.registerAgent}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
-          gap: "16px",
-          marginBottom: "24px"
-        }}>
-          {agents.map((agent) => {
-            const TypeIcon = typeIcons[agent.type] || Bot;
-            const colors = typeColors[agent.type] || typeColors.custom;
-
-            return (
-              <div
-                key={agent.id}
-                className="card card-elevated"
-                style={{ padding: "20px", cursor: "pointer" }}
-                onClick={() => viewAgentDetails(agent.id)}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
-                  <div
-                    className="stat-icon"
-                    style={{
-                      background:
-                        agent.status === "running"
-                          ? "rgba(34, 197, 94, 0.15)"
-                          : agent.status === "idle"
-                          ? "rgba(99, 102, 241, 0.15)"
-                          : "rgba(239, 68, 68, 0.15)",
-                      width: "48px",
-                      height: "48px",
-                    }}
-                  >
-                    <Users
-                      size={26}
-                      color={
-                        agent.status === "running"
-                          ? "#22c55e"
-                          : agent.status === "idle"
-                          ? "#6366f1"
-                          : "#ef4444"
-                      }
-                    />
-                  </div>
-
-                  <span className={`badge ${agent.status === "running" ? "status-running" : agent.status === "idle" ? "status-idle" : "status-error"}`}>
-                    {agent.status === "running" ? t.agents.running : agent.status === "idle" ? t.agents.idle : t.agents.error}
-                  </span>
-                </div>
-
-                <div style={{ marginBottom: "12px" }}>
-                  <div style={{ fontWeight: 600, fontSize: "17px", marginBottom: "4px" }}>{agent.name}</div>
-                  <div style={{ color: "var(--text-muted)", fontSize: "13px", fontFamily: "'JetBrains Mono', monospace" }}>
-                    ID: {agent.id.slice(0, 14)}...
-                  </div>
-                </div>
-
-                {(agent as any).type && (
-                  <div style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    padding: "4px 10px",
-                    borderRadius: "var(--radius-sm)",
-                    background: colors.bg,
-                    color: colors.color,
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    marginBottom: "12px",
-                  }}>
-                    <TypeIcon size={13} />
-                    {agent.type}
-                  </div>
-                )}
-
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "12px", borderTop: "1px solid var(--border-subtle)" }}>
-                  <span style={{ color: "var(--text-secondary)", fontSize: "13px" }}>
-                    {t.agents.tasks}: <strong>{agent.task_count}</strong>
-                  </span>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={(e) => { e.stopPropagation(); viewAgentDetails(agent.id); }}
-                  >
-                    <Eye size={14} /> {t.agents.view}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Agent Details Panel */}
-      {selectedAgent && (
-        <div className="card card-elevated">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-            <h3 className="card-title" style={{ marginBottom: 0 }}>
-              <UserCheck size={18} />
-              {t.agents.agentDetails}: {selectedAgent.name}
-            </h3>
-            <button className="icon-btn" onClick={() => setSelectedAgent(null)}>
-              <X size={18} />
-            </button>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "14px" }}>
-            <div style={{
-              padding: "16px",
-              background: "var(--bg-tertiary)",
-              borderRadius: "var(--radius-md)",
-            }}>
-              <div style={{ color: "var(--text-muted)", fontSize: "12px", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>{t.agents.id}</div>
-              <div style={{ fontWeight: 500, fontFamily: "'JetBrains Mono', monospace", fontSize: "13px", wordBreak: "break-all" }}>{selectedAgent.id}</div>
-            </div>
-
-            <div style={{
-              padding: "16px",
-              background: "var(--bg-tertiary)",
-              borderRadius: "var(--radius-md)",
-            }}>
-              <div style={{ color: "var(--text-muted)", fontSize: "12px", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>{t.agents.status}</div>
-              <span className={`badge ${selectedAgent.status === "running" ? "status-running" : selectedAgent.status === "idle" ? "status-idle" : "status-error"}`}>
-                {selectedAgent.status === "running" ? t.agents.running : selectedAgent.status === "idle" ? t.agents.idle : t.agents.error}
-              </span>
-            </div>
-
-            <div style={{
-              padding: "16px",
-              background: "var(--bg-tertiary)",
-              borderRadius: "var(--radius-md)",
-            }}>
-              <div style={{ color: "var(--text-muted)", fontSize: "12px", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>{t.agents.tasksCompleted}</div>
-              <div style={{ fontWeight: 700, fontSize: "24px", color: "var(--primary-color)" }}>{selectedAgent.task_count}</div>
-            </div>
-
-            <div style={{
-              padding: "16px",
-              background: "var(--bg-tertiary)",
-              borderRadius: "var(--radius-md)",
-            }}>
-              <div style={{ color: "var(--text-muted)", fontSize: "12px", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>{t.agents.lastActive}</div>
-              <div style={{ fontWeight: 500, fontSize: "14px" }}>{selectedAgent.last_active ? new Date(selectedAgent.last_active).toLocaleString() : "-"}</div>
-            </div>
-          </div>
-
-          {(selectedAgent as any).capabilities && (selectedAgent as any).capabilities.length > 0 && (
-            <div style={{ marginTop: "20px", paddingTop: "20px", borderTop: "1px solid var(--border-subtle)" }}>
-              <div style={{ color: "var(--text-secondary)", fontSize: "14px", fontWeight: 600, marginBottom: "10px" }}>Capabilities</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                {(selectedAgent as any).capabilities.map((cap: string) => (
-                  <span key={cap} className="tag" style={{ textTransform: "capitalize" }}>{cap.replace(/_/g, ' ')}</span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Register Modal */}
-      {showRegisterModal && (
-        <div className="modal-overlay" onClick={() => setShowRegisterModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2>{t.agents.registerAgent}</h2>
-
-            <div style={{ marginBottom: "20px" }}>
-              <label className="form-label">{t.agents.name}</label>
+      {/* Toolbar */}
+      <div className="card card-elevated" style={{ marginBottom: "20px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: "200px" }}>
+            <div style={{ position: "relative", flex: 1, maxWidth: "360px" }}>
+              <Search size={15} style={{
+                position: "absolute", left: "12px", top: "50%",
+                transform: "translateY(-50%)", color: "var(--text-muted)"
+              }} />
               <input
                 type="text"
                 className="form-input"
-                value={newAgentName}
-                onChange={(e) => setNewAgentName(e.target.value)}
-                placeholder="My Research Agent"
-                autoFocus
+                placeholder={`${t.agents.searchAgents}...`}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ paddingLeft: "38px" }}
               />
             </div>
+          </div>
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowRegisterModal(true)}
+          >
+            <Plus size={16} />
+            {t.agents.registerNew}
+          </button>
+        </div>
+      </div>
 
-            <div style={{ marginBottom: "28px" }}>
-              <label className="form-label">Type</label>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "10px", marginTop: "8px" }}>
-                {[
-                  { value: "coding", label: "Coding Assistant", icon: Code2 },
-                  { value: "research", label: "Research Agent", icon: FlaskConical },
-                  { value: "analysis", label: "Data Analyst", icon: BarChart3 },
-                  { value: "custom", label: "Custom", icon: Bot },
-                ].map((opt) => {
-                  const IconComp = opt.icon;
-                  const isSelected = newAgentType === opt.value;
-                  const colors = typeColors[opt.value];
+      {/* Agent Type Stats Bar */}
+      <div style={{
+        display: "flex", gap: "10px", marginBottom: "20px",
+        overflowX: "auto", paddingBottom: "4px",
+      }}>
+        {Object.entries(agentTypeConfig).map(([typeKey, config]) => {
+          const count = agents.filter(a => a.type === typeKey).length;
+          const IconComp = config.icon;
+          return (
+            <div key={typeKey} style={{
+              padding: "10px 16px", borderRadius: "var(--radius-md)",
+              background: config.bgLight, border: `1px solid ${config.color}20`,
+              display: "flex", alignItems: "center", gap: "10px",
+              minWidth: "140px", cursor: "pointer",
+              transition: "all var(--transition-fast)",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 4px 12px ${config.color}15`; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; }}
+            >
+              <div style={{
+                width: "32px", height: "32px", borderRadius: "var(--radius-sm)",
+                background: config.gradient, display: "flex", alignItems: "center", justifyContent: "center",
+                flexShrink: 0,
+              }}>
+                <IconComp size={16} color="white" />
+              </div>
+              <div>
+                <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>{config.label}</div>
+                <div style={{ fontSize: "17px", fontWeight: 700, color: config.color, lineHeight: 1.2 }}>{count}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
+      {/* Main Content Grid */}
+      <div style={{ display: "grid", gridTemplateColumns: selectedAgent ? "1fr 340px" : "1fr", gap: "20px", transition: "grid-template-columns 0.35s ease-out" }}>
+        {/* Agent Cards Grid */}
+        <div>
+          {loading ? (
+            <div style={{ textAlign: "center", padding: "48px" }}>
+              <div className="loading-spinner" />
+            </div>
+          ) : filteredAgents.length === 0 ? (
+            <div className="empty-state">
+              <Bot size={56} style={{ opacity: 0.25 }} />
+              <div className="empty-state-text">{t.agents.noAgentsRegistered}</div>
+              <div className="empty-state-hint">{t.agents.noAgentsHint}</div>
+              <button className="btn btn-primary mt-8" onClick={() => setShowRegisterModal(true)}>
+                <Plus size={16} /> {t.agents.registerNew}
+              </button>
+            </div>
+          ) : (
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+              gap: "14px",
+            }}>
+              {filteredAgents.map((agent, idx) => {
+                const config = getAgentConfig(agent.type);
+                const IconComp = config.icon;
+                const isSelected = selectedAgent?.name === agent.name;
+
+                return (
+                  <div
+                    key={agent.name}
+                    onClick={() => setSelectedAgent(isSelected ? null : agent)}
+                    className="card-hover-lift"
+                    style={{
+                      padding: "20px",
+                      borderRadius: "var(--radius-lg)",
+                      border: `2px solid`,
+                      borderColor: isSelected ? config.color : "var(--border-subtle)",
+                      background: isSelected ? `${config.color}06` : "var(--bg-secondary)",
+                      position: "relative",
+                      overflow: "hidden",
+                      cursor: "pointer",
+                      animation: `staggerFadeIn 0.35s ease-out ${idx * 60}ms both`,
+                      transition: "all var(--transition-fast)",
+                    }}
+                  >
+                    {/* Top gradient accent */}
+                    <div style={{
+                      position: "absolute", top: 0, left: 0, right: 0, height: "3px",
+                      background: config.gradient,
+                      opacity: isSelected ? 1 : 0.5,
+                    }} />
+
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
+                      <div style={{
+                        width: "46px", height: "46px", borderRadius: "var(--radius-md)",
+                        background: config.gradient,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0, boxShadow: `0 4px 12px ${config.color}30`,
+                      }}>
+                        <IconComp size={22} color="white" />
+                      </div>
+
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                          <span style={{ fontWeight: 600, fontSize: "15.5px" }}>{agent.name}</span>
+                          {isSelected && <ChevronRight size={14} style={{ color: config.color }} />}
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                          <span className="tag" style={{
+                            background: config.bgLight,
+                            color: config.color,
+                            fontWeight: 500,
+                            fontSize: "11.5px",
+                            padding: "2px 8px",
+                          }}>
+                            {config.label}
+                          </span>
+                        </div>
+
+                        {agent.description && (
+                          <p style={{
+                            fontSize: "13px", color: "var(--text-secondary)",
+                            lineHeight: 1.5, margin: 0, display: "-webkit-box",
+                            WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+                          }}>
+                            {agent.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Bottom status bar */}
+                    <div style={{
+                      marginTop: "14px", paddingTop: "12px",
+                      borderTop: "1px solid var(--border-subtle)",
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        {agent.status === "active" ? (
+                          <>
+                            <span style={{
+                              width: "8px", height: "8px", borderRadius: "50%",
+                              background: "#22c55e", boxShadow: "0 0 6px rgba(34,197,94,0.5)",
+                              animation: "statusPulse 2s ease-in-out infinite",
+                            }} />
+                            <span style={{ fontSize: "12px", color: "#22c55e", fontWeight: 500 }}>运行中</span>
+                          </>
+                        ) : (
+                          <>
+                            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#94a3b8" }} />
+                            <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>空闲</span>
+                          </>
+                        )}
+                      </div>
+                      <Activity size={13} style={{ color: "var(--text-muted)" }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Detail Panel - Slides in from right */}
+        {selectedAgent && (
+          <div className="card card-elevated" style={{
+            height: "fit-content",
+            position: "sticky",
+            top: "88px",
+            animation: "slideInRight 0.3s ease-out",
+          }}>
+            {(() => {
+              const config = getAgentConfig(selectedAgent.type);
+              const IconComp = config.icon;
+
+              return (
+                <>
+                  <div style={{
+                    padding: "20px", borderBottom: "1px solid var(--border-subtle)",
+                    background: config.bgLight, borderRadius: "var(--radius-lg) var(--radius-lg) 0 0",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                      <div style={{
+                        width: "52px", height: "52px", borderRadius: "var(--radius-md)",
+                        background: config.gradient,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        boxShadow: `0 4px 16px ${config.color}30`,
+                      }}>
+                        <IconComp size="26" color="white" />
+                      </div>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: "17px" }}>{selectedAgent.name}</h3>
+                        <span className="tag" style={{ background: config.bgLight, color: config.color, fontSize: "11.5px" }}>
+                          {config.label}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "16px" }}>
+                    <DetailRow icon={<Star size={14} />} label="类型" value={selectedAgent.type} />
+                    <DetailRow icon={<Activity size={14} />} label="状态" value={
+                      <span style={{ color: selectedAgent.status === "active" ? "#22c55e" : "var(--text-muted)" }}>
+                        {selectedAgent.status === "active" ? "● 运行中" : "○ 空闲"}
+                      </span>
+                    } />
+                    <DetailRow icon={<Clock size={14} />} label="描述" value={selectedAgent.description || "—"} />
+
+                    <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                      <button className="btn btn-primary btn-block">
+                        <Zap size={15} /> 启动智能体
+                      </button>
+                      <button className="btn btn-ghost btn-block">
+                        <ExternalLink size={15} /> 查看详情
+                      </button>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        )}
+      </div>
+
+      {/* Register Modal */}
+      {showRegisterModal && (
+        <RegisterModal
+          onClose={() => setShowRegisterModal(false)}
+          onRegister={handleRegister}
+        />
+      )}
+    </div>
+  );
+};
+
+function DetailRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11.5px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+        {icon}
+        {label}
+      </div>
+      <div style={{ fontSize: "14px", fontWeight: 500, paddingLeft: "20px" }}>{value}</div>
+    </div>
+  );
+}
+
+function RegisterModal({ onClose, onRegister }: { onClose: () => void; onRegister: (name: string, type: string) => void }) {
+  const { t } = useI18n();
+  const [step, setStep] = useState<"info" | "confirm">("info");
+  const [agentName, setAgentName] = useState("");
+  const [agentType, setAgentType] = useState("research");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!agentName.trim()) return;
+    if (step === "info") { setStep("confirm"); return; }
+    setSubmitting(true);
+    try { await onRegister(agentName.trim(), agentType); } finally { setSubmitting(false); }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" style={{ maxWidth: "520px" }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2 className="modal-title">{t.agents.registerNew}</h2>
+          <button className="modal-close-btn" onClick={onClose}>×</button>
+        </div>
+
+        {step === "info" ? (
+          <div style={{ padding: "28px", display: "flex", flexDirection: "column", gap: "20px" }}>
+            <div style={{ textAlign: "center", marginBottom: "8px" }}>
+              <div style={{
+                width: "64px", height: "64px", borderRadius: "var(--radius-lg)",
+                background: "linear-gradient(135deg, #6366f1, #a78bfa)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                margin: "0 auto 12px", boxShadow: "0 8px 24px rgba(99,102,241,0.3)",
+              }}>
+                <Plus size={28} color="white" />
+              </div>
+              <p style={{ color: "var(--text-secondary)", fontSize: "14px", margin: 0 }}>
+                创建一个新的 AI 智能体，赋予它独特的能力和角色
+              </p>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">{t.agents.agentName}</label>
+              <input
+                type="text"
+                className="form-input"
+                value={agentName}
+                onChange={(e) => setAgentName(e.target.value)}
+                placeholder="例如：Research Assistant、Code Reviewer..."
+                onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+                autoFocus
+              />
+              <p className="form-help">{t.agents.agentNameHelp}</p>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">{t.agents.agentType}</label>
+              <div style={{
+                display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "10px",
+              }}>
+                {Object.entries(agentTypeConfig).map(([key, cfg]) => {
+                  const IconComp = cfg.icon;
+                  const isActive = agentType === key;
                   return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setNewAgentType(opt.value)}
+                    <div
+                      key={key}
+                      onClick={() => setAgentType(key)}
                       style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        gap: "8px",
-                        padding: "16px 12px",
-                        borderRadius: "var(--radius-md)",
-                        border: `2px solid ${isSelected ? "var(--primary-color)" : "var(--border-color)"}`,
-                        background: isSelected ? "var(--primary-light)" : "var(--bg-tertiary)",
-                        cursor: "pointer",
-                        transition: "all var(--transition-fast)",
+                        padding: "14px", borderRadius: "var(--radius-md)",
+                        border: `2px solid`, borderColor: isActive ? cfg.color : "var(--border-subtle)",
+                        background: isActive ? cfg.bgLight : "var(--bg-tertiary)",
+                        cursor: "pointer", transition: "all var(--transition-fast)",
+                        display: "flex", alignItems: "center", gap: "10px",
                       }}
                     >
-                      <IconComp size={24} color={isSelected ? "var(--primary-color)" : "var(--text-muted)"} />
-                      <span style={{
-                        fontSize: "13px",
-                        fontWeight: 500,
-                        color: isSelected ? "var(--primary-color)" : "var(--text-secondary)"
+                      <div style={{
+                        width: "32px", height: "32px", borderRadius: "var(--radius-sm)",
+                        background: isActive ? cfg.gradient : "var(--bg-primary)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0,
                       }}>
-                        {opt.label}
-                      </span>
-                    </button>
+                        <IconComp size={15} color={isActive ? "white" : "var(--text-muted)"} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: "13px", fontWeight: 600, color: isActive ? cfg.color : "var(--text-primary)" }}>{cfg.label}</div>
+                        <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>{key}</div>
+                      </div>
+                    </div>
                   );
                 })}
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: "12px" }}>
-              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowRegisterModal(false)}>
-                {t.common.cancel}
+            <div style={{ display: "flex", gap: "10px", marginTop: "4px" }}>
+              <button className="btn btn-secondary btn-lg" onClick={onClose} style={{ flex: 1 }}>
+                取消
               </button>
               <button
-                className="btn btn-primary"
+                className="btn btn-primary btn-lg"
+                onClick={handleSubmit}
+                disabled={!agentName.trim() || submitting}
                 style={{ flex: 1 }}
-                onClick={handleRegisterAgent}
-                disabled={registering || !newAgentName.trim()}
               >
-                {registering ? t.common.loading : t.agents.registerAgent}
+                下一步 <ChevronRight size={16} />
               </button>
             </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <div style={{ padding: "28px", display: "flex", flexDirection: "column", gap: "20px", alignItems: "center", textAlign: "center" }}>
+            <CheckCircle2 size={48} color="#6366f1" />
+            <div>
+              <h3 style={{ margin: "0 0 8px 0" }}>确认注册</h3>
+              <p style={{ color: "var(--text-secondary)", fontSize: "14px", margin: 0 }}>
+                即将注册以下智能体：
+              </p>
+            </div>
+
+            <div style={{
+              width: "100%", padding: "16px", borderRadius: "var(--radius-md)",
+              background: "var(--bg-tertiary)", border: "1px solid var(--border-subtle)",
+              textAlign: "left",
+            }}>
+              <div style={{ display: "grid", gridTemplateColumns: "100px 1fr", gap: "10px", fontSize: "14px" }}>
+                <span style={{ color: "var(--text-muted)" }}>名称</span>
+                <strong>{agentName}</strong>
+                <span style={{ color: "var(--text-muted)" }}>类型</span>
+                <span><span className="tag" style={{ background: agentTypeConfig[agentType]?.bgLight, color: agentTypeConfig[agentType]?.color }}>{agentTypeConfig[agentType]?.label}</span></span>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", width: "100%" }}>
+              <button className="btn btn-secondary btn-lg" onClick={() => setStep("info")} style={{ flex: 1 }}>
+                返回修改
+              </button>
+              <button
+                className="btn btn-success btn-lg"
+                onClick={handleSubmit}
+                disabled={submitting}
+                style={{ flex: 1 }}
+              >
+                {submitting ? <Loader2 size={16} className="spin" /> : <CheckCircle2 size={16} />}
+                确认注册
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
-};
+}
 
 export default Agents;
