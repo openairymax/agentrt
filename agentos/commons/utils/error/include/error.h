@@ -26,6 +26,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include "../types/include/types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,6 +43,8 @@ typedef int32_t agentos_error_t;
 
 /* ==================== 向后兼容别名 ==================== */
 /* 兼容旧的 AGENTOS_E* 命名 */
+/* 这些宏已在 types.h 中定义，此处禁用以避免重定义 */
+#if 0
 #define AGENTOS_SUCCESS                AGENTOS_OK
 #define AGENTOS_EUNKNOWN               AGENTOS_ERR_UNKNOWN
 #define AGENTOS_EINVAL                AGENTOS_ERR_INVALID_PARAM
@@ -61,6 +64,7 @@ typedef int32_t agentos_error_t;
 #define AGENTOS_ERESOURCE             AGENTOS_ERR_SYS_RESOURCE
 #define AGENTOS_ESECURITY             AGENTOS_ERR_ESECURITY
 #define AGENTOS_ESANITIZE             AGENTOS_ERR_ESANITIZE
+#endif
 
 /* ==================== 错误码分段 ==================== */
 /*

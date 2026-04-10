@@ -33,7 +33,12 @@
 #include <time.h>
 
 #ifdef _WIN32
+    #define WIN32_LEAN_AND_MEAN
+    #include <winsock2.h>
     #include <windows.h>
+    #ifndef ETIMEDOUT
+        #define ETIMEDOUT WSAETIMEDOUT
+    #endif
     #ifndef MAP_FAILED
         #define MAP_FAILED ((void*)-1)
     #endif
@@ -1653,7 +1658,7 @@ agentos_error_t ipc_mq_receive(
     if (lock_result == ETIMEDOUT) {
         snprintf(mq->error_msg, sizeof(mq->error_msg),
                  "Receive timeout after %u ms", timeout_ms);
-        return AGENTOS_ETIMEOUT;
+        return AGENTOS_ETIMEDOUT;
     }
     if (lock_result != 0) {
         snprintf(mq->error_msg, sizeof(mq->error_msg),

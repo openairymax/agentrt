@@ -1053,6 +1053,60 @@ body {
 @keyframes statusPulse { 0%, 100% { opacity: 1; box-shadow: 0 0 4px rgba(34,197,94,0.5); } 50% { opacity: 0.7; box-shadow: 0 0 10px rgba(34,197,94,0.8); } }
 @keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
 
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(99,102,241,0.2); }
+  50% { box-shadow: 0 0 24px rgba(99,102,241,0.45), 0 0 48px rgba(139,92,246,0.15); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes dataFlow {
+  0% { transform: translateX(-100%); opacity: 0; }
+  30% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translateX(400%); opacity: 0; }
+}
+@keyframes ringPulse {
+  0% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.15); opacity: 0.3; }
+  100% { transform: scale(1); opacity: 0.6; }
+}
+@keyframes pipelineGlow {
+  0%, 100% { filter: drop-shadow(0 0 3px currentColor); }
+  50% { filter: drop-shadow(0 0 10px currentColor) drop-shadow(0 0 20px currentColor); }
+}
+@keyframes memoryRipple {
+  0% { transform: scale(0.95); opacity: 0.7; }
+  50% { transform: scale(1.02); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.7; }
+}
+@keyframes timelineDotBlink {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 4px currentColor; }
+  50% { transform: scale(1.4); box-shadow: 0 0 12px currentColor, 0 0 24px currentColor; }
+}
+@keyframes gaugeFill {
+  from { stroke-dashoffset: var(--circumference); }
+  to { stroke-dashoffset: var(--target-offset); }
+}
+@keyframes vizPulseRing {
+  0% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.15); opacity: 0.25; }
+  100% { transform: scale(1); opacity: 0.6; }
+}
+@keyframes vizDataFlow {
+  0% { transform: translateX(-100%); opacity: 0; }
+  30% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translateX(400%); opacity: 0; }
+}
+@keyframes vizScanLine {
+  0% { left: -100%; opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+
 .avatar {
   width: 32px;
   height: 32px;
@@ -2188,6 +2242,54 @@ html.theme-transitioning *::after {
   transform: translateY(-4px);
   box-shadow: var(--shadow-lg), 0 12px 36px rgba(0, 0, 0, 0.12);
   border-color: var(--primary-color);
+}
+
+/* Visual Dashboard Components */
+.viz-gauge-ring {
+  transition: stroke-dashoffset 1s cubic-bezier(.34,1.56,.64,1);
+  transform-origin: center;
+}
+.viz-pipeline-node {
+  transition: all 0.6s cubic-bezier(.34,1.56,.64,1);
+}
+.viz-pipeline-node-active {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+.viz-pipeline-connector {
+  position: relative;
+  overflow: hidden;
+}
+.viz-pipeline-connector::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: dataFlow 2.5s ease-in-out infinite;
+}
+.viz-memory-layer {
+  transition: all var(--transition-base);
+  transform-style: preserve-3d;
+}
+.viz-memory-layer:hover {
+  transform: translateX(4px) translateZ(8px) !important;
+}
+.viz-status-dot-running {
+  animation: statusPulse 2s infinite;
+}
+.viz-timeline-dot {
+  animation: timelineDotBlink 3s ease-in-out infinite;
+}
+.viz-dual-system-card {
+  transition: all 0.4s ease;
+}
+.viz-shield-grid-item {
+  transition: all var(--transition-fast);
+}
+.viz-shield-grid-item:hover {
+  transform: translateY(-2px);
 }
 
 /* Progress ring animation */

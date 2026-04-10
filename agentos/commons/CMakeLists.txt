@@ -148,6 +148,8 @@ target_include_directories(agentos_common PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/ipc/include
 )
 
+target_compile_definitions(agentos_common PRIVATE _CRT_SECURE_NO_WARNINGS)
+
 target_link_libraries(agentos_common
     Threads::Threads
 )

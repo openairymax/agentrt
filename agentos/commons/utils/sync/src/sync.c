@@ -19,7 +19,8 @@
  */
 
 #include "sync.h"
-#include "sync_platform.h"
+// #include "sync_platform.h"  // 文件不存在，暂时注释掉
+#include "sync_types.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
@@ -35,6 +36,15 @@
 #include <sys/time.h>
 #include <errno.h>
 #endif
+
+/**
+ * @brief 全局同步模块状态结构体
+ */
+typedef struct {
+    sync_error_callback_t error_callback;
+    void* user_context;
+    bool initialized;
+} sync_global_state_t;
 
 /**
  * @brief 全局同步模块状态
@@ -97,13 +107,13 @@ const char* sync_get_name(void* lock) {
     if (lock == NULL) {
         return NULL;
     }
-    
+
     struct sync_mutex* base = (struct sync_mutex*)lock;
-    
+
     if (!base->initialized) {
         return NULL;
     }
-    
+
     switch (base->type) {
         case SYNC_TYPE_MUTEX:
         case SYNC_TYPE_RECURSIVE_MUTEX:
@@ -132,15 +142,15 @@ sync_result_t sync_get_stats(void* lock, sync_stats_t* stats) {
     if (lock == NULL || stats == NULL) {
         return SYNC_ERROR_INVALID;
     }
-    
+
     struct sync_mutex* base = (struct sync_mutex*)lock;
     if (!base->initialized) {
         return SYNC_ERROR_INVALID;
     }
-    
+
     // 复制实际统计信息
     *stats = base->stats;
-    
+
     return SYNC_SUCCESS;
 }
 
@@ -151,15 +161,15 @@ sync_result_t sync_reset_stats(void* lock) {
     if (lock == NULL) {
         return SYNC_ERROR_INVALID;
     }
-    
+
     struct sync_mutex* base = (struct sync_mutex*)lock;
     if (!base->initialized) {
         return SYNC_ERROR_INVALID;
     }
-    
+
     // 实际重置统计信息
     memset(&base->stats, 0, sizeof(sync_stats_t));
-    
+
     return SYNC_SUCCESS;
 }
 
@@ -223,22 +233,22 @@ sync_result_t sync_debug(void* lock) {
     if (lock == NULL) {
         return SYNC_ERROR_INVALID;
     }
-    
+
     struct sync_mutex* base = (struct sync_mutex*)lock;
-    
+
     fprintf(stderr, "\n[SYNC DEBUG] ====================\n");
     fprintf(stderr, "[SYNC DEBUG] Lock at: %p\n", (void*)lock);
     fprintf(stderr, "[SYNC DEBUG] Type: %d\n", base->type);
-    fprintf(stderr, "[SYNC DEBUG] Initialized: %s\n", 
+    fprintf(stderr, "[SYNC DEBUG] Initialized: %s\n",
             base->initialized ? "true" : "false");
-    
+
     const char* name = sync_get_name(lock);
     if (name != NULL) {
         fprintf(stderr, "[SYNC DEBUG] Name: %s\n", name);
     } else {
         fprintf(stderr, "[SYNC DEBUG] Name: (unnamed)\n");
     }
-    
+
     sync_stats_t stats;
     if (sync_get_stats(lock, &stats) == SYNC_SUCCESS) {
         fprintf(stderr, "[SYNC DEBUG] --- Statistics ---\n");
@@ -247,14 +257,14 @@ sync_result_t sync_debug(void* lock) {
         fprintf(stderr, "[SYNC DEBUG] Wait count: %zu\n", stats.wait_count);
         fprintf(stderr, "[SYNC DEBUG] Timeout count: %zu\n", stats.timeout_count);
         fprintf(stderr, "[SYNC DEBUG] Deadlock count: %zu\n", stats.deadlock_count);
-        fprintf(stderr, "[SYNC DEBUG] Total wait time: %lu ms\n", 
+        fprintf(stderr, "[SYNC DEBUG] Total wait time: %lu ms\n",
                 (unsigned long)stats.total_wait_time_ms);
-        fprintf(stderr, "[SYNC DEBUG] Max wait time: %lu ms\n", 
+        fprintf(stderr, "[SYNC DEBUG] Max wait time: %lu ms\n",
                 (unsigned long)stats.max_wait_time_ms);
     }
-    
+
     fprintf(stderr, "[SYNC DEBUG] ====================\n\n");
-    
+
     return SYNC_SUCCESS;
 }
 

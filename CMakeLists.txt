@@ -22,6 +22,32 @@ project(AgentOS
 )
 
 # ========================================================================
+# 包管理器集成配置 (vcpkg/conan)
+# ========================================================================
+
+option(USE_VCPKG "Use vcpkg for dependency management" ON)
+option(USE_CONAN "Use conan for dependency management" OFF)
+
+# vcpkg 集成
+if(USE_VCPKG)
+    # 尝试自动检测 vcpkg 工具链文件
+    if(DEFINED ENV{VCPKG_ROOT} AND EXISTS "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
+        set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+            CACHE FILEPATH "Vcpkg toolchain file")
+        message(STATUS "Using vcpkg from: $ENV{VCPKG_ROOT}")
+    elseif(EXISTS "${CMAKE_SOURCE_DIR}/vcpkg.json")
+        # 如果存在 vcpkg.json，提示用户设置 VCPKG_ROOT
+        message(STATUS "vcpkg.json found. To use vcpkg, set VCPKG_ROOT environment variable")
+    endif()
+endif()
+
+# conan 集成
+if(USE_CONAN)
+    # 预留 conan 集成
+    message(STATUS "Conan support is not yet implemented")
+endif()
+
+# ========================================================================
 # 构建选项配置
 # ========================================================================
 
@@ -42,12 +68,12 @@ option(ENABLE_COVERAGE "Enable code coverage reporting" OFF)
 option(BUILD_ATOMS "Build atoms core modules (required)" ON)
 option(BUILD_COMMONS "Build commons utility library (required)" ON)
 option(BUILD_CUPOLAS "Build Cupolas security framework" ON)
-option(BUILD_HEAPSTORE "Build heapstore memory management" ON)
-option(BUILD_GATEWAY "Build gateway protocol translation layer" ON)
+option(BUILD_HEAPSTORE "Build heapstore memory management" OFF)
+option(BUILD_GATEWAY "Build gateway protocol translation layer" OFF)
 option(BUILD_DAEMON "Build daemon services" ON)
 option(BUILD_MANAGER "Build configuration manager" OFF)
-option(BUILD_OPENLAB "Build openlab examples and demos" ON)
-option(BUILD_TOOLKIT "Build development toolkit" ON)
+option(BUILD_OPENLAB "Build openlab examples and demos" OFF)
+option(BUILD_TOOLKIT "Build development toolkit" OFF)
 
 # ========================================================================
 # 编译器和语言标准配置
