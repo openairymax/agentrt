@@ -39,7 +39,7 @@ skills:
     source: "builtin"
     enabled: true
     unit_type: "file"
-    contract_path: "openlab/contrib/skills/filesystem/contract.json"
+    contract_path: "agentos/openlab/contrib/skills/filesystem/contract.json"
     permissions:
       - "file:read"
       - "file:write"
@@ -73,7 +73,7 @@ skills:
     source: "builtin"
     enabled: true
     unit_type: "shell"
-    contract_path: "openlab/contrib/skills/shell/contract.json"
+    contract_path: "agentos/openlab/contrib/skills/shell/contract.json"
     permissions:
       - "code:execute:shell"
     dependencies: []
@@ -105,7 +105,7 @@ skills:
     source: "builtin"
     enabled: true
     unit_type: "api"
-    contract_path: "openlab/contrib/skills/http/contract.json"
+    contract_path: "agentos/openlab/contrib/skills/http/contract.json"
     permissions:
       - "network:connect"
     dependencies: []
@@ -137,7 +137,7 @@ skills:
     source: "builtin"
     enabled: true
     unit_type: "code"
-    contract_path: "openlab/contrib/skills/python/contract.json"
+    contract_path: "agentos/openlab/contrib/skills/python/contract.json"
     permissions:
       - "code:execute:python"
     dependencies: []
@@ -169,7 +169,7 @@ skills:
     source: "builtin"
     enabled: true
     unit_type: "code"
-    contract_path: "openlab/contrib/skills/javascript/contract.json"
+    contract_path: "agentos/openlab/contrib/skills/javascript/contract.json"
     permissions:
       - "code:execute:javascript"
     dependencies: []
@@ -201,7 +201,7 @@ skills:
     source: "builtin"
     enabled: true
     unit_type: "db"
-    contract_path: "openlab/contrib/skills/database/contract.json"
+    contract_path: "agentos/openlab/contrib/skills/database/contract.json"
     permissions:
       - "database:connect"
       - "database:query"
@@ -234,7 +234,7 @@ skills:
     source: "builtin"
     enabled: true
     unit_type: "browser"
-    contract_path: "openlab/contrib/skills/browser/contract.json"
+    contract_path: "agentos/openlab/contrib/skills/browser/contract.json"
     permissions:
       - "browser:automate"
       - "network:connect"
@@ -270,7 +270,7 @@ skills:
     source: "builtin"
     enabled: true
     unit_type: "tool"
-    contract_path: "openlab/contrib/skills/git/contract.json"
+    contract_path: "agentos/openlab/contrib/skills/git/contract.json"
     permissions:
       - "git:clone"
       - "git:commit"
@@ -308,7 +308,7 @@ skills:
     source: "builtin"
     enabled: true
     unit_type: "api"
-    contract_path: "openlab/contrib/skills/vector_search/contract.json"
+    contract_path: "agentos/openlab/contrib/skills/vector_search/contract.json"
     permissions:
       - "embedding:generate"
       - "vector:search"
@@ -342,7 +342,7 @@ skills:
     source: "builtin"
     enabled: true
     unit_type: "tool"
-    contract_path: "openlab/contrib/skills/log_analysis/contract.json"
+    contract_path: "agentos/openlab/contrib/skills/log_analysis/contract.json"
     permissions:
       - "file:read:${AGENTOS_LOG_DIR}/*"
     dependencies:
