@@ -13,7 +13,7 @@
  * 3. 服务层：高级配置功能（验证、热更新、加密等）
  * 4. 兼容层：向后兼容现有配置API
  * 
- * @author AgentOS Team
+ * @author Spharx AgentOS Team
  * @date 2026-03-30
  * @version 2.0
  * 

@@ -5,7 +5,7 @@
   "agent_name": "Backend Agent",
   "description": "鍚庣寮€鍙戞櫤鑳戒綋锛岃礋璐PI璁捐銆佹暟鎹簱寮€鍙戙€佹湇鍔℃灦鏋勮璁″拰鎬ц兘浼樺寲",
   "version": "1.0.0.9",
-  "author": "SPHARX Team",
+  "author": "Spharx AgentOS Team",
   "license": "Apache-2.0",
   
   "capabilities": [

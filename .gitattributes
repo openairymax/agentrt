@@ -261,3 +261,21 @@ vcpkg.json text working-tree-encoding=UTF-8 eol=lf
 # Test fixtures
 tests/fuzz/** -text
 tests/benchmarks/** -text
+
+# =============================================================================
+# Git LFS Configuration - Large Binary Files
+# =============================================================================
+
+# Video files
+*.mp4 filter=lfs diff=lfs merge=lfs -text
+*.avi filter=lfs diff=lfs merge=lfs -text
+*.mov filter=lfs diff=lfs merge=lfs -text
+*.mkv filter=lfs diff=lfs merge=lfs -text
+*.wmv filter=lfs diff=lfs merge=lfs -text
+*.flv filter=lfs diff=lfs merge=lfs -text
+*.webm filter=lfs diff=lfs merge=lfs -text
+
+# Large image files and animations
+*.gif filter=lfs diff=lfs merge=lfs -text
+*.psd filter=lfs diff=lfs merge=lfs -text
+*.ai filter=lfs diff=lfs merge=lfs -text

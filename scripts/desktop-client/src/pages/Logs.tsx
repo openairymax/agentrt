@@ -12,7 +12,7 @@ import {
   Play,
   Clock,
 } from "lucide-react";
-import { invoke } from "../utils/tauriCompat";
+import sdk from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
 
 const SERVICES = [
@@ -60,7 +60,7 @@ const Logs: React.FC = () => {
   const loadLogs = async () => {
     setLoading(true);
     try {
-      const content = await invoke<string>("get_logs", { service: selectedService || null, tail: tailCount });
+      const content = await sdk.getLogs(selectedService || undefined, tailCount);
       setLogs(content);
     } catch (error) {
       setLogs(`${t.common.error}: ${error}`);
@@ -71,7 +71,7 @@ const Logs: React.FC = () => {
 
   const handleDownloadLogs = async () => {
     try {
-      const content = await invoke<string>("get_logs", { service: selectedService || null, tail: 1000 });
+      const content = await sdk.getLogs(selectedService || undefined, 1000);
       const blob = new Blob([content], { type: "text/plain" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");

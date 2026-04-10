@@ -74,7 +74,7 @@ market_d/
   "name": "智能客服 Agent",
   "version": "2.1.0",
   "description": "专业的客户服务助手",
-  "author": "Spharx Team",
+  "author": "Spharx AgentOS Team",
   "category": "customer_service",
   "skills": [
     "skill-faq-answer",

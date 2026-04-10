@@ -15,18 +15,9 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
-import { invoke } from "../utils/tauriCompat";
+import sdk from "../services/agentos-sdk";
+import type { LLMProviderConfig } from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
-
-interface LLMProvider {
-  id: string;
-  name: string;
-  type: string;
-  api_key?: string;
-  base_url: string;
-  model: string;
-  configured: boolean;
-}
 
 const providerConfig: Record<string, { icon: typeof Brain; color: string; gradient: string; bgLight: string; label: string; models: string[] }> = {
   openai: {
@@ -54,11 +45,16 @@ const pricingData: Record<string, Record<string, string>> = {
 
 const LLMConfig: React.FC = () => {
   const { t } = useI18n();
-  const [providers, setProviders] = useState<LLMProvider[]>([]);
+  const [providers, setProviders] = useState<LLMProviderConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [expandedProvider, setExpandedProvider] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
+  const [newProviderType, setNewProviderType] = useState("openai");
+  const [newApiKey, setNewApiKey] = useState("");
+  const [newBaseUrl, setNewBaseUrl] = useState("");
+  const [newModel, setNewModel] = useState("gpt-4o");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadProviders();
@@ -67,7 +63,7 @@ const LLMConfig: React.FC = () => {
   const loadProviders = async () => {
     setLoading(true);
     try {
-      const data = await invoke<LLMProvider[]>("list_llm_providers");
+      const data = await sdk.listLLMProviders();
       setProviders(data || []);
     } catch (error) {
       console.error("Failed to load providers:", error);
@@ -79,12 +75,37 @@ const LLMConfig: React.FC = () => {
   const handleTest = async (providerId: string) => {
     setTestingId(providerId);
     try {
-      await invoke("test_llm_connection", { provider_id: providerId });
-      alert(t.llmConfig.testSuccess);
+      const result = await sdk.testLLMConnection(providerId);
+      alert(result.success ? `${t.llmConfig.testSuccess} (${result.latency_ms}ms)` : `${t.llmConfig.testFailed}: ${result.message}`);
     } catch (error) {
       alert(`${t.llmConfig.testFailed}: ${error}`);
     } finally {
       setTestingId(null);
+    }
+  };
+
+  const handleSaveProvider = async () => {
+    if (!newApiKey.trim()) return;
+    setSaving(true);
+    try {
+      const saved = await sdk.saveLLMProvider({
+        id: `${newProviderType}-${Date.now()}`,
+        type: newProviderType as LLMProviderConfig["type"],
+        name: providerConfig[newProviderType]?.label || newProviderType,
+        api_key: newApiKey,
+        base_url: newBaseUrl || (newProviderType === "openai" ? "https://api.openai.com/v1" : newProviderType === "anthropic" ? "https://api.anthropic.com/v1" : "http://localhost:8080/v1"),
+        model: newModel,
+        configured: true,
+      });
+      setProviders(prev => [...prev, saved]);
+      setShowAddModal(false);
+      setNewApiKey("");
+      setNewBaseUrl("");
+      alert("LLM 提供商配置已保存");
+    } catch (error) {
+      alert(`保存失败: ${error}`);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -349,7 +370,7 @@ const LLMConfig: React.FC = () => {
             <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
               <div className="form-group">
                 <label className="form-label">提供商类型</label>
-                <select className="form-select">
+                <select className="form-select" value={newProviderType} onChange={(e) => setNewProviderType(e.target.value)}>
                   {Object.entries(providerConfig).map(([key, cfg]) => (
                     <option key={key} value={key}>{cfg.label}</option>
                   ))}
@@ -358,7 +379,7 @@ const LLMConfig: React.FC = () => {
               <div className="form-group">
                 <label className="form-label">API Key</label>
                 <div style={{ position: "relative" }}>
-                  <input type="password" className="form-input" placeholder="sk-..." style={{ paddingRight: "42px" }} />
+                  <input type="password" className="form-input" placeholder="sk-..." value={newApiKey} onChange={(e) => setNewApiKey(e.target.value)} style={{ paddingRight: "42px" }} />
                   <button style={{
                     position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)",
                     background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)",
@@ -369,19 +390,22 @@ const LLMConfig: React.FC = () => {
               </div>
               <div className="form-group">
                 <label className="form-label">Base URL（可选）</label>
-                <input type="text" className="form-input" placeholder="https://api.openai.com/v1" />
+                <input type="text" className="form-input" placeholder="https://api.openai.com/v1" value={newBaseUrl} onChange={(e) => setNewBaseUrl(e.target.value)} />
               </div>
               <div className="form-group">
                 <label className="form-label">默认模型</label>
-                <select className="form-select">
-                  <option>gpt-4o</option>
-                  <option>gpt-4o-mini</option>
-                  <option>gpt-4-turbo</option>
+                <select className="form-select" value={newModel} onChange={(e) => setNewModel(e.target.value)}>
+                  {(providerConfig[newProviderType]?.models || ["gpt-4o"]).map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
                 </select>
               </div>
               <div style={{ display: "flex", gap: "10px" }}>
                 <button className="btn btn-secondary btn-lg" onClick={() => setShowAddModal(false)} style={{ flex: 1 }}>取消</button>
-                <button className="btn btn-primary btn-lg" style={{ flex: 1 }}><Key size={16} />保存配置</button>
+                <button className="btn btn-primary btn-lg" onClick={handleSaveProvider} disabled={!newApiKey.trim() || saving} style={{ flex: 1 }}>
+                  {saving ? <Loader2 size={16} className="spin" /> : <Key size={16} />}
+                  保存配置
+                </button>
               </div>
             </div>
           </div>

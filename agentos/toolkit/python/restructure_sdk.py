@@ -308,7 +308,7 @@ For more information, see the documentation at https://agentos.dev
 """
 
 __version__ = "2.0.0.0"
-__author__ = "AgentOS Team"
+__author__ = "Spharx AgentOS Team"
 __license__ = "Apache-2.0"
 
 # Import version info

@@ -24,26 +24,10 @@ import {
   TrendingUp,
   AlertCircle,
 } from "lucide-react";
-import { invoke } from "../utils/tauriCompat";
+import sdk from "../services/agentos-sdk";
+import type { SystemInfo, ServiceStatus } from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
 import { PageLoader } from "../components/Skeleton";
-
-interface SystemInfo {
-  os: string;
-  os_version: string;
-  architecture: string;
-  cpu_cores: number;
-  total_memory_gb: number;
-  free_memory_gb: number;
-  hostname: string;
-}
-
-interface ServiceStatus {
-  name: string;
-  status: string;
-  healthy: boolean;
-  port?: number;
-}
 
 interface TimelineEvent {
   id: string;
@@ -182,9 +166,9 @@ const Dashboard: React.FC = () => {
 
   const loadDashboardData = async () => {
     try {
-      const sysInfo = await invoke<SystemInfo>("get_system_info");
+      const sysInfo = await sdk.getSystemInfo();
       setSystemInfo(sysInfo);
-      const svcStatus = await invoke<ServiceStatus[]>("get_service_status").catch(() => []);
+      const svcStatus = await sdk.getServiceStatus().catch(() => []);
       setServices(svcStatus);
     } catch (error) {
       console.error("Failed to load dashboard data:", error);
@@ -204,20 +188,20 @@ const Dashboard: React.FC = () => {
     switch (action) {
       case 'start':
         setActionLoading('start');
-        try { await invoke("start_services", { mode: "dev" }); await loadDashboardData(); }
+        try { await sdk.startServices("dev"); await loadDashboardData(); }
         catch (e) { alert(`${t.services.failedToStart}: ${e}`); }
         setActionLoading(null);
         break;
       case 'stop':
         if (!confirm(t.services.confirmStopAll)) return;
         setActionLoading('stop');
-        try { await invoke("stop_services"); setServices([]); }
+        try { await sdk.stopServices(); setServices([]); }
         catch (e) { alert(`${t.services.failedToStop}: ${e}`); }
         setActionLoading(null);
         break;
       case 'restart':
         setActionLoading('restart');
-        try { await invoke("restart_services", { mode: "dev" }); await loadDashboardData(); }
+        try { await sdk.restartServices("dev"); await loadDashboardData(); }
         catch (e) { alert(`${t.services.failedToRestart}: ${e}`); }
         setActionLoading(null);
         break;

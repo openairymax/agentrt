@@ -10,7 +10,7 @@ import {
   AlertCircle,
   CheckCircle2,
 } from "lucide-react";
-import { invoke } from "../utils/tauriCompat";
+import sdk from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
 
 const COMMAND_HISTORY: string[] = [
@@ -51,8 +51,8 @@ const Terminal: React.FC = () => {
     setOutput(prev => [...prev, `$ ${cmdToExecute}`, `[${timestamp}] Executing...`]);
 
     try {
-      const result = await invoke<string>("execute_command", { command: cmdToExecute });
-      setOutput(prev => [...prev.slice(-100), result]);
+      const result = await sdk.executeCliCommand(cmdToExecute, []);
+      setOutput(prev => [...prev.slice(-100), result.stdout || (result as any).output || String(result)]);
       setHistory([cmdToExecute, ...history.filter(h => h !== cmdToExecute).slice(0, 49)]);
     } catch (error) {
       setOutput(prev => [...prev.slice(-100), `Error: ${error}`]);

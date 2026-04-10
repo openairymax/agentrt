@@ -19,7 +19,7 @@
  * - 消息辅助函数（创建/释放/克隆/校验和/序列化/反序列化）
  * - 工具函数（错误消息/有效性检查/刷新）
  * 
- * @author AgentOS Team
+ * @author Spharx AgentOS Team
  * @date 2026-04-02
  */
 

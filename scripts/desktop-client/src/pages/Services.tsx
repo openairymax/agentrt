@@ -19,15 +19,9 @@ import {
   ArrowUpRight,
   Cpu,
 } from "lucide-react";
-import { invoke } from "../utils/tauriCompat";
+import sdk from "../services/agentos-sdk";
+import type { ServiceStatus } from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
-
-interface ServiceStatus {
-  name: string;
-  status: string;
-  healthy: boolean;
-  port?: number;
-}
 
 const serviceIcons: Record<string, { icon: typeof Server; color: string; gradient: string }> = {
   kernel: { icon: Cpu, color: "#6366f1", gradient: "linear-gradient(135deg, #6366f1, #818cf8)" },
@@ -53,7 +47,7 @@ const Services: React.FC = () => {
   const loadServiceStatus = async () => {
     setLoading(true);
     try {
-      const status = await invoke<ServiceStatus[]>("get_service_status");
+      const status = await sdk.getServiceStatus();
       setServices(status);
     } catch (error) {
       console.error("Failed to load service status:", error);
@@ -65,9 +59,9 @@ const Services: React.FC = () => {
   const doAction = async (action: string) => {
     setActionLoading(action);
     try {
-      if (action === 'start') await invoke("start_services", { mode: deployMode });
-      else if (action === 'stop') await invoke("stop_services");
-      else if (action === 'restart') await invoke("restart_services", { mode: deployMode });
+      if (action === 'start') await sdk.startServices(deployMode);
+      else if (action === 'stop') await sdk.stopServices();
+      else if (action === 'restart') await sdk.restartServices(deployMode);
       await loadServiceStatus();
       setLastAction({ type: action, time: new Date() });
     } catch (error) {
@@ -82,7 +76,7 @@ const Services: React.FC = () => {
   const handleRestartAll = () => doAction('restart');
 
   const openServiceUrl = (port: number) => {
-    invoke("open_browser", { url: `http://localhost:${port}` });
+    sdk.openBrowser(`http://localhost:${port}`);
   };
 
   const getServiceMeta = (name: string) => {
@@ -342,7 +336,7 @@ const Services: React.FC = () => {
                 cursor: "pointer", transition: "all var(--transition-fast)",
               }} onMouseEnter={(e) => { e.currentTarget.style.background = "var(--primary-light)"; e.currentTarget.style.borderColor = "var(--primary-color)"; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "var(--bg-tertiary)"; e.currentTarget.style.borderColor = ""; }}
-              onClick={() => invoke("open_browser", { url: svc.url })}
+              onClick={() => sdk.openBrowser(svc.url)}
               >
                 <div>
                   <span style={{ fontSize: "13.5px", fontWeight: 500 }}>{svc.name}</span>

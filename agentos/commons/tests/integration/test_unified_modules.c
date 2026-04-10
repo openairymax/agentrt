@@ -9,7 +9,7 @@
  * 此测试程序验证统一日志和配置模块的头文件包含和基本API兼容性。
  * 不执行实际功能测试，仅验证编译时兼容性。
  * 
- * @author AgentOS Team
+ * @author Spharx AgentOS Team
  * @date 2026-04-01
  * @version 2.0
  * 

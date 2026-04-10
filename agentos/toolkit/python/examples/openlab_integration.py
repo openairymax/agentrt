@@ -2,7 +2,7 @@
 #
 # 版本: 1.0.0
 # 最后更新: 2026-04-10
-# 作者: AgentOS 集成团队
+# 作者: Spharx AgentOS Team
 #
 # 本示例展示如何在 OpenLab 应用中集成 AgentOS Python SDK，
 # 实现以下功能：

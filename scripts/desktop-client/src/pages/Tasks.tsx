@@ -21,18 +21,9 @@ import {
   Shield,
   TrendingUp,
 } from "lucide-react";
-import { invoke } from "../utils/tauriCompat";
+import sdk from "../services/agentos-sdk";
+import type { TaskInfo } from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
-
-interface TaskInfo {
-  id: string;
-  name: string;
-  type: string;
-  status: string;
-  progress: number;
-  created_at: string;
-  updated_at?: string;
-}
 
 const taskTypeConfig: Record<string, { icon: typeof Zap; color: string; gradient: string; bgLight: string; label: string }> = {
   codegen: { icon: FileCode, color: "#6366f1", gradient: "linear-gradient(135deg, #6366f1, #818cf8)", bgLight: "rgba(99,102,241,0.08)", label: "代码生成" },
@@ -87,6 +78,10 @@ const Tasks: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [taskName, setTaskName] = useState("");
+  const [taskType, setTaskType] = useState("codegen");
+  const [taskParams, setTaskParams] = useState("");
 
   useEffect(() => {
     loadTasks();
@@ -95,7 +90,7 @@ const Tasks: React.FC = () => {
   const loadTasks = async () => {
     setLoading(true);
     try {
-      const data = await invoke<TaskInfo[]>("list_tasks");
+      const data = await sdk.listTasks();
       setTasks(data || []);
     } catch (error) {
       console.error("Failed to load tasks:", error);
@@ -107,12 +102,10 @@ const Tasks: React.FC = () => {
   const handleAction = async (taskId: string, action: string) => {
     setActionLoading(taskId + action);
     try {
-      if (action === "start") await invoke("start_task", { task_id: taskId });
-      else if (action === "stop") await invoke("stop_task", { task_id: taskId });
-      else if (action === "restart") await invoke("restart_task", { task_id: taskId });
+      if (action === "restart") await sdk.restartTask(taskId);
       else if (action === "delete") {
         if (!confirm(t.tasks.confirmDelete)) return;
-        await invoke("delete_task", { task_id: taskId });
+        await sdk.deleteTask(taskId);
       }
       await loadTasks();
     } catch (error) {
@@ -122,10 +115,29 @@ const Tasks: React.FC = () => {
     }
   };
 
+  const handleSubmitTask = async () => {
+    if (!taskName.trim()) return;
+    setSubmitting(true);
+    try {
+      let params: Record<string, unknown> = {};
+      try { params = taskParams ? JSON.parse(taskParams) : {}; } catch { params = { raw: taskParams }; }
+      const agentId = tasks.length > 0 && tasks[0].agent_id ? tasks[0].agent_id : "default";
+      const newTask = await sdk.submitTask(agentId, taskName, params, "normal");
+      setTasks(prev => [newTask, ...prev]);
+      setTaskName("");
+      setTaskParams("");
+      setActiveTab("history");
+    } catch (error) {
+      alert(`任务提交失败: ${error}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const filteredTasks = tasks.filter(
     (task) =>
-      task.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      task.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (task.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (task.type || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       task.status.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -224,6 +236,9 @@ const Tasks: React.FC = () => {
                 type="text"
                 className="form-input"
                 placeholder="例如：代码审查、数据分析、系统诊断..."
+                value={taskName}
+                onChange={(e) => setTaskName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSubmitTask()}
               />
               <p className="form-help">{t.tasks.taskNameHelp}</p>
             </div>
@@ -236,14 +251,16 @@ const Tasks: React.FC = () => {
                 {Object.entries(taskTypeConfig).map(([key, cfg]) => {
                   const IconComp = cfg.icon;
                   return (
-                    <div key={key} style={{
-                      padding: "14px", borderRadius: "var(--radius-md)",
-                      border: "2px solid var(--border-subtle)",
-                      cursor: "pointer", transition: "all var(--transition-fast)",
-                      textAlign: "center",
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = cfg.color; e.currentTarget.style.background = cfg.bgLight; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = ""; e.currentTarget.style.background = ""; }}
+                    <div
+                      key={key}
+                      onClick={() => setTaskType(key)}
+                      style={{
+                        padding: "14px", borderRadius: "var(--radius-md)",
+                        border: `2px solid ${taskType === key ? cfg.color : "var(--border-subtle)"}`,
+                        cursor: "pointer", transition: "all var(--transition-fast)",
+                        textAlign: "center",
+                        background: taskType === key ? cfg.bgLight : "var(--bg-tertiary)",
+                      }}
                     >
                       <IconComp size={24} color={cfg.color} style={{ marginBottom: "6px" }} />
                       <div style={{ fontSize: "13px", fontWeight: 600 }}>{cfg.label}</div>
@@ -260,13 +277,20 @@ const Tasks: React.FC = () => {
                 className="textarea-field"
                 rows={5}
                 placeholder='{"input": "...", "config": {...}}'
+                value={taskParams}
+                onChange={(e) => setTaskParams(e.target.value)}
                 style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "13px" }}
               />
               <p className="form-help">{t.tasks.parametersHelp}</p>
             </div>
 
-            <button className="btn btn-primary btn-lg">
-              <Play size={16} /> {t.tasks.submitTask}
+            <button
+              className="btn btn-primary btn-lg"
+              onClick={handleSubmitTask}
+              disabled={!taskName.trim() || submitting}
+            >
+              {submitting ? <Loader2 size={16} className="spin" /> : <Play size={16} />}
+              {t.tasks.submitTask}
             </button>
           </div>
         </div>
@@ -313,7 +337,7 @@ const Tasks: React.FC = () => {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               {filteredTasks.map((task, idx) => {
-                const typeCfg = taskTypeConfig[task.type] || { icon: Zap, color: "#94a3b8", gradient: "", bgLight: "", label: task.type };
+                const typeCfg = taskTypeConfig[task.type as keyof typeof taskTypeConfig] || { icon: Zap, color: "#94a3b8", gradient: "", bgLight: "", label: task.type || "unknown" };
                 const stCfg = statusConfig[task.status] || statusConfig.pending;
                 const TypeIcon = typeCfg.icon;
 

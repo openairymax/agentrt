@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { invoke } from '../utils/tauriCompat';
+import sdk from '../services/agentos-sdk';
 import { useI18n } from '../i18n';
 import {
   ChevronRight,
@@ -33,9 +33,7 @@ function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
   const handleComplete = async () => {
     setIsConfiguring(true);
     try {
-      await invoke('save_settings', {
-        settings: { language, projectPath, serviceMode },
-      });
+      await sdk.saveSettings({ language, projectPath, serviceMode });
       localStorage.setItem('agentos-wizard-completed', 'true');
       onComplete();
     } catch (error) {

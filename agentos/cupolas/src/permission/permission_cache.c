@@ -8,7 +8,7 @@
 /**
  * @file permission_cache.c
  * @brief Permission Cache Implementation - High-performance LRU cache based on hash table
- * @author Spharx
+ * @author Spharx AgentOS Team
  * @date 2024
  */
 

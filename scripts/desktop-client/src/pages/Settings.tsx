@@ -19,7 +19,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useI18n } from '../i18n';
-import { invoke } from "../utils/tauriCompat";
+import sdk from "../services/agentos-sdk";
 
 const Settings: React.FC = () => {
   const { t, language, setLanguage, availableLanguages } = useI18n();
@@ -51,8 +51,8 @@ const Settings: React.FC = () => {
   useEffect(() => {
     const loadSystemInfo = async () => {
       try {
-        const info = await invoke<{ platform: string; arch: string; version: string; cpu_cores?: number; total_memory_gb?: number }>('get_system_info');
-        setSystemInfo(info);
+        const info = await sdk.getSystemInfo();
+        setSystemInfo({ platform: info.os, arch: info.architecture, version: info.os_version, cpu_cores: info.cpu_cores, total_memory_gb: info.total_memory_gb });
       } catch (error) {
         console.error('Failed to load system info:', error);
       }
@@ -108,12 +108,8 @@ const Settings: React.FC = () => {
 
   const handleTestConnection = async () => {
     try {
-      const result = await invoke<{ success: boolean; message: string }>('test_backend_connection', { url: backendUrl });
-      if (result.success) {
-        alert(t.settings.connectionSuccess.replace('{url}', backendUrl));
-      } else {
-        alert(t.settings.connectionFailed.replace('{error}', result.message));
-      }
+      const result = await sdk.getHealthStatus();
+      alert(result.overall === "healthy" ? t.settings.connectionSuccess.replace('{url}', backendUrl) : t.settings.connectionFailed.replace('{error}', result.overall));
     } catch (error) {
       alert(t.settings.connectionError.replace('{error}', String(error)));
     }
@@ -395,7 +391,7 @@ const Settings: React.FC = () => {
             style={{ color: "var(--primary-color)", textDecoration: "none", fontWeight: 500 }}
             onClick={(e) => {
               e.preventDefault();
-              invoke('open_browser', { url: 'https://docs.agentos.io' });
+              sdk.openBrowser('https://docs.agentos.io');
             }}
           >
             docs.agentos.io

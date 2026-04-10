@@ -8,7 +8,7 @@
 /**
  * @file workbench_limits.c
  * @brief Resource Limits Runtime Enforcement - Cross-platform Implementation
- * @author Spharx
+ * @author Spharx AgentOS Team
  * @date 2024
  *
  * This module implements cross-platform resource limits:
