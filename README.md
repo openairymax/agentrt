@@ -80,7 +80,7 @@ SDK Layer (toolkit)
 ```
 
 **Design Principles**  
-  Built upon [ARCHITECTURAL_PRINCIPLES](docs/ARCHITECTURAL_PRINCIPLES.md):
+  Built upon the five-dimensional orthogonal design system described in [ARCHITECTURAL_PRINCIPLES](docs/ARCHITECTURAL_PRINCIPLES.md):
 - **System Perspective**: Feedback loops · Layered decomposition · Holistic design · Emergence management → Response <10ms
 - **Kernel Perspective**: Minimalist kernel · Contractual interfaces · Service isolation · Pluggable strategies → Kernel ~25K LOC
 - **Cognitive Perspective**: Dual‑system synergy · Incremental evolution · Memory stratification · Forgetting mechanism → Token savings 500%
