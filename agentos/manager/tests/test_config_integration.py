@@ -14,7 +14,7 @@ Manager 模块配置加载集成测试
 使用方法:
     python test_config_integration.py [--verbose] [--config-dir <path>]
 
-作者: CTO (SOLO Coder)
+作者: Spharx AgentOS Team
 版本: v1.0.0
 日期: 2026-04-01
 """

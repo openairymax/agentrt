@@ -1532,16 +1532,16 @@ python scripts/check_error_i18n.py --lang zh-CN,en-US
 
 | 引用文档 | 关系说明 |
 |---------|---------|
-| [体系并行论](../../Basic_Theories/体系并行论.md) | 本文档的核心理论框架，五维正交系统的理论基础 |
-| [认知层理论](../../philosophy/folder/Cognition_Theory.md) | 原则 C-1、C-2 的理论基础 |
-| [记忆层理论](../../philosophy/folder/Memory_Theory.md) | 原则 C-3、C-4 的理论基础 |
-| [设计原则](../../philosophy/folder/Design_Principles.md) | 本文档的哲学前身 |
-| [微内核架构](./microkernel.md) | 原则 K-1、K-3 的技术实现 |
-| [核心循环架构](./coreloopthree.md) | 原则 C-1、C-2、S-3 的技术实现 |
-| [记忆系统架构](./memoryrovol.md) | 原则 C-3、C-4 的技术实现 |
-| [系统调用规范](./syscall.md) | 原则 K-2、K-3 的接口规范 |
-| [C 安全编程指南](../../specifications/coding_standard/C&Cpp-secure-coding-guide.md) | 原则 E-1、E-3 的编码落实 |
-| [统一术语表](../../specifications/TERMINOLOGY.md) | 本文档使用的术语定义 |
+| [体系并行论](Basic_Theories/CN_01_体系并行论.md) | 本文档的核心理论框架，五维正交系统的理论基础 |
+| [认知层理论](Basic_Theories/CN_02_认知层理论.md) | 原则 C-1、C-2 的理论基础 |
+| [记忆层理论](Basic_Theories/CN_03_记忆层理论.md) | 原则 C-3、C-4 的理论基础 |
+| [设计原则](Basic_Theories/CN_04_设计原则.md) | 本文档的哲学前身 |
+| [微内核架构](Capital_Architecture/microkernel.md) | 原则 K-1、K-3 的技术实现 |
+| [核心循环架构](Capital_Architecture/coreloopthree.md) | 原则 C-1、C-2、S-3 的技术实现 |
+| [记忆系统架构](Capital_Architecture/memoryrovol.md) | 原则 C-3、C-4 的技术实现 |
+| [系统调用规范](Capital_Architecture/syscall.md) | 原则 K-2、K-3 的接口规范 |
+| [C 安全编程指南](Capital_Specifications/coding_standard/C_Cpp_secure_coding_guide.md) | 原则 E-1、E-3 的编码落实 |
+| [统一术语表](Capital_Specifications/TERMINOLOGY.md) | 本文档使用的术语定义 |
 
 ---
 

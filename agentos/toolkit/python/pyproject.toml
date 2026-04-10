@@ -6,9 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "agentos"
 version = "3.0.0"
 description = "AgentOS Python SDK - 官方多语言 SDK 集合"
-authors = [
-    { name = "SpharxWorks", email = "team@spharx.com" }
-]
+authors = ["Spharx AgentOS Team"]
 license = { file = "LICENSE" }
 readme = "README.md"
 classifiers = [

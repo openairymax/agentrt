@@ -8,9 +8,7 @@ version = "1.0.0.9"
 description = "OpenLab - Agent Operating System for intelligent agent management"
 readme = "README.md"
 license = {text = "MIT"}
-authors = [
-    {name = "SPHARX Team", email = "team@spharx.io"}
-]
+authors = ["Spharx AgentOS Team"]
 keywords = ["agent", "ai", "orchestration", "openlab", "multi-agent"]
 classifiers = [
     "Development Status :: 4 - Beta",

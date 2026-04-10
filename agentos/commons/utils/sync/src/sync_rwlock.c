@@ -6,7 +6,7 @@
  * @file sync_rwlock.c
  * @brief 读写锁实现
  *
- * @author AgentOS Team
+ * @author Spharx AgentOS Team
  * @date 2026-04-05
  */
 

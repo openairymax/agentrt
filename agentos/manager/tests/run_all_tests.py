@@ -13,7 +13,7 @@ Manager 模块测试套件运行器
 使用方法:
     python run_all_tests.py [--verbose] [--config-dir <path>] [test_name...]
 
-作者: CTO (SOLO Coder)
+作者: Spharx AgentOS Team
 版本: v1.0.0
 日期: 2026-04-01
 """

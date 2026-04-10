@@ -402,7 +402,7 @@ generate_quality_report() {
         "checks_total": ${CHECKS_TOTAL},
         "checks_passed": ${CHECKS_PASSED},
         "checks_failed": ${CHECKS_FAILED},
-        "pass_rate": $(awk "BEGIN {printf \"%.1f\", (${CHECKS_PASSED}/${CHECKS_TOTAL})*100}")%
+        "pass_rate": "$(awk "BEGIN {if (${CHECKS_TOTAL} > 0) printf \"%.1f\", (${CHECKS_PASSED}/${CHECKS_TOTAL})*100; else print \"0.0\"}")%"
     },
     "issues": {
         "critical": ${ISSUES_CRITICAL},
@@ -515,7 +515,7 @@ main() {
     mkdir -p "${PROJECT_ROOT}/ci-artifacts"
 
     gate_cpp_static_analysis
-   gate_code_format
+    gate_code_format
     gate_python_quality
     gate_shell_quality
     gate_security_basic

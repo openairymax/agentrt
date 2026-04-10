@@ -552,24 +552,40 @@ jobs:
           FOCUS_DIMENSION=$(echo "$TEST_PLAN" | jq -r '.focus')
           
           if [ "$FOCUS_DIMENSION" == "all" ] || [ "$FOCUS_DIMENSION" == "cognition-body" ]; then
-            echo "🧠 Testing Cognition Body (algorithms/core)..."
-            pytest unit/test_cognition.py -v --tb=short -m "cognition" \
-              --junitxml=reports/mcis-unit-tests/junit_cognition.xml \
-              --html=reports/mcis-unit-tests/test_cognition_report.html --self-contained-html || true
+            echo "Testing Cognition Body (algorithms/core)..."
+            if [ -f "unit/test_cognition.py" ]; then
+              pytest unit/test_cognition.py -v --tb=short -m "cognition" \
+                --junitxml=reports/mcis-unit-tests/junit_cognition.xml \
+                --html=reports/mcis-unit-tests/test_cognition_report.html --self-contained-html || true
+            else
+              echo "::notice::unit/test_cognition.py not found, skipping cognition body tests"
+            fi
           fi
           
           if [ "$FOCUS_DIMENSION" == "all" ] || [ "$FOCUS_DIMENSION" == "execution-body" ]; then
-            echo "⚡ Testing Execution Body (services/execution)..."
-            pytest unit/test_execution.py -v --tb=short -m "execution" \
-              --junitxml=reports/mcis-unit-tests/junit_execution.xml \
-              --html=reports/mcis-unit-tests/test_execution_report.html --self-contained-html || true
+            echo "Testing Execution Body (services/execution)..."
+            if [ -f "unit/test_execution.py" ]; then
+              pytest unit/test_execution.py -v --tb=short -m "execution" \
+                --junitxml=reports/mcis-unit-tests/junit_execution.xml \
+                --html=reports/mcis-unit-tests/test_execution_report.html --self-contained-html || true
+            else
+              echo "::notice::unit/test_execution.py not found, skipping execution body tests"
+            fi
           fi
           
           if [ "$FOCUS_DIMENSION" == "all" ] || [ "$FOCUS_DIMENSION" == "sdk-extensions" ]; then
-            echo "🌐 Testing SDK Extensions (multi-language)..."
-            pytest unit/test_sdk.py -v --tb=short -m "sdk" \
-              --junitxml=reports/mcis-unit-tests/junit_sdk.xml \
-              --html=reports/mcis-unit-tests/test_sdk_report.html --self-contained-html || true
+            echo "Testing SDK Extensions (multi-language)..."
+            if [ -f "unit/test_sdk.py" ]; then
+              pytest unit/test_sdk.py -v --tb=short -m "sdk" \
+                --junitxml=reports/mcis-unit-tests/junit_sdk.xml \
+                --html=reports/mcis-unit-tests/test_sdk_report.html --self-contained-html || true
+            else
+              echo "::notice::unit/test_sdk.py not found, running SDK tests from toolkit directory"
+              if [ -d "unit/sdk" ]; then
+                pytest unit/sdk/ -v --tb=short \
+                  --junitxml=reports/mcis-unit-tests/junit_sdk.xml || true
+              fi
+            fi
           fi
           
           # 默认运行所有单元测试
@@ -722,25 +738,37 @@ jobs:
         run: |
           cd tests
           
-          echo "🔗 Running MCIS integration tests..."
-          
-          # 测试认知体与执行体集成
-          echo "🧠⚡ Testing Cognition-Execution integration..."
-          pytest integration/test_cognition_execution.py -v --tb=short \
-            --junitxml=reports/mcis-integration-tests/junit_cognition_execution.xml \
-            --html=reports/mcis-integration-tests/cognition_execution_report.html --self-contained-html || true
-          
-          # 测试执行体与记忆体集成
-          echo "⚡💾 Testing Execution-Memory integration..."
-          pytest integration/test_execution_memory.py -v --tb=short \
-            --junitxml=reports/mcis-integration-tests/junit_execution_memory.xml \
-            --html=reports/mcis-integration-tests/execution_memory_report.html --self-contained-html || true
-          
-          # 测试SDK与核心集成
-          echo "🌐🧠 Testing SDK-Core integration..."
-          pytest integration/test_sdk_core.py -v --tb=short \
-            --junitxml=reports/mcis-integration-tests/junit_sdk_core.xml \
-            --html=reports/mcis-integration-tests/sdk_core_report.html --self-contained-html || true
+          echo "Running MCIS integration tests..."
+
+          # Test Cognition-Execution integration
+          echo "Testing Cognition-Execution integration..."
+          if [ -f "integration/test_cognition_execution.py" ]; then
+            pytest integration/test_cognition_execution.py -v --tb=short \
+              --junitxml=reports/mcis-integration-tests/junit_cognition_execution.xml \
+              --html=reports/mcis-integration-tests/cognition_execution_report.html --self-contained-html || true
+          else
+            echo "::notice::integration/test_cognition_execution.py not found, skipping"
+          fi
+
+          # Test Execution-Memory integration
+          echo "Testing Execution-Memory integration..."
+          if [ -f "integration/test_execution_memory.py" ]; then
+            pytest integration/test_execution_memory.py -v --tb=short \
+              --junitxml=reports/mcis-integration-tests/junit_execution_memory.xml \
+              --html=reports/mcis-integration-tests/execution_memory_report.html --self-contained-html || true
+          else
+            echo "::notice::integration/test_execution_memory.py not found, skipping"
+          fi
+
+          # Test SDK-Core integration
+          echo "Testing SDK-Core integration..."
+          if [ -f "integration/test_sdk_core.py" ]; then
+            pytest integration/test_sdk_core.py -v --tb=short \
+              --junitxml=reports/mcis-integration-tests/junit_sdk_core.xml \
+              --html=reports/mcis-integration-tests/sdk_core_report.html --self-contained-html || true
+          else
+            echo "::notice::integration/test_sdk_core.py not found, skipping"
+          fi
           
           # 运行所有集成测试
           echo "📋 Running comprehensive integration test suite..."

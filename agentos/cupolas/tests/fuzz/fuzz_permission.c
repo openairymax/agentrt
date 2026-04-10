@@ -8,7 +8,7 @@
 /**
  * @file fuzz_permission.c
  * @brief Permission System Fuzz Testing
- * @author Spharx
+ * @author Spharx AgentOS Team
  * @date 2024
  *
  * Fuzz testing for permission system using libFuzzer, covering:

@@ -2,7 +2,7 @@
 name = "agentos"
 version = "1.0.0.9"
 description = "AgentOS - 智能体操作系统核心引擎 (A+ 94/100 行业标杆评级)"
-authors = ["SPHARX <lidecheng@spharx.cn>", "SPHARX <wangliren@spharx.cn>"]
+authors = ["Spharx AgentOS Team"]
 license = "Apache-2.0"
 readme = "README.md"
 homepage = "https://spharx.cn"
