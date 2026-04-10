@@ -13,7 +13,7 @@
  * 4. 线程安全的错误信息存储
  * 5. 支持结构化错误上下文
  * 
- * @author AgentOS Team
+ * @author Spharx AgentOS Team
  * @date 2026-03-30
  * @version 2.0
  * 

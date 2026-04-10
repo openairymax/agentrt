@@ -47,12 +47,32 @@ static int ml_based_create(const sched_config_t* manager, void** data) {
     mld->model = NULL;
     mld->model_loaded = false;
 
-    // 尝试加载模型
+    // 尝试加载模型（带有降级逻辑）
     if (mld->model_path) {
-        // 这里应该加载机器学习模型
-        // 由于是示例，我们只是模拟加载
-        mld->model_loaded = true;
-        printf("ML model loaded from: %s\n", mld->model_path);
+        // 检查模型文件是否存在且可读（使用fopen进行跨平台检查）
+        FILE* test_file = fopen(mld->model_path, "rb");
+        if (test_file) {
+            // 文件存在且可读，尝试加载
+            fclose(test_file);
+            // TODO: 在此处集成实际的ML模型加载逻辑
+            // 当前为占位符：分配模拟模型结构体
+            mld->model = malloc(1);  /* 占位符 */
+            if (mld->model) {
+                mld->model_loaded = true;
+                printf("ML model loaded from: %s (simulated)\n", mld->model_path);
+            } else {
+                mld->model_loaded = false;
+                printf("Warning: Failed to allocate memory for ML model (degraded mode)\n");
+            }
+        } else {
+            // 模型文件不存在或不可读，进入降级模式
+            mld->model_loaded = false;
+            printf("Warning: ML model file not found or not readable: %s (degraded mode)\n", mld->model_path);
+        }
+    } else {
+        // 无模型路径，使用纯启发式模式
+        mld->model_loaded = false;
+        printf("Info: No ML model path provided, using heuristic scheduling\n");
     }
 
     *data = mld;

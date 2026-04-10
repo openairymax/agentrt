@@ -8,7 +8,7 @@
 /**
  * @file audit_rotator.c
  * @brief Audit Log Rotator Implementation
- * @author Spharx
+ * @author Spharx AgentOS Team
  * @date 2024
  */
 

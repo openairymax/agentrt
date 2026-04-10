@@ -15,7 +15,7 @@
 /**
  * @file cupolas.c
  * @brief AgentOS Security Dome - Core Facade Implementation
- * @author Spharx
+ * @author Spharx AgentOS Team
  * @date 2024
  *
  * @note This file implements the unified entry point for the cupolas module.

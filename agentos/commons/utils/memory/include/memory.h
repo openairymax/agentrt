@@ -9,7 +9,7 @@
  * 提供安全、高效、统一的内存管理接口，支持内存分配、释放、调试和统计功能。
  * 本模块旨在消除项目中分散的内存管理代码，提供一致的内存管理策略。
  * 
- * @author AgentOS Team
+ * @author Spharx AgentOS Team
  * @date 2026-03-30
  * @version 2.0
  * 

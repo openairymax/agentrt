@@ -10,7 +10,7 @@ import {
   Copy,
   Download,
 } from "lucide-react";
-import { invoke } from "../utils/tauriCompat";
+import sdk from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
 
 const CONFIG_FILES = [
@@ -34,7 +34,7 @@ const Config: React.FC = () => {
     setLoading(true);
     try {
       const file = CONFIG_FILES.find(f => f.id === targetId) || CONFIG_FILES[0];
-      const configContent = await invoke<string>("read_config_file", { filePath: file.path });
+      const configContent = await sdk.readConfigFile(file.path);
       setContent(configContent);
       setOriginalContent(configContent);
       setSelectedFile(targetId);
@@ -52,7 +52,7 @@ const Config: React.FC = () => {
     setSaving(true);
     try {
       const file = CONFIG_FILES.find(f => f.id === selectedFile) || CONFIG_FILES[0];
-      await invoke("write_config_file", { filePath: file.path, content });
+      await sdk.writeConfigFile(file.path, content);
       setOriginalContent(content);
       setHasChanges(false);
     } catch (error) {

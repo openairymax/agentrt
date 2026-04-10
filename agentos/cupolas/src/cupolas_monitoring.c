@@ -8,7 +8,7 @@
 /**
  * @file cupolas_monitoring.c
  * @brief Monitoring Interface - Prometheus / OpenTelemetry
- * @author Spharx
+ * @author Spharx AgentOS Team
  * @date 2024
  *
  * This module implements monitoring interface:

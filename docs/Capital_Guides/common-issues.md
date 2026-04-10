@@ -496,7 +496,7 @@ storage_yearly = (10000 * 100KB * 365 + 1GB * 365) * 3 ≈ 4TB（3副本）
 curl http://localhost:8080/health | jq '.version'
 
 # 3. 查看变更日志
-cat docs/references/changelog.md | grep -A50 "## [1.0.0]"
+cat ../../CHANGELOG.md | grep -A50 "## [1.0.0]"
 ```
 
 **升级步骤**:

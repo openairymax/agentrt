@@ -5,7 +5,7 @@
   "agent_name": "Security Agent",
   "description": "瀹夊叏瀹¤鏅鸿兘浣擄紝璐熻矗瀹夊叏璇勪及銆佹紡娲炴壂鎻忓拰瀹夊叏绛栫暐鍒跺畾",
   "version": "1.0.0.9",
-  "author": "SPHARX Team",
+  "author": "Spharx AgentOS Team",
   "license": "Apache-2.0",
   
   "capabilities": [

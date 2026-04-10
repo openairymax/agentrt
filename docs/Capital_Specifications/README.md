@@ -5,8 +5,8 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 copyright: "Copyright (c) 2026 SPHARX Ltd. All Rights Reserved."
 slogan: "From data intelligence emerges."
 title: "AgentOS 技术规范"
-version: "Doc V1.7"
-last_updated: "2026-03-31"
+version: "Doc V1.8"
+last_updated: "2026-04-10"
 author: "LirenWang"
 status: "production_ready"
 review_due: "2026-06-30"
@@ -411,10 +411,10 @@ python scripts/license_compliance.py --report
 
 ## 📚 相关文档
 
-- [架构设计原则](../architecture/folder/architectural_design_principles.md)
-- [编码规范总览](../coding_standard/README.md)
+- [架构设计原则](../ARCHITECTURAL_PRINCIPLES.md)
+- [编码规范总览](./coding_standard/README.md)
 - [术语表](TERMINOLOGY.md)
-- [API 参考](../api/README.md)
+- [API 参考](../Capital_API/README.md)
 
 ---
 

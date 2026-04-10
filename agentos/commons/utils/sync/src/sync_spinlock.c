@@ -6,23 +6,20 @@
  * @file sync_spinlock.c
  * @brief 自旋锁实现
  *
- * @author AgentOS Team
+ * @author Spharx AgentOS Team
  * @date 2026-04-05
  */
 
 #include "sync_platform.h"
+#include "../include/check.h"
 
 sync_result_t sync_spinlock_create(sync_spinlock_t* spinlock,
                                   const sync_attr_t* attr) {
-    if (spinlock == NULL) {
-        return SYNC_ERROR_INVALID;
-    }
+    CHECK_NULL_RET(spinlock, SYNC_ERROR_INVALID);
 
     struct sync_spinlock* s = (struct sync_spinlock*)AGENTOS_CALLOC(
         1, sizeof(struct sync_spinlock));
-    if (s == NULL) {
-        return SYNC_ERROR_MEMORY;
-    }
+    CHECK_NULL_RET(s, SYNC_ERROR_MEMORY);
 
     s->type = SYNC_TYPE_SPINLOCK;
     if (attr != NULL && attr->name != NULL) {
@@ -47,9 +44,7 @@ sync_result_t sync_spinlock_create(sync_spinlock_t* spinlock,
 }
 
 sync_result_t sync_spinlock_destroy(sync_spinlock_t spinlock) {
-    if (spinlock == NULL) {
-        return SYNC_ERROR_INVALID;
-    }
+    CHECK_NULL_RET(spinlock, SYNC_ERROR_INVALID);
 
     if (!spinlock->initialized) {
         AGENTOS_FREE(spinlock->name);

@@ -5,8 +5,8 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 copyright: "Copyright (c) 2026 SPHARX Ltd. All Rights Reserved."
 slogan: "From data intelligence emerges."
 title: "AgentOS API 参考文档"
-version: "Doc V1.7"
-last_updated: "2026-03-31"
+version: "Doc V1.8"
+last_updated: "2026-04-10"
 author: "LirenWang"
 status: "production_ready"
 review_due: "2026-06-30"
@@ -130,11 +130,11 @@ AgentOS API 背后是高效的核心算法支撑，涵盖文档处理、搜索�
 
 | 模块 | 架构文档 | 状态 |
 |------|----------|------|
-| **IPC Binder** | [../architecture/ipc.md](../architecture/ipc.md) | ✅ 生产就绪 |
-| **内存管理** | [../architecture/memoryrovol.md](../architecture/memoryrovol.md) | ✅ 生产就绪 |
-| **任务调度** | [../architecture/coreloopthree.md](../architecture/coreloopthree.md) | ✅ 生产就绪 |
-| **微内核** | [../architecture/microkernel.md](../architecture/microkernel.md) | ✅ 生产就绪 |
-| **安全穹顶** | [../architecture/ARCHITECTURAL_PRINCIPLES.md](../architecture/ARCHITECTURAL_PRINCIPLES.md) | ✅ 生产就绪 |
+| **IPC Binder** | [../Capital_Architecture/ipc.md](../Capital_Architecture/ipc.md) | ✅ 生产就绪 |
+| **内存管理** | [../Capital_Architecture/memoryrovol.md](../Capital_Architecture/memoryrovol.md) | ✅ 生产就绪 |
+| **任务调度** | [../Capital_Architecture/coreloopthree.md](../Capital_Architecture/coreloopthree.md) | ✅ 生产就绪 |
+| **微内核** | [../Capital_Architecture/microkernel.md](../Capital_Architecture/microkernel.md) | ✅ 生产就绪 |
+| **安全穹顶** | [../ARCHITECTURAL_PRINCIPLES.md](../ARCHITECTURAL_PRINCIPLES.md) | ✅ 生产就绪 |
 
 ---
 
@@ -468,10 +468,10 @@ AGENTOS_API int agentos_module_function(
 
 ## 📚 相关文档
 
-- [架构设计原则](../architecture/ARCHITECTURAL_PRINCIPLES.md)
-- [系统调用规范](../architecture/folder/syscall.md)
-- [编码规范](../specifications/coding_standard/C_coding_style_guide.md)
-- [术语表](../specifications/TERMINOLOGY.md)
+- [架构设计原则](../ARCHITECTURAL_PRINCIPLES.md)
+- [系统调用规范](../Capital_Architecture/syscall.md)
+- [编码规范](../Capital_Specifications/coding_standard/C_coding_style_guide.md)
+- [术语表](../Capital_Specifications/TERMINOLOGY.md)
 
 ---
 

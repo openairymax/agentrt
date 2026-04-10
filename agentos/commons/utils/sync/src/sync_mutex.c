@@ -6,7 +6,7 @@
  * @file sync_mutex.c
  * @brief 互斥锁实现
  *
- * @author AgentOS Team
+ * @author Spharx AgentOS Team
  * @date 2026-04-05
  */
 

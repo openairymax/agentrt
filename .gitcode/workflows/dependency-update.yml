@@ -292,58 +292,72 @@ jobs:
             echo "⚠️ No vcpkg.json found"
           fi
 
+      - name: Write dependency analysis Python script
+        uses: actions/write-file@v1
+        with:
+          path: analyze_deps.py
+          content: |
+            #!/usr/bin/env python3
+            # -*- coding: utf-8 -*-
+            import json
+            import sys
+
+            try:
+                with open('vcpkg.json.backup') as f:
+                    old = json.load(f)
+                with open('vcpkg.json') as f:
+                    new = json.load(f)
+
+                print('| Package | Old Version | New Version | Change Type |')
+                print('|---------|-------------|-------------|-------------|')
+
+                if 'builtin-baseline' in old and 'builtin-baseline' in new:
+                    if old['builtin-baseline'] != new['builtin-baseline']:
+                        baseline_old = old['builtin-baseline']
+                        baseline_new = new['builtin-baseline']
+                        print('| **Baseline** | {} | {} | Baseline Update |'.format(baseline_old, baseline_new))
+            except Exception as e:
+                print("| *Error analyzing dependencies: {}* |".format(str(e)))
+          write-mode: overwrite
+
       - name: Update vcpkg baseline with MCIS safety checks
         if: ${{ !env.DRY_RUN }}
         run: |
-          echo "🔄 Updating vcpkg baseline..."
-          
-          # 备份原文件
+          echo "Updating vcpkg baseline..."
+
+          # Backup original file
           cp vcpkg.json vcpkg.json.backup
-          
-          # 运行vcpkg更新
+
+          # Run vcpkg update
           vcpkg x-update-baseline --all || true
-          
-          # 检查是否有变化
+
+          # Check for changes
           if ! diff -q vcpkg.json vcpkg.json.backup > /dev/null; then
-            echo "✅ Dependencies have been updated"
+            echo "Dependencies have been updated" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### 📝 C/C++ Dependency Changes:" >> $GITHUB_STEP_SUMMARY
-            
-            # 分析变更
-            python3 -c "
-import json
-with open('vcpkg.json.backup') as f:
-    old = json.load(f)
-with open('vcpkg.json') as f:
-    new = json.load(f)
+            echo "### C/C++ Dependency Changes:" >> $GITHUB_STEP_SUMMARY
 
-print('| Package | Old Version | New Version | Change Type |')
-print('|---------|-------------|-------------|-------------|')
+            # Run Python analysis script
+            python3 analyze_deps.py 2>/dev/null || echo "| *Detailed change analysis requires full vcpkg diff* | | | |" >> $GITHUB_STEP_SUMMARY
 
-# 检查版本变化（简化示例）
-if 'builtin-baseline' in old and 'builtin-baseline' in new:
-    if old['builtin-baseline'] != new['builtin-baseline']:
-        print(f'| **Baseline** | {old[\"builtin-baseline\"]} | {new[\"builtin-baseline\"]} | Baseline Update |')
-" 2>/dev/null || echo "| *Detailed change analysis requires full vcpkg diff* | | | |" >> $GITHUB_STEP_SUMMARY
-            
             echo "" >> $GITHUB_STEP_SUMMARY
-            
-            # 创建分支和提交
+
+            # Create branch and commit
             BRANCH_NAME="mcis/deps/cpp-update-$(date +%Y%m%d)"
             git checkout -b "$BRANCH_NAME"
             git add vcpkg.json
             git commit -m "chore(deps): update C/C++ dependencies (MCIS maintenance)
-            
+
             Update vcpkg baseline for MCIS Cognition and Execution bodies.
-            
+
             MCIS Maintenance Dimension: ${{ env.MCIS_MAINTENANCE_DIMENSION }}
             Update Type: ${{ env.UPDATE_TYPE }}
-            
+
             This update ensures the foundation of MCIS cognitive and execution layers remains secure and up-to-date."
-            
+
             echo "branch_name=$BRANCH_NAME" >> $GITHUB_ENV
           else
-            echo "📭 No C/C++ dependency changes detected"
+            echo "::notice::No C/C++ dependency changes detected"
             rm vcpkg.json.backup
           fi
 

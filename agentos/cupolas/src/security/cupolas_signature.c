@@ -1,7 +1,7 @@
 /**
  * @file cupolas_signature.c
  * @brief 代码签名验证实现
- * @author Spharx
+ * @author Spharx AgentOS Team
  * @date 2026
  */
 
