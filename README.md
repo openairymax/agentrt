@@ -31,7 +31,7 @@ English | [简体中文](README_CN.md)
 Personal Client Preview
 
 <div align="center">
-<img src="docs/Other_Source/AgentOS 预览.gif" alt="AgentOS Preview" width="800">
+<img src="docs\Other_Source\AgentOS桌面版预览2.gif" alt="AgentOS Preview" width="800">
 </div>
 
 ## 💡 Innovation Highlights

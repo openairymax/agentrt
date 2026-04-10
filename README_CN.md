@@ -30,7 +30,7 @@
 个人用户客户端预告  
 
 <div align="center">
-<img src="docs/Other_Source/AgentOS 预览.gif" alt="AgentOS 预览" width="800">
+<img src="docs\Other_Source\AgentOS桌面版预览2.gif" alt="AgentOS 预览" width="800">
 </div>
 
 ## 💡 创新要点
