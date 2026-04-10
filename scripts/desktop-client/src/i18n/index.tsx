@@ -20,28 +20,24 @@ const translations: Record<Language, TranslationKeys> = {
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
 
 function detectSystemLanguage(): Language {
-  if (typeof navigator !== 'undefined') {
-    const lang = navigator.language.toLowerCase();
-    if (lang.startsWith('zh')) {
-      return 'zh';
-    }
-  }
-  return 'en';
-}
-
-function getStoredLanguage(): Language | null {
   if (typeof localStorage !== 'undefined') {
     const stored = localStorage.getItem('agentos-language');
     if (stored === 'en' || stored === 'zh') {
       return stored;
     }
   }
-  return null;
+  if (typeof navigator !== 'undefined') {
+    const lang = navigator.language.toLowerCase();
+    if (lang.startsWith('zh')) {
+      return 'zh';
+    }
+  }
+  return 'zh';
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(() => {
-    return getStoredLanguage() || detectSystemLanguage();
+    return detectSystemLanguage();
   });
 
   const setLanguage = useCallback((lang: Language) => {

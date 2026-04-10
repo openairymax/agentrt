@@ -6,7 +6,7 @@ description = "AgentOS Rust SDK - 与 Go SDK 保持一致的模块化结构"
 license = "MIT"
 homepage = "https://github.com/spharx/agentos"
 repository = "https://github.com/spharx/agentos"
-authors = ["SpharxWorks"]
+authors = ["Spharx AgentOS Team"]
 
 [dependencies]
 # HTTP 客户端

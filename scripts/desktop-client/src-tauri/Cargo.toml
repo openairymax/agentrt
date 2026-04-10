@@ -2,7 +2,7 @@
 name = "agentos-desktop"
 version = "0.1.0"
 description = "AgentOS Desktop Client - Official GUI for AgentOS"
-authors = ["SPHARX DevOps Team"]
+authors = ["Spharx AgentOS Team"]
 license = "MIT"
 repository = "https://github.com/SpharxTeam/AgentOS"
 edition = "2021"

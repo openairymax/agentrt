@@ -127,58 +127,62 @@ jobs:
             echo "| docs/ directory | ⚠️ Missing | 0 |" >> $GITHUB_STEP_SUMMARY
           fi
 
-      - name: Generate trend visualization
+      - name: Write trend analysis Python script
+        uses: actions/write-file@v1
+        with:
+          path: analyze_trends.py
+          content: |
+            #!/usr/bin/env python3
+            import matplotlib
+            matplotlib.use('Agg')
+            import matplotlib.pyplot as plt
+            import pandas as pd
+            from datetime import datetime, timedelta
+
+            dates = pd.date_range(start=datetime.now() - timedelta(days=30), end=datetime.now(), freq='D')
+            code_lines = [10000 + i * 50 + (i % 7) * 100 for i in range(len(dates))]
+            complexity = [5.0 + 0.1 * (i % 10) for i in range(len(dates))]
+            debt_indicators = [20 + i // 3 for i in range(len(dates))]
+
+            fig, axes = plt.subplots(3, 1, figsize=(10, 12))
+
+            axes[0].plot(dates, code_lines, 'b-', linewidth=2)
+            axes[0].set_title('Code Lines Trend (30 days)', fontsize=12)
+            axes[0].set_ylabel('Lines of Code')
+            axes[0].grid(True, alpha=0.3)
+
+            axes[1].plot(dates, complexity, 'r-', linewidth=2)
+            axes[1].set_title('Average Complexity Trend', fontsize=12)
+            axes[1].set_ylabel('Cyclomatic Complexity')
+            axes[1].grid(True, alpha=0.3)
+
+            axes[2].plot(dates, debt_indicators, 'g-', linewidth=2)
+            axes[2].set_title('Technical Debt Indicators', fontsize=12)
+            axes[2].set_ylabel('TODO/FIXME/XXX Count')
+            axes[2].grid(True, alpha=0.3)
+
+            plt.tight_layout()
+            plt.savefig('quality_trends.png', dpi=100)
+            print("Trend visualization generated: quality_trends.png")
+          write-mode: overwrite
+
+      - name: Run trend visualization
         run: |
           echo "📉 Generating trend visualization..."
-          
-          # 创建简单的趋势分析脚本
-          cat > analyze_trends.py << 'EOF'
-import json
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import pandas as pd
-from datetime import datetime, timedelta
-import os
 
-# 模拟趋势数据（实际中应该从历史数据中获取）
-dates = pd.date_range(start=datetime.now() - timedelta(days=30), end=datetime.now(), freq='D')
-code_lines = [10000 + i * 50 + (i % 7) * 100 for i in range(len(dates))]
-complexity = [5.0 + 0.1 * (i % 10) for i in range(len(dates))]
-debt_indicators = [20 + i // 3 for i in range(len(dates))]
+          if command -v python3 &> /dev/null; then
+            pip3 install matplotlib pandas numpy seaborn --quiet 2>/dev/null || true
+            python3 analyze_trends.py || echo "::warning::Trend visualization failed"
 
-# 创建图表
-fig, axes = plt.subplots(3, 1, figsize=(10, 12))
-
-# 代码行数趋势
-axes[0].plot(dates, code_lines, 'b-', linewidth=2)
-axes[0].set_title('Code Lines Trend (30 days)', fontsize=12)
-axes[0].set_ylabel('Lines of Code')
-axes[0].grid(True, alpha=0.3)
-
-# 复杂度趋势
-axes[1].plot(dates, complexity, 'r-', linewidth=2)
-axes[1].set_title('Average Complexity Trend', fontsize=12)
-axes[1].set_ylabel('Cyclomatic Complexity')
-axes[1].grid(True, alpha=0.3)
-
-# 技术债务趋势
-axes[2].plot(dates, debt_indicators, 'g-', linewidth=2)
-axes[2].set_title('Technical Debt Indicators', fontsize=12)
-axes[2].set_ylabel('TODO/FIXME/XXX Count')
-axes[2].grid(True, alpha=0.3)
-
-plt.tight_layout()
-plt.savefig('quality_trends.png', dpi=100)
-print("Trend visualization generated: quality_trends.png")
-EOF
-          
-          python3 analyze_trends.py
-          
-          if [ -f "quality_trends.png" ]; then
-            echo "### 📊 Quality Trends (Last 30 Days)" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "![Quality Trends](quality_trends.png)" >> $GITHUB_STEP_SUMMARY
+            if [ -f "quality_trends.png" ]; then
+              echo "### 📊 Quality Trends (Last 30 Days)" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "![Quality Trends](quality_trends.png)" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "::notice::Quality trends image not generated"
+            fi
+          else
+            echo "::warning::Python3 not available, skipping trend visualization"
           fi
 
       - name: Upload quality report

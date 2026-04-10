@@ -5,7 +5,7 @@
   "agent_name": "DevOps Agent",
   "description": "杩愮淮閮ㄧ讲鏅鸿兘浣擄紝璐熻矗CI/CD銆佸鍣ㄥ寲閮ㄧ讲銆佸熀纭€璁炬柦绠＄悊鍜岀洃鎺у憡璀?,
   "version": "1.0.0.9",
-  "author": "SPHARX Team",
+  "author": "Spharx AgentOS Team",
   "license": "Apache-2.0",
   
   "capabilities": [

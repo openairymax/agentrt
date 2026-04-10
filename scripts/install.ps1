@@ -41,7 +41,7 @@
 #   - 磁盘空间 >= 20GB
 #   - PowerShell 5.1+ 或 PowerShell Core 7+
 #
-# 作者: AgentOS DevOps Team
+# 作者: Spharx AgentOS Team
 # 版本: 2.0.0 (2026-04-08)
 # 兼容: Windows 10+, Windows Server 2019+, PowerShell 5.1+/7+
 # =============================================================================

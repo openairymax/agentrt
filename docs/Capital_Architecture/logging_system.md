@@ -758,9 +758,9 @@ logger.Info("Hello from Go")
 
 ---
 
-**版本**: Doc V1.6  
-**最后更新**: 2026-03-25  
-**维护者**: SPHARX Team  
+**版本**: Doc V1.8  
+**最后更新**: 2026-04-10  
+**维护者**: AgentOS 文档团队  
 **相关文档**: 
 - [原子日志接口](agentos/commons/utils/observability/include/logger.h)
 - [服务公共接口](agentos/daemon/agentos/commons/include/svc_common.h)

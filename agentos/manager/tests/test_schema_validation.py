@@ -13,7 +13,7 @@ Manager 模块 JSON Schema 验证单元测试
     - PyYAML (>= 5.0)
     - jsonschema (>= 4.0)
 
-作者: CTO (SOLO Coder)
+作者: Spharx AgentOS Team
 版本: v1.0.0
 日期: 2026-04-01
 """

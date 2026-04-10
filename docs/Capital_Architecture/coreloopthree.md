@@ -1,7 +1,7 @@
 Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 "From data intelligence emerges."
 
-# CoreLoopThree：三层一体核心运行时架构详解
+# 核心循环三层 (CoreLoopThree)：三层一体核心运行时架构详解
 
 **版本**: Doc V1.8
 **更新日期**: 2026-04-09
@@ -19,7 +19,7 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 
 ## 1. 概述
 
-CoreLoopThree 是 AgentOS 核心创新架构的具象体现，是 **体系并行论 (MCIS)** 在智能体运行时层面的直接映射与实践。通过将智能体运行时划分为认知、行动、记忆三个正交且协同的层次，实现了智能体生命周期管理的完整闭环。该架构严格遵循 **工程两论**（控制论反馈调节 + 系统工程层次分解）指导思想，是 **五维正交体系**（系统观、内核观、认知观、工程观、设计美学）在运行时层面的具体实现。
+核心循环三层 (CoreLoopThree) 是 AgentOS 核心创新架构的具象体现，是 **体系并行论 (MCIS)** 在智能体运行时层面的直接映射与实践。通过将智能体运行时划分为认知、行动、记忆三个正交且协同的层次，实现了智能体生命周期管理的完整闭环。该架构严格遵循 **工程两论**（控制论反馈调节 + 系统工程层次分解）指导思想，是 **五维正交体系**（系统观、内核观、认知观、工程观、设计美学）在运行时层面的具体实现。
 
 从 **体系并行论** 视角分析，CoreLoopThree 的三层架构对应 MCIS 中的三个核心 **体 (Body)**：
 1. **认知层 (Cognition Layer)** → **认知体 (Cognition Body)**：负责意图理解、任务规划、Agent调度
@@ -978,10 +978,10 @@ agentos_execution_register_unit(engine, "my_unit", &my_unit->base);
 - [README.md](../../README.md) - 项目总览
 - [memoryrovol.md](memoryrovol.md) - MemoryRovol 架构详解
 - [syscall.md](syscall.md) - 系统调用接口文档
-- [cognition.h](../include/cognition.h) - 认知层头文件
-- [execution.h](../include/execution.h) - 行动层头文件
-- [memory.h](../include/memory.h) - 记忆层头文件
-- [loop.h](../include/loop.h) - 核心循环接口
+- [cognition.h](../../../agentos/atoms/coreloopthree/include/cognition.h) - 认知层头文件 ✅
+- [execution.h](../../../agentos/atoms/coreloopthree/include/execution.h) - 行动层头文件 ✅
+- [memory.h](../../../agentos/atoms/coreloopthree/include/memory.h) - 记忆层头文件 ✅
+- [loop.h](../../../agentos/atoms/coreloopthree/include/loop.h) - 核心循环接口 ✅
 
 ---
 

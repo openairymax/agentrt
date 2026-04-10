@@ -6,7 +6,7 @@
  * @file sync_event.c
  * @brief 事件实现
  *
- * @author AgentOS Team
+ * @author Spharx AgentOS Team
  * @date 2026-04-05
  */
 

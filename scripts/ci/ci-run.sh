@@ -214,7 +214,7 @@ phase_build() {
 build_modules_fallback() {
     local modules=()
     if [[ "$CI_MODULE" == "all" ]]; then
-        modules=("daemon" "atoms" "commons" "cupolas" "gateway" "heapstore")
+        modules=("daemon" "atoms" "commons" "cupolas" "gateway" "heapstore" "manager")
     else
         IFS=',' read -ra modules <<< "$CI_MODULE"
     fi
@@ -417,7 +417,7 @@ quality_checks_fallback() {
     fi
 
     # 3. 检查 shell 脚本语法
-    if command -v bash -n &>/dev/null; then
+    if command -v bash &>/dev/null; then
         log_info "Checking shell script syntax..."
         local sh_errors=0
         while IFS= read -r -d '' file; do

@@ -72,10 +72,11 @@ agentos_error_t agentos_rule_generator_generate(
         "\nPlease generate a JSON rule that captures the commons characteristics of this cluster. "
         "The rule should have fields: 'name', 'description', 'condition', 'action', and 'confidence'. "
         "Output only valid JSON.");
+    }
 
     // 调用LLM服务
     if (!gen->llm) {
-        // 无LLM服务，返回简单占位符（生产环境应确保有LLM�?
+        // 无LLM服务，返回简单占位符（生产环境应确保有LLM服务）
         *out_rule = AGENTOS_STRDUP("{\"name\":\"Fallback pattern\",\"description\":\"No LLM available\",\"condition\":\"true\",\"action\":\"none\",\"confidence\":0.5}");
         if (!*out_rule) return AGENTOS_ENOMEM;
         return AGENTOS_SUCCESS;
