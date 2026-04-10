@@ -908,7 +908,7 @@ agentos_ipc_recv(channel, (void**)&response, &len, 5000);
 
 ---
 
-## 7. 实现状态 (Doc V1.6)
+## 7. 实现状态 (Doc V1.8)
 
 ### 7.1 已完成功能
 

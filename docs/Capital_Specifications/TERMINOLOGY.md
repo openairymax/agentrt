@@ -33,8 +33,8 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 - [系统调用 API 规范](./agentos_contract/syscall_api_contract.md)
 - [日志格式规范](./agentos_contract/logging_format.md)
 - [架构设计原则](../ARCHITECTURAL_PRINCIPLES.md)
-- [认知层理论](./philosophy/Cognition_Theory.md)
-- [设计哲学](./philosophy/Design_Principles.md)
+- [认知层理论](../Basic_Theories/CN_02_认知层理论.md)
+- [设计原则](../Basic_Theories/CN_04_设计原则.md)
 
 ### 三、使用方法
 
@@ -91,8 +91,8 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 
 **中文优先**: 后端服务层 (daemon)
 
-**来源**: [架构设计原则.md - 1.2.3 节](./架构设计原则.md)  
-**参见**: [cupolas](#cupolas-安全隔离层)、[Atoms](#atoms-内核层)
+**来源**: [架构设计原则](../ARCHITECTURAL_PRINCIPLES.md)  
+**参见**: [cupolas](#cupolas-安全穹顶)、[Atoms](#atoms-内核层)
 
 ### C
 
@@ -113,7 +113,7 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 
 **中文优先**: 安全穹顶 (cupolas)
 
-**来源**: [架构设计原则.md - 1.2.3 节](./架构设计原则.md)  
+**来源**: [架构设计原则](../ARCHITECTURAL_PRINCIPLES.md)  
 **参见**: [Security by Design](#security-by-design-安全内生设计)、[Sandbox](#sandbox-沙箱)
 
 ### E
@@ -134,7 +134,7 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 
 **中文优先**: 反馈闭环 (Feedback Loop)
 
-**来源**: [架构设计原则.md - 2.1 节](./架构设计原则.md)  
+**来源**: [架构设计原则](../ARCHITECTURAL_PRINCIPLES.md)  
 **参见**: [Engineering Cybernetics](#engineering-cybernetics-工程控制论)、[System Engineering](#system-engineering-系统工程)
 
 ### I
@@ -154,7 +154,7 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 
 **中文优先**: 进程间通信 (IPC)
 
-**来源**: [架构设计原则.md - 2.3 节](./架构设计原则.md)  
+**来源**: [架构设计原则](../ARCHITECTURAL_PRINCIPLES.md)  
 **参见**: [Microkernel](#microkernel-微内核)、[Syscall](#syscall-系统调用)
 
 ### J
@@ -185,7 +185,7 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 
 **中文优先**: 微内核 (Microkernel)
 
-**来源**: [架构设计原则.md - 2.3 节](./架构设计原则.md)  
+**来源**: [架构设计原则](../ARCHITECTURAL_PRINCIPLES.md)  
 **参见**: [IPC](#ipc-进程间通信)、[Service Isolation](#service-isolation-服务隔离)
 
 ### O
@@ -236,8 +236,8 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 
 **中文优先**: 安全内生设计 (Security by Design)
 
-**来源**: [架构设计原则.md - 5.1 节](./架构设计原则.md)  
-**参见**: [cupolas](#cupolas-安全隔离层)、[Sandbox](#sandbox-沙箱)
+**来源**: [架构设计原则](../ARCHITECTURAL_PRINCIPLES.md)  
+**参见**: [cupolas](#cupolas-安全穹顶)、[Sandbox](#sandbox-沙箱)
 
 #### Service Isolation (服务隔离)
 
@@ -245,7 +245,7 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 
 **中文优先**: 服务隔离 (Service Isolation)
 
-**来源**: [架构设计原则.md - 2.3 节](./架构设计原则.md)  
+**来源**: [架构设计原则](../ARCHITECTURAL_PRINCIPLES.md)  
 **参见**: [Microkernel](#microkernel-微内核)、[IPC](#ipc-进程间通信)
 
 #### Skill (技能)
@@ -297,15 +297,15 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 
 ## 参考文献
 
-[1] AgentOS 设计哲学。./philosophy/Design_Principles.md  
-[2] AgentOS 认知层理论。./philosophy/Cognition_Theory.md  
-[3] AgentOS 记忆层理论。./philosophy/Memory_Theory.md  
-[4] 架构设计原则。./架构设计原则.md  
-[5] Agent 契约规范。./agentos_contract/agent/agent_contract.md  
-[6] Skill 契约规范。./agentos_contract/skill/skill_contract.md  
-[7] 通信协议规范。./agentos_contract/protocol/protocol_contract.md  
-[8] 系统调用 API 规范。./agentos_contract/syscall/syscall_api_contract.md  
-[9] 日志格式规范。./agentos_contract/log/logging_format.md  
+[1] AgentOS 设计哲学。../Basic_Theories/CN_04_设计原则.md  
+[2] AgentOS 认知层理论。../Basic_Theories/CN_02_认知层理论.md  
+[3] 记忆层理论。../Basic_Theories/CN_03_记忆层理论.md  
+[4] 架构设计原则。../ARCHITECTURAL_PRINCIPLES.md  
+[5] Agent 契约规范。./agentos_contract/agent_contract.md  
+[6] Skill 契约规范。./agentos_contract/skill_contract.md  
+[7] 通信协议规范。./agentos_contract/protocol_contract.md  
+[8] 系统调用 API 规范。./agentos_contract/syscall_api_contract.md  
+[9] 日志格式规范。./agentos_contract/logging_format.md  
 
 ---
 

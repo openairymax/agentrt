@@ -12,7 +12,7 @@ This agent demonstrates:
 - Tool calling workflow
 - Structured result return mechanism
 
-Author: AgentOS Architecture Committee
+Author: Spharx AgentOS Team
 Version: 1.0.0.6
 """
 

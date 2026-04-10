@@ -2,17 +2,17 @@
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
  * SPDX-License-Identifier: Apache-2.0
- * 
+ *
  * @file check.h
  * @brief 通用检查宏 - 减少重复的参数验证和错误处理代码
- * 
+ *
  * 提供一组通用的检查宏，用于参数验证、错误处理和资源清理。
  * 旨在消除项目中分散的检查代码，提供一致的验证模式。
- * 
- * @author AgentOS Team
+ *
+ * @author Spharx AgentOS Team
  * @date 2026-04-07
  * @version 1.0
- * 
+ *
  * @note 线程安全：所有宏均为线程安全（无副作用）
  * @see ARCHITECTURAL_PRINCIPLES.md E-1 安全内生原则
  */
@@ -34,7 +34,7 @@
  * @param ptr 要检查的指针
  * @param err_code 错误码（如AGENTOS_EINVAL）
  * @return 如果ptr为NULL，返回err_code
- * 
+ *
  * @code
  * CHECK_NULL_RET(input, AGENTOS_EINVAL);
  * @endcode
@@ -58,7 +58,7 @@
  * @param expr 要检查的表达式
  * @param err_code 错误码
  * @return 如果expr为假，返回err_code
- * 
+ *
  * @code
  * CHECK_COND_RET(size > 0, AGENTOS_EINVAL);
  * @endcode
@@ -82,7 +82,7 @@
  * @param func_call 函数调用表达式（返回agentos_error_t）
  * @param err_var 存储错误结果的变量名
  * @return 如果func_call失败，返回错误码
- * 
+ *
  * @code
  * CHECK_ERR_RET(agentos_init(), err);
  * @endcode
@@ -99,7 +99,7 @@
  * @brief 检查函数调用结果，如果失败则跳转到清理标签
  * @param func_call 函数调用表达式（返回agentos_error_t）
  * @param err_var 存储错误结果的变量名
- * 
+ *
  * @code
  * CHECK_ERR_GOTO(agentos_alloc(&ptr), err, cleanup);
  * @endcode
@@ -116,7 +116,7 @@
  * @brief 检查指针是否为NULL，如果是则跳转到清理标签
  * @param ptr 要检查的指针
  * @param label 跳转标签
- * 
+ *
  * @code
  * CHECK_NULL_GOTO(buffer, cleanup);
  * @endcode
@@ -131,7 +131,7 @@
 /**
  * @brief 安全释放指针并将其置为NULL
  * @param ptr 要释放的指针
- * 
+ *
  * @note 使用AGENTOS_FREE进行释放
  * @code
  * SAFE_FREE(buffer);
@@ -150,7 +150,7 @@
  * @param ptr_var 指针变量名
  * @param size 分配大小
  * @param label 跳转标签
- * 
+ *
  * @code
  * ALLOC_CHECK(buffer, sizeof(buffer_t), cleanup);
  * @endcode
@@ -167,7 +167,7 @@
  * @param count 元素数量
  * @param size 元素大小
  * @param label 跳转标签
- * 
+ *
  * @code
  * CALLOC_CHECK(array, 10, sizeof(int), cleanup);
  * @endcode
@@ -183,7 +183,7 @@
  * @param dest 目标指针变量
  * @param src 源字符串
  * @param label 跳转标签
- * 
+ *
  * @code
  * STRDUP_CHECK(copy, original, cleanup);
  * @endcode
@@ -241,7 +241,7 @@
  * @param label 跳转标签
  * @param err_var 错误变量名（如ret）
  * @param err_code 错误码
- * 
+ *
  * @code
  * CHECK_NULL_GOTO_ERR(buffer, cleanup, ret, AGENTOS_ENOMEM);
  * @endcode
@@ -261,7 +261,7 @@
  * @param label 跳转标签
  * @param err_var 错误变量名
  * @param err_code 错误码
- * 
+ *
  * @code
  * STRDUP_CHECK_ERR(copy, original, cleanup, ret, AGENTOS_ENOMEM);
  * @endcode
@@ -279,7 +279,7 @@
  * @param label 跳转标签
  * @param err_var 错误变量名
  * @param err_code 错误码
- * 
+ *
  * @code
  * MALLOC_CHECK_ERR(buffer, sizeof(buffer_t), cleanup, ret, AGENTOS_ENOMEM);
  * @endcode
@@ -298,7 +298,7 @@
  * @param label 跳转标签
  * @param err_var 错误变量名
  * @param err_code 错误码
- * 
+ *
  * @code
  * CALLOC_CHECK_ERR(array, 10, sizeof(int), cleanup, ret, AGENTOS_ENOMEM);
  * @endcode

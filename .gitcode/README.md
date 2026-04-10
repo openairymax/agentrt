@@ -45,25 +45,18 @@
 │   ├── 📄 config.yml              # Issue 配置
 │   ├── 📄 bug_report.md           # Bug 报告模板
 │   └── 📄 feature_request.md      # 功能建议模板
-└── 📁 workflows/                  # CI/CD 工作流
+└── 📁 workflows/                  # CI/CD 工作流 (MCIS-based)
+    ├── 📄 agentos-mcis-ci.yml     # 主CI流水线 (MCIS认知体+执行体+记忆体)
     ├── 📄 ci.yml                  # 基础 CI 流水线 (V3.0)
-    ├── 📄 daemon-ci.yml           # Daemon 专项 CI (V2.0)
     ├── 📄 quality-gate.yml        # 质量门禁 (V2.0)
-    ├── 📄 release.yml             # 发布流水线 (V2.0)
-    ├── 📄 security-audit.yml      # 安全审计 (V2.0)
-    ├── 📄 dependency-update.yml   # 依赖更新 (V1.0)
-    ├── 📄 manager-enhanced-tests.yml # Manager 增强测试
-    ├── 📄 stale.yml               # 陈旧 Issue/PR 管理 (V2.0)
-    ├── 📄 build-desktop.yml       # 桌面客户端构建
-    ├── 📄 heapstore-ci.yml        # Heapstore 模块 CI
-    ├── 📄 openlab-ci.yml          # OpenLab 模块 CI
-    ├── 📄 toolkit-go-ci.yml       # Go SDK CI
-    ├── 📄 toolkit-python-ci.yml   # Python SDK CI
-    ├── 📄 toolkit-rust-ci.yml     # Rust SDK CI
-    ├── 📄 toolkit-typescript-ci.yml # TypeScript SDK CI
-    ├── 📄 tests-deploy.yml        # 测试部署
-    ├── 📄 tests-release.yml       # 测试发布
-    └── 📄 tests-test.yml          # 测试流程
+    ├── 📄 quality-monitoring.yml  # 质量监控与趋势分析 (可观测体)
+    ├── 📄 release.yml             # 发布流水线 (MCIS系统观发布体)
+    ├── 📄 security-audit.yml      # 安全审计 (MCIS安全穹顶体)
+    ├── 📄 dependency-update.yml   # 依赖更新 (MCIS系统维护体)
+    ├── 📄 stale.yml               # 陈旧 Issue/PR 管理 (MCIS问题管理体)
+    ├── 📄 tests-test.yml          # 测试验证 (MCIS系统观验证体)
+    ├── 📄 toolkit-ci.yml          # 多语言SDK CI (SDK扩展体)
+    └── 📄 build-desktop.yml       # 桌面客户端构建
 ```
 
 ---

@@ -14,7 +14,7 @@
  * - DNS 解析 API（解析/结果释放）
  * - 工具函数（可达性检查/本地IP获取/地址转换/初始化/清理）
  * 
- * @author AgentOS Team
+ * @author Spharx AgentOS Team
  * @date 2026-04-03
  */
 

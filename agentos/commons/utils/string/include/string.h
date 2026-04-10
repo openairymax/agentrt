@@ -9,7 +9,7 @@
  * 提供安全、高效、统一的字符串处理接口，避免缓冲区溢出等常见安全问题。
  * 本模块旨在消除项目中分散的字符串处理代码，提供一致的字符串操作策略。
  * 
- * @author AgentOS Team
+ * @author Spharx AgentOS Team
  * @date 2026-03-30
  * @version 2.0
  * 

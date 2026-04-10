@@ -8,7 +8,7 @@
 /**
  * @file cupolas_entitlements.c
  * @brief Entitlements Permission Declarations - Fine-grained Permission Mechanism Implementation
- * @author Spharx
+ * @author Spharx AgentOS Team
  * @date 2026
  */
 

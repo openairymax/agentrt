@@ -6,7 +6,7 @@
  * @file sync_condition.c
  * @brief 条件变量实现
  *
- * @author AgentOS Team
+ * @author Spharx AgentOS Team
  * @date 2026-04-05
  */
 

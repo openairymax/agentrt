@@ -313,4 +313,4 @@ CUPOLAS_CHECK_RESULT(result);
 **版本**: 1.0.0  
 **创建日期**: 2026-04-05  
 **最后更新**: 2026-04-06  
-**作者**: Spharx Core Team
+**作者**: Spharx AgentOS Team

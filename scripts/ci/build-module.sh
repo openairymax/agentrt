@@ -44,6 +44,7 @@ declare -A MODULE_SOURCES=(
     [cupolas]="agentos/cupolas"
     [gateway]="agentos/gateway"
     [heapstore]="agentos/heapstore"
+    [manager]="agentos/manager"
 )
 
 declare -A MODULE_CMAKE_OPTIONS=(
@@ -53,6 +54,7 @@ declare -A MODULE_CMAKE_OPTIONS=(
     [cupolas]="-DBUILD_TESTS=ON"
     [gateway]="-DBUILD_TESTS=ON"
     [heapstore]="-DBUILD_TESTS=ON"
+    [manager]="-DBUILD_TESTS=ON"
 )
 
 ###############################################################################
@@ -211,27 +213,41 @@ build_module() {
     mkdir -p "$build_dir"
     cd "$build_dir"
 
-    # CMake 配置
-    local cmake_args=(
-        "$source_dir"
-        "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
-        "-DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX}"
-        ${MODULE_CMAKE_OPTIONS[$module]}
-        "${CMAKE_EXTRA_ARGS[@]}"
-    )
+    # CMake 配置（增量构建时跳过已配置的模块）
+    local need_cmake_config=true
+    if [[ "$INCREMENTAL" == "true" ]] && [[ -f "${build_dir}/CMakeCache.txt" ]]; then
+        local cache_source_dir
+        cache_source_dir=$(grep -m1 "CMAKE_HOME_DIRECTORY:INTERNAL=" "${build_dir}/CMakeCache.txt" 2>/dev/null | cut -d= -f2 || echo "")
+        if [[ "$cache_source_dir" == "$source_dir" ]]; then
+            log_info "Incremental build: reusing existing CMake configuration"
+            need_cmake_config=false
+        else
+            log_info "Incremental build: source directory changed, reconfiguring"
+        fi
+    fi
 
-    local cmake_log="${PROJECT_ROOT}/ci-logs/${module}-cmake.log"
-    mkdir -p "$(dirname "$cmake_log")"
+    if [[ "$need_cmake_config" == "true" ]]; then
+        local cmake_args=(
+            "$source_dir"
+            "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
+            "-DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX}"
+            ${MODULE_CMAKE_OPTIONS[$module]}
+            "${CMAKE_EXTRA_ARGS[@]}"
+        )
 
-    log_info "Running CMake configuration..."
-    if [[ "$VERBOSE" == "true" ]]; then
-        cmake "${cmake_args[@]}" | tee "$cmake_log"
-    else
-        if ! cmake "${cmake_args[@]}" > "$cmake_log" 2>&1; then
-            log_error "CMake configuration failed for $module"
-            log_error "See log: $cmake_log"
-            cd "$PROJECT_ROOT"
-            return 1
+        local cmake_log="${PROJECT_ROOT}/ci-logs/${module}-cmake.log"
+        mkdir -p "$(dirname "$cmake_log")"
+
+        log_info "Running CMake configuration..."
+        if [[ "$VERBOSE" == "true" ]]; then
+            cmake "${cmake_args[@]}" | tee "$cmake_log"
+        else
+            if ! cmake "${cmake_args[@]}" > "$cmake_log" 2>&1; then
+                log_error "CMake configuration failed for $module"
+                log_error "See log: $cmake_log"
+                cd "$PROJECT_ROOT"
+                return 1
+            fi
         fi
     fi
 

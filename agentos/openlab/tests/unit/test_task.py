@@ -75,7 +75,7 @@ class TestTaskDefinition:
             category=TaskCategory.LONG_RUNNING,
             priority=10,
             input_data={"key": "value"},
-            metadata={"author": "test"},
+            metadata={"author": "Spharx AgentOS Team"},
             timeout=3600.0,
             max_retries=3,
         )

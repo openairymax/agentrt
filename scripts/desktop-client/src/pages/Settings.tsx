@@ -16,14 +16,15 @@ import {
   AlertTriangle,
   Info,
   ExternalLink,
+  Sparkles,
 } from 'lucide-react';
 import { useI18n } from '../i18n';
-import { invoke } from "../utils/tauriCompat";
+import sdk from "../services/agentos-sdk";
 
 const Settings: React.FC = () => {
   const { t, language, setLanguage, availableLanguages } = useI18n();
   const [backendUrl, setBackendUrl] = useState<string>('http://localhost:18789');
-  const [theme, setTheme] = useState<'light' | 'dark' | 'auto'>('dark');
+  const [theme, setTheme] = useState<'light' | 'dark' | 'auto'>('light');
   const [autoStart, setAutoStart] = useState<boolean>(false);
   const [notificationEnabled, setNotificationEnabled] = useState<boolean>(true);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -36,7 +37,7 @@ const Settings: React.FC = () => {
         if (savedSettings) {
           const settings = JSON.parse(savedSettings);
           setBackendUrl(settings.backendUrl || 'http://localhost:18789');
-          setTheme(settings.theme || 'dark');
+          setTheme(settings.theme || 'light');
           setAutoStart(settings.autoStart || false);
           setNotificationEnabled(settings.notificationEnabled !== false);
         }
@@ -50,8 +51,8 @@ const Settings: React.FC = () => {
   useEffect(() => {
     const loadSystemInfo = async () => {
       try {
-        const info = await invoke<{ platform: string; arch: string; version: string; cpu_cores?: number; total_memory_gb?: number }>('get_system_info');
-        setSystemInfo(info);
+        const info = await sdk.getSystemInfo();
+        setSystemInfo({ platform: info.os, arch: info.architecture, version: info.os_version, cpu_cores: info.cpu_cores, total_memory_gb: info.total_memory_gb });
       } catch (error) {
         console.error('Failed to load system info:', error);
       }
@@ -62,6 +63,7 @@ const Settings: React.FC = () => {
   useEffect(() => {
     const applyTheme = () => {
       const root = document.documentElement;
+      root.classList.add('theme-smooth-transition');
       if (theme === 'light' || (theme === 'auto' && window.matchMedia('(prefers-color-scheme: light)').matches)) {
         root.classList.add('light');
         root.classList.remove('dark');
@@ -69,6 +71,9 @@ const Settings: React.FC = () => {
         root.classList.add('dark');
         root.classList.remove('light');
       }
+      setTimeout(() => {
+        root.classList.remove('theme-smooth-transition');
+      }, 400);
     };
     applyTheme();
     const mediaQuery = window.matchMedia('(prefers-color-scheme: light)');
@@ -103,12 +108,8 @@ const Settings: React.FC = () => {
 
   const handleTestConnection = async () => {
     try {
-      const result = await invoke<{ success: boolean; message: string }>('test_backend_connection', { url: backendUrl });
-      if (result.success) {
-        alert(t.settings.connectionSuccess.replace('{url}', backendUrl));
-      } else {
-        alert(t.settings.connectionFailed.replace('{error}', result.message));
-      }
+      const result = await sdk.getHealthStatus();
+      alert(result.overall === "healthy" ? t.settings.connectionSuccess.replace('{url}', backendUrl) : t.settings.connectionFailed.replace('{error}', result.overall));
     } catch (error) {
       alert(t.settings.connectionError.replace('{error}', String(error)));
     }
@@ -118,17 +119,17 @@ const Settings: React.FC = () => {
     if (confirm(t.settings.resetConfirm)) {
       localStorage.removeItem('agentos_settings');
       setBackendUrl('http://localhost:18789');
-      setTheme('dark');
+      setTheme('light');
       setAutoStart(false);
       setNotificationEnabled(true);
-      setLanguage('en');
+      setLanguage('zh');
     }
   };
 
   const themeOptions = [
-    { value: 'dark' as const, icon: Moon, label: t.settings.themeDark, desc: 'Dark theme for low-light environments' },
-    { value: 'light' as const, icon: Sun, label: t.settings.themeLight, desc: 'Light theme for bright environments' },
-    { value: 'auto' as const, icon: MonitorCheck, label: t.settings.themeAuto, desc: 'Follow system preference' },
+    { value: 'light' as const, icon: Sun, label: t.settings.themeLight, desc: '明亮主题', colors: { bg: '#f8fafc', sidebar: '#ffffff', text: '#0f172a', accent: '#6366f1', border: '#e2e8f0' } },
+    { value: 'dark' as const, icon: Moon, label: t.settings.themeDark, desc: '暗色主题', colors: { bg: '#0a0a0f', sidebar: '#111118', text: '#ededed', accent: '#6366f1', border: '#27273a' } },
+    { value: 'auto' as const, icon: MonitorCheck, label: t.settings.themeAuto, desc: '跟随系统', colors: { bg: 'linear-gradient(135deg, #f8fafc 50%, #0a0a0f 50%)', sidebar: 'linear-gradient(135deg, #ffffff 50%, #111118 50%)', text: '#6366f1', accent: '#6366f1', border: '#94a3b8' } },
   ];
 
   return (
@@ -184,7 +185,7 @@ const Settings: React.FC = () => {
             <p className="form-help">{t.settings.languageHelp}</p>
           </div>
 
-          {/* Theme Selector - Visual Cards */}
+          {/* Theme Selector - Visual Preview Cards */}
           <div className="form-group">
             <label className="form-label">
               <Monitor size={14} style={{ display: "inline", marginRight: "6px", verticalAlign: "middle" }} />
@@ -194,29 +195,39 @@ const Settings: React.FC = () => {
               {themeOptions.map((opt) => {
                 const IconComp = opt.icon;
                 const isSelected = theme === opt.value;
+                const c = opt.colors;
+                const isAuto = opt.value === 'auto';
                 return (
-                  <button
+                  <div
                     key={opt.value}
-                    type="button"
+                    className={`theme-preview-card ${isSelected ? 'selected' : ''}`}
                     onClick={() => setTheme(opt.value)}
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      gap: "8px",
-                      padding: "16px 12px",
-                      borderRadius: "var(--radius-md)",
-                      border: `2px solid ${isSelected ? "var(--primary-color)" : "var(--border-color)"}`,
-                      background: isSelected ? "var(--primary-light)" : "var(--bg-tertiary)",
-                      cursor: "pointer",
-                      transition: "all var(--transition-fast)",
-                    }}
                   >
-                    <IconComp size={24} color={isSelected ? "var(--primary-color)" : "var(--text-muted)"} />
-                    <span style={{ fontSize: "13px", fontWeight: 500, color: isSelected ? "var(--primary-color)" : "var(--text-secondary)" }}>
-                      {opt.label}
-                    </span>
-                  </button>
+                    <div className="theme-preview-mini">
+                      <div className="theme-preview-titlebar" style={{ background: isAuto ? c.bg : c.bg }}>
+                        <div className="theme-preview-dot" style={{ background: '#ef4444' }} />
+                        <div className="theme-preview-dot" style={{ background: '#f59e0b' }} />
+                        <div className="theme-preview-dot" style={{ background: '#22c55e' }} />
+                      </div>
+                      <div className="theme-preview-body">
+                        <div className="theme-preview-sidebar" style={{ background: isAuto ? c.sidebar : c.sidebar }} />
+                        <div className="theme-preview-content" style={{ background: isAuto ? c.bg : c.bg }}>
+                          <div className="theme-preview-line" style={{ background: isAuto ? c.text : c.border, opacity: 0.5 }} />
+                          <div className="theme-preview-line" style={{ background: c.accent, opacity: 0.6 }} />
+                          <div className="theme-preview-line" style={{ background: isAuto ? c.text : c.border, opacity: 0.3 }} />
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                      <IconComp size={16} color={isSelected ? "var(--primary-color)" : "var(--text-muted)"} />
+                      <span style={{ fontSize: "13px", fontWeight: 600, color: isSelected ? "var(--primary-color)" : "var(--text-secondary)" }}>
+                        {opt.label}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: "11px", color: "var(--text-muted)", textAlign: "center", marginTop: "2px" }}>
+                      {opt.desc}
+                    </div>
+                  </div>
                 );
               })}
             </div>
@@ -276,6 +287,23 @@ const Settings: React.FC = () => {
             {t.settings.testConnection}
           </button>
           <p className="form-help" style={{ textAlign: "center" }}>{t.settings.testConnectionHelp}</p>
+
+          {/* Quick Tips */}
+          <div style={{
+            marginTop: "20px",
+            padding: "16px",
+            background: "var(--primary-light)",
+            borderRadius: "var(--radius-md)",
+            border: "1px solid rgba(99, 102, 241, 0.15)",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+              <Sparkles size={16} style={{ color: "var(--primary-color)" }} />
+              <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--primary-color)" }}>快速提示</span>
+            </div>
+            <div style={{ fontSize: "12.5px", color: "var(--text-secondary)", lineHeight: 1.6 }}>
+              确保后端服务已启动并运行在正确的端口上。如果使用 Docker，请检查容器状态和网络配置。
+            </div>
+          </div>
         </div>
 
         {/* System Info Card */}
@@ -363,7 +391,7 @@ const Settings: React.FC = () => {
             style={{ color: "var(--primary-color)", textDecoration: "none", fontWeight: 500 }}
             onClick={(e) => {
               e.preventDefault();
-              invoke('open_browser', { url: 'https://docs.agentos.io' });
+              sdk.openBrowser('https://docs.agentos.io');
             }}
           >
             docs.agentos.io

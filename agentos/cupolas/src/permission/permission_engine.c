@@ -8,7 +8,7 @@
 /**
  * @file permission_engine.c
  * @brief Permission Engine Implementation
- * @author Spharx
+ * @author Spharx AgentOS Team
  * @date 2024
  */
 

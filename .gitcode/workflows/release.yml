@@ -481,126 +481,84 @@ jobs:
         id: changelog
         run: |
           VERSION=${{ env.VERSION }}
-          
-          # 获取上一个tag
+
+          # Get previous tag
           PREV_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]' | head -2 | tail -1)
-          
-          echo "## 📝 Generating MCIS Release Changelog" >> $GITHUB_STEP_SUMMARY
+
+          echo "## Generating MCIS Release Changelog" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           if [ -n "$PREV_TAG" ]; then
             echo "Generating MCIS changelog from $PREV_TAG to $VERSION..."
-            
-            cat > release_notes.md << 'EOF'
-# 🚀 AgentOS ${VERSION} - MCIS Release
 
-## 🎯 MCIS Dimension Integration
-
-This release represents the coordinated output of all MCIS dimensions:
-
-| Dimension | Status | Key Components |
-|-----------|--------|----------------|
-| **Cognition Body** | ✅ | Core kernel, atoms, commons |
-| **Execution Body** | ✅ | Daemon services, gateway |
-| **Memory Body** | ✅ | Heapstore storage system |
-| **Security Cupolas** | ✅ | Security frameworks |
-| **SDK Extensions** | ✅ | Multi-language SDKs |
-
-## 📋 MCIS Changelog
-
-### 🔍 New Features (MCIS Cognition Enhancements)
-$(git log ${PREV_TAG}..HEAD --grep='^feat' --oneline --no-merges 2>/dev/null | sed 's/^/- /' || echo "- MCIS cognitive improvements")
-
-### ⚡ Improvements (MCIS Execution Optimizations)
-$(git log ${PREV_TAG}..HEAD --grep='^perf\|^refactor' --oneline --no-merges 2>/dev/null | sed 's/^/- /' || echo "- MCIS execution optimizations")
-
-### 🐛 Bug Fixes (MCIS Negative Feedback)
-$(git log ${PREV_TAG}..HEAD --grep='^fix' --oneline --no-merges 2>/dev/null | sed 's/^/- /' || echo "- MCIS stability improvements")
-
-### 🛡️ Security Updates (MCIS Cupolas)
-$(git log ${PREV_TAG}..HEAD --grep='^security' --oneline --no-merges 2>/dev/null | sed 's/^/- /' || echo "- Security enhancements")
-
----
-
-## 📦 Release Contents
-
-### Core Kernel (Cognition Body)
-- `agentos-${VERSION}-linux-x86_64.tar.gz`: Complete kernel build
-
-### SDK Extensions
-- Python SDK: `agentos-${VERSION}-py3-none-any.whl`
-- Go SDK: `agentos-go-sdk-${VERSION}.tar.gz`
-- Rust SDK: `agentos-${VERSION}.crate`
-
-### Container Images (Execution Body)
-- Docker: `${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${VERSION}`
-
----
-
-## 🔄 MCIS Control Theory Applied
-
-- **Negative Feedback**: Quality gates and testing
-- **Positive Feedback**: Performance optimizations
-- **Feedforward**: Architectural improvements
-
----
-
-**Full commit history**: [View all commits](../../compare/${PREV_TAG}...v${VERSION})
-
-*MCIS Theory: Multibody Cybernetic Intelligent System*
-EOF
+            # Create release notes using simple shell commands (avoid complex heredoc in YAML)
+            {
+              echo "# AgentOS v${VERSION} - MCIS Release"
+              echo ""
+              echo "## MCIS Dimension Integration"
+              echo ""
+              echo "This release represents the coordinated output of all MCIS dimensions:"
+              echo ""
+              echo "| Dimension | Status | Key Components |"
+              echo "|-----------|--------|----------------|"
+              echo "| **Cognition Body** | OK | Core kernel, atoms, commons |"
+              echo "| **Execution Body** | OK | Daemon services, gateway |"
+              echo "| **Memory Body** | OK | Heapstore storage system |"
+              echo "| **Security Cupolas** | OK | Security frameworks |"
+              echo "| **SDK Extensions** | OK | Multi-language SDKs |"
+              echo ""
+              echo "## MCIS Changelog"
+              echo ""
+              echo "### New Features (MCIS Cognition Enhancements)"
+              git log ${PREV_TAG}..HEAD --grep='^feat' --oneline --no-merges 2>/dev/null | sed 's/^/- /' || echo "- MCIS cognitive improvements"
+              echo ""
+              echo "### Improvements (MCIS Execution Optimizations)"
+              git log ${PREV_TAG}..HEAD --grep='^perf\|^refactor' --oneline --no-merges 2>/dev/null | sed 's/^/- /' || echo "- MCIS execution optimizations"
+              echo ""
+              echo "### Bug Fixes (MCIS Negative Feedback)"
+              git log ${PREV_TAG}..HEAD --grep='^fix' --oneline --no-merges 2>/dev/null | sed 's/^/- /' || echo "- MCIS stability improvements"
+              echo ""
+              echo "### Security Updates (MCIS Cupolas)"
+              git log ${PREV_TAG}..HEAD --grep='^security' --oneline --no-merges 2>/dev/null | sed 's/^/- /' || echo "- Security enhancements"
+              echo ""
+              echo "---"
+              echo ""
+              echo "## Release Contents"
+              echo ""
+              echo "### Core Kernel (Cognition Body)"
+              echo "- agentos-${VERSION}-linux-x86_64.tar.gz: Complete kernel build"
+              echo ""
+              echo "### SDK Extensions"
+              echo "- Python SDK: agentos-${VERSION}-py3-none-any.whl"
+              echo "- Go SDK: agentos-go-sdk-${VERSION}.tar.gz"
+              echo "- Rust SDK: agentos-${VERSION}.crate"
+              echo ""
+              echo "---"
+              echo ""
+              echo "*MCIS Theory: Multibody Cybernetic Intelligent System*"
+            } > release_notes.md
           else
             echo "No previous tag found, creating initial MCIS release notes..."
-            cat > release_notes.md << 'EOF'
-# 🚀 AgentOS ${VERSION} - Initial MCIS Release
+            {
+              echo "# AgentOS v${VERSION} - Initial MCIS Release"
+              echo ""
+              echo "**First official MCIS-based release!**"
+              echo ""
+              echo "## MCIS Architecture Overview"
+              echo ""
+              echo "AgentOS is built on the **Multibody Cybernetic Intelligent System (MCIS)** theory."
+              echo ""
+              echo "### Key MCIS Dimensions:"
+              echo ""
+              echo "- **Cognition Body**: Core algorithms and decision-making"
+              echo "- **Execution Body**: Service execution and orchestration"
+              echo "- **Memory Body**: Multi-layer storage and retrieval"
+              echo "- **Security Cupolas**: Multi-layered protection system"
+              echo "- **SDK Extensions**: Cross-language integration"
+            } > release_notes.md
+          fi
 
-🎉 **First official MCIS-based release!**
-
-## 🎯 MCIS Architecture Overview
-
-AgentOS is built on the **Multibody Cybernetic Intelligent System (MCIS)** theory, featuring orthogonal dimensions that operate independently yet cooperatively.
-
-### Key MCIS Dimensions:
-
-- **Cognition Body**: Core algorithms and decision-making
-- **Execution Body**: Service execution and orchestration  
-- **Memory Body**: Multi-layer storage and retrieval
-- **Security Cupolas**: Multi-layered protection system
-- **SDK Extensions**: Cross-language integration
-
-## 📦 Initial Release Contents
-
-### Core Kernel
-- Microkernel architecture (CoreKern) - Four-atom mechanism
-- Three-layer cognitive loop (CoreLoopThree) - Fast/slow path separation
-- Four-layer memory system (MemoryRovol) - Progressive abstraction
-- Security domes (Cupolas) - Quadruple protection system
-
-### Multi-language SDK Support
-- Python SDK: Full AgentOS integration
-- Go SDK: High-performance client
-- Rust SDK: Safe, concurrent access
-- TypeScript SDK: Web and Node.js support
-
-### Deployment Options
-- Docker containers for all services
-- Kubernetes deployment manifests
-- Standalone binary distributions
-
----
-
-## 🔄 MCIS Control Theory
-
-This release implements the core MCIS control mechanisms:
-
-1. **Negative Feedback**: Error correction and stability
-2. **Positive Feedback**: Performance amplification  
-3. **Feedforward**: Predictive optimization
-
----
-
-*Welcome to the future of intelligent systems with MCIS architecture!*
-EOF
+          echo "Release notes generated successfully"
           fi
           
           cat release_notes.md

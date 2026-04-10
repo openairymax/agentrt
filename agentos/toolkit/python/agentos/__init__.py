@@ -42,7 +42,7 @@ Version History:
 """
 
 __version__ = "3.0.0"
-__author__ = "SpharxWorks"
+__author__ = "Spharx AgentOS Team"
 __license__ = "MIT"
 
 # 导入异常类和错误码常量
