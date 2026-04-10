@@ -3,7 +3,7 @@
   "contract_version": "1.0.0",
   "agent_id": "tester",
   "agent_name": "Tester Agent",
-  "description": "璐ㄩ噺娴嬭瘯鏅鸿兘浣擄紝璐熻矗娴嬭瘯绛栫暐鍒跺畾銆佽嚜鍔ㄥ寲娴嬭瘯鍜岃川閲忎繚璇?,
+  "description": "质量测试智能体，负责测试策略制定、自动化测试和质量保?,
   "version": "1.0.0.9",
   "author": "Spharx AgentOS Team",
   "license": "Apache-2.0",
@@ -11,11 +11,11 @@
   "capabilities": [
     {
       "name": "code_generation",
-      "description": "娴嬭瘯浠ｇ爜鐢熸垚鑳藉姏"
+      "description": "测试代码生成能力"
     },
     {
       "name": "debugging",
-      "description": "闂璇婃柇鑳藉姏"
+      "description": "问题诊断能力"
     }
   ],
   
