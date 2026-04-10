@@ -19,7 +19,7 @@
  * - Linux (POSIX Socket)
  * - macOS (POSIX Socket)
  * 
- * @author AgentOS Team
+ * @author Spharx AgentOS Team
  * @date 2026-04-02
  * @version 1.0.0.6
  * 

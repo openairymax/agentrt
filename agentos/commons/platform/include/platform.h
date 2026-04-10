@@ -16,7 +16,7 @@
  * - 零开销：内联函数 + 宏定义
  * - 类型安全：强类型封装
  * 
- * @author AgentOS Team
+ * @author Spharx AgentOS Team
  * @date 2026-03-30
  * @version 2.0
  * 

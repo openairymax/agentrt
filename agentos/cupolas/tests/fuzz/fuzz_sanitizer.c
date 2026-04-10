@@ -8,7 +8,7 @@
 /**
  * @file fuzz_sanitizer.c
  * @brief Input Sanitizer Fuzz Testing
- * @author Spharx
+ * @author Spharx AgentOS Team
  * @date 2024
  *
  * Fuzz testing for input sanitizer using libFuzzer, covering:

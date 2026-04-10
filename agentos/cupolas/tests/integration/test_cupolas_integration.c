@@ -8,7 +8,7 @@
 /**
  * @file test_cupolas_integration.c
  * @brief cupolas Module Integration Tests
- * @author Spharx
+ * @author Spharx AgentOS Team
  * @date 2024
  */
 

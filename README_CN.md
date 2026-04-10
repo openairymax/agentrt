@@ -24,7 +24,18 @@
 
 ## 🌟 项目简介
 
-**AgentOS** 是一个智能体操作系统，为驱动智能体团队提供完整的操作系统级支持。  
+**AgentOS** 是一个智能体操作系统，为驱动智能体团队提供完整的操作系统级支持。
+
+### 🎥 项目预览
+
+<div align="center">
+<video src="docs/Other_Source/Spharx AgentOS 客户端演示.mp4" controls="controls" width="800"></video>
+</div>
+
+> 💡 **提示**: 
+> - 如果视频无法播放，请确保已安装 [Git LFS](https://git-lfs.github.com/) 并执行 `git lfs pull`
+> - 或直接访问 [docs/Other_Source/Spharx AgentOS 客户端演示.mp4](docs/Other_Source/Spharx%20AgentOS%20客户端演示.mp4) 查看
+> - 详细说明请参考 [docs/Other_Source/README_VIDEO.md](docs/Other_Source/README_VIDEO.md)
 
 ## 💡 创新要点
 

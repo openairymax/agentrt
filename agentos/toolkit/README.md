@@ -579,7 +579,7 @@ mkdir -p <language>/{client,modules,types,utils,errors,config}
 
 ## 👥 作者
 
-**SpharxWorks**
+**Spharx AgentOS Team**
 
 ---
 

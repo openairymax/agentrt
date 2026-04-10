@@ -8,7 +8,7 @@
 /**
  * @file cupolas_network_security.c
  * @brief Network Security - TLS Hardening and Traffic Implementation
- * @author Spharx
+ * @author Spharx AgentOS Team
  * @date 2026
  */
 

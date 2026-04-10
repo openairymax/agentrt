@@ -19,7 +19,7 @@
  * 2. 原子层：提供高性能、线程安全的日志写入实现
  * 3. 服务层：提供高级功能（轮转、过滤、传输、监控）
  * 
- * @author AgentOS Team
+ * @author Spharx AgentOS Team
  * @date 2026-03-30
  * @version 2.0
  * 

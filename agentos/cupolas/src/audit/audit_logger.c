@@ -8,7 +8,7 @@
 /**
  * @file audit_logger.c
  * @brief Audit Logger Implementation
- * @author Spharx
+ * @author Spharx AgentOS Team
  * @date 2024
  */
 

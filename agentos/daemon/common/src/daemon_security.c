@@ -8,7 +8,7 @@
 /**
  * @file daemon_security.c
  * @brief Daemon Layer Security Integration - Unified Security for All Daemon Services
- * @author Spharx
+ * @author Spharx AgentOS Team
  * @date 2026-04-02
  *
  * This module provides unified security integration for all AgentOS daemon services:

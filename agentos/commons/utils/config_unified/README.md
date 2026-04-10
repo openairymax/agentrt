@@ -542,7 +542,7 @@ Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 ## 作者
 
-AgentOS 开发团队
+Spharx AgentOS Team
 
 ## 反馈和贡献
 

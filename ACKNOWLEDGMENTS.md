@@ -27,7 +27,7 @@ AgentOS 集成了许多优秀的开源项目，在此表示诚挚的感谢：
 
 #### Sentence Transformers
 - **用途**: 文本嵌入和语义相似度计算
-- **作者**: Nils Reimers
+- **作者**: Spharx AgentOS Team
 - **许可证**: Apache 2.0
 - **链接**: https://github.com/UKPLab/sentence-transformers
 - **感谢**: 简化了文本向量化流程
@@ -66,14 +66,14 @@ AgentOS 集成了许多优秀的开源项目，在此表示诚挚的感谢：
 
 #### Requests
 - **用途**: HTTP 客户端库
-- **作者**: Kenneth Reitz
+- **作者**: Spharx AgentOS Team
 - **许可证**: Apache 2.0
 - **链接**: https://requests.readthedocs.io/
 - **感谢**: "HTTP for Humans"，让网络请求如此简单
 
 #### Click
 - **用途**: 命令行接口创建
-- **作者**: Armin Ronacher
+- **作者**: Spharx AgentOS Team
 - **许可证**: BSD License
 - **链接**: https://click.palletsprojects.com/
 - **感谢**: 优雅地构建 CLI 工具
@@ -94,14 +94,14 @@ AgentOS 集成了许多优秀的开源项目，在此表示诚挚的感谢：
 
 #### mypy
 - **用途**: 静态类型检查
-- **作者**: Jukka Lehtosalo
+- **作者**: Spharx AgentOS Team
 - **许可证**: MIT License
 - **链接**: https://mypy-lang.org/
 - **感谢**: 提升了 Python 代码的类型安全
 
 #### pre-commit
 - **用途**: Git 预提交钩子管理
-- **作者**: Anthony Sottile
+- **作者**: Spharx AgentOS Team
 - **许可证**: MIT License
 - **链接**: https://pre-commit.com/
 - **感谢**: 自动化了代码质量检查
@@ -110,14 +110,14 @@ AgentOS 集成了许多优秀的开源项目，在此表示诚挚的感谢：
 
 #### Sphinx
 - **用途**: 文档生成
-- **作者**: Georg Brandl
+- **作者**: Spharx AgentOS Team
 - **许可证**: BSD License
 - **链接**: https://www.sphinx-doc.org/
 - **感谢**: Python 社区的标准文档工具
 
 #### MkDocs
 - **用途**: 项目文档站点生成
-- **作者**: Tom Christie
+- **作者**: Spharx AgentOS Team
 - **许可证**: BSD License
 - **链接**: https://www.mkdocs.org/
 - **感谢**: 快速构建美观的文档站点

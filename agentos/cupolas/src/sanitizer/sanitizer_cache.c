@@ -8,7 +8,7 @@
 /**
  * @file sanitizer_cache.c
  * @brief Sanitizer Cache Implementation
- * @author Spharx
+ * @author Spharx AgentOS Team
  * @date 2024
  */
 

@@ -37,7 +37,7 @@
 #   - 内存 >= 4GB RAM (开发) / 8GB (生产)
 #   - 磁盘空间 >= 20GB
 #
-# 作者: AgentOS DevOps Team
+# 作者: Spharx AgentOS Team
 # 版本: 2.0.0 (2026-04-08)
 # 兼容: Linux (Ubuntu/Debian/CentOS/Fedora/Arch/Alpine), macOS 12+
 # =============================================================================

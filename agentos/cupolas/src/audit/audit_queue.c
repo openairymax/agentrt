@@ -8,7 +8,7 @@
 /**
  * @file audit_queue.c
  * @brief Audit Log Queue Implementation - Thread-safe Producer-Consumer Queue
- * @author Spharx
+ * @author Spharx AgentOS Team
  * @date 2024
  */
 

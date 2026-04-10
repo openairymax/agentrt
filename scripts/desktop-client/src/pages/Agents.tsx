@@ -19,16 +19,12 @@ import {
   Clock,
   Activity,
   Star,
+  Play,
+  Square,
 } from "lucide-react";
-import { invoke } from "../utils/tauriCompat";
+import sdk from "../services/agentos-sdk";
+import type { AgentInfo } from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
-
-interface AgentInfo {
-  name: string;
-  type: string;
-  status: string;
-  description: string;
-}
 
 const agentTypeConfig: Record<string, { icon: typeof Bot; color: string; gradient: string; bgLight: string; label: string }> = {
   research: { icon: Brain, color: "#6366f1", gradient: "linear-gradient(135deg, #6366f1, #818cf8)", bgLight: "rgba(99,102,241,0.08)", label: "研究型" },
@@ -49,10 +45,13 @@ const Agents: React.FC = () => {
     loadAgents();
   }, []);
 
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [showConfigModal, setShowConfigModal] = useState<string | null>(null);
+
   const loadAgents = async () => {
     setLoading(true);
     try {
-      const data = await invoke<AgentInfo[]>("list_agents");
+      const data = await sdk.listAgents();
       setAgents(data || []);
     } catch (error) {
       console.error("Failed to load agents:", error);
@@ -63,7 +62,7 @@ const Agents: React.FC = () => {
 
   const handleRegister = async (name: string, type: string) => {
     try {
-      await invoke("register_agent", { agent_name: name, agent_type: type });
+      await sdk.registerAgent(name, type);
       setShowRegisterModal(false);
       loadAgents();
     } catch (error) {
@@ -71,10 +70,35 @@ const Agents: React.FC = () => {
     }
   };
 
+  const handleStartAgent = async (agentId: string) => {
+    setActionLoading(agentId + "-start");
+    try {
+      await sdk.startAgent(agentId);
+      loadAgents();
+    } catch (error) {
+      alert(`启动失败: ${error}`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleStopAgent = async (agentId: string) => {
+    if (!confirm("确定要停止此智能体吗？")) return;
+    setActionLoading(agentId + "-stop");
+    try {
+      await sdk.stopAgent(agentId);
+      loadAgents();
+    } catch (error) {
+      alert(`停止失败: ${error}`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const filteredAgents = agents.filter(
     (agent) =>
       agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      agent.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (agent.type || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (agent.description && agent.description.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
@@ -185,7 +209,7 @@ const Agents: React.FC = () => {
               gap: "14px",
             }}>
               {filteredAgents.map((agent, idx) => {
-                const config = getAgentConfig(agent.type);
+                const config = getAgentConfig(agent.type || "general");
                 const IconComp = config.icon;
                 const isSelected = selectedAgent?.name === agent.name;
 
@@ -261,7 +285,7 @@ const Agents: React.FC = () => {
                       display: "flex", justifyContent: "space-between", alignItems: "center",
                     }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        {agent.status === "active" ? (
+                        {agent.status === "active" || agent.status === "running" ? (
                           <>
                             <span style={{
                               width: "8px", height: "8px", borderRadius: "50%",
@@ -277,7 +301,38 @@ const Agents: React.FC = () => {
                           </>
                         )}
                       </div>
-                      <Activity size={13} style={{ color: "var(--text-muted)" }} />
+                      <div style={{ display: "flex", gap: "4px" }}>
+                        {(agent.status === "idle" || agent.status === "stopped") && (
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={(e) => { e.stopPropagation(); handleStartAgent(agent.id); }}
+                            disabled={actionLoading === (agent.id + "-start")}
+                            title="启动智能体"
+                            style={{ padding: "4px 10px", fontSize: "11.5px" }}
+                          >
+                            {actionLoading === (agent.id + "-start") ? <Loader2 size={12} className="spin" /> : <Play size={12} />}
+                          </button>
+                        )}
+                        {(agent.status === "running" || agent.status === "active") && (
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={(e) => { e.stopPropagation(); handleStopAgent(agent.id); }}
+                            disabled={actionLoading === (agent.id + "-stop")}
+                            title="停止智能体"
+                            style={{ padding: "4px 10px", fontSize: "11.5px", color: "#ef4444" }}
+                          >
+                            {actionLoading === (agent.id + "-stop") ? <Loader2 size={12} className="spin" /> : <Square size={12} />}
+                          </button>
+                        )}
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={(e) => { e.stopPropagation(); setShowConfigModal(agent.id); }}
+                          title="配置"
+                          style={{ padding: "4px 10px", fontSize: "11.5px" }}
+                        >
+                          <Shield size={12} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -295,7 +350,7 @@ const Agents: React.FC = () => {
             animation: "slideInRight 0.3s ease-out",
           }}>
             {(() => {
-              const config = getAgentConfig(selectedAgent.type);
+              const config = getAgentConfig(selectedAgent.type || "general");
               const IconComp = config.icon;
 
               return (
