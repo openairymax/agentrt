@@ -17,6 +17,7 @@
     "settings": "Settings",
     "llmConfig": "AI Models",
     "agentRuntime": "Runtime",
+    "systemMonitor": "System Monitor",
     "aiChat": "AI Chat"
   },
   "dashboard": {
