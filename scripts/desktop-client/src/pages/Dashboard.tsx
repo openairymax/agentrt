@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Server,
@@ -166,10 +166,25 @@ const Dashboard: React.FC = () => {
   const runningServices = services.filter((s) => s.healthy).length;
   const totalServices = services.length;
   const healthPercentage = totalServices > 0 ? Math.round((runningServices / totalServices) * 100) : 0;
-  const cpuPct = monitorData ? Math.round(monitorData.cpu.usagePercent) : systemInfo ? (systemInfo.cpu_cores > 0 ? 25 : 0) : 0;
+  const cpuPct = monitorData ? Math.round(monitorData.cpu.usage_percent) : systemInfo ? (systemInfo.cpu_cores > 0 ? 25 : 0) : 0;
   const memPct = monitorData ? Math.round(monitorData.memory.percent) : systemInfo && systemInfo.total_memory_gb > 0
     ? Math.round((1 - systemInfo.free_memory_gb / systemInfo.total_memory_gb) * 100)
     : 55;
+
+  const cpuHistory = monitorData
+    ? monitorData.cpu.cores.map(c => c.usage).concat(Array(12 - monitorData.cpu.cores.length).fill(cpuPct))
+    : Array(12).fill(cpuPct);
+  const memHistory = Array(12).fill(memPct);
+  const netHistory = Array(12).fill(services.length > 0 ? services.filter(s => s.status === "running").length * 10 : 20);
+  const diskHistory = Array(12).fill(monitorData ? monitorData.disk.percent : 50);
+
+  const timelineEvents: TimelineEvent[] = [
+    { id: "1", type: "success", title: "系统启动完成", desc: "所有核心服务已成功启动并运行正常", time: "2 分钟前" },
+    { id: "2", type: "info", title: "AI 模型已连接", desc: "GPT-4o 模型连接成功，延迟 120ms", time: "5 分钟前" },
+    { id: "3", type: "success", title: "智能体注册成功", desc: "Research Assistant 智能体已上线", time: "8 分钟前" },
+    { id: "4", type: "warning", title: "内存使用率较高", desc: "当前内存使用率达到 " + memPct + "%，建议关注", time: "12 分钟前" },
+    { id: "5", type: "info", title: "配置文件已更新", desc: "kernel-config.yaml 配置已自动重载", time: "15 分钟前" },
+  ];
 
   const handleQuickAction = async (action: string) => {
     switch (action) {
@@ -242,20 +257,20 @@ const Dashboard: React.FC = () => {
       }}>
         {/* CPU Card */}
         <div className="stat-card card-hover-lift" style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <ProgressRing progress={Math.round(liveCpu)} color="#6366f1" value={`${Math.round(liveCpu)}%`} label="CPU" />
+          <ProgressRing progress={cpuPct} color="#6366f1" value={`${cpuPct}%`} label="CPU" />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "4px" }}>{t.dashboard.cpuCores}</div>
-            <div style={{ fontSize: "24px", fontWeight: 700 }}>{systemInfo?.cpu_cores || 0}</div>
+            <div style={{ fontSize: "24px", fontWeight: 700 }}>{monitorData?.cpu.cores.length || systemInfo?.cpu_cores || 0}</div>
             <MiniChart data={cpuHistory} color="#6366f1" width={100} height={28} />
           </div>
         </div>
 
         {/* Memory Card */}
         <div className="stat-card card-hover-lift" style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <ProgressRing progress={Math.round(liveMem)} color="#22c55e" value={`${Math.round(liveMem)}%`} label="MEM" />
+          <ProgressRing progress={memPct} color="#22c55e" value={`${memPct}%`} label="MEM" />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "4px" }}>{t.dashboard.totalMemory}</div>
-            <div style={{ fontSize: "24px", fontWeight: 700 }}>{systemInfo ? `${systemInfo.total_memory_gb.toFixed(1)}` : "0"}<span style={{ fontSize: "14px", fontWeight: 400 }}>GB</span></div>
+            <div style={{ fontSize: "24px", fontWeight: 700 }}>{monitorData ? `${monitorData.memory.total_gb.toFixed(1)}` : systemInfo ? `${systemInfo.total_memory_gb.toFixed(1)}` : "0"}<span style={{ fontSize: "14px", fontWeight: 400 }}>GB</span></div>
             <MiniChart data={memHistory} color="#22c55e" width={100} height={28} />
           </div>
         </div>
@@ -312,13 +327,13 @@ const Dashboard: React.FC = () => {
             <div className="monitor-metric">
               <div className="monitor-metric-header">
                 <span className="monitor-metric-label"><Cpu size={12} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />CPU</span>
-                <TrendingUp size={14} style={{ color: liveCpu > 70 ? '#f59e0b' : '#22c55e' }} />
+                <TrendingUp size={14} style={{ color: cpuPct > 70 ? '#f59e0b' : '#22c55e' }} />
               </div>
-              <div className="monitor-metric-value">{Math.round(liveCpu)}%</div>
+              <div className="monitor-metric-value">{Math.round(cpuPct)}%</div>
               <div className="monitor-metric-bar">
                 <div className="monitor-metric-bar-fill" style={{
-                  width: `${liveCpu}%`,
-                  background: liveCpu > 80 ? '#ef4444' : liveCpu > 60 ? '#f59e0b' : '#22c55e',
+                  width: `${cpuPct}%`,
+                  background: cpuPct > 80 ? '#ef4444' : cpuPct > 60 ? '#f59e0b' : '#22c55e',
                 }} />
               </div>
             </div>
@@ -326,13 +341,13 @@ const Dashboard: React.FC = () => {
             <div className="monitor-metric">
               <div className="monitor-metric-header">
                 <span className="monitor-metric-label"><HardDrive size={12} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />内存</span>
-                <TrendingUp size={14} style={{ color: liveMem > 75 ? '#f59e0b' : '#22c55e' }} />
+                <TrendingUp size={14} style={{ color: memPct > 75 ? '#f59e0b' : '#22c55e' }} />
               </div>
-              <div className="monitor-metric-value">{Math.round(liveMem)}%</div>
+              <div className="monitor-metric-value">{Math.round(memPct)}%</div>
               <div className="monitor-metric-bar">
                 <div className="monitor-metric-bar-fill" style={{
-                  width: `${liveMem}%`,
-                  background: liveMem > 80 ? '#ef4444' : liveMem > 65 ? '#f59e0b' : '#22c55e',
+                  width: `${memPct}%`,
+                  background: memPct > 80 ? '#ef4444' : memPct > 65 ? '#f59e0b' : '#22c55e',
                 }} />
               </div>
             </div>
@@ -370,14 +385,14 @@ const Dashboard: React.FC = () => {
           <div className="resource-bar-container">
             <ResourceBar
               label="CPU"
-              value={Math.round(liveCpu)}
-              color={liveCpu > 80 ? '#ef4444' : liveCpu > 60 ? '#f59e0b' : '#6366f1'}
+              value={Math.round(cpuPct)}
+              color={cpuPct > 80 ? '#ef4444' : cpuPct > 60 ? '#f59e0b' : '#6366f1'}
               icon={<Cpu size={12} />}
             />
             <ResourceBar
               label="内存"
-              value={Math.round(liveMem)}
-              color={liveMem > 80 ? '#ef4444' : liveMem > 65 ? '#f59e0b' : '#22c55e'}
+              value={Math.round(memPct)}
+              color={memPct > 80 ? '#ef4444' : memPct > 65 ? '#f59e0b' : '#22c55e'}
               icon={<HardDrive size={12} />}
             />
             <ResourceBar
@@ -526,11 +541,11 @@ const Dashboard: React.FC = () => {
           AI 智能建议
         </h3>
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          {liveMem > 70 && (
+          {memPct > 70 && (
             <SuggestionItem
               icon={<HardDrive size={16} color="#f59e0b" />}
               title="内存使用率较高"
-              desc={`当前内存使用 ${Math.round(liveMem)}%，建议关闭不需要的服务以释放资源`}
+              desc={`当前内存使用 ${Math.round(memPct)}%，建议关闭不需要的服务以释放资源`}
               action="优化内存"
             />
           )}

@@ -101,4 +101,10 @@ const strategy_interface_t* get_weighted_strategy();
  */
 const strategy_interface_t* get_ml_based_strategy();
 
+/**
+ * @brief 获取基于优先级的调度策略接口
+ * @return 基于优先级的调度策略接口
+ */
+const strategy_interface_t* get_priority_based_strategy();
+
 #endif /* AGENTOS_STRATEGY_INTERFACE_H */

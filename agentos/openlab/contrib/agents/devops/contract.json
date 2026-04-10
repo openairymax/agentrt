@@ -3,7 +3,7 @@
   "contract_version": "1.0.0",
   "agent_id": "devops",
   "agent_name": "DevOps Agent",
-  "description": "杩愮淮閮ㄧ讲鏅鸿兘浣擄紝璐熻矗CI/CD銆佸鍣ㄥ寲閮ㄧ讲銆佸熀纭€璁炬柦绠＄悊鍜岀洃鎺у憡璀?,
+  "description": "运维部署智能体，负责CI/CD、容器化部署、基硢设施管理和监控告?,
   "version": "1.0.0.9",
   "author": "Spharx AgentOS Team",
   "license": "Apache-2.0",
@@ -11,11 +11,11 @@
   "capabilities": [
     {
       "name": "code_generation",
-      "description": "閰嶇疆浠ｇ爜鐢熸垚鑳藉姏"
+      "description": "配置代码生成能力"
     },
     {
       "name": "debugging",
-      "description": "闂璇婃柇鑳藉姏"
+      "description": "问题诊断能力"
     }
   ],
   
