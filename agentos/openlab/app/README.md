@@ -123,7 +123,7 @@ cd videoedit
   "name": "应用名称",
   "version": "1.0.0",
   "description": "应用描述",
-  "author": "作者信息",
+  "author": "Spharx AgentOS Team",
   "license": "许可证",
   "dependencies": {
     "agentos": "^1.0.0"

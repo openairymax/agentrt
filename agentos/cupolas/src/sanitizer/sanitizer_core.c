@@ -8,7 +8,7 @@
 /**
  * @file sanitizer_core.c
  * @brief Input Sanitizer Core Implementation
- * @author Spharx
+ * @author Spharx AgentOS Team
  * @date 2024
  */
 

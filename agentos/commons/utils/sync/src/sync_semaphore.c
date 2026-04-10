@@ -6,26 +6,23 @@
  * @file sync_semaphore.c
  * @brief 信号量实现
  *
- * @author AgentOS Team
+ * @author Spharx AgentOS Team
  * @date 2026-04-05
  */
 
 #include "sync_platform.h"
+#include "../include/check.h"
 #include <time.h>
 
 sync_result_t sync_semaphore_create(sync_semaphore_t* semaphore,
                                    unsigned int initial_value,
                                    unsigned int max_value,
                                    const sync_attr_t* attr) {
-    if (semaphore == NULL) {
-        return SYNC_ERROR_INVALID;
-    }
+    CHECK_NULL_RET(semaphore, SYNC_ERROR_INVALID);
 
     struct sync_semaphore* s = (struct sync_semaphore*)AGENTOS_CALLOC(
         1, sizeof(struct sync_semaphore));
-    if (s == NULL) {
-        return SYNC_ERROR_MEMORY;
-    }
+    CHECK_NULL_RET(s, SYNC_ERROR_MEMORY);
 
     s->type = SYNC_TYPE_SEMAPHORE;
     s->max_value = max_value;

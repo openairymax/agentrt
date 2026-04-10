@@ -8,7 +8,7 @@
 /**
  * @file cupolas_metrics.c
  * @brief Metrics Export - Prometheus Format
- * @author Spharx
+ * @author Spharx AgentOS Team
  * @date 2024
  *
  * This module implements metrics collection and export:

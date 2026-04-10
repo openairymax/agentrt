@@ -9,7 +9,7 @@
  * 本文件定义所有同步原语的内部结构体，供各平台实现文件使用。
  * 不对外暴露，仅供sync模块内部使用。
  *
- * @author AgentOS Team
+ * @author Spharx AgentOS Team
  * @date 2026-04-05
  */
 

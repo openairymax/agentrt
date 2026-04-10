@@ -26,9 +26,10 @@ import shlex
 import stat
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 
 class SecurityLevel(Enum):
@@ -37,7 +38,8 @@ class SecurityLevel(Enum):
     LOW = 1
     MEDIUM = 2
     HIGH = 3
-    PARANOID = 4
+    CRITICAL = 4
+    PARANOID = 5
 
 
 @dataclass
@@ -54,12 +56,218 @@ class SecurityConfig:
 
 
 @dataclass
+class ValidationContext:
+    """验证上下文"""
+    original_path: str
+    resolved_path: Optional[str] = None
+    allow_create: bool = False
+    data: Dict[str, Any] = field(default_factory=dict)
+
+@dataclass
 class ValidationResult:
     """验证结果"""
     valid: bool
     message: str = ""
     sanitized_value: Any = None
     risk_level: SecurityLevel = SecurityLevel.DISABLED
+    
+    @classmethod
+    def success(cls, message: str = "", sanitized_value: Any = None, 
+                risk_level: SecurityLevel = SecurityLevel.LOW) -> 'ValidationResult':
+        """创建成功结果"""
+        return cls(valid=True, message=message, sanitized_value=sanitized_value, risk_level=risk_level)
+    
+    @classmethod
+    def failure(cls, message: str, sanitized_value: Any = None,
+                risk_level: SecurityLevel = SecurityLevel.HIGH) -> 'ValidationResult':
+        """创建失败结果"""
+        return cls(valid=False, message=message, sanitized_value=sanitized_value, risk_level=risk_level)
+
+
+class ValidationStep(ABC):
+    """验证步骤基类"""
+    
+    def __init__(self, next_step: Optional['ValidationStep'] = None):
+        self.next_step = next_step
+    
+    def validate(self, path: str, context: ValidationContext) -> ValidationResult:
+        """执行验证"""
+        result = self._validate(path, context)
+        
+        if not result.valid:
+            return result
+        
+        if self.next_step:
+            return self.next_step.validate(path, context)
+        
+        return ValidationResult.success("All validations passed", context.data)
+    
+    @abstractmethod
+    def _validate(self, path: str, context: ValidationContext) -> ValidationResult:
+        """具体验证逻辑"""
+        pass
+
+
+class EmptyCheck(ValidationStep):
+    """空值检查"""
+    
+    def _validate(self, path: str, context: ValidationContext) -> ValidationResult:
+        if not path:
+            return ValidationResult.failure("Path is empty", risk_level=SecurityLevel.HIGH)
+        context.data['original_path'] = path
+        return ValidationResult.success("Path is not empty")
+
+
+class LengthCheck(ValidationStep):
+    """长度检查"""
+    
+    def __init__(self, max_length: int, next_step: Optional[ValidationStep] = None):
+        super().__init__(next_step)
+        self.max_length = max_length
+    
+    def _validate(self, path: str, context: ValidationContext) -> ValidationResult:
+        if len(path) > self.max_length:
+            return ValidationResult.failure(
+                f"Path exceeds maximum length {self.max_length}",
+                risk_level=SecurityLevel.HIGH
+            )
+        return ValidationResult.success("Path length is acceptable")
+
+
+class PatternCheck(ValidationStep):
+    """模式检查"""
+    
+    def __init__(self, dangerous_patterns: List[str], next_step: Optional[ValidationStep] = None):
+        super().__init__(next_step)
+        self.dangerous_patterns = dangerous_patterns
+    
+    def _validate(self, path: str, context: ValidationContext) -> ValidationResult:
+        for pattern in self.dangerous_patterns:
+            if re.search(pattern, path):
+                context.data['dangerous_pattern'] = pattern
+                return ValidationResult.failure(
+                    f"Path contains dangerous pattern: {pattern}",
+                    risk_level=SecurityLevel.CRITICAL
+                )
+        return ValidationResult.success("No dangerous patterns found")
+
+
+class PathResolutionCheck(ValidationStep):
+    """路径解析检查"""
+    
+    def _validate(self, path: str, context: ValidationContext) -> ValidationResult:
+        try:
+            resolved = os.path.realpath(path)
+            context.resolved_path = resolved
+            context.data['resolved_path'] = resolved
+            return ValidationResult.success("Path resolved successfully")
+        except Exception as e:
+            context.resolved_path = path
+            return ValidationResult.success(f"Path resolution failed, using original: {e}")
+
+
+class PrefixCheck(ValidationStep):
+    """前缀检查"""
+    
+    def __init__(self, allowed_prefixes: List[str], allowed_paths: Optional[List[str]] = None,
+                 next_step: Optional[ValidationStep] = None):
+        super().__init__(next_step)
+        self.allowed_prefixes = allowed_prefixes
+        self.allowed_paths = allowed_paths or []
+    
+    def _validate(self, path: str, context: ValidationContext) -> ValidationResult:
+        if not context.resolved_path:
+            return ValidationResult.success("Path resolution not available, skipping prefix check")
+        
+        # 检查允许的前缀
+        for prefix in self.allowed_prefixes:
+            if context.resolved_path.startswith(prefix):
+                return ValidationResult.success("Path is within allowed prefixes")
+        
+        # 检查允许的路径
+        for allowed in self.allowed_paths:
+            if context.resolved_path.startswith(allowed):
+                return ValidationResult.success("Path is within allowed paths")
+        
+        return ValidationResult.failure(
+            f"Path escapes allowed directory: {context.resolved_path}",
+            risk_level=SecurityLevel.HIGH
+        )
+
+
+class ExistenceCheck(ValidationStep):
+    """存在性检查"""
+    
+    def __init__(self, allow_create: bool, next_step: Optional[ValidationStep] = None):
+        super().__init__(next_step)
+        self.allow_create = allow_create
+    
+    def _validate(self, path: str, context: ValidationContext) -> ValidationResult:
+        if not context.resolved_path:
+            return ValidationResult.success("Path resolution not available, skipping existence check")
+        
+        if not os.path.exists(context.resolved_path):
+            if self.allow_create:
+                return ValidationResult.success("Path does not exist but creation is allowed")
+            else:
+                return ValidationResult.failure(
+                    "Path does not exist and creation is not allowed",
+                    risk_level=SecurityLevel.MEDIUM
+                )
+        
+        # 检查文件类型
+        if not os.path.isdir(context.resolved_path) and not os.path.isfile(context.resolved_path):
+            return ValidationResult.failure(
+                "Path exists but is neither file nor directory",
+                risk_level=SecurityLevel.MEDIUM
+            )
+        
+        return ValidationResult.success("Path exists and has valid type")
+
+
+class ValidationChainBuilder:
+    """验证链构建器"""
+    
+    def __init__(self):
+        self.steps: List[ValidationStep] = []
+    
+    def add_empty_check(self) -> 'ValidationChainBuilder':
+        self.steps.append(EmptyCheck())
+        return self
+    
+    def add_length_check(self, max_length: int) -> 'ValidationChainBuilder':
+        self.steps.append(LengthCheck(max_length))
+        return self
+    
+    def add_pattern_check(self, dangerous_patterns: List[str]) -> 'ValidationChainBuilder':
+        self.steps.append(PatternCheck(dangerous_patterns))
+        return self
+    
+    def add_path_resolution_check(self) -> 'ValidationChainBuilder':
+        self.steps.append(PathResolutionCheck())
+        return self
+    
+    def add_prefix_check(self, allowed_prefixes: List[str], 
+                         allowed_paths: Optional[List[str]] = None) -> 'ValidationChainBuilder':
+        self.steps.append(PrefixCheck(allowed_prefixes, allowed_paths))
+        return self
+    
+    def add_existence_check(self, allow_create: bool) -> 'ValidationChainBuilder':
+        self.steps.append(ExistenceCheck(allow_create))
+        return self
+    
+    def build(self) -> Optional[ValidationStep]:
+        """构建验证链"""
+        if not self.steps:
+            return None
+        
+        # 从后向前构建链
+        chain = None
+        for step in reversed(self.steps):
+            step.next_step = chain
+            chain = step
+        
+        return chain
 
 
 class SecurityManager:
@@ -95,61 +303,47 @@ class SecurityManager:
         self._audit_log: List[Dict[str, Any]] = []
 
     def validate_path(self, path: str, allow_create: bool = False) -> ValidationResult:
-        """验证路径安全性"""
-        if not path:
-            return ValidationResult(False, "Path is empty", risk_level=SecurityLevel.HIGH)
-
-        if len(path) > self.manager.max_path_length:
-            return ValidationResult(
-                False,
-                f"Path exceeds maximum length {self.manager.max_path_length}",
-                risk_level=SecurityLevel.HIGH
-            )
-
-        for pattern in self.DANGEROUS_PATTERNS:
-            if re.search(pattern, path):
-                self._audit("path_dangerous", {"path": path, "pattern": pattern})
-                return ValidationResult(
-                    False,
-                    f"Path contains dangerous pattern: {pattern}",
-                    path,
-                    risk_level=SecurityLevel.CRITICAL
-                )
-
-        try:
-            resolved = os.path.realpath(path)
-        except Exception:
-            resolved = path
-
-        is_safe = False
-        for prefix in self.ALLOWED_PATH_PREFIXES:
-            if resolved.startswith(prefix):
-                is_safe = True
-                break
-
-        if not is_safe and self.manager.allowed_paths:
-            for allowed in self.manager.allowed_paths:
-                if resolved.startswith(allowed):
-                    is_safe = True
-                    break
-
-        if not is_safe:
-            self._audit("path_rejected", {"path": path, "resolved": resolved})
-            return ValidationResult(
-                False,
-                f"Path escapes allowed directory: {path}",
-                risk_level=SecurityLevel.HIGH
-            )
-
-        if os.path.exists(resolved):
-            if not os.path.is_file(resolved) and not os.path.is_dir(resolved):
-                return ValidationResult(
-                    False,
-                    "Path exists but is neither file nor directory",
-                    risk_level=SecurityLevel.MEDIUM
-                )
-
-        return ValidationResult(True, "Path is safe", resolved, SecurityLevel.LOW)
+        """验证路径安全性 - 重构版本使用责任链模式"""
+        # 构建验证链
+        chain = ValidationChainBuilder() \
+            .add_empty_check() \
+            .add_length_check(self.manager.max_path_length) \
+            .add_pattern_check(self.DANGEROUS_PATTERNS) \
+            .add_path_resolution_check() \
+            .add_prefix_check(self.ALLOWED_PATH_PREFIXES, self.manager.allowed_paths) \
+            .add_existence_check(allow_create) \
+            .build()
+        
+        if not chain:
+            return ValidationResult.failure("Validation chain not configured")
+        
+        # 创建验证上下文
+        context = ValidationContext(
+            original_path=path,
+            allow_create=allow_create
+        )
+        
+        # 执行验证
+        result = chain.validate(path, context)
+        
+        # 添加审计日志
+        if not result.valid:
+            if "dangerous_pattern" in context.data:
+                self._audit("path_dangerous", {
+                    "path": path, 
+                    "pattern": context.data["dangerous_pattern"]
+                })
+            else:
+                self._audit("path_rejected", {
+                    "path": path,
+                    "resolved": context.resolved_path,
+                    "reason": result.message
+                })
+        elif context.resolved_path:
+            # 验证成功，返回解析后的路径
+            result.sanitized_value = context.resolved_path
+        
+        return result
 
     def validate_command(self, command: str) -> ValidationResult:
         """验证命令安全性"""
