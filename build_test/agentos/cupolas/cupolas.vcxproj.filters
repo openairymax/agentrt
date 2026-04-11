@@ -1,0 +1,213 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\cupolas.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\platform\platform.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\utils\cupolas_utils.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\cupolas_metrics.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\cupolas_config.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\cupolas_monitoring.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\permission\permission_engine.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\permission\permission_rule.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\permission\permission_cache.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\audit\audit_logger.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\audit\audit_queue.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\audit\audit_rotator.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\audit\audit_overflow.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\sanitizer\sanitizer_core.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\sanitizer\sanitizer_rules.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\sanitizer\sanitizer_cache.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\workbench\workbench.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\workbench\workbench_process_core.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\workbench\workbench_container.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\workbench\workbench_limits.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\cupolas_signature.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\cupolas_vault.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\cupolas_entitlements.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\cupolas_runtime_protection.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\cupolas_network_security.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\cupolas_error.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\network\tls_security.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\network\http_security.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\network\dns_security.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\network\network_filter.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\network\network_utils.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\circuit_breaker.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\include\cupolas.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\utils\cupolas_utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\cupolas_metrics.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\cupolas_config.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\cupolas_monitoring.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\platform\platform.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\permission\permission.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\permission\permission_engine.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\permission\permission_rule.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\permission\permission_cache.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\audit\audit.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\audit\audit_queue.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\audit\audit_rotator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\audit\audit_overflow.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\sanitizer\sanitizer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\sanitizer\sanitizer_rules.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\sanitizer\sanitizer_cache.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\workbench\workbench.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\workbench\workbench_process.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\workbench\workbench_container.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\workbench\workbench_limits.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\cupolas_signature.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\cupolas_vault.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\cupolas_entitlements.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\cupolas_runtime_protection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\cupolas_network_security.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\cupolas_error.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\network\tls_security.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\network\http_security.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\network\dns_security.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\network\network_filter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\network\network_utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\circuit_breaker.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{86C02E51-DE3F-3CDB-8220-99AD7C4F3C33}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{853EC8F3-7AF6-3373-B1A3-A80B3E87B0A2}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

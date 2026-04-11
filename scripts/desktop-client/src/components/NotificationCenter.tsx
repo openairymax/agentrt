@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Bell,
   X,
@@ -26,34 +27,15 @@ export interface NotificationItem {
   action?: { label: string; onClick: () => void };
 }
 
-const DEFAULT_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: '1', type: 'success', title: 'System Ready',
-    message: 'All services are running normally. AgentOS is ready to use.',
-    timestamp: new Date(Date.now() - 5 * 60000), read: false,
-    action: { label: 'View Dashboard', onClick: () => {} },
-  },
-  {
-    id: '2', type: 'info', title: 'New Feature Available',
-    message: 'AI Model Configuration is now available. Configure your LLM providers.',
-    timestamp: new Date(Date.now() - 15 * 60000), read: false,
-    action: { label: 'Configure Now', onClick: () => {} },
-  },
-  {
-    id: '3', type: 'warning', title: 'Memory Usage',
-    message: 'System memory usage is above 80%. Consider stopping unused services.',
-    timestamp: new Date(Date.now() - 30 * 60000), read: true,
-  },
-  {
-    id: '4', type: 'system', title: 'Auto-backup Completed',
-    message: 'Configuration backup completed successfully at scheduled time.',
-    timestamp: new Date(Date.now() - 60 * 60000), read: true,
-  },
-];
-
 const NotificationCenter: React.FC = () => {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(DEFAULT_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([
+    { id: '1', type: 'success', title: 'System Ready', message: 'All services are running normally. AgentOS is ready to use.', timestamp: new Date(Date.now() - 5 * 60000), read: false, action: { label: 'View Dashboard', onClick: () => navigate('/') } },
+    { id: '2', type: 'info', title: 'New Feature Available', message: 'AI Model Configuration is now available. Configure your LLM providers.', timestamp: new Date(Date.now() - 15 * 60000), read: false, action: { label: 'Configure Now', onClick: () => navigate('/llm-config') } },
+    { id: '3', type: 'warning', title: 'Memory Usage', message: 'System memory usage is above 80%. Consider stopping unused services.', timestamp: new Date(Date.now() - 30 * 60000), read: true },
+    { id: '4', type: 'system', title: 'Auto-backup Completed', message: 'Configuration backup completed successfully at scheduled time.', timestamp: new Date(Date.now() - 60 * 60000), read: true },
+  ]);
   const panelRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = notifications.filter(n => !n.read).length;

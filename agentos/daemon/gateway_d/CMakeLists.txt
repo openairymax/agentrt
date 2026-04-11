@@ -18,8 +18,33 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # ==================== 查找外部依赖 ====================
 find_package(Threads REQUIRED)
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(CJSON REQUIRED libcjson)
+
+# 使用与根项目一致的依赖查找方式
+# 在Windows上，PkgConfig通常不可用，使用find_package替代
+if(WIN32)
+    find_package(PkgConfig QUIET)
+else()
+    find_package(PkgConfig)
+endif()
+
+# cJSON查找
+if(PKG_CONFIG_FOUND)
+    pkg_check_modules(CJSON QUIET libcjson)
+endif()
+if(NOT CJSON_FOUND)
+    find_package(cJSON QUIET)
+    if(cJSON_FOUND)
+        set(CJSON_FOUND TRUE)
+        set(CJSON_LIBRARIES cjson)
+        set(CJSON_INCLUDE_DIRS ${cJSON_INCLUDE_DIRS})
+        message(STATUS "cJSON found via find_package")
+    else()
+        message(WARNING "cJSON not found, JSON functionality may be limited")
+        set(CJSON_FOUND FALSE)
+        set(CJSON_LIBRARIES "")
+        set(CJSON_INCLUDE_DIRS "")
+    endif()
+endif()
 
 # ==================== 路径设置 ====================
 
@@ -138,30 +163,41 @@ target_include_directories(gateway_lib_obj PUBLIC
 )
 
 # 查找 gateway 所需的外部库
-find_package(PkgConfig QUIET)
-pkg_check_modules(MICROHTTPD QUIET libmicrohttpd)
-pkg_check_modules(LIBWEBSOCKETS QUIET libwebsockets)
-
-if(MICROHTTPD_FOUND AND LIBWEBSOCKETS_FOUND)
-    target_include_directories(gateway_lib_obj PUBLIC
-        ${MICROHTTPD_INCLUDE_DIRS}
-        ${LIBWEBSOCKETS_INCLUDE_DIRS}
-    )
-    target_compile_definitions(gateway_lib_obj PUBLIC
-        GATEWAY_HAS_HTTP=1
-        GATEWAY_HAS_WS=1
-    )
+# PkgConfig 已在前面查找过，使用 PKG_CONFIG_FOUND 变量
+if(PKG_CONFIG_FOUND)
+    pkg_check_modules(MICROHTTPD QUIET libmicrohttpd)
+    pkg_check_modules(LIBWEBSOCKETS QUIET libwebsockets)
 else()
-    message(WARNING "libmicrohttpd/libwebsockets not found via pkg-config. "
-                   "HTTP and WebSocket gateways may not compile.")
+    # 尝试使用 CMake 的 find_package 查找这些库
+    find_package(libmicrohttpd QUIET)
+    find_package(libwebsockets QUIET)
+endif()
+
+# 条件包含外部库头文件和定义
+if(MICROHTTPD_FOUND)
+    target_include_directories(gateway_lib_obj PUBLIC ${MICROHTTPD_INCLUDE_DIRS})
+    target_compile_definitions(gateway_lib_obj PUBLIC GATEWAY_HAS_HTTP=1)
+else()
+    message(WARNING "libmicrohttpd not found, HTTP gateway may not compile.")
+endif()
+
+if(LIBWEBSOCKETS_FOUND)
+    target_include_directories(gateway_lib_obj PUBLIC ${LIBWEBSOCKETS_INCLUDE_DIRS})
+    target_compile_definitions(gateway_lib_obj PUBLIC GATEWAY_HAS_WS=1)
+else()
+    message(WARNING "libwebsockets not found, WebSocket gateway may not compile.")
 endif()
 
 target_link_libraries(gateway_d PRIVATE
     $<TARGET_OBJECTS:gateway_lib_obj>
     svc_common
     Threads::Threads
-    ${CJSON_LIBRARIES}
 )
+
+# 条件链接CJSON库
+if(CJSON_FOUND)
+    target_link_libraries(gateway_d PRIVATE ${CJSON_LIBRARIES})
+endif()
 
 # 如果找到了 HTTP/WS 库，也链接它们
 if(MICROHTTPD_FOUND)

@@ -27,8 +27,8 @@
 | **桌面客户端** | ✅✅✅ 完善 | `desktop-client/` (Tauri + i18n) |
 | **国际化** | ✅✅✅ 新增 | `desktop-client/src/i18n/` (中/英) |
 | **CI/CD流水线** | ✅✅ 成熟 | `ci/` (GitHub Actions) |
-| **开发辅助** | ✅✅ 完善 | `dev/` + `tools/` |
-| **运维监控** | ✅✅ 完善 | `ops/` (doctor/benchmark) |
+| **开发辅助** | ✅✅ 完善 | `development/` + `tools/` |
+| **运维监控** | ✅✅ 完善 | `operations/` (doctor/benchmark) |
 | **测试框架** | ✅✅ 成熟 | `tests/` (Shell+Python) |
 | **核心库** | ✅✅ 稳定 | `lib/` (Shell) + `core/` (Python) |
 
@@ -40,8 +40,16 @@
 scripts/
 │
 ├── 📜 README.md                    # 本文档（模块总览）
-├── 🚀 install.sh                   # [入口] 跨平台部署脚本 (Unix/Linux/macOS)
-├── 🚀 install.ps1                  # [入口] 跨平台部署脚本 (Windows PowerShell)
+├── 🚀 setup.sh                     # [入口] 项目设置脚本 (Unix/Linux/macOS)
+├── 🚀 setup.ps1                    # [入口] 项目设置脚本 (Windows PowerShell)
+│
+├── 📂 build/                       # 构建系统（统一构建入口）
+│   ├── CMakeLists.txt              #   CMake 根配置文件
+│   ├── build.sh                    #   构建脚本 (Unix/Linux/macOS)
+│   ├── build.ps1                   #   构建脚本 (Windows PowerShell)
+│   ├── install.sh                  #   安装脚本 (Unix/Linux/macOS)
+│   ├── install.ps1                 #   安装脚本 (Windows PowerShell)
+│   └── README.md                   #   构建系统文档
 │
 ├── 📂 desktop-client/              # Tauri 桌面客户端应用
 │   ├── src-tauri/                  #   Rust 后端 (18个Tauri命令)
@@ -99,7 +107,7 @@ scripts/
 │   ├── deploy-artifacts.sh         # 制品部署
 │   └── CI_CD_DOCUMENTATION.md       # CI/CD文档
 │
-├── 📂 dev/                         # 开发工具（开发环境层）
+├── 📂 development/                  # 开发工具（开发环境层）
 │   ├── config/                     # 开发配置文件
 │   │   ├── .clang-format           # C/C++格式化
 │   │   ├── .editorconfig          # 编辑器配置
@@ -108,7 +116,7 @@ scripts/
 │   ├── quickstart.sh               # 快速入门
 │   └── validate.sh                 # 环境验证
 │
-├── 📂 ops/                         # 运维工具（生产运维层）
+├── 📂 operations/                   # 运维工具（生产运维层）
 │   ├── doctor.py                   # 系统健康检查
 │   ├── benchmark.py                # 性能基准测试
 │   ├── token_counter.py             # Token统计
@@ -155,44 +163,44 @@ scripts/
 
 ## 🚀 快速开始
 
-### 方式一：命令行一键部署（推荐）
+### 方式一：命令行一键设置（推荐）
 
 #### Unix/Linux/macOS
 ```bash
 cd scripts
 
-# 交互式部署（推荐新手）
-chmod +x install.sh
-./install.sh
+# 交互式设置（推荐新手）
+chmod +x setup.sh
+./setup.sh
 
-# 一键部署开发环境
-./install.sh --mode dev --auto
+# 一键设置开发环境
+./setup.sh --mode dev --auto
 
-# 一键部署生产环境
-./install.sh --mode prod --auto
+# 一键设置生产环境
+./setup.sh --mode prod --auto
 
-# 仅部署后端服务
-./install.sh --mode dev --target backend
+# 仅设置后端服务
+./setup.sh --mode dev --target backend
 
 # 仅构建桌面客户端
-./install.sh --target client
+./setup.sh --target client
 
-# 全部部署（后端+客户端）
-./install.sh --target all
+# 全部设置（后端+客户端）
+./setup.sh --target all
 
 # 仅检查环境
-./install.sh --check-only
+./setup.sh --check-only
 ```
 
 #### Windows PowerShell
 ```powershell
 cd scripts
 
-# 交互式部署
-.\install.ps1
+# 交互式设置
+.\setup.ps1
 
-# 一键部署（推荐）
-.\install.ps1 -Mode dev -Auto
+# 一键设置（推荐）
+.\setup.ps1 -Mode dev -Auto
 
 # 以管理员身份运行
 .\install.ps1 -Mode prod -Auto -AsAdmin
@@ -266,7 +274,7 @@ cat scripts/lib/README.md
 cat scripts/core/README.md
 
 # 运维工具
-cat scripts/ops/README.md
+cat scripts/operations/README.md
 
 # 通用工具
 cat scripts/tools/README.md

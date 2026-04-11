@@ -26,6 +26,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include "../types/include/types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,25 +43,64 @@ typedef int32_t agentos_error_t;
 
 /* ==================== 向后兼容别名 ==================== */
 /* 兼容旧的 AGENTOS_E* 命名 */
+/* 使用 #ifndef 防止与 types.h 中的定义冲突 */
+#ifndef AGENTOS_SUCCESS
 #define AGENTOS_SUCCESS                AGENTOS_OK
+#endif
+#ifndef AGENTOS_EUNKNOWN
 #define AGENTOS_EUNKNOWN               AGENTOS_ERR_UNKNOWN
+#endif
+#ifndef AGENTOS_EINVAL
 #define AGENTOS_EINVAL                AGENTOS_ERR_INVALID_PARAM
+#endif
+#ifndef AGENTOS_ENOMEM
 #define AGENTOS_ENOMEM                AGENTOS_ERR_OUT_OF_MEMORY
+#endif
+#ifndef AGENTOS_EBUSY
 #define AGENTOS_EBUSY                 AGENTOS_ERR_BUSY
+#endif
+#ifndef AGENTOS_ENOENT
 #define AGENTOS_ENOENT                AGENTOS_ERR_NOT_FOUND
+#endif
+#ifndef AGENTOS_EPERM
 #define AGENTOS_EPERM                 AGENTOS_ERR_PERMISSION_DENIED
+#endif
+#ifndef AGENTOS_ETIMEDOUT
 #define AGENTOS_ETIMEDOUT             AGENTOS_ERR_TIMEOUT
+#endif
+#ifndef AGENTOS_EEXIST
 #define AGENTOS_EEXIST                AGENTOS_ERR_ALREADY_EXISTS
+#endif
+#ifndef AGENTOS_ECANCELED
 #define AGENTOS_ECANCELED             AGENTOS_ERR_CANCELED
+#endif
+#ifndef AGENTOS_ENOTSUP
 #define AGENTOS_ENOTSUP               AGENTOS_ERR_NOT_SUPPORTED
+#endif
+#ifndef AGENTOS_EIO
 #define AGENTOS_EIO                   AGENTOS_ERR_IO
+#endif
+#ifndef AGENTOS_EINTR
 #define AGENTOS_EINTR                 AGENTOS_ERR_INTERRUPTED
+#endif
+#ifndef AGENTOS_EOVERFLOW
 #define AGENTOS_EOVERFLOW             AGENTOS_ERR_OVERFLOW
+#endif
+#ifndef AGENTOS_EBADF
 #define AGENTOS_EBADF                 AGENTOS_ERR_SYS_FILE
+#endif
+#ifndef AGENTOS_ENOTINIT
 #define AGENTOS_ENOTINIT              AGENTOS_ERR_SYS_NOT_INIT
+#endif
+#ifndef AGENTOS_ERESOURCE
 #define AGENTOS_ERESOURCE             AGENTOS_ERR_SYS_RESOURCE
+#endif
+#ifndef AGENTOS_ESECURITY
 #define AGENTOS_ESECURITY             AGENTOS_ERR_ESECURITY
+#endif
+#ifndef AGENTOS_ESANITIZE
 #define AGENTOS_ESANITIZE             AGENTOS_ERR_ESANITIZE
+#endif
 
 /* ==================== 错误码分段 ==================== */
 /*

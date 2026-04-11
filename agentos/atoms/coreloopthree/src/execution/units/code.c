@@ -105,7 +105,7 @@ static agentos_error_t create_temp_file_unix(
     size_t temp_dir_len = strlen(temp_dir);
     if (temp_dir_len > 0 && temp_dir[temp_dir_len - 1] != '/') {
         if (temp_dir_len + 1 < sizeof(temp_dir)) {
-            strcat(temp_dir, "/");
+            strncat(temp_dir, "/", sizeof(temp_dir) - temp_dir_len - 1);
         }
     }
 

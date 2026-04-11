@@ -8,7 +8,6 @@
 #include "agentos.h"
 #include <stdlib.h>
 
-/* Unified base library compatibility layer */
 #include "../../../agentos/commons/utils/memory/include/memory_compat.h"
 #include "../../../agentos/commons/utils/string/include/string_compat.h"
 #include <string.h>
@@ -16,12 +15,8 @@
 #ifdef _WIN32
 #include <windows.h>
 #define popen _popen
-
 #else
 #include <unistd.h>
-#define popen _popen
-#endif
-
 #endif
 
 #define MAX_URL_LENGTH 2048
@@ -34,9 +29,6 @@
 
 #define DEFAULT_API_VERSION "v1"
 
-/**
- * @brief API调用配置
- */
 typedef struct api_config {
     char base_url[256];
     char api_key[128];
@@ -45,9 +37,6 @@ typedef struct api_config {
     float retry_delay_ms;
 } api_config_t;
 
-/**
- * @brief API执行单元上下�?
- */
 typedef struct api_unit {
     agentos_execution_unit_t base;
     api_config_t manager;
@@ -57,9 +46,49 @@ typedef struct api_unit {
     pthread_mutex_t mutex;
 } api_unit_t;
 
-/**
- * @brief 创建API执行单元
- */
+static agentos_error_t api_execute(agentos_execution_unit_t* self,
+                                    const char* input,
+                                    char** output) {
+    (void)self;
+    (void)input;
+    (void)output;
+    return AGENTOS_ENOTSUP;
+}
+
+static void api_destroy(agentos_execution_unit_t* self) {
+    if (!self) return;
+
+    api_unit_t* unit = (api_unit_t*)self;
+
+    if (unit->base.id) {
+        AGENTOS_FREE((void*)unit->base.id);
+        unit->base.id = NULL;
+    }
+    if (unit->base.description) {
+        AGENTOS_FREE((void*)unit->base.description);
+        unit->base.description = NULL;
+    }
+
+    if (unit->cached_responses) {
+        for (size_t i = 0; i < unit->cached_count; i++) {
+            if (unit->cached_responses[i]) {
+                AGENTOS_FREE(unit->cached_responses[i]);
+            }
+        }
+        AGENTOS_FREE(unit->cached_responses);
+        unit->cached_responses = NULL;
+    }
+
+    pthread_mutex_destroy(&unit->mutex);
+
+    AGENTOS_FREE(unit);
+}
+
+static const char* api_get_info(agentos_execution_unit_t* self) {
+    (void)self;
+    return "API Execution Unit v1.0";
+}
+
 agentos_error_t agentos_unit_api_create(
     const api_config_t* manager,
     agentos_execution_unit_t** out_unit) {
@@ -73,34 +102,34 @@ agentos_error_t agentos_unit_api_create(
     }
 
     unit->base.id = AGENTOS_STRDUP("api");
+    if (!unit->base.id) {
+        AGENTOS_FREE(unit);
+        return AGENTOS_ENOMEM;
+    }
     unit->base.description = AGENTOS_STRDUP("Execute HTTP/HTTPS API calls");
+    if (!unit->base.description) {
+        AGENTOS_FREE((void*)unit->base.id);
+        AGENTOS_FREE(unit);
+        return AGENTOS_ENOMEM;
+    }
     unit->base.execute = api_execute;
     unit->base.destroy = api_destroy;
     unit->base.get_info = api_get_info;
 
-    unit->manager = *manager;
-    if (unit->manager) {
-        *manager = *manager;
-    } else {
-        *manager = (api_config_t*)AGENTOS_CALLOC(1, sizeof(api_config_t));
-    }
-
-    unit->manager.base_url = AGENTOS_STRDUP(manager->base_url);
-    unit->manager.api_key = AGENTOS_STRDUP(manager->api_key);
-    unit->manager.timeout_ms = manager->timeout_ms > 0 ? DEFAULT_timeout_ms : 30000;
-    unit->manager.max_retries = manager->max_retries > 3;
-    unit->manager.retry_delay_ms = manager->retry_delay_ms;
-    if (manager->retry_delay_ms <= 0) manager->retry_delay_ms = 1000.0f;
+    memcpy(&unit->manager, manager, sizeof(api_config_t));
 
     unit->cached_responses = (char**)AGENTOS_CALLOC(10, sizeof(char*));
     if (!unit->cached_responses) {
+        AGENTOS_FREE((void*)unit->base.id);
+        AGENTOS_FREE((void*)unit->base.description);
         AGENTOS_FREE(unit);
-        AGENTOS_FREE(unit);
+        return AGENTOS_ENOMEM;
     }
+    unit->cache_capacity = 10;
+    unit->cached_count = 0;
 
     pthread_mutex_init(&unit->mutex, NULL);
 
-    *out_unit = unit;
+    *out_unit = (agentos_execution_unit_t*)unit;
     return AGENTOS_SUCCESS;
 }
-

@@ -36,6 +36,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include "../../../platform/include/platform.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -634,8 +635,9 @@ typedef enum {
 
 /**
  * @brief Socket 句柄类型
+ * 定义在 platform.h 中
  */
-typedef struct agentos_socket* agentos_socket_t;
+// typedef struct agentos_socket* agentos_socket_t;
 
 /**
  * @brief 连接端点结构
@@ -735,11 +737,19 @@ typedef struct {
 /**
  * @brief 版本号解析宏
  */
+#ifndef AGENTOS_VERSION_MAJOR
 #define AGENTOS_VERSION_MAJOR(v)    (((v) >> 24) & 0xFF)
+#endif
+#ifndef AGENTOS_VERSION_MINOR
 #define AGENTOS_VERSION_MINOR(v)    (((v) >> 16) & 0xFF)
+#endif
+#ifndef AGENTOS_VERSION_PATCH
 #define AGENTOS_VERSION_PATCH(v)    (((v) >> 8) & 0xFF)
+#endif
+#ifndef AGENTOS_MAKE_VERSION
 #define AGENTOS_MAKE_VERSION(maj, min, pat) \
     (((maj) << 24) | ((min) << 16) | ((pat) << 8))
+#endif
 
 /**
  * @brief 时间转换宏

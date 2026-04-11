@@ -41,7 +41,8 @@ add_library(agentos_memoryrovol STATIC
 target_link_libraries(agentos_memoryrovol PUBLIC agentos_atoms)
 
 target_include_directories(agentos_memoryrovol PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
+    $<INSTALL_INTERFACE:include/agentos/memoryrovol>
 )
 
 target_link_libraries(agentos_memoryrovol PRIVATE

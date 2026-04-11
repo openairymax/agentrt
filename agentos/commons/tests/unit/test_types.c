@@ -256,7 +256,7 @@ static void test_metric_structure(void **state) {
     
     agentos_metric_t metric = {0};
     
-    strcpy(metric.name, "test_metric");
+    metric.name = strdup("test_metric");
     metric.value = 42.5;
     metric.unit = METRIC_UNIT_COUNT;
     metric.metric_type = METRIC_TYPE_GAUGE;
@@ -323,7 +323,7 @@ static void test_conn_config_structure(void **state) {
     
     agentos_conn_config_t config = {0};
     
-    strcpy(config.host, "localhost");
+    config.remote.host = strdup("localhost");
     config.port = 8080;
     config.connect_timeout_ms = 5000;
     config.read_timeout_ms = 10000;
@@ -344,8 +344,8 @@ static void test_http_request_structure(void **state) {
     
     agentos_http_request_t request = {0};
     
-    strcpy(request.method, "GET");
-    strcpy(request.url, "http://api.example.com/data");
+    request.method = strdup("GET");
+    request.path = strdup("http://api.example.com/data");
     request.timeout_ms = 5000;
     
     assert_string_equal(request.method, "GET");
@@ -362,7 +362,7 @@ static void test_http_response_structure(void **state) {
     agentos_http_response_t response = {0};
     
     response.status_code = 200;
-    strcpy(response.body, "{\"status\":\"ok\"}");
+    response.body = strdup("{\"status\":\"ok\"}");
     response.body_length = strlen(response.body);
     
     assert_int_equal(response.status_code, 200);

@@ -75,7 +75,7 @@ int test_ipc_basic() {
     // 创建测试线程
     agentos_thread_t thread;
     agentos_thread_attr_t attr = {0};
-    strcpy(attr.name, "test_thread");
+    attr.name = "test_thread";
     attr.priority = AGENTOS_TASK_PRIORITY_NORMAL;
     attr.stack_size = 1024 * 1024;
     err = agentos_thread_create(&thread, &attr, test_ipc_thread, NULL);
