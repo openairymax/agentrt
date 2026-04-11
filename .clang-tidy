@@ -1,0 +1,115 @@
+---
+Checks: >
+    *,
+    -abseil-*,
+    -altera-*,
+    -android-*,
+    -boost-*,
+    -cppcoreguidelines-avoid-magic-numbers,
+    -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+    -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+    -cppcoreguidelines-pro-type-vararg,
+    -fuchsia-*,
+    -google-*,
+    -hicpp-avoid-goto,
+    -hicpp-no-assembler,
+    -hicpp-signed-bitwise,
+    -llvm-*,
+    -llvmlibc-*,
+    -modernize-use-trailing-return-type,
+    -misc-*,
+    -mpi-*,
+    -objc-*,
+    -openmp-*,
+    -performance-*,
+    -portability-*,
+    -readability-avoid-const-params-in-decls,
+    -readability-braces-around-statements,
+    -readability-convert-member-functions-to-static,
+    -readability-function-cognitive-complexity,
+    -readability-identifier-length,
+    -readability-implicit-bool-conversion,
+    -readability-inconsistent-declaration-parameter-name,
+    -readability-magic-numbers,
+    -readability-named-parameter,
+    -readability-redundant-access-specifiers,
+    -readability-redundant-control-flow,
+    -readability-redundant-declaration,
+    -readability-redundant-function-ptr-dereference,
+    -readability-redundant-member-init,
+    -readability-redundant-preprocessor,
+    -readability-redundant-smartptr-get,
+    -readability-redundant-string-cstr,
+    -readability-redundant-string-init,
+    -readability-simplify-boolean-expr,
+    -readability-static-accessed-through-instance,
+    -readability-static-definition-in-anonymous-namespace,
+    -readability-string-compare,
+    -readability-uppercase-literal-suffix,
+    -readability-use-anyofallof,
+    -zircon-*
+CheckOptions:
+  - key:             cert-err58-cpp.WarnOnly
+    value:           '1'
+  - key:             cppcoreguidelines-avoid-c-arrays.AllowTypes
+    value:           '[]'
+  - key:             cppcoreguidelines-avoid-non-const-global-variables.AllowedNames
+    value:           'g_*'
+  - key:             cppcoreguidelines-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic
+    value:           '1'
+  - key:             google-readability-braces-around-statements.ShortStatementLines
+    value:           '1'
+  - key:             google-readability-function-size.StatementThreshold
+    value:           '800'
+  - key:             google-readability-namespace-comments.ShortNamespaceLines
+    value:           '10'
+  - key:             google-readability-namespace-comments.SpacesBeforeComments
+    value:           '2'
+  - key:             hicpp-avoid-c-arrays.AllowTypes
+    value:           '[]'
+  - key:             hicpp-no-assembler.IgnoreNonFunctionDefinitions
+    value:           '1'
+  - key:             misc-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic
+    value:           '1'
+  - key:             modernize-use-nodiscard.IgnoreMacros
+    value:           '1'
+  - key:             modernize-use-trailing-return-type.MinLineLength
+    value:           '0'
+  - key:             readability-avoid-const-params-in-decls.IgnoreMacros
+    value:           '1'
+  - key:             readability-const-return-type.IgnoreMacros
+    value:           '1'
+  - key:             readability-identifier-length.IgnoredVariableNames
+    value:           '[a-z]'
+  - key:             readability-identifier-length.MinVariableNameLength
+    value:           '1'
+  - key:             readability-implicit-bool-conversion.AllowIntegerConditions
+    value:           '1'
+  - key:             readability-magic-numbers.IgnoredNumbers
+    value:           '0,1,2,4,8,16,32,64,128,256,512,1024,2048,4096'
+  - key:             readability-named-parameter.IgnoreMacros
+    value:           '1'
+  - key:             readability-redundant-control-flow.IgnoreMacros
+    value:           '1'
+  - key:             readability-redundant-declaration.IgnoreMacros
+    value:           '1'
+  - key:             readability-redundant-member-init.IgnoreMacros
+    value:           '1'
+  - key:             readability-redundant-preprocessor.IgnoreMacros
+    value:           '1'
+  - key:             readability-simplify-boolean-expr.ChainedConditionalReturn
+    value:           '1'
+  - key:             readability-static-accessed-through-instance.IgnoreMacros
+    value:           '1'
+  - key:             readability-static-definition-in-anonymous-namespace.IgnoreMacros
+    value:           '1'
+  - key:             readability-string-compare.IgnoreMacros
+    value:           '1'
+  - key:             readability-uppercase-literal-suffix.IgnoreMacros
+    value:           '1'
+  - key:             readability-use-anyofallof.MinExpressionComplexity
+    value:           '5'
+WarningsAsErrors: ''
+HeaderFilterRegex: ''
+FormatStyle:     file
+...

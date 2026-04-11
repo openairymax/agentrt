@@ -1,0 +1,361 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MinSizeRel|x64">
+      <Configuration>MinSizeRel</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="RelWithDebInfo|x64">
+      <Configuration>RelWithDebInfo</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{EAF7AEB8-B6C9-316B-991B-11584D45ADCA}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+    <Platform>x64</Platform>
+    <ProjectName>agentos_coreloopthree</ProjectName>
+    <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v145</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v145</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v145</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">D:\SPHARX-CN\SpharxWorks\AgentOS\build_test\lib\Debug\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">agentos_coreloopthree.dir\Debug\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">agentos_coreloopthree</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\SPHARX-CN\SpharxWorks\AgentOS\build_test\lib\Release\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">agentos_coreloopthree.dir\Release\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">agentos_coreloopthree</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">D:\SPHARX-CN\SpharxWorks\AgentOS\build_test\lib\MinSizeRel\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">agentos_coreloopthree.dir\MinSizeRel\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">agentos_coreloopthree</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">D:\SPHARX-CN\SpharxWorks\AgentOS\build_test\lib\RelWithDebInfo\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">agentos_coreloopthree.dir\RelWithDebInfo\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">agentos_coreloopthree</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">.lib</TargetExt>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\corekern\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\syscall\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\memory\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\string\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\logging\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\sync\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\platform\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\error\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\types\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\config\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\observability\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\ipc\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\io\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cache\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cost\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /utf-8</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <BufferSecurityCheck>true</BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DisableSpecificWarnings>4828</DisableSpecificWarnings>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>Disabled</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <SDLCheck>true</SDLCheck>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level4</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;_CRT_SECURE_NO_WARNINGS;_GNU_SOURCE;AGENTOS_VERSION_MAJOR=1;AGENTOS_VERSION_MINOR=0;AGENTOS_VERSION_PATCH=0;AGENTOS_VERSION_TWEAK=7;AGENTOS_VERSION="1.0.0.7";AGENTOS_HAS_THREADS=1;AGENTOS_VERSION="1.0.0.6";AGENTOS_BUILDING_SHARED;NOMINMAX;CMAKE_INTDIR="Debug"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;_GNU_SOURCE;AGENTOS_VERSION_MAJOR=1;AGENTOS_VERSION_MINOR=0;AGENTOS_VERSION_PATCH=0;AGENTOS_VERSION_TWEAK=7;AGENTOS_VERSION=\"1.0.0.7\";AGENTOS_HAS_THREADS=1;AGENTOS_VERSION=\"1.0.0.6\";AGENTOS_BUILDING_SHARED;NOMINMAX;CMAKE_INTDIR=\"Debug\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\corekern\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\syscall\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\memory\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\string\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\logging\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\sync\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\platform\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\error\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\types\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\config\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\observability\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\ipc\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\io\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cache\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cost\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\corekern\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\syscall\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\memory\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\string\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\logging\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\sync\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\platform\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\error\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\types\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\config\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\observability\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\ipc\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\io\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cache\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cost\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\corekern\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\syscall\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\memory\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\string\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\logging\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\sync\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\platform\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\error\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\types\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\config\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\observability\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\ipc\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\io\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cache\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cost\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /utf-8</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <BufferSecurityCheck>true</BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
+      <DisableSpecificWarnings>4828</DisableSpecificWarnings>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <SDLCheck>true</SDLCheck>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level4</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;_GNU_SOURCE;AGENTOS_VERSION_MAJOR=1;AGENTOS_VERSION_MINOR=0;AGENTOS_VERSION_PATCH=0;AGENTOS_VERSION_TWEAK=7;AGENTOS_VERSION="1.0.0.7";AGENTOS_HAS_THREADS=1;AGENTOS_VERSION="1.0.0.6";AGENTOS_BUILDING_SHARED;NOMINMAX;CMAKE_INTDIR="Release"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;_GNU_SOURCE;AGENTOS_VERSION_MAJOR=1;AGENTOS_VERSION_MINOR=0;AGENTOS_VERSION_PATCH=0;AGENTOS_VERSION_TWEAK=7;AGENTOS_VERSION=\"1.0.0.7\";AGENTOS_HAS_THREADS=1;AGENTOS_VERSION=\"1.0.0.6\";AGENTOS_BUILDING_SHARED;NOMINMAX;CMAKE_INTDIR=\"Release\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\corekern\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\syscall\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\memory\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\string\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\logging\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\sync\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\platform\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\error\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\types\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\config\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\observability\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\ipc\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\io\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cache\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cost\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\corekern\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\syscall\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\memory\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\string\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\logging\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\sync\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\platform\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\error\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\types\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\config\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\observability\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\ipc\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\io\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cache\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cost\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\corekern\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\syscall\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\memory\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\string\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\logging\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\sync\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\platform\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\error\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\types\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\config\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\observability\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\ipc\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\io\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cache\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cost\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /utf-8</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <BufferSecurityCheck>true</BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
+      <DisableSpecificWarnings>4828</DisableSpecificWarnings>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>MinSpace</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <SDLCheck>true</SDLCheck>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level4</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;_GNU_SOURCE;AGENTOS_VERSION_MAJOR=1;AGENTOS_VERSION_MINOR=0;AGENTOS_VERSION_PATCH=0;AGENTOS_VERSION_TWEAK=7;AGENTOS_VERSION="1.0.0.7";AGENTOS_HAS_THREADS=1;AGENTOS_VERSION="1.0.0.6";AGENTOS_BUILDING_SHARED;NOMINMAX;CMAKE_INTDIR="MinSizeRel"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;_GNU_SOURCE;AGENTOS_VERSION_MAJOR=1;AGENTOS_VERSION_MINOR=0;AGENTOS_VERSION_PATCH=0;AGENTOS_VERSION_TWEAK=7;AGENTOS_VERSION=\"1.0.0.7\";AGENTOS_HAS_THREADS=1;AGENTOS_VERSION=\"1.0.0.6\";AGENTOS_BUILDING_SHARED;NOMINMAX;CMAKE_INTDIR=\"MinSizeRel\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\corekern\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\syscall\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\memory\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\string\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\logging\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\sync\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\platform\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\error\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\types\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\config\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\observability\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\ipc\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\io\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cache\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cost\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\corekern\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\syscall\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\memory\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\string\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\logging\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\sync\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\platform\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\error\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\types\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\config\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\observability\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\ipc\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\io\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cache\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cost\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\corekern\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\syscall\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\memory\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\string\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\logging\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\sync\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\platform\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\error\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\types\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\config\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\observability\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\ipc\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\io\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cache\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cost\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /utf-8</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <BufferSecurityCheck>true</BufferSecurityCheck>
+      <CallingConvention></CallingConvention>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DisableSpecificWarnings>4828</DisableSpecificWarnings>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <FloatingPointModel></FloatingPointModel>
+      <ForceConformanceInForLoopScope></ForceConformanceInForLoopScope>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
+      <MinimalRebuild></MinimalRebuild>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RemoveUnreferencedCodeData></RemoveUnreferencedCodeData>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <SDLCheck>true</SDLCheck>
+      <SupportJustMyCode></SupportJustMyCode>
+      <TreatWChar_tAsBuiltInType></TreatWChar_tAsBuiltInType>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level4</WarningLevel>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;_GNU_SOURCE;AGENTOS_VERSION_MAJOR=1;AGENTOS_VERSION_MINOR=0;AGENTOS_VERSION_PATCH=0;AGENTOS_VERSION_TWEAK=7;AGENTOS_VERSION="1.0.0.7";AGENTOS_HAS_THREADS=1;AGENTOS_VERSION="1.0.0.6";AGENTOS_BUILDING_SHARED;NOMINMAX;CMAKE_INTDIR="RelWithDebInfo"</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <ScanSourceForModuleDependencies>false</ScanSourceForModuleDependencies>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;_GNU_SOURCE;AGENTOS_VERSION_MAJOR=1;AGENTOS_VERSION_MINOR=0;AGENTOS_VERSION_PATCH=0;AGENTOS_VERSION_TWEAK=7;AGENTOS_VERSION=\"1.0.0.7\";AGENTOS_HAS_THREADS=1;AGENTOS_VERSION=\"1.0.0.6\";AGENTOS_BUILDING_SHARED;NOMINMAX;CMAKE_INTDIR=\"RelWithDebInfo\"</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\corekern\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\syscall\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\memory\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\string\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\logging\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\sync\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\platform\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\error\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\types\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\config\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\observability\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\ipc\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\io\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cache\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cost\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\corekern\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\memoryrovol\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\syscall\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\memory\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\string\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\logging\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\sync\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\platform\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\error\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\types\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\config\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\observability\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\ipc\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\io\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cache\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\..\commons\utils\cost\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\CMakeLists.txt">
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building Custom Rule D:/SPHARX-CN/SpharxWorks/AgentOS/agentos/atoms/coreloopthree/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/SPHARX-CN/SpharxWorks/AgentOS -BD:/SPHARX-CN/SpharxWorks/AgentOS/build_test --check-stamp-file D:/SPHARX-CN/SpharxWorks/AgentOS/build_test/agentos/atoms/coreloopthree/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">D:\SPHARX-CN\SpharxWorks\AgentOS\build_test\agentos\atoms\coreloopthree\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Building Custom Rule D:/SPHARX-CN/SpharxWorks/AgentOS/agentos/atoms/coreloopthree/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/SPHARX-CN/SpharxWorks/AgentOS -BD:/SPHARX-CN/SpharxWorks/AgentOS/build_test --check-stamp-file D:/SPHARX-CN/SpharxWorks/AgentOS/build_test/agentos/atoms/coreloopthree/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\SPHARX-CN\SpharxWorks\AgentOS\build_test\agentos\atoms\coreloopthree\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Building Custom Rule D:/SPHARX-CN/SpharxWorks/AgentOS/agentos/atoms/coreloopthree/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/SPHARX-CN/SpharxWorks/AgentOS -BD:/SPHARX-CN/SpharxWorks/AgentOS/build_test --check-stamp-file D:/SPHARX-CN/SpharxWorks/AgentOS/build_test/agentos/atoms/coreloopthree/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">D:\SPHARX-CN\SpharxWorks\AgentOS\build_test\agentos\atoms\coreloopthree\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Building Custom Rule D:/SPHARX-CN/SpharxWorks/AgentOS/agentos/atoms/coreloopthree/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/SPHARX-CN/SpharxWorks/AgentOS -BD:/SPHARX-CN/SpharxWorks/AgentOS/build_test --check-stamp-file D:/SPHARX-CN/SpharxWorks/AgentOS/build_test/agentos/atoms/coreloopthree/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">D:\SPHARX-CN\SpharxWorks\AgentOS\build_test\agentos\atoms\coreloopthree\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\src\loop.c" />
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\src\config_loader.c" />
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\src\utils\error_utils.c" />
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\src\utils\id_utils.c" />
+  </ItemGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <ProjectReference Include="D:\SPHARX-CN\SpharxWorks\AgentOS\build_test\ZERO_CHECK.vcxproj">
+      <Project>{EABEB6E2-21A1-353A-8D93-64B2D13B1B94}</Project>
+      <Name>ZERO_CHECK</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="D:\SPHARX-CN\SpharxWorks\AgentOS\build_test\agentos\atoms\coreloopthree\src\cognition\agentos_cognition.vcxproj">
+      <Project>{B2C21F8B-FC8C-302F-A153-5D4045E21617}</Project>
+      <Name>agentos_cognition</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\SPHARX-CN\SpharxWorks\AgentOS\build_test\agentos\atoms\corekern\agentos_core.vcxproj">
+      <Project>{9A96D519-6A5A-3063-BE74-8FD58F81A65F}</Project>
+      <Name>agentos_core</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\SPHARX-CN\SpharxWorks\AgentOS\build_test\agentos\atoms\coreloopthree\src\execution\agentos_execution.vcxproj">
+      <Project>{C4E663E1-FDE0-3BF7-9C58-CF5E185BA49A}</Project>
+      <Name>agentos_execution</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

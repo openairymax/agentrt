@@ -42,7 +42,8 @@ add_library(agentos_syscall STATIC ${SOURCES})
 target_link_libraries(agentos_syscall PUBLIC agentos_atoms)
 
 target_include_directories(agentos_syscall PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include/agentos/syscall>
 )
 
 # 安全编译选项（基于 AgentOS C 编码风格指南附录 A）

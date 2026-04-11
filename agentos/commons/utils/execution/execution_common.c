@@ -17,7 +17,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#ifndef _WIN32
 #include <sys/wait.h>
+#endif
 
 /**
  * @brief 初始化执行结果
