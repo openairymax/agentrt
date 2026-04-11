@@ -7,7 +7,7 @@
 
 ## 📋 概述
 
-`scripts/dev/` 目录包含 AgentOS 开发过程中的辅助工具，提供文档生成、注册表更新、示例运行等功能。
+`scripts/development/` 目录包含 AgentOS 开发过程中的辅助工具，提供文档生成、注册表更新、示例运行等功能。
 
 ### 配置管理架构
 
@@ -21,7 +21,7 @@ AgentOS/
 │   ├── security/policy.yaml    # 安全配置
 │   └── ...                     # 所有运行时配置
 │
-├── scripts/dev/config/         # ✅ 开发工具统一配置
+├── scripts/development/config/         # ✅ 开发工具统一配置
 │   ├── .clang-format           # C/C++ 代码格式化
 │   ├── .clang-tidy             # C/C++ 静态分析
 │   ├── .clangd                 # clangd 语言服务器
@@ -37,7 +37,7 @@ AgentOS/
 
 **重要说明**：
 - ❌ **模块根目录不再保留开发工具配置**（如 `agentos/atoms/.clang-format`、`agentos/gateway/.clang-tidy`）
-- ✅ **所有开发工具配置统一到 `scripts/dev/config/`**，避免重复和冲突
+- ✅ **所有开发工具配置统一到 `scripts/development/config/`**，避免重复和冲突
 - ✅ **Manager 模块只管理运行时业务配置**（YAML/JSON 格式）
 - ✅ **模块特定工具保留在模块内**（如 cupolas 的 Doxygen 配置）
 
@@ -66,9 +66,9 @@ AgentOS/
 | `config/vcpkg.json` | C++ 依赖配置 (Windows) | Config | ✅ 生产就绪 |
 
 > 📌 **注意**: 
-> - 这些配置文件原位于项目根目录或模块根目录，已统一迁移到 `scripts/dev/config/` 目录
+> - 这些配置文件原位于项目根目录或模块根目录，已统一迁移到 `scripts/development/config/` 目录
 > - **模块根目录（如 agentos/atoms/、agentos/gateway/）不再保留 .clang-format 和 .clang-tidy**
-> - 使用工具时，工具会自动从 `scripts/dev/config/` 读取配置
+> - 使用工具时，工具会自动从 `scripts/development/config/` 读取配置
 
 ---
 
@@ -76,7 +76,7 @@ AgentOS/
 
 ### 统一配置说明
 
-所有开发工具配置统一位于 `scripts/dev/config/` 目录，各工具会自动从该目录读取配置。
+所有开发工具配置统一位于 `scripts/development/config/` 目录，各工具会自动从该目录读取配置。
 
 #### 1. clang-format - 代码格式化
 
@@ -85,13 +85,13 @@ AgentOS/
 **使用方法**:
 ```bash
 # 格式化单个文件
-clang-format -i --style=file:scripts/dev/config/.clang-format src/main.c
+clang-format -i --style=file:scripts/development/config/.clang-format src/main.c
 
 # 格式化整个目录
-find agentos/atoms/ -name "*.c" -o -name "*.h" | xargs clang-format -i --style=file:scripts/dev/config/.clang-format
+find agentos/atoms/ -name "*.c" -o -name "*.h" | xargs clang-format -i --style=file:scripts/development/config/.clang-format
 
 # 检查格式（不修改）
-clang-format --dry-run --Werror --style=file:scripts/dev/config/.clang-format src/main.c
+clang-format --dry-run --Werror --style=file:scripts/development/config/.clang-format src/main.c
 ```
 
 **VS Code 集成**:
@@ -99,13 +99,13 @@ clang-format --dry-run --Werror --style=file:scripts/dev/config/.clang-format sr
 // .vscode/settings.json
 {
   "C_Cpp.formatting": "clangFormat",
-  "C_Cpp.clang_format_fallbackStyle": "file:scripts/dev/config/.clang-format"
+  "C_Cpp.clang_format_fallbackStyle": "file:scripts/development/config/.clang-format"
 }
 ```
 
 **配置说明**:
 ```yaml
-# scripts/dev/config/.clang-format
+# scripts/development/config/.clang-format
 Language: Cpp
 BasedOnStyle: LLVM
 IndentWidth: 4              # 缩进 4 空格
@@ -132,7 +132,7 @@ clang-tidy -fix src/main.c -- -I include -std=c11
 
 **配置说明**:
 ```yaml
-# scripts/dev/config/.clang-tidy
+# scripts/development/config/.clang-tidy
 Checks: >
   -*,
   bugprone-*,
@@ -160,7 +160,7 @@ cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -B build
 # 复制 compile_commands.json 到项目根目录
 cp build/compile_commands.json .
 
-# clangd 会自动读取 scripts/dev/config/.clangd 配置
+# clangd 会自动读取 scripts/development/config/.clangd 配置
 ```
 
 **VS Code 集成**:
@@ -169,7 +169,7 @@ cp build/compile_commands.json .
 {
   "clangd.path": "clangd",
   "clangd.arguments": [
-    "--config=scripts/dev/config/.clangd"
+    "--config=scripts/development/config/.clangd"
   ]
 }
 ```
@@ -188,7 +188,7 @@ editorconfig-checker
 
 **配置说明**:
 ```ini
-# scripts/dev/config/.editorconfig
+# scripts/development/config/.editorconfig
 root = true
 
 [*]
@@ -219,12 +219,12 @@ lizard agentos/atoms/ agentos/gateway/ agentos/commons/
 lizard --xml > lizard-report.xml
 
 # 使用项目配置
-lizard -c scripts/dev/config/.lizardrc agentos/atoms/
+lizard -c scripts/development/config/.lizardrc agentos/atoms/
 ```
 
 **配置说明**:
 ```json
-# scripts/dev/config/.lizardrc
+# scripts/development/config/.lizardrc
 {
   "CCN": 15,              // 最大圈复杂度
   "length": 50,           // 最大函数行数
@@ -239,18 +239,18 @@ lizard -c scripts/dev/config/.lizardrc agentos/atoms/
 **使用方法**:
 ```bash
 # 检查重复代码
-jscpd --config scripts/dev/config/.jscpd.json
+jscpd --config scripts/development/config/.jscpd.json
 
 # 指定目录
-jscpd "agentos/atoms/**/*.c" "agentos/gateway/**/*.c" --config scripts/dev/config/.jscpd.json
+jscpd "agentos/atoms/**/*.c" "agentos/gateway/**/*.c" --config scripts/development/config/.jscpd.json
 
 # 生成 HTML 报告
-jscpd --report html --config scripts/dev/config/.jscpd.json
+jscpd --report html --config scripts/development/config/.jscpd.json
 ```
 
 **配置说明**:
 ```json
-# scripts/dev/config/.jscpd.json
+# scripts/development/config/.jscpd.json
 {
   "threshold": 15,        // 重复率阈值（%）
   "reporters": ["html", "console"],
@@ -268,18 +268,18 @@ jscpd --report html --config scripts/dev/config/.jscpd.json
 **使用方法**:
 ```bash
 # 安装 pre-commit 钩子
-pre-commit install --config scripts/dev/config/.pre-commit-config.yaml
+pre-commit install --config scripts/development/config/.pre-commit-config.yaml
 
 # 手动运行所有检查
-pre-commit run --all-files --config scripts/dev/config/.pre-commit-config.yaml
+pre-commit run --all-files --config scripts/development/config/.pre-commit-config.yaml
 
 # 检查特定文件
-pre-commit run --files src/main.c --config scripts/dev/config/.pre-commit-config.yaml
+pre-commit run --files src/main.c --config scripts/development/config/.pre-commit-config.yaml
 ```
 
 **配置说明**:
 ```yaml
-# scripts/dev/config/.pre-commit-config.yaml
+# scripts/development/config/.pre-commit-config.yaml
 repos:
   - repo: local
     hooks:
@@ -320,7 +320,7 @@ repos:
 **使用方法**:
 
 ```bash
-cd scripts/dev
+cd scripts/development
 
 # 生成完整文档
 python generate_docs.py --all
@@ -387,7 +387,7 @@ output:
 **使用方法**:
 
 ```bash
-cd scripts/dev
+cd scripts/development
 
 # 更新所有注册表
 python update_registry.py --all
@@ -451,7 +451,7 @@ skills:
 **使用方法**:
 
 ```bash
-cd scripts/dev
+cd scripts/development
 
 # 运行所有示例
 ./run_example.sh --all
@@ -557,7 +557,7 @@ cd scripts/build
 ./build.sh --release
 
 # 然后运行示例
-cd ../dev
+cd ../development
 ./run_example.sh hello_world
 ```
 
@@ -640,7 +640,7 @@ def test_examples(example):
 
 ```bash
 #!/bin/bash
-# scripts/dev/auto_update_registry.sh
+# scripts/development/auto_update_registry.sh
 
 set -euo pipefail
 

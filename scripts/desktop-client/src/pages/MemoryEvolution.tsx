@@ -70,8 +70,21 @@ const MemoryEvolution: React.FC = () => {
 
   const handleEvolve = async () => {
     setEvolving(true);
-    await new Promise(r => setTimeout(r, 2000));
-    setEvolving(false);
+    try {
+      const result = await sdk.memoryEvolve();
+      if (result && result.evolved > 0) {
+        alert(`记忆进化完成！共进化 ${result.evolved} 条记忆\n\n` + result.layers.map((l: any) => `${l.layer}: ${l.before} → ${l.after}`).join("\n"));
+        loadEntries();
+      } else {
+        await new Promise(r => setTimeout(r, 1500));
+        loadEntries();
+      }
+    } catch (error) {
+      console.error("Evolution failed:", error);
+      await new Promise(r => setTimeout(r, 1500));
+    } finally {
+      setEvolving(false);
+    }
   };
 
   const handleForget = async (id: string) => {
@@ -96,19 +109,19 @@ const MemoryEvolution: React.FC = () => {
   return (
     <div className="page-container">
       <div className="page-header">
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
           <div style={{
-            width: "48px", height: "48px", borderRadius: "var(--radius-lg)",
-            background: "linear-gradient(135deg, #8b5cf6, #a78bfa)",
+            width: "44px", height: "44px", borderRadius: "var(--radius-md)",
+            background: "linear-gradient(135deg,#6366f1,#818cf8)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 6px 20px rgba(139,92,246,0.3)",
+            boxShadow: "0 4px 16px rgba(99,102,241,0.35), 0 0 0 1px rgba(255,255,255,0.08) inset",
           }}>
-            <Layers size={24} color="white" />
+            <Database size={20} color="white" />
           </div>
           <div>
             <h1>四层记忆卷载</h1>
             <p style={{ color: "var(--text-secondary)", fontSize: "14px", margin: "2px 0 0 0" }}>
-              MemoryRovol · L1→L4 自动进化管理系统
+              MemoryEvolution · L1→L4 自动进化管理系统
             </p>
           </div>
         </div>

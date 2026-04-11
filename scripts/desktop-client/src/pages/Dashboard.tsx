@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Brain, Activity, Layers, Zap, Shield, Network,
   RefreshCw, Eye, Database, Target, Workflow,
   Radio, Bot, Sparkles, Wrench, ArrowRight,
+  Clock, TrendingUp, CheckCircle2, AlertTriangle,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import sdk from "../services/agentos-sdk";
 
 const PHASES = [
   { key: "perception", label: "感知", icon: Eye, color: "#06b6d4", gradient: "linear-gradient(135deg,#06b6d4,#22d3ee)", desc: "意图理解与上下文分析" },
@@ -504,12 +506,15 @@ function SvcGrid() {
 
 /* ─── Activity Timeline (enhanced with type icons) ─── */
 function TimeLine() {
+  const [visibleCount, setVisibleCount] = useState(5);
   const events = [
     { time: "刚刚", text: "认知循环完成一轮 感知→规划→行动 全流程", type: "cycle", c: "#8b5cf6", icon: Workflow },
     { time: "2m前", text: "memory_store(): 写入 12 条新记忆到 L2 特征层向量索引", type: "memory", c: "#06b6d4", icon: Database },
     { time: "5m前", text: "tool_d.read_file() 执行完成，耗时 23ms，返回 1.2KB 数据", type: "tool", c: "#10b981", icon: Wrench },
     { time: "8m前", text: "Cupolas 输入净化模块拦截了 1 个异常请求（SQL注入尝试）", type: "sec", c: "#ef4444", icon: Shield },
     { time: "12m前", text: "System 2 深度推理：对用户问题进行了多角度逻辑分析", type: "think", c: "#f59e0b", icon: Brain },
+    { time: "15m前", text: "网关服务完成健康检查，所有端点响应正常", type: "tool", c: "#10b981", icon: CheckCircle2 },
+    { time: "20m前", text: "L3 结构层知识图谱新增 8 个实体关系", type: "memory", c: "#06b6d4", icon: Database },
   ];
   return (
     <div className="card card-elevated" style={{ padding: "24px", position: "relative", overflow: "hidden" }}>
@@ -528,7 +533,9 @@ function TimeLine() {
             <div style={{ fontSize: "11.5px", color: "var(--text-muted)" }}>系统事件时间线</div>
           </div>
         </div>
-        <button className="btn btn-ghost btn-sm" style={{ padding: "6px 10px" }}><RefreshCw size={14} /></button>
+        <button className="btn btn-ghost btn-sm" style={{ padding: "6px 10px" }} onClick={() => setVisibleCount(v => v >= events.length ? 5 : events.length)}>
+          {visibleCount >= events.length ? <TrendingUp size={14} /> : <RefreshCw size={14} />}
+        </button>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "2px", position: "relative" }}>
@@ -537,7 +544,7 @@ function TimeLine() {
           <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: `${(1/events.length)*100}%`, background: "linear-gradient(180deg,#8b5cf630,transparent)", borderRadius: "1px" }} />
         </div>
 
-        {events.map((ev, i) => {
+        {events.slice(0, visibleCount).map((ev, i) => {
           const EvIcon = ev.icon;
           const isLatest = i === 0;
           return (
@@ -642,9 +649,49 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [phaseIdx, setPhaseIdx] = useState(1);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [systemData, setSystemData] = useState<{
+    cpu: number; memory: number; disk: number; processes: number;
+    servicesUp: number; servicesTotal: number;
+    uptime: string; version: string;
+  } | null>(null);
+
+  const fetchDashboardData = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const [monitorData, serviceStatus] = await Promise.all([
+        sdk.getSystemMonitorData().catch(() => null),
+        sdk.getServiceStatus().catch(() => null),
+      ]);
+      if (monitorData) {
+        setSystemData({
+          cpu: Math.round(monitorData.cpu.usage_percent),
+          memory: Math.round(monitorData.memory.percent),
+          disk: Math.round(monitorData.disk.percent),
+          processes: monitorData.cpu.cores.length,
+          servicesUp: serviceStatus ? serviceStatus.filter((s: any) => s.healthy).length : 5,
+          servicesTotal: serviceStatus ? serviceStatus.length : 6,
+          uptime: Math.floor(monitorData.uptime_seconds / 3600) + "h",
+          version: "v2.1.0",
+        });
+      }
+      setLastUpdate(new Date());
+    } catch {
+      // Keep mock data on error
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => { const t = setTimeout(() => setLoading(false), 500); return () => clearTimeout(t); }, []);
   useEffect(() => { const tm = setInterval(() => setPhaseIdx(p => (p + 1) % 3), 4000); return () => clearInterval(tm); }, []);
+  useEffect(() => { fetchDashboardData(); const iv = setInterval(fetchDashboardData, 10000); return () => clearInterval(iv); }, [fetchDashboardData]);
+
+  const cpuVal = systemData?.cpu ?? 23;
+  const memVal = systemData?.memory ?? 26;
+  const diskVal = systemData?.disk ?? 75;
+  const procVal = systemData ? Math.round((systemData.servicesUp / systemData.servicesTotal) * 100) : 83;
 
   if (loading) {
     return (
@@ -704,17 +751,22 @@ export default function Dashboard() {
             <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981", boxShadow: "0 0 8px rgba(16,185,129,0.6)", animation: "statusPulse 2s infinite" }} />
             <span style={{ fontSize: "12px", fontWeight: 700, color: "#10b981" }}>系统正常</span>
           </div>
-          <button className="btn btn-ghost" style={{ padding: "8px 10px" }}><RefreshCw size={16} /></button>
+          <button className="btn btn-ghost" style={{ padding: "8px 10px" }} onClick={fetchDashboardData} disabled={refreshing}>
+            <RefreshCw size={16} className={refreshing ? "spin" : ""} />
+          </button>
+          <span style={{ fontSize: "10.5px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+            {lastUpdate.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+          </span>
         </div>
       </div>
 
       {/* ═ Resource Gauges ═ */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginBottom: "20px" }}>
         {[
-          { v: 23, u: "%", l: "CPU", s: "8核/16线程", c: "#6366f1" },
-          { v: 26, u: "%", l: "内存", s: "4.2 / 16 GB", c: "#06b6d4" },
-          { v: 75, u: "", l: "磁盘", s: "128 / 512 GB", c: "#f59e0b" },
-          { v: 83, u: "%", l: "进程", s: "5/6 在线", c: "#10b981" },
+          { v: cpuVal, u: "%", l: "CPU", s: systemData ? `${systemData.processes}核心` : "8核/16线程", c: "#6366f1" },
+          { v: memVal, u: "%", l: "内存", s: systemData ? `${systemData.memory}% 已用` : "4.2 / 16 GB", c: "#06b6d4" },
+          { v: diskVal, u: "", l: "磁盘", s: systemData ? `${systemData.disk}% 已用` : "128 / 512 GB", c: "#f59e0b" },
+          { v: procVal, u: "%", l: "进程", s: systemData ? `${systemData.servicesUp}/${systemData.servicesTotal} 在线` : "5/6 在线", c: "#10b981" },
         ].map(m => (
           <div key={m.l} className="card card-elevated" style={{
             padding: "20px 16px", textAlign: "center",

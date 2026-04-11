@@ -39,7 +39,8 @@ static mock_resource_t* mock_resource_create(const char* name) {
     res->is_open = true;
     res->name = name ? AGENTOS_MALLOC(strlen(name) + 1) : NULL;
     if (res->name && name) {
-        strcpy(res->name, name);
+        strncpy(res->name, name, strlen(name));
+        res->name[strlen(name)] = '\0';
     }
     
     return res;
