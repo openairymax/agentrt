@@ -4,13 +4,14 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "execution.h"
-#include "registry.h"
-#include "agentos.h"
-#include "logger.h"
-#include "id_utils.h"
-#include "error_utils.h"
+#include "../../include/execution.h"
+#include "../../include/agent_registry.h"
+#include "../../../corekern/include/agentos.h"
+#include "../../../commons/utils/observability/include/logger.h"
+#include "../../include/id_utils.h"
+#include "../../include/error_utils.h"
 #include <stdlib.h>
+#include <stdint.h>
 
 /* Unified base library compatibility layer */
 #include "../../../agentos/commons/utils/memory/include/memory_compat.h"

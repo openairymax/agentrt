@@ -13,8 +13,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "../utils/test_framework.h"
-#include "../../agentos/commons/utils/memory/include/memory_compat.h"
-#include "../../agentos/commons/utils/resource/include/resource_compat.h"
+#include "../../utils/memory/include/memory_compat.h"
+#include "../../utils/resource/resource_guard.h"
+#include "../../../atoms/corekern/include/agentos.h"
 
 /**
  * @brief 模拟资源结构
