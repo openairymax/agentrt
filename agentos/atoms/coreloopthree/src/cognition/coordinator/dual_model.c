@@ -149,11 +149,11 @@ static agentos_error_t dual_coordinate(
     if (is_consistent) {
         // 输出一致，根据权重选择
         if (coordinator->primary_weight >= coordinator->secondary_weight) {
-            strcpy(selected_model, "Primary");
+            strncpy(selected_model, "Primary", sizeof(selected_model) - 1); selected_model[sizeof(selected_model) - 1] = '\0';
             selected_output = primary_output;
             final_confidence = (primary_confidence + similarity) / 2.0f;
         } else {
-            strcpy(selected_model, "Secondary");
+            strncpy(selected_model, "Secondary", sizeof(selected_model) - 1); selected_model[sizeof(selected_model) - 1] = '\0';
             selected_output = secondary_output;
             final_confidence = (secondary_confidence + similarity) / 2.0f;
         }
@@ -161,17 +161,17 @@ static agentos_error_t dual_coordinate(
         // 输出不一致
         if (validation_mode == CROSS_VALIDATION_BASIC) {
             // 基础模式：选择主模型
-            strcpy(selected_model, "Primary (Basic)");
+            strncpy(selected_model, "Primary (Basic)", sizeof(selected_model) - 1); selected_model[sizeof(selected_model) - 1] = '\0';
             selected_output = primary_output;
             final_confidence = primary_confidence * 0.7f;  // 不一致时降低置信度
         } else if (validation_mode == CROSS_VALIDATION_ADVANCED) {
             // 高级模式：基于置信度选择
             if (primary_confidence >= secondary_confidence) {
-                strcpy(selected_model, "Primary (Confidence)");
+                strncpy(selected_model, "Primary (Confidence)", sizeof(selected_model) - 1); selected_model[sizeof(selected_model) - 1] = '\0';
                 selected_output = primary_output;
                 final_confidence = primary_confidence;
             } else {
-                strcpy(selected_model, "Secondary (Confidence)");
+                strncpy(selected_model, "Secondary (Confidence)", sizeof(selected_model) - 1); selected_model[sizeof(selected_model) - 1] = '\0';
                 selected_output = secondary_output;
                 final_confidence = secondary_confidence;
             }
