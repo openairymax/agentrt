@@ -16,10 +16,22 @@
   --primary-gradient: linear-gradient(135deg, #6366f1, #818cf8);
   --success-color: #22c55e;
   --success-light: rgba(34, 197, 94, 0.12);
+  --success-gradient: linear-gradient(135deg, #22c55e, #4ade80);
   --warning-color: #f59e0b;
   --warning-light: rgba(245, 158, 11, 0.12);
+  --warning-gradient: linear-gradient(135deg, #f59e0b, #fbbf24);
   --error-color: #ef4444;
   --error-light: rgba(239, 68, 68, 0.12);
+  --error-gradient: linear-gradient(135deg, #ef4444, #f87171);
+  --cyan-color: #06b6d4;
+  --cyan-light: rgba(6, 182, 212, 0.12);
+  --cyan-gradient: linear-gradient(135deg, #06b6d4, #22d3ee);
+  --purple-color: #8b5cf6;
+  --purple-light: rgba(139, 92, 246, 0.12);
+  --purple-gradient: linear-gradient(135deg, #8b5cf6, #a78bfa);
+  --pink-color: #ec4899;
+  --pink-light: rgba(236, 72, 153, 0.12);
+  --pink-gradient: linear-gradient(135deg, #ec4899, #f472b6);
   --sidebar-width: 72px;
   --sidebar-expanded-width: 260px;
   --header-height: 56px;
@@ -28,13 +40,20 @@
   --radius-md: 10px;
   --radius-lg: 14px;
   --radius-xl: 20px;
+  --radius-full: 9999px;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.08);
   --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.2);
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.02);
+  --shadow-card-hover: 0 8px 24px rgba(0,0,0,0.08), 0 0 0 1px rgba(99,102,241,0.08);
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  --surface-glass: rgba(255, 255, 255, 0.03);
+  --border-glass: rgba(255, 255, 255, 0.06);
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
 }
 
 :root.dark {
@@ -443,7 +462,8 @@ body {
   border-radius: var(--radius-lg);
   padding: 20px;
   margin-bottom: 16px;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+  position: relative;
 }
 
 .card:hover {
@@ -451,14 +471,27 @@ body {
 }
 
 .card-elevated {
-  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-elevated) 100%);
-  box-shadow: var(--shadow-sm);
+  background: linear-gradient(145deg, var(--bg-secondary) 0%, var(--bg-elevated) 100%);
+  box-shadow: var(--shadow-card);
+}
+
+.card-elevated:hover {
+  box-shadow: var(--shadow-card-hover);
 }
 
 .card-glass {
   background: var(--glass-bg);
   backdrop-filter: blur(12px) saturate(180%);
   border: 1px solid var(--glass-border);
+}
+
+.card-hover-lift {
+  transition: transform var(--transition-spring), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.card-hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .card-title {
@@ -503,24 +536,24 @@ body {
 .btn-primary {
   background: linear-gradient(135deg, var(--primary-color), #818cf8);
   color: white;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35), 0 0 0 1px rgba(99,102,241,0.1) inset;
 }
 
 .btn-primary:hover {
-  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.45);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.45), 0 0 0 1px rgba(99,102,241,0.2) inset;
   transform: translateY(-1px);
 }
 
 .btn-success {
   background: linear-gradient(135deg, var(--success-color), #4ade80);
   color: white;
-  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3), 0 0 0 1px rgba(34,197,94,0.1) inset;
 }
 
 .btn-danger {
   background: linear-gradient(135deg, var(--error-color), #f87171);
   color: white;
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3), 0 0 0 1px rgba(239,68,68,0.1) inset;
 }
 
 .btn-secondary {
@@ -646,7 +679,7 @@ body {
   padding: 20px;
   position: relative;
   overflow: hidden;
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  transition: transform var(--transition-spring), box-shadow var(--transition-fast), border-color var(--transition-fast);
 }
 
 .stat-card::before {
@@ -656,14 +689,15 @@ body {
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, var(--primary-color), transparent);
+  background: var(--primary-gradient);
   opacity: 0;
   transition: opacity var(--transition-fast);
 }
 
 .stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--border-color);
 }
 
 .stat-card:hover::before {
@@ -871,13 +905,18 @@ body {
 }
 
 .page-container {
-  padding: 24px;
+  padding: 28px;
   max-width: 1280px;
   margin: 0 auto;
 }
 
 .page-header {
-  margin-bottom: 24px;
+  margin-bottom: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
 .page-header h1 {
@@ -1053,6 +1092,60 @@ body {
 @keyframes statusPulse { 0%, 100% { opacity: 1; box-shadow: 0 0 4px rgba(34,197,94,0.5); } 50% { opacity: 0.7; box-shadow: 0 0 10px rgba(34,197,94,0.8); } }
 @keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
 
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(99,102,241,0.2); }
+  50% { box-shadow: 0 0 24px rgba(99,102,241,0.45), 0 0 48px rgba(139,92,246,0.15); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes dataFlow {
+  0% { transform: translateX(-100%); opacity: 0; }
+  30% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translateX(400%); opacity: 0; }
+}
+@keyframes ringPulse {
+  0% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.15); opacity: 0.3; }
+  100% { transform: scale(1); opacity: 0.6; }
+}
+@keyframes pipelineGlow {
+  0%, 100% { filter: drop-shadow(0 0 3px currentColor); }
+  50% { filter: drop-shadow(0 0 10px currentColor) drop-shadow(0 0 20px currentColor); }
+}
+@keyframes memoryRipple {
+  0% { transform: scale(0.95); opacity: 0.7; }
+  50% { transform: scale(1.02); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.7; }
+}
+@keyframes timelineDotBlink {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 4px currentColor; }
+  50% { transform: scale(1.4); box-shadow: 0 0 12px currentColor, 0 0 24px currentColor; }
+}
+@keyframes gaugeFill {
+  from { stroke-dashoffset: var(--circumference); }
+  to { stroke-dashoffset: var(--target-offset); }
+}
+@keyframes vizPulseRing {
+  0% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.15); opacity: 0.25; }
+  100% { transform: scale(1); opacity: 0.6; }
+}
+@keyframes vizDataFlow {
+  0% { transform: translateX(-100%); opacity: 0; }
+  30% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translateX(400%); opacity: 0; }
+}
+@keyframes vizScanLine {
+  0% { left: -100%; opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+
 .avatar {
   width: 32px;
   height: 32px;
@@ -1120,12 +1213,12 @@ body {
 }
 
 .card-elevated {
-  transition: transform var(--transition-base), box-shadow var(--transition-base);
+  transition: transform var(--transition-spring), box-shadow var(--transition-fast), border-color var(--transition-fast);
 }
 
 .card-elevated:hover {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-card-hover);
 }
 
 /* Stat card hover effect */
@@ -1137,6 +1230,59 @@ body {
 /* Button press effect */
 .btn:active:not(:disabled) {
   transform: scale(0.97);
+}
+
+/* Smooth number transitions */
+.number-animate {
+  transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Card top accent on hover */
+.card-accent-hover {
+  position: relative;
+  overflow: hidden;
+}
+
+.card-accent-hover::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--primary-gradient);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.card-accent-hover:hover::after {
+  opacity: 1;
+}
+
+/* Icon button */
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.icon-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+/* Spin animation for loading */
+.spin {
+  animation: spin 1s linear infinite;
 }
 
 /* Focus ring for accessibility */
@@ -2188,6 +2334,54 @@ html.theme-transitioning *::after {
   transform: translateY(-4px);
   box-shadow: var(--shadow-lg), 0 12px 36px rgba(0, 0, 0, 0.12);
   border-color: var(--primary-color);
+}
+
+/* Visual Dashboard Components */
+.viz-gauge-ring {
+  transition: stroke-dashoffset 1s cubic-bezier(.34,1.56,.64,1);
+  transform-origin: center;
+}
+.viz-pipeline-node {
+  transition: all 0.6s cubic-bezier(.34,1.56,.64,1);
+}
+.viz-pipeline-node-active {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+.viz-pipeline-connector {
+  position: relative;
+  overflow: hidden;
+}
+.viz-pipeline-connector::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: dataFlow 2.5s ease-in-out infinite;
+}
+.viz-memory-layer {
+  transition: all var(--transition-base);
+  transform-style: preserve-3d;
+}
+.viz-memory-layer:hover {
+  transform: translateX(4px) translateZ(8px) !important;
+}
+.viz-status-dot-running {
+  animation: statusPulse 2s infinite;
+}
+.viz-timeline-dot {
+  animation: timelineDotBlink 3s ease-in-out infinite;
+}
+.viz-dual-system-card {
+  transition: all 0.4s ease;
+}
+.viz-shield-grid-item {
+  transition: all var(--transition-fast);
+}
+.viz-shield-grid-item:hover {
+  transform: translateY(-2px);
 }
 
 /* Progress ring animation */

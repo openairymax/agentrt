@@ -52,6 +52,7 @@ const LLMConfig: React.FC = () => {
   const [testingId, setTestingId] = useState<string | null>(null);
   const [newProviderType, setNewProviderType] = useState("openai");
   const [newApiKey, setNewApiKey] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
   const [newBaseUrl, setNewBaseUrl] = useState("");
   const [newModel, setNewModel] = useState("gpt-4o");
   const [saving, setSaving] = useState(false);
@@ -113,15 +114,27 @@ const LLMConfig: React.FC = () => {
     <div className="page-container">
       {/* Page Header */}
       <div className="page-header">
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <h1>{t.llmConfig.title}</h1>
-          <span className={`badge ${providers.some(p => p.configured) ? 'status-running' : 'status-stopped'}`}>
-            {providers.filter(p => p.configured).length}/{providers.length}
-          </span>
+        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+          <div style={{
+            width: "44px", height: "44px", borderRadius: "var(--radius-md)",
+            background: "linear-gradient(135deg,#10b981,#34d399)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 4px 16px rgba(16,185,129,0.35), 0 0 0 1px rgba(255,255,255,0.08) inset",
+          }}>
+            <Brain size={20} color="white" />
+          </div>
+          <div>
+            <h1 style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              {t.llmConfig.title}
+              <span className={`badge ${providers.some(p => p.configured) ? 'status-running' : 'status-stopped'}`}>
+                {providers.filter(p => p.configured).length}/{providers.length}
+              </span>
+            </h1>
+            <p style={{ color: "var(--text-secondary)", fontSize: "13px", margin: 0 }}>
+              {t.llmConfig.subtitle}
+            </p>
+          </div>
         </div>
-        <p style={{ color: "var(--text-secondary)", fontSize: "15px" }}>
-          {t.llmConfig.subtitle}
-        </p>
       </div>
 
       {/* Quick Setup Banner */}
@@ -379,12 +392,12 @@ const LLMConfig: React.FC = () => {
               <div className="form-group">
                 <label className="form-label">API Key</label>
                 <div style={{ position: "relative" }}>
-                  <input type="password" className="form-input" placeholder="sk-..." value={newApiKey} onChange={(e) => setNewApiKey(e.target.value)} style={{ paddingRight: "42px" }} />
+                  <input type={showApiKey ? "text" : "password"} className="form-input" placeholder="sk-..." value={newApiKey} onChange={(e) => setNewApiKey(e.target.value)} style={{ paddingRight: "42px" }} />
                   <button style={{
                     position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)",
                     background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)",
-                  }}>
-                    <Eye size={16} />
+                  }} onClick={() => setShowApiKey(!showApiKey)}>
+                    {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
               </div>

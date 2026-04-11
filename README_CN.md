@@ -35,7 +35,13 @@
 
 ## 💡 创新要点
 
-**基石思想**👉 **[《体系并行论》](docs/Basic_Theories/CN_01_体系并行论.md)**  
+<center>  
+
+⚡️  
+
+**基石[《体系并行论》](docs/Basic_Theories/CN_01_体系并行论.md)**
+
+</center>
 
 - **纯净内核**：内核仅提供原子机制，纯净高效
 - **认知循环**：认知，规划，行动
@@ -56,7 +62,9 @@
 - 持续优化执行效果  
 
 <p align="center">
-  <strong>✨ 全新架构 · 安全内生 · 智能涌现</strong>  
+  <strong> ✨ </strong>  
+  <p align="center">
+  <strong> 全新架构 · 安全内生 · 智能涌现 </strong>  
 </p>
 
 ## 🏗️ 系统架构
@@ -211,7 +219,9 @@ AgentOS 是**操作系统级**产品，而非单一框架：
 ### 相信的力量   
 
 <p align="center">
-  <strong>☀️ 这不是人类的日落，而是新世界的曙光</strong>  
+  <strong> ☀️ </strong>  
+  <p align="center">
+  <strong> 这不是人类的日落，而是新世界的曙光 </strong>  
 </p>  
 
 **相信**  
@@ -241,7 +251,9 @@ AgentOS 是**操作系统级**产品，而非单一框架：
 提交 PR，共同创造历史   
 
 <p align="center">  
-  <strong>🔥 “微微的灯火，照不亮前路，但能指引前行的方向”</strong>
+  <strong> 🔥 </strong>  
+  <p align="center">  
+  <strong> 微微的灯火，照不亮前路，但能指引前行的方向 </strong>
 </p>  
 
 ### 贡献流程  

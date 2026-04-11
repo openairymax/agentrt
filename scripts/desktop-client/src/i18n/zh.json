@@ -18,7 +18,9 @@
   "llmConfig": "AI 模型",
     "agentRuntime": "运行时",
     "systemMonitor": "系统监控",
-    "aiChat": "AI 助手"
+    "aiChat": "AI 助手",
+    "memoryEvolution": "四层记忆",
+    "tools": "工具管理"
 },
 "dashboard": {
   "title": "系统概览",

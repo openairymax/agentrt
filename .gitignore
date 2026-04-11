@@ -40,6 +40,7 @@
 
 .bendiwenjian/
 utf8_encoding.reg
+build_test/
 # =============================================================================
 # 1. CMake 构建系统（构建产物，不追踪）
 # =============================================================================
@@ -685,16 +686,16 @@ docs/private/
 !scripts/**/*.yaml
 !scripts/deploy/docker/.gitignore
 
-# scripts/dev/ 开发配置
-!scripts/dev/config/.clang-format
-!scripts/dev/config/.clangd
-!scripts/dev/config/.editorconfig
-!scripts/dev/config/.lizardrc
-!scripts/dev/config/.jscpd.json
-!scripts/dev/config/.pre-commit-config.yaml
-!scripts/dev/config/vcpkg.json
-!scripts/dev/quickstart.sh
-!scripts/dev/validate.sh
+# scripts/development/ 开发配置
+!scripts/development/config/.clang-format
+!scripts/development/config/.clangd
+!scripts/development/config/.editorconfig
+!scripts/development/config/.lizardrc
+!scripts/development/config/.jscpd.json
+!scripts/development/config/.pre-commit-config.yaml
+!scripts/development/config/vcpkg.json
+!scripts/development/quickstart.sh
+!scripts/development/validate.sh
 
 # 测试框架
 !tests/**/*.py

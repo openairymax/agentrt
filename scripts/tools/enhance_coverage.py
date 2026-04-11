@@ -204,7 +204,7 @@ class CoverageAnalyzer:
  */
 void test_{func_name}_valid_params(void) {{
     // Arrange
-    // TODO: Setup test data
+    // TODO-PHASE2: Setup test data (延期到第二阶段)
     
     // Act
     // agentos_error_t result = {func_name}(params);
