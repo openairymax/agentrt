@@ -22,12 +22,9 @@ import unittest
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from scripts.ops.checkpoint_manager import (
+from scripts.toolkit.checkpoint_manager import (
     CheckpointManager,
-    CheckpointInfo,
-    CheckpointStatus,
-    CheckpointResult,
-    get_checkpoint_manager
+    CheckpointMetadata as CheckpointInfo,
 )
 
 

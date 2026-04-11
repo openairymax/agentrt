@@ -15,8 +15,8 @@ AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"pwd)")
 AGENTOS_SCRIPTS_DIR="$(dirname "$AGENTOS_SCRIPT_DIR")"
 AGENTOS_PROJECT_ROOT="$(dirname "$AGENTOS_SCRIPTS_DIR")"
 
-# shellcheck source=$AGENTOS_SCRIPTS_DIR/lib/common.sh
-source "$AGENTOS_SCRIPTS_DIR/lib/common.sh"
+# shellcheck source=$AGENTOS_SCRIPTS_DIR/library/common.sh
+source "$AGENTOS_SCRIPTS_DIR/library/common.sh"
 
 ###############################################################################
 # 版本信息
