@@ -25,6 +25,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/logging/include
     ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/sync/include
     ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/platform/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/include
 )
 
 # 包含子目录

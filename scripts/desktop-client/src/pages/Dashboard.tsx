@@ -4,9 +4,11 @@ import {
   RefreshCw, Eye, Database, Target, Workflow,
   Radio, Bot, Sparkles, Wrench, ArrowRight,
   Clock, TrendingUp, CheckCircle2, AlertTriangle,
+  Download, Pause, Play, Settings2, BarChart3
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import sdk from "../services/agentos-sdk";
+import { exportToCSV, exportToJSON } from "../utils/export";
 
 const PHASES = [
   { key: "perception", label: "感知", icon: Eye, color: "#06b6d4", gradient: "linear-gradient(135deg,#06b6d4,#22d3ee)", desc: "意图理解与上下文分析" },
@@ -29,6 +31,94 @@ const SERVICES = [
   { name: "monit_d", label: "系统监控器", up: true, hrs: 47, cpu: 3.2, mem: 96 },
   { name: "market_d", label: "市场服务", up: false, hrs: 0, cpu: 0, mem: 0 },
 ];
+
+/* ─── Mini Sparkline Chart ─── */
+function MiniSparkline({ data, color, width = 120, height = 32 }: {
+  data: number[]; color: string; width?: number; height?: number;
+}) {
+  if (!data || data.length < 2) return null;
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const range = max - min || 1;
+  const points = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * width;
+    const y = height - ((v - min) / range) * (height * 0.8) - height * 0.1;
+    return `${x},${y}`;
+  }).join(' ');
+
+  return (
+    <svg width={width} height={height} style={{ overflow: 'visible' }}>
+      <defs>
+        <linearGradient id={`spark-${color.replace('#','')}`} x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+        </linearGradient>
+      </defs>
+      <polyline
+        fill={`url(#spark-${color.replace('#','')})`}
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={`${points} ${width},${height} 0,${height}`}
+      />
+      <polyline
+        fill="none"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={points}
+      />
+      <circle cx={points.split(' ').pop()?.split(',')[0]} cy={points.split(' ').pop()?.split(',')[1]} r="2.5" fill={color} opacity="0.9">
+        <animate attributeName="r" values="2;3.5;2" dur="2s" repeatCount="indefinite" />
+      </circle>
+    </svg>
+  );
+}
+
+/* ─── Refresh Interval Selector ─── */
+function RefreshSelector({
+  interval, onChange, isPaused, onTogglePause
+}: {
+  interval: number; onChange: (v: number) => void; isPaused: boolean; onTogglePause: () => void;
+}) {
+  const options = [
+    { label: '5s', value: 5000 },
+    { label: '10s', value: 10000 },
+    { label: '30s', value: 30000 },
+    { label: '手动', value: 0 },
+  ];
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <button
+        className="btn btn-ghost btn-sm"
+        onClick={onTogglePause}
+        title={isPaused ? "恢复刷新" : "暂停刷新"}
+        style={{ padding: '5px 8px', color: isPaused ? '#f59e0b' : undefined }}
+      >
+        {isPaused ? <Pause size={14} /> : <Play size={14} />}
+      </button>
+      {options.map(opt => (
+        <button
+          key={opt.value}
+          onClick={() => onChange(opt.value)}
+          className="btn btn-sm"
+          style={{
+            padding: '4px 10px',
+            fontSize: '11px',
+            background: interval === opt.value ? 'var(--primary-light)' : 'transparent',
+            color: interval === opt.value ? 'var(--primary-color)' : 'var(--text-muted)',
+            border: interval === opt.value ? '1px solid var(--primary-color)' : '1px solid transparent',
+            borderRadius: 'var(--radius-sm)',
+          }}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}];
 
 function useAnimNum(target: number, dur = 1200) {
   const [v, setV] = useState(0);
@@ -652,6 +742,10 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
+  const [refreshInterval, setRefreshInterval] = useState(10000);
+  const [isPaused, setIsPaused] = useState(false);
+  const [cpuHistory, setCpuHistory] = useState<number[]>([]);
+  const [memHistory, setMemHistory] = useState<number[]>([]);
   const [systemData, setSystemData] = useState<{
     cpu: number; memory: number; disk: number; processes: number;
     servicesUp: number; servicesTotal: number;
@@ -672,9 +766,11 @@ export default function Dashboard() {
         setConnectionStatus('disconnected');
       }
       if (monitorData) {
+        const newCpu = Math.round(monitorData.cpu.usage_percent);
+        const newMem = Math.round(monitorData.memory.percent);
         setSystemData({
-          cpu: Math.round(monitorData.cpu.usage_percent),
-          memory: Math.round(monitorData.memory.percent),
+          cpu: newCpu,
+          memory: newMem,
           disk: Math.round(monitorData.disk.percent),
           processes: monitorData.cpu.cores.length,
           servicesUp: serviceStatus ? serviceStatus.filter((s: any) => s.healthy).length : 5,
@@ -682,6 +778,8 @@ export default function Dashboard() {
           uptime: Math.floor(monitorData.uptime_seconds / 3600) + "h",
           version: "v2.1.0",
         });
+        setCpuHistory(prev => [...prev.slice(-19), newCpu]);
+        setMemHistory(prev => [...prev.slice(-19), newMem]);
       }
       setLastUpdate(new Date());
     } catch {
@@ -693,7 +791,13 @@ export default function Dashboard() {
 
   useEffect(() => { const t = setTimeout(() => setLoading(false), 500); return () => clearTimeout(t); }, []);
   useEffect(() => { const tm = setInterval(() => setPhaseIdx(p => (p + 1) % 3), 4000); return () => clearInterval(tm); }, []);
-  useEffect(() => { fetchDashboardData(); const iv = setInterval(fetchDashboardData, 10000); return () => clearInterval(iv); }, [fetchDashboardData]);
+  useEffect(() => {
+    fetchDashboardData();
+    if (refreshInterval > 0 && !isPaused) {
+      const iv = setInterval(fetchDashboardData, refreshInterval);
+      return () => clearInterval(iv);
+    }
+  }, [fetchDashboardData, refreshInterval, isPaused]);
 
   const cpuVal = systemData?.cpu ?? 23;
   const memVal = systemData?.memory ?? 26;
@@ -809,6 +913,39 @@ export default function Dashboard() {
           <button className="btn btn-ghost" style={{ padding: "8px 10px" }} onClick={fetchDashboardData} disabled={refreshing}>
             <RefreshCw size={16} className={refreshing ? "spin" : ""} />
           </button>
+          <RefreshSelector
+            interval={refreshInterval}
+            onChange={setRefreshInterval}
+            isPaused={isPaused}
+            onTogglePause={() => setIsPaused(p => !p)}
+          />
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '4px',
+            borderLeft: '1px solid var(--border-subtle)',
+            paddingLeft: '10px', marginLeft: '2px'
+          }}>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                if (systemData) {
+                  exportToCSV([{
+                    指标: 'CPU使用率', 值: systemData.cpu, 单位: '%',
+                    时间: lastUpdate.toLocaleString('zh-CN'),
+                  }, {
+                    指标: '内存使用率', 值: systemData.memory, 单位: '%',
+                    时间: lastUpdate.toLocaleString('zh-CN'),
+                  }, {
+                    指标: '磁盘使用率', 值: systemData.disk, 单位: '%',
+                    时间: lastUpdate.toLocaleString('zh-CN'),
+                  }], 'agentos_system_metrics');
+                }
+              }}
+              title="导出CSV"
+              style={{ padding: '5px 8px' }}
+            >
+              <Download size={14} />
+            </button>
+          </div>
           <span style={{ fontSize: "10.5px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
             {lastUpdate.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
           </span>
@@ -822,24 +959,34 @@ export default function Dashboard() {
           { v: memVal, u: "%", l: "内存", s: systemData ? `${systemData.memory}% 已用` : "4.2 / 16 GB", c: "#06b6d4" },
           { v: diskVal, u: "", l: "磁盘", s: systemData ? `${systemData.disk}% 已用` : "128 / 512 GB", c: "#f59e0b" },
           { v: procVal, u: "%", l: "进程", s: systemData ? `${systemData.servicesUp}/${systemData.servicesTotal} 在线` : "5/6 在线", c: "#10b981" },
-        ].map(m => (
+        ].map((m, idx) => (
           <div key={m.l} className="card card-elevated" style={{
             padding: "20px 16px", textAlign: "center",
             transition: "all 0.4s cubic-bezier(.34,1.56,.64,1)",
             position: "relative", overflow: "hidden",
           }}
-            onMouseEnter={e => {
-              e.currentTarget.style.transform = "translateY(-4px)";
-              e.currentTarget.style.boxShadow = `0 12px 32px ${m.c}15, 0 0 0 1px ${m.c}20`;
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.transform = "";
-              e.currentTarget.style.boxShadow = "";
-            }}
+          onMouseEnter={e => {
+            e.currentTarget.style.transform = "translateY(-4px)";
+            e.currentTarget.style.boxShadow = `0 12px 32px ${m.c}15, 0 0 0 1px ${m.c}20`;
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.transform = "";
+            e.currentTarget.style.boxShadow = "";
+          }}
           >
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg,${m.c}40,${m.c}10)`, opacity: 0, transition: "opacity 0.3s" }} onMouseEnter={e => (e.target as HTMLElement).style.opacity = "1"} />
             <GaugeRing pct={m.v} size={96} sw={7} color={m.c} label={`${m.v}${m.u}`} sub={m.l} />
             <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "6px", fontFamily: "'JetBrains Mono', monospace" }}>{m.s}</div>
+            {(idx === 0 || idx === 1) && (
+              <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'center' }}>
+                <MiniSparkline
+                  data={idx === 0 ? cpuHistory : memHistory}
+                  color={m.c}
+                  width={100}
+                  height={28}
+                />
+              </div>
+            )}
           </div>
         ))}
       </div>

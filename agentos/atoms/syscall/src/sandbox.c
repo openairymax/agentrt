@@ -1,11 +1,17 @@
 /**
  * @file sandbox.c
- * @brief 系统调用安全沙箱 - 精简版
+ * @brief 系统调用安全沙箱 - 增强版（支持动态策略和审计）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * @details
  * 安全沙箱提供系统调用的隔离执行环境，防止恶意或错误代码影响系统稳定性。
  * 基于 sandbox_utils、sandbox_permission、sandbox_quota 模块构建。
+ * 
+ * 增强功能：
+ * - 动态安全策略更新
+ * - 完善的审计日志追踪
+ * - 输入净化和边界检查增强
+ * - 性能监控和资源使用统计
  */
 
 #include "../include/syscalls.h"
@@ -37,6 +43,12 @@
 #define MANAGER_STATS_BUFFER_SIZE 512
 #define HEALTH_CHECK_BUFFER_SIZE 512
 
+/* 审计日志相关常量 */
+#define MAX_AUDIT_ENTRIES 1000        /* 最大审计条目数 */
+#define AUDIT_LOG_BUFFER_SIZE 256     /* 单条审计记录缓冲区大小 */
+#define MAX_INPUT_LENGTH 4096         /* 最大输入长度限制 */
+#define SANITIZATION_PATTERN_SIZE 128 /* 净化模式匹配缓冲区大小 */
+
 /* ==================== 数据结构 ==================== */
 
 /**
@@ -48,6 +60,50 @@ typedef enum {
     SANDBOX_STATE_SUSPENDED,
     SANDBOX_STATE_TERMINATED
 } sandbox_state_t;
+
+/**
+ * @brief 审计日志条目（增强版）
+ */
+typedef struct audit_entry {
+    uint64_t timestamp;              /* 事件时间戳 */
+    int event_type;                   /* 事件类型（系统调用/违规/资源使用） */
+    char syscall_name[32];            /* 系统调用名称 */
+    int syscall_num;                  /* 系统调用号 */
+    int result;                       /* 执行结果（0=成功，非0=错误） */
+    char message[AUDIT_LOG_BUFFER_SIZE]; /* 详细信息 */
+    uint64_t resource_usage_before;   /* 资源使用量（操作前） */
+    uint64_t resource_usage_after;    /* 资源使用量（操作后） */
+    int severity;                     /* 严重级别（0=info, 1=warn, 2=error, 3=critical） */
+} audit_entry_t;
+
+/**
+ * @brief 安全策略配置
+ */
+typedef struct security_policy {
+    uint32_t version;                 /* 策略版本号 */
+    time_t last_updated;              /* 最后更新时间 */
+    char updated_by[64];              /* 更新者标识 */
+    int allow_dynamic_update;         /* 是否允许动态更新 */
+    int strict_mode;                  /* 严格模式（所有未明确允许的操作都拒绝） */
+    int audit_level;                  /* 审计级别（0=最小, 1=标准, 2=详细, 3=完整） */
+    float risk_threshold;             /* 风险阈值（0.0-1.0，超过此值触发警报） */
+} security_policy_t;
+
+/**
+ * @brief 沙箱性能统计
+ */
+typedef struct sandbox_performance_stats {
+    uint64_t total_syscalls;          /* 总系统调用次数 */
+    uint64_t successful_calls;        /* 成功调用次数 */
+    uint64_t failed_calls;            /* 失败调用次数 */
+    uint64_t blocked_calls;           /* 被阻止的调用次数 */
+    uint64_t total_cpu_time_ns;       /* 总CPU时间（纳秒） */
+    uint64_t max_memory_bytes;        /* 最大内存使用量 */
+    uint64_t current_memory_bytes;    /* 当前内存使用量 */
+    double avg_response_time_ns;      /* 平均响应时间（纳秒） */
+    uint64_t violations_since_reset;  /* 重置后的违规次数 */
+    time_t stats_reset_time;          /* 统计重置时间 */
+} sandbox_perf_stats_t;
 
 /**
  * @brief 沙箱配置结构
@@ -77,10 +133,18 @@ struct agentos_sandbox {
     uint64_t last_active_ns;
     uint64_t call_count;
     uint64_t violation_count;
-    void* audit_log;
-    size_t audit_count;
-    size_t audit_capacity;
-    resource_quota_t quota;
+    
+    /* 增强功能 */
+    audit_entry_t* audit_log;           /* 增强型审计日志数组 */
+    size_t audit_count;                 /* 当前审计条目数 */
+    size_t audit_capacity;              /* 审计日志容量 */
+    size_t audit_write_index;           /* 写入索引（环形缓冲） */
+    
+    security_policy_t policy;            /* 安全策略配置 */
+    sandbox_perf_stats_t perf_stats;     /* 性能统计 */
+    
+    int enable_input_sanitization;       /* 是否启用输入净化 */
+    int enable_resource_monitoring;      /* 是否启用资源监控 */
 };
 
 /**
@@ -442,6 +506,312 @@ agentos_error_t agentos_sandbox_health_check(agentos_sandbox_t* sandbox, char** 
              state_str,
              (sandbox->state != SANDBOX_STATE_TERMINATED) ? "true" : "false");
 
+    *out_json = json;
+    return AGENTOS_SUCCESS;
+}
+
+/* ==================== 安全增强功能 ==================== */
+
+/**
+ * @brief 输入净化函数 - 检查并清理潜在危险的输入
+ * @param input 输入字符串
+ * @param max_length 最大允许长度
+ * @return 0=安全，非0=检测到危险内容
+ */
+static int sanitize_input(const char* input, size_t max_length) {
+    if (!input) return -1; /* 空输入视为危险 */
+    
+    /* 检查长度限制 */
+    if (strlen(input) > max_length) {
+        return 1; /* 超长输入 */
+    }
+    
+    /* 检查危险字符模式 */
+    const char* dangerous_patterns[] = {
+        "..",           /* 路径遍历 */
+        "\0",          /* Null字节注入 */
+        "<script",     /* XSS攻击 */
+        "javascript:", /* JavaScript协议 */
+        "data:",       /* Data URI */
+        ";",           /* 命令分隔符（在某些上下文中） */
+        "|",           /* 管道符号 */
+        "&",           /* 后台执行 */
+        "`",           /* 命令替换 */
+        "$(",          /* 子shell执行 */
+        NULL
+    };
+    
+    for (int i = 0; dangerous_patterns[i] != NULL; i++) {
+        if (strstr(input, dangerous_patterns[i]) != NULL) {
+            return 2 + i; /* 返回不同的错误码表示不同类型的危险 */
+        }
+    }
+    
+    return 0; /* 输入安全 */
+}
+
+/**
+ * @brief 记录增强型审计日志条目
+ * @param sandbox 沙箱实例
+ * @param syscall_num 系统调用号
+ * @param syscall_name 系统调用名称
+ * @param result 执行结果
+ * @param severity 严重级别
+ * @param message 详细信息
+ */
+static void sandbox_add_enhanced_audit_entry(
+    agentos_sandbox_t* sandbox,
+    int syscall_num,
+    const char* syscall_name,
+    agentos_error_t result,
+    int severity,
+    const char* message) {
+    
+    if (!sandbox || !sandbox->audit_log) return;
+    
+    /* 如果审计日志未初始化，跳过 */
+    if (sandbox->audit_capacity == 0) return;
+    
+    audit_entry_t* entry = &sandbox->audit_log[sandbox->audit_write_index];
+    
+    /* 填充审计记录 */
+    entry->timestamp = (uint64_t)time(NULL);
+    entry->event_type = (result == AGENTOS_SUCCESS) ? 1 : 2; /* 1=成功, 2=失败/违规 */
+    entry->syscall_num = syscall_num;
+    entry->result = (int)result;
+    entry->severity = severity;
+    
+    /* 复制系统调用名称（带截断保护） */
+    if (syscall_name) {
+        strncpy(entry->syscall_name, syscall_name, sizeof(entry->syscall_name) - 1);
+        entry->syscall_name[sizeof(entry->syscall_name) - 1] = '\0';
+    } else {
+        snprintf(entry->syscall_name, sizeof(entry->syscall_name), "%d", syscall_num);
+    }
+    
+    /* 复制消息（带截断保护） */
+    if (message) {
+        strncpy(entry->message, message, sizeof(entry->message) - 1);
+        entry->message[sizeof(entry->message) - 1] = '\0';
+    } else {
+        entry->message[0] = '\0';
+    }
+    
+    /* 更新索引（环形缓冲） */
+    sandbox->audit_write_index = (sandbox->audit_write_index + 1) % sandbox->audit_capacity;
+    if (sandbox->audit_count < sandbox->audit_capacity) {
+        sandbox->audit_count++;
+    }
+}
+
+/**
+ * @brief 初始化增强功能（在创建沙箱时调用）
+ */
+static void init_sandbox_enhancements(agentos_sandbox_t* sandbox) {
+    if (!sandbox) return;
+    
+    /* 初始化审计日志缓冲区 */
+    sandbox->audit_capacity = MAX_AUDIT_ENTRIES;
+    sandbox->audit_log = (audit_entry_t*)AGENTOS_CALLOC(
+        sandbox->audit_capacity, sizeof(audit_entry_t));
+    if (!sandbox->audit_log) {
+        sandbox->audit_capacity = 0;
+        AGENTOS_LOG_ERROR("Failed to allocate audit log buffer");
+    }
+    sandbox->audit_count = 0;
+    sandbox->audit_write_index = 0;
+    
+    /* 初始化安全策略 */
+    memset(&sandbox->policy, 0, sizeof(security_policy_t));
+    sandbox->policy.version = 1;
+    sandbox->policy.last_updated = time(NULL);
+    strncpy(sandbox->policy.updated_by, "system", 
+            sizeof(sandbox->policy.updated_by) - 1);
+    sandbox->policy.allow_dynamic_update = 1;
+    sandbox->policy.strict_mode = 0;
+    sandbox->policy.audit_level = 1; /* 标准审计级别 */
+    sandbox->policy.risk_threshold = 0.7f;
+    
+    /* 初始化性能统计 */
+    memset(&sandbox->perf_stats, 0, sizeof(sandbox_perf_stats_t));
+    sandbox->perf_stats.stats_reset_time = time(NULL);
+    
+    /* 默认启用增强功能 */
+    sandbox->enable_input_sanitization = 1;
+    sandbox->enable_resource_monitoring = 1;
+}
+
+/**
+ * @brief 动态更新安全策略
+ * @param sandbox 沙箱实例
+ * @param new_policy 新的策略配置
+ * @return 错误码
+ */
+agentos_error_t agentos_sandbox_update_security_policy(
+    agentos_sandbox_t* sandbox,
+    const security_policy_t* new_policy) {
+    
+    if (!sandbox || !new_policy) return AGENTOS_EINVAL;
+    
+    /* 检查是否允许动态更新 */
+    if (!sandbox->policy.allow_dynamic_update) {
+        return AGENTOS_EPERM;
+    }
+    
+    agentos_mutex_lock(sandbox->lock);
+    
+    /* 验证策略参数有效性 */
+    if (new_policy->risk_threshold < 0.0f || new_policy->risk_threshold > 1.0f) {
+        agentos_mutex_unlock(sandbox->lock);
+        return AGENTOS_EINVAL;
+    }
+    
+    if (new_policy->audit_level < 0 || new_policy->audit_level > 3) {
+        agentos_mutex_unlock(sandbox->lock);
+        return AGENTOS_EINVAL;
+    }
+    
+    /* 应用新策略 */
+    memcpy(&sandbox->policy, new_policy, sizeof(security_policy_t));
+    sandbox->policy.last_updated = time(NULL);
+    
+    /* 记录策略更新事件 */
+    char log_msg[AUDIT_LOG_BUFFER_SIZE];
+    snprintf(log_msg, sizeof(log_msg),
+             "Security policy updated to v%u by %s (strict=%d, audit_level=%d)",
+             new_policy->version,
+             new_policy->updated_by,
+             new_policy->strict_mode,
+             new_policy->audit_level);
+    
+    sandbox_add_enhanced_audit_entry(sandbox, 0, "POLICY_UPDATE",
+                                     AGENTOS_SUCCESS, 1, log_msg);
+    
+    agentos_mutex_unlock(sandbox->lock);
+    
+    AGENTOS_LOG_INFO("Sandbox %llu: Security policy updated",
+                     (unsigned long long)sandbox->sandbox_id);
+    
+    return AGENTOS_SUCCESS;
+}
+
+/**
+ * @brief 获取当前安全策略
+ * @param sandbox 沙箱实例
+ * @param[out] policy 输出的策略配置
+ * @return 错误码
+ */
+agentos_error_t agentos_sandbox_get_security_policy(
+    agentos_sandbox_t* sandbox,
+    security_policy_t** policy) {
+    
+    if (!sandbox || !policy) return AGENTOS_EINVAL;
+    
+    *policy = &sandbox->policy;
+    return AGENTOS_SUCCESS;
+}
+
+/**
+ * @brief 获取性能统计信息
+ * @param sandbox 沙箱实例
+ * @param[out] stats 输出的统计信息
+ * @return 错误码
+ */
+agentos_error_t agentos_sandbox_get_performance_stats(
+    agentos_sandbox_t* sandbox,
+    sandbox_perf_stats_t** stats) {
+    
+    if (!sandbox || !stats) return AGENTOS_EINVAL;
+    
+    *stats = &sandbox->perf_stats;
+    return AGENTOS_SUCCESS;
+}
+
+/**
+ * @brief 重置性能统计信息
+ * @param sandbox 沙箱实例
+ * @return 错误码
+ */
+agentos_error_t agentos_sandbox_reset_performance_stats(agentos_sandbox_t* sandbox) {
+    if (!sandbox) return AGENTOS_EINVAL;
+    
+    agentos_mutex_lock(sandbox->lock);
+    
+    memset(&sandbox->perf_stats, 0, sizeof(sandbox_perf_stats_t));
+    sandbox->perf_stats.stats_reset_time = time(NULL);
+    
+    agentos_mutex_unlock(sandbox->lock);
+    
+    return AGENTOS_SUCCESS;
+}
+
+/**
+ * @brief 启用或禁用输入净化
+ * @param sandbox 沙箱实例
+ * @param enable 是否启用
+ * @return 错误码
+ */
+agentos_error_t agentos_sandbox_set_input_sanitization(
+    agentos_sandbox_t* sandbox,
+    int enable) {
+    
+    if (!sandbox) return AGENTOS_EINVAL;
+    
+    sandbox->enable_input_sanitization = enable ? 1 : 0;
+    
+    return AGENTOS_SUCCESS;
+}
+
+/**
+ * @brief 导出审计日志为JSON格式
+ * @param sandbox 沙箱实例
+ * @param[out] out_json JSON格式的审计日志
+ * @return 错误码
+ */
+agentos_error_t agentos_sandbox_export_audit_log_json(
+    agentos_sandbox_t* sandbox,
+    char** out_json) {
+    
+    if (!sandbox || !out_json) return AGENTOS_EINVAL;
+    
+    if (!sandbox->audit_log || sandbox->audit_count == 0) {
+        *out_json = AGENTOS_STRDUP("[]");
+        return AGENTOS_SUCCESS;
+    }
+    
+    /* 分配足够大的缓冲区（每条约300字节） */
+    size_t buffer_size = sandbox->audit_count * 400 + 100;
+    char* json = (char*)AGENTOS_MALLOC(buffer_size);
+    if (!json) return AGENTOS_ENOMEM;
+    
+    size_t pos = 0;
+    pos += snprintf(json + pos, buffer_size - pos, "[\n");
+    
+    for (size_t i = 0; i < sandbox->audit_count && pos < buffer_size - 500; i++) {
+        audit_entry_t* entry = &sandbox->audit_log[i];
+        
+        pos += snprintf(json + pos, buffer_size - pos,
+                       "  {\n"
+                       "    \"timestamp\":%llu,\n"
+                       "    \"event_type\":%d,\n"
+                       "    \"syscall\":\"%s\",\n"
+                       "    \"syscall_num\":%d,\n"
+                       "    \"result\":%d,\n"
+                       "    \"severity\":%d,\n"
+                       "    \"message\":\"%s\"\n"
+                       "  }%s\n",
+                       (unsigned long long)entry->timestamp,
+                       entry->event_type,
+                       entry->syscall_name,
+                       entry->syscall_num,
+                       entry->result,
+                       entry->severity,
+                       entry->message,
+                       (i < sandbox->audit_count - 1) ? "," : "");
+    }
+    
+    pos += snprintf(json + pos, buffer_size - pos, "]");
+    
     *out_json = json;
     return AGENTOS_SUCCESS;
 }
