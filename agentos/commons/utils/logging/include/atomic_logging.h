@@ -32,8 +32,20 @@ extern "C" {
 #endif
 
 #include "logging.h"
-#include <stdatomic.h>
 #include <stdbool.h>
+
+/* 跨平台原子操作支持 */
+#if !defined(_MSC_VER) && (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L)
+#include <stdatomic.h>
+#define HAVE_STDATOMIC 1
+#else
+#define HAVE_STDATOMIC 0
+/* MSVC和其他不支持C11原子操作的编译器使用内部函数 */
+#if defined(_MSC_VER)
+#include <intrin.h>
+#include <windows.h>
+#endif
+#endif
 
 /* ==================== 原子层配置 ==================== */
 
