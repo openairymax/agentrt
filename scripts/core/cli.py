@@ -149,44 +149,6 @@ class AgentOSCLI:
         return Spinner(message)
 
 
-class InteractiveDoctor:
-    """交互式诊断工具"""
-
-    def __init__(self, cli: AgentOSCLI = None):
-        """
-        初始化交互式诊断
-
-        Args:
-            cli: AgentOSCLI 实例
-        """
-        self.cli = cli or AgentOSCLI()
-
-    def run_diagnosis(self) -> Dict[str, Any]:
-        """运行交互式诊断"""
-        self.cli.section("AgentOS Interactive Diagnosis")
-
-        checks = {
-            "system": "检查系统环境...",
-            "dependencies": "检查依赖项...",
-            "network": "检查网络连接...",
-            "docker": "检查 Docker 环境...",
-            "config": "检查配置文件...",
-        }
-
-        results = {}
-
-        for check_name, check_message in checks.items():
-            spinner = self.cli.spinner(check_message)
-            spinner.start()
-            time.sleep(0.5)
-            spinner.stop("done")
-
-            results[check_name] = {"status": "ok", "details": {}}
-
-        self.cli.section("Diagnosis Results")
-        self.cli.table(
-            ["Check", "Status"],
-            [[k, v["status"].upper()] for k, v in results.items()]
-        )
-
-        return results
+# Note: For full system diagnostics, use scripts.toolkit.AgentOSDoctor
+# The InteractiveDoctor class has been migrated to toolkit/doctor.py
+# to provide comprehensive 8-category health checking with JSON output.
