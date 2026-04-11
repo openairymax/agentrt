@@ -20,13 +20,10 @@ import tempfile
 import unittest
 from datetime import datetime
 
-from scripts.ops.memory_manager import (
+from scripts.toolkit.memory_manager import (
     MemoryManager,
     MemoryStats,
-    MemoryInfo,
-    MemoryLevel,
-    ForgettingStrategy,
-    get_memory_manager
+    MemoryLayer,
 )
 
 
