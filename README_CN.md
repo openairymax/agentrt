@@ -8,8 +8,8 @@
 
 [![AtomGit](https://atomgit.com/spharx/agentos/star/badge.svg)](https://atomgit.com/spharx/agentos)
 [![star](https://gitee.com/spharx/agentos/badge/star.svg?theme=dark)](https://gitee.com/spharx/agentos)
-[![GitHub](https://img.shields.io/github/stars/SpharxTeam/AgentOS?style=social)](https://github.com/SpharxTeam/AgentOS)
-
+[![GitHub](https://img.shields.io/github/stars/SpharxTeam/AgentOS?style=social)](https://github.com/SpharxTeam/AgentOS)  
+ 
 [![Version](https://img.shields.io/badge/version-1.0.0.9-5a6b7e)](https://atomgit.com/spharx/agentos)
 [![License](https://img.shields.io/badge/license-Apache--2.0-4a90d9)](LICENSE)
 [![Build](https://img.shields.io/badge/build-passing-2ea44f)](https://atomgit.com/spharx/agentos)
@@ -216,13 +216,15 @@ AgentOS 是**操作系统级**产品，而非单一框架：
 
 我们正在走进未来："Intelligence emergence, and nothing less, is the ultimate sublimation of AI"。   
 
-### 相信的力量   
+### 相信的力量
 
-<p align="center">
-  <strong> ☀️ </strong>  
-  <p align="center">
-  <strong> 这不是人类的日落，而是新世界的曙光 </strong>  
-</p>  
+<center>
+
+☀️  
+
+**这不是人类的日落，而是新世界的曙光**
+
+</center>  
 
 **相信**  
 
@@ -288,6 +290,16 @@ Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 →
 </div>  
 
 ---
+
+<p align="center">
+ <a href="https://star-history.com/#SpharxTeam/AgentOS">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/badge?repo=SpharxTeam/AgentOS&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/badge?repo=SpharxTeam/AgentOS" />
+    <img alt="Star History Rank" src="https://api.star-history.com/badge?repo=SpharxTeam/AgentOS" />
+  </picture>
+ </a>
+</p>
 
 ## ⭐️ Github Star History
 
