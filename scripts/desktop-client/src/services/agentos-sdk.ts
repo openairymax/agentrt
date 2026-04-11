@@ -324,6 +324,8 @@ export class AgentOSSDK {
 
   async deleteTask(taskId: string): Promise<void> { try { await sdkInvoke("delete_task", { task_id: taskId }); } catch (e) { wrapError("deleteTask", e); } }
 
+  async stopTask(taskId: string): Promise<TaskInfo> { try { return await sdkInvoke<TaskInfo>("stop_task", { task_id: taskId }); } catch (e) { wrapError("stopTask", e); } }
+
   async restartTask(taskId: string): Promise<TaskInfo> { try { return await sdkInvoke<TaskInfo>("restart_task", { task_id: taskId }); } catch (e) { wrapError("restartTask", e); } }
 
   async chat(request: LLMChatRequest): Promise<LLMChatResponse> { try { return await sdkInvoke<LLMChatResponse>("llm_chat", request as unknown as Record<string, unknown>); } catch (e) { wrapError("llm_chat", e); } }
@@ -346,6 +348,8 @@ export class AgentOSSDK {
 
   async memoryClear(type?: MemoryEntry["type"]): Promise<number> { try { return await sdkInvoke<number>("memory_clear", { type: type || "" }); } catch (e) { wrapError("memoryClear", e); } }
 
+  async memoryEvolve(): Promise<{ evolved: number; layers: Array<{ layer: string; before: number; after: number }> }> { try { return await sdkInvoke("memory_evolve"); } catch (e) { wrapError("memoryEvolve", e); } }
+
   async getContextWindowStats(): Promise<{ total_tokens: number; max_tokens: number; used_percent: number; breakdown: { system: number; history: number; tools: number; output: number } }> { try { return await sdkInvoke("context_window_stats"); } catch (e) { wrapError("getContextWindowStats", e); } }
 
   async runCognitiveLoop(input: string, tools?: ToolDefinition[]): Promise<CognitiveStep[]> { try { return await sdkInvoke<CognitiveStep[]>("run_cognitive_loop", { input, tools: tools || [] }); } catch (e) { wrapError("runCognitiveLoop", e); } }
@@ -353,6 +357,10 @@ export class AgentOSSDK {
   async callTool(name: string, args: Record<string, unknown>): Promise<ToolResult> { try { return await sdkInvoke<ToolResult>("call_tool", { name, arguments: JSON.stringify(args) }); } catch (e) { wrapError("callTool", e); } }
 
   async listAvailableTools(): Promise<Array<{ name: string; description: string; category: string; schema: Record<string, unknown> }>> { try { return await sdkInvoke("list_tools"); } catch (e) { wrapError("listTools", e); } }
+
+  async executeTool(name: string, args: Record<string, unknown>): Promise<ToolResult> { try { return await sdkInvoke<ToolResult>("call_tool", { name, arguments: JSON.stringify(args) }); } catch (e) { wrapError("executeTool", e); } }
+
+  async registerTool(tool: { name: string; description: string; category: string; schema: Record<string, unknown> }): Promise<void> { try { await sdkInvoke("register_tool", tool); } catch (e) { wrapError("registerTool", e); } }
 
   async getRuntimeMetrics(): Promise<AgentRuntimeMetrics> { try { return await sdkInvoke<AgentRuntimeMetrics>("runtime_metrics"); } catch (e) { wrapError("getRuntimeMetrics", e); } }
 

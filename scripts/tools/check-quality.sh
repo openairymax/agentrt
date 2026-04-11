@@ -1,200 +1,200 @@
 #!/bin/bash
 
-# AgentOS ±ľµŘ´úÂëÖĘÁżĽě˛é˝Ĺ±ľ
-# ÓĂÓÚÔÚĚá˝»Ç°Ľě˛é´úÂëÖŘ¸´ÂĘşÍČ¦¸´ÔÓ¶Č
-# ĘąÓĂ·˝·¨: ./scripts/check-quality.sh [ÄżÂĽÂ·ľ¶]
+# AgentOS 代码质量检查脚本
+# 用于在提交前检查代码重复率和圈复杂度
+# 使用方法: ./scripts/tools/check-quality.sh [目录路径]
 
 set -e
 
-# ŃŐÉ«¶¨Ňĺ
+# 颜色定义
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# ăĐÖµĹäÖĂŁ¨ÓëCIŇ»ÖÂŁ©
-DUPLICATE_THRESHOLD=5.0     # ÖŘ¸´ÂĘăĐÖµŁ¨%Ł©
-AVG_COMPLEXITY_THRESHOLD=3.5 # Ć˝ľůČ¦¸´ÔÓ¶ČăĐÖµ
-SINGLE_COMPLEXITY_THRESHOLD=10 # µĄ¸öşŻĘýČ¦¸´ÔÓ¶ČăĐÖµ
+# 阈值配置（与 CI 一致）
+DUPLICATE_THRESHOLD=5.0     # 重复率阈值（%）
+AVG_COMPLEXITY_THRESHOLD=3.5 # 平均圈复杂度阈值
+SINGLE_COMPLEXITY_THRESHOLD=10 # 单个函数圈复杂度阈值
 
-# Ä¬ČĎĽě˛éÄżÂĽ
+# 默认检查目录
 CHECK_DIR="${1:-.}"
 
-# ą¤ľßĽě˛éşŻĘý
+# 工具检查函数
 check_tool() {
     local tool_name="$1"
     local install_cmd="$2"
-    
+
     if ! command -v "$tool_name" &> /dev/null; then
-        echo -e "${YELLOW}ľŻ¸ć: $tool_name Î´°˛×°${NC}"
-        echo "°˛×°ĂüÁî: $install_cmd"
+        echo -e "${YELLOW}警告: $tool_name 未安装${NC}"
+        echo "安装命令: $install_cmd"
         return 1
     fi
     return 0
 }
 
-# Ľě˛éą¤ľßĘÇ·ńżÉÓĂ
-echo -e "${BLUE}=== Ľě˛éą¤ľßżÉÓĂĐÔ ===${NC}"
+# 检查工具是否可用
+echo -e "${BLUE}=== 检查工具可用性 ===${NC}"
 
 JSCPD_AVAILABLE=0
 LIZARD_AVAILABLE=0
 
 if check_tool "jscpd" "npm install -g jscpd"; then
     JSCPD_AVAILABLE=1
-    echo -e "${GREEN}? jscpd ŇŃ°˛×°${NC}"
+    echo -e "${GREEN}✓ jscpd 已安装${NC}"
 else
-    echo -e "${YELLOW}? jscpd Î´°˛×°Ł¬ĚřąýÖŘ¸´Ľě˛â${NC}"
+    echo -e "${YELLOW}✗ jscpd 未安装，跳过重复检测${NC}"
 fi
 
 if check_tool "lizard" "pip install lizard"; then
     LIZARD_AVAILABLE=1
-    echo -e "${GREEN}? lizard ŇŃ°˛×°${NC}"
+    echo -e "${GREEN}✓ lizard 已安装${NC}"
 else
-    echo -e "${YELLOW}? lizard Î´°˛×°Ł¬ĚřąýČ¦¸´ÔÓ¶Č·ÖÎö${NC}"
+    echo -e "${YELLOW}✗ lizard 未安装，跳过圈复杂度分析${NC}"
 fi
 
 echo ""
 
-# ´´˝¨±¨¸ćÄżÂĽ
+# 创建报告目录
 REPORT_DIR="$CHECK_DIR/reports"
 mkdir -p "$REPORT_DIR"
 
-# 1. ÖŘ¸´´úÂëĽě˛â
+# 1. 重复代码检测
 if [ $JSCPD_AVAILABLE -eq 1 ]; then
-    echo -e "${BLUE}=== ÔËĐĐÖŘ¸´´úÂëĽě˛â (jscpd) ===${NC}"
-    
-    # Ľě˛éĹäÖĂÎÄĽţ
+    echo -e "${BLUE}=== 运行重复代码检测 (jscpd) ===${NC}"
+
+    # 检查配置文件
     JSCPD_CONFIG="$CHECK_DIR/.jscpd.json"
     if [ ! -f "$JSCPD_CONFIG" ]; then
         JSCPD_CONFIG="../../.jscpd.json"
         if [ ! -f "$JSCPD_CONFIG" ]; then
-            echo -e "${YELLOW}ľŻ¸ć: Î´ŐŇµ˝.jscpd.jsonĹäÖĂÎÄĽţŁ¬ĘąÓĂÄ¬ČĎăĐÖµ${NC}"
+            echo -e "${YELLOW}警告: 未找到 .jscpd.json 配置文件，使用默认阈值${NC}"
             JSCPD_CONFIG=""
         fi
     fi
-    
-    # ÔËĐĐjscpd
+
+    # 运行 jscpd
     if [ -n "$JSCPD_CONFIG" ]; then
         jscpd --manager "$JSCPD_CONFIG" --output "$REPORT_DIR/jscpd-report" "$CHECK_DIR" 2>&1 | tee "$REPORT_DIR/jscpd.txt"
     else
         jscpd --threshold "$DUPLICATE_THRESHOLD" --format c,cpp,h,hpp --gitignore --output "$REPORT_DIR/jscpd-report" "$CHECK_DIR" 2>&1 | tee "$REPORT_DIR/jscpd.txt"
     fi
-    
-    # ˝âÎö˝áąű
+
+    # 解析结果
     if grep -q "Found.*duplicated lines" "$REPORT_DIR/jscpd.txt"; then
         DUPLICATE_PERCENT=$(grep -o "Found.*duplicated lines" "$REPORT_DIR/jscpd.txt" | grep -o '[0-9]*\.[0-9]*%' || echo "0%")
         DUPLICATE_VALUE=$(echo "$DUPLICATE_PERCENT" | sed 's/%//')
-        
-        echo -e "ÖŘ¸´ÂĘ: ${DUPLICATE_PERCENT}"
-        
-        # Ľě˛éăĐÖµ
+
+        echo "重复率: ${DUPLICATE_PERCENT}"
+
+        # 检查阈值
         if (( $(echo "$DUPLICATE_VALUE > $DUPLICATE_THRESHOLD" | bc -l) )); then
-            echo -e "${RED}? ´íÎó: ÖŘ¸´ÂĘ ${DUPLICATE_PERCENT} ł¬ąýăĐÖµ ${DUPLICATE_THRESHOLD}%${NC}"
+            echo -e "${RED}错误: 重复率 ${DUPLICATE_PERCENT} 超过阈值 ${DUPLICATE_THRESHOLD}%${NC}"
             FAILED=1
         else
-            echo -e "${GREEN}? ÖŘ¸´ÂĘÔÚăĐÖµÄÚ${NC}"
+            echo -e "${GREEN}✓ 重复率在阈值内${NC}"
         fi
     else
-        echo -e "${GREEN}? Î´Ľě˛âµ˝ÖŘ¸´´úÂë${NC}"
+        echo -e "${GREEN}✓ 未检测到重复代码${NC}"
     fi
 else
-    echo -e "${YELLOW}ĚřąýÖŘ¸´Ľě˛â (jscpd Î´°˛×°)${NC}"
+    echo -e "${YELLOW}跳过重复检测 (jscpd 未安装)${NC}"
 fi
 
 echo ""
 
-# 2. Č¦¸´ÔÓ¶Č·ÖÎö
+# 2. 圈复杂度分析
 if [ $LIZARD_AVAILABLE -eq 1 ]; then
-    echo -e "${BLUE}=== ÔËĐĐČ¦¸´ÔÓ¶Č·ÖÎö (lizard) ===${NC}"
-    
-    # Ľě˛éĹäÖĂÎÄĽţ
+    echo -e "${BLUE}=== 运行圈复杂度分析 (lizard) ===${NC}"
+
+    # 检查配置文件
     LIZARD_CONFIG="$CHECK_DIR/.lizardrc"
     if [ ! -f "$LIZARD_CONFIG" ]; then
         LIZARD_CONFIG="../../.lizardrc"
         if [ ! -f "$LIZARD_CONFIG" ]; then
-            echo -e "${YELLOW}ľŻ¸ć: Î´ŐŇµ˝.lizardrcĹäÖĂÎÄĽţŁ¬ĘąÓĂÄ¬ČĎăĐÖµ${NC}"
+            echo -e "${YELLOW}警告: 未找到 .lizardrc 配置文件，使用默认阈值${NC}"
             LIZARD_CONFIG=""
         fi
     fi
-    
-    # ÔËĐĐlizard
+
+    # 运行 lizard
     if [ -n "$LIZARD_CONFIG" ]; then
         lizard --manager "$LIZARD_CONFIG" --output_file "$REPORT_DIR/lizard-report.html" "$CHECK_DIR" 2>&1 | tee "$REPORT_DIR/lizard.txt"
     else
         lizard --CCN "$SINGLE_COMPLEXITY_THRESHOLD" --length 50 --arguments 6 --output_file "$REPORT_DIR/lizard-report.html" "$CHECK_DIR" 2>&1 | tee "$REPORT_DIR/lizard.txt"
     fi
-    
-    # ˝âÎö˝áąű
+
+    # 解析结果
     if grep -q "Average cyclomatic complexity" "$REPORT_DIR/lizard.txt"; then
         AVG_CCN=$(grep "Average cyclomatic complexity" "$REPORT_DIR/lizard.txt" | grep -o '[0-9]*\.[0-9]*' || echo "0")
-        
-        echo -e "Ć˝ľůČ¦¸´ÔÓ¶Č: ${AVG_CCN}"
-        
-        # Ľě˛éĆ˝ľů¸´ÔÓ¶ČăĐÖµ
+
+        echo "平均圈复杂度: ${AVG_CCN}"
+
+        # 检查平均圈复杂度阈值
         if (( $(echo "$AVG_CCN > $AVG_COMPLEXITY_THRESHOLD" | bc -l) )); then
-            echo -e "${RED}? ´íÎó: Ć˝ľůČ¦¸´ÔÓ¶Č ${AVG_CCN} ł¬ąýăĐÖµ ${AVG_COMPLEXITY_THRESHOLD}${NC}"
+            echo -e "${RED}错误: 平均圈复杂度 ${AVG_CCN} 超过阈值 ${AVG_COMPLEXITY_THRESHOLD}${NC}"
             FAILED=1
         else
-            echo -e "${GREEN}? Ć˝ľůČ¦¸´ÔÓ¶ČÔÚăĐÖµÄÚ${NC}"
+            echo -e "${GREEN}✓ 平均圈复杂度在阈值内${NC}"
         fi
-        
-        # Ľě˛é¸ß¸´ÔÓ¶ČşŻĘý
+
+        # 检查高复杂度函数
         if grep -q ".* exceeds " "$REPORT_DIR/lizard.txt"; then
             HIGH_COMPLEXITY_COUNT=$(grep -c ".* exceeds " "$REPORT_DIR/lizard.txt" || echo "0")
-            echo -e "¸ß¸´ÔÓ¶ČşŻĘýĘýÁż: ${HIGH_COMPLEXITY_COUNT}"
-            
+            echo "高复杂度函数数量: ${HIGH_COMPLEXITY_COUNT}"
+
             if [ "$HIGH_COMPLEXITY_COUNT" -gt 0 ]; then
-                echo -e "${YELLOW}??  ľŻ¸ć: ·˘ĎÖ ${HIGH_COMPLEXITY_COUNT} ¸öşŻĘýł¬ąý¸´ÔÓ¶ČăĐÖµ${NC}"
-                echo "¸ß¸´ÔÓ¶ČşŻĘýÁĐ±í:"
+                echo -e "${YELLOW}! 警告: 发现 ${HIGH_COMPLEXITY_COUNT} 个函数超过复杂度阈值${NC}"
+                echo "高复杂度函数列表:"
                 grep ".* exceeds " "$REPORT_DIR/lizard.txt" | head -10
-                
+
                 if [ "$HIGH_COMPLEXITY_COUNT" -gt 10 ]; then
-                    echo "... ¸ü¶ŕşŻĘýÇë˛éż´ÍęŐű±¨¸ć: $REPORT_DIR/lizard.txt"
+                    echo "... 更多函数请查看完整报告: $REPORT_DIR/lizard.txt"
                 fi
             fi
         fi
     else
-        echo -e "${GREEN}? Č¦¸´ÔÓ¶Č·ÖÎöÍęłÉ${NC}"
+        echo -e "${GREEN}✓ 圈复杂度分析完成${NC}"
     fi
 else
-    echo -e "${YELLOW}ĚřąýČ¦¸´ÔÓ¶Č·ÖÎö (lizard Î´°˛×°)${NC}"
+    echo -e "${YELLOW}跳过圈复杂度分析 (lizard 未安装)${NC}"
 fi
 
 echo ""
 
-# ×Ü˝á
-echo -e "${BLUE}=== ÖĘÁżĽě˛é×Ü˝á ===${NC}"
+# 总结
+echo -e "${BLUE}=== 质量检查总结 ===${NC}"
 
 if [ $JSCPD_AVAILABLE -eq 1 ] && [ $LIZARD_AVAILABLE -eq 1 ]; then
     if [ -n "${FAILED+set}" ]; then
-        echo -e "${RED}? ÖĘÁżĽě˛éÎ´Í¨ąý${NC}"
-        echo "ĎęÇéÇë˛éż´±¨¸ćÎÄĽţ:"
-        echo "  - $REPORT_DIR/jscpd.txt (ÖŘ¸´Ľě˛â)"
-        echo "  - $REPORT_DIR/lizard.txt (¸´ÔÓ¶Č·ÖÎö)"
-        echo "  - $REPORT_DIR/jscpd-report/ (ÖŘ¸´Ľě˛âHTML±¨¸ć)"
-        echo "  - $REPORT_DIR/lizard-report.html (¸´ÔÓ¶ČHTML±¨¸ć)"
+        echo -e "${RED}✗ 质量检查未通过${NC}"
+        echo "详情请查看报告文件:"
+        echo "  - $REPORT_DIR/jscpd.txt (重复检测)"
+        echo "  - $REPORT_DIR/lizard.txt (圈复杂度)"
+        echo "  - $REPORT_DIR/jscpd-report/ (重复检测HTML报告)"
+        echo "  - $REPORT_DIR/lizard-report.html (圈复杂度HTML报告)"
         exit 1
     else
-        echo -e "${GREEN}? ËůÓĐÖĘÁżĽě˛éÍ¨ąý${NC}"
-        echo "±¨¸ćÎÄĽţ:"
-        echo "  - $REPORT_DIR/jscpd.txt (ÖŘ¸´Ľě˛â)"
-        echo "  - $REPORT_DIR/lizard.txt (¸´ÔÓ¶Č·ÖÎö)"
-        echo "  - $REPORT_DIR/jscpd-report/ (ÖŘ¸´Ľě˛âHTML±¨¸ć)"
-        echo "  - $REPORT_DIR/lizard-report.html (¸´ÔÓ¶ČHTML±¨¸ć)"
+        echo -e "${GREEN}✓ 所有质量检查通过${NC}"
+        echo "报告文件:"
+        echo "  - $REPORT_DIR/jscpd.txt (重复检测)"
+        echo "  - $REPORT_DIR/lizard.txt (圈复杂度)"
+        echo "  - $REPORT_DIR/jscpd-report/ (重复检测HTML报告)"
+        echo "  - $REPORT_DIR/lizard-report.html (圈复杂度HTML报告)"
         exit 0
     fi
 else
-    echo -e "${YELLOW}??  ˛ż·ÖĽě˛éÎ´Ö´ĐĐŁ¬Çë°˛×°Č±Ę§µÄą¤ľß${NC}"
-    
+    echo -e "${YELLOW}! 部分检查未运行，请安装缺失的工具${NC}"
+
     if [ $JSCPD_AVAILABLE -eq 0 ]; then
-        echo "ĐčŇŞ°˛×°: npm install -g jscpd"
+        echo "需要安装: npm install -g jscpd"
     fi
-    
+
     if [ $LIZARD_AVAILABLE -eq 0 ]; then
-        echo "ĐčŇŞ°˛×°: pip install lizard"
+        echo "需要安装: pip install lizard"
     fi
-    
-    echo "°˛×°şóÖŘĐÂÔËĐĐĽě˛é"
+
+    echo "安装后重新运行此脚本"
     exit 0
 fi

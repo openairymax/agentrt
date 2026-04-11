@@ -3,7 +3,6 @@ import {
   FileText,
   RefreshCw,
   Download,
-  Filter,
   Search,
   AlertCircle,
   Info,
@@ -11,19 +10,21 @@ import {
   Pause,
   Play,
   Clock,
+  Terminal,
+  ArrowDown,
 } from "lucide-react";
 import sdk from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
 
 const SERVICES = [
-  { value: "", label: "All Services" },
-  { value: "kernel", label: "Kernel" },
-  { value: "gateway", label: "Gateway" },
-  { value: "postgres", label: "PostgreSQL" },
-  { value: "redis", label: "Redis" },
-  { value: "openlab", label: "OpenLab" },
-  { value: "prometheus", label: "Prometheus" },
-  { value: "grafana", label: "Grafana" },
+  { value: "", label: "All Services", color: "#9ca3af" },
+  { value: "kernel", label: "Kernel", color: "#8b5cf6" },
+  { value: "gateway", label: "Gateway", color: "#22c55e" },
+  { value: "postgres", label: "PostgreSQL", color: "#3b82f6" },
+  { value: "redis", label: "Redis", color: "#ef4444" },
+  { value: "openlab", label: "OpenLab", color: "#a855f7" },
+  { value: "prometheus", label: "Prometheus", color: "#f59e0b" },
+  { value: "grafana", label: "Grafana", color: "#06b6d4" },
 ];
 
 const LOG_LEVELS = [
@@ -47,7 +48,8 @@ const Logs: React.FC = () => {
 
   useEffect(() => {
     loadLogs();
-    const interval = setInterval(loadLogs, autoRefresh ? 5000 : 0);
+    if (!autoRefresh) return;
+    const interval = setInterval(loadLogs, 5000);
     return () => clearInterval(interval);
   }, [autoRefresh, selectedService, tailCount]);
 
@@ -95,138 +97,236 @@ const Logs: React.FC = () => {
     return result;
   })();
 
-  const getLineColor = (line: string) => {
+  const lines = filteredLogs.split("\n");
+
+  const getLineInfo = (line: string) => {
     const lower = line.toLowerCase();
-    if (lower.includes("error") || lower.includes("fatal")) return { color: "#ef4444", weight: "600" };
-    if (lower.includes("warn")) return { color: "#f59e0b", weight: "500" };
-    if (lower.includes("info")) return { color: "#6366f1", weight: "400" };
-    if (lower.includes("debug")) return { color: "#22c55e", weight: "400" };
-    return { color: "var(--text-secondary)", weight: "400" };
+    if (lower.includes("error") || lower.includes("fatal")) return { color: "#ef4444", level: "error" };
+    if (lower.includes("warn")) return { color: "#f59e0b", level: "warn" };
+    if (lower.includes("info")) return { color: "#6366f1", level: "info" };
+    if (lower.includes("debug")) return { color: "#22c55e", level: "debug" };
+    return { color: "var(--text-secondary)", level: "default" };
+  };
+
+  const levelCounts = (() => {
+    const counts: Record<string, number> = { error: 0, warn: 0, info: 0, debug: 0, total: 0 };
+    logs.split("\n").forEach(line => {
+      const lower = line.toLowerCase();
+      counts.total++;
+      if (lower.includes("error") || lower.includes("fatal")) counts.error++;
+      else if (lower.includes("warn")) counts.warn++;
+      else if (lower.includes("info")) counts.info++;
+      else if (lower.includes("debug")) counts.debug++;
+    });
+    return counts;
+  })();
+
+  const highlightSearch = (text: string, term: string): React.ReactNode => {
+    if (!term) return text;
+    const lower = text.toLowerCase();
+    const idx = lower.indexOf(term.toLowerCase());
+    if (idx === -1) return text;
+    return (
+      <>
+        {text.substring(0, idx)}
+        <mark style={{ background: "rgba(245,158,11,0.3)", color: "#fbbf24", borderRadius: "2px", padding: "0 2px" }}>{text.substring(idx, idx + term.length)}</mark>
+        {highlightSearch(text.substring(idx + term.length), term)}
+      </>
+    );
+  };
+
+  const scrollToBottom = () => {
+    if (logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    }
   };
 
   return (
     <div className="page-container">
-      {/* Page Header */}
       <div className="page-header">
-        <h1>{t.logs.systemLogsViewer}</h1>
-        <p style={{ color: "var(--text-secondary)", fontSize: "15px" }}>
-          Real-time system logs with syntax highlighting
-        </p>
-      </div>
-
-      {/* Control Panel */}
-      <div className="card card-elevated" style={{ marginBottom: "20px" }}>
-        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "end" }}>
-          {/* Service Filter */}
-          <div style={{ minWidth: "160px" }}>
-            <label className="form-label">{t.logs.serviceFilter}</label>
-            <select className="form-select" value={selectedService} onChange={(e) => setSelectedService(e.target.value)}>
-              {SERVICES.map(s => <option key={s.value || 'all'} value={s.value}>{s.label}</option>)}
-            </select>
+        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+          <div style={{
+            width: "44px", height: "44px", borderRadius: "var(--radius-md)",
+            background: "linear-gradient(135deg,#06b6d4,#22d3ee)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 4px 16px rgba(6,182,212,0.35), 0 0 0 1px rgba(255,255,255,0.08) inset",
+          }}>
+            <FileText size={20} color="white" />
           </div>
-
-          {/* Line Count */}
-          <div style={{ width: "130px" }}>
-            <label className="form-label">
-              <Clock size={13} style={{ display: "inline", marginRight: "4px", verticalAlign: "middle" }} />
-              {t.logs.showLastLines}
-            </label>
-            <select className="form-select" value={tailCount} onChange={(e) => setTailCount(Number(e.target.value))}>
-              {[50, 100, 250, 500, 1000].map(n => <option key={n} value={n}>{n}</option>)}
-            </select>
+          <div>
+            <h1>{t.logs.systemLogsViewer}</h1>
+            <p style={{ color: "var(--text-secondary)", fontSize: "13px", margin: 0 }}>
+              实时系统日志 · 语法高亮 · 多维度筛选
+            </p>
           </div>
-
-          {/* Log Level */}
-          <div style={{ minWidth: "140px" }}>
-            <label className="form-label">Log Level</label>
-            <select className="form-select" value={logLevel} onChange={(e) => setLogLevel(e.target.value)}>
-              {LOG_LEVELS.map(l => (
-                <option key={l.value} value={l.value}>{l.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Search */}
-          <div style={{ flex: 1, minWidth: "200px" }}>
-            <label className="form-label">{t.logs.searchLogs}</label>
-            <div style={{ position: "relative" }}>
-              <Search size={15} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
-              <input type="text" className="form-input" placeholder={t.logs.filterLogs} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ paddingLeft: "36px" }} />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {autoRefresh && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: "6px",
+              padding: "5px 14px", borderRadius: "var(--radius-full)",
+              background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)",
+              fontSize: "12px", fontWeight: 600, color: "#22c55e",
+            }}>
+              <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#22c55e", animation: "statusPulse 2s infinite" }} />
+              自动刷新 5s
             </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div style={{ display: "flex", gap: "8px" }}>
-            <button className="btn btn-secondary" onClick={loadLogs} disabled={loading}>
-              <RefreshCw size={16} />{t.logs.refresh}
-            </button>
-            <button className={`btn ${autoRefresh ? "btn-primary" : "btn-secondary"}`} onClick={() => setAutoRefresh(!autoRefresh)}>
-              {autoRefresh ? <><Pause size={16} />Pause</> : <><Play size={16} />Auto</>}
-            </button>
-            <button className="btn btn-secondary" onClick={handleDownloadLogs}>
-              <Download size={16} />{t.logs.export}
-            </button>
-            <button className="btn btn-danger" onClick={() => { if (confirm(t.logs.clearConfirm)) setLogs(""); }} disabled={!logs}>
-              <Trash2 size={16} />
-            </button>
-          </div>
+          )}
         </div>
       </div>
 
-      {/* Log Stats Bar */}
+      {/* Stats Bar */}
       <div style={{
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-        padding: "10px 16px", background: "var(--bg-secondary)", borderRadius: "var(--radius-md)",
-        fontSize: "12.5px", color: "var(--text-muted)", marginBottom: "12px", border: "1px solid var(--border-subtle)"
+        display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "10px",
+        marginBottom: "16px",
       }}>
-        <span>Showing <strong>{filteredLogs.split("\n").length}</strong> lines</span>
-        <div style={{ display: "flex", gap: "16px" }}>
-          {LOG_LEVELS.slice(1).map(lvl => (
-              <span key={lvl.value}><span style={{ color: lvl.color }}>●</span> {lvl.label}</span>
-          ))}
-          <span>{autoRefresh ? "● Auto-refresh ON (5s)" : "○ Auto-refresh OFF"}</span>
+        {[
+          { label: "总行数", value: levelCounts.total, color: "var(--text-primary)", bg: "var(--bg-secondary)" },
+          { label: "Error", value: levelCounts.error, color: "#ef4444", bg: "rgba(239,68,68,0.06)" },
+          { label: "Warning", value: levelCounts.warn, color: "#f59e0b", bg: "rgba(245,158,11,0.06)" },
+          { label: "Info", value: levelCounts.info, color: "#6366f1", bg: "rgba(99,102,241,0.06)" },
+          { label: "Debug", value: levelCounts.debug, color: "#22c55e", bg: "rgba(34,197,94,0.06)" },
+        ].map(stat => (
+          <div key={stat.label} style={{
+            padding: "12px 16px", borderRadius: "var(--radius-md)",
+            background: stat.bg, border: "1px solid var(--border-subtle)",
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+          }}>
+            <span style={{ fontSize: "11.5px", color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.03em" }}>{stat.label}</span>
+            <span style={{ fontSize: "18px", fontWeight: 800, color: stat.color, fontFamily: "var(--font-mono)" }}>{stat.value}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Control Panel */}
+      <div className="card card-elevated" style={{ marginBottom: "16px", padding: "14px 18px" }}>
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+          <div style={{ minWidth: "150px" }}>
+            <select className="form-select" value={selectedService} onChange={(e) => setSelectedService(e.target.value)} style={{ fontSize: "12.5px", padding: "8px 12px" }}>
+              {SERVICES.map(s => <option key={s.value || 'all'} value={s.value}>{s.label}</option>)}
+            </select>
+          </div>
+          <div style={{ width: "110px" }}>
+            <select className="form-select" value={tailCount} onChange={(e) => setTailCount(Number(e.target.value))} style={{ fontSize: "12.5px", padding: "8px 12px" }}>
+              {[50, 100, 250, 500, 1000].map(n => <option key={n} value={n}>{n} 行</option>)}
+            </select>
+          </div>
+          <div style={{ minWidth: "130px" }}>
+            <select className="form-select" value={logLevel} onChange={(e) => setLogLevel(e.target.value)} style={{ fontSize: "12.5px", padding: "8px 12px" }}>
+              {LOG_LEVELS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+            </select>
+          </div>
+          <div style={{ flex: 1, minWidth: "180px", position: "relative" }}>
+            <Search size={14} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
+            <input type="text" className="form-input" placeholder="搜索日志内容..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ paddingLeft: "34px", fontSize: "12.5px", padding: "8px 12px 8px 34px" }} />
+          </div>
+          <div style={{ display: "flex", gap: "4px" }}>
+            <button className="btn btn-ghost btn-sm" onClick={loadLogs} disabled={loading} title="Refresh">
+              <RefreshCw size={14} />
+            </button>
+            <button className={`btn btn-sm ${autoRefresh ? "btn-primary" : "btn-ghost"}`} onClick={() => setAutoRefresh(!autoRefresh)} title={autoRefresh ? "Pause" : "Auto Refresh"}>
+              {autoRefresh ? <Pause size={14} /> : <Play size={14} />}
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={handleDownloadLogs} title="Download">
+              <Download size={14} />
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={() => { if (confirm(t.logs.clearConfirm)) setLogs(""); }} disabled={!logs} title="Clear" style={{ color: logs ? "#ef4444" : undefined }}>
+              <Trash2 size={14} />
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Log Viewer */}
-      <div
-        ref={logContainerRef}
-        style={{
-          background: "var(--bg-primary)", border: "1px solid var(--border-color)",
-          borderRadius: "var(--radius-lg)", overflow: "auto", height: "calc(100vh - 380px)",
-          minHeight: "420px", fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-          fontSize: "12.5px", lineHeight: "1.7", padding: "16px"
-        }}
-      >
-        {loading ? (
-          <div style={{ textAlign: "center", padding: "80px 0", color: "var(--text-muted)" }}>
-            <div className="loading-spinner" style={{ margin: "0 auto 16px" }} />
-            <p>{t.logs.loadingLogs}</p>
+      <div style={{ position: "relative" }}>
+        <div
+          ref={logContainerRef}
+          style={{
+            background: "#0a0a0f", border: "1px solid var(--border-color)",
+            borderRadius: "var(--radius-lg)", overflow: "auto", height: "calc(100vh - 380px)",
+            minHeight: "400px", fontFamily: "var(--font-mono)",
+            fontSize: "12px", lineHeight: "1.65",
+          }}
+        >
+          {/* Terminal-style title bar */}
+          <div style={{
+            position: "sticky", top: 0, zIndex: 2,
+            background: "#111118", borderBottom: "1px solid var(--border-subtle)",
+            padding: "8px 16px", display: "flex", alignItems: "center", gap: "8px",
+          }}>
+            <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#ef4444" }} />
+            <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#f59e0b" }} />
+            <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#22c55e" }} />
+            <span style={{ marginLeft: "8px", fontSize: "11.5px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+              {selectedService ? SERVICES.find(s => s.value === selectedService)?.label : "All Services"} — {lines.length} 行
+            </span>
           </div>
-        ) : !filteredLogs ? (
-          <div className="empty-state">
-            <Info size={48} style={{ opacity: 0.3 }} />
-            <div className="empty-state-text">{t.logs.noLogsAvailable}</div>
-            <div className="empty-state-hint">{t.logs.startServicesForLogs}</div>
-          </div>
-        ) : (
-          <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
-            {filteredLogs.split("\n").map((line, i) => {
-              const { color, weight } = getLineColor(line);
-              return (
-                <div
-                  key={i}
-                  style={{
-                    color, fontWeight: weight, padding: "1px 6px", borderRadius: "3px",
-                    transition: "background var(--transition-fast)"
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
-                  onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                >{line || "\u00A0"}</div>
-              );
-            })}
-          </pre>
-        )}
+
+          {loading ? (
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "200px", flexDirection: "column", gap: "12px" }}>
+              <div className="loading-spinner" />
+              <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>{t.logs.loadingLogs}</span>
+            </div>
+          ) : !filteredLogs ? (
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "200px", flexDirection: "column", gap: "12px" }}>
+              <Terminal size={32} style={{ color: "var(--text-muted)", opacity: 0.3 }} />
+              <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>{t.logs.noLogsAvailable}</span>
+              <span style={{ fontSize: "11.5px", color: "var(--text-muted)", opacity: 0.6 }}>{t.logs.startServicesForLogs}</span>
+            </div>
+          ) : (
+            <div style={{ display: "flex" }}>
+              {/* Line Numbers */}
+              <div style={{
+                padding: "12px 10px 12px 16px", textAlign: "right", userSelect: "none",
+                color: "var(--text-muted)", opacity: 0.3, fontSize: "11px",
+                borderRight: "1px solid rgba(255,255,255,0.04)",
+                position: "sticky", left: 0, background: "#0a0a0f", zIndex: 1,
+              }}>
+                {lines.map((_, i) => (
+                  <div key={i} style={{ height: "19.8px" }}>{i + 1}</div>
+                ))}
+              </div>
+              {/* Log Content */}
+              <div style={{ flex: 1, padding: "12px 16px", minWidth: 0 }}>
+                {lines.map((line, i) => {
+                  const info = getLineInfo(line);
+                  return (
+                    <div
+                      key={i}
+                      style={{
+                        color: info.color, fontWeight: info.level === "error" ? 600 : info.level === "warn" ? 500 : 400,
+                        padding: "0 6px", borderRadius: "3px", whiteSpace: "pre-wrap", wordBreak: "break-all",
+                        transition: "background var(--transition-fast)",
+                        minHeight: "19.8px",
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.03)"}
+                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                    >
+                      {searchTerm ? highlightSearch(line || "\u00A0", searchTerm) : (line || "\u00A0")}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Scroll to bottom button */}
+        <button
+          onClick={scrollToBottom}
+          style={{
+            position: "absolute", bottom: "14px", right: "14px",
+            width: "32px", height: "32px", borderRadius: "50%",
+            background: "var(--bg-elevated)", border: "1px solid var(--border-color)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", boxShadow: "var(--shadow-md)",
+            transition: "all var(--transition-fast)",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = "var(--primary-color)"; e.currentTarget.style.borderColor = "var(--primary-color)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "var(--bg-elevated)"; e.currentTarget.style.borderColor = "var(--border-color)"; }}
+        >
+          <ArrowDown size={14} color="white" />
+        </button>
       </div>
     </div>
   );

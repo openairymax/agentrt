@@ -25,6 +25,7 @@ import {
 import sdk from "../services/agentos-sdk";
 import type { AgentInfo } from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
+import { useNavigate } from "react-router-dom";
 
 const agentTypeConfig: Record<string, { icon: typeof Bot; color: string; gradient: string; bgLight: string; label: string }> = {
   research: { icon: Brain, color: "#6366f1", gradient: "linear-gradient(135deg, #6366f1, #818cf8)", bgLight: "rgba(99,102,241,0.08)", label: "研究型" },
@@ -35,6 +36,7 @@ const agentTypeConfig: Record<string, { icon: typeof Bot; color: string; gradien
 
 const Agents: React.FC = () => {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -387,10 +389,18 @@ const Agents: React.FC = () => {
                     <DetailRow icon={<Clock size={14} />} label="描述" value={selectedAgent.description || "—"} />
 
                     <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                      <button className="btn btn-primary btn-block">
+                      <button className="btn btn-primary btn-block" onClick={async () => {
+                        if (!selectedAgent) return;
+                        try {
+                          await sdk.startAgent(selectedAgent.id);
+                          alert(`智能体 "${selectedAgent.name}" 启动指令已发送`);
+                        } catch (e) { alert("启动失败: " + e); }
+                      }}>
                         <Zap size={15} /> 启动智能体
                       </button>
-                      <button className="btn btn-ghost btn-block">
+                      <button className="btn btn-ghost btn-block" onClick={() => {
+                        if (selectedAgent) navigate(`/agents?id=${selectedAgent.id}`);
+                      }}>
                         <ExternalLink size={15} /> 查看详情
                       </button>
                     </div>

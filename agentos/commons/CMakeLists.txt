@@ -110,7 +110,7 @@ add_library(agentos_common STATIC ${SOURCES})
 
 # MSVC: 启用 C11 标准和 UTF-8 源文件编码
 if(MSVC)
-    target_compile_options(agentos_common PRIVATE /std:c11 /utf-8 /W3 /wd4819)
+    target_compile_options(agentos_common PRIVATE /std:c11 /utf-8 /W3 /wd4819 /wd4005 /D_ENABLE_ATOMIC_ALIGNMENT_FIX)
 endif()
 
 target_include_directories(agentos_common PRIVATE
@@ -149,6 +149,9 @@ target_include_directories(agentos_common PRIVATE
 )
 
 target_compile_definitions(agentos_common PRIVATE _CRT_SECURE_NO_WARNINGS)
+if(NOT CJSON_FOUND)
+    target_compile_definitions(agentos_common PRIVATE AGENTOS_NO_CJSON)
+endif()
 
 target_link_libraries(agentos_common
     Threads::Threads

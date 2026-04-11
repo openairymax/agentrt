@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import sdk from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
+import { useNavigate } from "react-router-dom";
 
 interface ToolInfo {
   name: string;
@@ -47,7 +48,7 @@ const categoryConfig: Record<string, { icon: typeof Wrench; color: string; gradi
   ai: { icon: Zap, color: "#a855f7", gradient: "linear-gradient(135deg, #a855f7, #c084fc)", label: "AI 能力" },
 };
 
-const mockTools: ToolInfo[] = [
+const FALLBACK_TOOLS: ToolInfo[] = [
   { name: "read_file", description: "读取文件内容，支持文本和二进制格式", category: "file", schema: { type: "object", properties: { path: { type: "string" }, encoding: { type: "string" } } }, status: "registered", call_count: 142, avg_latency_ms: 23, last_called: new Date().toISOString() },
   { name: "write_file", description: "写入内容到指定路径的文件", category: "file", schema: { type: "object", properties: { path: { type: "string" }, content: { type: "string" } } }, status: "registered", call_count: 89, avg_latency_ms: 31, last_called: new Date(Date.now() - 3600000).toISOString() },
   { name: "list_directory", description: "列出目录下的所有文件和子目录", category: "file", schema: { type: "object", properties: { path: { type: "string" }, recursive: { type: "boolean" } } }, status: "registered", call_count: 256, avg_latency_ms: 18, last_called: new Date(Date.now() - 7200000).toISOString() },
@@ -60,16 +61,44 @@ const mockTools: ToolInfo[] = [
 
 const ToolManager: React.FC = () => {
   const { t } = useI18n();
-  const [tools, setTools] = useState<ToolInfo[]>(mockTools);
+  const navigate = useNavigate();
+  const [tools, setTools] = useState<ToolInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [selectedTool, setSelectedTool] = useState<ToolInfo | null>(null);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [regName, setRegName] = useState("");
+  const [regDesc, setRegDesc] = useState("");
+  const [regCategory, setRegCategory] = useState("system");
+  const [regSchema, setRegSchema] = useState("");
 
-  useEffect(() => {
-    setTimeout(() => setLoading(false), 800);
-  }, []);
+  const loadTools = async () => {
+    setLoading(true);
+    try {
+      const result = await sdk.listAvailableTools();
+      if (result && result.length > 0) {
+        setTools(result.map((t: any) => ({
+          name: t.name,
+          description: t.description || "",
+          category: t.category || "system",
+          schema: t.schema || {},
+          status: "registered" as const,
+          call_count: t.call_count || 0,
+          avg_latency_ms: t.avg_latency_ms || 0,
+          last_called: t.last_called || "",
+        })));
+      } else {
+        setTools(FALLBACK_TOOLS);
+      }
+    } catch {
+      setTools(FALLBACK_TOOLS);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadTools(); }, []);
 
   const filteredTools = tools.filter(tool => {
     const matchSearch = tool.name.toLowerCase().includes(searchTerm.toLowerCase()) || tool.description.toLowerCase().includes(searchTerm.toLowerCase());
@@ -86,14 +115,14 @@ const ToolManager: React.FC = () => {
   return (
     <div className="page-container">
       <div className="page-header">
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
           <div style={{
-            width: "48px", height: "48px", borderRadius: "var(--radius-lg)",
-            background: "linear-gradient(135deg, #10b981, #34d399)",
+            width: "44px", height: "44px", borderRadius: "var(--radius-md)",
+            background: "linear-gradient(135deg,#10b981,#34d399)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 6px 20px rgba(16,185,129,0.3)",
+            boxShadow: "0 4px 16px rgba(16,185,129,0.35), 0 0 0 1px rgba(255,255,255,0.08) inset",
           }}>
-            <Wrench size={24} color="white" />
+            <Wrench size={20} color="white" />
           </div>
           <div>
             <h1>工具管理器</h1>
@@ -254,8 +283,16 @@ const ToolManager: React.FC = () => {
                       </pre>
                     </div>
                     <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
-                      <button className="btn btn-primary btn-block" style={{ flex: 1 }}><Play size={14} /> 测试执行</button>
-                      <button className="btn btn-ghost btn-block"><Eye size={14} /> 查看日志</button>
+                      <button className="btn btn-primary btn-block" style={{ flex: 1 }} onClick={() => {
+                        const input = prompt("输入测试参数 (JSON):");
+                        if (input) {
+                          try {
+                            const args = JSON.parse(input);
+                            sdk.executeTool(selectedTool.name, args).then((r: any) => alert("执行结果:\n" + JSON.stringify(r, null, 2))).catch((e: any) => alert("执行失败: " + e));
+                          } catch { alert("无效的 JSON 格式"); }
+                        }
+                      }}><Play size={14} /> 测试执行</button>
+                      <button className="btn btn-ghost btn-block" onClick={() => { navigate("/logs"); }}><Eye size={14} /> 查看日志</button>
                     </div>
                   </div>
                 </>
@@ -276,11 +313,11 @@ const ToolManager: React.FC = () => {
             <div style={{ padding: "28px", display: "flex", flexDirection: "column", gap: "18px" }}>
               <div className="form-group">
                 <label className="form-label">工具名称</label>
-                <input type="text" className="form-input" placeholder="例如：my_custom_tool" style={{ fontFamily: "JetBrains Mono, monospace" }} />
+                <input type="text" className="form-input" placeholder="例如：my_custom_tool" value={regName} onChange={e => setRegName(e.target.value)} style={{ fontFamily: "JetBrains Mono, monospace" }} />
               </div>
               <div className="form-group">
                 <label className="form-label">描述</label>
-                <textarea className="textarea-field" rows={3} placeholder="简要描述工具的功能和用途..." />
+                <textarea className="textarea-field" rows={3} placeholder="简要描述工具的功能和用途..." value={regDesc} onChange={e => setRegDesc(e.target.value)} />
               </div>
               <div className="form-group">
                 <label className="form-label">所属分类</label>
@@ -288,13 +325,21 @@ const ToolManager: React.FC = () => {
                   {catKeys.map(cat => {
                     const cfg = categoryConfig[cat];
                     const CfgIcon = cfg.icon;
+                    const isSelected = regCategory === cat;
                     return (
-                      <div key={cat} style={{ padding: "12px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)", textAlign: "center", cursor: "pointer", transition: "all var(--transition-fast)" }}
-                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = cfg.color; e.currentTarget.style.background = `${cfg.color}08`; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = ""; e.currentTarget.style.background = ""; }}
+                      <div key={cat} style={{
+                        padding: "12px", borderRadius: "var(--radius-md)",
+                        border: `1px solid ${isSelected ? cfg.color : "var(--border-subtle)"}`,
+                        textAlign: "center", cursor: "pointer",
+                        background: isSelected ? `${cfg.color}10` : "transparent",
+                        transition: "all var(--transition-fast)",
+                      }}
+                        onClick={() => setRegCategory(cat)}
+                        onMouseEnter={(e) => { if (!isSelected) { e.currentTarget.style.borderColor = cfg.color; e.currentTarget.style.background = `${cfg.color}08`; } }}
+                        onMouseLeave={(e) => { if (!isSelected) { e.currentTarget.style.borderColor = ""; e.currentTarget.style.background = ""; } }}
                       >
                         <CfgIcon size={18} color={cfg.color} style={{ marginBottom: "4px" }} />
-                        <div style={{ fontSize: "12px", fontWeight: 600 }}>{cfg.label}</div>
+                        <div style={{ fontSize: "12px", fontWeight: 600, color: isSelected ? cfg.color : undefined }}>{cfg.label}</div>
                       </div>
                     );
                   })}
@@ -302,11 +347,20 @@ const ToolManager: React.FC = () => {
               </div>
               <div className="form-group">
                 <label className="form-label">参数 Schema (JSON)</label>
-                <textarea className="textarea-field" rows={5} placeholder='{"type": "object", "properties": {...}}' style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "12px" }} />
+                <textarea className="textarea-field" rows={5} placeholder='{"type": "object", "properties": {...}}' value={regSchema} onChange={e => setRegSchema(e.target.value)} style={{ fontFamily: "JetBrains Mono, monospace", fontSize: "12px" }} />
               </div>
               <div style={{ display: "flex", gap: "10px" }}>
-                <button className="btn btn-secondary btn-lg" onClick={() => setShowRegisterModal(false)} style={{ flex: 1 }}>取消</button>
-                <button className="btn btn-success btn-lg" style={{ flex: 1 }}><CheckCircle2 size={16} /> 注册工具</button>
+                <button className="btn btn-secondary btn-lg" onClick={() => { setShowRegisterModal(false); setRegName(""); setRegDesc(""); setRegSchema(""); }} style={{ flex: 1 }}>取消</button>
+                <button className="btn btn-success btn-lg" style={{ flex: 1 }} onClick={async () => {
+                  if (!regName.trim()) { alert("请输入工具名称"); return; }
+                  try {
+                    const schema = regSchema.trim() ? JSON.parse(regSchema) : {};
+                    await sdk.registerTool({ name: regName, description: regDesc, category: regCategory, schema });
+                    setShowRegisterModal(false);
+                    setRegName(""); setRegDesc(""); setRegSchema("");
+                    loadTools();
+                  } catch (e) { alert("注册失败: " + e); }
+                }}><CheckCircle2 size={16} /> 注册工具</button>
               </div>
             </div>
           </div>

@@ -36,28 +36,36 @@ Personal Client Preview
 
 ## 💡 Innovation Highlights
 
-**Foundational Theory** 👉 **[Multibody Cybernetic Intelligent System](docs/Basic_Theories/EN_01_MCIS.md)**  
+<center>
 
-- **Pure Kernel**: Only atomic mechanisms (IPC/Mem/Task/Time), ensuring purity and efficiency.
-- **Cognitive Loop**: Perception → Planning → Action, with dual-system synergy (System 1 + System 2).
-- **Memory Stratification**: L1 Raw → L2 Features → L3 Structures → L4 Patterns, enabling intelligence emergence.
-- **Inherent Security**: Four-layer protection: Sandbox Isolation, Permission Arbitration, Input Sanitization, Audit Trail.
+⚡️
+
+**Foundational [Multibody Cybernetic Intelligent System](docs/Basic_Theories/EN_01_MCIS.md)**
+
+</center>
+
+- **Pure Kernel**: Only atomic mechanisms, ensuring purity and efficiency.
+- **Cognitive Loop**: Perception, Planning, Action.
+- **Memory Stratification**: L1 Raw → L2 Features → L3 Structures → L4 Patterns.
+- **Inherent Security**: Sandbox Isolation, Permission Arbitration, Input Sanitization, Audit Trail.
 - **Token Efficiency**: Saves approximately **500%** tokens compared to traditional frameworks.
 - **Comprehensive SDKs**: Native support for Go / Python / Rust / TypeScript.
 
 ## 🎯 Core Philosophy
 
-**Team Orchestration**  
-- Precisely coordinates multi‑agent collaboration  
-- Enables efficient task orchestration and resource scheduling  
+**Drive Teams**
+- Precisely coordinates multi-Agent collaboration
+- Efficiently completes complex task orchestration and resource scheduling
 
-**Autonomous Evolution**  
-- Self‑evolving capability  
-- Dynamically adjusts strategies  
-- Continuously optimizes execution effectiveness  
+**Autonomous Evolution**:
+- Possesses self-evolution capability
+- Dynamically adjusts strategies
+- Continuously optimizes execution effectiveness
 
 <p align="center">
-  <strong>✨ Groundbreaking Architecture · Inherent Security · Intelligence Emergence ✨</strong>
+  <strong> ✨ </strong>  
+  <p align="center">
+  <strong> Brand New Architecture · Inherent Security · Intelligence Emergence </strong>  
 </p>
 
 ## 🏗️ System Architecture
@@ -66,39 +74,34 @@ Personal Client Preview
   Complete architecture from kernel to application:
 
 ```
-Application Layer (openlab)
-    ⇅
-Service Layer (daemon)
-    ⇅
-Kernel Layer (atoms)
-    ⇅
-Security Layer (cupolas)
-    ⇅
-Support Layer (commons)
-    ⇅
-SDK Layer (toolkit)
+⬇️ Application Layer (openlab)
+⇅ Service Layer (daemon)
+⇅ Kernel Layer (atoms)
+⇅ Security Layer (cupolas)
+⇅ Support Layer (commons)
+⬆️ SDK Layer (toolkit)  
 ```
 
 **Design Principles**  
-  Built upon the five-dimensional orthogonal design system described in [ARCHITECTURAL_PRINCIPLES](docs/ARCHITECTURAL_PRINCIPLES.md):
-- **System Perspective**: Feedback loops · Layered decomposition · Holistic design · Emergence management → Response <10ms
+  Built upon [ARCHITECTURAL_PRINCIPLES](docs/ARCHITECTURAL_PRINCIPLES.md):
+- **System Perspective**: Feedback loops · Layered decomposition · Holistic design · Emergence management → Real-time response <10ms
 - **Kernel Perspective**: Minimalist kernel · Contractual interfaces · Service isolation · Pluggable strategies → Kernel ~25K LOC
-- **Cognitive Perspective**: Dual‑system synergy · Incremental evolution · Memory stratification · Forgetting mechanism → Token savings 500%
-- **Engineering Perspective**: Security built‑in · Observability · Resource determinism · Cross‑platform consistency → Test coverage >90%
-- **Design Aesthetics**: Simplicity first · Extreme attention to detail · Human‑centric · Perfectionism → API <50 per module
+- **Cognitive Perspective**: Dual-system synergy · Incremental evolution · Memory stratification · Forgetting mechanism → Token savings 500%
+- **Engineering Perspective**: Security built-in · Observability · Resource determinism · Cross-platform consistency → Test coverage >90%
+- **Design Aesthetics**: Simplicity first · Extreme attention to detail · Human-centric · Perfectionism → API <50/module
 
 ## 🚀 Quick Start
 
-### 📦 Requirements
+### Environment Requirements
 
-- **OS**: Ubuntu 22.04+ / macOS 13+ / Windows 11 (WSL2)
+- **Operating System**: Ubuntu 22.04+ / macOS 13+ / Windows 11 (WSL2)
 - **Compiler**: GCC 11+ / Clang 14+ (C11/C++17)
 - **Build Tools**: CMake 3.20+, Ninja
 - **Python**: 3.10+ (Required for OpenLab)
 
-### 🔨 Installation & Build
+### Installation & Build
 
-```bash
+```ctext
 # 1. Clone repository
 git clone https://atomgit.com/spharx/agentos.git && cd agentos
 
@@ -111,12 +114,12 @@ cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
 cmake --build . --parallel $(nproc)
 
 # 4. Run tests
-ctest --output-on-failure
+ctest --output-on-failure  
 ```
 
-### 🐳 Docker Quick Start
+### Docker Quick Start
 
-```bash
+```text
 # Build image
 docker build -f scripts/deploy/docker/Dockerfile.kernel -t agentos:latest .
 
@@ -124,116 +127,134 @@ docker build -f scripts/deploy/docker/Dockerfile.kernel -t agentos:latest .
 docker run -d --name agentos -p 8080:8080 -v ./config:/app/config agentos:latest
 ```
 
-### 💻 Usage
+### Usage Methods
 
-| Language | Usage |
+```
+| Language | Usage Method |
 |:-----|:---------|
 | C/C++ | Develop via `syscalls.h` system call interface |
-| Python | Install via `pip install agentos` then import directly |
+| Python | Install via `pip install agentos` then directly import |
 | Go | Use `import "github.com/spharx/agentos/toolkit/go"` |
 | Rust | Use `use agentos_toolkit::prelude::*;` |
-| TypeScript | Install via `npm install @spharx/agentos-toolkit` then import directly |
+| TypeScript | Install via `npm install @spharx/agentos-toolkit` then directly import |
+```
 
-### 📚 Documentation
+### Reading Navigation
 
 | Document | Core Content |
 |:-----|:---------|
-| [📘 Architectural Principles](docs/ARCHITECTURAL_PRINCIPLES.md) | Multibody Cybernetic Intelligent System, 24 core principles |
-| [🚀 Quick Start](docs/Capital_Guides/getting_started.md) | 5‑minute getting‑started guide |
-| [⚙️ Build Guide](docs/Capital_Guides/installation.md) | Detailed build steps and options |
-| [🧪 Testing Guide](docs/Capital_Guides/testing.md) | Unit/Integration/Contract testing |
-| [🐳 Deployment Guide](docs/Capital_Guides/deployment.md) | Docker/Kubernetes deployment |
+| [📘 Architectural Principles](docs/ARCHITECTURAL_PRINCIPLES.md) | Five-dimensional orthogonal system, 24 core principles |
+| [🚀 Quick Start](docs/guides/quickstart.md) | 5-minute getting-started guide |
+| [⚙️ Build Guide](docs/guides/build.md) | Detailed build steps and options |
+| [🧪 Testing Guide](docs/guides/testing.md) | Unit/Integration/Contract testing |
+| [🐳 Deployment Guide](docs/guides/deployment.md) | Docker/Kubernetes deployment |
 
-## ❔ FAQ
+### Common Questions
 
 <details>
-<summary><b>Q1: How does AgentOS differ from traditional AI Agent frameworks?</b></summary>
+<summary>👉 Q1: What is the difference between AgentOS and traditional AI Agent frameworks?</summary>
 
-AgentOS is an **operating‑system‑level** product, not merely a framework:
+AgentOS is an **operating system-level** product, not a single framework:
 
 | Dimension | AgentOS | Traditional Frameworks |
 |------|---------|----------|
-| **Positioning** | Multi‑agent collaboration OS | Single agent |
+| **Positioning** | Multi-agent collaboration OS | Single agent |
 | **Architecture** | Microkernel + strict layering | Loosely coupled modules |
-| **Security** | Four‑layer inherent security | Application‑level protection |
-| **Memory** | Four‑layer stratification system | Vector database |
+| **Security** | Four-layer inherent security | Application-level protection |
+| **Memory** | Four-layer stratification system | Vector database |
 | **Token Efficiency** | Saves ~500% | No optimization |
 
 </details>
 
 <details>
-<summary><b>Q2: What scenarios is it suitable for?</b></summary>
+<summary>👉 Q2: Which application scenarios is it suitable for?</summary>
 
-**✅ Perfect for**
-- 🎯 Complex multi‑step task orchestration
-- 🧠 Long‑term memory and knowledge accumulation
-- 🔒 High‑security enterprise applications
-- 💾 Resource‑constrained embedded scenarios (atomslite)
-- 🌐 Multi‑language development teams
+**✅ Especially suitable**
+- 🎯 Complex multi-step task orchestration
+- 🧠 Long-term memory and knowledge accumulation needs
+- 🔒 High-security enterprise applications
+- 💾 Resource-constrained embedded scenarios (atomslite)
+- 🌐 Multi-language development teams
 
-**❌ Not suitable for**
-- 🚫 Simple single‑call tasks (overkill)
+**❌ Not suitable**
+- 🚫 Simple single-call tasks (using a sledgehammer to crack a nut)
 
 </details>
 
 <details>
-<summary><b>Q3: How is security guaranteed?</b></summary>
+<summary>👉 Q3: How is security guaranteed?</summary>
 
-**Security built‑in design, four‑layer protection**
+**Security built-in design, four-layer protection**
 
-| Protection Layer | Implementation |
+| Protection Layer | Implementation Method |
 |---------|---------|
 | **Virtual Workspace** | Process/Container/WASM sandbox isolation |
 | **Permission Arbitration** | RBAC + YAML rule engine |
 | **Input Sanitization** | Regex filtering + Type checking |
-| **Audit Trail** | Full‑chain tamper‑proof logging |
+| **Audit Trail** | Full-chain tamper-proof logging |
 
 See [cupolas security documentation](agentos/cupolas/README.md)
 
 </details>
 
 <details>
-<summary><b>Q4: What prerequisites are needed?</b></summary>
+<summary>👉 Q4: What prerequisite knowledge is needed for learning?</summary>
 
-| Role | Prerequisites | Time to Get Started |
+| Role | Prerequisite Knowledge | Time to Get Started |
 |------|---------|----------|
-| **Application Developer** | Python/Go basics | 1‑2 days |
-| **System Developer** | C/C++, OS fundamentals | 1‑2 weeks |
+| **Application Developer** | Python/Go basics | 1-2 days |
+| **System Developer** | C/C++, OS fundamentals | 1-2 weeks |
 | **Architect** | Microkernel, distributed systems | 1 month |
 
-**Recommended Path**: [Quick Start](docs/Capital_Guides/getting_started.md) → [Architectural Principles](docs/ARCHITECTURAL_PRINCIPLES.md) → [CoreLoopThree](agentos/atoms/coreloopthree/README.md)
+**Recommended Path**: [Quick Start](agentos/manuals/guides/quickstart.md) → [Architectural Principles](agentos/manuals/ARCHITECTURAL_PRINCIPLES.md) → [CoreLoopThree](agentos/manuals/architecture/coreloopthree.md)
 
 </details>
 
+## 🎏 Participating in Contribution
+
+We are walking into the future: "Intelligence emergence, and nothing less, is the ultimate sublimation of AI".
+
+### The Power of Belief
+
 <p align="center">
-  <strong>☀️ This is not humanity's sunset, but the dawn of a new world ☀️</strong>
+  <strong> ☀️ </strong>  
+  <p align="center">
+  <strong> This is not humanity's sunset, but the dawn of a new world </strong>  
 </p>
 
-## 🤝 Contributing
+**Believe**
 
-> "Intelligence emergence, and nothing less, is the ultimate sublimation of AI."
+  The spirit of open source can maximize the wisdom of the group;  
+  Collaboration will propel humanity to new heights.
 
-This is the future we are stepping into.
+**Witness**
 
-### 🚩 The Power of Belief
+  Every day of our work is part of history;  
+  It will surely be engraved on the monument of human civilization's development.
 
-**Believe**  
-The spirit of open source can unleash the collective wisdom of the community, propelling humanity to new heights.
-
-**Witness**  
-Every day of our work is part of history, destined to be engraved on the monument of human civilization, witnessing the true emergence of intelligence.
-
-**This is not humanity's sunset, but the dawn of a new world.**
-
-### 💫 Ways to Contribute
+### Ways to Contribute
 
 Whether you are an experienced developer or just starting out:
-- 🐛 **Find Issues** → Report bugs, help us improve quality
-- 💡 **Share Ideas** → Suggest new features, make the project stronger
-- 📝 **Share Knowledge** → Improve documentation, help more people understand AgentOS
-- 🔧 **Write Code** → Submit PRs, jointly build a better intelligent agent OS
 
-### 📝 Contribution Process
+**Find Issues**  
+Report bugs, help us improve quality
+
+**Share Ideas**  
+Suggest new features, make the project stronger
+
+**Share Knowledge**  
+Improve documentation, help more people understand AgentOS
+
+**Write Code**  
+Submit PRs, jointly create history
+
+<p align="center">  
+  <strong> 🔥 </strong>  
+  <p align="center">  
+  <strong> A faint light cannot illuminate the entire path, yet it guides our direction forward </strong>
+</p>
+
+### Contribution Process
 
 See [Contributing Guide](CONTRIBUTING.md)
 
@@ -242,10 +263,6 @@ Fork Project → Create Branch → Develop & Test → Submit PR → Code Review 
 ```
 
 **Main Platforms**: [AtomGit](https://atomgit.com/spharx/agentos) (Recommended) · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)
-
-<p align="center">
-  <strong>🔥 "A faint light cannot illuminate the entire path, yet it guides our direction forward." 🔥</strong>
-</p>
 
 ## 📜 License
 

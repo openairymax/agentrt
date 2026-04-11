@@ -213,10 +213,20 @@ static size_t generate_openai_embedding(const char* text, float** out_embedding)
     }
 
     char* json_data;
-    int ret = asprintf(&json_data,
+    /* 计算所需缓冲区大小：固定部分43字符 + escaped_text长度 + 1个空终止符 */
+    size_t json_len = 43 + strlen(escaped_text) + 1;
+    json_data = (char*)AGENTOS_MALLOC(json_len);
+    if (!json_data) {
+        AGENTOS_FREE(escaped_text);
+        AGENTOS_FREE(chunk.data);
+        curl_easy_cleanup(curl);
+        return 0;
+    }
+    int ret = snprintf(json_data, json_len,
              "{\"input\":\"%s\",\"model\":\"text-embedding-ada-002\"}", escaped_text);
     AGENTOS_FREE(escaped_text);
-    if (ret < 0) {
+    if (ret < 0 || (size_t)ret >= json_len) {
+        AGENTOS_FREE(json_data);
         AGENTOS_FREE(chunk.data);
         curl_easy_cleanup(curl);
         return 0;
@@ -237,7 +247,7 @@ static size_t generate_openai_embedding(const char* text, float** out_embedding)
 
     CURLcode res = curl_easy_perform(curl);
 
-    curl_free(json_data);
+    AGENTOS_FREE(json_data);
     curl_slist_free_all(headers);
     curl_easy_cleanup(curl);
 
@@ -304,10 +314,20 @@ static size_t generate_deepseek_embedding(const char* text, float** out_embeddin
     }
 
     char* json_data;
-    int ret = asprintf(&json_data,
+    /* 计算所需缓冲区大小：固定部分28字符 + escaped_text长度 + 1个空终止符 */
+    size_t json_len = 28 + strlen(escaped_text) + 1;
+    json_data = (char*)AGENTOS_MALLOC(json_len);
+    if (!json_data) {
+        AGENTOS_FREE(escaped_text);
+        AGENTOS_FREE(chunk.data);
+        curl_easy_cleanup(curl);
+        return 0;
+    }
+    int ret = snprintf(json_data, json_len,
              "{\"input\":\"%s\",\"model\":\"embedding\"}", escaped_text);
     AGENTOS_FREE(escaped_text);
-    if (ret < 0) {
+    if (ret < 0 || (size_t)ret >= json_len) {
+        AGENTOS_FREE(json_data);
         AGENTOS_FREE(chunk.data);
         curl_easy_cleanup(curl);
         return 0;
@@ -328,12 +348,12 @@ static size_t generate_deepseek_embedding(const char* text, float** out_embeddin
 
     CURLcode res = curl_easy_perform(curl);
 
-    curl_free(json_data);
+    AGENTOS_FREE(json_data);
     curl_slist_free_all(headers);
     curl_easy_cleanup(curl);
 
     if (res != CURLE_OK) {
-        AGENTOS_FREE(chunk.data);
+        if (chunk.data) AGENTOS_FREE(chunk.data);
         return 0;
     }
 
