@@ -278,9 +278,10 @@ set(AGENTOS_INCLUDE_DIRS
 
 # 创建接口库来管理公共依赖
 add_library(agentos_atoms INTERFACE)
-target_include_directories(agentos_atoms INTERFACE
-    ${AGENTOS_INCLUDE_DIRS}
-)
+# target_include_directories(agentos_atoms INTERFACE
+#     $<BUILD_INTERFACE:${AGENTOS_INCLUDE_DIRS}>
+#     $<INSTALL_INTERFACE:include/agentos>
+# )
 
 # 包含子目录
 # Kernel subdirectories
@@ -291,12 +292,12 @@ add_subdirectory(syscall)
 
 # 安装配置
 # 库文件安装
-install(TARGETS agentos_core agentos_coreloopthree agentos_memoryrovol agentos_syscall agentos_cognition agentos_execution
-    EXPORT AgentOSTargets
-    ARCHIVE DESTINATION lib/agentos
-    LIBRARY DESTINATION lib/agentos
-    RUNTIME DESTINATION bin
-)
+# install(TARGETS agentos_atoms agentos_core agentos_coreloopthree agentos_memoryrovol agentos_syscall agentos_cognition agentos_execution
+#     EXPORT AgentOSTargets
+#     ARCHIVE DESTINATION lib/agentos
+#     LIBRARY DESTINATION lib/agentos
+#     RUNTIME DESTINATION bin
+# )
 
 # 子模块头文件安装
 install(DIRECTORY corekern/include/ DESTINATION include/agentos/corekern)
@@ -305,11 +306,11 @@ install(DIRECTORY memoryrovol/include/ DESTINATION include/agentos/memoryrovol)
 install(DIRECTORY syscall/include/ DESTINATION include/agentos/syscall)
 
 # 创建目标导出集
-install(EXPORT AgentOSTargets
-    FILE AgentOSTargets.cmake
-    NAMESPACE AgentOS::
-    DESTINATION lib/cmake/AgentOS
-)
+# install(EXPORT AgentOSTargets
+#     FILE AgentOSTargets.cmake
+#     NAMESPACE AgentOS::
+#     DESTINATION lib/cmake/AgentOS
+# )
 
 # 创建版本配置文件
 write_basic_package_version_file(

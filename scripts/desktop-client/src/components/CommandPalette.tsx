@@ -84,16 +84,19 @@ const COMMANDS: CommandItem[] = [
     id: 'toggle-sidebar', label: 'Toggle Sidebar',
     shortcut: ['Ctrl', 'B'], icon: Search, category: 'actions',
     keywords: ['sidebar', 'panel', 'toggle', 'hide', 'show'],
+    action: () => { window.dispatchEvent(new CustomEvent('toggle-sidebar')); },
   },
   {
     id: 'refresh-page', label: 'Refresh Page',
     shortcut: ['F5'], icon: RefreshCw, category: 'actions',
     keywords: ['refresh', 'reload', 'restart'],
+    action: () => { window.location.reload(); },
   },
   {
     id: 'clear-cache', label: 'Clear Cache',
     icon: Trash2, category: 'tools',
     keywords: ['cache', 'clear', 'storage'],
+    action: () => { localStorage.clear(); sessionStorage.clear(); },
   },
 ];
 

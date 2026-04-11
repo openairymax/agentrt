@@ -19,9 +19,14 @@
  */
 
 #include "network_common.h"
+#include "../../memory/include/memory_compat.h"
 #include <stdio.h>
 #include <stdlib.h>
+#define _CRT_NONSTDC_NO_DEPRECATE
 #include <string.h>
+#ifdef _WIN32
+#define strdup _strdup
+#endif
 #include <stdarg.h>
 
 #ifdef _WIN32
@@ -172,8 +177,10 @@ static int parse_url(const char* url, char* host, int* port, char* path) {
         strncpy(path, slash, path_len);
         path[path_len] = '\0';
     } else {
-        strcpy(host, start);
-        strcpy(path, "/");
+        strncpy(host, start, 255);
+        host[255] = '\0';
+        strncpy(path, "/", 511);
+        path[511] = '\0';
     }
 
     /* 检查端口（主机:端口 格式） */
@@ -254,7 +261,7 @@ network_connection_t* network_connection_create(const network_config_t* config) 
         return NULL;
     }
 
-    network_connection_t* conn = (network_connection_t*)calloc(1, sizeof(network_connection_t));
+    network_connection_t* conn = (network_connection_t*)AGENTOS_CALLOC(1, sizeof(network_connection_t));
     if (!conn) {
         return NULL;
     }
@@ -291,7 +298,7 @@ void network_connection_destroy(network_connection_t* connection) {
         network_disconnect(connection);
     }
 
-    free(connection);
+    AGENTOS_FREE(connection);
 }
 
 /**
@@ -883,7 +890,7 @@ agentos_error_t network_http_request(
     agentos_error_t err = network_send_all(connection, request_buf, (size_t)offset);
     if (err != AGENTOS_SUCCESS) {
         response->error = err;
-        response->error_message = strdup("Failed to send request headers");
+        response->error_message = AGENTOS_STRDUP("Failed to send request headers");
         return err;
     }
 
@@ -892,7 +899,7 @@ agentos_error_t network_http_request(
         err = network_send_all(connection, request->body, request->body_len);
         if (err != AGENTOS_SUCCESS) {
             response->error = err;
-            response->error_message = strdup("Failed to send request body");
+            response->error_message = AGENTOS_STRDUP("Failed to send request body");
             return err;
         }
     }
@@ -933,9 +940,9 @@ agentos_error_t network_http_request(
         size_t header_len = body_start - recv_buffer + 4;
 
         /* 提取响应头 */
-        response->headers = (char**)calloc(1, sizeof(char*));
+        response->headers = (char**)AGENTOS_CALLOC(1, sizeof(char*));
         if (response->headers) {
-            response->headers[0] = (char*)malloc(header_len + 1);
+            response->headers[0] = (char*)AGENTOS_MALLOC(header_len + 1);
             if (response->headers[0]) {
                 memcpy(response->headers[0], recv_buffer, header_len);
                 response->headers[0][header_len] = '\0';
@@ -946,7 +953,7 @@ agentos_error_t network_http_request(
         /* 提取响应体 */
         body_start += 4;
         size_t body_len = total_received - (body_start - recv_buffer);
-        response->body = malloc(body_len + 1);
+        response->body = AGENTOS_MALLOC(body_len + 1);
         if (response->body) {
             memcpy(response->body, body_start, body_len);
             response->body[body_len] = '\0';
@@ -954,7 +961,7 @@ agentos_error_t network_http_request(
         }
     } else {
         /* 没有找到头部/体分隔符，整个作为响应体 */
-        response->body = malloc(total_received + 1);
+        response->body = AGENTOS_MALLOC(total_received + 1);
         if (response->body) {
             memcpy(response->body, recv_buffer, total_received);
             response->body[total_received] = '\0';
@@ -1023,27 +1030,27 @@ void network_http_response_free(network_http_response_t* response) {
     }
 
     if (response->body) {
-        free(response->body);
+        AGENTOS_FREE(response->body);
         response->body = NULL;
     }
 
     if (response->headers) {
         for (size_t i = 0; i < response->header_count; i++) {
             if (response->headers[i]) {
-                free(response->headers[i]);
+                AGENTOS_FREE(response->headers[i]);
             }
         }
-        free(response->headers);
+        AGENTOS_FREE(response->headers);
         response->headers = NULL;
     }
 
     if (response->error_message) {
-        free(response->error_message);
+        AGENTOS_FREE(response->error_message);
         response->error_message = NULL;
     }
 
     if (response->status_text) {
-        free(response->status_text);
+        AGENTOS_FREE(response->status_text);
         response->status_text = NULL;
     }
 
@@ -1068,7 +1075,7 @@ network_pool_t* network_pool_create(
         return NULL;
     }
 
-    network_pool_t* pool = (network_pool_t*)calloc(1, sizeof(network_pool_t));
+    network_pool_t* pool = (network_pool_t*)AGENTOS_CALLOC(1, sizeof(network_pool_t));
     if (!pool) {
         return NULL;
     }
@@ -1076,10 +1083,10 @@ network_pool_t* network_pool_create(
     pool->base_config = *config;
     pool->max_size = pool_size;
     pool->current_size = 0;
-    pool->connections = (network_connection_t**)calloc(pool_size, sizeof(network_connection_t*));
+    pool->connections = (network_connection_t**)AGENTOS_CALLOC(pool_size, sizeof(network_connection_t*));
 
     if (!pool->connections) {
-        free(pool);
+        AGENTOS_FREE(pool);
         return NULL;
     }
 
@@ -1101,8 +1108,8 @@ void network_pool_destroy(network_pool_t* pool) {
         }
     }
 
-    free(pool->connections);
-    free(pool);
+    AGENTOS_FREE(pool->connections);
+    AGENTOS_FREE(pool);
 }
 
 /**
@@ -1293,13 +1300,13 @@ agentos_error_t network_dns_resolve(
     }
 
     /* 分配结果内存 */
-    result->addresses = (char**)calloc((size_t)count, sizeof(char*));
-    result->ports = (int*)calloc((size_t)count, sizeof(int));
+    result->addresses = (char**)AGENTOS_CALLOC((size_t)count, sizeof(char*));
+    result->ports = (int*)AGENTOS_CALLOC((size_t)count, sizeof(int));
     result->count = (size_t)count;
 
     if (!result->addresses || !result->ports) {
-        free(result->addresses);
-        free(result->ports);
+        AGENTOS_FREE(result->addresses);
+        AGENTOS_FREE(result->ports);
         freeaddrinfo(res);
         return AGENTOS_ENOMEM;
     }
@@ -1318,11 +1325,12 @@ agentos_error_t network_dns_resolve(
             inet_ntop(AF_INET6, &addr_in6->sin6_addr, ip_str, sizeof(ip_str));
             result->ports[i] = ntohs(addr_in6->sin6_port);
         } else {
-            strcpy(ip_str, "unknown");
+            strncpy(ip_str, "unknown", INET6_ADDRSTRLEN - 1);
+            ip_str[INET6_ADDRSTRLEN - 1] = '\0';
             result->ports[i] = 0;
         }
 
-        result->addresses[i] = strdup(ip_str);
+        result->addresses[i] = AGENTOS_STRDUP(ip_str);
         p = p->ai_next;
     }
 
@@ -1342,15 +1350,15 @@ void network_dns_result_free(network_dns_result_t* result) {
     if (result->addresses) {
         for (size_t i = 0; i < result->count; i++) {
             if (result->addresses[i]) {
-                free(result->addresses[i]);
+                AGENTOS_FREE(result->addresses[i]);
             }
         }
-        free(result->addresses);
+        AGENTOS_FREE(result->addresses);
         result->addresses = NULL;
     }
 
     if (result->ports) {
-        free(result->ports);
+        AGENTOS_FREE(result->ports);
         result->ports = NULL;
     }
 
