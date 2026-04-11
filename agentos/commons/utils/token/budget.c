@@ -17,14 +17,16 @@
 #include "../../utils/memory/include/memory_compat.h"
 #include "../../utils/string/include/string_compat.h"
 #include <string.h>
-#include <stdatomic.h>
 #include <time.h>
 
 #ifdef _WIN32
 #include <windows.h>
+#include <intrin.h>
+#include "../../../utils/include/atomic_compat.h"
 #else
 #include <pthread.h>
 #include <unistd.h>
+#include <stdatomic.h>
 #endif
 
 /**

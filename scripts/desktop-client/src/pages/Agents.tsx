@@ -26,6 +26,7 @@ import sdk from "../services/agentos-sdk";
 import type { AgentInfo } from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
 import { useNavigate } from "react-router-dom";
+import { useAlert } from "../components/useAlert";
 
 const agentTypeConfig: Record<string, { icon: typeof Bot; color: string; gradient: string; bgLight: string; label: string }> = {
   research: { icon: Brain, color: "#6366f1", gradient: "linear-gradient(135deg, #6366f1, #818cf8)", bgLight: "rgba(99,102,241,0.08)", label: "研究型" },
@@ -37,6 +38,7 @@ const agentTypeConfig: Record<string, { icon: typeof Bot; color: string; gradien
 const Agents: React.FC = () => {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const { error, success, confirm: confirmModal } = useAlert();
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -55,8 +57,8 @@ const Agents: React.FC = () => {
     try {
       const data = await sdk.listAgents();
       setAgents(data || []);
-    } catch (error) {
-      console.error("Failed to load agents:", error);
+    } catch (err) {
+      error("加载失败", `无法加载智能体列表: ${err}`);
     } finally {
       setLoading(false);
     }
@@ -67,8 +69,9 @@ const Agents: React.FC = () => {
       await sdk.registerAgent(name, type);
       setShowRegisterModal(false);
       loadAgents();
-    } catch (error) {
-      alert(`${t.agents.registerFailed}: ${error}`);
+      success("注册成功", `智能体 "${name}" 已成功注册`);
+    } catch (err) {
+      error("注册失败", `${t.agents.registerFailed}: ${err}`);
     }
   };
 
@@ -77,21 +80,26 @@ const Agents: React.FC = () => {
     try {
       await sdk.startAgent(agentId);
       loadAgents();
-    } catch (error) {
-      alert(`启动失败: ${error}`);
+    } catch (err) {
+      error("启动失败", `无法启动智能体: ${err}`);
     } finally {
       setActionLoading(null);
     }
   };
 
   const handleStopAgent = async (agentId: string) => {
-    if (!confirm("确定要停止此智能体吗？")) return;
+    const confirmed = await confirmModal({
+      type: 'danger',
+      title: '停止智能体',
+      message: '确定要停止此智能体吗？',
+    });
+    if (!confirmed) return;
     setActionLoading(agentId + "-stop");
     try {
       await sdk.stopAgent(agentId);
       loadAgents();
-    } catch (error) {
-      alert(`停止失败: ${error}`);
+    } catch (err) {
+      error("停止失败", `无法停止智能体: ${err}`);
     } finally {
       setActionLoading(null);
     }
@@ -393,8 +401,9 @@ const Agents: React.FC = () => {
                         if (!selectedAgent) return;
                         try {
                           await sdk.startAgent(selectedAgent.id);
-                          alert(`智能体 "${selectedAgent.name}" 启动指令已发送`);
-                        } catch (e) { alert("启动失败: " + e); }
+                          success("启动成功", `智能体 "${selectedAgent.name}" 启动指令已发送`);
+                          loadAgents();
+                        } catch (err) { error("启动失败", `无法启动智能体: ${err}`); }
                       }}>
                         <Zap size={15} /> 启动智能体
                       </button>

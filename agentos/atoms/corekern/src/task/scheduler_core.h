@@ -21,8 +21,9 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#include <intrin.h>
 /* Windows 平台的原子操作替代实现 */
-#define _Atomic volatile
+#include "../../../../commons/utils/include/atomic_compat.h"
 #else
 #include <stdatomic.h>
 #endif

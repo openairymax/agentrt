@@ -16,8 +16,10 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#include <intrin.h>
 #include <rpc.h>
 #pragma comment(lib, "rpcrt4.lib")
+#include "../../../../commons/utils/include/atomic_compat.h"
 #else
 #include <uuid/uuid.h>
 #endif
