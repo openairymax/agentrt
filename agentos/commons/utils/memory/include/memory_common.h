@@ -37,7 +37,7 @@ typedef struct {
 /**
  * @brief 内存分配统计信息
  */
-#ifndef memory_stats_t
+#ifndef AGENTOS_MEMORY_STATS_T_DEFINED
 typedef struct {
     size_t total_allocated;
     size_t total_freed;

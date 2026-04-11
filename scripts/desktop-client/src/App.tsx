@@ -21,6 +21,8 @@ import {
   Sparkles,
   X,
   MessageCircle,
+  Database,
+  Settings2,
 } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
 import Services from "./pages/Services";
@@ -33,6 +35,8 @@ import Settings from "./pages/Settings";
 import LLMConfig from "./pages/LLMConfig";
 import AgentRuntime from "./pages/AgentRuntime";
 import SystemMonitor from "./pages/SystemMonitor";
+import MemoryEvolution from "./pages/MemoryEvolution";
+import ToolManager from "./pages/ToolManager";
 import AIChat from "./components/AIChat";
 import WelcomeWizard from "./components/WelcomeWizard";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -53,6 +57,8 @@ const navConfig = [
   { section: "nav.system", items: [
     { path: "/agent-runtime", icon: Cpu, labelKey: "nav.agentRuntime" },
     { path: "/system-monitor", icon: Activity, labelKey: "nav.systemMonitor" },
+    { path: "/memory-evolution", icon: Database, labelKey: "nav.memoryEvolution" },
+    { path: "/tools", icon: Settings2, labelKey: "nav.tools" },
     { path: "/ai-chat", icon: Brain, labelKey: "nav.aiChat" },
     { path: "/llm-config", icon: Sparkles, labelKey: "nav.llmConfig" },
     { path: "/config", icon: SettingsIcon, labelKey: "nav.config" },
@@ -93,6 +99,9 @@ function TitleBarContent() {
     "/agents": t.nav.agents,
     "/tasks": t.nav.tasks,
     "/agent-runtime": "AgentOS 运行时",
+    "/system-monitor": "系统监控",
+    "/memory-evolution": "四层记忆卷载",
+    "/tools": "工具管理器",
     "/ai-chat": "AI 助手",
     "/llm-config": t.nav.llmConfig,
     "/config": t.nav.config,
@@ -317,6 +326,8 @@ function AppContent() {
               <Route path="/tasks" element={<Tasks />} />
               <Route path="/agent-runtime" element={<AgentRuntime />} />
               <Route path="/system-monitor" element={<SystemMonitor />} />
+              <Route path="/memory-evolution" element={<MemoryEvolution />} />
+              <Route path="/tools" element={<ToolManager />} />
               <Route path="/ai-chat" element={<AIChatPage />} />
               <Route path="/llm-config" element={<LLMConfig />} />
               <Route path="/config" element={<Config />} />

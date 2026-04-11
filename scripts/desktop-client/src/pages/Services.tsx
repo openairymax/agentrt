@@ -91,15 +91,27 @@ const Services: React.FC = () => {
     <div className="page-container">
       {/* Page Header */}
       <div className="page-header">
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <h1>{t.services.title}</h1>
-          <span className={`badge ${services.length > 0 ? 'status-running' : 'status-stopped'}`}>
-            {services.length} {t.services.activeServices.toLowerCase()}
-          </span>
+        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+          <div style={{
+            width: "44px", height: "44px", borderRadius: "var(--radius-md)",
+            background: "linear-gradient(135deg,#3b82f6,#60a5fa)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 4px 16px rgba(59,130,246,0.35), 0 0 0 1px rgba(255,255,255,0.08) inset",
+          }}>
+            <Server size={20} color="white" />
+          </div>
+          <div>
+            <h1 style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              {t.services.title}
+              <span className={`badge ${services.length > 0 ? 'status-running' : 'status-stopped'}`}>
+                {services.length} {t.services.activeServices.toLowerCase()}
+              </span>
+            </h1>
+            <p style={{ color: "var(--text-secondary)", fontSize: "13px", margin: 0 }}>
+              {t.services.subtitle}
+            </p>
+          </div>
         </div>
-        <p style={{ color: "var(--text-secondary)", fontSize: "15px" }}>
-          {t.services.subtitle}
-        </p>
       </div>
 
       {/* Control Panel */}

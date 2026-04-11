@@ -354,7 +354,7 @@ install-deps.sh 中的重试逻辑:
 ### 9.1 更新依赖版本
 
 1. 编辑 `scripts/ci/requirements-linux.txt` 或 `scripts/ci/requirements-macos.txt`
-2. 编辑 `scripts/dev/config/vcpkg.json`
+2. 编辑 `scripts/development/config/vcpkg.json`
 3. 提交代码 -> CI自动验证 -> 合并到main
 
 ### 9.2 添加新模块支持
@@ -368,7 +368,7 @@ install-deps.sh 中的重试逻辑:
 | 错误信息 | 可能原因 | 解决方案 |
 |---------|---------|---------|
 | Could not find TIKTOKEN | 存根未创建 | 检查 tiktoken.pc 是否存在 |
-| vcpkg.json not found | 文件缺失 | 确认 scripts/dev/config/vcpkg.json 存在 |
+| vcpkg.json not found | 文件缺失 | 确认 scripts/development/config/vcpkg.json 存在 |
 | OpenSSL not found | macOS路径问题 | 设置 OPENSSL_ROOT_DIR |
 | apt-get timeout | 网络问题 | 重试机制会自动处理 |
 | ctest timeout | 测试挂起 | 增加 --timeout 值 |

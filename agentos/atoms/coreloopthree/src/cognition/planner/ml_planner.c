@@ -64,7 +64,7 @@ static bool ml_planner_try_load_model(ml_planner_data_t* data) {
     }
     fclose(f);
 
-    /* TODO: Load actual ML model when runtime is integrated
+    /* TODO-PHASE2: Load actual ML model when runtime is integrated (延期到第二阶段)
      * Expected flow:
      *   1. Initialize ML runtime (ONNX/TensorFlow Lite/custom)
      *   2. Load model from data->model_path
@@ -160,7 +160,7 @@ static agentos_error_t ml_planner_plan(
     /* ML model available: full inference pipeline
      * Feature extraction -> Model forward pass -> Plan decoding */
     if (data->model->predict && data->model->handle) {
-        /* TODO: Implement full ML inference pipeline
+        /* TODO-PHASE2: Implement full ML inference pipeline (延期到第二阶段)
          * 1. Extract features from intent (type, complexity, context)
          * 2. Run model predict() to get task decomposition
          * 3. Decode model output into agentos_task_plan_t structure

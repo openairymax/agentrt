@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Cpu,
   Brain,
@@ -26,32 +26,27 @@ const AgentRuntime: React.FC = () => {
   const [loadingMetrics, setLoadingMetrics] = useState(true);
   const [loadingTools, setLoadingTools] = useState(true);
 
-  useEffect(() => {
-    const loadAll = async () => {
-      try {
-        const [mData, tData] = await Promise.all([
-          sdk.getRuntimeMetrics(),
-          sdk.listAvailableTools(),
-        ]);
-        setMetrics(mData || null);
-        setAvailableTools((tData || []).map((t: any) => ({
-          name: t.function?.name || t.name,
-          description: t.function?.description || t.description,
-          category: (t.function?.parameters as any)?.category || t.category || "general",
-        })));
-      } catch (error) {
-        console.error("Failed to load runtime data:", error);
-      } finally {
-        setLoadingMetrics(false);
-        setLoadingTools(false);
-      }
-    };
-    loadAll();
-    const interval = setInterval(() => {
-      sdk.getRuntimeMetrics().then(d => d && setMetrics(d)).catch(() => {});
-    }, 5000);
-    return () => clearInterval(interval);
+  const loadAll = useCallback(async () => {
+    try {
+      const [mData, tData] = await Promise.all([
+        sdk.getRuntimeMetrics(),
+        sdk.listAvailableTools(),
+      ]);
+      setMetrics(mData || null);
+      setAvailableTools((tData || []).map((t: any) => ({
+        name: t.function?.name || t.name,
+        description: t.function?.description || t.description,
+        category: (t.function?.parameters as any)?.category || t.category || "general",
+      })));
+    } catch (error) {
+      console.error("Failed to load runtime data:", error);
+    } finally {
+      setLoadingMetrics(false);
+      setLoadingTools(false);
+    }
   }, []);
+
+  useEffect(() => { loadAll(); const iv = setInterval(() => { sdk.getRuntimeMetrics().then(d => d && setMetrics(d)).catch(() => {}); }, 5000); return () => clearInterval(iv); }, [loadAll]);
 
   const displayMetrics = metrics || {
     cycle_count: 0,
@@ -79,89 +74,99 @@ const AgentRuntime: React.FC = () => {
   ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-      <div className="card card-elevated">
-        <div style={{ padding: "22px 26px", borderBottom: "1px solid var(--border-subtle)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-              <div style={{
-                width: "48px", height: "48px", borderRadius: "var(--radius-lg)",
-                background: "linear-gradient(135deg, #6366f1, #a78bfa)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                boxShadow: "0 4px 16px rgba(99,102,241,0.3)",
-              }}>
-                <Cpu size="24" color="white" />
-              </div>
-              <div>
-                <h3 style={{ margin: 0, fontSize: "18px" }}>AgentOS 运行时</h3>
-                <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "var(--text-secondary)" }}>
-                  核心运行时引擎：实时指标 · 记忆管理 · 认知循环 · 工具调度
-                  {metrics && <span style={{ marginLeft: "10px", color: "var(--primary-color)", fontWeight: 600 }}>· 已连接后端</span>}
-                </p>
-              </div>
-            </div>
-            <button className="btn btn-ghost" onClick={() => window.location.reload()}>
-              <RefreshCw size={14} /> 刷新
-            </button>
+    <div className="page-container">
+      <div className="page-header">
+        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+          <div style={{
+            width: "44px", height: "44px", borderRadius: "var(--radius-md)",
+            background: "linear-gradient(135deg,#6366f1,#a78bfa)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 4px 16px rgba(99,102,241,0.35), 0 0 0 1px rgba(255,255,255,0.08) inset",
+          }}>
+            <Cpu size={20} color="white" />
+          </div>
+          <div>
+            <h1 style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              AgentOS 运行时
+              {metrics && (
+                <span style={{
+                  padding: "3px 10px", borderRadius: "var(--radius-full)", fontSize: "11px", fontWeight: 600,
+                  background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)", color: "#22c55e",
+                }}>已连接后端</span>
+              )}
+            </h1>
+            <p style={{ color: "var(--text-secondary)", fontSize: "13px", margin: 0 }}>
+              核心运行时引擎 · 实时指标 · 记忆管理 · 认知循环 · 工具调度
+            </p>
           </div>
         </div>
+        <button className="btn btn-ghost btn-sm" onClick={() => loadAll()}>
+          <RefreshCw size={14} /> 刷新
+        </button>
+      </div>
 
-        {/* Metrics Bar */}
-        <div style={{
-          display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-          gap: "12px", padding: "18px 22px",
-        }}>
-          {METRIC_CARDS.map(mc => {
-            const IconComp = mc.icon;
-            return (
-              <div key={mc.key} style={{
-                padding: "14px 16px", borderRadius: "var(--radius-md)",
-                background: mc.bgLight, border: `1px solid ${mc.color}15`,
-                transition: "all var(--transition-fast)",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 8px 24px ${mc.color}10`; }}
-              onMouseLeave={(e) => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                  <IconComp size={16} color={mc.color} />
-                  <span style={{ fontSize: "11.5px", color: "var(--text-muted)", fontWeight: 500 }}>{mc.label}</span>
+      {/* Metrics Bar */}
+      <div style={{
+        display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+        gap: "12px",
+      }}>
+        {METRIC_CARDS.map(mc => {
+          const IconComp = mc.icon;
+          return (
+            <div key={mc.key} className="card card-elevated" style={{
+              padding: "14px 16px", position: "relative", overflow: "hidden",
+              transition: "all var(--transition-spring)",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = `0 8px 24px ${mc.color}15`; e.currentTarget.style.borderColor = `${mc.color}30`; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; e.currentTarget.style.borderColor = ""; }}
+            >
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg,${mc.color}40,${mc.color}10)` }} />
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                <div style={{ width: "28px", height: "28px", borderRadius: "var(--radius-sm)", background: mc.bgLight, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <IconComp size={14} color={mc.color} />
                 </div>
-                <div style={{ fontSize: "22px", fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: mc.color }}>
-                  {loadingMetrics ? "-" : mc.value}
-                  <span style={{ fontSize: "13px", fontWeight: 400, color: "var(--text-muted)", marginLeft: "3px" }}>{mc.unit}</span>
-                </div>
+                <span style={{ fontSize: "11.5px", color: "var(--text-muted)", fontWeight: 500 }}>{mc.label}</span>
               </div>
-            );
-          })}
-        </div>
+              <div style={{ fontSize: "22px", fontWeight: 800, fontFamily: "var(--font-mono)", color: mc.color, letterSpacing: "-0.02em" }}>
+                {loadingMetrics ? "-" : mc.value}
+                <span style={{ fontSize: "13px", fontWeight: 400, color: "var(--text-muted)", marginLeft: "3px" }}>{mc.unit}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
-        {/* Tab Switcher */}
-        <div style={{
-          display: "flex", gap: "4px", padding: "0 22px 16px",
-          borderBottom: "1px solid var(--border-subtle)",
-        }}>
-          {[
-            { key: "overview" as const, icon: Activity, label: "总览" },
-            { key: "memory" as const, icon: Database, label: "记忆系统" },
-            { key: "cognitive" as const, icon: Brain, label: "认知循环" },
-            { key: "tools" as const, icon: Wrench, label: "工具集" },
-          ].map(tab => (
+      {/* Tab Switcher */}
+      <div style={{
+        display: "flex", gap: "4px",
+        background: "var(--bg-secondary)", padding: "4px", borderRadius: "var(--radius-lg)",
+        border: "1px solid var(--border-subtle)", width: "fit-content",
+      }}>
+        {[
+          { key: "overview" as const, icon: Activity, label: "总览", color: "#6366f1" },
+          { key: "memory" as const, icon: Database, label: "记忆系统", color: "#f59e0b" },
+          { key: "cognitive" as const, icon: Brain, label: "认知循环", color: "#22c55e" },
+          { key: "tools" as const, icon: Wrench, label: "工具集", color: "#8b5cf6" },
+        ].map(tab => {
+          const TabIcon = tab.icon;
+          return (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               style={{
-                padding: "9px 18px", border: "none", borderRadius: "var(--radius-sm)",
-                background: activeTab === tab.key ? `${"#6366f1"}10` : "transparent",
-                color: activeTab === tab.key ? "var(--primary-color)" : "var(--text-secondary)",
-                cursor: "pointer", fontWeight: 500, fontSize: "13px",
-                transition: "all var(--transition-fast)", display: "flex", alignItems: "center", gap: "6px",
-                borderBottom: activeTab === tab.key ? `2px solid #6366f1` : "2px solid transparent",
+                padding: "8px 18px", border: "none", borderRadius: "var(--radius-md)",
+                background: activeTab === tab.key ? tab.color : "transparent",
+                color: activeTab === tab.key ? "white" : "var(--text-secondary)",
+                cursor: "pointer", fontWeight: 600, fontSize: "12.5px",
+                transition: "all var(--transition-fast)",
+                display: "flex", alignItems: "center", gap: "6px",
+                boxShadow: activeTab === tab.key ? `0 2px 8px ${tab.color}40` : "none",
               }}
             >
-              <tab.icon size={14} />{tab.label}
+              <TabIcon size={14} />{tab.label}
             </button>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
       {activeTab === "overview" && (
@@ -174,8 +179,10 @@ const AgentRuntime: React.FC = () => {
                   animation: `staggerFadeIn 0.45s ease-out ${idx * 120}ms both`,
                   cursor: "pointer",
                 }} onClick={() => {
-                  if (idx === 1) setActiveTab("cognitive");
+                  if (idx === 0) { window.location.hash = "#memory"; }
+                  else if (idx === 1) setActiveTab("cognitive");
                   else if (idx === 2) setActiveTab("tools");
+                  else if (idx === 3) { window.location.hash = "#logs"; }
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px" }}>
                     <div style={{
@@ -213,7 +220,7 @@ const AgentRuntime: React.FC = () => {
                 { label: "查看记忆条目", icon: Database, action: () => setActiveTab("memory"), color: "#6366f1" },
                 { label: "运行认知循环", icon: Brain, action: () => setActiveTab("cognitive"), color: "#22c55e" },
                 { label: "浏览工具列表", icon: Wrench, action: () => setActiveTab("tools"), color: "#f59e0b" },
-                { label: "刷新运行指标", icon: RefreshCw, action: () => window.location.reload(), color: "#06b6d4" },
+                { label: "刷新运行指标", icon: RefreshCw, action: () => loadAll(), color: "#06b6d4" },
               ].map(item => {
                 const IconComp = item.icon;
                 return (
