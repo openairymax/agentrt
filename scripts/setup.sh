@@ -79,10 +79,12 @@ install_dependencies() {
 build_project() {
     agentos_log_info "Building AgentOS..."
     
-    BUILD_SCRIPT="${SCRIPT_DIR}/build/build.sh"
+    BUILD_SCRIPT="${SCRIPT_DIR}/pipeline/build-module.sh"
     
     if [ ! -f "$BUILD_SCRIPT" ]; then
         agentos_log_error "Build script not found: $BUILD_SCRIPT"
+        agentos_log_info "Available scripts in pipeline/:"
+        ls -la "${SCRIPT_DIR}/pipeline/" 2>/dev/null || agentos_log_warn "Cannot list pipeline directory"
         return 1
     fi
     
