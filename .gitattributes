@@ -263,20 +263,18 @@ tests/fuzz/** -text
 tests/benchmarks/** -text
 
 # =============================================================================
-# Git LFS Configuration - Large Binary Files
+# Binary Files - Large Media Files
 # =============================================================================
 
-# Video files
-*.mp4 filter=lfs diff=lfs merge=lfs -text
-*.avi filter=lfs diff=lfs merge=lfs -text
-*.mov filter=lfs diff=lfs merge=lfs -text
-*.mkv filter=lfs diff=lfs merge=lfs -text
-*.wmv filter=lfs diff=lfs merge=lfs -text
-*.flv filter=lfs diff=lfs merge=lfs -text
-*.webm filter=lfs diff=lfs merge=lfs -text
+# Video files - treat as binary without LFS
+*.mp4 binary
+*.avi binary
+*.mov binary
+*.mkv binary
+*.wmv binary
+*.flv binary
+*.webm binary
 
-# Large image files and animations
-*.gif filter=lfs diff=lfs merge=lfs -text
-docs/Other_Source/AgentOS-desktop-preview.gif binary
-*.psd filter=lfs diff=lfs merge=lfs -text
-*.ai filter=lfs diff=lfs merge=lfs -text
+# Large image files and animations - treat as binary
+*.psd binary
+*.ai binary

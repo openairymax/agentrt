@@ -18,12 +18,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <stdatomic.h>
 
+/* 跨平台原子操作支持 */
 #ifdef _WIN32
 #include <windows.h>
+#include <intrin.h>
+/* Windows原子操作使用MSVC内部函数 */
 #else
 #include <pthread.h>
+#include <stdatomic.h>
 #endif
 
 /* ==================== 常量定义 ==================== */

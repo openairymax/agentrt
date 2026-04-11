@@ -1,0 +1,49 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\src\execution\compensation.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\src\execution\engine.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\src\execution\registry.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\src\execution\trace.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\src\execution\units\api.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\src\execution\units\browser.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\src\execution\units\code.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\src\execution\units\db.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\src\execution\units\file.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\src\execution\units\shell.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\src\execution\units\tool.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\src\execution\units\weighted.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\coreloopthree\src\execution\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{853EC8F3-7AF6-3373-B1A3-A80B3E87B0A2}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

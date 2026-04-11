@@ -18,7 +18,9 @@
     "llmConfig": "AI Models",
     "agentRuntime": "Runtime",
     "systemMonitor": "System Monitor",
-    "aiChat": "AI Chat"
+    "aiChat": "AI Chat",
+    "memoryEvolution": "Memory Evolution",
+    "tools": "Tool Manager"
   },
   "dashboard": {
     "title": "System Overview",

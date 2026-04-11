@@ -102,7 +102,8 @@ const Tasks: React.FC = () => {
   const handleAction = async (taskId: string, action: string) => {
     setActionLoading(taskId + action);
     try {
-      if (action === "restart") await sdk.restartTask(taskId);
+      if (action === "stop") await sdk.stopTask(taskId);
+      else if (action === "restart") await sdk.restartTask(taskId);
       else if (action === "delete") {
         if (!confirm(t.tasks.confirmDelete)) return;
         await sdk.deleteTask(taskId);
@@ -152,10 +153,22 @@ const Tasks: React.FC = () => {
     <div className="page-container">
       {/* Page Header */}
       <div className="page-header">
-        <h1>{t.tasks.title}</h1>
-        <p style={{ color: "var(--text-secondary)", fontSize: "15px" }}>
-          {t.tasks.subtitle}
-        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+          <div style={{
+            width: "44px", height: "44px", borderRadius: "var(--radius-md)",
+            background: "linear-gradient(135deg,#6366f1,#818cf8)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 4px 16px rgba(99,102,241,0.35), 0 0 0 1px rgba(255,255,255,0.08) inset",
+          }}>
+            <ClipboardList size={20} color="white" />
+          </div>
+          <div>
+            <h1>{t.tasks.title}</h1>
+            <p style={{ color: "var(--text-secondary)", fontSize: "13px", margin: 0 }}>
+              {t.tasks.subtitle}
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Stats Bar */}

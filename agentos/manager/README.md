@@ -278,17 +278,17 @@ export AGENTOS_ENV=development
 
 ```bash
 # 验证单个配置文件
-python scripts/dev/validate_config.py \
+python scripts/development/validate_config.py \
   --file agentos/manager/kernel/settings.yaml
 
 # 验证所有配置
-python scripts/dev/validate_config.py --all
+python scripts/development/validate_config.py --all
 
 # 检查配置版本兼容性
-python scripts/dev/validate_config.py --check-version
+python scripts/development/validate_config.py --check-version
 
 # 检查环境变量引用
-python scripts/dev/validate_config.py --check-env
+python scripts/development/validate_config.py --check-env
 ```
 
 ### 5. 部署配置
@@ -1094,24 +1094,24 @@ callbacks:
 
 ```bash
 # 验证单个配置文件
-python scripts/dev/validate_config.py \
+python scripts/development/validate_config.py \
   --file agentos/manager/kernel/settings.yaml \
   --schema agentos/manager/schema/kernel-settings.schema.json
 
 # 验证所有配置
-python scripts/dev/validate_config.py \
+python scripts/development/validate_config.py \
   --all
 
 # 检查配置版本
-python scripts/dev/validate_config.py \
+python scripts/development/validate_config.py \
   --check-version
 
 # 检查环境变量引用
-python scripts/dev/validate_config.py \
+python scripts/development/validate_config.py \
   --check-env
 
 # 生成验证报告
-python scripts/dev/validate_config.py \
+python scripts/development/validate_config.py \
   --all --report validation_report.json
 ```
 
@@ -1273,7 +1273,7 @@ ${AGENTOS_LOG_DIR}/config-audit.log
 python -c "import yaml; yaml.safe_load(open('agentos/manager/kernel/settings.yaml'))"
 
 # 2. 查看具体错误信息
-python scripts/dev/validate_config.py \
+python scripts/development/validate_config.py \
   --file agentos/manager/kernel/settings.yaml \
   --verbose
 

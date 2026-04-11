@@ -1,8 +1,4 @@
-"""
-OpenLab Core Tool Module
-
-宸ュ叿鎶借薄涓庢墽琛屾牳蹇冩ā鍧?閬靛惊 AgentOS 鏋舵瀯璁捐鍘熷垯 V1.8
-"""
+'''OpenLab Core Tool Module - AgentOS 架构设计原则 V1.8'''
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -13,16 +9,16 @@ import time
 
 
 class ToolCategory(Enum):
-    """宸ュ叿绫诲埆鏋氫妇"""
-    INPUT_OUTPUT = "input_output"      # 杈撳叆杈撳嚭
-    COMPUTATION = "computation"         # 璁＄畻
-    COMMUNICATION = "communication"     # 閫氫俊
-    DATA_ACCESS = "data_access"         # 鏁版嵁璁块棶
-    SYSTEM = "system"                   # 绯荤粺
-    CUSTOM = "custom"                   # 鑷畾涔?
+    '''工具类别枚举'''
+    INPUT_OUTPUT = "input_output"      # 输入输出
+    COMPUTATION = "computation"         # 计算
+    COMMUNICATION = "communication"     # 通信
+    DATA_ACCESS = "data_access"         # 数据访问
+    SYSTEM = "system"                   # 系统
+    CUSTOM = "custom"                   # 自定义
 
 class ToolCapability(Enum):
-    """宸ュ叿鑳藉姏鏋氫妇"""
+    '''工具能力枚举'''
     READ = "read"
     WRITE = "write"
     EXECUTE = "execute"
@@ -96,17 +92,17 @@ class Tool(ABC):
     
     @enabled.setter
     def enabled(self, value: bool) -> None:
-        """璁剧疆宸ュ叿鍚敤鐘舵€?""
+        '''设置工具启用状态'''
         self._enabled = value
     
     @property
     def last_used(self) -> Optional[float]:
-        """鏈€鍚庝娇鐢ㄦ椂闂?""
+        '''最后使用时间'''
         return self._last_used
     
     @property
     def usage_count(self) -> int:
-        """浣跨敤娆℃暟"""
+        '''使用次数'''
         return self._usage_count
     
     @abstractmethod
@@ -143,17 +139,19 @@ class Tool(ABC):
         Returns:
             ToolResult: 鎵ц缁撴灉
         """
-        # 妫€鏌ュ伐鍏锋槸鍚﹀惎鐢?        if not self._enabled:
+        # 检查工具是否启用
+        if not self._enabled:
             return ToolResult(
                 success=False,
                 error="Tool is disabled",
                 error_code="TOOL_DISABLED"
             )
         
-        # 鍒涘缓涓婁笅鏂?        if context is None:
+        # 创建上下文
+        if context is None:
             context = ToolContext(tool_id=self.tool_id)
         
-        # 鍙傛暟楠岃瘉
+        # 参数验证
         if self.INPUT_SCHEMA:
             validation_result = self._validate_input(parameters)
             if not validation_result[0]:
