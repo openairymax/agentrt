@@ -4,9 +4,9 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "layer2_feature.h"
-#include "agentos.h"
-#include "logger.h"
+#include "../../include/layer2_feature.h"
+#include "../../../corekern/include/agentos.h"
+#include "../../include/logger.h"
 #ifdef AGENTOS_HAS_CURL
 #include <curl/curl.h>
 #else

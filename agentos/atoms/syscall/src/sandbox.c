@@ -8,12 +8,12 @@
  * 基于 sandbox_utils、sandbox_permission、sandbox_quota 模块构建。
  */
 
-#include "syscalls.h"
-#include "agentos.h"
-#include "logger.h"
-#include "sandbox_utils.h"
-#include "sandbox_permission.h"
-#include "sandbox_quota.h"
+#include "../include/syscalls.h"
+#include "../../corekern/include/agentos.h"
+#include "../include/logger.h"
+#include "../include/sandbox_utils.h"
+#include "../include/sandbox_permission.h"
+#include "../include/sandbox_quota.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -211,7 +211,7 @@ agentos_error_t agentos_sandbox_create(const sandbox_config_t* manager,
     sandbox->audit_capacity = 0;
 
     memcpy(&sandbox->manager, manager, sizeof(sandbox_config_t));
-    
+
     sandbox_quota_init(&sandbox->quota);
 
     sandbox->lock = agentos_mutex_create();
@@ -308,7 +308,7 @@ agentos_error_t agentos_sandbox_invoke(agentos_sandbox_t* sandbox,
             g_sandbox_manager->total_violations++;
         }
         sandbox_add_audit_entry(sandbox, syscall_num, NULL, AGENTOS_EACCES, 0, "Permission denied");
-        
+
         agentos_mutex_lock(sandbox->lock);
         sandbox->state = SANDBOX_STATE_IDLE;
         agentos_mutex_unlock(sandbox->lock);
@@ -321,7 +321,7 @@ agentos_error_t agentos_sandbox_invoke(agentos_sandbox_t* sandbox,
     }
 
     *out_result = NULL;
-    
+
     sandbox_add_audit_entry(sandbox, syscall_num, NULL, AGENTOS_SUCCESS, 0, "Executed");
 
     agentos_mutex_lock(sandbox->lock);

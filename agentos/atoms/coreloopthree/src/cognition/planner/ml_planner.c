@@ -4,10 +4,12 @@
  * @copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  */
 
-#include "cognition.h"
+#include "../../include/cognition.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdbool.h>
+#include <stddef.h>
 
 /* Unified base library compatibility layer */
 #include "../../../agentos/commons/utils/memory/include/memory_compat.h"

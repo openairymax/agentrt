@@ -23,10 +23,16 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <intrin.h>
+#include "../../../commons/utils/include/atomic_compat.h"
 /* Windows原子操作使用MSVC内部函数 */
 #else
 #include <pthread.h>
 #include <stdatomic.h>
+#endif
+
+#ifdef _WIN32
+/* Windows 平台原子类型兼容定义 */
+typedef atomic_uint64_t atomic_uint_fast64_t;
 #endif
 
 /* ==================== 常量定义 ==================== */

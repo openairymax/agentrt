@@ -24,6 +24,7 @@ import {
 import sdk from "../services/agentos-sdk";
 import type { TaskInfo } from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
+import { useAlert } from "../components/useAlert";
 
 const taskTypeConfig: Record<string, { icon: typeof Zap; color: string; gradient: string; bgLight: string; label: string }> = {
   codegen: { icon: FileCode, color: "#6366f1", gradient: "linear-gradient(135deg, #6366f1, #818cf8)", bgLight: "rgba(99,102,241,0.08)", label: "代码生成" },
@@ -73,6 +74,7 @@ const TaskProgressRing: React.FC<{ progress: number; size?: number; strokeWidth?
 
 const Tasks: React.FC = () => {
   const { t } = useI18n();
+  const { error, success, confirm: confirmModal } = useAlert();
   const [activeTab, setActiveTab] = useState<"submit" | "history">("submit");
   const [tasks, setTasks] = useState<TaskInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,8 +94,8 @@ const Tasks: React.FC = () => {
     try {
       const data = await sdk.listTasks();
       setTasks(data || []);
-    } catch (error) {
-      console.error("Failed to load tasks:", error);
+    } catch (err) {
+      error("加载失败", `无法加载任务列表: ${err}`);
     } finally {
       setLoading(false);
     }
@@ -105,12 +107,19 @@ const Tasks: React.FC = () => {
       if (action === "stop") await sdk.stopTask(taskId);
       else if (action === "restart") await sdk.restartTask(taskId);
       else if (action === "delete") {
-        if (!confirm(t.tasks.confirmDelete)) return;
+        const confirmed = await confirmModal({
+          type: 'danger',
+          title: '删除任务',
+          message: t.tasks.confirmDelete || '确定要删除此任务吗？此操作无法撤销。',
+          confirmText: '删除',
+          cancelText: '取消',
+        });
+        if (!confirmed) return;
         await sdk.deleteTask(taskId);
       }
       await loadTasks();
-    } catch (error) {
-      alert(`${t.tasks.actionFailed}: ${error}`);
+    } catch (err) {
+      error("操作失败", `${t.tasks.actionFailed || '任务操作失败'}: ${err}`);
     } finally {
       setActionLoading(null);
     }
@@ -128,8 +137,8 @@ const Tasks: React.FC = () => {
       setTaskName("");
       setTaskParams("");
       setActiveTab("history");
-    } catch (error) {
-      alert(`任务提交失败: ${error}`);
+    } catch (err) {
+      error("提交失败", `任务提交失败: ${err}`);
     } finally {
       setSubmitting(false);
     }

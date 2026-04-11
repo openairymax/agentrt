@@ -651,6 +651,7 @@ export default function Dashboard() {
   const [phaseIdx, setPhaseIdx] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
   const [systemData, setSystemData] = useState<{
     cpu: number; memory: number; disk: number; processes: number;
     servicesUp: number; servicesTotal: number;
@@ -659,11 +660,17 @@ export default function Dashboard() {
 
   const fetchDashboardData = useCallback(async () => {
     setRefreshing(true);
+    setConnectionStatus('checking');
     try {
       const [monitorData, serviceStatus] = await Promise.all([
         sdk.getSystemMonitorData().catch(() => null),
         sdk.getServiceStatus().catch(() => null),
       ]);
+      if (monitorData || serviceStatus) {
+        setConnectionStatus('connected');
+      } else {
+        setConnectionStatus('disconnected');
+      }
       if (monitorData) {
         setSystemData({
           cpu: Math.round(monitorData.cpu.usage_percent),
@@ -678,7 +685,7 @@ export default function Dashboard() {
       }
       setLastUpdate(new Date());
     } catch {
-      // Keep mock data on error
+      setConnectionStatus('disconnected');
     } finally {
       setRefreshing(false);
     }
@@ -742,15 +749,63 @@ export default function Dashboard() {
           </div>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "10px" }}>
+          {/* Connection Status Indicator */}
           <div style={{
             display: "flex", alignItems: "center", gap: "7px", padding: "6px 16px",
-            background: "linear-gradient(135deg,rgba(16,185,129,0.1),rgba(16,185,129,0.05))",
-            borderRadius: "24px", border: "1px solid rgba(16,185,129,0.18)",
-            boxShadow: "0 2px 8px rgba(16,185,129,0.08)",
+            borderRadius: "24px",
+            background: connectionStatus === 'connected'
+              ? "linear-gradient(135deg,rgba(16,185,129,0.1),rgba(16,185,129,0.05))"
+              : connectionStatus === 'disconnected'
+                ? "linear-gradient(135deg,rgba(239,68,68,0.1),rgba(239,68,68,0.05))"
+                : "var(--bg-tertiary)",
+            border: `1px solid ${
+              connectionStatus === 'connected' ? "rgba(16,185,129,0.18)"
+              : connectionStatus === 'disconnected' ? "rgba(239,68,68,0.18)"
+              : "var(--border-subtle)"
+            }`,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+            transition: "all 0.3s ease",
           }}>
-            <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981", boxShadow: "0 0 8px rgba(16,185,129,0.6)", animation: "statusPulse 2s infinite" }} />
-            <span style={{ fontSize: "12px", fontWeight: 700, color: "#10b981" }}>系统正常</span>
+            <div style={{
+              width: "8px", height: "8px", borderRadius: "50%",
+              background: connectionStatus === 'connected' ? "#10b981"
+                : connectionStatus === 'disconnected' ? "#ef4444"
+                : "#f59e0b",
+              boxShadow: connectionStatus === 'connected' ? "0 0 8px rgba(16,185,129,0.6)"
+                : connectionStatus === 'disconnected' ? "0 0 8px rgba(239,68,68,0.5)"
+                : "0 0 8px rgba(245,158,11,0.5)",
+              animation: connectionStatus === 'checking' ? "spin 1.5s linear infinite" : "statusPulse 2s infinite",
+            }} />
+            <span style={{ fontSize: "12px", fontWeight: 700,
+              color: connectionStatus === 'connected' ? "#10b981"
+                : connectionStatus === 'disconnected' ? "#ef4444"
+                : "#f59e0b"
+            }}>
+              {connectionStatus === 'connected' ? "已连接"
+                : connectionStatus === 'disconnected' ? "未连接"
+                : "检测中"}
+            </span>
           </div>
+
+          {/* Quick Actions */}
+          <div style={{ display: "flex", gap: "6px" }}>
+            <button className="btn btn-ghost" style={{ padding: "7px 12px", fontSize: "12px" }}
+                    onClick={() => navigate('/agents')} title="管理智能体">
+              <Bot size={14} />
+              <span style={{ marginLeft: "4px" }}>智能体</span>
+            </button>
+            <button className="btn btn-ghost" style={{ padding: "7px 12px", fontSize: "12px" }}
+                    onClick={() => navigate('/tasks')} title="任务队列">
+              <Workflow size={14} />
+              <span style={{ marginLeft: "4px" }}>任务</span>
+            </button>
+            <button className="btn btn-ghost" style={{ padding: "7px 12px", fontSize: "12px" }}
+                    onClick={() => navigate('/terminal')} title="终端">
+              <Radio size={14} />
+              <span style={{ marginLeft: "4px" }}>终端</span>
+            </button>
+          </div>
+
           <button className="btn btn-ghost" style={{ padding: "8px 10px" }} onClick={fetchDashboardData} disabled={refreshing}>
             <RefreshCw size={16} className={refreshing ? "spin" : ""} />
           </button>

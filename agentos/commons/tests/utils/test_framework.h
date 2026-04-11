@@ -45,7 +45,13 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <setjmp.h>
+
+#ifdef AGENTOS_HAS_CMOCKA
 #include <cmocka.h>
+#else
+/* 使用 CMocka stub 实现（用于无 CMocka 环境的编译） */
+#include "cmocka_stub.h"
+#endif /* AGENTOS_HAS_CMOCKA */
 
 #include "../../../utils/types/include/types.h"
 

@@ -7,7 +7,7 @@
 #ifndef AGENTOS_LLM_CLIENT_H
 #define AGENTOS_LLM_CLIENT_H
 
-#include "agentos.h"
+#include "../corekern/include/agentos.h"
 #include <stddef.h>
 #include <stdint.h>
 

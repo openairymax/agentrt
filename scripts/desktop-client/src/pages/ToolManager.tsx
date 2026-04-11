@@ -27,6 +27,7 @@ import {
 import sdk from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
 import { useNavigate } from "react-router-dom";
+import { useAlert } from "../components/useAlert";
 
 interface ToolInfo {
   name: string;
@@ -62,6 +63,7 @@ const FALLBACK_TOOLS: ToolInfo[] = [
 const ToolManager: React.FC = () => {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const { error, success, warning, info } = useAlert();
   const [tools, setTools] = useState<ToolInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -283,13 +285,21 @@ const ToolManager: React.FC = () => {
                       </pre>
                     </div>
                     <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
-                      <button className="btn btn-primary btn-block" style={{ flex: 1 }} onClick={() => {
+                      <button className="btn btn-primary btn-block" style={{ flex: 1 }} onClick={async () => {
                         const input = prompt("输入测试参数 (JSON):");
                         if (input) {
                           try {
                             const args = JSON.parse(input);
-                            sdk.executeTool(selectedTool.name, args).then((r: any) => alert("执行结果:\n" + JSON.stringify(r, null, 2))).catch((e: any) => alert("执行失败: " + e));
-                          } catch { alert("无效的 JSON 格式"); }
+                            const result = await sdk.executeTool(selectedTool.name, args);
+                            success("执行成功", `工具 "${selectedTool.name}" 执行完成`);
+                            info("执行结果", JSON.stringify(result, null, 2));
+                          } catch (err) {
+                            if (err instanceof SyntaxError) {
+                              warning("格式错误", "无效的 JSON 格式，请检查输入");
+                            } else {
+                              error("执行失败", `无法执行工具: ${err}`);
+                            }
+                          }
                         }
                       }}><Play size={14} /> 测试执行</button>
                       <button className="btn btn-ghost btn-block" onClick={() => { navigate("/logs"); }}><Eye size={14} /> 查看日志</button>
@@ -352,14 +362,15 @@ const ToolManager: React.FC = () => {
               <div style={{ display: "flex", gap: "10px" }}>
                 <button className="btn btn-secondary btn-lg" onClick={() => { setShowRegisterModal(false); setRegName(""); setRegDesc(""); setRegSchema(""); }} style={{ flex: 1 }}>取消</button>
                 <button className="btn btn-success btn-lg" style={{ flex: 1 }} onClick={async () => {
-                  if (!regName.trim()) { alert("请输入工具名称"); return; }
+                  if (!regName.trim()) { warning("输入为空", "请输入工具名称"); return; }
                   try {
                     const schema = regSchema.trim() ? JSON.parse(regSchema) : {};
                     await sdk.registerTool({ name: regName, description: regDesc, category: regCategory, schema });
                     setShowRegisterModal(false);
                     setRegName(""); setRegDesc(""); setRegSchema("");
                     loadTools();
-                  } catch (e) { alert("注册失败: " + e); }
+                    success("注册成功", `工具 "${regName}" 已成功注册`);
+                  } catch (err) { error("注册失败", `无法注册工具: ${err}`); }
                 }}><CheckCircle2 size={16} /> 注册工具</button>
               </div>
             </div>
