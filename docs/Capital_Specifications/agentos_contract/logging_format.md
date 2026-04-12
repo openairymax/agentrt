@@ -10,7 +10,7 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 **最后更新**: 2026-04-09  
 **许可证**: GPL-3.0  
 **理论基础**: 工程两论（控制论与系统工程）、双系统认知理论、微内核哲学、设计美学  
-**关联规范**: [通信协议规范](./protocol_contract.md)、[系统调用 API 规范](./syscall_api_contract.md)、[日志打印规范](../coding_standard/Log_guide.md)
+**关联规范**: [通信协议规范](./protocol_contract.md)、[系统调用 API 规范](./syscall_api_contract.md)、[日志打印规范](../coding_standard/Log_standard.md)
 
 ---
 
@@ -933,7 +933,7 @@ class BatchHandler:
 |---------|---------|
 | [通信协议规范](./protocol_contract.md) | 本规范要求所有通信过程记录日志，支持 TraceID 贯穿 |
 | [系统调用 API 规范](./syscall_api_contract.md) | 系统调用的错误处理和审计日志应遵循本规范 |
-| [日志打印规范](../coding_standard/Log_guide.md) | 本规范定义日志格式，Log_guide.md 定义打印方法和最佳实践 |
+| [日志打印规范](../coding_standard/Log_standard.md) | 本规范定义日志格式，Log_standard.md 定义打印方法和最佳实践 |
 | [统一术语表](../TERMINOLOGY.md) | 本规范使用的术语定义和解释 |
 | [架构设计原则](../../../architecture/folder/architectural_design_principles.md) | 本规范的设计原则基于五维正交体系，是可观测性原则的具体实现 |
 

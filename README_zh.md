@@ -8,7 +8,7 @@
 
 [![AtomGit](https://atomgit.com/spharx/agentos/star/badge.svg)](https://atomgit.com/spharx/agentos)
 [![star](https://gitee.com/spharx/agentos/badge/star.svg?theme=dark)](https://gitee.com/spharx/agentos)
-[![GitHub](https://img.shields.io/github/stars/SpharxTeam/AgentOS?style=social)](https://github.com/SpharxTeam/AgentOS)  
+[![GitHub stars](https://img.shields.io/github/stars/SpharxTeam/AgentOS)](https://github.com/SpharxTeam/AgentOS/stargazers)  
  
 [![Version](https://img.shields.io/badge/version-1.0.0.9-5a6b7e)](https://atomgit.com/spharx/agentos)
 [![License](https://img.shields.io/badge/license-Apache--2.0-4a90d9)](LICENSE)
@@ -30,7 +30,7 @@
 个人用户客户端预告  
 
 <div align="center">
-<img src="docs/Other_Source/AgentOS-desktop-preview.gif" alt="AgentOS 预览" width="800">
+<img src="docs/Source_Other/AgentOS-desktop-preview.gif" alt="AgentOS 预览" width="800">
 </div>
 
 ## 💡 创新要点
@@ -291,22 +291,6 @@ Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 →
 
 ---
 
-<p align="center">
- <a href="https://star-history.com/#SpharxTeam/AgentOS">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/badge?repo=SpharxTeam/AgentOS&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/badge?repo=SpharxTeam/AgentOS" />
-    <img alt="Star History Rank" src="https://api.star-history.com/badge?repo=SpharxTeam/AgentOS" />
-  </picture>
- </a>
-</p>
-
 ## ⭐️ Github Star History
 
-<a href="https://www.star-history.com/">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&type=date&legend=top-left" />
- </picture>
-</a>
+[![Star History Chart](https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&type=date&legend=top-left)](https://star-history.com/#SpharxTeam/AgentOS)

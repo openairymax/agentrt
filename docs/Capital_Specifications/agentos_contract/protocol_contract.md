@@ -48,7 +48,7 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 | Habitat 网关 | 统一的通信网关，处理外部请求和服务间通信 | 本规范 |
 | JSON-RPC 2.0 | 基于 JSON 的远程过程调用协议 | 本规范 |
 | 系统调用 (Syscall) | 用户态进入内核的唯一入口 | [syscall_api_contract.md](./syscall_api_contract.md) |
-| TraceID | 分布式追踪的唯一标识 | [日志打印规范](../coding_standard/Log_guide.md) |
+| TraceID | 分布式追踪的唯一标识 | [日志打印规范](../coding_standard/Log_standard.md) |
 
 ---
 
@@ -862,7 +862,7 @@ curl -X POST http://localhost:18789/rpc \
 | [架构设计原则](../架构设计原则.md) | 本规范是架构原则在通信层面的具体实现，特别是层次分解和接口稳定原则 |
 | [系统调用 API 规范](./syscall_api_contract.md) | 本规范定义了系统调用的传输协议，syscall_api_contract.md 定义了具体的 API 接口 |
 | [日志格式规范](./logging_format.md) | 本规范要求所有组件使用统一的日志格式，支持 TraceID 贯穿 |
-| [日志打印规范](../coding_standard/Log_guide.md) | 通信过程中的日志记录应遵循日志打印规范 |
+| [日志打印规范](../coding_standard/Log_standard.md) | 通信过程中的日志记录应遵循日志打印规范 |
 | [统一术语表](../TERMINOLOGY.md) | 本规范使用的术语定义和解释 |
 
 ---

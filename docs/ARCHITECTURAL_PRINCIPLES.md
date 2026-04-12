@@ -1540,7 +1540,7 @@ python scripts/check_error_i18n.py --lang zh-CN,en-US
 | [核心循环架构](Capital_Architecture/coreloopthree.md) | 原则 C-1、C-2、S-3 的技术实现 |
 | [记忆系统架构](Capital_Architecture/memoryrovol.md) | 原则 C-3、C-4 的技术实现 |
 | [系统调用规范](Capital_Architecture/syscall.md) | 原则 K-2、K-3 的接口规范 |
-| [C 安全编程指南](Capital_Specifications/coding_standard/C_Cpp_secure_coding_guide.md) | 原则 E-1、E-3 的编码落实 |
+| [C 安全编程规范](Capital_Specifications/coding_standard/C_Cpp_secure_coding_standard.md) | 原则 E-1、E-3 的编码落实 |
 | [统一术语表](Capital_Specifications/TERMINOLOGY.md) | 本文档使用的术语定义 |
 
 ---

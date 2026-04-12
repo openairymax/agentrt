@@ -256,8 +256,8 @@
  *
  * - AgentOS 架构设计原则: manuals/ARCHITECTURAL_PRINCIPLES.md
  * - 代码注释规范: manuals/specifications/coding_standard/Code_comment_template.md
- * - 安全设计指南: manuals/specifications/coding_standard/Security_design_guide.md
- * - C 安全编码指南: manuals/specifications/coding_standard/C_Cpp_secure_coding_guide.md
+ * - 安全设计规范: docs/Capital_Specifications/coding_standard/Security_design_standard.md
+ * - C 安全编码规范: docs/Capital_Specifications/coding_standard/C_Cpp_secure_coding_standard.md
  *
  * @author SPHARX Ltd. - AgentOS Team
  * @version 1.0.0

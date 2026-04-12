@@ -203,6 +203,18 @@ void cupolas_flush_audit_log(void);
  * #include "cupolas_network_security.h"
  */
 
+/* ============================================================================
+ * SafetyGuard Framework
+ * ============================================================================ */
+
+/* SafetyGuard headers are located in src/guards/ directory */
+/* Users should include specific headers:
+ * #include "guard_core.h"
+ * #include "guard_integration.h"
+ * #include "guard_rules.h"      (future)
+ * #include "guard_models.h"     (future)
+ */
+
 #ifdef __cplusplus
 }
 #endif
