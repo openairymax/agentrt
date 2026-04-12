@@ -24,6 +24,7 @@
 typedef struct hnsw_node {
     char* id;
     float* vector;
+    float norm;           /* 预计算的向量L2范数平方 */
     uint32_t level;
     struct hnsw_node** neighbors;
     size_t* neighbor_counts;
@@ -65,6 +66,16 @@ static float cosine_similarity(const float* a, const float* b, uint32_t dim) {
     }
     if (norm_a == 0 || norm_b == 0) return 0.0f;
     return dot / (sqrtf(norm_a) * sqrtf(norm_b));
+}
+
+/* 使用预计算范数的余弦相似度计算 */
+static float cosine_similarity_precomputed(const float* a, const float* b, float a_norm_sq, float b_norm_sq, uint32_t dim) {
+    float dot = 0.0f;
+    for (uint32_t i = 0; i < dim; i++) {
+        dot += a[i] * b[i];
+    }
+    if (a_norm_sq == 0 || b_norm_sq == 0) return 0.0f;
+    return dot / (sqrtf(a_norm_sq) * sqrtf(b_norm_sq));
 }
 
 /**
@@ -155,6 +166,12 @@ static agentos_error_t hnsw_add(hnsw_index_t* index, const char* id, const float
         return AGENTOS_ENOMEM;
     }
     memcpy(node->vector, vector, index->dimension * sizeof(float));
+    /* 预计算向量范数平方 */
+    float norm_sq = 0.0f;
+    for (uint32_t i = 0; i < index->dimension; i++) {
+        norm_sq += vector[i] * vector[i];
+    }
+    node->norm = norm_sq;
     node->level = 1;
     node->neighbors = (hnsw_node_t**)AGENTOS_CALLOC(node->level + 1, sizeof(hnsw_node_t*));
     node->neighbor_counts = (size_t*)AGENTOS_CALLOC(node->level + 1, sizeof(size_t));
@@ -197,8 +214,15 @@ static agentos_error_t hnsw_search(hnsw_index_t* index, const float* query, uint
         ids[i] = NULL;
     }
 
+    /* 预计算查询向量的范数平方 */
+    float query_norm_sq = 0.0f;
+    for (uint32_t d = 0; d < index->dimension; d++) {
+        query_norm_sq += query[d] * query[d];
+    }
+    
     for (size_t i = 0; i < index->node_count; i++) {
-        float sim = cosine_similarity(query, index->nodes[i]->vector, index->dimension);
+        float sim = cosine_similarity_precomputed(query, index->nodes[i]->vector, 
+                                                  query_norm_sq, index->nodes[i]->norm, index->dimension);
         for (size_t j = 0; j < result_count; j++) {
             if (sim > scores[j]) {
                 for (size_t m = result_count - 1; m > j; m--) {

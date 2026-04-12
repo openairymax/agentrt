@@ -126,8 +126,8 @@ AgentOS 技术规范体系是项目开发、测试、部署和维护的权威标
 
 | 文档 | 版本 | 状态 | 描述 |
 |------|------|------|------|
-| [C_coding_style_guide.md](coding_standard/C_coding_style_guide.md) | v1.2.0 | ✅ 生产就绪 | C 语言编码风格、命名约定、代码组织 |
-| [C&Cpp-secure-coding-guide.md](coding_standard/C&Cpp-secure-coding-guide.md) | v1.2.0 | ✅ 生产就绪 | C/C++ 安全编码指南、漏洞防护 |
+| [C_coding_style_standard.md](coding_standard/C_coding_style_standard.md) | v1.2.0 | ✅ 生产就绪 | C 语言编码风格、命名约定、代码组织 |
+| [C_Cpp_secure_coding_standard.md](coding_standard/C_Cpp_secure_coding_standard.md) | v1.2.0 | ✅ 生产就绪 | C/C++ 安全编码规范、漏洞防护 |
 
 **核心原则**:
 - 遵循工程控制论的反馈闭环设计
@@ -138,7 +138,7 @@ AgentOS 技术规范体系是项目开发、测试、部署和维护的权威标
 
 | 文档 | 版本 | 状态 | 描述 |
 |------|------|------|------|
-| [Python_coding_style_guide.md](coding_standard/Python_coding_style_guide.md) | v1.2.0 | ✅ 生产就绪 | Python 编码风格、类型注解、异步编程 |
+| [Python_coding_style_standard.md](coding_standard/Python_coding_style_standard.md) | v1.2.0 | ✅ 生产就绪 | Python 编码风格、类型注解、异步编程 |
 
 **核心原则**:
 - 类型注解必须完整
@@ -149,7 +149,7 @@ AgentOS 技术规范体系是项目开发、测试、部署和维护的权威标
 
 | 文档 | 版本 | 状态 | 描述 |
 |------|------|------|------|
-| [JavaScript_coding_style_guide.md](coding_standard/JavaScript_coding_style_guide.md) | v1.2.0 | ✅ 生产就绪 | JavaScript/TypeScript 编码规范 |
+| [JavaScript_coding_style_standard.md](coding_standard/JavaScript_coding_style_standard.md) | v1.2.0 | ✅ 生产就绪 | JavaScript/TypeScript 编码规范 |
 
 **核心原则**:
 - TypeScript 必须启用严格模式
@@ -160,7 +160,7 @@ AgentOS 技术规范体系是项目开发、测试、部署和维护的权威标
 
 | 文档 | 版本 | 状态 | 描述 |
 |------|------|------|------|
-| [Log_guide.md](coding_standard/Log_guide.md) | v1.2.0 | ✅ 生产就绪 | 日志记录最佳实践、性能优化 |
+| [Log_standard.md](coding_standard/Log_standard.md) | v1.2.0 | ✅ 生产就绪 | 日志记录最佳实践、性能优化 |
 
 **核心原则**:
 - 日志级别必须合理使用

@@ -489,8 +489,8 @@ open coverage_report/index.html
 
 ### 技术规范
 
-- 📝 [C 编码规范](../paper/specifications/coding_standard/C_coding_style_guide.md)
-- 🔒 [安全编程指南](../paper/specifications/coding_standard/C&Cpp-secure-coding-guide.md)
+- 📝 [C 编码规范](../../docs/Capital_Specifications/coding_standard/C_coding_style_standard.md)
+- 🔒 [安全编程规范](../../docs/Capital_Specifications/coding_standard/C_Cpp_secure_coding_standard.md)
 - 📖 [API 设计规范](../paper/specifications/api_design_guidelines.md)
 
 ---

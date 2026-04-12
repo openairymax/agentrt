@@ -26,6 +26,7 @@ import sdk from "../services/agentos-sdk";
 import type { AgentInfo } from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
 import { useNavigate } from "react-router-dom";
+import { useAlert } from "../components/useAlert";
 
 const agentTypeConfig: Record<string, { icon: typeof Bot; color: string; gradient: string; bgLight: string; label: string }> = {
   research: { icon: Brain, color: "#6366f1", gradient: "linear-gradient(135deg, #6366f1, #818cf8)", bgLight: "rgba(99,102,241,0.08)", label: "研究型" },
@@ -37,15 +38,53 @@ const agentTypeConfig: Record<string, { icon: typeof Bot; color: string; gradien
 const Agents: React.FC = () => {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const { error, success, confirm: confirmModal } = useAlert();
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedAgent, setSelectedAgent] = useState<AgentInfo | null>(null);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [sortBy, setSortBy] = useState<'name' | 'status' | 'type'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [filterType, setFilterType] = useState<string>('all');
 
   useEffect(() => {
     loadAgents();
   }, []);
+
+  const filteredAndSortedAgents = useMemo(() => {
+    let result = [...agents];
+
+    if (searchTerm) {
+      result = result.filter(agent =>
+        agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        agent.type.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    if (filterType !== 'all') {
+      result = result.filter(agent => agent.type === filterType);
+    }
+
+    result.sort((a, b) => {
+      let cmp = 0;
+      switch (sortBy) {
+        case 'name':
+          cmp = a.name.localeCompare(b.name);
+          break;
+        case 'status':
+          cmp = (a.status === 'running' ? 0 : 1) - (b.status === 'running' ? 0 : 1);
+          break;
+        case 'type':
+          cmp = a.type.localeCompare(b.type);
+          break;
+      }
+      return sortOrder === 'asc' ? cmp : -cmp;
+    });
+
+    return result;
+  }, [agents, searchTerm, sortBy, sortOrder, filterType]);
 
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showConfigModal, setShowConfigModal] = useState<string | null>(null);
@@ -55,8 +94,8 @@ const Agents: React.FC = () => {
     try {
       const data = await sdk.listAgents();
       setAgents(data || []);
-    } catch (error) {
-      console.error("Failed to load agents:", error);
+    } catch (err) {
+      error("加载失败", `无法加载智能体列表: ${err}`);
     } finally {
       setLoading(false);
     }
@@ -67,8 +106,9 @@ const Agents: React.FC = () => {
       await sdk.registerAgent(name, type);
       setShowRegisterModal(false);
       loadAgents();
-    } catch (error) {
-      alert(`${t.agents.registerFailed}: ${error}`);
+      success("注册成功", `智能体 "${name}" 已成功注册`);
+    } catch (err) {
+      error("注册失败", `${t.agents.registerFailed}: ${err}`);
     }
   };
 
@@ -77,32 +117,85 @@ const Agents: React.FC = () => {
     try {
       await sdk.startAgent(agentId);
       loadAgents();
-    } catch (error) {
-      alert(`启动失败: ${error}`);
+    } catch (err) {
+      error("启动失败", `无法启动智能体: ${err}`);
     } finally {
       setActionLoading(null);
     }
   };
 
   const handleStopAgent = async (agentId: string) => {
-    if (!confirm("确定要停止此智能体吗？")) return;
+    const confirmed = await confirmModal({
+      type: 'danger',
+      title: '停止智能体',
+      message: '确定要停止此智能体吗？',
+    });
+    if (!confirmed) return;
     setActionLoading(agentId + "-stop");
     try {
       await sdk.stopAgent(agentId);
       loadAgents();
-    } catch (error) {
-      alert(`停止失败: ${error}`);
+    } catch (err) {
+      error("停止失败", `无法停止智能体: ${err}`);
     } finally {
       setActionLoading(null);
     }
   };
 
-  const filteredAgents = agents.filter(
-    (agent) =>
-      agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (agent.type || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (agent.description && agent.description.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const toggleSelectAgent = (agentId: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(agentId)) {
+        next.delete(agentId);
+      } else {
+        next.add(agentId);
+      }
+      return next;
+    });
+  };
+
+  const selectAllVisible = () => {
+    setSelectedIds(new Set(filteredAndSortedAgents.map(a => a.id)));
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+  };
+
+  const handleBatchStart = async () => {
+    if (selectedIds.size === 0) return;
+    for (const id of selectedIds) {
+      try { await sdk.startAgent(id); } catch {}
+    }
+    success("批量启动", `已发送 ${selectedIds.size} 个智能体的启动指令`);
+    clearSelection();
+    loadAgents();
+  };
+
+  const handleBatchStop = async () => {
+    if (selectedIds.size === 0) return;
+    const confirmed = await confirmModal({
+      type: 'danger',
+      title: '批量停止',
+      message: `确定要停止选中的 ${selectedIds.size} 个智能体吗？`,
+    });
+    if (!confirmed) return;
+    for (const id of selectedIds) {
+      try { await sdk.stopAgent(id); } catch {}
+    }
+    success("批量停止", `已发送 ${selectedIds.size} 个智能体的停止指令`);
+    clearSelection();
+    loadAgents();
+  };
+
+  const toggleSort = (field: 'name' | 'status' | 'type') => {
+    if (sortBy === field) {
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortOrder('asc');
+    }
+  };
 
   const getAgentConfig = (type: string) => {
     return agentTypeConfig[type] || { icon: Bot, color: "#94a3b8", gradient: "linear-gradient(135deg, #94a3b8, #cbd5e1)", bgLight: "rgba(148,163,184,0.08)", label: type };
@@ -141,14 +234,75 @@ const Agents: React.FC = () => {
                 style={{ paddingLeft: "38px" }}
               />
             </div>
+            {/* Type Filter */}
+            <div style={{ display: 'flex', gap: '4px' }}>
+              {['all', ...Object.keys(agentTypeConfig)].map(type => (
+                <button
+                  key={type}
+                  onClick={() => setFilterType(type)}
+                  className="btn btn-sm"
+                  style={{
+                    padding: '5px 10px',
+                    fontSize: '11.5px',
+                    background: filterType === type ? 'var(--primary-light)' : 'transparent',
+                    color: filterType === type ? 'var(--primary-color)' : 'var(--text-muted)',
+                    border: filterType === type ? '1px solid var(--primary-color)' : '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-full)',
+                  }}
+                >
+                  {type === 'all' ? '全部' : agentTypeConfig[type]?.label || type}
+                </button>
+              ))}
+            </div>
           </div>
-          <button
-            className="btn btn-primary"
-            onClick={() => setShowRegisterModal(true)}
-          >
-            <Plus size={16} />
-            {t.agents.registerNew}
-          </button>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {selectedIds.size > 0 && (
+              <>
+                <span style={{ fontSize: '12px', color: 'var(--primary-color)', fontWeight: 600 }}>
+                  已选 {selectedIds.size} 项
+                </span>
+                <button className="btn btn-ghost btn-sm" onClick={clearSelection}>
+                  取消选择
+                </button>
+                <button className="btn btn-success btn-sm" onClick={handleBatchStart}>
+                  <Play size={13} /> 批量启动
+                </button>
+                <button className="btn btn-danger btn-sm" onClick={handleBatchStop}>
+                  <Square size={13} /> 批量停止
+                </button>
+              </>
+            )}
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => toggleSort('name')}
+              title="按名称排序"
+            >
+              <ArrowUpDown size={14} />
+              名称{sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
+            </button>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                if (agents.length > 0) {
+                  exportToCSV(agents.map(a => ({
+                    名称: a.name, 类型: a.type, 状态: a.status,
+                    描述: a.description || '', 创建时间: a.created_at || '',
+                  })), 'agentos_agents');
+                }
+              }}
+              title="导出列表"
+            >
+              <Download size={14} />
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowRegisterModal(true)}
+            >
+              <Plus size={16} />
+              {t.agents.registerNew}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -195,7 +349,7 @@ const Agents: React.FC = () => {
             <div style={{ textAlign: "center", padding: "48px" }}>
               <div className="loading-spinner" />
             </div>
-          ) : filteredAgents.length === 0 ? (
+          ) : filteredAndSortedAgents.length === 0 ? (
             <div className="empty-state">
               <Bot size={56} style={{ opacity: 0.25 }} />
               <div className="empty-state-text">{t.agents.noAgentsRegistered}</div>
@@ -210,10 +364,11 @@ const Agents: React.FC = () => {
               gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
               gap: "14px",
             }}>
-              {filteredAgents.map((agent, idx) => {
+              {filteredAndSortedAgents.map((agent, idx) => {
                 const config = getAgentConfig(agent.type || "general");
                 const IconComp = config.icon;
                 const isSelected = selectedAgent?.name === agent.name;
+                const isChecked = selectedIds.has(agent.id);
 
                 return (
                   <div
@@ -224,8 +379,8 @@ const Agents: React.FC = () => {
                       padding: "20px",
                       borderRadius: "var(--radius-lg)",
                       border: `2px solid`,
-                      borderColor: isSelected ? config.color : "var(--border-subtle)",
-                      background: isSelected ? `${config.color}06` : "var(--bg-secondary)",
+                      borderColor: isSelected ? config.color : isChecked ? 'var(--primary-color)' : "var(--border-subtle)",
+                      background: isSelected ? `${config.color}06` : isChecked ? 'var(--primary-light)' : "var(--bg-secondary)",
                       position: "relative",
                       overflow: "hidden",
                       cursor: "pointer",
@@ -233,6 +388,21 @@ const Agents: React.FC = () => {
                       transition: "all var(--transition-fast)",
                     }}
                   >
+                    {/* Selection Checkbox */}
+                    <div
+                      onClick={(e) => { e.stopPropagation(); toggleSelectAgent(agent.id); }}
+                      style={{
+                        position: 'absolute', top: '12px', left: '12px',
+                        width: '22px', height: '22px', borderRadius: '6px',
+                        border: `2px solid ${isChecked ? 'var(--primary-color)' : 'var(--border-color)'}`,
+                        background: isChecked ? 'var(--primary-color)' : 'transparent',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', zIndex: 2,
+                        transition: 'all var(--transition-fast)',
+                      }}
+                    >
+                      {isChecked && <CheckSquare size={13} color="white" />}
+                    </div>
                     {/* Top gradient accent */}
                     <div style={{
                       position: "absolute", top: 0, left: 0, right: 0, height: "3px",
@@ -393,8 +563,9 @@ const Agents: React.FC = () => {
                         if (!selectedAgent) return;
                         try {
                           await sdk.startAgent(selectedAgent.id);
-                          alert(`智能体 "${selectedAgent.name}" 启动指令已发送`);
-                        } catch (e) { alert("启动失败: " + e); }
+                          success("启动成功", `智能体 "${selectedAgent.name}" 启动指令已发送`);
+                          loadAgents();
+                        } catch (err) { error("启动失败", `无法启动智能体: ${err}`); }
                       }}>
                         <Zap size={15} /> 启动智能体
                       </button>

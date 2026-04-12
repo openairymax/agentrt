@@ -269,6 +269,119 @@ int test_coordinator_fallback(void) {
     return 0;
 }
 
+/* 第二阶段新增：测试双模型自适应学习功能 */
+int test_dual_model_adaptive_learning(void) {
+    printf("  测试双模型自适应学习...\n");
+
+    agentos_dual_model_coordinator_t* coord = NULL;
+    int err = agentos_dual_model_coordinator_create(&coord);
+    if (err != 0 || coord == NULL) {
+        printf("    创建双模型协调器失败\n");
+        return 1;
+    }
+
+    /* 启用自适应学习 */
+    err = agentos_coordinator_dual_model_enable_adaptive_learning(
+        (agentos_coordinator_base_t*)coord, 1, 0.1f);
+    if (err != 0) {
+        printf("    启用自适应学习失败\n");
+        agentos_dual_model_coordinator_destroy(coord);
+        return 1;
+    }
+
+    /* 设置验证模式为自适应 */
+    err = agentos_coordinator_dual_model_set_validation_mode(
+        (agentos_coordinator_base_t*)coord, 3); /* CROSS_VALIDATION_ADAPTIVE = 3 */
+    if (err != 0) {
+        printf("    设置验证模式失败\n");
+        agentos_dual_model_coordinator_destroy(coord);
+        return 1;
+    }
+
+    /* 模拟多次决策以收集统计数据 */
+    agentos_cognition_result_t fast_result = {
+        .action = "action_a",
+        .confidence = 0.7f
+    };
+
+    agentos_cognition_result_t slow_result = {
+        .action = "action_b", 
+        .confidence = 0.9f
+    };
+
+    for (int i = 0; i < 5; i++) {
+        const char* final_action = NULL;
+        float confidence = 0.0f;
+        err = agentos_dual_model_coordinate(coord, &fast_result, &slow_result, &final_action, &confidence);
+        if (err != 0) {
+            printf("    第%d次双模型协调失败\n", i);
+            agentos_dual_model_coordinator_destroy(coord);
+            return 1;
+        }
+    }
+
+    /* 获取统计信息 */
+    char* stats_json = NULL;
+    err = agentos_coordinator_dual_model_get_stats(
+        (agentos_coordinator_base_t*)coord, &stats_json);
+    if (err != 0) {
+        printf("    获取统计信息失败\n");
+        agentos_dual_model_coordinator_destroy(coord);
+        return 1;
+    }
+
+    if (stats_json && strlen(stats_json) > 0) {
+        printf("    统计信息: %s\n", stats_json);
+        AGENTOS_FREE(stats_json);
+    }
+
+    /* 重置统计 */
+    err = agentos_coordinator_dual_model_reset_stats((agentos_coordinator_base_t*)coord);
+    if (err != 0) {
+        printf("    重置统计失败\n");
+        agentos_dual_model_coordinator_destroy(coord);
+        return 1;
+    }
+
+    agentos_dual_model_coordinator_destroy(coord);
+    printf("    双模型自适应学习测试通过\n");
+    return 0;
+}
+
+/* 第二阶段新增：测试交叉验证增强功能 */
+int test_cross_validation_enhanced(void) {
+    printf("  测试增强的交叉验证功能...\n");
+
+    agentos_dual_model_coordinator_t* coord = NULL;
+    int err = agentos_dual_model_coordinator_create(&coord);
+    if (err != 0 || coord == NULL) {
+        printf("    创建双模型协调器失败\n");
+        return 1;
+    }
+
+    /* 测试基础验证模式 */
+    err = agentos_coordinator_dual_model_set_validation_mode(
+        (agentos_coordinator_base_t*)coord, 1); /* CROSS_VALIDATION_BASIC */
+    if (err != 0) {
+        printf("    设置基础验证模式失败\n");
+        agentos_dual_model_coordinator_destroy(coord);
+        return 1;
+    }
+
+    /* 测试高级验证模式 */
+    err = agentos_coordinator_dual_model_set_validation_mode(
+        (agentos_coordinator_base_t*)coord, 2); /* CROSS_VALIDATION_ADVANCED */
+    if (err != 0) {
+        printf("    设置高级验证模式失败\n");
+        agentos_dual_model_coordinator_destroy(coord);
+        return 1;
+    }
+
+    agentos_dual_model_coordinator_destroy(coord);
+    printf("    交叉验证增强功能测试通过\n");
+    return 0;
+}
+
 int main(void) {
     printf("开始运行 coreloopthree 协调器单元测试...\n");
 
@@ -282,6 +395,9 @@ int main(void) {
     failures |= test_arbiter_selection();
     failures |= test_coordinator_consensus();
     failures |= test_coordinator_fallback();
+    /* 第二阶段新增测试 */
+    failures |= test_dual_model_adaptive_learning();
+    failures |= test_cross_validation_enhanced();
 
     if (failures == 0) {
         printf("\n所有协调器测试通过！\n");

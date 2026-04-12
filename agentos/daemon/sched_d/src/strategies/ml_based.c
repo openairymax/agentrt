@@ -8,8 +8,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "scheduler_service.h"
-#include "strategy_interface.h"
+#include <stdbool.h>
+#include "../../include/scheduler_service.h"
+#include "../include/strategy_interface.h"
 
 /**
  * @brief 机器学习调度策略数据
@@ -90,7 +91,7 @@ static int ml_based_destroy(void* data) {
     }
 
     ml_based_data_t* mld = (ml_based_data_t*)data;
-    
+
     if (mld->agents) {
         for (size_t i = 0; i < mld->agent_count; i++) {
             if (mld->agents[i]) {
@@ -138,7 +139,7 @@ static int ml_based_register_agent(void* data, const agent_info_t* agent_info) {
             // 更新现有 Agent
             free(mld->agents[i]->agent_id);
             free(mld->agents[i]->agent_name);
-            
+
             mld->agents[i]->agent_id = strdup(agent_info->agent_id);
             mld->agents[i]->agent_name = strdup(agent_info->agent_name);
             mld->agents[i]->load_factor = agent_info->load_factor;
@@ -146,7 +147,7 @@ static int ml_based_register_agent(void* data, const agent_info_t* agent_info) {
             mld->agents[i]->avg_response_time_ms = agent_info->avg_response_time_ms;
             mld->agents[i]->is_available = agent_info->is_available;
             mld->agents[i]->weight = agent_info->weight;
-            
+
             return 0;
         }
     }
@@ -238,11 +239,11 @@ static int ml_based_schedule(void* data, const task_info_t* task_info, sched_res
 
         for (size_t i = 0; i < mld->agent_count; i++) {
             agent_info_t* agent = mld->agents[i];
-            
+
             if (agent->is_available && agent->load_factor < 0.9) {
                 // 计算综合评分
                 float score = agent->success_rate * 0.7 + (1.0 - agent->load_factor) * 0.3;
-                
+
                 if (score > best_score) {
                     best_score = score;
                     best_agent = agent;
@@ -276,13 +277,13 @@ static int ml_based_schedule(void* data, const task_info_t* task_info, sched_res
 
     for (size_t i = 0; i < mld->agent_count; i++) {
         agent_info_t* agent = mld->agents[i];
-        
+
         if (agent->is_available && agent->load_factor < 0.9) {
             // 模拟模型预测得分
-            float score = agent->success_rate * 0.5 + 
-                         (1.0 - agent->load_factor) * 0.3 + 
+            float score = agent->success_rate * 0.5 +
+                         (1.0 - agent->load_factor) * 0.3 +
                          (1.0 / (1.0 + agent->avg_response_time_ms / 1000.0)) * 0.2;
-            
+
             if (score > best_score) {
                 best_score = score;
                 best_agent = agent;

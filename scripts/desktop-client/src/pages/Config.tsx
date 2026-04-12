@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import sdk from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
+import { useAlert } from "../components/useAlert";
 
 const CONFIG_FILES = [
   { id: "docker-compose", name: "docker-compose.yml", path: "config/docker-compose.yml", icon: Container, color: "#3b82f6", desc: "Docker 服务编排" },
@@ -86,6 +87,7 @@ function syntaxHighlight(line: string): React.ReactNode {
 
 const Config: React.FC = () => {
   const { t } = useI18n();
+  const { error, success, confirm: confirmModal } = useAlert();
   const [selectedFile, setSelectedFile] = useState("docker-compose");
   const [content, setContent] = useState(`# AgentOS Docker Compose Configuration
 version: "3.8"
@@ -169,15 +171,21 @@ volumes:
       await sdk.writeConfigFile(file.path, content);
       setOriginalContent(content);
       setHasChanges(false);
-    } catch (error) {
-      console.error("Failed to save config:", error);
+      success("保存成功", "配置文件已成功保存");
+    } catch (err) {
+      error("保存失败", `无法保存配置文件: ${err}`);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDiscardChanges = () => {
-    if (confirm(t.config.discardConfirm)) {
+  const handleDiscardChanges = async () => {
+    const confirmed = await confirmModal({
+      type: 'warning',
+      title: '丢弃更改',
+      message: t.config.discardConfirm,
+    });
+    if (confirmed) {
       setContent(originalContent);
       setHasChanges(false);
     }

@@ -3,8 +3,8 @@ Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 
 # AgentOS 文档中心
 
-**版本**: Doc V1.8
-**最后更新**: 2026-04-10
+**版本**: Doc V1.9
+**最后更新**: 2026-04-13
 **维护者**: Team
   - Zhixian Zhou | Spharx Ltd. zhouzhixian@spharx.cn
   - Liren Wang | Spharx Ltd. wangliren@spharx.cn
@@ -107,18 +107,18 @@ AgentOS的理论基石，理解设计哲学的必读材料：
 
 **编码规范**：
 
-- [**C编码风格指南**](Capital_Specifications/coding_standard/C_coding_style_guide.md) — C语言命名/函数/错误处理/并发/安全规范
-- [**C++编码风格指南**](Capital_Specifications/coding_standard/Cpp_coding_style_guide.md) — C++语言编码规范
-- [**Python编码风格指南**](Capital_Specifications/coding_standard/Python_coding_style_guide.md) — Python类型设计/异步/错误处理规范
-- [**JavaScript编码风格指南**](Capital_Specifications/coding_standard/JavaScript_coding_style_guide.md) — JavaScript/TypeScript编码规范
+- [**C编码风格规范**](Capital_Specifications/coding_standard/C_coding_style_standard.md) — C语言命名/函数/错误处理/并发/安全规范
+- [**C++编码风格规范**](Capital_Specifications/coding_standard/Cpp_coding_style_standard.md) — C++语言编码规范
+- [**Python编码风格规范**](Capital_Specifications/coding_standard/Python_coding_style_standard.md) — Python类型设计/异步/错误处理规范
+- [**JavaScript编码风格规范**](Capital_Specifications/coding_standard/JavaScript_coding_style_standard.md) — JavaScript/TypeScript编码规范
 - [**代码注释模板**](Capital_Specifications/coding_standard/Code_comment_template.md) — Doxygen/docstring注释规范
-- [**日志打印规范**](Capital_Specifications/coding_standard/Log_guide.md) — 日志级别/内容/格式/质量规范
+- [**日志打印规范**](Capital_Specifications/coding_standard/Log_standard.md) — 日志级别/内容/格式/质量规范
 
 **安全编码**：
 
-- [**安全设计指南**](Capital_Specifications/coding_standard/Security_design_guide.md) — D1~D4四层防护/加密/认证/隐私保护
-- [**C/C++安全编码指南**](Capital_Specifications/coding_standard/C_Cpp_secure_coding_guide.md) — C/C++安全编码实践
-- [**Java安全编码指南**](Capital_Specifications/coding_standard/Java_secure_coding_guide.md) — Java安全编码实践
+- [**安全设计规范**](Capital_Specifications/coding_standard/Security_design_standard.md) — D1~D4四层防护/加密/认证/隐私保护
+- [**C/C++安全编码规范**](Capital_Specifications/coding_standard/C_Cpp_secure_coding_standard.md) — C/C++安全编码实践
+- [**Java安全编码规范**](Capital_Specifications/coding_standard/Java_secure_coding_standard.md) — Java安全编码实践
 
 ---
 
@@ -285,22 +285,24 @@ docs/
 │   └── algorithms/               # 核心算法
 │       └── README.md
 ├── Capital_Guides/                # 入门与运维指南
-│   ├── getting_started.md
-│   ├── installation.md
-│   ├── configuration.md
-│   ├── deployment.md
-│   ├── create_agent.md
-│   ├── create_skill.md
-│   ├── migration_guide.md
-│   ├── testing.md
-│   ├── monitoring.md
-│   ├── kubernetes-deployment.md
-│   ├── backup-recovery.md
-│   ├── kernel_tuning.md
-│   ├── module_features.md
-│   ├── common-issues.md
-│   ├── diagnosis.md
-│   └── known-issues.md
+│   ├── getting_started.md         # 快速开始
+│   ├── installation.md            # 安装指南
+│   ├── configuration.md           # 配置指南
+│   ├── deployment.md              # 部署指南
+│   ├── create_agent.md           # 创建Agent
+│   ├── create_skill.md           # 创建Skill
+│   ├── migration_guide.md        # 迁移指南
+│   ├── testing.md               # 测试指南
+│   ├── monitoring.md            # 监控运维
+│   ├── kubernetes-deployment.md # K8s部署
+│   ├── backup-recovery.md       # 备份恢复
+│   ├── kernel_tuning.md         # 内核调优
+│   ├── performance-tuning.md    # 性能调优
+│   ├── security-hardening.md    # 安全加固
+│   ├── module_features.md       # 模块功能
+│   ├── common-issues.md         # 常见问题
+│   ├── diagnosis.md             # 故障诊断
+│   └── known-issues.md          # 已知问题
 ├── Capital_Specifications/        # 规范与契约
 │   ├── TERMINOLOGY.md
 │   ├── README.md
@@ -314,14 +316,14 @@ docs/
 │   │   ├── logging_format.md
 │   │   └── glossary_index.md
 │   ├── coding_standard/          # 编码规范
-│   │   ├── C_coding_style_guide.md
-│   │   ├── Cpp_coding_style_guide.md
-│   │   ├── Python_coding_style_guide.md
-│   │   ├── JavaScript_coding_style_guide.md
-│   │   ├── C_Cpp_secure_coding_guide.md
-│   │   ├── Java_secure_coding_guide.md
-│   │   ├── Security_design_guide.md
-│   │   ├── Log_guide.md
+│   │   ├── C_coding_style_standard.md
+│   │   ├── Cpp_coding_style_standard.md
+│   │   ├── Python_coding_style_standard.md
+│   │   ├── JavaScript_coding_style_standard.md
+│   │   ├── C_Cpp_secure_coding_standard.md
+│   │   ├── Java_secure_coding_standard.md
+│   │   ├── Security_design_standard.md
+│   │   ├── Log_standard.md
 │   │   └── Code_comment_template.md
 │   ├── integration_standards/    # 集成标准
 │   │   ├── README.md
@@ -331,6 +333,8 @@ docs/
 │       ├── error_code_reference.md
 │       ├── manuals_module_requirements.md
 │       └── resource_management_table.md
+├── Source_Other/                 # 其他资源
+│   └── AgentOS-desktop-preview.gif
 ├── White_Paper/                  # 白皮书
 │   ├── README.md
 │   └── history/

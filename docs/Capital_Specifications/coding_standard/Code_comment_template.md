@@ -314,7 +314,7 @@ import { TaskPlan, TaskResult, TaskStatus } from './types';
  *   - 2026-03-15: 第三方安全审计通过
  *   - 2026-03-20: 模糊测试覆盖率达到100%
  * 
- * @see 安全设计指南: Security_design_guide.md
+ * @see 安全设计指南: Security_design_standard.md
  */
 ```
 
@@ -952,7 +952,7 @@ submitTask(plan: TaskPlan): string {
 7. **Rust API Guidelines**: https://rust-lang.github.io/api-guidelines/
 8. **AgentOS 架构设计原则**: [architectural_design_principles.md](../../architecture/folder/architectural_design_principles.md)
 9. **AgentOS 统一术语表**: [TERMINOLOGY.md](../TERMINOLOGY.md)
-10. **AgentOS 安全设计指南**: [Security_design_guide.md](../Security_design_guide.md)
+10. **AgentOS 安全设计指南**: [Security_design_standard.md](../Security_design_standard.md)
 
 ---
 

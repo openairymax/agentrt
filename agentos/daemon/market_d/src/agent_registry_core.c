@@ -19,7 +19,7 @@ struct agent_registry {
     int initialized;
 };
 
-agent_registry_t* agent_registry_create(void) {
+agent_registry_t* agent_registry_core_create(void) {
     agent_registry_t* reg = (agent_registry_t*)calloc(1, sizeof(agent_registry_t));
     if (!reg) return NULL;
     agentos_mutex_init(&reg->lock);
@@ -27,14 +27,14 @@ agent_registry_t* agent_registry_create(void) {
     return reg;
 }
 
-void agent_registry_destroy(agent_registry_t* registry) {
+void agent_registry_core_destroy(agent_registry_t* registry) {
     if (!registry) return;
-    if (registry->initialized) agent_registry_shutdown(registry);
+    if (registry->initialized) agent_registry_core_shutdown(registry);
     agentos_mutex_destroy(&registry->lock);
     free(registry);
 }
 
-int agent_registry_init(agent_registry_t* registry, const char* db_path) {
+int agent_registry_core_init(agent_registry_t* registry, const char* db_path) {
     if (!registry || registry->initialized) return -1;
     if (db_path) registry->db_path = strdup(db_path);
     registry->entry_count = 0;
@@ -42,7 +42,7 @@ int agent_registry_init(agent_registry_t* registry, const char* db_path) {
     return 0;
 }
 
-void agent_registry_shutdown(agent_registry_t* registry) {
+void agent_registry_core_shutdown(agent_registry_t* registry) {
     if (!registry || !registry->initialized) return;
     agentos_mutex_lock(&registry->lock);
     for (size_t i = 0; i < registry->entry_count; i++) {
@@ -56,11 +56,11 @@ void agent_registry_shutdown(agent_registry_t* registry) {
     agentos_mutex_unlock(&registry->lock);
 }
 
-int agent_registry_add(agent_registry_t* registry, const agent_entry_t* reg) {
+int agent_registry_core_add(agent_registry_t* registry, const agent_entry_t* reg) {
     if (!registry || !registry->initialized || !reg) return -1;
     if (!reg->id[0] || !reg->name[0]) return -1;
     if (registry->entry_count >= MAX_AGENTS) return -1;
-    
+
     agentos_mutex_lock(&registry->lock);
     agent_entry_t* entry = &registry->entries[registry->entry_count];
     memset(entry, 0, sizeof(agent_entry_t));
@@ -77,7 +77,7 @@ int agent_registry_add(agent_registry_t* registry, const agent_entry_t* reg) {
     return 0;
 }
 
-int agent_registry_remove(agent_registry_t* registry, const char* agent_id) {
+int agent_registry_core_remove(agent_registry_t* registry, const char* agent_id) {
     if (!registry || !registry->initialized || !agent_id) return -1;
     agentos_mutex_lock(&registry->lock);
     for (size_t i = 0; i < registry->entry_count; i++) {
@@ -96,7 +96,7 @@ int agent_registry_remove(agent_registry_t* registry, const char* agent_id) {
     return -1;
 }
 
-const agent_entry_t* agent_registry_get(agent_registry_t* registry, const char* agent_id) {
+const agent_entry_t* agent_registry_core_get(agent_registry_t* registry, const char* agent_id) {
     if (!registry || !registry->initialized || !agent_id) return NULL;
     agentos_mutex_lock(&registry->lock);
     for (size_t i = 0; i < registry->entry_count; i++) {
@@ -109,7 +109,7 @@ const agent_entry_t* agent_registry_get(agent_registry_t* registry, const char* 
     return NULL;
 }
 
-size_t agent_registry_list(agent_registry_t* registry, const agent_entry_t** out_entries, size_t max_entries) {
+size_t agent_registry_core_list(agent_registry_t* registry, const agent_entry_t** out_entries, size_t max_entries) {
     if (!registry || !registry->initialized || !out_entries) return 0;
     agentos_mutex_lock(&registry->lock);
     size_t count = (registry->entry_count < max_entries) ? registry->entry_count : max_entries;
@@ -118,14 +118,14 @@ size_t agent_registry_list(agent_registry_t* registry, const agent_entry_t** out
     return count;
 }
 
-size_t agent_registry_count(agent_registry_t* registry) {
+size_t agent_registry_core_count(agent_registry_t* registry) {
     if (!registry || !registry->initialized) return 0;
     return registry->entry_count;
 }
 
-int agent_registry_add_version(agent_registry_t* registry, const char* agent_id, const agent_version_t* version) {
+int agent_registry_core_add_version(agent_registry_t* registry, const char* agent_id, const agent_version_t* version) {
     if (!registry || !registry->initialized || !agent_id || !version) return -1;
-    
+
     agentos_mutex_lock(&registry->lock);
     for (size_t i = 0; i < registry->entry_count; i++) {
         if (strcmp(registry->entries[i].id, agent_id) == 0) {
@@ -150,7 +150,7 @@ int agent_registry_add_version(agent_registry_t* registry, const char* agent_id,
     return -1;
 }
 
-const char* agent_registry_get_latest_version(agent_registry_t* registry, const char* agent_id) {
+const char* agent_registry_core_get_latest_version(agent_registry_t* registry, const char* agent_id) {
     if (!registry || !registry->initialized || !agent_id) return NULL;
     agentos_mutex_lock(&registry->lock);
     for (size_t i = 0; i < registry->entry_count; i++) {
@@ -163,7 +163,7 @@ const char* agent_registry_get_latest_version(agent_registry_t* registry, const 
     return NULL;
 }
 
-size_t agent_registry_search_by_tag(agent_registry_t* registry, const char* tag,
+size_t agent_registry_core_search_by_tag(agent_registry_t* registry, const char* tag,
                                    const agent_entry_t** out_entries, size_t max_entries) {
     if (!registry || !registry->initialized || !tag || !out_entries) return 0;
     agentos_mutex_lock(&registry->lock);
@@ -180,7 +180,7 @@ size_t agent_registry_search_by_tag(agent_registry_t* registry, const char* tag,
     return count;
 }
 
-size_t agent_registry_search(agent_registry_t* registry, const char* query,
+size_t agent_registry_core_search(agent_registry_t* registry, const char* query,
                             const agent_entry_t** out_entries, size_t max_entries) {
     if (!registry || !registry->initialized || !query || !out_entries) return 0;
     agentos_mutex_lock(&registry->lock);
