@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agentos.spharx.ai/schemas/logging-v1.schema.json",
   "title": "AgentOS Logging Configuration Schema",
-  "description": "Configuration schema for logging system settings. Based on Log_guide.md specifications.",
+  "description": "Configuration schema for logging system settings. Based on Log_standard.md specifications.",
   "type": "object",
   "required": ["_config_version", "logging"],
   "properties": {
@@ -39,7 +39,7 @@
         },
         "domain": {
           "type": "object",
-          "description": "Domain ID configuration following Log_guide.md Section 5-1",
+          "description": "Domain ID configuration following Log_standard.md Section 5-1",
           "required": ["enabled", "id"],
           "properties": {
             "enabled": {
@@ -76,7 +76,7 @@
         },
         "privacy": {
           "type": "object",
-          "description": "Privacy markers configuration following Log_guide.md Section 5-4",
+          "description": "Privacy markers configuration following Log_standard.md Section 5-4",
           "required": ["enabled", "marker_format"],
           "properties": {
             "enabled": {

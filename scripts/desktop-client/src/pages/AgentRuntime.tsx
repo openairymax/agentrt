@@ -18,8 +18,10 @@ import sdk from "../services/agentos-sdk";
 import type { AgentRuntimeMetrics, ToolDefinition } from "../services/agentos-sdk";
 import MemorySystem from "../components/MemorySystem";
 import CognitiveLoop from "../components/CognitiveLoop";
+import { useAlert } from "../components/useAlert";
 
 const AgentRuntime: React.FC = () => {
+  const { error } = useAlert();
   const [activeTab, setActiveTab] = useState<"overview" | "memory" | "cognitive" | "tools">("overview");
   const [metrics, setMetrics] = useState<AgentRuntimeMetrics | null>(null);
   const [availableTools, setAvailableTools] = useState<Array<{name: string; category: string; description: string}>>([]);
@@ -38,8 +40,8 @@ const AgentRuntime: React.FC = () => {
         description: t.function?.description || t.description,
         category: (t.function?.parameters as any)?.category || t.category || "general",
       })));
-    } catch (error) {
-      console.error("Failed to load runtime data:", error);
+    } catch (err) {
+      error("加载失败", `无法加载运行时数据: ${err}`);
     } finally {
       setLoadingMetrics(false);
       setLoadingTools(false);

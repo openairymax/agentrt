@@ -1118,7 +1118,7 @@ cupolas模块实现零信任安全模型，需要严格的安全保障：
  * 基于YAML规则引擎实现细粒度访问控制。
  * 支持动态策略更新和形式化验证。
  * 
- * @see Security_design_guide.md 中的零信任架构
+ * @see Security_design_standard.md 中的零信任架构
  */
 export class SecurityPolicyEngine {
   private readonly policies = new Map<string, SecurityPolicy>();

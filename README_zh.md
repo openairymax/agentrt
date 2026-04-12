@@ -8,8 +8,8 @@
 
 [![AtomGit](https://atomgit.com/spharx/agentos/star/badge.svg)](https://atomgit.com/spharx/agentos)
 [![star](https://gitee.com/spharx/agentos/badge/star.svg?theme=dark)](https://gitee.com/spharx/agentos)
-[![GitHub](https://img.shields.io/github/stars/SpharxTeam/AgentOS?style=social)](https://github.com/SpharxTeam/AgentOS)
-
+[![GitHub stars](https://img.shields.io/github/stars/SpharxTeam/AgentOS)](https://github.com/SpharxTeam/AgentOS/stargazers)  
+ 
 [![Version](https://img.shields.io/badge/version-1.0.0.9-5a6b7e)](https://atomgit.com/spharx/agentos)
 [![License](https://img.shields.io/badge/license-Apache--2.0-4a90d9)](LICENSE)
 [![Build](https://img.shields.io/badge/build-passing-2ea44f)](https://atomgit.com/spharx/agentos)
@@ -30,7 +30,7 @@
 个人用户客户端预告  
 
 <div align="center">
-<img src="docs/Other_Source/AgentOS-desktop-preview.gif" alt="AgentOS 预览" width="800">
+<img src="docs/Source_Other/AgentOS-desktop-preview.gif" alt="AgentOS 预览" width="800">
 </div>
 
 ## 💡 创新要点
@@ -39,7 +39,7 @@
 
 ⚡️  
 
-**基石[《体系并行论》](docs/Basic_Theories/CN_01_体系并行论.md)**
+**基石理论[《体系并行论》](docs/Basic_Theories/CN_01_体系并行论.md)**
 
 </center>
 
@@ -216,13 +216,15 @@ AgentOS 是**操作系统级**产品，而非单一框架：
 
 我们正在走进未来："Intelligence emergence, and nothing less, is the ultimate sublimation of AI"。   
 
-### 相信的力量   
+### 相信的力量
 
-<p align="center">
-  <strong> ☀️ </strong>  
-  <p align="center">
-  <strong> 这不是人类的日落，而是新世界的曙光 </strong>  
-</p>  
+<center>
+
+☀️  
+
+**这不是人类的日落，而是新世界的曙光**
+
+</center>  
 
 **相信**  
 
@@ -234,20 +236,20 @@ AgentOS 是**操作系统级**产品，而非单一框架：
   我们每一天的工作都是历史的一部分；  
   必将铭刻在人类文明发展史的丰碑上。   
 
-### 贡献的方式  
+### 贡献的方式   
 
-无论你是经验丰富的开发者，还是刚刚起步的新手：
+无论你是经验丰富的开发者，还是刚刚起步的新手：  
  
-**发现问题**  
+**发现问题**   
 报告 Bug，帮助我们改进质量  
 
-**提出想法** 
+**提出想法**   
 新功能建议，让项目更加强大  
 
-**分享知识** 
+**分享知识**   
 完善文档，帮助更多人了解 AgentOS  
 
-**编写代码**  
+**编写代码**   
 提交 PR，共同创造历史   
 
 <p align="center">  
@@ -291,10 +293,4 @@ Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 →
 
 ## ⭐️ Github Star History
 
-<a href="https://www.star-history.com/">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&type=date&legend=top-left" />
- </picture>
-</a>
+[![Star History Chart](https://api.star-history.com/chart?repos=SpharxTeam/AgentOS&type=date&legend=top-left)](https://star-history.com/#SpharxTeam/AgentOS)

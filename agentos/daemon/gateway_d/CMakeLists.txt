@@ -70,6 +70,7 @@ set(COMMONS_INCLUDE_DIR ${COMMONS_DIR})
 set(GATEWAY_D_SOURCES
     src/main.c
     src/service.c
+    src/gateway_svc_adapter.c
 )
 
 # 可执行文件
@@ -225,6 +226,7 @@ install(TARGETS gateway_d
 
 install(FILES
     include/gateway_service.h
+    include/gateway_svc_adapter.h
     DESTINATION include/agentos/daemon/gateway_d
 )
 

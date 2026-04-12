@@ -426,7 +426,65 @@ cd examples/chatbot
 python3 main.py
 ```
 
-### 4.3 获取帮助
+### 4.4 开发工具
+
+AgentOS 提供了一系列强大的开发工具，帮助提升开发效率和质量：
+
+1. **统一代码质量分析器** (`scripts/tools/unified_quality_analyzer.py`):
+   - 支持 C/C++、Python、Go、TypeScript 多语言代码分析
+   - 集成 clang-tidy、cppcheck、bandit、mypy 等工具
+   - 生成详细的代码质量报告和修复建议
+   
+   ```bash
+   # 分析整个项目
+   python scripts/tools/unified_quality_analyzer.py --scan-all
+   
+   # 分析特定语言
+   python scripts/tools/unified_quality_analyzer.py --language cpp --path src/
+   
+   # 生成 JSON 报告
+   python scripts/tools/unified_quality_analyzer.py --output report.json --format json
+   ```
+
+2. **交互式开发教程引擎** (`scripts/tutorial/tutorial_engine.py`):
+   - 提供命令行和 Web 两种交互式学习方式
+   - 支持渐进式学习路径和实时验证
+   - 内置新贡献者教程（6个步骤，4小时）
+   
+   ```bash
+   # 启动新贡献者教程
+   python scripts/tutorial/tutorial_engine.py start --role new-contributor
+   
+   # 启动教程 Web 服务器
+   python scripts/tutorial/tutorial_engine.py serve --port 8080
+   ```
+
+3. **性能基准测试框架** (`scripts/benchmark/`):
+   - 统一的基准测试 API，支持测试定义、执行、监控
+   - 高级统计计算引擎，支持分布拟合和显著性检验
+   - 专业报告生成，支持 HTML、PDF、Markdown 格式
+   - 历史结果比较和回归检测
+   
+   ```bash
+   # 运行 CoreLoopThree 基准测试示例
+   python scripts/benchmark/example_coreloopthree_benchmark.py
+   
+   # 查看基准测试框架使用指南
+   cat docs/Capital_Specifications/performance_benchmarking_framework.md
+   ```
+
+4. **系统健康诊断工具** (`scripts/toolkit/doctor.py`):
+   - 8个诊断类别：系统、Python环境、构建工具、项目结构等
+   - 详细的健康报告和建议
+   - 自动检测和修复常见问题
+
+5. **服务管理框架** (`agentos/commons/svc_common.h/.c`):
+   - 统一的服务生命周期管理
+   - 服务状态监控和健康检查
+   - 服务注册和发现机制
+   - 守护进程适配器模式
+
+### 4.5 获取帮助
 
 - **官方文档**: https://docs.agentos.io
 - **GitHub Issues**: https://github.com/spharx/agentos/issues

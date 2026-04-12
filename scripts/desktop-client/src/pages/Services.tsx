@@ -22,6 +22,7 @@ import {
 import sdk from "../services/agentos-sdk";
 import type { ServiceStatus } from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
+import { useAlert } from "../components/useAlert";
 
 const serviceIcons: Record<string, { icon: typeof Server; color: string; gradient: string }> = {
   kernel: { icon: Cpu, color: "#6366f1", gradient: "linear-gradient(135deg, #6366f1, #818cf8)" },
@@ -34,6 +35,7 @@ const serviceIcons: Record<string, { icon: typeof Server; color: string; gradien
 
 const Services: React.FC = () => {
   const { t } = useI18n();
+  const { error, success, confirm: confirmModal } = useAlert();
   const [services, setServices] = useState<ServiceStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -64,15 +66,24 @@ const Services: React.FC = () => {
       else if (action === 'restart') await sdk.restartServices(deployMode);
       await loadServiceStatus();
       setLastAction({ type: action, time: new Date() });
-    } catch (error) {
-      alert(`${t.services.failedToStart || `Failed to start: ${error}`}`);
+    } catch (err) {
+      error("操作失败", `无法完成请求: ${err}`);
     } finally {
       setActionLoading(null);
     }
   };
 
   const handleStartAll = () => doAction('start');
-  const handleStopAll = () => { if (confirm(t.services.confirmStopAll)) doAction('stop'); };
+  const handleStopAll = async () => {
+    const confirmed = await confirmModal({
+      type: 'danger',
+      title: '停止所有服务',
+      message: t.services.confirmStopAll || '确定要停止所有正在运行的服务吗？此操作将中断所有活跃连接。',
+      confirmText: '停止服务',
+      cancelText: '取消',
+    });
+    if (confirmed) doAction('stop');
+  };
   const handleRestartAll = () => doAction('restart');
 
   const openServiceUrl = (port: number) => {

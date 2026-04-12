@@ -14,8 +14,8 @@
 #include <assert.h>
 
 /* 包含必要的头文件 */
-#include "layer1_raw.h"
-#include "agentos.h"
+#include "../include/layer1_raw.h"
+#include "../../corekern/include/agentos.h"
 
 /**
  * @brief 获取测试临时目录路径

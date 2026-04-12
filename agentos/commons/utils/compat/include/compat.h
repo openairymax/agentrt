@@ -6,7 +6,7 @@
  * 
  * 提供编译器兼容性、平台抽象宏、位操作工具等。
  * 
- * @see agentos/manuals/specifications/coding_standard/C_coding_style_guide.md
+ * @see docs/Capital_Specifications/coding_standard/C_coding_style_standard.md
  */
 
 #ifndef AGENTOS_UTILS_COMPAT_H

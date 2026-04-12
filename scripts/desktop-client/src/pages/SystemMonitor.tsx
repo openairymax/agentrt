@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import sdk from "../services/agentos-sdk";
 import type { SystemMonitorData, ProcessInfo, NetworkInterface, PortCheckResult, DirectoryListing } from "../services/agentos-sdk";
+import { useAlert } from "../components/useAlert";
 
 const formatBytes = (b: number) => b < 1024 ? b + "B" : b < 1048576 ? (b / 1024).toFixed(1) + "KB" : (b / 1048576).toFixed(1) + "MB";
 const fmtUptime = (s: number) => {
@@ -37,6 +38,7 @@ function MiniGauge({ pct, color, size = 48 }: { pct: number; color: string; size
 }
 
 const SystemMonitor: React.FC = () => {
+  const { error, confirm: confirmModal } = useAlert();
   const [tab, setTab] = useState<"overview" | "processes" | "network" | "files" | "diagnostics">("overview");
   const [data, setData] = useState<SystemMonitorData | null>(null);
   const [procs, setProcs] = useState<ProcessInfo[]>([]);
@@ -61,13 +63,14 @@ const SystemMonitor: React.FC = () => {
         sdk.getNetworkInterfaces().catch(() => []),
       ]);
       setData(m); setProcs(p); setNets(n);
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); setRefreshing(false); }
+    } catch (err) {
+      error("加载失败", `无法加载系统监控数据: ${err}`);
+    } finally { setLoading(false); setRefreshing(false); }
   };
 
   const loadDir = async (p: string) => {
     setFloading(true);
-    try { setFlist(await sdk.listDirectory(p)); setFpath(p); } catch (e) { alert("无法读取目录: " + e); }
+    try { setFlist(await sdk.listDirectory(p)); setFpath(p); } catch (err) { error("读取失败", `无法读取目录: ${err}`); }
     finally { setFloading(false); }
   };
 
@@ -93,8 +96,13 @@ const SystemMonitor: React.FC = () => {
   };
 
   const killProc = async (pid: number) => {
-    if (!confirm("确定终止进程 PID=" + pid + "?")) return;
-    try { await sdk.killProcess(pid); setProcs(procs.filter(p => p.pid !== pid)); } catch (e) { alert("终止失败: " + e); }
+    const confirmed = await confirmModal({
+      type: 'danger',
+      title: '终止进程',
+      message: `确定终止进程 PID=${pid} 吗？`,
+    });
+    if (!confirmed) return;
+    try { await sdk.killProcess(pid); setProcs(procs.filter(p => p.pid !== pid)); } catch (err) { error("终止失败", `无法终止进程: ${err}`); }
   };
 
   useEffect(() => { loadAll(); }, []);
