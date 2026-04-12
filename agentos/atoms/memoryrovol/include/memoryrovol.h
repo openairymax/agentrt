@@ -7,7 +7,7 @@
 #ifndef AGENTOS_MEMORYROV_H
 #define AGENTOS_MEMORYROV_H
 
-#include "agentos.h"
+#include "../../../corekern/include/agentos.h"
 #include "config.h"
 #include "forgetting.h"
 

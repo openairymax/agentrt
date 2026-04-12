@@ -15,6 +15,7 @@ option(BUILD_SHARED_LIBS "Build shared libraries instead of static libraries" ON
 option(WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)  # 暂时关闭，待解决现有警告后启用
 option(BUILD_TESTS "Build unit tests" OFF)
 option(ENABLE_COVERAGE "Enable code coverage reporting" OFF)
+option(ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" OFF)
 option(AGENTOS_BUILD_ALL "Build all AgentOS components" ON)
 
 # 输出构建配置信息
@@ -67,6 +68,17 @@ else()
         add_link_options(-Wl,-z,relro -Wl,-z,now -pie)
     elseif(APPLE)
         add_link_options(-Wl,-dead_strip -pie)
+    endif()
+endif()
+
+# Sanitizer支持（仅GCC/Clang）
+if(ENABLE_SANITIZERS AND NOT MSVC)
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        add_compile_options(-fsanitize=address,undefined)
+        add_link_options(-fsanitize=address,undefined)
+        message(STATUS "Sanitizers enabled (AddressSanitizer, UndefinedBehaviorSanitizer)")
+    else()
+        message(WARNING "Sanitizers only supported for GCC/Clang compilers")
     endif()
 endif()
 

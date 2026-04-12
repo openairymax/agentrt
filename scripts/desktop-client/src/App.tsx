@@ -45,6 +45,7 @@ import GlobalSearch from "./components/GlobalSearch";
 import KeyboardShortcutsModal, { useKeyboardShortcuts } from "./components/KeyboardShortcuts";
 import CommandPalette from "./components/CommandPalette";
 import { ToastProvider } from "./components/Toast";
+import { ModalProvider } from "./components/Modal";
 import { useI18n } from "./i18n";
 
 const navConfig = [
@@ -390,9 +391,11 @@ function App() {
 
   return (
     <ToastProvider>
-      <Router>
-        <AppContent />
-      </Router>
+      <ModalProvider>
+        <Router>
+          <AppContent />
+        </Router>
+      </ModalProvider>
     </ToastProvider>
   );
 }

@@ -341,16 +341,67 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
         return AUTH_TOKEN_INVALID;
     }
 
-    /* 解析 Payload（简化） */
+    /* 解析 Payload */
     size_t payload_len = (size_t)(dot2 - dot1 - 1);
     char* payload_b64 = (char*)malloc(payload_len + 1);
     strncpy(payload_b64, dot1 + 1, payload_len);
     payload_b64[payload_len] = '\0';
 
-    /* 尝试解码并解析 JSON */
-    /* 注意：这里简化处理，实际需要 Base64 解码 */
-    cJSON* payload = cJSON_Parse(payload_b64);
+    /* Base64 URL-safe 解码 */
+    size_t decoded_len = (payload_len * 3) / 4 + 4;
+    unsigned char* payload_decoded = (unsigned char*)malloc(decoded_len);
+    if (!payload_decoded) {
+        free(payload_b64);
+        agentos_mutex_unlock(&g_jwt.lock);
+        return AUTH_TOKEN_INVALID;
+    }
+
+    /* Base64 URL -> Standard Base64 转换 */
+    for (size_t i = 0; i < payload_len; i++) {
+        if (payload_b64[i] == '-') payload_b64[i] = '+';
+        else if (payload_b64[i] == '_') payload_b64[i] = '/';
+    }
+    /* 补齐 padding */
+    size_t pad = (4 - (payload_len % 4)) % 4;
+    char* payload_padded = (char*)malloc(payload_len + pad + 1);
+    if (!payload_padded) {
+        free(payload_decoded);
+        free(payload_b64);
+        agentos_mutex_unlock(&g_jwt.lock);
+        return AUTH_TOKEN_INVALID;
+    }
+    memcpy(payload_padded, payload_b64, payload_len);
+    for (size_t i = 0; i < pad; i++) payload_padded[payload_len + i] = '=';
+    payload_padded[payload_len + pad] = '\0';
+
+    /* 手动 Base64 解码 */
+    static const unsigned char b64_table[256] = {
+        ['A']=0,['B']=1,['C']=2,['D']=3,['E']=4,['F']=5,['G']=6,['H']=7,
+        ['I']=8,['J']=9,['K']=10,['L']=11,['M']=12,['N']=13,['O']=14,['P']=15,
+        ['Q']=16,['R']=17,['S']=18,['T']=19,['U']=20,['V']=21,['W']=22,['X']=23,
+        ['Y']=24,['Z']=25,['a']=26,['b']=27,['c']=28,['d']=29,['e']=30,['f']=31,
+        ['g']=32,['h']=33,['i']=34,['j']=35,['k']=36,['l']=37,['m']=38,['n']=39,
+        ['o']=40,['p']=41,['q']=42,['r']=43,['s']=44,['t']=45,['u']=46,['v']=47,
+        ['w']=48,['x']=49,['y']=50,['z']=51,['0']=52,['1']=53,['2']=54,['3']=55,
+        ['4']=56,['5']=57,['6']=58,['7']=59,['8']=60,['9']=61,['+']=62,['/']=63
+    };
+    size_t b64_len = payload_len + pad;
+    size_t out_idx = 0;
+    for (size_t i = 0; i + 3 < b64_len; i += 4) {
+        unsigned char a = b64_table[(unsigned char)payload_padded[i]];
+        unsigned char b = b64_table[(unsigned char)payload_padded[i+1]];
+        unsigned char c = (payload_padded[i+2] == '=') ? 0 : b64_table[(unsigned char)payload_padded[i+2]];
+        unsigned char d = (payload_padded[i+3] == '=') ? 0 : b64_table[(unsigned char)payload_padded[i+3]];
+        payload_decoded[out_idx++] = (a << 2) | (b >> 4);
+        if (payload_padded[i+2] != '=') payload_decoded[out_idx++] = ((b & 0xF) << 4) | (c >> 2);
+        if (payload_padded[i+3] != '=') payload_decoded[out_idx++] = ((c & 0x3) << 6) | d;
+    }
+    payload_decoded[out_idx] = '\0';
+    free(payload_padded);
     free(payload_b64);
+
+    cJSON* payload = cJSON_Parse((const char*)payload_decoded);
+    free(payload_decoded);
 
     if (!payload) {
         result->error_message = "Invalid token payload";

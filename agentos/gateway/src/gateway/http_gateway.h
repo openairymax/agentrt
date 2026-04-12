@@ -14,8 +14,16 @@
 
 #include "gateway.h"
 #include <stdint.h>
-#include <stdatomic.h>
 #include <cJSON.h>
+
+/* 跨平台原子操作支持 */
+#ifdef _WIN32
+#include <windows.h>
+#include <intrin.h>
+#include "../../../commons/utils/include/atomic_compat.h"
+#else
+#include <stdatomic.h>
+#endif
 
 /* 前向声明 */
 struct gateway_rate_limiter;

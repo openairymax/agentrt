@@ -1,6 +1,6 @@
 /**
  * @file decay.c
- * @brief 遗忘衰减计算（基于艾宾浩斯曲线）
+ * @brief 遗忘衰减计算（基于艾宾浩斯曲线，支持自适应学习）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -9,11 +9,42 @@
 #include "agentos.h"
 #include <math.h>
 #include <stdlib.h>
+#include <time.h>
 
 /* Unified base library compatibility layer */
 #include "../../../agentos/commons/utils/memory/include/memory_compat.h"
 #include "../../../agentos/commons/utils/string/include/string_compat.h"
 #include <string.h>
+
+#define ADAPTIVE_SAMPLE_SIZE 50      /* 自适应学习所需的最小样本数 */
+#define DEFAULT_LEARNING_RATE 0.05f   /* 默认学习率 */
+#define MIN_LAMBDA 0.001f             /* 最小lambda值 */
+#define MAX_LAMBDA 1.0f               /* 最大lambda值 */
+
+/**
+ * @brief 自适应学习历史记录
+ */
+typedef struct adaptive_record {
+    char record_id[64];               /* 记录ID */
+    float predicted_weight;           /* 预测权重 */
+    float actual_access_rate;         /* 实际访问率（0-1） */
+    uint64_t timestamp;              /* 记录时间戳 */
+} adaptive_record_t;
+
+/**
+ * @brief 自适应学习状态
+ */
+typedef struct adaptive_state {
+    adaptive_record_t samples[ADAPTIVE_SAMPLE_SIZE];  /* 样本缓冲区 */
+    size_t sample_count;                 /* 当前样本数 */
+    size_t sample_index;                 /* 写入索引（环形） */
+    float learning_rate;                 /* 学习率 */
+    int enabled;                         /* 是否启用自适应 */
+    uint64_t total_adjustments;          /* 总调整次数 */
+    float avg_error;                     /* 平均预测误差 */
+    float lambda_history[100];           /* lambda变化历史 */
+    size_t history_count;                /* 历史记录数 */
+} adaptive_state_t;
 
 struct agentos_forgetting_engine {
     agentos_forgetting_config_t manager;
@@ -22,6 +53,7 @@ struct agentos_forgetting_engine {
     agentos_mutex_t* lock;
     int auto_running;
     agentos_thread_t* auto_thread;
+    adaptive_state_t adaptive;           /* 自适应学习状态 */
 };
 
 agentos_error_t agentos_forgetting_create(
@@ -58,6 +90,9 @@ agentos_error_t agentos_forgetting_create(
         return AGENTOS_ENOMEM;
     }
 
+    /* 初始化自适应学习状态 */
+    init_adaptive_state(&eng->adaptive);
+
     *out_engine = eng;
     return AGENTOS_SUCCESS;
 }
@@ -70,10 +105,10 @@ void agentos_forgetting_destroy(agentos_forgetting_engine_t* engine) {
 }
 
 /**
- * 艾宾浩斯遗忘曲线�?R = exp(-λ * t)  (t 单位为秒)
+ * 艾宾浩斯遗忘曲线：R = exp(-λ * t)  (t 单位为秒)
  */
 static double ebbinghaus_weight(double lambda, uint64_t last_access, uint64_t now) {
-    double age_sec = (now - last_access) / 1e9; // 纳秒转秒
+    double age_sec = (now - last_access) / 1e9; /* 纳秒转秒 */
     return exp(-lambda * age_sec);
 }
 
@@ -82,7 +117,124 @@ static double ebbinghaus_weight(double lambda, uint64_t last_access, uint64_t no
  */
 static double access_weight(uint32_t access_count, uint32_t min_access) {
     if (min_access == 0) return 0.0;
-    return (access_count >= min_access) ? 1.0 : (double)access_count / min_access;
+    return (access_count >= min_access) ? 1.0 : (double)access_count / (double)min_access;
+}
+
+/**
+ * 初始化自适应学习状态
+ */
+static void init_adaptive_state(adaptive_state_t* state) {
+    if (!state) return;
+    
+    memset(state, 0, sizeof(adaptive_state_t));
+    state->learning_rate = DEFAULT_LEARNING_RATE;
+    state->enabled = 0; /* 默认禁用 */
+}
+
+/**
+ * 记录一个样本用于自适应学习
+ * @param state 自适应状态
+ * @param record_id 记录ID
+ * @param predicted 预测的遗忘权重
+ * @param actual 实际的访问情况（1=被访问，0=未被访问）
+ */
+static void record_adaptive_sample(adaptive_state_t* state,
+                                   const char* record_id,
+                                   float predicted,
+                                   int actual_accessed) {
+    if (!state || !state->enabled || !record_id) return;
+    
+    adaptive_record_t* record = &state->samples[state->sample_index];
+    
+    /* 记录样本数据 */
+    strncpy(record->record_id, record_id, sizeof(record->record_id) - 1);
+    record->record_id[sizeof(record->record_id) - 1] = '\0';
+    record->predicted_weight = predicted;
+    record->actual_access_rate = actual_accessed ? 1.0f : 0.0f;
+    record->timestamp = (uint64_t)time(NULL);
+    
+    /* 更新索引（环形缓冲） */
+    state->sample_index = (state->sample_index + 1) % ADAPTIVE_SAMPLE_SIZE;
+    if (state->sample_count < ADAPTIVE_SAMPLE_SIZE) {
+        state->sample_count++;
+    }
+}
+
+/**
+ * 基于历史样本调整lambda参数
+ * @param engine 遗忘引擎实例
+ * @return 调整后的lambda值
+ */
+static float adapt_lambda(agentos_forgetting_engine_t* engine) {
+    adaptive_state_t* state = &engine->adaptive;
+    
+    /* 检查是否有足够的数据 */
+    if (state->sample_count < ADAPTIVE_SAMPLE_SIZE / 2) {
+        return engine->manager.lambda; /* 数据不足，不调整 */
+    }
+    
+    /* 计算预测误差 */
+    float total_error = 0.0f;
+    size_t valid_samples = 0;
+    
+    for (size_t i = 0; i < state->sample_count; i++) {
+        adaptive_record_t* record = &state->samples[i];
+        
+        /* 计算误差：预测值与实际值的差异 */
+        float error = fabsf(record->predicted_weight - record->actual_access_rate);
+        total_error += error;
+        valid_samples++;
+    }
+    
+    if (valid_samples == 0) return engine->manager.lambda;
+    
+    /* 更新平均误差 */
+    state->avg_error = total_error / (float)valid_samples;
+    
+    /* 简单的自适应规则：
+     * - 如果平均误差 > 0.3，说明遗忘太快或太慢，需要调整lambda
+     * - 如果实际访问率普遍高于预测，说明遗忘太慢，增加lambda
+     * - 如果实际访问率普遍低于预测，说明遗忘太快，减少lambda
+     */
+    float adjustment = 0.0f;
+    float actual_avg = 0.0f;
+    float predicted_avg = 0.0f;
+    
+    for (size_t i = 0; i < state->sample_count; i++) {
+        actual_avg += state->samples[i].actual_access_rate;
+        predicted_avg += state->samples[i].predicted_weight;
+    }
+    
+    if (state->sample_count > 0) {
+        actual_avg /= (float)state->sample_count;
+        predicted_avg /= (float)state->sample_count;
+    }
+    
+    /* 根据差异计算调整量 */
+    float diff = actual_avg - predicted_avg;
+    adjustment = diff * state->learning_rate;
+    
+    /* 应用调整 */
+    float new_lambda = engine->manager.lambda + adjustment;
+    
+    /* 限制lambda范围 */
+    if (new_lambda < MIN_LAMBDA) new_lambda = MIN_LAMBDA;
+    if (new_lambda > MAX_LAMBDA) new_lambda = MAX_LAMBDA;
+    
+    /* 记录lambda变化历史 */
+    if (state->history_count < 100) {
+        state->lambda_history[state->history_count] = new_lambda;
+        state->history_count++;
+    } else {
+        /* 移动历史记录 */
+        memmove(state->lambda_history, state->lambda_history + 1,
+                99 * sizeof(float));
+        state->lambda_history[99] = new_lambda;
+    }
+    
+    state->total_adjustments++;
+    
+    return new_lambda;
 }
 
 agentos_error_t agentos_forgetting_get_weight(
@@ -99,14 +251,26 @@ agentos_error_t agentos_forgetting_get_weight(
     uint64_t now = agentos_time_monotonic_ns();
     double weight = 1.0;
 
+    /* 使用自适应调整后的lambda（如果启用） */
+    float effective_lambda = engine->manager.lambda;
+    
+    if (engine->adaptive.enabled && engine->adaptive.sample_count >= ADAPTIVE_SAMPLE_SIZE / 2) {
+        effective_lambda = adapt_lambda(engine);
+        /* 如果lambda有变化，更新到配置中（临时使用） */
+        if (fabsf(effective_lambda - engine->manager.lambda) > 0.0001f) {
+            /* 仅在自适应模式下使用调整后的值 */
+            engine->manager.lambda = effective_lambda;  /* 注意：这会修改配置 */
+        }
+    }
+
     switch (engine->manager.strategy) {
         case AGENTOS_FORGET_EBBINGHAUS:
-            weight = ebbinghaus_weight(engine->manager.lambda, meta->last_access, now);
+            weight = ebbinghaus_weight(effective_lambda, meta->last_access, now);
             break;
         case AGENTOS_FORGET_LINEAR:
             {
                 double age_sec = (now - meta->last_access) / 1e9;
-                weight = 1.0 - engine->manager.lambda * age_sec;
+                weight = 1.0 - effective_lambda * age_sec;
                 if (weight < 0) weight = 0.0;
             }
             break;
@@ -119,6 +283,14 @@ agentos_error_t agentos_forgetting_get_weight(
     }
 
     *out_weight = (float)weight;
+    
+    /* 记录样本用于后续自适应学习（异步记录） */
+    if (engine->adaptive.enabled) {
+        /* 这里简化处理：假设当前访问意味着权重应该较高 */
+        int accessed = (weight > engine->manager.threshold) ? 1 : 0;
+        record_adaptive_sample(&engine->adaptive, record_id, (float)weight, accessed);
+    }
+    
     agentos_layer1_raw_metadata_free(meta);
     return AGENTOS_SUCCESS;
 }
@@ -151,4 +323,86 @@ void agentos_forgetting_stop_auto(agentos_forgetting_engine_t* engine) {
         agentos_thread_join(engine->auto_thread, NULL);
         engine->auto_thread = NULL;
     }
+}
+
+/**
+ * @brief 启用或禁用自适应学习功能
+ * @param engine 遗忘引擎实例
+ * @param enable 是否启用（1=启用，0=禁用）
+ * @param learning_rate 学习率（0.0-1.0），仅在启用时有效
+ * @return 错误码
+ */
+agentos_error_t agentos_forgetting_enable_adaptive(
+    agentos_forgetting_engine_t* engine,
+    int enable,
+    float learning_rate) {
+    
+    if (!engine) return AGENTOS_EINVAL;
+    
+    agentos_mutex_lock(engine->lock);
+    
+    engine->adaptive.enabled = enable;
+    
+    if (enable) {
+        /* 验证并设置学习率 */
+        if (learning_rate < 0.001f || learning_rate > 1.0f) {
+            learning_rate = DEFAULT_LEARNING_RATE;  /* 使用默认值 */
+        }
+        engine->adaptive.learning_rate = learning_rate;
+        
+        /* 如果之前未初始化，现在初始化 */
+        if (engine->adaptive.sample_count == 0 && 
+            engine->adaptive.sample_index == 0) {
+            init_adaptive_state(&engine->adaptive);
+            engine->adaptive.enabled = 1;
+            engine->adaptive.learning_rate = learning_rate;
+        }
+    }
+    
+    agentos_mutex_unlock(engine->lock);
+    
+    return AGENTOS_SUCCESS;
+}
+
+/**
+ * @brief 获取自适应学习状态信息
+ * @param engine 遗忘引擎实例
+ * @param[out] sample_count 当前样本数量
+ * @param[out] total_adjustments 总调整次数
+ * @param[out] avg_error 平均预测误差
+ * @param[out] current_lambda 当前的lambda值
+ * @return 错误码
+ */
+agentos_error_t agentos_forgetting_get_adaptive_stats(
+    agentos_forgetting_engine_t* engine,
+    size_t* sample_count,
+    uint64_t* total_adjustments,
+    float* avg_error,
+    float* current_lambda) {
+    
+    if (!engine) return AGENTOS_EINVAL;
+    
+    if (sample_count) *sample_count = engine->adaptive.sample_count;
+    if (total_adjustments) *total_adjustments = engine->adaptive.total_adjustments;
+    if (avg_error) *avg_error = engine->adaptive.avg_error;
+    if (current_lambda) *current_lambda = engine->manager.lambda;
+    
+    return AGENTOS_SUCCESS;
+}
+
+/**
+ * @brief 重置自适应学习状态
+ * @param engine 遗忘引擎实例
+ * @return 错误码
+ */
+agentos_error_t agentos_forgetting_reset_adaptive(agentos_forgetting_engine_t* engine) {
+    if (!engine) return AGENTOS_EINVAL;
+    
+    agentos_mutex_lock(engine->lock);
+    init_adaptive_state(&engine->adaptive);
+    /* 恢复默认lambda值 */
+    engine->manager.lambda = 0.01f;  /* 默认值 */
+    agentos_mutex_unlock(engine->lock);
+    
+    return AGENTOS_SUCCESS;
 }

@@ -99,6 +99,7 @@ endif()
 # - svc_cache.c -> agentos/commons/utils/cache
 
 set(SVC_COMMON_SOURCES
+    src/svc_common.c          # 服务框架核心实现
     src/ipc_client.c
     src/svc_auth.c
     src/daemon_security.c

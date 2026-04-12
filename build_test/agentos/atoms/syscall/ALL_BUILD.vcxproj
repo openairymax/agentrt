@@ -69,7 +69,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Midl>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\SPHARX-CN\SpharxWorks\AgentOS\agentos;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\corekern\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\memory\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\string\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\logging\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\sync\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\platform\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -79,7 +79,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Midl>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\SPHARX-CN\SpharxWorks\AgentOS\agentos;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\corekern\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\memory\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\string\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\logging\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\sync\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\platform\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -89,7 +89,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
     <Midl>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\SPHARX-CN\SpharxWorks\AgentOS\agentos;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\corekern\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\memory\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\string\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\logging\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\sync\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\platform\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -99,7 +99,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
     <Midl>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\SPHARX-CN\SpharxWorks\AgentOS\agentos;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\atoms\corekern\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\memory\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\string\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\logging\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\sync\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\platform\include;D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\commons\utils\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>

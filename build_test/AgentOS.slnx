@@ -39,6 +39,13 @@
 		<Build Solution="RelWithDebInfo|*" Project="false"/>
 	</Project>
 	<Project Path="ZERO_CHECK.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="eabeb6e2-21a1-353a-8d93-64b2d13b1b94"/>
+	<Project Path="agentos/agentos-all.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="7bb9289f-6aef-36ba-a080-092b285b8332">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<Build Solution="Debug|*" Project="false"/>
+		<Build Solution="Release|*" Project="false"/>
+		<Build Solution="MinSizeRel|*" Project="false"/>
+		<Build Solution="RelWithDebInfo|*" Project="false"/>
+	</Project>
 	<Project Path="agentos/atoms/coreloopthree/src/cognition/agentos_cognition.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="b2c21f8b-fc8c-302f-a153-5d4045e21617">
 		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
 		<BuildDependency Project="agentos/atoms/corekern/agentos_core.vcxproj"/>
@@ -70,6 +77,13 @@
 		<BuildDependency Project="agentos/atoms/coreloopthree/agentos_coreloopthree.vcxproj"/>
 		<BuildDependency Project="agentos/atoms/coreloopthree/src/execution/agentos_execution.vcxproj"/>
 		<BuildDependency Project="agentos/atoms/memoryrovol/src/agentos_memoryrovol.vcxproj"/>
+	</Project>
+	<Project Path="clean-all.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="1894bb56-739d-3577-b5ff-cc9cd3e72d86">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<Build Solution="Debug|*" Project="false"/>
+		<Build Solution="Release|*" Project="false"/>
+		<Build Solution="MinSizeRel|*" Project="false"/>
+		<Build Solution="RelWithDebInfo|*" Project="false"/>
 	</Project>
 	<Project Path="agentos/cupolas/cupolas.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="445edc2e-2c7c-3605-b49a-addc5af8709b">
 		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
