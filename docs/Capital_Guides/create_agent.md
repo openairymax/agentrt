@@ -709,7 +709,7 @@ if (ret != 0) {
 - [Agent 契约规范](../specifications/agentos_contract/agent/agent_contract.md)
 - [架构设计原则](../architecture/ARCHITECTURAL_PRINCIPLES.md)
 - [Skill 创建指南](create_skill.md)
-- [编码规范](../specifications/coding_standard/C_coding_style_guide.md)
+- [编码规范](../Capital_Specifications/coding_standard/C_coding_style_standard.md)
 - [系统调用 API](../architecture/folder/syscall.md)
 
 ---

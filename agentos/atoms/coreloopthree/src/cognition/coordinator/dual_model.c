@@ -1,6 +1,6 @@
 /**
  * @file dual_model.c
- * @brief 双模型协调器实现
+ * @brief 双模型协调器实现（安全加固版）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -8,12 +8,85 @@
 #include "agentos.h"
 #include <stdlib.h>
 #include <time.h>
+#include <math.h>
 
 /* Unified base library compatibility layer */
 #include "../../../agentos/commons/utils/memory/include/memory_compat.h"
 #include "../../../agentos/commons/utils/string/include/string_compat.h"
 #include "../intent_utils.h"  /* for intent_string_similarity */
 #include <string.h>
+
+// ============================================================================
+// 安全加固宏和辅助函数
+// ============================================================================
+
+/* 安全字符串复制宏（确保空字符结尾） */
+#define SAFE_STRNCPY(dst, src, size) \
+    do { \
+        if ((dst) && (src) && (size) > 0) { \
+            strncpy((dst), (src), (size) - 1); \
+            (dst)[(size) - 1] = '\0'; \
+        } \
+    } while(0)
+
+/* 浮点数验证宏 */
+#define VALIDATE_FLOAT(value, min, max) \
+    ((!isnan((value)) && !isinf((value)) && (value) >= (min) && (value) <= (max)))
+
+#define VALIDATE_FLOAT_RANGE(value, min, max) VALIDATE_FLOAT(value, min, max)
+
+/* 字符串验证宏 */
+#define VALIDATE_STRING(str) \
+    ((str) != NULL && (str)[0] != '\0')
+
+/* 模型名称最大长度 */
+#define MODEL_NAME_MAX_LEN 31
+
+/* 缓冲区索引安全宏（防止环形缓冲区溢出） */
+#define SAFE_BUFFER_INDEX(index, max) \
+    (((index) < (max)) ? (index) : (0))
+
+/* 安全内存分配宏 */
+#define SAFE_ALLOC(type, count) \
+    ((type*)AGENTOS_CALLOC((count), sizeof(type)))
+
+/* 检查内存分配结果 */
+#define CHECK_ALLOC(ptr) \
+    do { \
+        if (!(ptr)) { \
+            return AGENTOS_ERROR_NO_MEMORY; \
+        } \
+    } while(0)
+
+// 安全字符串复制函数（返回实际复制的字符数，不包括空字符）
+static size_t safe_str_copy(char* dest, size_t dest_size, const char* src) {
+    if (!dest || !src || dest_size == 0) return 0;
+    
+    size_t src_len = strlen(src);
+    size_t copy_len = (src_len < dest_size - 1) ? src_len : dest_size - 1;
+    
+    memcpy(dest, src, copy_len);
+    dest[copy_len] = '\0';
+    
+    return copy_len;
+}
+
+// 浮点数范围检查
+static int validate_float_range(float value, float min, float max) {
+    return VALIDATE_FLOAT(value, min, max);
+}
+
+// 验证权重参数（权重和为1.0，每个权重在0.0-1.0之间）
+static int validate_weights(float primary_weight, float secondary_weight) {
+    if (!VALIDATE_FLOAT(primary_weight, 0.0f, 1.0f) ||
+        !VALIDATE_FLOAT(secondary_weight, 0.0f, 1.0f)) {
+        return 0;
+    }
+    
+    // 允许权重和接近1.0（有一定容差）
+    float sum = primary_weight + secondary_weight;
+    return (fabsf(sum - 1.0f) < 0.0001f);
+}
 
 /**
  * @brief 交叉验证模式
@@ -72,6 +145,15 @@ typedef struct dual_model_coordinator {
     performance_stats_t stats;               /**< 性能统计和历史记录 */
     int enable_adaptive_learning;            /**< 是否启用自适应学习 */
     float learning_rate;                     /**< 学习率 (0.0-1.0) */
+    /* 健康监控与故障恢复 */
+    int primary_healthy;                     /**< 主模型健康状态（1=健康，0=故障） */
+    int secondary_healthy;                   /**< 次模型健康状态 */
+    uint64_t primary_error_count;            /**< 主模型错误计数 */
+    uint64_t secondary_error_count;          /**< 次模型错误计数 */
+    uint64_t primary_last_error_time;        /**< 主模型最后错误时间（纳秒） */
+    uint64_t secondary_last_error_time;      /**< 次模型最后错误时间 */
+    uint64_t health_check_interval;          /**< 健康检查间隔（纳秒） */
+    uint64_t last_health_check_time;         /**< 最后健康检查时间 */
 } dual_model_coordinator_t;
 
 /**
@@ -151,8 +233,7 @@ static void record_decision(performance_stats_t* stats,
     
     /* 记录到历史（环形缓冲） */
     decision_record_t* record = &stats->history[stats->history_index];
-    strncpy(record->selected_model, model_name, sizeof(record->selected_model) - 1);
-    record->selected_model[sizeof(record->selected_model) - 1] = '\0';
+    SAFE_STRNCPY(record->selected_model, model_name, sizeof(record->selected_model));
     record->similarity = similarity;
     record->confidence = confidence;
     record->timestamp = (uint64_t)time(NULL);  /* 简化：使用当前时间 */
@@ -348,11 +429,11 @@ static agentos_error_t dual_coordinate(
     if (is_consistent) {
         /* 输出一致，根据权重选择 */
         if (coordinator->primary_weight >= coordinator->secondary_weight) {
-            strncpy(selected_model, "Primary", sizeof(selected_model) - 1); selected_model[sizeof(selected_model) - 1] = '\0';
+            SAFE_STRNCPY(selected_model, "Primary", sizeof(selected_model));
             selected_output = primary_output;
             final_confidence = (primary_confidence + similarity) / 2.0f;
         } else {
-            strncpy(selected_model, "Secondary", sizeof(selected_model) - 1); selected_model[sizeof(selected_model) - 1] = '\0';
+            SAFE_STRNCPY(selected_model, "Secondary", sizeof(selected_model));
             selected_output = secondary_output;
             final_confidence = (secondary_confidence + similarity) / 2.0f;
         }
@@ -361,7 +442,7 @@ static agentos_error_t dual_coordinate(
         switch (validation_mode) {
             case CROSS_VALIDATION_BASIC:
                 /* 基础模式：选择主模型 */
-                strncpy(selected_model, "Primary (Basic)", sizeof(selected_model) - 1); selected_model[sizeof(selected_model) - 1] = '\0';
+                SAFE_STRNCPY(selected_model, "Primary (Basic)", sizeof(selected_model));
                 selected_output = primary_output;
                 final_confidence = primary_confidence * 0.7f;  /* 不一致时降低置信度 */
                 break;
@@ -369,11 +450,11 @@ static agentos_error_t dual_coordinate(
             case CROSS_VALIDATION_ADVANCED:
                 /* 高级模式：基于置信度选择 */
                 if (primary_confidence >= secondary_confidence) {
-                    strncpy(selected_model, "Primary (Confidence)", sizeof(selected_model) - 1); selected_model[sizeof(selected_model) - 1] = '\0';
+                    SAFE_STRNCPY(selected_model, "Primary (Confidence)", sizeof(selected_model));
                     selected_output = primary_output;
                     final_confidence = primary_confidence;
                 } else {
-                    strncpy(selected_model, "Secondary (Confidence)", sizeof(selected_model) - 1); selected_model[sizeof(selected_model) - 1] = '\0';
+                    SAFE_STRNCPY(selected_model, "Secondary (Confidence)", sizeof(selected_model));
                     selected_output = secondary_output;
                     final_confidence = secondary_confidence;
                 }
@@ -406,11 +487,11 @@ static agentos_error_t dual_coordinate(
                     } else {
                         /* 数据不足，回退到高级模式 */
                         if (primary_confidence >= secondary_confidence) {
-                            strncpy(selected_model, "Primary (Adaptive-Fallback)", sizeof(selected_model) - 1); selected_model[sizeof(selected_model) - 1] = '\0';
+                            SAFE_STRNCPY(selected_model, "Primary (Adaptive-Fallback)", sizeof(selected_model));
                             selected_output = primary_output;
                             final_confidence = primary_confidence;
                         } else {
-                            strncpy(selected_model, "Secondary (Adaptive-Fallback)", sizeof(selected_model) - 1); selected_model[sizeof(selected_model) - 1] = '\0';
+                            SAFE_STRNCPY(selected_model, "Secondary (Adaptive-Fallback)", sizeof(selected_model));
                             selected_output = secondary_output;
                             final_confidence = secondary_confidence;
                         }
@@ -420,7 +501,7 @@ static agentos_error_t dual_coordinate(
                 
             default:
                 /* 未知模式，默认选择主模型 */
-                strncpy(selected_model, "Primary (Default)", sizeof(selected_model) - 1); selected_model[sizeof(selected_model) - 1] = '\0';
+                SAFE_STRNCPY(selected_model, "Primary (Default)", sizeof(selected_model));
                 selected_output = primary_output;
                 final_confidence = primary_confidence * 0.5f;
                 break;
@@ -478,6 +559,27 @@ agentos_error_t agentos_coordinator_dual_model_create(
     agentos_coordinator_base_t** out_base) {
     if (!out_base) return AGENTOS_EINVAL;
 
+    /* 验证模型名称参数 */
+    if (!VALIDATE_STRING(primary_model)) {
+        return AGENTOS_EINVAL;
+    }
+    if (!VALIDATE_STRING(secondary_model)) {
+        return AGENTOS_EINVAL;
+    }
+
+    /* 验证模型名称长度 */
+    if (strlen(primary_model) > MODEL_NAME_MAX_LEN) {
+        return AGENTOS_EINVAL;
+    }
+    if (strlen(secondary_model) > MODEL_NAME_MAX_LEN) {
+        return AGENTOS_EINVAL;
+    }
+
+    /* 验证权重参数 */
+    if (!validate_weights(primary_weight, secondary_weight)) {
+        return AGENTOS_EINVAL;
+    }
+
     dual_model_coordinator_t* coordinator = (dual_model_coordinator_t*)AGENTOS_CALLOC(1, sizeof(dual_model_coordinator_t));
     if (!coordinator) return AGENTOS_ENOMEM;
 
@@ -500,6 +602,16 @@ agentos_error_t agentos_coordinator_dual_model_create(
 
     coordinator->primary_weight = primary_weight;
     coordinator->secondary_weight = secondary_weight;
+
+    /* 初始化健康监控状态 */
+    coordinator->primary_healthy = 1;  /* 默认健康 */
+    coordinator->secondary_healthy = 1;
+    coordinator->primary_error_count = 0;
+    coordinator->secondary_error_count = 0;
+    coordinator->primary_last_error_time = 0;
+    coordinator->secondary_last_error_time = 0;
+    coordinator->health_check_interval = 60ULL * 1000000000ULL; /* 60秒默认检查间隔 */
+    coordinator->last_health_check_time = 0;
 
     /* 交叉验证配置默认值 */
     coordinator->validation_mode = CROSS_VALIDATION_NONE;  /* 默认不启用 */

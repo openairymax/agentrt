@@ -352,7 +352,7 @@ config_change:
 
 - ARCHITECTURAL_PRINCIPLES.md - 架构原则
 - agentos/manager/README.md - Manager 模块说明
-- specifications/coding_standard/Security_design_guide.md - 安全设计指南
+- specifications/coding_standard/Security_design_standard.md - 安全设计规范
 
 ---
 

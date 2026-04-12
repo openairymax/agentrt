@@ -23,6 +23,7 @@
 #include "svc_logger.h"
 #include "platform.h"
 #include "error.h"
+#include "safe_string_utils.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -282,12 +283,16 @@ agentos_error_t agentos_service_create(
     }
     
     /* 初始化基本信息 */
-    strncpy(service->name, name, MAX_SERVICE_NAME_LEN - 1);
-    service->name[MAX_SERVICE_NAME_LEN - 1] = '\0';
+    if (safe_strcpy(service->name, name, MAX_SERVICE_NAME_LEN) != 0) {
+        AGENTOS_FREE(service);
+        return AGENTOS_EINVAL;
+    }
     
     if (config->version) {
-        strncpy(service->version, config->version, MAX_SERVICE_VERSION_LEN - 1);
-        service->version[MAX_SERVICE_VERSION_LEN - 1] = '\0';
+        if (safe_strcpy(service->version, config->version, MAX_SERVICE_VERSION_LEN) != 0) {
+            AGENTOS_FREE(service);
+            return AGENTOS_EINVAL;
+        }
     }
     
     /* 初始化状态 */
@@ -871,8 +876,10 @@ agentos_error_t agentos_registry_init(const char* registry_url) {
         return AGENTOS_SUCCESS;
     }
 
-    strncpy(g_cross_registry.registry_url, registry_url, sizeof(g_cross_registry.registry_url) - 1);
-    g_cross_registry.registry_url[sizeof(g_cross_registry.registry_url) - 1] = '\0';
+    if (safe_strcpy(g_cross_registry.registry_url, registry_url, sizeof(g_cross_registry.registry_url)) != 0) {
+        agentos_platform_mutex_unlock(&g_cross_registry.mutex);
+        return AGENTOS_EINVAL;
+    }
     memset(g_cross_registry.entries, 0, sizeof(g_cross_registry.entries));
     g_cross_registry.entry_count = 0;
     g_cross_registry.initialized = true;
@@ -960,8 +967,9 @@ static bool tag_matches(const char* filter_tags, const char* service_tags) {
     if (!service_tags || !service_tags[0]) return false;
 
     char filter_copy[AGENTOS_MAX_TAGS_LEN];
-    strncpy(filter_copy, filter_tags, sizeof(filter_copy) - 1);
-    filter_copy[sizeof(filter_copy) - 1] = '\0';
+    if (safe_strcpy(filter_copy, filter_tags, sizeof(filter_copy)) != 0) {
+        return false;
+    }
 
     char* saveptr = NULL;
     char* token = strtok_r(filter_copy, ",", &saveptr);
@@ -1124,7 +1132,10 @@ static agentos_error_t config_mgr_init(void) {
 
     memset(g_config_mgr.watchers, 0, sizeof(g_config_mgr.watchers));
     g_config_mgr.watcher_count = 0;
-    strncpy(g_config_mgr.config_base_path, "./config", sizeof(g_config_mgr.config_base_path) - 1);
+    if (safe_strcpy(g_config_mgr.config_base_path, "./config", sizeof(g_config_mgr.config_base_path)) != 0) {
+        agentos_platform_mutex_destroy(&g_config_mgr.mutex);
+        return AGENTOS_EINVAL;
+    }
     g_config_mgr.initialized = true;
 
     return AGENTOS_SUCCESS;
@@ -1246,7 +1257,10 @@ agentos_error_t agentos_config_watch(
     }
 
     config_watcher_t* watcher = &g_config_mgr.watchers[g_config_mgr.watcher_count];
-    strncpy(watcher->service_name, service_name, sizeof(watcher->service_name) - 1);
+    if (safe_strcpy(watcher->service_name, service_name, sizeof(watcher->service_name)) != 0) {
+        agentos_platform_mutex_unlock(&g_config_mgr.mutex);
+        return AGENTOS_EINVAL;
+    }
     watcher->callback = callback;
     watcher->user_data = user_data;
     watcher->active = true;
@@ -1732,9 +1746,15 @@ agentos_error_t agentos_service_client_create(
     internal->default_timeout_ms = 30000;
 
     if (config) {
-        strncpy(internal->base_url, config, sizeof(internal->base_url) - 1);
+        if (safe_strcpy(internal->base_url, config, sizeof(internal->base_url)) != 0) {
+            AGENTOS_FREE(internal);
+            return AGENTOS_EINVAL;
+        }
     } else {
-        strncpy(internal->base_url, "http://localhost:8080", sizeof(internal->base_url) - 1);
+        if (safe_strcpy(internal->base_url, "http://localhost:8080", sizeof(internal->base_url)) != 0) {
+            AGENTOS_FREE(internal);
+            return AGENTOS_EINVAL;
+        }
     }
 
     agentos_service_client_t* cli = (agentos_service_client_t*)AGENTOS_CALLOC(1, sizeof(agentos_service_client_t));

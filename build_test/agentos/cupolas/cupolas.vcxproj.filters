@@ -94,6 +94,12 @@
     <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\network\network_utils.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\guards\guard_core.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\guards\guard_integration.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\circuit_breaker.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -193,6 +199,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\security\network\network_utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\guards\guard_core.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\guards\guard_integration.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="D:\SPHARX-CN\SpharxWorks\AgentOS\agentos\cupolas\src\circuit_breaker.h">

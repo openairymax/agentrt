@@ -14,6 +14,7 @@
 #include "config.h"
 #include "../../utils/memory/include/memory_compat.h"
 #include "../../utils/string/include/string_compat.h"
+#include "../../../daemon/common/include/safe_string_utils.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -99,9 +100,13 @@ void agentos_config_destroy(agentos_config_t* manager) {
 int agentos_config_parse(agentos_config_t* manager, const char* text) {
     if (!manager || !text) return -1;
 
-    char* copy = AGENTOS_CALLOC(1, strlen(text) + 1);
+    size_t text_len = strlen(text);
+    char* copy = AGENTOS_CALLOC(1, text_len + 1);
     if (!copy) return -1;
-    strcpy(copy, text);
+    if (safe_strcpy(copy, text, text_len + 1) != 0) {
+        AGENTOS_FREE(copy);
+        return -1;
+    }
 
     char* saveptr = NULL;
     char* line = strtok_r(copy, "\n\r", &saveptr);
@@ -300,7 +305,11 @@ int agentos_config_set_string(agentos_config_t* manager, const char* key, const 
         entry->type = CONFIG_VALUE_STRING;
         entry->string_val = value ? AGENTOS_CALLOC(1, strlen(value) + 1) : NULL;
         if (entry->string_val && value) {
-            strcpy(entry->string_val, value);
+            if (safe_strcpy(entry->string_val, value, strlen(value) + 1) != 0) {
+                AGENTOS_FREE(entry->string_val);
+                entry->string_val = NULL;
+                return -1;
+            }
         }
         return 0;
     }
@@ -309,11 +318,18 @@ int agentos_config_set_string(agentos_config_t* manager, const char* key, const 
     entry = (config_entry_t*)AGENTOS_CALLOC(1, sizeof(config_entry_t));
     if (!entry) return -1;
 
-    strncpy(entry->key, key, MAX_KEY_LEN - 1);
+    if (safe_strcpy(entry->key, key, MAX_KEY_LEN) != 0) {
+        AGENTOS_FREE(entry);
+        return -1;
+    }
     entry->type = CONFIG_VALUE_STRING;
     entry->string_val = value ? AGENTOS_CALLOC(1, strlen(value) + 1) : NULL;
     if (entry->string_val && value) {
-        strcpy(entry->string_val, value);
+        if (safe_strcpy(entry->string_val, value, strlen(value) + 1) != 0) {
+            AGENTOS_FREE(entry->string_val);
+            AGENTOS_FREE(entry);
+            return -1;
+        }
     }
 
     entry->next = manager->buckets[idx];
@@ -340,7 +356,10 @@ int agentos_config_set_int(agentos_config_t* manager, const char* key, int value
     entry = (config_entry_t*)AGENTOS_CALLOC(1, sizeof(config_entry_t));
     if (!entry) return -1;
 
-    strncpy(entry->key, key, MAX_KEY_LEN - 1);
+    if (safe_strcpy(entry->key, key, MAX_KEY_LEN) != 0) {
+        AGENTOS_FREE(entry);
+        return -1;
+    }
     entry->type = CONFIG_VALUE_INT;
     entry->int_val = value;
 
@@ -368,7 +387,10 @@ int agentos_config_set_double(agentos_config_t* manager, const char* key, double
     entry = (config_entry_t*)AGENTOS_CALLOC(1, sizeof(config_entry_t));
     if (!entry) return -1;
 
-    strncpy(entry->key, key, MAX_KEY_LEN - 1);
+    if (safe_strcpy(entry->key, key, MAX_KEY_LEN) != 0) {
+        AGENTOS_FREE(entry);
+        return -1;
+    }
     entry->type = CONFIG_VALUE_DOUBLE;
     entry->double_val = value;
 
@@ -396,7 +418,10 @@ int agentos_config_set_bool(agentos_config_t* manager, const char* key, int valu
     entry = (config_entry_t*)AGENTOS_CALLOC(1, sizeof(config_entry_t));
     if (!entry) return -1;
 
-    strncpy(entry->key, key, MAX_KEY_LEN - 1);
+    if (safe_strcpy(entry->key, key, MAX_KEY_LEN) != 0) {
+        AGENTOS_FREE(entry);
+        return -1;
+    }
     entry->type = CONFIG_VALUE_BOOL;
     entry->bool_val = value ? 1 : 0;
 
