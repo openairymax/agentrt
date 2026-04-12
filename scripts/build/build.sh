@@ -73,6 +73,7 @@ main() {
         -DBUILD_EXAMPLES=ON
         -DBUILD_DOCS=OFF
         -DENABLE_COVERAGE=OFF
+        -DWARNINGS_AS_ERRORS=OFF
     "
     
     if [ "$OS" = "linux" ]; then

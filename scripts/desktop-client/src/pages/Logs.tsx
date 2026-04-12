@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import sdk from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
+import { useAlert } from "../components/useAlert";
 
 const SERVICES = [
   { value: "", label: "All Services", color: "#9ca3af" },
@@ -37,6 +38,7 @@ const LOG_LEVELS = [
 
 const Logs: React.FC = () => {
   const { t } = useI18n();
+  const { error, confirm: confirmModal } = useAlert();
   const [logs, setLogs] = useState("");
   const [selectedService, setSelectedService] = useState("");
   const [tailCount, setTailCount] = useState(100);
@@ -81,8 +83,8 @@ const Logs: React.FC = () => {
       a.download = `agentos-logs-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.log`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Download failed:", error);
+    } catch (err) {
+      error("下载失败", `无法下载日志文件: ${err}`);
     }
   };
 
@@ -230,7 +232,14 @@ const Logs: React.FC = () => {
             <button className="btn btn-ghost btn-sm" onClick={handleDownloadLogs} title="Download">
               <Download size={14} />
             </button>
-            <button className="btn btn-ghost btn-sm" onClick={() => { if (confirm(t.logs.clearConfirm)) setLogs(""); }} disabled={!logs} title="Clear" style={{ color: logs ? "#ef4444" : undefined }}>
+            <button className="btn btn-ghost btn-sm" onClick={async () => {
+              const confirmed = await confirmModal({
+                type: 'danger',
+                title: '清除日志',
+                message: t.logs.clearConfirm,
+              });
+              if (confirmed) setLogs("");
+            }} disabled={!logs} title="Clear" style={{ color: logs ? "#ef4444" : undefined }}>
               <Trash2 size={14} />
             </button>
           </div>

@@ -14,6 +14,8 @@
 extern "C" {
 #endif
 
+#include <stddef.h>  /* for NULL */
+
 /* CURL 类型定义 */
 typedef void CURL;
 typedef struct curl_slist {

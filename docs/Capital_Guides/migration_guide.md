@@ -422,7 +422,7 @@ agentos-migrate --report --output=migration_report.md
 
 - [架构设计原则](../architecture/ARCHITECTURAL_PRINCIPLES.md) - 理解版本演进的设计动机
 - [系统调用 API](../api/README.md) - v1.0 新的系统调用接口
-- [编码规范](../specifications/coding_standard/C_coding_style_guide.md) - v1.0 编码标准
+- [编码规范](../Capital_Specifications/coding_standard/C_coding_style_standard.md) - v1.0 编码标准
 - [故障排查](troubleshooting.md) - 迁移过程中的问题诊断
 
 ---

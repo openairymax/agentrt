@@ -81,6 +81,8 @@ set(CUPOLAS_SOURCES
     src/security/network/dns_security.c
     src/security/network/network_filter.c
     src/security/network/network_utils.c
+    src/guards/guard_core.c
+    src/guards/guard_integration.c
     src/circuit_breaker.c
 )
 
@@ -117,6 +119,8 @@ set(CUPOLAS_HEADERS
     src/security/network/dns_security.h
     src/security/network/network_filter.h
     src/security/network/network_utils.h
+    src/guards/guard_core.h
+    src/guards/guard_integration.h
     src/circuit_breaker.h
 )
 

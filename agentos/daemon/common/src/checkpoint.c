@@ -25,6 +25,13 @@
 #include <time.h>
 #include <stdio.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <dirent.h>
+#include <sys/stat.h>
+#endif
+
 /* Unified base library compatibility layer */
 #include "../../../../agentos/commons/utils/memory/include/memory_compat.h"
 
@@ -592,9 +599,70 @@ agentos_error_t agentos_checkpoint_cleanup(uint64_t max_age_sec, size_t max_cnt)
         return AGENTOS_ENOTINIT;
     }
 
-    (void)max_age_sec;
-    (void)max_cnt;
+    pthread_mutex_lock(&g_checkpoint_mutex);
+    uint64_t now = (uint64_t)time(NULL);
 
+    if (max_age_sec > 0) {
+        char pattern[MAX_CHECKPOINT_PATH];
+        snprintf(pattern, sizeof(pattern), "%s/*.chk", g_checkpoint_storage_path);
+
+#ifdef _WIN32
+        WIN32_FIND_DATAA find_data;
+        HANDLE hFind = FindFirstFileA(pattern, &find_data);
+        if (hFind != INVALID_HANDLE_VALUE) {
+            do {
+                char filepath[MAX_CHECKPOINT_PATH];
+                snprintf(filepath, sizeof(filepath), "%s/%s",
+                         g_checkpoint_storage_path, find_data.cFileName);
+
+                ULARGE_INTEGER file_time;
+                file_time.LowPart = find_data.ftLastWriteTime.dwLowDateTime;
+                file_time.HighPart = find_data.ftLastWriteTime.dwHighDateTime;
+                uint64_t mod_time = (file_time.QuadPart / 10000000ULL) - 11644473600ULL;
+
+                if ((now - mod_time) > max_age_sec) {
+                    DeleteFileA(filepath);
+                    g_checkpoint_stats.total_checkpoints =
+                        (g_checkpoint_stats.total_checkpoints > 0)
+                            ? g_checkpoint_stats.total_checkpoints - 1 : 0;
+                }
+            } while (FindNextFileA(hFind, &find_data));
+            FindClose(hFind);
+        }
+#else
+        DIR* dir = opendir(g_checkpoint_storage_path);
+        if (dir) {
+            struct dirent* entry;
+            while ((entry = readdir(dir)) != NULL) {
+                size_t len = strlen(entry->d_name);
+                if (len < 4 || strcmp(entry->d_name + len - 4, ".chk") != 0)
+                    continue;
+
+                char filepath[MAX_CHECKPOINT_PATH];
+                snprintf(filepath, sizeof(filepath), "%s/%s",
+                         g_checkpoint_storage_path, entry->d_name);
+
+                struct stat st;
+                if (stat(filepath, &st) == 0) {
+                    uint64_t mod_time = (uint64_t)st.st_mtime;
+                    if ((now - mod_time) > max_age_sec) {
+                        remove(filepath);
+                        g_checkpoint_stats.total_checkpoints =
+                            (g_checkpoint_stats.total_checkpoints > 0)
+                                ? g_checkpoint_stats.total_checkpoints - 1 : 0;
+                    }
+                }
+            }
+            closedir(dir);
+        }
+#endif
+    }
+
+    if (max_cnt > 0 && g_checkpoint_stats.total_checkpoints > max_cnt) {
+        g_checkpoint_stats.total_checkpoints = max_cnt;
+    }
+
+    pthread_mutex_unlock(&g_checkpoint_mutex);
     return AGENTOS_SUCCESS;
 }
 

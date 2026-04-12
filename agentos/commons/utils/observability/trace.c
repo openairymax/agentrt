@@ -20,14 +20,16 @@
 #include "../../utils/string/include/string_compat.h"
 #include <string.h>
 #include <time.h>
-#include <stdatomic.h>
 #include <ctype.h>
 
 #ifdef _WIN32
 #include <windows.h>
+#include <intrin.h>
+#include "../../../utils/include/atomic_compat.h"
 #else
 #include <pthread.h>
 #include <unistd.h>
+#include <stdatomic.h>
 #endif
 
 #define MAX_SPANS 1024

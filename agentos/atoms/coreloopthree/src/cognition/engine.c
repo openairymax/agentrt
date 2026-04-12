@@ -55,6 +55,8 @@ static inline char* cJSON_PrintUnformatted(const cJSON* i) {
 
 #ifdef _WIN32
 #include <windows.h>
+#include <intrin.h>
+#include "../../../../commons/utils/include/atomic_compat.h"
 #else
 #include <stdatomic.h>
 #endif

@@ -887,7 +887,7 @@ func (c *VectorDBClient) Search(query Vector, k int) ([]SearchResult, error) {
 | 引用文档 | 关系说明 |
 |---------|---------|
 | [架构设计原则](../../architecture/folder/architectural_design_principles.md) | 本规范是原则 E-2（可观测性原则）和 E-4（运维友好原则）在日志打印方面的具体实施 |
-| [C&C++安全编程指南](./C_Cpp_secure_coding_guide.md) | 日志中的错误处理应遵循安全编程指南的异常处理规范 |
+| [C&C++安全编程指南](./C_Cpp_secure_coding_standard.md) | 日志中的错误处理应遵循安全编程指南的异常处理规范 |
 | [统一术语表](../TERMINOLOGY.md) | 本规范使用的术语定义和解释 |
 | [AgentOS 核心架构文档](../../architecture/folder/) | 与本规范密切相关的架构文档：<br>- logging_system.md（可观测性核心架构）<br>- coreloopthree.md（运行时日志）<br>- memoryrovol.md（内存相关日志）<br>- microkernel.md（内核日志） |
 
