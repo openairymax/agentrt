@@ -159,9 +159,68 @@ static char* duplicate_string(const char* str) {
  * @param data_len 数据长度
  * @param ctx 配置上下�? * @return 错误�? */
 static config_error_t parse_json_simple(const char* data, size_t data_len, config_context_t* ctx) {
-    // 简化实现：实际项目应使用完整JSON解析�?    // 这里只返回成功，不实际解�?    (void)data;
-    (void)data_len;
-    (void)ctx;
+    if (!data || data_len == 0 || !ctx) return CONFIG_ERROR_INVALID_ARG;
+    const char* p = data;
+    const char* end = data + data_len;
+    while (p < end && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) p++;
+    if (p >= end) return CONFIG_SUCCESS;
+    if (*p == '{') {
+        p++;
+        while (p < end) {
+            while (p < end && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r' || *p == ',')) p++;
+            if (p >= end || *p == '}') break;
+            if (*p != '"') { p++; continue; }
+            p++;
+            const char* key_start = p;
+            while (p < end && *p != '"') { if (*p == '\\') p++; p++; }
+            size_t key_len = (size_t)(p - key_start);
+            char key[256];
+            if (key_len >= sizeof(key)) key_len = sizeof(key) - 1;
+            memcpy(key, key_start, key_len);
+            key[key_len] = '\0';
+            p++;
+            while (p < end && *p != ':') p++;
+            p++;
+            while (p < end && (*p == ' ' || *p == '\t')) p++;
+            if (p >= end) break;
+            if (*p == '"') {
+                p++;
+                const char* val_start = p;
+                while (p < end && *p != '"') { if (*p == '\\') p++; p++; }
+                size_t val_len = (size_t)(p - val_start);
+                char val[1024];
+                if (val_len >= sizeof(val)) val_len = sizeof(val) - 1;
+                memcpy(val, val_start, val_len);
+                val[val_len] = '\0';
+                config_value_t* cv = config_value_create_string(val);
+                if (cv) config_context_set(ctx, key, cv);
+                p++;
+            } else if (*p == '-' || (*p >= '0' && *p <= '9')) {
+                const char* num_start = p;
+                while (p < end && *p != ',' && *p != '}' && *p != ' ' && *p != '\n') p++;
+                char num_buf[64];
+                size_t nlen = (size_t)(p - num_start);
+                if (nlen >= sizeof(num_buf)) nlen = sizeof(num_buf) - 1;
+                memcpy(num_buf, num_start, nlen);
+                num_buf[nlen] = '\0';
+                if (strchr(num_buf, '.') || strchr(num_buf, 'e') || strchr(num_buf, 'E')) {
+                    config_value_t* cv = config_value_create_double(atof(num_buf));
+                    if (cv) config_context_set(ctx, key, cv);
+                } else {
+                    config_value_t* cv = config_value_create_int(atoi(num_buf));
+                    if (cv) config_context_set(ctx, key, cv);
+                }
+            } else if (strncmp(p, "true", 4) == 0) {
+                config_value_t* cv = config_value_create_bool(true);
+                if (cv) config_context_set(ctx, key, cv);
+                p += 4;
+            } else if (strncmp(p, "false", 5) == 0) {
+                config_value_t* cv = config_value_create_bool(false);
+                if (cv) config_context_set(ctx, key, cv);
+                p += 5;
+            }
+        }
+    }
     return CONFIG_SUCCESS;
 }
 
@@ -173,9 +232,62 @@ static config_error_t parse_json_simple(const char* data, size_t data_len, confi
  * @param data_len 数据长度
  * @param ctx 配置上下�? * @return 错误�? */
 static config_error_t parse_ini_simple(const char* data, size_t data_len, config_context_t* ctx) {
-    // 简化实现：实际项目应使用完整INI解析�?    // 这里只返回成功，不实际解�?    (void)data;
-    (void)data_len;
-    (void)ctx;
+    if (!data || data_len == 0 || !ctx) return CONFIG_ERROR_INVALID_ARG;
+    char section[256] = "";
+    const char* p = data;
+    const char* end = data + data_len;
+    while (p < end) {
+        while (p < end && (*p == ' ' || *p == '\t')) p++;
+        if (p >= end) break;
+        if (*p == '#' || *p == ';') {
+            while (p < end && *p != '\n') p++;
+            if (p < end) p++;
+            continue;
+        }
+        if (*p == '[') {
+            p++;
+            const char* sec_start = p;
+            while (p < end && *p != ']') p++;
+            size_t sec_len = (size_t)(p - sec_start);
+            if (sec_len >= sizeof(section)) sec_len = sizeof(section) - 1;
+            memcpy(section, sec_start, sec_len);
+            section[sec_len] = '\0';
+            while (p < end && *p != '\n') p++;
+            if (p < end) p++;
+            continue;
+        }
+        const char* line_start = p;
+        const char* eq = NULL;
+        while (p < end && *p != '\n') {
+            if (*p == '=' && !eq) eq = p;
+            p++;
+        }
+        if (eq && eq > line_start) {
+            size_t key_len = (size_t)(eq - line_start);
+            char key_buf[512];
+            const char* val_start = eq + 1;
+            const char* val_end = p;
+            while (val_end > val_start && (*(val_end-1) == '\r' || *(val_end-1) == '\n' || *(val_end-1) == ' ')) val_end--;
+            size_t val_len = (size_t)(val_end - val_start);
+            while (key_len > 0 && (*(line_start + key_len - 1) == ' ' || *(line_start + key_len - 1) == '\t')) key_len--;
+            if (section[0]) {
+                snprintf(key_buf, sizeof(key_buf), "%s.", section);
+                size_t sl = strlen(key_buf);
+                if (sl + key_len < sizeof(key_buf)) { memcpy(key_buf + sl, line_start, key_len); key_buf[sl + key_len] = '\0'; }
+            } else {
+                if (key_len >= sizeof(key_buf)) key_len = sizeof(key_buf) - 1;
+                memcpy(key_buf, line_start, key_len);
+                key_buf[key_len] = '\0';
+            }
+            char val_buf[1024];
+            if (val_len >= sizeof(val_buf)) val_len = sizeof(val_buf) - 1;
+            memcpy(val_buf, val_start, val_len);
+            val_buf[val_len] = '\0';
+            config_value_t* cv = config_value_create_string(val_buf);
+            if (cv) config_context_set(ctx, key_buf, cv);
+        }
+        if (p < end) p++;
+    }
     return CONFIG_SUCCESS;
 }
 
@@ -186,10 +298,19 @@ static config_error_t parse_ini_simple(const char* data, size_t data_len, config
  * @param last_modified 上次修改时间
  * @return 是否已修�? */
 static bool check_file_modified(const char* file_path, uint64_t last_modified) {
-    // 简化实现：实际项目应使用stat等系统调�?    // 这里总是返回false
-    (void)file_path;
-    (void)last_modified;
-    return false;
+    if (!file_path) return false;
+#ifdef _WIN32
+    WIN32_FILE_ATTRIBUTE_DATA attr;
+    if (!GetFileAttributesExA(file_path, GetFileExInfoStandard, &attr)) return false;
+    uint64_t mod_time = ((uint64_t)attr.ftLastWriteTime.dwHighDateTime << 32) | attr.ftLastWriteTime.dwLowDateTime;
+    mod_time /= 10000000;
+    return mod_time > last_modified;
+#else
+    struct stat st;
+    if (stat(file_path, &st) != 0) return false;
+    uint64_t mod_time = (uint64_t)st.st_mtime;
+    return mod_time > last_modified;
+#endif
 }
 
 /* ==================== 文件配置源适配�?==================== */
@@ -317,8 +438,37 @@ static const config_source_adapter_t file_source_adapter = {
  * 从环境变量加载配置�? * 
  * @param source 配置�? * @param ctx 配置上下�? * @return 错误�? */
 static config_error_t env_source_load(config_source_t* source, config_context_t* ctx) {
-    // 简化实现：实际项目应完整解析环境变�?    (void)source;
-    (void)ctx;
+    if (!source || !ctx) return CONFIG_ERROR_INVALID_ARG;
+    env_source_priv_t* priv = (env_source_priv_t*)source->priv_data;
+    if (!priv) return CONFIG_ERROR_INVALID_ARG;
+    extern char** environ;
+    char** env = environ;
+    if (!env) return CONFIG_SUCCESS;
+    size_t prefix_len = priv->prefix ? strlen(priv->prefix) : 0;
+    for (size_t idx = 0; env[idx]; idx++) {
+        const char* entry = env[idx];
+        if (prefix_len > 0 && strncmp(entry, priv->prefix, prefix_len) != 0) continue;
+        const char* eq = strchr(entry, '=');
+        if (!eq) continue;
+        size_t key_len = (size_t)(eq - entry);
+        char key[512];
+        const char* val = eq + 1;
+        if (prefix_len > 0) {
+            size_t offset = prefix_len;
+            key_len -= offset;
+            if (key_len >= sizeof(key)) key_len = sizeof(key) - 1;
+            memcpy(key, entry + offset, key_len);
+        } else {
+            if (key_len >= sizeof(key)) key_len = sizeof(key) - 1;
+            memcpy(key, entry, key_len);
+        }
+        key[key_len] = '\0';
+        if (priv->separator) {
+            for (char* p = key; *p; p++) { if (*p == '_') *p = '.'; }
+        }
+        config_value_t* cv = config_value_create_string(val);
+        if (cv) config_context_set(ctx, key, cv);
+    }
     return CONFIG_SUCCESS;
 }
 
@@ -391,9 +541,26 @@ static const config_source_adapter_t env_source_adapter = {
  * 从命令行参数加载配置�? * 
  * @param source 配置�? * @param ctx 配置上下�? * @return 错误�? */
 static config_error_t args_source_load(config_source_t* source, config_context_t* ctx) {
-    // 简化实现：实际项目应完整解析命令行参数
-    (void)source;
-    (void)ctx;
+    if (!source || !ctx) return CONFIG_ERROR_INVALID_ARG;
+    args_source_priv_t* priv = (args_source_priv_t*)source->priv_data;
+    if (!priv || !priv->argv) return CONFIG_ERROR_INVALID_ARG;
+    size_t prefix_len = priv->prefix ? strlen(priv->prefix) : 0;
+    const char* assign = priv->assign_char ? priv->assign_char : "=";
+    for (int idx = 1; idx < priv->argc; idx++) {
+        const char* arg = priv->argv[idx];
+        if (!arg) continue;
+        if (prefix_len > 0 && strncmp(arg, priv->prefix, prefix_len) != 0) continue;
+        const char* eq = strstr(arg, assign);
+        if (!eq) continue;
+        size_t key_len = (size_t)(eq - arg);
+        char key[512];
+        if (key_len >= sizeof(key)) key_len = sizeof(key) - 1;
+        memcpy(key, arg + prefix_len, key_len - prefix_len);
+        key[key_len - prefix_len] = '\0';
+        const char* val = eq + strlen(assign);
+        config_value_t* cv = config_value_create_string(val);
+        if (cv) config_context_set(ctx, key, cv);
+    }
     return CONFIG_SUCCESS;
 }
 
@@ -542,8 +709,15 @@ static const config_source_adapter_t memory_source_adapter = {
  * 从默认值加载配置�? * 
  * @param source 配置�? * @param ctx 配置上下�? * @return 错误�? */
 static config_error_t defaults_source_load(config_source_t* source, config_context_t* ctx) {
-    // 简化实现：实际项目应完整处理默认�?    (void)source;
-    (void)ctx;
+    if (!source || !ctx) return CONFIG_ERROR_INVALID_ARG;
+    defaults_source_priv_t* priv = (defaults_source_priv_t*)source->priv_data;
+    if (!priv) return CONFIG_ERROR_INVALID_ARG;
+    for (size_t idx = 0; idx < priv->count; idx++) {
+        if (priv->keys[idx] && priv->values[idx]) {
+            config_value_t* cv = config_value_create_string(priv->values[idx]);
+            if (cv) config_context_set(ctx, priv->keys[idx], cv);
+        }
+    }
     return CONFIG_SUCCESS;
 }
 

@@ -18,6 +18,9 @@ typedef struct provider_ctx provider_ctx_t;
 
 /* 操作表 */
 typedef struct {
+    const char* name;
+    const char* default_model;
+    const char* default_base_url;
     provider_ctx_t* (*init)(const char* name, const char* api_key,
                              const char* api_base, const char* organization,
                              double timeout_sec, int max_retries);

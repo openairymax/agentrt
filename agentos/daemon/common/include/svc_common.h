@@ -398,6 +398,318 @@ AGENTOS_API uint32_t agentos_service_count(void);
 typedef void (*agentos_service_enum_fn)(agentos_service_t service, void* user_data);
 AGENTOS_API void agentos_service_foreach(agentos_service_enum_fn callback, void* user_data);
 
+/**
+ * @brief 设置服务用户数据
+ * @param service [in] 服务句柄
+ * @param user_data [in] 用户数据指针
+ * @return 错误码
+ * @threadsafe 是
+ * @reentrant 是
+ */
+AGENTOS_API agentos_error_t agentos_service_set_user_data(agentos_service_t service, void* user_data);
+
+/**
+ * @brief 获取服务用户数据
+ * @param service [in] 服务句柄
+ * @return 用户数据指针（未设置返回NULL）
+ * @threadsafe 是
+ * @reentrant 是
+ */
+AGENTOS_API void* agentos_service_get_user_data(agentos_service_t service);
+
+/* ==================== 服务元数据（Phase 3.2） ==================== */
+
+#define AGENTOS_MAX_ENDPOINT_LEN    256
+#define AGENTOS_MAX_SERVICE_TYPE_LEN 32
+#define AGENTOS_MAX_TAGS_LEN        256
+
+/**
+ * @brief 服务元数据结构
+ * 
+ * 用于跨进程服务注册和发现。
+ * 包含服务名称、版本、端点、类型、标签、状态、负载等信息。
+ */
+typedef struct {
+    char name[64];
+    char version[32];
+    char endpoint[AGENTOS_MAX_ENDPOINT_LEN];
+    char service_type[AGENTOS_MAX_SERVICE_TYPE_LEN];
+    char tags[AGENTOS_MAX_TAGS_LEN];
+    agentos_svc_state_t state;
+    uint32_t capabilities;
+    uint32_t current_load;
+    uint64_t last_heartbeat;
+    bool healthy;
+    uint32_t instance_id;
+} agentos_service_metadata_t;
+
+/* ==================== 跨进程服务注册中心（Phase 3.2） ==================== */
+
+/**
+ * @brief 初始化服务注册中心客户端
+ * @param registry_url [in] 注册中心URL（如 http://localhost:8080/registry）
+ * @return 0成功，非0失败
+ * @threadsafe 是
+ */
+AGENTOS_API agentos_error_t agentos_registry_init(const char* registry_url);
+
+/**
+ * @brief 向注册中心注册服务
+ * @param service [in] 服务句柄
+ * @param metadata [in] 服务元数据
+ * @return 0成功，非0失败
+ * @threadsafe 是
+ */
+AGENTOS_API agentos_error_t agentos_registry_register(
+    agentos_service_t service,
+    const agentos_service_metadata_t* metadata
+);
+
+/**
+ * @brief 从注册中心注销服务
+ * @param service [in] 服务句柄
+ * @return 0成功，非0失败
+ * @threadsafe 是
+ */
+AGENTOS_API agentos_error_t agentos_registry_deregister(
+    agentos_service_t service
+);
+
+/**
+ * @brief 从注册中心发现服务
+ * @param service_type [in] 服务类型（如 "llm"、"tool"），NULL表示所有类型
+ * @param filter_tags [in] 过滤标签（逗号分隔），NULL表示不过滤
+ * @param result_count [out] 发现的服务数量
+ * @return 服务元数据数组（需调用 agentos_registry_discover_free 释放）
+ * @threadsafe 是
+ */
+AGENTOS_API agentos_service_metadata_t* agentos_registry_discover(
+    const char* service_type,
+    const char* filter_tags,
+    size_t* result_count
+);
+
+/**
+ * @brief 释放服务发现结果
+ * @param results [in] 服务元数据数组
+ */
+AGENTOS_API void agentos_registry_discover_free(agentos_service_metadata_t* results);
+
+/**
+ * @brief 发送心跳到注册中心
+ * @param service [in] 服务句柄
+ * @return 0成功，非0失败
+ * @threadsafe 是
+ */
+AGENTOS_API agentos_error_t agentos_registry_heartbeat(agentos_service_t service);
+
+/**
+ * @brief 清理注册中心客户端资源
+ */
+AGENTOS_API void agentos_registry_cleanup(void);
+
+/* ==================== 配置管理（Phase 3.2） ==================== */
+
+#define AGENTOS_CONFIG_CHECKSUM_LEN 65
+
+/**
+ * @brief 配置数据结构
+ */
+typedef struct {
+    char* raw_config;
+    size_t config_size;
+    uint64_t version;
+    time_t last_modified;
+    char checksum[AGENTOS_CONFIG_CHECKSUM_LEN];
+} agentos_config_t;
+
+/**
+ * @brief 配置变更回调函数类型
+ * @param service_name [in] 服务名称
+ * @param old_config [in] 旧配置
+ * @param new_config [in] 新配置
+ * @param user_data [in] 用户数据
+ */
+typedef void (*agentos_config_change_callback_t)(
+    const char* service_name,
+    const agentos_config_t* old_config,
+    const agentos_config_t* new_config,
+    void* user_data
+);
+
+/**
+ * @brief 加载服务配置
+ * @param service_name [in] 服务名称
+ * @param config [out] 配置输出（需调用 agentos_config_free 释放）
+ * @return 0成功，非0失败
+ * @threadsafe 是
+ */
+AGENTOS_API agentos_error_t agentos_config_load(
+    const char* service_name,
+    agentos_config_t** config
+);
+
+/**
+ * @brief 监视配置变更
+ * @param service_name [in] 服务名称
+ * @param callback [in] 变更回调函数
+ * @param user_data [in] 用户数据
+ * @return 0成功，非0失败
+ * @threadsafe 是
+ */
+AGENTOS_API agentos_error_t agentos_config_watch(
+    const char* service_name,
+    agentos_config_change_callback_t callback,
+    void* user_data
+);
+
+/**
+ * @brief 取消配置监视
+ * @param service_name [in] 服务名称
+ * @param callback [in] 要移除的回调函数，NULL表示移除所有
+ * @return 0成功，非0失败
+ * @threadsafe 是
+ */
+AGENTOS_API agentos_error_t agentos_config_unwatch(
+    const char* service_name,
+    agentos_config_change_callback_t callback
+);
+
+/**
+ * @brief 释放配置资源
+ * @param config [in] 配置指针
+ */
+AGENTOS_API void agentos_config_free(agentos_config_t* config);
+
+/* ==================== 故障恢复（Phase 3.3） ==================== */
+
+/**
+ * @brief 监控配置结构
+ */
+typedef struct {
+    uint32_t healthcheck_interval_ms;
+    uint32_t max_restart_attempts;
+    uint32_t restart_backoff_base_ms;
+    uint32_t restart_backoff_max_ms;
+    uint32_t degradation_threshold;
+    bool auto_restart;
+    bool enable_degradation;
+} agentos_monitor_config_t;
+
+/**
+ * @brief 降级处理函数类型
+ * @param service [in] 服务句柄
+ * @param reason [in] 降级原因
+ * @param user_data [in] 用户数据
+ * @return 0成功降级，非0降级失败
+ */
+typedef agentos_error_t (*agentos_degradation_handler_t)(
+    agentos_service_t service,
+    const char* reason,
+    void* user_data
+);
+
+/**
+ * @brief 启动服务监控
+ * @param service [in] 服务句柄
+ * @param config [in] 监控配置
+ * @return 0成功，非0失败
+ * @threadsafe 是
+ */
+AGENTOS_API agentos_error_t agentos_service_monitor_start(
+    agentos_service_t service,
+    const agentos_monitor_config_t* config
+);
+
+/**
+ * @brief 停止服务监控
+ * @param service [in] 服务句柄
+ * @return 0成功，非0失败
+ * @threadsafe 是
+ */
+AGENTOS_API agentos_error_t agentos_service_monitor_stop(
+    agentos_service_t service
+);
+
+/**
+ * @brief 设置服务降级处理函数
+ * @param service [in] 服务句柄
+ * @param handler [in] 降级处理函数
+ * @param user_data [in] 用户数据
+ * @return 0成功，非0失败
+ * @threadsafe 是
+ */
+AGENTOS_API agentos_error_t agentos_service_set_degradation_handler(
+    agentos_service_t service,
+    agentos_degradation_handler_t handler,
+    void* user_data
+);
+
+/* ==================== 服务间通信客户端（Phase 3.2） ==================== */
+
+/**
+ * @brief 流式回调函数类型
+ * @param data [in] 数据块
+ * @param data_size [in] 数据大小
+ * @param user_data [in] 用户数据
+ * @return 0继续，非0中断
+ */
+typedef int (*agentos_stream_callback_t)(
+    const char* data,
+    size_t data_size,
+    void* user_data
+);
+
+/**
+ * @brief 通信协议类型
+ */
+typedef enum {
+    AGENTOS_PROTO_HTTP = 0,
+    AGENTOS_PROTO_GRPC,
+    AGENTOS_PROTO_IPC,
+    AGENTOS_PROTO_MEMORY
+} agentos_protocol_type_t;
+
+/**
+ * @brief 服务通信客户端接口
+ */
+typedef struct {
+    agentos_error_t (*call)(
+        const char* service_name,
+        const char* method,
+        const char* params_json,
+        char** response_json,
+        uint32_t timeout_ms
+    );
+    agentos_error_t (*stream)(
+        const char* service_name,
+        const char* method,
+        const char* params_json,
+        agentos_stream_callback_t callback,
+        void* user_data
+    );
+    void* internal;
+} agentos_service_client_t;
+
+/**
+ * @brief 创建服务通信客户端
+ * @param protocol [in] 通信协议
+ * @param config [in] 客户端配置（JSON格式字符串），NULL使用默认
+ * @param client [out] 客户端输出
+ * @return 0成功，非0失败
+ */
+AGENTOS_API agentos_error_t agentos_service_client_create(
+    agentos_protocol_type_t protocol,
+    const char* config,
+    agentos_service_client_t** client
+);
+
+/**
+ * @brief 销毁服务通信客户端
+ * @param client [in] 客户端指针
+ */
+AGENTOS_API void agentos_service_client_destroy(agentos_service_client_t* client);
+
 #ifdef __cplusplus
 }
 #endif

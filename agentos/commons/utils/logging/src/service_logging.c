@@ -153,10 +153,34 @@ static void console_outputter_destroy(outputter_t* self) {
  * @param self 输出器实�? * @param record 日志记录
  * @return 0成功，负值表示错�? */
 static int file_outputter_output(outputter_t* self, const log_record_t* record) {
-    (void)self;
-    (void)record;
-    
-    // 简化实现：暂时不支持文件输�?    return -1;
+    if (!self || !record) return -1;
+
+    FILE* fp = (FILE*)self->user_data;
+    if (!fp) {
+        fp = fopen(self->name, "a");
+        if (!fp) return -1;
+        self->user_data = fp;
+    }
+
+    char time_buf[64];
+    time_t now = (time_t)(record->timestamp / 1000);
+    struct tm* tm_info = localtime(&now);
+    strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", tm_info);
+
+    const char* level_str = "UNKNOWN";
+    switch (record->level) {
+        case LOG_LEVEL_TRACE: level_str = "TRACE"; break;
+        case LOG_LEVEL_DEBUG: level_str = "DEBUG"; break;
+        case LOG_LEVEL_INFO:  level_str = "INFO";  break;
+        case LOG_LEVEL_WARN:  level_str = "WARN";  break;
+        case LOG_LEVEL_ERROR: level_str = "ERROR"; break;
+        case LOG_LEVEL_FATAL: level_str = "FATAL"; break;
+    }
+
+    fprintf(fp, "[%s] [%s] %s:%d - %s\n",
+            time_buf, level_str, record->module, record->line, record->message);
+    fflush(fp);
+    return 0;
 }
 
 /**
@@ -164,6 +188,10 @@ static int file_outputter_output(outputter_t* self, const log_record_t* record) 
  * 销毁文件输出器�? * 
  * @param self 输出器实�? */
 static void file_outputter_destroy(outputter_t* self) {
+    if (self && self->user_data) {
+        fclose((FILE*)self->user_data);
+        self->user_data = NULL;
+    }
     AGENTOS_FREE(self);
 }
 
@@ -176,8 +204,11 @@ static bool level_filter_filter(filter_t* self, const log_record_t* record) {
     if (!self || !record) {
         return false;
     }
-    
-    // 简化实现：允许所有级�?    return true;
+
+    int min_level = (int)(intptr_t)self->user_data;
+    if (min_level <= 0) min_level = LOG_LEVEL_INFO;
+
+    return record->level >= min_level;
 }
 
 /**
@@ -463,9 +494,36 @@ int service_logging_get_stats(service_logging_stats_t* stats) {
 }
 
 int service_logging_reload_config(const char* config_path) {
-    (void)config_path;
-    
-    // 简化实现：暂时不支持配置重�?    return 0;
+    if (!g_service_state.initialized) return -1;
+    if (!config_path) return -1;
+
+    FILE* f = fopen(config_path, "r");
+    if (!f) return -1;
+
+    char line[512];
+    while (fgets(line, sizeof(line), f)) {
+        char* nl = strchr(line, '\n');
+        if (nl) *nl = '\0';
+        if (line[0] == '#' || line[0] == '\0') continue;
+        char* eq = strchr(line, '=');
+        if (!eq) continue;
+        *eq = '\0';
+        const char* key = line;
+        const char* val = eq + 1;
+        if (strcmp(key, "worker_threads") == 0) {
+            g_service_state.manager.worker_threads = atoi(val);
+        } else if (strcmp(key, "enable_rotation") == 0) {
+            g_service_state.manager.enable_rotation = (strcmp(val, "true") == 0);
+        } else if (strcmp(key, "enable_filtering") == 0) {
+            g_service_state.manager.enable_filtering = (strcmp(val, "true") == 0);
+        } else if (strcmp(key, "enable_transport") == 0) {
+            g_service_state.manager.enable_transport = (strcmp(val, "true") == 0);
+        } else if (strcmp(key, "enable_monitoring") == 0) {
+            g_service_state.manager.enable_monitoring = (strcmp(val, "true") == 0);
+        }
+    }
+    fclose(f);
+    return 0;
 }
 
 void service_logging_cleanup(void) {

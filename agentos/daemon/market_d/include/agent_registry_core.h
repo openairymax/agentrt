@@ -50,23 +50,23 @@ typedef struct agent_entry {
 
 typedef struct agent_registry agent_registry_t;
 
-agent_registry_t* agent_registry_create(void);
-void agent_registry_destroy(agent_registry_t* registry);
-int agent_registry_init(agent_registry_t* registry, const char* db_path);
-void agent_registry_shutdown(agent_registry_t* registry);
+agent_registry_t* agent_registry_core_create(void);
+void agent_registry_core_destroy(agent_registry_t* registry);
+int agent_registry_core_init(agent_registry_t* registry, const char* db_path);
+void agent_registry_core_shutdown(agent_registry_t* registry);
 
-int agent_registry_add(agent_registry_t* registry, const agent_entry_t* reg);
-int agent_registry_remove(agent_registry_t* registry, const char* agent_id);
-const agent_entry_t* agent_registry_get(agent_registry_t* registry, const char* agent_id);
-size_t agent_registry_list(agent_registry_t* registry, const agent_entry_t** out_entries, size_t max_entries);
-size_t agent_registry_count(agent_registry_t* registry);
+int agent_registry_core_add(agent_registry_t* registry, const agent_entry_t* reg);
+int agent_registry_core_remove(agent_registry_t* registry, const char* agent_id);
+const agent_entry_t* agent_registry_core_get(agent_registry_t* registry, const char* agent_id);
+size_t agent_registry_core_list(agent_registry_t* registry, const agent_entry_t** out_entries, size_t max_entries);
+size_t agent_registry_core_count(agent_registry_t* registry);
 
-int agent_registry_add_version(agent_registry_t* registry, const char* agent_id, const agent_version_t* version);
-const char* agent_registry_get_latest_version(agent_registry_t* registry, const char* agent_id);
+int agent_registry_core_add_version(agent_registry_t* registry, const char* agent_id, const agent_version_t* version);
+const char* agent_registry_core_get_latest_version(agent_registry_t* registry, const char* agent_id);
 
-size_t agent_registry_search_by_tag(agent_registry_t* registry, const char* tag,
+size_t agent_registry_core_search_by_tag(agent_registry_t* registry, const char* tag,
                                    const agent_entry_t** out_entries, size_t max_entries);
-size_t agent_registry_search(agent_registry_t* registry, const char* query,
+size_t agent_registry_core_search(agent_registry_t* registry, const char* query,
                           const agent_entry_t** out_entries, size_t max_entries);
 
 #ifdef __cplusplus
