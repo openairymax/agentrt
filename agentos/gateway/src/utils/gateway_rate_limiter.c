@@ -16,8 +16,16 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <stdatomic.h>
 #include <time.h>
+
+/* 跨平台原子操作支持 */
+#ifdef _WIN32
+#include <windows.h>
+#include <intrin.h>
+#include "../../../commons/utils/include/atomic_compat.h"
+#else
+#include <stdatomic.h>
+#endif
 
 /* ========== 客户端状态结构 ========== */
 

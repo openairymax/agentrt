@@ -1237,7 +1237,7 @@ cupolas模块实现零信任安全模型，要求形式化验证支持：
  * 支持能力传递、撤销和审计追踪。
  * 
  * @formal 关键安全属性已通过形式化验证
- * @see Security_design_guide.md 中的零信任架构
+ * @see Security_design_standard.md 中的零信任架构
  */
 class CapabilityManager {
 public:

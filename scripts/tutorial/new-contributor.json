@@ -1,0 +1,131 @@
+{
+  "id": "new-contributor",
+  "title": "新贡献者入门指南",
+  "description": "面向首次接触AgentOS的贡献者，涵盖环境配置、代码结构和第一个PR提交",
+  "role": "new-contributor",
+  "estimated_hours": 4,
+  "prerequisites": [],
+  "steps": [
+    {
+      "id": "welcome",
+      "title": "欢迎来到AgentOS",
+      "description": "了解AgentOS的基本概念和项目愿景",
+      "step_type": "theory",
+      "content": "# 欢迎来到AgentOS！\n\n**AgentOS** 是一个基于**体系并行论 (MCIS)** 理论构建的智能体操作系统。\n\n## 核心概念\n- **智能体 (Agent)**: 具有自主决策和执行能力的软件实体\n- **技能 (Skill)**: 智能体执行特定任务的能力\n- **记忆 (Memory)**: 智能体长期和短期的经验存储\n- **核心三层循环 (CoreLoopThree)**: 认知、执行、记忆的协同工作流\n\n## 项目愿景\n构建一个**安全、高效、可扩展**的智能体操作系统，支持大规模智能体应用开发。\n\n## 学习目标\n完成本教程后，你将能够：\n1. 搭建AgentOS开发环境\n2. 理解项目代码结构\n3. 提交你的第一个Pull Request",
+      "duration_minutes": 10,
+      "prerequisites": [],
+      "commands": [],
+      "expected_output": "",
+      "validation_type": "manual",
+      "validation_command": "",
+      "validation_pattern": "",
+      "hints": [],
+      "resources": []
+    },
+    {
+      "id": "env-setup",
+      "title": "环境配置",
+      "description": "配置开发环境，安装必要工具",
+      "step_type": "practice",
+      "content": "# 环境配置\n\n## 系统要求\n- **操作系统**: Linux/macOS/Windows (WSL2)\n- **内存**: 最低8GB，推荐16GB\n- **存储**: 最少20GB可用空间\n\n## 安装必要工具\n\n### 1. Git\n```bash\n# 检查Git是否安装\ngit --version\n```\n\n### 2. Python 3.8+\n```bash\npython3 --version\npip3 --version\n```\n\n### 3. CMake 3.20+\n```bash\ncmake --version\n```\n\n### 4. C/C++ 编译器\n```bash\n# GCC\ngcc --version\n\n# 或 Clang\nclang --version\n```\n\n## 实践任务\n运行以下命令检查你的环境：\n```bash\ngit --version && \\\npython3 --version && \\\ncmake --version && \\\ngcc --version\n```\n\n所有命令都应成功执行，显示版本信息。",
+      "duration_minutes": 20,
+      "prerequisites": ["welcome"],
+      "commands": [
+        "git --version",
+        "python3 --version",
+        "cmake --version",
+        "gcc --version"
+      ],
+      "expected_output": "",
+      "validation_type": "command",
+      "validation_command": "git --version && python3 --version && cmake --version && gcc --version",
+      "validation_pattern": "git version.*\\npython 3\\.[8-9]\\..*\\ncmake version 3\\.2[0-9]\\..*\\ngcc.*",
+      "hints": [
+        "如果缺少某个工具，请参考官方文档安装",
+        "Windows用户建议使用WSL2"
+      ],
+      "resources": []
+    },
+    {
+      "id": "project-structure",
+      "title": "项目结构分析",
+      "description": "了解AgentOS的代码组织结构",
+      "step_type": "theory",
+      "content": "# AgentOS 项目结构\n\n## 主要目录\n```\nagentos/\n├── atoms/                    # 核心原子模块\n│   ├── coreloopthree/       # 认知三层循环\n│   ├── memoryrovol/         # 记忆系统\n│   └── syscall/             # 系统调用接口\n├── daemon/                  # 守护进程服务\n├── include/                 # 公共头文件\n├── scripts/                 # 开发运维工具\n└── docs/                    # 文档\n```\n\n## 关键文件\n- **CMakeLists.txt**: 构建系统配置\n- **ARCHITECTURAL_PRINCIPLES.md**: 架构设计原则\n- **Capital_Specifications/**: 项目规范文档\n\n## 实践任务\n浏览项目目录，熟悉关键文件：\n```bash\nls -la agentos/\nfind agentos -name \"*.md\" | head -10\n```\n\n了解项目结构有助于你快速定位代码和文档。",
+      "duration_minutes": 15,
+      "prerequisites": ["env-setup"],
+      "commands": [
+        "ls -la",
+        "find . -name '*.md' | head -10"
+      ],
+      "expected_output": "",
+      "validation_type": "manual",
+      "validation_command": "",
+      "validation_pattern": "",
+      "hints": [],
+      "resources": []
+    },
+    {
+      "id": "first-build",
+      "title": "首次构建",
+      "description": "构建AgentOS项目，验证环境配置",
+      "step_type": "practice",
+      "content": "# 首次构建AgentOS\n\n## 构建步骤\n\n### 1. 进入项目目录\n```bash\ncd agentos\n```\n\n### 2. 创建构建目录\n```bash\nmkdir -p build && cd build\n```\n\n### 3. 配置CMake\n```bash\ncmake .. -DCMAKE_BUILD_TYPE=Debug\n```\n\n### 4. 编译项目\n```bash\nmake -j$(nproc)  # Linux/macOS\n# 或\nmake -j%NUMBER_OF_PROCESSORS%  # Windows\n```\n\n## 验证构建\n构建成功后，你会看到类似输出：\n```\n[100%] Built target agentos\n```\n\n## 实践任务\n按照上述步骤构建AgentOS项目。\n\n**注意**: 首次构建可能需要较长时间（10-30分钟），具体取决于你的系统性能。",
+      "duration_minutes": 30,
+      "prerequisites": ["project-structure"],
+      "commands": [
+        "mkdir -p build",
+        "cd build",
+        "cmake .. -DCMAKE_BUILD_TYPE=Debug",
+        "make -j4"
+      ],
+      "expected_output": "",
+      "validation_type": "file",
+      "validation_command": "",
+      "validation_pattern": "build/.*\\.(so|dll|a|lib)",
+      "hints": [
+        "如果构建失败，检查错误信息并修复环境问题",
+        "可以尝试减少并行编译任务数：make -j2"
+      ],
+      "resources": []
+    },
+    {
+      "id": "first-pr",
+      "title": "第一个Pull Request",
+      "description": "学习如何提交你的第一个贡献",
+      "step_type": "exercise",
+      "content": "# 提交第一个Pull Request\n\n## 贡献流程\n\n### 1. Fork 项目\n- 访问 https://github.com/SpharxTeam/AgentOS\n- 点击右上角的 \"Fork\" 按钮\n\n### 2. 克隆你的分支\n```bash\ngit clone https://github.com/YOUR_USERNAME/AgentOS.git\ncd AgentOS\n```\n\n### 3. 创建特性分支\n```bash\ngit checkout -b fix-typo-docs\n```\n\n### 4. 进行修改\n例如，修复文档中的拼写错误：\n```bash\n# 查找可能的拼写错误\ngrep -r \"teh\" docs/ || true\ngrep -r \"adn\" docs/ || true\n```\n\n### 5. 提交更改\n```bash\ngit add .\ngit commit -m \"docs: fix typo in getting_started.md\"\n```\n\n### 6. 推送分支\n```bash\ngit push origin fix-typo-docs\n```\n\n### 7. 创建Pull Request\n- 访问你的GitHub仓库页面\n- 点击 \"Compare & pull request\"\n- 填写PR描述，引用相关Issue\n\n## 实践任务\n提交一个简单的文档修复PR。\n\n**注意**: 对于首次贡献，建议从文档修复开始。",
+      "duration_minutes": 30,
+      "prerequisites": ["first-build"],
+      "commands": [
+        "git clone",
+        "git checkout -b fix-typo-docs"
+      ],
+      "expected_output": "",
+      "validation_type": "manual",
+      "validation_command": "",
+      "validation_pattern": "",
+      "hints": [
+        "从小处着手，修复简单的文档问题",
+        "阅读CONTRIBUTING.md了解详细指南"
+      ],
+      "resources": []
+    },
+    {
+      "id": "review",
+      "title": "回顾与总结",
+      "description": "回顾学习成果，规划下一步",
+      "step_type": "review",
+      "content": "# 回顾与总结\n\n恭喜你完成了新贡献者入门教程！\n\n## 学习成果\n✅ 配置了AgentOS开发环境  \n✅ 了解了项目结构和架构设计  \n✅ 成功构建了AgentOS项目  \n✅ 学习了贡献流程和PR提交  \n\n## 下一步建议\n\n### 1. 深入阅读文档\n- [架构设计原则](../docs/ARCHITECTURAL_PRINCIPLES.md)\n- [代码规范](../docs/Capital_Specifications/coding_standard/)\n- [API文档](../docs/Capital_API/)\n\n### 2. 参与社区讨论\n- 加入GitHub Discussions\n- 参与Issue讨论\n- 审查他人的PR\n\n### 3. 选择下一个教程\n- **模块开发者**: 学习如何开发AgentOS模块\n- **系统集成者**: 学习如何部署和集成AgentOS\n\n## 持续学习\nAgentOS是一个不断发展的项目，持续学习和参与是成为核心贡献者的关键。\n\n感谢你的贡献！🎉",
+      "duration_minutes": 10,
+      "prerequisites": ["first-pr"],
+      "commands": [],
+      "expected_output": "",
+      "validation_type": "manual",
+      "validation_command": "",
+      "validation_pattern": "",
+      "hints": [],
+      "resources": []
+    }
+  ]
+}

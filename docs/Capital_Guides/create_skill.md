@@ -663,7 +663,7 @@ agentos-cli skill validate --contract skill_contract.json
 
 - [Skill 契约规范](../specifications/agentos_contract/skill/skill_contract.md)
 - [Agent 创建指南](create_agent.md)
-- [编码规范](../specifications/coding_standard/C_coding_style_guide.md)
+- [编码规范](../Capital_Specifications/coding_standard/C_coding_style_standard.md)
 - [安全穹顶](../architecture/folder/microkernel.md)
 
 ---

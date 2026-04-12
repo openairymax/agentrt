@@ -18,6 +18,7 @@ import {
 import sdk from "../services/agentos-sdk";
 import type { LLMProviderConfig } from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
+import { useAlert } from "../components/useAlert";
 
 const providerConfig: Record<string, { icon: typeof Brain; color: string; gradient: string; bgLight: string; label: string; models: string[] }> = {
   openai: {
@@ -45,6 +46,7 @@ const pricingData: Record<string, Record<string, string>> = {
 
 const LLMConfig: React.FC = () => {
   const { t } = useI18n();
+  const { error, success, info } = useAlert();
   const [providers, setProviders] = useState<LLMProviderConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -66,8 +68,8 @@ const LLMConfig: React.FC = () => {
     try {
       const data = await sdk.listLLMProviders();
       setProviders(data || []);
-    } catch (error) {
-      console.error("Failed to load providers:", error);
+    } catch (err) {
+      error("加载失败", `无法加载 LLM 提供商: ${err}`);
     } finally {
       setLoading(false);
     }
@@ -77,9 +79,13 @@ const LLMConfig: React.FC = () => {
     setTestingId(providerId);
     try {
       const result = await sdk.testLLMConnection(providerId);
-      alert(result.success ? `${t.llmConfig.testSuccess} (${result.latency_ms}ms)` : `${t.llmConfig.testFailed}: ${result.message}`);
-    } catch (error) {
-      alert(`${t.llmConfig.testFailed}: ${error}`);
+      if (result.success) {
+        success("连接成功", `${t.llmConfig.testSuccess} (${result.latency_ms}ms)`);
+      } else {
+        error("连接失败", `${t.llmConfig.testFailed}: ${result.message}`);
+      }
+    } catch (err) {
+      error("测试失败", `${t.llmConfig.testFailed}: ${err}`);
     } finally {
       setTestingId(null);
     }
@@ -102,9 +108,9 @@ const LLMConfig: React.FC = () => {
       setShowAddModal(false);
       setNewApiKey("");
       setNewBaseUrl("");
-      alert("LLM 提供商配置已保存");
-    } catch (error) {
-      alert(`保存失败: ${error}`);
+      success("保存成功", "LLM 提供商配置已保存");
+    } catch (err) {
+      error("保存失败", `无法保存配置: ${err}`);
     } finally {
       setSaving(false);
     }

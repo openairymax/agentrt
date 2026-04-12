@@ -20,9 +20,11 @@ import {
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 import sdk from "../services/agentos-sdk";
+import { useAlert } from "../components/useAlert";
 
 const Settings: React.FC = () => {
   const { t, language, setLanguage, availableLanguages } = useI18n();
+  const { success, error, info, confirm: confirmModal } = useAlert();
   const [backendUrl, setBackendUrl] = useState<string>('http://localhost:18789');
   const [theme, setTheme] = useState<'light' | 'dark' | 'auto'>('light');
   const [autoStart, setAutoStart] = useState<boolean>(false);
@@ -109,20 +111,31 @@ const Settings: React.FC = () => {
   const handleTestConnection = async () => {
     try {
       const result = await sdk.getHealthStatus();
-      alert(result.overall === "healthy" ? t.settings.connectionSuccess.replace('{url}', backendUrl) : t.settings.connectionFailed.replace('{error}', result.overall));
-    } catch (error) {
-      alert(t.settings.connectionError.replace('{error}', String(error)));
+      if (result.overall === "healthy") {
+        success("连接成功", t.settings.connectionSuccess.replace('{url}', backendUrl));
+      } else {
+        error("连接失败", t.settings.connectionFailed.replace('{error}', result.overall));
+      }
+    } catch (err) {
+      error("连接错误", t.settings.connectionError.replace('{error}', String(err)));
     }
   };
 
-  const handleResetSettings = () => {
-    if (confirm(t.settings.resetConfirm)) {
+  const handleResetSettings = async () => {
+    const confirmed = await confirmModal({
+      type: 'warning',
+      title: '重置设置',
+      message: t.settings.resetConfirm || '确定要重置所有设置吗？此操作无法撤销。',
+      confirmText: '重置',
+      cancelText: '取消',
+    });
+    if (confirmed) {
       localStorage.removeItem('agentos_settings');
       setBackendUrl('http://localhost:18789');
       setTheme('light');
       setAutoStart(false);
       setNotificationEnabled(true);
-      setLanguage('zh');
+      info("已重置", "设置已恢复为默认值");
     }
   };
 
@@ -375,10 +388,17 @@ const Settings: React.FC = () => {
               </button>
               <button
                 className="btn btn-danger"
-                onClick={() => {
-                  if (confirm(t.settings.clearCacheConfirm)) {
+                onClick={async () => {
+                  const confirmed = await confirmModal({
+                    type: 'danger',
+                    title: '清除缓存',
+                    message: t.settings.clearCacheConfirm || '确定要清除所有本地缓存数据吗？',
+                    confirmText: '清除',
+                    cancelText: '取消',
+                  });
+                  if (confirmed) {
                     localStorage.clear();
-                    alert(t.settings.cacheCleared);
+                    info("缓存已清除", t.settings.cacheCleared || "所有缓存已清理");
                   }
                 }}
                 style={{ flex: 1 }}

@@ -25,6 +25,7 @@ import {
 import sdk from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
 import type { MemoryEntry } from "../services/agentos-sdk";
+import { useAlert } from "../components/useAlert";
 
 const layerConfig = [
   { key: "L1", name: "原始卷", desc: "原始数据存储", icon: Database, color: "#6366f1", gradient: "linear-gradient(135deg, #6366f1, #818cf8)" },
@@ -44,6 +45,7 @@ const typeConfig: Record<string, { label: string; color: string; icon: typeof Da
 
 const MemoryEvolution: React.FC = () => {
   const { t } = useI18n();
+  const { error, success, info, confirm: confirmModal } = useAlert();
   const [entries, setEntries] = useState<MemoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -59,8 +61,8 @@ const MemoryEvolution: React.FC = () => {
     try {
       const data = await sdk.memoryList(filterType === "all" ? undefined : filterType as MemoryEntry["type"], 100);
       setEntries(data || []);
-    } catch (error) {
-      console.error("Failed to load memory entries:", error);
+    } catch (err) {
+      error("加载失败", `无法加载记忆条目: ${err}`);
     } finally {
       setLoading(false);
     }
@@ -73,14 +75,16 @@ const MemoryEvolution: React.FC = () => {
     try {
       const result = await sdk.memoryEvolve();
       if (result && result.evolved > 0) {
-        alert(`记忆进化完成！共进化 ${result.evolved} 条记忆\n\n` + result.layers.map((l: any) => `${l.layer}: ${l.before} → ${l.after}`).join("\n"));
+        const evolutionDetails = result.layers.map((l: { layer: string; before: number; after: number }) => `${l.layer}: ${l.before} → ${l.after}`).join("\n");
+        success("进化完成", `记忆进化完成！共进化 ${result.evolved} 条记忆\n\n${evolutionDetails}`);
         loadEntries();
       } else {
+        info("进化中", "正在进行记忆进化，请稍候...");
         await new Promise(r => setTimeout(r, 1500));
         loadEntries();
       }
-    } catch (error) {
-      console.error("Evolution failed:", error);
+    } catch (err) {
+      error("进化失败", `记忆进化过程出错: ${err}`);
       await new Promise(r => setTimeout(r, 1500));
     } finally {
       setEvolving(false);
@@ -88,13 +92,19 @@ const MemoryEvolution: React.FC = () => {
   };
 
   const handleForget = async (id: string) => {
-    if (!confirm("确定要遗忘此条记忆吗？")) return;
+    const confirmed = await confirmModal({
+      type: 'danger',
+      title: '遗忘记忆',
+      message: '确定要遗忘此条记忆吗？此操作无法撤销。',
+    });
+    if (!confirmed) return;
     try {
       await sdk.memoryDelete(id);
       setEntries(prev => prev.filter(e => e.id !== id));
       if (selectedEntry?.id === id) setSelectedEntry(null);
-    } catch (error) {
-      console.error("Failed to delete memory:", error);
+      success("已遗忘", "记忆条目已被成功移除");
+    } catch (err) {
+      error("删除失败", `无法删除记忆条目: ${err}`);
     }
   };
 

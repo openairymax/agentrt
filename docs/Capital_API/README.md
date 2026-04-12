@@ -470,7 +470,7 @@ AGENTOS_API int agentos_module_function(
 
 - [架构设计原则](../ARCHITECTURAL_PRINCIPLES.md)
 - [系统调用规范](../Capital_Architecture/syscall.md)
-- [编码规范](../Capital_Specifications/coding_standard/C_coding_style_guide.md)
+- [编码规范](../Capital_Specifications/coding_standard/C_coding_style_standard.md)
 - [术语表](../Capital_Specifications/TERMINOLOGY.md)
 
 ---

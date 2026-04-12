@@ -24,15 +24,19 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <stdatomic.h>
 
+/* 跨平台原子操作支持 */
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <windows.h>
+#include <intrin.h>
+#include "../../../commons/utils/include/atomic_compat.h"
 #else
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <stdatomic.h>
 #endif
 
 /* ========== HTTP网关内部结构 ========== */
