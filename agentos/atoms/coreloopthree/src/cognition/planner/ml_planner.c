@@ -4,16 +4,15 @@
  * @copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  */
 
-#include "../../include/cognition.h"
+#include "../../../include/cognition.h"
+#include "../../../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../../../commons/utils/logging/include/logging_compat.h"
+#include "../../../../../commons/platform/include/platform.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <stddef.h>
-
-/* Unified base library compatibility layer */
-#include "../../../agentos/commons/utils/memory/include/memory_compat.h"
-#include "../../../agentos/commons/utils/string/include/string_compat.h"
 
 /**
  * @brief Simple model inference interface (placeholder for actual ML runtime)
@@ -69,7 +68,7 @@ static bool ml_planner_try_load_model(ml_planner_data_t* data) {
     /* PHASE2-IMPLEMENTED: ML model initialization with placeholder
      * Current implementation uses a lightweight placeholder that can be
      * upgraded to full ONNX/TensorFlow Lite integration when runtime is available.
-     * 
+     *
      * Integration roadmap (for future enhancement):
      *   1. Initialize ML runtime (ONNX/TensorFlow Lite/custom)
      *   2. Load model from data->model_path
@@ -168,7 +167,7 @@ static agentos_error_t ml_planner_plan(
         /* PHASE2-IMPLEMENTED: ML inference pipeline stub
          * Current implementation provides a framework for future ML integration.
          * When full ML runtime is available, this section will implement:
-         * 
+         *
          * 1. Extract features from intent (type, complexity, context)
          * 2. Run model predict() to get task decomposition
          * 3. Decode model output into agentos_task_plan_t structure

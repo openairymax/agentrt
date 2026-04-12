@@ -417,3 +417,82 @@ sched_strategy_vtable_t g_weighted_strategy_vtable = {
 sched_strategy_vtable_t* weighted_strategy_get_vtable(void) {
     return &g_weighted_strategy_vtable;
 }
+
+/* ==================== strategy_interface_t 适配层 ==================== */
+
+static int weighted_iface_create(const sched_config_t* config, void** data) {
+    return weighted_create(config, data);
+}
+
+static int weighted_iface_destroy(void* data) {
+    return weighted_destroy(data);
+}
+
+static int weighted_iface_register_agent(void* data, const agent_info_t* agent_info) {
+    return weighted_register(data, agent_info);
+}
+
+static int weighted_iface_unregister_agent(void* data, const char* agent_id) {
+    return weighted_unregister(data, agent_id);
+}
+
+static int weighted_iface_update_agent_status(void* data, const agent_info_t* agent_info) {
+    if (!data || !agent_info) return AGENTOS_ERR_INVALID_PARAM;
+    weighted_data_t* wdata = (weighted_data_t*)data;
+    agentos_mutex_lock(&wdata->lock);
+    for (size_t i = 0; i < wdata->agent_count; i++) {
+        if (wdata->agents[i].agent_id && strcmp(wdata->agents[i].agent_id, agent_info->agent_id) == 0) {
+            wdata->agents[i].success_rate = agent_info->success_rate;
+            wdata->agents[i].avg_latency = agent_info->avg_response_time;
+            break;
+        }
+    }
+    agentos_mutex_unlock(&wdata->lock);
+    return AGENTOS_OK;
+}
+
+static int weighted_iface_schedule(void* data, const task_info_t* task_info, sched_result_t** result) {
+    (void)task_info;
+    return weighted_select(data, result);
+}
+
+static const char* weighted_iface_get_name(void) {
+    return "weighted";
+}
+
+static size_t weighted_iface_get_available_agent_count(void* data) {
+    if (!data) return 0;
+    weighted_data_t* wdata = (weighted_data_t*)data;
+    size_t count = 0;
+    agentos_mutex_lock(&wdata->lock);
+    for (size_t i = 0; i < wdata->agent_count; i++) {
+        if (wdata->agents[i].weight > 0) count++;
+    }
+    agentos_mutex_unlock(&wdata->lock);
+    return count;
+}
+
+static size_t weighted_iface_get_total_agent_count(void* data) {
+    if (!data) return 0;
+    weighted_data_t* wdata = (weighted_data_t*)data;
+    agentos_mutex_lock(&wdata->lock);
+    size_t count = wdata->agent_count;
+    agentos_mutex_unlock(&wdata->lock);
+    return count;
+}
+
+static const strategy_interface_t g_weighted_strategy_iface = {
+    .create = weighted_iface_create,
+    .destroy = weighted_iface_destroy,
+    .register_agent = weighted_iface_register_agent,
+    .unregister_agent = weighted_iface_unregister_agent,
+    .update_agent_status = weighted_iface_update_agent_status,
+    .schedule = weighted_iface_schedule,
+    .get_name = weighted_iface_get_name,
+    .get_available_agent_count = weighted_iface_get_available_agent_count,
+    .get_total_agent_count = weighted_iface_get_total_agent_count,
+};
+
+const strategy_interface_t* get_weighted_strategy(void) {
+    return &g_weighted_strategy_iface;
+}

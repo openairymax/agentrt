@@ -49,7 +49,10 @@ static agentos_error_t gateway_adapter_init(
         return AGENTOS_EINVAL;
     }
     
-    gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)service;
+    gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)agentos_service_get_user_data(service);
+    if (!ctx) {
+        return AGENTOS_EINVAL;
+    }
     
     // 保存通用配置
     if (config) {
@@ -113,7 +116,10 @@ static agentos_error_t gateway_adapter_start(agentos_service_t service) {
         return AGENTOS_EINVAL;
     }
     
-    gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)service;
+    gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)agentos_service_get_user_data(service);
+    if (!ctx) {
+        return AGENTOS_EINVAL;
+    }
     
     if (!ctx->gateway_svc) {
         return AGENTOS_ENOTINIT;
@@ -136,7 +142,10 @@ static agentos_error_t gateway_adapter_stop(agentos_service_t service, bool forc
         return AGENTOS_EINVAL;
     }
     
-    gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)service;
+    gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)agentos_service_get_user_data(service);
+    if (!ctx) {
+        return AGENTOS_EINVAL;
+    }
     
     if (!ctx->gateway_svc) {
         return AGENTOS_ENOTINIT;
@@ -159,7 +168,10 @@ static void gateway_adapter_destroy(agentos_service_t service) {
         return;
     }
     
-    gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)service;
+    gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)agentos_service_get_user_data(service);
+    if (!ctx) {
+        return;
+    }
     
     if (ctx->gateway_svc) {
         gateway_service_destroy(ctx->gateway_svc);
@@ -167,14 +179,16 @@ static void gateway_adapter_destroy(agentos_service_t service) {
     }
     
     // 释放动态分配的资源
-    if (ctx->gateway_cfg.http.host && ctx->gateway_cfg.http.host != "0.0.0.0") {
+    if (ctx->gateway_cfg.http.host && strcmp(ctx->gateway_cfg.http.host, "0.0.0.0") != 0) {
         free((void*)ctx->gateway_cfg.http.host);
     }
-    if (ctx->gateway_cfg.ws.host && ctx->gateway_cfg.ws.host != "0.0.0.0") {
+    if (ctx->gateway_cfg.ws.host && strcmp(ctx->gateway_cfg.ws.host, "0.0.0.0") != 0) {
         free((void*)ctx->gateway_cfg.ws.host);
     }
     
     free(ctx);
+    
+    agentos_service_set_user_data(service, NULL);
 }
 
 /**
@@ -185,7 +199,10 @@ static agentos_error_t gateway_adapter_healthcheck(agentos_service_t service) {
         return AGENTOS_EINVAL;
     }
     
-    gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)service;
+    gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)agentos_service_get_user_data(service);
+    if (!ctx) {
+        return AGENTOS_EINVAL;
+    }
     
     if (!ctx->gateway_svc) {
         return AGENTOS_ENOTINIT;
@@ -249,8 +266,9 @@ agentos_error_t gateway_service_adapter_create(
     }
     
     // 通过通用服务创建API创建服务实例
+    agentos_service_t svc_handle = NULL;
     agentos_error_t err = agentos_service_create(
-        (agentos_service_t*)out_service,
+        &svc_handle,
         ctx->common_cfg.name,
         &gateway_adapter_iface,
         &ctx->common_cfg
@@ -261,14 +279,17 @@ agentos_error_t gateway_service_adapter_create(
         return err;
     }
     
-    // 将适配器上下文与服务关联
-    // 注意：agentos_service_create会分配自己的内部结构，
-    // 我们需要将适配器上下文存储在用户数据字段中
-    // 这里我们假设agentos_service_t内部有user_data字段
-    // 由于svc_common.c的实现细节未知，我们采用另一种方法：
-    // 直接使用适配器上下文作为agentos_service_t的实例
+    // 将适配器上下文存储在服务的user_data字段中
+    // 这样接口函数可以通过user_data获取适配器上下文，
+    // 而不是将service句柄强转为适配器上下文（避免类型混淆）
+    err = agentos_service_set_user_data(svc_handle, ctx);
+    if (err != AGENTOS_SUCCESS) {
+        agentos_service_destroy(svc_handle);
+        free(ctx);
+        return err;
+    }
     
-    *out_service = (agentos_service_t)ctx;
+    *out_service = svc_handle;
     return AGENTOS_SUCCESS;
 }
 
@@ -285,8 +306,8 @@ gateway_service_t gateway_service_adapter_get_original(agentos_service_t service
         return NULL;
     }
     
-    gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)service;
-    return ctx->gateway_svc;
+    gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)agentos_service_get_user_data(service);
+    return ctx ? ctx->gateway_svc : NULL;
 }
 
 /**
@@ -330,7 +351,29 @@ agentos_error_t gateway_service_adapter_wrap(
         ctx->common_cfg.enable_metrics = true;
     }
     
-    *out_service = (agentos_service_t)ctx;
+    // 通过通用服务创建API创建服务实例
+    agentos_service_t svc_handle = NULL;
+    agentos_error_t err = agentos_service_create(
+        &svc_handle,
+        ctx->common_cfg.name,
+        &gateway_adapter_iface,
+        &ctx->common_cfg
+    );
+    
+    if (err != AGENTOS_SUCCESS) {
+        free(ctx);
+        return err;
+    }
+    
+    // 将适配器上下文存储在user_data中
+    err = agentos_service_set_user_data(svc_handle, ctx);
+    if (err != AGENTOS_SUCCESS) {
+        agentos_service_destroy(svc_handle);
+        free(ctx);
+        return err;
+    }
+    
+    *out_service = svc_handle;
     return AGENTOS_SUCCESS;
 }
 
@@ -397,9 +440,8 @@ agentos_svc_state_t gateway_service_adapter_get_state(agentos_service_t service)
         return AGENTOS_SVC_STATE_NONE;
     }
     
-    gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)service;
-    
-    if (!ctx->gateway_svc) {
+    gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)agentos_service_get_user_data(service);
+    if (!ctx || !ctx->gateway_svc) {
         return AGENTOS_SVC_STATE_NONE;
     }
     
@@ -414,9 +456,8 @@ bool gateway_service_adapter_is_running(agentos_service_t service) {
         return false;
     }
     
-    gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)service;
-    
-    if (!ctx->gateway_svc) {
+    gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)agentos_service_get_user_data(service);
+    if (!ctx || !ctx->gateway_svc) {
         return false;
     }
     
@@ -434,9 +475,8 @@ agentos_error_t gateway_service_adapter_get_stats(
         return AGENTOS_EINVAL;
     }
     
-    gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)service;
-    
-    if (!ctx->gateway_svc) {
+    gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)agentos_service_get_user_data(service);
+    if (!ctx || !ctx->gateway_svc) {
         return AGENTOS_ENOTINIT;
     }
     
@@ -444,6 +484,108 @@ agentos_error_t gateway_service_adapter_get_stats(
 }
 
 /* ==================== 示例使用代码 ==================== */
+
+const agentos_svc_interface_t* gateway_service_adapter_get_interface(void) {
+    return &gateway_adapter_iface;
+}
+
+bool gateway_service_adapter_supports_type(
+    agentos_service_t service,
+    gateway_daemon_type_t type
+) {
+    if (!service) return false;
+    gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)agentos_service_get_user_data(service);
+    if (!ctx) return false;
+    switch (type) {
+        case GATEWAY_DAEMON_HTTP:
+            return ctx->gateway_cfg.http.enabled;
+        case GATEWAY_DAEMON_WS:
+            return ctx->gateway_cfg.ws.enabled;
+        case GATEWAY_DAEMON_STDIO:
+            return ctx->gateway_cfg.stdio.enabled;
+        default:
+            return false;
+    }
+}
+
+agentos_error_t gateway_service_adapter_set_type_enabled(
+    agentos_service_t service,
+    gateway_daemon_type_t type,
+    bool enabled
+) {
+    if (!service) return AGENTOS_EINVAL;
+    gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)agentos_service_get_user_data(service);
+    if (!ctx) return AGENTOS_EINVAL;
+    agentos_svc_state_t state = agentos_service_get_state(service);
+    if (state == AGENTOS_SVC_STATE_RUNNING) {
+        return AGENTOS_EBUSY;
+    }
+    switch (type) {
+        case GATEWAY_DAEMON_HTTP:
+            ctx->gateway_cfg.http.enabled = enabled;
+            break;
+        case GATEWAY_DAEMON_WS:
+            ctx->gateway_cfg.ws.enabled = enabled;
+            break;
+        case GATEWAY_DAEMON_STDIO:
+            ctx->gateway_cfg.stdio.enabled = enabled;
+            break;
+        default:
+            return AGENTOS_EINVAL;
+    }
+    return AGENTOS_SUCCESS;
+}
+
+agentos_error_t gateway_service_adapter_create_from_config(
+    agentos_service_t* out_service,
+    const char* config_path
+) {
+    if (!out_service || !config_path) return AGENTOS_EINVAL;
+    agentos_svc_config_t config;
+    memset(&config, 0, sizeof(config));
+    config.name = "gateway_d";
+    config.version = "1.0.0";
+    config.capabilities = AGENTOS_SVC_CAP_ASYNC | AGENTOS_SVC_CAP_STREAMING;
+    config.max_concurrent = 1000;
+    config.timeout_ms = 30000;
+    config.auto_start = true;
+    config.enable_metrics = true;
+    agentos_error_t err = gateway_service_adapter_create(out_service, &config);
+    if (err != AGENTOS_SUCCESS) return err;
+    gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)agentos_service_get_user_data(*out_service);
+    if (ctx) {
+        gateway_service_get_default_config(&ctx->gateway_cfg);
+        ctx->gateway_cfg.config_path = config_path;
+    }
+    return AGENTOS_SUCCESS;
+}
+
+agentos_error_t gateway_service_adapter_reload_config(
+    agentos_service_t service,
+    const char* config_path
+) {
+    if (!service) return AGENTOS_EINVAL;
+    gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)agentos_service_get_user_data(service);
+    if (!ctx) return AGENTOS_EINVAL;
+    agentos_svc_state_t state = agentos_service_get_state(service);
+    if (state == AGENTOS_SVC_STATE_RUNNING) {
+        return AGENTOS_EBUSY;
+    }
+    if (config_path) {
+        ctx->gateway_cfg.config_path = config_path;
+    }
+    return AGENTOS_SUCCESS;
+}
+
+agentos_error_t gateway_service_adapter_register(agentos_service_t service) {
+    if (!service) return AGENTOS_EINVAL;
+    return agentos_service_register(service);
+}
+
+agentos_error_t gateway_service_adapter_unregister(agentos_service_t service) {
+    if (!service) return AGENTOS_EINVAL;
+    return agentos_service_unregister(service);
+}
 
 #if 0
 /**

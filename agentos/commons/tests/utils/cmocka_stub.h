@@ -24,6 +24,12 @@ extern "C" {
 /** @brief 测试状态指针类型 */
 typedef void** CMockaState;
 
+/** @brief 测试夹具函数类型 */
+typedef void (*CMFixtureFunction)(void** state);
+
+/** @brief 单元测试函数类型 */
+typedef void (*CMUnitTestFunction)(void** state);
+
 /** @brief 单元测试结构 */
 struct CMUnitTest {
     const char* name;
@@ -152,8 +158,8 @@ static inline void _assert_in_set(int value, const int* set, size_t size,
  */
 static inline int cmocka_run_group_tests(const struct CMUnitTest* tests,
                                          size_t num_tests,
-                                         void* (*setup)(void**),
-                                         void* (*teardown)(void**)) {
+                                         CMFixtureFunction setup,
+                                         CMFixtureFunction teardown) {
     (void)setup;
     (void)teardown;
 
