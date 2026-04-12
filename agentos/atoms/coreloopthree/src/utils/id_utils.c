@@ -4,8 +4,10 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "id_utils.h"
+#include "../include/id_utils.h"
+#include "../../../corekern/include/error.h"
 #include <stdlib.h>
+#include <stdint.h>
 
 /* Unified base library compatibility layer */
 #include "../../../agentos/commons/utils/memory/include/memory_compat.h"
@@ -16,8 +18,10 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#include <intrin.h>
 #include <rpc.h>
 #pragma comment(lib, "rpcrt4.lib")
+#include "../../../../commons/utils/include/atomic_compat.h"
 #else
 #include <uuid/uuid.h>
 #endif

@@ -1001,8 +1001,8 @@ Skill 契约涉及两个版本概念，需明确区分：
 | [Agent 契约规范](./agent_contract.md) | 本规范与 Agent 契约规范结构相似，两者共同构成 AgentOS 的能力描述体系 |
 | [架构设计原则](../../ARCHITECTURAL_PRINCIPLES.md) | 本规范是架构原则在技能管理方面的具体实现，特别是微内核思想和模块化原则 |
 | [统一术语表](../TERMINOLOGY.md) | 本规范使用的术语定义和解释，如 Skill、执行单元、契约等 |
-| [C&C++ 安全编程指南](../coding_standard/C_Cpp_secure_coding_guide.md) | 编译型技能的实现应遵循安全编程指南，特别是在内存管理和错误处理方面 |
-| [日志打印规范](../coding_standard/Log_guide.md) | 技能运行时应遵循日志规范，记录关键操作和异常情况 |
+| [C&C++ 安全编程规范](../coding_standard/C_Cpp_secure_coding_standard.md) | 编译型技能的实现应遵循安全编程规范，特别是在内存管理和错误处理方面 |
+| [日志打印规范](../coding_standard/Log_standard.md) | 技能运行时应遵循日志规范，记录关键操作和异常情况 |
 
 ---
 

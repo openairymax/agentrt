@@ -1191,7 +1191,7 @@ public class SecureKernelBinding {
    - [ipc.md](../../architecture/folder/ipc.md)
    - [syscall.md](../../architecture/folder/syscall.md)
    - [logging_system.md](../../architecture/folder/logging_system.md)
-   - [Security_design_guide.md](../Security_design_guide.md)
+   - [Security_design_standard.md](../Security_design_standard.md)
 
 ---
 

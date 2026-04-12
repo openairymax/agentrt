@@ -229,11 +229,9 @@ static int do_rpc_call(ipc_pool_entry_t* entry,
         
         retry++;
         
-        /* 重试延迟 */
         if (retry <= max_retries) {
             uint32_t delay = IPC_RETRY_DELAY_MS * retry;
-            agentos_mutex_lock(&entry->lock);
-            agentos_mutex_unlock(&entry->lock);
+            agentos_sleep_ms(delay);
         }
     }
     
@@ -341,7 +339,8 @@ int svc_ipc_init(const char* baseruntime_url) {
     
     agentos_mutex_unlock(&g_init_lock);
     return SVC_OK;
-    
+}
+
 #undef SVC_ERROR
 
 void svc_ipc_cleanup(void) {

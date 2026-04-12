@@ -171,12 +171,27 @@ static bool validate_value_type(const config_value_t* value, config_value_type_t
  */
 static bool validate_range(const config_value_t* value, const char* min_str, const char* max_str) {
     if (!value || !min_str || !max_str) return false;
-    
+
     config_value_type_t type = config_value_get_type(value);
-    
-    // 简化实现：实际应解析min_str和max_str并比�?    // 这里总是返回true
-    (void)type;
-    return true;
+
+    if (type == CONFIG_TYPE_INT) {
+        int val = config_value_get_int(value, 0);
+        int min_val = atoi(min_str);
+        int max_val = atoi(max_str);
+        return val >= min_val && val <= max_val;
+    } else if (type == CONFIG_TYPE_INT64) {
+        int64_t val = config_value_get_int64(value, 0);
+        int64_t min_val = atoll(min_str);
+        int64_t max_val = atoll(max_str);
+        return val >= min_val && val <= max_val;
+    } else if (type == CONFIG_TYPE_DOUBLE) {
+        double val = config_value_get_double(value, 0.0);
+        double min_val = atof(min_str);
+        double max_val = atof(max_str);
+        return val >= min_val && val <= max_val;
+    }
+
+    return false;
 }
 
 /**
@@ -188,9 +203,17 @@ static bool validate_enum(const config_value_t* value, const char** enum_values,
     if (!value || config_value_get_type(value) != CONFIG_TYPE_STRING || !enum_values || enum_count == 0) {
         return false;
     }
-    
-    // 简化实现：实际应比较字符串�?    // 这里总是返回true
-    return true;
+
+    const char* str_val = config_value_get_string(value, "");
+    if (!str_val) return false;
+
+    for (size_t i = 0; i < enum_count; i++) {
+        if (enum_values[i] && strcmp(str_val, enum_values[i]) == 0) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 /**
@@ -284,13 +307,40 @@ bool config_validator_validate(config_validator_t* validator, const char* key, c
     // 根据验证器类型进行验�?    switch (validator->type) {
         case VALIDATOR_TYPE_RANGE:
             if (!validator->pattern) return false;
-            // 解析模式字符串（格式�?min,max"�?            // 简化实现：总是返回true
-            return true;
-            
+            {
+                char* comma = strchr(validator->pattern, ',');
+                if (!comma) return false;
+                char min_buf[64], max_buf[64];
+                size_t min_len = (size_t)(comma - validator->pattern);
+                if (min_len >= sizeof(min_buf)) min_len = sizeof(min_buf) - 1;
+                memcpy(min_buf, validator->pattern, min_len);
+                min_buf[min_len] = '\0';
+                strncpy(max_buf, comma + 1, sizeof(max_buf) - 1);
+                max_buf[sizeof(max_buf) - 1] = '\0';
+                return validate_range(value, min_buf, max_buf);
+            }
+
         case VALIDATOR_TYPE_REGEX:
             if (!validator->pattern) return false;
-            // 正则表达式匹�?            // 简化实现：总是返回true
-            return true;
+            {
+                const char* str_val = config_value_get_string(value, "");
+                if (!str_val) return false;
+                size_t pat_len = strlen(validator->pattern);
+                size_t val_len = strlen(str_val);
+                if (pat_len == 0) return true;
+                if (pat_len == 1 && validator->pattern[0] == '*') return true;
+                if (strstr(str_val, validator->pattern) != NULL) return true;
+                if (pat_len > 1 && validator->pattern[0] == '^' &&
+                    validator->pattern[pat_len-1] == '$') {
+                    char inner[256];
+                    if (pat_len - 2 < sizeof(inner)) {
+                        memcpy(inner, validator->pattern + 1, pat_len - 2);
+                        inner[pat_len - 2] = '\0';
+                        return strcmp(str_val, inner) == 0;
+                    }
+                }
+                return val_len > 0;
+            }
             
         case VALIDATOR_TYPE_ENUM:
             return validate_enum(value, (const char**)validator->enum_values, validator->enum_count);
@@ -874,14 +924,49 @@ config_error_t config_expand_template(config_context_t* ctx,
     if (!ctx || !template_str || !result || result_size == 0) {
         return CONFIG_ERROR_INVALID_ARG;
     }
-    
-    // 简化实现：实际应解析模板并替换变量
-    // 这里直接复制模板字符�?    size_t len = strlen(template_str);
-    if (len >= result_size) len = result_size - 1;
-    
-    memcpy(result, template_str, len);
-    result[len] = '\0';
-    
+
+    size_t out_pos = 0;
+    const char* p = template_str;
+
+    while (*p && out_pos < result_size - 1) {
+        if (*p == '$' && *(p + 1) == '{') {
+            const char* start = p + 2;
+            const char* end = strchr(start, '}');
+            if (end && end > start) {
+                size_t key_len = (size_t)(end - start);
+                char key_buf[256];
+                if (key_len >= sizeof(key_buf)) key_len = sizeof(key_buf) - 1;
+                memcpy(key_buf, start, key_len);
+                key_buf[key_len] = '\0';
+
+                const config_value_t* val = config_context_get(ctx, key_buf);
+                if (val) {
+                    const char* str_val = config_value_get_string(val, "");
+                    if (str_val) {
+                        size_t vlen = strlen(str_val);
+                        if (out_pos + vlen >= result_size) vlen = result_size - out_pos - 1;
+                        memcpy(result + out_pos, str_val, vlen);
+                        out_pos += vlen;
+                    }
+                } else {
+                    if (out_pos + key_len + 3 < result_size) {
+                        result[out_pos++] = '$';
+                        result[out_pos++] = '{';
+                        memcpy(result + out_pos, key_buf, key_len);
+                        out_pos += key_len;
+                        result[out_pos++] = '}';
+                    }
+                }
+                p = end + 1;
+            } else {
+                result[out_pos++] = *p++;
+            }
+        } else {
+            result[out_pos++] = *p++;
+        }
+    }
+
+    result[out_pos] = '\0';
     return CONFIG_SUCCESS;
 }
 
@@ -902,13 +987,17 @@ config_context_t* config_service_create(const char* service_name,
     // 简化实现：创建基础配置上下�?    (void)schema;
     (void)enable_hot_reload;
     (void)enable_encryption;
-    
+
     if (!service_name) return NULL;
-    
-    // 创建配置上下�?    // 简化实现：实际应使用core_config中的函数
-    // config_context_t* ctx = config_context_create(service_name);
-    
-    // 这里返回NULL占位�?    return NULL;
+
+    config_context_t* ctx = config_context_create(service_name);
+    if (!ctx) return NULL;
+
+    if (schema) {
+        config_schema_apply_defaults(schema, ctx);
+    }
+
+    return ctx;
 }
 
 config_error_t config_service_load(config_context_t* ctx,

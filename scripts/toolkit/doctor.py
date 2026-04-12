@@ -18,7 +18,7 @@ Comprehensive system health checker with 8 diagnostic categories:
 
 Usage:
     from scripts.toolkit import AgentOSDoctor
-    
+
     doctor = AgentOSDoctor()
     doctor.run_all_checks()
     doctor.print_report()
@@ -116,7 +116,7 @@ class BaseChecker:
 
 class SystemChecker(BaseChecker):
     """System environment checks"""
-    
+
     REQUIRED_MEMORY_GB = 2.0
     REQUIRED_DISK_GB = 5.0
 
@@ -131,7 +131,7 @@ class SystemChecker(BaseChecker):
     def check_python_version(self) -> CheckResult:
         version = sys.version.split()[0]
         major, minor = sys.version_info[:2]
-        
+
         if major < 3 or (major == 3 and minor < 8):
             return self._fail(
                 "Python Version",
@@ -140,10 +140,12 @@ class SystemChecker(BaseChecker):
             )
         return self._pass("Python Version", f"Python {version}")
 
-    def check_memory(self) -> try:
-            mem = psutil.virtual_info()
+    def check_memory(self) -> CheckResult:
+        try:
+            import psutil
+            mem = psutil.virtual_memory()
             mem_gb = mem.total / (1024 ** 3)
-            
+
             if mem_gb < self.REQUIRED_MEMORY_GB:
                 return self._warn(
                     "Memory",
@@ -153,10 +155,12 @@ class SystemChecker(BaseChecker):
         except ImportError:
             return self._skip("Memory", "psutil not installed")
 
-    def check_disk_space(self) -> try:
-            disk = psutil.disk_usage(Path.cwd())
+    def check_disk_space(self) -> CheckResult:
+        try:
+            import psutil
+            disk = psutil.disk_usage(str(Path.cwd()))
             disk_free_gb = disk.free / (1024 ** 3)
-            
+
             if disk_free_gb < self.REQUIRED_DISK_GB:
                 return self._warn(
                     "Disk Space",
@@ -244,7 +248,7 @@ class BuildToolsChecker(BaseChecker):
                           fix="Install GCC or Clang")
 
     def check_cpp_compiler(self) -> CheckResult:
-        for cxx in ["clang++", "g++]:
+        for cxx in ["clang++", "g++"]:
             try:
                 result = subprocess.run(
                     [cxx, "--version"],
@@ -370,7 +374,7 @@ class SecurityChecker(BaseChecker):
 class AgentOSDoctor:
     """
     Main diagnostic orchestrator.
-    
+
     Runs all checkers and aggregates results into a unified report.
     """
 
@@ -394,11 +398,11 @@ class AgentOSDoctor:
 
     def run_all_checks(self, categories: Optional[List[str]] = None) -> HealthReport:
         target_categories = set(categories) if categories else {c[0] for c in self.CHECKERS}
-        
+
         for cat_name, checker_cls in self.CHECKERS:
             if cat_name not in target_categories:
                 continue
-            
+
             checker = checker_cls()
             try:
                 results = checker.run_all()

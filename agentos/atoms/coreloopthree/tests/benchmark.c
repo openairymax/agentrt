@@ -14,6 +14,7 @@
 #include "../../../agentos/commons/utils/string/include/string_compat.h"
 #include <string.h>
 #include <time.h>
+#include "../src/cognition/coordinator/strategy.h"
 
 /**
  * @brief 基准测试：任务提交性能
@@ -259,12 +260,127 @@ static void benchmark_memory_query() {
     agentos_memory_destroy(engine);
 }
 
+/**
+ * @brief 基准测试：双模型基本协调性能
+ */
+static void benchmark_dual_model_basic() {
+    agentos_coordinator_strategy_t* coordinator = NULL;
+    agentos_error_t err = agentos_dual_model_coordinator_create(&coordinator);
+    if (err != AGENTOS_SUCCESS) {
+        printf("benchmark_dual_model_basic: Failed to create coordinator\n");
+        return;
+    }
+
+    agentos_cognition_result_t result_a = {
+        .action = "action_a",
+        .confidence = 0.7f
+    };
+    
+    agentos_cognition_result_t result_b = {
+        .action = "action_b", 
+        .confidence = 0.9f
+    };
+
+    const char* final_action = NULL;
+    float confidence = 0.0f;
+    
+    int num_iterations = 1000;
+    clock_t start = clock();
+    
+    for (int i = 0; i < num_iterations; i++) {
+        err = agentos_dual_model_coordinate(coordinator, &result_a, &result_b, &final_action, &confidence);
+        if (err != AGENTOS_SUCCESS) {
+            printf("benchmark_dual_model_basic: Failed to coordinate at iteration %d\n", i);
+            break;
+        }
+    }
+    
+    clock_t end = clock();
+    double elapsed = (double)(end - start) / CLOCKS_PER_SEC;
+    
+    printf("benchmark_dual_model_basic: %d iterations in %.3f seconds (%.3f ops/sec)\n",
+           num_iterations, elapsed, num_iterations / elapsed);
+    
+    agentos_dual_model_coordinator_destroy(coordinator);
+}
+
+/**
+ * @brief 基准测试：双模型自适应学习性能
+ */
+static void benchmark_dual_model_adaptive() {
+    agentos_coordinator_strategy_t* coordinator = NULL;
+    agentos_error_t err = agentos_dual_model_coordinator_create(&coordinator);
+    if (err != AGENTOS_SUCCESS) {
+        printf("benchmark_dual_model_adaptive: Failed to create coordinator\n");
+        return;
+    }
+
+    /* 启用自适应学习 */
+    agentos_coordinator_base_t* base = (agentos_coordinator_base_t*)coordinator;
+    err = agentos_coordinator_dual_model_enable_adaptive_learning(base, 1, 0.1f);
+    if (err != AGENTOS_SUCCESS) {
+        printf("benchmark_dual_model_adaptive: Failed to enable adaptive learning\n");
+        agentos_dual_model_coordinator_destroy(coordinator);
+        return;
+    }
+
+    /* 设置自适应验证模式 */
+    err = agentos_coordinator_dual_model_set_validation_mode(base, 3); /* CROSS_VALIDATION_ADAPTIVE */
+    if (err != AGENTOS_SUCCESS) {
+        printf("benchmark_dual_model_adaptive: Failed to set validation mode\n");
+        agentos_dual_model_coordinator_destroy(coordinator);
+        return;
+    }
+
+    agentos_cognition_result_t result_a = {
+        .action = "action_a",
+        .confidence = 0.7f
+    };
+    
+    agentos_cognition_result_t result_b = {
+        .action = "action_b", 
+        .confidence = 0.9f
+    };
+
+    const char* final_action = NULL;
+    float confidence = 0.0f;
+    
+    int num_iterations = 1000;
+    clock_t start = clock();
+    
+    for (int i = 0; i < num_iterations; i++) {
+        err = agentos_dual_model_coordinate(coordinator, &result_a, &result_b, &final_action, &confidence);
+        if (err != AGENTOS_SUCCESS) {
+            printf("benchmark_dual_model_adaptive: Failed to coordinate at iteration %d\n", i);
+            break;
+        }
+    }
+    
+    clock_t end = clock();
+    double elapsed = (double)(end - start) / CLOCKS_PER_SEC;
+    
+    printf("benchmark_dual_model_adaptive: %d iterations in %.3f seconds (%.3f ops/sec)\n",
+           num_iterations, elapsed, num_iterations / elapsed);
+    
+    /* 获取统计信息 */
+    char* stats_json = NULL;
+    err = agentos_coordinator_dual_model_get_stats(base, &stats_json);
+    if (err == AGENTOS_SUCCESS && stats_json) {
+        printf("benchmark_dual_model_adaptive: Stats collected\n");
+        AGENTOS_FREE(stats_json);
+    }
+    
+    agentos_dual_model_coordinator_destroy(coordinator);
+}
+
 int main() {
     printf("=== Running Benchmark Tests ===\n");
     benchmark_task_submit();
     benchmark_task_query();
     benchmark_memory_write();
     benchmark_memory_query();
+    benchmark_dual_model_basic();
+    benchmark_dual_model_adaptive();
     printf("=== Benchmark Tests Complete ===\n");
     return 0;
 }

@@ -22,7 +22,7 @@
  * 
  * @note 线程安全：所有公共接口均为线程安全
  * @see ARCHITECTURAL_PRINCIPLES.md E-1 安全内生原则
- * @see C_Cpp_secure_coding_guide.md 安全编码指南
+ * @see C_Cpp_secure_coding_standard.md 安全编码指南
  */
 
 #ifndef AGENTOS_INPUT_VALIDATOR_H
