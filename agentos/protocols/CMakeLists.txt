@@ -22,18 +22,21 @@ project(protocols
 # 包含目录
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/protocol/include
     ${AGENTOS_COMMONS_INCLUDE_DIR}
 )
 
 # 源文件
 set(PROTOCOLS_SOURCES
     src/unified_protocol.c
+    protocol/src/protocol_router.c
 )
 
 # 头文件
 set(PROTOCOLS_HEADERS
     include/protocols.h
     include/unified_protocol.h
+    protocol/include/protocol_router.h
 )
 
 # 创建库

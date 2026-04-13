@@ -18,6 +18,7 @@
 #include "../utils/gateway_utils.h"
 #include "../utils/gateway_rate_limiter.h"
 #include "../utils/gateway_rpc_handler.h"
+#include "../utils/gateway_protocol_handler.h"
 
 #include <microhttpd.h>
 #include <cJSON.h>
@@ -243,12 +244,30 @@ static char* http_handler_adapter(void* request, void* user_data) {
  * @return JSON响应字符串
  */
 static char* handle_jsonrpc_request(http_gateway_t* gateway, http_request_context_t* context) {
-    /* 使用统一的 RPC 处理器 */
-    rpc_result_t result = gateway_rpc_handle_request(
-        context->json_request,
-        gateway->handler,
-        gateway->handler_data
-    );
+    rpc_result_t result;
+    
+    /* 检查是否有多协议处理器和原始数据 */
+    if (gateway->protocol_handler && context->upload_data && context->upload_data_size > 0) {
+        /* 使用多协议处理器处理原始请求数据 */
+        result = gateway_protocol_handle_request(
+            gateway->protocol_handler,
+            context->upload_data,
+            context->upload_data_size,
+            UNIFIED_PROTOCOL_AUTO,  /* 自动检测协议类型 */
+            gateway->handler,
+            gateway->handler_data
+        );
+    } else if (context->json_request) {
+        /* 使用原有的JSON-RPC处理器 */
+        result = gateway_rpc_handle_request(
+            context->json_request,
+            gateway->handler,
+            gateway->handler_data
+        );
+    } else {
+        /* 无效请求 */
+        return jsonrpc_create_error_response(NULL, -32600, "Invalid request", NULL);
+    }
 
     if (result.error_code != 0 || !result.response_json) {
         /* 错误情况：返回错误响应 */
@@ -337,6 +356,12 @@ static void http_gateway_destroy(void* gateway_impl) {
     /* 清理速率限制器 */
     if (gateway->rate_limiter) {
         gateway_rate_limiter_destroy(gateway->rate_limiter);
+    }
+    
+    /* 清理协议处理器 */
+    if (gateway->protocol_handler) {
+        gateway_protocol_handler_destroy(gateway->protocol_handler);
+        gateway->protocol_handler = NULL;
     }
 
     free(gateway);
@@ -507,6 +532,13 @@ gateway_t* http_gateway_create(const char* host, uint16_t port) {
         }
         
         gateway->rate_limiter = gateway_rate_limiter_create(&rl_config);
+    }
+    
+    /* 初始化多协议处理器 */
+    gateway->protocol_handler = gateway_protocol_handler_create(NULL);
+    if (!gateway->protocol_handler) {
+        /* 协议处理器创建失败，但不影响基本功能 */
+        /* 可以降级为纯JSON-RPC模式 */
     }
     
     gateway_t* gw = malloc(sizeof(gateway_t));

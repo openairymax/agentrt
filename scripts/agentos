@@ -1,0 +1,458 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2026 SPHARX Ltd.
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""
+AgentOS Unified CLI - 统一命令行入口
+
+Usage:
+    agentos <command> [options] [arguments]
+
+Commands:
+    Service Management:
+        service list              List all services
+        service start [name]      Start service(s)
+        service stop [name]       Stop service(s)
+        service restart [name]    Restart service(s)
+        service status [name]     Get service status
+        service health            Health check all services
+
+    Agent Management:
+        agent list                List registered agents
+        agent register <name>     Register new agent
+        agent start <id>          Start agent
+        agent stop <id>           Stop agent
+        agent info <id>           Get agent details
+
+    Task Management:
+        task list                 List tasks
+        task submit <desc>        Submit new task
+        task status <id>          Get task status
+        task cancel <id>          Cancel task
+        task result <id>          Get task result
+
+    Protocol Operations:
+        protocol list             List protocol adapters
+        protocol test <proto>     Test protocol connection
+        protocol send <proto> <method> [params]  Send protocol message
+
+    Configuration:
+        config get <key>          Get configuration value
+        config set <key> <value>  Set configuration value
+        config list               List all configuration
+        config reload             Reload configuration
+
+    Monitoring:
+        monitor metrics           Show metrics
+        monitor alerts            Show active alerts
+        monitor dashboard         Open Grafana dashboard
+
+    Development:
+        dev init                  Initialize development environment
+        dev build                 Build project
+        dev test                  Run tests
+        dev doctor                Run diagnostics
+        dev shell                 Open development shell
+
+    System:
+        version                   Show version
+        status                    Show system status
+        help                      Show help
+"""
+
+import sys
+import os
+import json
+import subprocess
+import argparse
+from pathlib import Path
+from typing import Optional, Dict, Any, List
+
+BOLD = "\033[1m"
+GREEN = "\033[32m"
+YELLOW = "\033[33m"
+RED = "\033[31m"
+BLUE = "\033[34m"
+CYAN = "\033[36m"
+RESET = "\033[0m"
+
+GATEWAY_URL = os.environ.get("AGENTOS_GATEWAY_URL", "http://localhost:18789")
+API_KEY = os.environ.get("AGENTOS_API_KEY", "")
+
+
+def print_header(text: str):
+    print(f"\n{BOLD}{BLUE}{'=' * 60}{RESET}")
+    print(f"{BOLD}{BLUE}  {text}{RESET}")
+    print(f"{BOLD}{BLUE}{'=' * 60}{RESET}\n")
+
+
+def print_success(text: str):
+    print(f"{GREEN}✓{RESET} {text}")
+
+
+def print_error(text: str):
+    print(f"{RED}✗{RESET} {text}")
+
+
+def print_warning(text: str):
+    print(f"{YELLOW}⚠{RESET} {text}")
+
+
+def print_info(text: str):
+    print(f"{CYAN}→{RESET} {text}")
+
+
+def api_request(method: str, path: str, data: Optional[Dict] = None) -> Dict:
+    import urllib.request
+    import urllib.error
+
+    url = f"{GATEWAY_URL}{path}"
+    headers = {"Content-Type": "application/json"}
+    if API_KEY:
+        headers["Authorization"] = f"Bearer {API_KEY}"
+
+    body = json.dumps(data).encode() if data else None
+    req = urllib.request.Request(url, data=body, headers=headers, method=method)
+
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        return {"error": f"HTTP {e.code}: {e.reason}"}
+    except urllib.error.URLError as e:
+        return {"error": f"Connection failed: {e.reason}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def jsonrpc_request(method: str, params: Optional[Dict] = None) -> Dict:
+    import uuid
+    return api_request("POST", "/jsonrpc", {
+        "jsonrpc": "2.0",
+        "id": str(uuid.uuid4()),
+        "method": method,
+        "params": params or {}
+    })
+
+
+def cmd_service_list(args):
+    print_header("AgentOS Services")
+    result = jsonrpc_request("service.list")
+    if "error" in result:
+        print_error(f"Failed to list services: {result['error']}")
+        return 1
+
+    services = result.get("result", {}).get("services", [])
+    if not services:
+        print_info("No services found")
+        return 0
+
+    print(f"{'Name':<20} {'Status':<12} {'Healthy':<10} {'Port':<8}")
+    print("-" * 50)
+    for svc in services:
+        status = svc.get("status", "unknown")
+        healthy = "✓" if svc.get("healthy") else "✗"
+        port = svc.get("port", "-")
+        name = svc.get("name", "-")
+        print(f"{name:<20} {status:<12} {healthy:<10} {port:<8}")
+
+    return 0
+
+
+def cmd_service_health(args):
+    print_header("AgentOS Health Check")
+    result = api_request("GET", "/health")
+    if "error" in result:
+        print_error(f"Health check failed: {result['error']}")
+        return 1
+
+    status = result.get("status", "unknown")
+    version = result.get("version", "unknown")
+    uptime = result.get("uptime_seconds", 0)
+
+    if status == "ok" or status == "healthy":
+        print_success(f"Gateway is healthy (v{version}, uptime: {uptime}s)")
+    else:
+        print_warning(f"Gateway status: {status}")
+
+    return 0
+
+
+def cmd_agent_list(args):
+    print_header("AgentOS Agents")
+    result = jsonrpc_request("agent.list")
+    if "error" in result:
+        print_error(f"Failed to list agents: {result['error']}")
+        return 1
+
+    agents = result.get("result", {}).get("agents", [])
+    if not agents:
+        print_info("No agents registered")
+        return 0
+
+    print(f"{'ID':<12} {'Name':<20} {'Type':<15} {'Status':<12}")
+    print("-" * 59)
+    for agent in agents:
+        aid = agent.get("id", "-")[:10]
+        name = agent.get("name", "-")
+        atype = agent.get("type", "-")
+        status = agent.get("status", "-")
+        print(f"{aid:<12} {name:<20} {atype:<15} {status:<12}")
+
+    return 0
+
+
+def cmd_task_list(args):
+    print_header("AgentOS Tasks")
+    result = jsonrpc_request("task.list")
+    if "error" in result:
+        print_error(f"Failed to list tasks: {result['error']}")
+        return 1
+
+    tasks = result.get("result", {}).get("tasks", [])
+    if not tasks:
+        print_info("No tasks found")
+        return 0
+
+    print(f"{'ID':<12} {'Agent':<15} {'Status':<12} {'Progress':<10}")
+    print("-" * 49)
+    for task in tasks:
+        tid = task.get("id", "-")[:10]
+        agent = task.get("agent_id", "-")[:13]
+        status = task.get("status", "-")
+        progress = f"{task.get('progress', 0) * 100:.0f}%"
+        print(f"{tid:<12} {agent:<15} {status:<12} {progress:<10}")
+
+    return 0
+
+
+def cmd_protocol_list(args):
+    print_header("AgentOS Protocol Adapters")
+    result = api_request("GET", "/api/v1/protocols/adapters")
+    if "error" in result:
+        print_info("Backend not available, showing default protocols:")
+        protocols = [
+            {"name": "JSON-RPC", "protocol": "jsonrpc", "version": "2.0", "status": "active", "endpoint": "/jsonrpc"},
+            {"name": "MCP", "protocol": "mcp", "version": "1.0", "status": "active", "endpoint": "/mcp"},
+            {"name": "A2A", "protocol": "a2a", "version": "0.3", "status": "active", "endpoint": "/a2a"},
+            {"name": "OpenAI", "protocol": "openai", "version": "1.0", "status": "active", "endpoint": "/v1"},
+        ]
+    else:
+        protocols = result.get("adapters", [])
+
+    print(f"{'Protocol':<15} {'Version':<10} {'Status':<10} {'Endpoint':<15}")
+    print("-" * 50)
+    for proto in protocols:
+        name = proto.get("protocol", proto.get("name", "-")).upper()
+        version = proto.get("version", "-")
+        status = proto.get("status", "-")
+        endpoint = proto.get("endpoint", "-")
+        print(f"{name:<15} {version:<10} {status:<10} {endpoint:<15}")
+
+    return 0
+
+
+def cmd_config_get(args):
+    key = args.key
+    result = jsonrpc_request("config.get", {"key": key})
+    if "error" in result:
+        print_error(f"Failed to get config '{key}': {result.get('error')}")
+        return 1
+
+    value = result.get("result", {}).get("value", "null")
+    print(f"{key} = {value}")
+    return 0
+
+
+def cmd_config_set(args):
+    key = args.key
+    value = args.value
+    result = jsonrpc_request("config.set", {"key": key, "value": value})
+    if "error" in result:
+        print_error(f"Failed to set config '{key}': {result.get('error')}")
+        return 1
+
+    print_success(f"Set {key} = {value}")
+    return 0
+
+
+def cmd_version(args):
+    print(f"{BOLD}AgentOS{RESET} v2.0.0")
+    print(f"  Gateway: {GATEWAY_URL}")
+    print(f"  Protocols: JSON-RPC, MCP, A2A, OpenAI API")
+    return 0
+
+
+def cmd_status(args):
+    print_header("AgentOS System Status")
+
+    result = api_request("GET", "/health")
+    if "error" in result:
+        print_error(f"Gateway unreachable: {result['error']}")
+        print_info(f"Expected at: {GATEWAY_URL}")
+        return 1
+
+    print_success(f"Gateway: {result.get('status', 'unknown')} (v{result.get('version', '?')})")
+
+    services = result.get("services", {})
+    if isinstance(services, dict):
+        for name, info in services.items():
+            if isinstance(info, dict):
+                status = "healthy" if info.get("healthy") else "unhealthy"
+                symbol = "✓" if info.get("healthy") else "✗"
+                print(f"  {symbol} {name}: {status}")
+
+    return 0
+
+
+def cmd_dev_doctor(args):
+    print_header("AgentOS Diagnostics")
+    errors = 0
+
+    import shutil
+
+    tools = [
+        ("cmake", "CMake", True),
+        ("gcc", "C Compiler (GCC)", True),
+        ("g++", "C++ Compiler (G++)", True),
+        ("python3", "Python 3", True),
+        ("docker", "Docker", False),
+        ("node", "Node.js", False),
+        ("cargo", "Rust/Cargo", False),
+    ]
+
+    print(f"{'Tool':<25} {'Status':<10}")
+    print("-" * 35)
+    for cmd, name, required in tools:
+        path = shutil.which(cmd)
+        if path:
+            print_success(f"{name:<25} Found")
+        elif required:
+            print_error(f"{name:<25} Missing (required)")
+            errors += 1
+        else:
+            print_warning(f"{name:<25} Not found (optional)")
+
+    gateway_ok = False
+    try:
+        import urllib.request
+        urllib.request.urlopen(f"{GATEWAY_URL}/health", timeout=3)
+        gateway_ok = True
+    except Exception:
+        pass
+
+    if gateway_ok:
+        print_success(f"{'Gateway':<25} Running ({GATEWAY_URL})")
+    else:
+        print_warning(f"{'Gateway':<25} Not running")
+
+    if errors > 0:
+        print_error(f"\n{errors} required tool(s) missing")
+        return 1
+    else:
+        print_success("\nAll required tools available")
+        return 0
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="agentos",
+        description="AgentOS Unified CLI - 统一命令行工具"
+    )
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    # Service commands
+    svc_parser = subparsers.add_parser("service", help="Service management")
+    svc_sub = svc_parser.add_subparsers(dest="subcommand")
+    svc_sub.add_parser("list", help="List services")
+    svc_sub.add_parser("health", help="Health check")
+    svc_sub.add_parser("start", help="Start services")
+    svc_sub.add_parser("stop", help="Stop services")
+    svc_sub.add_parser("restart", help="Restart services")
+
+    # Agent commands
+    agent_parser = subparsers.add_parser("agent", help="Agent management")
+    agent_sub = agent_parser.add_subparsers(dest="subcommand")
+    agent_sub.add_parser("list", help="List agents")
+    agent_sub.add_parser("register", help="Register agent")
+
+    # Task commands
+    task_parser = subparsers.add_parser("task", help="Task management")
+    task_sub = task_parser.add_subparsers(dest="subcommand")
+    task_sub.add_parser("list", help="List tasks")
+    task_sub.add_parser("submit", help="Submit task")
+
+    # Protocol commands
+    proto_parser = subparsers.add_parser("protocol", help="Protocol operations")
+    proto_sub = proto_parser.add_subparsers(dest="subcommand")
+    proto_sub.add_parser("list", help="List protocols")
+
+    # Config commands
+    cfg_parser = subparsers.add_parser("config", help="Configuration management")
+    cfg_sub = cfg_parser.add_subparsers(dest="subcommand")
+    cfg_get = cfg_sub.add_parser("get", help="Get config value")
+    cfg_get.add_argument("key", help="Config key")
+    cfg_set = cfg_sub.add_parser("set", help="Set config value")
+    cfg_set.add_argument("key", help="Config key")
+    cfg_set.add_argument("value", help="Config value")
+
+    # Dev commands
+    dev_parser = subparsers.add_parser("dev", help="Development tools")
+    dev_sub = dev_parser.add_subparsers(dest="subcommand")
+    dev_sub.add_parser("doctor", help="Run diagnostics")
+    dev_sub.add_parser("build", help="Build project")
+    dev_sub.add_parser("test", help="Run tests")
+
+    # System commands
+    subparsers.add_parser("version", help="Show version")
+    subparsers.add_parser("status", help="Show system status")
+
+    args = parser.parse_args()
+
+    if not args.command:
+        parser.print_help()
+        return 0
+
+    cmd_map = {
+        "service": {
+            "list": cmd_service_list,
+            "health": cmd_service_health,
+        },
+        "agent": {
+            "list": cmd_agent_list,
+        },
+        "task": {
+            "list": cmd_task_list,
+        },
+        "protocol": {
+            "list": cmd_protocol_list,
+        },
+        "config": {
+            "get": cmd_config_get,
+            "set": cmd_config_set,
+        },
+        "dev": {
+            "doctor": cmd_dev_doctor,
+        },
+        "version": lambda a: cmd_version(a),
+        "status": lambda a: cmd_status(a),
+    }
+
+    handler = cmd_map.get(args.command)
+    if handler:
+        if isinstance(handler, dict):
+            subcmd = getattr(args, "subcommand", None)
+            if subcmd and subcmd in handler:
+                return handler[subcmd](args)
+            else:
+                print_info(f"Available subcommands: {', '.join(handler.keys())}")
+                return 0
+        else:
+            return handler(args)
+    else:
+        parser.print_help()
+        return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main() or 0)
