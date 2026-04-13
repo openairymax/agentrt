@@ -159,29 +159,12 @@ const Tasks: React.FC = () => {
   };
 
   return (
-    <div className="page-container">
-      {/* Page Header */}
-      <div className="page-header">
-        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-          <div style={{
-            width: "44px", height: "44px", borderRadius: "var(--radius-md)",
-            background: "linear-gradient(135deg,#6366f1,#818cf8)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 4px 16px rgba(99,102,241,0.35), 0 0 0 1px rgba(255,255,255,0.08) inset",
-          }}>
-            <ClipboardList size={20} color="white" />
-          </div>
-          <div>
-            <h1>{t.tasks.title}</h1>
-            <p style={{ color: "var(--text-secondary)", fontSize: "13px", margin: 0 }}>
-              {t.tasks.subtitle}
-            </p>
-          </div>
-        </div>
-      </div>
-
+    <PageLayout
+      title={t.tasks.title}
+      subtitle={t.tasks.subtitle}
+    >
       {/* Stats Bar */}
-      <div className="card card-elevated" style={{ marginBottom: "20px" }}>
+      <Card>
         <div style={{
           display: "flex", gap: "16px",
           justifyContent: "space-between",
@@ -191,7 +174,7 @@ const Tasks: React.FC = () => {
           {/* Tab Switch */}
           <div style={{
             display: "flex", background: "var(--bg-tertiary)",
-            borderRadius: "var(--radius-md)", padding: "3px",
+            borderRadius: "8px", padding: "3px",
             border: "1px solid var(--border-subtle)",
           }}>
             {[
@@ -202,11 +185,11 @@ const Tasks: React.FC = () => {
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 style={{
-                  padding: "7px 20px", border: "none", borderRadius: "var(--radius-sm)",
+                  padding: "8px 20px", border: "none", borderRadius: "6px",
                   background: activeTab === tab.key ? "var(--primary-color)" : "transparent",
                   color: activeTab === tab.key ? "white" : "var(--text-secondary)",
                   cursor: "pointer", fontWeight: 500, fontSize: "13px",
-                  transition: "all var(--transition-fast)",
+                  transition: "all 0.2s ease",
                   display: "flex", alignItems: "center", gap: "6px",
                 }}
               >
@@ -214,7 +197,7 @@ const Tasks: React.FC = () => {
                 {tab.label}
                 {tab.key === "history" && (
                   <span style={{
-                    fontSize: "11px", background: activeTab === tab.key ? "rgba(255,255,255,0.25)" : "var(--bg-primary)",
+                    fontSize: "11px", background: activeTab === tab.key ? "rgba(255,255,255,0.25)" : "var(--bg-secondary)",
                     padding: "1px 7px", borderRadius: "10px", fontWeight: 600,
                   }}>{stats.total}</span>
                 )}
@@ -232,43 +215,41 @@ const Tasks: React.FC = () => {
             ].map(stat => (
               <div key={stat.label} style={{
                 display: "flex", alignItems: "center", gap: "5px",
-                fontSize: "12.5px", padding: "4px 12px", borderRadius: "20px",
+                fontSize: "12px", padding: "4px 12px", borderRadius: "20px",
                 background: `${stat.color}10`, border: `1px solid ${stat.color}20`,
               }}>
-                <span style={{ fontWeight: 700, color: stat.color }}>{stat.value}</span>
+                <span style={{ fontWeight: 600, color: stat.color }}>{stat.value}</span>
                 <span style={{ color: stat.color }}>{stat.label}</span>
               </div>
             ))}
           </div>
         </div>
-      </div>
+      </Card>
 
       {activeTab === "submit" ? (
         /* Submit Task Tab */
-        <div className="card card-elevated">
-          <h3 className="card-title">
-            <Plus size={18} />
+        <Card>
+          <h3 style={{ margin: "0 0 20px 0", fontSize: "16px", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px" }}>
+            <Plus size={16} />
             提交新任务
           </h3>
 
-          <div style={{ maxWidth: "600px", display: "flex", flexDirection: "column", gap: "16px" }}>
-            <div className="form-group">
-              <label className="form-label">{t.tasks.taskName}</label>
-              <input
-                type="text"
-                className="form-input"
+          <div style={{ maxWidth: "600px", display: "flex", flexDirection: "column", gap: "20px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <label style={{ fontSize: "14px", fontWeight: 500 }}>{t.tasks.taskName}</label>
+              <Input
                 placeholder="例如：代码审查、数据分析、系统诊断..."
                 value={taskName}
                 onChange={(e) => setTaskName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSubmitTask()}
               />
-              <p className="form-help">{t.tasks.taskNameHelp}</p>
+              <p style={{ fontSize: "12px", color: "var(--text-muted)", margin: 0 }}>{t.tasks.taskNameHelp}</p>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">{t.tasks.taskType}</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <label style={{ fontSize: "14px", fontWeight: 500 }}>{t.tasks.taskType}</label>
               <div style={{
-                display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px",
+                display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px",
               }}>
                 {Object.entries(taskTypeConfig).map(([key, cfg]) => {
                   const IconComp = cfg.icon;
@@ -277,11 +258,12 @@ const Tasks: React.FC = () => {
                       key={key}
                       onClick={() => setTaskType(key)}
                       style={{
-                        padding: "14px", borderRadius: "var(--radius-md)",
+                        padding: "16px", borderRadius: "8px",
                         border: `2px solid ${taskType === key ? cfg.color : "var(--border-subtle)"}`,
-                        cursor: "pointer", transition: "all var(--transition-fast)",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
                         textAlign: "center",
-                        background: taskType === key ? cfg.bgLight : "var(--bg-tertiary)",
+                        background: taskType === key ? `${cfg.color}06` : "var(--bg-tertiary)",
                       }}
                     >
                       <IconComp size={24} color={cfg.color} style={{ marginBottom: "6px" }} />
@@ -293,54 +275,65 @@ const Tasks: React.FC = () => {
               </div>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">{t.tasks.parameters}</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <label style={{ fontSize: "14px", fontWeight: 500 }}>{t.tasks.parameters}</label>
               <textarea
-                className="textarea-field"
-                rows={5}
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--border-color)",
+                  background: "var(--bg-secondary)",
+                  color: "var(--text-primary)",
+                  resize: "vertical",
+                  minHeight: "120px",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: "13px",
+                  transition: "all 0.2s ease",
+                }}
                 placeholder='{"input": "...", "config": {...}}'
                 value={taskParams}
                 onChange={(e) => setTaskParams(e.target.value)}
-                style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "13px" }}
               />
-              <p className="form-help">{t.tasks.parametersHelp}</p>
+              <p style={{ fontSize: "12px", color: "var(--text-muted)", margin: 0 }}>{t.tasks.parametersHelp}</p>
             </div>
 
-            <button
-              className="btn btn-primary btn-lg"
+            <Button
+              variant="primary"
               onClick={handleSubmitTask}
               disabled={!taskName.trim() || submitting}
             >
               {submitting ? <Loader2 size={16} className="spin" /> : <Play size={16} />}
               {t.tasks.submitTask}
-            </button>
+            </Button>
           </div>
-        </div>
+        </Card>
       ) : (
         /* History Tab */
         <>
           {/* Search & Filter */}
-          <div className="card card-elevated" style={{ marginBottom: "16px" }}>
+          <Card style={{ marginBottom: "16px" }}>
             <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
               <div style={{ position: "relative", flex: 1, maxWidth: "360px" }}>
                 <Search size={15} style={{
                   position: "absolute", left: "12px", top: "50%",
                   transform: "translateY(-50%)", color: "var(--text-muted)"
                 }} />
-                <input
-                  type="text"
-                  className="form-input"
+                <Input
                   placeholder={`${t.tasks.searchTasks}...`}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   style={{ paddingLeft: "38px" }}
                 />
               </div>
-              <button className="btn btn-secondary" onClick={loadTasks}>
+              <Button
+                variant="secondary"
+                onClick={loadTasks}
+              >
                 <RotateCcw size={15} />
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
 
           {/* Task List */}
           {loading ? (
@@ -348,133 +341,140 @@ const Tasks: React.FC = () => {
               <div className="loading-spinner" />
             </div>
           ) : filteredTasks.length === 0 ? (
-            <div className="empty-state">
-              <ClipboardList size={56} style={{ opacity: 0.25 }} />
-              <div className="empty-state-text">{t.tasks.noTasks}</div>
-              <div className="empty-state-hint">{t.tasks.noTasksHint}</div>
-              <button className="btn btn-primary mt-8" onClick={() => setActiveTab("submit")}>
-                <Plus size={16} /> {t.tasks.submitTask}
-              </button>
-            </div>
+            <Card>
+              <div style={{ textAlign: "center", padding: "48px" }}>
+                <ClipboardList size={56} style={{ opacity: 0.25 }} />
+                <div style={{ fontSize: "15px", fontWeight: 500, margin: "16px 0 8px 0" }}>
+                  {t.tasks.noTasks}
+                </div>
+                <div style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "24px" }}>
+                  {t.tasks.noTasksHint}
+                </div>
+                <Button
+                  variant="primary"
+                  onClick={() => setActiveTab("submit")}
+                >
+                  <Plus size={16} />
+                  {t.tasks.submitTask}
+                </Button>
+              </div>
+            </Card>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              {filteredTasks.map((task, idx) => {
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {filteredTasks.map((task) => {
                 const typeCfg = taskTypeConfig[task.type as keyof typeof taskTypeConfig] || { icon: Zap, color: "#94a3b8", gradient: "", bgLight: "", label: task.type || "unknown" };
                 const stCfg = statusConfig[task.status] || statusConfig.pending;
                 const TypeIcon = typeCfg.icon;
 
                 return (
-                  <div
-                    key={task.id}
-                    className="card-hover-lift"
-                    style={{
-                      padding: "18px 20px",
-                      borderRadius: "var(--radius-lg)",
-                      border: "1px solid var(--border-subtle)",
-                      position: "relative",
-                      overflow: "hidden",
-                      animation: `staggerFadeIn 0.35s ease-out ${idx * 50}ms both`,
+                  <Card key={task.id}>
+                    <div style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: "18px",
-                    }}
-                  >
-                    {/* Progress Ring */}
-                    <TaskProgressRing
-                      progress={task.progress}
-                      color={stCfg.color}
-                      size={48}
-                      strokeWidth={4}
-                    />
+                      gap: "16px",
+                    }}>
+                      {/* Progress Ring */}
+                      <TaskProgressRing
+                        progress={task.progress}
+                        color={stCfg.color}
+                        size={44}
+                        strokeWidth={3}
+                      />
 
-                    {/* Content */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
-                        <span style={{ fontWeight: 600, fontSize: "15px" }}>{task.name}</span>
-                        <span className="tag" style={{
-                          background: stCfg.bg, color: stCfg.color,
-                          fontSize: "11px", fontWeight: 500, padding: "2px 8px",
-                        }}>
-                          {stCfg.label}
-                        </span>
-                        <span className="tag" style={{
-                          background: typeCfg.bgLight, color: typeCfg.color,
-                          fontSize: "11px", fontWeight: 400, padding: "2px 8px",
-                        }}>
-                          <TypeIcon size={10} style={{ display: "inline", marginRight: "3px" }} />
-                          {typeCfg.label}
-                        </span>
-                      </div>
-
-                      {/* Progress bar */}
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "8px" }}>
-                        <div style={{
-                          flex: 1, height: "4px", background: "var(--bg-tertiary)",
-                          borderRadius: "2px", overflow: "hidden",
-                        }}>
-                          <div style={{
-                            width: `${task.progress}%`, height: "100%",
-                            background: task.status === "failed"
-                              ? `repeating-linear-gradient(90deg, ${stCfg.color}, ${stCfg.color} 4px, transparent 4px, transparent 8px)`
-                              : stCfg.gradient || stCfg.color,
-                            borderRadius: "2px",
-                            transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
-                          }} />
+                      {/* Content */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                          <span style={{ fontWeight: 600, fontSize: "14px" }}>{task.name}</span>
+                          <span style={{
+                            background: "var(--bg-tertiary)", color: stCfg.color,
+                            fontSize: "11px", fontWeight: 500, padding: "2px 8px",
+                            borderRadius: "4px",
+                          }}>
+                            {stCfg.label}
+                          </span>
+                          <span style={{
+                            background: "var(--bg-tertiary)", color: typeCfg.color,
+                            fontSize: "11px", fontWeight: 400, padding: "2px 8px",
+                            borderRadius: "4px",
+                          }}>
+                            <TypeIcon size={10} style={{ display: "inline", marginRight: "3px" }} />
+                            {typeCfg.label}
+                          </span>
                         </div>
-                        <span style={{
-                          fontSize: "12px", color: "var(--text-muted)",
-                          fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap",
-                        }}>
-                          {Math.round(task.progress)}%
-                        </span>
+
+                        {/* Progress bar */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+                          <div style={{
+                            flex: 1, height: "4px", background: "var(--bg-tertiary)",
+                            borderRadius: "2px", overflow: "hidden",
+                          }}>
+                            <div style={{
+                              width: `${task.progress}%`, height: "100%",
+                              background: task.status === "failed"
+                                ? stCfg.color
+                                : stCfg.color,
+                              borderRadius: "2px",
+                              transition: "width 0.6s ease",
+                            }} />
+                          </div>
+                          <span style={{
+                            fontSize: "12px", color: "var(--text-muted)",
+                            fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap",
+                          }}>
+                            {Math.round(task.progress)}%
+                          </span>
+                        </div>
+
+                        {/* Meta info */}
+                        <div style={{ display: "flex", gap: "16px", fontSize: "11px", color: "var(--text-muted)" }}>
+                          <span><Clock size={11} style={{ display: "inline", marginRight: "3px", verticalAlign: "middle" }} />{new Date(task.created_at).toLocaleString('zh-CN')}</span>
+                          <span>ID: {task.id.slice(0, 8)}</span>
+                        </div>
                       </div>
 
-                      {/* Meta info */}
-                      <div style={{ display: "flex", gap: "16px", marginTop: "8px", fontSize: "11.5px", color: "var(--text-muted)" }}>
-                        <span><Clock size={11} style={{ display: "inline", marginRight: "3px", verticalAlign: "middle" }} />{new Date(task.created_at).toLocaleString('zh-CN')}</span>
-                        <span>ID: {task.id.slice(0, 8)}</span>
+                      {/* Actions */}
+                      <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                        {task.status === "running" && (
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => handleAction(task.id, "stop")}
+                            disabled={actionLoading !== null}
+                            title={t.tasks.stopTask}
+                          >
+                            <Square size={13} />
+                          </Button>
+                        )}
+                        {(task.status === "completed" || task.status === "failed") && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleAction(task.id, "restart")}
+                            disabled={actionLoading !== null}
+                            title={t.tasks.restartTask}
+                          >
+                            <RotateCcw size={13} />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleAction(task.id, "delete")}
+                          disabled={actionLoading !== null}
+                          title={t.tasks.deleteTask}
+                        >
+                          <Trash2 size={13} />
+                        </Button>
                       </div>
                     </div>
-
-                    {/* Actions */}
-                    <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-                      {task.status === "running" && (
-                        <button
-                          className="btn btn-danger btn-sm"
-                          onClick={() => handleAction(task.id, "stop")}
-                          disabled={actionLoading !== null}
-                          title={t.tasks.stopTask}
-                        >
-                          <Square size={13} />
-                        </button>
-                      )}
-                      {(task.status === "completed" || task.status === "failed") && (
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => handleAction(task.id, "restart")}
-                          disabled={actionLoading !== null}
-                          title={t.tasks.restartTask}
-                        >
-                          <RotateCcw size={13} />
-                        </button>
-                      )}
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => handleAction(task.id, "delete")}
-                        disabled={actionLoading !== null}
-                        title={t.tasks.deleteTask}
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </div>
+                  </Card>
                 );
               })}
             </div>
           )}
         </>
       )}
-    </div>
+    </PageLayout>
   );
 };
 

@@ -417,5 +417,70 @@
   "resetUsage": "重置使用统计",
   "testSuccess": "连接测试成功！",
   "testFailed": "连接测试失败"
+},
+"protocols": {
+  "title": "协议兼容性",
+  "demo": {
+    "title": "协议兼容性演示",
+    "subtitle": "AgentOS UnifiedProtocol",
+    "connectionTest": {
+      "title": "连接测试",
+      "endpointAddress": "端点地址",
+      "endpointPlaceholder": "http://localhost:18789",
+      "testButton": "测试 {protocol} 连接",
+      "testing": "测试中...",
+      "success": "✅",
+      "failure": "❌",
+      "latency": "延迟: {latency}ms",
+      "endpoint": "端点: {endpoint}"
+    },
+    "capabilities": {
+      "title": "协议能力",
+      "noSelection": "选择协议查看可用方法",
+      "selectMethod": "点击选择方法",
+      "method": "方法",
+      "description": "描述",
+      "parameters": "参数",
+      "parameterList": "参数: {params}"
+    },
+    "messageSending": {
+      "title": "消息发送",
+      "methodName": "方法名",
+      "methodPlaceholder": "tools/list",
+      "parametersJson": "参数 (JSON)",
+      "sendButton": "发送 {protocol} 消息",
+      "sending": "发送中...",
+      "response": "响应",
+      "waitingResponse": "发送消息后查看响应"
+    },
+    "status": {
+      "active": "活跃",
+      "inactive": "未激活"
+    }
+  },
+  "list": {
+    "jsonrpc": {
+      "name": "JSON-RPC 2.0",
+      "description": "AgentOS 原生 JSON-RPC 协议"
+    },
+    "mcp": {
+      "name": "MCP v1.0",
+      "description": "模型上下文协议 - 工具与资源集成"
+    },
+    "a2a": {
+      "name": "A2A v0.3",
+      "description": "智能体到智能体协议 - 智能体间通信"
+    },
+    "openai": {
+      "name": "OpenAI API v1",
+      "description": "OpenAI 兼容 API - 聊天完成与模型"
+    }
+  },
+  "errors": {
+    "connectionFailed": "连接测试失败: {error}",
+    "invalidJson": "参数 JSON 格式无效",
+    "messageFailed": "消息发送失败: {error}",
+    "unsupportedProtocol": "不支持的协议: {protocol}"
+  }
 }
 }

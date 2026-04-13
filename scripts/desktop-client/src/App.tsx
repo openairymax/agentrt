@@ -37,6 +37,7 @@ import AgentRuntime from "./pages/AgentRuntime";
 import SystemMonitor from "./pages/SystemMonitor";
 import MemoryEvolution from "./pages/MemoryEvolution";
 import ToolManager from "./pages/ToolManager";
+import ProtocolPlayground from "./pages/ProtocolPlayground";
 import AIChat from "./components/AIChat";
 import WelcomeWizard from "./components/WelcomeWizard";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -70,26 +71,7 @@ const navConfig = [
   ]},
 ];
 
-function FloatingAIButton() {
-  const [isOpen, setIsOpen] = useState(false);
-  const location = useLocation();
-  const navigate = useNavigate();
 
-  if (location.pathname === '/ai-chat') return null;
-
-  return (
-    <>
-      <button
-        className="floating-ai-btn"
-        onClick={() => navigate('/ai-chat')}
-        title="AI 助手"
-      >
-        <Sparkles size={22} />
-        <span className="floating-ai-pulse" />
-      </button>
-    </>
-  );
-}
 
 function TitleBarContent() {
   const location = useLocation();
@@ -100,11 +82,11 @@ function TitleBarContent() {
     "/services": t.nav.services,
     "/agents": t.nav.agents,
     "/tasks": t.nav.tasks,
-    "/agent-runtime": "AgentOS 运行时",
-    "/system-monitor": "系统监控",
-    "/memory-evolution": "四层记忆卷载",
-    "/tools": "工具管理器",
-    "/ai-chat": "AI 助手",
+    "/agent-runtime": t.nav.agentRuntime,
+    "/system-monitor": t.nav.systemMonitor,
+    "/memory-evolution": t.nav.memoryEvolution,
+    "/tools": t.nav.tools,
+    "/ai-chat": t.nav.aiChat,
     "/llm-config": t.nav.llmConfig,
     "/config": t.nav.config,
     "/logs": t.nav.logs,
@@ -113,31 +95,15 @@ function TitleBarContent() {
   };
 
   const currentLabel = routeLabels[location.pathname] || "AgentOS";
-  const breadcrumbs = [t.app.title, currentLabel];
 
   return (
     <div className="titlebar">
       <div className="titlebar-left">
-        <div className="titlebar-breadcrumbs">
-          {breadcrumbs.map((crumb, idx) => (
-            <React.Fragment key={idx}>
-              <span className="titlebar-breadcrumb-item">{crumb}</span>
-              {idx < breadcrumbs.length - 1 && (
-                <ChevronRight size={14} className="titlebar-breadcrumb-separator" />
-              )}
-            </React.Fragment>
-          ))}
-        </div>
-      </div>
-
-      <div className="titlebar-center" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <GlobalSearch />
-        <CommandPalette />
+        <div className="titlebar-title">{currentLabel}</div>
       </div>
 
       <div className="titlebar-actions">
-        <NotificationCenter />
-        <div className="avatar" title="User">U</div>
+        <GlobalSearch />
       </div>
     </div>
   );
@@ -145,40 +111,19 @@ function TitleBarContent() {
 
 function StatusBar() {
   const { t } = useI18n();
-  const [time, setTime] = useState(new Date());
-
-  useEffect(() => {
-    const timer = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   return (
     <div className="statusbar">
       <div className="statusbar-left">
-        <div className="statusbar-item clickable">
-          <GitBranch size={13} />
-          <span>main</span>
-        </div>
-        <div className="statusbar-item clickable">
-          <CircleDot size={13} />
-          <span>0 problems</span>
-        </div>
         <div className="statusbar-item">
-          <Wifi size={13} />
+          <CircleDot size={13} />
           <span>{t.common.systemConnected}</span>
         </div>
       </div>
       <div className="statusbar-right">
-        <div className="statusbar-item clickable" data-tooltip="Keyboard Shortcuts (?)">
-          <Keyboard size={13} />
-          <span style={{ marginLeft: '4px' }}>⌘K</span>
-        </div>
         <div className="statusbar-item">
           <Cpu size={13} />
           <span>v0.3.2</span>
-        </div>
-        <div className="statusbar-item number-display">
-          {time.toLocaleTimeString('en-US', { hour12: false })}
         </div>
       </div>
     </div>
@@ -186,12 +131,9 @@ function StatusBar() {
 }
 
 function AppContent() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const { t } = useI18n();
   const { showShortcuts, setShowShortcuts } = useKeyboardShortcuts();
   const location = useLocation();
-  const [pageKey, setPageKey] = useState(0);
-  const [pageAnimating, setPageAnimating] = useState(false);
 
   const getNestedValue = (obj: any, path: string): string => {
     return path.split('.').reduce((acc, part) => acc?.[part], obj) || path;
@@ -199,86 +141,12 @@ function AppContent() {
 
   const isAIChatPage = location.pathname === '/ai-chat';
 
-  useEffect(() => {
-    setPageAnimating(true);
-    setPageKey(prev => prev + 1);
-    const timer = setTimeout(() => setPageAnimating(false), 300);
-    return () => clearTimeout(timer);
-  }, [location.pathname]);
-
   return (
     <div className="app-layout">
-      {/* Activity Bar */}
-      <aside className="activity-bar">
-        <div className="activity-bar-logo" title="AgentOS">A</div>
-
-        <div className="activity-bar-items">
-          {navConfig[0].items.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) =>
-                `activity-bar-item ${isActive ? "active" : ""}`
-              }
-              title={getNestedValue(t, item.labelKey)}
-            >
-              <item.icon size={22} />
-            </NavLink>
-          ))}
-
-          <div style={{ height: 8 }} />
-
-          {/* AI Chat - Special Highlight */}
-          <NavLink
-            to="/ai-chat"
-            className={({ isActive }) =>
-              `activity-bar-item ai-chat-item ${isActive ? "active" : ""}`
-            }
-            title="AI 助手"
-          >
-            <MessageCircle size={22} />
-          </NavLink>
-
-          {navConfig[1].items.slice(1, 4).map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) =>
-                `activity-bar-item ${isActive ? "active" : ""}`
-              }
-              title={getNestedValue(t, item.labelKey)}
-            >
-              <item.icon size={22} />
-            </NavLink>
-          ))}
-        </div>
-
-        <div className="activity-bar-bottom">
-          <NavLink
-            to="/settings"
-            className={({ isActive }) =>
-              `activity-bar-item ${isActive ? "active" : ""}`
-            }
-            title={getNestedValue(t, navConfig[1].items[4].labelKey)}
-          >
-            <SettingsIcon size={22} />
-          </NavLink>
-
-          <button
-            className="activity-bar-item"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            title={sidebarOpen ? "Close Sidebar (Ctrl+B)" : "Open Sidebar"}
-          >
-            {sidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
-          </button>
-        </div>
-      </aside>
-
       {/* Sidebar Panel */}
-      <aside className={`sidebar-panel ${!sidebarOpen ? 'collapsed' : ''}`}>
+      <aside className="sidebar-panel">
         <div className="sidebar-panel-header">
           <span className="sidebar-panel-title">{t.app.title}</span>
-          <button className="sidebar-panel-close" onClick={() => setSidebarOpen(false)}>✕</button>
         </div>
 
         <nav className="nav-menu">
@@ -290,36 +158,23 @@ function AppContent() {
                   key={item.path}
                   to={item.path}
                   className={({ isActive }) =>
-                    `nav-item ${isActive ? "active" : ""} ${item.path === '/ai-chat' ? 'nav-item-ai' : ''}`
+                    `nav-item ${isActive ? "active" : ""}`
                   }
                 >
-                  <item.icon size={18} />
-                  <span>{item.path === '/ai-chat' ? 'AI 助手' : getNestedValue(t, item.labelKey)}</span>
+                  <item.icon size={16} />
+                  <span>{getNestedValue(t, item.labelKey)}</span>
                 </NavLink>
               ))}
             </div>
           ))}
         </nav>
-
-        <div style={{ padding: "16px", borderTop: "1px solid var(--border-subtle)" }}>
-          <div className="nav-item" style={{ justifyContent: "flex-start", fontSize: "12px" }}>
-            <Activity size={16} />
-            <span>{t.common.systemConnected}</span>
-          </div>
-        </div>
       </aside>
 
       {/* Main Workspace */}
       <main className="main-workspace">
         {!isAIChatPage && <TitleBarContent />}
 
-        <div
-          key={pageKey}
-          className={`content-area ${!isAIChatPage ? 'stagger-enter' : ''}`}
-          style={{
-            animation: pageAnimating ? 'pageFadeIn 0.3s ease-out' : undefined,
-          }}
-        >
+        <div className="content-area">
           <ErrorBoundary>
             <Routes>
               <Route path="/" element={<Dashboard />} />
@@ -344,9 +199,6 @@ function AppContent() {
         {!isAIChatPage && <StatusBar />}
       </main>
 
-      {/* Floating AI Button */}
-      <FloatingAIButton />
-
       {/* Modals */}
       <KeyboardShortcutsModal isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
     </div>
@@ -355,23 +207,23 @@ function AppContent() {
 
 function AIChatPage() {
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-secondary)' }}>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 20px', borderBottom: '1px solid var(--border-subtle)',
-        background: 'var(--bg-secondary)',
+        padding: '16px 24px', borderBottom: '1px solid var(--border-subtle)',
+        background: 'var(--bg-primary)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{
-            width: '36px', height: '36px', borderRadius: '12px',
+            width: '40px', height: '40px', borderRadius: '12px',
             background: 'var(--primary-gradient)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <Brain size={20} color="white" />
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: '16px' }}>AI 助手</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>AgentOS 智能对话 · 全功能模式</div>
+            <div style={{ fontWeight: 600, fontSize: '16px' }}>AI 助手</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>AgentOS 智能对话</div>
           </div>
         </div>
       </div>

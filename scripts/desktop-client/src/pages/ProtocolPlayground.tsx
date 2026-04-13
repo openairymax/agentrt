@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { useI18n } from '../i18n';
 
 interface ProtocolInfo {
   id: string;
@@ -37,6 +38,7 @@ interface ProtocolMessageResponse {
 }
 
 const ProtocolPlayground: React.FC = () => {
+  const { t } = useI18n();
   const [protocols, setProtocols] = useState<ProtocolInfo[]>([]);
   const [selectedProtocol, setSelectedProtocol] = useState<string>('');
   const [capabilities, setCapabilities] = useState<ProtocolCapability[]>([]);

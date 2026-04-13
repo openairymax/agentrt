@@ -8,6 +8,7 @@
  */
 
 #include "unified_protocol.h"
+#include "../../daemon/common/include/safe_string_utils.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -68,7 +69,7 @@ protocol_stack_handle_t protocol_stack_create(const protocol_stack_config_t* con
         size_t name_len = strlen(config->name) + 1;
         char* name_copy = (char*)malloc(name_len);
         if (name_copy) {
-            strcpy(name_copy, config->name);
+            safe_strcpy(name_copy, config->name, name_len);
             stack->config.name = name_copy;
         }
     }
