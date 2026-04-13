@@ -215,6 +215,20 @@ static agentos_error_t create_loop_engines(agentos_core_loop_t* loop)
     err = agentos_memory_create(NULL, &loop->memory);
     if (err != AGENTOS_SUCCESS) return err;
 
+    // 自动注册TaskFlow执行单元（如果可用）
+    taskflow_unit_config_t tf_config = {
+        .taskflow_config = TASKFLOW_CONFIG_DEFAULT,
+        .max_concurrent_graphs = 10,
+        .default_timeout_ms = 30000,
+        .enable_auto_checkpoint = true,
+        .auto_checkpoint_interval = 100
+    };
+    agentos_error_t tf_err = taskflow_register_unit(loop->execution, "taskflow", &tf_config);
+    if (tf_err != AGENTOS_SUCCESS) {
+        // 记录警告但继续运行（TaskFlow是可选的）
+        // 注意：这里没有日志系统，暂时忽略
+    }
+
     return AGENTOS_SUCCESS;
 }
 

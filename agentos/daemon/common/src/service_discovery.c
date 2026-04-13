@@ -871,10 +871,10 @@ AGENTOS_API agentos_error_t sd_check_dependencies(
             size_t token_len = strlen(token);
             if (missing_len + token_len + 2 < sizeof(missing)) {
                 if (missing_len > 0) {
-                    strcat(missing, ",");
+                    safe_strcat(missing, ",", sizeof(missing));
                     missing_len++;
                 }
-                strcat(missing, token);
+                safe_strcat(missing, token, sizeof(missing));
                 missing_len += token_len;
             }
         }

@@ -8,6 +8,7 @@
  */
 
 #include "protocol_router.h"
+#include "../../../daemon/common/include/safe_string_utils.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -403,16 +404,16 @@ static rule_node_t* create_rule_node(const protocol_rule_t* rule,
         size_t len = strlen(rule->source_endpoint) + 1;
         char* copy = (char*)malloc(len);
         if (copy) {
-            strcpy(copy, rule->source_endpoint);
+            safe_strcpy(copy, rule->source_endpoint, len);
             node->rule.source_endpoint = copy;
         }
     }
-    
+
     if (rule->target_endpoint) {
         size_t len = strlen(rule->target_endpoint) + 1;
         char* copy = (char*)malloc(len);
         if (copy) {
-            strcpy(copy, rule->target_endpoint);
+            safe_strcpy(copy, rule->target_endpoint, len);
             node->rule.target_endpoint = copy;
         }
     }

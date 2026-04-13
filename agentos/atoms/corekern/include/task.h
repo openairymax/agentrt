@@ -18,6 +18,8 @@
 #include <stddef.h>
 #include "error.h"
 #include "export.h"
+/* 统一类型定义：包含平台抽象层 */
+#include "../../../commons/platform/include/platform.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,33 +30,14 @@ extern "C" {
  */
 typedef uint64_t agentos_task_id_t;
 
-/**
- * @brief 线程 ID 类型
+/* 
+ * 以下类型现在由platform.h提供：
+ * - agentos_thread_id_t
+ * - agentos_mutex_t
+ * - agentos_cond_t
+ * - agentos_thread_t
+ * 请直接使用platform.h中的定义
  */
-typedef uint64_t agentos_thread_id_t;
-
-/**
- * @brief 互斥锁类型（不透明指针）
- */
-typedef struct agentos_mutex agentos_mutex_t;
-
-/**
- * @brief 条件变量类型（不透明指针）
- */
-typedef struct agentos_cond agentos_cond_t;
-
-/**
- * @brief 线程句柄
- *
- * Windows: HANDLE
- * POSIX: pthread_t
- */
-#if defined(_WIN32) || defined(_WIN64)
-    #include <windows.h>
-    typedef HANDLE agentos_thread_t;
-#else
-    typedef struct agentos_thread agentos_thread_t;
-#endif
 
 /**
  * @brief 任务优先级常量

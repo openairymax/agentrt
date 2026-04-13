@@ -417,5 +417,70 @@
     "resetUsage": "Reset Usage Stats",
     "testSuccess": "Connection test successful!",
     "testFailed": "Connection test failed"
+  },
+  "protocols": {
+    "title": "Protocol Compatibility",
+    "demo": {
+      "title": "Protocol Compatibility Demo",
+      "subtitle": "AgentOS UnifiedProtocol",
+      "connectionTest": {
+        "title": "Connection Test",
+        "endpointAddress": "Endpoint Address",
+        "endpointPlaceholder": "http://localhost:18789",
+        "testButton": "Test {protocol} Connection",
+        "testing": "Testing...",
+        "success": "✅",
+        "failure": "❌",
+        "latency": "Latency: {latency}ms",
+        "endpoint": "Endpoint: {endpoint}"
+      },
+      "capabilities": {
+        "title": "Protocol Capabilities",
+        "noSelection": "Select protocol to view available methods",
+        "selectMethod": "Click to select method",
+        "method": "Method",
+        "description": "Description",
+        "parameters": "Parameters",
+        "parameterList": "Parameters: {params}"
+      },
+      "messageSending": {
+        "title": "Message Sending",
+        "methodName": "Method Name",
+        "methodPlaceholder": "tools/list",
+        "parametersJson": "Parameters (JSON)",
+        "sendButton": "Send {protocol} Message",
+        "sending": "Sending...",
+        "response": "Response",
+        "waitingResponse": "Send a message to see the response"
+      },
+      "status": {
+        "active": "Active",
+        "inactive": "Inactive"
+      }
+    },
+    "list": {
+      "jsonrpc": {
+        "name": "JSON-RPC 2.0",
+        "description": "AgentOS Native JSON-RPC Protocol"
+      },
+      "mcp": {
+        "name": "MCP v1.0",
+        "description": "Model Context Protocol - Tool & Resource Integration"
+      },
+      "a2a": {
+        "name": "A2A v0.3",
+        "description": "Agent-to-Agent Protocol - Inter-Agent Communication"
+      },
+      "openai": {
+        "name": "OpenAI API v1",
+        "description": "OpenAI Compatible API - Chat Completion & Models"
+      }
+    },
+    "errors": {
+      "connectionFailed": "Connection test failed: {error}",
+      "invalidJson": "Invalid JSON parameters format",
+      "messageFailed": "Message sending failed: {error}",
+      "unsupportedProtocol": "Unsupported protocol: {protocol}"
+    }
   }
 }

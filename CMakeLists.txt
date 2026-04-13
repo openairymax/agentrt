@@ -82,6 +82,14 @@ if(ENABLE_SANITIZERS AND NOT MSVC)
     endif()
 endif()
 
+# MSVC Release模式特殊处理：解决/O2与/RTC1冲突
+if(MSVC AND CMAKE_BUILD_TYPE STREQUAL "Release")
+    # 移除默认的/RTC1标志（如果存在），因为与/O2不兼容
+    string(REPLACE "/RTC1" "" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
+    string(REPLACE "/RTC1" "" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
+    message(STATUS "Adjusted MSVC Release flags to avoid /O2 and /RTC1 conflict")
+endif()
+
 # 调试符号（由构建类型控制）
 if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     if(MSVC)

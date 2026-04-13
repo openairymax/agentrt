@@ -1,6 +1,6 @@
 # =============================================================================
 # AgentOS .gitignore 文件
-# 版本：7.1.0
+# 版本：8.0.0
 # 最后更新：2026-04-13
 # 说明：规范化排除所有不应纳入版本控制的文件和目录
 #
@@ -10,8 +10,9 @@
 # 3. 本地开发配置一律排除（.env.local、IDE 配置等）
 # 4. 空目录通过 .gitkeep 保留，但排除目录内容
 # 5. 项目必需文件使用否定规则明确保留
+# 6. 通配符规则限定作用范围，避免意外排除项目必需文件
 #
-# 项目模块结构（2026-04-09 V5.0 校正后）：
+# 项目模块结构（2026-04-13 V8.0 校正后）：
 # 核心模块 (agentos/)
 #   - atoms/       : 内核原子模块 (40,917行, A+评级)
 #   - atomslite/   : 轻量级原子模块
@@ -42,9 +43,13 @@ CHANGELOG.md
 
 # =============================================================================
 # 修复记录目录（本地工作记录，不追踪）
+# 注意：.bendiwenjian/ 目录整体排除，但总线检查报告需保留
+# Git 机制要求：父目录排除后，必须逐级否定才能重新包含子文件
 # =============================================================================
 
 .bendiwenjian/
+!.bendiwenjian/总线检查/
+!.bendiwenjian/总线检查/*.md
 
 # =============================================================================
 # 1. CMake 构建系统（构建产物，不追踪）
@@ -95,7 +100,6 @@ compile_commands/*.json
 *.exe.manifest
 *.out
 *.app
-*.bin
 
 # 预编译头
 *.pch
@@ -171,7 +175,7 @@ agentos/toolkit/go/go.sum
 agentos/toolkit/go/*.exe
 agentos/toolkit/go/testsuite/
 agentos/toolkit/go/coverage/
-*.test
+agentos/toolkit/go/*.test
 cover.out
 cover.html
 
@@ -205,13 +209,12 @@ agentos/toolkit/typescript/tsbuildinfo/
 # =============================================================================
 
 # 环境文件
-.env
+*.env
 .env.local
 .env.*.local
 .env.dev
 .env.test
 .env.production
-*.env
 
 # 密钥和证书
 *.pem
@@ -228,7 +231,6 @@ secrets.yaml
 secrets.yml
 credentials.json
 service_account.json
-*.keystore
 oauth/
 .token
 
@@ -259,7 +261,6 @@ override.yaml
 out/
 *.hprof
 *.heap
-*.snap
 *.clion/
 
 # Vim
@@ -268,7 +269,6 @@ out/
 *~
 .netrwhist
 *.un~
-# \#*\#
 .\#*
 *.elc
 
@@ -301,7 +301,6 @@ bld/
 .classpath
 .project
 .settings/
-bin/
 
 # =============================================================================
 # 9. 日志、数据库和运行时文件（运行时生成，不追踪）
@@ -392,14 +391,10 @@ agentos/heapstore/db/*
 # 测试结果和报告
 test-results/
 test_output/
-*.test
 *.spec
-*.snap
 *.snapshot
 
 # 测试覆盖率
-coverage/
-htmlcov/
 *.gcov
 
 # 测试数据（运行时生成）
@@ -507,23 +502,17 @@ agentos/heapstore/models/*.onnx
 *.arrow
 *.feather
 
-# 数据集
+# 数据集（仅排除根目录数据目录）
 /data/
 /datasets/
-*.csv
-*.tsv
-*.jsonl
 
-# 压缩包
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.zip
-*.rar
-*.7z
-*.gz
-*.bz2
-*.xz
+# 压缩包（仅排除构建和部署目录下的）
+deploy/**/*.tar.gz
+deploy/**/*.tar.bz2
+deploy/**/*.tar.xz
+deploy/**/*.zip
+deploy/**/*.rar
+deploy/**/*.7z
 
 # Docker 和 Kubernetes
 deploy/docker/*.tar
@@ -624,7 +613,7 @@ scripts/desktop-client/src-tauri/WixTools/
 scripts/desktop-client/src-tauri/Cargo.lock
 
 # =============================================================================
-# 20. 新增目录（docker/ 和 docs/）
+# 20. docker/ 和 docs/ 目录（保留配置文件，排除运行时产物）
 # =============================================================================
 
 # docker/ 目录（保留配置文件，排除运行时产物）
@@ -645,16 +634,16 @@ docs/site/
 docs/*.svg
 docs/*.png
 docs/*.pdf
-docs/local/
-docs/private/
+
+# Doxygen API 文档输出（保留源文件 mainpage.dox）
+docs/api/html/
+docs/api/xml/
+docs/api/latex/
+docs/api/man/
 
 # =============================================================================
 # 21. 必须保留的例外（项目必需文件）
 # =============================================================================
-
-# 版本控制配置
-!.gitignore
-!.gitattributes
 
 # 环境模板
 !.env.example
@@ -668,9 +657,6 @@ docs/private/
 
 # 关键文档
 !docs/**/*.md
-!README.md
-!README_EN.md
-!LICENSE
 !CONTRIBUTING.md
 !AUTHORS.md
 !SECURITY.md
@@ -765,12 +751,6 @@ docs/private/
 
 # .gitcode/ 是平台模板目录，随仓库同步
 # 包含 CI/CD 工作流、Issue 模板、PR 模板等
-
-# =============================================================================
-# 23. 总线检查报告目录（保留最终版本）
-# =============================================================================
-
-!.bendiwenjian/总线检查/*.md
 
 # =============================================================================
 # 结束

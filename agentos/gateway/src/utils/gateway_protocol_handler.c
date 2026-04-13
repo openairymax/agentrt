@@ -10,6 +10,7 @@
 #include "gateway_protocol_handler.h"
 #include "jsonrpc.h"
 #include "syscall_router.h"
+#include "../../../daemon/common/include/safe_string_utils.h"
 #include <cJSON.h>
 #include <stdlib.h>
 #include <string.h>
@@ -72,10 +73,49 @@ gateway_protocol_handler_t gateway_protocol_handler_create(
         free(handler);
         return NULL;
     }
-    
-    // TODO: 添加预定义协议转换规则
-    // 这里可以添加MCP->JSON-RPC, A2A->JSON-RPC等规则
-    
+
+    // 添加MCP v1.0 -> JSON-RPC 协议转换规则
+    protocol_rule_t mcp_rule = {
+        .source_protocol = UNIFIED_PROTOCOL_MCP_V1,
+        .target_protocol = UNIFIED_PROTOCOL_JSON_RPC,
+        .source_endpoint = "/mcp/*",
+        .target_endpoint = "/jsonrpc",
+        .priority = 100,
+        .enabled = true,
+        .transformer = mcp_to_jsonrpc_transformer
+    };
+    if (protocol_router_add_rule(handler->router, &mcp_rule) == 0) {
+        SVC_LOG_DEBUG("MCP v1.0 -> JSON-RPC rule added");
+    }
+
+    // 添加A2A v0.3.0 -> JSON-RPC 协议转换规则
+    protocol_rule_t a2a_rule = {
+        .source_protocol = UNIFIED_PROTOCOL_A2A_V03,
+        .target_protocol = UNIFIED_PROTOCOL_JSON_RPC,
+        .source_endpoint = "/a2a/*",
+        .target_endpoint = "/jsonrpc",
+        .priority = 90,
+        .enabled = true,
+        .transformer = a2a_to_jsonrpc_transformer
+    };
+    if (protocol_router_add_rule(handler->router, &a2a_rule) == 0) {
+        SVC_LOG_DEBUG("A2A v0.3.0 -> JSON-RPC rule added");
+    }
+
+    // 添加OpenAI API -> JSON-RPC 协议转换规则
+    protocol_rule_t openai_rule = {
+        .source_protocol = UNIFIED_PROTOCOL_OPENAI_API,
+        .target_protocol = UNIFIED_PROTOCOL_JSON_RPC,
+        .source_endpoint = "/v1/*",
+        .target_endpoint = "/jsonrpc",
+        .priority = 80,
+        .enabled = true,
+        .transformer = openai_to_jsonrpc_transformer
+    };
+    if (protocol_router_add_rule(handler->router, &openai_rule) == 0) {
+        SVC_LOG_DEBUG("OpenAI API -> JSON-RPC rule added");
+    }
+
     handler->total_requests = 0;
     handler->jsonrpc_requests = 0;
     handler->mcp_requests = 0;
@@ -408,8 +448,8 @@ int gateway_protocol_convert_from_jsonrpc(
     if (!*target_response) {
         return -1;
     }
-    strcpy(*target_response, jsonrpc_response);
-    
+    safe_strcpy(*target_response, jsonrpc_response, len + 1);
+
     return 0;
 }
 
