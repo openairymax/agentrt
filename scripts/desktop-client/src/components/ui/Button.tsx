@@ -2,12 +2,13 @@ import React from 'react';
 
 interface ButtonProps {
   children: React.ReactNode;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
   size?: 'sm' | 'md' | 'lg';
   disabled?: boolean;
   className?: string;
   style?: React.CSSProperties;
+  title?: string;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -18,6 +19,7 @@ export const Button: React.FC<ButtonProps> = ({
   disabled = false,
   className = '',
   style = {},
+  title,
 }) => {
   const baseStyles: React.CSSProperties = {
     display: 'inline-flex',
@@ -106,6 +108,7 @@ export const Button: React.FC<ButtonProps> = ({
         ...style,
         opacity: disabled ? 0.5 : 1,
       }}
+      title={title}
       onMouseEnter={(e) => {
         if (!disabled) {
           Object.assign(e.currentTarget.style, hoverStyles[variant]);

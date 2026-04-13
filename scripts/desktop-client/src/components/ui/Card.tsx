@@ -5,6 +5,7 @@ interface CardProps {
   className?: string;
   style?: React.CSSProperties;
   padding?: number;
+  onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
 }
 
 export const Card: React.FC<CardProps> = ({
@@ -12,6 +13,7 @@ export const Card: React.FC<CardProps> = ({
   className = '',
   style = {},
   padding = 16,
+  onClick,
 }) => {
   return (
     <div
@@ -25,6 +27,7 @@ export const Card: React.FC<CardProps> = ({
         transition: 'all 0.2s ease',
         ...style,
       }}
+      onClick={onClick}
     >
       {children}
     </div>

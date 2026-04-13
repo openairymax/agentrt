@@ -18,8 +18,8 @@
 #include <stddef.h>
 #include "error.h"
 #include "export.h"
-/* 统一类型定义：包含平台抽象层 */
-#include "../../../commons/platform/include/platform.h"
+/* 统一类型定义：使用commons作为权威基础库 */
+#include "../../../commons/include/agentos_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -119,6 +119,7 @@ AGENTOS_API void agentos_mutex_destroy(agentos_mutex_t* mutex);
  * @brief 获取互斥锁
  *
  * @param mutex [in] 互斥锁句柄
+ * @return int 成功返回0，失败返回错误码
  *
  * @threadsafe 是
  * @reentrant 否
@@ -127,7 +128,7 @@ AGENTOS_API void agentos_mutex_destroy(agentos_mutex_t* mutex);
  *
  * @see agentos_mutex_unlock()
  */
-AGENTOS_API void agentos_mutex_lock(agentos_mutex_t* mutex);
+AGENTOS_API int agentos_mutex_lock(agentos_mutex_t* mutex);
 
 /**
  * @brief 尝试获取互斥锁（非阻塞）
@@ -147,13 +148,14 @@ AGENTOS_API int agentos_mutex_trylock(agentos_mutex_t* mutex);
  * @brief 释放互斥锁
  *
  * @param mutex [in] 互斥锁句柄
+ * @return int 成功返回0，失败返回错误码
  *
  * @threadsafe 是
  * @reentrant 否
  *
  * @see agentos_mutex_lock()
  */
-AGENTOS_API void agentos_mutex_unlock(agentos_mutex_t* mutex);
+AGENTOS_API int agentos_mutex_unlock(agentos_mutex_t* mutex);
 
 /**
  * @brief 创建条件变量
@@ -199,15 +201,14 @@ AGENTOS_API void agentos_cond_destroy(agentos_cond_t* cond);
  * @see agentos_cond_signal()
  * @see agentos_cond_broadcast()
  */
-AGENTOS_API agentos_error_t agentos_cond_wait(
-    agentos_cond_t* cond,
-    agentos_mutex_t* mutex,
-    uint32_t timeout_ms);
+AGENTOS_API int agentos_cond_wait(agentos_cond_t* cond, agentos_mutex_t* mutex);
+AGENTOS_API int agentos_cond_timedwait(agentos_cond_t* cond, agentos_mutex_t* mutex, uint32_t timeout_ms);
 
 /**
  * @brief 发送信号（唤醒一个等待的线程）
  *
  * @param cond [in] 条件变量句柄
+ * @return int 成功返回0，失败返回错误码
  *
  * @threadsafe 是
  * @reentrant 否
@@ -215,12 +216,13 @@ AGENTOS_API agentos_error_t agentos_cond_wait(
  * @see agentos_cond_wait()
  * @see agentos_cond_broadcast()
  */
-AGENTOS_API void agentos_cond_signal(agentos_cond_t* cond);
+AGENTOS_API int agentos_cond_signal(agentos_cond_t* cond);
 
 /**
  * @brief 广播（唤醒所有等待的线程）
  *
  * @param cond [in] 条件变量句柄
+ * @return int 成功返回0，失败返回错误码
  *
  * @threadsafe 是
  * @reentrant 否
@@ -228,7 +230,7 @@ AGENTOS_API void agentos_cond_signal(agentos_cond_t* cond);
  * @see agentos_cond_wait()
  * @see agentos_cond_signal()
  */
-AGENTOS_API void agentos_cond_broadcast(agentos_cond_t* cond);
+AGENTOS_API int agentos_cond_broadcast(agentos_cond_t* cond);
 
 /**
  * @brief 创建线程

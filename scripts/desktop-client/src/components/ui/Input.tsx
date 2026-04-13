@@ -9,6 +9,7 @@ interface InputProps {
   className?: string;
   style?: React.CSSProperties;
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  autoFocus?: boolean;
 }
 
 export const Input: React.FC<InputProps> = ({
@@ -20,6 +21,7 @@ export const Input: React.FC<InputProps> = ({
   className = '',
   style = {},
   onKeyDown,
+  autoFocus = false,
 }) => {
   return (
     <input
@@ -52,6 +54,7 @@ export const Input: React.FC<InputProps> = ({
         e.currentTarget.style.borderColor = 'var(--border-color)';
         e.currentTarget.style.boxShadow = 'none';
       }}
+      autoFocus={autoFocus}
     />
   );
 };

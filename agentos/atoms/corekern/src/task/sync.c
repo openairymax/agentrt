@@ -9,8 +9,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../agentos/commons/utils/memory/include/memory_compat.h"
-#include "../../../agentos/commons/utils/string/include/string_compat.h"
+#include "../../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -23,7 +23,10 @@
 agentos_mutex_t* agentos_mutex_create(void) {
     agentos_mutex_t* mutex = (agentos_mutex_t*)AGENTOS_MALLOC(sizeof(agentos_mutex_t));
     if (!mutex) return NULL;
-    InitializeCriticalSection(mutex);
+    if (agentos_mutex_init(mutex) != 0) {
+        AGENTOS_FREE(mutex);
+        return NULL;
+    }
     return mutex;
 }
 
@@ -34,8 +37,11 @@ void agentos_mutex_destroy(agentos_mutex_t* mutex) {
     }
 }
 
-void agentos_mutex_lock(agentos_mutex_t* mutex) {
-    if (mutex) EnterCriticalSection(mutex);
+#if 0
+int agentos_mutex_lock(agentos_mutex_t* mutex) {
+    if (!mutex) return AGENTOS_EINVAL;
+    EnterCriticalSection(mutex);
+    return AGENTOS_SUCCESS;
 }
 
 int agentos_mutex_trylock(agentos_mutex_t* mutex) {
@@ -43,14 +49,20 @@ int agentos_mutex_trylock(agentos_mutex_t* mutex) {
     return TryEnterCriticalSection(mutex) ? 0 : -1;
 }
 
-void agentos_mutex_unlock(agentos_mutex_t* mutex) {
-    if (mutex) LeaveCriticalSection(mutex);
+int agentos_mutex_unlock(agentos_mutex_t* mutex) {
+    if (!mutex) return AGENTOS_EINVAL;
+    LeaveCriticalSection(mutex);
+    return AGENTOS_SUCCESS;
 }
+#endif
 
 agentos_cond_t* agentos_cond_create(void) {
     agentos_cond_t* cond = (agentos_cond_t*)AGENTOS_MALLOC(sizeof(agentos_cond_t));
     if (!cond) return NULL;
-    InitializeConditionVariable(cond);
+    if (agentos_cond_init(cond) != 0) {
+        AGENTOS_FREE(cond);
+        return NULL;
+    }
     return cond;
 }
 
@@ -58,6 +70,7 @@ void agentos_cond_destroy(agentos_cond_t* cond) {
     AGENTOS_FREE(cond);
 }
 
+#if 0
 agentos_error_t agentos_cond_wait(
     agentos_cond_t* cond,
     agentos_mutex_t* mutex,
@@ -71,14 +84,21 @@ agentos_error_t agentos_cond_wait(
     }
     return ret ? AGENTOS_SUCCESS : AGENTOS_ETIMEDOUT;
 }
+#endif
 
-void agentos_cond_signal(agentos_cond_t* cond) {
-    if (cond) WakeConditionVariable(cond);
+#if 0
+int agentos_cond_signal(agentos_cond_t* cond) {
+    if (!cond) return AGENTOS_EINVAL;
+    WakeConditionVariable(cond);
+    return AGENTOS_SUCCESS;
 }
 
-void agentos_cond_broadcast(agentos_cond_t* cond) {
-    if (cond) WakeAllConditionVariable(cond);
+int agentos_cond_broadcast(agentos_cond_t* cond) {
+    if (!cond) return AGENTOS_EINVAL;
+    WakeAllConditionVariable(cond);
+    return AGENTOS_SUCCESS;
 }
+#endif
 
 #else
 
@@ -111,8 +131,11 @@ void agentos_mutex_destroy(agentos_mutex_t* mutex) {
     }
 }
 
-void agentos_mutex_lock(agentos_mutex_t* mutex) {
-    if (mutex) pthread_mutex_lock(mutex);
+#if 0
+int agentos_mutex_lock(agentos_mutex_t* mutex) {
+    if (!mutex) return AGENTOS_EINVAL;
+    int ret = pthread_mutex_lock(mutex);
+    return (ret == 0) ? AGENTOS_SUCCESS : AGENTOS_EBUSY;
 }
 
 int agentos_mutex_trylock(agentos_mutex_t* mutex) {
@@ -120,9 +143,12 @@ int agentos_mutex_trylock(agentos_mutex_t* mutex) {
     return pthread_mutex_trylock(mutex);
 }
 
-void agentos_mutex_unlock(agentos_mutex_t* mutex) {
-    if (mutex) pthread_mutex_unlock(mutex);
+int agentos_mutex_unlock(agentos_mutex_t* mutex) {
+    if (!mutex) return AGENTOS_EINVAL;
+    int ret = pthread_mutex_unlock(mutex);
+    return (ret == 0) ? AGENTOS_SUCCESS : AGENTOS_EBUSY;
 }
+#endif
 
 agentos_cond_t* agentos_cond_create(void) {
     agentos_cond_t* cond = (agentos_cond_t*)AGENTOS_MALLOC(sizeof(agentos_cond_t));
@@ -141,6 +167,7 @@ void agentos_cond_destroy(agentos_cond_t* cond) {
     }
 }
 
+#if 0
 agentos_error_t agentos_cond_wait(
     agentos_cond_t* cond,
     agentos_mutex_t* mutex,
@@ -161,13 +188,20 @@ agentos_error_t agentos_cond_wait(
     int ret = pthread_cond_timedwait(cond, mutex, &ts);
     return (ret == ETIMEDOUT) ? AGENTOS_ETIMEDOUT : AGENTOS_SUCCESS;
 }
+#endif
 
-void agentos_cond_signal(agentos_cond_t* cond) {
-    if (cond) pthread_cond_signal(cond);
+#if 0
+int agentos_cond_signal(agentos_cond_t* cond) {
+    if (!cond) return AGENTOS_EINVAL;
+    int ret = pthread_cond_signal(cond);
+    return (ret == 0) ? AGENTOS_SUCCESS : AGENTOS_EBUSY;
 }
 
-void agentos_cond_broadcast(agentos_cond_t* cond) {
-    if (cond) pthread_cond_broadcast(cond);
+int agentos_cond_broadcast(agentos_cond_t* cond) {
+    if (!cond) return AGENTOS_EINVAL;
+    int ret = pthread_cond_broadcast(cond);
+    return (ret == 0) ? AGENTOS_SUCCESS : AGENTOS_EBUSY;
 }
+#endif
 
 #endif

@@ -25,6 +25,10 @@ import sdk from "../services/agentos-sdk";
 import type { TaskInfo } from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
 import { useAlert } from "../components/useAlert";
+import { Button } from "../components/ui/Button";
+import { Input } from "../components/ui/Input";
+import { Card } from "../components/ui/Card";
+import { PageLayout } from "../components/PageLayout";
 
 const taskTypeConfig: Record<string, { icon: typeof Zap; color: string; gradient: string; bgLight: string; label: string }> = {
   codegen: { icon: FileCode, color: "#6366f1", gradient: "linear-gradient(135deg, #6366f1, #818cf8)", bgLight: "rgba(99,102,241,0.08)", label: "代码生成" },

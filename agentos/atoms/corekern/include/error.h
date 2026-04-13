@@ -16,6 +16,8 @@
 
 #include <stdint.h>
 #include "export.h"
+/* 统一错误码定义：使用commons权威基础库 */
+#include "../../commons/include/agentos_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,7 +34,7 @@ extern "C" {
  * 使用 int32_t 确保跨平台一致性
  * 正值表示成功，负值表示错误
  */
-typedef int32_t agentos_error_t;
+/* agentos_error_t 现在由 agentos_types.h 提供 */
 
 /**
  * @brief 成功

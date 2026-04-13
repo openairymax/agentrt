@@ -31,6 +31,10 @@ import type { AgentInfo } from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
 import { useNavigate } from "react-router-dom";
 import { useAlert } from "../components/useAlert";
+import { Button } from "../components/ui/Button";
+import { Input } from "../components/ui/Input";
+import { Card } from "../components/ui/Card";
+import { PageLayout } from "../components/PageLayout";
 
 const agentTypeConfig: Record<string, { icon: typeof Bot; color: string; gradient: string; bgLight: string; label: string }> = {
   research: { icon: Brain, color: "#6366f1", gradient: "linear-gradient(135deg, #6366f1, #818cf8)", bgLight: "rgba(99,102,241,0.08)", label: "研究型" },
