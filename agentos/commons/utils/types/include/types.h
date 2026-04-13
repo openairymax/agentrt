@@ -37,6 +37,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include "../../../platform/include/platform.h"
+/* 统一类型定义：使用顶层权威类型定义 */
+#include "../../../include/agentos_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -560,31 +562,9 @@ typedef enum {
  */
 typedef struct agentos_ipc_channel* agentos_ipc_channel_t;
 
-/**
- * @brief IPC 消息头结构
- */
-typedef struct {
-    uint32_t magic;                 /**< 魔数 (0x414F5350 = "AOSP") */
-    uint32_t version;               /**< 协议版本 */
-    uint32_t type;                  /**< 消息类型 */
-    uint32_t flags;                 /**< 消息标志 */
-    uint64_t msg_id;                /**< 消息 ID */
-    uint64_t correlation_id;        /**< 关联 ID（请求-响应模式） */
-    char source[64];                /**< 发送者标识 */
-    char target[64];                /**< 目标标识 */
-    uint32_t payload_len;           /**< 负载长度 */
-    uint32_t checksum;              /**< 校验和 */
-    agentos_timestamp_t timestamp;  /**< 时间戳 */
-} agentos_ipc_header_t;
+/* agentos_ipc_header_t 现在由 agentos_types.h 提供 */
 
-/**
- * @brief IPC 消息结构
- */
-typedef struct {
-    agentos_ipc_header_t header;    /**< 消息头 */
-    void* payload;                  /**< 负载数据 */
-    size_t payload_size;            /**< 负载大小 */
-} agentos_ipc_message_t;
+/* agentos_ipc_message_t 现在由 agentos_types.h 提供 */
 
 /**
  * @brief IPC 通道配置

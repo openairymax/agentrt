@@ -24,10 +24,10 @@
 
 /* Unified base library compatibility layer */
 #include "../../../../commons/utils/memory/include/memory_compat.h"
-#include "../../../agentos/commons/utils/string/include/string_compat.h"
+#include "../../../../commons/utils/string/include/string_compat.h"
 
 /* Check macros for unified error handling */
-#include "../../../agentos/commons/utils/include/check.h"
+#include "../../../../commons/utils/include/check.h"
 #include <string.h>
 #ifdef _WIN32
 /* Windows 平台原子操作兼容层 */

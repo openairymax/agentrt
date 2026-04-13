@@ -55,7 +55,7 @@ const SERVICES = [
 /* ─── Dual System Panel ─── */
 function DualPanel() {
   return (
-    <div className="card" style={{ padding: "20px" }}>
+    <Card>
       <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
         <Brain size={18} color="#f59e0b" />
         <span style={{ fontSize: "15px", fontWeight: 600 }}>双系统思考</span>
@@ -76,7 +76,7 @@ function DualPanel() {
           </div>
         ))}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -89,7 +89,7 @@ function SecShield() {
     { emoji: "\ud83d\udccb", name: "全链路审计追踪", sub: "不可篡改日志", c: "#8b5cf6" },
   ];
   return (
-    <div className="card" style={{ padding: "20px" }}>
+    <Card>
       <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
         <Shield size={18} color="#ef4444" />
         <span style={{ fontSize: "15px", fontWeight: 600 }}>安全状态</span>
@@ -114,7 +114,7 @@ function SecShield() {
         <div style={{ fontSize: "13px", fontWeight: 600, color: "#10b981", marginBottom: "4px" }}>安全罩已激活 — 零信任架构运行正常</div>
         <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>所有防护层在线，实时监控中</div>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -122,7 +122,7 @@ function SecShield() {
 function SvcGrid() {
   const live = SERVICES.filter(s => s.up).length;
   return (
-    <div className="card" style={{ padding: "20px" }}>
+    <Card>
       <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
         <Network size={18} color="#3b82f6" />
         <div>
@@ -157,7 +157,7 @@ function SvcGrid() {
           );
         })}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -171,7 +171,7 @@ function TimeLine() {
     { time: "12m前", text: "System 2 深度推理：对用户问题进行了多角度逻辑分析", type: "think", c: "#f59e0b", icon: Brain },
   ];
   return (
-    <div className="card" style={{ padding: "20px" }}>
+    <Card>
       <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
         <Activity size={18} color="#ec4899" />
         <span style={{ fontSize: "15px", fontWeight: 600 }}>实时流</span>
@@ -193,7 +193,7 @@ function TimeLine() {
           );
         })}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -206,35 +206,37 @@ function QNav({ nav }: { nav: (p: string) => void }) {
     { Ic: Wrench, label: "工具管理", path: "/tools", c: "#10b981" },
   ];
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px" }}>
-      {items.map(it => {
-        const Icon = it.Ic;
-        return (
-          <div key={it.path}
-            onClick={() => nav(it.path)}
-            style={{
-              padding: "16px",
-              borderLeft: `3px solid ${it.c}`,
-              background: "var(--bg-secondary)",
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = "var(--bg-tertiary)";
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = "var(--bg-secondary)";
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-              <Icon size={18} color={it.c} />
-              <span style={{ fontSize: "14px", fontWeight: 600 }}>{it.label}</span>
+    <Card>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px" }}>
+        {items.map(it => {
+          const Icon = it.Ic;
+          return (
+            <div key={it.path}
+              onClick={() => nav(it.path)}
+              style={{
+                padding: "16px",
+                borderLeft: `3px solid ${it.c}`,
+                background: "var(--bg-secondary)",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = "var(--bg-tertiary)";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = "var(--bg-secondary)";
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+                <Icon size={18} color={it.c} />
+                <span style={{ fontSize: "14px", fontWeight: 600 }}>{it.label}</span>
+              </div>
+              <div style={{ fontSize: "11px", color: it.c }}>进入模块</div>
             </div>
-            <div style={{ fontSize: "11px", color: it.c }}>进入模块</div>
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
 

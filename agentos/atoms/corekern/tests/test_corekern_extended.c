@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file test_corekern_extended.c
  * @brief corekern模块扩展单元测试
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -13,8 +13,8 @@
 #include <assert.h>
 #include <time.h>
 
-#include "../../../agentos/commons/utils/memory/include/memory_compat.h"
-#include "../../../agentos/commons/utils/string/include/string_compat.h"
+#include "../../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../../commons/utils/string/include/string_compat.h"
 #include "error.h"
 #include "task.h"
 #include "mem.h"
