@@ -1,0 +1,383 @@
+# Doxyfile - AgentOS 全项目 API 文档生成配置
+#
+# SPDX-FileCopyrightText: 2026 SPHARX Ltd.
+# SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause
+#
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+#
+# 覆盖模块: atoms / commons / cupolas / daemon / gateway / heapstore
+# 基于 AgentOS 架构设计原则 (E-7: 文档即代码)
+# 参考: manuals/ARCHITECTURAL_PRINCIPLES.md
+
+#---------------------------------------------------------------------------
+# 项目相关配置
+#---------------------------------------------------------------------------
+
+PROJECT_NAME           = "AgentOS"
+
+PROJECT_NUMBER         = "2.0.0"
+
+PROJECT_BRIEF          = "多体控制论智能操作系统 — 微内核架构 · 五大框架 · 多协议网关"
+
+OUTPUT_DIRECTORY       = docs/api
+
+CREATE_SUBDIRS         = YES
+
+OUTPUT_LANGUAGE        = Chinese
+
+ABBREVIATE_BRIEF       = "The $name class" \
+                         "The $name widget" \
+                         "The $name file" \
+                         is \
+                         provides \
+                         specifies \
+                         contains \
+                         represents \
+                         a \
+                         an \
+                         the
+
+ALWAYS_DETAILED_SEC    = YES
+
+FULL_PATH_NAMES        = YES
+
+STRIP_FROM_PATH        = agentos
+
+STRIP_FROM_INC_PATH    = agentos
+
+#---------------------------------------------------------------------------
+# 构建相关配置
+#---------------------------------------------------------------------------
+
+EXTRACT_ALL            = YES
+
+EXTRACT_PRIVATE        = NO
+
+EXTRACT_STATIC         = YES
+
+EXTRACT_LOCAL_CLASSES  = YES
+
+EXTRACT_ANON_NSPACES   = NO
+
+HIDE_UNDOC_MEMBERS     = NO
+
+HIDE_UNDOC_CLASSES     = NO
+
+HIDE_FRIEND_COMPOUNDS  = NO
+
+HIDE_IN_BODY_DOCS      = NO
+
+INTERNAL_DOCS          = NO
+
+CASE_SENSE_NAMES       = NO
+
+HIDE_SCOPE_NAMES       = NO
+
+SHOW_INCLUDE_FILES     = YES
+
+SHOW_GROUPED_DOC_INC   = YES
+
+FORCE_INFO_INCLUDES    = YES
+
+GENERATE_SOURCELIST    = YES
+
+SOURCE_BROWSER         = YES
+
+INLINE_SOURCES         = NO
+
+STRIP_CODE_COMMENTS    = YES
+
+REFERENCED_BY_RELATION = YES
+
+REFERENCES_RELATION    = YES
+
+#---------------------------------------------------------------------------
+# 消息相关配置
+#---------------------------------------------------------------------------
+
+WARNINGS               = YES
+
+WARN_IF_UNDOCUMENTED   = YES
+
+WARN_IF_DOC_ERROR      = YES
+
+WARN_NO_PARAMDOC       = YES
+
+WARN_LOGFILE           = docs/api/doxygen_warnings.log
+
+WARN_FORMAT            = "$file:$line: $text"
+
+WARN_AS_ERROR          = FAIL_ON_WARNINGS
+
+#---------------------------------------------------------------------------
+# 输入相关配置
+#---------------------------------------------------------------------------
+
+INPUT_ENCODING         = UTF-8
+
+INPUT                  = agentos/atoms \
+                         agentos/commons \
+                         agentos/cupolas/include \
+                         agentos/cupolas/src \
+                         agentos/daemon/common/include \
+                         agentos/daemon/gateway_d \
+                         agentos/daemon/llm_d/include \
+                         agentos/daemon/tool_d/include \
+                         agentos/daemon/sched_d \
+                         agentos/daemon/monit_d \
+                         agentos/daemon/market_d \
+                         agentos/gateway/include \
+                         agentos/gateway/src \
+                         agentos/heapstore/include \
+                         docs/api/mainpage.dox
+
+FILE_PATTERNS          = *.c \
+                         *.h \
+                         *.md \
+                         *.dox
+
+RECURSIVE              = YES
+
+EXCLUDE                = agentos/cupolas/src/mainpage.dox
+
+EXCLUDE_PATTERNS       = */tests/* \
+                         */fuzz/* \
+                         */CMakeFiles/* \
+                         */build/* \
+                         */.git/* \
+                         */node_modules/* \
+                         */target/* \
+                         */dist/* \
+                         */__pycache__/* \
+                         */third_party/* \
+                         */vendor/*
+
+EXAMPLE_PATH           = agentos/heapstore/examples
+
+EXAMPLE_PATTERNS       = *.c
+
+EXAMPLE_RECURSIVE      = YES
+
+IMAGE_PATH             = docs/api/images
+
+#---------------------------------------------------------------------------
+# 源浏览器相关配置
+#---------------------------------------------------------------------------
+
+INCLUDE_GRAPH          = YES
+
+INCLUDED_BY_GRAPH      = YES
+
+CALL_GRAPH             = YES
+
+CALLER_GRAPH           = YES
+
+GRAPHICAL_HIERARCHY    = YES
+
+DIRECTORY_GRAPH        = YES
+
+DOT_IMAGE_FORMAT       = svg
+
+INTERACTIVE_SVG        = YES
+
+MAX_DOT_GRAPH_DEPTH    = 4
+
+MAX_DOT_GRAPH_NODES    = 200
+
+#---------------------------------------------------------------------------
+# 索引相关配置
+#---------------------------------------------------------------------------
+
+GENERATE_TREEVIEW      = YES
+
+ENUM_VALUES_PER_LINE   = 4
+
+#---------------------------------------------------------------------------
+# HTML 相关配置
+#---------------------------------------------------------------------------
+
+GENERATE_HTML          = YES
+
+HTML_OUTPUT            = html
+
+HTML_FILE_EXTENSION    = .html
+
+HTML_COLORSTYLE_HUE    = 220
+
+HTML_COLORSTYLE_SAT    = 100
+
+HTML_COLORSTYLE_GAMMA  = 80
+
+GENERATE_HTMLHELP      = NO
+
+GENERATE_CHI           = NO
+
+BINARY_TOC             = NO
+
+TOC_EXPAND             = YES
+
+DISABLE_INDEX          = NO
+
+GENERATE_TREEVIEW      = YES
+
+HIDE_FORWARD_DECLARATIONS = NO
+
+SEARCHENGINE           = YES
+
+SERVER_BASED_SEARCH    = NO
+
+#---------------------------------------------------------------------------
+# LaTeX 相关配置
+#---------------------------------------------------------------------------
+
+GENERATE_LATEX         = NO
+
+#---------------------------------------------------------------------------
+# RTF 相关配置
+#---------------------------------------------------------------------------
+
+GENERATE_RTF           = NO
+
+#---------------------------------------------------------------------------
+# Man page 相关配置
+#---------------------------------------------------------------------------
+
+GENERATE_MAN           = NO
+
+#---------------------------------------------------------------------------
+# XML 相关配置
+#---------------------------------------------------------------------------
+
+GENERATE_XML           = NO
+
+#---------------------------------------------------------------------------
+# 预处理相关配置
+#---------------------------------------------------------------------------
+
+ENABLE_PREPROCESSING   = YES
+
+MACRO_EXPANSION        = YES
+
+EXPAND_ONLY_PREDEF     = YES
+
+SEARCH_INCLUDES        = YES
+
+INCLUDE_PATH           = agentos/atoms/corekern/include \
+                         agentos/atoms/coreloopthree/include \
+                         agentos/atoms/memoryrovol/include \
+                         agentos/atoms/syscall/include \
+                         agentos/atoms/taskflow/include \
+                         agentos/atoms/frameworks/include \
+                         agentos/commons/platform/include \
+                         agentos/commons/utils/include \
+                         agentos/commons/utils/observability/include \
+                         agentos/commons/utils/compat/include \
+                         agentos/commons/utils/config/include \
+                         agentos/commons/utils/cost/include \
+                         agentos/commons/utils/error/include \
+                         agentos/commons/utils/io/include \
+                         agentos/commons/utils/ipc/include \
+                         agentos/commons/utils/logging/include \
+                         agentos/commons/utils/memory/include \
+                         agentos/commons/utils/string/include \
+                         agentos/commons/utils/sync/include \
+                         agentos/commons/utils/token/include \
+                         agentos/commons/utils/types/include \
+                         agentos/cupolas/include \
+                         agentos/daemon/common/include \
+                         agentos/daemon/llm_d/include \
+                         agentos/daemon/tool_d/include \
+                         agentos/gateway/include \
+                         agentos/heapstore/include
+
+PREDEFINED             = __cplusplus \
+                         AGENTOS_API= \
+                         AGENTOS_EXPORT= \
+                         CUPOLAS_API= \
+                         AGENTOS_PLATFORM_WINDOWS= \
+                         AGENTOS_PLATFORM_LINUX= \
+                         AGENTOS_PLATFORM_MACOS= \
+                         __attribute__\(x\)= \
+                         __declspec\(x\)=
+
+EXPAND_AS_DEFINED      =
+
+SKIP_FUNCTION_MACROS   = YES
+
+#---------------------------------------------------------------------------
+# Dot 相关配置
+#---------------------------------------------------------------------------
+
+CLASS_DIAGRAMS         = YES
+
+COLLABORATION_GRAPH    = YES
+
+GROUP_GRAPHS           = YES
+
+UML_LOOK               = YES
+
+TEMPLATE_RELATIONS     = YES
+
+INCLUDE_GRAPH          = YES
+
+INCLUDED_BY_GRAPH      = YES
+
+CALL_GRAPH             = YES
+
+CALLER_GRAPH           = YES
+
+GRAPHICAL_HIERARCHY    = YES
+
+DIRECTORY_GRAPH        = YES
+
+DOT_IMAGE_FORMAT       = svg
+
+INTERACTIVE_SVG        = YES
+
+DOT_PATH               =
+
+DOTFILE_NAMES          = dot
+
+MAX_DOT_GRAPH_DEPTH    = 4
+
+MAX_DOT_GRAPH_NODES    = 200
+
+DOT_CLEANUP            = YES
+
+#---------------------------------------------------------------------------
+# 特殊配置
+#---------------------------------------------------------------------------
+
+ALGORITHMS             = YES
+
+INLINE_INHERITED_MEMB  = YES
+
+SORT_MEMBER_DOCS       = YES
+
+SORT_BRIEF_DOCS        = NO
+
+SORT_MEMBERS_CTORS_1ST = NO
+
+SORT_GROUP_NAMES       = YES
+
+TAB_SIZE               = 4
+
+OPTIMIZE_OUTPUT_FOR_C  = YES
+
+SUBGROUPING            = YES
+
+TYPEDEF_HIDES_STRUCT   = YES
+
+SYMBOL_CACHE_SIZE      = 0
+
+#---------------------------------------------------------------------------
+# 日志与调试
+#---------------------------------------------------------------------------
+
+TIMESTAMP              = YES
+
+VERBOSE                = NO
+
+#---------------------------------------------------------------------------
+# 配置文件结束
+#---------------------------------------------------------------------------

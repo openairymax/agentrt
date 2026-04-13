@@ -161,3 +161,101 @@ char* agentos_metrics_export(agentos_metrics_t* metrics) {
     cJSON_Delete(root);
     return json;
 }
+
+static int sanitize_metric_name(const char* name, char* out, size_t out_size) {
+    if (!name || !out || out_size == 0) return -1;
+    size_t j = 0;
+    for (size_t i = 0; name[i] && j < out_size - 1; i++) {
+        char ch = name[i];
+        if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+            (ch >= '0' && ch <= '9') || ch == '_' || ch == ':') {
+            out[j++] = ch;
+        } else if (ch == '.' || ch == '-') {
+            out[j++] = '_';
+        }
+    }
+    out[j] = '\0';
+    return (j > 0) ? 0 : -1;
+}
+
+char* agentos_metrics_export_prometheus_filtered(
+    agentos_metrics_t* metrics,
+    const char* prefix
+) {
+    if (!metrics) return NULL;
+
+    size_t buf_size = 4096;
+    char* buf = (char*)AGENTOS_MALLOC(buf_size);
+    if (!buf) return NULL;
+    size_t pos = 0;
+
+#define APPEND(fmt, ...) do { \
+    int written = snprintf(buf + pos, buf_size - pos, fmt, ##__VA_ARGS__); \
+    if (written < 0) { AGENTOS_FREE(buf); return NULL; } \
+    if ((size_t)written >= buf_size - pos) { \
+        buf_size *= 2; \
+        char* new_buf = (char*)AGENTOS_MALLOC(buf_size); \
+        if (!new_buf) { AGENTOS_FREE(buf); return NULL; } \
+        memcpy(new_buf, buf, pos); \
+        AGENTOS_FREE(buf); \
+        buf = new_buf; \
+        written = snprintf(buf + pos, buf_size - pos, fmt, ##__VA_ARGS__); \
+        if (written < 0 || (size_t)written >= buf_size - pos) { AGENTOS_FREE(buf); return NULL; } \
+    } \
+    pos += (size_t)written; \
+} while(0)
+
+    char safe_name[256];
+
+    metric_counter_t* c = metrics->counters;
+    while (c) {
+        if (prefix && strncmp(c->name, prefix, strlen(prefix)) != 0) {
+            c = c->next;
+            continue;
+        }
+        if (sanitize_metric_name(c->name, safe_name, sizeof(safe_name)) != 0) {
+            c = c->next;
+            continue;
+        }
+        APPEND("# TYPE %s counter\n%s %llu\n", safe_name, safe_name,
+               (unsigned long long)c->value);
+        c = c->next;
+    }
+
+    metric_gauge_t* g = metrics->gauges;
+    while (g) {
+        if (prefix && strncmp(g->name, prefix, strlen(prefix)) != 0) {
+            g = g->next;
+            continue;
+        }
+        if (sanitize_metric_name(g->name, safe_name, sizeof(safe_name)) != 0) {
+            g = g->next;
+            continue;
+        }
+        APPEND("# TYPE %s gauge\n%s %.17g\n", safe_name, safe_name, g->value);
+        g = g->next;
+    }
+
+    metric_timing_t* t = metrics->timings;
+    while (t) {
+        if (prefix && strncmp(t->name, prefix, strlen(prefix)) != 0) {
+            t = t->next;
+            continue;
+        }
+        if (sanitize_metric_name(t->name, safe_name, sizeof(safe_name)) != 0) {
+            t = t->next;
+            continue;
+        }
+        APPEND("# TYPE %s summary\n%s_sum %.17g\n%s_count %zu\n",
+               safe_name, safe_name, t->sum, safe_name, t->count);
+        t = t->next;
+    }
+
+#undef APPEND
+
+    return buf;
+}
+
+char* agentos_metrics_export_prometheus(agentos_metrics_t* metrics) {
+    return agentos_metrics_export_prometheus_filtered(metrics, NULL);
+}

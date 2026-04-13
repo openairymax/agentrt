@@ -80,6 +80,8 @@ typedef struct http_gateway {
     size_t max_request_size;         /**< 最大请求大小 */
     cors_config_t cors;              /**< CORS配置 */
     gateway_rate_limiter_t* rate_limiter; /**< 速率限制器 */
+    
+    gateway_protocol_handler_t protocol_handler; /**< 多协议处理器 */
 } http_gateway_t;
 
 /**

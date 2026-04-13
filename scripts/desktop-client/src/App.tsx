@@ -60,6 +60,7 @@ const navConfig = [
     { path: "/system-monitor", icon: Activity, labelKey: "nav.systemMonitor" },
     { path: "/memory-evolution", icon: Database, labelKey: "nav.memoryEvolution" },
     { path: "/tools", icon: Settings2, labelKey: "nav.tools" },
+    { path: "/protocols", icon: Wifi, labelKey: "nav.protocols" },
     { path: "/ai-chat", icon: Brain, labelKey: "nav.aiChat" },
     { path: "/llm-config", icon: Sparkles, labelKey: "nav.llmConfig" },
     { path: "/config", icon: SettingsIcon, labelKey: "nav.config" },
@@ -329,6 +330,7 @@ function AppContent() {
               <Route path="/system-monitor" element={<SystemMonitor />} />
               <Route path="/memory-evolution" element={<MemoryEvolution />} />
               <Route path="/tools" element={<ToolManager />} />
+              <Route path="/protocols" element={<ProtocolPlayground />} />
               <Route path="/ai-chat" element={<AIChatPage />} />
               <Route path="/llm-config" element={<LLMConfig />} />
               <Route path="/config" element={<Config />} />
