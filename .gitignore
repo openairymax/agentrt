@@ -1,7 +1,7 @@
 # =============================================================================
 # AgentOS .gitignore 文件
-# 版本：7.0.0
-# 最后更新：2026-04-09
+# 版本：7.1.0
+# 最后更新：2026-04-13
 # 说明：规范化排除所有不应纳入版本控制的文件和目录
 #
 # 设计原则：
@@ -46,8 +46,6 @@ CHANGELOG.md
 
 .bendiwenjian/
 
-build_test/
-build_test/
 # =============================================================================
 # 1. CMake 构建系统（构建产物，不追踪）
 # =============================================================================
@@ -61,6 +59,8 @@ CMakePresets.json
 
 # CMake 构建目录
 build/
+build_test/
+build_test_protocol/
 _build/
 cmake-build*/
 cmake-build-debug/
@@ -146,7 +146,6 @@ Pipfile.lock
 .coverage.*
 coverage/
 htmlcov/
-*.xml
 coverage.xml
 .tox/
 .nox/
@@ -161,9 +160,6 @@ ipython_kernel_config.py
 .mypy_cache/
 .dmypy.json
 dmypy.json
-.ruff_cache/
-
-# Ruff
 .ruff_cache/
 
 # =============================================================================
@@ -675,7 +671,6 @@ docs/private/
 !README.md
 !README_EN.md
 !LICENSE
-!CHANGELOG.md
 !CONTRIBUTING.md
 !AUTHORS.md
 !SECURITY.md
