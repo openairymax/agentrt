@@ -136,12 +136,16 @@ int agent_registry_core_add_version(agent_registry_t* registry, const char* agen
             agent_version_t* v = &registry->entries[i].versions[registry->entries[i].version_count];
             memset(v, 0, sizeof(agent_version_t));
             strncpy(v->version, version->version, sizeof(v->version) - 1);
+            v->version[sizeof(v->version) - 1] = '\0';
             strncpy(v->download_url, version->download_url, sizeof(v->download_url) - 1);
+            v->download_url[sizeof(v->download_url) - 1] = '\0';
             strncpy(v->checksum, version->checksum, sizeof(v->checksum) - 1);
+            v->checksum[sizeof(v->checksum) - 1] = '\0';
             v->created_at = (uint64_t)time(NULL);
             v->deprecated = version->deprecated;
             registry->entries[i].version_count++;
             strncpy(registry->entries[i].latest_version, version->version, sizeof(registry->entries[i].latest_version) - 1);
+            registry->entries[i].latest_version[sizeof(registry->entries[i].latest_version) - 1] = '\0';
             agentos_mutex_unlock(&registry->lock);
             return 0;
         }

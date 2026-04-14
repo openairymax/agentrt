@@ -16,29 +16,24 @@
 #include <stdio.h>
 #include <time.h>
 
+/* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
+#include <agentos/atomic_compat.h>
+
+/* 平台特定头文件 */
 #ifdef _WIN32
-#include <windows.h>
-#include <intrin.h>
-#include <rpc.h>
-#pragma comment(lib, "rpcrt4.lib")
-#include "../../../../commons/utils/include/atomic_compat.h"
+    #define WIN32_LEAN_AND_MEAN
+    #include <windows.h>
+    #include <rpc.h>
+    #pragma comment(lib, "rpcrt4.lib")
 #else
-#include <uuid/uuid.h>
+    #include <uuid/uuid.h>
 #endif
 
-// 全局计数器用于生成唯一ID
-#ifdef _WIN32
-static volatile LONG task_counter = 0;
-static volatile LONG plan_counter = 0;
-static volatile LONG record_counter = 0;
-static volatile LONG session_counter = 0;
-#else
-#include <stdatomic.h>
-static atomic_ullong task_counter = 0;
-static atomic_ullong plan_counter = 0;
-static atomic_ullong record_counter = 0;
-static atomic_ullong session_counter = 0;
-#endif
+// 全局计数器用于生成唯一ID（使用统一原子类型）
+static volatile long task_counter = 0;
+static volatile long plan_counter = 0;
+static volatile long record_counter = 0;
+static volatile long session_counter = 0;
 
 void agentos_generate_task_id(const char* prefix, char* buf, size_t len) {
     if (!buf || len == 0) return;

@@ -1,5 +1,7 @@
 mod cli;
 mod commands;
+mod backend_client;
+mod protocol_commands;
 
 use tauri::Manager;
 
@@ -80,6 +82,11 @@ pub fn run() {
             commands::dns_lookup,
             // System Monitor
             commands::system_monitor,
+            // Protocol Compatibility
+            protocol_commands::list_protocols,
+            protocol_commands::test_protocol_connection,
+            protocol_commands::send_protocol_message,
+            protocol_commands::get_protocol_capabilities,
         ])
         .setup(|app| {
             log::info!("AgentOS Desktop Client starting...");

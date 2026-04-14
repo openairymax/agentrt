@@ -278,10 +278,10 @@ set(AGENTOS_INCLUDE_DIRS
 
 # 创建接口库来管理公共依赖
 add_library(agentos_atoms INTERFACE)
-# target_include_directories(agentos_atoms INTERFACE
-#     $<BUILD_INTERFACE:${AGENTOS_INCLUDE_DIRS}>
-#     $<INSTALL_INTERFACE:include/agentos>
-# )
+target_include_directories(agentos_atoms INTERFACE
+    $<BUILD_INTERFACE:${AGENTOS_INCLUDE_DIRS}>
+    $<INSTALL_INTERFACE:include/agentos>
+)
 
 # 包含子目录
 # Kernel subdirectories

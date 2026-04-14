@@ -16,19 +16,15 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../agentos/commons/utils/memory/include/memory_compat.h"
-#include "../../../agentos/commons/utils/string/include/string_compat.h"
+#include "../../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../../commons/utils/string/include/string_compat.h"
 
 /* Check macros for unified error handling */
-#include "../../../agentos/commons/utils/include/check.h"
+#include "../../../../commons/utils/include/check.h"
 #include <string.h>
 #include <stdio.h>
-#ifdef _WIN32
-/* Windows 平台原子操作兼容层 */
-#include "../../../agentos/commons/utils/include/atomic_compat.h"
-#else
-#include <stdatomic.h>
-#endif
+/* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
+#include <agentos/atomic_compat.h>
 
 /* ==================== 全局状态 ==================== */
 
@@ -88,13 +84,13 @@ static int ensure_initialized(void) {
                                                     memory_order_acquire)) {
             /* 当前线程获得初始化权 */
             init_lock = agentos_mutex_create();
-            CHECK_NULL(init_lock) {
+            if (!init_lock) {
                 atomic_store_explicit(&mem_initialized, 0, memory_order_release);
                 return -1;
             }
 
             mem_stats_mutex = agentos_mutex_create();
-            CHECK_NULL(mem_stats_mutex) {
+            if (!mem_stats_mutex) {
                 agentos_mutex_destroy(init_lock);
                 init_lock = NULL;
                 atomic_store_explicit(&mem_initialized, 0, memory_order_release);

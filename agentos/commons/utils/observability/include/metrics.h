@@ -59,6 +59,29 @@ void agentos_metrics_timing(agentos_metrics_t* metrics, const char* name, double
  */
 char* agentos_metrics_export(agentos_metrics_t* metrics);
 
+/**
+ * @brief 导出指标为Prometheus格式字符串
+ * @param metrics 收集器
+ * @return Prometheus格式字符串（需调用者释放），失败返回 NULL
+ *
+ * 输出格式遵循Prometheus exposition format:
+ * - Counter: # TYPE name counter \n name value
+ * - Gauge: # TYPE name gauge \n name value
+ * - Timing: # TYPE name summary \n name_sum value \n name_count count
+ */
+char* agentos_metrics_export_prometheus(agentos_metrics_t* metrics);
+
+/**
+ * @brief 导出指定前缀的指标为Prometheus格式
+ * @param metrics 收集器
+ * @param prefix 指标名称前缀过滤（NULL导出全部）
+ * @return Prometheus格式字符串（需调用者释放），失败返回 NULL
+ */
+char* agentos_metrics_export_prometheus_filtered(
+    agentos_metrics_t* metrics,
+    const char* prefix
+);
+
 #ifdef __cplusplus
 }
 #endif

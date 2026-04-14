@@ -9,8 +9,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../agentos/commons/utils/memory/include/memory_compat.h"
-#include "../../../agentos/commons/utils/string/include/string_compat.h"
+#include "../../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 
 /* ==================== 静态全局状态 ==================== */
@@ -40,7 +40,7 @@ static inline int atomic_compare_exchange(void** ptr, void** expected, void* des
     return 0;
 }
 
-static inline uint64_t atomic_fetch_add_64(volatile uint64_t* ptr, uint64_t val) {
+static inline uint64_t agentos_atomic_fetch_add_64(volatile uint64_t* ptr, uint64_t val) {
     return (uint64_t)InterlockedExchangeAdd64((volatile LONGLONG*)ptr, (LONGLONG)val);
 }
 #endif
@@ -180,7 +180,7 @@ uint64_t scheduler_core_fetch_add_task_id(void) {
     if (!g_core_ctx) return 0;
 
 #ifdef _WIN32
-    return atomic_fetch_add_64(&g_core_ctx->next_task_id, 1);
+    return agentos_atomic_fetch_add_64(&g_core_ctx->next_task_id, 1);
 #else
     return __atomic_fetch_add(&g_core_ctx->next_task_id, 1, __ATOMIC_SEQ_CST);
 #endif

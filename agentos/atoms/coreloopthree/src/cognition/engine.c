@@ -53,12 +53,13 @@ static inline char* cJSON_PrintUnformatted(const cJSON* i) {
 }
 #endif /* AGENTOS_HAS_CJSON */
 
+/* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
+#include <agentos/atomic_compat.h>
+
+/* 平台特定头文件 */
 #ifdef _WIN32
-#include <windows.h>
-#include <intrin.h>
-#include "../../../../commons/utils/include/atomic_compat.h"
-#else
-#include <stdatomic.h>
+    #define WIN32_LEAN_AND_MEAN
+    #include <windows.h>
 #endif
 
 struct agentos_cognition_engine {

@@ -2,24 +2,24 @@
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
  * SPDX-License-Identifier: Apache-2.0
- * 
+ *
  * @file platform.h
  * @brief 跨平台兼容层 - 统一不同操作系统的API差异
- * 
+ *
  * 支持平台：
  * - Linux (POSIX)
  * - macOS (Darwin)
  * - Windows (Win32/Win64)
- * 
+ *
  * 设计原则：
  * - 单一职责：仅处理平台差异
  * - 零开销：内联函数 + 宏定义
  * - 类型安全：强类型封装
- * 
+ *
  * @author Spharx AgentOS Team
  * @date 2026-03-30
  * @version 2.0
- * 
+ *
  * @note 线程安全：平台抽象层本身不涉及线程安全
  * @see ARCHITECTURAL_PRINCIPLES.md E-4 跨平台一致性原则
  */
