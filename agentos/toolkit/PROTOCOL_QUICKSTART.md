@@ -1,47 +1,47 @@
-# AgentOS Protocol Quick Start Guide
+# AgentOS 协议快速入门指南
 
-**Version**: 1.0.0
-**Last Updated**: 2026-04-14
-**Time to Complete**: 10 minutes
-**Difficulty**: Beginner-friendly
+**版本**: 1.0.0
+**最后更新**: 2026-04-14
+**预计完成时间**: 10 分钟
+**难度**: 入门级
 
-Get up and running with AgentOS's multi-protocol communication system in 5 steps.
-
----
-
-## Prerequisites
-
-- AgentOS Gateway running at `http://localhost:18789` (or your configured URL)
-- Python 3.8+ (for examples; Go/Rust/TypeScript also supported)
-- Basic understanding of JSON and HTTP
+通过 5 个步骤快速上手 AgentOS 多协议通信系统。
 
 ---
 
-## Step 1: Verify Your Setup
+## 前置条件
 
-Check that the gateway is running and protocols are available:
+- AgentOS 网关运行在 `http://localhost:18789`（或您配置的 URL）
+- Python 3.8+（示例使用 Python；也支持 Go/Rust/TypeScript）
+- 具备 JSON 和 HTTP 基础知识
+
+---
+
+## 步骤 1: 验证环境
+
+检查网关是否运行以及协议是否可用：
 
 ```bash
 agentos status
 agentos protocol list
 ```
 
-Expected output:
+预期输出：
 ```
 ============================================================
-  AgentOS Protocol Adapters
+  AgentOS 协议适配器
 ============================================================
 
-Protocol         Version    Status      Endpoint
+协议          版本     状态      端点
 -----------------------------------------------------
-JSON-RPC         2.0        active      /jsonrpc
-MCP              1.0        active      /mcp
-A2A              0.3        active      /a2a
-OpenAI           1.0        active      /v1
-OpenJiuwen       1.0        active      /ojiuwen
+JSON-RPC      2.0      active    /jsonrpc
+MCP           1.0      active    /mcp
+A2A           0.3      active    /a2a
+OpenAI        1.0      active    /v1
+OpenJiuwen    1.0      active    /ojiuwen
 ```
 
-Test connectivity for each protocol:
+测试各协议的连接：
 
 ```bash
 agentos protocol test jsonrpc
@@ -51,15 +51,15 @@ agentos protocol test openai
 
 ---
 
-## Step 2: Your First Protocol Request (Python)
+## 步骤 2: 您的第一个协议请求（Python）
 
-### Install SDK
+### 安装 SDK
 
 ```bash
 pip install agentos-toolkit
 ```
 
-### Send a JSON-RPC Request
+### 发送 JSON-RPC 请求
 
 ```python
 import asyncio
@@ -77,22 +77,22 @@ async def main():
         method="ping",
         params={},
     )
-    print(f"Response: {result}")
+    print(f"响应: {result}")
 
 asyncio.run(main())
 ```
 
-Run it:
+运行：
 ```bash
 python my_first_protocol.py
-# Response: {'jsonrpc': '2.0', 'result': {'status': 'ok', 'version': '2.0'}, 'id': '...'}
+# 响应: {'jsonrpc': '2.0', 'result': {'status': 'ok', 'version': '2.0'}, 'id': '...'}
 ```
 
 ---
 
-## Step 3: Auto-Detect Protocols
+## 步骤 3: 自动检测协议
 
-The SDK can automatically detect which protocol to use based on content:
+SDK 可以根据内容自动检测应使用哪种协议：
 
 ```python
 from agentos.protocol import ProtocolClient, ProtocolType
@@ -102,22 +102,22 @@ client = ProtocolClient.from_env()
 result = await client.detect_protocol(
     content='{"model":"gpt-4o","messages":[{"role":"user","content":"Hello"}]}',
 )
-print(f"Detected: {result.protocol_type}")  # ProtocolType.OPENAI
+print(f"检测到: {result.protocol_type}")  # ProtocolType.OPENAI
 
 result = await client.detect_protocol(
     content='{"jsonrpc":"2.0","method":"tools/list","id":1}',
 )
-print(f"Detected: {result.protocol_type}")  # ProtocolType.MCP
+print(f"检测到: {result.protocol_type}")  # ProtocolType.MCP
 ```
 
-Or use the CLI:
+或使用 CLI：
 ```bash
 echo '{"model":"gpt-4","messages":[{}]}' | agentos protocol detect --content-type application/json
 ```
 
 ---
 
-## Step 4: Use Different Protocols
+## 步骤 4: 使用不同协议
 
 ### MCP (Model Context Protocol)
 
@@ -127,13 +127,13 @@ from agentos.protocol import create_mcp_client
 mcp = create_mcp_client(base_url="http://localhost:18789")
 
 tools = await mcp.list_tools()
-print(f"Available tools: {[t['name'] for t in tools]}")
+print(f"可用工具: {[t['name'] for t in tools]}")
 
 result = await mcp.call_tool("calculator_add", {"a": 10, "b": 20})
-print(f"Result: {result}")
+print(f"结果: {result}")
 ```
 
-### OpenAI API Compatible
+### OpenAI API 兼容
 
 ```python
 from agentos.protocol import create_openai_client
@@ -143,7 +143,7 @@ openai = create_openai_client(
     model="gpt-4o",
 )
 
-response = await openai.chat("What is AgentOS?")
+response = await openai.chat("什么是 AgentOS？")
 print(response)
 ```
 
@@ -159,73 +159,73 @@ agents = await client.send_request(
     {"capability": "data_analysis"},
     protocol=ProtocolType.A2A,
 )
-print(f"Found agents: {agents}")
+print(f"发现的代理: {agents}")
 ```
 
 ---
 
-## Step 5: Streaming Responses
+## 步骤 5: 流式响应
 
-All protocols support streaming:
+所有协议都支持流式响应：
 
 ```python
 async def streaming_example():
     client = ProtocolClient.from_env()
 
-    print("Streaming response:")
+    print("流式响应:")
     async for chunk in client.stream_request(
         method="llm.chat",
-        params={"prompt": "Tell me about MCIS theory in 3 sentences"},
+        params={"prompt": "用三句话介绍 MCIS 理论"},
     ):
         print(chunk, end="", flush=True)
-    print()  # newline after stream
+    print()  # 流结束后换行
 
 asyncio.run(streaming_example())
 ```
 
 ---
 
-## CLI Quick Reference
+## CLI 快速参考
 
-| Command | Description |
+| 命令 | 说明 |
 |---------|-------------|
-| `agentos protocol list` | List all available protocols |
-| `agentos protocol info jsonrpc` | Show detailed info about a protocol |
-| `agentos protocol test mcp` | Test connection to a protocol |
-| `agentos protocol detect -c '{"..."}'` | Auto-detect protocol from content |
-| `agentos protocol send jsonrpc task.submit '{"content":"Hi"}'` | Send a message |
-| `agentos protocol stats` | View protocol statistics |
-| `agentos protocol transform jsonrpc mcp` | Show transformation details |
-| `agentos protocol capabilities openai` | Show what a protocol supports |
+| `agentos protocol list` | 列出所有可用协议 |
+| `agentos protocol info jsonrpc` | 显示协议的详细信息 |
+| `agentos protocol test mcp` | 测试协议连接 |
+| `agentos protocol detect -c '{"..."}'` | 从内容自动检测协议 |
+| `agentos protocol send jsonrpc task.submit '{"content":"Hi"}'` | 发送协议消息 |
+| `agentos protocol stats` | 查看协议统计信息 |
+| `agentos protocol transform jsonrpc mcp` | 显示转换详情 |
+| `agentos protocol capabilities openai` | 显示协议支持的能力 |
 
-### Examples
+### 使用示例
 
 ```bash
-# Check all protocols
+# 查看所有协议
 $ agentos protocol list
 
-# Get detailed info about OpenAI protocol
+# 获取 OpenAI 协议的详细信息
 $ agentos protocol info openai
 
-# Test MCP connectivity with verbose output
+# 测试 MCP 连接（含详细输出）
 $ agentos protocol test mcp -v
 
-# Detect protocol from a string
+# 从字符串检测协议
 $ agentos protocol detect -c '{"tools/call":{"name":"search"}}'
 
-# Send a JSON-RPC request
+# 发送 JSON-RPC 请求
 $ agentos protocol send jsonrpc ping '{}'
 
-# See statistics
+# 查看统计信息
 $ agentos protocol stats
 
-# Understand JSON-RPC → MCP transformation
+# 了解 JSON-RPC → MCP 转换
 $ agentos protocol transform jsonrpc mcp
 ```
 
 ---
 
-## Multi-Language Quick Start
+## 多语言快速开始
 
 ### Go
 
@@ -250,7 +250,7 @@ func main() {
     if err != nil {
         panic(err)
     }
-    fmt.Printf("Result: %v\n", result)
+    fmt.Printf("结果: %v\n", result)
 }
 ```
 
@@ -267,7 +267,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = ProtocolClient::new(config);
 
     let result = client.send_request("ping", None, None).await?;
-    println!("Result: {:?}", result);
+    println!("结果: {:?}", result);
     Ok(())
 }
 ```
@@ -280,48 +280,48 @@ import { createProtocolClient } from '@agentos/toolkit';
 const client = createProtocolClient({ baseURL: 'http://localhost:18789' });
 
 const result = await client.sendRequest({ method: 'ping' });
-console.log('Result:', result);
+console.log('结果:', result);
 ```
 
 ---
 
-## Protocol Selection Guide
+## 协议选择指南
 
-| Use Case | Recommended Protocol | Why |
-|----------|---------------------|-----|
-| General AgentOS tasks | **JSON-RPC** | Native, full feature support |
-| Tool calling / LLM context | **MCP** | Standardized tool discovery & invocation |
-| Multi-agent coordination | **A2A** | Built-in discovery, delegation, consensus |
-| LLM chat completions | **OpenAI** | Drop-in compatible with OpenAI ecosystem |
-| High-performance binary | **OpenJiuwen** | Lowest latency, CRC32 integrity |
-
----
-
-## Next Steps
-
-1. **Read the Full Guide**: [PROTOCOL_GUIDE.md](./PROTOCOL_GUIDE.md) — comprehensive documentation
-2. **Try OpenLab Integration**: Use `openlab.protocols.ProtocolSessionManager` in your agents
-3. **Build Custom Adapters**: Implement `proto_adapter_vtable_t` for new protocols
-4. **Explore Transformations**: Use `agentos protocol transform <src> <tgt>` to understand message mapping
+| 使用场景 | 推荐协议 | 原因 |
+|----------|---------|------|
+| AgentOS 通用任务 | **JSON-RPC** | 原生支持，功能完整 |
+| 工具调用 / LLM 上下文 | **MCP** | 标准化的工具发现与调用 |
+| 多代理协调 | **A2A** | 内置发现、委托、共识机制 |
+| LLM 聊天补全 | **OpenAI** | 与 OpenAI 生态即插即用兼容 |
+| 高性能二进制 | **OpenJiuwen** | 最低延迟，CRC32 完整性保证 |
 
 ---
 
-## Troubleshooting
+## 下一步
 
-**Gateway not responding?**
+1. **阅读完整指南**: [PROTOCOL_GUIDE.md](./PROTOCOL_GUIDE.md) — 全面的协议系统文档
+2. **尝试 OpenLab 集成**: 在您的代理中使用 `openlab.protocols.ProtocolSessionManager`
+3. **构建自定义适配器**: 为新协议实现 `proto_adapter_vtable_t`
+4. **探索协议转换**: 使用 `agentos protocol transform <src> <tgt>` 了解消息映射
+
+---
+
+## 故障排除
+
+**网关无响应？**
 ```bash
 agentos status
 agentos service health
 ```
 
-**Protocol detection wrong?**
-- Add explicit `contentType` hint
-- Use `protocol detect -t application/mcp` to force type
+**协议检测错误？**
+- 添加显式的 `contentType` 提示
+- 使用 `protocol detect -t application/mcp` 强制指定类型
 
-**Connection timeout?**
-- Check `AGENTOS_GATEWAY_URL` env var
-- Verify gateway is running: `agentos status`
+**连接超时？**
+- 检查 `AGENTOS_GATEWAY_URL` 环境变量
+- 确认网关正在运行：`agentos status`
 
 ---
 
-*For detailed API reference, see [PROTOCOL_GUIDE.md](./PROTOCOL_GUIDE.md)*
+*详细 API 参考请参阅 [PROTOCOL_GUIDE.md](./PROTOCOL_GUIDE.md)*

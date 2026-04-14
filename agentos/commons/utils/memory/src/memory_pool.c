@@ -23,11 +23,13 @@
 
 /**
  * @brief 内存池块结构
+ * @note 性能优化：块头嵌入 pool 指针用于 O(1) 所有权验证，避免 O(n) 线性扫描
  */
 typedef struct memory_pool_block {
-    struct memory_pool_block* next;      /**< 指向下一个块的指�?*/
+    struct memory_pool_block* next;      /**< 指向下一个块的指针 */
     bool allocated;                      /**< 块是否已分配 */
-    size_t index;                        /**< 块索引（用于调试�?*/
+    size_t index;                        /**< 块索引（用于调试） */
+    struct memory_pool* pool;            /**< 所属池指针（O(1）验证用） */
 } memory_pool_block_t;
 
 /**
@@ -190,13 +192,16 @@ static bool memory_pool_allocate_blocks(memory_pool_t* pool, size_t block_count)
     pool->blocks = new_blocks;
     pool->blocks_capacity = new_capacity;
     
-    // 初始化新�?    uint8_t* memory_ptr = (uint8_t*)pool->memory_area;
+    // 初始化新块
+    uint8_t* memory_ptr = (uint8_t*)pool->memory_area;
     for (size_t i = 0; i < block_count; i++) {
         memory_pool_block_t* block = (memory_pool_block_t*)memory_ptr;
-        
-        // 初始化块�?        block->next = NULL;
+
+        // 初始化块（含 O(1) 验证用池指针）
+        block->next = NULL;
         block->allocated = false;
         block->index = pool->stats.total_blocks + i;
+        block->pool = pool;
         
         // 将块添加到空闲链�?        block->next = pool->free_list;
         pool->free_list = block;
@@ -304,22 +309,29 @@ void memory_pool_destroy(memory_pool_t* pool) {
     if (pool == NULL) {
         return;
     }
-    
+
+    size_t leaked_blocks = 0;
+    const char* pool_name_for_log = NULL;
+
     memory_pool_lock(pool);
-    
-    // 检查是否有未释放的�?    if (pool->stats.allocated_blocks > 0) {
-        fprintf(stderr, "警告：销毁内存池时发现未释放的块\n");
-        fprintf(stderr, "内存池：%s\n", pool->name ? pool->name : "(unnamed)");
-        fprintf(stderr, "未释放块数：%zu\n", pool->stats.allocated_blocks);
-        
-        // 可选：释放所有块（强制释放）
-        // 在实际使用中，这里应该由调用者确保所有块都已释放
-        // 这里简化处理，仅输出警�?    }
-    
+
+    // 检查是否有未释放的块（收集信息，不在锁内做I/O）
+    if (pool->stats.allocated_blocks > 0) {
+        leaked_blocks = pool->stats.allocated_blocks;
+        pool_name_for_log = pool->name;
+    }
+
     // 释放内存区域
     memory_pool_free_blocks(pool);
-    
+
     memory_pool_unlock(pool);
+
+    /* 锁外输出警告信息，避免锁内I/O阻塞 */
+    if (leaked_blocks > 0) {
+        fprintf(stderr, "警告：销毁内存池时发现未释放的块\n");
+        fprintf(stderr, "内存池：%s\n", pool_name_for_log ? pool_name_for_log : "(unnamed)");
+        fprintf(stderr, "未释放块数：%zu\n", leaked_blocks);
+    }
     
     // 销毁锁
     memory_pool_lock_destroy(pool);
@@ -385,22 +397,15 @@ void memory_pool_free(memory_pool_t* pool, void* ptr) {
     if (pool == NULL || ptr == NULL) {
         return;
     }
-    
-    memory_pool_lock(pool);
-    
+
     // 计算块头指针
     memory_pool_block_t* block = (memory_pool_block_t*)((uint8_t*)ptr - sizeof(memory_pool_block_t));
-    
-    // 验证块是否属于此�?    bool block_found = false;
-    for (size_t i = 0; i < pool->stats.total_blocks; i++) {
-        if (pool->blocks[i] == block) {
-            block_found = true;
-            break;
-        }
-    }
-    
-    if (!block_found || !block->allocated) {
-        // 无效释放：要么块不属于此池，要么未分�?        fprintf(stderr, "错误：尝试释放无效的内存池块\n");
+
+    memory_pool_lock(pool);
+
+    // O(1) 验证：通过嵌入的池指针确认所有权（替代原来的 O(n) 线性扫描）
+    if (block->pool != pool || !block->allocated) {
+        fprintf(stderr, "错误：尝试释放无效的内存池块\n");
         memory_pool_unlock(pool);
         return;
     }
