@@ -1,97 +1,97 @@
-# AgentOS Protocol System Guide
+# AgentOS 协议系统使用指南
 
-**Version**: 1.0.0
-**Last Updated**: 2026-04-14
-**Status**: Stable
-**License**: MIT
+**版本**: 1.0.0
+**最后更新**: 2026-04-14
+**状态**: 稳定
+**许可证**: MIT
 
-AgentOS Protocol System provides unified multi-protocol communication capabilities supporting **JSON-RPC 2.0**, **MCP v1.0**, **A2A v0.3**, **OpenAI API**, and **OpenJiuwen (custom binary)** protocols with automatic detection, routing, and bidirectional transformation.
+AgentOS 协议系统提供统一的 多协议通信能力，支持 **JSON-RPC 2.0**、**MCP v1.0**、**A2A v0.3**、**OpenAI API** 和 **OpenJiuwen（自定义二进制）** 协议，具备自动检测、路由和双向转换功能。
 
-## Table of Contents
+## 目录
 
-1. [Architecture Overview](#1-architecture-overview)
-2. [Supported Protocols](#2-supported-protocols)
-3. [Protocol Detection](#3-protocol-detection)
-4. [SDK Usage Guides](#4-sdk-usage-guides)
+1. [架构概述](#1-架构概述)
+2. [支持的协议](#2-支持的协议)
+3. [协议检测](#3-协议检测)
+4. [SDK 使用指南](#4-sdk-使用指南)
    - [Python SDK](#python-sdk)
    - [Go SDK](#go-sdk)
    - [Rust SDK](#rust-sdk)
    - [TypeScript SDK](#typescript-sdk)
-5. [Protocol Transformation](#5-protocol-transformation)
-6. [OpenLab Integration](#6-openlab-integration)
-7. [Gateway Bridge](#7-gateway-bridge)
-8. [CLI Tool Reference](#8-cli-tool-reference)
-9. [Advanced Topics](#9-advanced-topics)
-10. [Troubleshooting](#10-troubleshooting)
+5. [协议转换](#5-协议转换)
+6. [OpenLab 集成](#6-openlab-集成)
+7. [网关桥接](#7-网关桥接)
+8. [CLI 工具参考](#8-cli-工具参考)
+9. [高级主题](#9-高级主题)
+10. [故障排除](#10-故障排除)
 
 ---
 
-## 1. Architecture Overview
+## 1. 架构概述
 
-### Layered Protocol Architecture
+### 分层协议架构
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│              Application Layer (OpenLab)             │
+│              应用层 (OpenLab)                         │
 │         ProtocolSessionManager / ProtocolHandler     │
 ├─────────────────────────────────────────────────────┤
-│              SDK Client Layer (Toolkit)              │
-│    ProtocolClient (Go/Python/Rust/TypeScript)        │
+│              SDK 客户端层 (Toolkit)                  │
+│    ProtocolClient (Go/Python/Rust/TypeScript)       │
 ├─────────────────────────────────────────────────────┤
-│              Gateway Bridge Layer                    │
-│      gateway_protocol_bridge (auto-detect + route)   │
+│              网关桥接层                               │
+│      gateway_protocol_bridge (自动检测 + 路由)       │
 ├─────────────────────────────────────────────────────┤
-│              Core Protocol Layer                     │
+│              核心协议层                              │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ │
 │  │ JSON-RPC │ │   MCP    │ │   A2A    │ │ OpenAI │ │
 │  │ Adapter  │ │ Adapter  │ │ Adapter  │ │Adapter │ │
 │  └──────────┘ └──────────┘ └──────────┘ └────────┘ │
 │  ┌────────────────────────────────────────────────┐ │
-│  │          Protocol Transformers                  │ │
-│  │  Bidirectional: JSON-RPC <-> MCP/A2A/OpenAI/... │ │
+│  │          协议转换器 (Protocol Transformers)      │ │
+│  │  双向转换: JSON-RPC <-> MCP/A2A/OpenAI/...     │ │
 │  └────────────────────────────────────────────────┘ │
 │  ┌────────────────┐ ┌─────────────────────────────┐ │
-│  │ Protocol Router │ │ Protocol Extension Manager  │ │
+│  │ Protocol Router │ │ Protocol Extension Manager   │ │
 │  └────────────────┘ └─────────────────────────────┘ │
 ├─────────────────────────────────────────────────────┤
-│            Interface Layer (I-L1 ~ I-L4)             │
-│  proto_adapter_vtable / proto_router_iface / ...     │
+│            接口层 (I-L1 ~ I-L4)                     │
+│  proto_adapter_vtable / proto_router_iface / ...    │
 └─────────────────────────────────────────────────────┘
 ```
 
-### Interface Layers (I-L1 ~ I-L4)
+### 接口层说明 (I-L1 ~ I-L4)
 
-| Layer | Interface | Responsibility |
-|-------|-----------|----------------|
-| **I-L1** | `proto_adapter_vtable_t` | Single protocol adapter lifecycle (init/destroy/handle/version) |
-| **I-L2** | `proto_router_iface_t` | Message routing and transformation between protocols |
-| **I-L3** | `proto_gateway_iface_t` | Protocol gateway registration, request handling, auto-detection |
-| **I-L4** | `proto_extension_mgr_iface_s` | Dynamic extension loading/unloading/auto-discovery |
+| 层级 | 接口 | 职责 |
+|------|------|------|
+| **I-L1** | `proto_adapter_vtable_t` | 单个协议适配器的生命周期管理 (init/destroy/handle/version) |
+| **I-L2** | `proto_router_iface_t` | 协议间消息路由和转换 |
+| **I-L3** | `proto_gateway_iface_t` | 协议网关注册、请求处理、自动检测 |
+| **I-L4** | `proto_extension_mgr_iface_s` | 动态扩展加载/卸载/自动发现 |
 
-### Key Components
+### 核心组件
 
-| Component | Location | Description |
-|-----------|----------|-------------|
-| Unified Interface | `interfaces/include/agentos_protocol_interface.h` | I-L1~I-L4 interface definitions |
-| Protocol Router | `protocols/core/router/` | Message routing and dispatch |
-| Protocol Transformers | `protocols/core/transformers/` | Bidirectional format conversion |
-| MCP Adapter | `protocols/adapters/mcp/` | MCP v1.0 protocol implementation |
-| A2A Adapter | `protocols/standards/a2a/` | A2A v0.3 agent-to-agent protocol |
-| OpenAI Adapter | `protocols/integrations/openai/` | OpenAI Enterprise API compatibility |
-| OpenJiuwen Adapter | `protocols/integrations/openjiuwen/` | Custom binary protocol with CRC32 |
-| Extension Framework | `protocols/core/adapter/` | Dynamic adapter loading system |
-| Gateway Bridge | `gateway/src/gateway/gateway_protocol_bridge.c` | Gateway ↔ Protocols integration |
+| 组件 | 位置 | 说明 |
+|------|------|------|
+| 统一接口 | `interfaces/include/agentos_protocol_interface.h` | I-L1~I-L4 接口定义 |
+| 协议路由器 | `protocols/core/router/` | 消息路由与分发 |
+| 协议转换器 | `protocols/core/transformers/` | 双向格式转换 |
+| MCP 适配器 | `protocols/adapters/mcp/` | MCP v1.0 协议实现 |
+| A2A 适配器 | `protocols/standards/a2a/` | A2A v0.3 代理间协议 |
+| OpenAI 适配器 | `protocols/integrations/openai/` | OpenAI 企业 API 兼容 |
+| OpenJiuwen 适配器 | `protocols/integrations/openjiuwen/` | 自定义二进制协议，含 CRC32 |
+| 扩展框架 | `protocols/core/adapter/` | 动态适配器加载系统 |
+| 网关桥接 | `gateway/src/gateway/gateway_protocol_bridge.c` | 网关 ↔ 协议集成 |
 
 ---
 
-## 2. Supported Protocols
+## 2. 支持的协议
 
 ### 2.1 JSON-RPC 2.0
 
-The default and primary protocol for AgentOS internal communication.
+AgentOS 内部通信的默认和主要协议。
 
-**Endpoint**: `/jsonrpc`
-**Version**: 2.0
+**端点**: `/jsonrpc`
+**版本**: 2.0
 **Content-Type**: `application/json`
 
 ```json
@@ -105,10 +105,10 @@ The default and primary protocol for AgentOS internal communication.
 
 ### 2.2 MCP (Model Context Protocol) v1.0
 
-Standardized protocol for AI model context management.
+AI 模型上下文管理的标准化协议。
 
-**Endpoint**: `/mcp`
-**Version**: 1.0
+**端点**: `/mcp`
+**版本**: 1.0
 **Content-Type**: `application/json`
 
 ```json
@@ -119,18 +119,18 @@ Standardized protocol for AI model context management.
 }
 ```
 
-Key MCP methods supported:
-- `tools/list` — List available tools
-- `tools/call` — Execute a tool by name
-- `initialize` — Session initialization
-- `ping` — Health check
+支持的 MCP 核心方法：
+- `tools/list` — 列出可用工具
+- `tools/call` — 按名称执行工具
+- `initialize` — 会话初始化
+- `ping` — 健康检查
 
 ### 2.3 A2A (Agent-to-Agent) v0.3
 
-Protocol for multi-agent coordination and task delegation.
+多代理协调与任务委托协议。
 
-**Endpoint**: `/a2a`
-**Version**: 0.3
+**端点**: `/a2a`
+**版本**: 0.3
 **Content-Type**: `application/json`
 
 ```json
@@ -145,18 +145,18 @@ Protocol for multi-agent coordination and task delegation.
 }
 ```
 
-Key A2A operations:
-- Agent discovery and registration
-- Task delegation with negotiation
-- Consensus-based decision making
-- Streaming progress updates
+核心 A2A 操作：
+- 代理发现与注册
+- 带协商的任务委托
+- 基于共识的决策
+- 流式进度更新
 
-### 2.4 OpenAI API Compatible
+### 2.4 OpenAI API 兼容
 
-OpenAI-compatible API for LLM interactions.
+用于 LLM 交互的 OpenAI 兼容 API。
 
-**Endpoint**: `/v1/chat/completions`, `/v1/embeddings`
-**Version**: 1.0 (compatible)
+**端点**: `/v1/chat/completions`, `/v1/embeddings`
+**版本**: 1.0 (兼容)
 **Content-Type**: `application/json`
 
 ```json
@@ -170,48 +170,48 @@ OpenAI-compatible API for LLM interactions.
 }
 ```
 
-Built-in models:
-- `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo` (chat completions)
-- `text-embedding-ada-002`, `text-embedding-3-small`, `text-embedding-3-large` (embeddings)
+内置模型：
+- `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo` (聊天补全)
+- `text-embedding-ada-002`, `text-embedding-3-small`, `text-embedding-3-large` (向量嵌入)
 
-### 2.5 OpenJiuwen (Custom Binary)
+### 2.5 OpenJiuwen (自定义二进制)
 
-High-performance custom binary protocol with CRC32 integrity check.
+高性能自定义二进制协议，带 CRC32 完整性校验。
 
-**Magic Number**: `0x4F4A574D` ("OJWM")
-**Header Size**: 24 bytes
-**Features**: Binary payload, CRC32 checksum, versioned format
+**魔数**: `0x4F4A574D` ("OJWM")
+**头部大小**: 24 字节
+**特性**: 二进制载荷、CRC32 校验和、带版本格式
 
-Binary header structure:
+二进制头部结构：
 ```
-Offset  Size  Field
-0       4     Magic (0x4F4A574D)
-4       2     Version (uint16)
-6       2     Message Type (uint16)
-8       4     Payload Length (uint32)
-12      4     Sequence Number (uint32)
-16      4     Timestamp (uint32)
-20      4     CRC32 Checksum (uint32)
+偏移量  大小  字段
+0       4     魔数 (0x4F4A574D)
+4       2     版本 (uint16)
+6       2     消息类型 (uint16)
+8       4     载荷长度 (uint32)
+12      4     序列号 (uint32)
+16      4     时间戳 (uint32)
+20      4     CRC32 校验和 (uint32)
 ```
 
 ---
 
-## 3. Protocol Detection
+## 3. 协议检测
 
-The system supports automatic protocol detection based on content analysis:
+系统支持基于内容分析的自动协议检测：
 
-### Detection Heuristics
+### 检测启发式规则
 
-| Signal | Confidence | Detected Protocol |
-|--------|-----------|-------------------|
-| Content-Type: `application/json-rpc` or body has `jsonrpc` field | 95% | JSON-RPC |
-| Content-Type: `application/mcp` or MCP-specific method names | 90% | MCP |
-| Content-Type: `application/a2a` or `agent_id` + `task` fields | 85% | A2A |
-| URL path starts with `/v1/` or has `model`+`messages` fields | 88% | OpenAI |
-| Binary data with magic `0x4F4A574D` | 100% | OpenJiuwen |
-| Default fallback | — | JSON-RPC |
+| 信号 | 置信度 | 检测到的协议 |
+|------|--------|-------------|
+| Content-Type: `application/json-rpc` 或报文体中有 `jsonrpc` 字段 | 95% | JSON-RPC |
+| Content-Type: `application/mcp` 或 MCP 特定方法名 | 90% | MCP |
+| Content-Type: `application/a2a` 或 `agent_id` + `task` 字段 | 85% | A2A |
+| URL 路径以 `/v1/` 开头或包含 `model`+`messages` 字段 | 88% | OpenAI |
+| 带魔数 `0x4F4A574D` 的二进制数据 | 100% | OpenJiuwen |
+| 默认回退 | — | JSON-RPC |
 
-### SDK Auto-Detection Example
+### SDK 自动检测示例
 
 ```python
 from agentos.protocol import ProtocolClient, ProtocolType
@@ -221,23 +221,23 @@ result = await client.detect_protocol(
     content='{"model":"gpt-4","messages":[{"role":"user","content":"Hi"}]}',
     content_type="application/json"
 )
-print(f"Detected: {result.protocol_type}")  # ProtocolType.OPENAI
-print(f"Confidence: {result.confidence:.1%}")
+print(f"检测到: {result.protocol_type}")  # ProtocolType.OPENAI
+print(f"置信度: {result.confidence:.1%}")
 ```
 
 ---
 
-## 4. SDK Usage Guides
+## 4. SDK 使用指南
 
 ### Python SDK
 
-#### Installation
+#### 安装
 
 ```bash
 pip install agentos-toolkit
 ```
 
-#### Quick Start
+#### 快速开始
 
 ```python
 import asyncio
@@ -258,13 +258,13 @@ async def main():
 
     result = await client.send_request(
         method="task.submit",
-        params={"content": "Analyze sales data", "priority": "high"},
+        params={"content": "分析销售数据", "priority": "high"},
     )
-    print(f"Response: {result}")
+    print(f"响应: {result}")
 
     streaming = await client.stream_request(
         method="llm.chat",
-        params={"prompt": "Tell me about AgentOS"},
+        params={"prompt": "介绍 AgentOS"},
     )
     async for chunk in streaming:
         print(chunk, end="", flush=True)
@@ -272,7 +272,7 @@ async def main():
 asyncio.run(main())
 ```
 
-#### Protocol-Specific Clients (Factory Functions)
+#### 协议专用客户端（工厂函数）
 
 ```python
 from agentos.protocol import create_mcp_client, create_openai_client
@@ -286,10 +286,10 @@ openai_client = create_openai_client(
     api_key="your-key",
     model="gpt-4o",
 )
-response = await openai_client.chat("Explain MCIS theory")
+response = await openai_client.chat("解释 MCIS 理论")
 ```
 
-#### Full API Reference
+#### 完整 API 参考
 
 ```python
 class ProtocolClient:
@@ -322,13 +322,13 @@ class ProtocolType(IntEnum):
 
 ### Go SDK
 
-#### Installation
+#### 安装
 
 ```bash
 go get github.com/spharxworks/agentos-toolkit-go
 ```
 
-#### Quick Start
+#### 快速开始
 
 ```go
 package main
@@ -359,7 +359,7 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
-    fmt.Printf("Detected: %s (confidence: %.1f%%)\n",
+    fmt.Printf("检测到: %s (置信度: %.1f%%)\n",
         result.ProtocolType, result.Confidence*100)
 
     resp, err := client.SendRequest(ctx, &protocol.RequestOptions{
@@ -369,11 +369,11 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
-    fmt.Printf("Response: %v\n", resp)
+    fmt.Printf("响应: %v\n", resp)
 }
 ```
 
-#### Streaming Example
+#### 流式响应示例
 
 ```go
 stream, err := client.StreamRequest(ctx, &protocol.RequestOptions{
@@ -389,7 +389,7 @@ for chunk := range stream.Ch() {
 }
 ```
 
-#### Full API Reference
+#### 完整 API 参考
 
 ```go
 type ProtocolClient struct { ... }
@@ -422,9 +422,9 @@ const (
 
 ### Rust SDK
 
-#### Installation
+#### 安装
 
-Add to `Cargo.toml`:
+在 `Cargo.toml` 中添加：
 
 ```toml
 [dependencies]
@@ -432,7 +432,7 @@ agentos-toolkit = "3.0.0"
 tokio = { version = "1", features = ["full"] }
 ```
 
-#### Quick Start
+#### 快速开始
 
 ```rust
 use agentos_toolkit::protocol::{
@@ -454,7 +454,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some("application/json"),
     ).await?;
 
-    println!("Detected: {} ({:.1}%)", detection.protocol_type, detection.confidence * 100.0);
+    println!("检测到: {} ({:.1}%)", detection.protocol_type, detection.confidence * 100.0);
 
     let response = client.send_request(
         "task.submit",
@@ -462,13 +462,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         None,
     ).await?;
 
-    println!("Response: {:?}", response);
+    println!("响应: {:?}", response);
 
     Ok(())
 }
 ```
 
-#### Streaming with Error Handling
+#### 流式响应与错误处理
 
 ```rust
 use agentos_toolkit::protocol::{ProtocolClient, ProtocolConfig};
@@ -489,7 +489,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     while let Some(chunk) = stream.next().await {
         match chunk {
             Ok(data) => print!("{}", data),
-            Err(e) => eprintln!("Stream error: {}", e),
+            Err(e) => eprintln!("流式错误: {}", e),
         }
     }
 
@@ -497,7 +497,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-#### Full API Reference
+#### 完整 API 参考
 
 ```rust
 pub struct ProtocolClient { /* ... */ }
@@ -537,15 +537,15 @@ pub struct DetectionResult {
 
 ### TypeScript SDK
 
-#### Installation
+#### 安装
 
 ```bash
 npm install @agentos/toolkit
-# or
+# 或
 yarn add @agentos/toolkit
 ```
 
-#### Quick Start
+#### 快速开始
 
 ```typescript
 import {
@@ -566,19 +566,19 @@ async function main() {
     content: '{"model":"gpt-4","messages":[{"role":"user","content":"hi"}]}',
     contentType: 'application/json',
   });
-  console.log(`Detected: ${detection.protocolType} (${(detection.confidence * 100).toFixed(1)}%)`);
+  console.log(`检测到: ${detection.protocolType} (${(detection.confidence * 100).toFixed(1)}%)`);
 
   const response = await client.sendRequest({
     method: 'task.submit',
     params: { content: 'Hello from TypeScript' },
   });
-  console.log('Response:', response);
+  console.log('响应:', response);
 }
 
 main();
 ```
 
-#### Factory Functions
+#### 工厂函数
 
 ```typescript
 const mcpClient = createMCPClient({ baseURL: 'http://localhost:18789' });
@@ -590,10 +590,10 @@ const openaiClient = createOpenAIClient({
   apiKey: 'your-key',
   model: 'gpt-4o',
 });
-const chat = await openaiClient.chat('What is MCIS theory?');
+const chat = await openaiClient.chat('什么是 MCIS 理论?');
 ```
 
-#### Full API Reference
+#### 完整 API 参考
 
 ```typescript
 enum ProtocolType {
@@ -649,14 +649,14 @@ function createOpenAIClient(options?: ProtocolConfigOptions): ProtocolClient;
 
 ---
 
-## 5. Protocol Transformation
+## 5. 协议转换
 
-The protocol transformer module enables bidirectional message conversion between any two supported protocols.
+协议转换器模块支持任意两种支持的协议之间的双向消息转换。
 
-### Supported Transformations
+### 支持的转换路径
 
-| Source → Target | Function | Status |
-|-----------------|----------|--------|
+| 源 → 目标 | 函数 | 状态 |
+|-----------|------|------|
 | JSON-RPC → MCP | `transformer_jsonrpc_to_mcp_request` | ✅ |
 | MCP → JSON-RPC | `transformer_mcp_to_jsonrpc_request` | ✅ |
 | JSON-RPC → A2A | `transformer_jsonrpc_to_a2a_request` | ✅ |
@@ -666,9 +666,9 @@ The protocol transformer module enables bidirectional message conversion between
 | JSON-RPC → OpenJiuwen | `transformer_jsonrpc_to_openjiuwen_request` | ✅ |
 | OpenJiuwen → JSON-RPC | `transformer_openjiuwen_to_jsonrpc_request` | ✅ |
 
-### Using Auto-Transform
+### 使用自动转换
 
-The router's `protocol_auto_transform()` function automatically selects the correct transformation:
+路由器的 `protocol_auto_transform()` 函数自动选择正确的转换路径：
 
 ```c
 #include "protocol_transformers.h"
@@ -684,41 +684,41 @@ int result = protocol_auto_transform(
 );
 ```
 
-### Transformation Examples
+### 转换示例
 
-#### JSON-RPC → MCP (tools/call mapping)
+#### JSON-RPC → MCP (tools/call 映射)
 
 ```json
-// Input (JSON-RPC):
+// 输入 (JSON-RPC):
 {"jsonrpc":"2.0","method":"tool.execute","params":{"name":"web_search","query":"AgentOS"},"id":1}
 
-// Output (MCP):
+// 输出 (MCP):
 {"jsonrpc":"2.0","method":"tools/call","params":{"name":"web_search","arguments":{"query":"AgentOS"}},"id":1}
 ```
 
-#### JSON-RPC → OpenAI (chat/completions mapping)
+#### JSON-RPC → OpenAI (chat/completions 映射)
 
 ```json
-// Input (JSON-RPC):
+// 输入 (JSON-RPC):
 {"jsonrpc":"2.0","method":"llm.chat","params":{"prompt":"Hello","max_tokens":100},"id":1}
 
-// Output (OpenAI):
+// 输出 (OpenAI):
 {"model":"gpt-4o","messages":[{"role":"user","content":"Hello"}],"max_tokens":100,"temperature":0.7}
 ```
 
-#### JSON-RPC → OpenJiuwen (binary encoding)
+#### JSON-RPC → OpenJiuwen (二进制编码)
 
 ```c
-// Input: JSON-RPC text message
-// Output: 24-byte header + binary payload + CRC32
-// Magic: 0x4F4A574D, Type: MSG_TYPE_REQUEST
+// 输入: JSON-RPC 文本消息
+// 输出: 24字节头部 + 二进制载荷 + CRC32
+// 魔数: 0x4F4A574D, 类型: MSG_TYPE_REQUEST
 ```
 
 ---
 
-## 6. OpenLab Integration
+## 6. OpenLab 集成
 
-The `openlab.protocols` module provides Python bindings for integrating the protocol system into OpenLab applications.
+`openlab.protocols` 模块提供 Python 绑定，用于将协议系统集成到 OpenLab 应用中。
 
 ### ProtocolSessionManager
 
@@ -742,12 +742,12 @@ await manager.initialize()
 await manager.discover_tools()
 
 result = await manager.execute_tool("calculator_add", {"a": 10, "b": 20})
-print(f"Result: {result.output}")
+print(f"结果: {result.output}")
 
 await manager.close()
 ```
 
-### Custom Protocol Handler
+### 自定义协议处理器
 
 ```python
 from openlab.protocols import ProtocolHandler, ProtocolRequestContext, ProtocolResponse
@@ -766,26 +766,26 @@ class MyCustomHandler(ProtocolHandler):
             return ProtocolResponse.success({"pong": True, "timestamp": time.time()})
         elif ctx.method == "custom.echo":
             return ProtocolResponse.success({"echo": ctx.params.get("data")})
-        return ProtocolResponse.error("unknown_method", f"Unknown method: {ctx.method}")
+        return ProtocolResponse.error("unknown_method", f"未知方法: {ctx.method}")
 
 manager.register_handler(MyCustomHandler())
 ```
 
-### Tool Binding Modes
+### 工具绑定模式
 
-| Mode | Behavior |
-|------|----------|
-| `AUTO` | Automatically bind discovered tools |
-| `MANUAL` | Explicit registration required |
-| `LAZY` | Bind on first use |
+| 模式 | 行为 |
+|------|------|
+| `AUTO` | 自动绑定发现到的工具 |
+| `MANUAL` | 需要显式注册 |
+| `LAZY` | 首次使用时绑定 |
 
 ---
 
-## 7. Gateway Bridge
+## 7. 网关桥接
 
-The `gateway_protocol_bridge` module integrates the protocol system into the HTTP/WebSocket gateway layer.
+`gateway_protocol_bridge` 模块将协议系统集成到 HTTP/WebSocket 网关层。
 
-### Configuration
+### 配置
 
 ```c
 #include "gateway_protocol_bridge.h"
@@ -799,7 +799,7 @@ gateway_bridge_config_t config = {
 };
 ```
 
-### Registration Flow
+### 注册流程
 
 ```c
 gateway_bridge_handle_t* bridge = gateway_bridge_create(&config);
@@ -810,7 +810,7 @@ gateway_bridge_register_handler(bridge, PROTO_A2A, a2a_handler_fn);
 gateway_bridge_register_handler(bridge, PROTO_OPENAI, openai_handler_fn);
 ```
 
-### Statistics & Diagnostics
+### 统计与诊断
 
 ```c
 char* diagnostics = gateway_bridge_get_diagnostics(bridge, true);
@@ -819,40 +819,40 @@ free(diagnostics);
 
 gateway_bridge_stats_t stats;
 gateway_bridge_get_statistics(bridge, &stats);
-printf("Total requests: %llu\n", stats.total_requests);
-printf("Transform count: %llu\n", stats.transform_count);
+printf("总请求数: %llu\n", stats.total_requests);
+printf("转换次数: %llu\n", stats.transform_count);
 ```
 
 ---
 
-## 8. CLI Tool Reference
+## 8. CLI 工具参考
 
-The `agentos` CLI tool includes protocol management commands:
+`agentos` CLI 工具包含协议管理命令：
 
 ```bash
-agentos protocol list              # List all available protocol adapters
-agentos protocol detect           # Detect protocol from input
-agentos protocol test <proto>     # Test connection for specific protocol
-agentos protocol send <proto> <method> [params]  # Send a protocol message
-agentos protocol stats            # Show protocol statistics
-agentos protocol transform <src> <tgt> <data>    # Transform between protocols
+agentos protocol list              # 列出所有可用协议适配器
+agentos protocol detect           # 从输入检测协议
+agentos protocol test <proto>     # 测试特定协议的连接
+agentos protocol send <proto> <method> [params]  # 发送协议消息
+agentos protocol stats            # 显示协议统计信息
+agentos protocol transform <src> <tgt> [data]    # 协议间转换
 ```
 
-### Examples
+### 使用示例
 
 ```bash
 $ agentos protocol list
-Protocol         Version    Status      Endpoint
-─────────────    ───────    ──────      ────────────
-JSON-RPC         2.0        active      /jsonrpc
-MCP              1.0        active      /mcp
-A2A              0.3        active      /a2a
-OpenAI           1.0        active      /v1
-OpenJiuwen       1.0        active      /ojiuwen
+协议          版本     状态      端点
+────────────  ──────   ──────    ────────────
+JSON-RPC      2.0      active    /jsonrpc
+MCP           1.0      active    /mcp
+A2A           0.3      active    /a2a
+OpenAI        1.0      active    /v1
+OpenJiuwen    1.0      active    /ojiuwen
 
 $ agentos protocol test jsonrpc
-Testing JSON-RPC connection to http://localhost:18789/jsonrpc...
-✓ Connected (latency: 12ms, version: 2.0)
+正在测试到 http://localhost:18789/jsonrpc 的 JSON-RPC 连接...
+✓ 连接成功 (延迟: 12ms, 版本: 2.0)
 
 $ agentos protocol send jsonrpc task.submit '{"content":"Hello CLI"}'
 {
@@ -862,28 +862,28 @@ $ agentos protocol send jsonrpc task.submit '{"content":"Hello CLI"}'
 }
 
 $ agentos protocol stats
-Protocol Statistics:
-  Total Requests:    1,234
-  By Protocol:
+协议统计:
+  总请求数:     1,234
+  按协议分布:
     JSON-RPC:  856 (69.4%)
     MCP:       234 (19.0%)
     A2A:       98  (7.9%)
     OpenAI:    46  (3.7%)
-  Transforms:  45
-  Errors:      3
+  转换次数:    45
+  错误次数:    3
 ```
 
 ---
 
-## 9. Advanced Topics
+## 9. 高级主题
 
-### 9.1 Custom Protocol Adapter Development
+### 9.1 自定义协议适配器开发
 
-To add a new protocol adapter:
+添加新协议适配器的步骤：
 
-1. Implement `proto_adapter_vtable_t` interface
-2. Register via `proto_extension_mgr_iface_s.load()`
-3. Add transformer entries to the dispatch table
+1. 实现 `proto_adapter_vtable_t` 接口
+2. 通过 `proto_extension_mgr_iface_s.load()` 注册
+3. 在分发表中添转换器条目
 
 ```c
 #include "agentos_protocol_interface.h"
@@ -901,41 +901,41 @@ static proto_adapter_vtable_t my_vtable = {
 };
 ```
 
-### 9.2 Streaming Protocol Patterns
+### 9.2 流式协议模式
 
-All protocols support streaming responses through the unified streaming API:
+所有协议通过统一流式 API 支持流式响应：
 
-- **JSON-RPC**: Server-Sent Events (SSE) over `/jsonrpc/stream`
-- **MCP**: `notifications/message` with incremental content
-- **A2A**: Phase-based progress callbacks
-- **OpenAI**: Native SSE streaming (`stream: true`)
-- **OpenJiuwen**: Chunked binary frames with sequence numbers
+- **JSON-RPC**: 通过 `/jsonrpc/stream` 的 Server-Sent Events (SSE)
+- **MCP**: 带增量内容的 `notifications/message`
+- **A2A**: 基于阶段的进度回调
+- **OpenAI**: 原生 SSE 流式响应 (`stream: true`)
+- **OpenJiuwen**: 带序列号的分块二进制帧
 
-### 9.3 Security Considerations
+### 9.3 安全注意事项
 
-- All adapters validate input size against `max_payload_size`
-- OpenJiuwen uses CRC32 for integrity verification
-- API key authentication via `Authorization: Bearer <token>` header
-- Rate limiting configurable per protocol endpoint
-- Input sanitization through Cupolas security dome
+- 所有适配器根据 `max_payload_size` 验证输入大小
+- OpenJiuwen 使用 CRC32 进行完整性校验
+- API 密钥认证通过 `Authorization: Bearer <token>` 头
+- 每个协议端点均可配置速率限制
+- 通过 Cupolas 安全穹顶进行输入清理
 
 ---
 
-## 10. Troubleshooting
+## 10. 故障排除
 
-### Common Issues
+### 常见问题
 
-| Issue | Cause | Solution |
-|-------|-------|----------|
-| `Protocol not detected` | Missing content-type headers | Set explicit `contentType` in requests |
-| `Transformation failed` | Incompatible field types | Check field compatibility matrix |
-| `Connection timeout` | Gateway not running | Run `agentos service health` first |
-| `CRC32 mismatch` | Corrupted OpenJiuwen payload | Re-send the message |
-| `Unknown method` | Protocol handler not registered | Check `protocol list` output |
+| 问题 | 原因 | 解决方案 |
+|------|------|---------|
+| `协议未检测到` | 缺少 content-type 头 | 在请求中显式设置 `contentType` |
+| `转换失败` | 不兼容的字段类型 | 检查字段兼容性矩阵 |
+| `连接超时` | 网关未运行 | 先运行 `agentos service health` |
+| `CRC32 不匹配` | OpenJiuwen 载荷损坏 | 重新发送消息 |
+| `未知方法` | 协议处理器未注册 | 检查 `protocol list` 输出 |
 
-### Debug Mode
+### 调试模式
 
-Enable verbose logging:
+启用详细日志：
 
 ```bash
 export AGENTOS_DEBUG=true
@@ -943,31 +943,31 @@ export AGENTOS_LOG_LEVEL=DEBUG
 agentos protocol test jsonrpc --verbose
 ```
 
-### Health Check Sequence
+### 健康检查序列
 
 ```bash
-agentos status                    # Overall system status
-agentos service health            # Gateway health
-agentos protocol list             # Available protocols
-agentos protocol test jsonrpc     # Per-protocol connectivity
+agentos status                    # 整体系统状态
+agentos service health            # 网关健康状态
+agentos protocol list             # 可用协议列表
+agentos protocol test jsonrpc     # 各协议连接测试
 agentos protocol test mcp
 agentos protocol test openai
 ```
 
 ---
 
-## Version History
+## 版本历史
 
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0.0 | 2026-04-14 | Initial release — comprehensive protocol system documentation |
+| 版本 | 日期 | 变更 |
+|------|------|------|
+| 1.0.0 | 2026-04-14 | 初始版本 — 完整的协议系统文档 |
 
-## Related Documents
+## 相关文档
 
-- [Unified Interface Specification](../interfaces/include/agentos_protocol_interface.h)
-- [Protocol Router Design](../protocols/core/router/include/protocol_router.h)
-- [Transformer Implementation](../protocols/core/transformers/include/protocol_transformers.h)
-- [Gateway Bridge API](../gateway/include/gateway_protocol_bridge.h)
-- [OpenLab Protocol Bindings](../openlab/openlab/protocols/__init__.py)
-- [AgentOS Architecture](../../docs/Capital_Architecture/)
-- [Getting Started Guide](../../docs/Capital_Guides/getting_started.md)
+- [统一接口规范](../interfaces/include/agentos_protocol_interface.h)
+- [协议路由器设计](../protocols/core/router/include/protocol_router.h)
+- [转换器实现](../protocols/core/transformers/include/protocol_transformers.h)
+- [网关桥接 API](../gateway/include/gateway_protocol_bridge.h)
+- [OpenLab 协议绑定](../openlab/openlab/protocols/__init__.py)
+- [AgentOS 架构](../../docs/Capital_Architecture/)
+- [快速入门指南](../../docs/Capital_Guides/getting_started.md)

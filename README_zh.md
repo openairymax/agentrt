@@ -1,6 +1,8 @@
 <div align="center">
 
-# Agent OS
+# Agent OS  
+
+Powered by OpenAirymax  
 
 > 成为人类计算工程史上，第四个"操作系统哲学"
 
@@ -39,7 +41,7 @@
 
 ⚡️  
 
-**基石理论[《体系并行论》](docs/Basic_Theories/CN_01_体系并行论.md)**
+**基石理论[《体系并行论》](docs/Basic_Theories/CN_01_体系并行论.md)**  
 
 </center>
 
