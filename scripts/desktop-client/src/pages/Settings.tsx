@@ -261,7 +261,7 @@ const Settings: React.FC = () => {
 
           {/* Toggle Options */}
           <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "8px" }}>
-            <label className="checkbox-label" style={{ padding: "12px", background: "var(--bg-tertiary)", borderRadius: "var(--radius-md)" }}>
+            <label className="checkbox-label" style={{ padding: "12px", background: "var(--bg-tertiary)", borderRadius: "var(--radius-md)", transition: "all 0.2s ease", border: "1px solid var(--border-subtle)" }}>
               <input type="checkbox" checked={autoStart} onChange={(e) => setAutoStart(e.target.checked)} />
               <div>
                 <span style={{ fontWeight: 500 }}>{t.settings.autoStart}</span>
@@ -269,7 +269,7 @@ const Settings: React.FC = () => {
               </div>
             </label>
 
-            <label className="checkbox-label" style={{ padding: "12px", background: "var(--bg-tertiary)", borderRadius: "var(--radius-md)" }}>
+            <label className="checkbox-label" style={{ padding: "12px", background: "var(--bg-tertiary)", borderRadius: "var(--radius-md)", transition: "all 0.2s ease", border: "1px solid var(--border-subtle)" }}>
               <input type="checkbox" checked={notificationEnabled} onChange={(e) => setNotificationEnabled(e.target.checked)} />
               <div>
                 <span style={{ fontWeight: 500 }}>
@@ -332,7 +332,7 @@ const Settings: React.FC = () => {
         </div>
 
         {/* System Info Card */}
-        <div className="card card-elevated">
+        <div className="card card-elevated" style={{ border: "1px solid var(--border-subtle)", background: "var(--bg-secondary)", boxShadow: 'var(--shadow-sm)', transition: "all 0.2s ease" }}>
           <h3 className="card-title">
             <Info size={18} />
             {t.settings.system}
@@ -355,7 +355,7 @@ const Settings: React.FC = () => {
         </div>
 
         {/* Actions Card */}
-        <div className="card card-elevated">
+        <div className="card card-elevated" style={{ border: "1px solid var(--border-subtle)", background: "var(--bg-secondary)", boxShadow: 'var(--shadow-sm)', transition: "all 0.2s ease" }}>
           <h3 className="card-title">
             <Save size={18} />
             {t.settings.actions}
@@ -366,7 +366,7 @@ const Settings: React.FC = () => {
               className="btn btn-primary btn-lg"
               onClick={handleSaveSettings}
               disabled={saveStatus === 'saving'}
-              style={{ width: "100%" }}
+              style={{ width: "100%", transition: "all 0.2s ease" }}
             >
               {saveStatus === 'saving' ? (
                 <>
@@ -382,7 +382,7 @@ const Settings: React.FC = () => {
             </button>
 
             <div style={{ display: "flex", gap: "10px" }}>
-              <button className="btn btn-secondary" onClick={handleResetSettings} style={{ flex: 1 }}>
+              <button className="btn btn-secondary" onClick={handleResetSettings} style={{ flex: 1, transition: "all 0.2s ease" }}>
                 <RotateCcw size={16} />
                 {t.settings.reset}
               </button>
@@ -401,7 +401,7 @@ const Settings: React.FC = () => {
                     info("缓存已清除", t.settings.cacheCleared || "所有缓存已清理");
                   }
                 }}
-                style={{ flex: 1 }}
+                style={{ flex: 1, transition: "all 0.2s ease" }}
               >
                 <Trash2 size={16} />
                 {t.settings.clearCache}

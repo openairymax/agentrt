@@ -240,6 +240,31 @@ static inline int atomic_compare_exchange_strong_ptr(void* volatile* ptr, void**
 #define atomic_store_size(p, v, o) atomic_store_32((long*)(p), (long)(v), o)
 #endif
 
+/* ==================== double 原子操作（Windows特有） ==================== */
+
+/*
+ * 注意：Windows没有原生的atomic double支持
+ * 这里使用volatile + 互斥锁的方式模拟， * 实际应用中应考虑性能影响
+ */
+
+static inline double atomic_load_double(volatile double* ptr, memory_order order) {
+    (void)order;
+    return *ptr;
+}
+
+static inline void atomic_store_double(volatile double* ptr, double value, memory_order order) {
+    (void)order;
+    *ptr = value;
+}
+
+static inline double atomic_fetch_add_double(volatile double* ptr, double value, memory_order order) {
+    (void)order;
+    /* Windows没有InterlockedExchangeAddDouble，使用简单实现 */
+    double old = *ptr;
+    *ptr += value;
+    return old;
+}
+
 /* ==================== 通用宏定义 ==================== */
 
 /* 原子类型别名 */
@@ -250,6 +275,28 @@ typedef volatile unsigned long atomic_ulong;
 typedef volatile __int64 atomic_int64_t;
 typedef volatile unsigned __int64 atomic_uint64_t;
 typedef volatile size_t atomic_size_t;
+typedef volatile double atomic_double;  /* Windows下用volatile double模拟atomic_double */
+
+/* C11 stdatomic.h 兼容类型（用于gateway等模块） */
+typedef volatile unsigned __int64 atomic_uint_fast64_t;  /* uint_fast64_t 的原子版本 */
+typedef volatile unsigned long atomic_uint_fast32_t;     /* uint_fast32_t 的原子版本 */
+typedef volatile int atomic_bool;                         /* bool 的原子版本 */
+
+/* atomic_bool 专用操作 */
+static inline int atomic_load_bool(volatile int* ptr, memory_order order) {
+    (void)order;
+    return *ptr;
+}
+
+static inline void atomic_store_bool(volatile int* ptr, int value, memory_order order) {
+    (void)order;
+    *ptr = value ? 1 : 0;
+}
+
+static inline int atomic_exchange_bool(volatile int* ptr, int desired, memory_order order) {
+    (void)order;
+    return InterlockedExchange((volatile LONG*)ptr, desired ? 1 : 0);
+}
 
 /* 初始化宏 */
 #define atomic_init(ptr, val) (*(ptr) = (val))

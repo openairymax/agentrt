@@ -557,14 +557,15 @@ typedef enum {
     AGENTOS_IPC_FLAG_BROADCAST = 4     /**< 广播消息 */
 } agentos_ipc_flag_t;
 
-/**
- * @brief IPC 通道句柄类型
- */
-typedef struct agentos_ipc_channel* agentos_ipc_channel_t;
-
 /* agentos_ipc_header_t 现在由 agentos_types.h 提供 */
 
 /* agentos_ipc_message_t 现在由 agentos_types.h 提供 */
+
+/**
+ * @brief IPC 通道句柄类型
+ * @note 内核级IPC通道类型，完整定义见corekern/include/ipc.h
+ *       应用层应使用commons/utils/ipc/include/ipc_common.h中的ipc_channel_t
+ */
 
 /**
  * @brief IPC 通道配置

@@ -88,13 +88,13 @@ static int ensure_initialized(void) {
                                                     memory_order_acquire)) {
             /* 当前线程获得初始化权 */
             init_lock = agentos_mutex_create();
-            CHECK_NULL(init_lock) {
+            if (!init_lock) {
                 atomic_store_explicit(&mem_initialized, 0, memory_order_release);
                 return -1;
             }
 
             mem_stats_mutex = agentos_mutex_create();
-            CHECK_NULL(mem_stats_mutex) {
+            if (!mem_stats_mutex) {
                 agentos_mutex_destroy(init_lock);
                 init_lock = NULL;
                 atomic_store_explicit(&mem_initialized, 0, memory_order_release);

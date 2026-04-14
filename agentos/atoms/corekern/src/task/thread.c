@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file thread.c
  * @brief 线程管理辅助函数实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -45,10 +45,9 @@ static void* thread_wrapper(void* arg) {
 /**
  * @brief 创建线程
  */
-agentos_error_t agentos_thread_create(
+int agentos_thread_create(
     agentos_thread_t* thread,
-    const agentos_thread_attr_t* attr,
-    void (*func)(void*),
+    agentos_thread_func_t func,
     void* arg) {
     if (!thread || !func) {
         return AGENTOS_EINVAL;
@@ -64,7 +63,7 @@ agentos_error_t agentos_thread_create(
 
     HANDLE hThread = (HANDLE)_beginthreadex(
         NULL,
-        (unsigned)(attr ? attr->stack_size : 0),
+        0,
         thread_wrapper,
         thread_args,
         0,
@@ -80,14 +79,6 @@ agentos_error_t agentos_thread_create(
 #else
     pthread_attr_t pthread_attr;
     pthread_attr_init(&pthread_attr);
-
-    if (attr) {
-        if (attr->stack_size > 0) {
-            pthread_attr_setstacksize(&pthread_attr, attr->stack_size);
-        }
-        pthread_attr_setdetachstate(&pthread_attr,
-            attr->detach_state ? PTHREAD_CREATE_DETACHED : PTHREAD_CREATE_JOINABLE);
-    }
 
     void** thread_args = (void**)AGENTOS_MALLOC(2 * sizeof(void*));
     if (!thread_args) {

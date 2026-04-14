@@ -1,6 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useI18n } from '../i18n';
+import { useAlert } from '../components/useAlert';
+import {
+  CheckCircle2,
+  XCircle,
+  Globe,
+  Server,
+  Code,
+  Send,
+  RefreshCw,
+  Terminal,
+  Settings,
+  Zap,
+  AlertCircle,
+  Loader2,
+} from 'lucide-react';
 
 interface ProtocolInfo {
   id: string;
@@ -39,6 +54,7 @@ interface ProtocolMessageResponse {
 
 const ProtocolPlayground: React.FC = () => {
   const { t } = useI18n();
+  const { error: alertError, success } = useAlert();
   const [protocols, setProtocols] = useState<ProtocolInfo[]>([]);
   const [selectedProtocol, setSelectedProtocol] = useState<string>('');
   const [capabilities, setCapabilities] = useState<ProtocolCapability[]>([]);
@@ -142,93 +158,190 @@ const ProtocolPlayground: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          协议兼容性演示
-        </h1>
-        <span className="text-sm text-gray-500 dark:text-gray-400">
-          AgentOS UnifiedProtocol
-        </span>
+    <div className="page-container">
+      {/* Page Header */}
+      <div className="page-header">
+        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+          <div style={{
+            width: "44px", height: "44px", borderRadius: "var(--radius-md)",
+            background: "linear-gradient(135deg,#6366f1,#818cf8)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 4px 16px rgba(99,102,241,0.35), 0 0 0 1px rgba(255,255,255,0.08) inset",
+          }}>
+            <Globe size={20} color="white" />
+          </div>
+          <div>
+            <h1>协议兼容性演示</h1>
+            <p style={{ color: "var(--text-secondary)", fontSize: "13px", margin: 0 }}>
+              AgentOS UnifiedProtocol · 实时连接测试
+            </p>
+          </div>
+        </div>
       </div>
 
+      {/* Error Message */}
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-red-700 dark:text-red-300 text-sm">
+        <div style={{
+          padding: "12px 16px", borderRadius: "var(--radius-md)",
+          background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.12)",
+          color: "#ef4444", fontSize: "13px", marginBottom: "16px",
+          display: "flex", alignItems: "center", gap: "8px",
+        }}>
+          <AlertCircle size={16} />
           {error}
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+      {/* Protocol Cards */}
+      <div style={{
+        display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+        gap: "16px", marginBottom: "20px",
+      }}>
         {protocols.map((proto) => (
-          <button
+          <div
             key={proto.id}
             onClick={() => setSelectedProtocol(proto.id)}
-            className={`p-4 rounded-xl border-2 transition-all text-left ${
-              selectedProtocol === proto.id
-                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md'
-                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-            }`}
+            style={{
+              padding: "20px", borderRadius: "var(--radius-lg)",
+              border: `2px solid ${selectedProtocol === proto.id ? proto.color : "var(--border-subtle)"}`,
+              background: selectedProtocol === proto.id ? `${proto.color}06` : "var(--bg-secondary)",
+              cursor: "pointer", transition: "all 0.2s ease",
+              boxShadow: 'var(--shadow-sm)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+              e.currentTarget.style.borderColor = selectedProtocol === proto.id ? proto.color : 'var(--border-color)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+              e.currentTarget.style.borderColor = selectedProtocol === proto.id ? proto.color : "var(--border-subtle)";
+            }}
           >
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-2xl">{proto.icon}</span>
-              <span className="font-semibold text-gray-900 dark:text-white">
-                {proto.name}
-              </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
+              <div style={{
+                width: "42px", height: "42px", borderRadius: "var(--radius-md)",
+                background: `linear-gradient(135deg,${proto.color},${proto.color}80)`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: `0 4px 12px ${proto.color}25`,
+              }}>
+                <Settings size={18} color="white" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontWeight: 600, fontSize: "15px", color: "var(--text-primary)" }}>
+                    {proto.name}
+                  </span>
+                  {proto.status === 'active' ? (
+                    <CheckCircle2 size={14} color="#22c55e" />
+                  ) : (
+                    <XCircle size={14} color="var(--text-muted)" />
+                  )}
+                </div>
+                <div style={{ fontSize: "11.5px", color: "var(--text-muted)", marginTop: "2px" }}>
+                  v{proto.version}
+                </div>
+              </div>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            <p style={{ fontSize: "12.5px", color: "var(--text-secondary)", margin: "0 0 12px 0", lineHeight: 1.4 }}>
               {proto.description}
             </p>
-            <div className="flex items-center gap-2">
-              <span
-                className="inline-block w-2 h-2 rounded-full"
-                style={{ backgroundColor: proto.status === 'active' ? '#4CAF50' : '#9E9E9E' }}
-              />
-              <span className="text-xs text-gray-500 dark:text-gray-400">
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <div style={{
+                width: "6px", height: "6px", borderRadius: "50%",
+                background: proto.status === 'active' ? "#22c55e" : "var(--text-muted)",
+              }} />
+              <span style={{ fontSize: "11.5px", color: "var(--text-muted)" }}>
                 {proto.status} · {proto.endpoint}
               </span>
             </div>
-          </button>
+          </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-          <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            连接测试
-          </h2>
-          <div className="space-y-3">
+      {/* Main Content */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
+        {/* Connection Test */}
+        <div className="card card-elevated" style={{ padding: "20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
+            <div style={{
+              width: "32px", height: "32px", borderRadius: "var(--radius-sm)",
+              background: "rgba(99,102,241,0.1)", display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <Server size={16} color="#6366f1" />
+            </div>
+            <h2 style={{ fontSize: "15px", fontWeight: 600, margin: 0, color: "var(--text-primary)" }}>
+              连接测试
+            </h2>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>
                 端点地址
               </label>
               <input
                 type="text"
                 value={testEndpoint}
                 onChange={(e) => setTestEndpoint(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                className="form-input"
+                style={{ fontSize: "13px", padding: "10px 14px" }}
                 placeholder="http://localhost:18789"
               />
             </div>
             <button
               onClick={testConnection}
               disabled={testing || !selectedProtocol}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+              style={{
+                padding: "12px 20px", borderRadius: "var(--radius-md)",
+                border: "none", background: "var(--primary-color)",
+                color: "white", fontWeight: 600, fontSize: "13px",
+                cursor: testing || !selectedProtocol ? "not-allowed" : "pointer",
+                opacity: testing || !selectedProtocol ? 0.5 : 1,
+                transition: "all 0.2s ease",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+              }}
+              onMouseEnter={(e) => {
+                if (!testing && selectedProtocol) {
+                  e.currentTarget.style.background = "var(--primary-hover)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!testing && selectedProtocol) {
+                  e.currentTarget.style.background = "var(--primary-color)";
+                }
+              }}
             >
-              {testing ? '测试中...' : `测试 ${selectedProtocol.toUpperCase()} 连接`}
+              {testing ? (
+                <>
+                  <Loader2 size={16} className="spin" />
+                  测试中...
+                </>
+              ) : (
+                <>
+                  <RefreshCw size={16} />
+                  测试 {selectedProtocol.toUpperCase()} 连接
+                </>
+              )}
             </button>
             {testResult && (
-              <div
-                className={`p-3 rounded-lg text-sm ${
-                  testResult.success
-                    ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
-                    : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <span>{testResult.success ? '✅' : '❌'}</span>
-                  <span className="font-medium">{testResult.message}</span>
+              <div style={{
+                padding: "14px", borderRadius: "var(--radius-md)",
+                background: testResult.success ? "rgba(34,197,94,0.06)" : "rgba(239,68,68,0.06)",
+                border: `1px solid ${testResult.success ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)"}`,
+                animation: "fadeIn 0.3s ease-out",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                  {testResult.success ? (
+                    <CheckCircle2 size={16} color="#22c55e" />
+                  ) : (
+                    <XCircle size={16} color="#ef4444" />
+                  )}
+                  <span style={{ fontWeight: 600, fontSize: "13px", color: testResult.success ? "#22c55e" : "#ef4444" }}>
+                    {testResult.message}
+                  </span>
                 </div>
-                <div className="text-xs opacity-75">
+                <div style={{ fontSize: "11.5px", color: "var(--text-muted)" }}>
                   延迟: {testResult.latency_ms}ms · 端点: {testResult.endpoint}
                 </div>
               </div>
@@ -236,112 +349,213 @@ const ProtocolPlayground: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-          <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            协议能力
-          </h2>
+        {/* Protocol Capabilities */}
+        <div className="card card-elevated" style={{ padding: "20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
+            <div style={{
+              width: "32px", height: "32px", borderRadius: "var(--radius-sm)",
+              background: "rgba(16,185,129,0.1)", display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <Zap size={16} color="#10b981" />
+            </div>
+            <h2 style={{ fontSize: "15px", fontWeight: 600, margin: 0, color: "var(--text-primary)" }}>
+              协议能力
+            </h2>
+          </div>
           {capabilities.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              选择协议查看可用方法
-            </p>
+            <div style={{
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              padding: "32px 16px", background: "var(--bg-tertiary)", borderRadius: "var(--radius-md)",
+              border: "1px solid var(--border-subtle)",
+            }}>
+              <Settings size={32} style={{ color: "var(--text-muted)", opacity: 0.5, marginBottom: "12px" }} />
+              <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>
+                选择协议查看可用方法
+              </span>
+            </div>
           ) : (
-            <div className="space-y-2 max-h-64 overflow-y-auto">
+            <div style={{ maxHeight: "320px", overflowY: "auto", paddingRight: "8px" }}>
               {capabilities.map((cap) => (
-                <button
+                <div
                   key={cap.name}
                   onClick={() => selectCapability(cap)}
-                  className={`w-full text-left p-2 rounded-lg text-sm transition-colors ${
-                    messageMethod === cap.name
-                      ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
-                      : 'hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
+                  style={{
+                    padding: "12px 14px", borderRadius: "var(--radius-md)",
+                    border: `1px solid ${messageMethod === cap.name ? "var(--primary-light)" : "var(--border-subtle)"}`,
+                    background: messageMethod === cap.name ? "var(--primary-light)" : "var(--bg-tertiary)",
+                    cursor: "pointer", transition: "all 0.2s ease",
+                    marginBottom: "8px",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (messageMethod !== cap.name) {
+                      e.currentTarget.style.background = "var(--bg-secondary)";
+                      e.currentTarget.style.borderColor = "var(--border-color)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (messageMethod !== cap.name) {
+                      e.currentTarget.style.background = "var(--bg-tertiary)";
+                      e.currentTarget.style.borderColor = "var(--border-subtle)";
+                    }
+                  }}
                 >
-                  <div className="font-mono font-medium text-gray-900 dark:text-white">
+                  <div style={{ fontFamily: "var(--font-mono)", fontWeight: 600, fontSize: "13px", color: "var(--text-primary)", marginBottom: "4px" }}>
                     {cap.name}
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                  <div style={{ fontSize: "11.5px", color: "var(--text-secondary)" }}>
                     {cap.description}
                     {cap.params.length > 0 && (
-                      <span className="ml-1">
-                        · 参数: {cap.params.join(', ')}
+                      <span style={{ color: "var(--text-muted)", marginLeft: "8px" }}>
+                        参数: {cap.params.join(', ')}
                       </span>
                     )}
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           )}
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-        <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-          消息发送
-        </h2>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="space-y-3">
+      {/* Message Sending */}
+      <div className="card card-elevated" style={{ padding: "20px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
+          <div style={{
+            width: "32px", height: "32px", borderRadius: "var(--radius-sm)",
+            background: "rgba(245,158,11,0.1)", display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <Send size={16} color="#f59e0b" />
+          </div>
+          <h2 style={{ fontSize: "15px", fontWeight: 600, margin: 0, color: "var(--text-primary)" }}>
+            消息发送
+          </h2>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>
                 方法名
               </label>
               <input
                 type="text"
                 value={messageMethod}
                 onChange={(e) => setMessageMethod(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-mono"
+                className="form-input"
+                style={{ fontSize: "13px", fontFamily: "var(--font-mono)", padding: "10px 14px" }}
                 placeholder="tools/list"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>
                 参数 (JSON)
               </label>
-              <textarea
-                value={messageParams}
-                onChange={(e) => setMessageParams(e.target.value)}
-                rows={6}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-mono"
-                placeholder='{"key": "value"}'
-              />
+              <div style={{ position: "relative" }}>
+                <textarea
+                  value={messageParams}
+                  onChange={(e) => setMessageParams(e.target.value)}
+                  rows={6}
+                  className="form-input"
+                  style={{ fontSize: "13px", fontFamily: "var(--font-mono)", padding: "12px 14px", resize: "vertical" }}
+                  placeholder='{"key": "value"}'
+                />
+              </div>
             </div>
             <button
               onClick={sendMessage}
               disabled={sending || !selectedProtocol || !messageMethod}
-              className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+              style={{
+                padding: "12px 20px", borderRadius: "var(--radius-md)",
+                border: "none", background: "#10b981",
+                color: "white", fontWeight: 600, fontSize: "13px",
+                cursor: sending || !selectedProtocol || !messageMethod ? "not-allowed" : "pointer",
+                opacity: sending || !selectedProtocol || !messageMethod ? 0.5 : 1,
+                transition: "all 0.2s ease",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+              }}
+              onMouseEnter={(e) => {
+                if (!sending && selectedProtocol && messageMethod) {
+                  e.currentTarget.style.background = "#059669";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!sending && selectedProtocol && messageMethod) {
+                  e.currentTarget.style.background = "#10b981";
+                }
+              }}
             >
-              {sending ? '发送中...' : `发送 ${selectedProtocol.toUpperCase()} 消息`}
+              {sending ? (
+                <>
+                  <Loader2 size={16} className="spin" />
+                  发送中...
+                </>
+              ) : (
+                <>
+                  <Send size={16} />
+                  发送 {selectedProtocol.toUpperCase()} 消息
+                </>
+              )}
             </button>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>
               响应
             </label>
             {messageResponse ? (
-              <div className="space-y-2">
-                <div
-                  className={`flex items-center gap-2 text-sm ${
-                    messageResponse.success
-                      ? 'text-green-600 dark:text-green-400'
-                      : 'text-red-600 dark:text-red-400'
-                  }`}
-                >
-                  <span>{messageResponse.success ? '✅' : '❌'}</span>
-                  <span>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <div style={{
+                  display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px",
+                  borderRadius: "var(--radius-sm)",
+                  background: messageResponse.success ? "rgba(34,197,94,0.06)" : "rgba(239,68,68,0.06)",
+                  border: `1px solid ${messageResponse.success ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)"}`,
+                }}>
+                  {messageResponse.success ? (
+                    <CheckCircle2 size={14} color="#22c55e" />
+                  ) : (
+                    <XCircle size={14} color="#ef4444" />
+                  )}
+                  <span style={{ fontSize: "12px", fontWeight: 600, color: messageResponse.success ? "#22c55e" : "#ef4444" }}>
                     {messageResponse.protocol.toUpperCase()} · {messageResponse.latency_ms}ms
                   </span>
                 </div>
-                <pre className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg text-xs font-mono overflow-auto max-h-64 text-gray-800 dark:text-gray-200">
-                  {JSON.stringify(
-                    messageResponse.success ? messageResponse.data : { error: messageResponse.error },
-                    null,
-                    2
-                  )}
-                </pre>
+                <div style={{
+                  background: "#0a0a0f", borderRadius: "var(--radius-md)",
+                  border: "1px solid var(--border-color)",
+                  overflow: "hidden",
+                }}>
+                  <div style={{
+                    background: "#111118", borderBottom: "1px solid var(--border-subtle)",
+                    padding: "8px 12px", display: "flex", alignItems: "center", gap: "8px",
+                  }}>
+                    <Terminal size={12} style={{ color: "var(--text-muted)" }} />
+                    <span style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+                      response.json
+                    </span>
+                  </div>
+                  <pre style={{
+                    padding: "14px", margin: 0, fontSize: "12px", fontFamily: "var(--font-mono)",
+                    color: "var(--text-secondary)", lineHeight: 1.5, overflow: "auto",
+                    maxHeight: "240px",
+                  }}>
+                    {JSON.stringify(
+                      messageResponse.success ? messageResponse.data : { error: messageResponse.error },
+                      null,
+                      2
+                    )}
+                  </pre>
+                </div>
               </div>
             ) : (
-              <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg text-sm text-gray-400 dark:text-gray-500 text-center">
-                发送消息后查看响应
+              <div style={{
+                background: "var(--bg-tertiary)", borderRadius: "var(--radius-md)",
+                border: "1px solid var(--border-subtle)",
+                display: "flex", flexDirection: "column", alignItems: "center",
+                justifyContent: "center", padding: "48px 16px",
+              }}>
+                <Code size={32} style={{ color: "var(--text-muted)", opacity: 0.5, marginBottom: "12px" }} />
+                <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>
+                  发送消息后查看响应
+                </span>
               </div>
             )}
           </div>

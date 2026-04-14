@@ -13,6 +13,10 @@
 #include <string.h>
 #include <stdlib.h>
 
+#ifdef GATEWAY_HAS_CJSON
+#include <cJSON.h>
+#endif
+
 /* ==================== 标准错误消息 ==================== */
 
 static const char* const g_error_messages[] = {
@@ -33,6 +37,7 @@ static const char* const g_custom_error_messages[] = {
 /* ==================== 请求验证 ==================== */
 
 int jsonrpc_validate_request(const cJSON* json) {
+#ifdef GATEWAY_HAS_CJSON
     if (!json) {
         return -1;
     }
@@ -70,9 +75,14 @@ int jsonrpc_validate_request(const cJSON* json) {
     }
 
     return 0;
+#else
+    (void)json;
+    return -1; /* 无cJSON时返回无效 */
+#endif
 }
 
 const char* jsonrpc_get_method(const cJSON* json) {
+#ifdef GATEWAY_HAS_CJSON
     if (!json) {
         return NULL;
     }
@@ -81,25 +91,40 @@ const char* jsonrpc_get_method(const cJSON* json) {
         return NULL;
     }
     return method->valuestring;
+#else
+    (void)json;
+    return NULL;
+#endif
 }
 
 const cJSON* jsonrpc_get_params(const cJSON* json) {
+#ifdef GATEWAY_HAS_CJSON
     if (!json) {
         return NULL;
     }
     return cJSON_GetObjectItemCaseSensitive(json, "params");
+#else
+    (void)json;
+    return NULL;
+#endif
 }
 
 const cJSON* jsonrpc_get_id(const cJSON* json) {
+#ifdef GATEWAY_HAS_CJSON
     if (!json) {
         return NULL;
     }
     return cJSON_GetObjectItemCaseSensitive(json, "id");
+#else
+    (void)json;
+    return NULL;
+#endif
 }
 
 /* ==================== 响应生成 ==================== */
 
 char* jsonrpc_create_success_response(const cJSON* id, cJSON* result) {
+#ifdef GATEWAY_HAS_CJSON
     cJSON* response = cJSON_CreateObject();
     if (!response) {
         return NULL;
@@ -126,6 +151,11 @@ char* jsonrpc_create_success_response(const cJSON* id, cJSON* result) {
     cJSON_Delete(response);
 
     return json_str;
+#else
+    (void)id;
+    (void)result;
+    return NULL;
+#endif
 }
 
 char* jsonrpc_create_error_response(
@@ -134,6 +164,7 @@ char* jsonrpc_create_error_response(
     const char* message,
     cJSON* data
 ) {
+#ifdef GATEWAY_HAS_CJSON
     cJSON* response = cJSON_CreateObject();
     if (!response) {
         if (data) cJSON_Delete(data);
@@ -177,6 +208,13 @@ char* jsonrpc_create_error_response(
     cJSON_Delete(response);
 
     return json_str;
+#else
+    (void)id;
+    (void)code;
+    (void)message;
+    (void)data;
+    return NULL;
+#endif
 }
 
 /* ==================== 便捷响应函数 ==================== */
@@ -194,19 +232,31 @@ char* jsonrpc_create_method_not_found_response(const cJSON* id) {
 }
 
 char* jsonrpc_create_invalid_params_response(const cJSON* id, const char* detail) {
+#ifdef GATEWAY_HAS_CJSON
     cJSON* data = NULL;
     if (detail) {
         data = cJSON_CreateString(detail);
     }
     return jsonrpc_create_error_response(id, JSONRPC_INVALID_PARAMS, NULL, data);
+#else
+    (void)id;
+    (void)detail;
+    return NULL;
+#endif
 }
 
 char* jsonrpc_create_internal_error_response(const cJSON* id, const char* detail) {
+#ifdef GATEWAY_HAS_CJSON
     cJSON* data = NULL;
     if (detail) {
         data = cJSON_CreateString(detail);
     }
     return jsonrpc_create_error_response(id, JSONRPC_INTERNAL_ERROR, NULL, data);
+#else
+    (void)id;
+    (void)detail;
+    return NULL;
+#endif
 }
 
 char* jsonrpc_create_rate_limited_response(const cJSON* id) {

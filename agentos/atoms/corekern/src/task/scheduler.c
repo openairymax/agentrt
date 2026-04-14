@@ -62,7 +62,7 @@ static void* user_thread_entry_adapter(void* (*user_func)(void*), void* arg)
  * @param user_func 用户线程入口函数
  * @return 适配后的函数指针
  */
-static void* (*wrap_user_thread_entry(void (*user_func)(void*)))(void*)
+static void* (*wrap_user_thread_entry(agentos_thread_func_t user_func))(void*)
 {
     /* 返回一个适配器函数，该适配器调用user_func */
     return (void* (*)(void*))user_func;
@@ -80,12 +80,12 @@ static void* (*wrap_user_thread_entry(void (*user_func)(void*)))(void*)
 static int ensure_scheduler_fully_initialized(void)
 {
     /* 初始化调度器核心层 */
-    CHECK_COND(scheduler_core_init() == 0) {
+    if (scheduler_core_init() != 0) {
         return -1;
     }
 
     /* 初始化平台适配器 */
-    CHECK_COND(scheduler_platform_auto_init() == 0) {
+    if (scheduler_platform_auto_init() != 0) {
         return -1;
     }
 
@@ -161,15 +161,13 @@ agentos_error_t agentos_task_init(void)
  * 使用新的架构创建线程：核心层管理任务信息，平台适配器执行具体线程操作
  *
  * @param thread 线程句柄输出
- * @param attr 线程属性（名称、优先级、栈大小）
  * @param func 线程入口函数
  * @param arg 线程参数
- * @return AGENTOS_SUCCESS 成功，错误码 失败
+ * @return 0 成功，错误码 失败
  */
-agentos_error_t agentos_thread_create(
+int agentos_thread_create(
     agentos_thread_t* thread,
-    const agentos_thread_attr_t* attr,
-    void (*func)(void*),
+    agentos_thread_func_t func,
     void* arg)
 {
     /* 参数检查 */
@@ -194,22 +192,10 @@ agentos_error_t agentos_thread_create(
         return AGENTOS_ENOMEM;
     }
 
-    /* 解析线程属性 */
+    /* 解析线程属性（使用默认值） */
     const char* task_name = "unnamed";
     int priority = AGENTOS_TASK_PRIORITY_NORMAL;
     size_t stack_size = 0;
-
-    if (attr) {
-        if (attr->name) {
-            task_name = attr->name;
-        }
-        priority = attr->priority;
-        if (priority < AGENTOS_TASK_PRIORITY_MIN ||
-            priority > AGENTOS_TASK_PRIORITY_MAX) {
-            priority = AGENTOS_TASK_PRIORITY_NORMAL;
-        }
-        stack_size = attr->stack_size;
-    }
 
     /* 创建核心任务信息结构 */
     task_info_core_t* task_info = scheduler_core_task_info_create(

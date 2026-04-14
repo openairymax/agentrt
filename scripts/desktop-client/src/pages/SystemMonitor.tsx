@@ -118,61 +118,109 @@ const SystemMonitor: React.FC = () => {
   return (
     <div className="page-container">
       <div className="page-header">
-        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
           <div style={{
-            width: "44px", height: "44px", borderRadius: "var(--radius-md)",
+            width: "48px", 
+            height: "48px", 
+            borderRadius: "var(--radius-md)",
             background: "linear-gradient(135deg,#f59e0b,#fbbf24)",
-            display: "flex", alignItems: "center", justifyContent: "center",
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center",
             boxShadow: "0 4px 16px rgba(245,158,11,0.35), 0 0 0 1px rgba(255,255,255,0.08) inset",
+            transition: "all 0.2s ease",
           }}>
-            <Monitor size={20} color="white" />
+            <Monitor size={24} color="white" />
           </div>
           <div>
-            <h1 style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <h1 style={{ display: "flex", alignItems: "center", gap: "12px", margin: 0, fontSize: "20px" }}>
               系统监控
               <span style={{
-                padding: "3px 10px", borderRadius: "var(--radius-full)", fontSize: "11px", fontWeight: 600,
+                padding: "4px 12px", 
+                borderRadius: "9999px", 
+                fontSize: "12px", 
+                fontWeight: 600,
                 background: data ? "rgba(34,197,94,0.1)" : "rgba(245,158,11,0.1)",
                 border: `1px solid ${data ? "rgba(34,197,94,0.2)" : "rgba(245,158,11,0.2)"}`,
                 color: data ? "#22c55e" : "#f59e0b",
+                transition: "all 0.2s ease",
               }}>
                 {data ? "已连接" : "模拟模式"}
               </span>
             </h1>
-            <p style={{ color: "var(--text-secondary)", fontSize: "13px", margin: 0 }}>
+            <p style={{ color: "var(--text-secondary)", fontSize: "14px", margin: "8px 0 0 0" }}>
               实时资源监控 · 进程管理 · 网络诊断
             </p>
           </div>
         </div>
-        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "12.5px", color: "var(--text-secondary)" }}>
-            <input type="checkbox" checked={autoRefresh} onChange={e => setAutoRefresh(e.target.checked)} /> 自动刷新
+        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+          <label style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            gap: "6px", 
+            cursor: "pointer", 
+            fontSize: "13px", 
+            color: "var(--text-secondary)",
+            transition: "all 0.2s ease",
+          }}>
+            <input 
+              type="checkbox" 
+              checked={autoRefresh} 
+              onChange={e => setAutoRefresh(e.target.checked)}
+              style={{ cursor: "pointer" }}
+            /> 
+            自动刷新
           </label>
-          <button className="btn btn-primary btn-sm" onClick={() => { setRefreshing(true); loadAll(); }} disabled={refreshing}>
-            <RefreshCw size={14} className={refreshing ? "spin" : ""} /> 刷新
+          <button 
+            className="btn btn-primary btn-sm"
+            onClick={() => { setRefreshing(true); loadAll(); }}
+            disabled={refreshing}
+            style={{
+              transition: "all 0.2s ease",
+              borderRadius: "var(--radius-md)",
+            }}
+          >
+            <RefreshCw size={14} className={refreshing ? "spin" : ""} />
+            <span style={{ marginLeft: "6px" }}>刷新</span>
           </button>
         </div>
       </div>
 
       {/* Tab Bar */}
       <div style={{
-        display: "flex", gap: "4px", marginBottom: "20px",
-        background: "var(--bg-secondary)", padding: "4px", borderRadius: "var(--radius-lg)",
+        display: "flex", 
+        gap: "6px", 
+        marginBottom: "24px",
+        background: "var(--bg-secondary)", 
+        padding: "6px", 
+        borderRadius: "var(--radius-lg)",
         border: "1px solid var(--border-subtle)",
+        transition: "all 0.2s ease",
       }}>
         {TABS.map(t => {
           const TabIcon = t.icon;
           return (
-            <button key={t.k} onClick={() => setTab(t.k)} style={{
-              padding: "8px 18px", border: "none", borderRadius: "var(--radius-md)",
-              background: tab === t.k ? t.color : "transparent",
-              color: tab === t.k ? "white" : "var(--text-secondary)",
-              cursor: "pointer", fontWeight: 600, fontSize: "12.5px",
-              transition: "all var(--transition-fast)",
-              display: "flex", alignItems: "center", gap: "6px",
-              boxShadow: tab === t.k ? `0 2px 8px ${t.color}40` : "none",
-            }}>
-              <TabIcon size={14} />{t.label}
+            <button 
+              key={t.k} 
+              onClick={() => setTab(t.k)} 
+              style={{
+                padding: "10px 20px", 
+                border: "none", 
+                borderRadius: "var(--radius-md)",
+                background: tab === t.k ? t.color : "transparent",
+                color: tab === t.k ? "white" : "var(--text-secondary)",
+                cursor: "pointer", 
+                fontWeight: 600, 
+                fontSize: "13px",
+                transition: "all 0.2s ease",
+                display: "flex", 
+                alignItems: "center", 
+                gap: "8px",
+                boxShadow: tab === t.k ? `0 2px 8px ${t.color}40` : "none",
+              }}
+            >
+              <TabIcon size={16} />
+              {t.label}
             </button>
           );
         })}
@@ -181,7 +229,7 @@ const SystemMonitor: React.FC = () => {
       {/* ═══ OVERVIEW ═══ */}
       {tab === "overview" && data && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "20px" }}>
             {[
               { icon: Cpu, label: "CPU 使用率", val: Math.round(data.cpu.usage_percent) + "%", sub: data.cpu.cores.length + " 核心", c: "#f59e0b", pct: data.cpu.usage_percent / 100 },
               { icon: HardDrive, label: "内存使用", val: Math.round(data.memory.used_gb) + "GB / " + Math.round(data.memory.total_gb) + "GB", sub: Math.round(data.memory.percent) + "%", c: "#6366f1", pct: data.memory.percent / 100 },
@@ -190,31 +238,61 @@ const SystemMonitor: React.FC = () => {
             ].map((card, i) => {
               const IconComp = card.icon;
               return (
-                <div key={i} className="card card-elevated" style={{
-                  animation: `staggerFadeIn 0.35s ease-out ${i * 70}ms both`,
-                  position: "relative", overflow: "hidden",
-                }}>
-                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg,${card.c}40,${card.c}10)` }} />
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div 
+                  key={i} 
+                  className="card card-elevated" 
+                  style={{
+                    padding: "20px",
+                    boxShadow: 'var(--shadow-sm)',
+                    borderRadius: "var(--radius-lg)",
+                    animation: `staggerFadeIn 0.35s ease-out ${i * 70}ms both`,
+                    position: "relative", 
+                    overflow: "hidden",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                  }}
+                >
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: `linear-gradient(90deg,${card.c},${card.c}aa)` }} />
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                       <div style={{
-                        width: "40px", height: "40px", borderRadius: "var(--radius-md)",
-                        background: `${card.c}12`, display: "flex", alignItems: "center", justifyContent: "center",
+                        width: "48px", 
+                        height: "48px", 
+                        borderRadius: "var(--radius-md)",
+                        background: `${card.c}12`, 
+                        display: "flex", 
+                        alignItems: "center", 
+                        justifyContent: "center",
                       }}>
-                        <IconComp size={19} color={card.c} />
+                        <IconComp size={24} color={card.c} />
                       </div>
-                      <span style={{ fontSize: "13px", color: "var(--text-muted)", fontWeight: 500 }}>{card.label}</span>
+                      <span style={{ fontSize: "14px", color: "var(--text-muted)", fontWeight: 500 }}>{card.label}</span>
                     </div>
-                    {card.pct > 0 && <MiniGauge pct={card.pct * 100} color={card.c} size={44} />}
+                    {card.pct > 0 && <MiniGauge pct={card.pct * 100} color={card.c} size={48} />}
                   </div>
-                  <div style={{ fontSize: "22px", fontWeight: 800, fontFamily: "var(--font-mono)", color: card.c, letterSpacing: "-0.02em" }}>{card.val}</div>
-                  {card.sub && <div style={{ fontSize: "11.5px", color: "var(--text-muted)", marginTop: "4px" }}>{card.sub}</div>}
+                  <div style={{ fontSize: "24px", fontWeight: 800, fontFamily: "var(--font-mono)", color: card.c, letterSpacing: "-0.02em", lineHeight: 1 }}>{card.val}</div>
+                  {card.sub && <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "6px" }}>{card.sub}</div>}
                   {card.pct > 0 && (
-                    <div style={{ height: "4px", background: "var(--bg-tertiary)", borderRadius: "2px", marginTop: "12px", overflow: "hidden" }}>
+                    <div style={{ 
+                      height: "4px", 
+                      background: "var(--bg-tertiary)", 
+                      borderRadius: "2px", 
+                      marginTop: "16px", 
+                      overflow: "hidden"
+                    }}>
                       <div style={{
-                        width: Math.min(card.pct * 100, 100) + "%", height: "100%",
+                        width: Math.min(card.pct * 100, 100) + "%", 
+                        height: "100%",
                         background: `linear-gradient(90deg,${card.c},${card.c}aa)`,
-                        borderRadius: "2px", transition: "width 0.6s ease-out",
+                        borderRadius: "2px", 
+                        transition: "width 0.6s ease-out",
                       }} />
                     </div>
                   )}
@@ -223,37 +301,105 @@ const SystemMonitor: React.FC = () => {
             })}
           </div>
 
-          <div className="grid-2" style={{ marginTop: "16px" }}>
-            <div className="card card-elevated" style={{ position: "relative", overflow: "hidden" }}>
-              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg,#f59e0b40,#f59e0b10)" }} />
-              <h3 className="card-title">
-                <div style={{ width: "28px", height: "28px", borderRadius: "var(--radius-sm)", background: "rgba(245,158,11,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Cpu size={14} color="#f59e0b" />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginTop: "24px" }}>
+            <div className="card card-elevated" style={{ 
+              padding: "20px",
+              boxShadow: 'var(--shadow-sm)',
+              position: "relative", 
+              overflow: "hidden",
+            }}>
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: "linear-gradient(90deg,#f59e0b,#fbbf24)" }} />
+              <h3 style={{ 
+                display: "flex", 
+                alignItems: "center", 
+                gap: "12px", 
+                margin: "0 0 16px 0", 
+                fontSize: "16px", 
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+              }}>
+                <div style={{ 
+                  width: "32px", 
+                  height: "32px", 
+                  borderRadius: "var(--radius-md)", 
+                  background: "rgba(245,158,11,0.1)", 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center"
+                }}>
+                  <Cpu size={16} color="#f59e0b" />
                 </div>
                 CPU 核心详情
               </h3>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))", gap: "8px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: "12px" }}>
                 {data.cpu.cores.map((c, i) => (
-                  <div key={i} style={{
-                    padding: "10px", borderRadius: "var(--radius-md)",
-                    background: c.usage > 70 ? "rgba(239,68,68,0.06)" : c.usage > 30 ? "rgba(245,158,11,0.06)" : "rgba(34,197,94,0.04)",
-                    textAlign: "center", border: `1px solid ${c.usage > 70 ? "rgba(239,68,68,0.12)" : c.usage > 30 ? "rgba(245,158,11,0.12)" : "var(--border-subtle)"}`,
-                    transition: "all var(--transition-fast)",
-                  }}>
-                    <div style={{ fontSize: "16px", fontWeight: 800, color: c.usage > 70 ? "#ef4444" : c.usage > 30 ? "#f59e0b" : "#22c55e", fontFamily: "var(--font-mono)" }}>
+                  <div 
+                    key={i} 
+                    style={{
+                      padding: "12px", 
+                      borderRadius: "var(--radius-md)",
+                      background: c.usage > 70 ? "rgba(239,68,68,0.06)" : c.usage > 30 ? "rgba(245,158,11,0.06)" : "rgba(34,197,94,0.04)",
+                      textAlign: "center", 
+                      border: `1px solid ${c.usage > 70 ? "rgba(239,68,68,0.12)" : c.usage > 30 ? "rgba(245,158,11,0.12)" : "var(--border-subtle)"}`,
+                      transition: "all 0.2s ease",
+                      boxShadow: 'var(--shadow-sm)',
+                    }}
+                    onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                      e.currentTarget.style.borderColor = c.usage > 70 ? "#ef4444" : c.usage > 30 ? "#f59e0b" : "#22c55e";
+                    }}
+                    onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                      e.currentTarget.style.borderColor = c.usage > 70 ? "rgba(239,68,68,0.12)" : c.usage > 30 ? "rgba(245,158,11,0.12)" : "var(--border-subtle)";
+                    }}
+                  >
+                    <div style={{ 
+                      fontSize: "18px", 
+                      fontWeight: 800, 
+                      color: c.usage > 70 ? "#ef4444" : c.usage > 30 ? "#f59e0b" : "#22c55e", 
+                      fontFamily: "var(--font-mono)"
+                    }}>
                       {Math.round(c.usage)}%
                     </div>
-                    <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px", fontWeight: 600 }}>Core #{i}</div>
+                    <div style={{ 
+                      fontSize: "11px", 
+                      color: "var(--text-muted)", 
+                      marginTop: "4px", 
+                      fontWeight: 600 
+                    }}>Core #{i}</div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="card card-elevated" style={{ position: "relative", overflow: "hidden" }}>
-              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg,#6366f140,#6366f110)" }} />
-              <h3 className="card-title">
-                <div style={{ width: "28px", height: "28px", borderRadius: "var(--radius-sm)", background: "var(--primary-light)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <HardDrive size={14} color="#6366f1" />
+            <div className="card card-elevated" style={{ 
+              padding: "20px",
+              boxShadow: 'var(--shadow-sm)',
+              position: "relative", 
+              overflow: "hidden",
+            }}>
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: "linear-gradient(90deg,#6366f1,#818cf8)" }} />
+              <h3 style={{ 
+                display: "flex", 
+                alignItems: "center", 
+                gap: "12px", 
+                margin: "0 0 16px 0", 
+                fontSize: "16px", 
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+              }}>
+                <div style={{ 
+                  width: "32px", 
+                  height: "32px", 
+                  borderRadius: "var(--radius-md)", 
+                  background: "var(--primary-light)", 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center"
+                }}>
+                  <HardDrive size={16} color="#6366f1" />
                 </div>
                 内存 & 磁盘
               </h3>
@@ -263,33 +409,57 @@ const SystemMonitor: React.FC = () => {
                   { l: "可用", v: data.memory.free_gb, mx: data.memory.total_gb, c: "#22c55e" },
                 ].map(item => (
                   <div key={item.l}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-                      <span style={{ fontSize: "13px", fontWeight: 500 }}>{item.l}</span>
-                      <span style={{ fontSize: "13px", fontWeight: 700, color: item.c, fontFamily: "var(--font-mono)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                      <span style={{ fontSize: "14px", fontWeight: 500, color: 'var(--text-primary)' }}>{item.l}</span>
+                      <span style={{ 
+                        fontSize: "14px", 
+                        fontWeight: 700, 
+                        color: item.c, 
+                        fontFamily: "var(--font-mono)"
+                      }}>
                         {item.v.toFixed(1)}GB / {item.mx.toFixed(1)}GB
                       </span>
                     </div>
-                    <div style={{ height: "8px", background: "var(--bg-tertiary)", borderRadius: "4px", overflow: "hidden" }}>
+                    <div style={{ 
+                      height: "8px", 
+                      background: "var(--bg-tertiary)", 
+                      borderRadius: "4px", 
+                      overflow: "hidden"
+                    }}>
                       <div style={{
-                        width: (item.v / item.mx * 100) + "%", height: "100%",
+                        width: (item.v / item.mx * 100) + "%", 
+                        height: "100%",
                         background: `linear-gradient(90deg,${item.c},${item.c}aa)`,
-                        borderRadius: "4px", transition: "width 0.6s ease-out",
+                        borderRadius: "4px", 
+                        transition: "width 0.6s ease-out",
                       }} />
                     </div>
                   </div>
                 ))}
-                <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--border-subtle)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-                    <span style={{ fontSize: "13px", fontWeight: 500 }}>磁盘</span>
-                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#22c55e", fontFamily: "var(--font-mono)" }}>
+                <div style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid var(--border-subtle)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                    <span style={{ fontSize: "14px", fontWeight: 500, color: 'var(--text-primary)' }}>磁盘</span>
+                    <span style={{ 
+                      fontSize: "14px", 
+                      fontWeight: 700, 
+                      color: "#22c55e", 
+                      fontFamily: "var(--font-mono)"
+                    }}>
                       {data.disk.used_gb.toFixed(0)}GB / {data.disk.total_gb.toFixed(0)}GB ({Math.round(data.disk.percent)}%)
                     </span>
                   </div>
-                  <div style={{ height: "8px", background: "var(--bg-tertiary)", borderRadius: "4px", overflow: "hidden" }}>
+                  <div style={{ 
+                    height: "8px", 
+                    background: "var(--bg-tertiary)", 
+                    borderRadius: "4px", 
+                    overflow: "hidden"
+                  }}>
                     <div style={{
-                      width: data.disk.percent + "%", height: "100%",
+                      width: data.disk.percent + "%", 
+                      height: "100%",
                       background: "linear-gradient(90deg,#22c55e,#4ade80)",
-                      borderRadius: "4px", transition: "width 0.6s ease-out",
+                      borderRadius: "4px", 
+                      transition: "width 0.6s ease-out",
                     }} />
                   </div>
                 </div>
@@ -298,36 +468,82 @@ const SystemMonitor: React.FC = () => {
           </div>
 
           {nets.length > 0 && (
-            <div className="card card-elevated" style={{ marginTop: "16px", position: "relative", overflow: "hidden" }}>
-              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg,#06b6d440,#06b6d410)" }} />
-              <h3 className="card-title">
-                <div style={{ width: "28px", height: "28px", borderRadius: "var(--radius-sm)", background: "var(--cyan-light)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Wifi size={14} color="#06b6d4" />
+            <div className="card card-elevated" style={{ 
+              marginTop: "24px", 
+              padding: "20px",
+              boxShadow: 'var(--shadow-sm)',
+              position: "relative", 
+              overflow: "hidden",
+            }}>
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: "linear-gradient(90deg,#06b6d4,#22d3ee)" }} />
+              <h3 style={{ 
+                display: "flex", 
+                alignItems: "center", 
+                gap: "12px", 
+                margin: "0 0 20px 0", 
+                fontSize: "16px", 
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+              }}>
+                <div style={{ 
+                  width: "32px", 
+                  height: "32px", 
+                  borderRadius: "var(--radius-md)", 
+                  background: "var(--cyan-light)", 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center"
+                }}>
+                  <Wifi size={16} color="#06b6d4" />
                 </div>
                 网络接口
               </h3>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "12px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: "16px" }}>
                 {nets.map((iface, i) => (
-                  <div key={i} style={{
-                    padding: "16px", borderRadius: "var(--radius-md)",
-                    border: `1px solid ${iface.is_up ? "rgba(34,197,94,0.2)" : "var(--border-subtle)"}`,
-                    background: iface.is_up ? "rgba(34,197,94,0.03)" : "var(--bg-tertiary)",
-                    animation: `staggerFadeIn 0.3s ease-out ${i * 60}ms both`,
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <Wifi size={18} color={iface.is_up ? "#22c55e" : "#94a3b8"} />
-                        <strong>{iface.name}</strong>
+                  <div 
+                    key={i} 
+                    style={{
+                      padding: "16px", 
+                      borderRadius: "var(--radius-md)",
+                      border: `1px solid ${iface.is_up ? "rgba(34,197,94,0.2)" : "var(--border-subtle)"}`,
+                      background: iface.is_up ? "rgba(34,197,94,0.03)" : "var(--bg-tertiary)",
+                      animation: `staggerFadeIn 0.3s ease-out ${i * 60}ms both`,
+                      transition: "all 0.2s ease",
+                      boxShadow: 'var(--shadow-sm)',
+                    }}
+                    onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                      e.currentTarget.style.borderColor = iface.is_up ? "#22c55e" : "var(--border-color)";
+                    }}
+                    onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                      e.currentTarget.style.borderColor = iface.is_up ? "rgba(34,197,94,0.2)" : "var(--border-subtle)";
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <Wifi size={20} color={iface.is_up ? "#22c55e" : "#94a3b8"} />
+                        <strong style={{ fontSize: "15px", color: 'var(--text-primary)' }}>{iface.name}</strong>
                       </div>
-                      <span className={`tag ${iface.is_up ? "status-running" : "status-stopped"}`} style={{ fontSize: "10.5px" }}>
+                      <span style={{
+                        padding: "4px 12px",
+                        borderRadius: "9999px",
+                        background: iface.is_up ? "#22c55e15" : "#ef444415",
+                        color: iface.is_up ? "#22c55e" : "#ef4444",
+                        fontSize: "12px",
+                        fontWeight: 500,
+                        border: `1px solid ${iface.is_up ? "#22c55e20" : "#ef444420"}`,
+                      }}>
                         {iface.is_up ? "在线" : "离线"}
                       </span>
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: "12.5px", fontFamily: "var(--font-mono)", color: "var(--text-secondary)" }}>
-                      <span><Globe size={11} style={{ marginRight: "5px", verticalAlign: "middle", opacity: 0.5 }} />IPv4: {iface.ipv4}</span>
-                      <span style={{ display: "flex", gap: "16px", marginTop: "4px" }}>
-                        <span><Upload size={11} style={{ verticalAlign: "middle", color: "#22c55e" }} /> ↑{formatBytes(iface.bytes_sent)}</span>
-                        <span><Download size={11} style={{ verticalAlign: "middle", color: "#6366f1" }} /> ↓{formatBytes(iface.bytes_recv)}</span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px", fontFamily: "var(--font-mono)", color: "var(--text-secondary)" }}>
+                      <span><Globe size={14} style={{ marginRight: "8px", verticalAlign: "middle", opacity: 0.6 }} />IPv4: {iface.ipv4}</span>
+                      <span style={{ display: "flex", gap: "20px", marginTop: "8px" }}>
+                        <span><Upload size={14} style={{ verticalAlign: "middle", color: "#22c55e", marginRight: "4px" }} /> ↑{formatBytes(iface.bytes_sent)}</span>
+                        <span><Download size={14} style={{ verticalAlign: "middle", color: "#6366f1", marginRight: "4px" }} /> ↓{formatBytes(iface.bytes_recv)}</span>
                       </span>
                     </div>
                   </div>
@@ -340,60 +556,159 @@ const SystemMonitor: React.FC = () => {
 
       {/* ═══ PROCESSES ═══ */}
       {tab === "processes" && (
-        <div className="card card-elevated" style={{ position: "relative", overflow: "hidden" }}>
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg,#f59e0b40,#f59e0b10)" }} />
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-            <h3 className="card-title">
-              <div style={{ width: "28px", height: "28px", borderRadius: "var(--radius-sm)", background: "rgba(245,158,11,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Cpu size={14} color="#f59e0b" />
+        <div className="card card-elevated" style={{ 
+          padding: "20px",
+          boxShadow: 'var(--shadow-sm)',
+          position: "relative", 
+          overflow: "hidden",
+        }}>
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: "linear-gradient(90deg,#f59e0b,#fbbf24)" }} />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+            <h3 style={{ 
+              display: "flex", 
+              alignItems: "center", 
+              gap: "12px", 
+              margin: 0, 
+              fontSize: "16px", 
+              fontWeight: 600,
+              color: 'var(--text-primary)',
+            }}>
+              <div style={{ 
+                width: "32px", 
+                height: "32px", 
+                borderRadius: "var(--radius-md)", 
+                background: "rgba(245,158,11,0.1)", 
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "center"
+              }}>
+                <Cpu size={16} color="#f59e0b" />
               </div>
               进程列表
-              <span style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: 400, marginLeft: "4px" }}>({procs.length})</span>
+              <span style={{ 
+                fontSize: "12px", 
+                color: "var(--text-muted)", 
+                fontWeight: 400, 
+                marginLeft: "8px"
+              }}>({procs.length})</span>
             </h3>
-            <button className="btn btn-ghost btn-sm" onClick={() => sdk.listProcesses().then(setProcs).catch(() => {})}>
-              <RefreshCw size={14} />
+            <button 
+              className="btn btn-ghost btn-sm"
+              onClick={() => sdk.listProcesses().then(setProcs).catch(() => {})}
+              style={{
+                transition: "all 0.2s ease",
+                borderRadius: "var(--radius-md)",
+              }}
+            >
+              <RefreshCw size={16} />
+              <span style={{ marginLeft: "6px" }}>刷新</span>
             </button>
           </div>
-          <div style={{ overflowX: "auto" }}>
+          <div style={{ overflowX: "auto", borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
               <thead>
-                <tr style={{ borderBottom: "2px solid var(--border-subtle)" }}>
+                <tr style={{ background: "var(--bg-secondary)", borderBottom: "1px solid var(--border-subtle)" }}>
                   {["PID", "进程名", "状态", "CPU%", "内存(MB)", "命令", "操作"].map(h => (
                     <th key={h} style={{
-                      padding: "10px 12px", textAlign: "left", fontWeight: 700,
-                      color: "var(--text-muted)", fontSize: "11px", textTransform: "uppercase",
-                      letterSpacing: "0.04em", whiteSpace: "nowrap",
+                      padding: "12px 16px", 
+                      textAlign: "left", 
+                      fontWeight: 600,
+                      color: "var(--text-secondary)", 
+                      fontSize: "12px", 
+                      textTransform: "uppercase",
+                      letterSpacing: "0.04em", 
+                      whiteSpace: "nowrap",
                     }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {procs.length === 0 ? (
-                  <tr><td colSpan={7} style={{ textAlign: "center", padding: 48, color: "var(--text-muted)" }}>暂无进程数据</td></tr>
+                  <tr>
+                    <td colSpan={7} style={{ 
+                      textAlign: "center", 
+                      padding: "60px 20px", 
+                      color: "var(--text-muted)",
+                      background: "var(--bg-tertiary)",
+                    }}>
+                      <div style={{ marginBottom: "8px" }}>暂无进程数据</div>
+                      <button 
+                        className="btn btn-primary btn-sm"
+                        onClick={() => sdk.listProcesses().then(setProcs).catch(() => {})}
+                      >
+                        <RefreshCw size={14} />
+                        <span style={{ marginLeft: "6px" }}>刷新进程</span>
+                      </button>
+                    </td>
+                  </tr>
                 ) : procs.map((p, i) => (
-                  <tr key={p.pid} style={{
-                    borderBottom: "1px solid var(--border-subtle)",
-                    animation: `staggerFadeIn 0.25s ease-out ${i * 30}ms both`,
-                    transition: "background var(--transition-fast)",
-                  }}
+                  <tr 
+                    key={p.pid} 
+                    style={{
+                      borderBottom: "1px solid var(--border-subtle)",
+                      animation: `staggerFadeIn 0.25s ease-out ${i * 30}ms both`,
+                      transition: "all 0.2s ease",
+                    }}
                     onMouseEnter={e => e.currentTarget.style.background = "var(--bg-tertiary)"}
                     onMouseLeave={e => e.currentTarget.style.background = ""}
                   >
-                    <td style={{ padding: "10px 12px", fontFamily: "var(--font-mono)", color: "var(--primary-color)", whiteSpace: "nowrap", fontWeight: 600 }}>{p.pid}</td>
-                    <td style={{ padding: "10px 12px", fontWeight: 500 }}>{p.name}</td>
-                    <td style={{ padding: "10px 12px" }}>
-                      <span className={`tag ${p.status === "running" ? "status-running" : ""}`} style={{ fontSize: "10px" }}>{p.status}</span>
+                    <td style={{ 
+                      padding: "12px 16px", 
+                      fontFamily: "var(--font-mono)", 
+                      color: "var(--primary-color)", 
+                      whiteSpace: "nowrap", 
+                      fontWeight: 600 
+                    }}>{p.pid}</td>
+                    <td style={{ 
+                      padding: "12px 16px", 
+                      fontWeight: 500,
+                      color: 'var(--text-primary)',
+                    }}>{p.name}</td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <span style={{
+                        padding: "4px 12px",
+                        borderRadius: "9999px",
+                        background: p.status === "running" ? "#22c55e15" : "#94a3b815",
+                        color: p.status === "running" ? "#22c55e" : "#94a3b8",
+                        fontSize: "12px",
+                        fontWeight: 500,
+                        border: `1px solid ${p.status === "running" ? "#22c55e20" : "#94a3b820"}`,
+                      }}>{p.status}</span>
                     </td>
                     <td style={{
-                      padding: "10px 12px", fontFamily: "var(--font-mono)",
-                      color: (p.cpu_percent || 0) > 50 ? "#ef4444" : (p.cpu_percent || 0) > 20 ? "#f59e0b" : "inherit",
-                      fontWeight: (p.cpu_percent || 0) > 20 ? 700 : 400,
+                      padding: "12px 16px", 
+                      fontFamily: "var(--font-mono)",
+                      color: (p.cpu_percent || 0) > 50 ? "#ef4444" : (p.cpu_percent || 0) > 20 ? "#f59e0b" : "var(--text-primary)",
+                      fontWeight: (p.cpu_percent || 0) > 20 ? 600 : 400,
                     }}>{(p.cpu_percent || 0).toFixed(1)}</td>
-                    <td style={{ padding: "10px 12px", fontFamily: "var(--font-mono)" }}>{(p.memory_mb || 0).toFixed(0)}</td>
-                    <td style={{ padding: "10px 12px", maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-muted)", fontSize: "12px" }}>{p.command}</td>
-                    <td style={{ padding: "10px 12px" }}>
-                      <button className="btn btn-danger btn-sm" onClick={() => killProc(p.pid)} title="终止进程" style={{ padding: "3px 8px", fontSize: "11px" }}>
-                        <XCircle size={12} />
+                    <td style={{ 
+                      padding: "12px 16px", 
+                      fontFamily: "var(--font-mono)",
+                      color: 'var(--text-primary)',
+                    }}>{(p.memory_mb || 0).toFixed(0)}</td>
+                    <td style={{ 
+                      padding: "12px 16px", 
+                      maxWidth: 300, 
+                      overflow: "hidden", 
+                      textOverflow: "ellipsis", 
+                      whiteSpace: "nowrap", 
+                      color: "var(--text-muted)", 
+                      fontSize: "12px"
+                    }}>{p.command}</td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <button 
+                        className="btn btn-danger btn-sm"
+                        onClick={() => killProc(p.pid)}
+                        title="终止进程"
+                        style={{
+                          padding: "6px 12px", 
+                          fontSize: "12px",
+                          transition: "all 0.2s ease",
+                          borderRadius: "var(--radius-md)",
+                        }}
+                      >
+                        <XCircle size={14} />
+                        <span style={{ marginLeft: "4px" }}>终止</span>
                       </button>
                     </td>
                   </tr>

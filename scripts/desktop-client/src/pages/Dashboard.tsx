@@ -2,9 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   Brain, Activity, Layers, Zap, Shield, Network,
   RefreshCw, Eye, Database, Target, Workflow,
-  Radio, Bot, Sparkles, Wrench, ArrowRight,
-  Clock, TrendingUp, CheckCircle2, AlertTriangle,
-  Download, Pause, Play, Settings2, BarChart3
+  Bot, Wrench, Download, Terminal, Sparkles
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import sdk from "../services/agentos-sdk";
@@ -14,16 +12,16 @@ import { Card } from "../components/ui/Card";
 import { PageLayout } from "../components/PageLayout";
 
 const PHASES = [
-  { key: "perception", label: "感知", icon: Eye, color: "#06b6d4", gradient: "linear-gradient(135deg,#06b6d4,#22d3ee)", desc: "意图理解与上下文分析" },
-  { key: "planning", label: "规划", icon: Brain, color: "#8b5cf6", gradient: "linear-gradient(135deg,#8b5cf6,#a78bfa)", desc: "DAG任务分解与策略生成" },
-  { key: "action", label: "行动", icon: Target, color: "#10b981", gradient: "linear-gradient(135deg,#10b981,#34d399)", desc: "执行调度与结果反馈" },
+  { key: "perception", label: "感知", icon: Eye, color: "var(--info-color)", desc: "意图理解与上下文分析" },
+  { key: "planning", label: "规划", icon: Brain, color: "var(--primary-color)", desc: "DAG任务分解与策略生成" },
+  { key: "action", label: "行动", icon: Target, color: "var(--success-color)", desc: "执行调度与结果反馈" },
 ];
 
 const MEM_LAYERS = [
-  { key: "L1", name: "L1 原始卷", color: "#6366f1", grad: "linear-gradient(135deg,#6366f1,#818cf8)", entries: 1250, max: 1500, icon: Database, tech: ["Raw Storage", "JSON/Binary"] },
-  { key: "L2", name: "L2 特征层", color: "#06b6d4", grad: "linear-gradient(135deg,#06b6d4,#22d3ee)", entries: 890, max: 1200, icon: Zap, tech: ["FAISS Vector", "768-dim"] },
-  { key: "L3", name: "L3 结构层", color: "#f59e0b", grad: "linear-gradient(135deg,#f59e0b,#fbbf24)", entries: 456, max: 600, icon: Network, tech: ["Knowledge Graph", "RDF"] },
-  { key: "L4", name: "L4 模式层", color: "#10b981", grad: "linear-gradient(135deg,#10b981,#34d399)", entries: 128, max: 200, icon: Sparkles, tech: ["Persistent Homology", "Stable Rules"] },
+  { key: "L1", name: "L1 原始卷", color: "var(--primary-color)", entries: 1250, max: 1500, icon: Database, tech: ["Raw Storage", "JSON/Binary"] },
+  { key: "L2", name: "L2 特征层", color: "var(--info-color)", entries: 890, max: 1200, icon: Zap, tech: ["FAISS Vector", "768-dim"] },
+  { key: "L3", name: "L3 结构层", color: "var(--warning-color)", entries: 456, max: 600, icon: Network, tech: ["Knowledge Graph", "RDF"] },
+  { key: "L4", name: "L4 模式层", color: "var(--success-color)", entries: 128, max: 200, icon: Brain, tech: ["Persistent Homology", "Stable Rules"] },
 ];
 
 const SERVICES = [
@@ -56,25 +54,52 @@ const SERVICES = [
 function DualPanel() {
   return (
     <Card>
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
-        <Brain size={18} color="#f59e0b" />
-        <span style={{ fontSize: "15px", fontWeight: 600 }}>双系统思考</span>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-        {[
-          { name: "快思考 S1", desc: "直觉响应 · 模式匹配", latency: "~23ms", color: "#22c55e" },
-          { name: "慢推理 S2", desc: "深度分析 · 逻辑推演", latency: "~1.2s", color: "#8b5cf6" },
-        ].map(sys => (
-          <div key={sys.name} style={{
-            padding: "16px",
-            borderLeft: `3px solid ${sys.color}`,
-            background: "var(--bg-secondary)",
+      <div style={{ padding: '20px' }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+          <div style={{
+            width: "32px",
+            height: "32px",
+            borderRadius: "8px",
+            background: "var(--warning-light)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}>
-            <div style={{ fontSize: "14px", fontWeight: 600, color: sys.color, marginBottom: "4px" }}>{sys.name}</div>
-            <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px" }}>{sys.desc}</div>
-            <div style={{ fontSize: "12px", color: sys.color, fontWeight: 600 }}>{sys.latency}</div>
+            <Brain size={18} color="var(--warning-color)" />
           </div>
-        ))}
+          <span style={{ fontSize: "15px", fontWeight: 500, color: 'var(--text-primary)' }}>双系统思考</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+          {
+            [
+              { name: "快思考 S1", desc: "直觉响应 · 模式匹配", latency: "~23ms", color: "var(--success-color)" },
+              { name: "慢推理 S2", desc: "深度分析 · 逻辑推演", latency: "~1.2s", color: "var(--primary-color)" },
+            ].map(sys => (
+              <div
+                key={sys.name}
+                style={{
+                  padding: "16px",
+                  borderLeft: `3px solid ${sys.color}`,
+                  background: "var(--bg-secondary)",
+                  borderRadius: "8px",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
+                  e.currentTarget.style.background = 'var(--bg-tertiary)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
+                  e.currentTarget.style.background = 'var(--bg-secondary)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                <div style={{ fontSize: "14px", fontWeight: 500, color: sys.color, marginBottom: "8px" }}>{sys.name}</div>
+                <div style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "12px" }}>{sys.desc}</div>
+                <div style={{ fontSize: "16px", color: sys.color, fontWeight: 500 }}>{sys.latency}</div>
+              </div>
+            ))
+          }
+        </div>
       </div>
     </Card>
   );
@@ -90,29 +115,55 @@ function SecShield() {
   ];
   return (
     <Card>
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
-        <Shield size={18} color="#ef4444" />
-        <span style={{ fontSize: "15px", fontWeight: 600 }}>安全状态</span>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
-        {shields.map(s => (
-          <div key={s.name} style={{
-            padding: "12px",
-            borderLeft: `3px solid ${s.c}`,
-            background: "var(--bg-secondary)",
+      <div style={{ padding: '20px' }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+          <div style={{
+            width: "32px",
+            height: "32px",
+            borderRadius: "8px",
+            background: "var(--error-light)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}>
-            <div style={{ fontSize: "13px", fontWeight: 600, color: s.c, marginBottom: "2px" }}>{s.name}</div>
-            <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>{s.sub}</div>
+            <Shield size={18} color="var(--error-color)" />
           </div>
-        ))}
-      </div>
-      <div style={{
-        padding: "12px",
-        background: "var(--bg-secondary)",
-        borderLeft: "3px solid #10b981",
-      }}>
-        <div style={{ fontSize: "13px", fontWeight: 600, color: "#10b981", marginBottom: "4px" }}>安全罩已激活 — 零信任架构运行正常</div>
-        <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>所有防护层在线，实时监控中</div>
+          <span style={{ fontSize: "15px", fontWeight: 500, color: 'var(--text-primary)' }}>安全状态</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+          {shields.map(s => (
+            <div
+              key={s.name}
+              style={{
+                padding: "16px",
+                borderLeft: `3px solid ${s.c}`,
+                background: "var(--bg-secondary)",
+                borderRadius: "8px",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
+                e.currentTarget.style.background = 'var(--bg-tertiary)';
+                e.currentTarget.style.transform = 'translateY(-1px)';
+              }}
+              onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
+                e.currentTarget.style.background = 'var(--bg-secondary)';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+            >
+              <div style={{ fontSize: "13px", fontWeight: 500, color: s.c, marginBottom: "4px" }}>{s.emoji} {s.name}</div>
+              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>{s.sub}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{
+          padding: "16px",
+          background: "var(--bg-secondary)",
+          borderLeft: "3px solid var(--success-color)",
+          borderRadius: "8px",
+        }}>
+          <div style={{ fontSize: "14px", fontWeight: 500, color: "var(--success-color)", marginBottom: "6px" }}>安全罩已激活 — 零信任架构运行正常</div>
+          <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>所有防护层在线，实时监控中</div>
+        </div>
       </div>
     </Card>
   );
@@ -123,39 +174,68 @@ function SvcGrid() {
   const live = SERVICES.filter(s => s.up).length;
   return (
     <Card>
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
-        <Network size={18} color="#3b82f6" />
-        <div>
-          <span style={{ fontSize: "15px", fontWeight: 600 }}>守护服务</span>
-          <span style={{ fontSize: "11px", color: "var(--text-muted)", marginLeft: "8px" }}>{live}/6 服务在线</span>
+      <div style={{ padding: '20px' }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+          <div style={{
+            width: "32px",
+            height: "32px",
+            borderRadius: "8px",
+            background: "var(--primary-light)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}>
+            <Network size={18} color="var(--primary-color)" />
+          </div>
+          <div>
+            <span style={{ fontSize: "15px", fontWeight: 500, color: 'var(--text-primary)' }}>守护服务</span>
+            <span style={{ fontSize: "12px", color: "var(--text-muted)", marginLeft: "12px" }}>{live}/6 服务在线</span>
+          </div>
         </div>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
-        {SERVICES.map(svc => {
-          const up = svc.up;
-          return (
-            <div key={svc.name} style={{
-              padding: "12px",
-              borderLeft: up ? "3px solid #22c55e" : "3px solid var(--border-color)",
-              background: "var(--bg-secondary)",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                <div style={{
-                  width: "8px", height: "8px", borderRadius: "50%",
-                  background: up ? "#22c55e" : "var(--border-color)",
-                }} />
-                <span style={{ fontSize: "13px", fontWeight: 600 }}>{svc.label}</span>
-              </div>
-              {up && (
-                <div style={{ display: "flex", gap: "8px", fontSize: "11px", color: "var(--text-muted)" }}>
-                  <span>{svc.hrs}h</span>
-                  <span>CPU {svc.cpu}%</span>
-                  <span>{svc.mem}MB</span>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px" }}>
+          {SERVICES.map(svc => {
+            const up = svc.up;
+            return (
+              <div
+                key={svc.name}
+                style={{
+                  padding: "16px",
+                  borderLeft: up ? "3px solid var(--success-color)" : "3px solid var(--border-color)",
+                  background: "var(--bg-secondary)",
+                  borderRadius: "8px",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
+                  e.currentTarget.style.background = 'var(--bg-tertiary)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
+                  e.currentTarget.style.background = 'var(--bg-secondary)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+                  <div style={{
+                    width: "8px",
+                    height: "8px",
+                    borderRadius: "50%",
+                    background: up ? "var(--success-color)" : "var(--border-color)",
+                    boxShadow: up ? '0 0 0 2px var(--success-light)' : 'none',
+                    transition: "all 0.2s ease",
+                  }} />
+                  <span style={{ fontSize: "14px", fontWeight: 500, color: 'var(--text-primary)' }}>{svc.label}</span>
                 </div>
-              )}
-            </div>
-          );
-        })}
+                {up && (
+                  <div style={{ display: "flex", gap: "12px", fontSize: "12px", color: "var(--text-muted)" }}>
+                    <span>{svc.hrs}h</span>
+                    <span>CPU {svc.cpu}%</span>
+                    <span>{svc.mem}MB</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </Card>
   );
@@ -164,34 +244,81 @@ function SvcGrid() {
 /* ─── Activity Timeline ─── */
 function TimeLine() {
   const events = [
-    { time: "刚刚", text: "认知循环完成一轮 感知→规划→行动 全流程", type: "cycle", c: "#8b5cf6", icon: Workflow },
-    { time: "2m前", text: "memory_store(): 写入 12 条新记忆到 L2 特征层向量索引", type: "memory", c: "#06b6d4", icon: Database },
-    { time: "5m前", text: "tool_d.read_file() 执行完成，耗时 23ms，返回 1.2KB 数据", type: "tool", c: "#10b981", icon: Wrench },
-    { time: "8m前", text: "Cupolas 输入净化模块拦截了 1 个异常请求（SQL注入尝试）", type: "sec", c: "#ef4444", icon: Shield },
-    { time: "12m前", text: "System 2 深度推理：对用户问题进行了多角度逻辑分析", type: "think", c: "#f59e0b", icon: Brain },
+    { time: "刚刚", text: "认知循环完成一轮 感知→规划→行动 全流程", type: "cycle", c: "var(--primary-color)", icon: Workflow },
+    { time: "2m前", text: "memory_store(): 写入 12 条新记忆到 L2 特征层向量索引", type: "memory", c: "var(--info-color)", icon: Database },
+    { time: "5m前", text: "tool_d.read_file() 执行完成，耗时 23ms，返回 1.2KB 数据", type: "tool", c: "var(--success-color)", icon: Wrench },
+    { time: "8m前", text: "Cupolas 输入净化模块拦截了 1 个异常请求（SQL注入尝试）", type: "sec", c: "var(--error-color)", icon: Shield },
+    { time: "12m前", text: "System 2 深度推理：对用户问题进行了多角度逻辑分析", type: "think", c: "var(--warning-color)", icon: Brain },
   ];
   return (
     <Card>
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
-        <Activity size={18} color="#ec4899" />
-        <span style={{ fontSize: "15px", fontWeight: 600 }}>实时流</span>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-        {events.map((ev, i) => {
-          const EvIcon = ev.icon;
-          return (
-            <div key={i} style={{ display: "flex", gap: "12px", padding: "12px 0", borderBottom: "1px solid var(--border-subtle)" }}>
-              <EvIcon size={16} color={ev.c} />
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                  <span style={{ fontSize: "12px", color: ev.c, fontWeight: 600 }}>{ev.time}</span>
-                  <span style={{ fontSize: "10px", padding: "2px 6px", background: `${ev.c}12`, color: ev.c, borderRadius: "4px" }}>{ev.type}</span>
+      <div style={{ padding: '20px' }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+          <div style={{
+            width: "32px",
+            height: "32px",
+            borderRadius: "8px",
+            background: "var(--primary-light)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}>
+            <Activity size={18} color="var(--primary-color)" />
+          </div>
+          <span style={{ fontSize: "15px", fontWeight: 500, color: 'var(--text-primary)' }}>实时流</span>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          {events.map((ev, i) => {
+            const EvIcon = ev.icon;
+            return (
+              <div
+                key={i}
+                style={{
+                  display: "flex",
+                  gap: "16px",
+                  padding: "12px 0",
+                  borderBottom: "1px solid var(--border-subtle)",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
+                  e.currentTarget.style.background = 'var(--bg-tertiary)';
+                }}
+                onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
+                  e.currentTarget.style.background = 'transparent';
+                }}
+              >
+                <div style={{
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "8px",
+                  background: `${ev.c}15`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}>
+                  <EvIcon size={16} color={ev.c} />
                 </div>
-                <div style={{ fontSize: "13px", color: "var(--text-primary)" }}>{ev.text}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "6px" }}>
+                    <span style={{ fontSize: "12px", color: ev.c, fontWeight: 500 }}>{ev.time}</span>
+                    <span style={{
+                      fontSize: "11px",
+                      padding: "2px 8px",
+                      background: `${ev.c}12`,
+                      color: ev.c,
+                      borderRadius: "4px",
+                      fontWeight: 500,
+                    }}>
+                      {ev.type}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "14px", color: "var(--text-primary)", lineHeight: 1.4 }}>{ev.text}</div>
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </Card>
   );
@@ -200,41 +327,57 @@ function TimeLine() {
 /* ─── Quick Navigation Cards ─── */
 function QNav({ nav }: { nav: (p: string) => void }) {
   const items = [
-    { Ic: Target, label: "任务编排", path: "/tasks", c: "#6366f1" },
-    { Ic: Eye, label: "可观测性", path: "/logs", c: "#06b6d4" },
-    { Ic: Database, label: "记忆管理", path: "/memory-evolution", c: "#8b5cf6" },
-    { Ic: Wrench, label: "工具管理", path: "/tools", c: "#10b981" },
+    { Ic: Target, label: "任务编排", path: "/tasks", c: "var(--primary-color)" },
+    { Ic: Eye, label: "可观测性", path: "/logs", c: "var(--info-color)" },
+    { Ic: Database, label: "记忆管理", path: "/memory-evolution", c: "var(--warning-color)" },
+    { Ic: Wrench, label: "工具管理", path: "/tools", c: "var(--success-color)" },
   ];
   return (
     <Card>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px" }}>
-        {items.map(it => {
-          const Icon = it.Ic;
-          return (
-            <div key={it.path}
-              onClick={() => nav(it.path)}
-              style={{
-                padding: "16px",
-                borderLeft: `3px solid ${it.c}`,
-                background: "var(--bg-secondary)",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = "var(--bg-tertiary)";
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = "var(--bg-secondary)";
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-                <Icon size={18} color={it.c} />
-                <span style={{ fontSize: "14px", fontWeight: 600 }}>{it.label}</span>
+      <div style={{ padding: '20px' }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px" }}>
+          {items.map(it => {
+            const Icon = it.Ic;
+            return (
+              <div
+                key={it.path}
+                onClick={() => nav(it.path)}
+                style={{
+                  padding: "16px",
+                  borderLeft: `3px solid ${it.c}`,
+                  background: "var(--bg-secondary)",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  borderRadius: "8px",
+                }}
+                onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
+                  e.currentTarget.style.background = "var(--bg-tertiary)";
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
+                  e.currentTarget.style.background = "var(--bg-secondary)";
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+                  <div style={{
+                    width: "24px",
+                    height: "24px",
+                    borderRadius: "8px",
+                    background: `${it.c}15`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}>
+                    <Icon size={14} color={it.c} />
+                  </div>
+                  <span style={{ fontSize: "14px", fontWeight: 500, color: 'var(--text-primary)' }}>{it.label}</span>
+                </div>
+                <div style={{ fontSize: "12px", color: it.c, fontWeight: 500 }}>进入模块</div>
               </div>
-              <div style={{ fontSize: "11px", color: it.c }}>进入模块</div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </Card>
   );
@@ -425,10 +568,19 @@ export default function Dashboard() {
       subtitle="工业级 AI 智能体 · 实时状态监控"
     >
       {/* Header Actions */}
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "16px",
+        marginBottom: "24px",
+        flexWrap: 'wrap',
+      }}>
         {/* Connection Status Indicator */}
         <div style={{
-          display: "flex", alignItems: "center", gap: "6px", padding: "6px 14px",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          padding: "8px 16px",
           borderRadius: "9999px",
           background: connectionStatus === 'connected' ? "var(--bg-secondary)" : "var(--bg-tertiary)",
           border: `1px solid ${
@@ -436,14 +588,20 @@ export default function Dashboard() {
             : connectionStatus === 'disconnected' ? "#ef444420"
             : "var(--border-subtle)"
           }`,
+          transition: 'all 0.2s ease',
         }}>
           <div style={{
-            width: "6px", height: "6px", borderRadius: "50%",
+            width: "8px",
+            height: "8px",
+            borderRadius: "50%",
             background: connectionStatus === 'connected' ? "#10b981"
               : connectionStatus === 'disconnected' ? "#ef4444"
               : "#f59e0b",
+            boxShadow: connectionStatus === 'connected' ? '0 0 0 2px rgba(16, 185, 129, 0.2)' : 'none',
           }} />
-          <span style={{ fontSize: "12px",
+          <span style={{
+            fontSize: "12px",
+            fontWeight: 500,
             color: connectionStatus === 'connected' ? "#10b981"
               : connectionStatus === 'disconnected' ? "#ef4444"
               : "#f59e0b"
@@ -455,30 +613,58 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div style={{ display: "flex", gap: "6px" }}>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           <Button
-            variant="ghost"
+            variant="primary"
             size="sm"
             onClick={() => navigate('/agents')}
             title="管理智能体"
+            style={{
+              transition: 'all 0.2s ease',
+              borderRadius: '6px',
+            }}
           >
             <Bot size={14} />
+            智能体
           </Button>
           <Button
-            variant="ghost"
+            variant="secondary"
             size="sm"
             onClick={() => navigate('/tasks')}
             title="任务队列"
+            style={{
+              transition: 'all 0.2s ease',
+              borderRadius: '6px',
+            }}
           >
             <Workflow size={14} />
+            任务
           </Button>
           <Button
-            variant="ghost"
+            variant="secondary"
+            size="sm"
+            onClick={() => navigate('/ai-chat')}
+            title="AI 助手"
+            style={{
+              transition: 'all 0.2s ease',
+              borderRadius: '6px',
+            }}
+          >
+            <Brain size={14} />
+            AI 助手
+          </Button>
+          <Button
+            variant="secondary"
             size="sm"
             onClick={() => navigate('/terminal')}
             title="终端"
+            style={{
+              transition: 'all 0.2s ease',
+              borderRadius: '6px',
+            }}
           >
-            <Radio size={14} />
+            <Terminal size={14} />
+            终端
           </Button>
         </div>
 
@@ -488,14 +674,23 @@ export default function Dashboard() {
           onClick={fetchDashboardData}
           disabled={refreshing}
           title="刷新"
+          style={{
+            transition: 'all 0.2s ease',
+            borderRadius: '6px',
+          }}
         >
           <RefreshCw size={14} className={refreshing ? "spin" : ""} />
+          刷新
         </Button>
 
         <div style={{
-          display: 'flex', alignItems: 'center', gap: '6px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
           borderLeft: '1px solid var(--border-subtle)',
-          paddingLeft: '12px', marginLeft: '4px'
+          paddingLeft: '16px',
+          marginLeft: '8px',
+          flexShrink: 0,
         }}>
           <Button
             variant="ghost"
@@ -515,92 +710,201 @@ export default function Dashboard() {
               }
             }}
             title="导出CSV"
+            style={{
+              transition: 'all 0.2s ease',
+              borderRadius: '6px',
+            }}
           >
-            <Download size={12} />
+            <Download size={14} />
+            导出
           </Button>
-          <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+          <span style={{
+            fontSize: "12px",
+            color: "var(--text-muted)",
+            fontWeight: 500,
+          }}>
             {lastUpdate.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}
           </span>
         </div>
       </div>
 
       {/* Resource Gauges */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginBottom: "20px" }}>
-        {[
-          { v: cpuVal, u: "%", l: "CPU", s: systemData ? `${systemData.processes}核心` : "8核/16线程", c: "#6366f1" },
-          { v: memVal, u: "%", l: "内存", s: systemData ? `${systemData.memory}% 已用` : "4.2 / 16 GB", c: "#06b6d4" },
-          { v: diskVal, u: "%", l: "磁盘", s: systemData ? `${systemData.disk}% 已用` : "128 / 512 GB", c: "#f59e0b" },
-          { v: procVal, u: "%", l: "进程", s: systemData ? `${systemData.servicesUp}/${systemData.servicesTotal} 在线` : "5/6 在线", c: "#10b981" },
-        ].map((m) => (
-          <Card key={m.l} style={{
-            borderLeft: `3px solid ${m.c}`,
-          }}>
-            <div style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "8px" }}>{m.l}</div>
-            <div style={{ fontSize: "24px", fontWeight: 600, color: m.c, marginBottom: "4px" }}>{m.v}{m.u}</div>
-            <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>{m.s}</div>
-          </Card>
-        ))}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "20px", marginBottom: "24px" }}>
+        {
+          [
+            { v: cpuVal, u: "%", l: "CPU", s: systemData ? `${systemData.processes}核心` : "8核/16线程", c: "var(--primary-color)" },
+            { v: memVal, u: "%", l: "内存", s: systemData ? `${systemData.memory}% 已用` : "4.2 / 16 GB", c: "var(--info-color)" },
+            { v: diskVal, u: "%", l: "磁盘", s: systemData ? `${systemData.disk}% 已用` : "128 / 512 GB", c: "var(--warning-color)" },
+            { v: procVal, u: "%", l: "进程", s: systemData ? `${systemData.servicesUp}/${systemData.servicesTotal} 在线` : "5/6 在线", c: "var(--success-color)" },
+          ].map((m) => (
+            <Card
+              key={m.l}
+              style={{
+                borderLeft: `3px solid ${m.c}`,
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
+                e.currentTarget.style.transform = 'translateY(-1px)';
+              }}
+              onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+            >
+              <div style={{ padding: '16px' }}>
+                <div style={{
+                  fontSize: "12px",
+                  color: "var(--text-muted)",
+                  marginBottom: "12px",
+                  fontWeight: 500,
+                }}>
+                  {m.l}
+                </div>
+                <div style={{
+                  fontSize: "28px",
+                  fontWeight: 500,
+                  color: m.c,
+                  marginBottom: "8px",
+                  lineHeight: 1,
+                }}>
+                  {m.v}{m.u}
+                </div>
+                <div style={{
+                  fontSize: "12px",
+                  color: "var(--text-muted)",
+                  fontWeight: 500,
+                }}>
+                  {m.s}
+                </div>
+              </div>
+            </Card>
+          ))
+        }
       </div>
 
       {/* Cognitive Pipeline */}
-      <Card style={{ marginBottom: "20px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
-          <Workflow size={18} color="#8b5cf6" />
-          <span style={{ fontSize: "15px", fontWeight: 600 }}>认知处理流程</span>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
-          {PHASES.map((p) => {
-            const Icon = p.icon;
-            return (
-              <div key={p.key} style={{ padding: "12px", borderLeft: `3px solid ${p.color}`, background: "var(--bg-secondary)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                  <Icon size={16} color={p.color} />
-                  <span style={{ fontSize: "13px", fontWeight: 600, color: p.color }}>{p.label}</span>
+      <Card style={{ marginBottom: "24px" }}>
+        <div style={{ padding: '20px' }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+            <div style={{
+              width: "32px",
+              height: "32px",
+              borderRadius: "8px",
+              background: "var(--primary-light)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}>
+              <Workflow size={18} color="var(--primary-color)" />
+            </div>
+            <span style={{ fontSize: "15px", fontWeight: 500, color: 'var(--text-primary)' }}>认知处理流程</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px" }}>
+            {PHASES.map((p) => {
+              const Icon = p.icon;
+              return (
+                <div
+                  key={p.key}
+                  style={{
+                    padding: "16px",
+                    borderLeft: `3px solid ${p.color}`,
+                    background: "var(--bg-secondary)",
+                    borderRadius: "8px",
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'var(--bg-tertiary)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'var(--bg-secondary)';
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+                    <div style={{
+                      width: "28px",
+                      height: "28px",
+                      borderRadius: "8px",
+                      background: `${p.color}15`,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}>
+                      <Icon size={16} color={p.color} />
+                    </div>
+                    <span style={{ fontSize: "14px", fontWeight: 500, color: p.color }}>{p.label}</span>
+                  </div>
+                  <div style={{ fontSize: "12px", color: "var(--text-muted)", lineHeight: 1.4 }}>{p.desc}</div>
                 </div>
-                <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>{p.desc}</div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </Card>
 
       {/* Main Grid: Memory + Dual System */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "24px" }}>
         <Card>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
-            <Layers size={18} color="#8b5cf6" />
-            <span style={{ fontSize: "15px", fontWeight: 600 }}>记忆体系</span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            {MEM_LAYERS.map((layer) => {
-              const Ic = layer.icon;
-              const pct = Math.round((layer.entries / layer.max) * 100);
-              return (
-                <div key={layer.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border-subtle)" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <Ic size={16} color={layer.color} />
-                    <span style={{ fontSize: "13px" }}>{layer.name}</span>
+          <div style={{ padding: '20px' }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+              <div style={{
+                width: "32px",
+                height: "32px",
+                borderRadius: "8px",
+                background: "var(--primary-light)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}>
+                <Layers size={18} color="var(--primary-color)" />
+              </div>
+              <span style={{ fontSize: "15px", fontWeight: 500, color: 'var(--text-primary)' }}>记忆体系</span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {MEM_LAYERS.map((layer) => {
+                const Ic = layer.icon;
+                const pct = Math.round((layer.entries / layer.max) * 100);
+                return (
+                  <div key={layer.key} style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "12px 0",
+                    borderBottom: "1px solid var(--border-subtle)",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <div style={{
+                        width: "24px",
+                        height: "24px",
+                        borderRadius: "8px",
+                        background: `${layer.color}15`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}>
+                        <Ic size={14} color={layer.color} />
+                      </div>
+                      <span style={{ fontSize: "14px", color: 'var(--text-primary)' }}>{layer.name}</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                      <span style={{ fontSize: "13px", color: layer.color, fontWeight: 500 }}>{pct}%</span>
+                      <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>{layer.entries}/{layer.max}</span>
+                    </div>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span style={{ fontSize: "12px", color: layer.color, fontWeight: 600 }}>{pct}%</span>
-                    <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{layer.entries}/{layer.max}</span>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </Card>
         <DualPanel />
       </div>
 
       {/* Security + Services */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "24px" }}>
         <SecShield />
         <SvcGrid />
       </div>
 
       {/* Timeline + Quick Nav */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
         <TimeLine />
         <QNav nav={navigate} />
       </div>
