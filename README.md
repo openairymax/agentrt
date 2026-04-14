@@ -1,6 +1,8 @@
 <div align="center">
 
-# Agent OS
+# Agent OS  
+
+Powered by OpenAirymax  
 
 > The seminal fourth "Operating System Philosophy" in human computing history.
 
@@ -34,15 +36,15 @@ Personal Client Preview
 <img src="docs/Source_Other/AgentOS-desktop-preview.gif" alt="AgentOS Preview" width="800">
 </div>
 
-## 💡 Innovation Highlights
+## 💡 Innovation Highlights  
 
-<center>
+<center>  
 
-⚡️
+⚡️  
 
-**Foundational [Multibody Cybernetic Intelligent System](docs/Basic_Theories/EN_01_MCIS.md)**
+**Foundational [Multibody Cybernetic Intelligent System](docs/Basic_Theories/EN_01_MCIS.md)**  
 
-</center>
+</center>  
 
 - **Pure Kernel**: Only atomic mechanisms, ensuring purity and efficiency.
 - **Cognitive Loop**: Perception, Planning, Action.
