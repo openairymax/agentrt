@@ -297,6 +297,7 @@ int auth_jwt_generate_token(const char* subject, const char* role, char** out_to
     /* 构建签名部分 */
     size_t sign_input_size = strlen(header_b64) + 1 + payload_b64_size + 100;
     char* sign_input = (char*)malloc(sign_input_size);
+    if (!sign_input) { free(header_b64); free(payload_b64); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
     snprintf(sign_input, sign_input_size, "%s.%s", header_b64, payload_b64);
 
     uint8_t hmac_output[32];
@@ -305,11 +306,13 @@ int auth_jwt_generate_token(const char* subject, const char* role, char** out_to
 
     size_t sig_b64_size = 128;
     char* sig_b64 = (char*)malloc(sig_b64_size);
+    if (!sig_b64) { free(sign_input); free(header_b64); free(payload_b64); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
     base64_encode(hmac_output, hmac_len, sig_b64, &sig_b64_size);
 
     /* 组合 Token */
     size_t token_size = sign_input_size + sig_b64_size + 10;
     *out_token = (char*)malloc(token_size);
+    if (!*out_token) { free(sign_input); free(sig_b64); free(header_b64); free(payload_b64); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
     snprintf(*out_token, token_size, "%s.%s", sign_input, sig_b64);
 
     free(sign_input);

@@ -51,16 +51,23 @@ typedef struct client_state {
 
 struct gateway_rate_limiter {
     gateway_rate_limit_config_t config;     /**< 配置 */
-    
+
     client_state_t** clients_table;         /**< 客户端哈希表 */
     size_t table_size;                      /**< 哈希表大小 */
-    
+
     atomic_uint_fast64_t total_allowed;     /**< 总允许请求数 */
     atomic_uint_fast64_t total_rejected;    /**< 总拒绝请求数 */
     atomic_uint_fast32_t active_clients;    /**< 活跃客户端数 */
-    
+
     atomic_bool running;                    /**< 运行标志 */
     time_t last_cleanup_time;               /**< 上次清理时间 */
+
+    /* 哈希表互斥锁 - 保护 clients_table 结构修改 */
+#ifdef _WIN32
+    CRITICAL_SECTION table_lock;
+#else
+    pthread_mutex_t table_lock;
+#endif
 };
 
 /* ========== 哈希函数 ========== */
@@ -121,31 +128,56 @@ static void client_state_destroy(client_state_t* state) {
 /**
  * @brief 查找或创建客户端状态
  */
-static client_state_t* get_or_create_client(gateway_rate_limiter_t* limiter, 
+static client_state_t* get_or_create_client(gateway_rate_limiter_t* limiter,
                                              const char* client_key,
                                              uint64_t now_ns) {
     uint32_t hash = hash_string(client_key, limiter->table_size);
-    client_state_t* current = limiter->clients_table[hash];
-    
+
+#ifdef _WIN32
+    EnterCriticalSection(&limiter->table_lock);
+#else
+    pthread_mutex_lock(&limiter->table_lock);
+#endif
+
     /* 查找现有客户端 */
+    client_state_t* current = limiter->clients_table[hash];
     while (current) {
         if (strcmp(current->client_key, client_key) == 0) {
             current->last_access_time = time(NULL);
+
+#ifdef _WIN32
+            LeaveCriticalSection(&limiter->table_lock);
+#else
+            pthread_mutex_unlock(&limiter->table_lock);
+#endif
             return current;
         }
         current = current->next;
     }
-    
+
     /* 创建新客户端 */
     client_state_t* new_client = client_state_create(client_key, now_ns);
-    if (!new_client) return NULL;
-    
+    if (!new_client) {
+#ifdef _WIN32
+        LeaveCriticalSection(&limiter->table_lock);
+#else
+        pthread_mutex_unlock(&limiter->table_lock);
+#endif
+        return NULL;
+    }
+
     /* 插入到哈希表 */
     new_client->next = limiter->clients_table[hash];
     limiter->clients_table[hash] = new_client;
-    
+
     atomic_fetch_add(&limiter->active_clients, 1);
-    
+
+#ifdef _WIN32
+    LeaveCriticalSection(&limiter->table_lock);
+#else
+    pthread_mutex_unlock(&limiter->table_lock);
+#endif
+
     return new_client;
 }
 
@@ -214,10 +246,16 @@ static bool check_time_windows(client_state_t* client,
 static void cleanup_expired_clients(gateway_rate_limiter_t* limiter) {
     time_t now = time(NULL);
     time_t expire_threshold = now - 3600;  /* 1小时未活跃 */
-    
+
+#ifdef _WIN32
+    EnterCriticalSection(&limiter->table_lock);
+#else
+    pthread_mutex_lock(&limiter->table_lock);
+#endif
+
     for (size_t i = 0; i < limiter->table_size; i++) {
         client_state_t** current = &limiter->clients_table[i];
-        
+
         while (*current) {
             if ((*current)->last_access_time < expire_threshold) {
                 client_state_t* to_delete = *current;
@@ -229,8 +267,14 @@ static void cleanup_expired_clients(gateway_rate_limiter_t* limiter) {
             }
         }
     }
-    
+
     limiter->last_cleanup_time = now;
+
+#ifdef _WIN32
+    LeaveCriticalSection(&limiter->table_lock);
+#else
+    pthread_mutex_unlock(&limiter->table_lock);
+#endif
 }
 
 /* ========== 辅助函数：速率限制检查 ========== */
@@ -332,7 +376,14 @@ gateway_rate_limiter_t* gateway_rate_limiter_create(const gateway_rate_limit_con
     atomic_init(&limiter->total_rejected, 0);
     atomic_init(&limiter->active_clients, 0);
     atomic_init(&limiter->running, true);
-    
+
+    /* 初始化哈希表互斥锁 */
+#ifdef _WIN32
+    InitializeCriticalSection(&limiter->table_lock);
+#else
+    pthread_mutex_init(&limiter->table_lock, NULL);
+#endif
+
     limiter->last_cleanup_time = time(NULL);
     
     return limiter;
@@ -340,9 +391,16 @@ gateway_rate_limiter_t* gateway_rate_limiter_create(const gateway_rate_limit_con
 
 void gateway_rate_limiter_destroy(gateway_rate_limiter_t* limiter) {
     if (!limiter) return;
-    
+
     atomic_store(&limiter->running, false);
-    
+
+    /* 锁定哈希表进行完整清理 */
+#ifdef _WIN32
+    EnterCriticalSection(&limiter->table_lock);
+#else
+    pthread_mutex_lock(&limiter->table_lock);
+#endif
+
     /* 清理所有客户端状态 */
     if (limiter->clients_table) {
         for (size_t i = 0; i < limiter->table_size; i++) {
@@ -355,7 +413,15 @@ void gateway_rate_limiter_destroy(gateway_rate_limiter_t* limiter) {
         }
         free(limiter->clients_table);
     }
-    
+
+#ifdef _WIN32
+    LeaveCriticalSection(&limiter->table_lock);
+    DeleteCriticalSection(&limiter->table_lock);
+#else
+    pthread_mutex_unlock(&limiter->table_lock);
+    pthread_mutex_destroy(&limiter->table_lock);
+#endif
+
     free(limiter);
 }
 
@@ -364,21 +430,21 @@ bool gateway_rate_limiter_allow(gateway_rate_limiter_t* limiter, const char* cli
     if (!is_rate_limiter_valid(limiter, client_key)) {
         return true;
     }
-    
-    /* 步骤 2: 获取当前时间 */
+
+    /* 步骤 2: 获取当前时间（缓存避免重复调用） */
     uint64_t now_ns = gateway_time_ns();
     time_t now = time(NULL);
-    
-    /* 步骤 3: 可能执行清理 */
+
+    /* 步骤 3: 可能执行清理（使用已缓存的 now） */
     maybe_cleanup_clients(limiter, now);
-    
-    /* 步骤 4: 获取或创建客户端状态 */
+
+    /* 步骤 4: 获取或创建客户端状态（内部使用自己的 time()） */
     client_state_t* client = get_or_create_client(limiter, client_key, now_ns);
     if (!client) {
         /* 内存分配失败，为安全起见允许通过 */
         return true;
     }
-    
+
     /* 步骤 5: 执行速率限制检查 */
     return check_rate_limit(client, limiter, &limiter->config, now_ns);
 }
@@ -404,18 +470,36 @@ void gateway_rate_limiter_get_stats(
 
 void gateway_rate_limiter_reset_client(gateway_rate_limiter_t* limiter, const char* client_key) {
     if (!limiter || !client_key) return;
-    
+
     uint32_t hash = hash_string(client_key, limiter->table_size);
+
+#ifdef _WIN32
+    EnterCriticalSection(&limiter->table_lock);
+#else
+    pthread_mutex_lock(&limiter->table_lock);
+#endif
+
     client_state_t* current = limiter->clients_table[hash];
-    
     while (current) {
         if (strcmp(current->client_key, client_key) == 0) {
             current->tokens = 0;
             current->request_count_minute = 0;
             current->request_count_hour = 0;
             current->last_update_ns = gateway_time_ns();
+
+#ifdef _WIN32
+            LeaveCriticalSection(&limiter->table_lock);
+#else
+            pthread_mutex_unlock(&limiter->table_lock);
+#endif
             return;
         }
         current = current->next;
     }
+
+#ifdef _WIN32
+    LeaveCriticalSection(&limiter->table_lock);
+#else
+    pthread_mutex_unlock(&limiter->table_lock);
+#endif
 }
