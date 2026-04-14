@@ -75,6 +75,49 @@ typedef int32_t agentos_error_t;
 
 /* ==================== 统一的IPC类型定义（解决冲突） ==================== */
 /**
+ * @section IPC类型架构说明
+ * 
+ * AgentOS采用**分层IPC架构**，遵循微内核设计原则（Liedtke微内核原则）：
+ * 
+ * **Level 1: 内核级IPC (Kernel-Level)**
+ * - 类型：agentos_kernel_ipc_message_t
+ * - 位置：corekern/include/ipc.h
+ * - 用途：微内核内部进程间通信
+ * - 特点：
+ *   ✓ 轻量级结构（40字节）：code, data, size, fd, msg_id
+ *   ✓ 零外部依赖（不依赖commons）
+ *   ✓ 极致性能（微秒级延迟）
+ *   ✓ 简单易用（适合内核态编程）
+ *   
+ * **Level 2: 应用级IPC (Application-Level)**  
+ * - 类型：agentos_ipc_message_t + agentos_ipc_header_t
+ * - 位置：本文件（权威定义）
+ * - 用途：跨模块、应用层、服务间通信
+ * - 特点：
+ *   ✓ 完整元数据（magic, version, source, target等）
+ *   ✓ 标准化接口（支持序列化、校验和）
+ *   ✓ 功能丰富（RPC、Pub/Sub、流式传输）
+ *   ✓ 跨平台兼容（Windows/Linux/macOS）
+ *   
+ * **Level 3: IPC模块内部类型 (Implementation Detail)**
+ * - 类型：ipc_message_t + ipc_message_header_t
+ * - 位置：commons/utils/ipc/include/ipc_common.h
+ * - 用途：IPC子系统内部实现
+ * - 特点：包含实现细节字段（reserved等），不应在公共API中使用
+ * 
+ * **设计决策理由：**
+ * 1. **微内核纯净性**：corekern不依赖任何外部库，保持最小化
+ * 2. **性能优化**：内核级IPC避免不必要的内存拷贝和解析开销
+ * 3. **职责分离**：内核关注机制，应用层关注策略和功能
+ * 4. **向前兼容**：两级架构允许独立演进，不影响对方
+ * 
+ * **使用指南：**
+ * - 在corekern模块内 → 使用 agentos_kernel_ipc_message_t
+ * - 在daemon/services/应用层 → 使用 agentos_ipc_message_t
+ * - 跨层通信 → 使用转换函数（见下方）
+ */
+
+/**
  * @brief IPC消息头结构（权威定义）
  */
 typedef struct {
@@ -92,14 +135,29 @@ typedef struct {
 } agentos_ipc_header_t;
 
 /**
- * @brief IPC消息结构（权威定义）
- * @note 这是全项目唯一的agentos_ipc_message_t定义
+ * @brief 应用级IPC消息结构（权威定义）
+ * @note 这是应用层标准的agentos_ipc_message_t定义，与内核级agentos_kernel_ipc_message_t区分
  */
 typedef struct {
     agentos_ipc_header_t header;    /**< 消息头 */
     void* payload;                  /**< 负载数据 */
     size_t payload_size;            /**< 负载大小 */
 } agentos_ipc_message_t;
+
+/* ==================== IPC类型转换函数（跨层通信支持） ==================== */
+/*
+ * 内核级IPC消息类型说明：
+ * 
+ * 类型名：agentos_kernel_ipc_message_t
+ * 定义位置：corekern/include/ipc.h
+ * 用途：微内核内部进程间通信（轻量级、高性能）
+ * 
+ * 使用场景：
+ * - 当daemon服务需要将应用级消息转换为内核级消息时
+ * - 当需要在不同IPC层次间桥接时
+ * 
+ * 注意：此类型仅在corekern模块内使用，应用层应使用agentos_ipc_message_t
+ */
 
 /* ==================== 统一的任务相关类型 ==================== */
 /**

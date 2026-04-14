@@ -47,6 +47,8 @@ import KeyboardShortcutsModal, { useKeyboardShortcuts } from "./components/Keybo
 import CommandPalette from "./components/CommandPalette";
 import { ToastProvider } from "./components/Toast";
 import { ModalProvider } from "./components/Modal";
+import { StepByStepGuide } from "./components/StepByStepGuide";
+import { OperationFeedbackProvider } from "./components/OperationFeedback";
 import { useI18n } from "./i18n";
 
 const navConfig = [
@@ -238,6 +240,9 @@ function App() {
   const [wizardCompleted, setWizardCompleted] = useState(() => {
     return localStorage.getItem('agentos-wizard-completed') === 'true';
   });
+  const [guideCompleted, setGuideCompleted] = useState(() => {
+    return localStorage.getItem('agentos-guide-completed') === 'true';
+  });
 
   if (!wizardCompleted) {
     return <WelcomeWizard onComplete={() => setWizardCompleted(true)} />;
@@ -246,9 +251,14 @@ function App() {
   return (
     <ToastProvider>
       <ModalProvider>
-        <Router>
-          <AppContent />
-        </Router>
+        <OperationFeedbackProvider>
+          <Router>
+            <AppContent />
+          </Router>
+          {!guideCompleted && (
+            <StepByStepGuide onComplete={() => setGuideCompleted(true)} />
+          )}
+        </OperationFeedbackProvider>
       </ModalProvider>
     </ToastProvider>
   );

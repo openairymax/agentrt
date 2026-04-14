@@ -31,17 +31,17 @@ import { Card } from "../components/ui/Card";
 import { PageLayout } from "../components/PageLayout";
 
 const taskTypeConfig: Record<string, { icon: typeof Zap; color: string; gradient: string; bgLight: string; label: string }> = {
-  codegen: { icon: FileCode, color: "#6366f1", gradient: "linear-gradient(135deg, #6366f1, #818cf8)", bgLight: "rgba(99,102,241,0.08)", label: "代码生成" },
-  research: { icon: Brain, color: "#22c55e", gradient: "linear-gradient(135deg, #22c55e, #4ade80)", bgLight: "rgba(34,197,94,0.08)", label: "研究分析" },
-  system: { icon: Shield, color: "#f59e0b", gradient: "linear-gradient(135deg, #f59e0b, #fbbf24)", bgLight: "rgba(245,158,11,0.08)", label: "系统任务" },
+  codegen: { icon: FileCode, color: "var(--primary-color)", gradient: "var(--primary-gradient)", bgLight: "var(--primary-light)", label: "代码生成" },
+  research: { icon: Brain, color: "var(--success-color)", gradient: "linear-gradient(135deg, var(--success-color), #4ade80)", bgLight: "var(--success-light)", label: "研究分析" },
+  system: { icon: Shield, color: "var(--warning-color)", gradient: "linear-gradient(135deg, var(--warning-color), #fbbf24)", bgLight: "var(--warning-light)", label: "系统任务" },
 };
 
 const statusConfig: Record<string, { color: string; bg: string; label: string; dotColor: string; gradient?: string }> = {
-  running: { color: "#3b82f6", bg: "rgba(59,130,246,0.08)", label: "运行中", dotColor: "#3b82f6", gradient: "linear-gradient(135deg, #3b82f6, #60a5fa)" },
-  completed: { color: "#22c55e", bg: "rgba(34,197,94,0.08)", label: "已完成", dotColor: "#22c55e", gradient: "linear-gradient(135deg, #22c55e, #4ade80)" },
-  failed: { color: "#ef4444", bg: "rgba(239,68,68,0.08)", label: "失败", dotColor: "#ef4444" },
-  pending: { color: "#f59e0b", bg: "rgba(245,158,11,0.08)", label: "等待中", dotColor: "#f59e0b" },
-  cancelled: { color: "#94a3b8", bg: "rgba(148,163,184,0.08)", label: "已取消", dotColor: "#94a3b8" },
+  running: { color: "var(--primary-color)", bg: "var(--primary-light)", label: "运行中", dotColor: "var(--primary-color)", gradient: "var(--primary-gradient)" },
+  completed: { color: "var(--success-color)", bg: "var(--success-light)", label: "已完成", dotColor: "var(--success-color)", gradient: "linear-gradient(135deg, var(--success-color), #4ade80)" },
+  failed: { color: "var(--error-color)", bg: "var(--error-light)", label: "失败", dotColor: "var(--error-color)" },
+  pending: { color: "var(--warning-color)", bg: "var(--warning-light)", label: "等待中", dotColor: "var(--warning-color)" },
+  cancelled: { color: "var(--text-muted)", bg: "rgba(148,163,184,0.08)", label: "已取消", dotColor: "var(--text-muted)" },
 };
 
 const TaskProgressRing: React.FC<{ progress: number; size?: number; strokeWidth?: number; color: string; showLabel?: boolean }> = ({
@@ -168,18 +168,23 @@ const Tasks: React.FC = () => {
       subtitle={t.tasks.subtitle}
     >
       {/* Stats Bar */}
-      <Card>
+      <Card style={{ marginBottom: '20px' }}>
         <div style={{
-          display: "flex", gap: "16px",
+          display: "flex", 
+          gap: "20px",
           justifyContent: "space-between",
           alignItems: "center",
           flexWrap: "wrap",
+          padding: '16px',
         }}>
           {/* Tab Switch */}
           <div style={{
-            display: "flex", background: "var(--bg-tertiary)",
-            borderRadius: "8px", padding: "3px",
+            display: "flex", 
+            background: "var(--bg-tertiary)",
+            borderRadius: "8px", 
+            padding: "4px",
             border: "1px solid var(--border-subtle)",
+            boxShadow: 'var(--shadow-sm)',
           }}>
             {[
               { key: "submit" as const, icon: Plus, label: t.tasks.submitTask },
@@ -189,39 +194,84 @@ const Tasks: React.FC = () => {
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 style={{
-                  padding: "8px 20px", border: "none", borderRadius: "6px",
+                  padding: "10px 24px", 
+                  border: "none", 
+                  borderRadius: "6px",
                   background: activeTab === tab.key ? "var(--primary-color)" : "transparent",
                   color: activeTab === tab.key ? "white" : "var(--text-secondary)",
-                  cursor: "pointer", fontWeight: 500, fontSize: "13px",
+                  cursor: "pointer", 
+                  fontWeight: 500, 
+                  fontSize: "13px",
                   transition: "all 0.2s ease",
-                  display: "flex", alignItems: "center", gap: "6px",
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: "8px",
+                }}
+                onMouseEnter={(e) => {
+                  if (activeTab !== tab.key) {
+                    e.currentTarget.style.background = 'var(--bg-secondary)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (activeTab !== tab.key) {
+                    e.currentTarget.style.background = 'transparent';
+                  }
                 }}
               >
                 <tab.icon size={14} />
                 {tab.label}
                 {tab.key === "history" && (
                   <span style={{
-                    fontSize: "11px", background: activeTab === tab.key ? "rgba(255,255,255,0.25)" : "var(--bg-secondary)",
-                    padding: "1px 7px", borderRadius: "10px", fontWeight: 600,
-                  }}>{stats.total}</span>
+                    fontSize: "11px", 
+                    background: activeTab === tab.key ? "rgba(255,255,255,0.25)" : "var(--bg-secondary)",
+                    padding: "2px 8px", 
+                    borderRadius: "12px", 
+                    fontWeight: 600,
+                  }}>
+                    {stats.total}
+                  </span>
                 )}
               </button>
             ))}
           </div>
 
           {/* Quick Stats */}
-          <div style={{ display: "flex", gap: "12px" }}>
+          <div style={{ 
+            display: "flex", 
+            gap: "12px",
+            flexWrap: 'wrap',
+          }}>
             {[
               { label: "全部", value: stats.total, color: "var(--text-secondary)" },
-              { label: "运行中", value: stats.running, color: "#3b82f6" },
-              { label: "已完成", value: stats.completed, color: "#22c55e" },
-              { label: "失败", value: stats.failed, color: "#ef4444" },
+              { label: "运行中", value: stats.running, color: "var(--primary-color)" },
+              { label: "已完成", value: stats.completed, color: "var(--success-color)" },
+              { label: "失败", value: stats.failed, color: "var(--error-color)" },
             ].map(stat => (
-              <div key={stat.label} style={{
-                display: "flex", alignItems: "center", gap: "5px",
-                fontSize: "12px", padding: "4px 12px", borderRadius: "20px",
-                background: `${stat.color}10`, border: `1px solid ${stat.color}20`,
-              }}>
+              <div 
+                key={stat.label} 
+                style={{
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: "6px",
+                  fontSize: "12px", 
+                  padding: "6px 16px", 
+                  borderRadius: "20px",
+                  background: `${stat.color}10`, 
+                  border: `1px solid ${stat.color}20`,
+                  transition: 'all 0.2s ease',
+                  boxShadow: 'var(--shadow-sm)',
+                }}
+                onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                  e.currentTarget.style.background = `${stat.color}15`;
+                }}
+                onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                  e.currentTarget.style.background = `${stat.color}10`;
+                }}
+              >
                 <span style={{ fontWeight: 600, color: stat.color }}>{stat.value}</span>
                 <span style={{ color: stat.color }}>{stat.label}</span>
               </div>
@@ -232,212 +282,437 @@ const Tasks: React.FC = () => {
 
       {activeTab === "submit" ? (
         /* Submit Task Tab */
-        <Card>
-          <h3 style={{ margin: "0 0 20px 0", fontSize: "16px", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px" }}>
-            <Plus size={16} />
-            提交新任务
-          </h3>
-
-          <div style={{ maxWidth: "600px", display: "flex", flexDirection: "column", gap: "20px" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              <label style={{ fontSize: "14px", fontWeight: 500 }}>{t.tasks.taskName}</label>
-              <Input
-                placeholder="例如：代码审查、数据分析、系统诊断..."
-                value={taskName}
-                onChange={(e) => setTaskName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSubmitTask()}
-              />
-              <p style={{ fontSize: "12px", color: "var(--text-muted)", margin: 0 }}>{t.tasks.taskNameHelp}</p>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              <label style={{ fontSize: "14px", fontWeight: 500 }}>{t.tasks.taskType}</label>
+        <Card style={{ boxShadow: 'var(--shadow-sm)' }}>
+          <div style={{ padding: '24px' }}>
+            <h3 style={{ 
+              margin: "0 0 24px 0", 
+              fontSize: "18px", 
+              fontWeight: 600, 
+              display: "flex", 
+              alignItems: "center", 
+              gap: "10px",
+              color: 'var(--text-primary)',
+            }}>
               <div style={{
-                display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px",
+                width: "32px",
+                height: "32px",
+                borderRadius: "8px",
+                background: "var(--primary-color)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}>
-                {Object.entries(taskTypeConfig).map(([key, cfg]) => {
-                  const IconComp = cfg.icon;
-                  return (
-                    <div
-                      key={key}
-                      onClick={() => setTaskType(key)}
-                      style={{
-                        padding: "16px", borderRadius: "8px",
-                        border: `2px solid ${taskType === key ? cfg.color : "var(--border-subtle)"}`,
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                        textAlign: "center",
-                        background: taskType === key ? `${cfg.color}06` : "var(--bg-tertiary)",
-                      }}
-                    >
-                      <IconComp size={24} color={cfg.color} style={{ marginBottom: "6px" }} />
-                      <div style={{ fontSize: "13px", fontWeight: 600 }}>{cfg.label}</div>
-                      <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>{key}</div>
-                    </div>
-                  );
-                })}
+                <Plus size={16} color="white" />
               </div>
-            </div>
+              提交新任务
+            </h3>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              <label style={{ fontSize: "14px", fontWeight: 500 }}>{t.tasks.parameters}</label>
-              <textarea
+            <div style={{ maxWidth: "600px", display: "flex", flexDirection: "column", gap: "24px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <label style={{ 
+                  fontSize: "14px", 
+                  fontWeight: 500,
+                  color: 'var(--text-primary)',
+                }}>
+                  {t.tasks.taskName}
+                </label>
+                <Input
+                  placeholder="例如：代码审查、数据分析、系统诊断..."
+                  value={taskName}
+                  onChange={(e) => setTaskName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSubmitTask()}
+                  style={{
+                    transition: 'all 0.2s ease',
+                  }}
+                />
+                <p style={{ 
+                  fontSize: "12px", 
+                  color: "var(--text-muted)", 
+                  margin: 0,
+                }}>
+                  {t.tasks.taskNameHelp}
+                </p>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <label style={{ 
+                  fontSize: "14px", 
+                  fontWeight: 500,
+                  color: 'var(--text-primary)',
+                }}>
+                  {t.tasks.taskType}
+                </label>
+                <div style={{
+                  display: "grid", 
+                  gridTemplateColumns: "repeat(3, 1fr)", 
+                  gap: "16px",
+                }}>
+                  {Object.entries(taskTypeConfig).map(([key, cfg]) => {
+                    const IconComp = cfg.icon;
+                    return (
+                      <div
+                        key={key}
+                        onClick={() => setTaskType(key)}
+                        style={{
+                          padding: "20px", 
+                          borderRadius: "8px",
+                          border: `2px solid ${taskType === key ? cfg.color : "var(--border-subtle)"}`,
+                          cursor: "pointer",
+                          transition: "all 0.2s ease",
+                          textAlign: "center",
+                          background: taskType === key ? `${cfg.color}06` : "var(--bg-tertiary)",
+                          boxShadow: 'var(--shadow-sm)',
+                        }}
+                        onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
+                          if (taskType !== key) {
+                            e.currentTarget.style.borderColor = 'var(--border-color)';
+                            e.currentTarget.style.background = 'var(--bg-secondary)';
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                          }
+                        }}
+                        onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
+                          if (taskType !== key) {
+                            e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                            e.currentTarget.style.background = 'var(--bg-tertiary)';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                          }
+                        }}
+                      >
+                        <div style={{
+                          width: "48px",
+                          height: "48px",
+                          borderRadius: "12px",
+                          background: `${cfg.color}15`,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          margin: "0 auto 12px",
+                        }}>
+                          <IconComp size={24} color={cfg.color} />
+                        </div>
+                        <div style={{ 
+                          fontSize: "14px", 
+                          fontWeight: 600,
+                          color: taskType === key ? cfg.color : 'var(--text-primary)',
+                        }}>
+                          {cfg.label}
+                        </div>
+                        <div style={{ 
+                          fontSize: "11px", 
+                          color: "var(--text-muted)",
+                          marginTop: "4px",
+                        }}>
+                          {key}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <label style={{ 
+                  fontSize: "14px", 
+                  fontWeight: 500,
+                  color: 'var(--text-primary)',
+                }}>
+                  {t.tasks.parameters}
+                </label>
+                <textarea
+                  style={{
+                    width: "100%",
+                    padding: "16px",
+                    borderRadius: "8px",
+                    border: "1px solid var(--border-color)",
+                    background: "var(--bg-secondary)",
+                    color: "var(--text-primary)",
+                    resize: "vertical",
+                    minHeight: "140px",
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: "13px",
+                    transition: "all 0.2s ease",
+                  }}
+                  placeholder='{"input": "...", "config": {...}}'
+                  value={taskParams}
+                  onChange={(e) => setTaskParams(e.target.value)}
+                />
+                <p style={{ 
+                  fontSize: "12px", 
+                  color: "var(--text-muted)", 
+                  margin: 0,
+                }}>
+                  {t.tasks.parametersHelp}
+                </p>
+              </div>
+
+              <Button
+                variant="primary"
+                onClick={handleSubmitTask}
+                disabled={!taskName.trim() || submitting}
                 style={{
-                  width: "100%",
-                  padding: "12px",
-                  borderRadius: "8px",
-                  border: "1px solid var(--border-color)",
-                  background: "var(--bg-secondary)",
-                  color: "var(--text-primary)",
-                  resize: "vertical",
-                  minHeight: "120px",
-                  fontFamily: "'JetBrains Mono', monospace",
-                  fontSize: "13px",
-                  transition: "all 0.2s ease",
+                  transition: 'all 0.2s ease',
+                  boxShadow: 'var(--shadow-sm)',
                 }}
-                placeholder='{"input": "...", "config": {...}}'
-                value={taskParams}
-                onChange={(e) => setTaskParams(e.target.value)}
-              />
-              <p style={{ fontSize: "12px", color: "var(--text-muted)", margin: 0 }}>{t.tasks.parametersHelp}</p>
+              >
+                {submitting ? <Loader2 size={16} className="spin" /> : <Play size={16} />}
+                {t.tasks.submitTask}
+              </Button>
             </div>
-
-            <Button
-              variant="primary"
-              onClick={handleSubmitTask}
-              disabled={!taskName.trim() || submitting}
-            >
-              {submitting ? <Loader2 size={16} className="spin" /> : <Play size={16} />}
-              {t.tasks.submitTask}
-            </Button>
           </div>
         </Card>
       ) : (
         /* History Tab */
         <>
           {/* Search & Filter */}
-          <Card style={{ marginBottom: "16px" }}>
-            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-              <div style={{ position: "relative", flex: 1, maxWidth: "360px" }}>
-                <Search size={15} style={{
-                  position: "absolute", left: "12px", top: "50%",
-                  transform: "translateY(-50%)", color: "var(--text-muted)"
+          <Card style={{ marginBottom: "20px", boxShadow: 'var(--shadow-sm)' }}>
+            <div style={{ 
+              display: "flex", 
+              gap: "12px", 
+              alignItems: "center",
+              padding: '16px',
+            }}>
+              <div style={{ position: "relative", flex: 1, maxWidth: "400px" }}>
+                <Search size={16} style={{
+                  position: "absolute", 
+                  left: "12px", 
+                  top: "50%",
+                  transform: "translateY(-50%)", 
+                  color: "var(--text-muted)"
                 }} />
                 <Input
                   placeholder={`${t.tasks.searchTasks}...`}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  style={{ paddingLeft: "38px" }}
+                  style={{ 
+                    paddingLeft: "40px",
+                    transition: 'all 0.2s ease',
+                  }}
                 />
               </div>
               <Button
                 variant="secondary"
                 onClick={loadTasks}
+                style={{
+                  transition: 'all 0.2s ease',
+                }}
               >
-                <RotateCcw size={15} />
+                <RotateCcw size={16} />
+                刷新
               </Button>
             </div>
           </Card>
 
           {/* Task List */}
           {loading ? (
-            <div style={{ textAlign: "center", padding: "48px" }}>
+            <div style={{ 
+              textAlign: "center", 
+              padding: "64px",
+              background: 'var(--bg-secondary)',
+              borderRadius: '8px',
+              border: '1px solid var(--border-subtle)',
+            }}>
               <div className="loading-spinner" />
+              <div style={{ 
+                marginTop: '16px', 
+                fontSize: '14px', 
+                color: 'var(--text-muted)'
+              }}>
+                加载任务列表...
+              </div>
             </div>
           ) : filteredTasks.length === 0 ? (
-            <Card>
-              <div style={{ textAlign: "center", padding: "48px" }}>
-                <ClipboardList size={56} style={{ opacity: 0.25 }} />
-                <div style={{ fontSize: "15px", fontWeight: 500, margin: "16px 0 8px 0" }}>
-                  {t.tasks.noTasks}
-                </div>
-                <div style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "24px" }}>
-                  {t.tasks.noTasksHint}
-                </div>
-                <Button
-                  variant="primary"
-                  onClick={() => setActiveTab("submit")}
-                >
-                  <Plus size={16} />
-                  {t.tasks.submitTask}
-                </Button>
+            <Card style={{ 
+              textAlign: "center", 
+              padding: "64px",
+              boxShadow: 'var(--shadow-sm)',
+            }}>
+              <div style={{
+                width: "80px",
+                height: "80px",
+                borderRadius: "20px",
+                background: "var(--bg-tertiary)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 24px",
+              }}>
+                <ClipboardList size={40} style={{ opacity: 0.2 }} />
               </div>
+              <div style={{ 
+                fontSize: "16px", 
+                fontWeight: 500, 
+                margin: "0 0 12px 0",
+                color: 'var(--text-primary)',
+              }}>
+                {t.tasks.noTasks}
+              </div>
+              <div style={{ 
+                fontSize: "14px", 
+                color: "var(--text-muted)", 
+                marginBottom: "32px",
+                maxWidth: "320px",
+                marginLeft: "auto",
+                marginRight: "auto",
+              }}>
+                {t.tasks.noTasksHint}
+              </div>
+              <Button
+                variant="primary"
+                onClick={() => setActiveTab("submit")}
+                style={{
+                  transition: 'all 0.2s ease',
+                  boxShadow: 'var(--shadow-sm)',
+                }}
+              >
+                <Plus size={16} />
+                {t.tasks.submitTask}
+              </Button>
             </Card>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               {filteredTasks.map((task) => {
-                const typeCfg = taskTypeConfig[task.type as keyof typeof taskTypeConfig] || { icon: Zap, color: "#94a3b8", gradient: "", bgLight: "", label: task.type || "unknown" };
+                const typeCfg = taskTypeConfig[task.type as keyof typeof taskTypeConfig] || { icon: Zap, color: "var(--text-muted)", gradient: "", bgLight: "", label: task.type || "unknown" };
                 const stCfg = statusConfig[task.status] || statusConfig.pending;
                 const TypeIcon = typeCfg.icon;
 
                 return (
-                  <Card key={task.id}>
+                  <Card 
+                    key={task.id}
+                    style={{
+                      transition: 'all 0.2s ease',
+                      boxShadow: 'var(--shadow-sm)',
+                      border: '1px solid var(--border-subtle)',
+                      background: 'var(--bg-secondary)',
+                    }}
+                    onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                      e.currentTarget.style.borderColor = 'var(--border-color)';
+                    }}
+                    onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                      e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                    }}
+                  >
                     <div style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: "16px",
+                      gap: "20px",
+                      padding: '16px',
                     }}>
                       {/* Progress Ring */}
                       <TaskProgressRing
                         progress={task.progress}
                         color={stCfg.color}
-                        size={44}
-                        strokeWidth={3}
+                        size={52}
+                        strokeWidth={3.5}
                       />
 
                       {/* Content */}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                          <span style={{ fontWeight: 600, fontSize: "14px" }}>{task.name}</span>
+                        <div style={{ 
+                          display: "flex", 
+                          alignItems: "center", 
+                          gap: "10px", 
+                          marginBottom: "12px",
+                          flexWrap: 'wrap',
+                        }}>
+                          <span style={{ 
+                            fontWeight: 600, 
+                            fontSize: "15px",
+                            color: 'var(--text-primary)',
+                          }}>
+                            {task.name}
+                          </span>
                           <span style={{
-                            background: "var(--bg-tertiary)", color: stCfg.color,
-                            fontSize: "11px", fontWeight: 500, padding: "2px 8px",
+                            background: `${stCfg.color}15`, 
+                            color: stCfg.color,
+                            fontSize: "11px", 
+                            fontWeight: 500, 
+                            padding: "4px 12px",
                             borderRadius: "4px",
                           }}>
                             {stCfg.label}
                           </span>
                           <span style={{
-                            background: "var(--bg-tertiary)", color: typeCfg.color,
-                            fontSize: "11px", fontWeight: 400, padding: "2px 8px",
+                            background: `${typeCfg.color}15`, 
+                            color: typeCfg.color,
+                            fontSize: "11px", 
+                            fontWeight: 500, 
+                            padding: "4px 12px",
                             borderRadius: "4px",
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
                           }}>
-                            <TypeIcon size={10} style={{ display: "inline", marginRight: "3px" }} />
+                            <TypeIcon size={12} />
                             {typeCfg.label}
                           </span>
                         </div>
 
                         {/* Progress bar */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+                        <div style={{ 
+                          display: "flex", 
+                          alignItems: "center", 
+                          gap: "12px", 
+                          marginBottom: "12px"
+                        }}>
                           <div style={{
-                            flex: 1, height: "4px", background: "var(--bg-tertiary)",
-                            borderRadius: "2px", overflow: "hidden",
+                            flex: 1, 
+                            height: "6px", 
+                            background: "var(--bg-tertiary)",
+                            borderRadius: "3px", 
+                            overflow: "hidden",
                           }}>
                             <div style={{
-                              width: `${task.progress}%`, height: "100%",
+                              width: `${task.progress}%`, 
+                              height: "100%",
                               background: task.status === "failed"
                                 ? stCfg.color
                                 : stCfg.color,
-                              borderRadius: "2px",
+                              borderRadius: "3px",
                               transition: "width 0.6s ease",
                             }} />
                           </div>
                           <span style={{
-                            fontSize: "12px", color: "var(--text-muted)",
-                            fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap",
+                            fontSize: "12px", 
+                            color: "var(--text-muted)",
+                            fontFamily: "'JetBrains Mono', monospace", 
+                            whiteSpace: "nowrap",
                           }}>
                             {Math.round(task.progress)}%
                           </span>
                         </div>
 
                         {/* Meta info */}
-                        <div style={{ display: "flex", gap: "16px", fontSize: "11px", color: "var(--text-muted)" }}>
-                          <span><Clock size={11} style={{ display: "inline", marginRight: "3px", verticalAlign: "middle" }} />{new Date(task.created_at).toLocaleString('zh-CN')}</span>
+                        <div style={{ 
+                          display: "flex", 
+                          gap: "20px", 
+                          fontSize: "12px", 
+                          color: "var(--text-muted)",
+                          flexWrap: 'wrap',
+                        }}>
+                          <span style={{ 
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}>
+                            <Clock size={12} />
+                            {new Date(task.created_at).toLocaleString('zh-CN')}
+                          </span>
                           <span>ID: {task.id.slice(0, 8)}</span>
                         </div>
                       </div>
 
                       {/* Actions */}
-                      <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                      <div style={{ 
+                        display: "flex", 
+                        gap: "8px", 
+                        flexShrink: 0,
+                      }}>
                         {task.status === "running" && (
                           <Button
                             variant="danger"
@@ -445,8 +720,12 @@ const Tasks: React.FC = () => {
                             onClick={() => handleAction(task.id, "stop")}
                             disabled={actionLoading !== null}
                             title={t.tasks.stopTask}
+                            style={{
+                              transition: 'all 0.2s ease',
+                              borderRadius: '6px',
+                            }}
                           >
-                            <Square size={13} />
+                            <Square size={14} />
                           </Button>
                         )}
                         {(task.status === "completed" || task.status === "failed") && (
@@ -456,8 +735,12 @@ const Tasks: React.FC = () => {
                             onClick={() => handleAction(task.id, "restart")}
                             disabled={actionLoading !== null}
                             title={t.tasks.restartTask}
+                            style={{
+                              transition: 'all 0.2s ease',
+                              borderRadius: '6px',
+                            }}
                           >
-                            <RotateCcw size={13} />
+                            <RotateCcw size={14} />
                           </Button>
                         )}
                         <Button
@@ -466,8 +749,12 @@ const Tasks: React.FC = () => {
                           onClick={() => handleAction(task.id, "delete")}
                           disabled={actionLoading !== null}
                           title={t.tasks.deleteTask}
+                          style={{
+                            transition: 'all 0.2s ease',
+                            borderRadius: '6px',
+                          }}
                         >
-                          <Trash2 size={13} />
+                          <Trash2 size={14} />
                         </Button>
                       </div>
                     </div>

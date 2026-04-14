@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file event.c
  * @brief 事件同步与事件循环实�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -47,7 +47,7 @@ agentos_error_t agentos_event_wait(agentos_event_t* event, uint32_t timeout_ms) 
         return AGENTOS_SUCCESS;
     }
 
-    agentos_error_t err = agentos_cond_wait(event->cond, event->mutex, timeout_ms);
+    agentos_error_t err = agentos_cond_timedwait(event->cond, event->mutex, timeout_ms);
     if (err == AGENTOS_SUCCESS) {
         event->signaled = 0;
     }

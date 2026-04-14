@@ -11,9 +11,9 @@ message(STATUS "Configuring AgentOS core components...")
 option(BUILD_ATOMS "Build atoms module (core kernel components)" ON)
 option(BUILD_COMMONS "Build commons module (common utilities)" ON)
 option(BUILD_CUPOLAS "Build cupolas module (security framework)" ON)
-option(BUILD_DAEMON "Build daemon modules (system services)" ON)
-option(BUILD_GATEWAY "Build gateway module (API gateway)" ON)
-option(BUILD_HEAPSTORE "Build heapstore module (persistent storage)" ON)
+option(BUILD_DAEMON "Build daemon modules (system services)" OFF)  # Windows上暂时禁用，需要PkgConfig
+option(BUILD_GATEWAY "Build gateway module (API gateway)" OFF)  # Windows上暂时禁用，需要cJSON
+option(BUILD_HEAPSTORE "Build heapstore module (persistent storage)" OFF)  # Windows上暂时禁用
 option(BUILD_TOOLKIT "Build toolkit modules (language SDKs)" OFF)  # 默认关闭，需要额外配置
 
 # 全局包含目录

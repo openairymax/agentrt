@@ -8,7 +8,10 @@
  *
  * "From data intelligence emerges."
  *
- * @note 提供基于系统原生线程的任务调度功能，包括互斥锁、条件变量、线程管理等
+ * @note 提供基于系统原生线程的任务调度功能
+ * 
+ * @note 线程同步原语（mutex, cond, thread）由 platform.h 提供，
+ *       本文件仅提供任务调度相关的扩展功能
  */
 
 #ifndef AGENTOS_TASK_H
@@ -20,6 +23,8 @@
 #include "export.h"
 /* 统一类型定义：使用commons作为权威基础库 */
 #include "../../../commons/include/agentos_types.h"
+/* 线程同步原语由platform.h提供 */
+#include "../../../commons/platform/include/platform.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,15 +34,6 @@ extern "C" {
  * @brief 任务 ID 类型
  */
 typedef uint64_t agentos_task_id_t;
-
-/* 
- * 以下类型现在由platform.h提供：
- * - agentos_thread_id_t
- * - agentos_mutex_t
- * - agentos_cond_t
- * - agentos_thread_t
- * 请直接使用platform.h中的定义
- */
 
 /**
  * @brief 任务优先级常量
@@ -60,11 +56,6 @@ typedef enum {
 } agentos_task_state_t;
 
 /**
- * @brief 线程函数类型
- */
-typedef void* (*agentos_thread_func_t)(void*);
-
-/**
  * @brief 线程属性结构
  */
 typedef struct {
@@ -73,6 +64,8 @@ typedef struct {
     size_t stack_size;    /**< 栈大小 */
     int detach_state;     /**< 分离状态 */
 } agentos_thread_attr_t;
+
+/* ==================== 任务调度核心接口 ==================== */
 
 /**
  * @brief 初始化任务调度系统
@@ -86,186 +79,6 @@ typedef struct {
  * @see agentos_task_cleanup()
  */
 AGENTOS_API agentos_error_t agentos_task_init(void);
-
-/**
- * @brief 创建互斥锁
- *
- * @return agentos_mutex_t* 互斥锁句柄
- *
- * @ownership 返回的句柄由调用者管理，需通过 agentos_mutex_destroy() 释放
- * @threadsafe 否，创建后使用是线程安全的
- * @reentrant 否
- *
- * @see agentos_mutex_destroy()
- * @see agentos_mutex_lock()
- * @see agentos_mutex_trylock()
- * @see agentos_mutex_unlock()
- */
-AGENTOS_API agentos_mutex_t* agentos_mutex_create(void);
-
-/**
- * @brief 销毁互斥锁
- *
- * @param mutex [in] 互斥锁句柄
- *
- * @threadsafe 否
- * @reentrant 否
- *
- * @see agentos_mutex_create()
- */
-AGENTOS_API void agentos_mutex_destroy(agentos_mutex_t* mutex);
-
-/**
- * @brief 获取互斥锁
- *
- * @param mutex [in] 互斥锁句柄
- * @return int 成功返回0，失败返回错误码
- *
- * @threadsafe 是
- * @reentrant 否
- *
- * @note 如果锁已被其他线程持有，当前线程会阻塞
- *
- * @see agentos_mutex_unlock()
- */
-AGENTOS_API int agentos_mutex_lock(agentos_mutex_t* mutex);
-
-/**
- * @brief 尝试获取互斥锁（非阻塞）
- *
- * @param mutex [in] 互斥锁句柄
- * @return int 成功返回 0，失败返回非零值
- *
- * @threadsafe 是
- * @reentrant 否
- *
- * @see agentos_mutex_lock()
- * @see agentos_mutex_unlock()
- */
-AGENTOS_API int agentos_mutex_trylock(agentos_mutex_t* mutex);
-
-/**
- * @brief 释放互斥锁
- *
- * @param mutex [in] 互斥锁句柄
- * @return int 成功返回0，失败返回错误码
- *
- * @threadsafe 是
- * @reentrant 否
- *
- * @see agentos_mutex_lock()
- */
-AGENTOS_API int agentos_mutex_unlock(agentos_mutex_t* mutex);
-
-/**
- * @brief 创建条件变量
- *
- * @return agentos_cond_t* 条件变量句柄
- *
- * @ownership 返回的句柄由调用者管理，需通过 agentos_cond_destroy() 释放
- * @threadsafe 否，创建后使用是线程安全的
- * @reentrant 否
- *
- * @see agentos_cond_destroy()
- * @see agentos_cond_wait()
- * @see agentos_cond_signal()
- * @see agentos_cond_broadcast()
- */
-AGENTOS_API agentos_cond_t* agentos_cond_create(void);
-
-/**
- * @brief 销毁条件变量
- *
- * @param cond [in] 条件变量句柄
- *
- * @threadsafe 否
- * @reentrant 否
- *
- * @see agentos_cond_create()
- */
-AGENTOS_API void agentos_cond_destroy(agentos_cond_t* cond);
-
-/**
- * @brief 等待条件变量
- *
- * @param cond [in] 条件变量句柄
- * @param mutex [in] 互斥锁句柄（必须由调用者持有）
- * @param timeout_ms [in] 超时时间（毫秒），0 表示无限等待
- * @return agentos_error_t 错误码
- *
- * @threadsafe 是
- * @reentrant 否
- *
- * @note 等待时会释放 mutex，醒来时重新获取 mutex
- *
- * @see agentos_cond_signal()
- * @see agentos_cond_broadcast()
- */
-AGENTOS_API int agentos_cond_wait(agentos_cond_t* cond, agentos_mutex_t* mutex);
-AGENTOS_API int agentos_cond_timedwait(agentos_cond_t* cond, agentos_mutex_t* mutex, uint32_t timeout_ms);
-
-/**
- * @brief 发送信号（唤醒一个等待的线程）
- *
- * @param cond [in] 条件变量句柄
- * @return int 成功返回0，失败返回错误码
- *
- * @threadsafe 是
- * @reentrant 否
- *
- * @see agentos_cond_wait()
- * @see agentos_cond_broadcast()
- */
-AGENTOS_API int agentos_cond_signal(agentos_cond_t* cond);
-
-/**
- * @brief 广播（唤醒所有等待的线程）
- *
- * @param cond [in] 条件变量句柄
- * @return int 成功返回0，失败返回错误码
- *
- * @threadsafe 是
- * @reentrant 否
- *
- * @see agentos_cond_wait()
- * @see agentos_cond_signal()
- */
-AGENTOS_API int agentos_cond_broadcast(agentos_cond_t* cond);
-
-/**
- * @brief 创建线程
- *
- * @param thread [out] 输出线程句柄
- * @param attr [in] 线程属性（NULL 表示默认属性）
- * @param func [in] 线程函数
- * @param arg [in] 传递给线程函数的参数
- * @return agentos_error_t 错误码
- *
- * @ownership thread 由调用者管理，需通过 agentos_thread_join() 回收
- * @threadsafe 否
- * @reentrant 否
- *
- * @see agentos_thread_join()
- */
-AGENTOS_API agentos_error_t agentos_thread_create(
-    agentos_thread_t* thread,
-    const agentos_thread_attr_t* attr,
-    void (*func)(void*),
-    void* arg);
-
-/**
- * @brief 等待线程结束
- *
- * @param thread [in] 线程句柄
- * @param retval [out] 输出线程返回值（可为 NULL）
- * @return agentos_error_t 错误码
- *
- * @threadsafe 否
- * @reentrant 否
- *
- * @see agentos_thread_create()
- */
-AGENTOS_API agentos_error_t agentos_thread_join(agentos_thread_t thread, void** retval);
 
 /**
  * @brief 获取当前任务 ID
