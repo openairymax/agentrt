@@ -25,6 +25,9 @@
     #include <ws2tcpip.h>
     #include <windows.h>
     #include <synchapi.h>
+#else
+    #include <pthread.h>
+    #include <semaphore.h>
 #endif
 
 #ifdef __cplusplus
@@ -55,10 +58,11 @@ struct sync_recursive_mutex {
     const char* name;
     sync_stats_t stats;
     size_t recursive_count;
-    pthread_t owner_thread;
 #ifdef _WIN32
+    DWORD owner_thread;
     CRITICAL_SECTION mutex;
 #else
+    pthread_t owner_thread;
     pthread_mutex_t mutex;
 #endif
 };

@@ -11,17 +11,16 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-/* 跨平台原子操作支持 - Windows头文件必须在最前面 */
+/* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
+#include <agentos/atomic_compat.h>
+
+/* Windows 特定头文件和定义 */
 #ifdef _WIN32
     #define WIN32_LEAN_AND_MEAN
     #include <winsock2.h>
     #include <ws2tcpip.h>
     #include <windows.h>
-    #include <intrin.h>
     #define strdup _strdup
-    #include "../../../commons/utils/include/atomic_compat.h"
-#else
-    #include <stdatomic.h>
 #endif
 
 #include "gateway_rate_limiter.h"

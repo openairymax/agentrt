@@ -8,6 +8,7 @@
  */
 
 #include "protocol_router.h"
+#include "protocol_transformers.h"
 #include "../../../../daemon/common/include/safe_string_utils.h"
 #include <stdlib.h>
 #include <string.h>
@@ -309,68 +310,28 @@ int protocol_transformer_jsonrpc_to_mcp(const unified_message_t* source,
                                         unified_message_t* target,
                                         void* context)
 {
-    // TODO: 实现JSON-RPC到MCP的实际转换逻辑
-    // 目前仅作为存根实现
-    
-    if (!source || !target) {
-        return -1;
-    }
-    
-    *target = *source;
-    target->protocol = PROTOCOL_CUSTOM; // 标记为自定义，后续会设置为MCP
-    
-    return 0;
+    return transformer_jsonrpc_to_mcp_request(source, target, context);
 }
 
 int protocol_transformer_mcp_to_jsonrpc(const unified_message_t* source,
                                         unified_message_t* target,
                                         void* context)
 {
-    // TODO: 实现MCP到JSON-RPC的实际转换逻辑
-    // 目前仅作为存根实现
-    
-    if (!source || !target) {
-        return -1;
-    }
-    
-    *target = *source;
-    target->protocol = PROTOCOL_HTTP; // JSON-RPC通常通过HTTP传输
-    
-    return 0;
+    return transformer_mcp_to_jsonrpc_response(source, target, context);
 }
 
 int protocol_transformer_openai_to_jsonrpc(const unified_message_t* source,
                                            unified_message_t* target,
                                            void* context)
 {
-    // TODO: 实现OpenAI API到JSON-RPC的实际转换逻辑
-    // 目前仅作为存根实现
-    
-    if (!source || !target) {
-        return -1;
-    }
-    
-    *target = *source;
-    target->protocol = PROTOCOL_HTTP; // OpenAI API使用HTTP
-    
-    return 0;
+    return transformer_openai_chat_to_jsonrpc(source, target, context);
 }
 
 int protocol_transformer_a2a_to_jsonrpc(const unified_message_t* source,
                                         unified_message_t* target,
                                         void* context)
 {
-    // TODO: 实现A2A到JSON-RPC的实际转换逻辑
-    // 目前仅作为存根实现
-    
-    if (!source || !target) {
-        return -1;
-    }
-    
-    *target = *source;
-    target->protocol = PROTOCOL_WEBSOCKET; // A2A通常使用WebSocket
-    
-    return 0;
+    return transformer_a2a_to_jsonrpc_response(source, target, context);
 }
 
 int protocol_transformer_default(const unified_message_t* source,

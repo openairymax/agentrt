@@ -280,6 +280,8 @@ Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 →
 "From data intelligence emerges."  
 始于数据，终于智能。  
 
+<img src="docs/Source_Other/feishu-community-qr.png" width="200" />
+
 <a href="https://atomgit.com/spharx/agentos">AtomGit</a> ·
 <a href="https://gitee.com/spharx/agentos">Gitee</a> ·
 <a href="https://github.com/SpharxTeam/AgentOS">GitHub</a> ·

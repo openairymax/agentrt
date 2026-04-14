@@ -32,9 +32,14 @@ Commands:
         task result <id>          Get task result
 
     Protocol Operations:
-        protocol list             List protocol adapters
-        protocol test <proto>     Test protocol connection
-        protocol send <proto> <method> [params]  Send protocol message
+        protocol list                  List all protocol adapters
+        protocol info <proto>          Show detailed protocol information
+        protocol test <proto>          Test protocol connectivity
+        protocol detect                Detect protocol from input content
+        protocol send <proto> <method> [params]  Send a protocol message
+        protocol stats                 Show protocol statistics
+        protocol transform <src> <tgt> [data]   Transform between protocols
+        protocol capabilities <proto>  Show protocol capabilities
 
     Configuration:
         config get <key>          Get configuration value
@@ -236,18 +241,447 @@ def cmd_protocol_list(args):
             {"name": "MCP", "protocol": "mcp", "version": "1.0", "status": "active", "endpoint": "/mcp"},
             {"name": "A2A", "protocol": "a2a", "version": "0.3", "status": "active", "endpoint": "/a2a"},
             {"name": "OpenAI", "protocol": "openai", "version": "1.0", "status": "active", "endpoint": "/v1"},
+            {"name": "OpenJiuwen", "protocol": "openjiuwen", "version": "1.0", "status": "active", "endpoint": "/ojiuwen"},
         ]
     else:
         protocols = result.get("adapters", [])
 
-    print(f"{'Protocol':<15} {'Version':<10} {'Status':<10} {'Endpoint':<15}")
-    print("-" * 50)
+    print(f"{'Protocol':<15} {'Version':<10} {'Status':<10} {'Endpoint':<18}")
+    print("-" * 53)
     for proto in protocols:
         name = proto.get("protocol", proto.get("name", "-")).upper()
         version = proto.get("version", "-")
         status = proto.get("status", "-")
         endpoint = proto.get("endpoint", "-")
-        print(f"{name:<15} {version:<10} {status:<10} {endpoint:<15}")
+        print(f"{name:<15} {version:<10} {status:<10} {endpoint:<18}")
+
+    return 0
+
+
+PROTOCOL_META = {
+    "jsonrpc": {
+        "name": "JSON-RPC 2.0",
+        "version": "2.0",
+        "endpoint": "/jsonrpc",
+        "content_type": "application/json",
+        "transport": "HTTP/WebSocket",
+        "methods": ["task.submit", "task.status", "task.result", "memory.write", "memory.search",
+                     "session.create", "skill.load", "service.list", "agent.list", "ping"],
+        "features": ["batch requests", "notifications", "idempotency", "streaming (SSE)"],
+        "spec_url": "https://www.jsonrpc.org/specification",
+    },
+    "mcp": {
+        "name": "MCP v1.0 (Model Context Protocol)",
+        "version": "1.0",
+        "endpoint": "/mcp",
+        "content_type": "application/json",
+        "transport": "HTTP/stdio (SSE)",
+        "methods": ["initialize", "tools/list", "tools/call", "resources/list", "resources/read",
+                     "prompts/list", "prompts/get", "ping"],
+        "features": ["tool discovery", "resource management", "prompt templates", "sampling"],
+        "spec_url": "https://modelcontextprotocol.io/",
+    },
+    "a2a": {
+        "name": "A2A v0.3 (Agent-to-Agent)",
+        "version": "0.3",
+        "endpoint": "/a2a",
+        "content_type": "application/json",
+        "transport": "HTTP/WebSocket",
+        "methods": ["agent.discover", "agent.register", "task.delegate", "negotiate.propose",
+                     "consensus.vote", "streaming.progress"],
+        "features": ["multi-agent coordination", "task delegation", "negotiation", "consensus voting", "streaming"],
+        "spec_url": "https://github.com/google/A2A",
+    },
+    "openai": {
+        "name": "OpenAI API Compatible",
+        "version": "1.0",
+        "endpoint": "/v1",
+        "content_type": "application/json",
+        "transport": "HTTP (SSE)",
+        "methods": ["/v1/chat/completions", "/v1/embeddings", "/v1/models", "/v1/completions"],
+        "models": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo",
+                   "text-embedding-ada-002", "text-embedding-3-small", "text-embedding-3-large"],
+        "features": ["chat completions", "embeddings", "streaming (SSE)", "function calling"],
+        "spec_url": "https://platform.openai.com/docs/api-reference",
+    },
+    "openjiuwen": {
+        "name": "OpenJiuwen (Custom Binary)",
+        "version": "1.0",
+        "endpoint": "/ojiuwen",
+        "content_type": "application/octet-stream",
+        "transport": "TCP/WebSocket (binary)",
+        "methods": ["request", "response", "notification", "heartbeat"],
+        "features": ["binary protocol", "CRC32 integrity", "24-byte header", "low latency", "sequence numbers"],
+        "magic": "0x4F4A574D (OJWM)",
+        "header_size": "24 bytes",
+    },
+}
+
+
+def _resolve_protocol(name: str) -> str:
+    aliases = {
+        "json-rpc": "jsonrpc", "jsonrpc": "jsonrpc", "json": "jsonrpc",
+        "mcp": "mcp", "model-context-protocol": "mcp",
+        "a2a": "a2a", "agent-to-agent": "a2a", "agent2agent": "a2a",
+        "openai": "openai", "openai-api": "openai", "openai-compatible": "openai",
+        "ojiuwen": "openjiuwen", "openjiuwen": "openjiuwen", "ojw": "openjiuwen", "binary": "openjiuwen",
+    }
+    return aliases.get(name.lower().strip(), name.lower().strip())
+
+
+def cmd_protocol_info(args):
+    proto_name = _resolve_protocol(args.proto)
+    meta = PROTOCOL_META.get(proto_name)
+
+    if not meta:
+        valid = ", ".join(PROTOCOL_META.keys())
+        print_error(f"Unknown protocol '{args.proto}'. Valid: {valid}")
+        return 1
+
+    print_header(f"Protocol: {meta['name']}")
+    print(f"  {BOLD}Version:{RESET}       {meta['version']}")
+    print(f"  {BOLD}Endpoint:{RESET}      {meta['endpoint']}")
+    print(f"  {BOLD}Content-Type:{RESET}  {meta['content_type']}")
+    print(f"  {BOLD}Transport:{RESET}     {meta['transport']}")
+
+    if "models" in meta:
+        print(f"\n  {BOLD}Built-in Models:{RESET}")
+        for m in meta["models"]:
+            print(f"    - {m}")
+
+    if "magic" in meta:
+        print(f"\n  {BOLD}Binary Format:{RESET}")
+        print(f"    Magic Number: {meta['magic']}")
+        print(f"    Header Size:  {meta['header_size']}")
+
+    print(f"\n  {BOLD}Methods:{RESET}")
+    for method in meta["methods"]:
+        print(f"    - {method}")
+
+    print(f"\n  {BOLD}Features:{RESET}")
+    for feature in meta["features"]:
+        print(f"    - {feature}")
+
+    print(f"\n  {BOLD}Specification:{RESET} {meta['spec_url']}")
+    return 0
+
+
+def cmd_protocol_test(args):
+    import time
+    proto_name = _resolve_protocol(args.proto)
+    meta = PROTOCOL_META.get(proto_name)
+
+    if not meta:
+        valid = ", ".join(PROTOCOL_META.keys())
+        print_error(f"Unknown protocol '{args.proto}'. Valid: {valid}")
+        return 1
+
+    print_header(f"Testing {meta['name']}")
+    endpoint = meta["endpoint"]
+
+    print_info(f"Connecting to {GATEWAY_URL}{endpoint} ...")
+
+    start_time = time.time()
+
+    if proto_name == "jsonrpc":
+        result = jsonrpc_request("ping", {})
+    elif proto_name == "mcp":
+        result = api_request("POST", "/mcp", {"jsonrpc": "2.0", "method": "ping", "id": 1})
+    elif proto_name == "openai":
+        result = api_request("GET", "/v1/models")
+    elif proto_name == "a2a":
+        result = api_request("POST", "/a2a", {"type": "discovery_request"})
+    elif proto_name == "openjiuwen":
+        result = api_request("GET", "/ojiuwen/health")
+    else:
+        result = api_request("GET", endpoint.replace("/", "", 1) + "/health" if endpoint.startswith("/") else endpoint + "/health")
+
+    latency_ms = (time.time() - start_time) * 1000
+
+    if "error" in result and isinstance(result["error"], str) and ("Connection failed" in result["error"] or "HTTP" in result["error"]):
+        print_error(f"Connection failed ({latency_ms:.0f}ms)")
+        print_info(f"Ensure gateway is running at {GATEWAY_URL}")
+        return 1
+
+    version = meta["version"]
+    if isinstance(result, dict) and "result" in result:
+        resp_version = result.get("result", {}).get("version", version)
+    else:
+        resp_version = version
+
+    print_success(f"Connected successfully ({latency_ms:.0f}ms, version: {resp_version})")
+
+    if args.verbose:
+        print(f"\n{CYAN}Raw response:{RESET}")
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+
+    return 0
+
+
+def cmd_protocol_detect(args):
+    content = args.content
+    content_type = getattr(args, 'content_type', None)
+
+    if not content or content == "-":
+        try:
+            content = sys.stdin.read()
+        except Exception:
+            print_error("No input content provided. Use --content or pipe stdin.")
+            return 1
+
+    print_header("Protocol Detection")
+
+    confidence_scores = []
+
+    if '"jsonrpc"' in content and ('"method"' in content or '"result"' in content):
+        confidence_scores.append(("JSON-RPC", 0.95))
+    if any(m in content for m in ['"tools/list"', '"tools/call"', '"initialize"', '"resources/']):
+        confidence_scores.append(("MCP", 0.90))
+    if any(k in content for k in ['"agent_id"', '"task_delegation"', '"type":"task']):
+        confidence_scores.append(("A2A", 0.85))
+    if any(k in content for k in ['"messages"', '"model":', '"temperature"', '"max_tokens"']):
+        confidence_scores.append(("OpenAI", 0.88))
+
+    if content_type:
+        ct_map = {
+            "application/json-rpc": ("JSON-RPC", 0.98),
+            "application/mcp": ("MCP", 0.97),
+            "application/a2a": ("A2A", 0.96),
+            "application/openai+json": ("OpenAI", 0.95),
+            "application/octet-stream": ("OpenJiuwen", 0.90),
+        }
+        if content_type in ct_map:
+            confidence_scores.append(ct_map[content_type])
+
+    if not confidence_scores:
+        confidence_scores.append(("JSON-RPC", 0.50))
+
+    confidence_scores.sort(key=lambda x: x[1], reverse=True)
+
+    detected = confidence_scores[0]
+    print(f"  {BOLD}Input size:{RESET}     {len(content)} bytes")
+    print(f"  {BOLD}Content-Type:{RESET}   {content_type or '(not specified)'}")
+    print(f"\n  {BOLD}Detected:{RESET}      {GREEN}{detected[0]}{RESET} ({detected[1]*100:.1f}% confidence)")
+
+    if len(confidence_scores) > 1:
+        print(f"\n  {BOLD}Alternatives:{RESET}")
+        for alt, conf in confidence_scores[1:4]:
+            bar_len = int(conf * 30)
+            bar = "█" * bar_len + "░" * (30 - bar_len)
+            print(f"    {alt:<15} [{bar}] {conf*100:.1f}%")
+
+    return 0
+
+
+def cmd_protocol_send(args):
+    proto_name = _resolve_protocol(args.proto)
+    method = args.method
+    params_raw = getattr(args, 'params', None)
+
+    params = {}
+    if params_raw:
+        try:
+            params = json.loads(params_raw)
+        except json.JSONDecodeError as e:
+            print_error(f"Invalid JSON params: {e}")
+            return 1
+
+    meta = PROTOCOL_META.get(proto_name)
+    if not meta:
+        valid = ", ".join(PROTOCOL_META.keys())
+        print_error(f"Unknown protocol '{args.proto}'. Valid: {valid}")
+        return 1
+
+    print_header(f"Sending via {meta['name']}")
+    print_info(f"Method: {method}")
+    if params:
+        print_info(f"Params: {json.dumps(params, ensure_ascii=False)}")
+
+    if proto_name == "jsonrpc":
+        import uuid
+        payload = {
+            "jsonrpc": "2.0",
+            "method": method,
+            "params": params,
+            "id": f"cli-{uuid.uuid4().hex[:8]}",
+        }
+        result = api_request("POST", "/jsonrpc", payload)
+    elif proto_name == "mcp":
+        payload = {
+            "jsonrpc": "2.0",
+            "method": method,
+            "params": params,
+            "id": 1,
+        }
+        result = api_request("POST", "/mcp", payload)
+    elif proto_name == "openai":
+        if method.startswith("/"):
+            path = method
+        else:
+            path = f"/v1/{method}"
+        payload = params
+        result = api_request("POST", path, payload)
+    elif proto_name == "a2a":
+        payload = {"type": method, **params}
+        result = api_request("POST", "/a2a", payload)
+    else:
+        payload = {"method": method, "params": params}
+        result = api_request("POST", meta["endpoint"], payload)
+
+    print(f"\n{BOLD}Response:{RESET}")
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+    return 0
+
+
+def cmd_protocol_stats(args):
+    print_header("Protocol Statistics")
+
+    stats_result = api_request("GET", "/api/v1/protocols/stats")
+
+    if "error" not in stats_result and isinstance(stats_result, dict):
+        stats = stats_result
+    else:
+        stats = {
+            "total_requests": 0,
+            "by_protocol": {
+                "jsonrpc": {"count": 0, "errors": 0},
+                "mcp": {"count": 0, "errors": 0},
+                "a2a": {"count": 0, "errors": 0},
+                "openai": {"count": 0, "errors": 0},
+                "openjiuwen": {"count": 0, "errors": 0},
+            },
+            "transforms": 0,
+            "transform_errors": 0,
+            "avg_latency_ms": 0,
+        }
+
+    total = stats.get("total_requests", 0)
+    transforms = stats.get("transforms", 0)
+    transform_errors = stats.get("transform_errors", 0)
+    avg_latency = stats.get("avg_latency_ms", 0)
+
+    print(f"  {BOLD}Total Requests:{RESET}   {total:,}")
+    print(f"  {BOLD}Transforms:{RESET}       {transforms}")
+    print(f"  {BOLD}Transform Errors:{RESET} {transform_errors}")
+    print(f"  {BOLD}Avg Latency:{RESET}      {avg_latency:.1f}ms")
+
+    by_proto = stats.get("by_protocol", {})
+    if by_proto:
+        print(f"\n  {BOLD}By Protocol:{RESET}")
+        print(f"  {'Protocol':<15} {'Requests':>10} {'Errors':>8} {'Share':>8}")
+        print(f"  {'-'*15} {'-'*10} {'-'*8} {'-'*8}")
+        for proto_name, pdata in by_proto.items():
+            count = pdata.get("count", 0)
+            errors = pdata.get("errors", 0)
+            share = (count / total * 100) if total > 0 else 0
+            ptag = proto_name.upper()
+            print(f"  {ptag:<15} {count:>10,} {errors:>8} {share:>7.1f}%")
+
+    return 0
+
+
+def cmd_protocol_transform(args):
+    src = _resolve_protocol(args.src)
+    tgt = _resolve_protocol(args.tgt)
+    data_arg = getattr(args, 'data', None)
+
+    if src == tgt:
+        print_warning("Source and target are the same protocol — nothing to transform.")
+        return 0
+
+    print_header(f"Protocol Transform: {src.upper()} → {tgt.upper()}")
+
+    sample_data = {
+        ("jsonrpc", "mcp"): {
+            "input": '{"jsonrpc":"2.0","method":"tool.execute","params":{"name":"web_search","query":"AgentOS"},"id":1}',
+            "output_desc": "tool.execute → tools/call (params → arguments mapping)",
+        },
+        ("jsonrpc", "openai"): {
+            "input": '{"jsonrpc":"2.0","method":"llm.chat","params":{"prompt":"Hello","max_tokens":100},"id":1}',
+            "output_desc": "llm.chat → chat/completions (prompt → messages mapping)",
+        },
+        ("jsonrpc", "a2a"): {
+            "input": '{"jsonrpc":"2.0","method":"task.delegate","params":{"description":"Analyze data","target":"agent-002"},"id":1}',
+            "output_desc": "task.delegate → task_delegation type with input_data",
+        },
+        ("mcp", "jsonrpc"): {
+            "input": '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"calc","arguments":{"x":1}},"id":1}',
+            "output_desc": "tools/call → tool.execute (arguments → params mapping)",
+        },
+        ("openai", "jsonrpc"): {
+            "input": '{"model":"gpt-4o","messages":[{"role":"user","content":"Hi"}],"max_tokens":100}',
+            "output_desc": "chat/completions → llm.chat (messages → prompt extraction)",
+        },
+    }
+
+    key = (src, tgt)
+    if key in sample_data:
+        sample = sample_data[key]
+        print(f"  {BOLD}Sample Input ({src.upper()}):{RESET}")
+        try:
+            parsed = json.loads(sample["input"])
+            print(f"  {json.dumps(parsed, indent=4, ensure_ascii=False)}")
+        except Exception:
+            print(f"  {sample['input']}")
+        print(f"\n  {BOLD}Expected Transformation:{RESET}")
+        print(f"  {sample['output_desc']}")
+    else:
+        print_info(f"Transformation {src.upper()} → {tgt.upper()} is supported via the unified transformer pipeline.")
+        print_info(f"Transformer function: transformer_{src}_to_{tgt}_request()")
+
+    if data_arg:
+        print(f"\n  {BOLD}Custom Input Data:{RESET}")
+        try:
+            parsed = json.loads(data_arg)
+            print(f"  {json.dumps(parsed, indent=2, ensure_ascii=False)}")
+        except Exception:
+            print(f"  {data_arg[:200]}")
+        print(f"\n  {CYAN}Note:{RESET} Run transformation against a live gateway for actual results.")
+
+    print(f"\n  {BOLD}Available transformations:{RESET}")
+    transforms = [
+        "JSON-RPC ↔ MCP", "JSON-RPC ↔ A2A", "JSON-RPC ↔ OpenAI",
+        "JSON-RPC ↔ OpenJiuwen", "MCP ↔ JSON-RPC", "A2A ↔ JSON-RPC",
+        "OpenAI ↔ JSON-RPC", "OpenJiuwen ↔ JSON-RPC",
+    ]
+    for t in transforms:
+        mark = "✓" if (src in t.lower() and tgt in t.lower()) else " "
+        print(f"    {mark} {t}")
+
+    return 0
+
+
+def cmd_protocol_capabilities(args):
+    proto_name = _resolve_protocol(args.proto)
+    meta = PROTOCOL_META.get(proto_name)
+
+    if not meta:
+        valid = ", ".join(PROTOCOL_META.keys())
+        print_error(f"Unknown protocol '{args.proto}'. Valid: {valid}")
+        return 1
+
+    print_header(f"Capabilities: {meta['name']}")
+
+    methods = meta.get("methods", [])
+    features = meta.get("features", [])
+
+    print(f"  {BOLD}Supported Methods ({len(methods)}):{RESET}")
+    for i, m in enumerate(methods, 1):
+        print(f"    {i:2}. {m}")
+
+    print(f"\n  {BOLD}Features ({len(features)}):{RESET}")
+    for f in features:
+        print(f"    - {f}")
+
+    if "models" in meta:
+        print(f"\n  {BOLD}Available Models ({len(meta['models'])}):{RESET}")
+        for m in meta["models"]:
+            print(f"    - {m}")
+
+    print(f"\n  {BOLD}Transport Details:{RESET}")
+    print(f"    Endpoint:     {GATEWAY_URL}{meta['endpoint']}")
+    print(f"    Content-Type: {meta['content_type']}")
+    print(f"    Transport:    {meta['transport']}")
 
     return 0
 
@@ -277,9 +711,9 @@ def cmd_config_set(args):
 
 
 def cmd_version(args):
-    print(f"{BOLD}AgentOS{RESET} v2.0.0")
+    print(f"{BOLD}AgentOS{RESET} v2.1.0")
     print(f"  Gateway: {GATEWAY_URL}")
-    print(f"  Protocols: JSON-RPC, MCP, A2A, OpenAI API")
+    print(f"  Protocols: JSON-RPC 2.0, MCP v1.0, A2A v0.3, OpenAI API, OpenJiuwen (binary)")
     return 0
 
 
@@ -385,7 +819,33 @@ def main():
     # Protocol commands
     proto_parser = subparsers.add_parser("protocol", help="Protocol operations")
     proto_sub = proto_parser.add_subparsers(dest="subcommand")
-    proto_sub.add_parser("list", help="List protocols")
+    proto_sub.add_parser("list", help="List all protocol adapters")
+
+    proto_info = proto_sub.add_parser("info", help="Show detailed protocol information")
+    proto_info.add_argument("proto", help="Protocol name (jsonrpc/mcp/a2a/openai/openjiuwen)")
+
+    proto_test = proto_sub.add_parser("test", help="Test protocol connectivity")
+    proto_test.add_argument("proto", help="Protocol name (jsonrpc/mcp/a2a/openai/openjiuwen)")
+    proto_test.add_argument("-v", "--verbose", action="store_true", help="Show raw response")
+
+    proto_detect = proto_sub.add_parser("detect", help="Detect protocol from input content")
+    proto_detect.add_argument("--content", "-c", default=None, help="JSON content string to analyze")
+    proto_detect.add_argument("--content-type", "-t", default=None, help="MIME content-type hint")
+
+    proto_send = proto_sub.add_parser("send", help="Send a protocol message")
+    proto_send.add_argument("proto", help="Target protocol (jsonrpc/mcp/a2a/openai)")
+    proto_send.add_argument("method", help="Method name or endpoint path")
+    proto_send.add_argument("params", nargs="?", default=None, help="JSON params string")
+
+    proto_sub.add_parser("stats", help="Show protocol statistics")
+
+    proto_transform = proto_sub.add_parser("transform", help="Transform between protocols")
+    proto_transform.add_argument("src", help="Source protocol")
+    proto_transform.add_argument("tgt", help="Target protocol")
+    proto_transform.add_argument("data", nargs="?", default=None, help="Optional input data for transformation demo")
+
+    proto_caps = proto_sub.add_parser("capabilities", help="Show protocol capabilities")
+    proto_caps.add_argument("proto", help="Protocol name")
 
     # Config commands
     cfg_parser = subparsers.add_parser("config", help="Configuration management")
@@ -426,6 +886,13 @@ def main():
         },
         "protocol": {
             "list": cmd_protocol_list,
+            "info": cmd_protocol_info,
+            "test": cmd_protocol_test,
+            "detect": cmd_protocol_detect,
+            "send": cmd_protocol_send,
+            "stats": cmd_protocol_stats,
+            "transform": cmd_protocol_transform,
+            "capabilities": cmd_protocol_capabilities,
         },
         "config": {
             "get": cmd_config_get,

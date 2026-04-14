@@ -10,7 +10,7 @@
 #include "gateway_protocol_handler.h"
 #include "jsonrpc.h"
 #include "syscall_router.h"
-#include "../../../daemon/common/include/safe_string_utils.h"
+#include <agentos/safe_string_utils.h>
 #include <cJSON.h>
 #include <stdlib.h>
 #include <string.h>

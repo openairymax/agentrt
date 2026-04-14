@@ -274,6 +274,8 @@ This project is licensed under the **Apache License 2.0**. See [LICENSE](LICENSE
 
 **"From data intelligence emerges."**
 
+<img src="docs/Source_Other/feishu-community-qr.png" width="200" />
+
 <a href="https://atomgit.com/spharx/agentos">AtomGit</a> ·
 <a href="https://gitee.com/spharx/agentos">Gitee</a> ·
 <a href="https://github.com/SpharxTeam/AgentOS">GitHub</a> ·

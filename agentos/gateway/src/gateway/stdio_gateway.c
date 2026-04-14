@@ -22,21 +22,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* 跨平台原子操作支持 */
-#ifdef _WIN32
-#include <windows.h>
-#include <intrin.h>
-#include "../../../commons/utils/include/atomic_compat.h"
-#else
-#include <stdatomic.h>
-#endif
+/* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
+#include <agentos/atomic_compat.h>
 
+/* 平台特定头文件 */
 #ifdef _WIN32
-#include <windows.h>
-#define STDIN_FILENO 0
+    #define WIN32_LEAN_AND_MEAN
+    #include <windows.h>
+    #define STDIN_FILENO 0
 #else
-#include <unistd.h>
-#include <sys/select.h>
+    #include <unistd.h>
+    #include <sys/select.h>
 #endif
 
 /* ========== 辅助函数（使用 gateway_utils.h 中的公共实现） ========== */
