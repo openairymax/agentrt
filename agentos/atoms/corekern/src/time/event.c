@@ -9,8 +9,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../agentos/commons/utils/memory/include/memory_compat.h"
-#include "../../../agentos/commons/utils/string/include/string_compat.h"
+#include "../../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../../commons/utils/string/include/string_compat.h"
 
 struct agentos_event {
     volatile int signaled;
@@ -47,7 +47,7 @@ agentos_error_t agentos_event_wait(agentos_event_t* event, uint32_t timeout_ms) 
         return AGENTOS_SUCCESS;
     }
 
-    agentos_error_t err = agentos_cond_wait(event->cond, event->mutex, timeout_ms);
+    agentos_error_t err = agentos_cond_timedwait(event->cond, event->mutex, timeout_ms);
     if (err == AGENTOS_SUCCESS) {
         event->signaled = 0;
     }

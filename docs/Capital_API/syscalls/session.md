@@ -301,7 +301,7 @@ agentos_session_create(const char* agent_id,
 - `AGENTOS_SUCCESS` (0x0000): 创建成功
 - `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 参数无效
 - `AGENTOS_ERROR_NO_MEMORY` (0x1002): 内存不足
-- `AGENTOS_ERROR_AGENT_NOT_FOUND` (0x3001): Agent 不存在
+- `AGENTOS_ERROR_AGENT_NOT_FOUND` (0x3006): Agent 不存在
 
 **使用示例**：
 ```c
@@ -437,6 +437,172 @@ agentos_session_close(const char* session_id,
                       bool archive,
                       const char* summary);
 ```
+
+### `agentos_session_update()`
+
+```c
+/**
+ * @brief 更新会话信息
+ * 
+ * 动态更新会话的元数据。仅允许更新部分字段，
+ * 会话 ID 和创建时间不可更改。
+ * 
+ * @param session_id 会话 ID
+ * @param updates 更新内容（JSON 格式，仅包含需更新的字段）
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @threadsafe 是
+ * @reentrant 否
+ */
+AGENTOS_API agentos_error_t
+agentos_session_update(const char* session_id,
+                       const char* updates);
+```
+
+**可更新字段**（JSON 格式）：
+```json
+{
+    "title": "新会话标题",
+    "tags": ["updated", "important"],
+    "metadata": {"key": "value"}
+}
+```
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 更新成功
+- `AGENTOS_ERROR_SESSION_NOT_FOUND` (0x3001): 会话不存在
+- `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 参数无效
+
+### `agentos_session_list()`
+
+```c
+/**
+ * @brief 列出所有会话
+ * 
+ * 根据过滤条件列出会话列表。
+ * 
+ * @param filter 过滤条件（JSON 格式，NULL 表示列出所有）
+ * @param offset 分页偏移量
+ * @param limit 每页数量限制
+ * @param out_sessions [out] 返回会话描述符数组
+ * @param out_count [out] 返回实际数量
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @ownership 调用者拥有返回数组，需逐个释放后释放数组本身
+ * @threadsafe 是
+ * @reentrant 否
+ */
+AGENTOS_API agentos_error_t
+agentos_session_list(const char* filter,
+                     uint32_t offset,
+                     uint32_t limit,
+                     agentos_session_descriptor_t*** out_sessions,
+                     uint32_t* out_count);
+```
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 获取成功
+- `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 参数无效
+- `AGENTOS_ERROR_NO_MEMORY` (0x1002): 内存不足
+
+### `agentos_session_message_list()`
+
+```c
+/**
+ * @brief 列出会话消息
+ * 
+ * 获取指定会话的消息列表，支持分页和过滤。
+ * 
+ * @param session_id 会话 ID
+ * @param offset 消息偏移量（0 为最早消息）
+ * @param limit 最大返回条数
+ * @param out_messages [out] 返回消息数组
+ * @param out_count [out] 返回实际数量
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @ownership 调用者拥有返回数组，需通过 agentos_session_message_list_free() 释放
+ * @threadsafe 是
+ * @reentrant 否
+ */
+AGENTOS_API agentos_error_t
+agentos_session_message_list(const char* session_id,
+                             uint32_t offset,
+                             uint32_t limit,
+                             agentos_session_message_t*** out_messages,
+                             uint32_t* out_count);
+```
+
+**辅助释放函数**：
+```c
+AGENTOS_API void agentos_session_message_list_free(
+    agentos_session_message_t** messages, uint32_t count);
+```
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 获取成功
+- `AGENTOS_ERROR_SESSION_NOT_FOUND` (0x3001): 会话不存在
+- `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 参数无效
+
+### `agentos_session_context_set()`
+
+```c
+/**
+ * @brief 设置会话上下文
+ * 
+ * 手动设置或更新会话的上下文信息。通常上下文由系统自动维护，
+ * 此接口用于高级场景的手动干预。
+ * 
+ * @param session_id 会话 ID
+ * @param context 上下文数据（JSON 格式）
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @threadsafe 是
+ * @reentrant 否
+ * @see agentos_session_context_get()
+ */
+AGENTOS_API agentos_error_t
+agentos_session_context_set(const char* session_id,
+                            const char* context);
+```
+
+**上下文 JSON 示例**：
+```json
+{
+    "conversation_summary": "用户正在讨论微内核架构设计",
+    "current_topic": "IPC 机制优化",
+    "user_intent": "寻求技术方案",
+    "related_memory_ids": ["mem_001", "mem_042"],
+    "active_task_ids": ["task_007"]
+}
+```
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 设置成功
+- `AGENTOS_ERROR_SESSION_NOT_FOUND` (0x3001): 会话不存在
+- `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 上下文格式无效
+
+### `agentos_session_stats()`
+
+```c
+/**
+ * @brief 获取会话统计信息
+ * 
+ * 获取全局会话统计信息，包括会话数量、消息数量等。
+ * 
+ * @param out_stats [out] 返回统计信息结构体
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @ownership 无堆内存分配，结构体为值类型
+ * @threadsafe 是
+ * @reentrant 是
+ */
+AGENTOS_API agentos_error_t
+agentos_session_stats(agentos_session_statistics_t* out_stats);
+```
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 获取成功
+- `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 参数无效
 
 ---
 

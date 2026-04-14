@@ -1,0 +1,247 @@
+# API Documentation Auto-Generate & Publish (GitCode Actions)
+#
+# 版本: V1.0 - 2026-04-13
+# 定位: 全项目Doxygen API文档自动生成与GitHub Pages发布
+# 主要职责:
+#   ✅ 全项目Doxygen文档生成
+#   ✅ 文档覆盖率分析与报告
+#   ✅ 自动发布到GitHub Pages
+#   ✅ 文档质量门禁（警告数阈值）
+#
+# 触发条件:
+#   - 推送到main分支时自动生成
+#   - 手动触发
+#   - 每日定时生成（UTC 02:00）
+
+name: API Docs (Doxygen)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'agentos/**/*.h'
+      - 'agentos/**/*.c'
+      - 'Doxyfile'
+      - 'docs/api/**'
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'
+
+permissions:
+  contents: write
+
+env:
+  DOXYGEN_VERSION: '1.9.8'
+  MAX_WARNINGS: 200
+  DOC_OUTPUT_DIR: docs/api/html
+
+jobs:
+  # ================================================================
+  # Job 1: 生成Doxygen API文档
+  # ================================================================
+  generate-docs:
+    name: Generate Doxygen API Docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Doxygen and dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            doxygen \
+            graphviz \
+            fonts-noto-cjk \
+            plantuml
+
+      - name: Verify Doxygen version
+        run: |
+          doxygen --version
+          dot -V
+
+      - name: Create output directory
+        run: mkdir -p ${{ env.DOC_OUTPUT_DIR }}
+
+      - name: Generate API documentation
+        run: |
+          echo "📝 Generating AgentOS API documentation..."
+          doxygen Doxyfile 2>&1 | tee docs/api/doxygen_output.log
+
+      - name: Analyze documentation warnings
+        id: warnings
+        run: |
+          if [ -f docs/api/doxygen_warnings.log ]; then
+            WARNING_COUNT=$(wc -l < docs/api/doxygen_warnings.log)
+            echo "count=$WARNING_COUNT" >> $GITHUB_OUTPUT
+            echo "⚠️  Found $WARNING_COUNT documentation warnings"
+
+            if [ "$WARNING_COUNT" -gt ${{ env.MAX_WARNINGS }} ]; then
+              echo "::warning::Documentation warnings ($WARNING_COUNT) exceed threshold (${{ env.MAX_WARNINGS }})"
+            fi
+          else
+            echo "count=0" >> $GITHUB_OUTPUT
+            echo "✅ No documentation warnings"
+          fi
+
+      - name: Analyze documentation coverage
+        id: coverage
+        run: |
+          echo "📊 Analyzing documentation coverage..."
+
+          TOTAL_HEADERS=0
+          DOCUMENTED_HEADERS=0
+          TOTAL_FUNCTIONS=0
+          DOCUMENTED_FUNCTIONS=0
+
+          for header in $(find agentos -name "*.h" -path "*/include/*" 2>/dev/null); do
+            TOTAL_HEADERS=$((TOTAL_HEADERS + 1))
+
+            if grep -q "/**\|/*!\|///" "$header"; then
+              DOCUMENTED_HEADERS=$((DOCUMENTED_HEADERS + 1))
+            fi
+
+            FUNC_COUNT=$(grep -c "^[a-zA-Z_].*(" "$header" 2>/dev/null || echo 0)
+            DOC_FUNC_COUNT=$(grep -c "/**\|/*!\|///" "$header" 2>/dev/null || echo 0)
+
+            TOTAL_FUNCTIONS=$((TOTAL_FUNCTIONS + FUNC_COUNT))
+            DOCUMENTED_FUNCTIONS=$((DOCUMENTED_FUNCTIONS + DOC_FUNC_COUNT))
+          done
+
+          if [ $TOTAL_HEADERS -gt 0 ]; then
+            HEADER_COVERAGE=$((DOCUMENTED_HEADERS * 100 / TOTAL_HEADERS))
+          else
+            HEADER_COVERAGE=0
+          fi
+
+          if [ $TOTAL_FUNCTIONS -gt 0 ]; then
+            FUNCTION_COVERAGE=$((DOCUMENTED_FUNCTIONS * 100 / TOTAL_FUNCTIONS))
+          else
+            FUNCTION_COVERAGE=0
+          fi
+
+          echo "header_total=$TOTAL_HEADERS" >> $GITHUB_OUTPUT
+          echo "header_documented=$DOCUMENTED_HEADERS" >> $GITHUB_OUTPUT
+          echo "header_coverage=$HEADER_COVERAGE" >> $GITHUB_OUTPUT
+          echo "function_total=$TOTAL_FUNCTIONS" >> $GITHUB_OUTPUT
+          echo "function_documented=$DOCUMENTED_FUNCTIONS" >> $GITHUB_OUTPUT
+          echo "function_coverage=$FUNCTION_COVERAGE" >> $GITHUB_OUTPUT
+
+      - name: Generate coverage report
+        run: |
+          cat > docs/api/coverage_report.md << 'REPORT_EOF'
+          # AgentOS API Documentation Coverage Report
+
+          ## Summary
+
+          | Metric | Count | Coverage |
+          |--------|-------|----------|
+          | **Public Headers** | ${{ steps.coverage.outputs.header_total }} | ${{ steps.coverage.outputs.header_coverage }}% |
+          | **API Functions** | ${{ steps.coverage.outputs.function_total }} | ${{ steps.coverage.outputs.function_coverage }}% |
+          | **Doc Warnings** | ${{ steps.warnings.outputs.count }} | - |
+
+          ## Module Breakdown
+
+          REPORT_EOF
+
+          for module in atoms/commons cupolas daemon gateway heapstore; do
+            HEADER_COUNT=$(find agentos/$module -name "*.h" -path "*/include/*" 2>/dev/null | wc -l)
+            DOC_COUNT=$(find agentos/$module -name "*.h" -path "*/include/*" -exec grep -l "/**\|/*!\|///" {} \; 2>/dev/null | wc -l)
+            if [ $HEADER_COUNT -gt 0 ]; then
+              COV=$((DOC_COUNT * 100 / HEADER_COUNT))
+            else
+              COV=0
+            fi
+            echo "| **$module** | $DOC_COUNT/$HEADER_COUNT | ${COV}% |" >> docs/api/coverage_report.md
+          done
+
+          echo "" >> docs/api/coverage_report.md
+          echo "---" >> docs/api/coverage_report.md
+          echo "*Generated at $(date -u '+%Y-%m-%d %H:%M:%S UTC')*" >> docs/api/coverage_report.md
+
+      - name: Upload documentation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-docs-${{ github.run_id }}
+          path: |
+            ${{ env.DOC_OUTPUT_DIR }}/
+            docs/api/doxygen_warnings.log
+            docs/api/doxygen_output.log
+            docs/api/coverage_report.md
+          retention-days: 30
+
+      - name: Documentation quality gate
+        run: |
+          WARNING_COUNT=${{ steps.warnings.outputs.count }}
+          HEADER_COVERAGE=${{ steps.coverage.outputs.header_coverage }}
+
+          echo "## 📊 Documentation Quality Gate" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value | Threshold | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$WARNING_COUNT" -le ${{ env.MAX_WARNINGS }} ]; then
+            echo "| Warnings | $WARNING_COUNT | ≤${{ env.MAX_WARNINGS }} | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Warnings | $WARNING_COUNT | ≤${{ env.MAX_WARNINGS }} | ❌ Fail |" >> $GITHUB_STEP_SUMMARY
+            echo "::error::Documentation warnings ($WARNING_COUNT) exceed threshold (${{ env.MAX_WARNINGS }})"
+          fi
+
+          if [ "$HEADER_COVERAGE" -ge 60 ]; then
+            echo "| Header Coverage | ${HEADER_COVERAGE}% | ≥60% | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Header Coverage | ${HEADER_COVERAGE}% | ≥60% | ⚠️ Warning |" >> $GITHUB_STEP_SUMMARY
+            echo "::warning::Header documentation coverage (${HEADER_COVERAGE}%) is below 60%"
+          fi
+
+  # ================================================================
+  # Job 2: 发布到GitHub Pages
+  # ================================================================
+  publish-docs:
+    name: Publish to GitHub Pages
+    needs: generate-docs
+    if: github.ref == 'refs/heads/main' && github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download documentation artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: api-docs-${{ github.run_id }}
+          path: docs/api/
+
+      - name: Install Doxygen
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends doxygen graphviz fonts-noto-cjk
+
+      - name: Regenerate docs for publishing
+        run: |
+          doxygen Doxyfile
+
+      - name: Publish to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/api/html
+          publish_branch: gh-pages
+          destination_dir: api-docs
+          user_name: 'AgentOS CI'
+          user_email: 'ci@spharx.cn'
+          commit_message: 'docs: update API documentation (${{ github.sha }})'
+
+      - name: Publish summary
+        run: |
+          echo "## 📚 API Documentation Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**URL**: https://${{ github.repository_owner }}.github.io/agentos/api-docs/" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Time**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY

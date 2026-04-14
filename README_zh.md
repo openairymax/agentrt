@@ -24,7 +24,7 @@
 
 ## 🌟 项目简介
 
-**AgentOS** 是一个智能体操作系统，为驱动智能体团队提供完整的操作系统级支持。
+**AgentOS** 是一个智能体底层操作系统，为驱动智能体团队提供完整的操作系统级支持。
 
 ### 🎥 项目预览  
 个人用户客户端预告  
@@ -279,6 +279,8 @@ Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 →
 
 "From data intelligence emerges."  
 始于数据，终于智能。  
+
+<img src="docs/Source_Other/feishu-community-qr.png" width="200" />
 
 <a href="https://atomgit.com/spharx/agentos">AtomGit</a> ·
 <a href="https://gitee.com/spharx/agentos">Gitee</a> ·

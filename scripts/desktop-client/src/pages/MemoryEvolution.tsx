@@ -35,12 +35,12 @@ const layerConfig = [
 ];
 
 const typeConfig: Record<string, { label: string; color: string; icon: typeof Database }> = {
-  conversation: { label: "对话记忆", color: "#6366f1", icon: Database },
-  fact: { label: "事实知识", color: "#22c55e", icon: CheckCircle2 },
-  skill: { label: "技能经验", color: "#f59e0b", icon: Zap },
-  preference: { label: "偏好设置", color: "#ec4899", icon: Brain },
-  error: { label: "错误记录", color: "#ef4444", icon: AlertTriangle },
-  observation: { label: "观察记录", color: "#06b6d4", icon: BarChart3 },
+  conversation: { label: "对话记忆", color: "var(--primary-color)", icon: Database },
+  fact: { label: "事实知识", color: "var(--success-color)", icon: CheckCircle2 },
+  skill: { label: "技能经验", color: "var(--warning-color)", icon: Zap },
+  preference: { label: "偏好设置", color: "var(--error-color)", icon: Brain },
+  error: { label: "错误记录", color: "var(--error-color)", icon: AlertTriangle },
+  observation: { label: "观察记录", color: "var(--info-color)", icon: BarChart3 },
 };
 
 const MemoryEvolution: React.FC = () => {
@@ -122,9 +122,9 @@ const MemoryEvolution: React.FC = () => {
         <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
           <div style={{
             width: "44px", height: "44px", borderRadius: "var(--radius-md)",
-            background: "linear-gradient(135deg,#6366f1,#818cf8)",
+            background: "var(--primary-gradient)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 4px 16px rgba(99,102,241,0.35), 0 0 0 1px rgba(255,255,255,0.08) inset",
+            boxShadow: "0 4px 16px rgba(0,113,227,0.35), 0 0 0 1px rgba(255,255,255,0.08) inset",
           }}>
             <Database size={20} color="white" />
           </div>
@@ -193,7 +193,7 @@ const MemoryEvolution: React.FC = () => {
 
         <div style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid var(--border-subtle)", display: "flex", gap: "8px", flexWrap: "wrap" }}>
           {["FAISS 向量检索", "艾宾浩斯遗忘曲线", "持久同调 Ripser", "自动进化触发"].map((tag, i) => (
-            <span key={i} style={{ fontSize: "11px", padding: "4px 10px", background: "rgba(139,92,246,0.08)", color: "#8b5cf6", borderRadius: "var(--radius-full)", fontWeight: 600 }}>{tag}</span>
+            <span key={i} style={{ fontSize: "11px", padding: "4px 10px", background: "var(--primary-light)", color: "var(--primary-color)", borderRadius: "var(--radius-full)", fontWeight: 600 }}>{tag}</span>
           ))}
         </div>
       </div>
@@ -261,7 +261,7 @@ const MemoryEvolution: React.FC = () => {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "420px", overflowY: "auto" }}>
               {filteredEntries.map((entry, idx) => {
-                const tc = typeConfig[entry.type] || { label: entry.type, color: "#94a3b8", icon: Database };
+                const tc = typeConfig[entry.type] || { label: entry.type, color: "var(--text-muted)", icon: Database };
                 const TcIcon = tc.icon;
                 const isSelected = selectedEntry?.id === entry.id;
                 return (

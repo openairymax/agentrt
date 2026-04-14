@@ -35,15 +35,17 @@ static inline void cJSON_AddNumberToObject(cJSON* o, const char* k, double v) { 
 static inline char* cJSON_PrintUnformatted(const cJSON* i) { (void)i; return NULL; }
 #endif /* AGENTOS_HAS_CJSON */
 
+/* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
+#include <agentos/atomic_compat.h>
+
+/* 平台特定头文件 */
 #ifdef _WIN32
-#include <windows.h>
-#include <intrin.h>
-#include <process.h>
-#include "../../../../commons/utils/include/atomic_compat.h"
+    #define WIN32_LEAN_AND_MEAN
+    #include <windows.h>
+    #include <process.h>
 #else
-#include <pthread.h>
-#include <unistd.h>
-#include <stdatomic.h>
+    #include <pthread.h>
+    #include <unistd.h>
 #endif
 
 typedef struct task_control_block {

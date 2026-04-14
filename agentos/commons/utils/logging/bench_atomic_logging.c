@@ -26,14 +26,15 @@
 #include <time.h>
 
 #if defined(_WIN32)
-#include <windows.h>
-#include <intrin.h>
-#include "../../../utils/include/atomic_compat.h"
+    #define WIN32_LEAN_AND_MEAN
+    #include <windows.h>
 #else
-#include <pthread.h>
-#include <unistd.h>
-#include <stdatomic.h>
+    #include <pthread.h>
+    #include <unistd.h>
 #endif
+
+/* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
+#include <agentos/atomic_compat.h>
 
 /* ==================== 测试配置 ==================== */
 

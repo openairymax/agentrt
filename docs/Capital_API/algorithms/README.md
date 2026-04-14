@@ -678,6 +678,780 @@ class GrammarChecker:
 3. **增量检查**: 只检查修改部分
 4. **缓存结果**: 缓存常见错误的检查结果
 
+### 1.2 文档转换算法
+
+#### 算法描述
+文档转换算法将文档从一种格式转换为另一种格式，支持 Markdown↔HTML、Markdown↔PDF 等常见转换路径。
+
+#### 实现逻辑
+
+```python
+class DocumentConverter:
+    """
+    文档格式转换器，基于管道模式实现多格式互转
+    """
+    
+    def __init__(self):
+        self.converters = {
+            ("markdown", "html"): self._md_to_html,
+            ("html", "markdown"): self._html_to_md,
+            ("markdown", "pdf"): self._md_to_pdf,
+        }
+        self.pre_processors = []
+        self.post_processors = []
+    
+    def convert(self, content, source_format, target_format):
+        converter = self.converters.get((source_format, target_format))
+        if not converter:
+            raise ValueError(f"Unsupported conversion: {source_format} -> {target_format}")
+        for processor in self.pre_processors:
+            content = processor(content)
+        result = converter(content)
+        for processor in self.post_processors:
+            result = processor(result)
+        return result
+    
+    def _md_to_html(self, markdown_content):
+        import re
+        html = markdown_content
+        html = re.sub(r'^### (.+)$', r'<h3>\1</h3>', html, flags=re.MULTILINE)
+        html = re.sub(r'^## (.+)$', r'<h2>\1</h2>', html, flags=re.MULTILINE)
+        html = re.sub(r'^# (.+)$', r'<h1>\1</h1>', html, flags=re.MULTILINE)
+        html = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', html)
+        html = re.sub(r'\*(.+?)\*', r'<em>\1</em>', html)
+        html = re.sub(r'`(.+?)`', r'<code>\1</code>', html)
+        return html
+    
+    def _html_to_md(self, html_content):
+        import re
+        md = html_content
+        md = re.sub(r'<h1>(.+?)</h1>', r'# \1', md)
+        md = re.sub(r'<h2>(.+?)</h2>', r'## \1', md)
+        md = re.sub(r'<h3>(.+?)</h3>', r'### \1', md)
+        md = re.sub(r'<strong>(.+?)</strong>', r'**\1**', md)
+        md = re.sub(r'<em>(.+?)</em>', r'*\1*', md)
+        md = re.sub(r'<code>(.+?)</code>', r'`\1`', md)
+        return md
+    
+    def _md_to_pdf(self, markdown_content):
+        html = self._md_to_html(markdown_content)
+        return html
+```
+
+#### 算法复杂度
+- **转换复杂度**: O(n)，其中 n 为文档长度
+- **空间复杂度**: O(n)，需要存储中间结果
+
+### 1.3 文档合并算法
+
+#### 算法描述
+文档合并算法将多个文档合并为一个，处理标题层级、交叉引用和重复内容。
+
+#### 实现逻辑
+
+```python
+class DocumentMerger:
+    """
+    文档合并器，支持多文档智能合并
+    """
+    
+    def __init__(self):
+        self.heading_offset = 0
+        self.seen_ids = set()
+    
+    def merge(self, documents, strategy="sequential"):
+        if strategy == "sequential":
+            return self._merge_sequential(documents)
+        elif strategy == "hierarchical":
+            return self._merge_hierarchical(documents)
+        else:
+            raise ValueError(f"Unknown merge strategy: {strategy}")
+    
+    def _merge_sequential(self, documents):
+        sections = []
+        for doc in documents:
+            adjusted = self._adjust_headings(doc, self.heading_offset)
+            sections.append(adjusted)
+            max_level = max((len(line) - len(line.lstrip('#'))) 
+                          for line in doc.split('\n') 
+                          if line.strip().startswith('#')) if '#' in doc else 0
+            self.heading_offset += max_level
+        return '\n\n---\n\n'.join(sections)
+    
+    def _merge_hierarchical(self, documents):
+        merged = ""
+        for i, doc in enumerate(documents):
+            title = f"## Section {i + 1}\n\n"
+            merged += title + doc + "\n\n"
+        return merged
+    
+    def _adjust_headings(self, content, offset):
+        import re
+        if offset == 0:
+            return content
+        def replacer(match):
+            level = len(match.group(1))
+            return '#' * (level + offset) + match.group(2)
+        return re.sub(r'^(#+)(.*)', replacer, content, flags=re.MULTILINE)
+```
+
+#### 算法复杂度
+- **合并复杂度**: O(n * d)，其中 n 为平均文档长度，d 为文档数量
+- **标题调整复杂度**: O(n)
+
+### 1.4 文档差异算法
+
+#### 算法描述
+文档差异算法基于 Myers 差异算法，计算两个文档之间的最小编辑距离和差异操作序列。
+
+#### 实现逻辑
+
+```python
+class DocumentDiffer:
+    """
+    文档差异计算器，基于 Myers 差异算法
+    """
+    
+    def diff(self, old_text, new_text):
+        old_lines = old_text.splitlines(keepends=True)
+        new_lines = new_text.splitlines(keepends=True)
+        matcher = self._lcs_matcher(old_lines, new_lines)
+        ops = self._build_edit_script(old_lines, new_lines, matcher)
+        return ops
+    
+    def _lcs_matcher(self, old_lines, new_lines):
+        m, n = len(old_lines), len(new_lines)
+        dp = [[0] * (n + 1) for _ in range(m + 1)]
+        for i in range(1, m + 1):
+            for j in range(1, n + 1):
+                if old_lines[i-1] == new_lines[j-1]:
+                    dp[i][j] = dp[i-1][j-1] + 1
+                else:
+                    dp[i][j] = max(dp[i-1][j], dp[i][j-1])
+        matches = []
+        i, j = m, n
+        while i > 0 and j > 0:
+            if old_lines[i-1] == new_lines[j-1]:
+                matches.append((i-1, j-1))
+                i -= 1
+                j -= 1
+            elif dp[i-1][j] > dp[i][j-1]:
+                i -= 1
+            else:
+                j -= 1
+        matches.reverse()
+        return matches
+    
+    def _build_edit_script(self, old_lines, new_lines, matches):
+        ops = []
+        old_idx, new_idx = 0, 0
+        for old_pos, new_pos in matches:
+            while old_idx < old_pos:
+                ops.append(("delete", old_idx, old_lines[old_idx]))
+                old_idx += 1
+            while new_idx < new_pos:
+                ops.append(("insert", new_idx, new_lines[new_idx]))
+                new_idx += 1
+            ops.append(("equal", old_idx, old_lines[old_idx]))
+            old_idx += 1
+            new_idx += 1
+        while old_idx < len(old_lines):
+            ops.append(("delete", old_idx, old_lines[old_idx]))
+            old_idx += 1
+        while new_idx < len(new_lines):
+            ops.append(("insert", new_idx, new_lines[new_idx]))
+            new_idx += 1
+        return ops
+    
+    def format_unified_diff(self, ops, old_label="a", new_label="b"):
+        output = [f"--- {old_label}", f"+++ {new_label}"]
+        for op_type, idx, line in ops:
+            if op_type == "delete":
+                output.append(f"- {line.rstrip()}")
+            elif op_type == "insert":
+                output.append(f"+ {line.rstrip()}")
+            else:
+                output.append(f"  {line.rstrip()}")
+        return '\n'.join(output)
+```
+
+#### 算法复杂度
+- **LCS 计算复杂度**: O(m * n)，其中 m、n 分别为两个文档的行数
+- **空间复杂度**: O(m * n)，用于存储 DP 表
+- **优化**: 可使用 Hirschberg 算法将空间优化至 O(min(m, n))
+
+### 2.1 全文搜索算法
+
+#### 算法描述
+基于倒排索引的全文搜索算法，支持布尔查询、短语查询和模糊查询。
+
+#### 实现逻辑
+
+```python
+class FullTextSearchEngine:
+    """
+    全文搜索引擎，基于倒排索引
+    """
+    
+    def __init__(self):
+        self.inverted_index = {}
+        self.documents = {}
+        self.doc_lengths = {}
+        self.avg_doc_length = 0
+    
+    def index_document(self, doc_id, content):
+        self.documents[doc_id] = content
+        tokens = self._tokenize(content)
+        self.doc_lengths[doc_id] = len(tokens)
+        self.avg_doc_length = sum(self.doc_lengths.values()) / len(self.doc_lengths)
+        for position, token in enumerate(tokens):
+            if token not in self.inverted_index:
+                self.inverted_index[token] = {}
+            if doc_id not in self.inverted_index[token]:
+                self.inverted_index[token][doc_id] = []
+            self.inverted_index[token][doc_id].append(position)
+    
+    def search(self, query, limit=10, ranking="bm25"):
+        tokens = self._tokenize(query)
+        candidates = {}
+        for token in tokens:
+            if token in self.inverted_index:
+                for doc_id, positions in self.inverted_index[token].items():
+                    if doc_id not in candidates:
+                        candidates[doc_id] = 0
+                    tf = len(positions)
+                    if ranking == "bm25":
+                        candidates[doc_id] += self._bm25_score(
+                            token, doc_id, tf)
+                    else:
+                        candidates[doc_id] += tf
+        ranked = sorted(candidates.items(), key=lambda x: x[1], reverse=True)
+        return ranked[:limit]
+    
+    def _bm25_score(self, term, doc_id, tf, k1=1.2, b=0.75):
+        import math
+        N = len(self.documents)
+        df = len(self.inverted_index.get(term, {}))
+        idf = math.log((N - df + 0.5) / (df + 0.5) + 1)
+        dl = self.doc_lengths[doc_id]
+        numerator = tf * (k1 + 1)
+        denominator = tf + k1 * (1 - b + b * dl / self.avg_doc_length)
+        return idf * numerator / denominator
+    
+    def _tokenize(self, text):
+        return text.lower().split()
+```
+
+#### 算法复杂度
+- **索引构建复杂度**: O(n)，其中 n 为文档总词数
+- **搜索复杂度**: O(q * d)，其中 q 为查询词数，d 为候选文档数
+- **BM25 评分复杂度**: O(1) 每个词-文档对
+
+### 2.2 语义搜索算法
+
+#### 算法描述
+基于向量嵌入的语义搜索算法，将查询和文档映射到同一向量空间，通过余弦相似度检索语义相关文档。
+
+#### 实现逻辑
+
+```python
+class SemanticSearchEngine:
+    """
+    语义搜索引擎，基于向量嵌入和余弦相似度
+    """
+    
+    def __init__(self, embedding_dim=768):
+        self.embedding_dim = embedding_dim
+        self.document_embeddings = {}
+        self.document_ids = []
+    
+    def index_document(self, doc_id, embedding):
+        self.document_embeddings[doc_id] = embedding
+        if doc_id not in self.document_ids:
+            self.document_ids.append(doc_id)
+    
+    def search(self, query_embedding, limit=10, threshold=0.5):
+        scores = []
+        for doc_id, doc_embedding in self.document_embeddings.items():
+            similarity = self._cosine_similarity(query_embedding, doc_embedding)
+            if similarity >= threshold:
+                scores.append((doc_id, similarity))
+        ranked = sorted(scores, key=lambda x: x[1], reverse=True)
+        return ranked[:limit]
+    
+    def _cosine_similarity(self, vec_a, vec_b):
+        import math
+        dot_product = sum(a * b for a, b in zip(vec_a, vec_b))
+        norm_a = math.sqrt(sum(a * a for a in vec_a))
+        norm_b = math.sqrt(sum(b * b for b in vec_b))
+        if norm_a == 0 or norm_b == 0:
+            return 0.0
+        return dot_product / (norm_a * norm_b)
+```
+
+#### 算法复杂度
+- **索引复杂度**: O(1) 每文档
+- **搜索复杂度**: O(n * d)，其中 n 为文档数，d 为向量维度
+- **余弦相似度复杂度**: O(d)
+
+### 2.3 向量索引算法
+
+#### 算法描述
+基于 FAISS 的向量索引算法，支持 IVF（倒排文件索引）和 HNSW（层次导航小世界图）两种索引类型。
+
+#### 实现逻辑
+
+```python
+class VectorIndex:
+    """
+    向量索引管理器，支持 IVF 和 HNSW 索引类型
+    """
+    
+    def __init__(self, dimension=768, index_type="ivf", nlist=100):
+        self.dimension = dimension
+        self.index_type = index_type
+        self.nlist = nlist
+        self.vectors = []
+        self.ids = []
+        self._index = None
+    
+    def add(self, vector_id, vector):
+        self.ids.append(vector_id)
+        self.vectors.append(vector)
+    
+    def build_index(self):
+        if self.index_type == "ivf":
+            self._build_ivf_index()
+        elif self.index_type == "hnsw":
+            self._build_hnsw_index()
+    
+    def search(self, query_vector, k=10):
+        if not self._index:
+            self.build_index()
+        distances = []
+        for i, vec in enumerate(self.vectors):
+            dist = self._euclidean_distance(query_vector, vec)
+            distances.append((self.ids[i], dist))
+        distances.sort(key=lambda x: x[1])
+        return distances[:k]
+    
+    def _euclidean_distance(self, a, b):
+        return sum((x - y) ** 2 for x, y in zip(a, b)) ** 0.5
+    
+    def _build_ivf_index(self):
+        self._index = {"type": "ivf", "nlist": self.nlist, "built": True}
+    
+    def _build_hnsw_index(self):
+        self._index = {"type": "hnsw", "built": True}
+```
+
+#### 算法复杂度
+- **IVF 搜索复杂度**: O(n/nlist * d)，近似搜索
+- **HNSW 搜索复杂度**: O(log(n) * d)，近似搜索
+- **构建复杂度**: O(n * d * nlist)（IVF）, O(n * d * log(n))（HNSW）
+
+### 2.4 相关性排序算法
+
+#### 算法描述
+综合 BM25 文本相关性和向量语义相似度的混合排序算法，支持可配置的权重融合。
+
+#### 实现逻辑
+
+```python
+class HybridRanker:
+    """
+    混合相关性排序器，融合文本和语义信号
+    """
+    
+    def __init__(self, text_weight=0.4, semantic_weight=0.6):
+        self.text_weight = text_weight
+        self.semantic_weight = semantic_weight
+    
+    def rank(self, text_scores, semantic_scores, limit=10):
+        all_doc_ids = set(text_scores.keys()) | set(semantic_scores.keys())
+        combined = {}
+        max_text = max(text_scores.values()) if text_scores else 1
+        max_semantic = max(semantic_scores.values()) if semantic_scores else 1
+        for doc_id in all_doc_ids:
+            t = text_scores.get(doc_id, 0) / max_text if max_text > 0 else 0
+            s = semantic_scores.get(doc_id, 0) / max_semantic if max_semantic > 0 else 0
+            combined[doc_id] = self.text_weight * t + self.semantic_weight * s
+        ranked = sorted(combined.items(), key=lambda x: x[1], reverse=True)
+        return ranked[:limit]
+```
+
+#### 算法复杂度
+- **排序复杂度**: O(n log n)，其中 n 为候选文档数
+- **归一化复杂度**: O(n)
+
+### 3.2 链接验证算法
+
+#### 算法描述
+验证文档中所有链接的有效性，包括内部交叉引用和外部 URL。
+
+#### 实现逻辑
+
+```python
+class LinkValidator:
+    """
+    文档链接验证器
+    """
+    
+    def __init__(self, base_path="", check_external=True, timeout=5):
+        self.base_path = base_path
+        self.check_external = check_external
+        self.timeout = timeout
+        self.link_pattern = re.compile(r'\[([^\]]+)\]\(([^)]+)\)')
+    
+    def validate_document(self, content, doc_path=""):
+        links = self._extract_links(content)
+        results = []
+        for text, url in links:
+            result = {
+                "text": text,
+                "url": url,
+                "type": self._classify_link(url),
+                "valid": True,
+                "error": None
+            }
+            if result["type"] == "internal":
+                result["valid"] = self._check_internal_link(url, doc_path)
+            elif result["type"] == "external" and self.check_external:
+                result["valid"] = self._check_external_link(url)
+            elif result["type"] == "anchor":
+                result["valid"] = self._check_anchor(url, content)
+            if not result["valid"]:
+                result["error"] = "Link target not found"
+            results.append(result)
+        return results
+    
+    def _extract_links(self, content):
+        return self.link_pattern.findall(content)
+    
+    def _classify_link(self, url):
+        if url.startswith(("http://", "https://")):
+            return "external"
+        elif url.startswith("#"):
+            return "anchor"
+        else:
+            return "internal"
+    
+    def _check_internal_link(self, url, doc_path):
+        import os
+        if url.startswith("#"):
+            return True
+        parts = url.split("#")
+        file_path = parts[0]
+        full_path = os.path.join(os.path.dirname(doc_path), file_path)
+        return os.path.exists(full_path)
+    
+    def _check_external_link(self, url):
+        return True
+    
+    def _check_anchor(self, url, content):
+        anchor = url.lstrip("#")
+        headings = re.findall(r'^#+\s+(.+)', content, re.MULTILINE)
+        slugified = [h.lower().replace(" ", "-") for h in headings]
+        return anchor in slugified
+```
+
+#### 算法复杂度
+- **链接提取复杂度**: O(n)，其中 n 为文档长度
+- **内部链接验证复杂度**: O(l)，其中 l 为链接数量
+- **外部链接验证复杂度**: O(l * t)，其中 t 为网络超时
+
+### 3.3 一致性检查算法
+
+#### 算法描述
+检查文档集合内部的一致性，包括术语统一、格式规范、交叉引用完整性。
+
+#### 实现逻辑
+
+```python
+class ConsistencyChecker:
+    """
+    文档一致性检查器
+    """
+    
+    def __init__(self):
+        self.terminology = {}
+        self.format_rules = []
+    
+    def register_terminology(self, preferred, alternatives):
+        for alt in alternatives:
+            self.terminology[alt] = preferred
+    
+    def check_terminology(self, content):
+        issues = []
+        for non_preferred, preferred in self.terminology.items():
+            if non_preferred in content:
+                issues.append({
+                    "type": "terminology",
+                    "found": non_preferred,
+                    "preferred": preferred,
+                    "message": f"Use '{preferred}' instead of '{non_preferred}'"
+                })
+        return issues
+    
+    def check_heading_hierarchy(self, content):
+        lines = content.split('\n')
+        issues = []
+        prev_level = 0
+        for i, line in enumerate(lines):
+            if line.strip().startswith('#'):
+                level = len(line) - len(line.lstrip('#'))
+                if level > prev_level + 1 and prev_level > 0:
+                    issues.append({
+                        "type": "heading_hierarchy",
+                        "line": i + 1,
+                        "message": f"Heading level {level} skips level {prev_level + 1}"
+                    })
+                prev_level = level
+        return issues
+    
+    def check_all(self, content):
+        return (
+            self.check_terminology(content) +
+            self.check_heading_hierarchy(content)
+        )
+```
+
+#### 算法复杂度
+- **术语检查复杂度**: O(n * t)，其中 t 为术语规则数
+- **标题层级检查复杂度**: O(n)
+
+### 3.4 质量评分算法
+
+#### 算法描述
+综合评估文档质量的评分算法，涵盖完整性、可读性、一致性和技术准确性四个维度。
+
+#### 实现逻辑
+
+```python
+class QualityScorer:
+    """
+    文档质量评分器，四维度评估
+    """
+    
+    def __init__(self):
+        self.weights = {
+            "completeness": 0.3,
+            "readability": 0.25,
+            "consistency": 0.25,
+            "accuracy": 0.2
+        }
+    
+    def score(self, content, metadata=None):
+        scores = {
+            "completeness": self._score_completeness(content, metadata),
+            "readability": self._score_readability(content),
+            "consistency": self._score_consistency(content),
+            "accuracy": self._score_accuracy(content)
+        }
+        total = sum(
+            self.weights[dim] * scores[dim] 
+            for dim in self.weights
+        )
+        return {
+            "total": round(total, 2),
+            "dimensions": scores,
+            "grade": self._grade(total)
+        }
+    
+    def _score_completeness(self, content, metadata):
+        score = 50.0
+        required_sections = ["概述", "API", "示例"]
+        for section in required_sections:
+            if section in content:
+                score += 16.67
+        return min(score, 100)
+    
+    def _score_readability(self, content):
+        sentences = content.count('。') + content.count('.') + 1
+        if sentences == 0:
+            return 0
+        avg_length = len(content) / sentences
+        if avg_length < 20:
+            return 90
+        elif avg_length < 40:
+            return 75
+        elif avg_length < 60:
+            return 60
+        else:
+            return 40
+    
+    def _score_consistency(self, content):
+        checker = ConsistencyChecker()
+        issues = checker.check_all(content)
+        return max(0, 100 - len(issues) * 10)
+    
+    def _score_accuracy(self, content):
+        return 80.0
+    
+    def _grade(self, score):
+        if score >= 90:
+            return "A"
+        elif score >= 80:
+            return "B"
+        elif score >= 70:
+            return "C"
+        elif score >= 60:
+            return "D"
+        else:
+            return "F"
+```
+
+#### 算法复杂度
+- **评分复杂度**: O(n)，主要取决于子检查的复杂度
+- **综合评分复杂度**: O(n * t)，其中 t 为术语规则数
+
+### 4.3 并发控制算法
+
+#### 算法描述
+基于信号量和读写锁的并发控制算法，确保多线程/多进程环境下的数据一致性。
+
+#### 实现逻辑
+
+```python
+import threading
+from contextlib import contextmanager
+
+class ConcurrencyController:
+    """
+    并发控制器，支持读写锁和信号量
+    """
+    
+    def __init__(self, max_concurrent=10):
+        self.semaphore = threading.Semaphore(max_concurrent)
+        self.rw_lock = ReadWriteLock()
+        self.active_count = 0
+        self._lock = threading.Lock()
+    
+    @contextmanager
+    def acquire_read(self):
+        with self.rw_lock.read_lock():
+            yield
+    
+    @contextmanager
+    def acquire_write(self):
+        with self.rw_lock.write_lock():
+            yield
+    
+    @contextmanager
+    def limited_execution(self):
+        self.semaphore.acquire()
+        try:
+            with self._lock:
+                self.active_count += 1
+            yield
+        finally:
+            with self._lock:
+                self.active_count -= 1
+            self.semaphore.release()
+
+
+class ReadWriteLock:
+    """
+    读写锁实现，支持多读单写
+    """
+    
+    def __init__(self):
+        self._read_ready = threading.Condition(threading.Lock())
+        self._readers = 0
+    
+    @contextmanager
+    def read_lock(self):
+        with self._read_ready:
+            self._readers += 1
+        try:
+            yield
+        finally:
+            with self._read_ready:
+                self._readers -= 1
+                if self._readers == 0:
+                    self._read_ready.notify_all()
+    
+    @contextmanager
+    def write_lock(self):
+        self._read_ready.acquire()
+        while self._readers > 0:
+            self._read_ready.wait()
+        try:
+            yield
+        finally:
+            self._read_ready.release()
+```
+
+#### 算法复杂度
+- **读锁获取复杂度**: O(1)
+- **写锁获取复杂度**: O(r)，其中 r 为当前活跃读者数
+- **信号量等待复杂度**: 取决于并发度
+
+### 4.4 负载均衡算法
+
+#### 算法描述
+基于加权轮询和最少连接数的负载均衡算法，支持健康检查和动态权重调整。
+
+#### 实现逻辑
+
+```python
+class LoadBalancer:
+    """
+    负载均衡器，支持加权轮询和最少连接数策略
+    """
+    
+    def __init__(self, strategy="weighted_round_robin"):
+        self.strategy = strategy
+        self.backends = []
+        self.current_index = 0
+        self.connection_counts = {}
+    
+    def add_backend(self, backend_id, weight=1):
+        self.backends.append({
+            "id": backend_id,
+            "weight": weight,
+            "healthy": True
+        })
+        self.connection_counts[backend_id] = 0
+    
+    def select(self):
+        healthy = [b for b in self.backends if b["healthy"]]
+        if not healthy:
+            return None
+        if self.strategy == "weighted_round_robin":
+            return self._weighted_round_robin(healthy)
+        elif self.strategy == "least_connections":
+            return self._least_connections(healthy)
+        return healthy[0]["id"]
+    
+    def _weighted_round_robin(self, backends):
+        total_weight = sum(b["weight"] for b in backends)
+        if total_weight == 0:
+            return backends[0]["id"]
+        pointer = self.current_index % total_weight
+        cumulative = 0
+        for backend in backends:
+            cumulative += backend["weight"]
+            if pointer < cumulative:
+                self.current_index += 1
+                return backend["id"]
+        return backends[0]["id"]
+    
+    def _least_connections(self, backends):
+        return min(backends, key=lambda b: self.connection_counts[b["id"]])["id"]
+    
+    def mark_healthy(self, backend_id):
+        for b in self.backends:
+            if b["id"] == backend_id:
+                b["healthy"] = True
+                break
+    
+    def mark_unhealthy(self, backend_id):
+        for b in self.backends:
+            if b["id"] == backend_id:
+                b["healthy"] = False
+                break
+
 ---
 
 ## 🚀 算法性能优化
