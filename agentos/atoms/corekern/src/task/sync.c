@@ -9,8 +9,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../../commons/utils/memory/include/memory_compat.h"
-#include "../../../../commons/utils/string/include/string_compat.h"
+#include <agentos/memory_compat.h>
+#include <agentos/string_compat.h>
 #include <string.h>
 
 #if defined(_WIN32) || defined(_WIN64)

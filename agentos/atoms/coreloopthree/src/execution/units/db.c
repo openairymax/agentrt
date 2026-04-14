@@ -9,12 +9,12 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../agentos/commons/utils/memory/include/memory_compat.h"
-#include "../../../agentos/commons/utils/string/include/string_compat.h"
+#include <agentos/memory_compat.h>
+#include <agentos/string_compat.h>
 #include <string.h>
 #include <stdio.h>
 
-#include "../../../agentos/commons/utils/execution/include/execution_common.h"\n\ntypedef struct $1_unit_data {\n    execution_unit_data_t base;\n    char* metadata_json;\n} $1_unit_data_t;
+#include <agentos/execution_common.h>\n\ntypedef struct $1_unit_data {\n    execution_unit_data_t base;\n    char* metadata_json;\n} $1_unit_data_t;
 
 /**
  * @brief 验证SQL查询是否仅包含安全操作（SELECT）

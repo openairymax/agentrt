@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file scheduler_windows.c
  * @brief Windows平台调度器适配器实�? * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
@@ -13,7 +13,7 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../../commons/utils/memory/include/memory_compat.h"
+#include <agentos/memory_compat.h>
 #include <string.h>
 
 /* ==================== 内部类型定义 ==================== */

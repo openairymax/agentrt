@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file timer.c
  * @brief 定时器实�?
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -9,8 +9,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../../commons/utils/memory/include/memory_compat.h"
-#include "../../../../commons/utils/string/include/string_compat.h"
+#include <agentos/memory_compat.h>
+#include <agentos/string_compat.h>
 #include <string.h>
 
 typedef struct agentos_timer {
