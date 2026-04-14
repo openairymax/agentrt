@@ -5,7 +5,7 @@
 **状态**: 稳定
 **许可证**: MIT
 
-AgentOS 协议系统提供统一的 多协议通信能力，支持 **JSON-RPC 2.0**、**MCP v1.0**、**A2A v0.3**、**OpenAI API** 和 **OpenJiuwen（自定义二进制）** 协议，具备自动检测、路由和双向转换功能。
+AgentOS 协议系统提供统一的 多协议通信能力，支持 **JSON-RPC 2.0**、**MCP v1.0**、**A2A v0.3**、**OpenAI API**、**OpenJiuwen（自定义二进制）**、**OpenClaw（离线AI Agent平台）** 和 **Claude API（Anthropic）** 共 **7种协议**，以及 **LangChain** 和 **AutoGen** 框架适配，具备自动检测、路由和双向转换功能。
 
 ## 目录
 
@@ -18,11 +18,14 @@ AgentOS 协议系统提供统一的 多协议通信能力，支持 **JSON-RPC 2.
    - [Rust SDK](#rust-sdk)
    - [TypeScript SDK](#typescript-sdk)
 5. [协议转换](#5-协议转换)
-6. [OpenLab 集成](#6-openlab-集成)
-7. [网关桥接](#7-网关桥接)
-8. [CLI 工具参考](#8-cli-工具参考)
-9. [高级主题](#9-高级主题)
-10. [故障排除](#10-故障排除)
+6. [框架适配器](#6-框架适配器)
+   - [LangChain 适配器](#langchain-适配器)
+   - [AutoGen 适配器](#autogen-适配器)
+7. [OpenLab 集成](#7-openlab-集成)
+8. [网关桥接](#8-网关桥接)
+9. [CLI 工具参考](#9-cli-工具参考)
+10. [高级主题](#10-高级主题)
+11. [故障排除](#11-故障排除)
 
 ---
 
@@ -38,6 +41,9 @@ AgentOS 协议系统提供统一的 多协议通信能力，支持 **JSON-RPC 2.
 │              SDK 客户端层 (Toolkit)                  │
 │    ProtocolClient (Go/Python/Rust/TypeScript)       │
 ├─────────────────────────────────────────────────────┤
+│         框架适配层 (LangChain / AutoGen)             │
+│  LCEL Chain · Agent · Memory · GroupChat            │
+├─────────────────────────────────────────────────────┤
 │              网关桥接层                               │
 │      gateway_protocol_bridge (自动检测 + 路由)       │
 ├─────────────────────────────────────────────────────┤
@@ -46,6 +52,10 @@ AgentOS 协议系统提供统一的 多协议通信能力，支持 **JSON-RPC 2.
 │  │ JSON-RPC │ │   MCP    │ │   A2A    │ │ OpenAI │ │
 │  │ Adapter  │ │ Adapter  │ │ Adapter  │ │Adapter │ │
 │  └──────────┘ └──────────┘ └──────────┘ └────────┘ │
+│  ┌──────────┐ ┌──────────┐                         │
+│  │OpenJiuwen│ │OpenClaw  │  Claude API Adapter     │
+│  │ Adapter  │ │ Adapter  │                         │
+│  └──────────┘ └──────────┘                         │
 │  ┌────────────────────────────────────────────────┐ │
 │  │          协议转换器 (Protocol Transformers)      │ │
 │  │  双向转换: JSON-RPC <-> MCP/A2A/OpenAI/...     │ │
@@ -53,6 +63,10 @@ AgentOS 协议系统提供统一的 多协议通信能力，支持 **JSON-RPC 2.
 │  ┌────────────────┐ ┌─────────────────────────────┐ │
 │  │ Protocol Router │ │ Protocol Extension Manager   │ │
 │  └────────────────┘ └─────────────────────────────┘ │
+│  ┌────────────────────────────────────────────────┐ │
+│  │        Protocol Registry (注册中心)             │ │
+│  │  7内置协议 / 5分类 / 8态状态机 / 依赖追踪       │ │
+│  └────────────────────────────────────────────────┘ │
 ├─────────────────────────────────────────────────────┤
 │            接口层 (I-L1 ~ I-L4)                     │
 │  proto_adapter_vtable / proto_router_iface / ...    │
@@ -75,12 +89,17 @@ AgentOS 协议系统提供统一的 多协议通信能力，支持 **JSON-RPC 2.
 | 统一接口 | `interfaces/include/agentos_protocol_interface.h` | I-L1~I-L4 接口定义 |
 | 协议路由器 | `protocols/core/router/` | 消息路由与分发 |
 | 协议转换器 | `protocols/core/transformers/` | 双向格式转换 |
+| 协议注册中心 | `protocols/core/registry/` | 7内置协议注册/状态机/依赖追踪 |
 | MCP 适配器 | `protocols/adapters/mcp/` | MCP v1.0 协议实现 |
 | A2A 适配器 | `protocols/standards/a2a/` | A2A v0.3 代理间协议 |
 | OpenAI 适配器 | `protocols/integrations/openai/` | OpenAI 企业 API 兼容 |
 | OpenJiuwen 适配器 | `protocols/integrations/openjiuwen/` | 自定义二进制协议，含 CRC32 |
-| 扩展框架 | `protocols/core/adapter/` | 动态适配器加载系统 |
-| 网关桥接 | `gateway/src/gateway/gateway_protocol_bridge.c` | 网关 ↔ 协议集成 |
+| **OpenClaw 适配器** | `protocols/integrations/openclaw/` | **离线私有化 AI Agent 平台集成** |
+| **Claude API 适配器** | `protocols/integrations/claude/` | **Anthropic Claude API 集成** |
+| **LangChain 框架适配** | `protocols/frameworks/langchain/` | **LCEL Chain / Agent / Memory / Tool** |
+| **AutoGen 框架适配** | `protocols/frameworks/autogen/` | **多 Agent 对话 / Group Chat / Code Executor** |
+| 扩展框架 | `protocols/core/adapter/` | 动态适配器加载系统 (I-L4) |
+| 网关桥接 | `gateway/src/gateway/gateway_protocol_bridge.c` | 网关 ↔ 协议集成 (7协议检测+registry集成) |
 
 ---
 
@@ -194,6 +213,84 @@ AI 模型上下文管理的标准化协议。
 20      4     CRC32 校验和 (uint32)
 ```
 
+### 2.6 OpenClaw (离线 AI Agent 平台)
+
+OpenClaw 是离线私有化部署的 AI Agent 平台，支持多模态交互与集群协作。
+
+**端点**: `/openclaw`
+**版本**: 1.0
+**特性**: 4种运行模式 / 5级安全等级 / 6种模态
+
+```json
+{
+  "agent_id": "agent-001",
+  "action": "send_message",
+  "session_id": "sess-abc123",
+  "payload": {
+    "content": "分析数据趋势",
+    "modality": "text",
+    "priority": "normal"
+  },
+  "security_level": 3,
+  "cluster_mode": "standalone"
+}
+```
+
+核心 OpenClaw 能力：
+- **Agent 生命周期**: 注册 → 发现 → 注销 + 心跳保活
+- **会话管理**: 创建/关闭会话，消息收发
+- **任务委派**: 带超时和优先级的任务分发
+- **集群模式**: standalone / clustered / hybrid / embedded
+- **安全分级**: L0(开放) → L4(最高机密)，5级权限控制
+- **多模态**: 文本 / 图像 / 音频 / 视频 / 文件 / 代码
+
+### 2.7 Claude API (Anthropic)
+
+Anthropic Claude 大语言模型 API 集成，支持 Extended Thinking 和 Tool Use。
+
+**端点**: `/v1/messages`
+**版本**: 1.0
+**Content-Type**: `application/json`
+
+```json
+{
+  "model": "claude-sonnet-4-20250514",
+  "max_tokens": 4096,
+  "messages": [
+    { "role": "user", "content": "解释 MCIS 理论" }
+  ],
+  "tools": [
+    {
+      "name": "web_search",
+      "description": "搜索互联网信息",
+      "input_schema": {
+        "type": "object",
+        "properties": { "query": { "type": "string" } }
+      }
+    }
+  ]
+}
+```
+
+内置模型支持：
+
+| 模型 | 类型 | 最大上下文 | 特性 |
+|------|------|-----------|------|
+| `claude-opus-4` | 超旗舰 | 200K | 最强推理能力 |
+| `claude-sonnet-4` | 旗舰 | 200K | 高性能平衡 |
+| `claude-haiku-4` | 轻量 | 200K | 低延迟快速响应 |
+| `claude-3.5-sonnet` | 前代旗舰 | 200K | Extended Thinking |
+| `claude-3.5-haiku` | 前代轻量 | 200K | 快速工具调用 |
+| `claude-3-opus` | 经典旗舰 | 200K | 复杂推理 |
+
+核心 Claude 能力：
+- **Messages API**: 完整的对话接口（同步+流式）
+- **Tool Use**: 结构化工具调用与结果回传
+- **Extended Thinking**: 深度思考模式（思维链输出）
+- **Vision**: 图像理解与分析
+- **Token 计数**: 精确的 token 用量统计
+- **Prompt Caching**: 提示词缓存优化成本
+
 ---
 
 ## 3. 协议检测
@@ -209,6 +306,8 @@ AI 模型上下文管理的标准化协议。
 | Content-Type: `application/a2a` 或 `agent_id` + `task` 字段 | 85% | A2A |
 | URL 路径以 `/v1/` 开头或包含 `model`+`messages` 字段 | 88% | OpenAI |
 | 带魔数 `0x4F4A574D` 的二进制数据 | 100% | OpenJiuwen |
+| 包含 `openclaw`/`cluster_mode`/`security_level` 字段 | 88% | OpenClaw |
+| 包含 `claude-`/`anthropic-version`/`max_tokens`+Anthropic特征 | 90% | Claude |
 | 默认回退 | — | JSON-RPC |
 
 ### SDK 自动检测示例
@@ -716,6 +815,161 @@ int result = protocol_auto_transform(
 
 ---
 
+## 6. 框架适配器
+
+AgentOS 协议系统提供对主流 AI 开发框架的适配支持，使 AgentOS 能与 LangChain 和 AutoGen 等框架无缝协作。
+
+### 6.1 LangChain 适配器
+
+将 LangChain 的核心概念映射到 AgentOS 协议层。
+
+**位置**: `protocols/frameworks/langchain/`
+
+#### 概念映射
+
+| LangChain 概念 | AgentOS 映射 | 说明 |
+|----------------|-------------|------|
+| LCEL Chain | Pipeline (协议会话) | 编译后的执行链 |
+| Agent | Protocol Session + Handler | 带工具调用的智能体 |
+| Tool | MCP Tool | 通过 executor 回调执行 |
+| LLM / ChatModel | LLM Daemon | 大语言模型接口 |
+| Memory | MemoryRovol (L1-L4) | 四层滚动记忆 |
+| Retriever | memory.search() | 记忆检索 |
+| OutputParser | Transformer | 输出格式转换 |
+
+#### 支持的 Chain 类型
+
+| Chain 类型 | 说明 |
+|-----------|------|
+| Sequential | 线性步骤链（按序执行） |
+| Router | 条件路由链（按条件分支） |
+| MapReduce | 映射归约链（并行处理+聚合） |
+| Parallel | 并行链（多路同时执行） |
+| Conditional | 条件判断链 |
+
+#### 支持的 Agent 类型
+
+| Agent 类型 | 说明 |
+|-----------|------|
+| ReAct | 推理-行动循环 |
+| PlanAndExecute | 先规划后执行 |
+| OpenAIFunctions | OpenAI 函数调用风格 |
+| StructuredChat | 结构化对话 |
+| XML | XML 格式推理 |
+
+#### 使用示例
+
+```c
+#include "langchain_adapter.h"
+
+langchain_adapter_t* lc = langchain_adapter_create();
+
+langchain_tool_def_t tool = {
+    .name = "calculator",
+    .description = "数学计算",
+    .executor = calculator_execute,
+};
+langchain_register_tool(lc, &tool);
+
+langchain_chain_def_t chain = {
+    .type = LANGCHAIN_CHAIN_SEQUENTIAL,
+    .steps = { "input", "llm", "output" },
+    .step_count = 3,
+};
+langchain_create_chain(lc, &chain, "my_chain");
+
+char* result = NULL;
+langchain_execute_chain(lc, "my_chain", "{\"query\":\"1+1\"}", &result);
+printf("结果: %s\n", result);  // {"result": 2}
+free(result);
+
+// 流式输出
+langchain_stream_handler_t stream_handler = {
+    .on_chunk = my_chunk_callback,
+    .user_data = NULL,
+};
+langchain_execute_chain_streaming(lc, "my_chain", "{\"query\":\"分析\"}", &stream_handler);
+
+langchain_adapter_destroy(lc);
+```
+
+### 6.2 AutoGen 适配器
+
+将 Microsoft AutoGen 多代理框架集成到 AgentOS。
+
+**位置**: `protocols/frameworks/autogen/`
+
+#### 概念映射
+
+| AutoGen 概念 | AgentOS 映射 | 说明 |
+|-------------|-------------|------|
+| ConversableAgent | Agent + Session | 可对话代理 |
+| GroupChat | A2A 协议协调 | 多代理群组对话 |
+| UserProxyAgent | Human-in-Loop | 人工介入回调 |
+| CodeExecutor | Tool Sandbox | 代码执行沙箱 |
+
+#### 支持的角色类型
+
+| 角色 | 说明 |
+|------|------|
+| UserProxy | 用户代理（人工交互） |
+| Assistant | 助手代理（通用响应） |
+| Coder | 编程代理（代码生成） |
+| Planner | 规划代理（任务分解） |
+| Researcher | 研究代理（信息检索） |
+| Reviewer | 审查代理（质量检查） |
+| Custom | 自定义角色 |
+
+#### Group Chat 模式
+
+| 模式 | 说明 |
+|------|------|
+| RoundRobin | 轮流发言 |
+| SpeakerSelection | 选择下一个发言者 |
+| RAG | 检索增强生成模式 |
+| Sequential | 顺序执行模式 |
+| Parallel | 并行处理模式 |
+| Custom | 自定义调度逻辑 |
+
+#### 使用示例
+
+```c
+#include "autogen_adapter.h"
+
+autogen_adapter_t* ag = autogen_adapter_create();
+
+autogen_agent_config_t planner_cfg = {
+    .name = "planner",
+    .role = AUTOGEN_ROLE_PLANNER,
+    .system_message = "你是一个任务规划专家，负责将复杂问题分解为子任务。",
+};
+autogen_create_agent(ag, &planner_cfg);
+
+autogen_agent_config_t coder_cfg = {
+    .name = "coder",
+    .role = AUTOGEN_ROLE_CODER,
+    .system_message = "你是一个编程专家，负责编写高质量代码。",
+};
+autogen_create_agent(ag, &coder_cfg);
+
+autogen_group_chat_config_t gc_cfg = {
+    .mode = AUTOGEN_CHAT_ROUND_ROBIN,
+    .max_rounds = 10,
+    .participants = { "planner", "coder" },
+    .participant_count = 2,
+};
+autogen_create_group_chat(ag, &gc_cfg, "dev_team");
+
+autogen_chat_result_t result;
+autogen_initiate_chat(ag, "dev_team", "设计一个REST API服务", &result);
+printf("完成轮次: %d\n", result.rounds_completed);
+printf("消息历史: %zu 条\n", result.message_count);
+
+autogen_adapter_destroy(ag);
+```
+
+---
+
 ## 6. OpenLab 集成
 
 `openlab.protocols` 模块提供 Python 绑定，用于将协议系统集成到 OpenLab 应用中。
@@ -842,24 +1096,15 @@ agentos protocol transform <src> <tgt> [data]    # 协议间转换
 
 ```bash
 $ agentos protocol list
-协议          版本     状态      端点
-────────────  ──────   ──────    ────────────
-JSON-RPC      2.0      active    /jsonrpc
-MCP           1.0      active    /mcp
-A2A           0.3      active    /a2a
-OpenAI        1.0      active    /v1
-OpenJiuwen    1.0      active    /ojiuwen
-
-$ agentos protocol test jsonrpc
-正在测试到 http://localhost:18789/jsonrpc 的 JSON-RPC 连接...
-✓ 连接成功 (延迟: 12ms, 版本: 2.0)
-
-$ agentos protocol send jsonrpc task.submit '{"content":"Hello CLI"}'
-{
-  "jsonrpc": "2.0",
-  "result": { "task_id": "task-abc123", "status": "pending" },
-  "id": "cli-001"
-}
+协议          版本     状态      端点           类型
+────────────  ──────   ──────    ───────────    ──────────
+JSON-RPC      2.0      active    /jsonrpc        标准
+MCP           1.0      active    /mcp            标准
+A2A           0.3      active    /a2a            标准
+OpenAI        1.0      active    /v1            集成
+OpenJiuwen    1.0      active    /ojiuwen       集成
+OpenClaw      1.0      active    /openclaw      集成
+Claude API    1.0      active    /v1/messages   集成
 
 $ agentos protocol stats
 协议统计:
@@ -869,8 +1114,13 @@ $ agentos protocol stats
     MCP:       234 (19.0%)
     A2A:       98  (7.9%)
     OpenAI:    46  (3.7%)
+    OpenClaw:  12  (1.0%)
+    Claude:     8  (0.6%)
+    OpenJiuwen: 4  (0.3%)
   转换次数:    45
   错误次数:    3
+  注册中心:    7 协议已注册
+  扩展适配器:  2 (LangChain + AutoGen)
 ```
 
 ---
@@ -960,6 +1210,7 @@ agentos protocol test openai
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| 1.1.0 | 2026-04-14 | 新增 OpenClaw/Claude 协议文档 + LangChain/AutoGen 框架适配器文档 + 注册中心说明 + 网关7协议检测 |
 | 1.0.0 | 2026-04-14 | 初始版本 — 完整的协议系统文档 |
 
 ## 相关文档

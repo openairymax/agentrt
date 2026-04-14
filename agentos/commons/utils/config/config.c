@@ -12,9 +12,9 @@
  */
 
 #include "config.h"
-#include "../../utils/memory/include/memory_compat.h"
-#include "../../utils/string/include/string_compat.h"
-#include "../../../daemon/common/include/safe_string_utils.h"
+#include <agentos/memory_compat.h>
+#include <agentos/string_compat.h>
+#include <agentos/safe_string_utils.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

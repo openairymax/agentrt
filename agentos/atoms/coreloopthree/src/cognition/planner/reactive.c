@@ -4,22 +4,16 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "cognition.h
-#include "../../../agentos/commons/utils/cognition/include/cognition_common.h""
-#include "llm_client.h
-#include "../../../agentos/commons/utils/cognition/include/cognition_common.h""
-#include <stdlib.h
-#include "../../../agentos/commons/utils/cognition/include/cognition_common.h">
+#include "cognition.h"
+#include <agentos/cognition_common.h>
+#include "llm_client.h"
+#include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../agentos/commons/utils/memory/include/memory_compat.h
-#include "../../../agentos/commons/utils/cognition/include/cognition_common.h""
-#include "../../../agentos/commons/utils/string/include/string_compat.h
-#include "../../../agentos/commons/utils/cognition/include/cognition_common.h""
-#include <string.h
-#include "../../../agentos/commons/utils/cognition/include/cognition_common.h">
-#include <stdio.h
-#include "../../../agentos/commons/utils/cognition/include/cognition_common.h">
+#include <agentos/memory_compat.h>
+#include <agentos/string_compat.h>
+#include <string.h>
+#include <stdio.h>
 
 typedef struct reactive_data {
     agentos_llm_service_t* llm;

@@ -11,8 +11,8 @@
 #include <time.h>
 
 /* 基础库兼容性层 */
-#include "../../../../agentos/commons/utils/memory/include/memory_compat.h"
-#include "../../../../agentos/commons/utils/string/include/string_compat.h"
+#include <agentos/memory_compat.h>
+#include <agentos/string_compat.h>
 
 /* 任务依赖结构 */
 typedef struct task_dependency {

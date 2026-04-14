@@ -192,41 +192,55 @@ from .utils import (
 from .agent import AgentOS, AsyncAgentOS
 
 # 导入工具函数（向后兼容）
-from .utils import (
-    generate_hash,
-    get_env_var,
-    parse_timeout,
-    merge_dicts,
-    retry_with_backoff,
-    Timer,
-    RateLimiter,
-)
+import sys
+import os
+
+# 直接导入 utils.py 文件
+utils_file_path = os.path.join(os.path.dirname(__file__), 'utils.py')
+sys.path.insert(0, os.path.dirname(utils_file_path))
+
+# 动态导入 utils 模块
+import importlib.util
+spec = importlib.util.spec_from_file_location('agentos_utils', utils_file_path)
+agentos_utils = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(agentos_utils)
+
+# 从动态导入的模块中获取函数
+generate_hash = agentos_utils.generate_hash
+get_env_var = agentos_utils.get_env_var
+parse_timeout = agentos_utils.parse_timeout
+merge_dicts = agentos_utils.merge_dicts
+retry_with_backoff = agentos_utils.retry_with_backoff
+Timer = agentos_utils.Timer
+RateLimiter = agentos_utils.RateLimiter
 
 # 导入遥测
 from .telemetry import (
-    Telemetry,
-    Meter,
+    TelemetryManager as Telemetry,
     Tracer,
     Span,
-    SpanStatus,
-    MetricPoint,
+    Metrics as Meter,
 )
 
 # 导入类型定义（向后兼容）
 from .types import (
-    MemoryInfo,
-    MemoryRecordType,
-    SessionInfo,
-    TelemetryMetrics,
-    Priority,
-    TaskID,
-    SessionID,
-    MemoryRecordID,
-    SkillID,
-    Timestamp,
-    ErrorCode,
-    JSONValue,
-    JSONObject,
+    TaskStatus,
+    MemoryLayer,
+    SessionStatus,
+    SkillStatus,
+    SpanStatus,
+    Task,
+    TaskResult,
+    Memory,
+    MemorySearchResult,
+    Session,
+    Skill,
+    SkillResult,
+    SkillInfo,
+    PaginationOptions,
+    SortOptions,
+    FilterOptions,
+    ListOptions,
 )
 
 __all__ = [
@@ -394,23 +408,26 @@ __all__ = [
     "Meter",
     "Tracer",
     "Span",
-    "SpanStatus",
-    "MetricPoint",
 
     # 类型定义（向后兼容）
-    "MemoryInfo",
-    "MemoryRecordType",
-    "SessionInfo",
-    "TelemetryMetrics",
-    "Priority",
-
-    # 类型别名
-    "TaskID",
-    "SessionID",
-    "MemoryRecordID",
-    "SkillID",
-    "Timestamp",
-    "ErrorCode",
-    "JSONValue",
-    "JSONObject",
+    # 枚举类型
+    "TaskStatus",
+    "MemoryLayer",
+    "SessionStatus",
+    "SkillStatus",
+    "SpanStatus",
+    # 领域模型
+    "Task",
+    "TaskResult",
+    "Memory",
+    "MemorySearchResult",
+    "Session",
+    "Skill",
+    "SkillResult",
+    "SkillInfo",
+    # 列表查询选项
+    "PaginationOptions",
+    "SortOptions",
+    "FilterOptions",
+    "ListOptions",
 ]

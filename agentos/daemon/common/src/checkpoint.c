@@ -18,7 +18,7 @@
  */
 
 #include "../include/checkpoint.h"
-#include "../../../../agentos/atoms/corekern/include/agentos.h"
+#include <agentos/agentos.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -33,7 +33,7 @@
 #endif
 
 /* Unified base library compatibility layer */
-#include "../../../../agentos/commons/utils/memory/include/memory_compat.h"
+#include <agentos/memory_compat.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -450,10 +450,13 @@ agentos_error_t agentos_checkpoint_restore(
         if (sscanf(line, "  \"%127[^\"]\": \"%1023[^\"]\"", key, value) == 2) {
             if (strcmp(key, "task_id") == 0) {
                 strncpy(cp->task_id, value, sizeof(cp->task_id) - 1);
+                cp->task_id[sizeof(cp->task_id) - 1] = '\0';
             } else if (strcmp(key, "session_id") == 0) {
                 strncpy(cp->session_id, value, sizeof(cp->session_id) - 1);
+                cp->session_id[sizeof(cp->session_id) - 1] = '\0';
             } else if (strcmp(key, "state") == 0) {
                 strncpy(state_str, value, sizeof(state_str) - 1);
+                state_str[sizeof(state_str) - 1] = '\0';
             } else if (strcmp(key, "state_json") == 0) {
                 cp->state_json = safe_strdup(value);
                 if (cp->state_json) {

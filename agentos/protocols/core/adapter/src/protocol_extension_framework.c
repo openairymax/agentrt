@@ -434,7 +434,58 @@ int proto_ext_list_adapters(proto_ext_framework_t* fw, char** names_json) {
 
 int proto_ext_list_capabilities(proto_ext_framework_t* fw, char** caps_json) {
     if (!fw || !caps_json) return -1;
-    *caps_json = strdup("{\"capabilities\":[]}");
+
+    uint32_t all_caps = 0;
+    for (size_t i = 0; i < fw->adapter_count; i++) {
+        if (fw->adapters[i].state >= PROTO_EXT_STATE_LOADED) {
+            all_caps |= fw->adapters[i].descriptor.capabilities;
+        }
+    }
+
+    size_t buf_size = 2048;
+    char* buf = malloc(buf_size);
+    if (!buf) return -3;
+
+    size_t offset = snprintf(buf, buf_size, "{\"capabilities\":[");
+
+    bool first = true;
+    const struct { uint32_t bit; const char* name; } cap_names[] = {
+        { PROTO_CAP_REQUEST_RESPONSE, "request_response" },
+        { PROTO_CAP_STREAMING, "streaming" },
+        { PROTO_CAP_BIDIRECTIONAL, "bidirectional" },
+        { PROTO_CAP_BINARY, "binary" },
+        { PROTO_CAP_COMPRESSION, "compression" },
+        { PROTO_CAP_ENCRYPTION, "encryption" },
+        { PROTO_CAP_AUTHENTICATION, "authentication" },
+        { PROTO_CAP_DISCOVERY, "discovery" },
+        { PROTO_CAP_DELEGATION, "delegation" },
+        { PROTO_CAP_NEGOTIATION, "negotiation" },
+        { PROTO_CAP_CONSENSUS, "consensus" },
+        { PROTO_CAP_TOOL_USE, "tool_use" },
+        { PROTO_CAP_VISION, "vision" },
+        { PROTO_CAP_EXTENDED_THINKING, "extended_thinking" },
+        { PROTO_CAP_CODE_EXECUTION, "code_execution" },
+        { PROTO_CAP_HUMAN_IN_LOOP, "human_in_loop" },
+        { PROTO_CAP_MEMORY, "memory" },
+        { PROTO_CAP_RAG, "rag" },
+        { PROTO_CAP_MULTI_AGENT, "multi_agent" },
+        { PROTO_CAP_CLUSTER, "cluster" },
+        { PROTO_CAP_EMBEDDING, "embedding" },
+        { PROTO_CAP_TOKEN_COUNTING, "token_counting" },
+        { PROTO_CAP_PROMPT_CACHING, "prompt_caching" },
+        { PROTO_CAP_SAFETY_FILTER, "safety_filter" },
+    };
+
+    for (size_t c = 0; c < sizeof(cap_names)/sizeof(cap_names[0]); c++) {
+        if (all_caps & cap_names[c].bit) {
+            if (!first) offset += snprintf(buf + offset, buf_size - offset, ",");
+            offset += snprintf(buf + offset, buf_size - offset, "\"%s\"", cap_names[c].name);
+            first = false;
+        }
+    }
+
+    snprintf(buf + offset, buf_size - offset, "],\"raw_flags\":%u}", all_caps);
+    *caps_json = buf;
     return 0;
 }
 
@@ -469,19 +520,157 @@ proto_ext_state_t proto_ext_get_state(proto_ext_framework_t* fw, const char* nam
     return PROTO_EXT_STATE_UNLOADED;
 }
 
+static char* json_extract_string(const char* json, const char* key) {
+    if (!json || !key) return NULL;
+    char search[128];
+    snprintf(search, sizeof(search), "\"%s\"", key);
+    const char* p = strstr(json, search);
+    if (!p) return NULL;
+    p += strlen(search);
+    while (*p && (*p == ' ' || *p == ':')) p++;
+    if (*p != '"') return NULL;
+    p++;
+    const char* end = strchr(p, '"');
+    if (!end) return NULL;
+    size_t len = end - p;
+    char* result = malloc(len + 1);
+    memcpy(result, p, len);
+    result[len] = '\0';
+    return result;
+}
+
+static int json_extract_int(const char* json, const char* key, int default_val) {
+    char* s = json_extract_string(json, key);
+    if (s) { int v = atoi(s); free(s); return v; }
+    return default_val;
+}
+
 int proto_ext_load_from_config(proto_ext_framework_t* fw, const char* config_json) {
     if (!fw || !config_json) return -1;
+
+    const char* adapters_start = strstr(config_json, "\"adapters\"");
+    if (!adapters_start) {
+        adapters_start = strstr(config_json, "\"extensions\"");
+        if (!adapters_start) return -2;
+    }
+
+    const char* array_start = strchr(adapters_start, '[');
+    if (!array_start) return -3;
+
+    int loaded_count = 0;
+    const char* p = array_start + 1;
+    while (*p && *p != ']') {
+        const char* obj_start = strchr(p, '{');
+        if (!obj_start) break;
+        const char* obj_end = strchr(obj_start, '}');
+        if (!obj_end) break;
+
+        size_t obj_len = obj_end - obj_start + 1;
+        char* obj_buf = malloc(obj_len + 1);
+        memcpy(obj_buf, obj_start, obj_len);
+        obj_buf[obj_len] = '\0';
+
+        char* name = json_extract_string(obj_buf, "name");
+        char* version = json_extract_string(obj_buf, "version");
+        char* desc = json_extract_string(obj_buf, "description");
+        char* author = json_extract_string(obj_buf, "author");
+        int proto_type = json_extract_int(obj_buf, "protocol_type", PROTOCOL_CUSTOM);
+        uint32_t caps = (uint32_t)json_extract_int(obj_buf, "capabilities", 0);
+        int priority = json_extract_int(obj_buf, "priority", 50);
+
+        if (name) {
+            proto_ext_descriptor_t desc_struct = { .protocol_type = proto_type,
+                .capabilities = caps, .priority = priority, .hot_loadable = true };
+            strncpy(desc_struct.name, name, PROTO_EXT_MAX_NAME_LEN - 1);
+            if (version) strncpy(desc_struct.version, version, PROTO_EXT_MAX_VERSION_LEN - 1);
+            else strcpy(desc_struct.version, "1.0.0");
+            if (desc) strncpy(desc_struct.description, desc, 255);
+            else strcpy(desc_struct.description, "Loaded from config");
+            if (author) strncpy(desc_struct.author, author, 127);
+
+            proto_ext_callbacks_t empty_cbs = { 0 };
+
+            int rc = proto_ext_register(fw, &desc_struct, &empty_cbs);
+            if (rc == 0) {
+                proto_ext_load(fw, name, obj_buf);
+                loaded_count++;
+            }
+        }
+
+        free(name); free(version); free(desc); free(author); free(obj_buf);
+        p = obj_end + 1;
+        while (*p && (*p == ',' || *p == ' ' || *p == '\n' || *p == '\r')) p++;
+    }
+
+    return loaded_count;
+}
+
+static proto_ext_framework_t* g_framework_instance = NULL;
+
+static int fw_adapter_init(void* ctx, const char* config) {
+    (void)ctx;
+    if (!g_framework_instance) {
+        g_framework_instance = proto_ext_framework_create();
+        if (config && config[0] != '\0') {
+            proto_ext_load_from_config(g_framework_instance, config);
+        }
+    }
+    return 0;
+}
+
+static void fw_adapter_destroy(void* ctx) {
+    (void)ctx;
+    if (g_framework_instance) {
+        proto_ext_framework_destroy(g_framework_instance);
+        g_framework_instance = NULL;
+    }
+}
+
+static int fw_adapter_encode(void* ctx, const void* in, size_t in_len, void** out, size_t* out_len) {
+    (void)ctx; (void)in; (void)in_len;
+    if (out) *out = NULL;
+    if (out_len) *out_len = 0;
+    return 0;
+}
+
+static int fw_adapter_decode(void* ctx, const void* in, size_t in_len, void** out, size_t* out_len) {
+    (void)ctx; (void)in; (void)in_len;
+    if (out) *out = NULL;
+    if (out_len) *out_len = 0;
+    return 0;
+}
+
+static bool fw_adapter_is_connected(void* ctx) {
+    (void)ctx;
+    return g_framework_instance != NULL;
+}
+
+static int fw_adapter_get_stats(void* ctx, char** stats_json) {
+    (void)ctx;
+    if (!g_framework_instance || !stats_json) return -1;
+    proto_ext_list_adapters(g_framework_instance, stats_json);
     return 0;
 }
 
 static protocol_adapter_t proto_ext_framework_adapter = {
     .type = PROTOCOL_CUSTOM,
-    .init = NULL, .destroy = NULL,
-    .encode = NULL, .decode = NULL,
-    .connect = NULL, .disconnect = NULL,
-    .is_connected = NULL, .get_stats = NULL
+    .init = fw_adapter_init,
+    .destroy = fw_adapter_destroy,
+    .encode = fw_adapter_encode,
+    .decode = fw_adapter_decode,
+    .connect = NULL,
+    .disconnect = NULL,
+    .is_connected = fw_adapter_is_connected,
+    .get_stats = fw_adapter_get_stats
 };
 
 const protocol_adapter_t* proto_ext_get_framework_adapter(void) {
     return &proto_ext_framework_adapter;
+}
+
+proto_ext_framework_t* proto_ext_get_global_instance(void) {
+    if (!g_framework_instance) {
+        g_framework_instance = proto_ext_framework_create();
+    }
+    return g_framework_instance;
 }

@@ -11,8 +11,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../utils/memory/include/memory_compat.h"
-#include "../../utils/string/include/string_compat.h"
+#include <agentos/memory_compat.h>
+#include <agentos/string_compat.h>
 #include <string.h>
 #include <time.h>
 #include <pthread.h>
@@ -398,6 +398,7 @@ int service_logging_add_outputter(const char* name, int type, void* user_data) {
 
     outputter->type = type;
     strncpy(outputter->name, name, sizeof(outputter->name) - 1);
+    outputter->name[sizeof(outputter->name) - 1] = '\0';
     outputter->user_data = user_data;
 
     // 根据类型设置函数

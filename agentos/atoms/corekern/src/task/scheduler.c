@@ -23,11 +23,11 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../../commons/utils/memory/include/memory_compat.h"
-#include "../../../../commons/utils/string/include/string_compat.h"
+#include <agentos/memory_compat.h>
+#include <agentos/string_compat.h>
 
 /* Check macros for unified error handling */
-#include "../../../../commons/utils/include/check.h"
+#include <agentos/check.h>
 #include <string.h>
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include <agentos/atomic_compat.h>

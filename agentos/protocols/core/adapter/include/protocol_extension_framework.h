@@ -193,6 +193,8 @@ int proto_ext_load_from_config(proto_ext_framework_t* fw,
 
 const protocol_adapter_t* proto_ext_get_framework_adapter(void);
 
+proto_ext_framework_t* proto_ext_get_global_instance(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -5,9 +5,9 @@
  */
 
 #include "../../../include/cognition.h"
-#include "../../../../../commons/utils/memory/include/memory_compat.h"
-#include "../../../../../commons/utils/logging/include/logging_compat.h"
-#include "../../../../../commons/platform/include/platform.h"
+#include <agentos/memory_compat.h>
+#include <agentos/logging_compat.h>
+#include <agentos/platform.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
