@@ -26,18 +26,19 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-/* 跨平台原子操作支持 */
+/* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
+#include <agentos/atomic_compat.h>
+
+/* 平台特定头文件 */
 #ifdef _WIN32
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <windows.h>
-#include <intrin.h>
-#include "../../../commons/utils/include/atomic_compat.h"
+    #define WIN32_LEAN_AND_MEAN
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+    #include <windows.h>
 #else
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <stdatomic.h>
+    #include <arpa/inet.h>
+    #include <sys/socket.h>
+    #include <netinet/in.h>
 #endif
 
 /* ========== HTTP网关内部结构 ========== */

@@ -210,10 +210,12 @@ static void init_checkpoint_fields(
 
     if (task_id) {
         strncpy(cp->task_id, task_id, sizeof(cp->task_id) - 1);
+        cp->task_id[sizeof(cp->task_id) - 1] = '\0';
     }
 
     if (session_id) {
         strncpy(cp->session_id, session_id, sizeof(cp->session_id) - 1);
+        cp->session_id[sizeof(cp->session_id) - 1] = '\0';
     }
 
     cp->sequence_num = sequence_num;
