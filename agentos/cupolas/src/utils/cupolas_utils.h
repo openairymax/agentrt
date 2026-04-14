@@ -632,6 +632,13 @@ void cupolas_memset_s(void* ptr, size_t len);
 uint64_t cupolas_get_timestamp_ms(void);
 
 /**
+ * @brief Get current timestamp in nanoseconds
+ * @return Monotonic timestamp in nanoseconds (uint64_t)
+ * @note Uses high-resolution performance counters
+ */
+uint64_t cupolas_get_timestamp_ns(void);
+
+/**
  * @brief Compute djb2 hash of string
  * @param str Null-terminated string to hash
  * @return 32-bit hash value

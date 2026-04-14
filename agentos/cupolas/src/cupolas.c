@@ -33,6 +33,7 @@
 #include "workbench/workbench.h"
 #include "audit/audit.h"
 #include "../utils/cupolas_utils.h"
+#include "guards/guard_integration.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -275,6 +276,48 @@ int cupolas_check_permission(const char* agent_id, const char* action,
                                resource, result >= 0 ? result : -1, agent_id);
     }
 
+    // SafetyGuard集成：如果权限检查通过，进行安全守卫检查
+    if (result > 0 && cupolas_guards_is_enabled()) {
+        guard_manager_t* guard_manager = cupolas_guards_get_manager();
+        if (guard_manager) {
+            const size_t max_results = 8;
+            guard_result_t results[max_results];
+            size_t actual_results = 0;
+            
+            // 创建守卫检测上下文
+            guard_context_t guard_ctx = {
+                .operation = "permission_check",
+                .resource = resource,
+                .agent_id = agent_id,
+                .session_id = context, // 使用context作为会话ID
+                .input_data = (void*)action,
+                .input_size = action ? strlen(action) + 1 : 0,
+                .context_data = NULL,
+                .timestamp = cupolas_get_timestamp_ns()
+            };
+            
+            int guard_ret = guard_manager_check_sync(guard_manager, &guard_ctx,
+                                                   results, max_results, &actual_results);
+            if (guard_ret == CUPOLAS_OK) {
+                // 检查守卫检测结果，如果有高风险则拒绝
+                for (size_t i = 0; i < actual_results; i++) {
+                    guard_result_t* guard_result = &results[i];
+                    if (guard_result->risk_level >= RISK_LEVEL_MEDIUM &&
+                        (guard_result->recommended_action == GUARD_ACTION_BLOCK ||
+                         guard_result->recommended_action == GUARD_ACTION_ISOLATE ||
+                         guard_result->recommended_action == GUARD_ACTION_TERMINATE)) {
+                        // 安全守卫建议阻止，记录审计日志并拒绝访问
+                        if (g_cupolas.audit) {
+                            audit_logger_log_event(g_cupolas.audit, "guard_block",
+                                                   resource, 0, agent_id);
+                        }
+                        return 0; // 拒绝访问
+                    }
+                }
+            }
+        }
+    }
+
     return result > 0 ? 1 : (result == 0 ? 0 : result);
 }
 
@@ -367,6 +410,52 @@ int cupolas_sanitize_input(const char* input, char* output, size_t output_size) 
                                input, (int)result, NULL);
     }
 
+    // SafetyGuard集成：如果消毒成功，进行安全守卫检查
+    if (result == SANITIZE_OK && cupolas_guards_is_enabled()) {
+        guard_manager_t* guard_manager = cupolas_guards_get_manager();
+        if (guard_manager) {
+            const size_t max_results = 8;
+            guard_result_t results[max_results];
+            size_t actual_results = 0;
+            
+            // 创建守卫检测上下文
+            guard_context_t guard_ctx = {
+                .operation = "input_sanitization",
+                .resource = "sanitizer",
+                .agent_id = "system", // 默认代理ID
+                .session_id = NULL,
+                .input_data = (void*)output,
+                .input_size = strlen(output) + 1,
+                .context_data = NULL,
+                .timestamp = cupolas_get_timestamp_ns()
+            };
+            
+            int guard_ret = guard_manager_check_sync(guard_manager, &guard_ctx,
+                                                   results, max_results, &actual_results);
+            if (guard_ret == CUPOLAS_OK) {
+                // 检查守卫检测结果，如果有高风险则处理
+                for (size_t i = 0; i < actual_results; i++) {
+                    guard_result_t* guard_result = &results[i];
+                    if (guard_result->risk_level >= RISK_LEVEL_CRITICAL) {
+                        // 严重风险：清空输出并返回错误
+                        output[0] = '\0';
+                        if (g_cupolas.audit) {
+                            audit_logger_log_event(g_cupolas.audit, "guard_block",
+                                                   input, 0, "system");
+                        }
+                        return cupolas_ERR_INVALID_ARG;
+                    } else if (guard_result->risk_level >= RISK_LEVEL_HIGH) {
+                        // 高风险：记录审计日志但允许通过
+                        if (g_cupolas.audit) {
+                            audit_logger_log_event(g_cupolas.audit, "guard_warn",
+                                                   input, 0, "system");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     return (result == SANITIZE_OK) ? CUPOLAS_OK : cupolas_ERR_PERMISSION_DENIED;
 }
 
@@ -416,6 +505,66 @@ int cupolas_execute_command(const char* command, char* const argv[],
 
     if (!g_cupolas.initialized) {
         return cupolas_ERR_STATE_ERROR;
+    }
+
+    // SafetyGuard集成：执行前进行安全守卫检查
+    if (cupolas_guards_is_enabled()) {
+        guard_manager_t* guard_manager = cupolas_guards_get_manager();
+        if (guard_manager) {
+            // 构建命令字符串用于检测
+            char cmd_buffer[1024] = {0};
+            size_t pos = 0;
+            
+            // 添加命令
+            if (command) {
+                pos += snprintf(cmd_buffer + pos, sizeof(cmd_buffer) - pos, "%s", command);
+            }
+            
+            // 添加参数
+            if (argv) {
+                for (int i = 0; argv[i] && pos < sizeof(cmd_buffer) - 1; i++) {
+                    pos += snprintf(cmd_buffer + pos, sizeof(cmd_buffer) - pos, " %s", argv[i]);
+                }
+            }
+            
+            const size_t max_results = 8;
+            guard_result_t results[max_results];
+            size_t actual_results = 0;
+            
+            // 创建守卫检测上下文
+            guard_context_t guard_ctx = {
+                .operation = "command_execution",
+                .resource = "workbench",
+                .agent_id = "system", // 默认代理ID
+                .session_id = NULL,
+                .input_data = cmd_buffer,
+                .input_size = strlen(cmd_buffer) + 1,
+                .context_data = NULL,
+                .timestamp = cupolas_get_timestamp_ns()
+            };
+            
+            int guard_ret = guard_manager_check_sync(guard_manager, &guard_ctx,
+                                                   results, max_results, &actual_results);
+            if (guard_ret == CUPOLAS_OK) {
+                // 检查守卫检测结果，如果有高风险则阻止执行
+                for (size_t i = 0; i < actual_results; i++) {
+                    guard_result_t* guard_result = &results[i];
+                    if (guard_result->risk_level >= RISK_LEVEL_MEDIUM &&
+                        (guard_result->recommended_action == GUARD_ACTION_BLOCK ||
+                         guard_result->recommended_action == GUARD_ACTION_ISOLATE ||
+                         guard_result->recommended_action == GUARD_ACTION_TERMINATE)) {
+                        // 安全守卫建议阻止，记录审计日志并返回权限错误
+                        if (g_cupolas.audit) {
+                            char task_desc[256];
+                            snprintf(task_desc, sizeof(task_desc), "guard_block:%s", command);
+                            audit_logger_log_event(g_cupolas.audit, "execute_command",
+                                                   task_desc, cupolas_ERR_PERMISSION_DENIED, NULL);
+                        }
+                        return cupolas_ERR_PERMISSION_DENIED;
+                    }
+                }
+            }
+        }
     }
 
     cupolas_workbench_config_t wbcfg;

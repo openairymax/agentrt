@@ -11,21 +11,24 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+/* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
+#include <agentos/atomic_compat.h>
+
+/* Windows 特定头文件和定义 */
+#ifdef _WIN32
+    #define WIN32_LEAN_AND_MEAN
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+    #include <windows.h>
+    #define strdup _strdup
+#endif
+
 #include "gateway_rate_limiter.h"
 #include "gateway_utils.h"
 
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
-/* 跨平台原子操作支持 */
-#ifdef _WIN32
-#include <windows.h>
-#include <intrin.h>
-#include "../../../commons/utils/include/atomic_compat.h"
-#else
-#include <stdatomic.h>
-#endif
 
 /* ========== 客户端状态结构 ========== */
 
@@ -263,6 +266,7 @@ static inline void consume_token(client_state_t* client) {
  * @brief 检查速率限制（核心逻辑）
  */
 static bool check_rate_limit(client_state_t* client, 
+                             gateway_rate_limiter_t* limiter,
                              const gateway_rate_limit_config_t* config,
                              uint64_t now_ns) {
     /* 更新令牌 */
@@ -270,7 +274,6 @@ static bool check_rate_limit(client_state_t* client,
     
     /* 检查时间窗口 */
     if (!check_time_windows(client, config, now_ns)) {
-        gateway_rate_limiter_t* limiter = client->limiter;
         if (limiter) {
             atomic_fetch_add(&limiter->total_rejected, 1);
         }
@@ -280,7 +283,6 @@ static bool check_rate_limit(client_state_t* client,
     /* 检查令牌桶 */
     if (client->tokens > 0) {
         consume_token(client);
-        gateway_rate_limiter_t* limiter = client->limiter;
         if (limiter) {
             atomic_fetch_add(&limiter->total_allowed, 1);
         }
@@ -288,7 +290,6 @@ static bool check_rate_limit(client_state_t* client,
     }
     
     /* 令牌不足，拒绝 */
-    gateway_rate_limiter_t* limiter = client->limiter;
     if (limiter) {
         atomic_fetch_add(&limiter->total_rejected, 1);
     }
@@ -379,7 +380,7 @@ bool gateway_rate_limiter_allow(gateway_rate_limiter_t* limiter, const char* cli
     }
     
     /* 步骤 5: 执行速率限制检查 */
-    return check_rate_limit(client, &limiter->config, now_ns);
+    return check_rate_limit(client, limiter, &limiter->config, now_ns);
 }
 
 void gateway_rate_limiter_get_stats(

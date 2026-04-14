@@ -101,13 +101,13 @@ const Logs: React.FC = () => {
 
   const lines = filteredLogs.split("\n");
 
-  const getLineInfo = (line: string) => {
-    const lower = line.toLowerCase();
-    if (lower.includes("error") || lower.includes("fatal")) return { color: "#ef4444", level: "error" };
-    if (lower.includes("warn")) return { color: "#f59e0b", level: "warn" };
-    if (lower.includes("info")) return { color: "#6366f1", level: "info" };
-    if (lower.includes("debug")) return { color: "#22c55e", level: "debug" };
-    return { color: "var(--text-secondary)", level: "default" };
+  const getLogLevelColor = (text: string) => {
+    const lower = text.toLowerCase();
+    if (lower.includes("error") || lower.includes("fatal")) return { color: "var(--error-color)", level: "error" };
+    if (lower.includes("warn")) return { color: "var(--warning-color)", level: "warn" };
+    if (lower.includes("info")) return { color: "var(--primary-color)", level: "info" };
+    if (lower.includes("debug")) return { color: "var(--success-color)", level: "debug" };
+    return { color: "var(--text-secondary)", level: "info" };
   };
 
   const levelCounts = (() => {
@@ -131,7 +131,7 @@ const Logs: React.FC = () => {
     return (
       <>
         {text.substring(0, idx)}
-        <mark style={{ background: "rgba(245,158,11,0.3)", color: "#fbbf24", borderRadius: "2px", padding: "0 2px" }}>{text.substring(idx, idx + term.length)}</mark>
+        <mark style={{ background: "var(--warning-light)", color: "var(--warning-color)", borderRadius: "2px", padding: "0 2px" }}>{text.substring(idx, idx + term.length)}</mark>
         {highlightSearch(text.substring(idx + term.length), term)}
       </>
     );
@@ -184,10 +184,10 @@ const Logs: React.FC = () => {
       }}>
         {[
           { label: "总行数", value: levelCounts.total, color: "var(--text-primary)", bg: "var(--bg-secondary)" },
-          { label: "Error", value: levelCounts.error, color: "#ef4444", bg: "rgba(239,68,68,0.06)" },
-          { label: "Warning", value: levelCounts.warn, color: "#f59e0b", bg: "rgba(245,158,11,0.06)" },
-          { label: "Info", value: levelCounts.info, color: "#6366f1", bg: "rgba(99,102,241,0.06)" },
-          { label: "Debug", value: levelCounts.debug, color: "#22c55e", bg: "rgba(34,197,94,0.06)" },
+          { label: "Error", value: levelCounts.error, color: "var(--error-color)", bg: "var(--error-light)" },
+          { label: "Warning", value: levelCounts.warn, color: "var(--warning-color)", bg: "var(--warning-light)" },
+          { label: "Info", value: levelCounts.info, color: "var(--primary-color)", bg: "var(--primary-light)" },
+          { label: "Debug", value: levelCounts.debug, color: "var(--success-color)", bg: "var(--success-light)" },
         ].map(stat => (
           <div key={stat.label} style={{
             padding: "12px 16px", borderRadius: "var(--radius-md)",
@@ -239,7 +239,7 @@ const Logs: React.FC = () => {
                 message: t.logs.clearConfirm,
               });
               if (confirmed) setLogs("");
-            }} disabled={!logs} title="Clear" style={{ color: logs ? "#ef4444" : undefined }}>
+            }} disabled={!logs} title="Clear" style={{ color: logs ? "var(--error-color)" : undefined }}>
               <Trash2 size={14} />
             </button>
           </div>
@@ -263,9 +263,9 @@ const Logs: React.FC = () => {
             background: "#111118", borderBottom: "1px solid var(--border-subtle)",
             padding: "8px 16px", display: "flex", alignItems: "center", gap: "8px",
           }}>
-            <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#ef4444" }} />
-            <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#f59e0b" }} />
-            <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#22c55e" }} />
+            <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: "var(--error-color)" }} />
+            <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: "var(--warning-color)" }} />
+            <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: "var(--success-color)" }} />
             <span style={{ marginLeft: "8px", fontSize: "11.5px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
               {selectedService ? SERVICES.find(s => s.value === selectedService)?.label : "All Services"} — {lines.length} 行
             </span>
@@ -298,7 +298,7 @@ const Logs: React.FC = () => {
               {/* Log Content */}
               <div style={{ flex: 1, padding: "12px 16px", minWidth: 0 }}>
                 {lines.map((line, i) => {
-                  const info = getLineInfo(line);
+                  const info = getLogLevelColor(line);
                   return (
                     <div
                       key={i}

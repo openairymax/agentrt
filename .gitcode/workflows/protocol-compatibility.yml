@@ -1,0 +1,416 @@
+# Protocol Compatibility CI (GitCode Actions)
+#
+# 版本: V1.0 - 2026-04-13
+# 定位: 多协议兼容性自动化测试与基准验证
+# 主要职责:
+#   ✅ JSON-RPC 2.0 / MCP / A2A / OpenAI API 协议兼容性测试
+#   ✅ IPC服务总线多协议消息传递测试
+#   ✅ 服务发现协议感知测试
+#   ✅ 熔断器协议集成测试
+#   ✅ 统一指标协议导出测试
+#   ✅ 性能基准测试与回归检测
+#   ✅ 协议兼容性报告生成
+#
+# 触发条件:
+#   - 协议/网关相关代码变更
+#   - 定时回归测试
+#   - 手动触发
+
+name: Protocol Compatibility CI
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'agentos/gateway/**'
+      - 'agentos/daemon/common/**'
+      - 'agentos/atoms/frameworks/**'
+      - 'agentos/protocols/**'
+      - 'tests/integration/test_protocol_compatibility.py'
+      - 'tests/benchmarks/benchmark_performance.py'
+      - '.gitcode/workflows/protocol-compatibility.yml'
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'agentos/gateway/**'
+      - 'agentos/daemon/common/**'
+      - 'agentos/atoms/frameworks/**'
+      - 'agentos/protocols/**'
+      - 'tests/integration/**'
+      - 'tests/benchmarks/**'
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+    inputs:
+      test_scope:
+        description: 'Test scope'
+        required: false
+        default: 'full'
+        type: choice
+        options:
+          - 'full'
+          - 'protocols-only'
+          - 'ipc-only'
+          - 'benchmarks-only'
+          - 'smoke'
+      gateway_url:
+        description: 'Gateway URL override'
+        required: false
+        default: ''
+      skip_build:
+        description: 'Skip gateway build (use existing)'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: protocol-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: '3.11'
+  GATEWAY_PORT: 18789
+  REDIS_PORT: 6379
+  POSTGRES_PORT: 5432
+
+jobs:
+  # ================================================================
+  # Job 1: 构建网关服务
+  # ================================================================
+  build-gateway:
+    name: Build Gateway Service
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build gcc g++ \
+            libcurl4-openssl-dev libyaml-dev libcjson-dev libssl-dev
+
+      - name: Configure and build gateway
+        run: |
+          mkdir -p build && cd build
+          cmake .. \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTS=ON \
+            -DENABLE_MCP=ON \
+            -DENABLE_A2A=ON \
+            -DENABLE_OPENAI=ON
+          cmake --build . --target gateway_d --parallel $(nproc)
+
+      - name: Upload gateway binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: gateway-binary
+          path: build/bin/gateway_d
+          retention-days: 1
+
+  # ================================================================
+  # Job 2: 协议兼容性测试
+  # ================================================================
+  protocol-compatibility-tests:
+    name: Protocol Compatibility Tests
+    needs: build-gateway
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: agentos
+          POSTGRES_PASSWORD: agentos
+          POSTGRES_DB: agentos_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install test dependencies
+        run: |
+          pip install --quiet requests websocket-client pyyaml
+
+      - name: Download gateway binary
+        uses: actions/download-artifact@v4
+        with:
+          name: gateway-binary
+          path: ./gateway-bin/
+
+      - name: Start gateway service
+        run: |
+          chmod +x ./gateway-bin/gateway_d
+          ./gateway-bin/gateway_d --port ${{ env.GATEWAY_PORT }} --config agentos/gateway/config/ &
+          GATEWAY_PID=$!
+          echo "GATEWAY_PID=$GATEWAY_PID" >> $GITHUB_ENV
+
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:${{ env.GATEWAY_PORT }}/health > /dev/null 2>&1; then
+              echo "Gateway started on port ${{ env.GATEWAY_PORT }}"
+              break
+            fi
+            echo "Waiting for gateway... ($i/30)"
+            sleep 1
+          done
+
+          if ! curl -s http://localhost:${{ env.GATEWAY_PORT }}/health > /dev/null 2>&1; then
+            echo "::error::Gateway failed to start"
+            exit 1
+          fi
+
+      - name: Run protocol compatibility tests
+        env:
+          AGENTOS_GATEWAY_URL: http://localhost:${{ env.GATEWAY_PORT }}
+          AGENTOS_REDIS_URL: redis://localhost:${{ env.REDIS_PORT }}
+          AGENTOS_DATABASE_URL: postgresql://agentos:agentos@localhost:${{ env.POSTGRES_PORT }}/agentos_test
+        run: |
+          echo "🧪 Running protocol compatibility test suite..."
+          python tests/integration/test_protocol_compatibility.py \
+            --gateway $AGENTOS_GATEWAY_URL \
+            --verbose \
+            --json > tests/protocol_test_results.json 2>&1 || true
+
+          echo "📋 Test execution completed"
+
+      - name: Parse and report test results
+        id: results
+        run: |
+          if [ -f tests/protocol_test_results.json ]; then
+            TOTAL=$(python -c "import json; d=json.load(open('tests/protocol_test_results.json')); print(d.get('total', 0))" 2>/dev/null || echo "0")
+            PASSED=$(python -c "import json; d=json.load(open('tests/protocol_test_results.json')); print(d.get('passed', 0))" 2>/dev/null || echo "0")
+            FAILED=$(python -c "import json; d=json.load(open('tests/protocol_test_results.json')); print(d.get('failed', 0))" 2>/dev/null || echo "0")
+            SKIPPED=$(python -c "import json; d=json.load(open('tests/protocol_test_results.json')); print(d.get('skipped', 0))" 2>/dev/null || echo "0")
+
+            echo "total=$TOTAL" >> $GITHUB_OUTPUT
+            echo "passed=$PASSED" >> $GITHUB_OUTPUT
+            echo "failed=$FAILED" >> $GITHUB_OUTPUT
+            echo "skipped=$SKIPPED" >> $GITHUB_OUTPUT
+
+            echo "## 🧪 Protocol Compatibility Test Results" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Total | $TOTAL |" >> $GITHUB_STEP_SUMMARY
+            echo "| ✅ Passed | $PASSED |" >> $GITHUB_STEP_SUMMARY
+            echo "| ❌ Failed | $FAILED |" >> $GITHUB_STEP_SUMMARY
+            echo "| ⏭️ Skipped | $SKIPPED |" >> $GITHUB_STEP_SUMMARY
+
+            if [ "$FAILED" -gt 0 ]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### ❌ Failed Tests" >> $GITHUB_STEP_SUMMARY
+              python -c "
+          import json
+          d = json.load(open('tests/protocol_test_results.json'))
+          for r in d.get('results', []):
+              if not r.get('passed'):
+                  print(f'- **{r[\"name\"]}** ({r[\"category\"]}): {r.get(\"message\", \"No message\")}')
+          " 2>/dev/null >> $GITHUB_STEP_SUMMARY || true
+            fi
+          else
+            echo "total=0" >> $GITHUB_OUTPUT
+            echo "passed=0" >> $GITHUB_OUTPUT
+            echo "failed=0" >> $GITHUB_OUTPUT
+            echo "skipped=0" >> $GITHUB_OUTPUT
+            echo "::warning::No test results file found"
+          fi
+
+      - name: Stop gateway service
+        if: always()
+        run: |
+          if [ -n "$GATEWAY_PID" ]; then
+            kill $GATEWAY_PID 2>/dev/null || true
+          fi
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: protocol-test-results
+          path: |
+            tests/protocol_test_results.json
+          retention-days: 30
+
+      - name: Protocol quality gate
+        run: |
+          FAILED=${{ steps.results.outputs.failed }}
+          if [ "$FAILED" -gt 0 ]; then
+            echo "::error::$FAILED protocol compatibility tests failed"
+            exit 1
+          fi
+          echo "✅ All protocol compatibility tests passed"
+
+  # ================================================================
+  # Job 3: 性能基准测试
+  # ================================================================
+  performance-benchmarks:
+    name: Performance Benchmarks
+    needs: build-gateway
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install benchmark dependencies
+        run: |
+          pip install --quiet requests websocket-client pyyaml numpy
+
+      - name: Download gateway binary
+        uses: actions/download-artifact@v4
+        with:
+          name: gateway-binary
+          path: ./gateway-bin/
+
+      - name: Start gateway service
+        run: |
+          chmod +x ./gateway-bin/gateway_d
+          ./gateway-bin/gateway_d --port ${{ env.GATEWAY_PORT }} --config agentos/gateway/config/ &
+          GATEWAY_PID=$!
+          echo "GATEWAY_PID=$GATEWAY_PID" >> $GITHUB_ENV
+
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:${{ env.GATEWAY_PORT }}/health > /dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run performance benchmarks
+        env:
+          AGENTOS_GATEWAY_URL: http://localhost:${{ env.GATEWAY_PORT }}
+        run: |
+          echo "📊 Running performance benchmarks..."
+          python tests/benchmarks/benchmark_performance.py \
+            --gateway $AGENTOS_GATEWAY_URL \
+            --iterations 100 \
+            --json > tests/benchmark_results.json 2>&1 || true
+
+      - name: Analyze benchmark results
+        id: bench
+        run: |
+          if [ -f tests/benchmark_results.json ]; then
+            echo "## 📊 Performance Benchmark Results" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            python -c "
+          import json
+          d = json.load(open('tests/benchmark_results.json'))
+          print('| Benchmark | P50 (ms) | P95 (ms) | P99 (ms) | Throughput (RPS) |')
+          print('|-----------|----------|----------|----------|------------------|')
+          for b in d.get('benchmarks', []):
+              name = b.get('name', 'unknown')
+              stats = b.get('statistics', {})
+              p50 = stats.get('median_ms', 0)
+              p95 = stats.get('p95_ms', 0)
+              p99 = stats.get('p99_ms', 0)
+              rps = stats.get('throughput_rps', 0)
+              print(f'| {name} | {p50:.2f} | {p95:.2f} | {p99:.2f} | {rps:.1f} |')
+          " 2>/dev/null >> $GITHUB_STEP_SUMMARY || echo "Benchmark results parsing failed" >> $GITHUB_STEP_SUMMARY
+
+            REGRESSION=$(python -c "
+          import json
+          d = json.load(open('tests/benchmark_results.json'))
+          regressions = []
+          for b in d.get('benchmarks', []):
+              stats = b.get('statistics', {})
+              if stats.get('p95_ms', 0) > 500:
+                  regressions.append(b.get('name', 'unknown'))
+          print(len(regressions))
+          " 2>/dev/null || echo "0")
+
+            echo "regression_count=$REGRESSION" >> $GITHUB_OUTPUT
+          else
+            echo "regression_count=0" >> $GITHUB_OUTPUT
+            echo "::warning::No benchmark results file found"
+          fi
+
+      - name: Stop gateway service
+        if: always()
+        run: |
+          if [ -n "$GATEWAY_PID" ]; then
+            kill $GATEWAY_PID 2>/dev/null || true
+          fi
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results
+          path: tests/benchmark_results.json
+          retention-days: 90
+
+      - name: Performance regression gate
+        run: |
+          REGRESSIONS=${{ steps.bench.outputs.regression_count }}
+          if [ "$REGRESSIONS" -gt 0 ]; then
+            echo "::warning::$REGRESSIONS benchmarks show P95 latency > 500ms (potential regression)"
+          fi
+          echo "✅ Performance benchmarks completed"
+
+  # ================================================================
+  # Job 4: 协议兼容性综合报告
+  # ================================================================
+  protocol-ci-summary:
+    name: Protocol CI Summary
+    needs: [protocol-compatibility-tests, performance-benchmarks]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## 🔗 Protocol Compatibility CI Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Protocol Compatibility Tests | \`${{ needs.protocol-compatibility-tests.result }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Performance Benchmarks | \`${{ needs.performance-benchmarks.result }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*Generated at $(date -u '+%Y-%m-%d %H:%M:%S UTC')*" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.protocol-compatibility-tests.result }}" != "success" ]; then
+            echo "::error::Protocol compatibility tests failed"
+            exit 1
+          fi

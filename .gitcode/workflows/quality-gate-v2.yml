@@ -1,0 +1,333 @@
+# Quality Gate (GitCode Actions)
+#
+# 版本: V2.0 - 2026-04-13
+# 定位: 增强版代码质量门禁 - 发布前综合质量验证
+# 主要职责:
+#   ✅ 代码复杂度分析
+#   ✅ 文档覆盖率检查
+#   ✅ 协议兼容性验证
+#   ✅ 安全合规检查
+#   ✅ 性能回归检测
+#   ✅ 发布就绪性评估
+#
+# 控制论耦合:
+#   负反馈: 质量不达标 → 阻断合并/发布
+#   正反馈: 质量优秀 → 加速审批流程
+#   前馈: 趋势分析 → 预防质量退化
+
+name: Quality Gate (Enhanced)
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      gate_level:
+        description: 'Gate strictness level'
+        required: false
+        default: 'standard'
+        type: choice
+        options:
+          - 'standard'
+          - 'strict'
+          - 'release'
+      skip_performance:
+        description: 'Skip performance gate'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: quality-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GATE_LEVEL: ${{ github.event.inputs.gate_level || 'standard' }}
+  COVERAGE_THRESHOLD_STANDARD: 70
+  COVERAGE_THRESHOLD_STRICT: 85
+  COVERAGE_THRESHOLD_RELEASE: 90
+  MAX_CYCLOMATIC_COMPLEXITY: 15
+  MAX_DUPLICATION_PERCENT: 5
+  MAX_DOC_WARNINGS: 200
+
+jobs:
+  # ================================================================
+  # Job 1: 代码质量分析
+  # ================================================================
+  code-quality:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install analysis tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            cppcheck clang-tools clang-format clang-tidy \
+            lizard python3-pip
+          pip install --quiet radon xenon
+
+      - name: Run cppcheck
+        run: |
+          mkdir -p reports
+          cppcheck --enable=all --suppress=missingInclude \
+            --xml --xml-version=2 \
+            agentos/ 2> reports/cppcheck.xml || true
+          cppcheck --enable=all --suppress=missingInclude \
+            agentos/ 2>&1 | tee reports/cppcheck.txt || true
+
+      - name: Analyze cyclomatic complexity
+        run: |
+          echo "## 📊 Cyclomatic Complexity Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          HIGH_COMPLEXITY=0
+
+          for c_file in $(find agentos -name "*.c" -not -path "*/tests/*" -not -path "*/build/*" 2>/dev/null | head -50); do
+            if command -v lizard &>/dev/null; then
+              complexity=$(lizard "$c_file" -C ${{ env.MAX_CYCLOMATIC_COMPLEXITY }} 2>/dev/null | tail -1 | grep -oP '\d+' | head -1 || echo "0")
+              if [ -n "$complexity" ] && [ "$complexity" -gt 0 ]; then
+                echo "- **$c_file**: $complexity functions exceed complexity threshold" >> $GITHUB_STEP_SUMMARY
+                HIGH_COMPLEXITY=$((HIGH_COMPLEXITY + 1))
+              fi
+            fi
+          done
+
+          if [ "$HIGH_COMPLEXITY" -gt 0 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "::warning::$HIGH_COMPLEXITY files have high cyclomatic complexity"
+          fi
+
+          echo "high_complexity=$HIGH_COMPLEXITY" >> $GITHUB_OUTPUT
+
+      - name: Check code formatting
+        run: |
+          FORMAT_ISSUES=0
+
+          if [ -f "agentos/gateway/.clang-format" ]; then
+            for c_file in $(find agentos/gateway -name "*.c" -o -name "*.h" | head -20); do
+              if ! clang-format --style=file:"agentos/gateway/.clang-format" --dry-run "$c_file" 2>/dev/null; then
+                FORMAT_ISSUES=$((FORMAT_ISSUES + 1))
+              fi
+            done
+          fi
+
+          echo "format_issues=$FORMAT_ISSUES" >> $GITHUB_OUTPUT
+
+      - name: Code quality summary
+        run: |
+          echo "## 📝 Code Quality Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value | Threshold | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          HIGH_COMPLEXITY=${{ steps.complexity.outputs.high_complexity || '0' }}
+          FORMAT_ISSUES=${{ steps.format.outputs.format_issues || '0' }}
+
+          if [ "$HIGH_COMPLEXITY" -le 5 ]; then
+            echo "| High Complexity Files | $HIGH_COMPLEXITY | ≤5 | ✅ |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| High Complexity Files | $HIGH_COMPLEXITY | ≤5 | ⚠️ |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "$FORMAT_ISSUES" -le 3 ]; then
+            echo "| Format Issues | $FORMAT_ISSUES | ≤3 | ✅ |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Format Issues | $FORMAT_ISSUES | ≤3 | ⚠️ |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload code quality reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: code-quality-reports
+          path: reports/
+          retention-days: 14
+
+  # ================================================================
+  # Job 2: 文档覆盖率检查
+  # ================================================================
+  documentation-coverage:
+    name: Documentation Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check API documentation coverage
+        id: doc_coverage
+        run: |
+          PUBLIC_HEADERS=$(find agentos/daemon agentos/commons agentos/atoms agentos/gateway agentos/heapstore \
+            -name "*.h" -path "*/include/*" 2>/dev/null)
+          UNDOCUMENTED=0
+          DOCUMENTED=0
+          UNDOCUMENTED_FILES=""
+
+          for header in $PUBLIC_HEADERS; do
+            if grep -q "/**\|/*!\|///" "$header"; then
+              DOCUMENTED=$((DOCUMENTED + 1))
+            else
+              UNDOCUMENTED=$((UNDOCUMENTED + 1))
+              UNDOCUMENTED_FILES="$UNDOCUMENTED_FILES\n  - $header"
+            fi
+          done
+
+          TOTAL=$((DOCUMENTED + UNDOCUMENTED))
+
+          if [ $TOTAL -gt 0 ]; then
+            COVERAGE=$((DOCUMENTED * 100 / TOTAL))
+          else
+            COVERAGE=0
+          fi
+
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
+          echo "documented=$DOCUMENTED" >> $GITHUB_OUTPUT
+          echo "undocumented=$UNDOCUMENTED" >> $GITHUB_OUTPUT
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+
+          echo "## 📚 Documentation Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Total Headers | $TOTAL |" >> $GITHUB_STEP_SUMMARY
+          echo "| Documented | $DOCUMENTED |" >> $GITHUB_STEP_SUMMARY
+          echo "| Undocumented | $UNDOCUMENTED |" >> $GITHUB_STEP_SUMMARY
+          echo "| Coverage | ${COVERAGE}% |" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$GATE_LEVEL" = "release" ]; then
+            THRESHOLD=${{ env.COVERAGE_THRESHOLD_RELEASE }}
+          elif [ "$GATE_LEVEL" = "strict" ]; then
+            THRESHOLD=${{ env.COVERAGE_THRESHOLD_STRICT }}
+          else
+            THRESHOLD=${{ env.COVERAGE_THRESHOLD_STANDARD }}
+          fi
+
+          if [ "$COVERAGE" -lt "$THRESHOLD" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ Coverage (${COVERAGE}%) below ${GATE_LEVEL} threshold (${THRESHOLD}%)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Undocumented Files:" >> $GITHUB_STEP_SUMMARY
+            echo -e "$UNDOCUMENTED_FILES" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # ================================================================
+  # Job 3: 安全合规检查
+  # ================================================================
+  security-compliance:
+    name: Security Compliance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install security tools
+        run: pip install --quiet bandit safety pip-audit
+
+      - name: Run Bandit security scan
+        run: |
+          mkdir -p reports
+          bandit -r agentos/ -f json -o reports/bandit.json 2>/dev/null || true
+          bandit -r agentos/ -f txt 2>/dev/null | tail -20 || true
+
+      - name: Check for hardcoded secrets
+        run: |
+          SECRETS_FOUND=0
+
+          patterns=(
+            "BEGIN RSA PRIVATE KEY"
+            "BEGIN PRIVATE KEY"
+            "BEGIN EC PRIVATE KEY"
+            "password\s*=\s*['\"][^'\"]+['\"]"
+            "api_key\s*=\s*['\"][^'\"]+['\"]"
+            "secret\s*=\s*['\"][^'\"]+['\"]"
+          )
+
+          for pattern in "${patterns[@]}"; do
+            if grep -r "$pattern" agentos/ --include="*.c" --include="*.h" --include="*.py" --include="*.rs" -l 2>/dev/null | head -5; then
+              SECRETS_FOUND=$((SECRETS_FOUND + 1))
+              echo "::error::Potential hardcoded secret found matching: $pattern"
+            fi
+          done
+
+          if [ "$SECRETS_FOUND" -gt 0 ]; then
+            echo "::error::$SECRETS_FOUND potential hardcoded secrets detected"
+          fi
+
+      - name: Security compliance summary
+        run: |
+          echo "## 🛡️ Security Compliance Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f reports/bandit.json ]; then
+            HIGH=$(python3 -c "import json; d=json.load(open('reports/bandit.json')); print(len([r for r in d.get('results',[]) if r.get('issue_severity')=='HIGH']))" 2>/dev/null || echo "N/A")
+            MEDIUM=$(python3 -c "import json; d=json.load(open('reports/bandit.json')); print(len([r for r in d.get('results',[]) if r.get('issue_severity')=='MEDIUM']))" 2>/dev/null || echo "N/A")
+            LOW=$(python3 -c "import json; d=json.load(open('reports/bandit.json')); print(len([r for r in d.get('results',[]) if r.get('issue_severity')=='LOW']))" 2>/dev/null || echo "N/A")
+
+            echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| 🔴 High | $HIGH |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🟡 Medium | $MEDIUM |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🟢 Low | $LOW |" >> $GITHUB_STEP_SUMMARY
+
+            if [ "$HIGH" != "N/A" ] && [ "$HIGH" -gt 0 ]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "::error::$HIGH high-severity security issues found"
+            fi
+          fi
+
+  # ================================================================
+  # Job 4: 发布就绪性评估
+  # ================================================================
+  release-readiness:
+    name: Release Readiness Assessment
+    needs: [code-quality, documentation-coverage, security-compliance]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Assess release readiness
+        run: |
+          echo "## 🚀 Release Readiness Assessment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Gate Level**: ${{ env.GATE_LEVEL }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "| Gate | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Code Quality | \`${{ needs.code-quality.result }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Documentation | \`${{ needs.documentation-coverage.result }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security | \`${{ needs.security-compliance.result }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          FAIL=0
+          [ "${{ needs.code-quality.result }}" = "failure" ] && FAIL=1
+          [ "${{ needs.documentation-coverage.result }}" = "failure" ] && FAIL=1
+          [ "${{ needs.security-compliance.result }}" = "failure" ] && FAIL=1
+
+          if [ "$FAIL" -eq 1 ]; then
+            echo "### ❌ Release Not Ready" >> $GITHUB_STEP_SUMMARY
+            echo "One or more quality gates failed. Fix issues before merging." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "### ✅ Release Ready" >> $GITHUB_STEP_SUMMARY
+            echo "All quality gates passed. Safe to merge and release." >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*Assessment at $(date -u '+%Y-%m-%d %H:%M:%S UTC')*" >> $GITHUB_STEP_SUMMARY

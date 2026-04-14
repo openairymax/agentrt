@@ -466,6 +466,163 @@ agentos_memory_forget(const char* policy,
 }
 ```
 
+### `agentos_memory_stats()`
+
+```c
+/**
+ * @brief 获取记忆系统统计信息
+ * 
+ * 获取全局记忆系统统计信息，包括记录数量、存储使用量、
+ * 各层记录分布等。
+ * 
+ * @param out_stats [out] 返回统计信息结构体
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @ownership 无堆内存分配，结构体为值类型
+ * @threadsafe 是
+ * @reentrant 是
+ */
+AGENTOS_API agentos_error_t
+agentos_memory_stats(agentos_memory_statistics_t* out_stats);
+```
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 获取成功
+- `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 参数无效
+
+### `agentos_memory_layer_stats()`
+
+```c
+/**
+ * @brief 获取各记忆层统计信息
+ * 
+ * 获取 L1-L4 各层的详细统计信息，包括记录数量、存储大小、
+ * 索引状态等。
+ * 
+ * @param layer 指定层级（1=L1, 2=L2, 3=L3, 4=L4），0=所有层级
+ * @param out_stats [out] 返回层级统计信息（JSON 格式）
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @ownership 调用者拥有 *out_stats，需通过 agentos_sys_free() 释放
+ * @threadsafe 是
+ * @reentrant 否
+ */
+AGENTOS_API agentos_error_t
+agentos_memory_layer_stats(uint8_t layer,
+                           char** out_stats);
+```
+
+**返回 JSON 示例**：
+```json
+{
+    "layers": [
+        {"level": 1, "record_count": 15000, "size_bytes": 5242880, "index_type": "raw"},
+        {"level": 2, "record_count": 3200, "size_bytes": 2097152, "index_type": "faiss_ivf"},
+        {"level": 3, "record_count": 800, "size_bytes": 1048576, "index_type": "graph_db"},
+        {"level": 4, "record_count": 150, "size_bytes": 524288, "index_type": "pattern_index"}
+    ]
+}
+```
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 获取成功
+- `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 层级参数无效
+- `AGENTOS_ERROR_NO_MEMORY` (0x1002): 内存不足
+
+### `agentos_memory_export()`
+
+```c
+/**
+ * @brief 导出记忆数据
+ * 
+ * 将指定范围的记忆数据导出为 JSON 格式。支持按层级、
+ * 时间范围、标签等条件筛选导出数据。
+ * 
+ * @param filter 导出过滤条件（JSON 格式）
+ * @param out_data [out] 返回导出数据（JSON 格式）
+ * @param out_size [out] 返回导出数据大小
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @ownership 调用者拥有 *out_data，需通过 agentos_sys_free() 释放
+ * @threadsafe 是
+ * @reentrant 否
+ */
+AGENTOS_API agentos_error_t
+agentos_memory_export(const char* filter,
+                      char** out_data,
+                      size_t* out_size);
+```
+
+**过滤条件示例**：
+```json
+{
+    "layer": [1, 2],
+    "tags": ["important"],
+    "time_range": {"start": 1672531200000, "end": 1672617600000},
+    "importance_min": 0.5,
+    "max_records": 10000
+}
+```
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 导出成功
+- `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 过滤条件无效
+- `AGENTOS_ERROR_NO_MEMORY` (0x1002): 内存不足
+- `AGENTOS_ERROR_NO_DATA` (0x2003): 无匹配数据
+
+### `agentos_memory_import()`
+
+```c
+/**
+ * @brief 导入记忆数据
+ * 
+ * 将外部记忆数据导入到系统中。支持 JSON 格式的批量导入，
+ * 自动分配到对应记忆层。
+ * 
+ * @param data 导入数据（JSON 格式）
+ * @param data_size 数据大小
+ * @param options 导入选项（JSON 格式，可选）
+ * @param out_report [out] 返回导入报告（JSON 格式）
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @ownership 调用者拥有 *out_report，需通过 agentos_sys_free() 释放
+ * @threadsafe 是
+ * @reentrant 否
+ */
+AGENTOS_API agentos_error_t
+agentos_memory_import(const char* data,
+                      size_t data_size,
+                      const char* options,
+                      char** out_report);
+```
+
+**导入选项示例**：
+```json
+{
+    "merge_strategy": "overwrite",
+    "skip_duplicates": true,
+    "auto_evolve": true,
+    "validate_schema": true
+}
+```
+
+**返回报告示例**：
+```json
+{
+    "total_records": 1500,
+    "imported": 1420,
+    "skipped": 65,
+    "failed": 15,
+    "layers": {"L1": 800, "L2": 400, "L3": 180, "L4": 40}
+}
+```
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 导入成功
+- `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 数据格式无效
+- `AGENTOS_ERROR_NO_MEMORY` (0x1002): 内存不足
+- `AGENTOS_ERROR_IMPORT_FAILED` (0x2004): 导入失败
+
 ---
 
 ## 🚀 使用示例
