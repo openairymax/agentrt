@@ -69,6 +69,13 @@ include_directories(
     ${COMMONS_DIR}/utils/sync/include
 )
 
+# protocols 模块（统一协议栈）
+set(PROTOCOLS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../protocols")
+include_directories(
+    ${PROTOCOLS_DIR}/include
+    ${PROTOCOLS_DIR}/protocol/include
+)
+
 # ========== 源文件 ==========
 set(GATEWAY_SOURCES
     src/gateway/gateway_api.c
@@ -79,6 +86,7 @@ set(GATEWAY_SOURCES
     src/utils/jsonrpc.c
     src/utils/syscall_router.c
     src/utils/gateway_rpc_handler.c
+    src/utils/gateway_protocol_handler.c
     src/utils/gateway_rate_limiter.c
 )
 
@@ -91,6 +99,7 @@ set(GATEWAY_HEADERS
     src/utils/jsonrpc.h
     src/utils/syscall_router.h
     src/utils/gateway_utils.h
+    src/utils/gateway_protocol_handler.h
     src/utils/gateway_rate_limiter.h
 )
 
@@ -105,7 +114,7 @@ target_include_directories(gateway
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_link_libraries(gateway)
+target_link_libraries(gateway PRIVATE agentos_protocols)
 
 # 条件链接依赖库
 if(cJSON_FOUND)

@@ -24,7 +24,9 @@
     #include <process.h>
     #include <sys/stat.h>
     #include <bcrypt.h>
-    #ifndef EEXIST
+    #define strdup _strdup
+    #define access _access
+#ifndef EEXIST
         #define EEXIST 17
     #endif
     #pragma comment(lib, "bcrypt.lib")

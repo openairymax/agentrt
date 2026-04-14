@@ -20,14 +20,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#ifdef _WIN32
-#include <windows.h>
-#include <intrin.h>
-/* Windows 平台的原子操作替代实现 */
-#include "../../../../commons/utils/include/atomic_compat.h"
-#else
-#include <stdatomic.h>
-#endif
+/* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
+#include <agentos/atomic_compat.h>
 
 #ifdef __cplusplus
 extern "C" {

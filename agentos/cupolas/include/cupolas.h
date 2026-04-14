@@ -27,6 +27,8 @@
 #define CUPOLAS_H
 
 #include <stddef.h>
+/* 统一错误码定义：使用commons权威基础库 */
+#include "../../commons/include/agentos_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,7 +38,7 @@ extern "C" {
  * Unified Error Codes (Following AgentOS Standard)
  * ============================================================================ */
 
-typedef int agentos_error_t;
+/* agentos_error_t defined in agentos_types.h */
 
 #define AGENTOS_OK                     0
 #define AGENTOS_ERR_UNKNOWN           -1

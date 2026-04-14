@@ -181,15 +181,9 @@ typedef struct agentos_task_statistics {
     uint32_t queue_depth;
     
     /** System 1 路径任务占比（%） */
-    float system1_ratio;
-    
-    /** System 2 路径任务占比（%） */
-    float success_rate_percent;
-    
-    /** System 1 路径任务占比 */
     float system1_ratio_percent;
     
-    /** System 2 路径任务占比 */
+    /** System 2 路径任务占比（%） */
     float system2_ratio_percent;
 } agentos_task_statistics_t;
 ```
@@ -393,6 +387,66 @@ agentos_task_wait(uint64_t task_id,
                   uint32_t timeout_ms,
                   char** out_result);
 ```
+
+### `agentos_task_priority_set()`
+
+```c
+/**
+ * @brief 设置任务优先级
+ * 
+ * 动态调整任务的优先级。优先级范围为 0-100，0 为最高优先级。
+ * 仅 PENDING 状态的任务可调整优先级。
+ * 
+ * @param task_id 任务 ID
+ * @param priority 新优先级（0=最高，100=最低）
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @threadsafe 是
+ * @reentrant 否
+ */
+AGENTOS_API agentos_error_t
+agentos_task_priority_set(uint64_t task_id,
+                          uint8_t priority);
+```
+
+**优先级语义**：
+
+| 优先级范围 | 语义 | 典型场景 |
+|-----------|------|---------|
+| 0-19 | 紧急 | 系统关键任务、用户直接请求 |
+| 20-49 | 高优先级 | 重要业务逻辑、实时交互 |
+| 50-79 | 普通优先级 | 常规任务、批量处理 |
+| 80-100 | 低优先级 | 后台清理、日志归档 |
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 设置成功
+- `AGENTOS_ERROR_NOT_FOUND` (0x1005): 任务不存在
+- `AGENTOS_ERROR_INVALID_STATE` (0x1006): 任务状态不允许修改优先级
+- `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 优先级值超出范围
+
+### `agentos_task_stats()`
+
+```c
+/**
+ * @brief 获取任务统计信息
+ * 
+ * 获取全局任务执行统计信息，包括任务数量、成功率、
+ * System 1/System 2 路径占比等。
+ * 
+ * @param out_stats [out] 返回统计信息结构体
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @ownership 无堆内存分配，结构体为值类型
+ * @threadsafe 是
+ * @reentrant 是
+ */
+AGENTOS_API agentos_error_t
+agentos_task_stats(agentos_task_statistics_t* out_stats);
+```
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 获取成功
+- `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 参数无效
 
 ---
 

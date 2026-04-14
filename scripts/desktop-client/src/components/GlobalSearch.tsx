@@ -12,6 +12,13 @@ import {
   Terminal,
   ArrowRight,
   Command,
+  Activity,
+  Database,
+  Settings2,
+  Wifi,
+  MessageCircle,
+  Sparkles,
+  Cpu,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useI18n } from '../i18n';
@@ -36,15 +43,21 @@ const GlobalSearch: React.FC = () => {
   const { t } = useI18n();
 
   const searchItems: SearchResult[] = useMemo(() => [
-    { id: 'dash', type: 'page', title: t.nav.dashboard, subtitle: 'System overview & monitoring', icon: LayoutDashboard, path: '/', keywords: ['dashboard', 'overview', 'home', 'main'] },
-    { id: 'serv', type: 'page', title: t.nav.services, subtitle: 'Manage Docker services', icon: Server, path: '/services', keywords: ['services', 'docker', 'containers'] },
-    { id: 'agen', type: 'page', title: t.nav.agents, subtitle: 'AI agents management', icon: Users, path: '/agents', keywords: ['agents', 'ai', 'bots', 'assistants'] },
-    { id: 'task', type: 'page', title: t.nav.tasks, subtitle: 'Submit & track tasks', icon: ClipboardList, path: '/tasks', keywords: ['tasks', 'jobs', 'queue'] },
-    { id: 'llmc', type: 'page', title: t.nav.llmConfig, subtitle: 'Configure AI models', icon: Brain, path: '/llm-config', keywords: ['ai', 'llm', 'model', 'openai', 'claude', 'api'] },
-    { id: 'conf', type: 'page', title: t.nav.config, subtitle: 'Edit configuration files', icon: SettingsIcon, path: '/config', keywords: ['config', 'settings', 'yaml', 'env'] },
-    { id: 'logs', type: 'page', title: t.nav.logs, subtitle: 'View system logs', icon: FileText, path: '/logs', keywords: ['logs', 'errors', 'debugging'] },
-    { id: 'term', type: 'page', title: t.nav.terminal, subtitle: 'Execute commands', icon: Terminal, path: '/terminal', keywords: ['terminal', 'shell', 'command', 'bash'] },
-    { id: 'sett', type: 'page', title: t.nav.settings, subtitle: 'Application preferences', icon: SettingsIcon, path: '/settings', keywords: ['settings', 'preferences', 'theme', 'language'] },
+    { id: 'dash', type: 'page', title: t.nav.dashboard, subtitle: '系统概览与监控', icon: LayoutDashboard, path: '/', keywords: ['dashboard', 'overview', 'home', 'main', '系统', '概览'] },
+    { id: 'agen', type: 'page', title: t.nav.agents, subtitle: 'AI智能体管理', icon: Users, path: '/agents', keywords: ['agents', 'ai', 'bots', 'assistants', '智能体', '机器人'] },
+    { id: 'task', type: 'page', title: t.nav.tasks, subtitle: '任务编排与追踪', icon: ClipboardList, path: '/tasks', keywords: ['tasks', 'jobs', 'queue', '任务', '编排'] },
+    { id: 'serv', type: 'page', title: t.nav.services, subtitle: '服务管理与监控', icon: Server, path: '/services', keywords: ['services', 'docker', 'containers', '服务', '容器'] },
+    { id: 'ai-chat', type: 'page', title: t.nav.aiChat, subtitle: 'AI智能助手', icon: MessageCircle, path: '/ai-chat', keywords: ['ai', 'chat', 'assistant', '助手', '对话'] },
+    { id: 'llmc', type: 'page', title: t.nav.llmConfig, subtitle: 'AI模型配置', icon: Sparkles, path: '/llm-config', keywords: ['ai', 'llm', 'model', 'openai', 'claude', 'api', '模型', '配置'] },
+    { id: 'agent-runtime', type: 'page', title: t.nav.agentRuntime, subtitle: '运行时管理', icon: Cpu, path: '/agent-runtime', keywords: ['runtime', 'agent', '运行时', '管理'] },
+    { id: 'memory-evolution', type: 'page', title: t.nav.memoryEvolution, subtitle: '记忆系统管理', icon: Database, path: '/memory-evolution', keywords: ['memory', 'evolution', '记忆', '系统'] },
+    { id: 'system-monitor', type: 'page', title: t.nav.systemMonitor, subtitle: '系统资源监控', icon: Activity, path: '/system-monitor', keywords: ['system', 'monitor', 'resource', '系统', '监控', '资源'] },
+    { id: 'logs', type: 'page', title: t.nav.logs, subtitle: '系统日志查看', icon: FileText, path: '/logs', keywords: ['logs', 'errors', 'debugging', '日志', '错误', '调试'] },
+    { id: 'terminal', type: 'page', title: t.nav.terminal, subtitle: '终端命令执行', icon: Terminal, path: '/terminal', keywords: ['terminal', 'shell', 'command', 'bash', '终端', '命令'] },
+    { id: 'tools', type: 'page', title: t.nav.tools, subtitle: '工具管理', icon: Settings2, path: '/tools', keywords: ['tools', '管理', '工具'] },
+    { id: 'protocols', type: 'page', title: '协议测试', subtitle: '协议 测试', icon: Wifi, path: '/protocols', keywords: ['protocols', 'test', '协议', '测试'] },
+    { id: 'config', type: 'page', title: t.nav.config, subtitle: '配置文件编辑', icon: SettingsIcon, path: '/config', keywords: ['config', 'settings', 'yaml', 'env', '配置', '文件'] },
+    { id: 'settings', type: 'page', title: t.nav.settings, subtitle: '应用偏好设置', icon: SettingsIcon, path: '/settings', keywords: ['settings', 'preferences', 'theme', 'language', '设置', '偏好', '主题', '语言'] },
   ], [t]);
 
   const filteredResults = useMemo(() => {

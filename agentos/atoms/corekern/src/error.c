@@ -29,7 +29,7 @@ static const char* error_strings[] = {
 #define ERROR_COUNT (sizeof(error_strings) / sizeof(error_strings[0]))
 
 const char* agentos_strerror(agentos_error_t err) {
-    if (err == AGENTOS_ERROR) {
+    if (err == AGENTOS_EUNKNOWN) {
         return "Generic error";
     }
     if (err > 0 || err < -(agentos_error_t)ERROR_COUNT) {
