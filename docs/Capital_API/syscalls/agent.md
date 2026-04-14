@@ -443,6 +443,264 @@ agentos_agent_skill_bind(const char* agent_id,
                          const char* manager);
 ```
 
+### `agentos_agent_skill_unbind()`
+
+```c
+/**
+ * @brief 解绑 Skill
+ * 
+ * 将指定 Skill 从 Agent 解绑，Agent 将失去该能力。
+ * 正在使用该 Skill 的任务会继续完成，但后续任务无法再调用该 Skill。
+ * 
+ * @param agent_id Agent ID
+ * @param skill_name Skill 名称
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @threadsafe 是
+ * @reentrant 否
+ * @see agentos_agent_skill_bind()
+ */
+AGENTOS_API agentos_error_t
+agentos_agent_skill_unbind(const char* agent_id,
+                           const char* skill_name);
+```
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 解绑成功
+- `AGENTOS_ERROR_AGENT_NOT_FOUND` (0x5001): Agent 不存在
+- `AGENTOS_ERROR_SKILL_NOT_BOUND` (0x5007): Skill 未绑定到该 Agent
+- `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 参数无效
+
+### `agentos_agent_get()`
+
+```c
+/**
+ * @brief 获取 Agent 信息
+ * 
+ * 获取指定 Agent 的完整描述信息，包括状态、配置和运行时数据。
+ * 
+ * @param agent_id Agent ID
+ * @param out_descriptor [out] 返回 Agent 描述符（调用者负责释放）
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @ownership 调用者拥有 *out_descriptor，需释放 metadata 字段后释放结构体本身
+ * @threadsafe 是
+ * @reentrant 否
+ * @see agentos_agent_create(), agentos_agent_state()
+ */
+AGENTOS_API agentos_error_t
+agentos_agent_get(const char* agent_id,
+                  agentos_agent_descriptor_t** out_descriptor);
+```
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 获取成功
+- `AGENTOS_ERROR_AGENT_NOT_FOUND` (0x5001): Agent 不存在
+- `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 参数无效
+
+**使用示例**：
+```c
+agentos_agent_descriptor_t* desc = NULL;
+agentos_error_t err = agentos_agent_get(agent_id, &desc);
+if (err == AGENTOS_SUCCESS) {
+    printf("Agent: %s, State: %d, Tasks: %u\n",
+           desc->name, desc->state, desc->active_task_count);
+    if (desc->metadata) free(desc->metadata);
+    free(desc);
+}
+```
+
+### `agentos_agent_update()`
+
+```c
+/**
+ * @brief 更新 Agent 配置
+ * 
+ * 动态更新 Agent 的运行时配置。仅允许更新部分配置项，
+ * 核心配置（如类型、名称）不可更改。Agent 必须处于 READY 或 PAUSED 状态。
+ * 
+ * @param agent_id Agent ID
+ * @param config 更新配置（JSON 格式，仅包含需更新的字段）
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @threadsafe 是
+ * @reentrant 否
+ * @see agentos_agent_create(), agentos_agent_get()
+ */
+AGENTOS_API agentos_error_t
+agentos_agent_update(const char* agent_id,
+                     const char* config);
+```
+
+**可更新字段**（JSON 格式）：
+```json
+{
+    "max_concurrent_tasks": 16,
+    "default_task_timeout_ms": 60000,
+    "cognition_config": "{\"model\": \"gpt-4\", \"temperature\": 0.7}",
+    "memory_config": "{\"max_records\": 10000}",
+    "security_config": "{\"sandbox\": true}",
+    "resource_limits": {
+        "max_memory_bytes": 536870912,
+        "max_cpu_percent": 80,
+        "max_execution_time_sec": 3600
+    },
+    "retry_config": {
+        "max_retries": 3,
+        "retry_interval_ms": 1000,
+        "backoff_factor": 2.0
+    }
+}
+```
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 更新成功
+- `AGENTOS_ERROR_AGENT_NOT_FOUND` (0x5001): Agent 不存在
+- `AGENTOS_ERROR_INVALID_STATE` (0x5003): Agent 状态不允许更新
+- `AGENTOS_ERROR_RESOURCE_LIMIT` (0x5004): 新资源限制超出系统容量
+- `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 配置格式无效
+
+### `agentos_agent_list()`
+
+```c
+/**
+ * @brief 列出所有 Agent
+ * 
+ * 返回当前系统中所有 Agent 的 ID 列表。
+ * 
+ * @param out_agent_ids [out] 返回 Agent ID 数组（调用者负责逐个释放后释放数组）
+ * @param out_count [out] 返回 Agent 数量
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @ownership 调用者拥有 *out_agent_ids 数组及其每个元素
+ * @threadsafe 是
+ * @reentrant 否
+ */
+AGENTOS_API agentos_error_t
+agentos_agent_list(char*** out_agent_ids,
+                   size_t* out_count);
+```
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 获取成功
+- `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 参数无效
+- `AGENTOS_ERROR_NO_MEMORY` (0x1002): 内存不足
+
+**使用示例**：
+```c
+char** agent_ids = NULL;
+size_t count = 0;
+agentos_error_t err = agentos_agent_list(&agent_ids, &count);
+if (err == AGENTOS_SUCCESS) {
+    printf("Total agents: %zu\n", count);
+    for (size_t i = 0; i < count; i++) {
+        printf("  [%zu] %s\n", i, agent_ids[i]);
+        free(agent_ids[i]);
+    }
+    free(agent_ids);
+}
+```
+
+### `agentos_agent_state()`
+
+```c
+/**
+ * @brief 获取 Agent 状态
+ * 
+ * 获取指定 Agent 的当前状态。相比 agentos_agent_get() 更轻量，
+ * 仅返回状态值，不分配内存。
+ * 
+ * @param agent_id Agent ID
+ * @param out_state [out] 返回 Agent 状态枚举值
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @ownership 无堆内存分配
+ * @threadsafe 是
+ * @reentrant 是
+ * @see agentos_agent_get()
+ */
+AGENTOS_API agentos_error_t
+agentos_agent_state(const char* agent_id,
+                    uint8_t* out_state);
+```
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 获取成功
+- `AGENTOS_ERROR_AGENT_NOT_FOUND` (0x5001): Agent 不存在
+- `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 参数无效
+
+### `agentos_agent_stats()`
+
+```c
+/**
+ * @brief 获取 Agent 统计信息
+ * 
+ * 获取全局 Agent 统计信息，包括各状态/类型的 Agent 数量、
+ * 任务执行统计、资源使用情况等。
+ * 
+ * @param out_stats [out] 返回统计信息结构体
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @ownership 无堆内存分配，结构体为值类型
+ * @threadsafe 是
+ * @reentrant 是
+ * @see agentos_agent_get()
+ */
+AGENTOS_API agentos_error_t
+agentos_agent_stats(agentos_agent_statistics_t* out_stats);
+```
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 获取成功
+- `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 参数无效
+
+### `agentos_agent_history()`
+
+```c
+/**
+ * @brief 获取 Agent 状态历史
+ * 
+ * 获取指定 Agent 的状态变更历史记录，支持分页查询。
+ * 返回链表结构，按时间倒序排列（最新变更在前）。
+ * 
+ * @param agent_id Agent ID
+ * @param offset 起始偏移量（0 为最新记录）
+ * @param limit 最大返回条数
+ * @param out_history [out] 返回状态历史链表头
+ * @param out_count [out] 返回实际返回条数
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @ownership 调用者拥有 *out_history，需通过 agentos_state_history_free() 释放
+ * @threadsafe 是
+ * @reentrant 否
+ * @see agentos_agent_state(), agentos_state_history_free()
+ */
+AGENTOS_API agentos_error_t
+agentos_agent_history(const char* agent_id,
+                      uint32_t offset,
+                      uint32_t limit,
+                      agentos_state_history_t** out_history,
+                      uint32_t* out_count);
+```
+
+**辅助释放函数**：
+
+```c
+/**
+ * @brief 释放状态历史链表
+ * 
+ * 释放 agentos_agent_history() 返回的链表及其所有节点。
+ * 
+ * @param history 链表头指针
+ */
+AGENTOS_API void agentos_state_history_free(agentos_state_history_t* history);
+```
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 获取成功
+- `AGENTOS_ERROR_AGENT_NOT_FOUND` (0x5001): Agent 不存在
+- `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 参数无效
+
 ---
 
 ## 🚀 使用示例

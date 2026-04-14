@@ -1,65 +1,181 @@
-# Copyright (c) 2026 SPHARX. All Rights Reserved.
-# Docker Compose configuration for Development Environment
-# Version: 1.0.0
+# AgentOS Full Development Environment
+# Version: 2.0.0
 #
-# 使用方法: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# 一键启动完整开发环境:
+#   docker-compose up -d
+#
+# 包含服务:
+#   - gateway: 多协议网关 (HTTP/WS/MCP/A2A/OpenAI)
+#   - redis: 缓存与会话存储
+#   - postgres: 持久化数据库
+#   - prometheus: 指标收集
+#   - grafana: 可视化仪表板
+#   - jaeger: 分布式追踪
 
 version: '3.8'
 
 services:
   gateway:
     build:
-      target: development
+      context: ..
+      dockerfile: docker/Dockerfile
       args:
-        CMAKE_BUILD_TYPE: Debug
-    
-    # 开发环境使用调试配置
+        BUILD_VERSION: ${BUILD_VERSION:-2.0.0}
+        BUILD_DATE: ${BUILD_DATE:-2026-04-12}
+      target: runtime
+    image: ghcr.io/spharx/agentos/gateway:${BUILD_VERSION:-latest}
+    container_name: agentos-gateway
+    hostname: gateway
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-8080}:8080"
+      - "${WS_PORT:-8081}:8081"
+      - "${METRICS_PORT:-9090}:9090"
     environment:
-      - AGENTOS_LOG_LEVEL=DEBUG
-      - AGENTOS_ENABLE_AUTH=false
-      - AGENTOS_DEBUG_MODE=true
-    
-    # 挂载源代码用于热重载
+      - AGENTOS_LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - AGENTOS_SERVER_HOST=0.0.0.0
+      - AGENTOS_HTTP_PORT=8080
+      - AGENTOS_WS_PORT=8081
+      - AGENTOS_METRICS_PORT=9090
+      - AGENTOS_REDIS_HOST=redis
+      - AGENTOS_REDIS_PORT=6379
+      - AGENTOS_POSTGRES_HOST=postgres
+      - AGENTOS_POSTGRES_PORT=5432
+      - AGENTOS_POSTGRES_DB=agentos
+      - AGENTOS_POSTGRES_USER=agentos
+      - AGENTOS_POSTGRES_PASSWORD=agentos_dev
+      - AGENTOS_JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-prod}
+      - AGENTOS_ENABLE_AUTH=${ENABLE_AUTH:-false}
+      - AGENTOS_MCP_ENABLED=true
+      - AGENTOS_A2A_ENABLED=true
+      - AGENTOS_OPENAI_ENABLED=true
+      - AGENTOS_TRACING_ENABLED=true
+      - AGENTOS_TRACING_ENDPOINT=http://jaeger:4318/v1/traces
     volumes:
-      - ../src:/app/src:ro
-      - ../include:/app/include:ro
       - ../manager:/etc/agentos/gateway:ro
       - gateway-logs:/var/log/agentos
-    
-    # 开发环境不限制资源
-    deploy:
-      resources:
-        limits:
-          cpus: '4'
-          memory: 1G
-    
-    # 开发环境开启stdin
-    stdin_open: true
-    tty: true
+      - gateway-run:/var/run/agentos
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - agentos-net
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
-  # 开发环境额外的调试工具
   redis:
-    # 开发环境暴露管理端口
+    image: redis:7-alpine
+    container_name: agentos-redis
+    hostname: redis
+    restart: unless-stopped
     ports:
       - "${REDIS_PORT:-6379}:6379"
-    
-    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru --loglevel debug
-
-  # Redis Commander - Redis Web管理界面
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    container_name: agentos-redis-commander
-    hostname: redis-commander
-    restart: unless-stopped
-    
-    environment:
-      - REDIS_HOSTS=local:redis:6379
-    
-    ports:
-      - "${REDIS_COMMANDER_PORT:-8082}:8081"
-    
-    depends_on:
-      - redis
-    
+    volumes:
+      - redis-data:/data
     networks:
-      - agentos-network
+      - agentos-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: agentos-postgres
+    hostname: postgres
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      - POSTGRES_DB=agentos
+      - POSTGRES_USER=agentos
+      - POSTGRES_PASSWORD=agentos_dev
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - agentos-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentos"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: agentos-prometheus
+    hostname: prometheus
+    restart: unless-stopped
+    ports:
+      - "${PROMETHEUS_PORT:-9091}:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+    networks:
+      - agentos-net
+    profiles:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: agentos-grafana
+    hostname: grafana
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana_agentos_dashboard.json:/etc/grafana/provisioning/dashboards/agentos.json:ro
+    depends_on:
+      - prometheus
+    networks:
+      - agentos-net
+    profiles:
+      - monitoring
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.53
+    container_name: agentos-jaeger
+    hostname: jaeger
+    restart: unless-stopped
+    ports:
+      - "${JAEGER_UI_PORT:-16686}:16686"
+      - "${JAEGER_OTLP_PORT:-4318}:4318"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - agentos-net
+    profiles:
+      - monitoring
+
+volumes:
+  gateway-logs:
+  gateway-run:
+  redis-data:
+  postgres-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  agentos-net:
+    driver: bridge
+    name: agentos-network

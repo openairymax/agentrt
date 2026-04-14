@@ -18,6 +18,8 @@ pub struct CliConfig {
     pub project_root: Option<String>,
     pub docker_compose_path: Option<String>,
     pub timeout_seconds: u64,
+    pub gateway_url: Option<String>,
+    pub api_key: Option<String>,
 }
 
 impl Default for CliConfig {
@@ -27,6 +29,8 @@ impl Default for CliConfig {
             project_root: None,
             docker_compose_path: None,
             timeout_seconds: 300,
+            gateway_url: Some("http://localhost:18789".to_string()),
+            api_key: None,
         }
     }
 }

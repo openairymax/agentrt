@@ -409,7 +409,7 @@ class ConfigIntegrationTester:
         """
         测试日志 Domain ID 格式
         
-        验证 logging/manager.yaml 中的 Domain ID 符合 Log_guide.md 规范
+        验证 logging/manager.yaml 中的 Domain ID 符合 Log_standard.md 规范
         """
         logging_config = self.configs_cache.get('logging')
         

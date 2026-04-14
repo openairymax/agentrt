@@ -19,9 +19,12 @@
 #include <stddef.h>
 
 #ifdef _WIN32
-#include <windows.h>
+    #define WIN32_LEAN_AND_MEAN
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+    #include <windows.h>
 #else
-#include <time.h>
+    #include <time.h>
 #endif
 
 #ifdef __cplusplus
