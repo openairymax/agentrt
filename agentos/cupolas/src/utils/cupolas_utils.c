@@ -79,6 +79,20 @@ uint64_t cupolas_get_timestamp_ms(void) {
 #endif
 }
 
+/* 纳秒级时间戳获取 */
+uint64_t cupolas_get_timestamp_ns(void) {
+#ifdef _WIN32
+    LARGE_INTEGER frequency, counter;
+    QueryPerformanceFrequency(&frequency);
+    QueryPerformanceCounter(&counter);
+    return (uint64_t)(counter.QuadPart * 1000000000ULL / frequency.QuadPart);
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+#endif
+}
+
 /* 简单哈希函数 */
 uint32_t cupolas_hash_string(const char* str) {
     if (!str) return 0;

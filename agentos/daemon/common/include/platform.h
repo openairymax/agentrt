@@ -365,6 +365,7 @@ static inline int agentos_get_sysinfo(agentos_sysinfo_t* info) {
 #pragma warning(pop)
     
     strncpy(info->os_name, "Windows", sizeof(info->os_name) - 1);
+    info->os_name[sizeof(info->os_name) - 1] = '\0';
     snprintf(info->os_version, sizeof(info->os_version), "%lu.%lu", 
              osvi.dwMajorVersion, osvi.dwMinorVersion);
     
@@ -385,7 +386,9 @@ static inline int agentos_get_sysinfo(agentos_sysinfo_t* info) {
     uname(&uts);
     
     strncpy(info->os_name, uts.sysname, sizeof(info->os_name) - 1);
+    info->os_name[sizeof(info->os_name) - 1] = '\0';
     strncpy(info->os_version, uts.release, sizeof(info->os_version) - 1);
+    info->os_version[sizeof(info->os_version) - 1] = '\0';
     gethostname(info->hostname, sizeof(info->hostname) - 1);
     
     info->cpu_count = sysconf(_SC_NPROCESSORS_ONLN);
@@ -402,59 +405,39 @@ static inline int agentos_get_sysinfo(agentos_sysinfo_t* info) {
 
 /* ==================== 原子操作兼容 ==================== */
 
-/**
- * @brief 原子整数类型
+/*
+ * @note 原子操作已迁移至 <agentos/atomic_compat.h>
+ * 以下函数保留向后兼容，新代码请使用 atomic_compat.h
  */
+#include <agentos/atomic_compat.h>
+
+/** @brief 原子整数类型（兼容层，建议使用 atomic_compat.h 中的类型） */
 typedef struct {
     volatile int value;
 } agentos_atomic_int_t;
 
-/**
- * @brief 原子加载
- */
+/** @deprecated 使用 atomic_compat.h 中的 atomic_load 替代 */
 static inline int agentos_atomic_load(agentos_atomic_int_t* atomic) {
     if (!atomic) return 0;
-#ifdef _WIN32
-    return InterlockedCompareExchange((LONG*)&atomic->value, 0, 0);
-#else
-    return __atomic_load_n(&atomic->value, __ATOMIC_SEQ_CST);
-#endif
+    return atomic_load_32((long*)&atomic->value, memory_order_seq_cst);
 }
 
-/**
- * @brief 原子存储
- */
+/** @deprecated 使用 atomic_compat.h 中的 atomic_store 替代 */
 static inline void agentos_atomic_store(agentos_atomic_int_t* atomic, int value) {
     if (!atomic) return;
-#ifdef _WIN32
-    InterlockedExchange((LONG*)&atomic->value, value);
-#else
-    __atomic_store_n(&atomic->value, value, __ATOMIC_SEQ_CST);
-#endif
+    atomic_store_32((long*)&atomic->value, (long)value, memory_order_seq_cst);
 }
 
-/**
- * @brief 原子加法
- */
+/** @deprecated 使用 atomic_compat.h 中的 atomic_fetch_add 替代 */
 static inline int agentos_atomic_fetch_add(agentos_atomic_int_t* atomic, int value) {
     if (!atomic) return 0;
-#ifdef _WIN32
-    return InterlockedExchangeAdd((LONG*)&atomic->value, value);
-#else
-    return __atomic_fetch_add(&atomic->value, value, __ATOMIC_SEQ_CST);
-#endif
+    return (int)atomic_fetch_add_32((long*)&atomic->value, (long)value, memory_order_seq_cst);
 }
 
-/**
- * @brief 原子减法
- */
+/** @deprecated 使用 atomic_compat.h 中的 atomic_fetch_sub 替代 */
 static inline int agentos_atomic_fetch_sub(agentos_atomic_int_t* atomic, int value) {
     if (!atomic) return 0;
-#ifdef _WIN32
-    return InterlockedExchangeAdd((LONG*)&atomic->value, -value);
-#else
-    return __atomic_fetch_sub(&atomic->value, value, __ATOMIC_SEQ_CST);
-#endif
+    return (int)atomic_fetch_sub_32((long*)&atomic->value, (long)value, memory_order_seq_cst);
 }
 
 /* ==================== 服务器端 Socket 兼容 ==================== */
@@ -545,6 +528,7 @@ static inline agentos_socket_t agentos_socket_create_unix_server(const char* pat
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
+    addr.sun_path[sizeof(addr.sun_path) - 1] = '\0';
 
     if (bind(sock, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
         agentos_socket_close(sock);

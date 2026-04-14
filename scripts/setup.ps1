@@ -1,241 +1,228 @@
-# AgentOS 一键安装设置脚本 (Windows PowerShell)
-# 统一入口脚本，简化项目初始化流程
+# AgentOS Windows Setup Script
+# Version: 1.0.0
+# Description: Windows development environment setup and build script for AgentOS
+# Compatible with: Windows 10/11, PowerShell 5.1+
 
-[CmdletBinding()]
 param(
-    [Parameter()]
-    [switch]$InstallDeps,
-
-    [Parameter()]
-    [switch]$InstallVcpkg,
-
-    [Parameter()]
-    [switch]$BuildProject,
-
-    [Parameter()]
-    [switch]$Help
+    [switch]$Help,
+    [string]$BuildType = "Debug",
+    [string]$Generator = "Visual Studio 17 2022",
+    [switch]$SkipDeps,
+    [switch]$Clean,
+    [switch]$Test
 )
 
 $ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue"
 
-function Write-Info {
-    Write-Host "[INFO] " -NoNewline -ForegroundColor Green
-    Write-Host $args
-}
-
-function Write-Warn {
-    Write-Host "[WARN] " -NoNewline -ForegroundColor Yellow
-    Write-Host $args
-}
-
-function Write-Error {
-    Write-Host "[ERROR] " -NoNewline -ForegroundColor Red
-    Write-Host $args
-}
-
-function Show-Help {
-    Write-Host "AgentOS 一键安装设置脚本 (Windows)"
-    Write-Host "用法: .\setup.ps1 [选项]"
+function Write-Header {
+    param([string]$Message)
     Write-Host ""
-    Write-Host "选项:"
-    Write-Host "  -InstallDeps    安装系统依赖 (需要管理员权限)"
-    Write-Host "  -InstallVcpkg   安装 vcpkg 和依赖"
-    Write-Host "  -BuildProject   构建项目"
-    Write-Host "  -Help           显示此帮助信息"
-    Write-Host ""
-    Write-Host "示例:"
-    Write-Host "  .\setup.ps1 -InstallVcpkg -BuildProject"
-    Write-Host "  .\setup.ps1 -InstallDeps"
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host " $Message" -ForegroundColor Cyan
+    Write-Host "========================================" -ForegroundColor Cyan
+}
+
+function Test-Command {
+    param([string]$Command)
+    try {
+        $null = Get-Command $Command -ErrorAction Stop
+        return $true
+    } catch {
+        return $false
+    }
 }
 
 if ($Help) {
-    Show-Help
+    Write-Host @"
+AgentOS Windows Setup Script
+============================
+
+Usage: .\setup.ps1 [options]
+
+Options:
+  -Help              Show this help message
+  -BuildType <type>  Build type (Debug|Release|RelWithDebInfo) [Default: Debug]
+  -Generator <gen>   CMake generator [Default: Visual Studio 17 2022]
+  -SkipDeps          Skip dependency installation
+  -Clean             Clean build directory before building
+  -Test              Run tests after build
+
+Examples:
+  .\setup.ps1                              # Debug build with default settings
+  .\setup.ps1 -BuildType Release          # Release build
+  .\setup.ps1 -Clean -Test               # Clean build and run tests
+"@
     exit 0
 }
 
-$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ScriptsDir = Split-Path -Parent $ScriptDir
-$ProjectRoot = Split-Path -Parent $ScriptsDir
+Write-Host ""
+Write-Host "╔══════════════════════════════════════════╗" -ForegroundColor Green
+Write-Host "║     AgentOS Windows Setup Script v1.0     ║" -ForegroundColor Green
+Write-Host "╚══════════════════════════════════════════╝" -ForegroundColor Green
+Write-Host ""
 
-function Test-Administrator {
-    $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $principal = New-Object Security.Principal.WindowsPrincipal($currentUser)
-    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+$ScriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ProjectRoot = if (Test-Path "$ScriptPath\..\CMakeLists.txt") { Resolve-Path "$ScriptPath\.." } else { $ScriptPath }
+$BuildDir = "$ProjectRoot\build"
+
+Write-Host "[INFO] Project root: $ProjectRoot"
+Write-Host "[INFO] Build directory: $BuildDir"
+
+# Step 1: Check prerequisites
+Write-Header "Step 1: Checking Prerequisites"
+
+$PrerequisitesOK = $true
+
+# Check CMake
+if (Test-Command cmake) {
+    $cmakeVersion = (cmake --version | Select-String "\d+\.\d+\.\d+").Matches[0].Value
+    Write-Host "[✓] CMake found: $cmakeVersion" -ForegroundColor Green
+} else {
+    Write-Host "[✗] CMake not found. Please install CMake from https://cmake.org/download/" -ForegroundColor Red
+    $PrerequisitesOK = $false
 }
 
-function Install-SystemDependencies {
-    Write-Info "正在安装系统依赖..."
-
-    if (!(Get-Command choco -ErrorAction SilentlyContinue)) {
-        Write-Info "正在安装 Chocolatey..."
-        Set-ExecutionPolicy Bypass -Scope Process -Force
-        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-        Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-    }
-
-    $packages = @(
-        "git",
-        "cmake",
-        "visualstudio2022-buildtools",
-        "openssl",
-        "sqlite",
-        "curl",
-        "yaml-cpp",
-        "cjson",
-        "libmicrohttpd",
-        "libwebsockets",
-        "python3"
-    )
-
-    foreach ($package in $packages) {
-        Write-Info "正在安装 $package..."
-        choco install $package -y
-    }
-
-    Write-Info "系统依赖安装完成"
+# Check Visual Studio Build Tools
+if (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\VisualStudio\*\*" -ErrorAction SilentlyContinue) {
+    Write-Host "[✓] Visual Studio/Build Tools installed" -ForegroundColor Green
+} else {
+    Write-Host "[!] Visual Studio not detected. MSVC compiler may not be available." -ForegroundColor Yellow
 }
 
-function Install-Vcpkg {
-    Write-Info "正在安装 vcpkg..."
+# Check Git
+if (Test-Command git) {
+    $gitVersion = (git --version)
+    Write-Host "[✓] Git found: $gitVersion" -ForegroundColor Green
+} else {
+    Write-Host "[!] Git not found. Some features may be limited." -ForegroundColor Yellow
+}
 
-    $VcpkgDir = Join-Path $ProjectRoot "vcpkg"
-    if (Test-Path $VcpkgDir) {
-        Write-Info "vcpkg 已存在，跳过安装"
-        return
-    }
+if (-not $PrerequisitesOK) {
+    Write-Host "`n[ERROR] Prerequisites check failed. Please install missing dependencies." -ForegroundColor Red
+    exit 1
+}
 
-    git clone https://github.com/Microsoft/vcpkg.git $VcpkgDir
-
-    Push-Location $VcpkgDir
-    try {
+# Step 2: Install dependencies (if needed)
+if (-not $SkipDeps) {
+    Write-Header "Step 2: Installing Dependencies"
+    
+    # Install vcpkg if not present
+    $vcpkgRoot = "$env:USERPROFILE\vcpkg"
+    if (-not (Test-Path $vcpkgRoot)) {
+        Write-Host "[INFO] Installing vcpkg..." -ForegroundColor Yellow
+        git clone https://github.com/microsoft/vcpkg.git $vcpkgRoot
+        Push-Location $vcpkgRoot
         .\bootstrap-vcpkg.bat
-    } finally {
         Pop-Location
+        Write-Host "[✓] vcpkg installed successfully" -ForegroundColor Green
+    } else {
+        Write-Host "[✓] vcpkg already installed at $vcpkgRoot" -ForegroundColor Green
     }
-
-    $vcpkgPath = (Get-Item $VcpkgDir).FullName
-    [Environment]::SetEnvironmentVariable("VCPKG_ROOT", $vcpkgPath, "User")
-    [Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$vcpkgPath", "User")
-
-    Write-Info "vcpkg 安装完成"
-    Write-Info "VCPKG_ROOT 已设置为: $vcpkgPath"
+    
+    # Set vcpkg environment
+    $env:VCPKG_ROOT = $vcpkgRoot
+    $env:Path += ";$vcpkgRoot"
+} else {
+    Write-Host "[INFO] Skipping dependency installation..." -ForegroundColor Yellow
 }
 
-function Install-VcpkgDependencies {
-    Write-Info "正在安装 vcpkg 依赖..."
+# Step 3: Configure CMake
+Write-Header "Step 3: Configuring CMake"
 
-    $VcpkgJson = Join-Path $ProjectRoot "vcpkg.json"
-    if (!(Test-Path $VcpkgJson)) {
-        Write-Error "vcpkg.json 不存在"
-        exit 1
-    }
-
-    $VcpkgDir = Join-Path $ProjectRoot "vcpkg"
-    if (!(Test-Path (Join-Path $VcpkgDir "vcpkg.exe"))) {
-        Write-Error "vcpkg 未找到"
-        exit 1
-    }
-
-    Push-Location $VcpkgDir
-    try {
-        .\vcpkg install ..\vcpkg.json
-    } finally {
-        Pop-Location
-    }
-
-    Write-Info "vcpkg 依赖安装完成"
+if ($Clean -and (Test-Path $BuildDir)) {
+    Write-Host "[INFO] Cleaning build directory..." -ForegroundColor Yellow
+    Remove-Item -Recurse -Force $BuildDir -ErrorAction SilentlyContinue
 }
 
-function Build-Project {
-    Write-Info "正在构建项目..."
-
-    $BuildScript = Join-Path $ScriptsDir "build\build.ps1"
-    if (!(Test-Path $BuildScript)) {
-        Write-Error "build.ps1 未找到"
-        exit 1
-    }
-
-    & $BuildScript -BuildType Release -Clean
-
-    Write-Info "项目构建完成"
+if (-not (Test-Path $BuildDir)) {
+    New-Item -ItemType Directory -Path $BuildDir -Force | Out-Null
 }
 
-function Main {
-    Write-Info "AgentOS 一键安装设置脚本 v1.0.0"
-    Write-Info "======================================"
+Push-Location $BuildDir
 
-    Write-Info "操作系统: Windows"
-    Write-Info "主机名: $env:COMPUTERNAME"
-    Write-Info "用户名: $env:USERNAME"
+$cmakeArgs = @(
+    "..",
+    "-G", $Generator,
+    "-A", "x64",
+    "-DCMAKE_BUILD_TYPE=$BuildType",
+    "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake",
+    "-DBUILD_TESTS=ON",
+    "-DBUILD_EXAMPLES=ON",
+    "-DENABLE_SANITIZERS=OFF",
+    "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+)
 
-    if ($InstallDeps) {
-        if (!(Test-Administrator)) {
-            Write-Error "安装系统依赖需要管理员权限"
-            Write-Info "请以管理员身份运行 PowerShell"
-            exit 1
-        }
-        Install-SystemDependencies
+Write-Host "[INFO] Running CMake configuration..." -ForegroundColor Yellow
+Write-Host "[CMD] cmake $($cmakeArgs -join ' ')" -ForegroundColor Gray
+
+try {
+    & cmake @cmakeArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw "CMake configuration failed with exit code $LASTEXITCODE"
     }
+    Write-Host "[✓] CMake configuration completed successfully" -ForegroundColor Green
+} catch {
+    Write-Host "[ERROR] $_" -ForegroundColor Red
+    Pop-Location
+    exit 1
+}
 
-    if ($InstallVcpkg) {
-        Install-Vcpkg
+# Step 4: Build project
+Write-Header "Step 4: Building Project"
+
+$configArg = "--config", $BuildType
+$buildTarget = if ($Test) { "ALL_BUILD" } else { "AgentOS" }
+
+Write-Host "[INFO] Building target: $buildTarget ($BuildType)..." -ForegroundColor Yellow
+Write-Host "[CMD] cmake --build . --config $BuildType --target $buildTarget" -ForegroundColor Gray
+
+try {
+    & cmake --build . @configArg --target $buildTarget -- /nologo /verbosity:minimal /maxcpucount
+    if ($LASTEXITCODE -ne 0) {
+        throw "Build failed with exit code $LASTEXITCODE"
     }
+    Write-Host "[✓] Build completed successfully" -ForegroundColor Green
+} catch {
+    Write-Host "[ERROR] $_" -ForegroundColor Red
+    Pop-Location
+    exit 1
+}
 
-    if ($InstallVcpkg -and (Test-Path (Join-Path $ProjectRoot "vcpkg"))) {
-        Install-VcpkgDependencies
-    }
-
-    if ($BuildProject) {
-        Build-Project
-    }
-
-    if (!$InstallDeps -and !$InstallVcpkg -and !$BuildProject) {
-        Write-Info "请选择要执行的操作:"
-        Write-Host "1) 安装系统依赖 (需要管理员权限)" -ForegroundColor Cyan
-        Write-Host "2) 安装 vcpkg 和依赖" -ForegroundColor Cyan
-        Write-Host "3) 构建项目" -ForegroundColor Cyan
-        Write-Host "4) 退出" -ForegroundColor Cyan
-
-        $choice = Read-Host "请输入选项 (1-4)"
-
-        switch ($choice) {
-            "1" {
-                if (!(Test-Administrator)) {
-                    Write-Error "需要管理员权限"
-                    Write-Info "请以管理员身份重新运行此脚本"
-                    exit 1
-                }
-                Install-SystemDependencies
-            }
-            "2" {
-                Install-Vcpkg
-                Install-VcpkgDependencies
-            }
-            "3" {
-                Build-Project
-            }
-            "4" {
-                exit 0
-            }
-            default {
-                Write-Error "无效选项"
-                exit 1
-            }
-        }
-    }
-
-    Write-Info "设置完成！"
-    Write-Info "======================================"
-    Write-Info "下一步："
-    Write-Info "1. 运行 .\build.ps1 进行构建"
-    Write-Info "2. 查看 README.md 获取使用说明"
-    Write-Info "3. 运行示例程序: .\build_windows_*\bin\*.exe"
-
-    $VcpkgDir = Join-Path $ProjectRoot "vcpkg"
-    if (Test-Path $VcpkgDir) {
-        Write-Info "vcpkg 已安装，环境变量已设置"
-        Write-Info "VCPKG_ROOT: $VcpkgDir"
+# Step 5: Run tests (if requested)
+if ($Test) {
+    Write-Header "Step 5: Running Tests"
+    
+    Write-Host "[INFO] Running test suite..." -ForegroundColor Yellow
+    
+    & ctest --output-on-failure -C $BuildType
+    
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "[✓] All tests passed!" -ForegroundColor Green
+    } else {
+        Write-Host "[WARNING] Some tests failed. Check output above." -ForegroundColor Yellow
     }
 }
 
-Main
+Pop-Location
+
+# Summary
+Write-Header "Setup Complete!"
+
+Write-Host @"
+Build Configuration:
+  - Type: $BuildType
+  - Generator: $Generator
+  - Directory: $BuildDir
+
+Next Steps:
+  1. Run the daemon: cd build && ctest -R daemon_test -C $BuildType
+  2. Run gateway: .\build\bin\$BuildType\gateway_d.exe
+  3. Run tests: cd build && ctest -C $BuildType
+
+For more information, see docs/BUILD.md
+"@ -ForegroundColor White
+
+Write-Host ""
+Write-Host "🎉 AgentOS Windows setup completed successfully!" -ForegroundColor Green
+Write-Host ""

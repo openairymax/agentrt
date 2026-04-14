@@ -18,22 +18,26 @@
  * @version 1.0.0.7
  */
 
+/* Windows网络编程：必须在所有Windows头文件前定义 */
+#ifdef _WIN32
+    #define WIN32_LEAN_AND_MEAN
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+    #pragma comment(lib, "ws2_32.lib")
+#endif
+
 #include "network_common.h"
 #include "../../memory/include/memory_compat.h"
 #include <stdio.h>
 #include <stdlib.h>
-#define _CRT_NONSTDC_NO_DEPRECATE
 #include <string.h>
+#define _CRT_NONSTDC_NO_DEPRECATE
 #ifdef _WIN32
 #define strdup _strdup
 #endif
 #include <stdarg.h>
 
-#ifdef _WIN32
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #pragma comment(lib, "ws2_32.lib")
-#else
+#ifndef _WIN32
     #include <sys/socket.h>
     #include <netinet/in.h>
     #include <arpa/inet.h>

@@ -1,0 +1,184 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "agentos-overview",
+    "title": "AgentOS Overview",
+    "description": "AgentOS unified monitoring dashboard - service health, performance, and alerting",
+    "tags": ["agentos", "overview"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "15s",
+    "time": { "from": "now-1h", "to": "now" },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Service Health Status",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "up{job=~\"agentos.*\"}",
+            "legendFormat": "{{instance}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+            ],
+            "thresholds": { "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Active Alerts",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+        "targets": [
+          {
+            "expr": "count(ALERTS{alertstate=\"firing\"})",
+            "legendFormat": "Firing",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 }] }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Request Rate",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+        "targets": [
+          {
+            "expr": "rate(agentos_agentos_runtime_requests_total[5m])",
+            "legendFormat": "{{method}} {{path}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "reqps", "custom": { "fillOpacity": 10 } }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Request Duration (P95)",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(agentos_agentos_runtime_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "P95",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Error Rate",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+        "targets": [
+          {
+            "expr": "rate(agentos_agentos_runtime_errors_total[5m])",
+            "legendFormat": "{{type}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "errps", "custom": { "fillOpacity": 10 }, "color": { "mode": "palette-classic" } }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Active Sessions & Connections",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+        "targets": [
+          {
+            "expr": "agentos_agentos_runtime_active_sessions",
+            "legendFormat": "Sessions",
+            "refId": "A"
+          },
+          {
+            "expr": "agentos_agentos_runtime_active_connections",
+            "legendFormat": "Connections",
+            "refId": "B"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Process Memory Usage",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+        "targets": [
+          {
+            "expr": "agentos_system_process_memory_bytes",
+            "legendFormat": "{{instance}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10 } }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Circuit Breaker Status",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 12, "x": 12, "y": 20 },
+        "targets": [
+          {
+            "expr": "agentos_circuit_breaker_state",
+            "legendFormat": "{{service}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              { "type": "value", "options": { "0": { "text": "CLOSED", "color": "green" }, "1": { "text": "OPEN", "color": "red" }, "2": { "text": "HALF-OPEN", "color": "yellow" } } }
+            ]
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "Service Discovery - Registered Services",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 12, "y": 24 },
+        "targets": [
+          {
+            "expr": "agentos_sd_active_services",
+            "legendFormat": "Services",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Service Discovery - Active Instances",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 18, "y": 24 },
+        "targets": [
+          {
+            "expr": "agentos_sd_active_instances",
+            "legendFormat": "Instances",
+            "refId": "A"
+          }
+        ]
+      }
+    ]
+  },
+  "overwrite": true
+}

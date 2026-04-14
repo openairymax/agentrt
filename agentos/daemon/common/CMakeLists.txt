@@ -101,14 +101,20 @@ endif()
 set(SVC_COMMON_SOURCES
     src/svc_common.c          # 服务框架核心实现
     src/ipc_client.c
+    src/ipc_service_bus.c     # IPC服务总线
+    src/service_discovery.c   # 跨进程服务发现
+    src/circuit_breaker.c     # 熔断器与自愈
+    src/unified_metrics.c     # 统一指标收集
+    src/alert_manager.c       # 智能告警管理
+    src/config_manager.c      # 统一配置管理
     src/svc_auth.c
     src/daemon_security.c
     src/jsonrpc_helpers.c
     src/method_dispatcher.c
     src/safe_string_utils.c
     src/input_validator.c
-    src/param_validator.c     # JSON-RPC 参数验证工具
-    src/log_sanitizer.c       # 日志脱敏过滤器
+    src/param_validator.c
+    src/log_sanitizer.c
 )
 
 # 创建静态库
@@ -258,8 +264,14 @@ install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/include/method_dispatcher.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/safe_string_utils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/input_validator.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/param_validator.h  # JSON-RPC 参数验证
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/log_sanitizer.h    # 日志脱敏过滤器
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/param_validator.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/log_sanitizer.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ipc_service_bus.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/service_discovery.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/circuit_breaker.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/unified_metrics.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/alert_manager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/config_manager.h
     DESTINATION include/agentos
 )
 

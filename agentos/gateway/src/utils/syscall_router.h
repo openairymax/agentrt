@@ -15,8 +15,15 @@
 #ifndef GATEWAY_SYSCALL_ROUTER_H
 #define GATEWAY_SYSCALL_ROUTER_H
 
-#include <cJSON.h>
 #include "agentos.h"
+
+/* cJSON 条件包含 */
+#ifdef GATEWAY_HAS_CJSON
+#include <cJSON.h>
+#else
+/* 当没有cJSON时，定义前向声明以允许编译 */
+typedef struct cJSON cJSON;
+#endif
 
 #ifdef __cplusplus
 extern "C" {

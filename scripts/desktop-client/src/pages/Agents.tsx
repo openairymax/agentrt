@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Bot,
   Plus,
@@ -21,12 +21,20 @@ import {
   Star,
   Play,
   Square,
+  ArrowUpDown,
+  Download,
+  CheckSquare,
 } from "lucide-react";
+import { exportToCSV } from "../utils/export";
 import sdk from "../services/agentos-sdk";
 import type { AgentInfo } from "../services/agentos-sdk";
 import { useI18n } from "../i18n";
 import { useNavigate } from "react-router-dom";
 import { useAlert } from "../components/useAlert";
+import { Button } from "../components/ui/Button";
+import { Input } from "../components/ui/Input";
+import { Card } from "../components/ui/Card";
+import { PageLayout } from "../components/PageLayout";
 
 const agentTypeConfig: Record<string, { icon: typeof Bot; color: string; gradient: string; bgLight: string; label: string }> = {
   research: { icon: Brain, color: "#6366f1", gradient: "linear-gradient(135deg, #6366f1, #818cf8)", bgLight: "rgba(99,102,241,0.08)", label: "研究型" },
@@ -59,7 +67,7 @@ const Agents: React.FC = () => {
     if (searchTerm) {
       result = result.filter(agent =>
         agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        agent.type.toLowerCase().includes(searchTerm.toLowerCase())
+        (agent.type && agent.type.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
 
@@ -77,7 +85,7 @@ const Agents: React.FC = () => {
           cmp = (a.status === 'running' ? 0 : 1) - (b.status === 'running' ? 0 : 1);
           break;
         case 'type':
-          cmp = a.type.localeCompare(b.type);
+          cmp = (a.type || '').localeCompare(b.type || '');
           break;
       }
       return sortOrder === 'asc' ? cmp : -cmp;
@@ -155,7 +163,7 @@ const Agents: React.FC = () => {
   };
 
   const selectAllVisible = () => {
-    setSelectedIds(new Set(filteredAndSortedAgents.map(a => a.id)));
+    setSelectedIds(new Set(filteredAndSortedAgents.map((a: AgentInfo) => a.id)));
   };
 
   const clearSelection = () => {
@@ -202,87 +210,148 @@ const Agents: React.FC = () => {
   };
 
   return (
-    <div className="page-container">
-      {/* Page Header */}
-      <div className="page-header">
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <h1>{t.agents.title}</h1>
-          <span className={`badge ${agents.length > 0 ? 'status-running' : 'status-stopped'}`}>
-            {agents.length} {t.agents.activeAgents.toLowerCase()}
-          </span>
-        </div>
-        <p style={{ color: "var(--text-secondary)", fontSize: "15px" }}>
-          {t.agents.subtitle}
-        </p>
-      </div>
-
+    <PageLayout
+      title={t.agents.title}
+      subtitle={t.agents.subtitle}
+      actions={
+        <Button
+          variant="primary"
+          onClick={() => setShowRegisterModal(true)}
+          style={{
+            transition: 'all 0.2s ease',
+            boxShadow: 'var(--shadow-sm)',
+          }}
+        >
+          <Plus size={16} />
+          {t.agents.registerNew}
+        </Button>
+      }
+    >
       {/* Toolbar */}
-      <div className="card card-elevated" style={{ marginBottom: "20px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: "200px" }}>
-            <div style={{ position: "relative", flex: 1, maxWidth: "360px" }}>
+      <Card style={{ marginBottom: '20px' }}>
+        <div style={{ 
+          display: "flex", 
+          justifyContent: "space-between", 
+          alignItems: "center", 
+          flexWrap: "wrap", 
+          gap: "16px",
+          padding: '16px',
+        }}>
+          <div style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            gap: "12px", 
+            flex: 1, 
+            minWidth: "200px"
+          }}>
+            <div style={{ 
+              position: "relative", 
+              flex: 1, 
+              maxWidth: "360px"
+            }}>
               <Search size={15} style={{
-                position: "absolute", left: "12px", top: "50%",
-                transform: "translateY(-50%)", color: "var(--text-muted)"
+                position: "absolute", 
+                left: "12px", 
+                top: "50%",
+                transform: "translateY(-50%)", 
+                color: "var(--text-muted)"
               }} />
-              <input
-                type="text"
-                className="form-input"
+              <Input
                 placeholder={`${t.agents.searchAgents}...`}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ paddingLeft: "38px" }}
+                style={{ 
+                  paddingLeft: "38px",
+                  transition: 'all 0.2s ease',
+                }}
               />
             </div>
             {/* Type Filter */}
-            <div style={{ display: 'flex', gap: '4px' }}>
+            <div style={{ 
+              display: 'flex', 
+              gap: '6px',
+              flexWrap: 'wrap',
+            }}>
               {['all', ...Object.keys(agentTypeConfig)].map(type => (
-                <button
+                <Button
                   key={type}
                   onClick={() => setFilterType(type)}
-                  className="btn btn-sm"
+                  variant={filterType === type ? 'primary' : 'ghost'}
+                  size="sm"
                   style={{
-                    padding: '5px 10px',
                     fontSize: '11.5px',
-                    background: filterType === type ? 'var(--primary-light)' : 'transparent',
-                    color: filterType === type ? 'var(--primary-color)' : 'var(--text-muted)',
-                    border: filterType === type ? '1px solid var(--primary-color)' : '1px solid var(--border-subtle)',
-                    borderRadius: 'var(--radius-full)',
+                    borderRadius: '9999px',
+                    transition: 'all 0.2s ease',
                   }}
                 >
                   {type === 'all' ? '全部' : agentTypeConfig[type]?.label || type}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            gap: "8px",
+            flexWrap: 'wrap',
+          }}>
             {selectedIds.size > 0 && (
               <>
-                <span style={{ fontSize: '12px', color: 'var(--primary-color)', fontWeight: 600 }}>
+                <span style={{ 
+                  fontSize: '12px', 
+                  color: 'var(--primary-color)', 
+                  fontWeight: 600,
+                  backgroundColor: 'var(--primary-light)',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                }}>
                   已选 {selectedIds.size} 项
                 </span>
-                <button className="btn btn-ghost btn-sm" onClick={clearSelection}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearSelection}
+                  style={{ transition: 'all 0.2s ease' }}
+                >
                   取消选择
-                </button>
-                <button className="btn btn-success btn-sm" onClick={handleBatchStart}>
-                  <Play size={13} /> 批量启动
-                </button>
-                <button className="btn btn-danger btn-sm" onClick={handleBatchStop}>
-                  <Square size={13} /> 批量停止
-                </button>
+                </Button>
+                <Button
+                  variant="success"
+                  size="sm"
+                  onClick={handleBatchStart}
+                  style={{ transition: 'all 0.2s ease' }}
+                >
+                  <Play size={13} />
+                  批量启动
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={handleBatchStop}
+                  style={{ transition: 'all 0.2s ease' }}
+                >
+                  <Square size={13} />
+                  批量停止
+                </Button>
               </>
             )}
-            <button
-              className="btn btn-ghost btn-sm"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => toggleSort('name')}
               title="按名称排序"
+              style={{ 
+                transition: 'all 0.2s ease',
+                borderRadius: '6px',
+              }}
             >
               <ArrowUpDown size={14} />
               名称{sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
-            </button>
-            <button
-              className="btn btn-ghost btn-sm"
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 if (agents.length > 0) {
                   exportToCSV(agents.map(a => ({
@@ -292,49 +361,86 @@ const Agents: React.FC = () => {
                 }
               }}
               title="导出列表"
+              style={{ 
+                transition: 'all 0.2s ease',
+                borderRadius: '6px',
+              }}
             >
               <Download size={14} />
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={() => setShowRegisterModal(true)}
-            >
-              <Plus size={16} />
-              {t.agents.registerNew}
-            </button>
+            </Button>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Agent Type Stats Bar */}
       <div style={{
-        display: "flex", gap: "10px", marginBottom: "20px",
-        overflowX: "auto", paddingBottom: "4px",
+        display: "flex", 
+        gap: "12px", 
+        marginBottom: "24px",
+        overflowX: "auto", 
+        paddingBottom: "8px",
+        scrollbarWidth: 'thin',
+        scrollbarColor: 'var(--border-color) var(--bg-tertiary)',
       }}>
         {Object.entries(agentTypeConfig).map(([typeKey, config]) => {
           const count = agents.filter(a => a.type === typeKey).length;
           const IconComp = config.icon;
           return (
-            <div key={typeKey} style={{
-              padding: "10px 16px", borderRadius: "var(--radius-md)",
-              background: config.bgLight, border: `1px solid ${config.color}20`,
-              display: "flex", alignItems: "center", gap: "10px",
-              minWidth: "140px", cursor: "pointer",
-              transition: "all var(--transition-fast)",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 4px 12px ${config.color}15`; }}
-            onMouseLeave={(e) => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; }}
-            >
+            <div 
+                key={typeKey} 
+                style={{
+                  padding: "12px 20px", 
+                  borderRadius: "8px",
+                  background: "var(--bg-secondary)",
+                  border: `1px solid var(--border-subtle)`,
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: "12px",
+                  minWidth: "140px",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  boxShadow: 'var(--shadow-sm)',
+                }}
+                onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                  e.currentTarget.style.borderColor = 'var(--border-color)';
+                }}
+                onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                  e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                }}
+                onClick={() => setFilterType(typeKey)}
+              >
               <div style={{
-                width: "32px", height: "32px", borderRadius: "var(--radius-sm)",
-                background: config.gradient, display: "flex", alignItems: "center", justifyContent: "center",
+                width: "36px", 
+                height: "36px", 
+                borderRadius: "8px",
+                background: config.color,
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "center",
                 flexShrink: 0,
               }}>
-                <IconComp size={16} color="white" />
+                <IconComp size={18} color="white" />
               </div>
               <div>
-                <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>{config.label}</div>
-                <div style={{ fontSize: "17px", fontWeight: 700, color: config.color, lineHeight: 1.2 }}>{count}</div>
+                <div style={{ 
+                  fontSize: "12px", 
+                  color: "var(--text-muted)",
+                  marginBottom: "2px",
+                }}>
+                  {config.label}
+                </div>
+                <div style={{ 
+                  fontSize: "18px", 
+                  fontWeight: 600, 
+                  color: config.color, 
+                  lineHeight: 1.2 
+                }}>
+                  {count}
+                </div>
               </div>
             </div>
           );
@@ -342,97 +448,186 @@ const Agents: React.FC = () => {
       </div>
 
       {/* Main Content Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: selectedAgent ? "1fr 340px" : "1fr", gap: "20px", transition: "grid-template-columns 0.35s ease-out" }}>
+      <div style={{ 
+        display: "grid", 
+        gridTemplateColumns: selectedAgent ? "1fr 360px" : "1fr", 
+        gap: "24px"
+      }}>
         {/* Agent Cards Grid */}
         <div>
           {loading ? (
-            <div style={{ textAlign: "center", padding: "48px" }}>
+            <div style={{ 
+              textAlign: "center", 
+              padding: "64px",
+              background: 'var(--bg-secondary)',
+              borderRadius: '8px',
+              border: '1px solid var(--border-subtle)',
+            }}>
               <div className="loading-spinner" />
+              <div style={{ 
+                marginTop: '16px', 
+                fontSize: '14px', 
+                color: 'var(--text-muted)'
+              }}>
+                加载智能体列表...
+              </div>
             </div>
           ) : filteredAndSortedAgents.length === 0 ? (
-            <div className="empty-state">
-              <Bot size={56} style={{ opacity: 0.25 }} />
-              <div className="empty-state-text">{t.agents.noAgentsRegistered}</div>
-              <div className="empty-state-hint">{t.agents.noAgentsHint}</div>
-              <button className="btn btn-primary mt-8" onClick={() => setShowRegisterModal(true)}>
-                <Plus size={16} /> {t.agents.registerNew}
-              </button>
-            </div>
+            <Card style={{ 
+              textAlign: "center", 
+              padding: "64px",
+            }}>
+              <div style={{
+                width: "80px",
+                height: "80px",
+                borderRadius: "20px",
+                background: "var(--bg-tertiary)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 24px",
+              }}>
+                <Bot size={40} style={{ opacity: 0.2 }} />
+              </div>
+              <div style={{ 
+                fontSize: "16px", 
+                fontWeight: 500, 
+                margin: "0 0 12px 0",
+                color: 'var(--text-primary)',
+              }}>
+                {t.agents.noAgentsRegistered}
+              </div>
+              <div style={{ 
+                fontSize: "14px", 
+                color: "var(--text-muted)", 
+                marginBottom: "32px",
+                maxWidth: "320px",
+                marginLeft: "auto",
+                marginRight: "auto",
+              }}>
+                {t.agents.noAgentsHint}
+              </div>
+              <Button
+                variant="primary"
+                onClick={() => setShowRegisterModal(true)}
+                style={{
+                  transition: 'all 0.2s ease',
+                  boxShadow: 'var(--shadow-sm)',
+                }}
+              >
+                <Plus size={16} />
+                {t.agents.registerNew}
+              </Button>
+            </Card>
           ) : (
             <div style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-              gap: "14px",
+              gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+              gap: "20px",
             }}>
-              {filteredAndSortedAgents.map((agent, idx) => {
+              {filteredAndSortedAgents.map((agent: AgentInfo) => {
                 const config = getAgentConfig(agent.type || "general");
                 const IconComp = config.icon;
                 const isSelected = selectedAgent?.name === agent.name;
                 const isChecked = selectedIds.has(agent.id);
 
                 return (
-                  <div
-                    key={agent.name}
-                    onClick={() => setSelectedAgent(isSelected ? null : agent)}
-                    className="card-hover-lift"
+                  <Card 
+                    key={agent.name} 
                     style={{
-                      padding: "20px",
-                      borderRadius: "var(--radius-lg)",
                       border: `2px solid`,
                       borderColor: isSelected ? config.color : isChecked ? 'var(--primary-color)' : "var(--border-subtle)",
                       background: isSelected ? `${config.color}06` : isChecked ? 'var(--primary-light)' : "var(--bg-secondary)",
-                      position: "relative",
-                      overflow: "hidden",
                       cursor: "pointer",
-                      animation: `staggerFadeIn 0.35s ease-out ${idx * 60}ms both`,
-                      transition: "all var(--transition-fast)",
+                      transition: 'all 0.2s ease',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      boxShadow: 'var(--shadow-sm)',
+                    }}
+                    onClick={() => setSelectedAgent(isSelected ? null : agent)}
+                    onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                      e.currentTarget.style.borderColor = isSelected ? config.color : isChecked ? 'var(--primary-color)' : 'var(--border-color)';
+                    }}
+                    onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                      e.currentTarget.style.borderColor = isSelected ? config.color : isChecked ? 'var(--primary-color)' : "var(--border-subtle)";
                     }}
                   >
                     {/* Selection Checkbox */}
                     <div
                       onClick={(e) => { e.stopPropagation(); toggleSelectAgent(agent.id); }}
                       style={{
-                        position: 'absolute', top: '12px', left: '12px',
-                        width: '22px', height: '22px', borderRadius: '6px',
+                        position: 'absolute', 
+                        top: '16px', 
+                        left: '16px',
+                        width: '20px', 
+                        height: '20px', 
+                        borderRadius: '4px',
                         border: `2px solid ${isChecked ? 'var(--primary-color)' : 'var(--border-color)'}`,
                         background: isChecked ? 'var(--primary-color)' : 'transparent',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        cursor: 'pointer', zIndex: 2,
-                        transition: 'all var(--transition-fast)',
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        cursor: 'pointer', 
+                        zIndex: 2,
+                        transition: 'all 0.2s ease',
                       }}
                     >
-                      {isChecked && <CheckSquare size={13} color="white" />}
+                      {isChecked && <CheckSquare size={12} color="white" />}
                     </div>
-                    {/* Top gradient accent */}
-                    <div style={{
-                      position: "absolute", top: 0, left: 0, right: 0, height: "3px",
-                      background: config.gradient,
-                      opacity: isSelected ? 1 : 0.5,
-                    }} />
 
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
+                    <div style={{ 
+                      display: "flex", 
+                      alignItems: "flex-start", 
+                      gap: "16px",
+                      padding: '16px',
+                    }}>
                       <div style={{
-                        width: "46px", height: "46px", borderRadius: "var(--radius-md)",
-                        background: config.gradient,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        flexShrink: 0, boxShadow: `0 4px 12px ${config.color}30`,
+                        width: "48px", 
+                        height: "48px", 
+                        borderRadius: "8px",
+                        background: config.color,
+                        display: "flex", 
+                        alignItems: "center", 
+                        justifyContent: "center",
+                        flexShrink: 0,
                       }}>
-                        <IconComp size={22} color="white" />
+                        <IconComp size={24} color="white" />
                       </div>
 
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                          <span style={{ fontWeight: 600, fontSize: "15.5px" }}>{agent.name}</span>
-                          {isSelected && <ChevronRight size={14} style={{ color: config.color }} />}
+                        <div style={{ 
+                          display: "flex", 
+                          alignItems: "center", 
+                          gap: "8px", 
+                          marginBottom: "6px"
+                        }}>
+                          <span style={{ 
+                            fontWeight: 600, 
+                            fontSize: "15px",
+                            color: 'var(--text-primary)',
+                          }}>
+                            {agent.name}
+                          </span>
+                          {isSelected && <ChevronRight size={16} style={{ color: config.color }} />}
                         </div>
 
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-                          <span className="tag" style={{
-                            background: config.bgLight,
+                        <div style={{ 
+                          display: "flex", 
+                          alignItems: "center", 
+                          gap: "8px", 
+                          marginBottom: "8px"
+                        }}>
+                          <span style={{
+                            background: "var(--bg-tertiary)",
                             color: config.color,
                             fontWeight: 500,
-                            fontSize: "11.5px",
-                            padding: "2px 8px",
+                            fontSize: "11px",
+                            padding: "4px 10px",
+                            borderRadius: "4px",
                           }}>
                             {config.label}
                           </span>
@@ -440,9 +635,14 @@ const Agents: React.FC = () => {
 
                         {agent.description && (
                           <p style={{
-                            fontSize: "13px", color: "var(--text-secondary)",
-                            lineHeight: 1.5, margin: 0, display: "-webkit-box",
-                            WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+                            fontSize: "13px", 
+                            color: "var(--text-secondary)",
+                            lineHeight: 1.5, 
+                            margin: 0, 
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2, 
+                            WebkitBoxOrient: "vertical", 
+                            overflow: "hidden",
                           }}>
                             {agent.description}
                           </p>
@@ -452,74 +652,115 @@ const Agents: React.FC = () => {
 
                     {/* Bottom status bar */}
                     <div style={{
-                      marginTop: "14px", paddingTop: "12px",
+                      marginTop: "0", 
+                      padding: "12px 16px",
                       borderTop: "1px solid var(--border-subtle)",
-                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      display: "flex", 
+                      justifyContent: "space-between", 
+                      alignItems: "center",
                     }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         {agent.status === "active" || agent.status === "running" ? (
                           <>
                             <span style={{
-                              width: "8px", height: "8px", borderRadius: "50%",
-                              background: "#22c55e", boxShadow: "0 0 6px rgba(34,197,94,0.5)",
-                              animation: "statusPulse 2s ease-in-out infinite",
+                              width: "8px", 
+                              height: "8px", 
+                              borderRadius: "50%",
+                              background: "#22c55e",
+                              boxShadow: '0 0 0 2px rgba(34, 197, 94, 0.2)',
                             }} />
-                            <span style={{ fontSize: "12px", color: "#22c55e", fontWeight: 500 }}>运行中</span>
+                            <span style={{ 
+                              fontSize: "13px", 
+                              color: "#22c55e", 
+                              fontWeight: 500 
+                            }}>
+                              运行中
+                            </span>
                           </>
                         ) : (
                           <>
-                            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#94a3b8" }} />
-                            <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>空闲</span>
+                            <span style={{ 
+                              width: "8px", 
+                              height: "8px", 
+                              borderRadius: "50%", 
+                              background: "#94a3b8"
+                            }} />
+                            <span style={{ 
+                              fontSize: "13px", 
+                              color: "var(--text-muted)" 
+                            }}>
+                              空闲
+                            </span>
                           </>
                         )}
                       </div>
-                      <div style={{ display: "flex", gap: "4px" }}>
+                      <div style={{ display: "flex", gap: "6px" }}>
                         {(agent.status === "idle" || agent.status === "stopped") && (
-                          <button
-                            className="btn btn-ghost btn-sm"
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={(e) => { e.stopPropagation(); handleStartAgent(agent.id); }}
                             disabled={actionLoading === (agent.id + "-start")}
                             title="启动智能体"
-                            style={{ padding: "4px 10px", fontSize: "11.5px" }}
+                            style={{
+                              transition: 'all 0.2s ease',
+                              borderRadius: '6px',
+                            }}
                           >
-                            {actionLoading === (agent.id + "-start") ? <Loader2 size={12} className="spin" /> : <Play size={12} />}
-                          </button>
+                            {actionLoading === (agent.id + "-start") ? 
+                              <Loader2 size={14} className="spin" /> : 
+                              <Play size={14} />
+                            }
+                          </Button>
                         )}
                         {(agent.status === "running" || agent.status === "active") && (
-                          <button
-                            className="btn btn-ghost btn-sm"
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={(e) => { e.stopPropagation(); handleStopAgent(agent.id); }}
                             disabled={actionLoading === (agent.id + "-stop")}
                             title="停止智能体"
-                            style={{ padding: "4px 10px", fontSize: "11.5px", color: "#ef4444" }}
+                            style={{
+                              color: "#ef4444",
+                              transition: 'all 0.2s ease',
+                              borderRadius: '6px',
+                            }}
                           >
-                            {actionLoading === (agent.id + "-stop") ? <Loader2 size={12} className="spin" /> : <Square size={12} />}
-                          </button>
+                            {actionLoading === (agent.id + "-stop") ? 
+                              <Loader2 size={14} className="spin" /> : 
+                              <Square size={14} />
+                            }
+                          </Button>
                         )}
-                        <button
-                          className="btn btn-ghost btn-sm"
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={(e) => { e.stopPropagation(); setShowConfigModal(agent.id); }}
                           title="配置"
-                          style={{ padding: "4px 10px", fontSize: "11.5px" }}
+                          style={{
+                            transition: 'all 0.2s ease',
+                            borderRadius: '6px',
+                          }}
                         >
-                          <Shield size={12} />
-                        </button>
+                          <Shield size={14} />
+                        </Button>
                       </div>
                     </div>
-                  </div>
+                  </Card>
                 );
               })}
             </div>
           )}
         </div>
 
-        {/* Detail Panel - Slides in from right */}
+        {/* Detail Panel */}
         {selectedAgent && (
-          <div className="card card-elevated" style={{
+          <Card style={{
             height: "fit-content",
             position: "sticky",
             top: "88px",
-            animation: "slideInRight 0.3s ease-out",
+            border: '1px solid var(--border-subtle)',
+            boxShadow: 'var(--shadow-sm)',
           }}>
             {(() => {
               const config = getAgentConfig(selectedAgent.type || "general");
@@ -528,58 +769,119 @@ const Agents: React.FC = () => {
               return (
                 <>
                   <div style={{
-                    padding: "20px", borderBottom: "1px solid var(--border-subtle)",
-                    background: config.bgLight, borderRadius: "var(--radius-lg) var(--radius-lg) 0 0",
+                    padding: "20px", 
+                    borderBottom: "1px solid var(--border-subtle)",
+                    background: "var(--bg-tertiary)",
                   }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
                       <div style={{
-                        width: "52px", height: "52px", borderRadius: "var(--radius-md)",
-                        background: config.gradient,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        boxShadow: `0 4px 16px ${config.color}30`,
+                        width: "56px", 
+                        height: "56px", 
+                        borderRadius: "8px",
+                        background: config.color,
+                        display: "flex", 
+                        alignItems: "center", 
+                        justifyContent: "center",
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
                       }}>
-                        <IconComp size="26" color="white" />
+                        <IconComp size="28" color="white" />
                       </div>
                       <div>
-                        <h3 style={{ margin: 0, fontSize: "17px" }}>{selectedAgent.name}</h3>
-                        <span className="tag" style={{ background: config.bgLight, color: config.color, fontSize: "11.5px" }}>
+                        <h3 style={{ 
+                          margin: 0, 
+                          fontSize: "18px",
+                          fontWeight: 600,
+                          color: 'var(--text-primary)',
+                        }}>
+                          {selectedAgent.name}
+                        </h3>
+                        <span style={{
+                          background: "var(--bg-secondary)",
+                          color: config.color,
+                          fontSize: "11px",
+                          padding: "4px 10px",
+                          borderRadius: "4px",
+                          display: 'inline-block',
+                          marginTop: '6px',
+                        }}>
                           {config.label}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "16px" }}>
-                    <DetailRow icon={<Star size={14} />} label="类型" value={selectedAgent.type} />
-                    <DetailRow icon={<Activity size={14} />} label="状态" value={
-                      <span style={{ color: selectedAgent.status === "active" ? "#22c55e" : "var(--text-muted)" }}>
-                        {selectedAgent.status === "active" ? "● 运行中" : "○ 空闲"}
-                      </span>
-                    } />
-                    <DetailRow icon={<Clock size={14} />} label="描述" value={selectedAgent.description || "—"} />
+                  <div style={{ 
+                    padding: "20px", 
+                    display: "flex", 
+                    flexDirection: "column", 
+                    gap: "20px"
+                  }}>
+                    <DetailRow 
+                      icon={<Star size={16} />} 
+                      label="类型" 
+                      value={selectedAgent.type} 
+                    />
+                    <DetailRow 
+                      icon={<Activity size={16} />} 
+                      label="状态" 
+                      value={
+                        <span style={{ 
+                          color: selectedAgent.status === "active" ? "#22c55e" : "var(--text-muted)",
+                          fontWeight: 500,
+                        }}>
+                          {selectedAgent.status === "active" ? "运行中" : "空闲"}
+                        </span>
+                      } 
+                    />
+                    <DetailRow 
+                      icon={<Clock size={16} />} 
+                      label="描述" 
+                      value={selectedAgent.description || "—"} 
+                    />
 
-                    <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                      <button className="btn btn-primary btn-block" onClick={async () => {
-                        if (!selectedAgent) return;
-                        try {
-                          await sdk.startAgent(selectedAgent.id);
-                          success("启动成功", `智能体 "${selectedAgent.name}" 启动指令已发送`);
-                          loadAgents();
-                        } catch (err) { error("启动失败", `无法启动智能体: ${err}`); }
-                      }}>
-                        <Zap size={15} /> 启动智能体
-                      </button>
-                      <button className="btn btn-ghost btn-block" onClick={() => {
-                        if (selectedAgent) navigate(`/agents?id=${selectedAgent.id}`);
-                      }}>
-                        <ExternalLink size={15} /> 查看详情
-                      </button>
+                    <div style={{ 
+                      marginTop: "8px", 
+                      display: "flex", 
+                      flexDirection: "column", 
+                      gap: "12px"
+                    }}>
+                      <Button
+                        variant="primary"
+                        onClick={async () => {
+                          if (!selectedAgent) return;
+                          try {
+                            await sdk.startAgent(selectedAgent.id);
+                            success("启动成功", `智能体 "${selectedAgent.name}" 启动指令已发送`);
+                            loadAgents();
+                          } catch (err) { 
+                            error("启动失败", `无法启动智能体: ${err}`); 
+                          }
+                        }}
+                        style={{
+                          transition: 'all 0.2s ease',
+                          boxShadow: 'var(--shadow-sm)',
+                        }}
+                      >
+                        启动智能体
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          if (selectedAgent) navigate(`/agents?id=${selectedAgent.id}`);
+                        }}
+                        style={{
+                          transition: 'all 0.2s ease',
+                        }}
+                      >
+                        <ExternalLink size={16} />
+                        查看详情
+                      </Button>
                     </div>
                   </div>
                 </>
               );
             })()}
-          </div>
+          </Card>
         )}
       </div>
 
@@ -590,7 +892,7 @@ const Agents: React.FC = () => {
           onRegister={handleRegister}
         />
       )}
-    </div>
+    </PageLayout>
   );
 };
 
@@ -621,47 +923,138 @@ function RegisterModal({ onClose, onRegister }: { onClose: () => void; onRegiste
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" style={{ maxWidth: "520px" }} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2 className="modal-title">{t.agents.registerNew}</h2>
-          <button className="modal-close-btn" onClick={onClose}>×</button>
+    <div 
+      className="modal-overlay" 
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        backdropFilter: 'blur(4px)',
+      }}
+    >
+      <Card 
+        style={{ 
+          maxWidth: "480px", 
+          margin: "0 auto",
+          width: '90%',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          boxShadow: 'var(--shadow-xl)',
+          border: '1px solid var(--border-subtle)',
+        }} 
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ 
+          display: "flex", 
+          justifyContent: "space-between", 
+          alignItems: "center", 
+          padding: "20px", 
+          borderBottom: "1px solid var(--border-subtle)",
+          background: "var(--bg-tertiary)",
+        }}>
+          <h2 style={{ 
+            margin: 0, 
+            fontSize: "20px", 
+            fontWeight: 600,
+            color: 'var(--text-primary)',
+          }}>
+            {t.agents.registerNew}
+          </h2>
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              fontSize: "24px",
+              cursor: "pointer",
+              color: "var(--text-muted)",
+              padding: "4px",
+              borderRadius: "4px",
+              transition: "all 0.2s ease",
+              lineHeight: 1,
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-secondary)"}
+            onMouseLeave={(e) => e.currentTarget.style.background = "none"}
+          >
+            ×
+          </button>
         </div>
 
         {step === "info" ? (
-          <div style={{ padding: "28px", display: "flex", flexDirection: "column", gap: "20px" }}>
-            <div style={{ textAlign: "center", marginBottom: "8px" }}>
+          <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "24px" }}>
+            <div style={{ textAlign: "center" }}>
               <div style={{
-                width: "64px", height: "64px", borderRadius: "var(--radius-lg)",
-                background: "linear-gradient(135deg, #6366f1, #a78bfa)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                margin: "0 auto 12px", boxShadow: "0 8px 24px rgba(99,102,241,0.3)",
+                width: "64px", 
+                height: "64px", 
+                borderRadius: "16px",
+                background: "var(--primary-color)",
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "center",
+                margin: "0 auto 16px",
+                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
               }}>
                 <Plus size={28} color="white" />
               </div>
-              <p style={{ color: "var(--text-secondary)", fontSize: "14px", margin: 0 }}>
+              <p style={{ 
+                color: "var(--text-secondary)", 
+                fontSize: "14px", 
+                margin: 0,
+                maxWidth: "320px",
+                marginLeft: "auto",
+                marginRight: "auto",
+              }}>
                 创建一个新的 AI 智能体，赋予它独特的能力和角色
               </p>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">{t.agents.agentName}</label>
-              <input
-                type="text"
-                className="form-input"
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <label style={{ 
+                fontSize: "14px", 
+                fontWeight: 500,
+                color: 'var(--text-primary)',
+              }}>
+                {t.agents.agentName}
+              </label>
+              <Input
                 value={agentName}
                 onChange={(e) => setAgentName(e.target.value)}
                 placeholder="例如：Research Assistant、Code Reviewer..."
                 onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
                 autoFocus
+                style={{
+                  transition: 'all 0.2s ease',
+                }}
               />
-              <p className="form-help">{t.agents.agentNameHelp}</p>
+              <p style={{ 
+                fontSize: "12px", 
+                color: "var(--text-muted)", 
+                margin: 0,
+              }}>
+                {t.agents.agentNameHelp}
+              </p>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">{t.agents.agentType}</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <label style={{ 
+                fontSize: "14px", 
+                fontWeight: 500,
+                color: 'var(--text-primary)',
+              }}>
+                {t.agents.agentType}
+              </label>
               <div style={{
-                display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "10px",
+                display: "grid", 
+                gridTemplateColumns: "repeat(2, 1fr)", 
+                gap: "12px",
               }}>
                 {Object.entries(agentTypeConfig).map(([key, cfg]) => {
                   const IconComp = cfg.icon;
@@ -671,24 +1064,61 @@ function RegisterModal({ onClose, onRegister }: { onClose: () => void; onRegiste
                       key={key}
                       onClick={() => setAgentType(key)}
                       style={{
-                        padding: "14px", borderRadius: "var(--radius-md)",
-                        border: `2px solid`, borderColor: isActive ? cfg.color : "var(--border-subtle)",
-                        background: isActive ? cfg.bgLight : "var(--bg-tertiary)",
-                        cursor: "pointer", transition: "all var(--transition-fast)",
-                        display: "flex", alignItems: "center", gap: "10px",
+                        padding: "16px", 
+                        borderRadius: "8px",
+                        border: `2px solid`, 
+                        borderColor: isActive ? cfg.color : "var(--border-subtle)",
+                        background: isActive ? `${cfg.color}06` : "var(--bg-tertiary)",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                        display: "flex", 
+                        alignItems: "center", 
+                        gap: "12px",
+                        boxShadow: 'var(--shadow-sm)',
+                      }}
+                      onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
+                        if (!isActive) {
+                          e.currentTarget.style.borderColor = 'var(--border-color)';
+                          e.currentTarget.style.background = 'var(--bg-secondary)';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                        }
+                      }}
+                      onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
+                        if (!isActive) {
+                          e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                          e.currentTarget.style.background = 'var(--bg-tertiary)';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                        }
                       }}
                     >
                       <div style={{
-                        width: "32px", height: "32px", borderRadius: "var(--radius-sm)",
-                        background: isActive ? cfg.gradient : "var(--bg-primary)",
-                        display: "flex", alignItems: "center", justifyContent: "center",
+                        width: "36px", 
+                        height: "36px", 
+                        borderRadius: "8px",
+                        background: isActive ? cfg.color : "var(--bg-secondary)",
+                        display: "flex", 
+                        alignItems: "center", 
+                        justifyContent: "center",
                         flexShrink: 0,
                       }}>
-                        <IconComp size={15} color={isActive ? "white" : "var(--text-muted)"} />
+                        <IconComp size={18} color={isActive ? "white" : "var(--text-muted)"} />
                       </div>
                       <div>
-                        <div style={{ fontSize: "13px", fontWeight: 600, color: isActive ? cfg.color : "var(--text-primary)" }}>{cfg.label}</div>
-                        <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>{key}</div>
+                        <div style={{ 
+                          fontSize: "13px", 
+                          fontWeight: 600, 
+                          color: isActive ? cfg.color : "var(--text-primary)"
+                        }}>
+                          {cfg.label}
+                        </div>
+                        <div style={{ 
+                          fontSize: "11px", 
+                          color: "var(--text-muted)"
+                        }}>
+                          {key}
+                        </div>
                       </div>
                     </div>
                   );
@@ -696,60 +1126,141 @@ function RegisterModal({ onClose, onRegister }: { onClose: () => void; onRegiste
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: "10px", marginTop: "4px" }}>
-              <button className="btn btn-secondary btn-lg" onClick={onClose} style={{ flex: 1 }}>
+            <div style={{ 
+              display: "flex", 
+              gap: "12px", 
+              marginTop: "8px",
+            }}>
+              <Button
+                variant="secondary"
+                onClick={onClose}
+                style={{ 
+                  flex: 1,
+                  transition: 'all 0.2s ease',
+                }}
+              >
                 取消
-              </button>
-              <button
-                className="btn btn-primary btn-lg"
+              </Button>
+              <Button
+                variant="primary"
                 onClick={handleSubmit}
                 disabled={!agentName.trim() || submitting}
-                style={{ flex: 1 }}
+                style={{ 
+                  flex: 1,
+                  transition: 'all 0.2s ease',
+                  boxShadow: 'var(--shadow-sm)',
+                }}
               >
                 下一步 <ChevronRight size={16} />
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
-          <div style={{ padding: "28px", display: "flex", flexDirection: "column", gap: "20px", alignItems: "center", textAlign: "center" }}>
-            <CheckCircle2 size={48} color="#6366f1" />
+          <div style={{ 
+            padding: "24px", 
+            display: "flex", 
+            flexDirection: "column", 
+            gap: "24px", 
+            alignItems: "center", 
+            textAlign: "center"
+          }}>
+            <div style={{
+              width: "56px", 
+              height: "56px", 
+              borderRadius: "28px",
+              background: "#22c55e",
+              display: "flex", 
+              alignItems: "center", 
+              justifyContent: "center",
+              boxShadow: '0 4px 12px rgba(34, 197, 94, 0.3)',
+            }}>
+              <CheckCircle2 size={28} color="white" />
+            </div>
             <div>
-              <h3 style={{ margin: "0 0 8px 0" }}>确认注册</h3>
-              <p style={{ color: "var(--text-secondary)", fontSize: "14px", margin: 0 }}>
+              <h3 style={{ 
+                margin: "0 0 8px 0", 
+                fontSize: "18px", 
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+              }}>
+                确认注册
+              </h3>
+              <p style={{ 
+                color: "var(--text-secondary)", 
+                fontSize: "14px", 
+                margin: 0,
+              }}>
                 即将注册以下智能体：
               </p>
             </div>
 
-            <div style={{
-              width: "100%", padding: "16px", borderRadius: "var(--radius-md)",
-              background: "var(--bg-tertiary)", border: "1px solid var(--border-subtle)",
-              textAlign: "left",
+            <Card style={{ 
+              width: "100%", 
+              background: "var(--bg-tertiary)",
+              border: '1px solid var(--border-subtle)',
             }}>
-              <div style={{ display: "grid", gridTemplateColumns: "100px 1fr", gap: "10px", fontSize: "14px" }}>
-                <span style={{ color: "var(--text-muted)" }}>名称</span>
-                <strong>{agentName}</strong>
-                <span style={{ color: "var(--text-muted)" }}>类型</span>
-                <span><span className="tag" style={{ background: agentTypeConfig[agentType]?.bgLight, color: agentTypeConfig[agentType]?.color }}>{agentTypeConfig[agentType]?.label}</span></span>
+              <div style={{ 
+                display: "grid", 
+                gridTemplateColumns: "100px 1fr", 
+                gap: "16px", 
+                fontSize: "14px",
+                padding: '16px',
+              }}>
+                <span style={{ 
+                  color: "var(--text-muted)",
+                  fontWeight: 500,
+                }}>
+                  名称
+                </span>
+                <strong style={{ color: 'var(--text-primary)' }}>{agentName}</strong>
+                <span style={{ 
+                  color: "var(--text-muted)",
+                  fontWeight: 500,
+                }}>
+                  类型
+                </span>
+                <span>
+                  <span style={{
+                    background: "var(--bg-secondary)",
+                    color: agentTypeConfig[agentType]?.color,
+                    fontSize: "11px",
+                    padding: "4px 10px",
+                    borderRadius: "4px",
+                  }}>
+                    {agentTypeConfig[agentType]?.label}
+                  </span>
+                </span>
               </div>
-            </div>
+            </Card>
 
-            <div style={{ display: "flex", gap: "10px", width: "100%" }}>
-              <button className="btn btn-secondary btn-lg" onClick={() => setStep("info")} style={{ flex: 1 }}>
+            <div style={{ display: "flex", gap: "12px", width: "100%" }}>
+              <Button
+                variant="secondary"
+                onClick={() => setStep("info")}
+                style={{ 
+                  flex: 1,
+                  transition: 'all 0.2s ease',
+                }}
+              >
                 返回修改
-              </button>
-              <button
-                className="btn btn-success btn-lg"
+              </Button>
+              <Button
+                variant="success"
                 onClick={handleSubmit}
                 disabled={submitting}
-                style={{ flex: 1 }}
+                style={{ 
+                  flex: 1,
+                  transition: 'all 0.2s ease',
+                  boxShadow: 'var(--shadow-sm)',
+                }}
               >
                 {submitting ? <Loader2 size={16} className="spin" /> : <CheckCircle2 size={16} />}
                 确认注册
-              </button>
+              </Button>
             </div>
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

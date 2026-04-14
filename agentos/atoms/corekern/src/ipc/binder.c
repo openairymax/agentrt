@@ -19,8 +19,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../agentos/commons/utils/memory/include/memory_compat.h"
-#include "../../../agentos/commons/utils/string/include/string_compat.h"
+#include "../../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../../commons/utils/string/include/string_compat.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -347,7 +347,7 @@ agentos_error_t agentos_ipc_connect(
  */
 agentos_error_t agentos_ipc_call(
     agentos_ipc_channel_t* channel,
-    const agentos_ipc_message_t* msg,
+    const agentos_kernel_ipc_message_t* msg,
     void* response,
     size_t* response_size,
     uint32_t timeout_ms) {
@@ -355,7 +355,7 @@ agentos_error_t agentos_ipc_call(
     if (!channel || !msg) return AGENTOS_EINVAL;
     if (!channel->remote_target) return AGENTOS_ENOENT;
 
-    agentos_ipc_message_t call_msg = *msg;
+    agentos_kernel_ipc_message_t call_msg = *msg;
     call_msg.msg_id = generate_msg_id();
 
     pending_call_t* pc = pending_call_create();
@@ -412,7 +412,7 @@ agentos_error_t agentos_ipc_call(
         uint32_t remaining = (uint32_t)(timeout_ms - elapsed);
         if (remaining > 100) remaining = 100; /* 最多等�?00ms后检�?*/
 
-        agentos_cond_wait(pc->cond, pc->cond_lock, remaining);
+        agentos_cond_timedwait(pc->cond, pc->cond_lock, remaining);
     }
 
     agentos_mutex_unlock(pc->cond_lock);
@@ -434,12 +434,12 @@ agentos_error_t agentos_ipc_call(
  */
 agentos_error_t agentos_ipc_send(
     agentos_ipc_channel_t* channel,
-    const agentos_ipc_message_t* msg) {
+    const agentos_kernel_ipc_message_t* msg) {
 
     if (!channel || !msg) return AGENTOS_EINVAL;
     if (!channel->remote_target) return AGENTOS_ENOENT;
 
-    agentos_ipc_message_t send_msg = *msg;
+    agentos_kernel_ipc_message_t send_msg = *msg;
     send_msg.msg_id = generate_msg_id();
 
     agentos_error_t err = channel->remote_target->callback(
@@ -457,7 +457,7 @@ agentos_error_t agentos_ipc_send(
  */
 agentos_error_t agentos_ipc_reply(
     agentos_ipc_channel_t* channel,
-    const agentos_ipc_message_t* msg) {
+    const agentos_kernel_ipc_message_t* msg) {
 
     if (!channel || !msg) return AGENTOS_EINVAL;
 

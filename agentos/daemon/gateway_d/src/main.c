@@ -20,6 +20,11 @@
 #include "platform.h"
 #include "error.h"
 
+#include "../../protocols/include/unified_protocol.h"
+#include "../../protocols/mcp/include/mcp_v1_adapter.h"
+#include "../../protocols/a2a/include/a2a_v03_adapter.h"
+#include "../../protocols/openai/include/openai_enterprise_adapter.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -176,6 +181,43 @@ int main(int argc, char* argv[]) {
         goto cleanup_service;
     }
 
+    /* Initialize UnifiedProtocol stack for multi-protocol support */
+    protocol_stack_handle_t protocol_stack = NULL;
+    unified_protocol_config_t proto_config = {
+        .name = "AgentOS-Gateway-ProtocolStack",
+        .max_adapters = 8,
+        .default_protocol = UNIFIED_PROTOCOL_JSON_RPC
+    };
+
+    protocol_stack = unified_protocol_create(&proto_config);
+    if (!protocol_stack) {
+        SVC_LOG_WARN("Failed to create protocol stack, using JSON-RPC only");
+    } else {
+        /* Register MCP v1.0 adapter */
+        if (unified_protocol_register_adapter(protocol_stack, &mcp_v1_adapter_interface) == 0) {
+            SVC_LOG_INFO("MCP v1.0 adapter registered successfully");
+        } else {
+            SVC_LOG_WARN("Failed to register MCP v1.0 adapter");
+        }
+
+        /* Register A2A v0.3.0 adapter */
+        if (unified_protocol_register_adapter(protocol_stack, &a2a_v03_adapter_interface) == 0) {
+            SVC_LOG_INFO("A2A v0.3.0 adapter registered successfully");
+        } else {
+            SVC_LOG_WARN("Failed to register A2A v0.3.0 adapter");
+        }
+
+        /* Register OpenAI Enterprise adapter */
+        if (unified_protocol_register_adapter(protocol_stack, &openai_enterprise_adapter_interface) == 0) {
+            SVC_LOG_INFO("OpenAI Enterprise adapter registered successfully");
+        } else {
+            SVC_LOG_WARN("Failed to register OpenAI Enterprise adapter");
+        }
+
+        SVC_LOG_INFO("UnifiedProtocol stack initialized with %zu adapters",
+                    unified_protocol_get_adapter_count(protocol_stack));
+    }
+
     err = gateway_service_start(g_service);
     if (err != AGENTOS_SUCCESS) {
         SVC_LOG_ERROR("Failed to start service (err=%d)", err);
@@ -199,6 +241,12 @@ int main(int argc, char* argv[]) {
 
     SVC_LOG_INFO("Gateway shutting down...");
     gateway_service_stop(g_service, false);
+
+    /* Cleanup protocol stack */
+    if (protocol_stack) {
+        unified_protocol_destroy(protocol_stack);
+        SVC_LOG_INFO("Protocol stack destroyed");
+    }
 
 cleanup_service:
     gateway_service_destroy(g_service);

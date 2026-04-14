@@ -437,6 +437,215 @@ agentos_trace_end(
 free(span_id);
 ```
 
+### `agentos_log_query()`
+
+```c
+/**
+ * @brief 查询日志记录
+ * 
+ * 根据过滤条件查询日志记录。
+ * 
+ * @param filter 查询过滤条件（JSON 格式）
+ * @param offset 分页偏移量
+ * @param limit 每页数量限制
+ * @param out_records [out] 返回日志记录数组（JSON 格式）
+ * @param out_count [out] 返回实际数量
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @ownership 调用者拥有 *out_records，需通过 agentos_sys_free() 释放
+ * @threadsafe 是
+ * @reentrant 否
+ */
+AGENTOS_API agentos_error_t
+agentos_log_query(const char* filter,
+                  uint32_t offset,
+                  uint32_t limit,
+                  char** out_records,
+                  uint32_t* out_count);
+```
+
+**过滤条件示例**：
+```json
+{
+    "level_min": "WARN",
+    "module": "cupolas",
+    "time_range": {"start": 1672531200000, "end": 1672617600000},
+    "trace_id": "trace_abc123",
+    "search": "permission denied"
+}
+```
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 查询成功
+- `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 过滤条件无效
+- `AGENTOS_ERROR_NO_MEMORY` (0x1002): 内存不足
+
+### `agentos_metric_query()`
+
+```c
+/**
+ * @brief 查询指标数据
+ * 
+ * 根据名称和标签查询指标数据点。
+ * 
+ * @param name 指标名称（支持通配符 *）
+ * @param labels 标签过滤（JSON 格式，可选）
+ * @param time_range 时间范围（JSON 格式）
+ * @param out_datapoints [out] 返回数据点数组（JSON 格式）
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @ownership 调用者拥有 *out_datapoints，需通过 agentos_sys_free() 释放
+ * @threadsafe 是
+ * @reentrant 否
+ */
+AGENTOS_API agentos_error_t
+agentos_metric_query(const char* name,
+                     const char* labels,
+                     const char* time_range,
+                     char** out_datapoints);
+```
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 查询成功
+- `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 参数无效
+- `AGENTOS_ERROR_NO_MEMORY` (0x1002): 内存不足
+
+### `agentos_trace_context_get()`
+
+```c
+/**
+ * @brief 获取当前追踪上下文
+ * 
+ * 获取当前线程的追踪上下文信息，包括 trace_id、span_id 等。
+ * 用于在服务内部传递追踪信息。
+ * 
+ * @param out_context [out] 返回追踪上下文（JSON 格式）
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @ownership 调用者拥有 *out_context，需通过 agentos_sys_free() 释放
+ * @threadsafe 是
+ * @reentrant 是
+ * @see agentos_trace_inject()
+ */
+AGENTOS_API agentos_error_t
+agentos_trace_context_get(char** out_context);
+```
+
+**返回 JSON 示例**：
+```json
+{
+    "trace_id": "trace_abc123",
+    "span_id": "span_def456",
+    "parent_span_id": "span_ghi789",
+    "sampled": true
+}
+```
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 获取成功
+- `AGENTOS_ERROR_NO_MEMORY` (0x1002): 内存不足
+
+### `agentos_trace_inject()`
+
+```c
+/**
+ * @brief 注入追踪上下文
+ * 
+ * 将追踪上下文注入到当前线程，用于分布式追踪的跨服务传播。
+ * 通常从请求头中提取的追踪信息通过此接口注入。
+ * 
+ * @param context 追踪上下文（JSON 格式）
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @threadsafe 是
+ * @reentrant 否
+ * @see agentos_trace_context_get()
+ */
+AGENTOS_API agentos_error_t
+agentos_trace_inject(const char* context);
+```
+
+**使用示例**：
+```c
+// 从 HTTP 请求头提取追踪信息并注入
+const char* traceparent = request_header("traceparent");
+const char* tracestate = request_header("tracestate");
+
+char context[512];
+snprintf(context, sizeof(context),
+    "{\"trace_id\": \"%s\", \"tracestate\": \"%s\"}",
+    traceparent, tracestate);
+
+agentos_trace_inject(context);
+```
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 注入成功
+- `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 上下文格式无效
+
+### `agentos_telemetry_export()`
+
+```c
+/**
+ * @brief 导出可观测性数据
+ * 
+ * 将日志、指标、追踪数据统一导出为 OpenTelemetry 兼容格式。
+ * 支持按时间范围和类型筛选导出数据。
+ * 
+ * @param options 导出选项（JSON 格式）
+ * @param out_data [out] 返回导出数据（JSON 格式）
+ * @param out_size [out] 返回数据大小
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @ownership 调用者拥有 *out_data，需通过 agentos_sys_free() 释放
+ * @threadsafe 是
+ * @reentrant 否
+ */
+AGENTOS_API agentos_error_t
+agentos_telemetry_export(const char* options,
+                         char** out_data,
+                         size_t* out_size);
+```
+
+**导出选项示例**：
+```json
+{
+    "types": ["logs", "metrics", "traces"],
+    "time_range": {"start": 1672531200000, "end": 1672617600000},
+    "format": "otlp_json",
+    "compression": "gzip"
+}
+```
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 导出成功
+- `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 选项格式无效
+- `AGENTOS_ERROR_NO_MEMORY` (0x1002): 内存不足
+
+### `agentos_telemetry_stats()`
+
+```c
+/**
+ * @brief 获取可观测性统计信息
+ * 
+ * 获取全局可观测性系统统计信息，包括日志/指标/追踪的数量、
+ * 存储使用量、采样率等。
+ * 
+ * @param out_stats [out] 返回统计信息结构体
+ * @return AGENTOS_SUCCESS 成功；其他值表示错误
+ * 
+ * @ownership 无堆内存分配，结构体为值类型
+ * @threadsafe 是
+ * @reentrant 是
+ */
+AGENTOS_API agentos_error_t
+agentos_telemetry_stats(agentos_telemetry_statistics_t* out_stats);
+```
+
+**返回值**：
+- `AGENTOS_SUCCESS` (0x0000): 获取成功
+- `AGENTOS_ERROR_INVALID_ARGUMENT` (0x1001): 参数无效
+
 ---
 
 ## 🚀 使用示例

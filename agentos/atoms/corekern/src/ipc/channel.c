@@ -10,11 +10,11 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include <memory_compat.h>
-#include <string_compat.h>
+#include "../../../../commons/utils/memory/include/memory_compat.h"
+#include "../../../../commons/utils/string/include/string_compat.h"
 
 /* Check macros for unified error handling */
-#include <check.h>
+#include "../../../../commons/utils/include/check.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -22,7 +22,7 @@
  * @brief IPC 消息队列节点
  */
 typedef struct ipc_message_node {
-    agentos_ipc_message_t msg;
+    agentos_kernel_ipc_message_t msg;
     struct ipc_message_node* next;
 } ipc_message_node_t;
 
@@ -53,6 +53,7 @@ agentos_error_t agentos_ipc_create_channel(
     (void)callback;  /* 回调函数暂未使用 */
     (void)userdata;   /* 用户数据暂未使用 */
 
+    agentos_ipc_channel_t* channel = NULL;
     CALLOC_CHECK(channel, 1, sizeof(agentos_ipc_channel_t), error_return);
 
     /* 使用名称的哈希值作为端口号（简化实现） */
@@ -138,7 +139,7 @@ agentos_error_t agentos_ipc_close(agentos_ipc_channel_t* channel) {
  */
 agentos_error_t agentos_ipc_send(
     agentos_ipc_channel_t* channel,
-    const agentos_ipc_message_t* msg) {
+    const agentos_kernel_ipc_message_t* msg) {
     if (!channel || !msg) {
         return AGENTOS_EINVAL;
     }
@@ -153,7 +154,7 @@ agentos_error_t agentos_ipc_send(
     }
 
     /* 复制消息内容 */
-    memcpy(&node->msg, msg, sizeof(agentos_ipc_message_t));
+    memcpy(&node->msg, msg, sizeof(agentos_kernel_ipc_message_t));
     node->next = NULL;
 
     /* 添加到队列尾部 */
@@ -182,7 +183,7 @@ agentos_error_t agentos_ipc_send(
 agentos_error_t agentos_ipc_recv(
     agentos_ipc_channel_t* channel,
     uint32_t timeout_ms,
-    agentos_ipc_message_t* out_msg) {
+    agentos_kernel_ipc_message_t* out_msg) {
     if (!channel || !out_msg) {
         return AGENTOS_EINVAL;
     }
@@ -191,7 +192,7 @@ agentos_error_t agentos_ipc_recv(
 
     /* 等待消息到达 */
     if (!channel->queue && timeout_ms > 0) {
-        agentos_cond_wait_timeout(channel->cond, channel->lock, timeout_ms);
+        agentos_cond_timedwait(channel->cond, channel->lock, timeout_ms);
     }
 
     /* 检查队列 */
@@ -202,7 +203,7 @@ agentos_error_t agentos_ipc_recv(
 
     /* 从队列头部取出消息 */
     ipc_message_node_t* node = channel->queue;
-    memcpy(out_msg, &node->msg, sizeof(agentos_ipc_message_t));
+    memcpy(out_msg, &node->msg, sizeof(agentos_kernel_ipc_message_t));
     
     channel->queue = node->next;
     channel->queue_size--;

@@ -1,7 +1,7 @@
 # =============================================================================
 # AgentOS .gitignore 文件
-# 版本：7.0.0
-# 最后更新：2026-04-09
+# 版本：8.0.0
+# 最后更新：2026-04-13
 # 说明：规范化排除所有不应纳入版本控制的文件和目录
 #
 # 设计原则：
@@ -10,19 +10,22 @@
 # 3. 本地开发配置一律排除（.env.local、IDE 配置等）
 # 4. 空目录通过 .gitkeep 保留，但排除目录内容
 # 5. 项目必需文件使用否定规则明确保留
+# 6. 通配符规则限定作用范围，避免意外排除项目必需文件
 #
-# 项目模块结构（2026-04-09 V5.0 校正后）：
+# 项目模块结构（2026-04-14 V8.1 校正后）：
 # 核心模块 (agentos/)
-#   - atoms/       : 内核原子模块 (40,917行, A+评级)
+#   - atoms/       : 原子内核 (40,917行, A+评级)
 #   - atomslite/   : 轻量级原子模块
 #   - commons/     : 统一基础库 (S级, 97.1分)
-#   - cupolas/     : 安全穹顶模块 (A++评级, 97.5分)
-#   - daemon/      : 用户态服务模块 (S+评级, 96.5分)
-#   - gateway/     : 网关服务模块 (A+评级)
-#   - heapstore/   : 数据持久化层 (A评级, 98%生产就绪)
-#   - manager/     : 配置管理器
+#   - cupolas/     : 安全穹顶 (A++评级, 97.5分)
+#   - daemon/      : 用户态服务 (S+评级, 96.5分)
+#   - gateway/     : 统一网关 (A+评级)
+#   - heapstore/   : 运行时数据存储 (A评级, 98%生产就绪)
+#   - manager/     : 统一配置管理
+#   - openlab/     : 开放生态 (已移动到 agentos/)
+#   - protocols/   : 行业协议适配
 #   - toolkit/     : 多语言 SDK 工具 (35,638行, 4语言)
-#   - openlab/     : Python 应用中心 (已移动到 agentos/)
+#   - interfaces/  : 统一接口定义
 #
 # 文档模块
 #   - docs/        : 项目文档 (原 manuals/)
@@ -35,13 +38,21 @@
 # =============================================================================
 
 # =============================================================================
+# 本地文档（不追踪，仅保留在本地）
+# =============================================================================
+
+CHANGELOG.md
+
+# =============================================================================
 # 修复记录目录（本地工作记录，不追踪）
+# 注意：.bendiwenjian/ 目录整体排除，但总线检查报告需保留
+# Git 机制要求：父目录排除后，必须逐级否定才能重新包含子文件
 # =============================================================================
 
 .bendiwenjian/
+!.bendiwenjian/总线检查/
+!.bendiwenjian/总线检查/*.md
 
-build_test/
-build_test/
 # =============================================================================
 # 1. CMake 构建系统（构建产物，不追踪）
 # =============================================================================
@@ -55,6 +66,8 @@ CMakePresets.json
 
 # CMake 构建目录
 build/
+build_test/
+build_test_protocol/
 _build/
 cmake-build*/
 cmake-build-debug/
@@ -89,7 +102,6 @@ compile_commands/*.json
 *.exe.manifest
 *.out
 *.app
-*.bin
 
 # 预编译头
 *.pch
@@ -140,7 +152,6 @@ Pipfile.lock
 .coverage.*
 coverage/
 htmlcov/
-*.xml
 coverage.xml
 .tox/
 .nox/
@@ -157,9 +168,6 @@ ipython_kernel_config.py
 dmypy.json
 .ruff_cache/
 
-# Ruff
-.ruff_cache/
-
 # =============================================================================
 # 4. Go 语言 SDK（构建产物，不追踪）
 # =============================================================================
@@ -169,7 +177,7 @@ agentos/toolkit/go/go.sum
 agentos/toolkit/go/*.exe
 agentos/toolkit/go/testsuite/
 agentos/toolkit/go/coverage/
-*.test
+agentos/toolkit/go/*.test
 cover.out
 cover.html
 
@@ -203,13 +211,12 @@ agentos/toolkit/typescript/tsbuildinfo/
 # =============================================================================
 
 # 环境文件
-.env
+*.env
 .env.local
 .env.*.local
 .env.dev
 .env.test
 .env.production
-*.env
 
 # 密钥和证书
 *.pem
@@ -226,7 +233,6 @@ secrets.yaml
 secrets.yml
 credentials.json
 service_account.json
-*.keystore
 oauth/
 .token
 
@@ -257,7 +263,6 @@ override.yaml
 out/
 *.hprof
 *.heap
-*.snap
 *.clion/
 
 # Vim
@@ -266,7 +271,6 @@ out/
 *~
 .netrwhist
 *.un~
-# \#*\#
 .\#*
 *.elc
 
@@ -299,7 +303,6 @@ bld/
 .classpath
 .project
 .settings/
-bin/
 
 # =============================================================================
 # 9. 日志、数据库和运行时文件（运行时生成，不追踪）
@@ -390,14 +393,10 @@ agentos/heapstore/db/*
 # 测试结果和报告
 test-results/
 test_output/
-*.test
 *.spec
-*.snap
 *.snapshot
 
 # 测试覆盖率
-coverage/
-htmlcov/
 *.gcov
 
 # 测试数据（运行时生成）
@@ -505,23 +504,17 @@ agentos/heapstore/models/*.onnx
 *.arrow
 *.feather
 
-# 数据集
+# 数据集（仅排除根目录数据目录）
 /data/
 /datasets/
-*.csv
-*.tsv
-*.jsonl
 
-# 压缩包
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.zip
-*.rar
-*.7z
-*.gz
-*.bz2
-*.xz
+# 压缩包（仅排除构建和部署目录下的）
+deploy/**/*.tar.gz
+deploy/**/*.tar.bz2
+deploy/**/*.tar.xz
+deploy/**/*.zip
+deploy/**/*.rar
+deploy/**/*.7z
 
 # Docker 和 Kubernetes
 deploy/docker/*.tar
@@ -622,7 +615,7 @@ scripts/desktop-client/src-tauri/WixTools/
 scripts/desktop-client/src-tauri/Cargo.lock
 
 # =============================================================================
-# 20. 新增目录（docker/ 和 docs/）
+# 20. docker/ 和 docs/ 目录（保留配置文件，排除运行时产物）
 # =============================================================================
 
 # docker/ 目录（保留配置文件，排除运行时产物）
@@ -643,16 +636,16 @@ docs/site/
 docs/*.svg
 docs/*.png
 docs/*.pdf
-docs/local/
-docs/private/
+
+# Doxygen API 文档输出（保留源文件 mainpage.dox）
+docs/api/html/
+docs/api/xml/
+docs/api/latex/
+docs/api/man/
 
 # =============================================================================
 # 21. 必须保留的例外（项目必需文件）
 # =============================================================================
-
-# 版本控制配置
-!.gitignore
-!.gitattributes
 
 # 环境模板
 !.env.example
@@ -666,10 +659,6 @@ docs/private/
 
 # 关键文档
 !docs/**/*.md
-!README.md
-!README_EN.md
-!LICENSE
-!CHANGELOG.md
 !CONTRIBUTING.md
 !AUTHORS.md
 !SECURITY.md
@@ -764,12 +753,6 @@ docs/private/
 
 # .gitcode/ 是平台模板目录，随仓库同步
 # 包含 CI/CD 工作流、Issue 模板、PR 模板等
-
-# =============================================================================
-# 23. 总线检查报告目录（保留最终版本）
-# =============================================================================
-
-!.bendiwenjian/总线检查/*.md
 
 # =============================================================================
 # 结束
