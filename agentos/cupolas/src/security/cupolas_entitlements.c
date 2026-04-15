@@ -13,7 +13,9 @@
  */
 
 #include "cupolas_entitlements.h"
-#include "../utils/cupolas_utils.h"
+#include "cupolas_error.h"
+#include "utils/cupolas_utils.h"
+#include "../platform/platform.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -245,7 +247,7 @@ static int cupolas_parse_entitlements_content(const char* content, cupolas_entit
     memset(info, 0, sizeof(*info));
     
     char* dup = cupolas_strdup(content);
-    if (!dup) return cupolas_ENT_PARSE_ERROR;
+    if (!dup) return CUPOLAS_ENT_PARSE_ERROR;
     
     char* saveptr;
     char* line = strtok_r(dup, "\n", &saveptr);
@@ -270,7 +272,7 @@ static int cupolas_parse_entitlements_content(const char* content, cupolas_entit
     }
     
     free(dup);
-    return cupolas_ENT_OK;
+    return CUPOLAS_ENT_OK;
 }
 
 int cupolas_entitlements_init(void) {
@@ -293,17 +295,17 @@ void cupolas_entitlements_cleanup(void) {
 }
 
 int cupolas_entitlements_load(const char* yaml_path, cupolas_entitlements_t** entitlements) {
-    if (!yaml_path || !entitlements) return cupolas_ENT_INVALID;
+    if (!yaml_path || !entitlements) return CUPOLAS_ENT_INVALID;
     
     FILE* f = fopen(yaml_path, "r");
-    if (!f) return cupolas_ENT_NOT_FOUND;
+    if (!f) return CUPOLAS_ENT_NOT_FOUND;
     
     fseek(f, 0, SEEK_END);
     long size = ftell(f);
     fseek(f, 0, SEEK_SET);
     
     char* content = (char*)malloc(size + 1);
-    if (!content) { fclose(f); return cupolas_ENT_PARSE_ERROR; }
+    if (!content) { fclose(f); return CUPOLAS_ENT_PARSE_ERROR; }
     
     size_t read_size = fread(content, 1, size, f);
     fclose(f);
@@ -316,17 +318,17 @@ int cupolas_entitlements_load(const char* yaml_path, cupolas_entitlements_t** en
 }
 
 int cupolas_entitlements_load_json(const char* json_path, cupolas_entitlements_t** entitlements) {
-    if (!json_path || !entitlements) return cupolas_ENT_INVALID;
+    if (!json_path || !entitlements) return CUPOLAS_ENT_INVALID;
     
     FILE* f = fopen(json_path, "r");
-    if (!f) return cupolas_ENT_NOT_FOUND;
+    if (!f) return CUPOLAS_ENT_NOT_FOUND;
     
     fseek(f, 0, SEEK_END);
     long size = ftell(f);
     fseek(f, 0, SEEK_SET);
     
     char* content = (char*)malloc(size + 1);
-    if (!content) { fclose(f); return cupolas_ENT_PARSE_ERROR; }
+    if (!content) { fclose(f); return CUPOLAS_ENT_PARSE_ERROR; }
     
     size_t read_size = fread(content, 1, size, f);
     fclose(f);
@@ -339,10 +341,10 @@ int cupolas_entitlements_load_json(const char* json_path, cupolas_entitlements_t
 }
 
 int cupolas_entitlements_load_string(const char* yaml_content, cupolas_entitlements_t** entitlements) {
-    if (!yaml_content || !entitlements) return cupolas_ENT_INVALID;
+    if (!yaml_content || !entitlements) return CUPOLAS_ENT_INVALID;
     
     *entitlements = (cupolas_entitlements_t*)calloc(1, sizeof(cupolas_entitlements_t));
-    if (!*entitlements) return cupolas_ENT_PARSE_ERROR;
+    if (!*entitlements) return CUPOLAS_ENT_PARSE_ERROR;
     
     CUPOLAS_MUTEX_INIT(&(*entitlements)->lock);
     
@@ -351,13 +353,13 @@ int cupolas_entitlements_load_string(const char* yaml_content, cupolas_entitleme
     (*entitlements)->is_verified = 0;
     
     int result = cupolas_parse_entitlements_content(yaml_content, &(*entitlements)->info);
-    if (result != cupolas_ENT_OK) {
+    if (result != CUPOLAS_ENT_OK) {
         cupolas_entitlements_free(*entitlements);
         *entitlements = NULL;
         return result;
     }
     
-    return cupolas_ENT_OK;
+    return CUPOLAS_ENT_OK;
 }
 
 void cupolas_entitlements_free(cupolas_entitlements_t* entitlements) {
@@ -410,24 +412,24 @@ void cupolas_entitlements_free(cupolas_entitlements_t* entitlements) {
 }
 
 int cupolas_entitlements_verify(cupolas_entitlements_t* entitlements, const char* public_key) {
-    if (!entitlements || !public_key) return cupolas_ENT_INVALID;
-    if (!entitlements->signature || entitlements->sig_len == 0) return cupolas_ENT_SIGNATURE_INVALID;
+    if (!entitlements || !public_key) return CUPOLAS_ENT_INVALID;
+    if (!entitlements->signature || entitlements->sig_len == 0) return CUPOLAS_ENT_SIGNATURE_INVALID;
     
     BIO* bio = BIO_new_mem_buf(public_key, -1);
-    if (!bio) return cupolas_ENT_SIGNATURE_INVALID;
+    if (!bio) return CUPOLAS_ENT_SIGNATURE_INVALID;
     
     EVP_PKEY* pkey = PEM_read_bio_PUBKEY(bio, NULL, NULL, NULL);
     BIO_free(bio);
     
-    if (!pkey) return cupolas_ENT_SIGNATURE_INVALID;
+    if (!pkey) return CUPOLAS_ENT_SIGNATURE_INVALID;
     
     EVP_MD_CTX* md_ctx = EVP_MD_CTX_new();
     if (!md_ctx) {
         EVP_PKEY_free(pkey);
-        return cupolas_ENT_SIGNATURE_INVALID;
+        return CUPOLAS_ENT_SIGNATURE_INVALID;
     }
     
-    int result = cupolas_ENT_SIGNATURE_INVALID;
+    int result = CUPOLAS_ENT_SIGNATURE_INVALID;
     
     if (EVP_DigestVerifyInit(md_ctx, NULL, EVP_sha256(), NULL, pkey) == 1) {
         size_t content_len = strlen(entitlements->raw_content);
@@ -435,7 +437,7 @@ int cupolas_entitlements_verify(cupolas_entitlements_t* entitlements, const char
                             entitlements->sig_len,
                             (unsigned char*)entitlements->raw_content,
                             content_len) == 1) {
-            result = cupolas_ENT_OK;
+            result = CUPOLAS_ENT_OK;
             entitlements->is_verified = 1;
         }
     }
@@ -448,23 +450,23 @@ int cupolas_entitlements_verify(cupolas_entitlements_t* entitlements, const char
 
 int cupolas_entitlements_sign(cupolas_entitlements_t* entitlements, const char* private_key,
                             char* signature_out, size_t* sig_len) {
-    if (!entitlements || !private_key || !signature_out || !sig_len) return cupolas_ENT_INVALID;
+    if (!entitlements || !private_key || !signature_out || !sig_len) return CUPOLAS_ENT_INVALID;
     
     BIO* bio = BIO_new_mem_buf(private_key, -1);
-    if (!bio) return cupolas_ENT_PARSE_ERROR;
+    if (!bio) return CUPOLAS_ENT_PARSE_ERROR;
     
     EVP_PKEY* pkey = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
     BIO_free(bio);
     
-    if (!pkey) return cupolas_ENT_PARSE_ERROR;
+    if (!pkey) return CUPOLAS_ENT_PARSE_ERROR;
     
     EVP_MD_CTX* md_ctx = EVP_MD_CTX_new();
     if (!md_ctx) {
         EVP_PKEY_free(pkey);
-        return cupolas_ENT_PARSE_ERROR;
+        return CUPOLAS_ENT_PARSE_ERROR;
     }
     
-    int result = cupolas_ENT_PARSE_ERROR;
+    int result = CUPOLAS_ENT_PARSE_ERROR;
     
     if (EVP_DigestSignInit(md_ctx, NULL, EVP_sha256(), NULL, pkey) == 1) {
         size_t content_len = strlen(entitlements->raw_content);
@@ -477,7 +479,7 @@ int cupolas_entitlements_sign(cupolas_entitlements_t* entitlements, const char* 
                 if (EVP_DigestSign(md_ctx, (unsigned char*)signature_out, sig_len,
                                   (unsigned char*)entitlements->raw_content,
                                   content_len) == 1) {
-                    result = cupolas_ENT_OK;
+                    result = CUPOLAS_ENT_OK;
                     
                     free(entitlements->signature);
                     entitlements->signature = (char*)malloc(*sig_len);
@@ -601,10 +603,10 @@ int cupolas_entitlements_check_vault(cupolas_entitlements_t* entitlements, const
 }
 
 int cupolas_entitlements_get_resource_limits(cupolas_entitlements_t* entitlements, cupolas_ent_resource_limits_t* limits) {
-    if (!entitlements || !limits) return cupolas_ENT_INVALID;
+    if (!entitlements || !limits) return CUPOLAS_ENT_INVALID;
     
     *limits = entitlements->info.resources;
-    return cupolas_ENT_OK;
+    return CUPOLAS_ENT_OK;
 }
 
 int cupolas_entitlements_check_resource(cupolas_entitlements_t* entitlements, const char* resource_type, uint64_t current_value) {
@@ -632,10 +634,10 @@ int cupolas_entitlements_check_resource(cupolas_entitlements_t* entitlements, co
 }
 
 int cupolas_entitlements_get_info(cupolas_entitlements_t* entitlements, cupolas_entitlements_info_t* info) {
-    if (!entitlements || !info) return cupolas_ENT_INVALID;
+    if (!entitlements || !info) return CUPOLAS_ENT_INVALID;
     
     *info = entitlements->info;
-    return cupolas_ENT_OK;
+    return CUPOLAS_ENT_OK;
 }
 
 void cupolas_entitlements_free_info(cupolas_entitlements_info_t* info) {
@@ -648,23 +650,23 @@ const char* cupolas_entitlements_get_agent_id(cupolas_entitlements_t* entitlemen
 }
 
 int cupolas_entitlements_check_validity(cupolas_entitlements_t* entitlements) {
-    if (!entitlements) return cupolas_ENT_INVALID;
+    if (!entitlements) return CUPOLAS_ENT_INVALID;
     
     uint64_t now = cupolas_get_time_ms() / 1000;
     
     if (entitlements->info.not_before > 0 && now < entitlements->info.not_before) {
-        return cupolas_ENT_EXPIRED;
+        return CUPOLAS_ENT_EXPIRED;
     }
     
     if (entitlements->info.not_after > 0 && now > entitlements->info.not_after) {
-        return cupolas_ENT_EXPIRED;
+        return CUPOLAS_ENT_EXPIRED;
     }
     
-    return cupolas_ENT_OK;
+    return CUPOLAS_ENT_OK;
 }
 
 int cupolas_entitlements_export_yaml(cupolas_entitlements_t* entitlements, char* yaml_out, size_t* len) {
-    if (!entitlements || !yaml_out || !len) return cupolas_ENT_INVALID;
+    if (!entitlements || !yaml_out || !len) return CUPOLAS_ENT_INVALID;
     
     int written = snprintf(yaml_out, *len,
         "agent_id: %s\n"
@@ -694,15 +696,15 @@ int cupolas_entitlements_export_yaml(cupolas_entitlements_t* entitlements, char*
     
     if (written < 0 || (size_t)written >= *len) {
         *len = (size_t)written + 1;
-        return cupolas_ENT_PARSE_ERROR;
+        return CUPOLAS_ENT_PARSE_ERROR;
     }
     
     *len = (size_t)written;
-    return cupolas_ENT_OK;
+    return CUPOLAS_ENT_OK;
 }
 
 int cupolas_entitlements_export_json(cupolas_entitlements_t* entitlements, char* json_out, size_t* len) {
-    if (!entitlements || !json_out || !len) return cupolas_ENT_INVALID;
+    if (!entitlements || !json_out || !len) return CUPOLAS_ENT_INVALID;
     
     int written = snprintf(json_out, *len,
         "{\n"
@@ -735,22 +737,22 @@ int cupolas_entitlements_export_json(cupolas_entitlements_t* entitlements, char*
     
     if (written < 0 || (size_t)written >= *len) {
         *len = (size_t)written + 1;
-        return cupolas_ENT_PARSE_ERROR;
+        return CUPOLAS_ENT_PARSE_ERROR;
     }
     
     *len = (size_t)written;
-    return cupolas_ENT_OK;
+    return CUPOLAS_ENT_OK;
 }
 
 const char* cupolas_entitlements_result_string(cupolas_ent_result_t result) {
     switch (result) {
-        case cupolas_ENT_OK: return "Success";
-        case cupolas_ENT_INVALID: return "Invalid parameter";
-        case cupolas_ENT_SIGNATURE_INVALID: return "Invalid signature";
-        case cupolas_ENT_EXPIRED: return "Expired";
-        case cupolas_ENT_DENIED: return "Permission denied";
-        case cupolas_ENT_NOT_FOUND: return "Not found";
-        case cupolas_ENT_PARSE_ERROR: return "Parse error";
+        case CUPOLAS_ENT_OK: return "Success";
+        case CUPOLAS_ENT_INVALID: return "Invalid parameter";
+        case CUPOLAS_ENT_SIGNATURE_INVALID: return "Invalid signature";
+        case CUPOLAS_ENT_EXPIRED: return "Expired";
+        case CUPOLAS_ENT_DENIED: return "Permission denied";
+        case CUPOLAS_ENT_NOT_FOUND: return "Not found";
+        case CUPOLAS_ENT_PARSE_ERROR: return "Parse error";
         default: return "Unknown error";
     }
 }

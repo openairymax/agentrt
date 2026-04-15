@@ -86,7 +86,8 @@ void sync_cleanup(void) {
 /**
  * @brief 获取同步原语类型
  */
-sync_type_t sync_get_type(sync_lock_type_t lock_type) {
+sync_type_t sync_get_type(void* lock, sync_lock_type_t lock_type) {
+    (void)lock;
     switch (lock_type) {
         case SYNC_LOCK_MUTEX: return SYNC_TYPE_MUTEX;
         case SYNC_LOCK_RECURSIVE_MUTEX: return SYNC_TYPE_RECURSIVE_MUTEX;

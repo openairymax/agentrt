@@ -22,8 +22,8 @@ char* cupolas_strdup(const char* str) {
 }
 
 /* 安全的字符串复制 */
-int cupolas_strlcpy(char* dst, const char* src, size_t size) {
-    if (!dst || size == 0) return -1;
+size_t cupolas_strlcpy(char* dst, const char* src, size_t size) {
+    if (!dst || size == 0) return 0;
     if (!src) {
         dst[0] = '\0';
         return 0;
@@ -35,19 +35,17 @@ int cupolas_strlcpy(char* dst, const char* src, size_t size) {
     memcpy(dst, src, copy_len);
     dst[copy_len] = '\0';
     
-    return (int)src_len;
+    return src_len;
 }
 
 /* 安全的内存设置 */
-void* cupolas_memset_s(void* ptr, size_t size, int value) {
-    if (!ptr || size == 0) return NULL;
+void cupolas_memset_s(void* ptr, size_t len) {
+    if (!ptr || len == 0) return;
     
     volatile unsigned char* p = (volatile unsigned char*)ptr;
-    while (size--) {
-        *p++ = (unsigned char)value;
+    while (len--) {
+        *p++ = 0;
     }
-    
-    return ptr;
 }
 
 /* 安全的内存比较 */

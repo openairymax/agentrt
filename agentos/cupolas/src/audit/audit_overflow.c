@@ -6,7 +6,7 @@
  */
 
 #include "audit_overflow.h"
-#include "../../utils/cupolas_utils.h"
+#include "utils/cupolas_utils.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -46,7 +46,7 @@ static const char* overflow_level_strings[] = {
 
 static void get_timestamp_filename(char* buffer, size_t buffer_size) {
     time_t now = time(NULL);
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     struct tm* tm_info = localtime(&now);
 #else
     struct tm tm_buf;
@@ -62,7 +62,7 @@ static void get_timestamp_filename(char* buffer, size_t buffer_size) {
 static int ensure_overflow_dir(const char* dir) {
     if (!dir) return -1;
     
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     return mkdir(dir);
 #else
     return mkdir(dir, 0755);

@@ -18,12 +18,13 @@
  */
 
 #include "workbench_limits.h"
-#include "../utils/cupolas_utils.h"
+#include "utils/cupolas_utils.h"
+#include "../platform/platform.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
 #include <windows.h>
 #include <jobapi.h>
 #else
@@ -34,7 +35,7 @@
 #endif
 
 struct limit_context {
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     HANDLE job_handle;
     HANDLE process_handle;
 #else
@@ -81,7 +82,7 @@ limit_context_t* limits_create(size_t memory_limit_bytes,
     ctx->cpu_time_mode = LIMIT_MODE_ENFORCED;
     ctx->processes_mode = LIMIT_MODE_ENFORCED;
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     ctx->job_handle = INVALID_HANDLE_VALUE;
     ctx->process_handle = GetCurrentProcess();
 #else
@@ -95,7 +96,7 @@ limit_context_t* limits_create(size_t memory_limit_bytes,
 void limits_destroy(limit_context_t* ctx) {
     if (!ctx) return;
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     if (ctx->job_handle != INVALID_HANDLE_VALUE) {
         CloseHandle(ctx->job_handle);
     }
@@ -104,7 +105,7 @@ void limits_destroy(limit_context_t* ctx) {
     cupolas_mem_free(ctx);
 }
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
 static int setup_windows_job(limit_context_t* ctx) {
     if (ctx->job_handle != INVALID_HANDLE_VALUE) {
         return 0;
@@ -156,7 +157,7 @@ static int setup_windows_job(limit_context_t* ctx) {
 int limits_attach(limit_context_t* ctx) {
     if (!ctx) return cupolas_ERROR_INVALID_ARG;
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     if (setup_windows_job(ctx) != 0) {
         return cupolas_ERROR_UNKNOWN;
     }
@@ -176,7 +177,7 @@ int limits_attach(limit_context_t* ctx) {
 void limits_detach(limit_context_t* ctx) {
     if (!ctx) return;
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     if (ctx->job_handle != INVALID_HANDLE_VALUE) {
         TerminateJobObject(ctx->job_handle, 0);
         CloseHandle(ctx->job_handle);
@@ -193,7 +194,7 @@ int limits_set_memory(limit_context_t* ctx, size_t limit_bytes, limit_mode_t mod
     ctx->memory_limit = limit_bytes;
     ctx->memory_mode = mode;
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     if (ctx->job_handle != INVALID_HANDLE_VALUE) {
         JOBOBJECT_BASIC_LIMIT_INFORMATION limits = {0};
         DWORD size = sizeof(limits);
@@ -235,7 +236,7 @@ int limits_set_cpu_time(limit_context_t* ctx, uint32_t limit_ms, limit_mode_t mo
     ctx->cpu_time_limit_ms = limit_ms;
     ctx->cpu_time_mode = mode;
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     if (ctx->job_handle != INVALID_HANDLE_VALUE) {
         JOBOBJECT_BASIC_LIMIT_INFORMATION limits = {0};
         DWORD size = sizeof(limits);
@@ -281,7 +282,7 @@ int limits_set_cpu_weight(limit_context_t* ctx, uint32_t weight, limit_mode_t mo
     ctx->cpu_weight = weight;
     ctx->cpu_weight_mode = mode;
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     return 0;
 #else
     return 0;
@@ -294,7 +295,7 @@ int limits_set_processes(limit_context_t* ctx, uint32_t limit, limit_mode_t mode
     ctx->processes_limit = limit;
     ctx->processes_mode = mode;
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     if (ctx->job_handle != INVALID_HANDLE_VALUE) {
         JOBOBJECT_BASIC_LIMIT_INFORMATION limits = {0};
         DWORD size = sizeof(limits);
@@ -336,7 +337,7 @@ int limits_set_threads(limit_context_t* ctx, uint32_t limit, limit_mode_t mode) 
     ctx->threads_limit = limit;
     ctx->threads_mode = mode;
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     return 0;
 #else
     struct rlimit rl;
@@ -357,7 +358,7 @@ int limits_set_file_size(limit_context_t* ctx, size_t limit_bytes, limit_mode_t 
     ctx->file_size_limit = limit_bytes;
     ctx->file_size_mode = mode;
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     return 0;
 #else
     struct rlimit rl;
@@ -378,7 +379,7 @@ int limits_set_file_descriptors(limit_context_t* ctx, uint32_t limit, limit_mode
     ctx->file_descriptors_limit = limit;
     ctx->file_descriptors_mode = mode;
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     return 0;
 #else
     struct rlimit rl;
@@ -398,7 +399,7 @@ int limits_get_stats(limit_context_t* ctx, resource_stats_t* stats) {
 
     memset(stats, 0, sizeof(resource_stats_t));
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     PROCESS_MEMORY_COUNTERS pmc;
     if (GetProcessMemoryInfo(ctx->process_handle, &pmc, sizeof(pmc))) {
         stats->memory_current = pmc.WorkingSetSize;
@@ -482,7 +483,7 @@ int limits_enforce(limit_context_t* ctx) {
 
     int killed = 0;
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     if (ctx->job_handle != INVALID_HANDLE_VALUE) {
         BOOL has_cpu_time = FALSE;
         JOBOBJECT_BASIC_UI_RESTRICTIONS ui_restrictions;
@@ -534,7 +535,7 @@ void limits_set_exceeded_callback(limit_context_t* ctx,
 }
 
 bool limits_is_available(void) {
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     return true;
 #else
     return true;

@@ -19,13 +19,15 @@
  */
 
 #include "cupolas_config.h"
-#include "../utils/cupolas_utils.h"
+#include "utils/cupolas_utils.h"
+#include "platform/platform.h"
+#include "cupolas_metrics.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
 #include <windows.h>
 #else
 #include <sys/stat.h>
@@ -111,7 +113,7 @@ cupolas_config_t* cupolas_config_create(const char* config_dir) {
     if (config_dir) {
         snprintf(cfg->config_dir, sizeof(cfg->config_dir), "%s", config_dir);
     } else {
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
         snprintf(cfg->config_dir, sizeof(cfg->config_dir), "C:\\ProgramData\\cupolas\\conf");
 #else
         snprintf(cfg->config_dir, sizeof(cfg->config_dir), "/etc/agentos/cupolas/conf");
@@ -166,7 +168,7 @@ int cupolas_config_load(cupolas_config_t* cfg, config_type_t type, const char* f
                 cfg->config_dir, config_type_names[type]);
     }
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     WIN32_FILE_ATTRIBUTE_DATA attr;
     if (GetFileAttributesExA(entry->file_path, GetFileExInfoStandard, &attr)) {
         ULARGE_INTEGER ft;
@@ -184,7 +186,7 @@ int cupolas_config_load(cupolas_config_t* cfg, config_type_t type, const char* f
     entry->version.major = 1;
     entry->version.minor = 0;
     entry->version.patch = 0;
-    entry->version.timestamp_ns = metrics_get_timestamp_ns();
+    entry->version.timestamp_ns = cupolas_get_timestamp_ns();
 
     entry->status = CONFIG_STATUS_APPLIED;
 
@@ -361,7 +363,7 @@ int cupolas_config_check_reload(cupolas_config_t* cfg, config_type_t type) {
 
         config_entry_t* entry = &cfg->entries[i];
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
         WIN32_FILE_ATTRIBUTE_DATA attr;
         if (GetFileAttributesExA(entry->file_path, GetFileExInfoStandard, &attr)) {
             ULARGE_INTEGER ft;

@@ -13,32 +13,35 @@
 extern "C" {
 #endif
 
-/* 前向声明 */
-typedef struct agentos_forgetting_engine agentos_forgetting_engine_t;
+/* Forward declarations */
 typedef struct agentos_layer1_raw agentos_layer1_raw_t;
 typedef struct agentos_layer2_feature agentos_layer2_feature_t;
 
-/**
- * @brief 遗忘策略类型
- */
 typedef enum {
-    AGENTOS_FORGET_NONE = 0,       /**< 永不遗忘 */
-    AGENTOS_FORGET_EBBINGHAUS,     /**< 艾宾浩斯曲线 */
-    AGENTOS_FORGET_LINEAR,         /**< 线性衰减 */
-    AGENTOS_FORGET_ACCESS_BASED    /**< 基于访问次数 */
+    AGENTOS_FORGET_NONE = 0,
+    AGENTOS_FORGET_EBBINGHAUS,
+    AGENTOS_FORGET_LINEAR,
+    AGENTOS_FORGET_ACCESS_BASED
 } agentos_forget_strategy_t;
 
-/**
- * @brief 遗忘引擎配置
- */
 typedef struct agentos_forgetting_config {
-    agentos_forget_strategy_t strategy;   /**< 策略 */
-    double lambda;                         /**< 衰减率（对于Ebbinghaus） */
-    double threshold;                      /**< 裁剪阈值 */
-    uint32_t min_access;                   /**< 最小访问次数（访问策略） */
-    uint32_t check_interval_sec;           /**< 检查间隔（秒） */
-    const char* archive_path;               /**< 归档路径（可选） */
+    agentos_forget_strategy_t strategy;
+    double lambda;
+    double threshold;
+    uint32_t min_access;
+    uint32_t check_interval_sec;
+    const char* archive_path;
 } agentos_forgetting_config_t;
+
+typedef struct agentos_forgetting_engine {
+    agentos_forgetting_config_t manager;
+    agentos_layer1_raw_t* layer1;
+    agentos_layer2_feature_t* layer2;
+    agentos_mutex_t* lock;
+    int auto_running;
+    agentos_thread_t* auto_thread;
+    void* adaptive;
+} agentos_forgetting_engine_t;
 
 /**
  * @brief 创建遗忘引擎

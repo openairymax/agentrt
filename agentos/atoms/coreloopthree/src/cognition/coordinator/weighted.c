@@ -48,6 +48,7 @@ static agentos_error_t weighted_coordinate(
     const char** inputs,
     size_t input_count,
     char** out_result) {
+    (void)context;
     if (!base || !out_result) return AGENTOS_EINVAL;
 
     weighted_data_t* data = (weighted_data_t*)base->data;

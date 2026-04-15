@@ -10,7 +10,6 @@
 
 /* Unified base library compatibility layer */
 #include <agentos/memory.h>
-#include <agentos/string.h>
 #include <string.h>
 
 struct agentos_ipc_buffer {

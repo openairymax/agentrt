@@ -13,7 +13,7 @@
  */
 
 #include "cupolas_runtime_protection.h"
-#include "../utils/cupolas_utils.h"
+#include "utils/cupolas_utils.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -24,20 +24,22 @@
 #include <pthread.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <sys/prctl.h>
 #ifdef __linux__
+#include <sys/prctl.h>
 #include <linux/seccomp.h>
 #include <linux/filter.h>
 #include <sys/syscall.h>
+#ifdef HAVE_LIBSECCOMP
 #include <seccomp.h>
+#endif
 #endif
 #endif
 
 #include <openssl/sha.h>
 
-#define cupolas_MAX_SECCOMP_RULES 256
-#define cupolas_MAX_CFI_TARGETS 4096
-#define cupolas_MAX_VIOLATION_HISTORY 128
+#define CUPOLAS_MAX_SECCOMP_RULES 256
+#define CUPOLAS_MAX_CFI_TARGETS 4096
+#define CUPOLAS_MAX_VIOLATION_HISTORY 128
 
 typedef struct {
     char* syscall_name;
@@ -54,7 +56,7 @@ typedef struct {
 } cfi_target_t;
 
 typedef struct {
-    cupolas_violation_event_t events[cupolas_MAX_VIOLATION_HISTORY];
+    cupolas_violation_event_t events[CUPOLAS_MAX_VIOLATION_HISTORY];
     size_t count;
     size_t head;
 } violation_history_t;
@@ -64,12 +66,12 @@ static struct {
     cupolas_runtime_protect_config_t manager;
     cupolas_protection_status_t status;
     
-    seccomp_rule_internal_t seccomp_rules[cupolas_MAX_SECCOMP_RULES];
+    seccomp_rule_internal_t seccomp_rules[CUPOLAS_MAX_SECCOMP_RULES];
     size_t seccomp_rule_count;
     uint64_t seccomp_allowed_count;
     uint64_t seccomp_denied_count;
     
-    cfi_target_t cfi_targets[cupolas_MAX_CFI_TARGETS];
+    cfi_target_t cfi_targets[CUPOLAS_MAX_CFI_TARGETS];
     size_t cfi_target_count;
     uint64_t cfi_check_count;
     uint64_t cfi_violation_count;
@@ -108,16 +110,16 @@ static uint32_t cupolas_get_tid(void) {
 }
 
 static void cupolas_record_violation(cupolas_violation_type_t type, const char* details, const char* syscall_name) {
-    if (g_runtime_protect.violations.count >= cupolas_MAX_VIOLATION_HISTORY) {
-        g_runtime_protect.violations.head = (g_runtime_protect.violations.head + 1) % cupolas_MAX_VIOLATION_HISTORY;
+    if (g_runtime_prot.violations.count >= CUPOLAS_MAX_VIOLATION_HISTORY) {
+        g_runtime_prot.violations.head = (g_runtime_prot.violations.head + 1) % CUPOLAS_MAX_VIOLATION_HISTORY;
     }
     
-    size_t idx = (g_runtime_protect.violations.head + g_runtime_protect.violations.count) % cupolas_MAX_VIOLATION_HISTORY;
-    if (g_runtime_protect.violations.count < cupolas_MAX_VIOLATION_HISTORY) {
-        g_runtime_protect.violations.count++;
+    size_t idx = (g_runtime_prot.violations.head + g_runtime_prot.violations.count) % CUPOLAS_MAX_VIOLATION_HISTORY;
+    if (g_runtime_prot.violations.count < CUPOLAS_MAX_VIOLATION_HISTORY) {
+        g_runtime_prot.violations.count++;
     }
     
-    cupolas_violation_event_t* event = &g_runtime_protect.violations.events[idx];
+    cupolas_violation_event_t* event = &g_runtime_prot.violations.events[idx];
     event->type = type;
     event->timestamp = cupolas_get_time_ms();
     event->pid = cupolas_get_pid();
@@ -129,106 +131,106 @@ static void cupolas_record_violation(cupolas_violation_type_t type, const char* 
     event->fault_address = NULL;
     event->error_code = 0;
     
-    g_runtime_protect.stats.violations_detected++;
+    g_runtime_prot.stats.violations_detected++;
     
-    if (g_runtime_protect.violation_callback) {
-        g_runtime_protect.violation_callback(event);
+    if (g_runtime_prot.violation_callback) {
+        g_runtime_prot.violation_callback(event);
     }
 }
 
 int cupolas_runtime_protect_init(const cupolas_runtime_protect_config_t* manager) {
-    if (g_runtime_protect.initialized) return 0;
+    if (g_runtime_prot.initialized) return 0;
     
-    memset(&g_runtime_protect, 0, sizeof(g_runtime_protect));
+    memset(&g_runtime_prot, 0, sizeof(g_runtime_prot));
     
 #ifdef _WIN32
-    InitializeCriticalSection(&g_runtime_protect.lock);
+    InitializeCriticalSection(&g_runtime_prot.lock);
 #else
-    pthread_mutex_init(&g_runtime_protect.lock, NULL);
+    pthread_mutex_init(&g_runtime_prot.lock, NULL);
 #endif
     
     if (manager) {
-        g_runtime_protect.manager = *manager;
+        g_runtime_prot.manager = *manager;
     } else {
-        g_runtime_protect.manager.level = cupolas_PROTECT_BASIC;
-        g_runtime_protect.manager.memory.enable_aslr = true;
-        g_runtime_protect.manager.memory.enable_dep = true;
-        g_runtime_protect.manager.seccomp.default_action = 0;
-        g_runtime_protect.manager.integrity.check_interval_ms = 60000;
-        g_runtime_protect.manager.enable_audit = true;
+        g_runtime_prot.manager.level = CUPOLAS_PROTECT_BASIC;
+        g_runtime_prot.manager.memory.enable_aslr = true;
+        g_runtime_prot.manager.memory.enable_dep = true;
+        g_runtime_prot.manager.seccomp.default_action = 0;
+        g_runtime_prot.manager.integrity.check_interval_ms = 60000;
+        g_runtime_prot.manager.enable_audit = true;
     }
     
-    g_runtime_protect.status = cupolas_PROTECT_STATUS_INACTIVE;
-    g_runtime_protect.initialized = 1;
+    g_runtime_prot.status = CUPOLAS_PROTECT_STATUS_INACTIVE;
+    g_runtime_prot.initialized = 1;
     
     return 0;
 }
 
 void cupolas_runtime_protect_cleanup(void) {
-    if (!g_runtime_protect.initialized) return;
+    if (!g_runtime_prot.initialized) return;
     
-    for (size_t i = 0; i < g_runtime_protect.seccomp_rule_count; i++) {
-        free(g_runtime_protect.seccomp_rules[i].syscall_name);
+    for (size_t i = 0; i < g_runtime_prot.seccomp_rule_count; i++) {
+        free(g_runtime_prot.seccomp_rules[i].syscall_name);
     }
     
-    for (size_t i = 0; i < cupolas_MAX_VIOLATION_HISTORY; i++) {
-        free(g_runtime_protect.violations.events[i].details);
-        free(g_runtime_protect.violations.events[i].syscall_name);
+    for (size_t i = 0; i < CUPOLAS_MAX_VIOLATION_HISTORY; i++) {
+        free(g_runtime_prot.violations.events[i].details);
+        free(g_runtime_prot.violations.events[i].syscall_name);
     }
     
-    CUPOLAS_MUTEX_DESTROY(&g_runtime_protect.lock);
+    CUPOLAS_MUTEX_DESTROY(&g_runtime_prot.lock);
     
-    memset(&g_runtime_protect, 0, sizeof(g_runtime_protect));
+    memset(&g_runtime_prot, 0, sizeof(g_runtime_prot));
 }
 
 int cupolas_runtime_protect_enable(const cupolas_runtime_protect_config_t* manager) {
-    if (!g_runtime_protect.initialized) {
+    if (!g_runtime_prot.initialized) {
         int result = cupolas_runtime_protect_init(manager);
         if (result != 0) return result;
     } else if (manager) {
-        g_runtime_protect.manager = *manager;
+        g_runtime_prot.manager = *manager;
     }
     
-    if (g_runtime_protect.manager.memory.enable_dep ||
-        g_runtime_protect.manager.memory.enable_aslr) {
-        int result = cupolas_memory_protect_enable(&g_runtime_protect.manager.memory);
+    if (g_runtime_prot.manager.memory.enable_dep ||
+        g_runtime_prot.manager.memory.enable_aslr) {
+        int result = cupolas_memory_protect_enable(&g_runtime_prot.manager.memory);
         if (result != 0) return result;
     }
     
-    if (g_runtime_protect.manager.cfi.enable_cfi) {
-        int result = cupolas_cfi_enable(&g_runtime_protect.manager.cfi);
+    if (g_runtime_prot.manager.cfi.enable_cfi) {
+        int result = cupolas_cfi_enable(&g_runtime_prot.manager.cfi);
         if (result != 0) return result;
     }
     
-    if (g_runtime_protect.manager.seccomp.enable_seccomp) {
-        int result = cupolas_seccomp_enable(&g_runtime_protect.manager.seccomp);
+    if (g_runtime_prot.manager.seccomp.enable_seccomp) {
+        int result = cupolas_seccomp_enable(&g_runtime_prot.manager.seccomp);
         if (result != 0) return result;
     }
     
-    if (g_runtime_protect.manager.integrity.enable_code_integrity ||
-        g_runtime_protect.manager.integrity.enable_data_integrity) {
-        int result = cupolas_integrity_enable(&g_runtime_protect.manager.integrity);
+    if (g_runtime_prot.manager.integrity.enable_code_integrity ||
+        g_runtime_prot.manager.integrity.enable_data_integrity) {
+        int result = cupolas_integrity_enable(&g_runtime_prot.manager.integrity);
         if (result != 0) return result;
     }
     
-    g_runtime_protect.status = cupolas_PROTECT_STATUS_ACTIVE;
+    g_runtime_prot.status = CUPOLAS_PROTECT_STATUS_ACTIVE;
     return 0;
 }
 
 int cupolas_runtime_protect_disable(void) {
-    if (!g_runtime_protect.initialized) return -1;
+    if (!g_runtime_prot.initialized) return -1;
     
-    g_runtime_protect.status = cupolas_PROTECT_STATUS_INACTIVE;
+    g_runtime_prot.status = CUPOLAS_PROTECT_STATUS_INACTIVE;
     return 0;
 }
 
 cupolas_protection_status_t cupolas_runtime_protect_get_status(void) {
-    return g_runtime_protect.status;
+    return g_runtime_prot.status;
 }
 
 int cupolas_runtime_protect_get_config(cupolas_runtime_protect_config_t* manager) {
     if (!manager) return -1;
-    *manager = g_runtime_protect.manager;
+    *manager = g_runtime_prot.manager;
     return 0;
 }
 
@@ -330,22 +332,22 @@ void cupolas_memory_free_protected(void* ptr) {
 int cupolas_cfi_enable(const cupolas_cfi_config_t* manager) {
     if (!manager) return -1;
     
-    g_runtime_protect.cfi_target_count = 0;
-    g_runtime_protect.cfi_check_count = 0;
-    g_runtime_protect.cfi_violation_count = 0;
+    g_runtime_prot.cfi_target_count = 0;
+    g_runtime_prot.cfi_check_count = 0;
+    g_runtime_prot.cfi_violation_count = 0;
     
     return 0;
 }
 
 int cupolas_cfi_register_target(void* source, void* target) {
     if (!source || !target) return -1;
-    if (g_runtime_protect.cfi_target_count >= cupolas_MAX_CFI_TARGETS) return -1;
+    if (g_runtime_prot.cfi_target_count >= CUPOLAS_MAX_CFI_TARGETS) return -1;
     
-    cfi_target_t* entry = &g_runtime_protect.cfi_targets[g_runtime_protect.cfi_target_count];
+    cfi_target_t* entry = &g_runtime_prot.cfi_targets[g_runtime_prot.cfi_target_count];
     entry->source = source;
     entry->target = target;
     entry->valid = 1;
-    g_runtime_protect.cfi_target_count++;
+    g_runtime_prot.cfi_target_count++;
     
     return 0;
 }
@@ -353,48 +355,48 @@ int cupolas_cfi_register_target(void* source, void* target) {
 int cupolas_cfi_verify_transfer(void* source, void* target) {
     if (!source || !target) return 0;
     
-    g_runtime_protect.cfi_check_count++;
-    g_runtime_protect.stats.total_checks++;
+    g_runtime_prot.cfi_check_count++;
+    g_runtime_prot.stats.total_checks++;
     
-    for (size_t i = 0; i < g_runtime_protect.cfi_target_count; i++) {
-        cfi_target_t* entry = &g_runtime_protect.cfi_targets[i];
+    for (size_t i = 0; i < g_runtime_prot.cfi_target_count; i++) {
+        cfi_target_t* entry = &g_runtime_prot.cfi_targets[i];
         if (entry->source == source && entry->target == target && entry->valid) {
             return 1;
         }
     }
     
-    g_runtime_protect.cfi_violation_count++;
-    g_runtime_protect.stats.cfi_violations++;
+    g_runtime_prot.cfi_violation_count++;
+    g_runtime_prot.stats.cfi_violations++;
     
-    cupolas_record_violation(cupolas_VIOLATION_CONTROL_FLOW, "Invalid control flow transfer", NULL);
+    cupolas_record_violation(CUPOLAS_VIOLATION_CONTROL_FLOW, "Invalid control flow transfer", NULL);
     
     return 0;
 }
 
 int cupolas_cfi_get_stats(uint64_t* checks, uint64_t* violations) {
     if (!checks || !violations) return -1;
-    *checks = g_runtime_protect.cfi_check_count;
-    *violations = g_runtime_protect.cfi_violation_count;
+    *checks = g_runtime_prot.cfi_check_count;
+    *violations = g_runtime_prot.cfi_violation_count;
     return 0;
 }
 
 int cupolas_seccomp_enable(const cupolas_seccomp_config_t* manager) {
     if (!manager) return -1;
     
-    g_runtime_protect.seccomp_rule_count = 0;
-    g_runtime_protect.seccomp_allowed_count = 0;
-    g_runtime_protect.seccomp_denied_count = 0;
+    g_runtime_prot.seccomp_rule_count = 0;
+    g_runtime_prot.seccomp_allowed_count = 0;
+    g_runtime_prot.seccomp_denied_count = 0;
     
     if (manager->allowed_syscalls) {
         for (size_t i = 0; i < manager->syscall_count && 
-             g_runtime_protect.seccomp_rule_count < cupolas_MAX_SECCOMP_RULES; i++) {
-            seccomp_rule_internal_t* rule = &g_runtime_protect.seccomp_rules[g_runtime_protect.seccomp_rule_count];
+             g_runtime_prot.seccomp_rule_count < CUPOLAS_MAX_SECCOMP_RULES; i++) {
+            seccomp_rule_internal_t* rule = &g_runtime_prot.seccomp_rules[g_runtime_prot.seccomp_rule_count];
             rule->syscall_name = cupolas_strdup(manager->allowed_syscalls[i]);
             rule->action = 0;
             rule->arg_index = 0;
             rule->arg_value = 0;
             rule->op[0] = '\0';
-            g_runtime_protect.seccomp_rule_count++;
+            g_runtime_prot.seccomp_rule_count++;
         }
     }
     
@@ -411,30 +413,30 @@ int cupolas_seccomp_enable(const cupolas_seccomp_config_t* manager) {
 
 int cupolas_seccomp_allow(const char* syscall_name) {
     if (!syscall_name) return -1;
-    if (g_runtime_protect.seccomp_rule_count >= cupolas_MAX_SECCOMP_RULES) return -1;
+    if (g_runtime_prot.seccomp_rule_count >= CUPOLAS_MAX_SECCOMP_RULES) return -1;
     
-    seccomp_rule_internal_t* rule = &g_runtime_protect.seccomp_rules[g_runtime_protect.seccomp_rule_count];
+    seccomp_rule_internal_t* rule = &g_runtime_prot.seccomp_rules[g_runtime_prot.seccomp_rule_count];
     rule->syscall_name = cupolas_strdup(syscall_name);
     rule->action = 0;
     rule->arg_index = 0;
     rule->arg_value = 0;
     rule->op[0] = '\0';
-    g_runtime_protect.seccomp_rule_count++;
+    g_runtime_prot.seccomp_rule_count++;
     
     return 0;
 }
 
 int cupolas_seccomp_deny(const char* syscall_name) {
     if (!syscall_name) return -1;
-    if (g_runtime_protect.seccomp_rule_count >= cupolas_MAX_SECCOMP_RULES) return -1;
+    if (g_runtime_prot.seccomp_rule_count >= CUPOLAS_MAX_SECCOMP_RULES) return -1;
     
-    seccomp_rule_internal_t* rule = &g_runtime_protect.seccomp_rules[g_runtime_protect.seccomp_rule_count];
+    seccomp_rule_internal_t* rule = &g_runtime_prot.seccomp_rules[g_runtime_prot.seccomp_rule_count];
     rule->syscall_name = cupolas_strdup(syscall_name);
     rule->action = 1;
     rule->arg_index = 0;
     rule->arg_value = 0;
     rule->op[0] = '\0';
-    g_runtime_protect.seccomp_rule_count++;
+    g_runtime_prot.seccomp_rule_count++;
     
     return 0;
 }
@@ -442,16 +444,16 @@ int cupolas_seccomp_deny(const char* syscall_name) {
 int cupolas_seccomp_add_rule(const char* syscall_name, uint32_t arg_index, const char* op,
                            uint64_t value, int action) {
     if (!syscall_name || !op) return -1;
-    if (g_runtime_protect.seccomp_rule_count >= cupolas_MAX_SECCOMP_RULES) return -1;
+    if (g_runtime_prot.seccomp_rule_count >= CUPOLAS_MAX_SECCOMP_RULES) return -1;
     
-    seccomp_rule_internal_t* rule = &g_runtime_protect.seccomp_rules[g_runtime_protect.seccomp_rule_count];
+    seccomp_rule_internal_t* rule = &g_runtime_prot.seccomp_rules[g_runtime_prot.seccomp_rule_count];
     rule->syscall_name = cupolas_strdup(syscall_name);
     rule->action = action;
     rule->arg_index = arg_index;
     rule->arg_value = value;
     strncpy(rule->op, op, sizeof(rule->op) - 1);
     rule->op[sizeof(rule->op) - 1] = '\0';
-    g_runtime_protect.seccomp_rule_count++;
+    g_runtime_prot.seccomp_rule_count++;
     
     return 0;
 }
@@ -459,82 +461,82 @@ int cupolas_seccomp_add_rule(const char* syscall_name, uint32_t arg_index, const
 int cupolas_seccomp_check(const char* syscall_name) {
     if (!syscall_name) return 0;
     
-    g_runtime_protect.stats.total_checks++;
+    g_runtime_prot.stats.total_checks++;
     
-    for (size_t i = 0; i < g_runtime_protect.seccomp_rule_count; i++) {
-        seccomp_rule_internal_t* rule = &g_runtime_protect.seccomp_rules[i];
+    for (size_t i = 0; i < g_runtime_prot.seccomp_rule_count; i++) {
+        seccomp_rule_internal_t* rule = &g_runtime_prot.seccomp_rules[i];
         if (strcmp(rule->syscall_name, syscall_name) == 0) {
             if (rule->action == 0) {
-                g_runtime_protect.seccomp_allowed_count++;
+                g_runtime_prot.seccomp_allowed_count++;
                 return 1;
             } else {
-                g_runtime_protect.seccomp_denied_count++;
-                g_runtime_protect.stats.syscall_denied++;
-                cupolas_record_violation(cupolas_VIOLATION_SYSCALL, "Blocked syscall", syscall_name);
+                g_runtime_prot.seccomp_denied_count++;
+                g_runtime_prot.stats.syscall_denied++;
+                cupolas_record_violation(CUPOLAS_VIOLATION_SYSCALL, "Blocked syscall", syscall_name);
                 return 0;
             }
         }
     }
     
-    if (g_runtime_protect.manager.seccomp.default_action == 0) {
-        g_runtime_protect.seccomp_allowed_count++;
+    if (g_runtime_prot.manager.seccomp.default_action == 0) {
+        g_runtime_prot.seccomp_allowed_count++;
         return 1;
     }
     
-    g_runtime_protect.seccomp_denied_count++;
-    g_runtime_protect.stats.syscall_denied++;
-    cupolas_record_violation(cupolas_VIOLATION_SYSCALL, "Default deny", syscall_name);
+    g_runtime_prot.seccomp_denied_count++;
+    g_runtime_prot.stats.syscall_denied++;
+    cupolas_record_violation(CUPOLAS_VIOLATION_SYSCALL, "Default deny", syscall_name);
     return 0;
 }
 
 int cupolas_seccomp_get_stats(uint64_t* allowed, uint64_t* denied) {
     if (!allowed || !denied) return -1;
-    *allowed = g_runtime_protect.seccomp_allowed_count;
-    *denied = g_runtime_protect.seccomp_denied_count;
+    *allowed = g_runtime_prot.seccomp_allowed_count;
+    *denied = g_runtime_prot.seccomp_denied_count;
     return 0;
 }
 
 int cupolas_integrity_enable(const cupolas_integrity_config_t* manager) {
     if (!manager) return -1;
     
-    g_runtime_protect.stats.integrity_checks = 0;
-    g_runtime_protect.stats.integrity_failures = 0;
+    g_runtime_prot.stats.integrity_checks = 0;
+    g_runtime_prot.stats.integrity_failures = 0;
     
     if (manager->enable_code_integrity) {
-        cupolas_integrity_compute_code_hash(g_runtime_protect.code_hash);
+        cupolas_integrity_compute_code_hash(g_runtime_prot.code_hash);
     }
     
-    g_runtime_protect.hashes_computed = 1;
+    g_runtime_prot.hashes_computed = 1;
     
     return 0;
 }
 
 int cupolas_integrity_check(void) {
-    if (!g_runtime_protect.hashes_computed) return 0;
+    if (!g_runtime_prot.hashes_computed) return 0;
     
-    g_runtime_protect.stats.integrity_checks++;
+    g_runtime_prot.stats.integrity_checks++;
     
     uint8_t current_hash[32];
     if (cupolas_integrity_compute_code_hash(current_hash) != 0) {
-        g_runtime_protect.stats.integrity_failures++;
-        cupolas_record_violation(cupolas_VIOLATION_INTEGRITY, "Failed to compute code hash", NULL);
+        g_runtime_prot.stats.integrity_failures++;
+        cupolas_record_violation(CUPOLAS_VIOLATION_INTEGRITY, "Failed to compute code hash", NULL);
         return -1;
     }
     
-    if (memcmp(current_hash, g_runtime_protect.code_hash, 32) != 0) {
-        g_runtime_protect.stats.integrity_failures++;
-        g_runtime_protect.status = cupolas_PROTECT_STATUS_COMPROMISED;
-        cupolas_record_violation(cupolas_VIOLATION_INTEGRITY, "Code integrity violation detected", NULL);
+    if (memcmp(current_hash, g_runtime_prot.code_hash, 32) != 0) {
+        g_runtime_prot.stats.integrity_failures++;
+        g_runtime_prot.status = CUPOLAS_PROTECT_STATUS_COMPROMISED;
+        cupolas_record_violation(CUPOLAS_VIOLATION_INTEGRITY, "Code integrity violation detected", NULL);
         
-        if (g_runtime_protect.integrity_callback) {
-            g_runtime_protect.integrity_callback(-1);
+        if (g_runtime_prot.integrity_callback) {
+            g_runtime_prot.integrity_callback(-1);
         }
         
         return -1;
     }
     
-    if (g_runtime_protect.integrity_callback) {
-        g_runtime_protect.integrity_callback(0);
+    if (g_runtime_prot.integrity_callback) {
+        g_runtime_prot.integrity_callback(0);
     }
     
     return 0;
@@ -579,67 +581,67 @@ int cupolas_integrity_verify_data(const uint8_t* expected_hash) {
 }
 
 int cupolas_integrity_set_callback(void (*callback)(int result)) {
-    g_runtime_protect.integrity_callback = callback;
+    g_runtime_prot.integrity_callback = callback;
     return 0;
 }
 
 int cupolas_violation_set_callback(void (*callback)(const cupolas_violation_event_t* event)) {
-    g_runtime_protect.violation_callback = callback;
+    g_runtime_prot.violation_callback = callback;
     return 0;
 }
 
 int cupolas_violation_get_last(cupolas_violation_event_t* event) {
     if (!event) return -1;
-    if (g_runtime_protect.violations.count == 0) return -1;
+    if (g_runtime_prot.violations.count == 0) return -1;
     
-    size_t idx = (g_runtime_protect.violations.head + g_runtime_protect.violations.count - 1) % cupolas_MAX_VIOLATION_HISTORY;
-    *event = g_runtime_protect.violations.events[idx];
+    size_t idx = (g_runtime_prot.violations.head + g_runtime_prot.violations.count - 1) % CUPOLAS_MAX_VIOLATION_HISTORY;
+    *event = g_runtime_prot.violations.events[idx];
     
     return 0;
 }
 
 void cupolas_violation_clear(void) {
-    for (size_t i = 0; i < cupolas_MAX_VIOLATION_HISTORY; i++) {
-        free(g_runtime_protect.violations.events[i].details);
-        free(g_runtime_protect.violations.events[i].syscall_name);
+    for (size_t i = 0; i < CUPOLAS_MAX_VIOLATION_HISTORY; i++) {
+        free(g_runtime_prot.violations.events[i].details);
+        free(g_runtime_prot.violations.events[i].syscall_name);
     }
-    memset(&g_runtime_protect.violations, 0, sizeof(g_runtime_protect.violations));
+    memset(&g_runtime_prot.violations, 0, sizeof(g_runtime_prot.violations));
 }
 
 int cupolas_violation_get_stats(cupolas_protection_stats_t* stats) {
     if (!stats) return -1;
-    *stats = g_runtime_protect.stats;
+    *stats = g_runtime_prot.stats;
     return 0;
 }
 
 const char* cupolas_protection_level_string(cupolas_protection_level_t level) {
     switch (level) {
-        case cupolas_PROTECT_NONE: return "None";
-        case cupolas_PROTECT_BASIC: return "Basic";
-        case cupolas_PROTECT_ENHANCED: return "Enhanced";
-        case cupolas_PROTECT_MAXIMUM: return "Maximum";
+        case CUPOLAS_PROTECT_NONE: return "None";
+        case CUPOLAS_PROTECT_BASIC: return "Basic";
+        case CUPOLAS_PROTECT_ENHANCED: return "Enhanced";
+        case CUPOLAS_PROTECT_MAXIMUM: return "Maximum";
         default: return "Unknown";
     }
 }
 
 const char* cupolas_protection_status_string(cupolas_protection_status_t status) {
     switch (status) {
-        case cupolas_PROTECT_STATUS_INACTIVE: return "Inactive";
-        case cupolas_PROTECT_STATUS_ACTIVE: return "Active";
-        case cupolas_PROTECT_STATUS_VIOLATION: return "Violation";
-        case cupolas_PROTECT_STATUS_COMPROMISED: return "Compromised";
+        case CUPOLAS_PROTECT_STATUS_INACTIVE: return "Inactive";
+        case CUPOLAS_PROTECT_STATUS_ACTIVE: return "Active";
+        case CUPOLAS_PROTECT_STATUS_VIOLATION: return "Violation";
+        case CUPOLAS_PROTECT_STATUS_COMPROMISED: return "Compromised";
         default: return "Unknown";
     }
 }
 
 const char* cupolas_violation_type_string(cupolas_violation_type_t type) {
     switch (type) {
-        case cupolas_VIOLATION_NONE: return "None";
-        case cupolas_VIOLATION_SYSCALL: return "Syscall Violation";
-        case cupolas_VIOLATION_MEMORY: return "Memory Violation";
-        case cupolas_VIOLATION_CONTROL_FLOW: return "Control Flow Violation";
-        case cupolas_VIOLATION_INTEGRITY: return "Integrity Violation";
-        case cupolas_VIOLATION_RESOURCE: return "Resource Violation";
+        case CUPOLAS_VIOLATION_NONE: return "None";
+        case CUPOLAS_VIOLATION_SYSCALL: return "Syscall Violation";
+        case CUPOLAS_VIOLATION_MEMORY: return "Memory Violation";
+        case CUPOLAS_VIOLATION_CONTROL_FLOW: return "Control Flow Violation";
+        case CUPOLAS_VIOLATION_INTEGRITY: return "Integrity Violation";
+        case CUPOLAS_VIOLATION_RESOURCE: return "Resource Violation";
         default: return "Unknown";
     }
 }
