@@ -37,8 +37,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include "../../../platform/include/platform.h"
-/* 统一类型定义：使用顶层权威类型定义 */
-#include "../../../include/agentos_types.h"
+#include "../../include/agentos_types.h"
 
 #ifdef __cplusplus
 extern "C" {

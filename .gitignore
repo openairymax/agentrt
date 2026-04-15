@@ -1,7 +1,7 @@
 # =============================================================================
 # AgentOS .gitignore 文件
-# 版本：8.0.0
-# 最后更新：2026-04-13
+# 版本：8.1.0
+# 最后更新：2026-04-15
 # 说明：规范化排除所有不应纳入版本控制的文件和目录
 #
 # 设计原则：
@@ -609,10 +609,25 @@ scripts/desktop-client/node_modules/
 # 前端构建缓存
 scripts/desktop-client/.vite/
 scripts/desktop-client/.turbo/
+scripts/desktop-client/.cache/
+scripts/desktop-client/.temp/
+scripts/desktop-client/coverage/
 
-# Tauri 配置缓存
+# Tauri 配置和生成文件
 scripts/desktop-client/src-tauri/WixTools/
+scripts/desktop-client/src-tauri/gen/
 scripts/desktop-client/src-tauri/Cargo.lock
+
+# 包管理器日志
+scripts/desktop-client/npm-debug.log*
+scripts/desktop-client/yarn-debug.log*
+scripts/desktop-client/yarn-error.log*
+scripts/desktop-client/pnpm-debug.log*
+
+# 环境文件
+scripts/desktop-client/.env
+scripts/desktop-client/.env.local
+scripts/desktop-client/.env.production.local
 
 # =============================================================================
 # 20. docker/ 和 docs/ 目录（保留配置文件，排除运行时产物）
