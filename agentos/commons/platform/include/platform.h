@@ -30,6 +30,9 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+/* 注意：不在此处包含 <time.h>，因为项目的 corekern/include/time.h 会覆盖系统 time.h */
+/* 需要使用 time.h 定义的代码（如 clockid_t, CLOCK_MONOTONIC）应在 .c 文件中 */
+/* 在包含 platform.h 之前先包含系统的 <time.h> */
 
 #ifdef __cplusplus
 extern "C" {
@@ -64,15 +67,7 @@ extern "C" {
 #endif
 
 /* ==================== 导出宏定义 ==================== */
-#if defined(_WIN32) || defined(_WIN64)
-    #ifdef AGENTOS_BUILDING_DLL
-        #define AGENTOS_API __declspec(dllexport)
-    #else
-        #define AGENTOS_API __declspec(dllimport)
-    #endif
-#else
-    #define AGENTOS_API __attribute__((visibility("default")))
-#endif
+#include "export.h"
 
 /* ==================== 线程局部存储 ==================== */
 #if defined(_WIN32) || defined(_WIN64)
@@ -113,6 +108,7 @@ extern "C" {
     #include <ws2tcpip.h>
     #pragma comment(lib, "ws2_32.lib")
 #else
+    #include <time.h>
     #include <pthread.h>
     #include <unistd.h>
     #include <sys/types.h>

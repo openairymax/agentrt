@@ -455,15 +455,23 @@ class VersionManager:
                 v += f"+{self.build}"
             return v
 
-        def __lt__(self, other):
-            if (self.major, self.minor, self.patch) < (other.major, other.minor, other.patch):
-                return True
-            if self.pre_release and not other.pre_release:
-                return True
-            return False
-
         def __eq__(self, other):
             return (self.major, self.minor, self.patch) == (other.major, other.minor, other.patch)
+
+        def __gt__(self, other):
+            return (self.major, self.minor, self.patch) > (other.major, other.minor, other.patch)
+
+        def __ge__(self, other):
+            return (self.major, self.minor, self.patch) >= (other.major, other.minor, other.patch)
+
+        def __lt__(self, other):
+            return (self.major, self.minor, self.patch) < (other.major, other.minor, other.patch)
+
+        def __le__(self, other):
+            return (self.major, self.minor, self.patch) <= (other.major, other.minor, other.patch)
+
+        def __ne__(self, other):
+            return not self == other
 
     def parse_version(self, version_str: str) -> Optional[SemanticVersion]:
         """解析版本字符串"""

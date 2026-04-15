@@ -5,13 +5,13 @@
  */
 
 #include "../include/id_utils.h"
-#include "../../../corekern/include/error.h"
+#include <agentos/error.h>
 #include <stdlib.h>
 #include <stdint.h>
 
 /* Unified base library compatibility layer */
-#include "../../../agentos/commons/utils/memory/include/memory_compat.h"
-#include "../../../agentos/commons/utils/string/include/string_compat.h"
+#include <agentos/memory.h>
+#include <agentos/string.h>
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
