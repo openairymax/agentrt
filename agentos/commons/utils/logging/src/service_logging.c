@@ -8,6 +8,7 @@
  * 注意：这是一个简化实现，提供基本功能�? * 生产环境应使用完整实现以获得所有高级功能�? */
 
 #include "service_logging.h"
+#include <stdio.h>
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
@@ -26,10 +27,10 @@ static const int DEFAULT_WORKER_THREADS = 2;
 static const int DEFAULT_CONFIG_RELOAD_INTERVAL = 30;
 
 /** 最大输出器数量 */
-static const int MAX_OUTPUTTERS = 16;
+#define MAX_OUTPUTTERS 16
 
 /** 最大过滤器数量 */
-static const int MAX_FILTERS = 32;
+#define MAX_FILTERS 32
 
 /* ==================== 内部数据结构 ==================== */
 

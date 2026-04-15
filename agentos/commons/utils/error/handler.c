@@ -10,7 +10,8 @@
  * - 错误统计和报告
  */
 
-#include "error.h"
+/* 使用明确的相对路径确保包含commons的error.h */
+#include "include/error.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>

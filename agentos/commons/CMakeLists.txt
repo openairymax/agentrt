@@ -154,7 +154,7 @@ if(NOT CJSON_FOUND)
 endif()
 
 target_link_libraries(agentos_common
-    Threads::Threads
+    PUBLIC Threads::Threads
 )
 
 # 链接可选依赖（如果找到）
@@ -167,8 +167,13 @@ if(YAML_FOUND)
     target_include_directories(agentos_common PRIVATE ${YAML_INCLUDE_DIRS})
 endif()
 if(CJSON_FOUND)
+    if(NOT CJSON_LIBRARIES)
+        set(CJSON_LIBRARIES "cjson")
+    endif()
     target_link_libraries(agentos_common PRIVATE ${CJSON_LIBRARIES})
-    target_include_directories(agentos_common PRIVATE ${CJSON_INCLUDE_DIRS})
+    if(CJSON_INCLUDE_DIRS)
+        target_include_directories(agentos_common PRIVATE ${CJSON_INCLUDE_DIRS})
+    endif()
 endif()
 
 install(TARGETS agentos_common DESTINATION lib)
