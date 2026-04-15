@@ -15,7 +15,7 @@
 #include "ipc.h"
 #include "task.h"
 #include "mem.h"
-#include "time.h"  /* 提供 agentos_time_monotonic_ms() 函数 */
+#include "agentos_time.h"
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */

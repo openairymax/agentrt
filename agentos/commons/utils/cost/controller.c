@@ -193,8 +193,8 @@ int agentos_budget_controller_consume(agentos_budget_controller_t* controller, d
         return -1;
     }
 
-    double new_period = atomic_fetch_add(&controller->period_cost, cost_usd) + cost_usd;
-    double new_total = atomic_fetch_add(&controller->consumed_cost, cost_usd) + cost_usd;
+    double new_period = atomic_fetch_add_double(&controller->period_cost, cost_usd, memory_order_relaxed) + cost_usd;
+    double new_total = atomic_fetch_add_double(&controller->consumed_cost, cost_usd, memory_order_relaxed) + cost_usd;
     atomic_fetch_add(&controller->request_count, 1);
 
     budget_ctrl_mutex_lock(&controller->mutex);

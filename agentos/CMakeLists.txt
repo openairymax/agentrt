@@ -7,6 +7,23 @@ project(agentos-core VERSION 1.0.0 LANGUAGES C CXX)
 
 message(STATUS "Configuring AgentOS core components...")
 
+# 全局特性测试宏定义 - 必须在所有其他配置之前
+# 这些宏确保POSIX函数和类型在所有平台上一致可用
+if(UNIX AND NOT APPLE)
+    add_compile_definitions(
+        _POSIX_C_SOURCE=200809L
+        _XOPEN_SOURCE=700
+        _GNU_SOURCE
+    )
+    message(STATUS "POSIX feature test macros enabled for Linux")
+elseif(APPLE)
+    add_compile_definitions(
+        _POSIX_C_SOURCE=200112L
+        _DARWIN_C_SOURCE
+    )
+    message(STATUS "POSIX feature test macros enabled for macOS")
+endif()
+
 # 选项设置
 option(BUILD_ATOMS "Build atoms module (core kernel components)" ON)
 option(BUILD_COMMONS "Build commons module (common utilities)" ON)

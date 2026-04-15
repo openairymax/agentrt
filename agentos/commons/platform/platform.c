@@ -12,13 +12,19 @@
  * - 文件系统操作
  */
 
-#include "platform.h"
+/* 1. POSIX标准头文件（必须最先包含，确保特性测试宏生效） */
+#include <time.h>
+#include <unistd.h>
+
+/* 2. C标准库头文件 */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
 
-#if AGENTOS_PLATFORM_WINDOWS
+#if defined(_WIN32) || defined(_WIN64)
     #include <io.h>
     #include <direct.h>
     #include <process.h>
@@ -26,19 +32,26 @@
     #include <bcrypt.h>
     #define strdup _strdup
     #define access _access
-#ifndef EEXIST
+    #ifndef EEXIST
         #define EEXIST 17
     #endif
     #pragma comment(lib, "bcrypt.lib")
 #else
-    #include <unistd.h>
     #include <sys/stat.h>
     #include <sys/types.h>
     #include <sys/wait.h>
+    #include <sys/time.h>
     #include <fcntl.h>
     #include <signal.h>
     #include <errno.h>
+    #include <pthread.h>
 #endif
+
+/* 2. 项目头文件（最后包含，避免覆盖系统定义） */
+#include "platform.h"
+
+/* 3. 确保系统头文件声明在项目头文件之后仍然可用 */
+#include <string.h>
 
 /* ==================== 网络初始化 ==================== */
 
