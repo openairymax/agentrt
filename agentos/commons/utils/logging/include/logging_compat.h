@@ -27,6 +27,13 @@ extern "C" {
 
 #include "logging.h"
 
+/* ==================== 前向声明 ==================== */
+
+typedef struct migration_module_info migration_module_info_t;
+typedef struct migration_options migration_options_t;
+typedef struct migration_validation_result migration_validation_result_t;
+typedef struct logging_compat_stats logging_compat_stats_t;
+
 /* ==================== 现有API宏定义映�?==================== */
 
 /**

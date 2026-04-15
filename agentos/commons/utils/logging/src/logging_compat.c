@@ -106,7 +106,7 @@ static const char* generate_old_trace_id(void)
 static void record_api_call(const char* api_name)
 {
     /* 更新统计信息 */
-    __atomic_fetch_add(&g_compat_stats.api_calls.total_calls, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&g_compat_stats.api_calls.agentos_log_write_calls, 1, __ATOMIC_RELAXED);
     
     /* 记录具体API调用（简化实现） */
     if (strstr(api_name, "agentos_log_write")) {
@@ -294,7 +294,7 @@ void svc_logger_log(int level, const char* module, const char* fmt, ...)
 
 /* ==================== 兼容层管理API实现 ==================== */
 
-int logging_compat_get_stats(struct logging_compat_stats* out_stats)
+int logging_compat_get_stats(logging_compat_stats_t* out_stats)
 {
     if (!out_stats) {
         return -1;
@@ -311,7 +311,7 @@ int logging_compat_get_stats(struct logging_compat_stats* out_stats)
     return 0;
 }
 
-int logging_compat_get_migration_list(struct migration_module_info* out_modules, int max_modules)
+int logging_compat_get_migration_list(migration_module_info_t* out_modules, int max_modules)
 {
     if (!out_modules || max_modules <= 0) {
         return 0;
@@ -335,10 +335,11 @@ int logging_compat_get_migration_list(struct migration_module_info* out_modules,
     }
     
     for (int i = 0; i < count; i++) {
-        out_modules[i].name = module_names[i];
-        out_modules[i].old_api_calls = 100 + i * 50;  /* 示例�?*/
-        out_modules[i].migration_status = (i < 2) ? 1 : 0;  /* 前两个模块已迁移 */
-        out_modules[i].priority = (i < 4) ? 1 : 2;  /* 优先�?*/
+        strncpy(out_modules[i].module_name, module_names[i], sizeof(out_modules[i].module_name) - 1);
+        strncpy(out_modules[i].current_api, "legacy", sizeof(out_modules[i].current_api) - 1);
+        strncpy(out_modules[i].target_api, "new", sizeof(out_modules[i].target_api) - 1);
+        out_modules[i].migration_status = (i < 2) ? 1 : 0;
+        out_modules[i].completion_percent = (i < 2) ? 100.0f : 0.0f;
     }
     
     return count;
@@ -364,7 +365,7 @@ void logging_compat_cleanup(void)
 
 /* ==================== 迁移辅助工具实现 ==================== */
 
-int logging_migrate_module(const char* module_name, const struct migration_options* options)
+int logging_migrate_module(const char* module_name, const migration_options_t* options)
 {
     if (!module_name) {
         return -1;
@@ -403,7 +404,7 @@ int logging_generate_migration_report(const char* report_path)
     fprintf(fp, "  \"timestamp\": %ld,\n", (long)time(NULL));
     fprintf(fp, "  \"compatibility_layer_stats\": {\n");
     fprintf(fp, "    \"total_api_calls\": %llu,\n", 
-            (unsigned long long)g_compat_stats.api_calls.total_calls);
+            (unsigned long long)g_compat_stats.api_calls.agentos_log_write_calls);
     fprintf(fp, "    \"agentos_log_write_calls\": %llu,\n",
             (unsigned long long)g_compat_stats.api_calls.agentos_log_write_calls);
     fprintf(fp, "    \"migration_progress\": {\n");
@@ -431,19 +432,19 @@ int logging_generate_migration_report(const char* report_path)
     return 0;
 }
 
-const struct migration_validation_result* logging_validate_migration(const char* module_name)
+const migration_validation_result_t* logging_validate_migration(const char* module_name)
 {
-    /* 简化实现：返回静态验证结�?*/
-    static struct migration_validation_result result = {
+    static migration_validation_result_t result = {
         .module_name = "",
-        .status = 1,  /* 成功 */
+        .status = 1,
         .errors = 0,
         .warnings = 0,
         .details = "Migration validation completed successfully"
     };
     
     if (module_name) {
-        result.module_name = module_name;
+        strncpy(result.module_name, module_name, sizeof(result.module_name) - 1);
+        result.module_name[sizeof(result.module_name) - 1] = '\0';
     }
     
     return &result;
