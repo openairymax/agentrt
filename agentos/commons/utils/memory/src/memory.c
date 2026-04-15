@@ -158,15 +158,14 @@ static void memory_handle_fail(size_t size, const char* tag) {
             break;
             
         case MEMORY_FAIL_STRATEGY_RETRY:
-            // 简单重试一�?            // 在实际实现中，这里可以实现更复杂的重试逻辑
             break;
             
         case MEMORY_FAIL_STRATEGY_CALLBACK:
-            // 回调已经在上面调用过�?            break;
+            break;
             
         case MEMORY_FAIL_STRATEGY_RETURN_NULL:
         default:
-            // 返回NULL，由调用者处�?            break;
+            break;
     }
 }
 

@@ -10,15 +10,16 @@
  * - 错误统计和报告
  */
 
-#include "error.h"
+/* 使用明确的相对路径确保包含commons的error.h */
+#include "include/error.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../utils/memory/include/memory_compat.h"
-#include "../../utils/string/include/string_compat.h"
+#include <agentos/memory.h>
+#include <agentos/string.h>
 #include <time.h>
 
 #ifdef _WIN32

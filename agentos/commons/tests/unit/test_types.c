@@ -26,7 +26,7 @@
 #include <stddef.h>
 #include <setjmp.h>
 #include <cmocka.h>
-#include "../../../utils/types/include/types.h"
+#include <agentos/types.h>
 #include "../tests/utils/test_framework.h"
 
 /* ============================================================================

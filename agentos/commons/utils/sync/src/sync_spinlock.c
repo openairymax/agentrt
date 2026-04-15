@@ -11,7 +11,7 @@
  */
 
 #include "sync_platform.h"
-#include "../../../utils/include/check.h"
+#include <agentos/check.h>
 
 sync_result_t sync_spinlock_create(sync_spinlock_t* spinlock,
                                   const sync_attr_t* attr) {

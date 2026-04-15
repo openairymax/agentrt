@@ -1,15 +1,25 @@
 /**
  * @file platform_adapter.c
  * @brief 平台适配器 - 实现
- * 
+ *
  * 实现跨平台抽象层，消除平台相关代码重复。
- * 
+ *
  * @copyright Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "include/platform_adapter.h"
-#include <stdio.h>
+/* 特性测试宏必须在任何头文件之前定义 */
+#define _POSIX_C_SOURCE 200809L
+#define _XOPEN_SOURCE 700
+#define _GNU_SOURCE
+
+/* 1. POSIX标准头文件（必须最先包含） */
 #include <time.h>
+#include <unistd.h>
+
+/* 2. C标准库头文件 */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #if defined(_WIN32)
     #include <windows.h>
@@ -19,7 +29,6 @@
     #include <sys/stat.h>
     #define PLATFORM_SLASH '\\'
 #else
-    #include <unistd.h>
     #include <sys/stat.h>
     #include <sys/types.h>
     #include <sys/wait.h>
@@ -28,6 +37,11 @@
     #include <limits.h>
     #define PLATFORM_SLASH '/'
 #endif
+
+#include "include/platform_adapter.h"
+
+/* 确保系统头文件声明在项目头文件之后仍然可用 */
+#include <string.h>
 
 /**
  * @brief 获取当前平台类型
