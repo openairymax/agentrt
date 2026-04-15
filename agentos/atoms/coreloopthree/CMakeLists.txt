@@ -74,6 +74,7 @@ endif()
 
 target_include_directories(agentos_coreloopthree PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../memoryrovol/src
 )
 
 target_link_libraries(agentos_coreloopthree PRIVATE

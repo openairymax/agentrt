@@ -17,8 +17,10 @@
 #include "agentos.h"
 #include <stdlib.h>
 
-/* heapstore 集成接口 */
+/* heapstore 集成接口（heapstore模块可选） */
+#ifdef BUILD_HEAPSTORE
 #include <agentos/heapstore_integration.h>
+#endif
 
 /* Unified base library compatibility layer */
 #include <agentos/memory.h>

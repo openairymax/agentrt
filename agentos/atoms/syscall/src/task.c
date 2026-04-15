@@ -5,8 +5,8 @@
  */
 
 #include "syscalls.h"
-#include "coreloopthree/cognition.h"
-#include "coreloopthree/execution.h"
+#include "../../coreloopthree/include/cognition.h"
+#include "../../coreloopthree/include/execution.h"
 #include "agentos.h"
 #include "logger.h"
 #include <stdlib.h>

@@ -185,7 +185,7 @@ agentos_error_t agentos_layer1_raw_create_production(
 
     agentos_error_t dir_result = ensure_directory_exists(manager->storage_path);
     if (dir_result != AGENTOS_SUCCESS) {
-        AGENTOS_ERROR("Failed to create storage directory: %s", manager->storage_path);
+        AGENTOS_EUNKNOWN("Failed to create storage directory: %s", manager->storage_path);
         AGENTOS_FREE(engine->inner);
         AGENTOS_FREE(engine);
         return dir_result;
@@ -194,7 +194,7 @@ agentos_error_t agentos_layer1_raw_create_production(
     size_t queue_capacity = manager->queue_size > 0 ? manager->queue_size : DEFAULT_ASYNC_QUEUE_SIZE;
     engine->inner->queue = async_queue_create(queue_capacity);
     if (!engine->inner->queue) {
-        AGENTOS_ERROR("Failed to create async queue");
+        AGENTOS_EUNKNOWN("Failed to create async queue");
         AGENTOS_FREE(engine->inner);
         AGENTOS_FREE(engine);
         return AGENTOS_ENOMEM;
