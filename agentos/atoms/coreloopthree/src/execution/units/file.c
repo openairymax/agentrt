@@ -9,8 +9,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../agentos/commons/utils/memory/include/memory_compat.h"
-#include "../../../agentos/commons/utils/string/include/string_compat.h"
+#include <agentos/memory.h>
+#include <agentos/string.h>
 #include <string.h>
 #include <stdio.h>
 #include <sys/stat.h>
@@ -24,7 +24,7 @@
 #define PATH_SEPARATOR "/"
 #endif
 
-#include "../../../agentos/commons/utils/execution/include/execution_common.h"\n\ntypedef struct $1_unit_data {\n    execution_unit_data_t base;\n    char* metadata_json;\n} $1_unit_data_t;
+#include <agentos/execution_common.h>\n\ntypedef struct $1_unit_data {\n    execution_unit_data_t base;\n    char* metadata_json;\n} $1_unit_data_t;
 
 /* ==================== 辅助函数声明 ==================== */
 

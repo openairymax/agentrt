@@ -36,15 +36,15 @@ Personal Client Preview
 <img src="docs/Source_Other/AgentOS-desktop-preview.gif" alt="AgentOS Preview" width="800">
 </div>
 
-## 💡 Innovation Highlights  
+## 💡 Innovation Highlights
 
-<center>  
+<div align="center">
 
 ⚡️  
 
 **Foundational [Multibody Cybernetic Intelligent System](docs/Basic_Theories/EN_01_MCIS.md)**  
 
-</center>  
+</div>  
 
 - **Pure Kernel**: Only atomic mechanisms, ensuring purity and efficiency.
 - **Cognitive Loop**: Perception, Planning, Action.

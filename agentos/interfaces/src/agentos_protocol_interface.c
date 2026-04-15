@@ -80,13 +80,33 @@ static int gw_std_handle_request(proto_gateway_iface_t* gw,
     return 0;
 }
 
-static int gw_std_detect_protocol(proto_gateway_iface_t* gw,
-                                   const char* data,
-                                   size_t size,
-                                   char** detected_protocol) {
-    (void)gw; (void)data; (void)size;
-    if (detected_protocol) *detected_protocol = strdup("jsonrpc");
-    return 0;
+static int gw_std_detect_protocol(proto_gateway_iface_t* gw, const char* data, size_t len, char** detected) {
+    (void)gw;
+    if (!data || !len || !detected) return -1;
+
+    const char* result = NULL;
+
+    if (len >= 4 && memcmp(data, "\x4F\x4A\x57\x4D", 4) == 0) {
+        result = "openjiuwen";
+    } else if (len > 0 && data[0] == '{') {
+        bool has_jsonrpc = (strstr(data, "\"jsonrpc\"") != NULL);
+        bool has_mcp = (strstr(data, "\"method\"") != NULL && strstr(data, "\"jsonrpc\"") == NULL);
+        bool has_claude = (strstr(data, "\"model\"") != NULL && strstr(data, "\"anthropic\"") != NULL);
+        bool has_openai = (strstr(data, "\"model\"") != NULL && strstr(data, "\"messages\"") != NULL);
+        bool has_a2a = (strstr(data, "\"agentUrl\"") != NULL || strstr(data, "\"task\"") != NULL);
+
+        if (has_jsonrpc)      result = "jsonrpc";
+        else if (has_mcp)     result = "mcp";
+        else if (has_a2a)     result = "a2a";
+        else if (has_claude)  result = "claude";
+        else if (has_openai)  result = "openai";
+        else                  result = "jsonrpc";
+    } else {
+        result = "unknown";
+    }
+
+    *detected = strdup(result);
+    return (*detected) ? 0 : -1;
 }
 
 static int gw_std_set_request_handler(proto_gateway_iface_t* gw,
@@ -105,7 +125,12 @@ static int gw_std_set_event_callback(proto_gateway_iface_t* gw,
 
 static int gw_std_list_protocols(proto_gateway_iface_t* gw, char** protocols_json) {
     (void)gw;
-    if (protocols_json) *protocols_json = strdup("{\"protocols\":[\"jsonrpc\",\"mcp\",\"a2a\",\"openai\"]}");
+    if (protocols_json)
+        *protocols_json = strdup(
+            "{\"protocols\":["
+            "\"jsonrpc\",\"mcp\",\"a2a\",\"openai\","
+            "\"openjiuwen\",\"openclaw\",\"claude\""
+            "]}");
     return 0;
 }
 
@@ -143,8 +168,38 @@ void proto_gateway_standard_destroy(proto_gateway_iface_t* gw) {
  * ============================================================================ */
 
 int proto_interface_register_builtins(void) {
+    static bool registered = false;
+    if (registered) return 0;
 
-    return 0;
+    protocol_registry_t* registry = proto_registry_create();
+    if (!registry) return -1;
+
+    int count = proto_registry_initialize_builtins(registry);
+    if (count > 0) {
+        proto_registry_entry_t* entries = NULL;
+        size_t total = proto_registry_list_active(registry, &entries);
+
+        for (size_t i = 0; i < total; i++) {
+            proto_adapter_entry_t* entry = (proto_adapter_entry_t*)calloc(1, sizeof(proto_adapter_entry_t));
+            if (!entry) continue;
+
+            entry->name = strdup(entries[i].name);
+            entry->version = strdup(entries[i].version);
+            entry->description = strdup(entries[i].description);
+            entry->type = entries[i].type;
+            entry->capabilities = entries[i].capabilities;
+            entry->is_builtin = true;
+            entry->vtable = NULL;
+            entry->next = g_adapter_registry;
+            g_adapter_registry = entry;
+            g_adapter_count++;
+        }
+
+        if (entries) free(entries);
+    }
+
+    registered = true;
+    return count;
 }
 
 const proto_adapter_entry_t* proto_interface_find(const char* name) {
@@ -199,5 +254,7 @@ protocol_type_t proto_interface_parse_type(const char* name) {
     if (strcasecmp(name, "a2a") == 0 || strcasecmp(name, "a2a_v03") == 0) return PROTOCOL_CUSTOM;
     if (strcasecmp(name, "openai") == 0) return PROTOCOL_CUSTOM;
     if (strcasecmp(name, "openjiuwen") == 0) return PROTOCOL_CUSTOM;
+    if (strcasecmp(name, "openclaw") == 0) return PROTOCOL_CUSTOM;
+    if (strcasecmp(name, "claude") == 0) return PROTOCOL_CUSTOM;
     return PROTOCOL_CUSTOM;
 }
