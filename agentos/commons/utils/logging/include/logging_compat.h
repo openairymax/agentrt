@@ -129,29 +129,37 @@ void agentos_log_write_va(int level, const char* file, int line, const char* fmt
 /**
  * @brief 错误级别日志宏（兼容版本�? * 
  * 兼容现有`AGENTOS_LOG_ERROR`宏�? */
+#ifndef AGENTOS_LOG_ERROR
 #define AGENTOS_LOG_ERROR(fmt, ...) \
     agentos_log_write(AGENTOS_LOG_LEVEL_ERROR, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#endif
 
 /**
  * @brief 警告级别日志宏（兼容版本�? * 
  * 兼容现有`AGENTOS_LOG_WARN`宏�? */
+#ifndef AGENTOS_LOG_WARN
 #define AGENTOS_LOG_WARN(fmt, ...) \
     agentos_log_write(AGENTOS_LOG_LEVEL_WARN, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#endif
 
 /**
  * @brief 信息级别日志宏（兼容版本�? * 
  * 兼容现有`AGENTOS_LOG_INFO`宏�? */
+#ifndef AGENTOS_LOG_INFO
 #define AGENTOS_LOG_INFO(fmt, ...) \
     agentos_log_write(AGENTOS_LOG_LEVEL_INFO, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#endif
 
 /**
  * @brief 调试级别日志宏（兼容版本�? * 
  * 兼容现有`AGENTOS_LOG_DEBUG`宏�? * 注意：根据原common版本的行为，DEBUG日志可能被条件编译禁用�? */
+#ifndef AGENTOS_LOG_DEBUG
 #ifdef AGENTOS_DEBUG
 #define AGENTOS_LOG_DEBUG(fmt, ...) \
     agentos_log_write(AGENTOS_LOG_LEVEL_DEBUG, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 #else
 #define AGENTOS_LOG_DEBUG(fmt, ...) ((void)0)
+#endif
 #endif
 
 /* ==================== 服务日志API兼容（部分） ==================== */

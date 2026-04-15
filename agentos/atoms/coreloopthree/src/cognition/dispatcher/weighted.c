@@ -72,7 +72,7 @@ static float compute_weighted_score(
 static void weighted_destroy(agentos_dispatching_strategy_t* strategy)
 {
     if (!strategy) return;
-    weighted_data_t* data = (weighted_data_t*)strategy->context;
+    weighted_data_t* data = (weighted_data_t*)strategy->data;
     if (data) {
         if (data->lock) agentos_mutex_destroy(data->lock);
         AGENTOS_FREE(data);
@@ -108,7 +108,7 @@ static agentos_error_t weighted_select(
         agents = (agent_info_t**)candidates;
         agent_count = count;
     } else {
-        err = data->get_agents(data->registry_ctx, task->agent_role, &agents, &agent_count);
+        err = data->get_agents(data->registry_ctx, task->task_node_agent_role, &agents, &agent_count);
         if (err != AGENTOS_SUCCESS) return err;
         if (agent_count == 0) return AGENTOS_ENOENT;
     }
@@ -127,7 +127,7 @@ static agentos_error_t weighted_select(
     }
 
     if (best_index >= 0 && agents[best_index]) {
-        *out_agent_id = AGENTOS_STRDUP(agents[best_index]->name);
+        *out_agent_id = AGENTOS_STRDUP(agents[best_index]->agent_id);
         return *out_agent_id ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
     }
 
@@ -145,20 +145,18 @@ static agentos_error_t weighted_select(
  * @return AGENTOS_EINVAL 参数无效
  * @return AGENTOS_ENOMEM 内存分配失败
  */
-agentos_error_t agentos_dispatching_weighted_create(
+agentos_dispatching_strategy_t* agentos_dispatching_weighted_create(
     const weighted_config_t* config,
     void* registry_ctx,
-    agent_registry_get_agents_func get_agents_func,
-    agentos_dispatching_strategy_t** out_strategy)
+    agent_registry_get_agents_func get_agents_func)
 {
-    if (!registry_ctx || !get_agents_func || !out_strategy) {
-        return AGENTOS_EINVAL;
+    if (!registry_ctx || !get_agents_func) {
+        return NULL;
     }
 
     weighted_data_t* data = (weighted_data_t*)AGENTOS_CALLOC(1, sizeof(weighted_data_t));
-    if (!data) return AGENTOS_ENOMEM;
+    if (!data) return NULL;
 
-    /* 使用提供的配置或默认值 */
     if (config) {
         data->config = *config;
     } else {
@@ -176,13 +174,12 @@ agentos_error_t agentos_dispatching_weighted_create(
     if (!strategy) {
         if (data->lock) agentos_mutex_destroy(data->lock);
         AGENTOS_FREE(data);
-        return AGENTOS_ENOMEM;
+        return NULL;
     }
 
-    strategy->context = data;
-    strategy->select_agent = weighted_select;
+    strategy->data = data;
+    strategy->dispatch = weighted_select;
     strategy->destroy = weighted_destroy;
 
-    *out_strategy = strategy;
-    return AGENTOS_SUCCESS;
+    return strategy;
 }

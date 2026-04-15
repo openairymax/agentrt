@@ -7,20 +7,15 @@
 #include "execution.h"
 #include "agentos.h"
 #include <stdlib.h>
-
-/* Unified base library compatibility layer */
-#include <agentos/memory.h>
-#include <agentos/string.h>
 #include <string.h>
 #include <stdio.h>
+#include <strings.h>
+#include <agentos/memory.h>
 
-#include <agentos/execution_common.h>\n\ntypedef struct $1_unit_data {\n    execution_unit_data_t base;\n    char* metadata_json;\n} $1_unit_data_t;
+typedef struct browser_unit_data {
+    char* metadata_json;
+} browser_unit_data_t;
 
-/**
- * @brief 验证URL是否安全（仅允许 http/https 协议�?
- * @param url URL字符�?
- * @return 1 安全�? 不安�?
- */
 static int is_safe_url(const char* url) {
     if (!url) return 0;
     if (strncasecmp(url, "http://", 7) != 0 &&
@@ -33,9 +28,6 @@ static int is_safe_url(const char* url) {
     return 1;
 }
 
-/**
- * @brief 浏览器执行单元的执行方法
- */
 static agentos_error_t browser_execute(agentos_execution_unit_t* unit, const void* input, void** out_output) {
     (void)unit;
     if (!input || !out_output) return AGENTOS_EINVAL;
@@ -59,16 +51,20 @@ static agentos_error_t browser_execute(agentos_execution_unit_t* unit, const voi
     return AGENTOS_ENOTSUP;
 }
 
-static void browser_destroy(agentos_execution_unit_t* unit) {\n    if (!unit) return;\n    browser_unit_data_t* data = (browser_unit_data_t*)unit->data;\n    if (data) {\n        execution_unit_data_cleanup(&data->base);\n        if (data->metadata_json) AGENTOS_FREE(data->metadata_json);\n        AGENTOS_FREE(data);\n    }\n    AGENTOS_FREE(unit);\n}
-
-static const char* browser_get_metadata(agentos_execution_unit_t* unit) {
-    browser_unit_data_t* data = (browser_unit_data_t*)unit->data;
-    return data ? data->metadata_json : NULL;
+static void browser_destroy(agentos_execution_unit_t* unit) {
+    if (!unit) return;
+    browser_unit_data_t* data = (browser_unit_data_t*)unit->execution_unit_data;
+    if (data) {
+        if (data->metadata_json) AGENTOS_FREE(data->metadata_json);
+        AGENTOS_FREE(data);
+    }
+    AGENTOS_FREE(unit);
 }
 
 agentos_execution_unit_t* agentos_browser_unit_create(void) {
     agentos_execution_unit_t* unit = (agentos_execution_unit_t*)AGENTOS_MALLOC(sizeof(agentos_execution_unit_t));
     if (!unit) return NULL;
+    memset(unit, 0, sizeof(*unit));
 
     browser_unit_data_t* data = (browser_unit_data_t*)AGENTOS_MALLOC(sizeof(browser_unit_data_t));
     if (!data) {
@@ -86,10 +82,9 @@ agentos_execution_unit_t* agentos_browser_unit_create(void) {
         return NULL;
     }
 
-    unit->data = data;
-    unit->execute = browser_execute;
-    unit->destroy = browser_destroy;
-    unit->get_metadata = browser_get_metadata;
+    unit->execution_unit_data = data;
+    unit->execution_unit_execute = browser_execute;
+    unit->execution_unit_destroy = browser_destroy;
 
     return unit;
 }

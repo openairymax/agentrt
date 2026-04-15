@@ -7,20 +7,16 @@
 #include "execution.h"
 #include "agentos.h"
 #include <stdlib.h>
-
-/* Unified base library compatibility layer */
-#include <agentos/memory.h>
-#include <agentos/string.h>
 #include <string.h>
 #include <stdio.h>
+#include <strings.h>
+#include <agentos/memory.h>
 
-#include <agentos/execution_common.h>\n\ntypedef struct $1_unit_data {\n    execution_unit_data_t base;\n    char* metadata_json;\n} $1_unit_data_t;
+typedef struct db_unit_data {
+    char* connection_string;
+    char* metadata_json;
+} db_unit_data_t;
 
-/**
- * @brief 验证SQL查询是否仅包含安全操作（SELECT）
- * @param query SQL查询字符串
- * @return 1 安全，0 不安全
- */
 static int is_safe_query(const char* query) {
     if (!query) return 0;
     const char* p = query;
@@ -33,9 +29,6 @@ static int is_safe_query(const char* query) {
     return 1;
 }
 
-/**
- * @brief 数据库执行单元的执行方法
- */
 static agentos_error_t db_execute(agentos_execution_unit_t* unit, const void* input, void** out_output) {
     (void)unit;
     if (!input || !out_output) return AGENTOS_EINVAL;
@@ -52,16 +45,21 @@ static agentos_error_t db_execute(agentos_execution_unit_t* unit, const void* in
     return AGENTOS_SUCCESS;
 }
 
-static void db_destroy(agentos_execution_unit_t* unit) {\n    if (!unit) return;\n    db_unit_data_t* data = (db_unit_data_t*)unit->data;\n    if (data) {\n        execution_unit_data_cleanup(&data->base);\n        if (data->metadata_json) AGENTOS_FREE(data->metadata_json);\n        AGENTOS_FREE(data);\n    }\n    AGENTOS_FREE(unit);\n}
-
-static const char* db_get_metadata(agentos_execution_unit_t* unit) {
-    db_unit_data_t* data = (db_unit_data_t*)unit->data;
-    return data ? data->metadata_json : NULL;
+static void db_destroy(agentos_execution_unit_t* unit) {
+    if (!unit) return;
+    db_unit_data_t* data = (db_unit_data_t*)unit->execution_unit_data;
+    if (data) {
+        if (data->connection_string) AGENTOS_FREE(data->connection_string);
+        if (data->metadata_json) AGENTOS_FREE(data->metadata_json);
+        AGENTOS_FREE(data);
+    }
+    AGENTOS_FREE(unit);
 }
 
 agentos_execution_unit_t* agentos_db_unit_create(const char* connection_string) {
     agentos_execution_unit_t* unit = (agentos_execution_unit_t*)AGENTOS_MALLOC(sizeof(agentos_execution_unit_t));
     if (!unit) return NULL;
+    memset(unit, 0, sizeof(*unit));
 
     db_unit_data_t* data = (db_unit_data_t*)AGENTOS_MALLOC(sizeof(db_unit_data_t));
     if (!data) {
@@ -82,10 +80,9 @@ agentos_execution_unit_t* agentos_db_unit_create(const char* connection_string) 
         return NULL;
     }
 
-    unit->data = data;
-    unit->execute = db_execute;
-    unit->destroy = db_destroy;
-    unit->get_metadata = db_get_metadata;
+    unit->execution_unit_data = data;
+    unit->execution_unit_execute = db_execute;
+    unit->execution_unit_destroy = db_destroy;
 
     return unit;
 }

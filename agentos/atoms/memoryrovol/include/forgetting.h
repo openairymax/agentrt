@@ -39,7 +39,7 @@ typedef struct agentos_forgetting_engine {
     agentos_layer2_feature_t* layer2;
     agentos_mutex_t* lock;
     int auto_running;
-    agentos_thread_t* auto_thread;
+    agentos_thread_t auto_thread;
     void* adaptive;
 } agentos_forgetting_engine_t;
 

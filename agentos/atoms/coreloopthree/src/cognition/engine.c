@@ -21,7 +21,6 @@
 /* JSON解析库 - 条件编译 */
 #ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
-static int g_cjson_available = 1;
 #else
 typedef struct cJSON { int type; char* valuestring; double valuedouble; struct cJSON* child; struct cJSON* next; } cJSON;
 #define cJSON_NULL 0
@@ -255,7 +254,7 @@ agentos_error_t agentos_cognition_process(
 
     if (!engine || !input || !out_plan) {
         AGENTOS_LOG_ERROR("Invalid parameters to cognition_process: engine=%p, input=%p, out_plan=%p",
-                         engine, input, out_plan);
+                         (void*)engine, (void*)input, (void*)out_plan);
         return AGENTOS_EINVAL;
     }
     if (input_len == 0) return AGENTOS_EINVAL;
@@ -341,11 +340,11 @@ agentos_error_t agentos_cognition_process(
         return err;
     }
 
-    if (plan && !plan->plan_id) {
+    if (plan && !plan->task_plan_id) {
         char id_buf[64];
         agentos_generate_plan_id(id_buf, sizeof(id_buf));
-        plan->plan_id = AGENTOS_STRDUP(id_buf);
-        if (!plan->plan_id) {
+        plan->task_plan_id = AGENTOS_STRDUP(id_buf);
+        if (!plan->task_plan_id) {
             AGENTOS_LOG_ERROR("Failed to allocate plan_id: %s (code %d)",
                             agentos_error_string(AGENTOS_ENOMEM), AGENTOS_ENOMEM);
             agentos_task_plan_free(plan);
@@ -366,8 +365,8 @@ agentos_error_t agentos_cognition_process(
     char feedback_buf[512];
     snprintf(feedback_buf, sizeof(feedback_buf),
         "{\"plan_id\":\"%s\",\"node_count\":%zu,\"elapsed_ns\":%" PRIu64 ",\"status\":\"success\"}",
-        plan->plan_id ? plan->plan_id : "unknown",
-        plan->node_count,
+        plan->task_plan_id ? plan->task_plan_id : "unknown",
+        plan->task_plan_node_count,
         elapsed);
     trigger_feedback(engine, 0, "process_complete", feedback_buf);
 
@@ -389,23 +388,23 @@ agentos_error_t agentos_cognition_process(
  */
 void agentos_task_plan_free(agentos_task_plan_t* plan) {
     if (!plan) return;
-    for (size_t i = 0; i < plan->node_count; i++) {
-        agentos_task_node_t* node = plan->nodes[i];
+    for (size_t i = 0; i < plan->task_plan_node_count; i++) {
+        agentos_task_node_t* node = plan->task_plan_nodes[i];
         if (node) {
-            if (node->task_id) AGENTOS_FREE(node->task_id);
-            if (node->agent_role) AGENTOS_FREE(node->agent_role);
-            if (node->depends_on) {
-                for (size_t j = 0; j < node->depends_count; j++) {
-                    AGENTOS_FREE(node->depends_on[j]);
+            if (node->task_node_id) AGENTOS_FREE(node->task_node_id);
+            if (node->task_node_agent_role) AGENTOS_FREE(node->task_node_agent_role);
+            if (node->task_node_depends_on) {
+                for (size_t j = 0; j < node->task_node_depends_count; j++) {
+                    AGENTOS_FREE(node->task_node_depends_on[j]);
                 }
-                AGENTOS_FREE(node->depends_on);
+                AGENTOS_FREE(node->task_node_depends_on);
             }
             AGENTOS_FREE(node);
         }
     }
-    AGENTOS_FREE(plan->nodes);
-    if (plan->entry_points) AGENTOS_FREE(plan->entry_points);
-    if (plan->plan_id) AGENTOS_FREE(plan->plan_id);
+    AGENTOS_FREE(plan->task_plan_nodes);
+    if (plan->task_plan_entry_points) AGENTOS_FREE(plan->task_plan_entry_points);
+    if (plan->task_plan_id) AGENTOS_FREE(plan->task_plan_id);
     AGENTOS_FREE(plan);
 }
 

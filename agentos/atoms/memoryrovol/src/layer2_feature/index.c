@@ -50,6 +50,7 @@ struct agentos_layer2_feature {
     char index_path[256];
     char embedding_model[128];
     uint32_t dimension;
+    uint32_t m;
 };
 
 /**

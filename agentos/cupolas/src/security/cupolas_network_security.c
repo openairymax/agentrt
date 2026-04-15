@@ -114,7 +114,7 @@ int cupolas_net_security_init(const cupolas_tls_config_t* manager) {
     } else {
         g_net_security.manager.tls.min_version = CUPOLAS_TLS_1_2;
         g_net_security.manager.tls.max_version = CUPOLAS_TLS_1_3;
-        g_net_security.manager.tls.require_cert_verify = true;
+        g_net_security.manager.verify_mode = CUPOLAS_CERT_REQUIRED;
         g_net_security.manager.http.enforce_https = true;
         g_net_security.manager.http.hsts_enabled = true;
         g_net_security.manager.http.hsts_max_age = 31536000;
@@ -165,22 +165,20 @@ int cupolas_net_security_get_config(cupolas_tls_config_t* manager) {
 int cupolas_tls_configure(const cupolas_tls_config_t* manager) {
     if (!manager) return -1;
     
-    g_net_security.manager.tls = *manager;
+    g_net_security.manager = *manager;
     
     if (g_net_security.ssl_ctx) {
         int min_ver = TLS1_2_VERSION;
         int max_ver = TLS1_3_VERSION;
         
         switch (manager->min_version) {
-            case CUPOLAS_TLS_AUTO: min_ver = TLS1_VERSION; break;
-            case CUPOLAS_TLS_1_2: min_ver = TLS1_1_VERSION; break;
+            case CUPOLAS_TLS_AUTO: min_ver = TLS1_2_VERSION; break;
             case CUPOLAS_TLS_1_2: min_ver = TLS1_2_VERSION; break;
             case CUPOLAS_TLS_1_3: min_ver = TLS1_3_VERSION; break;
         }
         
         switch (manager->max_version) {
-            case CUPOLAS_TLS_AUTO: max_ver = TLS1_VERSION; break;
-            case CUPOLAS_TLS_1_2: max_ver = TLS1_1_VERSION; break;
+            case CUPOLAS_TLS_AUTO: max_ver = TLS1_3_VERSION; break;
             case CUPOLAS_TLS_1_2: max_ver = TLS1_2_VERSION; break;
             case CUPOLAS_TLS_1_3: max_ver = TLS1_3_VERSION; break;
         }
@@ -304,7 +302,7 @@ int cupolas_tls_verify_cert_chain(const char* cert_chain, size_t chain_len, cupo
                 break;
             case X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN:
             case X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT:
-                *result = cupolas_CERT_SELF_SIGNED;
+                *result = CUPOLAS_CERT_REQUIRED;
                 break;
             default:
                 *result = CUPOLAS_CERT_REQUIRED;
@@ -401,7 +399,7 @@ int cupolas_tls_check_connection(const char* hostname, uint16_t port, cupolas_ce
                 break;
             case X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN:
             case X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT:
-                *result = cupolas_CERT_SELF_SIGNED;
+                *result = CUPOLAS_CERT_REQUIRED;
                 break;
             default:
                 *result = CUPOLAS_CERT_REQUIRED;
@@ -624,14 +622,14 @@ int cupolas_net_check_access(const char* host, uint16_t port, cupolas_proto_t pr
         
         if (host_match && port_match && proto_match) {
             switch (rule->action) {
-                case cupolas_NET_ALLOW:
+                case CUPOLAS_FW_ALLOW:
                     return 1;
-                case cupolas_NET_DENY:
+                case CUPOLAS_FW_DENY:
                     g_net_security.stats.blocked_connections++;
                     return 0;
-                case cupolas_NET_LOG:
+                case CUPOLAS_FW_LOG:
                     return 1;
-                case cupolas_NET_RATE_LIMIT:
+                case CUPOLAS_FW_RATE_LIMIT:
                     return 1;
             }
         }
@@ -660,9 +658,9 @@ int cupolas_net_check_url(const char* url, const char* method) {
         
         if (rule->url_pattern && cupolas_match_url_pattern(rule->url_pattern, url)) {
             switch (rule->action) {
-                case cupolas_NET_ALLOW:
+                case CUPOLAS_FW_ALLOW:
                     return 1;
-                case cupolas_NET_DENY:
+                case CUPOLAS_FW_DENY:
                     g_net_security.stats.blocked_connections++;
                     return 0;
                 default:
@@ -687,7 +685,13 @@ int cupolas_net_check_url(const char* url, const char* method) {
 
 int cupolas_http_configure(const cupolas_http_security_config_t* manager) {
     if (!manager) return -1;
-    g_net_security.manager.http = *manager;
+    g_net_security.manager.http.enforce_https = manager->enforce_https;
+    g_net_security.manager.http.max_url_length = manager->max_url_length;
+    g_net_security.manager.http.max_body_size = manager->max_body_size;
+    g_net_security.manager.http.allowed_methods = manager->allowed_methods;
+    g_net_security.manager.http.method_count = manager->method_count;
+    g_net_security.manager.http.forbidden_headers = manager->forbidden_headers;
+    g_net_security.manager.http.forbidden_count = manager->forbidden_count;
     return 0;
 }
 
@@ -783,7 +787,10 @@ int cupolas_http_is_url_safe(const char* url) {
 
 int cupolas_dns_configure(const cupolas_dns_security_config_t* manager) {
     if (!manager) return -1;
-    g_net_security.manager.dns = *manager;
+    g_net_security.manager.dns.enable_dnssec = manager->enable_dnssec;
+    strncpy(g_net_security.manager.dns.upstream_server, manager->upstream_server,
+            sizeof(g_net_security.manager.dns.upstream_server) - 1);
+    g_net_security.manager.dns.upstream_server[sizeof(g_net_security.manager.dns.upstream_server) - 1] = '\0';
     return 0;
 }
 
@@ -952,8 +959,6 @@ const char* cupolas_cert_result_string(cupolas_cert_mode_t result) {
         case CUPOLAS_CERT_NONE: return "No validation";
         case CUPOLAS_CERT_OPTIONAL: return "Optional";
         case CUPOLAS_CERT_REQUIRED: return "Required";
-        case CUPOLAS_CERT_REQUIRED: return "Hostname mismatch";
-        case cupolas_CERT_SELF_SIGNED: return "Self-signed certificate";
         default: return "Unknown";
     }
 }

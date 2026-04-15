@@ -5,13 +5,14 @@
  */
 
 #include "../include/forgetting.h"
+#include "../include/layer1_raw.h"
 #include "../include/layer2_feature.h"
 #include "agentos.h"
 #include <math.h>
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 
-/* Unified base library compatibility layer */
 #include <agentos/memory.h>
 #include <agentos/string.h>
 #include <string.h>
@@ -45,6 +46,8 @@ typedef struct adaptive_state {
     float lambda_history[100];           /* lambda变化历史 */
     size_t history_count;                /* 历史记录数 */
 } adaptive_state_t;
+
+static void init_adaptive_state(adaptive_state_t* state);
 
 #define ADAPTIVE(engine) ((adaptive_state_t*)(engine)->adaptive)
 
@@ -243,31 +246,30 @@ agentos_error_t agentos_forgetting_get_weight(
     if (!engine || !record_id || !out_weight) return AGENTOS_EINVAL;
 
     agentos_raw_metadata_t* meta = NULL;
-    agentos_error_t err = agentos_layer1_raw_get_metadata(engine->layer1, record_id, &meta);
+    agentos_error_t err = agentos_raw_metadata_db_query(NULL, record_id, &meta);
     if (err != AGENTOS_SUCCESS) return err;
 
     uint64_t now = agentos_time_monotonic_ns();
     double weight = 1.0;
 
-    /* 使用自适应调整后的lambda（如果启用） */
     float effective_lambda = engine->manager.lambda;
     
     if (ADAPTIVE(engine)->enabled && ADAPTIVE(engine)->sample_count >= ADAPTIVE_SAMPLE_SIZE / 2) {
         effective_lambda = adapt_lambda(engine);
-        /* 如果lambda有变化，更新到配置中（临时使用） */
-        if (fabsf(effective_lambda - engine->manager.lambda) > 0.0001f) {
-            /* 仅在自适应模式下使用调整后的值 */
-            engine->manager.lambda = effective_lambda;  /* 注意：这会修改配置 */
+        if (fabs(effective_lambda - engine->manager.lambda) > 0.0001) {
+            engine->manager.lambda = effective_lambda;
         }
     }
 
+    uint64_t last_access = meta->modified_ns > 0 ? meta->modified_ns : meta->created_ns;
+
     switch (engine->manager.strategy) {
         case AGENTOS_FORGET_EBBINGHAUS:
-            weight = ebbinghaus_weight(effective_lambda, meta->last_access, now);
+            weight = ebbinghaus_weight(effective_lambda, last_access, now);
             break;
         case AGENTOS_FORGET_LINEAR:
             {
-                double age_sec = (now - meta->last_access) / 1e9;
+                double age_sec = (now - last_access) / 1e9;
                 weight = 1.0 - effective_lambda * age_sec;
                 if (weight < 0) weight = 0.0;
             }
@@ -282,14 +284,12 @@ agentos_error_t agentos_forgetting_get_weight(
 
     *out_weight = (float)weight;
     
-    /* 记录样本用于后续自适应学习（异步记录） */
     if (ADAPTIVE(engine)->enabled) {
-        /* 这里简化处理：假设当前访问意味着权重应该较高 */
         int accessed = (weight > engine->manager.threshold) ? 1 : 0;
         record_adaptive_sample(ADAPTIVE(engine), record_id, (float)weight, accessed);
     }
     
-    agentos_layer1_raw_metadata_free(meta);
+    agentos_raw_metadata_free(meta);
     return AGENTOS_SUCCESS;
 }
 
@@ -307,7 +307,7 @@ agentos_error_t agentos_forgetting_start_auto(agentos_forgetting_engine_t* engin
     if (!engine) return AGENTOS_EINVAL;
     if (engine->auto_running) return AGENTOS_SUCCESS;
     engine->auto_running = 1;
-    if (agentos_thread_create(&engine->auto_thread, auto_worker, engine) != AGENTOS_SUCCESS) {
+    if (agentos_thread_create(&engine->auto_thread, auto_worker, engine) != 0) {
         engine->auto_running = 0;
         return AGENTOS_ENOMEM;
     }
@@ -317,9 +317,8 @@ agentos_error_t agentos_forgetting_start_auto(agentos_forgetting_engine_t* engin
 void agentos_forgetting_stop_auto(agentos_forgetting_engine_t* engine) {
     if (!engine || !engine->auto_running) return;
     engine->auto_running = 0;
-    if (engine->auto_thread) {
+    if (engine->auto_running) {
         agentos_thread_join(engine->auto_thread, NULL);
-        engine->auto_thread = NULL;
     }
 }
 

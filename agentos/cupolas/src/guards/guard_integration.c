@@ -12,7 +12,7 @@
  */
 
 #include "guard_core.h"
-#include "../cupolas.h"
+#include "../../include/cupolas.h"
 #include "../permission/permission.h"
 #include "../sanitizer/sanitizer.h"
 #include "../workbench/workbench.h"
@@ -188,7 +188,7 @@ static int command_execution_guard_hook(const char* command, char* const argv[])
                     result->recommended_action == GUARD_ACTION_TERMINATE) {
                     // 阻断命令执行
                     // TODO: 记录审计日志
-                    return CUPOLAS_ERR_PERMISSION_DENIED;
+                    return cupolas_ERROR_PERMISSION;
                 }
                 break;
                 
@@ -253,7 +253,7 @@ static int sanitizer_guard_hook(const char* input, char* output, size_t output_s
             // 对于严重风险，可以清空输出或返回错误
             if (result->risk_level == RISK_LEVEL_CRITICAL) {
                 if (output_size > 0) output[0] = '\0';
-                return CUPOLAS_ERR_INVALID_ARG;
+                return cupolas_ERROR_INVALID_ARG;
             }
         }
     }
@@ -272,13 +272,13 @@ static int sanitizer_guard_hook(const char* input, char* output, size_t output_s
  */
 CUPOLAS_API int cupolas_guards_init(const guard_manager_config_t* config) {
     if (g_guard_manager) {
-        return CUPOLAS_ERR_ALREADY_EXISTS; // 已初始化
+        return cupolas_ERROR_BUSY; // 已初始化
     }
     
     // 创建守卫管理器
     g_guard_manager = guard_manager_create(config);
     if (!g_guard_manager) {
-        return CUPOLAS_ERR_OUT_OF_MEMORY;
+        return cupolas_ERROR_NO_MEMORY;
     }
     
     g_guards_enabled = true;
@@ -337,7 +337,7 @@ CUPOLAS_API guard_manager_t* cupolas_guards_get_manager(void) {
  */
 CUPOLAS_API int cupolas_guards_register_guard(guard_t* guard) {
     if (!g_guard_manager) {
-        return CUPOLAS_ERR_NOT_INITIALIZED;
+        return cupolas_ERROR_BUSY;
     }
     
     return guard_manager_register_guard(g_guard_manager, guard);
@@ -367,7 +367,7 @@ CUPOLAS_API int cupolas_guards_check(
 {
     if (!g_guard_manager || !g_guards_enabled) {
         if (actual_results) *actual_results = 0;
-        return CUPOLAS_ERR_NOT_INITIALIZED;
+        return cupolas_ERROR_BUSY;
     }
     
     // 创建检测上下文
@@ -398,7 +398,7 @@ CUPOLAS_API int cupolas_guards_check(
  */
 CUPOLAS_API int cupolas_guards_register_hooks(void) {
     if (!g_guard_manager) {
-        return CUPOLAS_ERR_NOT_INITIALIZED;
+        return cupolas_ERROR_BUSY;
     }
     
     // TODO: 实现钩子注册机制
