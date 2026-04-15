@@ -22,7 +22,7 @@
 #include "logger.h"
 #include "id_utils.h"
 #include "error_utils.h"
-#include "observability.h"
+#include "../../../commons/utils/observability/include/observability_compat.h"
 
 /* 辅助模块（已拆分，以下内部函数为历史遗留副本，计划在未来版本移除） */
 #include "intent_utils.h"      /* to_lowercase, contains_ignore_case, string_similarity 等 */

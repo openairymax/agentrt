@@ -32,7 +32,7 @@ add_library(agentos_memoryrovol STATIC
     # retrieval/rerank.c         # 暂时排除：类型定义冲突
     memory_optimizer.c
     memoryrovol.c
-    monitoring.c
+    # monitoring.c   # 暂时排除：agentos_monitoring_t/agentos_observability_t类型未定义
     vector_store.c
     llm_client.c
 )

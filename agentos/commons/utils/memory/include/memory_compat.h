@@ -13,7 +13,19 @@
 
 #include <stddef.h>
 #include "agentos_memory.h"
-#include "memory_common.h"
+
+#ifndef AGENTOS_MEMORY_STATS_T_DEFINED
+#define AGENTOS_MEMORY_STATS_T_DEFINED
+typedef struct {
+    size_t total_allocated;
+    size_t total_freed;
+    size_t current_allocated;
+    size_t peak_allocated;
+    size_t allocation_count;
+    size_t free_count;
+    size_t leak_count;
+} memory_stats_t;
+#endif
 
 #ifdef __cplusplus
 extern "C" {

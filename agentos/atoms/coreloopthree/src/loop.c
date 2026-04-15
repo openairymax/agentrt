@@ -8,11 +8,13 @@
 #include "cognition.h"
 #include "execution.h"
 #include "memory.h"
+#include "memory_pool.h"
 #include "agentos.h"
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
 #include <agentos/memory.h>
+#include <agentos/memory_common.h>
 #include <agentos/string.h>
 #include <agentos/check.h>
 #include <string.h>

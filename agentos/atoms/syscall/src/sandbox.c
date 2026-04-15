@@ -17,7 +17,7 @@
 #include "../include/syscalls.h"
 #include <agentos/agentos.h>
 #include "../include/logger.h"
-#include "../include/sandbox_utils.h"
+#include "sandbox_utils.h"
 #include "../include/sandbox_permission.h"
 #include "../include/sandbox_quota.h"
 #include <stdlib.h>
