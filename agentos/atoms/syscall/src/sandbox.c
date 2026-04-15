@@ -26,8 +26,8 @@
 #include <time.h>
 
 /* 基础库兼容性层 */
-#include <agentos/memory_compat.h>
-#include <agentos/string_compat.h>
+#include <agentos/memory.h>
+#include <agentos/string.h>
 #include <agentos/check.h>
 
 /* ==================== 常量定义 ==================== */

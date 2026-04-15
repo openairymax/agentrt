@@ -8,8 +8,8 @@
 #include "agentos.h"
 #include <stdlib.h>
 
-#include <agentos/memory_compat.h>
-#include <agentos/string_compat.h>
+#include <agentos/memory.h>
+#include <agentos/string.h>
 #include <string.h>
 
 #ifdef _WIN32

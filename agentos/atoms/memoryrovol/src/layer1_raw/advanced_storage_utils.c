@@ -11,7 +11,7 @@
 #include <stdio.h>
 
 /* 基础库兼容性层 */
-#include <agentos/memory_compat.h>
+#include <agentos/memory.h>
 
 /* 压缩库 */
 #include <zstd.h>

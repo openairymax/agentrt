@@ -21,8 +21,8 @@
 #include <agentos/heapstore_integration.h>
 
 /* Unified base library compatibility layer */
-#include <agentos/memory_compat.h>
-#include <agentos/string_compat.h>
+#include <agentos/memory.h>
+#include <agentos/string.h>
 #include <agentos/check.h>
 #include <agentos/logger.h>
 #include <string.h>
