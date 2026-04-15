@@ -17,6 +17,7 @@
 #include "logging.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 /* Unified base library compatibility layer */
 #include <agentos/memory.h>

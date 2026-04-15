@@ -46,15 +46,7 @@ typedef struct adaptive_state {
     size_t history_count;                /* 历史记录数 */
 } adaptive_state_t;
 
-struct agentos_forgetting_engine {
-    agentos_forgetting_config_t manager;
-    agentos_layer1_raw_t* layer1;
-    agentos_layer2_feature_t* layer2;
-    agentos_mutex_t* lock;
-    int auto_running;
-    agentos_thread_t* auto_thread;
-    adaptive_state_t adaptive;           /* 自适应学习状态 */
-};
+#define ADAPTIVE(engine) ((adaptive_state_t*)(engine)->adaptive)
 
 agentos_error_t agentos_forgetting_create(
     const agentos_forgetting_config_t* manager,
@@ -90,8 +82,13 @@ agentos_error_t agentos_forgetting_create(
         return AGENTOS_ENOMEM;
     }
 
-    /* 初始化自适应学习状态 */
-    init_adaptive_state(&eng->adaptive);
+    eng->adaptive = AGENTOS_CALLOC(1, sizeof(adaptive_state_t));
+    if (!eng->adaptive) {
+        agentos_mutex_destroy(eng->lock);
+        AGENTOS_FREE(eng);
+        return AGENTOS_ENOMEM;
+    }
+    init_adaptive_state(ADAPTIVE(eng));
 
     *out_engine = eng;
     return AGENTOS_SUCCESS;
@@ -100,6 +97,7 @@ agentos_error_t agentos_forgetting_create(
 void agentos_forgetting_destroy(agentos_forgetting_engine_t* engine) {
     if (!engine) return;
     agentos_forgetting_stop_auto(engine);
+    if (engine->adaptive) AGENTOS_FREE(engine->adaptive);
     if (engine->lock) agentos_mutex_destroy(engine->lock);
     AGENTOS_FREE(engine);
 }
@@ -166,7 +164,7 @@ static void record_adaptive_sample(adaptive_state_t* state,
  * @return 调整后的lambda值
  */
 static float adapt_lambda(agentos_forgetting_engine_t* engine) {
-    adaptive_state_t* state = &engine->adaptive;
+    adaptive_state_t* state = ADAPTIVE(engine);
     
     /* 检查是否有足够的数据 */
     if (state->sample_count < ADAPTIVE_SAMPLE_SIZE / 2) {
@@ -254,7 +252,7 @@ agentos_error_t agentos_forgetting_get_weight(
     /* 使用自适应调整后的lambda（如果启用） */
     float effective_lambda = engine->manager.lambda;
     
-    if (engine->adaptive.enabled && engine->adaptive.sample_count >= ADAPTIVE_SAMPLE_SIZE / 2) {
+    if (ADAPTIVE(engine)->enabled && ADAPTIVE(engine)->sample_count >= ADAPTIVE_SAMPLE_SIZE / 2) {
         effective_lambda = adapt_lambda(engine);
         /* 如果lambda有变化，更新到配置中（临时使用） */
         if (fabsf(effective_lambda - engine->manager.lambda) > 0.0001f) {
@@ -285,10 +283,10 @@ agentos_error_t agentos_forgetting_get_weight(
     *out_weight = (float)weight;
     
     /* 记录样本用于后续自适应学习（异步记录） */
-    if (engine->adaptive.enabled) {
+    if (ADAPTIVE(engine)->enabled) {
         /* 这里简化处理：假设当前访问意味着权重应该较高 */
         int accessed = (weight > engine->manager.threshold) ? 1 : 0;
-        record_adaptive_sample(&engine->adaptive, record_id, (float)weight, accessed);
+        record_adaptive_sample(ADAPTIVE(engine), record_id, (float)weight, accessed);
     }
     
     agentos_layer1_raw_metadata_free(meta);
@@ -341,21 +339,21 @@ agentos_error_t agentos_forgetting_enable_adaptive(
     
     agentos_mutex_lock(engine->lock);
     
-    engine->adaptive.enabled = enable;
+    ADAPTIVE(engine)->enabled = enable;
     
     if (enable) {
         /* 验证并设置学习率 */
         if (learning_rate < 0.001f || learning_rate > 1.0f) {
             learning_rate = DEFAULT_LEARNING_RATE;  /* 使用默认值 */
         }
-        engine->adaptive.learning_rate = learning_rate;
+        ADAPTIVE(engine)->learning_rate = learning_rate;
         
         /* 如果之前未初始化，现在初始化 */
-        if (engine->adaptive.sample_count == 0 && 
-            engine->adaptive.sample_index == 0) {
-            init_adaptive_state(&engine->adaptive);
-            engine->adaptive.enabled = 1;
-            engine->adaptive.learning_rate = learning_rate;
+        if (ADAPTIVE(engine)->sample_count == 0 && 
+            ADAPTIVE(engine)->sample_index == 0) {
+            init_adaptive_state(ADAPTIVE(engine));
+            ADAPTIVE(engine)->enabled = 1;
+            ADAPTIVE(engine)->learning_rate = learning_rate;
         }
     }
     
@@ -382,9 +380,9 @@ agentos_error_t agentos_forgetting_get_adaptive_stats(
     
     if (!engine) return AGENTOS_EINVAL;
     
-    if (sample_count) *sample_count = engine->adaptive.sample_count;
-    if (total_adjustments) *total_adjustments = engine->adaptive.total_adjustments;
-    if (avg_error) *avg_error = engine->adaptive.avg_error;
+    if (sample_count) *sample_count = ADAPTIVE(engine)->sample_count;
+    if (total_adjustments) *total_adjustments = ADAPTIVE(engine)->total_adjustments;
+    if (avg_error) *avg_error = ADAPTIVE(engine)->avg_error;
     if (current_lambda) *current_lambda = engine->manager.lambda;
     
     return AGENTOS_SUCCESS;
@@ -399,7 +397,7 @@ agentos_error_t agentos_forgetting_reset_adaptive(agentos_forgetting_engine_t* e
     if (!engine) return AGENTOS_EINVAL;
     
     agentos_mutex_lock(engine->lock);
-    init_adaptive_state(&engine->adaptive);
+    init_adaptive_state(ADAPTIVE(engine));
     /* 恢复默认lambda值 */
     engine->manager.lambda = 0.01f;  /* 默认值 */
     agentos_mutex_unlock(engine->lock);

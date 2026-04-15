@@ -960,7 +960,7 @@ agentos_error_t network_http_request(
         response->body = AGENTOS_MALLOC(body_len + 1);
         if (response->body) {
             memcpy(response->body, body_start, body_len);
-            response->body[body_len] = '\0';
+            ((char*)response->body)[body_len] = '\0';
             response->body_len = body_len;
         }
     } else {
@@ -968,7 +968,7 @@ agentos_error_t network_http_request(
         response->body = AGENTOS_MALLOC(total_received + 1);
         if (response->body) {
             memcpy(response->body, recv_buffer, total_received);
-            response->body[total_received] = '\0';
+            ((char*)response->body)[total_received] = '\0';
             response->body_len = total_received;
         }
     }

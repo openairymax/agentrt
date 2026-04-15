@@ -24,7 +24,7 @@
 #include <agentos/memory.h>
 #include <agentos/string.h>
 #include <agentos/check.h>
-#include <agentos/logger.h>
+#include <agentos/logging.h>
 #include <string.h>
 #include <cjson/cJSON.h>
 

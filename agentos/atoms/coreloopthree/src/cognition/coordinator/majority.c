@@ -39,6 +39,7 @@ static agentos_error_t majority_coordinate(
     const char** inputs,
     size_t input_count,
     char** out_result) {
+    (void)context;
     if (!base || !out_result) {
         return AGENTOS_EINVAL;
     }

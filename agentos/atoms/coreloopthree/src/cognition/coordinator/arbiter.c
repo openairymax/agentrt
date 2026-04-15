@@ -43,6 +43,7 @@ static agentos_error_t arbiter_coordinate(
     const char** inputs,
     size_t input_count,
     char** out_result) {
+    (void)context;
     if (!base || !out_result) return AGENTOS_EINVAL;
 
     arbiter_data_t* data = (arbiter_data_t*)base->data;

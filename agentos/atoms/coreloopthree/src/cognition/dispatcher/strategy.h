@@ -68,9 +68,10 @@ agentos_dispatching_strategy_t* agentos_dispatching_ml_create(
  * @param get_agents_func 获取候选Agent列表的函数
  * @return 策略对象
  */
-agentos_dispatching_strategy_t* agentos_dispatching_priority_create(
+agentos_error_t agentos_dispatching_priority_create(
     void* registry_ctx,
-    agent_registry_get_agents_func get_agents_func);
+    agent_registry_get_agents_func get_agents_func,
+    agentos_dispatching_strategy_t** out_strategy);
 
 #ifdef __cplusplus
 }

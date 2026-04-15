@@ -6,7 +6,7 @@
  */
 
 #include "circuit_breaker.h"
-#include "../utils/cupolas_utils.h"
+#include "utils/cupolas_utils.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

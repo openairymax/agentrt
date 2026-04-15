@@ -12,88 +12,62 @@
  * - Audit Trail (audit/)
  */
 
-/**
- * @file cupolas.c
- * @brief AgentOS Security Dome - Core Facade Implementation
- * @author Spharx AgentOS Team
- * @date 2024
- *
- * @note This file implements the unified entry point for the cupolas module.
- *       It follows the Facade design pattern to provide a simplified interface
- *       to the complex four-layer security subsystem.
- * @threadsafe All public APIs are thread-safe with internal locking
- * @reentrant Yes, but concurrent calls may serialize internally
- */
-
 #include "cupolas.h"
 #include "cupolas_config.h"
-#include "cupolas_error.h"
+#include "security/cupolas_error.h"
 #include "permission/permission.h"
 #include "sanitizer/sanitizer.h"
 #include "workbench/workbench.h"
 #include "audit/audit.h"
-#include "../utils/cupolas_utils.h"
+#include "utils/cupolas_utils.h"
 #include "guards/guard_integration.h"
+#include "platform/platform.h"
 
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 
-/* ============================================================================
- * Module State
- * ============================================================================ */
+#define CUPOLAS_DEFAULT_AUDIT_MAX_FILE_SIZE (10 * 1024 * 1024)
+#define CUPOLAS_DEFAULT_AUDIT_MAX_FILES 5
+#define CUPOLAS_CONFIG_PATH_MAX 512
 
-/** @brief Global module state */
+typedef struct {
+    char permission_rules_path[CUPOLAS_CONFIG_PATH_MAX];
+    char audit_log_dir[CUPOLAS_CONFIG_PATH_MAX];
+} cupolas_internal_config_t;
+
+static void cupolas_internal_config_init_defaults(cupolas_internal_config_t* cfg) {
+    if (!cfg) return;
+    memset(cfg, 0, sizeof(*cfg));
+#ifdef _WIN32
+    snprintf(cfg->permission_rules_path, sizeof(cfg->permission_rules_path),
+             "C:\\ProgramData\\agentos\\cupolas\\permission_rules.yaml");
+    snprintf(cfg->audit_log_dir, sizeof(cfg->audit_log_dir),
+             "C:\\ProgramData\\agentos\\cupolas\\logs");
+#else
+    snprintf(cfg->permission_rules_path, sizeof(cfg->permission_rules_path),
+             "/etc/agentos/cupolas/permission_rules.yaml");
+    snprintf(cfg->audit_log_dir, sizeof(cfg->audit_log_dir),
+             "/var/log/agentos/cupolas");
+#endif
+}
+
+static void cupolas_internal_config_cleanup(cupolas_internal_config_t* cfg) {
+    if (!cfg) return;
+    cupolas_memset_s(cfg, sizeof(*cfg));
+}
+
 static struct {
-    int initialized;              /**< Initialization flag */
-    cupolas_config_t config;     /**< Active configuration */
-    permission_engine_t* perm;   /**< Permission engine instance */
-    sanitizer_t* san;            /**< Sanitizer instance */
-    workbench_t* wb;             /**< Workbench instance */
-    audit_logger_t* audit;       /**< Audit logger instance */
-    cupolas_mutex_t lock;         /**< State protection mutex */
+    int initialized;
+    cupolas_internal_config_t config;
+    cupolas_config_t* config_mgr;
+    permission_engine_t* perm;
+    sanitizer_t* san;
+    workbench_t* wb;
+    audit_logger_t* audit;
+    cupolas_mutex_t lock;
 } g_cupolas = {0};
 
-/* ============================================================================
- * Initialization and Cleanup
- * ============================================================================ */
-
-/**
- * @brief Initialize cupolas security dome module
- * @param[in] config_path Path to configuration file (NULL for defaults)
- * @param[out] error Optional error code output on failure
- * @return CUPOLAS_OK (0) on success, negative error code on failure
- * @post On success, module is initialized and ready for use
- * @post On failure, module remains in uninitialized state
- * @note Thread-safe: Multiple threads may call init, only first succeeds
- * @threadsafe Yes
- * @reentrant No (idempotent - safe to call multiple times)
- * @ownership config_path string: caller retains ownership, may be NULL
- *
- * @details
- * Initialization sequence:
- * 1. Load configuration from file or apply defaults
- * 2. Initialize platform abstraction layer
- * 3. Create permission engine with RBAC rules
- * 4. Create input sanitizer with default rules
- * 5. Create workbench (sandbox) manager
- * 6. Create audit logger
- * 7. Set initialized flag
- *
- * Example:
- * @code
- * agentos_error_t err;
- * if (cupolas_init("config/cupolas.yaml", &err) != CUPOLAS_OK) {
- *     fprintf(stderr, "Init failed: %s\n", agentos_error_get_message(err));
- *     return 1;
- * }
- * // ... use cupolas APIs ...
- * cupolas_cleanup();
- * @endcode
- *
- * @see cupolas_cleanup()
- * @since 1.0.0
- */
 int cupolas_init(const char* config_path, agentos_error_t* error) {
     if (g_cupolas.initialized) {
         return CUPOLAS_OK;
@@ -108,47 +82,64 @@ int cupolas_init(const char* config_path, agentos_error_t* error) {
 
     cupolas_mutex_lock(&g_cupolas.lock);
 
-    int result = cupolas_config_init_defaults(&g_cupolas.config);
-    if (result != CUPOLAS_OK && result != cupolas_ERR_NOT_FOUND) {
-        if (error) *error = AGENTOS_ERR_INVALID_PARAM;
-        cupolas_mutex_unlock(&g_cupolas.lock);
-        return result;
-    }
+    cupolas_internal_config_init_defaults(&g_cupolas.config);
 
     if (config_path && config_path[0] != '\0') {
-        result = cupolas_config_load(config_path, &g_cupolas.config);
-        if (result != CUPOLAS_OK) {
-            if (error) *error = AGENTOS_ERR_IO;
-            cupolas_mutex_unlock(&g_cupolas.lock);
-            return result;
+        g_cupolas.config_mgr = cupolas_config_create(NULL);
+        if (g_cupolas.config_mgr) {
+            int result = cupolas_config_load(g_cupolas.config_mgr,
+                                             CONFIG_TYPE_ALL, config_path);
+            if (result != 0) {
+                if (error) *error = AGENTOS_ERR_IO;
+                cupolas_config_destroy(g_cupolas.config_mgr);
+                g_cupolas.config_mgr = NULL;
+                cupolas_mutex_unlock(&g_cupolas.lock);
+                return result;
+            }
         }
     }
 
-    g_cupolas.perm = permission_engine_create(g_cupolas.config.permission_rules_path);
+    g_cupolas.perm = permission_engine_create(
+        g_cupolas.config.permission_rules_path[0] ? g_cupolas.config.permission_rules_path : NULL);
     if (!g_cupolas.perm) {
         if (error) *error = AGENTOS_ERR_OUT_OF_MEMORY;
+        if (g_cupolas.config_mgr) {
+            cupolas_config_destroy(g_cupolas.config_mgr);
+            g_cupolas.config_mgr = NULL;
+        }
         cupolas_mutex_unlock(&g_cupolas.lock);
         return cupolas_ERR_OUT_OF_MEMORY;
     }
 
-    g_cupolas.san = sanitizer_create();
+    g_cupolas.san = sanitizer_create(NULL);
     if (!g_cupolas.san) {
         if (error) *error = AGENTOS_ERR_OUT_OF_MEMORY;
         permission_engine_destroy(g_cupolas.perm);
         g_cupolas.perm = NULL;
+        if (g_cupolas.config_mgr) {
+            cupolas_config_destroy(g_cupolas.config_mgr);
+            g_cupolas.config_mgr = NULL;
+        }
         cupolas_mutex_unlock(&g_cupolas.lock);
         return cupolas_ERR_OUT_OF_MEMORY;
     }
 
     g_cupolas.wb = NULL;
 
-    g_cupolas.audit = audit_logger_create(g_cupolas.config.audit_log_dir);
+    g_cupolas.audit = audit_logger_create(
+        g_cupolas.config.audit_log_dir[0] ? g_cupolas.config.audit_log_dir : ".",
+        "cupolas_audit", CUPOLAS_DEFAULT_AUDIT_MAX_FILE_SIZE,
+        CUPOLAS_DEFAULT_AUDIT_MAX_FILES);
     if (!g_cupolas.audit) {
         if (error) *error = AGENTOS_ERR_OUT_OF_MEMORY;
         sanitizer_destroy(g_cupolas.san);
         g_cupolas.san = NULL;
         permission_engine_destroy(g_cupolas.perm);
         g_cupolas.perm = NULL;
+        if (g_cupolas.config_mgr) {
+            cupolas_config_destroy(g_cupolas.config_mgr);
+            g_cupolas.config_mgr = NULL;
+        }
         cupolas_mutex_unlock(&g_cupolas.lock);
         return cupolas_ERR_OUT_OF_MEMORY;
     }
@@ -159,28 +150,6 @@ int cupolas_init(const char* config_path, agentos_error_t* error) {
     return CUPOLAS_OK;
 }
 
-/**
- * @brief Cleanup cupolas security dome module and release all resources
- * @pre cupolas_init() must have been called successfully
- * @post All resources released, no further API calls safe except init
- * @note Thread-safe: Blocks until all operations complete
- * @threadsafe Yes
- * @reentrant No
- *
- * @details
- * Cleanup sequence (reverse of initialization):
- * 1. Flush pending audit logs
- * 2. Destroy audit logger
- * 3. Destroy workbench (if created)
- * 4. Destroy sanitizer
- * 5. Destroy permission engine
- * 6. Release configuration resources
- * 7. Clear initialized flag
- *
- * @warning After cleanup, only cupolas_init() may be safely called
- * @see cupolas_init()
- * @since 1.0.0
- */
 void cupolas_cleanup(void) {
     if (!g_cupolas.initialized) {
         return;
@@ -195,7 +164,7 @@ void cupolas_cleanup(void) {
     }
 
     if (g_cupolas.wb) {
-        cupolas_workbench_destroy(g_cupolas.wb);
+        workbench_destroy(g_cupolas.wb);
         g_cupolas.wb = NULL;
     }
 
@@ -209,7 +178,12 @@ void cupolas_cleanup(void) {
         g_cupolas.perm = NULL;
     }
 
-    cupolas_config_cleanup(&g_cupolas.config);
+    if (g_cupolas.config_mgr) {
+        cupolas_config_destroy(g_cupolas.config_mgr);
+        g_cupolas.config_mgr = NULL;
+    }
+
+    cupolas_internal_config_cleanup(&g_cupolas.config);
 
     g_cupolas.initialized = 0;
     cupolas_mutex_unlock(&g_cupolas.lock);
@@ -217,48 +191,10 @@ void cupolas_cleanup(void) {
     cupolas_mutex_destroy(&g_cupolas.lock);
 }
 
-/**
- * @brief Get cupolas module version string
- * @return Static version string (do not free), format: "major.minor.patch"
- * @note Thread-safe: Always safe to call, no initialization required
- * @threadsafe Yes
- * @reentrant Yes
- *
- * @since 1.0.0
- */
 const char* cupolas_version(void) {
     return "1.0.0";
 }
 
-/* ============================================================================
- * Permission Management
- * ============================================================================ */
-
-/**
- * @brief Check if an agent is permitted to perform an action on a resource
- * @param[in] agent_id Agent identifier (must not be NULL)
- * @param[in] action Action type: "read", "write", "execute" (must not be NULL)
- * @param[in] resource Resource path or identifier (must not be NULL)
- * @param[in] context Additional context for policy evaluation (may be NULL)
- * @return Positive (>0) if allowed, 0 if denied, negative on error
- * @note Thread-safe: Yes, uses internal locking
- * @reentrant Yes
- * @ownership All input strings: caller retains ownership
- *
- * @details
- * This function implements the core RBAC decision:
- * 1. Validate input parameters
- * 2. Check module initialization state
- * 3. Delegate to permission engine for rule evaluation
- * 4. Log decision to audit trail
- * 5. Return result
- *
- * Performance:
- * - Cache hit: O(1) average
- * - Cache miss: O(n) where n = number of rules
- *
- * @since 1.0.0
- */
 int cupolas_check_permission(const char* agent_id, const char* action,
                            const char* resource, const char* context) {
     if (!agent_id || !action || !resource) {
@@ -272,46 +208,44 @@ int cupolas_check_permission(const char* agent_id, const char* action,
     int result = permission_engine_check(g_cupolas.perm, agent_id, action, resource, context);
 
     if (g_cupolas.audit) {
-        audit_logger_log_event(g_cupolas.audit, "permission_check",
-                               resource, result >= 0 ? result : -1, agent_id);
+        audit_logger_log(g_cupolas.audit, AUDIT_EVENT_PERMISSION,
+                         agent_id, action, resource, NULL,
+                         result >= 0 ? result : -1);
     }
 
-    // SafetyGuard集成：如果权限检查通过，进行安全守卫检查
     if (result > 0 && cupolas_guards_is_enabled()) {
         guard_manager_t* guard_manager = cupolas_guards_get_manager();
         if (guard_manager) {
             const size_t max_results = 8;
             guard_result_t results[max_results];
             size_t actual_results = 0;
-            
-            // 创建守卫检测上下文
+
             guard_context_t guard_ctx = {
                 .operation = "permission_check",
                 .resource = resource,
                 .agent_id = agent_id,
-                .session_id = context, // 使用context作为会话ID
+                .session_id = context,
                 .input_data = (void*)action,
                 .input_size = action ? strlen(action) + 1 : 0,
                 .context_data = NULL,
                 .timestamp = cupolas_get_timestamp_ns()
             };
-            
+
             int guard_ret = guard_manager_check_sync(guard_manager, &guard_ctx,
                                                    results, max_results, &actual_results);
-            if (guard_ret == CUPOLAS_OK) {
-                // 检查守卫检测结果，如果有高风险则拒绝
+            if (guard_ret == 0) {
                 for (size_t i = 0; i < actual_results; i++) {
-                    guard_result_t* guard_result = &results[i];
-                    if (guard_result->risk_level >= RISK_LEVEL_MEDIUM &&
-                        (guard_result->recommended_action == GUARD_ACTION_BLOCK ||
-                         guard_result->recommended_action == GUARD_ACTION_ISOLATE ||
-                         guard_result->recommended_action == GUARD_ACTION_TERMINATE)) {
-                        // 安全守卫建议阻止，记录审计日志并拒绝访问
+                    guard_result_t* gr = &results[i];
+                    if (gr->risk_level >= RISK_LEVEL_MEDIUM &&
+                        (gr->recommended_action == GUARD_ACTION_BLOCK ||
+                         gr->recommended_action == GUARD_ACTION_ISOLATE ||
+                         gr->recommended_action == GUARD_ACTION_TERMINATE)) {
                         if (g_cupolas.audit) {
-                            audit_logger_log_event(g_cupolas.audit, "guard_block",
-                                                   resource, 0, agent_id);
+                            audit_logger_log(g_cupolas.audit, AUDIT_EVENT_PERMISSION,
+                                             agent_id, "guard_block",
+                                             resource, NULL, 0);
                         }
-                        return 0; // 拒绝访问
+                        return 0;
                     }
                 }
             }
@@ -321,20 +255,6 @@ int cupolas_check_permission(const char* agent_id, const char* action,
     return result > 0 ? 1 : (result == 0 ? 0 : result);
 }
 
-/**
- * @brief Add a dynamic permission rule to the engine
- * @param[in] agent_id Agent ID pattern (NULL or "*" for wildcard)
- * @param[in] action Action pattern (NULL or "*" for wildcard)
- * @param[in] resource Resource pattern with glob support
- * @param[in] allow 1 to allow, 0 to deny
- * @param[in] priority Higher value = higher evaluation priority
- * @return CUPOLAS_OK (0) on success, negative error code on failure
- * @note Thread-safe: Yes
- * @reentrant Yes
- * @ownership All input strings: caller retains ownership
- *
- * @since 1.0.0
- */
 int cupolas_add_permission_rule(const char* agent_id, const char* action,
                                const char* resource, int allow, int priority) {
     if (!g_cupolas.initialized || !g_cupolas.perm) {
@@ -345,54 +265,14 @@ int cupolas_add_permission_rule(const char* agent_id, const char* action,
                                      resource, allow, priority);
 }
 
-/**
- * @brief Clear the permission decision cache
- * @note Thread-safe: Yes
- * @reentrant Yes
- * @post All cached permission decisions are invalidated
- *
- * @details Useful after rule updates to force re-evaluation.
- *
- * @since 1.0.0
- */
 void cupolas_clear_permission_cache(void) {
     if (!g_cupolas.initialized || !g_cupolas.perm) {
         return;
     }
 
-    permission_engine_invalidate_cache(g_cupolas.perm);
+    permission_engine_clear_cache(g_cupolas.perm);
 }
 
-/* ============================================================================
- * Input Sanitization
- * ============================================================================ */
-
-/**
- * @brief Sanitize user input string to prevent injection attacks
- * @param[in] input Input string to sanitize (must not be NULL)
- * @param[out] output Output buffer for sanitized result (must not be NULL)
- * @param[in] output_size Size of output buffer in bytes
- * @return CUPOLAS_OK (0) on success, negative error code on failure
- * @note Thread-safe: Yes
- * @reentrant Yes
- * @ownership input: caller retains; output: callee writes, caller owns buffer
- *
- * @details
- * Sanitization pipeline:
- * 1. Null/empty check
- * 2. Length validation against buffer size
- * 3. Regex-based pattern filtering (injection prevention)
- * 4. Type-specific validation (if configured)
- * 5. Write sanitized result to output buffer
- *
- * Supported sanitization types:
- * - SQL injection prevention
- * - Command injection prevention
- * - XSS prevention
- * - Path traversal prevention
- *
- * @since 1.0.0
- */
 int cupolas_sanitize_input(const char* input, char* output, size_t output_size) {
     if (!input || !output || output_size == 0) {
         return cupolas_ERR_INVALID_PARAM;
@@ -403,52 +283,50 @@ int cupolas_sanitize_input(const char* input, char* output, size_t output_size) 
     }
 
     sanitize_result_t result = sanitizer_sanitize(g_cupolas.san, input,
-                                                  output, output_size);
+                                                  output, output_size, NULL);
 
     if (g_cupolas.audit) {
-        audit_logger_log_event(g_cupolas.audit, "sanitize_input",
-                               input, (int)result, NULL);
+        audit_logger_log(g_cupolas.audit, AUDIT_EVENT_SANITIZER,
+                         "system", "sanitize_input",
+                         input, NULL, (int)result);
     }
 
-    // SafetyGuard集成：如果消毒成功，进行安全守卫检查
     if (result == SANITIZE_OK && cupolas_guards_is_enabled()) {
         guard_manager_t* guard_manager = cupolas_guards_get_manager();
         if (guard_manager) {
             const size_t max_results = 8;
             guard_result_t results[max_results];
             size_t actual_results = 0;
-            
-            // 创建守卫检测上下文
+
             guard_context_t guard_ctx = {
                 .operation = "input_sanitization",
                 .resource = "sanitizer",
-                .agent_id = "system", // 默认代理ID
+                .agent_id = "system",
                 .session_id = NULL,
                 .input_data = (void*)output,
                 .input_size = strlen(output) + 1,
                 .context_data = NULL,
                 .timestamp = cupolas_get_timestamp_ns()
             };
-            
+
             int guard_ret = guard_manager_check_sync(guard_manager, &guard_ctx,
                                                    results, max_results, &actual_results);
-            if (guard_ret == CUPOLAS_OK) {
-                // 检查守卫检测结果，如果有高风险则处理
+            if (guard_ret == 0) {
                 for (size_t i = 0; i < actual_results; i++) {
-                    guard_result_t* guard_result = &results[i];
-                    if (guard_result->risk_level >= RISK_LEVEL_CRITICAL) {
-                        // 严重风险：清空输出并返回错误
+                    guard_result_t* gr = &results[i];
+                    if (gr->risk_level >= RISK_LEVEL_CRITICAL) {
                         output[0] = '\0';
                         if (g_cupolas.audit) {
-                            audit_logger_log_event(g_cupolas.audit, "guard_block",
-                                                   input, 0, "system");
+                            audit_logger_log(g_cupolas.audit, AUDIT_EVENT_SANITIZER,
+                                             "system", "guard_block",
+                                             input, NULL, 0);
                         }
-                        return cupolas_ERR_INVALID_ARG;
-                    } else if (guard_result->risk_level >= RISK_LEVEL_HIGH) {
-                        // 高风险：记录审计日志但允许通过
+                        return cupolas_ERROR_INVALID_ARG;
+                    } else if (gr->risk_level >= RISK_LEVEL_HIGH) {
                         if (g_cupolas.audit) {
-                            audit_logger_log_event(g_cupolas.audit, "guard_warn",
-                                                   input, 0, "system");
+                            audit_logger_log(g_cupolas.audit, AUDIT_EVENT_SANITIZER,
+                                             "system", "guard_warn",
+                                             input, NULL, 0);
                         }
                     }
                 }
@@ -459,43 +337,6 @@ int cupolas_sanitize_input(const char* input, char* output, size_t output_size) 
     return (result == SANITIZE_OK) ? CUPOLAS_OK : cupolas_ERR_PERMISSION_DENIED;
 }
 
-/* ============================================================================
- * Command Execution (Workbench)
- * ============================================================================ */
-
-/**
- * @brief Execute command in isolated sandboxed environment
- * @param[in] command Command path or executable name (must not be NULL)
- * @param[in] argv Argument array (NULL-terminated, must not be NULL)
- * @param[out] exit_code Exit code output (may be NULL if not needed)
- * @param[out] stdout_buf Standard output capture buffer (may be NULL)
- * @param[in] stdout_size Standard output buffer size in bytes
- * @param[out] stderr_buf Standard error capture buffer (may be NULL)
- * @param[in] stderr_size Standard error buffer size in bytes
- * @return CUPOLAS_OK (0) on success, negative error code on failure
- * @note Thread-safe: Each workbench instance is single-threaded
- * @reentrant No
- * @ownership All input strings: caller retains; output buffers: caller owns
- *
- * @details
- * Execution flow:
- * 1. Validate command path and arguments
- * 2. Create sandboxed workbench environment
- * 3. Apply resource limits (CPU, memory, network, file descriptors)
- * 4. Spawn process within sandbox
- * 5. Capture output (if buffers provided)
- * 6. Wait for completion with timeout
- * 7. Cleanup sandbox
- * 8. Return exit code and captured output
- *
- * Security guarantees:
- * - Process isolation via OS-level sandboxing
- * - Resource quota enforcement
- * - Network access control (optional)
- * - File system namespace restriction
- *
- * @since 1.0.0
- */
 int cupolas_execute_command(const char* command, char* const argv[],
                           int* exit_code, char* stdout_buf, size_t stdout_size,
                           char* stderr_buf, size_t stderr_size) {
@@ -507,58 +348,51 @@ int cupolas_execute_command(const char* command, char* const argv[],
         return cupolas_ERR_STATE_ERROR;
     }
 
-    // SafetyGuard集成：执行前进行安全守卫检查
     if (cupolas_guards_is_enabled()) {
         guard_manager_t* guard_manager = cupolas_guards_get_manager();
         if (guard_manager) {
-            // 构建命令字符串用于检测
             char cmd_buffer[1024] = {0};
             size_t pos = 0;
-            
-            // 添加命令
+
             if (command) {
                 pos += snprintf(cmd_buffer + pos, sizeof(cmd_buffer) - pos, "%s", command);
             }
-            
-            // 添加参数
+
             if (argv) {
                 for (int i = 0; argv[i] && pos < sizeof(cmd_buffer) - 1; i++) {
                     pos += snprintf(cmd_buffer + pos, sizeof(cmd_buffer) - pos, " %s", argv[i]);
                 }
             }
-            
+
             const size_t max_results = 8;
             guard_result_t results[max_results];
             size_t actual_results = 0;
-            
-            // 创建守卫检测上下文
+
             guard_context_t guard_ctx = {
                 .operation = "command_execution",
                 .resource = "workbench",
-                .agent_id = "system", // 默认代理ID
+                .agent_id = "system",
                 .session_id = NULL,
                 .input_data = cmd_buffer,
                 .input_size = strlen(cmd_buffer) + 1,
                 .context_data = NULL,
                 .timestamp = cupolas_get_timestamp_ns()
             };
-            
+
             int guard_ret = guard_manager_check_sync(guard_manager, &guard_ctx,
                                                    results, max_results, &actual_results);
-            if (guard_ret == CUPOLAS_OK) {
-                // 检查守卫检测结果，如果有高风险则阻止执行
+            if (guard_ret == 0) {
                 for (size_t i = 0; i < actual_results; i++) {
-                    guard_result_t* guard_result = &results[i];
-                    if (guard_result->risk_level >= RISK_LEVEL_MEDIUM &&
-                        (guard_result->recommended_action == GUARD_ACTION_BLOCK ||
-                         guard_result->recommended_action == GUARD_ACTION_ISOLATE ||
-                         guard_result->recommended_action == GUARD_ACTION_TERMINATE)) {
-                        // 安全守卫建议阻止，记录审计日志并返回权限错误
+                    guard_result_t* gr = &results[i];
+                    if (gr->risk_level >= RISK_LEVEL_MEDIUM &&
+                        (gr->recommended_action == GUARD_ACTION_BLOCK ||
+                         gr->recommended_action == GUARD_ACTION_ISOLATE ||
+                         gr->recommended_action == GUARD_ACTION_TERMINATE)) {
                         if (g_cupolas.audit) {
-                            char task_desc[256];
-                            snprintf(task_desc, sizeof(task_desc), "guard_block:%s", command);
-                            audit_logger_log_event(g_cupolas.audit, "execute_command",
-                                                   task_desc, cupolas_ERR_PERMISSION_DENIED, NULL);
+                            audit_logger_log(g_cupolas.audit, AUDIT_EVENT_WORKBENCH,
+                                             "system", "execute_command",
+                                             command, "guard_block",
+                                             cupolas_ERR_PERMISSION_DENIED);
                         }
                         return cupolas_ERR_PERMISSION_DENIED;
                     }
@@ -567,63 +401,44 @@ int cupolas_execute_command(const char* command, char* const argv[],
         }
     }
 
-    cupolas_workbench_config_t wbcfg;
-    cupolas_workbench_config_init_defaults(&wbcfg);
+    workbench_config_t wbcfg;
+    workbench_default_config(&wbcfg);
 
     if (!g_cupolas.wb) {
-        g_cupolas.wb = cupolas_workbench_create(&wbcfg);
+        g_cupolas.wb = workbench_create(&wbcfg);
         if (!g_cupolas.wb) {
             return cupolas_ERR_OUT_OF_MEMORY;
         }
     }
 
-    cupolas_workbench_result_t result;
-    int ret = cupolas_workbench_execute(g_cupolas.wb, command, argv, &result);
+    workbench_result_t result;
+    int ret = workbench_execute(g_cupolas.wb, command, argv, &result);
 
     if (exit_code) {
         *exit_code = result.exit_code;
     }
 
-    if (stdout_buf && stdout_size > 0 && result.stdout_output) {
-        strncpy(stdout_buf, result.stdout_output, stdout_size - 1);
+    if (stdout_buf && stdout_size > 0 && result.stdout_data) {
+        strncpy(stdout_buf, result.stdout_data, stdout_size - 1);
         stdout_buf[stdout_size - 1] = '\0';
     }
 
-    if (stderr_buf && stderr_size > 0 && result.stderr_output) {
-        strncpy(stderr_buf, result.stderr_output, stderr_size - 1);
+    if (stderr_buf && stderr_size > 0 && result.stderr_data) {
+        strncpy(stderr_buf, result.stderr_data, stderr_size - 1);
         stderr_buf[stderr_size - 1] = '\0';
     }
 
+    workbench_result_free(&result);
+
     if (g_cupolas.audit) {
-        char task_desc[256];
-        snprintf(task_desc, sizeof(task_desc), "exec:%s", command);
-        audit_logger_log_event(g_cupolas.audit, "execute_command",
-                               task_desc, ret, NULL);
+        audit_logger_log(g_cupolas.audit, AUDIT_EVENT_WORKBENCH,
+                         "system", "execute_command",
+                         command, NULL, ret);
     }
 
     return ret;
 }
 
-/* ============================================================================
- * Audit Logging
- * ============================================================================ */
-
-/**
- * @brief Flush all pending audit log entries to persistent storage
- * @note Thread-safe: Yes
- * @reentrant Yes
- * @post All pending entries are written synchronously
- *
- * @details
- * Forces immediate write of all buffered audit log entries to disk.
- * Normally called automatically by the background flush thread, but can
- * be called explicitly when:
- * - Before shutdown (via cupolas_cleanup())
- * - After critical security events
- * - For compliance requirements (immediate persistence)
- *
- * @since 1.0.0
- */
 void cupolas_flush_audit_log(void) {
     if (!g_cupolas.initialized || !g_cupolas.audit) {
         return;

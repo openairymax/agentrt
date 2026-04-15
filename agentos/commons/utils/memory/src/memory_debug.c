@@ -51,7 +51,8 @@ typedef struct {
     bool initialized;                     /**< 模块是否已初始化 */
     memory_debug_options_t options;       /**< 当前调试选项 */
     
-    // 调试块链�?    memory_debug_block_t* block_list_head; /**< 调试块链表头 */
+    // 调试块链表
+    memory_debug_block_t* block_list_head; /**< 调试块链表头 */
     size_t block_count;                   /**< 调试块数�?*/
     
     // 统计信息
@@ -211,7 +212,8 @@ static void memory_debug_record_error(memory_error_type_t type,
     
     g_debug_state.error_count++;
     
-    // 输出到日�?    if (g_debug_state.options.verbosity_level >= 1) {
+    // 输出到日志
+    if (g_debug_state.options.verbosity_level >= 1) {
         FILE* log = stderr;
         if (g_debug_state.options.log_file != NULL) {
             log = fopen(g_debug_state.options.log_file, "a");
@@ -328,7 +330,8 @@ static bool memory_debug_validate_block(memory_debug_block_t* block,
         return false;
     }
     
-    // 检查魔�?    if (block->magic != MEMORY_DEBUG_MAGIC) {
+    // 检查魔数
+    if (block->magic != MEMORY_DEBUG_MAGIC) {
         if (error != NULL) {
             memory_error_report_t report = {
                 .type = MEMORY_ERROR_CORRUPTION,
@@ -345,7 +348,8 @@ static bool memory_debug_validate_block(memory_debug_block_t* block,
         return false;
     }
     
-    // 检查红�?    if (g_debug_state.options.enable_boundary_check && 
+    // 检查红区
+    if (g_debug_state.options.enable_boundary_check && 
         g_debug_state.options.redzone_size > 0) {
         uint8_t* redzone_start = (uint8_t*)block + sizeof(memory_debug_block_t);
         size_t redzone_size = g_debug_state.options.redzone_size - sizeof(memory_debug_block_t);
@@ -407,7 +411,8 @@ bool memory_debug_init(const memory_debug_options_t* options) {
         memcpy(&g_debug_state.options, options, sizeof(memory_debug_options_t));
     }
     
-    // 初始化状�?    g_debug_state.block_list_head = NULL;
+    // 初始化状态
+    g_debug_state.block_list_head = NULL;
     g_debug_state.block_count = 0;
     g_debug_state.total_allocations = 0;
     g_debug_state.total_frees = 0;
@@ -426,7 +431,8 @@ bool memory_debug_init(const memory_debug_options_t* options) {
 }
 
 bool memory_debug_enable(bool enable) {
-    // 启用/禁用由memory.c处理，这里只返回状�?    return g_debug_state.initialized;
+    // 启用/禁用由memory.c处理，这里只返回状态
+    return g_debug_state.initialized;
 }
 
 bool memory_debug_is_enabled(void) {
@@ -473,12 +479,14 @@ size_t memory_debug_check_leaks(memory_leak_report_t* report, bool dump_to_log) 
         current = current->next;
     }
     
-    // 更新报告�?    if (report != NULL) {
+    // 更新报告
+    if (report != NULL) {
         report->leak_count = leak_count;
         report->total_leaked_bytes = total_leaked_bytes;
     }
     
-    // 输出到日�?    if (dump_to_log && leak_count > 0) {
+    // 输出到日志
+    if (dump_to_log && leak_count > 0) {
         FILE* log = stderr;
         if (g_debug_state.options.log_file != NULL) {
             log = fopen(g_debug_state.options.log_file, "a");
@@ -950,7 +958,8 @@ unsigned int memory_debug_checkpoint(const char* name) {
 size_t memory_debug_compare_checkpoints(unsigned int checkpoint1,
                                        unsigned int checkpoint2,
                                        memory_leak_report_t* diff_report) {
-    // 简化实现：检查点功能未完整实�?    if (diff_report != NULL) {
+    // 简化实现：检查点功能未完整实现
+    if (diff_report != NULL) {
         memset(diff_report, 0, sizeof(memory_leak_report_t));
     }
     

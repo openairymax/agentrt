@@ -6,7 +6,7 @@
  */
 
 #include "tls_security.h"
-#include "../../utils/cupolas_utils.h"
+#include "utils/cupolas_utils.h"
 #include <stdio.h>
 
 #ifdef _WIN32

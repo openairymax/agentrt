@@ -17,6 +17,17 @@
  * @see ARCHITECTURAL_PRINCIPLES.md E-1 安全内生原则
  */
 
+#if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wpedantic"
+    #include_next <string.h>
+    #pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+    #include <string.h>
+#else
+    #include <string.h>
+#endif
+
 #ifndef AGENTOS_STRING_H
 #define AGENTOS_STRING_H
 

@@ -12,7 +12,7 @@
  * @date 2024
  */
 
-#include "../utils/cupolas_utils.h"
+#include "utils/cupolas_utils.h"
 #include "permission_engine.h"
 #include <stdlib.h>
 #include <string.h>

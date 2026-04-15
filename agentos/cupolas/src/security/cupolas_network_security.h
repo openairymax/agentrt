@@ -96,6 +96,17 @@ typedef struct {
     uint32_t handshake_timeout_ms;        /**< Handshake timeout */
     uint32_t read_timeout_ms;             /**< Read timeout */
     uint32_t write_timeout_ms;            /**< Write timeout */
+
+    bool enable_ids;                      /**< Enable IDS */
+    struct {
+        bool enforce_https;
+        bool enable_dnssec;
+        char dns_server[64];
+    } http;
+    struct {
+        bool enable_dnssec;
+        char upstream_server[64];
+    } dns;
 } cupolas_tls_config_t;
 
 /**
@@ -120,6 +131,23 @@ typedef struct {
     
     char* description;                  /**< Rule description */
 } cupolas_fw_rule_t;
+
+typedef struct {
+    char local_ip[64];
+    uint16_t local_port;
+    char remote_ip[64];
+    uint16_t remote_port;
+    cupolas_proto_t protocol;
+    bool is_encrypted;
+    uint64_t bytes_sent;
+    uint64_t bytes_received;
+    uint64_t connect_time;
+    char hostname[256];
+    char cipher_suite[128];
+    struct {
+        bool enforce_https;
+    } http;
+} cupolas_connection_info_t;
 
 /**
  * @brief Firewall configuration

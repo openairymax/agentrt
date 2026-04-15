@@ -14,6 +14,7 @@
 #include "token_standard.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <ctype.h>
 #include "../../platform/include/platform.h"
 

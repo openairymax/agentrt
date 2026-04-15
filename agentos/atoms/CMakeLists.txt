@@ -261,8 +261,6 @@ set(AGENTOS_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/coreloopthree/include
     ${CMAKE_CURRENT_SOURCE_DIR}/memoryrovol/include
     ${CMAKE_CURRENT_SOURCE_DIR}/syscall/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/memory/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/string/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/logging/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/sync/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/platform/include

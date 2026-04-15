@@ -27,22 +27,57 @@ extern "C" {
 
 #include "logging.h"
 
-/* ==================== 前向声明 ==================== */
+/* ==================== 迁移辅助结构体定义（必须在函数声明之前） ==================== */
 
-typedef struct migration_module_info migration_module_info_t;
-typedef struct migration_options migration_options_t;
-typedef struct migration_validation_result migration_validation_result_t;
 typedef struct logging_compat_stats logging_compat_stats_t;
 
-/* ==================== 现有API宏定义映�?==================== */
+typedef struct migration_module_info {
+    char module_name[64];
+    char current_api[64];
+    char target_api[64];
+    int migration_status;
+    float completion_percent;
+} migration_module_info_t;
+
+typedef struct migration_options {
+    int dry_run;
+    int backup_enabled;
+    int verbose;
+    char backup_path[256];
+} migration_options_t;
+
+typedef struct migration_validation_result {
+    char module_name[64];
+    int status;
+    int errors;
+    int warnings;
+    char details[256];
+} migration_validation_result_t;
+
+/* ==================== 兼容层统计结构体 ==================== */
 
 /**
- * @brief 现有日志级别宏定�? * 
- * 映射现有项目的日志级别宏到新架构的枚举值�? */
+ * @brief 现有日志级别宏定义
+ * 
+ * 使用条件编译保护，避免与logger.h中的定义冲突。
+ * logger.h 中已定义 AGENTOS_LOG_LEVEL_ERROR 等宏（值为1/2/3/4），
+ * 此处仅在未被定义时才定义。
+ */
+#ifndef AGENTOS_LOG_LEVEL_ERROR
 #define AGENTOS_LOG_LEVEL_ERROR LOG_LEVEL_ERROR
+#endif
+
+#ifndef AGENTOS_LOG_LEVEL_WARN
 #define AGENTOS_LOG_LEVEL_WARN  LOG_LEVEL_WARN
+#endif
+
+#ifndef AGENTOS_LOG_LEVEL_INFO
 #define AGENTOS_LOG_LEVEL_INFO  LOG_LEVEL_INFO
+#endif
+
+#ifndef AGENTOS_LOG_LEVEL_DEBUG
 #define AGENTOS_LOG_LEVEL_DEBUG LOG_LEVEL_DEBUG
+#endif
 
 #ifndef AGENTOS_LOG_LEVEL
 #define AGENTOS_LOG_LEVEL LOG_LEVEL_INFO
@@ -201,7 +236,7 @@ typedef struct {
 int logging_compat_init(const logging_compat_config_t* manager);
 
 /**
- * @brief 获取兼容层统计信�? * 
+ * @brief 获取兼容层统计信息 * 
  * 获取兼容层的运行时统计信息，用于监控迁移进度�? * 
  * @param out_stats 输出参数，接收统计信�? * @return 0 成功，负值表示错�? */
 int logging_compat_get_stats(logging_compat_stats_t* out_stats);
@@ -246,37 +281,14 @@ int logging_generate_migration_report(const char* report_path);
  */
 const migration_validation_result_t* logging_validate_migration(const char* module_name);
 
-/* ==================== 迁移辅助结构体定义 ==================== */
-
-typedef struct migration_module_info {
-    char module_name[64];
-    char current_api[64];
-    char target_api[64];
-    int migration_status;
-    float completion_percent;
-} migration_module_info_t;
-
-typedef struct migration_options {
-    int dry_run;
-    int backup_enabled;
-    int verbose;
-    char backup_path[256];
-} migration_options_t;
-
-typedef struct migration_validation_result {
-    char module_name[64];
-    int status;
-    int errors;
-    int warnings;
-    char details[256];
-} migration_validation_result_t;
-
 /* ==================== 兼容层统计结构体 ==================== */
 
 /**
- * @brief 兼容层统计信�? * 
- * 兼容层的运行时统计信息�? */
-typedef struct logging_compat_stats {
+ * @brief 兼容层统计信息
+ * 
+ * 兼容层的运行时统计信息。
+ */
+struct logging_compat_stats {
     /** @brief 旧API调用次数统计 */
     struct {
         /** @brief agentos_log_write调用次数 */
@@ -348,7 +360,7 @@ typedef struct logging_compat_stats {
         /** @brief 迁移错误次数 */
         uint64_t migration_errors;
     } errors;
-} logging_compat_stats_t;
+};
 
 #ifdef __cplusplus
 }

@@ -23,13 +23,14 @@
  */
 
 #include "workbench_container.h"
-#include "../utils/cupolas_utils.h"
+#include "utils/cupolas_utils.h"
+#include "../platform/platform.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
 #include <windows.h>
 #else
 #include <unistd.h>
@@ -175,7 +176,7 @@ void container_manager_destroy(void* mgr) {
 static int execute_command(const char* cmd, int timeout_ms, char* output, size_t output_size) {
     if (!cmd) return -1;
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     FILE* pipe = _popen(cmd, "r");
 #else
     FILE* pipe = popen(cmd, "r");
@@ -197,7 +198,7 @@ static int execute_command(const char* cmd, int timeout_ms, char* output, size_t
         output[offset] = '\0';
     }
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     int result = _pclose(pipe);
 #else
     int result = pclose(pipe);
@@ -297,7 +298,7 @@ int container_pull_image(void* mgr, const char* image) {
     if (!mgr || !image) return cupolas_ERROR_INVALID_ARG;
 
     if (!is_safe_image_name(image)) {
-        return cupolas_ERR_PERMISSION_DENIED;
+        return cupolas_ERROR_PERMISSION;
     }
 
     container_handle_t* handle = (container_handle_t*)mgr;
@@ -321,20 +322,20 @@ int container_start(void* mgr, const char* name, container_result_t* result) {
 
     /* 安全验证: 防止通过 image/command/args 注入命令 */
     if (!is_safe_image_name(handle->manager.image)) {
-        return cupolas_ERR_PERMISSION_DENIED;
+        return cupolas_ERROR_PERMISSION;
     }
     if (!is_safe_image_name(handle->manager.command)) {
-        return cupolas_ERR_PERMISSION_DENIED;
+        return cupolas_ERROR_PERMISSION;
     }
     for (size_t i = 0; i < handle->manager.args_count && handle->manager.args; i++) {
         if (!is_safe_image_name(handle->manager.args[i])) {
-            return cupolas_ERR_PERMISSION_DENIED;
+            return cupolas_ERROR_PERMISSION;
         }
     }
 
     if (name) {
         if (!is_safe_image_name(name)) {
-            return cupolas_ERR_PERMISSION_DENIED;
+            return cupolas_ERROR_PERMISSION;
         }
         snprintf(handle->container_name, sizeof(handle->container_name), "%s%s",
                  CONTAINER_NAME_PREFIX, name);
@@ -524,11 +525,11 @@ int container_exec(void* mgr, const char* command, const char** args,
 
     /* 安全验证: 防止通过 command/args 注入命令 */
     if (!is_safe_image_name(command)) {
-        return cupolas_ERR_PERMISSION_DENIED;
+        return cupolas_ERROR_PERMISSION;
     }
     for (size_t i = 0; i < arg_count && args; i++) {
         if (!is_safe_image_name(args[i])) {
-            return cupolas_ERR_PERMISSION_DENIED;
+            return cupolas_ERROR_PERMISSION;
         }
     }
 
