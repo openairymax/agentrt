@@ -4,7 +4,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "time.h"
+#include "agentos_time.h"
 #include "task.h"
 #include <stdlib.h>
 
