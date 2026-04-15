@@ -2,8 +2,8 @@ version: '3.8'
 
 # =============================================================================
 # AgentOS Docker Compose - 生产环境 (Production)
-# 版本: 2.0.0 (High-Availability Production Deployment)
-# 最后更新: 2026-04-06
+# 版本: 2.0.1 (High-Availability Production Deployment)
+# 最后更新: 2026-04-15
 #
 # 🎯 生产级设计原则:
 # 🔒 安全第一: 最小权限、只读文件系统、seccomp 加固、禁止特权模式
@@ -211,24 +211,24 @@ services:
     # 环境变量（生产级安全配置）
     environment:
       # Gateway 基础配置
-      - GATEWAY_BIND_ADDRESS=0.0.0.0
-      - GATEWAY_PORT=18789
-      - GATEWAY_ADMIN_PORT=18790
+      GATEWAY_BIND_ADDRESS: 0.0.0.0
+      GATEWAY_PORT: 18789
+      GATEWAY_ADMIN_PORT: 18790
       # 上游连接（指向 Kernel 集群，支持 DNS 轮询负载均衡）
-      - GATEWAY_UPSTREAM_URL=http://kernel:18080
+      GATEWAY_UPSTREAM_URL: http://kernel:18080
       # 协议启用（三协议全开）
-      - GATEWAY_PROTOCOLS=http,websocket,stdio
+      GATEWAY_PROTOCOLS: http,websocket,stdio
       # 速率限制（生产环境严格限制）
-      - GATEWAY_GLOBAL_QPS=${GATEWAY_GLOBAL_QPS:-5000}     # 全局 QPS（比开发低）
-      - GATEWAY_PER_IP_QPS=${GATEWAY_PER_IP_QPS:-50}       # 单 IP QPS（防 DDoS）
+      GATEWAY_GLOBAL_QPS: ${GATEWAY_GLOBAL_QPS:-5000}     # 全局 QPS（比开发低）
+      GATEWAY_PER_IP_QPS: ${GATEWAY_PER_IP_QPS:-50}       # 单 IP QPS（防 DDoS）
       # 🔐 JWT 认证配置（必须从 .env 注入强密钥！）
-      - GATEWAY_JWT_SECRET=${GATEWAY_JWT_SECRET:?❌ ERROR: 必须设置 GATEWAY_JWT_SECRET}
-      - GATEWAY_JWT_ISSUER=agentos-gateway-production
-      - GATEWAY_TOKEN_EXPIRY_HOURS=${TOKEN_EXPIRY_HOURS:-8}
-      - GATEWAY_REFRESH_TOKEN_EXPIRY_DAYS=${REFRESH_TOKEN_DAYS:-7}
+      GATEWAY_JWT_SECRET: ${GATEWAY_JWT_SECRET}
+      GATEWAY_JWT_ISSUER: agentos-gateway-production
+      GATEWAY_TOKEN_EXPIRY_HOURS: ${TOKEN_EXPIRY_HOURS:-8}
+      GATEWAY_REFRESH_TOKEN_EXPIRY_DAYS: ${REFRESH_TOKEN_DAYS:-7}
       # 时区
-      - TZ=${TZ:-Asia/Shanghai}
-      - LANG=C.UTF-8
+      TZ: ${TZ:-Asia/Shanghai}
+      LANG: C.UTF-8
 
     # 网络（跨前后端网络，作为流量入口）
     networks:
@@ -297,7 +297,7 @@ services:
   # - 内存优化（work_mem, maintenance_work_mem）
   # ===========================================================================
   postgres:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: agentos-postgres-prod
     hostname: agentos-postgres
     restart: always
@@ -315,7 +315,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-agentos}
       POSTGRES_USER: ${POSTGRES_USER:-agentos}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?❌ ERROR: 必须设置 POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
       PGDATA: /var/lib/postgresql/data/pgdata       # 独立数据目录（性能优化）
       # 字符集和排序规则
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
@@ -334,22 +334,37 @@ services:
 
     # PostgreSQL 性能调优命令
     command:
-      - "postgres"
-      - "-c", "max_connections=${PG_MAX_CONNECTIONS:-200}"           # 最大连接数
-      - "-c", "shared_buffers=${PG_SHARED_BUFFERS:-256MB}"          # 共享缓冲区
-      - "-c", "effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE:-1GB}" # 有效缓存大小
-      - "-c", "work_mem=${PG_WORK_MEM:-4MB}"                          # 排序/哈希内存
-      - "-c", "maintenance_work_mem=${PG_MAINTENANCE_WORK_MEM:-64MB}" # 维护操作内存
-      - "-c", "wal_level=replica"                                    # WAL 级别（支持复制）
-      - "-c", "max_wal_senders=3"                                     # 最大 WAL 发送进程
-      - "-c", "wal_keep_size=1GB"                                     # WAL 保留大小
-      - "-c", "log_statement=all"                                     # 记录所有 SQL（审计）
-      - "-c", "log_min_duration_statement=${PG_SLOW_QUERY_MS:-1000}" # 慢查询阈值（1秒）
-      - "-c", "log_checkpoints=on"                                    # 记录 checkpoint
-      - "-c", "log_connections=on"                                    # 记录连接
-      - "-c", "log_disconnections=on"                                 # 记录断开
-      - "-c", "log_lock_waits=on"                                     # 记录锁等待
-      - "-c", "log_temp_files=0"                                      # 记录临时文件
+      - postgres
+      - -c
+      - max_connections=${PG_MAX_CONNECTIONS:-200}
+      - -c
+      - shared_buffers=${PG_SHARED_BUFFERS:-256MB}
+      - -c
+      - effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE:-1GB}
+      - -c
+      - work_mem=${PG_WORK_MEM:-4MB}
+      - -c
+      - maintenance_work_mem=${PG_MAINTENANCE_WORK_MEM:-64MB}
+      - -c
+      - wal_level=replica
+      - -c
+      - max_wal_senders=3
+      - -c
+      - wal_keep_size=1GB
+      - -c
+      - log_statement=all
+      - -c
+      - log_min_duration_statement=${PG_SLOW_QUERY_MS:-1000}
+      - -c
+      - log_checkpoints=on
+      - -c
+      - log_connections=on
+      - -c
+      - log_disconnections=on
+      - -c
+      - log_lock_waits=on
+      - -c
+      - log_temp_files=0
 
     # 资源限制
     deploy:
@@ -385,7 +400,7 @@ services:
   # - 最大内存限制（防 OOM）
   # ===========================================================================
   redis:
-    image: redis:7-alpine
+    image: redis:7.2-alpine
     container_name: agentos-redis-prod
     hostname: agentos-redis
     restart: always
@@ -401,27 +416,27 @@ services:
     # 启动命令（生产级 Redis 配置）
     command: >
       redis-server
-      --appendonly yes                              # AOF 持久化开启
-      --appendfsync everysec                        # 每秒同步（性能与安全的平衡点）
-      --appendfilename "appendonly.aof"             # AOF 文件名
-      --auto-aof-rewrite-percentage 100             # AOF 重写触发（增长 100%）
-      --auto-aof rewrite-min-size 64mb              # AOF 最小重写大小
-      --maxmemory ${REDIS_MAX_MEMORY:-1024mb}       # 最大内存 1GB（生产适当增大）
-      --maxmemory-policy allkeys-lru               # 内存满时淘汰 LRU 键
-      --requirepass ${REDIS_PASSWORD:?❌ ERROR: 必须设置 REDIS_PASSWORD}  # 🔐 密码认证
-      --bind 0.0.0.0                               # 绑定地址（内网访问）
-      --port 6379                                  # 端口
-      --tcp-backlog 511                            # TCP 连接队列长度
-      --timeout 300                                # 空闲超时（秒）
-      --tcp-keepalive 300                          # TCP KeepAlive
-      --save ""                                    # 禁用 RDB（仅用 AOF）
-      --stop-writes-on-bgsave-error yes            # BGSAVE 失败时停止写入
-      --databases 16                               # 数据库数量
-      --loglevel notice                           # 日志级别
-      --syslog-enabled no                         # 禁用 syslog
-      --lazyfree-lazy-eviction yes                 # 惰性删除（避免阻塞）
-      --lazyfree-lazy-expire yes                   # 过期键惰性删除
-      --lazyfree-lazy-server-del yes               # 服务器 DEL 惰性删除
+      --appendonly yes
+      --appendfsync everysec
+      --appendfilename "appendonly.aof"
+      --auto-aof-rewrite-percentage 100
+      --auto-aof-rewrite-min-size 64mb
+      --maxmemory ${REDIS_MAX_MEMORY:-1024mb}
+      --maxmemory-policy allkeys-lru
+      --requirepass ${REDIS_PASSWORD}
+      --bind 0.0.0.0
+      --port 6379
+      --tcp-backlog 511
+      --timeout 300
+      --tcp-keepalive 300
+      --save ""
+      --stop-writes-on-bgsave-error yes
+      --databases 16
+      --loglevel notice
+      --syslog-enabled no
+      --lazyfree-lazy-eviction yes
+      --lazyfree-lazy-expire yes
+      --lazyfree-lazy-server-del yes
 
     # 网络
     networks:
@@ -487,20 +502,20 @@ services:
     # 环境变量
     environment:
       # OpenLab 配置
-      - OPENLAB_DEBUG=false                  # ❌ 生产禁止 DEBUG 模式
-      - OPENLAB_PORT=443
+      OPENLAB_DEBUG: false                  # ❌ 生产禁止 DEBUG 模式
+      OPENLAB_PORT: 443
       # 连接 Gateway 作为统一 API 入口（推荐）
-      - AGENTOS_GATEWAY_URL=http://gateway:18789
+      AGENTOS_GATEWAY_URL: http://gateway:18789
       # 直接连接 Kernel IPC（备用通道）
-      - AGENTOS_IPC_URL=http://kernel:18080
+      AGENTOS_IPC_URL: http://kernel:18080
       # 数据库连接（从 .env 注入）
-      - DATABASE_URL=${DATABASE_URL:?❌ ERROR: 必须设置 DATABASE_URL}
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0  # 🔐 含密码的 Redis URL
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0  # 🔐 含密码的 Redis URL
       # 🔐 应用密钥（必须从 .env 注入！）
-      - OPENLAB_SECRET_KEY=${OPENLAB_SECRET_KEY:?❌ ERROR: 必须设置 OPENLAB_SECRET_KEY}
-      - OPENLAB_SESSION_TIMEOUT=${SESSION_TIMEOUT:-3600}  # 会话超时（秒）
+      OPENLAB_SECRET_KEY: ${OPENLAB_SECRET_KEY}
+      OPENLAB_SESSION_TIMEOUT: ${SESSION_TIMEOUT:-3600}  # 会话超时（秒）
       # 时区
-      - TZ=${TZ:-Asia/Shanghai}
+      TZ: ${TZ:-Asia/Shanghai}
 
     # 网络
     networks:
@@ -538,7 +553,7 @@ services:
   # 版本: Prometheus v2.45.0
   # ===========================================================================
   prometheus:
-    image: prom/prometheus:v2.45.0
+    image: prom/prometheus:v2.50.0
     container_name: agentos-prometheus-prod
     hostname: agentos-prometheus
     restart: always
@@ -594,7 +609,7 @@ services:
   # 版本: Grafana 10.2.0
   # ===========================================================================
   grafana:
-    image: grafana/grafana:10.2.0
+    image: grafana/grafana:10.3.0
     container_name: agentos-grafana-prod
     hostname: agentos-grafana
     restart: always
@@ -605,15 +620,15 @@ services:
 
     # 环境变量（安全配置）
     environment:
-      GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?❌ ERROR: 必须设置 GRAFANA_ADMIN_PASSWORD}
-      GF_USERS_ALLOW_SIGN_UP=false           # 禁止自助注册
-      GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s:%(http_port)s/
-      GF_AUTH_ANONYMOUS_ENABLED=false        # ❌ 生产禁止匿名访问
-      GF_AUTH_BASIC_ENABLED=true             # 启用 Basic Auth
-      GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-piechart-panel  # 预装插件
-      GF_LOG_LEVEL=info                      # 日志级别
-      GF_LOG_MODE=console                    # 输出到 console（Docker 日志驱动收集）
+      GF_SECURITY_ADMIN_USER: "${GRAFANA_ADMIN_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD}"
+      GF_USERS_ALLOW_SIGN_UP: false
+      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s:%(http_port)s/"
+      GF_AUTH_ANONYMOUS_ENABLED: false        # ❌ 生产禁止匿名访问
+      GF_AUTH_BASIC_ENABLED: true             # 启用 Basic Auth
+      GF_INSTALL_PLUGINS: "grafana-clock-panel,grafana-piechart-panel"  # 预装插件
+      GF_LOG_LEVEL: info                      # 日志级别
+      GF_LOG_MODE: console                    # 输出到 console（Docker 日志驱动收集）
 
     # 卷挂载
     volumes:

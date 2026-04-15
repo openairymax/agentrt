@@ -1,7 +1,7 @@
 # AgentOS Docker 部署方案 - 生产级容器化架构
 
 <p align="center">
-  <strong>版本: 2.0.0 (Production-Grade) | 最后更新: 2026-04-06</strong><br>
+  <strong>版本: 2.0.1 (Production-Grade) | 最后更新: 2026-04-15</strong><br>
   <em>基于 CIS Docker Benchmark 合规 | 支持高可用部署 | 内置可观测性</em>
 </p>
 
