@@ -15,12 +15,12 @@
 #include "ipc.h"
 #include "task.h"
 #include "mem.h"
-#include "time.h"  /* 提供 agentos_time_monotonic_ms() 函数 */
+#include "agentos_time.h"
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../../commons/utils/memory/include/memory_compat.h"
-#include "../../../../commons/utils/string/include/string_compat.h"
+#include <agentos/memory.h>
+#include <agentos/string.h>
 #include <string.h>
 #include <stdio.h>
 

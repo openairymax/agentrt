@@ -1,7 +1,7 @@
 # =============================================================================
 # AgentOS 内核 Dockerfile - 生产级构建
-# 版本: 2.0.0 (Production-Ready)
-# 最后更新: 2026-04-06
+# 版本: 2.0.1 (Production-Ready)
+# 最后更新: 2026-04-15
 #
 # 🎯 生产级特性:
 # ✅ 多阶段构建 (Builder → Runtime → Minimal)
@@ -24,7 +24,7 @@
 # =============================================================================
 # 阶段1: 构建环境 (Builder) - 仅用于编译，不进入最终镜像
 # =============================================================================
-FROM ubuntu:22.04 AS builder
+FROM ubuntu:24.04 AS builder
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG BUILD_TYPE=Release
@@ -94,20 +94,20 @@ RUN find /build -name "*.o" -delete 2>/dev/null || true
 # =============================================================================
 # 阶段2: 运行时环境 (Runtime) - 最终生产镜像
 # =============================================================================
-FROM ubuntu:22.04 AS runtime
+FROM ubuntu:24.04 AS runtime
 
 # 元数据标签（符合 OCI Image Spec）
 LABEL maintainer="SPHARX DevOps <devops@spharx.cn>" \
-      org.opencontainers.image.title="AgentOS Kernel v2.0" \
+      org.opencontainers.image.title="AgentOS Kernel v2.0.1" \
       org.opencontainers.image.description="AgentOS智能体操作系统内核层 (生产级)" \
-      org.opencontainers.image.version="2.0.0" \
+      org.opencontainers.image.version="2.0.1" \
       org.opencontainers.image.source="https://gitcode.com/spharx/agentos" \
       org.opencontainers.image.documentation="https://docs.spharx.cn/agentos/docker" \
       org.opencontainers.image.vendor="SPHARX Ltd." \
       org.opencontainers.image.licenses="Proprietary" \
-      org.opencontainers.image.ref.name="spharx/agentos:kernel-v2.0" \
+      org.opencontainers.image.ref.name="spharx/agentos:kernel-v2.0.1" \
       org.opencontainers.image.base.digest="" \
-      org.opencontainers.image.created="2026-04-06T00:00:00Z"
+      org.opencontainers.image.created="2026-04-15T00:00:00Z"
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -178,10 +178,10 @@ ENV AGENTOS_HOME=/app \
     LC_ALL=C.UTF-8 \
     PYTHONUNBUFFERED=1 \
     # 内存优化
-    MALLOC_ARENA_MAX=2G \
-    MALLOC_MMAP_THRESHOLD_=131072 \
+    MALLOC_ARENA_MAX=2 \
+    MALLOC_MMAP_THRESHOLD=131072 \
     # 安全相关
-    __GLASOW_USE_TLS=1
+    GLIBC_TUNABLES=glibc.rtld.dynamic_sort=2
 
 # 健康检查（多层检测：TCP + HTTP + 进程存活）
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \

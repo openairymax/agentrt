@@ -149,6 +149,23 @@ int gw_protocol_bridge_reset_stats(gw_protocol_bridge_handle_t bridge);
 
 char* gw_protocol_bridge_diagnose(gw_protocol_bridge_handle_t bridge);
 
+/* ============================================================================
+ * Registry & Extension Integration
+ * ============================================================================ */
+
+int gw_protocol_bridge_list_registry_protocols(
+    gw_protocol_bridge_handle_t bridge,
+    char** protocols_json);
+
+int gw_protocol_bridge_load_extensions_from_config(
+    gw_protocol_bridge_handle_t bridge,
+    const char* config_json);
+
+int gw_protocol_bridge_register_extension_adapter(
+    gw_protocol_bridge_handle_t bridge,
+    gw_proto_type_t proto_type,
+    void* handler);
+
 #ifdef __cplusplus
 }
 #endif

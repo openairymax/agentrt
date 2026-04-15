@@ -83,53 +83,66 @@ install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/syscalls.h DESTINATION include
 # 测试配置
 enable_testing()
 
-# 单元测试
-add_executable(test_syscall_entry tests/unit/test_syscall_entry.c)
-target_include_directories(test_syscall_entry PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../corekern/include
-)
-target_link_libraries(test_syscall_entry
-    agentos_syscall
-    agentos_core
-    Threads::Threads
-)
-add_test(NAME test_syscall_entry COMMAND test_syscall_entry)
+# 检查测试目录是否存在
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
+    # 单元测试
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/test_syscall_entry.c")
+        add_executable(test_syscall_entry tests/unit/test_syscall_entry.c)
+        target_include_directories(test_syscall_entry PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../corekern/include
+        )
+        target_link_libraries(test_syscall_entry
+            agentos_syscall
+            agentos_core
+            Threads::Threads
+        )
+        add_test(NAME test_syscall_entry COMMAND test_syscall_entry)
+    endif()
 
-add_executable(test_syscall_table tests/unit/test_syscall_table.c)
-target_include_directories(test_syscall_table PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../corekern/include
-)
-target_link_libraries(test_syscall_table
-    agentos_syscall
-    agentos_core
-    Threads::Threads
-)
-add_test(NAME test_syscall_table COMMAND test_syscall_table)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/test_syscall_table.c")
+        add_executable(test_syscall_table tests/unit/test_syscall_table.c)
+        target_include_directories(test_syscall_table PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../corekern/include
+        )
+        target_link_libraries(test_syscall_table
+            agentos_syscall
+            agentos_core
+            Threads::Threads
+        )
+        add_test(NAME test_syscall_table COMMAND test_syscall_table)
+    endif()
 
-# 集成测试
-add_executable(test_full_workflow tests/integration/test_full_workflow.c)
-target_include_directories(test_full_workflow PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../corekern/include
-)
-target_link_libraries(test_full_workflow
-    agentos_syscall
-    agentos_core
-    Threads::Threads
-)
-add_test(NAME test_full_workflow COMMAND test_full_workflow)
+    # 集成测试
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/test_full_workflow.c")
+        add_executable(test_full_workflow tests/integration/test_full_workflow.c)
+        target_include_directories(test_full_workflow PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../corekern/include
+        )
+        target_link_libraries(test_full_workflow
+            agentos_syscall
+            agentos_core
+            Threads::Threads
+        )
+        add_test(NAME test_full_workflow COMMAND test_full_workflow)
+    endif()
 
-# 扩展单元测试
-add_executable(test_syscall_extended tests/unit/test_syscall_extended.c)
-target_include_directories(test_syscall_extended PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../corekern/include
-)
-target_link_libraries(test_syscall_extended
-    agentos_syscall
-    agentos_core
-    Threads::Threads
-)
-add_test(NAME test_syscall_extended COMMAND test_syscall_extended)
+    # 扩展单元测试
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/test_syscall_extended.c")
+        add_executable(test_syscall_extended tests/unit/test_syscall_extended.c)
+        target_include_directories(test_syscall_extended PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../corekern/include
+        )
+        target_link_libraries(test_syscall_extended
+            agentos_syscall
+            agentos_core
+            Threads::Threads
+        )
+        add_test(NAME test_syscall_extended COMMAND test_syscall_extended)
+    endif()
+else()
+    message(WARNING "Tests directory not found, skipping syscall tests")
+endif()
