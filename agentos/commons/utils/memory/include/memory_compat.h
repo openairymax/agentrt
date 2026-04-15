@@ -12,7 +12,8 @@
 #define AGENTOS_MEMORY_COMPAT_H
 
 #include <stddef.h>
-#include "memory.h"
+#include "agentos_memory.h"
+#include "memory_common.h"
 
 #ifdef __cplusplus
 extern "C" {

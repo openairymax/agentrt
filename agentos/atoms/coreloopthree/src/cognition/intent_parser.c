@@ -94,7 +94,7 @@ struct agentos_intent_parser {
     uint64_t success_count;            /**< 成功次数 */
     uint64_t failure_count;            /**< 失败次数 */
     uint64_t total_time_ns;            /**< 总耗时（纳秒） */
-    agentos_observability_t* obs;      /**< 可观测性句柄 */
+    void* obs;                         /**< 可观测性句柄（预留） */
     char* parser_id;                   /**< 解析器 ID */
     uint8_t* keyword_trie;             /**< 关键词 Trie 树 */
     size_t keyword_count;              /**< 关键词数量 */
@@ -367,7 +367,7 @@ static agentos_error_t match_intent_by_rules(agentos_intent_parser_t* parser,
     }
 
     if (best_intent) AGENTOS_FREE(best_intent);
-    return AGENTOS_ENOTFOUND;
+    return AGENTOS_ENOENT;
 }
 
 /**
@@ -385,7 +385,7 @@ static agentos_error_t match_intent_by_rules(agentos_intent_parser_t* parser,
 
 static size_t extract_entities_from_text(const char* text, extracted_entity_t* entities,
                                          size_t max_entries) {
-    if (!text || !entities || max_entities == 0) return 0;
+    if (!text || !entities || max_entries == 0) return 0;
 
     // 简单实现：基于关键词的实体提取
     // 生产环境应使用 NER 模型
@@ -395,11 +395,11 @@ static size_t extract_entities_from_text(const char* text, extracted_entity_t* e
     size_t keyword_count = extract_keywords(text, keywords, MAX_KEYWORDS);
 
     // 定义一些简单的实体类型映射
-    const char* number_words[] = {"一", "二", "三", "四", "五", "六", "七", "八", "九", "十",
+    __attribute__((unused)) const char* number_words[] = {"一", "二", "三", "四", "五", "六", "七", "八", "九", "十",
                                    "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
                                    "first", "second", "third", "fourth", "fifth", NULL};
 
-    for (size_t i = 0; i < keyword_count && count < max_entities; i++) {
+    for (size_t i = 0; i < keyword_count && count < max_entries; i++) {
         const char* keyword = keywords[i];
         char* type = NULL;
         float confidence = 0.5f;  // 基础置信度
@@ -477,24 +477,18 @@ agentos_error_t agentos_intent_parser_create(agentos_intent_parser_t** out_parse
     }
 
     // 生成唯一 ID
-    parser->parser_id = agentos_generate_uuid();
+    char uuid_buf[64];
+    if (agentos_generate_uuid(uuid_buf) == AGENTOS_SUCCESS) {
+        parser->parser_id = AGENTOS_STRDUP(uuid_buf);
+    } else {
+        parser->parser_id = NULL;
+    }
     if (!parser->parser_id) {
         AGENTOS_LOG_WARN("Failed to generate UUID for intent parser, using default");
         parser->parser_id = AGENTOS_STRDUP("intent_parser_default");
     }
 
     // 初始化可观测性
-    parser->obs = agentos_observability_create();
-    if (parser->obs) {
-        agentos_observability_register_metric(parser->obs, "intent_parser_processed_total",
-                                              AGENTOS_METRIC_COUNTER, "Total number of intent parsing operations");
-        agentos_observability_register_metric(parser->obs, "intent_parser_success_total",
-                                              AGENTOS_METRIC_COUNTER, "Total number of successful intent parsing");
-        agentos_observability_register_metric(parser->obs, "intent_parser_failure_total",
-                                              AGENTOS_METRIC_COUNTER, "Total number of failed intent parsing");
-        agentos_observability_register_metric(parser->obs, "intent_parser_duration_seconds",
-                                              AGENTOS_METRIC_HISTOGRAM, "Intent parsing duration in seconds");
-    }
 
     // 添加默认规则
     intent_rule_t* rule;
@@ -554,20 +548,12 @@ void agentos_intent_parser_destroy(agentos_intent_parser_t* parser) {
 
     AGENTOS_LOG_DEBUG("Destroying intent parser: %s", parser->parser_id);
 
-    // 释放可观测性资源
-    if (parser->obs) {
-        agentos_observability_destroy(parser->obs);
-    }
-
-    // 释放规则链表
     free_rule_list(parser->rule_list);
 
-    // 释放互斥锁
     if (parser->lock) {
         agentos_mutex_destroy(parser->lock);
     }
 
-    // 释放 ID
     if (parser->parser_id) {
         AGENTOS_FREE(parser->parser_id);
     }
@@ -592,36 +578,23 @@ agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t* parser,
     }
 
     // 记录开始时间
-    uint64_t start_time_ns = agentos_get_monotonic_time_ns();
+    uint64_t start_time_ns = (uint64_t)agentos_time_monotonic_ms() * 1000000ULL;
 
     // 更新统计
     parser->total_parsed++;
 
-    // 记录指标
-    if (parser->obs) {
-        agentos_observability_increment_counter(parser->obs, "intent_parser_processed_total", 1);
-    }
-
-    // 创建意图结构
     agentos_intent_t* intent = (agentos_intent_t*)AGENTOS_CALLOC(1, sizeof(agentos_intent_t));
     if (!intent) {
         AGENTOS_LOG_ERROR("Failed to allocate intent structure");
         parser->failure_count++;
-        if (parser->obs) {
-            agentos_observability_increment_counter(parser->obs, "intent_parser_failure_total", 1);
-        }
         return AGENTOS_ENOMEM;
     }
 
-    // 复制原始文本
     intent->intent_raw_text = (char*)AGENTOS_MALLOC(input_len + 1);
     if (!intent->intent_raw_text) {
         AGENTOS_LOG_ERROR("Failed to allocate raw text buffer");
         AGENTOS_FREE(intent);
         parser->failure_count++;
-        if (parser->obs) {
-            agentos_observability_increment_counter(parser->obs, "intent_parser_failure_total", 1);
-        }
         return AGENTOS_ENOMEM;
     }
     memcpy(intent->intent_raw_text, input, input_len);
@@ -681,45 +654,27 @@ agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t* parser,
                          intent_name, confidence);
 
         parser->success_count++;
-        if (parser->obs) {
-            agentos_observability_increment_counter(parser->obs, "intent_parser_success_total", 1);
-        }
     } else {
-        // 未识别意图，使用默认
         intent->intent_goal = AGENTOS_STRDUP("unknown");
         intent->intent_goal_len = 7;
-        intent->intent_flags = 0x02;  // 未知意图标志
+        intent->intent_flags = 0x02;
 
         AGENTOS_LOG_WARN("No intent matched for input: %.*s", (int)input_len, input);
 
         parser->failure_count++;
-        if (parser->obs) {
-            agentos_observability_increment_counter(parser->obs, "intent_parser_failure_total", 1);
-        }
     }
 
-    // 计算耗时
-    uint64_t end_time_ns = agentos_get_monotonic_time_ns();
+    uint64_t end_time_ns = (uint64_t)agentos_time_monotonic_ms() * 1000000ULL;
     uint64_t duration_ns = end_time_ns - start_time_ns;
     parser->total_time_ns += duration_ns;
 
-    // 记录直方图指标
-    if (parser->obs) {
-        agentos_observability_record_histogram(parser->obs, "intent_parser_duration_seconds",
-                                              (double)duration_ns / 1e9);
-    }
-
     *out_intent = intent;
 
-    // 记录成功反馈
     if (match_result == AGENTOS_SUCCESS) {
         char feedback_json[256];
         snprintf(feedback_json, sizeof(feedback_json),
                 "{\"intent\":\"%s\",\"confidence\":%.2f,\"duration_ns\":%llu}",
                 intent_name, confidence, (unsigned long long)duration_ns);
-
-        // 触发反馈回调（如果注册了）
-        // 这里可以集成到更大的反馈系统
     }
 
     return AGENTOS_SUCCESS;

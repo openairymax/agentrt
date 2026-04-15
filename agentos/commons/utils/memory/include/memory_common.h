@@ -2,7 +2,9 @@
 #define MEMORY_COMMON_H
 
 #include <error.h>
-#include <agentos/memory.h>
+#include <stddef.h>
+#include <stdbool.h>
+#include "agentos_memory.h"
 
 typedef enum {
     MEMORY_STRATEGY_DEFAULT = 0,

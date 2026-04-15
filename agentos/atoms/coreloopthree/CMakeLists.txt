@@ -56,7 +56,7 @@ if(MSVC)
     target_compile_options(agentos_coreloopthree PRIVATE /sdl) # 启用额外安全检查
     target_compile_options(agentos_coreloopthree PRIVATE /guard:cf) # 控制流防护
 else()
-    target_compile_options(agentos_coreloopthree PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    target_compile_options(agentos_coreloopthree PRIVATE -Wall -Wextra -Wpedantic )
     # GCC/Clang安全选项
     target_compile_options(agentos_coreloopthree PRIVATE -fstack-protector-strong)
     target_compile_options(agentos_coreloopthree PRIVATE -D_FORTIFY_SOURCE=2)

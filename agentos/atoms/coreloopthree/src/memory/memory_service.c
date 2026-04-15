@@ -4,7 +4,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "memory.h"
+#include "agentos_memory.h"
 #include "logger.h"
 #include <stdlib.h>
 

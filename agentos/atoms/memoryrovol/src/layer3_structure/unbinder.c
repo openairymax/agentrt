@@ -13,10 +13,6 @@
 #include <string.h>
 #include <math.h>
 
-struct agentos_unbinder {
-    agentos_binder_t* binder;
-    agentos_mutex_t* lock;
-};
 
 agentos_unbinder_t* agentos_unbinder_create(agentos_binder_t* binder) {
     if (!binder) return NULL;

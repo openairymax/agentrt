@@ -5,7 +5,7 @@
  * @copyright Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "string.h"
+#include "agentos_string.h"
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */

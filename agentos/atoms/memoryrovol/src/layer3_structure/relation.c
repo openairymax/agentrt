@@ -16,16 +16,6 @@
 #include <string.h>
 #include <math.h>
 
-struct agentos_relation_encoder {
-    agentos_binder_t* binder;
-    agentos_mutex_t* lock;
-    float* role_subject;
-    float* role_predicate;
-    float* role_object;
-    // 持久化
-    sqlite3* db;
-    char* db_path;
-};
 
 
 static float* random_unit_vector(size_t dim) {

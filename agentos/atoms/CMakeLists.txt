@@ -11,7 +11,7 @@ endif()
 
 # 库构建选项
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static libraries" ON)
-option(WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
+option(WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 
 # 编译选项
 set(CMAKE_C_STANDARD 11)

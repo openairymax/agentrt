@@ -30,7 +30,7 @@ static void rr_destroy(agentos_dispatching_strategy_t* strategy)
 {
     if (!strategy) return;
     struct agentos_round_robin_dispatch* rr =
-        (struct agentos_round_robin_dispatch*)strategy->context;
+        (struct agentos_round_robin_dispatch*)strategy->data;
     if (rr) AGENTOS_FREE(rr);
     AGENTOS_FREE(strategy);
 }
@@ -92,19 +92,18 @@ static agentos_error_t rr_select(
  * @return AGENTOS_EINVAL 参数无效
  * @return AGENTOS_ENOMEM 内存分配失败
  */
-agentos_error_t agentos_dispatching_round_robin_create(
+agentos_dispatching_strategy_t* agentos_dispatching_round_robin_create(
     void* registry_ctx,
-    agent_registry_get_agents_func get_agents_func,
-    agentos_dispatching_strategy_t** out_strategy)
+    agent_registry_get_agents_func get_agents_func)
 {
-    if (!registry_ctx || !get_agents_func || !out_strategy) {
-        return AGENTOS_EINVAL;
+    if (!registry_ctx || !get_agents_func) {
+        return NULL;
     }
 
     struct agentos_round_robin_dispatch* rr =
         (struct agentos_round_robin_dispatch*)AGENTOS_CALLOC(1, sizeof(*rr));
     if (!rr) {
-        return AGENTOS_ENOMEM;
+        return NULL;
     }
 
     rr->registry_ctx = registry_ctx;
@@ -115,13 +114,12 @@ agentos_error_t agentos_dispatching_round_robin_create(
         (agentos_dispatching_strategy_t*)AGENTOS_CALLOC(1, sizeof(*strategy));
     if (!strategy) {
         AGENTOS_FREE(rr);
-        return AGENTOS_ENOMEM;
+        return NULL;
     }
 
-    strategy->context = rr;
-    strategy->select_agent = rr_select;
+    strategy->data = rr;
+    strategy->dispatch = rr_select;
     strategy->destroy = rr_destroy;
 
-    *out_strategy = strategy;
-    return AGENTOS_SUCCESS;
+    return strategy;
 }

@@ -3,7 +3,7 @@
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
  * SPDX-License-Identifier: Apache-2.0
  * 
- * @file string.h
+ * @file agentos_string.h
  * @brief 统一字符串处理模块 - 核心层API
  * 
  * 提供安全、高效、统一的字符串处理接口，避免缓冲区溢出等常见安全问题。
@@ -17,17 +17,6 @@
  * @see ARCHITECTURAL_PRINCIPLES.md E-1 安全内生原则
  */
 
-#if defined(__GNUC__) || defined(__clang__)
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wpedantic"
-    #include_next <string.h>
-    #pragma GCC diagnostic pop
-#elif defined(_MSC_VER)
-    #include <string.h>
-#else
-    #include <string.h>
-#endif
-
 #ifndef AGENTOS_STRING_H
 #define AGENTOS_STRING_H
 
@@ -35,20 +24,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdarg.h>
-
-#ifdef _WIN32
-    #include <BaseTsd.h>
-    typedef SSIZE_T ssize_t;
-#elif !defined(__ssize_t_defined) && !defined(_SSIZE_T_DEFINED)
-    /* POSIX系统: ssize_t 通常定义在 unistd.h 中 */
-    #include <sys/types.h>
-    #if defined(__APPLE__)
-        #include <machine/types.h>
-        typedef __darwin_ssize_t ssize_t;
-    #elif defined(_POSIX_VERSION)
-        /* 大多数POSIX系统已经通过 sys/types.h 定义了 ssize_t */
-    #endif
-#endif
+#include <sys/types.h>
 
 #ifdef __cplusplus
 extern "C" {

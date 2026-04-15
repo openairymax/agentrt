@@ -488,7 +488,7 @@ static agentos_error_t perform_bfs_search(agentos_knowledge_graph_t* kg,
     while (queue_front < queue_back && !found) {
         char* current = queue[queue_front++];
         found = process_current_node(kg, end_idx, in_queue, visited,
-                                    queue, &queue_back, current);
+                                    queue, &queue_front, &queue_back, current);
     }
 
     if (found) {

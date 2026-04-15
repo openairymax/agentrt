@@ -6,14 +6,10 @@
 
 #include "execution.h"
 #include "agentos.h"
-#include "core.h"
 #include <stdlib.h>
-
-/* Unified base library compatibility layer */
-#include <agentos/memory.h>
-#include <agentos/string.h>
 #include <string.h>
 #include <stdio.h>
+#include <agentos/memory.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -23,24 +19,14 @@
 
 #define AGENTOS_MAX_CODE_SIZE (4 * 1024 * 1024)
 
-#include <agentos/execution_common.h>\n\ntypedef struct $1_unit_data {\n    execution_unit_data_t base;\n    char* metadata_json;\n} $1_unit_data_t;
-
-/**
- * @brief 创建跨平台临时文件并写入内容
- * @param suffix 文件后缀（如 ".py"）
- * @param content 要写入的内容
- * @param content_len 内容长度
- * @param out_path 输出临时文件路径（需调用者释放）
- * @return 成功返回 AGENTOS_SUCCESS
- */
+typedef struct code_unit_data {
+    char* language;
+    char* metadata_json;
+} code_unit_data_t;
 
 #ifdef _WIN32
-/**
- * @brief Windows平台创建临时文件实现
- */
 static agentos_error_t create_temp_file_windows(
     const char* suffix, const char* content, size_t content_len, char** out_path) {
-
     char temp_dir[MAX_PATH];
     DWORD dir_len = GetTempPathA(MAX_PATH, temp_dir);
     if (dir_len == 0 || dir_len > MAX_PATH) return AGENTOS_EIO;
@@ -49,18 +35,15 @@ static agentos_error_t create_temp_file_windows(
     UINT ret = GetTempFileNameA(temp_dir, "aos", 0, temp_path);
     if (ret == 0) return AGENTOS_EIO;
 
-    // 如果有后缀，重命名文件
     if (suffix) {
         char final_path[MAX_PATH];
         snprintf(final_path, MAX_PATH, "%s%s", temp_path, suffix);
         if (!MoveFileA(temp_path, final_path)) {
-            // 重命名失败，使用原文件名
-        snprintf(final_path, MAX_PATH, "%s", temp_path);
+            snprintf(final_path, MAX_PATH, "%s", temp_path);
         }
         snprintf(temp_path, MAX_PATH, "%s", final_path);
     }
 
-    // 写入文件内容
     FILE* f = fopen(temp_path, "wb");
     if (!f) {
         DeleteFileA(temp_path);
@@ -88,20 +71,14 @@ static agentos_error_t create_temp_file_windows(
 
     return AGENTOS_SUCCESS;
 }
-
 #else
-/**
- * @brief Unix/Linux平台创建临时文件实现
- */
 static agentos_error_t create_temp_file_unix(
     const char* suffix, const char* content, size_t content_len, char** out_path) {
-
     char temp_dir[256];
-    if (agentos_core_get_temp_dir(temp_dir, sizeof(temp_dir)) != 0) {
-        return AGENTOS_EIO;
-    }
+    const char* td = getenv("TMPDIR");
+    if (!td) td = "/tmp";
+    snprintf(temp_dir, sizeof(temp_dir), "%s", td);
 
-    // 确保临时目录以路径分隔符结尾
     size_t temp_dir_len = strlen(temp_dir);
     if (temp_dir_len > 0 && temp_dir[temp_dir_len - 1] != '/') {
         if (temp_dir_len + 1 < sizeof(temp_dir)) {
@@ -143,14 +120,9 @@ static agentos_error_t create_temp_file_unix(
 }
 #endif
 
-/**
- * @brief 创建跨平台临时文件主函数
- */
 static agentos_error_t create_temp_file(
     const char* suffix, const char* content, size_t content_len, char** out_path) {
-
     if (!content || !out_path) return AGENTOS_EINVAL;
-
 #ifdef _WIN32
     return create_temp_file_windows(suffix, content, content_len, out_path);
 #else
@@ -158,16 +130,6 @@ static agentos_error_t create_temp_file(
 #endif
 }
 
-/**
- * @brief 删除临时文件
- * @param path 文件路径（可为NULL）
- *
- * @details 跨平台删除临时文件：
- * - Windows: 使用 DeleteFileA
- * - POSIX: 使用 unlink
- *
- * @note 此函数不返回错误状态，因为临时文件删除失败不影响系统正确性
- */
 static void remove_temp_file(const char* path) {
     if (!path) return;
 #ifdef _WIN32
@@ -177,12 +139,6 @@ static void remove_temp_file(const char* path) {
 #endif
 }
 
-/**
- * @brief 跨平台执行命令并捕获输出
- * @param cmd 要执行的命令
- * @param out_output 输出缓冲区（需调用者释放）
- * @return AGENTOS_SUCCESS 或错误码
- */
 static agentos_error_t execute_command_capture(const char* cmd, char** out_output) {
 #ifdef _WIN32
     HANDLE hReadPipe, hWritePipe;
@@ -284,24 +240,16 @@ static agentos_error_t execute_command_capture(const char* cmd, char** out_outpu
 #endif
 }
 
-/**
- * @brief 执行代码的核心逻辑
- * @param unit 执行单元
- * @param input 输入代码字符串
- * @param out_output 输出执行结果
- * @return AGENTOS_SUCCESS 或错误码
- */
 static agentos_error_t code_execute(
     agentos_execution_unit_t* unit, const void* input, void** out_output) {
-
-    code_unit_data_t* data = (code_unit_data_t*)unit->data;
+    code_unit_data_t* data = (code_unit_data_t*)unit->execution_unit_data;
     if (!data || !input || !out_output) return AGENTOS_EINVAL;
 
     const char* code = (const char*)input;
     size_t code_len = strlen(code);
 
     if (code_len > AGENTOS_MAX_CODE_SIZE) {
-        return AGENTOS_EMSGSIZE;
+        return AGENTOS_EINVAL;
     }
 
     if (strcmp(data->language, "python") != 0 &&
@@ -349,30 +297,24 @@ static agentos_error_t code_execute(
     return AGENTOS_SUCCESS;
 }
 
-/**
- * @brief 销毁代码执行单元
- */
-static void code_destroy(agentos_execution_unit_t* unit) {\n    if (!unit) return;\n    code_unit_data_t* data = (code_unit_data_t*)unit->data;\n    if (data) {\n        execution_unit_data_cleanup(&data->base);\n        if (data->metadata_json) AGENTOS_FREE(data->metadata_json);\n        AGENTOS_FREE(data);\n    }\n    AGENTOS_FREE(unit);\n}
-
-/**
- * @brief 获取执行单元元数据
- */
-static const char* code_get_metadata(agentos_execution_unit_t* unit) {
-    code_unit_data_t* data = (code_unit_data_t*)unit->data;
-    return data ? data->metadata_json : NULL;
+static void code_destroy(agentos_execution_unit_t* unit) {
+    if (!unit) return;
+    code_unit_data_t* data = (code_unit_data_t*)unit->execution_unit_data;
+    if (data) {
+        if (data->language) AGENTOS_FREE(data->language);
+        if (data->metadata_json) AGENTOS_FREE(data->metadata_json);
+        AGENTOS_FREE(data);
+    }
+    AGENTOS_FREE(unit);
 }
 
-/**
- * @brief 创建代码执行单元
- * @param language 支持的语言如"python"、"javascript"、"node"
- * @return 执行单元指针，失败返回NULL
- */
 agentos_execution_unit_t* agentos_code_unit_create(const char* language) {
     if (!language) return NULL;
     if (strlen(language) > 32) return NULL;
 
     agentos_execution_unit_t* unit = (agentos_execution_unit_t*)AGENTOS_MALLOC(sizeof(agentos_execution_unit_t));
     if (!unit) return NULL;
+    memset(unit, 0, sizeof(*unit));
 
     code_unit_data_t* data = (code_unit_data_t*)AGENTOS_MALLOC(sizeof(code_unit_data_t));
     if (!data) {
@@ -393,10 +335,9 @@ agentos_execution_unit_t* agentos_code_unit_create(const char* language) {
         return NULL;
     }
 
-    unit->data = data;
-    unit->execute = code_execute;
-    unit->destroy = code_destroy;
-    unit->get_metadata = code_get_metadata;
+    unit->execution_unit_data = data;
+    unit->execution_unit_execute = code_execute;
+    unit->execution_unit_destroy = code_destroy;
 
     return unit;
 }
