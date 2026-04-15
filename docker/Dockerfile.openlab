@@ -1,7 +1,7 @@
 # =============================================================================
 # AgentOS OpenLab Dockerfile
-# 版本: 1.0.0
-# 最后更新: 2026-04-05
+# 版本: 1.0.1
+# 最后更新: 2026-04-15
 #
 # 设计原则:
 # 1. 多阶段构建：前端构建 + 后端运行时分离
@@ -12,7 +12,7 @@
 # =============================================================================
 # 阶段1: 前端构建 (Frontend Builder)
 # =============================================================================
-FROM node:20-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 
@@ -31,7 +31,7 @@ RUN yarn build || npm run build
 # =============================================================================
 # 阶段2: 后端构建 (Backend Builder)
 # =============================================================================
-FROM python:3.11-slim AS backend-builder
+FROM python:3.12-slim AS backend-builder
 
 WORKDIR /app/backend
 
@@ -52,12 +52,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # =============================================================================
 # 阶段3: 运行时环境 (Runtime - Production)
 # =============================================================================
-FROM python:3.11-slim AS production
+FROM python:3.12-slim AS production
 
 LABEL maintainer="SPHARX Ltd. <devops@spharx.cn>"
 LABEL org.opencontainers.image.title="AgentOS OpenLab"
 LABEL org.opencontainers.image.description="AgentOS智能体交互平台"
-LABEL org.opencontainers.image.version="1.0.0"
+LABEL org.opencontainers.image.version="1.0.1"
 LABEL org.opencontainers.image.source="https://gitcode.com/spharx/agentos"
 
 # 安装运行时依赖和Nginx
@@ -115,7 +115,7 @@ CMD ["/bin/sh", "-c", "nginx && cd /app/backend && uvicorn main:app --host 0.0.0
 # =============================================================================
 # 阶段4: 开发环境 (Development)
 # =============================================================================
-FROM node:20-alpine AS development
+FROM node:22-alpine AS development
 
 LABEL stage="development"
 

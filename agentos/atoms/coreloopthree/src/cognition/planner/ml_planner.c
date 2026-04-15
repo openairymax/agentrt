@@ -5,9 +5,9 @@
  */
 
 #include "../../../include/cognition.h"
-#include "../../../../../commons/utils/memory/include/memory_compat.h"
-#include "../../../../../commons/utils/logging/include/logging_compat.h"
-#include "../../../../../commons/platform/include/platform.h"
+#include <agentos/memory.h>
+#include <agentos/logging.h>
+#include <agentos/platform.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -102,44 +102,44 @@ static agentos_error_t ml_planner_fallback_plan(
     agentos_task_plan_t* plan = (agentos_task_plan_t*)AGENTOS_CALLOC(1, sizeof(agentos_task_plan_t));
     if (!plan) return AGENTOS_ENOMEM;
 
-    plan->plan_id = AGENTOS_STRDUP("ml_fallback_plan");
-    plan->nodes = NULL;
-    plan->node_count = 0;
-    plan->entry_points = NULL;
-    plan->entry_count = 0;
+    plan->task_plan_id = AGENTOS_STRDUP("ml_fallback_plan");
+    plan->task_plan_nodes = NULL;
+    plan->task_plan_node_count = 0;
+    plan->task_plan_entry_points = NULL;
+    plan->task_plan_entry_count = 0;
 
     agentos_task_node_t* node = (agentos_task_node_t*)AGENTOS_CALLOC(1, sizeof(agentos_task_node_t));
     if (!node) {
-        AGENTOS_FREE(plan->plan_id);
+        AGENTOS_FREE(plan->task_plan_id);
         AGENTOS_FREE(plan);
         return AGENTOS_ENOMEM;
     }
 
     /* Assign task based on intent priority heuristic */
-    node->task_id = AGENTOS_STRDUP("ml_fallback_task");
-    node->agent_role = AGENTOS_STRDUP("default");
-    node->depends_on = NULL;
-    node->depends_count = 0;
-    node->timeout_ms = 30000;
-    node->priority = 128;
-    node->input = NULL;
+    node->task_node_id = AGENTOS_STRDUP("ml_fallback_task");
+    node->task_node_agent_role = AGENTOS_STRDUP("default");
+    node->task_node_depends_on = NULL;
+    node->task_node_depends_count = 0;
+    node->task_node_timeout_ms = 30000;
+    node->task_node_priority = 128;
+    node->task_node_input = NULL;
 
-    plan->nodes = (agentos_task_node_t**)AGENTOS_MALLOC(sizeof(agentos_task_node_t*));
-    if (!plan->nodes) {
-        AGENTOS_FREE(node->task_id);
-        AGENTOS_FREE(node->agent_role);
+    plan->task_plan_nodes = (agentos_task_node_t**)AGENTOS_MALLOC(sizeof(agentos_task_node_t*));
+    if (!plan->task_plan_nodes) {
+        AGENTOS_FREE(node->task_node_id);
+        AGENTOS_FREE(node->task_node_agent_role);
         AGENTOS_FREE(node);
-        AGENTOS_FREE(plan->plan_id);
+        AGENTOS_FREE(plan->task_plan_id);
         AGENTOS_FREE(plan);
         return AGENTOS_ENOMEM;
     }
-    plan->nodes[0] = node;
-    plan->node_count = 1;
+    plan->task_plan_nodes[0] = node;
+    plan->task_plan_node_count = 1;
 
-    plan->entry_points = (char**)AGENTOS_MALLOC(sizeof(char*));
-    if (plan->entry_points) {
-        plan->entry_count = 1;
-        plan->entry_points[0] = node->task_id;
+    plan->task_plan_entry_points = (char**)AGENTOS_MALLOC(sizeof(char*));
+    if (plan->task_plan_entry_points) {
+        plan->task_plan_entry_count = 1;
+        plan->task_plan_entry_points[0] = node->task_node_id;
     }
 
     *out_plan = plan;

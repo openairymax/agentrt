@@ -28,6 +28,15 @@
 #ifdef _WIN32
     #include <BaseTsd.h>
     typedef SSIZE_T ssize_t;
+#elif !defined(__ssize_t_defined) && !defined(_SSIZE_T_DEFINED)
+    /* POSIX系统: ssize_t 通常定义在 unistd.h 中 */
+    #include <sys/types.h>
+    #if defined(__APPLE__)
+        #include <machine/types.h>
+        typedef __darwin_ssize_t ssize_t;
+    #elif defined(_POSIX_VERSION)
+        /* 大多数POSIX系统已经通过 sys/types.h 定义了 ssize_t */
+    #endif
 #endif
 
 #ifdef __cplusplus

@@ -9,8 +9,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../../agentos/commons/utils/memory/include/memory_compat.h"
-#include "../../../agentos/commons/utils/string/include/string_compat.h"
+#include <agentos/memory.h>
+#include <agentos/string.h>
 #include <string.h>
 #include <stdio.h>
 #include <float.h>
@@ -18,7 +18,7 @@
 /**
  * @brief 加权调度私有数据
  */
-#include "../../../agentos/commons/utils/strategy/include/strategy_common.h"\n\ntypedef struct weighted_data {\n    weighted_config_t manager;\n    void* registry_ctx;\n    agent_registry_get_agents_func get_agents;\n    agentos_mutex_t* lock;\n} weighted_data_t;
+#include <agentos/strategy_common.h>\n\ntypedef struct weighted_data {\n    weighted_config_t manager;\n    void* registry_ctx;\n    agent_registry_get_agents_func get_agents;\n    agentos_mutex_t* lock;\n} weighted_data_t;
 
 
 static void weighted_destroy(agentos_dispatching_strategy_t* strategy) {

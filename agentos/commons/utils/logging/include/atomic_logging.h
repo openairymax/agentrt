@@ -93,7 +93,7 @@ typedef struct _AtomicLogRecordNode {
     _Atomic uint64_t sequence;
     
     /** @brief 填充字节，确保缓存行对齐 */
-    uint8_t _padding[64 - sizeof(log_record_t) - sizeof(_Atomic uint32_t) - sizeof(_Atomic uint64_t)];
+    uint8_t _padding[1];
 } AtomicLogRecordNode;
 
 /**
@@ -357,7 +357,7 @@ static inline void atomic_read_barrier(void) {
  * @param desired 新值
  * @return true 操作成功，false 操作失败
  */
-static inline bool atomic_compare_exchange_weak(volatile uint64_t* ptr, uint64_t* expected, uint64_t desired) {
+static inline bool agentos_atomic_cas_weak(volatile uint64_t* ptr, uint64_t* expected, uint64_t desired) {
 #if defined(__GNUC__) || defined(__clang__)
     return __atomic_compare_exchange_n(ptr, expected, desired, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE);
 #elif defined(_MSC_VER)

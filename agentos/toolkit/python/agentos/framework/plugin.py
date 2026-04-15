@@ -36,6 +36,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Type, TypeVar
 
+from .skill import VersionManager
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar('T')

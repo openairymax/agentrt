@@ -454,8 +454,10 @@ guard_t* guard_create(
     
     // 复制名称和描述
     strncpy(guard->name, name, GUARD_NAME_MAX_LEN - 1);
+    guard->name[GUARD_NAME_MAX_LEN - 1] = '\0';
     if (description) {
         strncpy(guard->description, description, GUARD_DESC_MAX_LEN - 1);
+        guard->description[GUARD_DESC_MAX_LEN - 1] = '\0';
     }
     
     // 设置基本属性

@@ -37,13 +37,13 @@ Powered by OpenAirymax
 
 ## 💡 创新要点
 
-<center>  
+<div align="center">
 
 ⚡️  
 
-**基石理论[《体系并行论》](docs/Basic_Theories/CN_01_体系并行论.md)**  
+**基石理论 [《体系并行论》](docs/Basic_Theories/CN_01_体系并行论.md)**  
 
-</center>
+</div>
 
 - **纯净内核**：内核仅提供原子机制，纯净高效
 - **认知循环**：认知，规划，行动
@@ -220,13 +220,13 @@ AgentOS 是**操作系统级**产品，而非单一框架：
 
 ### 相信的力量
 
-<center>
+<div align="center">
 
 ☀️  
 
 **这不是人类的日落，而是新世界的曙光**
 
-</center>  
+</div>  
 
 **相信**  
 

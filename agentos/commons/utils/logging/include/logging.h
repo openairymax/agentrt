@@ -62,6 +62,7 @@ extern "C" {
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <stdarg.h>
 
 /* ==================== 日志级别定义 ==================== */
 
