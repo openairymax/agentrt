@@ -34,6 +34,8 @@ static const int DEFAULT_CONFIG_RELOAD_INTERVAL = 30;
 
 /* ==================== 内部数据结构 ==================== */
 
+typedef log_monitoring_stats_t service_logging_stats_t;
+
 /** 输出器基�?*/
 typedef struct outputter {
     /** 输出器类�?*/

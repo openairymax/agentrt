@@ -69,10 +69,7 @@ set(SOURCES
     # 统一资源守护模块
     utils/resource/resource_guard.c
     # 统一日志模块
-    utils/logging/src/logging_compat.c
     utils/logging/src/logging.c
-    utils/logging/src/atomic_logging.c
-    utils/logging/src/service_logging.c
     utils/logging/logging_common.c
     # 统一配置模块
     utils/config_unified/src/core_config.c
