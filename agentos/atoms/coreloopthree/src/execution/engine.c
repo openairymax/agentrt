@@ -6,16 +6,16 @@
 
 #include "../../include/execution.h"
 #include "../../include/agent_registry.h"
-#include "../../../corekern/include/agentos.h"
-#include "../../../commons/utils/observability/include/logger.h"
+#include <agentos/agentos.h>
+#include <agentos/logger.h>
 #include "../../include/id_utils.h"
 #include "../../include/error_utils.h"
 #include <stdlib.h>
 #include <stdint.h>
 
 /* Unified base library compatibility layer */
-#include "../../../agentos/commons/utils/memory/include/memory_compat.h"
-#include "../../../agentos/commons/utils/string/include/string_compat.h"
+#include <agentos/memory.h>
+#include <agentos/string.h>
 #include <string.h>
 #include <stdio.h>
 

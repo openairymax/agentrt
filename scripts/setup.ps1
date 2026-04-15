@@ -58,7 +58,7 @@ Examples:
 
 Write-Host ""
 Write-Host "╔══════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║     AgentOS Windows Setup Script v1.0     ║" -ForegroundColor Green
+Write-Host "║     AgentOS Windows Setup Script v1.0    ║" -ForegroundColor Green
 Write-Host "╚══════════════════════════════════════════╝" -ForegroundColor Green
 Write-Host ""
 
@@ -106,7 +106,7 @@ if (-not $PrerequisitesOK) {
 # Step 2: Install dependencies (if needed)
 if (-not $SkipDeps) {
     Write-Header "Step 2: Installing Dependencies"
-    
+
     # Install vcpkg if not present
     $vcpkgRoot = "$env:USERPROFILE\vcpkg"
     if (-not (Test-Path $vcpkgRoot)) {
@@ -119,7 +119,7 @@ if (-not $SkipDeps) {
     } else {
         Write-Host "[✓] vcpkg already installed at $vcpkgRoot" -ForegroundColor Green
     }
-    
+
     # Set vcpkg environment
     $env:VCPKG_ROOT = $vcpkgRoot
     $env:Path += ";$vcpkgRoot"
@@ -192,11 +192,11 @@ try {
 # Step 5: Run tests (if requested)
 if ($Test) {
     Write-Header "Step 5: Running Tests"
-    
+
     Write-Host "[INFO] Running test suite..." -ForegroundColor Yellow
-    
+
     & ctest --output-on-failure -C $BuildType
-    
+
     if ($LASTEXITCODE -eq 0) {
         Write-Host "[✓] All tests passed!" -ForegroundColor Green
     } else {

@@ -1,7 +1,7 @@
 # =============================================================================
 # AgentOS Daemon Dockerfile - 生产级构建
-# 版本: 2.0.0 (Production-Ready)
-# 最后更新: 2026-04-06
+# 版本: 2.0.1 (Production-Ready)
+# 最后更新: 2026-04-15
 #
 # 🎯 生产级特性:
 # ✅ 多目标构建 (Builder → Runtime → Gateway → Debug)
@@ -14,7 +14,7 @@
 # =============================================================================
 # 阶段1: 构建环境 (Builder)
 # =============================================================================
-FROM ubuntu:22.04 AS builder
+FROM ubuntu:24.04 AS builder
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG DAEMON_SERVICES=all
@@ -79,7 +79,7 @@ RUN find /opt/venv -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || 
 # =============================================================================
 # 阶段2: 运行时环境 (Runtime) - 守护进程服务
 # =============================================================================
-FROM ubuntu:22.04 AS runtime
+FROM ubuntu:24.04 AS runtime
 
 LABEL maintainer="SPHARX DevOps <devops@spharx.cn>" \
       org.opencontainers.image.title="AgentOS Daemon Services v2.0" \

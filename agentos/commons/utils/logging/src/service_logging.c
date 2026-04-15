@@ -8,11 +8,12 @@
  * 注意：这是一个简化实现，提供基本功能�? * 生产环境应使用完整实现以获得所有高级功能�? */
 
 #include "service_logging.h"
+#include <stdio.h>
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "../../utils/memory/include/memory_compat.h"
-#include "../../utils/string/include/string_compat.h"
+#include <agentos/memory_compat.h>
+#include <agentos/string_compat.h>
 #include <string.h>
 #include <time.h>
 #include <pthread.h>
@@ -26,10 +27,10 @@ static const int DEFAULT_WORKER_THREADS = 2;
 static const int DEFAULT_CONFIG_RELOAD_INTERVAL = 30;
 
 /** 最大输出器数量 */
-static const int MAX_OUTPUTTERS = 16;
+#define MAX_OUTPUTTERS 16
 
 /** 最大过滤器数量 */
-static const int MAX_FILTERS = 32;
+#define MAX_FILTERS 32
 
 /* ==================== 内部数据结构 ==================== */
 
@@ -398,6 +399,7 @@ int service_logging_add_outputter(const char* name, int type, void* user_data) {
 
     outputter->type = type;
     strncpy(outputter->name, name, sizeof(outputter->name) - 1);
+    outputter->name[sizeof(outputter->name) - 1] = '\0';
     outputter->user_data = user_data;
 
     // 根据类型设置函数

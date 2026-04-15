@@ -99,3 +99,51 @@ void secure_clear(void* buf, size_t size) {
     volatile unsigned char* p = (volatile unsigned char*)buf;
     for (size_t i = 0; i < size; i++) p[i] = 0;
 }
+
+/* ==================== 输入验证函数（规范 3.2.2） ==================== */
+
+bool validate_string_input(const char* str, size_t max_len) {
+    if (!str) return false;
+    size_t len = 0;
+    for (size_t i = 0; i < max_len; i++) {
+        if (str[i] == '\0') { len = i; break; }
+        if (i == max_len - 1) return false;
+    }
+    for (size_t i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)str[i];
+        if (c < 0x20 && c != '\t' && c != '\n' && c != '\r') return false;
+    }
+    return true;
+}
+
+bool validate_pointer(const void* ptr) {
+    return ptr != NULL;
+}
+
+bool validate_range(int64_t value, int64_t min_val, int64_t max_val) {
+    return value >= min_val && value <= max_val;
+}
+
+/* ==================== 安全内存操作 ==================== */
+
+void* safe_malloc(size_t size, const char* purpose) {
+    (void)purpose;
+    if (size == 0) return NULL;
+    void* ptr = malloc(size);
+    return ptr;
+}
+
+void* safe_calloc(size_t count, size_t size, const char* purpose) {
+    (void)purpose;
+    if (count == 0 || size == 0) return NULL;
+    if (count > SIZE_MAX / size) return NULL;
+    void* ptr = calloc(count, size);
+    return ptr;
+}
+
+void* safe_realloc(void* ptr, size_t new_size, const char* purpose) {
+    (void)purpose;
+    if (new_size == 0) { free(ptr); return NULL; }
+    void* new_ptr = realloc(ptr, new_size);
+    return new_ptr;
+}

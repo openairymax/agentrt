@@ -2,8 +2,8 @@ version: '3.8'
 
 # =============================================================================
 # AgentOS Docker Compose - 开发环境 (Development)
-# 版本: 2.0.0 (Production-Grade Dev Environment)
-# 最后更新: 2026-04-06
+# 版本: 2.0.1 (Production-Grade Dev Environment)
+# 最后更新: 2026-04-15
 #
 # 🎯 设计原则:
 # ✅ 与生产环境保持一致的架构（便于迁移）
@@ -238,7 +238,7 @@ services:
   # 版本: PostgreSQL 15 Alpine（轻量级镜像）
   # ===========================================================================
   postgres:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: agentos-postgres-dev
     hostname: agentos-postgres
     restart: unless-stopped
@@ -296,7 +296,7 @@ services:
   # 版本: Redis 7 Alpine（最新稳定版）
   # ===========================================================================
   redis:
-    image: redis:7-alpine
+    image: redis:7.2-alpine
     container_name: agentos-redis-dev
     hostname: agentos-redis
     restart: unless-stopped
@@ -312,13 +312,13 @@ services:
     # 启动命令（开启 AOF 持久化 + 内存限制）
     command: >
       redis-server
-      --appendonly yes                     # AOF 持久化（防止数据丢失）
-      --appendfsync everysec               # 每秒同步（性能与安全的平衡）
-      --maxmemory 256mb                    # 最大内存 256MB（开发环境）
-      --maxmemory-policy allkeys-lru       # 内存满时淘汰 LRU 键
-      --save ""                            # 禁用 RDB（仅使用 AOF）
-      --loglevel notice                    # 日志级别
-      --timeout 300                        # 空闲连接超时
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+      --loglevel notice
+      --timeout 300
 
     # 网络
     networks:
@@ -329,7 +329,7 @@ services:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
-      retries:5
+      retries: 5
       start_period: 10s
 
     # 资源限制
@@ -398,7 +398,8 @@ services:
 
     # 依赖关系
     depends_on:
-      - gateway                           # 通过 Gateway 间接依赖 Kernel
+      gateway:
+        condition: service_healthy        # 通过 Gateway 间接依赖 Kernel
 
     # 资源限制
     deploy:
@@ -425,7 +426,7 @@ services:
   # 启动方式: docker compose --profile monitoring up -d
   # ===========================================================================
   prometheus:
-    image: prom/prometheus:v2.45.0
+    image: prom/prometheus:v2.50.0
     container_name: agentos-prometheus-dev
     hostname: agentos-prometheus
     restart: unless-stopped
@@ -465,6 +466,14 @@ services:
           cpus: '0.25'
           memory: 256M
 
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
     # 日志配置
     logging:
       driver: json-file
@@ -480,7 +489,7 @@ services:
   # 启动方式: docker compose --profile monitoring up -d
   # ===========================================================================
   grafana:
-    image: grafana/grafana:10.2.0
+    image: grafana/grafana:10.3.0
     container_name: agentos-grafana-dev
     hostname: agentos-grafana
     restart: unless-stopped
@@ -511,7 +520,8 @@ services:
 
     # 依赖关系
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_healthy
 
     # 资源限制
     deploy:

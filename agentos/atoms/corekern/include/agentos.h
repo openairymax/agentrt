@@ -54,7 +54,7 @@
 /**
  * @brief 时间管理接口
  */
-#include "time.h"
+#include "agentos_time.h"
 
 #ifdef __cplusplus
 extern "C" {

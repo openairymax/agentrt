@@ -197,14 +197,14 @@ int logging_compat_init(const logging_compat_config_t* manager);
  * @brief 获取兼容层统计信�? * 
  * 获取兼容层的运行时统计信息，用于监控迁移进度�? * 
  * @param out_stats 输出参数，接收统计信�? * @return 0 成功，负值表示错�? */
-int logging_compat_get_stats(struct logging_compat_stats* out_stats);
+int logging_compat_get_stats(logging_compat_stats_t* out_stats);
 
 /**
  * @brief 获取待迁移API列表
  * 
  * 获取项目中仍在使用旧API的模块列表，用于迁移规划�? * 
  * @param out_modules 输出数组，接收模块信�? * @param max_modules 最大模块数�? * @return 实际返回的模块数量，负值表示错�? */
-int logging_compat_get_migration_list(struct migration_module_info* out_modules, int max_modules);
+int logging_compat_get_migration_list(migration_module_info_t* out_modules, int max_modules);
 
 /**
  * @brief 清理兼容�? * 
@@ -220,7 +220,7 @@ void logging_compat_cleanup(void);
  * @param module_name 模块名称
  * @param options 迁移选项
  * @return 0 成功，负值表示错�? */
-int logging_migrate_module(const char* module_name, const struct migration_options* options);
+int logging_migrate_module(const char* module_name, const migration_options_t* options);
 
 /**
  * @brief 生成迁移报告
@@ -237,7 +237,32 @@ int logging_generate_migration_report(const char* report_path);
  * @param module_name 模块名称
  * @return 验证结果结构体指针，失败返回NULL
  */
-const struct migration_validation_result* logging_validate_migration(const char* module_name);
+const migration_validation_result_t* logging_validate_migration(const char* module_name);
+
+/* ==================== 迁移辅助结构体定义 ==================== */
+
+typedef struct migration_module_info {
+    char module_name[64];
+    char current_api[64];
+    char target_api[64];
+    int migration_status;
+    float completion_percent;
+} migration_module_info_t;
+
+typedef struct migration_options {
+    int dry_run;
+    int backup_enabled;
+    int verbose;
+    char backup_path[256];
+} migration_options_t;
+
+typedef struct migration_validation_result {
+    char module_name[64];
+    int status;
+    int errors;
+    int warnings;
+    char details[256];
+} migration_validation_result_t;
 
 /* ==================== 兼容层统计结构体 ==================== */
 
