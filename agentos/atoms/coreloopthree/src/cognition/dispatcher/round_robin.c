@@ -11,8 +11,8 @@
 #include <string.h>
 
 /* Unified base library compatibility layer */
-#include <agentos/memory_compat.h>
-#include <agentos/string_compat.h>
+#include <agentos/memory.h>
+#include <agentos/string.h>
 
 /**
  * @brief 轮询调度策略内部结构

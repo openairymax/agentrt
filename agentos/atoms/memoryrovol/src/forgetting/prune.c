@@ -10,8 +10,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include <agentos/memory_compat.h>
-#include <agentos/string_compat.h>
+#include <agentos/memory.h>
+#include <agentos/string.h>
 
 agentos_error_t agentos_forgetting_prune(
     agentos_forgetting_engine_t* engine,

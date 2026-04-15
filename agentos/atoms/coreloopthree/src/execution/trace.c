@@ -9,8 +9,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include <agentos/memory_compat.h>
-#include <agentos/string_compat.h>
+#include <agentos/memory.h>
+#include <agentos/string.h>
 #include <string.h>
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */

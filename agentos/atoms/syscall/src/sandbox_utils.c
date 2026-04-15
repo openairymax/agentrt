@@ -11,8 +11,8 @@
 #include <time.h>
 
 /* 基础库兼容性层 */
-#include <agentos/memory_compat.h>
-#include <agentos/string_compat.h>
+#include <agentos/memory.h>
+#include <agentos/string.h>
 
 /* 沙箱内部结构（需要知道布局） */
 struct agentos_sandbox {

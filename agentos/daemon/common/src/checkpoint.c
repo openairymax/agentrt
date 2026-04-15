@@ -33,7 +33,7 @@
 #endif
 
 /* Unified base library compatibility layer */
-#include <agentos/memory_compat.h>
+#include <agentos/memory.h>
 
 #ifdef _WIN32
 #include <windows.h>

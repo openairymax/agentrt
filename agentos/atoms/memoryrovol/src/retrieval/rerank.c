@@ -29,8 +29,8 @@
 #include "../include/layer1_raw.h"
 
 /* Unified base library compatibility layer */
-#include <agentos/memory_compat.h>
-#include <agentos/string_compat.h>
+#include <agentos/memory.h>
+#include <agentos/string.h>
 
 /**
  * @brief 重排序器内部结构

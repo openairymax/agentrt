@@ -12,8 +12,8 @@
  */
 
 #include "config.h"
-#include <agentos/memory_compat.h>
-#include <agentos/string_compat.h>
+#include <agentos/memory.h>
+#include <agentos/string.h>
 #include <agentos/safe_string_utils.h>
 #include <stdlib.h>
 #include <string.h>
