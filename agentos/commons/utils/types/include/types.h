@@ -162,7 +162,6 @@ typedef enum {
 /**
  * @brief 任务句柄类型
  * @details 用于引用任务实例
- * 注意：完整结构体定义在 atoms/coreloopthree/include/execution.h 中
  */
 #ifndef AGENTOS_TASK_T_DEFINED
 #define AGENTOS_TASK_T_DEFINED
@@ -228,10 +227,10 @@ typedef enum {
 #ifndef AGENTOS_MEMORY_TYPE_T_DEFINED
 #define AGENTOS_MEMORY_TYPE_T_DEFINED
 typedef enum {
-    AGENTOS_MEMTYPE_TEXT      = 0,    /**< 文本记忆 */
-    AGENTOS_MEMTYPE_EMBEDDING = 1,    /**< 向量嵌入 */
-    AGENTOS_MEMTYPE_STRUCTURED = 2,   /**< 结构化数据 */
-    AGENTOS_MEMTYPE_BINARY    = 3     /**< 二进制数据 */
+    AGENTOS_MEMTYPE_TEXT      = 0,
+    AGENTOS_MEMTYPE_EMBEDDING = 1,
+    AGENTOS_MEMTYPE_STRUCTURED = 2,
+    AGENTOS_MEMTYPE_BINARY    = 3
 } agentos_memory_type_t;
 #endif
 
@@ -281,9 +280,9 @@ typedef struct {
 #ifndef AGENTOS_MEMORY_RESULT_T_DEFINED
 #define AGENTOS_MEMORY_RESULT_T_DEFINED
 typedef struct {
-    agentos_memory_entry_t* entries;/**< 记忆条目数组 */
-    size_t count;                   /**< 条目数量 */
-    float* scores;                  /**< 相似度分数 */
+    agentos_memory_entry_t* entries;
+    size_t count;
+    float* scores;
 } agentos_memory_result_t;
 #endif
 
@@ -455,13 +454,16 @@ typedef struct {
 /**
  * @brief 日志级别枚举
  */
+#ifndef AGENTOS_LOG_LEVEL_T_DEFINED
+#define AGENTOS_LOG_LEVEL_T_DEFINED
 typedef enum {
-    AGENTOS_LOG_DEBUG   = 0,    /**< 调试级别 */
-    AGENTOS_LOG_INFO    = 1,    /**< 信息级别 */
-    AGENTOS_LOG_WARN    = 2,    /**< 警告级别 */
-    AGENTOS_LOG_ERROR   = 3,    /**< 错误级别 */
-    AGENTOS_LOG_FATAL   = 4     /**< 致命级别 */
+    AGENTOS_LOG_LEVEL_DEBUG   = 0,
+    AGENTOS_LOG_LEVEL_INFO    = 1,
+    AGENTOS_LOG_LEVEL_WARN    = 2,
+    AGENTOS_LOG_LEVEL_ERROR   = 3,
+    AGENTOS_LOG_LEVEL_FATAL   = 4
 } agentos_log_level_t;
+#endif
 
 /**
  * @brief 指标类型枚举

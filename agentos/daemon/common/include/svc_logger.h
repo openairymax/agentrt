@@ -29,7 +29,10 @@ extern "C" {
  * @brief 日志级别枚举（兼容层）
  * @note 映射到 commons 的 log_level_t
  */
+#ifndef AGENTOS_LOG_LEVEL_T_DEFINED
+#define AGENTOS_LOG_LEVEL_T_DEFINED
 typedef log_level_t agentos_log_level_t;
+#endif
 
 /* 兼容旧日志级别名称 */
 #define AGENTOS_LOG_TRACE   LOG_LEVEL_DEBUG

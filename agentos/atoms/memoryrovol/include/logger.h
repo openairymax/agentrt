@@ -21,12 +21,15 @@ extern "C" {
 /**
  * @brief 日志级别枚举
  */
+#ifndef AGENTOS_LOG_LEVEL_T_DEFINED
+#define AGENTOS_LOG_LEVEL_T_DEFINED
 typedef enum agentos_log_level_e {
     AGENTOS_LOG_DEBUG = 0,    /**< 调试信息，仅开发阶段使用 */
     AGENTOS_LOG_INFO  = 1,    /**< 一般信息，正常运行状态 */
     AGENTOS_LOG_WARN  = 2,    /**< 警告信息，可能需要关注 */
     AGENTOS_LOG_ERROR = 3     /**< 错误信息，需要立即处理 */
 } agentos_log_level_t;
+#endif
 
 /* ==================== 日志宏接口 ==================== */
 

@@ -19,7 +19,7 @@ add_library(agentos_memoryrovol STATIC
     layer3_structure/graph.c
     layer3_structure/relation.c
     layer3_structure/sequence.c
-    # layer3_structure/unbinder.c   # 暂时排除：函数指针下标语法错误
+    layer3_structure/unbinder.c
     # layer4_pattern/clustering.c   # 暂时排除：agentos_clustering_engine_t类型未定义
     # layer4_pattern/miner.c        # 暂时排除：persistence.h头文件缺失
     # layer4_pattern/persistence.c  # 暂时排除：agentos_persistence_feature_t类型未定义

@@ -10,7 +10,7 @@
 #include "agentos.h"
 #include "config.h"
 #include "forgetting.h"
-#include "../../../commons/utils/observability/include/observability_compat.h"
+#include <observability_compat.h>
 
 #ifdef __cplusplus
 extern "C" {

@@ -18,8 +18,8 @@
 #include <agentos/agentos.h>
 #include "../include/logger.h"
 #include "sandbox_utils.h"
-#include "../include/sandbox_permission.h"
-#include "../include/sandbox_quota.h"
+#include "sandbox_permission.h"
+#include "sandbox_quota.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -142,6 +142,7 @@ struct agentos_sandbox {
     
     security_policy_t policy;            /* 安全策略配置 */
     sandbox_perf_stats_t perf_stats;     /* 性能统计 */
+    resource_quota_t quota;              /* 资源配额 */
     
     int enable_input_sanitization;       /* 是否启用输入净化 */
     int enable_resource_monitoring;      /* 是否启用资源监控 */
@@ -162,6 +163,9 @@ typedef struct sandbox_manager {
 
 static sandbox_manager_t* g_sandbox_manager = NULL;
 static agentos_mutex_t* g_manager_lock = NULL;
+
+/* 前向声明 */
+void agentos_sandbox_destroy(agentos_sandbox_t* sandbox);
 
 /* ==================== 沙箱管理器 ==================== */
 
@@ -518,6 +522,7 @@ agentos_error_t agentos_sandbox_health_check(agentos_sandbox_t* sandbox, char** 
  * @param max_length 最大允许长度
  * @return 0=安全，非0=检测到危险内容
  */
+__attribute__((unused))
 static int sanitize_input(const char* input, size_t max_length) {
     if (!input) return -1; /* 空输入视为危险 */
     
@@ -607,6 +612,7 @@ static void sandbox_add_enhanced_audit_entry(
 /**
  * @brief 初始化增强功能（在创建沙箱时调用）
  */
+__attribute__((unused))
 static void init_sandbox_enhancements(agentos_sandbox_t* sandbox) {
     if (!sandbox) return;
     

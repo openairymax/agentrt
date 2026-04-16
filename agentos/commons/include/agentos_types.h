@@ -69,6 +69,7 @@ typedef int32_t agentos_error_t;
 #define AGENTOS_E2BIG          (-23)   /**< 参数过长 */
 #define AGENTOS_EALREADY       (-24)   /**< 操作已在进行 */
 #define AGENTOS_EUNAVAILABLE    (-25)   /**< 服务不可用 */
+#define AGENTOS_EQUOTA         (-26)   /**< 配额超限 */
 #define AGENTOS_EUNKNOWN       (-99)   /**< 未知错误 */
 
 /* ==================== 统一的同步原语类型（来自platform.h） ==================== */
