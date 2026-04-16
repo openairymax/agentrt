@@ -24,7 +24,7 @@ typedef struct {
     size_t capacity;
 } feature_collector_t;
 
-static void collector_add(feature_collector_t* col, int dim, double birth, double death) {
+__attribute__((unused)) static void collector_add(feature_collector_t* col, int dim, double birth, double death) {
     if (col->count >= col->capacity) {
         col->capacity = (col->capacity == 0) ? 16 : col->capacity * 2;
         agentos_persistence_feature_t** new_f = (agentos_persistence_feature_t**)AGENTOS_REALLOC(

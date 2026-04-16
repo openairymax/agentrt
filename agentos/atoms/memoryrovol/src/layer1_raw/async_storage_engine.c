@@ -218,7 +218,9 @@ agentos_error_t agentos_layer1_raw_create_production(
     }
 
     engine->inner->obs = agentos_observability_create();
-    if (engine->inner->obs) {
+    if (!engine->inner->obs) {
+        AGENTOS_LOG_WARN("Failed to create observability for async storage engine, metrics disabled");
+    } else {
         agentos_observability_register_metric(engine->inner->obs, "storage_write_total",
                                               AGENTOS_METRIC_COUNTER, "Total writes");
         agentos_observability_register_metric(engine->inner->obs, "storage_write_success_total",
@@ -226,6 +228,7 @@ agentos_error_t agentos_layer1_raw_create_production(
         agentos_observability_register_metric(engine->inner->obs, "storage_write_failure_total",
                                               AGENTOS_METRIC_COUNTER, "Failed writes");
     }
+
 
     engine->inner->engine_id = agentos_generate_uuid();
     if (!engine->inner->engine_id) {

@@ -12,6 +12,8 @@
 #include <stdio.h>
 #include <time.h>
 #include <errno.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #define DEFAULT_OVERFLOW_DIR "/var/log/cupolas"
 #define DEFAULT_MAX_FILE_SIZE_MB 100

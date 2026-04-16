@@ -19,10 +19,10 @@
  */
 
 #include "sync.h"
-// #include "sync_platform.h"  // 文件不存在，暂时注释掉
 #include "sync_types.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
 
 #ifdef _WIN32
@@ -32,6 +32,7 @@
 #else
 #include <pthread.h>
 #include <semaphore.h>
+#include <sched.h>
 #include <unistd.h>
 #include <sys/time.h>
 #include <errno.h>
@@ -313,6 +314,6 @@ void sync_yield(void) {
 #ifdef _WIN32
     SwitchToThread();
 #else
-    pthread_yield();
+    sched_yield();
 #endif
 }

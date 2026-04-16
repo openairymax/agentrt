@@ -48,7 +48,7 @@ static const log_level_t DEFAULT_LOG_LEVEL = LOG_LEVEL_INFO;
 static const log_format_t DEFAULT_LOG_FORMAT = LOG_FORMAT_TEXT;
 
 /** 最大模块名称长�?*/
-static const size_t MAX_MODULE_NAME_LEN = 256;
+static const size_t MAX_MODULE_NAME_LEN __attribute__((unused)) = 256;
 
 /** 最大消息长�?*/
 static const size_t MAX_MESSAGE_LEN = 4096;

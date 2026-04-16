@@ -193,7 +193,7 @@ agentos_error_t agentos_layer1_raw_deserialize(
     size_t data_len = len - sizeof(uint32_t) - meta_len;
     void* data = AGENTOS_MALLOC(data_len);
     if (!data) {
-        agentos_layer1_raw_metadata_free(meta);
+        agentos_raw_metadata_free(meta);
         return AGENTOS_ENOMEM;
     }
     memcpy(data, (const char*)bytes + sizeof(uint32_t) + meta_len, data_len);

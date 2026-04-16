@@ -38,7 +38,7 @@ struct agentos_token_counter {
 /**
  * @brief 简化的中文字符Token估算
  */
-static size_t estimate_cjk_tokens(const char* text, size_t length) {
+__attribute__((unused)) static size_t estimate_cjk_tokens(const char* text, size_t length) {
     size_t count = 0;
     size_t i = 0;
     
@@ -66,7 +66,7 @@ static size_t estimate_cjk_tokens(const char* text, size_t length) {
 /**
  * @brief 估算英文Token数（基于简单分词）
  */
-static size_t estimate_english_tokens(const char* text, size_t length) {
+__attribute__((unused)) static size_t estimate_english_tokens(const char* text, size_t length) {
     size_t count = 0;
     size_t i = 0;
     int in_word = 0;

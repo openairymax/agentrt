@@ -17,9 +17,22 @@
 #define AGENTOS_DAEMON_ERRORS_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+#ifndef AGENTOS_EINIT
+#define AGENTOS_EINIT    (-100)
+#endif
+
+#ifndef AGENTOS_ESTATE
+#define AGENTOS_ESTATE   (-101)
+#endif
+
+#ifndef AGENTOS_EHEALTH
+#define AGENTOS_EHEALTH  (-102)
 #endif
 
 /**

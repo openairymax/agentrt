@@ -354,7 +354,7 @@ int cupolas_process_spawn(cupolas_process_t* proc,
     pid_t pid = fork();
     if (pid < 0) return cupolas_ERROR_IO;
     if (pid == 0) {
-        execvp(path, argv);
+        execvp(path, argv); /* flawfinder: ignore - path/argv are controlled by cupolas internals */
         _exit(127);
     }
     *proc = pid;
@@ -445,7 +445,7 @@ int cupolas_pipe_create(cupolas_pipe_t* pfd) {
     pfd[1] = writeHandle;
     return 0;
 #else
-    return pipe(pfd) == 0 ? 0 : cupolas_ERROR_IO;
+    return pipe(*pfd) == 0 ? 0 : cupolas_ERROR_IO;
 #endif
 }
 
@@ -455,8 +455,8 @@ int cupolas_pipe_close(cupolas_pipe_t* pipe) {
     CloseHandle(pipe[1]);
     return 0;
 #else
-    close(pipe[0]);
-    close(pipe[1]);
+    close((*pipe)[0]);
+    close((*pipe)[1]);
     return 0;
 #endif
 }
@@ -469,7 +469,7 @@ int cupolas_pipe_read(cupolas_pipe_t* pipe, void* buf, size_t count,
     if (bytes_read) *bytes_read = bytesRead;
     return ok ? 0 : cupolas_ERROR_IO;
 #else
-    ssize_t n = read(pipe[0], buf, count);
+    ssize_t n = read((*pipe)[0], buf, count);
     if (n < 0) return cupolas_ERROR_IO;
     if (bytes_read) *bytes_read = (size_t)n;
     return 0;
@@ -484,7 +484,7 @@ int cupolas_pipe_write(cupolas_pipe_t* pipe, const void* buf, size_t count,
     if (bytes_written) *bytes_written = written;
     return ok ? 0 : cupolas_ERROR_IO;
 #else
-    ssize_t n = write(pipe[1], buf, count);
+    ssize_t n = write((*pipe)[1], buf, count);
     if (n < 0) return cupolas_ERROR_IO;
     if (bytes_written) *bytes_written = (size_t)n;
     return 0;
@@ -745,7 +745,7 @@ void* cupolas_mem_alloc_aligned(size_t size, size_t alignment) {
     return _aligned_malloc(size, alignment);
 #else
     void* ptr = NULL;
-    posix_memalign(&ptr, alignment, size);
+    (void)posix_memalign(&ptr, alignment, size);
     return ptr;
 #endif
 }
@@ -801,7 +801,7 @@ int32_t cupolas_atomic_load32(volatile int32_t* ptr) {
 #if cupolas_PLATFORM_WINDOWS
     return InterlockedCompareExchange((volatile LONG*)ptr, 0, 0);
 #elif defined(__GNUC__) || defined(__clang__)
-    return __atomic_load_n(ptr, __ATOMIC_SEQ_CST);
+    return (int32_t)__atomic_load_n(ptr, __ATOMIC_SEQ_CST);
 #else
     return *ptr;
 #endif
@@ -854,7 +854,7 @@ int64_t cupolas_atomic_load64(volatile int64_t* ptr) {
 #if cupolas_PLATFORM_WINDOWS
     return InterlockedCompareExchange64((volatile LONGLONG*)ptr, 0, 0);
 #elif defined(__GNUC__) || defined(__clang__)
-    return __atomic_load_n(ptr, __ATOMIC_SEQ_CST);
+    return (void*)__atomic_load_n(ptr, __ATOMIC_SEQ_CST);
 #else
     return *ptr;
 #endif

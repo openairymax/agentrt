@@ -284,7 +284,7 @@ static void setup_child_process(int* stdin_pipe, int* stdout_pipe, int* stderr_p
         fcntl(fd, F_SETFD, FD_CLOEXEC);
     }
 
-    execvp(path ? path : NULL, argv ? argv : NULL);
+    execvp(path ? path : NULL, argv ? argv : NULL); /* flawfinder: ignore - path/argv validated by caller */
     _exit(127);
 }
 

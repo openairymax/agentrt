@@ -40,6 +40,14 @@
  * 实际值来自 commons 的编译器定义 (-DAGENTOS_PLATFORM_xxx)。
  */
 
+/* 旧 API 命名兼容映射（daemon 代码使用 agentos_platform_ 前缀） */
+typedef agentos_mutex_t agentos_platform_mutex_t;
+#define agentos_platform_mutex_init    agentos_mutex_init
+#define agentos_platform_mutex_lock    agentos_mutex_lock
+#define agentos_platform_mutex_unlock  agentos_mutex_unlock
+#define agentos_platform_mutex_destroy agentos_mutex_destroy
+#define agentos_platform_get_time_ms   agentos_time_ms
+
 /* 线程本地存储兼容 */
 #ifndef AGENTOS_THREAD_LOCAL
 #define AGENTOS_THREAD_LOCAL _Thread_local

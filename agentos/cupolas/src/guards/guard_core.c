@@ -96,7 +96,7 @@ static void sort_guards_by_priority(guard_manager_private_t* manager) {
 }
 
 // 复制检测上下文
-static guard_context_t* copy_guard_context(const guard_context_t* src) {
+__attribute__((unused)) static guard_context_t* copy_guard_context(const guard_context_t* src) {
     if (!src) return NULL;
     
     guard_context_t* dst = (guard_context_t*)calloc(1, sizeof(guard_context_t));
@@ -125,7 +125,7 @@ static guard_context_t* copy_guard_context(const guard_context_t* src) {
 }
 
 // 释放检测上下文
-static void free_guard_context(guard_context_t* context) {
+__attribute__((unused)) static void free_guard_context(guard_context_t* context) {
     if (!context) return;
     
     if (context->operation) free((void*)context->operation);

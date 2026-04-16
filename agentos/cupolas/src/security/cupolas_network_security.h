@@ -138,7 +138,7 @@ typedef struct {
  * @brief Firewall rule structure
  */
 typedef struct {
-    uint32_t rule_id;                   /**< Rule identifier */
+    char* rule_id;                       /**< Rule identifier */
     cupolas_proto_t protocol;             /**< Protocol */
     cupolas_direction_t direction;        /**< Direction */
     
@@ -160,10 +160,10 @@ typedef struct {
     char* host_pattern;                 /**< Host pattern */
     char* url_pattern;                  /**< URL pattern */
     bool enabled;                       /**< Rule enabled */
-    char* dst_port_start;               /**< Destination port range start */
-    char* dst_port_end;                 /**< Destination port range end */
-    char* src_port_start;               /**< Source port range start */
-    char* src_port_end;                 /**< Source port range end */
+    uint16_t dst_port_start;            /**< Destination port range start */
+    uint16_t dst_port_end;              /**< Destination port range end */
+    uint16_t src_port_start;            /**< Source port range start */
+    uint16_t src_port_end;              /**< Source port range end */
     int priority;                       /**< Rule priority */
     uint32_t burst_limit;               /**< Burst limit for rate limiting */
 } cupolas_fw_rule_t;
@@ -420,7 +420,7 @@ int cupolas_firewall_add_rule(const cupolas_fw_rule_t* rule);
  * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
  * @reentrant No
  */
-int cupolas_firewall_remove_rule(uint32_t rule_id);
+int cupolas_firewall_remove_rule(const char* rule_id);
 
 /**
  * @brief Check if connection is allowed

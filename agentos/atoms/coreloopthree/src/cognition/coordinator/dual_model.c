@@ -51,12 +51,14 @@
     ((type*)AGENTOS_CALLOC((count), sizeof(type)))
 
 /* 检查内存分配结果 */
+#ifndef CHECK_ALLOC
 #define CHECK_ALLOC(ptr) \
     do { \
         if (!(ptr)) { \
             return AGENTOS_ERROR_NO_MEMORY; \
         } \
     } while(0)
+#endif
 
 // 安全字符串复制函数（返回实际复制的字符数，不包括空字符）
 __attribute__((unused))
