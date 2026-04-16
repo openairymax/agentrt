@@ -31,7 +31,11 @@ agentos_error_t agentos_forgetting_prune(
         if (agentos_forgetting_get_weight(engine, all_ids[i], &weight) == AGENTOS_SUCCESS) {
             if (weight < engine->manager.threshold) {
                 // 先删�?L2 向量
-                agentos_layer2_feature_remove(engine->layer2, all_ids[i]);
+                agentos_error_t l2_err = agentos_layer2_feature_remove(engine->layer2, all_ids[i]);
+                if (l2_err != AGENTOS_SUCCESS) {
+                    AGENTOS_LOG_WARN("Failed to remove L2 feature for %s, skipping L1 delete", all_ids[i]);
+                    continue;
+                }
                 // 再删�?L1 记录
                 if (agentos_layer1_raw_delete(engine->layer1, all_ids[i]) == AGENTOS_SUCCESS) {
                     pruned++;

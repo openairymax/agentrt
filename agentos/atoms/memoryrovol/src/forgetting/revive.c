@@ -65,7 +65,9 @@ agentos_error_t agentos_forgetting_revive(
     }
 
     // 删除归档文件
-    remove(archive_file);
+    if (remove(archive_file) != 0) {
+        AGENTOS_LOG_WARN("Failed to remove archive file: %s", archive_file);
+    }
 
     *out_data = data;
     *out_len = size;

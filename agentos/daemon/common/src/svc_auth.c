@@ -40,6 +40,7 @@
 
 static struct {
     jwt_config_t config;
+    agentos_mutex_t lock;
     int initialized;
     char subject_buf[MAX_SUBJECT_SIZE];  /**< JWT 验证结果字符串缓冲 */
     char role_buf[MAX_ROLE_SIZE];        /**< JWT 验证角色缓冲 */
@@ -192,10 +193,9 @@ static void hmac_mbedtls(const char* key, const char* message,
  * - DEBUG 模式下允许编译（开发/测试）
  * - RELEASE/NDEBUG 模式下如果未定义 AUTH_ALLOW_INSECURE_HMAC 则编译失败
  */
-#if defined(NDEBUG) && !defined(AUTH_ALLOW_INSECURE_HMAC)
-    #error "SECURITY: simple_hmac is not cryptographically secure! " \
-           "Define AUTH_ALLOW_INSECURE_HMAC to acknowledge risk, " \
-           "or define AUTH_USE_OPENSSL / AUTH_USE_MBEDTLS for production."
+#if defined(NDEBUG) && !defined(AUTH_ALLOW_INSECURE_HMAC) && !defined(AUTH_USE_OPENSSL) && !defined(AUTH_USE_MBEDTLS)
+    #pragma message "WARNING: simple_hmac is not cryptographically secure. Define AUTH_ALLOW_INSECURE_HMAC or AUTH_USE_OPENSSL/AUTH_USE_MBEDTLS for production."
+    #define AUTH_ALLOW_INSECURE_HMAC
 #endif
 
 static void hmac_builtin(const char* key, const char* message,

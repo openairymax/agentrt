@@ -88,8 +88,12 @@ agentos_error_t agentos_compensation_register(
     entry->compensator_id = AGENTOS_STRDUP(compensator_id);
 
     if (input) {
-        entry->input = AGENTOS_STRDUP((const char*)input);
-        entry->input_size = entry->input ? strlen((const char*)input) + 1 : 0;
+        size_t input_len = strnlen((const char*)input, 65536);
+        entry->input = AGENTOS_MALLOC(input_len + 1);
+        if (entry->input) {
+            memcpy(entry->input, input, input_len + 1);
+            entry->input_size = input_len + 1;
+        }
     }
 
     if (!entry->action_id || !entry->compensator_id || (input && !entry->input)) {

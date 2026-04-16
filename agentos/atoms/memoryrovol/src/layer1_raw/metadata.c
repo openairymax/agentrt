@@ -268,7 +268,15 @@ agentos_error_t agentos_raw_metadata_db_query_time(
             ids = new_ids;
         }
         const unsigned char* text = sqlite3_column_text(stmt, 0);
-        ids[count++] = AGENTOS_STRDUP((const char*)text);
+        char* copied = AGENTOS_STRDUP((const char*)text);
+        if (!copied) {
+            for (size_t j = 0; j < count; j++) AGENTOS_FREE(ids[j]);
+            AGENTOS_FREE(ids);
+            sqlite3_finalize(stmt);
+            agentos_mutex_unlock(db_handle->lock);
+            return AGENTOS_ENOMEM;
+        }
+        ids[count++] = copied;
     }
 
     sqlite3_finalize(stmt);

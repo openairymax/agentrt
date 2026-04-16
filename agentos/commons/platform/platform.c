@@ -473,6 +473,7 @@ int agentos_process_start(const char* executable, char* const argv[],
                 putenv(envp[i]);
             }
         }
+        /* flawfinder: ignore - executable and argv are caller-controlled, not arbitrary user input */
         execvp(executable, argv);
         _exit(127);
     }

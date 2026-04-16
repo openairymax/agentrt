@@ -122,6 +122,9 @@ agentos_error_t agentos_memory_write_async(
         AGENTOS_FREE(req);
         return err;
     }
-    agentos_thread_detach(thread);
+    agentos_error_t detach_err = agentos_thread_detach(thread);
+    if (detach_err != AGENTOS_SUCCESS) {
+        AGENTOS_LOG_WARN("Failed to detach memory service thread");
+    }
     return AGENTOS_SUCCESS;
 }

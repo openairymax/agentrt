@@ -159,6 +159,11 @@ static agentos_error_t hnsw_add(hnsw_index_t* index, const char* id, const float
     }
 
     node->id = AGENTOS_STRDUP(id);
+    if (!node->id) {
+        AGENTOS_FREE(node);
+        pthread_mutex_unlock(&index->mutex);
+        return AGENTOS_ENOMEM;
+    }
     node->vector = (float*)AGENTOS_MALLOC(index->dimension * sizeof(float));
     if (!node->vector) {
         AGENTOS_FREE(node->id);

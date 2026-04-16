@@ -87,20 +87,24 @@ static agentos_error_t hierarchical_plan_func(
 
     if (count > 0) {
         plan->task_plan_nodes = (agentos_task_node_t**)AGENTOS_CALLOC(count, sizeof(agentos_task_node_t*));
-        if (plan->task_plan_nodes) {
-            for (size_t i = 0; i < count; i++) {
-                agentos_task_node_t* node = (agentos_task_node_t*)AGENTOS_CALLOC(1, sizeof(agentos_task_node_t));
-                if (node) {
-                    node->task_node_id = AGENTOS_STRDUP(task_names[i]);
-                    if (!node->task_node_id) {
-                        AGENTOS_FREE(node);
-                        continue;
-                    }
-                    plan->task_plan_nodes[i] = node;
-                }
-            }
-            plan->task_plan_node_count = count;
+        if (!plan->task_plan_nodes) {
+            AGENTOS_FREE(plan);
+            return AGENTOS_ENOMEM;
         }
+        size_t actual_count = 0;
+        for (size_t i = 0; i < count; i++) {
+            agentos_task_node_t* node = (agentos_task_node_t*)AGENTOS_CALLOC(1, sizeof(agentos_task_node_t));
+            if (node) {
+                node->task_node_id = AGENTOS_STRDUP(task_names[i]);
+                if (!node->task_node_id) {
+                    AGENTOS_FREE(node);
+                    continue;
+                }
+                plan->task_plan_nodes[actual_count] = node;
+                actual_count++;
+            }
+        }
+        plan->task_plan_node_count = actual_count;
     }
 
     (void)data;

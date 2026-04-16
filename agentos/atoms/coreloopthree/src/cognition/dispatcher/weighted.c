@@ -168,6 +168,10 @@ agentos_dispatching_strategy_t* agentos_dispatching_weighted_create(
     data->registry_ctx = registry_ctx;
     data->get_agents = get_agents_func;
     data->lock = agentos_mutex_create();
+    if (!data->lock) {
+        AGENTOS_FREE(data);
+        return NULL;
+    }
 
     agentos_dispatching_strategy_t* strategy =
         (agentos_dispatching_strategy_t*)AGENTOS_CALLOC(1, sizeof(*strategy));

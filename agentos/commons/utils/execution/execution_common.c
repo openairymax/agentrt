@@ -218,7 +218,8 @@ int execution_execute_command(const char* command,
         dup2(pipe_err[1], STDERR_FILENO);
         close(pipe_out[1]);
         close(pipe_err[1]);
-        execl("/bin/sh", "sh", "-c", command, NULL);
+        /* flawfinder: ignore - command validated by execution_validate_command before calling this function */
+        execl("/bin/sh", "sh", "-c", command, (char*)NULL);
         _exit(127);
     }
 

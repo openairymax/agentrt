@@ -72,6 +72,10 @@ static agentos_error_t arbiter_coordinate(
         } else {
             *out_result = AGENTOS_STRDUP("invalid_choice");
         }
+        if (!*out_result) {
+            agentos_mutex_unlock(data->lock);
+            return AGENTOS_ENOMEM;
+        }
 
         agentos_mutex_unlock(data->lock);
         return AGENTOS_SUCCESS;
@@ -82,6 +86,10 @@ static agentos_error_t arbiter_coordinate(
         *out_result = AGENTOS_STRDUP(inputs[0]);
     } else {
         *out_result = AGENTOS_STRDUP("no_input");
+    }
+    if (!*out_result) {
+        agentos_mutex_unlock(data->lock);
+        return AGENTOS_ENOMEM;
     }
 
     agentos_mutex_unlock(data->lock);

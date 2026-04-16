@@ -80,6 +80,11 @@ static shard_manager_t* create_shard(int shard_id, const char* base_path) {
     shard->shard_id = shard_id;
     shard->base_path = AGENTOS_STRDUP(base_path);
     shard->stats_lock = agentos_mutex_create();
+    if (!shard->stats_lock) {
+        AGENTOS_FREE(shard->base_path);
+        AGENTOS_FREE(shard);
+        return NULL;
+    }
     shard->write_count = 0;
     shard->read_count = 0;
     shard->error_count = 0;

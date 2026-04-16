@@ -30,6 +30,7 @@ typedef struct file_unit_data {
 
 static int is_path_traversal_attempt(const char* path) {
     if (!path) return 1;
+    if (path[0] == '/' || path[0] == '\\') return 1;
     if (strstr(path, "..") != NULL) return 1;
     if (strstr(path, "//") != NULL) return 1;
     if (strstr(path, "\\\\") != NULL) return 1;
@@ -47,21 +48,41 @@ static agentos_error_t file_build_path(
         return AGENTOS_EPERM;
     }
 
-    if (data->root_dir) {
-        snprintf(out_full, max_len, "%s/%s", data->root_dir, path);
-    } else {
-        snprintf(out_full, max_len, "%s", path);
+    if (!data->root_dir) {
+        return AGENTOS_EPERM;
     }
 
+    snprintf(out_full, max_len, "%s/%s", data->root_dir, path);
+
 #ifndef _WIN32
-    if (data->root_dir) {
+    {
         char resolved_root[PATH_MAX];
         char resolved_full[PATH_MAX];
-        if (realpath(data->root_dir, resolved_root) &&
-            realpath(out_full, resolved_full)) {
-            size_t root_len = strlen(resolved_root);
-            if (strncmp(resolved_full, resolved_root, root_len) != 0) {
-                return AGENTOS_EPERM;
+        if (realpath(data->root_dir, resolved_root)) {
+            if (realpath(out_full, resolved_full)) {
+                size_t root_len = strlen(resolved_root);
+                if (strncmp(resolved_full, resolved_root, root_len) != 0) {
+                    return AGENTOS_EPERM;
+                }
+            } else {
+                char resolved_parent[PATH_MAX];
+                char parent_path[512];
+                snprintf(parent_path, sizeof(parent_path), "%s/%s", data->root_dir, ".");
+                if (realpath(parent_path, resolved_parent)) {
+                    size_t parent_len = strlen(resolved_parent);
+                    char full_copy[512];
+                    snprintf(full_copy, sizeof(full_copy), "%s", out_full);
+                    char* last_sep = strrchr(full_copy, '/');
+                    if (last_sep) {
+                        *last_sep = '\0';
+                        char resolved_dir[PATH_MAX];
+                        if (realpath(full_copy, resolved_dir)) {
+                            if (strncmp(resolved_dir, resolved_parent, parent_len) != 0) {
+                                return AGENTOS_EPERM;
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -186,7 +207,7 @@ static agentos_error_t file_execute(agentos_execution_unit_t* unit, const void* 
     char op[32] = {0};
     char path[256] = {0};
 
-    if (sscanf(cmd, "op=%31[^&]&path=%255s", op, path) != 2) {
+    if (sscanf(cmd, "op=%31[^&]&path=%255[^\n]", op, path) != 2) {
         return AGENTOS_EINVAL;
     }
 

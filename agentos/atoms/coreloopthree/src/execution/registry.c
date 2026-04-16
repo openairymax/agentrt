@@ -113,6 +113,7 @@ agentos_error_t agentos_registry_register_unit(const char* unit_id, agentos_exec
 
 void agentos_registry_unregister_unit(const char* unit_id) {
     if (!unit_id) return;
+    if (ensure_registry_init() != AGENTOS_SUCCESS) return;
     agentos_mutex_lock(g_registry_lock);
     registry_entry_t** p = &g_registry;
     while (*p) {
@@ -130,6 +131,7 @@ void agentos_registry_unregister_unit(const char* unit_id) {
 
 agentos_execution_unit_t* agentos_registry_get_unit(const char* unit_id) {
     if (!unit_id) return NULL;
+    if (ensure_registry_init() != AGENTOS_SUCCESS) return NULL;
     agentos_mutex_lock(g_registry_lock);
     registry_entry_t* entry = g_registry;
     while (entry) {
