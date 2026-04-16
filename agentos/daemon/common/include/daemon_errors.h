@@ -35,6 +35,22 @@ extern "C" {
 #define AGENTOS_EHEALTH  (-102)
 #endif
 
+#ifndef AGENTOS_EDEPEND
+#define AGENTOS_EDEPEND  (-103)
+#endif
+
+#ifndef AGENTOS_EFAIL
+#define AGENTOS_EFAIL   (-104)
+#endif
+
+#ifndef CUPOLAS_ERR_INVALID_PARAM
+#define CUPOLAS_ERR_INVALID_PARAM (-2001)
+#endif
+
+#ifndef AGENTOS_ERR_NOT_SUPPORTED
+#define AGENTOS_ERR_NOT_SUPPORTED  (-105)
+#endif
+
 /**
  * @brief JSON-RPC 2.0 标准错误码
  * @{

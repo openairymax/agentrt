@@ -13,13 +13,20 @@
 #include "svc_common.h"
 #include "platform.h"
 #include "error.h"
+#include "svc_config.h"
+
 #include <curl/curl.h>
 #include <cjson/cJSON.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 
-/* ==================== 配置常量 ==================== */
+#ifndef agentos_error_push_ex
+void agentos_error_push_ex(int code, const char* file, int line,
+                           const char* func, const char* fmt, ...);
+#endif
+
+/* ==================== 公共接口实现 ==================== */
 
 #define IPC_POOL_SIZE 4
 #define IPC_DEFAULT_TIMEOUT_MS 30000

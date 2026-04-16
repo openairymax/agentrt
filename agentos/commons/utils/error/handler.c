@@ -670,7 +670,7 @@ const agentos_error_context_entry_t* agentos_error_chain_iter_next(
         return NULL;
     }
     
-    if (iter->current_index >= iter->chain->depth) {
+    if ((size_t)iter->current_index >= (size_t)iter->chain->depth) {
         return NULL;
     }
     

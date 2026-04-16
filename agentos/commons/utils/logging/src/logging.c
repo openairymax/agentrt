@@ -223,7 +223,7 @@ log_level_t log_level_from_string(const char* str) {
     // 尝试解析为数�?
     char* endptr;
     long value = strtol(str, &endptr, 10);
-    if (endptr != str && *endptr == '\0' && value >= 0 && value < LEVEL_NAMES_COUNT) {
+    if (endptr != str && *endptr == '\0' && value >= 0 && (size_t)value < LEVEL_NAMES_COUNT) {
         return (log_level_t)value;
     }
     

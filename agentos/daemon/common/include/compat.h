@@ -5,7 +5,7 @@
  * @brief 兼容性定义兼容层
  * 
  * 本文件是 agentos/commons/utils/compat 的兼容层，提供向后兼容的 API。
- * 新代码应直接使用 #include "agentos/utils/compat/compat.h"
+ * 新代码应直接使用 #include <compat.h>
  * 
  * @see agentos/commons/utils/compat/include/compat.h
  */
@@ -14,7 +14,7 @@
 #define AGENTOS_DAEMON_COMMON_COMPAT_H
 
 /* 包含 commons 的统一兼容性定义 */
-#include "agentos/utils/compat/compat.h"
+#include <compat.h>
 
 /* ==================== 额外的兼容性别名 ==================== */
 

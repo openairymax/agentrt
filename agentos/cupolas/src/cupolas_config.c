@@ -149,7 +149,7 @@ int cupolas_config_load(cupolas_config_t* cfg, config_type_t type, const char* f
 
     if (type == CONFIG_TYPE_ALL) {
         int loaded = 0;
-        for (int i = 0; i < CONFIG_TYPE_ALL; i++) {
+        for (config_type_t i = 0; i < CONFIG_TYPE_ALL; i++) {
             if (cupolas_config_load(cfg, (config_type_t)i, NULL) == 0) {
                 loaded++;
             }
@@ -164,8 +164,11 @@ int cupolas_config_load(cupolas_config_t* cfg, config_type_t type, const char* f
     if (file_path) {
         snprintf(entry->file_path, sizeof(entry->file_path), "%s", file_path);
     } else {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
         snprintf(entry->file_path, sizeof(entry->file_path), "%s/%s.yaml",
                 cfg->config_dir, config_type_names[type]);
+#pragma GCC diagnostic pop
     }
 
 #if cupolas_PLATFORM_WINDOWS
@@ -356,7 +359,7 @@ int cupolas_config_check_reload(cupolas_config_t* cfg, config_type_t type) {
     cupolas_rwlock_wrlock(&cfg->lock);
 
     int changed = 0;
-    for (int i = 0; i < CONFIG_TYPE_ALL; i++) {
+    for (config_type_t i = 0; i < CONFIG_TYPE_ALL; i++) {
         if (type != CONFIG_TYPE_ALL && type != i) {
             continue;
         }
@@ -419,7 +422,7 @@ size_t cupolas_config_export_json(cupolas_config_t* cfg, config_type_t type,
 
     size_t offset = snprintf(buffer, size, "{\"configs\":[");
 
-    for (int i = 0; i < CONFIG_TYPE_ALL; i++) {
+    for (config_type_t i = 0; i < CONFIG_TYPE_ALL; i++) {
         if (type != CONFIG_TYPE_ALL && type != i) {
             continue;
         }
@@ -453,7 +456,7 @@ size_t cupolas_config_export_yaml(cupolas_config_t* cfg, config_type_t type,
 
     size_t offset = 0;
 
-    for (int i = 0; i < CONFIG_TYPE_ALL; i++) {
+    for (config_type_t i = 0; i < CONFIG_TYPE_ALL; i++) {
         if (type != CONFIG_TYPE_ALL && type != i) {
             continue;
         }
@@ -487,7 +490,7 @@ bool cupolas_config_validate_all(cupolas_config_t* cfg) {
     cupolas_rwlock_rdlock(&cfg->lock);
 
     bool all_valid = true;
-    for (int i = 0; i < CONFIG_TYPE_ALL; i++) {
+    for (config_type_t i = 0; i < CONFIG_TYPE_ALL; i++) {
         if (cfg->entries[i].status != CONFIG_STATUS_APPLIED) {
             all_valid = false;
             break;

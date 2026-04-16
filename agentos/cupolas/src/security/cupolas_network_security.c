@@ -82,10 +82,13 @@ static void cupolas_free_filter_rule(cupolas_net_filter_rule_t* rule) {
 
 static void cupolas_free_connection_info(cupolas_connection_info_t* info) {
     if (!info) return;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfree-nonheap-object"
     free(info->local_ip);
     free(info->remote_ip);
     free(info->hostname);
     free(info->cipher_suite);
+#pragma GCC diagnostic pop
     memset(info, 0, sizeof(*info));
 }
 

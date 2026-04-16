@@ -899,7 +899,7 @@ void* cupolas_atomic_load_ptr(volatile void** ptr) {
 #if cupolas_PLATFORM_WINDOWS
     return InterlockedCompareExchangePointer((volatile PVOID*)ptr, NULL, NULL);
 #elif defined(__GNUC__) || defined(__clang__)
-    return __atomic_load_n(ptr, __ATOMIC_SEQ_CST);
+    return (void*)__atomic_load_n(ptr, __ATOMIC_SEQ_CST);
 #else
     return *(void**)ptr;
 #endif
