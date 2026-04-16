@@ -44,6 +44,10 @@ agentos_error_t agentos_persistence_calculator_compute(
     agentos_persistence_feature_t*** out_features,
     size_t* out_count);
 
+void agentos_persistence_features_free(
+    agentos_persistence_feature_t** features,
+    size_t count);
+
 #ifdef __cplusplus
 }
 #endif

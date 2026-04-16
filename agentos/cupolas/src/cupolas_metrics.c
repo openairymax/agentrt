@@ -267,7 +267,7 @@ bool metrics_iter_next(metric_iterator_t* iter, metric_sample_t* sample) {
 void metrics_iter_destroy(metric_iterator_t* iter) {
 }
 
-static void format_label_values(char* buffer, size_t size,
+__attribute__((unused)) static void format_label_values(char* buffer, size_t size,
                                 const char** label_names,
                                 const char** label_values,
                                 size_t label_count) {

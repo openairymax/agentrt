@@ -19,6 +19,21 @@ struct agentos_token_counter {
 };
 typedef struct agentos_token_counter agentos_token_counter_t;
 
+static size_t agentos_token_counter_count(void* counter, const char* text) {
+    (void)counter;
+    if (!text) return 0;
+    size_t count = 0;
+    int in_word = 0;
+    for (const char* p = text; *p; p++) {
+        if ((unsigned char)*p > 32) {
+            if (!in_word) { count++; in_word = 1; }
+        } else {
+            in_word = 0;
+        }
+    }
+    return count;
+}
+
 typedef struct mount_entry {
     char* record_id;
     char* content;
