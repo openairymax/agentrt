@@ -82,7 +82,7 @@ static agentos_error_t hierarchical_plan_func(
     if (!plan) return AGENTOS_ENOMEM;
 
     const domain_rule_t* rule = match_domain(intent ? intent->intent_goal : NULL);
-    const char** task_names = rule ? rule->subtasks : g_default_subtasks;
+    const char* const* task_names = rule ? rule->subtasks : g_default_subtasks;
     size_t count = rule ? rule->subtask_count : g_default_count;
 
     if (count > 0) {

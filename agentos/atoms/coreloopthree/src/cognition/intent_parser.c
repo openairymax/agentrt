@@ -170,7 +170,7 @@ static float string_similarity(const char* s1, const char* s2) {
                    tolower(s1[i + k]) == tolower(s2[j + k])) {
                 k++;
             }
-            if (k > commons) commons = k;
+            if (k > (size_t)commons) commons = (int)k;
         }
     }
 

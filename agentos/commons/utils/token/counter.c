@@ -74,7 +74,7 @@ __attribute__((unused)) static size_t estimate_english_tokens(const char* text, 
     while (i < length) {
         char c = text[i];
         
-        if (isalnum((unsigned char)c) || c >= 0x80) {
+        if (isalnum((unsigned char)c) || (unsigned char)c >= 0x80) {
             in_word = 1;
         } else {
             if (in_word) {

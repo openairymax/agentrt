@@ -16,6 +16,28 @@
 /* 包含 commons 的统一错误处理框架 */
 #include <error.h>
 
+#ifndef AGENTOS_OK
+#define AGENTOS_OK                      0
+#endif
+
+/* Fallback for types that may not be available from all error.h versions */
+#ifndef AGENTOS_ERROR_CONTEXT_MAX_DEPTH
+#define AGENTOS_ERROR_CONTEXT_MAX_DEPTH 8
+#endif
+
+struct agentos_error_context_entry_s {
+    const char* file;
+    int line;
+    const char* func;
+    int code;
+    char message[256];
+};
+
+#ifndef AGENTOS_ERROR_CONTEXT_ENTRY_DEFINED
+#define AGENTOS_ERROR_CONTEXT_ENTRY_DEFINED
+typedef struct agentos_error_context_entry_s agentos_error_context_entry_t;
+#endif
+
 /* ==================== 兼容性别名 ==================== */
 
 /* 旧的错误码名称映射到新的名称 */

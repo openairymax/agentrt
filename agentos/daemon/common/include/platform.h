@@ -5,8 +5,11 @@
  * @brief 平台抽象兼容层
  * 
  * 本文件是 agentos/commons/platform 的兼容层，提供向后兼容的 API。
- * 新代码应直接使用 #include "agentos/platform/platform.h"
- * 
+ * 新代码应直接使用 #include <platform.h>
+#include <compat.h>
+#include <atomic_compat.h>
+
+/**
  * @see agentos/commons/platform/include/platform.h
  */
 
@@ -14,15 +17,19 @@
 #define AGENTOS_DAEMON_COMMON_PLATFORM_H
 
 /* 包含 commons 的统一平台抽象层 */
-#include "agentos/platform/platform.h"
+#include <platform.h>
 
 /* 系统头文件 - 用于服务器端 Socket 函数 */
 #if AGENTOS_PLATFORM_POSIX
+#include <sys/stat.h>
 #include <sys/un.h>      /* Unix Domain Socket */
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <dlfcn.h>
+#include <sys/utsname.h>
+#include <sys/sysinfo.h>
 #elif AGENTOS_PLATFORM_WINDOWS
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -89,6 +96,7 @@ typedef agentos_mutex_t* agentos_mutex_handle_t;
  * @brief 条件变量句柄类型（兼容层）
  */
 typedef agentos_cond_t* agentos_cond_handle_t;
+typedef agentos_cond_t* agentos_platform_cond_t;
 
 /**
  * @brief 线程句柄类型（兼容层）
@@ -423,6 +431,26 @@ static inline int agentos_get_sysinfo(agentos_sysinfo_t* info) {
 typedef struct {
     volatile int value;
 } agentos_atomic_int_t;
+
+#ifndef ATOMIC_COMPAT_HAS_32
+#define ATOMIC_COMPAT_HAS_32
+static inline long atomic_load_32(volatile long* ptr, long order) {
+    (void)order;
+    return __sync_val_compare_and_swap(ptr, 0, 0);
+}
+static inline void atomic_store_32(volatile long* ptr, long val, long order) {
+    (void)order;
+    __sync_lock_test_and_set(ptr, val);
+}
+static inline long atomic_fetch_add_32(volatile long* ptr, long val, long order) {
+    (void)order;
+    return __sync_add_and_fetch(ptr, val);
+}
+static inline long atomic_fetch_sub_32(volatile long* ptr, long val, long order) {
+    (void)order;
+    return __sync_sub_and_fetch(ptr, val);
+}
+#endif
 
 /** @deprecated 使用 atomic_compat.h 中的 atomic_load 替代 */
 static inline int agentos_atomic_load(agentos_atomic_int_t* atomic) {

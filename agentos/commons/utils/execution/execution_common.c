@@ -325,7 +325,7 @@ char* execution_format_result_json(const execution_result_t* result) {
         result->error ? result->error : ""
     );
     
-    if (written >= buffer_size) {
+    if ((size_t)written >= buffer_size) {
         // 缓冲区不足，重新分配
         buffer_size = written + 1;
         char* new_buffer = memory_safe_realloc(buffer, buffer_size);

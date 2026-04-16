@@ -18,6 +18,7 @@
 #define AGENTOS_DAEMON_COMMON_SVC_COMMON_H
 
 #include "error.h"
+#include "daemon_errors.h"
 #include "platform.h"
 #include <stdbool.h>
 #include <stdint.h>

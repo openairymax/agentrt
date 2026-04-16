@@ -545,15 +545,14 @@ int cupolas_integrity_check(void) {
 
 int cupolas_integrity_compute_code_hash(uint8_t* hash_out) {
     if (!hash_out) return -1;
-    
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     SHA256_CTX ctx;
     SHA256_Init(&ctx);
-    
     const char* dummy_code = "DUMMY_CODE_SECTION";
     SHA256_Update(&ctx, dummy_code, strlen(dummy_code));
-    
     SHA256_Final(hash_out, &ctx);
-    
+#pragma GCC diagnostic pop
     return 0;
 }
 
@@ -568,16 +567,19 @@ int cupolas_integrity_verify_code(const uint8_t* expected_hash) {
 
 int cupolas_integrity_verify_data(const uint8_t* expected_hash) {
     if (!expected_hash) return -1;
-    
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     SHA256_CTX ctx;
     SHA256_Init(&ctx);
-    
+
     const char* dummy_data = "DUMMY_DATA_SECTION";
     SHA256_Update(&ctx, dummy_data, strlen(dummy_data));
-    
+
     uint8_t current_hash[32];
     SHA256_Final(current_hash, &ctx);
-    
+#pragma GCC diagnostic pop
+
     return memcmp(current_hash, expected_hash, 32) == 0 ? 0 : -1;
 }
 

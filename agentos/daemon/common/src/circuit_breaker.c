@@ -13,7 +13,10 @@
 #include "svc_logger.h"
 #include "platform.h"
 #include "error.h"
+#include "daemon_errors.h"
 #include "safe_string_utils.h"
+
+#include <agentos/memory.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -109,8 +112,8 @@ static void transition_state(
 
 static void check_window_reset(cb_internal_t* cb) {
     uint64_t now = agentos_platform_get_time_ms();
-    if (cb->window_size_ms > 0 &&
-        (now - cb->window_start) >= cb->window_size_ms) {
+    if (cb->config.window_size_ms > 0 &&
+        (now - cb->window_start) >= cb->config.window_size_ms) {
         cb->window_start = now;
         cb->window_failures = 0;
         cb->window_calls = 0;

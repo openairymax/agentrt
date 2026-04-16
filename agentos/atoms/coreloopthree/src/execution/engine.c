@@ -322,7 +322,7 @@ fail:
 /**
  * @brief 工作线程主函�?
  */
-static void worker_thread_func(void* arg) {
+static void* worker_thread_func(void* arg) {
     agentos_execution_engine_t* engine = (agentos_execution_engine_t*)arg;
 
     while (engine->running) {
@@ -378,6 +378,7 @@ static void worker_thread_func(void* arg) {
         task_hash_table_remove(engine->task_map, tcb->task_id);
         tcb_release(tcb);
     }
+    return NULL;
 }
 
 /**
@@ -530,7 +531,7 @@ agentos_error_t agentos_execution_submit(
 
     if (!engine || !task || !out_task_id) {
         AGENTOS_LOG_ERROR("Invalid parameters to execution_submit: engine=%p, task=%p, out_task_id=%p",
-                         engine, task, out_task_id);
+                         (void*)engine, (void*)task, (void*)out_task_id);
         return AGENTOS_EINVAL;
     }
 
@@ -560,7 +561,7 @@ agentos_error_t agentos_execution_submit(
 
     if (!tcb->task_id || !tcb->completed_cond || !tcb->tcb_lock) {
         AGENTOS_LOG_ERROR("Failed to create task resources: task_id=%p, cond=%p, lock=%p",
-                         tcb->task_id, tcb->completed_cond, tcb->tcb_lock);
+                         (void*)tcb->task_id, (void*)tcb->completed_cond, (void*)tcb->tcb_lock);
         if (tcb->task_id) AGENTOS_FREE(tcb->task_id);
         if (tcb->completed_cond) agentos_cond_destroy(tcb->completed_cond);
         if (tcb->tcb_lock) agentos_mutex_destroy(tcb->tcb_lock);
