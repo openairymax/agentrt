@@ -182,6 +182,18 @@ int agentos_mutex_trylock(agentos_mutex_t* mutex);
  */
 int agentos_mutex_unlock(agentos_mutex_t* mutex);
 
+/**
+ * @brief 动态创建互斥锁（分配内存并初始化）
+ * @return 互斥锁指针，失败返回NULL
+ */
+agentos_mutex_t* agentos_mutex_create(void);
+
+/**
+ * @brief 动态销毁互斥锁（销毁并释放内存）
+ * @param mutex 互斥锁指针
+ */
+void agentos_mutex_free(agentos_mutex_t* mutex);
+
 /* ==================== 条件变量接口 ==================== */
 
 /**
@@ -227,6 +239,18 @@ int agentos_cond_signal(agentos_cond_t* cond);
  * @return 0 成功，非0 失败
  */
 int agentos_cond_broadcast(agentos_cond_t* cond);
+
+/**
+ * @brief 动态创建条件变量（分配内存并初始化）
+ * @return 条件变量指针，失败返回NULL
+ */
+agentos_cond_t* agentos_cond_create(void);
+
+/**
+ * @brief 动态销毁条件变量（销毁并释放内存）
+ * @param cond 条件变量指针
+ */
+void agentos_cond_free(agentos_cond_t* cond);
 
 /* ==================== 线程接口 ==================== */
 

@@ -13,8 +13,10 @@
 #include "svc_logger.h"
 #include "platform.h"
 #include "error.h"
+#include "daemon_errors.h"
 #include "safe_string_utils.h"
 
+#include <agentos/memory.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>

@@ -19,13 +19,15 @@
  */
 
 #include "cupolas_config.h"
-#include "../utils/cupolas_utils.h"
+#include "utils/cupolas_utils.h"
+#include "platform/platform.h"
+#include "cupolas_metrics.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
 #include <windows.h>
 #else
 #include <sys/stat.h>
@@ -111,7 +113,7 @@ cupolas_config_t* cupolas_config_create(const char* config_dir) {
     if (config_dir) {
         snprintf(cfg->config_dir, sizeof(cfg->config_dir), "%s", config_dir);
     } else {
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
         snprintf(cfg->config_dir, sizeof(cfg->config_dir), "C:\\ProgramData\\cupolas\\conf");
 #else
         snprintf(cfg->config_dir, sizeof(cfg->config_dir), "/etc/agentos/cupolas/conf");
@@ -147,7 +149,7 @@ int cupolas_config_load(cupolas_config_t* cfg, config_type_t type, const char* f
 
     if (type == CONFIG_TYPE_ALL) {
         int loaded = 0;
-        for (int i = 0; i < CONFIG_TYPE_ALL; i++) {
+        for (config_type_t i = 0; i < CONFIG_TYPE_ALL; i++) {
             if (cupolas_config_load(cfg, (config_type_t)i, NULL) == 0) {
                 loaded++;
             }
@@ -162,11 +164,14 @@ int cupolas_config_load(cupolas_config_t* cfg, config_type_t type, const char* f
     if (file_path) {
         snprintf(entry->file_path, sizeof(entry->file_path), "%s", file_path);
     } else {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
         snprintf(entry->file_path, sizeof(entry->file_path), "%s/%s.yaml",
                 cfg->config_dir, config_type_names[type]);
+#pragma GCC diagnostic pop
     }
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     WIN32_FILE_ATTRIBUTE_DATA attr;
     if (GetFileAttributesExA(entry->file_path, GetFileExInfoStandard, &attr)) {
         ULARGE_INTEGER ft;
@@ -184,7 +189,7 @@ int cupolas_config_load(cupolas_config_t* cfg, config_type_t type, const char* f
     entry->version.major = 1;
     entry->version.minor = 0;
     entry->version.patch = 0;
-    entry->version.timestamp_ns = metrics_get_timestamp_ns();
+    entry->version.timestamp_ns = cupolas_get_timestamp_ns();
 
     entry->status = CONFIG_STATUS_APPLIED;
 
@@ -354,14 +359,14 @@ int cupolas_config_check_reload(cupolas_config_t* cfg, config_type_t type) {
     cupolas_rwlock_wrlock(&cfg->lock);
 
     int changed = 0;
-    for (int i = 0; i < CONFIG_TYPE_ALL; i++) {
+    for (config_type_t i = 0; i < CONFIG_TYPE_ALL; i++) {
         if (type != CONFIG_TYPE_ALL && type != i) {
             continue;
         }
 
         config_entry_t* entry = &cfg->entries[i];
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
         WIN32_FILE_ATTRIBUTE_DATA attr;
         if (GetFileAttributesExA(entry->file_path, GetFileExInfoStandard, &attr)) {
             ULARGE_INTEGER ft;
@@ -417,7 +422,7 @@ size_t cupolas_config_export_json(cupolas_config_t* cfg, config_type_t type,
 
     size_t offset = snprintf(buffer, size, "{\"configs\":[");
 
-    for (int i = 0; i < CONFIG_TYPE_ALL; i++) {
+    for (config_type_t i = 0; i < CONFIG_TYPE_ALL; i++) {
         if (type != CONFIG_TYPE_ALL && type != i) {
             continue;
         }
@@ -451,7 +456,7 @@ size_t cupolas_config_export_yaml(cupolas_config_t* cfg, config_type_t type,
 
     size_t offset = 0;
 
-    for (int i = 0; i < CONFIG_TYPE_ALL; i++) {
+    for (config_type_t i = 0; i < CONFIG_TYPE_ALL; i++) {
         if (type != CONFIG_TYPE_ALL && type != i) {
             continue;
         }
@@ -485,7 +490,7 @@ bool cupolas_config_validate_all(cupolas_config_t* cfg) {
     cupolas_rwlock_rdlock(&cfg->lock);
 
     bool all_valid = true;
-    for (int i = 0; i < CONFIG_TYPE_ALL; i++) {
+    for (config_type_t i = 0; i < CONFIG_TYPE_ALL; i++) {
         if (cfg->entries[i].status != CONFIG_STATUS_APPLIED) {
             all_valid = false;
             break;

@@ -13,13 +13,6 @@
 #include <string.h>
 #include <math.h>
 
-struct agentos_sequence_encoder {
-    agentos_binder_t* binder;
-    int position_encoding;   // 0=随机,1=正弦,2=学习（暂不支持）
-    size_t max_len;
-    float** position_vectors;
-    agentos_mutex_t* lock;
-};
 
 static float* sinusoidal_position(size_t index, size_t dim) {
     float* vec = (float*)AGENTOS_MALLOC(dim * sizeof(float));

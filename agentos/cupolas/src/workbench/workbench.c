@@ -7,7 +7,7 @@
 
 #include "workbench.h"
 #include "workbench_process.h"
-#include "../utils/cupolas_utils.h"
+#include "utils/cupolas_utils.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -202,13 +202,13 @@ static void cupolas_workbench_setup_process_attr(workbench_t* wb, cupolas_proces
     attr->redirect_stderr = wb->manager.redirect_stderr;
     
     if (wb->manager.redirect_stdin) {
-        attr->stdin_pipe = wb->stdin_pipe;
+        memcpy(attr->stdin_pipe, wb->stdin_pipe, sizeof(attr->stdin_pipe));
     }
     if (wb->manager.redirect_stdout) {
-        attr->stdout_pipe = wb->stdout_pipe;
+        memcpy(attr->stdout_pipe, wb->stdout_pipe, sizeof(attr->stdout_pipe));
     }
     if (wb->manager.redirect_stderr) {
-        attr->stderr_pipe = wb->stderr_pipe;
+        memcpy(attr->stderr_pipe, wb->stderr_pipe, sizeof(attr->stderr_pipe));
     }
 }
 

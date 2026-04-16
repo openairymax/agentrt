@@ -6,16 +6,13 @@
 
 #include "../../include/layer2_feature.h"
 #include <agentos/agentos.h>
-#include "../../include/logger.h"
+#include <agentos/logging.h>
 #ifdef AGENTOS_HAS_CURL
 #include <curl/curl.h>
-#else
-#include "../include/curl_stub.h"
-#endif /* AGENTOS_HAS_CURL */
+#endif
 #ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
-else
-/* cJSON stub - 简化实现（仅用于编译通过） */
+#else
 typedef struct cJSON {
     int type;
     char* valuestring;
@@ -36,16 +33,21 @@ static inline cJSON* cJSON_CreateObject(void) { return NULL; }
 static inline void cJSON_AddStringToObject(cJSON* object, const char* name, const char* string) { (void)object; (void)name; (void)string; }
 static inline char* cJSON_PrintUnformatted(const cJSON* item) { (void)item; return NULL; }
 static inline void cJSON_Delete(cJSON* item) { (void)item; }
-#endif /* AGENTOS_HAS_CJSON */
+#endif
 #include <stdlib.h>
 
-/* Unified base library compatibility layer */
 #include <agentos/memory.h>
 #include <agentos/string.h>
 #include <string.h>
 #include <pthread.h>
 #include <math.h>
-#include <uthash.h>
+
+typedef struct embedding_entry {
+    char* key;
+    float* vector;
+    size_t dim;
+    struct embedding_entry* next;
+} embedding_entry_t;
 
 /* ==================== 常量定义 ==================== */
 
@@ -239,7 +241,7 @@ static size_t generate_openai_embedding(const char* text, float** out_embedding)
              g_embedder->api_key ? g_embedder->api_key : "");
     headers = curl_slist_append(headers, auth_header);
 
-    curl_easy_setopt(curl, CURLOPT_URL, g_embedder->base_url ? g_embedder->base_url : DEFAULT_OPENAI_ENDPOINT);
+    curl_easy_setopt(curl, CURLOPT_URL, g_embedder->base_url ? g_embedder->base_url : "https://api.openai.com/v1");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_data);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
@@ -340,7 +342,7 @@ static size_t generate_deepseek_embedding(const char* text, float** out_embeddin
              g_embedder->api_key ? g_embedder->api_key : "");
     headers = curl_slist_append(headers, auth_header);
 
-    curl_easy_setopt(curl, CURLOPT_URL, g_embedder->base_url ? g_embedder->base_url : DEFAULT_DEEPSEEK_ENDPOINT);
+    curl_easy_setopt(curl, CURLOPT_URL, g_embedder->base_url ? g_embedder->base_url : "https://api.deepseek.com/v1");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_data);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
@@ -453,7 +455,7 @@ agentos_error_t agentos_embedder_embed(const char* text, float** out_embedding, 
     }
 
     if (dim == 0 || !emb) {
-        return AGENTOS_FAILURE;
+        return AGENTOS_EINVAL;
     }
 
     *out_embedding = emb;

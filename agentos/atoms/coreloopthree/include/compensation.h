@@ -31,9 +31,10 @@ typedef struct agentos_compensation_entry {
 typedef struct agentos_compensation {
     agentos_compensation_entry_t* entries;
     size_t entry_count;
-    pthread_mutex_t mutex;
+    agentos_mutex_t* lock;
     char** human_queue;
     size_t human_queue_size;
+    size_t human_queue_capacity;
 } agentos_compensation_t;
 
 /**

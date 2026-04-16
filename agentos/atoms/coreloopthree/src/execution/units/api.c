@@ -1,10 +1,10 @@
 /**
  * @file api.c
- * @brief API调用执行单元实现
+ * @brief API Call Execution Unit Implementation
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "strategy.h"
+#include "execution.h"
 #include "agentos.h"
 #include <stdlib.h>
 
@@ -13,8 +13,8 @@
 #include <string.h>
 
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#define popen _popen
 #else
 #include <unistd.h>
 #endif
@@ -24,11 +24,6 @@
 #define MAX_BODY_SIZE 4096
 #define DEFAULT_TIMEOUT_MS 30000
 
-#define DEFAULT_API_KEY ""
-#define DEFAULT_API_BASE "https://api.example.com"
-
-#define DEFAULT_API_VERSION "v1"
-
 typedef struct api_config {
     char base_url[256];
     char api_key[128];
@@ -37,99 +32,111 @@ typedef struct api_config {
     float retry_delay_ms;
 } api_config_t;
 
-typedef struct api_unit {
-    agentos_execution_unit_t base;
-    api_config_t manager;
+typedef struct api_unit_data {
+    char* id;
+    char* description;
+    api_config_t config;
     char** cached_responses;
     size_t cached_count;
     size_t cache_capacity;
-    pthread_mutex_t mutex;
-} api_unit_t;
+    agentos_mutex_t* lock;
+} api_unit_data_t;
 
-static agentos_error_t api_execute(agentos_execution_unit_t* self,
-                                    const char* input,
-                                    char** output) {
-    (void)self;
+static agentos_error_t api_execute(agentos_execution_unit_t* unit,
+                                    const void* input,
+                                    void** out_output) {
+    (void)unit;
     (void)input;
-    (void)output;
+    (void)out_output;
     return AGENTOS_ENOTSUP;
 }
 
-static void api_destroy(agentos_execution_unit_t* self) {
-    if (!self) return;
+static void api_destroy(agentos_execution_unit_t* unit) {
+    if (!unit) return;
 
-    api_unit_t* unit = (api_unit_t*)self;
+    api_unit_data_t* data = (api_unit_data_t*)unit->execution_unit_data;
+    if (data) {
+        if (data->id) AGENTOS_FREE(data->id);
+        if (data->description) AGENTOS_FREE(data->description);
 
-    if (unit->base.id) {
-        AGENTOS_FREE((void*)unit->base.id);
-        unit->base.id = NULL;
-    }
-    if (unit->base.description) {
-        AGENTOS_FREE((void*)unit->base.description);
-        unit->base.description = NULL;
-    }
-
-    if (unit->cached_responses) {
-        for (size_t i = 0; i < unit->cached_count; i++) {
-            if (unit->cached_responses[i]) {
-                AGENTOS_FREE(unit->cached_responses[i]);
+        if (data->cached_responses) {
+            for (size_t i = 0; i < data->cached_count; i++) {
+                if (data->cached_responses[i]) {
+                    AGENTOS_FREE(data->cached_responses[i]);
+                }
             }
+            AGENTOS_FREE(data->cached_responses);
         }
-        AGENTOS_FREE(unit->cached_responses);
-        unit->cached_responses = NULL;
-    }
 
-    pthread_mutex_destroy(&unit->mutex);
+        if (data->lock) agentos_mutex_destroy(data->lock);
+        AGENTOS_FREE(data);
+    }
 
     AGENTOS_FREE(unit);
 }
 
-static const char* api_get_info(agentos_execution_unit_t* self) {
-    (void)self;
-    return "API Execution Unit v1.0";
+static const char* api_get_metadata(agentos_execution_unit_t* unit) {
+    if (!unit || !unit->execution_unit_data) return "api";
+    api_unit_data_t* data = (api_unit_data_t*)unit->execution_unit_data;
+    return data->description ? data->description : "API Execution Unit v1.0";
 }
 
 agentos_error_t agentos_unit_api_create(
-    const api_config_t* manager,
+    const api_config_t* config,
     agentos_execution_unit_t** out_unit) {
-    if (!manager || !out_unit) {
+    if (!config || !out_unit) {
         return AGENTOS_EINVAL;
     }
 
-    api_unit_t* unit = (api_unit_t*)AGENTOS_CALLOC(1, sizeof(api_unit_t));
+    agentos_execution_unit_t* unit = (agentos_execution_unit_t*)AGENTOS_CALLOC(1, sizeof(agentos_execution_unit_t));
     if (!unit) {
         return AGENTOS_ENOMEM;
     }
 
-    unit->base.id = AGENTOS_STRDUP("api");
-    if (!unit->base.id) {
+    api_unit_data_t* data = (api_unit_data_t*)AGENTOS_CALLOC(1, sizeof(api_unit_data_t));
+    if (!data) {
         AGENTOS_FREE(unit);
         return AGENTOS_ENOMEM;
     }
-    unit->base.description = AGENTOS_STRDUP("Execute HTTP/HTTPS API calls");
-    if (!unit->base.description) {
-        AGENTOS_FREE((void*)unit->base.id);
+
+    data->id = AGENTOS_STRDUP("api");
+    data->description = AGENTOS_STRDUP("Execute HTTP/HTTPS API calls");
+    if (!data->id || !data->description) {
+        if (data->id) AGENTOS_FREE(data->id);
+        if (data->description) AGENTOS_FREE(data->description);
+        AGENTOS_FREE(data);
         AGENTOS_FREE(unit);
         return AGENTOS_ENOMEM;
     }
-    unit->base.execute = api_execute;
-    unit->base.destroy = api_destroy;
-    unit->base.get_info = api_get_info;
 
-    memcpy(&unit->manager, manager, sizeof(api_config_t));
+    memcpy(&data->config, config, sizeof(api_config_t));
 
-    unit->cached_responses = (char**)AGENTOS_CALLOC(10, sizeof(char*));
-    if (!unit->cached_responses) {
-        AGENTOS_FREE((void*)unit->base.id);
-        AGENTOS_FREE((void*)unit->base.description);
+    data->cached_responses = (char**)AGENTOS_CALLOC(10, sizeof(char*));
+    if (!data->cached_responses) {
+        AGENTOS_FREE(data->id);
+        AGENTOS_FREE(data->description);
+        AGENTOS_FREE(data);
         AGENTOS_FREE(unit);
         return AGENTOS_ENOMEM;
     }
-    unit->cache_capacity = 10;
-    unit->cached_count = 0;
+    data->cache_capacity = 10;
+    data->cached_count = 0;
 
-    pthread_mutex_init(&unit->mutex, NULL);
+    data->lock = agentos_mutex_create();
+    if (!data->lock) {
+        AGENTOS_FREE(data->id);
+        AGENTOS_FREE(data->description);
+        AGENTOS_FREE(data->cached_responses);
+        AGENTOS_FREE(data);
+        AGENTOS_FREE(unit);
+        return AGENTOS_ENOMEM;
+    }
 
-    *out_unit = (agentos_execution_unit_t*)unit;
+    unit->execution_unit_data = data;
+    unit->execution_unit_execute = api_execute;
+    unit->execution_unit_destroy = api_destroy;
+    unit->execution_unit_get_metadata = api_get_metadata;
+
+    *out_unit = unit;
     return AGENTOS_SUCCESS;
 }

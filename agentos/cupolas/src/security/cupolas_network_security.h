@@ -92,17 +92,53 @@ typedef struct {
     bool enable_sct;                      /**< Enable SCT */
     bool enable_session_tickets;          /**< Enable session tickets */
     uint32_t session_cache_size;          /**< Session cache size */
+    bool enable_logging;                  /**< Enable logging */
+    bool enable_audit;                    /**< Enable audit */
+    char* ca_bundle_path;                 /**< CA bundle path */
+    char* client_cert_path;               /**< Client certificate path */
+    char* client_key_path;                /**< Client key path */
+    struct {
+        cupolas_tls_version_t min_version;
+        cupolas_tls_version_t max_version;
+    } tls;
     
     uint32_t handshake_timeout_ms;        /**< Handshake timeout */
     uint32_t read_timeout_ms;             /**< Read timeout */
     uint32_t write_timeout_ms;            /**< Write timeout */
+
+    bool enable_ids;                      /**< Enable IDS */
+    struct {
+        bool enforce_https;
+        bool enable_dnssec;
+        char dns_server[64];
+        char** blocked_domains;
+        size_t blocked_count;
+        char** allowed_domains;
+        size_t domain_count;
+        size_t max_url_length;
+        size_t max_body_size;
+        char** allowed_methods;
+        size_t method_count;
+        char** forbidden_headers;
+        size_t forbidden_count;
+        bool hsts_enabled;
+        uint32_t hsts_max_age;
+    } http;
+    struct {
+        bool enable_dnssec;
+        char upstream_server[64];
+        char** blocked_domains;
+        size_t blocked_count;
+        char** allowed_domains;
+        size_t domain_count;
+    } dns;
 } cupolas_tls_config_t;
 
 /**
  * @brief Firewall rule structure
  */
 typedef struct {
-    uint32_t rule_id;                   /**< Rule identifier */
+    char* rule_id;                       /**< Rule identifier */
     cupolas_proto_t protocol;             /**< Protocol */
     cupolas_direction_t direction;        /**< Direction */
     
@@ -119,7 +155,35 @@ typedef struct {
     uint64_t valid_until;               /**< Valid until timestamp */
     
     char* description;                  /**< Rule description */
+    char* src_ip_pattern;               /**< Source IP pattern */
+    char* dst_ip_pattern;               /**< Destination IP pattern */
+    char* host_pattern;                 /**< Host pattern */
+    char* url_pattern;                  /**< URL pattern */
+    bool enabled;                       /**< Rule enabled */
+    uint16_t dst_port_start;            /**< Destination port range start */
+    uint16_t dst_port_end;              /**< Destination port range end */
+    uint16_t src_port_start;            /**< Source port range start */
+    uint16_t src_port_end;              /**< Source port range end */
+    int priority;                       /**< Rule priority */
+    uint32_t burst_limit;               /**< Burst limit for rate limiting */
 } cupolas_fw_rule_t;
+
+typedef struct {
+    char local_ip[64];
+    uint16_t local_port;
+    char remote_ip[64];
+    uint16_t remote_port;
+    cupolas_proto_t protocol;
+    bool is_encrypted;
+    uint64_t bytes_sent;
+    uint64_t bytes_received;
+    uint64_t connect_time;
+    char hostname[256];
+    char cipher_suite[128];
+    struct {
+        bool enforce_https;
+    } http;
+} cupolas_connection_info_t;
 
 /**
  * @brief Firewall configuration
@@ -151,7 +215,35 @@ typedef struct {
     uint64_t rate_limit_hits;
     uint64_t cert_errors;
     uint64_t hostname_mismatches;
+    uint64_t dns_queries;
+    uint64_t dns_blocked;
+    uint64_t http_requests;
+    uint64_t https_requests;
+    uint64_t plaintext_blocked;
+    uint64_t blocked_connections;
 } cupolas_net_stats_t;
+
+typedef cupolas_fw_rule_t cupolas_net_filter_rule_t;
+typedef struct {
+    bool enable_ids;
+    cupolas_tls_config_t manager;
+} cupolas_net_security_config_t;
+typedef struct {
+    bool enable_ids;
+} cupolas_ids_config_t;
+typedef struct {
+    bool enable_dnssec;
+    char upstream_server[64];
+} cupolas_dns_security_config_t;
+typedef struct {
+    bool enforce_https;
+    size_t max_url_length;
+    size_t max_body_size;
+    char** allowed_methods;
+    size_t method_count;
+    char** forbidden_headers;
+    size_t forbidden_count;
+} cupolas_http_security_config_t;
 
 /**
  * @brief Initialize network security module
@@ -328,7 +420,7 @@ int cupolas_firewall_add_rule(const cupolas_fw_rule_t* rule);
  * @note Thread-safe: Safe to call from multiple threads (but not concurrently with other operations)
  * @reentrant No
  */
-int cupolas_firewall_remove_rule(uint32_t rule_id);
+int cupolas_firewall_remove_rule(const char* rule_id);
 
 /**
  * @brief Check if connection is allowed

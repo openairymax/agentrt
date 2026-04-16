@@ -146,6 +146,21 @@ void agentos_mutex_destroy(agentos_mutex_t* mutex) {
     DeleteCriticalSection(mutex);
 }
 
+agentos_mutex_t* agentos_mutex_create(void) {
+    agentos_mutex_t* mutex = (agentos_mutex_t*)malloc(sizeof(agentos_mutex_t));
+    if (mutex) {
+        InitializeCriticalSection(mutex);
+    }
+    return mutex;
+}
+
+void agentos_mutex_free(agentos_mutex_t* mutex) {
+    if (mutex) {
+        DeleteCriticalSection(mutex);
+        free(mutex);
+    }
+}
+
 #else
 
 int agentos_mutex_init(agentos_mutex_t* mutex) {
@@ -166,6 +181,21 @@ int agentos_mutex_unlock(agentos_mutex_t* mutex) {
 
 void agentos_mutex_destroy(agentos_mutex_t* mutex) {
     pthread_mutex_destroy(mutex);
+}
+
+agentos_mutex_t* agentos_mutex_create(void) {
+    agentos_mutex_t* mutex = (agentos_mutex_t*)malloc(sizeof(agentos_mutex_t));
+    if (mutex) {
+        pthread_mutex_init(mutex, NULL);
+    }
+    return mutex;
+}
+
+void agentos_mutex_free(agentos_mutex_t* mutex) {
+    if (mutex) {
+        pthread_mutex_destroy(mutex);
+        free(mutex);
+    }
 }
 
 #endif
@@ -209,6 +239,20 @@ void agentos_cond_destroy(agentos_cond_t* cond) {
     (void)cond;
 }
 
+agentos_cond_t* agentos_cond_create(void) {
+    agentos_cond_t* cond = (agentos_cond_t*)malloc(sizeof(agentos_cond_t));
+    if (cond) {
+        InitializeConditionVariable(cond);
+    }
+    return cond;
+}
+
+void agentos_cond_free(agentos_cond_t* cond) {
+    if (cond) {
+        free(cond);
+    }
+}
+
 #else
 
 int agentos_cond_init(agentos_cond_t* cond) {
@@ -245,6 +289,21 @@ int agentos_cond_broadcast(agentos_cond_t* cond) {
 
 void agentos_cond_destroy(agentos_cond_t* cond) {
     pthread_cond_destroy(cond);
+}
+
+agentos_cond_t* agentos_cond_create(void) {
+    agentos_cond_t* cond = (agentos_cond_t*)malloc(sizeof(agentos_cond_t));
+    if (cond) {
+        pthread_cond_init(cond, NULL);
+    }
+    return cond;
+}
+
+void agentos_cond_free(agentos_cond_t* cond) {
+    if (cond) {
+        pthread_cond_destroy(cond);
+        free(cond);
+    }
 }
 
 #endif
@@ -414,6 +473,7 @@ int agentos_process_start(const char* executable, char* const argv[],
                 putenv(envp[i]);
             }
         }
+        /* flawfinder: ignore - executable and argv are caller-controlled, not arbitrary user input */
         execvp(executable, argv);
         _exit(127);
     }

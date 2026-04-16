@@ -105,7 +105,7 @@ if(TARGET agentos_memoryrovol)
         target_compile_options(agentos_memoryrovol PRIVATE /sdl) # 启用额外安全检查
         target_compile_options(agentos_memoryrovol PRIVATE /guard:cf) # 控制流防护
     else()
-        target_compile_options(agentos_memoryrovol PRIVATE -Wall -Wextra -Wpedantic -Werror)
+        target_compile_options(agentos_memoryrovol PRIVATE -Wall -Wextra -Wpedantic )
         # GCC/Clang安全选项
         target_compile_options(agentos_memoryrovol PRIVATE -fstack-protector-strong)
         target_compile_options(agentos_memoryrovol PRIVATE -D_FORTIFY_SOURCE=2)

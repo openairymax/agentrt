@@ -6,12 +6,14 @@
  */
 
 #include "audit_overflow.h"
-#include "../../utils/cupolas_utils.h"
+#include "utils/cupolas_utils.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
 #include <errno.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #define DEFAULT_OVERFLOW_DIR "/var/log/cupolas"
 #define DEFAULT_MAX_FILE_SIZE_MB 100
@@ -37,7 +39,7 @@ struct overflow_handler {
     overflow_stats_t stats;
 };
 
-static const char* overflow_level_strings[] = {
+static const char* overflow_level_strings[] __attribute__((unused)) = {
     "NORMAL",
     "WARNING",
     "CRITICAL",
@@ -46,7 +48,7 @@ static const char* overflow_level_strings[] = {
 
 static void get_timestamp_filename(char* buffer, size_t buffer_size) {
     time_t now = time(NULL);
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     struct tm* tm_info = localtime(&now);
 #else
     struct tm tm_buf;
@@ -62,7 +64,7 @@ static void get_timestamp_filename(char* buffer, size_t buffer_size) {
 static int ensure_overflow_dir(const char* dir) {
     if (!dir) return -1;
     
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     return mkdir(dir);
 #else
     return mkdir(dir, 0755);
@@ -199,7 +201,7 @@ overflow_handler_t* overflow_handler_create(const char* overflow_dir,
     memset(handler, 0, sizeof(overflow_handler_t));
     
     snprintf(handler->overflow_dir, sizeof(handler->overflow_dir),
-             overflow_dir ? overflow_dir : DEFAULT_OVERFLOW_DIR);
+             "%s", overflow_dir ? overflow_dir : DEFAULT_OVERFLOW_DIR);
     handler->max_file_size_bytes = (max_file_size_mb > 0 ? max_file_size_mb : DEFAULT_MAX_FILE_SIZE_MB) * 1024 * 1024;
     handler->flush_interval_ms = flush_interval_ms > 0 ? flush_interval_ms : DEFAULT_FLUSH_INTERVAL_MS;
     

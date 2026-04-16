@@ -23,7 +23,7 @@
 /* 安全字符串复制宏（确保空字符结尾） */
 #define SAFE_STRNCPY(dst, src, size) \
     do { \
-        if ((dst) && (src) && (size) > 0) { \
+        if ((src) && (size) > 0) { \
             strncpy((dst), (src), (size) - 1); \
             (dst)[(size) - 1] = '\0'; \
         } \
@@ -51,14 +51,17 @@
     ((type*)AGENTOS_CALLOC((count), sizeof(type)))
 
 /* 检查内存分配结果 */
+#ifndef CHECK_ALLOC
 #define CHECK_ALLOC(ptr) \
     do { \
         if (!(ptr)) { \
             return AGENTOS_ERROR_NO_MEMORY; \
         } \
     } while(0)
+#endif
 
 // 安全字符串复制函数（返回实际复制的字符数，不包括空字符）
+__attribute__((unused))
 static size_t safe_str_copy(char* dest, size_t dest_size, const char* src) {
     if (!dest || !src || dest_size == 0) return 0;
     
@@ -72,6 +75,7 @@ static size_t safe_str_copy(char* dest, size_t dest_size, const char* src) {
 }
 
 // 浮点数范围检查
+__attribute__((unused))
 static int validate_float_range(float value, float min, float max) {
     return VALIDATE_FLOAT(value, min, max);
 }
@@ -254,7 +258,9 @@ static void record_decision(performance_stats_t* stats,
  */
 static float adaptive_threshold_adjust(dual_model_coordinator_t* coordinator,
                                        float current_similarity) {
-    if (!coordinator || !coordinator->enable_adaptive_learning) {
+    (void)current_similarity;
+    if (!coordinator) return 0.5f;
+    if (!coordinator->enable_adaptive_learning) {
         return coordinator->disagreement_threshold;
     }
     

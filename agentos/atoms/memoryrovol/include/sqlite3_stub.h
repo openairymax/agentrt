@@ -33,7 +33,7 @@ typedef struct sqlite3_stmt sqlite3_stmt;
 #define SQLITE_CORRUPT      11  /* 数据库磁盘映像不正确 */
 #define SQLITE_NOTFOUND     12  /* sqlite3_file_control()中未知操作数 */
 #define SQLITE_FULL         13  /* 数据库满时插入失败 */
-#define SQLITE_CANTOPEN     14  ** 无法打开数据库文件 */
+#define SQLITE_CANTOPEN     14  /* Cannot open database file */
 #define SQLITE_PROTOCOL     15  /* 数据库锁定协议错误 */
 #define SQLITE_EMPTY        16  /* 数据库为空 */
 #define SQLITE_SCHEMA       17  /* 数据库模式已更改 */

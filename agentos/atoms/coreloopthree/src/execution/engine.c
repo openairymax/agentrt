@@ -7,7 +7,7 @@
 #include "../../include/execution.h"
 #include "../../include/agent_registry.h"
 #include <agentos/agentos.h>
-#include <agentos/logger.h>
+#include <agentos/logging.h>
 #include "../../include/id_utils.h"
 #include "../../include/error_utils.h"
 #include <stdlib.h>
@@ -249,8 +249,8 @@ static void tcb_release(task_tcb_t* tcb) {
         AGENTOS_FREE(tcb->task_id);
         if (tcb->task_desc) {
             if (tcb->task_desc->task_id) AGENTOS_FREE(tcb->task_desc->task_id);
-            if (tcb->task_desc->agent_id) AGENTOS_FREE(tcb->task_desc->agent_id);
-            if (tcb->task_desc->input) AGENTOS_FREE(tcb->task_desc->input);
+            if (tcb->task_desc->task_agent_id) AGENTOS_FREE(tcb->task_desc->task_agent_id);
+            if (tcb->task_desc->task_input) AGENTOS_FREE(tcb->task_desc->task_input);
             AGENTOS_FREE(tcb->task_desc);
         }
         if (tcb->result) AGENTOS_FREE(tcb->result);
@@ -271,22 +271,23 @@ static agentos_task_t* task_desc_deep_copy(const agentos_task_t* task) {
         copy->task_id = AGENTOS_STRDUP(task->task_id);
         if (!copy->task_id) goto fail;
     }
-    if (task->agent_id) {
-        copy->agent_id = AGENTOS_STRDUP(task->agent_id);
-        if (!copy->agent_id) goto fail;
+    if (task->task_agent_id) {
+        copy->task_agent_id = AGENTOS_STRDUP(task->task_agent_id);
+        if (!copy->task_agent_id) goto fail;
     }
-    if (task->input) {
-        copy->input = AGENTOS_STRDUP(task->input);
-        if (!copy->input) goto fail;
+    if (task->task_input) {
+        size_t input_len = strnlen((const char*)task->task_input, 65536);
+        copy->task_input = AGENTOS_MALLOC(input_len + 1);
+        if (!copy->task_input) goto fail;
+        memcpy(copy->task_input, task->task_input, input_len + 1);
     }
-    copy->priority = task->priority;
-    copy->timeout_ms = task->timeout_ms;
+    copy->task_timeout_ms = task->task_timeout_ms;
     return copy;
 
 fail:
     if (copy->task_id) AGENTOS_FREE(copy->task_id);
-    if (copy->agent_id) AGENTOS_FREE(copy->agent_id);
-    if (copy->input) AGENTOS_FREE(copy->input);
+    if (copy->task_agent_id) AGENTOS_FREE(copy->task_agent_id);
+    if (copy->task_input) AGENTOS_FREE(copy->task_input);
     AGENTOS_FREE(copy);
     return NULL;
 }
@@ -302,22 +303,20 @@ static agentos_task_t* task_result_deep_copy(const task_tcb_t* tcb) {
         result->task_id = AGENTOS_STRDUP(tcb->task_desc->task_id);
         if (!result->task_id) goto fail;
     }
-    if (tcb->task_desc->agent_id) {
-        result->agent_id = AGENTOS_STRDUP(tcb->task_desc->agent_id);
-        if (!result->agent_id) goto fail;
+    if (tcb->task_desc->task_agent_id) {
+        result->task_agent_id = AGENTOS_STRDUP(tcb->task_desc->task_agent_id);
+        if (!result->task_agent_id) goto fail;
     }
     if (tcb->result && tcb->result_len > 0) {
-        result->output = AGENTOS_MALLOC(tcb->result_len);
-        if (!result->output) goto fail;
-        memcpy(result->output, tcb->result, tcb->result_len);
-        result->output_len = tcb->result_len;
+        result->task_output = AGENTOS_MALLOC(tcb->result_len);
+        if (!result->task_output) goto fail;
+        memcpy(result->task_output, tcb->result, tcb->result_len);
     }
-    result->priority = tcb->task_desc->priority;
     return result;
 
 fail:
     if (result->task_id) AGENTOS_FREE(result->task_id);
-    if (result->agent_id) AGENTOS_FREE(result->agent_id);
+    if (result->task_agent_id) AGENTOS_FREE(result->task_agent_id);
     AGENTOS_FREE(result);
     return NULL;
 }
@@ -325,14 +324,14 @@ fail:
 /**
  * @brief 工作线程主函�?
  */
-static void worker_thread_func(void* arg) {
+static void* worker_thread_func(void* arg) {
     agentos_execution_engine_t* engine = (agentos_execution_engine_t*)arg;
 
     while (engine->running) {
         task_tcb_t* tcb = NULL;
         agentos_mutex_lock(engine->queue_lock);
         while (engine->task_queue == NULL && engine->running) {
-            agentos_cond_wait(engine->task_available_cond, engine->queue_lock, 0);
+            agentos_cond_wait(engine->task_available_cond, engine->queue_lock);
         }
         if (!engine->running) {
             agentos_mutex_unlock(engine->queue_lock);
@@ -354,15 +353,18 @@ static void worker_thread_func(void* arg) {
         tcb->status = TASK_STATUS_RUNNING;
         agentos_mutex_unlock(tcb->tcb_lock);
 
-        agentos_execution_unit_t* unit = agentos_registry_get_unit(tcb->task_desc->agent_id);
+        agentos_execution_unit_t* unit = agentos_registry_get_unit(tcb->task_desc->task_agent_id);
         void* output = NULL;
         size_t output_len = 0;
         agentos_error_t exec_err;
         if (unit) {
-            exec_err = unit->execute(unit, tcb->task_desc->input, &output);
+            exec_err = unit->execution_unit_execute(unit, tcb->task_desc->task_input, &output);
+            if (output) {
+                output_len = strlen((const char*)output);
+            }
         } else {
             exec_err = AGENTOS_ENOENT;
-            AGENTOS_LOG_ERROR("No execution unit found for agent %s", tcb->task_desc->agent_id);
+            AGENTOS_LOG_ERROR("No execution unit found for agent %s", tcb->task_desc->task_agent_id);
         }
 
         agentos_mutex_lock(tcb->tcb_lock);
@@ -381,6 +383,7 @@ static void worker_thread_func(void* arg) {
         task_hash_table_remove(engine->task_map, tcb->task_id);
         tcb_release(tcb);
     }
+    return NULL;
 }
 
 /**
@@ -533,7 +536,7 @@ agentos_error_t agentos_execution_submit(
 
     if (!engine || !task || !out_task_id) {
         AGENTOS_LOG_ERROR("Invalid parameters to execution_submit: engine=%p, task=%p, out_task_id=%p",
-                         engine, task, out_task_id);
+                         (void*)engine, (void*)task, (void*)out_task_id);
         return AGENTOS_EINVAL;
     }
 
@@ -563,7 +566,7 @@ agentos_error_t agentos_execution_submit(
 
     if (!tcb->task_id || !tcb->completed_cond || !tcb->tcb_lock) {
         AGENTOS_LOG_ERROR("Failed to create task resources: task_id=%p, cond=%p, lock=%p",
-                         tcb->task_id, tcb->completed_cond, tcb->tcb_lock);
+                         (void*)tcb->task_id, (void*)tcb->completed_cond, (void*)tcb->tcb_lock);
         if (tcb->task_id) AGENTOS_FREE(tcb->task_id);
         if (tcb->completed_cond) agentos_cond_destroy(tcb->completed_cond);
         if (tcb->tcb_lock) agentos_mutex_destroy(tcb->tcb_lock);
@@ -627,10 +630,10 @@ agentos_error_t agentos_execution_wait(
     agentos_mutex_lock(tcb->tcb_lock);
     while (tcb->status == TASK_STATUS_PENDING || tcb->status == TASK_STATUS_RUNNING) {
         if (timeout_ms == 0) {
-            agentos_cond_wait(cond, tcb->tcb_lock, 0);
+            agentos_cond_wait(cond, tcb->tcb_lock);
         } else {
-            agentos_error_t err = agentos_cond_wait(cond, tcb->tcb_lock, timeout_ms);
-            if (err == AGENTOS_ETIMEDOUT) {
+            int err = agentos_cond_timedwait(cond, tcb->tcb_lock, timeout_ms);
+            if (err != 0) {
                 agentos_mutex_unlock(tcb->tcb_lock);
                 tcb_release(tcb);
                 return AGENTOS_ETIMEDOUT;
@@ -724,9 +727,9 @@ agentos_error_t agentos_execution_get_result(
 void agentos_task_free(agentos_task_t* task) {
     if (!task) return;
     if (task->task_id) AGENTOS_FREE(task->task_id);
-    if (task->agent_id) AGENTOS_FREE(task->agent_id);
-    if (task->input) AGENTOS_FREE(task->input);
-    if (task->output) AGENTOS_FREE(task->output);
+    if (task->task_agent_id) AGENTOS_FREE(task->task_agent_id);
+    if (task->task_input) AGENTOS_FREE(task->task_input);
+    if (task->task_output) AGENTOS_FREE(task->task_output);
     AGENTOS_FREE(task);
 }
 

@@ -5,8 +5,8 @@
  */
 
 #include "syscalls.h"
-#include "coreloopthree/cognition.h"
-#include "coreloopthree/execution.h"
+#include "../../coreloopthree/include/cognition.h"
+#include "../../coreloopthree/include/execution.h"
 #include "agentos.h"
 #include "logger.h"
 #include <stdlib.h>
@@ -52,7 +52,7 @@ static cJSON* build_name_to_index_map(agentos_task_plan_t* plan, size_t n) {
     if (!name_to_idx) return NULL;
     
     for (size_t i = 0; i < n; i++) {
-        char idx_str[16];
+        char idx_str[24];
         snprintf(idx_str, sizeof(idx_str), "%zu", i);
         cJSON_AddStringToObject(name_to_idx, plan->task_plan_nodes[i]->task_node_id, idx_str);
     }

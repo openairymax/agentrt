@@ -17,6 +17,7 @@
 #include <agentos/compat/stdint.h>
 #include <agentos/compat/stdbool.h>
 #include <stddef.h>
+#include <stdlib.h>
 
 #ifdef __cplusplus
 extern "C" {
