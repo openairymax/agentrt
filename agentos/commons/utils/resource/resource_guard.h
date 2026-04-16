@@ -131,7 +131,7 @@ void agentos_resource_track_clear(void);
  * @param cleanup 清理函数
  */
 #define AGENTOS_SCOPE_GUARD(resource, cleanup) \
-    agentos_resource_guard_t AGENTOS_UNIQUE_NAME(_guard) __attribute__((cleanup(agentos_resource_guard_cleanup))) = { \
+    agentos_resource_guard_t AGENTOS_UNIQUE_NAME(_guard) AGENTOS_ATTRIBUTE((cleanup(agentos_resource_guard_cleanup))) = { \
         .resource = (resource), \
         .cleanup = (cleanup), \
         .file = __FILE__, \
@@ -146,7 +146,7 @@ void agentos_resource_track_clear(void);
  * @param cleanup 清理函数
  */
 #define AGENTOS_SCOPE_EXIT(resource, cleanup) \
-    agentos_resource_guard_t AGENTOS_UNIQUE_NAME(_scope_exit) __attribute__((cleanup(agentos_resource_guard_cleanup))) = { \
+    agentos_resource_guard_t AGENTOS_UNIQUE_NAME(_scope_exit) AGENTOS_ATTRIBUTE((cleanup(agentos_resource_guard_cleanup))) = { \
         .resource = (resource), \
         .cleanup = (cleanup), \
         .file = __FILE__, \
@@ -223,14 +223,10 @@ void agentos_resource_track_clear(void);
 
 #endif /* AGENTOS_RESOURCE_TRACKING */
 
-/* ==================== 跨平台属性支持 ==================== */
-
-#ifndef __attribute__
-#define __attribute__(x)
-#endif
-
 #ifdef _MSC_VER
-#define __attribute__(x)
+#define AGENTOS_ATTRIBUTE(x)
+#else
+#define AGENTOS_ATTRIBUTE(x) __attribute__(x)
 #endif
 
 #ifdef __cplusplus

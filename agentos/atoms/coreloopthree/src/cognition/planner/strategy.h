@@ -11,6 +11,11 @@
 #include "llm_client.h"
 #include <stddef.h>
 
+typedef struct agentos_memory_engine agentos_memory_engine_t;
+typedef struct agentos_planner_base agentos_planner_base_t;
+typedef struct agentos_planning_context agentos_planning_context_t;
+typedef struct agentos_plan agentos_plan_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif

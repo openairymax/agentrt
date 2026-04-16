@@ -376,7 +376,8 @@ int32_t config_value_get_int(const config_value_t* value, int32_t default_value)
         case CONFIG_TYPE_DOUBLE:
             return (int32_t)value->data.double_value;
         case CONFIG_TYPE_STRING:
-            // 尝试解析字符�?            return (int32_t)strtol(value->data.string_value.str, NULL, 10);
+            // 尝试解析字符串
+            return (int32_t)strtol(value->data.string_value.str, NULL, 10);
         default:
             return default_value;
     }
@@ -488,10 +489,12 @@ config_error_t config_context_set(config_context_t* ctx, const char* key, config
         return CONFIG_ERROR_INVALID_ARG;
     }
     
-    // 查找现有�?    int index = find_item_index(ctx, key);
+    // 查找现有项
+    int index = find_item_index(ctx, key);
     
     if (index >= 0) {
-        // 替换现有�?        config_value_destroy(ctx->items[index].value);
+        // 替换现有项
+        config_value_destroy(ctx->items[index].value);
         ctx->items[index].value = value;
         return CONFIG_SUCCESS;
     } else {
@@ -537,10 +540,12 @@ config_error_t config_context_delete(config_context_t* ctx, const char* key) {
         return CONFIG_ERROR_NOT_FOUND;
     }
     
-    // 删除�?    AGENTOS_FREE(ctx->items[index].key);
+    // 删除项
+    AGENTOS_FREE(ctx->items[index].key);
     config_value_destroy(ctx->items[index].value);
     
-    // 移动后续�?    for (size_t i = index + 1; i < ctx->count; i++) {
+    // 移动后续项
+    for (size_t i = index + 1; i < ctx->count; i++) {
         ctx->items[i - 1] = ctx->items[i];
     }
     
@@ -591,36 +596,36 @@ config_error_t config_context_unlock(config_context_t* ctx) {
 
 const char* config_error_to_string(config_error_t error) {
     static const char* error_strings[] = {
-        "成功",
-        "参数无效",
-        "配置项不存在",
-        "类型不匹�?,
-        "内存不足",
-        "I/O错误",
-        "解析错误",
-        "验证失败",
-        "配置被锁�?,
-        "不支持的操作"
+        "Success",
+        "Invalid argument",
+        "Not found",
+        "Type mismatch",
+        "Out of memory",
+        "I/O error",
+        "Parse error",
+        "Validation failed",
+        "Config locked",
+        "Unsupported operation"
     };
     
     if (error >= 0 && error < sizeof(error_strings) / sizeof(error_strings[0])) {
         return error_strings[error];
     }
     
-    return "未知错误";
+    return "Unknown error";
 }
 
 const char* config_type_to_string(config_value_type_t type) {
     static const char* type_strings[] = {
-        "空类�?,
-        "布尔类型",
-        "32位整�?,
-        "64位整�?,
-        "双精度浮点数",
-        "字符�?,
-        "数组",
-        "对象",
-        "二进制数�?
+        "Null",
+        "Boolean",
+        "Int32",
+        "Int64",
+        "Double",
+        "String",
+        "Array",
+        "Object",
+        "Binary"
     };
     
     if (type >= 0 && type < sizeof(type_strings) / sizeof(type_strings[0])) {

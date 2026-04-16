@@ -59,6 +59,17 @@ typedef int32_t agentos_error_t;
 #define AGENTOS_EPROTO         (-13)   /**< 协议错误 */
 #define AGENTOS_ENOTCONN       (-14)   /**< 未连接 */
 #define AGENTOS_ECONNRESET     (-15)   /**< 连接重置 */
+#define AGENTOS_EACCES         (-16)   /**< 权限不足 */
+#define AGENTOS_ECONNREFUSED   (-17)   /**< 连接被拒绝 */
+#define AGENTOS_EMSGSIZE       (-18)   /**< 消息过长 */
+#define AGENTOS_ENOSPC         (-19)   /**< 空间不足 */
+#define AGENTOS_ERANGE         (-20)   /**< 数值范围错误 */
+#define AGENTOS_EDEADLK        (-21)   /**< 死锁 */
+#define AGENTOS_EAGAIN         (-22)   /**< 资源暂时不可用 */
+#define AGENTOS_E2BIG          (-23)   /**< 参数过长 */
+#define AGENTOS_EALREADY       (-24)   /**< 操作已在进行 */
+#define AGENTOS_EUNAVAILABLE    (-25)   /**< 服务不可用 */
+#define AGENTOS_EQUOTA         (-26)   /**< 配额超限 */
 #define AGENTOS_EUNKNOWN       (-99)   /**< 未知错误 */
 
 /* ==================== 统一的同步原语类型（来自platform.h） ==================== */

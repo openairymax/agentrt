@@ -11,6 +11,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifndef AGENTOS_LAYER3_STRUCTURE_SQLITE3_TYPEDEF
+#define AGENTOS_LAYER3_STRUCTURE_SQLITE3_TYPEDEF
+typedef struct sqlite3 sqlite3;
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -35,8 +40,62 @@ typedef struct agentos_relation {
     char* to_id;
     agentos_relation_type_t type;
     float weight;
+    char* metadata_json;
     struct agentos_relation* next;
 } agentos_relation_t;
+
+typedef struct agentos_binder {
+    void* data;
+    agentos_mutex_t* lock;
+    char* name;
+    uint32_t dimension;
+    float* Q;
+    int use_complex;
+    void (*bind_matrices)(struct agentos_binder* self, const float* input, float* output);
+} agentos_binder_t;
+
+agentos_error_t agentos_binder_bind(
+    agentos_binder_t* binder,
+    const float** vectors,
+    size_t count,
+    float** out_result);
+
+typedef struct agentos_unbinder {
+    agentos_binder_t* binder;
+    agentos_mutex_t* lock;
+} agentos_unbinder_t;
+
+typedef struct agentos_sequence_encoder {
+    void* model;
+    uint32_t dimension;
+    char* model_path;
+    agentos_mutex_t* lock;
+    float** position_vectors;
+    uint32_t max_len;
+    agentos_binder_t* binder;
+    int position_encoding;
+} agentos_sequence_encoder_t;
+
+typedef struct agentos_relation_encoder {
+    void* model;
+    uint32_t dimension;
+    char* model_path;
+    agentos_mutex_t* lock;
+    sqlite3* db;
+    char* db_path;
+    float* role_subject;
+    float* role_predicate;
+    float* role_object;
+    agentos_binder_t* binder;
+} agentos_relation_encoder_t;
+
+typedef struct agentos_layer3_structure_config {
+    uint32_t max_nodes;
+    uint32_t max_edges;
+    float similarity_threshold;
+    const char* storage_path;
+    const char* db_path;
+} agentos_layer3_structure_config_t;
 
 /**
  * @brief 知识图谱句柄

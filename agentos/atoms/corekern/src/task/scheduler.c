@@ -43,7 +43,7 @@
  * @param arg 线程参数
  * @return 始终返回NULL（用户函数无返回值）
  */
-static void* user_thread_entry_adapter(void* (*user_func)(void*), void* arg)
+__attribute__((unused)) static void* user_thread_entry_adapter(void* (*user_func)(void*), void* arg)
 {
     /* 用户函数是 void (*func)(void*)，我们调用它并返回NULL */
     user_func(arg);

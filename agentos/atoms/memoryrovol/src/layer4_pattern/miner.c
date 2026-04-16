@@ -35,7 +35,18 @@
 /* 默认配置 */
 #define DEFAULT_MIN_CLUSTER_SIZE 5
 #define DEFAULT_PERSISTENCE_THRESHOLD 0.1
-#define DEFAULT_MINING_INTERVAL 3600  /* 1小时 */
+#define DEFAULT_MINING_INTERVAL 3600
+
+struct agentos_layer4_pattern_config {
+    int auto_mining;
+    int mining_interval_sec;
+    double min_persistence;
+    double persistence_threshold;
+    int min_cluster_size;
+    char* pattern_storage_path;
+    char data_source[128];
+};
+typedef struct agentos_layer4_pattern_config agentos_layer4_pattern_config_t;
 
 struct agentos_layer4_pattern {
     agentos_persistence_calculator_t* pers_calc;
@@ -44,13 +55,14 @@ struct agentos_layer4_pattern {
     agentos_pattern_validator_t* validator;
     agentos_mutex_t* lock;
     agentos_layer4_pattern_config_t manager;
-    // 自动挖掘线程
     pthread_t auto_thread;
     int auto_running;
-    // 数据源回调（可扩展）
     void* data_source_ctx;
     agentos_error_t (*get_vectors_func)(void* ctx, float** out_vectors, char*** out_ids, size_t* out_count);
 };
+typedef struct agentos_layer4_pattern agentos_layer4_pattern_t;
+
+static void agentos_pattern_miner_stop_auto(agentos_layer4_pattern_t* miner);
 
 /* ==================== 内部辅助函数 ==================== */
 
@@ -135,7 +147,7 @@ static agentos_error_t generate_rules_for_clusters(
         for (size_t i = 0; i < count; i++) {
             if (labels[i] == c) cluster_size++;
         }
-        if (cluster_size < miner->manager.min_cluster_size) continue;
+        if (cluster_size < (size_t)miner->manager.min_cluster_size) continue;
 
         // 收集该聚类的向量和ID
         float* cluster_vectors = (float*)AGENTOS_MALLOC(cluster_size * dim * sizeof(float));
@@ -156,8 +168,8 @@ static agentos_error_t generate_rules_for_clusters(
 
         // 生成规则
         char* rule_json = NULL;
-        agentos_error_t err = agentos_rule_generator_generate(
-            miner->rule_gen, cluster_vectors, cluster_ids, cluster_size, &rule_json);
+        agentos_error_t err = agentos_rule_generator_from_cluster(
+            miner->rule_gen, cluster_ids, cluster_size, &rule_json);
         if (err == AGENTOS_SUCCESS && rule_json) {
             // 计算聚类中心（可用均值）
             float* centroid = (float*)AGENTOS_CALLOC(dim, sizeof(float));

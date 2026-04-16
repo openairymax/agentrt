@@ -838,19 +838,42 @@ bool cupolas_atomic_cas_ptr(cupolas_atomic_ptr_t* ptr, void* expected, void* des
  * Error Handling
  * ============================================================================ */
 
-/* Error Codes */
+#ifndef cupolas_OK
 #define cupolas_OK                    0
+#endif
+#ifndef cupolas_ERROR_UNKNOWN
 #define cupolas_ERROR_UNKNOWN         -1
+#endif
+#ifndef cupolas_ERROR_INVALID_ARG
 #define cupolas_ERROR_INVALID_ARG     -2
+#endif
+#ifndef cupolas_ERROR_NO_MEMORY
 #define cupolas_ERROR_NO_MEMORY       -3
+#endif
+#ifndef cupolas_ERROR_NOT_FOUND
 #define cupolas_ERROR_NOT_FOUND       -4
+#endif
+#ifndef cupolas_ERROR_PERMISSION
 #define cupolas_ERROR_PERMISSION      -5
+#endif
+#ifndef cupolas_ERROR_BUSY
 #define cupolas_ERROR_BUSY            -6
+#endif
+#ifndef cupolas_ERROR_TIMEOUT
 #define cupolas_ERROR_TIMEOUT         -7
+#endif
+#ifndef cupolas_ERROR_WOULD_BLOCK
 #define cupolas_ERROR_WOULD_BLOCK     -8
+#endif
+#ifndef cupolas_ERROR_OVERFLOW
 #define cupolas_ERROR_OVERFLOW        -9
+#endif
+#ifndef cupolas_ERROR_NOT_SUPPORTED
 #define cupolas_ERROR_NOT_SUPPORTED   -10
+#endif
+#ifndef cupolas_ERROR_IO
 #define cupolas_ERROR_IO              -11
+#endif
 
 /**
  * @brief Get last error code
@@ -914,6 +937,26 @@ int cupolas_strcasecmp(const char* s1, const char* s2);
  * @reentrant Yes
  */
 int cupolas_strncasecmp(const char* s1, const char* s2, size_t n);
+
+/* ============================================================================
+ * One-Time Initialization
+ * ============================================================================ */
+
+#if cupolas_PLATFORM_WINDOWS
+typedef INIT_ONCE cupolas_once_t;
+#define CUPOLAS_ONCE_INIT INIT_ONCE_STATIC_INIT
+#else
+typedef pthread_once_t cupolas_once_t;
+#define CUPOLAS_ONCE_INIT PTHREAD_ONCE_INIT
+#endif
+
+static inline void cupolas_call_once(cupolas_once_t* once, void (*func)(void)) {
+#if cupolas_PLATFORM_WINDOWS
+    InitOnceExecuteOnce(once, (PINIT_ONCE_FN)(void*)func, NULL, NULL);
+#else
+    pthread_once(once, func);
+#endif
+}
 
 #ifdef __cplusplus
 }

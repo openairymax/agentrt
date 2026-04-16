@@ -28,6 +28,7 @@ typedef struct binding_context {
     binder_config_t manager;
 } binding_context_t;
 
+__attribute__((unused))
 static binding_context_t* binder_create_context(void) {
     binding_context_t* ctx = (binding_context_t*)AGENTOS_CALLOC(1, sizeof(binding_context_t));
     if (!ctx) return NULL;
@@ -36,6 +37,7 @@ static binding_context_t* binder_create_context(void) {
     return ctx;
 }
 
+__attribute__((unused))
 static void binder_free_context(binding_context_t* ctx) {
     if (ctx) AGENTOS_FREE(ctx);
 }
@@ -45,5 +47,9 @@ agentos_error_t agentos_layer3_bind_entities(
     const char* entity_b,
     agentos_relation_type_t relation_type,
     float weight) {
+    (void)entity_a;
+    (void)entity_b;
+    (void)relation_type;
+    (void)weight;
     return AGENTOS_SUCCESS;
 }

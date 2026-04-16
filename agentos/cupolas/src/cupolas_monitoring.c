@@ -20,13 +20,14 @@
 
 #include "cupolas_monitoring.h"
 #include "cupolas_metrics.h"
-#include "../utils/cupolas_utils.h"
+#include "utils/cupolas_utils.h"
+#include "platform/platform.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
 #include <windows.h>
 #include <winsock2.h>
 #else

@@ -47,6 +47,7 @@ struct agentos_memory_optimizer {
     uint8_t auto_defrag;
     uint8_t auto_compress;
 };
+typedef struct agentos_memory_optimizer agentos_memory_optimizer_t;
 
 static agentos_memory_optimizer_t* g_memory_optimizer = NULL;
 

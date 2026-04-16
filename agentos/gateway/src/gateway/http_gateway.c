@@ -20,6 +20,8 @@
 #include "../utils/gateway_rpc_handler.h"
 #include "../utils/gateway_protocol_handler.h"
 
+#ifdef GATEWAY_HAS_HTTP
+
 #include <microhttpd.h>
 #include <cJSON.h>
 #include <string.h>
@@ -384,7 +386,8 @@ static agentos_error_t http_gateway_get_stats(void* gateway_impl, char** out_jso
     
     char* json_str = cJSON_Print(stats);
     cJSON_Delete(stats);
-    
+
+    if (!json_str) return AGENTOS_ENOMEM;
     *out_json = json_str;
     return AGENTOS_SUCCESS;
 }
@@ -555,3 +558,15 @@ gateway_t* http_gateway_create(const char* host, uint16_t port) {
     
     return gw;
 }
+
+#endif /* GATEWAY_HAS_HTTP */
+
+#ifndef GATEWAY_HAS_HTTP
+
+gateway_t* http_gateway_create(const char* host, uint16_t port) {
+    (void)host;
+    (void)port;
+    return NULL;
+}
+
+#endif /* !GATEWAY_HAS_HTTP */

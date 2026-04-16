@@ -18,9 +18,10 @@
  * @brief 轮询调度策略内部结构
  */
 struct agentos_round_robin_dispatch {
-    void* registry_ctx;                          /**< 注册中心上下文 */
-    agent_registry_get_agents_func get_agents;   /**< 获取候选Agent列表的函数 */
-    size_t last_index;                           /**< 上次选择的Agent索引 */
+    void* registry_ctx;
+    agent_registry_get_agents_func get_agents;
+    size_t last_index;
+    agentos_mutex_t* lock;
 };
 
 /**
@@ -30,8 +31,11 @@ static void rr_destroy(agentos_dispatching_strategy_t* strategy)
 {
     if (!strategy) return;
     struct agentos_round_robin_dispatch* rr =
-        (struct agentos_round_robin_dispatch*)strategy->context;
-    if (rr) AGENTOS_FREE(rr);
+        (struct agentos_round_robin_dispatch*)strategy->data;
+    if (rr) {
+        agentos_mutex_destroy(rr->lock);
+        AGENTOS_FREE(rr);
+    }
     AGENTOS_FREE(strategy);
 }
 
@@ -71,8 +75,11 @@ static agentos_error_t rr_select(
         if (agent_count == 0) return AGENTOS_ENOENT;
     }
 
-    size_t next_index = (rr->last_index + 1) % agent_count;
+    size_t next_index;
+    agentos_mutex_lock(rr->lock);
+    next_index = (rr->last_index + 1) % agent_count;
     rr->last_index = next_index;
+    agentos_mutex_unlock(rr->lock);
 
     if (agents[next_index]) {
         *out_agent_id = AGENTOS_STRDUP(agents[next_index]->agent_id);
@@ -92,36 +99,39 @@ static agentos_error_t rr_select(
  * @return AGENTOS_EINVAL 参数无效
  * @return AGENTOS_ENOMEM 内存分配失败
  */
-agentos_error_t agentos_dispatching_round_robin_create(
+agentos_dispatching_strategy_t* agentos_dispatching_round_robin_create(
     void* registry_ctx,
-    agent_registry_get_agents_func get_agents_func,
-    agentos_dispatching_strategy_t** out_strategy)
+    agent_registry_get_agents_func get_agents_func)
 {
-    if (!registry_ctx || !get_agents_func || !out_strategy) {
-        return AGENTOS_EINVAL;
+    if (!registry_ctx || !get_agents_func) {
+        return NULL;
     }
 
     struct agentos_round_robin_dispatch* rr =
         (struct agentos_round_robin_dispatch*)AGENTOS_CALLOC(1, sizeof(*rr));
     if (!rr) {
-        return AGENTOS_ENOMEM;
+        return NULL;
     }
 
     rr->registry_ctx = registry_ctx;
     rr->get_agents = get_agents_func;
     rr->last_index = (size_t)-1;
+    rr->lock = agentos_mutex_create();
+    if (!rr->lock) {
+        AGENTOS_FREE(rr);
+        return NULL;
+    }
 
     agentos_dispatching_strategy_t* strategy =
         (agentos_dispatching_strategy_t*)AGENTOS_CALLOC(1, sizeof(*strategy));
     if (!strategy) {
         AGENTOS_FREE(rr);
-        return AGENTOS_ENOMEM;
+        return NULL;
     }
 
-    strategy->context = rr;
-    strategy->select_agent = rr_select;
+    strategy->data = rr;
+    strategy->dispatch = rr_select;
     strategy->destroy = rr_destroy;
 
-    *out_strategy = strategy;
-    return AGENTOS_SUCCESS;
+    return strategy;
 }

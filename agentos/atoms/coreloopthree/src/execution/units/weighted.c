@@ -7,19 +7,18 @@
 #include "cognition.h"
 #include "agent_registry.h"
 #include <stdlib.h>
-
-/* Unified base library compatibility layer */
-#include <agentos/memory.h>
-#include <agentos/string.h>
 #include <string.h>
 #include <stdio.h>
 #include <float.h>
+#include <agentos/memory.h>
+#include <agentos/strategy_common.h>
 
-/**
- * @brief 加权调度私有数据
- */
-#include <agentos/strategy_common.h>\n\ntypedef struct weighted_data {\n    weighted_config_t manager;\n    void* registry_ctx;\n    agent_registry_get_agents_func get_agents;\n    agentos_mutex_t* lock;\n} weighted_data_t;
-
+typedef struct weighted_data {
+    weighted_config_t manager;
+    void* registry_ctx;
+    agent_registry_get_agents_func get_agents;
+    agentos_mutex_t* lock;
+} weighted_data_t;
 
 static void weighted_destroy(agentos_dispatching_strategy_t* strategy) {
     if (!strategy) return;
@@ -31,7 +30,16 @@ static void weighted_destroy(agentos_dispatching_strategy_t* strategy) {
     AGENTOS_FREE(strategy);
 }
 
-static float compute_score(const agent_info_t* agent, const weighted_data_t* data) {\n    strategy_agent_info_t strategy_agent = {\n        .cost_estimate = agent->cost_estimate,\n        .success_rate = agent->success_rate,\n        .trust_score = agent->trust_score,\n        .name = agent->name,\n        .user_data = NULL\n    };\n    return strategy_compute_weighted_score(&strategy_agent, &data->manager);\n}
+static float compute_score(const agent_info_t* agent, const weighted_data_t* data) {
+    strategy_agent_info_t strategy_agent;
+    memset(&strategy_agent, 0, sizeof(strategy_agent));
+    strategy_agent.cost_estimate = agent->cost_estimate;
+    strategy_agent.success_rate = agent->success_rate;
+    strategy_agent.trust_score = agent->trust_score;
+    strategy_agent.name = agent->role;
+    strategy_agent.user_data = NULL;
+    return strategy_compute_weighted_score(&strategy_agent, &data->manager);
+}
 
 static agentos_error_t weighted_dispatch(
     const agentos_task_node_t* task,
@@ -51,7 +59,7 @@ static agentos_error_t weighted_dispatch(
         agents = (agent_info_t**)candidates;
         agent_count = count;
     } else {
-        err = data->get_agents(data->registry_ctx, task->agent_role, &agents, &agent_count);
+        err = data->get_agents(data->registry_ctx, task->task_node_agent_role, &agents, &agent_count);
         if (err != AGENTOS_SUCCESS) return err;
         if (agent_count == 0) return AGENTOS_ENOENT;
     }
@@ -64,7 +72,7 @@ static agentos_error_t weighted_dispatch(
         float score = compute_score(agent, data);
         if (score > best_score) {
             best_score = score;
-            best_index = i;
+            best_index = (int)i;
         }
     }
 
@@ -78,13 +86,6 @@ static agentos_error_t weighted_dispatch(
     return AGENTOS_ENOENT;
 }
 
-/**
- * @brief 创建加权调度策略
- * @param manager 权重配置（若为NULL使用默认值）
- * @param registry_ctx 注册中心上下文
- * @param get_agents_func 获取Agent列表函数
- * @return 策略对象
- */
 agentos_dispatching_strategy_t* agentos_dispatching_weighted_create(
     const weighted_config_t* manager,
     void* registry_ctx,
@@ -94,22 +95,21 @@ agentos_dispatching_strategy_t* agentos_dispatching_weighted_create(
 
     agentos_dispatching_strategy_t* strat = (agentos_dispatching_strategy_t*)AGENTOS_MALLOC(sizeof(agentos_dispatching_strategy_t));
     if (!strat) return NULL;
+    memset(strat, 0, sizeof(*strat));
 
     weighted_data_t* data = (weighted_data_t*)AGENTOS_MALLOC(sizeof(weighted_data_t));
     if (!data) {
         AGENTOS_FREE(strat);
         return NULL;
     }
+    memset(data, 0, sizeof(*data));
 
-    // 从配置读取权重，若未提供则使用默认值
     if (manager) {
-        data->cost_weight = manager->cost_weight;
-        data->perf_weight = manager->perf_weight;
-        data->trust_weight = manager->trust_weight;
+        data->manager = *manager;
     } else {
-        data->cost_weight = 0.3f;
-        data->perf_weight = 0.4f;
-        data->trust_weight = 0.3f;
+        data->manager.cost_weight = 0.3f;
+        data->manager.perf_weight = 0.4f;
+        data->manager.trust_weight = 0.3f;
     }
 
     data->registry_ctx = registry_ctx;

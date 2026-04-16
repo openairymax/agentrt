@@ -24,6 +24,20 @@ typedef struct registry_entry {
 
 static registry_entry_t* g_registry = NULL;
 static agentos_mutex_t* g_registry_lock = NULL;
+static volatile int g_registry_initialized = 0;
+
+/**
+ * @brief 确保注册表已初始化（线程安全）
+ */
+static agentos_error_t ensure_registry_init(void) {
+    if (g_registry_initialized) return AGENTOS_SUCCESS;
+    if (!g_registry_lock) {
+        g_registry_lock = agentos_mutex_create();
+        if (!g_registry_lock) return AGENTOS_ENOMEM;
+    }
+    g_registry_initialized = 1;
+    return AGENTOS_SUCCESS;
+}
 
 /**
  * @brief 初始化注册表（需在程序启动时调用�?
@@ -61,6 +75,9 @@ void agentos_registry_cleanup(void) {
 agentos_error_t agentos_registry_register_unit(const char* unit_id, agentos_execution_unit_t* unit) {
     if (!unit_id || !unit) return AGENTOS_EINVAL;
 
+    agentos_error_t err = ensure_registry_init();
+    if (err != AGENTOS_SUCCESS) return err;
+
     agentos_mutex_lock(g_registry_lock);
 
     // 检查是否已存在同名单元
@@ -96,6 +113,7 @@ agentos_error_t agentos_registry_register_unit(const char* unit_id, agentos_exec
 
 void agentos_registry_unregister_unit(const char* unit_id) {
     if (!unit_id) return;
+    if (ensure_registry_init() != AGENTOS_SUCCESS) return;
     agentos_mutex_lock(g_registry_lock);
     registry_entry_t** p = &g_registry;
     while (*p) {
@@ -113,6 +131,7 @@ void agentos_registry_unregister_unit(const char* unit_id) {
 
 agentos_execution_unit_t* agentos_registry_get_unit(const char* unit_id) {
     if (!unit_id) return NULL;
+    if (ensure_registry_init() != AGENTOS_SUCCESS) return NULL;
     agentos_mutex_lock(g_registry_lock);
     registry_entry_t* entry = g_registry;
     while (entry) {

@@ -137,15 +137,18 @@ typedef struct {
  * @brief 任务状态枚举
  * @details 定义任务的生命周期状态
  */
+#ifndef AGENTOS_TASK_STATUS_T_DEFINED
+#define AGENTOS_TASK_STATUS_T_DEFINED
 typedef enum {
-    AGENTOS_TASK_PENDING     = 0,    /**< 等待执行 */
-    AGENTOS_TASK_RUNNING     = 1,    /**< 正在执行 */
-    AGENTOS_TASK_SUCCEEDED   = 2,    /**< 执行成功 */
-    AGENTOS_TASK_FAILED      = 3,    /**< 执行失败 */
-    AGENTOS_TASK_CANCELLED   = 4,    /**< 已取消 */
-    AGENTOS_TASK_TIMEOUT     = 5,    /**< 执行超时 */
-    AGENTOS_TASK_RETRYING    = 6     /**< 重试中 */
+    AGENTOS_TASK_PENDING     = 0,
+    AGENTOS_TASK_RUNNING     = 1,
+    AGENTOS_TASK_SUCCEEDED   = 2,
+    AGENTOS_TASK_FAILED      = 3,
+    AGENTOS_TASK_CANCELLED   = 4,
+    AGENTOS_TASK_TIMEOUT     = 5,
+    AGENTOS_TASK_RETRYING    = 6
 } agentos_task_status_t;
+#endif
 
 /**
  * @brief 任务类型枚举
@@ -160,7 +163,10 @@ typedef enum {
  * @brief 任务句柄类型
  * @details 用于引用任务实例
  */
-typedef struct agentos_task* agentos_task_t;
+#ifndef AGENTOS_TASK_T_DEFINED
+#define AGENTOS_TASK_T_DEFINED
+typedef struct agentos_task agentos_task_t;
+#endif
 
 /**
  * @brief 任务配置结构
@@ -218,12 +224,15 @@ typedef enum {
 /**
  * @brief 记忆类型枚举
  */
+#ifndef AGENTOS_MEMORY_TYPE_T_DEFINED
+#define AGENTOS_MEMORY_TYPE_T_DEFINED
 typedef enum {
-    AGENTOS_MEMTYPE_TEXT      = 0,    /**< 文本记忆 */
-    AGENTOS_MEMTYPE_EMBEDDING = 1,    /**< 向量嵌入 */
-    AGENTOS_MEMTYPE_STRUCTURED = 2,   /**< 结构化数据 */
-    AGENTOS_MEMTYPE_BINARY    = 3     /**< 二进制数据 */
+    AGENTOS_MEMTYPE_TEXT      = 0,
+    AGENTOS_MEMTYPE_EMBEDDING = 1,
+    AGENTOS_MEMTYPE_STRUCTURED = 2,
+    AGENTOS_MEMTYPE_BINARY    = 3
 } agentos_memory_type_t;
+#endif
 
 /**
  * @brief 记忆句柄类型
@@ -268,11 +277,14 @@ typedef struct {
 /**
  * @brief 记忆搜索结果
  */
+#ifndef AGENTOS_MEMORY_RESULT_T_DEFINED
+#define AGENTOS_MEMORY_RESULT_T_DEFINED
 typedef struct {
-    agentos_memory_entry_t* entries;/**< 记忆条目数组 */
-    size_t count;                   /**< 条目数量 */
-    float* scores;                  /**< 相似度分数 */
+    agentos_memory_entry_t* entries;
+    size_t count;
+    float* scores;
 } agentos_memory_result_t;
+#endif
 
 /** @} */ /* end of MemoryTypes */
 
@@ -442,13 +454,16 @@ typedef struct {
 /**
  * @brief 日志级别枚举
  */
+#ifndef AGENTOS_LOG_LEVEL_T_DEFINED
+#define AGENTOS_LOG_LEVEL_T_DEFINED
 typedef enum {
-    AGENTOS_LOG_DEBUG   = 0,    /**< 调试级别 */
-    AGENTOS_LOG_INFO    = 1,    /**< 信息级别 */
-    AGENTOS_LOG_WARN    = 2,    /**< 警告级别 */
-    AGENTOS_LOG_ERROR   = 3,    /**< 错误级别 */
-    AGENTOS_LOG_FATAL   = 4     /**< 致命级别 */
+    AGENTOS_LOG_LEVEL_DEBUG   = 0,
+    AGENTOS_LOG_LEVEL_INFO    = 1,
+    AGENTOS_LOG_LEVEL_WARN    = 2,
+    AGENTOS_LOG_LEVEL_ERROR   = 3,
+    AGENTOS_LOG_LEVEL_FATAL   = 4
 } agentos_log_level_t;
+#endif
 
 /**
  * @brief 指标类型枚举

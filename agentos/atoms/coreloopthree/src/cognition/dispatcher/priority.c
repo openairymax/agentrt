@@ -30,7 +30,7 @@ static void priority_destroy(agentos_dispatching_strategy_t* strategy)
 {
     if (!strategy) return;
     struct agentos_priority_dispatch* priority =
-        (struct agentos_priority_dispatch*)strategy->context;
+        (struct agentos_priority_dispatch*)strategy->data;
     if (priority) AGENTOS_FREE(priority);
     AGENTOS_FREE(strategy);
 }
@@ -126,8 +126,8 @@ agentos_error_t agentos_dispatching_priority_create(
         return AGENTOS_ENOMEM;
     }
 
-    strategy->context = priority;
-    strategy->select_agent = priority_select;
+    strategy->data = priority;
+    strategy->dispatch = priority_select;
     strategy->destroy = priority_destroy;
 
     *out_strategy = strategy;

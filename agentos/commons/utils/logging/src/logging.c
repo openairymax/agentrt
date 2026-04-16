@@ -17,6 +17,7 @@
 #include "logging.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 /* Unified base library compatibility layer */
 #include <agentos/memory.h>
@@ -47,7 +48,7 @@ static const log_level_t DEFAULT_LOG_LEVEL = LOG_LEVEL_INFO;
 static const log_format_t DEFAULT_LOG_FORMAT = LOG_FORMAT_TEXT;
 
 /** 最大模块名称长�?*/
-static const size_t MAX_MODULE_NAME_LEN = 256;
+static const size_t MAX_MODULE_NAME_LEN __attribute__((unused)) = 256;
 
 /** 最大消息长�?*/
 static const size_t MAX_MESSAGE_LEN = 4096;
@@ -222,7 +223,7 @@ log_level_t log_level_from_string(const char* str) {
     // 尝试解析为数�?
     char* endptr;
     long value = strtol(str, &endptr, 10);
-    if (endptr != str && *endptr == '\0' && value >= 0 && value < LEVEL_NAMES_COUNT) {
+    if (endptr != str && *endptr == '\0' && value >= 0 && (size_t)value < LEVEL_NAMES_COUNT) {
         return (log_level_t)value;
     }
     

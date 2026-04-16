@@ -3,7 +3,7 @@
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
  * SPDX-License-Identifier: Apache-2.0
  * 
- * @file memory.h
+ * @file agentos_memory.h
  * @brief 统一内存管理模块 - 核心层API
  * 
  * 提供安全、高效、统一的内存管理接口，支持内存分配、释放、调试和统计功能。

@@ -103,7 +103,7 @@ agentos_error_t agentos_sys_agent_terminate(const char* agent_id) {
 
     agentos_mutex_unlock(agent_lock);
     AGENTOS_LOG_WARN("Agent not found: %s", agent_id);
-    return AGENTOS_ENOTFOUND;
+    return AGENTOS_ENOENT;
 }
 
 /**
@@ -125,7 +125,7 @@ agentos_error_t agentos_sys_agent_invoke(const char* agent_id, const char* input
 
     if (!inst) {
         AGENTOS_LOG_WARN("Agent not found: %s", agent_id);
-        return AGENTOS_ENOTFOUND;
+        return AGENTOS_ENOENT;
     }
 
     // 简单实现：回显输入

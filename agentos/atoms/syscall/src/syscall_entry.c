@@ -139,7 +139,7 @@ void* sys_telemetry_metrics(void** args, int argc) {
 void* sys_telemetry_traces(void** args, int argc) {
     if (argc != 1) return (void*)(intptr_t)AGENTOS_EINVAL;
     char** out_traces = (char**)args[0];
-    intptr_t res = agentos_sys_telemetry_traces(out_traces);
+    intptr_t res = agentos_sys_telemetry_traces(NULL, out_traces);
     return (void*)res;
 }
 

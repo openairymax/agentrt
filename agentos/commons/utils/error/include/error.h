@@ -102,6 +102,40 @@ typedef int32_t agentos_error_t;
 #define AGENTOS_ESANITIZE             AGENTOS_ERR_ESANITIZE
 #endif
 
+#ifndef AGENTOS_EACCES
+#define AGENTOS_EACCES                AGENTOS_ERR_PERMISSION_DENIED
+#endif
+#ifndef AGENTOS_ECONNREFUSED
+#define AGENTOS_ECONNREFUSED          (-20)
+#endif
+#ifndef AGENTOS_ECONNRESET
+#define AGENTOS_ECONNRESET            (-21)
+#endif
+#ifndef AGENTOS_ENOTCONN
+#define AGENTOS_ENOTCONN              (-22)
+#endif
+#ifndef AGENTOS_EPROTO
+#define AGENTOS_EPROTO                (-23)
+#endif
+#ifndef AGENTOS_EMSGSIZE
+#define AGENTOS_EMSGSIZE              (-24)
+#endif
+#ifndef AGENTOS_ENOSPC
+#define AGENTOS_ENOSPC                (-25)
+#endif
+#ifndef AGENTOS_ERANGE
+#define AGENTOS_ERANGE                (-26)
+#endif
+#ifndef AGENTOS_EDEADLK
+#define AGENTOS_EDEADLK               AGENTOS_ERR_SYS_DEADLOCK
+#endif
+#ifndef AGENTOS_EAGAIN
+#define AGENTOS_EAGAIN                AGENTOS_ERR_WOULD_BLOCK
+#endif
+#ifndef AGENTOS_E2BIG
+#define AGENTOS_E2BIG                 (-27)
+#endif
+
 /* ==================== 错误码分段 ==================== */
 /*
  * 错误码分段规划：

@@ -17,9 +17,51 @@
 #define AGENTOS_DAEMON_ERRORS_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+#ifndef AGENTOS_EINIT
+#define AGENTOS_EINIT    (-100)
+#endif
+
+#ifndef AGENTOS_ESTATE
+#define AGENTOS_ESTATE   (-101)
+#endif
+
+#ifndef AGENTOS_EHEALTH
+#define AGENTOS_EHEALTH  (-102)
+#endif
+
+#ifndef AGENTOS_EDEPEND
+#define AGENTOS_EDEPEND  (-103)
+#endif
+
+#ifndef AGENTOS_EFAIL
+#define AGENTOS_EFAIL   (-104)
+#endif
+
+#ifndef CUPOLAS_ERR_INVALID_PARAM
+#define CUPOLAS_ERR_INVALID_PARAM (-2001)
+#endif
+
+#ifndef AGENTOS_ERR_NOT_SUPPORTED
+#define AGENTOS_ERR_NOT_SUPPORTED  (-105)
+#endif
+
+#ifndef AGENTOS_ERR_INVALID_PARAM
+#define AGENTOS_ERR_INVALID_PARAM      (-2)
+#endif
+#ifndef AGENTOS_ERR_OUT_OF_MEMORY
+#define AGENTOS_ERR_OUT_OF_MEMORY     (-3)
+#endif
+#ifndef AGENTOS_ERR_PERMISSION_DENIED
+#define AGENTOS_ERR_PERMISSION_DENIED  (-10)
+#endif
+#ifndef AGENTOS_ERR_ALREADY_EXISTS
+#define AGENTOS_ERR_ALREADY_EXISTS     (-11)
 #endif
 
 /**

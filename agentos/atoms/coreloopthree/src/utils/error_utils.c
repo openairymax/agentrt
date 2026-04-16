@@ -44,7 +44,7 @@ static const struct {
     {AGENTOS_EDEADLK, "EDEADLK", "死锁"},
     {AGENTOS_EAGAIN, "EAGAIN", "资源暂时不可用"},
     {AGENTOS_EINTR, "EINTR", "操作被中断"},
-    {AGENTOS_UNKNOWN, "UNKNOWN", "未知错误"}
+    {AGENTOS_EUNKNOWN, "UNKNOWN", "未知错误"}
 };
 
 #define ERROR_MAP_SIZE (sizeof(error_map) / sizeof(error_map[0]))
