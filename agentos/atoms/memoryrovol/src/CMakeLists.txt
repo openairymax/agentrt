@@ -20,16 +20,16 @@ add_library(agentos_memoryrovol STATIC
     layer3_structure/relation.c
     layer3_structure/sequence.c
     layer3_structure/unbinder.c
-    # layer4_pattern/clustering.c   # 暂时排除：agentos_clustering_engine_t类型未定义
-    # layer4_pattern/miner.c        # 暂时排除：persistence.h头文件缺失
-    # layer4_pattern/persistence.c  # 暂时排除：agentos_persistence_feature_t类型未定义
-    # layer4_pattern/rules.c        # 暂时排除：类型定义不完整
-    # layer4_pattern/validator.c    # 暂时排除：agentos_pattern_validator_t/agentos_pattern_t类型未定义
-    # retrieval/attractor.c      # 暂时排除：agentos_feature_vector_t/agentos_retrieval_config_t成员不匹配
+    layer4_pattern/clustering.c
+    layer4_pattern/miner.c
+    layer4_pattern/persistence.c
+    layer4_pattern/rules.c
+    layer4_pattern/validator.c
+    retrieval/attractor.c
     retrieval/cache.c
     retrieval/energy.c
-    # retrieval/mount.c          # 暂时排除：agentos_token_counter_t类型未定义
-    # retrieval/rerank.c         # 暂时排除：类型定义冲突
+    retrieval/mount.c
+    retrieval/rerank.c
     memory_optimizer.c
     memoryrovol.c
     # monitoring.c   # 暂时排除：agentos_monitoring_t/agentos_observability_t类型未定义

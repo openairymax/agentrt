@@ -60,6 +60,9 @@ char* agentos_raw_metadata_to_json(const agentos_raw_metadata_t* meta) {
 
     char* json = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
+    if (!json) {
+        return NULL;
+    }
     return json;
 }
 

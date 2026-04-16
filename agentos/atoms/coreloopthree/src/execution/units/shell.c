@@ -23,11 +23,41 @@ typedef struct shell_unit_data {
     char* metadata_json;
 } shell_unit_data_t;
 
+static const char* ALLOWED_SHELL_COMMANDS[] = {
+    "ls", "cat", "echo", "pwd", "whoami", "date", "hostname",
+    "df", "du", "free", "uptime", "uname", "id", "env",
+    "head", "tail", "wc", "sort", "uniq", "grep", "find",
+    NULL
+};
+
+static int is_shell_command_allowed(const char* cmd) {
+    if (!cmd) return 0;
+    while (*cmd == ' ' || *cmd == '\t') cmd++;
+    for (int i = 0; ALLOWED_SHELL_COMMANDS[i] != NULL; i++) {
+        size_t len = strlen(ALLOWED_SHELL_COMMANDS[i]);
+        if (strncmp(cmd, ALLOWED_SHELL_COMMANDS[i], len) == 0) {
+            if (cmd[len] == ' ' || cmd[len] == '\0' || cmd[len] == '\t' || cmd[len] == '\n') {
+                if (!strchr(cmd, ';') && !strstr(cmd, "&&") && !strstr(cmd, "||") &&
+                    !strstr(cmd, "|") && !strstr(cmd, "$(") && !strstr(cmd, "`") &&
+                    !strstr(cmd, ">") && !strstr(cmd, "<") && !strstr(cmd, "&")) {
+                    return 1;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
 static agentos_error_t shell_execute(
     agentos_execution_unit_t* unit, const void* input, void** out_output) {
     (void)unit;
     const char* cmd = (const char*)input;
     if (!cmd || !out_output) return AGENTOS_EINVAL;
+
+    if (!is_shell_command_allowed(cmd)) {
+        *out_output = AGENTOS_STRDUP("{\"error\":\"command_not_allowed\"}");
+        return AGENTOS_EPERM;
+    }
 
 #ifdef _WIN32
     HANDLE hReadPipe, hWritePipe;

@@ -31,7 +31,22 @@ typedef struct agentos_retrieval_config {
     uint32_t cache_size;
     uint32_t rerank_top_k;
     int enable_attractor;
+    uint32_t max_iterations;
+    float tolerance;
+    float beta;
 } agentos_retrieval_config_t;
+
+typedef struct agentos_feature_vector {
+    size_t dim;
+    float* data;
+} agentos_feature_vector_t;
+
+void agentos_feature_vector_free(agentos_feature_vector_t* vec);
+
+agentos_error_t agentos_layer2_feature_get_vector(
+    void* layer2,
+    const char* id,
+    agentos_feature_vector_t** out_vec);
 
 /* 前向声明：吸引子网络类型（定义在 retrieval/attractor.c） */
 struct agentos_attractor_network;

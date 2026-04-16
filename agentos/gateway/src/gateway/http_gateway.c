@@ -384,7 +384,8 @@ static agentos_error_t http_gateway_get_stats(void* gateway_impl, char** out_jso
     
     char* json_str = cJSON_Print(stats);
     cJSON_Delete(stats);
-    
+
+    if (!json_str) return AGENTOS_ENOMEM;
     *out_json = json_str;
     return AGENTOS_SUCCESS;
 }

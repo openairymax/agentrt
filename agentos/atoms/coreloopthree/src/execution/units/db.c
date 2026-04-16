@@ -26,6 +26,13 @@ static int is_safe_query(const char* query) {
     if (strstr(query, ";") != NULL) return 0;
     if (strstr(query, "'") != NULL) return 0;
     if (strstr(query, "\"") != NULL) return 0;
+    if (strcasestr(query, "UNION") != NULL) return 0;
+    if (strcasestr(query, "INTO") != NULL) return 0;
+    if (strcasestr(query, "OUTFILE") != NULL) return 0;
+    if (strcasestr(query, "LOAD_FILE") != NULL) return 0;
+    if (strstr(query, "0x") != NULL) return 0;
+    if (strstr(query, "CHAR(") != NULL) return 0;
+    if (strstr(query, "CONCAT(") != NULL) return 0;
     return 1;
 }
 

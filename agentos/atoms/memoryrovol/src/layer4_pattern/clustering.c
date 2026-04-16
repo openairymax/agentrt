@@ -22,6 +22,7 @@ struct agentos_clustering_engine {
     void* params;
     agentos_mutex_t* lock;
 };
+typedef struct agentos_clustering_engine agentos_clustering_engine_t;
 
 agentos_error_t agentos_clustering_engine_create(
     const char* method,

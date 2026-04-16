@@ -5,6 +5,7 @@
  */
 
 #include "layer4_pattern.h"
+#include "persistence.h"
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
@@ -16,12 +17,6 @@
 #ifdef HAVE_RIPSER
 #include <ripser.h>
 #endif
-
-struct agentos_persistence_calculator {
-    double noise_factor;
-    int max_dim;
-    agentos_mutex_t* lock;
-};
 
 typedef struct {
     agentos_persistence_feature_t** features;

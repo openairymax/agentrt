@@ -278,12 +278,15 @@ int cupolas_sanitize_input(const char* input, char* output, size_t output_size) 
         return cupolas_ERR_INVALID_PARAM;
     }
 
+    cupolas_mutex_lock(&g_cupolas.lock);
     if (!g_cupolas.initialized || !g_cupolas.san) {
+        cupolas_mutex_unlock(&g_cupolas.lock);
         return cupolas_ERR_STATE_ERROR;
     }
 
     sanitize_result_t result = sanitizer_sanitize(g_cupolas.san, input,
                                                   output, output_size, NULL);
+    cupolas_mutex_unlock(&g_cupolas.lock);
 
     if (g_cupolas.audit) {
         audit_logger_log(g_cupolas.audit, AUDIT_EVENT_SANITIZER,
@@ -344,7 +347,9 @@ int cupolas_execute_command(const char* command, char* const argv[],
         return cupolas_ERR_INVALID_PARAM;
     }
 
+    cupolas_mutex_lock(&g_cupolas.lock);
     if (!g_cupolas.initialized) {
+        cupolas_mutex_unlock(&g_cupolas.lock);
         return cupolas_ERR_STATE_ERROR;
     }
 
@@ -394,6 +399,7 @@ int cupolas_execute_command(const char* command, char* const argv[],
                                              command, "guard_block",
                                              cupolas_ERR_PERMISSION_DENIED);
                         }
+                        cupolas_mutex_unlock(&g_cupolas.lock);
                         return cupolas_ERR_PERMISSION_DENIED;
                     }
                 }
@@ -407,6 +413,7 @@ int cupolas_execute_command(const char* command, char* const argv[],
     if (!g_cupolas.wb) {
         g_cupolas.wb = workbench_create(&wbcfg);
         if (!g_cupolas.wb) {
+            cupolas_mutex_unlock(&g_cupolas.lock);
             return cupolas_ERR_OUT_OF_MEMORY;
         }
     }
@@ -436,6 +443,7 @@ int cupolas_execute_command(const char* command, char* const argv[],
                          command, NULL, ret);
     }
 
+    cupolas_mutex_unlock(&g_cupolas.lock);
     return ret;
 }
 

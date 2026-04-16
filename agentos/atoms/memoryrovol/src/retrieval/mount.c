@@ -14,6 +14,11 @@
 #include <agentos/string.h>
 #include <string.h>
 
+struct agentos_token_counter {
+    void* impl;
+};
+typedef struct agentos_token_counter agentos_token_counter_t;
+
 typedef struct mount_entry {
     char* record_id;
     char* content;
@@ -24,15 +29,16 @@ typedef struct mount_entry {
 
 struct agentos_mounter {
     agentos_layer1_raw_t* layer1;          /**< 原始层，用于读取内容 */
-    agentos_token_counter_t* token_counter; /**< token 计数器 */
+    void* token_counter;                    /**< token 计数器（opaque handle）*/
     size_t token_limit;                     /**< 最大允许 token 数 */
     mount_entry_t* mounted;                 /**< 已挂载的记忆链表 */
     agentos_mutex_t* lock;
 };
+typedef struct agentos_mounter agentos_mounter_t;
 
 agentos_error_t agentos_mounter_create(
     agentos_layer1_raw_t* layer1,
-    agentos_token_counter_t* token_counter,
+    void* token_counter,
     size_t token_limit,
     agentos_mounter_t** out_mounter) {
 

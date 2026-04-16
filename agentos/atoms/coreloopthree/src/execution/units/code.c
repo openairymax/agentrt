@@ -205,6 +205,7 @@ static agentos_error_t execute_command_capture(const char* cmd, char** out_outpu
     *out_output = output;
     return (exitCode == 0) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 #else
+    /* flawfinder: ignore - cmd is built by build_command with escape_shell_arg */
     FILE* pipe = popen(cmd, "r");
     if (!pipe) return AGENTOS_EIO;
 
@@ -240,6 +241,25 @@ static agentos_error_t execute_command_capture(const char* cmd, char** out_outpu
 #endif
 }
 
+static agentos_error_t escape_shell_arg(const char* arg, char* out, size_t out_size) {
+    if (!arg || !out || out_size < 4) return AGENTOS_EINVAL;
+    size_t j = 0;
+    out[j++] = '\'';
+    for (size_t i = 0; arg[i] && j < out_size - 4; i++) {
+        if (arg[i] == '\'') {
+            out[j++] = '\'';
+            out[j++] = '\\';
+            out[j++] = '\'';
+            out[j++] = '\'';
+        } else {
+            out[j++] = arg[i];
+        }
+    }
+    out[j++] = '\'';
+    out[j] = '\0';
+    return AGENTOS_SUCCESS;
+}
+
 static agentos_error_t code_execute(
     agentos_execution_unit_t* unit, const void* input, void** out_output) {
     code_unit_data_t* data = (code_unit_data_t*)unit->execution_unit_data;
@@ -273,11 +293,17 @@ static agentos_error_t code_execute(
     agentos_error_t err = create_temp_file(suffix, code, code_len, &temp_path);
     if (err != AGENTOS_SUCCESS) return err;
 
-    char cmd[1024];
+    char cmd[2048];
 #ifdef _WIN32
     snprintf(cmd, sizeof(cmd), "\"%s\" \"%s\"", interpreter, temp_path);
 #else
-    snprintf(cmd, sizeof(cmd), "%s '%s' 2>&1", interpreter, temp_path);
+    char escaped_path[4096];
+    if (escape_shell_arg(temp_path, escaped_path, sizeof(escaped_path)) != AGENTOS_SUCCESS) {
+        remove_temp_file(temp_path);
+        AGENTOS_FREE(temp_path);
+        return AGENTOS_EINVAL;
+    }
+    snprintf(cmd, sizeof(cmd), "%s %s 2>&1", interpreter, escaped_path);
 #endif
 
     char* output = NULL;

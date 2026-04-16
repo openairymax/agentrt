@@ -35,7 +35,18 @@
 /* 默认配置 */
 #define DEFAULT_MIN_CLUSTER_SIZE 5
 #define DEFAULT_PERSISTENCE_THRESHOLD 0.1
-#define DEFAULT_MINING_INTERVAL 3600  /* 1小时 */
+#define DEFAULT_MINING_INTERVAL 3600
+
+struct agentos_layer4_pattern_config {
+    int auto_mining;
+    int mining_interval_sec;
+    double min_persistence;
+    double persistence_threshold;
+    int min_cluster_size;
+    char* pattern_storage_path;
+    char data_source[128];
+};
+typedef struct agentos_layer4_pattern_config agentos_layer4_pattern_config_t;
 
 struct agentos_layer4_pattern {
     agentos_persistence_calculator_t* pers_calc;
@@ -44,13 +55,12 @@ struct agentos_layer4_pattern {
     agentos_pattern_validator_t* validator;
     agentos_mutex_t* lock;
     agentos_layer4_pattern_config_t manager;
-    // 自动挖掘线程
     pthread_t auto_thread;
     int auto_running;
-    // 数据源回调（可扩展）
     void* data_source_ctx;
     agentos_error_t (*get_vectors_func)(void* ctx, float** out_vectors, char*** out_ids, size_t* out_count);
 };
+typedef struct agentos_layer4_pattern agentos_layer4_pattern_t;
 
 /* ==================== 内部辅助函数 ==================== */
 

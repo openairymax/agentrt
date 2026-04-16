@@ -19,6 +19,7 @@
 #else
 #include <unistd.h>
 #include <dirent.h>
+#include <limits.h>
 #define PATH_SEPARATOR "/"
 #endif
 
@@ -27,17 +28,45 @@ typedef struct file_unit_data {
     char* metadata_json;
 } file_unit_data_t;
 
+static int is_path_traversal_attempt(const char* path) {
+    if (!path) return 1;
+    if (strstr(path, "..") != NULL) return 1;
+    if (strstr(path, "//") != NULL) return 1;
+    if (strstr(path, "\\\\") != NULL) return 1;
+    return 0;
+}
+
 static agentos_error_t file_build_path(
     file_unit_data_t* data,
     const char* path,
     char* out_full,
     size_t max_len) {
     if (!data || !path || !out_full) return AGENTOS_EINVAL;
+
+    if (is_path_traversal_attempt(path)) {
+        return AGENTOS_EPERM;
+    }
+
     if (data->root_dir) {
         snprintf(out_full, max_len, "%s/%s", data->root_dir, path);
     } else {
         snprintf(out_full, max_len, "%s", path);
     }
+
+#ifndef _WIN32
+    if (data->root_dir) {
+        char resolved_root[PATH_MAX];
+        char resolved_full[PATH_MAX];
+        if (realpath(data->root_dir, resolved_root) &&
+            realpath(out_full, resolved_full)) {
+            size_t root_len = strlen(resolved_root);
+            if (strncmp(resolved_full, resolved_root, root_len) != 0) {
+                return AGENTOS_EPERM;
+            }
+        }
+    }
+#endif
+
     return AGENTOS_SUCCESS;
 }
 

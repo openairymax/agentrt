@@ -38,27 +38,33 @@ void agentos_unbinder_destroy(agentos_unbinder_t* unbinder) {
  */
 static void unbind_real_q1(const float* bound, const float* known, float* out,
                            size_t dim, float* mat) {
-    // 假设绑定：bound = (G·known) �?(G·unknown)
-    float* gk = (float*)alloca(dim * sizeof(float));
-    for (size_t i = 0; i < dim; i++) {
-        gk[i] = 0;
-        for (size_t j = 0; j < dim; j++) {
-            gk[i] += mat[i * dim + j] * known[j];
+    if (mat) {
+        float gk[dim];
+        memset(gk, 0, dim * sizeof(float));
+        for (size_t i = 0; i < dim; i++) {
+            for (size_t j = 0; j < dim; j++) {
+                gk[i] += mat[i * dim + j] * known[j];
+            }
         }
-    }
-    // 逐元素除得到 G·unknown
-    float* gu = (float*)alloca(dim * sizeof(float));
-    for (size_t i = 0; i < dim; i++) {
-        if (fabsf(gk[i]) > 1e-6)
-            gu[i] = bound[i] / gk[i];
-        else
-            gu[i] = 0;
-    }
-    // 用矩阵转置近似逆（假设G正交�?
-    for (size_t i = 0; i < dim; i++) {
-        out[i] = 0;
-        for (size_t j = 0; j < dim; j++) {
-            out[i] += mat[j * dim + i] * gu[j];
+        float gu[dim];
+        for (size_t i = 0; i < dim; i++) {
+            if (fabsf(gk[i]) > 1e-6f)
+                gu[i] = bound[i] / gk[i];
+            else
+                gu[i] = 0;
+        }
+        for (size_t i = 0; i < dim; i++) {
+            out[i] = 0;
+            for (size_t j = 0; j < dim; j++) {
+                out[i] += mat[j * dim + i] * gu[j];
+            }
+        }
+    } else {
+        for (size_t i = 0; i < dim; i++) {
+            if (fabsf(known[i]) > 1e-6f)
+                out[i] = bound[i] / known[i];
+            else
+                out[i] = 0;
         }
     }
 }
@@ -88,8 +94,8 @@ agentos_error_t agentos_unbinder_unbind(
 
     agentos_binder_t* binder = unbinder->binder;
     size_t dim = binder->dimension;
-    int Q = binder->Q;
     int use_complex = binder->use_complex;
+    int Q = (binder->Q && dim > 0) ? (int)binder->Q[0] : 1;
 
     // 目前只支持已知一个向量的情况
     if (known_count != 1) return AGENTOS_ENOTSUP;
@@ -109,9 +115,11 @@ agentos_error_t agentos_unbinder_unbind(
         unbind_complex_op(bound_vector, known_vectors[0], unknown, dim);
     } else {
         if (Q == 1 && binder->bind_matrices) {
-            unbind_real_q1(bound_vector, known_vectors[0], unknown, dim, binder->bind_matrices[0]);
+            float g_output[dim];
+            memset(g_output, 0, dim * sizeof(float));
+            binder->bind_matrices(binder, known_vectors[0], g_output);
+            unbind_real_q1(bound_vector, g_output, unknown, dim, NULL);
         } else {
-            // Q>1时无法精确解，返回零向量
             memset(unknown, 0, dim * sizeof(float));
         }
     }

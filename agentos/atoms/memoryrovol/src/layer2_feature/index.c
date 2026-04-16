@@ -175,7 +175,20 @@ static agentos_error_t hnsw_add(hnsw_index_t* index, const char* id, const float
     node->norm = norm_sq;
     node->level = 1;
     node->neighbors = (hnsw_node_t**)AGENTOS_CALLOC(node->level + 1, sizeof(hnsw_node_t*));
+    if (!node->neighbors) {
+        AGENTOS_FREE(node->vector);
+        AGENTOS_FREE(node);
+        pthread_mutex_unlock(&index->mutex);
+        return AGENTOS_ENOMEM;
+    }
     node->neighbor_counts = (size_t*)AGENTOS_CALLOC(node->level + 1, sizeof(size_t));
+    if (!node->neighbor_counts) {
+        AGENTOS_FREE(node->neighbors);
+        AGENTOS_FREE(node->vector);
+        AGENTOS_FREE(node);
+        pthread_mutex_unlock(&index->mutex);
+        return AGENTOS_ENOMEM;
+    }
 
     index->nodes[index->node_count++] = node;
 

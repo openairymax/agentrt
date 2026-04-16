@@ -5,6 +5,7 @@
  */
 
 #include "layer4_pattern.h"
+#include "validator.h"
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
@@ -13,16 +14,11 @@
 #include <string.h>
 #include <math.h>
 
-struct agentos_pattern_validator {
-    double min_confidence;
-    int min_support;
-    agentos_mutex_t* lock;
-};
-
 agentos_error_t agentos_pattern_validator_create(
     const void* manager,
     agentos_pattern_validator_t** out_validator) {
 
+    (void)manager;
     if (!out_validator) return AGENTOS_EINVAL;
     agentos_pattern_validator_t* val = (agentos_pattern_validator_t*)AGENTOS_CALLOC(1, sizeof(agentos_pattern_validator_t));
     if (!val) return AGENTOS_ENOMEM;
@@ -55,7 +51,6 @@ agentos_error_t agentos_pattern_validator_validate(
 
     if (!validator || !pattern || !out_valid) return AGENTOS_EINVAL;
 
-    // 基础置信度检�?
     int valid = 1;
     float confidence = pattern->confidence;
 
@@ -63,13 +58,12 @@ agentos_error_t agentos_pattern_validator_validate(
         valid = 0;
     }
 
-    // 如果有测试向量，验证模式中心与测试向量的平均距离
     if (test_vectors && test_count > 0 && pattern->centroid) {
-        size_t dim = pattern->dimension;
+        int dim = pattern->dimension;
         double avg_dist = 0.0;
         for (size_t i = 0; i < test_count; i++) {
             double dist = 0.0;
-            for (size_t j = 0; j < dim; j++) {
+            for (int j = 0; j < dim; j++) {
                 double diff = test_vectors[i * dim + j] - pattern->centroid[j];
                 dist += diff * diff;
             }
@@ -77,7 +71,6 @@ agentos_error_t agentos_pattern_validator_validate(
         }
         avg_dist /= test_count;
 
-        // 距离阈值可配置
         if (avg_dist > 0.5) valid = 0;
     }
 
