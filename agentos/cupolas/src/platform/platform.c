@@ -854,7 +854,7 @@ int64_t cupolas_atomic_load64(volatile int64_t* ptr) {
 #if cupolas_PLATFORM_WINDOWS
     return InterlockedCompareExchange64((volatile LONGLONG*)ptr, 0, 0);
 #elif defined(__GNUC__) || defined(__clang__)
-    return (void*)__atomic_load_n(ptr, __ATOMIC_SEQ_CST);
+    return (int64_t)__atomic_load_n(ptr, __ATOMIC_SEQ_CST);
 #else
     return *ptr;
 #endif

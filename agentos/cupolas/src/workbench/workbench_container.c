@@ -225,7 +225,7 @@ static int execute_command(const char* cmd, int timeout_ms, char* output, size_t
  * @note Currently unused (dead code) — container_start() uses inline snprintf.
  *       If re-activated, add is_safe_image_name checks for each field.
  */
-static char* build_docker_command(container_handle_t* handle, const char* action) {
+__attribute__((unused)) static char* build_docker_command(container_handle_t* handle, const char* action) {
     static char cmd[MAX_COMMAND_LENGTH];
     size_t pos = 0;
 
@@ -308,7 +308,7 @@ int container_pull_image(void* mgr, const char* image) {
         return cupolas_ERROR_PERMISSION;
     }
 
-    container_handle_t* handle = (container_handle_t*)mgr;
+    container_handle_t* handle __attribute__((unused)) = (container_handle_t*)mgr;
     char cmd[MAX_COMMAND_LENGTH];
     snprintf(cmd, MAX_COMMAND_LENGTH, "docker pull %s", image);
 

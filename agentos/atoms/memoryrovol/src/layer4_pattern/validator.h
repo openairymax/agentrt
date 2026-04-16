@@ -51,6 +51,17 @@ agentos_error_t agentos_pattern_validator_validate(
     int* out_valid,
     float* out_confidence);
 
+agentos_pattern_t* agentos_pattern_create(
+    const char* description,
+    const char* rule_json,
+    float confidence,
+    const float* centroid,
+    size_t dimension);
+
+void agentos_pattern_free(agentos_pattern_t* pattern);
+
+void agentos_patterns_free(agentos_pattern_t** patterns, size_t count);
+
 #ifdef __cplusplus
 }
 #endif

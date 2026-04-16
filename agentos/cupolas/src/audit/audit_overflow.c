@@ -39,7 +39,7 @@ struct overflow_handler {
     overflow_stats_t stats;
 };
 
-static const char* overflow_level_strings[] = {
+static const char* overflow_level_strings[] __attribute__((unused)) = {
     "NORMAL",
     "WARNING",
     "CRITICAL",

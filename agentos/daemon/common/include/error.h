@@ -5,7 +5,7 @@
  * @brief 错误处理兼容层
  * 
  * 本文件是 agentos/commons/utils/error 的兼容层，提供向后兼容的 API。
- * 新代码应直接使用 #include "agentos/utils/error/error.h"
+ * 新代码应直接使用 #include <error.h>
  * 
  * @see agentos/commons/utils/error/include/error.h
  */
@@ -14,7 +14,7 @@
 #define AGENTOS_DAEMON_COMMON_ERROR_H
 
 /* 包含 commons 的统一错误处理框架 */
-#include "agentos/utils/error/error.h"
+#include <error.h>
 
 /* ==================== 兼容性别名 ==================== */
 

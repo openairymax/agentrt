@@ -56,7 +56,7 @@ struct agentos_layer2_feature {
 /**
  * @brief 计算余弦相似�?
  */
-static float cosine_similarity(const float* a, const float* b, uint32_t dim) {
+__attribute__((unused)) static float cosine_similarity(const float* a, const float* b, uint32_t dim) {
     float dot = 0.0f;
     float norm_a = 0.0f;
     float norm_b = 0.0f;

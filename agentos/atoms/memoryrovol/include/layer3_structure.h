@@ -11,6 +11,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifndef AGENTOS_LAYER3_STRUCTURE_SQLITE3_TYPEDEF
+#define AGENTOS_LAYER3_STRUCTURE_SQLITE3_TYPEDEF
+typedef struct sqlite3 sqlite3;
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

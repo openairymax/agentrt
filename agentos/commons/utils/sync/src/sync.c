@@ -273,7 +273,7 @@ sync_result_t sync_debug(void* lock) {
 /**
  * @brief 超时转换为毫秒
  */
-static uint64_t sync_internal_timeout_to_ms(const sync_timeout_t* timeout) {
+__attribute__((unused)) static uint64_t sync_internal_timeout_to_ms(const sync_timeout_t* timeout) {
     if (timeout == NULL) {
         return 0;
     }
