@@ -32,7 +32,7 @@ const char* agentos_strerror(agentos_error_t err) {
     if (err == AGENTOS_EUNKNOWN) {
         return "Generic error";
     }
-    if (err > 0 || err < -(agentos_error_t)ERROR_COUNT) {
+    if (err > 0 || err <= -(agentos_error_t)ERROR_COUNT) {
         return "Unknown error";
     }
     return error_strings[-err];

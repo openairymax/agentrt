@@ -34,12 +34,13 @@ option(BUILD_HEAPSTORE "Build heapstore module (persistent storage)" OFF)  # Win
 option(BUILD_TOOLKIT "Build toolkit modules (language SDKs)" OFF)  # 默认关闭，需要额外配置
 
 # 全局包含目录
+# 注意: 不包含 string/include 和 memory/include，因为它们包含与系统头文件同名的
+# string.h 和 memory.h，会导致系统头文件被遮蔽（shadowing）
+# 需要这些自定义头文件的模块应通过 target_include_directories PRIVATE 方式引入
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/atoms/corekern/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/memory/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/string/include
     ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/logging/include
     ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/sync/include
     ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/platform/include

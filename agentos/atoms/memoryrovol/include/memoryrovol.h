@@ -7,9 +7,10 @@
 #ifndef AGENTOS_MEMORYROV_H
 #define AGENTOS_MEMORYROV_H
 
-#include "../../../corekern/include/agentos.h"
+#include "agentos.h"
 #include "config.h"
 #include "forgetting.h"
+#include <observability_compat.h>
 
 #ifdef __cplusplus
 extern "C" {

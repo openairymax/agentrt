@@ -69,23 +69,14 @@ set(SOURCES
     # 统一资源守护模块
     utils/resource/resource_guard.c
     # 统一日志模块
-    utils/logging/src/logging_compat.c
     utils/logging/src/logging.c
-    utils/logging/src/atomic_logging.c
-    utils/logging/src/service_logging.c
     utils/logging/logging_common.c
-    # 统一配置模块
-    utils/config_unified/src/core_config.c
-    utils/config_unified/src/config_source.c
-    utils/config_unified/src/config_service.c
-    utils/config_unified/src/config_compat.c
+    # 统一配置模块（暂时禁用，实现与头文件不匹配）
+    # utils/config_unified/src/core_config.c
     # 统一内存管理模块
     utils/memory/src/memory.c
-    utils/memory/src/memory_pool.c
-    utils/memory/src/memory_debug.c
     utils/memory/memory_common.c
     # 统一字符串处理模块
-    utils/string/src/string.c
     utils/string/string_common.c
     # 统一线程同步原语模块
     utils/sync/src/sync.c
@@ -113,33 +104,29 @@ if(MSVC)
     target_compile_options(agentos_common PRIVATE /std:c11 /utf-8 /W3 /wd4819 /wd4005 /D_ENABLE_ATOMIC_ALIGNMENT_FIX)
 endif()
 
-target_include_directories(agentos_common PRIVATE
+target_include_directories(agentos_common PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/platform/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils/types/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils/logging/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils/error/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils/sync/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils/execution/include
+)
+
+target_include_directories(agentos_common PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/token/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/cost/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/observability/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/utils/logging/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/utils/error/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/io/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/utils/types/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/security/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/resource/include
-    # 统一基础库包含目录
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/memory/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/string/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/utils/sync/include
-    # 缓存和兼容性模块
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/cache/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/compat/include
-    # 平台适配层应用级工具 (utils/platform/)
-    # 提供文件系统、环境变量、进程管理等高级跨平台功能
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/platform/include
-    # 配置模块
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/config_unified/include
-    # 认知模块
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/cognition/include
-    # 执行模块
-    ${CMAKE_CURRENT_SOURCE_DIR}/utils/execution/include
     # 策略模块
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/strategy/include
     # 网络通信模块

@@ -13,6 +13,32 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#ifndef AGENTOS_API
+#if defined(_WIN32) && defined(AGENTOS_BUILD_DLL)
+#define AGENTOS_API __declspec(dllexport)
+#elif defined(_WIN32)
+#define AGENTOS_API __declspec(dllimport)
+#else
+#define AGENTOS_API __attribute__((visibility("default")))
+#endif
+#endif
+
+#ifndef AGENTOS_ERR_INVALID_PARAM
+#define AGENTOS_ERR_INVALID_PARAM      (-2)
+#endif
+#ifndef AGENTOS_ERR_OUT_OF_MEMORY
+#define AGENTOS_ERR_OUT_OF_MEMORY     (-3)
+#endif
+#ifndef AGENTOS_ERR_PERMISSION_DENIED
+#define AGENTOS_ERR_PERMISSION_DENIED  (-10)
+#endif
+#ifndef AGENTOS_ERR_ALREADY_EXISTS
+#define AGENTOS_ERR_ALREADY_EXISTS     (-11)
+#endif
+#ifndef AGENTOS_ERR_NOT_SUPPORTED
+#define AGENTOS_ERR_NOT_SUPPORTED      (-12)
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

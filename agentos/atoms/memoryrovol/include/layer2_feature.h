@@ -79,6 +79,19 @@ agentos_error_t agentos_layer2_feature_search(
     float** out_scores,
     size_t* out_count);
 
+typedef struct agentos_bm25_index agentos_bm25_index_t;
+
+agentos_bm25_index_t* agentos_bm25_index_create(size_t capacity);
+void agentos_bm25_index_destroy(agentos_bm25_index_t* index);
+int agentos_bm25_index_add_doc(agentos_bm25_index_t* index, const char* doc_id,
+                                const char** terms, size_t term_count);
+int agentos_bm25_index_search(const agentos_bm25_index_t* index, const char** query_terms,
+                               size_t query_count, size_t max_results,
+                               char*** out_doc_ids, double** out_scores,
+                               size_t* out_count);
+size_t agentos_bm25_index_doc_count(const agentos_bm25_index_t* index);
+void agentos_bm25_index_reset(agentos_bm25_index_t* index);
+
 #ifdef __cplusplus
 }
 #endif

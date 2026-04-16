@@ -12,7 +12,11 @@ find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
 
 pkg_check_modules(CJSON REQUIRED libcjson)
-pkg_check_modules(YAML REQUIRED yaml-0.1)
+pkg_check_modules(YAML QUIET yaml-0.1)
+if(NOT YAML_FOUND)
+    message(STATUS "libyaml not found, YAML config support will be disabled")
+    add_definitions(-DNO_YAML_SUPPORT=1)
+endif()
 
 # ==================== 路径设置 ====================
 # agentos/daemon/common 兼容层路径

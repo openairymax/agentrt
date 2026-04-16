@@ -332,17 +332,23 @@ static void handle_execute(cJSON* params, int id, agentos_socket_t client_fd) {
  * @param client_fd 客户端描述符
  */
 static void handle_client(agentos_socket_t client_fd) {
-    char buffer[MAX_BUFFER];
-    ssize_t n = agentos_socket_recv(client_fd, buffer, sizeof(buffer) - 1);
+    char* buffer = (char*)malloc(MAX_BUFFER);
+    if (!buffer) {
+        agentos_socket_close(client_fd);
+        return;
+    }
+    ssize_t n = agentos_socket_recv(client_fd, buffer, MAX_BUFFER - 1);
 
     if (n <= 0) {
+        free(buffer);
         agentos_socket_close(client_fd);
         return;
     }
     buffer[n] = '\0';
 
-    if ((size_t)n >= sizeof(buffer) - 1) {
+    if ((size_t)n >= (size_t)(MAX_BUFFER - 1)) {
         JSONRPC_SEND_ERROR(client_fd, INVALID_REQUEST, "Request too large", -1);
+        free(buffer);
         agentos_socket_close(client_fd);
         return;
     }
@@ -350,6 +356,7 @@ static void handle_client(agentos_socket_t client_fd) {
     cJSON* req = cJSON_Parse(buffer);
     if (!req) {
         JSONRPC_SEND_ERROR(client_fd, PARSE_ERROR, "Parse error: invalid JSON", -1);
+        free(buffer);
         agentos_socket_close(client_fd);
         return;
     }
@@ -363,6 +370,7 @@ static void handle_client(agentos_socket_t client_fd) {
         !cJSON_IsString(method) || !id) {
         JSONRPC_SEND_ERROR(client_fd, INVALID_REQUEST, "Invalid Request: missing jsonrpc/method/id", -1);
         cJSON_Delete(req);
+        free(buffer);
         agentos_socket_close(client_fd);
         return;
     }
@@ -374,6 +382,7 @@ static void handle_client(agentos_socket_t client_fd) {
     method_dispatcher_dispatch(g_dispatcher, req, jsonrpc_build_error, &client_fd);
 
     cJSON_Delete(req);
+    free(buffer);
     agentos_socket_close(client_fd);
 }
 

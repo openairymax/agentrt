@@ -13,7 +13,7 @@
 
 /* Unified base library compatibility layer */
 #include <agentos/memory.h>
-#include <agentos/memory_pool.h>
+#include <agentos/memory_common.h>
 #include <agentos/string.h>
 #include <agentos/check.h>
 #include <string.h>
@@ -57,8 +57,8 @@ static void free_loop_memory(agentos_core_loop_t* loop);
 
 /* 提取的辅助函数 - 降低 agentos_loop_submit 圈复杂度 */
 static char* build_enhanced_input(const char* input, size_t input_len,
-                                   agentos_memory_t* memories, size_t memory_count);
-static void free_memories(agentos_memory_t* memories, size_t memory_count);
+                                   agentos_memory_record_t** records, size_t record_count);
+static void free_memories(agentos_memory_record_t** records, size_t record_count);
 
 /* 默认配置 */
 static void init_default_config(agentos_loop_config_t* manager) {
@@ -130,15 +130,19 @@ static memory_pool_t* get_loop_memory_pool(void)
 
     agentos_mutex_lock(g_pool_mutex);
     if (g_loop_memory_pool == NULL) {
-        memory_pool_options_t options = {
+        memory_pool_config_t options = {
             .block_size = sizeof(agentos_core_loop_t),
-            .initial_blocks = 8,
-            .max_blocks = 64,
-            .expansion_size = 4,
-            .thread_safe = true,
-            .name = "coreloop_pool"
+            .block_count = 8,
+            .strategy = MEMORY_STRATEGY_DEFAULT,
+            .thread_safe = true
         };
-        g_loop_memory_pool = memory_pool_create(&options);
+        static memory_pool_t pool_storage;
+        g_loop_memory_pool = &pool_storage;
+        agentos_error_t pool_err = memory_pool_init(g_loop_memory_pool, &options);
+        if (pool_err != AGENTOS_SUCCESS) {
+            AGENTOS_LOG_ERROR("Failed to init loop memory pool");
+            g_loop_memory_pool = NULL;
+        }
     }
     agentos_mutex_unlock(g_pool_mutex);
     return g_loop_memory_pool;
@@ -155,7 +159,7 @@ static agentos_core_loop_t* allocate_loop_memory(void)
         return (agentos_core_loop_t*)AGENTOS_CALLOC(1, sizeof(agentos_core_loop_t));
     }
 
-    agentos_core_loop_t* loop = (agentos_core_loop_t*)memory_pool_alloc(pool);
+    agentos_core_loop_t* loop = (agentos_core_loop_t*)memory_pool_alloc(pool, sizeof(agentos_core_loop_t));
     if (loop == NULL) {
         return (agentos_core_loop_t*)AGENTOS_CALLOC(1, sizeof(agentos_core_loop_t));
     }
@@ -217,20 +221,6 @@ static agentos_error_t create_loop_engines(agentos_core_loop_t* loop)
 
     err = agentos_memory_create(NULL, &loop->memory);
     if (err != AGENTOS_SUCCESS) return err;
-
-    // 自动注册TaskFlow执行单元（如果可用）
-    taskflow_unit_config_t tf_config = {
-        .taskflow_config = TASKFLOW_CONFIG_DEFAULT,
-        .max_concurrent_graphs = 10,
-        .default_timeout_ms = 30000,
-        .enable_auto_checkpoint = true,
-        .auto_checkpoint_interval = 100
-    };
-    agentos_error_t tf_err = taskflow_register_unit(loop->execution, "taskflow", &tf_config);
-    if (tf_err != AGENTOS_SUCCESS) {
-        // 记录警告但继续运行（TaskFlow是可选的）
-        // 注意：这里没有日志系统，暂时忽略
-    }
 
     return AGENTOS_SUCCESS;
 }
@@ -294,16 +284,10 @@ static void cleanup_loop_resources(agentos_core_loop_t* loop)
  * @param memories 记忆数组指针
  * @param memory_count 记忆数量
  */
-static void free_memories(agentos_memory_t* memories, size_t memory_count)
+static void free_memories(agentos_memory_record_t** records, size_t record_count)
 {
-    if (!memories) return;
-
-    for (size_t i = 0; i < memory_count; i++) {
-        if (memories[i].content) {
-            AGENTOS_FREE(memories[i].content);
-        }
-    }
-    AGENTOS_FREE(memories);
+    if (!records) return;
+    AGENTOS_FREE(records);
 }
 
 /**
@@ -315,30 +299,28 @@ static void free_memories(agentos_memory_t* memories, size_t memory_count)
  * @return 增强后的输入字符串，需调用者释放；失败返回NULL
  */
 static char* build_enhanced_input(const char* input, size_t input_len,
-                                   agentos_memory_t* memories, size_t memory_count)
+                                   agentos_memory_record_t** records, size_t record_count)
 {
-    if (!input || memory_count == 0 || !memories) return NULL;
+    if (!input || record_count == 0 || !records) return NULL;
 
-    /* 分配足够空间：原始输入 + 记忆内容 + 格式标记 */
     size_t total_len = input_len + 1024;
-    for (size_t i = 0; i < memory_count; i++) {
-        if (memories[i].content) {
-            total_len += memories[i].content_len + 64;
+    for (size_t i = 0; i < record_count; i++) {
+        if (records[i] && records[i]->memory_record_data) {
+            total_len += records[i]->memory_record_data_len + 64;
         }
     }
 
     char* enhanced_input = (char*)AGENTOS_MALLOC(total_len);
     if (!enhanced_input) return NULL;
 
-    /* 构建带上下文的输入 */
     size_t pos = 0;
     pos += snprintf(enhanced_input + pos, total_len - pos,
-        "[上下文增强]\n相关记忆数量：%zu\n\n", memory_count);
+        "[上下文增强]\n相关记忆数量：%zu\n\n", record_count);
 
-    for (size_t i = 0; i < memory_count && i < 5; i++) {
-        if (memories[i].content) {
+    for (size_t i = 0; i < record_count && i < 5; i++) {
+        if (records[i] && records[i]->memory_record_data) {
             pos += snprintf(enhanced_input + pos, total_len - pos,
-                "记忆 %zu: %.*s\n", i + 1, (int)memories[i].content_len, memories[i].content);
+                "记忆 %zu: %.*s\n", i + 1, (int)records[i]->memory_record_data_len, (const char*)records[i]->memory_record_data);
         }
     }
 
@@ -392,18 +374,23 @@ AGENTOS_API void agentos_loop_destroy(agentos_core_loop_t* loop)
 
     if (loop->memory) {
         agentos_memory_destroy(loop->memory);
+        loop->memory = NULL;
     }
     if (loop->execution) {
         agentos_execution_destroy(loop->execution);
+        loop->execution = NULL;
     }
     if (loop->cognition) {
         agentos_cognition_destroy(loop->cognition);
+        loop->cognition = NULL;
     }
     if (loop->cond) {
         agentos_cond_destroy(loop->cond);
+        loop->cond = NULL;
     }
     if (loop->lock) {
         agentos_mutex_destroy(loop->lock);
+        loop->lock = NULL;
     }
 
     free_loop_memory(loop);
@@ -460,9 +447,27 @@ AGENTOS_API agentos_error_t agentos_loop_submit(
     if (!loop->cognition || !loop->execution || !loop->memory) return AGENTOS_ENOTINIT;
 
     /* 步骤 1: 从记忆中检索相关上下文 */
-    agentos_memory_t* memories = NULL;
+    agentos_memory_query_t query = {0};
+    query.memory_query_text = (char*)input;
+    query.memory_query_text_len = input_len;
+    query.memory_query_limit = 5;
+    query.memory_query_include_raw = 1;
+    agentos_memory_result_t* result = NULL;
+    agentos_error_t err = agentos_memory_query(loop->memory, &query, &result);
+
     size_t memory_count = 0;
-    agentos_error_t err = agentos_memory_retrieve(loop->memory, input, input_len, 5, &memories, &memory_count);
+    agentos_memory_record_t** memories = NULL;
+    if (err == AGENTOS_SUCCESS && result && result->memory_result_count > 0) {
+        memory_count = result->memory_result_count;
+        memories = (agentos_memory_record_t**)AGENTOS_CALLOC(memory_count, sizeof(agentos_memory_record_t*));
+        if (memories) {
+            for (size_t i = 0; i < memory_count; i++) {
+                memories[i] = result->memory_result_items[i]->memory_result_item_record;
+            }
+        } else {
+            memory_count = 0;
+        }
+    }
 
     /* 步骤 2: 构建增强输入（如果有相关记忆） */
     char* enhanced_input = NULL;
@@ -471,6 +476,7 @@ AGENTOS_API agentos_error_t agentos_loop_submit(
     }
 
     /* 释放记忆结果（无论是否构建了增强输入） */
+    if (result) agentos_memory_result_free(result);
     free_memories(memories, memory_count);
 
     /* 步骤 3: 认知层处理（带上下文增强） */
@@ -534,12 +540,18 @@ AGENTOS_API agentos_error_t agentos_loop_wait(
 
         /* 步骤 4: 将执行结果存储到记忆中（形成闭环） */
         if (*out_result && *out_result_len > 0) {
-            agentos_error_t store_err = agentos_memory_store(
+            agentos_memory_record_t record = {0};
+            record.memory_record_data = *out_result;
+            record.memory_record_data_len = *out_result_len;
+            record.memory_record_type = MEMORY_TYPE_RAW;
+            record.memory_record_importance = 0.7f;
+            char* new_record_id = NULL;
+            agentos_error_t store_err = agentos_memory_write(
                 loop->memory,
-                *out_result,
-                *out_result_len,
-                0.7f
+                &record,
+                &new_record_id
             );
+            if (new_record_id) AGENTOS_FREE(new_record_id);
             if (store_err != AGENTOS_SUCCESS) {
                 AGENTOS_LOG_WARN("Failed to store execution result to memory: %d", store_err);
             } else {

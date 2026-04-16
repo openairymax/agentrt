@@ -39,6 +39,17 @@ typedef agentos_error_t (*agent_registry_get_agents_func)(
     agent_info_t*** out_agents,
     size_t* out_count);
 
+#ifndef AGENTOS_EXECUTION_UNIT_T_DEFINED
+#define AGENTOS_EXECUTION_UNIT_T_DEFINED
+typedef struct agentos_execution_unit agentos_execution_unit_t;
+#endif
+
+AGENTOS_API agentos_error_t agentos_registry_init(void);
+AGENTOS_API void agentos_registry_cleanup(void);
+AGENTOS_API agentos_error_t agentos_registry_register_unit(const char* unit_id, agentos_execution_unit_t* unit);
+AGENTOS_API void agentos_registry_unregister_unit(const char* unit_id);
+AGENTOS_API agentos_execution_unit_t* agentos_registry_get_unit(const char* unit_id);
+
 #ifdef __cplusplus
 }
 #endif

@@ -143,10 +143,10 @@ target_include_directories(gateway_d PRIVATE
 
 # 将 gateway 库的源文件直接加入编译（确保符号可解析）
 set(GATEWAY_LIB_SOURCES
-    ${GATEWAY_SRC_DIR}/agentos/gateway/gateway_api.c
-    ${GATEWAY_SRC_DIR}/agentos/gateway/http_gateway.c
-    ${GATEWAY_SRC_DIR}/agentos/gateway/ws_gateway.c
-    ${GATEWAY_SRC_DIR}/agentos/gateway/stdio_gateway.c
+    ${GATEWAY_SRC_DIR}/gateway/gateway_api.c
+    ${GATEWAY_SRC_DIR}/gateway/http_gateway.c
+    ${GATEWAY_SRC_DIR}/gateway/ws_gateway.c
+    ${GATEWAY_SRC_DIR}/gateway/stdio_gateway.c
     ${GATEWAY_SRC_DIR}/utils/jsonrpc.c
     ${GATEWAY_SRC_DIR}/utils/syscall_router.c
 )

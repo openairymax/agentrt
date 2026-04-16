@@ -1,30 +1,67 @@
 /**
  * @file shell.c
- * @brief Shell命令执行单元（跨平台�?
+ * @brief Shell命令执行单元（跨平台）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "execution.h"
 #include "agentos.h"
 #include <stdlib.h>
-
-/* Unified base library compatibility layer */
-#include <agentos/memory.h>
-#include <agentos/string.h>
 #include <string.h>
 #include <stdio.h>
+#include <agentos/memory.h>
 
-#include <agentos/platform_adapter.h>\n\n#include <agentos/execution_common.h>\n\ntypedef struct $1_unit_data {\n    execution_unit_data_t base;\n    char* metadata_json;\n} $1_unit_data_t;
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#include <sys/wait.h>
+#include <signal.h>
+#endif
 
-/**
- * @brief 跨平台执行命令并捕获输出
- */
+typedef struct shell_unit_data {
+    char* metadata_json;
+} shell_unit_data_t;
+
+static const char* ALLOWED_SHELL_COMMANDS[] = {
+    "ls", "cat", "echo", "pwd", "whoami", "date", "hostname",
+    "df", "du", "free", "uptime", "uname", "id", "env",
+    "head", "tail", "wc", "sort", "uniq", "grep", "find",
+    NULL
+};
+
+static int is_shell_command_allowed(const char* cmd) {
+    if (!cmd) return 0;
+    while (*cmd == ' ' || *cmd == '\t') cmd++;
+    if (*cmd == '\0') return 0;
+    if (*cmd == '/' || *cmd == '\\' || *cmd == '-') return 0;
+    for (int i = 0; ALLOWED_SHELL_COMMANDS[i] != NULL; i++) {
+        size_t len = strlen(ALLOWED_SHELL_COMMANDS[i]);
+        if (strncmp(cmd, ALLOWED_SHELL_COMMANDS[i], len) == 0) {
+            if (cmd[len] == ' ' || cmd[len] == '\0' || cmd[len] == '\t' || cmd[len] == '\n') {
+                if (!strchr(cmd, ';') && !strstr(cmd, "&&") && !strstr(cmd, "||") &&
+                    !strchr(cmd, '|') && !strstr(cmd, "$(") && !strstr(cmd, "${") &&
+                    !strchr(cmd, '`') && !strchr(cmd, '>') && !strchr(cmd, '<') &&
+                    !strchr(cmd, '&') && !strchr(cmd, '\n') && !strchr(cmd, '\r') &&
+                    !strstr(cmd, "..")) {
+                    return 1;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
 static agentos_error_t shell_execute(
     agentos_execution_unit_t* unit, const void* input, void** out_output) {
-
     (void)unit;
     const char* cmd = (const char*)input;
     if (!cmd || !out_output) return AGENTOS_EINVAL;
+
+    if (!is_shell_command_allowed(cmd)) {
+        *out_output = AGENTOS_STRDUP("{\"error\":\"command_not_allowed\"}");
+        return *out_output ? AGENTOS_EPERM : AGENTOS_ENOMEM;
+    }
 
 #ifdef _WIN32
     HANDLE hReadPipe, hWritePipe;
@@ -116,7 +153,7 @@ static agentos_error_t shell_execute(
         dup2(pipe_err[1], STDERR_FILENO);
         close(pipe_out[1]);
         close(pipe_err[1]);
-
+        /* flawfinder: ignore - cmd validated by is_shell_command_allowed (whitelist + metachar rejection) */
         execl("/bin/sh", "sh", "-c", cmd, (char*)NULL);
         _exit(127);
     }
@@ -168,22 +205,16 @@ static agentos_error_t shell_execute(
 #endif
 }
 
-/**
- * @brief 销毁Shell执行单元
- */
-static void shell_destroy(agentos_execution_unit_t* unit) {\n    if (!unit) return;\n    shell_unit_data_t* data = (shell_unit_data_t*)unit->data;\n    if (data) {\n        execution_unit_data_cleanup(&data->base);\n        if (data->metadata_json) AGENTOS_FREE(data->metadata_json);\n        AGENTOS_FREE(data);\n    }\n    AGENTOS_FREE(unit);\n}
-
-/**
- * @brief 获取执行单元元数�?
- */
-static const char* shell_get_metadata(agentos_execution_unit_t* unit) {
-    shell_unit_data_t* data = (shell_unit_data_t*)unit->data;
-    return data ? data->metadata_json : NULL;
+static void shell_destroy(agentos_execution_unit_t* unit) {
+    if (!unit) return;
+    shell_unit_data_t* data = (shell_unit_data_t*)unit->execution_unit_data;
+    if (data) {
+        if (data->metadata_json) AGENTOS_FREE(data->metadata_json);
+        AGENTOS_FREE(data);
+    }
+    AGENTOS_FREE(unit);
 }
 
-/**
- * @brief 创建Shell命令执行单元
- */
 agentos_execution_unit_t* agentos_shell_unit_create(void) {
     agentos_execution_unit_t* unit = (agentos_execution_unit_t*)AGENTOS_CALLOC(1, sizeof(agentos_execution_unit_t));
     if (!unit) return NULL;
@@ -201,10 +232,9 @@ agentos_execution_unit_t* agentos_shell_unit_create(void) {
         return NULL;
     }
 
-    unit->data = data;
-    unit->execute = shell_execute;
-    unit->destroy = shell_destroy;
-    unit->get_metadata = shell_get_metadata;
+    unit->execution_unit_data = data;
+    unit->execution_unit_execute = shell_execute;
+    unit->execution_unit_destroy = shell_destroy;
 
     return unit;
 }

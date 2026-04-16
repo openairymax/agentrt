@@ -169,7 +169,7 @@ void memory_pool_free(memory_pool_t* pool, void* ptr) {
 
     memory_block_header_t* block = (memory_block_header_t*)((uint8_t*)ptr - sizeof(memory_block_header_t));
     if (block->magic != 0xDEADBEEF) {
-        AGENTOS_LOG_ERROR("Invalid memory block magic: %p", ptr);
+        AGENTOS_LOG_ERROR("Invalid memory block magic: %p", (void*)ptr);
         return;
     }
 

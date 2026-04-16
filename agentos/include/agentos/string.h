@@ -9,6 +9,7 @@
 
 #include <agentos/compat/stdint.h>
 
+#include <string.h>
 #include "../../commons/utils/string/include/string_compat.h"
 
 #endif /* AGENTOS_STRING_STANDARD_H */
