@@ -20,9 +20,51 @@
 
 /* Unified base library compatibility layer */
 #include <agentos/memory.h>
-#include <agentos/string.h>
 #include <string.h>
 #include <stdio.h>
+
+/* platform.h provides agentos_mutex_t, agentos_cond_t and init/destroy functions */
+#include "platform.h"
+
+/* ==================== 兼容层：create/destroy 包装 ==================== */
+
+static inline agentos_mutex_t* agentos_mutex_create_compat(void) {
+    agentos_mutex_t* m = (agentos_mutex_t*)AGENTOS_CALLOC(1, sizeof(agentos_mutex_t));
+    if (m && agentos_mutex_init(m) != 0) {
+        AGENTOS_FREE(m);
+        return NULL;
+    }
+    return m;
+}
+
+static inline void agentos_mutex_destroy_compat(agentos_mutex_t* m) {
+    if (m) {
+        agentos_mutex_destroy(m);
+        AGENTOS_FREE(m);
+    }
+}
+
+static inline agentos_cond_t* agentos_cond_create_compat(void) {
+    agentos_cond_t* c = (agentos_cond_t*)AGENTOS_CALLOC(1, sizeof(agentos_cond_t));
+    if (c && agentos_cond_init(c) != 0) {
+        AGENTOS_FREE(c);
+        return NULL;
+    }
+    return c;
+}
+
+static inline void agentos_cond_destroy_compat(agentos_cond_t* c) {
+    if (c) {
+        agentos_cond_destroy(c);
+        AGENTOS_FREE(c);
+    }
+}
+
+/* 使用兼容层宏替换 */
+#define agentos_mutex_create() agentos_mutex_create_compat()
+#define agentos_mutex_destroy_ptr(p) agentos_mutex_destroy_compat(p)
+#define agentos_cond_create() agentos_cond_create_compat()
+#define agentos_cond_destroy_ptr(p) agentos_cond_destroy_compat(p)
 
 /* ==================== 平台相关宏定�?==================== */
 
@@ -77,8 +119,8 @@ typedef struct pending_call {
     struct pending_call* next;
 
     /* 条件变量用于高效等待 */
-    agentos_cond_t* cond;
-    agentos_mutex_t* cond_lock;
+    agentos_cond_t cond;
+    agentos_mutex_t cond_lock;
 } pending_call_t;
 
 /**
@@ -157,15 +199,13 @@ static pending_call_t* pending_call_create(void) {
     pending_call_t* pc = (pending_call_t*)AGENTOS_CALLOC(1, sizeof(pending_call_t));
     if (!pc) return NULL;
 
-    pc->cond_lock = agentos_mutex_create();
-    if (!pc->cond_lock) {
+    if (agentos_mutex_init(&pc->cond_lock) != 0) {
         AGENTOS_FREE(pc);
         return NULL;
     }
 
-    pc->cond = agentos_cond_create();
-    if (!pc->cond) {
-        agentos_mutex_destroy(pc->cond_lock);
+    if (agentos_cond_init(&pc->cond) != 0) {
+        agentos_mutex_destroy(&pc->cond_lock);
         AGENTOS_FREE(pc);
         return NULL;
     }
@@ -179,8 +219,8 @@ static pending_call_t* pending_call_create(void) {
  */
 static void pending_call_destroy(pending_call_t* pc) {
     if (!pc) return;
-    if (pc->cond) agentos_cond_destroy(pc->cond);
-    if (pc->cond_lock) agentos_mutex_destroy(pc->cond_lock);
+    agentos_cond_destroy(&pc->cond);
+    agentos_mutex_destroy(&pc->cond_lock);
     AGENTOS_FREE(pc);
 }
 
@@ -220,7 +260,7 @@ void agentos_ipc_cleanup(void) {
     agentos_mutex_unlock(binder_global_lock);
 
     if (binder_global_lock) {
-        agentos_mutex_destroy(binder_global_lock);
+        agentos_mutex_destroy_ptr(binder_global_lock);
         binder_global_lock = NULL;
     }
 }
@@ -283,7 +323,7 @@ agentos_error_t agentos_ipc_create_channel(
 cleanup:
     agentos_mutex_unlock(binder_global_lock);
     if (ch) {
-        if (ch->lock) agentos_mutex_destroy(ch->lock);
+        if (ch->lock) agentos_mutex_destroy_ptr(ch->lock);
         AGENTOS_FREE(ch);
     }
     AGENTOS_FREE(node);
@@ -394,13 +434,13 @@ agentos_error_t agentos_ipc_call(
     }
 
     /* 使用条件变量等待，避免忙轮询 */
-    agentos_mutex_lock(pc->cond_lock);
+    agentos_mutex_lock(&pc->cond_lock);
 
     uint64_t start_time = agentos_time_monotonic_ms();
     while (!ATOMIC_LOAD(&pc->completed)) {
         uint64_t elapsed = agentos_time_monotonic_ms() - start_time;
         if (elapsed >= timeout_ms) {
-            agentos_mutex_unlock(pc->cond_lock);
+            agentos_mutex_unlock(&pc->cond_lock);
 
             agentos_mutex_lock(channel->lock);
             remove_pending_call_locked(channel, pc);
@@ -412,10 +452,10 @@ agentos_error_t agentos_ipc_call(
         uint32_t remaining = (uint32_t)(timeout_ms - elapsed);
         if (remaining > 100) remaining = 100; /* 最多等�?00ms后检�?*/
 
-        agentos_cond_timedwait(pc->cond, pc->cond_lock, remaining);
+        agentos_cond_timedwait(&pc->cond, &pc->cond_lock, remaining);
     }
 
-    agentos_mutex_unlock(pc->cond_lock);
+    agentos_mutex_unlock(&pc->cond_lock);
 
     agentos_mutex_lock(channel->lock);
     remove_pending_call_locked(channel, pc);
@@ -484,9 +524,7 @@ agentos_error_t agentos_ipc_reply(
     ATOMIC_STORE(&pc->completed, 1);
 
     /* 唤醒等待的线�?*/
-    if (pc->cond) {
-        agentos_cond_signal(pc->cond);
-    }
+    agentos_cond_signal(&pc->cond);
 
     agentos_mutex_unlock(channel->lock);
     return AGENTOS_SUCCESS;

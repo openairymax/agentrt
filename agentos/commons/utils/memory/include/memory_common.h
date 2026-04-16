@@ -1,8 +1,24 @@
 #ifndef MEMORY_COMMON_H
 #define MEMORY_COMMON_H
 
+#include <stddef.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <error.h>
-#include <agentos/memory.h>
+#include "agentos_memory.h"
+
+#ifndef AGENTOS_MEMORY_STATS_T_DEFINED
+#define AGENTOS_MEMORY_STATS_T_DEFINED
+typedef struct {
+    size_t total_allocated;
+    size_t total_freed;
+    size_t current_allocated;
+    size_t peak_allocated;
+    size_t allocation_count;
+    size_t free_count;
+    size_t leak_count;
+} memory_stats_t;
+#endif
 
 typedef enum {
     MEMORY_STRATEGY_DEFAULT = 0,
@@ -18,14 +34,14 @@ typedef struct {
     bool thread_safe;
 } memory_pool_config_t;
 
+#ifndef MEMORY_POOL_T_DEFINED
+#define MEMORY_POOL_T_DEFINED
 typedef struct {
     void* pool;
     memory_pool_config_t manager;
     size_t used_blocks;
     size_t peak_usage;
 } memory_pool_t;
-
-memory_pool_config_t memory_create_default_pool_config(void);
 
 agentos_error_t memory_pool_init(memory_pool_t* pool, const memory_pool_config_t* manager);
 
@@ -36,6 +52,9 @@ void memory_pool_free(memory_pool_t* pool, void* ptr);
 void memory_pool_cleanup(memory_pool_t* pool);
 
 void memory_pool_get_stats(const memory_pool_t* pool, memory_stats_t* stats);
+#endif
+
+memory_pool_config_t memory_create_default_pool_config(void);
 
 void* memory_safe_alloc(size_t size);
 

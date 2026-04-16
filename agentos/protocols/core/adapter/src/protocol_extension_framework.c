@@ -583,9 +583,9 @@ int proto_ext_load_from_config(proto_ext_framework_t* fw, const char* config_jso
                 .capabilities = caps, .priority = priority, .hot_loadable = true };
             strncpy(desc_struct.name, name, PROTO_EXT_MAX_NAME_LEN - 1);
             if (version) strncpy(desc_struct.version, version, PROTO_EXT_MAX_VERSION_LEN - 1);
-            else strcpy(desc_struct.version, "1.0.0");
+            else { strncpy(desc_struct.version, "1.0.0", PROTO_EXT_MAX_VERSION_LEN - 1); desc_struct.version[PROTO_EXT_MAX_VERSION_LEN - 1] = '\0'; }
             if (desc) strncpy(desc_struct.description, desc, 255);
-            else strcpy(desc_struct.description, "Loaded from config");
+            else { strncpy(desc_struct.description, "Loaded from config", 255); desc_struct.description[254] = '\0'; }
             if (author) strncpy(desc_struct.author, author, 127);
 
             proto_ext_callbacks_t empty_cbs = { 0 };

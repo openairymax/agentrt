@@ -57,9 +57,11 @@ agentos_error_t agentos_hybrid_search_weighted(
 
     // 获取BM25搜索结果
     char** bm25_ids = NULL;
-    float* bm25_scores = NULL;
+    double* bm25_dscores = NULL;
     size_t bm25_count = 0;
-    err = agentos_bm25_search(bm25_idx, query, top_k * 2, &bm25_ids, &bm25_scores, &bm25_count);
+    const char* query_terms[2] = { query, NULL };
+    err = agentos_bm25_index_search(bm25_idx, query_terms, 1, top_k * 2,
+                                     &bm25_ids, &bm25_dscores, &bm25_count);
     if (err != AGENTOS_SUCCESS) {
         for (size_t i = 0; i < vec_count; i++) AGENTOS_FREE(vec_ids[i]);
         AGENTOS_FREE(vec_ids);
@@ -74,7 +76,7 @@ agentos_error_t agentos_hybrid_search_weighted(
         for (size_t i = 0; i < vec_count; i++) AGENTOS_FREE(vec_ids[i]);
         AGENTOS_FREE(vec_ids); AGENTOS_FREE(vec_scores);
         for (size_t i = 0; i < bm25_count; i++) AGENTOS_FREE(bm25_ids[i]);
-        AGENTOS_FREE(bm25_ids); AGENTOS_FREE(bm25_scores);
+        AGENTOS_FREE(bm25_ids); AGENTOS_FREE(bm25_dscores);
         return AGENTOS_ENOMEM;
     }
 
@@ -96,7 +98,7 @@ agentos_error_t agentos_hybrid_search_weighted(
             }
         }
         if (found >= 0) {
-            items[found].score += bm25_scores[i] * (1 - vector_weight);
+            items[found].score += (float)bm25_dscores[i] * (1 - vector_weight);
             items[found].bm25_rank = i + 1;
             AGENTOS_FREE(bm25_ids[i]); // 不再需�?
         } else {
@@ -111,14 +113,14 @@ agentos_error_t agentos_hybrid_search_weighted(
                 items = new_items;
             }
             items[item_count].id = AGENTOS_STRDUP(bm25_ids[i]);
-            items[item_count].score = bm25_scores[i] * (1 - vector_weight);
+            items[item_count].score = (float)bm25_dscores[i] * (1 - vector_weight);
             items[item_count].bm25_rank = i + 1;
             item_count++;
             AGENTOS_FREE(bm25_ids[i]);
         }
     }
     AGENTOS_FREE(bm25_ids);
-    AGENTOS_FREE(bm25_scores);
+    AGENTOS_FREE(bm25_dscores);
     for (size_t i = 0; i < vec_count; i++) AGENTOS_FREE(vec_ids[i]);
     AGENTOS_FREE(vec_ids);
     AGENTOS_FREE(vec_scores);
@@ -177,9 +179,11 @@ agentos_error_t agentos_hybrid_search_rrf(
     if (err != AGENTOS_SUCCESS) return err;
 
     char** bm25_ids = NULL;
-    float* bm25_scores = NULL;
+    double* bm25_dscores = NULL;
     size_t bm25_count = 0;
-    err = agentos_bm25_search(bm25_idx, query, top_k * 2, &bm25_ids, &bm25_scores, &bm25_count);
+    const char* query_terms2[2] = { query, NULL };
+    err = agentos_bm25_index_search(bm25_idx, query_terms2, 1, top_k * 2,
+                                     &bm25_ids, &bm25_dscores, &bm25_count);
     if (err != AGENTOS_SUCCESS) {
         for (size_t i = 0; i < vec_count; i++) AGENTOS_FREE(vec_ids[i]);
         AGENTOS_FREE(vec_ids);
@@ -194,7 +198,7 @@ agentos_error_t agentos_hybrid_search_rrf(
         for (size_t i = 0; i < vec_count; i++) AGENTOS_FREE(vec_ids[i]);
         AGENTOS_FREE(vec_ids); AGENTOS_FREE(vec_scores);
         for (size_t i = 0; i < bm25_count; i++) AGENTOS_FREE(bm25_ids[i]);
-        AGENTOS_FREE(bm25_ids); AGENTOS_FREE(bm25_scores);
+        AGENTOS_FREE(bm25_ids); AGENTOS_FREE(bm25_dscores);
         return AGENTOS_ENOMEM;
     }
 
@@ -235,7 +239,7 @@ agentos_error_t agentos_hybrid_search_rrf(
         }
     }
     AGENTOS_FREE(bm25_ids);
-    AGENTOS_FREE(bm25_scores);
+    AGENTOS_FREE(bm25_dscores);
     for (size_t i = 0; i < vec_count; i++) AGENTOS_FREE(vec_ids[i]);
     AGENTOS_FREE(vec_ids);
     AGENTOS_FREE(vec_scores);

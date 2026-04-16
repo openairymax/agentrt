@@ -28,11 +28,11 @@ add_library(agentos_memoryrovol STATIC
     retrieval/attractor.c
     retrieval/cache.c
     retrieval/energy.c
-    # retrieval/mount.c          # 暂时排除：agentos_token_counter_t类型未定义
-    # retrieval/rerank.c         # 暂时排除：类型定义冲突
+    retrieval/mount.c
+    retrieval/rerank.c
     memory_optimizer.c
     memoryrovol.c
-    monitoring.c
+    # monitoring.c   # 暂时排除：agentos_monitoring_t/agentos_observability_t类型未定义
     vector_store.c
     llm_client.c
 )

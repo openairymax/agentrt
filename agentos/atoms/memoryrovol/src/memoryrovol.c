@@ -196,7 +196,7 @@ agentos_error_t agentos_memoryrov_add_memory(agentos_memoryrov_handle_t* handle,
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t agentos_memoryrov_evolve(agentos_memoryrov_handle_t* handle) {
+agentos_error_t agentos_memoryrov_evolve(agentos_memoryrov_handle_t* handle, int force) {
     if (!handle || !handle->initialized) {
         return AGENTOS_EINVAL;
     }

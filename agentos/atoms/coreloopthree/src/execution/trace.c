@@ -33,6 +33,30 @@ static trace_span_t* g_trace_spans = NULL;
 static agentos_mutex_t* g_trace_lock = NULL;
 static agentos_mutex_t* g_current_lock = NULL;
 static trace_span_t* g_current_span = NULL;
+static volatile int g_trace_initialized = 0;
+
+/**
+ * @brief 确保trace系统已初始化（线程安全）
+ * @return AGENTOS_SUCCESS 成功，AGENTOS_ENOMEM 内存不足
+ */
+static agentos_error_t ensure_trace_init(void) {
+    if (g_trace_initialized) return AGENTOS_SUCCESS;
+
+    if (!g_trace_lock) {
+        g_trace_lock = agentos_mutex_create();
+        if (!g_trace_lock) return AGENTOS_ENOMEM;
+    }
+    if (!g_current_lock) {
+        g_current_lock = agentos_mutex_create();
+        if (!g_current_lock) {
+            agentos_mutex_destroy(g_trace_lock);
+            g_trace_lock = NULL;
+            return AGENTOS_ENOMEM;
+        }
+    }
+    g_trace_initialized = 1;
+    return AGENTOS_SUCCESS;
+}
 
 #ifdef _WIN32
 static volatile LONG span_counter = 0;
@@ -41,10 +65,10 @@ static void generate_span_id(char* buf, size_t len) {
     snprintf(buf, len, "span_%ld", id);
 }
 #else
-static atomic_ullong span_counter = 0;
+static atomic_uint64_t span_counter = 0;
 static void generate_span_id(char* buf, size_t len) {
-    unsigned long long id = atomic_fetch_add(&span_counter, 1);
-    snprintf(buf, len, "span_%llu", id);
+    uint64_t id = (uint64_t)atomic_fetch_add(&span_counter, 1);
+    snprintf(buf, len, "span_%llu", (unsigned long long)id);
 }
 #endif
 
@@ -90,6 +114,9 @@ void agentos_trace_shutdown(void) {
 agentos_error_t agentos_trace_start_span(const char* name, const char* trace_id, const char* parent_id, char** out_span_id) {
     if (!name || !out_span_id) return AGENTOS_EINVAL;
 
+    agentos_error_t err = ensure_trace_init();
+    if (err != AGENTOS_SUCCESS) return err;
+
     trace_span_t* span = (trace_span_t*)AGENTOS_CALLOC(1, sizeof(trace_span_t));
     if (!span) return AGENTOS_ENOMEM;
 
@@ -114,11 +141,9 @@ agentos_error_t agentos_trace_start_span(const char* name, const char* trace_id,
     agentos_mutex_lock(g_trace_lock);
     span->next = g_trace_spans;
     g_trace_spans = span;
-    agentos_mutex_unlock(g_trace_lock);
 
-    agentos_mutex_lock(g_current_lock);
     g_current_span = span;
-    agentos_mutex_unlock(g_current_lock);
+    agentos_mutex_unlock(g_trace_lock);
 
     *out_span_id = AGENTOS_STRDUP(span->span_id);
     return *out_span_id ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
@@ -126,6 +151,9 @@ agentos_error_t agentos_trace_start_span(const char* name, const char* trace_id,
 
 agentos_error_t agentos_trace_end_span(const char* span_id) {
     if (!span_id) return AGENTOS_EINVAL;
+
+    agentos_error_t err = ensure_trace_init();
+    if (err != AGENTOS_SUCCESS) return err;
 
     agentos_mutex_lock(g_trace_lock);
     trace_span_t* span = g_trace_spans;
@@ -143,13 +171,17 @@ agentos_error_t agentos_trace_end_span(const char* span_id) {
 
 agentos_error_t agentos_trace_get_current_span(char** out_span_id) {
     if (!out_span_id) return AGENTOS_EINVAL;
-    agentos_mutex_lock(g_current_lock);
+
+    agentos_error_t err = ensure_trace_init();
+    if (err != AGENTOS_SUCCESS) return err;
+
+    agentos_mutex_lock(g_trace_lock);
     if (g_current_span) {
         *out_span_id = AGENTOS_STRDUP(g_current_span->span_id);
-        agentos_mutex_unlock(g_current_lock);
+        agentos_mutex_unlock(g_trace_lock);
         return *out_span_id ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
     } else {
-        agentos_mutex_unlock(g_current_lock);
+        agentos_mutex_unlock(g_trace_lock);
         *out_span_id = NULL;
         return AGENTOS_ENOENT;
     }

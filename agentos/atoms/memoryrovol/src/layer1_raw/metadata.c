@@ -166,16 +166,52 @@ agentos_error_t agentos_raw_metadata_db_get(
     memset(meta, 0, sizeof(agentos_raw_metadata_t));
 
     meta->record_id = AGENTOS_STRDUP(record_id);
+    if (!meta->record_id) {
+        AGENTOS_FREE(meta);
+        sqlite3_finalize(stmt);
+        agentos_mutex_unlock(db_handle->lock);
+        return AGENTOS_ENOMEM;
+    }
     meta->timestamp = (uint64_t)sqlite3_column_int64(stmt, 0);
     meta->data_len = (uint32_t)sqlite3_column_int(stmt, 1);
     meta->access_count = (uint32_t)sqlite3_column_int(stmt, 2);
     meta->last_access = (uint64_t)sqlite3_column_int64(stmt, 3);
     const unsigned char* source = sqlite3_column_text(stmt, 4);
-    if (source) meta->source = AGENTOS_STRDUP((const char*)source);
+    if (source) {
+        meta->source = AGENTOS_STRDUP((const char*)source);
+        if (!meta->source) {
+            if (meta->record_id) AGENTOS_FREE(meta->record_id);
+            AGENTOS_FREE(meta);
+            sqlite3_finalize(stmt);
+            agentos_mutex_unlock(db_handle->lock);
+            return AGENTOS_ENOMEM;
+        }
+    }
     const unsigned char* trace = sqlite3_column_text(stmt, 5);
-    if (trace) meta->trace_id = AGENTOS_STRDUP((const char*)trace);
+    if (trace) {
+        meta->trace_id = AGENTOS_STRDUP((const char*)trace);
+        if (!meta->trace_id) {
+            if (meta->source) AGENTOS_FREE(meta->source);
+            if (meta->record_id) AGENTOS_FREE(meta->record_id);
+            AGENTOS_FREE(meta);
+            sqlite3_finalize(stmt);
+            agentos_mutex_unlock(db_handle->lock);
+            return AGENTOS_ENOMEM;
+        }
+    }
     const unsigned char* tags = sqlite3_column_text(stmt, 6);
-    if (tags) meta->tags_json = AGENTOS_STRDUP((const char*)tags);
+    if (tags) {
+        meta->tags_json = AGENTOS_STRDUP((const char*)tags);
+        if (!meta->tags_json) {
+            if (meta->trace_id) AGENTOS_FREE(meta->trace_id);
+            if (meta->source) AGENTOS_FREE(meta->source);
+            if (meta->record_id) AGENTOS_FREE(meta->record_id);
+            AGENTOS_FREE(meta);
+            sqlite3_finalize(stmt);
+            agentos_mutex_unlock(db_handle->lock);
+            return AGENTOS_ENOMEM;
+        }
+    }
 
     sqlite3_finalize(stmt);
     agentos_mutex_unlock(db_handle->lock);
@@ -232,7 +268,15 @@ agentos_error_t agentos_raw_metadata_db_query_time(
             ids = new_ids;
         }
         const unsigned char* text = sqlite3_column_text(stmt, 0);
-        ids[count++] = AGENTOS_STRDUP((const char*)text);
+        char* copied = AGENTOS_STRDUP((const char*)text);
+        if (!copied) {
+            for (size_t j = 0; j < count; j++) AGENTOS_FREE(ids[j]);
+            AGENTOS_FREE(ids);
+            sqlite3_finalize(stmt);
+            agentos_mutex_unlock(db_handle->lock);
+            return AGENTOS_ENOMEM;
+        }
+        ids[count++] = copied;
     }
 
     sqlite3_finalize(stmt);

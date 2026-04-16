@@ -1,46 +1,40 @@
 /**
  * @file ml_based.c
- * @brief 基于机器学习的调度器实现
+ * @brief ML-Based Dispatching Strategy Implementation
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#include "cognition.h"
 #include "strategy.h"
 #include "agentos.h"
 #include <stdlib.h>
 
-/* Unified base library compatibility layer */
 #include <agentos/memory.h>
 #include <agentos/string.h>
 #include <string.h>
 #include <math.h>
 
-/**
- * @brief ML调度器上下文
- */
-typedef struct ml_dispatcher {
-    agentos_dispatcher_base_t base;
+typedef struct ml_dispatch_data {
     float* model_weights;
     size_t weight_count;
     char** model_names;
     size_t model_count;
     float learning_rate;
-} ml_dispatcher_t;
+} ml_dispatch_data_t;
 
-/**
- * @brief 计算模型得分
- */
+__attribute__((unused))
 static float compute_model_score(
-    ml_dispatcher_t* dispatcher,
+    ml_dispatch_data_t* data,
     const char* model_name,
     const char* task_type) {
-    if (!dispatcher || !model_name) return 0.0f;
+    if (!data || !model_name) return 0.0f;
 
     float base_score = 0.5f;
 
-    for (size_t i = 0; i < dispatcher->model_count; i++) {
-        if (strcmp(dispatcher->model_names[i], model_name) == 0) {
-            if (i < dispatcher->weight_count) {
-                base_score = dispatcher->model_weights[i];
+    for (size_t i = 0; i < data->model_count; i++) {
+        if (strcmp(data->model_names[i], model_name) == 0) {
+            if (i < data->weight_count) {
+                base_score = data->model_weights[i];
             }
             break;
         }
@@ -55,118 +49,79 @@ static float compute_model_score(
     return fminf(base_score, 1.0f);
 }
 
-/**
- * @brief 选择最佳模�?
- */
-static agentos_error_t ml_select(
-    agentos_dispatcher_base_t* base,
-    const agentos_dispatch_context_t* context,
-    char** out_model_id) {
-    if (!base || !context || !out_model_id) {
-        return AGENTOS_EINVAL;
-    }
+static agentos_error_t ml_dispatch(
+    const agentos_task_node_t* task,
+    const void** candidates,
+    size_t count,
+    void* context,
+    char** out_agent_id) {
+    if (!context || !out_agent_id) return AGENTOS_EINVAL;
 
-    ml_dispatcher_t* dispatcher = (ml_dispatcher_t*)base;
+    ml_dispatch_data_t* data = (ml_dispatch_data_t*)context;
 
-    if (dispatcher->model_count == 0) {
-        *out_model_id = AGENTOS_STRDUP("default");
+    if (data->model_count == 0) {
+        *out_agent_id = AGENTOS_STRDUP("default");
         return AGENTOS_SUCCESS;
     }
 
-    float best_score = -1.0f;
-    const char* best_model = dispatcher->model_names[0];
+    (void)task;
+    (void)candidates;
+    (void)count;
 
-    for (size_t i = 0; i < dispatcher->model_count; i++) {
-        float score = compute_model_score(
-            dispatcher,
-            dispatcher->model_names[i],
-            context->task_type);
+    float best_score = -1.0f;
+    const char* best_model = data->model_names[0];
+
+    for (size_t i = 0; i < data->model_count; i++) {
+        float score = data->model_weights[i < data->weight_count ? i : 0];
         if (score > best_score) {
             best_score = score;
-            best_model = dispatcher->model_names[i];
+            best_model = data->model_names[i];
         }
     }
 
-    *out_model_id = AGENTOS_STRDUP(best_model);
+    *out_agent_id = AGENTOS_STRDUP(best_model);
     return AGENTOS_SUCCESS;
 }
 
-/**
- * @brief 更新模型权重（在线学习）
- */
-static agentos_error_t ml_update_weights(
-    ml_dispatcher_t* dispatcher,
-    const char* model_name,
-    float reward) {
-    if (!dispatcher || !model_name) return AGENTOS_EINVAL;
+static void ml_destroy(agentos_dispatching_strategy_t* strategy) {
+    if (!strategy) return;
 
-    for (size_t i = 0; i < dispatcher->model_count; i++) {
-        if (strcmp(dispatcher->model_names[i], model_name) == 0) {
-            if (i < dispatcher->weight_count) {
-                float old_weight = dispatcher->model_weights[i];
-                dispatcher->model_weights[i] += dispatcher->learning_rate * (reward - old_weight);
-                dispatcher->model_weights[i] = fmaxf(0.0f, fminf(1.0f, dispatcher->model_weights[i]));
+    ml_dispatch_data_t* data = (ml_dispatch_data_t*)strategy->data;
+    if (data) {
+        if (data->model_weights) AGENTOS_FREE(data->model_weights);
+        if (data->model_names) {
+            for (size_t i = 0; i < data->model_count; i++) {
+                if (data->model_names[i]) AGENTOS_FREE(data->model_names[i]);
             }
-            break;
+            AGENTOS_FREE(data->model_names);
         }
+        AGENTOS_FREE(data);
     }
-
-    return AGENTOS_SUCCESS;
+    AGENTOS_FREE(strategy);
 }
 
-/**
- * @brief 销毁ML调度�?
- */
-static void ml_destroy(agentos_dispatcher_base_t* base) {
-    if (!base) return;
+agentos_dispatching_strategy_t* agentos_dispatching_ml_create(
+    const char* model_path,
+    void* registry_ctx,
+    agent_registry_get_agents_func get_agents_func) {
+    (void)model_path;
+    (void)registry_ctx;
+    (void)get_agents_func;
 
-    ml_dispatcher_t* dispatcher = (ml_dispatcher_t*)base;
-    if (dispatcher->model_weights) AGENTOS_FREE(dispatcher->model_weights);
-    if (dispatcher->model_names) {
-        for (size_t i = 0; i < dispatcher->model_count; i++) {
-            if (dispatcher->model_names[i]) AGENTOS_FREE(dispatcher->model_names[i]);
-        }
-        AGENTOS_FREE(dispatcher->model_names);
-    }
-    AGENTOS_FREE(dispatcher);
-}
+    ml_dispatch_data_t* data = (ml_dispatch_data_t*)AGENTOS_CALLOC(1, sizeof(ml_dispatch_data_t));
+    if (!data) return NULL;
 
-/**
- * @brief 创建ML调度�?
- */
-agentos_error_t agentos_dispatcher_ml_create(
-    const char** model_names,
-    size_t model_count,
-    agentos_dispatcher_base_t** out_dispatcher) {
-    if (!out_dispatcher) return AGENTOS_EINVAL;
+    data->learning_rate = 0.1f;
 
-    ml_dispatcher_t* dispatcher = (ml_dispatcher_t*)
-        AGENTOS_CALLOC(1, sizeof(ml_dispatcher_t));
-    if (!dispatcher) return AGENTOS_ENOMEM;
-
-    dispatcher->base.select = ml_select;
-    dispatcher->base.destroy = ml_destroy;
-    dispatcher->learning_rate = 0.1f;
-
-    if (model_names && model_count > 0) {
-        dispatcher->model_count = model_count;
-        dispatcher->weight_count = model_count;
-        dispatcher->model_weights = (float*)AGENTOS_CALLOC(model_count, sizeof(float));
-        dispatcher->model_names = (char**)AGENTOS_CALLOC(model_count, sizeof(char*));
-
-        if (!dispatcher->model_weights || !dispatcher->model_names) {
-            if (dispatcher->model_weights) AGENTOS_FREE(dispatcher->model_weights);
-            if (dispatcher->model_names) AGENTOS_FREE(dispatcher->model_names);
-            AGENTOS_FREE(dispatcher);
-            return AGENTOS_ENOMEM;
-        }
-
-        for (size_t i = 0; i < model_count; i++) {
-            dispatcher->model_weights[i] = 1.0f / model_count;
-            dispatcher->model_names[i] = AGENTOS_STRDUP(model_names[i]);
-        }
+    agentos_dispatching_strategy_t* strategy = (agentos_dispatching_strategy_t*)AGENTOS_CALLOC(1, sizeof(agentos_dispatching_strategy_t));
+    if (!strategy) {
+        AGENTOS_FREE(data);
+        return NULL;
     }
 
-    *out_dispatcher = &dispatcher->base;
-    return AGENTOS_SUCCESS;
+    strategy->dispatch = ml_dispatch;
+    strategy->destroy = ml_destroy;
+    strategy->data = data;
+
+    return strategy;
 }

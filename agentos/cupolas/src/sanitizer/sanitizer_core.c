@@ -15,7 +15,8 @@
 #include "sanitizer.h"
 #include "sanitizer_rules.h"
 #include "sanitizer_cache.h"
-#include "../utils/cupolas_utils.h"
+#include "utils/cupolas_utils.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -156,7 +157,7 @@ static bool cupolas_sanitizer_contains_dangerous_chars(const char* input, const 
     while (*p) {
         char c = *p;
         
-        if (cupolas_sanitizer_is_html_dangerous(c, ctx)) return true;
+        if (is_html_dangerous(c, ctx)) return true;
         if (cupolas_sanitizer_is_sql_dangerous(c, ctx)) return true;
         if (cupolas_sanitizer_is_shell_dangerous(c, ctx)) return true;
         if (cupolas_sanitizer_is_path_dangerous(c, prev_char, ctx)) return true;
@@ -265,17 +266,27 @@ static int cupolas_sanitizer_apply_escape_rules(const char* input, char* output,
     size_t in_len = strlen(input);
     size_t out_pos = 0;
     
-    for (size_t i = 0; i < in_len && out_pos < output_size - 1; i++) {
+    for (size_t i = 0; i < in_len; i++) {
         char c = input[i];
         
         if (cupolas_sanitizer_try_escape_html(c, output, &out_pos, output_size, ctx)) continue;
         if (cupolas_sanitizer_try_escape_sql(c, output, &out_pos, output_size, ctx)) continue;
         if (cupolas_sanitizer_try_escape_shell(c, output, &out_pos, output_size, ctx)) continue;
         
-        output[out_pos++] = c;
+        if (c == '<' || c == '>' || c == '&' || c == '"' || c == '\'' ||
+            c == '|' || c == '$' || c == '`' || c == '\\' || c == ';') {
+            if (out_pos + 1 < output_size) {
+                output[out_pos++] = '?';
+            }
+            continue;
+        }
+        
+        if (out_pos + 1 < output_size) {
+            output[out_pos++] = c;
+        }
     }
     
-    output[out_pos] = '\0';
+    output[out_pos < output_size ? out_pos : output_size - 1] = '\0';
     return cupolas_OK;
 }
 

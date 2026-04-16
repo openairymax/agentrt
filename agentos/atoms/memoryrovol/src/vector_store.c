@@ -56,7 +56,7 @@ static agentos_error_t vector_store_init_schema(agentos_vector_store_t* store) {
     if (rc != SQLITE_OK) {
         AGENTOS_LOG_ERROR("Failed to create vector store schema: %s", err_msg);
         sqlite3_free(err_msg);
-        return AGENTOS_ERROR;
+        return AGENTOS_EUNKNOWN;
     }
     sqlite3_free(err_msg); /* 成功时也需要释放，sqlite3_free(NULL)是安全的 */
 
@@ -96,7 +96,7 @@ agentos_error_t agentos_vector_store_create(
     if (rc != SQLITE_OK) {
         AGENTOS_LOG_ERROR("Failed to open SQLite database: %s", sqlite3_errmsg(store->db));
         AGENTOS_FREE(store);
-        return AGENTOS_ERROR;
+        return AGENTOS_EUNKNOWN;
     }
 
     /* 初始化表结构 */
@@ -160,7 +160,7 @@ agentos_error_t agentos_vector_store_put(
     if (rc != SQLITE_OK) {
         AGENTOS_LOG_ERROR("Failed to prepare statement: %s", sqlite3_errmsg(store->db));
         sqlite3_finalize(stmt); /* 即使stmt为NULL也是安全的 */
-        return AGENTOS_ERROR;
+        return AGENTOS_EUNKNOWN;
     }
 
     /* 绑定参数 */
@@ -173,7 +173,7 @@ agentos_error_t agentos_vector_store_put(
     if (rc != SQLITE_DONE) {
         AGENTOS_LOG_ERROR("Failed to insert vector: %s", sqlite3_errmsg(store->db));
         sqlite3_finalize(stmt);
-        return AGENTOS_ERROR;
+        return AGENTOS_EUNKNOWN;
     }
 
     sqlite3_finalize(stmt);
@@ -205,7 +205,7 @@ agentos_error_t agentos_vector_store_get(
     if (rc != SQLITE_OK) {
         AGENTOS_LOG_ERROR("Failed to prepare statement: %s", sqlite3_errmsg(store->db));
         sqlite3_finalize(stmt); /* 即使stmt为NULL也是安全的 */
-        return AGENTOS_ERROR;
+        return AGENTOS_EUNKNOWN;
     }
 
     /* 绑定参数 */
@@ -260,7 +260,7 @@ agentos_error_t agentos_vector_store_delete(
     if (rc != SQLITE_OK) {
         AGENTOS_LOG_ERROR("Failed to prepare statement: %s", sqlite3_errmsg(store->db));
         sqlite3_finalize(stmt); /* 即使stmt为NULL也是安全的 */
-        return AGENTOS_ERROR;
+        return AGENTOS_EUNKNOWN;
     }
 
     /* 绑定参数 */
@@ -274,7 +274,7 @@ agentos_error_t agentos_vector_store_delete(
         return AGENTOS_SUCCESS;
     }
 
-    return AGENTOS_ERROR;
+    return AGENTOS_EUNKNOWN;
 }
 
 /**
@@ -301,7 +301,7 @@ agentos_error_t agentos_vector_store_exists(
     if (rc != SQLITE_OK) {
         AGENTOS_LOG_ERROR("Failed to prepare statement: %s", sqlite3_errmsg(store->db));
         sqlite3_finalize(stmt); /* 即使stmt为NULL也是安全的 */
-        return AGENTOS_ERROR;
+        return AGENTOS_EUNKNOWN;
     }
 
     /* 绑定参数 */
@@ -339,7 +339,7 @@ agentos_error_t agentos_vector_store_list_ids(
     if (rc != SQLITE_OK) {
         AGENTOS_LOG_ERROR("Failed to prepare statement: %s", sqlite3_errmsg(store->db));
         sqlite3_finalize(stmt); /* 即使stmt为NULL也是安全的 */
-        return AGENTOS_ERROR;
+        return AGENTOS_EUNKNOWN;
     }
 
     /* 计算结果数量 */
@@ -390,7 +390,7 @@ agentos_error_t agentos_vector_store_clear(agentos_vector_store_t* store) {
     if (rc != SQLITE_OK) {
         AGENTOS_LOG_ERROR("Failed to clear vectors: %s", err_msg);
         sqlite3_free(err_msg);
-        return AGENTOS_ERROR;
+        return AGENTOS_EUNKNOWN;
     }
     sqlite3_free(err_msg); /* 成功时也需要释放，sqlite3_free(NULL)是安全的 */
 

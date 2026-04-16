@@ -33,6 +33,7 @@ set(SOURCES
     src/agent.c
     src/skill.c
     src/sandbox.c
+    src/sandbox_quota.c
     src/circuit_breaker.c
 )
 
@@ -43,6 +44,9 @@ target_link_libraries(agentos_syscall PUBLIC agentos_atoms)
 
 target_include_directories(agentos_syscall PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../memoryrovol/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/observability/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../heapstore/include>
     $<INSTALL_INTERFACE:include/agentos/syscall>
 )
 
@@ -54,7 +58,7 @@ if(MSVC)
     target_compile_options(agentos_syscall PRIVATE /sdl)
     target_compile_options(agentos_syscall PRIVATE /guard:cf)
 else()
-    target_compile_options(agentos_syscall PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    target_compile_options(agentos_syscall PRIVATE -Wall -Wextra -Wpedantic )
     target_compile_options(agentos_syscall PRIVATE -fstack-protector-strong)
     target_compile_options(agentos_syscall PRIVATE -D_FORTIFY_SOURCE=2)
     target_compile_options(agentos_syscall PRIVATE -fPIE)

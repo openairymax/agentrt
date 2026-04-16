@@ -15,6 +15,7 @@
 #include "jsonrpc.h"
 #include "syscalls.h"
 
+#include <cJSON.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -272,12 +273,17 @@ static char* route_session_methods(const char* method, cJSON* params, cJSON* req
         }
     }
     else if (strcmp(method, "agentos_sys_session_list") == 0) {
-        char* sessions_json = NULL;
-        err = agentos_sys_session_list(&sessions_json);
+        char** sessions = NULL;
+        size_t session_count = 0;
+        err = agentos_sys_session_list(&sessions, &session_count);
         
-        if (err == AGENTOS_SUCCESS && sessions_json) {
-            result = cJSON_Parse(sessions_json);
-            free(sessions_json);
+        if (err == AGENTOS_SUCCESS && sessions) {
+            result = cJSON_CreateArray();
+            for (size_t i = 0; i < session_count && sessions[i]; i++) {
+                cJSON_AddItemToArray(result, cJSON_CreateString(sessions[i]));
+                free(sessions[i]);
+            }
+            free(sessions);
         }
     }
     

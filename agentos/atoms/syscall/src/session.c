@@ -17,14 +17,26 @@
 #include "agentos.h"
 #include <stdlib.h>
 
-/* heapstore 集成接口 */
+/* heapstore 集成接口（heapstore模块可选） */
+#ifdef BUILD_HEAPSTORE
 #include <agentos/heapstore_integration.h>
+#else
+static inline agentos_error_t heapstore_syscall_session_save(
+    const char* sid, const char* meta, uint64_t c, uint64_t la) {
+    (void)sid; (void)meta; (void)c; (void)la;
+    return AGENTOS_SUCCESS;
+}
+static inline agentos_error_t heapstore_syscall_session_delete(const char* sid) {
+    (void)sid;
+    return AGENTOS_SUCCESS;
+}
+#endif
 
 /* Unified base library compatibility layer */
 #include <agentos/memory.h>
 #include <agentos/string.h>
 #include <agentos/check.h>
-#include <agentos/logger.h>
+#include <agentos/logging.h>
 #include <string.h>
 #include <cjson/cJSON.h>
 
@@ -60,6 +72,16 @@ static session_persist_config_t g_persist_config = {
 static session_t* sessions = NULL;
 static agentos_mutex_t* session_lock = NULL;
 
+static int safe_atoi_range(const char* str, int min_val, int max_val, int default_val) {
+    if (!str || !*str) return default_val;
+    for (const char* p = str; *p; p++) {
+        if (*p < '0' || *p > '9') return default_val;
+    }
+    int val = atoi(str);
+    if (val < min_val || val > max_val) return default_val;
+    return val;
+}
+
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 static void load_persist_config(void) {
@@ -72,16 +94,16 @@ static void load_persist_config(void) {
     if (env_val) g_persist_config.enabled = (strcmp(env_val, "true") == 0);
     
     env_val = getenv("AGENTOS_SESSION_PERSIST_MAX_RETRIES");
-    if (env_val) g_persist_config.max_retries = atoi(env_val);
+    if (env_val) g_persist_config.max_retries = safe_atoi_range(env_val, 0, 100, 3);
     
     env_val = getenv("AGENTOS_SESSION_PERSIST_INITIAL_DELAY_MS");
-    if (env_val) g_persist_config.initial_delay_ms = (uint32_t)atoi(env_val);
+    if (env_val) g_persist_config.initial_delay_ms = (uint32_t)safe_atoi_range(env_val, 1, 60000, 100);
     
     env_val = getenv("AGENTOS_SESSION_PERSIST_MAX_DELAY_MS");
-    if (env_val) g_persist_config.max_delay_ms = (uint32_t)atoi(env_val);
+    if (env_val) g_persist_config.max_delay_ms = (uint32_t)safe_atoi_range(env_val, 1, 300000, 5000);
     
     env_val = getenv("AGENTOS_SESSION_PERSIST_BACKOFF_MULTIPLIER");
-    if (env_val) g_persist_config.backoff_multiplier = (uint32_t)atoi(env_val);
+    if (env_val) g_persist_config.backoff_multiplier = (uint32_t)safe_atoi_range(env_val, 1, 10, 2);
     
     env_val = getenv("AGENTOS_SESSION_PERSIST_FAIL_FAST");
     if (env_val) g_persist_config.fail_fast = (strcmp(env_val, "true") == 0);

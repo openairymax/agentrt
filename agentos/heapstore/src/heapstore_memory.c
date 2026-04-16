@@ -48,19 +48,24 @@ heapstore_error_t heapstore_memory_init(void) {
     strncpy(s_memory_path, base_path, sizeof(s_memory_path) - 1);
     s_memory_path[sizeof(s_memory_path) - 1] = '\0';
 
-    heapstore_ensure_directory(s_memory_path);
+    heapstore_error_t err;
+    err = heapstore_ensure_directory(s_memory_path);
+    if (err != heapstore_SUCCESS) return err;
 
     char pools_path[heapstore_MEMORY_MAX_PATH];
     snprintf(pools_path, sizeof(pools_path), "%s/pools", s_memory_path);
-    heapstore_ensure_directory(pools_path);
+    err = heapstore_ensure_directory(pools_path);
+    if (err != heapstore_SUCCESS) return err;
 
     char allocations_path[heapstore_MEMORY_MAX_PATH];
     snprintf(allocations_path, sizeof(allocations_path), "%s/allocations", s_memory_path);
-    heapstore_ensure_directory(allocations_path);
+    err = heapstore_ensure_directory(allocations_path);
+    if (err != heapstore_SUCCESS) return err;
 
     char stats_path[heapstore_MEMORY_MAX_PATH];
     snprintf(stats_path, sizeof(stats_path), "%s/stats", s_memory_path);
-    heapstore_ensure_directory(stats_path);
+    err = heapstore_ensure_directory(stats_path);
+    if (err != heapstore_SUCCESS) return err;
 
     memset(s_pools, 0, sizeof(s_pools));
     memset(s_allocations, 0, sizeof(s_allocations));

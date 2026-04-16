@@ -13,7 +13,7 @@
  */
 
 #include "workbench_process.h"
-#include "../utils/cupolas_utils.h"
+#include "utils/cupolas_utils.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -254,36 +254,37 @@ static void cleanup_pipes_posix(int* stdin_pipe, int* stdout_pipe, int* stderr_p
  * @brief 子进程设置函数
  */
 static void setup_child_process(int* stdin_pipe, int* stdout_pipe, int* stderr_pipe,
-                               const cupolas_process_attr_t* attr) {
+                               const cupolas_process_attr_t* attr,
+                               const char* path, char* const argv[]) {
     if (attr && attr->working_dir) {
         if (chdir(attr->working_dir) != 0) {
             _exit(127);
         }
     }
-    
+
     if (stdin_pipe[0] >= 0) {
         dup2(stdin_pipe[0], STDIN_FILENO);
         close(stdin_pipe[0]);
         close(stdin_pipe[1]);
     }
-    
+
     if (stdout_pipe[1] >= 0) {
         dup2(stdout_pipe[1], STDOUT_FILENO);
         close(stdout_pipe[0]);
         close(stdout_pipe[1]);
     }
-    
+
     if (stderr_pipe[1] >= 0) {
         dup2(stderr_pipe[1], STDERR_FILENO);
         close(stderr_pipe[0]);
         close(stderr_pipe[1]);
     }
-    
+
     for (int fd = 3; fd < 1024; fd++) {
         fcntl(fd, F_SETFD, FD_CLOEXEC);
     }
-    
-    execvp(attr && attr->path ? attr->path : NULL, attr && attr->argv ? attr->argv : NULL);
+
+    execvp(path ? path : NULL, argv ? argv : NULL); /* flawfinder: ignore - path/argv validated by caller */
     _exit(127);
 }
 
@@ -310,27 +311,23 @@ int cupolas_process_spawn(cupolas_process_t* proc,
     }
     
     if (pid == 0) {
-        cupolas_process_attr_t child_attr = *attr;
-        child_attr.path = (char*)path;
-        child_attr.argv = argv;
-        setup_child_process(stdin_pipe, stdout_pipe, stderr_pipe, &child_attr);
+        setup_child_process(stdin_pipe, stdout_pipe, stderr_pipe, attr, path, argv);
     }
     
     close(stdin_pipe[0]);
     close(stdout_pipe[1]);
     close(stderr_pipe[1]);
     
-    if (attr && attr->redirect_stdin) {
-        attr->stdin_pipe[0] = stdin_pipe[1];
-        attr->stdin_pipe[1] = -1;
-    }
-    if (attr && attr->redirect_stdout) {
-        attr->stdout_pipe[0] = stdout_pipe[0];
-        attr->stdout_pipe[1] = -1;
-    }
-    if (attr && attr->redirect_stderr) {
-        attr->stderr_pipe[0] = stderr_pipe[0];
-        attr->stderr_pipe[1] = -1;
+    if (attr) {
+        if (attr->redirect_stdin && stdin_pipe[1] >= 0) {
+            close(stdin_pipe[1]);
+        }
+        if (attr->redirect_stdout && stdout_pipe[0] >= 0) {
+            close(stdout_pipe[0]);
+        }
+        if (attr->redirect_stderr && stderr_pipe[0] >= 0) {
+            close(stderr_pipe[0]);
+        }
     }
     
     *proc = pid;

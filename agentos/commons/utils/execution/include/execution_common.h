@@ -11,6 +11,7 @@
 #ifndef EXECUTION_COMMON_H
 #define EXECUTION_COMMON_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 

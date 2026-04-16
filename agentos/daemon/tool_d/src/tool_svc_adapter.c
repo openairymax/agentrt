@@ -38,7 +38,16 @@ static agentos_error_t tool_adapter_init(
     if (!ctx) return AGENTOS_EINVAL;
 
     if (config) {
-        memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
+        memset(&ctx->common_cfg, 0, sizeof(agentos_svc_config_t));
+        ctx->common_cfg.name = config->name ? strdup(config->name) : NULL;
+        ctx->common_cfg.version = config->version ? strdup(config->version) : NULL;
+        ctx->common_cfg.capabilities = config->capabilities;
+        ctx->common_cfg.max_concurrent = config->max_concurrent;
+        ctx->common_cfg.timeout_ms = config->timeout_ms;
+        ctx->common_cfg.priority = config->priority;
+        ctx->common_cfg.auto_start = config->auto_start;
+        ctx->common_cfg.enable_metrics = config->enable_metrics;
+        ctx->common_cfg.enable_tracing = config->enable_tracing;
     }
 
     if (!ctx->tool_svc) {
@@ -85,6 +94,15 @@ static void tool_adapter_destroy(agentos_service_t service) {
         ctx->config_path = NULL;
     }
 
+    if (ctx->common_cfg.name && ctx->common_cfg.name[0] != '\0') {
+        free((void*)ctx->common_cfg.name);
+        ctx->common_cfg.name = NULL;
+    }
+    if (ctx->common_cfg.version && ctx->common_cfg.version[0] != '\0') {
+        free((void*)ctx->common_cfg.version);
+        ctx->common_cfg.version = NULL;
+    }
+
     agentos_service_set_user_data(service, NULL);
     free(ctx);
 }
@@ -114,7 +132,16 @@ agentos_error_t tool_service_adapter_create(
     if (!ctx) return AGENTOS_ENOMEM;
 
     if (config) {
-        memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
+        memset(&ctx->common_cfg, 0, sizeof(agentos_svc_config_t));
+        ctx->common_cfg.name = config->name ? strdup(config->name) : NULL;
+        ctx->common_cfg.version = config->version ? strdup(config->version) : NULL;
+        ctx->common_cfg.capabilities = config->capabilities;
+        ctx->common_cfg.max_concurrent = config->max_concurrent;
+        ctx->common_cfg.timeout_ms = config->timeout_ms;
+        ctx->common_cfg.priority = config->priority;
+        ctx->common_cfg.auto_start = config->auto_start;
+        ctx->common_cfg.enable_metrics = config->enable_metrics;
+        ctx->common_cfg.enable_tracing = config->enable_tracing;
         if (config->name) {
             size_t path_len = strlen(config->name) + strlen("_config.json") + 1;
             ctx->config_path = calloc(1, path_len);
@@ -167,7 +194,16 @@ agentos_error_t tool_service_adapter_wrap(
     ctx->owns_service = false;
 
     if (config) {
-        memcpy(&ctx->common_cfg, config, sizeof(agentos_svc_config_t));
+        memset(&ctx->common_cfg, 0, sizeof(agentos_svc_config_t));
+        ctx->common_cfg.name = config->name ? strdup(config->name) : NULL;
+        ctx->common_cfg.version = config->version ? strdup(config->version) : NULL;
+        ctx->common_cfg.capabilities = config->capabilities;
+        ctx->common_cfg.max_concurrent = config->max_concurrent;
+        ctx->common_cfg.timeout_ms = config->timeout_ms;
+        ctx->common_cfg.priority = config->priority;
+        ctx->common_cfg.auto_start = config->auto_start;
+        ctx->common_cfg.enable_metrics = config->enable_metrics;
+        ctx->common_cfg.enable_tracing = config->enable_tracing;
     } else {
         ctx->common_cfg.name = "tool_d";
         ctx->common_cfg.version = "1.0.0";

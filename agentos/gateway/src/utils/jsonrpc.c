@@ -127,6 +127,7 @@ char* jsonrpc_create_success_response(const cJSON* id, cJSON* result) {
 #ifdef GATEWAY_HAS_CJSON
     cJSON* response = cJSON_CreateObject();
     if (!response) {
+        if (result) cJSON_Delete(result);
         return NULL;
     }
 

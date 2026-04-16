@@ -13,7 +13,8 @@
  */
 
 #include "sanitizer_cache.h"
-#include "../utils/cupolas_utils.h"
+#include "utils/cupolas_utils.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 

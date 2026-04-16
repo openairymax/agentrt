@@ -34,8 +34,12 @@ static unsigned __stdcall thread_wrapper(void* arg) {
     return 0;
 #else
 static void* thread_wrapper(void* arg) {
-    void (*func)(void*) = (void (*)(void*))((void**)arg)[0];
-    void* arg_val = ((void**)arg)[1];
+    void** args = (void**)arg;
+    void (*func)(void*);
+    void* arg_val;
+    /* 使用 memcpy 避免对象指针到函数指针的直接转换（ISO C 禁止） */
+    memcpy(&func, &args[0], sizeof(func));
+    arg_val = args[1];
     AGENTOS_FREE(arg);
     func(arg_val);
     return NULL;
@@ -85,7 +89,7 @@ int agentos_thread_create(
         pthread_attr_destroy(&pthread_attr);
         return AGENTOS_ENOMEM;
     }
-    thread_args[0] = (void*)func;
+    memcpy(&thread_args[0], &func, sizeof(func));
     thread_args[1] = arg;
 
     int ret = pthread_create(thread, &pthread_attr, thread_wrapper, thread_args);

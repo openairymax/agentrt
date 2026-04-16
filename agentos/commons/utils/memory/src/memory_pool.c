@@ -6,7 +6,7 @@
  */
 
 #include "memory_pool.h"
-#include "memory.h"
+#include "agentos_memory.h"
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
