@@ -19,6 +19,8 @@
 #include "agentos.h"
 #include "logger.h"
 #include "monitoring_metrics.h"
+#include <agentos/platform.h>
+#include <agentos/observability_compat.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -130,6 +132,7 @@ struct agentos_monitoring {
     int is_running;
     agentos_thread_t* monitoring_thread;
 };
+typedef struct agentos_monitoring agentos_monitoring_t;
 
 /* ==================== 工具函数 ==================== */
 

@@ -14,7 +14,7 @@
  */
 
 #include "syscalls.h"
-#include "../../../commons/utils/observability/include/observability_compat.h"
+#include "observability_compat.h"
 #include "agentos.h"
 #include <stdlib.h>
 #include <string.h>

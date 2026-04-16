@@ -33,6 +33,7 @@ set(SOURCES
     src/agent.c
     src/skill.c
     src/sandbox.c
+    src/sandbox_quota.c
     src/circuit_breaker.c
 )
 
