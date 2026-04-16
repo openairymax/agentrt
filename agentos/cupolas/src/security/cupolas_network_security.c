@@ -988,8 +988,9 @@ int cupolas_net_parse_url(const char* url, char* scheme, char* host, uint16_t* p
         } else {
             host_len = strlen(p);
         }
-        strncpy(host, p, host_len);
-        host[host_len] = '\0';
+        size_t copy_len = host_len < (size_t)255 ? host_len : 255;
+        memcpy(host, p, copy_len);
+        host[copy_len] = '\0';
     }
     
     if (port_colon && (!slash || port_colon < slash)) {

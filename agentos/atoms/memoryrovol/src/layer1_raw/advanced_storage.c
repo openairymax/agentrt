@@ -343,7 +343,11 @@ agentos_error_t agentos_advanced_storage_delete(agentos_advanced_storage_t* stor
 
     if (!shard) return AGENTOS_EINVAL;
 
-    return agentos_layer1_raw_delete(shard->storage, id);
+    agentos_error_t err = agentos_layer1_raw_delete(shard->storage, id);
+    if (err != AGENTOS_SUCCESS) {
+        AGENTOS_LOG_ERROR("Failed to delete data for %s", id);
+    }
+    return err;
 }
 
 /**

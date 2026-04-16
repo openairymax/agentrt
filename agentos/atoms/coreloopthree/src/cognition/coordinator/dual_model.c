@@ -257,7 +257,8 @@ static void record_decision(performance_stats_t* stats,
 static float adaptive_threshold_adjust(dual_model_coordinator_t* coordinator,
                                        float current_similarity) {
     (void)current_similarity;
-    if (!coordinator || !coordinator->enable_adaptive_learning) {
+    if (!coordinator) return 0.5f;
+    if (!coordinator->enable_adaptive_learning) {
         return coordinator->disagreement_threshold;
     }
     

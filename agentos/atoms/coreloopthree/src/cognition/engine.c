@@ -361,7 +361,7 @@ agentos_error_t agentos_cognition_process(
     engine->stats_success_count++;
     agentos_mutex_unlock(engine->lock);
 
-    // 触发实时反馈：任务处理完�?
+    // 触发实时反馈：任务处理完成
     char feedback_buf[512];
     snprintf(feedback_buf, sizeof(feedback_buf),
         "{\"plan_id\":\"%s\",\"node_count\":%zu,\"elapsed_ns\":%" PRIu64 ",\"status\":\"success\"}",

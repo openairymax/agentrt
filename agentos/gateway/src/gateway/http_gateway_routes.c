@@ -38,6 +38,13 @@ int handle_post_jsonrpc(http_gateway_t* gateway,
     (void)connection;
     
     char* json_response = handle_jsonrpc_request(gateway, context);
+    if (!json_response) {
+        const char* err_msg = "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"Internal error\"},\"id\":null}";
+        struct MHD_Response* response = create_http_response(500, err_msg, strlen(err_msg));
+        int ret = MHD_queue_response(connection, 500, response);
+        MHD_destroy_response(response);
+        return ret;
+    }
     struct MHD_Response* response = create_http_response(200, json_response, strlen(json_response));
     
     uint64_t response_time_ns = gateway_time_ns() - context->start_time_ns;

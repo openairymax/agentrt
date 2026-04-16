@@ -48,6 +48,13 @@ permission_engine_t* permission_engine_create(const char* rules_path) {
     
     if (rules_path) {
         engine->rules_path = cupolas_strdup(rules_path);
+        if (!engine->rules_path) {
+            cache_manager_destroy(engine->cache);
+            rule_manager_destroy(engine->rules);
+            cupolas_rwlock_destroy(&engine->rwlock);
+            cupolas_mem_free(engine);
+            return NULL;
+        }
     }
     
     cupolas_atomic_store32(&engine->ref_count, 1);

@@ -92,6 +92,10 @@ static agentos_error_t hierarchical_plan_func(
                 agentos_task_node_t* node = (agentos_task_node_t*)AGENTOS_CALLOC(1, sizeof(agentos_task_node_t));
                 if (node) {
                     node->task_node_id = AGENTOS_STRDUP(task_names[i]);
+                    if (!node->task_node_id) {
+                        AGENTOS_FREE(node);
+                        continue;
+                    }
                     plan->task_plan_nodes[i] = node;
                 }
             }

@@ -199,7 +199,7 @@ overflow_handler_t* overflow_handler_create(const char* overflow_dir,
     memset(handler, 0, sizeof(overflow_handler_t));
     
     snprintf(handler->overflow_dir, sizeof(handler->overflow_dir),
-             overflow_dir ? overflow_dir : DEFAULT_OVERFLOW_DIR);
+             "%s", overflow_dir ? overflow_dir : DEFAULT_OVERFLOW_DIR);
     handler->max_file_size_bytes = (max_file_size_mb > 0 ? max_file_size_mb : DEFAULT_MAX_FILE_SIZE_MB) * 1024 * 1024;
     handler->flush_interval_ms = flush_interval_ms > 0 ? flush_interval_ms : DEFAULT_FLUSH_INTERVAL_MS;
     

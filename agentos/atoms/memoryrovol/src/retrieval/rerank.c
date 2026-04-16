@@ -41,6 +41,7 @@ struct agentos_reranker {
     agentos_mutex_t* lock;                /**< 线程安全锁 */
     int use_llm;                          /**< 是否使用LLM（降级标志） */
 };
+typedef struct agentos_reranker agentos_reranker_t;
 
 /**
  * @brief 创建重排序器实例

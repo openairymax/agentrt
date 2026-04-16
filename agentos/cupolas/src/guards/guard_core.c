@@ -338,12 +338,10 @@ int guard_manager_check_sync(
         
         int check_result = guard_check(guard, context, &result);
         if (check_result == CUPOLAS_OK) {
-            // 记录检测结果
             if (result_count < max_results) {
                 results[result_count] = result;
                 result_count++;
                 
-                // 更新统计信息
                 if (result.risk_level == RISK_LEVEL_SAFE) {
                     priv->stats.safe_checks++;
                 } else {
@@ -358,6 +356,8 @@ int guard_manager_check_sync(
                     }
                 }
             }
+        } else {
+            priv->stats.error_checks++;
         }
         
         // TODO: 处理超时

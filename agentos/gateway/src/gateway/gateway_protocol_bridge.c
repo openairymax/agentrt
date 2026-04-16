@@ -388,7 +388,7 @@ char* gw_protocol_bridge_diagnose(gw_protocol_bridge_handle_t bridge) {
     gw_bridge_stats_t stats;
     gw_protocol_bridge_get_stats(bridge, &stats);
 
-    char* diag = malloc(2048);
+    char* diag = malloc(3072);
     if (!diag) return NULL;
 
     snprintf(diag, 3072,

@@ -162,6 +162,58 @@ static inline char* agentos_strndup(const char* str, size_t n) {
 #define AGENTOS_FREE(ptr) agentos_free(ptr)
 
 /**
+ * @defgroup safe_memory_alloc 安全内存分配宏（SEC-016合规）
+ * @{
+ *
+ * @brief 带自动NULL检查的安全内存分配宏
+ *
+ * 使用方法：
+ *   SAFE_MALLOC(ptr, sizeof(my_struct_t));  // 失败时return AGENTOS_ENOMEM
+ *   SAFE_CALLOC(arr, count, sizeof(element_t));  // 失败时return AGENTOS_ENOMEM
+ *
+ * 注意：这些宏只能在有返回值的函数中使用（因为包含return语句）
+ */
+
+/**
+ * @def SAFE_MALLOC(ptr, size)
+ * @brief 安全内存分配，失败时记录日志并返回AGENTOS_ENOMEM
+ */
+#define SAFE_MALLOC(ptr, size) do { \
+    (ptr) = AGENTOS_MALLOC(size); \
+    if (!(ptr)) { \
+        LOG_ERROR("Memory allocation failed: %zu bytes at %s:%d", \
+                 (size_t)(size), __FILE__, __LINE__); \
+        return AGENTOS_ENOMEM; \
+    } \
+} while(0)
+
+/**
+ * @def SAFE_CALLOC(ptr, num, size)
+ * @brief 安全内存清零分配，失败时记录日志并返回AGENTOS_ENOMEM
+ */
+#define SAFE_CALLOC(ptr, num, size) do { \
+    (ptr) = AGENTOS_CALLOC(num, size); \
+    if (!(ptr)) { \
+        LOG_ERROR("calloc failed: %zu x %zu at %s:%d", \
+                 (size_t)(num), (size_t)(size), __FILE__, __LINE__); \
+        return AGENTOS_ENOMEM; \
+    } \
+} while(0)
+
+/**
+ * @def CHECK_ALLOC(ptr)
+ * @brief 检查指针是否为NULL，如果是则记录错误并返回AGENTOS_ENOMEM
+ */
+#define CHECK_ALLOC(ptr) do { \
+    if (!(ptr)) { \
+        LOG_ERROR("NULL pointer at %s:%d", __FILE__, __LINE__); \
+        return AGENTOS_ENOMEM; \
+    } \
+} while(0)
+
+/** @} */ // end of safe_memory_alloc
+
+/**
  * @def AGENTOS_STRDUP(str)
  * @brief 安全字符串复制宏
  */

@@ -134,7 +134,7 @@ agentos_error_t agentos_bm25_search(
 
     char sql[512];
     snprintf(sql, sizeof(sql),
-        "SELECT record_id, rank FROM documents_fts WHERE documents_fts MATCH ? ORDER BY rank LIMIT %d;", top_k);
+        "SELECT record_id, rank FROM documents_fts WHERE documents_fts MATCH ? ORDER BY rank LIMIT %u;", top_k);
 
     agentos_mutex_lock(idx->lock);
     sqlite3_stmt* stmt;

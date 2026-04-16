@@ -265,17 +265,27 @@ static int cupolas_sanitizer_apply_escape_rules(const char* input, char* output,
     size_t in_len = strlen(input);
     size_t out_pos = 0;
     
-    for (size_t i = 0; i < in_len && out_pos < output_size - 1; i++) {
+    for (size_t i = 0; i < in_len; i++) {
         char c = input[i];
         
         if (cupolas_sanitizer_try_escape_html(c, output, &out_pos, output_size, ctx)) continue;
         if (cupolas_sanitizer_try_escape_sql(c, output, &out_pos, output_size, ctx)) continue;
         if (cupolas_sanitizer_try_escape_shell(c, output, &out_pos, output_size, ctx)) continue;
         
-        output[out_pos++] = c;
+        if (c == '<' || c == '>' || c == '&' || c == '"' || c == '\'' ||
+            c == '|' || c == '$' || c == '`' || c == '\\' || c == ';') {
+            if (out_pos + 1 < output_size) {
+                output[out_pos++] = '?';
+            }
+            continue;
+        }
+        
+        if (out_pos + 1 < output_size) {
+            output[out_pos++] = c;
+        }
     }
     
-    output[out_pos] = '\0';
+    output[out_pos < output_size ? out_pos : output_size - 1] = '\0';
     return cupolas_OK;
 }
 
