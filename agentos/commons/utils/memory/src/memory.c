@@ -375,7 +375,7 @@ void memory_cleanup(void) {
         while (current != NULL) {
             leak_count++;
             leak_size += current->size;
-            fprintf(stderr, "泄漏�?p (%zu字节) - 标签�?s\n", 
+            fprintf(stderr, "Leak: %p (%zu bytes) - tag: %s\n", 
                    current->address, current->size, 
                    current->tag ? current->tag : "(null)");
             
@@ -392,7 +392,7 @@ void memory_cleanup(void) {
             current = next;
         }
         
-        fprintf(stderr, "总计泄漏�?zu个块�?zu字节\n", leak_count, leak_size);
+        fprintf(stderr, "Total leaks: %zu blocks, %zu bytes\n", leak_count, leak_size);
         g_state.debug_list_head = NULL;
     }
     
@@ -652,13 +652,20 @@ size_t memory_check_leaks(bool dump_to_stderr) {
     memory_lock();
     
     size_t leak_size = 0;
+    size_t leak_count = 0;
     struct memory_debug_info* current = g_state.debug_list_head;
     
+    struct memory_debug_info* tmp = current;
+    while (tmp != NULL) {
+        leak_count++;
+        tmp = tmp->next;
+    }
+    
     if (dump_to_stderr && current != NULL) {
-        fprintf(stderr, "=== 内存泄漏检测报�?===\n");
-        fprintf(stderr, "时间�?llu\n", (unsigned long long)memory_get_timestamp());
-        fprintf(stderr, "当前分配�?zu字节\n", g_state.stats.current_allocated);
-        fprintf(stderr, "泄漏块数：\n");
+        fprintf(stderr, "=== Memory Leak Detection Report ===\n");
+        fprintf(stderr, "Time: %llu\n", (unsigned long long)memory_get_timestamp());
+        fprintf(stderr, "Current allocated: %zu bytes\n", g_state.stats.current_allocated);
+        fprintf(stderr, "Leak blocks: %zu\n", leak_count);
     }
     
     while (current != NULL) {
@@ -679,7 +686,7 @@ size_t memory_check_leaks(bool dump_to_stderr) {
     }
     
     if (dump_to_stderr && leak_size > 0) {
-        fprintf(stderr, "总计泄漏�?zu字节\n", leak_size);
+        fprintf(stderr, "Total leaks: %zu bytes\n", leak_size);
         fprintf(stderr, "========================\n");
     }
     
@@ -701,30 +708,30 @@ void memory_dump_debug_info(const char* file) {
         return;
     }
     
-    fprintf(output, "=== 内存调试信息转储 ===\n");
-    fprintf(output, "时间�?llu\n", (unsigned long long)memory_get_timestamp());
-    fprintf(output, "当前分配块数：\n");
+    fprintf(output, "=== Memory Debug Info Dump ===\n");
+    fprintf(output, "Timestamp: %llu\n", (unsigned long long)memory_get_timestamp());
+    fprintf(output, "Current allocation blocks:\n");
     
     struct memory_debug_info* current = g_state.debug_list_head;
     size_t count = 0;
     
     while (current != NULL) {
         count++;
-        fprintf(output, "�?#%zu:\n", count);
-        fprintf(output, "  地址�?p\n", current->address);
-        fprintf(output, "  大小�?zu字节\n", current->size);
-        fprintf(output, "  标签�?s\n", current->tag ? current->tag : "(null)");
-        fprintf(output, "  位置�?s:%d (%s)\n", 
-               current->file ? current->file : "(unknown)", 
+        fprintf(output, "  [#%zu]:\n", count);
+        fprintf(output, "    address: %p\n", current->address);
+        fprintf(output, "    size: %zu bytes\n", current->size);
+        fprintf(output, "    tag: %s\n", current->tag ? current->tag : "(null)");
+        fprintf(output, "    location: %s:%d (%s)\n",
+               current->file ? current->file : "(unknown)",
                current->line,
                current->function ? current->function : "(unknown)");
-        fprintf(output, "  时间�?llu\n", (unsigned long long)current->timestamp);
+        fprintf(output, "    timestamp: %llu\n", (unsigned long long)current->timestamp);
         fprintf(output, "\n");
-        
+
         current = current->next;
     }
-    
-    fprintf(output, "总计�?zu个内存块\n", count);
+
+    fprintf(output, "Total: %zu memory blocks\n", count);
     fprintf(output, "=======================\n");
     
     if (file) {

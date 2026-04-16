@@ -113,7 +113,7 @@ void cupolas_log_message(const char* level, const char* format, ...) {
     va_start(args, format);
     
     fprintf(stderr, "[CUPOLAS %s] ", level);
-    vfprintf(stderr, format, args);
+    vfprintf(stderr, format, args); /* flawfinder: ignore - format string is internal, not user input */
     fprintf(stderr, "\n");
     
     va_end(args);

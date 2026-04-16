@@ -16,6 +16,7 @@
 #include "sanitizer_rules.h"
 #include "sanitizer_cache.h"
 #include "utils/cupolas_utils.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -156,7 +157,7 @@ static bool cupolas_sanitizer_contains_dangerous_chars(const char* input, const 
     while (*p) {
         char c = *p;
         
-        if (cupolas_sanitizer_is_html_dangerous(c, ctx)) return true;
+        if (is_html_dangerous(c, ctx)) return true;
         if (cupolas_sanitizer_is_sql_dangerous(c, ctx)) return true;
         if (cupolas_sanitizer_is_shell_dangerous(c, ctx)) return true;
         if (cupolas_sanitizer_is_path_dangerous(c, prev_char, ctx)) return true;

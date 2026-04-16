@@ -12,10 +12,12 @@
 #include <platform.h>
 #include <memory_common.h>
 #include <logging_common.h>
+#include <agentos_time.h>
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <inttypes.h>
 #include <sys/types.h>
 #ifndef _WIN32
 #include <sys/wait.h>
@@ -125,7 +127,7 @@ int execution_execute_command(const char* command,
         return -1;
     }
 
-    uint64_t start_time = platform_get_current_time_ms();
+    uint64_t start_time = agentos_time_monotonic_ms();
 
     int status = 0;
     char* output = NULL;
@@ -260,7 +262,7 @@ int execution_execute_command(const char* command,
     }
 #endif
 
-    uint64_t end_time = platform_get_current_time_ms();
+    uint64_t end_time = agentos_time_monotonic_ms();
     uint64_t execution_time = end_time - start_time;
 
     execution_set_result(result, status, output, output_size, error, error_size, execution_time);
@@ -317,7 +319,7 @@ char* execution_format_result_json(const execution_result_t* result) {
     }
     
     int written = snprintf(buffer, buffer_size, 
-        "{\"status\":%d,\"execution_time\":%llu,\"output\":\"%s\",\"error\":\"%s\"}",
+        "{\"status\":%d,\"execution_time\":%" PRIu64 ",\"output\":\"%s\",\"error\":\"%s\"}",
         result->status, result->execution_time,
         result->output ? result->output : "",
         result->error ? result->error : ""
@@ -334,7 +336,7 @@ char* execution_format_result_json(const execution_result_t* result) {
         buffer = new_buffer;
         
         snprintf(buffer, buffer_size, 
-            "{\"status\":%d,\"execution_time\":%llu,\"output\":\"%s\",\"error\":\"%s\"}",
+            "{\"status\":%d,\"execution_time\":%" PRIu64 ",\"output\":\"%s\",\"error\":\"%s\"}",
             result->status, result->execution_time,
             result->output ? result->output : "",
             result->error ? result->error : ""

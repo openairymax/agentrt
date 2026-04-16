@@ -293,7 +293,7 @@ static agentos_error_t code_execute(
     agentos_error_t err = create_temp_file(suffix, code, code_len, &temp_path);
     if (err != AGENTOS_SUCCESS) return err;
 
-    char cmd[2048];
+    char cmd[8192];
 #ifdef _WIN32
     snprintf(cmd, sizeof(cmd), "\"%s\" \"%s\"", interpreter, temp_path);
 #else

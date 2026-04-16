@@ -160,22 +160,22 @@ target_include_directories(svc_common PUBLIC
 
 # 包含 commons 的头文件目录
 target_include_directories(svc_common PUBLIC
-    ${COMMONS_DIR}
-    ${COMMONS_DIR}/platform/include
-    ${COMMONS_DIR}/utils/error/include
-    ${COMMONS_DIR}/utils/logging/include
-    ${COMMONS_DIR}/utils/config_unified/include
-    ${COMMONS_DIR}/utils/memory/include
-    ${COMMONS_DIR}/utils/string/include
-    ${COMMONS_DIR}/utils/sync/include
-    ${COMMONS_DIR}/utils/observability/include
-    ${COMMONS_DIR}/utils/io/include
-    ${COMMONS_DIR}/utils/types/include
-    ${COMMONS_DIR}/utils/cache/include
-    ${COMMONS_DIR}/utils/compat/include
+    $<BUILD_INTERFACE:${COMMONS_DIR}>
+    $<BUILD_INTERFACE:${COMMONS_DIR}/platform/include>
+    $<BUILD_INTERFACE:${COMMONS_DIR}/utils/error/include>
+    $<BUILD_INTERFACE:${COMMONS_DIR}/utils/logging/include>
+    $<BUILD_INTERFACE:${COMMONS_DIR}/utils/config_unified/include>
+    $<BUILD_INTERFACE:${COMMONS_DIR}/utils/memory/include>
+    $<BUILD_INTERFACE:${COMMONS_DIR}/utils/string/include>
+    $<BUILD_INTERFACE:${COMMONS_DIR}/utils/sync/include>
+    $<BUILD_INTERFACE:${COMMONS_DIR}/utils/observability/include>
+    $<BUILD_INTERFACE:${COMMONS_DIR}/utils/io/include>
+    $<BUILD_INTERFACE:${COMMONS_DIR}/utils/types/include>
+    $<BUILD_INTERFACE:${COMMONS_DIR}/utils/cache/include>
+    $<BUILD_INTERFACE:${COMMONS_DIR}/utils/compat/include>
     # 新增网络和IPC模块
-    ${COMMONS_DIR}/utils/network/include
-    ${COMMONS_DIR}/utils/ipc/include
+    $<BUILD_INTERFACE:${COMMONS_DIR}/utils/network/include>
+    $<BUILD_INTERFACE:${COMMONS_DIR}/utils/ipc/include>
 )
 
 # 条件包含外部库头文件
@@ -243,7 +243,6 @@ endif()
 
 # 安装规则
 install(TARGETS svc_common
-    EXPORT agentos-targets
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
@@ -273,11 +272,4 @@ install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/include/alert_manager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/config_manager.h
     DESTINATION include/agentos
-)
-
-# 导出配置
-install(EXPORT agentos-targets
-    FILE agentos-targets.cmake
-    NAMESPACE agentos::
-    DESTINATION lib/cmake/agentos
 )

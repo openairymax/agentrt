@@ -67,7 +67,7 @@ static void generate_span_id(char* buf, size_t len) {
 #else
 static atomic_uint64_t span_counter = 0;
 static void generate_span_id(char* buf, size_t len) {
-    uint64_t id = atomic_fetch_add_64((volatile int64_t*)&span_counter, 1, memory_order_seq_cst);
+    uint64_t id = (uint64_t)atomic_fetch_add(&span_counter, 1);
     snprintf(buf, len, "span_%llu", (unsigned long long)id);
 }
 #endif

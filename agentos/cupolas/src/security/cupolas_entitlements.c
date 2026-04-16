@@ -59,7 +59,7 @@ struct cupolas_entitlements {
 
 static int g_initialized = 0;
 
-static int cupolas_str_ends_with(const char* str, const char* suffix) {
+__attribute__((unused)) static int cupolas_str_ends_with(const char* str, const char* suffix) {
     if (!str || !suffix) return 0;
     size_t str_len = strlen(str);
     size_t suffix_len = strlen(suffix);
@@ -349,7 +349,7 @@ int cupolas_entitlements_load_string(const char* yaml_content, cupolas_entitleme
     CUPOLAS_MUTEX_INIT(&(*entitlements)->lock);
     
     (*entitlements)->raw_content = cupolas_strdup(yaml_content);
-    (*entitlements)->load_time = cupolas_get_time_ms();
+    (*entitlements)->load_time = cupolas_time_ms();
     (*entitlements)->is_verified = 0;
     
     int result = cupolas_parse_entitlements_content(yaml_content, &(*entitlements)->info);
@@ -652,7 +652,7 @@ const char* cupolas_entitlements_get_agent_id(cupolas_entitlements_t* entitlemen
 int cupolas_entitlements_check_validity(cupolas_entitlements_t* entitlements) {
     if (!entitlements) return CUPOLAS_ENT_INVALID;
     
-    uint64_t now = cupolas_get_time_ms() / 1000;
+    uint64_t now = cupolas_time_ms() / 1000;
     
     if (entitlements->info.not_before > 0 && now < entitlements->info.not_before) {
         return CUPOLAS_ENT_EXPIRED;

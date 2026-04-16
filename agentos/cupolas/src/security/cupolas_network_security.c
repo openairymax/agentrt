@@ -222,12 +222,8 @@ int cupolas_tls_verify_cert(const char* cert_path, const char* hostname, cupolas
     const ASN1_TIME* not_after = X509_get0_notAfter(cert);
     
     time_t now = time(NULL);
-    ASN1_TIME* now_asn1 = ASN1_TIME_adj(NULL, now, 0, 0);
-    
-    int before_cmp = X509_cmp_time(not_before, now_asn1);
-    int after_cmp = X509_cmp_time(not_after, now_asn1);
-    
-    ASN1_TIME_free(now_asn1);
+    int before_cmp = X509_cmp_time(not_before, &now);
+    int after_cmp = X509_cmp_time(not_after, &now);
     
     if (before_cmp > 0) {
         *result = CUPOLAS_CERT_REQUIRED;

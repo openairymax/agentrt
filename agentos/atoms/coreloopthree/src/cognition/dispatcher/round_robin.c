@@ -18,10 +18,10 @@
  * @brief 轮询调度策略内部结构
  */
 struct agentos_round_robin_dispatch {
-    void* registry_ctx;                          /**< 注册中心上下文 */
-    agent_registry_get_agents_func get_agents;   /**< 获取候选Agent列表的函数 */
-    size_t last_index;                           /**< 上次选择的Agent索引 */
-    agentos_mutex_t* lock;                       /**< 互斥锁 */
+    void* registry_ctx;
+    agent_registry_get_agents_func get_agents;
+    size_t last_index;
+    agentos_mutex_t* lock;
 };
 
 /**
@@ -33,7 +33,7 @@ static void rr_destroy(agentos_dispatching_strategy_t* strategy)
     struct agentos_round_robin_dispatch* rr =
         (struct agentos_round_robin_dispatch*)strategy->data;
     if (rr) {
-        agentos_mutex_destroy(&rr->lock);
+        agentos_mutex_destroy(rr->lock);
         AGENTOS_FREE(rr);
     }
     AGENTOS_FREE(strategy);
@@ -76,10 +76,10 @@ static agentos_error_t rr_select(
     }
 
     size_t next_index;
-    agentos_mutex_lock(&rr->lock);
+    agentos_mutex_lock(rr->lock);
     next_index = (rr->last_index + 1) % agent_count;
     rr->last_index = next_index;
-    agentos_mutex_unlock(&rr->lock);
+    agentos_mutex_unlock(rr->lock);
 
     if (agents[next_index]) {
         *out_agent_id = AGENTOS_STRDUP(agents[next_index]->agent_id);
@@ -116,7 +116,8 @@ agentos_dispatching_strategy_t* agentos_dispatching_round_robin_create(
     rr->registry_ctx = registry_ctx;
     rr->get_agents = get_agents_func;
     rr->last_index = (size_t)-1;
-    if (agentos_mutex_init(&rr->lock) != 0) {
+    rr->lock = agentos_mutex_create();
+    if (!rr->lock) {
         AGENTOS_FREE(rr);
         return NULL;
     }

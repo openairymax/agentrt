@@ -151,7 +151,7 @@ static void set_socket_timeout(void* handle, int timeout_ms, int is_recv) {
  * @param path 输出路径
  * @return 成功返回 0
  */
-static int parse_url(const char* url, char* host, int* port, char* path) {
+__attribute__((unused)) static int parse_url(const char* url, char* host, int* port, char* path) {
     if (!url || !host || !port || !path) return -1;
 
     const char* start = url;

@@ -14,6 +14,7 @@
 
 #include "cupolas_runtime_protection.h"
 #include "utils/cupolas_utils.h"
+#include "../platform/platform.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -121,7 +122,7 @@ static void cupolas_record_violation(cupolas_violation_type_t type, const char* 
     
     cupolas_violation_event_t* event = &g_runtime_prot.violations.events[idx];
     event->type = type;
-    event->timestamp = cupolas_get_time_ms();
+    event->timestamp = cupolas_time_ms();
     event->pid = cupolas_get_pid();
     event->tid = cupolas_get_tid();
     if (event->details) { free(event->details); event->details = NULL; }

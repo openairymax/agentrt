@@ -65,6 +65,7 @@ typedef struct async_queue {
     int shutdown;
 } async_queue_t;
 
+__attribute__((unused))
 static async_queue_t* queue_create(size_t max_size) {
     async_queue_t* q = (async_queue_t*)AGENTOS_CALLOC(1, sizeof(async_queue_t));
     if (!q) return NULL;
@@ -74,6 +75,7 @@ static async_queue_t* queue_create(size_t max_size) {
     return q;
 }
 
+__attribute__((unused))
 static void queue_destroy(async_queue_t* q) {
     if (!q) return;
     pthread_mutex_lock(&q->mutex);
@@ -85,6 +87,7 @@ static void queue_destroy(async_queue_t* q) {
     AGENTOS_FREE(q);
 }
 
+__attribute__((unused))
 static agentos_error_t queue_push(async_queue_t* q, const char* id, const void* data, size_t len) {
     if (!q || !id) return AGENTOS_EINVAL;
     pthread_mutex_lock(&q->mutex);
@@ -250,6 +253,7 @@ agentos_error_t agentos_layer1_raw_flush(
     agentos_layer1_raw_t* l1,
     uint32_t timeout_ms) {
     if (!l1) return AGENTOS_EINVAL;
+    (void)timeout_ms;
     return AGENTOS_SUCCESS;
 }
 

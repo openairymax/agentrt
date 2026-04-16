@@ -6,6 +6,7 @@
 
 #include "../include/forgetting.h"
 #include "../include/layer2_feature.h"
+#include "../include/layer1_raw.h"
 #include "agentos.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -57,13 +58,11 @@ agentos_error_t agentos_forgetting_revive(
     }
 
     // 重新写入 L1
-    char* new_id = NULL;
-    agentos_error_t err = agentos_layer1_raw_write(engine->layer1, data, size, NULL, &new_id);
+    agentos_error_t err = agentos_layer1_raw_write(engine->layer1, record_id, data, (size_t)size);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_FREE(data);
         return err;
     }
-    AGENTOS_FREE(new_id);
 
     // 删除归档文件
     remove(archive_file);

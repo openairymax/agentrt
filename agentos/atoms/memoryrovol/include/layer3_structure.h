@@ -49,6 +49,12 @@ typedef struct agentos_binder {
     void (*bind_matrices)(struct agentos_binder* self, const float* input, float* output);
 } agentos_binder_t;
 
+agentos_error_t agentos_binder_bind(
+    agentos_binder_t* binder,
+    const float** vectors,
+    size_t count,
+    float** out_result);
+
 typedef struct agentos_unbinder {
     agentos_binder_t* binder;
     agentos_mutex_t* lock;
@@ -70,11 +76,11 @@ typedef struct agentos_relation_encoder {
     uint32_t dimension;
     char* model_path;
     agentos_mutex_t* lock;
-    void* db;
+    sqlite3* db;
     char* db_path;
-    char* role_subject;
-    char* role_predicate;
-    char* role_object;
+    float* role_subject;
+    float* role_predicate;
+    float* role_object;
     agentos_binder_t* binder;
 } agentos_relation_encoder_t;
 

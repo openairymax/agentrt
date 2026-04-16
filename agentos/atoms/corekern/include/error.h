@@ -126,17 +126,25 @@ extern "C" {
 
 #include <stdio.h>
 
+#ifndef AGENTOS_LOG_DEBUG
 #define AGENTOS_LOG_DEBUG(fmt, ...) \
     fprintf(stderr, "[DEBUG] " fmt "\n", ##__VA_ARGS__)
+#endif
 
+#ifndef AGENTOS_LOG_INFO
 #define AGENTOS_LOG_INFO(fmt, ...) \
     fprintf(stderr, "[INFO] " fmt "\n", ##__VA_ARGS__)
+#endif
 
+#ifndef AGENTOS_LOG_WARN
 #define AGENTOS_LOG_WARN(fmt, ...) \
     fprintf(stderr, "[WARN] " fmt "\n", ##__VA_ARGS__)
+#endif
 
+#ifndef AGENTOS_LOG_ERROR
 #define AGENTOS_LOG_ERROR(fmt, ...) \
     fprintf(stderr, "[ERROR] " fmt "\n", ##__VA_ARGS__)
+#endif
 
 #endif /* _WIN32 */
 

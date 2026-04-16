@@ -127,12 +127,6 @@ agentos_error_t agentos_relation_encode_triple(
 
     if (!enc || !subject || !predicate || !object || !out_relation) return AGENTOS_EINVAL;
 
-    const float* vectors[6] = {
-        enc->role_subject, subject,
-        enc->role_predicate, predicate,
-        enc->role_object, object
-    };
-
     size_t dim = enc->binder->dimension;
     float* bound_subj = NULL;
     float* bound_pred = NULL;

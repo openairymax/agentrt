@@ -1,4 +1,5 @@
 #include "include/memory_common.h"
+#include "include/memory_compat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
