@@ -136,9 +136,11 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/market_d/include/
 )
 
 # 导出项目配置
-export(TARGETS svc_common agentos-gateway-d agentos-llm-d agentos-tool-d 
-              agentos-monit-d agentos-sched-d agentos-market-d
-    FILE "${CMAKE_CURRENT_BINARY_DIR}/agentos-daemon-targets.cmake"
-)
-
-export(PACKAGE agentos-daemon)
+if(TARGET svc_common AND TARGET agentos-gateway-d AND TARGET agentos-llm-d AND TARGET agentos-tool-d
+   AND TARGET agentos-monit-d AND TARGET agentos-sched-d AND TARGET agentos-market-d)
+    export(TARGETS svc_common agentos-gateway-d agentos-llm-d agentos-tool-d 
+                  agentos-monit-d agentos-sched-d agentos-market-d
+        FILE "${CMAKE_CURRENT_BINARY_DIR}/agentos-daemon-targets.cmake"
+    )
+    export(PACKAGE agentos-daemon)
+endif()

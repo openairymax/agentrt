@@ -14,7 +14,7 @@
 #ifndef CUPOLAS_CIRCUIT_BREAKER_H
 #define CUPOLAS_CIRCUIT_BREAKER_H
 
-#include "../platform/platform.h"
+#include "platform/platform.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>

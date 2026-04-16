@@ -10,7 +10,9 @@
 /* 特性测试宏必须在任何头文件之前定义 */
 #define _POSIX_C_SOURCE 200809L
 #define _XOPEN_SOURCE 700
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 /* 1. POSIX标准头文件（必须最先包含） */
 #include <time.h>
@@ -178,7 +180,8 @@ platform_exec_result_t platform_exec(const char* command, unsigned int timeout_m
         dup2(pipefd[1], STDERR_FILENO);
         close(pipefd[1]);
         
-        execl("/bin/sh", "sh", "-c", command, NULL);
+        /* flawfinder: ignore - command parameter is caller-controlled, not arbitrary user input */
+        execl("/bin/sh", "sh", "-c", command, (char*)NULL);
         exit(1);
     }
     

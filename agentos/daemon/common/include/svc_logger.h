@@ -5,7 +5,7 @@
  * @brief 日志服务兼容层
  * 
  * 本文件是 agentos/commons/utils/logging 的兼容层，提供向后兼容的 API。
- * 新代码应直接使用 #include "agentos/utils/logging/logging.h"
+ * 新代码应直接使用 #include <logging.h>
  * 
  * @see agentos/commons/utils/logging/include/logging.h
  */
@@ -14,7 +14,7 @@
 #define AGENTOS_DAEMON_COMMON_SVC_LOGGER_H
 
 /* 包含 commons 的统一日志系统 */
-#include "agentos/utils/logging/logging.h"
+#include <logging.h>
 #include "error.h"
 #include "platform.h"
 #include <stdbool.h>
@@ -29,7 +29,10 @@ extern "C" {
  * @brief 日志级别枚举（兼容层）
  * @note 映射到 commons 的 log_level_t
  */
+#ifndef AGENTOS_LOG_LEVEL_T_DEFINED
+#define AGENTOS_LOG_LEVEL_T_DEFINED
 typedef log_level_t agentos_log_level_t;
+#endif
 
 /* 兼容旧日志级别名称 */
 #define AGENTOS_LOG_TRACE   LOG_LEVEL_DEBUG

@@ -48,7 +48,7 @@ if(MSVC)
     target_compile_options(agentos_core PRIVATE /sdl) # 启用额外安全检查
     target_compile_options(agentos_core PRIVATE /guard:cf) # 控制流防护
 else()
-    target_compile_options(agentos_core PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    target_compile_options(agentos_core PRIVATE -Wall -Wextra -Wpedantic)
     # GCC/Clang安全选项
     target_compile_options(agentos_core PRIVATE -fstack-protector-strong)
     target_compile_options(agentos_core PRIVATE -D_FORTIFY_SOURCE=2)

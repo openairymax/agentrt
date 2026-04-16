@@ -19,10 +19,10 @@
  */
 
 #include "sync.h"
-// #include "sync_platform.h"  // 文件不存在，暂时注释掉
 #include "sync_types.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
 
 #ifdef _WIN32
@@ -32,6 +32,7 @@
 #else
 #include <pthread.h>
 #include <semaphore.h>
+#include <sched.h>
 #include <unistd.h>
 #include <sys/time.h>
 #include <errno.h>
@@ -86,7 +87,8 @@ void sync_cleanup(void) {
 /**
  * @brief 获取同步原语类型
  */
-sync_type_t sync_get_type(sync_lock_type_t lock_type) {
+sync_type_t sync_get_type(void* lock, sync_lock_type_t lock_type) {
+    (void)lock;
     switch (lock_type) {
         case SYNC_LOCK_MUTEX: return SYNC_TYPE_MUTEX;
         case SYNC_LOCK_RECURSIVE_MUTEX: return SYNC_TYPE_RECURSIVE_MUTEX;
@@ -271,7 +273,7 @@ sync_result_t sync_debug(void* lock) {
 /**
  * @brief 超时转换为毫秒
  */
-static uint64_t sync_internal_timeout_to_ms(const sync_timeout_t* timeout) {
+__attribute__((unused)) static uint64_t sync_internal_timeout_to_ms(const sync_timeout_t* timeout) {
     if (timeout == NULL) {
         return 0;
     }
@@ -312,6 +314,6 @@ void sync_yield(void) {
 #ifdef _WIN32
     SwitchToThread();
 #else
-    pthread_yield();
+    sched_yield();
 #endif
 }

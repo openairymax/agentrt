@@ -6,6 +6,7 @@
 
 #include "metrics.h"
 #include <stdlib.h>
+#include <stdio.h>
 
 /* Unified base library compatibility layer */
 #include <agentos/memory.h>

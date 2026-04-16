@@ -105,7 +105,7 @@ void permission_engine_clear_cache(permission_engine_t* engine);
  * @param[in] engine Engine handle (must not be NULL)
  * @param[in] agent_id Agent ID pattern (NULL or "*" for wildcard)
  * @param[in] action Action pattern (NULL or "*" for wildcard)
- * @param[in] resource Resource pattern with glob support (e.g., "/data/*")
+ * @param[in] resource Resource pattern with glob support (e.g., "/data/star")
  * @param[in] allow 1 to allow, 0 to deny
  * @param[in] priority Higher value = higher priority
  * @return 0 on success, negative on failure

@@ -4,8 +4,8 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#ifndef AGENTOS_MEMORY_H
-#define AGENTOS_MEMORY_H
+#ifndef AGENTOS_CORELOOPTHREE_MEMORY_H
+#define AGENTOS_CORELOOPTHREE_MEMORY_H
 
 // API 版本声明 (MAJOR.MINOR.PATCH)
 #define MEMORY_API_VERSION_MAJOR 1
@@ -32,12 +32,15 @@ typedef struct agentos_memory_query agentos_memory_query_t;
 /**
  * @brief 记忆记录类型
  */
+#ifndef AGENTOS_MEMORY_TYPE_T_DEFINED
+#define AGENTOS_MEMORY_TYPE_T_DEFINED
 typedef enum {
-    MEMORY_TYPE_RAW = 0,        /**< 原始事件 */
-    MEMORY_TYPE_FEATURE,         /**< 特征向量 */
-    MEMORY_TYPE_STRUCTURE,       /**< 结构化关系 */
-    MEMORY_TYPE_PATTERN          /**< 抽象模式 */
+    MEMORY_TYPE_RAW = 0,
+    MEMORY_TYPE_FEATURE,
+    MEMORY_TYPE_STRUCTURE,
+    MEMORY_TYPE_PATTERN
 } agentos_memory_type_t;
+#endif
 
 /**
  * @brief 记忆记录
@@ -84,11 +87,14 @@ typedef struct agentos_memory_result_item {
 /**
  * @brief 检索结果
  */
+#ifndef AGENTOS_MEMORY_RESULT_T_DEFINED
+#define AGENTOS_MEMORY_RESULT_T_DEFINED
 typedef struct agentos_memory_result {
-    agentos_memory_result_item_t** memory_result_items;    /**< 结果数组 */
-    size_t memory_result_count;                             /**< 结果数量 */
-    uint64_t memory_result_query_time_ns;                    /**< 查询耗时（纳秒） */
+    agentos_memory_result_item_t** memory_result_items;
+    size_t memory_result_count;
+    uint64_t memory_result_query_time_ns;
 } agentos_memory_result_t;
+#endif
 
 /* ==================== 记忆引擎接口 ==================== */
 
@@ -255,4 +261,4 @@ AGENTOS_API agentos_error_t agentos_memory_health_check(
 }
 #endif
 
-#endif /* AGENTOS_MEMORY_H */
+#endif /* AGENTOS_CORELOOPTHREE_MEMORY_H */

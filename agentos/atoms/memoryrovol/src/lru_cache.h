@@ -7,7 +7,7 @@
 #ifndef LRU_CACHE_H
 #define LRU_CACHE_H
 
-#include "../../../agentos/commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
 #include "agentos.h"
 #include <stddef.h>
 #include <stdint.h>

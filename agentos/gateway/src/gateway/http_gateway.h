@@ -22,6 +22,8 @@
 /* 前向声明 */
 struct gateway_rate_limiter;
 typedef struct gateway_rate_limiter gateway_rate_limiter_t;
+struct gateway_protocol_handler_s;
+typedef struct gateway_protocol_handler_s* gateway_protocol_handler_t;
 
 #ifdef __cplusplus
 extern "C" {

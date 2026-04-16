@@ -56,11 +56,7 @@ static guard_block_t* create_guarded_block(size_t size) {
 
 static void validate_guard(guard_block_t* block, const char* operation) {
     if (!block) return;
-#ifdef _WIN32
-    (void)operation;  /* 避免未使用参数警告 */
-#else
-    UNREFERENCED_PARAMETER(operation);
-#endif
+    (void)operation;
 
     if (!check_guard(block->front)) {
 #ifdef AGENTOS_ENABLE_MEMORY_DEBUG

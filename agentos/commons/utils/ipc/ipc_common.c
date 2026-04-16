@@ -45,6 +45,7 @@
 #else
     #include <unistd.h>
     #include <sys/time.h>
+    #include <sys/mman.h>
     #include <fcntl.h>
     #include <errno.h>
 #endif

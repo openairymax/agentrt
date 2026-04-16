@@ -13,7 +13,9 @@
  */
 
 #include "cupolas_vault.h"
-#include "../utils/cupolas_utils.h"
+#include "cupolas_error.h"
+#include "utils/cupolas_utils.h"
+#include "../platform/platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -339,7 +341,7 @@ int cupolas_vault_retrieve(cupolas_vault_t* vault,
         return -3;
     }
 
-    if (!cupolas_vault_check_access(vault, cred_id, agent_id, cupolas_VAULT_OP_READ)) {
+    if (!cupolas_vault_check_access(vault, cred_id, agent_id, CUPOLAS_VAULT_OP_READ)) {
         cupolas_rwlock_unlock(&vault->lock);
         return -4;
     }
@@ -429,7 +431,7 @@ int cupolas_vault_update(cupolas_vault_t* vault,
         return -1;
     }
 
-    if (!cupolas_vault_check_access(vault, cred_id, agent_id, cupolas_VAULT_OP_WRITE)) {
+    if (!cupolas_vault_check_access(vault, cred_id, agent_id, CUPOLAS_VAULT_OP_WRITE)) {
         return -2;
     }
 
@@ -740,22 +742,22 @@ void cupolas_vault_free_acl(cupolas_vault_acl_t* acl) {
 
 const char* cupolas_vault_cred_type_string(cupolas_vault_cred_type_t type) {
     switch (type) {
-        case cupolas_VAULT_CRED_PASSWORD:    return "password";
-        case cupolas_VAULT_CRED_TOKEN:       return "token";
-        case cupolas_VAULT_CRED_KEY:         return "key";
-        case cupolas_VAULT_CRED_CERTIFICATE: return "certificate";
-        case cupolas_VAULT_CRED_SECRET:      return "secret";
-        case cupolas_VAULT_CRED_NOTE:        return "note";
+        case CUPOLAS_VAULT_CRED_PASSWORD:    return "password";
+        case CUPOLAS_VAULT_CRED_TOKEN:       return "token";
+        case CUPOLAS_VAULT_CRED_KEY:         return "key";
+        case CUPOLAS_VAULT_CRED_CERTIFICATE: return "certificate";
+        case CUPOLAS_VAULT_CRED_SECRET:      return "secret";
+        case CUPOLAS_VAULT_CRED_NOTE:        return "note";
         default:                           return "unknown";
     }
 }
 
 const char* cupolas_vault_operation_string(cupolas_vault_operation_t op) {
     switch (op) {
-        case cupolas_VAULT_OP_READ:   return "read";
-        case cupolas_VAULT_OP_WRITE:  return "write";
-        case cupolas_VAULT_OP_DELETE: return "delete";
-        case cupolas_VAULT_OP_EXPORT: return "export";
+        case CUPOLAS_VAULT_OP_READ:   return "read";
+        case CUPOLAS_VAULT_OP_WRITE:  return "write";
+        case CUPOLAS_VAULT_OP_DELETE: return "delete";
+        case CUPOLAS_VAULT_OP_EXPORT: return "export";
         default:                    return "unknown";
     }
 }

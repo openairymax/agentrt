@@ -5,13 +5,10 @@
  */
 
 #include "io.h"
-#include "../memory/include/memory.h"
+#include "../memory/include/agentos_memory.h"
+#include <agentos/memory_compat.h>
 #include <stdio.h>
 #include <stdlib.h>
-
-/* Unified base library compatibility layer */
-#include <agentos/memory.h>
-#include <agentos/string.h>
 #include <string.h>
 #include <sys/stat.h>
 

@@ -5,6 +5,7 @@
  */
 
 #include "layer4_pattern.h"
+#include "persistence.h"
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
@@ -17,19 +18,13 @@
 #include <ripser.h>
 #endif
 
-struct agentos_persistence_calculator {
-    double noise_factor;
-    int max_dim;
-    agentos_mutex_t* lock;
-};
-
 typedef struct {
     agentos_persistence_feature_t** features;
     size_t count;
     size_t capacity;
 } feature_collector_t;
 
-static void collector_add(feature_collector_t* col, int dim, double birth, double death) {
+__attribute__((unused)) static void collector_add(feature_collector_t* col, int dim, double birth, double death) {
     if (col->count >= col->capacity) {
         col->capacity = (col->capacity == 0) ? 16 : col->capacity * 2;
         agentos_persistence_feature_t** new_f = (agentos_persistence_feature_t**)AGENTOS_REALLOC(

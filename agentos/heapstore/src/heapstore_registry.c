@@ -716,7 +716,7 @@ heapstore_error_t heapstore_registry_query_skills(heapstore_registry_iter_t** it
     if (!new_iter) {
         sqlite3_finalize(stmt);
         pthread_mutex_unlock(&s_registry.lock);
-        return heapstore_ERR_NO_MEMORY;
+        return heapstore_ERR_OUT_OF_MEMORY;
     }
 
     new_iter->stmt = stmt;
@@ -770,7 +770,7 @@ heapstore_error_t heapstore_registry_query_sessions(const char* filter_status, h
     if (!new_iter) {
         sqlite3_finalize(stmt);
         pthread_mutex_unlock(&s_registry.lock);
-        return heapstore_ERR_NO_MEMORY;
+        return heapstore_ERR_OUT_OF_MEMORY;
     }
 
     new_iter->stmt = stmt;

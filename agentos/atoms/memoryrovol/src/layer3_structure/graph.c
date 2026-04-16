@@ -160,10 +160,10 @@ agentos_error_t agentos_knowledge_graph_add_entity(
     const char* entity_id) {
     if (!kg || !entity_id) return AGENTOS_EINVAL;
 
-    pthread_mutex_lock(&kg->mutex);
+    agentos_mutex_lock(kg->mutex);
 
     if (find_entity(kg, entity_id)) {
-        pthread_mutex_unlock(&kg->mutex);
+        agentos_mutex_unlock(kg->mutex);
         return AGENTOS_SUCCESS;
     }
 
@@ -172,7 +172,7 @@ agentos_error_t agentos_knowledge_graph_add_entity(
         entity_node_t** new_entities = (entity_node_t**)AGENTOS_REALLOC(kg->entities,
             new_cap * sizeof(entity_node_t*));
         if (!new_entities) {
-            pthread_mutex_unlock(&kg->mutex);
+            agentos_mutex_unlock(kg->mutex);
             return AGENTOS_ENOMEM;
         }
         kg->entities = new_entities;
@@ -181,7 +181,7 @@ agentos_error_t agentos_knowledge_graph_add_entity(
 
     entity_node_t* node = (entity_node_t*)AGENTOS_CALLOC(1, sizeof(entity_node_t));
     if (!node) {
-        pthread_mutex_unlock(&kg->mutex);
+        agentos_mutex_unlock(kg->mutex);
         return AGENTOS_ENOMEM;
     }
 
@@ -192,7 +192,7 @@ agentos_error_t agentos_knowledge_graph_add_entity(
 
     kg->entities[kg->entity_count++] = node;
 
-    pthread_mutex_unlock(&kg->mutex);
+    agentos_mutex_unlock(kg->mutex);
     return AGENTOS_SUCCESS;
 }
 
@@ -207,14 +207,14 @@ agentos_error_t agentos_knowledge_graph_add_relation(
     float weight) {
     if (!kg || !from_id || !to_id) return AGENTOS_EINVAL;
 
-    pthread_mutex_lock(&kg->mutex);
+    agentos_mutex_lock(kg->mutex);
 
     agentos_error_t err = AGENTOS_SUCCESS;
 
     if (!find_entity(kg, from_id)) {
         err = agentos_knowledge_graph_add_entity(kg, from_id);
         if (err != AGENTOS_SUCCESS) {
-            pthread_mutex_unlock(&kg->mutex);
+            agentos_mutex_unlock(kg->mutex);
             return err;
         }
     }
@@ -222,20 +222,20 @@ agentos_error_t agentos_knowledge_graph_add_relation(
     if (!find_entity(kg, to_id)) {
         err = agentos_knowledge_graph_add_entity(kg, to_id);
         if (err != AGENTOS_SUCCESS) {
-            pthread_mutex_unlock(&kg->mutex);
+            agentos_mutex_unlock(kg->mutex);
             return err;
         }
     }
 
     entity_node_t* from_node = find_entity(kg, from_id);
     if (!from_node) {
-        pthread_mutex_unlock(&kg->mutex);
+        agentos_mutex_unlock(kg->mutex);
         return AGENTOS_ENOENT;
     }
 
     agentos_relation_t* rel = (agentos_relation_t*)AGENTOS_CALLOC(1, sizeof(agentos_relation_t));
     if (!rel) {
-        pthread_mutex_unlock(&kg->mutex);
+        agentos_mutex_unlock(kg->mutex);
         return AGENTOS_ENOMEM;
     }
 
@@ -247,7 +247,7 @@ agentos_error_t agentos_knowledge_graph_add_relation(
     from_node->relations = rel;
     from_node->relation_count++;
 
-    pthread_mutex_unlock(&kg->mutex);
+    agentos_mutex_unlock(kg->mutex);
     return AGENTOS_SUCCESS;
 }
 
@@ -262,11 +262,11 @@ agentos_error_t agentos_knowledge_graph_query(
     size_t* out_count) {
     if (!kg || !entity_id || !out_related_ids || !out_count) return AGENTOS_EINVAL;
 
-    pthread_mutex_lock(&kg->mutex);
+    agentos_mutex_lock(kg->mutex);
 
     entity_node_t* node = find_entity(kg, entity_id);
     if (!node) {
-        pthread_mutex_unlock(&kg->mutex);
+        agentos_mutex_unlock(kg->mutex);
         *out_related_ids = NULL;
         *out_count = 0;
         return AGENTOS_SUCCESS;
@@ -274,7 +274,7 @@ agentos_error_t agentos_knowledge_graph_query(
 
     size_t max_related = node->relation_count;
     if (max_related == 0) {
-        pthread_mutex_unlock(&kg->mutex);
+        agentos_mutex_unlock(kg->mutex);
         *out_related_ids = NULL;
         *out_count = 0;
         return AGENTOS_SUCCESS;
@@ -282,7 +282,7 @@ agentos_error_t agentos_knowledge_graph_query(
 
     char** related_ids = (char**)AGENTOS_CALLOC(max_related, sizeof(char*));
     if (!related_ids) {
-        pthread_mutex_unlock(&kg->mutex);
+        agentos_mutex_unlock(kg->mutex);
         return AGENTOS_ENOMEM;
     }
 
@@ -296,7 +296,7 @@ agentos_error_t agentos_knowledge_graph_query(
         rel = rel->next;
     }
 
-    pthread_mutex_unlock(&kg->mutex);
+    agentos_mutex_unlock(kg->mutex);
 
     *out_related_ids = related_ids;
     *out_count = count;
@@ -323,13 +323,13 @@ agentos_error_t agentos_knowledge_graph_find_path(
         return AGENTOS_SUCCESS;
     }
 
-    pthread_mutex_lock(&kg->mutex);
+    agentos_mutex_lock(kg->mutex);
 
     size_t start_idx = find_entity_index(kg, from_id);
     size_t end_idx = find_entity_index(kg, to_id);
 
     if (start_idx == SIZE_MAX || end_idx == SIZE_MAX) {
-        pthread_mutex_unlock(&kg->mutex);
+        agentos_mutex_unlock(kg->mutex);
         return AGENTOS_ENOENT;
     }
 
@@ -338,7 +338,7 @@ agentos_error_t agentos_knowledge_graph_find_path(
     char** queue = (char**)AGENTOS_CALLOC(kg->entity_count, sizeof(char*));
 
     if (!visited || !in_queue || !queue) {
-        pthread_mutex_unlock(&kg->mutex);
+        agentos_mutex_unlock(kg->mutex);
         AGENTOS_FREE(visited);
         AGENTOS_FREE(in_queue);
         AGENTOS_FREE(queue);
@@ -371,7 +371,7 @@ agentos_error_t agentos_knowledge_graph_find_path(
     AGENTOS_FREE(in_queue);
     AGENTOS_FREE(queue);
 
-    pthread_mutex_unlock(&kg->mutex);
+    agentos_mutex_unlock(kg->mutex);
 
     return err;
 }
@@ -488,7 +488,7 @@ static agentos_error_t perform_bfs_search(agentos_knowledge_graph_t* kg,
     while (queue_front < queue_back && !found) {
         char* current = queue[queue_front++];
         found = process_current_node(kg, end_idx, in_queue, visited,
-                                    queue, &queue_back, current);
+                                    queue, &queue_front, &queue_back, current);
     }
 
     if (found) {

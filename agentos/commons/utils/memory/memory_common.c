@@ -1,4 +1,5 @@
 #include "include/memory_common.h"
+#include "include/memory_compat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -91,7 +92,7 @@ void memory_pool_free(memory_pool_t* pool, void* ptr) {
         return;
     }
     
-    if (ptr >= pool->pool && ptr < (char*)pool->pool + pool->manager.block_size * pool->manager.block_count) {
+    if (ptr >= (void*)pool->pool && ptr < (void*)((char*)pool->pool + pool->manager.block_size * pool->manager.block_count)) {
         pool->used_blocks--;
     } else {
         size_t size = malloc_usable_size(ptr);

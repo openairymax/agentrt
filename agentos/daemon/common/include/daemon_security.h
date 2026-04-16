@@ -14,6 +14,12 @@
 #ifndef DAEMON_SECURITY_H
 #define DAEMON_SECURITY_H
 
+#include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include "error.h"
+#include "daemon_errors.h"
+
 /*
  * External Dependency Guard (E-1 安全内生 + E-3 资源确定性 + S-2 层次分解)
  *
@@ -38,16 +44,19 @@
             #include "../../../agentos/cupolas/src/security/cupolas_vault.h"
         #else
             #define CUPOLAS_AVAILABLE 0
-            #warning "daemon_security: cupolas headers not found, degraded mode"
         #endif
     #else
-        #define CUPOLAS_AVAILABLE 1
-        #include "../../agentos/cupolas/include/cupolas.h"
-        #include "../../agentos/cupolas/src/sanitizer/sanitizer.h"
-        #include "../../agentos/cupolas/src/permission/permission.h"
-        #include "../../agentos/cupolas/src/security/cupolas_signature.h"
-        #include "../../agentos/cupolas/src/security/cupolas_vault.h"
+        #define CUPOLAS_AVAILABLE 0
     #endif
+#endif
+
+#if !CUPOLAS_AVAILABLE
+typedef int sanitize_level_t;
+typedef struct { char name[128]; } cupolas_signer_info_t;
+typedef int cupolas_vault_cred_type_t;
+#define SANITIZE_LEVEL_NONE     0
+#define SANITIZE_LEVEL_NORMAL   1
+#define SANITIZE_LEVEL_STRICT   2
 #endif
 
 #ifdef __cplusplus

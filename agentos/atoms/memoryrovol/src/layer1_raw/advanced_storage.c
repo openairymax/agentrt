@@ -80,6 +80,11 @@ static shard_manager_t* create_shard(int shard_id, const char* base_path) {
     shard->shard_id = shard_id;
     shard->base_path = AGENTOS_STRDUP(base_path);
     shard->stats_lock = agentos_mutex_create();
+    if (!shard->stats_lock) {
+        AGENTOS_FREE(shard->base_path);
+        AGENTOS_FREE(shard);
+        return NULL;
+    }
     shard->write_count = 0;
     shard->read_count = 0;
     shard->error_count = 0;
@@ -343,7 +348,11 @@ agentos_error_t agentos_advanced_storage_delete(agentos_advanced_storage_t* stor
 
     if (!shard) return AGENTOS_EINVAL;
 
-    return agentos_layer1_raw_delete(shard->storage, id);
+    agentos_error_t err = agentos_layer1_raw_delete(shard->storage, id);
+    if (err != AGENTOS_SUCCESS) {
+        AGENTOS_LOG_ERROR("Failed to delete data for %s", id);
+    }
+    return err;
 }
 
 /**
