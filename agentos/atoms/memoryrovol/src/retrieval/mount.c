@@ -215,7 +215,14 @@ agentos_error_t agentos_mounter_list(
     size_t i = 0;
     e = mounter->mounted;
     while (e) {
-        ids[i++] = AGENTOS_STRDUP(e->record_id);
+        ids[i] = AGENTOS_STRDUP(e->record_id);
+        if (!ids[i]) {
+            for (size_t j = 0; j < i; j++) AGENTOS_FREE(ids[j]);
+            AGENTOS_FREE(ids);
+            agentos_mutex_unlock(mounter->lock);
+            return AGENTOS_ENOMEM;
+        }
+        i++;
         e = e->next;
     }
     agentos_mutex_unlock(mounter->lock);

@@ -159,9 +159,8 @@ agentos_error_t agentos_bm25_search(
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         if (count >= cap) {
             cap *= 2;
-            char** new_ids = AGENTOS_REALLOC(ids, cap * sizeof(char*));
-            float* new_scores = AGENTOS_REALLOC(scores, cap * sizeof(float));
-            if (!new_ids || !new_scores) {
+            char** new_ids = (char**)AGENTOS_REALLOC(ids, cap * sizeof(char*));
+            if (!new_ids) {
                 sqlite3_finalize(stmt);
                 agentos_mutex_unlock(idx->lock);
                 for (size_t i = 0; i < count; i++) AGENTOS_FREE(ids[i]);
@@ -170,6 +169,15 @@ agentos_error_t agentos_bm25_search(
                 return AGENTOS_ENOMEM;
             }
             ids = new_ids;
+            float* new_scores = (float*)AGENTOS_REALLOC(scores, cap * sizeof(float));
+            if (!new_scores) {
+                sqlite3_finalize(stmt);
+                agentos_mutex_unlock(idx->lock);
+                for (size_t i = 0; i < count; i++) AGENTOS_FREE(ids[i]);
+                AGENTOS_FREE(ids);
+                AGENTOS_FREE(scores);
+                return AGENTOS_ENOMEM;
+            }
             scores = new_scores;
         }
         const unsigned char* id = sqlite3_column_text(stmt, 0);

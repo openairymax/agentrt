@@ -33,13 +33,17 @@ static const char* ALLOWED_SHELL_COMMANDS[] = {
 static int is_shell_command_allowed(const char* cmd) {
     if (!cmd) return 0;
     while (*cmd == ' ' || *cmd == '\t') cmd++;
+    if (*cmd == '\0') return 0;
+    if (*cmd == '/' || *cmd == '\\' || *cmd == '-') return 0;
     for (int i = 0; ALLOWED_SHELL_COMMANDS[i] != NULL; i++) {
         size_t len = strlen(ALLOWED_SHELL_COMMANDS[i]);
         if (strncmp(cmd, ALLOWED_SHELL_COMMANDS[i], len) == 0) {
             if (cmd[len] == ' ' || cmd[len] == '\0' || cmd[len] == '\t' || cmd[len] == '\n') {
                 if (!strchr(cmd, ';') && !strstr(cmd, "&&") && !strstr(cmd, "||") &&
-                    !strstr(cmd, "|") && !strstr(cmd, "$(") && !strstr(cmd, "`") &&
-                    !strstr(cmd, ">") && !strstr(cmd, "<") && !strstr(cmd, "&")) {
+                    !strchr(cmd, '|') && !strstr(cmd, "$(") && !strstr(cmd, "${") &&
+                    !strchr(cmd, '`') && !strchr(cmd, '>') && !strchr(cmd, '<') &&
+                    !strchr(cmd, '&') && !strchr(cmd, '\n') && !strchr(cmd, '\r') &&
+                    !strstr(cmd, "..")) {
                     return 1;
                 }
             }
@@ -56,7 +60,7 @@ static agentos_error_t shell_execute(
 
     if (!is_shell_command_allowed(cmd)) {
         *out_output = AGENTOS_STRDUP("{\"error\":\"command_not_allowed\"}");
-        return AGENTOS_EPERM;
+        return *out_output ? AGENTOS_EPERM : AGENTOS_ENOMEM;
     }
 
 #ifdef _WIN32
@@ -149,6 +153,7 @@ static agentos_error_t shell_execute(
         dup2(pipe_err[1], STDERR_FILENO);
         close(pipe_out[1]);
         close(pipe_err[1]);
+        /* flawfinder: ignore - cmd validated by is_shell_command_allowed (whitelist + metachar rejection) */
         execl("/bin/sh", "sh", "-c", cmd, (char*)NULL);
         _exit(127);
     }

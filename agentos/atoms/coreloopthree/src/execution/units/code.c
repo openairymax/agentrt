@@ -314,7 +314,6 @@ static agentos_error_t code_execute(
     if (err != AGENTOS_SUCCESS) {
         if (output) {
             *out_output = output;
-            return AGENTOS_SUCCESS;
         }
         return err;
     }
@@ -349,8 +348,20 @@ agentos_execution_unit_t* agentos_code_unit_create(const char* language) {
     }
 
     data->language = AGENTOS_STRDUP(language);
+    char safe_lang[64];
+    size_t lj = 0;
+    for (size_t li = 0; language[li] && lj < sizeof(safe_lang) - 1; li++) {
+        char c = language[li];
+        if (c == '"' || c == '\\') {
+            if (lj + 1 < sizeof(safe_lang) - 1) safe_lang[lj++] = '\\';
+        }
+        if (lj < sizeof(safe_lang) - 1 && (unsigned char)c >= 0x20) {
+            safe_lang[lj++] = c;
+        }
+    }
+    safe_lang[lj] = '\0';
     char meta[128];
-    snprintf(meta, sizeof(meta), "{\"type\":\"code\",\"lang\":\"%s\"}", language);
+    snprintf(meta, sizeof(meta), "{\"type\":\"code\",\"lang\":\"%s\"}", safe_lang);
     data->metadata_json = AGENTOS_STRDUP(meta);
 
     if (!data->language || !data->metadata_json) {

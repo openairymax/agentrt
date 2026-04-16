@@ -14,6 +14,12 @@
 #ifndef DAEMON_SECURITY_H
 #define DAEMON_SECURITY_H
 
+#include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include "error.h"
+#include "daemon_errors.h"
+
 /*
  * External Dependency Guard (E-1 安全内生 + E-3 资源确定性 + S-2 层次分解)
  *
@@ -48,6 +54,9 @@
 typedef int sanitize_level_t;
 typedef struct { char name[128]; } cupolas_signer_info_t;
 typedef int cupolas_vault_cred_type_t;
+#define SANITIZE_LEVEL_NONE     0
+#define SANITIZE_LEVEL_NORMAL   1
+#define SANITIZE_LEVEL_STRICT   2
 #endif
 
 #ifdef __cplusplus

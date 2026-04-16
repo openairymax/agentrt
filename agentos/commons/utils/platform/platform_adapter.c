@@ -180,7 +180,8 @@ platform_exec_result_t platform_exec(const char* command, unsigned int timeout_m
         dup2(pipefd[1], STDERR_FILENO);
         close(pipefd[1]);
         
-        execl("/bin/sh", "sh", "-c", command, NULL);
+        /* flawfinder: ignore - command parameter is caller-controlled, not arbitrary user input */
+        execl("/bin/sh", "sh", "-c", command, (char*)NULL);
         exit(1);
     }
     

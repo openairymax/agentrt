@@ -82,7 +82,11 @@ static agentos_error_t reflective_plan(
     plan->task_plan_entry_points = (char**)AGENTOS_MALLOC(sizeof(char*));
     if (plan->task_plan_entry_points) {
         plan->task_plan_entry_count = 1;
-        plan->task_plan_entry_points[0] = node->task_node_id;
+        plan->task_plan_entry_points[0] = AGENTOS_STRDUP(node->task_node_id);
+        if (!plan->task_plan_entry_points[0]) {
+            AGENTOS_FREE(plan->task_plan_entry_points);
+            plan->task_plan_entry_count = 0;
+        }
     }
 
     *out_plan = plan;

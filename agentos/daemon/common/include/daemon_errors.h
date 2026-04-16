@@ -51,6 +51,19 @@ extern "C" {
 #define AGENTOS_ERR_NOT_SUPPORTED  (-105)
 #endif
 
+#ifndef AGENTOS_ERR_INVALID_PARAM
+#define AGENTOS_ERR_INVALID_PARAM      (-2)
+#endif
+#ifndef AGENTOS_ERR_OUT_OF_MEMORY
+#define AGENTOS_ERR_OUT_OF_MEMORY     (-3)
+#endif
+#ifndef AGENTOS_ERR_PERMISSION_DENIED
+#define AGENTOS_ERR_PERMISSION_DENIED  (-10)
+#endif
+#ifndef AGENTOS_ERR_ALREADY_EXISTS
+#define AGENTOS_ERR_ALREADY_EXISTS     (-11)
+#endif
+
 /**
  * @brief JSON-RPC 2.0 标准错误码
  * @{

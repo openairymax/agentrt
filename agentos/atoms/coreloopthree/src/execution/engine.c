@@ -276,8 +276,10 @@ static agentos_task_t* task_desc_deep_copy(const agentos_task_t* task) {
         if (!copy->task_agent_id) goto fail;
     }
     if (task->task_input) {
-        copy->task_input = AGENTOS_STRDUP(task->task_input);
+        size_t input_len = strnlen((const char*)task->task_input, 65536);
+        copy->task_input = AGENTOS_MALLOC(input_len + 1);
         if (!copy->task_input) goto fail;
+        memcpy(copy->task_input, task->task_input, input_len + 1);
     }
     copy->task_timeout_ms = task->task_timeout_ms;
     return copy;
@@ -357,6 +359,9 @@ static void* worker_thread_func(void* arg) {
         agentos_error_t exec_err;
         if (unit) {
             exec_err = unit->execution_unit_execute(unit, tcb->task_desc->task_input, &output);
+            if (output) {
+                output_len = strlen((const char*)output);
+            }
         } else {
             exec_err = AGENTOS_ENOENT;
             AGENTOS_LOG_ERROR("No execution unit found for agent %s", tcb->task_desc->task_agent_id);

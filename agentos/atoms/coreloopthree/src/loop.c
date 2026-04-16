@@ -138,7 +138,11 @@ static memory_pool_t* get_loop_memory_pool(void)
         };
         static memory_pool_t pool_storage;
         g_loop_memory_pool = &pool_storage;
-        memory_pool_init(g_loop_memory_pool, &options);
+        agentos_error_t pool_err = memory_pool_init(g_loop_memory_pool, &options);
+        if (pool_err != AGENTOS_SUCCESS) {
+            AGENTOS_LOG_ERROR("Failed to init loop memory pool");
+            g_loop_memory_pool = NULL;
+        }
     }
     agentos_mutex_unlock(g_pool_mutex);
     return g_loop_memory_pool;
@@ -370,18 +374,23 @@ AGENTOS_API void agentos_loop_destroy(agentos_core_loop_t* loop)
 
     if (loop->memory) {
         agentos_memory_destroy(loop->memory);
+        loop->memory = NULL;
     }
     if (loop->execution) {
         agentos_execution_destroy(loop->execution);
+        loop->execution = NULL;
     }
     if (loop->cognition) {
         agentos_cognition_destroy(loop->cognition);
+        loop->cognition = NULL;
     }
     if (loop->cond) {
         agentos_cond_destroy(loop->cond);
+        loop->cond = NULL;
     }
     if (loop->lock) {
         agentos_mutex_destroy(loop->lock);
+        loop->lock = NULL;
     }
 
     free_loop_memory(loop);
@@ -455,6 +464,8 @@ AGENTOS_API agentos_error_t agentos_loop_submit(
             for (size_t i = 0; i < memory_count; i++) {
                 memories[i] = result->memory_result_items[i]->memory_result_item_record;
             }
+        } else {
+            memory_count = 0;
         }
     }
 

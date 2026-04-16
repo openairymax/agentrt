@@ -17,23 +17,75 @@ typedef struct db_unit_data {
     char* metadata_json;
 } db_unit_data_t;
 
+static const char* DANGEROUS_SQL_KEYWORDS[] = {
+    "UNION", "INTO", "OUTFILE", "LOAD_FILE", "DUMPFILE",
+    "INFORMATION_SCHEMA", "BENCHMARK", "SLEEP", "WAITFOR",
+    "CONCAT", "GROUP_CONCAT", "CONCAT_WS", "CHAR(", "CHR(",
+    "NCHAR(", "UNHEX(", "HEX(", "EXTRACTVALUE", "UPDATEXML",
+    "PROCEDURE", "ANALYSE", "LOAD_EXTENSION", "ATTACH",
+    "DETACH", "REPLACE", "INSERT", "UPDATE", "DELETE",
+    "DROP", "CREATE", "ALTER", "EXEC", "EXECUTE",
+    "GRANT", "REVOKE", "TRUNCATE", "RENAME",
+    NULL
+};
+
+static const char* DANGEROUS_SQL_PATTERNS[] = {
+    "--", ";", "'", "\"", "`", "/*", "*/", "0x", "0b",
+    "X'", "||", "&&", "#",
+    NULL
+};
+
 static int is_safe_query(const char* query) {
     if (!query) return 0;
     const char* p = query;
     while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') p++;
     if (strncasecmp(p, "SELECT", 6) != 0) return 0;
-    if (strstr(query, "--") != NULL) return 0;
-    if (strstr(query, ";") != NULL) return 0;
-    if (strstr(query, "'") != NULL) return 0;
-    if (strstr(query, "\"") != NULL) return 0;
-    if (strcasestr(query, "UNION") != NULL) return 0;
-    if (strcasestr(query, "INTO") != NULL) return 0;
-    if (strcasestr(query, "OUTFILE") != NULL) return 0;
-    if (strcasestr(query, "LOAD_FILE") != NULL) return 0;
-    if (strstr(query, "0x") != NULL) return 0;
-    if (strstr(query, "CHAR(") != NULL) return 0;
-    if (strstr(query, "CONCAT(") != NULL) return 0;
+    if (p[6] != ' ' && p[6] != '\t' && p[6] != '\n' && p[6] != '\r' && p[6] != '\0') return 0;
+
+    for (int i = 0; DANGEROUS_SQL_PATTERNS[i] != NULL; i++) {
+        if (strstr(query, DANGEROUS_SQL_PATTERNS[i]) != NULL) return 0;
+    }
+
+    for (int i = 0; DANGEROUS_SQL_KEYWORDS[i] != NULL; i++) {
+        if (strcasestr(query, DANGEROUS_SQL_KEYWORDS[i]) != NULL) return 0;
+    }
+
+    for (const char* c = query; *c; c++) {
+        if ((unsigned char)*c < 0x20 && *c != '\t' && *c != '\n' && *c != '\r') {
+            return 0;
+        }
+    }
+
     return 1;
+}
+
+static size_t json_escape_string(const char* src, char* dst, size_t dst_size) {
+    if (!src || !dst || dst_size == 0) return 0;
+    size_t j = 0;
+    for (size_t i = 0; src[i] && j < dst_size - 1; i++) {
+        char c = src[i];
+        if (c == '"' || c == '\\') {
+            if (j + 2 >= dst_size) break;
+            dst[j++] = '\\';
+            dst[j++] = c;
+        } else if (c == '\n') {
+            if (j + 2 >= dst_size) break;
+            dst[j++] = '\\';
+            dst[j++] = 'n';
+        } else if (c == '\r') {
+            if (j + 2 >= dst_size) break;
+            dst[j++] = '\\';
+            dst[j++] = 'r';
+        } else if (c == '\t') {
+            if (j + 2 >= dst_size) break;
+            dst[j++] = '\\';
+            dst[j++] = 't';
+        } else if ((unsigned char)c >= 0x20) {
+            dst[j++] = c;
+        }
+    }
+    dst[j] = '\0';
+    return j;
 }
 
 static agentos_error_t db_execute(agentos_execution_unit_t* unit, const void* input, void** out_output) {
@@ -75,8 +127,14 @@ agentos_execution_unit_t* agentos_db_unit_create(const char* connection_string) 
     }
 
     data->connection_string = connection_string ? AGENTOS_STRDUP(connection_string) : NULL;
-    char meta[256];
-    snprintf(meta, sizeof(meta), "{\"type\":\"db\",\"conn\":\"%s\"}", connection_string ? connection_string : "");
+    char escaped_conn[512];
+    if (connection_string) {
+        json_escape_string(connection_string, escaped_conn, sizeof(escaped_conn));
+    } else {
+        escaped_conn[0] = '\0';
+    }
+    char meta[768];
+    snprintf(meta, sizeof(meta), "{\"type\":\"db\",\"conn\":\"%s\"}", escaped_conn);
     data->metadata_json = AGENTOS_STRDUP(meta);
 
     if (!data->metadata_json || (connection_string && !data->connection_string)) {
