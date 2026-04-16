@@ -43,6 +43,7 @@ typedef enum {
     TASK_STATUS_CANCELLED,
     TASK_STATUS_RETRYING
 } agentos_task_status_t;
+#define AGENTOS_TASK_STATUS_T_DEFINED
 
 /**
  * @brief 执行任务结构
@@ -63,6 +64,7 @@ typedef struct agentos_task {
     uint32_t task_max_retries;        /**< 最大重试次数 */
     char* task_error_msg;             /**< 错误信息 */
 } agentos_task_t;
+#define AGENTOS_TASK_T_DEFINED
 
 /**
  * @brief 执行单元基类（类似抽象接口）

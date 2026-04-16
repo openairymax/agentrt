@@ -39,6 +39,7 @@ static agentos_error_t majority_coordinate(
     const char** inputs,
     size_t input_count,
     char** out_result) {
+    (void)context;
     if (!base || !out_result) {
         return AGENTOS_EINVAL;
     }
@@ -87,6 +88,11 @@ static agentos_error_t majority_coordinate(
         if (votes[i].count > max_votes) {
             if (best_result) AGENTOS_FREE(best_result);
             best_result = AGENTOS_STRDUP(votes[i].result);
+            if (!best_result) {
+                for (size_t j = 0; j < unique_count; j++) AGENTOS_FREE(votes[j].result);
+                AGENTOS_FREE(votes);
+                return AGENTOS_ENOMEM;
+            }
             max_votes = votes[i].count;
         }
     }
@@ -97,6 +103,11 @@ static agentos_error_t majority_coordinate(
         *out_result = best_result;
     } else {
         *out_result = AGENTOS_STRDUP("no_majority");
+        if (!*out_result) {
+            for (size_t j = 0; j < unique_count; j++) AGENTOS_FREE(votes[j].result);
+            AGENTOS_FREE(votes);
+            return AGENTOS_ENOMEM;
+        }
         if (best_result) AGENTOS_FREE(best_result);
     }
 

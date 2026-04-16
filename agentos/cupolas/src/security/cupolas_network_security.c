@@ -13,7 +13,7 @@
  */
 
 #include "cupolas_network_security.h"
-#include "../utils/cupolas_utils.h"
+#include "utils/cupolas_utils.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -48,7 +48,7 @@ typedef struct {
 
 static struct {
     int initialized;
-    cupolas_net_security_config_t manager;
+    cupolas_tls_config_t manager;
     
     filter_rule_entry_t filter_rules[cupolas_MAX_FILTER_RULES];
     size_t filter_rule_count;
@@ -82,14 +82,17 @@ static void cupolas_free_filter_rule(cupolas_net_filter_rule_t* rule) {
 
 static void cupolas_free_connection_info(cupolas_connection_info_t* info) {
     if (!info) return;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfree-nonheap-object"
     free(info->local_ip);
     free(info->remote_ip);
     free(info->hostname);
     free(info->cipher_suite);
+#pragma GCC diagnostic pop
     memset(info, 0, sizeof(*info));
 }
 
-int cupolas_net_security_init(const cupolas_net_security_config_t* manager) {
+int cupolas_net_security_init(const cupolas_tls_config_t* manager) {
     if (g_net_security.initialized) return 0;
     
     memset(&g_net_security, 0, sizeof(g_net_security));
@@ -112,9 +115,9 @@ int cupolas_net_security_init(const cupolas_net_security_config_t* manager) {
     if (manager) {
         g_net_security.manager = *manager;
     } else {
-        g_net_security.manager.tls.min_version = cupolas_TLS_1_2;
-        g_net_security.manager.tls.max_version = cupolas_TLS_1_3;
-        g_net_security.manager.tls.require_cert_verify = true;
+        g_net_security.manager.tls.min_version = CUPOLAS_TLS_1_2;
+        g_net_security.manager.tls.max_version = CUPOLAS_TLS_1_3;
+        g_net_security.manager.verify_mode = CUPOLAS_CERT_REQUIRED;
         g_net_security.manager.http.enforce_https = true;
         g_net_security.manager.http.hsts_enabled = true;
         g_net_security.manager.http.hsts_max_age = 31536000;
@@ -156,7 +159,7 @@ void cupolas_net_security_cleanup(void) {
     memset(&g_net_security, 0, sizeof(g_net_security));
 }
 
-int cupolas_net_security_get_config(cupolas_net_security_config_t* manager) {
+int cupolas_net_security_get_config(cupolas_tls_config_t* manager) {
     if (!manager) return -1;
     *manager = g_net_security.manager;
     return 0;
@@ -165,24 +168,22 @@ int cupolas_net_security_get_config(cupolas_net_security_config_t* manager) {
 int cupolas_tls_configure(const cupolas_tls_config_t* manager) {
     if (!manager) return -1;
     
-    g_net_security.manager.tls = *manager;
+    g_net_security.manager = *manager;
     
     if (g_net_security.ssl_ctx) {
         int min_ver = TLS1_2_VERSION;
         int max_ver = TLS1_3_VERSION;
         
         switch (manager->min_version) {
-            case cupolas_TLS_1_0: min_ver = TLS1_VERSION; break;
-            case cupolas_TLS_1_1: min_ver = TLS1_1_VERSION; break;
-            case cupolas_TLS_1_2: min_ver = TLS1_2_VERSION; break;
-            case cupolas_TLS_1_3: min_ver = TLS1_3_VERSION; break;
+            case CUPOLAS_TLS_AUTO: min_ver = TLS1_2_VERSION; break;
+            case CUPOLAS_TLS_1_2: min_ver = TLS1_2_VERSION; break;
+            case CUPOLAS_TLS_1_3: min_ver = TLS1_3_VERSION; break;
         }
         
         switch (manager->max_version) {
-            case cupolas_TLS_1_0: max_ver = TLS1_VERSION; break;
-            case cupolas_TLS_1_1: max_ver = TLS1_1_VERSION; break;
-            case cupolas_TLS_1_2: max_ver = TLS1_2_VERSION; break;
-            case cupolas_TLS_1_3: max_ver = TLS1_3_VERSION; break;
+            case CUPOLAS_TLS_AUTO: max_ver = TLS1_3_VERSION; break;
+            case CUPOLAS_TLS_1_2: max_ver = TLS1_2_VERSION; break;
+            case CUPOLAS_TLS_1_3: max_ver = TLS1_3_VERSION; break;
         }
         
         SSL_CTX_set_min_proto_version(g_net_security.ssl_ctx, min_ver);
@@ -201,14 +202,14 @@ int cupolas_tls_configure(const cupolas_tls_config_t* manager) {
     return 0;
 }
 
-int cupolas_tls_verify_cert(const char* cert_path, const char* hostname, cupolas_cert_result_t* result) {
+int cupolas_tls_verify_cert(const char* cert_path, const char* hostname, cupolas_cert_mode_t* result) {
     if (!cert_path || !result) return -1;
     
-    *result = cupolas_CERT_OK;
+    *result = CUPOLAS_CERT_NONE;
     
     FILE* f = fopen(cert_path, "r");
     if (!f) {
-        *result = cupolas_CERT_INVALID;
+        *result = CUPOLAS_CERT_REQUIRED;
         return -1;
     }
     
@@ -216,7 +217,7 @@ int cupolas_tls_verify_cert(const char* cert_path, const char* hostname, cupolas
     fclose(f);
     
     if (!cert) {
-        *result = cupolas_CERT_INVALID;
+        *result = CUPOLAS_CERT_REQUIRED;
         return -1;
     }
     
@@ -224,21 +225,17 @@ int cupolas_tls_verify_cert(const char* cert_path, const char* hostname, cupolas
     const ASN1_TIME* not_after = X509_get0_notAfter(cert);
     
     time_t now = time(NULL);
-    ASN1_TIME* now_asn1 = ASN1_TIME_adj(NULL, now, 0, 0);
-    
-    int before_cmp = X509_cmp_time(not_before, now_asn1);
-    int after_cmp = X509_cmp_time(not_after, now_asn1);
-    
-    ASN1_TIME_free(now_asn1);
+    int before_cmp = X509_cmp_time(not_before, &now);
+    int after_cmp = X509_cmp_time(not_after, &now);
     
     if (before_cmp > 0) {
-        *result = cupolas_CERT_EXPIRED;
+        *result = CUPOLAS_CERT_REQUIRED;
         X509_free(cert);
         return 0;
     }
     
     if (after_cmp < 0) {
-        *result = cupolas_CERT_EXPIRED;
+        *result = CUPOLAS_CERT_REQUIRED;
         X509_free(cert);
         return 0;
     }
@@ -249,7 +246,7 @@ int cupolas_tls_verify_cert(const char* cert_path, const char* hostname, cupolas
         free(hostname_dup);
         
         if (match != 1) {
-            *result = cupolas_CERT_HOST_MISMATCH;
+            *result = CUPOLAS_CERT_REQUIRED;
             X509_free(cert);
             return 0;
         }
@@ -259,14 +256,14 @@ int cupolas_tls_verify_cert(const char* cert_path, const char* hostname, cupolas
     return 0;
 }
 
-int cupolas_tls_verify_cert_chain(const char* cert_chain, size_t chain_len, cupolas_cert_result_t* result) {
+int cupolas_tls_verify_cert_chain(const char* cert_chain, size_t chain_len, cupolas_cert_mode_t* result) {
     if (!cert_chain || !result) return -1;
     
-    *result = cupolas_CERT_OK;
+    *result = CUPOLAS_CERT_NONE;
     
     BIO* bio = BIO_new_mem_buf(cert_chain, (int)chain_len);
     if (!bio) {
-        *result = cupolas_CERT_INVALID;
+        *result = CUPOLAS_CERT_REQUIRED;
         return -1;
     }
     
@@ -283,7 +280,7 @@ int cupolas_tls_verify_cert_chain(const char* cert_chain, size_t chain_len, cupo
     BIO_free(bio);
     
     if (sk_X509_num(certs) == 0) {
-        *result = cupolas_CERT_INVALID;
+        *result = CUPOLAS_CERT_REQUIRED;
         sk_X509_free(certs);
         X509_STORE_CTX_free(ctx);
         X509_STORE_free(store);
@@ -297,17 +294,17 @@ int cupolas_tls_verify_cert_chain(const char* cert_chain, size_t chain_len, cupo
         int err = X509_STORE_CTX_get_error(ctx);
         switch (err) {
             case X509_V_ERR_CERT_HAS_EXPIRED:
-                *result = cupolas_CERT_EXPIRED;
+                *result = CUPOLAS_CERT_REQUIRED;
                 break;
             case X509_V_ERR_CERT_REVOKED:
-                *result = cupolas_CERT_REVOKED;
+                *result = CUPOLAS_CERT_REQUIRED;
                 break;
             case X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN:
             case X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT:
-                *result = cupolas_CERT_SELF_SIGNED;
+                *result = CUPOLAS_CERT_REQUIRED;
                 break;
             default:
-                *result = cupolas_CERT_UNTRUSTED;
+                *result = CUPOLAS_CERT_REQUIRED;
                 break;
         }
     }
@@ -319,20 +316,20 @@ int cupolas_tls_verify_cert_chain(const char* cert_chain, size_t chain_len, cupo
     return 0;
 }
 
-int cupolas_tls_check_connection(const char* hostname, uint16_t port, cupolas_cert_result_t* result) {
+int cupolas_tls_check_connection(const char* hostname, uint16_t port, cupolas_cert_mode_t* result) {
     if (!hostname || !result) return -1;
     
-    *result = cupolas_CERT_OK;
+    *result = CUPOLAS_CERT_NONE;
     
     struct hostent* host = gethostbyname(hostname);
     if (!host) {
-        *result = cupolas_CERT_INVALID;
+        *result = CUPOLAS_CERT_REQUIRED;
         return -1;
     }
     
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) {
-        *result = cupolas_CERT_INVALID;
+        *result = CUPOLAS_CERT_REQUIRED;
         return -1;
     }
     
@@ -349,7 +346,7 @@ int cupolas_tls_check_connection(const char* hostname, uint16_t port, cupolas_ce
 #else
         close(sock);
 #endif
-        *result = cupolas_CERT_INVALID;
+        *result = CUPOLAS_CERT_REQUIRED;
         return -1;
     }
     
@@ -360,7 +357,7 @@ int cupolas_tls_check_connection(const char* hostname, uint16_t port, cupolas_ce
 #else
         close(sock);
 #endif
-        *result = cupolas_CERT_INVALID;
+        *result = CUPOLAS_CERT_REQUIRED;
         return -1;
     }
     
@@ -372,13 +369,13 @@ int cupolas_tls_check_connection(const char* hostname, uint16_t port, cupolas_ce
         int err = SSL_get_error(ssl, ssl_result);
         switch (err) {
             case SSL_ERROR_SSL:
-                *result = cupolas_CERT_INVALID;
+                *result = CUPOLAS_CERT_REQUIRED;
                 break;
             case SSL_ERROR_SYSCALL:
-                *result = cupolas_CERT_INVALID;
+                *result = CUPOLAS_CERT_REQUIRED;
                 break;
             default:
-                *result = cupolas_CERT_INVALID;
+                *result = CUPOLAS_CERT_REQUIRED;
                 break;
         }
         SSL_free(ssl);
@@ -394,17 +391,17 @@ int cupolas_tls_check_connection(const char* hostname, uint16_t port, cupolas_ce
     if (verify_result_long != X509_V_OK) {
         switch (verify_result_long) {
             case X509_V_ERR_CERT_HAS_EXPIRED:
-                *result = cupolas_CERT_EXPIRED;
+                *result = CUPOLAS_CERT_REQUIRED;
                 break;
             case X509_V_ERR_CERT_REVOKED:
-                *result = cupolas_CERT_REVOKED;
+                *result = CUPOLAS_CERT_REQUIRED;
                 break;
             case X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN:
             case X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT:
-                *result = cupolas_CERT_SELF_SIGNED;
+                *result = CUPOLAS_CERT_REQUIRED;
                 break;
             default:
-                *result = cupolas_CERT_UNTRUSTED;
+                *result = CUPOLAS_CERT_REQUIRED;
                 break;
         }
     }
@@ -602,12 +599,12 @@ static int cupolas_match_url_pattern(const char* pattern, const char* url) {
     return strstr(url, pattern) != NULL;
 }
 
-int cupolas_net_check_access(const char* host, uint16_t port, cupolas_protocol_t protocol, const char* direction) {
+int cupolas_net_check_access(const char* host, uint16_t port, cupolas_proto_t protocol, const char* direction) {
     if (!host) return 0;
     
     g_net_security.stats.total_connections++;
     
-    if (g_net_security.manager.http.enforce_https && protocol == cupolas_PROTO_HTTP) {
+    if (g_net_security.manager.http.enforce_https && protocol == CUPOLAS_PROTO_TCP) {
         g_net_security.stats.plaintext_blocked++;
         return 0;
     }
@@ -624,14 +621,14 @@ int cupolas_net_check_access(const char* host, uint16_t port, cupolas_protocol_t
         
         if (host_match && port_match && proto_match) {
             switch (rule->action) {
-                case cupolas_NET_ALLOW:
+                case CUPOLAS_FW_ALLOW:
                     return 1;
-                case cupolas_NET_DENY:
+                case CUPOLAS_FW_DENY:
                     g_net_security.stats.blocked_connections++;
                     return 0;
-                case cupolas_NET_LOG:
+                case CUPOLAS_FW_LOG:
                     return 1;
-                case cupolas_NET_RATE_LIMIT:
+                case CUPOLAS_FW_RATE_LIMIT:
                     return 1;
             }
         }
@@ -660,9 +657,9 @@ int cupolas_net_check_url(const char* url, const char* method) {
         
         if (rule->url_pattern && cupolas_match_url_pattern(rule->url_pattern, url)) {
             switch (rule->action) {
-                case cupolas_NET_ALLOW:
+                case CUPOLAS_FW_ALLOW:
                     return 1;
-                case cupolas_NET_DENY:
+                case CUPOLAS_FW_DENY:
                     g_net_security.stats.blocked_connections++;
                     return 0;
                 default:
@@ -687,7 +684,13 @@ int cupolas_net_check_url(const char* url, const char* method) {
 
 int cupolas_http_configure(const cupolas_http_security_config_t* manager) {
     if (!manager) return -1;
-    g_net_security.manager.http = *manager;
+    g_net_security.manager.http.enforce_https = manager->enforce_https;
+    g_net_security.manager.http.max_url_length = manager->max_url_length;
+    g_net_security.manager.http.max_body_size = manager->max_body_size;
+    g_net_security.manager.http.allowed_methods = manager->allowed_methods;
+    g_net_security.manager.http.method_count = manager->method_count;
+    g_net_security.manager.http.forbidden_headers = manager->forbidden_headers;
+    g_net_security.manager.http.forbidden_count = manager->forbidden_count;
     return 0;
 }
 
@@ -783,7 +786,10 @@ int cupolas_http_is_url_safe(const char* url) {
 
 int cupolas_dns_configure(const cupolas_dns_security_config_t* manager) {
     if (!manager) return -1;
-    g_net_security.manager.dns = *manager;
+    g_net_security.manager.dns.enable_dnssec = manager->enable_dnssec;
+    strncpy(g_net_security.manager.dns.upstream_server, manager->upstream_server,
+            sizeof(g_net_security.manager.dns.upstream_server) - 1);
+    g_net_security.manager.dns.upstream_server[sizeof(g_net_security.manager.dns.upstream_server) - 1] = '\0';
     return 0;
 }
 
@@ -930,35 +936,28 @@ int cupolas_net_ids_set_callback(void (*callback)(const char* alert_type, const 
 
 const char* cupolas_tls_version_string(cupolas_tls_version_t version) {
     switch (version) {
-        case cupolas_TLS_1_0: return "TLS 1.0";
-        case cupolas_TLS_1_1: return "TLS 1.1";
-        case cupolas_TLS_1_2: return "TLS 1.2";
-        case cupolas_TLS_1_3: return "TLS 1.3";
+        case CUPOLAS_TLS_AUTO: return "Auto";
+        case CUPOLAS_TLS_1_2: return "TLS 1.2";
+        case CUPOLAS_TLS_1_3: return "TLS 1.3";
         default: return "Unknown";
     }
 }
 
-const char* cupolas_protocol_string(cupolas_protocol_t protocol) {
+const char* cupolas_protocol_string(cupolas_proto_t protocol) {
     switch (protocol) {
-        case cupolas_PROTO_TCP: return "TCP";
-        case cupolas_PROTO_UDP: return "UDP";
-        case cupolas_PROTO_HTTP: return "HTTP";
-        case cupolas_PROTO_HTTPS: return "HTTPS";
-        case cupolas_PROTO_WEBSOCKET: return "WebSocket";
-        case cupolas_PROTO_DNS: return "DNS";
+        case CUPOLAS_PROTO_ANY: return "Any";
+        case CUPOLAS_PROTO_TCP: return "TCP";
+        case CUPOLAS_PROTO_UDP: return "UDP";
+        case CUPOLAS_PROTO_ICMP: return "ICMP";
         default: return "Unknown";
     }
 }
 
-const char* cupolas_cert_result_string(cupolas_cert_result_t result) {
+const char* cupolas_cert_result_string(cupolas_cert_mode_t result) {
     switch (result) {
-        case cupolas_CERT_OK: return "Certificate valid";
-        case cupolas_CERT_INVALID: return "Certificate invalid";
-        case cupolas_CERT_EXPIRED: return "Certificate expired";
-        case cupolas_CERT_REVOKED: return "Certificate revoked";
-        case cupolas_CERT_UNTRUSTED: return "Certificate untrusted";
-        case cupolas_CERT_HOST_MISMATCH: return "Hostname mismatch";
-        case cupolas_CERT_SELF_SIGNED: return "Self-signed certificate";
+        case CUPOLAS_CERT_NONE: return "No validation";
+        case CUPOLAS_CERT_OPTIONAL: return "Optional";
+        case CUPOLAS_CERT_REQUIRED: return "Required";
         default: return "Unknown";
     }
 }
@@ -988,8 +987,9 @@ int cupolas_net_parse_url(const char* url, char* scheme, char* host, uint16_t* p
         } else {
             host_len = strlen(p);
         }
-        strncpy(host, p, host_len);
-        host[host_len] = '\0';
+        size_t copy_len = host_len < (size_t)255 ? host_len : 255;
+        memcpy(host, p, copy_len);
+        host[copy_len] = '\0';
     }
     
     if (port_colon && (!slash || port_colon < slash)) {

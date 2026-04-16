@@ -5,9 +5,8 @@
  */
 
 #include "syscalls.h"
-#include "memoryrovol/memoryrovol.h"
+#include "memoryrovol.h"
 #include "agentos.h"
-#include "logger.h"
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */

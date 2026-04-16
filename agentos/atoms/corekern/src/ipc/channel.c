@@ -11,12 +11,53 @@
 
 /* Unified base library compatibility layer */
 #include <agentos/memory.h>
-#include <agentos/string.h>
 
 /* Check macros for unified error handling */
 #include <agentos/check.h>
 #include <string.h>
 #include <stdio.h>
+
+/* platform.h provides agentos_mutex_t, agentos_cond_t and init/destroy functions */
+#include "platform.h"
+
+/* ==================== 兼容层：create/destroy 包装 ==================== */
+
+static inline agentos_mutex_t* agentos_mutex_create_compat(void) {
+    agentos_mutex_t* m = (agentos_mutex_t*)AGENTOS_CALLOC(1, sizeof(agentos_mutex_t));
+    if (m && agentos_mutex_init(m) != 0) {
+        AGENTOS_FREE(m);
+        return NULL;
+    }
+    return m;
+}
+
+static inline void agentos_mutex_destroy_compat(agentos_mutex_t* m) {
+    if (m) {
+        agentos_mutex_destroy(m);
+        AGENTOS_FREE(m);
+    }
+}
+
+static inline agentos_cond_t* agentos_cond_create_compat(void) {
+    agentos_cond_t* c = (agentos_cond_t*)AGENTOS_CALLOC(1, sizeof(agentos_cond_t));
+    if (c && agentos_cond_init(c) != 0) {
+        AGENTOS_FREE(c);
+        return NULL;
+    }
+    return c;
+}
+
+static inline void agentos_cond_destroy_compat(agentos_cond_t* c) {
+    if (c) {
+        agentos_cond_destroy(c);
+        AGENTOS_FREE(c);
+    }
+}
+
+#define agentos_mutex_create() agentos_mutex_create_compat()
+#define agentos_mutex_destroy_ptr(p) agentos_mutex_destroy_compat(p)
+#define agentos_cond_create() agentos_cond_create_compat()
+#define agentos_cond_destroy_ptr(p) agentos_cond_destroy_compat(p)
 
 /**
  * @brief IPC 消息队列节点
@@ -85,10 +126,10 @@ agentos_error_t agentos_ipc_create_channel(
 
 cleanup:
     if (channel->cond) {
-        agentos_cond_destroy(channel->cond);
+        agentos_cond_destroy_ptr(channel->cond);
     }
     if (channel->lock) {
-        agentos_mutex_destroy(channel->lock);
+        agentos_mutex_destroy_ptr(channel->lock);
     }
     AGENTOS_FREE(channel);
     return AGENTOS_ENOMEM;
@@ -122,11 +163,10 @@ agentos_error_t agentos_ipc_close(agentos_ipc_channel_t* channel) {
         agentos_mutex_unlock(channel->lock);
 
         if (channel->cond) {
-            agentos_cond_destroy(channel->cond);
+            agentos_cond_destroy_ptr(channel->cond);
             channel->cond = NULL;
         }
-        
-        agentos_mutex_destroy(channel->lock);
+        agentos_mutex_destroy_ptr(channel->lock);
         channel->lock = NULL;
     }
     AGENTOS_FREE(channel);

@@ -6,8 +6,9 @@
 
 #ifndef MEMORY_POOL_H
 #define MEMORY_POOL_H
+#define MEMORY_POOL_T_DEFINED
 
-#include "../../../agentos/commons/utils/memory/include/memory_compat.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
 #include "agentos.h"
 #include <stddef.h>
 #include <stdint.h>

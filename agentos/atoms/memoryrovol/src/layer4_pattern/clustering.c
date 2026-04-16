@@ -22,6 +22,7 @@ struct agentos_clustering_engine {
     void* params;
     agentos_mutex_t* lock;
 };
+typedef struct agentos_clustering_engine agentos_clustering_engine_t;
 
 agentos_error_t agentos_clustering_engine_create(
     const char* method,
@@ -69,7 +70,7 @@ agentos_error_t agentos_clustering_engine_cluster(
     if (!engine || !vectors || count == 0 || !out_labels || !out_num_clusters)
         return AGENTOS_EINVAL;
 
-    size_t dim = 384; // 实际应从参数获取
+    size_t dim __attribute__((unused)) = 384; // 实际应从参数获取
 
 #ifdef HAVE_HDBSCAN
     // Use HDBSCAN for clustering

@@ -36,7 +36,7 @@ agentos_error_t agentos_config_load(const char* path, char** out_json) {
     fseek(file, 0, SEEK_SET);
     if (size < 0 || size > AGENTOS_MAX_CONFIG_SIZE) {
         fclose(file);
-        return (size < 0) ? AGENTOS_EIO : AGENTOS_EMSGSIZE;
+        return (size < 0) ? AGENTOS_EIO : AGENTOS_EINVAL;
     }
 
     char* buffer = (char*)AGENTOS_MALLOC((size_t)size + 1);

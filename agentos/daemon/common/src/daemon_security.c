@@ -39,6 +39,8 @@ static struct {
 
 /* ---------- Initialization and Shutdown ---------- */
 
+#if CUPOLAS_AVAILABLE
+
 /**
  * @brief Initialize daemon security layer
  */

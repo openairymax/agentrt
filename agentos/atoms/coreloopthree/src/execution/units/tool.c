@@ -7,36 +7,37 @@
 #include "execution.h"
 #include "agentos.h"
 #include <stdlib.h>
-
-/* Unified base library compatibility layer */
-#include <agentos/memory.h>
-#include <agentos/string.h>
 #include <string.h>
 #include <stdio.h>
+#include <agentos/memory.h>
 
-#include <agentos/execution_common.h>\n\ntypedef struct $1_unit_data {\n    execution_unit_data_t base;\n    char* metadata_json;\n} $1_unit_data_t;
+typedef struct tool_unit_data {
+    char* tool_name;
+    char* metadata_json;
+} tool_unit_data_t;
 
 static agentos_error_t tool_execute(agentos_execution_unit_t* unit, const void* input, void** out_output) {
-    tool_unit_data_t* data = (tool_unit_data_t*)unit->data;
+    tool_unit_data_t* data = (tool_unit_data_t*)unit->execution_unit_data;
     if (!data || !input) return AGENTOS_EINVAL;
 
-    // 解析 input 为字符串参数
     const char* cmd = (const char*)input;
-    // 模拟工具执行，实际应调用外部工具接口
-    printf("[Tool %s] executing: %s\n", data->tool_name, cmd);
+    (void)cmd;
 
-    // 工具执行成功，简单地返回字符串
     const char* result = "Tool executed successfully";
     *out_output = AGENTOS_STRDUP(result);
     if (!*out_output) return AGENTOS_ENOMEM;
     return AGENTOS_SUCCESS;
 }
 
-static void tool_destroy(agentos_execution_unit_t* unit) {\n    if (!unit) return;\n    tool_unit_data_t* data = (tool_unit_data_t*)unit->data;\n    if (data) {\n        execution_unit_data_cleanup(&data->base);\n        if (data->metadata_json) AGENTOS_FREE(data->metadata_json);\n        AGENTOS_FREE(data);\n    }\n    AGENTOS_FREE(unit);\n}
-
-static const char* tool_get_metadata(agentos_execution_unit_t* unit) {
-    tool_unit_data_t* data = (tool_unit_data_t*)unit->data;
-    return data ? data->metadata_json : NULL;
+static void tool_destroy(agentos_execution_unit_t* unit) {
+    if (!unit) return;
+    tool_unit_data_t* data = (tool_unit_data_t*)unit->execution_unit_data;
+    if (data) {
+        if (data->tool_name) AGENTOS_FREE(data->tool_name);
+        if (data->metadata_json) AGENTOS_FREE(data->metadata_json);
+        AGENTOS_FREE(data);
+    }
+    AGENTOS_FREE(unit);
 }
 
 agentos_execution_unit_t* agentos_tool_unit_create(const char* tool_name) {
@@ -44,6 +45,7 @@ agentos_execution_unit_t* agentos_tool_unit_create(const char* tool_name) {
 
     agentos_execution_unit_t* unit = (agentos_execution_unit_t*)AGENTOS_MALLOC(sizeof(agentos_execution_unit_t));
     if (!unit) return NULL;
+    memset(unit, 0, sizeof(*unit));
 
     tool_unit_data_t* data = (tool_unit_data_t*)AGENTOS_MALLOC(sizeof(tool_unit_data_t));
     if (!data) {
@@ -64,10 +66,9 @@ agentos_execution_unit_t* agentos_tool_unit_create(const char* tool_name) {
         return NULL;
     }
 
-    unit->data = data;
-    unit->execute = tool_execute;
-    unit->destroy = tool_destroy;
-    unit->get_metadata = tool_get_metadata;
+    unit->execution_unit_data = data;
+    unit->execution_unit_execute = tool_execute;
+    unit->execution_unit_destroy = tool_destroy;
 
     return unit;
 }

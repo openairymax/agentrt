@@ -11,6 +11,7 @@
 #include "cognition_common.h"
 #include <memory_common.h>
 #include <platform.h>
+#include <agentos_time.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -38,7 +39,7 @@ int agent_info_init(agent_info_t* agent, const char* agent_id) {
     agent->total_tasks = 0;
     agent->successful_tasks = 0;
     agent->avg_latency = 0.0;
-    agent->last_used = platform_get_current_time_ms();
+    agent->last_used = agentos_time_monotonic_ms();
     
     return 0;
 }
@@ -88,7 +89,7 @@ void agent_info_update_stats(agent_info_t* agent, bool success, uint64_t latency
     agent->avg_latency = (agent->avg_latency * (agent->total_tasks - 1) + latency) / agent->total_tasks;
     
     // 更新最后使用时间
-    agent->last_used = platform_get_current_time_ms();
+    agent->last_used = agentos_time_monotonic_ms();
     
     // 更新权重
     agent->weight = agent_info_calculate_weight(agent);
@@ -433,7 +434,7 @@ uint64_t cognition_calculate_task_priority(const task_info_t* task) {
     
     // 基于截止时间调整优先级
     if (task->deadline > 0) {
-        uint64_t now = platform_get_current_time_ms();
+        uint64_t now = agentos_time_monotonic_ms();
         uint64_t time_left = task->deadline - now;
         
         if (time_left < 3600000) { // 少于1小时

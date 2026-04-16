@@ -5,7 +5,7 @@
  * @brief 缓存服务兼容层
  * 
  * 本文件是 agentos/commons/utils/cache 的兼容层，提供向后兼容的 API。
- * 新代码应直接使用 #include "agentos/utils/cache/cache_common.h"
+ * 新代码应直接使用 #include <cache_common.h>
  * 
  * @see agentos/commons/utils/cache/include/cache_common.h
  */
@@ -14,7 +14,7 @@
 #define SVC_CACHE_H
 
 /* 包含 commons 的统一缓存库 */
-#include "agentos/utils/cache/cache_common.h"
+#include <cache_common.h>
 
 #include <stddef.h>
 #include <stdbool.h>

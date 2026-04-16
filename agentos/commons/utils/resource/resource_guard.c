@@ -5,15 +5,11 @@
  */
 
 #include "resource_guard.h"
-#include "../memory/include/memory.h"
+#include "../memory/include/agentos_memory.h"
 #include "../sync/include/sync.h"
-#include "../string/include/string.h"
+#include "../string/include/agentos_string.h"
 #include <stdio.h>
 #include <stdlib.h>
-
-/* Unified base library compatibility layer */
-#include <agentos/memory.h>
-#include <agentos/string.h>
 #include <string.h>
 
 /* ==================== 核心接口实现 ==================== */

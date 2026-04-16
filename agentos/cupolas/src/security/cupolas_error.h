@@ -274,35 +274,85 @@ cupolas_runtime_error_t cupolas_error_to_runtime(cupolas_error_t error);
  * Backward Compatibility Aliases
  * ============================================================================ */
 
-/* AgentOS standard error code aliases */
+#ifndef AGENTOS_OK
 #define AGENTOS_OK                    cupolas_ERR_OK
+#endif
+#ifndef AGENTOS_ERR_UNKNOWN
 #define AGENTOS_ERR_UNKNOWN          cupolas_ERR_UNKNOWN
+#endif
+#ifndef AGENTOS_ERR_INVALID_PARAM
 #define AGENTOS_ERR_INVALID_PARAM   cupolas_ERR_INVALID_PARAM
+#endif
+#ifndef AGENTOS_ERR_NULL_POINTER
 #define AGENTOS_ERR_NULL_POINTER    cupolas_ERR_NULL_POINTER
+#endif
+#ifndef AGENTOS_ERR_OUT_OF_MEMORY
 #define AGENTOS_ERR_OUT_OF_MEMORY   cupolas_ERR_OUT_OF_MEMORY
+#endif
+#ifndef AGENTOS_ERR_BUFFER_TOO_SMALL
 #define AGENTOS_ERR_BUFFER_TOO_SMALL cupolas_ERR_BUFFER_TOO_SMALL
+#endif
+#ifndef AGENTOS_ERR_NOT_FOUND
 #define AGENTOS_ERR_NOT_FOUND        cupolas_ERR_NOT_FOUND
+#endif
+#ifndef AGENTOS_ERR_ALREADY_EXISTS
 #define AGENTOS_ERR_ALREADY_EXISTS   cupolas_ERR_ALREADY_EXISTS
+#endif
+#ifndef AGENTOS_ERR_TIMEOUT
 #define AGENTOS_ERR_TIMEOUT          cupolas_ERR_TIMEOUT
+#endif
+#ifndef AGENTOS_ERR_NOT_SUPPORTED
 #define AGENTOS_ERR_NOT_SUPPORTED    cupolas_ERR_NOT_SUPPORTED
+#endif
+#ifndef AGENTOS_ERR_PERMISSION_DENIED
 #define AGENTOS_ERR_PERMISSION_DENIED cupolas_ERR_PERMISSION_DENIED
+#endif
+#ifndef AGENTOS_ERR_IO
 #define AGENTOS_ERR_IO              cupolas_ERR_IO
+#endif
+#ifndef AGENTOS_ERR_STATE_ERROR
 #define AGENTOS_ERR_STATE_ERROR     cupolas_ERR_STATE_ERROR
+#endif
+#ifndef AGENTOS_ERR_OVERFLOW
 #define AGENTOS_ERR_OVERFLOW        cupolas_ERR_OVERFLOW
+#endif
 
-/* Legacy cupolas error code aliases */
+#ifndef cupolas_OK
 #define cupolas_OK                    cupolas_ERR_OK
+#endif
+#ifndef cupolas_ERROR_UNKNOWN
 #define cupolas_ERROR_UNKNOWN         cupolas_ERR_UNKNOWN
+#endif
+#ifndef cupolas_ERROR_INVALID_ARG
 #define cupolas_ERROR_INVALID_ARG     cupolas_ERR_INVALID_PARAM
+#endif
+#ifndef cupolas_ERROR_NO_MEMORY
 #define cupolas_ERROR_NO_MEMORY       cupolas_ERR_OUT_OF_MEMORY
+#endif
+#ifndef cupolas_ERROR_NOT_FOUND
 #define cupolas_ERROR_NOT_FOUND       cupolas_ERR_NOT_FOUND
+#endif
+#ifndef cupolas_ERROR_PERMISSION
 #define cupolas_ERROR_PERMISSION      cupolas_ERR_PERMISSION_DENIED
+#endif
+#ifndef cupolas_ERROR_BUSY
 #define cupolas_ERROR_BUSY            cupolas_ERR_STATE_ERROR
+#endif
+#ifndef cupolas_ERROR_TIMEOUT
 #define cupolas_ERROR_TIMEOUT         cupolas_ERR_TIMEOUT
+#endif
+#ifndef cupolas_ERROR_WOULD_BLOCK
 #define cupolas_ERROR_WOULD_BLOCK     cupolas_ERR_TRY_AGAIN
+#endif
+#ifndef cupolas_ERROR_OVERFLOW
 #define cupolas_ERROR_OVERFLOW         cupolas_ERR_OVERFLOW
+#endif
+#ifndef cupolas_ERROR_NOT_SUPPORTED
 #define cupolas_ERROR_NOT_SUPPORTED   cupolas_ERR_NOT_SUPPORTED
+#endif
+#ifndef cupolas_ERROR_IO
 #define cupolas_ERROR_IO             cupolas_ERR_IO
+#endif
 
 #ifdef __cplusplus
 }

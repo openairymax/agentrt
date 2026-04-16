@@ -18,7 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include "../../utils/cupolas_utils.h"
+#include "utils/cupolas_utils.h"
 
 #define DEFAULT_QUEUE_SIZE 10000
 #define DEFAULT_BATCH_SIZE 100
@@ -43,10 +43,10 @@ static void* audit_writer_thread(void* arg) {
     
     while (cupolas_atomic_load32(&logger->running)) {
         size_t actual_count = 0;
-        int ret = audit_queue_timed_pop(logger->queue, batch, DEFAULT_BATCH_SIZE, 
-                                         DEFAULT_FLUSH_INTERVAL_MS, &actual_count);
-        
-        if (ret == cupolas_OK && actual_count > 0) {
+        int ret = audit_queue_timed_pop(logger->queue, &batch[actual_count],
+                                         DEFAULT_FLUSH_INTERVAL_MS);
+        if (ret == cupolas_OK) {
+            actual_count++;
             for (size_t i = 0; i < actual_count; i++) {
                 if (audit_rotator_write(logger->rotator, batch[i]) == cupolas_OK) {
                     cupolas_atomic_add64(&logger->total_logged, 1);

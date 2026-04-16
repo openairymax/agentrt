@@ -122,8 +122,8 @@ static agentos_error_t attractor_iterate(
     }
 
     for (uint32_t iter = 0; iter < net->manager.max_iterations; iter++) {
-        // 计算每个模式与当前状态的内积
-        float* proj = (float*)alloca(candidate_count * sizeof(float));
+        float proj[candidate_count];
+        memset(proj, 0, candidate_count * sizeof(float));
         for (size_t i = 0; i < candidate_count; i++) {
             const float* pat = patterns + i * dim;
             float dot = 0.0f;

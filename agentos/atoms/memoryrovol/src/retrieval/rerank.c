@@ -41,6 +41,7 @@ struct agentos_reranker {
     agentos_mutex_t* lock;                /**< 线程安全锁 */
     int use_llm;                          /**< 是否使用LLM（降级标志） */
 };
+typedef struct agentos_reranker agentos_reranker_t;
 
 /**
  * @brief 创建重排序器实例
@@ -110,7 +111,7 @@ void agentos_reranker_destroy(agentos_reranker_t* reranker)
  * @param query [in] 原始查询字符串（用于LLM重排序）
  * @return AGENTOS_SUCCESS 成功
  * @return AGENTOS_EINVAL 参数无效
- * @return AGENTOS_ERROR 重排序失败
+ * @return AGENTOS_EUNKNOWN 重排序失败
  */
 agentos_error_t agentos_reranker_rerank(
     agentos_reranker_t* reranker,

@@ -88,6 +88,44 @@ agentos_error_t agentos_layer1_raw_flush(
  */
 void agentos_free_string_array(char** arr, size_t count);
 
+typedef struct agentos_raw_metadata {
+    char* record_id;
+    char* source;
+    char* content_type;
+    uint64_t created_ns;
+    uint64_t modified_ns;
+    uint64_t last_access;
+    size_t data_size;
+    size_t data_len;
+    uint32_t access_count;
+    double importance;
+    char* trace_id;
+    char* tags_json;
+    char** tags;
+    size_t tag_count;
+    uint64_t timestamp;
+} agentos_raw_metadata_t;
+
+typedef struct agentos_raw_metadata_db agentos_raw_metadata_db_t;
+
+agentos_error_t agentos_raw_metadata_db_open(
+    const char* path,
+    agentos_raw_metadata_db_t** out_db);
+
+void agentos_raw_metadata_db_close(
+    agentos_raw_metadata_db_t* db_handle);
+
+agentos_error_t agentos_raw_metadata_db_upsert(
+    agentos_raw_metadata_db_t* db_handle,
+    const agentos_raw_metadata_t* meta);
+
+agentos_error_t agentos_raw_metadata_db_query(
+    agentos_raw_metadata_db_t* db_handle,
+    const char* record_id,
+    agentos_raw_metadata_t** out_meta);
+
+void agentos_raw_metadata_free(agentos_raw_metadata_t* meta);
+
 #ifdef __cplusplus
 }
 #endif

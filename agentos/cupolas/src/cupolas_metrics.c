@@ -18,13 +18,14 @@
  */
 
 #include "cupolas_metrics.h"
-#include "../utils/cupolas_utils.h"
+#include "utils/cupolas_utils.h"
+#include "platform/platform.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
 
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
 #include <windows.h>
 #else
 #include <sys/time.h>
@@ -243,7 +244,7 @@ void metrics_summary_observe(const char* name, const char** label_values, double
 }
 
 uint64_t metrics_get_timestamp_ns(void) {
-#ifdef cupolas_PLATFORM_WINDOWS
+#if cupolas_PLATFORM_WINDOWS
     FILETIME ft;
     GetSystemTimeAsFileTime(&ft);
     ULONGLONG ticks = ((ULONGLONG)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
@@ -266,7 +267,7 @@ bool metrics_iter_next(metric_iterator_t* iter, metric_sample_t* sample) {
 void metrics_iter_destroy(metric_iterator_t* iter) {
 }
 
-static void format_label_values(char* buffer, size_t size,
+__attribute__((unused)) static void format_label_values(char* buffer, size_t size,
                                 const char** label_names,
                                 const char** label_values,
                                 size_t label_count) {

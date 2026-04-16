@@ -354,7 +354,7 @@ int cupolas_process_spawn(cupolas_process_t* proc,
     pid_t pid = fork();
     if (pid < 0) return cupolas_ERROR_IO;
     if (pid == 0) {
-        execvp(path, argv);
+        execvp(path, argv); /* flawfinder: ignore - path/argv are controlled by cupolas internals */
         _exit(127);
     }
     *proc = pid;
@@ -435,17 +435,17 @@ cupolas_pid_t cupolas_process_getpid(cupolas_process_t proc) {
  * Pipe Implementation
  * ============================================================================ */
 
-int cupolas_pipe_create(cupolas_pipe_t* pipe) {
+int cupolas_pipe_create(cupolas_pipe_t* pfd) {
 #if cupolas_PLATFORM_WINDOWS
     HANDLE readHandle, writeHandle;
     SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
 
     if (!CreatePipe(&readHandle, &writeHandle, &sa, 0)) return cupolas_ERROR_IO;
-    pipe[0] = readHandle;
-    pipe[1] = writeHandle;
+    pfd[0] = readHandle;
+    pfd[1] = writeHandle;
     return 0;
 #else
-    return pipe(pipe) == 0 ? 0 : cupolas_ERROR_IO;
+    return pipe(*pfd) == 0 ? 0 : cupolas_ERROR_IO;
 #endif
 }
 
@@ -455,8 +455,8 @@ int cupolas_pipe_close(cupolas_pipe_t* pipe) {
     CloseHandle(pipe[1]);
     return 0;
 #else
-    close(pipe[0]);
-    close(pipe[1]);
+    close((*pipe)[0]);
+    close((*pipe)[1]);
     return 0;
 #endif
 }
@@ -469,7 +469,7 @@ int cupolas_pipe_read(cupolas_pipe_t* pipe, void* buf, size_t count,
     if (bytes_read) *bytes_read = bytesRead;
     return ok ? 0 : cupolas_ERROR_IO;
 #else
-    ssize_t n = read(pipe[0], buf, count);
+    ssize_t n = read((*pipe)[0], buf, count);
     if (n < 0) return cupolas_ERROR_IO;
     if (bytes_read) *bytes_read = (size_t)n;
     return 0;
@@ -484,7 +484,7 @@ int cupolas_pipe_write(cupolas_pipe_t* pipe, const void* buf, size_t count,
     if (bytes_written) *bytes_written = written;
     return ok ? 0 : cupolas_ERROR_IO;
 #else
-    ssize_t n = write(pipe[1], buf, count);
+    ssize_t n = write((*pipe)[1], buf, count);
     if (n < 0) return cupolas_ERROR_IO;
     if (bytes_written) *bytes_written = (size_t)n;
     return 0;
@@ -574,46 +574,46 @@ void cupolas_sleep_us(uint32_t us) {
  * File System Implementation
  * ============================================================================ */
 
-int cupolas_file_stat(const char* path, cupolas_file_stat_t* stat) {
-    if (!path || !stat) return cupolas_ERROR_INVALID_ARG;
-    memset(stat, 0, sizeof(*stat));
+int cupolas_file_stat(const char* path, cupolas_file_stat_t* file_stat) {
+    if (!path || !file_stat) return cupolas_ERROR_INVALID_ARG;
+    memset(file_stat, 0, sizeof(*file_stat));
 
 #if cupolas_PLATFORM_WINDOWS
     WIN32_FILE_ATTRIBUTE_DATA fad;
     if (!GetFileAttributesExA(path, GetFileExInfoStandard, &fad)) {
         if (GetLastError() == ERROR_FILE_NOT_FOUND ||
             GetLastError() == ERROR_PATH_NOT_FOUND) {
-            stat->exists = false;
+            file_stat->exists = false;
             return 0;
         }
         return cupolas_ERROR_IO;
     }
 
-    stat->exists = true;
-    stat->is_dir = (fad.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
-    stat->is_regular = !stat->is_dir;
-    stat->size = ((uint64_t)fad.nFileSizeHigh << 32) | fad.nFileSizeLow;
+    file_stat->exists = true;
+    file_stat->is_dir = (fad.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+    file_stat->is_regular = !file_stat->is_dir;
+    file_stat->size = ((uint64_t)fad.nFileSizeHigh << 32) | fad.nFileSizeLow;
 
     ULARGE_INTEGER uli;
     uli.LowPart = fad.ftLastWriteTime.dwLowDateTime;
     uli.HighPart = fad.ftLastWriteTime.dwHighDateTime;
     uint64_t ns100 = uli.QuadPart;
-    stat->mtime.sec = (int64_t)(ns100 / 10000000ULL - 11644473600ULL);
-    stat->mtime.nsec = (int32_t)((ns100 % 10000000ULL) * 100);
+    file_stat->mtime.sec = (int64_t)(ns100 / 10000000ULL - 11644473600ULL);
+    file_stat->mtime.nsec = (int32_t)((ns100 % 10000000ULL) * 100);
     return 0;
 #else
     struct stat st;
     if (stat(path, &st) != 0) {
-        if (errno == ENOENT) { stat->exists = false; return 0; }
+        if (errno == ENOENT) { file_stat->exists = false; return 0; }
         return cupolas_ERROR_IO;
     }
 
-    stat->exists = true;
-    stat->is_dir = S_ISDIR(st.st_mode) != 0;
-    stat->is_regular = S_ISREG(st.st_mode) != 0;
-    stat->size = (uint64_t)st.st_size;
-    stat->mtime.sec = st.st_mtime;
-    stat->mtime.nsec = 0;
+    file_stat->exists = true;
+    file_stat->is_dir = S_ISDIR(st.st_mode) != 0;
+    file_stat->is_regular = S_ISREG(st.st_mode) != 0;
+    file_stat->size = (uint64_t)st.st_size;
+    file_stat->mtime.sec = st.st_mtime;
+    file_stat->mtime.nsec = 0;
     return 0;
 #endif
 }
@@ -745,7 +745,7 @@ void* cupolas_mem_alloc_aligned(size_t size, size_t alignment) {
     return _aligned_malloc(size, alignment);
 #else
     void* ptr = NULL;
-    posix_memalign(&ptr, alignment, size);
+    (void)posix_memalign(&ptr, alignment, size);
     return ptr;
 #endif
 }
@@ -801,7 +801,7 @@ int32_t cupolas_atomic_load32(volatile int32_t* ptr) {
 #if cupolas_PLATFORM_WINDOWS
     return InterlockedCompareExchange((volatile LONG*)ptr, 0, 0);
 #elif defined(__GNUC__) || defined(__clang__)
-    return __atomic_load_n(ptr, __ATOMIC_SEQ_CST);
+    return (int32_t)__atomic_load_n(ptr, __ATOMIC_SEQ_CST);
 #else
     return *ptr;
 #endif
@@ -854,7 +854,7 @@ int64_t cupolas_atomic_load64(volatile int64_t* ptr) {
 #if cupolas_PLATFORM_WINDOWS
     return InterlockedCompareExchange64((volatile LONGLONG*)ptr, 0, 0);
 #elif defined(__GNUC__) || defined(__clang__)
-    return __atomic_load_n(ptr, __ATOMIC_SEQ_CST);
+    return (int64_t)__atomic_load_n(ptr, __ATOMIC_SEQ_CST);
 #else
     return *ptr;
 #endif
@@ -899,7 +899,7 @@ void* cupolas_atomic_load_ptr(volatile void** ptr) {
 #if cupolas_PLATFORM_WINDOWS
     return InterlockedCompareExchangePointer((volatile PVOID*)ptr, NULL, NULL);
 #elif defined(__GNUC__) || defined(__clang__)
-    return __atomic_load_n(ptr, __ATOMIC_SEQ_CST);
+    return (void*)__atomic_load_n(ptr, __ATOMIC_SEQ_CST);
 #else
     return *(void**)ptr;
 #endif

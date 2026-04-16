@@ -304,7 +304,7 @@ agentos_error_t agentos_llm_service_call(
     if (res != CURLE_OK) {
         AGENTOS_LOG_ERROR("LLM service call failed: %s", curl_easy_strerror(res));
         if (response.data) AGENTOS_FREE(response.data);
-        return AGENTOS_ERROR;
+        return AGENTOS_EUNKNOWN;
     }
 
     /* 检查 HTTP 状态码 */
@@ -313,7 +313,7 @@ agentos_error_t agentos_llm_service_call(
     if (response_code != 200) {
         AGENTOS_LOG_ERROR("LLM service returned error code: %ld", response_code);
         if (response.data) AGENTOS_FREE(response.data);
-        return AGENTOS_ERROR;
+        return AGENTOS_EUNKNOWN;
     }
 
     /* 解析响应 JSON */
@@ -322,7 +322,7 @@ agentos_error_t agentos_llm_service_call(
 
     if (!response_json) {
         AGENTOS_LOG_ERROR("Failed to parse LLM response");
-        return AGENTOS_ERROR;
+        return AGENTOS_EUNKNOWN;
     }
 
     /* 提取响应内容 */
@@ -330,7 +330,7 @@ agentos_error_t agentos_llm_service_call(
     if (!choices || !cJSON_IsArray(choices) || cJSON_GetArraySize(choices) == 0) {
         AGENTOS_LOG_ERROR("No choices in LLM response");
         cJSON_Delete(response_json);
-        return AGENTOS_ERROR;
+        return AGENTOS_EUNKNOWN;
     }
 
     cJSON* first_choice = cJSON_GetArrayItem(choices, 0);
@@ -338,14 +338,14 @@ agentos_error_t agentos_llm_service_call(
     if (!message_obj) {
         AGENTOS_LOG_ERROR("No message in LLM response");
         cJSON_Delete(response_json);
-        return AGENTOS_ERROR;
+        return AGENTOS_EUNKNOWN;
     }
 
     cJSON* content = cJSON_GetObjectItemCaseSensitive(message_obj, "content");
     if (!content || !cJSON_IsString(content)) {
         AGENTOS_LOG_ERROR("No content in LLM response");
         cJSON_Delete(response_json);
-        return AGENTOS_ERROR;
+        return AGENTOS_EUNKNOWN;
     }
 
     *out_response = AGENTOS_STRDUP(content->valuestring);

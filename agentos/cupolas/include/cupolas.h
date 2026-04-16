@@ -27,47 +27,109 @@
 #define CUPOLAS_H
 
 #include <stddef.h>
-/* 统一错误码定义：使用commons权威基础库 */
 #include "../../commons/include/agentos_types.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* ============================================================================
- * Unified Error Codes (Following AgentOS Standard)
- * ============================================================================ */
+#ifndef CUPOLAS_API
+#if defined(_WIN32) || defined(_WIN64) || defined(__CYGWIN__)
+    #ifdef CUPOLAS_BUILDING_DLL
+        #define CUPOLAS_API __declspec(dllexport)
+    #else
+        #define CUPOLAS_API __declspec(dllimport)
+    #endif
+#elif defined(__GNUC__) || defined(__clang__)
+    #define CUPOLAS_API __attribute__((visibility("default")))
+#else
+    #define CUPOLAS_API
+#endif
+#endif
 
-/* agentos_error_t defined in agentos_types.h */
-
+#ifndef AGENTOS_OK
 #define AGENTOS_OK                     0
+#endif
+#ifndef AGENTOS_ERR_UNKNOWN
 #define AGENTOS_ERR_UNKNOWN           -1
+#endif
+#ifndef AGENTOS_ERR_INVALID_PARAM
 #define AGENTOS_ERR_INVALID_PARAM     -2
+#endif
+#ifndef AGENTOS_ERR_NULL_POINTER
 #define AGENTOS_ERR_NULL_POINTER      -3
+#endif
+#ifndef AGENTOS_ERR_OUT_OF_MEMORY
 #define AGENTOS_ERR_OUT_OF_MEMORY     -4
+#endif
+#ifndef AGENTOS_ERR_BUFFER_TOO_SMALL
 #define AGENTOS_ERR_BUFFER_TOO_SMALL  -5
+#endif
+#ifndef AGENTOS_ERR_NOT_FOUND
 #define AGENTOS_ERR_NOT_FOUND         -6
+#endif
+#ifndef AGENTOS_ERR_ALREADY_EXISTS
 #define AGENTOS_ERR_ALREADY_EXISTS    -7
+#endif
+#ifndef AGENTOS_ERR_TIMEOUT
 #define AGENTOS_ERR_TIMEOUT           -8
+#endif
+#ifndef AGENTOS_ERR_NOT_SUPPORTED
 #define AGENTOS_ERR_NOT_SUPPORTED     -9
+#endif
+#ifndef AGENTOS_ERR_PERMISSION_DENIED
 #define AGENTOS_ERR_PERMISSION_DENIED -10
+#endif
+#ifndef AGENTOS_ERR_IO
 #define AGENTOS_ERR_IO               -11
+#endif
+#ifndef AGENTOS_ERR_STATE_ERROR
 #define AGENTOS_ERR_STATE_ERROR      -13
+#endif
+#ifndef AGENTOS_ERR_OVERFLOW
 #define AGENTOS_ERR_OVERFLOW         -14
+#endif
 
-/* Backward Compatibility Aliases */
+#ifndef cupolas_OK
 #define cupolas_OK                    AGENTOS_OK
+#endif
+#ifndef cupolas_ERROR_UNKNOWN
 #define cupolas_ERROR_UNKNOWN         AGENTOS_ERR_UNKNOWN
+#endif
+#ifndef cupolas_ERROR_INVALID_ARG
 #define cupolas_ERROR_INVALID_ARG     AGENTOS_ERR_INVALID_PARAM
+#endif
+#ifndef cupolas_ERROR_NO_MEMORY
 #define cupolas_ERROR_NO_MEMORY       AGENTOS_ERR_OUT_OF_MEMORY
+#endif
+#ifndef cupolas_ERROR_NOT_FOUND
 #define cupolas_ERROR_NOT_FOUND       AGENTOS_ERR_NOT_FOUND
+#endif
+#ifndef cupolas_ERROR_PERMISSION
 #define cupolas_ERROR_PERMISSION      AGENTOS_ERR_PERMISSION_DENIED
+#endif
+#ifndef cupolas_ERROR_BUSY
 #define cupolas_ERROR_BUSY            AGENTOS_ERR_STATE_ERROR
+#endif
+#ifndef cupolas_ERROR_TIMEOUT
 #define cupolas_ERROR_TIMEOUT         AGENTOS_ERR_TIMEOUT
+#endif
+#ifndef cupolas_ERROR_WOULD_BLOCK
 #define cupolas_ERROR_WOULD_BLOCK     AGENTOS_ERR_STATE_ERROR
+#endif
+#ifndef cupolas_ERROR_OVERFLOW
 #define cupolas_ERROR_OVERFLOW        AGENTOS_ERR_OVERFLOW
+#endif
+#ifndef cupolas_ERROR_NOT_SUPPORTED
 #define cupolas_ERROR_NOT_SUPPORTED   AGENTOS_ERR_NOT_SUPPORTED
+#endif
+#ifndef cupolas_ERROR_IO
 #define cupolas_ERROR_IO             AGENTOS_ERR_IO
+#endif
+
+#ifndef CUPOLAS_OK
+#define CUPOLAS_OK                    cupolas_OK
+#endif
 
 /* ============================================================================
  * Initialization and Cleanup

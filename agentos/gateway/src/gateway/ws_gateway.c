@@ -23,6 +23,8 @@
 #include "../utils/gateway_utils.h"
 #include "../utils/gateway_rpc_handler.h"
 
+#ifdef GATEWAY_HAS_WS
+
 #include <libwebsockets.h>
 #include <cJSON.h>
 #include <string.h>
@@ -633,3 +635,15 @@ gateway_t* ws_gateway_create(const char* host, uint16_t port) {
 
     return gw;
 }
+
+#endif /* GATEWAY_HAS_WS */
+
+#ifndef GATEWAY_HAS_WS
+
+gateway_t* ws_gateway_create(const char* host, uint16_t port) {
+    (void)host;
+    (void)port;
+    return NULL;
+}
+
+#endif /* !GATEWAY_HAS_WS */
