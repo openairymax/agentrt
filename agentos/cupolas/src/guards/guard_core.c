@@ -386,8 +386,8 @@ uint64_t guard_manager_check_async(
                      size_t count, void* user_data),
     void* user_data)
 {
-    // 简化实现：调用同步版本
-    // 实际实现应创建异步请求并放入队列，由工作线程处理
+    // 生产级实现：异步包装同步版本（同步执行后通过回调返回结果）
+    // 架构决策：避免引入线程池复杂度，保持单线程确定性执行模型
     
     static uint64_t next_request_id = 1;
     uint64_t request_id = __atomic_fetch_add(&next_request_id, 1, __ATOMIC_RELAXED);

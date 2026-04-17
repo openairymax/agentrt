@@ -334,7 +334,7 @@ int cognition_select_best_agent(agent_info_t* agents, size_t agent_count,
     if (!result->selected_agent) {
         result->success = false;
         result->error = memory_safe_strdup("Failed to allocate memory for selected agent");
-        result->error_size = strlen(result->error);
+        result->error_size = result->error ? strlen(result->error) : 0;
         return -1;
     }
     

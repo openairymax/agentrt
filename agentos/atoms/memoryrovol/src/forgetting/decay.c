@@ -15,7 +15,6 @@
 
 #include <agentos/memory.h>
 #include <agentos/string.h>
-#include <string.h>
 
 #define ADAPTIVE_SAMPLE_SIZE 50      /* 自适应学习所需的最小样本数 */
 #define DEFAULT_LEARNING_RATE 0.05f   /* 默认学习率 */
@@ -317,9 +316,7 @@ agentos_error_t agentos_forgetting_start_auto(agentos_forgetting_engine_t* engin
 void agentos_forgetting_stop_auto(agentos_forgetting_engine_t* engine) {
     if (!engine || !engine->auto_running) return;
     engine->auto_running = 0;
-    if (engine->auto_running) {
-        agentos_thread_join(engine->auto_thread, NULL);
-    }
+    agentos_thread_join(engine->auto_thread, NULL);
 }
 
 /**

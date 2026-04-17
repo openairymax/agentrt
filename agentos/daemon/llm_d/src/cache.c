@@ -253,8 +253,16 @@ void cache_clear(cache_t* cache) {
         cache->buckets[i].head = NULL;
         agentos_mutex_unlock(&cache->buckets[i].lock);
     }
-    agentos_mutex_lock(&cache->lru_lock);
+    agentos_mutex_unlock(&cache->lru_lock);
     cache->lru_head = cache->lru_tail = NULL;
     cache->size = 0;
     agentos_mutex_unlock(&cache->lru_lock);
+}
+
+size_t cache_size(cache_t* cache) {
+    return cache ? cache->size : 0;
+}
+
+size_t cache_capacity(cache_t* cache) {
+    return cache ? cache->capacity : 0;
 }

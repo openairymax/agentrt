@@ -48,7 +48,7 @@ class _RetryableError(Exception):
 
 
 @dataclass
-class manager:
+class ClientConfig:
     """
     客户端配置
     
@@ -75,9 +75,9 @@ class manager:
         if self.max_retries < 0:
             raise AgentOSError("最大重试次数不能为负数")
 
-    def clone(self) -> 'manager':
+    def clone(self) -> 'ClientConfig':
         """创建配置副本"""
-        return manager(
+        return ClientConfig(
             endpoint=self.endpoint,
             timeout=self.timeout,
             max_retries=self.max_retries,
@@ -167,17 +167,17 @@ class APIClient(ABC):
 class Client(APIClient):
     """AgentOS Python SDK 核心客户端"""
 
-    def __init__(self, manager: Optional[manager] = None, **kwargs):
+    def __init__(self, config: Optional[ClientConfig] = None, **kwargs):
         """初始化客户端"""
-        if manager is None:
-            manager = manager()
+        if config is None:
+            config = ClientConfig()
 
         for key, value in kwargs.items():
-            if hasattr(manager, key):
-                setattr(manager, key, value)
+            if hasattr(config, key):
+                setattr(config, key, value)
 
-        manager.validate()
-        self._config = manager
+        config.validate()
+        self._config = config
         self._session = self._create_session()
 
     def _create_session(self) -> requests.Session:
@@ -214,7 +214,7 @@ class Client(APIClient):
         return session
 
     @property
-    def manager(self) -> manager:
+    def config(self) -> ClientConfig:
         """获取配置副本"""
         return self._config.clone()
 
@@ -384,8 +384,7 @@ class Client(APIClient):
         """分类请求错误"""
         if isinstance(error, requests.Timeout):
             return AgentOSTimeoutError(
-                timeout_ms=int(request_config['timeout'] * 1000),
-                operation=f"{request_config['method']} {request_config['path']}"
+                operation=f"{request_config['method']} {request_config['path']} (timeout={request_config['timeout']}s)"
             )
         elif isinstance(error, requests.ConnectionError):
             return NetworkError(f"连接错误：{error}")

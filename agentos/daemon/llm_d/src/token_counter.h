@@ -8,7 +8,9 @@
 #define LLM_TOKEN_COUNTER_H
 
 #include <stddef.h>
+#ifdef HAVE_TIKTOKEN
 #include <tiktoken.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {

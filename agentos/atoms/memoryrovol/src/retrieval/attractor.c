@@ -89,7 +89,7 @@ static agentos_error_t attractor_iterate(
 
     // 构建候选向量矩�?
     float* patterns = (float*)AGENTOS_MALLOC(candidate_count * dim * sizeof(float));
-    if (!patterns) {
+    if (!patterns || (candidate_count > 0 && dim > 0 && candidate_count * dim / dim != candidate_count)) {
         AGENTOS_LOG_ERROR("Failed to allocate patterns matrix");
         return AGENTOS_ENOMEM;
     }
@@ -121,8 +121,15 @@ static agentos_error_t attractor_iterate(
         return AGENTOS_ENOMEM;
     }
 
+    float* proj = (float*)AGENTOS_MALLOC(candidate_count * sizeof(float));
+    if (!proj) {
+        AGENTOS_FREE(patterns);
+        AGENTOS_FREE(state);
+        AGENTOS_FREE(new_state);
+        return AGENTOS_ENOMEM;
+    }
+
     for (uint32_t iter = 0; iter < net->manager.max_iterations; iter++) {
-        float proj[candidate_count];
         memset(proj, 0, candidate_count * sizeof(float));
         for (size_t i = 0; i < candidate_count; i++) {
             const float* pat = patterns + i * dim;
@@ -152,7 +159,9 @@ static agentos_error_t attractor_iterate(
         if (diff < net->manager.tolerance) break;
     }
 
-    // 找到与最终状态最接近的候�?
+    AGENTOS_FREE(proj);
+
+    // 找到与最终状态最接近的候选模式
     float best_sim = -1.0f;
     int best_idx = -1;
     for (size_t i = 0; i < candidate_count; i++) {

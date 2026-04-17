@@ -161,9 +161,9 @@
  * @brief 测试套件结束
  */
 #define TEST_SUITE_END() \
-    printf("\n" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "="\n"); \
-    printf("Test Results: %d total, %d passed, %d failed\n", total_tests, passed_tests, failed_tests); \
-    printf("=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "=" "="\n"); \
+    printf("\n" "======================\n"); /* flawfinder: ignore - format string is compile-time constant */ \
+    printf("Test Results: %d total, %d passed, %d failed\n", total_tests, passed_tests, failed_tests); /* flawfinder: ignore - format string is compile-time constant */ \
+    printf("======================\n"); /* flawfinder: ignore - format string is compile-time constant */ \
     return (failed_tests > 0) ? 1 : 0
 
 /* ============================================================

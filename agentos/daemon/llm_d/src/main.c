@@ -20,6 +20,8 @@
 #include "jsonrpc_helpers.h"
 #include "method_dispatcher.h"
 #include "param_validator.h"
+#include "svc_logger.h"
+#include "daemon_errors.h"
 #include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -204,6 +206,10 @@ static int parse_params(cJSON* params, request_context_t* ctx, llm_request_confi
 
 /* ==================== 方法处理器包装函数 ==================== */
 
+/* 前向声明 */
+static char* handle_complete(cJSON* params, int id);
+static char* handle_complete_stream(cJSON* params, int id, agentos_socket_t client_fd);
+
 /**
  * @brief complete 方法的包装器（适配 method_dispatcher 接口）
  */
@@ -303,6 +309,15 @@ static char* handle_complete(cJSON* params, int id) {
 /**
  * @brief 处理 complete_stream 方法
  */
+typedef struct {
+    agentos_socket_t fd;
+} llm_stream_ctx_t;
+
+static void llm_stream_callback(const char* chunk, void* user_data) {
+    llm_stream_ctx_t* sctx = (llm_stream_ctx_t*)user_data;
+    agentos_socket_send(sctx->fd, chunk, strlen(chunk));
+}
+
 static char* handle_complete_stream(cJSON* params, int id, agentos_socket_t client_fd) {
     request_context_t* ctx = request_context_create();
     if (!ctx) {
@@ -317,18 +332,10 @@ static char* handle_complete_stream(cJSON* params, int id, agentos_socket_t clie
     
     cfg.stream = 1;
     
-    /* 流式回调函数 */
-    struct {
-        agentos_socket_t fd;
-    } stream_ctx = { client_fd };
-    
-    auto void stream_callback(const char* chunk, void* user_data) {
-        agentos_socket_t fd = ((typeof(stream_ctx)*)user_data)->fd;
-        agentos_socket_send(fd, chunk, strlen(chunk));
-    }
+    llm_stream_ctx_t stream_ctx = { .fd = client_fd };
     
     llm_response_t* resp = NULL;
-    int ret = llm_service_complete_stream(g_service, &cfg, stream_callback, &stream_ctx, &resp);
+    int ret = llm_service_complete_stream(g_service, &cfg, llm_stream_callback, &stream_ctx, &resp);
     
     if (ret != 0) {
         request_context_destroy(ctx);
@@ -340,7 +347,7 @@ static char* handle_complete_stream(cJSON* params, int id, agentos_socket_t clie
     }
     
     request_context_destroy(ctx);
-    return NULL;  /* 流式响应已发送 */
+    return NULL;
 }
 
 /* ==================== 客户端处理 ==================== */

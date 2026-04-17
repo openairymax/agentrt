@@ -97,12 +97,9 @@ agentos_uuid_error_t agentos_uuid_v4(char* out_buf, size_t buf_len) {
     memcpy(uuid, uuid_mac, 16);
 
 #else
+    srand((unsigned int)(time(NULL) ^ (uintptr_t)&uuid));
     for (int i = 0; i < 16; i++) {
-        if (i == 6) {
-            uuid[i] = 0x40 | (uuid[i] & 0x0F);
-        } else if (i == 8) {
-            uuid[i] = 0x80 | (uuid[i] & 0x3F);
-        }
+        uuid[i] = (unsigned char)(rand() & 0xFF);
     }
 #endif
 

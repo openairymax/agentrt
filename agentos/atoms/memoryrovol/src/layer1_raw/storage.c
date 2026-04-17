@@ -24,6 +24,18 @@
 #define DEFAULT_QUEUE_SIZE 1024
 #define DEFAULT_WORKERS 4
 
+static int is_path_component_safe(const char* id) {
+    if (!id || !*id) return 0;
+    for (const char* p = id; *p; p++) {
+        if (*p == '/' || *p == '\\' || *p == ':' || *p == '*' ||
+            *p == '?' || *p == '"' || *p == '<' || *p == '>' || *p == '|') {
+            return 0;
+        }
+    }
+    if (strstr(id, "..") != NULL) return 0;
+    return 1;
+}
+
 /**
  * @brief L1 原始卷内部结构
  */
@@ -172,6 +184,7 @@ agentos_error_t agentos_layer1_raw_write(
     const void* data,
     size_t len) {
     if (!l1 || !id || !data) return AGENTOS_EINVAL;
+    if (!is_path_component_safe(id)) return AGENTOS_EINVAL;
 
     char filepath[512];
     snprintf(filepath, sizeof(filepath), "%s/%s.dat", l1->inner->storage_path, id);
@@ -191,6 +204,7 @@ agentos_error_t agentos_layer1_raw_read(
     void** out_data,
     size_t* out_len) {
     if (!l1 || !id || !out_data) return AGENTOS_EINVAL;
+    if (!is_path_component_safe(id)) return AGENTOS_EINVAL;
 
     char filepath[512];
     snprintf(filepath, sizeof(filepath), "%s/%s.dat", l1->inner->storage_path, id);
@@ -202,7 +216,12 @@ agentos_error_t agentos_layer1_raw_read(
     long len = ftell(fp);
     fseek(fp, 0, SEEK_SET);
 
-    void* data = AGENTOS_MALLOC(len);
+    if (len <= 0) {
+        fclose(fp);
+        return len < 0 ? AGENTOS_EIO : AGENTOS_ENOENT;
+    }
+
+    void* data = AGENTOS_MALLOC((size_t)len);
     if (!data) {
         fclose(fp);
         return AGENTOS_ENOMEM;
@@ -226,6 +245,7 @@ agentos_error_t agentos_layer1_raw_delete(
     agentos_layer1_raw_t* l1,
     const char* id) {
     if (!l1 || !id) return AGENTOS_EINVAL;
+    if (!is_path_component_safe(id)) return AGENTOS_EINVAL;
 
     char filepath[512];
     snprintf(filepath, sizeof(filepath), "%s/%s.dat", l1->inner->storage_path, id);

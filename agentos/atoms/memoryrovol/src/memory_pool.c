@@ -50,6 +50,12 @@ memory_pool_t* memory_pool_create(uint8_t pool_id, const char* name, uint64_t si
 
     pool->pool_id = pool_id;
     pool->pool_name = name ? AGENTOS_STRDUP(name) : NULL;
+    if (name && !pool->pool_name) {
+        agentos_mutex_destroy(pool->lock);
+        AGENTOS_FREE(pool->base_address);
+        AGENTOS_FREE(pool);
+        return NULL;
+    }
     pool->total_size = size;
     pool->used_size = 0;
     pool->peak_size = 0;

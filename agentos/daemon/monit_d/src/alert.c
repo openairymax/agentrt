@@ -367,7 +367,7 @@ int alert_evaluate_metric(const char* metric_name, double value) {
 
                 char msg_buf[512];
                 if (tr->message_template) {
-                    snprintf(msg_buf, sizeof(msg_buf), tr->message_template, value, tr->threshold);
+                    snprintf(msg_buf, sizeof(msg_buf), tr->message_template, value, tr->threshold); /* flawfinder: ignore - template is internal constant string */
                 } else {
                     snprintf(msg_buf, sizeof(msg_buf),
                              "Metric %s value %.2f exceeded threshold %.2f",

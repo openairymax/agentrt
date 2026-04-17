@@ -43,6 +43,18 @@ agentos_error_t async_storage_build_file_path(const char* storage_path, const ch
                                               char* file_path, size_t max_len) {
     if (!storage_path || !id || !file_path) return AGENTOS_EINVAL;
 
+    for (const char* p = id; *p; p++) {
+        if (*p == '/' || *p == '\\' || *p == ':' || *p == '*' ||
+            *p == '?' || *p == '"' || *p == '<' || *p == '>' || *p == '|') {
+            AGENTOS_LOG_ERROR("Invalid character in record ID: %s", id);
+            return AGENTOS_EINVAL;
+        }
+    }
+    if (strstr(id, "..") != NULL) {
+        AGENTOS_LOG_ERROR("Path traversal attempt in record ID: %s", id);
+        return AGENTOS_EINVAL;
+    }
+
     int written = snprintf(file_path, max_len, "%s/%s.raw", storage_path, id);
     if (written < 0 || (size_t)written >= max_len) {
         AGENTOS_LOG_ERROR("File path too long: %s/%s.raw", storage_path, id);

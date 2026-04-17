@@ -18,7 +18,7 @@
 #include <string.h>
 
 typedef struct {
-    market_service_t market_svc;
+    market_service_t* market_svc;
     market_config_t market_cfg;
     agentos_svc_config_t common_cfg;
     bool owns_service;
@@ -58,8 +58,8 @@ static agentos_error_t market_adapter_init(
         market_config_from_common(&ctx->market_cfg, &ctx->common_cfg);
         int ret = market_service_create(&ctx->market_cfg, &ctx->market_svc);
         if (ret != 0 || !ctx->market_svc) {
-            svc_logger_error("市场服务创建失败: %d", ret);
-            return AGENTOS_ERROR;
+            SVC_LOG_ERROR("市场服务创建失败: %d", ret);
+            return AGENTOS_ERR_UNKNOWN;
         }
         ctx->owns_service = true;
     }
@@ -71,7 +71,7 @@ static agentos_error_t market_adapter_start(agentos_service_t service) {
     if (!service) return AGENTOS_EINVAL;
     market_adapter_ctx_t* ctx = market_get_ctx(service);
     if (!ctx || !ctx->market_svc) return AGENTOS_ENOTINIT;
-    svc_logger_info("市场服务适配器已启动");
+    SVC_LOG_INFO("市场服务适配器已启动");
     return AGENTOS_SUCCESS;
 }
 
@@ -79,7 +79,7 @@ static agentos_error_t market_adapter_stop(agentos_service_t service, bool force
     if (!service) return AGENTOS_EINVAL;
     market_adapter_ctx_t* ctx = market_get_ctx(service);
     if (!ctx) return AGENTOS_EINVAL;
-    svc_logger_info("市场服务适配器已停止");
+    SVC_LOG_INFO("市场服务适配器已停止");
     return AGENTOS_SUCCESS;
 }
 
@@ -104,7 +104,8 @@ static agentos_error_t market_adapter_healthcheck(agentos_service_t service) {
     if (!service) return AGENTOS_EINVAL;
     market_adapter_ctx_t* ctx = market_get_ctx(service);
     if (!ctx) return AGENTOS_EINVAL;
-    return ctx->market_svc ? AGENTOS_SUCCESS : AGENTOS_ENOTINIT;
+    if (!ctx->market_svc) return AGENTOS_ENOTINIT;
+    return AGENTOS_SUCCESS;
 }
 
 static const agentos_svc_interface_t market_adapter_iface = {
@@ -156,7 +157,7 @@ agentos_error_t market_service_adapter_create(
 
 agentos_error_t market_service_adapter_wrap(
     agentos_service_t* out_service,
-    market_service_t market_svc,
+    market_service_t* market_svc,
     const agentos_svc_config_t* config
 ) {
     if (!out_service || !market_svc) return AGENTOS_EINVAL;
@@ -194,7 +195,7 @@ agentos_error_t market_service_adapter_wrap(
     return AGENTOS_SUCCESS;
 }
 
-market_service_t market_service_adapter_get_original(agentos_service_t service) {
+market_service_t* market_service_adapter_get_original(agentos_service_t service) {
     if (!service) return NULL;
     market_adapter_ctx_t* ctx = market_get_ctx(service);
     return ctx ? ctx->market_svc : NULL;

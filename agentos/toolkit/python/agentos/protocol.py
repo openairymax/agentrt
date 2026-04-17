@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+import asyncio
 from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Any, Callable, Dict, List, Optional, Union
@@ -351,12 +352,13 @@ class ProtocolClient:
                                params: Dict[str, Any]) -> Dict[str, Any]:
 
         if self._config.protocol_type == ProtocolType.OPENAI:
-            messages = params.pop("messages", [])
+            local_params = dict(params)
+            messages = local_params.pop("messages", [])
             return {
-                "model": params.pop("model", "gpt-4o"),
+                "model": local_params.pop("model", "gpt-4o"),
                 "messages": messages,
-                "temperature": params.pop("temperature", 0.7),
-                "max_tokens": params.pop("max_tokens", 2048),
+                "temperature": local_params.pop("temperature", 0.7),
+                "max_tokens": local_params.pop("max_tokens", 2048),
                 "stream": self._config.enable_streaming,
             }
 
@@ -385,6 +387,3 @@ class ProtocolClient:
             "method": method,
             "params": params,
         }
-
-
-import asyncio

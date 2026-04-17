@@ -15,6 +15,7 @@
 
 #include "platform.h"
 #include "error.h"
+#include "daemon_errors.h"
 
 #ifdef __cplusplus
 extern "C" {

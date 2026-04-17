@@ -24,6 +24,7 @@
 #define MAX_TRACES 512
 #define MAX_TRACE_SPANS 64
 #define MAX_REPORT_SIZE 65536
+#define MAX_METRICS 256
 
 typedef struct {
     char* alert_id;
@@ -548,7 +549,8 @@ int monitor_service_start_agent_trace(monitor_service_t* service, const char* ag
 
     agent_execution_trace_t* t = (agent_execution_trace_t*)calloc(1, sizeof(agent_execution_trace_t));
     if (t) {
-        t->trace_id = entry->trace_id;
+        t->agent_id = agent_id ? strdup(agent_id) : NULL;
+        t->task_id = task_id ? strdup(task_id) : NULL;
     }
 
     *trace = t;
@@ -589,7 +591,8 @@ int monitor_service_end_agent_trace(monitor_service_t* service,
 
     agentos_mutex_lock(&service->trace_lock);
     for (size_t i = 0; i < service->trace_count; i++) {
-        if (service->traces[i].trace_id == trace->trace_id) {
+        if (service->traces[i].trace_id && trace->agent_id && 
+            strcmp(service->traces[i].trace_id, trace->agent_id) == 0) {
             service->traces[i].end_time = get_timestamp_ms();
             service->traces[i].status = 0;
             break;
@@ -632,11 +635,11 @@ int monitor_service_export_agent_trace(monitor_service_t* service,
     if (strcmp(fmt, "json") == 0) {
         snprintf(buf, sizeof(buf),
                  "{\"trace_id\":\"%s\",\"format\":\"json\"}",
-                 trace && trace->trace_id ? trace->trace_id : "unknown");
+                 trace && trace->agent_id ? trace->agent_id : "unknown");
     } else {
         snprintf(buf, sizeof(buf),
                  "trace_id=%s\nformat=%s\n",
-                 trace && trace->trace_id ? trace->trace_id : "unknown", fmt);
+                 trace && trace->agent_id ? trace->agent_id : "unknown", fmt);
     }
 
     *data = strdup(buf);
