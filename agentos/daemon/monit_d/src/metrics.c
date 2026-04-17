@@ -13,6 +13,7 @@
 #include "monitor_service.h"
 #include "platform.h"
 #include "error.h"
+#include "daemon_errors.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -27,14 +28,15 @@
 #define DEFAULT_EXPORT_INTERVAL_MS 60000
 #define DEFAULT_RETENTION_SECONDS 3600
 
-/* ==================== 指标类型 ==================== */
+/* ==================== 指标配置类型 ==================== */
 
-typedef enum {
-    METRIC_TYPE_COUNTER,
-    METRIC_TYPE_GAUGE,
-    METRIC_TYPE_HISTOGRAM,
-    METRIC_TYPE_SUMMARY
-} metric_type_t;
+typedef struct {
+    uint32_t export_interval_ms;
+    uint32_t retention_seconds;
+} metrics_config_t;
+
+/* ==================== 指标类型 ==================== */
+/* metric_type_t 已在 monitor_service.h 中定义 */
 
 /* ==================== 标签 ==================== */
 

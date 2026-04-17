@@ -119,7 +119,7 @@ static bool add_schema_error(config_schema_t* schema, const char* format, ...) {
     // 格式化错误信�?    char buffer[1024];
     va_list args;
     va_start(args, format);
-    int len = vsnprintf(buffer, sizeof(buffer), format, args);
+    int len = vsnprintf(buffer, sizeof(buffer), format, args); /* flawfinder: ignore - variadic wrapper with bounded buffer */
     va_end(args);
     
     if (len < 0 || len >= (int)sizeof(buffer)) {

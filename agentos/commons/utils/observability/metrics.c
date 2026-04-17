@@ -191,7 +191,7 @@ char* agentos_metrics_export_prometheus_filtered(
     size_t pos = 0;
 
 #define APPEND(fmt, ...) do { \
-    int written = snprintf(buf + pos, buf_size - pos, fmt, ##__VA_ARGS__); \
+    int written = snprintf(buf + pos, buf_size - pos, fmt, ##__VA_ARGS__); /* flawfinder: ignore - bounded snprintf in APPEND macro */ \
     if (written < 0) { AGENTOS_FREE(buf); return NULL; } \
     if ((size_t)written >= buf_size - pos) { \
         buf_size *= 2; \
@@ -200,7 +200,7 @@ char* agentos_metrics_export_prometheus_filtered(
         memcpy(new_buf, buf, pos); \
         AGENTOS_FREE(buf); \
         buf = new_buf; \
-        written = snprintf(buf + pos, buf_size - pos, fmt, ##__VA_ARGS__); \
+        written = snprintf(buf + pos, buf_size - pos, fmt, ##__VA_ARGS__); /* flawfinder: ignore - bounded realloc+snprintf retry */ \
         if (written < 0 || (size_t)written >= buf_size - pos) { AGENTOS_FREE(buf); return NULL; } \
     } \
     pos += (size_t)written; \

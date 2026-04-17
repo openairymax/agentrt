@@ -202,6 +202,11 @@ int lru_cache_put(lru_cache_t* cache, const char* key, const void* value, size_t
     }
 
     new_entry->key = AGENTOS_STRDUP(key);
+    if (!new_entry->key) {
+        AGENTOS_FREE(new_entry);
+        agentos_mutex_unlock(cache->lock);
+        return -1;
+    }
     new_entry->value = AGENTOS_MALLOC(size);
     if (!new_entry->value) {
         AGENTOS_FREE(new_entry->key);

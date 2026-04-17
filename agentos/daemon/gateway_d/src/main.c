@@ -20,10 +20,12 @@
 #include "platform.h"
 #include "error.h"
 
-#include "../../protocols/include/unified_protocol.h"
-#include "../../protocols/mcp/include/mcp_v1_adapter.h"
-#include "../../protocols/a2a/include/a2a_v03_adapter.h"
-#include "../../protocols/openai/include/openai_enterprise_adapter.h"
+#ifdef AGENTOS_HAS_PROTOCOLS
+#include "unified_protocol.h"
+#include "mcp_v1_adapter.h"
+#include "a2a_v03_adapter.h"
+#include "openai_enterprise_adapter.h"
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -182,6 +184,7 @@ int main(int argc, char* argv[]) {
     }
 
     /* Initialize UnifiedProtocol stack for multi-protocol support */
+#ifdef AGENTOS_HAS_PROTOCOLS
     protocol_stack_handle_t protocol_stack = NULL;
     unified_protocol_config_t proto_config = {
         .name = "AgentOS-Gateway-ProtocolStack",
@@ -217,6 +220,7 @@ int main(int argc, char* argv[]) {
         SVC_LOG_INFO("UnifiedProtocol stack initialized with %zu adapters",
                     unified_protocol_get_adapter_count(protocol_stack));
     }
+#endif
 
     err = gateway_service_start(g_service);
     if (err != AGENTOS_SUCCESS) {
@@ -243,10 +247,12 @@ int main(int argc, char* argv[]) {
     gateway_service_stop(g_service, false);
 
     /* Cleanup protocol stack */
+#ifdef AGENTOS_HAS_PROTOCOLS
     if (protocol_stack) {
         unified_protocol_destroy(protocol_stack);
         SVC_LOG_INFO("Protocol stack destroyed");
     }
+#endif
 
 cleanup_service:
     gateway_service_destroy(g_service);

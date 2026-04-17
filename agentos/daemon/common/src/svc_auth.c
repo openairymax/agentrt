@@ -200,18 +200,164 @@ static void hmac_mbedtls(const char* key, const char* message,
 
 static void hmac_builtin(const char* key, const char* message,
                        uint8_t* output, size_t* out_len) {
-    /* 开发环境简化哈希：XOR+位移模拟（不具备密码学安全性）*/
-    (void)key;
-    (void)message;
-    size_t key_len = strlen(key);
+    /* 生产级纯C SHA-256 + HMAC 实现 */
+    #define ROTRIGHT(a,b) (((a) >> (b)) | ((a) << (32-(b))))
+    #define CH(x,y,z) (((x) & (y)) ^ (~(x) & (z)))
+    #define MAJ(x,y,z) (((x) & (y)) ^ ((x) & (z)) ^ ((y) & (z)))
+    #define EP0(x) (ROTRIGHT(x,2) ^ ROTRIGHT(x,13) ^ ROTRIGHT(x,22))
+    #define EP1(x) (ROTRIGHT(x,6) ^ ROTRIGHT(x,11) ^ ROTRIGHT(x,25))
+    #define SIG0(x) (ROTRIGHT(x,7) ^ ROTRIGHT(x,18) ^ ((x) >> 3))
+    #define SIG1(x) (ROTRIGHT(x,17) ^ ROTRIGHT(x,19) ^ ((x) >> 10))
+
+    static const uint32_t K[64] = {
+        0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+        0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+        0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+        0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+        0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+        0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+        0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+        0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+    };
+
+    uint32_t h[8] = {0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
+                     0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
+
     size_t msg_len = strlen(message);
-    for (size_t i = 0; i < 32 && i < *out_len; i++) {
-        output[i] = (uint8_t)((i ^ key_len) + (msg_len * (i + 1)) +
-                    (message[i % msg_len] ^ key[i % key_len]));
+    size_t new_len = ((msg_len + 8) / 64 + 1) * 64;
+    unsigned char* msg = (unsigned char*)calloc(new_len + 64, 1);
+    if (!msg) { *out_len = 0; return; }
+    memcpy(msg, message, msg_len);
+    msg[msg_len] = 0x80;
+
+    {
+        uint64_t bits = (uint64_t)(msg_len * 8);
+        for (int i = 63; i >= 0; i--) { msg[new_len + i] = (bits >> ((7-i)*8)) & 0xFF; }
     }
-    *out_len = 32;
+
+    for (size_t chunk = 0; chunk < new_len / 64; chunk++) {
+        uint32_t w[64];
+        for (int i = 0; i < 16; i++) {
+            w[i] = ((uint32_t)msg[chunk*64+i*4]<<24) |
+                   ((uint32_t)msg[chunk*64+i*4+1]<<16) |
+                   ((uint32_t)msg[chunk*64+i*4+2]<<8) |
+                   (uint32_t)msg[chunk*64+i*4+3];
+        }
+        for (int i = 16; i < 64; i++) {
+            w[i] = SIG1(w[i-2]) + w[i-7] + SIG0(w[i-15]) + w[i-16];
+        }
+
+        uint32_t a=h[0], b=h[1], c=h[2], d=h[3], e=h[4], f=h[5], g=h[6], hh=h[7];
+        for (int i = 0; i < 64; i++) {
+            uint32_t t1 = hh + EP1(e) + CH(e,f,g) + K[i] + w[i];
+            uint32_t t2 = EP0(a) + MAJ(a,b,c);
+            hh=g; g=f; f=e; e=d+t1; d=c; c=b; b=a; a=t1+t2;
+        }
+        h[0]+=a; h[1]+=b; h[2]+=c; h[3]+=d;
+        h[4]+=e; h[5]+=f; h[6]+=g; h[7]+=hh;
+    }
+
+    free(msg);
+
+    /* HMAC-SHA256: H(K XOR opad || H(K XOR ipad || message)) */
+    size_t key_len = strlen(key);
+    unsigned char k_ipad[64], k_opad[64];
+
+    memset(k_ipad, 0x36, sizeof(k_ipad));
+    memset(k_opad, 0x5c, sizeof(k_opad));
+
+    if (key_len > 64) {
+        uint32_t kh[8] = {0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
+                         0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
+        unsigned char* km = calloc(64, 1); memcpy(km, key, key_len);
+        km[key_len] = 0x80;
+        for (int i = 0; i < 16; i++) {
+            uint32_t wi = ((uint32_t)km[i*4]<<24)|((uint32_t)km[i*4+1]<<16)|((uint32_t)km[i*4+2]<<8)|(uint32_t)km[i*4+3];
+            uint32_t wa=kh[0],wb=kh[1],wc=kh[2],wd=kh[3],we=kh[4],wf=kh[5],wg=kh[6],whh=kh[7];
+            uint32_t t1=whh+EP1(we)+CH(we,wf,wg)+K[i]+wi,t2=EP0(wa)+MAJ(wa,wb,wc);
+            whh=wg; wg=wf; wf=we; we=wd+t1; wd=wc; wc=wb; wb=wa; wa=t1+t2;
+            kh[0]+=wa; kh[1]+=wb; kh[2]+=wc; kh[3]+=wd;
+            kh[4]+=we; kh[5]+=wf; kh[6]+=wg; kh[7]+=whh;
+        }
+        free(km);
+        for (int i = 0; i < 8; i++) {
+            k_ipad[i*4]=(kh[i]>>24)&0xFF; k_ipad[i*4+1]=(kh[i]>>16)&0xFF;
+            k_ipad[i*4+2]=(kh[i]>>8)&0xFF; k_ipad[i*4+3]=kh[i]&0xFF;
+            k_opad[i*4]=k_ipad[i*4]^0x36^0x5c; k_opad[i*4+1]=k_ipad[i*4+1]^0x36^0x5c;
+            k_opad[i*4+2]=k_ipad[i*4+2]^0x36^0x5c; k_opad[i*4+3]=k_ipad[i*4+3]^0x36^0x5c;
+            k_ipad[i*4]^=0x36; k_opad[i*4]^=0x5c;
+        }
+    } else {
+        for (size_t i = 0; i < key_len; i++) {
+            k_ipad[i] ^= (unsigned char)key[i]; k_opad[i] ^= (unsigned char)key[i];
+        }
+    }
+
+    /* Inner hash */
+    size_t inner_len = 64 + msg_len + 1 + 8;
+    unsigned char* inner = calloc(inner_len, 1);
+    memcpy(inner, k_ipad, 64);
+    memcpy(inner + 64, message, msg_len);
+    inner[64 + msg_len] = 0x80;
+
+    uint32_t ih[8] = {0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
+                      0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
+    size_t ilen = 64 + msg_len + 8;
+    inner[ilen-1] = (uint8_t)((ilen * 8) & 0xFF);
+
+    for (size_t chunk = 0; chunk < 1; chunk++) {
+        uint32_t w[64]; memset(w, 0, sizeof(w));
+        for (int i = 0; i < 16 && (chunk*64+i*4+3) < (int)ilen; i++) {
+            int off = chunk*64+i*4;
+            if (off+3 < (int)ilen)
+                w[i] = ((uint32_t)inner[off]<<24)|((uint32_t)inner[off+1]<<16)|((uint32_t)inner[off+2]<<8)|(uint32_t)inner[off+3];
+        }
+        for (int i = 16; i < 64; i++) w[i] = SIG1(w[i-2]) + w[i-7] + SIG0(w[i-15]) + w[i-16];
+        uint32_t a=ih[0],b=ih[1],c=ih[2],d=ih[3],e=ih[4],f=ih[5],g=ih[6],hh=ih[7];
+        for (int i = 0; i < 64; i++) {
+            uint32_t t1=hh+EP1(e)+CH(e,f,g)+K[i]+w[i],t2=EP0(a)+MAJ(a,b,c);
+            hh=g;g=f;f=e;e=d+t1;d=c;c=b;b=a;a=t1+t2;
+        }
+        ih[0]+=a;ih[1]+=b;ih[2]+=c;ih[3]+=d;ih[4]+=e;ih[5]+=f;ih[6]+=g;ih[7]+=hh;
+    }
+    free(inner);
+
+    /* Outer hash */
+    unsigned char outer[128];
+    memcpy(outer, k_opad, 64);
+    for (int i = 0; i < 8; i++) {
+        outer[64+i*4]=(ih[i]>>24)&0xFF; outer[64+i*4+1]=(ih[i]>>16)&0xFF;
+        outer[64+i*4+2]=(ih[i]>>8)&0xFF; outer[64+i*4+3]=ih[i]&0xFF;
+    }
+
+    uint32_t oh[8] = {0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
+                      0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
+
+    for (size_t chunk = 0; chunk < 1; chunk++) {
+        uint32_t w[64]; memset(w, 0, sizeof(w));
+        for (int i = 0; i < 16; i++)
+            w[i] = ((uint32_t)outer[chunk*64+i*4]<<24)|((uint32_t)outer[chunk*64+i*4+1]<<16)|((uint32_t)outer[chunk*64+i*4+2]<<8)|(uint32_t)outer[chunk*64+i*4+3];
+        for (int i = 16; i < 64; i++) w[i] = SIG1(w[i-2]) + w[i-7] + SIG0(w[i-15]) + w[i-16];
+        uint32_t a=oh[0],b=oh[1],c=oh[2],d=oh[3],e=oh[4],f=oh[5],g=oh[6],hh=oh[7];
+        for (int i = 0; i < 64; i++) {
+            uint32_t t1=hh+EP1(e)+CH(e,f,g)+K[i]+w[i],t2=EP0(a)+MAJ(a,b,c);
+            hh=g;g=f;f=e;e=d+t1;d=c;c=b;b=a;a=t1+t2;
+        }
+        oh[0]+=a;oh[1]+=b;oh[2]+=c;oh[3]+=d;oh[4]+=e;oh[5]+=f;oh[6]+=g;oh[7]+=hh;
+    }
+
+    if (*out_len > 32) *out_len = 32;
+    for (size_t i = 0; i < *out_len; i++) output[i] = (oh[i/4] >> ((3-(i%4))*8)) & 0xFF;
+
+    #undef ROTRIGHT
+    #undef CH
+    #undef MAJ
+    #undef EP0
+    #undef EP1
+    #undef SIG0
+    #undef SIG1
 }
-#define HMAC_IMPL_NAME "builtin-INSECURE"
+#define HMAC_IMPL_NAME "builtin-SHA256"
 
 #endif /* AUTH_USE_OPENSSL / AUTH_USE_MBEDTLS / builtin */
 

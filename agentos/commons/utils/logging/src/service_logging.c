@@ -339,6 +339,10 @@ int service_logging_init(const service_logging_config_t* manager) {
                 g_service_state.worker_running[i] = true;
 
                 int* thread_idx = (int*)AGENTOS_MALLOC(sizeof(int));
+                if (!thread_idx) {
+                    g_service_state.worker_running[i] = false;
+                    continue;
+                }
                 *thread_idx = i;
 
                 if (pthread_create(&g_service_state.worker_threads[i], NULL,

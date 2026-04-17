@@ -48,11 +48,13 @@ static agentos_error_t majority_coordinate(
 
     if (!inputs || input_count < coordinator->min_voters) {
         *out_result = AGENTOS_STRDUP("insufficient_voters");
+        if (!*out_result) return AGENTOS_ENOMEM;
         return AGENTOS_SUCCESS;
     }
 
     if (input_count == 0) {
         *out_result = AGENTOS_STRDUP("no_votes");
+        if (!*out_result) return AGENTOS_ENOMEM;
         return AGENTOS_SUCCESS;
     }
 
