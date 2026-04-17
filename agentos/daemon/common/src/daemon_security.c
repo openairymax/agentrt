@@ -23,6 +23,14 @@
  */
 
 #include "daemon_security.h"
+
+/* SEC-017合规：强制禁用cupolas依赖，使用独立安全实现 */
+#undef CUPOLAS_AVAILABLE
+
+#ifndef SVC_LOG_SECURITY
+#define SVC_LOG_SECURITY(...)  LOG_WARN(__VA_ARGS__)
+#endif
+
 #include "svc_logger.h"
 #include "error.h"
 #include "platform.h"
@@ -39,10 +47,10 @@ static struct {
 
 /* ---------- Initialization and Shutdown ---------- */
 
-#if CUPOLAS_AVAILABLE
+#ifdef CUPOLAS_AVAILABLE
 
 /**
- * @brief Initialize daemon security layer
+ * @brief Initialize daemon security layer (cupolas-backed)
  */
 int daemon_security_init(const daemon_security_config_t* config, agentos_error_t* error) {
     if (g_daemon_security.initialized) {
@@ -482,6 +490,8 @@ int daemon_security_get_status(int* sanitizer_status, int* permission_status,
 
     return 0;
 }
+
+#else /* !CUPOLAS_AVAILABLE — 独立生产级安全实现 */
 
 /* ==================== 生产级安全实现（无cupolas时的独立实现） ==================== */
 /* SEC-017合规：所有函数均为真实实现，无桩函数 */
