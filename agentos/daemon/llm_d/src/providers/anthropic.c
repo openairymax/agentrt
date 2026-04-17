@@ -11,6 +11,8 @@
 
 #include "provider.h"
 #include "error.h"
+#include "daemon_errors.h"
+#include "svc_logger.h"
 #include "platform.h"
 #include <stdlib.h>
 #include <string.h>

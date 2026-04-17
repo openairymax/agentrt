@@ -13,7 +13,15 @@
 extern "C" {
 #endif
 
-typedef struct service_config service_config_t;
+typedef struct service_config {
+    size_t cache_capacity;
+    uint32_t cache_ttl_sec;
+    int max_retries;
+    uint32_t timeout_ms;
+    const char* token_encoding;
+    struct { const char* name; const char* enabled; }* providers;
+    size_t provider_count;
+} service_config_t;
 
 typedef struct {
     const char* name;

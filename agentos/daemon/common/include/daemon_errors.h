@@ -80,6 +80,18 @@ extern "C" {
 #define AGENTOS_ERR_OVERFLOW            (-14)
 #endif
 
+#ifndef AGENTOS_ERR_IO
+#define AGENTOS_ERR_IO                  (-15)
+#endif
+
+#ifndef AGENTOS_ERR_PARSE_ERROR
+#define AGENTOS_ERR_PARSE_ERROR          (-16)
+#endif
+
+#ifndef AGENTOS_ERR_UNKNOWN
+#define AGENTOS_ERR_UNKNOWN             (-17)
+#endif
+
 #ifndef AGENTOS_ERROR
 #define AGENTOS_ERROR(code, msg) do { (void)(msg); return (code); } while(0)
 #endif

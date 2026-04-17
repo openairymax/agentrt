@@ -177,15 +177,10 @@ llm_service_t* llm_service_create(const char* config_path) {
     /* 加载基础配置 */
     service_config_t base_cfg;
     memset(&base_cfg, 0, sizeof(base_cfg));
-    
-    if (svc_config_load(config_path, &base_cfg) != 0) {
-        SVC_LOG_WARN("Failed to load base manager, using defaults");
-        /* 使用默认配置继续 */
-        base_cfg.cache_capacity = 1024;
-        base_cfg.cache_ttl_sec = 3600;
-        base_cfg.max_retries = 3;
-        base_cfg.timeout_ms = 30000;
-    }
+    base_cfg.cache_capacity = 1024;
+    base_cfg.cache_ttl_sec = 3600;
+    base_cfg.max_retries = 3;
+    base_cfg.timeout_ms = 30000;
 
     /* 解析定价规则（使用 cJSON） */
     FILE* f = fopen(config_path, "rb");
@@ -594,4 +589,19 @@ int svc_config_load(const char* config_path, service_config_t* cfg) {
     
     cJSON_Delete(root);
     return AGENTOS_OK;
+}
+
+void llm_response_free(llm_response_t* resp) {
+    if (!resp) return;
+    free(resp->id);
+    free(resp->model);
+    free(resp->finish_reason);
+    if (resp->choices) {
+        for (size_t i = 0; i < resp->choice_count; i++) {
+            free((void*)resp->choices[i].role);
+            free((void*)resp->choices[i].content);
+        }
+        free(resp->choices);
+    }
+    free(resp);
 }

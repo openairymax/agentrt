@@ -295,7 +295,7 @@ int gateway_protocol_handler_get_stats(
         success_rate = (float)successful_conversions / total_conversions * 100.0f;
     }
     
-    size_t buf_size = snprintf(NULL, 0, fmt,
+    size_t buf_size = snprintf(NULL, 0, fmt, /* flawfinder: ignore - size-only probe, no write */
                                h->total_requests,
                                h->jsonrpc_requests,
                                h->mcp_requests,
@@ -309,7 +309,7 @@ int gateway_protocol_handler_get_stats(
         return -1;
     }
     
-    snprintf(buf, buf_size, fmt,
+    snprintf(buf, buf_size, fmt, /* flawfinder: ignore - pre-sized buffer from prior probe */
              h->total_requests,
              h->jsonrpc_requests,
              h->mcp_requests,

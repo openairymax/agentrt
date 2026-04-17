@@ -341,6 +341,11 @@ static agentos_error_t match_intent_by_rules(agentos_intent_parser_t* parser,
                 best_confidence = rule->confidence;
                 if (best_intent) AGENTOS_FREE(best_intent);
                 best_intent = AGENTOS_STRDUP(rule->intent_name);
+                if (!best_intent) {
+                    AGENTOS_FREE(lower_text);
+                    agentos_mutex_unlock(parser->lock);
+                    return AGENTOS_ENOMEM;
+                }
             }
         }
         // 检查相似度

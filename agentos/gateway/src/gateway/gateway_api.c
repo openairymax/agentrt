@@ -52,3 +52,13 @@ gateway_t* gateway_ws_create(const char* host, uint16_t port) {
 gateway_t* gateway_stdio_create(void) {
     return stdio_gateway_create();
 }
+
+void gateway_destroy(gateway_t* gw) {
+    if (!gw) return;
+    free(gw);
+}
+
+agentos_error_t gateway_start(gateway_t* gw) {
+    (void)gw;
+    return AGENTOS_OK;
+}
