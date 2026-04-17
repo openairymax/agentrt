@@ -96,7 +96,7 @@ static bool ml_planner_try_load_model(ml_planner_data_t* data) {
  * based on intent type analysis.
  */
 static agentos_error_t ml_planner_fallback_plan(
-    const agentos_intent_t* intent,
+    const agentos_intent_t* intent __attribute__((unused)),
     agentos_task_plan_t** out_plan) {
 
     agentos_task_plan_t* plan = (agentos_task_plan_t*)AGENTOS_CALLOC(1, sizeof(agentos_task_plan_t));

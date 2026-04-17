@@ -145,17 +145,17 @@ static void update_agent_weight(agent_weight_t* agent, int success, double laten
 /**
  * @brief 创建加权策略
  */
-static int weighted_create(sched_strategy_t* strategy, const sched_strategy_config_t* manager) {
+static int weighted_create(sched_strategy_t* strategy, const sched_config_t* manager) {
     (void)manager;
     
     weighted_data_t* data = (weighted_data_t*)calloc(1, sizeof(weighted_data_t));
     if (!data) {
-        AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "Failed to allocate weighted data");
+        return AGENTOS_ERR_OUT_OF_MEMORY;
     }
     
     if (agentos_mutex_init(&data->lock) != 0) {
         free(data);
-        AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "Failed to initialize mutex");
+        return AGENTOS_ERR_UNKNOWN;
     }
     
     data->initialized = 1;

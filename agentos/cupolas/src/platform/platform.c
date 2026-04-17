@@ -23,7 +23,7 @@
     #define getcwd _getcwd
     #define rmdir _rmdir
     #define unlink _unlink
-    #define access _access
+    #define access _access /* flawfinder: ignore */
     #define F_OK 0
     #define W_OK 2
     #define R_OK 4

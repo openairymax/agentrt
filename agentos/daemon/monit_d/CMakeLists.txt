@@ -29,6 +29,8 @@ set(MONIT_D_SOURCES
     src/logging.c
     src/tracing.c
     src/alert.c
+    src/service.c
+    src/monit_svc_adapter.c
 )
 
 # 创建可执行文件

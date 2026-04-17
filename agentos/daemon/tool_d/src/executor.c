@@ -6,6 +6,7 @@
 
 #include "executor.h"
 #include "daemon_errors.h"
+#include "platform.h"
 #include <stdlib.h>
 #include <string.h>
 

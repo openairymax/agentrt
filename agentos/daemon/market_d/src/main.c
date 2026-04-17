@@ -27,6 +27,16 @@
 #include <signal.h>
 #include <cjson/cJSON.h>
 
+/* ==================== 前向声明 ==================== */
+
+static void handle_register_agent(cJSON* params, int id, agentos_socket_t client_fd);
+static void handle_search_agents(cJSON* params, int id, agentos_socket_t client_fd);
+static void handle_install_agent(cJSON* params, int id, agentos_socket_t client_fd);
+static void handle_register_skill(cJSON* params, int id, agentos_socket_t client_fd);
+static void handle_search_skills(cJSON* params, int id, agentos_socket_t client_fd);
+static void handle_health_check(int id, agentos_socket_t client_fd);
+static void signal_handler(int signum);
+
 /* ==================== 配置常量 ==================== */
 
 #define DEFAULT_SOCKET_PATH_UNIX "/var/run/agentos/market.sock"
