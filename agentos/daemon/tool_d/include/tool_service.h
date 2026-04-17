@@ -92,6 +92,7 @@ int tool_service_execute(tool_service_t* svc,
 int tool_service_execute_stream(tool_service_t* svc,
                                 const tool_execute_request_t* req,
                                 tool_stream_callback_t callback,
+                                void* callback_data,
                                 tool_result_t** out_result);
 
 void tool_result_free(tool_result_t* res);

@@ -353,14 +353,14 @@ AGENTOS_API char* um_export_prometheus_module(const char* module_name) {
     size_t pos = 0;
 
 #define PAPPEND(fmt, ...) do { \
-    int w = snprintf(buf + pos, buf_size - pos, fmt, ##__VA_ARGS__); \
+    int w = snprintf(buf + pos, buf_size - pos, fmt, ##__VA_ARGS__); /* flawfinder: ignore - bounded snprintf in PAPPEND macro */ \
     if (w < 0) { AGENTOS_FREE(buf); agentos_platform_mutex_unlock(&g_um.mutex); return NULL; } \
     if ((size_t)w >= buf_size - pos) { \
         buf_size *= 2; \
         char* nb = (char*)AGENTOS_MALLOC(buf_size); \
         if (!nb) { AGENTOS_FREE(buf); agentos_platform_mutex_unlock(&g_um.mutex); return NULL; } \
         memcpy(nb, buf, pos); AGENTOS_FREE(buf); buf = nb; \
-        w = snprintf(buf + pos, buf_size - pos, fmt, ##__VA_ARGS__); \
+        w = snprintf(buf + pos, buf_size - pos, fmt, ##__VA_ARGS__); /* flawfinder: ignore - bounded realloc+snprintf retry */ \
         if (w < 0 || (size_t)w >= buf_size - pos) { AGENTOS_FREE(buf); agentos_platform_mutex_unlock(&g_um.mutex); return NULL; } \
     } \
     pos += (size_t)w; \

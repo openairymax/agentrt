@@ -1783,11 +1783,11 @@ agentos_error_t agentos_service_client_create(
     }
 
     switch (protocol) {
-        case AGENTOS_PROTO_HTTP:
+        case SVC_PROTO_HTTP:
             cli->call = http_client_call;
             cli->stream = http_client_stream;
             break;
-        case AGENTOS_PROTO_MEMORY:
+        case SVC_PROTO_MEMORY:
             cli->call = memory_client_call;
             cli->stream = memory_client_stream;
             break;

@@ -13,6 +13,7 @@
 #include "svc_logger.h"
 #include "error.h"
 #include "platform.h"
+#include "executor.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -34,7 +35,7 @@ tool_service_t* tool_service_create(const char* config_path) {
     }
 
     /* 创建注册表 */
-    svc->registry = tool_registry_create();
+    svc->registry = tool_registry_create(NULL);
     if (!svc->registry) {
         SVC_LOG_ERROR("Failed to create registry");
         agentos_mutex_destroy(&svc->lock);
@@ -45,9 +46,9 @@ tool_service_t* tool_service_create(const char* config_path) {
     /* 创建执行器 */
     tool_executor_config_t exec_config;
     memset(&exec_config, 0, sizeof(exec_config));
-    exec_config.timeout_ms = 30000;
-    
-    svc->executor = tool_executor_create(&exec_config);
+    exec_config.timeout_sec = 30;
+
+    svc->executor = tool_executor_create_ex(&exec_config);
     if (!svc->executor) {
         SVC_LOG_ERROR("Failed to create executor");
         tool_registry_destroy(svc->registry);
@@ -314,14 +315,14 @@ int tool_service_execute(tool_service_t* svc,
     tool_metadata_t* meta = get_tool_metadata(svc, req->tool_id);
     if (!meta) {
         SVC_LOG_ERROR("Tool not found: %s", req->tool_id);
-        return AGENTOS_ERR_TOOL_NOT_FOUND;
+        return AGENTOS_ERROR_TOOL_NOT_FOUND;
     }
 
     /* 2. 验证参数 */
     int valid = validate_tool_params(svc, meta, req->tool_id, req->params_json);
     if (valid <= 0) {
         tool_metadata_free(meta);
-        return AGENTOS_ERR_TOOL_VALIDATION;
+        return AGENTOS_ERROR_TOOL_VALIDATION;
     }
 
     /* 3. 检查缓存 */
@@ -375,7 +376,7 @@ int tool_service_execute_stream(tool_service_t* svc,
     
     if (!meta) {
         SVC_LOG_ERROR("Tool not found: %s", req->tool_id);
-        return AGENTOS_ERR_TOOL_NOT_FOUND;
+        return AGENTOS_ERROR_TOOL_NOT_FOUND;
     }
 
     /* 2. 验证参数 */
@@ -384,7 +385,7 @@ int tool_service_execute_stream(tool_service_t* svc,
         if (!valid) {
             SVC_LOG_WARN("Parameter validation failed for tool: %s", req->tool_id);
             tool_metadata_free(meta);
-            return AGENTOS_ERR_TOOL_VALIDATION;
+            return AGENTOS_ERROR_TOOL_VALIDATION;
         }
     }
 

@@ -273,15 +273,25 @@ static size_t generate_openai_embedding(const char* text, float** out_embedding)
     }
 
     cJSON* embedding_obj = cJSON_GetArrayItem(data, 0);
+    if (!embedding_obj) {
+        cJSON_Delete(root);
+        AGENTOS_FREE(chunk.data);
+        return 0;
+    }
     cJSON* embedding_arr = cJSON_GetObjectItem(embedding_obj, "embedding");
+    if (!embedding_arr || !cJSON_IsArray(embedding_arr)) {
+        cJSON_Delete(root);
+        AGENTOS_FREE(chunk.data);
+        return 0;
+    }
 
-    size_t count = cJSON_GetArraySize(embedding_arr);
+    size_t count = (size_t)cJSON_GetArraySize(embedding_arr);
     float* emb = (float*)AGENTOS_MALLOC(count * sizeof(float));
 
     if (emb) {
         for (size_t i = 0; i < count; i++) {
             cJSON* val = cJSON_GetArrayItem(embedding_arr, i);
-            emb[i] = (float)val->valuedouble;
+            emb[i] = val ? (float)val->valuedouble : 0.0f;
         }
         *out_embedding = emb;
     }

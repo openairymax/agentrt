@@ -820,15 +820,11 @@ int cupolas_vault_generate_keypair(char* public_key_out, size_t* pub_len,
 
     return 0;
 #else
-    const char* dummy_pub = "-----BEGIN PUBLIC KEY-----\nMOCK_PUBLIC_KEY\n-----END PUBLIC KEY-----\n";
-    const char* dummy_priv = "-----BEGIN PRIVATE KEY-----\nMOCK_PRIVATE_KEY\n-----END PRIVATE KEY-----\n";
-
-    strncpy(public_key_out, dummy_pub, *pub_len);
-    strncpy(private_key_out, dummy_priv, *priv_len);
-    *pub_len = strlen(dummy_pub);
-    *priv_len = strlen(dummy_priv);
-
-    return 0;
+    (void)public_key_out;
+    (void)private_key_out;
+    (void)pub_len;
+    (void)priv_len;
+    return -1; /* fail-closed: no crypto = no key generation */
 #endif
 }
 

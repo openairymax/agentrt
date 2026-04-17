@@ -41,6 +41,23 @@ static volatile int g_running = 1;
 static agentos_mutex_t g_running_lock;
 static method_dispatcher_t* g_dispatcher = NULL;  /* 方法分发器 */
 
+/* ==================== 信号处理 ==================== */
+
+static void signal_handler(int sig) {
+    (void)sig;
+    agentos_mutex_lock(&g_running_lock);
+    g_running = 0;
+    agentos_mutex_unlock(&g_running_lock);
+}
+
+#ifdef _WIN32
+static BOOL WINAPI console_handler(DWORD ctrl_type) {
+    (void)ctrl_type;
+    signal_handler(SIGINT);
+    return TRUE;
+}
+#endif
+
 /* ==================== 错误码定义（统一使用 AGENTOS_ERR_*） ==================== */
 #define MONIT_ERR_INVALID_PARAM   AGENTOS_ERR_INVALID_PARAM
 #define MONIT_ERR_OUT_OF_MEMORY   AGENTOS_ERR_OUT_OF_MEMORY

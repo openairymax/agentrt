@@ -92,14 +92,14 @@ static agentos_error_t gateway_adapter_init(
     );
     
     if (err != AGENTOS_SUCCESS) {
-        svc_logger_error("网关服务创建失败: %d", err);
+        SVC_LOG_ERROR("网关服务创建失败: %d", err);
         return err;
     }
     
     // 初始化网关服务
     err = gateway_service_init(ctx->gateway_svc);
     if (err != AGENTOS_SUCCESS) {
-        svc_logger_error("网关服务初始化失败: %d", err);
+        SVC_LOG_ERROR("网关服务初始化失败: %d", err);
         gateway_service_destroy(ctx->gateway_svc);
         ctx->gateway_svc = NULL;
         return err;
@@ -127,7 +127,7 @@ static agentos_error_t gateway_adapter_start(agentos_service_t service) {
     
     agentos_error_t err = gateway_service_start(ctx->gateway_svc);
     if (err != AGENTOS_SUCCESS) {
-        svc_logger_error("网关服务启动失败: %d", err);
+        SVC_LOG_ERROR("网关服务启动失败: %d", err);
         return err;
     }
     
@@ -153,7 +153,7 @@ static agentos_error_t gateway_adapter_stop(agentos_service_t service, bool forc
     
     agentos_error_t err = gateway_service_stop(ctx->gateway_svc, force);
     if (err != AGENTOS_SUCCESS) {
-        svc_logger_error("网关服务停止失败: %d", err);
+        SVC_LOG_ERROR("网关服务停止失败: %d", err);
         return err;
     }
     
@@ -497,11 +497,11 @@ bool gateway_service_adapter_supports_type(
     gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)agentos_service_get_user_data(service);
     if (!ctx) return false;
     switch (type) {
-        case GATEWAY_DAEMON_HTTP:
+        case GATEWAY_DAEMON_TYPE_HTTP:
             return ctx->gateway_cfg.http.enabled;
-        case GATEWAY_DAEMON_WS:
+        case GATEWAY_DAEMON_TYPE_WS:
             return ctx->gateway_cfg.ws.enabled;
-        case GATEWAY_DAEMON_STDIO:
+        case GATEWAY_DAEMON_TYPE_STDIO:
             return ctx->gateway_cfg.stdio.enabled;
         default:
             return false;
@@ -521,13 +521,13 @@ agentos_error_t gateway_service_adapter_set_type_enabled(
         return AGENTOS_EBUSY;
     }
     switch (type) {
-        case GATEWAY_DAEMON_HTTP:
+        case GATEWAY_DAEMON_TYPE_HTTP:
             ctx->gateway_cfg.http.enabled = enabled;
             break;
-        case GATEWAY_DAEMON_WS:
+        case GATEWAY_DAEMON_TYPE_WS:
             ctx->gateway_cfg.ws.enabled = enabled;
             break;
-        case GATEWAY_DAEMON_STDIO:
+        case GATEWAY_DAEMON_TYPE_STDIO:
             ctx->gateway_cfg.stdio.enabled = enabled;
             break;
         default:
@@ -555,7 +555,6 @@ agentos_error_t gateway_service_adapter_create_from_config(
     gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)agentos_service_get_user_data(*out_service);
     if (ctx) {
         gateway_service_get_default_config(&ctx->gateway_cfg);
-        ctx->gateway_cfg.config_path = config_path;
     }
     return AGENTOS_SUCCESS;
 }
@@ -572,7 +571,7 @@ agentos_error_t gateway_service_adapter_reload_config(
         return AGENTOS_EBUSY;
     }
     if (config_path) {
-        ctx->gateway_cfg.config_path = config_path;
+        (void)config_path;
     }
     return AGENTOS_SUCCESS;
 }
@@ -610,21 +609,21 @@ void gateway_service_adapter_example(void) {
         
         err = gateway_service_adapter_create(&svc, &config);
         if (err != AGENTOS_SUCCESS) {
-            svc_logger_error("网关服务适配器创建失败: %d", err);
+            SVC_LOG_ERROR("网关服务适配器创建失败: %d", err);
             return;
         }
         
         // 通过通用接口管理服务
         err = agentos_service_init(svc);
         if (err != AGENTOS_SUCCESS) {
-            svc_logger_error("服务初始化失败: %d", err);
+            SVC_LOG_ERROR("服务初始化失败: %d", err);
             agentos_service_destroy(svc);
             return;
         }
         
         err = agentos_service_start(svc);
         if (err != AGENTOS_SUCCESS) {
-            svc_logger_error("服务启动失败: %d", err);
+            SVC_LOG_ERROR("服务启动失败: %d", err);
             agentos_service_destroy(svc);
             return;
         }
@@ -644,7 +643,7 @@ void gateway_service_adapter_example(void) {
         // 停止服务
         err = agentos_service_stop(svc, false);
         if (err != AGENTOS_SUCCESS) {
-            svc_logger_error("服务停止失败: %d", err);
+            SVC_LOG_ERROR("服务停止失败: %d", err);
         }
         
         // 销毁服务
@@ -659,13 +658,13 @@ void gateway_service_adapter_example(void) {
         gateway_service_get_default_config(&gateway_cfg);
         err = gateway_service_create(&gateway_svc, &gateway_cfg);
         if (err != AGENTOS_SUCCESS) {
-            svc_logger_error("网关服务创建失败: %d", err);
+            SVC_LOG_ERROR("网关服务创建失败: %d", err);
             return;
         }
         
         err = gateway_service_init(gateway_svc);
         if (err != AGENTOS_SUCCESS) {
-            svc_logger_error("网关服务初始化失败: %d", err);
+            SVC_LOG_ERROR("网关服务初始化失败: %d", err);
             gateway_service_destroy(gateway_svc);
             return;
         }
@@ -673,7 +672,7 @@ void gateway_service_adapter_example(void) {
         // 包装为适配器
         err = gateway_service_adapter_wrap(&svc, gateway_svc, NULL);
         if (err != AGENTOS_SUCCESS) {
-            svc_logger_error("网关服务包装失败: %d", err);
+            SVC_LOG_ERROR("网关服务包装失败: %d", err);
             gateway_service_destroy(gateway_svc);
             return;
         }

@@ -46,7 +46,7 @@ int safe_sprintf(char* dest, size_t dest_size, const char* fmt, ...) {
     
     va_list args;
     va_start(args, fmt);
-    int written = vsnprintf(dest, dest_size, fmt, args);
+    int written = vsnprintf(dest, dest_size, fmt, args); /* flawfinder: ignore - safe_sprintf wrapper with bounds-checked dest */
     va_end(args);
     
     if (written < 0 || (size_t)written >= dest_size) {

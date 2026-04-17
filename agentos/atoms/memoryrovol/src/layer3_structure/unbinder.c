@@ -39,14 +39,20 @@ void agentos_unbinder_destroy(agentos_unbinder_t* unbinder) {
 static void unbind_real_q1(const float* bound, const float* known, float* out,
                            size_t dim, float* mat) {
     if (mat) {
-        float gk[dim];
+        float* gk = (float*)AGENTOS_MALLOC(dim * sizeof(float));
+        float* gu = (float*)AGENTOS_MALLOC(dim * sizeof(float));
+        if (!gk || !gu) {
+            AGENTOS_FREE(gk);
+            AGENTOS_FREE(gu);
+            memset(out, 0, dim * sizeof(float));
+            return;
+        }
         memset(gk, 0, dim * sizeof(float));
         for (size_t i = 0; i < dim; i++) {
             for (size_t j = 0; j < dim; j++) {
                 gk[i] += mat[i * dim + j] * known[j];
             }
         }
-        float gu[dim];
         for (size_t i = 0; i < dim; i++) {
             if (fabsf(gk[i]) > 1e-6f)
                 gu[i] = bound[i] / gk[i];
@@ -59,6 +65,8 @@ static void unbind_real_q1(const float* bound, const float* known, float* out,
                 out[i] += mat[j * dim + i] * gu[j];
             }
         }
+        AGENTOS_FREE(gk);
+        AGENTOS_FREE(gu);
     } else {
         for (size_t i = 0; i < dim; i++) {
             if (fabsf(known[i]) > 1e-6f)
@@ -115,10 +123,15 @@ agentos_error_t agentos_unbinder_unbind(
         unbind_complex_op(bound_vector, known_vectors[0], unknown, dim);
     } else {
         if (Q == 1 && binder->bind_matrices) {
-            float g_output[dim];
-            memset(g_output, 0, dim * sizeof(float));
-            binder->bind_matrices(binder, known_vectors[0], g_output);
-            unbind_real_q1(bound_vector, g_output, unknown, dim, NULL);
+            float* g_output = (float*)AGENTOS_MALLOC(dim * sizeof(float));
+            if (!g_output) {
+                memset(unknown, 0, dim * sizeof(float));
+            } else {
+                memset(g_output, 0, dim * sizeof(float));
+                binder->bind_matrices(binder, known_vectors[0], g_output);
+                unbind_real_q1(bound_vector, g_output, unknown, dim, NULL);
+                AGENTOS_FREE(g_output);
+            }
         } else {
             memset(unknown, 0, dim * sizeof(float));
         }

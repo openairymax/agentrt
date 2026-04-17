@@ -177,7 +177,11 @@ static agentos_task_t* priority_queue_pop(priority_queue_t* queue, uint32_t time
             return NULL;
         }
 
-        agentos_cond_wait(queue->cond, queue->lock, timeout_ms);
+        if (timeout_ms > 0) {
+            agentos_cond_timedwait(queue->cond, queue->lock, (int)timeout_ms);
+        } else {
+            agentos_cond_wait(queue->cond, queue->lock);
+        }
         
         if (timeout_ms > 0) {
             agentos_mutex_unlock(queue->lock);
@@ -326,7 +330,11 @@ agentos_error_t agentos_task_executor_wait(agentos_task_executor_t* executor,
            task->state != TASK_STATE_FAILED &&
            task->state != TASK_STATE_CANCELLED &&
            task->state != TASK_STATE_TIMEOUT) {
-        agentos_cond_wait(task->cond, task->lock, timeout_ms);
+        if (timeout_ms > 0) {
+            agentos_cond_timedwait(task->cond, task->lock, (int)timeout_ms);
+        } else {
+            agentos_cond_wait(task->cond, task->lock);
+        }
         break; /* 简化实现 */
     }
     agentos_mutex_unlock(task->lock);

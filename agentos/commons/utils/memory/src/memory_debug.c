@@ -349,8 +349,8 @@ static bool memory_debug_validate_block(memory_debug_block_t* block,
     }
     
     // 检查红区
-    if (g_debug_state.options.enable_boundary_check && 
-        g_debug_state.options.redzone_size > 0) {
+    if (g_debug_state.options.enable_boundary_check &&
+        g_debug_state.options.redzone_size > sizeof(memory_debug_block_t)) {
         uint8_t* redzone_start = (uint8_t*)block + sizeof(memory_debug_block_t);
         size_t redzone_size = g_debug_state.options.redzone_size - sizeof(memory_debug_block_t);
         
