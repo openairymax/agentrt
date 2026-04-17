@@ -23,6 +23,18 @@
 #include <sys/stat.h>
 #endif
 
+static int is_path_component_safe(const char* id) {
+    if (!id || !*id) return 0;
+    for (const char* p = id; *p; p++) {
+        if (*p == '/' || *p == '\\' || *p == ':' || *p == '*' ||
+            *p == '?' || *p == '"' || *p == '<' || *p == '>' || *p == '|') {
+            return 0;
+        }
+    }
+    if (strstr(id, "..") != NULL) return 0;
+    return 1;
+}
+
 /* 确保归档目录存在 */
 static int ensure_archive_dir(const char* path) {
     struct stat st = {0};
@@ -68,6 +80,12 @@ agentos_error_t agentos_forgetting_archive(
         agentos_error_t err = agentos_layer1_raw_read(engine->layer1, record_ids[i], &data, &len);
         if (err != AGENTOS_SUCCESS) {
             AGENTOS_LOG_WARN("Failed to read L1 record %s", record_ids[i]);
+            continue;
+        }
+
+        if (!is_path_component_safe(record_ids[i])) {
+            AGENTOS_LOG_WARN("Unsafe record ID rejected: %s", record_ids[i]);
+            AGENTOS_FREE(data);
             continue;
         }
 

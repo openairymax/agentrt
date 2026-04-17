@@ -156,10 +156,10 @@ void* memory_safe_realloc(void* ptr, size_t size) {
         return NULL;
     }
     
+    size_t old_size = ptr ? malloc_usable_size(ptr) : 0;
     void* new_ptr = AGENTOS_REALLOC(ptr, size);
     if (new_ptr) {
-        if (ptr) {
-            size_t old_size = malloc_usable_size(ptr);
+        if (old_size > 0) {
             g_memory_stats.total_freed += old_size;
             g_memory_stats.current_allocated -= old_size;
         }

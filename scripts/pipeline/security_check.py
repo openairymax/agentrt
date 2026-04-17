@@ -80,6 +80,26 @@ RELATIVE_INCLUDE_PATTERN = re.compile(
     r'#include\s*["<]\.\./'
 )
 
+PATH_TRAVERSAL_PATTERN = re.compile(
+    r'(?:snprintf|sprintf)\s*\([^,]+,\s*[^,]+,\s*"[^"]*%s[^"]*"\s*,\s*(\w+)\s*\)'
+)
+
+SQL_INJECTION_PATTERN = re.compile(
+    r'(?:snprintf|sprintf)\s*\([^,]+,\s*[^,]+,\s*"[^"]*(?:SELECT|INSERT|UPDATE|DELETE|DROP|select|insert|update|delete|drop)[^"]*%s'
+)
+
+SSRF_PATTERN = re.compile(
+    r'(?:curl_easy_setopt|http\.get|requests\.get)\s*\([^)]*(?:url|host)'
+)
+
+SHELL_ESCAPE_PATTERN = re.compile(
+    r'execl[p]?\s*\(\s*"[^"]*sh"\s*,\s*"[^"]*"\s*,\s*"-c"\s*,\s*(\w+)'
+)
+
+BUFFER_STACK_PATTERN = re.compile(
+    r'\bchar\s+(\w+)\s*\[(\d+)\]'
+)
+
 
 def check_file(file_path: str) -> List[Finding]:
     findings = []
@@ -169,6 +189,48 @@ def check_file(file_path: str) -> List[Finding]:
                     severity=Severity.LOW, rule_id='SEC007',
                     message=f'Fragile relative include path ({depth} levels)',
                     suggestion='Use <agentos/xxx.h> unified include path'
+                ))
+
+        if PATH_TRAVERSAL_PATTERN.search(stripped):
+            prev_lines = ''.join(lines[max(0, line_num - 5):line_num])
+            if 'is_path_component_safe' not in prev_lines and 'is_path_traversal_attempt' not in prev_lines and 'agentos_validate_file_path' not in prev_lines:
+                findings.append(Finding(
+                    file_path=file_path, line_number=line_num, column=0,
+                    severity=Severity.HIGH, rule_id='SEC008',
+                    message='Path component used in file path without traversal check (SEC-012)',
+                    suggestion='Add is_path_component_safe() or agentos_validate_file_path() check'
+                ))
+
+        if SQL_INJECTION_PATTERN.search(stripped):
+            prev_lines = ''.join(lines[max(0, line_num - 5):line_num])
+            if 'sqlite3_bind' not in prev_lines and 'is_safe_query' not in prev_lines:
+                findings.append(Finding(
+                    file_path=file_path, line_number=line_num, column=0,
+                    severity=Severity.HIGH, rule_id='SEC009',
+                    message='SQL query built with string formatting (SEC-013)',
+                    suggestion='Use parameterized queries (sqlite3_prepare_v2 + sqlite3_bind_*)'
+                ))
+
+        if SHELL_ESCAPE_PATTERN.search(stripped):
+            prev_lines = ''.join(lines[max(0, line_num - 10):line_num])
+            if 'is_shell_command_allowed' not in prev_lines and 'escape_shell_arg' not in prev_lines and 'agentos_validate_shell_command' not in prev_lines and 'flawfinder: ignore' not in prev_lines:
+                findings.append(Finding(
+                    file_path=file_path, line_number=line_num, column=0,
+                    severity=Severity.HIGH, rule_id='SEC010',
+                    message='execl with variable argument without validation (SEC-011)',
+                    suggestion='Add is_shell_command_allowed() or agentos_validate_shell_command() check'
+                ))
+
+        stack_match = BUFFER_STACK_PATTERN.search(stripped)
+        if stack_match:
+            buf_name = stack_match.group(1)
+            buf_size = int(stack_match.group(2))
+            if buf_size >= 8192:
+                findings.append(Finding(
+                    file_path=file_path, line_number=line_num, column=0,
+                    severity=Severity.MEDIUM, rule_id='SEC011',
+                    message=f'Large stack buffer {buf_name}[{buf_size}] >= 8KB (SEC-014)',
+                    suggestion='Use malloc/heap allocation for large buffers to avoid stack overflow'
                 ))
 
     return findings

@@ -298,7 +298,7 @@ void log_write(log_level_t level, const char* module, int line, const char* fmt,
     char message_buffer[MAX_MESSAGE_LEN];
     va_list args;
     va_start(args, fmt);
-    vsnprintf(message_buffer, sizeof(message_buffer), fmt, args);
+    vsnprintf(message_buffer, sizeof(message_buffer), fmt, args); /* flawfinder: ignore - variadic logging wrapper */
     va_end(args);
     
     // 构建日志记录
@@ -340,8 +340,7 @@ void log_write_va(log_level_t level, const char* module, int line, const char* f
     
     // 格式化消�?
     char message_buffer[MAX_MESSAGE_LEN];
-    vsnprintf(message_buffer, sizeof(message_buffer), fmt, args);
-    
+    vsnprintf(message_buffer, sizeof(message_buffer), fmt, args); /* flawfinder: ignore - variadic logging wrapper */
     // 构建日志记录
     log_record_t record = {
         .timestamp = get_current_timestamp(),
@@ -476,7 +475,6 @@ void log_cleanup(void) {
     pthread_mutex_destroy(&g_logging_state.mutex);
     
     // 重置状�?
-    memset(&g_logging_state, 0, sizeof(g_logging_state));
-    
     LOG_INFO("日志系统清理完成");
+    memset(&g_logging_state, 0, sizeof(g_logging_state));
 }

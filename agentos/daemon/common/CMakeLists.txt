@@ -115,6 +115,7 @@ set(SVC_COMMON_SOURCES
     src/input_validator.c
     src/param_validator.c
     src/log_sanitizer.c
+    src/platform_compat.c     # 平台兼容层实现
 )
 
 # 创建静态库

@@ -108,18 +108,6 @@ typedef int (*gateway_request_handler_t)(
  * @param[in] host 监听地址（如 "127.0.0.1", "0.0.0.0"），不能为 NULL
  * @param[in] port 监听端口（如 8080）
  * @return 网关句柄，失败返回 NULL（内存不足或参数无效）
- *
- * @ownership 调用者必须通过 gateway_destroy() 释放
- * @threadsafe 安全
- * @since 1.0.0
- *
- * @code
- * gateway_t* gw = gateway_http_create("0.0.0.0", 8080);
- * if (!gw) { /* 处理错误 */ }
- * gateway_start(gw);
- * // ... 运行 ...
- * gateway_destroy(gw);
- * @endcode
  */
 gateway_t* gateway_http_create(const char* host, uint16_t port);
 

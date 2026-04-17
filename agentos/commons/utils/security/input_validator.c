@@ -495,7 +495,8 @@ agentos_error_t agentos_sanitize_shell_param(
     if (!param || !out_sanitized) return AGENTOS_EINVAL;
     
     size_t len = strlen(param);
-    size_t buf_size = len * 2 + 3;
+    if (len > SIZE_MAX / 4 - 3) return AGENTOS_EOVERFLOW;
+    size_t buf_size = len * 4 + 3;
     
     char* sanitized = (char*)AGENTOS_MALLOC(buf_size);
     if (!sanitized) return AGENTOS_ENOMEM;

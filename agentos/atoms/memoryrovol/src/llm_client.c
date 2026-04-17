@@ -115,8 +115,23 @@ agentos_error_t agentos_llm_service_create(
 
     /* 复制配置 */
     service->config.model_name = config->model_name ? AGENTOS_STRDUP(config->model_name) : AGENTOS_STRDUP("gpt-3.5-turbo");
+    if (!service->config.model_name) {
+        AGENTOS_FREE(service);
+        return AGENTOS_ENOMEM;
+    }
     service->config.api_key = AGENTOS_STRDUP(config->api_key);
+    if (!service->config.api_key) {
+        AGENTOS_FREE((void*)service->config.model_name);
+        AGENTOS_FREE(service);
+        return AGENTOS_ENOMEM;
+    }
     service->config.base_url = AGENTOS_STRDUP(config->base_url);
+    if (!service->config.base_url) {
+        AGENTOS_FREE((void*)service->config.api_key);
+        AGENTOS_FREE((void*)service->config.model_name);
+        AGENTOS_FREE(service);
+        return AGENTOS_ENOMEM;
+    }
     service->config.timeout_ms = config->timeout_ms > 0 ? config->timeout_ms : 30000;
     service->config.temperature = config->temperature > 0 ? config->temperature : 0.7f;
     service->config.max_tokens = config->max_tokens > 0 ? config->max_tokens : 2048;

@@ -392,10 +392,10 @@ char* string_trim_start(char* str) {
 }
 
 char* string_trim_end(char* str) {
-    if (str == NULL) {
-        return NULL;
+    if (str == NULL || str[0] == '\0') {
+        return str;
     }
-    
+
     char* end = str + strlen(str) - 1;
     while (end >= str && string_is_whitespace_char(*end)) {
         *end = '\0';
@@ -773,7 +773,7 @@ char* string_alloc_format_v(const char* format, va_list args) {
     
     // 第二次调用实际格式化
     va_copy(args_copy, args);
-    int result = vsnprintf(buffer, (size_t)needed + 1, format, args_copy);
+    int result = vsnprintf(buffer, (size_t)needed + 1, format, args_copy); /* flawfinder: ignore - variadic string wrapper with bounded buffer */
     va_end(args_copy);
     
     if (result < 0) {

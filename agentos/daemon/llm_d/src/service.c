@@ -19,7 +19,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <cjson/cJSON.h>
+#ifdef HAVE_YAML
 #include <yaml.h>
+#endif
 
 /* ---------- 缓存键生成（便携版本） ---------- */
 

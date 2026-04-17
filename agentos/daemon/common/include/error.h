@@ -14,34 +14,19 @@
 #define AGENTOS_DAEMON_COMMON_ERROR_H
 
 /* 包含 commons 的统一错误处理框架 */
-#include <error.h>
+/* 使用相对路径避免 include 搜索找到 daemon 自身的 error.h */
+#include "../../../commons/utils/error/include/error.h"
 
 #ifndef AGENTOS_OK
 #define AGENTOS_OK                      0
 #endif
 
-/* Fallback for types that may not be available from all error.h versions */
-#ifndef AGENTOS_ERROR_CONTEXT_MAX_DEPTH
-#define AGENTOS_ERROR_CONTEXT_MAX_DEPTH 8
-#endif
-
-struct agentos_error_context_entry_s {
-    const char* file;
-    int line;
-    const char* func;
-    int code;
-    char message[256];
-};
-
-#ifndef AGENTOS_ERROR_CONTEXT_ENTRY_DEFINED
-#define AGENTOS_ERROR_CONTEXT_ENTRY_DEFINED
-typedef struct agentos_error_context_entry_s agentos_error_context_entry_t;
-#endif
-
 /* ==================== 兼容性别名 ==================== */
 
 /* 旧的错误码名称映射到新的名称 */
+#ifndef AGENTOS_SUCCESS
 #define AGENTOS_SUCCESS                    AGENTOS_OK
+#endif
 #define AGENTOS_ERROR_UNKNOWN              AGENTOS_ERR_UNKNOWN
 #define AGENTOS_ERROR_OUT_OF_MEMORY        AGENTOS_ERR_OUT_OF_MEMORY
 #define AGENTOS_ERROR_INVALID_PARAMETER    AGENTOS_ERR_INVALID_PARAM
@@ -158,11 +143,5 @@ typedef struct agentos_error_context_entry_s agentos_error_context_entry_t;
 #define AGENTOS_IS_SUCCESS(code)            ((code) == AGENTOS_OK)
 
 /* ==================== 兼容性类型别名 ==================== */
-
-/**
- * @brief 兼容旧的错误上下文类型名
- * @deprecated 请使用 agentos_error_context_entry_t
- */
-typedef agentos_error_context_entry_t agentos_error_context_t;
 
 #endif /* AGENTOS_DAEMON_COMMON_ERROR_H */

@@ -629,9 +629,11 @@ int agentos_random_bytes(void* buf, size_t len) {
 int agentos_file_exists(const char* path) {
     if (!path) return 0;
 #if AGENTOS_PLATFORM_WINDOWS
-    return _access(path, 0) == 0 ? 1 : 0;
+    struct _stat st;
+    return _stat(path, &st) == 0 ? 1 : 0;
 #else
-    return access(path, F_OK) == 0 ? 1 : 0;
+    struct stat st;
+    return stat(path, &st) == 0 ? 1 : 0;
 #endif
 }
 

@@ -95,6 +95,7 @@ agentos_error_t agentos_vector_store_create(
     int rc = sqlite3_open(config->db_path, &store->db);
     if (rc != SQLITE_OK) {
         AGENTOS_LOG_ERROR("Failed to open SQLite database: %s", sqlite3_errmsg(store->db));
+        sqlite3_close(store->db);
         AGENTOS_FREE(store);
         return AGENTOS_EUNKNOWN;
     }
