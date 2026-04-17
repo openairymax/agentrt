@@ -23,6 +23,18 @@
 #include <sys/stat.h>
 #endif
 
+static int is_path_component_safe(const char* id) {
+    if (!id || !*id) return 0;
+    for (const char* p = id; *p; p++) {
+        if (*p == '/' || *p == '\\' || *p == ':' || *p == '*' ||
+            *p == '?' || *p == '"' || *p == '<' || *p == '>' || *p == '|') {
+            return 0;
+        }
+    }
+    if (strstr(id, "..") != NULL) return 0;
+    return 1;
+}
+
 /* 确保归档目录存在 */
 static int ensure_archive_dir(const char* path) {
     struct stat st = {0};
@@ -71,6 +83,12 @@ agentos_error_t agentos_forgetting_archive(
             continue;
         }
 
+        if (!is_path_component_safe(record_ids[i])) {
+            AGENTOS_LOG_WARN("Unsafe record ID rejected: %s", record_ids[i]);
+            AGENTOS_FREE(data);
+            continue;
+        }
+
         // 写入归档文件
         char archive_file[512];
         snprintf(archive_file, sizeof(archive_file), "%s/%s.raw", archive_path, record_ids[i]);
@@ -80,9 +98,13 @@ agentos_error_t agentos_forgetting_archive(
             AGENTOS_LOG_WARN("Failed to create archive file %s", archive_file);
             continue;
         }
-        fwrite(data, 1, len, f);
+        size_t written = fwrite(data, 1, len, f);
         fclose(f);
         AGENTOS_FREE(data);
+        if (written != len) {
+            AGENTOS_LOG_WARN("Incomplete write to archive file %s, skipping deletion", archive_file);
+            continue;
+        }
 
         // 删除 L2 向量
         agentos_layer2_feature_remove(engine->layer2, record_ids[i]);

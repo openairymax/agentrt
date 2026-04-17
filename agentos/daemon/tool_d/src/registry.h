@@ -8,7 +8,7 @@
 #define TOOL_REGISTRY_H
 
 #include "tool_service.h"
-#include "manager.h"
+#include "config.h"
 
 #ifdef __cplusplus
 extern "C" {

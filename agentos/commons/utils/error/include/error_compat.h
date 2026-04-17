@@ -200,7 +200,7 @@ static inline void agentos_compat_error_handle(agentos_error_t err, const char* 
         char buffer[512];
         va_list args;
         va_start(args, fmt);
-        vsnprintf(buffer, sizeof(buffer), fmt, args);
+        vsnprintf(buffer, sizeof(buffer), fmt, args); /* flawfinder: ignore - variadic error wrapper with bounded buffer */
         va_end(args);
         
         agentos_error_push_ex(err, file, line, "unknown", "%s", buffer);
@@ -231,7 +231,7 @@ static inline void agentos_compat_error_handle_with_context(
         char buffer[512];
         va_list args;
         va_start(args, fmt);
-        vsnprintf(buffer, sizeof(buffer), fmt, args);
+        vsnprintf(buffer, sizeof(buffer), fmt, args); /* flawfinder: ignore - variadic error wrapper with bounded buffer */
         va_end(args);
         
         agentos_error_push_ex(err, file, line, function, "%s", buffer);

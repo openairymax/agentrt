@@ -25,6 +25,7 @@ sync_result_t sync_rwlock_create(sync_rwlock_t* rwlock, const sync_attr_t* attr)
 
     r->type = SYNC_TYPE_RWLOCK;
     r->read_count = 0;
+    r->is_writer = false;
     if (attr != NULL && attr->name != NULL) {
         r->name = sync_internal_strdup(attr->name);
     }
@@ -86,11 +87,13 @@ sync_result_t sync_rwlock_read_lock(sync_rwlock_t rwlock,
     }
 
 #ifdef _WIN32
-    DWORD wait_ms = (timeout == NULL) ? INFINITE : (DWORD)timeout->timeout_ms;
-    DWORD result = WaitForSingleObject(rwlock->rwlock, wait_ms);
-    if (result == WAIT_TIMEOUT) {
-        sync_internal_update_stats_timeout(&rwlock->stats);
-        return SYNC_ERROR_TIMEOUT;
+    if (timeout == NULL) {
+        AcquireSRWLockShared(&rwlock->rwlock);
+    } else {
+        if (!TryAcquireSRWLockShared(&rwlock->rwlock)) {
+            sync_internal_update_stats_timeout(&rwlock->stats);
+            return SYNC_ERROR_TIMEOUT;
+        }
     }
 #else
     int rc;
@@ -117,6 +120,7 @@ sync_result_t sync_rwlock_read_lock(sync_rwlock_t rwlock,
 #endif
 
     rwlock->read_count++;
+    rwlock->is_writer = false;
     int64_t elapsed = 0;
     if (start_time > 0) {
         elapsed = ((int64_t)clock() - start_time) * 1000 / CLOCKS_PER_SEC;
@@ -162,11 +166,13 @@ sync_result_t sync_rwlock_write_lock(sync_rwlock_t rwlock,
     }
 
 #ifdef _WIN32
-    DWORD wait_ms = (timeout == NULL) ? INFINITE : (DWORD)timeout->timeout_ms;
-    DWORD result = WaitForSingleObject(rwlock->rwlock, wait_ms);
-    if (result == WAIT_TIMEOUT) {
-        sync_internal_update_stats_timeout(&rwlock->stats);
-        return SYNC_ERROR_TIMEOUT;
+    if (timeout == NULL) {
+        AcquireSRWLockExclusive(&rwlock->rwlock);
+    } else {
+        if (!TryAcquireSRWLockExclusive(&rwlock->rwlock)) {
+            sync_internal_update_stats_timeout(&rwlock->stats);
+            return SYNC_ERROR_TIMEOUT;
+        }
     }
 #else
     int rc;
@@ -192,6 +198,7 @@ sync_result_t sync_rwlock_write_lock(sync_rwlock_t rwlock,
     }
 #endif
 
+    rwlock->is_writer = true;
     int64_t elapsed = 0;
     if (start_time > 0) {
         elapsed = ((int64_t)clock() - start_time) * 1000 / CLOCKS_PER_SEC;
@@ -230,7 +237,11 @@ sync_result_t sync_rwlock_unlock(sync_rwlock_t rwlock) {
     }
 
 #ifdef _WIN32
-    ReleaseSRWLockExclusive(&rwlock->rwlock);
+    if (rwlock->is_writer) {
+        ReleaseSRWLockExclusive(&rwlock->rwlock);
+    } else {
+        ReleaseSRWLockShared(&rwlock->rwlock);
+    }
 #else
     int rc = pthread_rwlock_unlock(&rwlock->rwlock);
     if (rc != 0) {

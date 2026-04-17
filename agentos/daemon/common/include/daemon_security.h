@@ -36,7 +36,8 @@
 #else
     #ifdef __has_include
         #if __has_include("../../../agentos/cupolas/include/cupolas.h")
-            #define CUPOLAS_AVAILABLE 1
+            /* SEC-017合规：强制使用独立安全实现 */
+            #define CUPOLAS_AVAILABLE 0
             #include "../../../agentos/cupolas/include/cupolas.h"
             #include "../../../agentos/cupolas/src/sanitizer/sanitizer.h"
             #include "../../../agentos/cupolas/src/permission/permission.h"

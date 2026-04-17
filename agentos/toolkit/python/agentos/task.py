@@ -125,7 +125,7 @@ class Task:
                 )
             
             if timeout and time_module.time() - start_time > timeout:
-                raise TimeoutError(timeout_ms=int(timeout * 1000), operation="task wait")
+                raise TimeoutError(operation=f"task wait (timeout={timeout}s)")
             
             time_module.sleep(0.5)  # Wait for 500ms before querying again
     
@@ -158,7 +158,7 @@ class Task:
                 )
             
             if timeout and time_module.time() - start_time > timeout:
-                raise TimeoutError(timeout_ms=int(timeout * 1000), operation="task wait")
+                raise TimeoutError(operation=f"task wait (timeout={timeout}s)")
             
             await asyncio.sleep(0.5)  # Wait for 500ms before querying again
     

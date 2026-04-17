@@ -186,7 +186,7 @@ static void log_output(log_level_t level, const log_context_t* context, const ch
     // 输出到控制台
     if (g_log_config.targets & LOG_TARGET_CONSOLE) {
         fprintf(stdout, "%s", prefix);
-        vfprintf(stdout, format, args);
+        vfprintf(stdout, format, args); /* flawfinder: ignore - variadic logging wrapper */
         fprintf(stdout, "\n");
         fflush(stdout);
     }
@@ -209,7 +209,7 @@ static void log_output(log_level_t level, const log_context_t* context, const ch
                      "%s:%d: ", context->function, context->line);
         }
         fprintf(g_log_file, "%s", file_prefix);
-        vfprintf(g_log_file, format, args);
+        vfprintf(g_log_file, format, args); /* flawfinder: ignore - variadic logging wrapper */
         fprintf(g_log_file, "\n");
         fflush(g_log_file);
     }

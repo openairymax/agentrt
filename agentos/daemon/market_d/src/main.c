@@ -27,6 +27,16 @@
 #include <signal.h>
 #include <cjson/cJSON.h>
 
+/* ==================== 前向声明 ==================== */
+
+static void handle_register_agent(cJSON* params, int id, agentos_socket_t client_fd);
+static void handle_search_agents(cJSON* params, int id, agentos_socket_t client_fd);
+static void handle_install_agent(cJSON* params, int id, agentos_socket_t client_fd);
+static void handle_register_skill(cJSON* params, int id, agentos_socket_t client_fd);
+static void handle_search_skills(cJSON* params, int id, agentos_socket_t client_fd);
+static void handle_health_check(int id, agentos_socket_t client_fd);
+static void signal_handler(int signum);
+
 /* ==================== 配置常量 ==================== */
 
 #define DEFAULT_SOCKET_PATH_UNIX "/var/run/agentos/market.sock"
@@ -157,7 +167,14 @@ static void handle_search_agents(cJSON* params, int id, agentos_socket_t client_
 
     agent_info_t** agents = NULL;
     size_t count = 0;
-    int ret = market_service_search_agents(g_service, keyword, offset, limit, &agents, &count);
+
+    search_params_t sp;
+    memset(&sp, 0, sizeof(sp));
+    sp.query = (char*)keyword;
+    sp.limit = limit;
+    sp.offset = offset;
+
+    int ret = market_service_search_agents(g_service, &sp, &agents, &count);
 
     if (ret != AGENTOS_SUCCESS) {
         JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Search failed", id);
@@ -172,7 +189,7 @@ static void handle_search_agents(cJSON* params, int id, agentos_socket_t client_
         if (agents[i]->version) cJSON_AddStringToObject(a, "version", agents[i]->version);
         if (agents[i]->description) cJSON_AddStringToObject(a, "description", agents[i]->description);
         if (agents[i]->author) cJSON_AddStringToObject(a, "author", agents[i]->author);
-        cJSON_AddBoolToObject(a, "installed", agents[i]->installed);
+        cJSON_AddBoolToObject(a, "installed", agents[i]->status == AGENT_STATUS_AVAILABLE);
         cJSON_AddItemToArray(arr, a);
     }
     free(agents);
@@ -250,7 +267,14 @@ static void handle_search_skills(cJSON* params, int id, agentos_socket_t client_
 
     skill_info_t** skills = NULL;
     size_t count = 0;
-    int ret = market_service_search_skills(g_service, keyword, 0, 20, &skills, &count);
+
+    search_params_t sp;
+    memset(&sp, 0, sizeof(sp));
+    sp.query = (char*)keyword;
+    sp.limit = 20;
+    sp.offset = 0;
+
+    int ret = market_service_search_skills(g_service, &sp, &skills, &count);
 
     if (ret != AGENTOS_SUCCESS) {
         JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Search failed", id);
@@ -330,6 +354,12 @@ static void handle_client(agentos_socket_t client_fd) {
 
 /* ==================== 帮助信息 ==================== */
 
+static void signal_handler(int signum) {
+    (void)signum;
+    g_running = 0;
+    SVC_LOG_INFO("Received shutdown signal");
+}
+
 static void print_usage(const char* prog) {
     printf("AgentOS Market Daemon\n");
     printf("Usage: %s [options]\n\n", prog);
@@ -380,12 +410,12 @@ int main(int argc, char** argv) {
 
     /* 创建配置 */
     market_config_t config = {
-        .max_agents = 1000,
-        .max_skills = 5000,
-        .enable_auto_update = false,
-        .repository_url = NULL,
-        .cache_ttl_sec = 3600,
-        .log_file_path = "market.log"
+        .registry_url = NULL,
+        .storage_path = "market.log",
+        .sync_interval_ms = 30000,
+        .cache_ttl_ms = 3600000,
+        .enable_remote_registry = false,
+        .enable_auto_update = false
     };
 
     /* 创建市场服务 */

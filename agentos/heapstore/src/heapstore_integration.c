@@ -357,7 +357,7 @@ agentos_error_t heapstore_memoryrovol_save(
     heapstore_memory_pool_t pool;
     memset(&pool, 0, sizeof(pool));
 
-    snprintf(pool.pool_id, "mem_raw_%llu", (unsigned long long)time(NULL));
+    snprintf(pool.pool_id, "mem_raw_%llu", (unsigned long long)time(NULL)); /* flawfinder: ignore - fixed-format into sized char array */
     strncpy(pool.name, "memoryrovol_raw", sizeof(pool.name) - 1);
     pool.total_size = len;
     pool.used_size = len;

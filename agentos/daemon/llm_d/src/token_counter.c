@@ -9,6 +9,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef HAVE_TIKTOKEN
+#include <tiktoken.h>
+
 struct token_counter {
     tiktoken_t* enc;
     char* encoding_name;
@@ -38,3 +41,29 @@ size_t token_counter_count(token_counter_t* tc, const char* text) {
     if (!tc || !text) return (size_t)-1;
     return tiktoken_count_tokens(tc->enc, text);
 }
+
+#else
+
+struct token_counter {
+    char* encoding_name;
+};
+
+token_counter_t* token_counter_create(const char* encoding_name) {
+    token_counter_t* tc = calloc(1, sizeof(token_counter_t));
+    if (!tc) return NULL;
+    tc->encoding_name = strdup(encoding_name ? encoding_name : "cl100k_base");
+    return tc;
+}
+
+void token_counter_destroy(token_counter_t* tc) {
+    if (!tc) return;
+    free(tc->encoding_name);
+    free(tc);
+}
+
+size_t token_counter_count(token_counter_t* tc, const char* text) {
+    (void)tc; (void)text;
+    return 0;
+}
+
+#endif /* HAVE_TIKTOKEN */

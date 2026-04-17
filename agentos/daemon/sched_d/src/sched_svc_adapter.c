@@ -18,7 +18,7 @@
 #include <string.h>
 
 typedef struct {
-    sched_service_t sched_svc;
+    sched_service_t* sched_svc;
     sched_config_t sched_cfg;
     agentos_svc_config_t common_cfg;
     bool owns_service;
@@ -58,8 +58,8 @@ static agentos_error_t sched_adapter_init(
         sched_config_from_common(&ctx->sched_cfg, &ctx->common_cfg);
         int ret = sched_service_create(&ctx->sched_cfg, &ctx->sched_svc);
         if (ret != 0 || !ctx->sched_svc) {
-            svc_logger_error("调度器服务创建失败: %d", ret);
-            return AGENTOS_ERROR;
+            SVC_LOG_ERROR("调度器服务创建失败: %d", ret);
+            return AGENTOS_ERR_UNKNOWN;
         }
         ctx->owns_service = true;
     }
@@ -71,7 +71,7 @@ static agentos_error_t sched_adapter_start(agentos_service_t service) {
     if (!service) return AGENTOS_EINVAL;
     sched_adapter_ctx_t* ctx = sched_get_ctx(service);
     if (!ctx || !ctx->sched_svc) return AGENTOS_ENOTINIT;
-    svc_logger_info("调度器服务适配器已启动");
+    SVC_LOG_INFO("调度器服务适配器已启动");
     return AGENTOS_SUCCESS;
 }
 
@@ -79,7 +79,7 @@ static agentos_error_t sched_adapter_stop(agentos_service_t service, bool force)
     if (!service) return AGENTOS_EINVAL;
     sched_adapter_ctx_t* ctx = sched_get_ctx(service);
     if (!ctx) return AGENTOS_EINVAL;
-    svc_logger_info("调度器服务适配器已停止");
+    SVC_LOG_INFO("调度器服务适配器已停止");
     return AGENTOS_SUCCESS;
 }
 
@@ -108,7 +108,7 @@ static agentos_error_t sched_adapter_healthcheck(agentos_service_t service) {
 
     bool health_status = false;
     int ret = sched_service_health_check(ctx->sched_svc, &health_status);
-    if (ret != 0 || !health_status) return AGENTOS_ERROR;
+    if (ret != 0 || !health_status) return AGENTOS_ERR_UNKNOWN;
 
     return AGENTOS_SUCCESS;
 }
@@ -162,7 +162,7 @@ agentos_error_t sched_service_adapter_create(
 
 agentos_error_t sched_service_adapter_wrap(
     agentos_service_t* out_service,
-    sched_service_t sched_svc,
+    sched_service_t* sched_svc,
     const agentos_svc_config_t* config
 ) {
     if (!out_service || !sched_svc) return AGENTOS_EINVAL;
@@ -200,7 +200,7 @@ agentos_error_t sched_service_adapter_wrap(
     return AGENTOS_SUCCESS;
 }
 
-sched_service_t sched_service_adapter_get_original(agentos_service_t service) {
+sched_service_t* sched_service_adapter_get_original(agentos_service_t service) {
     if (!service) return NULL;
     sched_adapter_ctx_t* ctx = sched_get_ctx(service);
     return ctx ? ctx->sched_svc : NULL;
