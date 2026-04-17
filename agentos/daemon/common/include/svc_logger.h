@@ -18,6 +18,7 @@
 #include "error.h"
 #include "platform.h"
 #include <stdbool.h>
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,13 +36,27 @@ typedef log_level_t agentos_log_level_t;
 #endif
 
 /* 兼容旧日志级别名称 */
+#ifndef AGENTOS_LOG_TRACE
 #define AGENTOS_LOG_TRACE   LOG_LEVEL_DEBUG
+#endif
+#ifndef AGENTOS_LOG_DEBUG
 #define AGENTOS_LOG_DEBUG   LOG_LEVEL_DEBUG
+#endif
+#ifndef AGENTOS_LOG_INFO
 #define AGENTOS_LOG_INFO    LOG_LEVEL_INFO
+#endif
+#ifndef AGENTOS_LOG_WARN
 #define AGENTOS_LOG_WARN    LOG_LEVEL_WARN
+#endif
+#ifndef AGENTOS_LOG_ERROR
 #define AGENTOS_LOG_ERROR   LOG_LEVEL_ERROR
+#endif
+#ifndef AGENTOS_LOG_FATAL
 #define AGENTOS_LOG_FATAL   LOG_LEVEL_FATAL
+#endif
+#ifndef AGENTOS_LOG_OFF
 #define AGENTOS_LOG_OFF     LOG_LEVEL_COUNT
+#endif
 
 /* ==================== 追踪上下文 ==================== */
 
@@ -370,32 +385,29 @@ static inline void agentos_logger_log_with_trace(agentos_logger_t logger,
 /**
  * @brief 跟踪级别日志
  */
+#ifndef LOG_TRACE
 #define LOG_TRACE(...) AGENTOS_LOG_IMPL(agentos_logger_default(), LOG_LEVEL_DEBUG, __VA_ARGS__)
+#endif
 
-/**
- * @brief 调试级别日志
- */
+#ifndef LOG_DEBUG
 #define LOG_DEBUG(...) AGENTOS_LOG_IMPL(agentos_logger_default(), LOG_LEVEL_DEBUG, __VA_ARGS__)
+#endif
 
-/**
- * @brief 信息级别日志
- */
+#ifndef LOG_INFO
 #define LOG_INFO(...) AGENTOS_LOG_IMPL(agentos_logger_default(), LOG_LEVEL_INFO, __VA_ARGS__)
+#endif
 
-/**
- * @brief 警告级别日志
- */
+#ifndef LOG_WARN
 #define LOG_WARN(...) AGENTOS_LOG_IMPL(agentos_logger_default(), LOG_LEVEL_WARN, __VA_ARGS__)
+#endif
 
-/**
- * @brief 错误级别日志
- */
+#ifndef LOG_ERROR
 #define LOG_ERROR(...) AGENTOS_LOG_IMPL(agentos_logger_default(), LOG_LEVEL_ERROR, __VA_ARGS__)
+#endif
 
-/**
- * @brief 致命级别日志
- */
+#ifndef LOG_FATAL
 #define LOG_FATAL(...) AGENTOS_LOG_IMPL(agentos_logger_default(), LOG_LEVEL_FATAL, __VA_ARGS__)
+#endif
 
 /* ==================== 带追踪上下文的日志宏 ==================== */
 

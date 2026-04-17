@@ -53,6 +53,8 @@ CHANGELOG.md
 .bendiwenjian/总线检查/
 .bendiwenjian/总线检查/*.md
 .cargo/
+.atomcode/
+datalog/
 
 # =============================================================================
 # 1. CMake 构建系统（构建产物，不追踪）

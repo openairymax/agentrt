@@ -92,7 +92,7 @@ static agentos_error_t gateway_adapter_init(
     );
     
     if (err != AGENTOS_SUCCESS) {
-        svc_logger_error("网关服务创建失败: %d", err);
+        SVC_LOG_ERROR("网关服务创建失败: %d", err);
         return err;
     }
     
@@ -497,11 +497,11 @@ bool gateway_service_adapter_supports_type(
     gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)agentos_service_get_user_data(service);
     if (!ctx) return false;
     switch (type) {
-        case GATEWAY_DAEMON_HTTP:
+        case GATEWAY_DAEMON_TYPE_HTTP:
             return ctx->gateway_cfg.http.enabled;
-        case GATEWAY_DAEMON_WS:
+        case GATEWAY_DAEMON_TYPE_WS:
             return ctx->gateway_cfg.ws.enabled;
-        case GATEWAY_DAEMON_STDIO:
+        case GATEWAY_DAEMON_TYPE_STDIO:
             return ctx->gateway_cfg.stdio.enabled;
         default:
             return false;
@@ -521,13 +521,13 @@ agentos_error_t gateway_service_adapter_set_type_enabled(
         return AGENTOS_EBUSY;
     }
     switch (type) {
-        case GATEWAY_DAEMON_HTTP:
+        case GATEWAY_DAEMON_TYPE_HTTP:
             ctx->gateway_cfg.http.enabled = enabled;
             break;
-        case GATEWAY_DAEMON_WS:
+        case GATEWAY_DAEMON_TYPE_WS:
             ctx->gateway_cfg.ws.enabled = enabled;
             break;
-        case GATEWAY_DAEMON_STDIO:
+        case GATEWAY_DAEMON_TYPE_STDIO:
             ctx->gateway_cfg.stdio.enabled = enabled;
             break;
         default:
@@ -555,7 +555,6 @@ agentos_error_t gateway_service_adapter_create_from_config(
     gateway_adapter_ctx_t* ctx = (gateway_adapter_ctx_t*)agentos_service_get_user_data(*out_service);
     if (ctx) {
         gateway_service_get_default_config(&ctx->gateway_cfg);
-        ctx->gateway_cfg.config_path = config_path;
     }
     return AGENTOS_SUCCESS;
 }
@@ -572,7 +571,7 @@ agentos_error_t gateway_service_adapter_reload_config(
         return AGENTOS_EBUSY;
     }
     if (config_path) {
-        ctx->gateway_cfg.config_path = config_path;
+        (void)config_path;
     }
     return AGENTOS_SUCCESS;
 }

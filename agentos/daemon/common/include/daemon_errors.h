@@ -64,6 +64,26 @@ extern "C" {
 #define AGENTOS_ERR_ALREADY_EXISTS     (-11)
 #endif
 
+#ifndef AGENTOS_OK
+#define AGENTOS_OK                      0
+#endif
+
+#ifndef AGENTOS_ERR_NOT_FOUND
+#define AGENTOS_ERR_NOT_FOUND           (-6)
+#endif
+
+#ifndef AGENTOS_ERR_STATE_ERROR
+#define AGENTOS_ERR_STATE_ERROR         (-13)
+#endif
+
+#ifndef AGENTOS_ERR_OVERFLOW
+#define AGENTOS_ERR_OVERFLOW            (-14)
+#endif
+
+#ifndef AGENTOS_ERROR
+#define AGENTOS_ERROR(code, msg) do { (void)(msg); return (code); } while(0)
+#endif
+
 /**
  * @brief JSON-RPC 2.0 标准错误码
  * @{

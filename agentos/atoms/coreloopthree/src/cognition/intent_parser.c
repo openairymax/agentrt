@@ -351,6 +351,11 @@ static agentos_error_t match_intent_by_rules(agentos_intent_parser_t* parser,
                 best_confidence = adjusted_confidence;
                 if (best_intent) AGENTOS_FREE(best_intent);
                 best_intent = AGENTOS_STRDUP(rule->intent_name);
+                if (!best_intent) {
+                    AGENTOS_FREE(lower_text);
+                    agentos_mutex_unlock(parser->lock);
+                    return AGENTOS_ENOMEM;
+                }
             }
         }
 
@@ -441,6 +446,11 @@ static size_t extract_entities_from_text(const char* text, extracted_entity_t* e
         if (type) {
             entities[count].type = AGENTOS_STRDUP(type);
             entities[count].value = AGENTOS_STRDUP(keyword);
+            if (!entities[count].type || !entities[count].value) {
+                AGENTOS_FREE(entities[count].type);
+                AGENTOS_FREE(entities[count].value);
+                continue;
+            }
             entities[count].value_len = strlen(keyword);
             entities[count].confidence = confidence;
             entities[count].start_pos = 0;  // 简化实现

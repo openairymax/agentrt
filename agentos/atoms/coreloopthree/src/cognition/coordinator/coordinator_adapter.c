@@ -12,6 +12,24 @@
 #include <agentos/string.h>
 #include <string.h>
 
+extern agentos_error_t agentos_coordinator_dual_model_create(
+    const char* primary_model, const char* secondary_model,
+    float primary_weight, float secondary_weight,
+    agentos_coordinator_base_t** out_base);
+
+extern agentos_error_t agentos_coordinator_majority_create(
+    size_t min_voters, float threshold,
+    agentos_coordinator_base_t** out_base);
+
+extern agentos_error_t agentos_coordinator_weighted_create(
+    const char** model_names, const float* weights,
+    size_t model_count, agentos_coordinator_base_t** out_base);
+
+extern agentos_error_t agentos_coordinator_arbiter_create(
+    const char* arbiter_model,
+    void (*callback)(const char* question, char* answer, size_t max_len),
+    agentos_coordinator_base_t** out_base);
+
 typedef struct {
     agentos_coordinator_base_t* base;
 } strategy_adapter_data_t;

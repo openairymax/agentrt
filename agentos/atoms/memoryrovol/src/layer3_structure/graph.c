@@ -319,6 +319,11 @@ agentos_error_t agentos_knowledge_graph_find_path(
         *out_path = (char**)AGENTOS_CALLOC(1, sizeof(char*));
         if (!*out_path) return AGENTOS_ENOMEM;
         (*out_path)[0] = AGENTOS_STRDUP(from_id);
+        if (!(*out_path)[0]) {
+            AGENTOS_FREE(*out_path);
+            *out_path = NULL;
+            return AGENTOS_ENOMEM;
+        }
         *out_path_length = 1;
         return AGENTOS_SUCCESS;
     }
