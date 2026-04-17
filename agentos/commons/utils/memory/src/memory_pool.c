@@ -154,7 +154,11 @@ static bool memory_pool_allocate_blocks(memory_pool_t* pool, size_t block_count)
         sizeof(void*)
     );
     
-    // 计算总内存大�?    size_t total_size = block_count * aligned_block_size;
+    // 计算总内存大小（带溢出检查）
+    if (block_count > 0 && aligned_block_size > SIZE_MAX / block_count) {
+        return false;
+    }
+    size_t total_size = block_count * aligned_block_size;
     
     // 检查是否超过最大限�?    if (pool->options.max_blocks > 0 && 
         pool->stats.total_blocks + block_count > pool->options.max_blocks) {
@@ -176,7 +180,11 @@ static bool memory_pool_allocate_blocks(memory_pool_t* pool, size_t block_count)
     pool->memory_area = new_memory;
     pool->memory_area_size = total_size;
     
-    // 扩展块指针数�?    size_t new_capacity = pool->blocks_capacity + block_count;
+    // 扩展块指针数组（带溢出检查）
+    size_t new_capacity = pool->blocks_capacity + block_count;
+    if (new_capacity > SIZE_MAX / sizeof(memory_pool_block_t*)) {
+        return false;
+    }
     memory_pool_block_t** new_blocks = memory_realloc(
         pool->blocks, 
         new_capacity * sizeof(memory_pool_block_t*), 

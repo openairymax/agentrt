@@ -15,7 +15,8 @@
 
 #include "scheduler_service.h"
 #include "strategy_interface.h"
-#include "monitor_service.h"
+#include "../../monit_d/include/monitor_service.h"
+
 #include "platform.h"
 #include "error.h"
 #include "svc_logger.h"
@@ -28,6 +29,14 @@
 #include <time.h>
 #include <signal.h>
 #include <cjson/cJSON.h>
+
+/* ==================== 前向声明 ==================== */
+
+static void handle_register_agent(cJSON* params, int id, agentos_socket_t client_fd);
+static void handle_schedule_task(cJSON* params, int id, agentos_socket_t client_fd);
+static void handle_get_stats(int id, agentos_socket_t client_fd);
+static void handle_health_check(int id, agentos_socket_t client_fd);
+static void signal_handler(int signum);
 
 /* ==================== 配置常量 ==================== */
 
@@ -82,7 +91,7 @@ static void on_schedule_task_method(cJSON* params, int id, void* user_data) {
  * @brief 处理 get_stats 方法
  */
 static void on_get_stats_method(cJSON* params, int id, void* user_data) {
-    (void)user_data;
+    (void)params;
     handle_get_stats(id, *(agentos_socket_t*)user_data);
 }
 
@@ -90,7 +99,7 @@ static void on_get_stats_method(cJSON* params, int id, void* user_data) {
  * @brief 处理 health_check 方法
  */
 static void on_health_check_method(cJSON* params, int id, void* user_data) {
-    (void)user_data;
+    (void)params;
     handle_health_check(id, *(agentos_socket_t*)user_data);
 }
 
@@ -298,6 +307,12 @@ static void handle_client(agentos_socket_t client_fd) {
 }
 
 /* ==================== 帮助信息 ==================== */
+
+static void signal_handler(int signum) {
+    (void)signum;
+    g_running = 0;
+    SVC_LOG_INFO("Received shutdown signal");
+}
 
 /**
  * @brief 打印使用说明

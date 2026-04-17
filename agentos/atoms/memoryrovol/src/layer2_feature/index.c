@@ -5,6 +5,7 @@
  */
 
 #include "../include/layer2_feature.h"
+#include "logger.h"
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
@@ -244,14 +245,14 @@ static agentos_error_t hnsw_search(hnsw_index_t* index, const float* query, uint
                                                   query_norm_sq, index->nodes[i]->norm, index->dimension);
         for (size_t j = 0; j < result_count; j++) {
             if (sim > scores[j]) {
-                for (size_t m = result_count - 1; m > j; m--) {
-                    scores[m] = scores[m - 1];
-                    if (ids[m - 1]) AGENTOS_FREE(ids[m - 1]);
-                    ids[m] = ids[m - 1] ? AGENTOS_STRDUP(ids[m - 1]) : NULL;
-                }
+                if (ids[result_count - 1]) AGENTOS_FREE(ids[result_count - 1]);
+                memmove(&scores[j + 1], &scores[j], (result_count - 1 - j) * sizeof(float));
+                memmove(&ids[j + 1], &ids[j], (result_count - 1 - j) * sizeof(char*));
                 scores[j] = sim;
-                if (ids[j]) AGENTOS_FREE(ids[j]);
                 ids[j] = AGENTOS_STRDUP(index->nodes[i]->id);
+                if (!ids[j]) {
+                    AGENTOS_LOG_WARN("STRDUP failed in HNSW search sort, result may be incomplete");
+                }
                 break;
             }
         }

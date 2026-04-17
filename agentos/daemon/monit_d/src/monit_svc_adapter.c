@@ -18,7 +18,7 @@
 #include <string.h>
 
 typedef struct {
-    monitor_service_t monit_svc;
+    void* monit_svc;  // monitor_service_t* 但使用 void* 避免类型问题
     monitor_config_t monit_cfg;
     agentos_svc_config_t common_cfg;
     bool owns_service;
@@ -60,8 +60,8 @@ static agentos_error_t monit_adapter_init(
         monit_config_from_common(&ctx->monit_cfg, &ctx->common_cfg);
         int ret = monitor_service_create(&ctx->monit_cfg, &ctx->monit_svc);
         if (ret != 0 || !ctx->monit_svc) {
-            svc_logger_error("监控服务创建失败: %d", ret);
-            return AGENTOS_ERROR;
+            SVC_LOG_ERROR("监控服务创建失败: %d", ret);
+            return AGENTOS_ERR_UNKNOWN;
         }
         ctx->owns_service = true;
     }
@@ -73,7 +73,7 @@ static agentos_error_t monit_adapter_start(agentos_service_t service) {
     if (!service) return AGENTOS_EINVAL;
     monit_adapter_ctx_t* ctx = monit_get_ctx(service);
     if (!ctx || !ctx->monit_svc) return AGENTOS_ENOTINIT;
-    svc_logger_info("监控服务适配器已启动");
+    SVC_LOG_INFO("监控服务适配器已启动");
     return AGENTOS_SUCCESS;
 }
 
@@ -81,7 +81,7 @@ static agentos_error_t monit_adapter_stop(agentos_service_t service, bool force)
     if (!service) return AGENTOS_EINVAL;
     monit_adapter_ctx_t* ctx = monit_get_ctx(service);
     if (!ctx) return AGENTOS_EINVAL;
-    svc_logger_info("监控服务适配器已停止");
+    SVC_LOG_INFO("监控服务适配器已停止");
     return AGENTOS_SUCCESS;
 }
 
@@ -114,9 +114,9 @@ static agentos_error_t monit_adapter_healthcheck(agentos_service_t service) {
         ctx->monit_svc, "monitor_service", &result
     );
 
-    if (ret != 0 || !result) return AGENTOS_ERROR;
+    if (ret != 0 || !result) return AGENTOS_ERR_UNKNOWN;
 
-    agentos_error_t err = result->is_healthy ? AGENTOS_SUCCESS : AGENTOS_ERROR;
+    agentos_error_t err = result->is_healthy ? AGENTOS_SUCCESS : AGENTOS_ERR_UNKNOWN;
 
     free(result->service_name);
     free(result->status_message);
@@ -175,7 +175,7 @@ agentos_error_t monit_service_adapter_create(
 
 agentos_error_t monit_service_adapter_wrap(
     agentos_service_t* out_service,
-    monitor_service_t monit_svc,
+    void* monit_svc,
     const agentos_svc_config_t* config
 ) {
     if (!out_service || !monit_svc) return AGENTOS_EINVAL;
@@ -213,7 +213,7 @@ agentos_error_t monit_service_adapter_wrap(
     return AGENTOS_SUCCESS;
 }
 
-monitor_service_t monit_service_adapter_get_original(agentos_service_t service) {
+void* monit_service_adapter_get_original(agentos_service_t service) {
     if (!service) return NULL;
     monit_adapter_ctx_t* ctx = monit_get_ctx(service);
     return ctx ? ctx->monit_svc : NULL;

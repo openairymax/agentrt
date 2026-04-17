@@ -21,8 +21,14 @@
 #ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
 #else
-typedef struct cJSON { int type; char* valuestring; double valuedouble; struct cJSON* child; struct cJSON* next; } cJSON;
-#define cJSON_NULL 0 cJSON_False 1 cJSON_True 2 cJSON_Number 3 cJSON_String 4 cJSON_Array 5 cJSON_Object 6
+typedef struct cJSON { int type; char* valuestring; double valuedouble; int valueint; struct cJSON* child; struct cJSON* next; } cJSON;
+#define cJSON_NULL 0
+#define cJSON_False 1
+#define cJSON_True 2
+#define cJSON_Number 3
+#define cJSON_String 4
+#define cJSON_Array 5
+#define cJSON_Object 6
 static inline cJSON* cJSON_CreateObject(void) { return NULL; }
 static inline cJSON* cJSON_CreateArray(void) { return NULL; }
 static inline void cJSON_Delete(cJSON* item) { (void)item; }
@@ -200,6 +206,10 @@ static char* execute_node(agentos_task_node_t* node, uint32_t timeout_ms) {
     } else {
         output = AGENTOS_STRDUP("");
     }
+    if (!output) {
+        agentos_task_free(result_task);
+        return NULL;
+    }
     agentos_task_free(result_task);
     return output;
 }
@@ -271,6 +281,10 @@ agentos_error_t agentos_sys_task_wait(const char* task_id, uint32_t timeout_ms, 
             *out_result = AGENTOS_STRDUP((char*)result_task->task_output);
         } else {
             *out_result = AGENTOS_STRDUP("");
+        }
+        if (!*out_result) {
+            agentos_task_free(result_task);
+            return AGENTOS_ENOMEM;
         }
         agentos_task_free(result_task);
     }

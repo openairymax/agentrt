@@ -96,7 +96,7 @@ static bool ml_planner_try_load_model(ml_planner_data_t* data) {
  * based on intent type analysis.
  */
 static agentos_error_t ml_planner_fallback_plan(
-    const agentos_intent_t* intent,
+    const agentos_intent_t* intent __attribute__((unused)),
     agentos_task_plan_t** out_plan) {
 
     agentos_task_plan_t* plan = (agentos_task_plan_t*)AGENTOS_CALLOC(1, sizeof(agentos_task_plan_t));
@@ -117,7 +117,20 @@ static agentos_error_t ml_planner_fallback_plan(
 
     /* Assign task based on intent priority heuristic */
     node->task_node_id = AGENTOS_STRDUP("ml_fallback_task");
+    if (!node->task_node_id) {
+        AGENTOS_FREE(node);
+        AGENTOS_FREE(plan->task_plan_id);
+        AGENTOS_FREE(plan);
+        return AGENTOS_ENOMEM;
+    }
     node->task_node_agent_role = AGENTOS_STRDUP("default");
+    if (!node->task_node_agent_role) {
+        AGENTOS_FREE(node->task_node_id);
+        AGENTOS_FREE(node);
+        AGENTOS_FREE(plan->task_plan_id);
+        AGENTOS_FREE(plan);
+        return AGENTOS_ENOMEM;
+    }
     node->task_node_depends_on = NULL;
     node->task_node_depends_count = 0;
     node->task_node_timeout_ms = 30000;
@@ -199,6 +212,11 @@ agentos_plan_strategy_t* agentos_plan_ml_create(
 
     data->model = NULL;
     data->model_path = model_path ? AGENTOS_STRDUP(model_path) : NULL;
+    if (model_path && !data->model_path) {
+        AGENTOS_FREE(data);
+        AGENTOS_FREE(strat);
+        return NULL;
+    }
     data->llm = llm;
     data->fallback_mode = true;
     data->lock = agentos_mutex_create();

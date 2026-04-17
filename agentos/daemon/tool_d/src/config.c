@@ -4,7 +4,7 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "manager.h"
+#include "config.h"
 #include "svc_logger.h"
 #include <yaml.h>
 #include <stdlib.h>

@@ -72,7 +72,7 @@ static void ensure_initialized(void) {
 /**
  * @brief 简单的大小写不敏感字符串比较
  */
-static int strcasestr(const char* haystack, const char* needle) {
+static int log_strcasestr(const char* haystack, const char* needle) {
     if (!haystack || !needle) return 0;
     
     size_t haystack_len = strlen(haystack);
@@ -98,7 +98,7 @@ static int strcasestr(const char* haystack, const char* needle) {
  */
 static const char* find_pattern(const char* message, const sensitive_field_t* pattern) {
     const char* pos = message;
-    while ((pos = strcasestr(pos, pattern->pattern)) != NULL) {
+    while ((pos = log_strcasestr(pos, pattern->pattern)) != NULL) {
         /* 检查是否是独立的字段（前面是空白或引号，后面是 = 或 : 或空白） */
         if (pos > message) {
             char prev = *(pos - 1);

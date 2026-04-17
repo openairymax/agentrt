@@ -122,6 +122,8 @@ typedef struct gateway {
 
 /* ========== 内联操作函数（供内部模块使用） ========== */
 
+#ifndef GATEWAY_API_IMPLEMENTATION
+
 /**
  * @brief 启动网关（内部内联版本）
  * @param gateway 网关实例
@@ -167,6 +169,10 @@ static inline const char* gateway_get_name(gateway_t* gateway) {
     return gateway->ops->get_name(gateway->impl);
 }
 
+#endif /* GATEWAY_API_IMPLEMENTATION */
+
+#ifndef GATEWAY_API_IMPLEMENTATION
+
 /**
  * @brief 获取统计信息
  * @param gateway 网关实例
@@ -191,6 +197,8 @@ static inline bool gateway_is_running(gateway_t* gateway) {
     }
     return gateway->ops->is_running(gateway->impl);
 }
+
+#endif /* GATEWAY_API_IMPLEMENTATION */
 
 /**
  * @brief 获取网关类型

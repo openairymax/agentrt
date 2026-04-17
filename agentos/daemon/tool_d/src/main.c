@@ -95,6 +95,26 @@ static BOOL WINAPI console_handler(DWORD fdwCtrlType) {
 /* ==================== 请求处理方法 ==================== */
 
 /**
+ * @brief 处理 register 方法
+ */
+static void handle_register(cJSON* params, int id, agentos_socket_t fd);
+
+/**
+ * @brief 处理 list_tools 方法
+ */
+static void handle_list(int id, agentos_socket_t fd);
+
+/**
+ * @brief 处理 get_tool 方法
+ */
+static void handle_get(cJSON* params, int id, agentos_socket_t fd);
+
+/**
+ * @brief 处理 execute_tool 方法
+ */
+static void handle_execute(cJSON* params, int id, agentos_socket_t fd);
+
+/**
  * @brief 方法处理器包装函数
  */
 

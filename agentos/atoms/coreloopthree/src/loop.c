@@ -526,7 +526,6 @@ AGENTOS_API agentos_error_t agentos_loop_wait(
     agentos_error_t err = agentos_execution_wait(loop->execution, task_id, timeout_ms, &result_task);
 
     if (err == AGENTOS_SUCCESS && result_task) {
-        /* 提取输出结果 */
         if (result_task->task_output) {
             size_t len = 0;
             const char* output = (const char*)result_task->task_output;
@@ -538,8 +537,12 @@ AGENTOS_API agentos_error_t agentos_loop_wait(
             *out_result_len = 0;
         }
 
-        /* 步骤 4: 将执行结果存储到记忆中（形成闭环） */
-        if (*out_result && *out_result_len > 0) {
+        if (!*out_result) {
+            agentos_task_free(result_task);
+            return AGENTOS_ENOMEM;
+        }
+
+        if (*out_result_len > 0) {
             agentos_memory_record_t record = {0};
             record.memory_record_data = *out_result;
             record.memory_record_data_len = *out_result_len;

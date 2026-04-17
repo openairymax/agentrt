@@ -93,6 +93,7 @@ static shard_manager_t* create_shard(int shard_id, const char* base_path) {
     shard->cache = advanced_cache_manager_create(DEFAULT_MAX_CACHE_MEMORY);
     if (!shard->cache) {
         AGENTOS_LOG_ERROR("Failed to create cache for shard %d", shard_id);
+        agentos_mutex_destroy(shard->stats_lock);
         AGENTOS_FREE(shard->base_path);
         AGENTOS_FREE(shard);
         return NULL;
@@ -103,6 +104,7 @@ static shard_manager_t* create_shard(int shard_id, const char* base_path) {
     if (!shard->async_queue) {
         AGENTOS_LOG_ERROR("Failed to create async queue for shard %d", shard_id);
         advanced_cache_manager_destroy(shard->cache);
+        agentos_mutex_destroy(shard->stats_lock);
         AGENTOS_FREE(shard->base_path);
         AGENTOS_FREE(shard);
         return NULL;
@@ -114,6 +116,7 @@ static shard_manager_t* create_shard(int shard_id, const char* base_path) {
         AGENTOS_LOG_ERROR("Failed to create L1 raw storage for shard %d", shard_id);
         advanced_async_queue_destroy(shard->async_queue);
         advanced_cache_manager_destroy(shard->cache);
+        agentos_mutex_destroy(shard->stats_lock);
         AGENTOS_FREE(shard->base_path);
         AGENTOS_FREE(shard);
         return NULL;

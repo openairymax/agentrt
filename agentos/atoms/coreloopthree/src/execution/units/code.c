@@ -293,17 +293,23 @@ static agentos_error_t code_execute(
     agentos_error_t err = create_temp_file(suffix, code, code_len, &temp_path);
     if (err != AGENTOS_SUCCESS) return err;
 
-    char cmd[8192];
+    char* cmd = (char*)AGENTOS_MALLOC(8192);
+    if (!cmd) {
+        remove_temp_file(temp_path);
+        AGENTOS_FREE(temp_path);
+        return AGENTOS_ENOMEM;
+    }
 #ifdef _WIN32
-    snprintf(cmd, sizeof(cmd), "\"%s\" \"%s\"", interpreter, temp_path);
+    snprintf(cmd, 8192, "\"%s\" \"%s\"", interpreter, temp_path);
 #else
     char escaped_path[4096];
     if (escape_shell_arg(temp_path, escaped_path, sizeof(escaped_path)) != AGENTOS_SUCCESS) {
         remove_temp_file(temp_path);
         AGENTOS_FREE(temp_path);
+        AGENTOS_FREE(cmd);
         return AGENTOS_EINVAL;
     }
-    snprintf(cmd, sizeof(cmd), "%s %s 2>&1", interpreter, escaped_path);
+    snprintf(cmd, 8192, "%s %s 2>&1", interpreter, escaped_path);
 #endif
 
     char* output = NULL;
@@ -315,10 +321,12 @@ static agentos_error_t code_execute(
         if (output) {
             *out_output = output;
         }
+        AGENTOS_FREE(cmd);
         return err;
     }
 
     *out_output = output;
+    AGENTOS_FREE(cmd);
     return AGENTOS_SUCCESS;
 }
 
