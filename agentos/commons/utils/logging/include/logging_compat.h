@@ -110,7 +110,7 @@ const char* agentos_log_get_trace_id(void);
  */
 void agentos_log_write(int level, const char* file, int line, const char* fmt, ...)
 #if defined(__GNUC__) || defined(__clang__)
-    __attribute__((format(printf, 4, 5)))
+    __attribute__((format(printf, 4, 5))) /* flawfinder: ignore */
 #endif
 ;
 

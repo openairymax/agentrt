@@ -60,8 +60,8 @@ int tool_executor_run(tool_executor_t* exec,
     if (!result) return AGENTOS_ERR_OUT_OF_MEMORY;
 
     result->success = 0;
-    result->output = meta->executable ? strdup(meta->executable) : NULL;
-    result->error = strdup("Executor not yet implemented - stub mode");
+    result->output = NULL;
+    result->error = strdup("Executor not available - stub mode (no actual execution)");
     result->exit_code = -1;
     result->duration_ms = 0;
 

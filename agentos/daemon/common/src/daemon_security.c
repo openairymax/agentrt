@@ -514,14 +514,14 @@ int daemon_sanitize_llm_input(const char* input, char* output, size_t output_siz
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
-    /* 基本复制: 无 cupolas 时仅做截断保护 */
     size_t len = strlen(input);
     if (len >= output_size) {
         len = output_size - 1;
-        SVC_LOG_WARN("LLM input truncated in stub mode (no sanitizer available)");
     }
     memcpy(output, input, len);
     output[len] = '\0';
+
+    SVC_LOG_ERROR("[STUB-DENY] LLM input sanitization FAILED: no cupolas sanitizer - input passed through unsanitized (fail-open for data flow, logged as error)");
     return 0;
 }
 
@@ -548,12 +548,12 @@ int daemon_sanitize_tool_params(const char* tool_name, const char* params,
     memcpy(sanitized_params, params, plen);
     sanitized_params[plen] = '\0';
 
-    SVC_LOG_WARN("Tool params sanitized in STUB mode (no cupolas sanitizer)");
+    SVC_LOG_ERROR("[STUB-DENY] Tool params sanitization FAILED: no cupolas sanitizer - params passed through unsanitized (fail-open for data flow, logged as error)");
     return 0;
 }
 
 /**
- * @brief 存根模式: 工具权限检查（默认允许，记录警告）
+ * @brief 存根模式: 工具权限检查（fail-closed: 默认拒绝，无cupolas时禁止）
  */
 int daemon_check_tool_permission(const char* agent_id, const char* tool_name,
                                  const char* action) {
@@ -561,9 +561,9 @@ int daemon_check_tool_permission(const char* agent_id, const char* tool_name,
     (void)tool_name;
     (void)action;
 
-    SVC_LOG_WARN("[STUB] Tool permission check BYPASSED: tool=%s (no cupolas)", 
+    SVC_LOG_ERROR("[STUB-DENY] Tool permission check DENIED: tool=%s (no cupolas - fail-closed)",
                 tool_name ? tool_name : "unknown");
-    return 1;  /* 默认允许 */
+    return 0;
 }
 
 /**
@@ -575,9 +575,9 @@ int daemon_check_llm_permission(const char* agent_id, const char* model_name,
     (void)model_name;
     (void)action;
 
-    SVC_LOG_WARN("[STUB] LLM permission check BYPASSED: model=%s (no cupolas)",
+    SVC_LOG_ERROR("[STUB-DENY] LLM permission check DENIED: model=%s (no cupolas - fail-closed)",
                 model_name ? model_name : "unknown");
-    return 1;  /* 默认允许 */
+    return 0;
 }
 
 /**
@@ -591,13 +591,8 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
-#ifdef DEBUG
-    *is_valid = true;  /* 调试模式允许未签名包 */
-#else
-    *is_valid = false; /* 生产环境拒绝未签名包 */
-#endif
-
-    SVC_LOG_WARN("[STUB] Package signature verification SKIPPED: %s (no cupolas)", package_path);
+    *is_valid = false; /* fail-closed: no cupolas = no signature verification = reject */
+    SVC_LOG_ERROR("[STUB-DENY] Package signature verification FAILED: %s (no cupolas - fail-closed)", package_path);
     return 0;
 }
 

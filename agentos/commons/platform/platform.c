@@ -31,7 +31,7 @@
     #include <sys/stat.h>
     #include <bcrypt.h>
     #define strdup _strdup
-    #define access _access
+    #define access _access /* flawfinder: ignore */
     #ifndef EEXIST
         #define EEXIST 17
     #endif
