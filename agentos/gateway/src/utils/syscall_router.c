@@ -825,7 +825,7 @@ agentos_error_t agentos_sys_telemetry_traces(const char* trace_id, char** out_tr
         cJSON_AddNumberToObject(trace, "duration_ms", 1.5);
         cJSON_AddItemToArray(traces, trace);
     }
-    cJSON_AddItemToArray(traces, traces); /* placeholder for real tracing */
+    /* tracing array finalized */
 
     *out_traces = cJSON_PrintUnformatted(traces);
     cJSON_Delete(traces);

@@ -187,29 +187,134 @@ int agentos_atomic_fetch_sub(agentos_atomic_int_t* atomic, int value) {
     return __atomic_fetch_sub(&atomic->value, value, __ATOMIC_SEQ_CST);
 }
 
-/* ==================== Socket 兼容层（桩实现） ==================== */
+/* ==================== Socket 兼容层（生产级真实实现） ==================== */
+/* SEC-017合规：基于POSIX Socket API的真实网络通信实现 */
 
-int agentos_socket_init(void) { return 0; }
-void agentos_socket_cleanup(void) {}
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <arpa/inet.h>
+#include <sys/un.h>
+#include <poll.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+
+static int g_socket_initialized = 0;
+
+int agentos_socket_init(void) {
+    if (g_socket_initialized) return 0;
+    g_socket_initialized = 1;
+    return 0;
+}
+
+void agentos_socket_cleanup(void) {
+    g_socket_initialized = 0;
+}
 
 agentos_socket_t agentos_socket_create_tcp_server(const char* host, uint16_t port) {
-    (void)host; (void)port; return -1;
+    if (!host) return -1;
+
+    int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, IPPROTO_TCP);
+    if (fd < 0) return -1;
+
+    int opt = 1;
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
+
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+
+    if (inet_pton(AF_INET, host, &addr.sin_addr) <= 0) {
+        addr.sin_addr.s_addr = INADDR_ANY;
+    }
+
+    if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
+        close(fd);
+        return -1;
+    }
+
+    if (listen(fd, SOMAXCONN) != 0) {
+        close(fd);
+        return -1;
+    }
+
+    return fd;
 }
 
 #if AGENTOS_PLATFORM_POSIX
 agentos_socket_t agentos_socket_create_unix_server(const char* path) {
-    (void)path; return -1;
+    if (!path) return -1;
+
+    int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
+    if (fd < 0) return -1;
+
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
+
+    unlink(path);
+
+    if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
+        close(fd);
+        return -1;
+    }
+
+    if (listen(fd, SOMAXCONN) != 0) {
+        close(fd);
+        return -1;
+    }
+
+    return fd;
 }
 #endif
 
 agentos_socket_t agentos_socket_accept(agentos_socket_t server_fd, uint32_t timeout_ms) {
-    (void)server_fd; (void)timeout_ms; return -1;
+    if (server_fd < 0) return -1;
+
+    struct pollfd pfd;
+    pfd.fd = server_fd;
+    pfd.events = POLLIN;
+
+    int ret = poll(&pfd, 1,
+        timeout_ms == 0 ? -1 : (int)timeout_ms);
+
+    if (ret <= 0 || !(pfd.revents & POLLIN)) return -1;
+
+    struct sockaddr_in client_addr;
+    socklen_t client_len = sizeof(client_addr);
+    int client_fd = accept(server_fd, (struct sockaddr*)&client_addr, &client_len);
+
+    if (client_fd >= 0) {
+        int flags = fcntl(client_fd, F_GETFL, 0);
+        fcntl(client_fd, F_SETFL, flags | O_NONBLOCK);
+    }
+
+    return client_fd;
 }
 
 ssize_t agentos_socket_recv(agentos_socket_t sock, void* buf, size_t len) {
-    (void)sock; (void)buf; (void)len; return -1;
+    if (sock < 0 || !buf || len == 0) return -1;
+    ssize_t ret = recv(sock, buf, len, MSG_DONTWAIT);
+    if (ret < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) return 0;
+    return ret;
 }
 
 ssize_t agentos_socket_send(agentos_socket_t sock, const void* buf, size_t len) {
-    (void)sock; (void)buf; (void)len; return -1;
+    if (sock < 0 || !buf || len == 0) return -1;
+    ssize_t total_sent = 0;
+    const uint8_t* ptr = (const uint8_t*)buf;
+
+    while (total_sent < (ssize_t)len) {
+        ssize_t sent = send(sock, ptr + total_sent, len - total_sent, MSG_NOSIGNAL | MSG_DONTWAIT);
+        if (sent <= 0) {
+            if (total_sent > 0) break;
+            return sent;
+        }
+        total_sent += sent;
+    }
+    return total_sent;
 }
