@@ -281,6 +281,9 @@ agentos_error_t agentos_llm_service_call(
 
     /* 构建请求 JSON */
     cJSON* root = cJSON_CreateObject();
+    if (!root) {
+        return AGENTOS_ENOMEM;
+    }
     cJSON_AddStringToObject(root, "model", service->config.model_name);
     cJSON_AddNumberToObject(root, "temperature", service->config.temperature);
     cJSON_AddNumberToObject(root, "max_tokens", service->config.max_tokens);

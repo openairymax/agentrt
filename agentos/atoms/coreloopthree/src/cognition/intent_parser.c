@@ -671,6 +671,11 @@ agentos_error_t agentos_intent_parser_parse(agentos_intent_parser_t* parser,
         parser->success_count++;
     } else {
         intent->intent_goal = AGENTOS_STRDUP("unknown");
+        if (!intent->intent_goal) {
+            AGENTOS_FREE(intent);
+            parser->failure_count++;
+            return AGENTOS_ENOMEM;
+        }
         intent->intent_goal_len = 7;
         intent->intent_flags = 0x02;
 
