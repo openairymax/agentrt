@@ -16,6 +16,18 @@
 #include <agentos/string.h>
 #include <string.h>
 
+static int is_path_component_safe(const char* id) {
+    if (!id || !*id) return 0;
+    for (const char* p = id; *p; p++) {
+        if (*p == '/' || *p == '\\' || *p == ':' || *p == '*' ||
+            *p == '?' || *p == '"' || *p == '<' || *p == '>' || *p == '|') {
+            return 0;
+        }
+    }
+    if (strstr(id, "..") != NULL) return 0;
+    return 1;
+}
+
 agentos_error_t agentos_forgetting_revive(
     agentos_forgetting_engine_t* engine,
     const char* record_id,
@@ -23,6 +35,7 @@ agentos_error_t agentos_forgetting_revive(
     size_t* out_len) {
 
     if (!engine || !record_id || !out_data || !out_len) return AGENTOS_EINVAL;
+    if (!is_path_component_safe(record_id)) return AGENTOS_EINVAL;
 
     const char* archive_path = engine->manager.archive_path;
     if (!archive_path) {

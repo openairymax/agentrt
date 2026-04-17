@@ -76,6 +76,7 @@ struct sync_rwlock {
     const char* name;
     sync_stats_t stats;
     size_t read_count;
+    bool is_writer;
 #ifdef _WIN32
     SRWLOCK rwlock;
 #else

@@ -34,6 +34,8 @@ set(MARKET_D_SOURCES
     src/skill_registry.c
     src/installer.c
     src/publisher.c
+    src/market_service_impl.c
+    src/market_svc_adapter.c
 )
 
 # 创建可执行文件

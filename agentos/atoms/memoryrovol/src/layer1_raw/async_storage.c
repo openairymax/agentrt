@@ -187,7 +187,16 @@ agentos_error_t agentos_layer1_raw_create(const char* storage_path, uint32_t wor
     }
 
     l1->lock = agentos_mutex_create();
+    if (!l1->lock) {
+        AGENTOS_FREE(l1->workers);
+        AGENTOS_FREE(l1->storage_path);
+        AGENTOS_FREE(l1);
+        return AGENTOS_ENOMEM;
+    }
     l1->obs = agentos_observability_create();
+    if (!l1->obs) {
+        AGENTOS_LOG_WARN("Failed to create observability for async storage, metrics disabled");
+    }
     l1->running = 1;
     l1->healthy = 1;
 

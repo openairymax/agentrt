@@ -8,6 +8,7 @@
 #define LLM_PROVIDER_H
 
 #include "llm_service.h"
+#include <curl/curl.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -15,6 +16,22 @@ extern "C" {
 
 /* 不透明上下文 */
 typedef struct provider_ctx provider_ctx_t;
+
+/* 基础上下文（各提供商共享） */
+typedef struct {
+    char api_key[256];
+    char api_base[512];
+    char organization[128];
+    double timeout_sec;
+    int max_retries;
+} provider_base_ctx_t;
+
+/* HTTP 响应 */
+typedef struct {
+    char* data;
+    size_t size;
+    size_t capacity;
+} provider_http_resp_t;
 
 /* 操作表 */
 typedef struct {
@@ -42,6 +59,30 @@ typedef struct {
     provider_ctx_t* ctx;
     char** models;
 } provider_t;
+
+/* 通用工具函数 */
+void provider_base_init(provider_base_ctx_t* base_ctx,
+                        const char* api_key,
+                        const char* api_base,
+                        const char* organization,
+                        double timeout_sec,
+                        int max_retries,
+                        const char* default_base);
+
+int provider_http_post(const char* url,
+                       struct curl_slist* headers,
+                       const char* body,
+                       double timeout_sec,
+                       int max_retries,
+                       provider_http_resp_t** out_response,
+                       long* out_http_code);
+
+void provider_http_resp_free(provider_http_resp_t* resp);
+
+char* provider_build_openai_request(const llm_request_config_t* manager,
+                                     const char* default_model);
+
+int provider_parse_openai_response(const char* body, llm_response_t** out);
 
 #ifdef __cplusplus
 }

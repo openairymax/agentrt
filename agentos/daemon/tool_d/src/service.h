@@ -12,7 +12,7 @@
 #include "executor.h"
 #include "validator.h"
 #include "cache.h"
-#include "manager.h"
+#include "config.h"
 #include "platform.h"
 
 struct tool_service {

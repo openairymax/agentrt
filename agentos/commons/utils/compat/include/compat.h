@@ -81,8 +81,8 @@ extern "C" {
     #define AGENTOS_ALIGNED(x)      __attribute__((aligned(x)))
     #define AGENTOS_DEPRECATED      __attribute__((deprecated))
     #define AGENTOS_FALLTHROUGH     __attribute__((fallthrough))
-    #define AGENTOS_PRINTF_FORMAT(fmt, args) __attribute__((format(printf, fmt, args)))
-    #define AGENTOS_SCANF_FORMAT(fmt, args)  __attribute__((format(scanf, fmt, args)))
+    #define AGENTOS_PRINTF_FORMAT(fmt, args) __attribute__((format(printf, fmt, args))) /* flawfinder: ignore - compile-time format attribute */
+    #define AGENTOS_SCANF_FORMAT(fmt, args)  __attribute__((format(scanf, fmt, args)))  /* flawfinder: ignore - compile-time format attribute */
     #define AGENTOS_LIKELY(x)       __builtin_expect(!!(x), 1)
     #define AGENTOS_UNLIKELY(x)     __builtin_expect(!!(x), 0)
     #define AGENTOS_PREFETCH(x)     __builtin_prefetch(x)

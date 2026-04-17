@@ -422,7 +422,7 @@ char* agentos_trace_export(void) {
 
         span = span->next;
 
-        if (offset >= buffer_size - 512) {
+        if (buffer_size > 512 && offset >= buffer_size - 512) {
             buffer_size *= 2;
             char* new_buffer = (char*)AGENTOS_REALLOC(buffer, buffer_size);
             if (!new_buffer) {

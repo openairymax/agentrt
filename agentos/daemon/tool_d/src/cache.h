@@ -8,6 +8,7 @@
 #define TOOL_CACHE_H
 
 #include <stddef.h>
+#include "tool_service.h"
 
 #ifdef __cplusplus
 extern "C" {

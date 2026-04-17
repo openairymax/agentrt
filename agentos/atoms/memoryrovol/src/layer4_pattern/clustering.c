@@ -17,9 +17,16 @@
 #include <hdbscan/hdbscan.h>
 #endif
 
+typedef struct {
+    int min_cluster_size;
+    int min_samples;
+    int max_clusters;
+    float epsilon;
+} clustering_params_t;
+
 struct agentos_clustering_engine {
     char method[32];
-    void* params;
+    clustering_params_t* params;
     agentos_mutex_t* lock;
 };
 typedef struct agentos_clustering_engine agentos_clustering_engine_t;
@@ -40,13 +47,16 @@ agentos_error_t agentos_clustering_engine_create(
         return AGENTOS_ENOMEM;
     }
 
-    // Parse config (simplified, could use cJSON for full parsing)
-    eng->params = AGENTOS_MALLOC(8); /* placeholder */
+    eng->params = (clustering_params_t*)AGENTOS_CALLOC(1, sizeof(clustering_params_t));
     if (!eng->params) {
         agentos_mutex_destroy(eng->lock);
         AGENTOS_FREE(eng);
         return AGENTOS_ENOMEM;
     }
+    eng->params->min_cluster_size = 5;
+    eng->params->min_samples = 1;
+    eng->params->max_clusters = 100;
+    eng->params->epsilon = 0.5f;
 
     *out_engine = eng;
     return AGENTOS_SUCCESS;

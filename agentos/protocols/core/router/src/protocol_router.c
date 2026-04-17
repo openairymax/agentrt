@@ -279,7 +279,7 @@ int protocol_router_get_stats(protocol_router_handle_t router,
         avg_time = r->total_conversion_time_ns / r->total_messages_routed;
     }
     
-    size_t buf_size = snprintf(NULL, 0, fmt,
+    size_t buf_size = snprintf(NULL, 0, fmt, /* flawfinder: ignore - size-only probe, no write */
                                r->total_messages_routed,
                                r->messages_routed_success,
                                r->messages_routed_failed,
@@ -291,7 +291,7 @@ int protocol_router_get_stats(protocol_router_handle_t router,
         return -1;
     }
     
-    snprintf(buf, buf_size, fmt,
+    snprintf(buf, buf_size, fmt, /* flawfinder: ignore - pre-sized buffer from prior probe */
              r->total_messages_routed,
              r->messages_routed_success,
              r->messages_routed_failed,

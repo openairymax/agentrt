@@ -110,7 +110,7 @@ const char* agentos_log_get_trace_id(void);
  */
 void agentos_log_write(int level, const char* file, int line, const char* fmt, ...)
 #if defined(__GNUC__) || defined(__clang__)
-    __attribute__((format(printf, 4, 5)))
+    __attribute__((format(printf, 4, 5))) /* flawfinder: ignore */
 #endif
 ;
 
@@ -197,7 +197,7 @@ int svc_logger_set_level(int level);
  */
 void svc_logger_log(int level, const char* module, const char* fmt, ...)
 #if defined(__GNUC__) || defined(__clang__)
-    __attribute__((format(printf, 3, 4)))
+    __attribute__((format(printf, 3, 4))) /* flawfinder: ignore */
 #endif
 ;
 

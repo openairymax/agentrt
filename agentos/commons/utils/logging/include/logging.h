@@ -279,7 +279,7 @@ int log_set_default_config(const log_config_t* manager);
  */
 void log_write(log_level_t level, const char* module, int line, const char* fmt, ...)
 #if defined(__GNUC__) || defined(__clang__)
-    __attribute__((format(printf, 4, 5)))
+    __attribute__((format(printf, 4, 5))) /* flawfinder: ignore */
 #endif
 ;
 

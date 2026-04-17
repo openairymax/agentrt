@@ -26,6 +26,8 @@ set(COMMONS_INCLUDE_DIR ${COMMONS_DIR})
 set(SCHED_D_SOURCES
     src/main.c
     src/monitor.c
+    src/sched_service_impl.c
+    src/sched_svc_adapter.c
     src/strategies/weighted.c
     src/strategies/round_robin.c
     src/strategies/ml_based.c
@@ -51,6 +53,7 @@ elseif(UNIX)
     target_link_libraries(agentos-sched-d PRIVATE
         pthread
         rt
+        m
     )
 endif()
 

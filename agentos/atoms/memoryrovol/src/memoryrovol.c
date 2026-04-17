@@ -288,8 +288,18 @@ agentos_error_t agentos_memoryrov_retrieve(agentos_memoryrov_handle_t* handle,
 
     /* 填充结果 */
     for (size_t i = 0; i < result_count; i++) {
-        /* 使用新的结构体字段名（record_id/score/data/data_len/metadata） */
         (*out_results)[i].record_id = AGENTOS_STRDUP(result_ids[i]);
+        if (!(*out_results)[i].record_id) {
+            for (size_t j = 0; j < i; j++) {
+                AGENTOS_FREE((*out_results)[j].record_id);
+                AGENTOS_FREE((*out_results)[j].data);
+            }
+            AGENTOS_FREE(*out_results);
+            *out_results = NULL;
+            AGENTOS_FREE(result_ids);
+            AGENTOS_FREE(scores);
+            return AGENTOS_ENOMEM;
+        }
         (*out_results)[i].score = scores[i];
         (*out_results)[i].created_at = time(NULL);
         (*out_results)[i].updated_at = time(NULL);

@@ -70,7 +70,12 @@ static void agentos_pattern_miner_stop_auto(agentos_layer4_pattern_t* miner);
  * @brief 计算距离矩阵（余弦距离）
  */
 static float* compute_distance_matrix(const float* vectors, size_t count, size_t dim) {
-    float* dist = (float*)AGENTOS_MALLOC(count * count * sizeof(float));
+    if (count == 0) return NULL;
+    if (count > SIZE_MAX / count) return NULL;
+    size_t matrix_size = count * count;
+    if (matrix_size > SIZE_MAX / sizeof(float)) return NULL;
+
+    float* dist = (float*)AGENTOS_MALLOC(matrix_size * sizeof(float));
     if (!dist) return NULL;
     for (size_t i = 0; i < count; i++) {
         dist[i * count + i] = 0.0f;
@@ -152,7 +157,7 @@ static agentos_error_t generate_rules_for_clusters(
         // 收集该聚类的向量和ID
         float* cluster_vectors = (float*)AGENTOS_MALLOC(cluster_size * dim * sizeof(float));
         const char** cluster_ids = (const char**)AGENTOS_MALLOC(cluster_size * sizeof(const char*));
-        if (!cluster_vectors || !cluster_ids) {
+        if (!cluster_vectors || !cluster_ids || (cluster_size > 0 && dim > 0 && cluster_size * dim / dim != cluster_size)) {
             AGENTOS_FREE(cluster_vectors);
             AGENTOS_FREE(cluster_ids);
             continue;

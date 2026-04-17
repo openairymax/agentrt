@@ -10,6 +10,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 /**
  * @brief 监控服务配置
@@ -78,16 +79,9 @@ typedef struct {
 /**
  * @brief 日志级别
  */
-#ifndef LOG_LEVEL_ENUM_DEFINED
-#define LOG_LEVEL_ENUM_DEFINED
-typedef enum {
-    LOG_LEVEL_DEBUG,        /**< 调试 */
-    LOG_LEVEL_INFO,         /**< 信息 */
-    LOG_LEVEL_WARNING,      /**< 警告 */
-    LOG_LEVEL_ERROR,        /**< 错误 */
-    LOG_LEVEL_FATAL,        /**< 致命 */
-    LOG_LEVEL_COUNT
-} log_level_t;
+#include <logging.h>
+#ifndef LOG_LEVEL_WARNING
+#define LOG_LEVEL_WARNING LOG_LEVEL_WARN
 #endif
 
 /**

@@ -13,6 +13,7 @@ import time
 import logging
 import asyncio
 from typing import Optional, Dict, Any, List
+from urllib.parse import quote_plus
 import requests
 import aiohttp
 
@@ -137,7 +138,7 @@ class AgentOS:
         Returns:
             A list of Memory objects.
         """
-        params = f"?query={query}&top_k={top_k}"
+        params = f"?query={quote_plus(query)}&top_k={top_k}"
         response = self._request("GET", f"/api/v1/memories/search{params}")
         memories = []
         for mem_data in response.get("memories", []):
@@ -330,7 +331,7 @@ class AsyncAgentOS:
         Returns:
             A list of Memory objects.
         """
-        params = f"?query={query}&top_k={top_k}"
+        params = f"?query={quote_plus(query)}&top_k={top_k}"
         response = await self._request("GET", f"/api/v1/memories/search{params}")
         memories = []
         for mem_data in response.get("memories", []):
