@@ -2,6 +2,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <limits.h>
+#include <sys/stat.h>
 
 int agentos_time_now(agentos_timestamp_t* ts) {
     if (!ts) return -1;
@@ -168,4 +169,31 @@ int agentos_atomic_fetch_add(agentos_atomic_int_t* atomic, int value) {
 int agentos_atomic_fetch_sub(agentos_atomic_int_t* atomic, int value) {
     if (!atomic) return 0;
     return __atomic_fetch_sub(&atomic->value, value, __ATOMIC_SEQ_CST);
+}
+
+/* ==================== Socket 兼容层（桩实现） ==================== */
+
+int agentos_socket_init(void) { return 0; }
+void agentos_socket_cleanup(void) {}
+
+agentos_socket_t agentos_socket_create_tcp_server(const char* host, uint16_t port) {
+    (void)host; (void)port; return -1;
+}
+
+#if AGENTOS_PLATFORM_POSIX
+agentos_socket_t agentos_socket_create_unix_server(const char* path) {
+    (void)path; return -1;
+}
+#endif
+
+agentos_socket_t agentos_socket_accept(agentos_socket_t server_fd, uint32_t timeout_ms) {
+    (void)server_fd; (void)timeout_ms; return -1;
+}
+
+ssize_t agentos_socket_recv(agentos_socket_t sock, void* buf, size_t len) {
+    (void)sock; (void)buf; (void)len; return -1;
+}
+
+ssize_t agentos_socket_send(agentos_socket_t sock, const void* buf, size_t len) {
+    (void)sock; (void)buf; (void)len; return -1;
 }

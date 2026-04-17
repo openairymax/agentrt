@@ -94,6 +94,25 @@ static inline int svc_config_get_log_level(const svc_config_t* config) {
     return config ? config->log_level : 3;
 }
 
+static inline const char* svc_config_get_string(const svc_config_t* config, const char* key) {
+    (void)config; (void)key;
+    return NULL;
+}
+
+static inline int svc_config_get_int(const svc_config_t* config, const char* key) {
+    (void)config; (void)key;
+    return 0;
+}
+
+static inline int svc_config_get_bool(const svc_config_t* config, const char* key) {
+    (void)config; (void)key;
+    return 0;
+}
+
+static inline void svc_config_destroy(svc_config_t* config) {
+    svc_config_free(config);
+}
+
 #ifdef __cplusplus
 }
 #endif

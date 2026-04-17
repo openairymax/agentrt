@@ -145,32 +145,38 @@ static size_t format_log_message(const log_record_t* record, char* buffer, size_
     // 简单文本格式实�?
     time_t sec = record->timestamp / 1000;
     int ms = record->timestamp % 1000;
-    struct tm* tm_info = localtime(&sec);
-    
+    struct tm tm_storage;
+    localtime_r(&sec, &tm_storage);
+    struct tm* tm_info = &tm_storage;
+
     const char* level_name = log_level_to_string(record->level);
-    
-    // 构建日志消息
+
     int len = snprintf(buffer, buffer_size,
         "[%04d-%02d-%02d %02d:%02d:%02d.%03d] [%s] [%s:%d]",
         tm_info->tm_year + 1900, tm_info->tm_mon + 1, tm_info->tm_mday,
         tm_info->tm_hour, tm_info->tm_min, tm_info->tm_sec, ms,
         level_name, record->module, record->line);
-    
-    // 添加追踪ID（如果存在）
+    if (len < 0) return 0;
+    if ((size_t)len >= buffer_size) len = (int)buffer_size - 1;
+
     if (record->trace_id && record->trace_id[0] != '\0') {
-        len += snprintf(buffer + len, buffer_size - len,
+        len += snprintf(buffer + len, buffer_size - (size_t)len,
             " [trace:%s]", record->trace_id);
+        if (len < 0) return 0;
+        if ((size_t)len >= buffer_size) len = (int)buffer_size - 1;
     }
-    
-    // 添加线程/进程ID
-    len += snprintf(buffer + len, buffer_size - len,
+
+    len += snprintf(buffer + len, buffer_size - (size_t)len,
         " [thread:%llu] [process:%u]",
         (unsigned long long)record->thread_id,
         (unsigned)record->process_id);
-    
-    // 添加消息内容
-    len += snprintf(buffer + len, buffer_size - len,
+    if (len < 0) return 0;
+    if ((size_t)len >= buffer_size) len = (int)buffer_size - 1;
+
+    len += snprintf(buffer + len, buffer_size - (size_t)len,
         " %s\n", record->message);
+    if (len < 0) return 0;
+    if ((size_t)len >= buffer_size) len = (int)buffer_size - 1;
     
     return (size_t)len;
 }
@@ -474,7 +480,6 @@ void log_cleanup(void) {
     pthread_mutex_unlock(&g_logging_state.mutex);
     pthread_mutex_destroy(&g_logging_state.mutex);
     
-    // 重置状�?
     LOG_INFO("日志系统清理完成");
     memset(&g_logging_state, 0, sizeof(g_logging_state));
 }

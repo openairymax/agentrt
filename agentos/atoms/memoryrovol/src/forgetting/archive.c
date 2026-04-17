@@ -98,9 +98,13 @@ agentos_error_t agentos_forgetting_archive(
             AGENTOS_LOG_WARN("Failed to create archive file %s", archive_file);
             continue;
         }
-        fwrite(data, 1, len, f);
+        size_t written = fwrite(data, 1, len, f);
         fclose(f);
         AGENTOS_FREE(data);
+        if (written != len) {
+            AGENTOS_LOG_WARN("Incomplete write to archive file %s, skipping deletion", archive_file);
+            continue;
+        }
 
         // 删除 L2 向量
         agentos_layer2_feature_remove(engine->layer2, record_ids[i]);

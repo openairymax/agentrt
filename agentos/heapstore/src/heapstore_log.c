@@ -283,7 +283,7 @@ void heapstore_log_writev(heapstore_log_level_t level,
     snprintf(msec, sizeof(msec), "%03d", (int)(ts.tv_nsec / 1000000));
 
     char message[heapstore_LOG_MAX_LINE_LEN];
-    vsnprintf(message, sizeof(message), format, args);
+    vsnprintf(message, sizeof(message), format, args); /* flawfinder: ignore - bounded buffer heapstore_LOG_MAX_LINE_LEN */
 
     const char* filename = file;
     const char* last_slash = strrchr(file, '/');

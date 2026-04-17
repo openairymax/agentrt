@@ -15,7 +15,8 @@
 
 #include "scheduler_service.h"
 #include "strategy_interface.h"
-#include "monitor_service.h"
+#include "../monit_d/include/monitor_service.h"
+
 #include "platform.h"
 #include "error.h"
 #include "svc_logger.h"

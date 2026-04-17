@@ -20,6 +20,8 @@ struct llm_service {
     cost_tracker_t* cost;
     token_counter_t* token_counter;
     agentos_mutex_t lock;   /* 保护 registry 和 cost 等 */
+    void** rules;
+    size_t rule_count;
 };
 
 #endif /* LLM_SERVICE_INTERNAL_H */

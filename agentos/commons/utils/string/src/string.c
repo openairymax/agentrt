@@ -350,11 +350,11 @@ const char* string_find_char_last(const char* str, char ch) {
 }
 
 char* string_trim(char* str) {
-    if (str == NULL) {
-        return NULL;
+    if (str == NULL || str[0] == '\0') {
+        return str;
     }
-    
-    // 先修剪结�?    char* end = str + strlen(str) - 1;
+
+    char* end = str + strlen(str) - 1;
     while (end >= str && string_is_whitespace_char(*end)) {
         *end = '\0';
         end--;
