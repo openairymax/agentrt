@@ -349,25 +349,40 @@ agentos_error_t agentos_vector_store_list_ids(
         count++;
     }
 
+    if (count == 0) {
+        sqlite3_finalize(stmt);
+        *out_ids = NULL;
+        *out_count = 0;
+        return AGENTOS_SUCCESS;
+    }
+
     /* 分配数组 */
     char** ids = (char**)AGENTOS_MALLOC(count * sizeof(char*));
     if (!ids) {
         sqlite3_finalize(stmt);
         return AGENTOS_ENOMEM;
     }
+    memset(ids, 0, count * sizeof(char*));
 
     /* 重置语句并重新执行 */
     sqlite3_reset(stmt);
     size_t i = 0;
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
+    while (sqlite3_step(stmt) == SQLITE_ROW && i < count) {
         const char* id = (const char*)sqlite3_column_text(stmt, 0);
-        ids[i++] = AGENTOS_STRDUP(id);
+        ids[i] = id ? AGENTOS_STRDUP(id) : NULL;
+        if (!ids[i]) {
+            for (size_t j = 0; j < i; j++) AGENTOS_FREE(ids[j]);
+            AGENTOS_FREE(ids);
+            sqlite3_finalize(stmt);
+            return AGENTOS_ENOMEM;
+        }
+        i++;
     }
 
     sqlite3_finalize(stmt);
 
     *out_ids = ids;
-    *out_count = count;
+    *out_count = i;
 
     return AGENTOS_SUCCESS;
 }

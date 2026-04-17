@@ -77,14 +77,30 @@ int agentos_thread_getname(char* name, size_t size) {
 }
 
 int agentos_mkdir(const char* path, int recursive) {
+    if (!path) return -1;
 #ifdef _WIN32
     (void)recursive;
     return _mkdir(path);
 #else
     if (recursive) {
         char tmp[PATH_MAX];
-        snprintf(tmp, sizeof(tmp), "mkdir -p \"%s\"", path);
-        return system(tmp);
+        size_t len = strlen(path);
+        if (len == 0 || len >= PATH_MAX) return -1;
+        memcpy(tmp, path, len + 1);
+        for (size_t i = (tmp[0] == '/') ? 1 : 0; i <= len; i++) {
+            if (tmp[i] == '/' || tmp[i] == '\0') {
+                char saved = tmp[i];
+                tmp[i] = '\0';
+                if (i > 0 && tmp[0] != '\0') {
+                    struct stat st;
+                    if (stat(tmp, &st) != 0) {
+                        if (mkdir(tmp, 0755) != 0) { tmp[i] = saved; return -1; }
+                    }
+                }
+                tmp[i] = saved;
+            }
+        }
+        return 0;
     }
     return mkdir(path, 0755);
 #endif

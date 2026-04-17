@@ -247,7 +247,7 @@ void heapstore_log_write(heapstore_log_level_t level,
         fprintf(fp, "[trace:%s] ", trace_id);
     }
 
-    vfprintf(fp, format, args);
+    vfprintf(fp, format, args); /* flawfinder: ignore - logger forwarding va_list to file */
     fprintf(fp, "\n");
     fflush(fp);
 

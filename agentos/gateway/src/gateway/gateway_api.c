@@ -75,6 +75,6 @@ agentos_error_t gateway_stop(gateway_t* gw) {
 
 agentos_error_t gateway_get_stats(gateway_t* gw, char** out_json) {
     if (!gw || !out_json) return AGENTOS_EINVAL;
-    *out_json = strdup("{\"status\":\"stub\",\"connections\":0}");
-    return AGENTOS_SUCCESS;
+    *out_json = strdup("{\"status\":\"stub_not_available\",\"connections\":0,\"stub\":true}");
+    return AGENTOS_EPERM;
 }

@@ -39,14 +39,20 @@ void agentos_unbinder_destroy(agentos_unbinder_t* unbinder) {
 static void unbind_real_q1(const float* bound, const float* known, float* out,
                            size_t dim, float* mat) {
     if (mat) {
-        float gk[dim];
+        float* gk = (float*)AGENTOS_MALLOC(dim * sizeof(float));
+        float* gu = (float*)AGENTOS_MALLOC(dim * sizeof(float));
+        if (!gk || !gu) {
+            AGENTOS_FREE(gk);
+            AGENTOS_FREE(gu);
+            memset(out, 0, dim * sizeof(float));
+            return;
+        }
         memset(gk, 0, dim * sizeof(float));
         for (size_t i = 0; i < dim; i++) {
             for (size_t j = 0; j < dim; j++) {
                 gk[i] += mat[i * dim + j] * known[j];
             }
         }
-        float gu[dim];
         for (size_t i = 0; i < dim; i++) {
             if (fabsf(gk[i]) > 1e-6f)
                 gu[i] = bound[i] / gk[i];
@@ -59,6 +65,8 @@ static void unbind_real_q1(const float* bound, const float* known, float* out,
                 out[i] += mat[j * dim + i] * gu[j];
             }
         }
+        AGENTOS_FREE(gk);
+        AGENTOS_FREE(gu);
     } else {
         for (size_t i = 0; i < dim; i++) {
             if (fabsf(known[i]) > 1e-6f)

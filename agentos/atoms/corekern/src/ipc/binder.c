@@ -546,6 +546,9 @@ agentos_error_t agentos_ipc_close(agentos_ipc_channel_t* channel) {
                 if (*pp == channel->remote_target) {
                     binder_node_t* dead = *pp;
                     *pp = dead->next;
+                    if (dead->channel && dead->channel != channel) {
+                        agentos_ipc_close(dead->channel);
+                    }
                     AGENTOS_FREE(dead);
                     break;
                 }

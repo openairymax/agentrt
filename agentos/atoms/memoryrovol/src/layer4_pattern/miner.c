@@ -70,7 +70,12 @@ static void agentos_pattern_miner_stop_auto(agentos_layer4_pattern_t* miner);
  * @brief 计算距离矩阵（余弦距离）
  */
 static float* compute_distance_matrix(const float* vectors, size_t count, size_t dim) {
-    float* dist = (float*)AGENTOS_MALLOC(count * count * sizeof(float));
+    if (count == 0) return NULL;
+    if (count > SIZE_MAX / count) return NULL;
+    size_t matrix_size = count * count;
+    if (matrix_size > SIZE_MAX / sizeof(float)) return NULL;
+
+    float* dist = (float*)AGENTOS_MALLOC(matrix_size * sizeof(float));
     if (!dist) return NULL;
     for (size_t i = 0; i < count; i++) {
         dist[i * count + i] = 0.0f;

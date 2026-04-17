@@ -308,6 +308,12 @@ static void handle_client(agentos_socket_t client_fd) {
 
 /* ==================== 帮助信息 ==================== */
 
+static void signal_handler(int signum) {
+    (void)signum;
+    g_running = 0;
+    SVC_LOG_INFO("Received shutdown signal");
+}
+
 /**
  * @brief 打印使用说明
  * @param prog 程序名

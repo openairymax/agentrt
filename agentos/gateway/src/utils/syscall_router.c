@@ -559,14 +559,14 @@ agentos_error_t agentos_sys_session_list(char*** sessions, size_t* count) {
 
 /* Telemetry */
 agentos_error_t agentos_sys_telemetry_metrics(char** out_metrics) {
-    if (out_metrics) *out_metrics = strdup("{\"metrics\":{\"stub\":true}}");
-    return AGENTOS_OK;
+    if (out_metrics) *out_metrics = strdup("{\"metrics\":{\"stub\":true,\"status\":\"not_available\"}}");
+    return AGENTOS_ERR_NOT_SUPPORTED;
 }
 
 agentos_error_t agentos_sys_telemetry_traces(const char* trace_id, char** out_traces) {
     (void)trace_id;
-    if (out_traces) *out_traces = strdup("{\"traces\":[]}");
-    return AGENTOS_OK;
+    if (out_traces) *out_traces = strdup("{\"traces\":[],\"stub\":true,\"status\":\"not_available\"}}");
+    return AGENTOS_ERR_NOT_SUPPORTED;
 }
 
 /* Agent 管理 */
@@ -591,7 +591,7 @@ agentos_error_t agentos_sys_agent_invoke(const char* agent_id, const char* input
 agentos_error_t agentos_sys_agent_list(char*** agent_ids, size_t* count) {
     if (agent_ids) { *agent_ids = (char**)calloc(1, sizeof(char*)); (*agent_ids)[0] = NULL; }
     if (count) *count = 0;
-    return AGENTOS_OK;
+    return AGENTOS_ERR_NOT_SUPPORTED;
 }
 
 #endif /* AGENTOS_SYS_STUBS_DEFINED */

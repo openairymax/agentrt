@@ -46,6 +46,10 @@ agentos_error_t memory_pool_init(memory_pool_t* pool, const memory_pool_config_t
     }
     
     size_t pool_size = pool->manager.block_size * pool->manager.block_count;
+    if (pool->manager.block_count > 0 && pool->manager.block_size > SIZE_MAX / pool->manager.block_count) {
+        return AGENTOS_EOVERFLOW;
+    }
+    pool_size = pool->manager.block_size * pool->manager.block_count;
     pool->pool = AGENTOS_MALLOC(pool_size);
     if (!pool->pool) {
         return AGENTOS_ENOMEM;

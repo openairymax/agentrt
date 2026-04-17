@@ -30,10 +30,10 @@
 #ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
 #else
-/* cJSON stub - 简化实现（仅用于编译通过） */
 typedef struct cJSON {
     int type;
     char* valuestring;
+    double valuedouble;
     struct cJSON* child;
     struct cJSON* next;
     struct cJSON* prev;
@@ -49,9 +49,18 @@ typedef struct cJSON {
 
 static inline cJSON* cJSON_CreateObject(void) { return NULL; }
 static inline void cJSON_AddStringToObject(cJSON* object, const char* name, const char* string) { (void)object; (void)name; (void)string; }
+static inline void cJSON_AddNumberToObject(cJSON* object, const char* name, double number) { (void)object; (void)name; (void)number; }
+static inline cJSON* cJSON_AddArrayToObject(cJSON* object, const char* name) { (void)object; (void)name; return NULL; }
+static inline void cJSON_AddItemToArray(cJSON* array, cJSON* item) { (void)array; (void)item; }
 static inline char* cJSON_PrintUnformatted(const cJSON* item) { (void)item; return NULL; }
 static inline void cJSON_Delete(cJSON* item) { (void)item; }
-#endif /* AGENTOS_HAS_CJSON */
+static inline cJSON* cJSON_Parse(const char* value) { (void)value; return NULL; }
+static inline cJSON* cJSON_GetObjectItemCaseSensitive(const cJSON* object, const char* string) { (void)object; (void)string; return NULL; }
+static inline int cJSON_IsArray(const cJSON* item) { (void)item; return 0; }
+static inline int cJSON_IsString(const cJSON* item) { (void)item; return 0; }
+static inline cJSON* cJSON_GetArrayItem(const cJSON* array, int index) { (void)array; (void)index; return NULL; }
+static inline int cJSON_GetArraySize(const cJSON* array) { (void)array; return 0; }
+#endif
 
 /**
  * @brief 内存缓冲区（用于 HTTP 响应）
