@@ -377,7 +377,7 @@ void agentos_error_push_ex(agentos_error_t code,
     char message_buffer[1024];
     va_list args;
     va_start(args, fmt);
-    vsnprintf(message_buffer, sizeof(message_buffer), fmt, args); /* flawfinder: ignore - variadic error handler with bounded buffer */
+    vsnprintf(message_buffer, sizeof(message_buffer), fmt, args);
     va_end(args);
     
     /* 添加到错误链 */

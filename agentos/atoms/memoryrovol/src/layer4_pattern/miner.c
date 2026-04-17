@@ -152,7 +152,7 @@ static agentos_error_t generate_rules_for_clusters(
         // 收集该聚类的向量和ID
         float* cluster_vectors = (float*)AGENTOS_MALLOC(cluster_size * dim * sizeof(float));
         const char** cluster_ids = (const char**)AGENTOS_MALLOC(cluster_size * sizeof(const char*));
-        if (!cluster_vectors || !cluster_ids) {
+        if (!cluster_vectors || !cluster_ids || (cluster_size > 0 && dim > 0 && cluster_size * dim / dim != cluster_size)) {
             AGENTOS_FREE(cluster_vectors);
             AGENTOS_FREE(cluster_ids);
             continue;

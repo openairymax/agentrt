@@ -197,7 +197,7 @@ int svc_logger_set_level(int level);
  */
 void svc_logger_log(int level, const char* module, const char* fmt, ...)
 #if defined(__GNUC__) || defined(__clang__)
-    __attribute__((format(printf, 3, 4))) /* flawfinder: ignore - compile-time format attribute */
+    __attribute__((format(printf, 3, 4))) /* flawfinder: ignore */
 #endif
 ;
 

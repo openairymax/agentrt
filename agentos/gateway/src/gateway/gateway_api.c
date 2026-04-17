@@ -16,10 +16,13 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
+#define GATEWAY_API_IMPLEMENTATION
 #include "gateway.h"
 #include "http_gateway.h"
 #include "ws_gateway.h"
 #include "stdio_gateway.h"
+#include <stdlib.h>
+#include <string.h>
 
 /**
  * @brief 创建 HTTP 网关（公共 API 入口）
@@ -53,6 +56,8 @@ gateway_t* gateway_stdio_create(void) {
     return stdio_gateway_create();
 }
 
+/* ==================== 公共 API 实现（非内联版本） ==================== */
+
 void gateway_destroy(gateway_t* gw) {
     if (!gw) return;
     free(gw);
@@ -60,5 +65,16 @@ void gateway_destroy(gateway_t* gw) {
 
 agentos_error_t gateway_start(gateway_t* gw) {
     (void)gw;
-    return AGENTOS_OK;
+    return AGENTOS_SUCCESS;
+}
+
+agentos_error_t gateway_stop(gateway_t* gw) {
+    (void)gw;
+    return AGENTOS_SUCCESS;
+}
+
+agentos_error_t gateway_get_stats(gateway_t* gw, char** out_json) {
+    if (!gw || !out_json) return AGENTOS_EINVAL;
+    *out_json = strdup("{\"status\":\"stub\",\"connections\":0}");
+    return AGENTOS_SUCCESS;
 }

@@ -463,10 +463,6 @@ agentos_error_t agentos_monitoring_check_thresholds(agentos_monitoring_t* monito
         *out_warnings = warnings;
     } else {
         *out_warnings = AGENTOS_STRDUP("{\"warnings\":[]}");
-        if (!*out_warnings) {
-            agentos_mutex_unlock(monitoring->lock);
-            return AGENTOS_ENOMEM;
-        }
     }
 
     agentos_mutex_unlock(monitoring->lock);

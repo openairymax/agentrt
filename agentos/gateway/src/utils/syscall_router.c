@@ -463,3 +463,135 @@ char* gateway_syscall_route(const char* method, cJSON* params, cJSON* request_id
     /* 方法未找到 */
     return jsonrpc_create_error_response(request_id, -32601, "Method not found", NULL);
 }
+
+/* ==================== Syscall 桩实现（运行时依赖占位） ==================== */
+/* 这些函数由 syscall 模块提供，此处提供桩实现以通过链接 */
+
+#ifndef AGENTOS_SYS_STUBS_DEFINED
+#define AGENTOS_SYS_STUBS_DEFINED
+
+#ifndef AGENTOS_ERR_NOT_SUPPORTED
+#define AGENTOS_ERR_NOT_SUPPORTED  (-105)
+#endif
+
+#ifndef AGENTOS_OK
+#define AGENTOS_OK  0
+#endif
+
+/* Task 管理 */
+agentos_error_t agentos_sys_task_submit(const char* input, size_t len,
+                                         uint32_t timeout_ms, char** out_result) {
+    (void)input; (void)len; (void)timeout_ms;
+    if (out_result) *out_result = strdup("{\"stub\":true,\"status\":\"not_implemented\"}");
+    return AGENTOS_ERR_NOT_SUPPORTED;
+}
+
+agentos_error_t agentos_sys_task_query(const char* task_id, int* status) {
+    (void)task_id;
+    if (status) *status = 0;
+    return AGENTOS_ERR_NOT_SUPPORTED;
+}
+
+agentos_error_t agentos_sys_task_wait(const char* task_id, uint32_t timeout_ms,
+                                       char** out_result) {
+    (void)task_id; (void)timeout_ms;
+    if (out_result) *out_result = strdup("{}");
+    return AGENTOS_ERR_NOT_SUPPORTED;
+}
+
+agentos_error_t agentos_sys_task_cancel(const char* task_id) {
+    (void)task_id;
+    return AGENTOS_ERR_NOT_SUPPORTED;
+}
+
+/* Memory 管理 */
+agentos_error_t agentos_sys_memory_write(const void* data, size_t len,
+                                          const char* metadata, char** out_record_id) {
+    (void)data; (void)len; (void)metadata;
+    if (out_record_id) *out_record_id = strdup("stub_record_001");
+    return AGENTOS_ERR_NOT_SUPPORTED;
+}
+
+agentos_error_t agentos_sys_memory_search(const char* query, uint32_t limit,
+                                           char*** record_ids, float** scores, size_t* count) {
+    (void)query; (void)limit;
+    if (record_ids) { *record_ids = (char**)calloc(1, sizeof(char*)); (*record_ids)[0] = NULL; }
+    if (scores) *scores = (float*)calloc(1, sizeof(float));
+    if (count) *count = 0;
+    return AGENTOS_ERR_NOT_SUPPORTED;
+}
+
+agentos_error_t agentos_sys_memory_get(const char* record_id, void** out_data, size_t* out_len) {
+    (void)record_id;
+    if (out_data) *out_data = strdup("{}");
+    if (out_len) *out_len = 2;
+    return AGENTOS_ERR_NOT_SUPPORTED;
+}
+
+agentos_error_t agentos_sys_memory_delete(const char* record_id) {
+    (void)record_id;
+    return AGENTOS_ERR_NOT_SUPPORTED;
+}
+
+/* Session 管理 */
+agentos_error_t agentos_sys_session_create(const char* metadata, char** out_session_id) {
+    (void)metadata;
+    if (out_session_id) *out_session_id = strdup("stub_session_001");
+    return AGENTOS_ERR_NOT_SUPPORTED;
+}
+
+agentos_error_t agentos_sys_session_get(const char* session_id, char** out_info) {
+    (void)session_id;
+    if (out_info) *out_info = strdup("{\"stub\":true}");
+    return AGENTOS_ERR_NOT_SUPPORTED;
+}
+
+agentos_error_t agentos_sys_session_close(const char* session_id) {
+    (void)session_id;
+    return AGENTOS_ERR_NOT_SUPPORTED;
+}
+
+agentos_error_t agentos_sys_session_list(char*** sessions, size_t* count) {
+    if (sessions) { *sessions = (char**)calloc(1, sizeof(char*)); (*sessions)[0] = NULL; }
+    if (count) *count = 0;
+    return AGENTOS_ERR_NOT_SUPPORTED;
+}
+
+/* Telemetry */
+agentos_error_t agentos_sys_telemetry_metrics(char** out_metrics) {
+    if (out_metrics) *out_metrics = strdup("{\"metrics\":{\"stub\":true}}");
+    return AGENTOS_OK;
+}
+
+agentos_error_t agentos_sys_telemetry_traces(const char* trace_id, char** out_traces) {
+    (void)trace_id;
+    if (out_traces) *out_traces = strdup("{\"traces\":[]}");
+    return AGENTOS_OK;
+}
+
+/* Agent 管理 */
+agentos_error_t agentos_sys_agent_spawn(const char* spec, char** out_agent_id) {
+    (void)spec;
+    if (out_agent_id) *out_agent_id = strdup("stub_agent_001");
+    return AGENTOS_ERR_NOT_SUPPORTED;
+}
+
+agentos_error_t agentos_sys_agent_terminate(const char* agent_id) {
+    (void)agent_id;
+    return AGENTOS_ERR_NOT_SUPPORTED;
+}
+
+agentos_error_t agentos_sys_agent_invoke(const char* agent_id, const char* input,
+                                         size_t len, char** out_output) {
+    (void)agent_id; (void)input; (void)len;
+    if (out_output) *out_output = strdup("{\"result\":\"stub_response\"}");
+    return AGENTOS_ERR_NOT_SUPPORTED;
+}
+
+agentos_error_t agentos_sys_agent_list(char*** agent_ids, size_t* count) {
+    if (agent_ids) { *agent_ids = (char**)calloc(1, sizeof(char*)); (*agent_ids)[0] = NULL; }
+    if (count) *count = 0;
+    return AGENTOS_OK;
+}
+
+#endif /* AGENTOS_SYS_STUBS_DEFINED */
