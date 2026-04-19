@@ -30,12 +30,8 @@ typedef enum sanitize_result {
     SANITIZE_ERROR
 } sanitize_result_t;
 
-/* Sanitize Level */
-typedef enum sanitize_level {
-    SANITIZE_LEVEL_STRICT = 0,
-    SANITIZE_LEVEL_NORMAL,
-    SANITIZE_LEVEL_RELAXED
-} sanitize_level_t;
+/* Sanitize Level - canonical definition from commons/types/ */
+#include "sanitize_level.h"
 
 /* Sanitize Context */
 typedef struct sanitize_context {

@@ -36,8 +36,7 @@
 #else
     #ifdef __has_include
         #if __has_include("../../../agentos/cupolas/include/cupolas.h")
-            /* SEC-017合规：强制使用独立安全实现 */
-            #define CUPOLAS_AVAILABLE 0
+            #define CUPOLAS_AVAILABLE 1
             #include "../../../agentos/cupolas/include/cupolas.h"
             #include "../../../agentos/cupolas/src/sanitizer/sanitizer.h"
             #include "../../../agentos/cupolas/src/permission/permission.h"
@@ -52,9 +51,9 @@
 #endif
 
 #if !CUPOLAS_AVAILABLE
-typedef int sanitize_level_t;
-typedef struct { char name[128]; } cupolas_signer_info_t;
-typedef int cupolas_vault_cred_type_t;
+#include "sanitize_level.h"
+#include "cupolas_signer_info.h"
+#include "cupolas_vault_cred_type.h"
 #define SANITIZE_LEVEL_NONE     0
 #define SANITIZE_LEVEL_NORMAL   1
 #define SANITIZE_LEVEL_STRICT   2

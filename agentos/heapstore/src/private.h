@@ -17,7 +17,7 @@
 #include <pthread.h>
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
-#include <agentos/utils/include/atomic_compat.h>
+#include "atomic_compat.h"
 
 #define heapstore_MAX_PATH_LEN 512
 #define heapstore_MAX_NAME_LEN 128

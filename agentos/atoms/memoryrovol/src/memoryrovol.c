@@ -26,8 +26,8 @@
 #include <time.h>  /* time()函数 */
 
 /* Unified base library compatibility layer */
-#include <agentos/utils/memory/memory_compat.h>
-#include <agentos/utils/string/string_compat.h>
+#include "include/memory_compat.h"
+#include "string_compat.h"
 #include <string.h>
 #include <stdio.h>
 #include <time.h>

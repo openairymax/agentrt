@@ -16,7 +16,7 @@
 #include "daemon_errors.h"
 #include "safe_string_utils.h"
 
-#include <agentos/utils/memory/memory_compat.h>
+#include "include/memory_compat.h"
 
 #include <stdlib.h>
 #include <string.h>
