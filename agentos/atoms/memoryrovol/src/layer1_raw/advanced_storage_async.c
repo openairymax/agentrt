@@ -10,8 +10,8 @@
 #include <string.h>
 
 /* 基础库兼容性层 */
-#include <agentos/memory.h>
-#include <agentos/string.h>
+#include <agentos/utils/memory/memory_compat.h>
+#include <agentos/utils/string/string_compat.h>
 
 /* ==================== 异步操作管理 ==================== */
 

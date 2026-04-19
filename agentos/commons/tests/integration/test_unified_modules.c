@@ -20,8 +20,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include <agentos/memory.h>
-#include <agentos/string.h>
+#include <agentos/utils/memory/memory_compat.h>
+#include <agentos/utils/string/string_compat.h>
 
 /* 包含统一日志模块头文件 */
 #include "../../utils/logging/include/logging.h"
