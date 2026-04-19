@@ -424,9 +424,11 @@ char* agentos_error_chain_to_json(const agentos_error_chain_t* chain);
 
 /* ==================== 向后兼容接口（已废弃） ==================== */
 
+#ifndef AGENTOS_ERROR_CONTEXT_T_DEFINED
+#define AGENTOS_ERROR_CONTEXT_T_DEFINED
 /**
  * @brief 错误上下文结构（兼容旧代码）
- * @deprecated 请使用 agentos_error_chain_t
+ * @deprecated 请使用 agentos_error_chain_t 或 atoms/coreloopthree/include/error_utils.h 中的完整版定义
  */
 typedef struct {
     const char* file;
@@ -435,6 +437,7 @@ typedef struct {
     const char* message;
     agentos_error_t error_code;
 } agentos_error_context_t;
+#endif /* AGENTOS_ERROR_CONTEXT_T_DEFINED */
 
 /**
  * @brief 错误处理回调函数类型

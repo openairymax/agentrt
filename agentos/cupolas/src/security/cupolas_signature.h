@@ -51,19 +51,9 @@ typedef enum {
 } cupolas_sig_algo_t;
 
 /**
- * @brief Signer information structure
+ * @brief Signer information structure - canonical definition from commons/types/
  */
-typedef struct {
-    char* subject_cn;               /**< Common name */
-    char* subject_org;              /**< Organization */
-    char* subject_ou;               /**< Organizational unit */
-    char* issuer_cn;                /**< Issuer CN */
-    char* serial_number;            /**< Serial number */
-    uint64_t not_before;            /**< Validity start */
-    uint64_t not_after;             /**< Validity end */
-    bool is_ca;                     /**< Is CA certificate */
-    uint32_t key_usage;             /**< Key usage flags */
-} cupolas_signer_info_t;
+#include "cupolas_signer_info.h"
 
 /**
  * @brief Code signature verification context (opaque)

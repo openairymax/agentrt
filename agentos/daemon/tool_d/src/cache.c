@@ -5,9 +5,10 @@
  */
 
 #include "cache.h"
-#include <agentos/utils/memory/memory_common.h>
+#include "memory_common.h"
 #include "tool_service.h"
 #include "platform.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>

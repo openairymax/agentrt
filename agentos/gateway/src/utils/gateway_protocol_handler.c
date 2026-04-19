@@ -11,7 +11,7 @@
 #include "gateway_protocol_handler.h"
 #include "jsonrpc.h"
 #include "syscall_router.h"
-#include <agentos/daemon/common/include/safe_string_utils.h>
+#include "daemon/common/include/safe_string_utils.h"
 #include <cJSON.h>
 #include <stdlib.h>
 #include <string.h>
@@ -87,35 +87,35 @@ static int is_valid_json(const char* data, size_t len) {
     return 1;
 }
 
-static unified_protocol_type_t detect_protocol_internal(
+static agentos_protocol_type_t detect_protocol_internal(
     const char* request_data,
     size_t request_size) {
 
     if (!request_data || request_size == 0) {
-        return UNIFIED_PROTOCOL_UNKNOWN;
+        return AGENTOS_PROTOCOL_COUNT;
     }
 
     if (!is_valid_json(request_data, request_size)) {
-        return UNIFIED_PROTOCOL_UNKNOWN;
+        return AGENTOS_PROTOCOL_COUNT;
     }
 
     if (string_contains_any(request_data, OPENAI_SIGNATURES)) {
-        return UNIFIED_PROTOCOL_OPENAI_API;
+        return AGENTOS_PROTOCOL_OPENAI;
     }
 
     if (string_contains_any(request_data, MCP_SIGNATURES)) {
-        return UNIFIED_PROTOCOL_MCP;
+        return AGENTOS_PROTOCOL_MCP;
     }
 
     if (string_contains_any(request_data, A2A_SIGNATURES)) {
-        return UNIFIED_PROTOCOL_A2A;
+        return AGENTOS_PROTOCOL_A2A;
     }
 
     if (string_contains_any(request_data, JSONRPC_SIGNATURES)) {
-        return UNIFIED_PROTOCOL_JSONRPC;
+        return AGENTOS_PROTOCOL_JSON_RPC;
     }
 
-    return UNIFIED_PROTOCOL_UNKNOWN;
+    return AGENTOS_PROTOCOL_COUNT;
 }
 
 static rpc_result_t create_error_result(int code, const char* message, const char* id_str) {
@@ -315,7 +315,7 @@ rpc_result_t gateway_protocol_handle_request(
     gateway_protocol_handler_t handler,
     const char* request_data,
     size_t request_size,
-    unified_protocol_type_t protocol_type,
+    agentos_protocol_type_t protocol_type,
     int (*custom_handler)(const char*, char**, void*),
     void* handler_data) {
 
@@ -338,36 +338,36 @@ rpc_result_t gateway_protocol_handle_request(
         return create_error_result(-32603, err_msg, "null");
     }
 
-    unified_protocol_type_t detected_type = protocol_type;
+    agentos_protocol_type_t detected_type = protocol_type;
 
-    if (protocol_type == UNIFIED_PROTOCOL_AUTO && handler->config.enable_protocol_detection) {
+    if (protocol_type == AGENTOS_PROTOCOL_A2A && handler->config.enable_protocol_detection) {
         detected_type = detect_protocol_internal(request_data, request_size);
 
-        if (detected_type == UNIFIED_PROTOCOL_UNKNOWN &&
+        if (detected_type == AGENTOS_PROTOCOL_COUNT &&
             handler->config.default_protocol) {
 
             if (strcmp(handler->config.default_protocol, "jsonrpc") == 0)
-                detected_type = UNIFIED_PROTOCOL_JSONRPC;
+                detected_type = AGENTOS_PROTOCOL_JSON_RPC;
             else if (strcmp(handler->config.default_protocol, "mcp") == 0)
-                detected_type = UNIFIED_PROTOCOL_MCP;
+                detected_type = AGENTOS_PROTOCOL_MCP;
             else if (strcmp(handler->config.default_protocol, "openai") == 0)
-                detected_type = UNIFIED_PROTOCOL_OPENAI_API;
+                detected_type = AGENTOS_PROTOCOL_OPENAI;
             else if (strcmp(handler->config.default_protocol, "a2a") == 0)
-                detected_type = UNIFIED_PROTOCOL_A2A;
+                detected_type = AGENTOS_PROTOCOL_A2A;
         }
     }
 
     switch (detected_type) {
-        case UNIFIED_PROTOCOL_JSONRPC:
+        case AGENTOS_PROTOCOL_JSON_RPC:
             handler->jsonrpc_requests++;
             break;
-        case UNIFIED_PROTOCOL_MCP:
+        case AGENTOS_PROTOCOL_MCP:
             handler->mcp_requests++;
             break;
-        case UNIFIED_PROTOCOL_A2A:
+        case AGENTOS_PROTOCOL_A2A:
             handler->a2a_requests++;
             break;
-        case UNIFIED_PROTOCOL_OPENAI_API:
+        case AGENTOS_PROTOCOL_OPENAI:
             handler->openai_requests++;
             break;
         default:
@@ -379,7 +379,7 @@ rpc_result_t gateway_protocol_handle_request(
     cJSON* converted_params = NULL;
 
     switch (detected_type) {
-        case UNIFIED_PROTOCOL_JSONRPC:
+        case AGENTOS_PROTOCOL_JSON_RPC:
             {
                 cJSON* json_rpc = cJSON_ParseWithLength(request_data, request_size);
                 if (!json_rpc) {
@@ -406,7 +406,7 @@ rpc_result_t gateway_protocol_handle_request(
             }
             break;
 
-        case UNIFIED_PROTOCOL_MCP:
+        case AGENTOS_PROTOCOL_MCP:
             if (!handler->config.enable_mcp_protocol) {
                 free(method); free(id_str);
                 handler->conversion_errors++;
@@ -415,7 +415,7 @@ rpc_result_t gateway_protocol_handle_request(
             converted_params = extract_mcp_to_jsonrpc(request_data, request_size, &method, &id_str);
             break;
 
-        case UNIFIED_PROTOCOL_A2A:
+        case AGENTOS_PROTOCOL_A2A:
             if (!handler->config.enable_a2a_protocol) {
                 free(method); free(id_str);
                 handler->conversion_errors++;
@@ -424,7 +424,7 @@ rpc_result_t gateway_protocol_handle_request(
             converted_params = extract_a2a_to_jsonrpc(request_data, request_size, &method, &id_str);
             break;
 
-        case UNIFIED_PROTOCOL_OPENAI_API:
+        case AGENTOS_PROTOCOL_OPENAI:
             if (!handler->config.enable_openai_protocol) {
                 free(method); free(id_str);
                 handler->conversion_errors++;
@@ -492,13 +492,13 @@ rpc_result_t gateway_protocol_handle_request(
     final_result.error_code = 0;
     final_result.response_json = response_str;
 
-    if (detected_type != UNIFIED_PROTOCOL_JSONRPC) {
+    if (detected_type != AGENTOS_PROTOCOL_JSON_RPC) {
         cJSON* jsonrpc_resp = cJSON_Parse(response_str);
         if (jsonrpc_resp) {
             cJSON* result_data = cJSON_GetObjectItem(jsonrpc_resp, "result");
             if (result_data) {
                 switch (detected_type) {
-                    case UNIFIED_PROTOCOL_OPENAI_API:
+                    case AGENTOS_PROTOCOL_OPENAI:
                         {
                             cJSON* openai_resp = cJSON_CreateObject();
                             cJSON* choices = cJSON_CreateArray();
@@ -523,7 +523,7 @@ rpc_result_t gateway_protocol_handle_request(
                         }
                         break;
 
-                    case UNIFIED_PROTOCOL_MCP:
+                    case AGENTOS_PROTOCOL_MCP:
                         {
                             cJSON* mcp_resp = cJSON_CreateObject();
                             cJSON_AddItemToObject(mcp_resp, "content", cJSON_Parse(cJSON_PrintUnformatted(result_data)));
@@ -536,7 +536,7 @@ rpc_result_t gateway_protocol_handle_request(
                         }
                         break;
 
-                    case UNIFIED_PROTOCOL_A2A:
+                    case AGENTOS_PROTOCOL_A2A:
                         {
                             cJSON* a2a_resp = cJSON_CreateObject();
                             cJSON_AddItemToObject(a2a_resp, "response", cJSON_Parse(cJSON_PrintUnformatted(result_data)));
@@ -640,33 +640,33 @@ int gateway_protocol_handler_load_config_from_json(
     return 0;
 }
 
-unified_protocol_type_t gateway_protocol_detect(
+agentos_protocol_type_t gateway_protocol_detect(
     const char* request_data,
     size_t request_size) {
     return detect_protocol_internal(request_data, request_size);
 }
 
 int gateway_protocol_is_jsonrpc(const char* request_data, size_t request_size) {
-    return detect_protocol_internal(request_data, request_size) == UNIFIED_PROTOCOL_JSONRPC ? 1 : 0;
+    return detect_protocol_internal(request_data, request_size) == AGENTOS_PROTOCOL_JSON_RPC ? 1 : 0;
 }
 
 int gateway_protocol_is_mcp(const char* request_data, size_t request_size) {
-    return detect_protocol_internal(request_data, request_size) == UNIFIED_PROTOCOL_MCP ? 1 : 0;
+    return detect_protocol_internal(request_data, request_size) == AGENTOS_PROTOCOL_MCP ? 1 : 0;
 }
 
 int gateway_protocol_is_a2a(const char* request_data, size_t request_size) {
-    return detect_protocol_internal(request_data, request_size) == UNIFIED_PROTOCOL_A2A ? 1 : 0;
+    return detect_protocol_internal(request_data, request_size) == AGENTOS_PROTOCOL_A2A ? 1 : 0;
 }
 
 int gateway_protocol_is_openai(const char* request_data, size_t request_size) {
-    return detect_protocol_internal(request_data, request_size) == UNIFIED_PROTOCOL_OPENAI_API? 1 : 0;
+    return detect_protocol_internal(request_data, request_size) == AGENTOS_PROTOCOL_OPENAI? 1 : 0;
 }
 
 int gateway_protocol_convert_to_jsonrpc(
     gateway_protocol_handler_t handler,
     const char* request_data,
     size_t request_size,
-    unified_protocol_type_t protocol_type,
+    agentos_protocol_type_t protocol_type,
     char** jsonrpc_out) {
 
     if (!handler || !request_data || !jsonrpc_out) return -1;
@@ -676,16 +676,16 @@ int gateway_protocol_convert_to_jsonrpc(
     cJSON* params = NULL;
 
     switch (protocol_type) {
-        case UNIFIED_PROTOCOL_MCP:
+        case AGENTOS_PROTOCOL_MCP:
             params = extract_mcp_to_jsonrpc(request_data, request_size, &method, &id_str);
             break;
-        case UNIFIED_PROTOCOL_A2A:
+        case AGENTOS_PROTOCOL_A2A:
             params = extract_a2a_to_jsonrpc(request_data, request_size, &method, &id_str);
             break;
-        case UNIFIED_PROTOCOL_OPENAI_API:
+        case AGENTOS_PROTOCOL_OPENAI:
             params = extract_openai_to_jsonrpc(request_data, request_size, &method, &id_str);
             break;
-        case UNIFIED_PROTOCOL_JSONRPC:
+        case AGENTOS_PROTOCOL_JSON_RPC:
             *jsonrpc_out = strndup(request_data, request_size);
             free(method); free(id_str);
             return *jsonrpc_out ? 0 : -2;
@@ -725,7 +725,7 @@ int gateway_protocol_convert_to_jsonrpc(
 int gateway_protocol_convert_from_jsonrpc(
     gateway_protocol_handler_t handler,
     const char* jsonrpc_response,
-    unified_protocol_type_t target_protocol,
+    agentos_protocol_type_t target_protocol,
     char** target_response) {
 
     if (!handler || !jsonrpc_response || !target_response) return -1;
@@ -740,7 +740,7 @@ int gateway_protocol_convert_from_jsonrpc(
     }
 
     switch (target_protocol) {
-        case UNIFIED_PROTOCOL_OPENAI_API:
+        case AGENTOS_PROTOCOL_OPENAI:
             {
                 cJSON* openai = cJSON_CreateObject();
                 cJSON* choices = cJSON_CreateArray();
@@ -762,7 +762,7 @@ int gateway_protocol_convert_from_jsonrpc(
             }
             break;
 
-        case UNIFIED_PROTOCOL_MCP:
+        case AGENTOS_PROTOCOL_MCP:
             {
                 cJSON* mcp = cJSON_CreateObject();
                 cJSON_AddItemToObject(mcp, "content", cJSON_Parse(cJSON_PrintUnformatted(result)));
@@ -773,7 +773,7 @@ int gateway_protocol_convert_from_jsonrpc(
             }
             break;
 
-        case UNIFIED_PROTOCOL_A2A:
+        case AGENTOS_PROTOCOL_A2A:
             {
                 cJSON* a2a = cJSON_CreateObject();
                 cJSON_AddItemToObject(a2a, "response", cJSON_Parse(cJSON_PrintUnformatted(result)));
@@ -817,7 +817,7 @@ rpc_result_t gateway_protocol_handle_jsonrpc(
 
     rpc_result_t result = gateway_protocol_handle_request(
         h, request_str, strlen(request_str),
-        UNIFIED_PROTOCOL_JSONRPC, handler, handler_data);
+        AGENTOS_PROTOCOL_JSON_RPC, handler, handler_data);
 
     free(request_str);
     gateway_protocol_handler_destroy(h);

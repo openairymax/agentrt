@@ -14,8 +14,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include <agentos/utils/memory/memory_compat.h>
-#include <agentos/utils/string/string_compat.h>
+#include "include/memory_compat.h"
+#include "string_compat.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -145,16 +145,12 @@ agentos_error_t agentos_llm_service_create(
     service->config.temperature = config->temperature > 0 ? config->temperature : 0.7f;
     service->config.max_tokens = config->max_tokens > 0 ? config->max_tokens : 2048;
 
-    /* 初始化 CURL（支持降级模式） */
+    /* 初始化 CURL（不支持降级模式，严格遵循SEC-017） */
     CURL* curl = curl_easy_init();
     if (!curl) {
-        AGENTOS_LOG_WARN("CURL initialization failed - running in degraded mode (no LLM support)");
-        /* 降级模式：继续创建服务但标记为无CURL支持 */
-        service->curl = NULL;
-        service->initialized = 1;  /* 仍然标记为初始化，但功能受限 */
-        *out_service = service;
-        AGENTOS_LOG_INFO("LLM service created in degraded mode (model: %s)", service->config.model_name);
-        return AGENTOS_SUCCESS;
+        AGENTOS_LOG_ERROR("CURL initialization failed - LLM service cannot function without HTTP client");
+        AGENTOS_FREE(service);
+        return AGENTOS_ENOTSUP;
     }
 
     service->curl = curl;
@@ -181,23 +177,10 @@ agentos_error_t agentos_llm_complete(
         return AGENTOS_ENOTINIT;
     }
 
-    /* 降级模式检查：如果没有CURL支持，返回降级响应 */
+    /* 严格模式：无CURL支持时返回明确错误，不返回假SUCCESS (SEC-017) */
     if (!service->curl) {
-        AGENTOS_LOG_WARN("LLM complete attempted in degraded mode (no CURL support)");
-        agentos_llm_response_t* resp = (agentos_llm_response_t*)AGENTOS_CALLOC(1, sizeof(agentos_llm_response_t));
-        if (!resp) {
-            return AGENTOS_ENOMEM;
-        }
-        resp->text = AGENTOS_STRDUP("LLM service unavailable (degraded mode)");
-        if (!resp->text) {
-            AGENTOS_FREE(resp);
-            return AGENTOS_ENOMEM;
-        }
-        resp->usage_tokens = 0;
-        resp->total_tokens = 0;
-        resp->finish_reason = 0;
-        *out_response = resp;
-        return AGENTOS_SUCCESS;
+        AGENTOS_LOG_ERROR("LLM complete attempted but CURL not available - service in invalid state");
+        return AGENTOS_ENOTINIT;
     }
 
     /* 使用现有的agentos_llm_service_call实现作为基础 */
@@ -267,12 +250,10 @@ agentos_error_t agentos_llm_service_call(
         return AGENTOS_ENOTINIT;
     }
 
-    /* 降级模式检查：如果没有CURL支持，返回错误 */
+    /* 严格模式：无CURL支持时返回明确错误 (SEC-017) */
     if (!service->curl) {
-        AGENTOS_LOG_WARN("LLM service call attempted in degraded mode (no CURL support)");
-        /* 返回一个友好的降级响应而不是错误 */
-        *out_response = AGENTOS_STRDUP("LLM service unavailable (running in degraded mode)");
-        return *out_response ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
+        AGENTOS_LOG_ERROR("LLM service call attempted but CURL not available");
+        return AGENTOS_ENOTINIT;
     }
 
     /* 构建请求 URL */
