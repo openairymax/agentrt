@@ -35,7 +35,7 @@ extern "C" {
 #include <stdbool.h>
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
-#include <agentos/atomic_compat.h>
+#include <agentos/utils/include/atomic_compat.h>
 #define HAVE_STDATOMIC 1
 
 /* ==================== 原子层配置 ==================== */

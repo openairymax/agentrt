@@ -3,6 +3,9 @@
 /**
  * @file agentos_protocol_interface.c
  * @brief AgentOS Protocol System Unified Interface Implementation
+ *
+ * 原位置: agentos/interfaces/src/
+ * 迁移至: agentos/protocols/src/ (2026-04-19 interfaces删除重构)
  */
 
 #include "agentos_protocol_interface.h"
@@ -10,19 +13,12 @@
 #include <string.h>
 #include <stdio.h>
 
-/* ============================================================================
- * 内部状态
- * ============================================================================ */
-
 static proto_adapter_entry_t* g_adapter_registry = NULL;
 static size_t g_adapter_count = 0;
 
-/* ============================================================================
- * I-L2: Standard Router Implementation
- * ============================================================================ */
-
+/* I-L2: Standard Router Implementation */
 struct proto_router_iface_s {
-    void* internal_router;    /* protocol_router_handle_t */
+    void* internal_router;
 };
 
 proto_router_iface_t* proto_router_standard_create(void) {
@@ -34,7 +30,6 @@ proto_router_iface_t* proto_router_standard_create(void) {
         free(iface);
         return NULL;
     }
-
     return iface;
 }
 
@@ -46,10 +41,7 @@ void proto_router_standard_destroy(proto_router_iface_t* router) {
     free(router);
 }
 
-/* ============================================================================
- * I-L3: Standard Gateway Implementation
- * ============================================================================ */
-
+/* I-L3: Standard Gateway Implementation */
 struct proto_gateway_iface_s {
     void* internal_data;
 };
@@ -85,7 +77,6 @@ static int gw_std_detect_protocol(proto_gateway_iface_t* gw, const char* data, s
     if (!data || !len || !detected) return -1;
 
     const char* result = NULL;
-
     if (len >= 4 && memcmp(data, "\x4F\x4A\x57\x4D", 4) == 0) {
         result = "openjiuwen";
     } else if (len > 0 && data[0] == '{') {
@@ -163,10 +154,7 @@ void proto_gateway_standard_destroy(proto_gateway_iface_t* gw) {
     free(gw);
 }
 
-/* ============================================================================
- * 全局注册与发现 API 实现
- * ============================================================================ */
-
+/* Global Registration & Discovery API Implementation */
 int proto_interface_register_builtins(void) {
     static bool registered = false;
     if (registered) return 0;
@@ -194,7 +182,6 @@ int proto_interface_register_builtins(void) {
             g_adapter_registry = entry;
             g_adapter_count++;
         }
-
         if (entries) free(entries);
     }
 

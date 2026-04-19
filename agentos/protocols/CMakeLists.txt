@@ -227,10 +227,6 @@ if(TARGET commons)
     target_link_libraries(agentos_protocols commons)
 endif()
 
-if(TARGET interfaces)
-    target_link_libraries(agentos_protocols interfaces)
-endif()
-
 # 编译定义
 target_compile_definitions(agentos_protocols PRIVATE
     PROTOCOLS_VERSION="${PROJECT_VERSION}"

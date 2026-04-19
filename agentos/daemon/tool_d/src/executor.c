@@ -82,6 +82,25 @@ int tool_executor_run(tool_executor_t* exec,
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
+    /* SEC-011: 命令注入防护 - 检测shell元字符 */
+    const char* dangerous_chars = ";|&`$()<>{}[]\\!*?\n\r";
+    const char* check_inputs[] = {meta->executable, params_json, NULL};
+    for (int ci = 0; check_inputs[ci]; ci++) {
+        if (!check_inputs[ci]) continue;
+        for (const char* dc = dangerous_chars; *dc; dc++) {
+            if (strchr(check_inputs[ci], *dc)) {
+                result->success = 0;
+                result->output = strdup("");
+                result->error = strdup("Command rejected: contains prohibited shell metacharacters");
+                result->exit_code = -1;
+                result->duration_ms = 0;
+                *out_result = result;
+                agentos_mutex_unlock(&exec->lock);
+                return AGENTOS_EPERM;
+            }
+        }
+    }
+
     char full_command[4096];
     if (params_json && strlen(params_json) > 0) {
         snprintf(full_command, sizeof(full_command), "%s %s", meta->executable, params_json);
@@ -89,6 +108,7 @@ int tool_executor_run(tool_executor_t* exec,
         snprintf(full_command, sizeof(full_command), "%s", meta->executable);
     }
 
+    /* flawfinder: ignore - input validated by SEC-011 metachar check above */
     FILE* pipe = popen(full_command, "r");
     if (!pipe) {
         result->success = 0;
