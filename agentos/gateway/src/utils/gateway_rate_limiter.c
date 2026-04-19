@@ -12,7 +12,7 @@
  */
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
-#include <agentos/atomic_compat.h>
+#include <agentos/utils/include/atomic_compat.h>
 
 /* Windows 特定头文件和定义 */
 #ifdef _WIN32

@@ -16,15 +16,15 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include <agentos/memory.h>
-#include <agentos/string.h>
+#include <agentos/utils/memory/memory_compat.h>
+#include <agentos/utils/string/string_compat.h>
 
 /* Check macros for unified error handling */
-#include <agentos/check.h>
+#include <agentos/utils/include/check.h>
 #include <string.h>
 #include <stdio.h>
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
-#include <agentos/atomic_compat.h>
+#include <agentos/utils/include/atomic_compat.h>
 
 /* ==================== 全局状态 ==================== */
 

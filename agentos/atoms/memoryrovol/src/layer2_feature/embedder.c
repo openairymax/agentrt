@@ -5,8 +5,8 @@
  */
 
 #include "../../include/layer2_feature.h"
-#include <agentos/agentos.h>
-#include <agentos/logging.h>
+#include <agentos/atoms/corekern/include/agentos.h>
+#include <agentos/utils/logging/logging_compat.h>
 #ifdef AGENTOS_HAS_CURL
 #include <curl/curl.h>
 #endif
@@ -36,8 +36,8 @@ static inline void cJSON_Delete(cJSON* item) { (void)item; }
 #endif
 #include <stdlib.h>
 
-#include <agentos/memory.h>
-#include <agentos/string.h>
+#include <agentos/utils/memory/memory_compat.h>
+#include <agentos/utils/string/string_compat.h>
 #include <string.h>
 #include <pthread.h>
 #include <math.h>
