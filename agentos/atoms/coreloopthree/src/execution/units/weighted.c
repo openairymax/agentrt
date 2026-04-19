@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <float.h>
 #include "include/memory_compat.h"
-#include "include/strategy_common.h"
+#include "utils/strategy/include/strategy_common.h"
 
 typedef struct weighted_data {
     weighted_config_t manager;
