@@ -11,8 +11,8 @@
 #include <math.h>
 
 /* Unified base library compatibility layer */
-#include <agentos/memory.h>
-#include <agentos/string.h>
+#include <agentos/utils/memory/memory_compat.h>
+#include <agentos/utils/string/string_compat.h>
 #include "../intent_utils.h"  /* for intent_string_similarity */
 #include <string.h>
 

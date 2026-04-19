@@ -10,8 +10,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <agentos/memory.h>
-#include <agentos/string.h>
+#include <agentos/utils/memory/memory_compat.h>
+#include <agentos/utils/string/string_compat.h>
 
 agentos_error_t agentos_compensation_create(agentos_compensation_t** out_manager) {
     if (!out_manager) return AGENTOS_EINVAL;

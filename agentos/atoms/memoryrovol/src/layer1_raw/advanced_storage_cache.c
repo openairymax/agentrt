@@ -10,7 +10,7 @@
 #include <string.h>
 
 /* 基础库兼容性层 */
-#include <agentos/memory.h>
+#include <agentos/utils/memory/memory_compat.h>
 
 /* 前向声明 */
 struct shard_manager {

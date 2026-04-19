@@ -19,6 +19,10 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <pthread.h>
+
+#define RUNTIME_LOCK()   pthread_mutex_lock(&g_runtime.mutex)
+#define RUNTIME_UNLOCK() pthread_mutex_unlock(&g_runtime.mutex)
 
 /**
  * @brief 路由任务管理相关系统调用
@@ -550,7 +554,16 @@ static struct {
     size_t agent_count;
     uint64_t total_tasks_submitted;
     uint64_t total_memory_writes;
+    pthread_mutex_t mutex;
 } g_runtime = {0};
+
+static void __attribute__((constructor)) runtime_init(void) {
+    pthread_mutex_init(&g_runtime.mutex, NULL);
+}
+
+static void __attribute__((destructor)) runtime_cleanup(void) {
+    pthread_mutex_destroy(&g_runtime.mutex);
+}
 
 static const char* generate_uuid(void) {
     static char uuid[37];
@@ -565,18 +578,19 @@ agentos_error_t agentos_sys_task_submit(const char* input, size_t len,
                                          uint32_t timeout_ms, char** out_result) {
     if (!input || !out_result) return AGENTOS_ERR_INVALID_PARAM;
 
-    if (g_runtime.task_count >= MAX_TASKS) return AGENTOS_ERR_OUT_OF_MEMORY;
+    RUNTIME_LOCK();
+    if (g_runtime.task_count >= MAX_TASKS) { RUNTIME_UNLOCK(); return AGENTOS_ERR_OUT_OF_MEMORY; }
 
     task_entry_t* task = &g_runtime.tasks[g_runtime.task_count++];
     task->task_id = strdup(generate_uuid());
     task->input = strndup(input, len > 4096 ? 4096 : len);
     task->input_len = len;
-    task->status = 1; /* PENDING */
+    task->status = 1;
     task->result = NULL;
     task->timeout_ms = timeout_ms ? timeout_ms : 30000;
     task->created_at = time(NULL);
-
     g_runtime.total_tasks_submitted++;
+    RUNTIME_UNLOCK();
 
     cJSON* resp = cJSON_CreateObject();
     cJSON_AddStringToObject(resp, "task_id", task->task_id);
@@ -590,13 +604,15 @@ agentos_error_t agentos_sys_task_submit(const char* input, size_t len,
 
 agentos_error_t agentos_sys_task_query(const char* task_id, int* status) {
     if (!task_id || !status) return AGENTOS_ERR_INVALID_PARAM;
-
+    RUNTIME_LOCK();
     for (size_t i = 0; i < g_runtime.task_count; i++) {
         if (strcmp(g_runtime.tasks[i].task_id, task_id) == 0) {
             *status = g_runtime.tasks[i].status;
+            RUNTIME_UNLOCK();
             return AGENTOS_OK;
         }
     }
+    RUNTIME_UNLOCK();
     *status = -1;
     return AGENTOS_ERR_NOT_FOUND;
 }
@@ -605,9 +621,10 @@ agentos_error_t agentos_sys_task_wait(const char* task_id, uint32_t timeout_ms,
                                        char** out_result) {
     if (!task_id || !out_result) return AGENTOS_ERR_INVALID_PARAM;
 
+    RUNTIME_LOCK();
     for (size_t i = 0; i < g_runtime.task_count; i++) {
         if (strcmp(g_runtime.tasks[i].task_id, task_id) == 0) {
-            g_runtime.tasks[i].status = 2; /* COMPLETED */
+            g_runtime.tasks[i].status = 2;
             g_runtime.tasks[i].result = strdup("{\"output\":\"processed\",\"exit_code\":0}");
 
             cJSON* resp = cJSON_CreateObject();
@@ -616,9 +633,11 @@ agentos_error_t agentos_sys_task_wait(const char* task_id, uint32_t timeout_ms,
             cJSON_AddStringToObject(resp, "result", g_runtime.tasks[i].result);
             *out_result = cJSON_PrintUnformatted(resp);
             cJSON_Delete(resp);
+            RUNTIME_UNLOCK();
             return AGENTOS_OK;
         }
     }
+    RUNTIME_UNLOCK();
     *out_result = strdup("{}");
     return AGENTOS_ERR_NOT_FOUND;
 }
@@ -626,12 +645,15 @@ agentos_error_t agentos_sys_task_wait(const char* task_id, uint32_t timeout_ms,
 agentos_error_t agentos_sys_task_cancel(const char* task_id) {
     if (!task_id) return AGENTOS_ERR_INVALID_PARAM;
 
+    RUNTIME_LOCK();
     for (size_t i = 0; i < g_runtime.task_count; i++) {
         if (strcmp(g_runtime.tasks[i].task_id, task_id) == 0) {
-            g_runtime.tasks[i].status = 4; /* CANCELLED */
+            g_runtime.tasks[i].status = 4;
+            RUNTIME_UNLOCK();
             return AGENTOS_OK;
         }
     }
+    RUNTIME_UNLOCK();
     return AGENTOS_ERR_NOT_FOUND;
 }
 
@@ -640,20 +662,21 @@ agentos_error_t agentos_sys_memory_write(const void* data, size_t len,
                                           const char* metadata, char** out_record_id) {
     if (!data || !len || !out_record_id) return AGENTOS_ERR_INVALID_PARAM;
 
-    if (g_runtime.record_count >= MAX_RECORDS) return AGENTOS_ERR_OUT_OF_MEMORY;
+    RUNTIME_LOCK();
+    if (g_runtime.record_count >= MAX_RECORDS) { RUNTIME_UNLOCK(); return AGENTOS_ERR_OUT_OF_MEMORY; }
 
     memory_record_t* rec = &g_runtime.records[g_runtime.record_count++];
     rec->record_id = strdup(generate_uuid());
     rec->data = malloc(len);
-    if (!rec->data) return AGENTOS_ERR_OUT_OF_MEMORY;
+    if (!rec->data) { RUNTIME_UNLOCK(); return AGENTOS_ERR_OUT_OF_MEMORY; }
     memcpy(rec->data, data, len);
     rec->len = len;
     rec->metadata = metadata ? strdup(metadata) : NULL;
     rec->score = 1.0f;
     rec->created_at = time(NULL);
-
     g_runtime.total_memory_writes++;
     *out_record_id = strdup(rec->record_id);
+    RUNTIME_UNLOCK();
     return AGENTOS_OK;
 }
 
@@ -661,43 +684,45 @@ agentos_error_t agentos_sys_memory_search(const char* query, uint32_t limit,
                                            char*** record_ids, float** scores, size_t* count) {
     if (!record_ids || !scores || !count) return AGENTOS_ERR_INVALID_PARAM;
 
+    RUNTIME_LOCK();
     size_t found = 0;
     size_t max_results = limit ? limit : 10;
     if (max_results > g_runtime.record_count) max_results = g_runtime.record_count;
 
     *record_ids = (char**)calloc(max_results, sizeof(char*));
     *scores = (float*)calloc(max_results, sizeof(float));
-    if (!*record_ids || !*scores) return AGENTOS_ERR_OUT_OF_MEMORY;
+    if (!*record_ids || !*scores) { RUNTIME_UNLOCK(); return AGENTOS_ERR_OUT_OF_MEMORY; }
 
     for (size_t i = 0; i < g_runtime.record_count && found < max_results; i++) {
         if (!query || strlen(query) == 0 ||
             (g_runtime.records[i].metadata &&
              strstr(g_runtime.records[i].metadata, query) != NULL)) {
-
             (*record_ids)[found] = strdup(g_runtime.records[i].record_id);
             (*scores)[found] = g_runtime.records[i].score;
             found++;
         }
     }
-
     *count = found;
+    RUNTIME_UNLOCK();
     return AGENTOS_OK;
 }
 
 agentos_error_t agentos_sys_memory_get(const char* record_id, void** out_data, size_t* out_len) {
     if (!record_id || !out_data || !out_len) return AGENTOS_ERR_INVALID_PARAM;
 
+    RUNTIME_LOCK();
     for (size_t i = 0; i < g_runtime.record_count; i++) {
         if (strcmp(g_runtime.records[i].record_id, record_id) == 0) {
             *out_data = malloc(g_runtime.records[i].len + 1);
-            if (!*out_data) return AGENTOS_ERR_OUT_OF_MEMORY;
+            if (!*out_data) { RUNTIME_UNLOCK(); return AGENTOS_ERR_OUT_OF_MEMORY; }
             memcpy(*out_data, g_runtime.records[i].data, g_runtime.records[i].len);
             ((char*)*out_data)[g_runtime.records[i].len] = '\0';
             *out_len = g_runtime.records[i].len;
+            RUNTIME_UNLOCK();
             return AGENTOS_OK;
         }
     }
-
+    RUNTIME_UNLOCK();
     *out_data = strdup("");
     *out_len = 0;
     return AGENTOS_ERR_NOT_FOUND;
@@ -706,18 +731,20 @@ agentos_error_t agentos_sys_memory_get(const char* record_id, void** out_data, s
 agentos_error_t agentos_sys_memory_delete(const char* record_id) {
     if (!record_id) return AGENTOS_ERR_INVALID_PARAM;
 
+    RUNTIME_LOCK();
     for (size_t i = 0; i < g_runtime.record_count; i++) {
         if (strcmp(g_runtime.records[i].record_id, record_id) == 0) {
             free(g_runtime.records[i].record_id);
             free(g_runtime.records[i].data);
             free(g_runtime.records[i].metadata);
-
             memmove(&g_runtime.records[i], &g_runtime.records[i + 1],
                     (g_runtime.record_count - i - 1) * sizeof(memory_record_t));
             g_runtime.record_count--;
+            RUNTIME_UNLOCK();
             return AGENTOS_OK;
         }
     }
+    RUNTIME_UNLOCK();
     return AGENTOS_ERR_NOT_FOUND;
 }
 
@@ -725,25 +752,26 @@ agentos_error_t agentos_sys_memory_delete(const char* record_id) {
 agentos_error_t agentos_sys_session_create(const char* metadata, char** out_session_id) {
     if (!out_session_id) return AGENTOS_ERR_INVALID_PARAM;
 
-    if (g_runtime.session_count >= MAX_SESSIONS) return AGENTOS_ERR_OUT_OF_MEMORY;
+    RUNTIME_LOCK();
+    if (g_runtime.session_count >= MAX_SESSIONS) { RUNTIME_UNLOCK(); return AGENTOS_ERR_OUT_OF_MEMORY; }
 
     session_entry_t* sess = &g_runtime.sessions[g_runtime.session_count++];
     sess->session_id = strdup(generate_uuid());
     sess->metadata = metadata ? strdup(metadata) : NULL;
     sess->created_at = time(NULL);
     sess->last_accessed = sess->created_at;
-
     *out_session_id = strdup(sess->session_id);
+    RUNTIME_UNLOCK();
     return AGENTOS_OK;
 }
 
 agentos_error_t agentos_sys_session_get(const char* session_id, char** out_info) {
     if (!session_id || !out_info) return AGENTOS_ERR_INVALID_PARAM;
 
+    RUNTIME_LOCK();
     for (size_t i = 0; i < g_runtime.session_count; i++) {
         if (strcmp(g_runtime.sessions[i].session_id, session_id) == 0) {
             g_runtime.sessions[i].last_accessed = time(NULL);
-
             cJSON* info = cJSON_CreateObject();
             cJSON_AddStringToObject(info, "session_id", session_id);
             cJSON_AddStringToObject(info, "metadata",
@@ -752,10 +780,11 @@ agentos_error_t agentos_sys_session_get(const char* session_id, char** out_info)
                 (double)(time(NULL) - g_runtime.sessions[i].created_at));
             *out_info = cJSON_PrintUnformatted(info);
             cJSON_Delete(info);
+            RUNTIME_UNLOCK();
             return AGENTOS_OK;
         }
     }
-
+    RUNTIME_UNLOCK();
     *out_info = strdup("{}");
     return AGENTOS_ERR_NOT_FOUND;
 }
@@ -763,30 +792,34 @@ agentos_error_t agentos_sys_session_get(const char* session_id, char** out_info)
 agentos_error_t agentos_sys_session_close(const char* session_id) {
     if (!session_id) return AGENTOS_ERR_INVALID_PARAM;
 
+    RUNTIME_LOCK();
     for (size_t i = 0; i < g_runtime.session_count; i++) {
         if (strcmp(g_runtime.sessions[i].session_id, session_id) == 0) {
             free(g_runtime.sessions[i].session_id);
             free(g_runtime.sessions[i].metadata);
-
             memmove(&g_runtime.sessions[i], &g_runtime.sessions[i + 1],
                     (g_runtime.session_count - i - 1) * sizeof(session_entry_t));
             g_runtime.session_count--;
+            RUNTIME_UNLOCK();
             return AGENTOS_OK;
         }
     }
+    RUNTIME_UNLOCK();
     return AGENTOS_ERR_NOT_FOUND;
 }
 
 agentos_error_t agentos_sys_session_list(char*** sessions, size_t* count) {
     if (!sessions || !count) return AGENTOS_ERR_INVALID_PARAM;
 
+    RUNTIME_LOCK();
     *sessions = (char**)calloc(g_runtime.session_count, sizeof(char*));
-    if (!*sessions && g_runtime.session_count > 0) return AGENTOS_ERR_OUT_OF_MEMORY;
+    if (!*sessions && g_runtime.session_count > 0) { RUNTIME_UNLOCK(); return AGENTOS_ERR_OUT_OF_MEMORY; }
 
     for (size_t i = 0; i < g_runtime.session_count; i++) {
         (*sessions)[i] = strdup(g_runtime.sessions[i].session_id);
     }
     *count = g_runtime.session_count;
+    RUNTIME_UNLOCK();
     return AGENTOS_OK;
 }
 
@@ -794,6 +827,7 @@ agentos_error_t agentos_sys_session_list(char*** sessions, size_t* count) {
 agentos_error_t agentos_sys_telemetry_metrics(char** out_metrics) {
     if (!out_metrics) return AGENTOS_ERR_INVALID_PARAM;
 
+    RUNTIME_LOCK();
     cJSON* metrics = cJSON_CreateObject();
 
     cJSON* runtime = cJSON_CreateObject();
@@ -809,6 +843,7 @@ agentos_error_t agentos_sys_telemetry_metrics(char** out_metrics) {
     cJSON_AddNumberToObject(metrics, "uptime_seconds", (double)time(NULL));
 
     *out_metrics = cJSON_PrintUnformatted(metrics);
+    RUNTIME_UNLOCK();
     cJSON_Delete(metrics);
     return AGENTOS_OK;
 }
@@ -836,27 +871,31 @@ agentos_error_t agentos_sys_telemetry_traces(const char* trace_id, char** out_tr
 agentos_error_t agentos_sys_agent_spawn(const char* spec, char** out_agent_id) {
     if (!spec || !out_agent_id) return AGENTOS_ERR_INVALID_PARAM;
 
-    if (g_runtime.agent_count >= MAX_AGENTS) return AGENTOS_ERR_OUT_OF_MEMORY;
+    RUNTIME_LOCK();
+    if (g_runtime.agent_count >= MAX_AGENTS) { RUNTIME_UNLOCK(); return AGENTOS_ERR_OUT_OF_MEMORY; }
 
     agent_entry_t* agent = &g_runtime.agents[g_runtime.agent_count++];
     agent->agent_id = strdup(generate_uuid());
     agent->spec = strdup(spec);
-    agent->status = 1; /* RUNNING */
+    agent->status = 1;
     agent->spawned_at = time(NULL);
-
     *out_agent_id = strdup(agent->agent_id);
+    RUNTIME_UNLOCK();
     return AGENTOS_OK;
 }
 
 agentos_error_t agentos_sys_agent_terminate(const char* agent_id) {
     if (!agent_id) return AGENTOS_ERR_INVALID_PARAM;
 
+    RUNTIME_LOCK();
     for (size_t i = 0; i < g_runtime.agent_count; i++) {
         if (strcmp(g_runtime.agents[i].agent_id, agent_id) == 0) {
-            g_runtime.agents[i].status = 3; /* TERMINATED */
+            g_runtime.agents[i].status = 3;
+            RUNTIME_UNLOCK();
             return AGENTOS_OK;
         }
     }
+    RUNTIME_UNLOCK();
     return AGENTOS_ERR_NOT_FOUND;
 }
 
@@ -864,10 +903,12 @@ agentos_error_t agentos_sys_agent_invoke(const char* agent_id, const char* input
                                          size_t len, char** out_output) {
     if (!agent_id || !input || !out_output) return AGENTOS_ERR_INVALID_PARAM;
 
+    RUNTIME_LOCK();
     for (size_t i = 0; i < g_runtime.agent_count; i++) {
         if (strcmp(g_runtime.agents[i].agent_id, agent_id) == 0) {
             if (g_runtime.agents[i].status != 1) {
                 *out_output = strdup("{\"error\":\"Agent not running\"}");
+                RUNTIME_UNLOCK();
                 return AGENTOS_ERR_INVALID_STATE;
             }
 
@@ -877,10 +918,11 @@ agentos_error_t agentos_sys_agent_invoke(const char* agent_id, const char* input
             cJSON_AddNumberToObject(result, "processing_time_ms", 5.2);
             *out_output = cJSON_PrintUnformatted(result);
             cJSON_Delete(result);
+            RUNTIME_UNLOCK();
             return AGENTOS_OK;
         }
     }
-
+    RUNTIME_UNLOCK();
     *out_output = strdup("{\"error\":\"Agent not found\"}");
     return AGENTOS_ERR_NOT_FOUND;
 }
@@ -888,13 +930,15 @@ agentos_error_t agentos_sys_agent_invoke(const char* agent_id, const char* input
 agentos_error_t agentos_sys_agent_list(char*** agent_ids, size_t* count) {
     if (!agent_ids || !count) return AGENTOS_ERR_INVALID_PARAM;
 
+    RUNTIME_LOCK();
     *agent_ids = (char**)calloc(g_runtime.agent_count, sizeof(char*));
-    if (!*agent_ids && g_runtime.agent_count > 0) return AGENTOS_ERR_OUT_OF_MEMORY;
+    if (!*agent_ids && g_runtime.agent_count > 0) { RUNTIME_UNLOCK(); return AGENTOS_ERR_OUT_OF_MEMORY; }
 
     for (size_t i = 0; i < g_runtime.agent_count; i++) {
         (*agent_ids)[i] = strdup(g_runtime.agents[i].agent_id);
     }
     *count = g_runtime.agent_count;
+    RUNTIME_UNLOCK();
     return AGENTOS_OK;
 }
 
