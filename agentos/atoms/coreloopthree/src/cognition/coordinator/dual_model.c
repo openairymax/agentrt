@@ -563,6 +563,25 @@ static agentos_error_t dual_coordinate(
         record_decision(&coordinator->stats, selected_model, similarity, final_confidence, is_consistent);
     }
 
+    /* 错误计数：低置信度或不一致时递增 */
+    if (primary_confidence < 0.3f || (input_count > 0 && !*primary_output)) {
+        coordinator->primary_error_count++;
+        coordinator->primary_last_error_time = (uint64_t)time(NULL) * 1000000000ULL;
+    }
+    if (input_count > 1 && (secondary_confidence < 0.3f || !*secondary_output)) {
+        coordinator->secondary_error_count++;
+        coordinator->secondary_last_error_time = (uint64_t)time(NULL) * 1000000000ULL;
+    }
+    if (!is_consistent && final_confidence < 0.5f) {
+        if (coordinator->primary_weight >= coordinator->secondary_weight) {
+            coordinator->primary_error_count++;
+            coordinator->primary_last_error_time = (uint64_t)time(NULL) * 1000000000ULL;
+        } else {
+            coordinator->secondary_error_count++;
+            coordinator->secondary_last_error_time = (uint64_t)time(NULL) * 1000000000ULL;
+        }
+    }
+
     /* 格式化输出结果 */
     if (validation_mode != CROSS_VALIDATION_NONE || coordinator->enable_adaptive_learning) {
         if (validation_mode == CROSS_VALIDATION_ADAPTIVE && coordinator->enable_adaptive_learning) {

@@ -627,16 +627,48 @@ static void fw_adapter_destroy(void* ctx) {
 }
 
 static int fw_adapter_encode(void* ctx, const void* in, size_t in_len, void** out, size_t* out_len) {
-    (void)ctx; (void)in; (void)in_len;
-    if (out) *out = NULL;
-    if (out_len) *out_len = 0;
+    if (!ctx || !in || !out || !out_len) return -1;
+    if (in_len == 0) { *out = NULL; *out_len = 0; return -2; }
+
+    protocol_extension_framework_t* fw = (protocol_extension_framework_t*)ctx;
+
+    if (fw->registered_adapter_count > 0) {
+        for (size_t i = 0; i < fw->registered_adapter_count; i++) {
+            if (fw->registered_adapters[i].encode) {
+                int ret = fw->registered_adapters[i].encode(
+                    fw->registered_adapters[i].context, in, in_len, out, out_len);
+                if (ret == 0 && *out && *out_len > 0) return 0;
+            }
+        }
+    }
+
+    *out = malloc(in_len);
+    if (!*out) return -3;
+    memcpy(*out, in, in_len);
+    *out_len = in_len;
     return 0;
 }
 
 static int fw_adapter_decode(void* ctx, const void* in, size_t in_len, void** out, size_t* out_len) {
-    (void)ctx; (void)in; (void)in_len;
-    if (out) *out = NULL;
-    if (out_len) *out_len = 0;
+    if (!ctx || !in || !out || !out_len) return -1;
+    if (in_len == 0) { *out = NULL; *out_len = 0; return -2; }
+
+    protocol_extension_framework_t* fw = (protocol_extension_framework_t*)ctx;
+
+    if (fw->registered_adapter_count > 0) {
+        for (size_t i = 0; i < fw->registered_adapter_count; i++) {
+            if (fw->registered_adapters[i].decode) {
+                int ret = fw->registered_adapters[i].decode(
+                    fw->registered_adapters[i].context, in, in_len, out, out_len);
+                if (ret == 0 && *out && *out_len > 0) return 0;
+            }
+        }
+    }
+
+    *out = malloc(in_len);
+    if (!*out) return -3;
+    memcpy(*out, in, in_len);
+    *out_len = in_len;
     return 0;
 }
 

@@ -59,8 +59,9 @@ typedef struct stdio_gateway {
     atomic_uint_fast64_t bytes_received;     /**< 接收字节数 */
     atomic_uint_fast64_t bytes_sent;         /**< 发送字节数 */
     
-    char input_buffer[8192];         /**< 输入缓冲区 */
-    size_t input_buffer_pos;         /**< 输入缓冲区位置 */
+    char* input_buffer;             /**< 输入缓冲区(动态分配) */
+    size_t input_buffer_size;       /**< 输入缓冲区大小 */
+    size_t input_buffer_pos;        /**< 输入缓冲区位置 */
 } stdio_gateway_t;
 
 /* ========== 命令处理（使用统一RPC处理器） ========== */
@@ -219,7 +220,7 @@ static agentos_error_t stdio_gateway_start(void* gateway_impl) {
                 size_t input_len = strlen(buffer);
                 atomic_fetch_add(&gateway->bytes_received, input_len);
                 
-                if (gateway->input_buffer_pos + input_len < sizeof(gateway->input_buffer)) {
+                if (gateway->input_buffer_pos + input_len < gateway->input_buffer_size) {
                     memcpy(gateway->input_buffer + gateway->input_buffer_pos, buffer, input_len);
                     gateway->input_buffer_pos += input_len;
                     
@@ -271,6 +272,10 @@ static void stdio_gateway_destroy(void* gateway_impl) {
     }
     gateway->handler = NULL;
     gateway->handler_data = NULL;
+
+    free(gateway->input_buffer);
+    gateway->input_buffer = NULL;
+    gateway->input_buffer_size = 0;
 
     free(gateway);
 }
@@ -344,6 +349,17 @@ gateway_t* stdio_gateway_create(void) {
     gateway->handler_adapter = NULL;
     gateway->handler = NULL;
     gateway->handler_data = NULL;
+    
+    const char* env_bs = getenv("AGENTOS_STDIO_BUFFER_SIZE");
+    gateway->input_buffer_size = env_bs ? (size_t)strtoul(env_bs, NULL, 10) : 8192;
+    if (gateway->input_buffer_size < 1024) gateway->input_buffer_size = 1024;
+    if (gateway->input_buffer_size > 1048576) gateway->input_buffer_size = 1048576;
+    gateway->input_buffer = (char*)malloc(gateway->input_buffer_size);
+    if (!gateway->input_buffer) {
+        free(gateway);
+        return NULL;
+    }
+    gateway->input_buffer_pos = 0;
     
     atomic_init(&gateway->running, false);
     atomic_init(&gateway->commands_total, 0);

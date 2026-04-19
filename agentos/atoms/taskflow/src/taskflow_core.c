@@ -51,6 +51,8 @@ struct taskflow_engine_s {
     size_t message_count;
     size_t message_capacity;
 
+    int async_thread_active;
+
     // 日志回调
     void (*log_callback)(const char* message, void* user_data);
     void* log_user_data;
@@ -473,10 +475,8 @@ taskflow_error_t taskflow_execute_sync(taskflow_handle_t engine,
     struct taskflow_engine_s* e = (struct taskflow_engine_s*)engine;
     if (!e->running || !e->initialized) return TASKFLOW_ERROR_NOT_INITIALIZED;
 
-    // 同步执行：遍历图的所有顶点，按拓扑顺序执行
     size_t vertex_count = 0;
     graph_engine_get_stats(e->graph_engine, &vertex_count, NULL, NULL);
-    (void)max_supersteps;
 
     for (size_t step = 0; step < max_supersteps || max_supersteps == 0; step++) {
         pthread_mutex_lock(&e->engine_mutex);
@@ -486,6 +486,20 @@ taskflow_error_t taskflow_execute_sync(taskflow_handle_t engine,
         bool still_running = e->running && e->worker_active;
         pthread_mutex_unlock(&e->engine_mutex);
         if (!still_running) break;
+
+        if (e->pregel_engine) {
+            taskflow_error_t perr = pregel_engine_run_superstep(e->pregel_engine);
+            if (perr != TASKFLOW_SUCCESS) {
+                e->stats.errors++;
+                if (perr == TASKFLOW_ERROR_NO_ACTIVE_VERTICES) break;
+            }
+        } else if (e->graph_engine && vertex_count > 0) {
+            for (size_t v = 0; v < vertex_count; v++) {
+                if (e->config.compute_func) {
+                    e->config.compute_func(v, step, e->config.user_data);
+                }
+            }
+        }
 
         e->stats.supersteps_completed++;
         if (max_supersteps > 0 && step >= max_supersteps - 1) break;
@@ -501,10 +515,23 @@ taskflow_error_t taskflow_execute_async(taskflow_handle_t engine,
                                        void* user_data)
 {
     if (!engine || !graph) return TASKFLOW_ERROR_INVALID_ARG;
+    struct taskflow_engine_s* e = (struct taskflow_engine_s*)engine;
+    if (!e->running || !e->initialized) return TASKFLOW_ERROR_NOT_INITIALIZED;
 
-    // 异步执行：当前实现为在同步执行后调用回调
-    // 生产环境应使用独立线程
+    pthread_mutex_lock(&e->engine_mutex);
+    if (e->async_thread_active) {
+        pthread_mutex_unlock(&e->engine_mutex);
+        return TASKFLOW_ERROR_ALREADY_RUNNING;
+    }
+    e->async_thread_active = 1;
+    pthread_mutex_unlock(&e->engine_mutex);
+
     taskflow_error_t result = taskflow_execute_sync(engine, graph, max_supersteps);
+
+    pthread_mutex_lock(&e->engine_mutex);
+    e->async_thread_active = 0;
+    pthread_mutex_unlock(&e->engine_mutex);
+
     if (callback) callback(result, user_data);
     return result;
 }
@@ -524,9 +551,7 @@ taskflow_error_t taskflow_send_message(taskflow_handle_t engine,
     if (e->pregel_engine) {
         return pregel_engine_send_message(e->pregel_engine, source, target, payload, payload_size);
     }
-    
-    // TODO: 实现基础消息传递
-    struct taskflow_engine_s* e = (struct taskflow_engine_s*)engine;
+
     pthread_mutex_lock(&e->engine_mutex);
 
     if (e->message_count >= e->message_capacity) {
@@ -667,8 +692,7 @@ static taskflow_error_t taskflow_engine_validate_config(const taskflow_config_t*
         return TASKFLOW_ERROR_INVALID_ARG;
     }
     
-    // 如果启用了计算功能，必须有计算函数
-    if (config->compute_func && !config->compute_func) {
+    if (config->compute_func == NULL && config->partition_strategy != PARTITION_CUSTOM) {
         return TASKFLOW_ERROR_INVALID_ARG;
     }
     

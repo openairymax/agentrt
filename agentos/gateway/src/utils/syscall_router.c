@@ -872,17 +872,17 @@ agentos_error_t agentos_sys_memory_delete(const char* record_id) {
     if (!record_id) return AGENTOS_ERR_INVALID_PARAM;
 
     RUNTIME_LOCK();
-    for (size_t i = 0; i < g_runtime.record_count; i++) {
-        if (strcmp(g_runtime.records[i].record_id, record_id) == 0) {
-            free(g_runtime.records[i].record_id);
-            free(g_runtime.records[i].data);
-            free(g_runtime.records[i].metadata);
-            memmove(&g_runtime.records[i], &g_runtime.records[i + 1],
-                    (g_runtime.record_count - i - 1) * sizeof(memory_record_t));
-            g_runtime.record_count--;
-            RUNTIME_UNLOCK();
-            return AGENTOS_OK;
-        }
+    ssize_t idx = ht_lookup(&g_runtime.record_index, record_id);
+    if (idx >= 0 && (size_t)idx < g_runtime.record_count) {
+        ht_remove(&g_runtime.record_index, record_id);
+        free(g_runtime.records[idx].record_id);
+        free(g_runtime.records[idx].data);
+        free(g_runtime.records[idx].metadata);
+        memmove(&g_runtime.records[idx], &g_runtime.records[idx + 1],
+                (g_runtime.record_count - idx - 1) * sizeof(memory_record_t));
+        g_runtime.record_count--;
+        RUNTIME_UNLOCK();
+        return AGENTOS_OK;
     }
     RUNTIME_UNLOCK();
     return AGENTOS_ERR_NOT_FOUND;
@@ -901,6 +901,7 @@ agentos_error_t agentos_sys_session_create(const char* metadata, char** out_sess
     sess->created_at = time(NULL);
     sess->last_accessed = sess->created_at;
     *out_session_id = strdup(sess->session_id);
+    ht_insert(&g_runtime.session_index, sess->session_id, g_runtime.session_count - 1);
     RUNTIME_UNLOCK();
     return AGENTOS_OK;
 }
@@ -909,20 +910,19 @@ agentos_error_t agentos_sys_session_get(const char* session_id, char** out_info)
     if (!session_id || !out_info) return AGENTOS_ERR_INVALID_PARAM;
 
     RUNTIME_LOCK();
-    for (size_t i = 0; i < g_runtime.session_count; i++) {
-        if (strcmp(g_runtime.sessions[i].session_id, session_id) == 0) {
-            g_runtime.sessions[i].last_accessed = time(NULL);
-            cJSON* info = cJSON_CreateObject();
-            cJSON_AddStringToObject(info, "session_id", session_id);
-            cJSON_AddStringToObject(info, "metadata",
-                g_runtime.sessions[i].metadata ? g_runtime.sessions[i].metadata : "");
-            cJSON_AddNumberToObject(info, "age_seconds",
-                (double)(time(NULL) - g_runtime.sessions[i].created_at));
-            *out_info = cJSON_PrintUnformatted(info);
-            cJSON_Delete(info);
-            RUNTIME_UNLOCK();
-            return AGENTOS_OK;
-        }
+    ssize_t idx = ht_lookup(&g_runtime.session_index, session_id);
+    if (idx >= 0 && (size_t)idx < g_runtime.session_count) {
+        g_runtime.sessions[idx].last_accessed = time(NULL);
+        cJSON* info = cJSON_CreateObject();
+        cJSON_AddStringToObject(info, "session_id", session_id);
+        cJSON_AddStringToObject(info, "metadata",
+            g_runtime.sessions[idx].metadata ? g_runtime.sessions[idx].metadata : "");
+        cJSON_AddNumberToObject(info, "age_seconds",
+            (double)(time(NULL) - g_runtime.sessions[idx].created_at));
+        *out_info = cJSON_PrintUnformatted(info);
+        cJSON_Delete(info);
+        RUNTIME_UNLOCK();
+        return AGENTOS_OK;
     }
     RUNTIME_UNLOCK();
     *out_info = strdup("{}");
@@ -933,16 +933,16 @@ agentos_error_t agentos_sys_session_close(const char* session_id) {
     if (!session_id) return AGENTOS_ERR_INVALID_PARAM;
 
     RUNTIME_LOCK();
-    for (size_t i = 0; i < g_runtime.session_count; i++) {
-        if (strcmp(g_runtime.sessions[i].session_id, session_id) == 0) {
-            free(g_runtime.sessions[i].session_id);
-            free(g_runtime.sessions[i].metadata);
-            memmove(&g_runtime.sessions[i], &g_runtime.sessions[i + 1],
-                    (g_runtime.session_count - i - 1) * sizeof(session_entry_t));
-            g_runtime.session_count--;
-            RUNTIME_UNLOCK();
-            return AGENTOS_OK;
-        }
+    ssize_t idx = ht_lookup(&g_runtime.session_index, session_id);
+    if (idx >= 0 && (size_t)idx < g_runtime.session_count) {
+        ht_remove(&g_runtime.session_index, session_id);
+        free(g_runtime.sessions[idx].session_id);
+        free(g_runtime.sessions[idx].metadata);
+        memmove(&g_runtime.sessions[idx], &g_runtime.sessions[idx + 1],
+                (g_runtime.session_count - idx - 1) * sizeof(session_entry_t));
+        g_runtime.session_count--;
+        RUNTIME_UNLOCK();
+        return AGENTOS_OK;
     }
     RUNTIME_UNLOCK();
     return AGENTOS_ERR_NOT_FOUND;
@@ -1020,6 +1020,7 @@ agentos_error_t agentos_sys_agent_spawn(const char* spec, char** out_agent_id) {
     agent->status = 1;
     agent->spawned_at = time(NULL);
     *out_agent_id = strdup(agent->agent_id);
+    ht_insert(&g_runtime.agent_index, agent->agent_id, g_runtime.agent_count - 1);
     RUNTIME_UNLOCK();
     return AGENTOS_OK;
 }
@@ -1028,12 +1029,11 @@ agentos_error_t agentos_sys_agent_terminate(const char* agent_id) {
     if (!agent_id) return AGENTOS_ERR_INVALID_PARAM;
 
     RUNTIME_LOCK();
-    for (size_t i = 0; i < g_runtime.agent_count; i++) {
-        if (strcmp(g_runtime.agents[i].agent_id, agent_id) == 0) {
-            g_runtime.agents[i].status = 3;
-            RUNTIME_UNLOCK();
-            return AGENTOS_OK;
-        }
+    ssize_t idx = ht_lookup(&g_runtime.agent_index, agent_id);
+    if (idx >= 0 && (size_t)idx < g_runtime.agent_count) {
+        g_runtime.agents[idx].status = 3;
+        RUNTIME_UNLOCK();
+        return AGENTOS_OK;
     }
     RUNTIME_UNLOCK();
     return AGENTOS_ERR_NOT_FOUND;
@@ -1044,23 +1044,22 @@ agentos_error_t agentos_sys_agent_invoke(const char* agent_id, const char* input
     if (!agent_id || !input || !out_output) return AGENTOS_ERR_INVALID_PARAM;
 
     RUNTIME_LOCK();
-    for (size_t i = 0; i < g_runtime.agent_count; i++) {
-        if (strcmp(g_runtime.agents[i].agent_id, agent_id) == 0) {
-            if (g_runtime.agents[i].status != 1) {
-                *out_output = strdup("{\"error\":\"Agent not running\"}");
-                RUNTIME_UNLOCK();
-                return AGENTOS_ERR_INVALID_STATE;
-            }
-
-            cJSON* result = cJSON_CreateObject();
-            cJSON_AddStringToObject(result, "agent_id", agent_id);
-            cJSON_AddStringToObject(result, "output", "invocation processed");
-            cJSON_AddNumberToObject(result, "processing_time_ms", 5.2);
-            *out_output = cJSON_PrintUnformatted(result);
-            cJSON_Delete(result);
+    ssize_t idx = ht_lookup(&g_runtime.agent_index, agent_id);
+    if (idx >= 0 && (size_t)idx < g_runtime.agent_count) {
+        if (g_runtime.agents[idx].status != 1) {
+            *out_output = strdup("{\"error\":\"Agent not running\"}");
             RUNTIME_UNLOCK();
-            return AGENTOS_OK;
+            return AGENTOS_ERR_INVALID_STATE;
         }
+
+        cJSON* result = cJSON_CreateObject();
+        cJSON_AddStringToObject(result, "agent_id", agent_id);
+        cJSON_AddStringToObject(result, "output", "invocation processed");
+        cJSON_AddNumberToObject(result, "processing_time_ms", 5.2);
+        *out_output = cJSON_PrintUnformatted(result);
+        cJSON_Delete(result);
+        RUNTIME_UNLOCK();
+        return AGENTOS_OK;
     }
     RUNTIME_UNLOCK();
     *out_output = strdup("{\"error\":\"Agent not found\"}");

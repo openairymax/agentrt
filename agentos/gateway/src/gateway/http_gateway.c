@@ -321,13 +321,14 @@ static agentos_error_t http_gateway_start(void* gateway_impl) {
     if (env_timeout) { unsigned long v = strtoul(env_timeout, NULL, 10); if (v > 0) conn_timeout = (unsigned int)v; }
     
     gateway->daemon = MHD_start_daemon(
-        MHD_USE_THREAD_PER_CONNECTION,
+        MHD_USE_EPOLL_INTERNAL_THREAD | MHD_USE_TURBO,
         gateway->port,
         NULL, NULL,
         handle_http_request,
         gateway,
         MHD_OPTION_CONNECTION_LIMIT, conn_limit,
         MHD_OPTION_CONNECTION_TIMEOUT, conn_timeout,
+        MHD_OPTION_THREAD_POOL_SIZE, 4,
         MHD_OPTION_NOTIFY_COMPLETED, http_request_completed_callback, NULL,
         MHD_OPTION_END);
     

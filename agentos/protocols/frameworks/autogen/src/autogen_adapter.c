@@ -22,6 +22,9 @@ struct autogen_adapter_context_s {
     size_t group_chat_count;
     autogen_conversation_t* conversations;
     size_t conversation_count;
+    autogen_tool_executor_fn* tool_executors;
+    char** tool_names;
+    size_t tool_count;
     autogen_code_executor_fn code_executor;
     void* code_executor_data;
     autogen_human_callback_fn human_callback;
@@ -319,9 +322,31 @@ int autogen_register_tool(autogen_adapter_context_t* ctx,
                           autogen_tool_executor_fn executor,
                           void* user_data) {
     if (!ctx || !name) return -1;
+
+    for (size_t i = 0; i < ctx->tool_count; i++) {
+        if (strcmp(ctx->tool_names[i], name) == 0) {
+            ctx->tool_executors[i] = executor;
+            return 0;
+        }
+    }
+
+    autogen_tool_executor_fn* new_exec = (autogen_tool_executor_fn*)realloc(
+        ctx->tool_executors,
+        (ctx->tool_count + 1) * sizeof(autogen_tool_executor_fn));
+    char** new_names = (char**)realloc(
+        ctx->tool_names,
+        (ctx->tool_count + 1) * sizeof(char*));
+
+    if (!new_exec || !new_names) return -2;
+
+    ctx->tool_executors = new_exec;
+    ctx->tool_names = new_names;
+    ctx->tool_names[ctx->tool_count] = strdup(name);
+    ctx->tool_executors[ctx->tool_count] = executor;
+    ctx->tool_count++;
+
     (void)description;
     (void)schema_json;
-    (void)executor;
     (void)user_data;
     return 0;
 }
@@ -330,9 +355,29 @@ int autogen_get_conversation(autogen_adapter_context_t* ctx,
                              const char* group_id,
                              autogen_conversation_t* conv) {
     if (!ctx || !conv) return -1;
-    (void)group_id;
     memset(conv, 0, sizeof(autogen_conversation_t));
-    return 0;
+
+    if (!group_id) return -2;
+
+    for (size_t i = 0; i < ctx->conversation_count; i++) {
+        if (ctx->conversations[i].group_id &&
+            strcmp(ctx->conversations[i].group_id, group_id) == 0) {
+            *conv = ctx->conversations[i];
+            return 0;
+        }
+    }
+
+    for (size_t i = 0; i < ctx->group_chat_count; i++) {
+        if (ctx->group_chats[i].group_id &&
+            strcmp(ctx->group_chats[i].group_id, group_id) == 0) {
+            conv->group_id = ctx->group_chats[i].group_id;
+            conv->message_count = 0;
+            conv->is_active = true;
+            return 0;
+        }
+    }
+
+    return -3;
 }
 
 int autogen_set_code_executor(autogen_adapter_context_t* ctx,
@@ -391,6 +436,55 @@ int autogen_get_statistics(autogen_adapter_context_t* ctx,
     return (written >= 0 && (size_t)written < buffer_size) ? 0 : -2;
 }
 
+static int autogen_proto_init(void** context) {
+    autogen_config_t config = autogen_config_default();
+    autogen_adapter_context_t* ctx = autogen_adapter_create(&config);
+    if (!ctx) return -1;
+    *context = ctx;
+    return 0;
+}
+
+static void autogen_proto_destroy(void* context) {
+    autogen_adapter_destroy((autogen_adapter_context_t*)context);
+}
+
+static int autogen_proto_handle_request(void* context,
+                                         const char* raw_request,
+                                         size_t request_size,
+                                         const char* content_type,
+                                         char** response,
+                                         size_t* response_size,
+                                         char** response_content_type) {
+    if (!context || !raw_request) return -1;
+    (void)request_size;
+    (void)content_type;
+
+    autogen_adapter_context_t* ctx = (autogen_adapter_context_t*)context;
+
+    autogen_message_t msg = {0};
+    msg.sender_id = "proto-client";
+    msg.content = strdup(raw_request);
+    msg.timestamp = (uint64_t)time(NULL);
+    msg.is_visible = true;
+
+    autogen_message_t reply = {0};
+    int ret = autogen_send_message(ctx, &msg, &reply);
+
+    if (ret == 0 && reply.content) {
+        *response = strdup(reply.content);
+        *response_size = strlen(reply.content);
+    } else {
+        *response = strdup("{\"status\":\"error\"}");
+        *response_size = strlen(*response);
+    }
+
+    if (response_content_type) *response_content_type = strdup("application/json");
+
+    autogen_message_destroy(&msg);
+    autogen_message_destroy(&reply);
+    return ret;
+}
+
 const proto_adapter_t* autogen_get_protocol_adapter(void) {
     static proto_adapter_t adapter = {0};
     static bool initialized = false;
@@ -399,9 +493,9 @@ const proto_adapter_t* autogen_get_protocol_adapter(void) {
         adapter.name = "AutoGen";
         adapter.version = AUTOGEN_ADAPTER_VERSION;
         adapter.description = "Microsoft AutoGen Framework Adapter - multi-agent conversations, group chat, code execution, human-in-the-loop";
-        adapter.init = NULL;
-        adapter.destroy = NULL;
-        adapter.handle_request = NULL;
+        adapter.init = autogen_proto_init;
+        adapter.destroy = autogen_proto_destroy;
+        adapter.handle_request = autogen_proto_handle_request;
         adapter.get_version = autogen_adapter_version;
         adapter.capabilities = PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING | PROTO_CAP_AGENT_DISCOVERY | PROTO_CAP_CODE_EXECUTION | PROTO_CAP_HUMAN_LOOP;
         initialized = true;
