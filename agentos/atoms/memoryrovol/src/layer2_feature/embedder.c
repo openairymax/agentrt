@@ -377,16 +377,116 @@ static size_t generate_deepseek_embedding(const char* text, float** out_embeddin
     return emb ? count : 0;
 }
 
-/* 生成本地嵌入（随机向量，仅用于测试） */
 static size_t generate_local_embedding(const char* text, float** out_embedding, int dimension) {
     if (!text || dimension <= 0) return 0;
 
-    float* emb = (float*)AGENTOS_MALLOC(dimension * sizeof(float));
+    float* emb = (float*)AGENTOS_CALLOC(dimension, sizeof(float));
     if (!emb) return 0;
 
-    srand((unsigned int)strlen(text));
+    size_t text_len = strlen(text);
+    if (text_len == 0) { *out_embedding = emb; return (size_t)dimension; }
+
+    /* TF-IDF inspired local embedding: hash-based feature extraction */
+    for (size_t i = 0; i < text_len; i++) {
+        unsigned char c = (unsigned char)text[i];
+        if (c <= 32) continue;
+
+        size_t slot = (size_t)(c * 31 + (i > 0 ? (unsigned char)text[i-1] : 0)) % (size_t)dimension;
+
+        /* Trigram hashing for better feature capture */
+        unsigned int hash = c;
+        if (i + 1 < text_len) hash = hash * 31 + (unsigned char)text[i + 1];
+        if (i + 2 < text_len) hash = hash * 31 + (unsigned char)text[i + 2];
+        slot = (size_t)(hash) % (size_t)dimension;
+
+        emb[slot] += 1.0f;
+
+        /* Secondary slot for bigram */
+        unsigned int hash2 = c * 37;
+        if (i + 1 < text_len) hash2 += (unsigned char)text[i + 1] * 41;
+        size_t slot2 = (size_t)(hash2) % (size_t)dimension;
+        if (slot2 != slot) emb[slot2] += 0.5f;
+    }
+
+    /* L2 normalization */
+    float norm = 0.0f;
     for (int i = 0; i < dimension; i++) {
-        emb[i] = (float)rand() / RAND_MAX * 2.0f - 1.0f;
+        norm += emb[i] * emb[i];
+    }
+    if (norm > 0.0f) {
+        float inv_norm = 1.0f / sqrtf(norm);
+        for (int i = 0; i < dimension; i++) {
+            emb[i] *= inv_norm;
+        }
+    }
+
+    *out_embedding = emb;
+    return (size_t)dimension;
+}
+
+static size_t generate_sentence_transformers_embedding(const char* text, float** out_embedding, int dimension) {
+    if (!text || dimension <= 0) return 0;
+
+    /* Sentence-Transformers via local ONNX runtime or HTTP API */
+    /* Currently uses enhanced TF-IDF as local fallback */
+    /* In production, this would load an ONNX model and run inference */
+
+    float* emb = (float*)AGENTOS_CALLOC(dimension, sizeof(float));
+    if (!emb) return 0;
+
+    size_t text_len = strlen(text);
+    if (text_len == 0) { *out_embedding = emb; return (size_t)dimension; }
+
+    /* Multi-granularity hashing for sentence-level features */
+    /* Word-level features */
+    int word_count = 0;
+    for (size_t i = 0; i < text_len; i++) {
+        if (text[i] == ' ' || text[i] == '\n' || text[i] == '\t') {
+            word_count++;
+        }
+    }
+    word_count++;
+
+    /* Sentence structure features */
+    int sentence_count = 0;
+    for (size_t i = 0; i < text_len; i++) {
+        if (text[i] == '.' || text[i] == '!' || text[i] == '?') {
+            sentence_count++;
+        }
+    }
+    if (sentence_count == 0) sentence_count = 1;
+
+    /* Character n-gram hashing (3,4,5-grams) */
+    for (int n = 3; n <= 5; n++) {
+        for (size_t i = 0; i + (size_t)n <= text_len; i++) {
+            unsigned int hash = 5381;
+            for (int j = 0; j < n; j++) {
+                hash = ((hash << 5) + hash) + (unsigned char)text[i + j];
+            }
+            size_t slot = (size_t)(hash) % (size_t)dimension;
+            float weight = 1.0f / (float)n;
+            emb[slot] += weight;
+        }
+    }
+
+    /* Global features: word count, sentence count, avg word length */
+    size_t meta_slot = 0;
+    emb[meta_slot] += (float)word_count * 0.01f;
+    meta_slot = (meta_slot + 1) % (size_t)dimension;
+    emb[meta_slot] += (float)sentence_count * 0.05f;
+    meta_slot = (meta_slot + 1) % (size_t)dimension;
+    emb[meta_slot] += (text_len > 0) ? (float)text_len / (float)word_count * 0.01f : 0.0f;
+
+    /* L2 normalization */
+    float norm = 0.0f;
+    for (int i = 0; i < dimension; i++) {
+        norm += emb[i] * emb[i];
+    }
+    if (norm > 0.0f) {
+        float inv_norm = 1.0f / sqrtf(norm);
+        for (int i = 0; i < dimension; i++) {
+            emb[i] *= inv_norm;
+        }
     }
 
     *out_embedding = emb;
@@ -432,6 +532,9 @@ agentos_error_t agentos_embedder_embed(const char* text, float** out_embedding, 
             break;
         case EMBEDDER_DEEPSEEK:
             dim = generate_deepseek_embedding(text, &emb);
+            break;
+        case EMBEDDER_SENTENCE_TRANSFORMERS:
+            dim = generate_sentence_transformers_embedding(text, &emb, g_embedder->dimension);
             break;
         case EMBEDDER_LOCAL:
         default:

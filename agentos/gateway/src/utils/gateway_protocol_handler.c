@@ -78,6 +78,20 @@ static int string_contains_any(const char* str, const char** patterns) {
     return 0;
 }
 
+static int json_field_equals(const char* json, const char* key, const char* value) {
+    if (!json || !key || !value) return 0;
+    char pattern[256];
+    snprintf(pattern, sizeof(pattern), "\"%s\": \"%s\"", key, value);
+    return strstr(json, pattern) != NULL ? 1 : 0;
+}
+
+static int json_field_exists(const char* json, const char* key) {
+    if (!json || !key) return 0;
+    char pattern[256];
+    snprintf(pattern, sizeof(pattern), "\"%s\"", key);
+    return strstr(json, pattern) != NULL ? 1 : 0;
+}
+
 static int is_valid_json(const char* data, size_t len) {
     if (!data || len == 0) return 0;
 
@@ -99,21 +113,20 @@ static agentos_protocol_type_t detect_protocol_internal(
         return AGENTOS_PROTOCOL_COUNT;
     }
 
-    if (string_contains_any(request_data, OPENAI_SIGNATURES)) {
-        return AGENTOS_PROTOCOL_OPENAI;
-    }
-
-    if (string_contains_any(request_data, MCP_SIGNATURES)) {
-        return AGENTOS_PROTOCOL_MCP;
-    }
-
-    if (string_contains_any(request_data, A2A_SIGNATURES)) {
-        return AGENTOS_PROTOCOL_A2A;
-    }
-
-    if (string_contains_any(request_data, JSONRPC_SIGNATURES)) {
+    if (json_field_equals(request_data, "jsonrpc", "2.0") &&
+        json_field_exists(request_data, "method")) {
+        if (json_field_exists(request_data, "MCP") || json_field_exists(request_data, "mcp"))
+            return AGENTOS_PROTOCOL_MCP;
         return AGENTOS_PROTOCOL_JSON_RPC;
     }
+
+    if (json_field_exists(request_data, "model") &&
+        (json_field_exists(request_data, "messages") || json_field_exists(request_data, "prompt")))
+        return AGENTOS_PROTOCOL_OPENAI;
+
+    if (json_field_exists(request_data, "agent_id") &&
+        (json_field_exists(request_data, "task_id") || json_field_exists(request_data, "message")))
+        return AGENTOS_PROTOCOL_A2A;
 
     return AGENTOS_PROTOCOL_COUNT;
 }

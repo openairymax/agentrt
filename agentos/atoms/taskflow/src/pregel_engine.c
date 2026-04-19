@@ -750,20 +750,62 @@ taskflow_error_t pregel_engine_set_vote_to_halt(pregel_engine_handle_t engine,
 uint64_t pregel_engine_create_checkpoint(pregel_engine_handle_t engine)
 {
     if (!engine) return 0;
-    
+
     struct pregel_engine_s* e = (struct pregel_engine_s*)engine;
-    
-    if (!e->initialized || !e->running) {
+
+    if (!e->initialized) {
         return 0;
     }
-    
-    // TODO: 实现检查点创建
-    // 1. 暂停计算
-    // 2. 保存顶点状态和消息队列
-    // 3. 生成检查点ID
-    // 4. 恢复计算
-    
-    return 0; // 暂未实现
+
+    pthread_mutex_lock(&e->mutex);
+
+    static uint64_t next_checkpoint_id = 1;
+    uint64_t cp_id = next_checkpoint_id++;
+
+    size_t states_size = e->vertex_state_count * sizeof(pregel_vertex_state_t);
+    size_t snapshot_size = states_size + sizeof(superstep_t) + sizeof(size_t);
+
+    void* snapshot = AGENTOS_MALLOC(snapshot_size);
+    if (snapshot) {
+        size_t offset = 0;
+        memcpy((char*)snapshot + offset, &e->current_superstep, sizeof(superstep_t));
+        offset += sizeof(superstep_t);
+        memcpy((char*)snapshot + offset, &e->active_vertices, sizeof(size_t));
+        offset += sizeof(size_t);
+        if (e->vertex_states && states_size > 0) {
+            memcpy((char*)snapshot + offset, e->vertex_states, states_size);
+        }
+    }
+
+    if (e->checkpoint_count < 16) {
+        e->checkpoints = (checkpoint_t*)AGENTOS_REALLOC(
+            e->checkpoints, (e->checkpoint_count + 1) * sizeof(checkpoint_t));
+        if (e->checkpoints) {
+            size_t idx = e->checkpoint_count;
+            e->checkpoints[idx].checkpoint_id = cp_id;
+            e->checkpoints[idx].superstep = e->current_superstep;
+            e->checkpoints[idx].timestamp = (uint64_t)time(NULL);
+            e->checkpoints[idx].data_size = snapshot_size;
+            e->checkpoints[idx].snapshot_data = snapshot;
+            e->checkpoints[idx].is_consistent = true;
+            e->checkpoint_count++;
+        }
+    } else {
+        if (e->checkpoints[0].snapshot_data) AGENTOS_FREE(e->checkpoints[0].snapshot_data);
+        memmove(&e->checkpoints[0], &e->checkpoints[1],
+                15 * sizeof(checkpoint_t));
+        e->checkpoints[15].checkpoint_id = cp_id;
+        e->checkpoints[15].superstep = e->current_superstep;
+        e->checkpoints[15].timestamp = (uint64_t)time(NULL);
+        e->checkpoints[15].data_size = snapshot_size;
+        e->checkpoints[15].snapshot_data = snapshot;
+        e->checkpoints[15].is_consistent = true;
+    }
+
+    e->last_checkpoint_id = cp_id;
+
+    pthread_mutex_unlock(&e->mutex);
+    return cp_id;
 }
 
 taskflow_error_t pregel_engine_restore_checkpoint(pregel_engine_handle_t engine,
@@ -772,20 +814,46 @@ taskflow_error_t pregel_engine_restore_checkpoint(pregel_engine_handle_t engine,
     if (!engine || checkpoint_id == 0) {
         return TASKFLOW_ERROR_INVALID_ARG;
     }
-    
+
     struct pregel_engine_s* e = (struct pregel_engine_s*)engine;
-    
+
     if (!e->initialized) {
         return TASKFLOW_ERROR_NOT_INITIALIZED;
     }
-    
-    // TODO: 实现检查点恢复
-    // 1. 查找检查点
-    // 2. 停止当前计算
-    // 3. 恢复顶点状态和消息队列
-    // 4. 恢复计算
-    
-    return TASKFLOW_ERROR_INTERNAL; // 暂未实现
+
+    pthread_mutex_lock(&e->mutex);
+
+    checkpoint_t* cp = NULL;
+    for (size_t i = 0; i < e->checkpoint_count; i++) {
+        if (e->checkpoints[i].checkpoint_id == checkpoint_id) {
+            cp = &e->checkpoints[i];
+            break;
+        }
+    }
+
+    if (!cp || !cp->snapshot_data) {
+        pthread_mutex_unlock(&e->mutex);
+        return TASKFLOW_ERROR_INVALID_ARG;
+    }
+
+    char* data = (char*)cp->snapshot_data;
+    size_t offset = 0;
+
+    memcpy(&e->current_superstep, data + offset, sizeof(superstep_t));
+    offset += sizeof(superstep_t);
+
+    memcpy(&e->active_vertices, data + offset, sizeof(size_t));
+    offset += sizeof(size_t);
+
+    size_t states_size = e->vertex_state_count * sizeof(pregel_vertex_state_t);
+    if (e->vertex_states && states_size > 0 && cp->data_size >= offset + states_size) {
+        memcpy(e->vertex_states, data + offset, states_size);
+    }
+
+    e->computation_done = false;
+
+    pthread_mutex_unlock(&e->mutex);
+    return TASKFLOW_SUCCESS;
 }
 
 taskflow_error_t pregel_engine_get_stats(pregel_engine_handle_t engine,

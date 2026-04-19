@@ -156,8 +156,14 @@ static agentos_error_t reflective_plan(
     void* context,
     agentos_task_plan_t** out_plan) {
 
-    if (!intent || !context || !out_plan) return AGENTOS_EINVAL;
+    if (!intent || !out_plan) return AGENTOS_EINVAL;
+
     reflective_context_t* ctx = (reflective_context_t*)context;
+
+    if (!ctx) {
+        agentos_error_t init_err = reflective_plan_init((void**)&ctx);
+        if (init_err != AGENTOS_SUCCESS) return init_err;
+    }
 
     if (!ctx->initialized) {
         agentos_error_t err = agentos_tc_chain_create(
