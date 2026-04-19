@@ -33,8 +33,11 @@ agentos_error_t agentos_error_to_json(
     const char* message,
     char** out_json);
 
+#ifndef AGENTOS_ERROR_CONTEXT_T_DEFINED
+#define AGENTOS_ERROR_CONTEXT_T_DEFINED
 /**
  * @brief 错误上下文结构，用于记录错误的详细信息
+ * @note 这是agentos_error_context_t的完整版定义（含动态分配和时间戳）
  */
 typedef struct agentos_error_context {
     agentos_error_t code;           /**< 错误码 */
@@ -44,6 +47,7 @@ typedef struct agentos_error_context {
     char* function;                  /**< 发生错误的函数名 */
     uint64_t timestamp_ns;           /**< 错误发生时间戳 */
 } agentos_error_context_t;
+#endif /* AGENTOS_ERROR_CONTEXT_T_DEFINED */
 
 /**
  * @brief 创建错误上下文

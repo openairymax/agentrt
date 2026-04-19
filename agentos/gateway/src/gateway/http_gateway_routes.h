@@ -20,7 +20,7 @@
 #include <cJSON.h>
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
-#include <agentos/utils/include/atomic_compat.h>
+#include "atomic_compat.h"
 
 #include "http_gateway.h"
 #include "jsonrpc.h"

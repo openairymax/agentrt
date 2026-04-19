@@ -17,7 +17,7 @@
 #define AGENTOS_SYNC_TYPES_H
 
 #include "sync.h"
-#include "memory_compat.h"
+#include "include/memory_compat.h"
 
 #ifdef _WIN32
     #define WIN32_LEAN_AND_MEAN

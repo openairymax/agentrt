@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <agentos/utils/memory/memory_compat.h>
+#include "include/memory_compat.h"
 
 typedef struct tool_unit_data {
     char* tool_name;
