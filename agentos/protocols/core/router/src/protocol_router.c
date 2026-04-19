@@ -9,7 +9,7 @@
 
 #include "protocol_router.h"
 #include "protocol_transformers.h"
-#include <agentos/safe_string_utils.h>
+#include <agentos/daemon/common/include/safe_string_utils.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>

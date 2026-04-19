@@ -18,7 +18,7 @@
  */
 
 #include "../include/checkpoint.h"
-#include <agentos/agentos.h>
+#include <agentos/atoms/corekern/include/agentos.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -33,7 +33,7 @@
 #endif
 
 /* Unified base library compatibility layer */
-#include <agentos/memory.h>
+#include <agentos/utils/memory/memory_compat.h>
 
 #ifdef _WIN32
 #include <windows.h>

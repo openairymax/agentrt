@@ -1,7 +1,7 @@
 # =============================================================================
 # AgentOS .gitignore 文件
-# 版本：8.1.0
-# 最后更新：2026-04-15
+# 版本：9.0.0
+# 最后更新：2026-04-19
 # 说明：规范化排除所有不应纳入版本控制的文件和目录
 #
 # 设计原则：
@@ -11,6 +11,17 @@
 # 4. 空目录通过 .gitkeep 保留，但排除目录内容
 # 5. 项目必需文件使用否定规则明确保留
 # 6. 通配符规则限定作用范围，避免意外排除项目必需文件
+#
+# V9.0.0更新（全面强化版）：
+# - 强化构建产物排除规则
+# - 增加本地文档/临时脚本防护
+# - 明确项目必需文件白名单
+# - 防止意外追踪非源码文件
+#
+# V8.3.0更新：
+# - 添加 **/CTestTestfile.cmake 排除CMake测试配置文件
+# - 添加 agentos/daemon/*/agentos-* 排除daemon编译可执行文件
+# - 添加 agentos/daemon/gateway_d/gateway_d 排除gateway可执行文件
 #
 # 项目模块结构（2026-04-14 V8.1 校正后）：
 # 核心模块 (agentos/)
@@ -67,6 +78,19 @@ cmake_install.*
 CMakeUserPresets.json
 CMakePresets.json
 
+# CMake生成的Makefile（递归排除所有子目录）
+**/Makefile
+
+# CMake自动生成的版本配置文件
+**/AgentOSConfigVersion.cmake
+
+# CMake自动生成的测试配置文件
+**/CTestTestfile.cmake
+
+# 编译生成的可执行文件（无扩展名，按daemon命名规则）
+agentos/daemon/*/agentos-*
+agentos/daemon/gateway_d/gateway_d
+
 # CMake 构建目录
 build/
 build_test/
@@ -76,6 +100,14 @@ cmake-build*/
 cmake-build-debug/
 cmake-build-release/
 cmake-build-coverage/
+
+# 外部构建目录（Out-of-Source Build）
+# 所有构建产物统一输出到此目录，保持源码仓库纯净
+AgentOS-build/
+
+# CMake 构建输出目录（库和可执行文件）
+agentos/lib/
+agentos/bin/
 
 # 编译器数据库（IDE 工具生成）
 compile_commands.json
@@ -600,6 +632,18 @@ reports/
 test_reports/
 coverage_reports/
 
+# 本地生成的分析/检查报告（非项目必需）
+*检查报告*.md
+*验证报告*.md
+*分析报告*.md
+*评估报告*.md
+*穷尽检查*.md
+
+# 本地工作记录目录（历史档案除外）
+.bendiwenjian/
+.bendiwenjian/总线检查/
+.bendiwenjian/总线检查/*.md
+
 # =============================================================================
 # 19. 桌面客户端（Tauri 构建产物，不追踪）
 # =============================================================================
@@ -722,6 +766,9 @@ docs/api/man/
 !tests/unit/sdk/rust/.gitkeep
 !tests/unit/services/llm_d/.gitkeep
 !tests/unit/services/tool_d/.gitkeep
+# 手写Makefile（非CMake生成，需保留）
+!tests/Makefile
+!scripts/deployment/docker/Makefile
 
 # Docker 配置
 !Dockerfile*
@@ -746,7 +793,6 @@ docs/api/man/
 !tests/unit/**/CMakeLists.txt
 
 # 根目录项目配置
-!Makefile
 !pyproject.toml
 
 # agentos/toolkit/ 配置文件
@@ -773,5 +819,53 @@ docs/api/man/
 # 包含 CI/CD 工作流、Issue 模板、PR 模板等
 
 # =============================================================================
+# 23. 强化防护规则（V9.0新增）
+# =============================================================================
+
+# 23.1 防止意外追踪非源码文件（白名单模式）
+# 只有以下类型的文件应该被git追踪：
+# - 源码: *.c, *.h, *.py, *.ts, *.tsx, *.rs, *.go, *.js
+# - 配置: CMakeLists.txt, *.yml, *.yaml, *.json, *.toml
+# - 文档: *.md (仅项目必需文档)
+# - 脚本: *.sh, *.bat, *.ps1
+# - 其他: Dockerfile*, .gitignore, .gitkeep, LICENSE, NOTICE
+
+# 23.2 本地生成的临时脚本（不追踪）
+*.local.sh
+*.local.py
+*.local.bat
+*debug*.sh
+*test-local*.sh
+*quick-test*.sh
+
+# 23.3 IDE/编辑器工作区文件（强化排除）
+*.workspace
+*.code-workspace
+.vscode/*.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# 23.4 操作系统元数据（强化排除)
+.fuse_hidden*
+.nfs*
+.Trashes*
+.apdisk
+._*
+
+# 23.5 项目根目录特殊文件（明确保留）
+!LICENSE
+!NOTICE
+!.gitattributes
+!.gitcode/CODEOWNERS
+
+# =============================================================================
 # 结束
 # =============================================================================
+#
+# V9.0.0 维护说明：
+# 1. 添加新规则时，必须验证不会误排除项目必需文件
+# 2. 使用 git check-ignore -v <file> 验证规则生效
+# 3. 定期运行 git status --porcelain 检查是否有意外追踪的文件
+# 4. 项目必需文件必须在第21节有明确的否定规则(!前缀)
+#

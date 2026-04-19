@@ -10,7 +10,7 @@
 #include <string.h>
 
 /* 基础库兼容性层 */
-#include <agentos/memory.h>
+#include <agentos/utils/memory/memory_compat.h>
 
 /* 沙箱内部结构 */
 struct agentos_sandbox {
