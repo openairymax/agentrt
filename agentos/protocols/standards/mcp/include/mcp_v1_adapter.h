@@ -201,6 +201,34 @@ typedef void (*mcp_log_callback_t)(mcp_log_level_t level,
                                     const char* message,
                                     void* user_data);
 
+/* ========== Streaming Support (PROTO-001) ========== */
+
+typedef enum {
+    MCP_STREAM_EVENT_CONTENT = 0,
+    MCP_STREAM_EVENT_ERROR,
+    MCP_STREAM_EVENT_DONE,
+    MCP_STREAM_EVENT_PROGRESS,
+    MCP_STREAM_EVENT_CANCELLED
+} mcp_stream_event_type_t;
+
+typedef struct {
+    mcp_stream_event_type_t type;
+    char* event_data;
+    size_t data_size;
+    double progress;
+    double total;
+} mcp_stream_event_t;
+
+typedef void (*mcp_stream_callback_t)(const mcp_stream_event_t* event,
+                                      void* user_data);
+
+typedef struct {
+    bool enabled;
+    int chunk_size;
+    int max_buffer_size;
+    int flush_interval_ms;
+} mcp_stream_config_t;
+
 mcp_v1_config_t mcp_v1_config_default(void);
 
 mcp_v1_context_t* mcp_v1_context_create(const mcp_v1_config_t* config);
@@ -284,6 +312,22 @@ int mcp_v1_send_progress(mcp_v1_context_t* ctx,
 int mcp_v1_notify_cancelled(mcp_v1_context_t* ctx,
                              const char* request_id,
                              const char* reason);
+
+/* Streaming API (PROTO-001) */
+int mcp_v1_stream_config(mcp_v1_context_t* ctx, const mcp_stream_config_t* config);
+int mcp_v1_handle_tools_call_streaming(mcp_v1_context_t* ctx,
+                                        const char* name,
+                                        const char* arguments_json,
+                                        mcp_stream_callback_t callback,
+                                        void* user_data);
+int mcp_v1_handle_sampling_streaming(mcp_v1_context_t* ctx,
+                                      const mcp_sampling_params_t* params,
+                                      mcp_stream_callback_t callback,
+                                      void* user_data);
+const char* mcp_stream_event_type_string(mcp_stream_event_type_t type);
+void mcp_stream_event_init(mcp_stream_event_t* event,
+                            mcp_stream_event_type_t type,
+                            const char* data);
 
 int mcp_v1_route_request(mcp_v1_context_t* ctx,
                           const char* method,
