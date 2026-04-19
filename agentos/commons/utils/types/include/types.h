@@ -234,10 +234,13 @@ typedef enum {
 } agentos_memory_type_t;
 #endif
 
+#ifndef AGENTOS_MEMORY_T_DEFINED
+#define AGENTOS_MEMORY_T_DEFINED
 /**
- * @brief 记忆句柄类型
+ * @brief 记忆句柄类型（不透明指针，用于跨模块传递）
  */
 typedef struct agentos_memory* agentos_memory_t;
+#endif /* AGENTOS_MEMORY_T_DEFINED */
 
 /**
  * @brief 记忆条目结构
