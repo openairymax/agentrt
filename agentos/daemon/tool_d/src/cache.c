@@ -5,7 +5,7 @@
  */
 
 #include "cache.h"
-#include <agentos/utils/memory/memory_common.h>
+#include "memory_common.h"
 #include "tool_service.h"
 #include "platform.h"
 #include <stdlib.h>

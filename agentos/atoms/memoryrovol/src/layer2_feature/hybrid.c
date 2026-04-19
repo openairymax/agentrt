@@ -6,11 +6,11 @@
 
 #include "layer2_feature.h"
 #include <stdlib.h>
-#include <agentos/utils/include/check.h>
+#include "check.h"
 
 /* Unified base library compatibility layer */
-#include <agentos/utils/memory/memory_compat.h>
-#include <agentos/utils/string/string_compat.h>
+#include "include/memory_compat.h"
+#include "string_compat.h"
 #include <string.h>
 #include <math.h>
 

@@ -10,8 +10,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include <agentos/utils/memory/memory_compat.h>
-#include <agentos/utils/string/string_compat.h>
+#include "include/memory_compat.h"
+#include "string_compat.h"
 #include <string.h>
 
 #define AGENTOS_MAX_CONFIG_SIZE (4 * 1024 * 1024)
