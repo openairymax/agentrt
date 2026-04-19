@@ -22,9 +22,22 @@ extern "C" {
  * ============================================================================ */
 
 #define OPENJIUWEN_PROTOCOL_VERSION "1.0.0"
-#define OPENJIUWEN_MAX_MESSAGE_SIZE (64 * 1024)  /* 64KB */
+#define OPENJIUWEN_MAX_MESSAGE_SIZE (64 * 1024)
 #define OPENJIUWEN_DEFAULT_ENDPOINT "/openjiuwen/v1"
 #define OPENJIUWEN_TIMEOUT_MS 30000
+#define OPENJIUWEN_HEARTBEAT_INTERVAL_SEC 30
+#define OPENJIUWEN_MAX_CONSECUTIVE_ERRORS 5
+#define OPENJIUWEN_RECONNECT_BASE_DELAY_MS 1000
+#define OPENJIUWEN_RECONNECT_MAX_DELAY_MS 60000
+#define OPENJIUWEN_SEND_QUEUE_SIZE 64
+
+typedef enum {
+    OPENJIUWEN_CONN_DISCONNECTED = 0,
+    OPENJIUWEN_CONN_CONNECTING,
+    OPENJIUWEN_CONN_CONNECTED,
+    OPENJIUWEN_CONN_RECONNECTING,
+    OPENJIUWEN_CONN_ERROR
+} openjiuwen_conn_state_t;
 
 /* ============================================================================
  * 数据类型定义
@@ -70,12 +83,18 @@ typedef enum openjiuwen_message_type_e {
  * @brief OpenJiuwen适配器实例（继承自protocol_adapter_t）
  */
 typedef struct openjiuwen_adapter_s {
-    protocol_adapter_t base;          /* 基类接口 */
-    openjiuwen_config_t config;       /* 配置信息 */
-    void* connection_handle;          /* 连接句柄 */
-    bool initialized;                 /* 初始化状态 */
-    uint32_t message_counter;         /* 消息计数器 */
-    void* user_data;                  /* 用户数据 */
+    protocol_adapter_t base;
+    openjiuwen_config_t config;
+    void* connection_handle;
+    bool initialized;
+    uint32_t message_counter;
+    void* user_data;
+    openjiuwen_conn_state_t conn_state;
+    uint32_t consecutive_errors;
+    uint32_t total_reconnects;
+    uint32_t last_heartbeat_sec;
+    uint32_t last_error_code;
+    uint64_t last_activity_ms;
 } openjiuwen_adapter_t;
 
 /* ============================================================================

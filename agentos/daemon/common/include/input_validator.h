@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-typedef struct validation_result validation_result_t;
+#define MAX_RULES 64
 
 typedef enum {
     VALIDATE_REQUIRED = 0,
@@ -35,6 +35,14 @@ typedef struct {
     const char* pattern;
     custom_validator_fn custom_validator;
 } validation_rule_t;
+
+typedef struct validation_result {
+    int valid;
+    char* error_message;
+    char* error_field;
+    validation_rule_t rules[MAX_RULES];
+    int rule_count;
+} validation_result_t;
 
 validation_result_t* validator_create(void);
 void validator_destroy(validation_result_t* validator);

@@ -7,6 +7,8 @@ project(agentos-cognition)
 file(GLOB COGNITION_SOURCES
     "engine.c"
     "intent_parser.c"
+    "thinking_chain.c"
+    "metacognition.c"
     "planner/*.c"
     "coordinator/*.c"
     "dispatcher/*.c"
@@ -15,6 +17,8 @@ file(GLOB COGNITION_SOURCES
 add_library(agentos_cognition STATIC ${COGNITION_SOURCES})
 
 target_include_directories(agentos_cognition PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../corekern/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../memoryrovol/include
@@ -22,6 +26,7 @@ target_include_directories(agentos_cognition PRIVATE
 
 target_link_libraries(agentos_cognition
     agentos_core
+    m
 )
 
 if(WIN32)

@@ -201,5 +201,7 @@ install(DIRECTORY utils/strategy/include/ DESTINATION include/agentos/utils/stra
 # 测试配置
 option(BUILD_TESTS "Build unit tests" OFF)
 if(BUILD_TESTS)
-    add_subdirectory(tests)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
+        add_subdirectory(tests)
+    endif()
 endif()
