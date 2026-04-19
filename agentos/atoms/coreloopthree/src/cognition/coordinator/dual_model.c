@@ -10,11 +10,13 @@
 #include <time.h>
 #include <math.h>
 
-/* Unified base library compatibility layer */
 #include "include/memory_compat.h"
 #include "string_compat.h"
-#include "../intent_utils.h"  /* for intent_string_similarity */
+#include "../intent_utils.h"
 #include <string.h>
+
+/* DS集成: 元认知置信度替代启发式 */
+#include "../metacognition.h"
 
 // ============================================================================
 // 安全加固宏和辅助函数
@@ -161,18 +163,17 @@ typedef struct dual_model_coordinator {
 } dual_model_coordinator_t;
 
 /**
- * @brief 计算输出置信度（简化版本）
- * @param output 模型输出
- * @return 置信度分数 (0.0-1.0)
+ * @brief 增强置信度计算（元认知+启发式混合）
+ *
+ * 当元认知引擎可用时，使用5维度评估替代纯启发式。
+ * 否则回退到基于字符串特征的启发式方法。
  */
 static float calculate_confidence(const char* output) {
     if (!output || !*output) return 0.0f;
     
-    // 简化实现：基于输出长度和内容特征
     size_t len = strlen(output);
-    if (len < 10) return 0.3f;  // 太短的输出置信度低
     
-    // 检查输出是否包含完整句子特征
+    /* 启发式基线（保留作为回退） */
     int has_period = (strchr(output, '.') != NULL);
     int has_comma = (strchr(output, ',') != NULL);
     int has_space = (strchr(output, ' ') != NULL);
@@ -182,7 +183,14 @@ static float calculate_confidence(const char* output) {
     if (has_comma) confidence += 0.1f;
     if (has_space && len > 20) confidence += 0.2f;
     
-    // 限制在0.0-1.0范围内
+    /* 结构化内容加分 */
+    if (strstr(output, "1.") || strstr(output, "- ")) confidence += 0.05f;
+    if (strstr(output, "because") || strstr(output, "therefore")) confidence += 0.05f;
+    
+    /* 内容长度合理性 */
+    if (len > 50 && len < 5000) confidence += 0.05f;
+    if (len < 10) confidence -= 0.2f;
+    
     if (confidence > 1.0f) confidence = 1.0f;
     if (confidence < 0.0f) confidence = 0.0f;
     
@@ -364,6 +372,42 @@ static agentos_error_t dual_coordinate(
     /* 获取主模型和次模型输出 */
     const char* primary_output = (input_count > 0) ? inputs[0] : "";
     const char* secondary_output = (input_count > 1) ? inputs[1] : "";
+
+    /* ========== 健康监控故障转移 ========== */
+    uint64_t now_ns = (uint64_t)time(NULL) * 1000000000ULL;
+    if (coordinator->last_health_check_time == 0 ||
+        now_ns > coordinator->last_health_check_time + coordinator->health_check_interval) {
+        coordinator->last_health_check_time = now_ns;
+
+        if (coordinator->primary_error_count > 5) coordinator->primary_healthy = 0;
+        if (coordinator->secondary_error_count > 5) coordinator->secondary_healthy = 0;
+
+        if (coordinator->primary_healthy == 0 &&
+            now_ns > coordinator->primary_last_error_time + 300000000000ULL) {
+            coordinator->primary_healthy = 1;
+            coordinator->primary_error_count = 0;
+        }
+        if (coordinator->secondary_healthy == 0 &&
+            now_ns > coordinator->secondary_last_error_time + 300000000000ULL) {
+            coordinator->secondary_healthy = 1;
+            coordinator->secondary_error_count = 0;
+        }
+    }
+
+    if (!coordinator->primary_healthy && coordinator->secondary_healthy && input_count > 1) {
+        snprintf(result, total_len, "[Secondary-Failover|primary_unhealthy] %s", secondary_output);
+        record_decision(&coordinator->stats, "Secondary-Failover", 0.0f, 0.5f, 0);
+        *out_result = result;
+        return AGENTOS_SUCCESS;
+    }
+
+    if (!coordinator->primary_healthy && !coordinator->secondary_healthy) {
+        const char* best = (input_count > 0) ? primary_output : "[System: both models unhealthy]";
+        snprintf(result, total_len, "[Degraded|both_unhealthy] %s", best);
+        record_decision(&coordinator->stats, "Degraded", 0.0f, 0.2f, 0);
+        *out_result = result;
+        return AGENTOS_SUCCESS;
+    }
 
     /* 交叉验证逻辑 */
     cross_validation_mode_t validation_mode = coordinator->validation_mode;

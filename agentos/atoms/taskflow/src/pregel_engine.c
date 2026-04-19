@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
+#include <pthread.h>
 
 // ============================================================================
 // 内部数据结构
@@ -77,8 +79,9 @@ struct pregel_engine_s {
     bool computation_done;
     
     // 同步原语
-    void* mutex;
-    void* cond_var;
+    pthread_mutex_t mutex;
+    pthread_cond_t cond_var;
+    pthread_cond_t pause_cond;
     
     // 检查点管理
     uint64_t last_checkpoint_id;
@@ -226,19 +229,55 @@ static bool init_vertex_states(struct pregel_engine_s* engine) {
 static void worker_thread_func(void* arg) {
     worker_context_t* context = (worker_context_t*)arg;
     if (!context || !context->engine) return;
-    
+
     struct pregel_engine_s* engine = context->engine;
-    
+
     while (context->running) {
-        // TODO: 实现工作线程逻辑
-        // 1. 等待同步信号
-        // 2. 处理分配到的顶点
-        // 3. 执行计算函数
-        // 4. 发送消息
-        // 5. 标记完成
-        
-        // 简单休眠以避免忙等待
-        // 实际实现应使用条件变量
+        pthread_mutex_lock(&engine->mutex);
+
+        while (context->running && engine->paused) {
+            pthread_cond_wait(&engine->pause_cond, &engine->mutex);
+        }
+
+        if (!context->running) {
+            pthread_mutex_unlock(&engine->mutex);
+            break;
+        }
+
+        // 检查是否有活跃顶点需要处理
+        bool has_work = false;
+        for (size_t i = 0; i < engine->vertex_state_count; i++) {
+            if (engine->vertex_states[i].active && !engine->vertex_states[i].vote_to_halt) {
+                has_work = true;
+                break;
+            }
+        }
+
+        if (!has_work || engine->computation_done) {
+            pthread_cond_timedwait(&engine->cond_var, &engine->mutex,
+                &(struct timespec){.tv_sec = time(NULL) + 1});
+            pthread_mutex_unlock(&engine->mutex);
+            continue;
+        }
+
+        // 处理分配到该工作线程的顶点（简化：按worker_id取模分配）
+        for (size_t i = context->worker_id; i < engine->vertex_state_count; i += engine->worker_count) {
+            if (engine->vertex_states[i].active && !engine->vertex_states[i].vote_to_halt
+                && engine->config.compute_func) {
+                engine->config.compute_func(
+                    engine->vertex_states[i].vertex_id,
+                    engine->vertex_states[i].value,
+                    engine->vertex_states[i].incoming_messages,
+                    engine->vertex_states[i].incoming_message_count,
+                    engine);
+            }
+        }
+
+        pthread_mutex_unlock(&engine->mutex);
+
+        // 避免忙等待
+        struct timespec ts = {.tv_nsec = 10000000}; // 10ms
+        nanosleep(&ts, NULL);
     }
 }
 
@@ -375,6 +414,11 @@ void pregel_engine_destroy(pregel_engine_handle_t engine)
     if (e->workers) {
         free(e->workers);
     }
+
+    // 销毁同步原语
+    pthread_mutex_destroy(&e->mutex);
+    pthread_cond_destroy(&e->cond_var);
+    pthread_cond_destroy(&e->pause_cond);
     
     // 释放检查点
     if (e->checkpoints) {
@@ -409,9 +453,27 @@ taskflow_error_t pregel_engine_init(pregel_engine_handle_t engine,
         return TASKFLOW_ERROR_MEMORY;
     }
     
-    // TODO: 初始化同步原语（mutex, cond_var）
-    
-    // TODO: 创建工作线程
+    // 初始化同步原语（mutex, cond_var）
+    pthread_mutex_init(&e->mutex, NULL);
+    pthread_cond_init(&e->cond_var, NULL);
+    pthread_cond_init(&e->pause_cond, NULL);
+
+    // 创建工作线程
+    size_t num_workers = e->config.max_workers > 0 ? e->config.max_workers : 4;
+    e->workers = (worker_context_t*)calloc(num_workers, sizeof(worker_context_t));
+    if (!e->workers) {
+        pthread_mutex_destroy(&e->mutex);
+        pthread_cond_destroy(&e->cond_var);
+        pthread_cond_destroy(&e->pause_cond);
+        return TASKFLOW_ERROR_MEMORY;
+    }
+    e->worker_count = num_workers;
+
+    for (size_t i = 0; i < num_workers; i++) {
+        e->workers[i].worker_id = i;
+        e->workers[i].engine = e;
+        e->workers[i].running = false;
+    }
     
     e->initialized = true;
     return TASKFLOW_SUCCESS;
@@ -439,6 +501,13 @@ taskflow_error_t pregel_engine_start(pregel_engine_handle_t engine,
     }
     
     // TODO: 启动工作线程
+    pthread_mutex_lock(&e->mutex);
+    for (size_t i = 0; i < e->worker_count; i++) {
+        e->workers[i].running = true;
+        pthread_create((pthread_t*)&e->workers[i].thread_handle, NULL,
+                       (void*(*)(void*))worker_thread_func, &e->workers[i]);
+    }
+    pthread_mutex_unlock(&e->mutex);
     
     e->running = true;
     e->paused = false;
@@ -460,6 +529,20 @@ taskflow_error_t pregel_engine_stop(pregel_engine_handle_t engine)
     }
     
     // TODO: 停止工作线程
+    pthread_mutex_lock(&e->mutex);
+    for (size_t i = 0; i < e->worker_count; i++) {
+        e->workers[i].running = false;
+    }
+    pthread_cond_broadcast(&e->cond_var);
+    pthread_cond_broadcast(&e->pause_cond);
+    pthread_mutex_unlock(&e->mutex);
+
+    for (size_t i = 0; i < e->worker_count; i++) {
+        if (e->workers[i].thread_handle) {
+            pthread_join((pthread_t)e->workers[i].thread_handle, NULL);
+            e->workers[i].thread_handle = NULL;
+        }
+    }
     
     e->running = false;
     e->paused = false;
@@ -484,8 +567,10 @@ taskflow_error_t pregel_engine_pause(pregel_engine_handle_t engine)
     }
     
     e->paused = true;
-    
+
     // TODO: 暂停工作线程
+    pthread_mutex_lock(&e->mutex);
+    pthread_mutex_unlock(&e->mutex);
     
     return TASKFLOW_SUCCESS;
 }
@@ -507,8 +592,11 @@ taskflow_error_t pregel_engine_resume(pregel_engine_handle_t engine)
     }
     
     e->paused = false;
-    
+
     // TODO: 恢复工作线程
+    pthread_mutex_lock(&e->mutex);
+    pthread_cond_broadcast(&e->pause_cond);
+    pthread_mutex_unlock(&e->mutex);
     
     return TASKFLOW_SUCCESS;
 }
@@ -596,10 +684,25 @@ taskflow_error_t pregel_engine_broadcast_message(pregel_engine_handle_t engine,
     }
     
     // TODO: 实现广播消息
-    // 1. 获取所有顶点ID
-    // 2. 向每个顶点（除了源顶点）发送消息
-    
-    return TASKFLOW_ERROR_INTERNAL; // 暂未实现
+    pthread_mutex_lock(&e->mutex);
+    taskflow_error_t result = TASKFLOW_SUCCESS;
+    size_t sent_count = 0;
+
+    for (size_t i = 0; i < e->vertex_state_count; i++) {
+        vertex_id_t target = e->vertex_states[i].vertex_id;
+        if (target == source) continue; // 跳过源顶点
+
+        size_t worker_id = target % e->worker_count;
+        if (!message_queue_enqueue(e->message_queues[worker_id], target, payload, payload_size, e->current_superstep)) {
+            result = TASKFLOW_ERROR_MEMORY;
+            break;
+        }
+        sent_count++;
+        e->stats.total_messages++;
+    }
+    pthread_mutex_unlock(&e->mutex);
+
+    return (sent_count > 0) ? result : TASKFLOW_SUCCESS;
 }
 
 bool pregel_engine_get_vote_to_halt(pregel_engine_handle_t engine,

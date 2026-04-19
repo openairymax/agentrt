@@ -69,6 +69,9 @@ static struct {
 
 void gateway_destroy(gateway_t* gw) {
     if (!gw) return;
+    if (gw->ops && gw->ops->destroy) {
+        gw->ops->destroy(gw->impl);
+    }
     if (g_gateway_stats.running) {
         g_gateway_stats.running = false;
         g_gateway_stats.active_connections = 0;
@@ -77,14 +80,23 @@ void gateway_destroy(gateway_t* gw) {
 }
 
 agentos_error_t gateway_start(gateway_t* gw) {
-    (void)gw;
-    g_gateway_stats.start_time = time(NULL);
-    g_gateway_stats.running = true;
-    return AGENTOS_SUCCESS;
+    if (!gw) return AGENTOS_EINVAL;
+    agentos_error_t err = AGENTOS_SUCCESS;
+    if (gw->ops && gw->ops->start) {
+        err = gw->ops->start(gw->impl);
+    }
+    if (err == AGENTOS_SUCCESS) {
+        g_gateway_stats.start_time = time(NULL);
+        g_gateway_stats.running = true;
+    }
+    return err;
 }
 
 agentos_error_t gateway_stop(gateway_t* gw) {
-    (void)gw;
+    if (!gw) return AGENTOS_EINVAL;
+    if (gw->ops && gw->ops->stop) {
+        gw->ops->stop(gw->impl);
+    }
     g_gateway_stats.running = false;
     g_gateway_stats.active_connections = 0;
     return AGENTOS_SUCCESS;

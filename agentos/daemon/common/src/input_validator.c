@@ -10,16 +10,6 @@
 #include <string.h>
 #include <stdio.h>
 
-#define MAX_RULES 64
-
-struct validation_result {
-    int valid;
-    char* error_message;
-    char* error_field;
-    validation_rule_t rules[MAX_RULES];
-    int rule_count;
-};
-
 validation_result_t* validator_create(void) {
     validation_result_t* v = (validation_result_t*)calloc(1, sizeof(validation_result_t));
     if (!v) return NULL;

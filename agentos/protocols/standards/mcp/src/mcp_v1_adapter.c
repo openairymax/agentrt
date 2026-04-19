@@ -966,7 +966,13 @@ int mcp_v1_route_request(mcp_v1_context_t* ctx,
 }
 
 static int mcp_adapter_init(void* context) {
-    (void)context;
+    mcp_v1_context_t* ctx = (mcp_v1_context_t*)context;
+    if (!ctx) return -1;
+    mcp_v1_config_t config = mcp_v1_config_default();
+    mcp_v1_context_t* new_ctx = mcp_v1_context_create(&config);
+    if (!new_ctx) return -2;
+    memcpy(ctx, new_ctx, sizeof(mcp_v1_context_t));
+    free(new_ctx);
     return 0;
 }
 
@@ -976,33 +982,92 @@ static void mcp_adapter_destroy(void* context) {
 
 static int mcp_adapter_encode(void* context, const unified_message_t* msg,
                                void** encoded, size_t* size) {
-    (void)context; (void)msg; (void)encoded; (void)size;
+    if (!context || !msg || !encoded || !size) return -1;
+    mcp_v1_context_t* ctx = (mcp_v1_context_t*)context;
+
+    char* response_json = NULL;
+    int result = mcp_v1_route_request(ctx, msg->endpoint,
+                                       (const char*)msg->payload, &response_json);
+    if (result != 0 || !response_json) {
+        *encoded = NULL;
+        *size = 0;
+        return result;
+    }
+
+    *encoded = response_json;
+    *size = strlen(response_json);
     return 0;
 }
 
-static int mcp_adapter_decode(void* context, const void* data, size_t size,
+static int mcp_adapter_decode(void* context, const void* data, size_t data_size,
                                unified_message_t* msg) {
-    (void)context; (void)data; (void)size; (void)msg;
-    return 0;
+    if (!context || !data || !msg) return -1;
+    if (data_size == 0) return -2;
+
+    mcp_v1_context_t* ctx = (mcp_v1_context_t*)context;
+
+    char* input_copy = malloc(data_size + 1);
+    if (!input_copy) return -3;
+    memcpy(input_copy, data, data_size);
+    input_copy[data_size] = '\0';
+
+    char* response_json = NULL;
+    int result = mcp_v1_route_request(ctx, "tools/call", input_copy, &response_json);
+    free(input_copy);
+
+    if (result == 0 && response_json) {
+        msg->payload = response_json;
+        msg->payload_size = strlen(response_json);
+        msg->protocol = PROTOCOL_CUSTOM;
+        msg->direction = DIRECTION_RESPONSE;
+        msg->timestamp = get_current_timestamp();
+    }
+
+    return result;
 }
 
 static int mcp_adapter_connect(void* context, const char* address) {
-    (void)context; (void)address;
+    if (!context) return -1;
+    mcp_v1_context_t* ctx = (mcp_v1_context_t*)context;
+    if (address) {
+        ctx->config.server_name = strdup(address);
+    }
     return 0;
 }
 
 static int mcp_adapter_disconnect(void* context) {
-    (void)context;
+    if (!context) return -1;
+    mcp_v1_context_t* ctx = (mcp_v1_context_t*)context;
+    if (ctx->config.server_name) {
+        free((void*)ctx->config.server_name);
+        ctx->config.server_name = NULL;
+    }
     return 0;
 }
 
 static bool mcp_adapter_is_connected(void* context) {
-    (void)context;
-    return true;
+    if (!context) return false;
+    mcp_v1_context_t* ctx = (mcp_v1_context_t*)context;
+    return ctx->tool_count > 0 || ctx->resource_count > 0;
 }
 
 static void mcp_adapter_get_stats(void* context, void* stats) {
-    (void)context; (void)stats;
+    if (!context || !stats) return;
+    mcp_v1_context_t* ctx = (mcp_v1_context_t*)context;
+
+    typedef struct {
+        size_t tool_count;
+        size_t resource_count;
+        size_t prompt_count;
+        uint32_t capabilities;
+    } mcp_stats_t;
+
+    mcp_stats_t* out = (mcp_stats_t*)stats;
+    memset(out, 0, sizeof(*out));
+    out->tool_count = ctx->tool_count;
+    out->resource_count = ctx->resource_count;
+    out->prompt_count = ctx->prompt_count;
+    out->capabilities = ctx->config.capabilities;
 }
 
 static protocol_adapter_t mcp_v1_adapter = {

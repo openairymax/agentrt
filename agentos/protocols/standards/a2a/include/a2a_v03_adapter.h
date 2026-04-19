@@ -39,6 +39,16 @@ extern "C" {
 #define A2A_V03_MAX_MESSAGE_SIZE    (16 * 1024 * 1024)
 #define A2A_V03_DEFAULT_TIMEOUT_MS  60000
 
+/* Authentication & Crypto (PROTO-002) */
+#define A2A_AUTH_TOKEN_SIZE        64
+#define A2A_AUTH_SECRET_MAX_LEN    128
+#define A2A_CRYPTO_NONCE_SIZE      16
+#define A2A_CRYPTO_TAG_SIZE        16
+#define A2A_CRYPTO_KEY_SIZE        32
+#define A2A_SESSION_ID_SIZE        36
+#define A2A_MAX_FAILED_AUTH_ATTEMPTS 5
+#define A2A_TOKEN_EXPIRY_SEC       3600
+
 typedef enum {
     A2A_CAP_TASK_EXECUTION = 0x01,
     A2A_CAP_STREAMING = 0x02,
@@ -179,6 +189,96 @@ typedef void (*a2a_streaming_handler_t)(a2a_v03_context_t* ctx,
                                          const char* chunk_json,
                                          bool is_final,
                                          void* user_data);
+
+/* ========== Authentication Types (PROTO-002) ========== */
+
+typedef enum {
+    A2A_AUTH_NONE = 0,
+    A2A_AUTH_API_KEY,           /* Simple API key authentication */
+    A2A_AUTH_HMAC_SHA256,       /* HMAC-SHA256 request signing */
+    A2A_AUTH_JWT_BEARER         /* JWT Bearer token (future) */
+} a2a_auth_method_t;
+
+typedef enum {
+    A2A_CRYPTO_NONE = 0,
+    A2A_CRYPTO_AES_128_GCM,     /* AES-128-GCM payload encryption */
+    A2A_CRYPTO_AES_256_GCM      /* AES-256-GCM payload encryption */
+} a2a_crypto_method_t;
+
+typedef struct {
+    char agent_id[A2A_SESSION_ID_SIZE];
+    char token[A2A_AUTH_TOKEN_SIZE];
+    uint64_t issued_at;
+    uint64_t expires_at;
+    uint32_t permissions;
+    bool valid;
+} a2a_auth_token_t;
+
+typedef struct {
+    char session_id[A2A_SESSION_ID_SIZE];
+    char remote_agent_id[64];
+    a2a_auth_method_t auth_method;
+    a2a_crypto_method_t crypto_method;
+    uint64_t created_at;
+    uint64_t last_activity;
+    uint64_t request_count;
+    bool authenticated;
+    bool encrypted;
+} a2a_session_t;
+
+typedef struct {
+    a2a_auth_method_t method;
+    char shared_secret[A2A_AUTH_SECRET_MAX_LEN];  /**< HMAC key or API key */
+    size_t secret_len;
+    bool require_auth;               /**< Reject unauthenticated requests */
+    int max_failed_attempts;         /**< Lockout after N failures */
+    uint32_t token_ttl_sec;          /**< Token time-to-live */
+    size_t max_sessions;             /**< Max concurrent sessions */
+} a2a_auth_config_t;
+
+/* ========== Authentication API (PROTO-002) ========== */
+
+int a2a_v03_auth_init(a2a_v03_context_t* ctx, const a2a_auth_config_t* auth_config);
+void a2a_v03_auth_shutdown(a2a_v03_context_t* ctx);
+
+int a2a_v03_authenticate(a2a_v03_context_t* ctx,
+                          const char* agent_id,
+                          const char* credential,
+                          a2a_auth_token_t** out_token);
+
+int a2a_v03_verify_token(a2a_v03_context_t* ctx,
+                           const char* token_str,
+                           a2a_auth_token_t** out_token);
+
+int a2a_v03_invalidate_token(a2a_v03_context_t* ctx, const char* token_str);
+const char* a2a_v03_sign_request(a2a_v03_context_t* ctx,
+                                   const char* method,
+                                   const char* params_json,
+                                   const char* token_str,
+                                   char* out_signature,
+                                   size_t sig_buf_size);
+
+int a2a_v03_verify_signature(a2a_v03_context_t* ctx,
+                              const char* method,
+                              const char* params_json,
+                              const char* signature,
+                              const char* token_str);
+
+int a2a_v03_create_session(a2a_v03_context_t* ctx,
+                            const char* remote_agent_id,
+                            a2a_auth_method_t auth_method,
+                            a2a_crypto_method_t crypto_method,
+                            a2a_session_t** out_session);
+
+int a2a_v03_validate_session(a2a_v03_context_t* ctx,
+                               const char* session_id,
+                               a2a_session_t** out_session);
+
+void a2a_v03_destroy_session(a2a_v03_context_t* ctx, const char* session_id);
+size_t a2a_v03_get_active_session_count(a2a_v03_context_t* ctx);
+
+const char* a2a_auth_method_string(a2a_auth_method_t method);
+const char* a2a_crypto_method_string(a2a_crypto_method_t method);
 
 a2a_v03_config_t a2a_v03_config_default(void);
 

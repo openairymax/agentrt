@@ -293,8 +293,32 @@ static char* handle_jsonrpc_request(http_gateway_t* gateway, http_request_contex
 /* handle_http_request() 函数已迁移至 http_gateway_routes.c */
 /* ========== 网关操作表 ========== */
 
+static void http_request_completed_callback(void* cls, struct MHD_Connection* connection,
+                                              void** con_cls, enum MHD_RequestTerminationCode toe) {
+    (void)cls;
+    (void)connection;
+    (void)toe;
+    if (con_cls && *con_cls) {
+        http_request_context_t* ctx = (http_request_context_t*)*con_cls;
+        if (ctx->request_body) {
+            free(ctx->request_body);
+            ctx->request_body = NULL;
+        }
+        free(ctx);
+        *con_cls = NULL;
+    }
+}
+
 static agentos_error_t http_gateway_start(void* gateway_impl) {
     http_gateway_t* gateway = (http_gateway_t*)gateway_impl;
+    
+    unsigned int conn_limit = gateway->connection_limit > 0 ? gateway->connection_limit : 1000;
+    unsigned int conn_timeout = gateway->connection_timeout > 0 ? gateway->connection_timeout : 30;
+    
+    const char* env_conn = getenv("GATEWAY_HTTP_CONN_LIMIT");
+    const char* env_timeout = getenv("GATEWAY_HTTP_TIMEOUT");
+    if (env_conn) { unsigned long v = strtoul(env_conn, NULL, 10); if (v > 0) conn_limit = (unsigned int)v; }
+    if (env_timeout) { unsigned long v = strtoul(env_timeout, NULL, 10); if (v > 0) conn_timeout = (unsigned int)v; }
     
     gateway->daemon = MHD_start_daemon(
         MHD_USE_THREAD_PER_CONNECTION,
@@ -302,8 +326,9 @@ static agentos_error_t http_gateway_start(void* gateway_impl) {
         NULL, NULL,
         handle_http_request,
         gateway,
-        MHD_OPTION_CONNECTION_LIMIT, 1000,
-        MHD_OPTION_CONNECTION_TIMEOUT, 30,
+        MHD_OPTION_CONNECTION_LIMIT, conn_limit,
+        MHD_OPTION_CONNECTION_TIMEOUT, conn_timeout,
+        MHD_OPTION_NOTIFY_COMPLETED, http_request_completed_callback, NULL,
         MHD_OPTION_END);
     
     if (!gateway->daemon) {

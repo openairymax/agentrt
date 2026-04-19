@@ -248,13 +248,100 @@ static bool add_in_edge_index(struct graph_engine_s* e, vertex_id_t target, size
 static void update_vertex_degree(struct graph_engine_s* e, vertex_id_t vertex_id, bool is_out_edge, int delta) {
     size_t idx = find_vertex_index(e, vertex_id);
     if (idx == SIZE_MAX) return;
-    
+
     if (is_out_edge) {
         if (delta > 0) e->vertices[idx].out_degree++;
         else if (e->vertices[idx].out_degree > 0) e->vertices[idx].out_degree--;
     } else {
         if (delta > 0) e->vertices[idx].in_degree++;
         else if (e->vertices[idx].in_degree > 0) e->vertices[idx].in_degree--;
+    }
+}
+
+// 从哈希链中移除指定ID的索引条目（通用模式）
+static void remove_index_entry(void** table, size_t hash, void* target_id,
+                                size_t id_offset, size_t next_offset,
+                                void (*free_fn)(void*)) {
+    void** prev_ptr = &table[hash];
+    void* entry = table[hash];
+    while (entry) {
+        void* next = *(void**)((uint8_t*)entry + next_offset);
+        if (memcmp((uint8_t*)entry + id_offset, target_id, sizeof(vertex_id_t)) == 0) {
+            *prev_ptr = next;
+            free_fn(entry);
+            return;
+        }
+        prev_ptr = (void**)((uint8_t*)entry + next_offset);
+        entry = next;
+    }
+}
+
+// 移除边索引条目并更新所有引用该边的索引
+static void remove_edge_from_all_indexes(struct graph_engine_s* e, edge_id_t edge_id,
+                                          vertex_id_t source, vertex_id_t target,
+                                          size_t removed_idx) {
+    size_t hash;
+
+    // 从edge_index移除
+    hash = vertex_id_hash(edge_id, e->index_size);
+    edge_index_entry_t** ep = (edge_index_entry_t**)&e->edge_index[hash];
+    edge_index_entry_t* ee = e->edge_index[hash];
+    while (ee) {
+        edge_index_entry_t* next = ee->next;
+        if (ee->edge_id == edge_id) {
+            *ep = next;
+            free(ee);
+            break;
+        }
+        ep = &ee->next;
+        ee = next;
+    }
+
+    // 从out_edge_index移除
+    hash = vertex_id_hash(source, e->index_size);
+    out_edge_index_entry_t** op = (out_edge_index_entry_t**)&e->out_edge_index[hash];
+    out_edge_index_entry_t* oe = e->out_edge_index[hash];
+    while (oe) {
+        out_edge_index_entry_t* next = oe->next;
+        if (oe->edge_idx == removed_idx) {
+            *op = next;
+            free(oe);
+            break;
+        }
+        op = &oe->next;
+        oe = next;
+    }
+
+    // 从in_edge_index移除
+    hash = vertex_id_hash(target, e->index_size);
+    in_edge_index_entry_t** ip = (in_edge_index_entry_t**)&e->in_edge_index[hash];
+    in_edge_index_entry_t* ie = e->in_edge_index[hash];
+    while (ie) {
+        in_edge_index_entry_t* next = ie->next;
+        if (ie->edge_idx == removed_idx) {
+            *ip = next;
+            free(ie);
+            break;
+        }
+        ip = &ie->next;
+        ie = next;
+    }
+}
+
+// 移除顶点索引条目
+static void remove_vertex_index_entry(struct graph_engine_s* e, vertex_id_t vertex_id) {
+    size_t hash = vertex_id_hash(vertex_id, e->index_size);
+    vertex_index_entry_t** pp = (vertex_index_entry_t**)&e->vertex_index[hash];
+    vertex_index_entry_t* p = e->vertex_index[hash];
+    while (p) {
+        vertex_index_entry_t* next = p->next;
+        if (p->vertex_id == vertex_id) {
+            *pp = next;
+            free(p);
+            return;
+        }
+        pp = &p->next;
+        p = next;
     }
 }
 
@@ -699,8 +786,42 @@ taskflow_error_t graph_engine_add_vertex(graph_engine_handle_t engine,
 taskflow_error_t graph_engine_remove_vertex(graph_engine_handle_t engine,
                                            vertex_id_t vertex_id)
 {
-    // TODO: 实现顶点移除
-    return TASKFLOW_ERROR_INTERNAL;
+    if (!engine || vertex_id == 0) return TASKFLOW_ERROR_INVALID_ARG;
+
+    struct graph_engine_s* e = (struct graph_engine_s*)engine;
+    if (!e->initialized) return TASKFLOW_ERROR_NOT_INITIALIZED;
+
+    size_t idx = find_vertex_index(e, vertex_id);
+    if (idx == SIZE_MAX) return TASKFLOW_ERROR_INVALID_ARG;
+
+    // 收集并移除所有关联边（先收集ID列表避免遍历时修改）
+    graph_edge_t out_edges[256], in_edges[256];
+    size_t out_count = collect_out_edges(e, vertex_id, out_edges, 256);
+    size_t in_count = collect_in_edges(e, vertex_id, in_edges, 256);
+
+    for (size_t i = 0; i < out_count; i++) {
+        graph_engine_remove_edge(engine, out_edges[i].id);
+    }
+    for (size_t i = 0; i < in_count; i++) {
+        // 入边可能已被出边移除时连带删除，跳过已不存在的
+        if (find_edge_index(e, in_edges[i].id) != SIZE_MAX) {
+            graph_engine_remove_edge(engine, in_edges[i].id);
+        }
+    }
+
+    // 从vertex_index哈希表中移除
+    remove_vertex_index_entry(e, vertex_id);
+
+    // 用最后一个元素覆盖被删除的元素（swap-and-pop）
+    if (idx < e->vertex_count - 1) {
+        e->vertices[idx] = e->vertices[e->vertex_count - 1];
+        // 更新被移动顶点的索引
+        remove_vertex_index_entry(e, e->vertices[idx].id);
+        add_vertex_index(e, e->vertices[idx].id, idx);
+    }
+    e->vertex_count--;
+
+    return TASKFLOW_SUCCESS;
 }
 
 taskflow_error_t graph_engine_add_edge(graph_engine_handle_t engine,
@@ -742,13 +863,36 @@ taskflow_error_t graph_engine_add_edge(graph_engine_handle_t engine,
     }
     
     if (!add_out_edge_index(e, edge->source, edge_idx)) {
-        // 清理已添加的边索引
-        // TODO: 需要从edge_index中移除（简化实现中跳过）
+        // 回滚：移除已添加的边索引
+        size_t eh = vertex_id_hash(edge->id, e->index_size);
+        edge_index_entry_t** rep = (edge_index_entry_t**)&e->edge_index[eh];
+        edge_index_entry_t* re = e->edge_index[eh];
+        while (re) {
+            edge_index_entry_t* rnext = re->next;
+            if (re->edge_id == edge->id) { *rep = rnext; free(re); break; }
+            rep = &re->next; re = rnext;
+        }
         return TASKFLOW_ERROR_MEMORY;
     }
-    
+
     if (!add_in_edge_index(e, edge->target, edge_idx)) {
-        // 清理已添加的索引（简化实现中跳过）
+        // 回滚：移除out_edge_index和edge_index
+        size_t oh = vertex_id_hash(edge->source, e->index_size);
+        out_edge_index_entry_t** rop = (out_edge_index_entry_t**)&e->out_edge_index[oh];
+        out_edge_index_entry_t* roe = e->out_edge_index[oh];
+        while (roe) {
+            out_edge_index_entry_t* rnext = roe->next;
+            if (roe->edge_idx == edge_idx) { *rop = rnext; free(roe); break; }
+            rop = &roe->next; roe = rnext;
+        }
+        size_t eh = vertex_id_hash(edge->id, e->index_size);
+        edge_index_entry_t** rep = (edge_index_entry_t**)&e->edge_index[eh];
+        edge_index_entry_t* re = e->edge_index[eh];
+        while (re) {
+            edge_index_entry_t* rnext = re->next;
+            if (re->edge_id == edge->id) { *rep = rnext; free(re); break; }
+            rep = &re->next; re = rnext;
+        }
         return TASKFLOW_ERROR_MEMORY;
     }
     
@@ -764,8 +908,71 @@ taskflow_error_t graph_engine_add_edge(graph_engine_handle_t engine,
 taskflow_error_t graph_engine_remove_edge(graph_engine_handle_t engine,
                                          edge_id_t edge_id)
 {
-    // TODO: 实现边移除
-    return TASKFLOW_ERROR_INTERNAL;
+    if (!engine || edge_id == 0) return TASKFLOW_ERROR_INVALID_ARG;
+
+    struct graph_engine_s* e = (struct graph_engine_s*)engine;
+    if (!e->initialized) return TASKFLOW_ERROR_NOT_INITIALIZED;
+
+    size_t idx = find_edge_index(e, edge_id);
+    if (idx == SIZE_MAX) return TASKFLOW_ERROR_INVALID_ARG;
+
+    graph_edge_t* removed = &e->edges[idx];
+    vertex_id_t source = removed->source;
+    vertex_id_t target = removed->target;
+
+    // 从所有索引中移除
+    remove_edge_from_all_indexes(e, edge_id, source, target, idx);
+
+    // 更新顶点度数
+    update_vertex_degree(e, source, true, -1);
+    update_vertex_degree(e, target, false, -1);
+
+    // swap-and-pop: 用最后一个边覆盖被删除的边
+    if (idx < e->edge_count - 1) {
+        graph_edge_t* last_edge = &e->edges[e->edge_count - 1];
+        // 移除被移动边的旧索引
+        size_t last_hash = vertex_id_hash(last_edge->id, e->index_size);
+        edge_index_entry_t** lep = (edge_index_entry_t**)&e->edge_index[last_hash];
+        edge_index_entry_t* lee = e->edge_index[last_hash];
+        while (lee) {
+            edge_index_entry_t* lnext = lee->next;
+            if (lee->edge_id == last_edge->id) {
+                *lep = lnext;
+                free(lee);
+                break;
+            }
+            lep = &lee->next;
+            lee = lnext;
+        }
+
+        // 更新out/in edge index中被移动边的引用
+        size_t src_hash = vertex_id_hash(last_edge->source, e->index_size);
+        out_edge_index_entry_t** oep = (out_edge_index_entry_t**)&e->out_edge_index[src_hash];
+        out_edge_index_entry_t* oee = e->out_edge_index[src_hash];
+        while (oee) {
+            if (oee->edge_idx == e->edge_count - 1) {
+                oee->edge_idx = idx;
+                break;
+            }
+            oee = oee->next;
+        }
+        size_t tgt_hash = vertex_id_hash(last_edge->target, e->index_size);
+        in_edge_index_entry_t** iep = (in_edge_index_entry_t**)&e->in_edge_index[tgt_hash];
+        in_edge_index_entry_t* iee = e->in_edge_index[tgt_hash];
+        while (iee) {
+            if (iee->edge_idx == e->edge_count - 1) {
+                iee->edge_idx = idx;
+                break;
+            }
+            iee = iee->next;
+        }
+
+        e->edges[idx] = *last_edge;
+        add_edge_index(e, e->edges[idx].id, idx);
+    }
+    e->edge_count--;
+
+    return TASKFLOW_SUCCESS;
 }
 
 taskflow_error_t graph_engine_get_vertex(graph_engine_handle_t engine,

@@ -81,7 +81,9 @@ install(FILES ${heapstore_HEADERS}
 
 if(BUILD_TESTS)
     enable_testing()
-    add_subdirectory(tests)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
+        add_subdirectory(tests)
+    endif()
 endif()
 
 message(STATUS "AgentOS heapstore v${PROJECT_VERSION}")

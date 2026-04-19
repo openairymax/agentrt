@@ -201,7 +201,6 @@ agentos_error_t agentos_memoryrov_evolve(agentos_memoryrov_handle_t* handle, int
         return AGENTOS_EINVAL;
     }
 
-    /* 获取所有 ID */
     char** ids = NULL;
     size_t count = 0;
     agentos_error_t err = agentos_layer1_raw_list_ids(handle->l1_raw, &ids, &count);
@@ -209,34 +208,124 @@ agentos_error_t agentos_memoryrov_evolve(agentos_memoryrov_handle_t* handle, int
         return err;
     }
 
-    /* 对每个记忆进行演化 */
+    /* ========== L3 语义关系抽取 ========== */
     for (size_t i = 0; i < count; i++) {
-        /* 读取记忆内容 */
-        void* data = NULL;
-        size_t len = 0;
-        err = agentos_layer1_raw_read(handle->l1_raw, ids[i], &data, &len);
-        if (err != AGENTOS_SUCCESS || !data) {
-            continue;
-        }
+        void* data_i = NULL;
+        size_t len_i = 0;
+        err = agentos_layer1_raw_read(handle->l1_raw, ids[i], &data_i, &len_i);
+        if (err != AGENTOS_SUCCESS || !data_i) continue;
 
-        /* 在 L3 中建立关系（简单实现：按顺序连接） */
+        char* content_i = (char*)data_i;
+
+        /* 时序关系: 相邻记忆 */
         if (i > 0) {
-            err = agentos_knowledge_graph_add_relation(
-                handle->l3_struct,
-                ids[i - 1],
-                ids[i],
-                AGENTOS_RELATION_BEFORE,
-                1.0f
-            );
-            if (err != AGENTOS_SUCCESS) {
-                /* 关系添加失败不影响主流程 */
-            }
+            agentos_knowledge_graph_add_relation(
+                handle->l3_struct, ids[i - 1], ids[i],
+                AGENTOS_RELATION_BEFORE, 1.0f);
         }
 
-        AGENTOS_FREE(data);
+        /* 语义关系: 基于内容相似度 */
+        for (size_t j = 0; j < count && j < i; j++) {
+            if (i == j) continue;
+
+            void* data_j = NULL;
+            size_t len_j = 0;
+            agentos_error_t err_j = agentos_layer1_raw_read(handle->l1_raw, ids[j], &data_j, &len_j);
+            if (err_j != AGENTOS_SUCCESS || !data_j) continue;
+
+            char* content_j = (char*)data_j;
+
+            /* 关键词重叠度计算 */
+            float similarity = 0.0f;
+            size_t overlap = 0;
+            size_t min_len = len_i < len_j ? len_i : len_j;
+
+            if (min_len > 10) {
+                /* 滑动窗口关键词匹配 */
+                size_t window = (min_len > 64) ? 64 : min_len;
+                for (size_t w = 0; w + window <= len_i; w += window / 2) {
+                    for (size_t v = 0; v + window <= len_j; v += window / 2) {
+                        if (memcmp(content_i + w, content_j + v, window) == 0) {
+                            overlap++;
+                            break;
+                        }
+                    }
+                }
+                size_t max_windows = (len_i / (window / 2 + 1)) + 1;
+                similarity = (max_windows > 0) ? (float)overlap / (float)max_windows : 0.0f;
+            }
+
+            if (similarity > 0.3f) {
+                agentos_knowledge_graph_add_relation(
+                    handle->l3_struct, ids[j], ids[i],
+                    AGENTOS_RELATION_SIMILAR_TO, similarity);
+            }
+
+            /* 包含关系: 长内容包含短内容 */
+            if (len_i > len_j * 2 && len_j > 5) {
+                if (memmem(content_i, len_i, content_j, len_j) != NULL) {
+                    agentos_knowledge_graph_add_relation(
+                        handle->l3_struct, ids[j], ids[i],
+                        AGENTOS_RELATION_MEMBERS_OF, 0.9f);
+                }
+            }
+
+            /* 因果关系: 关键词检测 */
+            static const char* causal_markers[] = {
+                "because", "therefore", "caused", "result", "hence",
+                "so that", "leads to", "due to"
+            };
+            for (size_t m = 0; m < sizeof(causal_markers) / sizeof(causal_markers[0]); m++) {
+                if (strstr(content_i, causal_markers[m]) != NULL) {
+                    agentos_knowledge_graph_add_relation(
+                        handle->l3_struct, ids[j], ids[i],
+                        AGENTOS_RELATION_CAUSES, 0.7f);
+                    break;
+                }
+            }
+
+            AGENTOS_FREE(data_j);
+        }
+
+        AGENTOS_FREE(data_i);
     }
 
-    /* 释放 ID 数组 */
+    /* ========== L4 规则挖掘 ========== */
+    if (handle->l4_pattern && count >= 3) {
+        /* 使用L2特征聚类驱动L4规则发现 */
+        for (size_t i = 0; i < count; i++) {
+            void* data = NULL;
+            size_t len = 0;
+            err = agentos_layer1_raw_read(handle->l1_raw, ids[i], &data, &len);
+            if (err != AGENTOS_SUCCESS || !data) continue;
+
+            /* 通过L2检索相似记忆，构建聚类用于规则生成 */
+            char** sim_ids = NULL;
+            float* sim_scores = NULL;
+            size_t sim_count = 0;
+            agentos_layer2_feature_search(handle->l2_feature,
+                (const char*)data, 5, &sim_ids, &sim_scores, &sim_count);
+
+            if (sim_count >= 2) {
+                const char** cluster_ids = (const char**)sim_ids;
+                char* rule_text = NULL;
+                agentos_rule_generator_from_cluster(
+                    handle->l4_pattern, cluster_ids, sim_count, &rule_text);
+                if (rule_text) AGENTOS_FREE(rule_text);
+            }
+
+            if (sim_ids) AGENTOS_FREE(sim_ids);
+            if (sim_scores) AGENTOS_FREE(sim_scores);
+            AGENTOS_FREE(data);
+        }
+    }
+
+    /* ========== 遗忘裁剪 ========== */
+    if (!force) {
+        uint32_t pruned = 0;
+        agentos_forgetting_prune(handle->forgetting, &pruned);
+    }
+
     if (ids) {
         agentos_free_string_array(ids, count);
     }

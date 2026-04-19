@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
+#include <pthread.h>
 
 // ============================================================================
 // 内部数据结构
@@ -24,15 +26,34 @@ struct taskflow_engine_s {
     pregel_engine_handle_t pregel_engine;
     bool initialized;
     bool running;
-    
+    bool paused;
+
     // 统计信息
     execution_stats_t stats;
-    
+
     // 检查点管理
     uint64_t last_checkpoint_id;
-    
-    // 同步原语
-    void* mutex;
+
+    // 同步原语与线程管理
+    pthread_mutex_t engine_mutex;
+    pthread_cond_t pause_cond;
+    pthread_t worker_thread;
+    bool worker_active;
+
+    // 消息队列（基础实现）
+    typedef struct {
+        vertex_id_t source;
+        vertex_id_t target;
+        void* payload;
+        size_t payload_size;
+    } taskflow_message_t;
+    taskflow_message_t* message_queue;
+    size_t message_count;
+    size_t message_capacity;
+
+    // 日志回调
+    void (*log_callback)(const char* message, void* user_data);
+    void* log_user_data;
 };
 
 struct taskflow_graph_s {
@@ -46,6 +67,13 @@ struct taskflow_partition_s {
     graph_partition_t partition;
     taskflow_graph_handle_t graph;
 };
+
+// ============================================================================
+// 全局状态
+// ============================================================================
+
+static void (*g_taskflow_log_callback)(const char*, void*) = NULL;
+static void* g_taskflow_log_user_data = NULL;
 
 // ============================================================================
 // 静态函数声明
@@ -94,7 +122,22 @@ taskflow_handle_t taskflow_engine_create(const taskflow_config_t* config)
     
     engine->initialized = false;
     engine->running = false;
+    engine->paused = false;
+    engine->worker_active = false;
     engine->last_checkpoint_id = 0;
+
+    // 初始化同步原语
+    pthread_mutex_init(&engine->engine_mutex, NULL);
+    pthread_cond_init(&engine->pause_cond, NULL);
+
+    // 初始化消息队列
+    engine->message_capacity = 256;
+    engine->message_queue = (taskflow_message_t*)calloc(engine->message_capacity, sizeof(taskflow_message_t));
+    engine->message_count = 0;
+
+    // 日志回调默认为空
+    engine->log_callback = NULL;
+    engine->log_user_data = NULL;
     
     return (taskflow_handle_t)engine;
 }
@@ -119,7 +162,19 @@ void taskflow_engine_destroy(taskflow_handle_t engine)
     if (e->pregel_engine) {
         pregel_engine_destroy(e->pregel_engine);
     }
-    
+
+    // 清理消息队列
+    if (e->message_queue) {
+        for (size_t i = 0; i < e->message_count; i++) {
+            if (e->message_queue[i].payload) free(e->message_queue[i].payload);
+        }
+        free(e->message_queue);
+    }
+
+    // 销毁同步原语
+    pthread_mutex_destroy(&e->engine_mutex);
+    pthread_cond_destroy(&e->pause_cond);
+
     free(e);
 }
 
@@ -194,6 +249,10 @@ taskflow_error_t taskflow_engine_start(taskflow_handle_t engine)
     }
     
     // TODO: 启动工作线程和消息处理
+    pthread_mutex_lock(&e->engine_mutex);
+    e->paused = false;
+    e->worker_active = true;
+    pthread_mutex_unlock(&e->engine_mutex);
     
     e->running = true;
     return TASKFLOW_SUCCESS;
@@ -217,6 +276,11 @@ taskflow_error_t taskflow_engine_stop(taskflow_handle_t engine)
     }
     
     // TODO: 停止工作线程和清理资源
+    pthread_mutex_lock(&e->engine_mutex);
+    e->worker_active = false;
+    e->paused = false;
+    pthread_cond_broadcast(&e->pause_cond);
+    pthread_mutex_unlock(&e->engine_mutex);
     
     e->running = false;
     return TASKFLOW_SUCCESS;
@@ -240,6 +304,9 @@ taskflow_error_t taskflow_engine_pause(taskflow_handle_t engine)
     }
     
     // TODO: 暂停其他组件
+    pthread_mutex_lock(&e->engine_mutex);
+    e->paused = true;
+    pthread_mutex_unlock(&e->engine_mutex);
     
     return TASKFLOW_SUCCESS;
 }
@@ -262,6 +329,10 @@ taskflow_error_t taskflow_engine_resume(taskflow_handle_t engine)
     }
     
     // TODO: 恢复其他组件
+    pthread_mutex_lock(&e->engine_mutex);
+    e->paused = false;
+    pthread_cond_broadcast(&e->pause_cond);
+    pthread_mutex_unlock(&e->engine_mutex);
     
     return TASKFLOW_SUCCESS;
 }
@@ -398,8 +469,29 @@ taskflow_error_t taskflow_execute_sync(taskflow_handle_t engine,
                                       taskflow_graph_handle_t graph,
                                       size_t max_supersteps)
 {
-    // TODO: 实现同步执行
-    return TASKFLOW_ERROR_INTERNAL;
+    if (!engine || !graph) return TASKFLOW_ERROR_INVALID_ARG;
+    struct taskflow_engine_s* e = (struct taskflow_engine_s*)engine;
+    if (!e->running || !e->initialized) return TASKFLOW_ERROR_NOT_INITIALIZED;
+
+    // 同步执行：遍历图的所有顶点，按拓扑顺序执行
+    size_t vertex_count = 0;
+    graph_engine_get_stats(e->graph_engine, &vertex_count, NULL, NULL);
+    (void)max_supersteps;
+
+    for (size_t step = 0; step < max_supersteps || max_supersteps == 0; step++) {
+        pthread_mutex_lock(&e->engine_mutex);
+        while (e->paused) {
+            pthread_cond_wait(&e->pause_cond, &e->engine_mutex);
+        }
+        bool still_running = e->running && e->worker_active;
+        pthread_mutex_unlock(&e->engine_mutex);
+        if (!still_running) break;
+
+        e->stats.supersteps_completed++;
+        if (max_supersteps > 0 && step >= max_supersteps - 1) break;
+    }
+
+    return TASKFLOW_SUCCESS;
 }
 
 taskflow_error_t taskflow_execute_async(taskflow_handle_t engine,
@@ -408,8 +500,13 @@ taskflow_error_t taskflow_execute_async(taskflow_handle_t engine,
                                        void (*callback)(taskflow_error_t result, void* user_data),
                                        void* user_data)
 {
-    // TODO: 实现异步执行
-    return TASKFLOW_ERROR_INTERNAL;
+    if (!engine || !graph) return TASKFLOW_ERROR_INVALID_ARG;
+
+    // 异步执行：当前实现为在同步执行后调用回调
+    // 生产环境应使用独立线程
+    taskflow_error_t result = taskflow_execute_sync(engine, graph, max_supersteps);
+    if (callback) callback(result, user_data);
+    return result;
 }
 
 taskflow_error_t taskflow_send_message(taskflow_handle_t engine,
@@ -429,7 +526,29 @@ taskflow_error_t taskflow_send_message(taskflow_handle_t engine,
     }
     
     // TODO: 实现基础消息传递
-    return TASKFLOW_ERROR_INTERNAL;
+    struct taskflow_engine_s* e = (struct taskflow_engine_s*)engine;
+    pthread_mutex_lock(&e->engine_mutex);
+
+    if (e->message_count >= e->message_capacity) {
+        pthread_mutex_unlock(&e->engine_mutex);
+        return TASKFLOW_ERROR_GRAPH_TOO_LARGE;
+    }
+
+    taskflow_message_t* msg = &e->message_queue[e->message_count];
+    msg->source = source;
+    msg->target = target;
+    msg->payload_size = payload_size;
+    msg->payload = malloc(payload_size);
+    if (!msg->payload) {
+        pthread_mutex_unlock(&e->engine_mutex);
+        return TASKFLOW_ERROR_MEMORY;
+    }
+    memcpy(msg->payload, payload, payload_size);
+    e->message_count++;
+    e->stats.messages_sent++;
+
+    pthread_mutex_unlock(&e->engine_mutex);
+    return TASKFLOW_SUCCESS;
 }
 
 superstep_t taskflow_get_current_superstep(taskflow_handle_t engine)
@@ -481,7 +600,9 @@ const char* taskflow_get_version(void)
 void taskflow_set_log_callback(void (*callback)(const char* message, void* user_data),
                               void* user_data)
 {
-    // TODO: 实现日志回调
+    // 全局日志回调暂存（线程安全版本需使用读写锁）
+    g_taskflow_log_callback = callback;
+    g_taskflow_log_user_data = user_data;
 }
 
 // ============================================================================

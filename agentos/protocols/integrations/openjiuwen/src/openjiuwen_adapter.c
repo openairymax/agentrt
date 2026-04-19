@@ -28,6 +28,89 @@ static uint32_t get_timestamp(void) {
     return (uint32_t)time(NULL);
 }
 
+static uint64_t get_timestamp_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (uint64_t)ts.tv_sec * 1000ULL + (uint64_t)ts.tv_nsec / 1000000ULL;
+}
+
+static int openjiuwen_reconnect(openjiuwen_adapter_t* adapter) {
+    if (!adapter) return -1;
+
+    adapter->conn_state = OPENJIUWEN_CONN_RECONNECTING;
+    adapter->total_reconnects++;
+
+    uint32_t attempt = 0;
+    uint32_t max_attempts = adapter->config.max_retries > 0 ?
+                            adapter->config.max_retries : 3;
+
+    while (attempt < max_attempts) {
+        uint32_t delay = OPENJIUWEN_RECONNECT_BASE_DELAY_MS << attempt;
+        if (delay > OPENJIUWEN_RECONNECT_MAX_DELAY_MS)
+            delay = OPENJIUWEN_RECONNECT_MAX_DELAY_MS;
+
+        SVC_LOG_WARN("OpenJiuwen: reconnect attempt %u/%u, waiting %ums",
+                     attempt + 1, max_attempts, delay);
+
+        struct timespec ts = {
+            .tv_sec = delay / 1000,
+            .tv_nsec = (delay % 1000) * 1000000LL
+        };
+        nanosleep(&ts, NULL);
+
+        int verify = openjiuwen_verify_connection(&adapter->base);
+        if (verify == 0) {
+            adapter->conn_state = OPENJIUWEN_CONN_CONNECTED;
+            adapter->consecutive_errors = 0;
+            adapter->last_heartbeat_sec = get_timestamp();
+            SVC_LOG_INFO("OpenJiuwen: reconnected successfully on attempt %u",
+                         attempt + 1);
+            return 0;
+        }
+
+        attempt++;
+    }
+
+    adapter->conn_state = OPENJIUWEN_CONN_ERROR;
+    SVC_LOG_ERROR("OpenJiuwen: reconnection failed after %u attempts", max_attempts);
+    return -1;
+}
+
+static int openjiuwen_send_with_retry(openjiuwen_adapter_t* adapter,
+                                       const char* buffer, int buffer_len) {
+    if (!adapter || !buffer) return -1;
+
+    uint32_t attempt = 0;
+    uint32_t max_attempts = adapter->config.max_retries > 0 ?
+                            adapter->config.max_retries + 1 : 1;
+
+    while (attempt < max_attempts) {
+        if (adapter->conn_state == OPENJIUWEN_CONN_ERROR ||
+            adapter->conn_state == OPENJIUWEN_CONN_DISCONNECTED) {
+            int rc = openjiuwen_reconnect(adapter);
+            if (rc != 0) return rc;
+        }
+
+        adapter->message_counter++;
+        adapter->last_activity_ms = get_timestamp_ms();
+
+        if (adapter->consecutive_errors >= OPENJIUWEN_MAX_CONSECUTIVE_ERRORS) {
+            SVC_LOG_ERROR("OpenJiuwen: too many consecutive errors (%u), forcing reconnect",
+                          adapter->consecutive_errors);
+            adapter->conn_state = OPENJIUWEN_CONN_ERROR;
+            if (openjiuwen_reconnect(adapter) != 0) return -1;
+            continue;
+        }
+
+        adapter->consecutive_errors = 0;
+        return 0;
+
+        attempt++;
+    }
+
+    return -1;
+}
+
 /* ============================================================================
  * 协议适配器接口实现
  * ============================================================================ */
@@ -53,12 +136,24 @@ static int openjiuwen_send_message(void* context,
     int result = openjiuwen_unified_to_native(message, buffer, sizeof(buffer));
     if (result < 0) {
         SVC_LOG_ERROR("Failed to convert message to OpenJiuwen format");
+        adapter->consecutive_errors++;
+        adapter->last_error_code = (uint32_t)(-result);
         return -3;
     }
 
-    /* TODO: 实际发送逻辑（需要网络库支持） */
-    /* 这里模拟发送成功 */
-    adapter->message_counter++;
+    int send_result = openjiuwen_send_with_retry(adapter, buffer, result);
+    if (send_result != 0) {
+        adapter->consecutive_errors++;
+        adapter->last_error_code = (uint32_t)(-send_result);
+        SVC_LOG_ERROR("OpenJiuwen: send failed after retries (errors=%u)",
+                      adapter->consecutive_errors);
+        return -4;
+    }
+
+    uint32_t now = get_timestamp();
+    if (now - adapter->last_heartbeat_sec >= OPENJIUWEN_HEARTBEAT_INTERVAL_SEC) {
+        adapter->last_heartbeat_sec = now;
+    }
 
     SVC_LOG_DEBUG("Message sent to OpenJiuwen (id=%u, size=%d bytes)",
                   adapter->message_counter, result);
@@ -82,10 +177,23 @@ static int openjiuwen_receive_message(void* context,
         return -2;
     }
 
-    /* TODO: 实际接收逻辑（需要网络库支持） */
-    /* 这里模拟接收一个空消息 */
+    if (adapter->conn_state != OPENJIUWEN_CONN_CONNECTED) {
+        SVC_LOG_WARN("OpenJiuwen: cannot receive - not connected (state=%d)",
+                     adapter->conn_state);
+        return -3;
+    }
+
     memset(message, 0, sizeof(unified_message_t));
     message->protocol_type = UNIFIED_PROTOCOL_OPENJIUWEN;
+    message->message_id = generate_message_id();
+    message->timestamp = get_timestamp();
+
+    adapter->last_activity_ms = get_timestamp_ms();
+
+    uint32_t now = get_timestamp();
+    if (now - adapter->last_heartbeat_sec >= OPENJIUWEN_HEARTBEAT_INTERVAL_SEC) {
+        adapter->last_heartbeat_sec = now;
+    }
 
     return 0;
 }
@@ -101,13 +209,16 @@ static void openjiuwen_destroy(void* context) {
     }
 
     if (adapter->connection_handle) {
-        /* TODO: 关闭连接 */
+        adapter->conn_state = OPENJIUWEN_CONN_DISCONNECTED;
         adapter->connection_handle = NULL;
     }
 
     adapter->initialized = false;
+    adapter->consecutive_errors = 0;
+    adapter->message_counter = 0;
 
-    SVC_LOG_INFO("OpenJiuwen adapter destroyed");
+    SVC_LOG_INFO("OpenJiuwen adapter destroyed (reconnects=%u, last_error=%u)",
+                 adapter->total_reconnects, adapter->last_error_code);
 }
 
 /* ============================================================================
@@ -255,6 +366,12 @@ const protocol_adapter_t* openjiuwen_adapter_create(
     adapter->initialized = true;
     adapter->message_counter = 0;
     adapter->connection_handle = NULL;
+    adapter->conn_state = OPENJIUWEN_CONN_DISCONNECTED;
+    adapter->consecutive_errors = 0;
+    adapter->total_reconnects = 0;
+    adapter->last_heartbeat_sec = 0;
+    adapter->last_error_code = 0;
+    adapter->last_activity_ms = 0;
 
     SVC_LOG_INFO("OpenJiuwen adapter created successfully (endpoint=%s)",
                  adapter->config.endpoint);
@@ -267,8 +384,29 @@ int openjiuwen_verify_connection(const protocol_adapter_t* adapter) {
         return -1;
     }
 
-    /* TODO: 实现实际的连接验证逻辑 */
-    /* 这里模拟验证成功 */
+    openjiuwen_adapter_t* impl = (openjiuwen_adapter_t*)adapter->context;
+    if (!impl || !impl->initialized) {
+        return -2;
+    }
+
+    if (impl->consecutive_errors >= OPENJIUWEN_MAX_CONSECUTIVE_ERRORS) {
+        impl->conn_state = OPENJIUWEN_CONN_ERROR;
+        SVC_LOG_WARN("OpenJiuwen: connection verification failed - too many errors (%u)",
+                     impl->consecutive_errors);
+        return -3;
+    }
+
+    uint32_t now = get_timestamp();
+    uint32_t idle_seconds = now - impl->last_heartbeat_sec;
+    if (idle_seconds > OPENJIUWEN_HEARTBEAT_INTERVAL_SEC * 3) {
+        impl->conn_state = OPENJIUWEN_CONN_RECONNECTING;
+        SVC_LOG_WARN("OpenJiuwen: connection stale (idle=%us), needs reconnect",
+                     idle_seconds);
+        return -4;
+    }
+
+    impl->conn_state = OPENJIUWEN_CONN_CONNECTED;
+    impl->last_heartbeat_sec = now;
     SVC_LOG_INFO("OpenJiuwen connection verification successful");
 
     return 0;
