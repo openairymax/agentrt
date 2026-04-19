@@ -101,6 +101,14 @@ cmake-build-debug/
 cmake-build-release/
 cmake-build-coverage/
 
+# 外部构建目录（Out-of-Source Build）
+# 所有构建产物统一输出到此目录，保持源码仓库纯净
+AgentOS-build/
+
+# CMake 构建输出目录（库和可执行文件）
+agentos/lib/
+agentos/bin/
+
 # 编译器数据库（IDE 工具生成）
 compile_commands.json
 compile_flags.txt

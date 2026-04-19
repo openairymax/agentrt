@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <agentos/memory.h>
+#include <agentos/utils/memory/memory_compat.h>
 
 #ifdef _WIN32
 #include <windows.h>

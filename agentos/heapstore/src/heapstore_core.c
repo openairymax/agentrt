@@ -27,7 +27,7 @@
 #include <time.h>
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
-#include <agentos/atomic_compat.h>
+#include <agentos/utils/include/atomic_compat.h>
 
 /* 平台特定头文件 */
 #ifdef _WIN32

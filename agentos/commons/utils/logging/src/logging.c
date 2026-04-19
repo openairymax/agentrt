@@ -20,8 +20,8 @@
 #include <unistd.h>
 
 /* Unified base library compatibility layer */
-#include <agentos/memory.h>
-#include <agentos/string.h>
+#include <agentos/utils/memory/memory_compat.h>
+#include <agentos/utils/string/string_compat.h>
 #include <string.h>
 #include <time.h>
 #include <stdarg.h>

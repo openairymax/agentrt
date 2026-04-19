@@ -21,7 +21,7 @@
 #include <string.h>
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
-#include <agentos/atomic_compat.h>
+#include <agentos/utils/include/atomic_compat.h>
 
 #ifdef _WIN32
     #define WIN32_LEAN_AND_MEAN

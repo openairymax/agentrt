@@ -18,8 +18,8 @@
 #define GATEWAY_PROTOCOL_HANDLER_H
 
 #include "gateway_rpc_handler.h"
-#include <agentos/unified_protocol.h>
-#include <agentos/protocol_router.h>
+#include <agentos/protocols/include/unified_protocol.h>
+#include <agentos/protocols/include/protocol_router.h>
 #include <stddef.h>
 
 #ifdef __cplusplus

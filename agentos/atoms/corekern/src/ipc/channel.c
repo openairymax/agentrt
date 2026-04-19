@@ -10,10 +10,10 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include <agentos/memory.h>
+#include <agentos/utils/memory/memory_compat.h>
 
 /* Check macros for unified error handling */
-#include <agentos/check.h>
+#include <agentos/utils/include/check.h>
 #include <string.h>
 #include <stdio.h>
 
