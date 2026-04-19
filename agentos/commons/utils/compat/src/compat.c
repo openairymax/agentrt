@@ -167,7 +167,7 @@ void agentos_debug_break(void) {
 
 /* ==================== 版本信息实现 ==================== */
 
-static const char* g_version_string = AGENTOS_VERSION_STRING;
+static const char* g_version_string = "0.1.0";
 
 const char* agentos_version_string(void) {
     return g_version_string;
@@ -179,9 +179,9 @@ const char* agentos_build_info(void) {
     if (build_info[0] == '\0') {
         snprintf(build_info, sizeof(build_info),
             "AgentOS v%s | Compiler: %s | Platform: %s | Build: %s %s",
-            AGENTOS_VERSION_STRING,
-            AGENTOS_COMPILER_NAME,
-            AGENTOS_PLATFORM_NAME,
+            "0.1.0",
+            "gcc",
+            "linux",
             __DATE__,
             __TIME__
         );

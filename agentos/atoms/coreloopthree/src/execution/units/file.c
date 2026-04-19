@@ -10,7 +10,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <sys/stat.h>
-#include <agentos/utils/memory/memory_compat.h>
+#include "include/memory_compat.h"
 
 #ifdef _WIN32
 #include <direct.h>

@@ -11,7 +11,7 @@
  */
 
 #include "sync_platform.h"
-#include <agentos/utils/include/check.h>
+#include "check.h"
 #include <time.h>
 
 sync_result_t sync_semaphore_create(sync_semaphore_t* semaphore,
