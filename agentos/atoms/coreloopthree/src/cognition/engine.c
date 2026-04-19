@@ -12,8 +12,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include <agentos/memory.h>
-#include <agentos/string.h>
+#include <agentos/utils/memory/memory_compat.h>
+#include <agentos/utils/string/string_compat.h>
 #include <string.h>
 #include <stdio.h>
 #include <inttypes.h>
@@ -53,7 +53,7 @@ static inline char* cJSON_PrintUnformatted(const cJSON* i) {
 #endif /* AGENTOS_HAS_CJSON */
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
-#include <agentos/atomic_compat.h>
+#include <agentos/utils/include/atomic_compat.h>
 
 /* 平台特定头文件 */
 #ifdef _WIN32
