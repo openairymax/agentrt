@@ -13,8 +13,8 @@
 #include <time.h>
 #include <string.h>
 
-#include <agentos/utils/memory/memory_compat.h>
-#include <agentos/utils/string/string_compat.h>
+#include "include/memory_compat.h"
+#include "string_compat.h"
 
 #define ADAPTIVE_SAMPLE_SIZE 50      /* 自适应学习所需的最小样本数 */
 #define DEFAULT_LEARNING_RATE 0.05f   /* 默认学习率 */

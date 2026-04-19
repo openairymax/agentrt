@@ -1,3 +1,5 @@
+#include <stdbool.h>
+#include <stdint.h>
 // SPDX-FileCopyrightText: 2026 SPHARX.
 // SPDX-License-Identifier: Apache-2.0
 /**
@@ -18,8 +20,8 @@
 #define GATEWAY_PROTOCOL_HANDLER_H
 
 #include "gateway_rpc_handler.h"
-#include <agentos/protocols/include/unified_protocol.h>
-#include <agentos/protocols/include/protocol_router.h>
+#include "protocols/include/unified_protocol.h"
+#include "protocols/include/protocol_router.h"
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -82,7 +84,7 @@ rpc_result_t gateway_protocol_handle_request(
     gateway_protocol_handler_t handler,
     const char* request_data,
     size_t request_size,
-    unified_protocol_type_t protocol_type,
+    agentos_protocol_type_t protocol_type,
     int (*custom_handler)(const char*, char**, void*),
     void* handler_data);
 
@@ -123,7 +125,7 @@ int gateway_protocol_handler_get_stats(
  * @param request_size 请求数据大小
  * @return 检测到的协议类型，或UNIFIED_PROTOCOL_UNKNOWN如果无法检测
  */
-unified_protocol_type_t gateway_protocol_detect(
+agentos_protocol_type_t gateway_protocol_detect(
     const char* request_data,
     size_t request_size);
 
@@ -184,7 +186,7 @@ int gateway_protocol_convert_to_jsonrpc(
     gateway_protocol_handler_t handler,
     const char* request_data,
     size_t request_size,
-    unified_protocol_type_t protocol_type,
+    agentos_protocol_type_t protocol_type,
     char** jsonrpc_out);
 
 /**
@@ -198,7 +200,7 @@ int gateway_protocol_convert_to_jsonrpc(
 int gateway_protocol_convert_from_jsonrpc(
     gateway_protocol_handler_t handler,
     const char* jsonrpc_response,
-    unified_protocol_type_t target_protocol,
+    agentos_protocol_type_t target_protocol,
     char** target_response);
 
 // ============================================================================

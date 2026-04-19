@@ -19,16 +19,16 @@
 #include "agentos.h"
 #include "logger.h"
 #include "monitoring_metrics.h"
-#include <agentos/commons/platform/include/platform.h>
-#include <agentos/observability_compat.h>
+#include "platform.h"
+"utils/observability/include/observability_compat.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
 
 /* 基础库兼容性层 */
-#include <agentos/utils/memory/memory_compat.h>
-#include <agentos/utils/string/string_compat.h>
+#include "include/memory_compat.h"
+#include "string_compat.h"
 
 /* ==================== 常量定义 ==================== */
 

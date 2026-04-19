@@ -26,7 +26,7 @@
 #include "logger.h"
 #include "observability.h"
 #include "manager.h"
-#include <agentos/resource_quota.h>
+"utils/resource/resource_quota.h"
 #include <stdlib.h>
 #include <string.h>
 

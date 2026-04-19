@@ -8,7 +8,7 @@
  */
 
 #include "openjiuwen_adapter.h"
-#include <agentos/daemon/common/include/safe_string_utils.h>
+#include "common/include/safe_string_utils.h"
 
 #include <stdlib.h>
 #include <string.h>

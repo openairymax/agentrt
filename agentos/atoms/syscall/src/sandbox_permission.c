@@ -9,8 +9,8 @@
 #include "logger.h"
 
 /* 基础库兼容性层 */
-#include <agentos/utils/memory/memory_compat.h>
-#include <agentos/utils/string/string_compat.h>
+#include "include/memory_compat.h"
+#include "string_compat.h"
 
 /* 沙箱内部结构 */
 struct agentos_sandbox {
