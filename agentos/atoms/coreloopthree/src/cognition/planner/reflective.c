@@ -7,8 +7,8 @@
 #include "cognition.h"
 #include "llm_client.h"
 #include "strategy.h"
-#include <agentos/memory.h>
-#include <agentos/string.h>
+#include <agentos/utils/memory/memory_compat.h>
+#include <agentos/utils/string/string_compat.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

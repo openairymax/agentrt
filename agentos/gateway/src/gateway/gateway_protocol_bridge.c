@@ -437,7 +437,7 @@ char* gw_protocol_bridge_diagnose(gw_protocol_bridge_handle_t bridge) {
             (b->handlers[6]?1:0)
         ),
         b->registry ? (int)proto_registry_count(b->registry) : -1,
-        b->ext_framework ? 0 /* TODO: get adapter count */ : 0
+        b->ext_framework ? (int)b->ext_framework->adapter_count : 0
     );
 
     return diag;

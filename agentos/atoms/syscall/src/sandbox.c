@@ -15,7 +15,7 @@
  */
 
 #include "../include/syscalls.h"
-#include <agentos/agentos.h>
+#include <agentos/atoms/corekern/include/agentos.h>
 #include "../include/logger.h"
 #include "sandbox_utils.h"
 #include "sandbox_permission.h"
@@ -26,9 +26,9 @@
 #include <time.h>
 
 /* 基础库兼容性层 */
-#include <agentos/memory.h>
-#include <agentos/string.h>
-#include <agentos/check.h>
+#include <agentos/utils/memory/memory_compat.h>
+#include <agentos/utils/string/string_compat.h>
+#include <agentos/utils/include/check.h>
 
 /* ==================== 常量定义 ==================== */
 

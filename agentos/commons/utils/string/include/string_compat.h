@@ -12,8 +12,9 @@
 typedef intptr_t ssize_t;
 
 /* Windows 平台 snprintf 定义（必须在 stdio.h 之后） */
+/* flawfinder: ignore - Windows compat macro, format is always const */
 #ifndef snprintf
-#define snprintf _snprintf /* flawfinder: ignore - Windows compat macro */
+#define snprintf _snprintf
 #endif
 
 #else

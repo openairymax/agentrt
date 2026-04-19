@@ -25,8 +25,8 @@
 #endif
 
 /* Unified base library compatibility layer */
-#include <agentos/memory.h>
-#include <agentos/string.h>
+#include <agentos/utils/memory/memory_compat.h>
+#include <agentos/utils/string/string_compat.h>
 
 /* heapstore 持久化开关（可通过配置关闭） */
 static bool g_use_heapstore_persistence __attribute__((unused)) = true;
