@@ -111,6 +111,9 @@ target_include_directories(agentos_common PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/error/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/sync/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/execution/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils/memory
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils/string
 )
 
 target_include_directories(agentos_common PRIVATE

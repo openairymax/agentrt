@@ -9,12 +9,12 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include <agentos/utils/memory/memory_compat.h>
-#include <agentos/utils/string/string_compat.h>
+#include "include/memory_compat.h"
+#include "string_compat.h"
 #include <string.h>
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
-#include <agentos/utils/include/atomic_compat.h>
+#include "atomic_compat.h"
 
 /**
  * @brief 追踪跨度

@@ -21,12 +21,12 @@
 
 /* heapstore 集成接口（heapstore模块可选） */
 #ifdef BUILD_HEAPSTORE
-#include <agentos/heapstore_integration.h>
+"heapstore/include/heapstore_integration.h"
 #endif
 
 /* Unified base library compatibility layer */
-#include <agentos/utils/memory/memory_compat.h>
-#include <agentos/utils/string/string_compat.h>
+#include "include/memory_compat.h"
+#include "string_compat.h"
 
 /* heapstore 持久化开关（可通过配置关闭） */
 static bool g_use_heapstore_persistence __attribute__((unused)) = true;

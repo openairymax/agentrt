@@ -10,8 +10,8 @@
 #include <time.h>
 
 /* Unified base library compatibility layer */
-#include <agentos/utils/memory/memory_compat.h>
-#include <agentos/utils/string/string_compat.h>
+#include "include/memory_compat.h"
+#include "string_compat.h"
 #include <string.h>
 
 #define DEFAULT_CACHE_TTL_SEC 3600  /* 默认TTL：1小时 */
