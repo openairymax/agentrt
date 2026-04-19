@@ -19,12 +19,8 @@
 #include <string.h>
 #include <stdio.h>
 
-/* SQLite 集成 */
-#ifdef AGENTOS_HAS_SQLITE3
+/* SQLite 集成（SQLite3 已通过CMake检测并定义 AGENTOS_HAS_SQLITE3=1） */
 #include <sqlite3.h>
-#else
-#include "../include/sqlite3_stub.h"
-#endif /* AGENTOS_HAS_SQLITE3 */
 
 /**
  * @brief 向量存储内部结构

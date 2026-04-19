@@ -15,15 +15,10 @@ extern "C" {
 #endif
 
 /* ==================== 日志 ==================== */
-
-#define AGENTOS_LOG_LEVEL_ERROR 1
-#define AGENTOS_LOG_LEVEL_WARN  2
-#define AGENTOS_LOG_LEVEL_INFO  3
-#define AGENTOS_LOG_LEVEL_DEBUG 4
+/* Note: AGENTOS_LOG_LEVEL_* constants defined as enum in types.h (agentos_log_level_t) */
 
 #ifndef AGENTOS_LOG_LEVEL
 #define AGENTOS_LOG_LEVEL AGENTOS_LOG_LEVEL_INFO
-// From data intelligence emerges. by spharx
 #endif
 
 /**

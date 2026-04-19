@@ -19,12 +19,8 @@
 #include <string.h>
 #include <stdio.h>
 
-/* CURL HTTP 客户端（与 CMakeLists.txt 中的 AGENTOS_HAS_CURL 保持一致） */
-#ifdef AGENTOS_HAS_CURL
+/* CURL HTTP 客户端（libcurl 已通过CMake检测并定义 AGENTOS_HAS_CURL=1） */
 #include <curl/curl.h>
-#else
-#include "../include/curl_stub.h"
-#endif /* AGENTOS_HAS_CURL */
 
 /* JSON 解析 */
 #ifdef AGENTOS_HAS_CJSON

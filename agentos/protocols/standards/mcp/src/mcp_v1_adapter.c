@@ -634,6 +634,283 @@ int mcp_v1_notify_cancelled(mcp_v1_context_t* ctx,
     return 0;
 }
 
+/* ========== Streaming Support Implementation (PROTO-001) ========== */
+
+typedef struct {
+    mcp_stream_config_t config;
+    bool active;
+} mcp_stream_state_t;
+
+static mcp_stream_state_t* get_stream_state(mcp_v1_context_t* ctx) {
+    static mcp_stream_state_t default_state = {
+        .config = { .enabled = true, .chunk_size = 4096, .max_buffer_size = (10 * 1024 * 1024), .flush_interval_ms = 50 },
+        .active = false
+    };
+    (void)ctx;
+    return &default_state;
+}
+
+int mcp_v1_stream_config(mcp_v1_context_t* ctx, const mcp_stream_config_t* config) {
+    if (!ctx) return -1;
+    if (!config) return -2;
+
+    mcp_stream_state_t* ss = get_stream_state(ctx);
+    ss->config = *config;
+    return 0;
+}
+
+const char* mcp_stream_event_type_string(mcp_stream_event_type_t type) {
+    switch (type) {
+        case MCP_STREAM_EVENT_CONTENT:   return "content";
+        case MCP_STREAM_EVENT_ERROR:     return "error";
+        case MCP_STREAM_EVENT_DONE:      return "done";
+        case MCP_STREAM_EVENT_PROGRESS:  return "progress";
+        case MCP_STREAM_EVENT_CANCELLED: return "cancelled";
+        default: return "unknown";
+    }
+}
+
+void mcp_stream_event_init(mcp_stream_event_t* event,
+                            mcp_stream_event_type_t type,
+                            const char* data) {
+    if (!event) return;
+    memset(event, 0, sizeof(*event));
+    event->type = type;
+    event->event_data = data ? strdup(data) : NULL;
+    event->data_size = data ? strlen(data) : 0;
+}
+
+static void emit_sse_line(mcp_stream_callback_t callback, void* user_data,
+                           const char* field, const char* value) {
+    if (!callback) return;
+
+    size_t len = strlen(field) + (value ? strlen(value) : 0) + 16;
+    char* sse_line = malloc(len);
+    if (sse_line) {
+        snprintf(sse_line, len, "%s: %s\n", field, value ? value : "");
+        mcp_stream_event_t event;
+        mcp_stream_event_init(&event, MCP_STREAM_EVENT_CONTENT, sse_line);
+        callback(&event, user_data);
+        free(sse_line);
+    }
+}
+
+static int emit_sse_event(mcp_stream_callback_t callback, void* user_data,
+                           const char* event_type, const char* json_data) {
+    if (!callback) return 0;
+
+    emit_sse_line(callback, user_data, "event", event_type);
+    emit_sse_line(callback, user_data, "data", json_data);
+    emit_sse_line(callback, user_data, "", NULL);
+
+    return 0;
+}
+
+int mcp_v1_handle_tools_call_streaming(mcp_v1_context_t* ctx,
+                                        const char* name,
+                                        const char* arguments_json,
+                                        mcp_stream_callback_t callback,
+                                        void* user_data) {
+    if (!ctx || !name || !callback) return -1;
+
+    mcp_stream_event_t start_event;
+    mcp_stream_event_init(&start_event, MCP_STREAM_EVENT_PROGRESS,
+                          "{\"status\":\"started\"}");
+    start_event.progress = 0;
+    start_event.total = 100;
+    callback(&start_event, user_data);
+    free(start_event.event_data);
+
+    mcp_tool_entry_t* found = NULL;
+    for (size_t i = 0; i < ctx->tool_count; i++) {
+        if (strcmp(ctx->tools[i].tool.name, name) == 0) {
+            found = &ctx->tools[i];
+            break;
+        }
+    }
+
+    if (!found) {
+        char error_json[512];
+        snprintf(error_json, sizeof(error_json),
+            "{\"isError\":true,\"content\":[{\"type\":\"text\",\"text\":\"Tool not found: %s\"}]}",
+            name);
+        emit_sse_event(callback, user_data, "tools/call/result", error_json);
+
+        mcp_stream_event_t done_event;
+        mcp_stream_event_init(&done_event, MCP_STREAM_EVENT_ERROR, "Tool not found");
+        done_event.progress = 0;
+        done_event.total = 100;
+        callback(&done_event, user_data);
+        free(done_event.event_data);
+        return -2;
+    }
+
+    mcp_content_t* results = NULL;
+    size_t result_count = 0;
+    bool is_error = false;
+
+    found->handler(name, arguments_json, &results, &result_count, &is_error, found->user_data);
+
+    for (size_t i = 0; i < result_count; i++) {
+        size_t buf_size = 512 + (results[i].text ? strlen(results[i].text) : 0);
+        char* chunk_json = malloc(buf_size);
+        if (chunk_json) {
+            const char* type_str = "text";
+            switch (results[i].type) {
+                case MCP_CONTENT_IMAGE: type_str = "image"; break;
+                case MCP_CONTENT_RESOURCE: type_str = "resource"; break;
+                case MCP_CONTENT_EMBEDDED: type_str = "embedded"; break;
+                default: break;
+            }
+            snprintf(chunk_json, buf_size,
+                "{\"index\":%zu,\"type\":\"%s\",\"partial\":true}",
+                i, type_str);
+
+            size_t text_len = results[i].text ? strlen(results[i].text) : 0;
+            size_t offset = 0;
+            while (offset < text_len) {
+                size_t chunk_end = offset + 256;
+                if (chunk_end > text_len) chunk_end = text_len;
+
+                char tmp = results[i].text[chunk_end];
+                ((char*)results[i].text)[chunk_end] = '\0';
+
+                char sse_data[1024];
+                snprintf(sse_data, sizeof(sse_data),
+                    "%s{\"delta\":{\"text\":\"%s\"}}",
+                    offset == 0 ? chunk_json : "",
+                    results[i].text + offset);
+
+                emit_sse_event(callback, user_data, "tools/call/chunk", sse_data);
+
+                ((char*)results[i].text)[chunk_end] = tmp;
+                offset = chunk_end;
+
+                double pct = (double)offset / (double)(text_len > 0 ? text_len : 1) * 80.0;
+                mcp_stream_event_t progress_evt;
+                mcp_stream_event_init(&progress_evt, MCP_STREAM_EVENT_PROGRESS, NULL);
+                progress_evt.progress = pct;
+                progress_evt.total = 100;
+                callback(&progress_evt, user_data);
+                free(progress_evt.event_data);
+            }
+
+            free(chunk_json);
+        }
+    }
+
+    size_t final_buf_size = 4096 + result_count * 1024;
+    char* final_json = malloc(final_buf_size);
+    if (final_json) {
+        size_t offset = 0;
+        offset += snprintf(final_json + offset, final_buf_size - offset,
+            "{\"isError\":%s,\"content\":[", is_error ? "true" : "false");
+        for (size_t i = 0; i < result_count; i++) {
+            if (i > 0) offset += snprintf(final_json + offset, final_buf_size - offset, ",");
+            const char* type_str = "text";
+            switch (results[i].type) {
+                case MCP_CONTENT_IMAGE: type_str = "image"; break;
+                case MCP_CONTENT_RESOURCE: type_str = "resource"; break;
+                case MCP_CONTENT_EMBEDDED: type_str = "embedded"; break;
+                default: break;
+            }
+            char* text_esc = json_string_escape(results[i].text);
+            offset += snprintf(final_json + offset, final_buf_size - offset,
+                "{\"type\":\"%s\",\"text\":%s}", type_str, text_esc);
+            free(text_esc);
+        }
+        offset += snprintf(final_json + offset, final_buf_size - offset, "]}");
+
+        emit_sse_event(callback, user_data, "tools/call/result", final_json);
+        free(final_json);
+    }
+
+    mcp_stream_event_t done_event;
+    mcp_stream_event_init(&done_event, is_error ? MCP_STREAM_EVENT_ERROR : MCP_STREAM_EVENT_DONE,
+                          is_error ? "completed with errors" : "completed successfully");
+    done_event.progress = 100;
+    done_event.total = 100;
+    callback(&done_event, user_data);
+    free(done_event.event_data);
+
+    mcp_content_destroy(results, result_count);
+    return 0;
+}
+
+int mcp_v1_handle_sampling_streaming(mcp_v1_context_t* ctx,
+                                      const mcp_sampling_params_t* params,
+                                      mcp_stream_callback_t callback,
+                                      void* user_data) {
+    if (!ctx || !params || !callback) return -1;
+    if (!ctx->sampling_handler) return -2;
+    if (!(ctx->config.capabilities & MCP_CAP_SAMPLING)) return -3;
+
+    mcp_stream_event_t start_event;
+    mcp_stream_event_init(&start_event, MCP_STREAM_EVENT_PROGRESS,
+                          "{\"status\":\"sampling_started\"}");
+    start_event.progress = 0;
+    start_event.total = 100;
+    callback(&start_event, user_data);
+    free(start_event.event_data);
+
+    mcp_sampling_result_t result;
+    memset(&result, 0, sizeof(result));
+
+    ctx->sampling_handler(params, &result, ctx->sampling_user_data);
+
+    if (result.content && result.content_count > 0) {
+        for (size_t i = 0; i < result.content_count; i++) {
+            if (result.content[i].text && result.content[i].text[0]) {
+                size_t text_len = strlen(result.content[i].text);
+                size_t offset = 0;
+                while (offset < text_len) {
+                    size_t chunk_end = offset + 256;
+                    if (chunk_end > text_len) chunk_end = text_len;
+
+                    char tmp = result.content[i].text[chunk_end];
+                    ((char*)result.content[i].text)[chunk_end] = '\0';
+
+                    char sse_data[512];
+                    snprintf(sse_data, sizeof(sse_data),
+                        "{\"model\":\"%s\",\"delta\":{\"type\":\"text\",\"text\":\"%s\"},\"index\":%zu}",
+                        result.model ? result.model : "unknown",
+                        result.content[i].text + offset, i);
+                    emit_sse_event(callback, user_data, "sampling/chunk", sse_data);
+
+                    ((char*)result.content[i].text)[chunk_end] = tmp;
+                    offset = chunk_end;
+
+                    double pct = (double)offset / (double)(text_len > 0 ? text_len : 1) * 90.0;
+                    mcp_stream_event_t progress_evt;
+                    mcp_stream_event_init(&progress_evt, MCP_STREAM_EVENT_PROGRESS, NULL);
+                    progress_evt.progress = pct;
+                    progress_evt.total = 100;
+                    callback(&progress_evt, user_data);
+                    free(progress_evt.event_data);
+                }
+            }
+        }
+    }
+
+    char final_result[2048];
+    snprintf(final_result, sizeof(final_result),
+        "{\"model\":\"%s\",\"stopReason\":\"%s\",\"stoppedEarly\":%s}",
+        result.model ? result.model : "unknown",
+        result.stop_reason ? result.stop_reason : "end_turn",
+        result.stopped_early ? "true" : "false");
+    emit_sse_event(callback, user_data, "sampling/result", final_result);
+
+    mcp_stream_event_t done_event;
+    mcp_stream_event_init(&done_event, MCP_STREAM_EVENT_DONE, "Sampling complete");
+    done_event.progress = 100;
+    done_event.total = 100;
+    callback(&done_event, user_data);
+    free(done_event.event_data);
+
+    mcp_sampling_result_destroy(&result);
+    return 0;
+}
+
 int mcp_v1_route_request(mcp_v1_context_t* ctx,
                           const char* method,
                           const char* params_json,
