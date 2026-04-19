@@ -35,7 +35,7 @@ typedef enum {
 /**
  * @brief 创建协议路由器
  */
-protocol_router_result_t protocol_router_create(protocol_router_t* router);
+protocol_route_result_t protocol_router_create(protocol_router_t* router);
 
 /**
  * @brief 销毁协议路由器
@@ -45,7 +45,7 @@ void protocol_router_destroy(protocol_router_t router);
 /**
  * @brief 注册协议处理器
  */
-protocol_router_result_t protocol_router_register_handler(
+protocol_route_result_t protocol_router_register_handler(
     protocol_router_t router,
     const char* protocol_name,
     void* handler_context);
@@ -53,7 +53,7 @@ protocol_router_result_t protocol_router_register_handler(
 /**
  * @brief 路由消息到指定协议
  */
-protocol_router_result_t protocol_router_route(
+protocol_route_result_t protocol_router_route(
     protocol_router_t router,
     const char* target_protocol,
     const void* message,

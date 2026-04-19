@@ -20,8 +20,8 @@
 #include <stdio.h>
 
 /* 基础库兼容性层 */
-#include <agentos/utils/memory/memory_compat.h>
-#include <agentos/utils/string/string_compat.h>
+#include "include/memory_compat.h"
+#include "string_compat.h"
 
 /* ==================== 常量定义 ==================== */
 

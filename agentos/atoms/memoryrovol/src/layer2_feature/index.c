@@ -9,8 +9,8 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include <agentos/utils/memory/memory_compat.h>
-#include <agentos/string_compat.h>
+#include "include/memory_compat.h"
+#include "utils/string/include/string_compat.h"
 #include <string.h>
 #include <pthread.h>
 #include <math.h>

@@ -10,8 +10,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <float.h>
-#include <agentos/utils/memory/memory_compat.h>
-#include <agentos/utils/strategy/include/strategy_common.h>
+#include "include/memory_compat.h"
+#include "utils/strategy/include/strategy_common.h"
 
 typedef struct weighted_data {
     weighted_config_t manager;

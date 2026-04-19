@@ -17,22 +17,23 @@ extern "C" {
 typedef struct validation_result validation_result_t;
 
 typedef enum {
-    VALIDATE_REQUIRED,
+    VALIDATE_REQUIRED = 0,
     VALIDATE_STRING,
-    VALIDATE_NUMBER,
-    VALIDATE_MIN_LENGTH,
-    VALIDATE_MAX_LENGTH,
-    VALIDATE_MIN_VALUE,
-    VALIDATE_MAX_VALUE
+    VALIDATE_INT,
+    VALIDATE_PATTERN,
+    VALIDATE_CUSTOM
 } validation_rule_type_t;
+
+typedef int (*custom_validator_fn)(const cJSON* item, char** out_error);
 
 typedef struct {
     validation_rule_type_t type;
-    const char* field_name;
-    union {
-        size_t length_value;
-        double number_value;
-    };
+    bool required;
+    size_t min_len;
+    size_t max_len;
+    char* field_name;
+    const char* pattern;
+    custom_validator_fn custom_validator;
 } validation_rule_t;
 
 validation_result_t* validator_create(void);

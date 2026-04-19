@@ -9,8 +9,8 @@
 #include "agentos.h"
 #include <stdlib.h>
 
-#include <agentos/utils/memory/memory_compat.h>
-#include <agentos/utils/string/string_compat.h>
+#include "include/memory_compat.h"
+#include "string_compat.h"
 #include <string.h>
 #include <math.h>
 

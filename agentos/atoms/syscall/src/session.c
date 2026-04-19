@@ -19,7 +19,7 @@
 
 /* heapstore 集成接口（heapstore模块可选） */
 #ifdef BUILD_HEAPSTORE
-#include <agentos/heapstore_integration.h>
+"heapstore/include/heapstore_integration.h"
 #else
 static inline agentos_error_t heapstore_syscall_session_save(
     const char* sid, const char* meta, uint64_t c, uint64_t la) {
@@ -33,10 +33,10 @@ static inline agentos_error_t heapstore_syscall_session_delete(const char* sid) 
 #endif
 
 /* Unified base library compatibility layer */
-#include <agentos/utils/memory/memory_compat.h>
-#include <agentos/utils/string/string_compat.h>
-#include <agentos/utils/include/check.h>
-#include <agentos/utils/logging/logging_compat.h>
+#include "include/memory_compat.h"
+#include "string_compat.h"
+#include "check.h"
+#include "logging_compat.h"
 #include <string.h>
 #include <cjson/cJSON.h>
 
