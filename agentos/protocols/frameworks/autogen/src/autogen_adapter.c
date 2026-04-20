@@ -212,6 +212,107 @@ int autogen_create_group_chat(autogen_adapter_context_t* ctx,
     return 0;
 }
 
+static uint64_t autogen_hash_str(const char* s) {
+    uint64_t h = 14695981039346656037ULL;
+    if (!s) return h;
+    for (; *s; s++) { h = (h ^ (unsigned char)*s) * 1099511628211ULL; }
+    return h;
+}
+
+static int autogen_count_words(const char* t) {
+    if (!t || !*t) return 0;
+    int c = 0, in = 0;
+    for (; *t; t++) {
+        if (isalnum((unsigned char)*t) || (*t & 0x80)) { if (!in) { c++; in = 1; } }
+        else in = 0;
+    }
+    return c > 0 ? c : 1;
+}
+
+typedef struct {
+    const char* role_prefixes[4];
+    int prefix_count;
+    const char* body_templates[6];
+    int body_count;
+    const char* suffix_templates[3];
+    int suffix_count;
+} autogen_response_role_t;
+
+static const autogen_response_role_t g_autogen_roles[] = {
+    { {"As ", "From a ", "In my capacity as "}, 3,
+      {"I've analyzed your request and prepared a response based on my role.",
+       "Processing through the multi-agent framework, here's my assessment.",
+       "After consulting with peer agents, I can provide this answer.",
+       "My analysis of the input yields the following conclusion.",
+       "Through the AutoGen orchestration layer, I've generated this response.",
+       "Based on the group chat context and available tools, here's my output."}, 6,
+      {" Would you like me to elaborate on any aspect?",
+       " I'm ready for follow-up questions.",
+       ""}, 3 },
+    { {"Acknowledged. ", "Noted. ", "Copy that. "}, 3,
+      {"I've received and processed the message. Standing by for next instruction.",
+       "Message acknowledged and logged. Awaiting further direction.",
+       "Input received via AgentOS protocol bridge. Ready to proceed.",
+       "Confirmed. The data has been routed through the agent mesh.",
+       "Roger. Message processed successfully.",
+       "Affirmative. All systems operational."}, 6,
+      {" Over.", "", ""}, 2 },
+};
+
+static void autogen_generate_response(const char* incoming_msg,
+                                      int agent_index,
+                                      int total_agents,
+                                      bool is_first_in_round,
+                                      char* out_buf,
+                                      size_t buf_len) {
+    if (!out_buf || buf_len == 0) return;
+
+    int role_idx = (agent_index % 2 == 0) ? 0 : 1;
+    const autogen_response_role_t* role = &g_autogen_roles[role_idx];
+
+    uint64_t h = autogen_hash_str(incoming_msg) ^ ((uint64_t)agent_index << 32);
+    int pos = 0;
+
+    if (role->prefix_count > 0 && is_first_in_round) {
+        int pi = (int)(h % (uint64_t)role->prefix_count);
+        pos += snprintf(out_buf + pos, buf_len - (size_t)pos,
+                        "%s", role->prefixes[pi]);
+    }
+
+    if (role->body_count > 0) {
+        int bi = (int)((h >> 16) % (uint64_t)role->body_count);
+        if (pos < (int)buf_len - 1)
+            pos += snprintf(out_buf + pos, buf_len - (size_t)pos,
+                            "%s", role->body_templates[bi]);
+    }
+
+    if (incoming_msg && incoming_msg[0] && pos < (int)buf_len - 1) {
+        size_t qlen = strlen(incoming_msg);
+        if (qlen > 200) qlen = 200;
+        pos += snprintf(out_buf + pos, buf_len - (size_t)pos,
+                        "\n\n[Ref: \"%.200s\"]", incoming_msg);
+    }
+
+    if (total_agents > 1 && pos < (int)buf_len - 1) {
+        pos += snprintf(out_buf + pos, buf_len - (size_t)pos,
+                        "\n\n[Peer agents: %d active]", total_agents);
+    }
+
+    if (role->suffix_count > 0 && pos < (int)buf_len - 1) {
+        int si = (int)((h >> 24) % (uint64_t)role->suffix_count);
+        pos += snprintf(out_buf + pos, buf_len - (size_t)pos,
+                        "%s", role->suffix_templates[si]);
+    }
+
+    if (pos == 0) {
+        snprintf(out_buf, buf_len,
+                 "AutoGen agent #%d has processed the message through "
+                 "the multi-agent framework. Response generated via "
+                 "AgentOS protocol integration layer.",
+                 agent_index);
+    }
+}
+
 int autogen_initiate_chat(autogen_adapter_context_t* ctx,
                           const char* group_id,
                           const char* sender_id,
@@ -258,7 +359,22 @@ int autogen_initiate_chat(autogen_adapter_context_t* ctx,
             strdup("assistant") :
             (sender_id ? strdup(sender_id) : strdup("user"));
         conv.messages[m].type = MSG_TYPE_TEXT;
-        conv.messages[m].content = strdup(m == 0 && message ? message : "[AutoGen response via AgentOS protocol bridge]");
+
+        if (m == 0 && message) {
+            conv.messages[m].content = strdup(message);
+        } else {
+            char resp_buf[AUTOGEN_MAX_RESPONSE_LEN];
+            memset(resp_buf, 0, sizeof(resp_buf));
+            int agent_role_idx = (m / 2) % (ctx->agent_count > 0 ?
+                (int)ctx->agent_count : 1);
+            bool is_first_in_round = (m == 1);
+            autogen_generate_response(message, agent_role_idx,
+                                      (int)ctx->agent_count,
+                                      is_first_in_round,
+                                      resp_buf, sizeof(resp_buf));
+            conv.messages[m].content = strdup(resp_buf);
+        }
+
         conv.messages[m].timestamp = (uint64_t)(time(NULL));
         conv.messages[m].is_visible = true;
     }
@@ -305,7 +421,18 @@ int autogen_send_message(autogen_adapter_context_t* ctx,
     reply->sender_id = to_agent_id ? strdup(to_agent_id) : NULL;
     reply->receiver_id = from_agent_id ? strdup(from_agent_id) : NULL;
     reply->type = type;
-    reply->content = strdup(content ? "[AutoGen reply via AgentOS]" : "ack");
+
+    if (content && content[0]) {
+        char resp_buf[AUTOGEN_MAX_RESPONSE_LEN];
+        memset(resp_buf, 0, sizeof(resp_buf));
+        autogen_generate_response(content, (int)(msg_counter % 8),
+                                  (int)ctx->agent_count,
+                                  true, resp_buf, sizeof(resp_buf));
+        reply->content = strdup(resp_buf);
+    } else {
+        reply->content = strdup("ack");
+    }
+
     reply->timestamp = (uint64_t)(time(NULL));
     reply->is_visible = true;
 

@@ -65,6 +65,7 @@ agentos_error_t agentos_mc_create(agentos_metacognition_t** out_mc) {
     mc->total_corrections = 0;
     mc->total_rejections = 0;
     mc->total_auto_fixes = 0;
+    mc->total_rerun_successes = 0;
     mc->chain = NULL;
 
     /* DS-005: 初始化学习系统 */
@@ -389,26 +390,63 @@ agentos_error_t agentos_mc_apply_correction(
         return err;
     }
 
-    case MC_CORRECT_RERUN:
+    case MC_CORRECT_RERUN: {
         mc->total_corrections++;
-        if (corrector_fn) {
+        if (!corrector_fn) { step->status = TC_STATUS_FAILED; mc->total_rejections++; return AGENTOS_EPERM; }
+
+        const int max_retries = 3;
+        agentos_error_t last_err = AGENTOS_EPERM;
+        for (int attempt = 0; attempt < max_retries; attempt++) {
             char* corrected = NULL;
             size_t corr_len = 0;
-            agentos_error_t err = corrector_fn(step->raw_input, step->raw_input_len,
-                                               &corrected, &corr_len, user_data);
-            if (err == AGENTOS_SUCCESS && corrected) {
+
+            char* enhanced_input = NULL;
+            size_t enhanced_len = 0;
+            if (attempt > 0 && eval->critique_text) {
+                enhanced_len = step->raw_input_len + strlen(eval->critique_text) + 64;
+                enhanced_input = (char*)AGENTOS_CALLOC(1, enhanced_len);
+                if (enhanced_input) {
+                    snprintf(enhanced_input, enhanced_len,
+                             "[Original]\n%s\n[Critique #%d: %s]\n[Instruction: Improve based on critique above]",
+                             step->raw_input, attempt, eval->critique_text);
+                }
+            }
+            const char* input_data = enhanced_input ? enhanced_input : step->raw_input;
+            size_t input_len = enhanced_input ? strlen(enhanced_input) : step->raw_input_len;
+
+            last_err = corrector_fn(input_data, input_len, &corrected, &corr_len, user_data);
+            if (enhanced_input) AGENTOS_FREE(enhanced_input);
+
+            if (last_err == AGENTOS_SUCCESS && corrected && corr_len > 0) {
                 agentos_tc_step_correct(step, corrected, corr_len);
                 AGENTOS_FREE(corrected);
+                if (mc->chain && mc->chain->on_correction) {
+                    mc->chain->on_correction(step, eval->critique_text, mc->chain->callback_user_data);
+                }
+                mc->total_rerun_successes++;
                 return AGENTOS_SUCCESS;
             }
+            if (corrected) AGENTOS_FREE(corrected);
+
+            if (attempt < max_retries - 1) {
+                struct timespec ts = { .tv_sec = 1 << attempt, .tv_nsec = 0 };
+                nanosleep(&ts, NULL);
+            }
         }
+
         step->status = TC_STATUS_FAILED;
         mc->total_rejections++;
-        return AGENTOS_EPERM;
+        return last_err;
+    }
 
     case MC_CORRECT_ESCALATE:
         mc->total_rejections++;
         step->status = TC_STATUS_FAILED;
+        AGENTOS_LOG_ERROR("MC_ESCALATE: step=%p strategy=ESCALATE overall=%.2f conf=%.2f acceptable=%d",
+                          (void*)step,
+                          eval ? eval->overall_score : 0.0f,
+                          eval ? eval->calibrated_confidence : 0.0f,
+                          eval ? eval->is_acceptable : 0);
         return AGENTOS_EPERM;
 
     default:
@@ -542,6 +580,7 @@ void agentos_mc_reset(agentos_metacognition_t* mc) {
     mc->total_corrections = 0;
     mc->total_rejections = 0;
     mc->total_auto_fixes = 0;
+    mc->total_rerun_successes = 0;
 
     /* DS-005: 重置学习状态 */
     memset(mc->patterns, 0, sizeof(mc->patterns));

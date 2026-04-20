@@ -78,9 +78,15 @@ int handle_options_preflight(http_gateway_t* gateway,
     }
 
     struct MHD_Response* response = MHD_create_response_from_buffer(0, NULL, MHD_RESPMEM_PERSISTENT);
-    MHD_add_response_header(response, "Access-Control-Allow-Origin", "*");
+
     MHD_add_response_header(response, "Access-Control-Allow-Methods", "POST, GET, OPTIONS");
-    MHD_add_response_header(response, "Access-Control-Allow-Headers", "Content-Type, Authorization");
+    MHD_add_response_header(response, "Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID");
+    MHD_add_response_header(response, "Access-Control-Max-Age", "86400");
+
+    MHD_add_response_header(response, "X-Content-Type-Options", "nosniff");
+    MHD_add_response_header(response, "X-Frame-Options", "DENY");
+    MHD_add_response_header(response, "X-XSS-Protection", "1; mode=block");
+    MHD_add_response_header(response, "Cache-Control", "no-store");
     
     int ret = MHD_queue_response(connection, 200, response);
     MHD_destroy_response(response);

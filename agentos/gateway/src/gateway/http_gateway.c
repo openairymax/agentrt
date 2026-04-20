@@ -108,7 +108,9 @@ static struct MHD_Response* create_http_response_ex(
     
     MHD_add_response_header(response, "Content-Type", "application/json");
     MHD_add_response_header(response, "Server", "AgentOS-gateway/1.0");
-    
+
+    gateway_apply_security_headers(response);
+
     /* 安全的 CORS 头设置 */
     const char* origin = MHD_lookup_connection_value(connection, MHD_HEADER_KIND, "Origin");
     if (is_cors_origin_allowed(gateway, origin)) {
@@ -152,6 +154,9 @@ static struct MHD_Response* create_http_response(int status_code, const char* co
     
     MHD_add_response_header(response, "Content-Type", "application/json");
     MHD_add_response_header(response, "Server", "AgentOS-gateway/1.0");
+
+    gateway_apply_security_headers(response);
+
     /* 注意：此函数不设置CORS头，请使用create_http_response_ex() */
     
     return response;

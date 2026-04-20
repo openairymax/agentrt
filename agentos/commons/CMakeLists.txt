@@ -116,7 +116,7 @@ target_include_directories(agentos_common PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/string
 )
 
-target_include_directories(agentos_common PRIVATE
+target_include_directories(agentos_common PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/token/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/cost/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/observability/include

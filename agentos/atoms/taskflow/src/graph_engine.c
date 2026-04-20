@@ -1407,3 +1407,18 @@ bool graph_engine_is_empty(graph_engine_handle_t engine)
     struct graph_engine_s* e = (struct graph_engine_s*)engine;
     return (e->vertex_count == 0);
 }
+
+taskflow_error_t graph_engine_get_vertex_ids(graph_engine_handle_t engine,
+                                             vertex_id_t* out_ids,
+                                             size_t max_count,
+                                             size_t* out_actual)
+{
+    if (!engine || !out_ids || max_count == 0) return TASKFLOW_ERROR_INVALID_ARG;
+    struct graph_engine_s* e = (struct graph_engine_s*)engine;
+    size_t actual = (e->vertex_count < max_count) ? e->vertex_count : max_count;
+    for (size_t i = 0; i < actual; i++) {
+        out_ids[i] = e->vertices[i].id;
+    }
+    if (out_actual) *out_actual = actual;
+    return TASKFLOW_SUCCESS;
+}
