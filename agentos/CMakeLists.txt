@@ -60,6 +60,11 @@ else()
     message(WARNING "commons module not found or disabled")
 endif()
 
+# protocols模块（gateway依赖）
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/protocols/CMakeLists.txt")
+    add_subdirectory(protocols)
+endif()
+
 if(BUILD_CUPOLAS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cupolas/CMakeLists.txt")
     add_subdirectory(cupolas)
 else()

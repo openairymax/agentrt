@@ -88,12 +88,17 @@ typedef struct {
     char* schema_json;
 } a2a_skill_t;
 
+/* Compatibility macros for legacy .c files */
+#define A2A_MAX_AGENTS A2A_V03_MAX_AGENTS
+#define A2A_DEFAULT_TIMEOUT_MS A2A_V03_DEFAULT_TIMEOUT_MS
+
 typedef struct {
     char* id;
     char* name;
     char* description;
     char* url;
     char* version;
+    int protocol_version;
     a2a_capability_t capabilities;
     a2a_skill_t* skills;
     size_t skill_count;
@@ -101,7 +106,37 @@ typedef struct {
     char* provider_url;
     char* documentation_url;
     char* authentication_schemes_json;
+    char* capabilities_json;
+    bool available;
 } a2a_agent_card_t;
+
+/* Compatibility typedefs for legacy code */
+typedef a2a_agent_card_t a2a_agent_info_t;
+typedef void* a2a_handle_t;
+
+typedef struct {
+    a2a_agent_card_t agents[A2A_V03_MAX_AGENTS];
+    size_t count;
+} a2a_agent_list_t;
+
+typedef struct {
+    int min_protocol_version;
+    char capability_required[256];
+} a2a_discovery_filter_t;
+
+typedef struct {
+    uint32_t capabilities;
+    uint32_t default_timeout_ms;
+    size_t max_agents;
+    size_t max_tasks;
+    size_t max_message_size;
+    bool enable_negotiation;
+    bool enable_streaming;
+    bool enable_push_notifications;
+    bool require_authentication;
+    char* default_authentication;
+    void* custom_config;
+} a2a_config_t;
 
 typedef struct {
     char* id;

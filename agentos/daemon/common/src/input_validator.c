@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <strings.h>
 
 validation_result_t* validator_create(void) {
     validation_result_t* v = (validation_result_t*)calloc(1, sizeof(validation_result_t));
@@ -45,6 +46,65 @@ int validator_add_rule(validation_result_t* validator, const validation_rule_t* 
     r->pattern = rule->pattern;
     r->custom_validator = rule->custom_validator;
     validator->rule_count++;
+    return 0;
+}
+
+int security_check_string(const char* input, unsigned int flags, char** out_violation) {
+    if (!input) {
+        if (out_violation) *out_violation = strdup("NULL input");
+        return -1;
+    }
+
+    size_t len = strlen(input);
+    if (len == 0) {
+        if (out_violation) *out_violation = strdup("Empty string");
+        return -1;
+    }
+
+    if (flags & 0x01) {
+        const char* sql_patterns[] = {
+            "' OR ", "'; DROP", "'; DELETE", "'; INSERT",
+            "UNION SELECT", "--", "/*", "*/",
+            NULL
+        };
+        for (int i = 0; sql_patterns[i]; i++) {
+            if (strstr(input, sql_patterns[i])) {
+                if (out_violation) {
+                    char err[256];
+                    snprintf(err, sizeof(err), "SQL injection pattern: %s", sql_patterns[i]);
+                    *out_violation = strdup(err);
+                }
+                return -2;
+            }
+        }
+    }
+
+    if (flags & 0x02) {
+        if (strstr(input, "<script") || strstr(input, "javascript:") ||
+            strstr(input, "onerror=") || strstr(input, "onload=")) {
+            if (out_violation) *out_violation = strdup("XSS pattern detected");
+            return -3;
+        }
+    }
+
+    if (flags & 0x04) {
+        for (size_t i = 0; i < len; i++) {
+            unsigned char c = (unsigned char)input[i];
+            if (c < 0x20 && c != '\t' && c != '\n' && c != '\r') {
+                if (out_violation) *out_violation = strdup("Control character detected");
+                return -4;
+            }
+        }
+    }
+
+    if (flags & 0x08) {
+        if (strstr(input, "../") || strstr(input, "..\\") ||
+            strstr(input, "%2e%2e")) {
+            if (out_violation) *out_violation = strdup("Path traversal pattern");
+            return -5;
+        }
+    }
+
     return 0;
 }
 
@@ -137,6 +197,14 @@ static int apply_single_rule(const validation_rule_t* rule, const cJSON* data,
     case VALIDATE_CUSTOM:
         if (rule->custom_validator && item) {
             int ret = rule->custom_validator(item, out_error);
+            if (ret != 0) return ret;
+        }
+        break;
+
+    case VALIDATE_SANITIZE:
+        if (item && cJSON_IsString(item) && rule->sanitize_flags > 0) {
+            int ret = security_check_string(item->valuestring,
+                                            rule->sanitize_flags, out_error);
             if (ret != 0) return ret;
         }
         break;

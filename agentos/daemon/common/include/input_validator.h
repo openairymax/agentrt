@@ -21,6 +21,7 @@ typedef enum {
     VALIDATE_STRING,
     VALIDATE_INT,
     VALIDATE_PATTERN,
+    VALIDATE_SANITIZE,
     VALIDATE_CUSTOM
 } validation_rule_type_t;
 
@@ -34,6 +35,7 @@ typedef struct {
     char* field_name;
     const char* pattern;
     custom_validator_fn custom_validator;
+    unsigned int sanitize_flags;
 } validation_rule_t;
 
 typedef struct validation_result {
@@ -50,6 +52,10 @@ int validator_add_rule(validation_result_t* validator, const validation_rule_t* 
 validation_result_t* validator_validate(validation_result_t* validator, const cJSON* data);
 int validate_required_field(const cJSON* obj, const char* field, char** out_error);
 int validate_string_field(const cJSON* obj, const char* field, size_t min_len, size_t max_len, char** out_error);
+
+int validate_sanitized_string(const cJSON* obj, const char* field,
+                               unsigned int sanitize_flags, char** out_error);
+int security_check_string(const char* input, unsigned int flags, char** out_violation);
 
 #ifdef __cplusplus
 }

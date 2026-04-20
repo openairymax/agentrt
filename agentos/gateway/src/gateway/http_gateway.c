@@ -144,7 +144,7 @@ static struct MHD_Response* create_http_response_ex(
  * @return MHD 响应对象
  * @deprecated 请使用 create_http_response_ex() 以获得安全的CORS处理
  */
-static struct MHD_Response* create_http_response(int status_code, const char* content, size_t content_len) {
+struct MHD_Response* create_http_response(int status_code, const char* content, size_t content_len) {
     struct MHD_Response* response = MHD_create_response_from_buffer(
         content_len, (void*)content, MHD_RESPMEM_MUST_COPY);
     
@@ -251,7 +251,7 @@ static char* http_handler_adapter(void* request, void* user_data) {
  * @param context 请求上下文
  * @return JSON响应字符串
  */
-static char* handle_jsonrpc_request(http_gateway_t* gateway, http_request_context_t* context) {
+char* handle_jsonrpc_request(http_gateway_t* gateway, http_request_context_t* context) {
     rpc_result_t result;
     
     /* 检查是否有多协议处理器和原始数据 */
@@ -261,7 +261,7 @@ static char* handle_jsonrpc_request(http_gateway_t* gateway, http_request_contex
             gateway->protocol_handler,
             context->upload_data,
             context->upload_data_size,
-            UNIFIED_PROTOCOL_AUTO,  /* 自动检测协议类型 */
+            AGENTOS_PROTOCOL_COUNT,  /* 自动检测协议类型 */
             gateway->handler,
             gateway->handler_data
         );
@@ -305,11 +305,8 @@ static void http_request_completed_callback(void* cls, struct MHD_Connection* co
     (void)toe;
     if (con_cls && *con_cls) {
         http_request_context_t* ctx = (http_request_context_t*)*con_cls;
-        if (ctx->request_body) {
-            free(ctx->request_body);
-            ctx->request_body = NULL;
-        }
         free(ctx);
+        *con_cls = NULL;
         *con_cls = NULL;
     }
 }
@@ -391,7 +388,7 @@ static void http_gateway_destroy(void* gateway_impl) {
     if (gateway->rate_limiter) {
         gateway_rate_limiter_destroy(gateway->rate_limiter);
     }
-    
+
     /* 清理协议处理器 */
     if (gateway->protocol_handler) {
         gateway_protocol_handler_destroy(gateway->protocol_handler);
@@ -568,7 +565,7 @@ gateway_t* http_gateway_create(const char* host, uint16_t port) {
         
         gateway->rate_limiter = gateway_rate_limiter_create(&rl_config);
     }
-    
+
     /* 初始化多协议处理器 */
     gateway->protocol_handler = gateway_protocol_handler_create(NULL);
     if (!gateway->protocol_handler) {

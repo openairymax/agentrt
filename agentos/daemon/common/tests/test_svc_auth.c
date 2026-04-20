@@ -153,6 +153,9 @@ int test_jwt_refresh_token(void) {
     auth_jwt_generate_token("user-003", "agent", &old_token);
     TEST_ASSERT(old_token != NULL, "Old token should be generated");
 
+    /* 等待1秒确保时间戳不同 */
+    sleep(1);
+
     /* 刷新 Token */
     char* new_token = NULL;
     int ret = auth_jwt_refresh_token(old_token, &new_token);

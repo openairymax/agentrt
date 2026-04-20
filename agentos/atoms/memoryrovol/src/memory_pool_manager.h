@@ -43,7 +43,7 @@ typedef struct memory_pool {
     uint64_t alloc_failures;
     memory_block_header_t* free_list;
     memory_block_header_t* used_list;
-    void* lock;
+    agentos_mutex_t* lock;
     uint32_t flags;
 } memory_pool_t;
 

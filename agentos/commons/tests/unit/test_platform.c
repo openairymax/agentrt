@@ -207,7 +207,7 @@ int main(void) {
     TEST_RUN(test_network_functions);
     
     printf("\n===========================================\n");
-    printf("  测试结果�?d 通过�?d 失败\n", passed_tests, failed_tests);
+    printf("  测试结果: %d 通过, %d 失败\n", passed_tests, failed_tests);
     printf("===========================================\n");
     
     return failed_tests > 0 ? 1 : 0;

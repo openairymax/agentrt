@@ -8,17 +8,47 @@
  */
 
 #include "unified_protocol.h"
-#include "common/include/safe_string_utils.h"
+#include "safe_string_utils.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+#define PROTOCOL_WEBSOCKET    (AGENTOS_PROTOCOL_COUNT + 10)
+#define PROTOCOL_GRPC         (AGENTOS_PROTOCOL_COUNT + 11)
+#define PROTOCOL_MQTT         (AGENTOS_PROTOCOL_COUNT + 12)
+#define PROTOCOL_AMQP         (AGENTOS_PROTOCOL_COUNT + 13)
+#define PROTOCOL_RAW_TCP      (AGENTOS_PROTOCOL_COUNT + 14)
+#define PROTOCOL_RAW_UDP      (AGENTOS_PROTOCOL_COUNT + 15)
+#define PROTOCOL_HTTP         AGENTOS_PROTOCOL_JSON_RPC
+#define PROTOCOL_CUSTOM       (AGENTOS_PROTOCOL_COUNT + 99)
+
+typedef struct {
+    agentos_protocol_type_t type;
+    const char* name;
+    int (*init)(void* context);
+    int (*encode)(void* context, const void* msg, void** out_data, size_t* out_size);
+    int (*decode)(void* context, const void* data, size_t size, void* out_msg);
+    void (*destroy)(void* context);
+    int (*connect)(void* context, const char* endpoint);
+    int (*send)(void* context, const void* data, size_t size);
+    int (*receive)(void* context, void** data, size_t* size, uint32_t timeout_ms);
+} adapter_impl_t;
+
+typedef struct {
+    char name[128];
+    uint32_t max_adapters;
+    bool enable_logging;
+    void* custom_config;
+} protocol_stack_config_t;
+
+typedef struct protocol_stack_s* protocol_stack_handle_t;
 
 // ============================================================================
 // 内部数据结构
 // ============================================================================
 
 typedef struct protocol_adapter_node_s {
-    const protocol_adapter_t* adapter;
+    protocol_adapter_t* adapter;
     void* context;
     struct protocol_adapter_node_s* next;
 } protocol_adapter_node_t;
@@ -70,7 +100,9 @@ protocol_stack_handle_t protocol_stack_create(const protocol_stack_config_t* con
         char* name_copy = (char*)malloc(name_len);
         if (name_copy) {
             safe_strcpy(name_copy, config->name, name_len);
-            stack->config.name = name_copy;
+            strncpy(stack->config.name, name_copy, sizeof(stack->config.name) - 1);
+            stack->config.name[sizeof(stack->config.name) - 1] = '\0';
+            free(name_copy);
         }
     }
     
@@ -98,6 +130,7 @@ void protocol_stack_destroy(protocol_stack_handle_t handle)
         protocol_adapter_node_t* next = node->next;
         if (node->adapter && node->adapter->destroy) {
             node->adapter->destroy(node->context);
+            free(node->adapter);
         }
         free(node);
         node = next;
@@ -114,41 +147,47 @@ void protocol_stack_destroy(protocol_stack_handle_t handle)
     free(stack);
 }
 
-int protocol_stack_register_adapter(protocol_stack_handle_t handle, const protocol_adapter_t* adapter)
+int protocol_stack_register_adapter(protocol_stack_handle_t handle, protocol_adapter_t adapter)
 {
-    if (!handle || !adapter) {
+    if (!handle) {
         return -1;
     }
-    
+
     struct protocol_stack_s* stack = (struct protocol_stack_s*)handle;
-    
+
     // 检查是否已存在相同类型的适配器
-    protocol_adapter_node_t* existing = find_adapter_node(handle, adapter->type);
+    protocol_adapter_node_t* existing = find_adapter_node(handle, adapter.type);
     if (existing) {
         // 已存在，替换
         if (existing->adapter && existing->adapter->destroy) {
             existing->adapter->destroy(existing->context);
         }
-        existing->adapter = adapter;
-        if (adapter->init) {
-            adapter->init(existing->context);
+        *existing->adapter = adapter;
+        if (adapter.init) {
+            adapter.init(existing->context);
         }
         return 0;
     }
-    
+
     // 创建新节点
     protocol_adapter_node_t* node = (protocol_adapter_node_t*)malloc(sizeof(protocol_adapter_node_t));
     if (!node) {
         return -1;
     }
-    
-    node->adapter = adapter;
+
+    node->adapter = (protocol_adapter_t*)malloc(sizeof(protocol_adapter_t));
+    if (!node->adapter) {
+        free(node);
+        return -1;
+    }
+    *node->adapter = adapter;
     node->context = NULL;
-    
+
     // 初始化适配器
-    if (adapter->init) {
-        int result = adapter->init(node->context);
+    if (adapter.init) {
+        int result = adapter.init(node->context);
         if (result != 0) {
+            free(node->adapter);
             free(node);
             return result;
         }
@@ -182,8 +221,8 @@ int protocol_stack_send(protocol_stack_handle_t handle, const unified_message_t*
         return -1; // 未找到适配器
     }
     
-    const protocol_adapter_t* adapter = adapter_node->adapter;
-    
+    protocol_adapter_t* adapter = adapter_node->adapter;
+
     // 编码消息
     void* encoded_data = NULL;
     size_t encoded_size = 0;
@@ -427,7 +466,7 @@ static protocol_adapter_node_t* find_adapter_node(protocol_stack_handle_t handle
     protocol_adapter_node_t* node = stack->adapters;
     
     while (node) {
-        if (node->adapter && node->adapter->type == type) {
+        if (node->adapter && ((adapter_impl_t*)node->adapter)->type == type) {
             return node;
         }
         node = node->next;

@@ -7,9 +7,8 @@
  * 协议路由与转换引擎实现，支持MCP/A2A/OpenAI API等协议的自适应路由和转换。
  */
 
-#include "protocol_router.h"
+#include "../include/protocol_router.h"
 #include "protocol_transformers.h"
-#include "common/include/safe_string_utils.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
