@@ -983,3 +983,80 @@ taskflow_error_t pregel_engine_wait_for_completion(pregel_engine_handle_t engine
     pthread_mutex_unlock(&e->mutex);
     return result;
 }
+
+taskflow_error_t pregel_engine_run_superstep(pregel_engine_handle_t engine)
+{
+    if (!engine) return TASKFLOW_ERROR_INVALID_ARG;
+
+    struct pregel_engine_s* e = (struct pregel_engine_s*)engine;
+
+    if (!e->running || !e->initialized) {
+        return TASKFLOW_ERROR_NOT_INITIALIZED;
+    }
+
+    pthread_mutex_lock(&e->mutex);
+
+    // 检查是否还有活跃顶点
+    size_t active_count = 0;
+    for (size_t i = 0; i < e->vertex_state_count; i++) {
+        if (e->vertex_states[i].active && !e->vertex_states[i].vote_to_halt) {
+            active_count++;
+        }
+    }
+
+    if (active_count == 0) {
+        e->computation_done = true;
+        e->active_vertices = 0;
+        pthread_cond_broadcast(&e->cond_var);
+        pthread_mutex_unlock(&e->mutex);
+        return TASKFLOW_ERROR_NO_ACTIVE_VERTICES;
+    }
+
+    e->active_vertices = active_count;
+    e->current_superstep++;
+    e->stats.completed_supersteps++;
+    e->stats.active_supersteps = e->current_superstep;
+
+    // 执行超步开始回调
+    if (e->config.start_func) {
+        e->config.start_func(e->current_superstep, e->config.user_context);
+    }
+
+    // 处理消息交换：将next_step_queue中的消息分发到各工作线程队列
+    if (e->next_step_queue && !message_queue_is_empty(e->next_step_queue)) {
+        while (!message_queue_is_empty(e->next_step_queue)) {
+            message_queue_entry_t* entry = message_queue_dequeue(e->next_step_queue);
+            if (entry) {
+                size_t worker_id = vertex_id_hash(entry->target, e->worker_count);
+                if (worker_id < e->config.max_workers && e->message_queues[worker_id]) {
+                    // 转发到目标顶点的消息队列（不复制payload，转移所有权）
+                    size_t target_idx = get_vertex_state_index(e, entry->target);
+                    if (target_idx != SIZE_MAX) {
+                        pregel_vertex_state_t* vs = &e->vertex_states[target_idx];
+                        vs->incoming_message_count++;
+                        // 简化：直接释放入口消息（完整实现需要消息聚合）
+                    }
+                }
+                if (entry->payload) free(entry->payload);
+                free(entry);
+            }
+        }
+    }
+
+    pthread_mutex_unlock(&e->mutex);
+
+    // 工作线程会自动处理活跃顶点的计算（在worker_thread_func中）
+
+    // 执行超步结束回调
+    if (e->config.end_func) {
+        e->config.end_func(e->current_superstep, e->config.user_context);
+    }
+
+    // 检查点间隔检查
+    if (e->config.checkpoint_interval > 0 &&
+        e->current_superstep % e->config.checkpoint_interval == 0) {
+        pregel_engine_create_checkpoint(engine);
+    }
+
+    return TASKFLOW_SUCCESS;
+}

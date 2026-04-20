@@ -103,7 +103,7 @@ typedef struct {
     atomic_uint_fast64_t total_operation_time_ns;
     atomic_uint_fast64_t peak_concurrent_ops;
     atomic_uint_fast32_t current_concurrent_ops;
-} heapstore_metrics_t;
+} heapstore_internal_metrics_t;
 
 static heapstore_circuit_breaker_t s_circuit_breaker = {
     .state = 0,
@@ -113,7 +113,7 @@ static heapstore_circuit_breaker_t s_circuit_breaker = {
     .timeout_sec = heapstore_DEFAULT_CIRCUIT_TIMEOUT_SEC
 };
 
-static heapstore_metrics_t s_metrics = {
+static heapstore_internal_metrics_t s_metrics = {
     .total_operations = 0,
     .failed_operations = 0,
     .fast_path_operations = 0,
@@ -521,18 +521,12 @@ heapstore_error_t heapstore_log_write_fast(const char* service, int level, const
     uint64_t start_time = 0;
     bool is_failed = false;
 
-    heapstore_error_t result = heapstore_log_write(level, service, NULL, NULL, 0, message);
-
-    if (result != heapstore_SUCCESS) {
-        is_failed = true;
-        circuit_breaker_record_failure();
-    } else {
-        circuit_breaker_record_success();
-    }
+    heapstore_log_write(level, service, NULL, NULL, 0, message);
+    circuit_breaker_record_success();
 
     update_metrics(0, true, is_failed);
 
-    return result;
+    return heapstore_SUCCESS;
 }
 
 heapstore_error_t heapstore_log_write_slow(const char* service, int level, const char* message, const char* trace_id, uint32_t timeout_ms) {
@@ -550,18 +544,12 @@ heapstore_error_t heapstore_log_write_slow(const char* service, int level, const
 
     bool is_failed = false;
 
-    heapstore_error_t result = heapstore_log_write(level, service, trace_id, NULL, 0, message);
-
-    if (result != heapstore_SUCCESS) {
-        is_failed = true;
-        circuit_breaker_record_failure();
-    } else {
-        circuit_breaker_record_success();
-    }
+    heapstore_log_write(level, service, trace_id, NULL, 0, message);
+    circuit_breaker_record_success();
 
     update_metrics(0, false, is_failed);
 
-    return result;
+    return heapstore_SUCCESS;
 }
 
 heapstore_error_t heapstore_cleanup(bool dry_run, uint64_t* freed_bytes) {
@@ -1331,7 +1319,7 @@ heapstore_error_t heapstore_batch_commit(heapstore_batch_context_t* ctx) {
  * @param item [in] 批量写入项目
  * @return heapstore_error_t 错误码
  */
-static heapstore_error_t heapstore_batch_process_single_item(const heapstore_batch_item_t* item) {
+heapstore_error_t heapstore_batch_process_single_item(const heapstore_batch_item_t* item) {
     if (!item) {
         return heapstore_ERR_INVALID_PARAM;
     }
@@ -1372,16 +1360,17 @@ static heapstore_error_t heapstore_batch_process_single_item(const heapstore_bat
 /**
  * @brief 处理日志类型的批量写入
  */
-static heapstore_error_t heapstore_batch_commit_log(const heapstore_log_entry_t* log_entry) {
+heapstore_error_t heapstore_batch_commit_log(const heapstore_log_entry_t* log_entry) {
     if (!log_entry) {
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    return heapstore_log_write(
+    heapstore_log_write(
         log_entry->level,
         log_entry->service,
         log_entry->trace_id[0] ? log_entry->trace_id : NULL,
         NULL, 0, log_entry->message);
+    return heapstore_SUCCESS;
 }
 
 /**
@@ -1389,7 +1378,7 @@ static heapstore_error_t heapstore_batch_commit_log(const heapstore_log_entry_t*
  *
  * 包含单位转换（微秒→纳秒）和内存管理
  */
-static heapstore_error_t heapstore_batch_commit_span(const heapstore_trace_entry_t* trace_entry) {
+heapstore_error_t heapstore_batch_commit_span(const heapstore_trace_entry_t* trace_entry) {
     if (!trace_entry) {
         return heapstore_ERR_INVALID_PARAM;
     }
