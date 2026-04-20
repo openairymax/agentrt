@@ -13,6 +13,21 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <ctype.h>
+
+#define ROUTER_MAX_PARAMS 16
+#define ROUTER_PARAM_NAME_LEN 64
+#define ROUTER_PARAM_VAL_LEN 256
+
+typedef struct {
+    char name[ROUTER_PARAM_NAME_LEN];
+    char value[ROUTER_PARAM_VAL_LEN];
+} route_param_t;
+
+typedef struct {
+    route_param_t params[ROUTER_MAX_PARAMS];
+    int param_count;
+} route_match_info_t;
 
 // ============================================================================
 // 内部数据结构
@@ -409,10 +424,231 @@ static int match_endpoint(const char* pattern, const char* endpoint)
     if (!pattern || !endpoint) {
         return 0;
     }
-    
-    // 简单实现：支持通配符*和?
-    // TODO: 实现更复杂的模式匹配
-    return (strcmp(pattern, "*") == 0 || strcmp(pattern, endpoint) == 0);
+
+    size_t pat_len = strlen(pattern);
+    size_t end_len = strlen(endpoint);
+
+    if (pat_len == 0 || end_len == 0) {
+        return (pat_len == 0 && end_len == 0);
+    }
+
+    if (strcmp(pattern, "*") == 0) {
+        return 1;
+    }
+
+    if (strcmp(pattern, endpoint) == 0) {
+        return 1;
+    }
+
+    if (pattern[0] == '*' && pattern[1] == '\0') {
+        return 1;
+    }
+
+    if (pattern[pat_len - 1] == '/') {
+        if (end_len >= pat_len &&
+            strncmp(pattern, endpoint, pat_len) == 0) {
+            return 1;
+        }
+    }
+
+    const char* p = pattern;
+    const char* e = endpoint;
+
+    while (*p && *e) {
+        if (*p == '{') {
+            const char* close = strchr(p, '}');
+            if (!close) return 0;
+
+            while (*e && *e != '/' && *e != '?' && *e != '#') {
+                e++;
+            }
+            p = close + 1;
+            continue;
+        }
+
+        if (*p == '*') {
+            if (*(p + 1) == '*') {
+                p += 2;
+                while (*p == '/') p++;
+                if (!*p) return 1;
+                const char* next_slash = strchr(e, '/');
+                if (next_slash) {
+                    e = next_slash;
+                } else {
+                    e += strlen(e);
+                }
+                continue;
+            } else {
+                p++;
+                while (*e && *e != '/' && *e != '?' && *e != '#') {
+                    e++;
+                }
+                continue;
+            }
+        }
+
+        if (*p == '?') {
+            p++;
+            e++;
+            continue;
+        }
+
+        if (*p != *e) {
+            return 0;
+        }
+
+        p++;
+        e++;
+    }
+
+    if (!*p && !*e) {
+        return 1;
+    }
+
+    while (*p == '/') p++;
+    while (*e == '/') e++;
+
+    if ((*p == '{' || *p == '*' || *p == '?') && !*e) {
+        const char* tmp = p;
+        int all_optional = 1;
+        while (*tmp) {
+            if (*tmp == '{') {
+                const char* c = strchr(tmp, '}');
+                if (c) tmp = c + 1; else { all_optional = 0; break; }
+            } else if (*tmp == '*') {
+                tmp++;
+            } else if (*tmp == '?') {
+                tmp++;
+            } else if (*tmp != '/') {
+                all_optional = 0;
+                break;
+            } else {
+                tmp++;
+            }
+        }
+        if (all_optional) return 1;
+    }
+
+    return 0;
+}
+
+static int match_endpoint_extract(const char* pattern,
+                                   const char* endpoint,
+                                   route_match_info_t* info)
+{
+    if (!pattern || !endpoint) return 0;
+    if (info) memset(info, 0, sizeof(*info));
+
+    size_t pat_len = strlen(pattern);
+    size_t end_len = strlen(endpoint);
+
+    if (pat_len == 0 || end_len == 0) {
+        return (pat_len == 0 && end_len == 0);
+    }
+
+    if (strcmp(pattern, "*") == 0) return 1;
+    if (strcmp(pattern, endpoint) == 0) return 1;
+
+    if (pattern[pat_len - 1] == '/') {
+        if (end_len >= pat_len && strncmp(pattern, endpoint, pat_len) == 0)
+            return 1;
+    }
+
+    const char* p = pattern;
+    const char* e = endpoint;
+
+    while (*p && *e) {
+        if (*p == '{') {
+            const char* close = strchr(p, '}');
+            if (!close) return 0;
+            if (info && info->param_count < ROUTER_MAX_PARAMS) {
+                route_param_t* param = &info->params[info->param_count];
+                size_t nlen = (size_t)(close - p - 1);
+                if (nlen >= ROUTER_PARAM_NAME_LEN) nlen = ROUTER_PARAM_NAME_LEN - 1;
+                memcpy(param->name, p + 1, nlen);
+                param->name[nlen] = '\0';
+
+                const char* val_start = e;
+                while (*e && *e != '/' && *e != '?' && *e != '#') e++;
+                size_t vlen = (size_t)(e - val_start);
+                if (vlen >= ROUTER_PARAM_VAL_LEN) vlen = ROUTER_PARAM_VAL_LEN - 1;
+                memcpy(param->value, val_start, vlen);
+                param->value[vlen] = '\0';
+                info->param_count++;
+            } else {
+                while (*e && *e != '/' && *e != '?' && *e != '#') e++;
+            }
+            p = close + 1;
+            continue;
+        }
+
+        if (*p == '*') {
+            if (*(p + 1) == '*') {
+                p += 2;
+                while (*p == '/') p++;
+                if (!*p) return 1;
+                if (info && info->param_count < ROUTER_MAX_PARAMS) {
+                    route_param_t* param = &info->params[info->param_count];
+                    strncpy(param->name, "wildcard", ROUTER_PARAM_NAME_LEN - 1);
+                    const char* rest = e;
+                    const char* next_seg = strchr(e, '/');
+                    size_t vlen = next_seg ? (size_t)(next_seg - e) : strlen(e);
+                    if (vlen >= ROUTER_PARAM_VAL_LEN) vlen = ROUTER_PARAM_VAL_LEN - 1;
+                    memcpy(param->value, rest, vlen);
+                    param->value[vlen] = '\0';
+                    info->param_count++;
+                }
+                const char* next_slash = strchr(e, '/');
+                if (next_slash) e = next_slash; else e += strlen(e);
+                continue;
+            } else {
+                p++;
+                if (info && info->param_count < ROUTER_MAX_PARAMS) {
+                    route_param_t* param = &info->params[info->param_count];
+                    strncpy(param->name, "glob", ROUTER_PARAM_NAME_LEN - 1);
+                    const char* vs = e;
+                    while (*e && *e != '/' && *e != '?' && *e != '#') e++;
+                    size_t vl = (size_t)(e - vs);
+                    if (vl >= ROUTER_PARAM_VAL_LEN) vl = ROUTER_PARAM_VAL_LEN - 1;
+                    memcpy(param->value, vs, vl);
+                    param->value[vl] = '\0';
+                    info->param_count++;
+                } else {
+                    while (*e && *e != '/' && *e != '?' && *e != '#') e++;
+                }
+                continue;
+            }
+        }
+
+        if (*p == '?') { p++; e++; continue; }
+        if (*p != *e) return 0;
+        p++; e++;
+    }
+
+    if (!*p && !*e) return 1;
+
+    while (*p == '/') p++;
+    while (*e == '/') e++;
+
+    if ((*p == '{' || *p == '*') && !*e) {
+        const char* tmp = p;
+        int all_opt = 1;
+        while (*tmp) {
+            if (*tmp == '{') {
+                const char* c = strchr(tmp, '}');
+                if (c) tmp = c + 1; else { all_opt = 0; break; }
+            } else if (*tmp == '*' || *tmp == '?') {
+                tmp++;
+            } else if (*tmp != '/') {
+                all_opt = 0; break;
+            } else {
+                tmp++;
+            }
+        }
+        return all_opt;
+    }
+
+    return 0;
 }
 
 static int default_decision_func(const unified_message_t* message,

@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <dirent.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -195,10 +196,123 @@ int log_store_service_query_entries(const time_t* start_time,
     if (!out_entries || max_entries <= 0) {
         return -1;
     }
-    
-    // 简化实现：返回0条日志
+
+    if (!g_ctx.is_initialized) {
+        return -2;
+    }
+
     *out_entries = NULL;
-    return 0;
+
+    DIR* dir = opendir(g_ctx.storage_path);
+    if (!dir) {
+        return -3;
+    }
+
+    char** results = (char**)malloc(max_entries * sizeof(char*));
+    if (!results) {
+        closedir(dir);
+        return -4;
+    }
+
+    int found_count = 0;
+    struct dirent* entry;
+
+    while ((entry = readdir(dir)) != NULL && found_count < max_entries) {
+        if (strncmp(entry->d_name, "log_", 4) != 0) {
+            continue;
+        }
+
+        char filepath[768];
+        snprintf(filepath, sizeof(filepath), "%s/%s", g_ctx.storage_path, entry->d_name);
+
+        FILE* f = fopen(filepath, "r");
+        if (!f) {
+            continue;
+        }
+
+        char line[2048];
+        while (fgets(line, sizeof(line), f) != NULL && found_count < max_entries) {
+            line[strcspn(line, "\r\n")] = '\0';
+
+            if (strlen(line) < 20) {
+                continue;
+            }
+
+            time_t log_time = 0;
+            char level_str[16] = {0};
+            char comp_str[128] = {0};
+
+            if (sscanf(line, "[%*[^]]] [%15[^]]] [%127[^]]", level_str, comp_str) < 2) {
+                continue;
+            }
+
+            struct tm tm_info;
+            memset(&tm_info, 0, sizeof(tm_info));
+            char time_buf[32];
+            if (sscanf(line + 1, "%31[^]]", time_buf) == 1) {
+                strptime(time_buf, "%Y-%m-%d %H:%M:%S", &tm_info);
+                log_time = mktime(&tm_info);
+            }
+
+            if (start_time && *start_time > 0 && log_time < *start_time) {
+                continue;
+            }
+            if (end_time && *end_time > 0 && log_time > *end_time) {
+                continue;
+            }
+
+            heapstore_log_level_t entry_level = heapstore_LOG_INFO;
+            if (strcmp(level_str, "ERROR") == 0) entry_level = heapstore_LOG_ERROR;
+            else if (strcmp(level_str, "WARN") == 0) entry_level = heapstore_LOG_WARN;
+            else if (strcmp(level_str, "DEBUG") == 0) entry_level = heapstore_LOG_DEBUG;
+
+            if (level != -1 && entry_level != level) {
+                continue;
+            }
+
+            if (component && component[0] != '\0' &&
+                strstr(comp_str, component) == NULL) {
+                continue;
+            }
+
+            results[found_count] = strdup(line);
+            if (!results[found_count]) {
+                for (int i = 0; i < found_count; i++) {
+                    free(results[i]);
+                }
+                free(results);
+                fclose(f);
+                closedir(dir);
+                return -4;
+            }
+            found_count++;
+        }
+
+        fclose(f);
+    }
+
+    closedir(dir);
+
+    if (found_count == 0) {
+        free(results);
+        *out_entries = NULL;
+        return 0;
+    }
+
+    char** final_results = (char**)malloc(found_count * sizeof(char*));
+    if (!final_results) {
+        for (int i = 0; i < found_count; i++) {
+            free(results[i]);
+        }
+        free(results);
+        return -4;
+    }
+
+    memcpy(final_results, results, found_count * sizeof(char*));
+    free(results);
+
+    *out_entries = final_results;
+    return found_count;
 }
 
 /**
