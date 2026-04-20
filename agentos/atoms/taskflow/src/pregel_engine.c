@@ -101,6 +101,22 @@ struct pregel_engine_s {
 // 静态辅助函数
 // ============================================================================
 
+// FNV-1a哈希函数（用于顶点ID到工作线程的映射）
+static size_t vertex_id_hash(vertex_id_t id, size_t table_size) {
+    const uint64_t FNV_offset_basis = 14695981039346656037ULL;
+    const uint64_t FNV_prime = 1099511628211ULL;
+
+    uint64_t hash = FNV_offset_basis;
+    uint8_t* bytes = (uint8_t*)&id;
+
+    for (size_t i = 0; i < sizeof(vertex_id_t); i++) {
+        hash ^= bytes[i];
+        hash *= FNV_prime;
+    }
+
+    return (table_size > 0) ? (hash % table_size) : 0;
+}
+
 // 创建消息队列
 static message_queue_t* message_queue_create(void) {
     message_queue_t* queue = (message_queue_t*)calloc(1, sizeof(message_queue_t));
@@ -213,13 +229,26 @@ static bool init_vertex_states(struct pregel_engine_s* engine) {
     
     // 初始化每个顶点的状态
     for (size_t i = 0; i < vertex_count; i++) {
-        // TODO: 从图引擎获取顶点信息
-        // 目前先设置默认值
-        engine->vertex_states[i].vertex_id = i + 1; // 假设顶点ID从1开始连续
+        engine->vertex_states[i].vertex_id = i + 1;
         engine->vertex_states[i].active = true;
         engine->vertex_states[i].vote_to_halt = false;
         engine->vertex_states[i].incoming_message_count = 0;
         engine->vertex_states[i].incoming_messages = NULL;
+    }
+
+    // 尝试从图引擎获取真实顶点ID映射
+    {
+        vertex_id_t* real_ids = (vertex_id_t*)calloc(vertex_count, sizeof(vertex_id_t));
+        if (real_ids) {
+            size_t fetched = 0;
+            if (graph_engine_get_vertex_ids(engine->graph_engine, real_ids, vertex_count, &fetched)
+                == TASKFLOW_SUCCESS && fetched == vertex_count) {
+                for (size_t i = 0; i < vertex_count; i++) {
+                    engine->vertex_states[i].vertex_id = real_ids[i];
+                }
+            }
+            free(real_ids);
+        }
     }
     
     return true;
@@ -500,7 +529,7 @@ taskflow_error_t pregel_engine_start(pregel_engine_handle_t engine,
         return TASKFLOW_ERROR_INVALID_ARG; // 没有计算函数
     }
     
-    // TODO: 启动工作线程
+    // 启动工作线程
     pthread_mutex_lock(&e->mutex);
     for (size_t i = 0; i < e->worker_count; i++) {
         e->workers[i].running = true;
@@ -525,10 +554,9 @@ taskflow_error_t pregel_engine_stop(pregel_engine_handle_t engine)
     struct pregel_engine_s* e = (struct pregel_engine_s*)engine;
     
     if (!e->running) {
-        return TASKFLOW_SUCCESS; // 已经停止
+        return TASKFLOW_SUCCESS;
     }
-    
-    // TODO: 停止工作线程
+
     pthread_mutex_lock(&e->mutex);
     for (size_t i = 0; i < e->worker_count; i++) {
         e->workers[i].running = false;
@@ -568,7 +596,7 @@ taskflow_error_t pregel_engine_pause(pregel_engine_handle_t engine)
     
     e->paused = true;
 
-    // TODO: 暂停工作线程
+    // 工作线程在worker_thread_func中检测paused标志并等待pause_cond
     pthread_mutex_lock(&e->mutex);
     pthread_mutex_unlock(&e->mutex);
     
@@ -593,7 +621,7 @@ taskflow_error_t pregel_engine_resume(pregel_engine_handle_t engine)
     
     e->paused = false;
 
-    // TODO: 恢复工作线程
+    // 通过broadcast pause_cond唤醒所有等待的工作线程
     pthread_mutex_lock(&e->mutex);
     pthread_cond_broadcast(&e->pause_cond);
     pthread_mutex_unlock(&e->mutex);
@@ -682,8 +710,6 @@ taskflow_error_t pregel_engine_broadcast_message(pregel_engine_handle_t engine,
     if (!e->initialized) {
         return TASKFLOW_ERROR_NOT_INITIALIZED;
     }
-    
-    // TODO: 实现广播消息
     pthread_mutex_lock(&e->mutex);
     taskflow_error_t result = TASKFLOW_SUCCESS;
     size_t sent_count = 0;
@@ -906,20 +932,54 @@ taskflow_error_t pregel_engine_wait_for_completion(pregel_engine_handle_t engine
     if (!engine) {
         return TASKFLOW_ERROR_INVALID_ARG;
     }
-    
+
     struct pregel_engine_s* e = (struct pregel_engine_s*)engine;
-    
-    if (!e->running) {
-        return TASKFLOW_SUCCESS; // 已经停止
-    }
-    
-    // TODO: 实现等待完成
-    // 使用条件变量等待计算完成或超时
-    
-    // 简单实现：检查是否完成
-    if (e->computation_done || e->active_vertices == 0) {
+
+    if (!e->running || e->computation_done || e->active_vertices == 0) {
         return TASKFLOW_SUCCESS;
     }
-    
-    return TASKFLOW_ERROR_TIMEOUT; // 假设超时
+
+    pthread_mutex_lock(&e->mutex);
+
+    uint64_t deadline_ns = 0;
+    if (timeout_ms > 0 && timeout_ms != UINT32_MAX) {
+        struct timespec ts;
+        clock_gettime(CLOCK_REALTIME, &ts);
+        deadline_ns = (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec +
+                     (uint64_t)timeout_ms * 1000000ULL;
+    }
+
+    while (e->running && !e->computation_done && e->active_vertices > 0) {
+        if (timeout_ms == 0 || timeout_ms == UINT32_MAX) {
+            pthread_cond_wait(&e->cond_var, &e->mutex);
+        } else {
+            struct timespec now_ts;
+            clock_gettime(CLOCK_REALTIME, &now_ts);
+            uint64_t now_ns = (uint64_t)now_ts.tv_sec * 1000000000ULL + (uint64_t)now_ts.tv_nsec;
+            if (now_ns >= deadline_ns) {
+                pthread_mutex_unlock(&e->mutex);
+                return TASKFLOW_ERROR_TIMEOUT;
+            }
+            int remaining_ms = (int)((deadline_ns - now_ns) / 1000000ULL);
+            if (remaining_ms <= 0) remaining_ms = 1;
+            struct timespec abs_timeout;
+            abs_timeout.tv_sec = now_ts.tv_sec + (remaining_ms / 1000);
+            abs_timeout.tv_nsec = now_ts.tv_nsec + ((remaining_ms % 1000) * 1000000L);
+            if (abs_timeout.tv_nsec >= 1000000000L) {
+                abs_timeout.tv_sec++;
+                abs_timeout.tv_nsec -= 1000000000L;
+            }
+            int ret = pthread_cond_timedwait(&e->cond_var, &e->mutex, &abs_timeout);
+            if (ret == ETIMEDOUT) {
+                pthread_mutex_unlock(&e->mutex);
+                return TASKFLOW_ERROR_TIMEOUT;
+            }
+        }
+    }
+
+    taskflow_error_t result = (e->computation_done || e->active_vertices == 0)
+        ? TASKFLOW_SUCCESS : TASKFLOW_ERROR_INTERNAL;
+
+    pthread_mutex_unlock(&e->mutex);
+    return result;
 }

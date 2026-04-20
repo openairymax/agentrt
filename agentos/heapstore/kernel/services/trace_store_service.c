@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <dirent.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -26,6 +27,35 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#endif
+
+#ifndef HEAPSTORE_TRACE_POINT_DEFINED
+#define HEAPSTORE_TRACE_POINT_DEFINED
+
+typedef struct {
+    uint64_t timestamp_ns;
+    char component[64];
+    char operation[128];
+    int64_t duration_ns;
+    bool success;
+    char trace_id[64];
+    char metadata[256];
+} heapstore_trace_point_t;
+
+#endif
+
+#ifndef HEAPSTORE_TRACE_QUERY_DEFINED
+#define HEAPSTORE_TRACE_QUERY_DEFINED
+
+typedef struct {
+    time_t start_time;
+    time_t end_time;
+    char component_filter[64];
+    char operation_filter[128];
+    bool success_only;
+    int max_results;
+} heapstore_trace_query_t;
+
 #endif
 
 /**
@@ -206,10 +236,87 @@ int trace_store_service_query_traces(const heapstore_trace_query_t* query,
     if (!query || !out_traces || max_traces <= 0) {
         return -1;
     }
-    
-    // 简化实现：返回0个追踪点
+
+    if (!g_ctx.is_initialized) {
+        return -2;
+    }
+
     *out_traces = NULL;
-    return 0;
+
+    DIR* dir = opendir(g_ctx.storage_path);
+    if (!dir) {
+        return -3;
+    }
+
+    heapstore_trace_point_t* results = (heapstore_trace_point_t*)malloc(max_traces * sizeof(heapstore_trace_point_t));
+    if (!results) {
+        closedir(dir);
+        return -4;
+    }
+
+    int found_count = 0;
+    struct dirent* entry;
+
+    while ((entry = readdir(dir)) != NULL && found_count < max_traces) {
+        if (strncmp(entry->d_name, "trace_", 6) != 0) {
+            continue;
+        }
+
+        char filepath[768];
+        snprintf(filepath, sizeof(filepath), "%s/%s", g_ctx.storage_path, entry->d_name);
+
+        FILE* f = fopen(filepath, "rb");
+        if (!f) {
+            continue;
+        }
+
+        heapstore_trace_point_t point;
+        while (fread(&point, sizeof(heapstore_trace_point_t), 1, f) == 1 && found_count < max_traces) {
+            time_t point_time = (time_t)(point.timestamp_ns / 1000000000ULL);
+
+            if (query->start_time > 0 && point_time < query->start_time) {
+                continue;
+            }
+            if (query->end_time > 0 && point_time > query->end_time) {
+                continue;
+            }
+            if (query->component_filter[0] != '\0' &&
+                strstr(point.component, query->component_filter) == NULL) {
+                continue;
+            }
+            if (query->operation_filter[0] != '\0' &&
+                strstr(point.operation, query->operation_filter) == NULL) {
+                continue;
+            }
+            if (query->success_only && !point.success) {
+                continue;
+            }
+
+            results[found_count++] = point;
+        }
+
+        fclose(f);
+    }
+
+    closedir(dir);
+
+    if (found_count == 0) {
+        free(results);
+        *out_traces = NULL;
+        return 0;
+    }
+
+    heapstore_trace_point_t* final_results = (heapstore_trace_point_t*)malloc(found_count * sizeof(heapstore_trace_point_t));
+    if (!final_results) {
+        free(results);
+        return -4;
+    }
+
+    memcpy(final_results, results, found_count * sizeof(heapstore_trace_point_t));
+    free(results);
+
+    *out_traces = final_results;
+    return found_count;
 }
 
 /**

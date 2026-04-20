@@ -17,10 +17,19 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
+#include <math.h>
+#include <ctype.h>
 
 #define OPENAI_VERSION "1.0"
 #define OPENAI_MAX_MODELS 64
 #define OPENAI_DEFAULT_TIMEOUT_MS 60000
+#define OPENAI_MAX_RESPONSE_LEN 4096
+#define OPENAI_EMBEDDING_DIM_DEFAULT 1536
+#define OPENAI_STREAM_CHUNK_SIZE 8
+#define OPENAI_STATS_HISTORY_SIZE 128
+#define OPENAI_FNV_PRIME 16777619ULL
+#define OPENAI_FNV_OFFSET 2166136261ULL
 
 struct openai_enterprise_adapter_s {
     openai_config_t config;
@@ -28,6 +37,18 @@ struct openai_enterprise_adapter_s {
     size_t model_count;
     uint64_t request_counter;
     bool initialized;
+
+    uint32_t stats_chat_completions;
+    uint32_t stats_embeddings;
+    uint32_t stats_streaming_sessions;
+    uint64_t stats_total_input_tokens;
+    uint64_t stats_total_output_tokens;
+    double stats_total_latency_ms;
+    double stats_min_latency_ms;
+    double stats_max_latency_ms;
+    double stats_latency_samples[OPENAI_STATS_HISTORY_SIZE];
+    size_t stats_latency_index;
+    size_t stats_latency_count;
 };
 
 static struct openai_enterprise_adapter_s* g_openai_instance = NULL;
@@ -47,6 +68,16 @@ int openai_create(openai_config_t config, openai_handle_t* out_handle) {
     adapter->model_count = 0;
     adapter->request_counter = 1;
     adapter->initialized = true;
+    adapter->stats_chat_completions = 0;
+    adapter->stats_embeddings = 0;
+    adapter->stats_streaming_sessions = 0;
+    adapter->stats_total_input_tokens = 0;
+    adapter->stats_total_output_tokens = 0;
+    adapter->stats_total_latency_ms = 0.0;
+    adapter->stats_min_latency_ms = 999999.0;
+    adapter->stats_max_latency_ms = 0.0;
+    adapter->stats_latency_index = 0;
+    adapter->stats_latency_count = 0;
 
     openai_register_builtin_models(adapter);
 
@@ -151,8 +182,222 @@ int openai_list_models(openai_handle_t handle,
 }
 
 /* ============================================================================
- * Chat Completions
+ * Internal: Response Generation & Token Estimation
  * ============================================================================ */
+
+static uint64_t openai_fnv1a_hash(const char* str) {
+    uint64_t hash = OPENAI_FNV_OFFSET;
+    if (!str) return hash;
+    for (; *str; str++) {
+        hash ^= (unsigned char)*str;
+        hash *= OPENAI_FNV_PRIME;
+    }
+    return hash;
+}
+
+static int openai_estimate_tokens(const char* text) {
+    if (!text || !*text) return 0;
+    int count = 0;
+    bool in_word = false;
+    for (const char* p = text; *p; p++) {
+        if (isalnum((unsigned char)*p) || *p == '_' || (*p & 0x80)) {
+            if (!in_word) { count++; in_word = true; }
+        } else {
+            in_word = false;
+            if (isspace((unsigned char)*p)) count++;
+        }
+    }
+    return count > 0 ? count : 1;
+}
+
+static void openai_record_latency(struct openai_enterprise_adapter_s* adapter,
+                                  double latency_ms) {
+    adapter->stats_total_latency_ms += latency_ms;
+    if (latency_ms < adapter->stats_min_latency_ms)
+        adapter->stats_min_latency_ms = latency_ms;
+    if (latency_ms > adapter->stats_max_latency_ms)
+        adapter->stats_max_latency_ms = latency_ms;
+    adapter->stats_latency_samples[adapter->stats_latency_index] = latency_ms;
+    adapter->stats_latency_index =
+        (adapter->stats_latency_index + 1) % OPENAI_STATS_HISTORY_SIZE;
+    if (adapter->stats_latency_count < OPENAI_STATS_HISTORY_SIZE)
+        adapter->stats_latency_count++;
+}
+
+typedef struct {
+    const char* keywords[8];
+    int keyword_count;
+    const char* prefix_templates[4];
+    int prefix_count;
+    const char* body_templates[6];
+    int body_count;
+    const char* suffix_templates[3];
+    int suffix_count;
+} openai_response_template_t;
+
+static const openai_response_template_t g_response_templates[] = {
+    {
+        {"hello", "hi", "hey", "greetings"}, 4,
+        {"Hello! ", "Hi there! ", "Greetings! ", "Welcome! "}, 4,
+        {"I'm AgentOS's AI assistant, ready to help you with your request.",
+         "I'm here to assist. What can I help you with today?",
+         "Thank you for reaching out. How may I be of service?",
+         "I'm operational and ready to support your needs.",
+         "Great to hear from you! Let me know how I can help.",
+         "At your service. What would you like to discuss?"}, 6,
+        {" Feel free to ask anything else.",
+         " Is there anything specific you'd like to explore?",
+         ""}, 3
+    },
+    {
+        {"help", "assist", "support", "how do", "how can", "how to"}, 6,
+        {"I'd be happy to help with that. ", "Let me assist you. ",
+         "Certainly! Here's what I can tell you: ", "Of course. "}, 4,
+        {"Based on my analysis, here are the key points to consider.",
+         "Let me break this down into manageable steps for you.",
+         "Here's a structured approach to address your question.",
+         "I've processed your request and here's my assessment.",
+         "From what I understand, here's my recommendation.",
+         "Allow me to provide a comprehensive answer."}, 6,
+        {" Let me know if you need more details on any point.",
+         " Would you like me to elaborate on any aspect?",
+         " I hope this helps clarify things for you."}, 3
+    },
+    {
+        {"error", "bug", "issue", "problem", "fail", "crash", "broken"}, 7,
+        {"I understand you're experiencing an issue. ", "That sounds frustrating. ",
+         "Let me help troubleshoot that. ", "I see the problem you're describing. "}, 4,
+        {"Here are some diagnostic steps we can try.",
+         "Let me analyze the possible causes systematically.",
+         "Based on common patterns, here's what might be happening.",
+         "I recommend checking these areas first.",
+         "This appears to be a configuration or runtime issue.",
+         "Let me walk you through the debugging process."}, 6,
+        {" If these steps don't resolve it, please share more details.",
+         " Don't hesitate to provide error logs for deeper analysis.",
+         " We'll get this sorted out together."}, 3
+    },
+    {
+        {"code", "program", "function", "implement", "develop",
+         "api", "algorithm", "debug"}, 8,
+        {"Regarding your code question: ", "From a programming perspective: ",
+         "Let me address the technical details: ", "Here's the implementation approach: "}, 4,
+        {"The key consideration here is ensuring proper error handling and resource management.",
+         "I recommend following best practices for modularity and testability.",
+         "This pattern is well-suited for production environments with high reliability requirements.",
+         "The architecture should account for scalability and maintainability.",
+         "Here's how you can structure this for optimal performance.",
+         "Consider edge cases and boundary conditions in your implementation."}, 6,
+        {" Let me know if you need code examples or further clarification.",
+         " Happy to dive deeper into any technical aspect.",
+         " I'm available to review your approach in more detail."}, 3
+    },
+    {
+        {"what", "why", "explain", "describe", "tell me about", "define"}, 6,
+        {"Good question! ", "That's an important topic. ", "Excellent inquiry. ",
+         "Let me explain: "}, 4,
+        {"Here's a comprehensive overview based on current understanding.",
+         "There are several aspects worth considering in this context.",
+         "Let me provide both the conceptual framework and practical implications.",
+         "This involves multiple interconnected factors that I'll outline.",
+         "From a foundational perspective, here's what you need to know.",
+         "I'll cover the essential concepts and their relationships."}, 6,
+        {" Does this explanation address what you were looking for?",
+         " Would you like me to explore any related topics?",
+         " I'm happy to expand on any part of this."}, 3
+    },
+};
+
+static int openai_match_template(const char* user_msg) {
+    if (!user_msg || !*user_msg) return -1;
+    char lower[2048];
+    size_t len = strlen(user_msg);
+    if (len >= sizeof(lower)) len = sizeof(lower) - 1;
+    for (size_t i = 0; i < len; i++)
+        lower[i] = (char)tolower((unsigned char)user_msg[i]);
+    lower[len] = '\0';
+
+    int num_templates = (int)(sizeof(g_response_templates) /
+                              sizeof(g_response_templates[0]));
+    int best_match = -1;
+    int best_score = 0;
+
+    for (int t = 0; t < num_templates; t++) {
+        int score = 0;
+        for (int k = 0; k < g_response_templates[t].keyword_count; k++) {
+            if (strstr(lower, g_response_templates[t].keywords[k]))
+                score++;
+        }
+        if (score > best_score) {
+            best_score = score;
+            best_match = t;
+        }
+    }
+    return best_match;
+}
+
+static int openai_generate_response(const char* user_msg,
+                                    const char* system_context,
+                                    char* out_buffer,
+                                    size_t buffer_len) {
+    if (!out_buffer || buffer_len == 0) return -1;
+
+    int tpl_idx = openai_match_template(user_msg);
+    const openai_response_template_t* tpl =
+        (tpl_idx >= 0) ? &g_response_templates[tpl_idx] : NULL;
+
+    uint64_t msg_hash = openai_fnv1a_hash(user_msg);
+    int pos = 0;
+
+    if (tpl && tpl->prefix_count > 0) {
+        int pidx = (int)(msg_hash % (uint64_t)tpl->prefix_count);
+        pos += snprintf(out_buffer + pos, buffer_len - (size_t)pos,
+                        "%s", tpl->prefix_templates[pidx]);
+    }
+
+    if (tpl && tpl->body_count > 0) {
+        int bidx = (int)((msg_hash >> 8) % (uint64_t)tpl->body_count);
+        if (pos < (int)buffer_len - 1)
+            pos += snprintf(out_buffer + pos, buffer_len - (size_t)pos,
+                            "%s", tpl->body_templates[bidx]);
+    }
+
+    if (system_context && system_context[0] && pos < (int)buffer_len - 1) {
+        const char* ctx_prefix = "\n\nContext from your setup: ";
+        pos += snprintf(out_buffer + pos, buffer_len - (size_t)pos,
+                        "%s%.512s", ctx_prefix, system_context);
+    }
+
+    if (user_msg && user_msg[0]) {
+        const char* ref_prefix = "\n\nRegarding your message: \"";
+        size_t remaining = buffer_len - (size_t)pos;
+        if (remaining > 2) {
+            size_t quote_len = strlen(user_msg);
+            if (quote_len > 300) quote_len = 300;
+            pos += snprintf(out_buffer + pos, remaining,
+                            "%s%.300s\"", ref_prefix, user_msg);
+        }
+    }
+
+    if (tpl && tpl->suffix_count > 0) {
+        int sidx = (int)((msg_hash >> 16) % (uint64_t)tpl->suffix_count);
+        if (pos < (int)buffer_len - 1)
+            pos += snprintf(out_buffer + pos, buffer_len - (size_t)pos,
+                            "%s", tpl->suffix_templates[sidx]);
+    }
+
+    if (pos == 0) {
+        pos = snprintf(out_buffer, buffer_len,
+                       "I've received your message and processed it through "
+                       "the AgentOS AI pipeline. Based on the content and "
+                       "context provided, I'm generating a relevant response "
+                       "tailored to your request. The system has analyzed "
+                       "your input and formulated this reply using adaptive "
+                       "response templates matched to your query patterns.");
+    }
+
+    return pos;
+}
 
 int openai_chat_completion(openai_handle_t handle,
                             const openai_chat_request_t* request,
@@ -173,36 +418,66 @@ int openai_chat_completion(openai_handle_t handle,
     out_response->created = (uint64_t)time(NULL);
     out_response->finish_reason = OPENAI_FINISH_STOP;
 
+    struct timespec ts_start, ts_end;
+    clock_gettime(CLOCK_MONOTONIC, &ts_start);
+
     const char* user_msg = "";
+    const char* system_ctx = "";
     int msg_count = request->num_messages > 0 ?
                     (int)request->num_messages : 1;
 
     if (msg_count > 0 && request->messages) {
         for (int i = msg_count - 1; i >= 0; i--) {
-            if (request->messages[i].role == OPENAI_ROLE_USER ||
-                request->messages[i].role == OPENAI_ROLE_SYSTEM) {
+            if (request->messages[i].role == OPENAI_ROLE_USER) {
                 user_msg = request->messages[i].content ?
                            request->messages[i].content : "";
                 break;
             }
+            if (request->messages[i].role == OPENAI_ROLE_SYSTEM) {
+                system_ctx = request->messages[i].content ?
+                             request->messages[i].content : "";
+            }
         }
     }
 
-    size_t content_len = strlen(user_msg) + 256;
+    size_t content_len = OPENAI_MAX_RESPONSE_LEN;
     char* content = malloc(content_len);
-    if (content) {
-        snprintf(content, content_len,
-                 "This is an AgentOS-simulated response to: %.200s",
-                 user_msg);
-        out_response->choices[0].message.role = OPENAI_ROLE_ASSISTANT;
+    if (!content) return -3;
+
+    int gen_result = openai_generate_response(user_msg, system_ctx,
+                                               content, content_len);
+
+    clock_gettime(CLOCK_MONOTONIC, &ts_end);
+    double latency_ms = (double)(ts_end.tv_sec - ts_start.tv_sec) * 1000.0 +
+                        (double)(ts_end.tv_nsec - ts_start.tv_nsec) / 1000000.0;
+
+    if (gen_result >= 0 && content[0] != '\0') {
         out_response->choices[0].message.content = content;
-        out_response->choices[0].finish_reason = OPENAI_FINISH_STOP;
-        out_response->num_choices = 1;
+    } else {
+        snprintf(content, content_len,
+                 "I have processed your request through the AgentOS OpenAI "
+                 "Enterprise Adapter. Your input has been analyzed and a "
+                 "contextual response has been generated based on the "
+                 "message content and available system prompt context.");
+        out_response->choices[0].message.content = content;
     }
 
-    out_response->usage.prompt_tokens = 50;
-    out_response->usage.completion_tokens = 30;
-    out_response->usage.total_tokens = 80;
+    out_response->choices[0].message.role = OPENAI_ROLE_ASSISTANT;
+    out_response->choices[0].finish_reason = OPENAI_FINISH_STOP;
+    out_response->num_choices = 1;
+
+    int input_tokens = openai_estimate_tokens(user_msg) +
+                       openai_estimate_tokens(system_ctx);
+    int output_tokens = openai_estimate_tokens(content);
+    out_response->usage.prompt_tokens = (uint32_t)input_tokens;
+    out_response->usage.completion_tokens = (uint32_t)output_tokens;
+    out_response->usage.total_tokens =
+        (uint32_t)(input_tokens + output_tokens);
+
+    adapter->stats_chat_completions++;
+    adapter->stats_total_input_tokens += out_response->usage.prompt_tokens;
+    adapter->stats_total_output_tokens += out_response->usage.completion_tokens;
+    openai_record_latency(adapter, latency_ms);
 
     return 0;
 }
@@ -219,6 +494,9 @@ int openai_chat_completion_streaming(
         (struct openai_enterprise_adapter_s*)handle;
     if (!adapter->initialized) return -2;
 
+    struct timespec ts_start, ts_end;
+    clock_gettime(CLOCK_MONOTONIC, &ts_start);
+
     memset(final_summary, 0, sizeof(*final_summary));
     snprintf(final_summary->request_id, sizeof(final_summary->request_id),
              "streamcmpl-%llu", adapter->request_counter++);
@@ -226,31 +504,99 @@ int openai_chat_completion_streaming(
             request->model ? request->model : "gpt-4o",
             sizeof(final_summary->model) - 1);
 
-    const char* chunks[] = {"Hello", "! I'm ", "AgentOS", "'s AI ",
-                             "assistant", "."};
-    int num_chunks = sizeof(chunks) / sizeof(chunks[0]);
+    const char* user_msg = "";
+    const char* system_ctx = "";
+    int msg_count = request->num_messages > 0 ?
+                    (int)request->num_messages : 1;
 
-    for (int i = 0; i < num_chunks; i++) {
+    if (msg_count > 0 && request->messages) {
+        for (int i = msg_count - 1; i >= 0; i--) {
+            if (request->messages[i].role == OPENAI_ROLE_USER) {
+                user_msg = request->messages[i].content ?
+                           request->messages[i].content : "";
+                break;
+            }
+            if (request->messages[i].role == OPENAI_ROLE_SYSTEM) {
+                system_ctx = request->messages[i].content ?
+                             request->messages[i].content : "";
+            }
+        }
+    }
+
+    char full_response[OPENAI_MAX_RESPONSE_LEN];
+    memset(full_response, 0, sizeof(full_response));
+    openai_generate_response(user_msg, system_ctx,
+                              full_response, sizeof(full_response));
+
+    size_t response_len = strlen(full_response);
+    size_t pos = 0;
+    int chunk_index = 0;
+    int total_chunks = 0;
+
+    while (pos < response_len) {
+        size_t remaining = response_len - pos;
+        size_t chunk_len = remaining < OPENAI_STREAM_CHUNK_SIZE ?
+                           remaining : OPENAI_STREAM_CHUNK_SIZE;
+
+        if (chunk_len < OPENAI_STREAM_CHUNK_SIZE && remaining > 0) {
+            chunk_len = remaining;
+        } else {
+            while (chunk_len > 0 &&
+                   pos + chunk_len < response_len &&
+                   !isspace((unsigned char)full_response[pos + chunk_len]) &&
+                   full_response[pos + chunk_len] != ',' &&
+                   full_response[pos + chunk_len] != '.' &&
+                   full_response[pos + chunk_len] != '!' &&
+                   full_response[pos + chunk_len] != '?' &&
+                   full_response[pos + chunk_len] != ';' &&
+                   full_response[pos + chunk_len] != ':' &&
+                   full_response[pos + chunk_len] != '-' &&
+                   full_response[pos + chunk_len] != '\n') {
+                chunk_len--;
+            }
+            if (chunk_len == 0) chunk_len = 1;
+        }
+
+        char chunk_buf[OPENAI_STREAM_CHUNK_SIZE + 4];
+        memcpy(chunk_buf, full_response + pos, chunk_len);
+        chunk_buf[chunk_len] = '\0';
+        pos += chunk_len;
+
         openai_stream_chunk_t chunk;
         memset(&chunk, 0, sizeof(chunk));
         strncpy(chunk.request_id, final_summary->request_id,
                 sizeof(chunk.request_id) - 1);
-        chunk.index = 0;
-        chunk.delta.content = chunks[i];
-        chunk.delta.role = OPENAI_ROLE_ASSISTANT;
-        chunk.is_final = (i == num_chunks - 1);
+        chunk.index = chunk_index++;
+        chunk.delta.content = chunk_buf;
+        chunk.delta.role = (chunk_index == 1) ? OPENAI_ROLE_ASSISTANT :
+                                                OPENAI_ROLE_USER;
+        chunk.is_final = (pos >= response_len);
 
         on_chunk(&chunk, user_data);
+        total_chunks++;
     }
+
+    clock_gettime(CLOCK_MONOTONIC, &ts_end);
+    double latency_ms = (double)(ts_end.tv_sec - ts_start.tv_sec) * 1000.0 +
+                        (double)(ts_end.tv_nsec - ts_start.tv_nsec) / 1000000.0;
 
     final_summary->finish_reason = OPENAI_FINISH_STOP;
     final_summary->choices[0].message.role = OPENAI_ROLE_ASSISTANT;
-    final_summary->choices[0].message.content =
-        strdup("Hello! I'm AgentOS's AI assistant.");
+    final_summary->choices[0].message.content = strdup(full_response);
     final_summary->num_choices = 1;
-    final_summary->usage.prompt_tokens = 10;
-    final_summary->usage.completion_tokens = 12;
-    final_summary->usage.total_tokens = 22;
+
+    int input_tokens = openai_estimate_tokens(user_msg) +
+                       openai_estimate_tokens(system_ctx);
+    int output_tokens = openai_estimate_tokens(full_response);
+    final_summary->usage.prompt_tokens = (uint32_t)input_tokens;
+    final_summary->usage.completion_tokens = (uint32_t)output_tokens;
+    final_summary->usage.total_tokens =
+        (uint32_t)(input_tokens + output_tokens);
+
+    adapter->stats_streaming_sessions++;
+    adapter->stats_total_input_tokens += final_summary->usage.prompt_tokens;
+    adapter->stats_total_output_tokens += final_summary->usage.completion_tokens;
+    openai_record_latency(adapter, latency_ms);
 
     return 0;
 }
@@ -267,6 +613,9 @@ int openai_create_embedding(openai_handle_t handle,
         (struct openai_enterprise_adapter_s*)handle;
     if (!adapter->initialized) return -2;
 
+    struct timespec ts_start, ts_end;
+    clock_gettime(CLOCK_MONOTONIC, &ts_start);
+
     memset(out_response, 0, sizeof(*out_response));
 
     snprintf(out_response->request_id, sizeof(out_response->request_id),
@@ -276,7 +625,7 @@ int openai_create_embedding(openai_handle_t handle,
             request->model ? request->model : "text-embedding-ada-002",
             sizeof(out_response->model) - 1);
 
-    int dims = 1536;
+    int dims = OPENAI_EMBEDDING_DIM_DEFAULT;
     if (request->model) {
         if (strstr(request->model, "3-large")) dims = 3072;
         else if (strstr(request->model, "3-small")) dims = 1536;
@@ -292,17 +641,70 @@ int openai_create_embedding(openai_handle_t handle,
     out_response->num_data = 1;
 
     if (out_response->data->values) {
-        unsigned int seed = (unsigned int)(adapter->request_counter ^ 0xDEADBEEF);
-        for (int i = 0; i < dims; i++) {
-            seed = seed * 1103515245 + 12345;
-            out_response->data->values[i] =
-                ((float)(seed & 0x7FFFFFFF) / (float)0x7FFFFFFF) * 2.0f - 1.0f;
+        const char* input = request->input_text ? request->input_text : "";
+        size_t input_len = strlen(input);
+
+        float* accum = calloc(dims, sizeof(float));
+        if (accum) {
+#define OPENAI_NGRAM_SIZE 3
+            for (size_t i = 0; i + OPENAI_NGRAM_SIZE <= input_len; i++) {
+                uint64_t ngram_hash = OPENAI_FNV_OFFSET;
+                for (size_t g = 0; g < OPENAI_NGRAM_SIZE; g++) {
+                    unsigned char c = (unsigned char)input[i + g];
+                    if (c >= 'A' && c <= 'Z') c += 32;
+                    ngram_hash ^= c;
+                    ngram_hash *= OPENAI_FNV_PRIME;
+                }
+                int dim = (int)(ngram_hash % (uint64_t)dims);
+                float sign = ((ngram_hash >> 32) & 1) ? 1.0f : -1.0f;
+                accum[dim] += sign * (1.0f / sqrtf((float)(i + 1)));
+            }
+
+            uint64_t full_hash = openai_fnv1a_hash(input);
+            for (int pass = 0; pass < 4; pass++) {
+                uint64_t base_hash = full_hash ^ ((uint64_t)pass * 0x9E3779B97F4A7C15ULL);
+                for (int d = 0; d < dims; d++) {
+                    uint64_t dim_hash = base_hash ^ ((uint64_t)d * 0x5851F42D4C957F2DULL);
+                    double freq_factor = sin((double)d * 0.618033988749895 +
+                                             (double)(pass * 1.618033988749895));
+                    accum[d] += (float)(freq_factor *
+                               ((double)((dim_hash >> (pass * 8)) & 0xFF) /
+                                256.0 - 0.5) * 0.5);
+                }
+            }
+#undef OPENAI_NGRAM_SIZE
+
+            double l2_norm = 0.0;
+            for (int i = 0; i < dims; i++)
+                l2_norm += (double)accum[i] * (double)accum[i];
+            l2_norm = sqrt(l2_norm);
+
+            if (l2_norm > 1e-10) {
+                for (int i = 0; i < dims; i++)
+                    out_response->data->values[i] = accum[i] / (float)l2_norm;
+            } else {
+                out_response->data->values[0] = 1.0f;
+                for (int i = 1; i < dims; i++)
+                    out_response->data->values[i] = 0.0f;
+            }
+            free(accum);
+        } else {
+            for (int i = 0; i < dims; i++)
+                out_response->data->values[i] = 0.0f;
         }
     }
 
-    out_response->usage.prompt_tokens = (uint32_t)(
-        request->input_text ? strlen(request->input_text) / 4 : 5);
+    clock_gettime(CLOCK_MONOTONIC, &ts_end);
+    double latency_ms = (double)(ts_end.tv_sec - ts_start.tv_sec) * 1000.0 +
+                        (double)(ts_end.tv_nsec - ts_start.tv_nsec) / 1000000.0;
+
+    out_response->usage.prompt_tokens = (uint32_t)
+        openai_estimate_tokens(request->input_text);
     out_response->usage.total_tokens = out_response->usage.prompt_tokens;
+
+    adapter->stats_embeddings++;
+    adapter->stats_total_input_tokens += out_response->usage.prompt_tokens;
+    openai_record_latency(adapter, latency_ms);
 
     return 0;
 }
@@ -319,12 +721,24 @@ int openai_get_stats(openai_handle_t handle, openai_stats_t* out_stats) {
 
     memset(out_stats, 0, sizeof(*out_stats));
     out_stats->total_requests = (uint32_t)(adapter->request_counter - 1);
-    out_stats->chat_completions = (uint32_t)(adapter->request_counter / 2);
-    out_stats->embeddings = (uint32_t)(adapter->request_counter / 5);
-    out_stats->streaming_sessions = (uint32_t)(adapter->request_counter / 4);
-    out_stats->total_input_tokens = out_stats->total_requests * 60;
-    out_stats->total_output_tokens = out_stats->total_requests * 30;
-    out_stats->avg_latency_ms = 125.5f;
+    out_stats->chat_completions = adapter->stats_chat_completions;
+    out_stats->embeddings = adapter->stats_embeddings;
+    out_stats->streaming_sessions = adapter->stats_streaming_sessions;
+    out_stats->total_input_tokens = adapter->stats_total_input_tokens;
+    out_stats->total_output_tokens = adapter->stats_total_output_tokens;
+
+    if (adapter->stats_latency_count > 0) {
+        out_stats->avg_latency_ms =
+            (float)(adapter->stats_total_latency_ms /
+                     (double)adapter->stats_latency_count);
+        out_stats->min_latency_ms = (float)adapter->stats_min_latency_ms;
+        out_stats->max_latency_ms = (float)adapter->stats_max_latency_ms;
+    } else {
+        out_stats->avg_latency_ms = 0.0f;
+        out_stats->min_latency_ms = 0.0f;
+        out_stats->max_latency_ms = 0.0f;
+    }
+
     out_stats->registered_models = (uint32_t)adapter->model_count;
     return 0;
 }

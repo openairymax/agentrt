@@ -420,7 +420,7 @@ CUPOLAS_API int cupolas_guards_check(
 
 /**
  * @brief 注册Cupolas钩子
- * 
+ *
  * 将守卫钩子注册到Cupolas各个组件。
  * 注意：此函数需要在Cupolas初始化后调用。
  */
@@ -428,11 +428,55 @@ CUPOLAS_API int cupolas_guards_register_hooks(void) {
     if (!g_guard_manager) {
         return cupolas_ERROR_BUSY;
     }
-    
-    // TODO: 实现钩子注册机制
-    // 实际实现需要修改Cupolas核心代码以支持钩子
-    // 当前为存根实现
-    
+
+    static int hooks_registered = 0;
+    if (hooks_registered) {
+        return CUPOLAS_OK;
+    }
+
+    printf("[GUARD] Registering safety hooks to Cupolas components...\n");
+
+    int registered_count = 0;
+
+#ifdef CUPOLAS_HAS_PERMISSION_HOOK
+    extern int permission_register_post_check_hook(int (*hook)(const char*, const char*, const char*, const char*, int));
+    if (permission_register_post_check_hook(permission_guard_hook) == 0) {
+        registered_count++;
+        printf("[GUARD] ✓ Permission post-check hook registered\n");
+    } else {
+        printf("[GUARD] ✗ Failed to register permission hook\n");
+    }
+#endif
+
+#ifdef CUPOLAS_HAS_WORKBENCH_HOOK
+    extern int workbench_register_pre_exec_hook(int (*hook)(const char*, char* const[]));
+    if (workbench_register_pre_exec_hook(command_execution_guard_hook) == 0) {
+        registered_count++;
+        printf("[GUARD] ✓ Workbench pre-execution hook registered\n");
+    } else {
+        printf("[GUARD] ✗ Failed to register workbench hook\n");
+    }
+#endif
+
+#ifdef CUPOLAS_HAS_SANITIZER_HOOK
+    extern int sanitizer_register_post_process_hook(int (*hook)(const char*, char*, size_t, int));
+    if (sanitizer_register_post_process_hook(sanitizer_guard_hook) == 0) {
+        registered_count++;
+        printf("[GUARD] ✓ Sanitizer post-process hook registered\n");
+    } else {
+        printf("[GUARD] ✗ Failed to register sanitizer hook\n");
+    }
+#endif
+
+    if (registered_count > 0) {
+        hooks_registered = 1;
+        g_guards_enabled = true;
+        printf("[GUARD] Successfully registered %d safety hooks\n", registered_count);
+        return CUPOLAS_OK;
+    }
+
+    printf("[GUARD] Warning: No hooks registered (component hook APIs not available)\n");
+    printf("[GUARD] Guards will work in standalone mode (explicit checks only)\n");
     return CUPOLAS_OK;
 }
 
@@ -440,5 +484,26 @@ CUPOLAS_API int cupolas_guards_register_hooks(void) {
  * @brief 注销Cupolas钩子
  */
 CUPOLAS_API void cupolas_guards_unregister_hooks(void) {
-    // TODO: 实现钩子注销
+    printf("[GUARD] Unregistering safety hooks from Cupolas components...\n");
+
+#ifdef CUPOLAS_HAS_PERMISSION_HOOK
+    extern void permission_unregister_post_check_hook(void);
+    permission_unregister_post_check_hook();
+    printf("[GUARD] ✓ Permission hook unregistered\n");
+#endif
+
+#ifdef CUPOLAS_HAS_WORKBENCH_HOOK
+    extern void workbench_unregister_pre_exec_hook(void);
+    workbench_unregister_pre_exec_hook();
+    printf("[GUARD] ✓ Workbench hook unregistered\n");
+#endif
+
+#ifdef CUPOLAS_HAS_SANITIZER_HOOK
+    extern void sanitizer_unregister_post_process_hook(void);
+    sanitizer_unregister_post_process_hook();
+    printf("[GUARD] ✓ Sanitizer hook unregistered\n");
+#endif
+
+    g_guards_enabled = false;
+    printf("[GUARD] All safety hooks unregistered\n");
 }
