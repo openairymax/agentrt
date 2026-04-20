@@ -19,6 +19,9 @@
 #include <stdarg.h>
 #include <time.h>
 #include <pthread.h>
+#ifndef _WIN32
+#include <dirent.h>
+#endif
 
 #ifdef _WIN32
 #include <windows.h>

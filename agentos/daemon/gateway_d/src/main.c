@@ -252,16 +252,16 @@ int main(int argc, char* argv[]) {
         loop_count++;
 
         if (config.enable_metrics && (loop_count % HEALTH_CHECK_INTERVAL == 0)) {
-            gateway_service_stats_t stats;
+            agentos_svc_stats_t stats;
             if (gateway_service_get_stats(g_service, &stats) == AGENTOS_SUCCESS) {
                 SVC_LOG_INFO("Health Check [interval=%ds] "
-                            "| active_conn=%u | total_req=%llu "
-                            "| errors=%llu | uptime=%llus",
+                            "| concurrent=%u | total_req=%llu "
+                            "| errors=%llu | avg_time=%.1fms",
                             HEALTH_CHECK_INTERVAL,
-                            stats.active_connections,
-                            (unsigned long long)stats.total_requests,
-                            (unsigned long long)stats.total_errors,
-                            (unsigned long long)stats.uptime_seconds);
+                            stats.current_concurrent,
+                            (unsigned long long)stats.request_count,
+                            (unsigned long long)stats.error_count,
+                            stats.avg_time_ms);
             }
         }
     }
