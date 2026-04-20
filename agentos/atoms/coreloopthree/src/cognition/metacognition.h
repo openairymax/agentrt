@@ -160,6 +160,7 @@ struct agentos_metacognition {
     uint64_t total_corrections;  /**< 总修正次数 */
     uint64_t total_rejections;   /**< 总拒绝次数 */
     uint64_t total_auto_fixes;   /**< 总自动修正次数 */
+    uint64_t total_rerun_successes; /**< RERUN策略成功次数 */
 
     /* 关联的思考链路 */
     agentos_thinking_chain_t* chain; /**< 可选关联（用于回调通知） */
