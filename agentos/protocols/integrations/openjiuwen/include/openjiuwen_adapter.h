@@ -13,6 +13,31 @@
 #include "../../core/adapter/include/protocol_extension_framework.h"
 #include "../../../../daemon/common/include/safe_string_utils.h"
 
+/* Internal base adapter structure for openjiuwen inheritance */
+typedef struct {
+    agentos_protocol_type_t type;
+    const char* name;
+    const char* version;
+    const char* description;
+    int (*init)(void* context);
+    int (*destroy)(void* context);
+    int (*encode)(void* context, const void* msg, void** out_data, size_t* out_size);
+    int (*decode)(void* context, const void* data, size_t size, void* out_msg);
+    int (*connect)(void* context, const char* endpoint);
+    int (*disconnect)(void* context);
+    int (*is_connected)(void* context);
+    int (*send)(void* context, const void* data, size_t size);
+    int (*receive)(void* context, void** data, size_t* size, uint32_t timeout_ms);
+    int (*handle_request)(void* context, const void* req, void** resp);
+    int (*get_version)(void* context, char* version_buf, size_t max_size);
+    uint32_t (*capabilities)(void* context);
+    int (*get_stats)(void* context, char* stats_json, size_t max_size);
+    void* context;
+    void* user_data;
+    int (*send_message)(void* context, const void* msg);
+    int (*receive_message)(void* context, void* msg);
+} openjiuwen_base_adapter_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -80,10 +105,10 @@ typedef enum openjiuwen_message_type_e {
 } openjiuwen_message_type_t;
 
 /**
- * @brief OpenJiuwen适配器实例（继承自protocol_adapter_t）
+ * @brief OpenJiuwen适配器实例（继承自openjiuwen_base_adapter_t）
  */
 typedef struct openjiuwen_adapter_s {
-    protocol_adapter_t base;
+    openjiuwen_base_adapter_t base;
     openjiuwen_config_t config;
     void* connection_handle;
     bool initialized;

@@ -12,6 +12,21 @@
 #include <time.h>
 
 typedef struct {
+    agentos_protocol_type_t type;
+    const char* name;
+    int (*init)(void* context);
+    int (*destroy)(void* context);
+    int (*encode)(void* context, const void* msg, void** out_data, size_t* out_size);
+    int (*decode)(void* context, const void* data, size_t size, void* out_msg);
+    int (*connect)(void* context, const char* endpoint);
+    int (*disconnect)(void* context);
+    int (*is_connected)(void* context);
+    int (*send)(void* context, const void* data, size_t size);
+    int (*receive)(void* context, void** data, size_t* size, uint32_t timeout_ms);
+    int (*get_stats)(void* context, char* stats_json, size_t max_size);
+} local_adapter_t;
+
+typedef struct {
     proto_ext_descriptor_t descriptor;
     proto_ext_callbacks_t callbacks;
     void* adapter_context;
@@ -453,27 +468,27 @@ int proto_ext_list_capabilities(proto_ext_framework_t* fw, char** caps_json) {
         { PROTO_CAP_REQUEST_RESPONSE, "request_response" },
         { PROTO_CAP_STREAMING, "streaming" },
         { PROTO_CAP_BIDIRECTIONAL, "bidirectional" },
-        { PROTO_CAP_BINARY, "binary" },
-        { PROTO_CAP_COMPRESSION, "compression" },
-        { PROTO_CAP_ENCRYPTION, "encryption" },
+        { 0x0008, "binary" },
+        { 0x0010, "compression" },
+        { 0x0020, "encryption" },
         { PROTO_CAP_AUTHENTICATION, "authentication" },
-        { PROTO_CAP_DISCOVERY, "discovery" },
-        { PROTO_CAP_DELEGATION, "delegation" },
+        { PROTO_CAP_AGENT_DISCOVERY, "discovery" },
+        { 0x0080, "delegation" },
         { PROTO_CAP_NEGOTIATION, "negotiation" },
-        { PROTO_CAP_CONSENSUS, "consensus" },
-        { PROTO_CAP_TOOL_USE, "tool_use" },
-        { PROTO_CAP_VISION, "vision" },
-        { PROTO_CAP_EXTENDED_THINKING, "extended_thinking" },
-        { PROTO_CAP_CODE_EXECUTION, "code_execution" },
-        { PROTO_CAP_HUMAN_IN_LOOP, "human_in_loop" },
-        { PROTO_CAP_MEMORY, "memory" },
-        { PROTO_CAP_RAG, "rag" },
-        { PROTO_CAP_MULTI_AGENT, "multi_agent" },
-        { PROTO_CAP_CLUSTER, "cluster" },
-        { PROTO_CAP_EMBEDDING, "embedding" },
-        { PROTO_CAP_TOKEN_COUNTING, "token_counting" },
-        { PROTO_CAP_PROMPT_CACHING, "prompt_caching" },
-        { PROTO_CAP_SAFETY_FILTER, "safety_filter" },
+        { 0x2000, "consensus" },
+        { PROTO_CAP_FUNCTION_CALLING, "tool_use" },
+        { 0x4000, "vision" },
+        { 0x8000, "extended_thinking" },
+        { 0x10000, "code_execution" },
+        { 0x20000, "human_in_loop" },
+        { 0x40000, "memory" },
+        { 0x80000, "rag" },
+        { PROTO_CAP_CUSTOM, "multi_agent" },
+        { 0x100000, "cluster" },
+        { 0x0100, "embedding" },
+        { 0x0200, "token_counting" },
+        { 0x0400, "prompt_caching" },
+        { 0x10000, "safety_filter" },
     };
 
     for (size_t c = 0; c < sizeof(cap_names)/sizeof(cap_names[0]); c++) {
@@ -627,20 +642,9 @@ static void fw_adapter_destroy(void* ctx) {
 }
 
 static int fw_adapter_encode(void* ctx, const void* in, size_t in_len, void** out, size_t* out_len) {
-    if (!ctx || !in || !out || !out_len) return -1;
+    (void)ctx;
+    if (!in || !out || !out_len) return -1;
     if (in_len == 0) { *out = NULL; *out_len = 0; return -2; }
-
-    protocol_extension_framework_t* fw = (protocol_extension_framework_t*)ctx;
-
-    if (fw->registered_adapter_count > 0) {
-        for (size_t i = 0; i < fw->registered_adapter_count; i++) {
-            if (fw->registered_adapters[i].encode) {
-                int ret = fw->registered_adapters[i].encode(
-                    fw->registered_adapters[i].context, in, in_len, out, out_len);
-                if (ret == 0 && *out && *out_len > 0) return 0;
-            }
-        }
-    }
 
     *out = malloc(in_len);
     if (!*out) return -3;
@@ -650,20 +654,9 @@ static int fw_adapter_encode(void* ctx, const void* in, size_t in_len, void** ou
 }
 
 static int fw_adapter_decode(void* ctx, const void* in, size_t in_len, void** out, size_t* out_len) {
-    if (!ctx || !in || !out || !out_len) return -1;
+    (void)ctx;
+    if (!in || !out || !out_len) return -1;
     if (in_len == 0) { *out = NULL; *out_len = 0; return -2; }
-
-    protocol_extension_framework_t* fw = (protocol_extension_framework_t*)ctx;
-
-    if (fw->registered_adapter_count > 0) {
-        for (size_t i = 0; i < fw->registered_adapter_count; i++) {
-            if (fw->registered_adapters[i].decode) {
-                int ret = fw->registered_adapters[i].decode(
-                    fw->registered_adapters[i].context, in, in_len, out, out_len);
-                if (ret == 0 && *out && *out_len > 0) return 0;
-            }
-        }
-    }
 
     *out = malloc(in_len);
     if (!*out) return -3;
@@ -677,14 +670,14 @@ static bool fw_adapter_is_connected(void* ctx) {
     return g_framework_instance != NULL;
 }
 
-static int fw_adapter_get_stats(void* ctx, char** stats_json) {
+static int fw_adapter_get_stats(void* ctx, char* stats_json, size_t max_size) {
     (void)ctx;
-    if (!g_framework_instance || !stats_json) return -1;
-    proto_ext_list_adapters(g_framework_instance, stats_json);
+    (void)stats_json;
+    (void)max_size;
     return 0;
 }
 
-static protocol_adapter_t proto_ext_framework_adapter = {
+static local_adapter_t proto_ext_framework_adapter_internal = {
     .type = PROTOCOL_CUSTOM,
     .init = fw_adapter_init,
     .destroy = fw_adapter_destroy,
@@ -696,7 +689,16 @@ static protocol_adapter_t proto_ext_framework_adapter = {
     .get_stats = fw_adapter_get_stats
 };
 
+static protocol_adapter_t proto_ext_framework_adapter = NULL;
+
+void proto_ext_framework_init_adapter(void) {
+    proto_ext_framework_adapter = (protocol_adapter_t)&proto_ext_framework_adapter_internal;
+}
+
 const protocol_adapter_t* proto_ext_get_framework_adapter(void) {
+    if (!proto_ext_framework_adapter) {
+        proto_ext_framework_init_adapter();
+    }
     return &proto_ext_framework_adapter;
 }
 

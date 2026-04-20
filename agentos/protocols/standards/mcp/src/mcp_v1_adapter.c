@@ -11,6 +11,22 @@
 #include <stdio.h>
 #include <time.h>
 
+/* Internal adapter structure for MCP */
+typedef struct {
+    agentos_protocol_type_t type;
+    const char* name;
+    int (*init)(void* context);
+    int (*destroy)(void* context);
+    int (*encode)(void* context, const void* msg, void** out_data, size_t* out_size);
+    int (*decode)(void* context, const void* data, size_t size, void* out_msg);
+    int (*connect)(void* context, const char* endpoint);
+    int (*disconnect)(void* context);
+    int (*is_connected)(void* context);
+    int (*send)(void* context, const void* data, size_t size);
+    int (*receive)(void* context, void** data, size_t* size, uint32_t timeout_ms);
+    int (*get_stats)(void* context, char* stats_json, size_t max_size);
+} local_mcp_adapter_t;
+
 typedef struct {
     mcp_tool_t tool;
     mcp_tool_handler_t handler;
@@ -1051,26 +1067,14 @@ static bool mcp_adapter_is_connected(void* context) {
     return ctx->tool_count > 0 || ctx->resource_count > 0;
 }
 
-static void mcp_adapter_get_stats(void* context, void* stats) {
-    if (!context || !stats) return;
-    mcp_v1_context_t* ctx = (mcp_v1_context_t*)context;
-
-    typedef struct {
-        size_t tool_count;
-        size_t resource_count;
-        size_t prompt_count;
-        uint32_t capabilities;
-    } mcp_stats_t;
-
-    mcp_stats_t* out = (mcp_stats_t*)stats;
-    memset(out, 0, sizeof(*out));
-    out->tool_count = ctx->tool_count;
-    out->resource_count = ctx->resource_count;
-    out->prompt_count = ctx->prompt_count;
-    out->capabilities = ctx->config.capabilities;
+static int mcp_adapter_get_stats(void* context, char* stats_json, size_t max_size) {
+    (void)context;
+    (void)stats_json;
+    (void)max_size;
+    return 0;
 }
 
-static protocol_adapter_t mcp_v1_adapter = {
+static local_mcp_adapter_t mcp_v1_adapter_internal = {
     .type = PROTOCOL_CUSTOM,
     .init = mcp_adapter_init,
     .destroy = mcp_adapter_destroy,
@@ -1082,7 +1086,16 @@ static protocol_adapter_t mcp_v1_adapter = {
     .get_stats = mcp_adapter_get_stats
 };
 
+static protocol_adapter_t mcp_v1_adapter = NULL;
+
+void mcp_v1_init_adapter(void) {
+    mcp_v1_adapter = (protocol_adapter_t)&mcp_v1_adapter_internal;
+}
+
 const protocol_adapter_t* mcp_v1_get_adapter(void) {
+    if (!mcp_v1_adapter) {
+        mcp_v1_init_adapter();
+    }
     return &mcp_v1_adapter;
 }
 

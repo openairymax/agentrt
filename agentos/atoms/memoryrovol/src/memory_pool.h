@@ -47,17 +47,27 @@ typedef struct memory_pool {
     memory_block_header_t* used_list;
     agentos_mutex_t* lock;
     uint32_t flags;
+    void* gc_handle;
 } memory_pool_t;
 
 memory_pool_t* memory_pool_create(uint8_t pool_id, const char* name, uint64_t size);
 void memory_pool_destroy(memory_pool_t* pool);
 void* memory_pool_alloc(memory_pool_t* pool, size_t size);
 void memory_pool_free(memory_pool_t* pool, void* ptr);
+
+int  memory_pool_retain(memory_pool_t* pool, void* ptr);
+int  memory_pool_release(memory_pool_t* pool, void* ptr);
+uint32_t memory_pool_get_ref_count(memory_pool_t* pool, void* ptr);
+
+int  memory_pool_set_gc(memory_pool_t* pool, void* gc);
+void memory_pool_collect_garbage(memory_pool_t* pool);
+
 uint64_t memory_pool_get_used_size(memory_pool_t* pool);
 uint64_t memory_pool_get_peak_size(memory_pool_t* pool);
-double memory_pool_get_fragmentation_ratio(memory_pool_t* pool);
+double   memory_pool_get_fragmentation_ratio(memory_pool_t* pool);
 uint64_t memory_pool_get_alloc_count(memory_pool_t* pool);
 uint64_t memory_pool_get_free_count(memory_pool_t* pool);
+double   memory_pool_get_utilization(memory_pool_t* pool);
 
 #ifdef __cplusplus
 }

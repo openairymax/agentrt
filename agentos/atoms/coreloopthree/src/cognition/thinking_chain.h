@@ -63,6 +63,25 @@ typedef enum {
     TC_STATUS_SKIPPED = 5          /**< 跳过（如修正失败） */
 } tc_step_status_t;
 
+/* ==================== DS-005/006: 注意力分配类型（前向声明） ==================== */
+
+typedef struct {
+    float decomposition_weight;
+    float planning_weight;
+    float generation_weight;
+    float verification_weight;
+    float audit_weight;
+    float alignment_weight;
+} tc_attention_weights_t;
+
+#define TC_ATTENTION_DEFAULTS { \
+    .base_tokens = 8192, \
+    .weights = { .decomposition_weight = 0.15f, .planning_weight = 0.20f, \
+                 .generation_weight = 0.30f, .verification_weight = 0.15f, \
+                 .audit_weight = 0.12f, .alignment_weight = 0.08f }, \
+    .pressure_threshold = 0.80f, .enable_dynamic_adjustment = 1, \
+    .min_step_tokens = 256, .max_step_tokens = 4096 }
+
 /**
  * @brief 验证结果
  */
@@ -181,6 +200,15 @@ struct agentos_working_memory {
     uint64_t evictions;                       /**< 淘汰数 */
 };
 
+typedef struct {
+    size_t base_tokens;
+    tc_attention_weights_t weights;
+    float pressure_threshold;
+    int enable_dynamic_adjustment;
+    uint32_t min_step_tokens;
+    uint32_t max_step_tokens;
+} tc_attention_config_t;
+
 /**
  * @brief 思考链路（完整结构）
  *
@@ -208,6 +236,10 @@ struct agentos_thinking_chain {
     void (*on_step_completed)(agentos_thinking_step_t* step, void* user_data);
     void (*on_correction)(agentos_thinking_step_t* step, const char* critique, void* user_data);
     void* callback_user_data;
+
+    /* DS-005: 注意力分配配置 */
+    tc_attention_config_t attention_config;
+    int attention_configured;
 };
 
 /* ==================== Context Window API ==================== */
@@ -589,6 +621,38 @@ AGENTOS_API uint32_t agentos_tc_chain_checkpoint(agentos_thinking_chain_t* chain
 AGENTOS_API size_t agentos_tc_chain_rollback(
     agentos_thinking_chain_t* chain,
     uint32_t checkpoint_id);
+
+/* ==================== DS-005/006: 注意力分配与动态预算API ==================== */
+
+typedef struct {
+    size_t allocated_tokens;
+    float priority_score;
+    float urgency_score;
+    int is_elevated;
+} tc_allocation_result_t;
+
+AGENTOS_API agentos_error_t agentos_tc_set_attention_config(
+    agentos_thinking_chain_t* chain,
+    const tc_attention_config_t* config);
+
+AGENTOS_API agentos_error_t agentos_tc_allocate_attention(
+    agentos_thinking_chain_t* chain,
+    agentos_thinking_step_t* step,
+    tc_allocation_result_t* out_alloc);
+
+AGENTOS_API agentos_error_t agentos_tc_adjust_dynamic_budget(
+    agentos_thinking_chain_t* chain,
+    tc_step_type_t step_type,
+    float performance_score);
+
+AGENTOS_API float agentos_tc_compute_priority(
+    const agentos_thinking_step_t* step,
+    const agentos_thinking_chain_t* chain);
+
+AGENTOS_API agentos_error_t agentos_tc_wm_set_priority(
+    agentos_working_memory_t* wm,
+    const char* key,
+    float priority);
 
 #ifdef __cplusplus
 }

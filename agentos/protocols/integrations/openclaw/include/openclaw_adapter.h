@@ -98,6 +98,7 @@ typedef struct {
     char* tool_id;
     char* name;
     char* description;
+    char* owner_agent_id;
     char* input_schema_json;
     char* output_schema_json;
     bool requires_auth;

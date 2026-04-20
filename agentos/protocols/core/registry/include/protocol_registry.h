@@ -76,7 +76,7 @@ typedef struct {
     proto_type_t type;
     uint32_t capabilities;
     proto_state_t state;
-    const proto_adapter_t* adapter;
+    const protocol_adapter_t* adapter;
     void* context;
     proto_dependency_t dependencies[PROTO_REGISTRY_MAX_DEPS];
     size_t dependency_count;
@@ -120,7 +120,7 @@ int proto_registry_register(protocol_registry_t* registry,
                             proto_category_t category,
                             proto_type_t type,
                             uint32_t capabilities,
-                            const proto_adapter_t* adapter,
+                            const protocol_adapter_t* adapter,
                             void* context);
 
 int proto_registry_unregister(protocol_registry_t* registry,

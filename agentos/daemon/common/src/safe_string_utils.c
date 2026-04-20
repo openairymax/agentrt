@@ -12,31 +12,31 @@
 
 int safe_strcpy(char* dest, const char* src, size_t dest_size) {
     if (!dest || !src || dest_size == 0) return -1;
-    
+
     size_t src_len = strlen(src);
     if (src_len >= dest_size) {
         memcpy(dest, src, dest_size - 1);
         dest[dest_size - 1] = '\0';
         return -2;
     }
-    
+
     memcpy(dest, src, src_len + 1);
     return 0;
 }
 
 int safe_strcat(char* dest, const char* src, size_t dest_size) {
     if (!dest || !src || dest_size == 0) return -1;
-    
+
     size_t dest_len = strlen(dest);
     size_t src_len = strlen(src);
-    
+
     if (dest_len + src_len >= dest_size) {
         size_t remaining = dest_size - dest_len - 1;
         memcpy(dest + dest_len, src, remaining);
         dest[dest_len + remaining] = '\0';
         return -2;
     }
-    
+
     memcpy(dest + dest_len, src, src_len + 1);
     return 0;
 }

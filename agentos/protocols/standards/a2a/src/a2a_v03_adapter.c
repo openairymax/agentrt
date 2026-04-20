@@ -18,23 +18,53 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
 
+/* Forward declarations for types defined in header */
+typedef struct a2a_v03_adapter_s a2a_v03_adapter_t;
+
+/* Internal types needed only in this translation unit */
+typedef struct { int type; float proposed_cost; int proposed_timeout_ms; int proposed_priority; } a2a_proposal_internal_t;
+typedef struct { char task_id[64]; int outcome; float final_cost; int final_timeout_ms; int counter_priority; int round_number; } a2a_negotiation_result_internal_t;
+typedef struct { const char* task_id; const char* description; int num_participants; float consensus_threshold; } a2a_consensus_request_internal_t;
+typedef struct { char task_id[64]; int agreed; int rounds_completed; int agreements[16]; int total_participants; int agree_count; bool consensus_reached; int consensus_type; } a2a_consensus_result_internal_t;
+typedef void (*a2a_stream_callback_internal_t)(const char*, size_t, bool, void*);
+typedef struct { const char* task_id; const char* target_agent_id; const char* description; int timeout_ms; a2a_stream_callback_internal_t callback; void* user_data; } a2a_task_request_internal_t;
+typedef struct { char task_id[64]; int status; char* result_json; char accepted_by[64]; int negotiation_rounds; int estimated_duration_ms; } a2a_task_response_internal_t;
+typedef struct { uint32_t total_tasks; uint32_t active; uint32_t active_tasks; uint32_t completed_tasks; uint32_t failed_tasks; double avg_delegation_latency_ms; double avg_consensus_latency_ms; uint32_t registered_agents; } a2a_stats_internal_t;
+typedef struct { int event_type; char task_id[64]; uint8_t progress_percentage; char phase[64]; char* detail_json; } a2a_progress_event_internal_t;
+
+/* Compatibility defines */
+#define A2A_PROGRESS_UPDATE 1
+#define A2A_TASK_STATUS_COMPLETED 3
+#define A2A_TASK_STATUS_ACCEPTED 4
+#define A2A_OUTCOME_REJECTED 3
+#define A2A_CONSENSUS_MAJORITY 1
+#define A2A_CONSENSUS_UNANIMOUS 2
+#define A2A_CONSENSUS_NONE 0
+#define A2A_NEGOTIATE_COST 1
+#define A2A_NEGOTIATE_TIMEOUT 2
+#define A2A_NEGOTIATE_PRIORITY 3
+#define A2A_OUTCOME_ACCEPTED 1
+#define A2A_OUTCOME_COUNTER_OFFER 2
 #define A2A_VERSION "0.3"
-#define A2A_MAX_AGENTS 256
-#define A2A_DEFAULT_TIMEOUT_MS 30000
 
-typedef struct a2a_agent_card_s {
+/* Internal agent card struct with fixed arrays (used internally by this file) */
+typedef struct {
     char id[64];
     char name[128];
     char url[512];
     char capabilities[1024];
     int version;
+    int protocol_version;
     bool available;
-} a2a_agent_card_t;
+    char* capabilities_json;
+} a2a_internal_card_t;
 
+/* Use header-declared types; define local adapter state */
 struct a2a_v03_adapter_s {
-    a2a_config_t config;
-    a2a_agent_card_t agents[A2A_MAX_AGENTS];
+    a2a_internal_card_t agents[A2A_V03_MAX_AGENTS];
     size_t agent_count;
     uint64_t task_counter;
     bool initialized;
@@ -47,12 +77,12 @@ static struct a2a_v03_adapter_s* g_a2a_instance = NULL;
  * ============================================================================ */
 
 int a2a_v03_create(a2a_config_t config, a2a_handle_t* out_handle) {
+    (void)config;
     if (!out_handle) return -1;
 
     struct a2a_v03_adapter_s* adapter = calloc(1, sizeof(struct a2a_v03_adapter_s));
     if (!adapter) return -2;
 
-    adapter->config = config;
     adapter->agent_count = 0;
     adapter->task_counter = 1;
     adapter->initialized = true;
@@ -91,7 +121,7 @@ int a2a_v03_register_agent(a2a_handle_t handle,
     if (!adapter->initialized) return -2;
     if (adapter->agent_count >= A2A_MAX_AGENTS) return -3;
 
-    a2a_agent_card_t* card = &adapter->agents[adapter->agent_count];
+    a2a_internal_card_t* card = &adapter->agents[adapter->agent_count];
     snprintf(card->id, sizeof(card->id), "agent_%zu_%llu",
              adapter->agent_count + 1, adapter->task_counter++);
     strncpy(card->name, info->name ? info->name : "Unknown", sizeof(card->name) - 1);
@@ -121,7 +151,7 @@ int a2a_v03_discover_agents(a2a_handle_t handle,
 
     size_t matched = 0;
     for (size_t i = 0; i < adapter->agent_count && matched < A2A_MAX_AGENTS; i++) {
-        const a2a_agent_card_t* card = &adapter->agents[i];
+        const a2a_internal_card_t* card = &adapter->agents[i];
 
         if (!card->available) continue;
         if (filter && filter->min_protocol_version > 0 &&
@@ -151,7 +181,7 @@ int a2a_v03_get_agent_card(a2a_handle_t handle,
 
     for (size_t i = 0; i < adapter->agent_count; i++) {
         if (strcmp(adapter->agents[i].id, agent_id) == 0) {
-            const a2a_agent_card_t* card = &adapter->agents[i];
+            const a2a_internal_card_t* card = &adapter->agents[i];
             memset(out_info, 0, sizeof(*out_info));
             out_info->name = strdup(card->name);
             out_info->url = strdup(card->url);
@@ -169,8 +199,8 @@ int a2a_v03_get_agent_card(a2a_handle_t handle,
  * ============================================================================ */
 
 int a2a_v03_delegate_task(a2a_handle_t handle,
-                           const a2a_task_request_t* request,
-                           a2a_task_response_t* out_response) {
+                           const a2a_task_request_internal_t* request,
+                           a2a_task_response_internal_t* out_response) {
     if (!handle || !request || !out_response) return -1;
     struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)handle;
     if (!adapter->initialized) return -2;
@@ -203,8 +233,8 @@ int a2a_v03_delegate_task(a2a_handle_t handle,
 
 int a2a_v03_negotiate_task(a2a_handle_t handle,
                              const char* task_id,
-                             const a2a_proposal_t* proposal,
-                             a2a_negotiation_result_t* out_result) {
+                             const a2a_proposal_internal_t* proposal,
+                             a2a_negotiation_result_internal_t* out_result) {
     if (!handle || !task_id || !proposal || !out_result) return -1;
     struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)handle;
     if (!adapter->initialized) return -2;
@@ -235,8 +265,8 @@ int a2a_v03_negotiate_task(a2a_handle_t handle,
 }
 
 int a2a_v03_achieve_consensus(a2a_handle_t handle,
-                               const a2a_consensus_request_t* request,
-                               a2a_consensus_result_t* out_result) {
+                               const a2a_consensus_request_internal_t* request,
+                               a2a_consensus_result_internal_t* out_result) {
     if (!handle || !request || !out_result) return -1;
     struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)handle;
     if (!adapter->initialized) return -2;
@@ -277,10 +307,10 @@ int a2a_v03_achieve_consensus(a2a_handle_t handle,
  * ============================================================================ */
 
 int a2a_v03_stream_task(a2a_handle_t handle,
-                         const a2a_task_request_t* request,
-                         a2a_stream_callback_t on_chunk,
+                         const a2a_task_request_internal_t* request,
+                         a2a_stream_callback_internal_t on_chunk,
                          void* user_data,
-                         a2a_task_response_t* final_response) {
+                         a2a_task_response_internal_t* final_response) {
     if (!handle || !request || !on_chunk || !final_response) return -1;
     struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)handle;
     if (!adapter->initialized) return -2;
@@ -288,7 +318,7 @@ int a2a_v03_stream_task(a2a_handle_t handle,
     snprintf(final_response->task_id, sizeof(final_response->task_id),
              "stream_task_%llu", adapter->task_counter++);
 
-    a2a_progress_event_t event;
+    a2a_progress_event_internal_t event;
     memset(&event, 0, sizeof(event));
     strncpy(event.task_id, final_response->task_id, sizeof(event.task_id) - 1);
 
@@ -305,7 +335,7 @@ int a2a_v03_stream_task(a2a_handle_t handle,
                  phases[i], event.progress_percentage);
         event.detail_json = strdup(detail);
 
-        on_chunk(&event, user_data);
+        on_chunk(event.detail_json, strlen(event.detail_json), (i == 4), user_data);
         free((void*)event.detail_json);
     }
 
@@ -319,7 +349,7 @@ int a2a_v03_stream_task(a2a_handle_t handle,
  * Statistics & Cleanup
  * ============================================================================ */
 
-int a2a_v03_get_stats(a2a_handle_t handle, a2a_stats_t* out_stats) {
+int a2a_v03_get_stats(a2a_handle_t handle, a2a_stats_internal_t* out_stats) {
     if (!handle || !out_stats) return -1;
     struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)handle;
     if (!adapter->initialized) return -2;
