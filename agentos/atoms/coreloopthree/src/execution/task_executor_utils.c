@@ -5,7 +5,7 @@
  */
 
 #include "task_executor_utils.h"
-#include "agentos.h"
+#include "../../../atoms/corekern/include/agentos.h"
 #include "logger.h"
 #include <string.h>
 #include <time.h>

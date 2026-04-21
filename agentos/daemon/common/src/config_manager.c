@@ -139,6 +139,8 @@ AGENTOS_API cm_config_t cm_create_default_config(void) {
 AGENTOS_API int cm_init(const cm_config_t* config) {
     if (g_cm.initialized) return 0;
 
+    memset(&g_cm, 0, sizeof(g_cm));
+
     if (config) {
         memcpy(&g_cm.config, config, sizeof(cm_config_t));
     } else {
@@ -148,13 +150,6 @@ AGENTOS_API int cm_init(const cm_config_t* config) {
     agentos_error_t err = agentos_platform_mutex_init(&g_cm.mutex);
     if (err != AGENTOS_SUCCESS) return -1;
 
-    memset(g_cm.entries, 0, sizeof(g_cm.entries));
-    g_cm.entry_count = 0;
-    memset(g_cm.history, 0, sizeof(g_cm.history));
-    g_cm.history_count = 0;
-    g_cm.history_head = 0;
-    g_cm.watcher_count = 0;
-    g_cm.validator_count = 0;
     g_cm.global_version = 1;
     g_cm.initialized = true;
 

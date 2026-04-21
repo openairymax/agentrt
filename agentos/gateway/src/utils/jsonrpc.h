@@ -16,6 +16,7 @@
 #define GATEWAY_JSONRPC_H
 
 #include <stddef.h>
+#include <stdbool.h>
 
 /* 前向声明 cJSON 类型 */
 struct cJSON;
@@ -177,5 +178,83 @@ char* jsonrpc_create_auth_failed_response(const cJSON* id);
  * @return 错误消息字符串
  */
 const char* jsonrpc_get_error_message(int code);
+
+/* ==================== Batch Requests (PROTO-004) ==================== */
+
+#define JSONRPC_MAX_BATCH_SIZE 64
+
+/**
+ * @brief 验证并解析批量请求（JSON数组）
+ *
+ * 批量请求格式: [{req1}, {req2}, ...]
+ * 每个子请求必须符合JSON-RPC 2.0规范。
+ *
+ * @param[in] batch_json JSON数组对象
+ * @param[out] out_count 解析出的请求数量
+ * @return 0 成功
+ * @return -1 输入为NULL或非数组
+ * @return -2 数组元素不是对象
+ * @return -3 超过最大批量大小
+ * @return -4 包含无效子请求（部分成功）
+ */
+int jsonrpc_validate_batch_request(const cJSON* batch_json, size_t* out_count);
+
+/**
+ * @brief 处理批量请求，返回响应数组
+ *
+ * 对每个子请求调用处理函数，收集所有响应。
+ * 即使部分请求失败，也会返回其他成功的响应。
+ *
+ * @param[in] batch_json 批量请求数组
+ * @param[in] handler 单请求处理回调
+ * @param[in] user_data 用户数据传给handler
+ * @return JSON响应数组字符串(需free)，失败返回NULL
+ */
+char* jsonrpc_process_batch(
+    const cJSON* batch_json,
+    char* (*handler)(const cJSON* request, void* user_data),
+    void* user_data
+);
+
+/* ==================== Notifications (PROTO-004) ==================== */
+
+/**
+ * @brief 创建通知（无id字段的特殊请求）
+ *
+ * 通知格式:
+ * {
+ *   "jsonrpc": "2.0",
+ *   "method": "<method>",
+ *   "params": <params>
+ * }
+ *
+ * 与普通请求的区别：没有"id"字段，服务器不应返回响应。
+ *
+ * @param[in] method 方法名
+ * @param[in] params 参数对象（可为NULL）
+ * @return JSON通知字符串(需free)，失败返回NULL
+ */
+char* jsonrpc_create_notification(const char* method, cJSON* params);
+
+/**
+ * @brief 验证是否为通知（无id字段）
+ *
+ * @param[in] json JSON对象
+ * @return true 是通知
+ * @return false 不是通知或有id字段
+ */
+bool jsonrpc_is_notification(const cJSON* json);
+
+/**
+ * @brief 创建参数化通知（便捷函数）
+ *
+ * @param[in] method 方法名
+ * @param[in] params_json 参数JSON字符串
+ * @return JSON通知字符串(需free)
+ */
+char* jsonrpc_create_notification_params(
+    const char* method,
+    const char* params_json
+);
 
 #endif /* GATEWAY_JSONRPC_H */

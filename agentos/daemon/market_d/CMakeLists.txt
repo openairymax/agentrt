@@ -103,7 +103,9 @@ target_compile_options(agentos-market-d PRIVATE
 # 测试支持
 if(BUILD_TESTS)
     enable_testing()
-    add_subdirectory(tests)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
+        add_subdirectory(tests)
+    endif()
 endif()
 
 # 安装规则

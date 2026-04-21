@@ -13,6 +13,7 @@
  */
 
 #include "http_gateway.h"
+#include "http_gateway_routes.h"
 #include "jsonrpc.h"
 #include "syscall_router.h"
 #include "gateway_utils.h"
@@ -23,6 +24,23 @@
 #include <cJSON.h>
 #include <string.h>
 #include <stdlib.h>
+
+/* MHD header iterator callback (same as http_gateway.c) */
+static int parse_headers(void* cls, enum MHD_ValueKind kind,
+                         const char* key, const char* value) {
+    (void)cls; (void)kind; (void)key; (void)value;
+    return MHD_YES;
+}
+
+#ifdef _WIN32
+    #define WIN32_LEAN_AND_MEAN
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+#else
+    #include <arpa/inet.h>
+    #include <sys/socket.h>
+    #include <netinet/in.h>
+#endif
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
@@ -78,15 +96,68 @@ int handle_options_preflight(http_gateway_t* gateway,
     }
 
     struct MHD_Response* response = MHD_create_response_from_buffer(0, NULL, MHD_RESPMEM_PERSISTENT);
-    MHD_add_response_header(response, "Access-Control-Allow-Origin", "*");
+
     MHD_add_response_header(response, "Access-Control-Allow-Methods", "POST, GET, OPTIONS");
-    MHD_add_response_header(response, "Access-Control-Allow-Headers", "Content-Type, Authorization");
+    MHD_add_response_header(response, "Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID");
+    MHD_add_response_header(response, "Access-Control-Max-Age", "86400");
+
+    MHD_add_response_header(response, "X-Content-Type-Options", "nosniff");
+    MHD_add_response_header(response, "X-Frame-Options", "DENY");
+    MHD_add_response_header(response, "X-XSS-Protection", "1; mode=block");
+    MHD_add_response_header(response, "Cache-Control", "no-store");
     
     int ret = MHD_queue_response(connection, 200, response);
     MHD_destroy_response(response);
     free(context);
     
     return ret;
+}
+
+/**
+ * @brief 验证API密钥（用于敏感端点保护）
+ * @param connection MHD连接对象
+ * @param gateway 网关实例
+ * @return true 验证通过，false 拒绝访问
+ */
+static bool gateway_verify_api_key(struct MHD_Connection* connection, http_gateway_t* gateway) {
+    (void)gateway;
+
+    const char* env_key = getenv("GATEWAY_API_KEY");
+    if (!env_key || !env_key[0]) return false;
+
+    const char* auth_header = MHD_lookup_connection_value(connection, MHD_HEADER_KIND, "Authorization");
+    if (auth_header && strncmp(auth_header, "Bearer ", 7) == 0) {
+        if (strcmp(auth_header + 7, env_key) == 0) return true;
+    }
+
+    const char* key_param = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, "api_key");
+    if (key_param && strcmp(key_param, env_key) == 0) return true;
+
+    return false;
+}
+
+/**
+ * @brief URL路径安全净化
+ * @param url 原始URL路径
+ * @return true 路径安全，false 检测到可疑模式
+ */
+static bool gateway_is_url_safe(const char* url) {
+    if (!url || !url[0]) return false;
+
+    size_t len = strlen(url);
+    if (len > 2048) return false;
+
+    for (size_t i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)url[i];
+        if (c < 0x20 || c > 0x7E) return false;
+    }
+
+    if (strstr(url, "..") != NULL) return false;
+    if (strstr(url, "%2e") != NULL || strstr(url, "%2E") != NULL) return false;
+    if (strstr(url, "%3b") != NULL || strstr(url, "%3B") != NULL) return false;
+    if (strstr(url, "%00") != NULL) return false;
+
+    return true;
 }
 
 /**
@@ -96,26 +167,36 @@ int handle_health_check(http_gateway_t* gateway,
                                 struct MHD_Connection* connection,
                                 http_request_context_t* context) {
     (void)context;
-    
+
     const char* health_json = "{\"status\":\"healthy\",\"service\":\"gateway\"}";
     struct MHD_Response* response = create_http_response(200, health_json, strlen(health_json));
-    
+
     atomic_fetch_add(&gateway->requests_total, 1);
-    
+
     int ret = MHD_queue_response(connection, 200, response);
     MHD_destroy_response(response);
     free(context);
-    
+
     return ret;
 }
 
 /**
- * @brief 处理 GET /metrics 指标导出 (CC=3)
+ * @brief 处理 GET /metrics 指标导出 (CC=3) — 需要API密钥认证
  */
 int handle_metrics_export(http_gateway_t* gateway,
                                   struct MHD_Connection* connection,
                                   http_request_context_t* context) {
     (void)context;
+
+    if (!gateway_verify_api_key(connection, gateway)) {
+        const char* err_json = "{\"error\":{\"code\":-32001,\"message\":\"Unauthorized: API key required\"}}";
+        struct MHD_Response* response = create_http_response(401, err_json, strlen(err_json));
+        int ret = MHD_queue_response(connection, 401, response);
+        MHD_destroy_response(response);
+        free(context);
+        atomic_fetch_add(&gateway->requests_failed, 1);
+        return ret;
+    }
     
     char* metrics_json = NULL;
     agentos_error_t err = agentos_sys_telemetry_metrics(&metrics_json);
@@ -206,15 +287,6 @@ int handle_parse_error(http_gateway_t* gateway,
 /* ========== 路由表定义（唯一实现） ========== */
 
 /**
- * @brief HTTP 路由条目
- */
-typedef struct {
-    const char* method;           /**< HTTP 方法 */
-    const char* path;             /**< URL 路径 */
-    int (*handler)(http_gateway_t*, struct MHD_Connection*, http_request_context_t*);
-} http_route_t;
-
-/**
  * @brief HTTP 路由表（按优先级排序）
  *
  * 路由匹配规则：
@@ -270,16 +342,27 @@ int handle_http_request(void* cls, struct MHD_Connection* connection,
     
     /* 速率限制检查（在早期阶段进行） */
     if (gateway->rate_limiter) {
-        /* 获取客户端 IP 地址 */
         const char* client_ip = MHD_lookup_connection_value(connection, MHD_HEADER_KIND, "X-Forwarded-For");
         if (!client_ip) {
             client_ip = MHD_lookup_connection_value(connection, MHD_HEADER_KIND, "X-Real-IP");
         }
         if (!client_ip) {
-            /* 尝试从连接获取 IP（简化实现） */
-            client_ip = "unknown";
+            const struct sockaddr* addr = MHD_get_connection_info(connection, MHD_CONNECTION_INFO_CLIENT_ADDRESS);
+            if (addr) {
+                char ip_buf[64];
+                if (addr->sa_family == AF_INET) {
+                    inet_ntop(AF_INET, &((struct sockaddr_in*)addr)->sin_addr, ip_buf, sizeof(ip_buf));
+                    client_ip = ip_buf;
+                } else if (addr->sa_family == AF_INET6) {
+                    inet_ntop(AF_INET6, &((struct sockaddr_in6*)addr)->sin6_addr, ip_buf, sizeof(ip_buf));
+                    client_ip = ip_buf;
+                }
+            }
         }
-        
+        if (!client_ip) {
+            client_ip = "_unresolved";
+        }
+
         if (!gateway_rate_limiter_allow(gateway->rate_limiter, client_ip)) {
             /* 返回 429 Too Many Requests */
             const char* error_response = "{\"error\":{\"code\":-32004,\"message\":\"Rate limit exceeded\"}}";
@@ -299,6 +382,18 @@ int handle_http_request(void* cls, struct MHD_Connection* connection,
         if (!context) {
             return MHD_NO;
         }
+
+        if (!gateway_is_url_safe(url)) {
+            free(context);
+            const char* error_response = "{\"error\":{\"code\":-32002,\"message\":\"Invalid URL path\"}}";
+            struct MHD_Response* response = MHD_create_response_from_buffer(
+                strlen(error_response), (void*)error_response, MHD_RESPMEM_PERSISTENT);
+            MHD_add_response_header(response, "Content-Type", "application/json");
+            int ret = MHD_queue_response(connection, 400, response);
+            MHD_destroy_response(response);
+            return ret;
+        }
+
         context->method = method;
         context->url = url;
         context->start_time_ns = gateway_time_ns();

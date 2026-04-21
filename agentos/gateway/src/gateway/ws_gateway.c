@@ -402,6 +402,21 @@ static int ws_callback(struct lws* wsi, enum lws_callback_reasons reason, void* 
         case LWS_CALLBACK_RECEIVE:
             if (!context) return -1;
 
+            if (len > gateway->max_request_size) {
+                char* error_json = jsonrpc_create_error_response(NULL, -32603,
+                    "Message too large", NULL);
+                if (error_json) {
+                    ws_message_t* error_msg = ws_message_create(
+                        WS_MSG_TYPE_ERROR, NULL, cJSON_Parse(error_json));
+                    if (error_msg) {
+                        ws_send_message(wsi, error_msg);
+                        ws_message_destroy(error_msg);
+                    }
+                    free(error_json);
+                }
+                return -1;
+            }
+
             /* 更新统计信息 */
             context->last_activity_ns = gateway_time_ns();
             context->messages_received++;
@@ -454,6 +469,8 @@ static int ws_callback(struct lws* wsi, enum lws_callback_reasons reason, void* 
             return result;
 
         case LWS_CALLBACK_CLOSED:
+        case LWS_CALLBACK_WS_PEER_INITIATED_CLOSE:
+        case LWS_CALLBACK_CLOSED_HTTP:
             return handle_ws_closed(gateway, &context);
 
         default:

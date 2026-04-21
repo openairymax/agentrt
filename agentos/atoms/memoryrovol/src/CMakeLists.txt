@@ -2,6 +2,7 @@
 # MemoryRovol 模块源文件列表
 # 注意：部分高级功能文件（mount.c/rerank.c等）因依赖问题暂时排除
 add_library(agentos_memoryrovol STATIC
+    garbage_collector.c
     forgetting/archive.c
     forgetting/decay.c
     forgetting/prune.c
@@ -30,9 +31,10 @@ add_library(agentos_memoryrovol STATIC
     retrieval/energy.c
     retrieval/mount.c
     retrieval/rerank.c
+    lru_cache.c
     memory_optimizer.c
+    memory_pool.c
     memoryrovol.c
-    # monitoring.c   # 暂时排除：agentos_monitoring_t/agentos_observability_t类型未定义
     vector_store.c
     llm_client.c
 )
