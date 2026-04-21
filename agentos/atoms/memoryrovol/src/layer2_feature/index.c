@@ -10,7 +10,7 @@
 
 /* Unified base library compatibility layer */
 #include "include/memory_compat.h"
-#include "utils/string/include/string_compat.h"
+#include "string_compat.h"
 #include <string.h>
 #include <pthread.h>
 #include <math.h>

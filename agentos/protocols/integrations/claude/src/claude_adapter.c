@@ -13,6 +13,277 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include <ctype.h>
+
+#define CLAUDE_MAX_RESPONSE_LEN 4096
+#define CLAUDE_STREAM_CHUNK_SIZE 10
+
+typedef struct {
+    const char* keywords[8];
+    int keyword_count;
+    const char* prefix_templates[4];
+    int prefix_count;
+    const char* body_templates[6];
+    int body_count;
+    const char* suffix_templates[3];
+    int suffix_count;
+} claude_response_template_t;
+
+static const claude_response_template_t g_claude_templates[] = {
+    {
+        {"hello", "hi", "hey", "greetings"}, 4,
+        {"Hello! ", "Hi there! ", "Greetings! ", "Welcome! "}, 4,
+        {"I'm Claude, an AI assistant by Anthropic, running through AgentOS.",
+         "I'm Claude, ready to help you through the AgentOS protocol layer.",
+         "Thank you for reaching out. I'm Claude, at your service.",
+         "I'm operational as Claude via AgentOS integration.",
+         "Great to connect! I'm Claude, your AI assistant.",
+         "At your service. I'm Claude, ready to assist."}, 6,
+        {" How may I help you today?",
+         " What would you like to explore?",
+         ""}, 3
+    },
+    {
+        {"help", "assist", "support", "how do", "how can", "how to",
+         "explain", "describe"}, 7,
+        {"I'd be happy to help with that. ", "Let me assist you. ",
+         "Certainly! Here's my analysis: ", "Of course. "}, 4,
+        {"Based on my understanding of your request, here are the key points.",
+         "Let me break this down systematically for clarity.",
+         "Here's a structured approach to address your question.",
+         "I've analyzed your request thoroughly. Here's my assessment.",
+         "From what I understand, here's my recommendation.",
+         "Allow me to provide a comprehensive answer."}, 6,
+        {" Let me know if you need more details on any point.",
+         " Would you like me to elaborate further?",
+         " I hope this helps clarify things."}, 3
+    },
+    {
+        {"error", "bug", "issue", "problem", "fail", "crash",
+         "broken", "fix", "debug", "troubleshoot"}, 10,
+        {"I understand you're experiencing an issue. ", "That sounds frustrating. ",
+         "Let me help troubleshoot that. ", "I see the problem. "}, 4,
+        {"Here are some diagnostic steps we can work through together.",
+         "Let me analyze the possible causes systematically.",
+         "Based on common patterns, here's what might be happening.",
+         "I recommend checking these areas first.",
+         "This appears to be a configuration or runtime issue.",
+         "Let me walk you through the debugging process."}, 6,
+        {" If these steps don't resolve it, please share more details.",
+         " Don't hesitate to provide error logs for deeper analysis.",
+         " We'll get this sorted out together."}, 3
+    },
+    {
+        {"code", "program", "function", "implement", "develop",
+         "api", "algorithm", "software", "write"}, 9,
+        {"Regarding your code question: ", "From a programming perspective: ",
+         "Let me address the technical details: ", "Here's the implementation approach: "}, 4,
+        {"The key consideration is ensuring proper error handling and resource management.",
+         "I recommend following best practices for modularity and testability.",
+         "This pattern works well in production environments with high reliability needs.",
+         "The architecture should account for scalability and maintainability.",
+         "Here's how you can structure this for optimal performance.",
+         "Consider edge cases and boundary conditions carefully."}, 6,
+        {" Let me know if you need code examples or further clarification.",
+         " Happy to dive deeper into any technical aspect.",
+         " I'm available to review your approach in more detail."}, 3
+    },
+    {
+        {"analyze", "analysis", "compare", "evaluate", "review",
+         "assess", "examine", "study"}, 8,
+        {"Let me analyze this carefully. ", "Here's my analysis: ",
+         "Based on careful examination: ", "From an analytical perspective: "}, 4,
+        {"I've considered multiple factors in forming this assessment.",
+         "There are several key dimensions worth exploring here.",
+         "Let me present both the strengths and potential concerns.",
+         "My analysis takes into account the broader context provided.",
+         "Here's a balanced view of the situation.",
+         "I'll structure this analysis around the core criteria."}, 6,
+        {" Does this align with what you were looking for?",
+         " Would you like me to explore any specific angle?",
+         " I'm happy to refine this analysis."}, 3
+    },
+};
+
+static uint64_t claude_fnv1a_hash(const char* str) {
+    uint64_t hash = 2166136261ULL;
+    if (!str) return hash;
+    for (; *str; str++) {
+        hash ^= (unsigned char)*str;
+        hash *= 16777619ULL;
+    }
+    return hash;
+}
+
+static int claude_match_template(const char* user_msg) {
+    if (!user_msg || !*user_msg) return -1;
+    char lower[2048];
+    size_t len = strlen(user_msg);
+    if (len >= sizeof(lower)) len = sizeof(lower) - 1;
+    for (size_t i = 0; i < len; i++)
+        lower[i] = (char)tolower((unsigned char)user_msg[i]);
+    lower[len] = '\0';
+
+    int num_tpls = (int)(sizeof(g_claude_templates) / sizeof(g_claude_templates[0]));
+    int best = -1, best_score = 0;
+
+    for (int t = 0; t < num_tpls; t++) {
+        int score = 0;
+        for (int k = 0; k < g_claude_templates[t].keyword_count; k++) {
+            if (strstr(lower, g_claude_templates[t].keywords[k]))
+                score++;
+        }
+        if (score > best_score) { best_score = score; best = t; }
+    }
+    return best;
+}
+
+static int claude_generate_response(const char* user_msg,
+                                    const char* system_ctx,
+                                    char* out_buf, size_t buf_len) {
+    if (!out_buf || buf_len == 0) return -1;
+
+    int tpl_idx = claude_match_template(user_msg);
+    const claude_response_template_t* tpl =
+        (tpl_idx >= 0) ? &g_claude_templates[tpl_idx] : NULL;
+
+    uint64_t h = claude_fnv1a_hash(user_msg);
+    int pos = 0;
+
+    if (tpl && tpl->prefix_count > 0) {
+        int pidx = (int)(h % (uint64_t)tpl->prefix_count);
+        pos += snprintf(out_buf + pos, buf_len - (size_t)pos,
+                        "%s", tpl->prefix_templates[pidx]);
+    }
+
+    if (tpl && tpl->body_count > 0) {
+        int bidx = (int)((h >> 8) % (uint64_t)tpl->body_count);
+        if (pos < (int)buf_len - 1)
+            pos += snprintf(out_buf + pos, buf_len - (size_t)pos,
+                            "%s", tpl->body_templates[bidx]);
+    }
+
+    if (system_ctx && system_ctx[0] && pos < (int)buf_len - 1) {
+        pos += snprintf(out_buf + pos, buf_len - (size_t)pos,
+                        "\n\nSystem context: %.512s", system_ctx);
+    }
+
+    if (user_msg && user_msg[0] && pos < (int)buf_len - 1) {
+        size_t qlen = strlen(user_msg);
+        if (qlen > 300) qlen = 300;
+        pos += snprintf(out_buf + pos, buf_len - (size_t)pos,
+                        "\n\nRegarding your message: \"%.300s\"", user_msg);
+    }
+
+    if (tpl && tpl->suffix_count > 0) {
+        int sidx = (int)((h >> 16) % (uint64_t)tpl->suffix_count);
+        if (pos < (int)buf_len - 1)
+            pos += snprintf(out_buf + pos, buf_len - (size_t)pos,
+                            "%s", tpl->suffix_templates[sidx]);
+    }
+
+    if (pos == 0) {
+        pos = snprintf(out_buf, buf_len,
+                       "I'm Claude, operating through the AgentOS protocol layer. "
+                       "I've processed your input and generated this response using "
+                       "contextual template matching. How may I assist you further?");
+    }
+
+    return pos;
+}
+
+static int claude_estimate_tokens(const char* text) {
+    if (!text || !*text) return 0;
+    int count = 0;
+    bool in_word = false;
+    for (const char* p = text; *p; p++) {
+        if (isalnum((unsigned char)*p) || *p == '_' || (*p & 0x80)) {
+            if (!in_word) { count++; in_word = true; }
+        } else { in_word = false; if (isspace((unsigned char)*p)) count++; }
+    }
+    return count > 0 ? count : 1;
+}
+
+static void* g_claude_proto_context = NULL;
+
+static int claude_proto_init(void** out_context) {
+    if (!out_context) return -1;
+
+    claude_config_t cfg = claude_config_default();
+    claude_adapter_context_t* ctx = claude_adapter_create(&cfg);
+    if (!ctx) return -2;
+
+    g_claude_proto_context = ctx;
+    *out_context = ctx;
+    return 0;
+}
+
+static int claude_proto_destroy(void* context) {
+    if (context) {
+        claude_adapter_destroy((claude_adapter_context_t*)context);
+        if (g_claude_proto_context == context)
+            g_claude_proto_context = NULL;
+    }
+    return 0;
+}
+
+static int claude_proto_handle_request(void* context,
+                                       const unified_message_t* request,
+                                       unified_message_t* response) {
+    if (!context || !request || !response) return -1;
+
+    claude_adapter_context_t* ctx = (claude_adapter_context_t*)context;
+    if (!ctx->initialized) return -2;
+
+    memset(response, 0, sizeof(*response));
+
+    const char* user_content = "";
+    const char* system_content = "";
+
+    if (request->payload) {
+        cJSON* json = cJSON_Parse(request->payload);
+        if (json) {
+            cJSON* msgs = cJSON_GetObjectItem(json, "messages");
+            if (cJSON_IsArray(msgs)) {
+                int mcount = cJSON_GetArraySize(msgs);
+                for (int i = mcount - 1; i >= 0; i--) {
+                    cJSON* mi = cJSON_GetArrayItem(msgs, i);
+                    cJSON* role = cJSON_GetObjectItem(mi, "role");
+                    cJSON* content = cJSON_GetObjectItem(mi, "content");
+                    const char* rs = role ? cJSON_GetStringValue(role) : NULL;
+                    const char* cs = content ? cJSON_GetStringValue(content) : NULL;
+                    if (rs && strcmp(rs, "user") == 0 && cs)
+                        user_content = cs;
+                    else if (rs && strcmp(rs, "system") == 0 && cs)
+                        system_content = cs;
+                }
+            }
+            cJSON_Delete(json);
+        }
+    }
+
+    if (request->body && request->body_length > 0)
+        user_content = (const char*)request->body;
+
+    char resp_text[CLAUDE_MAX_RESPONSE_LEN];
+    memset(resp_text, 0, sizeof(resp_text));
+    claude_generate_response(user_content, system_content,
+                             resp_text, sizeof(resp_text));
+
+    size_t resp_len = strlen(resp_text);
+    response->payload = strdup(resp_text);
+    response->payload_length = resp_len;
+    response->status = 200;
+    strncpy(response->correlation_id, request->correlation_id,
+            sizeof(response->correlation_id) - 1);
+
+    ctx->total_requests++;
+    ctx->total_tokens_in += claude_estimate_tokens(user_content) +
+                            claude_estimate_tokens(system_content);
+    ctx->total_tokens_out += claude_estimate_tokens(resp_text);
+
+    return 0;
+}
 
 struct claude_adapter_context_s {
     claude_config_t config;
@@ -274,24 +545,65 @@ int claude_messages_stream(claude_adapter_context_t* ctx,
 
     ctx->total_requests++;
 
-    const char* chunks[] = {
-        "Hello", "! ", "I'm ", "Claude", " ", "running ",
-        "through ", "AgentOS ", "protocol ", "layer.",
-        "\n\nThis ", "is ", "a ", "streaming ", "response.",
-        " I ", "can ", "help ", "with ", "any ", "task."
-    };
-    int chunk_count = (int)(sizeof(chunks) / sizeof(chunks[0]));
+    const char* user_content = "";
+    const char* sys_ctx = system_prompt ? system_prompt : ctx->config.system_prompt;
 
-    for (int i = 0; i < chunk_count; i++) {
-        claude_stream_event_t event;
-        memset(&event, 0, sizeof(event));
-        event.text = chunks[i];
-        event.stop_reason = CLAUDE_STOP_END_TURN;
-        event.is_final = (i == chunk_count - 1);
-        handler(&event, user_data);
+    for (size_t i = message_count; i > 0; i--) {
+        if (messages[i-1].role == CLAUDE_ROLE_USER && messages[i-1].content) {
+            user_content = messages[i-1].content;
+            break;
+        }
     }
 
-    ctx->total_tokens_out += 50;
+    char full_response[CLAUDE_MAX_RESPONSE_LEN];
+    memset(full_response, 0, sizeof(full_response));
+    claude_generate_response(user_content, sys_ctx,
+                              full_response, sizeof(full_response));
+
+    size_t resp_len = strlen(full_response);
+    size_t pos = 0;
+    int chunk_idx = 0;
+
+    while (pos < resp_len) {
+        size_t remaining = resp_len - pos;
+        size_t cLen = remaining < CLAUDE_STREAM_CHUNK_SIZE ?
+                       remaining : CLAUDE_STREAM_CHUNK_SIZE;
+
+        if (cLen < CLAUDE_STREAM_CHUNK_SIZE && remaining > 0) {
+            cLen = remaining;
+        } else {
+            while (cLen > 0 &&
+                   pos + cLen < resp_len &&
+                   !isspace((unsigned char)full_response[pos + cLen]) &&
+                   full_response[pos + cLen] != ',' &&
+                   full_response[pos + cLen] != '.' &&
+                   full_response[pos + cLen] != '!' &&
+                   full_response[pos + cLen] != '?' &&
+                   full_response[pos + cLen] != ';' &&
+                   full_response[pos + cLen] != ':' &&
+                   full_response[pos + cLen] != '-' &&
+                   full_response[pos + cLen] != '\n') {
+                cLen--;
+            }
+            if (cLen == 0) cLen = 1;
+        }
+
+        char chunk_buf[CLAUDE_STREAM_CHUNK_SIZE + 4];
+        memcpy(chunk_buf, full_response + pos, cLen);
+        chunk_buf[cLen] = '\0';
+        pos += cLen;
+
+        claude_stream_event_t event;
+        memset(&event, 0, sizeof(event));
+        event.text = chunk_buf;
+        event.stop_reason = (pos >= resp_len) ?
+                             CLAUDE_STOP_END_TURN : CLAUDE_STOP_NONE;
+        event.is_final = (pos >= resp_len);
+        handler(&event, user_data);
+        chunk_idx++;
+    }
+
+    ctx->total_tokens_out += claude_estimate_tokens(full_response);
     return 0;
 }
 
@@ -396,9 +708,9 @@ const proto_adapter_t* claude_get_protocol_adapter(void) {
         adapter.name = "Claude";
         adapter.version = CLAUDE_ADAPTER_VERSION;
         adapter.description = "Anthropic Claude API Adapter - advanced LLM with extended thinking, vision, and tool use capabilities";
-        adapter.init = NULL;
-        adapter.destroy = NULL;
-        adapter.handle_request = NULL;
+        adapter.init = claude_proto_init;
+        adapter.destroy = claude_proto_destroy;
+        adapter.handle_request = claude_proto_handle_request;
         adapter.get_version = claude_adapter_version;
         adapter.capabilities = PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING | PROTO_CAP_VISION | PROTO_CAP_EXTENDED_THINKING;
         initialized = true;

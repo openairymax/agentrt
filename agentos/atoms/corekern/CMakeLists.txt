@@ -72,5 +72,7 @@ set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)  # 链接时优化
 # 单元测试支持
 if(BUILD_TESTS)
     enable_testing()
-    add_subdirectory(tests)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
+        add_subdirectory(tests)
+    endif()
 endif()

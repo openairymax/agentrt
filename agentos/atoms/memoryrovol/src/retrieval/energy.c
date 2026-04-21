@@ -7,7 +7,7 @@
 #include "../include/retrieval.h"
 #include "../include/layer2_feature.h"
 #include "../include/forgetting.h"
-#include "agentos.h"
+#include "../../../atoms/corekern/include/agentos.h"
 #include <math.h>
 
 float agentos_energy_hopfield(

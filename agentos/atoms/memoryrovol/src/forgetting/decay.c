@@ -7,7 +7,7 @@
 #include "../include/forgetting.h"
 #include "../include/layer1_raw.h"
 #include "../include/layer2_feature.h"
-#include "agentos.h"
+#include "../../../atoms/corekern/include/agentos.h"
 #include <math.h>
 #include <stdlib.h>
 #include <time.h>

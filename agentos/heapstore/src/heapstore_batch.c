@@ -217,9 +217,8 @@ static heapstore_error_t batch_add_generic(
 
 heapstore_error_t heapstore_batch_add_log(
     heapstore_batch_context_t* ctx,
-    int level,
     const char* service,
-    const char* trace_id,
+    int level,
     const char* message) {
 
     if (!batch_validate_context(ctx)) {
@@ -248,14 +247,7 @@ heapstore_error_t heapstore_batch_add_log(
     memcpy(item->data.log.service, service, copy_len);
     item->data.log.service[copy_len] = '\0';
 
-    if (trace_id) {
-        copy_len = strlen(trace_id);
-        if (copy_len >= sizeof(item->data.log.trace_id)) {
-            copy_len = sizeof(item->data.log.trace_id) - 1;
-        }
-        memcpy(item->data.log.trace_id, trace_id, copy_len);
-        item->data.log.trace_id[copy_len] = '\0';
-    }
+    item->data.log.trace_id[0] = '\0';
 
     copy_len = strlen(message);
     if (copy_len >= sizeof(item->data.log.message)) {
@@ -269,9 +261,22 @@ heapstore_error_t heapstore_batch_add_log(
 
 heapstore_error_t heapstore_batch_add_span(
     heapstore_batch_context_t* ctx,
-    const heapstore_trace_entry_t* trace_entry) {
+    const heapstore_span_t* span) {
 
-    return batch_add_generic(ctx, HEAPSTORE_BATCH_ITEM_SPAN, trace_entry, sizeof(*trace_entry));
+    if (!span) return batch_add_generic(ctx, HEAPSTORE_BATCH_ITEM_SPAN, span, sizeof(*span));
+
+    heapstore_trace_entry_t converted;
+    memset(&converted, 0, sizeof(converted));
+    strncpy(converted.trace_id, span->trace_id, sizeof(converted.trace_id) - 1);
+    strncpy(converted.span_id, span->span_id, sizeof(converted.span_id) - 1);
+    strncpy(converted.parent_span_id, span->parent_span_id, sizeof(converted.parent_span_id) - 1);
+    strncpy(converted.name, span->name, sizeof(converted.name) - 1);
+    strncpy(converted.kind, span->kind, sizeof(converted.kind) - 1);
+    converted.start_time_us = span->start_time_ns / 1000;
+    converted.end_time_us = span->end_time_ns / 1000;
+    converted.status = (strcmp(span->status, "ok") == 0) ? 0 : -1;
+
+    return batch_add_generic(ctx, HEAPSTORE_BATCH_ITEM_SPAN, &converted, sizeof(converted));
 }
 
 heapstore_error_t heapstore_batch_add_session(
@@ -373,10 +378,8 @@ heapstore_error_t heapstore_batch_commit(heapstore_batch_context_t* ctx) {
     return result;
 }
 
-heapstore_error_t heapstore_batch_rollback(heapstore_batch_context_t* ctx) {
-    if (!ctx) {
-        return heapstore_ERR_INVALID_PARAM;
-    }
+void heapstore_batch_rollback(heapstore_batch_context_t* ctx) {
+    if (!ctx) return;
 
     heapstore_batch_item_t* item = ctx->head;
     while (item) {
@@ -387,6 +390,4 @@ heapstore_error_t heapstore_batch_rollback(heapstore_batch_context_t* ctx) {
 
     ctx->head = ctx->tail = NULL;
     ctx->count = 0;
-
-    return heapstore_SUCCESS;
 }

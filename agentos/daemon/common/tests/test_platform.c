@@ -44,7 +44,7 @@ static void test_mutex_operations(void) {
     ret = agentos_mutex_unlock(&mutex);
     assert(ret == 0);
 
-    ret = agentos_mutex_destroy(&mutex);
+    agentos_mutex_destroy(&mutex);
     assert(ret == 0);
 
     printf("    PASSED\n");

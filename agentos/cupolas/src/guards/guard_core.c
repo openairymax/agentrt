@@ -8,6 +8,7 @@
 #include "guard_core.h"
 #include "utils/cupolas_utils.h"
 #include "../platform/platform.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -359,8 +360,21 @@ int guard_manager_check_sync(
         } else {
             priv->stats.error_checks++;
         }
-        
-        // TODO: 处理超时
+
+        uint64_t current_time = cupolas_get_timestamp_ns();
+        uint64_t elapsed = current_time - start_time;
+        const uint64_t TIMEOUT_THRESHOLD_NS = 100000000ULL;
+
+        if (elapsed > TIMEOUT_THRESHOLD_NS) {
+            priv->stats.timeout_checks++;
+            size_t remaining = priv->guard_count - i - 1;
+            if (remaining > 0) {
+                printf("[GUARD] Check timeout after %zu/%zu guards (%llu ms)\n",
+                       i + 1, priv->guard_count,
+                       (unsigned long long)(elapsed / 1000000ULL));
+            }
+            break;
+        }
     }
     
     uint64_t end_time = cupolas_get_timestamp_ns();

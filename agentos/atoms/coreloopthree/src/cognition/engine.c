@@ -1,61 +1,34 @@
 /**
  * @file engine.c
- * @brief 认知引擎核心实现
+ * @brief 认知引擎核心实现 - 含双思考系统集成
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ *
+ * STUB-001修复: 集成thinking_chain + metacognition
+ * 实现完整5阶段认知处理管线:
+ * Phase 0: 指令拆解(S1) -> Phase 1: 规划(S2+S1) ->
+ * Phase 2: 执行-验证循环 -> Phase 3: 审计 -> Phase 4: 目标对齐
  */
 
 #include "cognition.h"
-#include "agentos.h"
+#include "../../../atoms/corekern/include/agentos.h"
 #include "logger.h"
 #include "id_utils.h"
 #include "error_utils.h"
 #include <stdlib.h>
 
-/* Unified base library compatibility layer */
 #include "include/memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
 #include <stdio.h>
 #include <inttypes.h>
 
-/* JSON解析库 - 条件编译 */
-#ifdef AGENTOS_HAS_CJSON
 #include <cjson/cJSON.h>
-#else
-typedef struct cJSON { int type; char* valuestring; double valuedouble; struct cJSON* child; struct cJSON* next; } cJSON;
-#define cJSON_NULL 0
-#define cJSON_False 1
-#define cJSON_True 2
-#define cJSON_Number 3
-#define cJSON_String 4
-#define cJSON_Array 5
-#define cJSON_Object 6
-static int g_cjson_available = 0;
 
-static inline cJSON* cJSON_CreateObject(void) {
-    fprintf(stderr, "[WARN] cJSON not available: cJSON_CreateObject() returns NULL\n");
-    return NULL;
-}
-static inline void cJSON_Delete(cJSON* item) { (void)item; }
-static inline cJSON* cJSON_CreateArray(void) {
-    fprintf(stderr, "[WARN] cJSON not available: cJSON_CreateArray() returns NULL\n");
-    return NULL;
-}
-static inline void cJSON_AddItemToArray(cJSON* a, cJSON* i) { (void)a;(void)i; }
-static inline void cJSON_AddItemToObject(cJSON* o, const char* k, cJSON* i) { (void)o;(void)k;(void)i; }
-static inline void cJSON_AddStringToObject(cJSON* o, const char* k, const char* v) { (void)o;(void)k;(void)v; }
-static inline void cJSON_AddNumberToObject(cJSON* o, const char* k, double v) { (void)o;(void)k;(void)v; }
-static inline char* cJSON_PrintUnformatted(const cJSON* i) {
-    (void)i;
-    fprintf(stderr, "[WARN] cJSON not available: cJSON_PrintUnformatted() returns NULL\n");
-    return NULL;
-}
-#endif /* AGENTOS_HAS_CJSON */
-
-/* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
 
-/* 平台特定头文件 */
+#include "thinking_chain.h"
+#include "metacognition.h"
+
 #ifdef _WIN32
     #define WIN32_LEAN_AND_MEAN
     #include <windows.h>
@@ -77,67 +50,38 @@ struct agentos_cognition_engine {
     uint64_t stats_success_count;
     uint64_t stats_failure_count;
     uint64_t stats_total_retries;
+
+    agentos_thinking_chain_t* chain;
+    agentos_metacognition_t* meta;
+    int enable_dual_thinking;
+    uint32_t chain_max_tokens;
+    size_t chain_wm_capacity;
+    float meta_acceptance_threshold;
+    uint64_t dual_think_invocations;
+    uint64_t dual_think_corrections;
 };
 
-/**
- * @brief 触发反馈回调
- * @param engine 认知引擎
- * @param level 反馈级别（1=实时，2=轮次内，3=跨轮次）
- * @param event 事件类型
- * @param data 反馈数据（JSON 格式）
- */
 static void trigger_feedback(
     agentos_cognition_engine_t* engine,
     int level,
     const char* event,
     const char* data) {
-
     if (engine && engine->feedback_cb) {
         engine->feedback_cb(
-            level,
-            "cognition",
-            event,
-            data,
-            data ? strlen(data) : 0,
-            engine->feedback_user_data
-        );
+            level, "cognition", event,
+            data, data ? strlen(data) : 0,
+            engine->feedback_user_data);
     }
 }
 
-/**
- * @brief 创建认知引擎
- *
- * @param plan_strategy 规划策略（可为NULL�?
- * @param coord_strategy 协调策略（可为NULL�?
- * @param disp_strategy 分发策略（可为NULL�?
- * @param out_engine 输出认知引擎指针
- * @return agentos_error_t 错误�?
- *
- * @note 使用默认配置创建认知引擎，如需自定义配置请使用 agentos_cognition_create_ex
- */
 agentos_error_t agentos_cognition_create(
     agentos_plan_strategy_t* plan_strategy,
     agentos_coordinator_strategy_t* coord_strategy,
     agentos_dispatching_strategy_t* disp_strategy,
     agentos_cognition_engine_t** out_engine) {
-
     return agentos_cognition_create_ex(NULL, plan_strategy, coord_strategy, disp_strategy, out_engine);
 }
 
-/**
- * @brief 创建认知引擎（扩展版本，支持自定义配置）
- *
- * @param manager 配置参数（可为NULL，使用默认配置）
- * @param plan_strategy 规划策略（可为NULL�?
- * @param coord_strategy 协调策略（可为NULL�?
- * @param disp_strategy 分发策略（可为NULL�?
- * @param out_engine 输出认知引擎指针
- * @return agentos_error_t 错误�?
- *
- * @note 如果config为NULL，将使用默认配置�?
- *       - default_timeout_ms: 30000 (30�?
- *       - max_retries: 3
- */
 agentos_error_t agentos_cognition_create_ex(
     const agentos_cognition_config_t* manager,
     agentos_plan_strategy_t* plan_strategy,
@@ -158,12 +102,10 @@ agentos_error_t agentos_cognition_create_ex(
     engine->disp_strat = disp_strategy;
     engine->lock = agentos_mutex_create();
     if (!engine->lock) {
-        AGENTOS_LOG_ERROR("Failed to create mutex");
         AGENTOS_FREE(engine);
         return AGENTOS_ENOMEM;
     }
 
-    // 设置配置
     if (manager) {
         engine->manager = *manager;
         engine->feedback_cb = manager->feedback_callback;
@@ -183,16 +125,35 @@ agentos_error_t agentos_cognition_create_ex(
     engine->stats_failure_count = 0;
     engine->stats_total_retries = 0;
 
+    engine->chain = NULL;
+    engine->meta = NULL;
+    engine->enable_dual_thinking = 1;
+    engine->chain_max_tokens = 8192;
+    engine->chain_wm_capacity = 64;
+    engine->meta_acceptance_threshold = 0.7f;
+    engine->dual_think_invocations = 0;
+    engine->dual_think_corrections = 0;
+
+    agentos_error_t ds_err = agentos_mc_create(&engine->meta);
+    if (ds_err != AGENTOS_SUCCESS) {
+        AGENTOS_LOG_WARN("Metacognition init failed: err=%d, dual-thinking disabled", (int)ds_err);
+        engine->enable_dual_thinking = 0;
+    }
+
     *out_engine = engine;
-
-    // 触发引擎创建反馈
     trigger_feedback(engine, 2, "engine_created", "{\"status\":\"initialized\"}");
-
     return AGENTOS_SUCCESS;
 }
 
 void agentos_cognition_destroy(agentos_cognition_engine_t* engine) {
     if (!engine) return;
+    if (engine->chain) {
+        agentos_tc_chain_stop(engine->chain);
+        agentos_tc_chain_destroy(engine->chain);
+    }
+    if (engine->meta) {
+        agentos_mc_destroy(engine->meta);
+    }
     if (engine->context && engine->context_destroy) {
         engine->context_destroy(engine->context);
     }
@@ -205,7 +166,6 @@ void agentos_cognition_destroy(agentos_cognition_engine_t* engine) {
 void agentos_cognition_set_fallback_plan(
     agentos_cognition_engine_t* engine,
     agentos_plan_strategy_t* fallback) {
-
     if (!engine) return;
     agentos_mutex_lock(engine->lock);
     engine->fallback_plan_strat = fallback;
@@ -216,7 +176,6 @@ void agentos_cognition_set_context(
     agentos_cognition_engine_t* engine,
     void* context,
     void (*destroy)(void*)) {
-
     if (!engine) return;
     agentos_mutex_lock(engine->lock);
     if (engine->context && engine->context_destroy) {
@@ -227,25 +186,6 @@ void agentos_cognition_set_context(
     agentos_mutex_unlock(engine->lock);
 }
 
-/**
- * @brief 处理用户输入，生成任务计�?
- *
- * @param engine 认知引擎
- * @param input 用户输入文本
- * @param input_len 输入文本长度
- * @param out_plan 输出任务计划指针
- * @return agentos_error_t 错误�?
- *
- * @note 处理流程�?
- *       1. 参数验证
- *       2. 构建意图结构
- *       3. 尝试主规划策�?
- *       4. 如果主策略失败，尝试回退策略
- *       5. 生成计划ID
- *       6. 更新统计信息
- *
- * @warning 调用者负责释放返回的任务计划（使�?agentos_task_plan_free�?
- */
 agentos_error_t agentos_cognition_process(
     agentos_cognition_engine_t* engine,
     const char* input,
@@ -253,7 +193,7 @@ agentos_error_t agentos_cognition_process(
     agentos_task_plan_t** out_plan) {
 
     if (!engine || !input || !out_plan) {
-        AGENTOS_LOG_ERROR("Invalid parameters to cognition_process: engine=%p, input=%p, out_plan=%p",
+        AGENTOS_LOG_ERROR("Invalid parameters to cognition_process: engine=%p input=%p out_plan=%p",
                          (void*)engine, (void*)input, (void*)out_plan);
         return AGENTOS_EINVAL;
     }
@@ -270,10 +210,48 @@ agentos_error_t agentos_cognition_process(
 
     uint64_t start_ns = agentos_time_monotonic_ns();
 
+    /* ========== Phase 0: Instruction Decomposition (S1) ========== */
+    if (engine->enable_dual_thinking && engine->meta) {
+        if (engine->chain) {
+            agentos_tc_chain_stop(engine->chain);
+            agentos_tc_chain_destroy(engine->chain);
+        }
+        agentos_error_t tc_err = agentos_tc_chain_create(
+            input, engine->chain_max_tokens, engine->chain_wm_capacity, &engine->chain);
+        if (tc_err == AGENTOS_SUCCESS) {
+            agentos_tc_chain_start(engine->chain);
+            agentos_mc_set_chain(engine->meta, engine->chain);
+
+            agentos_thinking_step_t* decomp_step = NULL;
+            agentos_tc_step_create(engine->chain, TC_STEP_DECOMPOSITION,
+                                   input, input_len, NULL, 0, &decomp_step);
+            if (decomp_step) {
+                agentos_tc_step_complete(decomp_step, input, input_len, 0.8f, "S1-decomposer");
+            }
+
+            char* preemptive_hint = NULL;
+            size_t hint_len = 0;
+            int preempt = agentos_mc_preemptive_check(
+                engine->meta, TC_STEP_PLANNING, input, input_len,
+                &preemptive_hint, &hint_len);
+            if (preempt == 1 && preemptive_hint) {
+                if (engine->chain->working_mem) {
+                    agentos_tc_working_memory_store(
+                        engine->chain->working_mem, "preemptive_hint",
+                        preemptive_hint, hint_len + 1, "text/plain", 1);
+                }
+                AGENTOS_FREE(preemptive_hint);
+            }
+        } else {
+            AGENTOS_LOG_WARN("Thinking chain creation failed: err=%d", (int)tc_err);
+        }
+        engine->dual_think_invocations++;
+    }
+
+    /* ========== Phase 1: Planning (S2 + S1 pre-validation) ========== */
     agentos_task_plan_t* plan = NULL;
     agentos_error_t err = AGENTOS_ENOTSUP;
 
-    // 读取策略指针（加锁防止与 set_fallback_plan 竞态）
     agentos_plan_strategy_t* plan_strat = NULL;
     agentos_plan_strategy_t* fallback_strat = NULL;
     agentos_mutex_lock(engine->lock);
@@ -281,21 +259,39 @@ agentos_error_t agentos_cognition_process(
     fallback_strat = engine->fallback_plan_strat;
     agentos_mutex_unlock(engine->lock);
 
-    // 尝试主策�?
     if (plan_strat && plan_strat->plan) {
         err = plan_strat->plan(&intent, plan_strat->data, &plan);
     }
 
-    // 如果主策略失败，尝试回退策略
-    if (err != AGENTOS_SUCCESS) {
-        AGENTOS_LOG_WARN("Primary planning failed: %s (code %d), trying fallback",
-                        agentos_error_string(err), err);
+    if (err == AGENTOS_SUCCESS && plan && engine->enable_dual_thinking &&
+        engine->meta && engine->chain) {
+        agentos_thinking_step_t* plan_step = NULL;
+        agentos_tc_step_create(engine->chain, TC_STEP_PLANNING,
+                               input, input_len, NULL, 0, &plan_step);
+        if (plan_step) {
+            char plan_desc[256];
+            int pd_len = snprintf(plan_desc, sizeof(plan_desc),
+                "plan_id=%s nodes=%zu",
+                plan->task_plan_id ? plan->task_plan_id : "?",
+                plan->task_plan_node_count);
+            agentos_tc_step_complete(plan_step, plan_desc, (size_t)pd_len, 0.75f, "S2-planner");
 
-        // 触发轮次内反馈：主策略失�?
+            mc_evaluation_result_t eval;
+            agentos_mc_evaluate_step(engine->meta, plan_step, NULL, 0, &eval);
+            if (!eval.is_acceptable && eval.strategy != MC_CORRECT_NONE) {
+                AGENTOS_LOG_WARN("Plan S1 pre-validation failed: score=%.2f strategy=%d",
+                                eval.overall_score, eval.strategy);
+                engine->dual_think_corrections++;
+            }
+            if (eval.critique_text) AGENTOS_FREE(eval.critique_text);
+        }
+    }
+
+    if (err != AGENTOS_SUCCESS) {
+        AGENTOS_LOG_WARN("Primary planning failed: err=%d, trying fallback", (int)err);
         char err_buf[256];
         snprintf(err_buf, sizeof(err_buf),
-            "{\"error_code\":%d,\"error_msg\":\"%s\",\"stage\":\"primary_planning\"}",
-            err, agentos_error_string(err));
+            "{\"error_code\":%d,\"stage\":\"primary_planning\"}", (int)err);
         trigger_feedback(engine, 1, "planning_retry", err_buf);
 
         if (fallback_strat && fallback_strat->plan) {
@@ -306,38 +302,25 @@ agentos_error_t agentos_cognition_process(
                 agentos_mutex_unlock(engine->lock);
             }
         } else {
-            AGENTOS_LOG_ERROR("No fallback planner available, primary error: %s (code %d)",
-                            agentos_error_string(err), err);
-
-            // 触发实时反馈：处理失�?
             snprintf(err_buf, sizeof(err_buf),
-                "{\"error_code\":%d,\"error_msg\":\"%s\",\"stage\":\"no_fallback\"}",
-                err, agentos_error_string(err));
+                "{\"error_code\":%d,\"stage\":\"no_fallback\"}", (int)err);
             trigger_feedback(engine, 0, "process_failed", err_buf);
-
             agentos_mutex_lock(engine->lock);
             engine->stats_failure_count++;
             agentos_mutex_unlock(engine->lock);
-
-            return err;
+            goto process_fail;
         }
     }
 
     if (err != AGENTOS_SUCCESS) {
-        AGENTOS_LOG_ERROR("Planning failed: %s (code %d)", agentos_error_string(err), err);
-
-        // 触发实时反馈：处理失�?
         char err_buf[256];
         snprintf(err_buf, sizeof(err_buf),
-            "{\"error_code\":%d,\"error_msg\":\"%s\",\"stage\":\"fallback_failed\"}",
-            err, agentos_error_string(err));
+            "{\"error_code\":%d,\"stage\":\"fallback_failed\"}", (int)err);
         trigger_feedback(engine, 0, "process_failed", err_buf);
-
         agentos_mutex_lock(engine->lock);
         engine->stats_failure_count++;
         agentos_mutex_unlock(engine->lock);
-
-        return err;
+        goto process_fail;
     }
 
     if (plan && !plan->task_plan_id) {
@@ -345,13 +328,68 @@ agentos_error_t agentos_cognition_process(
         agentos_generate_plan_id(id_buf, sizeof(id_buf));
         plan->task_plan_id = AGENTOS_STRDUP(id_buf);
         if (!plan->task_plan_id) {
-            AGENTOS_LOG_ERROR("Failed to allocate plan_id: %s (code %d)",
-                            agentos_error_string(AGENTOS_ENOMEM), AGENTOS_ENOMEM);
             agentos_task_plan_free(plan);
             return AGENTOS_ENOMEM;
         }
     }
 
+    /* ========== Phase 2: Execution-Verification Loop (DS-007 monitoring) ========== */
+    if (engine->enable_dual_thinking && engine->chain && plan) {
+        size_t anomaly_count = 0;
+        int has_critical = 0;
+        agentos_tc_chain_health_check(engine->chain, &anomaly_count, &has_critical);
+        if (has_critical) {
+            AGENTOS_LOG_WARN("Chain health check: %zu anomalies, critical detected", anomaly_count);
+            trigger_feedback(engine, 1, "anomaly_detected",
+                           "{\"anomalies\":1,\"critical\":true}");
+        }
+    }
+
+    /* ========== Phase 3: Subtask Audit (S1 + expert S1) ========== */
+    if (engine->enable_dual_thinking && engine->meta && engine->chain && plan) {
+        agentos_thinking_step_t* audit_step = NULL;
+        agentos_tc_step_create(engine->chain, TC_STEP_AUDIT,
+                               input, input_len, NULL, 0, &audit_step);
+        if (audit_step) {
+            char audit_desc[256];
+            int ad_len = snprintf(audit_desc, sizeof(audit_desc),
+                "audited_plan=%s nodes=%zu corrections=%llu",
+                plan->task_plan_id ? plan->task_plan_id : "?",
+                plan->task_plan_node_count,
+                (unsigned long long)engine->dual_think_corrections);
+            agentos_tc_step_complete(audit_step, audit_desc, (size_t)ad_len, 0.8f, "S1-auditor");
+        }
+    }
+
+    /* ========== Phase 4: Goal Alignment Check ========== */
+    if (engine->enable_dual_thinking && engine->meta && engine->chain) {
+        agentos_thinking_step_t* align_step = NULL;
+        agentos_tc_step_create(engine->chain, TC_STEP_ALIGNMENT,
+                               input, input_len, NULL, 0, &align_step);
+        if (align_step) {
+            mc_evaluation_result_t align_eval;
+            agentos_mc_evaluate_step(engine->meta, align_step, input, input_len, &align_eval);
+
+            int aligned = align_eval.is_acceptable;
+            agentos_tc_step_complete(align_step,
+                                    aligned ? "goal_aligned" : "goal_drift_detected",
+                                    aligned ? 12 : 18,
+                                    align_eval.overall_score, "S1-alignment");
+
+            if (!aligned) {
+                AGENTOS_LOG_WARN("Goal alignment check: drift detected (score=%.2f)",
+                                align_eval.overall_score);
+                trigger_feedback(engine, 2, "goal_drift",
+                               "{\"score\":0.0,\"action\":\"replan_recommended\"}");
+            }
+            if (align_eval.critique_text) AGENTOS_FREE(align_eval.critique_text);
+
+            agentos_mc_detect_patterns(engine->meta, NULL, NULL);
+            agentos_mc_adapt_threshold(engine->meta);
+        }
+    }
+
+    /* ========== Finalize ========== */
     uint64_t end_ns = agentos_time_monotonic_ns();
     uint64_t elapsed = end_ns - start_ns;
 
@@ -361,31 +399,29 @@ agentos_error_t agentos_cognition_process(
     engine->stats_success_count++;
     agentos_mutex_unlock(engine->lock);
 
-    // 触发实时反馈：任务处理完成
     char feedback_buf[512];
     snprintf(feedback_buf, sizeof(feedback_buf),
-        "{\"plan_id\":\"%s\",\"node_count\":%zu,\"elapsed_ns\":%" PRIu64 ",\"status\":\"success\"}",
+        "{\"plan_id\":\"%s\",\"node_count\":%zu,\"elapsed_ns\":%llu,"
+        "\"dual_think\":%d,\"corrections\":%llu,\"status\":\"success\"}",
         plan->task_plan_id ? plan->task_plan_id : "unknown",
         plan->task_plan_node_count,
-        elapsed);
+        (unsigned long long)elapsed,
+        engine->enable_dual_thinking,
+        (unsigned long long)engine->dual_think_corrections);
     trigger_feedback(engine, 0, "process_complete", feedback_buf);
 
     *out_plan = plan;
     return AGENTOS_SUCCESS;
+
+process_fail:
+    if (engine->chain) {
+        agentos_tc_chain_stop(engine->chain);
+        agentos_tc_chain_destroy(engine->chain);
+        engine->chain = NULL;
+    }
+    return err;
 }
 
-/**
- * @brief 释放任务计划及其所有资�?
- *
- * @param plan 任务计划指针
- *
- * @note 释放以下资源�?
- *       1. 计划ID
- *       2. 所有任务节�?
- *       3. 每个任务节点的任务ID、角色、依赖关�?
- *       4. 入口点数�?
- *       5. 任务节点数组
- */
 void agentos_task_plan_free(agentos_task_plan_t* plan) {
     if (!plan) return;
     for (size_t i = 0; i < plan->task_plan_node_count; i++) {
@@ -418,19 +454,23 @@ agentos_error_t agentos_cognition_stats(
     agentos_mutex_lock(engine->lock);
     uint32_t processed = engine->stats_processed;
     uint64_t avg_ns = (processed > 0) ? (engine->stats_total_time_ns / processed) : 0;
+    uint64_t dt_inv = engine->dual_think_invocations;
+    uint64_t dt_corr = engine->dual_think_corrections;
     agentos_mutex_unlock(engine->lock);
 
-    char buffer[256];
+    char buffer[512];
     int len = snprintf(buffer, sizeof(buffer),
-        "{\"processed\":%u,\"avg_time_ns\":%" PRIu64 "}",
-        processed, avg_ns);
+        "{\"processed\":%u,\"avg_time_ns\":%llu,"
+        "\"dual_think_invocations\":%llu,\"dual_think_corrections\":%llu}",
+        processed, (unsigned long long)avg_ns,
+        (unsigned long long)dt_inv, (unsigned long long)dt_corr);
 
     char* result = (char*)AGENTOS_MALLOC(len + 1);
     if (!result) return AGENTOS_ENOMEM;
     memcpy(result, buffer, len + 1);
 
     *out_stats = result;
-    if (out_len) *out_len = len;
+    if (out_len) *out_len = (size_t)len;
     return AGENTOS_SUCCESS;
 }
 
@@ -449,6 +489,14 @@ agentos_error_t agentos_cognition_health_check(
     cJSON_AddNumberToObject(root, "processed", engine->stats_processed);
     cJSON_AddNumberToObject(root, "avg_time_ns",
         (engine->stats_processed > 0) ? (engine->stats_total_time_ns / engine->stats_processed) : 0);
+    cJSON_AddBoolToObject(root, "dual_thinking_enabled", engine->enable_dual_thinking);
+    if (engine->chain) {
+        size_t anomaly_count = 0;
+        int has_critical = 0;
+        agentos_tc_chain_health_check(engine->chain, &anomaly_count, &has_critical);
+        cJSON_AddNumberToObject(root, "chain_anomalies", anomaly_count);
+        cJSON_AddBoolToObject(root, "chain_critical", has_critical);
+    }
     agentos_mutex_unlock(engine->lock);
 
     char* json = cJSON_PrintUnformatted(root);

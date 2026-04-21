@@ -16,7 +16,7 @@
 #include "layer4_pattern.h"
 #include "retrieval.h"
 #include "forgetting.h"
-#include "agentos.h"
+#include "../../atoms/corekern/include/agentos.h"
 #include "logger.h"
 #include "monitoring_metrics.h"
 #include "platform.h"

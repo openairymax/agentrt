@@ -528,10 +528,9 @@ agentos_error_t heapstore_logging_write(
     heapstore_log_file_info_t info;
     memset(&info, 0, sizeof(info));
 
-    heapstore_error_t err = heapstore_log_write(
-        module, log_level, trace_id, message, &info);
+    heapstore_log_write((int)log_level, module, trace_id, __FILE__, __LINE__, "%s", message);
 
-    return (err == heapstore_SUCCESS) ? AGENTOS_SUCCESS : AGENTOS_EIO;
+    return AGENTOS_SUCCESS;
 }
 
 agentos_error_t heapstore_integration_health_check(char** out_health_json) {

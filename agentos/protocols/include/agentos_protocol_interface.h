@@ -22,12 +22,15 @@
 extern "C" {
 #endif
 
+/* unified_message_t and protocol_type_t now defined in unified_protocol.h */
+
 /* ============================================================================
  * I-L1: Protocol Adapter Interface (协议适配器基础接口)
  * ============================================================================ */
 
 typedef enum {
     PROTO_CAP_SYNC_REQUEST     = 0x0001,
+    PROTO_CAP_REQUEST_RESPONSE = 0x0001,
     PROTO_CAP_STREAMING         = 0x0002,
     PROTO_CAP_BIDIRECTIONAL     = 0x0004,
     PROTO_CAP_TOOL_DISCOVERY    = 0x0008,
@@ -40,7 +43,16 @@ typedef enum {
     PROTO_CAP_RATE_LIMITING     = 0x0400,
     PROTO_CAP_NEGOTIATION       = 0x0800,
     PROTO_CAP_NOTIFICATIONS     = 0x1000,
-    PROTO_CAP_CUSTOM            = 0x8000
+    PROTO_CAP_CUSTOM            = 0x8000,
+    PROTO_CAP_BATCH             = 0x00010000,
+    PROTO_CAP_TOOL_CALLING      = 0x00020000,
+    PROTO_CAP_CONSENSUS         = 0x00040000,
+    PROTO_CAP_BINARY            = 0x00080000,
+    PROTO_CAP_LOW_LATENCY       = 0x00100000,
+    PROTO_CAP_CRC_CHECKSUM      = 0x00200000,
+    PROTO_CAP_MULTIMODAL        = 0x00400000,
+    PROTO_CAP_VISION            = 0x00800000,
+    PROTO_CAP_EXTENDED_THINKING = 0x01000000
 } proto_capability_flags_t;
 
 typedef enum {

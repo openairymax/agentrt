@@ -58,13 +58,19 @@ typedef enum {
 typedef struct {
     uint64_t message_id;            /**< 消息ID */
     protocol_type_t protocol;       /**< 协议类型 */
+    protocol_type_t source_protocol; /**< 源协议类型（转换前） */
     message_direction_t direction;  /**< 消息方向 */
     const char* endpoint;           /**< 端点/路径 */
+    char* source_endpoint;           /**< 源端点 */
+    char* target_endpoint;           /**< 目标端点 */
     const void* payload;            /**< 负载数据 */
     size_t payload_size;            /**< 负载大小 */
+    char* metadata;                 /**< 元数据 */
+    size_t metadata_len;            /**< 元数据长度 */
     uint32_t flags;                 /**< 消息标志 */
     uint64_t timestamp;             /**< 时间戳（纳秒） */
     void* user_data;                /**< 用户数据 */
+    void* transformer_context;      /**< 转换器上下文 */
 } unified_message_t;
 
 /**

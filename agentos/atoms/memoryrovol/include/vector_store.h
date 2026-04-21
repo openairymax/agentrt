@@ -7,7 +7,7 @@
 #ifndef AGENTOS_VECTOR_STORE_H
 #define AGENTOS_VECTOR_STORE_H
 
-#include "agentos.h"
+#include "../../atoms/corekern/include/agentos.h"
 #include <stddef.h>
 
 #ifdef __cplusplus

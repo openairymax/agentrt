@@ -238,9 +238,32 @@ int main(int argc, char* argv[]) {
     SVC_LOG_INFO("  Stdio:    %s",
                 config.stdio.enabled ? "[enabled]" : "[disabled]");
 
-    /* 主循环（使用跨平台 sleep） */
-    while (g_running && gateway_service_is_running(g_service)) {
+    /* 主事件循环：信号驱动 + 周期性健康检查 */
+    int loop_count = 0;
+    const int HEALTH_CHECK_INTERVAL = 30;
+
+    while (g_running) {
+        if (!gateway_service_is_running(g_service)) {
+            SVC_LOG_WARN("Gateway service stopped unexpectedly");
+            break;
+        }
+
         agentos_sleep_ms(1000);
+        loop_count++;
+
+        if (config.enable_metrics && (loop_count % HEALTH_CHECK_INTERVAL == 0)) {
+            agentos_svc_stats_t stats;
+            if (gateway_service_get_stats(g_service, &stats) == AGENTOS_SUCCESS) {
+                SVC_LOG_INFO("Health Check [interval=%ds] "
+                            "| concurrent=%u | total_req=%llu "
+                            "| errors=%llu | avg_time=%.1fms",
+                            HEALTH_CHECK_INTERVAL,
+                            stats.current_concurrent,
+                            (unsigned long long)stats.request_count,
+                            (unsigned long long)stats.error_count,
+                            stats.avg_time_ms);
+            }
+        }
     }
 
     SVC_LOG_INFO("Gateway shutting down...");

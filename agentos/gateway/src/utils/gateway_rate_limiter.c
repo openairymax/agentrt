@@ -365,7 +365,13 @@ gateway_rate_limiter_t* gateway_rate_limiter_create(const gateway_rate_limit_con
     }
     
     /* 创建哈希表（大小为质数，减少冲突） */
-    limiter->table_size = 1021;  /* 质数 */
+    const char* env_ts = getenv("AGENTOS_RATE_LIMIT_TABLE_SIZE");
+    if (env_ts) {
+        unsigned long v = strtoul(env_ts, NULL, 10);
+        limiter->table_size = (v > 0 && v < 100000) ? (size_t)v : 1021;
+    } else {
+        limiter->table_size = 1021;
+    }
     limiter->clients_table = calloc(limiter->table_size, sizeof(client_state_t*));
     if (!limiter->clients_table) {
         free(limiter);

@@ -5,7 +5,7 @@
  */
 
 #include "advanced_storage_utils.h"
-#include "agentos.h"
+#include "../../../atoms/corekern/include/agentos.h"
 #include "logger.h"
 #include <string.h>
 #include <stdio.h>

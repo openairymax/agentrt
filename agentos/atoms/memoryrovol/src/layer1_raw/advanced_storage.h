@@ -7,7 +7,7 @@
 #ifndef AGENTOS_ADVANCED_STORAGE_H
 #define AGENTOS_ADVANCED_STORAGE_H
 
-#include "agentos.h"
+#include "../../../atoms/corekern/include/agentos.h"
 #include <stddef.h>
 #include <stdint.h>
 
