@@ -20,6 +20,8 @@
 extern "C" {
 #endif
 
+/* 共享类型已在 heapstore_types.h 中定义，此处仅用于 API 声明 */
+
 /**
  * @brief 注册表类型
  */
@@ -29,44 +31,6 @@ typedef enum {
     heapstore_REG_SESSIONS,  /* 会话注册表 */
     heapstore_REG_MAX
 } heapstore_registry_type_t;
-
-/**
- * @brief Agent 记录结构
- */
-typedef struct heapstore_agent_record {
-    char id[128];
-    char name[256];
-    char type[64];
-    char version[32];
-    char status[32];
-    char config_path[512];
-    uint64_t created_at;
-    uint64_t updated_at;
-} heapstore_agent_record_t;
-
-/**
- * @brief 技能记录结构
- */
-typedef struct heapstore_skill_record {
-    char id[128];
-    char name[256];
-    char version[32];
-    char library_path[512];
-    char manifest_path[512];
-    uint64_t installed_at;
-} heapstore_skill_record_t;
-
-/**
- * @brief 会话记录结构
- */
-typedef struct heapstore_session_record {
-    char id[128];
-    char user_id[128];
-    uint64_t created_at;
-    uint64_t last_active_at;
-    uint32_t ttl_seconds;
-    char status[32];
-} heapstore_session_record_t;
 
 /**
  * @brief 注册表迭代器

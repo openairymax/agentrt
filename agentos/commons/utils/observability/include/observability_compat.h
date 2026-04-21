@@ -12,10 +12,13 @@ extern "C" {
 /* 类型别名 */
 typedef agentos_metrics_t agentos_observability_t;
 
-/* 指标类型常量（兼容旧API） */
+/* 指标类型常量（兼容旧API）- 供需要整数值的API使用 */
+#ifndef AGENTOS_OBSERVABILITY_METRIC_MACROS_DEFINED
+#define AGENTOS_OBSERVABILITY_METRIC_MACROS_DEFINED
 #define AGENTOS_METRIC_COUNTER   0
 #define AGENTOS_METRIC_GAUGE     1
 #define AGENTOS_METRIC_HISTOGRAM 2
+#endif /* AGENTOS_OBSERVABILITY_METRIC_MACROS_DEFINED */
 
 /* 函数映射：创建 */
 static inline agentos_observability_t* agentos_observability_create(void) {

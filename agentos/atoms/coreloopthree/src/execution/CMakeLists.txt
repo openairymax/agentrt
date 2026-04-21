@@ -17,6 +17,8 @@ add_library(agentos_execution STATIC ${EXECUTION_SOURCES})
 target_include_directories(agentos_execution PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../corekern/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../commons/utils
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../commons/utils/strategy/include
 )
 
 target_link_libraries(agentos_execution

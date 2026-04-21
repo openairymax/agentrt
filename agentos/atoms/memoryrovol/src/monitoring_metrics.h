@@ -7,7 +7,7 @@
 #ifndef AGENTOS_MONITORING_METRICS_H
 #define AGENTOS_MONITORING_METRICS_H
 
-#include "agentos.h"
+#include "../../atoms/corekern/include/agentos.h"
 #include <stdint.h>
 
 /* 前向声明 */

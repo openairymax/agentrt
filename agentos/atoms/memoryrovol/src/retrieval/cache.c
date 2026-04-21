@@ -5,7 +5,7 @@
  */
 
 #include "../include/retrieval.h"
-#include "agentos.h"
+#include "../../../atoms/corekern/include/agentos.h"
 #include <stdlib.h>
 #include <time.h>
 

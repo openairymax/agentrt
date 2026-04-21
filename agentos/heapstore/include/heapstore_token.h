@@ -18,6 +18,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "heapstore.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -832,20 +832,374 @@ int cupolas_vault_export(cupolas_vault_t* vault,
                         const char* export_path,
                         const char* password,
                         const char* agent_id) {
-    (void)vault;
-    (void)export_path;
-    (void)password;
+    if (!vault || !export_path || !password) {
+        return -1;
+    }
+
+    if (vault->is_locked) {
+        return -2;
+    }
+
+#ifdef cupolas_USE_OPENSSL
+    FILE* f = fopen(export_path, "wb");
+    if (!f) {
+        return -3;
+    }
+
+    uint8_t file_salt[SALT_SIZE];
+    if (RAND_bytes(file_salt, SALT_SIZE) != 1) {
+        fclose(f);
+        return -4;
+    }
+
+    uint8_t derived_key[AES_KEY_SIZE];
+    uint8_t derived_iv[AES_IV_SIZE];
+
+    if (PKCS5_PBKDF2_HMAC(password, strlen(password),
+                           file_salt, SALT_SIZE, 10000,
+                           EVP_sha256(), AES_KEY_SIZE + AES_IV_SIZE,
+                           derived_key) != 1) {
+        fclose(f);
+        remove(export_path);
+        return -5;
+    }
+
+    memcpy(derived_iv, derived_key + AES_KEY_SIZE, AES_IV_SIZE);
+
+    EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+    if (!ctx) {
+        fclose(f);
+        remove(export_path);
+        return -6;
+    }
+
+    if (EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, derived_key, derived_iv) != 1) {
+        EVP_CIPHER_CTX_free(ctx);
+        fclose(f);
+        remove(export_path);
+        return -7;
+    }
+
+    fwrite(&VAULT_MAGIC, sizeof(VAULT_MAGIC), 1, f);
+    fwrite(&VAULT_VERSION, sizeof(VAULT_VERSION), 1, f);
+    fwrite(file_salt, SALT_SIZE, 1, f);
+
+    time_t now = time(NULL);
+    fwrite(&now, sizeof(time_t), 1, f);
+
+    if (agent_id) {
+        size_t agent_len = strlen(agent_id);
+        fwrite(&agent_len, sizeof(size_t), 1, f);
+        fwrite(agent_id, 1, agent_len, f);
+    } else {
+        size_t zero = 0;
+        fwrite(&zero, sizeof(size_t), 1, f);
+    }
+
+    uint32_t cred_count = (uint32_t)vault->entry_count;
+    fwrite(&cred_count, sizeof(uint32_t), 1, f);
+
+    for (size_t i = 0; i < vault->entry_count; i++) {
+        credential_entry_t* entry = &vault->entries[i];
+
+        size_t id_len = strlen(entry->cred_id);
+        fwrite(&id_len, sizeof(size_t), 1, f);
+        fwrite(entry->cred_id, 1, id_len, f);
+
+        fwrite(&entry->type, sizeof(cupolas_vault_cred_type_t), 1, f);
+        fwrite(&entry->encrypted_len, sizeof(size_t), 1, f);
+
+        int out_len = 0;
+        int final_len = 0;
+        uint8_t* encrypted_buf = (uint8_t*)malloc(entry->encrypted_len + AES_BLOCK_SIZE);
+        if (!encrypted_buf || EVP_EncryptUpdate(ctx, encrypted_buf, &out_len,
+                                               entry->encrypted_data, entry->encrypted_len) != 1) {
+            free(encrypted_buf);
+            EVP_CIPHER_CTX_free(ctx);
+            fclose(f);
+            remove(export_path);
+            return -8;
+        }
+
+        if (EVP_EncryptFinal_ex(ctx, encrypted_buf + out_len, &final_len) != 1) {
+            free(encrypted_buf);
+            EVP_CIPHER_CTX_free(ctx);
+            fclose(f);
+            remove(export_path);
+            return -9;
+        }
+
+        size_t total_encrypted = out_len + final_len;
+        fwrite(&total_encrypted, sizeof(size_t), 1, f);
+        fwrite(encrypted_buf, 1, total_encrypted, f);
+        free(encrypted_buf);
+
+        fwrite(entry->iv, AES_IV_SIZE, 1, f);
+        fwrite(entry->salt, SALT_SIZE, 1, f);
+        fwrite(&entry->acl, sizeof(cupolas_vault_acl_t), 1, f);
+        fwrite(&entry->metadata, sizeof(cupolas_vault_metadata_t), 1, f);
+    }
+
+    EVP_CIPHER_CTX_free(ctx);
+    fclose(f);
+
+    if (vault->config.enable_audit) {
+        printf("[VAULT] Export completed: %zu credentials to %s\n",
+               vault->entry_count, export_path);
+    }
+
+    return 0;
+#else
     (void)agent_id;
-    return -1;
+    FILE* f = fopen(export_path, "w");
+    if (!f) return -3;
+
+    fprintf(f, "# AgentOS Vault Export (plaintext mode - no OpenSSL)\n");
+    fprintf(f, "# Vault ID: %s\n", vault->vault_id ? vault->vault_id : "unknown");
+    fprintf(f, "# Time: %ld\n", (long)time(NULL));
+    fprintf(f, "# Agent: %s\n", agent_id ? agent_id : "unknown");
+    fprintf(f, "# Credentials: %zu\n\n", vault->entry_count);
+
+    for (size_t i = 0; i < vault->entry_count; i++) {
+        credential_entry_t* entry = &vault->entries[i];
+        fprintf(f, "[%s]\n", entry->cred_id);
+        fprintf(f, "type=%d\n", (int)entry->type);
+        fprintf(f, "data_len=%zu\n", entry->encrypted_len);
+        if (entry->metadata.description && entry->metadata.description[0]) {
+            fprintf(f, "label=%s\n", entry->metadata.description);
+        }
+        fprintf(f, "\n");
+    }
+
+    fclose(f);
+    return 0;
+#endif
 }
 
 int cupolas_vault_import(cupolas_vault_t* vault,
                         const char* import_path,
                         const char* password,
                         const char* agent_id) {
-    (void)vault;
-    (void)import_path;
+    if (!vault || !import_path || !password) {
+        return -1;
+    }
+
+    if (vault->is_locked) {
+        return -2;
+    }
+
+#ifdef cupolas_USE_OPENSSL
+    FILE* f = fopen(import_path, "rb");
+    if (!f) {
+        return -3;
+    }
+
+    uint32_t magic = 0;
+    if (fread(&magic, sizeof(uint32_t), 1, f) != 1 || magic != VAULT_MAGIC) {
+        fclose(f);
+        return -4;
+    }
+
+    uint32_t version = 0;
+    if (fread(&version, sizeof(uint32_t), 1, f) != 1 || version > VAULT_VERSION) {
+        fclose(f);
+        return -5;
+    }
+
+    uint8_t file_salt[SALT_SIZE];
+    if (fread(file_salt, SALT_SIZE, 1, f) != 1) {
+        fclose(f);
+        return -6;
+    }
+
+    time_t export_time = 0;
+    fread(&export_time, sizeof(time_t), 1, f);
+
+    size_t agent_len = 0;
+    fread(&agent_len, sizeof(size_t), 1, f);
+    if (agent_len > 0) {
+        char* file_agent_id = (char*)malloc(agent_len + 1);
+        if (file_agent_id) {
+            fread(file_agent_id, 1, agent_len, f);
+            file_agent_id[agent_len] = '\0';
+            free(file_agent_id);
+        } else {
+            fseek(f, agent_len, SEEK_CUR);
+        }
+    }
+
+    uint32_t cred_count = 0;
+    if (fread(&cred_count, sizeof(uint32_t), 1, f) != 1) {
+        fclose(f);
+        return -7;
+    }
+
+    uint8_t derived_key[AES_KEY_SIZE];
+    uint8_t derived_iv[AES_IV_SIZE];
+
+    if (PKCS5_PBKDF2_HMAC(password, strlen(password),
+                           file_salt, SALT_SIZE, 10000,
+                           EVP_sha256(), AES_KEY_SIZE + AES_IV_SIZE,
+                           derived_key) != 1) {
+        fclose(f);
+        return -8;
+    }
+
+    memcpy(derived_iv, derived_key + AES_KEY_SIZE, AES_IV_SIZE);
+
+    EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+    if (!ctx) {
+        fclose(f);
+        return -9;
+    }
+
+    if (EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, derived_key, derived_iv) != 1) {
+        EVP_CIPHER_CTX_free(ctx);
+        fclose(f);
+        return -10;
+    }
+
+    size_t imported = 0;
+
+    for (uint32_t i = 0; i < cred_count; i++) {
+        size_t id_len = 0;
+        if (fread(&id_len, sizeof(size_t), 1, f) != 1) break;
+
+        char* cred_id = (char*)malloc(id_len + 1);
+        if (!cred_id || fread(cred_id, 1, id_len, f) != 1) {
+            free(cred_id);
+            break;
+        }
+        cred_id[id_len] = '\0';
+
+        cupolas_vault_cred_type_t type;
+        if (fread(&type, sizeof(cupolas_vault_cred_type_t), 1, f) != 1) {
+            free(cred_id);
+            break;
+        }
+
+        size_t enc_len = 0;
+        if (fread(&enc_len, sizeof(size_t), 1, f) != 1) {
+            free(cred_id);
+            break;
+        }
+
+        uint8_t* enc_data = (uint8_t*)malloc(enc_len);
+        if (!enc_data || fread(enc_data, 1, enc_len, f) != 1) {
+            free(cred_id);
+            free(enc_data);
+            break;
+        }
+
+        int out_len = 0;
+        int final_len = 0;
+        uint8_t* decrypted = (uint8_t*)malloc(enc_len + AES_BLOCK_SIZE);
+        if (!decrypted ||
+            EVP_DecryptUpdate(ctx, decrypted, &out_len, enc_data, enc_len) != 1 ||
+            EVP_DecryptFinal_ex(ctx, decrypted + out_len, &final_len) != 1) {
+            free(cred_id);
+            free(enc_data);
+            free(decrypted);
+            continue;
+        }
+
+        size_t total_decrypted = out_len + final_len;
+
+        if (vault->entry_count >= vault->entry_capacity) {
+            size_t new_cap = vault->entry_capacity * 2;
+            credential_entry_t* new_entries = (credential_entry_t*)realloc(
+                vault->entries, new_cap * sizeof(credential_entry_t));
+            if (!new_entries) {
+                free(cred_id);
+                free(enc_data);
+                free(decrypted);
+                continue;
+            }
+            vault->entries = new_entries;
+            vault->entry_capacity = new_cap;
+        }
+
+        credential_entry_t* entry = &vault->entries[vault->entry_count];
+        entry->cred_id = cred_id;
+        entry->type = type;
+        entry->encrypted_data = (uint8_t*)malloc(total_decrypted);
+        if (entry->encrypted_data) {
+            memcpy(entry->encrypted_data, decrypted, total_decrypted);
+            entry->encrypted_len = total_decrypted;
+        } else {
+            entry->encrypted_data = NULL;
+            entry->encrypted_len = 0;
+        }
+
+        fread(entry->iv, AES_IV_SIZE, 1, f);
+        fread(entry->salt, SALT_SIZE, 1, f);
+        fread(&entry->acl, sizeof(cupolas_vault_acl_t), 1, f);
+        fread(&entry->metadata, sizeof(cupolas_vault_metadata_t), 1, f);
+
+        vault->entry_count++;
+        imported++;
+
+        free(enc_data);
+        free(decrypted);
+    }
+
+    EVP_CIPHER_CTX_free(ctx);
+    fclose(f);
+
+    if (vault->config.enable_audit) {
+        printf("[VAULT] Import completed: %zu credentials from %s\n",
+               imported, import_path);
+    }
+
+    return (int)imported;
+#else
     (void)password;
     (void)agent_id;
-    return -1;
+
+    FILE* f = fopen(import_path, "r");
+    if (!f) return -3;
+
+    char line[1024];
+    size_t imported = 0;
+    bool in_entry = false;
+    char current_id[256] = {0};
+
+    while (fgets(line, sizeof(line), f)) {
+        line[strcspn(line, "\r\n")] = '\0';
+
+        if (line[0] == '[' && line[strlen(line)-1] == ']') {
+            if (in_entry && current_id[0]) {
+                if (vault->entry_count < vault->entry_capacity) {
+                    credential_entry_t* entry = &vault->entries[vault->entry_count];
+                    entry->cred_id = strdup(current_id);
+                entry->type = 0;
+                    entry->encrypted_data = NULL;
+                    entry->encrypted_len = 0;
+                    memset(&entry->acl, 0, sizeof(entry->acl));
+                    memset(&entry->metadata, 0, sizeof(entry->metadata));
+                    vault->entry_count++;
+                    imported++;
+                }
+            }
+            strncpy(current_id, line + 1, strlen(line) - 2);
+            current_id[strlen(line) - 2] = '\0';
+            in_entry = true;
+        }
+    }
+
+    if (in_entry && current_id[0] && vault->entry_count < vault->entry_capacity) {
+        credential_entry_t* entry = &vault->entries[vault->entry_count];
+        entry->cred_id = strdup(current_id);
+        entry->type = 0;
+        entry->encrypted_data = NULL;
+        entry->encrypted_len = 0;
+        memset(&entry->acl, 0, sizeof(entry->acl));
+        memset(&entry->metadata, 0, sizeof(entry->metadata));
+        vault->entry_count++;
+        imported++;
+    }
+
+    fclose(f);
+    return (int)imported;
+#endif
 }

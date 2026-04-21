@@ -145,6 +145,7 @@ typedef struct {
     uint64_t false_positives;       /**< 误报次数 */
     uint64_t false_negatives;       /**< 漏报次数 */
     uint64_t error_checks;          /**< 检测错误次数 */
+    uint64_t timeout_checks;        /**< 超时次数 */
     uint64_t total_detection_time;  /**< 总检测时间（纳秒） */
     uint64_t max_detection_time;    /**< 最大单次检测时间（纳秒） */
 } guard_stats_t;

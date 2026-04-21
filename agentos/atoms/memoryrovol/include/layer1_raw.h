@@ -7,7 +7,7 @@
 #ifndef AGENTOS_LAYER1_RAW_H
 #define AGENTOS_LAYER1_RAW_H
 
-#include "agentos.h"
+#include "../../atoms/corekern/include/agentos.h"
 #include <stddef.h>
 #include <stdint.h>
 

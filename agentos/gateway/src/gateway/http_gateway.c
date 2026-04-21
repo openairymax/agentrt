@@ -108,7 +108,9 @@ static struct MHD_Response* create_http_response_ex(
     
     MHD_add_response_header(response, "Content-Type", "application/json");
     MHD_add_response_header(response, "Server", "AgentOS-gateway/1.0");
-    
+
+    gateway_apply_security_headers(response);
+
     /* 安全的 CORS 头设置 */
     const char* origin = MHD_lookup_connection_value(connection, MHD_HEADER_KIND, "Origin");
     if (is_cors_origin_allowed(gateway, origin)) {
@@ -142,7 +144,7 @@ static struct MHD_Response* create_http_response_ex(
  * @return MHD 响应对象
  * @deprecated 请使用 create_http_response_ex() 以获得安全的CORS处理
  */
-static struct MHD_Response* create_http_response(int status_code, const char* content, size_t content_len) {
+struct MHD_Response* create_http_response(int status_code, const char* content, size_t content_len) {
     struct MHD_Response* response = MHD_create_response_from_buffer(
         content_len, (void*)content, MHD_RESPMEM_MUST_COPY);
     
@@ -152,6 +154,9 @@ static struct MHD_Response* create_http_response(int status_code, const char* co
     
     MHD_add_response_header(response, "Content-Type", "application/json");
     MHD_add_response_header(response, "Server", "AgentOS-gateway/1.0");
+
+    gateway_apply_security_headers(response);
+
     /* 注意：此函数不设置CORS头，请使用create_http_response_ex() */
     
     return response;
@@ -246,7 +251,7 @@ static char* http_handler_adapter(void* request, void* user_data) {
  * @param context 请求上下文
  * @return JSON响应字符串
  */
-static char* handle_jsonrpc_request(http_gateway_t* gateway, http_request_context_t* context) {
+char* handle_jsonrpc_request(http_gateway_t* gateway, http_request_context_t* context) {
     rpc_result_t result;
     
     /* 检查是否有多协议处理器和原始数据 */
@@ -256,7 +261,7 @@ static char* handle_jsonrpc_request(http_gateway_t* gateway, http_request_contex
             gateway->protocol_handler,
             context->upload_data,
             context->upload_data_size,
-            UNIFIED_PROTOCOL_AUTO,  /* 自动检测协议类型 */
+            AGENTOS_PROTOCOL_COUNT,  /* 自动检测协议类型 */
             gateway->handler,
             gateway->handler_data
         );
@@ -293,17 +298,40 @@ static char* handle_jsonrpc_request(http_gateway_t* gateway, http_request_contex
 /* handle_http_request() 函数已迁移至 http_gateway_routes.c */
 /* ========== 网关操作表 ========== */
 
+static void http_request_completed_callback(void* cls, struct MHD_Connection* connection,
+                                              void** con_cls, enum MHD_RequestTerminationCode toe) {
+    (void)cls;
+    (void)connection;
+    (void)toe;
+    if (con_cls && *con_cls) {
+        http_request_context_t* ctx = (http_request_context_t*)*con_cls;
+        free(ctx);
+        *con_cls = NULL;
+        *con_cls = NULL;
+    }
+}
+
 static agentos_error_t http_gateway_start(void* gateway_impl) {
     http_gateway_t* gateway = (http_gateway_t*)gateway_impl;
     
+    unsigned int conn_limit = gateway->connection_limit > 0 ? gateway->connection_limit : 1000;
+    unsigned int conn_timeout = gateway->connection_timeout > 0 ? gateway->connection_timeout : 30;
+    
+    const char* env_conn = getenv("GATEWAY_HTTP_CONN_LIMIT");
+    const char* env_timeout = getenv("GATEWAY_HTTP_TIMEOUT");
+    if (env_conn) { unsigned long v = strtoul(env_conn, NULL, 10); if (v > 0) conn_limit = (unsigned int)v; }
+    if (env_timeout) { unsigned long v = strtoul(env_timeout, NULL, 10); if (v > 0) conn_timeout = (unsigned int)v; }
+    
     gateway->daemon = MHD_start_daemon(
-        MHD_USE_THREAD_PER_CONNECTION,
+        MHD_USE_EPOLL_INTERNAL_THREAD | MHD_USE_TURBO,
         gateway->port,
         NULL, NULL,
         handle_http_request,
         gateway,
-        MHD_OPTION_CONNECTION_LIMIT, 1000,
-        MHD_OPTION_CONNECTION_TIMEOUT, 30,
+        MHD_OPTION_CONNECTION_LIMIT, conn_limit,
+        MHD_OPTION_CONNECTION_TIMEOUT, conn_timeout,
+        MHD_OPTION_THREAD_POOL_SIZE, 4,
+        MHD_OPTION_NOTIFY_COMPLETED, http_request_completed_callback, NULL,
         MHD_OPTION_END);
     
     if (!gateway->daemon) {
@@ -360,7 +388,7 @@ static void http_gateway_destroy(void* gateway_impl) {
     if (gateway->rate_limiter) {
         gateway_rate_limiter_destroy(gateway->rate_limiter);
     }
-    
+
     /* 清理协议处理器 */
     if (gateway->protocol_handler) {
         gateway_protocol_handler_destroy(gateway->protocol_handler);
@@ -537,7 +565,7 @@ gateway_t* http_gateway_create(const char* host, uint16_t port) {
         
         gateway->rate_limiter = gateway_rate_limiter_create(&rl_config);
     }
-    
+
     /* 初始化多协议处理器 */
     gateway->protocol_handler = gateway_protocol_handler_create(NULL);
     if (!gateway->protocol_handler) {
