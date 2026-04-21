@@ -7,7 +7,7 @@
 #ifndef AGENTOS_ROV_FFI_H
 #define AGENTOS_ROV_FFI_H
 
-#include "agentos.h"
+#include "../../../atoms/corekern/include/agentos.h"
 
 #ifdef __cplusplus
 extern "C" {

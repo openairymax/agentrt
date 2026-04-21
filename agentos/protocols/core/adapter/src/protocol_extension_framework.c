@@ -689,10 +689,10 @@ static local_adapter_t proto_ext_framework_adapter_internal = {
     .get_stats = fw_adapter_get_stats
 };
 
-static protocol_adapter_t proto_ext_framework_adapter = NULL;
+static protocol_adapter_t* proto_ext_framework_adapter = NULL;
 
 void proto_ext_framework_init_adapter(void) {
-    proto_ext_framework_adapter = (protocol_adapter_t)&proto_ext_framework_adapter_internal;
+    proto_ext_framework_adapter = (protocol_adapter_t*)&proto_ext_framework_adapter_internal;
 }
 
 const protocol_adapter_t* proto_ext_get_framework_adapter(void) {

@@ -16,7 +16,7 @@
 #define LAYER1_RAW_QUEUE_H
 
 #include "../../../agentos/commons/utils/memory/include/memory_compat.h"
-#include "agentos.h"
+#include "../../../atoms/corekern/include/agentos.h"
 #include <stddef.h>
 #include <stdint.h>
 

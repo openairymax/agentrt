@@ -1086,10 +1086,10 @@ static local_mcp_adapter_t mcp_v1_adapter_internal = {
     .get_stats = mcp_adapter_get_stats
 };
 
-static protocol_adapter_t mcp_v1_adapter = NULL;
+static protocol_adapter_t* mcp_v1_adapter = NULL;
 
 void mcp_v1_init_adapter(void) {
-    mcp_v1_adapter = (protocol_adapter_t)&mcp_v1_adapter_internal;
+    mcp_v1_adapter = (protocol_adapter_t*)&mcp_v1_adapter_internal;
 }
 
 const protocol_adapter_t* mcp_v1_get_adapter(void) {

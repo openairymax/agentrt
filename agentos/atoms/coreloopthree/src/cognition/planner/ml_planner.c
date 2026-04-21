@@ -4,8 +4,8 @@
  * @copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  */
 
-#include "../../../include/cognition.h"
-#include "include/memory_compat.h"
+#include "../include/cognition.h"
+#include "../../../commons/utils/memory/include/memory_compat.h"
 #include "logging_compat.h"
 #include "platform.h"
 #include <stdlib.h>

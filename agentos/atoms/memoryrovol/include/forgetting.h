@@ -7,7 +7,7 @@
 #ifndef AGENTOS_FORGETTING_H
 #define AGENTOS_FORGETTING_H
 
-#include "agentos.h"
+#include "../../atoms/corekern/include/agentos.h"
 
 #ifdef __cplusplus
 extern "C" {

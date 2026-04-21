@@ -17,7 +17,7 @@
 #include "../include/layer1_raw.h"
 #include "async_storage_io.h"
 #include "async_storage_queue.h"
-#include "agentos.h"
+#include "../../../atoms/corekern/include/agentos.h"
 #include "logger.h"
 #include "observability.h"
 #include <stdlib.h>

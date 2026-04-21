@@ -10,7 +10,7 @@
  */
 
 #include "cognition.h"
-#include "agentos.h"
+#include "../../../atoms/corekern/include/agentos.h"
 #include "logger.h"
 #include "id_utils.h"
 #include "error_utils.h"

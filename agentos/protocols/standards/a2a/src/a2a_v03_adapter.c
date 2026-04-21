@@ -113,85 +113,106 @@ const char* a2a_v03_version(void) {
  * Agent Discovery
  * ============================================================================ */
 
-int a2a_v03_register_agent(a2a_handle_t handle,
-                            const a2a_agent_info_t* info,
-                            char** out_agent_id) {
-    if (!handle || !info || !out_agent_id) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)handle;
+int a2a_v03_register_agent(a2a_v03_context_t* ctx,
+                            const a2a_agent_card_t* card) {
+    if (!ctx || !card) return -1;
+    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
     if (!adapter->initialized) return -2;
     if (adapter->agent_count >= A2A_MAX_AGENTS) return -3;
 
-    a2a_internal_card_t* card = &adapter->agents[adapter->agent_count];
-    snprintf(card->id, sizeof(card->id), "agent_%zu_%llu",
+    a2a_internal_card_t* internal_card = &adapter->agents[adapter->agent_count];
+    snprintf(internal_card->id, sizeof(internal_card->id), "agent_%zu_%llu",
              adapter->agent_count + 1, adapter->task_counter++);
-    strncpy(card->name, info->name ? info->name : "Unknown", sizeof(card->name) - 1);
-    strncpy(card->url, info->url ? info->url : "", sizeof(card->url) - 1);
+    strncpy(internal_card->name, card->name ? card->name : "Unknown", sizeof(internal_card->name) - 1);
+    strncpy(internal_card->url, card->url ? card->url : "", sizeof(internal_card->url) - 1);
 
-    if (info->capabilities_json) {
-        strncpy(card->capabilities, info->capabilities_json,
-                sizeof(card->capabilities) - 1);
+    if (card->capabilities_json) {
+        strncpy(internal_card->capabilities, card->capabilities_json,
+                sizeof(internal_card->capabilities) - 1);
     }
-    card->version = info->protocol_version > 0 ? info->protocol_version : 3;
-    card->available = true;
+    internal_card->version = card->protocol_version > 0 ? card->protocol_version : 3;
+    internal_card->available = true;
 
     adapter->agent_count++;
-
-    *out_agent_id = strdup(card->id);
     return 0;
 }
 
-int a2a_v03_discover_agents(a2a_handle_t handle,
-                              const a2a_discovery_filter_t* filter,
-                              a2a_agent_list_t* out_results) {
-    if (!handle || !out_results) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)handle;
+int a2a_v03_discover_agents(a2a_v03_context_t* ctx,
+                              const char* capability,
+                              const char* skill_name,
+                              a2a_agent_card_t*** results,
+                              size_t* result_count) {
+    if (!ctx || !results || !result_count) return -1;
+    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
     if (!adapter->initialized) return -2;
 
-    memset(out_results, 0, sizeof(*out_results));
+    *result_count = 0;
+    *results = NULL;
 
     size_t matched = 0;
+    a2a_agent_card_t** agent_array = NULL;
+
     for (size_t i = 0; i < adapter->agent_count && matched < A2A_MAX_AGENTS; i++) {
         const a2a_internal_card_t* card = &adapter->agents[i];
 
         if (!card->available) continue;
-        if (filter && filter->min_protocol_version > 0 &&
-            card->version < filter->min_protocol_version) continue;
-        if (filter && filter->capability_required[0] != '\0') {
-            if (!strstr(card->capabilities, filter->capability_required)) continue;
+        if (capability && capability[0] != '\0') {
+            if (!strstr(card->capabilities, capability)) continue;
         }
 
-        out_results->agents[matched].id = strdup(card->id);
-        out_results->agents[matched].name = strdup(card->name);
-        out_results->agents[matched].url = strdup(card->url);
-        out_results->agents[matched].capabilities_json = strdup(card->capabilities);
-        out_results->agents[matched].protocol_version = card->version;
         matched++;
     }
 
-    out_results->count = matched;
-    return 0;
-}
+    if (matched > 0) {
+        agent_array = (a2a_agent_card_t**)calloc(matched, sizeof(a2a_agent_card_t*));
+        if (!agent_array) return -3;
 
-int a2a_v03_get_agent_card(a2a_handle_t handle,
-                             const char* agent_id,
-                             a2a_agent_info_t* out_info) {
-    if (!handle || !agent_id || !out_info) return -1;
-    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)handle;
-    if (!adapter->initialized) return -2;
-
-    for (size_t i = 0; i < adapter->agent_count; i++) {
-        if (strcmp(adapter->agents[i].id, agent_id) == 0) {
+        size_t idx = 0;
+        for (size_t i = 0; i < adapter->agent_count && idx < matched; i++) {
             const a2a_internal_card_t* card = &adapter->agents[i];
-            memset(out_info, 0, sizeof(*out_info));
-            out_info->name = strdup(card->name);
-            out_info->url = strdup(card->url);
-            out_info->capabilities_json = strdup(card->capabilities);
-            out_info->protocol_version = card->version;
-            return 0;
+            if (!card->available) continue;
+            if (capability && capability[0] != '\0') {
+                if (!strstr(card->capabilities, capability)) continue;
+            }
+
+            agent_array[idx] = (a2a_agent_card_t*)calloc(1, sizeof(a2a_agent_card_t));
+            if (agent_array[idx]) {
+                agent_array[idx]->id = strdup(card->id);
+                agent_array[idx]->name = strdup(card->name);
+                agent_array[idx]->url = strdup(card->url);
+                agent_array[idx]->capabilities_json = strdup(card->capabilities);
+                agent_array[idx]->protocol_version = card->version;
+                idx++;
+            }
         }
     }
 
-    return -3;
+    *results = agent_array;
+    *result_count = matched;
+    return 0;
+}
+
+const a2a_agent_card_t* a2a_v03_get_agent_card(a2a_v03_context_t* ctx,
+                                                 const char* agent_id) {
+    if (!ctx || !agent_id) return NULL;
+    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+    if (!adapter->initialized) return NULL;
+
+    for (size_t i = 0; i < adapter->agent_count; i++) {
+        if (strcmp(adapter->agents[i].id, agent_id) == 0) {
+            static a2a_agent_card_t card;
+            memset(&card, 0, sizeof(card));
+            const a2a_internal_card_t* internal = &adapter->agents[i];
+            card.id = strdup(internal->id);
+            card.name = strdup(internal->name);
+            card.url = strdup(internal->url);
+            card.capabilities_json = strdup(internal->capabilities);
+            card.protocol_version = internal->version;
+            return &card;
+        }
+    }
+
+    return NULL;
 }
 
 /* ============================================================================
@@ -211,9 +232,9 @@ int a2a_v03_delegate_task(a2a_handle_t handle,
              "task_%llu", adapter->task_counter++);
 
     out_response->status = A2A_TASK_STATUS_ACCEPTED;
-    out_response->accepted_by = request->target_agent_id ?
-                                strdup(request->target_agent_id) :
-                                strdup("coordinator");
+    strncpy(out_response->accepted_by,
+            request->target_agent_id ? request->target_agent_id : "coordinator",
+            sizeof(out_response->accepted_by) - 1);
     out_response->negotiation_rounds = 0;
     out_response->estimated_duration_ms = request->timeout_ms > 0 ?
                                            request->timeout_ms / 2 :

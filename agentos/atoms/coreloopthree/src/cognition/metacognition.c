@@ -11,7 +11,7 @@
  */
 
 #include "metacognition.h"
-#include "agentos.h"
+#include "../../../atoms/corekern/include/agentos.h"
 #include "include/memory_compat.h"
 #include <stdlib.h>
 #include <string.h>
