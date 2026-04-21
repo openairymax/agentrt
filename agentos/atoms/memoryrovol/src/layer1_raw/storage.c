@@ -13,6 +13,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <pthread.h>
+#include <dirent.h>
 
 #ifdef _WIN32
 #include <direct.h>
@@ -266,6 +267,82 @@ agentos_error_t agentos_layer1_raw_list_ids(
     *out_ids = NULL;
     *out_count = 0;
 
+    const char* path = l1->inner->storage_path;
+    if (!path || !*path) return AGENTOS_SUCCESS;
+
+#ifndef _WIN32
+    DIR* dir = opendir(path);
+    if (!dir) return AGENTOS_SUCCESS;
+
+    size_t capacity = 32;
+    size_t count = 0;
+    char** ids = (char**)AGENTOS_MALLOC(capacity * sizeof(char*));
+    if (!ids) { closedir(dir); return AGENTOS_ENOMEM; }
+
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != NULL) {
+        const char* name = entry->d_name;
+        size_t name_len = strlen(name);
+        if (name_len < 5) continue;
+        if (strcmp(name + name_len - 4, ".dat") != 0) continue;
+
+        char* id = (char*)AGENTOS_MALLOC(name_len - 3);
+        if (!id) continue;
+        memcpy(id, name, name_len - 4);
+        id[name_len - 4] = '\0';
+
+        if (!is_path_component_safe(id)) { AGENTOS_FREE(id); continue; }
+
+        if (count >= capacity) {
+            capacity *= 2;
+            char** new_ids = (char**)AGENTOS_REALLOC(ids, capacity * sizeof(char*));
+            if (!new_ids) { AGENTOS_FREE(id); break; }
+            ids = new_ids;
+        }
+        ids[count++] = id;
+    }
+
+    closedir(dir);
+    *out_ids = ids;
+    *out_count = count;
+#else
+    char pattern[512];
+    snprintf(pattern, sizeof(pattern), "%s\\*.dat", path);
+    WIN32_FIND_DATAA find_data;
+    HANDLE hFind = FindFirstFileA(pattern, &find_data);
+    if (hFind == INVALID_HANDLE_VALUE) return AGENTOS_SUCCESS;
+
+    size_t capacity = 32;
+    size_t count = 0;
+    char** ids = (char**)AGENTOS_MALLOC(capacity * sizeof(char*));
+    if (!ids) { FindClose(hFind); return AGENTOS_ENOMEM; }
+
+    do {
+        const char* name = find_data.cFileName;
+        size_t name_len = strlen(name);
+        if (name_len < 5) continue;
+
+        char* id = (char*)AGENTOS_MALLOC(name_len - 3);
+        if (!id) continue;
+        memcpy(id, name, name_len - 4);
+        id[name_len - 4] = '\0';
+
+        if (!is_path_component_safe(id)) { AGENTOS_FREE(id); continue; }
+
+        if (count >= capacity) {
+            capacity *= 2;
+            char** new_ids = (char**)AGENTOS_REALLOC(ids, capacity * sizeof(char*));
+            if (!new_ids) { AGENTOS_FREE(id); break; }
+            ids = new_ids;
+        }
+        ids[count++] = id;
+    } while (FindNextFileA(hFind, &find_data));
+
+    FindClose(hFind);
+    *out_ids = ids;
+    *out_count = count;
+#endif
+
     return AGENTOS_SUCCESS;
 }
 
@@ -273,7 +350,36 @@ agentos_error_t agentos_layer1_raw_flush(
     agentos_layer1_raw_t* l1,
     uint32_t timeout_ms) {
     if (!l1) return AGENTOS_EINVAL;
-    (void)timeout_ms;
+
+    pthread_mutex_lock(&l1->inner->mutex);
+
+    if (l1->inner->queue) {
+        async_queue_t* q = (async_queue_t*)l1->inner->queue;
+        uint64_t deadline = 0;
+        if (timeout_ms > 0) {
+            struct timespec ts;
+            clock_gettime(CLOCK_REALTIME, &ts);
+            deadline = (uint64_t)ts.tv_sec * 1000 + (uint64_t)ts.tv_nsec / 1000000 + timeout_ms;
+        }
+
+        while (q->count > 0) {
+            if (timeout_ms > 0) {
+                struct timespec ts;
+                clock_gettime(CLOCK_REALTIME, &ts);
+                uint64_t now = (uint64_t)ts.tv_sec * 1000 + (uint64_t)ts.tv_nsec / 1000000;
+                if (now >= deadline) {
+                    pthread_mutex_unlock(&l1->inner->mutex);
+                    return AGENTOS_ETIMEDOUT;
+                }
+            }
+            pthread_mutex_unlock(&l1->inner->mutex);
+            struct timespec wait_ts = { .tv_sec = 0, .tv_nsec = 10000000L };
+            nanosleep(&wait_ts, NULL);
+            pthread_mutex_lock(&l1->inner->mutex);
+        }
+    }
+
+    pthread_mutex_unlock(&l1->inner->mutex);
     return AGENTOS_SUCCESS;
 }
 

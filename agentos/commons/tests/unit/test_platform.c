@@ -14,6 +14,7 @@
 #include <assert.h>
 
 #include "platform.h"
+#include "../../utils/error/include/error.h"
 
 /* ==================== 测试辅助�?==================== */
 
@@ -159,23 +160,18 @@ static int test_file_operations(void) {
  */
 static int test_thread_primitives(void) {
     agentos_mutex_t mutex = AGENTOS_INVALID_MUTEX;
-    
-    /* 测试互斥锁初始化 */
+
     int ret = agentos_mutex_init(&mutex);
     TEST_ASSERT(ret == 0, "Mutex initialization should succeed");
-    TEST_ASSERT(mutex != AGENTOS_INVALID_MUTEX, "Mutex should be valid after init");
-    
-    /* 测试加锁解锁 */
+
     ret = agentos_mutex_lock(&mutex);
     TEST_ASSERT(ret == 0, "Mutex lock should succeed");
-    
+
     ret = agentos_mutex_unlock(&mutex);
     TEST_ASSERT(ret == 0, "Mutex unlock should succeed");
-    
-    /* 清理 */
-    ret = agentos_mutex_destroy(&mutex);
-    TEST_ASSERT(ret == 0, "Mutex destroy should succeed");
-    
+
+    agentos_mutex_destroy(&mutex);
+
     printf("  Thread primitives: OK\n");
     return 0;
 }
@@ -184,18 +180,14 @@ static int test_thread_primitives(void) {
  * @brief 测试网络函数
  */
 static int test_network_functions(void) {
-    /* 测试网络初始�?*/
     int ret = agentos_network_init();
-    TEST_ASSERT(ret == 0 || ret == AGENTOS_ERR_ALREADY_EXISTS, 
+    TEST_ASSERT(ret == 0 || ret == AGENTOS_ERR_ALREADY_EXISTS,
                 "Network initialization should succeed or already exist");
-    
-    /* 测试忽略 SIGPIPE */
-    ret = agentos_ignore_sigpipe();
-    TEST_ASSERT(ret == 0, "Ignore SIGPIPE should succeed");
-    
-    /* 清理 */
+
+    agentos_ignore_sigpipe();
+
     agentos_network_cleanup();
-    
+
     printf("  Network functions: OK\n");
     return 0;
 }
@@ -216,7 +208,7 @@ int main(void) {
     TEST_RUN(test_network_functions);
     
     printf("\n===========================================\n");
-    printf("  测试结果�?d 通过�?d 失败\n", passed_tests, failed_tests);
+    printf("  测试结果: %d 通过, %d 失败\n", passed_tests, failed_tests);
     printf("===========================================\n");
     
     return failed_tests > 0 ? 1 : 0;

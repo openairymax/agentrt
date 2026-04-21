@@ -7,7 +7,7 @@
 #ifndef AGENTOS_AGENT_REGISTRY_H
 #define AGENTOS_AGENT_REGISTRY_H
 
-#include "agentos.h"
+#include "../atoms/corekern/include/agentos.h"
 
 #ifdef __cplusplus
 extern "C" {

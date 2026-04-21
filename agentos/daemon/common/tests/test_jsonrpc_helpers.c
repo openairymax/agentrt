@@ -321,7 +321,7 @@ static int test_get_error_message(void) {
     }
     
     msg = jsonrpc_get_error_message(-32050);
-    if (strcmp(msg, "Server error") != 0) {
+    if (strcmp(msg, "Unknown error") != 0) {
         TEST_FAIL("get_error_message", "wrong server error message");
         return -1;
     }

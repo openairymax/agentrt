@@ -157,7 +157,7 @@ if(AGENTOS_BUILD_ALL)
     endif()
 
     # 测试组件（可选）
-    if(BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
+    if(BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
         add_subdirectory(tests)
     endif()
 endif()

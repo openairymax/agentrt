@@ -13,30 +13,8 @@
 #include <string.h>
 #include <stdio.h>
 
-/* JSON解析库 - 条件编译 */
-#ifdef AGENTOS_HAS_CJSON
+/* JSON解析库（cJSON 已通过CMake检测并定义 AGENTOS_HAS_CJSON=1） */
 #include <cjson/cJSON.h>
-#else
-typedef struct cJSON { int type; char* valuestring; double valuedouble; int valueint; struct cJSON* child; struct cJSON* next; } cJSON;
-#define cJSON_NULL 0
-#define cJSON_False 1
-#define cJSON_True 2
-#define cJSON_Number 3
-#define cJSON_String 4
-#define cJSON_Array 5
-#define cJSON_Object 6
-static inline cJSON* cJSON_CreateObject(void) { return NULL; }
-static inline cJSON* cJSON_CreateArray(void) { return NULL; }
-static inline void cJSON_Delete(cJSON* item) { (void)item; }
-static inline cJSON* cJSON_Parse(const char* s) { (void)s; return NULL; }
-static inline cJSON* cJSON_GetObjectItem(const cJSON* o, const char* k) { (void)o;(void)k; return NULL; }
-static inline void cJSON_AddItemToObject(cJSON* o, const char* k, cJSON* i) { (void)o;(void)k;(void)i; }
-static inline void cJSON_AddStringToObject(cJSON* o, const char* k, const char* v) { (void)o;(void)k;(void)v; }
-static inline void cJSON_AddNumberToObject(cJSON* o, const char* k, double v) { (void)o;(void)k;(void)v; }
-static inline char* cJSON_PrintUnformatted(const cJSON* i) { (void)i; return NULL; }
-static inline int cJSON_IsString(const cJSON* item) { (void)item; return 0; }
-static inline int cJSON_IsNumber(const cJSON* item) { (void)item; return 0; }
-#endif
 
 /**
  * @brief 将元数据对象序列化为 JSON 字符�?

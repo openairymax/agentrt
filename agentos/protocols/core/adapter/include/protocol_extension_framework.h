@@ -22,6 +22,7 @@
 #define AGENTOS_PROTOCOL_EXTENSION_FRAMEWORK_H
 
 #include "unified_protocol.h"
+#include "../include/agentos_protocol_interface.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>

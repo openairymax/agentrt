@@ -16,16 +16,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-/* 子模块头文件 - 提供批量写入 API 所需的类型定义 */
-#include "heapstore_registry.h"
-#include "heapstore_trace.h"
-#include "heapstore_ipc.h"
-#include "heapstore_memory.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /**
  * @brief 错误码定义
  */
@@ -49,6 +39,19 @@ typedef enum {
     heapstore_ERR_TIMEOUT = -16,
     heapstore_ERR_INTERNAL = -99
 } heapstore_error_t;
+
+/* 共享类型定义 - 必须在子模块包含之前加载 */
+#include "heapstore_types.h"
+
+/* 子模块头文件 - 提供各子系统 API 声明 */
+#include "heapstore_registry.h"
+#include "heapstore_trace.h"
+#include "heapstore_ipc.h"
+#include "heapstore_memory.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  * @brief 数据分区路径类型

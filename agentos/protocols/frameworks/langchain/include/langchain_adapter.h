@@ -45,6 +45,10 @@ extern "C" {
 #define LANGCHAIN_MAX_MEMORY_ENTRIES  1024
 #define LANGCHAIN_DEFAULT_TIMEOUT_MS  60000
 
+/* Compatibility macros for .c file */
+#define LC_MAX_RESPONSE_LEN           8192
+#define LC_STREAM_CHUNK_SIZE          1024
+
 typedef enum {
     LC_TYPE_LLM = 0,
     LC_TYPE_CHAT_MODEL,
@@ -102,6 +106,12 @@ typedef struct {
 } langchain_chain_def_t;
 
 typedef struct {
+    char* id;
+    char* name;
+    langchain_chain_type_t type;
+    char** step_ids;
+    size_t step_count;
+    bool is_compiled;
     char* input_schema_json;
     char* output_schema_json;
     void* compiled_executable;
@@ -167,7 +177,44 @@ typedef struct {
     char* cache_backend_url;
 } langchain_config_t;
 
-typedef struct langchain_adapter_context_s langchain_adapter_context_t;
+typedef struct {
+    char* id;
+    char* name;
+    char* description;
+    char* llm_provider;
+    langchain_agent_type_t type;
+    double temperature;
+    int max_tokens;
+    char* llm_id;
+    char** tool_ids;
+    size_t tool_count;
+    char* memory_id;
+    int max_iterations;
+    int max_execution_time_sec;
+    bool handle_parsing_errors;
+    bool verbose;
+    bool is_available;
+} langchain_agent_instance_t;
+
+typedef struct langchain_adapter_context_s {
+    langchain_config_t config;
+    langchain_chain_instance_t chains[LANGCHAIN_MAX_CHAINS];
+    size_t chain_count;
+    langchain_tool_def_t tools[LANGCHAIN_MAX_TOOLS];
+    size_t tool_count;
+    langchain_agent_instance_t agents[LANGCHAIN_MAX_AGENTS];
+    size_t agent_count;
+    langchain_memory_t memories[LANGCHAIN_MAX_MEMORY_ENTRIES];
+    size_t memory_count;
+    langchain_streaming_fn streaming_handler;
+    void* streaming_user_data;
+    langchain_trace_fn trace_handler;
+    void* trace_user_data;
+    bool is_initialized;
+    uint64_t total_chains_executed;
+    uint64_t total_tokens_used;
+    double total_execution_time_ms;
+} langchain_adapter_context_t;
 
 typedef int (*langchain_tool_executor_fn)(const char* tool_name,
                                            const char* input_json,

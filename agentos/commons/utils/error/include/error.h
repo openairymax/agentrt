@@ -427,15 +427,16 @@ char* agentos_error_chain_to_json(const agentos_error_chain_t* chain);
 #ifndef AGENTOS_ERROR_CONTEXT_T_DEFINED
 #define AGENTOS_ERROR_CONTEXT_T_DEFINED
 /**
- * @brief 错误上下文结构（兼容旧代码）
- * @deprecated 请使用 agentos_error_chain_t 或 atoms/coreloopthree/include/error_utils.h 中的完整版定义
+ * @brief 错误上下文结构（完整版，含时间戳）
+ * @note 与 atoms/coreloopthree/include/error_utils.h 保持一致
  */
-typedef struct {
-    const char* file;
+typedef struct agentos_error_context {
+    agentos_error_t code;
+    char* message;
+    char* file;
     int line;
-    const char* function;
-    const char* message;
-    agentos_error_t error_code;
+    char* function;
+    uint64_t timestamp_ns;
 } agentos_error_context_t;
 #endif /* AGENTOS_ERROR_CONTEXT_T_DEFINED */
 

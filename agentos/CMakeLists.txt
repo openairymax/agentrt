@@ -30,7 +30,7 @@ option(BUILD_COMMONS "Build commons module (common utilities)" ON)
 option(BUILD_CUPOLAS "Build cupolas module (security framework)" ON)
 option(BUILD_DAEMON "Build daemon modules (system services)" OFF)  # Windows上暂时禁用，需要PkgConfig
 option(BUILD_GATEWAY "Build gateway module (API gateway)" OFF)  # Windows上暂时禁用，需要cJSON
-option(BUILD_HEAPSTORE "Build heapstore module (persistent storage)" OFF)  # Windows上暂时禁用
+option(BUILD_HEAPSTORE "Build heapstore module (persistent storage)" ON)
 option(BUILD_TOOLKIT "Build toolkit modules (language SDKs)" OFF)  # 默认关闭，需要额外配置
 
 # 全局包含目录
@@ -58,6 +58,11 @@ if(BUILD_COMMONS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/commons/CMakeLists.txt"
     add_subdirectory(commons)
 else()
     message(WARNING "commons module not found or disabled")
+endif()
+
+# protocols模块（gateway依赖）
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/protocols/CMakeLists.txt")
+    add_subdirectory(protocols)
 endif()
 
 if(BUILD_CUPOLAS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cupolas/CMakeLists.txt")

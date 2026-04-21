@@ -78,7 +78,7 @@ int proto_registry_register(protocol_registry_t* registry,
                             proto_category_t category,
                             proto_type_t type,
                             uint32_t capabilities,
-                            const proto_adapter_t* adapter,
+                            const protocol_adapter_t* adapter,
                             void* context) {
     if (!registry || !name) return -1;
     if (registry->entry_count >= PROTO_REGISTRY_MAX_ADAPTERS) return -2;

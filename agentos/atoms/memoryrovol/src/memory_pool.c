@@ -5,7 +5,7 @@
  */
 
 #include "memory_pool.h"
-#include "agentos.h"
+#include "../../atoms/corekern/include/agentos.h"
 #include "logger.h"
 #include <stdlib.h>
 #include <string.h>
@@ -236,4 +236,98 @@ uint64_t memory_pool_get_alloc_count(memory_pool_t* pool) {
 uint64_t memory_pool_get_free_count(memory_pool_t* pool) {
     if (!pool) return 0;
     return pool->free_count;
+}
+
+int memory_pool_retain(memory_pool_t* pool, void* ptr) {
+    if (!pool || !ptr) return -1;
+    agentos_mutex_lock(pool->lock);
+
+    memory_block_header_t* block = (memory_block_header_t*)((uint8_t*)ptr - sizeof(memory_block_header_t));
+    if (block->magic != 0xDEADBEEF) {
+        agentos_mutex_unlock(pool->lock);
+        return -1;
+    }
+    if (block->ref_count < 0xFFFF) block->ref_count++;
+    int rc = (int)block->ref_count;
+    block->last_access_ns = get_timestamp_ns();
+
+    agentos_mutex_unlock(pool->lock);
+    return rc;
+}
+
+int memory_pool_release(memory_pool_t* pool, void* ptr) {
+    if (!pool || !ptr) return -1;
+    agentos_mutex_lock(pool->lock);
+
+    memory_block_header_t* block = (memory_block_header_t*)((uint8_t*)ptr - sizeof(memory_block_header_t));
+    if (block->magic != 0xDEADBEEF) {
+        agentos_mutex_unlock(pool->lock);
+        return -1;
+    }
+    if (block->ref_count > 0) block->ref_count--;
+    int rc = (int)block->ref_count;
+
+    if (rc == 0 && block->in_use) {
+        if (block->prev) block->prev->next = block->next;
+        else pool->used_list = block->next;
+        if (block->next) block->next->prev = block->prev;
+
+        block->in_use = 0;
+        block->magic = 0xDEADBEEF;
+        block->last_access_ns = get_timestamp_ns();
+
+        block->next = pool->free_list;
+        block->prev = NULL;
+        if (pool->free_list) pool->free_list->prev = block;
+        pool->free_list = block;
+
+        pool->used_size -= block->size;
+        pool->free_count++;
+    }
+
+    agentos_mutex_unlock(pool->lock);
+    return rc;
+}
+
+uint32_t memory_pool_get_ref_count(memory_pool_t* pool, void* ptr) {
+    if (!pool || !ptr) return 0;
+    agentos_mutex_lock(pool->lock);
+
+    memory_block_header_t* block = (memory_block_header_t*)((uint8_t*)ptr - sizeof(memory_block_header_t));
+    uint32_t rc = (block->magic == 0xDEADBEEF) ? block->ref_count : 0;
+
+    agentos_mutex_unlock(pool->lock);
+    return rc;
+}
+
+int memory_pool_set_gc(memory_pool_t* pool, void* gc) {
+    if (!pool) return -1;
+    pool->gc_handle = gc;
+    return 0;
+}
+
+void memory_pool_collect_garbage(memory_pool_t* pool) {
+    if (!pool || !pool->gc_handle) return;
+
+    double utilization = memory_pool_get_utilization(pool);
+    if (utilization < 0.5) return;
+
+    memory_block_header_t* block = pool->used_list;
+    while (block) {
+        memory_block_header_t* next = block->next;
+        if (block->in_use && block->ref_count == 0 &&
+            block->last_access_ns > 0) {
+            uint64_t age_ns = get_timestamp_ns() - block->last_access_ns;
+            if (age_ns > 5000000000ULL) {
+                void* user_ptr = (void*)((uint8_t*)block + sizeof(memory_block_header_t));
+                memory_pool_free(pool, user_ptr);
+            }
+        }
+        block = next;
+    }
+}
+
+double memory_pool_get_utilization(memory_pool_t* pool) {
+    if (!pool || pool->total_size == 0) return 0.0;
+    return (double)pool->used_size / (double)pool->total_size;
 }

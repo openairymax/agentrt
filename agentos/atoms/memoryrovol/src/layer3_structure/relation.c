@@ -5,7 +5,7 @@
  */
 
 #include "layer3_structure.h"
-#include "agentos.h"
+#include "../../../atoms/corekern/include/agentos.h"
 #include "logger.h"
 #include <sqlite3.h>
 #include <stdlib.h>

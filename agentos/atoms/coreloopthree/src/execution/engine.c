@@ -6,7 +6,7 @@
 
 #include "../../include/execution.h"
 #include "../../include/agent_registry.h"
-#include "agentos.h"
+#include "../../../atoms/corekern/include/agentos.h"
 #include "logging_compat.h"
 #include "../../include/id_utils.h"
 #include "../../include/error_utils.h"

@@ -236,6 +236,19 @@ taskflow_error_t graph_engine_clear(graph_engine_handle_t engine);
  */
 bool graph_engine_is_empty(graph_engine_handle_t engine);
 
+/**
+ * @brief 获取所有顶点ID列表
+ * @param engine 图引擎句柄
+ * @param out_ids 顶点ID数组（输出）
+ * @param max_count 数组最大容量
+ * @param out_actual 实际获取的顶点数量（输出）
+ * @return 错误码
+ */
+taskflow_error_t graph_engine_get_vertex_ids(graph_engine_handle_t engine,
+                                             vertex_id_t* out_ids,
+                                             size_t max_count,
+                                             size_t* out_actual);
+
 #ifdef __cplusplus
 }
 #endif

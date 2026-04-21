@@ -142,7 +142,7 @@ extern "C" {
 #endif
 
 #define AGENTOS_INVALID_THREAD ((agentos_thread_t)0)
-#define AGENTOS_INVALID_MUTEX ((agentos_mutex_t)0)
+#define AGENTOS_INVALID_MUTEX ((agentos_mutex_t){0})
 #define AGENTOS_INVALID_SOCKET (-1)
 #define AGENTOS_INVALID_PROCESS ((agentos_process_t)0)
 

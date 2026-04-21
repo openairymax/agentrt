@@ -234,13 +234,11 @@ typedef enum {
 } agentos_memory_type_t;
 #endif
 
-#ifndef AGENTOS_MEMORY_T_DEFINED
-#define AGENTOS_MEMORY_T_DEFINED
 /**
- * @brief 记忆句柄类型（不透明指针，用于跨模块传递）
+ * @brief 记忆句柄类型 - forward declaration (full definition in memoryrovol.h)
  */
-typedef struct agentos_memory* agentos_memory_t;
-#endif /* AGENTOS_MEMORY_T_DEFINED */
+struct agentos_memory;
+typedef struct agentos_memory agentos_memory_t;
 
 /**
  * @brief 记忆条目结构
@@ -460,11 +458,11 @@ typedef struct {
 #ifndef AGENTOS_LOG_LEVEL_T_DEFINED
 #define AGENTOS_LOG_LEVEL_T_DEFINED
 typedef enum {
-    AGENTOS_LOG_LEVEL_DEBUG   = 0,
-    AGENTOS_LOG_LEVEL_INFO    = 1,
-    AGENTOS_LOG_LEVEL_WARN    = 2,
-    AGENTOS_LOG_LEVEL_ERROR   = 3,
-    AGENTOS_LOG_LEVEL_FATAL   = 4
+    AGENTOS_LOG_LEVEL_DEBUG_E   = 0,
+    AGENTOS_LOG_LEVEL_INFO_E    = 1,
+    AGENTOS_LOG_LEVEL_WARN_E    = 2,
+    AGENTOS_LOG_LEVEL_ERROR_E   = 3,
+    AGENTOS_LOG_LEVEL_FATAL_E   = 4
 } agentos_log_level_t;
 #endif
 
@@ -472,10 +470,10 @@ typedef enum {
  * @brief 指标类型枚举
  */
 typedef enum {
-    AGENTOS_METRIC_COUNTER   = 0,    /**< 计数器 */
-    AGENTOS_METRIC_GAUGE     = 1,    /**< 仪表 */
-    AGENTOS_METRIC_HISTOGRAM = 2,    /**< 直方图 */
-    AGENTOS_METRIC_SUMMARY   = 3     /**< 摘要 */
+    AGENTOS_METRIC_COUNTER_E   = 0,    /**< 计数器 */
+    AGENTOS_METRIC_GAUGE_E     = 1,    /**< 仪表 */
+    AGENTOS_METRIC_HISTOGRAM_E = 2,    /**< 直方图 */
+    AGENTOS_METRIC_SUMMARY_E   = 3     /**< 摘要 */
 } agentos_metric_type_t;
 
 /**
