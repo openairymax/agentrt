@@ -22,31 +22,7 @@
 extern "C" {
 #endif
 
-/**
- * @brief IPC 通道记录
- */
-typedef struct {
-    char channel_id[128];
-    char name[256];
-    char type[64];
-    uint64_t created_at;
-    uint64_t last_activity_at;
-    size_t buffer_size;
-    size_t current_usage;
-    char status[32];
-} heapstore_ipc_channel_t;
-
-/**
- * @brief IPC 缓冲区记录
- */
-typedef struct {
-    char buffer_id[128];
-    char channel_id[128];
-    uint64_t created_at;
-    size_t size;
-    uint32_t ref_count;
-    char status[32];
-} heapstore_ipc_buffer_t;
+/* 共享类型已在 heapstore_types.h 中定义，此处仅用于 API 声明 */
 
 /**
  * @brief 初始化 IPC 数据存储

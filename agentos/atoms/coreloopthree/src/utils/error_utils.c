@@ -5,7 +5,7 @@
  */
 
 #include "error_utils.h"
-#include "agentos.h"
+#include "../../../atoms/corekern/include/agentos.h"
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */

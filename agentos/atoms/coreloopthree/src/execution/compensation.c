@@ -5,7 +5,7 @@
  */
 
 #include "execution.h"
-#include "agentos.h"
+#include "../../../atoms/corekern/include/agentos.h"
 #include "compensation.h"
 #include <stdlib.h>
 #include <string.h>

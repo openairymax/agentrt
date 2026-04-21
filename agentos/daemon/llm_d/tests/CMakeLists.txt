@@ -1,9 +1,8 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
-# LLM 服务单元测试构建文件
+# LLM 服务单元测试构建文件 (TeamC)
 
 cmake_minimum_required(VERSION 3.20)
 
-# 测试源文件
 set(LLM_TEST_SOURCES
     test_service.c
     test_cache.c
@@ -11,49 +10,33 @@ set(LLM_TEST_SOURCES
     test_response.c
 )
 
-# 创建测试可执行文件
 add_executable(test_llm_d ${LLM_TEST_SOURCES})
 
-# 链接到 llm_d 和依赖
-target_link_libraries(test_llm_d PRIVATE
-    agentos-llm-d
-    svc_common
-    Threads::Threads
-    ${CURL_LIBRARIES}
-    ${CJSON_LIBRARIES}
-    ${YAML_LIBRARIES}
-)
-
-# 包含目录
 target_include_directories(test_llm_d PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
     ${CMAKE_CURRENT_SOURCE_DIR}/../src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../agentos/commons/include
-    ${CURL_INCLUDE_DIRS}
-    ${CJSON_INCLUDE_DIRS}
-    ${YAML_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/common/include
 )
 
-# 编译选项
-target_compile_options(test_llm_d PRIVATE
-    -Wall
-    -Wextra
-    -g
+target_link_libraries(test_llm_d PRIVATE
+    svc_common
+    Threads::Threads
 )
 
-# 注册测试
-foreach(test_file ${LLM_TEST_SOURCES})
-    get_filename_component(test_name ${test_file} NAME_WE)
-    add_test(NAME llm_d_${test_name} COMMAND test_llm_d)
-endforeach()
-
-# 可选：只有当 BUILD_COVERAGE 时才收集覆盖率
-if(BUILD_COVERAGE)
-    target_compile_options(test_llm_d PRIVATE
-        -fprofile-arcs
-        -ftest-coverage
-    )
-    target_link_options(test_llm_d PRIVATE
-        --coverage
-    )
+find_package(cjson QUIET)
+if(TARGET cjson OR cjson_FOUND)
+    target_link_libraries(test_llm_d PRIVATE cjson)
 endif()
+
+find_package(CURL QUIET)
+if(CURL_FOUND)
+    target_include_directories(test_llm_d PRIVATE ${CURL_INCLUDE_DIRS})
+    target_link_libraries(test_llm_d PRIVATE ${CURL_LIBRARIES})
+endif()
+
+target_compile_options(test_llm_d PRIVATE -Wall -Wextra -g -Wno-unused-function)
+
+enable_testing()
+add_test(NAME llm_d_tests COMMAND test_llm_d
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})

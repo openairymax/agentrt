@@ -20,33 +20,7 @@
 extern "C" {
 #endif
 
-/**
- * @brief 内存池记录
- */
-typedef struct {
-    char pool_id[128];
-    char name[256];
-    size_t total_size;
-    size_t used_size;
-    size_t block_size;
-    uint32_t block_count;
-    uint32_t free_block_count;
-    uint64_t created_at;
-    char status[32];
-} heapstore_memory_pool_t;
-
-/**
- * @brief 内存分配记录
- */
-typedef struct {
-    char allocation_id[128];
-    char pool_id[128];
-    size_t size;
-    uint64_t address;
-    uint64_t allocated_at;
-    uint64_t freed_at;
-    char status[32];
-} heapstore_memory_allocation_t;
+/* 共享类型已在 heapstore_types.h 中定义，此处仅用于 API 声明 */
 
 /**
  * @brief 初始化内存数据存储

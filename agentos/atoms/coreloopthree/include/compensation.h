@@ -7,7 +7,7 @@
 #ifndef AGENTOS_COMPENSATION_H
 #define AGENTOS_COMPENSATION_H
 
-#include "agentos.h"
+#include "../atoms/corekern/include/agentos.h"
 
 #ifdef __cplusplus
 extern "C" {

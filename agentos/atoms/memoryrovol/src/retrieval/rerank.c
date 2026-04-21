@@ -23,7 +23,7 @@
 #include <errno.h>
 
 /* 项目公共头文件 */
-#include "agentos.h"
+#include "../../../atoms/corekern/include/agentos.h"
 #include "../include/retrieval.h"
 #include "../include/llm_client.h"
 #include "../include/layer1_raw.h"

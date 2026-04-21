@@ -13,6 +13,31 @@
 #include "../../core/adapter/include/protocol_extension_framework.h"
 #include "../../../../daemon/common/include/safe_string_utils.h"
 
+/* Internal base adapter structure for openjiuwen inheritance */
+typedef struct {
+    agentos_protocol_type_t type;
+    const char* name;
+    const char* version;
+    const char* description;
+    int (*init)(void* context);
+    int (*destroy)(void* context);
+    int (*encode)(void* context, const void* msg, void** out_data, size_t* out_size);
+    int (*decode)(void* context, const void* data, size_t size, void* out_msg);
+    int (*connect)(void* context, const char* endpoint);
+    int (*disconnect)(void* context);
+    int (*is_connected)(void* context);
+    int (*send)(void* context, const void* data, size_t size);
+    int (*receive)(void* context, void** data, size_t* size, uint32_t timeout_ms);
+    int (*handle_request)(void* context, const void* req, void** resp);
+    int (*get_version)(void* context, char* version_buf, size_t max_size);
+    uint32_t (*capabilities)(void* context);
+    int (*get_stats)(void* context, char* stats_json, size_t max_size);
+    void* context;
+    void* user_data;
+    int (*send_message)(void* context, const void* msg);
+    int (*receive_message)(void* context, void* msg);
+} openjiuwen_base_adapter_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -22,9 +47,22 @@ extern "C" {
  * ============================================================================ */
 
 #define OPENJIUWEN_PROTOCOL_VERSION "1.0.0"
-#define OPENJIUWEN_MAX_MESSAGE_SIZE (64 * 1024)  /* 64KB */
+#define OPENJIUWEN_MAX_MESSAGE_SIZE (64 * 1024)
 #define OPENJIUWEN_DEFAULT_ENDPOINT "/openjiuwen/v1"
 #define OPENJIUWEN_TIMEOUT_MS 30000
+#define OPENJIUWEN_HEARTBEAT_INTERVAL_SEC 30
+#define OPENJIUWEN_MAX_CONSECUTIVE_ERRORS 5
+#define OPENJIUWEN_RECONNECT_BASE_DELAY_MS 1000
+#define OPENJIUWEN_RECONNECT_MAX_DELAY_MS 60000
+#define OPENJIUWEN_SEND_QUEUE_SIZE 64
+
+typedef enum {
+    OPENJIUWEN_CONN_DISCONNECTED = 0,
+    OPENJIUWEN_CONN_CONNECTING,
+    OPENJIUWEN_CONN_CONNECTED,
+    OPENJIUWEN_CONN_RECONNECTING,
+    OPENJIUWEN_CONN_ERROR
+} openjiuwen_conn_state_t;
 
 /* ============================================================================
  * 数据类型定义
@@ -67,15 +105,21 @@ typedef enum openjiuwen_message_type_e {
 } openjiuwen_message_type_t;
 
 /**
- * @brief OpenJiuwen适配器实例（继承自protocol_adapter_t）
+ * @brief OpenJiuwen适配器实例（继承自openjiuwen_base_adapter_t）
  */
 typedef struct openjiuwen_adapter_s {
-    protocol_adapter_t base;          /* 基类接口 */
-    openjiuwen_config_t config;       /* 配置信息 */
-    void* connection_handle;          /* 连接句柄 */
-    bool initialized;                 /* 初始化状态 */
-    uint32_t message_counter;         /* 消息计数器 */
-    void* user_data;                  /* 用户数据 */
+    openjiuwen_base_adapter_t base;
+    openjiuwen_config_t config;
+    void* connection_handle;
+    bool initialized;
+    uint32_t message_counter;
+    void* user_data;
+    openjiuwen_conn_state_t conn_state;
+    uint32_t consecutive_errors;
+    uint32_t total_reconnects;
+    uint32_t last_heartbeat_sec;
+    uint32_t last_error_code;
+    uint64_t last_activity_ms;
 } openjiuwen_adapter_t;
 
 /* ============================================================================

@@ -8,7 +8,7 @@
 #define ASYNC_STORAGE_UTILS_H
 
 #include "../../../agentos/commons/utils/memory/include/memory_compat.h"
-#include "agentos.h"
+#include "../../../atoms/corekern/include/agentos.h"
 #include <stddef.h>
 
 #ifdef __cplusplus

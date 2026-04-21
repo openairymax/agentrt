@@ -1,16 +1,14 @@
-# Gateway Daemon Tests
+# Gateway Daemon Tests (TeamC)
 # Copyright (C) 2026 SPHARX. All Rights Reserved.
 
 cmake_minimum_required(VERSION 3.16)
 
 project(gateway_d_tests VERSION 1.0.0 LANGUAGES C)
 
-# 测试源文件
 set(TEST_SOURCES
     test_service.c
 )
 
-# 创建测试
 foreach(TEST_SRC ${TEST_SOURCES})
     get_filename_component(TEST_NAME ${TEST_SRC} NAME_WE)
     
@@ -18,14 +16,20 @@ foreach(TEST_SRC ${TEST_SOURCES})
     
     target_include_directories(${TEST_NAME} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/../include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../src
         ${CMAKE_CURRENT_SOURCE_DIR}/../../common/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../agentos/commons/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/common/include
     )
     
     target_link_libraries(${TEST_NAME}
         PRIVATE
-            gateway_d_lib
             svc_common
+            Threads::Threads
     )
     
-    add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
+    target_compile_options(${TEST_NAME} PRIVATE -Wall -Wextra -g -Wno-unused-function)
+    
+    add_test(NAME gateway_d_${TEST_NAME} COMMAND ${TEST_NAME}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endforeach()

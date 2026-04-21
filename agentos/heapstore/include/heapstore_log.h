@@ -15,6 +15,7 @@
 #include "heapstore.h"
 
 #include <stdarg.h>
+#include <time.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,6 +50,8 @@ typedef struct {
     time_t created_at;
     time_t modified_at;
 } heapstore_log_file_info_t;
+
+/* 共享类型已在 heapstore_types.h 中定义，此处仅用于 API 声明 */
 
 /**
  * @brief 初始化日志系统

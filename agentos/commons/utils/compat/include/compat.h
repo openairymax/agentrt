@@ -414,6 +414,26 @@ AGENTOS_API void agentos_assert_fail(const char* cond, const char* file, int lin
  */
 AGENTOS_API void agentos_assert_fail_msg(const char* cond, const char* file, int line, const char* func, const char* msg);
 
+/**
+ * @brief 自定义断言处理器回调类型
+ *
+ * 设置后，断言失败时调用此回调而非abort()。
+ * 生产环境可设置为日志记录+优雅降级。
+ */
+typedef void (*agentos_assert_handler_t)(const char* cond, const char* file,
+                                          int line, const char* func,
+                                          const char* msg);
+
+/**
+ * @brief 设置自定义断言处理器
+ */
+AGENTOS_API void agentos_set_assert_handler(agentos_assert_handler_t handler);
+
+/**
+ * @brief 获取当前断言处理器
+ */
+AGENTOS_API agentos_assert_handler_t agentos_get_assert_handler(void);
+
 /* ==================== 静态断言 ==================== */
 
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
