@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
 
 // ============================================================================
 // 内部数据结构
@@ -94,7 +95,9 @@ static taskflow_error_t execute_node_task(workflow_context_t* context,
     // 更新内部状态
     size_t state_idx = find_node_state_index(internal_state, node_id);
     if (state_idx != SIZE_MAX) {
-        internal_state->node_states[state_idx].start_time = 0; // TODO: 获取时间戳
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        internal_state->node_states[state_idx].start_time = (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
         internal_state->node_states[state_idx].executed = true;
     }
     
@@ -107,7 +110,9 @@ static taskflow_error_t execute_node_task(workflow_context_t* context,
         // 标记为成功
         if (state_idx != SIZE_MAX) {
             internal_state->node_states[state_idx].succeeded = true;
-            internal_state->node_states[state_idx].end_time = 0; // TODO: 获取时间戳
+            struct timespec ts_end;
+            clock_gettime(CLOCK_MONOTONIC, &ts_end);
+            internal_state->node_states[state_idx].end_time = (uint64_t)ts_end.tv_sec * 1000000000ULL + (uint64_t)ts_end.tv_nsec;
         }
     }
     
@@ -195,6 +200,50 @@ static taskflow_error_t execute_sequential_workflow(workflow_context_t* context,
     return TASKFLOW_SUCCESS;
 }
 
+static taskflow_error_t execute_parallel_workflow(workflow_context_t* context,
+                                                  workflow_internal_state_t* internal_state) {
+    if (!context || !internal_state) return TASKFLOW_ERROR_INVALID_ARG;
+
+    // 并行执行：找出所有从start_node直接可达的节点，并行执行它们
+    const size_t MAX_PARALLEL = 32;
+    vertex_id_t parallel_nodes[MAX_PARALLEL];
+    size_t parallel_count = 0;
+
+    for (size_t i = 0; i < context->edge_count && parallel_count < MAX_PARALLEL; i++) {
+        if (context->edges[i].source_node == context->start_node &&
+            context->edges[i].target_node != context->end_node) {
+            bool duplicate = false;
+            for (size_t j = 0; j < parallel_count; j++) {
+                if (parallel_nodes[j] == context->edges[i].target_node) { duplicate = true; break; }
+            }
+            if (!duplicate) {
+                parallel_nodes[parallel_count++] = context->edges[i].target_node;
+            }
+        }
+    }
+
+    if (parallel_count == 0) {
+        internal_state->state = EXECUTION_COMPLETED;
+        return TASKFLOW_SUCCESS;
+    }
+
+    // 执行所有并行节点（当前为单线程模拟并行）
+    taskflow_error_t overall_result = TASKFLOW_SUCCESS;
+    for (size_t i = 0; i < parallel_count; i++) {
+        if (internal_state->state == EXECUTION_CANCELLED) break;
+        taskflow_error_t r = execute_node_task(context, internal_state, parallel_nodes[i]);
+        if (r != TASKFLOW_SUCCESS) overall_result = r;
+    }
+
+    // 汇聚到结束节点
+    if (context->end_node != 0 && internal_state->state != EXECUTION_FAILED) {
+        execute_node_task(context, internal_state, context->end_node);
+    }
+
+    internal_state->state = (overall_result == TASKFLOW_SUCCESS) ? EXECUTION_COMPLETED : EXECUTION_FAILED;
+    return overall_result;
+}
+
 // ============================================================================
 // 公共API实现
 // ============================================================================
@@ -233,7 +282,9 @@ workflow_context_t* workflow_context_create(
     // 创建或使用提供的TaskFlow引擎
     if (taskflow_engine) {
         context->taskflow_engine = taskflow_engine;
+        context->owns_engine = false;
     } else {
+        context->owns_engine = true;
         taskflow_config_t tf_config = {
             .max_vertices = config->max_nodes,
             .max_edges = config->max_edges,
@@ -277,7 +328,9 @@ void workflow_context_destroy(workflow_context_t* context)
     }
     
     // 如果内部创建了TaskFlow引擎，销毁它
-    // TODO: 需要跟踪是否内部创建
+    if (context->owns_engine && context->taskflow_engine) {
+        taskflow_engine_destroy(context->taskflow_engine);
+    }
     
     // 释放节点数组
     if (context->nodes) {
@@ -605,10 +658,10 @@ taskflow_error_t workflow_execute_sync(
             result = execute_sequential_workflow(context, internal_state);
             break;
             
-        case WORKFLOW_PARALLEL:
-            // TODO: 实现并行执行
-            result = TASKFLOW_ERROR_INTERNAL;
+        case WORKFLOW_PARALLEL: {
+            result = execute_parallel_workflow(context, internal_state);
             break;
+        }
             
         default:
             // 默认使用顺序执行

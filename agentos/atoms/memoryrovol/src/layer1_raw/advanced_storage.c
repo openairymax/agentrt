@@ -9,7 +9,7 @@
  */
 
 #include "layer1_raw.h"
-#include "agentos.h"
+#include "../../../atoms/corekern/include/agentos.h"
 #include "logger.h"
 #include "observability.h"
 #include "advanced_storage_utils.h"

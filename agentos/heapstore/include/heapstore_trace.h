@@ -22,21 +22,7 @@
 extern "C" {
 #endif
 
-/**
- * @brief Span 记录结构
- */
-typedef struct heapstore_span {
-    char trace_id[64];
-    char span_id[32];
-    char parent_span_id[32];
-    char name[128];
-    uint64_t start_time_ns;
-    uint64_t end_time_ns;
-    char service_name[64];
-    char status[32];
-    void* attributes;
-    size_t attribute_count;
-} heapstore_span_t;
+/* 共享类型 (span, trace_entry) 已在 heapstore_types.h 中定义 */
 
 /**
  * @brief 追踪导出器配置

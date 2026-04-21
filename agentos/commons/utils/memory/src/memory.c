@@ -407,7 +407,7 @@ void memory_cleanup(void) {
 void* memory_alloc(size_t size, const char* tag) {
     if (!g_state.initialized) {
         // 如果模块未初始化，使用系统默认分配
-        void* ptr = AGENTOS_MALLOC(size);
+        void* ptr = malloc(size);
         if (ptr != NULL) {
             memset(ptr, 0, size);
         }
@@ -424,7 +424,7 @@ void* memory_alloc(size_t size, const char* tag) {
 void* memory_calloc(size_t size, const char* tag) {
     if (!g_state.initialized) {
         // 如果模块未初始化，使用系统默认分配
-        return AGENTOS_CALLOC(1, size);
+        return calloc(1, size);
     }
     
     memory_lock();
@@ -535,7 +535,7 @@ void memory_free(void* ptr) {
     
     if (!g_state.initialized) {
         // 如果模块未初始化，使用系统默认释放
-        AGENTOS_FREE(ptr);
+        free(ptr);
         return;
     }
     

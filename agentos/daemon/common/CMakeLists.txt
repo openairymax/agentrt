@@ -15,7 +15,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # 测试支持选项
-option(BUILD_TESTS "Build unit tests" OFF)
+option(BUILD_TESTS "Build unit tests" ON)
 option(BUILD_COVERAGE "Build with code coverage" OFF)
 
 # 查找依赖
@@ -239,7 +239,9 @@ set_target_properties(svc_common PROPERTIES
 # 测试支持
 if(BUILD_TESTS)
     enable_testing()
-    add_subdirectory(tests)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
+        add_subdirectory(tests)
+    endif()
 endif()
 
 # 安装规则

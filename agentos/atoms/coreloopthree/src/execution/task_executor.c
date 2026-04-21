@@ -14,7 +14,7 @@
  */
 
 #include "execution.h"
-#include "agentos.h"
+#include "../../../atoms/corekern/include/agentos.h"
 #include "logger.h"
 #include "task_executor_utils.h"
 #include <stdlib.h>

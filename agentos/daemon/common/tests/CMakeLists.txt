@@ -1,9 +1,16 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
-# agentos/daemon/commons 单元测试
+# agentos/daemon/common 单元测试 (TeamC)
+# 对齐: 看板v14.0 C-W1-003 / 规范手册v13.0 TEST-01~06
 
 cmake_minimum_required(VERSION 3.20)
 
-# 测试源文件
+project(svc_common_tests VERSION 1.0.0 LANGUAGES C)
+
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+
+enable_testing()
+
 set(TEST_SOURCES
     test_error.c
     test_platform.c
@@ -15,43 +22,42 @@ set(TEST_SOURCES
     test_input_validator.c
 )
 
-# 创建测试可执行文件
-add_executable(test_svc_common ${TEST_SOURCES})
-
-# 链接到 svc_common 和依赖
-target_link_libraries(test_svc_common PRIVATE
-    svc_common
-    Threads::Threads
-    ${LIBCURL_LIBRARIES}
-    ${YAML_LIBRARIES}
-    ${CJSON_LIBRARIES}
-)
-
-# 包含目录
-target_include_directories(test_svc_common PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../include
-    ${LIBCURL_INCLUDE_DIRS}
-    ${YAML_INCLUDE_DIRS}
-    ${CJSON_INCLUDE_DIRS}
-)
-
-# 编译选项
-target_compile_options(test_svc_common PRIVATE
-    -Wall
-    -Wextra
-    -g
-)
-
-# 注册测试
-add_test(NAME svc_common_tests COMMAND test_svc_common)
-
-# 可选：只有当 BUILD_COVERAGE 时才收集覆盖率
-if(BUILD_COVERAGE)
-    target_compile_options(test_svc_common PRIVATE
-        -fprofile-arcs
-        -ftest-coverage
+foreach(TEST_SRC ${TEST_SOURCES})
+    get_filename_component(TEST_NAME ${TEST_SRC} NAME_WE)
+    set(TARGET_NAME "svc_${TEST_NAME}")
+    
+    add_executable(${TARGET_NAME} ${TEST_SRC})
+    
+    target_include_directories(${TARGET_NAME} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../src
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../agentos/commons/include
     )
-    target_link_options(test_svc_common PRIVATE
-        --coverage
+    
+    target_link_libraries(${TARGET_NAME} PRIVATE
+        svc_common
+        Threads::Threads
     )
-endif()
+    
+    find_package(cjson QUIET)
+    if(TARGET cjson OR cjson_FOUND)
+        target_link_libraries(${TARGET_NAME} PRIVATE cjson)
+    endif()
+    
+    find_package(CURL QUIET)
+    if(CURL_FOUND)
+        target_include_directories(${TARGET_NAME} PRIVATE ${CURL_INCLUDE_DIRS})
+        target_link_libraries(${TARGET_NAME} PRIVATE ${CURL_LIBRARIES})
+    endif()
+    
+    target_compile_options(${TARGET_NAME} PRIVATE
+        -Wall -Wextra -g -Wno-unused-function -Wno-unused-variable
+    )
+    
+    add_test(NAME ${TARGET_NAME} COMMAND ${TARGET_NAME}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    
+    message(STATUS "  [test] ${TARGET_NAME}: configured")
+endforeach()
+
+message(STATUS "  svc_common_tests: ${TEST_SOURCES}")

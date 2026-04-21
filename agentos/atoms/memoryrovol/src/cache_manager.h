@@ -47,7 +47,7 @@ typedef struct lru_cache {
     size_t hash_table_size;
     cache_entry_t* head;
     cache_entry_t* tail;
-    void* lock;
+    agentos_mutex_t* lock;
     uint32_t default_ttl_seconds;
 } lru_cache_t;
 

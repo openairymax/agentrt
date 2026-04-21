@@ -7,7 +7,7 @@
 #ifndef AGENTOS_LAYER3_STRUCTURE_H
 #define AGENTOS_LAYER3_STRUCTURE_H
 
-#include "agentos.h"
+#include "../../atoms/corekern/include/agentos.h"
 #include <stddef.h>
 #include <stdint.h>
 

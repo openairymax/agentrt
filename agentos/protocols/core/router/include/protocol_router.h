@@ -11,7 +11,7 @@
 #ifndef AGENTOS_PROTOCOL_ROUTER_H
 #define AGENTOS_PROTOCOL_ROUTER_H
 
-#include "../../common/include/unified_protocol.h"
+#include "unified_protocol.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>

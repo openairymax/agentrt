@@ -6,7 +6,7 @@
 
 #include "strategy.h"
 #include "cognition.h"
-#include "agentos.h"
+#include "../../../atoms/corekern/include/agentos.h"
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>

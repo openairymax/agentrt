@@ -42,20 +42,65 @@ void proto_router_standard_destroy(proto_router_iface_t* router) {
 }
 
 /* I-L3: Standard Gateway Implementation */
+typedef struct {
+    char name[64];
+    const proto_adapter_vtable_t* vtable;
+    proto_gateway_request_cb request_handler;
+    void* request_handler_data;
+    proto_gateway_event_cb event_callback;
+    void* event_callback_data;
+    uint64_t request_count;
+    uint64_t error_count;
+    uint64_t total_bytes;
+} gw_protocol_entry_t;
+
+#define GW_MAX_PROTOCOLS 32
+
 struct proto_gateway_iface_s {
-    void* internal_data;
+    gw_protocol_entry_t protocols[GW_MAX_PROTOCOLS];
+    size_t protocol_count;
 };
+
+static gw_protocol_entry_t* gw_find_protocol(proto_gateway_iface_t* gw, const char* name) {
+    if (!gw || !name) return NULL;
+    for (size_t i = 0; i < gw->protocol_count; i++) {
+        if (strcmp(gw->protocols[i].name, name) == 0) return &gw->protocols[i];
+    }
+    return NULL;
+}
 
 static int gw_std_register_protocol(proto_gateway_iface_t* gw,
                                      const char* name,
                                      const proto_adapter_vtable_t* adapter) {
-    (void)gw; (void)name; (void)adapter;
+    if (!gw || !name || !adapter) return -1;
+    if (gw->protocol_count >= GW_MAX_PROTOCOLS) return -2;
+
+    gw_protocol_entry_t* existing = gw_find_protocol(gw, name);
+    if (existing) {
+        existing->vtable = adapter;
+        return 0;
+    }
+
+    gw_protocol_entry_t* entry = &gw->protocols[gw->protocol_count++];
+    memset(entry, 0, sizeof(*entry));
+    strncpy(entry->name, name, sizeof(entry->name) - 1);
+    entry->vtable = adapter;
     return 0;
 }
 
 static int gw_std_unregister_protocol(proto_gateway_iface_t* gw, const char* name) {
-    (void)gw; (void)name;
-    return 0;
+    if (!gw || !name) return -1;
+
+    for (size_t i = 0; i < gw->protocol_count; i++) {
+        if (strcmp(gw->protocols[i].name, name) == 0) {
+            memmove(&gw->protocols[i], &gw->protocols[i + 1],
+                    (gw->protocol_count - i - 1) * sizeof(gw_protocol_entry_t));
+            gw->protocol_count--;
+            memset(&gw->protocols[gw->protocol_count], 0, sizeof(gw_protocol_entry_t));
+            return 0;
+        }
+    }
+    return -2;
 }
 
 static int gw_std_handle_request(proto_gateway_iface_t* gw,
@@ -65,11 +110,45 @@ static int gw_std_handle_request(proto_gateway_iface_t* gw,
                                   char** response,
                                   size_t* response_size,
                                   char** response_content_type) {
-    (void)gw; (void)raw_request; (void)request_size; (void)content_type;
-    if (response) *response = strdup("{}");
-    if (response_size) *response_size = 2;
+    if (!gw || !raw_request) return -1;
+
+    char* detected_proto = NULL;
+    int detect_result = gw_std_detect_protocol(gw, raw_request, request_size, &detected_proto);
+    if (detect_result != 0 || !detected_proto) {
+        if (response) *response = strdup("{\"error\":\"Protocol detection failed\"}");
+        if (response_size) *response_size = response ? strlen(*response) : 0;
+        if (response_content_type) *response_content_type = strdup("application/json");
+        free(detected_proto);
+        return -2;
+    }
+
+    gw_protocol_entry_t* entry = gw_find_protocol(gw, detected_proto);
+    free(detected_proto);
+
+    if (entry && entry->request_handler) {
+        int result = entry->request_handler(
+            raw_request, request_size, content_type,
+            response, response_size, response_content_type,
+            entry->request_handler_data);
+        entry->request_count++;
+        entry->total_bytes += request_size;
+        if (result != 0) entry->error_count++;
+        return result;
+    }
+
+    if (entry && entry->vtable && entry->vtable->handle_request) {
+        int result = entry->vtable->handle_request(
+            raw_request, request_size, content_type,
+            response, response_size, response_content_type);
+        entry->request_count++;
+        entry->total_bytes += request_size;
+        return result;
+    }
+
+    if (response) *response = strdup("{\"error\":\"No handler for protocol\"}");
+    if (response_size) *response_size = response ? strlen(*response) : 0;
     if (response_content_type) *response_content_type = strdup("application/json");
-    return 0;
+    return -3;
 }
 
 static int gw_std_detect_protocol(proto_gateway_iface_t* gw, const char* data, size_t len, char** detected) {
@@ -103,14 +182,24 @@ static int gw_std_detect_protocol(proto_gateway_iface_t* gw, const char* data, s
 static int gw_std_set_request_handler(proto_gateway_iface_t* gw,
                                       proto_gateway_request_cb handler,
                                       void* user_data) {
-    (void)gw; (void)handler; (void)user_data;
+    if (!gw || !handler) return -1;
+
+    for (size_t i = 0; i < gw->protocol_count; i++) {
+        gw->protocols[i].request_handler = handler;
+        gw->protocols[i].request_handler_data = user_data;
+    }
     return 0;
 }
 
 static int gw_std_set_event_callback(proto_gateway_iface_t* gw,
                                      proto_gateway_event_cb callback,
                                      void* user_data) {
-    (void)gw; (void)callback; (void)user_data;
+    if (!gw || !callback) return -1;
+
+    for (size_t i = 0; i < gw->protocol_count; i++) {
+        gw->protocols[i].event_callback = callback;
+        gw->protocols[i].event_callback_data = user_data;
+    }
     return 0;
 }
 
@@ -128,8 +217,22 @@ static int gw_std_list_protocols(proto_gateway_iface_t* gw, char** protocols_jso
 static int gw_std_get_protocol_stats(proto_gateway_iface_t* gw,
                                      const char* name,
                                      proto_stats_t* stats) {
-    (void)gw; (void)name;
-    if (stats) memset(stats, 0, sizeof(*stats));
+    if (!gw || !stats) return -1;
+    memset(stats, 0, sizeof(*stats));
+
+    if (name) {
+        gw_protocol_entry_t* entry = gw_find_protocol(gw, name);
+        if (!entry) return -2;
+        stats->request_count = entry->request_count;
+        stats->error_count = entry->error_count;
+        stats->total_bytes = entry->total_bytes;
+    } else {
+        for (size_t i = 0; i < gw->protocol_count; i++) {
+            stats->request_count += gw->protocols[i].request_count;
+            stats->error_count += gw->protocols[i].error_count;
+            stats->total_bytes += gw->protocols[i].total_bytes;
+        }
+    }
     return 0;
 }
 

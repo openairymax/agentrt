@@ -292,3 +292,187 @@ const char* jsonrpc_get_error_message(int code) {
 
     return "Unknown error";
 }
+
+/* ==================== Batch Requests (PROTO-004) ==================== */
+
+int jsonrpc_validate_batch_request(const cJSON* batch_json, size_t* out_count) {
+#ifdef GATEWAY_HAS_CJSON
+    if (!batch_json || !out_count) return -1;
+    *out_count = 0;
+
+    if (!cJSON_IsArray(batch_json)) return -1;
+
+    size_t count = cJSON_GetArraySize(batch_json);
+    if (count == 0) return -1;
+    if (count > JSONRPC_MAX_BATCH_SIZE) return -3;
+
+    int has_invalid = 0;
+    for (size_t i = 0; i < count; i++) {
+        const cJSON* item = cJSON_GetArrayItem(batch_json, (int)i);
+        if (!cJSON_IsObject(item)) {
+            has_invalid = 1;
+            continue;
+        }
+        (*out_count)++;
+    }
+
+    return has_invalid ? -4 : 0;
+#else
+    (void)batch_json;
+    (void)out_count;
+    return -1;
+#endif
+}
+
+char* jsonrpc_process_batch(
+    const cJSON* batch_json,
+    char* (*handler)(const cJSON* request, void* user_data),
+    void* user_data
+) {
+#ifdef GATEWAY_HAS_CJSON
+    if (!batch_json || !handler || !cJSON_IsArray(batch_json)) {
+        return NULL;
+    }
+
+    size_t count = (size_t)cJSON_GetArraySize(batch_json);
+    if (count > JSONRPC_MAX_BATCH_SIZE) count = JSONRPC_MAX_BATCH_SIZE;
+
+    cJSON* responses = cJSON_CreateArray();
+    if (!responses) return NULL;
+
+    for (size_t i = 0; i < count; i++) {
+        const cJSON* item = cJSON_GetArrayItem(batch_json, (int)i);
+
+        if (!cJSON_IsObject(item)) {
+            char* err_resp = jsonrpc_create_invalid_request_response();
+            if (err_resp) {
+                cJSON* parsed = cJSON_Parse(err_resp);
+                if (parsed) {
+                    cJSON_AddItemToArray(responses, parsed);
+                }
+                free(err_resp);
+            }
+            continue;
+        }
+
+        if (jsonrpc_is_notification(item)) {
+            continue;
+        }
+
+        int valid = jsonrpc_validate_request(item);
+        if (valid != 0) {
+            const cJSON* id = jsonrpc_get_id(item);
+            char* err_resp = NULL;
+            switch (valid) {
+                case -3: err_resp = jsonrpc_create_parse_error_response(); break;
+                case -2: err_resp = jsonrpc_create_invalid_request_response(); break;
+                default: err_resp = jsonrpc_create_invalid_request_response(); break;
+            }
+            if (err_resp) {
+                cJSON* parsed = cJSON_Parse(err_resp);
+                if (parsed) {
+                    cJSON_AddItemToArray(responses, parsed);
+                }
+                free(err_resp);
+            }
+            continue;
+        }
+
+        char* resp_str = handler(item, user_data);
+        if (resp_str) {
+            cJSON* resp_parsed = cJSON_Parse(resp_str);
+            if (resp_parsed) {
+                cJSON_AddItemToArray(responses, resp_parsed);
+            } else {
+                const cJSON* id = jsonrpc_get_id(item);
+                cJSON* err_parsed = cJSON_Parse(
+                    jsonrpc_create_internal_error_response(id, "Handler returned invalid JSON"));
+                if (err_parsed) {
+                    cJSON_AddItemToArray(responses, err_parsed);
+                }
+            }
+            free(resp_str);
+        } else {
+            const cJSON* id = jsonrpc_get_id(item);
+            char* err_resp = jsonrpc_create_internal_error_response(id,
+                                                                  "Handler returned NULL");
+            if (err_resp) {
+                cJSON* parsed = cJSON_Parse(err_resp);
+                if (parsed) {
+                    cJSON_AddItemToArray(responses, parsed);
+                }
+                free(err_resp);
+            }
+        }
+    }
+
+    char* result = cJSON_PrintUnformatted(responses);
+    cJSON_Delete(responses);
+    return result;
+#else
+    (void)batch_json;
+    (void)handler;
+    (void)user_data;
+    return NULL;
+#endif
+}
+
+/* ==================== Notifications (PROTO-004) ==================== */
+
+char* jsonrpc_create_notification(const char* method, cJSON* params) {
+#ifdef GATEWAY_HAS_CJSON
+    if (!method || strlen(method) == 0) return NULL;
+
+    cJSON* notif = cJSON_CreateObject();
+    if (!notif) {
+        if (params) cJSON_Delete(params);
+        return NULL;
+    }
+
+    cJSON_AddStringToObject(notif, "jsonrpc", "2.0");
+    cJSON_AddStringToObject(notif, "method", method);
+
+    if (params) {
+        cJSON_AddItemToObject(notif, "params", params);
+    }
+
+    char* json_str = cJSON_PrintUnformatted(notif);
+    cJSON_Delete(notif);
+
+    return json_str;
+#else
+    (void)method;
+    (void)params;
+    return NULL;
+#endif
+}
+
+bool jsonrpc_is_notification(const cJSON* json) {
+#ifdef GATEWAY_HAS_CJSON
+    if (!json || !cJSON_IsObject(json)) return false;
+
+    return !cJSON_HasObjectItem(json, "id");
+#else
+    (void)json;
+    return false;
+#endif
+}
+
+char* jsonrpc_create_notification_params(
+    const char* method,
+    const char* params_json
+) {
+#ifdef GATEWAY_HAS_CJSON
+    cJSON* params = NULL;
+    if (params_json && strlen(params_json) > 0) {
+        params = cJSON_Parse(params_json);
+        if (!params) return NULL;
+    }
+
+    return jsonrpc_create_notification(method, params);
+#else
+    (void)method;
+    (void)params_json;
+    return NULL;
+#endif
+}

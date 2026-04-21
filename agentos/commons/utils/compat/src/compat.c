@@ -10,6 +10,25 @@
 #include <stdlib.h>
 #include <string.h>
 
+typedef void (*assert_handler_fn_t)(const char* cond, const char* file,
+                                     int line, const char* func,
+                                     const char* msg);
+
+static assert_handler_fn_t g_assert_handler = NULL;
+
+void agentos_set_assert_handler(void (*handler)(const char*, const char*,
+                                                  int, const char*,
+                                                  const char*)) {
+    g_assert_handler = (assert_handler_fn_t)handler;
+}
+
+void (*agentos_get_assert_handler(void))(const char*, const char*,
+                                          int, const char*,
+                                          const char*) {
+    return (void (*)(const char*, const char*, int, const char*,
+                     const char*))g_assert_handler;
+}
+
 #ifdef AGENTOS_PLATFORM_WINDOWS
     #define WIN32_LEAN_AND_MEAN
     #include <windows.h>
@@ -121,7 +140,12 @@ int agentos_memmove_s(void* dest, size_t dest_size, const void* src, size_t coun
 void agentos_assert_fail(const char* cond, const char* file, int line, const char* func) {
     fprintf(stderr, "Assertion failed: %s\n", cond);
     fprintf(stderr, "  at %s:%d in %s()\n", file, line, func);
-    
+
+    if (g_assert_handler) {
+        g_assert_handler(cond, file, line, func, NULL);
+        return;
+    }
+
 #ifdef AGENTOS_PLATFORM_WINDOWS
     if (IsDebuggerPresent()) {
         DebugBreak();
@@ -129,7 +153,7 @@ void agentos_assert_fail(const char* cond, const char* file, int line, const cha
 #else
     raise(SIGABRT);
 #endif
-    
+
     abort();
 }
 
@@ -137,7 +161,12 @@ void agentos_assert_fail_msg(const char* cond, const char* file, int line, const
     fprintf(stderr, "Assertion failed: %s\n", cond);
     fprintf(stderr, "  Message: %s\n", msg);
     fprintf(stderr, "  at %s:%d in %s()\n", file, line, func);
-    
+
+    if (g_assert_handler) {
+        g_assert_handler(cond, file, line, func, msg);
+        return;
+    }
+
 #ifdef AGENTOS_PLATFORM_WINDOWS
     if (IsDebuggerPresent()) {
         DebugBreak();
@@ -145,7 +174,7 @@ void agentos_assert_fail_msg(const char* cond, const char* file, int line, const
 #else
     raise(SIGABRT);
 #endif
-    
+
     abort();
 }
 

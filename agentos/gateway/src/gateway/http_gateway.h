@@ -74,6 +74,8 @@ typedef struct http_gateway {
     atomic_uint_fast64_t bytes_sent;        /**< 发送字节数 */
     
     size_t max_request_size;         /**< 最大请求大小 */
+    unsigned int connection_limit;   /**< 最大并发连接数(0=默认1000) */
+    unsigned int connection_timeout; /**< 连接超时秒数(0=默认30) */
     cors_config_t cors;              /**< CORS配置 */
     gateway_rate_limiter_t* rate_limiter; /**< 速率限制器 */
     

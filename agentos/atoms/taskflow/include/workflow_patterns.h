@@ -98,6 +98,7 @@ typedef struct {
     vertex_id_t start_node;                 /**< 起始节点ID */
     vertex_id_t end_node;                   /**< 结束节点ID */
     void* execution_state;                  /**< 执行状态（内部使用） */
+    bool owns_engine;                       /**< 是否拥有引擎（内部创建时为true） */
 } workflow_context_t;
 
 // ============================================================================
