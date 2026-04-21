@@ -688,7 +688,7 @@ const proto_adapter_t* langchain_get_protocol_adapter(void) {
         adapter.destroy = langchain_proto_destroy;
         adapter.handle_request = langchain_proto_handle_request;
         adapter.get_version = langchain_adapter_version;
-        adapter.capabilities = PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING | PROTO_CAP_AGENT_DISCOVERY | PROTO_CAP_MEMORY_ACCESS;
+        adapter.capabilities = PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING | PROTO_CAP_AGENT_DISCOVERY | PROTO_CAP_RESOURCE_ACCESS;
         initialized = true;
     }
     return &adapter;
