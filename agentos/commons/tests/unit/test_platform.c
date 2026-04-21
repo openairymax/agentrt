@@ -14,6 +14,7 @@
 #include <assert.h>
 
 #include "platform.h"
+#include "../../utils/error/include/error.h"
 
 /* ==================== 测试辅助�?==================== */
 

@@ -7,7 +7,7 @@
 #ifndef AGENTOS_TASK_EXECUTOR_QUEUE_H
 #define AGENTOS_TASK_EXECUTOR_QUEUE_H
 
-#include "agentos.h"
+#include "../../../atoms/corekern/include/agentos.h"
 #include <stdint.h>
 
 /* 前向声明 */

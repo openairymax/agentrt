@@ -2,7 +2,7 @@
 #define GARBAGE_COLLECTOR_H
 
 #include "../../../commons/utils/memory/include/memory_compat.h"
-#include "agentos.h"
+#include "../../atoms/corekern/include/agentos.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>

@@ -5,7 +5,7 @@
  */
 
 #include "../../include/layer2_feature.h"
-#include "agentos.h"
+#include "../../../atoms/corekern/include/agentos.h"
 #include "logging_compat.h"
 #include <curl/curl.h>
 #include <cjson/cJSON.h>
