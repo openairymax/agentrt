@@ -196,6 +196,14 @@ typedef struct {
     bool is_available;
 } langchain_agent_instance_t;
 
+typedef void (*langchain_streaming_fn)(const char* chunk_text,
+                                       const char* source_step,
+                                       void* user_data);
+
+typedef void (*langchain_trace_fn)(const char* trace_event,
+                                   const char* trace_data_json,
+                                   void* user_data);
+
 typedef struct langchain_adapter_context_s {
     langchain_config_t config;
     langchain_chain_instance_t chains[LANGCHAIN_MAX_CHAINS];
@@ -220,14 +228,6 @@ typedef int (*langchain_tool_executor_fn)(const char* tool_name,
                                            const char* input_json,
                                            char** output_json,
                                            void* user_data);
-
-typedef void (*langchain_streaming_fn)(const char* chunk_text,
-                                       const char* source_step,
-                                       void* user_data);
-
-typedef void (*langchain_trace_fn)(const char* trace_event,
-                                   const char* trace_data_json,
-                                   void* user_data);
 
 langchain_config_t langchain_config_default(void);
 

@@ -45,6 +45,7 @@ extern "C" {
 #define AUTOGEN_MAX_GROUP_CHATS      16
 #define AUTOGEN_MAX_MESSAGES        512
 #define AUTOGEN_MAX_TOOLS            64
+#define AUTOGEN_MAX_RESPONSE_LEN    8192
 #define AUTOGEN_DEFAULT_TIMEOUT_MS 120000
 
 typedef enum {
@@ -92,7 +93,7 @@ typedef struct {
     bool is_termination;
     int max_consecutive_auto_reply;
     bool code_execution_enabled;
-    human_mode_t human_input_mode;
+    autogen_human_mode_t human_input_mode;
     char** allowed_transitions;
     size_t transition_count;
 } autogen_agent_def_t;

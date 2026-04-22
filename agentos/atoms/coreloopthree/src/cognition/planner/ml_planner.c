@@ -5,7 +5,7 @@
  */
 
 #include "../include/cognition.h"
-#include "../../../commons/utils/memory/include/memory_compat.h"
+#include "memory_compat.h"
 #include "logging_compat.h"
 #include "platform.h"
 #include <stdlib.h>

@@ -9,7 +9,7 @@
  */
 
 #include "layer1_raw.h"
-#include "../../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include "logger.h"
 #include "observability.h"
 #include "advanced_storage_utils.h"
@@ -20,7 +20,7 @@
 #include <stdio.h>
 
 /* 基础库兼容性层 */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 
 /* ==================== 常量定义 ==================== */

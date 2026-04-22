@@ -21,12 +21,12 @@
 #include "layer4_pattern.h"
 #include "retrieval.h"
 #include "forgetting.h"
-#include "../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include <stdlib.h>
 #include <time.h>  /* time()函数 */
 
 /* Unified base library compatibility layer */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
 #include <stdio.h>

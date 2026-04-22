@@ -257,21 +257,32 @@ endif()
 # 统一的头文件路径管理
 # 定义全局包含目录，避免使用相对路径
 set(AGENTOS_INCLUDE_DIRS
+    # atoms 内部模块头文件
     ${CMAKE_CURRENT_SOURCE_DIR}/corekern/include
     ${CMAKE_CURRENT_SOURCE_DIR}/coreloopthree/include
     ${CMAKE_CURRENT_SOURCE_DIR}/memoryrovol/include
     ${CMAKE_CURRENT_SOURCE_DIR}/syscall/include
+    # commons 基础库头文件 (完整覆盖所有子模块)
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/logging/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/sync/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/platform/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/error/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/types/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/config/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/config_unified/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/observability/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/ipc/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/io/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/cache/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/cost/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/memory/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/string/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/token/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/network/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/security/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/resource/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/uuid/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/strategy/include
 )
 
 # 创建接口库来管理公共依赖

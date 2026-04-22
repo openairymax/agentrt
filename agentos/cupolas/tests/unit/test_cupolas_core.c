@@ -18,6 +18,7 @@
 #include <assert.h>
 #include "../include/cupolas.h"
 #include "../src/platform/platform.h"
+#include "../src/permission/permission_cache.h"
 #include "../src/permission/permission.h"
 #include "../src/audit/audit.h"
 #include "../src/sanitizer/sanitizer.h"

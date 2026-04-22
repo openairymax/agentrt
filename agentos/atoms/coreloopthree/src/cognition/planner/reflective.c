@@ -15,8 +15,8 @@
 #include "cognition.h"
 #include "../thinking_chain.h"
 #include "../metacognition.h"
-#include "../../../atoms/corekern/include/agentos.h"
-#include "include/memory_compat.h"
+#include "agentos.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 #include <stdlib.h>
 #include <string.h>
