@@ -5,13 +5,13 @@
  */
 
 #include "advanced_storage_utils.h"
-#include "../../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include "logger.h"
 #include <string.h>
 #include <stdio.h>
 
 /* 基础库兼容性层 */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 
 /* 压缩库 */
 #include <zstd.h>

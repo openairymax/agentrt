@@ -12,7 +12,7 @@
 #ifndef AGENTOS_THINKING_CHAIN_H
 #define AGENTOS_THINKING_CHAIN_H
 
-#include "../../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>

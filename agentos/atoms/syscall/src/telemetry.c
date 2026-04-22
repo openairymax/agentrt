@@ -25,7 +25,7 @@
 #endif
 
 /* Unified base library compatibility layer */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 
 /* heapstore 持久化开关（可通过配置关闭） */

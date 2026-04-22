@@ -5,12 +5,12 @@
  */
 
 #include "../include/retrieval.h"
-#include "../../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include <stdlib.h>
 #include <time.h>
 
 /* Unified base library compatibility layer */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
 

@@ -7,7 +7,7 @@
 #ifndef AGENTOS_ID_UTILS_H
 #define AGENTOS_ID_UTILS_H
 
-#include "../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include <stddef.h>
 
 #ifdef __cplusplus

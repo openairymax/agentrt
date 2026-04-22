@@ -13,7 +13,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 
 typedef struct reactive_data {

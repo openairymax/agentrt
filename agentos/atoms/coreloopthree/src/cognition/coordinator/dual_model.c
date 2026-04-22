@@ -5,12 +5,12 @@
  */
 
 #include "strategy.h"
-#include "../../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>
 
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 #include "../intent_utils.h"
 #include <string.h>

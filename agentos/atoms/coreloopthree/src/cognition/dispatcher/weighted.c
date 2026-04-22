@@ -7,14 +7,14 @@
 #include "cognition.h"
 #include "agent_registry.h"
 #include "strategy.h"
-#include "../../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <float.h>
 
 /* Unified base library compatibility layer */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 
 /**

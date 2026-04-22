@@ -53,6 +53,7 @@ set(SOURCES
     # 统一令牌管理模块
     utils/token/counter.c
     utils/token/budget.c
+    utils/token/token_standard.c
     # 统一成本控制模块
     utils/cost/estimator.c
     utils/cost/controller.c
@@ -70,6 +71,7 @@ set(SOURCES
     utils/resource/resource_guard.c
     # 统一日志模块
     utils/logging/src/logging.c
+    utils/logging/src/logging_compat.c
     utils/logging/logging_common.c
     # 统一配置模块（暂时禁用，实现与头文件不匹配）
     # utils/config_unified/src/core_config.c
