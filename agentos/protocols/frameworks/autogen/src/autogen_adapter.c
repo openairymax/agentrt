@@ -8,6 +8,7 @@
 #define LOG_TAG "autogen_adapter"
 
 #include "autogen_adapter.h"
+#include "agentos_protocol_interface.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -276,7 +277,7 @@ static void autogen_generate_response(const char* incoming_msg,
     if (role->prefix_count > 0 && is_first_in_round) {
         int pi = (int)(h % (uint64_t)role->prefix_count);
         pos += snprintf(out_buf + pos, buf_len - (size_t)pos,
-                        "%s", role->prefixes[pi]);
+                        "%s", role->role_prefixes[pi]);
     }
 
     if (role->body_count > 0) {
@@ -487,19 +488,19 @@ int autogen_get_conversation(autogen_adapter_context_t* ctx,
     if (!group_id) return -2;
 
     for (size_t i = 0; i < ctx->conversation_count; i++) {
-        if (ctx->conversations[i].group_id &&
-            strcmp(ctx->conversations[i].group_id, group_id) == 0) {
+        if (ctx->conversations[i].conversation_id &&
+            strcmp(ctx->conversations[i].conversation_id, group_id) == 0) {
             *conv = ctx->conversations[i];
             return 0;
         }
     }
 
     for (size_t i = 0; i < ctx->group_chat_count; i++) {
-        if (ctx->group_chats[i].group_id &&
-            strcmp(ctx->group_chats[i].group_id, group_id) == 0) {
-            conv->group_id = ctx->group_chats[i].group_id;
+        if (ctx->group_chats[i].id &&
+            strcmp(ctx->group_chats[i].id, group_id) == 0) {
+            conv->conversation_id = ctx->group_chats[i].id;
             conv->message_count = 0;
-            conv->is_active = true;
+            conv->is_complete = false;
             return 0;
         }
     }
@@ -595,7 +596,7 @@ static int autogen_proto_handle_request(void* context,
     msg.is_visible = true;
 
     autogen_message_t reply = {0};
-    int ret = autogen_send_message(ctx, &msg, &reply);
+    int ret = autogen_send_message(ctx, "user", "agent", raw_request, MSG_TYPE_TEXT, &reply);
 
     if (ret == 0 && reply.content) {
         *response = strdup(reply.content);

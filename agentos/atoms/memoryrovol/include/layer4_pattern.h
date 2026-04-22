@@ -7,7 +7,7 @@
 #ifndef AGENTOS_LAYER4_PATTERN_H
 #define AGENTOS_LAYER4_PATTERN_H
 
-#include "../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include <stddef.h>
 #include <stdint.h>
 

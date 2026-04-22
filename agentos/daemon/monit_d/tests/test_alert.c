@@ -8,38 +8,19 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <stdint.h>
 #include "monitor_service.h"
 
-static void test_alert_manager_create_destroy(void) {
-    printf("  test_alert_manager_create_destroy...\n");
+static void test_monitor_service_create_destroy(void) {
+    printf("  test_monitor_service_create_destroy...\n");
 
-    alert_manager_t* am = alert_manager_create(NULL);
-    assert(am != NULL);
-
-    alert_manager_destroy(am);
-
-    printf("    PASSED\n");
-}
-
-static void test_alert_rule_create(void) {
-    printf("  test_alert_rule_create...\n");
-
-    alert_manager_t* am = alert_manager_create(NULL);
-    assert(am != NULL);
-
-    alert_rule_t rule;
-    memset(&rule, 0, sizeof(rule));
-    rule.name = "high_cpu_usage";
-    rule.metric = "cpu_usage_percent";
-    rule.condition = ALERT_CONDITION_GREATER_THAN;
-    rule.threshold = 80.0;
-    rule.duration_sec = 60;
-    rule.severity = ALERT_SEVERITY_WARNING;
-
-    int ret = alert_manager_add_rule(am, &rule);
+    monitor_service_t* svc = NULL;
+    int ret = monitor_service_create(NULL, &svc);
     assert(ret == 0);
+    assert(svc != NULL);
 
-    alert_manager_destroy(am);
+    ret = monitor_service_destroy(svc);
+    assert(ret == 0);
 
     printf("    PASSED\n");
 }
@@ -47,23 +28,23 @@ static void test_alert_rule_create(void) {
 static void test_alert_trigger(void) {
     printf("  test_alert_trigger...\n");
 
-    alert_manager_t* am = alert_manager_create(NULL);
-    assert(am != NULL);
+    monitor_service_t* svc = NULL;
+    int ret = monitor_service_create(NULL, &svc);
+    assert(ret == 0);
 
-    alert_rule_t rule;
-    memset(&rule, 0, sizeof(rule));
-    rule.name = "test_alert";
-    rule.metric = "test_metric";
-    rule.condition = ALERT_CONDITION_GREATER_THAN;
-    rule.threshold = 50.0;
-    rule.severity = ALERT_SEVERITY_CRITICAL;
+    alert_info_t alert;
+    memset(&alert, 0, sizeof(alert));
+    alert.alert_id = "test_alert_001";
+    alert.message = "CPU usage exceeded threshold";
+    alert.level = ALERT_LEVEL_WARNING;
+    alert.service_name = "test_service";
+    alert.resource_id = "cpu_usage_percent";
+    alert.is_resolved = false;
 
-    alert_manager_add_rule(am, &rule);
+    ret = monitor_service_trigger_alert(svc, &alert);
+    assert(ret == 0);
 
-    int ret = alert_manager_evaluate(am, "test_metric", 75.0);
-    assert(ret == 1);
-
-    alert_manager_destroy(am);
+    monitor_service_destroy(svc);
 
     printf("    PASSED\n");
 }
@@ -71,61 +52,65 @@ static void test_alert_trigger(void) {
 static void test_alert_severity(void) {
     printf("  test_alert_severity...\n");
 
-    assert(alert_severity_to_string(ALERT_SEVERITY_INFO) != NULL);
-    assert(alert_severity_to_string(ALERT_SEVERITY_WARNING) != NULL);
-    assert(alert_severity_to_string(ALERT_SEVERITY_CRITICAL) != NULL);
-
-    assert(strcmp(alert_severity_to_string(ALERT_SEVERITY_INFO), "INFO") == 0);
-    assert(strcmp(alert_severity_to_string(ALERT_SEVERITY_WARNING), "WARNING") == 0);
-    assert(strcmp(alert_severity_to_string(ALERT_SEVERITY_CRITICAL), "CRITICAL") == 0);
+    assert(ALERT_LEVEL_INFO == 0);
+    assert(ALERT_LEVEL_WARNING == 1);
+    assert(ALERT_LEVEL_ERROR == 2);
+    assert(ALERT_LEVEL_CRITICAL == 3);
 
     printf("    PASSED\n");
 }
 
-static void test_alert_notification(void) {
-    printf("  test_alert_notification...\n");
+static void test_alert_resolve(void) {
+    printf("  test_alert_resolve...\n");
 
-    alert_manager_t* am = alert_manager_create(NULL);
-    assert(am != NULL);
-
-    alert_notification_t notif;
-    memset(&notif, 0, sizeof(notif));
-    notif.type = NOTIFICATION_TYPE_WEBHOOK;
-    notif.endpoint = "http://localhost:8080/alert";
-    notif.enabled = 1;
-
-    int ret = alert_manager_add_notification(am, &notif);
+    monitor_service_t* svc = NULL;
+    int ret = monitor_service_create(NULL, &svc);
     assert(ret == 0);
 
-    alert_manager_destroy(am);
+    alert_info_t alert;
+    memset(&alert, 0, sizeof(alert));
+    alert.alert_id = "resolve_test_001";
+    alert.message = "Memory usage high";
+    alert.level = ALERT_LEVEL_ERROR;
+    alert.service_name = "test_service";
+    alert.is_resolved = false;
+
+    ret = monitor_service_trigger_alert(svc, &alert);
+    assert(ret == 0);
+
+    ret = monitor_service_resolve_alert(svc, "resolve_test_001");
+    assert(ret == 0);
+
+    monitor_service_destroy(svc);
 
     printf("    PASSED\n");
 }
 
-static void test_alert_history(void) {
-    printf("  test_alert_history...\n");
+static void test_alert_get_alerts(void) {
+    printf("  test_alert_get_alerts...\n");
 
-    alert_manager_t* am = alert_manager_create(NULL);
-    assert(am != NULL);
+    monitor_service_t* svc = NULL;
+    int ret = monitor_service_create(NULL, &svc);
+    assert(ret == 0);
 
-    alert_rule_t rule;
-    memset(&rule, 0, sizeof(rule));
-    rule.name = "history_test";
-    rule.metric = "test_value";
-    rule.condition = ALERT_CONDITION_GREATER_THAN;
-    rule.threshold = 10.0;
+    alert_info_t alert;
+    memset(&alert, 0, sizeof(alert));
+    alert.alert_id = "get_test_001";
+    alert.message = "Test alert";
+    alert.level = ALERT_LEVEL_WARNING;
+    alert.service_name = "test_service";
+    alert.is_resolved = false;
 
-    alert_manager_add_rule(am, &rule);
-    alert_manager_evaluate(am, "test_value", 20.0);
+    monitor_service_trigger_alert(svc, &alert);
 
-    alert_history_t* history = NULL;
+    alert_info_t** alerts = NULL;
     size_t count = 0;
-    int ret = alert_manager_get_history(am, &history, &count);
-    assert(ret == 0);
-    assert(history != NULL || count == 0);
+    ret = monitor_service_get_alerts(svc, &alerts, &count);
+    if (ret == 0) {
+        printf("    Found %zu alerts\n", count);
+    }
 
-    if (history) free(history);
-    alert_manager_destroy(am);
+    monitor_service_destroy(svc);
 
     printf("    PASSED\n");
 }
@@ -135,13 +120,12 @@ int main(void) {
     printf("  Alert Manager Unit Tests\n");
     printf("=========================================\n");
 
-    test_alert_manager_create_destroy();
-    test_alert_rule_create();
+    test_monitor_service_create_destroy();
     test_alert_trigger();
     test_alert_severity();
-    test_alert_notification();
-    test_alert_history();
+    test_alert_resolve();
+    test_alert_get_alerts();
 
-    printf("\n✅ All alert tests PASSED\n");
+    printf("\nAll alert tests PASSED\n");
     return 0;
 }

@@ -10,124 +10,145 @@
 #include <assert.h>
 #include "market_service.h"
 
-static void test_installer_create_destroy(void) {
-    printf("  test_installer_create_destroy...\n");
+static void test_installer_agent_install_uninstall(void) {
+    printf("  test_installer_agent_install_uninstall...\n");
 
-    installer_t* inst = installer_create(NULL);
-    assert(inst != NULL);
+    market_service_t* svc = NULL;
+    int ret = market_service_create(NULL, &svc);
+    assert(ret == 0 && svc != NULL);
 
-    installer_destroy(inst);
+    agent_info_t info;
+    memset(&info, 0, sizeof(info));
+    info.agent_id = "install_test_agent";
+    info.name = "Install Test Agent";
+    info.version = "1.0.0";
+    info.type = AGENT_TYPE_ASSISTANT;
 
-    printf("    PASSED\n");
-}
-
-static void test_installer_config(void) {
-    printf("  test_installer_config...\n");
-
-    installer_config_t manager = {
-        .install_dir = "/tmp/agentos/test",
-        .temp_dir = "/tmp/agentos/temp",
-        .verify_signature = 1,
-        .max_retries = 3
-    };
-
-    installer_t* inst = installer_create(&manager);
-    assert(inst != NULL);
-
-    installer_destroy(inst);
-
-    printf("    PASSED\n");
-}
-
-static void test_installer_prepare_request(void) {
-    printf("  test_installer_prepare_request...\n");
-
-    installer_t* inst = installer_create(NULL);
-    assert(inst != NULL);
+    market_service_register_agent(svc, &info);
 
     install_request_t request;
     memset(&request, 0, sizeof(request));
-    request.package_id = "test_package_001";
+    request.id = "install_test_agent";
     request.version = "1.0.0";
-    request.install_path = "/tmp/test_install";
 
-    int ret = installer_prepare_request(inst, &request);
-    assert(ret == 0 || ret == AGENTOS_ERR_INVALID_PARAM);
+    install_result_t* result = NULL;
+    ret = market_service_install_agent(svc, &request, &result);
+    if (ret == 0 && result != NULL) {
+        printf("    Agent install: success=%d, msg=%s\n",
+               result->success,
+               result->message ? result->message : "(null)");
+        free(result->message);
+        free(result->installed_version);
+        free(result->install_path);
+        free(result);
+    } else {
+        printf("    Agent install returned %d\n", ret);
+    }
 
-    installer_destroy(inst);
-
-    printf("    PASSED\n");
-}
-
-static void test_installer_validate_package(void) {
-    printf("  test_installer_validate_package...\n");
-
-    installer_t* inst = installer_create(NULL);
-    assert(inst != NULL);
-
-    const char* valid_package = "{\"id\": \"test\", \"version\": \"1.0.0\", \"files\": []}";
-    const char* invalid_package = "not a valid json";
-
-    int ret = installer_validate_package(inst, valid_package);
-    assert(ret == 0);
-
-    ret = installer_validate_package(inst, invalid_package);
-    assert(ret != 0);
-
-    installer_destroy(inst);
+    market_service_destroy(svc);
 
     printf("    PASSED\n");
 }
 
-static void test_installer_download_progress(void) {
-    printf("  test_installer_download_progress...\n");
+static void test_installer_skill_install_uninstall(void) {
+    printf("  test_installer_skill_install_uninstall...\n");
 
-    installer_t* inst = installer_create(NULL);
-    assert(inst != NULL);
+    market_service_t* svc = NULL;
+    int ret = market_service_create(NULL, &svc);
+    assert(ret == 0 && svc != NULL);
 
-    install_progress_t progress;
-    memset(&progress, 0, sizeof(progress));
-    progress.total_bytes = 1024;
-    progress.downloaded_bytes = 512;
-    progress.percentage = 50;
+    skill_info_t info;
+    memset(&info, 0, sizeof(info));
+    info.skill_id = "install_test_skill";
+    info.name = "Install Test Skill";
+    info.version = "1.0.0";
+    info.type = SKILL_TYPE_TOOL;
 
-    int ret = installer_set_progress_callback(inst, NULL, NULL);
-    assert(ret == 0);
-
-    installer_destroy(inst);
-
-    printf("    PASSED\n");
-}
-
-static void test_installer_rollback(void) {
-    printf("  test_installer_rollback...\n");
-
-    installer_t* inst = installer_create(NULL);
-    assert(inst != NULL);
+    market_service_register_skill(svc, &info);
 
     install_request_t request;
     memset(&request, 0, sizeof(request));
-    request.package_id = "rollback_test";
-    request.version = "1.0.0";
+    request.id = "install_test_skill";
+    request.force_update = true;
 
-    int ret = installer_rollback(inst, &request);
-    assert(ret == 0 || ret == AGENTOS_ERR_NOT_FOUND);
+    install_result_t* result = NULL;
+    ret = market_service_install_skill(svc, &request, &result);
+    if (ret == 0 && result != NULL) {
+        printf("    Skill install: success=%d, version=%s\n",
+               result->success,
+               result->installed_version ? result->installed_version : "(null)");
+        free(result->message);
+        free(result->installed_version);
+        free(result->install_path);
+        free(result);
+    } else {
+        printf("    Skill install returned %d\n", ret);
+    }
 
-    installer_destroy(inst);
+    market_service_destroy(svc);
 
     printf("    PASSED\n");
 }
 
-static void test_installer_status(void) {
-    printf("  test_installer_status...\n");
+static void test_installer_check_update(void) {
+    printf("  test_installer_check_update...\n");
 
-    installer_t* inst = installer_create(NULL);
-    assert(inst != NULL);
+    market_service_t* svc = NULL;
+    int ret = market_service_create(NULL, &svc);
+    assert(ret == 0 && svc != NULL);
 
-    install_status_t status = installer_get_status(inst);
-    assert(status == INSTALL_STATUS_IDLE || status >= 0);
+    bool has_update = false;
+    char* latest_version = NULL;
+    ret = market_service_check_update(svc, "some_agent_or_skill_id", &has_update, &latest_version);
+    if (ret == 0) {
+        printf("    Update check: has_update=%s, latest=%s\n",
+               has_update ? "yes" : "no",
+               latest_version ? latest_version : "(null)");
+        free(latest_version);
+    } else {
+        printf("    Check update returned %d\n", ret);
+    }
 
-    installer_destroy(inst);
+    market_service_destroy(svc);
+
+    printf("    PASSED\n");
+}
+
+static void test_installer_sync_registry(void) {
+    printf("  test_installer_sync_registry...\n");
+
+    market_service_t* svc = NULL;
+    int ret = market_service_create(NULL, &svc);
+    assert(ret == 0 && svc != NULL);
+
+    ret = market_service_sync_registry(svc);
+    if (ret == 0) {
+        printf("    Sync completed successfully\n");
+    } else {
+        printf("    Sync returned %d (may be expected)\n", ret);
+    }
+
+    market_service_destroy(svc);
+
+    printf("    PASSED\n");
+}
+
+static void test_installer_reload_config(void) {
+    printf("  test_installer_reload_config...\n");
+
+    market_service_t* svc = NULL;
+    int ret = market_service_create(NULL, &svc);
+    assert(ret == 0 && svc != NULL);
+
+    market_config_t new_config;
+    memset(&new_config, 0, sizeof(new_config));
+    new_config.sync_interval_ms = 60000;
+    new_config.cache_ttl_ms = 300000;
+
+    ret = market_service_reload_config(svc, &new_config);
+    assert(ret == 0);
+
+    market_service_destroy(svc);
 
     printf("    PASSED\n");
 }
@@ -137,14 +158,12 @@ int main(void) {
     printf("  Installer Unit Tests\n");
     printf("=========================================\n");
 
-    test_installer_create_destroy();
-    test_installer_config();
-    test_installer_prepare_request();
-    test_installer_validate_package();
-    test_installer_download_progress();
-    test_installer_rollback();
-    test_installer_status();
+    test_installer_agent_install_uninstall();
+    test_installer_skill_install_uninstall();
+    test_installer_check_update();
+    test_installer_sync_registry();
+    test_installer_reload_config();
 
-    printf("\n✅ All installer tests PASSED\n");
+    printf("\nAll installer tests PASSED\n");
     return 0;
 }

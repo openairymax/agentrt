@@ -13,26 +13,6 @@
 #include <stdio.h>
 #include <time.h>
 
-struct langchain_adapter_context_s {
-    langchain_config_t config;
-    bool initialized;
-    langchain_tool_def_t* registered_tools;
-    size_t tool_count;
-    langchain_tool_executor_fn* tool_executors;
-    void** tool_executor_data;
-    langchain_chain_instance_t* active_chains;
-    size_t chain_count;
-    langchain_memory_t* memories;
-    size_t memory_count;
-    langchain_streaming_fn stream_handler;
-    void* stream_handler_data;
-    langchain_trace_fn trace_handler;
-    void* trace_handler_data;
-    uint64_t total_executions;
-    uint64_t successful_executions;
-    double total_execution_time_ms;
-};
-
 langchain_config_t langchain_config_default(void) {
     langchain_config_t cfg = {0};
     cfg.base_url = "http://localhost:18789";
@@ -62,17 +42,13 @@ langchain_adapter_context_t* langchain_adapter_create(const langchain_config_t* 
     if (config->tracing_endpoint) ctx->config.tracing_endpoint = strdup(config->tracing_endpoint);
     if (config->cache_backend_url) ctx->config.cache_backend_url = strdup(config->cache_backend_url);
 
-    ctx->initialized = true;
-    ctx->registered_tools = NULL;
+    ctx->is_initialized = true;
     ctx->tool_count = 0;
-    ctx->tool_executors = NULL;
-    ctx->tool_executor_data = NULL;
-    ctx->active_chains = NULL;
     ctx->chain_count = 0;
-    ctx->memories = NULL;
+    ctx->agent_count = 0;
     ctx->memory_count = 0;
-    ctx->total_executions = 0;
-    ctx->successful_executions = 0;
+    ctx->total_chains_executed = 0;
+    ctx->total_tokens_used = 0;
     ctx->total_execution_time_ms = 0.0;
 
     return ctx;
@@ -88,25 +64,27 @@ void langchain_adapter_destroy(langchain_adapter_context_t* ctx) {
     free(ctx->config.cache_backend_url);
 
     for (size_t i = 0; i < ctx->tool_count; i++)
-        langchain_tool_def_destroy(&ctx->registered_tools[i]);
-    free(ctx->registered_tools);
-    free(ctx->tool_executors);
-    free(ctx->tool_executor_data);
+        langchain_tool_def_destroy(&ctx->tools[i]);
 
     for (size_t i = 0; i < ctx->chain_count; i++)
-        langchain_chain_instance_destroy(&ctx->active_chains[i]);
-    free(ctx->active_chains);
+        langchain_chain_instance_destroy(&ctx->chains[i]);
+
+    for (size_t i = 0; i < ctx->agent_count; i++) {
+        free(ctx->agents[i].id);
+        free(ctx->agents[i].name);
+        free(ctx->agents[i].description);
+        free(ctx->agents[i].llm_provider);
+    }
 
     for (size_t i = 0; i < ctx->memory_count; i++)
         langchain_memory_destroy(&ctx->memories[i]);
-    free(ctx->memories);
 
     memset(ctx, 0, sizeof(langchain_adapter_context_t));
     free(ctx);
 }
 
 bool langchain_adapter_is_initialized(const langchain_adapter_context_t* ctx) {
-    return ctx && ctx->initialized;
+    return ctx && ctx->is_initialized;
 }
 
 const char* langchain_adapter_version(void) {
@@ -118,32 +96,18 @@ int langchain_register_tool(langchain_adapter_context_t* ctx,
                              langchain_tool_executor_fn executor,
                              void* user_data) {
     if (!ctx || !tool || !tool->id) return -1;
+    if (ctx->tool_count >= LANGCHAIN_MAX_TOOLS) return -2;
 
-    langchain_tool_def_t* new_tools = (langchain_tool_def_t*)realloc(
-        ctx->registered_tools, (ctx->tool_count + 1) * sizeof(langchain_tool_def_t));
-    if (!new_tools && ctx->tool_count > 0) return -2;
-    ctx->registered_tools = new_tools;
+    memset(&ctx->tools[ctx->tool_count], 0, sizeof(langchain_tool_def_t));
+    ctx->tools[ctx->tool_count].id = strdup(tool->id);
+    ctx->tools[ctx->tool_count].name = tool->name ? strdup(tool->name) : NULL;
+    ctx->tools[ctx->tool_count].description = tool->description ? strdup(tool->description) : NULL;
+    ctx->tools[ctx->tool_count].function_schema_json = tool->function_schema_json ? strdup(tool->function_schema_json) : NULL;
+    ctx->tools[ctx->tool_count].tool_type = tool->tool_type;
+    ctx->tools[ctx->tool_count].is_async = tool->is_async;
 
-    langchain_tool_executor_fn* new_execs = (langchain_tool_executor_fn*)realloc(
-        ctx->tool_executors, (ctx->tool_count + 1) * sizeof(langchain_tool_executor_fn));
-    if (!new_execs && ctx->tool_count > 0) return -3;
-    ctx->tool_executors = new_execs;
-
-    void** new_datas = (void**)realloc(
-        ctx->tool_executor_data, (ctx->tool_count + 1) * sizeof(void*));
-    if (!new_datas && ctx->tool_count > 0) return -4;
-    ctx->tool_executor_data = new_datas;
-
-    memset(&ctx->registered_tools[ctx->tool_count], 0, sizeof(langchain_tool_def_t));
-    ctx->registered_tools[ctx->tool_count].id = strdup(tool->id);
-    ctx->registered_tools[ctx->tool_count].name = tool->name ? strdup(tool->name) : NULL;
-    ctx->registered_tools[ctx->tool_count].description = tool->description ? strdup(tool->description) : NULL;
-    ctx->registered_tools[ctx->tool_count].function_schema_json = tool->function_schema_json ? strdup(tool->function_schema_json) : NULL;
-    ctx->registered_tools[ctx->tool_count].tool_type = tool->tool_type;
-    ctx->registered_tools[ctx->tool_count].is_async = tool->is_async;
-
-    ctx->tool_executors[ctx->tool_count] = executor;
-    ctx->tool_executor_data[ctx->tool_count] = user_data;
+    (void)executor;
+    (void)user_data;
 
     ctx->tool_count++;
     return 0;
@@ -161,12 +125,12 @@ int langchain_list_tools(langchain_adapter_context_t* ctx,
     if (!*tools) return -3;
 
     for (size_t i = 0; i < ctx->tool_count; i++) {
-        (*tools)[i].id = ctx->registered_tools[i].id ? strdup(ctx->registered_tools[i].id) : NULL;
-        (*tools)[i].name = ctx->registered_tools[i].name ? strdup(ctx->registered_tools[i].name) : NULL;
-        (*tools)[i].description = ctx->registered_tools[i].description ? strdup(ctx->registered_tools[i].description) : NULL;
-        (*tools)[i].function_schema_json = ctx->registered_tools[i].function_schema_json ? strdup(ctx->registered_tools[i].function_schema_json) : NULL;
-        (*tools)[i].tool_type = ctx->registered_tools[i].tool_type;
-        (*tools)[i].is_async = ctx->registered_tools[i].is_async;
+        (*tools)[i].id = ctx->tools[i].id ? strdup(ctx->tools[i].id) : NULL;
+        (*tools)[i].name = ctx->tools[i].name ? strdup(ctx->tools[i].name) : NULL;
+        (*tools)[i].description = ctx->tools[i].description ? strdup(ctx->tools[i].description) : NULL;
+        (*tools)[i].function_schema_json = ctx->tools[i].function_schema_json ? strdup(ctx->tools[i].function_schema_json) : NULL;
+        (*tools)[i].tool_type = ctx->tools[i].tool_type;
+        (*tools)[i].is_async = ctx->tools[i].is_async;
     }
     *count = ctx->tool_count;
     return 0;
@@ -189,15 +153,12 @@ int langchain_create_chain(langchain_adapter_context_t* ctx,
     instance->output_schema_json = strdup("{}");
     instance->compiled_executable = NULL;
 
-    langchain_chain_instance_t* chains = (langchain_chain_instance_t*)realloc(
-        ctx->active_chains, (ctx->chain_count + 1) * sizeof(langchain_chain_instance_t));
-    if (chains) {
-        ctx->active_chains = chains;
-        memcpy(&ctx->active_chains[ctx->chain_count], instance, sizeof(langchain_chain_instance_t));
-        ctx->active_chains[ctx->chain_count].id = strdup(instance->id);
-        ctx->active_chains[ctx->chain_count].input_schema_json =
+    if (ctx->chain_count < LANGCHAIN_MAX_CHAINS) {
+        memcpy(&ctx->chains[ctx->chain_count], instance, sizeof(langchain_chain_instance_t));
+        ctx->chains[ctx->chain_count].id = strdup(instance->id);
+        ctx->chains[ctx->chain_count].input_schema_json =
             instance->input_schema_json ? strdup(instance->input_schema_json) : NULL;
-        ctx->active_chains[ctx->chain_count].output_schema_json =
+        ctx->chains[ctx->chain_count].output_schema_json =
             instance->output_schema_json ? strdup(instance->output_schema_json) : NULL;
         ctx->chain_count++;
     }
@@ -328,9 +289,9 @@ int langchain_execute_chain(langchain_adapter_context_t* ctx,
                              const char* input_json,
                              langchain_execution_result_t* result) {
     if (!ctx || !result) return -1;
-    if (!ctx->initialized) return -2;
+    if (!ctx->is_initialized) return -2;
 
-    ctx->total_executions++;
+    ctx->total_chains_executed++;
 
     memset(result, 0, sizeof(langchain_execution_result_t));
     result->chain_id = chain_id ? strdup(chain_id) : NULL;
@@ -357,7 +318,7 @@ int langchain_execute_chain(langchain_adapter_context_t* ctx,
     result->step_count = (ctx->tool_count > 0) ? (int)(ctx->tool_count + 2) : 3;
     result->success = true;
 
-    ctx->successful_executions++;
+    ctx->total_chains_executed++;
     ctx->total_execution_time_ms += result->execution_time_ms;
 
     return 0;
@@ -367,11 +328,11 @@ int langchain_execute_chain_streaming(langchain_adapter_context_t* ctx,
                                       const char* chain_id,
                                       const char* input_json,
                                       langchain_streaming_fn stream_handler,
-                                      void* user_data) {
+                                     void* user_data) {
     if (!ctx || !stream_handler) return -1;
-    if (!ctx->initialized) return -2;
+    if (!ctx->is_initialized) return -2;
 
-    ctx->total_executions++;
+    ctx->total_chains_executed++;
 
     char full_response[LC_MAX_RESPONSE_LEN];
     memset(full_response, 0, sizeof(full_response));
@@ -410,7 +371,7 @@ int langchain_execute_chain_streaming(langchain_adapter_context_t* ctx,
         chunk_idx++;
     }
 
-    ctx->successful_executions++;
+    ctx->total_chains_executed++;
     return 0;
 }
 
@@ -418,31 +379,21 @@ int langchain_create_agent(langchain_adapter_context_t* ctx,
                             const langchain_agent_def_t* definition,
                             char* out_agent_id) {
     if (!ctx || !out_agent_id) return -1;
+    if (ctx->agent_count >= LANGCHAIN_MAX_AGENTS) return -2;
 
     static uint32_t agent_counter = 0;
     agent_counter++;
     snprintf(out_agent_id, 64, "lc-agent-%08x", agent_counter);
 
-    langchain_agent_instance_t* new_agents = (langchain_agent_instance_t*)realloc(
-        ctx->agents, (ctx->agent_count + 1) * sizeof(langchain_agent_instance_t));
-    if (!new_agents) return -2;
-
-    ctx->agents = new_agents;
     langchain_agent_instance_t* agent = &ctx->agents[ctx->agent_count];
     memset(agent, 0, sizeof(*agent));
-    agent->agent_id = strdup(out_agent_id);
+    agent->id = strdup(out_agent_id);
 
     if (definition) {
         agent->name = definition->name ? strdup(definition->name) : NULL;
-        agent->description = definition->description ? strdup(definition->description) : NULL;
-        agent->llm_provider = definition->llm_provider ? strdup(definition->llm_provider) : NULL;
-        agent->temperature = definition->temperature;
-        agent->max_tokens = definition->max_tokens;
-        agent->verbose = definition->verbose;
     }
 
-    agent->is_active = true;
-    agent->created_at = (uint64_t)time(NULL);
+    agent->is_available = true;
     ctx->agent_count++;
 
     return 0;
@@ -457,14 +408,14 @@ int langchain_agent_run(langchain_adapter_context_t* ctx,
     langchain_agent_instance_t* found = NULL;
     if (agent_id) {
         for (size_t i = 0; i < ctx->agent_count; i++) {
-            if (ctx->agents[i].agent_id && strcmp(ctx->agents[i].agent_id, agent_id) == 0) {
+            if (ctx->agents[i].id && strcmp(ctx->agents[i].id, agent_id) == 0) {
                 found = &ctx->agents[i];
                 break;
             }
         }
     }
 
-    ctx->total_executions++;
+    ctx->total_chains_executed++;
 
     memset(result, 0, sizeof(langchain_execution_result_t));
     result->chain_id = agent_id ? strdup(agent_id) : NULL;
@@ -499,7 +450,7 @@ int langchain_agent_run(langchain_adapter_context_t* ctx,
     result->step_count = (int)(tool_cnt > 0 ? tool_cnt + 2 : 3);
     result->success = true;
 
-    ctx->successful_executions++;
+    ctx->total_chains_executed++;
     return 0;
 }
 
@@ -524,10 +475,7 @@ int langchain_create_memory(langchain_adapter_context_t* ctx,
     out_memory->summary = NULL;
     out_memory->last_updated = (uint64_t)(time(NULL));
 
-    langchain_memory_t* mems = (langchain_memory_t*)realloc(
-        ctx->memories, (ctx->memory_count + 1) * sizeof(langchain_memory_t));
-    if (mems) {
-        ctx->memories = mems;
+    if (ctx->memory_count < LANGCHAIN_MAX_MEMORY_ENTRIES) {
         memcpy(&ctx->memories[ctx->memory_count], out_memory, sizeof(langchain_memory_t));
         ctx->memories[ctx->memory_count].id = strdup(out_memory->id);
         ctx->memory_count++;
@@ -586,8 +534,8 @@ int langchain_set_streaming_handler(langchain_adapter_context_t* ctx,
                                     langchain_streaming_fn handler,
                                     void* user_data) {
     if (!ctx) return -1;
-    ctx->stream_handler = handler;
-    ctx->stream_handler_data = user_data;
+    ctx->streaming_handler = handler;
+    ctx->streaming_user_data = user_data;
     return 0;
 }
 
@@ -596,7 +544,7 @@ int langchain_set_trace_handler(langchain_adapter_context_t* ctx,
                                 void* user_data) {
     if (!ctx) return -1;
     ctx->trace_handler = handler;
-    ctx->trace_handler_data = user_data;
+    ctx->trace_user_data = user_data;
     return 0;
 }
 
@@ -617,13 +565,13 @@ int langchain_get_statistics(langchain_adapter_context_t* ctx,
         "\"memories\":%zu"
         "}",
         LANGCHAIN_ADAPTER_VERSION,
-        (unsigned long long)ctx->total_executions,
-        (unsigned long long)ctx->successful_executions,
-        ctx->total_executions > 0 ?
-            (double)(ctx->total_executions - ctx->successful_executions) / (double)ctx->total_executions * 100.0 :
+        (unsigned long long)ctx->total_chains_executed,
+        (unsigned long long)ctx->total_tokens_used,
+        ctx->total_chains_executed > 0 ?
+            (double)(ctx->total_chains_executed) / (double)(ctx->total_chains_executed + 1) * 100.0 :
             0.0,
-        ctx->total_executions > 0 ?
-            ctx->total_execution_time_ms / (double)ctx->total_executions :
+        ctx->total_chains_executed > 0 ?
+            ctx->total_execution_time_ms / (double)ctx->total_chains_executed :
             0.0,
         ctx->tool_count,
         ctx->chain_count,
@@ -688,7 +636,7 @@ const proto_adapter_t* langchain_get_protocol_adapter(void) {
         adapter.destroy = langchain_proto_destroy;
         adapter.handle_request = langchain_proto_handle_request;
         adapter.get_version = langchain_adapter_version;
-        adapter.capabilities = PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING | PROTO_CAP_AGENT_DISCOVERY | PROTO_CAP_MEMORY_ACCESS;
+        adapter.capabilities = PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING | PROTO_CAP_AGENT_DISCOVERY | PROTO_CAP_RESOURCE_ACCESS;
         initialized = true;
     }
     return &adapter;

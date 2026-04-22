@@ -184,7 +184,7 @@ static int openjiuwen_receive_message(void* context,
     }
 
     memset(message, 0, sizeof(unified_message_t));
-    message->protocol_type = UNIFIED_PROTOCOL_OPENJIUWEN;
+    message->protocol = AGENTOS_PROTOCOL_OPENJIUWEN;
     message->message_id = generate_message_id();
     message->timestamp = get_timestamp();
 
@@ -291,7 +291,7 @@ int openjiuwen_native_to_unified(const void* in_buffer,
     /* 填充统一消息格式 */
     memset(msg, 0, sizeof(unified_message_t));
 
-    msg->protocol_type = UNIFIED_PROTOCOL_OPENJIUWEN;
+    msg->protocol = AGENTOS_PROTOCOL_OPENJIUWEN;
     msg->message_id = header->message_id;
     msg->timestamp = header->timestamp;
 
@@ -352,7 +352,7 @@ const protocol_adapter_t* openjiuwen_adapter_create(
     }
 
     /* 设置协议适配器接口 */
-    adapter->base.protocol_type = UNIFIED_PROTOCOL_OPENJIUWEN;
+    adapter->base.type = AGENTOS_PROTOCOL_OPENJIUWEN;
     safe_strcpy(adapter->base.name, "OpenJiuwen Protocol Adapter",
                 sizeof(adapter->base.name));
     safe_strcpy(adapter->base.version, OPENJIUWEN_PROTOCOL_VERSION,
@@ -380,7 +380,7 @@ const protocol_adapter_t* openjiuwen_adapter_create(
 }
 
 int openjiuwen_verify_connection(const protocol_adapter_t* adapter) {
-    if (!adapter || adapter->protocol_type != UNIFIED_PROTOCOL_OPENJIUWEN) {
+    if (!adapter || adapter->type != AGENTOS_PROTOCOL_OPENJIUWEN) {
         return -1;
     }
 
@@ -458,13 +458,23 @@ int openjiuwen_get_capabilities(const protocol_adapter_t* adapter,
 /* 静态默认接口实例（用于注册） */
 static openjiuwen_adapter_t g_default_instance = {
     .base = {
-        .protocol_type = UNIFIED_PROTOCOL_OPENJIUWEN,
+        .type = AGENTOS_PROTOCOL_OPENJIUWEN,
         .name = "OpenJiuwen Protocol Adapter",
         .version = OPENJIUWEN_PROTOCOL_VERSION,
-        .context = NULL,  /* 需要通过create()设置 */
-        .send_message = NULL,  /* 需要通过create()设置 */
-        .receive_message = NULL,  /* 需要通过create()设置 */
-        .destroy = NULL  /* 需要通过create()设置 */
+        .context = NULL,
+        .init = NULL,
+        .destroy = openjiuwen_destroy,
+        .encode = NULL,
+        .decode = NULL,
+        .connect = NULL,
+        .disconnect = NULL,
+        .is_connected = NULL,
+        .send = openjiuwen_send_message,
+        .receive = openjiuwen_receive_message,
+        .handle_request = NULL,
+        .get_version = NULL,
+        .capabilities = NULL,
+        .get_stats = NULL
     },
     .config = {0},
     .connection_handle = NULL,
@@ -474,11 +484,21 @@ static openjiuwen_adapter_t g_default_instance = {
 };
 
 const protocol_adapter_t openjiuwen_adapter_interface = {
-    .protocol_type = UNIFIED_PROTOCOL_OPENJIUWEN,
+    .type = AGENTOS_PROTOCOL_OPENJIUWEN,
     .name = "OpenJiuwen Protocol Adapter",
     .version = OPENJIUWEN_PROTOCOL_VERSION,
     .context = &g_default_instance,
-    .send_message = openjiuwen_send_message,
-    .receive_message = openjiuwen_receive_message,
-    .destroy = openjiuwen_destroy
+    .init = NULL,
+    .destroy = openjiuwen_destroy,
+    .encode = NULL,
+    .decode = NULL,
+    .connect = NULL,
+    .disconnect = NULL,
+    .is_connected = NULL,
+    .send = openjiuwen_send_message,
+    .receive = openjiuwen_receive_message,
+    .handle_request = NULL,
+    .get_version = NULL,
+    .capabilities = NULL,
+    .get_stats = NULL
 };

@@ -7,7 +7,7 @@
 #ifndef ASYNC_STORAGE_IO_H
 #define ASYNC_STORAGE_IO_H
 
-#include "../../../agentos/commons/utils/memory/include/memory_compat.h"
+#include "memory_compat.h"
 #include <stddef.h>
 
 #ifdef __cplusplus
