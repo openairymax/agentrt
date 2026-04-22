@@ -9,12 +9,12 @@
 #include "clustering.h"
 #include "rules.h"
 #include "validator.h"
-#include "../../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include "logger.h"
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
 #include <stdio.h>

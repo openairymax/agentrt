@@ -15,8 +15,9 @@
 
 #include "platform.h"
 #include "../../utils/error/include/error.h"
+#include "mem.h"
 
-/* ==================== 测试辅助�?==================== */
+/* ==================== 测试辅助宏 ===================== */
 
 #define TEST_ASSERT(condition, message) \
     do { \

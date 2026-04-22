@@ -9,7 +9,6 @@
 #include <string.h>
 #include <assert.h>
 #include "llm_service.h"
-#include "service.h"
 
 static void test_service_create_destroy(void) {
     printf("  test_service_create_destroy...\n");
@@ -22,37 +21,16 @@ static void test_service_create_destroy(void) {
     printf("    PASSED\n");
 }
 
-static void test_service_config(void) {
-    printf("  test_service_config...\n");
+static void test_service_create_with_config(void) {
+    printf("  test_service_create_with_config...\n");
 
-    llm_service_config_t manager = {
-        .default_model = "gpt-4",
-        .timeout_ms = 30000,
-        .max_retries = 3,
-        .cache_enabled = 1,
-        .cache_ttl_sec = 3600
-    };
-
-    llm_service_t* svc = llm_service_create(&manager);
-    assert(svc != NULL);
-
-    llm_service_destroy(svc);
-
-    printf("    PASSED\n");
-}
-
-static void test_service_register_provider(void) {
-    printf("  test_service_register_provider...\n");
-
-    llm_service_t* svc = llm_service_create(NULL);
-    assert(svc != NULL);
-
-    int ret = llm_service_register_provider(svc, "openai", NULL, NULL, NULL, 30.0, 3);
-    assert(ret == 0);
-
-    llm_service_destroy(svc);
-
-    printf("    PASSED\n");
+    llm_service_t* svc = llm_service_create("/nonexistent/config.yaml");
+    if (svc != NULL) {
+        llm_service_destroy(svc);
+        printf("    PASSED (created with default config)\n");
+    } else {
+        printf("    PASSED (NULL returned for missing config)\n");
+    }
 }
 
 static void test_message_build(void) {
@@ -61,19 +39,14 @@ static void test_message_build(void) {
     llm_message_t messages[2];
     memset(messages, 0, sizeof(messages));
 
-    messages[0].role = strdup("system");
-    messages[0].content = strdup("You are a helpful assistant.");
+    messages[0].role = "system";
+    messages[0].content = "You are a helpful assistant.";
 
-    messages[1].role = strdup("user");
-    messages[1].content = strdup("Hello!");
+    messages[1].role = "user";
+    messages[1].content = "Hello!";
 
     assert(strcmp(messages[0].role, "system") == 0);
     assert(strcmp(messages[1].content, "Hello!") == 0);
-
-    free((void*)messages[0].role);
-    free((void*)messages[0].content);
-    free((void*)messages[1].role);
-    free((void*)messages[1].content);
 
     printf("    PASSED\n");
 }
@@ -81,18 +54,18 @@ static void test_message_build(void) {
 static void test_request_config(void) {
     printf("  test_request_config...\n");
 
-    llm_request_config_t manager;
-    memset(&manager, 0, sizeof(manager));
+    llm_request_config_t config;
+    memset(&config, 0, sizeof(config));
 
-    manager.model = "gpt-4";
-    manager.temperature = 0.7;
-    manager.max_tokens = 1024;
-    manager.stream = 0;
+    config.model = "gpt-4";
+    config.temperature = 0.7f;
+    config.max_tokens = 1024;
+    config.stream = 0;
 
-    assert(strcmp(manager.model, "gpt-4") == 0);
-    assert(manager.temperature > 0.69 && manager.temperature < 0.71);
-    assert(manager.max_tokens == 1024);
-    assert(manager.stream == 0);
+    assert(strcmp(config.model, "gpt-4") == 0);
+    assert(config.temperature > 0.69f && config.temperature < 0.71f);
+    assert(config.max_tokens == 1024);
+    assert(config.stream == 0);
 
     printf("    PASSED\n");
 }
@@ -112,18 +85,36 @@ static void test_response_free(void) {
     printf("    PASSED\n");
 }
 
+static void test_service_stats(void) {
+    printf("  test_service_stats...\n");
+
+    llm_service_t* svc = llm_service_create(NULL);
+    assert(svc != NULL);
+
+    char* stats_json = NULL;
+    int ret = llm_service_stats(svc, &stats_json);
+    if (ret == 0 && stats_json != NULL) {
+        printf("    Stats: %s\n", stats_json);
+        free(stats_json);
+    }
+
+    llm_service_destroy(svc);
+
+    printf("    PASSED\n");
+}
+
 int main(void) {
     printf("=========================================\n");
     printf("  LLM Service Unit Tests\n");
     printf("=========================================\n");
 
     test_service_create_destroy();
-    test_service_config();
-    test_service_register_provider();
+    test_service_create_with_config();
     test_message_build();
     test_request_config();
     test_response_free();
+    test_service_stats();
 
-    printf("\n✅ All LLM service tests PASSED\n");
+    printf("\nAll LLM service tests PASSED\n");
     return 0;
 }

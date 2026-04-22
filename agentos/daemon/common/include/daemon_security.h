@@ -327,7 +327,7 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
  * 
  * @example
  * @code
- * const char* api_key = "sk-abc123xyz456";
+ * const char* api_key = getenv("OPENAI_API_KEY");
  * int ret = daemon_store_credential("openai_api_key", CUPOLAS_VAULT_CRED_TOKEN,
  *                                   api_key, strlen(api_key), "agent-001");
  * @endcode

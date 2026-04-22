@@ -16,7 +16,7 @@
 // 在相同 MAJOR 版本内保证 ABI 兼容
 // 破坏性更改需递增 MAJOR 并发布迁移说明
 
-#include "../../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include <stddef.h>
 #include <stdint.h>
 

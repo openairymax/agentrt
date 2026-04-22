@@ -5,12 +5,12 @@
  */
 
 #include "execution.h"
-#include "../../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include "compensation.h"
 #include <stdlib.h>
 #include <string.h>
 
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 
 agentos_error_t agentos_compensation_create(agentos_compensation_t** out_manager) {

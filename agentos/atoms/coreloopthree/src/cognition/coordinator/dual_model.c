@@ -5,12 +5,12 @@
  */
 
 #include "strategy.h"
-#include "../../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>
 
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 #include "../intent_utils.h"
 #include <string.h>
@@ -61,26 +61,6 @@
         } \
     } while(0)
 #endif
-
-// 安全字符串复制函数（返回实际复制的字符数，不包括空字符）
-__attribute__((unused))
-static size_t safe_str_copy(char* dest, size_t dest_size, const char* src) {
-    if (!dest || !src || dest_size == 0) return 0;
-    
-    size_t src_len = strlen(src);
-    size_t copy_len = (src_len < dest_size - 1) ? src_len : dest_size - 1;
-    
-    memcpy(dest, src, copy_len);
-    dest[copy_len] = '\0';
-    
-    return copy_len;
-}
-
-// 浮点数范围检查
-__attribute__((unused))
-static int validate_float_range(float value, float min, float max) {
-    return VALIDATE_FLOAT(value, min, max);
-}
 
 // 验证权重参数（权重和为1.0，每个权重在0.0-1.0之间）
 static int validate_weights(float primary_weight, float secondary_weight) {

@@ -195,9 +195,7 @@ AgentOS 社区治理采用三层架构：
 
 本行为准则适用于以下社区空间：
 
-- AtomGit 仓库（https://atomgit.com/spharx/agentos）
-- Gitee 仓库（https://gitee.com/spharx/agentos）
-- GitHub 仓库（https://github.com/SpharxTeam/AgentOS）
+- AtomGit 仓库（https://atomgit.com/openairymax/agentos）
 - 官方邮件列表和通讯群组
 - 线下技术活动和会议
 - 任何以 AgentOS 社区名义开展的活动
@@ -233,7 +231,7 @@ AgentOS 社区治理采用三层架构：
 
 | 用途 | 联系方式 |
 |------|---------|
-| 行为准则事务 | conduct@spharx.cn |
+| 行为准则事务 | zhaochen@spharx.cn |
 | 安全问题 | wangliren@spharx.cn |
 | 技术支持 | lidecheng@spharx.cn |
 | 商务合作 | zhouzhixian@spharx.cn |

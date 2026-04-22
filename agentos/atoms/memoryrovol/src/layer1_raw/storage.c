@@ -8,7 +8,7 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
 #include <stdio.h>
@@ -65,9 +65,6 @@ typedef struct queue_entry {
     struct queue_entry* next;
 } queue_entry_t;
 
-/**
- * @brief 异步队列
- */
 typedef struct async_queue {
     queue_entry_t* head;
     queue_entry_t* tail;
@@ -77,64 +74,6 @@ typedef struct async_queue {
     pthread_cond_t cond;
     int shutdown;
 } async_queue_t;
-
-__attribute__((unused))
-static async_queue_t* queue_create(size_t max_size) {
-    async_queue_t* q = (async_queue_t*)AGENTOS_CALLOC(1, sizeof(async_queue_t));
-    if (!q) return NULL;
-    q->max_size = max_size;
-    pthread_mutex_init(&q->mutex, NULL);
-    pthread_cond_init(&q->cond, NULL);
-    return q;
-}
-
-__attribute__((unused))
-static void queue_destroy(async_queue_t* q) {
-    if (!q) return;
-    pthread_mutex_lock(&q->mutex);
-    q->shutdown = 1;
-    pthread_cond_broadcast(&q->cond);
-    pthread_mutex_unlock(&q->mutex);
-    pthread_mutex_destroy(&q->mutex);
-    pthread_cond_destroy(&q->cond);
-    AGENTOS_FREE(q);
-}
-
-__attribute__((unused))
-static agentos_error_t queue_push(async_queue_t* q, const char* id, const void* data, size_t len) {
-    if (!q || !id) return AGENTOS_EINVAL;
-    pthread_mutex_lock(&q->mutex);
-    if (q->count >= q->max_size) {
-        pthread_mutex_unlock(&q->mutex);
-        return AGENTOS_EBUSY;
-    }
-    queue_entry_t* entry = (queue_entry_t*)AGENTOS_MALLOC(sizeof(queue_entry_t));
-    if (!entry) {
-        pthread_mutex_unlock(&q->mutex);
-        return AGENTOS_ENOMEM;
-    }
-    entry->id = AGENTOS_STRDUP(id);
-    entry->data = AGENTOS_MALLOC(len);
-    if (!entry->data) {
-        AGENTOS_FREE(entry->id);
-        AGENTOS_FREE(entry);
-        pthread_mutex_unlock(&q->mutex);
-        return AGENTOS_ENOMEM;
-    }
-    memcpy(entry->data, data, len);
-    entry->len = len;
-    entry->next = NULL;
-    if (q->tail) {
-        q->tail->next = entry;
-        q->tail = entry;
-    } else {
-        q->head = q->tail = entry;
-    }
-    q->count++;
-    pthread_cond_signal(&q->cond);
-    pthread_mutex_unlock(&q->mutex);
-    return AGENTOS_SUCCESS;
-}
 
 agentos_error_t agentos_layer1_raw_create_async(
     const char* path,

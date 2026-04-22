@@ -1,0 +1,77 @@
+# AgentOS clangd configuration
+# Purpose: IDE single-file analysis requires explicit include paths (no CMake context)
+# CompilationDatabase: Points to out-of-source build directory
+
+CompileFlags:
+  CompilationDatabase: /home/spharx/SpharxWorks/OpenAirymax/AgentOS-build
+  Add:
+    - -std=c11
+    - -D_GNU_SOURCE
+    - -D_POSIX_C_SOURCE=200809L
+    - -Iagentos/atoms/corekern/include
+    - -Iagentos/atoms/coreloopthree/include
+    - -Iagentos/atoms/memoryrovol/include
+    - -Iagentos/atoms/syscall/include
+    - -Iagentos/atoms/threelevelmemory/include
+    - -Iagentos/atoms/memmap/include
+    - -Iagentos/atoms/memorypool/include
+    - -Iagentos/atoms/memorycompact/include
+    - -Iagentos/atoms/taskflow/include
+    - -Iagentos/atoms/taskflow/src
+    - -Iagentos/commons/utils/memory/include
+    - -Iagentos/commons/utils/string/include
+    - -Iagentos/commons/utils/token/include
+    - -Iagentos/commons/utils/network/include
+    - -Iagentos/commons/utils/security/include
+    - -Iagentos/commons/utils/resource/include
+    - -Iagentos/commons/utils/uuid/include
+    - -Iagentos/commons/utils/strategy/include
+    - -Iagentos/commons/utils/config_unified/include
+    - -Iagentos/commons/utils/error
+    - -Iagentos/commons/utils/types/include
+    - -Iagentos/commons/utils/compat/include
+    - -Iagentos/commons/utils/platform/include
+    - -Iagentos/commons/utils/io/include
+    - -Iagentos/commons/utils/logging/include
+    - -Iagentos/commons/utils/sync/include
+    - -Iagentos/cupolas/include
+    - -Iagentos/cupolas/src
+    - -Iagentos/cupolas/src/security
+    - -Iagentos/cupolas/src/sanitizer
+    - -Iagentos/cupolas/src/guards
+    - -Iagentos/cupolas/src/utils
+    - -Iagentos/cupolas/src/workbench
+    - -Iagentos/cupolas/src/audit
+    - -Iagentos/daemon/common/include
+    - -Iagentos/daemon/common/src
+    - -Iagentos/daemon/common/types/include
+    - -Iagentos/daemon/common/protocol/include
+    - -Iagentos/daemon/common/utils/include
+    - -Iagentos/daemon/common/config/include
+    - -Iagentos/heapstore/include
+    - -Iagentos/heapstore/src
+    - -Iagentos/gateway/include
+    - -Iagentos/gateway/src
+    - -Iagentos/manager/include
+    - -Iagentos/manager/src
+    - -I/usr/include
+  Remove:
+    - -Wno-*
+    - -Werror
+
+Diagnostics:
+  UnusedIncludes: Strict
+  MissingIncludes: Yes
+  ClangTidy:
+    Add: [bugprone-*, performance-*, readability-*]
+    Remove:
+      - readability-magic-numbers
+      - readability-identifier-length
+      - bugprone-easily-swappable-parameters
+
+Hover:
+  ShowAKA: Yes
+  ShowIncludeInsertion: Yes
+
+Index:
+  StandardLibrary: Yes

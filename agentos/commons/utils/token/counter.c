@@ -36,92 +36,61 @@ struct agentos_token_counter {
 };
 
 /**
- * @brief 简化的中文字符Token估算
+ * @brief 计算文本的Token数量
  */
-__attribute__((unused)) static size_t estimate_cjk_tokens(const char* text, size_t length) {
+size_t agentos_token_count(const char* text, const agentos_token_config_t* config) {
+    if (!text) return 0;
+
+    size_t length = strlen(text);
+    agentos_token_config_t default_cfg = AGENTOS_TOKEN_CONFIG_DEFAULT;
+    const agentos_token_config_t* cfg = config ? config : &default_cfg;
+
+    // 简单估算：ASCII字符1 token，CJK字符2 tokens
     size_t count = 0;
-    size_t i = 0;
-    
-    while (i < length) {
+    for (size_t i = 0; i < length; i++) {
         unsigned char c = (unsigned char)text[i];
-        
         if (c < 0x80) {
             count += 1;
-            i += 1;
         } else if (c < 0xE0) {
             count += 2;
-            i += 2;
+            i += 1;
         } else if (c < 0xF0) {
             count += 2;
-            i += 3;
+            i += 2;
         } else {
             count += 2;
-            i += 4;
+            i += 3;
         }
     }
-    
+
+    // 应用模型特定的缩放因子
+    switch (cfg->model_type) {
+        case AGENTOS_TOKEN_MODEL_GPT4: count = (count * 4 + 2) / 3; break;
+        case AGENTOS_TOKEN_MODEL_GPT35: count = (count * 5 + 2) / 4; break;
+        case AGENTOS_TOKEN_MODEL_CLAUDE: count = (count * 7 + 2) / 5; break;
+        case AGENTOS_TOKEN_MODEL_LLAMA: count = (count * 3 + 1) / 2; break;
+        default: break;
+    }
+
     return count;
 }
 
-/**
- * @brief 估算英文Token数（基于简单分词）
- */
-__attribute__((unused)) static size_t estimate_english_tokens(const char* text, size_t length) {
-    size_t count = 0;
-    size_t i = 0;
-    int in_word = 0;
-    
-    while (i < length) {
-        char c = text[i];
-        
-        if (isalnum((unsigned char)c) || (unsigned char)c >= 0x80) {
-            in_word = 1;
-        } else {
-            if (in_word) {
-                count += 1;
-                in_word = 0;
-            }
-            count += 1;
-        }
-        i++;
-    }
-    
-    if (in_word) {
-        count += 1;
-    }
-    
-    return count;
-}
-
-/**
- * @brief 根据模型名称选择计数策略
- */
 static size_t count_tokens_by_model(const char* model_name, const char* text, size_t length) {
-    // 映射模型名称到标准化模型类型
     agentos_token_config_t config = AGENTOS_TOKEN_CONFIG_DEFAULT;
-    
-    if (strstr(model_name, "gpt-4") || strstr(model_name, "gpt-4o")) {
-        config.model_type = AGENTOS_TOKEN_MODEL_GPT4;
-    } else if (strstr(model_name, "gpt-35") || strstr(model_name, "gpt-3.5")) {
-        config.model_type = AGENTOS_TOKEN_MODEL_GPT35;
-    } else if (strstr(model_name, "claude")) {
-        config.model_type = AGENTOS_TOKEN_MODEL_CLAUDE;
-    } else if (strstr(model_name, "llama") || strstr(model_name, "vicuna") || strstr(model_name, "alpaca")) {
-        config.model_type = AGENTOS_TOKEN_MODEL_LLAMA;
-    } else {
-        config.model_type = AGENTOS_TOKEN_MODEL_GENERIC;
+
+    if (model_name) {
+        if (strstr(model_name, "gpt-4") || strstr(model_name, "gpt-4o")) {
+            config.model_type = AGENTOS_TOKEN_MODEL_GPT4;
+        } else if (strstr(model_name, "gpt-35") || strstr(model_name, "gpt-3.5")) {
+            config.model_type = AGENTOS_TOKEN_MODEL_GPT35;
+        } else if (strstr(model_name, "claude")) {
+            config.model_type = AGENTOS_TOKEN_MODEL_CLAUDE;
+        } else if (strstr(model_name, "llama") || strstr(model_name, "vicuna") || strstr(model_name, "alpaca")) {
+            config.model_type = AGENTOS_TOKEN_MODEL_LLAMA;
+        }
     }
-    
-    // 使用标准化 Token 计算函数
-    size_t token_count = agentos_token_standard_count(text, length, &config);
-    
-    // 如果标准化函数出错，回退到原始算法
-    if (token_count == (size_t)-1) {
-        // 回退到原始简单估算
-        return (length * 3) / 4;
-    }
-    
-    return token_count;
+
+    return agentos_token_standard_count(text, length, &config);
 }
 
 agentos_token_counter_t* agentos_token_counter_create(const char* model_name) {

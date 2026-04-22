@@ -26,7 +26,7 @@
 #include <time.h>
 
 /* 基础库兼容性层 */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 #include "check.h"
 
@@ -518,11 +518,11 @@ agentos_error_t agentos_sandbox_health_check(agentos_sandbox_t* sandbox, char** 
 
 /**
  * @brief 输入净化函数 - 检查并清理潜在危险的输入
+ * @note [SECURITY] 保留供未来集成使用 - 当前版本通过其他机制处理输入验证
  * @param input 输入字符串
  * @param max_length 最大允许长度
  * @return 0=安全，非0=检测到危险内容
  */
-__attribute__((unused))
 static int sanitize_input(const char* input, size_t max_length) {
     if (!input) return -1; /* 空输入视为危险 */
     
@@ -611,8 +611,8 @@ static void sandbox_add_enhanced_audit_entry(
 
 /**
  * @brief 初始化增强功能（在创建沙箱时调用）
+ * @note [INFRA] 保留供未来沙箱增强功能使用
  */
-__attribute__((unused))
 static void init_sandbox_enhancements(agentos_sandbox_t* sandbox) {
     if (!sandbox) return;
     
