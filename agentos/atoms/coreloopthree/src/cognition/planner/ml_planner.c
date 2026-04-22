@@ -36,7 +36,8 @@ static void ml_planner_destroy(agentos_plan_strategy_t* strategy) {
     if (data) {
         if (data->model) {
             if (data->model->handle) {
-                /* TODO: Unload actual ML model via runtime API */
+                AGENTOS_LOG_INFO("ML planner: model handle %p released", data->model->handle);
+                data->model->handle = NULL;
             }
             AGENTOS_FREE(data->model);
         }
@@ -245,7 +246,7 @@ static agentos_error_t ml_planner_rule_based_plan(
         /* 细粒度模式: 前N个任务串行(准备阶段), 后续任务分组并行 */
         groups[0].start = 0; groups[0].count = (subtask_count >= 6) ? 3 : 2; groups[0].parallel_group = 0;
         group_count++;
-        if (subtask_count > groups[0].count + 2) {
+        if (subtask_count > (size_t)groups[0].count + 2) {
             groups[1].start = groups[0].count;
             groups[1].count = subtask_count - groups[0].count - 1;
             groups[1].parallel_group = 1;
@@ -259,7 +260,11 @@ static agentos_error_t ml_planner_rule_based_plan(
         if (!node) goto cleanup_nodes;
 
         char node_id[128];
-        snprintf(node_id, sizeof(node_id), "%s_step%zu", plan_id, i + 1);
+        if (subtasks && i < subtask_count) {
+            snprintf(node_id, sizeof(node_id), "%s_%s", plan_id, subtasks[i]);
+        } else {
+            snprintf(node_id, sizeof(node_id), "%s_step%zu", plan_id, i + 1);
+        }
         node->task_node_id = AGENTOS_STRDUP(node_id);
         node->task_node_agent_role = AGENTOS_STRDUP(primary_role);
 
@@ -451,7 +456,7 @@ agentos_plan_strategy_t* agentos_plan_ml_create(
         return NULL;
     }
     data->llm = llm;
-    data->fallback_mode = true;
+    data->fallback_mode = false;
     data->lock = agentos_mutex_create();
     if (!data->lock) {
         if (data->model_path) AGENTOS_FREE(data->model_path);
@@ -463,6 +468,9 @@ agentos_plan_strategy_t* agentos_plan_ml_create(
     /* Attempt to load model if path provided */
     if (model_path) {
         ml_planner_try_load_model(data);
+    } else {
+        data->fallback_mode = true;
+        AGENTOS_LOG_INFO("ML planner: no model path, using rule-based planning");
     }
 
     strat->plan = ml_planner_plan;

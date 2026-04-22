@@ -42,7 +42,8 @@ size_t agentos_token_count(const char* text, const agentos_token_config_t* confi
     if (!text) return 0;
 
     size_t length = strlen(text);
-    const agentos_token_config_t* cfg = config ? config : &AGENTOS_TOKEN_CONFIG_DEFAULT;
+    agentos_token_config_t default_cfg = AGENTOS_TOKEN_CONFIG_DEFAULT;
+    const agentos_token_config_t* cfg = config ? config : &default_cfg;
 
     // 简单估算：ASCII字符1 token，CJK字符2 tokens
     size_t count = 0;
