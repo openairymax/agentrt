@@ -14,7 +14,7 @@
  */
 
 #include "execution.h"
-#include "../../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include "logger.h"
 #include "task_executor_utils.h"
 #include <stdlib.h>
@@ -23,7 +23,7 @@
 #include <time.h>
 
 /* 基础库兼容性层 */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 
 /* ==================== 常量定义 ==================== */

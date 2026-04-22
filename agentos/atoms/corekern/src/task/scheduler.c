@@ -23,7 +23,7 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 
 /* Check macros for unified error handling */
@@ -35,15 +35,14 @@
 /* ==================== 类型适配辅助 ==================== */
 
 /**
- * @brief 用户线程入口函数适配器
- *
- * 将用户提供的 void (*func)(void*) 转换为 void* (*entry)(void*) 格式
+ * @brief 将用户提供的 void (*func)(void*) 转换为 void* (*entry)(void*) 格式
  *
  * @param user_func 用户线程入口函数
  * @param arg 线程参数
  * @return 始终返回NULL（用户函数无返回值）
+ * @note [INFRA] 线程适配器 - 保留供未来线程模型扩展使用
  */
-__attribute__((unused)) static void* user_thread_entry_adapter(void* (*user_func)(void*), void* arg)
+static void* user_thread_entry_adapter(void* (*user_func)(void*), void* arg)
 {
     /* 用户函数是 void (*func)(void*)，我们调用它并返回NULL */
     user_func(arg);
@@ -243,14 +242,17 @@ int agentos_thread_create(
 
     /* 设置输出线程句柄 */
 #if defined(_WIN32) || defined(_WIN64)
-    /* Windows: platform_handle是windows_task_data_t*，需要提取HANDLE */
-    /* 注意：需要从windows_task_data_t中提取线程句柄 */
-    /* 简化处理：暂时使用平台句柄作为线程句柄，需要适配 */
-    *thread = (agentos_thread_t)platform_handle;
+    {
+        typedef struct windows_task_data { HANDLE thread_handle; DWORD thread_id; } wtd_t;
+        wtd_t* wdata = (wtd_t*)platform_handle;
+        *thread = wdata->thread_handle;
+    }
 #else
-    /* POSIX: platform_handle是posix_task_data_t*，需要提取pthread_t */
-    /* 简化处理：暂时使用平台句柄作为线程句柄，需要适配 */
-    *thread = (agentos_thread_t)platform_handle;
+    {
+        typedef struct posix_task_data { pthread_t thread_handle; pthread_attr_t thread_attr; int has_custom_stack_size; } ptd_t;
+        ptd_t* pdata = (ptd_t*)platform_handle;
+        *thread = pdata->thread_handle;
+    }
 #endif
 
     return AGENTOS_SUCCESS;
@@ -475,4 +477,48 @@ agentos_error_t agentos_task_get_state(agentos_task_id_t tid, agentos_task_state
     *out_state = task_info->state;
 
     return AGENTOS_SUCCESS;
+}
+
+void agentos_task_cleanup(void)
+{
+    scheduler_core_ctx_t* ctx = scheduler_core_get_ctx();
+    if (!ctx || !scheduler_core_is_initialized()) {
+        return;
+    }
+
+    const scheduler_platform_ops_t* ops = scheduler_platform_get_ops();
+
+    agentos_mutex_lock(ctx->task_table_lock);
+
+    for (uint32_t i = 0; i < ctx->task_count; i++) {
+        task_info_core_t* info = ctx->task_table[i];
+        if (!info) continue;
+
+        if (ops && ops->cleanup_platform_resources && info->platform_handle) {
+            ops->cleanup_platform_resources(info->platform_handle, info->platform_data);
+        }
+
+        scheduler_core_task_info_destroy(info);
+        ctx->task_table[i] = NULL;
+    }
+
+    for (size_t b = 0; b < HASH_TABLE_BUCKETS; b++) {
+        task_hash_node_t* node = ctx->id_hash_table[b];
+        while (node) {
+            task_hash_node_t* next = node->next;
+            free(node);
+            node = next;
+        }
+        ctx->id_hash_table[b] = NULL;
+    }
+
+    ctx->task_count = 0;
+
+    agentos_mutex_unlock(ctx->task_table_lock);
+
+    if (ops && ops->cleanup) {
+        ops->cleanup();
+    }
+
+    scheduler_core_destroy();
 }

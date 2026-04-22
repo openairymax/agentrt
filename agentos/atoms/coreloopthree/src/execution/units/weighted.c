@@ -10,7 +10,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <float.h>
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "strategy_common.h"
 
 typedef struct weighted_data {

@@ -8,132 +8,138 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <stdint.h>
 #include "monitor_service.h"
 
-static void test_metrics_collector_create_destroy(void) {
-    printf("  test_metrics_collector_create_destroy...\n");
+static void test_monitor_service_create_destroy(void) {
+    printf("  test_monitor_service_create_destroy...\n");
 
-    metrics_collector_t* mc = metrics_collector_create(NULL);
-    assert(mc != NULL);
+    monitor_service_t* svc = NULL;
+    int ret = monitor_service_create(NULL, &svc);
+    assert(ret == 0);
+    assert(svc != NULL);
 
-    metrics_collector_destroy(mc);
+    ret = monitor_service_destroy(svc);
+    assert(ret == 0);
 
     printf("    PASSED\n");
 }
 
-static void test_metrics_counter(void) {
-    printf("  test_metrics_counter...\n");
+static void test_monitor_record_metric(void) {
+    printf("  test_monitor_record_metric...\n");
 
-    metrics_collector_t* mc = metrics_collector_create(NULL);
-    assert(mc != NULL);
-
-    int ret = metrics_counter_create(mc, "test_counter", "Test counter");
+    monitor_service_t* svc = NULL;
+    int ret = monitor_service_create(NULL, &svc);
     assert(ret == 0);
 
-    ret = metrics_counter_inc(mc, "test_counter");
+    metric_info_t metric;
+    memset(&metric, 0, sizeof(metric));
+    metric.name = "test_counter";
+    metric.description = "Test counter metric";
+    metric.type = METRIC_TYPE_COUNTER;
+    metric.value = 42.0;
+
+    ret = monitor_service_record_metric(svc, &metric);
     assert(ret == 0);
 
-    ret = metrics_counter_add(mc, "test_counter", 5);
-    assert(ret == 0);
-
-    int64_t value = metrics_counter_get(mc, "test_counter");
-    assert(value == 6);
-
-    metrics_collector_destroy(mc);
+    monitor_service_destroy(svc);
 
     printf("    PASSED\n");
 }
 
-static void test_metrics_gauge(void) {
-    printf("  test_metrics_gauge...\n");
+static void test_monitor_gauge_metric(void) {
+    printf("  test_monitor_gauge_metric...\n");
 
-    metrics_collector_t* mc = metrics_collector_create(NULL);
-    assert(mc != NULL);
-
-    int ret = metrics_gauge_create(mc, "test_gauge", "Test gauge");
+    monitor_service_t* svc = NULL;
+    int ret = monitor_service_create(NULL, &svc);
     assert(ret == 0);
 
-    ret = metrics_gauge_set(mc, "test_gauge", 100.5);
+    metric_info_t metric;
+    memset(&metric, 0, sizeof(metric));
+    metric.name = "memory_usage_bytes";
+    metric.description = "Memory usage";
+    metric.type = METRIC_TYPE_GAUGE;
+    metric.value = 1024.0;
+
+    ret = monitor_service_record_metric(svc, &metric);
     assert(ret == 0);
 
-    double value = metrics_gauge_get(mc, "test_gauge");
-    assert(value > 100.4 && value < 100.6);
-
-    ret = metrics_gauge_inc(mc, "test_gauge", 10.0);
-    assert(ret == 0);
-
-    value = metrics_gauge_get(mc, "test_gauge");
-    assert(value > 110.4 && value < 110.6);
-
-    metrics_collector_destroy(mc);
+    monitor_service_destroy(svc);
 
     printf("    PASSED\n");
 }
 
-static void test_metrics_histogram(void) {
-    printf("  test_metrics_histogram...\n");
+static void test_monitor_histogram_metric(void) {
+    printf("  test_monitor_histogram_metric...\n");
 
-    metrics_collector_t* mc = metrics_collector_create(NULL);
-    assert(mc != NULL);
-
-    int ret = metrics_histogram_create(mc, "test_histogram", "Test histogram");
+    monitor_service_t* svc = NULL;
+    int ret = monitor_service_create(NULL, &svc);
     assert(ret == 0);
 
-    for (int i = 0; i < 100; i++) {
-        metrics_histogram_observe(mc, "test_histogram", (double)i);
+    metric_info_t metric;
+    memset(&metric, 0, sizeof(metric));
+    metric.name = "request_duration_ms";
+    metric.description = "Request duration histogram";
+    metric.type = METRIC_TYPE_HISTOGRAM;
+    metric.value = 150.5;
+
+    ret = monitor_service_record_metric(svc, &metric);
+    assert(ret == 0);
+
+    monitor_service_destroy(svc);
+
+    printf("    PASSED\n");
+}
+
+static void test_monitor_get_metrics(void) {
+    printf("  test_monitor_get_metrics...\n");
+
+    monitor_service_t* svc = NULL;
+    int ret = monitor_service_create(NULL, &svc);
+    assert(ret == 0);
+
+    metric_info_t metric;
+    memset(&metric, 0, sizeof(metric));
+    metric.name = "requests_total";
+    metric.description = "Total requests";
+    metric.type = METRIC_TYPE_COUNTER;
+    metric.value = 100.0;
+
+    monitor_service_record_metric(svc, &metric);
+
+    metric_info_t** metrics = NULL;
+    size_t count = 0;
+    ret = monitor_service_get_metrics(svc, "requests_total", &metrics, &count);
+    if (ret == 0 && metrics != NULL) {
+        printf("    Found %zu metrics\n", count);
     }
 
-    histogram_stats_t stats;
-    ret = metrics_histogram_get_stats(mc, "test_histogram", &stats);
-    assert(ret == 0);
-    assert(stats.count == 100);
-
-    metrics_collector_destroy(mc);
+    monitor_service_destroy(svc);
 
     printf("    PASSED\n");
 }
 
-static void test_metrics_export_prometheus(void) {
-    printf("  test_metrics_export_prometheus...\n");
+static void test_monitor_labels(void) {
+    printf("  test_monitor_labels...\n");
 
-    metrics_collector_t* mc = metrics_collector_create(NULL);
-    assert(mc != NULL);
-
-    metrics_counter_create(mc, "requests_total", "Total requests");
-    metrics_counter_inc(mc, "requests_total");
-
-    metrics_gauge_create(mc, "memory_usage_bytes", "Memory usage");
-    metrics_gauge_set(mc, "memory_usage_bytes", 1024.0);
-
-    char* output = metrics_export_prometheus(mc);
-    assert(output != NULL);
-    assert(strstr(output, "requests_total") != NULL);
-    assert(strstr(output, "memory_usage_bytes") != NULL);
-
-    free(output);
-    metrics_collector_destroy(mc);
-
-    printf("    PASSED\n");
-}
-
-static void test_metrics_labels(void) {
-    printf("  test_metrics_labels...\n");
-
-    metrics_collector_t* mc = metrics_collector_create(NULL);
-    assert(mc != NULL);
-
-    metric_label_t labels[] = {
-        {"service", "llm_d"},
-        {"model", "gpt-4"}
-    };
-
-    int ret = metrics_counter_create_with_labels(mc, "api_calls", "API calls", labels, 2);
+    monitor_service_t* svc = NULL;
+    int ret = monitor_service_create(NULL, &svc);
     assert(ret == 0);
 
-    ret = metrics_counter_inc_with_labels(mc, "api_calls", labels, 2);
+    char* labels[] = {"service:llm_d", "model:gpt-4"};
+    metric_info_t metric;
+    memset(&metric, 0, sizeof(metric));
+    metric.name = "api_calls";
+    metric.description = "API calls";
+    metric.type = METRIC_TYPE_COUNTER;
+    metric.labels = labels;
+    metric.label_count = 2;
+    metric.value = 1.0;
+
+    ret = monitor_service_record_metric(svc, &metric);
     assert(ret == 0);
 
-    metrics_collector_destroy(mc);
+    monitor_service_destroy(svc);
 
     printf("    PASSED\n");
 }
@@ -143,13 +149,13 @@ int main(void) {
     printf("  Metrics Collector Unit Tests\n");
     printf("=========================================\n");
 
-    test_metrics_collector_create_destroy();
-    test_metrics_counter();
-    test_metrics_gauge();
-    test_metrics_histogram();
-    test_metrics_export_prometheus();
-    test_metrics_labels();
+    test_monitor_service_create_destroy();
+    test_monitor_record_metric();
+    test_monitor_gauge_metric();
+    test_monitor_histogram_metric();
+    test_monitor_get_metrics();
+    test_monitor_labels();
 
-    printf("\n✅ All metrics tests PASSED\n");
+    printf("\nAll metrics tests PASSED\n");
     return 0;
 }

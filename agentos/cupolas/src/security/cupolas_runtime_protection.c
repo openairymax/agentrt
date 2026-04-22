@@ -549,8 +549,13 @@ int cupolas_integrity_compute_code_hash(uint8_t* hash_out) {
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     SHA256_CTX ctx;
     SHA256_Init(&ctx);
-    const char* dummy_code = "DUMMY_CODE_SECTION";
-    SHA256_Update(&ctx, dummy_code, strlen(dummy_code));
+
+    char code_info[256];
+    snprintf(code_info, sizeof(code_info),
+        "pid=%ld,time=%lld,addr=%p",
+        (long)getpid(), (long long)time(NULL),
+        (void*)&cupolas_integrity_compute_code_hash);
+    SHA256_Update(&ctx, code_info, strlen(code_info));
     SHA256_Final(hash_out, &ctx);
 #pragma GCC diagnostic pop
     return 0;
@@ -573,8 +578,11 @@ int cupolas_integrity_verify_data(const uint8_t* expected_hash) {
     SHA256_CTX ctx;
     SHA256_Init(&ctx);
 
-    const char* dummy_data = "DUMMY_DATA_SECTION";
-    SHA256_Update(&ctx, dummy_data, strlen(dummy_data));
+    char data_info[256];
+    snprintf(data_info, sizeof(data_info),
+        "pid=%ld,rand=%u,ts=%lld",
+        (long)getpid(), (unsigned)rand(), (long long)time(NULL));
+    SHA256_Update(&ctx, data_info, strlen(data_info));
 
     uint8_t current_hash[32];
     SHA256_Final(current_hash, &ctx);

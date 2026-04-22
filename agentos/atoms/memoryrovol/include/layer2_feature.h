@@ -7,7 +7,7 @@
 #ifndef AGENTOS_LAYER2_FEATURE_H
 #define AGENTOS_LAYER2_FEATURE_H
 
-#include "../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include <stddef.h>
 #include <stdint.h>
 

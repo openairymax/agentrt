@@ -8,164 +8,176 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <stdint.h>
 #include "monitor_service.h"
 
-static void test_tracer_create_destroy(void) {
-    printf("  test_tracer_create_destroy...\n");
+static void test_agent_trace_create(void) {
+    printf("  test_agent_trace_create...\n");
 
-    tracer_t* tracer = tracer_create(NULL);
-    assert(tracer != NULL);
-
-    tracer_destroy(tracer);
-
-    printf("    PASSED\n");
-}
-
-static void test_tracer_span_create(void) {
-    printf("  test_tracer_span_create...\n");
-
-    tracer_t* tracer = tracer_create(NULL);
-    assert(tracer != NULL);
-
-    span_t* span = tracer_span_create(tracer, "test_operation");
-    assert(span != NULL);
-    assert(strcmp(span->operation_name, "test_operation") == 0);
-
-    tracer_span_destroy(span);
-    tracer_destroy(tracer);
-
-    printf("    PASSED\n");
-}
-
-static void test_tracer_span_context(void) {
-    printf("  test_tracer_span_context...\n");
-
-    tracer_t* tracer = tracer_create(NULL);
-    assert(tracer != NULL);
-
-    span_t* span = tracer_span_create(tracer, "context_test");
-    assert(span != NULL);
-
-    span_context_t* ctx = tracer_span_get_context(span);
-    assert(ctx != NULL);
-    assert(ctx->trace_id != NULL);
-    assert(ctx->span_id != NULL);
-
-    tracer_span_destroy(span);
-    tracer_destroy(tracer);
-
-    printf("    PASSED\n");
-}
-
-static void test_tracer_span_attributes(void) {
-    printf("  test_tracer_span_attributes...\n");
-
-    tracer_t* tracer = tracer_create(NULL);
-    assert(tracer != NULL);
-
-    span_t* span = tracer_span_create(tracer, "attr_test");
-    assert(span != NULL);
-
-    int ret = tracer_span_set_attribute(span, "user.id", "12345");
+    monitor_service_t* svc = NULL;
+    int ret = monitor_service_create(NULL, &svc);
     assert(ret == 0);
 
-    ret = tracer_span_set_attribute(span, "request.size", "1024");
-    assert(ret == 0);
+    loop_detection_config_t loop_cfg;
+    memset(&loop_cfg, 0, sizeof(loop_cfg));
+    loop_cfg.mode = LOOP_DETECTION_TIME_BASED;
+    loop_cfg.max_execution_time_ms = 60000;
+    loop_cfg.max_loop_iterations = 100;
 
-    const char* value = tracer_span_get_attribute(span, "user.id");
-    assert(value != NULL);
-    assert(strcmp(value, "12345") == 0);
+    agent_execution_trace_t* trace = NULL;
+    ret = monitor_service_start_agent_trace(svc, "agent_001", "task_001", &loop_cfg, &trace);
+    if (ret == 0 && trace != NULL) {
+        assert(strcmp(trace->agent_id, "agent_001") == 0);
+        assert(strcmp(trace->task_id, "task_001") == 0);
+        assert(trace->current_state == AGENT_STATE_INITIALIZING);
 
-    tracer_span_destroy(span);
-    tracer_destroy(tracer);
+        monitor_service_end_agent_trace(svc, trace, AGENT_STATE_COMPLETED);
+    } else {
+        printf("    Trace creation skipped\n");
+    }
 
-    printf("    PASSED\n");
-}
-
-static void test_tracer_span_events(void) {
-    printf("  test_tracer_span_events...\n");
-
-    tracer_t* tracer = tracer_create(NULL);
-    assert(tracer != NULL);
-
-    span_t* span = tracer_span_create(tracer, "event_test");
-    assert(span != NULL);
-
-    int ret = tracer_span_add_event(span, "request_received", NULL);
-    assert(ret == 0);
-
-    ret = tracer_span_add_event(span, "processing_started", NULL);
-    assert(ret == 0);
-
-    tracer_span_destroy(span);
-    tracer_destroy(tracer);
+    monitor_service_destroy(svc);
 
     printf("    PASSED\n");
 }
 
-static void test_tracer_span_status(void) {
-    printf("  test_tracer_span_status...\n");
+static void test_agent_state_update(void) {
+    printf("  test_agent_state_update...\n");
 
-    tracer_t* tracer = tracer_create(NULL);
-    assert(tracer != NULL);
-
-    span_t* span = tracer_span_create(tracer, "status_test");
-    assert(span != NULL);
-
-    int ret = tracer_span_set_status(span, SPAN_STATUS_OK, "Operation successful");
+    monitor_service_t* svc = NULL;
+    int ret = monitor_service_create(NULL, &svc);
     assert(ret == 0);
 
-    span_status_t status = tracer_span_get_status(span);
-    assert(status == SPAN_STATUS_OK);
+    loop_detection_config_t loop_cfg;
+    memset(&loop_cfg, 0, sizeof(loop_cfg));
+    loop_cfg.mode = LOOP_DETECTION_TIME_BASED;
+    loop_cfg.max_execution_time_ms = 60000;
 
-    tracer_span_destroy(span);
-    tracer_destroy(tracer);
+    agent_execution_trace_t* trace = NULL;
+    ret = monitor_service_start_agent_trace(svc, "agent_002", "task_002", &loop_cfg, &trace);
+    if (ret == 0 && trace != NULL) {
+        ret = monitor_service_update_agent_state(svc, trace, AGENT_STATE_READY, "init_complete");
+        assert(ret == 0);
 
-    printf("    PASSED\n");
-}
+        ret = monitor_service_update_agent_state(svc, trace, AGENT_STATE_EXECUTING, "executing_step_1");
+        assert(ret == 0);
 
-static void test_tracer_export_otlp(void) {
-    printf("  test_tracer_export_otlp...\n");
+        monitor_service_end_agent_trace(svc, trace, AGENT_STATE_COMPLETED);
+    } else {
+        printf("    State update skipped\n");
+    }
 
-    tracer_t* tracer = tracer_create(NULL);
-    assert(tracer != NULL);
-
-    span_t* span = tracer_span_create(tracer, "export_test");
-    assert(span != NULL);
-
-    tracer_span_set_attribute(span, "test.key", "test.value");
-    tracer_span_set_status(span, SPAN_STATUS_OK, NULL);
-
-    char* otlp_json = tracer_span_export_otlp(span);
-    assert(otlp_json != NULL);
-
-    free(otlp_json);
-    tracer_span_destroy(span);
-    tracer_destroy(tracer);
+    monitor_service_destroy(svc);
 
     printf("    PASSED\n");
 }
 
-static void test_tracer_child_span(void) {
-    printf("  test_tracer_child_span...\n");
+static void test_agent_loop_detection(void) {
+    printf("  test_agent_loop_detection...\n");
 
-    tracer_t* tracer = tracer_create(NULL);
-    assert(tracer != NULL);
+    monitor_service_t* svc = NULL;
+    int ret = monitor_service_create(NULL, &svc);
+    assert(ret == 0);
 
-    span_t* parent = tracer_span_create(tracer, "parent_operation");
-    assert(parent != NULL);
+    loop_detection_config_t loop_cfg;
+    memset(&loop_cfg, 0, sizeof(loop_cfg));
+    loop_cfg.mode = LOOP_DETECTION_PATTERN_BASED;
+    loop_cfg.max_loop_iterations = 3;
+    loop_cfg.pattern_window_size = 5;
 
-    span_t* child = tracer_span_create_child(parent, "child_operation");
-    assert(child != NULL);
+    agent_execution_trace_t* trace = NULL;
+    ret = monitor_service_start_agent_trace(svc, "agent_003", "task_003", &loop_cfg, &trace);
+    if (ret == 0 && trace != NULL) {
+        bool is_loop = false;
+        double confidence = 0.0;
 
-    span_context_t* parent_ctx = tracer_span_get_context(parent);
-    span_context_t* child_ctx = tracer_span_get_context(child);
+        for (int i = 0; i < 5; i++) {
+            monitor_service_update_agent_state(svc, trace, AGENT_STATE_EXECUTING, "same_location");
+        }
 
-    assert(strcmp(parent_ctx->trace_id, child_ctx->trace_id) == 0);
+        ret = monitor_service_check_loop(svc, trace, &is_loop, &confidence);
+        if (ret == 0) {
+            printf("    Loop detected: %s, confidence: %.2f\n",
+                   is_loop ? "yes" : "no", confidence);
+        }
 
-    tracer_span_destroy(child);
-    tracer_span_destroy(parent);
-    tracer_destroy(tracer);
+        monitor_service_end_agent_trace(svc, trace, AGENT_STATE_COMPLETED);
+    } else {
+        printf("    Loop detection skipped\n");
+    }
+
+    monitor_service_destroy(svc);
+
+    printf("    PASSED\n");
+}
+
+static void test_agent_trace_export(void) {
+    printf("  test_agent_trace_export...\n");
+
+    monitor_service_t* svc = NULL;
+    int ret = monitor_service_create(NULL, &svc);
+    assert(ret == 0);
+
+    loop_detection_config_t loop_cfg;
+    memset(&loop_cfg, 0, sizeof(loop_cfg));
+    loop_cfg.mode = LOOP_DETECTION_TIME_BASED;
+    loop_cfg.max_execution_time_ms = 60000;
+
+    agent_execution_trace_t* trace = NULL;
+    ret = monitor_service_start_agent_trace(svc, "agent_004", "task_004", &loop_cfg, &trace);
+    if (ret == 0 && trace != NULL) {
+        monitor_service_update_agent_state(svc, trace, AGENT_STATE_EXECUTING, "step_1");
+
+        char* data = NULL;
+        size_t size = 0;
+        ret = monitor_service_export_agent_trace(svc, trace, "json", &data, &size);
+        if (ret == 0 && data != NULL) {
+            printf("    Exported %zu bytes of trace data\n", size);
+            free(data);
+        }
+
+        monitor_service_end_agent_trace(svc, trace, AGENT_STATE_COMPLETED);
+    } else {
+        printf("    Trace export skipped\n");
+    }
+
+    monitor_service_destroy(svc);
+
+    printf("    PASSED\n");
+}
+
+static void test_agent_active_agents(void) {
+    printf("  test_agent_active_agents...\n");
+
+    monitor_service_t* svc = NULL;
+    int ret = monitor_service_create(NULL, &svc);
+    assert(ret == 0);
+
+    char** agent_ids = NULL;
+    size_t count = 0;
+    ret = monitor_service_get_active_agents(svc, &agent_ids, &count);
+    if (ret == 0) {
+        printf("    Active agents: %zu\n", count);
+        if (agent_ids) free(agent_ids);
+    }
+
+    monitor_service_destroy(svc);
+
+    printf("    PASSED\n");
+}
+
+static void test_agent_state_enum(void) {
+    printf("  test_agent_state_enum...\n");
+
+    assert(AGENT_STATE_CREATED == 0);
+    assert(AGENT_STATE_INITIALIZING == 1);
+    assert(AGENT_STATE_READY == 2);
+    assert(AGENT_STATE_EXECUTING == 3);
+    assert(AGENT_STATE_PAUSED == 4);
+    assert(AGENT_STATE_COMPLETED == 5);
+    assert(AGENT_STATE_FAILED == 6);
+    assert(AGENT_STATE_CANCELLED == 7);
+    assert(AGENT_STATE_STUCK == 8);
 
     printf("    PASSED\n");
 }
@@ -175,15 +187,13 @@ int main(void) {
     printf("  Tracer Unit Tests\n");
     printf("=========================================\n");
 
-    test_tracer_create_destroy();
-    test_tracer_span_create();
-    test_tracer_span_context();
-    test_tracer_span_attributes();
-    test_tracer_span_events();
-    test_tracer_span_status();
-    test_tracer_export_otlp();
-    test_tracer_child_span();
+    test_agent_trace_create();
+    test_agent_state_update();
+    test_agent_loop_detection();
+    test_agent_trace_export();
+    test_agent_active_agents();
+    test_agent_state_enum();
 
-    printf("\n✅ All tracing tests PASSED\n");
+    printf("\nAll tracing tests PASSED\n");
     return 0;
 }

@@ -11,7 +11,7 @@
 #include <time.h>
 
 /* 基础库兼容性层 */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 
 /* 沙箱内部结构（需要知道布局） */

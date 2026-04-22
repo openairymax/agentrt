@@ -16,7 +16,7 @@
 #include "layer4_pattern.h"
 #include "retrieval.h"
 #include "forgetting.h"
-#include "../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include "logger.h"
 #include "monitoring_metrics.h"
 #include "platform.h"
@@ -27,7 +27,7 @@
 #include <time.h>
 
 /* 基础库兼容性层 */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 
 /* ==================== 常量定义 ==================== */

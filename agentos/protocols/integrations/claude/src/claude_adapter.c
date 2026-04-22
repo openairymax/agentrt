@@ -13,6 +13,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <cjson/cJSON.h>
 #include <ctype.h>
 
 #define CLAUDE_MAX_RESPONSE_LEN 4096
@@ -206,6 +209,22 @@ static int claude_estimate_tokens(const char* text) {
 
 static void* g_claude_proto_context = NULL;
 
+struct claude_adapter_context_s {
+    claude_config_t config;
+    bool initialized;
+    claude_message_handler_t message_handler;
+    void* message_handler_data;
+    claude_stream_handler_t stream_handler;
+    void* stream_handler_data;
+    claude_tool_use_handler_t tool_use_handler;
+    void* tool_use_handler_data;
+    uint64_t total_requests;
+    uint64_t total_tokens_in;
+    uint64_t total_tokens_out;
+    uint64_t total_tool_calls;
+    char last_error[256];
+};
+
 static int claude_proto_init(void** out_context) {
     if (!out_context) return -1;
 
@@ -284,22 +303,6 @@ static int claude_proto_handle_request(void* context,
 
     return 0;
 }
-
-struct claude_adapter_context_s {
-    claude_config_t config;
-    bool initialized;
-    claude_message_handler_t message_handler;
-    void* message_handler_data;
-    claude_stream_handler_t stream_handler;
-    void* stream_handler_data;
-    claude_tool_use_handler_t tool_use_handler;
-    void* tool_use_handler_data;
-    uint64_t total_requests;
-    uint64_t total_tokens_in;
-    uint64_t total_tokens_out;
-    uint64_t total_tool_calls;
-    char last_error[256];
-};
 
 static claude_model_info_t g_builtin_models[] = {
     {
@@ -597,7 +600,7 @@ int claude_messages_stream(claude_adapter_context_t* ctx,
         memset(&event, 0, sizeof(event));
         event.text = chunk_buf;
         event.stop_reason = (pos >= resp_len) ?
-                             CLAUDE_STOP_END_TURN : CLAUDE_STOP_NONE;
+                             CLAUDE_STOP_END_TURN : 0;
         event.is_final = (pos >= resp_len);
         handler(&event, user_data);
         chunk_idx++;

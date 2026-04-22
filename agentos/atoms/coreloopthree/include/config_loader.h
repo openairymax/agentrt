@@ -7,7 +7,7 @@
 #ifndef AGENTOS_CONFIG_LOADER_H
 #define AGENTOS_CONFIG_LOADER_H
 
-#include "../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include <stddef.h>
 
 #ifdef __cplusplus

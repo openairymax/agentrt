@@ -14,7 +14,7 @@
 #ifndef AGENTOS_METACOGNITION_H
 #define AGENTOS_METACOGNITION_H
 
-#include "../../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include "thinking_chain.h"
 #include <stddef.h>
 #include <stdint.h>

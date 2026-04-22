@@ -7,7 +7,7 @@
 #ifndef AGENTOS_MEMORYROV_CONFIG_H
 #define AGENTOS_MEMORYROV_CONFIG_H
 
-#include "../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 
 #ifdef __cplusplus
 extern "C" {
