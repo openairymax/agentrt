@@ -18,6 +18,12 @@ option(ENABLE_COVERAGE "Enable code coverage reporting" OFF)
 option(ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" OFF)
 option(AGENTOS_BUILD_ALL "Build all AgentOS components" ON)
 
+# CTest必须在顶级启用（在任何add_subdirectory之前）
+if(BUILD_TESTS)
+    enable_testing()
+    message(STATUS "CTest enabled at root level (before subdirectories)")
+endif()
+
 # 输出构建配置信息
 message(STATUS "=========================================")
 message(STATUS "  AgentOS Build Configuration")
