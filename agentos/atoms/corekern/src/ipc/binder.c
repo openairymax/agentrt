@@ -19,7 +19,7 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include <string.h>
 #include <stdio.h>
 

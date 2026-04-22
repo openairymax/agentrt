@@ -7,7 +7,7 @@
 #ifndef CACHE_MANAGER_H
 #define CACHE_MANAGER_H
 
-#include "../../../agentos/commons/utils/memory/include/memory_compat.h"
+#include "memory_compat.h"
 #include <stddef.h>
 #include <stdint.h>
 

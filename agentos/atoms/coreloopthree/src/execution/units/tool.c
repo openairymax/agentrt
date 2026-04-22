@@ -5,11 +5,11 @@
  */
 
 #include "execution.h"
-#include "../../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 
 typedef struct tool_unit_data {
     char* tool_name;

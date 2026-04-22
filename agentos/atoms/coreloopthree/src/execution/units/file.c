@@ -5,12 +5,12 @@
  */
 
 #include "execution.h"
-#include "../../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <sys/stat.h>
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 
 #ifdef _WIN32
 #include <direct.h>

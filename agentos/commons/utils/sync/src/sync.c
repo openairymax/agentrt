@@ -271,16 +271,6 @@ sync_result_t sync_debug(void* lock) {
 }
 
 /**
- * @brief 超时转换为毫秒
- */
-__attribute__((unused)) static uint64_t sync_internal_timeout_to_ms(const sync_timeout_t* timeout) {
-    if (timeout == NULL) {
-        return 0;
-    }
-    return timeout->timeout_ms;
-}
-
-/**
  * @brief 获取当前时间戳（毫秒）
  */
 uint64_t sync_get_timestamp_ms(void) {

@@ -59,14 +59,6 @@ struct cupolas_entitlements {
 
 static int g_initialized = 0;
 
-__attribute__((unused)) static int cupolas_str_ends_with(const char* str, const char* suffix) {
-    if (!str || !suffix) return 0;
-    size_t str_len = strlen(str);
-    size_t suffix_len = strlen(suffix);
-    if (suffix_len > str_len) return 0;
-    return strcmp(str + str_len - suffix_len, suffix) == 0;
-}
-
 static char* cupolas_str_trim(char* str) {
     if (!str) return NULL;
     while (*str == ' ' || *str == '\t' || *str == '\n' || *str == '\r') str++;

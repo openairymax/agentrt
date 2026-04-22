@@ -183,17 +183,17 @@ static void memory_add_debug_info(void* addr, size_t size, const char* tag,
         return;
     }
     
-    struct memory_debug_info* info = AGENTOS_MALLOC(sizeof(struct memory_debug_info));
+    struct memory_debug_info* info = malloc(sizeof(struct memory_debug_info));
     if (info == NULL) {
         return;
     }
     
     info->address = addr;
     info->size = size;
-    info->tag = tag ? AGENTOS_STRDUP(tag) : NULL;
-    info->file = file ? AGENTOS_STRDUP(file) : NULL;
+    info->tag = tag ? strdup(tag) : NULL;
+    info->file = file ? strdup(file) : NULL;
     info->line = line;
-    info->function = function ? AGENTOS_STRDUP(function) : NULL;
+    info->function = function ? strdup(function) : NULL;
     info->timestamp = memory_get_timestamp();
     info->next = g_state.debug_list_head;
     g_state.debug_list_head = info;
@@ -216,10 +216,10 @@ static void memory_remove_debug_info(void* addr) {
         if (current->address == addr) {
             *prev = current->next;
             
-            if (current->tag) AGENTOS_FREE((void*)current->tag);
-            if (current->file) AGENTOS_FREE((void*)current->file);
-            if (current->function) AGENTOS_FREE((void*)current->function);
-            AGENTOS_FREE(current);
+            if (current->tag) free((void*)current->tag);
+            if (current->file) free((void*)current->file);
+            if (current->function) free((void*)current->function);
+            free(current);
             
             return;
         }
@@ -303,7 +303,7 @@ static void* memory_allocate_internal(size_t size, const char* tag, bool zero, s
         }
 #endif
     } else {
-        // 普通分�?        ptr = AGENTOS_MALLOC(size);
+        ptr = malloc(size);
     }
     
     if (ptr == NULL) {
@@ -384,10 +384,10 @@ void memory_cleanup(void) {
             
             struct memory_debug_info* next = current->next;
             
-            if (current->tag) AGENTOS_FREE((void*)current->tag);
-            if (current->file) AGENTOS_FREE((void*)current->file);
-            if (current->function) AGENTOS_FREE((void*)current->function);
-            AGENTOS_FREE(current);
+            if (current->tag) free((void*)current->tag);
+            if (current->file) free((void*)current->file);
+            if (current->function) free((void*)current->function);
+            free(current);
             
             current = next;
         }
@@ -473,8 +473,7 @@ void* memory_realloc(void* ptr, size_t new_size, const char* tag) {
     }
     
     if (!g_state.initialized) {
-        // 如果模块未初始化，使用系统默认重分配
-        return AGENTOS_REALLOC(ptr, new_size);
+        return realloc(ptr, new_size);
     }
     
     memory_lock();
@@ -483,8 +482,7 @@ void* memory_realloc(void* ptr, size_t new_size, const char* tag) {
     struct memory_debug_info* debug_info = memory_find_debug_info(ptr);
     size_t old_size = debug_info ? debug_info->size : 0;
     
-    // 使用系统realloc
-    void* new_ptr = AGENTOS_REALLOC(ptr, new_size);
+    void* new_ptr = realloc(ptr, new_size);
     if (new_ptr == NULL) {
         memory_handle_fail(new_size, tag);
         memory_unlock();
@@ -547,14 +545,13 @@ void memory_free(void* ptr) {
     
     // 释放内存
     if (debug_info && debug_info->address == ptr) {
-        // 对齐分配
 #ifdef _WIN32
         _aligned_free(ptr);
 #else
-        AGENTOS_FREE(ptr);
+        free(ptr);
 #endif
     } else {
-        // 普通分�?        AGENTOS_FREE(ptr);
+        free(ptr);
     }
     
     // 更新统计信息
@@ -629,10 +626,10 @@ bool memory_debug_enable(bool enable) {
         while (current != NULL) {
             struct memory_debug_info* next = current->next;
             
-            if (current->tag) AGENTOS_FREE((void*)current->tag);
-            if (current->file) AGENTOS_FREE((void*)current->file);
-            if (current->function) AGENTOS_FREE((void*)current->function);
-            AGENTOS_FREE(current);
+            if (current->tag) free((void*)current->tag);
+            if (current->file) free((void*)current->file);
+            if (current->function) free((void*)current->function);
+            free(current);
             
             current = next;
         }

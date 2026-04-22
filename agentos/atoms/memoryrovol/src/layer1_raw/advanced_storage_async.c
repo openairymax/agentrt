@@ -5,12 +5,12 @@
  */
 
 #include "advanced_storage_async.h"
-#include "../../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include "logger.h"
 #include <string.h>
 
 /* 基础库兼容性层 */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 
 /* ==================== 异步操作管理 ==================== */
