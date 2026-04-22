@@ -62,32 +62,6 @@
 
 **链接**: https://atomgit.com/spharx/agentos/issues
 
-### Gitee Issues（官方仓库）
-
-**适用场景**:
-- 报告 Bug
-- 提出功能建议
-- 询问具体问题
-
-**链接**: https://gitee.com/spharx/agentos/issues
-
-### GitHub Issues（官方仓库）
-
-**适用场景**:
-- 报告 Bug
-- 提出功能建议
-- 询问具体问题
-
-**链接**: https://github.com/SpharxTeam/AgentOS/issues
-
-### GitHub Discussions（官方仓库）
-
-**适用场景**:
-- 一般性问题讨论
-- 分享使用经验
-- 寻找合作者
-
-**链接**: https://github.com/SpharxTeam/AgentOS/discussions
 
 ### 技术社区
 
@@ -122,9 +96,7 @@
 
 ### 联系商业支持
 
-- **邮箱**: consulting@spharx.cn
-- **电话**: +86-XXX-XXXX-XXXX（工作日 9:00-18:00）
-- **微信**: SpharxOfficial
+- **邮箱**: lidecheng@spharx.cn
 
 ---
 
@@ -163,7 +135,7 @@
 ### Q: 我应该在哪里提问？
 
 **A**: 
-- 如果是 Bug 报告或功能建议 → Gitee Issues
+- 如果是 Bug 报告或功能建议 → AtomGit Issues
 - 如果是使用问题 → GitHub Discussions 或邮件技术支持
 - 如果是紧急问题 → 邮件技术支持并标注 [URGENT]
 

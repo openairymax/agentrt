@@ -7,7 +7,7 @@
 #ifndef AGENTOS_TASK_EXECUTOR_UTILS_H
 #define AGENTOS_TASK_EXECUTOR_UTILS_H
 
-#include "../../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include <stdint.h>
 #include <stddef.h>
 

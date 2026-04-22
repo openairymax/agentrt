@@ -689,3 +689,87 @@ void agentos_error_chain_iter_reset(agentos_error_chain_iterator_t* iter) {
     
     iter->current_index = 0;
 }
+
+/**
+ * @brief 获取错误链的深度
+ * @param chain 错误链指针
+ * @return 错误链深度，失败返回 0
+ */
+int agentos_error_chain_get_depth(const agentos_error_chain_t* chain) {
+    if (chain == NULL) {
+        return 0;
+    }
+    return chain->depth;
+}
+
+/**
+ * @brief 获取错误链的根错误（最早的错误）
+ * @param chain 错误链指针
+ * @return 根错误码，失败返回 AGENTOS_OK
+ */
+agentos_error_t agentos_error_chain_get_root_error(const agentos_error_chain_t* chain) {
+    if (chain == NULL || chain->depth <= 0) {
+        return AGENTOS_OK;
+    }
+    return chain->contexts[0].error_code;
+}
+
+/**
+ * @brief 获取错误链的最新错误
+ * @param chain 错误链指针
+ * @return 最新错误码，失败返回 AGENTOS_OK
+ */
+agentos_error_t agentos_error_chain_get_latest_error(const agentos_error_chain_t* chain) {
+    if (chain == NULL) {
+        return AGENTOS_OK;
+    }
+    return chain->code;
+}
+
+/**
+ * @brief 格式化错误链为字符串
+ * @param chain 错误链指针
+ * @param lang 语言类型
+ * @return 格式化后的字符串（需要调用 AGENTOS_FREE 释放）
+ */
+char* agentos_error_chain_format(
+    const agentos_error_chain_t* chain,
+    agentos_language_t lang) {
+    
+    if (chain == NULL) {
+        return AGENTOS_STRDUP("(null chain)");
+    }
+    
+    size_t buf_size = 4096;
+    char* buf = (char*)AGENTOS_MALLOC(buf_size);
+    if (buf == NULL) {
+        return NULL;
+    }
+    
+    size_t offset = 0;
+    offset += snprintf(buf + offset, buf_size - offset, 
+                       "Error chain (depth=%d, code=%d):\n", 
+                       chain->depth, chain->code);
+    
+    for (int i = 0; i < chain->depth && offset < buf_size - 1; i++) {
+        const agentos_error_context_entry_t* ctx = &chain->contexts[i];
+        offset += snprintf(buf + offset, buf_size - offset,
+                          "  [%d] %s:%d in %s(): %s\n",
+                          i + 1,
+                          ctx->file ? ctx->file : "?",
+                          ctx->line,
+                          ctx->function ? ctx->function : "?",
+                          ctx->message ? ctx->message : "");
+    }
+    
+    (void)lang;
+    return buf;
+}
+
+/**
+ * @brief 设置错误处理回调（兼容旧代码）
+ * @param handler 错误处理回调函数
+ */
+void agentos_error_set_handler(agentos_error_handler_t handler) {
+    (void)handler;
+}

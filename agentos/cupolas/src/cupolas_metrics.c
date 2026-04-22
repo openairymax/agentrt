@@ -267,26 +267,6 @@ bool metrics_iter_next(metric_iterator_t* iter, metric_sample_t* sample) {
 void metrics_iter_destroy(metric_iterator_t* iter) {
 }
 
-__attribute__((unused)) static void format_label_values(char* buffer, size_t size,
-                                const char** label_names,
-                                const char** label_values,
-                                size_t label_count) {
-    if (!label_values || label_count == 0) {
-        buffer[0] = '\0';
-        return;
-    }
-
-    size_t offset = 0;
-    for (size_t i = 0; i < label_count && offset < size - 1; i++) {
-        if (i > 0) {
-            offset += snprintf(buffer + offset, size - offset, ",");
-        }
-        offset += snprintf(buffer + offset, size - offset, "%s=\"%s\"",
-                          label_names[i] ? label_names[i] : "",
-                          label_values[i] ? label_values[i] : "");
-    }
-}
-
 size_t metrics_export_prometheus(char* buffer, size_t size) {
     if (!buffer || size == 0) {
         return 0;

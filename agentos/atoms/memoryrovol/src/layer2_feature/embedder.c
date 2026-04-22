@@ -5,13 +5,13 @@
  */
 
 #include "../../include/layer2_feature.h"
-#include "../../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include "logging_compat.h"
 #include <curl/curl.h>
 #include <cjson/cJSON.h>
 #include <stdlib.h>
 
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
 #include <pthread.h>

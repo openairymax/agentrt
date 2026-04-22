@@ -54,6 +54,19 @@
  * 本文件统一使用 gateway_time_ns()
  */
 
+/* ========== 安全HTTP头 ========== */
+
+void gateway_apply_security_headers(struct MHD_Response* response) {
+    if (!response) return;
+    
+    MHD_add_response_header(response, "X-Content-Type-Options", "nosniff");
+    MHD_add_response_header(response, "X-Frame-Options", "DENY");
+    MHD_add_response_header(response, "X-XSS-Protection", "1; mode=block");
+    MHD_add_response_header(response, "Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    MHD_add_response_header(response, "Cache-Control", "no-store, no-cache, must-revalidate");
+    MHD_add_response_header(response, "Pragma", "no-cache");
+}
+
 /* ========== HTTP 响应生成 ========== */
 
 /**
@@ -183,7 +196,7 @@ static int parse_headers(void* cls, enum MHD_ValueKind kind, const char* key, co
  * @param size 数据大小
  * @return 0 成功，非0 失败
  */
-static int parse_json_request(http_gateway_t* gateway, http_request_context_t* context, const char* data, size_t size) {
+int parse_json_request(http_gateway_t* gateway, http_request_context_t* context, const char* data, size_t size) {
     if (!data || size == 0) {
         return -1;
     }

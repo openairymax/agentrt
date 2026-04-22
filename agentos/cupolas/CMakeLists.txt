@@ -125,7 +125,7 @@ set(CUPOLAS_HEADERS
 )
 
 # commons 模块路径
-set(COMMON_MODULE_DIR ${CMAKE_SOURCE_DIR}/../commons)
+set(COMMON_MODULE_DIR ${CMAKE_SOURCE_DIR}/agentos/commons)
 
 # commons 模块的 include 目录
 set(COMMON_INCLUDE_DIRS
@@ -133,6 +133,7 @@ set(COMMON_INCLUDE_DIRS
     ${COMMON_MODULE_DIR}/utils/core/include
     ${COMMON_MODULE_DIR}/utils/error/include
     ${COMMON_MODULE_DIR}/utils/observability/include
+    ${COMMON_MODULE_DIR}/utils/types/include
 )
 
 add_library(cupolas STATIC ${CUPOLAS_SOURCES} ${CUPOLAS_HEADERS})
@@ -219,18 +220,43 @@ if(BUILD_TESTS)
     enable_testing()
 
     add_executable(test_cupolas_core tests/unit/test_cupolas_core.c)
+    target_include_directories(test_cupolas_core PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${COMMON_INCLUDE_DIRS}
+    )
     target_link_libraries(test_cupolas_core ${PROJECT_NAME})
 
     add_executable(test_cupolas_integration tests/integration/test_cupolas_integration.c)
+    target_include_directories(test_cupolas_integration PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${COMMON_INCLUDE_DIRS}
+    )
     target_link_libraries(test_cupolas_integration ${PROJECT_NAME})
 
     add_executable(test_cupolas_signature tests/unit/test_cupolas_signature.c)
+    target_include_directories(test_cupolas_signature PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${COMMON_INCLUDE_DIRS}
+    )
     target_link_libraries(test_cupolas_signature ${PROJECT_NAME})
 
     add_executable(test_cupolas_vault tests/unit/test_cupolas_vault.c)
+    target_include_directories(test_cupolas_vault PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${COMMON_INCLUDE_DIRS}
+    )
     target_link_libraries(test_cupolas_vault ${PROJECT_NAME})
 
     add_executable(test_stress_concurrent tests/stress/test_stress_concurrent.c)
+    target_include_directories(test_stress_concurrent PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${COMMON_INCLUDE_DIRS}
+    )
     target_link_libraries(test_stress_concurrent ${PROJECT_NAME})
 
     if(MSVC)

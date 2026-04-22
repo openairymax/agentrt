@@ -23,13 +23,13 @@
 #include <errno.h>
 
 /* 项目公共头文件 */
-#include "../../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include "../include/retrieval.h"
 #include "../include/llm_client.h"
 #include "../include/layer1_raw.h"
 
 /* Unified base library compatibility layer */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 
 /**

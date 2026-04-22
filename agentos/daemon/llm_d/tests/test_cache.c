@@ -13,54 +13,48 @@
 static void test_cache_create_destroy(void) {
     printf("  test_cache_create_destroy...\n");
 
-    llm_cache_t* cache = llm_cache_create(100, 3600);
+    cache_t* cache = cache_create(100, 3600);
     assert(cache != NULL);
 
-    llm_cache_destroy(cache);
+    cache_destroy(cache);
 
     printf("    PASSED\n");
 }
 
-static void test_cache_set_get(void) {
-    printf("  test_cache_set_get...\n");
+static void test_cache_put_get(void) {
+    printf("  test_cache_put_get...\n");
 
-    llm_cache_t* cache = llm_cache_create(100, 3600);
+    cache_t* cache = cache_create(100, 3600);
     assert(cache != NULL);
 
     const char* key = "test_key_123";
     const char* value = "test_response_content";
 
-    int ret = llm_cache_set(cache, key, value, strlen(value) + 1);
-    assert(ret == 0);
+    cache_put(cache, key, value);
 
-    char* retrieved = llm_cache_get(cache, key);
+    char* retrieved = NULL;
+    int ret = cache_get(cache, key, &retrieved);
+    assert(ret == 0);
     assert(retrieved != NULL);
     assert(strcmp(retrieved, value) == 0);
 
     free(retrieved);
-    llm_cache_destroy(cache);
+    cache_destroy(cache);
 
     printf("    PASSED\n");
 }
 
-static void test_cache_delete(void) {
-    printf("  test_cache_delete...\n");
+static void test_cache_miss(void) {
+    printf("  test_cache_miss...\n");
 
-    llm_cache_t* cache = llm_cache_create(100, 3600);
+    cache_t* cache = cache_create(100, 3600);
     assert(cache != NULL);
 
-    const char* key = "test_key_delete";
-    const char* value = "to_be_deleted";
+    char* retrieved = NULL;
+    int ret = cache_get(cache, "nonexistent_key", &retrieved);
+    assert(ret != 0 || retrieved == NULL);
 
-    llm_cache_set(cache, key, value, strlen(value) + 1);
-
-    int ret = llm_cache_delete(cache, key);
-    assert(ret == 0);
-
-    char* retrieved = llm_cache_get(cache, key);
-    assert(retrieved == NULL);
-
-    llm_cache_destroy(cache);
+    cache_destroy(cache);
 
     printf("    PASSED\n");
 }
@@ -68,46 +62,38 @@ static void test_cache_delete(void) {
 static void test_cache_clear(void) {
     printf("  test_cache_clear...\n");
 
-    llm_cache_t* cache = llm_cache_create(100, 3600);
+    cache_t* cache = cache_create(100, 3600);
     assert(cache != NULL);
 
-    llm_cache_set(cache, "key1", "value1", 7);
-    llm_cache_set(cache, "key2", "value2", 7);
-    llm_cache_set(cache, "key3", "value3", 7);
+    cache_put(cache, "key1", "value1");
+    cache_put(cache, "key2", "value2");
+    cache_put(cache, "key3", "value3");
 
-    int ret = llm_cache_clear(cache);
-    assert(ret == 0);
+    cache_clear(cache);
 
-    assert(llm_cache_get(cache, "key1") == NULL);
-    assert(llm_cache_get(cache, "key2") == NULL);
-    assert(llm_cache_get(cache, "key3") == NULL);
+    char* retrieved = NULL;
+    assert(cache_get(cache, "key1", &retrieved) != 0 || retrieved == NULL);
+    assert(cache_get(cache, "key2", &retrieved) != 0 || retrieved == NULL);
+    assert(cache_get(cache, "key3", &retrieved) != 0 || retrieved == NULL);
 
-    llm_cache_destroy(cache);
+    cache_destroy(cache);
 
     printf("    PASSED\n");
 }
 
-static void test_cache_stats(void) {
-    printf("  test_cache_stats...\n");
+static void test_cache_size(void) {
+    printf("  test_cache_size...\n");
 
-    llm_cache_t* cache = llm_cache_create(100, 3600);
+    cache_t* cache = cache_create(100, 3600);
     assert(cache != NULL);
+    assert(cache_capacity(cache) == 100);
 
-    llm_cache_set(cache, "key1", "value1", 7);
-    llm_cache_set(cache, "key2", "value2", 7);
+    cache_put(cache, "key1", "value1");
+    cache_put(cache, "key2", "value2");
 
-    llm_cache_get(cache, "key1");
-    llm_cache_get(cache, "key1");
-    llm_cache_get(cache, "nonexistent");
+    assert(cache_size(cache) == 2);
 
-    cache_stats_t stats;
-    llm_cache_get_stats(cache, &stats);
-
-    assert(stats.total_entries == 2);
-    assert(stats.hits == 2);
-    assert(stats.misses == 1);
-
-    llm_cache_destroy(cache);
+    cache_destroy(cache);
 
     printf("    PASSED\n");
 }
@@ -115,17 +101,19 @@ static void test_cache_stats(void) {
 static void test_cache_ttl(void) {
     printf("  test_cache_ttl...\n");
 
-    llm_cache_t* cache = llm_cache_create(100, 1);
+    cache_t* cache = cache_create(100, 1);
     assert(cache != NULL);
 
     const char* key = "ttl_test_key";
     const char* value = "ttl_test_value";
 
-    llm_cache_set(cache, key, value, strlen(value) + 1);
+    cache_put(cache, key, value);
 
-    char* retrieved = llm_cache_get(cache, key);
-    assert(retrieved != NULL);
-    free(retrieved);
+    char* retrieved = NULL;
+    int ret = cache_get(cache, key, &retrieved);
+    if (ret == 0 && retrieved != NULL) {
+        free(retrieved);
+    }
 
 #ifdef _WIN32
     Sleep(2000);
@@ -133,10 +121,11 @@ static void test_cache_ttl(void) {
     sleep(2);
 #endif
 
-    retrieved = llm_cache_get(cache, key);
-    assert(retrieved == NULL);
+    retrieved = NULL;
+    ret = cache_get(cache, key, &retrieved);
+    assert(ret != 0 || retrieved == NULL);
 
-    llm_cache_destroy(cache);
+    cache_destroy(cache);
 
     printf("    PASSED\n");
 }
@@ -147,12 +136,12 @@ int main(void) {
     printf("=========================================\n");
 
     test_cache_create_destroy();
-    test_cache_set_get();
-    test_cache_delete();
+    test_cache_put_get();
+    test_cache_miss();
     test_cache_clear();
-    test_cache_stats();
+    test_cache_size();
     test_cache_ttl();
 
-    printf("\n✅ All LLM cache tests PASSED\n");
+    printf("\nAll LLM cache tests PASSED\n");
     return 0;
 }

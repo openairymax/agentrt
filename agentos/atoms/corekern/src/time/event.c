@@ -9,7 +9,7 @@
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 
 struct agentos_event {
@@ -66,7 +66,9 @@ agentos_error_t agentos_event_signal(agentos_event_t* event) {
 
 agentos_error_t agentos_event_reset(agentos_event_t* event) {
     if (!event) return AGENTOS_EINVAL;
+    agentos_mutex_lock(event->mutex);
     event->signaled = 0;
+    agentos_mutex_unlock(event->mutex);
     return AGENTOS_SUCCESS;
 }
 
@@ -78,6 +80,7 @@ void agentos_event_destroy(agentos_event_t* event) {
 }
 
 agentos_error_t agentos_time_eventloop_init(void) {
+    eventloop_running = 0;
     return AGENTOS_SUCCESS;
 }
 
@@ -92,4 +95,8 @@ void agentos_time_eventloop_run(void) {
 
 void agentos_time_eventloop_stop(void) {
     eventloop_running = 0;
+}
+
+void agentos_time_eventloop_cleanup(void) {
+    agentos_time_eventloop_stop();
 }

@@ -33,7 +33,7 @@ static inline agentos_error_t heapstore_syscall_session_delete(const char* sid) 
 #endif
 
 /* Unified base library compatibility layer */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 #include "check.h"
 #include "logging_compat.h"

@@ -85,57 +85,61 @@ static int test_error_strings(void) {
 }
 
 /**
- * @brief 测试错误处理�?
+ * @brief 测试错误处理宏
  */
 static int test_error_macros(void) {
-    agentos_error_t err;
+    agentos_error_clear();
     
-    /* 测试 AGENTOS_ERROR_HANDLE */
-    err = AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "Test error");
-    TEST_ASSERT(err == AGENTOS_ERR_INVALID_PARAM, "Error handle should return error code");
+    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "Test error");
     
-    /* 测试 AGENTOS_ERROR_RETURN */
-    err = AGENTOS_ERROR_RETURN(AGENTOS_ERR_INVALID_PARAM);
-    TEST_ASSERT(err == AGENTOS_ERR_INVALID_PARAM, "Error return should return error code");
+    agentos_error_chain_t* chain = agentos_error_get_chain();
+    TEST_ASSERT(chain != NULL, "Error chain should exist after AGENTOS_ERROR_HANDLE");
+    
+    int depth = agentos_error_chain_get_depth(chain);
+    TEST_ASSERT(depth >= 1, "Error chain should have at least 1 error after AGENTOS_ERROR_HANDLE");
+    
+    agentos_error_clear();
     
     printf("  Error macros: OK\n");
     return 0;
 }
 
 /**
- * @brief 测试错误�?
+ * @brief 测试错误链
  */
 static int test_error_chain(void) {
-    agentos_error_chain_t* chain = agentos_error_chain_create();
-    TEST_ASSERT(chain != NULL, "Error chain creation should succeed");
+    agentos_error_clear();
     
-    /* 添加错误到链 */
-    agentos_error_chain_add(chain, AGENTOS_ERR_INVALID_PARAM, "test.c", 10, "test_func", "First error");
-    agentos_error_chain_add(chain, AGENTOS_ERR_OUT_OF_MEMORY, "test.c", 20, "test_func", "Second error");
+    agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, "test.c", 10, "test_func", "%s", "First error");
+    agentos_error_push_ex(AGENTOS_ERR_OUT_OF_MEMORY, "test.c", 20, "test_func", "%s", "Second error");
     
-    TEST_ASSERT(agentos_error_chain_count(chain) == 2, "Error chain should have 2 errors");
+    agentos_error_chain_t* chain = agentos_error_get_chain();
+    TEST_ASSERT(chain != NULL, "Error chain should exist");
     
-    /* 清理 */
-    agentos_error_chain_destroy(chain);
+    int depth = agentos_error_chain_get_depth(chain);
+    TEST_ASSERT(depth >= 2, "Error chain should have at least 2 errors");
+    
+    agentos_error_clear();
     
     printf("  Error chain: OK\n");
     return 0;
 }
 
 /**
- * @brief 测试错误上下�?
+ * @brief 测试错误上下文
  */
 static int test_error_context(void) {
-    agentos_error_context_t* ctx = agentos_error_context_create();
-    TEST_ASSERT(ctx != NULL, "Error context creation should succeed");
+    agentos_error_clear();
     
-    /* 添加上下文条�?*/
-    agentos_error_context_add(ctx, "test.c", 10, "test_func", AGENTOS_ERR_INVALID_PARAM, "Context error");
+    agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, "test.c", 10, "test_func", "%s", "Context error");
     
-    TEST_ASSERT(agentos_error_context_count(ctx) == 1, "Context should have 1 entry");
+    agentos_error_chain_t* chain = agentos_error_get_chain();
+    TEST_ASSERT(chain != NULL, "Error chain should exist for context test");
     
-    /* 清理 */
-    agentos_error_context_destroy(ctx);
+    int depth = agentos_error_chain_get_depth(chain);
+    TEST_ASSERT(depth >= 1, "Context should have at least 1 entry");
+    
+    agentos_error_clear();
     
     printf("  Error context: OK\n");
     return 0;

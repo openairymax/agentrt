@@ -238,36 +238,21 @@ agentos_error_t heapstore_syscall_session_list(
             break;
         }
         if (err != heapstore_SUCCESS) {
-            for (size_t i = 0; i < count; i++) {
-                free(sessions[i]);
-            }
-            free(sessions);
-            heapstore_registry_iter_destroy(iter);
-            return AGENTOS_EIO;
+            goto cleanup_error;
         }
 
         if (count >= capacity) {
             capacity *= 2;
             char** new_sessions = (char**)realloc(sessions, capacity * sizeof(char*));
             if (!new_sessions) {
-                for (size_t i = 0; i < count; i++) {
-                    free(sessions[i]);
-                }
-                free(sessions);
-                heapstore_registry_iter_destroy(iter);
-                return AGENTOS_ENOMEM;
+                goto cleanup_error;
             }
             sessions = new_sessions;
         }
 
         sessions[count] = strdup(record.id);
         if (!sessions[count]) {
-            for (size_t i = 0; i < count; i++) {
-                free(sessions[i]);
-            }
-            free(sessions);
-            heapstore_registry_iter_destroy(iter);
-            return AGENTOS_ENOMEM;
+            goto cleanup_error;
         }
         count++;
     }
@@ -278,6 +263,14 @@ agentos_error_t heapstore_syscall_session_list(
     *out_count = count;
 
     return AGENTOS_SUCCESS;
+
+cleanup_error:
+    for (size_t i = 0; i < count; i++) {
+        free(sessions[i]);
+    }
+    free(sessions);
+    heapstore_registry_iter_destroy(iter);
+    return (err == heapstore_ERR_NOT_FOUND) ? AGENTOS_EIO : AGENTOS_ENOMEM;
 }
 
 agentos_error_t heapstore_syscall_trace_save(
@@ -403,15 +396,16 @@ agentos_error_t heapstore_memoryrovol_load(
 
     *out_data = malloc(pool.total_size);
     if (!*out_data) {
-        if (pool.name) free(pool.name);
         return AGENTOS_ENOMEM;
     }
     memcpy(*out_data, &pool, sizeof(pool));
     *out_len = pool.total_size;
 
-    if (out_metadata && pool.name) {
+    if (out_metadata && pool.name[0] != '\0') {
         *out_metadata = strdup(pool.name);
         if (!*out_metadata) {
+            free(*out_data);
+            *out_data = NULL;
             return AGENTOS_ENOMEM;
         }
     }
