@@ -65,9 +65,10 @@ static bool ml_planner_try_load_model(ml_planner_data_t* data) {
     }
     fclose(f);
 
-    /* Model placeholder: rule-based planning is the primary path.
-     * ML runtime integration (ONNX/TFLite) can be added here when available
-     * to enhance planning quality with learned task decomposition patterns. */
+    /* [DESIGN] Rule-based planning is the current primary path.
+     * ML runtime integration (ONNX/TFLite) is planned for v2.0
+     * to enhance planning quality with learned task decomposition patterns.
+     * Fallback mode provides production-safe degradation when ML unavailable. */
     data->model = (ml_model_t*)AGENTOS_CALLOC(1, sizeof(ml_model_t));
     if (!data->model) {
         data->fallback_mode = true;

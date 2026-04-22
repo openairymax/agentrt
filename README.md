@@ -266,6 +266,10 @@ Fork Project → Create Branch → Develop & Test → Submit PR → Code Review 
 
 **Main Platforms**: [AtomGit](https://atomgit.com/spharx/agentos) (Recommended) · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)
 
+### Contributors
+
+See [AUTHORS.md](AUTHORS.md) for the list of contributors.
+
 ## 📜 License
 
 This project is licensed under the **Apache License 2.0**. See [LICENSE](LICENSE) file for details.

@@ -29,7 +29,7 @@
 #include "string_compat.h"
 
 /* heapstore 持久化开关（可通过配置关闭） */
-static bool g_use_heapstore_persistence __attribute__((unused)) = true;
+static bool g_use_heapstore_persistence = true;
 
 static agentos_metrics_t* g_metrics = NULL;
 static agentos_mutex_t* g_metrics_mutex = NULL;

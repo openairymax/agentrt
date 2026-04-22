@@ -39,13 +39,6 @@ struct overflow_handler {
     overflow_stats_t stats;
 };
 
-static const char* overflow_level_strings[] __attribute__((unused)) = {
-    "NORMAL",
-    "WARNING",
-    "CRITICAL",
-    "SPILLING"
-};
-
 static void get_timestamp_filename(char* buffer, size_t buffer_size) {
     time_t now = time(NULL);
 #if cupolas_PLATFORM_WINDOWS

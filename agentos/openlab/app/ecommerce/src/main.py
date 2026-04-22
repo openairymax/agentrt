@@ -674,7 +674,16 @@ class EcommerceApp:
         db_url = self.manager.get("database_url", "sqlite:///./ecommerce.db")
         redis_url = self.manager.get("redis_url", "redis://localhost:6379")
         stripe_key = self.manager.get("stripe_secret_key", "")
-        jwt_secret = self.manager.get("jwt_secret_key", "change-me")
+        jwt_secret = self.manager.get("jwt_secret_key", None)
+        if not jwt_secret:
+            import secrets
+            jwt_secret = secrets.token_urlsafe(32)
+            import logging
+            logging.warning(
+                "[SECURITY] jwt_secret_key not configured. "
+                "Generated random secret for this session only. "
+                "Set jwt_secret_key in config for production!"
+            )
         jwt_algorithm = self.manager.get("jwt_algorithm", "HS256")
         jwt_expire = self.manager.get("jwt_access_token_expire_minutes", 30)
 

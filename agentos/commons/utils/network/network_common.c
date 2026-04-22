@@ -144,60 +144,6 @@ static void set_socket_timeout(void* handle, int timeout_ms, int is_recv) {
 }
 
 /**
- * @brief 解析 URL 为各组成部分
- * @param url URL 字符串
- * @param host 输出主机名
- * @param port 输出端口
- * @param path 输出路径
- * @return 成功返回 0
- */
-__attribute__((unused)) static int parse_url(const char* url, char* host, int* port, char* path) {
-    if (!url || !host || !port || !path) return -1;
-
-    const char* start = url;
-
-    /* 跳过协议前缀 */
-    if (strncmp(url, "http://", 7) == 0) {
-        start += 7;
-        *port = 80;
-    } else if (strncmp(url, "https://", 8) == 0) {
-        start += 8;
-        *port = 443;
-    } else {
-        start = url;
-        *port = 80;
-    }
-
-    /* 提取主机和路径 */
-    const char* slash = strchr(start, '/');
-    if (slash) {
-        size_t host_len = slash - start;
-        if (host_len >= 256) host_len = 255;
-        strncpy(host, start, host_len);
-        host[host_len] = '\0';
-
-        size_t path_len = strlen(slash);
-        if (path_len >= 512) path_len = 511;
-        strncpy(path, slash, path_len);
-        path[path_len] = '\0';
-    } else {
-        strncpy(host, start, 255);
-        host[255] = '\0';
-        strncpy(path, "/", 511);
-        path[511] = '\0';
-    }
-
-    /* 检查端口（主机:端口 格式） */
-    char* colon = strchr(host, ':');
-    if (colon) {
-        *port = atoi(colon + 1);
-        *colon = '\0';
-    }
-
-    return 0;
-}
-
-/**
  * @brief 将 network_af_t 转换为系统地址族
  * @param af AgentOS 地址族枚举
  * @return 系统地址族值

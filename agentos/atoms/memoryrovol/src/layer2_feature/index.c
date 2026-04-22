@@ -54,22 +54,6 @@ struct agentos_layer2_feature {
     uint32_t m;
 };
 
-/**
- * @brief 计算余弦相似�?
- */
-__attribute__((unused)) static float cosine_similarity(const float* a, const float* b, uint32_t dim) {
-    float dot = 0.0f;
-    float norm_a = 0.0f;
-    float norm_b = 0.0f;
-    for (uint32_t i = 0; i < dim; i++) {
-        dot += a[i] * b[i];
-        norm_a += a[i] * a[i];
-        norm_b += b[i] * b[i];
-    }
-    if (norm_a == 0 || norm_b == 0) return 0.0f;
-    return dot / (sqrtf(norm_a) * sqrtf(norm_b));
-}
-
 /* 使用预计算范数的余弦相似度计算 */
 static float cosine_similarity_precomputed(const float* a, const float* b, float a_norm_sq, float b_norm_sq, uint32_t dim) {
     float dot = 0.0f;

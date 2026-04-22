@@ -80,8 +80,6 @@ agentos_error_t agentos_clustering_engine_cluster(
     if (!engine || !vectors || count == 0 || !out_labels || !out_num_clusters)
         return AGENTOS_EINVAL;
 
-    size_t dim __attribute__((unused)) = 384; // 实际应从参数获取
-
 #ifdef HAVE_HDBSCAN
     // Use HDBSCAN for clustering
     hdbscan_input input;
