@@ -268,7 +268,11 @@ AgentOS 是**操作系统级**产品，而非单一框架：
 Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 → 合并主分支
 ```
 
-**主要平台**：[AtomGit](https://atomgit.com/spharx/agentos)（推荐） · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)    
+**主要平台**：[AtomGit](https://atomgit.com/spharx/agentos)（推荐） · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)
+
+### 贡献者名单
+
+详见 [AUTHORS.md](AUTHORS.md)    
 
 
 ## 📜 许可证  

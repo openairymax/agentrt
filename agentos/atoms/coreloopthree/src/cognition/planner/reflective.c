@@ -3,7 +3,7 @@
  * @brief 反思式规划策略 - 生产级双思考实现
  * @copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
- * STUB-003修复: 替换mock S1/S2为真实LLM调用接口
+ * [✅ STUB-003已完成] mock S1/S2已替换为真实LLM调用接口
  * 实现完整5阶段推理管线:
  * - Phase 0: 指令拆解(S1) -> 识别子任务
  * - Phase 1: 规划生成(S2+S1) -> 构建依赖链

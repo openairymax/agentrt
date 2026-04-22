@@ -24,10 +24,6 @@
 
 /* ==================== 内部常量 ==================== */
 
-/** @brief 安全标识符字符集 */
-static const char* SAFE_IDENTIFIER_CHARS __attribute__((unused)) = 
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
-
 /** @brief 危险Shell命令 */
 static const char* DANGEROUS_COMMANDS[] = {
     "rm -rf", "dd", "mkfs", "fdisk", "format",

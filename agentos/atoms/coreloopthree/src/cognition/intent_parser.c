@@ -404,11 +404,6 @@ static size_t extract_entities_from_text(const char* text, extracted_entity_t* e
     char* keywords[MAX_KEYWORDS];
     size_t keyword_count = extract_keywords(text, keywords, MAX_KEYWORDS);
 
-    // 定义一些简单的实体类型映射
-    __attribute__((unused)) const char* number_words[] = {"一", "二", "三", "四", "五", "六", "七", "八", "九", "十",
-                                   "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
-                                   "first", "second", "third", "fourth", "fifth", NULL};
-
     for (size_t i = 0; i < keyword_count && count < max_entries; i++) {
         const char* keyword = keywords[i];
         char* type = NULL;

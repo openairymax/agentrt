@@ -28,20 +28,6 @@ typedef struct binding_context {
     binder_config_t manager;
 } binding_context_t;
 
-__attribute__((unused))
-static binding_context_t* binder_create_context(void) {
-    binding_context_t* ctx = (binding_context_t*)AGENTOS_CALLOC(1, sizeof(binding_context_t));
-    if (!ctx) return NULL;
-    ctx->manager.similarity_threshold = 0.7f;
-    ctx->manager.max_bindings_per_entity = 10;
-    return ctx;
-}
-
-__attribute__((unused))
-static void binder_free_context(binding_context_t* ctx) {
-    if (ctx) AGENTOS_FREE(ctx);
-}
-
 agentos_error_t agentos_layer3_bind_entities(
     const char* entity_a,
     const char* entity_b,

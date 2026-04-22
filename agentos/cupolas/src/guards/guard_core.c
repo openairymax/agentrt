@@ -96,8 +96,8 @@ static void sort_guards_by_priority(guard_manager_private_t* manager) {
     qsort(manager->guards, manager->guard_count, sizeof(guard_t*), compare_guard_priority);
 }
 
-// 复制检测上下文
-__attribute__((unused)) static guard_context_t* copy_guard_context(const guard_context_t* src) {
+// 复制检测上下文 - [INFRA] 保留供未来守卫上下文复制使用
+static guard_context_t* copy_guard_context(const guard_context_t* src) {
     if (!src) return NULL;
     
     guard_context_t* dst = (guard_context_t*)calloc(1, sizeof(guard_context_t));
@@ -125,8 +125,8 @@ __attribute__((unused)) static guard_context_t* copy_guard_context(const guard_c
     return dst;
 }
 
-// 释放检测上下文
-__attribute__((unused)) static void free_guard_context(guard_context_t* context) {
+// 释放检测上下文 - [INFRA] 保留供未来守卫上下文释放使用
+static void free_guard_context(guard_context_t* context) {
     if (!context) return;
     
     if (context->operation) free((void*)context->operation);

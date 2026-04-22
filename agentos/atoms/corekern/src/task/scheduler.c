@@ -35,15 +35,14 @@
 /* ==================== 类型适配辅助 ==================== */
 
 /**
- * @brief 用户线程入口函数适配器
- *
- * 将用户提供的 void (*func)(void*) 转换为 void* (*entry)(void*) 格式
+ * @brief 将用户提供的 void (*func)(void*) 转换为 void* (*entry)(void*) 格式
  *
  * @param user_func 用户线程入口函数
  * @param arg 线程参数
  * @return 始终返回NULL（用户函数无返回值）
+ * @note [INFRA] 线程适配器 - 保留供未来线程模型扩展使用
  */
-__attribute__((unused)) static void* user_thread_entry_adapter(void* (*user_func)(void*), void* arg)
+static void* user_thread_entry_adapter(void* (*user_func)(void*), void* arg)
 {
     /* 用户函数是 void (*func)(void*)，我们调用它并返回NULL */
     user_func(arg);

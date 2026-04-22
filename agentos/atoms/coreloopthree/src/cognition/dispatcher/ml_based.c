@@ -22,33 +22,6 @@ typedef struct ml_dispatch_data {
     float learning_rate;
 } ml_dispatch_data_t;
 
-__attribute__((unused))
-static float compute_model_score(
-    ml_dispatch_data_t* data,
-    const char* model_name,
-    const char* task_type) {
-    if (!data || !model_name) return 0.0f;
-
-    float base_score = 0.5f;
-
-    for (size_t i = 0; i < data->model_count; i++) {
-        if (strcmp(data->model_names[i], model_name) == 0) {
-            if (i < data->weight_count) {
-                base_score = data->model_weights[i];
-            }
-            break;
-        }
-    }
-
-    if (task_type) {
-        if (strstr(task_type, "code")) base_score *= 1.2f;
-        else if (strstr(task_type, "reasoning")) base_score *= 1.1f;
-        else if (strstr(task_type, "creative")) base_score *= 0.9f;
-    }
-
-    return fminf(base_score, 1.0f);
-}
-
 static agentos_error_t ml_dispatch(
     const agentos_task_node_t* task,
     const void** candidates,

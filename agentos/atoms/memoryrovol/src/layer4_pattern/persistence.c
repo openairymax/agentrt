@@ -24,24 +24,6 @@ typedef struct {
     size_t capacity;
 } feature_collector_t;
 
-__attribute__((unused)) static void collector_add(feature_collector_t* col, int dim, double birth, double death) {
-    if (col->count >= col->capacity) {
-        col->capacity = (col->capacity == 0) ? 16 : col->capacity * 2;
-        agentos_persistence_feature_t** new_f = (agentos_persistence_feature_t**)AGENTOS_REALLOC(
-            col->features, col->capacity * sizeof(agentos_persistence_feature_t*));
-        if (!new_f) return;
-        col->features = new_f;
-    }
-    agentos_persistence_feature_t* f = (agentos_persistence_feature_t*)AGENTOS_MALLOC(sizeof(agentos_persistence_feature_t));
-    if (!f) return;
-    f->dimension = dim;
-    f->birth = birth;
-    f->death = death;
-    f->persistence = death - birth;
-    f->confidence = 1.0;
-    col->features[col->count++] = f;
-}
-
 #ifdef HAVE_RIPSER
 static void ripser_callback(double birth, double death, int dim, void* user) {
     feature_collector_t* col = (feature_collector_t*)user;
