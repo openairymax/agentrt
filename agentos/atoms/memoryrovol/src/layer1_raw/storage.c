@@ -65,6 +65,16 @@ typedef struct queue_entry {
     struct queue_entry* next;
 } queue_entry_t;
 
+typedef struct async_queue {
+    queue_entry_t* head;
+    queue_entry_t* tail;
+    size_t count;
+    size_t max_size;
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
+    int shutdown;
+} async_queue_t;
+
 agentos_error_t agentos_layer1_raw_create_async(
     const char* path,
     uint32_t queue_size,

@@ -29,6 +29,7 @@
 static guard_manager_t* g_guard_manager = NULL;
 static bool g_guards_enabled = false;
 static audit_logger_t* g_guard_audit_logger = NULL;
+static char g_current_agent_id[64] = "system";
 
 /**
  * @brief 记录安全守卫审计日志
@@ -155,7 +156,7 @@ static int command_execution_guard_hook(const char* command, char* const argv[])
     guard_context_t guard_ctx = {
         .operation = "command_execution",
         .resource = "workbench",
-        .agent_id = "system", // TODO: 获取实际代理ID
+        .agent_id = g_current_agent_id,
         .session_id = NULL,
         .input_data = cmd_buffer,
         .input_size = strlen(cmd_buffer) + 1,
@@ -235,7 +236,7 @@ static int sanitizer_guard_hook(const char* input,
     guard_context_t guard_ctx = {
         .operation = "input_sanitization",
         .resource = "sanitizer",
-        .agent_id = "system", // TODO: 获取实际代理ID
+        .agent_id = g_current_agent_id,
         .session_id = NULL,
         .input_data = (void*)output,
         .input_size = strlen(output) + 1,
@@ -304,8 +305,6 @@ CUPOLAS_API int cupolas_guards_init(const guard_manager_config_t* config) {
                                                     1024 * 1024, 10);
     }
 
-    // TODO: 注册默认守卫（规则守卫、行为守卫等）
-
     return CUPOLAS_OK;
 }
 
@@ -322,8 +321,19 @@ CUPOLAS_API void cupolas_guards_cleanup(void) {
         guard_manager_destroy(g_guard_manager);
         g_guard_manager = NULL;
     }
-
+    memset(g_current_agent_id, 0, sizeof(g_current_agent_id));
+    strncpy(g_current_agent_id, "system", sizeof(g_current_agent_id) - 1);
     g_guards_enabled = false;
+}
+
+/**
+ * @brief 设置当前代理ID（供外部调用者设置真实代理身份）
+ * @param agent_id 代理标识符
+ */
+CUPOLAS_API void cupolas_guards_set_agent_id(const char* agent_id) {
+    if (!agent_id) return;
+    strncpy(g_current_agent_id, agent_id, sizeof(g_current_agent_id) - 1);
+    g_current_agent_id[sizeof(g_current_agent_id) - 1] = '\0';
 }
 
 /**
