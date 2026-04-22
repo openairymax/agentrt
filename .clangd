@@ -1,0 +1,125 @@
+# AgentOS clangd configuration - Root project level
+# Generated: 2026-04-22
+# Purpose: Resolve all CMake include paths, eliminate IDE false-positive diagnostics
+# Scope: Applies to all source files in the project (hierarchical clangd config)
+
+CompileFlags:
+  CompilationDatabase: /home/spharx/SpharxWorks/OpenAirymax/AgentOS/AgentOS-build
+
+  Add:
+    # =============================================
+    # Standard C settings
+    # =============================================
+    - -std=c11
+    - -D_GNU_SOURCE
+    - -D_POSIX_C_SOURCE=200809L
+
+    # =============================================
+    # atoms/ modules (core kernel)
+    # =============================================
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/atoms/corekern/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/atoms/coreloopthree/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/atoms/memoryrovol/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/atoms/syscall/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/atoms/threelevelmemory/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/atoms/memmap/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/atoms/memorypool/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/atoms/memorycompact/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/atoms/taskflow/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/atoms/taskflow/src
+
+    # =============================================
+    # commons/ modules (unified base library)
+    # =============================================
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/commons/utils/memory/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/commons/utils/string/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/commons/utils/token/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/commons/utils/network/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/commons/utils/security/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/commons/utils/resource/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/commons/utils/uuid/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/commons/utils/strategy/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/commons/utils/config_unified/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/commons/utils/error
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/commons/utils/types/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/commons/utils/compat/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/commons/utils/platform/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/commons/utils/io/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/commons/utils/logging/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/commons/utils/sync/include
+
+    # =============================================
+    # cupolas/ modules (security dome)
+    # =============================================
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/cupolas/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/cupolas/src
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/cupolas/src/security
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/cupolas/src/sanitizer
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/cupolas/src/guards
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/cupolas/src/utils
+
+    # =============================================
+    # daemon/ modules (user-space services)
+    # =============================================
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/daemon/common/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/daemon/common/src
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/daemon/common/types/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/daemon/common/protocol/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/daemon/common/utils/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/daemon/common/config/include
+
+    # =============================================
+    # heapstore/ modules (runtime data store)
+    # =============================================
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/heapstore/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/heapstore/src
+
+    # =============================================
+    # gateway/ modules (unified gateway)
+    # =============================================
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/gateway/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/gateway/src
+
+    # =============================================
+    # manager/ modules (unified config)
+    # =============================================
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/manager/include
+    -I/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/manager/src
+
+    # =============================================
+    # System includes
+    # =============================================
+    -I/usr/include
+
+  Remove:
+    # Remove warning suppressions that hide real issues
+    -Wno-*
+    # Remove -Werror to allow diagnostics to show as warnings
+    -Werror
+
+# Diagnostics configuration
+Diagnostics:
+  UnusedIncludes: Strict
+  MissingIncludes: Yes
+  ClangTidy:
+    Add:
+      - bugprone-*
+      - performance-*
+      - readability-*
+    Remove:
+      # These are noise for large codebases
+      - readability-magic-numbers
+      - readability-identifier-length
+      - bugprone-easily-swappable-parameters
+      - llvm-header-guard
+
+# Hover information
+Hover:
+  ShowAKA: Yes
+  ShowOrigins: Yes
+  ShowIncludeInsertion: Yes
+
+# Index configuration
+Index:
+  StandardLibrary: Yes
+  Background: Build
