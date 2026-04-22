@@ -75,6 +75,24 @@ size_t agentos_token_count(const char* text, const agentos_token_config_t* confi
     return count;
 }
 
+static size_t count_tokens_by_model(const char* model_name, const char* text, size_t length) {
+    agentos_token_config_t config = AGENTOS_TOKEN_CONFIG_DEFAULT;
+
+    if (model_name) {
+        if (strstr(model_name, "gpt-4") || strstr(model_name, "gpt-4o")) {
+            config.model_type = AGENTOS_TOKEN_MODEL_GPT4;
+        } else if (strstr(model_name, "gpt-35") || strstr(model_name, "gpt-3.5")) {
+            config.model_type = AGENTOS_TOKEN_MODEL_GPT35;
+        } else if (strstr(model_name, "claude")) {
+            config.model_type = AGENTOS_TOKEN_MODEL_CLAUDE;
+        } else if (strstr(model_name, "llama") || strstr(model_name, "vicuna") || strstr(model_name, "alpaca")) {
+            config.model_type = AGENTOS_TOKEN_MODEL_LLAMA;
+        }
+    }
+
+    return agentos_token_standard_count(text, length, &config);
+}
+
 agentos_token_counter_t* agentos_token_counter_create(const char* model_name) {
     if (!model_name) {
         return NULL;
