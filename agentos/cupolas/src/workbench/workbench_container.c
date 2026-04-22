@@ -217,93 +217,6 @@ static int execute_command(const char* cmd, int timeout_ms, char* output, size_t
     return result;
 }
 
-/**
- * @brief Build docker command string from handle configuration
- * @param[in] handle Container handle with configuration
- * @param[in] action Docker action (run, create, etc.)
- * @return Static buffer containing command string
- * @warning SECURITY: Callers MUST validate all user-supplied fields
- *          (image, command, args[], workdir, network_mode, env_vars[])
- *          via is_safe_image_name() before using the returned command.
- * @note Currently unused (dead code) — container_start() uses inline snprintf.
- *       If re-activated, add is_safe_image_name checks for each field.
- */
-__attribute__((unused)) static char* build_docker_command(container_handle_t* handle, const char* action) {
-    static char cmd[MAX_COMMAND_LENGTH];
-    size_t pos = 0;
-
-    pos += snprintf(cmd + pos, MAX_COMMAND_LENGTH - pos, "docker %s", action);
-
-    if (handle->manager.image) {
-        pos += snprintf(cmd + pos, MAX_COMMAND_LENGTH - pos, " --rm");
-        pos += snprintf(cmd + pos, MAX_COMMAND_LENGTH - pos, " -i");
-    }
-
-    if (strcmp(action, "run") == 0) {
-        if (handle->manager.resources.memory_limit > 0) {
-            pos += snprintf(cmd + pos, MAX_COMMAND_LENGTH - pos,
-                           " --memory=%zu", handle->manager.resources.memory_limit);
-        }
-
-        if (handle->manager.resources.cpu_shares > 0) {
-            pos += snprintf(cmd + pos, MAX_COMMAND_LENGTH - pos,
-                           " --cpu-shares=%d", handle->manager.resources.cpu_shares);
-        }
-
-        if (handle->manager.resources.cpu_quota > 0) {
-            pos += snprintf(cmd + pos, MAX_COMMAND_LENGTH - pos,
-                           " --cpu-quota=%d", handle->manager.resources.cpu_quota);
-        }
-
-        if (handle->manager.resources.pids_limit > 0) {
-            pos += snprintf(cmd + pos, MAX_COMMAND_LENGTH - pos,
-                           " --pids-limit=%d", handle->manager.resources.pids_limit);
-        }
-
-        if (handle->manager.resources.network_mode) {
-            pos += snprintf(cmd + pos, MAX_COMMAND_LENGTH - pos,
-                           " --network=%s", handle->manager.resources.network_mode);
-        }
-
-        if (handle->manager.resources.readonly_rootfs) {
-            pos += snprintf(cmd + pos, MAX_COMMAND_LENGTH - pos, " --read-only");
-        }
-
-        if (handle->manager.workdir) {
-            pos += snprintf(cmd + pos, MAX_COMMAND_LENGTH - pos,
-                           " -w %s", handle->manager.workdir);
-        }
-
-        for (size_t i = 0; i < handle->manager.env_count && handle->manager.env_vars; i++) {
-            pos += snprintf(cmd + pos, MAX_COMMAND_LENGTH - pos,
-                           " -e %s", handle->manager.env_vars[i]);
-        }
-
-        if (handle->manager.logging.enable_logging) {
-            pos += snprintf(cmd + pos, MAX_COMMAND_LENGTH - pos,
-                           " --log-driver=%s", handle->manager.logging.log_driver);
-            pos += snprintf(cmd + pos, MAX_COMMAND_LENGTH - pos,
-                           " --log-opt max-size=%zu", handle->manager.logging.log_max_size);
-            pos += snprintf(cmd + pos, MAX_COMMAND_LENGTH - pos,
-                           " --log-opt max-file=%d", handle->manager.logging.log_max_files);
-        }
-    }
-
-    if (handle->manager.image) {
-        pos += snprintf(cmd + pos, MAX_COMMAND_LENGTH - pos, " %s", handle->manager.image);
-    }
-
-    if (handle->manager.command) {
-        pos += snprintf(cmd + pos, MAX_COMMAND_LENGTH - pos, " %s", handle->manager.command);
-    }
-
-    for (size_t i = 0; i < handle->manager.args_count && handle->manager.args; i++) {
-        pos += snprintf(cmd + pos, MAX_COMMAND_LENGTH - pos, " %s", handle->manager.args[i]);
-    }
-
-    return cmd;
-}
-
 int container_pull_image(void* mgr, const char* image) {
     if (!mgr || !image) return cupolas_ERROR_INVALID_ARG;
 
@@ -311,7 +224,6 @@ int container_pull_image(void* mgr, const char* image) {
         return cupolas_ERROR_PERMISSION;
     }
 
-    container_handle_t* handle __attribute__((unused)) = (container_handle_t*)mgr;
     char cmd[MAX_COMMAND_LENGTH];
     snprintf(cmd, MAX_COMMAND_LENGTH, "docker pull %s", image);
 

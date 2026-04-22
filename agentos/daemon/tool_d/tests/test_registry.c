@@ -227,7 +227,7 @@ static void test_registry_list_json_empty(void) {
 static void test_registry_null_param(void) {
     printf("  test_registry_null_param...\n");
 
-    int ret = tool_registry_add(NULL, NULL, NULL);
+    int ret = tool_registry_add(NULL, NULL);
     assert(ret != 0);
 
     tool_metadata_t meta;

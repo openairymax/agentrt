@@ -145,12 +145,14 @@ target_include_directories(gateway_d PRIVATE
 set(GATEWAY_LIB_SOURCES
     ${GATEWAY_SRC_DIR}/gateway/gateway_api.c
     ${GATEWAY_SRC_DIR}/gateway/http_gateway.c
+    ${GATEWAY_SRC_DIR}/gateway/http_gateway_routes.c
     ${GATEWAY_SRC_DIR}/gateway/ws_gateway.c
     ${GATEWAY_SRC_DIR}/gateway/stdio_gateway.c
     ${GATEWAY_SRC_DIR}/utils/jsonrpc.c
     ${GATEWAY_SRC_DIR}/utils/syscall_router.c
     ${GATEWAY_SRC_DIR}/utils/gateway_rpc_handler.c
     ${GATEWAY_SRC_DIR}/utils/gateway_protocol_handler.c
+    ${GATEWAY_SRC_DIR}/utils/gateway_rate_limiter.c
 )
 
 # 创建 gateway 库对象（不安装，仅供 gateway_d 使用）

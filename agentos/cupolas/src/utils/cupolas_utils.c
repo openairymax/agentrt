@@ -9,19 +9,6 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-/* 简单的字符串复制实现 */
-char* cupolas_strdup(const char* str) {
-    if (!str) return NULL;
-    
-    size_t len = strlen(str) + 1;
-    char* dup = (char*)malloc(len);
-    if (dup) {
-        memcpy(dup, str, len);
-    }
-    return dup;
-}
-
-/* 安全的字符串复制 */
 size_t cupolas_strlcpy(char* dst, const char* src, size_t size) {
     if (!dst || size == 0) return 0;
     if (!src) {

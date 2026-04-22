@@ -7,13 +7,13 @@
 #include "../include/forgetting.h"
 #include "../include/layer1_raw.h"
 #include "../include/layer2_feature.h"
-#include "../../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include <math.h>
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
 
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 
 #define ADAPTIVE_SAMPLE_SIZE 50      /* 自适应学习所需的最小样本数 */

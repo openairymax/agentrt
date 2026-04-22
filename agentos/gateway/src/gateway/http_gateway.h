@@ -119,6 +119,27 @@ int handle_http_request(void* cls, struct MHD_Connection* connection,
                         const char* version, const char* upload_data,
                         size_t* upload_data_size, void** con_cls);
 
+/**
+ * @brief 应用安全HTTP响应头
+ * 
+ * 添加安全相关的HTTP头，如X-Content-Type-Options, X-Frame-Options等
+ * 
+ * @param response MHD响应对象
+ */
+void gateway_apply_security_headers(struct MHD_Response* response);
+
+/**
+ * @brief 解析JSON请求体
+ * 
+ * @param gateway HTTP网关实例
+ * @param context 请求上下文
+ * @param data 请求体数据
+ * @param size 数据大小
+ * @return 0成功，非0失败
+ */
+int parse_json_request(http_gateway_t* gateway, http_request_context_t* context, 
+                       const char* data, size_t size);
+
 #ifdef __cplusplus
 }
 #endif

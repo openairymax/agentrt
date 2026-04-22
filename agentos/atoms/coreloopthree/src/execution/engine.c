@@ -6,7 +6,7 @@
 
 #include "../../include/execution.h"
 #include "../../include/agent_registry.h"
-#include "../../../atoms/corekern/include/agentos.h"
+#include "agentos.h"
 #include "logging_compat.h"
 #include "../../include/id_utils.h"
 #include "../../include/error_utils.h"
@@ -14,7 +14,7 @@
 #include <stdint.h>
 
 /* Unified base library compatibility layer */
-#include "include/memory_compat.h"
+#include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
 #include <stdio.h>
