@@ -1,7 +1,11 @@
 /**
  * @file ml_planner.c
- * @brief ML-based planning strategy with graceful degradation
+ * @brief ML-based planning strategy with rule-based primary path
  * @copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * [DESIGN] Rule-based planning is the current production implementation.
+ * ML runtime integration (ONNX/TFLite) is planned for v2.0 to enhance
+ * planning quality with learned task decomposition patterns.
  */
 
 #include "../include/cognition.h"
@@ -15,7 +19,7 @@
 #include <stddef.h>
 
 /**
- * @brief Simple model inference interface (placeholder for actual ML runtime)
+ * @brief ML model handle (for future ML runtime integration)
  */
 typedef struct ml_model {
     void* handle;
@@ -27,7 +31,7 @@ typedef struct ml_planner_data {
     char* model_path;
     void* llm;
     agentos_mutex_t* lock;
-    bool fallback_mode;
+    bool rule_based_active;  /* True when using rule-based planning (current production path) */
 } ml_planner_data_t;
 
 static void ml_planner_destroy(agentos_plan_strategy_t* strategy) {
@@ -49,38 +53,29 @@ static void ml_planner_destroy(agentos_plan_strategy_t* strategy) {
 }
 
 /**
- * @brief Attempt to load ML model from path
+ * @brief Initialize model handle (currently uses rule-based planning)
  *
- * When no model runtime is available, sets fallback_mode=true
- * and generates simple heuristic plans instead.
+ * This function prepares the planner for rule-based planning, which is
+ * the current production-safe primary path. ML runtime integration
+ * will be added in v2.0.
  */
 static bool ml_planner_try_load_model(ml_planner_data_t* data) {
-    if (!data || !data->model_path) return false;
-
-    /* Check if model file exists */
-    FILE* f = fopen(data->model_path, "rb");
-    if (!f) {
-        AGENTOS_LOG_INFO("ML planner: model file not found, using fallback mode");
-        data->fallback_mode = true;
-        return false;
-    }
-    fclose(f);
+    if (!data) return false;
 
     /* [DESIGN] Rule-based planning is the current primary path.
      * ML runtime integration (ONNX/TFLite) is planned for v2.0
-     * to enhance planning quality with learned task decomposition patterns.
-     * Fallback mode provides production-safe degradation when ML unavailable. */
+     * to enhance planning quality with learned task decomposition patterns. */
     data->model = (ml_model_t*)AGENTOS_CALLOC(1, sizeof(ml_model_t));
     if (!data->model) {
-        data->fallback_mode = true;
+        data->rule_based_active = true;
         return false;
     }
 
     data->model->handle = NULL;
     data->model->predict = NULL;
-    data->fallback_mode = true;
+    data->rule_based_active = true;
 
-    AGENTOS_LOG_INFO("ML planner: model placeholder initialized, fallback mode active");
+    AGENTOS_LOG_INFO("ML planner: rule-based planning initialized, ML integration planned for v2.0");
     return true;
 }
 
@@ -456,7 +451,7 @@ agentos_plan_strategy_t* agentos_plan_ml_create(
         return NULL;
     }
     data->llm = llm;
-    data->fallback_mode = false;
+    data->rule_based_active = false;
     data->lock = agentos_mutex_create();
     if (!data->lock) {
         if (data->model_path) AGENTOS_FREE(data->model_path);
@@ -469,7 +464,7 @@ agentos_plan_strategy_t* agentos_plan_ml_create(
     if (model_path) {
         ml_planner_try_load_model(data);
     } else {
-        data->fallback_mode = true;
+        data->rule_based_active = true;
         AGENTOS_LOG_INFO("ML planner: no model path, using rule-based planning");
     }
 

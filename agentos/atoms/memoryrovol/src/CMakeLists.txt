@@ -26,6 +26,7 @@ add_library(agentos_memoryrovol STATIC
     layer4_pattern/persistence.c
     layer4_pattern/rules.c
     layer4_pattern/validator.c
+    layer4_pattern/layer4_pattern.c
     retrieval/attractor.c
     retrieval/cache.c
     retrieval/energy.c
