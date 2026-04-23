@@ -1,86 +1,44 @@
-# openlab Contrib - Planning Strategies (规划策略包)
+# Planning — 规划策略
 
-<div align="center">
+`openlab/contrib/strategies/planning/` 提供智能体的任务规划策略，负责将复杂目标分解为可执行的步骤序列。
 
-[![Version](https://img.shields.io/badge/version-v1.0.0.9-blue.svg)](../../../README.md)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](../../../../LICENSE)
-[![Status](https://img.shields.io/badge/status-active%20development-yellow.svg)](../../../README.md)
+## 核心能力
 
-**版本**: v1.0.0.9 | **更新日期**: 2026-03-25
+- **目标分解**：将高层次目标拆解为可执行的子任务
+- **依赖分析**：识别任务间的依赖关系，确定执行顺序
+- **资源评估**：评估执行每个子任务所需的资源
+- **计划优化**：基于约束条件优化执行计划
 
-</div>
+## 规划流程
 
-## 📊 功能完成度
-
-- **核心功能**: 85% 🔄
-- **单元测试**: 80% 🔄
-- **文档完善度**: 90% ✅
-- **开发状态**: 积极开发中 🟡
-
-## 🎯 概述
-
-Planning Strategies 是 openlab 的任务规划策略包，提供多种智能规划算法，帮助 Agent 高效分解复杂任务并生成最优执行路径。
-
-### 核心功能
-
-- **分层规划**: 自顶向下任务分解
-- **反应式规划**: 实时响应环境变化
-- **反思式规划**: 执行失败后自我调整
-- **DAG 规划**: 有向无环图依赖管理
-- **增量规划**: 动态扩展任务图
-
-## 🛠️ 主要变更 (v1.0.0.9)
-
-- ✨ **新增**: 基于思维链（CoT）的规划器
-- ✨ **新增**: 任务依赖关系自动推断
-- 🚀 **优化**: 规划速度提升 50%
-- 🚀 **优化**: 复杂任务分解成功率提升至 93%
-- 📝 **完善**: 添加规划质量评估指标
-
-## 🔧 使用示例
-
-```python
-from openlab.contrib.strategies.planning import (
-    HierarchicalPlanner,
-    ReactivePlanner,
-    ReflectivePlanner
-)
-
-# 分层规划器
-planner_h = HierarchicalPlanner(max_depth=5)
-dag = planner_h.plan("Build a web app", requirements)
-
-# 反应式规划器
-planner_r = ReactivePlanner()
-dag = planner_r.plan(goal, real_time_context)
-
-# 反思式规划器
-planner_ref = ReflectivePlanner()
-dag = planner_ref.plan(complex_task)
-if execution_failed:
-    adjusted_dag = planner_ref.reflect_and_adjust(dag)
+```
+目标输入 → 目标分解 → 依赖分析 → 资源评估 → 计划生成 → 计划执行
+    ↓          ↓          ↓          ↓          ↓          ↓
+ 用户需求   子任务列表   DAG 图    资源分配   时间线    执行引擎
 ```
 
-## 📈 性能指标
+## 使用方式
 
-| 指标 | 数值 | 测试条件 |
-|------|------|---------|
-| 规划速度 | < 100ms | 中等复杂度任务 |
-| 分解成功率 | 93% | 复杂任务测试集 |
-| 执行效率 | +40% | 相比无规划 |
+```python
+from contrib.strategies.planning import PlanningStrategy
 
-## 🤝 贡献指南
+planner = PlanningStrategy()
 
-欢迎贡献代码或提出改进建议！
+# 生成执行计划
+plan = planner.create_plan(
+    goal="开发一个 REST API 服务",
+    constraints={
+        "deadline": "2024-02-01",
+        "team_size": 3,
+        "tech_stack": ["Python", "FastAPI"]
+    }
+)
 
-## 📞 联系方式
-
-- **维护者**: openlab 社区
-- **技术支持**: lidecheng@spharx.cn
-- **问题反馈**: https://github.com/SpharxTeam/AgentOS/issues
+# 查看计划步骤
+for step in plan.steps:
+    print(f"{step.id}: {step.description} ({step.estimated_hours}h)")
+```
 
 ---
 
-© 2026 SPHARX Ltd. All Rights Reserved.
-
-*"From data intelligence emerges 始于数据，终于智能。"*
+*AgentOS OpenLab — Planning Strategy*

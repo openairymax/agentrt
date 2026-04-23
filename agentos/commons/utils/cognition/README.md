@@ -1,203 +1,94 @@
-# 认知工具模块
+# Cognition — 认知管理
 
-**版本**: v1.0.0  
-**最后更新**: 2026-04-06  
-**许可证**: Apache License 2.0
+`commons/utils/cognition/` 提供 Agent 的认知管理能力，包括 Agent 信息管理、任务调度和计划生成。
 
----
+## 设计目标
 
-## 🎯 概述
+- **Agent 信息管理**：统一管理 Agent 的标识、能力、状态和元数据
+- **任务调度**：基于 Agent 能力和当前负载的任务分发
+- **计划生成**：根据目标自动生成执行计划，拆解为可执行的任务序列
 
-认知工具模块是AgentOS智能体操作系统的核心认知组件，提供多智能体协作中的计划生成、任务调度、结果协调等关键功能。本模块旨在减少认知相关代码的重复，提供统一的认知抽象接口。
+## 核心能力
 
-## 🏗️ 核心功能
+| 接口 | 说明 |
+|------|------|
+| `agent_info_register` | 注册 Agent 信息 |
+| `agent_info_query` | 查询 Agent 信息 |
+| `task_dispatch` | 分发任务到最优 Agent |
+| `plan_generate` | 根据目标生成执行计划 |
+| `plan_optimize` | 优化已有执行计划 |
+| `capability_match` | 能力匹配计算 |
 
-### 1. Agent信息管理
+## Agent 信息结构
 
-提供Agent性能统计和权重计算能力：
-
-```c
-// 初始化Agent信息
-agent_info_t agent;
-agent_info_init(&agent, "agent-001");
-
-// 更新性能统计
-agent_info_update_stats(&agent, true, 150);  // 成功，延迟150ms
-
-// 计算权重（用于调度决策）
-double weight = agent_info_calculate_weight(&agent);
-
-// 清理资源
-agent_info_cleanup(&agent);
-```
-
-**核心数据结构**:
-- `agent_info_t` - Agent基本信息与性能指标
-- `task_info_t` - 任务描述与优先级
-- `plan_result_t` - 计划生成结果
-- `dispatch_result_t` - 调度选择结果
-- `coordination_result_t` - 多Agent协调结果
-
-### 2. 任务调度与协调
-
-```c
-// 选择最佳Agent执行任务
-dispatch_result_t dispatch;
-cognition_select_best_agent(agents, agent_count, &task, &dispatch);
-
-// 生成执行计划
-plan_result_t plan;
-cognition_generate_plan(&task, &plan);
-
-// 协调多个Agent的结果
-coordination_result_t coord;
-cognition_coordinate_results(results, result_count, &coord);
-```
-
-### 3. 任务优先级计算
-
-```c
-// 基于截止时间和任务类型计算优先级
-uint64_t priority = cognition_calculate_task_priority(&task);
-
-// 评估计划质量（0-100分）
-int quality = cognition_evaluate_plan_quality(plan_content, &task);
-```
-
-## 🔧 主要API接口
-
-| 函数名 | 功能描述 | 复杂度 |
-|--------|---------|--------|
-| `agent_info_init()` | 初始化Agent信息 | O(1) |
-| `agent_info_update_stats()` | 更新性能统计 | O(1) |
-| `agent_info_calculate_weight()` | 计算Agent权重 | O(1) |
-| `cognition_select_best_agent()` | 选择最佳Agent | O(n) |
-| `cognition_generate_plan()` | 生成执行计划 | O(1) |
-| `cognition_coordinate_results()` | 协调多Agent结果 | O(n) |
-| `cognition_calculate_task_priority()` | 计算任务优先级 | O(1) |
-| `cognition_evaluate_plan_quality()` | 评估计划质量 | O(n) |
-
-## 📊 使用示例
-
-### 场景1：多Agent任务分配
-
-```c
-#include "cognition_common.h"
-
-int main() {
-    // 定义多个Agent
-    agent_info_t agents[3];
-    agent_info_init(&agents[0], "data-agent");
-    agent_info_init(&agents[1], "compute-agent");
-    agent_info_init(&agents[2], "storage-agent");
-    
-    // 模拟历史性能数据
-    for (int i = 0; i < 100; i++) {
-        agent_info_update_stats(&agents[0], true, 120 + rand() % 50);
-        agent_info_update_stats(&agents[1], true, 80 + rand() % 30);
-        agent_info_update_stats(&agents[2], true, 200 + rand() % 80);
-    }
-    
-    // 定义任务
-    task_info_t task;
-    task_info_init(&task, "task-001", "compute", "matrix_multiplication");
-    
-    // 选择最佳Agent
-    dispatch_result_t dispatch;
-    if (cognition_select_best_agent(agents, 3, &task, &dispatch) == 0) {
-        printf("Selected agent: %s (confidence: %.2f)\n",
-               dispatch.selected_agent, dispatch.confidence);
-    }
-    
-    // 清理资源
-    task_info_cleanup(&task);
-    for (int i = 0; i < 3; i++) {
-        agent_info_cleanup(&agents[i]);
-    }
-    dispatch_result_cleanup(&dispatch);
-    
-    return 0;
-}
-```
-
-### 场景2：计划生成与质量评估
-
-```c
-// 生成执行计划
-plan_result_t plan;
-cognition_generate_plan(&task, &plan);
-
-if (plan.success) {
-    printf("Generated plan (%zu bytes):\n%s\n", plan.plan_size, plan.plan);
-    
-    // 评估计划质量
-    int quality = cognition_evaluate_plan_quality(plan.plan, &task);
-    printf("Plan quality score: %d/100\n", quality);
-    
-    if (quality >= 80) {
-        printf("✅ Plan meets quality threshold\n");
-    } else {
-        printf("⚠️ Plan needs improvement\n");
+```json
+{
+    "agent_id": "agent-001",
+    "name": "CodeAssistant",
+    "capabilities": ["code_review", "refactoring", "testing"],
+    "status": "idle",
+    "load": 0.3,
+    "metadata": {
+        "version": "1.0.0",
+        "language": "python"
     }
 }
-
-plan_result_cleanup(&plan);
 ```
 
-## ⚠️ 注意事项
+## 使用示例
 
-### 内存管理
-- 所有带 `_init()` 后缀的结构体必须配对调用 `_cleanup()` 
-- 字符串字段由模块内部管理，调用者不应手动释放
-- `plan_result_t.plan` 和错误信息字符串在 cleanup 时自动释放
+### Agent 信息注册与查询
 
-### 线程安全
-- ✅ `agent_info_update_stats()` 是线程安全的（原子操作）
-- ⚠️ `cognition_select_best_agent()` 非线程安全，需外部加锁
-- ⚠️ 其他函数在单线程环境下使用
+```python
+from cognition import AgentInfoManager
 
-### 性能建议
-- 对于高频调用的场景，建议缓存 `agent_info_t` 权重值
-- 批量更新统计信息比逐次更新效率更高
-- 任务优先级计算考虑了时间因素，避免在热路径中频繁调用
+manager = AgentInfoManager()
 
-## 🔗 依赖关系
+# 注册 Agent
+manager.register(
+    agent_id="agent-001",
+    name="CodeAssistant",
+    capabilities=["code_review", "refactoring"],
+    metadata={"version": "1.0.0"}
+)
 
-### 上游依赖
-- **无** - 本模块是基础工具层，不依赖其他commons子模块
+# 查询 Agent
+agent = manager.query("agent-001")
+print(f"Agent: {agent.name}, Status: {agent.status}")
 
-### 下游使用者
-- **execution模块** - 使用调度结果指导命令执行
-- **strategy模块** - 结合加权评分算法优化选择逻辑
-- **CoreKern内核** - 多Agent协作的核心调度器
+# 按能力查找
+agents = manager.find_by_capability("code_review")
+for agent in agents:
+    print(f"Found: {agent.name}")
+```
 
-### 外部依赖
-- `<stdint.h>` - 整数类型定义
-- `<stdbool.h>` - 布尔类型
-- `<stddef.h>` - size_t 等类型
+### 任务分发
 
-## 📈 质量指标
+```python
+from cognition import TaskDispatcher
 
-| 指标 | 当前值 | 目标值 |
-|------|--------|--------|
-| 圈复杂度（平均） | 2.1 | <3.0 |
-| 代码重复率 | 0% | <5% |
-| Doxygen覆盖 | 100% | >95% |
-| 单元测试覆盖 | 待补充 | >90% |
+dispatcher = TaskDispatcher()
 
-## 🔄 版本历史
+# 分发任务
+task = {
+    "type": "code_review",
+    "priority": "high",
+    "payload": {"repo": "agentos", "pr": 42}
+}
 
-| 版本 | 日期 | 变更说明 |
-|------|------|---------|
-| v1.0.0 | 2026-04-06 | 初始版本，包含完整的Agent管理和任务调度功能 |
+selected_agent = dispatcher.dispatch(task)
+print(f"Task dispatched to: {selected_agent.name}")
+```
+
+## 配置选项
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| match_threshold | float | 0.7 | 能力匹配阈值 |
+| load_balance | bool | true | 是否启用负载均衡 |
+| max_plan_depth | int | 10 | 计划最大深度 |
+| cache_ttl | int | 300 | 缓存 TTL（秒） |
 
 ---
 
-## 📞 技术支持
-
-如有问题或建议，请提交Issue至项目仓库。
-
----
-
-**© 2026 SPHARX Ltd. All Rights Reserved.**  
-**"From data intelligence emerges."**
+*AgentOS Commons Utils — Cognition*
