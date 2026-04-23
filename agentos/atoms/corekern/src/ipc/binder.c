@@ -242,6 +242,8 @@ agentos_error_t agentos_ipc_init(void) {
  * @brief 清理 IPC 子系�?
  */
 void agentos_ipc_cleanup(void) {
+    if (!binder_global_lock) return;
+    
     agentos_mutex_lock(binder_global_lock);
     while (root_nodes) {
         binder_node_t* node = root_nodes;
@@ -259,10 +261,8 @@ void agentos_ipc_cleanup(void) {
     }
     agentos_mutex_unlock(binder_global_lock);
 
-    if (binder_global_lock) {
-        agentos_mutex_destroy_ptr(binder_global_lock);
-        binder_global_lock = NULL;
-    }
+    agentos_mutex_destroy(binder_global_lock);
+    binder_global_lock = NULL;
 }
 
 /**

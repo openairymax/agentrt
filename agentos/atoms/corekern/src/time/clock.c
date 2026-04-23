@@ -54,6 +54,14 @@ agentos_error_t agentos_time_nanosleep(uint64_t ns) {
     return AGENTOS_SUCCESS;
 }
 
+uint64_t agentos_time_realtime_ns(void) {
+    return agentos_time_current_ns();
+}
+
+agentos_error_t agentos_time_sleep_ms(uint32_t ms) {
+    return agentos_time_nanosleep((uint64_t)ms * 1000000ULL);
+}
+
 #else
 
 #include <time.h>
@@ -84,6 +92,14 @@ agentos_error_t agentos_time_nanosleep(uint64_t ns) {
     ts.tv_nsec = ns % 1000000000ULL;
     if (nanosleep(&ts, NULL) != 0) return AGENTOS_EINTR;
     return AGENTOS_SUCCESS;
+}
+
+uint64_t agentos_time_realtime_ns(void) {
+    return agentos_time_current_ns();
+}
+
+agentos_error_t agentos_time_sleep_ms(uint32_t ms) {
+    return agentos_time_nanosleep((uint64_t)ms * 1000000ULL);
 }
 
 #endif
