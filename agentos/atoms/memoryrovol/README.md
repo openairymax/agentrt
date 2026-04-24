@@ -1,98 +1,145 @@
-# MemoryRovol - AgentOS 记忆卷载核心模块
+# MemoryRovol — 记忆系统
 
 **路径**: `agentos/atoms/memoryrovol/`
-**版本**: v1.0.0.6
-**最后更新**: 2026-03-26
-**许可证**: Apache License 2.0
+
+MemoryRovol 是 AgentOS 的**记忆系统**，实现了一个从原始数据到深层模式的四层渐进式记忆架构。该系统受认知科学中"多存储模型"（Atkinson-Shiffrin）和"层次记忆模型"的启发，为智能体提供持久化、可检索、自演化的记忆能力。
 
 ---
 
-## 🎯 概述
+## 设计理念
 
-MemoryRovol 是 AgentOS 的内核级记忆系统，实现四层卷载架构：原始卷（L1）、特征层（L2）、结构层（L3）、模式层（L4）。
+MemoryRovol 的设计基于以下核心理念：
 
-它提供了完整的记忆存储、检索、抽象和进化能力，是智能体实现持续学习的基础。
+- **层次化记忆**: 记忆从具体到抽象，从短期到长期，分层次存储和处理
+- **渐进式抽象**: 数据在逐层传递中不断抽象和提炼，形成更高层次的知识
+- **自演化**: 记忆系统能自主学习，发现模式，持续优化记忆结构
+- **多模态**: 支持文本、向量、图结构等多种记忆形式的统一管理
 
-## 📁 模块结构
+---
+
+## 架构总览
+
 ```
-memoryrovol/
-├── CMakeLists.txt # 顶层构建文件
-├── README.md # 本文件
-├── include/ # 公共头文件
-│ ├── memoryrovol.h # 主接口
-│ ├── layer1_raw.h # L1原始卷接口
-│ ├── layer2_feature.h # L2特征层接口
-│ ├── layer3_structure.h # L3结构层接口
-│ ├── layer4_pattern.h # L4模式层接口
-│ ├── retrieval.h # 检索机制接口
-│ ├── forgetting.h # 遗忘机制接口
-│ └── manager.h # 配置结构
-└── src/ # 源代码
-├── layer1_raw/ # L1原始卷实现
-├── layer2_feature/ # L2特征层实现
-├── layer3_structure/ # L3结构层实现
-├── layer4_pattern/ # L4模式层实现
-├── retrieval/ # 检索机制实现
-└── forgetting/ # 遗忘机制实现
-```
-
-## 🔧 核心功能
-
-- **L1 原始卷**：基于文件系统的原始数据存储，支持分片、压缩和元数据索引。
-- **L2 特征层**：集成多种嵌入模型（OpenAI、DeepSeek、Sentence Transformers）和 FAISS 向量索引，支持混合检索（向量+BM25）。
-- **L3 结构层**：提供绑定算子、解绑算子、关系编码、时序编码和图编码，实现记忆的结构化表示。
-- **L4 模式层**：基于持久同调（Ripser）挖掘稳定模式，通过聚类生成可复用规则，并与进化委员会联动。
-- **检索机制**：吸引子网络检索、能量函数、上下文感知挂载、LRU缓存和交叉编码器重排序。
-- **遗忘机制**：支持艾宾浩斯曲线、线性衰减、访问计数等多种策略，自动裁剪低权重记忆。
-
-## 📦 依赖
-
-- FAISS (>=1.7.0)
-- SQLite3 (>=3.35)
-- libcurl (>=7.68)
-- cJSON (>=1.7.15)
-- OpenSSL (>=1.1.1)
-- 可选：Ripser、HDBSCAN、Sentence Transformers 库
-
-## 🚀 构建
-
-```bash
-mkdir build && cd build
-cmake ../agentos/atoms/memoryrovol -DBUILD_TESTS=ON
-make -j4
+                      ┌──────────────────────┐
+                      │   Application Layer   │
+                      └──────────┬───────────┘
+                                 │
+                      ┌──────────▼───────────┐
+                      │    Retriever (检索)   │
+                      │  吸引子网络 / 级联检索  │
+                      └──────────┬───────────┘
+                                 │
+    ┌────────────────────────────┼────────────────────────────┐
+    │                            │                            │
+    ▼                            ▼                            ▼
+┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
+│   L1: Raw Layer  │  │  L2: Feature     │  │  L3: Structure   │
+│   (原始数据层)    │  │  Layer (特征层)   │  │  Layer (结构层)   │
+│                  │  │                  │  │                  │
+│  FileSystem      │  │  FAISS 向量索引   │  │  图数据库        │
+│  SQLite          │  │  语义嵌入         │  │  知识图谱        │
+│  原始记录         │  │  相似度搜索       │  │  关系推理        │
+└──────┬───────────┘  └──────┬───────────┘  └──────┬───────────┘
+       │                     │                     │
+       └─────────────────────┼─────────────────────┘
+                             │
+                             ▼
+                    ┌──────────────────┐
+                    │  L4: Pattern     │
+                    │  Layer (模式层)   │
+                    │                  │
+                    │  TDA 拓扑分析     │
+                    │  HDBSCAN 聚类     │
+                    │  深层模式挖掘     │
+                    └──────────────────┘
 ```
 
-## 🔗 集成
+---
 
-- 上层模块（如 `coreloopthree/memory`）通过 FFI 接口头文件 `rov_ffi.h` 调用 MemoryRovol 的核心功能。
-- 该接口提供了 C 语言兼容的绑定，支持跨语言调用。
+## 四层架构
 
-配置初始化支持两种方式：
-1. **结构体配置**：直接填充 `agentos_memoryrov_config_t` 结构体并传入初始化函数。
-2. **JSON 配置**：传入 JSON 格式的配置文件路径或字符串，由内部解析器自动加载。
+### L1: 原始层 (Raw Layer)
+
+最基础的记忆层，存储未经处理的原始数据。
+
+- **存储介质**: 文件系统 + SQLite 数据库
+- **数据类型**: 文本记录、日志、交互历史、原始文档
+- **操作**: 写入、读取、按时间范围查询
+- **特点**: 低成本、高容量、持久化
+
+### L2: 特征层 (Feature Layer)
+
+对原始数据进行向量化处理，构建语义索引。
+
+- **存储引擎**: FAISS 向量索引库
+- **嵌入模型**: 支持多种嵌入模型（BERT、GPT 等）
+- **搜索能力**: 基于余弦相似度的语义搜索
+- **索引类型**: IVF、HNSW、Flat（根据场景选择）
+
+### L3: 结构层 (Structure Layer)
+
+保存知识的结构化表示，构建实体间的关联关系。
+
+- **存储引擎**: 图数据库
+- **数据类型**: 实体、关系、属性构成的知识图谱
+- **推理能力**: 基于图结构的路径发现和关系推理
+- **应用场景**: 概念关联、因果推断、知识推理
+
+### L4: 模式层 (Pattern Layer)
+
+最高层次的记忆抽象，自动发现和存储数据中的深层模式。
+
+- **分析方法**: 拓扑数据分析 (TDA)
+- **聚类算法**: HDBSCAN 层次聚类
+- **输出**: 行为模式、趋势规律、异常检测规则
+- **演化**: 持续学习，随着数据积累不断更新模式
+
+---
+
+## 检索机制
+
+MemoryRovol 实现了多种检索策略，可根据场景灵活组合：
+
+### 吸引子网络检索
+
+模拟大脑的吸引子网络机制，通过部分输入重建完整记忆：
+
 ```
-// 示例：通过结构体配置
-agentos_memoryrov_config_t manager = {
-    .storage_path = "/var/agentos/memory",
-    .embedding_model = "sentence-transformers/all-MiniLM-L6-v2",
-    .cache_size_mb = 512,
-    .forgetting_strategy = FORGET_EBBINGHAUS
-};
-rov_init(&manager);
-
-// 示例：通过 JSON 配置
-rov_init_from_json("../agentos/manager/memory_config.json");
+输入(部分线索) → 特征提取 → 吸引子网络 → 完整记忆输出
 ```
 
-## 📞 联系方式
+### 分层级联检索
 
-- **维护者**: AgentOS 架构委员会
-- **技术支持**: lidecheng@spharx.cn
-- **问题反馈**: https://github.com/SpharxTeam/AgentOS/issues
-- **官方仓库**: https://gitee.com/spharx/agentos
+从 L4 到 L1 逐层搜索，优先返回更高层次的抽象记忆：
+
+```
+L4(模式匹配) → L3(结构推理) → L2(语义搜索) → L1(原始查询)
+```
+
+### 混合搜索策略
+
+结合多种检索方式，综合评分排序：
+
+```python
+results = hybrid_search(
+    query="系统架构设计",
+    weights={
+        "semantic": 0.4,   # L2 语义相似度
+        "structural": 0.3, # L3 结构关联
+        "recency": 0.2,    # 时间衰减
+        "pattern": 0.1     # L4 模式匹配
+    }
+)
+```
+
+---
+
+## 与相关模块的关系
+
+- **CoreLoopThree**: 在执行循环和认知循环中使用 MemoryRovol 管理上下文和记忆
+- **CoreKern**: 利用微内核的内存管理能力
+- **Daemon 服务**: LLM_d 等守护进程通过 MemoryRovol 管理长时间窗口的记忆
 
 ---
 
 © 2026 SPHARX Ltd. All Rights Reserved.
-
-*"四层卷载，从原始数据到高级模式。"*

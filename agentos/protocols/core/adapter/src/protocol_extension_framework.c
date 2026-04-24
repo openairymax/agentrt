@@ -12,21 +12,6 @@
 #include <time.h>
 
 typedef struct {
-    agentos_protocol_type_t type;
-    const char* name;
-    int (*init)(void* context);
-    int (*destroy)(void* context);
-    int (*encode)(void* context, const void* msg, void** out_data, size_t* out_size);
-    int (*decode)(void* context, const void* data, size_t size, void* out_msg);
-    int (*connect)(void* context, const char* endpoint);
-    int (*disconnect)(void* context);
-    int (*is_connected)(void* context);
-    int (*send)(void* context, const void* data, size_t size);
-    int (*receive)(void* context, void** data, size_t* size, uint32_t timeout_ms);
-    int (*get_stats)(void* context, char* stats_json, size_t max_size);
-} local_adapter_t;
-
-typedef struct {
     proto_ext_descriptor_t descriptor;
     proto_ext_callbacks_t callbacks;
     void* adapter_context;
@@ -622,63 +607,92 @@ int proto_ext_load_from_config(proto_ext_framework_t* fw, const char* config_jso
 
 static proto_ext_framework_t* g_framework_instance = NULL;
 
-static int fw_adapter_init(void* ctx, const char* config) {
+static int fw_adapter_init(void* ctx) {
     (void)ctx;
     if (!g_framework_instance) {
         g_framework_instance = proto_ext_framework_create();
-        if (config && config[0] != '\0') {
-            proto_ext_load_from_config(g_framework_instance, config);
-        }
     }
     return 0;
 }
 
-static void fw_adapter_destroy(void* ctx) {
+static int fw_adapter_destroy(void* ctx) {
     (void)ctx;
     if (g_framework_instance) {
         proto_ext_framework_destroy(g_framework_instance);
         g_framework_instance = NULL;
     }
-}
-
-static int fw_adapter_encode(void* ctx, const void* in, size_t in_len, void** out, size_t* out_len) {
-    (void)ctx;
-    if (!in || !out || !out_len) return -1;
-    if (in_len == 0) { *out = NULL; *out_len = 0; return -2; }
-
-    *out = malloc(in_len);
-    if (!*out) return -3;
-    memcpy(*out, in, in_len);
-    *out_len = in_len;
     return 0;
 }
 
-static int fw_adapter_decode(void* ctx, const void* in, size_t in_len, void** out, size_t* out_len) {
+static int fw_adapter_encode(void* ctx, const void* msg, void** out_data, size_t* out_size) {
     (void)ctx;
-    if (!in || !out || !out_len) return -1;
-    if (in_len == 0) { *out = NULL; *out_len = 0; return -2; }
+    if (!msg || !out_data || !out_size) return -1;
+    unified_message_t* umsg = (unified_message_t*)msg;
+    size_t in_len = umsg->payload_size ? umsg->payload_size : (umsg->payload ? strlen(umsg->payload) : 0);
+    if (in_len == 0) { *out_data = NULL; *out_size = 0; return -2; }
 
-    *out = malloc(in_len);
-    if (!*out) return -3;
-    memcpy(*out, in, in_len);
-    *out_len = in_len;
+    *out_data = malloc(in_len);
+    if (!*out_data) return -3;
+    memcpy(*out_data, umsg->payload ? umsg->payload : "", in_len);
+    *out_size = in_len;
     return 0;
 }
 
-static bool fw_adapter_is_connected(void* ctx) {
+static int fw_adapter_decode(void* ctx, const void* data, size_t size, void* out_msg) {
     (void)ctx;
-    return g_framework_instance != NULL;
+    if (!data || !out_msg || size == 0) return -1;
+
+    unified_message_t* msg = (unified_message_t*)out_msg;
+    memset(msg, 0, sizeof(*msg));
+    msg->payload = malloc(size + 1);
+    if (!msg->payload) return -3;
+    memcpy((void*)msg->payload, data, size);
+    ((char*)msg->payload)[size] = '\0';
+    msg->payload_size = size;
+    return 0;
+}
+
+static int fw_adapter_is_connected(void* ctx) {
+    (void)ctx;
+    return g_framework_instance != NULL ? 1 : 0;
 }
 
 static int fw_adapter_get_stats(void* ctx, char* stats_json, size_t max_size) {
     (void)ctx;
-    (void)stats_json;
-    (void)max_size;
+    if (!stats_json || max_size < 64) return -1;
+    int written = snprintf(stats_json, max_size,
+        "{\"adapter\":\"protocol_extension_framework\",\"status\":\"active\"}");
+    return (written >= 0 && (size_t)written < max_size) ? 0 : -2;
+}
+
+static int fw_adapter_handle_request(void* ctx, const void* req, void** resp) {
+    (void)ctx;
+    if (!req || !resp) return -1;
+    *resp = strdup("{\"status\":\"ok\",\"framework\":\"extension\"}");
+    return *resp ? 0 : -1;
+}
+
+static int fw_adapter_get_version(void* ctx, char* buf, size_t max_size) {
+    (void)ctx;
+    if (!buf || max_size == 0) return -1;
+    const char* ver = "1.0.0";
+    size_t len = strlen(ver);
+    if (len >= max_size) len = max_size - 1;
+    memcpy(buf, ver, len);
+    buf[len] = '\0';
     return 0;
 }
 
-static local_adapter_t proto_ext_framework_adapter_internal = {
+static uint32_t fw_adapter_capabilities(void* ctx) {
+    (void)ctx;
+    return (uint32_t)(PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING);
+}
+
+static protocol_adapter_t proto_ext_framework_adapter_internal = {
     .type = PROTOCOL_CUSTOM,
+    .name = "Protocol Extension Framework Adapter",
+    .version = "1.0.0",
+    .description = "Built-in protocol extension framework adapter",
     .init = fw_adapter_init,
     .destroy = fw_adapter_destroy,
     .encode = fw_adapter_encode,
@@ -686,20 +700,18 @@ static local_adapter_t proto_ext_framework_adapter_internal = {
     .connect = NULL,
     .disconnect = NULL,
     .is_connected = fw_adapter_is_connected,
-    .get_stats = fw_adapter_get_stats
+    .send = NULL,
+    .receive = NULL,
+    .handle_request = fw_adapter_handle_request,
+    .get_version = fw_adapter_get_version,
+    .capabilities = fw_adapter_capabilities,
+    .get_stats = fw_adapter_get_stats,
+    .context = NULL,
+    .user_data = NULL
 };
 
-static protocol_adapter_t* proto_ext_framework_adapter = NULL;
-
-void proto_ext_framework_init_adapter(void) {
-    proto_ext_framework_adapter = (protocol_adapter_t*)&proto_ext_framework_adapter_internal;
-}
-
 const protocol_adapter_t* proto_ext_get_framework_adapter(void) {
-    if (!proto_ext_framework_adapter) {
-        proto_ext_framework_init_adapter();
-    }
-    return &proto_ext_framework_adapter;
+    return &proto_ext_framework_adapter_internal;
 }
 
 proto_ext_framework_t* proto_ext_get_global_instance(void) {

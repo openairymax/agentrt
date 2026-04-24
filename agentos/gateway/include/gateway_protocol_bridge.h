@@ -65,6 +65,8 @@ typedef enum {
     GW_PROTO_A2A,
     GW_PROTO_OPENAI,
     GW_PROTO_OPENJIUWEN,
+    GW_PROTO_OPENCLAW,
+    GW_PROTO_CLAUDE,
     GW_PROTO_COUNT
 } gw_proto_type_t;
 

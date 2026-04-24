@@ -125,7 +125,7 @@ void agentos_observability_shutdown(void) {
     agentos_mutex_unlock(g_obs.lock);
 
     if (g_obs.lock) {
-        agentos_mutex_destroy(g_obs.lock);
+        agentos_mutex_free(g_obs.lock);
         g_obs.lock = NULL;
     }
 }
@@ -189,8 +189,8 @@ int agentos_metric_record(const agentos_metric_sample_t* sample) {
         }
         obs_metric_entry_t* entry = &g_obs.metrics[g_obs.metric_count];
         strncpy(entry->name, sample->name, sizeof(entry->name) - 1);
-        entry->name[sizeof(entry->name) - 1] = '\0';
-        if (sample->labels) {
+    entry->name[sizeof(entry->name) - 1] = '\0';
+    if (sample->labels[0] != '\0') {
             strncpy(entry->labels, sample->labels, sizeof(entry->labels) - 1);
             entry->labels[sizeof(entry->labels) - 1] = '\0';
         } else {
@@ -230,7 +230,7 @@ int agentos_metric_counter_create(const char* name, const char* labels) {
     } else {
         entry->labels[0] = '\0';
     }
-    entry->type = AGENTOS_METRIC_COUNTER;
+    entry->type = AGENTOS_METRIC_COUNTER_E;
     entry->value = 0.0;
     entry->timestamp_ns = agentos_time_monotonic_ns();
     g_obs.metric_count++;
@@ -250,7 +250,7 @@ int agentos_metric_counter_inc(const char* name, const char* labels, double valu
         agentos_mutex_unlock(g_obs.lock);
         return AGENTOS_ENOENT;
     }
-    if (entry->type != AGENTOS_METRIC_COUNTER) {
+    if (entry->type != AGENTOS_METRIC_COUNTER_E) {
         agentos_mutex_unlock(g_obs.lock);
         return AGENTOS_EINVAL;
     }
@@ -285,7 +285,7 @@ int agentos_metric_gauge_create(const char* name, const char* labels, double ini
     } else {
         entry->labels[0] = '\0';
     }
-    entry->type = AGENTOS_METRIC_GAUGE;
+    entry->type = AGENTOS_METRIC_GAUGE_E;
     entry->value = initial_value;
     entry->timestamp_ns = agentos_time_monotonic_ns();
     g_obs.metric_count++;
@@ -305,7 +305,7 @@ int agentos_metric_gauge_set(const char* name, const char* labels, double value)
         agentos_mutex_unlock(g_obs.lock);
         return AGENTOS_ENOENT;
     }
-    if (entry->type != AGENTOS_METRIC_GAUGE) {
+    if (entry->type != AGENTOS_METRIC_GAUGE_E) {
         agentos_mutex_unlock(g_obs.lock);
         return AGENTOS_EINVAL;
     }
@@ -431,20 +431,22 @@ int agentos_metrics_export_prometheus(char* buffer, size_t buffer_size) {
         obs_metric_entry_t* m = &g_obs.metrics[i];
         const char* type_str = "untyped";
         switch (m->type) {
-            case AGENTOS_METRIC_COUNTER: type_str = "counter"; break;
-            case AGENTOS_METRIC_GAUGE: type_str = "gauge"; break;
-            case AGENTOS_METRIC_HISTOGRAM: type_str = "histogram"; break;
-            case AGENTOS_METRIC_SUMMARY: type_str = "summary"; break;
+            case AGENTOS_METRIC_COUNTER_E: type_str = "counter"; break;
+        case AGENTOS_METRIC_GAUGE_E: type_str = "gauge"; break;
+        case AGENTOS_METRIC_HISTOGRAM_E: type_str = "histogram"; break;
+        case AGENTOS_METRIC_SUMMARY_E: type_str = "summary"; break;
         }
 
-        int n = snprintf(buffer + written, buffer_size - written,
-                        "# TYPE %s %s\n%s%s%s %.17g\n",
-                        m->name, type_str,
-                        m->name,
-                        m->labels[0] ? "{" : "",
-                        m->labels[0] ? m->labels : "",
-                        m->labels[0] ? "}" : "",
-                        m->value);
+        int n;
+        if (m->labels[0] != '\0') {
+            n = snprintf(buffer + written, buffer_size - written,
+                        "# TYPE %s %s\n%s{%s} %.17g\n",
+                        m->name, type_str, m->name, m->labels, m->value);
+        } else {
+            n = snprintf(buffer + written, buffer_size - written,
+                        "# TYPE %s %s\n%s %.17g\n",
+                        m->name, type_str, m->name, m->value);
+        }
         if (n < 0 || (size_t)n >= buffer_size - written) {
             agentos_mutex_unlock(g_obs.lock);
             return written > 0 ? written : AGENTOS_EOVERFLOW;

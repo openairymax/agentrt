@@ -9,11 +9,12 @@
 
 #include "../include/protocol_router.h"
 #include "protocol_transformers.h"
+#include "safe_string_utils.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <time.h>
 #include <ctype.h>
-
 #define ROUTER_MAX_PARAMS 16
 #define ROUTER_PARAM_NAME_LEN 64
 #define ROUTER_PARAM_VAL_LEN 256
@@ -214,8 +215,8 @@ int protocol_router_route(protocol_router_handle_t router,
         if (transformed->protocol == PROTOCOL_CUSTOM) {
             transformed->protocol = matched_node->rule.target_protocol;
         }
-        if (!transformed->endpoint && matched_node->rule.target_endpoint) {
-            transformed->endpoint = matched_node->rule.target_endpoint;
+        if (!transformed->endpoint[0] && matched_node->rule.target_endpoint) {
+            strncpy(transformed->endpoint, matched_node->rule.target_endpoint, sizeof(transformed->endpoint) - 1);
         }
     }
     
@@ -531,7 +532,7 @@ static int match_endpoint(const char* pattern, const char* endpoint)
     return 0;
 }
 
-static int match_endpoint_extract(const char* pattern,
+static int __attribute__((unused)) match_endpoint_extract(const char* pattern,
                                    const char* endpoint,
                                    route_match_info_t* info)
 {
@@ -669,7 +670,7 @@ static int default_decision_func(const unified_message_t* message,
         }
         
         // 检查端点匹配
-        if (rule->source_endpoint && message->endpoint) {
+        if (rule->source_endpoint && message->endpoint[0]) {
             if (!match_endpoint(rule->source_endpoint, message->endpoint)) {
                 continue;
             }

@@ -110,7 +110,6 @@ static request_context_t* request_context_create(void) {
 static void request_context_destroy(request_context_t* ctx) {
     if (!ctx) return;
     
-    /* 释放消息内容 */
     for (size_t i = 0; i < ctx->message_count; i++) {
         free((void*)ctx->messages[i].role);
         free((void*)ctx->messages[i].content);
@@ -137,7 +136,8 @@ static int parse_params(cJSON* params, request_context_t* ctx, llm_request_confi
     if (!cJSON_IsString(model)) {
         return -1;
     }
-    cfg->model = model->valuestring;
+    cfg->model = strdup(model->valuestring);
+    if (!cfg->model) return -1;
     
     /* 解析消息 */
     cJSON* messages = cJSON_GetObjectItem(params, "messages");
@@ -263,28 +263,49 @@ static char* handle_complete(cJSON* params, int id) {
     if (!ctx) {
         return jsonrpc_build_error(INTERNAL_ERROR, "Out of memory", id);
     }
-    
+
     llm_request_config_t cfg;
     if (parse_params(params, ctx, &cfg) != 0) {
         request_context_destroy(ctx);
         return jsonrpc_build_error(INVALID_PARAMS, "Invalid params", id);
     }
-    
+
     uint64_t start_time = agentos_time_ms();
-    
+
+#define LLM_MAX_RETRIES 3
+#define LLM_BASE_DELAY_MS 100
+
     llm_response_t* resp = NULL;
-    int ret = llm_service_complete(g_service, &cfg, &resp);
-    
+    int ret = -1;
+
+    for (int attempt = 0; attempt <= LLM_MAX_RETRIES; attempt++) {
+        ret = llm_service_complete(g_service, &cfg, &resp);
+
+        if (ret == 0) break;
+
+        if (attempt < LLM_MAX_RETRIES) {
+            unsigned delay_ms = LLM_BASE_DELAY_MS * (1 << attempt);
+            SVC_LOG_WARN("LLM complete attempt %d/%d failed (err=%d), retrying in %ums",
+                         attempt + 1, LLM_MAX_RETRIES + 1, ret, delay_ms);
+            agentos_sleep_ms(delay_ms);
+        }
+    }
+
     uint64_t end_time = agentos_time_ms();
-    (void)end_time;  /* 可用于记录延迟 */
-    
+    (void)start_time; (void)end_time;
+
     if (ret != 0) {
+        SVC_LOG_ERROR("LLM complete failed after %d attempts (total %llums)",
+                      LLM_MAX_RETRIES + 1,
+                      (unsigned long long)(end_time - start_time));
+        free((void*)cfg.model);
         request_context_destroy(ctx);
-        return jsonrpc_build_error(INTERNAL_ERROR, "Service error", id);
+        return jsonrpc_build_error(INTERNAL_ERROR, "LLM service unavailable after retries", id);
     }
     
     char* resp_json = response_to_json(resp);
     llm_response_free(resp);
+    free((void*)cfg.model);
     
     if (!resp_json) {
         request_context_destroy(ctx);
@@ -338,6 +359,7 @@ static char* handle_complete_stream(cJSON* params, int id, agentos_socket_t clie
     int ret = llm_service_complete_stream(g_service, &cfg, llm_stream_callback, &stream_ctx, &resp);
     
     if (ret != 0) {
+        free((void*)cfg.model);
         request_context_destroy(ctx);
         return jsonrpc_build_error(INTERNAL_ERROR, "Service error", id);
     }
@@ -346,6 +368,7 @@ static char* handle_complete_stream(cJSON* params, int id, agentos_socket_t clie
         llm_response_free(resp);
     }
     
+    free((void*)cfg.model);
     request_context_destroy(ctx);
     return NULL;
 }

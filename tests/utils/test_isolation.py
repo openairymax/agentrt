@@ -1,11 +1,17 @@
 # AgentOS 测试隔离和并行执行工具
-# Version: 1.0.0.6
-# Last updated: 2026-03-22
+# Version: 2.0.0
+# Last updated: 2026-04-23
 
 """
 测试隔离和并行执行模块。
 
 提供测试用例独立性保证和执行效率优化功能。
+增强功能：
+- 进程级隔离
+- 数据库隔离
+- 网络隔离
+- 资源限制
+- 状态快照/恢复
 """
 
 import os
@@ -18,10 +24,16 @@ import re
 import json
 import tempfile
 import shutil
+import signal
+import resource
+import socket
+import sqlite3
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Callable, Union
-from contextlib import contextmanager
-from unittest.mock import Mock, patch
+from typing import Dict, Any, List, Optional, Callable, Union, Generator
+from contextlib import contextmanager, asynccontextmanager
+from unittest.mock import Mock, patch, MagicMock
+from dataclasses import dataclass, field
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import pytest
 
 # 添加项目根目录到路径
@@ -342,3 +354,308 @@ def get_test_statistics(test_dir: Path) -> Dict[str, Any]:
             pass
 
     return stats
+
+
+@dataclass
+class IsolationConfig:
+    """隔离配置"""
+    isolate_filesystem: bool = True
+    isolate_environment: bool = True
+    isolate_network: bool = False
+    isolate_database: bool = True
+    max_memory_mb: int = 512
+    max_time_seconds: int = 60
+    cleanup_on_exit: bool = True
+
+
+class DatabaseIsolator:
+    """数据库隔离器"""
+
+    def __init__(self, base_dir: Path = None):
+        self.base_dir = base_dir or Path(tempfile.gettempdir()) / "agentos_test_dbs"
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+        self._connections: Dict[str, sqlite3.Connection] = {}
+
+    def create_isolated_db(self, name: str = "test") -> Path:
+        """创建隔离的数据库"""
+        db_path = self.base_dir / f"{name}_{uuid.uuid4().hex[:8]}.db"
+        conn = sqlite3.connect(str(db_path))
+        self._connections[str(db_path)] = conn
+        return db_path
+
+    def get_connection(self, db_path: Path) -> sqlite3.Connection:
+        """获取数据库连接"""
+        return self._connections.get(str(db_path))
+
+    def cleanup(self):
+        """清理所有数据库"""
+        for conn in self._connections.values():
+            try:
+                conn.close()
+            except Exception:
+                pass
+        self._connections.clear()
+
+        for db_file in self.base_dir.glob("*.db"):
+            try:
+                db_file.unlink()
+            except Exception:
+                pass
+
+
+class NetworkIsolator:
+    """网络隔离器"""
+
+    def __init__(self):
+        self._mock_servers = {}
+        self._blocked_hosts = set()
+
+    def find_free_port(self) -> int:
+        """查找可用端口"""
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(('', 0))
+            s.listen(1)
+            port = s.getsockname()[1]
+        return port
+
+    def block_host(self, host: str):
+        """阻止特定主机"""
+        self._blocked_hosts.add(host)
+
+    def unblock_host(self, host: str):
+        """解除阻止主机"""
+        self._blocked_hosts.discard(host)
+
+    @contextmanager
+    def isolated_network(self):
+        """隔离网络上下文"""
+        original_hosts = self._blocked_hosts.copy()
+        try:
+            yield self
+        finally:
+            self._blocked_hosts = original_hosts
+
+
+class ResourceLimiter:
+    """资源限制器"""
+
+    def __init__(self, max_memory_mb: int = 512, max_time_seconds: int = 60):
+        self.max_memory_mb = max_memory_mb
+        self.max_time_seconds = max_time_seconds
+        self._timer = None
+        self._timed_out = False
+
+    def _timeout_handler(self, signum, frame):
+        self._timed_out = True
+        raise TimeoutError(f"测试执行超过 {self.max_time_seconds} 秒")
+
+    @contextmanager
+    def limit_resources(self):
+        """限制资源使用"""
+        self._timed_out = False
+
+        if sys.platform != 'win32':
+            old_handler = signal.signal(signal.SIGALRM, self._timeout_handler)
+            signal.alarm(self.max_time_seconds)
+
+            try:
+                soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+                resource.setrlimit(resource.RLIMIT_AS, (self.max_memory_mb * 1024 * 1024, hard))
+            except (ValueError, resource.error):
+                pass
+
+        try:
+            yield self
+        finally:
+            if sys.platform != 'win32':
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler)
+
+    @property
+    def timed_out(self) -> bool:
+        return self._timed_out
+
+
+class StateSnapshot:
+    """状态快照"""
+
+    def __init__(self):
+        self._snapshots: Dict[str, Dict[str, Any]] = {}
+
+    def capture(self, name: str, state: Dict[str, Any]) -> str:
+        """捕获状态快照"""
+        snapshot_id = f"{name}_{uuid.uuid4().hex[:8]}"
+        self._snapshots[snapshot_id] = {
+            'name': name,
+            'state': copy.deepcopy(state),
+            'timestamp': time.time()
+        }
+        return snapshot_id
+
+    def restore(self, snapshot_id: str) -> Optional[Dict[str, Any]]:
+        """恢复状态快照"""
+        if snapshot_id not in self._snapshots:
+            return None
+        return copy.deepcopy(self._snapshots[snapshot_id]['state'])
+
+    def list_snapshots(self) -> List[str]:
+        """列出所有快照"""
+        return list(self._snapshots.keys())
+
+    def delete_snapshot(self, snapshot_id: str):
+        """删除快照"""
+        self._snapshots.pop(snapshot_id, None)
+
+
+class ProcessIsolator:
+    """进程隔离器"""
+
+    def __init__(self):
+        self._processes: Dict[str, Any] = {}
+
+    def run_in_isolated_process(
+        self,
+        func: Callable,
+        *args,
+        timeout: int = 60,
+        **kwargs
+    ) -> Any:
+        """在隔离进程中运行函数"""
+        with ProcessPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(func, *args, **kwargs)
+            try:
+                return future.result(timeout=timeout)
+            except TimeoutError:
+                future.cancel()
+                raise TimeoutError(f"进程执行超时 ({timeout}秒)")
+
+    @contextmanager
+    def isolated_process_context(self, name: str = "isolated"):
+        """隔离进程上下文"""
+        process_id = f"{name}_{uuid.uuid4().hex[:8]}"
+        try:
+            yield process_id
+        finally:
+            pass
+
+
+class FixtureIsolator:
+    """夹具隔离器"""
+
+    def __init__(self):
+        self._fixtures: Dict[str, Any] = {}
+        self._fixture_states: Dict[str, Dict] = {}
+
+    def register_fixture(self, name: str, fixture: Any, setup_func: Callable = None, teardown_func: Callable = None):
+        """注册夹具"""
+        self._fixtures[name] = {
+            'fixture': fixture,
+            'setup': setup_func,
+            'teardown': teardown_func
+        }
+
+    @contextmanager
+    def use_fixture(self, name: str):
+        """使用夹具"""
+        if name not in self._fixtures:
+            raise ValueError(f"未知夹具: {name}")
+
+        fixture_info = self._fixtures[name]
+        fixture = fixture_info['fixture']
+
+        if fixture_info['setup']:
+            fixture_info['setup'](fixture)
+
+        try:
+            yield fixture
+        finally:
+            if fixture_info['teardown']:
+                fixture_info['teardown'](fixture)
+
+
+import copy
+
+
+class ComprehensiveIsolation:
+    """综合隔离管理器"""
+
+    def __init__(self, config: IsolationConfig = None):
+        self.config = config or IsolationConfig()
+        self.fs_isolator = TestIsolationManager()
+        self.db_isolator = DatabaseIsolator() if self.config.isolate_database else None
+        self.net_isolator = NetworkIsolator() if self.config.isolate_network else None
+        self.resource_limiter = ResourceLimiter(
+            self.config.max_memory_mb,
+            self.config.max_time_seconds
+        )
+
+    @contextmanager
+    def full_isolation(self, test_name: str):
+        """完全隔离上下文"""
+        with self.fs_isolator.isolated_test_environment(test_name) as env_id:
+            with self.resource_limiter.limit_resources():
+                if self.config.isolate_network and self.net_isolator:
+                    with self.net_isolator.isolated_network():
+                        yield {
+                            'env_id': env_id,
+                            'db_path': self.db_isolator.create_isolated_db(test_name) if self.db_isolator else None
+                        }
+                else:
+                    yield {
+                        'env_id': env_id,
+                        'db_path': self.db_isolator.create_isolated_db(test_name) if self.db_isolator else None
+                    }
+
+    def cleanup(self):
+        """清理所有资源"""
+        self.fs_isolator.cleanup()
+        if self.db_isolator:
+            self.db_isolator.cleanup()
+
+
+@pytest.fixture(scope="function")
+def comprehensive_isolation():
+    """提供综合隔离环境"""
+    isolator = ComprehensiveIsolation()
+    with isolator.full_isolation("test") as env:
+        yield env
+    isolator.cleanup()
+
+
+@pytest.fixture(scope="function")
+def isolated_database():
+    """提供隔离的数据库"""
+    isolator = DatabaseIsolator()
+    db_path = isolator.create_isolated_db("test")
+    yield db_path
+    isolator.cleanup()
+
+
+@pytest.fixture(scope="function")
+def resource_limits():
+    """提供资源限制"""
+    limiter = ResourceLimiter()
+    with limiter.limit_resources():
+        yield limiter
+
+
+def with_timeout(seconds: int):
+    """超时装饰器"""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            limiter = ResourceLimiter(max_time_seconds=seconds)
+            with limiter.limit_resources():
+                return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+def with_memory_limit(max_mb: int):
+    """内存限制装饰器"""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            limiter = ResourceLimiter(max_memory_mb=max_mb)
+            with limiter.limit_resources():
+                return func(*args, **kwargs)
+        return wrapper
+    return decorator

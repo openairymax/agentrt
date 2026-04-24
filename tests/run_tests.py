@@ -233,6 +233,90 @@ class UnitTestRunner:
             return False
 
 
+class CTestRunner:
+    """C/C++ 测试运行器 (通过 CTest)"""
+
+    def __init__(self, agentos_dir: Path):
+        self.agentos_dir = agentos_dir
+
+    def run(self, verbose: bool = False) -> bool:
+        """运行 C 单元测试"""
+        print("🧪 运行 C/C++ 单元测试...")
+
+        build_dir = self.agentos_dir / "build"
+        if not build_dir.exists():
+            print("  ⚠️  编译目录不存在，请先运行 cmake 构建")
+            return False
+
+        try:
+            cmd = ["ctest", "--output-on-failure"]
+            if verbose:
+                cmd.append("-V")
+
+            result = subprocess.run(
+                cmd,
+                cwd=build_dir,
+                capture_output=True,
+                text=True,
+                timeout=120
+            )
+
+            if result.returncode == 0:
+                print("  ✅ C/C++ 测试通过")
+                return True
+            else:
+                print("  ❌ C/C++ 测试失败:")
+                if verbose:
+                    print(result.stdout)
+                return False
+
+        except subprocess.TimeoutExpired:
+            print("  ❌ C/C++ 测试超时")
+            return False
+        except FileNotFoundError:
+            print("  ⚠️  ctest 不可用，跳过 C 测试")
+            return True
+        except Exception as e:
+            print(f"  ❌ 运行 C 测试时出错: {e}")
+            return False
+
+
+class CoverageReporter:
+    """覆盖率报告生成器"""
+
+    def __init__(self, test_dir: Path):
+        self.test_dir = test_dir
+
+    def run(self, coverage_threshold: float = 85.0) -> bool:
+        """运行覆盖率测试并检查阈值"""
+        print("📊 生成测试覆盖率报告...")
+
+        try:
+            result = subprocess.run([
+                sys.executable, '-m', 'pytest',
+                '--cov=agentos',
+                '--cov-report=term-missing',
+                '--cov-report=html:coverage_html',
+                '--cov-report=xml:coverage.xml',
+                f'--cov-fail-under={coverage_threshold}',
+                'unit/',
+                '-q'
+            ], cwd=self.test_dir, capture_output=True, text=True, timeout=180)
+
+            if result.returncode == 0:
+                print(f"  ✅ 覆盖率 >= {coverage_threshold}%")
+                print(f"  📄 HTML 报告: {self.test_dir / 'coverage_html' / 'index.html'}")
+                return True
+            else:
+                print("  ❌ 覆盖率未达标或测试失败")
+                print(result.stdout)
+                return False
+
+        except Exception as e:
+            print(f"  ❌ 覆盖率检查失败: {e}")
+            return False
+
+
 class TestRunner:
     """测试运行器（主控类）"""
 

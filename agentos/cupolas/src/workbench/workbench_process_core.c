@@ -202,6 +202,8 @@ cupolas_pid_t cupolas_process_getpid(cupolas_process_t proc) {
 #include <signal.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <sys/time.h>
+#include <sys/select.h>
 
 /**
  * @brief 创建标准输入输出重定向管道 (POSIX)
@@ -337,11 +339,12 @@ int cupolas_process_spawn(cupolas_process_t* proc,
 int cupolas_process_wait(cupolas_process_t proc, cupolas_exit_status_t* status, uint32_t timeout_ms) {
     if (!status) return cupolas_ERROR_INVALID_ARG;
     
-    int options = 0;
-    
     if (timeout_ms > 0) {
-        int elapsed = 0;
-        while (elapsed < (int)timeout_ms) {
+        struct timeval tv;
+        tv.tv_sec = timeout_ms / 1000;
+        tv.tv_usec = (timeout_ms % 1000) * 1000;
+
+        while (tv.tv_sec > 0 || tv.tv_usec > 0) {
             int result = waitpid(proc, &status->code, WNOHANG);
             if (result > 0) {
                 if (WIFEXITED(status->code)) {
@@ -354,17 +357,28 @@ int cupolas_process_wait(cupolas_process_t proc, cupolas_exit_status_t* status, 
                     status->code = -1;
                 }
                 return cupolas_OK;
-            } else if (result < 0) {
+            } else if (result < 0 && errno == ECHILD) {
                 return cupolas_ERROR_UNKNOWN;
             }
-            
-            usleep(100000);
-            elapsed += 100;
+
+            struct timeval start, end;
+            gettimeofday(&start, NULL);
+
+            fd_set dummy;
+            FD_ZERO(&dummy);
+            select(0, &dummy, NULL, NULL, &tv);
+
+            gettimeofday(&end, NULL);
+            long elapsed_us = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec);
+            long remaining_us = tv.tv_sec * 1000000 + tv.tv_usec - elapsed_us;
+            if (remaining_us <= 0) break;
+            tv.tv_sec = remaining_us / 1000000;
+            tv.tv_usec = remaining_us % 1000000;
         }
         return cupolas_ERROR_TIMEOUT;
     }
     
-    int result = waitpid(proc, &status->code, options);
+    int result = waitpid(proc, &status->code, 0);
     if (result < 0) {
         return cupolas_ERROR_UNKNOWN;
     }
@@ -389,6 +403,16 @@ int cupolas_process_terminate(cupolas_process_t proc, int signal) {
 }
 
 int cupolas_process_close(cupolas_process_t proc) {
+    if (proc <= 0) return cupolas_ERROR_INVALID_ARG;
+
+#ifndef cupolas_PLATFORM_WINDOWS
+    int status = 0;
+    pid_t result;
+    do {
+        result = waitpid(proc, &status, WNOHANG);
+    } while (result < 0 && errno == EINTR);
+#endif
+
     (void)proc;
     return cupolas_OK;
 }

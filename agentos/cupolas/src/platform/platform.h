@@ -69,7 +69,10 @@ extern "C" {
     typedef HANDLE cupolas_thread_t;
     typedef DWORD cupolas_thread_id_t;
     typedef CRITICAL_SECTION cupolas_mutex_t;
-    typedef SRWLOCK cupolas_rwlock_t;
+    typedef struct {
+        SRWLOCK lock;
+        volatile long state;
+    } cupolas_rwlock_t;
     typedef CONDITION_VARIABLE cupolas_cond_t;
 #else
     #include <pthread.h>

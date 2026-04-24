@@ -453,20 +453,20 @@ void agentos_ignore_sigpipe(void);
 /**
  * @brief 安全的字符串复制
  * @param dest 目标缓冲区
- * @param dest_size 目标缓冲区大小
  * @param src 源字符串
- * @return 目标字符串指针
+ * @param dest_size 目标缓冲区大小
+ * @return 0成功，非0失败
  */
-char* agentos_strlcpy(char* dest, size_t dest_size, const char* src);
+int agentos_strlcpy(char* dest, const char* src, size_t dest_size);
 
 /**
  * @brief 安全的字符串连接
  * @param dest 目标缓冲区
- * @param dest_size 目标缓冲区大小
  * @param src 源字符串
- * @return 目标字符串指针
+ * @param dest_size 目标缓冲区大小
+ * @return 0成功，非0失败
  */
-char* agentos_strlcat(char* dest, size_t dest_size, const char* src);
+int agentos_strlcat(char* dest, const char* src, size_t dest_size);
 
 /* ==================== 错误处理接口 ==================== */
 
@@ -482,6 +482,36 @@ int agentos_get_last_error(void);
  * @return 错误描述字符串
  */
 const char* agentos_strerror(int error);
+
+/* ==================== 系统信息类型 (UNI-01: 唯一定义) ==================== */
+
+#ifndef AGENTOS_SYSINFO_T_DEFINED
+#define AGENTOS_SYSINFO_T_DEFINED
+typedef struct {
+    char os_name[64];
+    char os_version[64];
+    char hostname[64];
+    uint32_t cpu_count;
+    uint64_t memory_total;
+    uint64_t memory_free;
+} agentos_sysinfo_t;
+#endif
+
+int agentos_get_sysinfo(agentos_sysinfo_t* info);
+
+/* ==================== 原子操作类型 (UNI-01: 唯一定义) ==================== */
+
+#ifndef AGENTOS_ATOMIC_INT_T_DEFINED
+#define AGENTOS_ATOMIC_INT_T_DEFINED
+typedef struct {
+    volatile int value;
+} agentos_atomic_int_t;
+#endif
+
+int agentos_atomic_load(agentos_atomic_int_t* atomic);
+void agentos_atomic_store(agentos_atomic_int_t* atomic, int value);
+int agentos_atomic_fetch_add(agentos_atomic_int_t* atomic, int value);
+int agentos_atomic_fetch_sub(agentos_atomic_int_t* atomic, int value);
 
 #ifdef __cplusplus
 }

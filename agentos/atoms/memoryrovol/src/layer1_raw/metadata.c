@@ -286,3 +286,67 @@ agentos_error_t agentos_raw_metadata_db_query_time(
     *out_count = count;
     return AGENTOS_SUCCESS;
 }
+
+agentos_error_t agentos_raw_metadata_db_query(
+    agentos_raw_metadata_db_t* db_handle,
+    const char* record_id,
+    agentos_raw_metadata_t** out_meta) {
+
+    if (!db_handle || !record_id || !out_meta) return AGENTOS_EINVAL;
+
+    *out_meta = NULL;
+
+    const char* sql = "SELECT record_id, source, content_type, "
+                      "created_ns, modified_ns, last_access, data_size, "
+                      "data_len, access_count, importance, trace_id, tags_json "
+                      "FROM raw_metadata WHERE record_id=?;";
+
+    sqlite3_stmt* stmt = NULL;
+    int rc = sqlite3_prepare_v2(db_handle->db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) return AGENTOS_EIO;
+
+    sqlite3_bind_text(stmt, 1, record_id, -1, SQLITE_TRANSIENT);
+
+    if (sqlite3_step(stmt) != SQLITE_ROW) {
+        sqlite3_finalize(stmt);
+        return AGENTOS_ENOENT;
+    }
+
+    agentos_raw_metadata_t* meta = (agentos_raw_metadata_t*)AGENTOS_CALLOC(1, sizeof(agentos_raw_metadata_t));
+    if (!meta) { sqlite3_finalize(stmt); return AGENTOS_ENOMEM; }
+
+    meta->record_id = AGENTOS_STRDUP((const char*)sqlite3_column_text(stmt, 0));
+    meta->source = AGENTOS_STRDUP((const char*)sqlite3_column_text(stmt, 1));
+    meta->content_type = AGENTOS_STRDUP((const char*)sqlite3_column_text(stmt, 2));
+    meta->created_ns = (uint64_t)sqlite3_column_int64(stmt, 3);
+    meta->modified_ns = (uint64_t)sqlite3_column_int64(stmt, 4);
+    meta->last_access = (uint64_t)sqlite3_column_int64(stmt, 5);
+    meta->data_size = (size_t)sqlite3_column_int64(stmt, 6);
+    meta->data_len = (size_t)sqlite3_column_int64(stmt, 7);
+    meta->access_count = (uint32_t)sqlite3_column_int(stmt, 8);
+    meta->importance = sqlite3_column_double(stmt, 9);
+    meta->trace_id = AGENTOS_STRDUP((const char*)sqlite3_column_text(stmt, 10));
+    meta->tags_json = AGENTOS_STRDUP((const char*)sqlite3_column_text(stmt, 11));
+
+    sqlite3_finalize(stmt);
+    *out_meta = meta;
+    return AGENTOS_SUCCESS;
+}
+
+void agentos_raw_metadata_free(agentos_raw_metadata_t* meta) {
+    if (!meta) return;
+    
+    if (meta->record_id) AGENTOS_FREE(meta->record_id);
+    if (meta->source) AGENTOS_FREE(meta->source);
+    if (meta->content_type) AGENTOS_FREE(meta->content_type);
+    if (meta->trace_id) AGENTOS_FREE(meta->trace_id);
+    if (meta->tags_json) AGENTOS_FREE(meta->tags_json);
+    if (meta->tags) {
+        for (size_t i = 0; i < meta->tag_count; i++) {
+            if (meta->tags[i]) AGENTOS_FREE(meta->tags[i]);
+        }
+        AGENTOS_FREE(meta->tags);
+    }
+    
+    AGENTOS_FREE(meta);
+}

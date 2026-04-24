@@ -38,6 +38,9 @@ typedef struct agentos_loop_config {
     uint32_t loop_config_memory_threads;            /**< 记忆层线程数 */
     uint32_t loop_config_max_queued_tasks;          /**< 最大排队任务数 */
     uint32_t loop_config_stats_interval_ms;         /**< 统计输出间隔（毫秒，0表示不输出） */
+    size_t   loop_config_memory_query_limit;        /**< 记忆检索上限（默认5） */
+    uint32_t loop_config_task_timeout_ms;           /**< 任务执行超时（毫秒，默认30000） */
+    float    loop_config_memory_importance;         /**< 记忆重要性权重（默认0.7） */
     agentos_plan_strategy_t* loop_config_plan_strategy;      /**< 规划策略（可选） */
     agentos_coordinator_strategy_t* loop_config_coord_strategy; /**< 协同策略（可选） */
     agentos_dispatching_strategy_t* loop_config_disp_strategy; /**< 调度策略（可选） */
