@@ -1,87 +1,107 @@
-# openlab Contrib - GitHub Skill (GitHub 技能)
+# GitHub 技能模块
 
-<div align="center">
+`agentos/openlab/contrib/skills/github_skill/`
 
-[![Version](https://img.shields.io/badge/version-v1.0.0.9-blue.svg)](../../../README.md)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](../../../../LICENSE)
-[![Status](https://img.shields.io/badge/status-active%20development-yellow.svg)](../../../README.md)
+## 概述
 
-**版本**: v1.0.0.9 | **更新日期**: 2026-03-25
+GitHub 技能模块为 AgentOS 提供全面的 GitHub 平台集成能力，支持版本仓库管理、Issue 跟踪、代码审查、CI/CD 操作等核心功能。该模块通过 GitHub REST API 和 GraphQL API 实现与 GitHub 生态的深度交互。
 
-</div>
+## 核心功能
 
-## 📊 功能完成度
+- **仓库管理** - 创建、删除、Fork、Star 仓库，管理分支和标签
+- **Issue 管理** - 创建、分配、标记、关闭 Issue，支持批量操作和模板化
+- **Pull Request 管理** - 创建 PR、代码审查、合并策略控制、自动检测冲突
+- **代码审查** - 提交评论、行级审查、状态检查、合规性验证
+- **CI/CD 集成** - 触发 Actions 工作流、查看运行状态、获取构建日志
+- **内容管理** - 文件创建与更新、提交管理、Release 发布、Wiki 操作
+- **项目管理** - Milestone 管理、看板操作、项目卡片流转
 
-- **核心功能**: 90% ✅
-- **单元测试**: 85% 🔄
-- **文档完善度**: 95% ✅
-- **开发状态**: 积极开发中 🟡
-
-## 🎯 概述
-
-GitHub Skill 是 openlab 的 GitHub API 集成技能包，提供仓库管理、Issue 处理、PR 审查、代码搜索等功能的自动化支持。
-
-### 核心功能
-
-- **仓库管理**: 创建/克隆/同步仓库
-- **Issue 管理**: 创建/更新/关闭 Issue
-- **PR 审查**: 自动代码审查、合并检查
-- **代码搜索**: 跨仓库代码检索
-- **CI/CD 集成**: 工作流触发和状态监控
-
-## 🛠️ 主要变更 (v1.0.0.9)
-
-- ✨ **新增**: GitHub Actions 工作流触发
-- ✨ **新增**: 自动 PR 审查建议生成
-- 🚀 **优化**: API 调用速率提升至 5,000+ 次/小时
-- 🚀 **优化**: 代码审查准确率提升至 94%
-- 📝 **完善**: 添加批量 Issue 管理功能
-
-## 🔧 使用示例
+## 快速开始
 
 ```python
 from openlab.contrib.skills.github_skill import GitHubSkill
 
-async def main():
-    skill = GitHubSkill(token="your_github_token")
-    
-    # 创建 Issue
-    issue = await skill.create_issue(
-        repo="owner/repo",
-        title="Bug: Login fails",
-        body="Steps to reproduce..."
-    )
-    
-    # 获取 PR 列表
-    prs = await skill.list_pull_requests("owner/repo")
-    
-    # 代码审查
-    review = await skill.review_pr("owner/repo", 123)
-    
-    # 合并 PR
-    await skill.merge_pr("owner/repo", 123)
+skill = GitHubSkill(token="your_github_token")
+
+# 创建 Issue
+issue = skill.create_issue(
+    repo="owner/repo",
+    title="Bug: 登录页面响应超时",
+    body="详细描述...",
+    labels=["bug", "priority-high"],
+    assignees=["developer1"]
+)
+
+# 创建 Pull Request
+pr = skill.create_pull_request(
+    repo="owner/repo",
+    title="修复登录超时问题",
+    head="fix/login-timeout",
+    base="main",
+    body="修复描述..."
+)
+
+# 触发 Actions 工作流
+workflow = skill.trigger_workflow(
+    repo="owner/repo",
+    workflow_id="ci.yml",
+    ref="main"
+)
 ```
 
-## 📈 性能指标
+## 配置说明
 
-| 指标 | 数值 | 测试条件 |
-|------|------|---------|
-| API 调用速率 | 5,000+ 次/小时 | GitHub API limit |
-| 代码审查准确率 | 94% | 测试数据集 |
-| 响应时间 | < 1 秒 | 单次 API 调用 |
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `token` | GitHub 个人访问令牌 | 必填 |
+| `base_url` | GitHub API 地址 | `https://api.github.com` |
+| `timeout` | 请求超时时间(秒) | 30 |
+| `retry_count` | 失败重试次数 | 3 |
+| `graphql_enabled` | 启用 GraphQL 查询 | `true` |
+| `webhook_secret` | Webhook 密钥(可选) | 空 |
 
-## 🤝 贡献指南
+## 操作接口
 
-欢迎贡献代码或提出改进建议！
+| 接口 | 说明 | 参数 |
+|------|------|------|
+| `create_issue` | 创建 Issue | repo, title, body, labels, assignees |
+| `list_issues` | 查询 Issue 列表 | repo, state, labels, since |
+| `create_pr` | 创建 Pull Request | repo, title, head, base, body |
+| `review_pr` | 审查 Pull Request | repo, pr_number, action, body |
+| `merge_pr` | 合并 Pull Request | repo, pr_number, merge_method |
+| `trigger_workflow` | 触发 Actions | repo, workflow_id, ref, inputs |
+| `list_workflow_runs` | 查看工作流运行 | repo, workflow_id, status |
+| `create_release` | 创建 Release | repo, tag, name, body, prerelease |
+| `get_contents` | 获取文件内容 | repo, path, ref |
+| `search_code` | 搜索代码 | query, language, repo |
 
-## 📞 联系方式
+## 错误处理
 
-- **维护者**: openlab 社区
-- **技术支持**: lidecheng@spharx.cn
-- **问题反馈**: https://github.com/SpharxTeam/AgentOS/issues
+```python
+from openlab.contrib.skills.github_skill import GitHubSkill, GitHubError
+
+skill = GitHubSkill(token="your_github_token")
+
+try:
+    repo = skill.get_repo("owner/repo")
+except GitHubError as e:
+    if e.status_code == 404:
+        print("仓库不存在或无权访问")
+    elif e.status_code == 403:
+        print("API 速率限制已超出")
+    elif e.status_code == 401:
+        print("认证失败，请检查 Token 有效性")
+    else:
+        print(f"GitHub API 错误: {e.message}")
+```
+
+## 安全说明
+
+- Token 建议使用环境变量 `GITHUB_TOKEN` 配置，避免硬编码
+- 建议使用具有最小必要权限的 Fine-grained Token
+- Webhook 请求建议验证签名确保来源可信
+- API 请求遵循 GitHub 速率限制策略，自动处理 Retry-After 头
 
 ---
 
 © 2026 SPHARX Ltd. All Rights Reserved.
-
-*"From data intelligence emerges 始于数据，终于智能。"*

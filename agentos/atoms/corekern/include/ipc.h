@@ -224,6 +224,40 @@ AGENTOS_API agentos_error_t agentos_ipc_recv(
  */
 AGENTOS_API int32_t agentos_ipc_get_fd(agentos_ipc_channel_t* channel);
 
+/**
+ * @brief 同步调用（带超时等待响应）
+ *
+ * @param channel [in] 通道句柄（必须通过 agentos_ipc_connect 获取）
+ * @param msg [in] 请求消息
+ * @param response [out] 响应缓冲区
+ * @param response_size [in/out] 输入时为缓冲区大小，输出时为实际响应大小
+ * @param timeout_ms [in] 超时时间（毫秒）
+ * @return agentos_error_t 错误码
+ *
+ * @threadsafe 是
+ * @reentrant 否
+ */
+AGENTOS_API agentos_error_t agentos_ipc_call(
+    agentos_ipc_channel_t* channel,
+    const agentos_kernel_ipc_message_t* msg,
+    void* response,
+    size_t* response_size,
+    uint32_t timeout_ms);
+
+/**
+ * @brief 回复消息（唤醒等待的调用者）
+ *
+ * @param channel [in] 通道句柄
+ * @param msg [in] 回复消息（msg_id 必须匹配请求）
+ * @return agentos_error_t 错误码
+ *
+ * @threadsafe 是
+ * @reentrant 否
+ */
+AGENTOS_API agentos_error_t agentos_ipc_reply(
+    agentos_ipc_channel_t* channel,
+    const agentos_kernel_ipc_message_t* msg);
+
 #ifdef __cplusplus
 }
 #endif

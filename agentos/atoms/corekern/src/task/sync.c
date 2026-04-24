@@ -33,28 +33,8 @@ agentos_mutex_t* agentos_mutex_create(void) {
 void agentos_mutex_destroy(agentos_mutex_t* mutex) {
     if (mutex) {
         DeleteCriticalSection(mutex);
-        AGENTOS_FREE(mutex);
     }
 }
-
-#if 0
-int agentos_mutex_lock(agentos_mutex_t* mutex) {
-    if (!mutex) return AGENTOS_EINVAL;
-    EnterCriticalSection(mutex);
-    return AGENTOS_SUCCESS;
-}
-
-int agentos_mutex_trylock(agentos_mutex_t* mutex) {
-    if (!mutex) return -1;
-    return TryEnterCriticalSection(mutex) ? 0 : -1;
-}
-
-int agentos_mutex_unlock(agentos_mutex_t* mutex) {
-    if (!mutex) return AGENTOS_EINVAL;
-    LeaveCriticalSection(mutex);
-    return AGENTOS_SUCCESS;
-}
-#endif
 
 agentos_cond_t* agentos_cond_create(void) {
     agentos_cond_t* cond = (agentos_cond_t*)AGENTOS_MALLOC(sizeof(agentos_cond_t));
@@ -67,38 +47,10 @@ agentos_cond_t* agentos_cond_create(void) {
 }
 
 void agentos_cond_destroy(agentos_cond_t* cond) {
-    AGENTOS_FREE(cond);
-}
-
-#if 0
-agentos_error_t agentos_cond_wait(
-    agentos_cond_t* cond,
-    agentos_mutex_t* mutex,
-    uint32_t timeout_ms) {
-    if (!cond || !mutex) return AGENTOS_EINVAL;
-    BOOL ret;
-    if (timeout_ms == 0) {
-        ret = SleepConditionVariableCS(cond, mutex, INFINITE);
-    } else {
-        ret = SleepConditionVariableCS(cond, mutex, (DWORD)timeout_ms);
+    if (cond) {
+        AGENTOS_FREE(cond);
     }
-    return ret ? AGENTOS_SUCCESS : AGENTOS_ETIMEDOUT;
 }
-#endif
-
-#if 0
-int agentos_cond_signal(agentos_cond_t* cond) {
-    if (!cond) return AGENTOS_EINVAL;
-    WakeConditionVariable(cond);
-    return AGENTOS_SUCCESS;
-}
-
-int agentos_cond_broadcast(agentos_cond_t* cond) {
-    if (!cond) return AGENTOS_EINVAL;
-    WakeAllConditionVariable(cond);
-    return AGENTOS_SUCCESS;
-}
-#endif
 
 #else
 
@@ -127,28 +79,8 @@ agentos_mutex_t* agentos_mutex_create(void) {
 void agentos_mutex_destroy(agentos_mutex_t* mutex) {
     if (mutex) {
         pthread_mutex_destroy(mutex);
-        AGENTOS_FREE(mutex);
     }
 }
-
-#if 0
-int agentos_mutex_lock(agentos_mutex_t* mutex) {
-    if (!mutex) return AGENTOS_EINVAL;
-    int ret = pthread_mutex_lock(mutex);
-    return (ret == 0) ? AGENTOS_SUCCESS : AGENTOS_EBUSY;
-}
-
-int agentos_mutex_trylock(agentos_mutex_t* mutex) {
-    if (!mutex) return -1;
-    return pthread_mutex_trylock(mutex);
-}
-
-int agentos_mutex_unlock(agentos_mutex_t* mutex) {
-    if (!mutex) return AGENTOS_EINVAL;
-    int ret = pthread_mutex_unlock(mutex);
-    return (ret == 0) ? AGENTOS_SUCCESS : AGENTOS_EBUSY;
-}
-#endif
 
 agentos_cond_t* agentos_cond_create(void) {
     agentos_cond_t* cond = (agentos_cond_t*)AGENTOS_MALLOC(sizeof(agentos_cond_t));
@@ -163,45 +95,7 @@ agentos_cond_t* agentos_cond_create(void) {
 void agentos_cond_destroy(agentos_cond_t* cond) {
     if (cond) {
         pthread_cond_destroy(cond);
-        AGENTOS_FREE(cond);
     }
 }
-
-#if 0
-agentos_error_t agentos_cond_wait(
-    agentos_cond_t* cond,
-    agentos_mutex_t* mutex,
-    uint32_t timeout_ms) {
-    if (!cond || !mutex) return AGENTOS_EINVAL;
-    if (timeout_ms == 0) {
-        pthread_cond_wait(cond, mutex);
-        return AGENTOS_SUCCESS;
-    }
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    ts.tv_sec += timeout_ms / 1000;
-    ts.tv_nsec += (timeout_ms % 1000) * 1000000L;
-    if (ts.tv_nsec >= 1000000000L) {
-        ts.tv_sec += 1;
-        ts.tv_nsec -= 1000000000L;
-    }
-    int ret = pthread_cond_timedwait(cond, mutex, &ts);
-    return (ret == ETIMEDOUT) ? AGENTOS_ETIMEDOUT : AGENTOS_SUCCESS;
-}
-#endif
-
-#if 0
-int agentos_cond_signal(agentos_cond_t* cond) {
-    if (!cond) return AGENTOS_EINVAL;
-    int ret = pthread_cond_signal(cond);
-    return (ret == 0) ? AGENTOS_SUCCESS : AGENTOS_EBUSY;
-}
-
-int agentos_cond_broadcast(agentos_cond_t* cond) {
-    if (!cond) return AGENTOS_EINVAL;
-    int ret = pthread_cond_broadcast(cond);
-    return (ret == 0) ? AGENTOS_SUCCESS : AGENTOS_EBUSY;
-}
-#endif
 
 #endif

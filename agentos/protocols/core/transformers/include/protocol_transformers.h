@@ -183,10 +183,10 @@ int transformer_openjiuwen_to_jsonrpc(const unified_message_t* source,
  * @brief 根据源和目标协议自动选择转换器
  *
  * 协议映射表:
- *   HTTP(JSON-RPC) + endpoint /mcp/*     -> MCP
- *   HTTP(JSON-RPC) + endpoint /a2a/*     -> A2A
- *   HTTP(JSON-RPC) + endpoint /v1/chat/* -> OpenAI
- *   HTTP(JSON-RPC) + endpoint /ojw/*     -> OpenJiuwen
+ *   HTTP(JSON-RPC) + endpoint /mcp/(*)     -> MCP
+ *   HTTP(JSON-RPC) + endpoint /a2a/(*)     -> A2A
+ *   HTTP(JSON-RPC) + endpoint /v1/chat/(*) -> OpenAI
+ *   HTTP(JSON-RPC) + endpoint /ojw/(*)     -> OpenJiuwen
  */
 int protocol_auto_transform(const unified_message_t* source,
                            unified_message_t* target,

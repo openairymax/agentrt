@@ -5,6 +5,12 @@
 cmake_minimum_required(VERSION 3.20)
 project(agentos-core VERSION 1.0.0 LANGUAGES C CXX)
 
+# CTest必须在此处启用，以便子目录测试能传播到根CTest
+if(BUILD_TESTS)
+    enable_testing()
+    message(STATUS "AgentOS: CTest enabled")
+endif()
+
 message(STATUS "Configuring AgentOS core components...")
 
 # 全局特性测试宏定义 - 必须在所有其他配置之前

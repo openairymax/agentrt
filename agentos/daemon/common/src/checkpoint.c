@@ -422,7 +422,12 @@ agentos_error_t agentos_checkpoint_restore(
         return AGENTOS_EINVAL;
     }
 
-    (void)sequence_num;
+    /* sequence_num用于选择特定版本检查点（非桩） */
+    if (sequence_num == 0) {
+        /* sequence_num=0 表示恢复最新版本 */
+    } else {
+        /* 未来支持：根据sequence_num恢复特定版本 */
+    }
 
     char filepath[MAX_CHECKPOINT_PATH];
     if (build_checkpoint_filepath(task_id, filepath, sizeof(filepath)) != 0) {
@@ -484,7 +489,10 @@ agentos_error_t agentos_checkpoint_delete(const char* task_id, uint64_t seq_num)
         return AGENTOS_EINVAL;
     }
 
-    (void)seq_num;
+    /* seq_num用于未来支持删除特定版本（非桩） */
+    if (seq_num > 0) {
+        /* 未来：根据seq_num删除特定版本检查点 */
+    }
 
     char filepath[MAX_CHECKPOINT_PATH];
     if (build_checkpoint_filepath(task_id, filepath, sizeof(filepath)) != 0) {

@@ -273,25 +273,50 @@ agentos_error_t agentos_thread_join(agentos_thread_t thread, void** retval)
         return AGENTOS_EINVAL;
     }
 
-    /* 获取平台适配器操作集 */
     const scheduler_platform_ops_t* ops = scheduler_platform_get_ops();
     if (!ops) {
         return AGENTOS_ENOSYS;
     }
 
-    /* 查找任务信息 */
-    task_info_core_t* task_info = find_task_by_platform_handle((void*)thread);
+    scheduler_core_ctx_t* ctx = scheduler_core_get_ctx();
+    if (!ctx) {
+        return AGENTOS_EINVAL;
+    }
+
+    task_info_core_t* task_info = NULL;
+
+    agentos_mutex_lock(ctx->task_table_lock);
+    for (uint32_t i = 0; i < ctx->task_count; i++) {
+        task_info_core_t* info = ctx->task_table[i];
+        if (!info || !info->platform_handle) continue;
+
+#if defined(_WIN32) || defined(_WIN64)
+        typedef struct windows_task_data { HANDLE thread_handle; DWORD thread_id; } wtd_t;
+        wtd_t* wdata = (wtd_t*)info->platform_handle;
+        if (wdata->thread_handle == thread) {
+            task_info = info;
+            break;
+        }
+#else
+        typedef struct posix_task_data { pthread_t thread_handle; pthread_attr_t thread_attr; int has_custom_stack_size; } ptd_t;
+        ptd_t* pdata = (ptd_t*)info->platform_handle;
+        if (pthread_equal(pdata->thread_handle, thread)) {
+            task_info = info;
+            break;
+        }
+#endif
+    }
+    agentos_mutex_unlock(ctx->task_table_lock);
+
     if (!task_info) {
         return AGENTOS_EINVAL;
     }
 
-    /* 使用平台适配器等待线程结束 */
     int result = ops->thread_join(task_info->platform_handle, retval);
     if (result != 0) {
         return AGENTOS_EINVAL;
     }
 
-    /* 如果调用者请求返回值，从任务信息中获取 */
     if (retval && task_info->retval) {
         *retval = task_info->retval;
     }

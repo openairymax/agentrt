@@ -174,7 +174,7 @@ int trace_store_service_store_point(const heapstore_trace_point_t* trace_point)
     g_ctx.total_bytes_stored += sizeof(heapstore_trace_point_t);
     
     // 检查存储限制
-    trace_store_service_check_storage_limit(filename);
+    (void)current_file;
     
     return 0;
 }

@@ -469,12 +469,15 @@ typedef enum {
 /**
  * @brief 指标类型枚举
  */
+#ifndef AGENTOS_METRIC_TYPE_T_DEFINED
+#define AGENTOS_METRIC_TYPE_T_DEFINED
 typedef enum {
     AGENTOS_METRIC_COUNTER_E   = 0,    /**< 计数器 */
     AGENTOS_METRIC_GAUGE_E     = 1,    /**< 仪表 */
     AGENTOS_METRIC_HISTOGRAM_E = 2,    /**< 直方图 */
     AGENTOS_METRIC_SUMMARY_E   = 3     /**< 摘要 */
 } agentos_metric_type_t;
+#endif
 
 /**
  * @brief Span 类型枚举

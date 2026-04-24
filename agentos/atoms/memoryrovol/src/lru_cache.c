@@ -126,7 +126,39 @@ void* lru_cache_get(lru_cache_t* cache, const char* key, size_t* out_size) {
     while (entry) {
         if (strcmp(entry->key, key) == 0) {
             if (entry->expire_time_ns > 0 && get_timestamp_ns() > entry->expire_time_ns) {
-                break;
+                cache_entry_t* expired = entry;
+
+                if (expired->prev) {
+                    expired->prev->next = expired->next;
+                } else {
+                    cache->head = expired->next;
+                }
+                if (expired->next) {
+                    expired->next->prev = expired->prev;
+                } else {
+                    cache->tail = expired->prev;
+                }
+
+                if (cache->hash_table[index] == expired) {
+                    cache->hash_table[index] = expired->hash_next;
+                } else {
+                    cache_entry_t* walker = cache->hash_table[index];
+                    while (walker && walker->hash_next != expired) {
+                        walker = walker->hash_next;
+                    }
+                    if (walker) walker->hash_next = expired->hash_next;
+                }
+
+                cache->current_size -= expired->value_size;
+                cache->entry_count--;
+
+                if (expired->key) AGENTOS_FREE(expired->key);
+                if (expired->value) AGENTOS_FREE(expired->value);
+                AGENTOS_FREE(expired);
+
+                cache->miss_count++;
+                agentos_mutex_unlock(cache->lock);
+                return NULL;
             }
 
             entry->access_count++;

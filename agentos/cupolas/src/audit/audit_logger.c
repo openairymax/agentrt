@@ -47,6 +47,11 @@ static void* audit_writer_thread(void* arg) {
                                          DEFAULT_FLUSH_INTERVAL_MS);
         if (ret == cupolas_OK) {
             actual_count++;
+            while (actual_count < DEFAULT_BATCH_SIZE) {
+                audit_entry_t* next = NULL;
+                if (audit_queue_try_pop(logger->queue, &next) != cupolas_OK) break;
+                batch[actual_count++] = next;
+            }
             for (size_t i = 0; i < actual_count; i++) {
                 if (audit_rotator_write(logger->rotator, batch[i]) == cupolas_OK) {
                     cupolas_atomic_add64(&logger->total_logged, 1);

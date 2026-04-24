@@ -79,7 +79,7 @@ static void test_ipc_buffer_crud(void) {
     snprintf(buffer.channel_id, sizeof(buffer.channel_id), "%s", channel.channel_id);
     buffer.created_at = (uint64_t)time(NULL);
     buffer.size = 8192;
-    buffer.ref_count = 1;
+    buffer.used = 0;
     snprintf(buffer.status, sizeof(buffer.status), "active");
 
     if (err == heapstore_SUCCESS) {

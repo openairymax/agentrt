@@ -603,3 +603,316 @@ def project_info():
         "tests_dir": PROJECT_ROOT / "tests",
         "toolkit_dir": PROJECT_ROOT / "toolkit" / "python",
     }
+
+
+# ============================================================
+# 增强的测试夹具 (v2.0)
+# ============================================================
+
+@pytest.fixture(scope="session")
+def test_data_factory():
+    """
+    提供测试数据工厂。
+
+    Returns:
+        TestDataFactory: 测试数据工厂实例
+    """
+    from tests.utils.data_generator import TestDataFactory
+    factory = TestDataFactory(str(PROJECT_ROOT / "tests" / "fixtures" / "data"))
+    return factory
+
+
+@pytest.fixture(scope="function")
+def data_generator():
+    """
+    提供数据生成器。
+
+    Returns:
+        DataGenerator: 数据生成器实例
+    """
+    from tests.utils.data_generator import DataGenerator
+    return DataGenerator()
+
+
+@pytest.fixture(scope="function")
+def mock_factory():
+    """
+    提供 Mock 对象工厂。
+
+    Returns:
+        MockFactory: Mock 工厂实例
+    """
+    from tests.utils.test_helpers import MockFactory
+    return MockFactory()
+
+
+@pytest.fixture(scope="function")
+def assert_helpers():
+    """
+    提供断言辅助工具。
+
+    Returns:
+        AssertHelpers: 断言辅助类
+    """
+    from tests.utils.test_helpers import AssertHelpers
+    return AssertHelpers()
+
+
+@pytest.fixture(scope="function")
+def performance_tester():
+    """
+    提供性能测试器。
+
+    Returns:
+        PerformanceTester: 性能测试器实例
+    """
+    from tests.utils.test_helpers import PerformanceTester
+    return PerformanceTester()
+
+
+@pytest.fixture(scope="function")
+def memory_profiler():
+    """
+    提供内存分析器。
+
+    Yields:
+        MemoryProfiler: 内存分析器实例
+    """
+    from tests.utils.test_helpers import MemoryProfiler
+    profiler = MemoryProfiler()
+    with profiler:
+        yield profiler
+
+
+@pytest.fixture(scope="function")
+def test_reporter():
+    """
+    提供测试报告器。
+
+    Returns:
+        TestReporter: 测试报告器实例
+    """
+    from tests.utils.test_helpers import TestReporter
+    return TestReporter()
+
+
+@pytest.fixture(scope="function")
+def test_cleanup():
+    """
+    提供测试清理工具。
+
+    Yields:
+        TestCleanup: 测试清理工具实例
+    """
+    from tests.utils.test_helpers import TestCleanup
+    with TestCleanup() as cleanup:
+        yield cleanup
+
+
+@pytest.fixture(scope="function")
+def isolated_filesystem(temp_dir):
+    """
+    提供隔离的文件系统环境。
+
+    Args:
+        temp_dir: 临时目录fixture
+
+    Yields:
+        Path: 隔离的文件系统根目录
+    """
+    from tests.utils.test_isolation import TestIsolationManager
+    manager = TestIsolationManager()
+    with manager.isolated_test_environment("isolated_fs") as env_id:
+        yield Path(manager.temp_dirs[env_id])
+    manager.cleanup()
+
+
+@pytest.fixture(scope="function")
+def isolated_database():
+    """
+    提供隔离的数据库环境。
+
+    Yields:
+        Path: 数据库文件路径
+    """
+    from tests.utils.test_isolation import DatabaseIsolator
+    isolator = DatabaseIsolator()
+    db_path = isolator.create_isolated_db("test")
+    yield db_path
+    isolator.cleanup()
+
+
+@pytest.fixture(scope="function")
+def resource_limiter():
+    """
+    提供资源限制器。
+
+    Yields:
+        ResourceLimiter: 资源限制器实例
+    """
+    from tests.utils.test_isolation import ResourceLimiter
+    limiter = ResourceLimiter(max_memory_mb=512, max_time_seconds=60)
+    with limiter.limit_resources():
+        yield limiter
+
+
+@pytest.fixture(scope="function")
+def state_snapshot():
+    """
+    提供状态快照工具。
+
+    Returns:
+        StateSnapshot: 状态快照实例
+    """
+    from tests.utils.test_isolation import StateSnapshot
+    return StateSnapshot()
+
+
+@pytest.fixture(scope="function")
+def comprehensive_isolation():
+    """
+    提供综合隔离环境。
+
+    Yields:
+        Dict: 隔离环境信息
+    """
+    from tests.utils.test_isolation import ComprehensiveIsolation
+    isolator = ComprehensiveIsolation()
+    with isolator.full_isolation("test") as env:
+        yield env
+    isolator.cleanup()
+
+
+@pytest.fixture(scope="session")
+def environment_validator():
+    """
+    提供环境验证器。
+
+    Returns:
+        EnvironmentValidator: 环境验证器实例
+    """
+    from tests.utils.test_helpers import EnvironmentValidator
+    return EnvironmentValidator()
+
+
+@pytest.fixture(scope="function")
+def data_comparator():
+    """
+    提供数据比较器。
+
+    Returns:
+        DataComparator: 数据比较器实例
+    """
+    from tests.utils.test_helpers import DataComparator
+    return DataComparator()
+
+
+# ============================================================
+# 参数化测试数据夹具
+# ============================================================
+
+@pytest.fixture(params=[
+    ("valid_input", True),
+    ("invalid_input", False),
+    ("", False),
+    (None, False),
+])
+def validation_test_data(request):
+    """
+    提供验证测试数据。
+
+    Returns:
+        tuple: (输入值, 期望结果)
+    """
+    return request.param
+
+
+@pytest.fixture(params=["low", "medium", "high"])
+def priority_levels(request):
+    """
+    提供优先级测试数据。
+
+    Returns:
+        str: 优先级级别
+    """
+    return request.param
+
+
+@pytest.fixture(params=["pending", "running", "completed", "failed"])
+def task_statuses(request):
+    """
+    提供任务状态测试数据。
+
+    Returns:
+        str: 任务状态
+    """
+    return request.param
+
+
+# ============================================================
+# 测试钩子
+# ============================================================
+
+def pytest_configure(config):
+    """pytest 配置钩子"""
+    config.addinivalue_line(
+        "markers", "unit: 单元测试标记"
+    )
+    config.addinivalue_line(
+        "markers", "integration: 集成测试标记"
+    )
+    config.addinivalue_line(
+        "markers", "e2e: 端到端测试标记"
+    )
+    config.addinivalue_line(
+        "markers", "security: 安全测试标记"
+    )
+    config.addinivalue_line(
+        "markers", "benchmark: 性能基准测试标记"
+    )
+    config.addinivalue_line(
+        "markers", "contract: 合约测试标记"
+    )
+    config.addinivalue_line(
+        "markers", "slow: 慢速测试标记"
+    )
+    config.addinivalue_line(
+        "markers", "smoke: 冒烟测试标记"
+    )
+    config.addinivalue_line(
+        "markers", "regression: 回归测试标记"
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    """pytest 测试收集修改钩子"""
+    skip_slow = pytest.mark.skip(reason="需要 --runslow 选项运行")
+    skip_integration = pytest.mark.skip(reason="需要 --runintegration 选项运行")
+
+    for item in items:
+        if "slow" in item.keywords and not config.getoption("--runslow", default=False):
+            item.add_marker(skip_slow)
+        if "integration" in item.keywords and not config.getoption("--runintegration", default=False):
+            item.add_marker(skip_integration)
+
+
+def pytest_addoption(parser):
+    """pytest 命令行选项钩子"""
+    parser.addoption(
+        "--runslow",
+        action="store_true",
+        default=False,
+        help="运行慢速测试"
+    )
+    parser.addoption(
+        "--runintegration",
+        action="store_true",
+        default=False,
+        help="运行集成测试"
+    )
+    parser.addoption(
+        "--cov-fail-under",
+        type=int,
+        default=80,
+        help="覆盖率阈值"
+    )

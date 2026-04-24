@@ -18,15 +18,17 @@ extern "C" {
 #endif
 
 /**
- * @brief 指标类型枚举
- * @note 支持多种指标类型，满足生产级监控需求
+ * @brief 指标类型枚举（如果types.h未定义则在此定义）
  */
+#ifndef AGENTOS_METRIC_TYPE_T_DEFINED
+#define AGENTOS_METRIC_TYPE_T_DEFINED
 typedef enum {
-    AGENTOS_METRIC_COUNTER,      /**< 计数器，单调递增 */
-    AGENTOS_METRIC_GAUGE,        /**< 仪表，可增可减 */
-    AGENTOS_METRIC_HISTOGRAM,    /**< 直方图，统计分布 */
-    AGENTOS_METRIC_SUMMARY,      /**< 摘要，分位数统计 */
+    AGENTOS_METRIC_COUNTER_E   = 0,    /**< 计数器，单调递增 */
+    AGENTOS_METRIC_GAUGE_E     = 1,    /**< 仪表，可增可减 */
+    AGENTOS_METRIC_HISTOGRAM_E = 2,    /**< 直方图，统计分布 */
+    AGENTOS_METRIC_SUMMARY_E   = 3     /**< 摘要，分位数统计 */
 } agentos_metric_type_t;
+#endif
 
 /**
  * @brief 健康检查状态

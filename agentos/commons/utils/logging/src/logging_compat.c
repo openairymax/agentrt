@@ -12,6 +12,7 @@
 #include "logging_compat.h"
 #include "logging.h"
 #include <stdlib.h>
+#include <unistd.h>
 
 /* Unified base library compatibility layer */
 #include "include/memory_compat.h"

@@ -342,6 +342,12 @@ agentos_error_t agentos_memoryrov_retrieve(agentos_memoryrov_handle_t* handle,
         return AGENTOS_EINVAL;
     }
 
+    if (max_results == 0) {
+        *out_results = NULL;
+        *out_count = 0;
+        return AGENTOS_EINVAL;
+    }
+
     /* 使用 L2 特征层进行相似度检索 */
     char** result_ids = NULL;
     float* scores = NULL;
