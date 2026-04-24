@@ -381,9 +381,9 @@ class manager:
         return {
             "database_url": "sqlite:///./ecommerce.db",
             "redis_url": "redis://localhost:6379",
-            "stripe_secret_key": "",
-            "stripe_public_key": "",
-            "jwt_secret_key": "change-me-in-production",
+            "stripe_secret_key": os.getenv("STRIPE_SECRET_KEY", ""),
+            "stripe_public_key": os.getenv("STRIPE_PUBLIC_KEY", ""),
+            "jwt_secret_key": os.getenv("JWT_SECRET_KEY", secrets.token_urlsafe(32)),
             "jwt_algorithm": "HS256",
             "jwt_access_token_expire_minutes": 30,
             "cors_origins": ["http://localhost:3000", "http://localhost:8000"],

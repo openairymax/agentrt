@@ -178,26 +178,32 @@ int agentos_budget_controller_consume(agentos_budget_controller_t* controller, d
         return -1;
     }
 
-    check_and_reset_period(controller);
+    budget_ctrl_mutex_lock(&controller->mutex);
+
+    time_t now = get_current_time();
+    if (now >= controller->period_start + (time_t)controller->period_seconds) {
+        atomic_store(&controller->period_cost, 0.0);
+        controller->period_start = now;
+    }
 
     double current_period = atomic_load(&controller->period_cost);
     double current_total = atomic_load(&controller->consumed_cost);
 
     if (current_period + cost_usd > controller->max_cost_usd) {
         atomic_fetch_add(&controller->denied_count, 1);
+        budget_ctrl_mutex_unlock(&controller->mutex);
         return -1;
     }
 
     if (current_total + cost_usd > controller->max_cost_usd * 100) {
         atomic_fetch_add(&controller->denied_count, 1);
+        budget_ctrl_mutex_unlock(&controller->mutex);
         return -1;
     }
 
     double new_period = atomic_fetch_add_double(&controller->period_cost, cost_usd, memory_order_relaxed) + cost_usd;
     double new_total = atomic_fetch_add_double(&controller->consumed_cost, cost_usd, memory_order_relaxed) + cost_usd;
     atomic_fetch_add(&controller->request_count, 1);
-
-    budget_ctrl_mutex_lock(&controller->mutex);
 
     uint64_t requests = atomic_load(&controller->request_count);
     if (requests > 0) {

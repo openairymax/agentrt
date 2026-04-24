@@ -230,6 +230,9 @@ AGENTOS_API void* agentos_mem_pool_alloc(agentos_mem_pool_t* pool);
  *
  * @param pool [in] 内存池句柄
  * @param ptr [in] 要释放的内存指针
+ * @return AGENTOS_SUCCESS 成功
+ * @return AGENTOS_EINVAL 参数无效或指针不属于该池
+ * @return AGENTOS_EALREADY 双重释放（块已被释放过）
  *
  * @threadsafe 是
  * @reentrant 否
@@ -237,7 +240,7 @@ AGENTOS_API void* agentos_mem_pool_alloc(agentos_mem_pool_t* pool);
  * @see agentos_mem_pool_create()
  * @see agentos_mem_pool_alloc()
  */
-AGENTOS_API void agentos_mem_pool_free(agentos_mem_pool_t* pool, void* ptr);
+AGENTOS_API agentos_error_t agentos_mem_pool_free(agentos_mem_pool_t* pool, void* ptr);
 
 /**
  * @brief 销毁内存池

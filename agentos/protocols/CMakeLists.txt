@@ -32,6 +32,7 @@ option(PROTOCOLS_ENABLE_AUTOGEN "Enable AutoGen framework adapter" ON)
 # 包含目录 (Include Directories)
 # ============================================================
 set(PROTOCOLS_INCLUDE_DIRS
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/common/include
     ${CMAKE_CURRENT_SOURCE_DIR}/core/router/include
     ${CMAKE_CURRENT_SOURCE_DIR}/core/adapter/include
@@ -42,6 +43,7 @@ set(PROTOCOLS_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/integrations/openai/include
     ${CMAKE_CURRENT_SOURCE_DIR}/integrations/openjiuwen/include
     ${AGENTOS_COMMONS_INCLUDE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../daemon/common/include
 )
 
 if(PROTOCOLS_ENABLE_OPENCLAW)

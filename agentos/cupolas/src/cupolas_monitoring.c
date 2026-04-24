@@ -40,6 +40,9 @@
 #define MAX_METRICS_BUFFER (64 * 1024)
 #define MAX_HEALTH_CHECKS 32
 
+#define MAX_FILTER_PATTERNS 16
+#define MAX_PATTERN_LEN 128
+
 typedef struct health_check_entry {
     char name[128];
     health_check_fn_t callback;
@@ -57,6 +60,11 @@ struct cupolas_monitoring {
 
     health_check_entry_t health_checks[MAX_HEALTH_CHECKS];
     size_t health_check_count;
+
+    char include_patterns[MAX_FILTER_PATTERNS][MAX_PATTERN_LEN];
+    size_t include_count;
+    char exclude_patterns[MAX_FILTER_PATTERNS][MAX_PATTERN_LEN];
+    size_t exclude_count;
 
     cupolas_thread_t reporter_thread;
     bool reporter_running;
@@ -409,9 +417,29 @@ const char* cupolas_monitoring_get_listen_addr(cupolas_monitoring_t* mgr) {
 int cupolas_monitoring_set_filter(cupolas_monitoring_t* mgr,
                                const char** include_patterns,
                                const char** exclude_patterns) {
-    cupolas_UNUSED(mgr);
-    cupolas_UNUSED(include_patterns);
-    cupolas_UNUSED(exclude_patterns);
+    if (!mgr) return -1;
+
+    cupolas_rwlock_wrlock(&mgr->lock);
+
+    mgr->include_count = 0;
+    if (include_patterns) {
+        for (size_t i = 0; include_patterns[i] && mgr->include_count < MAX_FILTER_PATTERNS; i++) {
+            strncpy(mgr->include_patterns[mgr->include_count], include_patterns[i], MAX_PATTERN_LEN - 1);
+            mgr->include_patterns[mgr->include_count][MAX_PATTERN_LEN - 1] = '\0';
+            mgr->include_count++;
+        }
+    }
+
+    mgr->exclude_count = 0;
+    if (exclude_patterns) {
+        for (size_t i = 0; exclude_patterns[i] && mgr->exclude_count < MAX_FILTER_PATTERNS; i++) {
+            strncpy(mgr->exclude_patterns[mgr->exclude_count], exclude_patterns[i], MAX_PATTERN_LEN - 1);
+            mgr->exclude_patterns[mgr->exclude_count][MAX_PATTERN_LEN - 1] = '\0';
+            mgr->exclude_count++;
+        }
+    }
+
+    cupolas_rwlock_unlock(&mgr->lock);
 
     return 0;
 }

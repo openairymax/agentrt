@@ -90,7 +90,7 @@ static void destroy_core_ctx(scheduler_core_ctx_t* ctx) {
 
     /* 销毁任务表互斥�?*/
     if (ctx->task_table_lock) {
-        agentos_mutex_destroy(ctx->task_table_lock);
+        agentos_mutex_free(ctx->task_table_lock);
     }
 
     /* 清理任务表（任务信息本身由适配器清理） */
@@ -128,7 +128,7 @@ int scheduler_core_init(void) {
                                          0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
 #endif
             /* 其他线程已经设置了锁 */
-            agentos_mutex_destroy(new_lock);
+            agentos_mutex_free(new_lock);
         }
     }
 
@@ -163,13 +163,10 @@ void scheduler_core_destroy(void) {
     destroy_core_ctx(g_core_ctx);
     g_core_ctx = NULL;
 
-    /* 销毁初始化�?*/
-    if (g_ctx_init_lock) {
-        agentos_mutex_destroy(g_ctx_init_lock);
-        g_ctx_init_lock = NULL;
-    }
-
     agentos_mutex_unlock(g_ctx_init_lock);
+
+    agentos_mutex_free(g_ctx_init_lock);
+    g_ctx_init_lock = NULL;
 }
 
 int scheduler_core_is_initialized(void) {

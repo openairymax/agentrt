@@ -1,68 +1,56 @@
-# AgentOS Scripts Tests
+# 测试脚本
 
-## 测试结构
+`scripts/tests/`
 
-```
-tests/
-├── shell/                    # Shell 脚本测试
-│   ├── test_framework.sh     # 测试框架
-│   └── test_common_utils.sh  # 通用工具测试
-└── python/                   # Python 脚本测试
-    ├── conftest.py           # pytest 配置
-    └── test_core.py         # 核心模块测试
-```
+## 概述
 
-## 运行测试
+`tests/` 目录包含 AgentOS 项目的各类测试执行脚本，提供功能测试、集成测试、端到端测试的统一运行入口，支持 CI/CD 流水线自动化和本地手动测试。
 
-### Python 测试
+## 脚本列表
+
+| 脚本 | 说明 |
+|------|------|
+| `run_tests.sh` | 测试执行入口，支持选择测试范围和模式 |
+| `run_integration.sh` | 集成测试，验证多组件协同工作 |
+| `run_e2e.sh` | 端到端测试，模拟真实用户场景 |
+| `test_report.sh` | 测试报告生成与汇总 |
+
+## 使用示例
 
 ```bash
 # 运行所有测试
-pytest scripts/tests/python/ -v
+./tests/run_tests.sh
 
-# 带覆盖率
-pytest scripts/tests/python/ --cov=scripts/core --cov-report=html
+# 仅运行单元测试
+./tests/run_tests.sh --type unit
 
-# 只运行特定测试
-pytest scripts/tests/python/test_core.py::TestPluginRegistry -v
+# 运行集成测试
+./tests/run_tests.sh --type integration
+
+# 生成测试报告
+./tests/test_report.sh --format html --output ./reports/
 ```
 
-### Shell 测试
+## 测试类型
 
-```bash
-# 运行所有 Shell 测试
-for test in scripts/tests/shell/test_*.sh; do
-    bash "$test"
-done
+| 类型 | 说明 | 覆盖范围 |
+|------|------|----------|
+| 单元测试 | 验证单个函数或模块的正确性 | C (CMockery2), Python (pytest) |
+| 集成测试 | 验证多组件间的数据流和协议交互 | 跨守护进程通信 |
+| E2E 测试 | 模拟用户从入口到返回的全链路场景 | 完整系统流程 |
 
-# 运行特定测试
-bash scripts/tests/shell/test_common_utils.sh
+## CI/CD 集成
+
+```yaml
+# GitLab CI 示例
+test:
+  script:
+    - scripts/tests/run_tests.sh --ci
+  artifacts:
+    reports:
+      junit: reports/junit.xml
 ```
 
-## 测试框架
+---
 
-### Shell 测试框架
-
-提供断言函数：
-- `assert_true`, `assert_false`
-- `assert_equal`, `assert_contains`
-- `assert_file_exists`, `assert_dir_exists`
-- `assert_command_exists`, `assert_not_empty`
-
-### Python 测试框架
-
-使用 pytest 框架，支持：
-- fixtures
-- parametrize
-- async tests
-- coverage
-
-## CI/CD
-
-GitHub Actions 工作流 `.github/workflows/scripts-ci.yml` 包含：
-
-- Shell 脚本语法检查 (ShellCheck)
-- Python 测试 (pytest)
-- 安全扫描 (Bandit)
-- 跨平台测试
-- 性能基准测试
+© 2026 SPHARX Ltd. All Rights Reserved.

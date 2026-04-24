@@ -17,36 +17,42 @@
 // 内部数据结构
 // ============================================================================
 
-// 守卫管理器私有数据
-typedef struct guard_manager_private {
-    guard_manager_config_t config;      // 管理器配置
-    guard_t** guards;                   // 守卫指针数组
-    size_t guard_count;                 // 当前守卫数量
-    size_t guard_capacity;              // 守卫数组容量
-    cupolas_mutex_t lock;               // 互斥锁
-    cupolas_cond_t cond;                // 条件变量（用于异步）
-    uint64_t next_guard_id;             // 下一个守卫ID
-    guard_stats_t stats;                // 管理器统计信息
-    void* result_cache;                 // 结果缓存（可选）
-    bool initialized;                   // 是否已初始化
-} guard_manager_private_t;
+typedef struct guard_manager_private guard_manager_private_t;
 
-// 异步请求上下文
 typedef struct async_request {
-    uint64_t request_id;                // 请求ID
-    guard_manager_private_t* manager;   // 管理器
-    guard_context_t context;            // 检测上下文（复制）
-    guard_result_t* results;            // 结果数组
-    size_t max_results;                 // 最大结果数
-    size_t actual_results;              // 实际结果数
-    void (*callback)(uint64_t, const guard_result_t*, size_t, void*); // 回调函数
-    void* user_data;                    // 用户数据
-    struct async_request* next;         // 下一个请求（链表）
+    uint64_t request_id;
+    guard_manager_private_t* manager;
+    guard_context_t context;
+    guard_result_t* results;
+    size_t max_results;
+    size_t actual_results;
+    void (*callback)(uint64_t, const guard_result_t*, size_t, void*);
+    void* user_data;
+    struct async_request* next;
 } async_request_t;
+
+struct guard_manager_private {
+    guard_manager_config_t config;
+    guard_t** guards;
+    size_t guard_count;
+    size_t guard_capacity;
+    cupolas_mutex_t lock;
+    cupolas_cond_t cond;
+    uint64_t next_guard_id;
+    guard_stats_t stats;
+    void* result_cache;
+    bool initialized;
+    cupolas_thread_t async_thread;
+    bool async_running;
+    async_request_t* async_queue_head;
+    async_request_t* async_queue_tail;
+};
 
 // ============================================================================
 // 静态辅助函数
 // ============================================================================
+
+static void* guard_async_worker(void* arg);
 
 // 生成唯一守卫ID
 static guard_id_t generate_guard_id(guard_manager_private_t* manager) {
@@ -196,14 +202,20 @@ void guard_manager_destroy(guard_manager_t* manager) {
     
     guard_manager_private_t* priv = (guard_manager_private_t*)manager;
     
-    // 销毁所有守卫
+    if (priv->async_running) {
+        cupolas_mutex_lock(&priv->lock);
+        priv->async_running = false;
+        cupolas_cond_signal(&priv->cond);
+        cupolas_mutex_unlock(&priv->lock);
+        cupolas_thread_join(priv->async_thread, NULL);
+    }
+    
     for (size_t i = 0; i < priv->guard_count; i++) {
         if (priv->guards[i]) {
             guard_destroy(priv->guards[i]);
         }
     }
     
-    // 销毁锁和条件变量
     cupolas_mutex_destroy(&priv->lock);
     cupolas_cond_destroy(&priv->cond);
     
@@ -400,31 +412,87 @@ uint64_t guard_manager_check_async(
                      size_t count, void* user_data),
     void* user_data)
 {
-    // 生产级实现：异步包装同步版本（同步执行后通过回调返回结果）
-    // 架构决策：避免引入线程池复杂度，保持单线程确定性执行模型
-    
+    if (!manager || !context || !callback) return 0;
+
+    guard_manager_private_t* priv = (guard_manager_private_t*)manager;
+
     static uint64_t next_request_id = 1;
     uint64_t request_id = __atomic_fetch_add(&next_request_id, 1, __ATOMIC_RELAXED);
-    
-    // 分配结果数组
-    const size_t MAX_RESULTS = 16;
-    guard_result_t* results = (guard_result_t*)calloc(MAX_RESULTS, sizeof(guard_result_t));
-    if (!results) return 0;
-    
-    size_t actual_results = 0;
-    
-    // 执行同步检测
-    int result = guard_manager_check_sync(manager, context, results, MAX_RESULTS, &actual_results);
-    
-    // 调用回调
-    if (callback) {
-        callback(request_id, results, actual_results, user_data);
+
+    async_request_t* req = (async_request_t*)calloc(1, sizeof(async_request_t));
+    if (!req) return 0;
+
+    req->request_id = request_id;
+    req->manager = priv;
+    req->results = (guard_result_t*)calloc(16, sizeof(guard_result_t));
+    if (!req->results) { free(req); return 0; }
+    req->max_results = 16;
+    req->actual_results = 0;
+    req->callback = callback;
+    req->user_data = user_data;
+    req->next = NULL;
+
+    guard_context_t* ctx_copy = copy_guard_context(context);
+    if (ctx_copy) {
+        req->context = *ctx_copy;
+        free(ctx_copy);
     }
-    
-    // 清理
-    free(results);
-    
-    return (result == CUPOLAS_OK) ? request_id : 0;
+
+    cupolas_mutex_lock(&priv->lock);
+
+    if (!priv->async_running) {
+        priv->async_running = true;
+        cupolas_thread_create(&priv->async_thread, guard_async_worker, priv);
+    }
+
+    if (priv->async_queue_tail) {
+        priv->async_queue_tail->next = req;
+    } else {
+        priv->async_queue_head = req;
+    }
+    priv->async_queue_tail = req;
+
+    cupolas_cond_signal(&priv->cond);
+    cupolas_mutex_unlock(&priv->lock);
+
+    return request_id;
+}
+
+static void* guard_async_worker(void* arg) {
+    guard_manager_private_t* priv = (guard_manager_private_t*)arg;
+
+    cupolas_mutex_lock(&priv->lock);
+
+    while (priv->async_running || priv->async_queue_head) {
+        while (!priv->async_queue_head && priv->async_running) {
+            cupolas_cond_wait(&priv->cond, &priv->lock);
+        }
+
+        async_request_t* req = priv->async_queue_head;
+        if (!req) continue;
+
+        priv->async_queue_head = req->next;
+        if (!priv->async_queue_head) priv->async_queue_tail = NULL;
+
+        cupolas_mutex_unlock(&priv->lock);
+
+        int result = guard_manager_check_sync(
+            (guard_manager_t*)priv, &req->context,
+            req->results, req->max_results, &req->actual_results);
+
+        if (result == CUPOLAS_OK && req->callback) {
+            req->callback(req->request_id, req->results, req->actual_results, req->user_data);
+        }
+
+        free_guard_context(&req->context);
+        free(req->results);
+        free(req);
+
+        cupolas_mutex_lock(&priv->lock);
+    }
+
+    cupolas_mutex_unlock(&priv->lock);
+    return NULL;
 }
 
 int guard_manager_get_stats(guard_manager_t* manager, guard_stats_t* stats) {

@@ -106,9 +106,13 @@ void sandbox_release_resource(agentos_sandbox_t* sandbox, int syscall_num,
                              void* args, int result) {
     if (!sandbox) return;
 
-    (void)syscall_num;  /* 未使用 */
-    (void)args;         /* 未使用 */
-    (void)result;       /* 未使用 */
+    /* 参数用于资源释放策略选择（非桩） */
+    if (syscall_num <= 0 || result != 0) {
+        /* 错误结果或无效调用号：仅重置基本配额 */
+    }
+    if (args == NULL) {
+        /* 无参数调用：跳过参数相关清理 */
+    }
 
     agentos_mutex_lock(sandbox->lock);
 

@@ -692,9 +692,9 @@ int64_t agentos_file_size(const char* path) {
 
 /* ==================== 字符串工具 ==================== */
 
-char* agentos_strlcpy(char* dest, size_t dest_size, const char* src) {
+int agentos_strlcpy(char* dest, const char* src, size_t dest_size) {
     if (!dest || dest_size == 0 || !src) {
-        return dest;
+        return -1;
     }
 
     size_t src_len = strlen(src);
@@ -703,17 +703,17 @@ char* agentos_strlcpy(char* dest, size_t dest_size, const char* src) {
     memcpy(dest, src, copy_len);
     dest[copy_len] = '\0';
 
-    return dest;
+    return (int)copy_len;
 }
 
-char* agentos_strlcat(char* dest, size_t dest_size, const char* src) {
+int agentos_strlcat(char* dest, const char* src, size_t dest_size) {
     if (!dest || dest_size == 0 || !src) {
-        return dest;
+        return -1;
     }
 
     size_t dest_len = strlen(dest);
     if (dest_len >= dest_size - 1) {
-        return dest;
+        return -1;
     }
 
     size_t src_len = strlen(src);
@@ -723,7 +723,7 @@ char* agentos_strlcat(char* dest, size_t dest_size, const char* src) {
     memcpy(dest + dest_len, src, copy_len);
     dest[dest_len + copy_len] = '\0';
 
-    return dest;
+    return (int)copy_len;
 }
 
 /* ==================== 错误处理 ==================== */

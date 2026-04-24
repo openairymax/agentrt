@@ -226,6 +226,40 @@ AGENTOS_API agentos_error_t agentos_sys_agent_invoke(const char* agent_id, const
  */
 AGENTOS_API agentos_error_t agentos_sys_agent_list(char*** out_agent_ids, size_t* out_count);
 
+/* ==================== Skill 管理 ==================== */
+
+/**
+ * @brief 安装技能
+ * @param skill_url 技能 URL（file:// 或 http://）
+ * @param out_skill_id 输出技能 ID
+ * @return agentos_error_t
+ */
+AGENTOS_API agentos_error_t agentos_sys_skill_install(const char* skill_url, char** out_skill_id);
+
+/**
+ * @brief 执行技能
+ * @param skill_id 技能 ID
+ * @param input 输入数据
+ * @param out_output 输出结果
+ * @return agentos_error_t
+ */
+AGENTOS_API agentos_error_t agentos_sys_skill_execute(const char* skill_id, const char* input, char** out_output);
+
+/**
+ * @brief 列出所有已安装技能
+ * @param out_skills 输出技能 ID 数组
+ * @param out_count 输出数量
+ * @return agentos_error_t
+ */
+AGENTOS_API agentos_error_t agentos_sys_skill_list(char*** out_skills, size_t* out_count);
+
+/**
+ * @brief 卸载技能
+ * @param skill_id 技能 ID
+ * @return agentos_error_t
+ */
+AGENTOS_API agentos_error_t agentos_sys_skill_uninstall(const char* skill_id);
+
 /* ==================== 辅助函数 ==================== */
 
 /**

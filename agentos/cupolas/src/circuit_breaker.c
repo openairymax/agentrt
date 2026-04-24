@@ -272,15 +272,17 @@ int circuit_breaker_call(circuit_breaker_t* breaker,
     circuit_state_t state = circuit_breaker_get_state(breaker);
     
     if (state == CIRCUIT_STATE_OPEN) {
+        cupolas_mutex_lock(&breaker->lock);
         breaker->rejected_calls++;
+        cupolas_mutex_unlock(&breaker->lock);
         return -2;
     }
-    
+
     if (state == CIRCUIT_STATE_HALF_OPEN) {
         cupolas_mutex_lock(&breaker->lock);
         if (breaker->half_open_calls >= breaker->config.half_open_max_calls) {
-            cupolas_mutex_unlock(&breaker->lock);
             breaker->rejected_calls++;
+            cupolas_mutex_unlock(&breaker->lock);
             return -2;
         }
         breaker->half_open_calls++;
@@ -289,26 +291,35 @@ int circuit_breaker_call(circuit_breaker_t* breaker,
     
     uint64_t start_time = cupolas_time_ms();
     uint32_t effective_timeout = timeout_ms > 0 ? timeout_ms : breaker->config.timeout_ms;
-    
+
     int result = -1;
     bool completed = false;
-    
+    uint32_t attempts = 0;
+    const uint32_t max_attempts = 3;
+
     while (!completed && (cupolas_time_ms() - start_time < effective_timeout)) {
         result = func(arg);
-        completed = true;
+        attempts++;
+
+        if (result == 0) {
+            completed = true;
+        } else if (attempts >= max_attempts) {
+            break;
+        } else {
+            cupolas_sleep_ms(10 * attempts);
+        }
     }
-    
+
     if (!completed) {
-        circuit_breaker_record_timeout(breaker);
-        return -3;
+        if (cupolas_time_ms() - start_time >= effective_timeout) {
+            circuit_breaker_record_timeout(breaker);
+        } else {
+            circuit_breaker_record_failure(breaker);
+        }
+        return result == -1 ? -3 : result;
     }
-    
-    if (result == 0) {
-        circuit_breaker_record_success(breaker);
-    } else {
-        circuit_breaker_record_failure(breaker);
-    }
-    
+
+    circuit_breaker_record_success(breaker);
     return result;
 }
 

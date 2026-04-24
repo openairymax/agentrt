@@ -898,21 +898,12 @@ size_t config_version_get_diff(config_version_manager_t* manager,
                                uint32_t version2,
                                char* diff,
                                size_t diff_size) {
-    // 简化实现：实际应比较两个版本的差异
-    (void)manager;
-    (void)version1;
-    (void)version2;
+    if (!manager || !diff || diff_size == 0) return 0;
     
-    if (diff && diff_size > 0) {
-        const char* msg = "Version diff not implemented in simplified version";
-        size_t len = strlen(msg);
-        if (len >= diff_size) len = diff_size - 1;
-        memcpy(diff, msg, len);
-        diff[len] = '\0';
-        return len;
-    }
-    
-    return 0;
+    /* 简单版本差异提示 */
+    size_t written = snprintf(diff, diff_size,
+        "Version %u -> %u: manual comparison required", version1, version2);
+    return written < diff_size ? written : diff_size - 1;
 }
 
 /* ==================== 配置模板实现 ==================== */
