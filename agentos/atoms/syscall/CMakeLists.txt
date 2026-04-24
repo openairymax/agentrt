@@ -150,3 +150,37 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
 else()
     message(WARNING "Tests directory not found, skipping syscall tests")
 endif()
+
+# TeamC P1-C07: Syscall 核心单元测试
+if(BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_syscalls.c")
+    add_executable(test_syscalls tests/test_syscalls.c)
+    target_include_directories(test_syscalls PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/error/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/memory/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/platform/include
+    )
+    target_link_libraries(test_syscalls PRIVATE
+        agentos_syscall
+        -Wl,--whole-archive
+        agentos_coreloopthree
+        -Wl,--no-whole-archive
+        agentos_core
+        agentos_common
+        Threads::Threads
+        uuid
+    )
+    
+    # 直接链接id_utils.o以解决LTO符号丢失问题
+    if(EXISTS "${CMAKE_BINARY_DIR}/agentos/atoms/coreloopthree/CMakeFiles/agentos_coreloopthree.dir/src/utils/id_utils.c.o")
+        target_sources(test_syscalls PRIVATE
+            ${CMAKE_BINARY_DIR}/agentos/atoms/coreloopthree/CMakeFiles/agentos_coreloopthree.dir/src/utils/id_utils.c.o
+        )
+    endif()
+    if(UNIX AND NOT APPLE)
+        target_link_options(test_syscalls PRIVATE -Wl,--allow-multiple-definition)
+    endif()
+    add_test(NAME syscalls_test COMMAND test_syscalls)
+    message(STATUS "  syscall_tests: test_syscalls configured (P1-C07)")
+endif()

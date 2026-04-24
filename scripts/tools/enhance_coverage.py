@@ -100,7 +100,7 @@ class CoverageAnalyzer:
                 lines = f.readlines()
                 # 排除空行和注释行
                 code_lines = [line for line in lines 
-                             if line.strip() and not line.strip().startswith(('*', '//')]
+                             if line.strip() and not line.strip().startswith(('*', '//'))]
                 total_lines += len(code_lines)
 
         # 查找对应的测试文件

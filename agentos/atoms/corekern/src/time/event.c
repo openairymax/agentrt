@@ -1,6 +1,6 @@
 /**
  * @file event.c
- * @brief 事件同步与事件循环实�?
+ * @brief 事件同步与事件循环实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -8,7 +8,6 @@
 #include "task.h"
 #include <stdlib.h>
 
-/* Unified base library compatibility layer */
 #include "memory_compat.h"
 #include "string_compat.h"
 
@@ -29,8 +28,8 @@ agentos_event_t* agentos_event_create(void) {
     ev->cond = agentos_cond_create();
 
     if (!ev->mutex || !ev->cond) {
-        if (ev->mutex) agentos_mutex_destroy(ev->mutex);
-        if (ev->cond) agentos_cond_destroy(ev->cond);
+        if (ev->mutex) agentos_mutex_free(ev->mutex);
+        if (ev->cond) agentos_cond_free(ev->cond);
         AGENTOS_FREE(ev);
         return NULL;
     }
@@ -74,8 +73,8 @@ agentos_error_t agentos_event_reset(agentos_event_t* event) {
 
 void agentos_event_destroy(agentos_event_t* event) {
     if (!event) return;
-    if (event->mutex) agentos_mutex_destroy(event->mutex);
-    if (event->cond) agentos_cond_destroy(event->cond);
+    if (event->mutex) agentos_mutex_free(event->mutex);
+    if (event->cond) agentos_cond_free(event->cond);
     AGENTOS_FREE(event);
 }
 

@@ -45,6 +45,7 @@ int transformer_jsonrpc_to_mcp_request(const unified_message_t* source,
     strncpy(target->method, "tools/call", sizeof(target->method) - 1);
 
     transform_context_t* ctx = (transform_context_t*)context;
+    (void)ctx;
     if (ctx && ctx->trace_id[0]) {
         strncpy(target->metadata.trace_id, ctx->trace_id, sizeof(target->metadata.trace_id) - 1);
     }
@@ -87,7 +88,6 @@ int transformer_jsonrpc_to_mcp_request(const unified_message_t* source,
 
     target->payload_size = strlen(mcp_params) + 1;
     target->payload = strdup(mcp_params);
-    target = ENCODING_UTF8_JSON;
 
     return 0;
 }
@@ -103,17 +103,17 @@ int transformer_mcp_to_jsonrpc_response(const unified_message_t* source,
     target->direction = source->is_error ? MSG_TYPE_ERROR : MSG_TYPE_RESPONSE;
 
     transform_context_t* ctx = (transform_context_t*)context;
-    int jsonrpc_id = ctx ? ctx->jsonrpc_id_counter : 1;
+    (void)ctx;
 
     if (source->is_error) {
-        snprintf(target->error_code, sizeof(target->error_code), "%d", source->error_code);
+        target->error_code = source->error_code;
         snprintf(target->error_msg, sizeof(target->error_msg),
-            "%s", source->payload ? source->payload : "MCP error");
+            "%s", source->payload ? (const char*)source->payload : "MCP error");
     } else {
         char output_buf[8192] = {0};
         const char* content_text = "";
         if (source->payload) {
-            const char* text_key = strstr(source->payload, "\"text\"");
+            const char* text_key = strstr((const char*)source->payload, "\"text\"");
             if (text_key) {
                 const char* val_start = strchr(text_key + 5, '"');
                 if (val_start) {
@@ -130,13 +130,13 @@ int transformer_mcp_to_jsonrpc_response(const unified_message_t* source,
                         content_text = output_buf;
                     } else {
                         snprintf(output_buf, sizeof(output_buf),
-                            "{\"output\":%s,\"status\":\"success\"}", source->payload);
+                            "{\"output\":%s,\"status\":\"success\"}", (const char*)source->payload);
                         content_text = output_buf;
                     }
                 }
             } else {
                 snprintf(output_buf, sizeof(output_buf),
-                    "{\"output\":%s,\"status\":\"success\"}", source->payload);
+                    "{\"output\":%s,\"status\":\"success\"}", (const char*)source->payload);
                 content_text = output_buf;
             }
         } else {
@@ -145,7 +145,6 @@ int transformer_mcp_to_jsonrpc_response(const unified_message_t* source,
 
         target->payload_size = strlen(content_text) + 1;
         target->payload = strdup(content_text);
-        target = ENCODING_UTF8_JSON;
     }
 
     return 0;
@@ -165,11 +164,9 @@ int transformer_mcp_tools_list_to_jsonrpc(const unified_message_t* source,
     if (source->payload) {
         target->payload_size = strlen(source->payload) + 1;
         target->payload = strdup(source->payload);
-        target = ENCODING_UTF8_JSON;
     } else {
         target->payload = strdup("{\"skills\":[]}");
         target->payload_size = strlen(target->payload) + 1;
-        target = ENCODING_UTF8_JSON;
     }
 
     return 0;
@@ -224,7 +221,6 @@ int transformer_jsonrpc_to_a2a_task(const unified_message_t* source,
 
     target->payload_size = strlen(a2a_payload) + 1;
     target->payload = strdup(a2a_payload);
-    target = ENCODING_UTF8_JSON;
 
     return 0;
 }
@@ -237,7 +233,7 @@ int transformer_a2a_to_jsonrpc_response(const unified_message_t* source,
 
     memset(target, 0, sizeof(*target));
     target->protocol = PROTOCOL_HTTP;
-    target->endpoint = "jsonrpc";
+    strncpy(target->endpoint, "jsonrpc", sizeof(target->endpoint) - 1);
     target->direction = DIRECTION_RESPONSE;
 
     if (source->payload) {
@@ -259,7 +255,7 @@ int transformer_jsonrpc_to_a2a_discover(const unified_message_t* source,
 
     memset(target, 0, sizeof(*target));
     target->protocol = PROTOCOL_CUSTOM;
-    target->endpoint = "a2a/agent/discover";
+    strncpy(target->endpoint, "a2a/agent/discover", sizeof(target->endpoint) - 1);
     target->direction = DIRECTION_REQUEST;
 
     target->payload = strdup("{}");
@@ -276,7 +272,7 @@ int transformer_a2a_agents_to_jsonrpc(const unified_message_t* source,
 
     memset(target, 0, sizeof(*target));
     target->protocol = PROTOCOL_HTTP;
-    target->endpoint = "jsonrpc";
+    strncpy(target->endpoint, "jsonrpc", sizeof(target->endpoint) - 1);
     target->direction = DIRECTION_RESPONSE;
 
     if (source->payload) {
@@ -301,7 +297,7 @@ int transformer_jsonrpc_to_openai_chat(const unified_message_t* source,
 
     memset(target, 0, sizeof(*target));
     target->protocol = PROTOCOL_CUSTOM;
-    target->endpoint = "openai/chat/completions";
+    strncpy(target->endpoint, "openai/chat/completions", sizeof(target->endpoint) - 1);
     target->direction = DIRECTION_REQUEST;
 
     char openai_payload[16384] = {0};
@@ -365,7 +361,7 @@ int transformer_openai_chat_to_jsonrpc(const unified_message_t* source,
 
     memset(target, 0, sizeof(*target));
     target->protocol = PROTOCOL_HTTP;
-    target->endpoint = "jsonrpc";
+    strncpy(target->endpoint, "jsonrpc", sizeof(target->endpoint) - 1);
     target->direction = DIRECTION_RESPONSE;
 
     if (!source->payload) {
@@ -428,7 +424,7 @@ int transformer_openai_stream_chunk_to_jsonrpc(const unified_message_t* source,
 
     memset(target, 0, sizeof(*target));
     target->protocol = PROTOCOL_HTTP;
-    target->endpoint = "jsonrpc/llm.stream.chunk";
+    strncpy(target->endpoint, "jsonrpc/llm.stream.chunk", sizeof(target->endpoint) - 1);
     target->direction = DIRECTION_NOTIFICATION;
 
     if (source->payload) {
@@ -450,7 +446,7 @@ int transformer_jsonrpc_to_openai_embedding(const unified_message_t* source,
 
     memset(target, 0, sizeof(*target));
     target->protocol = PROTOCOL_CUSTOM;
-    target->endpoint = "openai/embeddings";
+    strncpy(target->endpoint, "openai/embeddings", sizeof(target->endpoint) - 1);
     target->direction = DIRECTION_REQUEST;
 
     const char* text = "";
@@ -504,7 +500,7 @@ int transformer_jsonrpc_to_openjiuwen(const unified_message_t* source,
 
     memset(target, 0, sizeof(*target));
     target->protocol = PROTOCOL_CUSTOM;
-    target->endpoint = "openjiuwen";
+    strncpy(target->endpoint, "openjiuwen", sizeof(target->endpoint) - 1);
     target->direction = DIRECTION_REQUEST;
 
     openjiuwen_header_t header;
@@ -552,7 +548,7 @@ int transformer_openjiuwen_to_jsonrpc(const unified_message_t* source,
 
     memset(target, 0, sizeof(*target));
     target->protocol = PROTOCOL_HTTP;
-    target->endpoint = "jsonrpc";
+    strncpy(target->endpoint, "jsonrpc", sizeof(target->endpoint) - 1);
 
     const unsigned char* data = (const unsigned char*)source->payload;
     const openjiuwen_header_t* hdr = (const openjiuwen_header_t*)data;
@@ -626,7 +622,7 @@ int protocol_auto_transform(const unified_message_t* source,
                            const char* target_protocol_name) {
     if (!source || !target || !target_protocol_name) return -1;
 
-    const char* from = (source->endpoint && source->endpoint[0]) ? source->endpoint : "jsonrpc";
+    const char* from = source->endpoint[0] ? source->endpoint : "jsonrpc";
 
     for (int i = 0; g_transform_table[i].from_proto != NULL; i++) {
         if (strcasecmp(g_transform_table[i].from_proto, from) == 0 &&
@@ -646,7 +642,7 @@ int protocol_auto_transform(const unified_message_t* source,
 int protocol_validate_transformed(const unified_message_t* msg) {
     if (!msg) return -1;
 
-    if (msg->endpoint && msg->endpoint[0] == '\0') return -2;
+    if (msg->endpoint[0] == '\0') return -2;
     if (msg->payload == NULL && msg->payload_size > 0) return -3;
     if (msg->payload != NULL && msg->payload_size < 4) return -4;
 

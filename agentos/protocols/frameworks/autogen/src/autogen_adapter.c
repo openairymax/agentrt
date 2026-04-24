@@ -13,6 +13,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include <ctype.h>
 
 struct autogen_adapter_context_s {
     autogen_config_t config;
@@ -220,7 +221,7 @@ static uint64_t autogen_hash_str(const char* s) {
     return h;
 }
 
-static int autogen_count_words(const char* t) {
+static int __attribute__((unused)) autogen_count_words(const char* t) {
     if (!t || !*t) return 0;
     int c = 0, in = 0;
     for (; *t; t++) {
@@ -564,53 +565,71 @@ int autogen_get_statistics(autogen_adapter_context_t* ctx,
     return (written >= 0 && (size_t)written < buffer_size) ? 0 : -2;
 }
 
-static int autogen_proto_init(void** context) {
+static int autogen_proto_init(void* context) {
     autogen_config_t config = autogen_config_default();
     autogen_adapter_context_t* ctx = autogen_adapter_create(&config);
     if (!ctx) return -1;
-    *context = ctx;
+    *(void**)context = ctx;
     return 0;
 }
 
-static void autogen_proto_destroy(void* context) {
-    autogen_adapter_destroy((autogen_adapter_context_t*)context);
+static int autogen_proto_destroy(void* context) {
+    if (context) {
+        autogen_adapter_destroy((autogen_adapter_context_t*)context);
+    }
+    return 0;
 }
 
 static int autogen_proto_handle_request(void* context,
-                                         const char* raw_request,
-                                         size_t request_size,
-                                         const char* content_type,
-                                         char** response,
-                                         size_t* response_size,
-                                         char** response_content_type) {
-    if (!context || !raw_request) return -1;
-    (void)request_size;
-    (void)content_type;
+                                         const void* req,
+                                         void** resp) {
+    if (!context || !req) return -1;
+    (void)context;
 
-    autogen_adapter_context_t* ctx = (autogen_adapter_context_t*)context;
+    const char* raw_request = (const char*)req;
 
     autogen_message_t msg = {0};
-    msg.sender_id = "proto-client";
+    msg.sender_id = strdup("proto-client");
     msg.content = strdup(raw_request);
-    msg.timestamp = (uint64_t)time(NULL);
+    msg.timestamp = (uint64_t)(time(NULL));
     msg.is_visible = true;
 
     autogen_message_t reply = {0};
+    autogen_adapter_context_t* ctx = (autogen_adapter_context_t*)context;
     int ret = autogen_send_message(ctx, "user", "agent", raw_request, MSG_TYPE_TEXT, &reply);
 
-    if (ret == 0 && reply.content) {
-        *response = strdup(reply.content);
-        *response_size = strlen(reply.content);
-    } else {
-        *response = strdup("{\"status\":\"error\"}");
-        *response_size = strlen(*response);
+    if (ret == 0 && resp) {
+        if (reply.content) {
+            *resp = strdup(reply.content);
+        } else {
+            *resp = strdup("{\"status\":\"error\"}");
+        }
+    } else if (resp) {
+        *resp = strdup("{\"status\":\"error\"}");
+        ret = -1;
     }
-
-    if (response_content_type) *response_content_type = strdup("application/json");
 
     autogen_message_destroy(&msg);
     autogen_message_destroy(&reply);
     return ret;
+}
+
+static int autogen_proto_get_version(void* context, char* buf, size_t max_size) {
+    (void)context;
+    if (!buf || max_size == 0) return -1;
+    const char* ver = autogen_adapter_version();
+    size_t len = strlen(ver);
+    if (len >= max_size) len = max_size - 1;
+    memcpy(buf, ver, len);
+    buf[len] = '\0';
+    return 0;
+}
+
+static uint32_t autogen_proto_capabilities(void* context) {
+    (void)context;
+    return (uint32_t)(
+        PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING |
+        PROTO_CAP_AGENT_DISCOVERY | PROTO_CAP_CODE_EXECUTION | PROTO_CAP_HUMAN_LOOP);
 }
 
 const proto_adapter_t* autogen_get_protocol_adapter(void) {
@@ -621,11 +640,12 @@ const proto_adapter_t* autogen_get_protocol_adapter(void) {
         adapter.name = "AutoGen";
         adapter.version = AUTOGEN_ADAPTER_VERSION;
         adapter.description = "Microsoft AutoGen Framework Adapter - multi-agent conversations, group chat, code execution, human-in-the-loop";
+        adapter.type = PROTOCOL_CUSTOM;
         adapter.init = autogen_proto_init;
         adapter.destroy = autogen_proto_destroy;
         adapter.handle_request = autogen_proto_handle_request;
-        adapter.get_version = autogen_adapter_version;
-        adapter.capabilities = PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING | PROTO_CAP_AGENT_DISCOVERY | PROTO_CAP_CODE_EXECUTION | PROTO_CAP_HUMAN_LOOP;
+        adapter.get_version = autogen_proto_get_version;
+        adapter.capabilities = autogen_proto_capabilities;
         initialized = true;
     }
     return &adapter;

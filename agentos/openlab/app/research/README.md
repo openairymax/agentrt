@@ -1,75 +1,35 @@
-# openlab App - Research (科研智能体应用)
+# Research — 智能研究助手应用
 
-<div align="center">
+`openlab/app/research/` 是一款基于 AgentOS 平台的智能研究助手应用，辅助研究人员进行文献检索、数据分析和报告生成。
 
-[![Version](https://img.shields.io/badge/version-v1.0.0.9-blue.svg)](../../README.md)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](../../../LICENSE)
-[![Status](https://img.shields.io/badge/status-active%20development-yellow.svg)](../../README.md)
+## 核心能力
 
-**版本**: v1.0.0.9 | **更新日期**: 2026-03-25
+- **文献检索**：自动检索和筛选相关学术文献
+- **数据分析**：数据清洗、统计分析和可视化
+- **报告生成**：自动生成研究报告和论文草稿
+- **知识管理**：文献管理和知识图谱构建
 
-</div>
+## 使用方式
 
-## 📊 功能完成度
+```python
+from research import ResearchApp
 
-- **核心功能**: 75% 🔄
-- **单元测试**: 70% 🔄
-- **文档完善度**: 85% ✅
-- **开发状态**: 积极开发中 🟡
+research = ResearchApp()
 
-## 🎯 概述
+# 文献检索
+papers = research.search_papers(
+    query="reinforcement learning",
+    max_results=20,
+    sort_by="citations"
+)
 
-Research 是基于 AgentOS 的科研智能体应用，为科研人员提供文献检索、实验设计、数据分析和论文写作的全流程辅助。
+# 生成摘要
+summary = research.generate_summary(papers)
 
-### 核心功能
-
-- **文献检索**: 自动检索和整理相关学术文献
-- **实验设计**: 辅助设计实验方案和参数配置
-- **数据分析**: 统计分析、可视化展示
-- **论文写作**: 语法检查、格式规范、引用管理
-- **趋势预测**: 研究热点分析和趋势预测
-
-## 🛠️ 主要变更 (v1.0.0.9)
-
-- ✨ **新增**: 文献检索 API 集成（arXiv/PubMed/IEEE）
-- ✨ **新增**: 实验方案模板库
-- 🚀 **优化**: 数据分析性能提升 60%
-- 🚀 **优化**: 引用格式自动匹配期刊要求
-- 📝 **完善**: 添加论文写作辅助功能
-
-## 🔧 使用示例
-
-```bash
-# 启动科研智能体
-python -m openlab.app.research.main --manager manager.yaml
-
-# 文献检索模式
-python -m openlab.app.research.main --mode literature_search --query "deep learning"
-
-# 数据分析模式
-python -m openlab.app.research.main --mode data_analysis --input ./data.csv
+# 导出报告
+research.export_report("output/research_report.md")
 ```
-
-## 📈 性能指标
-
-| 指标 | 数值 | 测试条件 |
-|------|------|---------|
-| 文献检索速度 | < 3 秒 | 百篇文献 |
-| 数据分析准确率 | 98% | 标准数据集 |
-| 支持文献格式 | 20+ | BibTeX/EndNote/RefMan等 |
-
-## 🤝 贡献指南
-
-欢迎贡献代码或提出改进建议！
-
-## 📞 联系方式
-
-- **维护者**: openlab 社区
-- **技术支持**: lidecheng@spharx.cn
-- **问题反馈**: https://github.com/SpharxTeam/AgentOS/issues
 
 ---
 
-© 2026 SPHARX Ltd. All Rights Reserved.
-
-*"From data intelligence emerges 始于数据，终于智能。"*
+*AgentOS OpenLab — Research*

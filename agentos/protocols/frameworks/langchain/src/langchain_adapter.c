@@ -8,10 +8,12 @@
 #define LOG_TAG "langchain_adapter"
 
 #include "langchain_adapter.h"
+#include "unified_protocol.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include <ctype.h>
 
 langchain_config_t langchain_config_default(void) {
     langchain_config_t cfg = {0};
@@ -581,47 +583,58 @@ int langchain_get_statistics(langchain_adapter_context_t* ctx,
     return (written >= 0 && (size_t)written < buffer_size) ? 0 : -2;
 }
 
-static int langchain_proto_init(void** context) {
+static int langchain_proto_init(void* context) {
+    if (!context) return -1;
     langchain_config_t config = langchain_config_default();
     langchain_adapter_context_t* ctx = langchain_adapter_create(&config);
-    if (!ctx) return -1;
-    *context = ctx;
+    if (!ctx) return -2;
+    *(void**)context = ctx;
     return 0;
 }
 
-static void langchain_proto_destroy(void* context) {
+static int langchain_proto_destroy(void* context) {
     langchain_adapter_destroy((langchain_adapter_context_t*)context);
+    return 0;
 }
 
 static int langchain_proto_handle_request(void* context,
-                                           const char* raw_request,
-                                           size_t request_size,
-                                           const char* content_type,
-                                           char** response,
-                                           size_t* response_size,
-                                           char** response_content_type) {
-    if (!context || !raw_request) return -1;
-    (void)request_size;
-    (void)content_type;
+                                           const void* req,
+                                           void** resp) {
+    if (!context || !req || !resp) return -1;
 
     langchain_adapter_context_t* ctx = (langchain_adapter_context_t*)context;
+    const unified_message_t* msg = (const unified_message_t*)req;
+    const char* raw_request = (const char*)(msg->payload ? msg->payload : "{}");
 
     char agent_id[64] = "proto-agent";
     langchain_execution_result_t result = {0};
     int ret = langchain_agent_run(ctx, agent_id, raw_request, &result);
 
     if (ret == 0 && result.output_json) {
-        *response = strdup(result.output_json);
-        *response_size = strlen(result.output_json);
+        *resp = strdup(result.output_json);
     } else {
-        *response = strdup("{\"status\":\"error\"}");
-        *response_size = strlen(*response);
+        *resp = strdup("{\"status\":\"error\"}");
+        ret = -1;
     }
-
-    if (response_content_type) *response_content_type = strdup("application/json");
 
     langchain_execution_result_destroy(&result);
     return ret;
+}
+
+static int langchain_proto_get_version(void* context, char* buf, size_t max_size) {
+    (void)context;
+    if (!buf || max_size == 0) return -1;
+    const char* ver = LANGCHAIN_ADAPTER_VERSION;
+    size_t len = strlen(ver);
+    if (len >= max_size) len = max_size - 1;
+    memcpy(buf, ver, len);
+    buf[len] = '\0';
+    return 0;
+}
+
+static uint32_t langchain_proto_capabilities(void* context) {
+    (void)context;
+    return (uint32_t)(PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING | PROTO_CAP_AGENT_DISCOVERY | PROTO_CAP_RESOURCE_ACCESS);
 }
 
 const proto_adapter_t* langchain_get_protocol_adapter(void) {
@@ -635,8 +648,8 @@ const proto_adapter_t* langchain_get_protocol_adapter(void) {
         adapter.init = langchain_proto_init;
         adapter.destroy = langchain_proto_destroy;
         adapter.handle_request = langchain_proto_handle_request;
-        adapter.get_version = langchain_adapter_version;
-        adapter.capabilities = PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING | PROTO_CAP_AGENT_DISCOVERY | PROTO_CAP_RESOURCE_ACCESS;
+        adapter.get_version = langchain_proto_get_version;
+        adapter.capabilities = langchain_proto_capabilities;
         initialized = true;
     }
     return &adapter;

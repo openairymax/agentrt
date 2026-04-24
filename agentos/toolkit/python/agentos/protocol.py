@@ -48,7 +48,7 @@ class ProtocolConfig:
     """Configuration for a protocol client."""
     protocol_type: ProtocolType = ProtocolType.JSONRPC
     endpoint: str = "http://localhost:18789"
-    api_key: str = ""
+    api_key: Optional[str] = None
     timeout: int = 30
     retry_count: int = 3
     retry_delay: float = 1.0

@@ -157,30 +157,8 @@ static rpc_result_t create_error_result(int code, const char* message, const cha
     return result;
 }
 
-static rpc_result_t create_success_result(cJSON* result_data, const char* id_str) {
-    rpc_result_t result;
-    memset(&result, 0, sizeof(result));
-    result.error_code = 0;
-    result.error_message = NULL;
-
-    cJSON* success_resp = cJSON_CreateObject();
-    cJSON_AddStringToObject(success_resp, "jsonrpc", "2.0");
-    cJSON_AddItemToObject(success_resp, "result", result_data ? result_data : cJSON_CreateObject());
-
-    if (id_str) {
-        cJSON_AddRawToObject(success_resp, "id", id_str);
-    } else {
-        cJSON_AddNullToObject(success_resp, "id");
-    }
-
-    result.response_json = cJSON_PrintUnformatted(success_resp);
-    cJSON_Delete(success_resp);
-
-    return result;
-}
-
 static cJSON* extract_openai_to_jsonrpc(const char* request_data, size_t request_size,
-                                        char** out_method, char** out_id) {
+                                         char** out_method, char** out_id) {
     cJSON* root = cJSON_ParseWithLength(request_data, request_size);
     if (!root) return NULL;
 

@@ -1,95 +1,126 @@
-# AgentOS Syscall - 系统调用接口
+# Syscall — 系统调用层
 
-<div align="center">
+**路径**: `agentos/atoms/syscall/`
 
-[![Version](https://img.shields.io/badge/version-v1.0.0.7-blue.svg)](../../README.md)
-[![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](../../../LICENSE)
+Syscall 层是 AgentOS 中**用户态与内核态之间的唯一通道**，提供统一的系统调用抽象接口。它将底层硬件的异构性和操作系统的差异性封装为标准的 API 集合，确保上层模块能以统一的方式访问系统资源。
 
-**版本**: v1.0.0.7 | **最后更新**: 2026-04-03
+---
 
-</div>
+## 设计原则
 
-## ✅ 完成状态
+- **统一抽象**: 所有系统资源通过统一的调用接口访问
+- **线程安全**: 所有接口设计为可重入、线程安全
+- **最小权限**: 每个调用携带调用方身份，内核进行权限校验
+- **零拷贝**: 核心数据路径避免不必要的数据复制
+- **异步兼容**: 同步接口与异步回调机制并存
+- **跨语言 FFI**: C ABI 导出，支持跨语言调用
 
-- **核心功能**: 100% ✅
-- **单元测试**: 100% ✅
-- **文档覆盖**: 100% ✅
-- **代码审查**: ✅
+---
 
-## 📖 概述
+## 接口体系
 
-Syscall（系统调用）是用户态程序与内核之间的**唯一通信通道**，防止其他模块（如 `agentos/daemon/`）绕过 syscall 直接调用内核内部函数。
+Syscall 层提供 5 类标准系统调用接口：
 
-本模块实现完整的系统调用接口，提供任务管理、内存操作、会话管理、可观测性、Agent 管理等核心功能。
+### 1. 任务调用 (Task Calls)
 
-## 🏗️ 架构设计
+任务生命周期管理和调度控制。
 
-### 核心接口分类
-
-| 类别 | 接口 | 说明 |
+| 接口 | 功能 | 参数 |
 |------|------|------|
-| **任务管理** | `agentos_sys_task_submit/query/wait/cancel` | 任务全生命周期管理 |
-| **内存管理** | `agentos_sys_memory_write/search/get/delete` | 记忆 CRUD 操作 |
-| **会话管理** | `agentos_sys_session_create/get/close/list` | 多轮对话会话管理 |
-| **可观测性** | `agentos_sys_telemetry_metrics/traces` | 指标采集和链路追踪 |
-| **Agent 管理** | `agentos_sys_agent_register/invoke/terminate` | Agent 生命周期管理 |
+| `task_create` | 创建新任务 | 入口函数、栈大小、优先级 |
+| `task_schedule` | 调度任务执行 | 任务 ID、调度策略 |
+| `task_suspend` | 挂起任务 | 任务 ID |
+| `task_resume` | 恢复任务 | 任务 ID |
+| `task_terminate` | 终止任务 | 任务 ID、退出码 |
+| `task_yield` | 主动让出 CPU | 无 |
+| `task_setprio` | 设置任务优先级 | 任务 ID、优先级 |
 
-### 设计原则
+### 2. 内存调用 (Memory Calls)
 
-- **唯一通道**: 用户态与内核通信的唯一路径
-- **接口规范**: 所有 API 通过 Doxygen 规范注释
-- **线程安全**: 所有系统调用保证线程安全
-- **错误处理**: 统一错误码和错误信息
+内存分配、映射和释放。
 
-## 🚀 主要功能 (v1.0.0.6)
+| 接口 | 功能 | 参数 |
+|------|------|------|
+| `mem_alloc` | 分配内存 | 大小、对齐方式 |
+| `mem_free` | 释放内存 | 指针 |
+| `mem_map` | 映射虚拟内存 | 物理地址、大小、权限 |
+| `mem_unmap` | 解除映射 | 虚拟地址 |
+| `mem_share` | 创建共享内存 | 大小、键值 |
+| `mem_protect` | 修改内存保护属性 | 地址、大小、权限 |
 
-- ✅ **完整实现**: 完整系统调用接口实现，包括任务/内存/会话/可观测性/Agent 等
-- ✅ **文档完善**: Doxygen 规范注释覆盖所有公开 API
-- 🚀 **优化**: 性能优化和统一错误处理机制
-- 🚀 **优化**: 支持跨进程 IPC 调用封装
-- 📚 **文档**: 接口文档和使用示例
+### 3. 会话调用 (Session Calls)
 
-## 📦 依赖
+会话管理和上下文维护。
 
-- AgentOS 微内核 (`corekern`)
-- AgentOS 公共库 (`commons`)
-- cJSON (>=1.7.15)
+| 接口 | 功能 | 参数 |
+|------|------|------|
+| `session_create` | 创建新会话 | 会话类型、配置 |
+| `session_destroy` | 销毁会话 | 会话 ID |
+| `session_get` | 获取会话信息 | 会话 ID |
+| `session_set` | 设置会话属性 | 会话 ID、键值对 |
 
-## 🔧 编译
+### 4. 遥测调用 (Telemetry Calls)
 
-```bash
-mkdir build && cd build
-cmake ../agentos/atoms/syscall -DBUILD_TESTS=ON
-make -j4
+系统监控、日志和性能数据采集。
+
+| 接口 | 功能 | 参数 |
+|------|------|------|
+| `telemetry_log` | 写入日志 | 级别、消息、标签 |
+| `telemetry_metric` | 上报指标 | 指标名、值、标签 |
+| `telemetry_trace` | 创建追踪 | 操作名、父 Span ID |
+| `telemetry_span_end` | 结束追踪 | Span ID |
+
+### 5. 代理调用 (Agent Calls)
+
+智能体代理相关的特定调用。
+
+| 接口 | 功能 | 参数 |
+|------|------|------|
+| `agent_register` | 注册智能体 | 名称、能力声明 |
+| `agent_unregister` | 注销智能体 | 代理 ID |
+| `agent_discover` | 发现智能体 | 能力过滤条件 |
+| `agent_invoke` | 调用智能体能力 | 代理 ID、能力名称、参数 |
+| `agent_cancel` | 取消调用 | 调用 ID |
+
+---
+
+## 调用流程
+
 ```
-
-## 🔗 集成
-
-syscall 模块是 AgentOS 的标准接口层，所有用户态程序通过 syscall 与内核交互：
+调用方 → 用户态 API → Syscall 入口 → 权限检查 → 参数校验 → 内核处理 → 返回结果
+```
 
 ```c
-// 提交任务
-const char* input = "{\"task\": \"analyze_data\"}";
-char* output = NULL;
-agentos_error_t err = agentos_sys_task_submit(input, strlen(input), 5000, &output);
-if (err == AGENTOS_SUCCESS) {
-    printf("Task output: %s\n", output);
-    agentos_sys_free(output);
-}
-
-// 查询任务状态
-int status = 0;
-err = agentos_sys_task_query(task_id, &status);
+// 调用示例: 创建任务
+syscall_ret_t ret = syscall_invoke(SYSCALL_TASK_CREATE, 3,
+    (uint64_t)entry_func,   // arg1: 入口函数
+    (uint64_t)stack_size,   // arg2: 栈大小
+    (uint64_t)priority      // arg3: 优先级
+);
 ```
 
-## 📞 联系方式
+---
 
-- **维护者**: AgentOS 架构委员会
-- **技术支持**: lidecheng@spharx.cn
-- **问题反馈**: https://github.com/SpharxTeam/AgentOS/issues
+## 安全机制
+
+Syscall 层实现了多层安全防护：
+
+| 安全层 | 说明 |
+|--------|------|
+| 参数校验 | 对所有输入参数进行边界检查和类型验证 |
+| 权限检查 | 调用方身份验证，基于能力模型的访问控制 |
+| 审计日志 | 所有系统调用记录审计日志，支持事后追溯 |
+| 速率限制 | 防止 DoS 攻击的调用频率控制 |
+
+---
+
+## 与相关模块的关系
+
+- **CoreKern**: Syscall 是 CoreKern 暴露给上层的能力接口
+- **CoreLoopThree**: 通过 Syscall 获取系统资源和执行系统操作
+- **TaskFlow**: 通过 Syscall 的任务调用管理任务生命周期
+- **Daemon 服务**: 各守护进程通过 Syscall 访问系统级能力
 
 ---
 
 © 2026 SPHARX Ltd. All Rights Reserved.
-
-*"系统调用，用户态与内核的唯一通道。"*

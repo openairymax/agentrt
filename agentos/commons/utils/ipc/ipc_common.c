@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <stdbool.h>
 
 #ifdef _WIN32
     #define WIN32_LEAN_AND_MEAN
@@ -141,14 +142,64 @@ struct ipc_mq {
     size_t total_dequeued;            /**< 总出队消息数 */
     ipc_mq_message_t* head;           /**< 队列头（高优先级） */
     ipc_mq_message_t* tail;           /**< 队列尾（低优先级） */
-#ifdef _WIN32
+# ifdef _WIN32
     HANDLE hMutex;                    /**< Windows 互斥锁 */
     HANDLE hNotEmpty;                 /**< 非空条件变量 */
-#else
+# else
     pthread_mutex_t mutex;            /**< POSIX 互斥锁 */
     pthread_cond_t not_empty;         /**< 非空条件变量 */
-#endif
+# endif
     char error_msg[256];              /**< 错误消息缓冲区 */
+};
+
+/**
+ * @brief RPC 方法节点
+ */
+typedef struct rpc_method_node {
+    char* method_name;                    /**< 方法名称 */
+    rpc_method_handler_t handler;         /**< 处理函数 */
+    void* user_data;                      /**< 用户数据 */
+    struct rpc_method_node* next;         /**< 下一个方法 */
+} rpc_method_node_t;
+
+/**
+ * @brief RPC 请求/响应消息格式
+ */
+typedef struct {
+    uint32_t magic;                   /**< RPC 魔数 */
+    uint32_t version;                 /**< 协议版本 */
+    uint64_t request_id;              /**< 请求 ID（用于匹配响应） */
+    uint32_t method_name_len;         /**< 方法名称长度 */
+    uint32_t payload_len;             /**< 负载长度 */
+    uint32_t status;                  /**< 响应状态码 */
+    char method_name[256];            /**< 方法名称 */
+} ipc_rpc_header_t;
+
+#define IPC_RPC_MAGIC 0x52504300  /* "RPC\0" */
+
+/**
+ * @brief RPC 服务端内部结构
+ */
+struct ipc_rpc_server {
+    char* service_name;             /**< 服务名称 */
+    rpc_method_node_t* methods;     /**< 方法链表 */
+    size_t method_count;            /**< 方法数量 */
+    ipc_channel_t* transport;       /**< 底层传输通道 */
+    size_t max_request_size;        /**< 最大请求大小 */
+    size_t max_response_size;       /**< 最大响应大小 */
+    uint64_t request_id_counter;    /**< 请求 ID 计数器 */
+    bool running;                   /**< 是否运行中 */
+    char error_msg[256];            /**< 错误消息缓冲区 */
+};
+
+/**
+ * @brief RPC 客户端内部结构
+ */
+struct ipc_rpc_client {
+    ipc_channel_t* transport;       /**< 底层传输通道 */
+    uint32_t timeout_ms;            /**< 默认超时 */
+    uint64_t request_id_counter;    /**< 请求 ID 计数器 */
+    char error_msg[256];            /**< 错误消息缓冲区 */
 };
 
 /* ============================================================================
@@ -637,7 +688,7 @@ agentos_error_t ipc_send_data(
     msg.header.type = IPC_MSG_DATA;
     msg.header.flags = 0;
     msg.header.msg_id = ++channel->msg_id_counter;
-    msg.header.payload_len = (uint32_t)len;
+    msg.header.payload_len = len;
     msg.header.timestamp = ipc_get_timestamp_ns();
     msg.payload = (void*)data;
     msg.payload_size = len;
@@ -814,7 +865,7 @@ agentos_error_t ipc_receive(
         if (fd >= 0) {
             payload_read = read(fd, message->payload, message->header.payload_len);
             
-            if (payload_read <= 0 || (uint32_t)payload_read < message->header.payload_len) {
+            if (payload_read <= 0 || (size_t)payload_read < message->header.payload_len) {
                 free(message->payload);
                 message->payload = NULL;
                 channel->stats.errors++;
@@ -1194,7 +1245,7 @@ void* ipc_shm_map(ipc_shm_t* shm) {
         INVALID_HANDLE_VALUE,
         NULL,
         shm->config.read_only ? PAGE_READONLY : PAGE_READWRITE,
-        0,
+        (DWORD)(shm->config.size >> 32),
         (DWORD)(shm->config.size & 0xFFFFFFFF),
         shm->config.name
     );
@@ -1743,7 +1794,7 @@ ipc_message_t* ipc_message_create(ipc_msg_type_t type, const void* payload, size
     msg->header.correlation_id = 0;
     memset(msg->header.source, 0, sizeof(msg->header.source));
     memset(msg->header.target, 0, sizeof(msg->header.target));
-    msg->header.payload_len = (uint32_t)payload_len;
+    msg->header.payload_len = payload_len;
     msg->header.checksum = 0;
     msg->header.timestamp = ipc_get_timestamp_ns();
     memset(msg->header.reserved, 0, sizeof(msg->header.reserved));
@@ -1917,6 +1968,317 @@ agentos_error_t ipc_flush(ipc_channel_t* channel) {
     if (!channel) {
         return AGENTOS_EINVAL;
     }
-    
+
+#ifdef _WIN32
+    if (channel->hPipe != INVALID_HANDLE_VALUE) {
+        FlushFileBuffers(channel->hPipe);
+    }
+#else
+    int fd = (channel->fd_write >= 0) ? channel->fd_write : channel->socket_fd;
+    if (fd >= 0) {
+        fsync(fd);
+    }
+#endif
+
+    return AGENTOS_SUCCESS;
+}
+
+/* ============================================================================
+ * RPC 通道 API 实现
+ * ============================================================================ */
+
+static rpc_method_node_t* rpc_find_method_node(ipc_rpc_server_t* server, const char* name) {
+    rpc_method_node_t* node = server->methods;
+    while (node) {
+        if (strcmp(node->method_name, name) == 0) return node;
+        node = node->next;
+    }
+    return NULL;
+}
+
+ipc_rpc_server_t* ipc_rpc_server_create(const ipc_rpc_server_config_t* config) {
+    if (!config || !config->transport) return NULL;
+
+    ipc_rpc_server_t* server = (ipc_rpc_server_t*)calloc(1, sizeof(ipc_rpc_server_t));
+    if (!server) return NULL;
+
+    server->transport = config->transport;
+    server->max_request_size = config->max_request_size > 0 ? config->max_request_size : (64 * 1024);
+    server->max_response_size = config->max_response_size > 0 ? config->max_response_size : (64 * 1024);
+
+    if (config->service_name) {
+        server->service_name = strdup(config->service_name);
+    }
+
+    for (size_t i = 0; i < config->method_count; i++) {
+        rpc_method_node_t* node = (rpc_method_node_t*)calloc(1, sizeof(rpc_method_node_t));
+        if (!node) continue;
+        node->method_name = strdup(config->methods[i].method_name);
+        node->handler = config->methods[i].handler;
+        node->user_data = config->methods[i].user_data;
+        node->next = server->methods;
+        server->methods = node;
+        server->method_count++;
+    }
+
+    return server;
+}
+
+void ipc_rpc_server_destroy(ipc_rpc_server_t* server) {
+    if (!server) return;
+
+    rpc_method_node_t* node = server->methods;
+    while (node) {
+        rpc_method_node_t* next = node->next;
+        free(node->method_name);
+        free(node);
+        node = next;
+    }
+
+    free(server->service_name);
+    free(server);
+}
+
+agentos_error_t ipc_rpc_server_start(ipc_rpc_server_t* server) {
+    if (!server) return AGENTOS_EINVAL;
+    if (server->running) return AGENTOS_EBUSY;
+    server->running = true;
+    return AGENTOS_SUCCESS;
+}
+
+agentos_error_t ipc_rpc_server_stop(ipc_rpc_server_t* server) {
+    if (!server) return AGENTOS_EINVAL;
+    server->running = false;
+    return AGENTOS_SUCCESS;
+}
+
+agentos_error_t ipc_rpc_server_register_method(ipc_rpc_server_t* server, const ipc_rpc_method_t* method) {
+    if (!server || !method || !method->method_name || !method->handler) return AGENTOS_EINVAL;
+
+    rpc_method_node_t* existing = rpc_find_method_node(server, method->method_name);
+    if (existing) {
+        existing->handler = method->handler;
+        existing->user_data = method->user_data;
+        return AGENTOS_SUCCESS;
+    }
+
+    rpc_method_node_t* node = (rpc_method_node_t*)calloc(1, sizeof(rpc_method_node_t));
+    if (!node) return AGENTOS_ENOMEM;
+
+    node->method_name = strdup(method->method_name);
+    node->handler = method->handler;
+    node->user_data = method->user_data;
+    node->next = server->methods;
+    server->methods = node;
+    server->method_count++;
+
+    return AGENTOS_SUCCESS;
+}
+
+rpc_method_handler_t ipc_rpc_server_find_method(ipc_rpc_server_t* server, const char* method_name) {
+    if (!server || !method_name) return NULL;
+    rpc_method_node_t* node = rpc_find_method_node(server, method_name);
+    return node ? node->handler : NULL;
+}
+
+agentos_error_t ipc_rpc_server_process(ipc_rpc_server_t* server, uint32_t timeout_ms) {
+    if (!server || !server->running || !server->transport) return AGENTOS_EINVAL;
+    if (ipc_channel_get_state(server->transport) != IPC_STATE_OPEN) return AGENTOS_ENOTCONN;
+
+    ipc_message_t msg = {0};
+    agentos_error_t err = ipc_receive(server->transport, &msg, timeout_ms);
+    if (err != AGENTOS_SUCCESS) return err;
+
+    /* 验证 RPC 消息 */
+    if (msg.header.magic != IPC_MAGIC) {
+        ipc_message_free(&msg);
+        return AGENTOS_EINVAL;
+    }
+
+    /* 解析方法名称（从负载中提取） */
+    if (msg.payload == NULL || msg.payload_size == 0) {
+        ipc_message_free(&msg);
+        return AGENTOS_EINVAL;
+    }
+
+    /* 负载格式：[method_name\0][request_payload] */
+    char* method_name = (char*)msg.payload;
+    size_t name_len = strnlen(method_name, msg.payload_size);
+    if (name_len >= msg.payload_size) {
+        ipc_message_free(&msg);
+        return AGENTOS_EINVAL;
+    }
+
+    void* request_payload = (char*)msg.payload + name_len + 1;
+    size_t request_len = msg.payload_size - name_len - 1;
+
+    rpc_method_node_t* node = rpc_find_method_node(server, method_name);
+    if (!node) {
+        /* 方法未找到，返回错误响应 */
+        ipc_rpc_header_t rsp_hdr = {0};
+        rsp_hdr.magic = IPC_RPC_MAGIC;
+        rsp_hdr.version = 1;
+        rsp_hdr.request_id = msg.header.msg_id;
+        rsp_hdr.status = 404; /* Method not found */
+        snprintf(rsp_hdr.method_name, sizeof(rsp_hdr.method_name), "ERROR: method '%s' not found", method_name);
+
+        ipc_message_t rsp_msg = {0};
+        rsp_msg.header = msg.header;
+        rsp_msg.header.type = IPC_MSG_RESPONSE;
+        rsp_msg.header.payload_len = sizeof(rsp_hdr);
+        rsp_msg.payload = &rsp_hdr;
+        rsp_msg.payload_size = sizeof(rsp_hdr);
+
+        ipc_send(server->transport, &rsp_msg);
+        ipc_message_free(&msg);
+        return AGENTOS_ENOENT;
+    }
+
+    /* 调用处理函数 */
+    size_t response_max = server->max_response_size;
+    void* response_buf = calloc(1, response_max);
+    if (!response_buf) {
+        ipc_message_free(&msg);
+        return AGENTOS_ENOMEM;
+    }
+
+    size_t response_len = 0;
+    agentos_error_t handler_err = node->handler(
+        request_payload, request_len,
+        response_buf, &response_len,
+        node->user_data
+    );
+
+    /* 构建响应消息 */
+    ipc_rpc_header_t rsp_hdr = {0};
+    rsp_hdr.magic = IPC_RPC_MAGIC;
+    rsp_hdr.version = 1;
+    rsp_hdr.request_id = msg.header.msg_id;
+    rsp_hdr.status = (handler_err == AGENTOS_SUCCESS) ? 0 : (uint32_t)handler_err;
+    rsp_hdr.method_name_len = (uint32_t)strlen(method_name);
+    rsp_hdr.payload_len = (uint32_t)response_len;
+    memcpy(rsp_hdr.method_name, method_name, strlen(method_name));
+
+    /* 发送响应 */
+    ipc_message_t rsp_msg = {0};
+    rsp_msg.header = msg.header;
+    rsp_msg.header.type = IPC_MSG_RESPONSE;
+    rsp_msg.header.payload_len = sizeof(rsp_hdr) + response_len;
+
+    /* 将 header 和 response_buf 合并 */
+    size_t total_payload = sizeof(rsp_hdr) + response_len;
+    void* combined_payload = malloc(total_payload);
+    if (combined_payload) {
+        memcpy(combined_payload, &rsp_hdr, sizeof(rsp_hdr));
+        if (response_len > 0) {
+            memcpy((char*)combined_payload + sizeof(rsp_hdr), response_buf, response_len);
+        }
+        rsp_msg.payload = combined_payload;
+        rsp_msg.payload_size = total_payload;
+        ipc_send(server->transport, &rsp_msg);
+        free(combined_payload);
+    }
+
+    free(response_buf);
+    ipc_message_free(&msg);
+    return AGENTOS_SUCCESS;
+}
+
+ipc_rpc_client_t* ipc_rpc_client_create(const ipc_rpc_client_config_t* config) {
+    if (!config || !config->transport) return NULL;
+
+    ipc_rpc_client_t* client = (ipc_rpc_client_t*)calloc(1, sizeof(ipc_rpc_client_t));
+    if (!client) return NULL;
+
+    client->transport = config->transport;
+    client->timeout_ms = config->timeout_ms > 0 ? config->timeout_ms : IPC_DEFAULT_TIMEOUT_MS;
+
+    return client;
+}
+
+void ipc_rpc_client_destroy(ipc_rpc_client_t* client) {
+    if (!client) return;
+    free(client);
+}
+
+agentos_error_t ipc_rpc_call_sync(
+    ipc_rpc_client_t* client,
+    const char* method_name,
+    const void* request,
+    size_t request_len,
+    void* response,
+    size_t response_max,
+    size_t* response_len
+) {
+    if (!client || !method_name || !request) return AGENTOS_EINVAL;
+    if (ipc_channel_get_state(client->transport) != IPC_STATE_OPEN) return AGENTOS_ENOTCONN;
+
+    size_t name_len = strlen(method_name);
+    size_t total_payload = name_len + 1 + request_len;
+
+    /* 构建请求负载: [method_name\0][request_data] */
+    void* request_buf = malloc(total_payload);
+    if (!request_buf) return AGENTOS_ENOMEM;
+
+    memcpy(request_buf, method_name, name_len);
+    ((char*)request_buf)[name_len] = '\0';
+    if (request_len > 0) {
+        memcpy((char*)request_buf + name_len + 1, request, request_len);
+    }
+
+    /* 发送请求 */
+    ipc_message_t req_msg = {0};
+    req_msg.header.magic = IPC_MAGIC;
+    req_msg.header.version = 1;
+    req_msg.header.type = IPC_MSG_REQUEST;
+    req_msg.header.msg_id = ++client->request_id_counter;
+    req_msg.header.payload_len = total_payload;
+    req_msg.header.timestamp = 0;
+    req_msg.payload = request_buf;
+    req_msg.payload_size = total_payload;
+
+    agentos_error_t err = ipc_send(client->transport, &req_msg);
+    free(request_buf);
+    if (err != AGENTOS_SUCCESS) return err;
+
+    /* 等待响应 */
+    ipc_message_t rsp_msg = {0};
+    err = ipc_receive(client->transport, &rsp_msg, client->timeout_ms);
+    if (err != AGENTOS_SUCCESS) return err;
+
+    /* 验证响应 */
+    if (rsp_msg.payload == NULL || rsp_msg.payload_size < sizeof(ipc_rpc_header_t)) {
+        ipc_message_free(&rsp_msg);
+        return AGENTOS_EINVAL;
+    }
+
+    ipc_rpc_header_t* rsp_hdr = (ipc_rpc_header_t*)rsp_msg.payload;
+    if (rsp_hdr->magic != IPC_RPC_MAGIC) {
+        ipc_message_free(&rsp_msg);
+        return AGENTOS_EINVAL;
+    }
+
+    if (rsp_hdr->status != 0) {
+        /* RPC 调用失败 */
+        ipc_message_free(&rsp_msg);
+        return (agentos_error_t)rsp_hdr->status;
+    }
+
+    /* 提取响应负载 */
+    size_t actual_response_len = rsp_hdr->payload_len;
+    if (actual_response_len > response_max) {
+        actual_response_len = response_max;
+    }
+
+    if (actual_response_len > 0 && response) {
+        void* resp_payload = (char*)rsp_msg.payload + sizeof(ipc_rpc_header_t);
+        memcpy(response, resp_payload, actual_response_len);
+    }
+
+    if (response_len) {
+        *response_len = rsp_hdr->payload_len;
+    }
+
+    ipc_message_free(&rsp_msg);
     return AGENTOS_SUCCESS;
 }
