@@ -259,10 +259,14 @@ int cupolas_config_rollback(cupolas_config_t* cfg, config_type_t type) {
 
     if (type >= 0 && type < CONFIG_TYPE_ALL) {
         config_entry_t* entry = &cfg->entries[type];
+        config_status_t prev_status = entry->status;
         entry->status = CONFIG_STATUS_ROLLBACK;
         snprintf(cfg->last_error, sizeof(cfg->last_error),
-                "Rolled back %s", config_type_names[type]);
-        entry->status = CONFIG_STATUS_APPLIED;
+                "Rolled back %s (from %s)", config_type_names[type],
+                config_status_names[prev_status]);
+        if (entry->version.major > 0) {
+            entry->version.patch = (entry->version.patch > 0) ? entry->version.patch - 1 : 0;
+        }
     }
 
     cupolas_rwlock_unlock(&cfg->lock);
@@ -347,8 +351,15 @@ int cupolas_config_set_auto_reload(cupolas_config_t* cfg, config_type_t type,
                                 uint32_t interval_ms) {
     if (!cfg) return -1;
 
-    cupolas_UNUSED(type);
-    cupolas_UNUSED(interval_ms);
+    cupolas_rwlock_wrlock(&cfg->lock);
+
+    if (interval_ms > 0) {
+        cfg->monitor_running = true;
+    } else {
+        cfg->monitor_running = false;
+    }
+
+    cupolas_rwlock_unlock(&cfg->lock);
 
     return 0;
 }

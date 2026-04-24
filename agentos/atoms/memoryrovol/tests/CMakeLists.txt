@@ -12,7 +12,7 @@ set(MEMORYROVOL_TEST_TARGETS
 )
 
 foreach(test ${MEMORYROVOL_TEST_TARGETS})
-    add_executable(${test} ${test}.c)
+    add_executable(${test} ${test}.c ${CMAKE_CURRENT_SOURCE_DIR}/test_memoryrovol_stubs.c)
     target_include_directories(${test} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/../include
         ${CMAKE_CURRENT_SOURCE_DIR}/../src

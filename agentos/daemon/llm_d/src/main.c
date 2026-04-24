@@ -110,7 +110,6 @@ static request_context_t* request_context_create(void) {
 static void request_context_destroy(request_context_t* ctx) {
     if (!ctx) return;
     
-    /* 释放消息内容 */
     for (size_t i = 0; i < ctx->message_count; i++) {
         free((void*)ctx->messages[i].role);
         free((void*)ctx->messages[i].content);
@@ -137,7 +136,8 @@ static int parse_params(cJSON* params, request_context_t* ctx, llm_request_confi
     if (!cJSON_IsString(model)) {
         return -1;
     }
-    cfg->model = model->valuestring;
+    cfg->model = strdup(model->valuestring);
+    if (!cfg->model) return -1;
     
     /* 解析消息 */
     cJSON* messages = cJSON_GetObjectItem(params, "messages");
@@ -279,12 +279,14 @@ static char* handle_complete(cJSON* params, int id) {
     (void)end_time;  /* 可用于记录延迟 */
     
     if (ret != 0) {
+        free((void*)cfg.model);
         request_context_destroy(ctx);
         return jsonrpc_build_error(INTERNAL_ERROR, "Service error", id);
     }
     
     char* resp_json = response_to_json(resp);
     llm_response_free(resp);
+    free((void*)cfg.model);
     
     if (!resp_json) {
         request_context_destroy(ctx);
@@ -338,6 +340,7 @@ static char* handle_complete_stream(cJSON* params, int id, agentos_socket_t clie
     int ret = llm_service_complete_stream(g_service, &cfg, llm_stream_callback, &stream_ctx, &resp);
     
     if (ret != 0) {
+        free((void*)cfg.model);
         request_context_destroy(ctx);
         return jsonrpc_build_error(INTERNAL_ERROR, "Service error", id);
     }
@@ -346,6 +349,7 @@ static char* handle_complete_stream(cJSON* params, int id, agentos_socket_t clie
         llm_response_free(resp);
     }
     
+    free((void*)cfg.model);
     request_context_destroy(ctx);
     return NULL;
 }

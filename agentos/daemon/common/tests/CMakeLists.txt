@@ -61,3 +61,37 @@ foreach(TEST_SRC ${TEST_SOURCES})
 endforeach()
 
 message(STATUS "  svc_common_tests: ${TEST_SOURCES}")
+
+# ===== P1-C06 深度单元测试 (test_daemon_common.c) =====
+add_executable(svc_test_daemon_common test_daemon_common.c)
+
+target_include_directories(svc_test_daemon_common PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../agentos/commons/include
+)
+
+target_link_libraries(svc_test_daemon_common PRIVATE
+    svc_common
+    Threads::Threads
+)
+
+find_package(cjson QUIET)
+if(TARGET cjson OR cjson_FOUND)
+    target_link_libraries(svc_test_daemon_common PRIVATE cjson)
+endif()
+
+find_package(CURL QUIET)
+if(CURL_FOUND)
+    target_include_directories(svc_test_daemon_common PRIVATE ${CURL_INCLUDE_DIRS})
+    target_link_libraries(svc_test_daemon_common PRIVATE ${CURL_LIBRARIES})
+endif()
+
+target_compile_options(svc_test_daemon_common PRIVATE
+    -Wall -Wextra -g -Wno-unused-function -Wno-unused-variable
+)
+
+add_test(NAME svc_test_daemon_common COMMAND svc_test_daemon_common
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+message(STATUS "  [test] svc_test_daemon_common: P1-C06 deep unit tests configured")

@@ -282,6 +282,34 @@ agentos_error_t agentos_sandbox_create(const sandbox_config_t* manager,
 
     sandbox_quota_init(&sandbox->quota);
 
+    /* 初始化增强功能（内联实现） */
+    {
+        sandbox->audit_capacity = MAX_AUDIT_ENTRIES;
+        sandbox->audit_log = (audit_entry_t*)AGENTOS_CALLOC(
+            sandbox->audit_capacity, sizeof(audit_entry_t));
+        if (!sandbox->audit_log) {
+            sandbox->audit_capacity = 0;
+        }
+        sandbox->audit_count = 0;
+        sandbox->audit_write_index = 0;
+        
+        memset(&sandbox->policy, 0, sizeof(security_policy_t));
+        sandbox->policy.version = 1;
+        sandbox->policy.last_updated = time(NULL);
+        strncpy(sandbox->policy.updated_by, "system", 
+                sizeof(sandbox->policy.updated_by) - 1);
+        sandbox->policy.allow_dynamic_update = 1;
+        sandbox->policy.strict_mode = 0;
+        sandbox->policy.audit_level = 1;
+        sandbox->policy.risk_threshold = 0.7f;
+        
+        memset(&sandbox->perf_stats, 0, sizeof(sandbox_perf_stats_t));
+        sandbox->perf_stats.stats_reset_time = time(NULL);
+        
+        sandbox->enable_input_sanitization = 1;
+        sandbox->enable_resource_monitoring = 1;
+    }
+
     sandbox->lock = agentos_mutex_create();
     if (!sandbox->lock) {
         if (sandbox->sandbox_name) AGENTOS_FREE(sandbox->sandbox_name);
@@ -607,44 +635,6 @@ static void sandbox_add_enhanced_audit_entry(
     if (sandbox->audit_count < sandbox->audit_capacity) {
         sandbox->audit_count++;
     }
-}
-
-/**
- * @brief 初始化增强功能（在创建沙箱时调用）
- * @note [INFRA] 保留供未来沙箱增强功能使用
- */
-static void init_sandbox_enhancements(agentos_sandbox_t* sandbox) {
-    if (!sandbox) return;
-    
-    /* 初始化审计日志缓冲区 */
-    sandbox->audit_capacity = MAX_AUDIT_ENTRIES;
-    sandbox->audit_log = (audit_entry_t*)AGENTOS_CALLOC(
-        sandbox->audit_capacity, sizeof(audit_entry_t));
-    if (!sandbox->audit_log) {
-        sandbox->audit_capacity = 0;
-        AGENTOS_LOG_ERROR("Failed to allocate audit log buffer");
-    }
-    sandbox->audit_count = 0;
-    sandbox->audit_write_index = 0;
-    
-    /* 初始化安全策略 */
-    memset(&sandbox->policy, 0, sizeof(security_policy_t));
-    sandbox->policy.version = 1;
-    sandbox->policy.last_updated = time(NULL);
-    strncpy(sandbox->policy.updated_by, "system", 
-            sizeof(sandbox->policy.updated_by) - 1);
-    sandbox->policy.allow_dynamic_update = 1;
-    sandbox->policy.strict_mode = 0;
-    sandbox->policy.audit_level = 1; /* 标准审计级别 */
-    sandbox->policy.risk_threshold = 0.7f;
-    
-    /* 初始化性能统计 */
-    memset(&sandbox->perf_stats, 0, sizeof(sandbox_perf_stats_t));
-    sandbox->perf_stats.stats_reset_time = time(NULL);
-    
-    /* 默认启用增强功能 */
-    sandbox->enable_input_sanitization = 1;
-    sandbox->enable_resource_monitoring = 1;
 }
 
 /**

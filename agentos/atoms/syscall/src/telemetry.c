@@ -21,7 +21,7 @@
 
 /* heapstore 集成接口（heapstore模块可选） */
 #ifdef BUILD_HEAPSTORE
-"heapstore/include/heapstore_integration.h"
+#include "heapstore/include/heapstore_integration.h"
 #endif
 
 /* Unified base library compatibility layer */

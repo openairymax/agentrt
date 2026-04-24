@@ -198,7 +198,6 @@ static void test_mem_realloc_null(void)
 
     void* ptr = agentos_mem_realloc(NULL, 128);
     TEST_ASSERT_NOT_NULL(ptr, "realloc(NULL, 128) 等价于 malloc(128)");
-    agentos_mem_free(ptr);
 
     void* result = agentos_mem_realloc(ptr, 0);
     TEST_ASSERT_NULL(result, "realloc(ptr, 0) 等价于 free(ptr)");

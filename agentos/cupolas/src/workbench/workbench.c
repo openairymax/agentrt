@@ -253,35 +253,31 @@ int workbench_execute(workbench_t* wb, const char* command, char* const argv[],
     uint32_t timeout_ms = wb->manager.timeout_ms > 0 ? wb->manager.timeout_ms : 0;
     
     cupolas_exit_status_t status;
+    bool timed_out = false;
     ret = cupolas_process_wait(wb->process, &status, timeout_ms);
     
-    cupolas_mutex_lock(&wb->lock);
-    
     if (ret == cupolas_ERROR_TIMEOUT) {
+        timed_out = true;
         cupolas_process_terminate(wb->process, 9);
         cupolas_process_wait(wb->process, &status, 1000);
-        
-        cupolas_workbench_read_output(wb);
-        cupolas_workbench_close_pipes(wb);
-        cupolas_process_close(wb->process);
-        
-        cupolas_workbench_fill_result(wb, result, -1, false, 0, true);
-        
-        wb->state = WORKBENCH_STATE_STOPPED;
-        cupolas_mutex_unlock(&wb->lock);
-        return cupolas_ERROR_TIMEOUT;
     }
     
     cupolas_workbench_read_output(wb);
     cupolas_workbench_close_pipes(wb);
     cupolas_process_close(wb->process);
     
-    cupolas_workbench_fill_result(wb, result, status.code, status.signaled, status.signal, false);
+    cupolas_mutex_lock(&wb->lock);
     
-    wb->state = WORKBENCH_STATE_IDLE;
+    if (timed_out) {
+        cupolas_workbench_fill_result(wb, result, -1, false, 0, true);
+        wb->state = WORKBENCH_STATE_STOPPED;
+    } else {
+        cupolas_workbench_fill_result(wb, result, status.code, status.signaled, status.signal, false);
+        wb->state = WORKBENCH_STATE_IDLE;
+    }
+    
     cupolas_mutex_unlock(&wb->lock);
-    
-    return cupolas_OK;
+    return timed_out ? cupolas_ERROR_TIMEOUT : cupolas_OK;
 }
 
 int workbench_execute_async(workbench_t* wb, const char* command, char* const argv[]) {
@@ -337,10 +333,7 @@ int workbench_wait(workbench_t* wb, workbench_result_t* result, uint32_t timeout
     cupolas_exit_status_t status;
     int ret = cupolas_process_wait(wb->process, &status, timeout_ms);
     
-    cupolas_mutex_lock(&wb->lock);
-    
     if (ret == cupolas_ERROR_TIMEOUT) {
-        cupolas_mutex_unlock(&wb->lock);
         return cupolas_ERROR_TIMEOUT;
     }
     
@@ -348,8 +341,8 @@ int workbench_wait(workbench_t* wb, workbench_result_t* result, uint32_t timeout
     cupolas_workbench_close_pipes(wb);
     cupolas_process_close(wb->process);
     
+    cupolas_mutex_lock(&wb->lock);
     cupolas_workbench_fill_result(wb, result, status.code, status.signaled, status.signal, false);
-    
     wb->state = WORKBENCH_STATE_IDLE;
     cupolas_mutex_unlock(&wb->lock);
     

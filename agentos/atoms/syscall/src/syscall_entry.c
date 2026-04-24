@@ -178,6 +178,40 @@ void* sys_agent_list(void** args, int argc) {
     return (void*)res;
 }
 
+/* ==================== Skill 系统调用 ==================== */
+
+void* sys_skill_install(void** args, int argc) {
+    if (argc != 2) return (void*)(intptr_t)AGENTOS_EINVAL;
+    const char* skill_url = (const char*)args[0];
+    char** out_skill_id = (char**)args[1];
+    intptr_t res = agentos_sys_skill_install(skill_url, out_skill_id);
+    return (void*)res;
+}
+
+void* sys_skill_execute(void** args, int argc) {
+    if (argc != 3) return (void*)(intptr_t)AGENTOS_EINVAL;
+    const char* skill_id = (const char*)args[0];
+    const char* input = (const char*)args[1];
+    char** out_output = (char**)args[2];
+    intptr_t res = agentos_sys_skill_execute(skill_id, input, out_output);
+    return (void*)res;
+}
+
+void* sys_skill_list(void** args, int argc) {
+    if (argc != 2) return (void*)(intptr_t)AGENTOS_EINVAL;
+    char*** out_skills = (char***)args[0];
+    size_t* out_count = (size_t*)args[1];
+    intptr_t res = agentos_sys_skill_list(out_skills, out_count);
+    return (void*)res;
+}
+
+void* sys_skill_uninstall(void** args, int argc) {
+    if (argc != 1) return (void*)(intptr_t)AGENTOS_EINVAL;
+    const char* skill_id = (const char*)args[0];
+    intptr_t res = agentos_sys_skill_uninstall(skill_id);
+    return (void*)res;
+}
+
 /* ==================== 系统初始化 ==================== */
 
 agentos_error_t agentos_syscalls_init(void) {
@@ -199,4 +233,10 @@ void agentos_syscalls_cleanup(void) {
     agentos_sys_agent_cleanup();
     
     /* 其他模块的清理函数可在未来添加 */
+}
+
+/* ==================== 辅助函数 ==================== */
+
+void agentos_sys_free(void* ptr) {
+    if (ptr) free(ptr);
 }

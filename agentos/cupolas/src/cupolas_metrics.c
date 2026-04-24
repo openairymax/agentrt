@@ -256,15 +256,63 @@ uint64_t metrics_get_timestamp_ns(void) {
 #endif
 }
 
+typedef struct metric_iterator {
+    const metrics_state_t* state;
+    size_t current_index;
+    const char* pattern;
+} metric_iterator_internal_t;
+
 metric_iterator_t* metrics_iter_create(const char* pattern) {
-    return (metric_iterator_t*)1;
+    if (g_init_state == 0) return NULL;
+    metric_iterator_internal_t* iter = (metric_iterator_internal_t*)cupolas_mem_alloc(sizeof(metric_iterator_internal_t));
+    if (!iter) return NULL;
+    memset(iter, 0, sizeof(metric_iterator_internal_t));
+    iter->state = &g_metrics;
+    iter->current_index = 0;
+    iter->pattern = pattern;
+    return (metric_iterator_t*)iter;
 }
 
 bool metrics_iter_next(metric_iterator_t* iter, metric_sample_t* sample) {
+    if (!iter || !sample) return false;
+    metric_iterator_internal_t* internal = (metric_iterator_internal_t*)iter;
+    const metrics_state_t* state = internal->state;
+
+    cupolas_rwlock_rdlock(&g_metrics_lock);
+
+    while (internal->current_index < state->entry_count) {
+        metric_entry_t* entry = (metric_entry_t*)&state->entries[internal->current_index];
+        internal->current_index++;
+
+        if (!entry->registered || !entry->name) continue;
+
+        memset(sample, 0, sizeof(metric_sample_t));
+        sample->name = entry->name;
+
+        switch (entry->type) {
+            case METRIC_TYPE_COUNTER:
+                sample->value = cupolas_atomic_load64(&entry->counter_value) / 1000.0;
+                break;
+            case METRIC_TYPE_GAUGE:
+                sample->value = cupolas_atomic_load64(&entry->gauge_value) / 1000.0;
+                break;
+            case METRIC_TYPE_HISTOGRAM:
+            case METRIC_TYPE_SUMMARY:
+                sample->value = cupolas_atomic_load64(&entry->histogram_sum_ns) / 1000000000.0;
+                break;
+        }
+
+        cupolas_rwlock_unlock(&g_metrics_lock);
+        return true;
+    }
+
+    cupolas_rwlock_unlock(&g_metrics_lock);
     return false;
 }
 
 void metrics_iter_destroy(metric_iterator_t* iter) {
+    if (!iter) return;
+    cupolas_mem_free(iter);
 }
 
 size_t metrics_export_prometheus(char* buffer, size_t size) {

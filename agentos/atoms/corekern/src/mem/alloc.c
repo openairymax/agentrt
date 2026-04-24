@@ -91,7 +91,7 @@ static int ensure_initialized(void) {
 
             mem_stats_mutex = agentos_mutex_create();
             if (!mem_stats_mutex) {
-                agentos_mutex_destroy(init_lock);
+                agentos_mutex_free(init_lock);
                 init_lock = NULL;
                 atomic_store_explicit(&mem_initialized, 0, memory_order_release);
                 return -1;
@@ -154,12 +154,12 @@ void agentos_mem_cleanup(void) {
     agentos_mutex_unlock(mem_stats_mutex);
 
     if (mem_stats_mutex) {
-        agentos_mutex_destroy(mem_stats_mutex);
+        agentos_mutex_free(mem_stats_mutex);
         mem_stats_mutex = NULL;
     }
 
     if (init_lock) {
-        agentos_mutex_destroy(init_lock);
+        agentos_mutex_free(init_lock);
         init_lock = NULL;
     }
 

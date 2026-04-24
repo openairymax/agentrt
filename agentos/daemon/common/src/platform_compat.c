@@ -18,23 +18,6 @@ typedef void* agentos_dl_t;
 #define AGENTOS_DL_T_DEFINED
 #endif
 
-#ifndef AGENTOS_SYSINFO_T_DEFINED
-typedef struct {
-    char os_name[64];
-    char os_version[64];
-    char hostname[64];
-    uint32_t cpu_count;
-    uint64_t memory_total;
-    uint64_t memory_free;
-} agentos_sysinfo_t;
-#define AGENTOS_SYSINFO_T_DEFINED
-#endif
-
-#ifndef AGENTOS_ATOMIC_INT_T_DEFINED
-typedef struct { volatile int value; } agentos_atomic_int_t;
-#define AGENTOS_ATOMIC_INT_T_DEFINED
-#endif
-
 int agentos_time_now(agentos_timestamp_t* ts) {
     if (!ts) return -1;
     *ts = agentos_time_ns();
