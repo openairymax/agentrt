@@ -483,6 +483,36 @@ int agentos_get_last_error(void);
  */
 const char* agentos_strerror(int error);
 
+/* ==================== 系统信息类型 (UNI-01: 唯一定义) ==================== */
+
+#ifndef AGENTOS_SYSINFO_T_DEFINED
+#define AGENTOS_SYSINFO_T_DEFINED
+typedef struct {
+    char os_name[64];
+    char os_version[64];
+    char hostname[64];
+    uint32_t cpu_count;
+    uint64_t memory_total;
+    uint64_t memory_free;
+} agentos_sysinfo_t;
+#endif
+
+int agentos_get_sysinfo(agentos_sysinfo_t* info);
+
+/* ==================== 原子操作类型 (UNI-01: 唯一定义) ==================== */
+
+#ifndef AGENTOS_ATOMIC_INT_T_DEFINED
+#define AGENTOS_ATOMIC_INT_T_DEFINED
+typedef struct {
+    volatile int value;
+} agentos_atomic_int_t;
+#endif
+
+int agentos_atomic_load(agentos_atomic_int_t* atomic);
+void agentos_atomic_store(agentos_atomic_int_t* atomic, int value);
+int agentos_atomic_fetch_add(agentos_atomic_int_t* atomic, int value);
+int agentos_atomic_fetch_sub(agentos_atomic_int_t* atomic, int value);
+
 #ifdef __cplusplus
 }
 #endif

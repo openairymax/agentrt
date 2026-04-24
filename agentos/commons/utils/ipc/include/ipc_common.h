@@ -176,7 +176,7 @@ typedef struct {
     uint64_t correlation_id;            /**< 关联 ID（请求-响应模式） */
     char source[64];                    /**< 发送者标识 */
     char target[64];                    /**< 目标标识 */
-    uint32_t payload_len;               /**< 负载长度 */
+    uint64_t payload_len;               /**< 负载长度 */
     uint32_t checksum;                  /**< 校验和 (CRC32) */
     agentos_timestamp_t timestamp;      /**< 时间戳 */
     uint8_t reserved[32];               /**< 保留字段 */
@@ -198,8 +198,8 @@ typedef struct {
     ipc_type_t type;                    /**< 通道类型 */
     const char* name;                   /**< 通道名称 */
     ipc_mode_t mode;                    /**< 读写模式 */
-    uint32_t buffer_size;               /**< 缓冲区大小 */
-    uint32_t max_message_size;          /**< 最大消息大小 */
+    size_t buffer_size;                  /**< 缓冲区大小 */
+    size_t max_message_size;             /**< 最大消息大小 */
     uint32_t timeout_ms;                /**< 默认超时 */
     uint32_t max_connections;           /**< 最大连接数（服务端） */
     bool nonblocking;                   /**< 是否非阻塞 */

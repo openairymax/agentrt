@@ -637,7 +637,7 @@ agentos_error_t ipc_send_data(
     msg.header.type = IPC_MSG_DATA;
     msg.header.flags = 0;
     msg.header.msg_id = ++channel->msg_id_counter;
-    msg.header.payload_len = (uint32_t)len;
+    msg.header.payload_len = len;
     msg.header.timestamp = ipc_get_timestamp_ns();
     msg.payload = (void*)data;
     msg.payload_size = len;
@@ -814,7 +814,7 @@ agentos_error_t ipc_receive(
         if (fd >= 0) {
             payload_read = read(fd, message->payload, message->header.payload_len);
             
-            if (payload_read <= 0 || (uint32_t)payload_read < message->header.payload_len) {
+            if (payload_read <= 0 || (size_t)payload_read < message->header.payload_len) {
                 free(message->payload);
                 message->payload = NULL;
                 channel->stats.errors++;
@@ -1194,7 +1194,7 @@ void* ipc_shm_map(ipc_shm_t* shm) {
         INVALID_HANDLE_VALUE,
         NULL,
         shm->config.read_only ? PAGE_READONLY : PAGE_READWRITE,
-        0,
+        (DWORD)(shm->config.size >> 32),
         (DWORD)(shm->config.size & 0xFFFFFFFF),
         shm->config.name
     );
@@ -1743,7 +1743,7 @@ ipc_message_t* ipc_message_create(ipc_msg_type_t type, const void* payload, size
     msg->header.correlation_id = 0;
     memset(msg->header.source, 0, sizeof(msg->header.source));
     memset(msg->header.target, 0, sizeof(msg->header.target));
-    msg->header.payload_len = (uint32_t)payload_len;
+    msg->header.payload_len = payload_len;
     msg->header.checksum = 0;
     msg->header.timestamp = ipc_get_timestamp_ns();
     memset(msg->header.reserved, 0, sizeof(msg->header.reserved));

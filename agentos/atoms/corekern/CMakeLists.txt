@@ -8,7 +8,6 @@ set(COREKERN_SOURCES
     src/main.c
     src/error.c
     src/ipc/binder.c
-    src/ipc/channel.c
     src/ipc/buffer.c
     src/mem/alloc.c
     src/mem/pool.c
@@ -16,7 +15,6 @@ set(COREKERN_SOURCES
     src/task/scheduler.c
     src/task/scheduler_core.c
     src/task/scheduler_platform.c
-    src/task/sync.c
     src/task/thread.c
     src/time/clock.c
     src/time/timer.c

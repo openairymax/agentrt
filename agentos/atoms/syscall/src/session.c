@@ -19,7 +19,7 @@
 
 /* heapstore 集成接口（heapstore模块可选） */
 #ifdef BUILD_HEAPSTORE
-"heapstore/include/heapstore_integration.h"
+#include "heapstore/include/heapstore_integration.h"
 #else
 static inline agentos_error_t heapstore_syscall_session_save(
     const char* sid, const char* meta, uint64_t c, uint64_t la) {
@@ -199,7 +199,7 @@ static void ensure_lock(void) {
         agentos_mutex_t* expected = NULL;
         if (!__atomic_compare_exchange_n(&session_lock, &expected, new_lock,
                                           false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
-            agentos_mutex_destroy(new_lock);
+            agentos_mutex_free(new_lock);
         }
     }
 }

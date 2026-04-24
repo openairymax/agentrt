@@ -174,6 +174,7 @@ target_include_directories(svc_common PUBLIC
     $<BUILD_INTERFACE:${COMMONS_DIR}/utils/types/include>
     $<BUILD_INTERFACE:${COMMONS_DIR}/utils/cache/include>
     $<BUILD_INTERFACE:${COMMONS_DIR}/utils/compat/include>
+    $<BUILD_INTERFACE:${COMMONS_DIR}/utils/include>
     # 新增网络和IPC模块
     $<BUILD_INTERFACE:${COMMONS_DIR}/utils/network/include>
     $<BUILD_INTERFACE:${COMMONS_DIR}/utils/ipc/include>

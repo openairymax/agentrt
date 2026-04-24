@@ -35,6 +35,7 @@ static volatile long plan_counter = 0;
 static volatile long record_counter = 0;
 static volatile long session_counter = 0;
 
+__attribute__((used))
 void agentos_generate_task_id(const char* prefix, char* buf, size_t len) {
     if (!buf || len == 0) return;
 
@@ -47,6 +48,7 @@ void agentos_generate_task_id(const char* prefix, char* buf, size_t len) {
 #endif
 }
 
+__attribute__((used))
 void agentos_generate_plan_id(char* buf, size_t len) {
     if (!buf || len == 0) return;
 
@@ -59,6 +61,7 @@ void agentos_generate_plan_id(char* buf, size_t len) {
 #endif
 }
 
+__attribute__((used))
 void agentos_generate_record_id(char* buf, size_t len) {
     if (!buf || len == 0) return;
 
@@ -71,6 +74,7 @@ void agentos_generate_record_id(char* buf, size_t len) {
 #endif
 }
 
+__attribute__((used))
 void agentos_generate_session_id(char* buf, size_t len) {
     if (!buf || len == 0) return;
 
@@ -86,6 +90,7 @@ void agentos_generate_session_id(char* buf, size_t len) {
 #endif
 }
 
+__attribute__((used))
 agentos_error_t agentos_generate_uuid(char* buf) {
     if (!buf) return AGENTOS_EINVAL;
 

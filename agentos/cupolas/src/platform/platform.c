@@ -94,7 +94,8 @@ int cupolas_mutex_unlock(cupolas_mutex_t* mutex) {
 
 int cupolas_rwlock_init(cupolas_rwlock_t* rwlock) {
 #if cupolas_PLATFORM_WINDOWS
-    InitializeSRWLock(rwlock);
+    InitializeSRWLock(&rwlock->lock);
+    rwlock->state = 0;
     return 0;
 #else
     return pthread_rwlock_init(rwlock, NULL) == 0 ? 0 : -1;
@@ -103,7 +104,7 @@ int cupolas_rwlock_init(cupolas_rwlock_t* rwlock) {
 
 int cupolas_rwlock_destroy(cupolas_rwlock_t* rwlock) {
 #if cupolas_PLATFORM_WINDOWS
-    /* SRWLOCK does not need explicit destruction */
+    rwlock->state = 0;
     (void)rwlock;
     return 0;
 #else
@@ -113,7 +114,8 @@ int cupolas_rwlock_destroy(cupolas_rwlock_t* rwlock) {
 
 int cupolas_rwlock_rdlock(cupolas_rwlock_t* rwlock) {
 #if cupolas_PLATFORM_WINDOWS
-    AcquireSRWLockShared(rwlock);
+    AcquireSRWLockShared(&rwlock->lock);
+    InterlockedIncrement(&rwlock->state);
     return 0;
 #else
     return pthread_rwlock_rdlock(rwlock) == 0 ? 0 : -1;
@@ -122,7 +124,8 @@ int cupolas_rwlock_rdlock(cupolas_rwlock_t* rwlock) {
 
 int cupolas_rwlock_wrlock(cupolas_rwlock_t* rwlock) {
 #if cupolas_PLATFORM_WINDOWS
-    AcquireSRWLockExclusive(rwlock);
+    AcquireSRWLockExclusive(&rwlock->lock);
+    InterlockedExchange(&rwlock->state, -1);
     return 0;
 #else
     return pthread_rwlock_wrlock(rwlock) == 0 ? 0 : -1;
@@ -131,7 +134,8 @@ int cupolas_rwlock_wrlock(cupolas_rwlock_t* rwlock) {
 
 int cupolas_rwlock_tryrdlock(cupolas_rwlock_t* rwlock) {
 #if cupolas_PLATFORM_WINDOWS
-    if (!TryAcquireSRWLockShared(rwlock)) return cupolas_ERROR_BUSY;
+    if (!TryAcquireSRWLockShared(&rwlock->lock)) return cupolas_ERROR_BUSY;
+    InterlockedIncrement(&rwlock->state);
     return 0;
 #else
     int ret = pthread_rwlock_tryrdlock(rwlock);
@@ -143,7 +147,8 @@ int cupolas_rwlock_tryrdlock(cupolas_rwlock_t* rwlock) {
 
 int cupolas_rwlock_trywrlock(cupolas_rwlock_t* rwlock) {
 #if cupolas_PLATFORM_WINDOWS
-    if (!TryAcquireSRWLockExclusive(rwlock)) return cupolas_ERROR_BUSY;
+    if (!TryAcquireSRWLockExclusive(&rwlock->lock)) return cupolas_ERROR_BUSY;
+    InterlockedExchange(&rwlock->state, -1);
     return 0;
 #else
     int ret = pthread_rwlock_trywrlock(rwlock);
@@ -155,7 +160,14 @@ int cupolas_rwlock_trywrlock(cupolas_rwlock_t* rwlock) {
 
 int cupolas_rwlock_unlock(cupolas_rwlock_t* rwlock) {
 #if cupolas_PLATFORM_WINDOWS
-    ReleaseSRWLockShared(rwlock);
+    long s = InterlockedExchangeAdd(&rwlock->state, 0);
+    if (s < 0) {
+        InterlockedExchange(&rwlock->state, 0);
+        ReleaseSRWLockExclusive(&rwlock->lock);
+    } else {
+        InterlockedDecrement(&rwlock->state);
+        ReleaseSRWLockShared(&rwlock->lock);
+    }
     return 0;
 #else
     return pthread_rwlock_unlock(rwlock) == 0 ? 0 : -1;

@@ -125,7 +125,7 @@ void agentos_observability_shutdown(void) {
     agentos_mutex_unlock(g_obs.lock);
 
     if (g_obs.lock) {
-        agentos_mutex_destroy(g_obs.lock);
+        agentos_mutex_free(g_obs.lock);
         g_obs.lock = NULL;
     }
 }
