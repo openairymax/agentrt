@@ -16,32 +16,13 @@
 static proto_adapter_entry_t* g_adapter_registry = NULL;
 static size_t g_adapter_count = 0;
 
-/* I-L2: Standard Router Implementation */
-struct proto_router_iface_s {
+/* Internal implementation contexts (separate from interface vtables in header) */
+typedef struct {
     void* internal_router;
-};
+} proto_router_impl_t;
 
-proto_router_iface_t* proto_router_standard_create(void) {
-    proto_router_iface_t* iface = calloc(1, sizeof(proto_router_iface_t));
-    if (!iface) return NULL;
+#define GW_MAX_PROTOCOLS 32
 
-    iface->internal_router = protocol_router_create(PROTOCOL_HTTP);
-    if (!iface->internal_router) {
-        free(iface);
-        return NULL;
-    }
-    return iface;
-}
-
-void proto_router_standard_destroy(proto_router_iface_t* router) {
-    if (!router) return;
-    if (router->internal_router) {
-        protocol_router_destroy(router->internal_router);
-    }
-    free(router);
-}
-
-/* I-L3: Standard Gateway Implementation */
 typedef struct {
     char name[64];
     const proto_adapter_vtable_t* vtable;
@@ -54,17 +35,74 @@ typedef struct {
     uint64_t total_bytes;
 } gw_protocol_entry_t;
 
-#define GW_MAX_PROTOCOLS 32
-
-struct proto_gateway_iface_s {
+typedef struct {
     gw_protocol_entry_t protocols[GW_MAX_PROTOCOLS];
     size_t protocol_count;
-};
+} proto_gateway_impl_t;
 
-static gw_protocol_entry_t* gw_find_protocol(proto_gateway_iface_t* gw, const char* name) {
-    if (!gw || !name) return NULL;
-    for (size_t i = 0; i < gw->protocol_count; i++) {
-        if (strcmp(gw->protocols[i].name, name) == 0) return &gw->protocols[i];
+static proto_gateway_impl_t* g_gw_impl = NULL;
+
+/* I-L2: Standard Router Implementation */
+proto_router_iface_t* proto_router_standard_create(void) {
+    proto_router_impl_t* impl = calloc(1, sizeof(proto_router_impl_t));
+    if (!impl) return NULL;
+
+    impl->internal_router = protocol_router_create(PROTOCOL_HTTP);
+    if (!impl->internal_router) { free(impl); return NULL; }
+
+    proto_router_iface_t* iface = calloc(1, sizeof(proto_router_iface_t));
+    if (!iface) {
+        protocol_router_destroy(impl->internal_router);
+        free(impl);
+        return NULL;
+    }
+    iface->add_route = router_std_add_route;
+    iface->remove_route = router_std_remove_route;
+    iface->route = router_std_route;
+    iface->transform = router_std_transform;
+    iface->batch_route = router_std_batch_route;
+    iface->set_default_protocol = router_std_set_default_protocol;
+    iface->list_routes = router_std_list_routes;
+    iface->get_stats = router_std_get_stats;
+    return iface;
+}
+
+void proto_router_standard_destroy(proto_router_iface_t* router) {
+    if (!router) return;
+    free(router);
+}
+
+/* I-L3: Standard Gateway Implementation */
+proto_gateway_iface_t* proto_gateway_standard_create(void) {
+    g_gw_impl = calloc(1, sizeof(proto_gateway_impl_t));
+    if (!g_gw_impl) return NULL;
+
+    proto_gateway_iface_t* iface = calloc(1, sizeof(proto_gateway_iface_t));
+    if (!iface) { free(g_gw_impl); g_gw_impl = NULL; return NULL; }
+
+    iface->register_protocol = gw_std_register_protocol;
+    iface->unregister_protocol = gw_std_unregister_protocol;
+    iface->handle_request = gw_std_handle_request;
+    iface->detect_protocol = gw_std_detect_protocol;
+    iface->set_request_handler = gw_std_set_request_handler;
+    iface->set_event_callback = gw_std_set_event_callback;
+    iface->list_protocols = gw_std_list_protocols;
+    iface->get_protocol_stats = gw_std_get_protocol_stats;
+    return iface;
+}
+
+void proto_gateway_standard_destroy(proto_gateway_iface_t* gw) {
+    (void)gw;
+    free(g_gw_impl);
+    g_gw_impl = NULL;
+    free(gw);
+}
+
+static gw_protocol_entry_t* gw_find_protocol(const char* name) {
+    if (!g_gw_impl || !name) return NULL;
+    for (size_t i = 0; i < g_gw_impl->protocol_count; i++) {
+        if (strcmp(g_gw_impl->protocols[i].name, name) == 0)
+            return &g_gw_impl->protocols[i];
     }
     return NULL;
 }
@@ -72,16 +110,15 @@ static gw_protocol_entry_t* gw_find_protocol(proto_gateway_iface_t* gw, const ch
 static int gw_std_register_protocol(proto_gateway_iface_t* gw,
                                      const char* name,
                                      const proto_adapter_vtable_t* adapter) {
-    if (!gw || !name || !adapter) return -1;
-    if (gw->protocol_count >= GW_MAX_PROTOCOLS) return -2;
+    (void)gw;
+    if (!name || !adapter) return -1;
+    if (!g_gw_impl) return -2;
+    if (g_gw_impl->protocol_count >= GW_MAX_PROTOCOLS) return -3;
 
-    gw_protocol_entry_t* existing = gw_find_protocol(gw, name);
-    if (existing) {
-        existing->vtable = adapter;
-        return 0;
-    }
+    gw_protocol_entry_t* existing = gw_find_protocol(name);
+    if (existing) { existing->vtable = adapter; return 0; }
 
-    gw_protocol_entry_t* entry = &gw->protocols[gw->protocol_count++];
+    gw_protocol_entry_t* entry = &g_gw_impl->protocols[g_gw_impl->protocol_count++];
     memset(entry, 0, sizeof(*entry));
     strncpy(entry->name, name, sizeof(entry->name) - 1);
     entry->vtable = adapter;
@@ -89,14 +126,16 @@ static int gw_std_register_protocol(proto_gateway_iface_t* gw,
 }
 
 static int gw_std_unregister_protocol(proto_gateway_iface_t* gw, const char* name) {
-    if (!gw || !name) return -1;
+    (void)gw;
+    if (!name) return -1;
+    if (!g_gw_impl) return -2;
 
-    for (size_t i = 0; i < gw->protocol_count; i++) {
-        if (strcmp(gw->protocols[i].name, name) == 0) {
-            memmove(&gw->protocols[i], &gw->protocols[i + 1],
-                    (gw->protocol_count - i - 1) * sizeof(gw_protocol_entry_t));
-            gw->protocol_count--;
-            memset(&gw->protocols[gw->protocol_count], 0, sizeof(gw_protocol_entry_t));
+    for (size_t i = 0; i < g_gw_impl->protocol_count; i++) {
+        if (strcmp(g_gw_impl->protocols[i].name, name) == 0) {
+            memmove(&g_gw_impl->protocols[i], &g_gw_impl->protocols[i + 1],
+                    (g_gw_impl->protocol_count - i - 1) * sizeof(gw_protocol_entry_t));
+            g_gw_impl->protocol_count--;
+            memset(&g_gw_impl->protocols[g_gw_impl->protocol_count], 0, sizeof(gw_protocol_entry_t));
             return 0;
         }
     }
@@ -110,7 +149,8 @@ static int gw_std_handle_request(proto_gateway_iface_t* gw,
                                   char** response,
                                   size_t* response_size,
                                   char** response_content_type) {
-    if (!gw || !raw_request) return -1;
+    (void)gw;
+    if (!raw_request) return -1;
 
     char* detected_proto = NULL;
     int detect_result = gw_std_detect_protocol(gw, raw_request, request_size, &detected_proto);
@@ -122,7 +162,7 @@ static int gw_std_handle_request(proto_gateway_iface_t* gw,
         return -2;
     }
 
-    gw_protocol_entry_t* entry = gw_find_protocol(gw, detected_proto);
+    gw_protocol_entry_t* entry = gw_find_protocol(detected_proto);
     free(detected_proto);
 
     if (entry && entry->request_handler) {
@@ -182,11 +222,13 @@ static int gw_std_detect_protocol(proto_gateway_iface_t* gw, const char* data, s
 static int gw_std_set_request_handler(proto_gateway_iface_t* gw,
                                       proto_gateway_request_cb handler,
                                       void* user_data) {
-    if (!gw || !handler) return -1;
+    (void)gw;
+    if (!handler) return -1;
+    if (!g_gw_impl) return -2;
 
-    for (size_t i = 0; i < gw->protocol_count; i++) {
-        gw->protocols[i].request_handler = handler;
-        gw->protocols[i].request_handler_data = user_data;
+    for (size_t i = 0; i < g_gw_impl->protocol_count; i++) {
+        g_gw_impl->protocols[i].request_handler = handler;
+        g_gw_impl->protocols[i].request_handler_data = user_data;
     }
     return 0;
 }
@@ -194,17 +236,20 @@ static int gw_std_set_request_handler(proto_gateway_iface_t* gw,
 static int gw_std_set_event_callback(proto_gateway_iface_t* gw,
                                      proto_gateway_event_cb callback,
                                      void* user_data) {
-    if (!gw || !callback) return -1;
+    (void)gw;
+    if (!callback) return -1;
+    if (!g_gw_impl) return -2;
 
-    for (size_t i = 0; i < gw->protocol_count; i++) {
-        gw->protocols[i].event_callback = callback;
-        gw->protocols[i].event_callback_data = user_data;
+    for (size_t i = 0; i < g_gw_impl->protocol_count; i++) {
+        g_gw_impl->protocols[i].event_callback = callback;
+        g_gw_impl->protocols[i].event_callback_data = user_data;
     }
     return 0;
 }
 
 static int gw_std_list_protocols(proto_gateway_iface_t* gw, char** protocols_json) {
     (void)gw;
+    (void)g_gw_impl;
     if (protocols_json)
         *protocols_json = strdup(
             "{\"protocols\":["
@@ -217,20 +262,23 @@ static int gw_std_list_protocols(proto_gateway_iface_t* gw, char** protocols_jso
 static int gw_std_get_protocol_stats(proto_gateway_iface_t* gw,
                                      const char* name,
                                      proto_stats_t* stats) {
-    if (!gw || !stats) return -1;
+    (void)gw;
+    if (!stats) return -1;
     memset(stats, 0, sizeof(*stats));
 
+    if (!g_gw_impl) return -2;
+
     if (name) {
-        gw_protocol_entry_t* entry = gw_find_protocol(gw, name);
-        if (!entry) return -2;
+        gw_protocol_entry_t* entry = gw_find_protocol(name);
+        if (!entry) return -3;
         stats->request_count = entry->request_count;
         stats->error_count = entry->error_count;
         stats->total_bytes = entry->total_bytes;
     } else {
-        for (size_t i = 0; i < gw->protocol_count; i++) {
-            stats->request_count += gw->protocols[i].request_count;
-            stats->error_count += gw->protocols[i].error_count;
-            stats->total_bytes += gw->protocols[i].total_bytes;
+        for (size_t i = 0; i < g_gw_impl->protocol_count; i++) {
+            stats->request_count += g_gw_impl->protocols[i].request_count;
+            stats->error_count += g_gw_impl->protocols[i].error_count;
+            stats->total_bytes += g_gw_impl->protocols[i].total_bytes;
         }
     }
     return 0;

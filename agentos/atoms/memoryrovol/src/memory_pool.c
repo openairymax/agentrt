@@ -102,7 +102,7 @@ void* memory_pool_alloc(memory_pool_t* pool, size_t size) {
     if (!pool || size == 0) return NULL;
 
     size_t aligned_size = align_size(size + sizeof(memory_block_header_t));
-    agentos_mutex_lock(pool->lock);
+    if (pool->lock) agentos_mutex_lock(pool->lock);
 
     memory_block_header_t* block = pool->free_list;
     memory_block_header_t* prev = NULL;
@@ -117,9 +117,9 @@ void* memory_pool_alloc(memory_pool_t* pool, size_t size) {
 
     if (!block) {
         pool->alloc_failures++;
-        agentos_mutex_unlock(pool->lock);
+        if (pool->lock) agentos_mutex_unlock(pool->lock);
         AGENTOS_LOG_WARN("Memory pool %s allocation failed: size=%zu",
-                         pool->pool_name, size);
+                         pool->pool_name ? pool->pool_name : "unnamed", size);
         return NULL;
     }
 
@@ -166,7 +166,7 @@ void* memory_pool_alloc(memory_pool_t* pool, size_t size) {
         pool->peak_size = pool->used_size;
     }
 
-    agentos_mutex_unlock(pool->lock);
+    if (pool->lock) agentos_mutex_unlock(pool->lock);
     return (void*)((uint8_t*)block + sizeof(memory_block_header_t));
 }
 
@@ -179,11 +179,11 @@ void memory_pool_free(memory_pool_t* pool, void* ptr) {
         return;
     }
 
-    agentos_mutex_lock(pool->lock);
+    if (pool->lock) agentos_mutex_lock(pool->lock);
 
     if (block->ref_count > 1) {
         block->ref_count--;
-        agentos_mutex_unlock(pool->lock);
+        if (pool->lock) agentos_mutex_unlock(pool->lock);
         return;
     }
 
@@ -210,7 +210,7 @@ void memory_pool_free(memory_pool_t* pool, void* ptr) {
     pool->used_size -= block->size;
     pool->free_count++;
 
-    agentos_mutex_unlock(pool->lock);
+    if (pool->lock) agentos_mutex_unlock(pool->lock);
 }
 
 uint64_t memory_pool_get_used_size(memory_pool_t* pool) {
@@ -240,28 +240,28 @@ uint64_t memory_pool_get_free_count(memory_pool_t* pool) {
 
 int memory_pool_retain(memory_pool_t* pool, void* ptr) {
     if (!pool || !ptr) return -1;
-    agentos_mutex_lock(pool->lock);
+    if (pool->lock) agentos_mutex_lock(pool->lock);
 
     memory_block_header_t* block = (memory_block_header_t*)((uint8_t*)ptr - sizeof(memory_block_header_t));
     if (block->magic != 0xDEADBEEF) {
-        agentos_mutex_unlock(pool->lock);
+        if (pool->lock) agentos_mutex_unlock(pool->lock);
         return -1;
     }
     if (block->ref_count < 0xFFFF) block->ref_count++;
     int rc = (int)block->ref_count;
     block->last_access_ns = get_timestamp_ns();
 
-    agentos_mutex_unlock(pool->lock);
+    if (pool->lock) agentos_mutex_unlock(pool->lock);
     return rc;
 }
 
 int memory_pool_release(memory_pool_t* pool, void* ptr) {
     if (!pool || !ptr) return -1;
-    agentos_mutex_lock(pool->lock);
+    if (pool->lock) agentos_mutex_lock(pool->lock);
 
     memory_block_header_t* block = (memory_block_header_t*)((uint8_t*)ptr - sizeof(memory_block_header_t));
     if (block->magic != 0xDEADBEEF) {
-        agentos_mutex_unlock(pool->lock);
+        if (pool->lock) agentos_mutex_unlock(pool->lock);
         return -1;
     }
     if (block->ref_count > 0) block->ref_count--;
@@ -285,18 +285,18 @@ int memory_pool_release(memory_pool_t* pool, void* ptr) {
         pool->free_count++;
     }
 
-    agentos_mutex_unlock(pool->lock);
+    if (pool->lock) agentos_mutex_unlock(pool->lock);
     return rc;
 }
 
 uint32_t memory_pool_get_ref_count(memory_pool_t* pool, void* ptr) {
     if (!pool || !ptr) return 0;
-    agentos_mutex_lock(pool->lock);
+    if (pool->lock) agentos_mutex_lock(pool->lock);
 
     memory_block_header_t* block = (memory_block_header_t*)((uint8_t*)ptr - sizeof(memory_block_header_t));
     uint32_t rc = (block->magic == 0xDEADBEEF) ? block->ref_count : 0;
 
-    agentos_mutex_unlock(pool->lock);
+    if (pool->lock) agentos_mutex_unlock(pool->lock);
     return rc;
 }
 

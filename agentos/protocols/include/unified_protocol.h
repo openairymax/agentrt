@@ -105,18 +105,18 @@ typedef struct {
     agentos_protocol_type_t protocol;
     agentos_protocol_type_t protocol_type;  /* alias for protocol */
     char protocol_name[64];
-    const char* endpoint;
-    const char* method;
+    char endpoint[256];
+    char method[64];
     message_direction_t direction;
     uint64_t message_id;
-    const void* payload;
+    void* payload;
     size_t payload_size;
     uint64_t timestamp;
     bool is_error;
     int error_code;
-    int status;  /* alias for compatibility */
+    int status;
     char error_msg[256];
-    const void* body;  /* alias for payload */
+    void* body;
     size_t body_length;  /* alias for payload_size */
     size_t payload_length;  /* alias for payload_size */
     char correlation_id[64];

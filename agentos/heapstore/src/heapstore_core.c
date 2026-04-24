@@ -287,7 +287,8 @@ static void initialize_atomic_vars(void) {
 typedef heapstore_error_t (*subsystem_init_func)(void);
 typedef void (*subsystem_shutdown_func)(void);
 
-static heapstore_error_t init_subsystem_with_rollback(
+static heapstore_error_t __attribute__((unused))
+init_subsystem_with_rollback(
     subsystem_init_func init,
     subsystem_shutdown_func shutdown,
     const char* name) {
@@ -518,7 +519,6 @@ heapstore_error_t heapstore_log_write_fast(const char* service, int level, const
         return heapstore_ERR_CIRCUIT_OPEN;
     }
 
-    uint64_t start_time = 0;
     bool is_failed = false;
 
     heapstore_log_write(level, service, NULL, NULL, 0, message);
@@ -690,22 +690,13 @@ const char* heapstore_strerror(heapstore_error_t err) {
 }
 
 /**
- * @brief 更新单个配置参数
- */
-static void update_config_param(const char* name, uint32_t* current, uint32_t new_value) {
-    if (new_value > 0) {
-        *current = new_value;
-    }
-}
-
-/**
  * @brief 更新配置参数
  */
 static void apply_config_update(const heapstore_config_t* manager) {
-    update_config_param("max_log_size_mb", &s_config.max_log_size_mb, manager->max_log_size_mb);
-    update_config_param("log_retention_days", &s_config.log_retention_days, manager->log_retention_days);
-    update_config_param("trace_retention_days", &s_config.trace_retention_days, manager->trace_retention_days);
-    update_config_param("db_vacuum_interval_days", &s_config.db_vacuum_interval_days, manager->db_vacuum_interval_days);
+    if (manager->max_log_size_mb > 0) s_config.max_log_size_mb = manager->max_log_size_mb;
+    if (manager->log_retention_days > 0) s_config.log_retention_days = manager->log_retention_days;
+    if (manager->trace_retention_days > 0) s_config.trace_retention_days = manager->trace_retention_days;
+    if (manager->db_vacuum_interval_days > 0) s_config.db_vacuum_interval_days = manager->db_vacuum_interval_days;
 
     s_config.enable_auto_cleanup = manager->enable_auto_cleanup;
     s_config.enable_log_rotation = manager->enable_log_rotation;
@@ -1282,148 +1273,6 @@ heapstore_error_t heapstore_batch_add_span(
     return heapstore_batch_add_trace(ctx, span->trace_id, span->span_id,
         span->parent_span_id, span->name, span->start_time_ns,
         span->end_time_ns, 0, span->attributes);
-}
-
-heapstore_error_t heapstore_batch_commit(heapstore_batch_context_t* ctx) {
-    if (!ctx) {
-        return heapstore_ERR_INVALID_PARAM;
-    }
-
-    heapstore_error_t result = heapstore_SUCCESS;
-    heapstore_batch_item_t* item = ctx->head;
-
-    while (item) {
-        heapstore_batch_item_t* next = item->next;
-
-        heapstore_error_t err = heapstore_batch_process_single_item(item);
-
-        if (err != heapstore_SUCCESS && result == heapstore_SUCCESS) {
-            result = err;
-        }
-
-        free(item);
-        item = next;
-    }
-
-    ctx->head = ctx->tail = NULL;
-    ctx->count = 0;
-
-    return result;
-}
-
-/**
- * @brief 处理单个批量写入项目
- *
- * 根据项目类型调用相应的存储子系统 API
- *
- * @param item [in] 批量写入项目
- * @return heapstore_error_t 错误码
- */
-heapstore_error_t heapstore_batch_process_single_item(const heapstore_batch_item_t* item) {
-    if (!item) {
-        return heapstore_ERR_INVALID_PARAM;
-    }
-
-    switch (item->type) {
-        case HEAPSTORE_BATCH_ITEM_LOG:
-            return heapstore_batch_commit_log(&item->data.log);
-
-        case HEAPSTORE_BATCH_ITEM_SPAN:
-            return heapstore_batch_commit_span(&item->data.span);
-
-        case HEAPSTORE_BATCH_ITEM_SESSION:
-            return heapstore_registry_add_session(&item->data.session);
-
-        case HEAPSTORE_BATCH_ITEM_AGENT:
-            return heapstore_registry_add_agent(&item->data.agent);
-
-        case HEAPSTORE_BATCH_ITEM_SKILL:
-            return heapstore_registry_add_skill(&item->data.skill);
-
-        case HEAPSTORE_BATCH_ITEM_MEMORY_POOL:
-            return heapstore_memory_record_pool(&item->data.memory_pool);
-
-        case HEAPSTORE_BATCH_ITEM_MEMORY_ALLOC:
-            return heapstore_memory_record_allocation(&item->data.memory_alloc);
-
-        case HEAPSTORE_BATCH_ITEM_IPC_CHANNEL:
-            return heapstore_ipc_record_channel(&item->data.ipc_channel);
-
-        case HEAPSTORE_BATCH_ITEM_IPC_BUFFER:
-            return heapstore_ipc_record_buffer(&item->data.ipc_buffer);
-
-        default:
-            return heapstore_ERR_INVALID_PARAM;
-    }
-}
-
-/**
- * @brief 处理日志类型的批量写入
- */
-heapstore_error_t heapstore_batch_commit_log(const heapstore_log_entry_t* log_entry) {
-    if (!log_entry) {
-        return heapstore_ERR_INVALID_PARAM;
-    }
-
-    heapstore_log_write(
-        log_entry->level,
-        log_entry->service,
-        log_entry->trace_id[0] ? log_entry->trace_id : NULL,
-        NULL, 0, log_entry->message);
-    return heapstore_SUCCESS;
-}
-
-/**
- * @brief 处理 Span 类型的批量写入
- *
- * 包含单位转换（微秒→纳秒）和内存管理
- */
-heapstore_error_t heapstore_batch_commit_span(const heapstore_trace_entry_t* trace_entry) {
-    if (!trace_entry) {
-        return heapstore_ERR_INVALID_PARAM;
-    }
-
-    heapstore_span_t span_rec;
-    memset(&span_rec, 0, sizeof(span_rec));
-
-    /* 复制基本字段 */
-    strncpy(span_rec.trace_id, trace_entry->trace_id, sizeof(span_rec.trace_id) - 1);
-    strncpy(span_rec.span_id, trace_entry->span_id, sizeof(span_rec.span_id) - 1);
-
-    /* 可选字段：parent_span_id */
-    if (trace_entry->parent_span_id[0]) {
-        strncpy(span_rec.parent_span_id, trace_entry->parent_span_id, sizeof(span_rec.parent_span_id) - 1);
-    }
-
-    /* 必填字段 */
-    strncpy(span_rec.name, trace_entry->name, sizeof(span_rec.name) - 1);
-
-    /* 单位转换：微秒 → 纳秒 */
-    span_rec.start_time_ns = (uint64_t)trace_entry->start_time_us * 1000ULL;
-    span_rec.end_time_ns = (uint64_t)trace_entry->end_time_us * 1000ULL;
-
-    /* 状态转换：int → string */
-    snprintf(span_rec.status, sizeof(span_rec.status), "%d", trace_entry->status);
-
-    /* 属性处理：需要深拷贝 */
-    if (trace_entry->attributes[0]) {
-        span_rec.attributes = strdup(trace_entry->attributes);
-        if (!span_rec.attributes) {
-            return heapstore_ERR_OUT_OF_MEMORY;
-        }
-        span_rec.attribute_count = 1;
-    }
-
-    /* 调用 trace 写入 API */
-    heapstore_error_t err = heapstore_trace_write_span(&span_rec);
-
-    /* 释放动态分配的属性内存 */
-    if (span_rec.attributes) {
-        free(span_rec.attributes);
-        span_rec.attributes = NULL;
-    }
-
-    return err;
 }
 
 void heapstore_batch_rollback(heapstore_batch_context_t* ctx) {

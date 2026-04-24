@@ -34,7 +34,7 @@ static pthread_mutex_t g_integration_mutex = PTHREAD_MUTEX_INITIALIZER;
 /**
  * @brief 初始化集成层互斥锁
  */
-static void integration_lock_init(void) {
+static void __attribute__((unused)) integration_lock_init(void) {
 #ifdef _WIN32
     InitializeCriticalSection(&g_integration_mutex);
 #endif
@@ -43,7 +43,7 @@ static void integration_lock_init(void) {
 /**
  * @brief 清理集成层互斥锁
  */
-static void integration_lock_cleanup(void) {
+static void __attribute__((unused)) integration_lock_cleanup(void) {
 #ifdef _WIN32
     DeleteCriticalSection(&g_integration_mutex);
 #endif
@@ -350,7 +350,7 @@ agentos_error_t heapstore_memoryrovol_save(
     heapstore_memory_pool_t pool;
     memset(&pool, 0, sizeof(pool));
 
-    snprintf(pool.pool_id, "mem_raw_%llu", (unsigned long long)time(NULL)); /* flawfinder: ignore - fixed-format into sized char array */
+    snprintf(pool.pool_id, sizeof(pool.pool_id), "mem_raw_%llu", (unsigned long long)time(NULL));
     strncpy(pool.name, "memoryrovol_raw", sizeof(pool.name) - 1);
     pool.total_size = len;
     pool.used_size = len;

@@ -37,6 +37,9 @@ static atomic_size_t used_allocated = 0;
 /** @brief 峰值使用字节数 */
 static atomic_size_t peak_allocated = 0;
 
+/** @brief 堆大小上限（0=无限制） */
+static atomic_size_t max_heap_size = 0;
+
 /** @brief 分配记录链表头 */
 static agentos_mem_alloc_info_t* alloc_list = NULL;
 
@@ -124,7 +127,8 @@ static int ensure_initialized(void) {
  * @note 线程安全，可多次调用
  */
 agentos_error_t agentos_mem_init(size_t heap_size) {
-    (void)heap_size;
+    /* 设置堆大小上限（0表示无限制） */
+    atomic_store_explicit(&max_heap_size, heap_size, memory_order_release);
 
     if (ensure_initialized() != 0) {
         return AGENTOS_ENOMEM;

@@ -96,6 +96,8 @@ target_link_libraries(agentos_coreloopthree PUBLIC
 
 if(WIN32)
     target_link_libraries(agentos_coreloopthree PRIVATE ws2_32)
+elseif(UNIX)
+    target_link_libraries(agentos_coreloopthree PRIVATE uuid)
 endif()
 
 # 安装头文件

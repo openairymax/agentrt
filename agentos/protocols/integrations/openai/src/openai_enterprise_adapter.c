@@ -23,15 +23,10 @@
 
 typedef void* openai_handle_t;
 
-typedef struct { int dummy; } openai_config_t;
+#ifndef OPENAI_MAX_MODELS
+#define OPENAI_MAX_MODELS 32
+#endif
 
-typedef struct {
-    char* id;
-    char* name;
-    char* owned_by;
-    bool is_default;
-    bool is_available;
-} openai_model_info_t;
 typedef struct {
     char* model;
     openai_message_t* messages;
@@ -69,7 +64,6 @@ typedef struct {
 } openai_stream_chunk_t;
 
 #define OPENAI_VERSION "1.0"
-#define OPENAI_MAX_MODELS 64
 #define OPENAI_DEFAULT_TIMEOUT_MS 60000
 #define OPENAI_MAX_RESPONSE_LEN 4096
 #define OPENAI_EMBEDDING_DIM_DEFAULT 1536
@@ -86,8 +80,8 @@ typedef struct {
 #define OPENAI_RETRY_JITTER_MS 200
 
 struct openai_enterprise_adapter_s {
-    openai_config_t config;
-    openai_model_info_t models[OPENAI_MAX_MODELS];
+    openai_enterprise_config_t config;
+    openai_model_t models[OPENAI_MAX_MODELS];
     size_t model_count;
     uint64_t request_counter;
     bool initialized;
@@ -117,11 +111,13 @@ struct openai_enterprise_adapter_s {
 
 static struct openai_enterprise_adapter_s* g_openai_instance = NULL;
 
+static void openai_register_builtin_models(struct openai_enterprise_adapter_s* a);
+
 /* ============================================================================
  * Lifecycle
  * ============================================================================ */
 
-int openai_create(openai_config_t config, openai_handle_t* out_handle) {
+int openai_create(openai_enterprise_config_t config, openai_handle_t* out_handle) {
     if (!out_handle) return -1;
 
     struct openai_enterprise_adapter_s* adapter =
@@ -188,7 +184,7 @@ const char* openai_version(void) {
  * Model Management
  * ============================================================================ */
 
-void openai_register_builtin_models(struct openai_enterprise_adapter_s* a) {
+static void openai_register_builtin_models(struct openai_enterprise_adapter_s* a) {
     static const char* builtin[][4] = {
         {"gpt-4o", "GPT-4o", "Multimodal flagship model",
          "{\"modality\":[\"text\",\"image\"],\"context\":128000,\"training\":\"Apr2024\"}"},
@@ -514,8 +510,9 @@ static void openai_on_429(struct openai_enterprise_adapter_s* adapter) {
     adapter->rate_backoff_until = now + delay_sec;
 }
 
-static int openai_compute_retry_delay_ms(struct openai_enterprise_adapter_s* adapter,
-                                          int attempt) {
+static int __attribute__((unused))
+openai_compute_retry_delay_ms(struct openai_enterprise_adapter_s* adapter,
+                              int attempt) {
     uint32_t base_delay = (uint32_t)(OPENAI_RETRY_BASE_DELAY_MS *
                                       adapter->rate_backoff_multiplier);
     double exponential = base_delay * (1 << attempt);
@@ -688,7 +685,6 @@ int openai_chat_completion_streaming(
 
     size_t response_len = strlen(full_response);
     size_t pos = 0;
-    int chunk_index = 0;
     int total_chunks = 0;
 
     while (pos < response_len) {

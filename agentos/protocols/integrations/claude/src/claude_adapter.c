@@ -22,7 +22,7 @@
 #define CLAUDE_STREAM_CHUNK_SIZE 10
 
 typedef struct {
-    const char* keywords[8];
+    const char* keywords[10];
     int keyword_count;
     const char* prefix_templates[4];
     int prefix_count;
@@ -225,15 +225,15 @@ struct claude_adapter_context_s {
     char last_error[256];
 };
 
-static int claude_proto_init(void** out_context) {
-    if (!out_context) return -1;
+static int claude_proto_init(void* context) {
+    if (!context) return -1;
 
     claude_config_t cfg = claude_config_default();
     claude_adapter_context_t* ctx = claude_adapter_create(&cfg);
     if (!ctx) return -2;
 
     g_claude_proto_context = ctx;
-    *out_context = ctx;
+    *(void**)context = ctx;
     return 0;
 }
 
@@ -247,14 +247,14 @@ static int claude_proto_destroy(void* context) {
 }
 
 static int claude_proto_handle_request(void* context,
-                                       const unified_message_t* request,
-                                       unified_message_t* response) {
-    if (!context || !request || !response) return -1;
+                                       const void* req,
+                                       void** resp) {
+    if (!context || !req || !resp) return -1;
 
     claude_adapter_context_t* ctx = (claude_adapter_context_t*)context;
     if (!ctx->initialized) return -2;
 
-    memset(response, 0, sizeof(*response));
+    const unified_message_t* request = (const unified_message_t*)req;
 
     const char* user_content = "";
     const char* system_content = "";
@@ -289,19 +289,43 @@ static int claude_proto_handle_request(void* context,
     claude_generate_response(user_content, system_content,
                              resp_text, sizeof(resp_text));
 
+    unified_message_t* response = (unified_message_t*)calloc(1, sizeof(unified_message_t));
+    if (!response) return -3;
+
     size_t resp_len = strlen(resp_text);
     response->payload = strdup(resp_text);
-    response->payload_length = resp_len;
+    response->payload_size = resp_len;
     response->status = 200;
-    strncpy(response->correlation_id, request->correlation_id,
-            sizeof(response->correlation_id) - 1);
+    if (request) {
+        strncpy(response->correlation_id, request->correlation_id,
+                sizeof(response->correlation_id) - 1);
+    }
 
     ctx->total_requests++;
     ctx->total_tokens_in += claude_estimate_tokens(user_content) +
                             claude_estimate_tokens(system_content);
     ctx->total_tokens_out += claude_estimate_tokens(resp_text);
 
+    *resp = response;
     return 0;
+}
+
+static int claude_proto_get_version(void* context, char* buf, size_t max_size) {
+    (void)context;
+    if (!buf || max_size == 0) return -1;
+    const char* ver = claude_adapter_version();
+    size_t len = strlen(ver);
+    if (len >= max_size) len = max_size - 1;
+    memcpy(buf, ver, len);
+    buf[len] = '\0';
+    return 0;
+}
+
+static uint32_t claude_proto_capabilities(void* context) {
+    (void)context;
+    return (uint32_t)(
+        PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING |
+        PROTO_CAP_VISION | PROTO_CAP_EXTENDED_THINKING);
 }
 
 static claude_model_info_t g_builtin_models[] = {
@@ -635,7 +659,7 @@ int claude_list_models(claude_adapter_context_t* ctx,
     if (!ctx || !models || !count) return -1;
 
     *models = (claude_model_info_t*)calloc((size_t)g_builtin_model_count, sizeof(claude_model_info_t));
-    if (!models) return -3;
+    if (!*models) return -3;
 
     for (int i = 0; i < g_builtin_model_count; i++) {
         (*models)[i] = g_builtin_models[i];
@@ -711,11 +735,12 @@ const proto_adapter_t* claude_get_protocol_adapter(void) {
         adapter.name = "Claude";
         adapter.version = CLAUDE_ADAPTER_VERSION;
         adapter.description = "Anthropic Claude API Adapter - advanced LLM with extended thinking, vision, and tool use capabilities";
+        adapter.type = PROTO_CLAUDE;
         adapter.init = claude_proto_init;
         adapter.destroy = claude_proto_destroy;
         adapter.handle_request = claude_proto_handle_request;
-        adapter.get_version = claude_adapter_version;
-        adapter.capabilities = PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING | PROTO_CAP_VISION | PROTO_CAP_EXTENDED_THINKING;
+        adapter.get_version = claude_proto_get_version;
+        adapter.capabilities = claude_proto_capabilities;
         initialized = true;
     }
 

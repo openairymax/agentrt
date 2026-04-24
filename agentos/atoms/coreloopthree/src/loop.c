@@ -57,7 +57,8 @@ static void free_loop_memory(agentos_core_loop_t* loop);
 
 /* 提取的辅助函数 - 降低 agentos_loop_submit 圈复杂度 */
 static char* build_enhanced_input(const char* input, size_t input_len,
-                                   agentos_memory_record_t** records, size_t record_count);
+                                   agentos_memory_record_t** records, size_t record_count,
+                                   size_t max_memories);
 static void free_memories(agentos_memory_record_t** records, size_t record_count);
 
 /* 默认配置 */
@@ -68,6 +69,9 @@ static void init_default_config(agentos_loop_config_t* manager) {
     manager->loop_config_memory_threads = 2;
     manager->loop_config_max_queued_tasks = 1000;
     manager->loop_config_stats_interval_ms = 60000;
+    manager->loop_config_memory_query_limit = 5;
+    manager->loop_config_task_timeout_ms = 30000;
+    manager->loop_config_memory_importance = 0.7f;
 }
 
 /* ==================== 辅助函数实现 - 用于降低圈复杂度 ==================== */
@@ -115,6 +119,7 @@ static memory_pool_t* get_loop_memory_pool(void)
     if (g_pool_mutex == NULL) {
         agentos_mutex_t* new_mutex = agentos_mutex_create();
         if (new_mutex == NULL) {
+            /* AgentOS 核心未初始化，跳过内存池，使用普通分配 */
             return NULL;
         }
 #ifdef _WIN32
@@ -128,7 +133,9 @@ static memory_pool_t* get_loop_memory_pool(void)
         }
     }
 
-    agentos_mutex_lock(g_pool_mutex);
+    if (agentos_mutex_lock(g_pool_mutex) != AGENTOS_SUCCESS) {
+        return NULL;
+    }
     if (g_loop_memory_pool == NULL) {
         memory_pool_config_t options = {
             .block_size = sizeof(agentos_core_loop_t),
@@ -154,17 +161,10 @@ static memory_pool_t* get_loop_memory_pool(void)
  */
 static agentos_core_loop_t* allocate_loop_memory(void)
 {
-    memory_pool_t* pool = get_loop_memory_pool();
-    if (pool == NULL) {
-        return (agentos_core_loop_t*)AGENTOS_CALLOC(1, sizeof(agentos_core_loop_t));
+    agentos_core_loop_t* loop = (agentos_core_loop_t*)AGENTOS_CALLOC(1, sizeof(agentos_core_loop_t));
+    if (loop) {
+        memset(loop, 0, sizeof(agentos_core_loop_t));
     }
-
-    agentos_core_loop_t* loop = (agentos_core_loop_t*)memory_pool_alloc(pool, sizeof(agentos_core_loop_t));
-    if (loop == NULL) {
-        return (agentos_core_loop_t*)AGENTOS_CALLOC(1, sizeof(agentos_core_loop_t));
-    }
-
-    memset(loop, 0, sizeof(agentos_core_loop_t));
     return loop;
 }
 
@@ -235,12 +235,7 @@ static void free_loop_memory(agentos_core_loop_t* loop)
         return;
     }
 
-    memory_pool_t* pool = get_loop_memory_pool();
-    if (pool != NULL) {
-        memory_pool_free(pool, loop);
-    } else {
-        AGENTOS_FREE(loop);
-    }
+    AGENTOS_FREE(loop);
 }
 
 /**
@@ -299,8 +294,8 @@ static void free_memories(agentos_memory_record_t** records, size_t record_count
  * @return 增强后的输入字符串，需调用者释放；失败返回NULL
  */
 static char* build_enhanced_input(const char* input, size_t input_len,
-                                   agentos_memory_record_t** records, size_t record_count)
-{
+                                   agentos_memory_record_t** records, size_t record_count,
+                                   size_t max_memories) {
     if (!input || record_count == 0 || !records) return NULL;
 
     size_t total_len = input_len + 1024;
@@ -317,7 +312,7 @@ static char* build_enhanced_input(const char* input, size_t input_len,
     pos += snprintf(enhanced_input + pos, total_len - pos,
         "[上下文增强]\n相关记忆数量：%zu\n\n", record_count);
 
-    for (size_t i = 0; i < record_count && i < 5; i++) {
+    for (size_t i = 0; i < record_count && i < max_memories; i++) {
         if (records[i] && records[i]->memory_record_data) {
             pos += snprintf(enhanced_input + pos, total_len - pos,
                 "记忆 %zu: %.*s\n", i + 1, (int)records[i]->memory_record_data_len, (const char*)records[i]->memory_record_data);
@@ -472,7 +467,8 @@ AGENTOS_API agentos_error_t agentos_loop_submit(
     /* 步骤 2: 构建增强输入（如果有相关记忆） */
     char* enhanced_input = NULL;
     if (err == AGENTOS_SUCCESS && memory_count > 0) {
-        enhanced_input = build_enhanced_input(input, input_len, memories, memory_count);
+        enhanced_input = build_enhanced_input(input, input_len, memories, memory_count,
+                                               loop->manager.loop_config_memory_query_limit);
     }
 
     /* 释放记忆结果（无论是否构建了增强输入） */
@@ -500,7 +496,7 @@ AGENTOS_API agentos_error_t agentos_loop_submit(
     agentos_task_t task;
     memset(&task, 0, sizeof(task));
     task.task_input = (void*)process_input;
-    task.task_timeout_ms = 30000;
+    task.task_timeout_ms = loop->manager.loop_config_task_timeout_ms;
 
     err = agentos_execution_submit(loop->execution, &task, out_task_id);
 
@@ -547,7 +543,7 @@ AGENTOS_API agentos_error_t agentos_loop_wait(
             record.memory_record_data = *out_result;
             record.memory_record_data_len = *out_result_len;
             record.memory_record_type = MEMORY_TYPE_RAW;
-            record.memory_record_importance = 0.7f;
+            record.memory_record_importance = loop->manager.loop_config_memory_importance;
             char* new_record_id = NULL;
             agentos_error_t store_err = agentos_memory_write(
                 loop->memory,

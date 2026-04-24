@@ -30,6 +30,9 @@
 #include "string_compat.h"
 #include "check.h"
 
+/* 前向声明：syscall分发入口（定义在 syscall_table.c） */
+void* agentos_syscall_invoke(int syscall_num, void** args, int argc);
+
 /* ==================== 常量定义 ==================== */
 
 #define MAX_SANDBOXES 64
@@ -373,8 +376,10 @@ agentos_error_t agentos_sandbox_invoke(agentos_sandbox_t* sandbox,
                                        void** out_result) {
     if (!sandbox || !out_result) return AGENTOS_EINVAL;
 
-    uint64_t start_time = 0;
-    (void)start_time;
+    /* 记录调用开始时间用于性能统计 */
+    struct timespec ts = {0, 0};
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    uint64_t start_time = (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
 
     sandbox->call_count++;
     if (g_sandbox_manager) {
@@ -416,9 +421,24 @@ agentos_error_t agentos_sandbox_invoke(agentos_sandbox_t* sandbox,
         return AGENTOS_EQUOTA;
     }
 
-    *out_result = NULL;
+    /* 实际执行系统调用（通过syscall入口分发） */
+    void* invoke_result = agentos_syscall_invoke(syscall_num, args, argc);
+    *out_result = invoke_result;
 
     sandbox_add_audit_entry(sandbox, syscall_num, NULL, AGENTOS_SUCCESS, 0, "Executed");
+
+    /* 更新性能统计（使用start_time计算耗时） */
+    struct timespec ts_end = {0, 0};
+    clock_gettime(CLOCK_MONOTONIC, &ts_end);
+    uint64_t end_time = (uint64_t)ts_end.tv_sec * 1000000000ULL + ts_end.tv_nsec;
+    uint64_t elapsed_ns = end_time - start_time;
+    
+    sandbox->perf_stats.total_syscalls++;
+    sandbox->perf_stats.total_cpu_time_ns += elapsed_ns;
+    if (elapsed_ns > 0) {
+        double avg = (double)sandbox->perf_stats.total_cpu_time_ns / sandbox->perf_stats.total_syscalls;
+        sandbox->perf_stats.avg_response_time_ns = avg;
+    }
 
     agentos_mutex_lock(sandbox->lock);
     sandbox->state = SANDBOX_STATE_IDLE;

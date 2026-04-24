@@ -453,20 +453,20 @@ void agentos_ignore_sigpipe(void);
 /**
  * @brief 安全的字符串复制
  * @param dest 目标缓冲区
- * @param dest_size 目标缓冲区大小
  * @param src 源字符串
- * @return 目标字符串指针
+ * @param dest_size 目标缓冲区大小
+ * @return 0成功，非0失败
  */
-char* agentos_strlcpy(char* dest, size_t dest_size, const char* src);
+int agentos_strlcpy(char* dest, const char* src, size_t dest_size);
 
 /**
  * @brief 安全的字符串连接
  * @param dest 目标缓冲区
- * @param dest_size 目标缓冲区大小
  * @param src 源字符串
- * @return 目标字符串指针
+ * @param dest_size 目标缓冲区大小
+ * @return 0成功，非0失败
  */
-char* agentos_strlcat(char* dest, size_t dest_size, const char* src);
+int agentos_strlcat(char* dest, const char* src, size_t dest_size);
 
 /* ==================== 错误处理接口 ==================== */
 
