@@ -28,6 +28,7 @@ endif()
 find_package(cJSON QUIET)
 find_package(libmicrohttpd QUIET)
 find_package(libwebsockets QUIET)
+find_package(Threads REQUIRED)
 
 # 条件定义和消息
 if(cJSON_FOUND)

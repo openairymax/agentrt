@@ -28,10 +28,10 @@ static const char* const g_error_messages[] = {
 };
 
 static const char* const g_custom_error_messages[] = {
-    [JSONRPC_RATE_LIMITED + 32001]      = "Rate limit exceeded",
-    [JSONRPC_AUTH_FAILED + 32002]       = "Authentication failed",
-    [JSONRPC_SESSION_EXPIRED + 32003]   = "Session expired",
-    [JSONRPC_SERVICE_UNAVAILABLE + 32004] = "Service unavailable",
+    "Rate limit exceeded",
+    "Authentication failed",
+    "Session expired",
+    "Service unavailable"
 };
 
 /* ==================== 请求验证 ==================== */
@@ -280,14 +280,15 @@ const char* jsonrpc_get_error_message(int code) {
     }
 
     /* 自定义错误码 */
-    if (code >= -32099 && code <= -32000) {
-        int idx = code + 32001;
-        if (idx >= 0 && idx < (int)(sizeof(g_custom_error_messages) / sizeof(g_custom_error_messages[0]))) {
-            const char* msg = g_custom_error_messages[idx];
-            if (msg) {
-                return msg;
-            }
-        }
+    int cidx = -1;
+    switch (code) {
+        case JSONRPC_RATE_LIMITED:      cidx = 0; break;
+        case JSONRPC_AUTH_FAILED:       cidx = 1; break;
+        case JSONRPC_SESSION_EXPIRED:   cidx = 2; break;
+        case JSONRPC_SERVICE_UNAVAILABLE: cidx = 3; break;
+    }
+    if (cidx >= 0 && cidx < (int)(sizeof(g_custom_error_messages) / sizeof(g_custom_error_messages[0]))) {
+        return g_custom_error_messages[cidx];
     }
 
     return "Unknown error";

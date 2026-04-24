@@ -2,12 +2,16 @@
  * @file counter.c
  * @brief Token计数器实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
- * 
+ *
  * @details
  * 本模块实现Token计数与预算管理功能：
- * - 基于TikToken的BPE分词器
+ * - 基于字符级启发式近似（word/CJK/punctuation 分词）
+ * - 支持按模型类型调整系数（GPT-4/GPT-3.5/Claude/Llama）
  * - 支持批量计数和截断
  * - 线程安全的计数器操作
+ *
+ * @note 本实现使用轻量级字符启发式算法，非完整BPE编码器。
+ *       对于生产环境高精度需求，建议集成TikToken或等效库。
  */
 
 #include "token.h"

@@ -42,13 +42,11 @@ static int g_tests_failed = 0;
 int test_mr_create_destroy(void) {
     agentos_memoryrov_handle_t* handle = agentos_memoryrov_create();
     TEST_ASSERT(handle != NULL, "handle should not be NULL");
-    
+
     if (handle) {
-        /* 注意: destroy可能因内存模块状态问题segfault */
-        /* 已在test_full_lifecycle中验证完整生命周期 */
-        printf("    (create OK, skip destroy to avoid known issue)\n");
+        agentos_memoryrov_destroy(handle);
     }
-    
+
     TEST_PASS("mr_create_destroy");
     return 0;
 }
@@ -332,7 +330,8 @@ int main(int argc, char** argv) {
     
     printf("\n========================================\n");
     printf("  MemoryRovol Core API Unit Tests\n");
-    printf("========================================\n\n");
+    printf("========================================\n");
+    fflush(stdout);
     
     RUN_TEST(test_mr_create_destroy);
     RUN_TEST(test_mr_destroy_null);

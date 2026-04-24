@@ -205,6 +205,7 @@ int main(void) {
     printf("\n========================================\n");
     printf("  CoreLoopThree 主循环 单元测试\n");
     printf("========================================\n\n");
+    fflush(stdout);
 
     /* API 版本 */
     RUN_TEST(test_api_version_constants);

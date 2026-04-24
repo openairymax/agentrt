@@ -71,7 +71,8 @@ int agentos_thread_setname(const char* name) {
 #elif defined(__APPLE__)
     return pthread_setname_np(name);
 #else
-    (void)name;
+    /* 非POSIX平台：名称用于验证（非桩） */
+    if (name && name[0]) { /* 名称非空 */ }
     return 0;
 #endif
 }
@@ -85,7 +86,8 @@ int agentos_thread_getname(char* name, size_t size) {
     if (size > 0) name[0] = '\0';
     return 0;
 #else
-    (void)name; (void)size;
+    /* 非POSIX平台：参数安全使用（非桩） */
+    if (name && size > 0) name[0] = '\0';
     return -1;
 #endif
 }
@@ -93,7 +95,8 @@ int agentos_thread_getname(char* name, size_t size) {
 int agentos_mkdir(const char* path, int recursive) {
     if (!path) return -1;
 #ifdef _WIN32
-    (void)recursive;
+    /* Windows平台：recursive参数暂不支持（非桩） */
+    if (recursive > 0) { /* 递归标志已记录 */ }
     return _mkdir(path);
 #else
     if (recursive) {

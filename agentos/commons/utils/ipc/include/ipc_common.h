@@ -800,6 +800,151 @@ agentos_error_t ipc_message_deserialize(
 );
 
 /* ============================================================================
+ * RPC 通道 API (基于传输通道的远程过程调用)
+ * ============================================================================ */
+
+/**
+ * @brief RPC 方法处理函数类型
+ * @param request 请求数据
+ * @param request_len 请求长度
+ * @param response [out] 响应缓冲区
+ * @param response_max [in/out] 响应缓冲区大小 / 实际响应长度
+ * @param user_data 用户数据
+ * @return 错误码
+ */
+typedef agentos_error_t (*rpc_method_handler_t)(
+    const void* request,
+    size_t request_len,
+    void* response,
+    size_t* response_max,
+    void* user_data
+);
+
+/**
+ * @brief RPC 服务端句柄
+ */
+typedef struct ipc_rpc_server ipc_rpc_server_t;
+
+/**
+ * @brief RPC 客户端句柄
+ */
+typedef struct ipc_rpc_client ipc_rpc_client_t;
+
+/**
+ * @brief RPC 方法注册信息
+ */
+typedef struct {
+    const char* method_name;         /**< 方法名称 */
+    rpc_method_handler_t handler;    /**< 处理函数 */
+    void* user_data;                 /**< 用户数据 */
+} ipc_rpc_method_t;
+
+/**
+ * @brief RPC 服务端配置
+ */
+typedef struct {
+    ipc_channel_t* transport;        /**< 底层传输通道 */
+    const char* service_name;        /**< 服务名称 */
+    ipc_rpc_method_t* methods;       /**< 方法数组 */
+    size_t method_count;             /**< 方法数量 */
+    size_t max_request_size;         /**< 最大请求大小 */
+    size_t max_response_size;        /**< 最大响应大小 */
+} ipc_rpc_server_config_t;
+
+/**
+ * @brief 创建 RPC 服务端
+ * @param config 服务端配置
+ * @return RPC 服务端句柄，失败返回 NULL
+ */
+ipc_rpc_server_t* ipc_rpc_server_create(const ipc_rpc_server_config_t* config);
+
+/**
+ * @brief 销毁 RPC 服务端
+ * @param server RPC 服务端句柄
+ */
+void ipc_rpc_server_destroy(ipc_rpc_server_t* server);
+
+/**
+ * @brief 启动 RPC 服务端（开始处理请求）
+ * @param server RPC 服务端句柄
+ * @return 错误码
+ */
+agentos_error_t ipc_rpc_server_start(ipc_rpc_server_t* server);
+
+/**
+ * @brief 停止 RPC 服务端
+ * @param server RPC 服务端句柄
+ * @return 错误码
+ */
+agentos_error_t ipc_rpc_server_stop(ipc_rpc_server_t* server);
+
+/**
+ * @brief 处理单个 RPC 请求（由事件循环调用）
+ * @param server RPC 服务端句柄
+ * @param timeout_ms 超时时间
+ * @return AGENTOS_SUCCESS 处理成功，AGENTOS_ETIMEDOUT 无请求，其他为错误
+ */
+agentos_error_t ipc_rpc_server_process(ipc_rpc_server_t* server, uint32_t timeout_ms);
+
+/**
+ * @brief RPC 客户端配置
+ */
+typedef struct {
+    ipc_channel_t* transport;        /**< 底层传输通道 */
+    uint32_t timeout_ms;             /**< 默认超时 */
+} ipc_rpc_client_config_t;
+
+/**
+ * @brief 创建 RPC 客户端
+ * @param config 客户端配置
+ * @return RPC 客户端句柄，失败返回 NULL
+ */
+ipc_rpc_client_t* ipc_rpc_client_create(const ipc_rpc_client_config_t* config);
+
+/**
+ * @brief 销毁 RPC 客户端
+ * @param client RPC 客户端句柄
+ */
+void ipc_rpc_client_destroy(ipc_rpc_client_t* client);
+
+/**
+ * @brief 同步 RPC 调用
+ * @param client RPC 客户端句柄
+ * @param method_name 方法名称
+ * @param request 请求数据
+ * @param request_len 请求长度
+ * @param response [out] 响应缓冲区（调用者分配）
+ * @param response_max [in] 响应缓冲区最大大小
+ * @param response_len [out] 实际响应长度
+ * @return 错误码
+ */
+agentos_error_t ipc_rpc_call_sync(
+    ipc_rpc_client_t* client,
+    const char* method_name,
+    const void* request,
+    size_t request_len,
+    void* response,
+    size_t response_max,
+    size_t* response_len
+);
+
+/**
+ * @brief 注册单个 RPC 方法（服务端运行时添加）
+ * @param server RPC 服务端句柄
+ * @param method 方法注册信息
+ * @return 错误码
+ */
+agentos_error_t ipc_rpc_server_register_method(ipc_rpc_server_t* server, const ipc_rpc_method_t* method);
+
+/**
+ * @brief 查找已注册的 RPC 方法
+ * @param server RPC 服务端句柄
+ * @param method_name 方法名称
+ * @return 方法处理函数，未找到返回 NULL
+ */
+rpc_method_handler_t ipc_rpc_server_find_method(ipc_rpc_server_t* server, const char* method_name);
+
+/* ============================================================================
  * 工具函数
  * ============================================================================ */
 
