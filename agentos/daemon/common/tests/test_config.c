@@ -229,25 +229,26 @@ static void test_config_export(void) {
     printf("    PASSED\n");
 }
 
+static bool g_validator_called = false;
+
+static bool my_validator(const char* key, const char* value,
+                         char* error_msg, size_t error_size) {
+    (void)key; (void)value; (void)error_msg; (void)error_size;
+    g_validator_called = true;
+    return true;
+}
+
 static void test_config_validator(void) {
     printf("  test_config_validator...\n");
 
     cm_init(NULL);
-
-    static bool validator_called = false;
-    bool my_validator(const char* key, const char* value,
-                     char* error_msg, size_t error_size) {
-        (void)key; (void)value; (void)error_msg; (void)error_size;
-        validator_called = true;
-        return true;
-    }
 
     int ret = cm_register_validator("valid.*", my_validator);
     TEST_ASSERT(ret == 0, "cm_register_validator");
 
     ret = cm_set("valid.test", "ok", "validator_test");
     TEST_ASSERT(ret == 0, "validated set succeeds");
-    TEST_ASSERT(validator_called, "validator was called");
+    TEST_ASSERT(g_validator_called, "validator was called");
 
     int failures = cm_validate_all();
     TEST_ASSERT(failures == 0, "cm_validate_all no failures");

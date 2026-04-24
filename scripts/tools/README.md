@@ -1,79 +1,46 @@
-# Tools - 通用工具集
+# 运维工具
 
-此目录包含各种开发和运维辅助工具脚本。
+`scripts/tools/`
 
-## 📁 工具列表
+## 概述
 
-### Python 工具
-- **analyze_quality.py** - 代码质量分析（复杂度、重复率、风格检查）
-- **enhance_coverage.py** - 测试覆盖率增强工具
+`tools/` 目录提供 AgentOS 系统日常运维管理所需的实用工具脚本，包括日志分析、性能诊断、配置管理、数据迁移等操作，帮助运维人员快速定位和解决问题。
 
-### 编码工具
-- **encoding/check_encoding.py** - 文件编码检查和转换工具
-- **encoding/fix_bom.py** - BOM (Byte Order Mark) 修复工具
+## 脚本列表
 
-### Shell 工具
-- **check-quality.sh** - 快速质量检查入口脚本
+| 脚本 | 说明 |
+|------|------|
+| `log_analyzer.sh` | 日志分析工具，支持关键词搜索、时间范围过滤、异常模式识别 |
+| `perf_diag.sh` | 性能诊断工具，采集 CPU/内存/磁盘/网络等系统指标 |
+| `config_backup.sh` | 配置文件备份与恢复 |
+| `data_migrate.sh` | 数据迁移工具，支持 LMDB/SQLite/Redis 间的数据同步 |
 
-### 配置文件
-- **requirements.txt** - Python 依赖包列表
-
-## 🚀 使用方法
-
-### 代码质量分析
-```bash
-cd scripts/tools
-python analyze_quality.py --path ../../agentos/atoms/
-```
-
-### 质量检查
-```bash
-cd scripts/tools
-./check-quality.sh
-```
-
-### 清理BOM标记
-```bash
-cd scripts/tools/encoding
-python fix_bom.py --fix
-```
-
-### 编码检查
-```bash
-cd scripts/tools/encoding
-python check_encoding.py --convert
-```
-
-## 🔧 依赖安装
+## 使用示例
 
 ```bash
-pip install -r requirements.txt
+# 日志分析：按时间范围搜索
+./tools/log_analyzer.sh --since "2026-04-01" --until "2026-04-23" --level ERROR
+
+# 性能诊断：输出 JSON 格式报告
+./tools/perf_diag.sh --duration 60 --json --output report.json
+
+# 备份配置
+./tools/config_backup.sh --output /backup/agentos-config-$(date +%Y%m%d).tar.gz
+
+# 数据迁移
+./tools/data_migrate.sh --source lmdb:///var/lib/agentos/data --target sqlite:///var/lib/agentos/export.db
 ```
 
-主要依赖：
-- `radon` - Python 复杂度分析
-- `pylint` - 代码风格检查
-- `jscpd` - 重复代码检测
+## 诊断指标
 
-## 📊 输出示例
+| 指标 | 来源 | 说明 |
+|------|------|------|
+| CPU 使用率 | `/proc/stat` | 用户态/内核态/空闲时间占比 |
+| 内存使用 | `/proc/meminfo` | 总量/已用/缓存/交换分区 |
+| 磁盘 I/O | `iostat` | 读写速率、IOPS、等待时间 |
+| 网络流量 | `/proc/net/dev` | 收发字节数、错误包数 |
+| 进程状态 | `ps` | 各守护进程的 CPU/内存占用、运行时长 |
 
-**analyze_quality.py 输出：**
-```
-==========================================
-AgentOS Code Quality Analysis Report
-==========================================
+---
 
-📊 总体评分: A- (87.5/100)
-
-📈 指标详情:
-├── Cyclomatic Complexity: 平均 3.2 ✅
-├── Code Duplication: 2.8% ✅  
-├── Style Consistency: 97% ✅
-└── Documentation Coverage: 85% ⚠️
-
-🔍 文件统计:
-├── 分析文件数: 451
-├── 总代码行数: 128,456
-├── 问题文件数: 12
-└── 建议优化项: 23
-```
+© 2026 SPHARX Ltd. All Rights Reserved.

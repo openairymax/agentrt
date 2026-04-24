@@ -1,90 +1,45 @@
-# AgentOS Scripts Core 模块
+# 核心功能脚本
 
-## 模块概述
+`scripts/core/`
 
-`scripts/core/` 包含 AgentOS Scripts 的核心框架组件，提供插件系统、事件总线、安全模块、遥测等核心功能。
+## 概述
 
-## 组件
+`core/` 目录包含 AgentOS 系统的核心运维脚本，负责系统的初始化引导、进程生命周期管理、日志轮转清理等基础运维操作，是保障系统稳定运行的基础设施。
 
-### plugin.py - 插件系统
+## 脚本列表
 
-灵活的可扩展插件架构，支持动态加载和执行。
-
-**主要类:**
-- `PluginRegistry` - 插件注册表
-- `Plugin` - 插件基类
-- `PluginContext` - 执行上下文
-- `PluginResult` - 执行结果
-
-### events.py - 事件总线
-
-统一的事件处理框架，支持同步/异步事件处理和事件历史。
-
-**主要类:**
-- `EventBus` - 事件总线
-- `Event` - 事件数据模型
-- `EventHandler` - 事件处理器
-
-### security.py - 安全模块
-
-输入验证、路径安全、命令注入防护等安全保障。
-
-**主要类:**
-- `SecurityManager` - 安全管理器
-- `InputValidator` - 输入验证器
-- `ValidationResult` - 验证结果
-
-### telemetry.py - 遥测模块
-
-性能指标收集和监控系统，支持 Prometheus 格式导出。
-
-**主要类:**
-- `MetricsCollector` - 指标收集器
-- `Timer` - 计时器上下文管理器
-
-### manager.py - 配置引擎
-
-基于 Jinja2 的配置模板渲染，支持多环境配置。
-
-**主要类:**
-- `ConfigEngine` - 配置引擎
-- `ConfigTemplate` - 配置模板
-
-### cli.py - 交互式 CLI
-
-增强的命令行界面，包括彩色输出、进度条、选择菜单等。
-
-**主要类:**
-- `AgentOSCLI` - CLI 主类
-- `ProgressBar` - 进度条
-- `Spinner` - 旋转指示器
-- `Table` - 表格格式化器
+| 脚本 | 说明 |
+|------|------|
+| `bootstrap.sh` | 系统初始化引导，检查运行环境并启动核心服务 |
+| `service_manager.sh` | 守护进程管理器，支持 start/stop/restart/status 操作 |
+| `log_rotator.sh` | 日志轮转与清理，按大小或时间自动归档旧日志 |
+| `health_check.sh` | 健康检查脚本，验证各组件运行状态 |
 
 ## 使用示例
 
-```python
-from scripts.core import (
-    PluginRegistry,
-    EventBus,
-    SecurityManager,
-    TelemetryCollector,
-    AgentOSCLI
-)
-
-# 初始化组件
-registry = PluginRegistry()
-bus = EventBus()
-security = SecurityManager()
-telemetry = TelemetryCollector()
-cli = AgentOSCLI(verbose=True)
-
-# 使用
-cli.info("Starting AgentOS...")
-telemetry.counter("requests")
-```
-
-## 测试
-
 ```bash
-pytest scripts/tests/python/test_core.py -v
+# 系统初始化
+./core/bootstrap.sh
+
+# 管理守护进程
+./core/service_manager.sh start  --name gateway_d
+./core/service_manager.sh stop   --name llm_d
+./core/service_manager.sh status --name all
+
+# 日志轮转
+./core/log_rotator.sh --max-size 100M --keep 7
+
+# 健康检查
+./core/health_check.sh --verbose
 ```
+
+## 功能特性
+
+- **bootstrap.sh**: 运行环境检测、依赖检查、配置文件加载、核心服务按序启动
+- **service_manager.sh**: 基于 PID 文件的进程管理、优雅停止（SIGTERM）、强制终止（SIGKILL）
+- **log_rotator.sh**: 支持按日志大小（--max-size）和保留天数（--keep）策略清理
+- **health_check.sh**: 端口检测、进程存活检测、API 响应检测，支持 JSON 格式输出
+
+---
+
+© 2026 SPHARX Ltd. All Rights Reserved.

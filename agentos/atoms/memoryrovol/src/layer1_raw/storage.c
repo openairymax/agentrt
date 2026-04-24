@@ -91,8 +91,19 @@ agentos_error_t agentos_layer1_raw_create_async(
         return AGENTOS_ENOMEM;
     }
 
-    if (path) {
+    if (path && *path) {
         snprintf(l1->inner->storage_path, sizeof(l1->inner->storage_path), "%s", path);
+    } else {
+        const char* tmpdir = getenv("TMPDIR");
+        if (!tmpdir || !*tmpdir) tmpdir = "/tmp";
+        snprintf(l1->inner->storage_path, sizeof(l1->inner->storage_path),
+                 "%s/agentos_l1_test_XXXXXX", tmpdir);
+
+#ifdef _WIN32
+        _mkdir(l1->inner->storage_path);
+#else
+        mkdir(l1->inner->storage_path, 0755);
+#endif
     }
 
     l1->inner->queue_size = queue_size > 0 ? queue_size : DEFAULT_QUEUE_SIZE;
@@ -111,6 +122,23 @@ void agentos_layer1_raw_destroy(agentos_layer1_raw_t* l1) {
     if (l1->inner) {
         l1->inner->shutdown = 1;
         pthread_cond_broadcast(&l1->inner->cond);
+
+        const char* path = l1->inner->storage_path;
+        if (path && *path && strstr(path, "agentos_l1_test_") != NULL) {
+            DIR* dir = opendir(path);
+            if (dir) {
+                struct dirent* entry;
+                while ((entry = readdir(dir)) != NULL) {
+                    if (entry->d_name[0] == '.') continue;
+                    char fpath[600];
+                    snprintf(fpath, sizeof(fpath), "%s/%s", path, entry->d_name);
+                    unlink(fpath);
+                }
+                closedir(dir);
+                rmdir(path);
+            }
+        }
+
         pthread_mutex_destroy(&l1->inner->mutex);
         pthread_cond_destroy(&l1->inner->cond);
         AGENTOS_FREE(l1->inner);

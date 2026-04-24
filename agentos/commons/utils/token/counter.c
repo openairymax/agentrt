@@ -2,12 +2,16 @@
  * @file counter.c
  * @brief Token计数器实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
- * 
+ *
  * @details
  * 本模块实现Token计数与预算管理功能：
- * - 基于TikToken的BPE分词器
+ * - 基于字符级启发式近似（word/CJK/punctuation 分词）
+ * - 支持按模型类型调整系数（GPT-4/GPT-3.5/Claude/Llama）
  * - 支持批量计数和截断
  * - 线程安全的计数器操作
+ *
+ * @note 本实现使用轻量级字符启发式算法，非完整BPE编码器。
+ *       对于生产环境高精度需求，建议集成TikToken或等效库。
  */
 
 #include "token.h"
@@ -42,28 +46,63 @@ size_t agentos_token_count(const char* text, const agentos_token_config_t* confi
     if (!text) return 0;
 
     size_t length = strlen(text);
+    if (length == 0) return 0;
+
     agentos_token_config_t default_cfg = AGENTOS_TOKEN_CONFIG_DEFAULT;
     const agentos_token_config_t* cfg = config ? config : &default_cfg;
 
-    // 简单估算：ASCII字符1 token，CJK字符2 tokens
-    size_t count = 0;
-    for (size_t i = 0; i < length; i++) {
+    size_t word_count = 0;
+    size_t cjk_count = 0;
+    size_t punct_count = 0;
+    bool in_word = false;
+
+    for (size_t i = 0; i < length; ) {
         unsigned char c = (unsigned char)text[i];
+
         if (c < 0x80) {
-            count += 1;
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
+                if (!in_word) { word_count++; in_word = true; }
+            } else {
+                in_word = false;
+                if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+                    /* whitespace */
+                } else {
+                    punct_count++;
+                }
+            }
+            i++;
         } else if (c < 0xE0) {
-            count += 2;
-            i += 1;
-        } else if (c < 0xF0) {
-            count += 2;
+            cjk_count++;
+            in_word = false;
             i += 2;
-        } else {
-            count += 2;
+        } else if (c < 0xF0) {
+            unsigned char c2 = (i + 1 < length) ? (unsigned char)text[i + 1] : 0;
+            if ((c & 0x0F) == 0x0E && (c2 & 0xC0) == 0x80) {
+                unsigned char c3 = (i + 2 < length) ? (unsigned char)text[i + 2] : 0;
+                unsigned int cp = ((c & 0x0F) << 12) | ((c2 & 0x3F) << 6) | (c3 & 0x3F);
+                if (cp >= 0x4E00 && cp <= 0x9FFF) {
+                    cjk_count++;
+                } else {
+                    word_count++;
+                }
+            } else {
+                cjk_count++;
+            }
+            in_word = false;
             i += 3;
+        } else {
+            cjk_count++;
+            in_word = false;
+            i += 4;
         }
     }
 
-    // 应用模型特定的缩放因子
+    size_t count = word_count + cjk_count + (punct_count + 1) / 2;
+
+    if (count == 0 && length > 0) {
+        count = (length + 3) / 4;
+    }
+
     switch (cfg->model_type) {
         case AGENTOS_TOKEN_MODEL_GPT4: count = (count * 4 + 2) / 3; break;
         case AGENTOS_TOKEN_MODEL_GPT35: count = (count * 5 + 2) / 4; break;

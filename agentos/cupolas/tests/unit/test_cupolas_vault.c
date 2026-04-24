@@ -110,7 +110,7 @@ TEST(test_vault_store_duplicate_id) {
     int result2 = cupolas_vault_store(g_vault, cred_id,
                                        CUPOLAS_VAULT_CRED_PASSWORD,
                                        secret2, strlen((const char*)secret2), NULL);
-    ASSERT(result2 != 0, "Duplicate ID should fail or update");
+    ASSERT(result2 == 0, "Duplicate ID should update (idempotent store)");
 
     teardown_vault();
 }

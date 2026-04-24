@@ -64,6 +64,7 @@ static void test_cache_put_get(void) {
 
     char* retrieved = NULL;
     int ret = tool_cache_get(cache, key, &retrieved);
+    fprintf(stderr, "DEBUG: ret=%d retrieved=%p\n", ret, (void*)retrieved);
     assert(ret == 0);
     assert(retrieved != NULL);
     assert(strcmp(retrieved, value) == 0);
@@ -115,6 +116,7 @@ int main(void) {
     printf("=========================================\n");
     printf("  Tool Cache Unit Tests\n");
     printf("=========================================\n");
+    fflush(stdout);
 
     test_cache_create_destroy();
     test_cache_key_generation();

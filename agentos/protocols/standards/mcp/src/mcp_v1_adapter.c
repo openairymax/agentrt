@@ -6,26 +6,11 @@
  */
 
 #include "mcp_v1_adapter.h"
+#include "unified_protocol.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
-
-/* Internal adapter structure for MCP */
-typedef struct {
-    agentos_protocol_type_t type;
-    const char* name;
-    int (*init)(void* context);
-    int (*destroy)(void* context);
-    int (*encode)(void* context, const void* msg, void** out_data, size_t* out_size);
-    int (*decode)(void* context, const void* data, size_t size, void* out_msg);
-    int (*connect)(void* context, const char* endpoint);
-    int (*disconnect)(void* context);
-    int (*is_connected)(void* context);
-    int (*send)(void* context, const void* data, size_t size);
-    int (*receive)(void* context, void** data, size_t* size, uint32_t timeout_ms);
-    int (*get_stats)(void* context, char* stats_json, size_t max_size);
-} local_mcp_adapter_t;
 
 typedef struct {
     mcp_tool_t tool;
@@ -992,18 +977,22 @@ static int mcp_adapter_init(void* context) {
     return 0;
 }
 
-static void mcp_adapter_destroy(void* context) {
-    mcp_v1_context_destroy((mcp_v1_context_t*)context);
+static int mcp_adapter_destroy(void* context) {
+    if (context) {
+        mcp_v1_context_destroy((mcp_v1_context_t*)context);
+    }
+    return 0;
 }
 
-static int mcp_adapter_encode(void* context, const unified_message_t* msg,
+static int mcp_adapter_encode(void* context, const void* msg,
                                void** encoded, size_t* size) {
     if (!context || !msg || !encoded || !size) return -1;
     mcp_v1_context_t* ctx = (mcp_v1_context_t*)context;
+    const unified_message_t* umsg = (const unified_message_t*)msg;
 
     char* response_json = NULL;
-    int result = mcp_v1_route_request(ctx, msg->endpoint,
-                                       (const char*)msg->payload, &response_json);
+    int result = mcp_v1_route_request(ctx, umsg->endpoint,
+                                       (const char*)umsg->payload, &response_json);
     if (result != 0 || !response_json) {
         *encoded = NULL;
         *size = 0;
@@ -1016,11 +1005,12 @@ static int mcp_adapter_encode(void* context, const unified_message_t* msg,
 }
 
 static int mcp_adapter_decode(void* context, const void* data, size_t data_size,
-                               unified_message_t* msg) {
-    if (!context || !data || !msg) return -1;
+                               void* out_msg) {
+    if (!context || !data || !out_msg) return -1;
     if (data_size == 0) return -2;
 
     mcp_v1_context_t* ctx = (mcp_v1_context_t*)context;
+    unified_message_t* msg = (unified_message_t*)out_msg;
 
     char* input_copy = malloc(data_size + 1);
     if (!input_copy) return -3;
@@ -1036,7 +1026,7 @@ static int mcp_adapter_decode(void* context, const void* data, size_t data_size,
         msg->payload_size = strlen(response_json);
         msg->protocol = PROTOCOL_CUSTOM;
         msg->direction = DIRECTION_RESPONSE;
-        msg->timestamp = get_current_timestamp();
+        msg->timestamp = (uint64_t)time(NULL);
     }
 
     return result;
@@ -1061,21 +1051,63 @@ static int mcp_adapter_disconnect(void* context) {
     return 0;
 }
 
-static bool mcp_adapter_is_connected(void* context) {
-    if (!context) return false;
+static int mcp_adapter_is_connected(void* context) {
+    if (!context) return 0;
     mcp_v1_context_t* ctx = (mcp_v1_context_t*)context;
-    return ctx->tool_count > 0 || ctx->resource_count > 0;
+    return (ctx->tool_count > 0 || ctx->resource_count > 0) ? 1 : 0;
 }
 
 static int mcp_adapter_get_stats(void* context, char* stats_json, size_t max_size) {
     (void)context;
-    (void)stats_json;
-    (void)max_size;
+    if (!stats_json || max_size < 64) return -1;
+    int written = snprintf(stats_json, max_size,
+        "{\"adapter_version\":\"%s\",\"protocol\":\"mcp\"}", MCP_V1_VERSION);
+    return (written >= 0 && (size_t)written < max_size) ? 0 : -2;
+}
+
+static int mcp_adapter_handle_request(void* context,
+                                       const void* req,
+                                       void** resp) {
+    if (!context || !req || !resp) return -1;
+    mcp_v1_context_t* ctx = (mcp_v1_context_t*)context;
+    const unified_message_t* msg = (const unified_message_t*)req;
+
+    const char* method = msg->method[0] ? msg->method : "tools/call";
+    const char* params = (const char*)(msg->payload ? msg->payload : "{}");
+
+    char* response_json = NULL;
+    int result = mcp_v1_route_request(ctx, method, params, &response_json);
+
+    if (result == 0 && response_json) {
+        *resp = response_json;
+    } else {
+        free(response_json);
+        *resp = strdup("{\"error\":\"request failed\"}");
+        result = -1;
+    }
+    return result;
+}
+
+static int mcp_adapter_get_version(void* context, char* buf, size_t max_size) {
+    (void)context;
+    if (!buf || max_size == 0) return -1;
+    size_t len = strlen(MCP_V1_VERSION);
+    if (len >= max_size) len = max_size - 1;
+    memcpy(buf, MCP_V1_VERSION, len);
+    buf[len] = '\0';
     return 0;
 }
 
-static local_mcp_adapter_t mcp_v1_adapter_internal = {
-    .type = PROTOCOL_CUSTOM,
+static uint32_t mcp_adapter_capabilities(void* context) {
+    (void)context;
+    return (uint32_t)(MCP_CAP_TOOLS | MCP_CAP_RESOURCES | MCP_CAP_PROMPTS | MCP_CAP_LOGGING | MCP_CAP_SAMPLING);
+}
+
+static protocol_adapter_t mcp_v1_adapter_internal = {
+    .type = AGENTOS_PROTOCOL_MCP,
+    .name = "MCP v1.0 Protocol Adapter",
+    .version = MCP_V1_VERSION,
+    .description = "Model Context Protocol v1.0 adapter",
     .init = mcp_adapter_init,
     .destroy = mcp_adapter_destroy,
     .encode = mcp_adapter_encode,
@@ -1083,20 +1115,18 @@ static local_mcp_adapter_t mcp_v1_adapter_internal = {
     .connect = mcp_adapter_connect,
     .disconnect = mcp_adapter_disconnect,
     .is_connected = mcp_adapter_is_connected,
-    .get_stats = mcp_adapter_get_stats
+    .send = NULL,
+    .receive = NULL,
+    .handle_request = mcp_adapter_handle_request,
+    .get_version = mcp_adapter_get_version,
+    .capabilities = mcp_adapter_capabilities,
+    .get_stats = mcp_adapter_get_stats,
+    .context = NULL,
+    .user_data = NULL
 };
 
-static protocol_adapter_t* mcp_v1_adapter = NULL;
-
-void mcp_v1_init_adapter(void) {
-    mcp_v1_adapter = (protocol_adapter_t*)&mcp_v1_adapter_internal;
-}
-
 const protocol_adapter_t* mcp_v1_get_adapter(void) {
-    if (!mcp_v1_adapter) {
-        mcp_v1_init_adapter();
-    }
-    return &mcp_v1_adapter;
+    return &mcp_v1_adapter_internal;
 }
 
 size_t mcp_v1_get_tool_count(mcp_v1_context_t* ctx) {

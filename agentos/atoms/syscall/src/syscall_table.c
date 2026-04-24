@@ -7,7 +7,7 @@
 #include "syscalls.h"
 #include <stddef.h>
 
-/* 系统调用号枚�?*/
+/* 系统调用号枚举 */
 enum {
     SYS_TASK_SUBMIT = 1,
     SYS_TASK_QUERY,
@@ -27,6 +27,10 @@ enum {
     SYS_AGENT_TERMINATE,
     SYS_AGENT_INVOKE,
     SYS_AGENT_LIST,
+    SYS_SKILL_INSTALL,
+    SYS_SKILL_EXECUTE,
+    SYS_SKILL_LIST,
+    SYS_SKILL_UNINSTALL,
     SYS_MAX
 };
 
@@ -51,6 +55,10 @@ extern void* sys_agent_spawn(void** args, int argc);
 extern void* sys_agent_terminate(void** args, int argc);
 extern void* sys_agent_invoke(void** args, int argc);
 extern void* sys_agent_list(void** args, int argc);
+extern void* sys_skill_install(void** args, int argc);
+extern void* sys_skill_execute(void** args, int argc);
+extern void* sys_skill_list(void** args, int argc);
+extern void* sys_skill_uninstall(void** args, int argc);
 
 static syscall_func_t syscall_table[SYS_MAX] = {
     [SYS_TASK_SUBMIT] = sys_task_submit,
@@ -71,6 +79,10 @@ static syscall_func_t syscall_table[SYS_MAX] = {
     [SYS_AGENT_TERMINATE] = sys_agent_terminate,
     [SYS_AGENT_INVOKE] = sys_agent_invoke,
     [SYS_AGENT_LIST] = sys_agent_list,
+    [SYS_SKILL_INSTALL] = sys_skill_install,
+    [SYS_SKILL_EXECUTE] = sys_skill_execute,
+    [SYS_SKILL_LIST] = sys_skill_list,
+    [SYS_SKILL_UNINSTALL] = sys_skill_uninstall,
 };
 
 void* agentos_syscall_invoke(int syscall_num, void** args, int argc) {

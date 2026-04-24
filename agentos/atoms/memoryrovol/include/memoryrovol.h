@@ -155,6 +155,65 @@ agentos_error_t agentos_memoryrov_query(
     float** out_scores,
     size_t* out_count);
 
+/**
+ * @brief 创建 MemoryRovol 系统实例
+ * @return 系统句柄指针，失败返回 NULL
+ * @ownership 调用者负责通过 agentos_memoryrov_destroy 释放
+ */
+agentos_memoryrov_handle_t* agentos_memoryrov_create(void);
+
+/**
+ * @brief 销毁 MemoryRovol 系统实例
+ * @param handle [in] 系统句柄（可为 NULL）
+ */
+void agentos_memoryrov_destroy(agentos_memoryrov_handle_t* handle);
+
+/**
+ * @brief 添加记忆条目
+ * @param handle [in] 系统句柄（非 NULL）
+ * @param content [in] 记忆内容（非 NULL）
+ * @param content_len [in] 内容长度
+ * @return agentos_error_t
+ */
+agentos_error_t agentos_memoryrov_add_memory(
+    agentos_memoryrov_handle_t* handle,
+    const char* content,
+    size_t content_len);
+
+/**
+ * @brief 检索记忆
+ * @param handle [in] 系统句柄（非 NULL）
+ * @param query [in] 查询字符串（非 NULL）
+ * @param limit [in] 返回结果数量上限
+ * @param out_results [out] 输出结果数组（需调用者释放）
+ * @param out_count [out] 输出结果数量
+ * @return agentos_error_t
+ */
+agentos_error_t agentos_memoryrov_retrieve(
+    agentos_memoryrov_handle_t* handle,
+    const char* query,
+    size_t limit,
+    agentos_memory_t** out_results,
+    size_t* out_count);
+
+/**
+ * @brief 执行记忆进化（模式挖掘、固化等）
+ * @param handle [in] 系统句柄（非 NULL）
+ * @param force [in] 强制立即执行
+ * @return agentos_error_t
+ */
+agentos_error_t agentos_memoryrov_evolve(
+    agentos_memoryrov_handle_t* handle,
+    int force);
+
+/**
+ * @brief 执行遗忘操作
+ * @param handle [in] 系统句柄（非 NULL）
+ * @return agentos_error_t
+ */
+agentos_error_t agentos_memoryrov_forget(
+    agentos_memoryrov_handle_t* handle);
+
 #ifdef __cplusplus
 }
 #endif

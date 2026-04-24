@@ -31,12 +31,22 @@ endif()
 add_subdirectory(src/cognition)
 add_subdirectory(src/execution)
 
+# 测试套件（仅在启用测试时构建）
+if(BUILD_TESTS)
+    option(BUILD_CORELOOPTHREE_TESTS "Build CoreLoopThree test suite" ON)
+    if(BUILD_CORELOOPTHREE_TESTS)
+        enable_testing()
+        add_subdirectory(tests)
+    endif()
+endif()
+
 # 创建主库
 add_library(agentos_coreloopthree STATIC
     src/loop.c
     src/config_loader.c
     src/utils/error_utils.c
     src/utils/id_utils.c
+    src/memory/engine.c
 )
 
 # 使用统一的头文件路径管理
@@ -77,12 +87,18 @@ target_include_directories(agentos_coreloopthree PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../memoryrovol/src
 )
 
-target_link_libraries(agentos_coreloopthree PRIVATE
+target_link_libraries(agentos_coreloopthree PUBLIC
     agentos_cognition
     agentos_execution
     agentos_core
-    ws2_32
+    agentos_memoryrovol
 )
+
+if(WIN32)
+    target_link_libraries(agentos_coreloopthree PRIVATE ws2_32)
+elseif(UNIX)
+    target_link_libraries(agentos_coreloopthree PRIVATE uuid)
+endif()
 
 # 安装头文件
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/

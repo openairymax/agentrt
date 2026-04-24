@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <inttypes.h>
 
 /* Forward declarations for types defined in header */
 typedef struct a2a_v03_adapter_s a2a_v03_adapter_t;
@@ -121,7 +122,7 @@ int a2a_v03_register_agent(a2a_v03_context_t* ctx,
     if (adapter->agent_count >= A2A_MAX_AGENTS) return -3;
 
     a2a_internal_card_t* internal_card = &adapter->agents[adapter->agent_count];
-    snprintf(internal_card->id, sizeof(internal_card->id), "agent_%zu_%llu",
+    snprintf(internal_card->id, sizeof(internal_card->id), "agent_%zu_%" PRIu64 ",",
              adapter->agent_count + 1, adapter->task_counter++);
     strncpy(internal_card->name, card->name ? card->name : "Unknown", sizeof(internal_card->name) - 1);
     strncpy(internal_card->url, card->url ? card->url : "", sizeof(internal_card->url) - 1);
@@ -229,7 +230,7 @@ int a2a_v03_delegate_task(a2a_handle_t handle,
     memset(out_response, 0, sizeof(*out_response));
 
     snprintf(out_response->task_id, sizeof(out_response->task_id),
-             "task_%llu", adapter->task_counter++);
+             "task_%" PRIu64, adapter->task_counter++);
 
     out_response->status = A2A_TASK_STATUS_ACCEPTED;
     strncpy(out_response->accepted_by,
@@ -295,7 +296,7 @@ int a2a_v03_achieve_consensus(a2a_handle_t handle,
     memset(out_result, 0, sizeof(*out_result));
 
     size_t agree_count = 0;
-    for (size_t i = 0; i < request->num_participants; i++) {
+    for (int i = 0; i < request->num_participants; i++) {
         if (i % 3 != 0) {
             out_result->agreements[i] = true;
             agree_count++;
@@ -337,7 +338,7 @@ int a2a_v03_stream_task(a2a_handle_t handle,
     if (!adapter->initialized) return -2;
 
     snprintf(final_response->task_id, sizeof(final_response->task_id),
-             "stream_task_%llu", adapter->task_counter++);
+             "stream_task_%" PRIu64, adapter->task_counter++);
 
     a2a_progress_event_internal_t event;
     memset(&event, 0, sizeof(event));
@@ -612,10 +613,10 @@ const char* a2a_v03_sign_request(a2a_v03_context_t* ctx,
 
     char sign_data[4096];
     int len = snprintf(sign_data, sizeof(sign_data),
-                       "%s|%s|%s|%llu",
+                       "%s|%s|%s|%" PRIu64 "",
                        method, params_json,
                        token_str ? token_str : "",
-                       (unsigned long long)a2a_timestamp_ms());
+                       (uint64_t)a2a_timestamp_ms());
 
     if (len <= 0 || len >= (int)sizeof(sign_data)) return NULL;
 
@@ -683,9 +684,9 @@ int a2a_v03_create_session(a2a_v03_context_t* ctx,
     memset(sess, 0, sizeof(*sess));
 
     snprintf(sess->session_id, sizeof(sess->session_id),
-             "sess_%s_%llu_%08x",
+             "sess_%s_%" PRIu64 "_%08x",
              remote_agent_id,
-             (unsigned long long)(now / 1000),
+             (uint64_t)(now / 1000),
              a2a_simple_hash(remote_agent_id, strlen(remote_agent_id)));
 
     strncpy(sess->remote_agent_id, remote_agent_id, sizeof(sess->remote_agent_id) - 1);

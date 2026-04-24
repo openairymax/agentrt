@@ -247,7 +247,7 @@ int gw_protocol_bridge_process_request(
     gw_detection_result_t detection;
     int det_ret = gw_protocol_bridge_detect_protocol(
         bridge, incoming->raw_data, incoming->raw_size,
-        incoming->content_type_hint, &detection);
+        incoming->content_type, &detection);
 
     if (det_ret != 0) {
         out_response->status_code = 400;

@@ -1,21 +1,30 @@
 """
 AgentOS 测试数据管理自动化框架
 Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-Version: 1.0.0
+Version: 2.0.0
+Last updated: 2026-04-23
 
 自动生成和管理测试数据
 支持多种数据类型和场景
+增强功能：
+- 关联数据生成
+- 数据验证
+- 批量操作优化
+- 自定义生成器
 """
 
 import json
 import random
 import string
 import uuid
+import hashlib
+import copy
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, List, Optional, Type, Union, Callable, Generator
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from enum import Enum
+from abc import ABC, abstractmethod
 
 
 class DataType(Enum):
@@ -30,6 +39,129 @@ class DataType(Enum):
     URL = "url"
     JSON = "json"
     LIST = "list"
+    PHONE = "phone"
+    NAME = "name"
+    ADDRESS = "address"
+    IP_ADDRESS = "ip_address"
+    COLOR = "color"
+    LOREM = "lorem"
+    TIMESTAMP = "timestamp"
+    HASH = "hash"
+    REFERENCE = "reference"
+
+
+class DataValidator(ABC):
+    """数据验证器基类"""
+
+    @abstractmethod
+    def validate(self, value: Any, spec: 'FieldSpec') -> bool:
+        """验证数据"""
+        pass
+
+    @abstractmethod
+    def get_error_message(self, value: Any, spec: 'FieldSpec') -> str:
+        """获取错误消息"""
+        pass
+
+
+class TypeValidator(DataValidator):
+    """类型验证器"""
+
+    TYPE_MAP = {
+        DataType.STRING: str,
+        DataType.INTEGER: int,
+        DataType.FLOAT: (int, float),
+        DataType.BOOLEAN: bool,
+        DataType.DATETIME: str,
+        DataType.UUID: str,
+        DataType.EMAIL: str,
+        DataType.URL: str,
+        DataType.JSON: dict,
+        DataType.LIST: list,
+        DataType.PHONE: str,
+        DataType.NAME: str,
+        DataType.ADDRESS: str,
+        DataType.IP_ADDRESS: str,
+        DataType.COLOR: str,
+        DataType.LOREM: str,
+        DataType.TIMESTAMP: (int, float),
+        DataType.HASH: str,
+        DataType.REFERENCE: str,
+    }
+
+    def validate(self, value: Any, spec: 'FieldSpec') -> bool:
+        expected_type = self.TYPE_MAP.get(spec.data_type)
+        if expected_type is None:
+            return True
+        return isinstance(value, expected_type)
+
+    def get_error_message(self, value: Any, spec: 'FieldSpec') -> str:
+        expected_type = self.TYPE_MAP.get(spec.data_type)
+        return f"类型错误: 期望 {expected_type}, 实际 {type(value)}"
+
+
+class RangeValidator(DataValidator):
+    """范围验证器"""
+
+    def validate(self, value: Any, spec: 'FieldSpec') -> bool:
+        if spec.min_value is not None and value < spec.min_value:
+            return False
+        if spec.max_value is not None and value > spec.max_value:
+            return False
+        return True
+
+    def get_error_message(self, value: Any, spec: 'FieldSpec') -> str:
+        return f"范围错误: {value} 不在 [{spec.min_value}, {spec.max_value}] 范围内"
+
+
+class LengthValidator(DataValidator):
+    """长度验证器"""
+
+    def validate(self, value: Any, spec: 'FieldSpec') -> bool:
+        if not hasattr(value, '__len__'):
+            return True
+        length = len(value)
+        if spec.min_length is not None and length < spec.min_length:
+            return False
+        if spec.max_length is not None and length > spec.max_length:
+            return False
+        return True
+
+    def get_error_message(self, value: Any, spec: 'FieldSpec') -> str:
+        length = len(value)
+        return f"长度错误: {length} 不在 [{spec.min_length}, {spec.max_length}] 范围内"
+
+
+class EnumValidator(DataValidator):
+    """枚举验证器"""
+
+    def validate(self, value: Any, spec: 'FieldSpec') -> bool:
+        if spec.enum_values is None:
+            return True
+        return value in spec.enum_values
+
+    def get_error_message(self, value: Any, spec: 'FieldSpec') -> str:
+        return f"枚举错误: {value} 不在 {spec.enum_values} 中"
+
+
+class CompositeValidator:
+    """组合验证器"""
+
+    def __init__(self):
+        self.validators: List[DataValidator] = [
+            TypeValidator(),
+            RangeValidator(),
+            LengthValidator(),
+            EnumValidator(),
+        ]
+
+    def validate(self, value: Any, spec: 'FieldSpec') -> tuple[bool, List[str]]:
+        """验证数据，返回 (是否通过, 错误消息列表)"""
+        errors = []
+        for validator in self.validators:
+            if not validator.validate(value, spec):
+                errors.append(validator.get_error_message(value, spec))
+        return len(errors) == 0, errors
 
 
 @dataclass
@@ -84,7 +216,17 @@ class DataGenerator:
             DataType.URL: self._generate_url,
             DataType.JSON: self._generate_json,
             DataType.LIST: self._generate_list,
+            DataType.PHONE: self._generate_phone,
+            DataType.NAME: self._generate_name,
+            DataType.ADDRESS: self._generate_address,
+            DataType.IP_ADDRESS: self._generate_ip_address,
+            DataType.COLOR: self._generate_color,
+            DataType.LOREM: self._generate_lorem,
+            DataType.TIMESTAMP: self._generate_timestamp,
+            DataType.HASH: self._generate_hash,
+            DataType.REFERENCE: self._generate_reference,
         }
+        self.validator = CompositeValidator()
 
     def generate_field(self, spec: FieldSpec) -> Any:
         """
@@ -209,6 +351,105 @@ class DataGenerator:
                 result.append(pattern[i])
             i += 1
         return ''.join(result)
+
+    def _generate_phone(self, spec: FieldSpec) -> str:
+        """生成电话号码"""
+        formats = [
+            "+1-XXX-XXX-XXXX",
+            "+86-XXX-XXXX-XXXX",
+            "XXX-XXX-XXXX",
+            "(XXX) XXX-XXXX",
+        ]
+        return self._generate_from_pattern(random.choice(formats))
+
+    def _generate_name(self, spec: FieldSpec) -> str:
+        """生成姓名"""
+        first_names = ["张", "李", "王", "刘", "陈", "杨", "赵", "黄", "周", "吴",
+                       "John", "Jane", "Mike", "Emily", "David", "Sarah", "Tom", "Lisa"]
+        last_names = ["伟", "芳", "娜", "敏", "静", "强", "磊", "洋", "勇", "艳",
+                      "Smith", "Johnson", "Williams", "Brown", "Jones", "Miller", "Davis"]
+        return f"{random.choice(first_names)}{random.choice(last_names)}"
+
+    def _generate_address(self, spec: FieldSpec) -> str:
+        """生成地址"""
+        streets = ["Main St", "Oak Ave", "Park Rd", "First Blvd", "Second Lane"]
+        cities = ["Beijing", "Shanghai", "Shenzhen", "Guangzhou", "Hangzhou",
+                  "New York", "London", "Tokyo", "Paris", "Sydney"]
+        return f"{random.randint(1, 999)} {random.choice(streets)}, {random.choice(cities)}"
+
+    def _generate_ip_address(self, spec: FieldSpec) -> str:
+        """生成IP地址"""
+        return f"{random.randint(1, 255)}.{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(1, 254)}"
+
+    def _generate_color(self, spec: FieldSpec) -> str:
+        """生成颜色"""
+        return f"#{random.randint(0, 255):02x}{random.randint(0, 255):02x}{random.randint(0, 255):02x}"
+
+    def _generate_lorem(self, spec: FieldSpec) -> str:
+        """生成占位文本"""
+        words = ["lorem", "ipsum", "dolor", "sit", "amet", "consectetur",
+                 "adipiscing", "elit", "sed", "do", "eiusmod", "tempor"]
+        length = spec.max_length or 50
+        result = []
+        while len(' '.join(result)) < length:
+            result.append(random.choice(words))
+        return ' '.join(result)[:length]
+
+    def _generate_timestamp(self, spec: FieldSpec) -> int:
+        """生成时间戳"""
+        now = int(datetime.now().timestamp())
+        offset = random.randint(-365 * 24 * 3600, 365 * 24 * 3600)
+        return now + offset
+
+    def _generate_hash(self, spec: FieldSpec) -> str:
+        """生成哈希值"""
+        data = str(uuid.uuid4()).encode()
+        return hashlib.sha256(data).hexdigest()
+
+    def _generate_reference(self, spec: FieldSpec) -> str:
+        """生成引用ID"""
+        return f"ref-{uuid.uuid4().hex[:8]}"
+
+
+class RelationManager:
+    """关联数据管理器"""
+
+    def __init__(self):
+        self._references: Dict[str, List[Any]] = {}
+        self._relations: Dict[str, Dict[str, str]] = {}
+
+    def store_reference(self, schema_name: str, record_id: str, record: Dict):
+        """存储引用"""
+        if schema_name not in self._references:
+            self._references[schema_name] = []
+        self._references[schema_name].append({'id': record_id, 'data': record})
+
+    def get_reference(self, schema_name: str) -> Optional[str]:
+        """获取随机引用ID"""
+        if schema_name not in self._references or not self._references[schema_name]:
+            return None
+        return random.choice(self._references[schema_name])['id']
+
+    def get_record(self, schema_name: str, record_id: str) -> Optional[Dict]:
+        """获取引用记录"""
+        if schema_name not in self._references:
+            return None
+        for ref in self._references[schema_name]:
+            if ref['id'] == record_id:
+                return ref['data']
+        return None
+
+    def define_relation(self, from_schema: str, to_schema: str, field_name: str):
+        """定义关联关系"""
+        if from_schema not in self._relations:
+            self._relations[from_schema] = {}
+        self._relations[from_schema][field_name] = to_schema
+
+    def resolve_relation(self, schema_name: str, field_name: str) -> Optional[str]:
+        """解析关联关系"""
+        if schema_name not in self._relations:
+            return None
+        return self._relations[schema_name].get(field_name)
 
 
 class TestDataFactory:
