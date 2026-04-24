@@ -46,21 +46,17 @@ extern "C" {
  *
  * 操作被信号中断
  */
+#ifndef AGENTOS_EINTR
 #define AGENTOS_EINTR                  -11
+#endif
 
-/**
- * @brief 错误的文件描述符
- *
- * 文件描述符无效或已关闭
- */
+#ifndef AGENTOS_EBADF
 #define AGENTOS_EBADF                  -13
+#endif
 
-/**
- * @brief 资源相关错误
- *
- * 资源耗尽、不足或状态异常
- */
+#ifndef AGENTOS_ERESOURCE
 #define AGENTOS_ERESOURCE              -15
+#endif
 
 /**
  * @brief 功能未实现

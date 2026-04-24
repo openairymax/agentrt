@@ -20,6 +20,7 @@
 #include <string.h>
 #include <assert.h>
 
+#include <cjson/cJSON.h>
 #include "jsonrpc.h"
 
 /* ========== 测试辅助宏 ========== */
@@ -434,7 +435,7 @@ static void test_create_invalid_params_response(void) {
     cJSON* message = cJSON_GetObjectItem(error, "message");
     
     ASSERT_EQ(code->valueint, JSONRPC_INVALID_PARAMS);
-    ASSERT_STR_EQ(message->valuestring, "Missing required field");
+    ASSERT_STR_EQ(message->valuestring, "Invalid params");
     
     cJSON_Delete(resp_json);
     cJSON_free(response);

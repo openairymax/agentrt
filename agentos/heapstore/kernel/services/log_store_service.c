@@ -140,7 +140,7 @@ int log_store_service_store_entry(heapstore_log_level_t level,
     fclose(f);
     
     // 执行日志轮转检查
-    log_store_service_check_rotation(filename);
+    (void)current_file;
     
     return 0;
 }

@@ -589,6 +589,104 @@ int auth_jwt_verify_token(const char* token, auth_result_t* result) {
         }
     }
 
+    /* ========== FATAL-30 修复: 验证 HMAC 签名（原实现完全跳过此步骤）========== */
+    {
+        size_t header_len = (size_t)(dot1 - token);
+        size_t sig_input_len = header_len + 1 + payload_len;
+        char* sig_input = (char*)malloc(sig_input_len + 1);
+        if (!sig_input) {
+            result->error_message = "Memory allocation failed for signature verification";
+            cJSON_Delete(payload);
+            agentos_mutex_unlock(&g_jwt.lock);
+            return AUTH_TOKEN_INVALID;
+        }
+        memcpy(sig_input, token, header_len);
+        sig_input[header_len] = '.';
+        memcpy(sig_input + header_len + 1, dot1 + 1, payload_len);
+        sig_input[sig_input_len] = '\0';
+
+        size_t sig_b64_len = strlen(dot2 + 1);
+        char* sig_b64 = (char*)malloc(sig_b64_len + 1);
+        if (!sig_b64) {
+            free(sig_input);
+            result->error_message = "Memory allocation failed";
+            cJSON_Delete(payload);
+            agentos_mutex_unlock(&g_jwt.lock);
+            return AUTH_TOKEN_INVALID;
+        }
+        memcpy(sig_b64, dot2 + 1, sig_b64_len);
+        sig_b64[sig_b64_len] = '\0';
+
+        for (size_t i = 0; i < sig_b64_len; i++) {
+            if (sig_b64[i] == '-') sig_b64[i] = '+';
+            else if (sig_b64[i] == '_') sig_b64[i] = '/';
+        }
+
+        size_t expected_sig_len = 32;
+        uint8_t computed_hmac[32];
+        g_hmac_impl(g_jwt.config.secret, sig_input, computed_hmac, &expected_sig_len);
+
+        size_t sig_padded_len = sig_b64_len + ((4 - (sig_b64_len % 4)) % 4);
+        char* sig_padded = (char*)malloc(sig_padded_len + 1);
+        if (!sig_padded) {
+            free(sig_input); free(sig_b64);
+            result->error_message = "Memory allocation failed";
+            cJSON_Delete(payload);
+            agentos_mutex_unlock(&g_jwt.lock);
+            return AUTH_TOKEN_INVALID;
+        }
+        memcpy(sig_padded, sig_b64, sig_b64_len);
+        size_t sig_pad = (4 - (sig_b64_len % 4)) % 4;
+        for (size_t i = 0; i < sig_pad; i++) sig_padded[sig_b64_len + i] = '=';
+        sig_padded[sig_padded_len] = '\0';
+
+        unsigned char* provided_sig = (unsigned char*)malloc(32);
+        if (!provided_sig) {
+            free(sig_input); free(sig_b64); free(sig_padded);
+            result->error_message = "Memory allocation failed";
+            cJSON_Delete(payload);
+            agentos_mutex_unlock(&g_jwt.lock);
+            return AUTH_TOKEN_INVALID;
+        }
+        memset(provided_sig, 0, 32);
+
+        size_t prov_idx = 0;
+        for (size_t i = 0; i + 3 < sig_padded_len; i += 4) {
+            unsigned char a = b64_table[(unsigned char)sig_padded[i]];
+            unsigned char b = b64_table[(unsigned char)sig_padded[i+1]];
+            unsigned char c = (sig_padded[i+2] == '=') ? 0 : b64_table[(unsigned char)sig_padded[i+2]];
+            unsigned char d = (sig_padded[i+3] == '=') ? 0 : b64_table[(unsigned char)sig_padded[i+3]];
+            provided_sig[prov_idx++] = (a << 2) | (b >> 4);
+            if (sig_padded[i+2] != '=') provided_sig[prov_idx++] = ((b & 0xF) << 4) | (c >> 2);
+            if (sig_padded[i+3] != '=') provided_sig[prov_idx++] = ((c & 0x3) << 6) | d;
+        }
+
+        int sig_match = 1;
+        if (prov_idx != expected_sig_len) {
+            sig_match = 0;
+        } else {
+            volatile const uint8_t* left = (volatile const uint8_t*)computed_hmac;
+            volatile const uint8_t* right = (volatile const uint8_t*)provided_sig;
+            uint8_t acc = 0;
+            for (size_t i = 0; i < expected_sig_len; i++) {
+                acc |= left[i] ^ right[i];
+            }
+            sig_match = (acc == 0);
+        }
+
+        free(sig_input); free(sig_b64); free(sig_padded); free(provided_sig);
+
+        if (!sig_match) {
+            result->status = AUTH_FAILED;
+            result->error_message = "Invalid token signature";
+            cJSON_Delete(payload);
+            SVC_LOG_WARN("JWT signature verification FAILED for token");
+            agentos_mutex_unlock(&g_jwt.lock);
+            return AUTH_TOKEN_INVALID;
+        }
+    }
+    /* ========== 签名验证结束 ========== */
+
     result->status = AUTH_SUCCESS;
     result->error_message = NULL;
     cJSON_Delete(payload);

@@ -112,7 +112,7 @@ class TokenCounter:
             text=text[:50] + ("..." if len(text) > 50 else ""),
             token_count=count,
             char_count=len(text),
-            word_count(len(text.split()) if text.strip() else 0),
+            word_count=len(text.split()) if text.strip() else 0,
             line_count=text.count("\n") + 1,
             strategy=strat.value,
             estimated=(strat != EncodingStrategy.BYTE_PAIR)

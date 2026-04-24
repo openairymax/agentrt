@@ -1,0 +1,32 @@
+# AgentOS 测试依赖
+
+# 核心测试框架
+pytest>=7.0
+pytest-cov>=4.0
+pytest-xdist>=3.0
+pytest-timeout>=2.0
+pytest-benchmark>=4.0
+pytest-asyncio>=0.21
+
+# 断言和匹配
+pytest-mock>=3.10
+hypothesis>=6.80
+
+# HTTP 测试
+httpx>=0.24
+aiohttp>=3.8
+responses>=0.23
+
+# 数据生成
+faker>=18.0
+factory-boy>=3.3
+
+# 代码质量
+coverage>=7.0
+flake8>=6.0
+black>=23.0
+isort>=5.12
+
+# 安全测试
+bandit>=1.7
+safety>=2.3

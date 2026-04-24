@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdio.h>
 
 #ifdef _WIN32
     #include "../../platform/include/platform.h"
@@ -118,9 +119,41 @@ static void normalize_model_name(const char* input, char* output, size_t output_
     output[j] = '\0';
 }
 
+static int load_config_from_file(agentos_cost_estimator_t* estimator, const char* config_path) {
+    if (!config_path || !estimator) return -1;
+
+    FILE* fp = fopen(config_path, "r");
+    if (!fp) return -1;
+
+    char line[512];
+    while (fgets(line, sizeof(line), fp)) {
+        char* nl = strchr(line, '\n');
+        if (nl) *nl = '\0';
+        char* cr = strchr(line, '\r');
+        if (cr) *cr = '\0';
+
+        if (line[0] == '#' || line[0] == '\0') continue;
+
+        char model[MAX_MODEL_NAME];
+        double input_cost, output_cost;
+        int max_in, max_out;
+        if (sscanf(line, "%63[^,],%lf,%lf,%d,%d", model, &input_cost, &output_cost, &max_in, &max_out) >= 3) {
+            if (estimator->config_count < MAX_CONFIG_ENTRIES) {
+                strncpy(estimator->configs[estimator->config_count].model_name, model, MAX_MODEL_NAME - 1);
+                estimator->configs[estimator->config_count].input_cost_per_1k = input_cost;
+                estimator->configs[estimator->config_count].output_cost_per_1k = output_cost;
+                estimator->configs[estimator->config_count].max_input_tokens = max_in > 0 ? max_in : 4096;
+                estimator->configs[estimator->config_count].max_output_tokens = max_out > 0 ? max_out : 4096;
+                estimator->config_count++;
+            }
+        }
+    }
+
+    fclose(fp);
+    return 0;
+}
+
 agentos_cost_estimator_t* agentos_cost_estimator_create(const char* config_path) {
-    (void)config_path;
-    
     agentos_cost_estimator_t* estimator = (agentos_cost_estimator_t*)AGENTOS_MALLOC(
         sizeof(agentos_cost_estimator_t));
     if (!estimator) {
@@ -151,6 +184,10 @@ agentos_cost_estimator_t* agentos_cost_estimator_create(const char* config_path)
             estimator->configs[estimator->config_count].max_output_tokens = default_configs[i].max_output_tokens;
             estimator->config_count++;
         }
+    }
+
+    if (config_path && config_path[0] != '\0') {
+        load_config_from_file(estimator, config_path);
     }
     
     return estimator;

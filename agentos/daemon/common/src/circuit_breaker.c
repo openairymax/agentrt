@@ -41,6 +41,7 @@ typedef struct circuit_breaker_s {
     uint64_t window_start;
     uint32_t window_failures;
     uint32_t window_calls;
+    bool destroying;
     agentos_platform_mutex_t mutex;
 } cb_internal_t;
 
@@ -191,6 +192,7 @@ AGENTOS_API void cb_manager_destroy(cb_manager_t manager) {
     agentos_platform_mutex_lock(&mgr->mutex);
     for (uint32_t i = 0; i < mgr->breaker_count; i++) {
         if (mgr->breakers[i]) {
+            mgr->breakers[i]->destroying = true;
             agentos_platform_mutex_destroy(&mgr->breakers[i]->mutex);
             AGENTOS_FREE(mgr->breakers[i]);
         }
@@ -268,6 +270,11 @@ AGENTOS_API void cb_destroy(circuit_breaker_t breaker) {
     if (!breaker) return;
 
     cb_internal_t* cb = (cb_internal_t*)breaker;
+
+    agentos_platform_mutex_lock(&cb->mutex);
+    cb->destroying = true;
+    agentos_platform_mutex_unlock(&cb->mutex);
+
     LOG_INFO("Circuit breaker '%s' destroyed", cb->name);
 
     agentos_platform_mutex_destroy(&cb->mutex);
@@ -280,6 +287,7 @@ AGENTOS_API bool cb_allow_request(circuit_breaker_t breaker) {
     cb_internal_t* cb = (cb_internal_t*)breaker;
 
     agentos_platform_mutex_lock(&cb->mutex);
+    if (cb->destroying) { agentos_platform_mutex_unlock(&cb->mutex); return false; }
 
     switch (cb->state) {
         case CB_STATE_CLOSED:
@@ -321,6 +329,7 @@ AGENTOS_API void cb_record_success(circuit_breaker_t breaker, uint32_t duration_
     cb_internal_t* cb = (cb_internal_t*)breaker;
 
     agentos_platform_mutex_lock(&cb->mutex);
+    if (cb->destroying) { agentos_platform_mutex_unlock(&cb->mutex); return; }
 
     cb->stats.total_calls++;
     cb->stats.successful_calls++;
@@ -355,6 +364,7 @@ AGENTOS_API void cb_record_failure(circuit_breaker_t breaker, int32_t error_code
     cb_internal_t* cb = (cb_internal_t*)breaker;
 
     agentos_platform_mutex_lock(&cb->mutex);
+    if (cb->destroying) { agentos_platform_mutex_unlock(&cb->mutex); return; }
 
     cb->stats.total_calls++;
     cb->stats.failed_calls++;
@@ -391,6 +401,7 @@ AGENTOS_API void cb_record_timeout(circuit_breaker_t breaker) {
     cb_internal_t* cb = (cb_internal_t*)breaker;
 
     agentos_platform_mutex_lock(&cb->mutex);
+    if (cb->destroying) { agentos_platform_mutex_unlock(&cb->mutex); return; }
 
     cb->stats.total_calls++;
     cb->stats.timeout_calls++;
@@ -441,6 +452,7 @@ AGENTOS_API agentos_error_t cb_get_stats(circuit_breaker_t breaker, cb_stats_t* 
     cb_internal_t* cb = (cb_internal_t*)breaker;
 
     agentos_platform_mutex_lock(&cb->mutex);
+    if (cb->destroying) { agentos_platform_mutex_unlock(&cb->mutex); return AGENTOS_EINVAL; }
     memcpy(stats, &cb->stats, sizeof(cb_stats_t));
     agentos_platform_mutex_unlock(&cb->mutex);
 
@@ -453,6 +465,7 @@ AGENTOS_API void cb_reset(circuit_breaker_t breaker) {
     cb_internal_t* cb = (cb_internal_t*)breaker;
 
     agentos_platform_mutex_lock(&cb->mutex);
+    if (cb->destroying) { agentos_platform_mutex_unlock(&cb->mutex); return; }
 
     cb_state_t old = cb->state;
     cb->state = CB_STATE_CLOSED;
@@ -479,6 +492,7 @@ AGENTOS_API void cb_force_open(circuit_breaker_t breaker) {
     cb_internal_t* cb = (cb_internal_t*)breaker;
 
     agentos_platform_mutex_lock(&cb->mutex);
+    if (cb->destroying) { agentos_platform_mutex_unlock(&cb->mutex); return; }
     transition_state(cb, NULL, CB_STATE_OPEN);
     agentos_platform_mutex_unlock(&cb->mutex);
 }
@@ -488,6 +502,7 @@ AGENTOS_API void cb_force_close(circuit_breaker_t breaker) {
     cb_internal_t* cb = (cb_internal_t*)breaker;
 
     agentos_platform_mutex_lock(&cb->mutex);
+    if (cb->destroying) { agentos_platform_mutex_unlock(&cb->mutex); return; }
     transition_state(cb, NULL, CB_STATE_CLOSED);
     agentos_platform_mutex_unlock(&cb->mutex);
 }
@@ -503,6 +518,7 @@ AGENTOS_API agentos_error_t cb_set_failover_config(
     cb_internal_t* cb = (cb_internal_t*)breaker;
 
     agentos_platform_mutex_lock(&cb->mutex);
+    if (cb->destroying) { agentos_platform_mutex_unlock(&cb->mutex); return AGENTOS_EINVAL; }
     memcpy(&cb->failover_config, config, sizeof(cb_failover_config_t));
     agentos_platform_mutex_unlock(&cb->mutex);
 
@@ -522,6 +538,7 @@ AGENTOS_API agentos_error_t cb_execute_failover(
     cb_internal_t* cb = (cb_internal_t*)breaker;
 
     agentos_platform_mutex_lock(&cb->mutex);
+    if (cb->destroying) { agentos_platform_mutex_unlock(&cb->mutex); return AGENTOS_EINVAL; }
 
     cb_failover_config_t* fc = &cb->failover_config;
     agentos_error_t err = AGENTOS_EFAIL;

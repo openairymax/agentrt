@@ -56,7 +56,7 @@ agentos_error_t agentos_forgetting_create(
     agentos_layer2_feature_t* layer2,
     agentos_forgetting_engine_t** out_engine) {
 
-    if (!layer1 || !layer2 || !out_engine) return AGENTOS_EINVAL;
+    if (!layer1 || !out_engine) return AGENTOS_EINVAL;
 
     agentos_forgetting_engine_t* eng = (agentos_forgetting_engine_t*)AGENTOS_CALLOC(1, sizeof(agentos_forgetting_engine_t));
     if (!eng) {
@@ -244,15 +244,11 @@ agentos_error_t agentos_forgetting_get_weight(
 
     if (!engine || !record_id || !out_weight) return AGENTOS_EINVAL;
 
-    agentos_raw_metadata_t* meta = NULL;
-    agentos_error_t err = agentos_raw_metadata_db_query(NULL, record_id, &meta);
-    if (err != AGENTOS_SUCCESS) return err;
-
     uint64_t now = agentos_time_monotonic_ns();
     double weight = 1.0;
 
     float effective_lambda = engine->manager.lambda;
-    
+
     if (ADAPTIVE(engine)->enabled && ADAPTIVE(engine)->sample_count >= ADAPTIVE_SAMPLE_SIZE / 2) {
         effective_lambda = adapt_lambda(engine);
         if (fabs(effective_lambda - engine->manager.lambda) > 0.0001) {
@@ -260,35 +256,58 @@ agentos_error_t agentos_forgetting_get_weight(
         }
     }
 
-    uint64_t last_access = meta->modified_ns > 0 ? meta->modified_ns : meta->created_ns;
+    if (engine->layer2) {
+        agentos_raw_metadata_t* meta = NULL;
+        agentos_error_t err = agentos_raw_metadata_db_query(NULL, record_id, &meta);
+        if (err == AGENTOS_SUCCESS && meta) {
+            uint64_t last_access = meta->modified_ns > 0 ? meta->modified_ns : meta->created_ns;
+
+            switch (engine->manager.strategy) {
+            case AGENTOS_FORGET_EBBINGHAUS:
+                weight = ebbinghaus_weight(effective_lambda, last_access, now);
+                break;
+            case AGENTOS_FORGET_LINEAR:
+                {
+                    double age_sec = (now - last_access) / 1e9;
+                    weight = 1.0 - effective_lambda * age_sec;
+                    if (weight < 0) weight = 0.0;
+                }
+                break;
+            case AGENTOS_FORGET_ACCESS_BASED:
+                weight = access_weight(meta->access_count, engine->manager.min_access);
+                break;
+            default:
+                weight = 1.0;
+                break;
+            }
+
+            *out_weight = (float)weight;
+
+            if (ADAPTIVE(engine)->enabled) {
+                int accessed = (weight > engine->manager.threshold) ? 1 : 0;
+                record_adaptive_sample(ADAPTIVE(engine), record_id, (float)weight, accessed);
+            }
+
+            agentos_raw_metadata_free(meta);
+            return AGENTOS_SUCCESS;
+        }
+    }
 
     switch (engine->manager.strategy) {
-        case AGENTOS_FORGET_EBBINGHAUS:
-            weight = ebbinghaus_weight(effective_lambda, last_access, now);
-            break;
-        case AGENTOS_FORGET_LINEAR:
-            {
-                double age_sec = (now - last_access) / 1e9;
-                weight = 1.0 - effective_lambda * age_sec;
-                if (weight < 0) weight = 0.0;
-            }
-            break;
-        case AGENTOS_FORGET_ACCESS_BASED:
-            weight = access_weight(meta->access_count, engine->manager.min_access);
-            break;
-        default:
-            weight = 1.0;
-            break;
+    case AGENTOS_FORGET_EBBINGHAUS:
+    case AGENTOS_FORGET_LINEAR:
+        /* 无元数据时假设记录是全新的，权重为 1.0 */
+        weight = 1.0;
+        break;
+    case AGENTOS_FORGET_ACCESS_BASED:
+        weight = access_weight(1, engine->manager.min_access);
+        break;
+    default:
+        weight = 1.0;
+        break;
     }
 
     *out_weight = (float)weight;
-    
-    if (ADAPTIVE(engine)->enabled) {
-        int accessed = (weight > engine->manager.threshold) ? 1 : 0;
-        record_adaptive_sample(ADAPTIVE(engine), record_id, (float)weight, accessed);
-    }
-    
-    agentos_raw_metadata_free(meta);
     return AGENTOS_SUCCESS;
 }
 

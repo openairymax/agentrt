@@ -18,6 +18,35 @@
 #include <string.h>
 
 #define MAX_PATH_LEN 512
+#define MAX_JSON_ESCAPE_LEN 4096
+
+static size_t json_escape(const char* src, char* dst, size_t dst_size) {
+    if (!src || !dst || dst_size == 0) {
+        if (dst && dst_size > 0) dst[0] = '\0';
+        return 0;
+    }
+    size_t j = 0;
+    for (size_t i = 0; src[i] && j + 6 < dst_size; i++) {
+        switch (src[i]) {
+            case '"':  dst[j++] = '\\'; dst[j++] = '"'; break;
+            case '\\': dst[j++] = '\\'; dst[j++] = '\\'; break;
+            case '\n': dst[j++] = '\\'; dst[j++] = 'n'; break;
+            case '\r': dst[j++] = '\\'; dst[j++] = 'r'; break;
+            case '\t': dst[j++] = '\\'; dst[j++] = 't'; break;
+            case '\b': dst[j++] = '\\'; dst[j++] = 'b'; break;
+            case '\f': dst[j++] = '\\'; dst[j++] = 'f'; break;
+            default:
+                if ((unsigned char)src[i] < 0x20) {
+                    j += snprintf(dst + j, dst_size - j, "\\u%04x", (unsigned char)src[i]);
+                } else {
+                    dst[j++] = src[i];
+                }
+                break;
+        }
+    }
+    dst[j] = '\0';
+    return j;
+}
 
 struct audit_rotator {
     char* log_dir;
@@ -199,15 +228,22 @@ int audit_rotator_write(audit_rotator_t* rotator, const audit_entry_t* entry) {
     struct tm* tm_info = localtime(&ts);
     strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", tm_info);
     
+    char esc_agent[MAX_JSON_ESCAPE_LEN];
+    char esc_action[MAX_JSON_ESCAPE_LEN];
+    char esc_resource[MAX_JSON_ESCAPE_LEN];
+    char esc_detail[MAX_JSON_ESCAPE_LEN];
+    
+    json_escape(entry->agent_id ? entry->agent_id : "", esc_agent, sizeof(esc_agent));
+    json_escape(entry->action ? entry->action : "", esc_action, sizeof(esc_action));
+    json_escape(entry->resource ? entry->resource : "", esc_resource, sizeof(esc_resource));
+    json_escape(entry->detail ? entry->detail : "", esc_detail, sizeof(esc_detail));
+    
     int written = fprintf(rotator->fp,
         "{\"ts\":\"%s.%03u\",\"type\":\"%s\",\"agent\":\"%s\",\"action\":\"%s\","
         "\"resource\":\"%s\",\"detail\":\"%s\",\"result\":%d}\n",
         timestamp, (unsigned)(entry->timestamp_ms % 1000),
         cupolas_audit_event_type_str(entry->type),
-        entry->agent_id ? entry->agent_id : "",
-        entry->action ? entry->action : "",
-        entry->resource ? entry->resource : "",
-        entry->detail ? entry->detail : "",
+        esc_agent, esc_action, esc_resource, esc_detail,
         entry->result);
     
     if (written > 0) {

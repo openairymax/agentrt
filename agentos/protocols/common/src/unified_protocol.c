@@ -20,7 +20,6 @@
 #define PROTOCOL_RAW_TCP      (AGENTOS_PROTOCOL_COUNT + 14)
 #define PROTOCOL_RAW_UDP      (AGENTOS_PROTOCOL_COUNT + 15)
 #define PROTOCOL_HTTP         AGENTOS_PROTOCOL_JSON_RPC
-#define PROTOCOL_CUSTOM       (AGENTOS_PROTOCOL_COUNT + 99)
 
 typedef struct {
     agentos_protocol_type_t type;
@@ -84,7 +83,7 @@ static uint64_t get_current_timestamp(void);
 
 protocol_stack_handle_t protocol_stack_create(const protocol_stack_config_t* config)
 {
-    if (!config || !config->name) {
+    if (!config) {
         return NULL;
     }
     
@@ -95,7 +94,7 @@ protocol_stack_handle_t protocol_stack_create(const protocol_stack_config_t* con
     
     // 复制配置
     stack->config = *config;
-    if (config->name) {
+    {
         size_t name_len = strlen(config->name) + 1;
         char* name_copy = (char*)malloc(name_len);
         if (name_copy) {
@@ -136,10 +135,6 @@ void protocol_stack_destroy(protocol_stack_handle_t handle)
         node = next;
     }
     
-    // 释放配置资源
-    if (stack->config.name) {
-        free((void*)stack->config.name);
-    }
     if (stack->config.custom_config) {
         free(stack->config.custom_config);
     }
@@ -396,8 +391,10 @@ unified_message_t unified_message_create(protocol_type_t protocol,
     message.message_id = next_message_id++;
     message.protocol = protocol;
     message.direction = direction;
-    message.endpoint = endpoint;
-    message.payload = payload;
+    if (endpoint) {
+        strncpy(message.endpoint, endpoint, sizeof(message.endpoint) - 1);
+    }
+    message.payload = (void*)payload;
     message.payload_size = payload_size;
     message.timestamp = get_current_timestamp();
     
@@ -487,7 +484,7 @@ static int validate_message(const unified_message_t* message)
         return -1;
     }
     
-    if (message->endpoint && strlen(message->endpoint) > 1024) {
+    if (message->endpoint[0] && strlen(message->endpoint) > 1024) {
         return -1;
     }
     

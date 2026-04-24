@@ -11,34 +11,51 @@ endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../..)
 
-set(TEST_SOURCES
-    test_heapstore_core.c
-    test_heapstore_registry.c
-    test_heapstore_trace.c
-    test_heapstore_log.c
-    test_heapstore_ipc.c
-    test_heapstore_memory.c
-    test_heapstore_integration.c
+# 查找SQLite3依赖
+find_package(PkgConfig QUIET)
+if(PkgConfig_FOUND)
+    pkg_check_modules(SQLITE3 sqlite3)
+endif()
+if(NOT SQLITE3_FOUND)
+    find_library(SQLITE3_LIB sqlite3)
+    if(SQLITE3_LIB)
+        set(SQLITE3_LIBRARIES ${SQLITE3_LIB})
+        set(SQLITE3_FOUND TRUE)
+    endif()
+endif()
+
+# 单独编译每个测试文件为独立可执行文件
+set(TEST_FILES
+    test_heapstore_core
+    test_heapstore_registry
+    test_heapstore_trace
+    test_heapstore_log
+    test_heapstore_ipc
+    test_heapstore_memory
+    test_heapstore_integration
 )
 
-add_executable(heapstore_tests ${TEST_SOURCES})
-
-target_link_libraries(heapstore_tests
-    agentos_heapstore
-    Threads::Threads
-)
-
-add_test(NAME heapstoreTests COMMAND heapstore_tests)
+foreach(test ${TEST_FILES})
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${test}.c")
+        add_executable(${test} ${test}.c)
+        target_link_libraries(${test}
+            PRIVATE agentos_heapstore
+            Threads::Threads
+            ${SQLITE3_LIBRARIES}
+        )
+        add_test(NAME ${test} COMMAND ${test})
+    endif()
+endforeach()
 
 option(BUILD_BENCHMARK "Build performance benchmark" ON)
 
 if(BUILD_BENCHMARK)
     add_executable(heapstore_benchmark benchmark_heapstore.c)
     target_link_libraries(heapstore_benchmark
-        agentos_heapstore
+        PRIVATE agentos_heapstore
         Threads::Threads
+        ${SQLITE3_LIBRARIES}
     )
 endif()
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/test_output)
-

@@ -17,7 +17,7 @@
 // 破坏性更改需递增 MAJOR 并发布迁移说明
 
 #include "agentos.h"
-#include "cognition.h"  // 引入反馈回调类型定义
+#include "cognition.h"
 #include "compensation.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -35,15 +35,17 @@ typedef struct agentos_compensation agentos_compensation_t;
 /**
  * @brief 任务状态枚举
  */
+#ifndef AGENTOS_TASK_STATUS_T_DEFINED
+#define AGENTOS_TASK_STATUS_T_DEFINED
 typedef enum {
     TASK_STATUS_PENDING = 0,
-    TASK_STATUS_RUNNING,
-    TASK_STATUS_SUCCEEDED,
-    TASK_STATUS_FAILED,
-    TASK_STATUS_CANCELLED,
-    TASK_STATUS_RETRYING
+    TASK_STATUS_RUNNING = 1,
+    TASK_STATUS_SUCCEEDED = 2,
+    TASK_STATUS_FAILED = 3,
+    TASK_STATUS_CANCELLED = 4,
+    TASK_STATUS_RETRYING = 5
 } agentos_task_status_t;
-#define AGENTOS_TASK_STATUS_T_DEFINED
+#endif
 
 /**
  * @brief 执行任务结构

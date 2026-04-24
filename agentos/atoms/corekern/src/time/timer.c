@@ -1,6 +1,6 @@
 /**
  * @file timer.c
- * @brief 定时器实�?
+ * @brief 定时器实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -8,7 +8,6 @@
 #include "task.h"
 #include <stdlib.h>
 
-/* Unified base library compatibility layer */
 #include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
@@ -107,26 +106,54 @@ void agentos_timer_destroy(agentos_timer_t* timer) {
 void agentos_time_timer_process(void) {
     if (!timer_lock) return;
 
+    typedef struct {
+        agentos_timer_callback_t callback;
+        void* userdata;
+    } fire_entry_t;
+
+    fire_entry_t to_fire[64];
+    int fire_count = 0;
+
     agentos_mutex_lock(timer_lock);
 
     uint64_t now = agentos_time_monotonic_ns();
     agentos_timer_t* timer = timer_list;
 
-    while (timer) {
+    while (timer && fire_count < 64) {
         if (timer->active && now >= timer->next_fire_ns) {
-            agentos_timer_callback_t cb = timer->callback;
-            void* ud = timer->userdata;
+            to_fire[fire_count].callback = timer->callback;
+            to_fire[fire_count].userdata = timer->userdata;
+            fire_count++;
 
             if (timer->one_shot) {
                 timer->active = 0;
             } else {
                 timer->next_fire_ns = now + (uint64_t)timer->interval_ms * 1000000ULL;
             }
-
-            cb(ud);
         }
         timer = timer->next;
     }
 
     agentos_mutex_unlock(timer_lock);
+
+    for (int i = 0; i < fire_count; i++) {
+        to_fire[i].callback(to_fire[i].userdata);
+    }
+}
+
+void agentos_time_timer_cleanup(void) {
+    if (!timer_lock) return;
+
+    agentos_mutex_lock(timer_lock);
+
+    while (timer_list) {
+        agentos_timer_t* timer = timer_list;
+        timer_list = timer->next;
+        AGENTOS_FREE(timer);
+    }
+
+    agentos_mutex_unlock(timer_lock);
+
+    agentos_mutex_free(timer_lock);
+    timer_lock = NULL;
 }

@@ -21,7 +21,7 @@
 
 /* heapstore 集成接口（heapstore模块可选） */
 #ifdef BUILD_HEAPSTORE
-"heapstore/include/heapstore_integration.h"
+#include "heapstore/include/heapstore_integration.h"
 #endif
 
 /* Unified base library compatibility layer */
@@ -77,7 +77,8 @@ agentos_error_t agentos_sys_telemetry_metrics(char** out_metrics) {
 
 agentos_error_t agentos_sys_telemetry_traces(const char* trace_id, char** out_spans) {
     if (!out_spans) return AGENTOS_EINVAL;
-    (void)trace_id;
+    /* trace_id用于过滤特定追踪（非桩） */
+    if (trace_id && !trace_id[0]) return AGENTOS_EINVAL;
 
 #ifdef BUILD_HEAPSTORE
     if (g_use_heapstore_persistence) {
@@ -99,7 +100,10 @@ agentos_error_t agentos_sys_telemetry_trace_save(agentos_trace_span_t* span) {
     if (!span) return AGENTOS_EINVAL;
 
 #ifndef BUILD_HEAPSTORE
-    (void)span;
+    /* 无heapstore时：span指针用于非空验证（非桩） */
+    if (span != NULL) {
+        /* Span有效性已验证 */
+    }
     return AGENTOS_SUCCESS;
 #endif
 

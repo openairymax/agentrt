@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
 
 struct openclaw_adapter_context_s {
     openclaw_config_t config;
@@ -155,7 +156,7 @@ int openclaw_connect(openclaw_adapter_context_t* ctx) {
     ctx->connected = true;
     ctx->connection_uptime_sec = 0;
     ctx->connect_timestamp = (uint64_t)time(NULL);
-    snprintf(ctx->last_error, sizeof(ctx->last_error), "");
+    ctx->last_error[0] = '\0';
     return 0;
 }
 
@@ -670,53 +671,70 @@ int openclaw_get_statistics(openclaw_adapter_context_t* ctx,
     return (written >= 0 && (size_t)written < buffer_size) ? 0 : -2;
 }
 
-static int openclaw_proto_init(void** context) {
+static int openclaw_proto_init(void* context) {
     openclaw_config_t config = openclaw_config_default();
     openclaw_adapter_context_t* ctx = openclaw_adapter_create(&config);
     if (!ctx) return -1;
-    *context = ctx;
+    *(void**)context = ctx;
     return 0;
 }
 
-static void openclaw_proto_destroy(void* context) {
-    openclaw_adapter_destroy((openclaw_adapter_context_t*)context);
+static int openclaw_proto_destroy(void* context) {
+    if (context) {
+        openclaw_adapter_destroy((openclaw_adapter_context_t*)context);
+    }
+    return 0;
 }
 
 static int openclaw_proto_handle_request(void* context,
-                                          const char* raw_request,
-                                          size_t request_size,
-                                          const char* content_type,
-                                          char** response,
-                                          size_t* response_size,
-                                          char** response_content_type) {
-    if (!context || !raw_request) return -1;
+                                          const void* req,
+                                          void** resp) {
+    if (!context || !req) return -1;
     openclaw_adapter_context_t* ctx = (openclaw_adapter_context_t*)context;
 
-    (void)request_size;
-    (void)content_type;
-
+    const char* raw_request = (const char*)req;
     openclaw_message_t msg = {0};
     msg.message_id = "proto-req";
     msg.payload = (void*)raw_request;
-    msg.payload_size = request_size;
+    msg.payload_size = raw_request ? strlen(raw_request) : 0;
     msg.modality = OPENCLAW_MODALITY_TEXT;
-    msg.timestamp = (uint64_t)time(NULL);
+    msg.timestamp = (uint64_t)(time(NULL));
 
-    openclaw_message_t resp = {0};
-    int ret = openclaw_send_message(ctx, &msg, &resp);
+    openclaw_message_t response = {0};
+    int ret = openclaw_send_message(ctx, &msg, &response);
 
-    if (ret == 0 && resp.payload) {
-        *response = strdup((const char*)resp.payload);
-        *response_size = resp.payload_size;
-    } else {
-        *response = strdup("{\"status\":\"error\",\"message\":\"Request processing failed\"}");
-        *response_size = strlen(*response);
+    if (ret == 0 && resp) {
+        if (response.payload) {
+            *resp = strdup((const char*)response.payload);
+        } else {
+            *resp = strdup("{\"status\":\"ok\"}");
+        }
+    } else if (resp) {
+        *resp = strdup("{\"status\":\"error\",\"message\":\"Request processing failed\"}");
+        ret = -1;
     }
 
-    if (response_content_type) *response_content_type = strdup("application/json");
-
-    openclaw_message_destroy(&resp);
+    openclaw_message_destroy(&msg);
+    openclaw_message_destroy(&response);
     return ret;
+}
+
+static int openclaw_proto_get_version(void* context, char* buf, size_t max_size) {
+    (void)context;
+    if (!buf || max_size == 0) return -1;
+    const char* ver = openclaw_adapter_version();
+    size_t len = strlen(ver);
+    if (len >= max_size) len = max_size - 1;
+    memcpy(buf, ver, len);
+    buf[len] = '\0';
+    return 0;
+}
+
+static uint32_t openclaw_proto_capabilities(void* context) {
+    (void)context;
+    return (uint32_t)(
+        PROTO_CAP_MULTIMODAL | PROTO_CAP_STREAMING |
+        PROTO_CAP_TOOL_CALLING | PROTO_CAP_AGENT_DISCOVERY);
 }
 
 const proto_adapter_t* openclaw_get_protocol_adapter(void) {
@@ -727,11 +745,12 @@ const proto_adapter_t* openclaw_get_protocol_adapter(void) {
         adapter.name = "OpenClaw";
         adapter.version = OPENCLAW_ADAPTER_VERSION;
         adapter.description = "OpenClaw Platform Integration Adapter - offline private AI Agent platform with multimodal capabilities";
+        adapter.type = PROTO_OPENCLAW;
         adapter.init = openclaw_proto_init;
         adapter.destroy = openclaw_proto_destroy;
         adapter.handle_request = openclaw_proto_handle_request;
-        adapter.get_version = openclaw_adapter_version;
-        adapter.capabilities = PROTO_CAP_MULTIMODAL | PROTO_CAP_STREAMING | PROTO_CAP_TOOL_CALLING | PROTO_CAP_AGENT_DISCOVERY;
+        adapter.get_version = openclaw_proto_get_version;
+        adapter.capabilities = openclaw_proto_capabilities;
         initialized = true;
     }
 

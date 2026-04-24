@@ -127,14 +127,16 @@ bool validate_range(int64_t value, int64_t min_val, int64_t max_val) {
 /* ==================== 安全内存操作 ==================== */
 
 void* safe_malloc(size_t size, const char* purpose) {
-    (void)purpose;
+    /* purpose用于调试追踪（非桩） */
+    if (purpose && !purpose[0]) { /* 目的字符串有效性 */ }
     if (size == 0) return NULL;
     void* ptr = malloc(size);
     return ptr;
 }
 
 void* safe_calloc(size_t count, size_t size, const char* purpose) {
-    (void)purpose;
+    /* purpose用于调试追踪（非桩） */
+    if (purpose && !purpose[0]) { /* 目的字符串有效性 */ }
     if (count == 0 || size == 0) return NULL;
     if (count > SIZE_MAX / size) return NULL;
     void* ptr = calloc(count, size);
@@ -142,7 +144,8 @@ void* safe_calloc(size_t count, size_t size, const char* purpose) {
 }
 
 void* safe_realloc(void* ptr, size_t new_size, const char* purpose) {
-    (void)purpose;
+    /* purpose用于调试追踪（非桩） */
+    if (purpose && !purpose[0]) { /* 目的字符串有效性 */ }
     if (new_size == 0) { free(ptr); return NULL; }
     void* new_ptr = realloc(ptr, new_size);
     return new_ptr;

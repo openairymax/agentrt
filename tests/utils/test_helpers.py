@@ -1,862 +1,680 @@
 """
-AgentOS 公共测试工具模块
-Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-Version: 1.0.0.9
+AgentOS 测试实用工具函数库
 
-提供统一的测试辅助函数，减少重复代码
+提供测试中常用的辅助函数，包括：
+- 测试数据生成
+- Mock 对象创建
+- 断言辅助
+- 性能测量
+- 测试隔离
+- 环境验证
+- 报告生成
+
+Version: 2.0.0
+Last updated: 2026-04-23
 """
 
-import pytest
+import os
+import sys
 import json
-import hashlib
-import secrets
-import string
-import re
-from typing import Any, Dict, List, Optional, Callable, Type, Union
-from unittest.mock import Mock, MagicMock, patch, AsyncMock
-from functools import wraps
 import time
+import tempfile
+import shutil
+import hashlib
+import threading
+import traceback
+import platform
+import subprocess
 import tracemalloc
 import asyncio
-from contextlib import contextmanager
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Callable, Generator, Union, Tuple
+from unittest.mock import MagicMock, patch, AsyncMock
+from contextlib import contextmanager, asynccontextmanager
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from functools import wraps, lru_cache
 
 
-# ============================================================
-# Mock 工厂函数
-# ============================================================
-
-def create_mock_response(
-    status_code: int = 200,
-    json_data: Optional[Dict[str, Any]] = None,
-    text: str = ""
-) -> Mock:
-    """
-    创建标准 Mock 响应对象
-
-    Args:
-        status_code: HTTP 状态码
-        json_data: JSON 响应数据
-        text: 文本响应
-
-    Returns:
-        Mock: 配置好的 Mock 响应对象
-    """
-    mock_response = Mock()
-    mock_response.status_code = status_code
-    mock_response.json.return_value = json_data or {}
-    mock_response.text = text
-    return mock_response
-
-
-def create_mock_session(
-    response_data: Optional[Dict[str, Any]] = None,
-    status_code: int = 200
-) -> Mock:
-    """
-    创建标准 Mock Session 对象
-
-    Args:
-        response_data: 响应数据
-        status_code: HTTP 状态码
-
-    Returns:
-        Mock: 配置好的 Mock Session 对象
-    """
-    mock_session_instance = Mock()
-    mock_response = create_mock_response(status_code, response_data)
-
-    mock_session_instance.post.return_value = mock_response
-    mock_session_instance.get.return_value = mock_response
-    mock_session_instance.put.return_value = mock_response
-    mock_session_instance.delete.return_value = mock_response
-
-    return mock_session_instance
-
-
-# ============================================================
-# 测试装饰器
-# ============================================================
-
-def with_mock_session(func: Callable) -> Callable:
-    """
-    装饰器：自动为测试函数添加 Mock Session
-
-    用法:
-        @with_mock_session
-        def test_something(mock_session):
-            client = AgentOS()
-            # mock_session 已自动配置
-    """
-    @wraps(func)
-    @patch('agentos.agent.requests.Session')
-    def wrapper(*args, **kwargs):
-        mock_session = create_mock_session()
-        return func(*args, mock_session, **kwargs)
-    return wrapper
-
-
-def performance_test(max_duration: float = 0.1):
-    """
-    装饰器：性能测试，确保函数执行时间不超过阈值
-
-    Args:
-        max_duration: 最大执行时间（秒）
-
-    用法:
-        @performance_test(max_duration=0.2)
-        def test_performance():
-            # 测试代码
-    """
-    def decorator(func: Callable) -> Callable:
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            start = time.perf_counter()
-            result = func(*args, **kwargs)
-            elapsed = time.perf_counter() - start
-
-            assert elapsed < max_duration, \
-                f"Performance test failed: {elapsed:.3f}s > {max_duration:.3f}s"
-
-            return result
-        return wrapper
-    return decorator
-
-
-# ============================================================
-# 参数化测试辅助函数
-# ============================================================
-
-def parametrize_validation(
-    test_cases: List[Dict[str, Any]]
-) -> Callable:
-    """
-    参数化验证测试
-
-    Args:
-        test_cases: 测试用例列表，每个用例包含:
-            - name: 测试名称
-            - input: 输入数据
-            - expected_valid: 是否期望验证通过
-            - expected_errors: 期望的错误信息列表（可选）
-
-    用法:
-        @parametrize_validation([
-            {"name": "valid", "input": {...}, "expected_valid": True},
-            {"name": "invalid", "input": {...}, "expected_valid": False, "expected_errors": ["field required"]}
-        ])
-        def test_validation(test_case):
-            # 测试代码
-    """
-    return pytest.mark.parametrize(
-        "test_case",
-        test_cases,
-        ids=[tc["name"] for tc in test_cases]
-    )
-
-
-# ============================================================
-# 断言辅助函数
-# ============================================================
-
-def assert_dict_contains(
-    actual: Dict[str, Any],
-    expected: Dict[str, Any],
-    path: str = ""
-) -> None:
-    """
-    递归断言字典包含期望的键值对
-
-    Args:
-        actual: 实际字典
-        expected: 期望字典
-        path: 当前路径（用于错误信息）
-
-    Raises:
-        AssertionError: 如果断言失败
-    """
-    for key, expected_value in expected.items():
-        current_path = f"{path}.{key}" if path else key
-
-        assert key in actual, f"Missing key: {current_path}"
-
-        actual_value = actual[key]
-
-        if isinstance(expected_value, dict):
-            assert isinstance(actual_value, dict), \
-                f"Expected dict at {current_path}, got {type(actual_value).__name__}"
-            assert_dict_contains(actual_value, expected_value, current_path)
-        else:
-            assert actual_value == expected_value, \
-                f"Value mismatch at {current_path}: expected {expected_value}, got {actual_value}"
-
-
-def assert_error_contains(
-    errors: List[str],
-    expected_substring: str
-) -> None:
-    """
-    断言错误列表包含期望的子串
-
-    Args:
-        errors: 错误列表
-        expected_substring: 期望的子串
-
-    Raises:
-        AssertionError: 如果没有找到匹配的错误
-    """
-    assert any(expected_substring in error for error in errors), \
-        f"Expected error containing '{expected_substring}' not found in {errors}"
-
-
-# ============================================================
-# 测试数据生成器
-# ============================================================
-
-class TestDataBuilder:
-    """
-    测试数据构建器
-
-    提供流式 API 构建测试数据
-    """
-
-    def __init__(self):
-        self._data = {}
-
-    def with_field(self, name: str, value: Any) -> 'TestDataBuilder':
-        """添加字段"""
-        self._data[name] = value
-        return self
-
-    def with_fields(self, **kwargs) -> 'TestDataBuilder':
-        """批量添加字段"""
-        self._data.update(kwargs)
-        return self
-
-    def without_field(self, name: str) -> 'TestDataBuilder':
-        """移除字段"""
-        self._data.pop(name, None)
-        return self
-
-    def build(self) -> Dict[str, Any]:
-        """构建最终数据"""
-        return self._data.copy()
-
-    def build_invalid(self, missing_field: str) -> Dict[str, Any]:
-        """构建缺少字段的数据"""
-        data = self._data.copy()
-        data.pop(missing_field, None)
-        return data
-
-
-# ============================================================
-# 契约测试辅助类
-# ============================================================
-
-class ContractTestHelper:
-    """
-    契约测试辅助类
-
-    提供契约验证的通用方法
-    """
+class TestDataGenerator:
+    """测试数据生成器"""
 
     @staticmethod
-    def create_valid_contract() -> Dict[str, Any]:
-        """创建有效的契约数据"""
+    def create_temp_file(content: str, suffix: str = '.json') -> Path:
+        """创建临时测试文件"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix=suffix, delete=False) as f:
+            f.write(content)
+            return Path(f.name)
+
+    @staticmethod
+    def create_temp_dir(prefix: str = 'test_') -> Path:
+        """创建临时测试目录"""
+        return Path(tempfile.mkdtemp(prefix=prefix))
+
+    @staticmethod
+    def generate_task_data(task_id: str = "test-task-001") -> Dict:
+        """生成测试任务数据"""
         return {
-            "schema_version": "1.0.0",
-            "agent_id": "com.agentos.test.v1",
-            "agent_name": "Test Agent",
-            "version": "1.0.0",
-            "role": "software_engineer",
-            "description": "测试 Agent",
-            "capabilities": [
-                {
-                    "name": "test_capability",
-                    "description": "测试能力",
-                    "input_schema": {"type": "object"},
-                    "output_schema": {"type": "object"}
-                }
-            ],
-            "models": {
-                "system1": "gpt-3.5-turbo",
-                "system2": "gpt-4"
-            },
-            "required_permissions": ["read_project_context"],
-            "cost_profile": {
-                "token_per_task_avg": 1000,
-                "api_cost_per_task": 0.01,
-                "maintenance_level": "community"
-            },
-            "trust_metrics": {
-                "install_count": 0,
-                "rating": 3.0,
-                "verified_provider": False,
-                "last_audit": "2026-03-01"
+            "id": task_id,
+            "name": f"Test Task {task_id}",
+            "description": "Automated test task",
+            "priority": "medium",
+            "status": "pending",
+            "created_at": "2026-04-22T10:00:00Z",
+            "updated_at": "2026-04-22T10:00:00Z",
+            "metadata": {
+                "source": "test",
+                "version": "1.0"
             }
         }
 
     @staticmethod
-    def create_invalid_contract(
-        missing_field: Optional[str] = None,
-        invalid_field: Optional[str] = None,
-        invalid_value: Any = None
-    ) -> Dict[str, Any]:
-        """
-        创建无效的契约数据
-
-        Args:
-            missing_field: 要移除的字段
-            invalid_field: 要设置无效值的字段
-            invalid_value: 无效值
-
-        Returns:
-            无效的契约数据
-        """
-        contract = ContractTestHelper.create_valid_contract()
-
-        if missing_field:
-            contract.pop(missing_field, None)
-
-        if invalid_field and invalid_value is not None:
-            contract[invalid_field] = invalid_value
-
-        return contract
-
-
-# ============================================================
-# 测试隔离辅助
-# ============================================================
-
-class TestIsolation:
-    """
-    测试隔离辅助类
-
-    确保测试之间相互隔离
-    """
-
-    def __init__(self):
-        self._saved_state = {}
-
-    def save_env(self, key: str) -> 'TestIsolation':
-        """保存环境变量"""
-        import os
-        self._saved_state[f"env_{key}"] = os.environ.get(key)
-        return self
-
-    def restore_env(self, key: str) -> 'TestIsolation':
-        """恢复环境变量"""
-        import os
-        saved_key = f"env_{key}"
-        if saved_key in self._saved_state:
-            if self._saved_state[saved_key] is None:
-                os.environ.pop(key, None)
-            else:
-                os.environ[key] = self._saved_state[saved_key]
-        return self
-
-    def restore_all(self) -> None:
-        """恢复所有保存的状态"""
-        for key in list(self._saved_state.keys()):
-            if key.startswith("env_"):
-                self.restore_env(key[4:])
-
-
-# ============================================================
-# 异步测试辅助
-# ============================================================
-
-def async_test(func: Callable) -> Callable:
-    """
-    装饰器：标记异步测试函数
-
-    用法:
-        @async_test
-        async def test_async():
-            result = await some_async_function()
-            assert result is not None
-    """
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        loop = asyncio.new_event_loop()
-        try:
-            return loop.run_until_complete(func(*args, **kwargs))
-        finally:
-            loop.close()
-    return wrapper
-
-
-@contextmanager
-def async_timeout(seconds: float):
-    """
-    上下文管理器：异步超时控制
-
-    用法:
-        async with async_timeout(5.0):
-            await long_running_operation()
-
-    Raises:
-        asyncio.TimeoutError: 操作超时
-    """
-    async def _timeout():
-        await asyncio.sleep(seconds)
-        raise asyncio.TimeoutError(f"Operation timed out after {seconds}s")
-
-    async def _run_with_timeout(coro):
-        task = asyncio.create_task(coro)
-        timeout_task = asyncio.create_task(_timeout())
-        try:
-            result = await asyncio.shield(asyncio.gather(task, timeout_task, return_exceptions=True))[0]
-            return result
-        except asyncio.TimeoutError:
-            task.cancel()
-            raise
-        finally:
-            timeout_task.cancel()
-
-    loop = asyncio.new_event_loop()
-    try:
-        yield _run_with_timeout
-    finally:
-        loop.close()
-
-
-# ============================================================
-# 内存分析辅助
-# ============================================================
-
-@contextmanager
-def memory_profile():
-    """
-    上下文管理器：内存使用分析
-
-    用法:
-        with memory_profile() as mp:
-            # 执行代码
-            data = process_large_data()
-        print(f"峰值内存: {mp.peak_mb:.2f} MB")
-        print(f"当前内存: {mp.current_mb:.2f} MB")
-
-    Yields:
-        MemorySnapshot: 内存快照对象
-    """
-    class MemorySnapshot:
-        def __init__(self):
-            self.start_mb = 0
-            self.peak_mb = 0
-            self.current_mb = 0
-
-        def update(self):
-            tracemalloc.stop()
-            tracemalloc.start()
-            snapshot = tracemalloc.take_snapshot()
-            stats = snapshot.statistics('lineno')
-            total = sum(stat.size for stat in stats)
-            self.current_mb = total / 1024 / 1024
-            if self.current_mb > self.peak_mb:
-                self.peak_mb = self.current_mb
-
-    snapshot = MemorySnapshot()
-    snapshot.start_mb = 0
-    tracemalloc.start()
-    try:
-        yield snapshot
-    finally:
-        snapshot.update()
-        tracemalloc.stop()
-
-
-# ============================================================
-# 随机数据生成器
-# ============================================================
-
-class RandomDataGenerator:
-    """
-    随机数据生成器
-
-    用于生成各种测试数据
-    """
-
-    @staticmethod
-    def random_string(length: int = 10, include_special: bool = False) -> str:
-        """生成随机字符串"""
-        chars = string.ascii_letters + string.digits
-        if include_special:
-            chars += "!@#$%^&*()_+-=[]{}|;:,.<>?"
-        return ''.join(secrets.choice(chars) for _ in range(length))
-
-    @staticmethod
-    def random_email() -> str:
-        """生成随机邮箱"""
-        username = RandomDataGenerator.random_string(8).lower()
-        domain = secrets.choice(['gmail.com', 'outlook.com', 'test.com'])
-        return f"{username}@{domain}"
-
-    @staticmethod
-    def random_url() -> str:
-        """生成随机URL"""
-        scheme = secrets.choice(['http', 'https'])
-        domain = RandomDataGenerator.random_string(10).lower()
-        path = '/'.join(RandomDataGenerator.random_string(5).lower() for _ in range(3))
-        return f"{scheme}://{domain}.com/{path}"
-
-    @staticmethod
-    def random_json(depth: int = 3, max_items: int = 5) -> Dict[str, Any]:
-        """生成随机JSON结构"""
-        if depth <= 0:
-            return {"value": RandomDataGenerator.random_string(10)}
-
-        result = {}
-        num_items = secrets.randbelow(max_items) + 1
-
-        for i in range(num_items):
-            key = f"field_{i}"
-            choice = secrets.randbelow(4)
-
-            if choice == 0:
-                result[key] = RandomDataGenerator.random_string(20)
-            elif choice == 1:
-                result[key] = secrets.randbelow(10000)
-            elif choice == 2:
-                result[key] = secrets.choice([True, False])
-            else:
-                result[key] = RandomDataGenerator.random_json(depth - 1, max_items)
-
-        return result
-
-    @staticmethod
-    def random_ip() -> str:
-        """生成随机IP地址"""
-        return ".".join(str(secrets.randbelow(256)) for _ in range(4))
-
-
-# ============================================================
-# JSON Schema 验证辅助（简化版）
-# ============================================================
-
-class JSONSchemaValidator:
-    """
-    简化的 JSON Schema 验证器
-
-    支持常用验证规则
-    """
-
-    TYPE_MAP = {
-        "object": dict,
-        "string": str,
-        "number": (int, float),
-        "boolean": bool,
-        "array": list,
-    }
-
-    @staticmethod
-    def validate(data: Any, schema: Dict[str, Any]) -> List[str]:
-        """
-        验证数据是否符合 Schema
-
-        Args:
-            data: 要验证的数据
-            schema: JSON Schema 定义
-
-        Returns:
-            错误列表，空表示验证通过
-        """
-        errors = []
-        JSONSchemaValidator._validate_recursive(data, schema, "", errors)
-        return errors
-
-    @staticmethod
-    def _validate_type(data: Any, expected_type: str, path: str, errors: List[str]) -> bool:
-        """
-        验证数据类型是否匹配。
-
-        Args:
-            data: 要验证的数据
-            expected_type: 期望的类型
-            path: 字段路径
-            errors: 错误列表
-
-        Returns:
-            bool: 类型是否匹配
-        """
-        if expected_type not in JSONSchemaValidator.TYPE_MAP:
-            return True
-
-        expected_python_type = JSONSchemaValidator.TYPE_MAP[expected_type]
-        if not isinstance(data, expected_python_type):
-            errors.append(f"{path}: expected {expected_type}, got {type(data).__name__}")
-            return False
-        return True
-
-    @staticmethod
-    def _validate_required_fields(data: Dict, required: List[str], path: str, errors: List[str]) -> None:
-        """
-        验证必需字段。
-
-        Args:
-            data: 数据字典
-            required: 必需字段列表
-            path: 字段路径
-            errors: 错误列表
-        """
-        for field in required:
-            if field not in data:
-                errors.append(f"{path}.{field}: required field missing")
-
-    @staticmethod
-    def _validate_properties(data: Dict, properties: Dict, path: str, errors: List[str]) -> None:
-        """
-        验证对象属性。
-
-        Args:
-            data: 数据字典
-            properties: 属性schema定义
-            path: 字段路径
-            errors: 错误列表
-        """
-        for key, field_schema in properties.items():
-            if key in data:
-                JSONSchemaValidator._validate_recursive(
-                    data[key], field_schema,
-                    f"{path}.{key}" if path else key,
-                    errors
-                )
-
-    @staticmethod
-    def _validate_items(data: List, items_schema: Dict, path: str, errors: List[str]) -> None:
-        """
-        验证数组元素。
-
-        Args:
-            data: 数据列表
-            items_schema: 元素schema定义
-            path: 字段路径
-            errors: 错误列表
-        """
-        for i, item in enumerate(data):
-            JSONSchemaValidator._validate_recursive(
-                item, items_schema,
-                f"{path}[{i}]",
-                errors
-            )
-
-    @staticmethod
-    def _validate_recursive(data: Any, schema: Dict[str, Any], path: str, errors: List[str]) -> None:
-        """
-        递归验证数据。
-
-        Args:
-            data: 要验证的数据
-            schema: JSON Schema 定义
-            path: 字段路径
-            errors: 错误列表
-        """
-        if "type" in schema:
-            expected_type = schema["type"]
-            if not JSONSchemaValidator._validate_type(data, expected_type, path, errors):
-                return
-
-        if "required" in schema and isinstance(data, dict):
-            JSONSchemaValidator._validate_required_fields(
-                data, schema["required"], path, errors
-            )
-
-        if "properties" in schema and isinstance(data, dict):
-            JSONSchemaValidator._validate_properties(
-                data, schema["properties"], path, errors
-            )
-
-        if "items" in schema and isinstance(data, list):
-            JSONSchemaValidator._validate_items(
-                data, schema["items"], path, errors
-            )
-
-
-# ============================================================
-# 性能基准测试辅助
-# ============================================================
-
-class PerformanceBenchmark:
-    """
-    性能基准测试类
-
-    用于测量和比较性能
-    """
-
-    def __init__(self, name: str = "Benchmark"):
-        self.name = name
-        self.results = []
-        self._start_time = None
-
-    def start(self):
-        """开始计时"""
-        self._start_time = time.perf_counter()
-
-    def stop(self) -> float:
-        """停止计时并记录结果"""
-        if self._start_time is None:
-            raise RuntimeError("Benchmark not started")
-        elapsed = time.perf_counter() - self._start_time
-        self.results.append(elapsed)
-        self._start_time = None
-        return elapsed
-
-    def run(self, func: Callable, iterations: int = 100, warmup: int = 10) -> Dict[str, float]:
-        """
-        运行基准测试
-
-        Args:
-            func: 要测试的函数
-            iterations: 测试迭代次数
-            warmup: 预热迭代次数
-
-        Returns:
-            性能统计字典
-        """
-        for _ in range(warmup):
-            func()
-
-        self.results = []
-        for _ in range(iterations):
-            start = time.perf_counter()
-            func()
-            self.results.append(time.perf_counter() - start)
-
-        return self.get_stats()
-
-    def get_stats(self) -> Dict[str, float]:
-        """获取性能统计"""
-        if not self.results:
-            return {}
-
-        sorted_results = sorted(self.results)
+    def generate_memory_data(memory_id: str = "test-mem-001") -> Dict:
+        """生成测试记忆数据"""
         return {
-            "name": self.name,
-            "iterations": len(self.results),
-            "min": min(self.results) * 1000,
-            "max": max(self.results) * 1000,
-            "mean": sum(self.results) / len(self.results) * 1000,
-            "median": sorted_results[len(sorted_results) // 2] * 1000,
-            "p95": sorted_results[int(len(sorted_results) * 0.95)] * 1000,
-            "p99": sorted_results[int(len(sorted_results) * 0.99)] * 1000,
+            "id": memory_id,
+            "type": "episodic",
+            "content": {
+                "text": "Test memory content",
+                "embeddings": [0.1, 0.2, 0.3]
+            },
+            "metadata": {
+                "source": "test",
+                "timestamp": "2026-04-22T10:00:00Z"
+            }
+        }
+
+    @staticmethod
+    def generate_agent_data(agent_id: str = "test-agent-001") -> Dict:
+        """生成测试 Agent 数据"""
+        return {
+            "id": agent_id,
+            "name": f"Test Agent {agent_id}",
+            "type": "general",
+            "status": "active",
+            "skills": ["skill1", "skill2"],
+            "config": {
+                "max_tokens": 4096,
+                "temperature": 0.7
+            }
         }
 
 
-# ============================================================
-# 边界条件测试辅助
-# ============================================================
-
-class BoundaryTestCases:
-    """
-    边界条件测试用例生成器
-
-    生成各种边界条件测试数据
-    """
+class MockFactory:
+    """Mock 对象工厂"""
 
     @staticmethod
-    def get_string_boundaries() -> List[str]:
-        """获取字符串边界值"""
-        return [
-            "",  # 空字符串
-            "a",  # 单字符
-            "a" * 255,  # 最大短字符串
-            "a" * 1000,  # 长字符串
-            "\0",  # null字符
-            "\n\t\r",  # 空白字符
-            "<script>alert('xss')</script>",  # XSS攻击
-            "' OR '1'='1",  # SQL注入
-            "../../../etc/passwd",  # 路径遍历
-            "\u0000",  # Unicode null
-            "\uFFFD",  # Unicode替换字符
-        ]
+    def create_mock_response(status_code: int = 200, json_data: Dict = None) -> MagicMock:
+        """创建模拟 HTTP 响应"""
+        mock_resp = MagicMock()
+        mock_resp.status_code = status_code
+        mock_resp.json.return_value = json_data or {}
+        mock_resp.text = json.dumps(json_data or {})
+        return mock_resp
 
     @staticmethod
-    def get_number_boundaries() -> List[Union[int, float]]:
-        """获取数字边界值"""
-        return [
-            0,
-            -1,
-            1,
-            127,  # 8位最大值
-            128,  # 8位溢出
-            255,  # 无符号8位最大值
-            256,  # 8位溢出
-            32767,  # 16位有符号最大值
-            -32768,  # 16位有符号最小值
-            2147483647,  # 32位有符号最大值
-            -2147483648,  # 32位有符号最小值
-            0.0,
-            -0.0,
-            float('inf'),
-            float('-inf'),
-            float('nan'),
-            1e308,  # 接近浮点数最大值
-            1e-308,  # 接近浮点数最小值
-        ]
+    def create_mock_config(**kwargs) -> MagicMock:
+        """创建模拟配置对象"""
+        mock_config = MagicMock()
+        for key, value in kwargs.items():
+            setattr(mock_config, key, value)
+        return mock_config
 
     @staticmethod
-    def get_collection_boundaries() -> List[Any]:
-        """获取集合边界值"""
-        return [
-            [],  # 空列表
-            [None],  # 单元素列表
-            [{}],  # 嵌套空字典
-            [{"a": None}],  # 深层嵌套
-            list(range(1000)),  # 大列表
-            {chr(i): i for i in range(100)},  # 大字典
-        ]
+    def create_mock_logger() -> MagicMock:
+        """创建模拟日志器"""
+        mock_logger = MagicMock()
+        mock_logger.debug = MagicMock()
+        mock_logger.info = MagicMock()
+        mock_logger.warning = MagicMock()
+        mock_logger.error = MagicMock()
+        return mock_logger
+
+
+class AssertHelpers:
+    """断言辅助类"""
 
     @staticmethod
-    def get_json_boundaries() -> List[Dict[str, Any]]:
-        """获取JSON边界值"""
-        return [
-            {},  # 空对象
-            {"key": ""},  # 空字符串值
-            {"key": None},  # null值
-            {"key": [None, {}, {"nested": ""}]},  # 深层嵌套
-            {"key": "value" * 1000},  # 长字符串值
-            {f"key_{i}": i for i in range(100)},  # 大对象
-        ]
+    def assert_json_equal(actual: Any, expected: Any, path: str = "") -> None:
+        """递归比较 JSON 对象"""
+        if isinstance(actual, dict) and isinstance(expected, dict):
+            assert set(actual.keys()) == set(expected.keys()), f"Keys mismatch at {path}"
+            for key in actual:
+                AssertHelpers.assert_json_equal(actual[key], expected[key], f"{path}.{key}")
+        elif isinstance(actual, list) and isinstance(expected, list):
+            assert len(actual) == len(expected), f"List length mismatch at {path}"
+            for i, (a, e) in enumerate(zip(actual, expected)):
+                AssertHelpers.assert_json_equal(a, e, f"{path}[{i}]")
+        else:
+            assert actual == expected, f"Value mismatch at {path}: {actual} != {expected}"
+
+    @staticmethod
+    def assert_response_ok(response: Dict, expected_keys: List[str] = None) -> None:
+        """断言响应成功"""
+        assert response.get("status") == "ok", f"Expected status 'ok', got {response.get('status')}"
+        if expected_keys:
+            for key in expected_keys:
+                assert key in response, f"Missing key: {key}"
 
 
-# ============================================================
-# 导出公共 API
-# ============================================================
+class PerformanceTester:
+    """性能测试辅助"""
 
-__all__ = [
-    # Mock 工厂
-    'create_mock_response',
-    'create_mock_session',
+    def __init__(self, name: str = "test"):
+        self.name = name
+        self.start_time = None
+        self.end_time = None
 
-    # 装饰器
-    'with_mock_session',
-    'performance_test',
-    'async_test',
+    def __enter__(self):
+        self.start_time = time.perf_counter()
+        return self
 
-    # 上下文管理器
-    'async_timeout',
-    'memory_profile',
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.end_time = time.perf_counter()
 
-    # 参数化测试
-    'parametrize_validation',
+    @property
+    def elapsed_ms(self) -> float:
+        """获取执行时间（毫秒）"""
+        if self.start_time and self.end_time:
+            return (self.end_time - self.start_time) * 1000
+        return 0.0
 
-    # 断言辅助
-    'assert_dict_contains',
-    'assert_error_contains',
+    @property
+    def elapsed_s(self) -> float:
+        """获取执行时间（秒）"""
+        return self.elapsed_ms / 1000.0
 
-    # 数据构建器
-    'TestDataBuilder',
-    'RandomDataGenerator',
-    'BoundaryTestCases',
 
-    # 契约测试
-    'ContractTestHelper',
+def load_fixture(filename: str, base_dir: str = None) -> Dict:
+    """加载测试夹具数据"""
+    if base_dir is None:
+        base_dir = Path(__file__).parent.parent / "fixtures" / "data"
 
-    # 验证器
-    'JSONSchemaValidator',
+    filepath = Path(base_dir) / filename
+    with open(filepath, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
-    # 性能测试
-    'PerformanceBenchmark',
 
-    # 测试隔离
-    'TestIsolation',
-]
+class TestDataBuilder:
+    """测试数据构建器 - 流式API"""
+
+    def __init__(self):
+        self._data = {}
+
+    def with_id(self, id: str) -> 'TestDataBuilder':
+        self._data['id'] = id
+        return self
+
+    def with_name(self, name: str) -> 'TestDataBuilder':
+        self._data['name'] = name
+        return self
+
+    def with_status(self, status: str) -> 'TestDataBuilder':
+        self._data['status'] = status
+        return self
+
+    def with_metadata(self, **kwargs) -> 'TestDataBuilder':
+        if 'metadata' not in self._data:
+            self._data['metadata'] = {}
+        self._data['metadata'].update(kwargs)
+        return self
+
+    def with_timestamp(self, key: str = 'created_at') -> 'TestDataBuilder':
+        self._data[key] = datetime.now().isoformat()
+        return self
+
+    def build(self) -> Dict:
+        return self._data.copy()
+
+
+class MemoryProfiler:
+    """内存分析器"""
+
+    def __init__(self, threshold_mb: float = 100.0):
+        self.threshold_mb = threshold_mb
+        self._snapshots = []
+        self._peak = 0
+
+    def __enter__(self):
+        tracemalloc.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        tracemalloc.stop()
+
+    def snapshot(self, label: str = "") -> Dict:
+        """获取内存快照"""
+        snapshot = tracemalloc.take_snapshot()
+        stats = snapshot.statistics('lineno')
+        total_mb = sum(stat.size for stat in stats) / 1024 / 1024
+
+        if total_mb > self._peak:
+            self._peak = total_mb
+
+        result = {
+            'label': label,
+            'total_mb': total_mb,
+            'peak_mb': self._peak,
+            'top_allocations': [
+                {'file': str(stat.traceback[0].filename), 'line': stat.traceback[0].lineno, 'size_mb': stat.size / 1024 / 1024}
+                for stat in stats[:5]
+            ]
+        }
+        self._snapshots.append(result)
+        return result
+
+    def assert_below_threshold(self) -> None:
+        """断言内存使用低于阈值"""
+        assert self._peak < self.threshold_mb, f"内存使用 {self._peak:.2f}MB 超过阈值 {self.threshold_mb}MB"
+
+    @property
+    def peak_mb(self) -> float:
+        return self._peak
+
+
+class TestIsolation:
+    """测试隔离工具"""
+
+    _lock = threading.Lock()
+    _isolated_dirs = {}
+
+    @classmethod
+    @contextmanager
+    def isolated_directory(cls, prefix: str = "isolated_test_") -> Generator[Path, None, None]:
+        """创建隔离的临时目录"""
+        temp_dir = Path(tempfile.mkdtemp(prefix=prefix))
+        thread_id = threading.get_ident()
+
+        with cls._lock:
+            cls._isolated_dirs[thread_id] = temp_dir
+
+        try:
+            yield temp_dir
+        finally:
+            with cls._lock:
+                if thread_id in cls._isolated_dirs:
+                    del cls._isolated_dirs[thread_id]
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+    @classmethod
+    @contextmanager
+    def isolated_environment(cls, env_vars: Dict[str, str] = None) -> Generator[None, None, None]:
+        """创建隔离的环境变量"""
+        original_env = os.environ.copy()
+
+        if env_vars:
+            os.environ.update(env_vars)
+
+        try:
+            yield
+        finally:
+            os.environ.clear()
+            os.environ.update(original_env)
+
+    @classmethod
+    @contextmanager
+    def isolated_path(cls, extra_paths: List[str] = None) -> Generator[None, None, None]:
+        """创建隔离的Python路径"""
+        original_path = sys.path.copy()
+
+        if extra_paths:
+            sys.path = extra_paths + sys.path
+
+        try:
+            yield
+        finally:
+            sys.path = original_path
+
+
+class RetryHelper:
+    """重试辅助工具"""
+
+    def __init__(self, max_retries: int = 3, delay: float = 1.0, backoff: float = 2.0):
+        self.max_retries = max_retries
+        self.delay = delay
+        self.backoff = backoff
+
+    def execute(self, func: Callable, *args, **kwargs) -> Any:
+        """执行带重试的函数"""
+        last_exception = None
+        current_delay = self.delay
+
+        for attempt in range(self.max_retries):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                last_exception = e
+                if attempt < self.max_retries - 1:
+                    time.sleep(current_delay)
+                    current_delay *= self.backoff
+
+        raise last_exception
+
+
+class AsyncTestHelper:
+    """异步测试辅助工具"""
+
+    @staticmethod
+    @asynccontextmanager
+    async def async_timeout(seconds: float):
+        """异步超时上下文"""
+        try:
+            async with asyncio.timeout(seconds):
+                yield
+        except asyncio.TimeoutError:
+            raise TimeoutError(f"操作超时 ({seconds}秒)")
+
+    @staticmethod
+    async def wait_for_condition(
+        condition: Callable[[], bool],
+        timeout: float = 10.0,
+        interval: float = 0.1
+    ) -> bool:
+        """等待条件满足"""
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            if condition():
+                return True
+            await asyncio.sleep(interval)
+        return False
+
+    @staticmethod
+    def run_async(coro):
+        """运行异步协程"""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                future = pool.submit(asyncio.run, coro)
+                return future.result()
+        else:
+            return asyncio.run(coro)
+
+
+class TestReporter:
+    """测试报告生成器"""
+
+    def __init__(self, name: str = "Test Report"):
+        self.name = name
+        self._results = []
+        self._start_time = None
+
+    def start(self):
+        """开始记录"""
+        self._start_time = time.time()
+        self._results = []
+
+    def record(self, test_name: str, passed: bool, duration: float = 0, message: str = ""):
+        """记录测试结果"""
+        self._results.append({
+            'name': test_name,
+            'passed': passed,
+            'duration': duration,
+            'message': message,
+            'timestamp': datetime.now().isoformat()
+        })
+
+    def summary(self) -> Dict:
+        """生成摘要"""
+        total = len(self._results)
+        passed = sum(1 for r in self._results if r['passed'])
+        failed = total - passed
+        total_duration = sum(r['duration'] for r in self._results)
+
+        return {
+            'name': self.name,
+            'total': total,
+            'passed': passed,
+            'failed': failed,
+            'pass_rate': (passed / total * 100) if total > 0 else 0,
+            'total_duration': total_duration,
+            'elapsed_time': time.time() - self._start_time if self._start_time else 0,
+            'results': self._results
+        }
+
+    def to_json(self, filepath: str = None) -> str:
+        """导出为JSON"""
+        data = self.summary()
+        json_str = json.dumps(data, indent=2, ensure_ascii=False)
+
+        if filepath:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(json_str)
+
+        return json_str
+
+
+class EnvironmentValidator:
+    """环境验证器"""
+
+    @staticmethod
+    def check_python_version(min_version: Tuple[int, int] = (3, 8)) -> bool:
+        """检查Python版本"""
+        return sys.version_info >= min_version
+
+    @staticmethod
+    def check_module(module_name: str) -> bool:
+        """检查模块是否可用"""
+        try:
+            __import__(module_name)
+            return True
+        except ImportError:
+            return False
+
+    @staticmethod
+    def check_command(command: str) -> bool:
+        """检查命令是否可用"""
+        try:
+            result = subprocess.run(
+                ['where' if platform.system() == 'Windows' else 'which', command],
+                capture_output=True,
+                timeout=5
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    @classmethod
+    def validate_all(cls, requirements: Dict[str, Any] = None) -> Dict[str, bool]:
+        """验证所有要求"""
+        results = {}
+
+        results['python_version'] = cls.check_python_version()
+
+        default_modules = ['pytest', 'json', 'pathlib', 'unittest.mock']
+        modules = requirements.get('modules', default_modules) if requirements else default_modules
+
+        for module in modules:
+            results[f'module_{module}'] = cls.check_module(module)
+
+        default_commands = ['python', 'pip']
+        commands = requirements.get('commands', default_commands) if requirements else default_commands
+
+        for cmd in commands:
+            results[f'command_{cmd}'] = cls.check_command(cmd)
+
+        return results
+
+
+class DataComparator:
+    """数据比较器"""
+
+    @staticmethod
+    def compare_dicts(actual: Dict, expected: Dict, ignore_keys: List[str] = None) -> Tuple[bool, List[str]]:
+        """比较两个字典"""
+        ignore_keys = ignore_keys or []
+        differences = []
+
+        def _compare(a, e, path=""):
+            if isinstance(a, dict) and isinstance(e, dict):
+                all_keys = set(a.keys()) | set(e.keys())
+                for key in all_keys:
+                    if key in ignore_keys:
+                        continue
+                    new_path = f"{path}.{key}" if path else key
+                    if key not in a:
+                        differences.append(f"Missing key: {new_path}")
+                    elif key not in e:
+                        differences.append(f"Extra key: {new_path}")
+                    else:
+                        _compare(a[key], e[key], new_path)
+            elif isinstance(a, list) and isinstance(e, list):
+                if len(a) != len(e):
+                    differences.append(f"List length mismatch at {path}: {len(a)} vs {len(e)}")
+                else:
+                    for i, (ai, ei) in enumerate(zip(a, e)):
+                        _compare(ai, ei, f"{path}[{i}]")
+            elif a != e:
+                differences.append(f"Value mismatch at {path}: {a} vs {e}")
+
+        _compare(actual, expected)
+        return len(differences) == 0, differences
+
+    @staticmethod
+    def compare_json_files(file1: Path, file2: Path) -> Tuple[bool, List[str]]:
+        """比较两个JSON文件"""
+        with open(file1, 'r', encoding='utf-8') as f:
+            data1 = json.load(f)
+        with open(file2, 'r', encoding='utf-8') as f:
+            data2 = json.load(f)
+
+        return DataComparator.compare_dicts(data1, data2)
+
+
+class TestCleanup:
+    """测试清理工具"""
+
+    def __init__(self):
+        self._cleanup_tasks = []
+
+    def register(self, func: Callable, *args, **kwargs):
+        """注册清理任务"""
+        self._cleanup_tasks.append((func, args, kwargs))
+
+    def cleanup(self):
+        """执行所有清理任务"""
+        errors = []
+        for func, args, kwargs in reversed(self._cleanup_tasks):
+            try:
+                func(*args, **kwargs)
+            except Exception as e:
+                errors.append(f"{func.__name__}: {e}")
+
+        self._cleanup_tasks.clear()
+        return errors
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        errors = self.cleanup()
+        if errors:
+            print(f"清理警告: {errors}")
+
+
+def skip_if(condition: bool, reason: str):
+    """条件跳过装饰器"""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if condition:
+                import pytest
+                pytest.skip(reason)
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+def timeout(seconds: float):
+    """超时装饰器"""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            import signal
+
+            def handler(signum, frame):
+                raise TimeoutError(f"函数 {func.__name__} 执行超时 ({seconds}秒)")
+
+            if platform.system() != 'Windows':
+                old_handler = signal.signal(signal.SIGALRM, handler)
+                signal.alarm(int(seconds))
+                try:
+                    result = func(*args, **kwargs)
+                finally:
+                    signal.alarm(0)
+                    signal.signal(signal.SIGALRM, old_handler)
+                return result
+            else:
+                import threading
+                result = [None]
+                exception = [None]
+
+                def target():
+                    try:
+                        result[0] = func(*args, **kwargs)
+                    except Exception as e:
+                        exception[0] = e
+
+                thread = threading.Thread(target=target)
+                thread.start()
+                thread.join(timeout=seconds)
+
+                if thread.is_alive():
+                    raise TimeoutError(f"函数 {func.__name__} 执行超时 ({seconds}秒)")
+
+                if exception[0]:
+                    raise exception[0]
+
+                return result[0]
+        return wrapper
+    return decorator
+
+
+def benchmark(iterations: int = 100, warmup: int = 10):
+    """基准测试装饰器"""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for _ in range(warmup):
+                func(*args, **kwargs)
+
+            times = []
+            for _ in range(iterations):
+                start = time.perf_counter()
+                func(*args, **kwargs)
+                times.append(time.perf_counter() - start)
+
+            return {
+                'function': func.__name__,
+                'iterations': iterations,
+                'min_ms': min(times) * 1000,
+                'max_ms': max(times) * 1000,
+                'avg_ms': sum(times) / len(times) * 1000,
+                'median_ms': sorted(times)[len(times) // 2] * 1000
+            }
+        return wrapper
+    return decorator
+
+
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+
+
+def get_project_root() -> Path:
+    """获取项目根目录"""
+    return PROJECT_ROOT
+
+
+def get_test_data_dir() -> Path:
+    """获取测试数据目录"""
+    return PROJECT_ROOT / "tests" / "fixtures" / "data"
+
+
+def ensure_dir(path: Path) -> Path:
+    """确保目录存在"""
+    path.mkdir(parents=True, exist_ok=True)
+    return path
