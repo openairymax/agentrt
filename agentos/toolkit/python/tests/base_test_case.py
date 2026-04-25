@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, AsyncMock
 from typing import Dict, Any, Optional
 from datetime import datetime
 
-from agentos.client.client import APIClient, APIResponse, manager
+from agentos.client.client import APIClient, APIResponse, ClientConfig
 from agentos.exceptions import AgentOSError
 
 
@@ -41,7 +41,7 @@ class BaseTestCase:
         自动应用（autouse=True），无需在每个测试类中重复定义
         """
         self.mock_client = MagicMock(spec=APIClient)
-        self.config = manager(
+        self.config = ClientConfig(
             endpoint="http://localhost:18789",
             timeout=30.0,
             max_retries=3,

@@ -18,10 +18,14 @@ package agentos
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -149,7 +153,7 @@ func (c *ProtocolClient) DetectProtocol(ctx context.Context) (ProtocolType, floa
 			bytes.Contains(body, []byte("\"choices\"")) {
 			detected = ProtocolOpenAI
 			confidence += 25.0
-		} else if bytes.Contains(body, []byte("\"jsonrpc\")) {
+		} else if bytes.Contains(body, []byte(`"jsonrpc"`)) {
 			detected = ProtocolJSONRPC
 			confidence += 40.0
 		}
@@ -205,8 +209,8 @@ func (c *ProtocolClient) SendRequest(ctx context.Context,
 		}
 		lastErr = err
 
-		var apiErr Error
-		if errors.As(err, &apiErr) && !IsRetryableError(apiErr) {
+		var apiErr *AgentOSError
+		if errors.As(err, &apiErr) && !isRetryableError(apiErr) {
 			break
 		}
 	}
@@ -398,7 +402,7 @@ func (c *ProtocolClient) doHTTPRequest(ctx context.Context, url string,
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, NewError(ErrorCodeNetwork, fmt.Sprintf("HTTP request failed: %v", err))
+		return nil, NewError(CodeNetworkError, fmt.Sprintf("HTTP request failed: %v", err), nil)
 	}
 	defer resp.Body.Close()
 
@@ -413,16 +417,16 @@ func (c *ProtocolClient) doHTTPRequest(ctx context.Context, url string,
 		}
 		json.Unmarshal(body, &apiErrResp)
 
-		errCode := ErrorCodeServer
+		errCode := CodeServerError
 		msg := fmt.Sprintf("HTTP %d", resp.StatusCode)
 		if apiErrResp.Error.Message != "" {
 			msg = apiErrResp.Error.Message
 		}
 		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
-			errCode = ErrorCodeInvalidParameter
+			errCode = CodeInvalidParameter
 		}
 
-		return nil, NewError(errCode, msg)
+		return nil, NewError(errCode, msg, nil)
 	}
 	return body, nil
 }
@@ -508,4 +512,17 @@ func getEnv(key, fallback string) string {
 		return val
 	}
 	return fallback
+}
+
+func generateID() string {
+	timestamp := time.Now().UnixNano()
+	randomNum, _ := rand.Int(rand.Reader, big.NewInt(1000000))
+	return fmt.Sprintf("req-%d-%06d", timestamp, randomNum.Int64())
+}
+
+func isRetryableError(err *AgentOSError) bool {
+	return err.Code == CodeNetworkError ||
+		err.Code == CodeTimeout ||
+		err.Code == CodeServerError ||
+		err.Code == CodeRateLimited
 }

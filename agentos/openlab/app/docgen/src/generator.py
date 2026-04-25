@@ -146,11 +146,11 @@ class DocumentationGenerator:
 
         # File type patterns
         self.file_patterns = {
-            FileType.MARKDOWN: re.compile(r'\.(md|markdown)$', re.IGNORECASE),
-            FileType.PYTHON: re.compile(r'\.py$', re.IGNORECASE),
-            FileType.YAML: re.compile(r'\.(yaml|yml)$', re.IGNORECASE),
-            FileType.JSON: re.compile(r'\.json$', re.IGNORECASE),
-            FileType.TEXT: re.compile(r'\.txt$', re.IGNORECASE),
+            FileType.MARKDOWN: re.compile(r'.(md|markdown)$', re.IGNORECASE),
+            FileType.PYTHON: re.compile(r'.py$', re.IGNORECASE),
+            FileType.YAML: re.compile(r'.(yaml|yml)$', re.IGNORECASE),
+            FileType.JSON: re.compile(r'.json$', re.IGNORECASE),
+            FileType.TEXT: re.compile(r'.txt$', re.IGNORECASE),
         }
 
         # Statistics
@@ -232,8 +232,7 @@ class DocumentationGenerator:
         self.cache_ttl = self.manager.get("cache_ttl", 3600)
 
         if self.cache_enabled:
-            self.cache_dir = Path(tempfile.gettempdir()) / \
-                "openlab_docgen_cache"
+            self.cache_dir = Path(tempfile.gettempdir()) /                 "openlab_docgen_cache"
             self.cache_dir.mkdir(parents=True, exist_ok=True)
             self.logger.info(f"Cache directory: {self.cache_dir}")
         else:
@@ -396,7 +395,7 @@ class DocumentationGenerator:
 
             # Extract frontmatter (YAML at beginning of file)
             frontmatter_match = re.match(
-                r'^---\n(.*?)\n---\n', content, re.DOTALL)
+                r'^---n(.*?)n---n', content, re.DOTALL)
             if frontmatter_match:
                 frontmatter_text = frontmatter_match.group(1)
                 try:
@@ -413,7 +412,7 @@ class DocumentationGenerator:
 
             # If no frontmatter, extract first heading as title
             if not metadata.title or metadata.title == path.stem:
-                heading_match = re.search(r'^#\s+(.+)$', content, re.MULTILINE)
+                heading_match = re.search(r'^#s+(.+)$', content, re.MULTILINE)
                 if heading_match:
                     metadata.title = heading_match.group(1).strip()
 
@@ -421,11 +420,11 @@ class DocumentationGenerator:
             if not metadata.description:
                 # Remove frontmatter if present
                 content_no_frontmatter = re.sub(
-                    r'^---\n.*?\n---\n', '', content, flags=re.DOTALL)
+                    r'^---n.*?n---n', '', content, flags=re.DOTALL)
 
                 # Find first paragraph
                 paragraph_match = re.search(
-                    r'^\s*([^\n#].+?)\n\n', content_no_frontmatter, re.DOTALL)
+                    r'^s*([^n#].+?)nn', content_no_frontmatter, re.DOTALL)
                 if paragraph_match:
                     metadata.description = paragraph_match.group(1).strip()[
                         :200]
@@ -448,12 +447,12 @@ class DocumentationGenerator:
 
             # Extract module docstring
             docstring_match = re.search(
-                r'^\"\"\"(.*?)\"\"\"', content, re.DOTALL)
+                r'^"""(.*?)"""', content, re.DOTALL)
             if docstring_match:
                 docstring = docstring_match.group(1).strip()
 
                 # Extract title (first line)
-                lines = docstring.split('\n')
+                lines = docstring.split('n')
                 if lines:
                     metadata.title = lines[0].strip()
 
@@ -467,7 +466,7 @@ class DocumentationGenerator:
                 metadata.title = path.stem
 
             # Extract imports as dependencies
-            import_pattern = r'^(?:from\s+(\S+)\s+import|import\s+(\S+))'
+            import_pattern = r'^(?:froms+(S+)s+import|imports+(S+))'
             imports = re.findall(import_pattern, content, re.MULTILINE)
 
             for import_match in imports:
@@ -813,9 +812,9 @@ class DocumentationGenerator:
             # Simplified: just collect all files
             pass
 
-        # @future 瀹屾暣鐨勫鑸敓鎴愬疄鐜拌鐐癸細
-        # 1. 鏀寔澶氱骇宓屽鐩綍缁撴瀯
-        # 2. 鑷姩鐢熸垚闈㈠寘灞戝鑸?        # 3. 鏀寔渚ц竟鏍忓姩鎬佸睍寮€/鎶樺彔
+        # @future 瀹屾暣鐨勫鑸敓鎴愬疄鐜拌鐐癸細
+        # 1. 鏀寔澶氱骇宓屽鐩綍缁撴瀯
+        # 2. 鑷姩鐢熸垚闈㈠寘灞戝鑸?        # 3. 鏀寔渚ц竟鏍忓姩鎬佸睍寮/鎶樺彔
 
         return navigation
 
@@ -847,7 +846,7 @@ class DocumentationGenerator:
             index['files'].append(file_entry)
 
             # @future 鍏ㄦ枃鎼滅储绱㈠紩瀹炵幇瑕佺偣锛?            # 1. 闆嗘垚Elasticsearch/Meilisearch寮曟搸
-            # 2. 鏀寔涓枃鍒嗚瘝鍜屽悓涔夎瘝鎵╁睍
+            # 2. 鏀寔涓枃鍒嗚瘝鍜屽悓涔夎瘝鎵╁睍
             # 3. 瀹炵幇鐩稿叧鎬ф帓搴忓拰妯＄硦鍖归厤
 
         return index
@@ -981,8 +980,7 @@ class DocumentationGenerator:
 
             # Update statistics
             self.stats['end_time'] = time.time()
-            self.stats['duration'] = self.stats['end_time'] - \
-                self.stats['start_time']
+            self.stats['duration'] = self.stats['end_time'] -                 self.stats['start_time']
             self.stats['files_processed'] = len(all_files)
             self.stats['files_generated'] = len(generated_files)
             self.stats['files_skipped'] = len(all_files) - len(generated_files)
@@ -1199,7 +1197,7 @@ async def main():
                 return 1
 
     except KeyboardInterrupt:
-        print("\nOperation cancelled by user")
+        print("nOperation cancelled by user")
         return 130
 
     except Exception as e:
