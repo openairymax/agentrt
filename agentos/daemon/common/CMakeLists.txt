@@ -118,14 +118,18 @@ set(SVC_COMMON_SOURCES
     src/platform_compat.c     # 平台兼容层实现
     src/api_recovery.c        # API恢复系统
     src/orchestrator.c        # 流程编排器
+    src/thread_pool.c         # 工作线程池
+    src/parallel_dispatcher.c # 工具并行执行引擎
 )
 
 # 创建静态库
 add_library(svc_common STATIC ${SVC_COMMON_SOURCES})
 
 # 链接 commons 库
+find_package(OpenSSL QUIET)
 target_link_libraries(svc_common PUBLIC
     agentos_common
+    ${OPENSSL_CRYPTO_LIBRARY}
 )
 
 # 平台特定配置
@@ -182,8 +186,14 @@ target_include_directories(svc_common PUBLIC
     $<BUILD_INTERFACE:${COMMONS_DIR}/utils/ipc/include>
 )
 
-# 条件包含外部库头文件
+set(ATOMS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../atoms")
+
+target_include_directories(svc_common PUBLIC
+    $<BUILD_INTERFACE:${ATOMS_DIR}/memoryrovol/include>
+    $<BUILD_INTERFACE:${ATOMS_DIR}/coreloopthree/include>
+)
 if(LIBCURL_FOUND)
+    target_compile_definitions(svc_common PUBLIC AGENTOS_HAS_CURL)
     target_include_directories(svc_common PRIVATE ${LIBCURL_INCLUDE_DIRS})
 endif()
 if(YAML_FOUND)
@@ -282,5 +292,6 @@ install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/include/conn_pool.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/orchestrator.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/daemon_defaults.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/parallel_dispatcher.h
     DESTINATION include/agentos
 )

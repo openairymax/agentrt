@@ -1,4 +1,4 @@
-import { AgentOSError } from './errors';
+import { AgentOSError, newError, ErrorCode } from './errors';
 
 export enum SyscallNamespace {
   TASK = 'task',
@@ -51,9 +51,7 @@ export class HttpSyscallBinding extends SyscallBinding {
       });
 
       if (!response.ok) {
-        throw AgentOSError.http(
-          `Syscall HTTP ${response.status}: ${request.operation}`
-        );
+        throw newError(ErrorCode.SERVER_ERROR, `Syscall HTTP ${response.status}: ${request.operation}`);
       }
 
       const data = await response.json();
@@ -62,9 +60,7 @@ export class HttpSyscallBinding extends SyscallBinding {
       if (err instanceof AgentOSError) {
         throw err;
       }
-      throw AgentOSError.network(
-        `Syscall network error: ${(err as Error).message}`
-      );
+      throw newError(ErrorCode.NETWORK_ERROR, `Syscall network error: ${(err as Error).message}`);
     }
   }
 }

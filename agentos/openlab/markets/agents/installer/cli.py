@@ -133,7 +133,7 @@ class AgentCLI:
                     self.console.print(Panel(str(result), title=title))
                 else:
                     if title:
-                        print(f"\n{title}")
+                        print(f"n{title}")
                         print("=" * len(title))
                     print(str(result))
 
@@ -156,7 +156,7 @@ class AgentCLI:
             self.console.print(table)
         else:
             if title:
-                print(f"\n{title}")
+                print(f"n{title}")
                 print("=" * len(title))
 
             for key, value in data.items():
@@ -172,7 +172,7 @@ class AgentCLI:
         """
         if not data:
             if title:
-                print(f"\n{title}: No data")
+                print(f"n{title}: No data")
             else:
                 print("No data")
             return
@@ -198,19 +198,19 @@ class AgentCLI:
             else:
                 # Simple list
                 if title:
-                    self.console.print(Panel("\n".join(str(item)
+                    self.console.print(Panel("n".join(str(item)
                                        for item in data), title=title))
                 else:
                     for item in data:
                         self.console.print(item)
         else:
             if title:
-                print(f"\n{title}")
+                print(f"n{title}")
                 print("=" * len(title))
 
             for i, item in enumerate(data, 1):
                 if isinstance(item, dict):
-                    print(f"\n{i}. ")
+                    print(f"n{i}. ")
                     for key, value in item.items():
                         print(f"  {key}: {value}")
                 else:
@@ -786,7 +786,7 @@ def run() -> None:
         exit_code = asyncio.run(main())
         sys.exit(exit_code)
     except KeyboardInterrupt:
-        print("\nOperation cancelled by user", file=sys.stderr)
+        print("nOperation cancelled by user", file=sys.stderr)
         sys.exit(130)
     except Exception as e:
         print(f"Unexpected error: {str(e)}", file=sys.stderr)

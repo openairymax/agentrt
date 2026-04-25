@@ -109,7 +109,15 @@ static agentos_error_t verify_with_metacognition(
             err = agentos_mc_evaluate_step(
                 coord->meta, step, content, content_len, &eval);
             if (err == AGENTOS_SUCCESS) {
-                *out_score = eval.overall_score;
+                if (coord->calibrator) {
+                    double raw = (double)eval.overall_score;
+                    double calibrated = confidence_calibrator_calibrate(
+                        coord->calibrator, raw, CC_DIM_ACCURACY);
+                    eval.overall_score = (float)calibrated;
+                    *out_score = (float)calibrated;
+                } else {
+                    *out_score = eval.overall_score;
+                }
                 *out_acceptable = eval.is_acceptable;
                 if (eval.critique_text && eval.critique_len > 0) {
                     *out_critique = eval.critique_text;
@@ -123,9 +131,21 @@ static agentos_error_t verify_with_metacognition(
         }
     }
 
-    return default_s1_verify(content, content_len,
-                             out_score, out_acceptable,
+    float fallback_score = 0.0f;
+    int fallback_acceptable = 0;
+    agentos_error_t fb_err = default_s1_verify(content, content_len,
+                             &fallback_score, &fallback_acceptable,
                              out_critique, out_critique_len, NULL);
+    if (fb_err == AGENTOS_SUCCESS && coord->calibrator) {
+        double calibrated = confidence_calibrator_calibrate(
+            coord->calibrator, (double)fallback_score, CC_DIM_ACCURACY);
+        *out_score = (float)calibrated;
+        *out_acceptable = fallback_acceptable;
+    } else if (fb_err == AGENTOS_SUCCESS) {
+        *out_score = fallback_score;
+        *out_acceptable = fallback_acceptable;
+    }
+    return fb_err;
 }
 
 static agentos_error_t build_correction_prompt(
@@ -198,6 +218,11 @@ agentos_error_t tc3_coordinator_create(
 
     coord->chain = chain;
     coord->meta = meta;
+    coord->calibrator = confidence_calibrator_create(CC_DEFAULT_DECAY_FACTOR);
+    if (!coord->calibrator) {
+        AGENTOS_FREE(coord);
+        return AGENTOS_ENOMEM;
+    }
 
     agentos_error_t err = su_stream_detector_create(
         &coord->config.stream_config, &coord->detector);
@@ -219,6 +244,7 @@ agentos_error_t tc3_coordinator_create(
 void tc3_coordinator_destroy(tc3_coordinator_t* coord) {
     if (!coord) return;
     if (coord->detector) su_stream_detector_destroy(coord->detector);
+    if (coord->calibrator) confidence_calibrator_destroy(coord->calibrator);
     free_unit_results(coord);
     if (coord->unit_results) AGENTOS_FREE(coord->unit_results);
     AGENTOS_FREE(coord);

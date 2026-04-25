@@ -411,10 +411,51 @@ heapstore_error_t heapstore_registry_delete_agent(const char* id) {
 }
 
 heapstore_error_t heapstore_registry_query_agents(const char* filter_type, const char* filter_status, heapstore_registry_iter_t** iter) {
-    (void)filter_type;
-    (void)filter_status;
-    (void)iter;
-    return heapstore_ERR_NOT_INITIALIZED;
+    if (!iter) return heapstore_ERR_INVALID_PARAM;
+    if (!s_registry.initialized || !s_registry.db) return heapstore_ERR_NOT_INITIALIZED;
+
+    char sql[512];
+    snprintf(sql, sizeof(sql),
+        "SELECT id, name, type, version, status, config_path, created_at, updated_at FROM agents WHERE 1=1");
+    if (filter_type) {
+        size_t pos = strlen(sql);
+        snprintf(sql + pos, sizeof(sql) - pos, " AND type = ?");
+    }
+    if (filter_status) {
+        size_t pos = strlen(sql);
+        snprintf(sql + pos, sizeof(sql) - pos, " AND status = ?");
+    }
+
+    pthread_mutex_lock(&s_registry.lock);
+
+    sqlite3_stmt* stmt;
+    int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        pthread_mutex_unlock(&s_registry.lock);
+        return heapstore_ERR_DB_QUERY_FAILED;
+    }
+
+    int param_idx = 1;
+    if (filter_type) {
+        sqlite3_bind_text(stmt, param_idx++, filter_type, -1, SQLITE_STATIC);
+    }
+    if (filter_status) {
+        sqlite3_bind_text(stmt, param_idx++, filter_status, -1, SQLITE_STATIC);
+    }
+
+    heapstore_registry_iter_t* new_iter = (heapstore_registry_iter_t*)calloc(1, sizeof(heapstore_registry_iter_t));
+    if (!new_iter) {
+        sqlite3_finalize(stmt);
+        pthread_mutex_unlock(&s_registry.lock);
+        return heapstore_ERR_OUT_OF_MEMORY;
+    }
+    new_iter->stmt = stmt;
+    new_iter->current_type = 0;
+    new_iter->has_more = 1;
+
+    *iter = new_iter;
+    pthread_mutex_unlock(&s_registry.lock);
+    return heapstore_SUCCESS;
 }
 
 heapstore_error_t heapstore_registry_add_skill(const heapstore_skill_record_t* record) {
