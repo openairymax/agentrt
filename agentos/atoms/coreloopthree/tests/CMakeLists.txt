@@ -32,6 +32,7 @@ set(CL3_COMMON_INCLUDES
     ${COMMONS_DIR}/utils/cache/include
     ${COMMONS_DIR}/utils/compat/include
     ${MEMORYROVOL_SRC_DIR}
+    ${MEMORYROVOL_INCLUDE_DIR}
 )
 
 foreach(TEST_SRC ${CL3_TEST_SOURCES})

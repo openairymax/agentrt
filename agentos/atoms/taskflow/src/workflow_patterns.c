@@ -170,28 +170,32 @@ static taskflow_error_t execute_sequential_workflow(workflow_context_t* context,
     if (!context || !internal_state) return TASKFLOW_ERROR_INVALID_ARG;
     
     vertex_id_t current_node = context->start_node;
+    size_t iterations = 0;
+    size_t max_iter = context->config.max_nodes > 0 ? context->config.max_nodes * 10 : 10000;
     
     while (current_node != 0 && current_node != context->end_node) {
-        // 检查是否暂停或停止
+        if (iterations >= max_iter) {
+            internal_state->state = EXECUTION_FAILED;
+            return TASKFLOW_ERROR_TIMEOUT;
+        }
+        iterations++;
+
         if (internal_state->state == EXECUTION_PAUSED) {
-            return TASKFLOW_SUCCESS; // 正常暂停
+            return TASKFLOW_SUCCESS;
         }
         if (internal_state->state == EXECUTION_CANCELLED) {
-            return TASKFLOW_SUCCESS; // 已取消
+            return TASKFLOW_SUCCESS;
         }
         
-        // 执行当前节点
         taskflow_error_t result = execute_node_task(context, internal_state, current_node);
         if (result != TASKFLOW_SUCCESS) {
             internal_state->state = EXECUTION_FAILED;
             return result;
         }
         
-        // 获取下一个节点
         current_node = get_next_executable_node(context, internal_state, current_node);
     }
     
-    // 执行结束节点（如果存在且不是0）
     if (context->end_node != 0 && context->end_node != current_node) {
         execute_node_task(context, internal_state, context->end_node);
     }
@@ -591,7 +595,9 @@ taskflow_error_t workflow_build_conditional(
     vertex_id_t condition_node_id,
     vertex_id_t true_branch_node_id,
     vertex_id_t false_branch_node_id,
-    vertex_id_t merge_node_id)
+    vertex_id_t merge_node_id,
+    bool (*condition_func)(void* ctx),
+    void* condition_context)
 {
     if (!context) return TASKFLOW_ERROR_INVALID_ARG;
 
@@ -604,8 +610,8 @@ taskflow_error_t workflow_build_conditional(
         .edge_id = (edge_id_t)(4000),
         .source_node = condition_node_id,
         .target_node = true_branch_node_id,
-        .condition_func = NULL,
-        .condition_context = NULL,
+        .condition_func = condition_func,
+        .condition_context = condition_context,
         .edge_label = "true_branch"
     };
     taskflow_error_t result = workflow_add_edge(context, &true_edge);
@@ -657,7 +663,9 @@ taskflow_error_t workflow_build_loop(
     vertex_id_t loop_start_node_id,
     vertex_id_t loop_body_node_id,
     vertex_id_t loop_condition_node_id,
-    vertex_id_t loop_end_node_id)
+    vertex_id_t loop_end_node_id,
+    bool (*continue_condition_func)(void* ctx),
+    void* condition_context)
 {
     if (!context) return TASKFLOW_ERROR_INVALID_ARG;
 
@@ -692,8 +700,8 @@ taskflow_error_t workflow_build_loop(
         .edge_id = (edge_id_t)(5002),
         .source_node = loop_condition_node_id,
         .target_node = loop_body_node_id,
-        .condition_func = NULL,
-        .condition_context = NULL,
+        .condition_func = continue_condition_func,
+        .condition_context = condition_context,
         .edge_label = "loop_continue"
     };
     result = workflow_add_edge(context, &cond_to_body);

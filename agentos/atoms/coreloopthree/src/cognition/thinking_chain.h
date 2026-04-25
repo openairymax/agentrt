@@ -26,6 +26,7 @@ typedef struct agentos_thinking_chain agentos_thinking_chain_t;
 typedef struct agentos_thinking_step agentos_thinking_step_t;
 typedef struct agentos_working_memory agentos_working_memory_t;
 typedef struct agentos_context_window agentos_context_window_t;
+typedef struct agentos_memory_engine agentos_memory_engine_t;
 
 /* ==================== 常量定义 ==================== */
 
@@ -220,6 +221,7 @@ struct agentos_thinking_chain {
     char* session_goal;                       /**< 会话目标描述 */
     agentos_context_window_t* ctx_window;     /**< Context Window */
     agentos_working_memory_t* working_mem;    /**< Working Memory */
+    agentos_memory_engine_t* memory;          /**< MemoryRovol 引用 (P2-B03) */
 
     /* 思考步骤DAG */
     agentos_thinking_step_t* steps;           /**< 步骤数组 */
@@ -473,6 +475,31 @@ AGENTOS_API void agentos_tc_chain_set_step_callback(
     void (*on_step_completed)(agentos_thinking_step_t*, void*),
     void (*on_correction)(agentos_thinking_step_t*, const char*, void*),
     void* user_data);
+
+/* ==================== MemoryRovol 集成API (P2-B03) ==================== */
+
+AGENTOS_API void agentos_tc_chain_set_memory(
+    agentos_thinking_chain_t* chain,
+    agentos_memory_engine_t* memory);
+
+AGENTOS_API agentos_error_t agentos_tc_context_window_prepopulate(
+    agentos_thinking_chain_t* chain,
+    const char* query_text,
+    size_t query_len,
+    uint32_t limit);
+
+AGENTOS_API agentos_error_t agentos_tc_working_memory_sync_to_persistent(
+    agentos_thinking_chain_t* chain,
+    float min_importance);
+
+AGENTOS_API agentos_error_t agentos_tc_step_write_to_memory(
+    agentos_thinking_chain_t* chain,
+    agentos_thinking_step_t* step);
+
+AGENTOS_API agentos_error_t agentos_tc_metacognition_inform_memory(
+    agentos_thinking_chain_t* chain,
+    const void* eval,
+    agentos_thinking_step_t* step);
 
 /* ==================== DS-007: 执行监控API ==================== */
 

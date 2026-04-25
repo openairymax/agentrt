@@ -60,7 +60,7 @@ static void test_memory_write_record(void) {
 
     agentos_memory_record_t record;
     memset(&record, 0, sizeof(record));
-    record.memory_record_type = MEMORY_TYPE_RAW;
+    record.memory_record_type = AGENTOS_MEMTYPE_TEXT;
     record.memory_record_importance = 0.85f;
 
     const char* data = "This is a test memory entry about a conversation";
@@ -115,7 +115,7 @@ static void test_memory_query_records(void) {
     query.memory_query_limit = 10;
     query.memory_query_include_raw = 0;
 
-    agentos_memory_result_t* result = NULL;
+    agentos_memory_result_ext_t* result = NULL;
     agentos_error_t err = agentos_memory_query(engine, &query, &result);
 
     if (err == AGENTOS_SUCCESS && result != NULL) {
@@ -153,7 +153,7 @@ static void test_memory_get_by_id(void) {
 
     agentos_memory_record_t record;
     memset(&record, 0, sizeof(record));
-    record.memory_record_type = MEMORY_TYPE_FEATURE;
+    record.memory_record_type = AGENTOS_MEMTYPE_EMBEDDING;
     record.memory_record_importance = 0.9f;
     const char* data = "feature vector data";
     record.memory_record_data = (void*)data;
@@ -195,7 +195,7 @@ static void test_memory_mount(void) {
 
     agentos_memory_record_t record;
     memset(&record, 0, sizeof(record));
-    record.memory_record_type = MEMORY_TYPE_STRUCTURE;
+    record.memory_record_type = AGENTOS_MEMTYPE_STRUCTURED;
     const char* data = "structured memory content";
     record.memory_record_data = (void*)data;
     record.memory_record_data_len = strlen(data);
@@ -307,8 +307,8 @@ static void test_memory_write_all_types(void) {
 
     const char* types[] = {"RAW", "FEATURE", "STRUCTURE", "PATTERN"};
     agentos_memory_type_t type_values[] = {
-        MEMORY_TYPE_RAW, MEMORY_TYPE_FEATURE,
-        MEMORY_TYPE_STRUCTURE, MEMORY_TYPE_PATTERN
+        AGENTOS_MEMTYPE_TEXT, AGENTOS_MEMTYPE_EMBEDDING,
+        AGENTOS_MEMTYPE_STRUCTURED, AGENTOS_MEMTYPE_BINARY
     };
 
     int all_ok = 1;
@@ -354,7 +354,7 @@ static void test_memory_query_with_limits(void) {
     query.memory_query_offset = 0;
     query.memory_query_include_raw = 0;
 
-    agentos_memory_result_t* result = NULL;
+    agentos_memory_result_ext_t* result = NULL;
     agentos_memory_query(engine, &query, &result);
     if (result) {
         assert(result->memory_result_count <= 3);
@@ -370,10 +370,10 @@ static void test_memory_query_with_limits(void) {
 /* ==================== 枚举值验证 ==================== */
 
 static void test_memory_enum_values(void) {
-    assert(MEMORY_TYPE_RAW == 0);
-    assert(MEMORY_TYPE_FEATURE == 1);
-    assert(MEMORY_TYPE_STRUCTURE == 2);
-    assert(MEMORY_TYPE_PATTERN == 3);
+    assert(AGENTOS_MEMTYPE_TEXT == 0);
+    assert(AGENTOS_MEMTYPE_EMBEDDING == 1);
+    assert(AGENTOS_MEMTYPE_STRUCTURED == 2);
+    assert(AGENTOS_MEMTYPE_BINARY == 3);
     TEST_PASS("memory type enum values correct");
 }
 

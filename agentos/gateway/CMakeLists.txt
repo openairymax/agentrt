@@ -125,7 +125,7 @@ target_include_directories(gateway
 )
 
 target_link_libraries(gateway PRIVATE
-    # agentos_protocols  # TODO: protocols模块有编译错误(TeamB修复后启用)
+    agentos_protocols
 )
 
 # 条件链接依赖库

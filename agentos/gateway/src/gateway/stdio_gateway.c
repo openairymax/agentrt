@@ -376,6 +376,8 @@ gateway_t* stdio_gateway_create(void) {
     gw->ops = &stdio_gateway_ops;
     gw->impl = gateway;
     gw->type = GATEWAY_TYPE_STDIO;
+    gw->public_handler = NULL;
+    gw->public_handler_data = NULL;
     
     return gw;
 }
