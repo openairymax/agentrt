@@ -59,6 +59,20 @@ export * from './types';
 // 错误
 export * from './errors';
 
+// Syscall 绑定
+export {
+  SyscallNamespace,
+  SyscallRequest,
+  SyscallResponse,
+  SyscallBinding,
+  HttpSyscallBinding,
+  TaskSyscall,
+  MemorySyscall,
+  SessionSyscall,
+  SkillSyscall,
+  AgentSyscall,
+} from './syscall';
+
 // 工具函数
 export * from './utils';
 

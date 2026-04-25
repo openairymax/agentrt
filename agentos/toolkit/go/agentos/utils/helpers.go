@@ -71,6 +71,53 @@ func GetFloat64(m map[string]interface{}, key string) float64 {
 	return 0
 }
 
+// GetFloat 从 map 中安全提取 float64 值，支持默认值
+func GetFloat(m map[string]interface{}, key string, defaultValue float64) float64 {
+	if v, ok := m[key]; ok {
+		switch n := v.(type) {
+		case float64:
+			return n
+		case int:
+			return float64(n)
+		case int64:
+			return float64(n)
+		case json.Number:
+			if f, err := n.Float64(); err == nil {
+				return f
+			}
+		}
+	}
+	return defaultValue
+}
+
+// GetTime 从 map 中安全提取并解析时间，支持默认值
+func GetTime(m map[string]interface{}, key string, defaultValue time.Time) time.Time {
+	if v, ok := m[key]; ok {
+		switch t := v.(type) {
+		case string:
+			if parsed, err := time.Parse(time.RFC3339, t); err == nil {
+				return parsed
+			}
+		case float64:
+			secs := int64(t)
+			return time.Unix(secs, 0)
+		case int64:
+			return time.Unix(t, 0)
+		}
+	}
+	return defaultValue
+}
+
+// GetBoolWithDefault 从 map 中安全提取 bool 值，支持默认值
+func GetBoolWithDefault(m map[string]interface{}, key string, defaultValue bool) bool {
+	if v, ok := m[key]; ok {
+		if b, ok := v.(bool); ok {
+			return b
+		}
+	}
+	return defaultValue
+}
+
 // GetBool 从 map 中安全提取 bool 值
 func GetBool(m map[string]interface{}, key string) bool {
 	if v, ok := m[key]; ok {

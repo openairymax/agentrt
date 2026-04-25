@@ -211,16 +211,38 @@ void tool_cache_put(tool_cache_t* cache, const char* key, const char* value) {
     }
 }
 
+void cache_clear(tool_cache_t* cache) {
+    if (!cache) return;
+
+    for (int i = 0; i < HASH_SIZE; ++i) {
+        agentos_mutex_lock(&cache->buckets[i].lock);
+        cache_entry_t* e = cache->buckets[i].head;
+        while (e) {
+            cache_entry_t* next = e->hnext;
+            entry_memory_safe_free(e);
+            e = next;
+        }
+        cache->buckets[i].head = NULL;
+        agentos_mutex_unlock(&cache->buckets[i].lock);
+    }
+
+    agentos_mutex_lock(&cache->lru_lock);
+    cache->lru_head = NULL;
+    cache->lru_tail = NULL;
+    cache->size = 0;
+    agentos_mutex_unlock(&cache->lru_lock);
+}
+
 char* tool_cache_key(const char* tool_id, const char* params_json) {
     if (!tool_id || !params_json) return NULL;
-    
+
     size_t tool_id_len = strlen(tool_id);
     size_t params_len = strlen(params_json);
     size_t len = tool_id_len + params_len + 2;
-    
+
     char* key = memory_safe_alloc(len);
     if (!key) return NULL;
-    
+
     snprintf(key, len, "%s|%s", tool_id, params_json);
     return key;
 }

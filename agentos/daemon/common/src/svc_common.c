@@ -336,7 +336,6 @@ agentos_error_t agentos_service_create(
     LOG_INFO("Service '%s' created successfully", name);
     
     return AGENTOS_SUCCESS;
-return AGENTOS_EUNKNOWN;
 }
 
 void agentos_service_destroy(agentos_service_t svc) {
@@ -452,7 +451,6 @@ agentos_error_t agentos_service_start(agentos_service_t svc) {
     LOG_INFO("Service '%s' started successfully", service->name);
     
     return AGENTOS_SUCCESS;
-return AGENTOS_EUNKNOWN;
 }
 
 agentos_error_t agentos_service_stop(agentos_service_t svc, bool force) {
@@ -529,7 +527,6 @@ agentos_error_t agentos_service_pause(agentos_service_t svc) {
     LOG_INFO("Service '%s' paused", service->name);
     
     return AGENTOS_SUCCESS;
-return AGENTOS_EUNKNOWN;
 }
 
 agentos_error_t agentos_service_resume(agentos_service_t svc) {
@@ -556,7 +553,6 @@ agentos_error_t agentos_service_resume(agentos_service_t svc) {
     LOG_INFO("Service '%s' resumed", service->name);
     
     return AGENTOS_SUCCESS;
-return AGENTOS_EUNKNOWN;
 }
 
 /* 服务状态查询 */
@@ -620,7 +616,6 @@ agentos_error_t agentos_service_get_stats(
     agentos_platform_mutex_unlock(&service->stats_mutex);
     
     return AGENTOS_SUCCESS;
-return AGENTOS_EUNKNOWN;
 }
 
 void agentos_service_reset_stats(agentos_service_t svc) {
@@ -680,7 +675,6 @@ agentos_error_t agentos_service_healthcheck(agentos_service_t svc) {
         default:
             return AGENTOS_ESTATE;
     }
-return AGENTOS_EUNKNOWN;
 }
 
 /* 服务能力查询 */
@@ -759,7 +753,6 @@ agentos_error_t agentos_service_register(agentos_service_t svc) {
     
     /* 服务已经通过 agentos_service_create 注册到内部注册表 */
     return AGENTOS_SUCCESS;
-return AGENTOS_EUNKNOWN;
 }
 
 agentos_error_t agentos_service_unregister(agentos_service_t svc) {
@@ -769,7 +762,6 @@ agentos_error_t agentos_service_unregister(agentos_service_t svc) {
     }
     
     return AGENTOS_SUCCESS;
-return AGENTOS_EUNKNOWN;
 }
 
 agentos_service_t agentos_service_find(const char* name) {
@@ -825,7 +817,6 @@ agentos_error_t agentos_service_set_user_data(agentos_service_t service, void* u
     agentos_platform_mutex_unlock(&internal->state_mutex);
 
     return AGENTOS_SUCCESS;
-return AGENTOS_EUNKNOWN;
 }
 
 void* agentos_service_get_user_data(agentos_service_t service) {
@@ -898,7 +889,6 @@ agentos_error_t agentos_registry_init(const char* registry_url) {
 
     LOG_INFO("Service registry client initialized: %s", registry_url);
     return AGENTOS_SUCCESS;
-return AGENTOS_EUNKNOWN;
 }
 
 agentos_error_t agentos_registry_register(
@@ -944,7 +934,6 @@ agentos_error_t agentos_registry_register(
     LOG_INFO("Service '%s' registered in cross-process registry (type=%s, endpoint=%s)",
              metadata->name, metadata->service_type, metadata->endpoint);
     return AGENTOS_SUCCESS;
-return AGENTOS_EUNKNOWN;
 }
 
 agentos_error_t agentos_registry_deregister(agentos_service_t service) {
@@ -1151,7 +1140,6 @@ static agentos_error_t config_mgr_init(void) {
     g_config_mgr.initialized = true;
 
     return AGENTOS_SUCCESS;
-return AGENTOS_EUNKNOWN;
 }
 
 static void compute_simple_checksum(const char* data, size_t len, char* out, size_t out_size) {
@@ -1239,7 +1227,6 @@ agentos_error_t agentos_config_load(
     LOG_INFO("Config loaded for service '%s': %zu bytes from %s",
              service_name, bytes_read, config_path);
     return AGENTOS_SUCCESS;
-return AGENTOS_EUNKNOWN;
 }
 
 agentos_error_t agentos_config_watch(
@@ -1284,7 +1271,6 @@ agentos_error_t agentos_config_watch(
 
     LOG_INFO("Config watcher registered for service '%s'", service_name);
     return AGENTOS_SUCCESS;
-return AGENTOS_EUNKNOWN;
 }
 
 agentos_error_t agentos_config_unwatch(
@@ -1320,7 +1306,6 @@ agentos_error_t agentos_config_unwatch(
 
     agentos_platform_mutex_unlock(&g_config_mgr.mutex);
     return AGENTOS_SUCCESS;
-return AGENTOS_EUNKNOWN;
 }
 
 void agentos_config_free(agentos_config_t* config) {
@@ -1377,7 +1362,6 @@ static agentos_error_t monitor_init(void) {
     g_monitor.initialized = true;
 
     return AGENTOS_SUCCESS;
-return AGENTOS_EUNKNOWN;
 }
 
 static void* monitor_thread_func(void* arg) {
@@ -1722,7 +1706,6 @@ static agentos_error_t memory_client_call(
         (*response_json)[1] = '}';
     }
     return AGENTOS_SUCCESS;
-return AGENTOS_EUNKNOWN;
 }
 
 static agentos_error_t memory_client_stream(
@@ -1744,7 +1727,6 @@ static agentos_error_t memory_client_stream(
     const char* data = "{}";
     callback(data, strlen(data), user_data);
     return AGENTOS_SUCCESS;
-return AGENTOS_EUNKNOWN;
 }
 
 agentos_error_t agentos_service_client_create(
@@ -1803,7 +1785,6 @@ agentos_error_t agentos_service_client_create(
 
     LOG_INFO("Service client created (protocol=%d, base_url=%s)", protocol, internal->base_url);
     return AGENTOS_SUCCESS;
-return AGENTOS_EUNKNOWN;
 }
 
 void agentos_service_client_destroy(agentos_service_client_t* client) {

@@ -18,7 +18,7 @@ Architecture:
 from .client import (
     Client,
     APIClient,
-    manager,
+    ClientConfig,
     RequestOptions,
     APIResponse,
     HealthStatus,
@@ -29,7 +29,7 @@ from .mock import MockClient
 __all__ = [
     "Client",
     "APIClient",
-    "manager",
+    "ClientConfig",
     "RequestOptions",
     "APIResponse",
     "HealthStatus",

@@ -216,7 +216,7 @@ void agentos_log_write(int level, const char* file, int line, const char* fmt, .
     }
     
     /* 转换日志级别 */
-    log_level_t new_level = convert_old_level_to_new(level);
+    log_level_t new_level __attribute__((unused)) = convert_old_level_to_new(level);
     
     /* 准备可变参数 */
     va_list args;
@@ -234,7 +234,7 @@ void agentos_log_write_va(int level, const char* file, int line, const char* fmt
     record_api_call("agentos_log_write_va");
     
     /* 转换日志级别 */
-    log_level_t new_level = convert_old_level_to_new(level);
+    log_level_t new_level __attribute__((unused)) = convert_old_level_to_new(level);
     
     /* 调用新架构的日志写入函数 */
     log_write_va(new_level, file, line, fmt, args);

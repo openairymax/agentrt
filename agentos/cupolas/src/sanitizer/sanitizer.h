@@ -31,7 +31,7 @@ typedef enum sanitize_result {
 } sanitize_result_t;
 
 /* Sanitize Level - canonical definition from commons/types/ */
-#include "sanitize_level.h"
+#include <sanitize_level.h>
 
 /* Sanitize Context */
 typedef struct sanitize_context {

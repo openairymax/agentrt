@@ -18,6 +18,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "../../../commons/utils/error/include/error.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,15 +52,10 @@ extern "C" {
 #define AGENTOS_ERR_NOT_SUPPORTED  (-105)
 #endif
 
-#ifndef AGENTOS_ERR_INVALID_PARAM
-#define AGENTOS_ERR_INVALID_PARAM      (-2)
-#endif
-#ifndef AGENTOS_ERR_OUT_OF_MEMORY
-#define AGENTOS_ERR_OUT_OF_MEMORY     (-3)
-#endif
 #ifndef AGENTOS_ERR_PERMISSION_DENIED
 #define AGENTOS_ERR_PERMISSION_DENIED  (-10)
 #endif
+
 #ifndef AGENTOS_ERR_ALREADY_EXISTS
 #define AGENTOS_ERR_ALREADY_EXISTS     (-11)
 #endif
@@ -80,20 +76,12 @@ extern "C" {
 #define AGENTOS_ERR_OVERFLOW            (-14)
 #endif
 
-#ifndef AGENTOS_ERR_IO
-#define AGENTOS_ERR_IO                  (-15)
-#endif
-
 #ifndef AGENTOS_ERR_PARSE_ERROR
 #define AGENTOS_ERR_PARSE_ERROR          (-16)
 #endif
 
 #ifndef AGENTOS_ERR_UNKNOWN
 #define AGENTOS_ERR_UNKNOWN             (-17)
-#endif
-
-#ifndef AGENTOS_ERROR
-#define AGENTOS_ERROR(code, msg) do { (void)(msg); return (code); } while(0)
 #endif
 
 /**

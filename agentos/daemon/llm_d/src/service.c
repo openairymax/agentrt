@@ -11,6 +11,7 @@
  */
 
 #include "service.h"
+#include "daemon_defaults.h"
 #include "svc_logger.h"
 #include "error.h"
 #include "platform.h"
@@ -177,10 +178,10 @@ llm_service_t* llm_service_create(const char* config_path) {
     /* 加载基础配置 */
     service_config_t base_cfg;
     memset(&base_cfg, 0, sizeof(base_cfg));
-    base_cfg.cache_capacity = 1024;
-    base_cfg.cache_ttl_sec = 3600;
-    base_cfg.max_retries = 3;
-    base_cfg.timeout_ms = 30000;
+    base_cfg.cache_capacity = AGENTOS_DEFAULT_CACHE_CAPACITY;
+    base_cfg.cache_ttl_sec = AGENTOS_DEFAULT_CACHE_TTL_SEC;
+    base_cfg.max_retries = AGENTOS_DEFAULT_MAX_RETRIES;
+    base_cfg.timeout_ms = AGENTOS_DEFAULT_TIMEOUT_MS;
 
     /* 解析定价规则（使用 cJSON） */
     FILE* f = fopen(config_path, "rb");
@@ -522,10 +523,10 @@ int svc_config_load(const char* config_path, service_config_t* cfg) {
     memset(cfg, 0, sizeof(service_config_t));
     
     /* 设置默认值 */
-    cfg->cache_capacity = 1024;
-    cfg->cache_ttl_sec = 3600;
-    cfg->max_retries = 3;
-    cfg->timeout_ms = 30000;
+    cfg->cache_capacity = AGENTOS_DEFAULT_CACHE_CAPACITY;
+    cfg->cache_ttl_sec = AGENTOS_DEFAULT_CACHE_TTL_SEC;
+    cfg->max_retries = AGENTOS_DEFAULT_MAX_RETRIES;
+    cfg->timeout_ms = AGENTOS_DEFAULT_TIMEOUT_MS;
     
     FILE* f = fopen(config_path, "rb");
     if (!f) {

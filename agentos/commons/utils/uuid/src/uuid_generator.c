@@ -97,9 +97,23 @@ agentos_uuid_error_t agentos_uuid_v4(char* out_buf, size_t buf_len) {
     memcpy(uuid, uuid_mac, 16);
 
 #else
-    srand((unsigned int)(time(NULL) ^ (uintptr_t)&uuid));
-    for (int i = 0; i < 16; i++) {
-        uuid[i] = (unsigned char)(rand() & 0xFF);
+    {
+        FILE* urandom = fopen("/dev/urandom", "rb");
+        if (urandom) {
+            size_t nread = fread(uuid, 1, 16, urandom);
+            fclose(urandom);
+            if (nread != 16) {
+                return AGENTOS_UUID_EUNAVAIL;
+            }
+        } else {
+            struct timespec ts;
+            clock_gettime(CLOCK_REALTIME, &ts);
+            unsigned int seed = (unsigned int)(ts.tv_sec ^ ts.tv_nsec ^ (uintptr_t)out_buf);
+            srand(seed);
+            for (int i = 0; i < 16; i++) {
+                uuid[i] = (unsigned char)(rand() & 0xFF);
+            }
+        }
     }
 #endif
 
