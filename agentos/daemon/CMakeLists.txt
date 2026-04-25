@@ -39,6 +39,7 @@ add_subdirectory(tool_d)
 add_subdirectory(monit_d)
 add_subdirectory(sched_d)
 add_subdirectory(market_d)
+add_subdirectory(channel_d)
 
 # 全局测试支持
 if(BUILD_TESTS)

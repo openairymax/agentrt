@@ -28,6 +28,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/wait.h>
 #include <netdb.h>
 #include <unistd.h>
 #endif
@@ -844,10 +845,32 @@ int cupolas_dns_is_domain_allowed(const char* domain) {
 
 int cupolas_dns_verify_dnssec(const char* domain) {
     if (!domain) return 0;
-    
-    (void)domain;
-    
-    return g_net_security.manager.dns.enable_dnssec ? 1 : 0;
+
+    if (!g_net_security.manager.dns.enable_dnssec) return 0;
+
+#ifdef __linux__
+    char cmd[512];
+    snprintf(cmd, sizeof(cmd), "dig +dnssec +short %s DNSKEY 2>/dev/null", domain);
+
+    FILE* fp = popen(cmd, "r");
+    if (!fp) return 0;
+
+    char line[256];
+    int found_dnskey = 0;
+    int found_rrsig = 0;
+    while (fgets(line, sizeof(line), fp)) {
+        if (strstr(line, "DNSKEY")) found_dnskey = 1;
+        if (strstr(line, "RRSIG")) found_rrsig = 1;
+    }
+    int status = pclose(fp);
+
+    if (WIFEXITED(status) && WEXITSTATUS(status) == 0 && (found_dnskey || found_rrsig)) {
+        return 1;
+    }
+    return 0;
+#else
+    return 0;
+#endif
 }
 
 int cupolas_net_get_connections(cupolas_connection_info_t** connections, size_t* count) {

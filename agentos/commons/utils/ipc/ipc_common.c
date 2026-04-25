@@ -32,6 +32,15 @@
 #include <string.h>
 #include <time.h>
 #include <stdbool.h>
+#include <limits.h>
+
+#ifndef OFF_MAX
+#ifdef LLONG_MAX
+#define OFF_MAX ((off_t)(LLONG_MAX >> 1))
+#else
+#define OFF_MAX ((off_t)((1LL << (sizeof(off_t) * 8 - 1)) - 1))
+#endif
+#endif
 
 #ifdef _WIN32
     #define WIN32_LEAN_AND_MEAN
@@ -47,8 +56,20 @@
     #include <unistd.h>
     #include <sys/time.h>
     #include <sys/mman.h>
+    #include <sys/socket.h>
+    #include <sys/un.h>
+    #include <netinet/in.h>
+    #include <arpa/inet.h>
     #include <fcntl.h>
     #include <errno.h>
+#endif
+
+#ifndef OFF_MAX
+#ifdef LLONG_MAX
+#define OFF_MAX ((off_t)(LLONG_MAX >> 1))
+#else
+#define OFF_MAX ((off_t)((1LL << (sizeof(off_t) * 8 - 1)) - 1))
+#endif
 #endif
 
 /* ============================================================================
@@ -424,7 +445,17 @@ agentos_error_t ipc_channel_open(ipc_channel_t* channel) {
             break;
             
         case IPC_TYPE_SOCKET:
-            /* Socket 在服务端/客户端 API 中处理 */
+            channel->socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+            if (channel->socket_fd < 0) {
+                snprintf(channel->error_msg, sizeof(channel->error_msg),
+                         "Socket creation failed: %s", strerror(errno));
+                channel->state = IPC_STATE_ERROR;
+                return AGENTOS_EIO;
+            }
+            if (channel->config.nonblocking) {
+                int flags = fcntl(channel->socket_fd, F_GETFL, 0);
+                fcntl(channel->socket_fd, F_SETFL, flags | O_NONBLOCK);
+            }
             break;
             
         case IPC_TYPE_SHM:
@@ -629,10 +660,22 @@ agentos_error_t ipc_send(ipc_channel_t* channel, const ipc_message_t* message) {
 #ifdef _WIN32
     DWORD bytes_written = 0;
     BOOL success = FALSE;
-    
+
     if (channel->hPipe != INVALID_HANDLE_VALUE) {
-        success = WriteFile(channel->hPipe, send_buffer, (DWORD)total_size, 
-                           &bytes_written, NULL);
+        size_t remaining = total_size;
+        char* ptr = (char*)send_buffer;
+        success = TRUE;
+        while (remaining > 0) {
+            DWORD chunk = (remaining > MAXDWORD) ? MAXDWORD : (DWORD)remaining;
+            DWORD chunk_written = 0;
+            if (!WriteFile(channel->hPipe, ptr, chunk, &chunk_written, NULL)) {
+                success = FALSE;
+                break;
+            }
+            ptr += chunk_written;
+            remaining -= chunk_written;
+        }
+        bytes_written = (DWORD)(total_size - remaining);
     }
 #else
     ssize_t bytes_written = 0;
@@ -716,6 +759,47 @@ agentos_error_t ipc_send_request(
     agentos_error_t err = ipc_send(channel, request);
     if (err != AGENTOS_SUCCESS) {
         return err;
+    }
+
+    if (channel->config.type == IPC_TYPE_SOCKET && channel->socket_fd >= 0) {
+        struct timeval tv;
+        tv.tv_sec = timeout_ms / 1000;
+        tv.tv_usec = (timeout_ms % 1000) * 1000;
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(channel->socket_fd, &readfds);
+        int sel = select(channel->socket_fd + 1, &readfds, NULL, NULL, &tv);
+        if (sel <= 0) {
+            return AGENTOS_ETIMEDOUT;
+        }
+
+        uint32_t net_len = 0;
+        ssize_t n = recv(channel->socket_fd, &net_len, sizeof(net_len), MSG_WAITALL);
+        if (n != (ssize_t)sizeof(net_len)) {
+            return AGENTOS_EIO;
+        }
+        uint32_t payload_len = ntohl(net_len);
+        if (payload_len > 0 && payload_len <= channel->config.buffer_size) {
+            if (!channel->internal_buffer) {
+                channel->internal_buffer = malloc(channel->config.buffer_size);
+            }
+            if (channel->internal_buffer) {
+                n = recv(channel->socket_fd, channel->internal_buffer,
+                         payload_len > channel->config.buffer_size ? channel->config.buffer_size : payload_len,
+                         MSG_WAITALL);
+                if (n > 0) {
+                    memset(response, 0, sizeof(ipc_message_t));
+                    response->header.type = IPC_MSG_RESPONSE;
+                    response->header.correlation_id = request->header.msg_id;
+                    response->header.payload_len = (uint32_t)n;
+                    response->payload = channel->internal_buffer;
+                    response->payload_size = (uint32_t)n;
+                    channel->stats.messages_received++;
+                    return AGENTOS_SUCCESS;
+                }
+            }
+        }
+        return AGENTOS_EIO;
     }
     
     memset(response, 0, sizeof(ipc_message_t));
@@ -1049,6 +1133,48 @@ ipc_channel_t* ipc_server_accept(ipc_server_t* server, uint32_t timeout_ms) {
     if (server->connection_count >= server->max_connections) {
         return NULL;
     }
+
+    if (server->config.type == IPC_TYPE_SOCKET) {
+        ipc_channel_t* listen_channel = server->connections && server->connection_count > 0
+            ? server->connections[0] : NULL;
+        int listen_fd = listen_channel ? listen_channel->socket_fd : -1;
+        if (listen_fd < 0) {
+            return NULL;
+        }
+
+        struct timeval tv;
+        tv.tv_sec = timeout_ms / 1000;
+        tv.tv_usec = (timeout_ms % 1000) * 1000;
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(listen_fd, &readfds);
+        int sel = select(listen_fd + 1, &readfds, NULL, NULL, &tv);
+        if (sel <= 0) {
+            return NULL;
+        }
+
+        struct sockaddr_un addr;
+        socklen_t addr_len = sizeof(addr);
+        int client_fd = accept(listen_fd, (struct sockaddr*)&addr, &addr_len);
+        if (client_fd < 0) {
+            return NULL;
+        }
+
+        ipc_channel_t* client_channel = ipc_channel_create(&server->config);
+        if (!client_channel) {
+            close(client_fd);
+            return NULL;
+        }
+        client_channel->socket_fd = client_fd;
+        client_channel->state = IPC_STATE_OPEN;
+
+        if (server->connection_count < server->max_connections) {
+            server->connections[server->connection_count] = client_channel;
+            server->connection_count++;
+        }
+
+        return client_channel;
+    }
     
     ipc_channel_t* client_channel = ipc_channel_create(&server->config);
     if (!client_channel) {
@@ -1133,6 +1259,66 @@ agentos_error_t ipc_client_connect(ipc_client_t* client, uint32_t timeout_ms) {
     }
     
     client->state = IPC_STATE_OPENING;
+
+    if (client->config.type == IPC_TYPE_SOCKET) {
+        int sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+        if (sock_fd < 0) {
+            client->state = IPC_STATE_ERROR;
+            return AGENTOS_EIO;
+        }
+
+        struct sockaddr_un addr;
+        memset(&addr, 0, sizeof(addr));
+        addr.sun_family = AF_UNIX;
+        const char* path = client->config.name ? client->config.name : "/tmp/agentos_ipc";
+        strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
+
+        if (timeout_ms > 0 && client->config.nonblocking) {
+            int flags = fcntl(sock_fd, F_GETFL, 0);
+            fcntl(sock_fd, F_SETFL, flags | O_NONBLOCK);
+        }
+
+        int ret = connect(sock_fd, (struct sockaddr*)&addr, sizeof(addr));
+        if (ret < 0) {
+            if (errno == EINPROGRESS && client->config.nonblocking) {
+                struct timeval tv;
+                tv.tv_sec = timeout_ms / 1000;
+                tv.tv_usec = (timeout_ms % 1000) * 1000;
+                fd_set writefds;
+                FD_ZERO(&writefds);
+                FD_SET(sock_fd, &writefds);
+                int sel = select(sock_fd + 1, NULL, &writefds, NULL, &tv);
+                if (sel <= 0) {
+                    close(sock_fd);
+                    client->state = IPC_STATE_ERROR;
+                    return AGENTOS_ETIMEDOUT;
+                }
+                int err = 0;
+                socklen_t err_len = sizeof(err);
+                getsockopt(sock_fd, SOL_SOCKET, SO_ERROR, &err, &err_len);
+                if (err != 0) {
+                    close(sock_fd);
+                    client->state = IPC_STATE_ERROR;
+                    return AGENTOS_EIO;
+                }
+            } else {
+                close(sock_fd);
+                client->state = IPC_STATE_ERROR;
+                return AGENTOS_EIO;
+            }
+        }
+
+        client->channel = ipc_channel_create(&client->config);
+        if (!client->channel) {
+            close(sock_fd);
+            client->state = IPC_STATE_ERROR;
+            return AGENTOS_ENOMEM;
+        }
+        client->channel->socket_fd = sock_fd;
+        client->channel->state = IPC_STATE_OPEN;
+        client->state = IPC_STATE_OPEN;
+        return AGENTOS_SUCCESS;
+    }
     
     client->channel = ipc_channel_create(&client->config);
     if (!client->channel) {
@@ -1273,7 +1459,11 @@ void* ipc_shm_map(ipc_shm_t* shm) {
     }
     
     if (shm->config.create) {
-        ftruncate(shm->shm_fd, (off_t)shm->config.size);
+        if (ftruncate(shm->shm_fd, (off_t)shm->config.size) != 0) {
+            snprintf(shm->error_msg, sizeof(shm->error_msg),
+                     "ftruncate failed for size %zu", shm->config.size);
+            return NULL;
+        }
     }
     
     shm->mapped_addr = mmap(
@@ -2156,7 +2346,11 @@ agentos_error_t ipc_rpc_server_process(ipc_rpc_server_t* server, uint32_t timeou
     rsp_hdr.request_id = msg.header.msg_id;
     rsp_hdr.status = (handler_err == AGENTOS_SUCCESS) ? 0 : (uint32_t)handler_err;
     rsp_hdr.method_name_len = (uint32_t)strlen(method_name);
-    rsp_hdr.payload_len = (uint32_t)response_len;
+    if (response_len > UINT32_MAX) {
+        rsp_hdr.payload_len = UINT32_MAX;
+    } else {
+        rsp_hdr.payload_len = (uint32_t)response_len;
+    }
     memcpy(rsp_hdr.method_name, method_name, strlen(method_name));
 
     /* 发送响应 */
@@ -2215,6 +2409,8 @@ agentos_error_t ipc_rpc_call_sync(
 
     size_t name_len = strlen(method_name);
     size_t total_payload = name_len + 1 + request_len;
+
+    if (total_payload > UINT32_MAX) return AGENTOS_EOVERFLOW;
 
     /* 构建请求负载: [method_name\0][request_data] */
     void* request_buf = malloc(total_payload);

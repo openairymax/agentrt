@@ -132,7 +132,7 @@ export abstract class BaseManager<T> {
     );
     const data = extractDataMap(resp);
     if (data && data.success === false) {
-      throw new AgentOSError(ErrorCode.Internal, errorMsg);
+      throw new AgentOSError(errorMsg, ErrorCode.INTERNAL);
     }
   }
 
@@ -235,7 +235,7 @@ export class TaskConverter implements ResourceConverter<any> {
     const taskId = data.task_id as string;
     if (!taskId) {
       throw new AgentOSError(
-        ErrorCode.InvalidResponse,
+        ErrorCode.INVALID_RESPONSE,
         context || '缺少 task_id',
       );
     }
@@ -257,7 +257,7 @@ export class MemoryConverter implements ResourceConverter<any> {
     const memoryId = data.memory_id as string;
     if (!memoryId) {
       throw new AgentOSError(
-        ErrorCode.InvalidResponse,
+        ErrorCode.INVALID_RESPONSE,
         context || '缺少 memory_id',
       );
     }
@@ -280,7 +280,7 @@ export class SessionConverter implements ResourceConverter<any> {
     const sessionId = data.session_id as string;
     if (!sessionId) {
       throw new AgentOSError(
-        ErrorCode.InvalidResponse,
+        ErrorCode.INVALID_RESPONSE,
         context || '缺少 session_id',
       );
     }
@@ -302,7 +302,7 @@ export class SkillConverter implements ResourceConverter<any> {
     const skillName = data.skill_name as string;
     if (!skillName) {
       throw new AgentOSError(
-        ErrorCode.InvalidResponse,
+        ErrorCode.INVALID_RESPONSE,
         context || '缺少 skill_name',
       );
     }

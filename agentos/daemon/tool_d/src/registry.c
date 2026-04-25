@@ -79,7 +79,27 @@ tool_registry_t* tool_registry_create(const tool_config_t* cfg) {
                     if (params) {
                         for (size_t i = 0; i < cnt; ++i) {
                             params[i].name = strdup(def->params[i]);
-                            params[i].schema = strdup("{}");
+                            const char* pname = def->params[i];
+                            size_t pname_len = pname ? strlen(pname) : 0;
+                            char schema[128];
+                            if (pname_len > 0) {
+                                const char* type_hint = "string";
+                                if (strstr(pname, "count") || strstr(pname, "num") ||
+                                    strstr(pname, "size") || strstr(pname, "port") ||
+                                    strstr(pname, "timeout") || strstr(pname, "limit")) {
+                                    type_hint = "integer";
+                                } else if (strstr(pname, "enable") || strstr(pname, "flag") ||
+                                           strstr(pname, "verbose") || strstr(pname, "force")) {
+                                    type_hint = "boolean";
+                                } else if (strstr(pname, "rate") || strstr(pname, "ratio") ||
+                                           strstr(pname, "threshold") || strstr(pname, "score")) {
+                                    type_hint = "number";
+                                }
+                                snprintf(schema, sizeof(schema), "{\"type\":\"%s\"}", type_hint);
+                            } else {
+                                snprintf(schema, sizeof(schema), "{}");
+                            }
+                            params[i].schema = strdup(schema);
                         }
                         meta.params = params;
                         meta.param_count = cnt;

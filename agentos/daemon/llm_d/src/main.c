@@ -15,6 +15,7 @@
 
 #include "llm_service.h"
 #include "platform.h"
+#include "thread_pool.h"
 #include "error.h"
 #include "response.h"
 #include "jsonrpc_helpers.h"
@@ -580,6 +581,23 @@ int main(int argc, char** argv) {
         printf("Listening on %s\n", g_config.socket_path);
     }
     
+    /* 创建线程池 */
+    thread_pool_config_t tp_config;
+    tp_config.min_threads = g_config.max_threads > 0 ? g_config.max_threads : 4;
+    tp_config.max_threads = g_config.max_threads > 0 ? g_config.max_threads : 8;
+    tp_config.queue_size = 256;
+    tp_config.idle_timeout_ms = 30000;
+    thread_pool_t* pool = thread_pool_create(&tp_config);
+    if (!pool) {
+        fprintf(stderr, "Failed to create thread pool\n");
+        agentos_socket_close(server_fd);
+        llm_service_destroy(g_service);
+        free_daemon_config();
+        agentos_mutex_destroy(&g_running_lock);
+        agentos_socket_cleanup();
+        return 1;
+    }
+
     /* 主事件循环 */
     while (g_running) {
         agentos_socket_t client_fd = agentos_socket_accept(server_fd, 5000);
@@ -588,12 +606,12 @@ int main(int argc, char** argv) {
             continue;
         }
         
-        /* 处理客户端请求 */
-        handle_client(client_fd);
+        thread_pool_submit(pool, (thread_task_fn_t)handle_client, (void*)(uintptr_t)client_fd);
     }
     
     /* 清理 */
     printf("LLM service stopping...\n");
+    thread_pool_destroy(pool);
     agentos_socket_close(server_fd);
     llm_service_destroy(g_service);
     if (g_dispatcher) method_dispatcher_destroy(g_dispatcher);

@@ -564,43 +564,98 @@ agentos_error_t agentos_sandbox_health_check(agentos_sandbox_t* sandbox, char** 
 
 /* ==================== 安全增强功能 ==================== */
 
-/**
- * @brief 输入净化函数 - 检查并清理潜在危险的输入
- * @note [SECURITY] 保留供未来集成使用 - 当前版本通过其他机制处理输入验证
- * @param input 输入字符串
- * @param max_length 最大允许长度
- * @return 0=安全，非0=检测到危险内容
- */
 static int sanitize_input(const char* input, size_t max_length) {
-    if (!input) return -1; /* 空输入视为危险 */
-    
-    /* 检查长度限制 */
-    if (strlen(input) > max_length) {
-        return 1; /* 超长输入 */
-    }
-    
-    /* 检查危险字符模式 */
+    if (!input) return -1;
+
+    size_t len = 0;
+    while (len < max_length && input[len] != '\0') len++;
+    if (len >= max_length) return 1;
+
     const char* dangerous_patterns[] = {
-        "..",           /* 路径遍历 */
-        "\0",          /* Null字节注入 */
-        "<script",     /* XSS攻击 */
-        "javascript:", /* JavaScript协议 */
-        "data:",       /* Data URI */
-        ";",           /* 命令分隔符（在某些上下文中） */
-        "|",           /* 管道符号 */
-        "&",           /* 后台执行 */
-        "`",           /* 命令替换 */
-        "$(",          /* 子shell执行 */
+        "..",
+        "<script",
+        "javascript:",
+        "data:",
         NULL
     };
-    
+
     for (int i = 0; dangerous_patterns[i] != NULL; i++) {
         if (strstr(input, dangerous_patterns[i]) != NULL) {
-            return 2 + i; /* 返回不同的错误码表示不同类型的危险 */
+            return 2 + i;
         }
     }
-    
-    return 0; /* 输入安全 */
+
+    return 0;
+}
+
+int agentos_sandbox_capability_check(agentos_sandbox_t* sandbox,
+                                     int capability_id,
+                                     const char* resource) {
+    if (!sandbox) return 0;
+
+    agentos_mutex_lock(sandbox->lock);
+
+    int has_capability = 0;
+    permission_rule_t* rule = sandbox->rules;
+    while (rule) {
+        if (rule->syscall_num == capability_id) {
+            if (rule->perm_type == PERM_ALLOW) {
+                if (!rule->condition || !resource ||
+                    strstr(resource, rule->condition) != NULL) {
+                    has_capability = 1;
+                }
+            }
+            break;
+        }
+        rule = rule->next;
+    }
+
+    if (has_capability && sandbox->policy.strict_mode) {
+        has_capability = 0;
+        rule = sandbox->rules;
+        while (rule) {
+            if (rule->syscall_num == capability_id && rule->perm_type == PERM_ALLOW) {
+                if (!rule->condition || !resource ||
+                    strstr(resource, rule->condition) != NULL) {
+                    has_capability = 1;
+                    break;
+                }
+            }
+            rule = rule->next;
+        }
+    }
+
+    agentos_mutex_unlock(sandbox->lock);
+    return has_capability;
+}
+
+agentos_error_t agentos_sandbox_validate_syscall(int syscall_num,
+                                                  void** args,
+                                                  int argc) {
+    if (syscall_num < 0) return AGENTOS_EINVAL;
+
+    for (int i = 0; i < argc; i++) {
+        if (!args[i]) continue;
+
+        char* str_arg = (char*)args[i];
+        size_t arg_len = 0;
+        int safe = 1;
+        while (arg_len < MAX_INPUT_LENGTH && str_arg[arg_len] != '\0') {
+            arg_len++;
+        }
+        if (arg_len >= MAX_INPUT_LENGTH) {
+            safe = 0;
+        } else {
+            int result = sanitize_input(str_arg, MAX_INPUT_LENGTH);
+            if (result != 0) safe = 0;
+        }
+
+        if (!safe) {
+            return AGENTOS_EINVAL;
+        }
+    }
+
+    return AGENTOS_SUCCESS;
 }
 
 /**
