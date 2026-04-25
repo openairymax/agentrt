@@ -36,6 +36,13 @@ typedef struct {
     float acceptance_threshold;
 } reflective_context_t;
 
+static agentos_error_t llm_build_dynamic_plan(
+    reflective_context_t*, const agentos_intent_t*,
+    agentos_task_plan_t**, int, int);
+static agentos_task_plan_t* build_fallback_plan(
+    const agentos_intent_t*, reflective_context_t*,
+    int, int, uint64_t);
+
 /* ============================================================================
  * 真实S2内容生成器 - 调用LLM服务
  * ============================================================================ */
@@ -369,54 +376,303 @@ static agentos_error_t reflective_plan(
     agentos_mc_detect_patterns(ctx->meta, NULL, NULL);
     agentos_mc_adapt_threshold(ctx->meta);
 
-    /* ========== Build Output Plan ========== */
+    /* ========== Build Output Plan (LLM Dynamic Planning) ========== */
+    agentos_task_plan_t* plan = NULL;
+    agentos_error_t plan_err = llm_build_dynamic_plan(ctx, intent, &plan,
+                                                       audit_passed, aligned);
+    if (plan_err != AGENTOS_SUCCESS || !plan) {
+        plan = build_fallback_plan(intent, ctx, audit_passed, aligned, ctx->session_count);
+    }
+
+    if (!plan) return AGENTOS_ENOMEM;
+    return AGENTOS_SUCCESS;
+}
+
+/* ============================================================================
+ * P2-B04: LLM 动态规划 - 调用LLM生成结构化任务计划
+ * ============================================================================ */
+
+typedef struct {
+    char name[64];
+    char role[64];
+    int timeout_ms;
+    int priority;
+    int depends_on_count;
+    char depends_on[4][64];
+} llm_plan_node_t;
+
+static agentos_error_t parse_llm_plan_json(
+    const char* json_text,
+    llm_plan_node_t* nodes,
+    size_t* node_count,
+    size_t max_nodes) {
+
+    *node_count = 0;
+    if (!json_text || !nodes) return AGENTOS_EINVAL;
+
+    const char* p = json_text;
+
+    while (*p && *node_count < max_nodes) {
+        const char* name_start = strstr(p, "\"name\"");
+        if (!name_start) break;
+        const char* name_val = strchr(name_start + 6, ':');
+        if (!name_val) break;
+        while (*name_val && (*name_val == ' ' || *name_val == '\t' || *name_val == '"')) name_val++;
+        const char* name_end = name_val;
+        while (*name_end && *name_end != '"' && *name_end != ',' && *name_end != '}') name_end++;
+
+        const char* role_start = strstr(name_end, "\"role\"");
+        const char* role_val = role_start ? strchr(role_start + 5, ':') : NULL;
+        if (role_val) {
+            while (*role_val && (*role_val == ' ' || *role_val == '\t' || *role_val == '"')) role_val++;
+        }
+
+        llm_plan_node_t* node = &nodes[*node_count];
+        memset(node, 0, sizeof(*node));
+        size_t nlen = (size_t)(name_end - name_val);
+        if (nlen >= sizeof(node->name)) nlen = sizeof(node->name) - 1;
+        memcpy(node->name, name_val, nlen);
+
+        if (role_val) {
+            const char* role_end = role_val;
+            while (*role_end && *role_end != '"' && *role_end != ',' && *role_end != '}') role_end++;
+            size_t rlen = (size_t)(role_end - role_val);
+            if (rlen >= sizeof(node->role)) rlen = sizeof(node->role) - 1;
+            memcpy(node->role, role_val, rlen);
+        } else {
+            snprintf(node->role, sizeof(node->role), "worker");
+        }
+        node->timeout_ms = 30000;
+        node->priority = 200 - (int)(*node_count) * 20;
+
+        const char* deps_start = strstr(name_end, "\"depends\"");
+        if (deps_start) {
+            const char* dep_arr = strchr(deps_start + 8, '[');
+            if (dep_arr) {
+                const char* dep = dep_arr + 1;
+                while (*dep && *dep != ']' && node->depends_on_count < 4) {
+                    while (*dep && (*dep == ' ' || *dep == '"' || *dep == '\t')) dep++;
+                    const char* de = dep;
+                    while (*de && *de != '"' && *de != ',' && *de != ']') de++;
+                    size_t dlen = (size_t)(de - dep);
+                    if (dlen > 0 && dlen < sizeof(node->depends_on[0])) {
+                        memcpy(node->depends_on[node->depends_on_count], dep, dlen);
+                        node->depends_on_count++;
+                    }
+                    dep = de;
+                    if (*dep == ',') dep++;
+                }
+            }
+        }
+
+        (*node_count)++;
+        p = name_end;
+    }
+
+    return (*node_count > 0) ? AGENTOS_SUCCESS : AGENTOS_EINVAL;
+}
+
+static agentos_error_t llm_build_dynamic_plan(
+    reflective_context_t* ctx,
+    const agentos_intent_t* intent,
+    agentos_task_plan_t** out_plan,
+    int audit_passed,
+    int aligned) {
+
+    if (!ctx || !intent || !out_plan) return AGENTOS_EINVAL;
+
+    if (!ctx->llm || !agentos_llm_service_is_available(ctx->llm)) {
+        return AGENTOS_ENOTSUP;
+    }
+
+    char prompt[2048];
+    int plen = snprintf(prompt, sizeof(prompt),
+        "You are a task planning AI. Analyze this goal and create a structured execution plan.\n\n"
+        "Goal: %s\n"
+        "Flags: %u\n"
+        "Audit Status: %s\n"
+        "Alignment Status: %s\n\n"
+        "Return ONLY valid JSON array of subtasks:\n"
+        "[{\"name\":\"task_name\",\"role\":\"agent_role\","
+        "\"depends\":[\"prev_task_id\"]}, ...]\n\n"
+        "Rules:\n"
+        "- Each task must have a unique name and role\n"
+        "- Dependencies reference previous task names\n"
+        "- Include: analysis, planning, execution, verification steps\n"
+        "- If audit failed, add a correction step\n"
+        "- If alignment failed, add a realignment step",
+        intent->intent_goal ? (const char*)intent->intent_goal : "(none)",
+        intent->intent_flags,
+        audit_passed ? "passed" : "FAILED",
+        aligned ? "aligned" : "DRIFTED");
+
+    if (plen <= 0 || (size_t)plen >= sizeof(prompt)) return AGENTOS_EUNKNOWN;
+
+    char* response = NULL;
+    agentos_error_t err = agentos_llm_service_call(ctx->llm, prompt, &response);
+    if (err != AGENTOS_SUCCESS || !response) {
+        if (response) AGENTOS_FREE(response);
+        return err ? err : AGENTOS_EUNKNOWN;
+    }
+
+    llm_plan_node_t parsed_nodes[16];
+    size_t parsed_count = 0;
+    err = parse_llm_plan_json(response, parsed_nodes, &parsed_count, 16);
+    AGENTOS_FREE(response);
+
+    if (err != AGENTOS_SUCCESS || parsed_count == 0) {
+        return err;
+    }
+
     agentos_task_plan_t* plan = (agentos_task_plan_t*)AGENTOS_CALLOC(1, sizeof(agentos_task_plan_t));
     if (!plan) return AGENTOS_ENOMEM;
 
     char plan_id[128];
-    snprintf(plan_id, sizeof(plan_id), "reflective_%s_%zu",
-             intent->intent_goal ? (const char*)intent->intent_goal : "unk", ctx->session_count);
+    snprintf(plan_id, sizeof(plan_id), "llm_dynamic_%zu", ctx->session_count);
     plan->task_plan_id = AGENTOS_STRDUP(plan_id);
 
-    size_t node_count = 5;
-    if (!audit_passed) node_count++;
-    if (!aligned) node_count++;
+    size_t total = parsed_count;
+    if (!audit_passed) total++;
+    if (!aligned) total++;
 
-    plan->task_plan_nodes = (agentos_task_node_t**)AGENTOS_CALLOC(node_count, sizeof(agentos_task_node_t*));
-    if (!plan->task_plan_nodes && node_count > 0) {
+    plan->task_plan_nodes = (agentos_task_node_t**)AGENTOS_CALLOC(total, sizeof(agentos_task_node_t*));
+    if (!plan->task_plan_nodes && total > 0) {
         AGENTOS_FREE(plan->task_plan_id); AGENTOS_FREE(plan); return AGENTOS_ENOMEM;
     }
 
-    const char* node_names[] = {"decompose", "plan", "execute", "audit", "align"};
-    const char* roles[] = {"analyzer", "planner", "executor", "auditor", "validator"};
-    int timeouts[] = {20000, 30000, 45000, 15000, 10000};
-    int priorities[] = {200, 180, 160, 240, 255};
-    size_t ni = 0;
-
-    for (int s = 0; s < 5 && ni < node_count; s++) {
+    for (size_t i = 0; i < parsed_count; i++) {
         agentos_task_node_t* node = (agentos_task_node_t*)AGENTOS_CALLOC(1, sizeof(agentos_task_node_t));
-        if (!node) goto cleanup_nodes;
+        if (!node) continue;
 
-        char nid[128];
-        snprintf(nid, sizeof(nid), "%s_%s", plan_id, node_names[s]);
+        char nid[256];
+        snprintf(nid, sizeof(nid), "%s_%s", plan_id,
+                 parsed_nodes[i].name[0] ? parsed_nodes[i].name : "task");
+
         node->task_node_id = AGENTOS_STRDUP(nid);
-        node->task_node_agent_role = AGENTOS_STRDUP(roles[s]);
-        node->task_node_timeout_ms = timeouts[s];
-        node->task_node_priority = priorities[s];
+        node->task_node_agent_role = AGENTOS_STRDUP(
+            parsed_nodes[i].role[0] ? parsed_nodes[i].role : "worker");
+        node->task_node_timeout_ms =
+            parsed_nodes[i].timeout_ms > 0 ? parsed_nodes[i].timeout_ms : 30000;
+        node->task_node_priority =
+            parsed_nodes[i].priority > 0 ? parsed_nodes[i].priority : (int)(200 - i * 15);
+
+        if (parsed_nodes[i].depends_on_count > 0) {
+            node->task_node_depends_on = (char**)AGENTOS_MALLOC(
+                parsed_nodes[i].depends_on_count * sizeof(char*));
+            if (node->task_node_depends_on) {
+                node->task_node_depends_count = (uint32_t)parsed_nodes[i].depends_on_count;
+                for (int d = 0; d < parsed_nodes[i].depends_on_count; d++) {
+                    char dep_id[256];
+                    snprintf(dep_id, sizeof(dep_id), "%s_%s", plan_id,
+                             parsed_nodes[i].depends_on[d]);
+                    node->task_node_depends_on[d] = AGENTOS_STRDUP(dep_id);
+                }
+            }
+        }
+
+        plan->task_plan_nodes[plan->task_plan_node_count++] = node;
+    }
+
+    if (!audit_passed) {
+        agentos_task_node_t* cn = (agentos_task_node_t*)AGENTOS_CALLOC(1, sizeof(agentos_task_node_t));
+        if (cn) {
+            char cid[256]; snprintf(cid, sizeof(cid), "%s_correction", plan_id);
+            cn->task_node_id = AGENTOS_STRDUP(cid);
+            cn->task_node_agent_role = AGENTOS_STRDUP("corrector");
+            cn->task_node_timeout_ms = 20000;
+            cn->task_node_priority = 250;
+            if (plan->task_plan_node_count > 2) {
+                cn->task_node_depends_on = (char**)AGENTOS_MALLOC(sizeof(char*));
+                if (cn->task_node_depends_on) {
+                    cn->task_node_depends_count = 1;
+                    cn->task_node_depends_on[0] = AGENTOS_STRDUP(
+                        plan->task_plan_nodes[plan->task_plan_node_count - 1]->task_node_id);
+                }
+            }
+            plan->task_plan_nodes[plan->task_plan_node_count++] = cn;
+        }
+    }
+
+    if (!aligned) {
+        agentos_task_node_t* rn = (agentos_task_node_t*)AGENTOS_CALLOC(1, sizeof(agentos_task_node_t));
+        if (rn) {
+            char rid[256]; snprintf(rid, sizeof(rid), "%s_realignment", plan_id);
+            rn->task_node_id = AGENTOS_STRDUP(rid);
+            rn->task_node_agent_role = AGENTOS_STRDUP("realigner");
+            rn->task_node_timeout_ms = 15000;
+            rn->task_node_priority = 254;
+            if (plan->task_plan_node_count > 2) {
+                rn->task_node_depends_on = (char**)AGENTOS_MALLOC(sizeof(char*));
+                if (rn->task_node_depends_on) {
+                    rn->task_node_depends_count = 1;
+                    rn->task_node_depends_on[0] = AGENTOS_STRDUP(
+                        plan->task_plan_nodes[plan->task_plan_node_count - 1]->task_node_id);
+                }
+            }
+            plan->task_plan_nodes[plan->task_plan_node_count++] = rn;
+        }
+    }
+
+    plan->task_plan_entry_points = (char**)AGENTOS_MALLOC(sizeof(char*));
+    if (plan->task_plan_entry_points && plan->task_plan_node_count > 0) {
+        plan->task_plan_entry_count = 1;
+        plan->task_plan_entry_points[0] = AGENTOS_STRDUP(
+            plan->task_plan_nodes[0]->task_node_id);
+    }
+
+    agentos_tc_chain_stop(ctx->chain);
+    *out_plan = plan;
+    return AGENTOS_SUCCESS;
+}
+
+static agentos_task_plan_t* build_fallback_plan(
+    const agentos_intent_t* intent,
+    reflective_context_t* ctx,
+    int audit_passed,
+    int aligned,
+    uint64_t session_count) {
+
+    agentos_task_plan_t* plan = (agentos_task_plan_t*)AGENTOS_CALLOC(1, sizeof(agentos_task_plan_t));
+    if (!plan) return NULL;
+
+    char plan_id[128];
+    snprintf(plan_id, sizeof(plan_id), "fallback_%zu", session_count);
+    plan->task_plan_id = AGENTOS_STRDUP(plan_id);
+
+    size_t nc = 5 + (audit_passed ? 0 : 1) + (aligned ? 0 : 1);
+    plan->task_plan_nodes = (agentos_task_node_t**)AGENTOS_CALLOC(nc, sizeof(agentos_task_node_t*));
+    if (!plan->task_plan_nodes) { AGENTOS_FREE(plan->task_plan_id); AGENTOS_FREE(plan); return NULL; }
+
+    static const struct { const char* name; const char* role; int to; int pri; } defaults[] = {
+        {"decompose",   "analyzer",  20000, 200},
+        {"plan",        "planner",   30000, 180},
+        {"execute",     "executor",  45000, 160},
+        {"audit",       "auditor",   15000, 240},
+        {"align",       "validator", 10000, 255}
+    };
+
+    for (int s = 0; s < 5; s++) {
+        agentos_task_node_t* node = (agentos_task_node_t*)AGENTOS_CALLOC(1, sizeof(agentos_task_node_t));
+        if (!node) break;
+
+        char nid[128]; snprintf(nid, sizeof(nid), "%s_%s", plan_id, defaults[s].name);
+        node->task_node_id = AGENTOS_STRDUP(nid);
+        node->task_node_agent_role = AGENTOS_STRDUP(defaults[s].role);
+        node->task_node_timeout_ms = defaults[s].to;
+        node->task_node_priority = defaults[s].pri;
 
         if (s > 0) {
             node->task_node_depends_on = (char**)AGENTOS_MALLOC(sizeof(char*));
             if (node->task_node_depends_on) {
                 node->task_node_depends_count = 1;
-                node->task_node_depends_on[0] = AGENTOS_STRDUP(plan->task_plan_nodes[s - 1]->task_node_id);
+                node->task_node_depends_on[0] = AGENTOS_STRDUP(
+                    plan->task_plan_nodes[s - 1]->task_node_id);
             }
         }
-
-        plan->task_plan_nodes[ni++] = node;
-        plan->task_plan_node_count++;
+        plan->task_plan_nodes[plan->task_plan_node_count++] = node;
     }
 
-    if (!audit_passed && ni < node_count) {
+    if (!audit_passed) {
         agentos_task_node_t* cn = (agentos_task_node_t*)AGENTOS_CALLOC(1, sizeof(agentos_task_node_t));
         if (cn) {
             char cid[128]; snprintf(cid, sizeof(cid), "%s_reaudit", plan_id);
@@ -425,16 +681,16 @@ static agentos_error_t reflective_plan(
             cn->task_node_timeout_ms = 20000;
             cn->task_node_priority = 250;
             cn->task_node_depends_on = (char**)AGENTOS_MALLOC(sizeof(char*));
-            if (cn->task_node_depends_on) {
+            if (cn->task_node_depends_on && plan->task_plan_node_count > 0) {
                 cn->task_node_depends_count = 1;
-                cn->task_node_depends_on[0] = AGENTOS_STRDUP(plan->task_plan_nodes[3]->task_node_id);
+                cn->task_node_depends_on[0] = AGENTOS_STRDUP(
+                    plan->task_plan_nodes[plan->task_plan_node_count - 1]->task_node_id);
             }
-            plan->task_plan_nodes[ni++] = cn;
-            plan->task_plan_node_count++;
+            plan->task_plan_nodes[plan->task_plan_node_count++] = cn;
         }
     }
 
-    if (!aligned && ni < node_count) {
+    if (!aligned) {
         agentos_task_node_t* rn = (agentos_task_node_t*)AGENTOS_CALLOC(1, sizeof(agentos_task_node_t));
         if (rn) {
             char rid[128]; snprintf(rid, sizeof(rid), "%s_realign", plan_id);
@@ -443,12 +699,12 @@ static agentos_error_t reflective_plan(
             rn->task_node_timeout_ms = 15000;
             rn->task_node_priority = 254;
             rn->task_node_depends_on = (char**)AGENTOS_MALLOC(sizeof(char*));
-            if (rn->task_node_depends_on) {
+            if (rn->task_node_depends_on && plan->task_plan_node_count > 0) {
                 rn->task_node_depends_count = 1;
-                rn->task_node_depends_on[0] = AGENTOS_STRDUP(plan->task_plan_nodes[4]->task_node_id);
+                rn->task_node_depends_on[0] = AGENTOS_STRDUP(
+                    plan->task_plan_nodes[plan->task_plan_node_count - 1]->task_node_id);
             }
-            plan->task_plan_nodes[ni++] = rn;
-            plan->task_plan_node_count++;
+            plan->task_plan_nodes[plan->task_plan_node_count++] = rn;
         }
     }
 
@@ -458,27 +714,8 @@ static agentos_error_t reflective_plan(
         plan->task_plan_entry_points[0] = AGENTOS_STRDUP(plan->task_plan_nodes[0]->task_node_id);
     }
 
-    agentos_tc_chain_stop(ctx->chain);
-    *out_plan = plan;
-    return AGENTOS_SUCCESS;
-
-cleanup_nodes:
-    for (size_t n = 0; n < plan->task_plan_node_count; n++) {
-        if (plan->task_plan_nodes[n]) {
-            AGENTOS_FREE(plan->task_plan_nodes[n]->task_node_id);
-            AGENTOS_FREE(plan->task_plan_nodes[n]->task_node_agent_role);
-            if (plan->task_plan_nodes[n]->task_node_depends_on) {
-                for (size_t d = 0; d < plan->task_plan_nodes[n]->task_node_depends_count; d++)
-                    AGENTOS_FREE(plan->task_plan_nodes[n]->task_node_depends_on[d]);
-                AGENTOS_FREE(plan->task_plan_nodes[n]->task_node_depends_on);
-            }
-            AGENTOS_FREE(plan->task_plan_nodes[n]);
-        }
-    }
-    AGENTOS_FREE(plan->task_plan_nodes);
-    AGENTOS_FREE(plan->task_plan_id);
-    AGENTOS_FREE(plan);
-    return AGENTOS_ENOMEM;
+    if (ctx && ctx->chain) agentos_tc_chain_stop(ctx->chain);
+    return plan;
 }
 
 const agentos_plan_strategy_t g_reflective_strategy = {

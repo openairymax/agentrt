@@ -124,8 +124,10 @@ set(SVC_COMMON_SOURCES
 add_library(svc_common STATIC ${SVC_COMMON_SOURCES})
 
 # 链接 commons 库
+find_package(OpenSSL QUIET)
 target_link_libraries(svc_common PUBLIC
     agentos_common
+    ${OPENSSL_CRYPTO_LIBRARY}
 )
 
 # 平台特定配置
