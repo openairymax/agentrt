@@ -72,6 +72,9 @@ static float* generate_text_embedding(const char* text, uint32_t dim) {
     float* vector = (float*)AGENTOS_CALLOC(dim, sizeof(float));
     if (!vector) return NULL;
     size_t len = strlen(text);
+    if (len == 0) {
+        return vector;  // Return zero-initialized vector for empty input
+    }
     for (uint32_t i = 0; i < dim; i++) {
         vector[i] = (float)((unsigned char)text[i % len]) / 255.0f;
     }

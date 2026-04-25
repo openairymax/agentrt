@@ -63,7 +63,7 @@ func TestClient_TimeoutBoundary(t *testing.T) {
 			}))
 			defer ts.Close()
 
-			cfg := &agentos.manager{
+			cfg := &agentos.Config{
 				Endpoint:  ts.URL,
 				Timeout:   tt.timeout,
 				MaxConnections: 10,
@@ -137,7 +137,7 @@ func TestClient_MaxConnectionsBoundary(t *testing.T) {
 			}))
 			defer ts.Close()
 
-			cfg := &agentos.manager{
+			cfg := &agentos.Config{
 				Endpoint:  ts.URL,
 				Timeout:   30 * time.Second,
 				MaxConnections: tt.maxConn,
@@ -162,7 +162,7 @@ func TestClient_MaxConnectionsBoundary(t *testing.T) {
 }
 
 func TestClient_EmptyEndpoint(t *testing.T) {
-	cfg := &agentos.manager{
+	cfg := &agentos.Config{
 		Endpoint:  "",
 		Timeout:   30 * time.Second,
 		MaxConnections: 10,
@@ -212,7 +212,7 @@ func TestClient_InvalidEndpoint(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := &agentos.manager{
+			cfg := &agentos.Config{
 				Endpoint:  tt.endpoint,
 				Timeout:   30 * time.Second,
 				MaxConnections: 10,

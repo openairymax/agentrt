@@ -12,6 +12,7 @@
  */
 
 #include "svc_auth.h"
+#include "daemon_defaults.h"
 #include "svc_logger.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,11 +28,10 @@
 #define MAX_APIKEY_SIZE       128
 #define MAX_CLIENTS           1024
 
-/* 默认配置值 */
-#define DEFAULT_TOKEN_TTL     3600       /* 1 小时 */
-#define DEFAULT_REFRESH_THRESHOLD 300    /* 5 分钟 */
-#define DEFAULT_RPS           100        /* 每秒请求数 */
-#define DEFAULT_BURST_SIZE    20         /* 突发大小 */
+#define DEFAULT_TOKEN_TTL     AGENTOS_DEFAULT_TOKEN_TTL_SEC
+#define DEFAULT_REFRESH_THRESHOLD AGENTOS_DEFAULT_REFRESH_THRESHOLD
+#define DEFAULT_RPS           AGENTOS_DEFAULT_RPS_LIMIT
+#define DEFAULT_BURST_SIZE    AGENTOS_DEFAULT_BURST_SIZE
 #define TOKEN_PREFIX          "agentos."
 #define BEARER_PREFIX         "Bearer "
 #define APIKEY_PREFIX         "ApiKey "
@@ -137,10 +137,9 @@ static hmac_fn_t g_hmac_impl = NULL;
 
 /*
  * ═══════════════════════════════════════════════════════════════
- * 模式 1: OpenSSL HMAC-SHA256 (生产环境推荐)
+ * 模式 1: OpenSSL HMAC-SHA256 (生产环境推荐，默认使用)
  * ═══════════════════════════════════════════════════════════════
  */
-#if defined(AUTH_USE_OPENSSL)
 #include <openssl/hmac.h>
 #include <openssl/evp.h>
 
@@ -155,7 +154,7 @@ static void hmac_openssl(const char* key, const char* message,
 }
 #define HMAC_IMPL_NAME "OpenSSL"
 
-/*
+#if defined(AUTH_USE_OPENSSL)
  * ═══════════════════════════════════════════════════════════════
  * 模式 2: mbedTLS HMAC-SHA256 (嵌入式环境)
  * ═══════════════════════════════════════════════════════════════
@@ -269,13 +268,28 @@ static void hmac_builtin(const char* key, const char* message,
     if (key_len > 64) {
         uint32_t kh[8] = {0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
                          0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
-        unsigned char* km = calloc(64, 1); memcpy(km, key, key_len);
+        size_t padded_len = 64 * 2;
+        if (key_len + 1 + 8 > padded_len) padded_len = ((key_len + 1 + 8 + 63) / 64) * 64;
+        unsigned char* km = calloc(padded_len, 1);
+        if (!km) { free(msg); return; }
+        memcpy(km, key, key_len);
         km[key_len] = 0x80;
-        for (int i = 0; i < 16; i++) {
-            uint32_t wi = ((uint32_t)km[i*4]<<24)|((uint32_t)km[i*4+1]<<16)|((uint32_t)km[i*4+2]<<8)|(uint32_t)km[i*4+3];
+        size_t bit_len = key_len * 8;
+        km[padded_len - 1] = (uint8_t)(bit_len & 0xFF);
+        km[padded_len - 2] = (uint8_t)((bit_len >> 8) & 0xFF);
+        for (size_t chunk = 0; chunk < padded_len / 64; chunk++) {
+            uint32_t w[64]; memset(w, 0, sizeof(w));
+            for (int i = 0; i < 16; i++) {
+                int off = (int)(chunk * 64 + (size_t)i * 4);
+                if (off + 3 < (int)padded_len)
+                    w[i] = ((uint32_t)km[off]<<24)|((uint32_t)km[off+1]<<16)|((uint32_t)km[off+2]<<8)|(uint32_t)km[off+3];
+            }
+            for (int i = 16; i < 64; i++) w[i] = SIG1(w[i-2]) + w[i-7] + SIG0(w[i-15]) + w[i-16];
             uint32_t wa=kh[0],wb=kh[1],wc=kh[2],wd=kh[3],we=kh[4],wf=kh[5],wg=kh[6],whh=kh[7];
-            uint32_t t1=whh+EP1(we)+CH(we,wf,wg)+K[i]+wi,t2=EP0(wa)+MAJ(wa,wb,wc);
-            whh=wg; wg=wf; wf=we; we=wd+t1; wd=wc; wc=wb; wb=wa; wa=t1+t2;
+            for (int i = 0; i < 64; i++) {
+                uint32_t t1=whh+EP1(we)+CH(we,wf,wg)+K[i]+w[i],t2=EP0(wa)+MAJ(wa,wb,wc);
+                whh=wg; wg=wf; wf=we; we=wd+t1; wd=wc; wc=wb; wb=wa; wa=t1+t2;
+            }
             kh[0]+=wa; kh[1]+=wb; kh[2]+=wc; kh[3]+=wd;
             kh[4]+=we; kh[5]+=wf; kh[6]+=wg; kh[7]+=whh;
         }
@@ -293,23 +307,28 @@ static void hmac_builtin(const char* key, const char* message,
         }
     }
 
-    /* Inner hash */
-    size_t inner_len = 64 + msg_len + 1 + 8;
-    unsigned char* inner = calloc(inner_len, 1);
+    /* Inner hash - 正确处理多块 */
+    size_t ilen = 64 + msg_len;
+    size_t inner_padded = ((ilen + 8) / 64 + 1) * 64;
+    unsigned char* inner = calloc(inner_padded + 64, 1);
+    if (!inner) { free(msg); return; }
     memcpy(inner, k_ipad, 64);
     memcpy(inner + 64, message, msg_len);
-    inner[64 + msg_len] = 0x80;
+    inner[ilen] = 0x80;
+
+    {
+        uint64_t ibits = (uint64_t)(ilen * 8);
+        for (int i = 63; i >= 0; i--) { inner[inner_padded + i] = (ibits >> ((7-i)*8)) & 0xFF; }
+    }
 
     uint32_t ih[8] = {0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
                       0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
-    size_t ilen = 64 + msg_len + 8;
-    inner[ilen-1] = (uint8_t)((ilen * 8) & 0xFF);
 
-    for (size_t chunk = 0; chunk < 1; chunk++) {
+    for (size_t chunk = 0; chunk < inner_padded / 64; chunk++) {
         uint32_t w[64]; memset(w, 0, sizeof(w));
-        for (int i = 0; i < 16 && (chunk*64+i*4+3) < (int)ilen; i++) {
-            int off = chunk*64+i*4;
-            if (off+3 < (int)ilen)
+        for (int i = 0; i < 16 && (chunk*64+i*4+3) < (int)inner_padded; i++) {
+            int off = (int)(chunk*64+i*4);
+            if (off+3 < (int)inner_padded)
                 w[i] = ((uint32_t)inner[off]<<24)|((uint32_t)inner[off+1]<<16)|((uint32_t)inner[off+2]<<8)|(uint32_t)inner[off+3];
         }
         for (int i = 16; i < 64; i++) w[i] = SIG1(w[i-2]) + w[i-7] + SIG0(w[i-15]) + w[i-16];
@@ -322,8 +341,10 @@ static void hmac_builtin(const char* key, const char* message,
     }
     free(inner);
 
-    /* Outer hash */
-    unsigned char outer[128];
+    /* Outer hash - 正确处理多块 */
+    size_t olen = 64 + 32;
+    size_t outer_padded = ((olen + 8) / 64 + 1) * 64;
+    unsigned char* outer = calloc(outer_padded + 64, 1);
     memcpy(outer, k_opad, 64);
     for (int i = 0; i < 8; i++) {
         outer[64+i*4]=(ih[i]>>24)&0xFF; outer[64+i*4+1]=(ih[i]>>16)&0xFF;
@@ -333,10 +354,18 @@ static void hmac_builtin(const char* key, const char* message,
     uint32_t oh[8] = {0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
                       0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
 
-    for (size_t chunk = 0; chunk < 1; chunk++) {
+    {
+        uint64_t obits = (uint64_t)(olen * 8);
+        for (int i = 63; i >= 0; i--) { outer[outer_padded + i] = (obits >> ((7-i)*8)) & 0xFF; }
+    }
+
+    for (size_t chunk = 0; chunk < outer_padded / 64; chunk++) {
         uint32_t w[64]; memset(w, 0, sizeof(w));
-        for (int i = 0; i < 16; i++)
-            w[i] = ((uint32_t)outer[chunk*64+i*4]<<24)|((uint32_t)outer[chunk*64+i*4+1]<<16)|((uint32_t)outer[chunk*64+i*4+2]<<8)|(uint32_t)outer[chunk*64+i*4+3];
+        for (int i = 0; i < 16 && (chunk*64+i*4+3) < (int)outer_padded; i++) {
+            int off = (int)(chunk*64+i*4);
+            if (off+3 < (int)outer_padded)
+                w[i] = ((uint32_t)outer[off]<<24)|((uint32_t)outer[off+1]<<16)|((uint32_t)outer[off+2]<<8)|(uint32_t)outer[off+3];
+        }
         for (int i = 16; i < 64; i++) w[i] = SIG1(w[i-2]) + w[i-7] + SIG0(w[i-15]) + w[i-16];
         uint32_t a=oh[0],b=oh[1],c=oh[2],d=oh[3],e=oh[4],f=oh[5],g=oh[6],hh=oh[7];
         for (int i = 0; i < 64; i++) {
@@ -363,12 +392,13 @@ static void hmac_builtin(const char* key, const char* message,
 
 /* ==================== JWT 实现 ==================== */
 
+
 int auth_jwt_init(const jwt_config_t* config) {
     agentos_mutex_lock(&g_jwt.lock);
 
     if (g_jwt.initialized) {
         agentos_mutex_unlock(&g_jwt.lock);
-        return AGENTOS_ERR_ALREADY_INIT;
+        return AUTH_SUCCESS;
     }
 
     if (!config || !config->secret || config->secret_len == 0) {
@@ -390,7 +420,7 @@ int auth_jwt_init(const jwt_config_t* config) {
 #elif defined(AUTH_USE_MBEDTLS)
     g_hmac_impl = hmac_mbedtls;
 #else
-    g_hmac_impl = hmac_builtin;
+    g_hmac_impl = hmac_openssl;
 #endif
 
     g_jwt.initialized = 1;
@@ -1042,7 +1072,8 @@ int auth_init(const auth_config_t* config) {
     int ret = 0;
 
     if (config->enable_jwt) {
-        ret = auth_jwt_init(&config->jwt);
+        const jwt_config_t* jwt_cfg = &config->jwt;
+        ret = auth_jwt_init(jwt_cfg);
         if (ret != AUTH_SUCCESS) return ret;
     }
 

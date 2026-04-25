@@ -10,6 +10,7 @@
  */
 
 #include "service.h"
+#include "daemon_defaults.h"
 #include "svc_logger.h"
 #include "error.h"
 #include "platform.h"
@@ -46,7 +47,7 @@ tool_service_t* tool_service_create(const char* config_path) {
     /* 创建执行器 */
     tool_executor_config_t exec_config;
     memset(&exec_config, 0, sizeof(exec_config));
-    exec_config.timeout_sec = 30;
+    exec_config.timeout_sec = AGENTOS_DEFAULT_TIMEOUT_SEC;
 
     svc->executor = tool_executor_create_ex(&exec_config);
     if (!svc->executor) {

@@ -116,6 +116,8 @@ set(SVC_COMMON_SOURCES
     src/param_validator.c
     src/log_sanitizer.c
     src/platform_compat.c     # 平台兼容层实现
+    src/api_recovery.c        # API恢复系统
+    src/orchestrator.c        # 流程编排器
 )
 
 # 创建静态库
@@ -275,5 +277,10 @@ install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/include/unified_metrics.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/alert_manager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/config_manager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/api_recovery.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/thread_pool.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/conn_pool.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/orchestrator.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/daemon_defaults.h
     DESTINATION include/agentos
 )

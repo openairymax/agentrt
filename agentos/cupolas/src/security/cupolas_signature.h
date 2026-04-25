@@ -53,7 +53,7 @@ typedef enum {
 /**
  * @brief Signer information structure - canonical definition from commons/types/
  */
-#include "cupolas_signer_info.h"
+#include <cupolas_signer_info.h>
 
 /**
  * @brief Code signature verification context (opaque)

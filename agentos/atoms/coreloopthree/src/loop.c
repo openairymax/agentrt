@@ -447,7 +447,7 @@ AGENTOS_API agentos_error_t agentos_loop_submit(
     query.memory_query_text_len = input_len;
     query.memory_query_limit = 5;
     query.memory_query_include_raw = 1;
-    agentos_memory_result_t* result = NULL;
+    agentos_memory_result_ext_t* result = NULL;
     agentos_error_t err = agentos_memory_query(loop->memory, &query, &result);
 
     size_t memory_count = 0;
@@ -542,7 +542,7 @@ AGENTOS_API agentos_error_t agentos_loop_wait(
             agentos_memory_record_t record = {0};
             record.memory_record_data = *out_result;
             record.memory_record_data_len = *out_result_len;
-            record.memory_record_type = MEMORY_TYPE_RAW;
+            record.memory_record_type = AGENTOS_MEMTYPE_TEXT;
             record.memory_record_importance = loop->manager.loop_config_memory_importance;
             char* new_record_id = NULL;
             agentos_error_t store_err = agentos_memory_write(

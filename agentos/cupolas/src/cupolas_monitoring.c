@@ -42,6 +42,7 @@
 
 #define MAX_FILTER_PATTERNS 16
 #define MAX_PATTERN_LEN 128
+#define HTTP_RESPONSE_BUF (256 * 1024)
 
 typedef struct health_check_entry {
     char name[128];
@@ -68,6 +69,15 @@ struct cupolas_monitoring {
 
     cupolas_thread_t reporter_thread;
     bool reporter_running;
+
+    int http_fd;
+    cupolas_thread_t http_thread;
+    bool http_running;
+    uint16_t http_port;
+
+    cupolas_thread_t collector_thread;
+    bool collector_running;
+    uint32_t collect_interval_ms;
 
     uint64_t last_report_time;
     char last_error[512];
@@ -98,6 +108,249 @@ const char* monitoring_status_string(monitoring_status_t status) {
     }
 }
 
+/* ========== System Metrics Collection (Linux /proc) ========== */
+
+#if cupolas_PLATFORM_POSIX
+#include <sys/resource.h>
+
+static uint64_t get_process_rss_bytes(void) {
+    FILE* f = fopen("/proc/self/status", "r");
+    if (!f) return 0;
+    char line[256];
+    uint64_t rss = 0;
+    while (fgets(line, sizeof(line), f)) {
+        if (strncmp(line, "VmRSS:", 6) == 0) {
+            unsigned long kb = 0;
+            if (sscanf(line + 6, "%lu", &kb) == 1)
+                rss = kb * 1024UL;
+            break;
+        }
+    }
+    fclose(f);
+    return rss;
+}
+
+static double get_process_cpu_seconds(void) {
+    FILE* f = fopen("/proc/self/stat", "r");
+    if (!f) return 0.0;
+    char line[1024];
+    if (!fgets(line, sizeof(line), f)) { fclose(f); return 0.0; }
+    fclose(f);
+
+    long utime = 0, stime = 0;
+    int field = 0;
+    const char* p = line;
+    while (*p && field < 15) {
+        if (*p == ' ') field++;
+        else if (field == 13) utime = strtol(p, NULL, 10);
+        else if (field == 14) stime = strtol(p, NULL, 10);
+        p++;
+    }
+    static long clk_tck = 0;
+    if (clk_tck == 0) clk_tck = sysconf(_SC_CLK_TCK);
+    if (clk_tck <= 0) clk_tck = 100;
+    return (double)(utime + stime) / (double)clk_tck;
+}
+
+static int get_thread_count(void) {
+    FILE* f = fopen("/proc/self/status", "r");
+    if (!f) return 1;
+    char line[256];
+    int threads = 1;
+    while (fgets(line, sizeof(line), f)) {
+        if (strncmp(line, "Threads:", 8) == 0) {
+            sscanf(line + 8, "%d", &threads);
+            break;
+        }
+    }
+    fclose(f);
+    return threads;
+}
+
+#else
+
+static uint64_t get_process_rss_bytes(void) { return 0; }
+static double get_process_cpu_seconds(void) { return 0.0; }
+static int get_thread_count(void) { return 1; }
+
+#endif
+
+static void* collector_thread_func(void* arg) {
+    cupolas_monitoring_t* mgr = (cupolas_monitoring_t*)arg;
+
+    while (mgr->collector_running) {
+        metrics_gauge_set(METRIC_PROCESS_MEMORY_BYTES, NULL,
+                          (double)get_process_rss_bytes());
+        metrics_gauge_set(METRIC_PROCESS_CPU_SECONDS, NULL,
+                          get_process_cpu_seconds());
+        metrics_gauge_set(METRIC_THREAD_COUNT, NULL,
+                          (double)get_thread_count());
+
+        for (uint32_t i = 0; i < mgr->collect_interval_ms / 100 && mgr->collector_running; i++) {
+            cupolas_sleep_ms(100);
+        }
+    }
+
+    return NULL;
+}
+
+/* ========== Minimal Prometheus HTTP Server ========== */
+
+static void send_http_response(int fd, int status_code,
+                               const char* status_text,
+                               const char* content_type,
+                               const char* body, size_t body_len) {
+    char header[512];
+    size_t hdr_len = snprintf(header, sizeof(header),
+        "HTTP/1.1 %d %s\r\n"
+        "Content-Type: %s\r\n"
+        "Content-Length: %zu\r\n"
+        "Connection: close\r\n"
+        "Access-Control-Allow-Origin: *\r\n"
+        "\r\n",
+        status_code, status_text, content_type, body_len);
+
+    (void)send(fd, header, hdr_len, MSG_NOSIGNAL);
+    if (body && body_len > 0)
+        (void)send(fd, body, body_len, MSG_NOSIGNAL);
+}
+
+static void handle_http_request(cupolas_monitoring_t* mgr, int client_fd,
+                                char* req_buf, size_t req_len) {
+    (void)req_len;
+
+    char method[16] = {0}, path[256] = {0};
+    sscanf(req_buf, "%15s %255s", method, path);
+
+    if (strcmp(method, "GET") != 0) {
+        const char* body = "Method Not Allowed";
+        send_http_response(client_fd, 405, "Method Not Allowed",
+                           "text/plain", body, strlen(body));
+        return;
+    }
+
+    if (strcmp(path, "/metrics") == 0) {
+        cupolas_rwlock_rdlock(&mgr->lock);
+
+        char buf[HTTP_RESPONSE_BUF];
+        size_t len = metrics_export_prometheus(buf, sizeof(buf));
+
+        cupolas_rwlock_unlock(&mgr->lock);
+
+        if (len > 0) {
+            send_http_response(client_fd, 200, "OK",
+                               "text/plain; version=0.0.4; charset=utf-8",
+                               buf, len);
+        } else {
+            const char* body = "# No metrics available\n";
+            send_http_response(client_fd, 200, "OK",
+                               "text/plain; version=0.0.4; charset=utf-8",
+                               body, strlen(body));
+        }
+    } else if (strcmp(path, "/health") == 0) {
+        health_check_result_t results[MAX_HEALTH_CHECKS];
+        int count = cupolas_monitoring_check_health(mgr, results, MAX_HEALTH_CHECKS);
+
+        char buf[4096];
+        size_t off = snprintf(buf, sizeof(buf), "{\n");
+        bool all_healthy = true;
+
+        for (int i = 0; i < count && off < sizeof(buf) - 256; i++) {
+            off += snprintf(buf + off, sizeof(buf) - off,
+                "  \"%s\": %s,\n",
+                results[i].component ? results[i].component : "unknown",
+                results[i].healthy ? "true" : "false");
+            if (!results[i].healthy) all_healthy = false;
+        }
+
+        off += snprintf(buf + off, sizeof(buf) - off,
+                        "  \"status\": \"%s\"\n}\n",
+                        all_healthy ? "healthy" : "unhealthy");
+
+        send_http_response(client_fd, all_healthy ? 200 : 503,
+                           all_healthy ? "OK" : "Service Unavailable",
+                           "application/json", buf, off);
+    } else if (strcmp(path, "/") == 0 || strcmp(path, "/") == 0) {
+        const char* body =
+            "<html><head><title>Cupolas Monitoring</title></head><body>"
+            "<h2>AgentOS Cupolas Monitoring</h2>"
+            "<ul>"
+            "<li><a href=\"/metrics\">/metrics</a> - Prometheus exposition format</li>"
+            "<li><a href=\"/health\">/health</a> - Health check endpoint</li>"
+            "</ul></body></html>";
+        send_http_response(client_fd, 200, "OK", "text/html", body, strlen(body));
+    } else {
+        const char* body = "Not Found";
+        send_http_response(client_fd, 404, "Not Found",
+                           "text/plain", body, strlen(body));
+    }
+}
+
+static void* http_server_thread_func(void* arg) {
+    cupolas_monitoring_t* mgr = (cupolas_monitoring_t*)arg;
+
+    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd < 0) {
+        CUPOLAS_LOG_ERROR("monitoring: socket() failed");
+        return NULL;
+    }
+
+    int opt = 1;
+    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = htons(mgr->http_port);
+
+    if (bind(server_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        CUPOLAS_LOG_ERROR("monitoring: bind() failed on port %d", mgr->http_port);
+        close(server_fd);
+        return NULL;
+    }
+
+    if (listen(server_fd, 8) < 0) {
+        CUPOLAS_LOG_ERROR("monitoring: listen() failed");
+        close(server_fd);
+        return NULL;
+    }
+
+    mgr->http_fd = server_fd;
+    CUPOLAS_LOG("monitoring: HTTP server listening on port %d", mgr->http_port);
+
+    while (mgr->http_running) {
+        struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(server_fd, &readfds);
+
+        int sel = select(server_fd + 1, &readfds, NULL, NULL, &tv);
+        if (sel <= 0 || !FD_ISSET(server_fd, &readfds))
+            continue;
+
+        struct sockaddr_in client_addr;
+        socklen_t client_len = sizeof(client_addr);
+        int client_fd = accept(server_fd, (struct sockaddr*)&client_addr, &client_len);
+        if (client_fd < 0) continue;
+
+        char req_buf[8192] = {0};
+        ssize_t n = recv(client_fd, req_buf, sizeof(req_buf) - 1, 0);
+        if (n > 0) {
+            handle_http_request(mgr, client_fd, req_buf, (size_t)n);
+        }
+
+        shutdown(client_fd, SHUT_RDWR);
+        close(client_fd);
+    }
+
+    close(server_fd);
+    mgr->http_fd = -1;
+    CUPOLAS_LOG("monitoring: HTTP server stopped");
+
+    return NULL;
+}
+
 cupolas_monitoring_t* cupolas_monitoring_create(const monitoring_config_t* manager) {
     cupolas_monitoring_t* mgr = (cupolas_monitoring_t*)cupolas_mem_alloc(sizeof(cupolas_monitoring_t));
     if (!mgr) {
@@ -119,6 +372,15 @@ cupolas_monitoring_t* cupolas_monitoring_create(const monitoring_config_t* manag
 
     mgr->status = MONITORING_STATUS_STOPPED;
     cupolas_rwlock_init(&mgr->lock);
+
+    mgr->http_fd = -1;
+    mgr->http_running = false;
+    mgr->http_port = manager ? manager->prometheus.port : 9090;
+    if (mgr->http_port == 0) mgr->http_port = 9090;
+
+    mgr->collector_running = false;
+    mgr->collect_interval_ms = manager ? manager->reporting_interval_ms : 10000;
+    if (mgr->collect_interval_ms < 1000) mgr->collect_interval_ms = 1000;
 
     return mgr;
 }
@@ -144,12 +406,62 @@ int cupolas_monitoring_start(cupolas_monitoring_t* mgr) {
     }
 
     mgr->status = MONITORING_STATUS_STARTING;
-
     mgr->reporter_running = true;
+
+    metrics_init(mgr->collect_interval_ms);
+
+    metric_desc_t mem_desc = {
+        .name = METRIC_PROCESS_MEMORY_BYTES,
+        .help = "Current process resident memory in bytes",
+        .type = METRIC_TYPE_GAUGE,
+        .label_names = NULL,
+        .label_count = 0
+    };
+    metrics_register(&mem_desc);
+
+    metric_desc_t cpu_desc = {
+        .name = METRIC_PROCESS_CPU_SECONDS,
+        .help = "Total CPU time consumed by process",
+        .type = METRIC_TYPE_GAUGE,
+        .label_names = NULL,
+        .label_count = 0
+    };
+    metrics_register(&cpu_desc);
+
+    metric_desc_t thread_desc = {
+        .name = METRIC_THREAD_COUNT,
+        .help = "Number of threads in process",
+        .type = METRIC_TYPE_GAUGE,
+        .label_names = NULL,
+        .label_count = 0
+    };
+    metrics_register(&thread_desc);
+
+    mgr->collector_running = true;
+    int ret = cupolas_thread_create(&mgr->collector_thread,
+                                    collector_thread_func, mgr);
+    if (ret != 0) {
+        CUPOLAS_LOG_ERROR("monitoring: failed to create collector thread");
+        mgr->collector_running = false;
+    }
+
+    if (mgr->manager.backend == MONITORING_BACKEND_PROMETHEUS ||
+        mgr->manager.backend == MONITORING_BACKEND_ALL) {
+        mgr->http_running = true;
+        ret = cupolas_thread_create(&mgr->http_thread,
+                                    http_server_thread_func, mgr);
+        if (ret != 0) {
+            CUPOLAS_LOG_ERROR("monitoring: failed to create HTTP server thread");
+            mgr->http_running = false;
+        }
+    }
 
     mgr->status = MONITORING_STATUS_RUNNING;
 
     cupolas_rwlock_unlock(&mgr->lock);
+
+    CUPOLAS_LOG("monitoring: started (port=%d, collect_ms=%u)",
+                mgr->http_port, mgr->collect_interval_ms);
 
     return 0;
 }
@@ -168,7 +480,33 @@ void cupolas_monitoring_stop(cupolas_monitoring_t* mgr) {
     mgr->status = MONITORING_STATUS_STOPPING;
     mgr->reporter_running = false;
 
+    mgr->http_running = false;
+    if (mgr->http_fd >= 0) {
+        shutdown(mgr->http_fd, SHUT_RDWR);
+    }
+
+    mgr->collector_running = false;
+
     cupolas_rwlock_unlock(&mgr->lock);
+
+    if (mgr->http_running == false && mgr->http_fd >= 0) {
+        void* retval = NULL;
+        cupolas_thread_join(mgr->http_thread, &retval);
+        (void)retval;
+    }
+
+    void* retval = NULL;
+    cupolas_thread_join(mgr->collector_thread, &retval);
+    (void)retval;
+
+    metrics_shutdown();
+
+    cupolas_rwlock_wrlock(&mgr->lock);
+    mgr->status = MONITORING_STATUS_STOPPED;
+    mgr->http_fd = -1;
+    cupolas_rwlock_unlock(&mgr->lock);
+
+    CUPOLAS_LOG("monitoring: stopped");
 }
 
 monitoring_status_t cupolas_monitoring_get_status(cupolas_monitoring_t* mgr) {

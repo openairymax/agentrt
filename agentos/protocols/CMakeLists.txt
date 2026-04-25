@@ -222,6 +222,7 @@ set_target_properties(agentos_protocols PROPERTIES
     OUTPUT_NAME agentos_protocols
     C_STANDARD 11
     C_STANDARD_REQUIRED ON
+    POSITION_INDEPENDENT_CODE ON
 )
 
 # 链接依赖

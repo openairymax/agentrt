@@ -10,6 +10,8 @@
 #include <string.h>
 #include <assert.h>
 #include "cognition.h"
+#include "execution.h"
+#include "memory.h"
 
 #define TEST_PASS(name) printf("[PASS] %s\n", name)
 #define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)

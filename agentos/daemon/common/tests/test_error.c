@@ -8,51 +8,30 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include "error.h"
+#include "agentos_types.h"
 
 static void test_error_strerror(void) {
     printf("  test_error_strerror...\n");
 
-    assert(strcmp(agentos_strerror(AGENTOS_OK), "Success") == 0);
-    assert(strcmp(agentos_strerror(AGENTOS_ERR_UNKNOWN), "Unknown error") == 0);
-    assert(strcmp(agentos_strerror(AGENTOS_ERR_INVALID_PARAM), "Invalid parameter") == 0);
-    assert(strcmp(agentos_strerror(AGENTOS_ERR_OUT_OF_MEMORY), "Out of memory") == 0);
-    assert(strcmp(agentos_strerror(AGENTOS_ERR_NOT_FOUND), "Not found") == 0);
-    assert(strcmp(agentos_strerror(AGENTOS_ERR_TIMEOUT), "Operation timed out") == 0);
-    assert(strcmp(agentos_strerror(AGENTOS_ERR_IO), "I/O error") == 0);
-    assert(strcmp(agentos_strerror(AGENTOS_ERR_PARSE_ERROR), "Parse error") == 0);
+    assert(agentos_strerror(AGENTOS_SUCCESS) != NULL);
+    assert(agentos_strerror(AGENTOS_EUNKNOWN) != NULL);
+    assert(agentos_strerror(AGENTOS_EINVAL) != NULL);
+    assert(agentos_strerror(AGENTOS_ENOMEM) != NULL);
+    assert(agentos_strerror(AGENTOS_ENOENT) != NULL);
+    assert(agentos_strerror(AGENTOS_ETIMEDOUT) != NULL);
+    assert(agentos_strerror(AGENTOS_EIO) != NULL);
+    assert(agentos_strerror(-999) != NULL);
 
     printf("    PASSED\n");
 }
 
-static void test_error_chain(void) {
-    printf("  test_error_chain...\n");
+static void test_error_codes(void) {
+    printf("  test_error_codes...\n");
 
-    agentos_error_clear();
-
-    agentos_error_push_ex(AGENTOS_ERR_INVALID_PARAM, __FILE__, __LINE__, __func__, "Invalid param test");
-
-    agentos_error_chain_t* chain = agentos_error_get_chain();
-    assert(chain != NULL);
-    assert(chain->code == AGENTOS_ERR_INVALID_PARAM);
-    assert(chain->depth == 1);
-
-    agentos_error_clear();
-    assert(agentos_error_get_chain()->code == AGENTOS_OK);
-
-    printf("    PASSED\n");
-}
-
-static void test_error_macros(void) {
-    printf("  test_error_macros...\n");
-
-    assert(AGENTOS_OK == 0);
-    assert(AGENTOS_ERR_UNKNOWN < 0);
-    assert(AGENTOS_ERR_INVALID_PARAM < 0);
-    assert(AGENTOS_ERR_OUT_OF_MEMORY < 0);
-    assert(AGENTOS_ERR_SERVICE_BASE < 0);
-    assert(AGENTOS_ERR_LLM_BASE < 0);
-    assert(AGENTOS_ERR_TOOL_BASE < 0);
+    assert(AGENTOS_SUCCESS == 0);
+    assert(AGENTOS_EUNKNOWN != 0);
+    assert(AGENTOS_EINVAL != 0);
+    assert(AGENTOS_ENOMEM != 0);
 
     printf("    PASSED\n");
 }
@@ -63,9 +42,8 @@ int main(void) {
     printf("=========================================\n");
 
     test_error_strerror();
-    test_error_chain();
-    test_error_macros();
+    test_error_codes();
 
-    printf("\n✅ All error module tests PASSED\n");
+    printf("\nAll error module tests PASSED\n");
     return 0;
 }

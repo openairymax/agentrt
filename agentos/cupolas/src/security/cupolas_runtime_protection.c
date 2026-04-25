@@ -580,8 +580,9 @@ int cupolas_integrity_verify_data(const uint8_t* expected_hash) {
 
     char data_info[256];
     snprintf(data_info, sizeof(data_info),
-        "pid=%ld,rand=%u,ts=%lld",
-        (long)getpid(), (unsigned)rand(), (long long)time(NULL));
+        "pid=%ld,addr=0x%lx",
+        (long)getpid(),
+        (unsigned long)(uintptr_t)&cupolas_integrity_verify_data);
     SHA256_Update(&ctx, data_info, strlen(data_info));
 
     uint8_t current_hash[32];

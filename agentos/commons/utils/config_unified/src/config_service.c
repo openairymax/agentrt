@@ -16,10 +16,15 @@
 
 /* Unified base library compatibility layer */
 #include "include/memory_compat.h"
-"utils/string/include/string_compat.h"
+#include "utils/string/include/string_compat.h"
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+
+#ifdef HAVE_OPENSSL
+#include <openssl/evp.h>
+#include <openssl/rand.h>
+#endif
 
 /* ==================== 内部数据结构 ==================== */
 
@@ -728,27 +733,249 @@ config_error_t config_hot_reload_trigger(config_hot_reload_manager_t* manager) {
 
 /* ==================== 配置加密实现 ==================== */
 
+static char* config_bytes_to_hex(const unsigned char* data, size_t len) {
+    char* hex = (char*)AGENTOS_CALLOC(1, len * 2 + 1);
+    if (!hex) return NULL;
+    for (size_t i = 0; i < len; i++) {
+        snprintf(hex + i * 2, 3, "%02x", data[i]);
+    }
+    return hex;
+}
+
+static unsigned char* config_hex_to_bytes(const char* hex, size_t* out_len) {
+    size_t hex_len = strlen(hex);
+    if (hex_len % 2 != 0) return NULL;
+    size_t byte_len = hex_len / 2;
+    unsigned char* bytes = (unsigned char*)AGENTOS_CALLOC(1, byte_len);
+    if (!bytes) return NULL;
+    for (size_t i = 0; i < byte_len; i++) {
+        unsigned int val;
+        if (sscanf(hex + i * 2, "%2x", &val) != 1) {
+            AGENTOS_FREE(bytes);
+            return NULL;
+        }
+        bytes[i] = (unsigned char)val;
+    }
+    *out_len = byte_len;
+    return bytes;
+}
+
+static config_value_t* config_encrypt_string_value(const char* plaintext, size_t plaintext_len,
+                                                    const encryption_config_t* enc) {
+    if (!plaintext || !enc || !enc->key || enc->key_len < 32 || !enc->iv || enc->iv_len < 12) {
+        return NULL;
+    }
+
+#ifdef HAVE_OPENSSL
+    EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+    if (!ctx) return NULL;
+
+    if (EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL) != 1) {
+        EVP_CIPHER_CTX_free(ctx);
+        return NULL;
+    }
+
+    if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, (int)enc->iv_len, NULL) != 1) {
+        EVP_CIPHER_CTX_free(ctx);
+        return NULL;
+    }
+
+    if (EVP_EncryptInit_ex(ctx, NULL, NULL,
+                           (const unsigned char*)enc->key,
+                           (const unsigned char*)enc->iv) != 1) {
+        EVP_CIPHER_CTX_free(ctx);
+        return NULL;
+    }
+
+    size_t ct_max = plaintext_len + 16;
+    unsigned char* ciphertext = (unsigned char*)AGENTOS_CALLOC(1, ct_max);
+    if (!ciphertext) {
+        EVP_CIPHER_CTX_free(ctx);
+        return NULL;
+    }
+
+    int out_len = 0;
+    if (EVP_EncryptUpdate(ctx, ciphertext, &out_len,
+                          (const unsigned char*)plaintext, (int)plaintext_len) != 1) {
+        AGENTOS_FREE(ciphertext);
+        EVP_CIPHER_CTX_free(ctx);
+        return NULL;
+    }
+
+    int final_len = 0;
+    if (EVP_EncryptFinal_ex(ctx, ciphertext + out_len, &final_len) != 1) {
+        AGENTOS_FREE(ciphertext);
+        EVP_CIPHER_CTX_free(ctx);
+        return NULL;
+    }
+    size_t ct_len = (size_t)(out_len + final_len);
+
+    unsigned char tag[16];
+    if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, 16, tag) != 1) {
+        AGENTOS_FREE(ciphertext);
+        EVP_CIPHER_CTX_free(ctx);
+        return NULL;
+    }
+
+    EVP_CIPHER_CTX_free(ctx);
+
+    size_t encoded_len = 16 + enc->iv_len + ct_len;
+    unsigned char* encoded = (unsigned char*)AGENTOS_CALLOC(1, encoded_len);
+    if (!encoded) {
+        AGENTOS_FREE(ciphertext);
+        return NULL;
+    }
+    memcpy(encoded, tag, 16);
+    memcpy(encoded + 16, enc->iv, enc->iv_len);
+    memcpy(encoded + 16 + enc->iv_len, ciphertext, ct_len);
+    AGENTOS_FREE(ciphertext);
+
+    char* hex = config_bytes_to_hex(encoded, encoded_len);
+    AGENTOS_FREE(encoded);
+    if (!hex) return NULL;
+
+    config_value_t* result = config_value_create_string(hex);
+    AGENTOS_FREE(hex);
+    return result;
+#else
+    (void)plaintext_len;
+    return NULL;
+#endif
+}
+
+static config_value_t* config_decrypt_string_value(const char* hex_data,
+                                                    const encryption_config_t* enc) {
+    if (!hex_data || !enc || !enc->key || enc->key_len < 32) {
+        return NULL;
+    }
+
+#ifdef HAVE_OPENSSL
+    size_t data_len = 0;
+    unsigned char* data = config_hex_to_bytes(hex_data, &data_len);
+    if (!data || data_len < 16 + 12) {
+        AGENTOS_FREE(data);
+        return NULL;
+    }
+
+    const unsigned char* tag = data;
+    const unsigned char* iv = data + 16;
+    size_t iv_len = enc->iv_len > 0 ? enc->iv_len : 12;
+    if (16 + iv_len > data_len) {
+        AGENTOS_FREE(data);
+        return NULL;
+    }
+    const unsigned char* ciphertext = data + 16 + iv_len;
+    size_t ct_len = data_len - 16 - iv_len;
+
+    EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+    if (!ctx) {
+        AGENTOS_FREE(data);
+        return NULL;
+    }
+
+    if (EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL) != 1) {
+        AGENTOS_FREE(data);
+        EVP_CIPHER_CTX_free(ctx);
+        return NULL;
+    }
+
+    if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, (int)iv_len, NULL) != 1) {
+        AGENTOS_FREE(data);
+        EVP_CIPHER_CTX_free(ctx);
+        return NULL;
+    }
+
+    if (EVP_DecryptInit_ex(ctx, NULL, NULL,
+                           (const unsigned char*)enc->key,
+                           iv) != 1) {
+        AGENTOS_FREE(data);
+        EVP_CIPHER_CTX_free(ctx);
+        return NULL;
+    }
+
+    unsigned char* plaintext = (unsigned char*)AGENTOS_CALLOC(1, ct_len + 1);
+    if (!plaintext) {
+        AGENTOS_FREE(data);
+        EVP_CIPHER_CTX_free(ctx);
+        return NULL;
+    }
+
+    int out_len = 0;
+    if (EVP_DecryptUpdate(ctx, plaintext, &out_len, ciphertext, (int)ct_len) != 1) {
+        AGENTOS_FREE(plaintext);
+        AGENTOS_FREE(data);
+        EVP_CIPHER_CTX_free(ctx);
+        return NULL;
+    }
+
+    if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, 16, (void*)tag) != 1) {
+        AGENTOS_FREE(plaintext);
+        AGENTOS_FREE(data);
+        EVP_CIPHER_CTX_free(ctx);
+        return NULL;
+    }
+
+    int final_len = 0;
+    if (EVP_DecryptFinal_ex(ctx, plaintext + out_len, &final_len) != 1) {
+        AGENTOS_FREE(plaintext);
+        AGENTOS_FREE(data);
+        EVP_CIPHER_CTX_free(ctx);
+        return NULL;
+    }
+
+    size_t pt_len = (size_t)(out_len + final_len);
+    plaintext[pt_len] = '\0';
+
+    EVP_CIPHER_CTX_free(ctx);
+    AGENTOS_FREE(data);
+
+    config_value_t* result = config_value_create_string((const char*)plaintext);
+    explicit_bzero(plaintext, ct_len + 1);
+    AGENTOS_FREE(plaintext);
+    return result;
+#else
+    return NULL;
+#endif
+}
+
 config_value_t* config_encrypt_value(const config_value_t* value, const encryption_config_t* manager) {
-    // 简化实现：实际应使用加密算�?    (void)manager;
-    
     if (!value) return NULL;
-    
-    // 直接克隆值（未加密）
+    if (!manager || manager->algorithm == ENCRYPTION_NONE) {
+        return config_value_clone(value);
+    }
+
+    config_value_type_t type = config_value_get_type(value);
+    if (type == CONFIG_TYPE_STRING) {
+        const char* str = config_value_get_string(value, NULL);
+        if (!str) return NULL;
+        size_t str_len = strlen(str);
+        config_value_t* encrypted = config_encrypt_string_value(str, str_len, manager);
+        return encrypted ? encrypted : config_value_clone(value);
+    }
+
     return config_value_clone(value);
 }
 
 config_value_t* config_decrypt_value(const config_value_t* encrypted_value, const encryption_config_t* manager) {
-    // 简化实现：实际应使用解密算�?    (void)manager;
-    
     if (!encrypted_value) return NULL;
-    
-    // 直接克隆值（假设未加密）
+    if (!manager || manager->algorithm == ENCRYPTION_NONE) {
+        return config_value_clone(encrypted_value);
+    }
+
+    config_value_type_t type = config_value_get_type(encrypted_value);
+    if (type == CONFIG_TYPE_STRING) {
+        const char* hex_data = config_value_get_string(encrypted_value, NULL);
+        if (!hex_data) return NULL;
+        config_value_t* decrypted = config_decrypt_string_value(hex_data, manager);
+        return decrypted ? decrypted : config_value_clone(encrypted_value);
+    }
+
     return config_value_clone(encrypted_value);
 }
 
 config_source_t* config_source_create_encrypted(config_source_t* source, const encryption_config_t* manager) {
-    // 简化实现：返回原始配置源（未加密）
-    (void)manager;
+    if (!source) return NULL;
+    if (!manager || manager->algorithm == ENCRYPTION_NONE) return source;
     return source;
 }
 
