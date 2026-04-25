@@ -19,6 +19,7 @@
  */
 
 #include "cupolas_config.h"
+#include "yaml_minimal.h"
 #include "utils/cupolas_utils.h"
 #include "platform/platform.h"
 #include "cupolas_metrics.h"
@@ -137,9 +138,18 @@ void cupolas_config_destroy(cupolas_config_t* cfg) {
 
     cfg->monitor_running = false;
 
+    for (int i = 0; i < (int)CONFIG_TYPE_ALL; i++) {
+        if (cfg->entries[i].data) {
+            yaml_destroy((yaml_document_t*)cfg->entries[i].data);
+            cfg->entries[i].data = NULL;
+        }
+        free(cfg->entries[i].file_path);
+        cfg->entries[i].file_path[0] = '\0';
+    }
+
     cupolas_rwlock_destroy(&cfg->lock);
 
-    cupolas_mem_free(cfg);
+    free(cfg);
 }
 
 int cupolas_config_load(cupolas_config_t* cfg, config_type_t type, const char* file_path) {
@@ -158,6 +168,11 @@ int cupolas_config_load(cupolas_config_t* cfg, config_type_t type, const char* f
         return loaded > 0 ? 0 : -1;
     }
 
+    if (type >= CONFIG_TYPE_ALL || type < 0) {
+        cupolas_rwlock_unlock(&cfg->lock);
+        return -1;
+    }
+
     config_entry_t* entry = &cfg->entries[type];
     entry->status = CONFIG_STATUS_LOADING;
 
@@ -173,17 +188,54 @@ int cupolas_config_load(cupolas_config_t* cfg, config_type_t type, const char* f
 
 #if cupolas_PLATFORM_WINDOWS
     WIN32_FILE_ATTRIBUTE_DATA attr;
-    if (GetFileAttributesExA(entry->file_path, GetFileExInfoStandard, &attr)) {
-        ULARGE_INTEGER ft;
-        ft.LowPart = attr.ftLastWriteTime.dwLowDateTime;
-        ft.HighPart = attr.ftLastWriteTime.dwHighDateTime;
-        entry->last_modified = (time_t)(ft.QuadPart / 10000000 - 11644473600LL);
+    if (!GetFileAttributesExA(entry->file_path, GetFileExInfoStandard, &attr)) {
+        snprintf(cfg->last_error, sizeof(cfg->last_error), "Configuration file not found: %s", entry->file_path);
+        entry->status = CONFIG_STATUS_ERROR;
+        cupolas_rwlock_unlock(&cfg->lock);
+        return -1;
     }
 #else
     struct stat st;
-    if (stat(entry->file_path, &st) == 0) {
-        entry->last_modified = st.st_mtime;
+    if (stat(entry->file_path, &st) != 0) {
+        snprintf(cfg->last_error, sizeof(cfg->last_error), "Configuration file not found: %s", entry->file_path);
+        entry->status = CONFIG_STATUS_ERROR;
+        cupolas_rwlock_unlock(&cfg->lock);
+        return -1;
     }
+#endif
+
+    if (entry->data) {
+        yaml_destroy((yaml_document_t*)entry->data);
+        entry->data = NULL;
+    }
+
+    yaml_document_t* doc = yaml_create();
+    if (!doc) {
+        snprintf(cfg->last_error, sizeof(cfg->last_error), "Memory allocation failed");
+        entry->status = CONFIG_STATUS_ERROR;
+        cupolas_rwlock_unlock(&cfg->lock);
+        return -1;
+    }
+
+    if (yaml_parse_file(doc, entry->file_path) != 0) {
+        const char* err = yaml_get_error(doc);
+        snprintf(cfg->last_error, sizeof(cfg->last_error),
+                 "YAML parse error: %s", err ? err : "unknown");
+        yaml_destroy(doc);
+        entry->status = CONFIG_STATUS_ERROR;
+        cupolas_rwlock_unlock(&cfg->lock);
+        return -1;
+    }
+
+    entry->data = doc;
+
+#if cupolas_PLATFORM_WINDOWS
+    ULARGE_INTEGER ft;
+    ft.LowPart = attr.ftLastWriteTime.dwLowDateTime;
+    ft.HighPart = attr.ftLastWriteTime.dwHighDateTime;
+    entry->last_modified = (time_t)(ft.QuadPart / 10000000 - 11644473600LL);
+#else
+    entry->last_modified = st.st_mtime;
 #endif
 
     entry->version.major = 1;
@@ -207,14 +259,48 @@ int cupolas_config_reload(cupolas_config_t* cfg, config_type_t type) {
         config_entry_t* entry = &cfg->entries[type];
         entry->status = CONFIG_STATUS_LOADING;
 
-        snprintf(cfg->last_error, sizeof(cfg->last_error), "Reloading %s",
-                config_type_names[type]);
+        if (entry->data) {
+            yaml_destroy((yaml_document_t*)entry->data);
+            entry->data = NULL;
+        }
 
+        yaml_document_t* doc = yaml_create();
+        if (!doc) {
+            snprintf(cfg->last_error, sizeof(cfg->last_error),
+                     "Reload %s: memory allocation failed", config_type_names[type]);
+            entry->status = CONFIG_STATUS_ERROR;
+            cupolas_rwlock_unlock(&cfg->lock);
+            return -1;
+        }
+
+        int ret = yaml_parse_file(doc, entry->file_path);
+        if (ret != 0) {
+            const char* err = yaml_get_error(doc);
+            snprintf(cfg->last_error, sizeof(cfg->last_error),
+                     "Reload %s: parse error: %s", config_type_names[type],
+                     err ? err : "unknown");
+            yaml_destroy(doc);
+            entry->status = CONFIG_STATUS_ROLLBACK;
+            cupolas_rwlock_unlock(&cfg->lock);
+            return -1;
+        }
+
+        entry->data = doc;
+        entry->version.patch++;
+        entry->version.timestamp_ns = cupolas_get_timestamp_ns();
         entry->status = CONFIG_STATUS_APPLIED;
+
+        CUPOLAS_LOG("Config reloaded: type=%s", config_type_names[type]);
+    } else {
+        int reloaded = 0;
+        for (int i = 0; i < (int)CONFIG_TYPE_ALL; i++) {
+            if (cupolas_config_reload(cfg, (config_type_t)i) == 0) reloaded++;
+        }
+        cupolas_rwlock_unlock(&cfg->lock);
+        return reloaded > 0 ? 0 : -1;
     }
 
     cupolas_rwlock_unlock(&cfg->lock);
-
     return 0;
 }
 
@@ -227,7 +313,70 @@ int cupolas_config_validate(cupolas_config_t* cfg, config_type_t type,
     memset(result, 0, sizeof(config_validation_result_t));
 
     if (type >= 0 && type < CONFIG_TYPE_ALL) {
+        config_entry_t* entry = &cfg->entries[type];
+        yaml_document_t* doc = (yaml_document_t*)entry->data;
+
+        if (!doc || !doc->root) {
+            static const char* err = "No configuration loaded";
+            result->valid = false;
+            result->errors = &err;
+            result->error_count = 1;
+            cupolas_rwlock_unlock(&cfg->lock);
+            return -1;
+        }
+
+        struct yaml_node* root = yaml_root(doc);
+        if (root && root->type == YAML_NODE_MAPPING) {
+            size_t sz = yaml_size(root);
+            if (sz == 0) {
+                static const char* warn = "Configuration mapping is empty";
+                result->warnings = &warn;
+                result->warning_count = 1;
+            }
+        }
+
         result->valid = true;
+
+        switch (type) {
+            case CONFIG_TYPE_RESOURCE_LIMITS: {
+                struct yaml_node* max_mem = yaml_get(root, "max_memory_mb");
+                struct yaml_node* max_cpu = yaml_get(root, "max_cpu_percent");
+                if (max_mem) {
+                    double v = yaml_as_double(max_mem, -1.0);
+                    if (v <= 0) {
+                        static const char* e = "max_memory_mb must be positive";
+                        result->errors = &e; result->error_count = 1;
+                        result->valid = false;
+                    }
+                }
+                if (max_cpu) {
+                    double v = yaml_as_double(max_cpu, -1.0);
+                    if (v <= 0 || v > 100) {
+                        static const char* e = "max_cpu_percent must be in (0,100]";
+                        result->errors = &e; result->error_count = 1;
+                        result->valid = false;
+                    }
+                }
+                break;
+            }
+            case CONFIG_TYPE_LOG_LEVEL: {
+                struct yaml_node* level = yaml_get(root, "level");
+                if (level) {
+                    const char* lv = yaml_as_string(level, "");
+                    if (strcmp(lv, "") != 0 &&
+                        strcmp(lv, "debug") != 0 && strcmp(lv, "info") != 0 &&
+                        strcmp(lv, "warn") != 0 && strcmp(lv, "error") != 0 &&
+                        strcmp(lv, "fatal") != 0) {
+                        static const char* e = "Invalid log level";
+                        result->errors = &e; result->error_count = 1;
+                        result->valid = false;
+                    }
+                }
+                break;
+            }
+            default:
+                break;
+        }
     } else {
         result->valid = false;
     }
@@ -465,29 +614,53 @@ size_t cupolas_config_export_yaml(cupolas_config_t* cfg, config_type_t type,
 
     cupolas_rwlock_rdlock(&cfg->lock);
 
+    buffer[0] = '\0';
     size_t offset = 0;
 
     for (config_type_t i = 0; i < CONFIG_TYPE_ALL; i++) {
-        if (type != CONFIG_TYPE_ALL && type != i) {
-            continue;
-        }
+        if (type != CONFIG_TYPE_ALL && type != i) continue;
 
         config_entry_t* entry = &cfg->entries[i];
-        offset += snprintf(buffer + offset, size - offset,
-                          "%s:\n"
-                          "  status: %s\n"
-                          "  version: %u.%u.%u\n"
-                          "  file: %s\n",
+        yaml_document_t* doc = (yaml_document_t*)entry->data;
+
+        offset += snprintf(buffer + offset, size > offset ? size - offset : 0,
+                          "# %s configuration\n"
+                          "# status: %s\n"
+                          "# version: %u.%u.%u\n"
+                          "# file: %s\n",
                           config_type_names[i],
                           config_status_names[entry->status],
                           entry->version.major,
                           entry->version.minor,
                           entry->version.patch,
-                          entry->file_path);
+                          entry->file_path[0] ? entry->file_path : "(none)");
+
+        if (doc && doc->root) {
+            if (offset < size - 1)
+                yaml_dump(doc->root, buffer, size, 0);
+            offset = strlen(buffer);
+            if (offset < size - 1) {
+                buffer[offset++] = '\n';
+                buffer[offset] = '\0';
+            }
+        } else {
+            const char* not_loaded = "  # (not loaded)\n";
+            size_t nl_len = strlen(not_loaded);
+            if (offset + nl_len + 1 < size) {
+                memcpy(buffer + offset, not_loaded, nl_len);
+                offset += nl_len;
+                buffer[offset] = '\0';
+            }
+        }
+
+        if (i < (config_type_t)(CONFIG_TYPE_ALL - 1)) {
+            if (offset < size - 2) {
+                buffer[offset++] = '\n'; buffer[offset] = '\0';
+            }
+        }
     }
 
     cupolas_rwlock_unlock(&cfg->lock);
-
     return offset;
 }
 

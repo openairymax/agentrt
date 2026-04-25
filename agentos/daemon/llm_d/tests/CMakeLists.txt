@@ -16,6 +16,10 @@ set(LLM_IMPL_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/cost_tracker.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/providers/registry.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/providers/provider.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/providers/openai.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/providers/anthropic.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/providers/deepseek.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/providers/local.c
 )
 
 set(LLM_TEST_SOURCES

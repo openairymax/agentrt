@@ -10,6 +10,7 @@
  */
 
 #include "gateway_service.h"
+#include "daemon_defaults.h"
 #include "svc_common.h"
 #include "svc_logger.h"
 #include "svc_config.h"
@@ -73,26 +74,26 @@ void gateway_service_get_default_config(gateway_service_config_t* config) {
     
     config->http.type = GATEWAY_DAEMON_TYPE_HTTP;
     config->http.host = "0.0.0.0";
-    config->http.port = 8080;
+    config->http.port = AGENTOS_DEFAULT_HTTP_PORT;
     config->http.enabled = true;
-    config->http.max_request_size = 10 * 1024 * 1024;
-    config->http.timeout_ms = 30000;
-    
+    config->http.max_request_size = AGENTOS_MAX_REQUEST_SIZE_HTTP;
+    config->http.timeout_ms = AGENTOS_DEFAULT_TIMEOUT_MS;
+
     config->ws.type = GATEWAY_DAEMON_TYPE_WS;
     config->ws.host = "0.0.0.0";
-    config->ws.port = 8081;
+    config->ws.port = AGENTOS_DEFAULT_WS_PORT;
     config->ws.enabled = false;
-    config->ws.max_request_size = 10 * 1024 * 1024;
-    config->ws.timeout_ms = 60000;
-    
+    config->ws.max_request_size = AGENTOS_MAX_REQUEST_SIZE_WS;
+    config->ws.timeout_ms = AGENTOS_DEFAULT_TIMEOUT_MS * 2;
+
     config->stdio.type = GATEWAY_DAEMON_TYPE_STDIO;
     config->stdio.enabled = false;
-    config->stdio.max_request_size = 1024 * 1024;
+    config->stdio.max_request_size = AGENTOS_MAX_REQUEST_SIZE_STDIO;
     config->stdio.timeout_ms = 0;
-    
+
     config->enable_metrics = false;
     config->enable_tracing = false;
-    config->shutdown_timeout_ms = 5000;
+    config->shutdown_timeout_ms = AGENTOS_SHUTDOWN_TIMEOUT_MS;
 }
 
 /**

@@ -56,7 +56,7 @@ static void normalize_weights(weighted_data_t* data) {
 
 static int select_by_weight(weighted_data_t* data) {
     if (data->agent_count == 0) return -1;
-    double r = ((double)rand() / (double)RAND_MAX) * data->total_weight;
+    double r = ((double)agentos_random_float()) * data->total_weight;
     double cumulative = 0.0;
     for (size_t i = 0; i < data->agent_count; i++) {
         cumulative += data->agents[i].weight;

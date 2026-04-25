@@ -23,6 +23,7 @@ foreach(test ${MEMORYROVOL_TEST_TARGETS})
     target_link_libraries(${test} PRIVATE 
         agentos_memoryrovol 
         agentos_common
+        agentos_coreloopthree
     )
     
     if(UNIX AND NOT APPLE)

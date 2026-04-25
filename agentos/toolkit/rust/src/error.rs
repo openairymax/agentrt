@@ -133,7 +133,7 @@ pub enum AgentOSError {
 
     /// 配置错误
     #[error("[{}] {}", CODE_INVALID_CONFIG, .0)]
-    manager(String),
+    Config(String),
 
     /// 连接被拒绝错误
     #[error("[{}] {}", CODE_CONNECTION_REFUSED, .0)]
@@ -226,8 +226,8 @@ impl AgentOSError {
     }
 
     /// 创建配置错误
-    pub fn manager(message: &str) -> Self {
-        AgentOSError::manager(message.to_string())
+    pub fn config(message: &str) -> Self {
+        AgentOSError::Config(message.to_string())
     }
 
     /// 创建连接被拒绝错误
@@ -283,7 +283,7 @@ impl AgentOSError {
             AgentOSError::Skill(_) => CODE_SKILL_NOT_FOUND,
             AgentOSError::Timeout(_) => CODE_TIMEOUT,
             AgentOSError::InvalidResponse(_) => CODE_INVALID_RESPONSE,
-            AgentOSError::manager(_) => CODE_INVALID_CONFIG,
+            AgentOSError::Config(_) => CODE_INVALID_CONFIG,
             AgentOSError::ConnectionRefused(_) => CODE_CONNECTION_REFUSED,
             AgentOSError::Unauthorized(_) => CODE_UNAUTHORIZED,
             AgentOSError::Forbidden(_) => CODE_FORBIDDEN,

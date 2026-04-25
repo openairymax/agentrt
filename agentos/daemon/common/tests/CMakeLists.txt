@@ -31,7 +31,12 @@ foreach(TEST_SRC ${TEST_SOURCES})
     target_include_directories(${TARGET_NAME} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/../include
         ${CMAKE_CURRENT_SOURCE_DIR}/../src
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../agentos/commons/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons/platform/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons/utils/error/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons/utils/types/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../commons/utils/memory/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../atoms/corekern/include
     )
     
     target_link_libraries(${TARGET_NAME} PRIVATE
