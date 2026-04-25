@@ -192,7 +192,7 @@ static float score_consistency(const char* context, size_t ctx_len,
         for (size_t i = 0; i + 5 < min_len; i += 6) {
             if (context[i] == content[i]) matches++;
         }
-        if (matches > min_len / 12) score += 0.05f;
+        if (matches > (int)(min_len / 12)) score += 0.05f;
     }
 
     return clampf(score, 0.2f, 1.0f);
@@ -429,7 +429,7 @@ agentos_error_t agentos_mc_apply_correction(
             if (corrected) AGENTOS_FREE(corrected);
 
             if (attempt < max_retries - 1) {
-                struct timespec ts = { .tv_sec = 1 << attempt, .tv_nsec = 0 };
+                struct timespec ts = { .tv_sec = 1U << (attempt > 30 ? 30 : attempt), .tv_nsec = 0 };
                 nanosleep(&ts, NULL);
             }
         }
@@ -528,7 +528,7 @@ agentos_error_t agentos_mc_stats(agentos_metacognition_t* mc, char** out_json) {
     if (!mc || !out_json) return AGENTOS_EINVAL;
 
     char buf[1024];
-    int len = snprintf(buf, sizeof(buf),
+    (void)snprintf(buf, sizeof(buf),
         "{\"evaluations\":%llu,"
         "\"corrections\":%llu,"
         "\"rejections\":%llu,"
@@ -637,7 +637,7 @@ agentos_error_t agentos_mc_detect_patterns(
 
     /* 按步骤类型+最低分维度分组统计 */
     typedef struct { char key[96]; uint64_t total; uint64_t fail; mc_dimension_t worst_dim; } pattern_acc_t;
-    pattern_acc_t acc[MC_MAX_PATTERNS] = {{{0}}};
+    pattern_acc_t acc[MC_MAX_PATTERNS] = {{{0}, 0, 0, 0}};
     size_t acc_count = 0;
 
     size_t check_n = (mc->record_count > 20) ? 20 : mc->record_count;

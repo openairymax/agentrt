@@ -7,6 +7,7 @@
 
 #include "mcp_v1_adapter.h"
 #include "unified_protocol.h"
+#include <cjson/cJSON.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -122,15 +123,19 @@ mcp_v1_context_t* mcp_v1_context_create(const mcp_v1_config_t* config) {
 
     ctx->tool_capacity = 32;
     ctx->tools = calloc(ctx->tool_capacity, sizeof(mcp_tool_entry_t));
+    if (!ctx->tools) { free(ctx); return NULL; }
 
     ctx->resource_capacity = 16;
     ctx->resources = calloc(ctx->resource_capacity, sizeof(mcp_resource_entry_t));
+    if (!ctx->resources) { free(ctx->tools); free(ctx); return NULL; }
 
     ctx->template_capacity = 16;
     ctx->resource_templates = calloc(ctx->template_capacity, sizeof(mcp_resource_template_t));
+    if (!ctx->resource_templates) { free(ctx->resources); free(ctx->tools); free(ctx); return NULL; }
 
     ctx->prompt_capacity = 16;
     ctx->prompts = calloc(ctx->prompt_capacity, sizeof(mcp_prompt_entry_t));
+    if (!ctx->prompts) { free(ctx->resource_templates); free(ctx->resources); free(ctx->tools); free(ctx); return NULL; }
 
     ctx->log_level = MCP_LOG_INFO;
     ctx->request_counter = 0;
@@ -366,14 +371,15 @@ int mcp_v1_handle_tools_call(mcp_v1_context_t* ctx,
 
     if (!found) {
         char* name_esc = json_string_escape(name);
+        const char* safe_name = name_esc ? name_esc : name;
         size_t len = snprintf(NULL, 0,
             "{\"isError\":true,\"content\":[{\"type\":\"text\",\"text\":\"Tool not found: %s\"}]}",
-            name);
+            safe_name);
         char* resp = malloc(len + 1);
         if (resp) {
             snprintf(resp, len + 1,
                 "{\"isError\":true,\"content\":[{\"type\":\"text\",\"text\":\"Tool not found: %s\"}]}",
-                name);
+                safe_name);
         }
         free(name_esc);
         *response_json = resp;
@@ -923,17 +929,54 @@ int mcp_v1_route_request(mcp_v1_context_t* ctx,
     if (strcmp(method, "tools/list") == 0) {
         return mcp_v1_handle_tools_list(ctx, response_json);
     } else if (strcmp(method, "tools/call") == 0) {
-        return mcp_v1_handle_tools_call(ctx, "unknown", params_json, response_json);
+        char tool_name[256] = {0};
+        if (params_json) {
+            cJSON* pj = cJSON_Parse(params_json);
+            if (pj) {
+                cJSON* name_item = cJSON_GetObjectItem(pj, "name");
+                if (cJSON_IsString(name_item) && name_item->valuestring) {
+                    strncpy(tool_name, name_item->valuestring, sizeof(tool_name) - 1);
+                    tool_name[sizeof(tool_name) - 1] = '\0';
+                }
+                cJSON_Delete(pj);
+            }
+        }
+        return mcp_v1_handle_tools_call(ctx, tool_name[0] ? tool_name : "unknown",
+                                        params_json, response_json);
     } else if (strcmp(method, "resources/list") == 0) {
         return mcp_v1_handle_resources_list(ctx, response_json);
     } else if (strcmp(method, "resources/read") == 0) {
-        return mcp_v1_handle_resources_read(ctx, "unknown", response_json);
+        char resource_uri[512] = {0};
+        if (params_json) {
+            cJSON* pj = cJSON_Parse(params_json);
+            if (pj) {
+                cJSON* uri_item = cJSON_GetObjectItem(pj, "uri");
+                if (cJSON_IsString(uri_item) && uri_item->valuestring) {
+                    strncpy(resource_uri, uri_item->valuestring, sizeof(resource_uri) - 1);
+                }
+                cJSON_Delete(pj);
+            }
+        }
+        return mcp_v1_handle_resources_read(ctx, resource_uri[0] ? resource_uri : "unknown",
+                                            response_json);
     } else if (strcmp(method, "resources/templates/list") == 0) {
         return mcp_v1_handle_resources_templates(ctx, response_json);
     } else if (strcmp(method, "prompts/list") == 0) {
         return mcp_v1_handle_prompts_list(ctx, response_json);
     } else if (strcmp(method, "prompts/get") == 0) {
-        return mcp_v1_handle_prompts_get(ctx, "unknown", params_json, response_json);
+        char prompt_name[256] = {0};
+        if (params_json) {
+            cJSON* pj = cJSON_Parse(params_json);
+            if (pj) {
+                cJSON* name_item = cJSON_GetObjectItem(pj, "name");
+                if (cJSON_IsString(name_item) && name_item->valuestring) {
+                    strncpy(prompt_name, name_item->valuestring, sizeof(prompt_name) - 1);
+                }
+                cJSON_Delete(pj);
+            }
+        }
+        return mcp_v1_handle_prompts_get(ctx, prompt_name[0] ? prompt_name : "unknown",
+                                         params_json, response_json);
     } else if (strcmp(method, "logging/setLogLevel") == 0) {
         return mcp_v1_set_log_level(ctx, MCP_LOG_INFO);
     } else if (strcmp(method, "initialize") == 0) {

@@ -1,3 +1,4 @@
+#include <cjson/cJSON.h>
 /**
  * @file local.c
  * @brief 本地模型适配器（兼容 OpenAI 格式）
@@ -109,16 +110,112 @@ static int local_complete(provider_ctx_t* ctx_ptr,
     return ret;
 }
 
-/* ---------- 流式完成 ---------- */
+/* ---------- 流式完成（SSE, OpenAI兼容格式） ---------- */
+
+typedef struct {
+    llm_stream_callback_t user_cb;
+    void*                 user_data;
+    char*                 acc_content;
+    size_t                acc_cap;
+    size_t                acc_len;
+    char*                 resp_id;
+    char*                 resp_model;
+    uint64_t              resp_created;
+    char*                 finish_reason;
+} loc_stream_acc_t;
+
+static int loc_stream_on_chunk(const char* json_line, void* userdata) {
+    loc_stream_acc_t* acc = (loc_stream_acc_t*)userdata;
+
+    cJSON* root = cJSON_Parse(json_line);
+    if (!root) return 0;
+
+    if (!acc->resp_id) {
+        cJSON* id = cJSON_GetObjectItem(root, "id");
+        if (cJSON_IsString(id) && id->valuestring)
+            acc->resp_id = strdup(id->valuestring);
+    }
+
+    if (!acc->resp_model) {
+        cJSON* model = cJSON_GetObjectItem(root, "model");
+        if (cJSON_IsString(model) && model->valuestring)
+            acc->resp_model = strdup(model->valuestring);
+    }
+
+    cJSON* created = cJSON_GetObjectItem(root, "created");
+    if (cJSON_IsNumber(created) && acc->resp_created == 0)
+        acc->resp_created = (uint64_t)created->valuedouble;
+
+    cJSON* choices = cJSON_GetObjectItem(root, "choices");
+    if (cJSON_IsArray(choices) && cJSON_GetArraySize(choices) > 0) {
+        cJSON* choice = cJSON_GetArrayItem(choices, 0);
+        cJSON* delta = cJSON_GetObjectItem(choice, "delta");
+        if (delta) {
+            cJSON* content = cJSON_GetObjectItem(delta, "content");
+            if (cJSON_IsString(content) && content->valuestring) {
+                const char* text = content->valuestring;
+                size_t tlen = strlen(text);
+
+                if (acc->user_cb)
+                    acc->user_cb(text, acc->user_data);
+
+                if (tlen > 0) {
+                    size_t needed = acc->acc_len + tlen + 1;
+                    if (needed > acc->acc_cap) {
+                        size_t new_cap = acc->acc_cap * 2;
+                        while (new_cap < needed) new_cap *= 2;
+                        char* ptr = (char*)realloc(acc->acc_content, new_cap);
+                        if (ptr) { acc->acc_content = ptr; acc->acc_cap = new_cap; }
+                    }
+                    if (acc->acc_content && acc->acc_len + tlen < acc->acc_cap) {
+                        memcpy(acc->acc_content + acc->acc_len, text, tlen);
+                        acc->acc_len += tlen;
+                        acc->acc_content[acc->acc_len] = '\0';
+                    }
+                }
+            }
+        }
+
+        cJSON* fr = cJSON_GetObjectItem(choice, "finish_reason");
+        if (cJSON_IsString(fr) && fr->valuestring &&
+            strcmp(fr->valuestring, "null") != 0) {
+            free(acc->finish_reason);
+            acc->finish_reason = strdup(fr->valuestring);
+        }
+    }
+
+    cJSON_Delete(root);
+    return 0;
+}
+
+static llm_response_t* loc_build_stream_response(loc_stream_acc_t* acc) {
+    llm_response_t* resp = (llm_response_t*)calloc(1, sizeof(llm_response_t));
+    if (!resp) return NULL;
+
+    resp->id = acc->resp_id ? acc->resp_id : strdup("");
+    acc->resp_id = NULL;
+    resp->model = acc->resp_model ? acc->resp_model : strdup("unknown");
+    acc->resp_model = NULL;
+    resp->created = acc->resp_created;
+    resp->choice_count = 1;
+    resp->choices = (llm_message_t*)calloc(1, sizeof(llm_message_t));
+    if (resp->choices) {
+        resp->choices[0].role = strdup("assistant");
+        resp->choices[0].content = acc->acc_content;
+        acc->acc_content = NULL;
+    }
+    resp->finish_reason = acc->finish_reason ? acc->finish_reason : strdup("stop");
+    acc->finish_reason = NULL;
+    return resp;
+}
 
 static int local_complete_stream(provider_ctx_t* ctx_ptr,
                                  const llm_request_config_t* manager,
                                  llm_stream_callback_t callback,
                                  void* user_data,
                                  llm_response_t** out_response) {
-    if (!ctx_ptr || !manager || !callback) {
+    if (!ctx_ptr || !manager || !callback)
         return AGENTOS_ERR_INVALID_PARAM;
-    }
 
     local_ctx_t* ctx = (local_ctx_t*)ctx_ptr;
     provider_base_ctx_t* base = &ctx->base;
@@ -127,9 +224,7 @@ static int local_complete_stream(provider_ctx_t* ctx_ptr,
     stream_cfg.stream = 1;
 
     char* req_body = provider_build_openai_request(&stream_cfg, LOCAL_DEFAULT_MODEL);
-    if (!req_body) {
-        return AGENTOS_ERR_OUT_OF_MEMORY;
-    }
+    if (!req_body) return AGENTOS_ERR_OUT_OF_MEMORY;
 
     char url[1024];
     snprintf(url, sizeof(url), "%s/chat/completions", base->api_base);
@@ -137,33 +232,36 @@ static int local_complete_stream(provider_ctx_t* ctx_ptr,
     struct curl_slist* headers = NULL;
     headers = curl_slist_append(headers, "Content-Type: application/json");
 
-    provider_http_resp_t* http_resp = NULL;
-    long http_code = 0;
+    loc_stream_acc_t acc;
+    memset(&acc, 0, sizeof(acc));
+    acc.user_cb = callback;
+    acc.user_data = user_data;
+    acc.acc_cap = 4096;
+    acc.acc_content = (char*)malloc(acc.acc_cap);
 
-    int ret = provider_http_post(url, headers, req_body,
-                               base->timeout_sec, base->max_retries,
-                               &http_resp, &http_code);
+    long http_code = 0;
+    int ret = provider_http_post_stream(url, headers, req_body,
+                                        base->timeout_sec,
+                                        loc_stream_on_chunk, &acc,
+                                        &http_code);
 
     curl_slist_free_all(headers);
     free(req_body);
 
     if (ret != AGENTOS_OK) {
+        SVC_LOG_ERROR("local: Stream HTTP error, status=%ld", http_code);
+        free(acc.acc_content); free(acc.resp_id);
+        free(acc.resp_model); free(acc.finish_reason);
         return ret;
     }
 
-    if (http_code != 200) {
-        provider_http_resp_free(http_resp);
-        return AGENTOS_ERR_IO;
-    }
+    llm_response_t* resp = loc_build_stream_response(&acc);
+    free(acc.acc_content); free(acc.resp_id);
+    free(acc.resp_model); free(acc.finish_reason);
 
-    if (callback && http_resp->data) {
-        callback(http_resp->data, user_data);
-    }
+    if (out_response) *out_response = resp;
+    else if (resp) llm_response_free(resp);
 
-    if (out_response) {
-        *out_response = NULL;
-    }
-    provider_http_resp_free(http_resp);
     return AGENTOS_OK;
 }
 

@@ -1,25 +1,20 @@
-// AgentOS TypeScript SDK Syscall
-// Version: 3.0.0
-// Last updated: 2026-04-04
-
 import { AgentOSError } from './errors';
 
-/** 系统调用命名空间 */
 export enum SyscallNamespace {
   TASK = 'task',
   MEMORY = 'memory',
   SESSION = 'session',
+  SKILL = 'skill',
+  AGENT = 'agent',
   TELEMETRY = 'telemetry',
 }
 
-/** 系统调用请求 */
 export interface SyscallRequest {
   namespace: SyscallNamespace;
   operation: string;
   params?: Record<string, any>;
 }
 
-/** 系统调用响应 */
 export interface SyscallResponse {
   success: boolean;
   data?: any;
@@ -27,17 +22,56 @@ export interface SyscallResponse {
   error_code?: string;
 }
 
-/** 系统调用绑定（抽象基类，供特定运行时实现�?*/
 export abstract class SyscallBinding {
-  /** 执行系统调用 */
   abstract invoke(request: SyscallRequest): Promise<SyscallResponse>;
 }
 
-/** 任务系统调用便捷方法 */
+export class HttpSyscallBinding extends SyscallBinding {
+  private baseUrl: string;
+  private defaultHeaders: Record<string, string>;
+
+  constructor(baseUrl: string, options?: { apiKey?: string; timeout?: number }) {
+    super();
+    this.baseUrl = baseUrl.replace(/\/+$/, '');
+    this.defaultHeaders = {
+      'Content-Type': 'application/json',
+    };
+    if (options?.apiKey) {
+      this.defaultHeaders['Authorization'] = `Bearer ${options.apiKey}`;
+    }
+  }
+
+  async invoke(request: SyscallRequest): Promise<SyscallResponse> {
+    const url = `${this.baseUrl}/api/v1/syscall/${request.namespace}`;
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: this.defaultHeaders,
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        throw AgentOSError.http(
+          `Syscall HTTP ${response.status}: ${request.operation}`
+        );
+      }
+
+      const data = await response.json();
+      return data as SyscallResponse;
+    } catch (err) {
+      if (err instanceof AgentOSError) {
+        throw err;
+      }
+      throw AgentOSError.network(
+        `Syscall network error: ${(err as Error).message}`
+      );
+    }
+  }
+}
+
 export class TaskSyscall {
   constructor(private binding: SyscallBinding) {}
 
-  /** 提交任务 */
   async submit(description: string): Promise<SyscallResponse> {
     return this.binding.invoke({
       namespace: SyscallNamespace.TASK,
@@ -46,7 +80,6 @@ export class TaskSyscall {
     });
   }
 
-  /** 查询任务状�?*/
   async query(taskId: string): Promise<SyscallResponse> {
     return this.binding.invoke({
       namespace: SyscallNamespace.TASK,
@@ -55,7 +88,14 @@ export class TaskSyscall {
     });
   }
 
-  /** 取消任务 */
+  async wait(taskId: string, timeoutMs: number = 0): Promise<SyscallResponse> {
+    return this.binding.invoke({
+      namespace: SyscallNamespace.TASK,
+      operation: 'wait',
+      params: { task_id: taskId, timeout_ms: timeoutMs },
+    });
+  }
+
   async cancel(taskId: string): Promise<SyscallResponse> {
     return this.binding.invoke({
       namespace: SyscallNamespace.TASK,
@@ -65,11 +105,9 @@ export class TaskSyscall {
   }
 }
 
-/** 记忆系统调用便捷方法 */
 export class MemorySyscall {
   constructor(private binding: SyscallBinding) {}
 
-  /** 写入记忆 */
   async write(content: string, metadata?: Record<string, any>): Promise<SyscallResponse> {
     return this.binding.invoke({
       namespace: SyscallNamespace.MEMORY,
@@ -78,7 +116,22 @@ export class MemorySyscall {
     });
   }
 
-  /** 搜索记忆 */
+  async read(memoryId: string): Promise<SyscallResponse> {
+    return this.binding.invoke({
+      namespace: SyscallNamespace.MEMORY,
+      operation: 'read',
+      params: { memory_id: memoryId },
+    });
+  }
+
+  async get(memoryId: string): Promise<SyscallResponse> {
+    return this.binding.invoke({
+      namespace: SyscallNamespace.MEMORY,
+      operation: 'get',
+      params: { memory_id: memoryId },
+    });
+  }
+
   async search(query: string, topK: number = 5): Promise<SyscallResponse> {
     return this.binding.invoke({
       namespace: SyscallNamespace.MEMORY,
@@ -87,7 +140,6 @@ export class MemorySyscall {
     });
   }
 
-  /** 删除记忆 */
   async delete(memoryId: string): Promise<SyscallResponse> {
     return this.binding.invoke({
       namespace: SyscallNamespace.MEMORY,
@@ -97,11 +149,9 @@ export class MemorySyscall {
   }
 }
 
-/** 会话系统调用便捷方法 */
 export class SessionSyscall {
   constructor(private binding: SyscallBinding) {}
 
-  /** 创建会话 */
   async create(): Promise<SyscallResponse> {
     return this.binding.invoke({
       namespace: SyscallNamespace.SESSION,
@@ -109,7 +159,29 @@ export class SessionSyscall {
     });
   }
 
-  /** 设置上下�?*/
+  async get(sessionId: string): Promise<SyscallResponse> {
+    return this.binding.invoke({
+      namespace: SyscallNamespace.SESSION,
+      operation: 'get',
+      params: { session_id: sessionId },
+    });
+  }
+
+  async close(sessionId: string): Promise<SyscallResponse> {
+    return this.binding.invoke({
+      namespace: SyscallNamespace.SESSION,
+      operation: 'close',
+      params: { session_id: sessionId },
+    });
+  }
+
+  async list(): Promise<SyscallResponse> {
+    return this.binding.invoke({
+      namespace: SyscallNamespace.SESSION,
+      operation: 'list',
+    });
+  }
+
   async setContext(sessionId: string, key: string, value: any): Promise<SyscallResponse> {
     return this.binding.invoke({
       namespace: SyscallNamespace.SESSION,
@@ -118,12 +190,74 @@ export class SessionSyscall {
     });
   }
 
-  /** 获取上下�?*/
   async getContext(sessionId: string, key: string): Promise<SyscallResponse> {
     return this.binding.invoke({
       namespace: SyscallNamespace.SESSION,
       operation: 'get_context',
       params: { session_id: sessionId, key },
+    });
+  }
+}
+
+export class SkillSyscall {
+  constructor(private binding: SyscallBinding) {}
+
+  async load(skillName: string): Promise<SyscallResponse> {
+    return this.binding.invoke({
+      namespace: SyscallNamespace.SKILL,
+      operation: 'load',
+      params: { skill_name: skillName },
+    });
+  }
+
+  async execute(skillId: string, params: Record<string, any>): Promise<SyscallResponse> {
+    return this.binding.invoke({
+      namespace: SyscallNamespace.SKILL,
+      operation: 'execute',
+      params: { skill_id: skillId, params },
+    });
+  }
+
+  async unload(skillId: string): Promise<SyscallResponse> {
+    return this.binding.invoke({
+      namespace: SyscallNamespace.SKILL,
+      operation: 'unload',
+      params: { skill_id: skillId },
+    });
+  }
+
+  async list(): Promise<SyscallResponse> {
+    return this.binding.invoke({
+      namespace: SyscallNamespace.SKILL,
+      operation: 'list',
+    });
+  }
+}
+
+export class AgentSyscall {
+  constructor(private binding: SyscallBinding) {}
+
+  async spawn(spec: Record<string, any>): Promise<SyscallResponse> {
+    return this.binding.invoke({
+      namespace: SyscallNamespace.AGENT,
+      operation: 'spawn',
+      params: { spec },
+    });
+  }
+
+  async terminate(agentId: string): Promise<SyscallResponse> {
+    return this.binding.invoke({
+      namespace: SyscallNamespace.AGENT,
+      operation: 'terminate',
+      params: { agent_id: agentId },
+    });
+  }
+
+  async invoke(agentId: string, method: string, args: Record<string, any>): Promise<SyscallResponse> {
+    return this.binding.invoke({
+      namespace: SyscallNamespace.AGENT,
+      operation: 'invoke',
+      params: { agent_id: agentId, method, args },
     });
   }
 }

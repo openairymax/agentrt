@@ -84,8 +84,8 @@ int agentos_token_analyze_text(
         }
         else if (c >= 0xE0 && c <= 0xEF && i + 2 < length) {
             // 3 字节字符（主要 CJK 字符）
-            unsigned char next1 = (unsigned char)text[i + 1];
-            unsigned char next2 = (unsigned char)text[i + 2];
+            unsigned char next1 __attribute__((unused)) = (unsigned char)text[i + 1];
+            unsigned char next2 __attribute__((unused)) = (unsigned char)text[i + 2];
             // 简化检测：3字节 UTF-8 字符很可能是 CJK
             if (c == 0xE4 || c == 0xE5 || c == 0xE6 || c == 0xE7 || 
                 c == 0xE8 || c == 0xE9 || c == 0xEA || c == 0xEB || 

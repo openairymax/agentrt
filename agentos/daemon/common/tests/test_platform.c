@@ -93,11 +93,11 @@ static void test_strlcpy(void) {
     char dest[32];
     const char* src = "Hello, AgentOS!";
 
-    agentos_strlcpy(dest, sizeof(dest), src);
+    agentos_strlcpy(dest, src, sizeof(dest));
     assert(strcmp(dest, src) == 0);
 
     char dest2[8];
-    agentos_strlcpy(dest2, sizeof(dest2), src);
+    agentos_strlcpy(dest2, src, sizeof(dest2));
     assert(strlen(dest2) >= 3);
 
     printf("    PASSED\n");

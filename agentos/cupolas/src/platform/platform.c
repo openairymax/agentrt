@@ -757,7 +757,8 @@ void* cupolas_mem_alloc_aligned(size_t size, size_t alignment) {
     return _aligned_malloc(size, alignment);
 #else
     void* ptr = NULL;
-    (void)posix_memalign(&ptr, alignment, size);
+    int ret = posix_memalign(&ptr, alignment, size);
+    if (ret != 0) return NULL;
     return ptr;
 #endif
 }
