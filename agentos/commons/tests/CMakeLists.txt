@@ -30,6 +30,7 @@ foreach(test_source ${UNIT_TEST_SOURCES})
     add_executable(${test_name} ${test_source})
 
     target_include_directories(${test_name} PRIVATE
+        ${COMMONS_ROOT}/include
         ${COMMONS_ROOT}/platform/include
         ${COMMONS_ROOT}/utils/logging/include
         ${COMMONS_ROOT}/utils/error/include
@@ -40,6 +41,7 @@ foreach(test_source ${UNIT_TEST_SOURCES})
         ${COMMONS_ROOT}/utils/cost/include
         ${COMMONS_ROOT}/utils/ipc/include
         ${COMMONS_ROOT}/utils/network/include
+        ${COMMONS_ROOT}/utils/memory/include
         ${AGENTOS_ROOT}/atoms/corekern/include
         ${CMAKE_CURRENT_SOURCE_DIR}
     )

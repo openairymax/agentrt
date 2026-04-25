@@ -431,3 +431,91 @@ agentos_error_t agentos_memoryrov_forget(agentos_memoryrov_handle_t* handle) {
     uint32_t pruned_count = 0;
     return agentos_forgetting_prune(handle->forgetting, &pruned_count);
 }
+
+agentos_error_t agentos_memoryrov_write_raw(
+    agentos_memoryrov_handle_t* handle,
+    const void* data,
+    size_t len,
+    const char* metadata,
+    char** out_record_id) {
+    if (!handle || !data || len == 0 || !out_record_id || !handle->initialized) {
+        return AGENTOS_EINVAL;
+    }
+    char id[64];
+#ifdef AGENTOS_HAS_UUID
+    agentos_uuid_error_t uuid_err = agentos_uuid_with_prefix("raw_", id, sizeof(id));
+    if (uuid_err != AGENTOS_UUID_SUCCESS) {
+        snprintf(id, sizeof(id), "raw_%lu_%zu", (unsigned long)time(NULL), (size_t)handle);
+    }
+#else
+    snprintf(id, sizeof(id), "raw_%lu_%zu", (unsigned long)time(NULL), (size_t)handle);
+#endif
+    agentos_error_t err = agentos_layer1_raw_write(handle->l1_raw, id, (const char*)data, len);
+    if (err != AGENTOS_SUCCESS) {
+        return err;
+    }
+    *out_record_id = AGENTOS_STRDUP(id);
+    if (!*out_record_id) {
+        return AGENTOS_ENOMEM;
+    }
+    (void)metadata;
+    return AGENTOS_SUCCESS;
+}
+
+agentos_error_t agentos_memoryrov_get_raw(
+    agentos_memoryrov_handle_t* handle,
+    const char* record_id,
+    void** out_data,
+    size_t* out_len) {
+    if (!handle || !record_id || !out_data || !out_len || !handle->initialized) {
+        return AGENTOS_EINVAL;
+    }
+    return agentos_layer1_raw_read(handle->l1_raw, record_id, out_data, out_len);
+}
+
+agentos_error_t agentos_memoryrov_delete_raw(
+    agentos_memoryrov_handle_t* handle,
+    const char* record_id) {
+    if (!handle || !record_id || !handle->initialized) {
+        return AGENTOS_EINVAL;
+    }
+    return agentos_layer1_raw_delete(handle->l1_raw, record_id);
+}
+
+agentos_error_t agentos_memoryrov_query(
+    agentos_memoryrov_handle_t* handle,
+    const char* query,
+    uint32_t limit,
+    char*** out_record_ids,
+    float** out_scores,
+    size_t* out_count) {
+    if (!handle || !query || !out_record_ids || !out_scores || !out_count || !handle->initialized) {
+        return AGENTOS_EINVAL;
+    }
+    if (limit == 0) {
+        *out_record_ids = NULL;
+        *out_scores = NULL;
+        *out_count = 0;
+        return AGENTOS_EINVAL;
+    }
+    return agentos_layer2_feature_search(handle->l2_feature, query, limit,
+                                          out_record_ids, out_scores, out_count);
+}
+
+agentos_error_t agentos_memoryrov_mount(
+    agentos_memoryrov_handle_t* handle,
+    const char* record_id,
+    const char* context) {
+    if (!handle || !record_id || !handle->initialized) {
+        return AGENTOS_EINVAL;
+    }
+    (void)context;
+    void* data = NULL;
+    size_t len = 0;
+    agentos_error_t err = agentos_layer1_raw_read(handle->l1_raw, record_id, &data, &len);
+    if (err != AGENTOS_SUCCESS) {
+        return err;
+    }
+    if (data) AGENTOS_FREE(data);
+    return AGENTOS_SUCCESS;
+}

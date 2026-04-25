@@ -284,7 +284,7 @@ static char* handle_complete(cJSON* params, int id) {
         if (ret == 0) break;
 
         if (attempt < LLM_MAX_RETRIES) {
-            unsigned delay_ms = LLM_BASE_DELAY_MS * (1 << attempt);
+            unsigned delay_ms = LLM_BASE_DELAY_MS * (1U << (attempt > 15 ? 15 : attempt));
             SVC_LOG_WARN("LLM complete attempt %d/%d failed (err=%d), retrying in %ums",
                          attempt + 1, LLM_MAX_RETRIES + 1, ret, delay_ms);
             agentos_sleep_ms(delay_ms);

@@ -25,7 +25,7 @@ extern "C" {
  * - Audit trail: All access attempts logged
  * - Anti-tampering: Integrity checks prevent data tampering
  */
-#include "cupolas_vault_cred_type.h"
+#include <cupolas_vault_cred_type.h>
 
 /**
  * @brief Access operation types (bit flags)

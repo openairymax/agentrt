@@ -7,6 +7,7 @@
 #include "layer3_structure.h"
 #include "agentos.h"
 #include "logger.h"
+#include "platform.h"
 #include <sqlite3.h>
 #include <stdlib.h>
 
@@ -23,7 +24,7 @@ static float* random_unit_vector(size_t dim) {
     if (!vec) return NULL;
     float norm = 0;
     for (size_t i = 0; i < dim; i++) {
-        vec[i] = (float)rand() / RAND_MAX * 2.0f - 1.0f;
+        vec[i] = (float)agentos_random_float() * 2.0f - 1.0f;
         norm += vec[i] * vec[i];
     }
     if (norm > 0) {

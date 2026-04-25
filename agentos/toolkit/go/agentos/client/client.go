@@ -1,10 +1,3 @@
-// AgentOS Go SDK - 客户端模块
-// Version: 3.0.0
-// Last updated: 2026-03-22
-//
-// 提供 HTTP 通信层、APIClient 接口定义和依赖倒转抽象。
-// 对应 Python SDK: client/__init__.py + agent.py
-
 package client
 
 import (
@@ -25,10 +18,8 @@ import (
 	"github.com/spharx/agentos/toolkit/go/agentos/utils"
 )
 
-// MaxResponseBodySize 响应体最大允许大小（10MB）
 const MaxResponseBodySize = 10 * 1024 * 1024
 
-// APIClient 定义所有 Manager 共同依赖的 HTTP 通信接口
 type APIClient interface {
 	Get(ctx context.Context, path string, opts ...types.RequestOption) (*types.APIResponse, error)
 	Post(ctx context.Context, path string, body interface{}, opts ...types.RequestOption) (*types.APIResponse, error)
@@ -36,56 +27,49 @@ type APIClient interface {
 	Delete(ctx context.Context, path string, opts ...types.RequestOption) (*types.APIResponse, error)
 }
 
-// Client 是 AgentOS Go SDK 的核心 HTTP 客户端
 type Client struct {
-	manager     *agentos.manager
+	config     *agentos.Config
 	httpClient *http.Client
 }
 
-// 确保 Client 实现了 APIClient 接口（编译期检查）
 var _ APIClient = (*Client)(nil)
 
-// NewClient 使用函数式选项创建新的 HTTP 客户端
 func NewClient(opts ...agentos.ConfigOption) (*Client, error) {
-	manager := agentos.NewConfig(opts...)
-	if err := manager.Validate(); err != nil {
+	config := agentos.NewConfig(opts...)
+	if err := config.Validate(); err != nil {
 		return nil, err
 	}
-	return newClientWithConfig(manager)
+	return newClientWithConfig(config)
 }
 
-// NewClientWithConfig 使用预构建的 manager 对象创建客户端
-func NewClientWithConfig(manager *agentos.manager) (*Client, error) {
-	if manager == nil {
-		manager = agentos.DefaultConfig()
+func NewClientWithConfig(config *agentos.Config) (*Client, error) {
+	if config == nil {
+		config = agentos.DefaultConfig()
 	}
-	if err := manager.Validate(); err != nil {
+	if err := config.Validate(); err != nil {
 		return nil, err
 	}
-	return newClientWithConfig(manager)
+	return newClientWithConfig(config)
 }
 
-// newClientWithConfig 内部构造函数
-func newClientWithConfig(manager *agentos.manager) (*Client, error) {
+func newClientWithConfig(config *agentos.Config) (*Client, error) {
 	return &Client{
-		manager: manager,
+		config: config,
 		httpClient: &http.Client{
-			Timeout: manager.Timeout,
+			Timeout: config.Timeout,
 			Transport: &http.Transport{
-				MaxIdleConns:        manager.MaxConnections,
-				IdleConnTimeout:     manager.IdleConnTimeout,
-				DisableCompression:  false,
+				MaxIdleConns:       config.MaxConnections,
+				IdleConnTimeout:    config.IdleConnTimeout,
+				DisableCompression: false,
 			},
 		},
 	}, nil
 }
 
-// GetConfig 返回当前客户端的配置副本
-func (c *Client) GetConfig() *agentos.manager {
-	return c.manager.Clone()
+func (c *Client) GetConfig() *agentos.Config {
+	return c.config.Clone()
 }
 
-// Health 检查 AgentOS 服务的健康状态
 func (c *Client) Health(ctx context.Context) (*types.HealthStatus, error) {
 	resp, err := c.Get(ctx, "/health")
 	if err != nil {
@@ -106,7 +90,6 @@ func (c *Client) Health(ctx context.Context) (*types.HealthStatus, error) {
 	}, nil
 }
 
-// Metrics 获取 AgentOS 系统运行指标
 func (c *Client) Metrics(ctx context.Context) (*types.Metrics, error) {
 	resp, err := c.Get(ctx, "/metrics")
 	if err != nil {
@@ -132,7 +115,6 @@ func (c *Client) Metrics(ctx context.Context) (*types.Metrics, error) {
 	}, nil
 }
 
-// Close 关闭客户端，释放 HTTP 连接池资源
 func (c *Client) Close() error {
 	if c.httpClient != nil {
 		c.httpClient.CloseIdleConnections()
@@ -140,23 +122,17 @@ func (c *Client) Close() error {
 	return nil
 }
 
-// String 返回客户端的可读描述
 func (c *Client) String() string {
-	return fmt.Sprintf("AgentOS Client[endpoint=%s, timeout=%v]", c.manager.Endpoint, c.manager.Timeout)
+	return fmt.Sprintf("AgentOS Client[endpoint=%s, timeout=%v]", c.config.Endpoint, c.config.Timeout)
 }
 
-// ============================================================
-// HTTP 通信实现 (APIClient 接口)
-// ============================================================
-
-// request 执行底层 HTTP 请求，包含序列化、重试和响应解析逻辑
 func (c *Client) request(ctx context.Context, method, path string, body interface{}, opts ...types.RequestOption) (*types.APIResponse, error) {
 	options := &types.RequestOptions{}
 	for _, opt := range opts {
 		opt(options)
 	}
 
-	fullURL := strings.TrimRight(c.manager.Endpoint, "/") + utils.BuildURL(path, options.QueryParams)
+	fullURL := strings.TrimRight(c.config.Endpoint, "/") + utils.BuildURL(path, options.QueryParams)
 
 	var reqBody io.Reader
 	if body != nil {
@@ -173,19 +149,19 @@ func (c *Client) request(ctx context.Context, method, path string, body interfac
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", c.manager.UserAgent)
+	req.Header.Set("User-Agent", c.config.UserAgent)
 	req.Header.Set("X-Request-ID", generateRequestID())
-	if c.manager.APIKey != "" {
-		req.Header.Set("Authorization", "Bearer "+c.manager.APIKey)
+	if c.config.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.config.APIKey)
 	}
 	for k, v := range options.Headers {
 		req.Header.Set(k, v)
 	}
 
 	var lastErr error
-	for attempt := 0; attempt <= c.manager.MaxRetries; attempt++ {
+	for attempt := 0; attempt <= c.config.MaxRetries; attempt++ {
 		if attempt > 0 {
-			delay := calculateBackoff(c.manager.RetryDelay, attempt)
+			delay := calculateBackoff(c.config.RetryDelay, attempt)
 
 			select {
 			case <-ctx.Done():
@@ -236,14 +212,12 @@ func (c *Client) request(ctx context.Context, method, path string, body interfac
 	return nil, lastErr
 }
 
-// generateRequestID 生成唯一的请求 ID
 func generateRequestID() string {
 	timestamp := time.Now().UnixNano()
 	randomNum, _ := rand.Int(rand.Reader, big.NewInt(1000000))
 	return fmt.Sprintf("req-%d-%06d", timestamp, randomNum.Int64())
 }
 
-// calculateBackoff 计算指数退避延迟（含抖动）
 func calculateBackoff(baseDelay time.Duration, attempt int) time.Duration {
 	backoff := float64(baseDelay) * math.Pow(2, float64(attempt-1))
 
@@ -253,28 +227,22 @@ func calculateBackoff(baseDelay time.Duration, attempt int) time.Duration {
 	return time.Duration(backoff) + jitter
 }
 
-// shouldRetry 根据 HTTP 状态码判断是否应进行重试
 func shouldRetry(statusCode int) bool {
 	return statusCode >= 500 || statusCode == http.StatusTooManyRequests
 }
 
-// Get 执行 HTTP GET 请求
 func (c *Client) Get(ctx context.Context, path string, opts ...types.RequestOption) (*types.APIResponse, error) {
 	return c.request(ctx, http.MethodGet, path, nil, opts...)
 }
 
-// Post 执行 HTTP POST 请求
 func (c *Client) Post(ctx context.Context, path string, body interface{}, opts ...types.RequestOption) (*types.APIResponse, error) {
 	return c.request(ctx, http.MethodPost, path, body, opts...)
 }
 
-// Put 执行 HTTP PUT 请求
 func (c *Client) Put(ctx context.Context, path string, body interface{}, opts ...types.RequestOption) (*types.APIResponse, error) {
 	return c.request(ctx, http.MethodPut, path, body, opts...)
 }
 
-// Delete 执行 HTTP DELETE 请求
 func (c *Client) Delete(ctx context.Context, path string, opts ...types.RequestOption) (*types.APIResponse, error) {
 	return c.request(ctx, http.MethodDelete, path, nil, opts...)
 }
-

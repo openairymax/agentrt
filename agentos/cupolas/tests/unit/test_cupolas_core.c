@@ -234,7 +234,7 @@ static void test_workbench_create_destroy(void) {
  * ============================================================================ */
 
 static void test_cupolas_init_cleanup(void) {
-    assert(cupolas_init(NULL) == cupolas_OK);
+    assert(cupolas_init(NULL, NULL) == cupolas_OK);
     assert(strcmp(cupolas_version(), "1.0.0") == 0);
     cupolas_cleanup();
     
@@ -242,7 +242,7 @@ static void test_cupolas_init_cleanup(void) {
 }
 
 static void test_cupolas_permission(void) {
-    assert(cupolas_init(NULL) == cupolas_OK);
+    assert(cupolas_init(NULL, NULL) == cupolas_OK);
     
     assert(cupolas_add_permission_rule("test_agent", "read", "/test/*", 1, 100) == cupolas_OK);
     assert(cupolas_check_permission("test_agent", "read", "/test/file.txt", NULL) == 1);
@@ -253,7 +253,7 @@ static void test_cupolas_permission(void) {
 }
 
 static void test_cupolas_sanitize(void) {
-    assert(cupolas_init(NULL) == cupolas_OK);
+    assert(cupolas_init(NULL, NULL) == cupolas_OK);
     
     char output[256];
     assert(cupolas_sanitize_input("hello", output, sizeof(output)) == cupolas_OK);

@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <inttypes.h>
+#include <math.h>
 
 /* ============================================================================
  * 内部辅助函数
@@ -1119,8 +1120,6 @@ size_t agentos_tc_chain_rollback(
         if (step->critique) AGENTOS_FREE(step->critique);
         if (step->role) AGENTOS_FREE(step->role);
         if (step->depends_on) {
-            for (size_t d = 0; d < step->depends_count; d++)
-                AGENTOS_FREE(step->depends_on[d]);
             AGENTOS_FREE(step->depends_on);
         }
         if (step->dependents) AGENTOS_FREE(step->dependents);
@@ -1264,6 +1263,7 @@ float agentos_tc_compute_priority(
         case TC_STEP_VERIFICATION:  type_factor = 0.55f; break;
         case TC_STEP_AUDIT:         type_factor = 0.50f; break;
         case TC_STEP_ALIGNMENT:     type_factor = 0.45f; break;
+        case TC_STEP_CORRECTION:    type_factor = 0.60f; break;
     }
 
     float conf_factor = (step->confidence > 0.0f)

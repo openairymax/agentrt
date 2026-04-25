@@ -109,8 +109,7 @@ int network_utils_validate_ip(const char* ip) {
 }
 
 int network_utils_validate_port(uint16_t port) {
-    (void)port;
-    return 1;
+    return (port >= 1) ? 1 : 0;
 }
 
 const char* network_utils_protocol_string(cupolas_protocol_t protocol) {

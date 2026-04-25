@@ -53,6 +53,13 @@ pub use client::{APIClient, Client};
 // 错误类型
 pub use error::{AgentOSError, ErrorCode};
 
+// Syscall 绑定
+pub use syscall::{
+    SyscallBinding, HttpSyscallBinding,
+    SyscallNamespace, SyscallRequest, SyscallResponse,
+    TaskSyscall, MemorySyscall, SessionSyscall, SkillSyscall, AgentSyscall,
+};
+
 // 类型定义
 pub use types::{
     // 枚举类型

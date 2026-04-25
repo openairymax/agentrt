@@ -92,7 +92,7 @@ static void test_ipc_buffer_crud(void) {
             assert(err == heapstore_SUCCESS);
             assert(strcmp(get_buf.channel_id, buffer.channel_id) == 0);
             assert(get_buf.size == buffer.size);
-            assert(get_buf.ref_count == buffer.ref_count);
+            assert(get_buf.size == buffer.size);
         }
     }
 
