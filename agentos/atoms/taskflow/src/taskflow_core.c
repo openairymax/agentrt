@@ -256,6 +256,39 @@ taskflow_error_t taskflow_engine_init(taskflow_handle_t engine)
     return TASKFLOW_SUCCESS;
 }
 
+static void* engine_worker_thread(void* arg) {
+    struct taskflow_engine_s* e = (struct taskflow_engine_s*)arg;
+    if (!e) return NULL;
+
+    while (e->worker_active) {
+        pthread_mutex_lock(&e->engine_mutex);
+
+        while (e->paused && e->worker_active) {
+            pthread_cond_wait(&e->pause_cond, &e->engine_mutex);
+        }
+
+        if (!e->worker_active) {
+            pthread_mutex_unlock(&e->engine_mutex);
+            break;
+        }
+
+        if (e->pregel_engine) {
+            taskflow_error_t err = pregel_engine_run_superstep(e->pregel_engine);
+            if (err == TASKFLOW_ERROR_NO_ACTIVE_VERTICES || err == TASKFLOW_ERROR_NOT_INITIALIZED) {
+                pthread_mutex_unlock(&e->engine_mutex);
+                break;
+            }
+        }
+
+        pthread_mutex_unlock(&e->engine_mutex);
+
+        struct timespec ts = {0, 10000000L};
+        nanosleep(&ts, NULL);
+    }
+
+    return NULL;
+}
+
 taskflow_error_t taskflow_engine_start(taskflow_handle_t engine)
 {
     if (!engine) {
@@ -269,15 +302,20 @@ taskflow_error_t taskflow_engine_start(taskflow_handle_t engine)
     }
     
     if (e->running) {
-        return TASKFLOW_SUCCESS; // 已经在运行
+        return TASKFLOW_SUCCESS;
     }
     
-    // 启动工作线程和消息处理
     pthread_mutex_lock(&e->engine_mutex);
     e->paused = false;
     e->worker_active = true;
     pthread_mutex_unlock(&e->engine_mutex);
-    
+
+    int ret = pthread_create(&e->worker_thread, NULL, engine_worker_thread, e);
+    if (ret != 0) {
+        e->worker_active = false;
+        return TASKFLOW_ERROR_INTERNAL;
+    }
+
     e->running = true;
     return TASKFLOW_SUCCESS;
 }
@@ -299,12 +337,13 @@ taskflow_error_t taskflow_engine_stop(taskflow_handle_t engine)
         pregel_engine_stop(e->pregel_engine);
     }
     
-    // 停止工作线程和清理资源
     pthread_mutex_lock(&e->engine_mutex);
     e->worker_active = false;
     e->paused = false;
     pthread_cond_broadcast(&e->pause_cond);
     pthread_mutex_unlock(&e->engine_mutex);
+
+    pthread_join(e->worker_thread, NULL);
     
     e->running = false;
     return TASKFLOW_SUCCESS;

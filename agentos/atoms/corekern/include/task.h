@@ -31,11 +31,6 @@ extern "C" {
 #endif
 
 /**
- * @brief 任务 ID 类型
- */
-typedef uint64_t agentos_task_id_t;
-
-/**
  * @brief 任务优先级常量
  */
 #define AGENTOS_TASK_PRIORITY_MIN     0   /**< 最低优先级 */

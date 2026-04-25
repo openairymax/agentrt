@@ -212,13 +212,16 @@ static void trace_store_service_check_storage_limit(const char* current_file)
     if (g_ctx.total_bytes_stored <= g_ctx.max_storage_bytes) {
         return;
     }
-    
-    // 超出存储限制，清理最旧的文件
-    // 简化实现：只记录警告
-    // 在实际实现中，这里应该删除最旧的文件
-    fprintf(stderr, "Warning: Trace storage limit exceeded (%llu bytes > %llu bytes)\n",
-            (unsigned long long)g_ctx.total_bytes_stored,
-            (unsigned long long)g_ctx.max_storage_bytes);
+
+    (void)current_file;
+    int deleted = trace_store_service_cleanup_old_files(1);
+    if (deleted > 0) {
+        fprintf(stderr, "Trace storage limit exceeded, cleaned %d old files\n", deleted);
+    } else {
+        fprintf(stderr, "Warning: Trace storage limit exceeded (%llu bytes > %llu bytes), no old files to clean\n",
+                (unsigned long long)g_ctx.total_bytes_stored,
+                (unsigned long long)g_ctx.max_storage_bytes);
+    }
 }
 
 /**
@@ -347,35 +350,73 @@ int trace_store_service_export_traces(const time_t* start_time,
                                       const char* export_format,
                                       const char* export_path)
 {
-    if (!export_format || !export_path) {
-        return -1;
-    }
-    
-    // 简化实现：创建空导出文件
+    if (!export_format || !export_path) return -1;
+    if (!g_ctx.is_initialized) return -1;
+
     FILE* f = fopen(export_path, "w");
-    if (!f) {
-        return -2;
-    }
-    
+    if (!f) return -2;
+
+    int exported = 0;
+    DIR* dir = opendir(g_ctx.storage_path);
+    if (!dir) { fclose(f); return -3; }
+
+    time_t t_start = start_time ? *start_time : 0;
+    time_t t_end = end_time ? *end_time : time(NULL);
+
     if (strcmp(export_format, "json") == 0) {
-        fprintf(f, "{\"traces\": []}\n");
+        fprintf(f, "{\"traces\": [\n");
     } else if (strcmp(export_format, "csv") == 0) {
-        fprintf(f, "timestamp,component,operation,duration_ns,success\n");
+        fprintf(f, "timestamp_ns,component,operation,duration_ns,success,trace_id,metadata\n");
     }
-    
+
+    struct dirent* entry;
+    bool first_json = true;
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_name[0] == '.') continue;
+
+        char filepath[1024];
+        snprintf(filepath, sizeof(filepath), "%s/%s", g_ctx.storage_path, entry->d_name);
+
+        struct stat file_stat;
+        if (stat(filepath, &file_stat) != 0) continue;
+        if (S_ISDIR(file_stat.st_mode)) continue;
+        if (file_stat.st_mtime < t_start || file_stat.st_mtime > t_end) continue;
+
+        FILE* tf = fopen(filepath, "r");
+        if (!tf) continue;
+
+        char line[1024];
+        while (fgets(line, sizeof(line), tf)) {
+            line[strcspn(line, "\n")] = '\0';
+            if (strlen(line) == 0) continue;
+
+            if (strcmp(export_format, "json") == 0) {
+                if (!first_json) fprintf(f, ",\n");
+                fprintf(f, "  %s", line);
+                first_json = false;
+            } else if (strcmp(export_format, "csv") == 0) {
+                fprintf(f, "%s\n", line);
+            }
+            exported++;
+        }
+        fclose(tf);
+    }
+
+    if (strcmp(export_format, "json") == 0) {
+        fprintf(f, "\n]}\n");
+    }
+
+    closedir(dir);
     fclose(f);
-    
-    // 返回文件大小
+
     f = fopen(export_path, "rb");
-    if (!f) {
-        return 0;
-    }
-    
+    if (!f) return exported;
     fseek(f, 0, SEEK_END);
     long size = ftell(f);
     fclose(f);
-    
-    return (int)size;
+
+    (void)size;
+    return exported;
 }
 
 /**

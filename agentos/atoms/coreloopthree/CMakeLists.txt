@@ -47,8 +47,9 @@ add_library(agentos_coreloopthree STATIC
     src/utils/error_utils.c
     src/utils/id_utils.c
     src/memory/engine.c
+    src/cognition/semantic_unit.c
+    src/cognition/triple_coordinator.c
 )
-
 # 使用统一的头文件路径管理
 target_link_libraries(agentos_coreloopthree PUBLIC agentos_atoms)
 

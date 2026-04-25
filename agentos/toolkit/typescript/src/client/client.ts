@@ -369,7 +369,7 @@ export class Client implements APIClient {
     
     if (typeof data === 'object' && data !== null) {
       const obj = data as Record<string, unknown>;
-      return obj.message || obj.error || JSON.stringify(data).substring(0, 200);
+      return String(obj.message || obj.error || JSON.stringify(data).substring(0, 200));
     }
     
     return '服务端返回错误';

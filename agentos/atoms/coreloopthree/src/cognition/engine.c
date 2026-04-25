@@ -55,12 +55,17 @@ struct agentos_cognition_engine {
 
     agentos_thinking_chain_t* chain;
     agentos_metacognition_t* meta;
+    agentos_memory_engine_t* memory;
     int enable_dual_thinking;
     uint32_t chain_max_tokens;
     size_t chain_wm_capacity;
     float meta_acceptance_threshold;
     uint64_t dual_think_invocations;
     uint64_t dual_think_corrections;
+    float align_history[8];
+    size_t align_history_count;
+    int align_drift_detected;
+    uint32_t align_replan_count;
 };
 
 static void trigger_feedback(
@@ -129,12 +134,17 @@ agentos_error_t agentos_cognition_create_ex(
 
     engine->chain = NULL;
     engine->meta = NULL;
+    engine->memory = NULL;
     engine->enable_dual_thinking = 1;
     engine->chain_max_tokens = 8192;
     engine->chain_wm_capacity = 64;
     engine->meta_acceptance_threshold = 0.7f;
     engine->dual_think_invocations = 0;
     engine->dual_think_corrections = 0;
+    memset(engine->align_history, 0, sizeof(engine->align_history));
+    engine->align_history_count = 0;
+    engine->align_drift_detected = 0;
+    engine->align_replan_count = 0;
 
     agentos_error_t ds_err = agentos_mc_create(&engine->meta);
     if (ds_err != AGENTOS_SUCCESS) {
@@ -188,6 +198,18 @@ void agentos_cognition_set_context(
     agentos_mutex_unlock(engine->lock);
 }
 
+void agentos_cognition_set_memory(
+    agentos_cognition_engine_t* engine,
+    agentos_memory_engine_t* memory) {
+    if (!engine) return;
+    agentos_mutex_lock(engine->lock);
+    engine->memory = memory;
+    if (engine->chain) {
+        agentos_tc_chain_set_memory(engine->chain, memory);
+    }
+    agentos_mutex_unlock(engine->lock);
+}
+
 agentos_error_t agentos_cognition_process(
     agentos_cognition_engine_t* engine,
     const char* input,
@@ -223,6 +245,13 @@ agentos_error_t agentos_cognition_process(
         if (tc_err == AGENTOS_SUCCESS) {
             agentos_tc_chain_start(engine->chain);
             agentos_mc_set_chain(engine->meta, engine->chain);
+
+            if (engine->memory) {
+                agentos_tc_chain_set_memory(engine->chain, engine->memory);
+                agentos_tc_context_window_prepopulate(
+                    engine->chain, input, input_len,
+                    5);
+            }
 
             agentos_thinking_step_t* decomp_step = NULL;
             agentos_tc_step_create(engine->chain, TC_STEP_DECOMPOSITION,
@@ -394,6 +423,10 @@ agentos_error_t agentos_cognition_process(
                                          0.3f, "t2-failed");
             }
 
+            if (engine->memory && engine->chain && gen_step) {
+                agentos_tc_step_write_to_memory(engine->chain, gen_step);
+            }
+
             tc3_coordinator_destroy(tc3);
         } else {
             AGENTOS_LOG_WARN("Triple coordinator creation failed, falling back to basic loop");
@@ -425,11 +458,22 @@ agentos_error_t agentos_cognition_process(
                 plan->task_plan_id ? plan->task_plan_id : "?",
                 plan->task_plan_node_count,
                 (unsigned long long)engine->dual_think_corrections);
-            agentos_tc_step_complete(audit_step, audit_desc, (size_t)ad_len, 0.8f, "S1-auditor");
+            mc_evaluation_result_t eval_audit;
+            agentos_mc_evaluate_step(engine->meta, audit_step, input, input_len, &eval_audit);
+
+            agentos_tc_step_complete(audit_step, audit_desc, (size_t)ad_len,
+                                eval_audit.overall_score, "S1-auditor");
+
+            if (engine->memory && engine->chain && audit_step) {
+                agentos_tc_metacognition_inform_memory(
+                    engine->chain, &eval_audit, audit_step);
+                agentos_tc_step_write_to_memory(engine->chain, audit_step);
+            }
+            if (eval_audit.critique_text) AGENTOS_FREE(eval_audit.critique_text);
         }
     }
 
-    /* ========== Phase 4: Goal Alignment Check ========== */
+    /* ========== Phase 4: Enhanced Goal Alignment Check (P2-B05) ========== */
     if (engine->enable_dual_thinking && engine->meta && engine->chain) {
         agentos_thinking_step_t* align_step = NULL;
         agentos_tc_step_create(engine->chain, TC_STEP_ALIGNMENT,
@@ -438,19 +482,99 @@ agentos_error_t agentos_cognition_process(
             mc_evaluation_result_t align_eval;
             agentos_mc_evaluate_step(engine->meta, align_step, input, input_len, &align_eval);
 
-            int aligned = align_eval.is_acceptable;
+            float logic_score = align_eval.overall_score;
+            float fact_score = align_eval.overall_score * 0.95f;
+            float goal_score = align_eval.is_acceptable ? align_eval.overall_score : 0.3f;
+
+            if (engine->chain->ctx_window) {
+                char* recent_ctx = NULL;
+                size_t recent_len = 0;
+                agentos_tc_context_window_get_recent(
+                    engine->chain->ctx_window, 300, &recent_ctx, &recent_len);
+                if (recent_ctx && recent_len > 0) {
+                    int goal_match = (strstr(recent_ctx, "goal") != NULL) ||
+                                     (strstr(recent_ctx, "objective") != NULL);
+                    goal_score = goal_match ? (goal_score + 0.1f) : (goal_score - 0.15f);
+                    if (goal_score > 1.0f) goal_score = 1.0f;
+                    if (goal_score < 0.0f) goal_score = 0.0f;
+                }
+                if (recent_ctx) AGENTOS_FREE(recent_ctx);
+            }
+
+            float composite = (logic_score * 0.30f + fact_score * 0.35f + goal_score * 0.35f);
+
+            size_t hist_idx = engine->align_history_count % 8;
+            engine->align_history[hist_idx] = composite;
+            engine->align_history_count++;
+
+            int aligned = (composite >= 0.65f);
+            float drift_trend = 0.0f;
+            if (engine->align_history_count >= 3) {
+                size_t n = (engine->align_history_count < 8) ?
+                            engine->align_history_count : 8;
+                float recent_avg = 0.0f, older_avg = 0.0f;
+                size_t half = n / 2;
+                for (size_t i = 0; i < half; i++) {
+                    size_t idx = (engine->align_history_count - 1 - i) % 8;
+                    recent_avg += engine->align_history[idx];
+                }
+                for (size_t i = half; i < n; i++) {
+                    size_t idx = (engine->align_history_count - 1 - i) % 8;
+                    older_avg += engine->align_history[idx];
+                }
+                recent_avg /= (float)half;
+                older_avg /= (float)(n - half);
+                drift_trend = older_avg - recent_avg;
+            }
+
+            const char* severity = "ok";
+            int trigger_replan = 0;
+            if (!aligned || drift_trend > 0.2f) {
+                if (drift_trend > 0.35f || composite < 0.3f) {
+                    severity = "critical";
+                    trigger_replan = 1;
+                    engine->align_drift_detected = 1;
+                } else if (drift_trend > 0.2f || composite < 0.5f) {
+                    severity = "alert";
+                } else {
+                    severity = "warning";
+                }
+            }
+
             agentos_tc_step_complete(align_step,
                                     aligned ? "goal_aligned" : "goal_drift_detected",
                                     aligned ? 12 : 18,
-                                    align_eval.overall_score, "S1-alignment");
+                                    composite, "S1-alignment");
 
-            if (!aligned) {
-                AGENTOS_LOG_WARN("Goal alignment check: drift detected (score=%.2f)",
-                                align_eval.overall_score);
-                trigger_feedback(engine, 2, "goal_drift",
-                               "{\"score\":0.0,\"action\":\"replan_recommended\"}");
+            if (!aligned || strcmp(severity, "ok") != 0) {
+                AGENTOS_LOG_WARN("Goal alignment: %s (score=%.2f trend=%.3f severity=%s)",
+                                aligned ? "marginal" : "DRIFT",
+                                composite, drift_trend, severity);
+
+                char fb[384];
+                snprintf(fb, sizeof(fb),
+                    "{\"composite\":%.2f,\"logic\":.2f,\"fact\":.2f,"
+                    "\"goal\":.2f,\"trend\":.3f,\"severity\":\"%s\","
+                    "\"replan\":%s,\"history_count\":%zu}",
+                    composite, logic_score, fact_score, goal_score,
+                    drift_trend, severity,
+                    trigger_replan ? "true" : "false",
+                    engine->align_history_count);
+                trigger_feedback(engine,
+                               trigger_replan ? 3 : (strcmp(severity, "warning") == 0 ? 1 : 2),
+                               trigger_replan ? "goal_drift_critical" : "goal_drift", fb);
+
+                if (trigger_replan) {
+                    engine->align_replan_count++;
+                }
             }
+
             if (align_eval.critique_text) AGENTOS_FREE(align_eval.critique_text);
+
+            if (engine->memory && engine->chain && align_step) {
+                agentos_tc_metacognition_inform_memory(
+                    engine->chain, &align_eval, align_step);
+            }
 
             agentos_mc_detect_patterns(engine->meta, NULL, NULL);
             agentos_mc_adapt_threshold(engine->meta);
