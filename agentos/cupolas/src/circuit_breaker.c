@@ -17,6 +17,19 @@
 #define DEFAULT_HALF_OPEN_MAX_CALLS 3
 #define DEFAULT_FAILURE_RATE_THRESHOLD 0.5
 
+struct circuit_breaker_registry_entry {
+    char name[128];
+    circuit_breaker_t* breaker;
+    struct circuit_breaker_registry_entry* next;
+};
+
+struct circuit_breaker_registry {
+    struct circuit_breaker_registry_entry* entries;
+    cupolas_mutex_t lock;
+};
+
+typedef struct circuit_breaker_registry circuit_breaker_registry_t;
+
 static const char* state_strings[] = {
     "CLOSED",
     "OPEN",
@@ -62,6 +75,8 @@ struct circuit_breaker {
     cupolas_mutex_t lock;
     circuit_state_change_callback_t callback;
     void* callback_user_data;
+    bool destroying;
+    circuit_breaker_registry_t* registry;
 };
 
 static void default_config(circuit_breaker_config_t* config) {
@@ -122,8 +137,27 @@ circuit_breaker_t* circuit_breaker_create(const circuit_breaker_config_t* config
 
 void circuit_breaker_destroy(circuit_breaker_t* breaker) {
     if (!breaker) return;
-    
+
+    if (breaker->registry) {
+        cupolas_mutex_lock(&breaker->registry->lock);
+        struct circuit_breaker_registry_entry** prev = &breaker->registry->entries;
+        struct circuit_breaker_registry_entry* entry = breaker->registry->entries;
+        while (entry) {
+            if (entry->breaker == breaker) {
+                *prev = entry->next;
+                cupolas_mem_free(entry);
+                break;
+            }
+            prev = &entry->next;
+            entry = entry->next;
+        }
+        cupolas_mutex_unlock(&breaker->registry->lock);
+    }
+
+    cupolas_mutex_lock(&breaker->lock);
+    breaker->destroying = true;
     cupolas_mutex_unlock(&breaker->lock);
+
     cupolas_mutex_destroy(&breaker->lock);
     cupolas_mem_free(breaker);
 }
@@ -132,8 +166,9 @@ void circuit_breaker_set_callback(circuit_breaker_t* breaker,
                                  circuit_state_change_callback_t callback,
                                  void* user_data) {
     if (!breaker) return;
-    
+
     cupolas_mutex_lock(&breaker->lock);
+    if (breaker->destroying) { cupolas_mutex_unlock(&breaker->lock); return; }
     breaker->callback = callback;
     breaker->callback_user_data = user_data;
     cupolas_mutex_unlock(&breaker->lock);
@@ -141,33 +176,36 @@ void circuit_breaker_set_callback(circuit_breaker_t* breaker,
 
 static void transition_state(circuit_breaker_t* breaker, circuit_state_t new_state) {
     if (!breaker || breaker->state == new_state) return;
-    
+
     circuit_state_t old_state = breaker->state;
     breaker->state = new_state;
     breaker->state_change_time_ms = cupolas_time_ms();
     breaker->state_changes++;
-    
+
     if (old_state == CIRCUIT_STATE_OPEN) {
         breaker->consecutive_failures = 0;
     } else if (old_state == CIRCUIT_STATE_HALF_OPEN) {
         breaker->half_open_calls = 0;
         breaker->consecutive_successes = 0;
     }
-    
+
     circuit_state_change_callback_t cb = breaker->callback;
     void* cb_data = breaker->callback_user_data;
-    
+
     cupolas_mutex_unlock(&breaker->lock);
-    
+
     if (cb) {
         cb(old_state, new_state, cb_data);
     }
+
+    cupolas_mutex_lock(&breaker->lock);
 }
 
 void circuit_breaker_record_success(circuit_breaker_t* breaker) {
     if (!breaker) return;
-    
+
     cupolas_mutex_lock(&breaker->lock);
+    if (breaker->destroying) { cupolas_mutex_unlock(&breaker->lock); return; }
     
     breaker->total_calls++;
     breaker->successful_calls++;
@@ -189,8 +227,9 @@ void circuit_breaker_record_success(circuit_breaker_t* breaker) {
 
 void circuit_breaker_record_failure(circuit_breaker_t* breaker) {
     if (!breaker) return;
-    
+
     cupolas_mutex_lock(&breaker->lock);
+    if (breaker->destroying) { cupolas_mutex_unlock(&breaker->lock); return; }
     
     breaker->total_calls++;
     breaker->failed_calls++;
@@ -211,8 +250,9 @@ void circuit_breaker_record_failure(circuit_breaker_t* breaker) {
 
 void circuit_breaker_record_timeout(circuit_breaker_t* breaker) {
     if (!breaker) return;
-    
+
     cupolas_mutex_lock(&breaker->lock);
+    if (breaker->destroying) { cupolas_mutex_unlock(&breaker->lock); return; }
     
     breaker->total_calls++;
     breaker->timed_out_calls++;
@@ -232,8 +272,9 @@ void circuit_breaker_record_timeout(circuit_breaker_t* breaker) {
 
 circuit_state_t circuit_breaker_get_state(circuit_breaker_t* breaker) {
     if (!breaker) return CIRCUIT_STATE_CLOSED;
-    
+
     cupolas_mutex_lock(&breaker->lock);
+    if (breaker->destroying) { cupolas_mutex_unlock(&breaker->lock); return CIRCUIT_STATE_CLOSED; }
     
     if (breaker->state == CIRCUIT_STATE_OPEN) {
         uint64_t now = cupolas_time_ms();
@@ -325,8 +366,9 @@ int circuit_breaker_call(circuit_breaker_t* breaker,
 
 void circuit_breaker_reset(circuit_breaker_t* breaker) {
     if (!breaker) return;
-    
+
     cupolas_mutex_lock(&breaker->lock);
+    if (breaker->destroying) { cupolas_mutex_unlock(&breaker->lock); return; }
     
     breaker->state = CIRCUIT_STATE_CLOSED;
     breaker->consecutive_failures = 0;
@@ -346,8 +388,9 @@ void circuit_breaker_reset(circuit_breaker_t* breaker) {
 
 void circuit_breaker_get_stats(circuit_breaker_t* breaker, circuit_breaker_stats_t* stats) {
     if (!breaker || !stats) return;
-    
+
     cupolas_mutex_lock(&breaker->lock);
+    if (breaker->destroying) { cupolas_mutex_unlock(&breaker->lock); return; }
     
     stats->total_calls = breaker->total_calls;
     stats->successful_calls = breaker->successful_calls;
@@ -364,8 +407,9 @@ void circuit_breaker_get_stats(circuit_breaker_t* breaker, circuit_breaker_stats
 
 void circuit_breaker_reset_stats(circuit_breaker_t* breaker) {
     if (!breaker) return;
-    
+
     cupolas_mutex_lock(&breaker->lock);
+    if (breaker->destroying) { cupolas_mutex_unlock(&breaker->lock); return; }
     
     breaker->total_calls = 0;
     breaker->successful_calls = 0;
@@ -379,17 +423,6 @@ void circuit_breaker_reset_stats(circuit_breaker_t* breaker) {
     
     cupolas_mutex_unlock(&breaker->lock);
 }
-
-struct circuit_breaker_registry_entry {
-    char name[128];
-    circuit_breaker_t* breaker;
-    struct circuit_breaker_registry_entry* next;
-};
-
-struct circuit_breaker_registry {
-    struct circuit_breaker_registry_entry* entries;
-    cupolas_mutex_t lock;
-};
 
 circuit_breaker_registry_t* circuit_breaker_registry_create(void) {
     circuit_breaker_registry_t* registry = 
@@ -453,6 +486,7 @@ int circuit_breaker_registry_register(circuit_breaker_registry_t* registry,
     new_entry->breaker = breaker;
     new_entry->next = registry->entries;
     registry->entries = new_entry;
+    breaker->registry = registry;
     
     cupolas_mutex_unlock(&registry->lock);
     

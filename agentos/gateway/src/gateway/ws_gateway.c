@@ -571,7 +571,7 @@ static agentos_error_t ws_gateway_get_stats(void* gateway_impl, char** out_json)
 }
 
 static agentos_error_t ws_gateway_set_handler(void* gateway_impl,
-                                              gateway_request_handler_t handler,
+                                              gateway_internal_handler_t handler,
                                               void* user_data) {
     ws_gateway_t* gateway = (ws_gateway_t*)gateway_impl;
     if (!gateway) return AGENTOS_EINVAL;
@@ -649,6 +649,8 @@ gateway_t* ws_gateway_create(const char* host, uint16_t port) {
     gw->ops = &ws_gateway_ops;
     gw->impl = gateway;
     gw->type = GATEWAY_TYPE_WS;
+    gw->public_handler = NULL;
+    gw->public_handler_data = NULL;
 
     return gw;
 }

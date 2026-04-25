@@ -251,6 +251,14 @@ config_error_t config_context_lock(config_context_t* ctx);
  */
 config_error_t config_context_unlock(config_context_t* ctx);
 
+config_context_t* config_context_clone(const config_context_t* ctx);
+
+config_error_t config_context_copy(config_context_t* dst, const config_context_t* src);
+
+const char* config_context_get_key_at(const config_context_t* ctx, size_t index);
+
+const config_value_t* config_context_get_value_at(const config_context_t* ctx, size_t index);
+
 /* ==================== 工具函数 ==================== */
 
 /**

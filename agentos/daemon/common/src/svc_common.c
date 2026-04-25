@@ -31,6 +31,10 @@
 #include <string.h>
 #include <time.h>
 
+#ifdef AGENTOS_HAS_CURL
+#include <curl/curl.h>
+#endif
+
 /* ==================== 内部常量 ==================== */
 
 #define MAX_SERVICE_NAME_LEN    64
@@ -1631,6 +1635,31 @@ typedef struct {
     uint32_t default_timeout_ms;
 } client_internal_t;
 
+#ifdef AGENTOS_HAS_CURL
+typedef struct {
+    char* data;
+    size_t size;
+    size_t capacity;
+} curl_response_buf_t;
+
+static size_t curl_write_cb(void* ptr, size_t size, size_t nmemb, void* userdata) {
+    curl_response_buf_t* buf = (curl_response_buf_t*)userdata;
+    size_t total = size * nmemb;
+    if (buf->size + total + 1 > buf->capacity) {
+        size_t new_cap = buf->capacity == 0 ? 4096 : buf->capacity;
+        while (new_cap < buf->size + total + 1) new_cap *= 2;
+        char* new_data = (char*)AGENTOS_REALLOC(buf->data, new_cap);
+        if (!new_data) return 0;
+        buf->data = new_data;
+        buf->capacity = new_cap;
+    }
+    memcpy(buf->data + buf->size, ptr, total);
+    buf->size += total;
+    buf->data[buf->size] = '\0';
+    return total;
+}
+#endif
+
 static agentos_error_t http_client_call(
     const char* service_name,
     const char* method,
@@ -1648,17 +1677,98 @@ static agentos_error_t http_client_call(
 
     agentos_service_t svc = agentos_service_find(service_name);
     if (svc) {
-        LOG_DEBUG("Service '%s' found in local registry, using in-process call", service_name);
+        agentos_service_internal_t* internal = (agentos_service_internal_t*)svc;
+
+        if (internal->iface.handle_request) {
+            agentos_error_t err = internal->iface.handle_request(
+                svc, method, params_json, response_json, internal->user_data);
+            if (err != AGENTOS_SUCCESS) {
+                LOG_WARN("Service '%s' handle_request('%s') failed: %d",
+                         service_name, method, err);
+                return err;
+            }
+            if (!*response_json) {
+                *response_json = AGENTOS_CALLOC(1, 2);
+                if (*response_json) {
+                    (*response_json)[0] = '{';
+                    (*response_json)[1] = '}';
+                }
+            }
+            return AGENTOS_SUCCESS;
+        }
+
+        agentos_svc_state_t state = agentos_service_get_state(svc);
+        if (state != AGENTOS_SVC_STATE_RUNNING) {
+            LOG_WARN("Service '%s' not running (state=%s), cannot handle request",
+                     service_name, agentos_svc_state_to_string(state));
+            return AGENTOS_ESTATE;
+        }
+
+        LOG_WARN("Service '%s' has no handle_request callback", service_name);
+        return AGENTOS_ENOTSUP;
+    }
+
+    char url[768];
+    client_internal_t* cli_internal = NULL;
+    snprintf(url, sizeof(url), "http://%s/api/%s", service_name, method);
+
+#ifdef AGENTOS_HAS_CURL
+    CURL* curl = curl_easy_init();
+    if (!curl) {
+        LOG_ERROR("Failed to initialize CURL for remote call to '%s'", service_name);
+        return AGENTOS_EINIT;
+    }
+
+    struct curl_slist* headers = NULL;
+    headers = curl_slist_append(headers, "Content-Type: application/json");
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, (long)timeout_ms);
+
+    if (params_json) {
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, params_json);
+    }
+
+    char* response_buf = NULL;
+    size_t response_buf_size = 0;
+    curl_response_buf_t resp_buf = { NULL, 0, 0 };
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_cb);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &resp_buf);
+
+    CURLcode res = curl_easy_perform(curl);
+    long http_code = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK) {
+        LOG_ERROR("CURL call to '%s' failed: %s", url, curl_easy_strerror(res));
+        return AGENTOS_EIO;
+    }
+
+    if (http_code >= 400) {
+        LOG_ERROR("Service '%s' returned HTTP %ld", service_name, http_code);
+        return AGENTOS_EIO;
+    }
+
+    if (!resp_buf.data || resp_buf.size == 0) {
         *response_json = AGENTOS_CALLOC(1, 2);
         if (*response_json) {
             (*response_json)[0] = '{';
             (*response_json)[1] = '}';
         }
-        return AGENTOS_SUCCESS;
+    } else {
+        *response_json = resp_buf.data;
     }
+#else
+    (void)cli_internal;
+    LOG_ERROR("Remote call to '%s' failed: libcurl not available", service_name);
+    return AGENTOS_EIO;
+#endif
 
-    LOG_WARN("Service '%s' not found, remote call not yet implemented", service_name);
-    return AGENTOS_ENOENT;
+    return AGENTOS_SUCCESS;
 }
 
 static agentos_error_t http_client_stream(
@@ -1676,9 +1786,25 @@ static agentos_error_t http_client_stream(
 
     agentos_service_t svc = agentos_service_find(service_name);
     if (svc) {
-        const char* data = "{}";
-        callback(data, strlen(data), user_data);
-        return AGENTOS_SUCCESS;
+        agentos_service_internal_t* internal = (agentos_service_internal_t*)svc;
+
+        if (internal->iface.handle_request) {
+            char* response = NULL;
+            agentos_error_t err = internal->iface.handle_request(
+                svc, method, params_json, &response, internal->user_data);
+            if (err == AGENTOS_SUCCESS && response) {
+                callback(response, strlen(response), user_data);
+                AGENTOS_FREE(response);
+            } else {
+                const char* err_json = "{\"error\":\"stream_failed\"}";
+                callback(err_json, strlen(err_json), user_data);
+            }
+            return err;
+        }
+
+        const char* err_json = "{\"error\":\"no_stream_handler\"}";
+        callback(err_json, strlen(err_json), user_data);
+        return AGENTOS_ENOTSUP;
     }
 
     return AGENTOS_ENOENT;
@@ -1697,15 +1823,32 @@ static agentos_error_t memory_client_call(
 
     agentos_service_t svc = agentos_service_find(service_name);
     if (!svc) {
+        LOG_WARN("Memory client: service '%s' not found", service_name);
         return AGENTOS_ENOENT;
     }
 
-    *response_json = AGENTOS_CALLOC(1, 2);
-    if (*response_json) {
-        (*response_json)[0] = '{';
-        (*response_json)[1] = '}';
+    agentos_service_internal_t* internal = (agentos_service_internal_t*)svc;
+
+    if (internal->iface.handle_request) {
+        agentos_error_t err = internal->iface.handle_request(
+            svc, method, params_json, response_json, internal->user_data);
+        if (err != AGENTOS_SUCCESS) {
+            LOG_WARN("Service '%s' handle_request('%s') failed: %d",
+                     service_name, method, err);
+            return err;
+        }
+        if (!*response_json) {
+            *response_json = AGENTOS_CALLOC(1, 2);
+            if (*response_json) {
+                (*response_json)[0] = '{';
+                (*response_json)[1] = '}';
+            }
+        }
+        return AGENTOS_SUCCESS;
     }
-    return AGENTOS_SUCCESS;
+
+    LOG_WARN("Service '%s' has no handle_request callback", service_name);
+    return AGENTOS_ENOTSUP;
 }
 
 static agentos_error_t memory_client_stream(
@@ -1724,9 +1867,25 @@ static agentos_error_t memory_client_stream(
         return AGENTOS_ENOENT;
     }
 
-    const char* data = "{}";
-    callback(data, strlen(data), user_data);
-    return AGENTOS_SUCCESS;
+    agentos_service_internal_t* internal = (agentos_service_internal_t*)svc;
+
+    if (internal->iface.handle_request) {
+        char* response = NULL;
+        agentos_error_t err = internal->iface.handle_request(
+            svc, method, params_json, &response, internal->user_data);
+        if (err == AGENTOS_SUCCESS && response) {
+            callback(response, strlen(response), user_data);
+            AGENTOS_FREE(response);
+        } else {
+            const char* err_json = "{\"error\":\"stream_failed\"}";
+            callback(err_json, strlen(err_json), user_data);
+        }
+        return err;
+    }
+
+    const char* err_json = "{\"error\":\"no_stream_handler\"}";
+    callback(err_json, strlen(err_json), user_data);
+    return AGENTOS_ENOTSUP;
 }
 
 agentos_error_t agentos_service_client_create(

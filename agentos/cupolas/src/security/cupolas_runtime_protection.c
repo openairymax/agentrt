@@ -25,6 +25,8 @@
 #include <pthread.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <dlfcn.h>
+#include <fcntl.h>
 #ifdef __linux__
 #include <sys/prctl.h>
 #include <linux/seccomp.h>
@@ -237,14 +239,38 @@ int cupolas_runtime_protect_get_config(cupolas_runtime_protect_config_t* manager
 
 int cupolas_memory_protect_enable(const cupolas_memory_protect_config_t* manager) {
     if (!manager) return -1;
-    
-    (void)manager;
-    
+
 #ifdef __linux__
     if (manager->enable_aslr) {
+        int fd = open("/proc/sys/kernel/randomize_va_space", O_RDONLY);
+        if (fd >= 0) {
+            char buf[8] = {0};
+            ssize_t n = read(fd, buf, sizeof(buf) - 1);
+            close(fd);
+            if (n > 0 && buf[0] != '2' && buf[0] != '1') {
+                fd = open("/proc/sys/kernel/randomize_va_space", O_WRONLY);
+                if (fd >= 0) {
+                    write(fd, "2", 1);
+                    close(fd);
+                }
+            }
+        }
+    }
+
+    if (manager->enable_stack_protector) {
+#ifdef PR_SET_PTRACER
+        prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY, 0, 0, 0);
+#endif
     }
 #endif
-    
+
+#ifdef _WIN32
+    if (manager->enable_aslr) {
+        HANDLE hProc = GetCurrentProcess();
+        SetProcessDEPPolicy(PROCESS_DEP_ENABLE);
+    }
+#endif
+
     return 0;
 }
 
@@ -550,12 +576,31 @@ int cupolas_integrity_compute_code_hash(uint8_t* hash_out) {
     SHA256_CTX ctx;
     SHA256_Init(&ctx);
 
-    char code_info[256];
-    snprintf(code_info, sizeof(code_info),
-        "pid=%ld,time=%lld,addr=%p",
-        (long)getpid(), (long long)time(NULL),
-        (void*)&cupolas_integrity_compute_code_hash);
-    SHA256_Update(&ctx, code_info, strlen(code_info));
+    extern const char __executable_start[];
+    extern const char __etext[];
+    uintptr_t text_start = (uintptr_t)__executable_start;
+    uintptr_t text_end = (uintptr_t)__etext;
+
+    if (text_end > text_start && (text_end - text_start) < 256 * 1024 * 1024) {
+        size_t code_size = (size_t)(text_end - text_start);
+        const uint8_t* code_ptr = (const uint8_t*)text_start;
+
+        size_t sample_step = code_size > 65536 ? code_size / 16384 : 1;
+        for (size_t i = 0; i < code_size; i += sample_step) {
+            SHA256_Update(&ctx, &code_ptr[i], 1);
+        }
+    } else {
+        Dl_info info;
+        if (dladdr((void*)&cupolas_integrity_compute_code_hash, &info) && info.dli_fbase) {
+            const uint8_t* base = (const uint8_t*)info.dli_fbase;
+            size_t hash_len = 4096;
+            SHA256_Update(&ctx, base, hash_len);
+        } else {
+            const uint8_t* fn_ptr = (const uint8_t*)&cupolas_integrity_compute_code_hash;
+            SHA256_Update(&ctx, fn_ptr, 256);
+        }
+    }
+
     SHA256_Final(hash_out, &ctx);
 #pragma GCC diagnostic pop
     return 0;
@@ -578,12 +623,29 @@ int cupolas_integrity_verify_data(const uint8_t* expected_hash) {
     SHA256_CTX ctx;
     SHA256_Init(&ctx);
 
-    char data_info[256];
-    snprintf(data_info, sizeof(data_info),
-        "pid=%ld,addr=0x%lx",
-        (long)getpid(),
-        (unsigned long)(uintptr_t)&cupolas_integrity_verify_data);
-    SHA256_Update(&ctx, data_info, strlen(data_info));
+    extern const char __data_start[];
+    extern const char __edata[];
+    uintptr_t data_start = (uintptr_t)__data_start;
+    uintptr_t data_end = (uintptr_t)__edata;
+
+    if (data_end > data_start && (data_end - data_start) < 256 * 1024 * 1024) {
+        size_t data_size = (size_t)(data_end - data_start);
+        const uint8_t* data_ptr = (const uint8_t*)data_start;
+
+        size_t sample_step = data_size > 65536 ? data_size / 16384 : 1;
+        for (size_t i = 0; i < data_size; i += sample_step) {
+            SHA256_Update(&ctx, &data_ptr[i], 1);
+        }
+    } else {
+        Dl_info info;
+        if (dladdr((void*)&cupolas_integrity_verify_data, &info) && info.dli_fbase) {
+            const uint8_t* base = (const uint8_t*)info.dli_fbase;
+            SHA256_Update(&ctx, base, 4096);
+        } else {
+            const uint8_t* fn_ptr = (const uint8_t*)&cupolas_integrity_verify_data;
+            SHA256_Update(&ctx, fn_ptr, 256);
+        }
+    }
 
     uint8_t current_hash[32];
     SHA256_Final(current_hash, &ctx);

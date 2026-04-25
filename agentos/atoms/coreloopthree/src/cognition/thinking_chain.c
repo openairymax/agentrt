@@ -738,6 +738,177 @@ void agentos_tc_chain_set_step_callback(
 }
 
 /* ============================================================================
+ * P2-B03: MemoryRovol 集成 - 7个连接点
+ * ============================================================================ */
+
+#include "memory.h"
+#include "metacognition.h"
+
+void agentos_tc_chain_set_memory(
+    agentos_thinking_chain_t* chain,
+    agentos_memory_engine_t* memory) {
+    if (!chain) return;
+    chain->memory = memory;
+}
+
+agentos_error_t agentos_tc_context_window_prepopulate(
+    agentos_thinking_chain_t* chain,
+    const char* query_text,
+    size_t query_len,
+    uint32_t limit) {
+
+    if (!chain || !query_text || !chain->memory || !chain->ctx_window) {
+        return AGENTOS_EINVAL;
+    }
+
+    agentos_memory_query_t query;
+    memset(&query, 0, sizeof(query));
+    query.memory_query_text = (char*)query_text;
+    query.memory_query_text_len = query_len;
+    query.memory_query_limit = limit > 0 ? limit : 5;
+
+    agentos_memory_result_ext_t* result = NULL;
+    agentos_error_t err = agentos_memory_query(chain->memory, &query, &result);
+    if (err != AGENTOS_SUCCESS || !result || result->memory_result_count == 0) {
+        if (result) agentos_memory_result_free(result);
+        return err == AGENTOS_SUCCESS ? AGENTOS_ENOENT : err;
+    }
+
+    for (size_t i = 0; i < result->memory_result_count; i++) {
+        agentos_memory_record_t* rec =
+            result->memory_result_items[i]->memory_result_item_record;
+        if (!rec || !rec->memory_record_data) continue;
+
+        char prefix[128];
+        int plen = snprintf(prefix, sizeof(prefix),
+            "[Memory#%zu score=%.2f] ", i,
+            result->memory_result_items[i]->memory_result_item_score);
+
+        size_t total_len = (size_t)plen + rec->memory_record_data_len + 1;
+        char* buf = (char*)AGENTOS_MALLOC(total_len);
+        if (!buf) continue;
+
+        memcpy(buf, prefix, (size_t)plen);
+        memcpy(buf + plen, rec->memory_record_data, rec->memory_record_data_len);
+        buf[total_len - 1] = '\n';
+
+        agentos_tc_context_window_append(chain->ctx_window, buf, total_len);
+        AGENTOS_FREE(buf);
+    }
+
+    agentos_memory_result_free(result);
+    return AGENTOS_SUCCESS;
+}
+
+agentos_error_t agentos_tc_working_memory_sync_to_persistent(
+    agentos_thinking_chain_t* chain,
+    float min_importance) {
+
+    if (!chain || !chain->working_mem || !chain->memory) return AGENTOS_EINVAL;
+
+    uint32_t synced = 0;
+    for (size_t i = 0; i < chain->working_mem->count; i++) {
+        struct wm_entry* e = &chain->working_mem->entries[i];
+        if (e->pinned && e->value && e->value_size > 0) {
+            agentos_memory_record_t rec;
+            memset(&rec, 0, sizeof(rec));
+            rec.memory_record_type = AGENTOS_MEMTYPE_TEXT;
+            rec.memory_record_data = e->value;
+            rec.memory_record_data_len = e->value_size;
+            rec.memory_record_importance = min_importance > 0.5f ? 0.8f : 0.6f;
+            rec.memory_record_source_agent = "thinking_chain_wm";
+            rec.memory_record_trace_id = chain->session_goal ? chain->session_goal : "unknown";
+
+            char* record_id = NULL;
+            agentos_error_t err = agentos_memory_write(
+                chain->memory, &rec, &record_id);
+            if (err == AGENTOS_SUCCESS && record_id) {
+                synced++;
+                AGENTOS_FREE(record_id);
+            }
+        }
+    }
+
+    return (synced > 0) ? AGENTOS_SUCCESS : AGENTOS_ENOENT;
+}
+
+agentos_error_t agentos_tc_step_write_to_memory(
+    agentos_thinking_chain_t* chain,
+    agentos_thinking_step_t* step) {
+
+    if (!chain || !step || !chain->memory) return AGENTOS_EINVAL;
+    if (!step->content || step->content_len == 0) return AGENTOS_EINVAL;
+    if (step->confidence < 0.6f) return AGENTOS_EINVAL;
+
+    agentos_memory_record_t rec;
+    memset(&rec, 0, sizeof(rec));
+    rec.memory_record_type = AGENTOS_MEMTYPE_TEXT;
+    rec.memory_record_data = step->content;
+    rec.memory_record_data_len = step->content_len;
+    rec.memory_record_importance = step->confidence;
+    rec.memory_record_source_agent = step->role ? step->role : "t2-generator";
+    rec.memory_record_access_count = (uint32_t)(step->correction_count + 1);
+
+    char trace_id[64];
+    snprintf(trace_id, sizeof(trace_id), "step_%u", step->step_id);
+    rec.memory_record_trace_id = trace_id;
+
+    char* record_id = NULL;
+    agentos_error_t err = agentos_memory_write(chain->memory, &rec, &record_id);
+    if (err == AGENTOS_SUCCESS && record_id && chain->memory) {
+        agentos_memory_mount(chain->memory, record_id,
+                              chain->session_goal ? chain->session_goal : "");
+        AGENTOS_FREE(record_id);
+    }
+
+    return err;
+}
+
+agentos_error_t agentos_tc_metacognition_inform_memory(
+    agentos_thinking_chain_t* chain,
+    const void* eval,
+    agentos_thinking_step_t* step) {
+
+    if (!chain || !eval || !step || !chain->memory) return AGENTOS_EINVAL;
+    const mc_evaluation_result_t* eval_typed = (const mc_evaluation_result_t*)eval;
+    if (eval_typed->strategy == MC_CORRECT_NONE) return AGENTOS_SUCCESS;
+
+    float importance = eval_typed->overall_score;
+    if (importance > 0.9f) importance = 0.95f;
+    else if (importance > 0.7f) importance = 0.8f;
+    else importance = 0.5f;
+
+    if (eval_typed->critique_text && eval_typed->critique_len > 0) {
+        agentos_memory_record_t rec;
+        memset(&rec, 0, sizeof(rec));
+        rec.memory_record_type = AGENTOS_MEMTYPE_TEXT;
+        rec.memory_record_data = (void*)eval_typed->critique_text;
+        rec.memory_record_data_len = eval_typed->critique_len;
+        rec.memory_record_importance = importance;
+        rec.memory_record_source_agent = "s1-metacognition";
+        rec.memory_record_trace_id = chain->session_goal ? chain->session_goal : "";
+
+        char* record_id = NULL;
+        agentos_error_t err = agentos_memory_write(chain->memory, &rec, &record_id);
+        if (err == AGENTOS_SUCCESS && record_id) {
+            AGENTOS_FREE(record_id);
+        }
+    }
+
+    if (chain->working_mem && step->confidence >= 0.7f) {
+        char key[64];
+        snprintf(key, sizeof(key), "eval_%u", step->step_id);
+        char val_buf[32];
+        int vlen = snprintf(val_buf, sizeof(val_buf), "%.3f", eval_typed->overall_score);
+        agentos_tc_working_memory_store(chain->working_mem, key,
+                                         val_buf, (size_t)vlen + 1,
+                                         "evaluation_score", 1);
+    }
+
+    return AGENTOS_SUCCESS;
+}
+
+/* ============================================================================
  * DS-007: 执行监控实现
  * ============================================================================ */
 

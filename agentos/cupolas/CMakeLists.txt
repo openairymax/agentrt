@@ -127,7 +127,7 @@ set(CUPOLAS_HEADERS
 )
 
 # commons 模块路径
-set(COMMON_MODULE_DIR ${CMAKE_SOURCE_DIR}/commons)
+set(COMMON_MODULE_DIR ${CMAKE_SOURCE_DIR}/agentos/commons)
 
 # commons 模块的 include 目录
 set(COMMON_INCLUDE_DIRS

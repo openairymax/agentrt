@@ -6,8 +6,10 @@
  */
 
 #include "market_service.h"
+#include "svc_logger.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <time.h>
 
 #define MAX_AGENTS 256
@@ -254,13 +256,65 @@ int market_service_install_agent(market_service_t* service, const install_reques
         return 0;
     }
 
+    const char* base_path = request->install_path ? request->install_path :
+                            (service->config.storage_path ? service->config.storage_path : "./agents");
+    char install_dir[1024];
+    snprintf(install_dir, sizeof(install_dir), "%s/%s", base_path, request->id);
+
+    {
+        char mkdir_cmd[2048];
+        snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p '%s'", install_dir);
+        int mkret = system(mkdir_cmd);
+        if (mkret != 0) {
+            res->success = false;
+            res->message = strdup("Failed to create install directory");
+            res->error_code = -4;
+            *result = res;
+            return 0;
+        }
+    }
+
+    char meta_path[1024];
+    snprintf(meta_path, sizeof(meta_path), "%s/agent.json", install_dir);
+    FILE* meta_fp = fopen(meta_path, "w");
+    if (meta_fp) {
+        fprintf(meta_fp, "{\n");
+        fprintf(meta_fp, "  \"agent_id\": \"%s\",\n", target->agent_id);
+        fprintf(meta_fp, "  \"name\": \"%s\",\n", target->name ? target->name : "");
+        fprintf(meta_fp, "  \"version\": \"%s\",\n", request->version ? request->version : (target->version ? target->version : "0.0.1"));
+        fprintf(meta_fp, "  \"author\": \"%s\",\n", target->author ? target->author : "");
+        fprintf(meta_fp, "  \"status\": \"installed\",\n");
+        fprintf(meta_fp, "  \"installed_at\": %lld\n", (long long)time(NULL));
+        fprintf(meta_fp, "}\n");
+        fclose(meta_fp);
+    }
+
+    if (target->repository && strlen(target->repository) > 0) {
+        char download_path[1024];
+        snprintf(download_path, sizeof(download_path), "%s/package.tar.gz", install_dir);
+        char curl_cmd[4096];
+        snprintf(curl_cmd, sizeof(curl_cmd),
+                "curl -sfL -o '%s' '%s' 2>/dev/null", download_path, target->repository);
+        int curl_ret = system(curl_cmd);
+        if (curl_ret != 0) {
+            SVC_LOG_WARN("Download failed for agent %s from %s (curl_ret=%d), metadata only install",
+                        request->id, target->repository, curl_ret);
+        } else {
+            char extract_cmd[4096];
+            snprintf(extract_cmd, sizeof(extract_cmd),
+                    "tar -xzf '%s' -C '%s' 2>/dev/null", download_path, install_dir);
+            system(extract_cmd);
+            remove(download_path);
+        }
+    }
+
     target->status = AGENT_STATUS_AVAILABLE;
     target->download_count++;
 
     res->success = true;
     res->message = strdup("Agent installed successfully");
     res->installed_version = strdup(request->version ? request->version : target->version);
-    res->install_path = strdup(request->install_path ? request->install_path : "./agents");
+    res->install_path = strdup(install_dir);
     res->error_code = 0;
 
     *result = res;
@@ -306,6 +360,19 @@ int market_service_uninstall_agent(market_service_t* service, const char* agent_
 
     for (size_t i = 0; i < service->agent_count; i++) {
         if (strcmp(service->agents[i]->agent_id, agent_id) == 0) {
+            const char* storage = service->config.storage_path ?
+                                  service->config.storage_path : "./agents";
+            char install_dir[1024];
+            snprintf(install_dir, sizeof(install_dir), "%s/%s", storage, agent_id);
+
+            char rm_cmd[2048];
+            snprintf(rm_cmd, sizeof(rm_cmd), "rm -rf '%s'", install_dir);
+            int rm_ret = system(rm_cmd);
+            if (rm_ret != 0) {
+                SVC_LOG_WARN("Failed to remove install directory: %s (ret=%d)",
+                           install_dir, rm_ret);
+            }
+
             service->agents[i]->status = AGENT_STATUS_DISABLED;
             return 0;
         }
@@ -432,5 +499,103 @@ int market_service_sync_registry(market_service_t* service) {
         return 0;
     }
 
+    if (!service->config.registry_url || strlen(service->config.registry_url) == 0) {
+        SVC_LOG_WARN("Sync registry: no registry_url configured");
+        return 0;
+    }
+
+    const char* storage = service->config.storage_path ?
+                          service->config.storage_path : "/tmp/agentos";
+    char index_path[1024];
+    snprintf(index_path, sizeof(index_path), "%s/registry_index.json", storage);
+
+    char mkdir_cmd[2048];
+    snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p '%s'", storage);
+    system(mkdir_cmd);
+
+    char url[2048];
+    if (strncmp(service->config.registry_url, "http", 4) == 0) {
+        snprintf(url, sizeof(url), "%s/index.json", service->config.registry_url);
+    } else {
+        snprintf(url, sizeof(url), "https://%s/index.json", service->config.registry_url);
+    }
+
+    char curl_cmd[4096];
+    snprintf(curl_cmd, sizeof(curl_cmd),
+            "curl -sfL -o '%s' '%s' --connect-timeout 10 --max-time 60 2>/dev/null",
+            index_path, url);
+    int curl_ret = system(curl_cmd);
+    if (curl_ret != 0) {
+        SVC_LOG_WARN("Sync registry: download failed from %s (curl_ret=%d)", url, curl_ret);
+        return 0;
+    }
+
+    FILE* idx_fp = fopen(index_path, "r");
+    if (!idx_fp) {
+        SVC_LOG_WARN("Sync registry: cannot open downloaded index %s", index_path);
+        return 0;
+    }
+
+    fseek(idx_fp, 0, SEEK_END);
+    long fsize = ftell(idx_fp);
+    fseek(idx_fp, 0, SEEK_SET);
+
+    if (fsize <= 0 || fsize > 10 * 1024 * 1024) {
+        fclose(idx_fp);
+        SVC_LOG_WARN("Sync registry: invalid index size %ld", fsize);
+        return 0;
+    }
+
+    char* idx_data = (char*)malloc((size_t)fsize + 1);
+    if (!idx_data) {
+        fclose(idx_fp);
+        return -2;
+    }
+    fread(idx_data, 1, (size_t)fsize, idx_fp);
+    idx_data[fsize] = '\0';
+    fclose(idx_fp);
+
+    char* entry = strstr(idx_data, "\"agent_id\"");
+    int synced = 0;
+    while (entry && synced < 256) {
+        char* id_start = strchr(entry, ':');
+        if (!id_start) break;
+        id_start++;
+        while (*id_start && (*id_start == ' ' || *id_start == '\t' || *id_start == '"')) id_start++;
+        char* id_end = id_start;
+        while (*id_end && *id_end != '"' && *id_end != ',' && *id_end != '}') id_end++;
+
+        size_t id_len = (size_t)(id_end - id_start);
+        if (id_len > 0 && id_len < 128) {
+            char found_id[128];
+            memcpy(found_id, id_start, id_len);
+            found_id[id_len] = '\0';
+
+            int already_exists = 0;
+            for (size_t i = 0; i < service->agent_count; i++) {
+                if (strcmp(service->agents[i]->agent_id, found_id) == 0) {
+                    already_exists = 1;
+                    break;
+                }
+            }
+
+            if (!already_exists && service->agent_count < MAX_AGENTS) {
+                agent_info_t* new_agent = (agent_info_t*)calloc(1, sizeof(agent_info_t));
+                if (new_agent) {
+                    new_agent->agent_id = strdup(found_id);
+                    new_agent->name = strdup(found_id);
+                    new_agent->version = strdup("latest");
+                    new_agent->status = AGENT_STATUS_AVAILABLE;
+                    service->agents[service->agent_count++] = new_agent;
+                    synced++;
+                }
+            }
+        }
+
+        entry = strstr(id_end + 1, "\"agent_id\"");
+    }
+
+    free(idx_data);
+    SVC_LOG_INFO("Sync registry: synced %d new agents from %s", synced, url);
     return 0;
 }

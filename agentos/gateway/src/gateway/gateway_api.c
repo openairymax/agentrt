@@ -1,21 +1,3 @@
-/*
- * Copyright (C) 2026 SPHARX. All Rights Reserved.
- * SPDX-FileCopyrightText: 2026 SPHARX.
- * SPDX-License-Identifier: Apache-2.0
- *
- * @file gateway_api.c
- * @brief 公共 API 包装函数实现
- *
- * 实现 include/gateway.h 中声明的公共 API 函数，
- * 将调用委托给各网关的内部创建函数。
- *
- * 架构说明：
- *   公共 API (gateway_http_create) --> 内部实现 (http_gateway_create)
- *   这样 agentos/daemon/gateway_d 等外部模块只需依赖公共头文件即可。
- *
- * @copyright (c) 2026 SPHARX. All Rights Reserved.
- */
-
 #define GATEWAY_API_IMPLEMENTATION
 #include "gateway.h"
 #include "http_gateway.h"
@@ -23,42 +5,19 @@
 #include "stdio_gateway.h"
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
-/**
- * @brief 创建 HTTP 网关（公共 API 入口）
- *
- * 委托给 http_gateway_create() 内部实现。
- * 对外暴露统一的 gateway_http_create 符号。
- *
- * @param host 监听地址
- * @param port 监听端口
- * @return 网关句柄，失败返回 NULL
- */
 gateway_t* gateway_http_create(const char* host, uint16_t port) {
     return http_gateway_create(host, port);
 }
 
-/**
- * @brief 创建 WebSocket 网关（公共 API 入口）
- *
- * 委托给 ws_gateway_create() 内部实现。
- */
 gateway_t* gateway_ws_create(const char* host, uint16_t port) {
     return ws_gateway_create(host, port);
 }
 
-/**
- * @brief 创建 Stdio 网关（公共 API 入口）
- *
- * 委托给 stdio_gateway_create() 内部实现。
- */
 gateway_t* gateway_stdio_create(void) {
     return stdio_gateway_create();
 }
-
-/* ==================== 公共 API 实现（非内联版本） ==================== */
-
-#include <time.h>
 
 static struct {
     uint64_t total_connections;
@@ -79,31 +38,31 @@ void gateway_destroy(gateway_t* gw) {
     free(gw);
 }
 
-agentos_error_t gateway_start(gateway_t* gw) {
-    if (!gw) return AGENTOS_EINVAL;
-    agentos_error_t err = AGENTOS_SUCCESS;
+int gateway_start(gateway_t* gw) {
+    if (!gw) return -1;
+    int err = 0;
     if (gw->ops && gw->ops->start) {
         err = gw->ops->start(gw->impl);
     }
-    if (err == AGENTOS_SUCCESS) {
+    if (err == 0) {
         g_gateway_stats.start_time = time(NULL);
         g_gateway_stats.running = true;
     }
     return err;
 }
 
-agentos_error_t gateway_stop(gateway_t* gw) {
-    if (!gw) return AGENTOS_EINVAL;
+int gateway_stop(gateway_t* gw) {
+    if (!gw) return -1;
     if (gw->ops && gw->ops->stop) {
         gw->ops->stop(gw->impl);
     }
     g_gateway_stats.running = false;
     g_gateway_stats.active_connections = 0;
-    return AGENTOS_SUCCESS;
+    return 0;
 }
 
-agentos_error_t gateway_get_stats(gateway_t* gw, char** out_json) {
-    if (!gw || !out_json) return AGENTOS_EINVAL;
+int gateway_get_stats(gateway_t* gw, char** out_json) {
+    if (!gw || !out_json) return -1;
 
     double uptime_seconds = difftime(time(NULL), g_gateway_stats.start_time);
 
@@ -115,5 +74,27 @@ agentos_error_t gateway_get_stats(gateway_t* gw, char** out_json) {
 
     *out_json = cJSON_PrintUnformatted(stats);
     cJSON_Delete(stats);
-    return AGENTOS_SUCCESS;
+    return 0;
+}
+
+int gateway_set_handler(gateway_t* gw, gateway_request_handler_t handler, void* user_data) {
+    if (!gw) return -1;
+    gw->public_handler = handler;
+    gw->public_handler_data = user_data;
+    return 0;
+}
+
+bool gateway_is_running(gateway_t* gw) {
+    if (!gw || !gw->ops || !gw->ops->is_running) return false;
+    return gw->ops->is_running(gw->impl);
+}
+
+gateway_type_t gateway_get_type(gateway_t* gw) {
+    if (!gw) return GATEWAY_TYPE_HTTP;
+    return gw->type;
+}
+
+const char* gateway_get_name(gateway_t* gw) {
+    if (!gw || !gw->ops || !gw->ops->get_name) return "unknown";
+    return gw->ops->get_name(gw->impl);
 }
