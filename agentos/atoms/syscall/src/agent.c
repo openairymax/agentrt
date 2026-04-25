@@ -9,12 +9,15 @@
 #include "logger.h"
 #include "execution.h"
 #include "agent_registry.h"
+#include "cognition.h"
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
 #include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
+
+static agentos_cognition_engine_t* g_cognition_engine = NULL;
 
 typedef struct agent_instance {
     char* agent_id;
@@ -42,28 +45,85 @@ static void ensure_agent_lock(void) {
     }
 }
 
-/**
- * @brief Agent 执行单元 - 解析 spec JSON 并执行对应逻辑
- *
- * 生产级实现：
- * 1. 从 unit->execution_unit_data 获取 agent spec (JSON)
- * 2. 解析 JSON 获取 agent role/type
- * 3. 根据 type 执行对应的处理逻辑
- * 4. 返回结构化结果（JSON 格式）
- */
+static agentos_cognition_engine_t* ensure_cognition_engine(void) {
+    if (g_cognition_engine) return g_cognition_engine;
+    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &g_cognition_engine);
+    if (err != AGENTOS_SUCCESS || !g_cognition_engine) {
+        g_cognition_engine = NULL;
+        return NULL;
+    }
+    return g_cognition_engine;
+}
+
+static char* build_memory_context(const char* input) {
+    if (!input) return NULL;
+    char** record_ids = NULL;
+    float* scores = NULL;
+    size_t count = 0;
+    agentos_error_t err = agentos_sys_memory_search(input, 3, &record_ids, &scores, &count);
+    if (err != AGENTOS_SUCCESS || count == 0 || !record_ids) {
+        if (record_ids) agentos_sys_free(record_ids);
+        if (scores) agentos_sys_free(scores);
+        return NULL;
+    }
+    size_t ctx_max = count * 256 + 64;
+    char* ctx = (char*)AGENTOS_MALLOC(ctx_max);
+    if (!ctx) {
+        agentos_sys_free(record_ids);
+        agentos_sys_free(scores);
+        return NULL;
+    }
+    size_t pos = 0;
+    pos += snprintf(ctx + pos, ctx_max - pos, "{\"memory_refs\":[");
+    for (size_t i = 0; i < count && pos < ctx_max - 2; i++) {
+        if (i > 0) pos += snprintf(ctx + pos, ctx_max - pos, ",");
+        pos += snprintf(ctx + pos, ctx_max - pos, "{\"id\":\"%s\",\"score\":%.3f}",
+                        record_ids[i] ? record_ids[i] : "", scores[i]);
+    }
+    pos += snprintf(ctx + pos, ctx_max - pos, "]}");
+    agentos_sys_free(record_ids);
+    agentos_sys_free(scores);
+    return ctx;
+}
+
+static char* serialize_task_plan(agentos_task_plan_t* plan) {
+    if (!plan) return NULL;
+    size_t buf_max = 4096 + plan->task_plan_node_count * 512;
+    char* buf = (char*)AGENTOS_MALLOC(buf_max);
+    if (!buf) return NULL;
+    size_t pos = 0;
+    pos += snprintf(buf + pos, buf_max - pos,
+                    "{\"plan_id\":\"%s\",\"node_count\":%zu,\"entry_count\":%zu,\"nodes\":[",
+                    plan->task_plan_id ? plan->task_plan_id : "",
+                    plan->task_plan_node_count,
+                    plan->task_plan_entry_count);
+    for (size_t i = 0; i < plan->task_plan_node_count && pos < buf_max - 256; i++) {
+        agentos_task_node_t* node = plan->task_plan_nodes[i];
+        if (!node) continue;
+        if (i > 0) pos += snprintf(buf + pos, buf_max - pos, ",");
+        pos += snprintf(buf + pos, buf_max - pos,
+                        "{\"id\":\"%s\",\"role\":\"%s\",\"timeout_ms\":%u,\"priority\":%u,\"dep_count\":%zu}",
+                        node->task_node_id ? node->task_node_id : "",
+                        node->task_node_agent_role ? node->task_node_agent_role : "",
+                        node->task_node_timeout_ms,
+                        node->task_node_priority,
+                        node->task_node_depends_count);
+    }
+    pos += snprintf(buf + pos, buf_max - pos, "]}");
+    return buf;
+}
+
 static agentos_error_t agent_unit_execute(agentos_execution_unit_t* unit,
                                           const void* input,
                                           void** out_output) {
     if (!unit || !input || !out_output) return AGENTOS_EINVAL;
 
-    /* 从单元私有数据获取 spec */
     const char* spec = (const char*)unit->execution_unit_data;
     if (!spec) {
         AGENTOS_LOG_ERROR("Agent unit has no spec data");
         return AGENTOS_ENOTINIT;
     }
 
-    /* 解析输入 */
     const char* input_str = (const char*)input;
     size_t input_len = strnlen(input_str, 65536);
     if (input_len == 0) {
@@ -71,21 +131,44 @@ static agentos_error_t agent_unit_execute(agentos_execution_unit_t* unit,
         return AGENTOS_EINVAL;
     }
 
-    /*
-     * 生产级执行逻辑：
-     * 根据 spec 中定义的 agent 类型，执行对应的处理流程。
-     *
-     * 当前实现采用命令式解析器模式（非简化 echo）：
-     * 1. 尝试从 spec JSON 中提取 role 字段
-     * 2. 根据 role 类型执行不同的处理管道
-     * 3. 返回包含执行时间、角色、结果的结构化 JSON
-     *
-     * TODO: 集成 cognition engine (agentos_cognition_process) 进行真实 AI 推理
-     * TODO: 集成 skill registry 调用可用 skills
-     * TODO: 集成 memory engine 进行上下文增强
-     */
+    uint64_t start_ns = agentos_time_monotonic_ns();
 
-    /* 提取 role（简单字符串搜索，避免 cJSON 依赖） */
+    agentos_cognition_engine_t* engine = ensure_cognition_engine();
+    if (engine) {
+        agentos_task_plan_t* plan = NULL;
+        agentos_error_t err = agentos_cognition_process(engine, input_str, input_len, &plan);
+        if (err == AGENTOS_SUCCESS && plan) {
+            char* plan_json = serialize_task_plan(plan);
+            agentos_task_plan_free(plan);
+            if (plan_json) {
+                char* mem_ctx = build_memory_context(input_str);
+                size_t result_max = strlen(plan_json) + (mem_ctx ? strlen(mem_ctx) : 0) + 256;
+                char* result = (char*)AGENTOS_MALLOC(result_max);
+                if (result) {
+                    if (mem_ctx) {
+                        snprintf(result, result_max,
+                                 "{\"status\":\"completed\",\"source\":\"cognition\","
+                                 "\"plan\":%s,\"memory_context\":%s}",
+                                 plan_json, mem_ctx);
+                    } else {
+                        snprintf(result, result_max,
+                                 "{\"status\":\"completed\",\"source\":\"cognition\","
+                                 "\"plan\":%s}",
+                                 plan_json);
+                    }
+                    AGENTOS_FREE(plan_json);
+                    if (mem_ctx) AGENTOS_FREE(mem_ctx);
+                    uint64_t end_ns = agentos_time_monotonic_ns();
+                    AGENTOS_LOG_INFO("Agent cognition execution: elapsed=%lu ms",
+                                     (unsigned long)((end_ns - start_ns) / 1000000));
+                    *out_output = result;
+                    return AGENTOS_SUCCESS;
+                }
+                AGENTOS_FREE(plan_json);
+            }
+        }
+    }
+
     const char* role = "general";
     const char* role_key = "\"role\"";
     const char* role_pos = strstr(spec, role_key);
@@ -108,54 +191,31 @@ static agentos_error_t agent_unit_execute(agentos_execution_unit_t* unit,
         }
     }
 
-    /* 获取当前时间戳用于审计 */
-    uint64_t start_ns = agentos_time_monotonic_ns();
-
-    /*
-     * 根据 agent role 执行不同的处理管道
-     * 生产环境中每个 role 应调用对应的处理器
-     */
+    char* mem_ctx = build_memory_context(input_str);
     char* result = NULL;
-    size_t result_max = input_len + 1024;
+    size_t result_max = input_len + (mem_ctx ? strlen(mem_ctx) : 0) + 1024;
     result = (char*)AGENTOS_MALLOC(result_max);
-    if (!result) return AGENTOS_ENOMEM;
+    if (!result) {
+        if (mem_ctx) AGENTOS_FREE(mem_ctx);
+        return AGENTOS_ENOMEM;
+    }
 
-    /* 执行处理 - 根据角色类型 */
-    if (strcmp(role, "analyst") == 0) {
-        /* 分析型 Agent: 执行数据分析管道 */
+    if (mem_ctx) {
         snprintf(result, result_max,
-                 "{\"status\":\"completed\",\"role\":\"%s\","
-                 "\"pipeline\":\"data_analysis\","
-                 "\"input_length\":%zu,\"processing_mode\":\"analytical\"}",
-                 role, input_len);
-    } else if (strcmp(role, "coder") == 0) {
-        /* 编码型 Agent: 执行代码生成管道 */
-        snprintf(result, result_max,
-                 "{\"status\":\"completed\",\"role\":\"%s\","
-                 "\"pipeline\":\"code_generation\","
-                 "\"input_length\":%zu,\"processing_mode\":\"generative\"}",
-                 role, input_len);
-    } else if (strcmp(role, "researcher") == 0) {
-        /* 研究型 Agent: 执行信息检索管道 */
-        snprintf(result, result_max,
-                 "{\"status\":\"completed\",\"role\":\"%s\","
-                 "\"pipeline\":\"information_retrieval\","
-                 "\"input_length\":%zu,\"processing_mode\":\"research\"}",
-                 role, input_len);
+                 "{\"status\":\"completed\",\"source\":\"fallback\",\"role\":\"%s\","
+                 "\"input_length\":%zu,\"memory_context\":%s}",
+                 role, input_len, mem_ctx);
+        AGENTOS_FREE(mem_ctx);
     } else {
-        /* 通用 Agent: 执行默认处理管道 */
         snprintf(result, result_max,
-                 "{\"status\":\"completed\",\"role\":\"%s\","
-                 "\"pipeline\":\"default\","
-                 "\"input_length\":%zu,\"processing_mode\":\"general\","
-                 "\"spec_preview\":\"%.100s\"}",
-                 role, input_len, spec);
+                 "{\"status\":\"completed\",\"source\":\"fallback\",\"role\":\"%s\","
+                 "\"input_length\":%zu}",
+                 role, input_len);
     }
 
     uint64_t end_ns = agentos_time_monotonic_ns();
-    uint64_t elapsed_ms = (end_ns - start_ns) / 1000000;
-
-    AGENTOS_LOG_INFO("Agent execution completed: role=%s, elapsed=%lu ms", role, (unsigned long)elapsed_ms);
+    AGENTOS_LOG_INFO("Agent fallback execution: role=%s, elapsed=%lu ms",
+                     role, (unsigned long)((end_ns - start_ns) / 1000000));
 
     *out_output = result;
     return AGENTOS_SUCCESS;
@@ -400,6 +460,11 @@ agentos_error_t agentos_sys_agent_list(char*** out_agent_ids, size_t* out_count)
  * @brief 清理 Agent 系统调用资源
  */
 void agentos_sys_agent_cleanup(void) {
+    if (g_cognition_engine) {
+        agentos_cognition_destroy(g_cognition_engine);
+        g_cognition_engine = NULL;
+    }
+
     if (!agent_lock) return;
 
     agentos_mutex_lock(agent_lock);
@@ -407,10 +472,8 @@ void agentos_sys_agent_cleanup(void) {
     while (inst) {
         agent_instance_t* next = inst->next;
 
-        /* 从 registry 注销 */
         agentos_registry_unregister_unit(inst->agent_id);
 
-        /* 释放执行单元 */
         if (inst->unit) {
             agent_unit_destroy(inst->unit);
             inst->unit = NULL;

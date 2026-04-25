@@ -79,4 +79,26 @@ permission_type_t sandbox_permission_check(agentos_sandbox_t* sandbox,
                                           int syscall_num,
                                           void** args, int argc);
 
+/**
+ * @brief 检查沙箱是否具有指定能力
+ * @param sandbox 沙箱句柄
+ * @param capability_id 能力ID（系统调用号）
+ * @param resource 目标资源标识
+ * @return 1=有能力，0=无能力
+ */
+int agentos_sandbox_capability_check(agentos_sandbox_t* sandbox,
+                                     int capability_id,
+                                     const char* resource);
+
+/**
+ * @brief 验证系统调用参数安全性
+ * @param syscall_num 系统调用号
+ * @param args 参数数组
+ * @param argc 参数数量
+ * @return AGENTOS_SUCCESS 安全，其他为错误码
+ */
+agentos_error_t agentos_sandbox_validate_syscall(int syscall_num,
+                                                  void** args,
+                                                  int argc);
+
 #endif /* AGENTOS_SANDBOX_PERMISSION_H */

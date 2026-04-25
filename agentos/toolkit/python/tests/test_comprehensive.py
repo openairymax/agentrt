@@ -13,10 +13,10 @@ import time
 # Import all available public APIs
 from agentos import (
     AgentOS, AsyncAgentOS,
-    Telemetry, Meter, Tracer, Span, SpanStatus, MetricPoint,
-    TaskStatus, TaskResult, MemoryInfo, MemoryRecordType,
-    SessionInfo, SkillInfo, SkillResult, TelemetryMetrics,
-    Priority,
+    Telemetry, Meter, Tracer, Span, SpanStatus,
+    TaskStatus, TaskResult, SkillInfo, SkillResult,
+    Memory, MemorySearchResult, Session, Skill,
+    MemoryLayer, SessionStatus, SkillStatus,
     generate_id, generate_timestamp, generate_hash,
     validate_json, sanitize_string,
     get_env_var, parse_timeout, merge_dicts,

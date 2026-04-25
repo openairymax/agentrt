@@ -222,6 +222,8 @@ static agentos_error_t create_loop_engines(agentos_core_loop_t* loop)
     err = agentos_memory_create(NULL, &loop->memory);
     if (err != AGENTOS_SUCCESS) return err;
 
+    agentos_cognition_set_memory(loop->cognition, loop->memory);
+
     return AGENTOS_SUCCESS;
 }
 

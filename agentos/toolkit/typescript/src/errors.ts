@@ -354,3 +354,23 @@ export const ConfigError = createErrorClass('ConfigError', '', ErrorCode.INVALID
 
 /** 限流错误类 */
 export const RateLimitError = createErrorClass('RateLimitError', '请求频率超限', ErrorCode.RATE_LIMITED);
+
+/** 验证错误类 */
+export const ValidationError = createErrorClass('ValidationError', '数据验证失败', ErrorCode.VALIDATION_ERROR);
+
+export interface AgentOSErrorStatic {
+  new (message: string, code?: string, cause?: Error): AgentOSError;
+  http(message: string): AgentOSError;
+  network(message: string): AgentOSError;
+}
+
+function _httpError(message: string): AgentOSError {
+  return new AgentOSError(message, ErrorCode.SERVER_ERROR);
+}
+
+function _networkError(message: string): AgentOSError {
+  return new AgentOSError(message, ErrorCode.NETWORK_ERROR);
+}
+
+(AgentOSError as unknown as AgentOSErrorStatic).http = _httpError;
+(AgentOSError as unknown as AgentOSErrorStatic).network = _networkError;

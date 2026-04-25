@@ -20,6 +20,7 @@
 #include "thinking_chain.h"
 #include "metacognition.h"
 #include "semantic_unit.h"
+#include "confidence_calibrator.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -130,6 +131,7 @@ struct tc3_coordinator {
     su_stream_detector_t* detector;
     agentos_thinking_chain_t* chain;
     agentos_metacognition_t* meta;
+    confidence_calibrator_t* calibrator;
     tc3_stats_t stats;
     tc3_unit_result_t* unit_results;
     size_t unit_results_capacity;

@@ -88,7 +88,7 @@ uint64_t agentos_thread_id(void) {
 
 #if AGENTOS_PLATFORM_WINDOWS
 
-int agentos_thread_create(agentos_thread_t* thread, agentos_thread_func_t func, void* arg) {
+int agentos_platform_thread_create(agentos_thread_t* thread, agentos_thread_func_t func, void* arg) {
     HANDLE h = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)func, arg, 0, NULL);
     if (h == NULL) {
         return (int)GetLastError();
@@ -97,7 +97,7 @@ int agentos_thread_create(agentos_thread_t* thread, agentos_thread_func_t func, 
     return 0;
 }
 
-int agentos_thread_join(agentos_thread_t thread, void** retval) {
+int agentos_platform_thread_join(agentos_thread_t thread, void** retval) {
     (void)retval;
     DWORD result = WaitForSingleObject(thread, INFINITE);
     if (result != WAIT_OBJECT_0) {
@@ -109,11 +109,11 @@ int agentos_thread_join(agentos_thread_t thread, void** retval) {
 
 #else
 
-int agentos_thread_create(agentos_thread_t* thread, agentos_thread_func_t func, void* arg) {
+int agentos_platform_thread_create(agentos_thread_t* thread, agentos_thread_func_t func, void* arg) {
     return pthread_create(thread, NULL, func, arg);
 }
 
-int agentos_thread_join(agentos_thread_t thread, void** retval) {
+int agentos_platform_thread_join(agentos_thread_t thread, void** retval) {
     return pthread_join(thread, retval);
 }
 

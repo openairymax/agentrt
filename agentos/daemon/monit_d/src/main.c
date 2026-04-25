@@ -15,11 +15,13 @@
 
 #include "monitor_service.h"
 #include "platform.h"
+#include "thread_pool.h"
 #include "error.h"
 #include "svc_logger.h"
 #include "jsonrpc_helpers.h"
 #include "method_dispatcher.h"
 #include "param_validator.h"
+#include "thread_pool.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -503,15 +505,31 @@ int main(int argc, char** argv) {
 
     SVC_LOG_INFO("Monitor service started successfully");
 
+    thread_pool_config_t tp_config;
+    tp_config.min_threads = 2;
+    tp_config.max_threads = 4;
+    tp_config.queue_size = 128;
+    tp_config.idle_timeout_ms = 30000;
+    thread_pool_t* pool = thread_pool_create(&tp_config);
+    if (!pool) {
+        SVC_LOG_ERROR("Failed to create thread pool");
+        agentos_socket_close(server_fd);
+        monitor_service_destroy(g_service);
+        agentos_mutex_destroy(&g_running_lock);
+        agentos_socket_cleanup();
+        return 1;
+    }
+
     /* 主事件循环 */
     while (g_running) {
         agentos_socket_t client_fd = agentos_socket_accept(server_fd, 5000);
         if (client_fd == AGENTOS_INVALID_SOCKET) continue;
-        handle_client(client_fd);
+        thread_pool_submit(pool, (thread_task_fn_t)handle_client, (void*)(uintptr_t)client_fd);
     }
 
     /* 清理资源 */
     SVC_LOG_INFO("Monitor service stopping...");
+    thread_pool_destroy(pool);
     agentos_socket_close(server_fd);
     monitor_service_destroy(g_service);
     if (g_dispatcher) method_dispatcher_destroy(g_dispatcher);
