@@ -8,6 +8,7 @@
  */
 
 #include "graph_engine.h"
+#include "taskflow.h"
 #include <stdlib.h>
 #include <string.h>
 

@@ -450,12 +450,38 @@ int trace_store_service_get_stats(uint64_t* out_total_traces,
  */
 int trace_store_service_cleanup_old_files(int days_to_keep)
 {
+    if (!g_ctx.is_initialized) return -1;
     if (days_to_keep <= 0) {
-        days_to_keep = 7; // 默认保留7天追踪数据
+        days_to_keep = 7;
     }
-    
-    // 简化实现：返回0
-    return 0;
+
+    time_t cutoff = time(NULL) - ((time_t)days_to_keep * 86400);
+    int deleted_count = 0;
+
+    DIR* dir = opendir(g_ctx.storage_path);
+    if (!dir) return 0;
+
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_name[0] == '.') continue;
+
+        char filepath[1024];
+        snprintf(filepath, sizeof(filepath), "%s/%s", g_ctx.storage_path, entry->d_name);
+
+        struct stat file_stat;
+        if (stat(filepath, &file_stat) != 0) continue;
+        if (S_ISDIR(file_stat.st_mode)) continue;
+
+        if (file_stat.st_mtime < cutoff) {
+            if (unlink(filepath) == 0) {
+                g_ctx.total_bytes_stored -= (uint64_t)file_stat.st_size;
+                deleted_count++;
+            }
+        }
+    }
+
+    closedir(dir);
+    return deleted_count;
 }
 
 /**
