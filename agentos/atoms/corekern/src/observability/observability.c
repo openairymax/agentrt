@@ -51,6 +51,8 @@ typedef struct {
     uint32_t metric_count;
     obs_health_entry_t health_checks[OBS_MAX_HEALTH_CHECKS];
     uint32_t health_check_count;
+    agentos_trace_context_t spans[OBS_MAX_TRACE_SPANS];
+    uint32_t span_count;
     agentos_mutex_t* lock;
 } obs_state_t;
 
@@ -121,6 +123,7 @@ void agentos_observability_shutdown(void) {
     agentos_mutex_lock(g_obs.lock);
     g_obs.metric_count = 0;
     g_obs.health_check_count = 0;
+    g_obs.span_count = 0;
     g_obs.initialized = 0;
     agentos_mutex_unlock(g_obs.lock);
 
@@ -151,14 +154,21 @@ int agentos_health_check_register(const char* name,
 }
 
 agentos_health_status_t agentos_health_check_run(int timeout_ms) {
-    (void)timeout_ms;
     if (!g_obs.initialized) return AGENTOS_HEALTH_FAIL;
 
     agentos_health_status_t worst = AGENTOS_HEALTH_PASS;
+    uint64_t deadline_ns = 0;
+    if (timeout_ms > 0) {
+        deadline_ns = agentos_time_monotonic_ns() + (uint64_t)timeout_ms * 1000000ULL;
+    }
 
     agentos_mutex_lock(g_obs.lock);
 
     for (uint32_t i = 0; i < g_obs.health_check_count; i++) {
+        if (timeout_ms > 0 && agentos_time_monotonic_ns() >= deadline_ns) {
+            worst = AGENTOS_HEALTH_WARN;
+            break;
+        }
         agentos_health_status_t status = g_obs.health_checks[i].callback(
             g_obs.health_checks[i].user_data);
         if (status > worst) {
@@ -343,6 +353,13 @@ int agentos_trace_span_start(agentos_trace_context_t* context,
         context->operation_name[0] = '\0';
     }
 
+    agentos_mutex_lock(g_obs.lock);
+    if (g_obs.span_count < OBS_MAX_TRACE_SPANS) {
+        memcpy(&g_obs.spans[g_obs.span_count], context, sizeof(agentos_trace_context_t));
+        g_obs.span_count++;
+    }
+    agentos_mutex_unlock(g_obs.lock);
+
     return AGENTOS_SUCCESS;
 }
 
@@ -353,26 +370,65 @@ int agentos_trace_span_end(agentos_trace_context_t* context, int error_code) {
     context->end_ns = agentos_time_monotonic_ns();
     context->error_code = error_code;
 
+    agentos_mutex_lock(g_obs.lock);
+    for (uint32_t i = 0; i < g_obs.span_count; i++) {
+        if (strcmp(g_obs.spans[i].span_id, context->span_id) == 0) {
+            g_obs.spans[i].end_ns = context->end_ns;
+            g_obs.spans[i].error_code = error_code;
+            break;
+        }
+    }
+    agentos_mutex_unlock(g_obs.lock);
+
     return AGENTOS_SUCCESS;
 }
 
 int agentos_trace_set_tag(agentos_trace_context_t* context,
                           const char* key, const char* value) {
-    (void)context;
-    (void)key;
-    (void)value;
     if (!context || !key) return AGENTOS_EINVAL;
     if (!g_obs.initialized) return AGENTOS_ENOTSUP;
 
+    agentos_mutex_lock(g_obs.lock);
+
+    for (uint32_t i = 0; i < g_obs.span_count; i++) {
+        if (strcmp(g_obs.spans[i].span_id, context->span_id) == 0) {
+            size_t avail = sizeof(g_obs.spans[i].operation_name) - strlen(g_obs.spans[i].operation_name) - 1;
+            if (avail > 0) {
+                char tag_buf[256];
+                int n = snprintf(tag_buf, sizeof(tag_buf), " %s=%s", key, value ? value : "");
+                if (n > 0 && (size_t)n < avail) {
+                    strncat(g_obs.spans[i].operation_name, tag_buf, avail);
+                }
+            }
+            break;
+        }
+    }
+
+    agentos_mutex_unlock(g_obs.lock);
     return AGENTOS_SUCCESS;
 }
 
 int agentos_trace_log(agentos_trace_context_t* context, const char* message) {
-    (void)context;
-    (void)message;
     if (!context || !message) return AGENTOS_EINVAL;
     if (!g_obs.initialized) return AGENTOS_ENOTSUP;
 
+    agentos_mutex_lock(g_obs.lock);
+
+    for (uint32_t i = 0; i < g_obs.span_count; i++) {
+        if (strcmp(g_obs.spans[i].span_id, context->span_id) == 0) {
+            size_t avail = sizeof(g_obs.spans[i].operation_name) - strlen(g_obs.spans[i].operation_name) - 1;
+            if (avail > 0) {
+                char log_buf[256];
+                int n = snprintf(log_buf, sizeof(log_buf), " [%s]", message);
+                if (n > 0 && (size_t)n < avail) {
+                    strncat(g_obs.spans[i].operation_name, log_buf, avail);
+                }
+            }
+            break;
+        }
+    }
+
+    agentos_mutex_unlock(g_obs.lock);
     return AGENTOS_SUCCESS;
 }
 
@@ -410,7 +466,21 @@ int agentos_performance_get_metrics(double* out_cpu_usage,
         *out_memory_usage = 0.0;
     }
 
-    *out_cpu_usage = 0.0;
+    double cpu_usage = 0.0;
+    FILE* stat_fp = fopen("/proc/stat", "r");
+    if (stat_fp) {
+        unsigned long long user, nice, system, idle, iowait, irq, softirq, steal;
+        if (fscanf(stat_fp, "cpu %llu %llu %llu %llu %llu %llu %llu %llu",
+                   &user, &nice, &system, &idle, &iowait, &irq, &softirq, &steal) == 8) {
+            unsigned long long total_idle = idle + iowait;
+            unsigned long long total = user + nice + system + idle + iowait + irq + softirq + steal;
+            if (total > 0) {
+                cpu_usage = (1.0 - (double)total_idle / (double)total) * 100.0;
+            }
+        }
+        fclose(stat_fp);
+    }
+    *out_cpu_usage = cpu_usage;
 
     long num_processors = sysconf(_SC_NPROCESSORS_ONLN);
     if (num_processors <= 0) num_processors = 1;

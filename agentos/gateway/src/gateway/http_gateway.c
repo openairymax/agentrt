@@ -452,7 +452,7 @@ static bool http_gateway_is_running(void* gateway_impl) {
  * 2. 公共模式（推荐）：通过 gateway_set_handler() API 传入，
  *    自动创建适配器将公共签名 (const char*, char**, void*) -> int 转换为内部签名
  */
-static agentos_error_t http_gateway_set_handler(void* gateway_impl, gateway_request_handler_t handler, void* user_data) {
+static agentos_error_t http_gateway_set_handler(void* gateway_impl, gateway_internal_handler_t handler, void* user_data) {
     http_gateway_t* gateway = (http_gateway_t*)gateway_impl;
     if (!gateway) return AGENTOS_EINVAL;
 

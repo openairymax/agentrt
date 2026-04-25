@@ -1,1 +1,8 @@
-"""\nCopyright (c) 2026 SPHARX. All Rights Reserved.\n"From data intelligence emerges."\n\nopenlab Contrib - Planning Strategies\n=====================================\n\nTask planning strategies for intelligent task decomposition.\n\nAvailable Strategies:\n    - HierarchicalPlanner: Top-down task decomposition\n    - ReactivePlanner: Real-time environment response\n    - ReflectivePlanner: Self-adjusting after failures\n\nExample:\n    from openlab.contrib.strategies.planning import (\n        HierarchicalPlanner,\n        ReactivePlanner,\n    )\n\n    planner = HierarchicalPlanner(max_depth=5)\n    dag = planner.plan("Build a web app", requirements)\n\nAuthor: Spharx AgentOS Team
+"""Planning strategy module."""
+
+class PlanningStrategy:
+    """Planning strategy for task decomposition."""
+    def __init__(self, config=None):
+        self.config = config or {}
+    async def plan(self, task):
+        raise NotImplementedError("PlanningStrategy.plan not yet implemented")

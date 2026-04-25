@@ -1,11 +1,12 @@
 /**
  * @file layer2_feature.c
- * @brief L2 特征层实�?
+ * @brief L2 特征层实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
 #include "../include/layer2_feature.h"
 #include "logger.h"
+#include "embedder.h"
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
@@ -25,10 +26,11 @@
 typedef struct hnsw_node {
     char* id;
     float* vector;
-    float norm;           /* 预计算的向量L2范数平方 */
+    float norm;
     uint32_t level;
     struct hnsw_node** neighbors;
     size_t* neighbor_counts;
+    int deleted;
 } hnsw_node_t;
 
 /**
@@ -65,16 +67,34 @@ static float cosine_similarity_precomputed(const float* a, const float* b, float
 }
 
 /**
- * @brief 生成简单文本向量（用于演示�?
+ * @brief 生成文本嵌入向量（委托给embedder模块）
  */
 static float* generate_text_embedding(const char* text, uint32_t dim) {
     if (!text) return NULL;
+
+    float* embedding = NULL;
+    size_t embed_dim = 0;
+    agentos_error_t err = agentos_embedder_embed(text, &embedding, &embed_dim);
+
+    if (err == AGENTOS_SUCCESS && embedding && embed_dim > 0) {
+        if (embed_dim == dim) {
+            return embedding;
+        }
+        float* vector = (float*)AGENTOS_CALLOC(dim, sizeof(float));
+        if (!vector) {
+            AGENTOS_FREE(embedding);
+            return NULL;
+        }
+        uint32_t copy_dim = embed_dim < dim ? (uint32_t)embed_dim : dim;
+        memcpy(vector, embedding, copy_dim * sizeof(float));
+        AGENTOS_FREE(embedding);
+        return vector;
+    }
+
     float* vector = (float*)AGENTOS_CALLOC(dim, sizeof(float));
     if (!vector) return NULL;
     size_t len = strlen(text);
-    if (len == 0) {
-        return vector;  // Return zero-initialized vector for empty input
-    }
+    if (len == 0) return vector;
     for (uint32_t i = 0; i < dim; i++) {
         vector[i] = (float)((unsigned char)text[i % len]) / 255.0f;
     }
@@ -102,7 +122,7 @@ static hnsw_index_t* hnsw_create(uint32_t dimension, uint32_t m) {
 }
 
 /**
- * @brief 销�?HNSW 索引
+ * @brief 销毁 HNSW 索引
  */
 static void hnsw_destroy(hnsw_index_t* index) {
     if (!index) return;
@@ -122,7 +142,7 @@ static void hnsw_destroy(hnsw_index_t* index) {
 }
 
 /**
- * @brief 添加向量到索�?
+ * @brief 添加向量到索引
  */
 static agentos_error_t hnsw_add(hnsw_index_t* index, const char* id, const float* vector) {
     if (!index || !id || !vector) return AGENTOS_EINVAL;
@@ -205,7 +225,19 @@ static agentos_error_t hnsw_search(hnsw_index_t* index, const float* query, uint
         return AGENTOS_SUCCESS;
     }
 
-    size_t result_count = k < index->node_count ? k : index->node_count;
+    size_t active_count = 0;
+    for (size_t i = 0; i < index->node_count; i++) {
+        if (!index->nodes[i]->deleted) active_count++;
+    }
+    if (active_count == 0) {
+        pthread_mutex_unlock(&index->mutex);
+        *out_ids = NULL;
+        *out_scores = NULL;
+        *out_count = 0;
+        return AGENTOS_SUCCESS;
+    }
+
+    size_t result_count = k < active_count ? k : active_count;
     char** ids = (char**)AGENTOS_CALLOC(result_count, sizeof(char*));
     float* scores = (float*)AGENTOS_CALLOC(result_count, sizeof(float));
 
@@ -228,6 +260,7 @@ static agentos_error_t hnsw_search(hnsw_index_t* index, const float* query, uint
     }
     
     for (size_t i = 0; i < index->node_count; i++) {
+        if (index->nodes[i]->deleted) continue;
         float sim = cosine_similarity_precomputed(query, index->nodes[i]->vector, 
                                                   query_norm_sq, index->nodes[i]->norm, index->dimension);
         for (size_t j = 0; j < result_count; j++) {
@@ -310,7 +343,22 @@ agentos_error_t agentos_layer2_feature_remove(
     agentos_layer2_feature_t* l2,
     const char* id) {
     if (!l2 || !id) return AGENTOS_EINVAL;
-    return AGENTOS_SUCCESS;
+
+    hnsw_index_t* index = l2->hnsw;
+    if (!index) return AGENTOS_ENOENT;
+
+    pthread_mutex_lock(&index->mutex);
+
+    for (size_t i = 0; i < index->node_count; i++) {
+        if (!index->nodes[i]->deleted && strcmp(index->nodes[i]->id, id) == 0) {
+            index->nodes[i]->deleted = 1;
+            pthread_mutex_unlock(&index->mutex);
+            return AGENTOS_SUCCESS;
+        }
+    }
+
+    pthread_mutex_unlock(&index->mutex);
+    return AGENTOS_ENOENT;
 }
 
 agentos_error_t agentos_layer2_feature_search(

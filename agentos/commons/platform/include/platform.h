@@ -266,7 +266,7 @@ typedef void* (*agentos_thread_func_t)(void* arg);
  * @param arg 线程参数
  * @return 0 成功，非0 失败
  */
-int agentos_thread_create(agentos_thread_t* thread, agentos_thread_func_t func, void* arg);
+int agentos_platform_thread_create(agentos_thread_t* thread, agentos_thread_func_t func, void* arg);
 
 /**
  * @brief 等待线程结束
@@ -274,7 +274,12 @@ int agentos_thread_create(agentos_thread_t* thread, agentos_thread_func_t func, 
  * @param retval 返回值指针（可为NULL）
  * @return 0 成功，非0 失败
  */
-int agentos_thread_join(agentos_thread_t thread, void** retval);
+int agentos_platform_thread_join(agentos_thread_t thread, void** retval);
+
+#ifndef AGENTOS_USE_SCHEDULER_THREAD_IMPL
+#define agentos_thread_create agentos_platform_thread_create
+#define agentos_thread_join agentos_platform_thread_join
+#endif
 
 /**
  * @brief 获取当前线程ID

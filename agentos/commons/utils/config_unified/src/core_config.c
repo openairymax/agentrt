@@ -308,8 +308,25 @@ config_value_t* config_value_clone(const config_value_t* value) {
             break;
             
         case CONFIG_TYPE_BINARY:
-            // 简化实现：不支持二进制数据克隆
-            copy = config_value_create_null();
+            if (value->data.binary_value.data && value->data.binary_value.size > 0) {
+                copy = config_value_alloc(CONFIG_TYPE_BINARY);
+                if (copy) {
+                    copy->data.binary_value.data = AGENTOS_MALLOC(value->data.binary_value.size);
+                    if (copy->data.binary_value.data) {
+                        memcpy(copy->data.binary_value.data, value->data.binary_value.data, value->data.binary_value.size);
+                        copy->data.binary_value.size = value->data.binary_value.size;
+                    } else {
+                        AGENTOS_FREE(copy);
+                        copy = NULL;
+                    }
+                }
+            } else {
+                copy = config_value_alloc(CONFIG_TYPE_BINARY);
+                if (copy) {
+                    copy->data.binary_value.data = NULL;
+                    copy->data.binary_value.size = 0;
+                }
+            }
             break;
     }
     
@@ -590,6 +607,82 @@ config_error_t config_context_unlock(config_context_t* ctx) {
     
     ctx->locked = false;
     return CONFIG_SUCCESS;
+}
+
+config_context_t* config_context_clone(const config_context_t* ctx) {
+    if (!ctx) return NULL;
+
+    config_context_t* clone = config_context_create(ctx->name);
+    if (!clone) return NULL;
+
+    for (size_t i = 0; i < ctx->count; i++) {
+        char* key_copy = duplicate_string(ctx->items[i].key);
+        if (!key_copy) {
+            config_context_destroy(clone);
+            return NULL;
+        }
+        config_value_t* val_copy = config_value_clone(ctx->items[i].value);
+        if (!val_copy) {
+            AGENTOS_FREE(key_copy);
+            config_context_destroy(clone);
+            return NULL;
+        }
+        if (clone->count >= clone->capacity) {
+            config_error_t err = expand_context_capacity(clone);
+            if (err != CONFIG_SUCCESS) {
+                AGENTOS_FREE(key_copy);
+                config_value_destroy(val_copy);
+                config_context_destroy(clone);
+                return NULL;
+            }
+        }
+        clone->items[clone->count].key = key_copy;
+        clone->items[clone->count].value = val_copy;
+        clone->count++;
+    }
+
+    clone->locked = ctx->locked;
+    return clone;
+}
+
+config_error_t config_context_copy(config_context_t* dst, const config_context_t* src) {
+    if (!dst || !src) return CONFIG_ERROR_INVALID_ARG;
+    if (dst->locked) return CONFIG_ERROR_LOCKED;
+
+    config_context_clear(dst);
+
+    for (size_t i = 0; i < src->count; i++) {
+        char* key_copy = duplicate_string(src->items[i].key);
+        if (!key_copy) return CONFIG_ERROR_OUT_OF_MEMORY;
+        config_value_t* val_copy = config_value_clone(src->items[i].value);
+        if (!val_copy) {
+            AGENTOS_FREE(key_copy);
+            return CONFIG_ERROR_OUT_OF_MEMORY;
+        }
+        if (dst->count >= dst->capacity) {
+            config_error_t err = expand_context_capacity(dst);
+            if (err != CONFIG_SUCCESS) {
+                AGENTOS_FREE(key_copy);
+                config_value_destroy(val_copy);
+                return err;
+            }
+        }
+        dst->items[dst->count].key = key_copy;
+        dst->items[dst->count].value = val_copy;
+        dst->count++;
+    }
+
+    return CONFIG_SUCCESS;
+}
+
+const char* config_context_get_key_at(const config_context_t* ctx, size_t index) {
+    if (!ctx || index >= ctx->count) return NULL;
+    return ctx->items[index].key;
+}
+
+const config_value_t* config_context_get_value_at(const config_context_t* ctx, size_t index) {
+    if (!ctx || index >= ctx->count) return NULL;
+    return ctx->items[index].value;
 }
 
 /* ==================== 工具函数实现 ==================== */

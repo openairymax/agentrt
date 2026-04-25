@@ -5,13 +5,10 @@ cmake_minimum_required(VERSION 3.20)
 project(agentos-cognition)
 
 file(GLOB COGNITION_SOURCES
-    "engine.c"
-    "intent_parser.c"
-    "thinking_chain.c"
-    "metacognition.c"
-    "planner/*.c"
-    "coordinator/*.c"
-    "dispatcher/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/planner/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/coordinator/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/dispatcher/*.c"
 )
 
 add_library(agentos_cognition STATIC ${COGNITION_SOURCES})
