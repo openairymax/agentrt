@@ -66,14 +66,14 @@ else()
     if(WARNINGS_AS_ERRORS)
         add_compile_options(-Werror)
     endif()
-    add_compile_options(-fstack-protector-strong -fPIE -fno-omit-frame-pointer)
+    add_compile_options(-fstack-protector-strong -fno-omit-frame-pointer)
     add_compile_definitions(-D_FORTIFY_SOURCE=2)
 
     # 链接器安全选项
     if(UNIX AND NOT APPLE)
-        add_link_options(-Wl,-z,relro -Wl,-z,now -pie)
+        add_link_options(-Wl,-z,relro -Wl,-z,now)
     elseif(APPLE)
-        add_link_options(-Wl,-dead_strip -pie)
+        add_link_options(-Wl,-dead_strip)
     endif()
 endif()
 

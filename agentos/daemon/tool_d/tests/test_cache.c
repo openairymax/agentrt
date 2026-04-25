@@ -64,8 +64,7 @@ static void test_cache_put_get(void) {
 
     char* retrieved = NULL;
     int ret = tool_cache_get(cache, key, &retrieved);
-    fprintf(stderr, "DEBUG: ret=%d retrieved=%p\n", ret, (void*)retrieved);
-    assert(ret == 0);
+    assert(ret == 1);
     assert(retrieved != NULL);
     assert(strcmp(retrieved, value) == 0);
 
@@ -83,7 +82,7 @@ static void test_cache_miss(void) {
 
     char* retrieved = NULL;
     int ret = tool_cache_get(cache, "nonexistent_key", &retrieved);
-    assert(ret != 0 || retrieved == NULL);
+    assert(ret == 0);
 
     tool_cache_destroy(cache);
 
@@ -103,9 +102,9 @@ static void test_cache_clear(void) {
     cache_clear(cache);
 
     char* retrieved = NULL;
-    assert(tool_cache_get(cache, "key1", &retrieved) != 0 || retrieved == NULL);
-    assert(tool_cache_get(cache, "key2", &retrieved) != 0 || retrieved == NULL);
-    assert(tool_cache_get(cache, "key3", &retrieved) != 0 || retrieved == NULL);
+    assert(tool_cache_get(cache, "key1", &retrieved) == 0);
+    assert(tool_cache_get(cache, "key2", &retrieved) == 0);
+    assert(tool_cache_get(cache, "key3", &retrieved) == 0);
 
     tool_cache_destroy(cache);
 

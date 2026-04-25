@@ -1,11 +1,3 @@
-// AgentOS Go SDK - 配置管理模块
-// Version: 3.0.0
-// Last updated: 2026-03-22
-//
-// 提供客户端配置的定义、创建、验证和合并功能。
-// 支持函数式选项模式和环境变量注入，零值保护守卫。
-// 对应 Python SDK: 隐含在 client 模块中
-
 package agentos
 
 import (
@@ -16,8 +8,7 @@ import (
 	"time"
 )
 
-// manager 定义 AgentOS 客户端的完整配置
-type manager struct {
+type Config struct {
 	Endpoint        string
 	Timeout         time.Duration
 	MaxRetries      int
@@ -30,12 +21,10 @@ type manager struct {
 	IdleConnTimeout time.Duration
 }
 
-// ConfigOption 定义配置选项的函数签名
-type ConfigOption func(*manager)
+type ConfigOption func(*Config)
 
-// DefaultConfig 返回默认配置
-func DefaultConfig() *manager {
-	return &manager{
+func DefaultConfig() *Config {
+	return &Config{
 		Endpoint:        "http://localhost:18789",
 		Timeout:         30 * time.Second,
 		MaxRetries:      3,
@@ -47,85 +36,75 @@ func DefaultConfig() *manager {
 	}
 }
 
-// WithEndpoint 设置服务端点地址（空值不覆盖默认值）
 func WithEndpoint(endpoint string) ConfigOption {
-	return func(c *manager) {
+	return func(c *Config) {
 		if endpoint != "" {
 			c.Endpoint = endpoint
 		}
 	}
 }
 
-// WithTimeout 设置请求超时时间
 func WithTimeout(timeout time.Duration) ConfigOption {
-	return func(c *manager) {
+	return func(c *Config) {
 		if timeout > 0 {
 			c.Timeout = timeout
 		}
 	}
 }
 
-// WithMaxRetries 设置最大重试次数
 func WithMaxRetries(maxRetries int) ConfigOption {
-	return func(c *manager) {
+	return func(c *Config) {
 		if maxRetries >= 0 {
 			c.MaxRetries = maxRetries
 		}
 	}
 }
 
-// WithRetryDelay 设置重试间隔
 func WithRetryDelay(delay time.Duration) ConfigOption {
-	return func(c *manager) {
+	return func(c *Config) {
 		if delay > 0 {
 			c.RetryDelay = delay
 		}
 	}
 }
 
-// WithAPIKey 设置 API 密钥
 func WithAPIKey(apiKey string) ConfigOption {
-	return func(c *manager) {
+	return func(c *Config) {
 		c.APIKey = apiKey
 	}
 }
 
-// WithUserAgent 设置 User-Agent 头
 func WithUserAgent(userAgent string) ConfigOption {
-	return func(c *manager) {
+	return func(c *Config) {
 		if userAgent != "" {
 			c.UserAgent = userAgent
 		}
 	}
 }
 
-// WithDebug 设置调试模式
 func WithDebug(debug bool) ConfigOption {
-	return func(c *manager) {
+	return func(c *Config) {
 		c.Debug = debug
 	}
 }
 
-// WithLogLevel 设置日志级别
 func WithLogLevel(level string) ConfigOption {
-	return func(c *manager) {
+	return func(c *Config) {
 		if level != "" {
 			c.LogLevel = level
 		}
 	}
 }
 
-// WithMaxConnections 设置最大连接数
 func WithMaxConnections(maxConn int) ConfigOption {
-	return func(c *manager) {
+	return func(c *Config) {
 		if maxConn > 0 {
 			c.MaxConnections = maxConn
 		}
 	}
 }
 
-// NewConfig 使用函数式选项创建新配置
-func NewConfig(opts ...ConfigOption) *manager {
+func NewConfig(opts ...ConfigOption) *Config {
 	cfg := DefaultConfig()
 	for _, opt := range opts {
 		opt(cfg)
@@ -133,8 +112,7 @@ func NewConfig(opts ...ConfigOption) *manager {
 	return cfg
 }
 
-// NewConfigFromEnv 从环境变量创建配置（自动验证）
-func NewConfigFromEnv() (*manager, error) {
+func NewConfigFromEnv() (*Config, error) {
 	cfg := DefaultConfig()
 
 	if v := os.Getenv("AGENTOS_ENDPOINT"); v != "" {
@@ -179,8 +157,7 @@ func NewConfigFromEnv() (*manager, error) {
 	return cfg, nil
 }
 
-// Validate 验证配置的合法性
-func (c *manager) Validate() error {
+func (c *Config) Validate() error {
 	if c.Endpoint == "" {
 		return ErrInvalidEndpoint
 	}
@@ -196,9 +173,8 @@ func (c *manager) Validate() error {
 	return nil
 }
 
-// Clone 创建配置的深拷贝
-func (c *manager) Clone() *manager {
-	return &manager{
+func (c *Config) Clone() *Config {
+	return &Config{
 		Endpoint:        c.Endpoint,
 		Timeout:         c.Timeout,
 		MaxRetries:      c.MaxRetries,
@@ -212,8 +188,7 @@ func (c *manager) Clone() *manager {
 	}
 }
 
-// Merge 将 override 的非零值合并到当前配置（Debug 除外，始终取 override 值）
-func (c *manager) Merge(override *manager) *manager {
+func (c *Config) Merge(override *Config) *Config {
 	result := c.Clone()
 	if override == nil {
 		return result
@@ -251,8 +226,6 @@ func (c *manager) Merge(override *manager) *manager {
 	return result
 }
 
-// String 返回配置的可读描述
-func (c *manager) String() string {
-	return fmt.Sprintf("manager[endpoint=%s, timeout=%v, retries=%d]", c.Endpoint, c.Timeout, c.MaxRetries)
+func (c *Config) String() string {
+	return fmt.Sprintf("Config[endpoint=%s, timeout=%v, retries=%d]", c.Endpoint, c.Timeout, c.MaxRetries)
 }
-

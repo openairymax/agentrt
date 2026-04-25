@@ -593,8 +593,63 @@ taskflow_error_t workflow_build_conditional(
     vertex_id_t false_branch_node_id,
     vertex_id_t merge_node_id)
 {
-    // 简化实现
-    return TASKFLOW_ERROR_INTERNAL; // 暂未实现
+    if (!context) return TASKFLOW_ERROR_INVALID_ARG;
+
+    if (find_node_index(context, condition_node_id) == SIZE_MAX) return TASKFLOW_ERROR_INVALID_ARG;
+    if (find_node_index(context, true_branch_node_id) == SIZE_MAX) return TASKFLOW_ERROR_INVALID_ARG;
+    if (find_node_index(context, false_branch_node_id) == SIZE_MAX) return TASKFLOW_ERROR_INVALID_ARG;
+    if (merge_node_id != 0 && find_node_index(context, merge_node_id) == SIZE_MAX) return TASKFLOW_ERROR_INVALID_ARG;
+
+    workflow_edge_t true_edge = {
+        .edge_id = (edge_id_t)(4000),
+        .source_node = condition_node_id,
+        .target_node = true_branch_node_id,
+        .condition_func = NULL,
+        .condition_context = NULL,
+        .edge_label = "true_branch"
+    };
+    taskflow_error_t result = workflow_add_edge(context, &true_edge);
+    if (result != TASKFLOW_SUCCESS) return result;
+
+    workflow_edge_t false_edge = {
+        .edge_id = (edge_id_t)(4001),
+        .source_node = condition_node_id,
+        .target_node = false_branch_node_id,
+        .condition_func = NULL,
+        .condition_context = NULL,
+        .edge_label = "false_branch"
+    };
+    result = workflow_add_edge(context, &false_edge);
+    if (result != TASKFLOW_SUCCESS) return result;
+
+    if (merge_node_id != 0) {
+        workflow_edge_t merge_true = {
+            .edge_id = (edge_id_t)(4002),
+            .source_node = true_branch_node_id,
+            .target_node = merge_node_id,
+            .condition_func = NULL,
+            .condition_context = NULL,
+            .edge_label = "merge_from_true"
+        };
+        result = workflow_add_edge(context, &merge_true);
+        if (result != TASKFLOW_SUCCESS) return result;
+
+        workflow_edge_t merge_false = {
+            .edge_id = (edge_id_t)(4003),
+            .source_node = false_branch_node_id,
+            .target_node = merge_node_id,
+            .condition_func = NULL,
+            .condition_context = NULL,
+            .edge_label = "merge_from_false"
+        };
+        result = workflow_add_edge(context, &merge_false);
+        if (result != TASKFLOW_SUCCESS) return result;
+    }
+
+    context->start_node = condition_node_id;
+    context->end_node = merge_node_id;
+
+    return TASKFLOW_SUCCESS;
 }
 
 taskflow_error_t workflow_build_loop(
@@ -604,8 +659,63 @@ taskflow_error_t workflow_build_loop(
     vertex_id_t loop_condition_node_id,
     vertex_id_t loop_end_node_id)
 {
-    // 简化实现
-    return TASKFLOW_ERROR_INTERNAL; // 暂未实现
+    if (!context) return TASKFLOW_ERROR_INVALID_ARG;
+
+    if (find_node_index(context, loop_start_node_id) == SIZE_MAX) return TASKFLOW_ERROR_INVALID_ARG;
+    if (find_node_index(context, loop_body_node_id) == SIZE_MAX) return TASKFLOW_ERROR_INVALID_ARG;
+    if (find_node_index(context, loop_condition_node_id) == SIZE_MAX) return TASKFLOW_ERROR_INVALID_ARG;
+    if (loop_end_node_id != 0 && find_node_index(context, loop_end_node_id) == SIZE_MAX) return TASKFLOW_ERROR_INVALID_ARG;
+
+    workflow_edge_t start_to_body = {
+        .edge_id = (edge_id_t)(5000),
+        .source_node = loop_start_node_id,
+        .target_node = loop_body_node_id,
+        .condition_func = NULL,
+        .condition_context = NULL,
+        .edge_label = "loop_enter"
+    };
+    taskflow_error_t result = workflow_add_edge(context, &start_to_body);
+    if (result != TASKFLOW_SUCCESS) return result;
+
+    workflow_edge_t body_to_cond = {
+        .edge_id = (edge_id_t)(5001),
+        .source_node = loop_body_node_id,
+        .target_node = loop_condition_node_id,
+        .condition_func = NULL,
+        .condition_context = NULL,
+        .edge_label = "loop_check"
+    };
+    result = workflow_add_edge(context, &body_to_cond);
+    if (result != TASKFLOW_SUCCESS) return result;
+
+    workflow_edge_t cond_to_body = {
+        .edge_id = (edge_id_t)(5002),
+        .source_node = loop_condition_node_id,
+        .target_node = loop_body_node_id,
+        .condition_func = NULL,
+        .condition_context = NULL,
+        .edge_label = "loop_continue"
+    };
+    result = workflow_add_edge(context, &cond_to_body);
+    if (result != TASKFLOW_SUCCESS) return result;
+
+    if (loop_end_node_id != 0) {
+        workflow_edge_t cond_to_end = {
+            .edge_id = (edge_id_t)(5003),
+            .source_node = loop_condition_node_id,
+            .target_node = loop_end_node_id,
+            .condition_func = NULL,
+            .condition_context = NULL,
+            .edge_label = "loop_exit"
+        };
+        result = workflow_add_edge(context, &cond_to_end);
+        if (result != TASKFLOW_SUCCESS) return result;
+    }
+
+    context->start_node = loop_start_node_id;
+    context->end_node = loop_end_node_id;
+
+    return TASKFLOW_SUCCESS;
 }
 
 taskflow_error_t workflow_execute_sync(

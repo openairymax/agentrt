@@ -66,27 +66,27 @@ static void test_all_subsystems_init(void) {
     assert(err == heapstore_SUCCESS);
 
     err = heapstore_registry_init();
-    if (err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED) {
+    if (err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED || err == heapstore_ERR_DIR_CREATE_FAILED) {
         printf("  Registry initialized\n");
     }
 
     err = heapstore_trace_init();
-    if (err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED) {
+    if (err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED || err == heapstore_ERR_DIR_CREATE_FAILED) {
         printf("  Trace initialized\n");
     }
 
     err = heapstore_ipc_init();
-    if (err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED) {
+    if (err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED || err == heapstore_ERR_DIR_CREATE_FAILED) {
         printf("  IPC initialized\n");
     }
 
     err = heapstore_memory_init();
-    if (err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED) {
+    if (err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED || err == heapstore_ERR_DIR_CREATE_FAILED) {
         printf("  Memory initialized\n");
     }
 
     err = heapstore_log_init();
-    if (err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED) {
+    if (err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED || err == heapstore_ERR_DIR_CREATE_FAILED) {
         printf("  Log initialized\n");
     }
 

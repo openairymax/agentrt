@@ -17,7 +17,7 @@ from urllib.parse import quote_plus
 import requests
 import aiohttp
 
-from .exceptions import AgentOSError, NetworkError, TimeoutError
+from .exceptions import AgentOSError, NetworkError, AgentOSTimeoutError
 from .task import Task
 from .memory import Memory
 from .session import Session
@@ -73,9 +73,9 @@ class AgentOS:
             response.raise_for_status()
             return response.json()
         except requests.exceptions.Timeout:
-            raise TimeoutError(f"Request timed out after {self.timeout} seconds")
+            raise AgentOSTimeoutError(operation=f"HTTP request (timeout={self.timeout}s)")
         except requests.exceptions.RequestException as e:
-            raise NetworkError(f"Network error: {str(e)}")
+            raise NetworkError(f"Network error: {str(e)}", cause=e)
         except json.JSONDecodeError:
             raise AgentOSError("Invalid JSON response from server")
     
@@ -254,13 +254,15 @@ class AsyncAgentOS:
         try:
             await self._ensure_session()
             timeout = aiohttp.ClientTimeout(total=self.timeout)
-            response_data = await self._execute_async_http_method(method, url, data, timeout)
-            response_data.raise_for_status()
-            return await response_data.json()
+            async with await self._execute_async_http_method(method, url, data, timeout) as resp:
+                if resp.status >= 400:
+                    body = await resp.text()
+                    raise AgentOSError(message=f"HTTP {resp.status}: {body[:200]}")
+                return await resp.json()
         except asyncio.TimeoutError:
-            raise TimeoutError(f"Request timed out after {self.timeout} seconds")
+            raise AgentOSTimeoutError(operation=f"HTTP request (timeout={self.timeout}s)")
         except aiohttp.ClientError as e:
-            raise NetworkError(f"Network error: {str(e)}")
+            raise NetworkError(f"Network error: {str(e)}", cause=e)
         except json.JSONDecodeError:
             raise AgentOSError("Invalid JSON response from server")
     
@@ -273,7 +275,6 @@ class AsyncAgentOS:
             self.session = aiohttp.ClientSession(headers=headers)
     
     async def _execute_async_http_method(self, method: str, url: str, data: Optional[Dict[str, Any]], timeout) -> aiohttp.ClientResponse:
-        """Execute the appropriate async HTTP method"""
         if method == "GET":
             return self.session.get(url, timeout=timeout)
         elif method == "POST":
@@ -283,7 +284,7 @@ class AsyncAgentOS:
         elif method == "DELETE":
             return self.session.delete(url, timeout=timeout)
         else:
-            raise AgentOSError(f"Unsupported HTTP method: {method}")
+            raise AgentOSError(message=f"Unsupported HTTP method: {method}")
     
     async def submit_task(self, task_description: str) -> Task:
         """

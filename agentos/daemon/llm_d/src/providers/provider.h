@@ -84,6 +84,19 @@ char* provider_build_openai_request(const llm_request_config_t* manager,
 
 int provider_parse_openai_response(const char* body, llm_response_t** out);
 
+/* ---------- SSE 流式传输 ---------- */
+
+typedef int (*provider_stream_chunk_cb_t)(const char* data_line,
+                                          void* user_data);
+
+int provider_http_post_stream(const char* url,
+                              struct curl_slist* headers,
+                              const char* body,
+                              double timeout_sec,
+                              provider_stream_chunk_cb_t on_chunk,
+                              void* chunk_user_data,
+                              long* out_http_code);
+
 #ifdef __cplusplus
 }
 #endif

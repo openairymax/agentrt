@@ -1,7 +1,3 @@
-// AgentOS Rust SDK Syscall
-// Version: 2.0.0
-// Last updated: 2026-03-23
-
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -10,7 +6,6 @@ use crate::AgentOSError;
 
 type Result<T> = std::result::Result<T, AgentOSError>;
 
-/// ﻝﺏﭨﻝﭨﻟﺍﻝ۷ﮒﺛﮒﻝ۸ﭦﻠﺑ
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SyscallNamespace {
     #[serde(rename = "task")]
@@ -19,6 +14,10 @@ pub enum SyscallNamespace {
     Memory,
     #[serde(rename = "session")]
     Session,
+    #[serde(rename = "skill")]
+    Skill,
+    #[serde(rename = "agent")]
+    Agent,
     #[serde(rename = "telemetry")]
     Telemetry,
 }
@@ -29,12 +28,13 @@ impl std::fmt::Display for SyscallNamespace {
             SyscallNamespace::Task => write!(f, "task"),
             SyscallNamespace::Memory => write!(f, "memory"),
             SyscallNamespace::Session => write!(f, "session"),
+            SyscallNamespace::Skill => write!(f, "skill"),
+            SyscallNamespace::Agent => write!(f, "agent"),
             SyscallNamespace::Telemetry => write!(f, "telemetry"),
         }
     }
 }
 
-/// ﻝﺏﭨﻝﭨﻟﺍﻝ۷ﻟﺁﺓﮔﺎ
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyscallRequest {
     pub namespace: SyscallNamespace,
@@ -42,7 +42,6 @@ pub struct SyscallRequest {
     pub params: HashMap<String, Value>,
 }
 
-/// ﻝﺏﭨﻝﭨﻟﺍﻝ۷ﮒﮒﭦ
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyscallResponse {
     pub success: bool,
@@ -50,24 +49,68 @@ pub struct SyscallResponse {
     pub error: Option<String>,
 }
 
-/// ﻝﺏﭨﻝﭨﻟﺍﻝ۷ﻝﭨﮒ؟ﮔﺛﻟﺎ۰ trait
 pub trait SyscallBinding {
-    /// ﮔ۶ﻟ۰ﻝﺏﭨﻝﭨﻟﺍﻝ۷
     fn invoke(&self, request: SyscallRequest) -> Result<SyscallResponse>;
 }
 
-/// ﻛﭨﭨﮒ۰ﻝﺏﭨﻝﭨﻟﺍﻝ۷
+pub struct HttpSyscallBinding {
+    base_url: String,
+    client: reqwest::blocking::Client,
+}
+
+impl HttpSyscallBinding {
+    pub fn new(base_url: &str) -> Self {
+        HttpSyscallBinding {
+            base_url: base_url.trim_end_matches('/').to_string(),
+            client: reqwest::blocking::Client::new(),
+        }
+    }
+
+    pub fn with_timeout(base_url: &str, timeout: std::time::Duration) -> Self {
+        HttpSyscallBinding {
+            base_url: base_url.trim_end_matches('/').to_string(),
+            client: reqwest::blocking::Client::builder()
+                .timeout(timeout)
+                .build()
+                .unwrap_or_else(|_| reqwest::blocking::Client::new()),
+        }
+    }
+}
+
+impl SyscallBinding for HttpSyscallBinding {
+    fn invoke(&self, request: SyscallRequest) -> Result<SyscallResponse> {
+        let url = format!("{}/api/v1/syscall/{}", self.base_url, request.namespace);
+        let body = serde_json::to_value(&request)
+            .map_err(|e| AgentOSError::json(&e.to_string()))?;
+
+        let resp = self.client
+            .post(&url)
+            .json(&body)
+            .send()
+            .map_err(|e| AgentOSError::network(&e.to_string()))?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            return Err(AgentOSError::http(&format!("Syscall HTTP {}: {}", status, request.operation)));
+        }
+
+        let syscall_resp: SyscallResponse = resp
+            .json()
+            .map_err(|e| AgentOSError::json(&e.to_string()))?;
+
+        Ok(syscall_resp)
+    }
+}
+
 pub struct TaskSyscall<B: SyscallBinding> {
     binding: B,
 }
 
 impl<B: SyscallBinding> TaskSyscall<B> {
-    /// ﮒﮒﭨﭦﻛﭨﭨﮒ۰ﻝﺏﭨﻝﭨﻟﺍﻝ۷
     pub fn new(binding: B) -> Self {
         TaskSyscall { binding }
     }
 
-    /// ﮔﻛﭦ۳ﻛﭨﭨﮒ۰
     pub fn submit(&self, description: &str) -> Result<SyscallResponse> {
         let mut params = HashMap::new();
         params.insert("description".to_string(), Value::String(description.to_string()));
@@ -78,7 +121,6 @@ impl<B: SyscallBinding> TaskSyscall<B> {
         })
     }
 
-    /// ﮔ۴ﻟﺁ۱ﻛﭨﭨﮒ۰
     pub fn query(&self, task_id: &str) -> Result<SyscallResponse> {
         let mut params = HashMap::new();
         params.insert("task_id".to_string(), Value::String(task_id.to_string()));
@@ -89,7 +131,17 @@ impl<B: SyscallBinding> TaskSyscall<B> {
         })
     }
 
-    /// ﮒﮔﭘﻛﭨﭨﮒ۰
+    pub fn wait(&self, task_id: &str, timeout_ms: u32) -> Result<SyscallResponse> {
+        let mut params = HashMap::new();
+        params.insert("task_id".to_string(), Value::String(task_id.to_string()));
+        params.insert("timeout_ms".to_string(), Value::Number(timeout_ms.into()));
+        self.binding.invoke(SyscallRequest {
+            namespace: SyscallNamespace::Task,
+            operation: "wait".to_string(),
+            params,
+        })
+    }
+
     pub fn cancel(&self, task_id: &str) -> Result<SyscallResponse> {
         let mut params = HashMap::new();
         params.insert("task_id".to_string(), Value::String(task_id.to_string()));
@@ -101,18 +153,15 @@ impl<B: SyscallBinding> TaskSyscall<B> {
     }
 }
 
-/// ﻟ؟ﺍﮒﺟﻝﺏﭨﻝﭨﻟﺍﻝ۷
 pub struct MemorySyscall<B: SyscallBinding> {
     binding: B,
 }
 
 impl<B: SyscallBinding> MemorySyscall<B> {
-    /// ﮒﮒﭨﭦﻟ؟ﺍﮒﺟﻝﺏﭨﻝﭨﻟﺍﻝ۷
     pub fn new(binding: B) -> Self {
         MemorySyscall { binding }
     }
 
-    /// ﮒﮒ۴ﻟ؟ﺍﮒﺟ
     pub fn write(&self, content: &str, metadata: Option<Value>) -> Result<SyscallResponse> {
         let mut params = HashMap::new();
         params.insert("content".to_string(), Value::String(content.to_string()));
@@ -126,7 +175,26 @@ impl<B: SyscallBinding> MemorySyscall<B> {
         })
     }
 
-    /// ﮔﻝﺑ۱ﻟ؟ﺍﮒﺟ
+    pub fn read(&self, memory_id: &str) -> Result<SyscallResponse> {
+        let mut params = HashMap::new();
+        params.insert("memory_id".to_string(), Value::String(memory_id.to_string()));
+        self.binding.invoke(SyscallRequest {
+            namespace: SyscallNamespace::Memory,
+            operation: "read".to_string(),
+            params,
+        })
+    }
+
+    pub fn get(&self, memory_id: &str) -> Result<SyscallResponse> {
+        let mut params = HashMap::new();
+        params.insert("memory_id".to_string(), Value::String(memory_id.to_string()));
+        self.binding.invoke(SyscallRequest {
+            namespace: SyscallNamespace::Memory,
+            operation: "get".to_string(),
+            params,
+        })
+    }
+
     pub fn search(&self, query: &str, top_k: u32) -> Result<SyscallResponse> {
         let mut params = HashMap::new();
         params.insert("query".to_string(), Value::String(query.to_string()));
@@ -138,7 +206,6 @@ impl<B: SyscallBinding> MemorySyscall<B> {
         })
     }
 
-    /// ﮒ ﻠ۳ﻟ؟ﺍﮒﺟ
     pub fn delete(&self, memory_id: &str) -> Result<SyscallResponse> {
         let mut params = HashMap::new();
         params.insert("memory_id".to_string(), Value::String(memory_id.to_string()));
@@ -150,18 +217,15 @@ impl<B: SyscallBinding> MemorySyscall<B> {
     }
 }
 
-/// ﻛﺙﻟﺁﻝﺏﭨﻝﭨﻟﺍﻝ۷
 pub struct SessionSyscall<B: SyscallBinding> {
     binding: B,
 }
 
 impl<B: SyscallBinding> SessionSyscall<B> {
-    /// ﮒﮒﭨﭦﻛﺙﻟﺁﻝﺏﭨﻝﭨﻟﺍﻝ۷
     pub fn new(binding: B) -> Self {
         SessionSyscall { binding }
     }
 
-    /// ﮒﮒﭨﭦﻛﺙﻟﺁ
     pub fn create(&self) -> Result<SyscallResponse> {
         self.binding.invoke(SyscallRequest {
             namespace: SyscallNamespace::Session,
@@ -170,7 +234,35 @@ impl<B: SyscallBinding> SessionSyscall<B> {
         })
     }
 
-    /// ﻟ؟ﺝﻝﺛ؟ﻛﺕﻛﺕﮔ?    pub fn set_context(&self, session_id: &str, key: &str, value: &str) -> Result<SyscallResponse> {
+    pub fn get(&self, session_id: &str) -> Result<SyscallResponse> {
+        let mut params = HashMap::new();
+        params.insert("session_id".to_string(), Value::String(session_id.to_string()));
+        self.binding.invoke(SyscallRequest {
+            namespace: SyscallNamespace::Session,
+            operation: "get".to_string(),
+            params,
+        })
+    }
+
+    pub fn close(&self, session_id: &str) -> Result<SyscallResponse> {
+        let mut params = HashMap::new();
+        params.insert("session_id".to_string(), Value::String(session_id.to_string()));
+        self.binding.invoke(SyscallRequest {
+            namespace: SyscallNamespace::Session,
+            operation: "close".to_string(),
+            params,
+        })
+    }
+
+    pub fn list(&self) -> Result<SyscallResponse> {
+        self.binding.invoke(SyscallRequest {
+            namespace: SyscallNamespace::Session,
+            operation: "list".to_string(),
+            params: HashMap::new(),
+        })
+    }
+
+    pub fn set_context(&self, session_id: &str, key: &str, value: &str) -> Result<SyscallResponse> {
         let mut params = HashMap::new();
         params.insert("session_id".to_string(), Value::String(session_id.to_string()));
         params.insert("key".to_string(), Value::String(key.to_string()));
@@ -182,13 +274,104 @@ impl<B: SyscallBinding> SessionSyscall<B> {
         })
     }
 
-    /// ﻟﺓﮒﻛﺕﻛﺕﮔ?    pub fn get_context(&self, session_id: &str, key: &str) -> Result<SyscallResponse> {
+    pub fn get_context(&self, session_id: &str, key: &str) -> Result<SyscallResponse> {
         let mut params = HashMap::new();
         params.insert("session_id".to_string(), Value::String(session_id.to_string()));
         params.insert("key".to_string(), Value::String(key.to_string()));
         self.binding.invoke(SyscallRequest {
             namespace: SyscallNamespace::Session,
             operation: "get_context".to_string(),
+            params,
+        })
+    }
+}
+
+pub struct SkillSyscall<B: SyscallBinding> {
+    binding: B,
+}
+
+impl<B: SyscallBinding> SkillSyscall<B> {
+    pub fn new(binding: B) -> Self {
+        SkillSyscall { binding }
+    }
+
+    pub fn load(&self, skill_name: &str) -> Result<SyscallResponse> {
+        let mut params = HashMap::new();
+        params.insert("skill_name".to_string(), Value::String(skill_name.to_string()));
+        self.binding.invoke(SyscallRequest {
+            namespace: SyscallNamespace::Skill,
+            operation: "load".to_string(),
+            params,
+        })
+    }
+
+    pub fn execute(&self, skill_id: &str, params_value: Value) -> Result<SyscallResponse> {
+        let mut params = HashMap::new();
+        params.insert("skill_id".to_string(), Value::String(skill_id.to_string()));
+        params.insert("params".to_string(), params_value);
+        self.binding.invoke(SyscallRequest {
+            namespace: SyscallNamespace::Skill,
+            operation: "execute".to_string(),
+            params,
+        })
+    }
+
+    pub fn unload(&self, skill_id: &str) -> Result<SyscallResponse> {
+        let mut params = HashMap::new();
+        params.insert("skill_id".to_string(), Value::String(skill_id.to_string()));
+        self.binding.invoke(SyscallRequest {
+            namespace: SyscallNamespace::Skill,
+            operation: "unload".to_string(),
+            params,
+        })
+    }
+
+    pub fn list(&self) -> Result<SyscallResponse> {
+        self.binding.invoke(SyscallRequest {
+            namespace: SyscallNamespace::Skill,
+            operation: "list".to_string(),
+            params: HashMap::new(),
+        })
+    }
+}
+
+pub struct AgentSyscall<B: SyscallBinding> {
+    binding: B,
+}
+
+impl<B: SyscallBinding> AgentSyscall<B> {
+    pub fn new(binding: B) -> Self {
+        AgentSyscall { binding }
+    }
+
+    pub fn spawn(&self, spec: Value) -> Result<SyscallResponse> {
+        let mut params = HashMap::new();
+        params.insert("spec".to_string(), spec);
+        self.binding.invoke(SyscallRequest {
+            namespace: SyscallNamespace::Agent,
+            operation: "spawn".to_string(),
+            params,
+        })
+    }
+
+    pub fn terminate(&self, agent_id: &str) -> Result<SyscallResponse> {
+        let mut params = HashMap::new();
+        params.insert("agent_id".to_string(), Value::String(agent_id.to_string()));
+        self.binding.invoke(SyscallRequest {
+            namespace: SyscallNamespace::Agent,
+            operation: "terminate".to_string(),
+            params,
+        })
+    }
+
+    pub fn invoke(&self, agent_id: &str, method: &str, args: Value) -> Result<SyscallResponse> {
+        let mut params = HashMap::new();
+        params.insert("agent_id".to_string(), Value::String(agent_id.to_string()));
+        params.insert("method".to_string(), Value::String(method.to_string()));
+        params.insert("args".to_string(), args);
+        self.binding.invoke(SyscallRequest {
+            namespace: SyscallNamespace::Agent,
+            operation: "invoke".to_string(),
             params,
         })
     }

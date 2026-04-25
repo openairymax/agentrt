@@ -84,6 +84,7 @@ set(CUPOLAS_SOURCES
     src/guards/guard_core.c
     src/guards/guard_integration.c
     src/circuit_breaker.c
+    src/yaml_minimal.c
 )
 
 set(CUPOLAS_HEADERS
@@ -122,10 +123,11 @@ set(CUPOLAS_HEADERS
     src/guards/guard_core.h
     src/guards/guard_integration.h
     src/circuit_breaker.h
+    src/yaml_minimal.h
 )
 
 # commons 模块路径
-set(COMMON_MODULE_DIR ${CMAKE_SOURCE_DIR}/agentos/commons)
+set(COMMON_MODULE_DIR ${CMAKE_SOURCE_DIR}/commons)
 
 # commons 模块的 include 目录
 set(COMMON_INCLUDE_DIRS
@@ -147,6 +149,9 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_include_directories(${PROJECT_NAME} PUBLIC
     ${COMMON_INCLUDE_DIRS}
 )
 

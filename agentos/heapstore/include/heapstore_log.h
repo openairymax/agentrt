@@ -25,10 +25,11 @@ extern "C" {
  * @brief 日志级别
  */
 typedef enum {
-    heapstore_LOG_ERROR = 0,
-    heapstore_LOG_WARN = 1,
-    heapstore_LOG_INFO = 2,
-    heapstore_LOG_DEBUG = 3
+    heapstore_LOG_DEBUG = 0,
+    heapstore_LOG_INFO = 1,
+    heapstore_LOG_WARN = 2,
+    heapstore_LOG_ERROR = 3,
+    heapstore_LOG_FATAL = 4
 } heapstore_log_level_t;
 
 /**

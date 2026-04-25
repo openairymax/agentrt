@@ -10,6 +10,7 @@
  */
 
 #include "circuit_breaker.h"
+#include "daemon_defaults.h"
 #include "svc_logger.h"
 #include "platform.h"
 #include "error.h"
@@ -42,6 +43,7 @@ typedef struct circuit_breaker_s {
     uint32_t window_failures;
     uint32_t window_calls;
     bool destroying;
+    struct cb_manager_s* manager;
     agentos_platform_mutex_t mutex;
 } cb_internal_t;
 
@@ -150,10 +152,10 @@ AGENTOS_API cb_config_t cb_create_default_config(void) {
     config.success_threshold = CB_DEFAULT_SUCCESS_THRESHOLD;
     config.timeout_ms = CB_DEFAULT_TIMEOUT_MS;
     config.half_open_max_calls = CB_DEFAULT_HALF_OPEN_MAX;
-    config.window_size_ms = 60000;
-    config.slow_call_duration_ms = 5000;
-    config.slow_call_rate_threshold = 50;
-    config.failure_rate_threshold = 50;
+    config.window_size_ms = AGENTOS_CB_WINDOW_SIZE_MS;
+    config.slow_call_duration_ms = AGENTOS_CB_SLOW_CALL_MS;
+    config.slow_call_rate_threshold = AGENTOS_CB_SLOW_CALL_RATE_PCT;
+    config.failure_rate_threshold = AGENTOS_CB_FAILURE_RATE_PCT;
     config.enable_slow_call_detection = true;
     config.enable_auto_failover = false;
     return config;
@@ -163,9 +165,9 @@ AGENTOS_API cb_failover_config_t cb_create_default_failover_config(void) {
     cb_failover_config_t config;
     memset(&config, 0, sizeof(cb_failover_config_t));
     config.strategy = CB_FAILOVER_RETRY;
-    config.max_retries = 3;
-    config.retry_delay_ms = 100;
-    config.retry_backoff_factor = 2;
+    config.max_retries = AGENTOS_DEFAULT_MAX_RETRIES;
+    config.retry_delay_ms = AGENTOS_DEFAULT_RETRY_DELAY_MS;
+    config.retry_backoff_factor = AGENTOS_DEFAULT_BACKOFF_FACTOR;
     return config;
 }
 
@@ -248,6 +250,7 @@ AGENTOS_API circuit_breaker_t cb_create(
     cb->state = CB_STATE_CLOSED;
     cb->state_changed_at = agentos_platform_get_time_ms();
     cb->window_start = agentos_platform_get_time_ms();
+    cb->manager = mgr;
 
     agentos_error_t err = agentos_platform_mutex_init(&cb->mutex);
     if (err != AGENTOS_SUCCESS) {
@@ -270,6 +273,25 @@ AGENTOS_API void cb_destroy(circuit_breaker_t breaker) {
     if (!breaker) return;
 
     cb_internal_t* cb = (cb_internal_t*)breaker;
+
+    /* 从管理器数组中移除，避免悬空指针 */
+    if (cb->manager) {
+        cb_manager_internal_t* mgr = cb->manager;
+
+        agentos_platform_mutex_lock(&mgr->mutex);
+        for (uint32_t i = 0; i < mgr->breaker_count; i++) {
+            if (mgr->breakers[i] == cb) {
+                /* 将后续元素前移填补空位 */
+                for (uint32_t j = i; j < mgr->breaker_count - 1; j++) {
+                    mgr->breakers[j] = mgr->breakers[j + 1];
+                }
+                mgr->breaker_count--;
+                mgr->breakers[mgr->breaker_count] = NULL;
+                break;
+            }
+        }
+        agentos_platform_mutex_unlock(&mgr->mutex);
+    }
 
     agentos_platform_mutex_lock(&cb->mutex);
     cb->destroying = true;

@@ -185,40 +185,17 @@ int main(int argc, char* argv[]) {
 
     /* Initialize UnifiedProtocol stack for multi-protocol support */
 #ifdef AGENTOS_HAS_PROTOCOLS
-    protocol_stack_handle_t protocol_stack = NULL;
-    unified_protocol_config_t proto_config = {
-        .name = "AgentOS-Gateway-ProtocolStack",
-        .max_adapters = 8,
-        .default_protocol = UNIFIED_PROTOCOL_JSON_RPC
-    };
-
-    protocol_stack = unified_protocol_create(&proto_config);
-    if (!protocol_stack) {
-        SVC_LOG_WARN("Failed to create protocol stack, using JSON-RPC only");
+    const protocol_adapter_t* mcp_adapter = mcp_v1_get_adapter();
+    if (mcp_adapter) {
+        if (mcp_adapter->init(mcp_adapter->context) == 0) {
+            SVC_LOG_INFO("MCP v1.0 adapter initialized (version=%s, caps=0x%x)",
+                        mcp_adapter->version ? mcp_adapter->version : "unknown",
+                        mcp_adapter->capabilities ? mcp_adapter->capabilities(mcp_adapter->context) : 0);
+        } else {
+            SVC_LOG_WARN("Failed to initialize MCP v1.0 adapter");
+        }
     } else {
-        /* Register MCP v1.0 adapter */
-        if (unified_protocol_register_adapter(protocol_stack, &mcp_v1_adapter_interface) == 0) {
-            SVC_LOG_INFO("MCP v1.0 adapter registered successfully");
-        } else {
-            SVC_LOG_WARN("Failed to register MCP v1.0 adapter");
-        }
-
-        /* Register A2A v0.3.0 adapter */
-        if (unified_protocol_register_adapter(protocol_stack, &a2a_v03_adapter_interface) == 0) {
-            SVC_LOG_INFO("A2A v0.3.0 adapter registered successfully");
-        } else {
-            SVC_LOG_WARN("Failed to register A2A v0.3.0 adapter");
-        }
-
-        /* Register OpenAI Enterprise adapter */
-        if (unified_protocol_register_adapter(protocol_stack, &openai_enterprise_adapter_interface) == 0) {
-            SVC_LOG_INFO("OpenAI Enterprise adapter registered successfully");
-        } else {
-            SVC_LOG_WARN("Failed to register OpenAI Enterprise adapter");
-        }
-
-        SVC_LOG_INFO("UnifiedProtocol stack initialized with %zu adapters",
-                    unified_protocol_get_adapter_count(protocol_stack));
+        SVC_LOG_WARN("MCP v1.0 adapter not available");
     }
 #endif
 
@@ -271,9 +248,12 @@ int main(int argc, char* argv[]) {
 
     /* Cleanup protocol stack */
 #ifdef AGENTOS_HAS_PROTOCOLS
-    if (protocol_stack) {
-        unified_protocol_destroy(protocol_stack);
-        SVC_LOG_INFO("Protocol stack destroyed");
+    {
+        const protocol_adapter_t* mcp_adapter = mcp_v1_get_adapter();
+        if (mcp_adapter && mcp_adapter->destroy) {
+            mcp_adapter->destroy(mcp_adapter->context);
+            SVC_LOG_INFO("MCP adapter destroyed");
+        }
     }
 #endif
 

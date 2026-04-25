@@ -34,7 +34,7 @@ func TestNewClient(t *testing.T) {
 }
 
 func TestNewClient_InvalidConfig(t *testing.T) {
-	cfg := &agentos.manager{Endpoint: "", Timeout: 30 * time.Second, MaxConnections: 10}
+	cfg := &agentos.Config{Endpoint: "", Timeout: 30 * time.Second, MaxConnections: 10}
 	_, err := NewClientWithConfig(cfg)
 	if err == nil {
 		t.Error("空端点应返回错误")
