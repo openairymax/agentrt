@@ -121,7 +121,7 @@ MemoryError = AgentOSMemoryError
 from .client import (
     Client,
     APIClient,
-    manager,
+    ClientConfig,
     RequestOptions,
     APIResponse,
     HealthStatus,
@@ -325,7 +325,7 @@ __all__ = [
     # ============================================================
     "Client",
     "APIClient",
-    "manager",
+    "ClientConfig",
     "RequestOptions",
     "APIResponse",
     "HealthStatus",

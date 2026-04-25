@@ -28,6 +28,8 @@
 
 #include "thinking_chain.h"
 #include "metacognition.h"
+#include "semantic_unit.h"
+#include "triple_coordinator.h"
 
 #ifdef _WIN32
     #define WIN32_LEAN_AND_MEAN
@@ -333,8 +335,8 @@ agentos_error_t agentos_cognition_process(
         }
     }
 
-    /* ========== Phase 2: Execution-Verification Loop (DS-007 monitoring) ========== */
-    if (engine->enable_dual_thinking && engine->chain && plan) {
+    /* ========== Phase 2: Streaming Critical Loop (t2/t1-f/t1-p) ========== */
+    if (engine->enable_dual_thinking && engine->chain && engine->meta && plan) {
         size_t anomaly_count = 0;
         int has_critical = 0;
         agentos_tc_chain_health_check(engine->chain, &anomaly_count, &has_critical);
@@ -342,6 +344,72 @@ agentos_error_t agentos_cognition_process(
             AGENTOS_LOG_WARN("Chain health check: %zu anomalies, critical detected", anomaly_count);
             trigger_feedback(engine, 1, "anomaly_detected",
                            "{\"anomalies\":1,\"critical\":true}");
+        }
+
+        agentos_thinking_step_t* gen_step = NULL;
+        agentos_tc_step_create(engine->chain, TC_STEP_GENERATION,
+                               input, input_len, NULL, 0, &gen_step);
+
+        tc3_config_t tc3_cfg = TC3_CONFIG_DEFAULTS;
+        tc3_cfg.s2_generate = NULL;
+        tc3_cfg.s1_verify = NULL;
+        tc3_cfg.s1_expert = NULL;
+
+        tc3_coordinator_t* tc3 = NULL;
+        agentos_error_t tc3_err = tc3_coordinator_create(
+            &tc3_cfg, engine->chain, engine->meta, &tc3);
+
+        if (tc3_err == AGENTOS_SUCCESS && tc3) {
+            char* phase2_output = NULL;
+            size_t phase2_output_len = 0;
+            tc3_err = tc3_coordinator_execute_streaming(
+                tc3, input, input_len, &phase2_output, &phase2_output_len);
+
+            if (tc3_err == AGENTOS_SUCCESS && phase2_output) {
+                if (gen_step) {
+                    agentos_tc_step_complete(gen_step, phase2_output, phase2_output_len,
+                                             0.8f, "t2-streaming");
+                }
+                if (engine->chain->ctx_window) {
+                    agentos_tc_context_window_append(
+                        engine->chain->ctx_window, phase2_output, phase2_output_len);
+                }
+
+                tc3_stats_t tc3_stats;
+                tc3_coordinator_get_stats(tc3, &tc3_stats);
+                engine->dual_think_corrections += tc3_stats.total_corrections;
+
+                char fb[512];
+                snprintf(fb, sizeof(fb),
+                    "{\"units\":%u,\"accepted\":%u,\"corrections\":%u,"
+                    "\"avg_score\":%.2f,\"time_ns\":%llu}",
+                    tc3_stats.total_units, tc3_stats.accepted_units,
+                    tc3_stats.total_corrections, tc3_stats.avg_score,
+                    (unsigned long long)tc3_stats.total_time_ns);
+                trigger_feedback(engine, 2, "phase2_critical_loop", fb);
+
+                AGENTOS_FREE(phase2_output);
+            } else if (gen_step) {
+                agentos_tc_step_complete(gen_step, "streaming_loop_failed", 21,
+                                         0.3f, "t2-failed");
+            }
+
+            tc3_coordinator_destroy(tc3);
+        } else {
+            AGENTOS_LOG_WARN("Triple coordinator creation failed, falling back to basic loop");
+            if (gen_step) {
+                agentos_tc_step_complete(gen_step, input, input_len, 0.5f, "t2-fallback");
+            }
+        }
+
+        if (gen_step) {
+            tc_monitor_result_t mon_result;
+            agentos_tc_step_monitor(gen_step, NULL, &mon_result);
+            if (mon_result.anomaly != TC_ANOMALY_NONE && mon_result.is_critical) {
+                trigger_feedback(engine, 1, "step_anomaly",
+                               "{\"anomaly\":1,\"critical\":true}");
+            }
+            if (mon_result.description) AGENTOS_FREE(mon_result.description);
         }
     }
 

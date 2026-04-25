@@ -1053,6 +1053,5 @@ int cupolas_net_validate_ip(const char* ip) {
 }
 
 int cupolas_net_validate_port(uint16_t port) {
-    (void)port;
-    return 1;
+    return (port >= 1) ? 1 : 0;
 }

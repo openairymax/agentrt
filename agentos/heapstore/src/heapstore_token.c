@@ -331,12 +331,78 @@ heapstore_error_t heapstore_token_check_budget(
                 *allowed = false;
             }
 
-            uint64_t used_percent = (used * 100) / max_tokens;
+            uint64_t used_percent = max_tokens > 0 ? (used * 100) / max_tokens : 0;
             if (used_percent >= entry->budget.critical_threshold_percent) {
                 *allowed = false;
             } else if (used_percent >= entry->budget.warning_threshold_percent) {
                 *allowed = true;
             }
+        }
+    }
+
+    token_mutex_unlock();
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_token_try_consume(
+    const char* task_id,
+    uint64_t requested_tokens,
+    bool* consumed
+) {
+    if (!g_token_initialized) {
+        return heapstore_ERR_NOT_INITIALIZED;
+    }
+
+    if (!task_id || !consumed) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+
+    *consumed = true;
+
+    token_mutex_lock();
+
+    int entry_idx = find_budget_entry(task_id);
+    if (entry_idx >= 0) {
+        task_budget_entry_t* entry = &g_budget_table[entry_idx];
+        if (entry->budget.enable_budget_enforcement) {
+            uint64_t used = atomic_load(&entry->used_tokens);
+            uint64_t max_tokens = entry->budget.max_tokens_per_task;
+
+            if (used + requested_tokens > max_tokens) {
+                *consumed = false;
+            } else {
+                atomic_store(&entry->used_tokens, used + requested_tokens);
+                *consumed = true;
+            }
+        }
+    }
+
+    token_mutex_unlock();
+    return heapstore_SUCCESS;
+}
+
+heapstore_error_t heapstore_token_refund(
+    const char* task_id,
+    uint64_t refund_tokens
+) {
+    if (!g_token_initialized) {
+        return heapstore_ERR_NOT_INITIALIZED;
+    }
+
+    if (!task_id || refund_tokens == 0) {
+        return heapstore_ERR_INVALID_PARAM;
+    }
+
+    token_mutex_lock();
+
+    int entry_idx = find_budget_entry(task_id);
+    if (entry_idx >= 0) {
+        task_budget_entry_t* entry = &g_budget_table[entry_idx];
+        uint64_t used = atomic_load(&entry->used_tokens);
+        if (refund_tokens > used) {
+            atomic_store(&entry->used_tokens, 0);
+        } else {
+            atomic_store(&entry->used_tokens, used - refund_tokens);
         }
     }
 

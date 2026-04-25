@@ -696,9 +696,9 @@ int daemon_check_tool_permission(const char* agent_id, const char* tool_name,
     }
 
     if (!g_security_ctx.permission_enabled) {
-        SVC_LOG_WARN("Permission check: disabled by configuration, allowing %s/%s",
+        SVC_LOG_WARN("Permission check: disabled by configuration, DENYING %s/%s (fail-closed)",
                     agent_id, tool_name);
-        return AGENTOS_OK;
+        return AGENTOS_EPERM;
     }
 
     for (size_t i = 0; i < g_security_ctx.acl_count; i++) {
@@ -733,9 +733,9 @@ int daemon_check_llm_permission(const char* agent_id, const char* model_name,
     }
 
     if (!g_security_ctx.permission_enabled) {
-        SVC_LOG_WARN("LLM permission check: disabled by configuration, allowing %s/%s",
+        SVC_LOG_WARN("LLM permission check: disabled by configuration, DENYING %s/%s (fail-closed)",
                     agent_id, model_name);
-        return AGENTOS_OK;
+        return AGENTOS_EPERM;
     }
 
     char resource[256];
@@ -776,8 +776,8 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
     }
 
     if (!g_security_ctx.signature_enabled) {
-        SVC_LOG_WARN("Signature verification: disabled by configuration");
-        *is_valid = true;
+        SVC_LOG_WARN("Signature verification: disabled by configuration, package NOT verified");
+        *is_valid = false;
         return AGENTOS_OK;
     }
 
@@ -792,9 +792,17 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
-    *is_valid = true;
-    SVC_LOG_INFO("Package basic integrity check passed: %s (%lld bytes)",
-                package_path, (long long)st.st_size);
+    if (st.st_size > 512 * 1024 * 1024) {
+        SVC_LOG_ERROR("Package exceeds size limit: %s (%lld bytes)",
+                     package_path, (long long)st.st_size);
+        *is_valid = false;
+        return AGENTOS_OK;
+    }
+
+    *is_valid = false;
+    SVC_LOG_WARN("Package signature verification: no cryptographic signature found for %s, "
+                 "marking as unverified (size=%lld bytes)",
+                 package_path, (long long)st.st_size);
     return AGENTOS_OK;
 }
 

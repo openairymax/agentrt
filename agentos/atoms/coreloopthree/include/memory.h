@@ -17,6 +17,7 @@
 // 破坏性更改需递增 MAJOR 并发布迁移说明
 
 #include "agentos.h"
+#include "types.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -24,23 +25,9 @@
 extern "C" {
 #endif
 
-/* 前向声明 */
 typedef struct agentos_memory_engine agentos_memory_engine_t;
 typedef struct agentos_memory_record agentos_memory_record_t;
 typedef struct agentos_memory_query agentos_memory_query_t;
-
-/**
- * @brief 记忆记录类型
- */
-#ifndef AGENTOS_MEMORY_TYPE_T_DEFINED
-#define AGENTOS_MEMORY_TYPE_T_DEFINED
-typedef enum {
-    MEMORY_TYPE_RAW = 0,
-    MEMORY_TYPE_FEATURE,
-    MEMORY_TYPE_STRUCTURE,
-    MEMORY_TYPE_PATTERN
-} agentos_memory_type_t;
-#endif
 
 /**
  * @brief 记忆记录
@@ -79,22 +66,16 @@ typedef struct agentos_memory_query {
  * @brief 检索结果项
  */
 typedef struct agentos_memory_result_item {
-    char* memory_result_item_record_id;      /**< 记录ID */
-    float memory_result_item_score;          /**< 相似度得分（0-1） */
-    agentos_memory_record_t* memory_result_item_record; /**< 完整记录（若include_raw为真） */
+    char* memory_result_item_record_id;
+    float memory_result_item_score;
+    agentos_memory_record_t* memory_result_item_record;
 } agentos_memory_result_item_t;
 
-/**
- * @brief 检索结果
- */
-#ifndef AGENTOS_MEMORY_RESULT_T_DEFINED
-#define AGENTOS_MEMORY_RESULT_T_DEFINED
-typedef struct agentos_memory_result {
+typedef struct agentos_memory_result_ext {
     agentos_memory_result_item_t** memory_result_items;
     size_t memory_result_count;
     uint64_t memory_result_query_time_ns;
-} agentos_memory_result_t;
-#endif
+} agentos_memory_result_ext_t;
 
 /* ==================== 记忆引擎接口 ==================== */
 
@@ -159,7 +140,7 @@ AGENTOS_API agentos_error_t agentos_memory_write(
 AGENTOS_API agentos_error_t agentos_memory_query(
     agentos_memory_engine_t* engine,
     const agentos_memory_query_t* query,
-    agentos_memory_result_t** out_result);
+    agentos_memory_result_ext_t** out_result);
 
 /**
  * @brief 根据ID获取记忆记录
@@ -214,7 +195,7 @@ AGENTOS_API agentos_error_t agentos_memory_mount(
  * @reentrant 否
  * @see agentos_memory_query()
  */
-AGENTOS_API void agentos_memory_result_free(agentos_memory_result_t* result);
+AGENTOS_API void agentos_memory_result_free(agentos_memory_result_ext_t* result);
 
 /**
  * @brief 释放单个记忆记录

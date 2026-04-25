@@ -10,7 +10,7 @@ import time
 from typing import Optional
 
 from .types import TaskStatus, TaskResult
-from .exceptions import TaskError, TimeoutError
+from .exceptions import TaskError, AgentOSTimeoutError
 
 class Task:
     """Task class for managing AgentOS tasks.
@@ -49,8 +49,7 @@ class Task:
             status_mapping = {
                 "pending": TaskStatus.PENDING,
                 "running": TaskStatus.RUNNING,
-                "succeeded": TaskStatus.SUCCEEDED,
-                "completed": TaskStatus.SUCCEEDED,  # Alternative name
+                "completed": TaskStatus.COMPLETED,
                 "failed": TaskStatus.FAILED,
                 "cancelled": TaskStatus.CANCELLED,
             }
@@ -79,12 +78,10 @@ class Task:
             if not status_str:
                 raise TaskError("Invalid response from server: missing status")
             
-            # Map string status to TaskStatus enum
             status_mapping = {
                 "pending": TaskStatus.PENDING,
                 "running": TaskStatus.RUNNING,
-                "succeeded": TaskStatus.SUCCEEDED,
-                "completed": TaskStatus.SUCCEEDED,  # Alternative name
+                "completed": TaskStatus.COMPLETED,
                 "failed": TaskStatus.FAILED,
                 "cancelled": TaskStatus.CANCELLED,
             }
@@ -115,17 +112,17 @@ class Task:
         start_time = time_module.time()
         while True:
             status = self.query()
-            if status in (TaskStatus.SUCCEEDED, TaskStatus.FAILED, TaskStatus.CANCELLED):
+            if status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED):
                 response = self.client._request("GET", f"/api/v1/tasks/{self.task_id}")
                 return TaskResult(
-                    task_id=self.task_id,
+                    id=self.task_id,
                     status=status,
-                    result=response.get("result"),
-                    error=response.get("error")
+                    output=response.get("result", ""),
+                    error=response.get("error", "")
                 )
             
             if timeout and time_module.time() - start_time > timeout:
-                raise TimeoutError(operation=f"task wait (timeout={timeout}s)")
+                raise AgentOSTimeoutError(operation=f"task wait (timeout={timeout}s)")
             
             time_module.sleep(0.5)  # Wait for 500ms before querying again
     
@@ -148,17 +145,17 @@ class Task:
         start_time = time_module.time()
         while True:
             status = await self.query_async()
-            if status in (TaskStatus.SUCCEEDED, TaskStatus.FAILED, TaskStatus.CANCELLED):
+            if status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED):
                 response = await self.client._request("GET", f"/api/v1/tasks/{self.task_id}")
                 return TaskResult(
-                    task_id=self.task_id,
+                    id=self.task_id,
                     status=status,
-                    result=response.get("result"),
-                    error=response.get("error")
+                    output=response.get("result", ""),
+                    error=response.get("error", "")
                 )
             
             if timeout and time_module.time() - start_time > timeout:
-                raise TimeoutError(operation=f"task wait (timeout={timeout}s)")
+                raise AgentOSTimeoutError(operation=f"task wait (timeout={timeout}s)")
             
             await asyncio.sleep(0.5)  # Wait for 500ms before querying again
     

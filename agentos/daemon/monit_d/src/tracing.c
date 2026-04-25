@@ -98,7 +98,7 @@ static struct {
 static void generate_hex_id(char* buf, size_t buf_len) {
     static const char hex[] = "0123456789abcdef";
     uint64_t t = (uint64_t)time(NULL);
-    uint64_t r = (uint64_t)rand();
+    uint64_t r = (uint64_t)agentos_random_uint32(0, UINT32_MAX);
     for (size_t i = 0; i < buf_len - 1; i++) {
         buf[i] = hex[(t ^ r ^ (i * 17 + 3)) & 0xF];
         r = r * 6364136223846793005ULL + 1442695040888963407ULL;
@@ -111,7 +111,7 @@ static bool should_sample(void) {
         case SAMPLE_ALWAYS:
             return true;
         case SAMPLE_PROBABILISTIC:
-            return ((double)rand() / RAND_MAX) < g_tracing.default_sampling_rate;
+            return ((double)agentos_random_float()) < g_tracing.default_sampling_rate;
         case SAMPLE_RATE_LIMITED: {
             uint64_t now = (uint64_t)time(NULL);
             if (now != g_tracing.last_rate_check) {

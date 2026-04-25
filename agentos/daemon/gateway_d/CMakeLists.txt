@@ -66,6 +66,13 @@ set(DAEMON_COMMON_INCLUDE_DIR ${DAEMON_COMMON_DIR}/include)
 set(COMMONS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../commons)
 set(COMMONS_INCLUDE_DIR ${COMMONS_DIR})
 
+# protocols 协议栈路径
+set(PROTOCOLS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../protocols)
+set(PROTOCOLS_INCLUDE_DIR ${PROTOCOLS_DIR}/include)
+set(PROTOCOLS_MCP_DIR ${PROTOCOLS_DIR}/mcp)
+set(PROTOCOLS_MCP_INCLUDE_DIR ${PROTOCOLS_MCP_DIR}/include)
+set(PROTOCOLS_COMMON_INCLUDE_DIR ${PROTOCOLS_DIR}/common/include)
+
 # ==================== 源文件 ====================
 set(GATEWAY_D_SOURCES
     src/main.c
@@ -125,6 +132,10 @@ target_include_directories(gateway_d PRIVATE
     # 网络和IPC模块
     ${COMMONS_INCLUDE_DIR}/utils/network/include
     ${COMMONS_INCLUDE_DIR}/utils/ipc/include
+    # 协议栈
+    ${PROTOCOLS_INCLUDE_DIR}
+    ${PROTOCOLS_COMMON_INCLUDE_DIR}
+    ${PROTOCOLS_MCP_DIR}/include
     # 外部依赖
     ${CJSON_INCLUDE_DIRS}
 )

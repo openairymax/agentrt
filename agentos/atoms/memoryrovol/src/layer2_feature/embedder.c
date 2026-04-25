@@ -215,6 +215,7 @@ static size_t generate_openai_embedding(const char* text, float** out_embedding)
     snprintf(auth_header, sizeof(auth_header), "Authorization: Bearer %s",
              g_embedder->api_key ? g_embedder->api_key : "");
     headers = curl_slist_append(headers, auth_header);
+    explicit_bzero(auth_header, sizeof(auth_header));
 
     curl_easy_setopt(curl, CURLOPT_URL, g_embedder->base_url ? g_embedder->base_url : "https://api.openai.com/v1");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
@@ -326,6 +327,7 @@ static size_t generate_deepseek_embedding(const char* text, float** out_embeddin
     snprintf(auth_header, sizeof(auth_header), "Authorization: Bearer %s",
              g_embedder->api_key ? g_embedder->api_key : "");
     headers = curl_slist_append(headers, auth_header);
+    explicit_bzero(auth_header, sizeof(auth_header));
 
     curl_easy_setopt(curl, CURLOPT_URL, g_embedder->base_url ? g_embedder->base_url : "https://api.deepseek.com/v1");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);

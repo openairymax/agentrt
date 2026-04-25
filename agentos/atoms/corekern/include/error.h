@@ -83,40 +83,33 @@ extern "C" {
  * @param fmt 格式字符串
  * @param ... 可变参数
  */
+#ifndef AGENTOS_LOG_DEBUG
 #define AGENTOS_LOG_DEBUG(fmt, ...) \
     do { \
         OutputDebugStringA("[DEBUG] " fmt "\n"); \
     } while(0)
+#endif
 
-/**
- * @brief 输出信息日志
- * @param fmt 格式字符串
- * @param ... 可变参数
- */
+#ifndef AGENTOS_LOG_INFO
 #define AGENTOS_LOG_INFO(fmt, ...) \
     do { \
         OutputDebugStringA("[INFO] " fmt "\n"); \
     } while(0)
+#endif
 
-/**
- * @brief 输出警告日志
- * @param fmt 格式字符串
- * @param ... 可变参数
- */
+#ifndef AGENTOS_LOG_WARN
 #define AGENTOS_LOG_WARN(fmt, ...) \
     do { \
         OutputDebugStringA("[WARN] " fmt "\n"); \
     } while(0)
+#endif
 
-/**
- * @brief 输出错误日志
- * @param fmt 格式字符串
- * @param ... 可变参数
- */
+#ifndef AGENTOS_LOG_ERROR
 #define AGENTOS_LOG_ERROR(fmt, ...) \
     do { \
         OutputDebugStringA("[ERROR] " fmt "\n"); \
     } while(0)
+#endif
 
 #else /* POSIX */
 

@@ -28,7 +28,7 @@ func TestClient_ConcurrentRequests(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	cfg := &agentos.manager{
+	cfg := &agentos.Config{
 		Endpoint:  ts.URL,
 		Timeout:   30 * time.Second,
 		MaxConnections: 100,
@@ -153,7 +153,7 @@ func TestClient_ConnectionPoolExhaustion(t *testing.T) {
 	defer ts.Close()
 
 	const maxConnections = 10
-	cfg := &agentos.manager{
+	cfg := &agentos.Config{
 		Endpoint:  ts.URL,
 		Timeout:   30 * time.Second,
 		MaxConnections: maxConnections,

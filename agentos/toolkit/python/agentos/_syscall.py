@@ -47,8 +47,10 @@ logger = logging.getLogger(__name__)
 class SyscallError(AgentOSError):
     """Base class for FFI binding errors."""
 
-    def __init__(self, error_code: int, message: str, context: Optional[Dict[str, Any]] = None):
-        super().__init__(error_code, message, context or {})
+    def __init__(self, error_code: int = -1, message: str = "", context: Optional[Dict[str, Any]] = None):
+        super().__init__(message=message, error_code=str(error_code), cause=None)
+        self.error_code_int = error_code
+        self.context = context or {}
 
 
 class SyscallProxy:
@@ -94,12 +96,12 @@ class SyscallProxy:
 
     # Error code to exception type mapping
     ERROR_HANDLERS = {
-        0: lambda msg, ctx: None,  # Success
-        1001: lambda msg, ctx: InitializationError(error_code=1001, message=msg, context=ctx),
-        1002: lambda msg, ctx: ValidationError(error_code=1002, message=msg, context=ctx),
-        1003: lambda msg, ctx: AgentOSMemoryError(error_code=1003, message=msg, context=ctx),
+        0: lambda msg, ctx: None,
+        1001: lambda msg, ctx: InitializationError(message=msg, cause=None),
+        1002: lambda msg, ctx: ValidationError(message=msg, cause=None),
+        1003: lambda msg, ctx: AgentOSMemoryError(message=msg, cause=None),
         2001: lambda msg, ctx: SyscallError(error_code=2001, message=msg, context=ctx),
-        3001: lambda msg, ctx: AgentOSMemoryError(error_code=3001, message=msg, context=ctx),
+        3001: lambda msg, ctx: AgentOSMemoryError(message=msg, cause=None),
         4001: lambda msg, ctx: SyscallError(error_code=4001, message=msg, context=ctx),
         5001: lambda msg, ctx: SyscallError(error_code=5001, message=msg, context=ctx),
     }
@@ -131,13 +133,8 @@ class SyscallProxy:
         except Exception as e:
             self._cleanup_resources()
             raise InitializationError(
-                error_code=1001,
                 message="Failed to initialize FFI binding",
-                context={
-                    "original_error": str(e),
-                    "platform": self._get_platform_info(),
-                    "lib_path": lib_path
-                }
+                cause=e
             )
 
     def _load_library(self, lib_path: Optional[str]) -> None:
@@ -151,9 +148,8 @@ class SyscallProxy:
             self._lib_path = lib_path
         except OSError as e:
             raise InitializationError(
-                error_code=1001,
                 message=f"Failed to load native library: {str(e)}",
-                context={"lib_path": lib_path}
+                cause=e
             )
 
     @staticmethod
@@ -171,10 +167,8 @@ class SyscallProxy:
         elif system == 'windows':
             lib_names = ['agentos.dll', 'libagentos']
         else:
-            raise InitializationError(
-                error_code=1001,
-                message=f"Unsupported platform: {system}",
-                context={"platform": system, "arch": arch}
+            raise FileNotFoundError(
+                f"AgentOS library not found on {system}/{arch}. Searched: {search_paths}"
             )
 
         # Search paths
