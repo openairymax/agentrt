@@ -133,19 +133,38 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
         add_test(NAME test_full_workflow COMMAND test_full_workflow)
     endif()
 
-    # 扩展单元测试
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/test_syscall_extended.c")
-        add_executable(test_syscall_extended tests/unit/test_syscall_extended.c)
+    # 扩展单元测试 (TeamC P1-C07 扩展, 覆盖率>50%)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_syscall_extended.c")
+        add_executable(test_syscall_extended tests/test_syscall_extended.c)
         target_include_directories(test_syscall_extended PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/include
-            ${CMAKE_CURRENT_SOURCE_DIR}/../corekern/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../corekern/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/error/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/memory/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/platform/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/core/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/sync/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/compat/include
         )
-        target_link_libraries(test_syscall_extended
+        target_link_libraries(test_syscall_extended PRIVATE
             agentos_syscall
+            -Wl,--whole-archive
+            agentos_coreloopthree
+            -Wl,--no-whole-archive
             agentos_core
+            agentos_common
             Threads::Threads
+            uuid
+            rt
+            m
         )
+        if(UNIX AND NOT APPLE)
+            target_link_options(test_syscall_extended PRIVATE -Wl,--allow-multiple-definition)
+        endif()
+        target_compile_options(test_syscall_extended PRIVATE -g -O0 -fno-lto)
         add_test(NAME test_syscall_extended COMMAND test_syscall_extended)
+        message(STATUS "  syscall_tests: test_syscall_extended configured (P1-C07 extended)")
     endif()
 else()
     message(WARNING "Tests directory not found, skipping syscall tests")

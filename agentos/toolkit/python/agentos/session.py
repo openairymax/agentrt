@@ -46,7 +46,7 @@ class Session:
             response = self.client._request("POST", f"/api/v1/sessions/{self.session_id}/context", data)
             return response.get("success", False)
         except Exception as e:
-            raise SessionError(f"Error setting session context: {str(e)}")
+            raise SessionError(f"Error setting session context: {str(e)}", cause=e)
     
     async def set_context_async(self, key: str, value: Any) -> bool:
         """
@@ -67,7 +67,7 @@ class Session:
             response = await self.client._request("POST", f"/api/v1/sessions/{self.session_id}/context", data)
             return response.get("success", False)
         except Exception as e:
-            raise SessionError(f"Error setting session context: {str(e)}")
+            raise SessionError(f"Error setting session context: {str(e)}", cause=e)
     
     def get_context(self, key: str) -> Optional[Any]:
         """
@@ -86,7 +86,7 @@ class Session:
             response = self.client._request("GET", f"/api/v1/sessions/{self.session_id}/context/{key}")
             return response.get("value")
         except Exception as e:
-            raise SessionError(f"Error getting session context: {str(e)}")
+            raise SessionError(f"Error getting session context: {str(e)}", cause=e)
     
     async def get_context_async(self, key: str) -> Optional[Any]:
         """
@@ -105,7 +105,7 @@ class Session:
             response = await self.client._request("GET", f"/api/v1/sessions/{self.session_id}/context/{key}")
             return response.get("value")
         except Exception as e:
-            raise SessionError(f"Error getting session context: {str(e)}")
+            raise SessionError(f"Error getting session context: {str(e)}", cause=e)
     
     def close(self) -> bool:
         """
@@ -121,7 +121,7 @@ class Session:
             response = self.client._request("DELETE", f"/api/v1/sessions/{self.session_id}")
             return response.get("success", False)
         except Exception as e:
-            raise SessionError(f"Error closing session: {str(e)}")
+            raise SessionError(f"Error closing session: {str(e)}", cause=e)
     
     async def close_async(self) -> bool:
         """
@@ -137,4 +137,4 @@ class Session:
             response = await self.client._request("DELETE", f"/api/v1/sessions/{self.session_id}")
             return response.get("success", False)
         except Exception as e:
-            raise SessionError(f"Error closing session: {str(e)}")
+            raise SessionError(f"Error closing session: {str(e)}", cause=e)

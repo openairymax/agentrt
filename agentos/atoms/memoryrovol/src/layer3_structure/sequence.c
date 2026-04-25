@@ -5,6 +5,7 @@
  */
 
 #include "layer3_structure.h"
+#include "platform.h"
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
@@ -31,7 +32,7 @@ static float* random_position(size_t index, size_t dim) {
     float* vec = (float*)AGENTOS_MALLOC(dim * sizeof(float));
     if (!vec) return NULL;
     for (size_t i = 0; i < dim; i++) {
-        vec[i] = (float)rand() / RAND_MAX * 2.0f - 1.0f;
+        vec[i] = (float)agentos_random_float() * 2.0f - 1.0f;
     }
     return vec;
 }

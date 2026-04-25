@@ -113,19 +113,19 @@ static int test_string_functions(void) {
     
     /* 测试 agentos_strlcpy */
     const char* src = "Hello, World!";
-    char* result = agentos_strlcpy(buffer, sizeof(buffer), src);
-    TEST_ASSERT(result == buffer, "strlcpy should return buffer");
+    int ret = agentos_strlcpy(buffer, src, sizeof(buffer));
+    TEST_ASSERT(ret == 13, "strlcpy should return length of copied string");
     TEST_ASSERT(strcmp(buffer, src) == 0, "String should be copied correctly");
     
     /* 测试截断 */
     char small_buffer[8];
-    agentos_strlcpy(small_buffer, sizeof(small_buffer), "This is a long string");
+    agentos_strlcpy(small_buffer, "This is a long string", sizeof(small_buffer));
     TEST_ASSERT(strlen(small_buffer) < sizeof(small_buffer), "String should be truncated");
     TEST_ASSERT(small_buffer[sizeof(small_buffer) - 1] == '\0', "String should be null-terminated");
     
     /* 测试 agentos_strlcat */
     char concat_buffer[32] = "Hello";
-    agentos_strlcat(concat_buffer, sizeof(concat_buffer), ", World!");
+    agentos_strlcat(concat_buffer, ", World!", sizeof(concat_buffer));
     TEST_ASSERT(strcmp(concat_buffer, "Hello, World!") == 0, "String should be concatenated");
     
     printf("  String functions: OK\n");

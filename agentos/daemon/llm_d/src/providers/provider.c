@@ -305,3 +305,177 @@ int provider_parse_openai_response(const char* body, llm_response_t** out) {
     *out = resp;
     return AGENTOS_OK;
 }
+
+/* ========== SSE 流式传输实现 ========== */
+
+typedef struct {
+    char*               line_buf;
+    size_t              line_cap;
+    size_t              line_len;
+    provider_stream_chunk_cb_t  on_chunk;
+    void*               chunk_user_data;
+    int                 cancelled;
+} sse_stream_ctx_t;
+
+static void sse_ctx_init(sse_stream_ctx_t* sse,
+                         provider_stream_chunk_cb_t cb,
+                         void* user_data) {
+    memset(sse, 0, sizeof(*sse));
+    sse->line_cap = 4096;
+    sse->line_buf = (char*)malloc(sse->line_cap);
+    sse->on_chunk = cb;
+    sse->chunk_user_data = user_data;
+}
+
+static void sse_ctx_destroy(sse_stream_ctx_t* sse) {
+    if (sse) {
+        free(sse->line_buf);
+        sse->line_buf = NULL;
+    }
+}
+
+static int sse_feed_line(sse_stream_ctx_t* sse, const char* line, size_t len) {
+    if (!line || len == 0) return 0;
+
+    if (len >= 5 && memcmp(line, "data:", 5) == 0) {
+        const char* data_start = line + 5;
+        while (*data_start == ' ' || *data_start == '\t') data_start++;
+        size_t data_len = len - (size_t)(data_start - line);
+
+        if (data_len >= 6 && memcmp(data_start, "[DONE]", 6) == 0) {
+            sse->cancelled = 1;
+            return 0;
+        }
+
+        if (sse->on_chunk) {
+            char* tmp = (char*)malloc(data_len + 1);
+            if (tmp) {
+                memcpy(tmp, data_start, data_len);
+                tmp[data_len] = '\0';
+                int ret = sse->on_chunk(tmp, sse->chunk_user_data);
+                free(tmp);
+                if (ret != 0) {
+                    sse->cancelled = 1;
+                    return ret;
+                }
+            }
+        }
+    }
+
+    return 0;
+}
+
+static void sse_process_buffer(sse_stream_ctx_t* sse) {
+    if (sse->line_len == 0) return;
+
+    char* p = sse->line_buf;
+    char* end = p + sse->line_len;
+
+    while (p < end) {
+        char* nl = (char*)memchr(p, '\n', (size_t)(end - p));
+        if (!nl) break;
+
+        size_t line_len = (size_t)(nl - p);
+        if (line_len > 0 && *(nl - 1) == '\r') line_len--;
+
+        if (line_len > 0) {
+            int r = sse_feed_line(sse, p, line_len);
+            if (r != 0 || sse->cancelled) return;
+        }
+
+        p = nl + 1;
+    }
+
+    if (p < end) {
+        size_t remaining = (size_t)(end - p);
+        memmove(sse->line_buf, p, remaining);
+        sse->line_len = remaining;
+    } else {
+        sse->line_len = 0;
+    }
+}
+
+static size_t sse_write_callback(void* contents, size_t size, size_t nmemb,
+                                 void* userp) {
+    size_t realsize = size * nmemb;
+    sse_stream_ctx_t* sse = (sse_stream_ctx_t*)userp;
+
+    if (sse->cancelled) return 0;
+
+    size_t needed = sse->line_len + realsize + 1;
+    if (needed > sse->line_cap) {
+        size_t new_cap = sse->line_cap * 2;
+        while (new_cap < needed) new_cap *= 2;
+        char* ptr = (char*)realloc(sse->line_buf, new_cap);
+        if (!ptr) return 0;
+        sse->line_buf = ptr;
+        sse->line_cap = new_cap;
+    }
+
+    memcpy(sse->line_buf + sse->line_len, contents, realsize);
+    sse->line_len += realsize;
+    sse->line_buf[sse->line_len] = '\0';
+
+    sse_process_buffer(sse);
+
+    if (sse->cancelled) return 0;
+    return realsize;
+}
+
+int provider_http_post_stream(const char* url,
+                              struct curl_slist* headers,
+                              const char* body,
+                              double timeout_sec,
+                              provider_stream_chunk_cb_t on_chunk,
+                              void* chunk_user_data,
+                              long* out_http_code) {
+    if (!url || !body || !on_chunk || !out_http_code) {
+        errno = EINVAL;
+        return AGENTOS_ERR_INVALID_PARAM;
+    }
+
+    sse_stream_ctx_t sse;
+    sse_ctx_init(&sse, on_chunk, chunk_user_data);
+    if (!sse.line_buf) {
+        return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
+
+    CURL* curl = curl_easy_init();
+    if (!curl) {
+        sse_ctx_destroy(&sse);
+        SVC_LOG_ERROR("provider_http_post_stream: curl_easy_init failed");
+        return AGENTOS_ERR_UNKNOWN;
+    }
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_POST, 1L);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body);
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, sse_write_callback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &sse);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, (long)timeout_sec);
+    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
+
+    CURLcode res = curl_easy_perform(curl);
+    long http_code = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+    *out_http_code = http_code;
+    curl_easy_cleanup(curl);
+
+    if (sse.line_len > 0) {
+        sse_process_buffer(&sse);
+    }
+
+    sse_ctx_destroy(&sse);
+
+    if (res != CURLE_OK) {
+        SVC_LOG_WARN("provider_http_post_stream: curl error: %s",
+                     curl_easy_strerror(res));
+        return AGENTOS_ERR_IO;
+    }
+
+    return AGENTOS_OK;
+}

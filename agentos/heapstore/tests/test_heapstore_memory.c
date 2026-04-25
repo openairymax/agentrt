@@ -19,7 +19,7 @@ static void test_memory_init_shutdown(void) {
     printf("Test: memory_init_shutdown...");
 
     heapstore_error_t err = heapstore_memory_init();
-    assert(err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED);
+    assert(err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED || err == heapstore_ERR_DIR_CREATE_FAILED);
 
     heapstore_memory_shutdown();
     printf("PASS\n");

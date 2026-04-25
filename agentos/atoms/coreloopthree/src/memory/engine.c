@@ -41,11 +41,11 @@ agentos_error_t agentos_memory_create(
         }
     }
 
-    agentos_error_t err = agentos_memoryrov_create(config_path, &engine->rov_handle);
-    if (err != AGENTOS_SUCCESS) {
+    engine->rov_handle = agentos_memoryrov_create();
+    if (!engine->rov_handle) {
         if (engine->config_path) AGENTOS_FREE(engine->config_path);
         AGENTOS_FREE(engine);
-        return err;
+        return AGENTOS_ENOMEM;
     }
 
     engine->lock = agentos_mutex_create();
@@ -115,11 +115,12 @@ agentos_error_t agentos_memory_write(
 agentos_error_t agentos_memory_query(
     agentos_memory_engine_t* engine,
     const agentos_memory_query_t* query,
-    agentos_memory_result_t** out_result) {
+    agentos_memory_result_ext_t** out_result) {
 
     if (!engine || !query || !out_result) return AGENTOS_EINVAL;
 
     char** results = NULL;
+    float* scores = NULL;
     size_t count = 0;
 
     agentos_mutex_lock(engine->lock);
@@ -128,12 +129,13 @@ agentos_error_t agentos_memory_query(
         query->memory_query_text,
         query->memory_query_limit,
         &results,
+        &scores,
         &count);
     agentos_mutex_unlock(engine->lock);
 
     if (err != AGENTOS_SUCCESS) return err;
 
-    agentos_memory_result_t* res = (agentos_memory_result_t*)AGENTOS_CALLOC(1, sizeof(agentos_memory_result_t));
+    agentos_memory_result_ext_t* res = (agentos_memory_result_ext_t*)AGENTOS_CALLOC(1, sizeof(agentos_memory_result_ext_t));
     if (!res) {
         for (size_t i = 0; i < count; i++) AGENTOS_FREE(results[i]);
         AGENTOS_FREE(results);
@@ -210,7 +212,7 @@ agentos_error_t agentos_memory_get(
 
     rec->memory_record_data = data;
     rec->memory_record_data_len = len;
-    rec->memory_record_type = MEMORY_TYPE_RAW;
+    rec->memory_record_type = AGENTOS_MEMTYPE_TEXT;
 
     *out_record = rec;
     return AGENTOS_SUCCESS;
@@ -236,7 +238,7 @@ agentos_error_t agentos_memory_mount(
 /**
  * @brief 释放查询结果
  */
-void agentos_memory_result_free(agentos_memory_result_t* result) {
+void agentos_memory_result_free(agentos_memory_result_ext_t* result) {
     if (!result) return;
     for (size_t i = 0; i < result->memory_result_count; i++) {
         if (result->memory_result_items[i]) {

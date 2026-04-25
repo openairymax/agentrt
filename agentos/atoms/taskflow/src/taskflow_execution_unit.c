@@ -316,22 +316,56 @@ taskflow_task_input_t* taskflow_parse_task_input(const agentos_task_t* agentos_t
 {
     if (!agentos_task || !agentos_task->task_input) return NULL;
     
-    // 简化实现：假设输入数据已经是taskflow_task_input_t格式
-    // 实际实现需要根据具体序列化格式解析
+    const taskflow_task_input_t* src = (const taskflow_task_input_t*)agentos_task->task_input;
     
-    // 这里返回NULL表示需要实现具体解析逻辑
-    return NULL;
+    taskflow_task_input_t* input = taskflow_task_input_create(
+        src->graph,
+        src->vertices, src->vertex_count,
+        src->edges, src->edge_count,
+        src->max_supersteps);
+    if (!input) return NULL;
+    
+    input->graph_config = src->graph_config;
+    input->user_context = src->user_context;
+    
+    return input;
 }
 
 taskflow_error_t taskflow_pack_task_output(const taskflow_task_output_t* output,
                                           agentos_task_t* agentos_task)
 {
     if (!output || !agentos_task) return TASKFLOW_ERROR_INVALID_ARG;
-    
-    // 简化实现：将输出数据打包到agentos_task中
-    // 实际实现需要序列化输出数据
-    
-    return TASKFLOW_ERROR_INTERNAL; // 暂未实现
+
+    taskflow_task_output_t* packed = taskflow_task_output_create();
+    if (!packed) return TASKFLOW_ERROR_MEMORY;
+
+    packed->result = output->result;
+    packed->completed_supersteps = output->completed_supersteps;
+    packed->active_vertices = output->active_vertices;
+    packed->stats = output->stats;
+
+    if (output->result_data && output->result_data_size > 0) {
+        packed->result_data = malloc(output->result_data_size);
+        if (!packed->result_data) {
+            taskflow_task_output_destroy(packed);
+            return TASKFLOW_ERROR_MEMORY;
+        }
+        memcpy(packed->result_data, output->result_data, output->result_data_size);
+        packed->result_data_size = output->result_data_size;
+    }
+
+    if (agentos_task->task_output) {
+        taskflow_task_output_destroy((taskflow_task_output_t*)agentos_task->task_output);
+    }
+    agentos_task->task_output = packed;
+
+    if (output->result == TASKFLOW_SUCCESS) {
+        agentos_task->task_status = TASK_STATUS_SUCCEEDED;
+    } else {
+        agentos_task->task_status = TASK_STATUS_FAILED;
+    }
+
+    return TASKFLOW_SUCCESS;
 }
 
 agentos_error_t taskflow_register_unit(

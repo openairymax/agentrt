@@ -14,9 +14,11 @@
 
 #include "heapstore.h"
 #include "heapstore_batch.h"
+#include "heapstore_log.h"
 #include "private.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 /* ==================== 内部辅助函数 ==================== */
 
@@ -25,11 +27,11 @@
  */
 static heapstore_error_t batch_commit_log(const void* data) {
     const heapstore_log_entry_t* log_entry = (const heapstore_log_entry_t*)data;
-    if (!log_entry || !log_entry->message) {
+    if (!log_entry || log_entry->message[0] == '\0') {
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    return heapstore_log_write(
+    heapstore_log_write(
         log_entry->level,
         log_entry->service,
         log_entry->trace_id[0] ? log_entry->trace_id : NULL,

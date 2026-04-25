@@ -89,7 +89,7 @@ class Skill:
         try:
             response = self.client._request("GET", f"/api/v1/skills/{self.skill_name}")
             return SkillInfo(
-                skill_name=self.skill_name,
+                name=self.skill_name,
                 description=response.get("description", ""),
                 version=response.get("version", ""),
                 parameters=response.get("parameters", {})
@@ -110,7 +110,7 @@ class Skill:
         try:
             response = await self.client._request("GET", f"/api/v1/skills/{self.skill_name}")
             return SkillInfo(
-                skill_name=self.skill_name,
+                name=self.skill_name,
                 description=response.get("description", ""),
                 version=response.get("version", ""),
                 parameters=response.get("parameters", {})
