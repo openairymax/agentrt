@@ -293,7 +293,6 @@ static char* handle_complete(cJSON* params, int id) {
     }
 
     uint64_t end_time = agentos_time_ms();
-    (void)start_time; (void)end_time;
 
     if (ret != 0) {
         SVC_LOG_ERROR("LLM complete failed after %d attempts (total %llums)",

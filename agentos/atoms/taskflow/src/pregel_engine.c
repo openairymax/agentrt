@@ -10,6 +10,8 @@
 
 #include "pregel_engine.h"
 #include "graph_engine.h"
+#include "taskflow.h"
+#include "taskflow_types.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
