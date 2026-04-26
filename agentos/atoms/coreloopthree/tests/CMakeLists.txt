@@ -16,6 +16,9 @@ set(CL3_TEST_SOURCES
     unit/test_memory.c
     unit/test_compensation.c
     unit/test_intent_parser.c
+    unit/test_cognitive_evolution.c
+    unit/test_context_processor.c
+    unit/test_parallel_dispatcher.c
 )
 
 set(CL3_COMMON_INCLUDES

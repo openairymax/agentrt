@@ -12,6 +12,7 @@
 #include "graph_engine.h"
 #include "taskflow.h"
 #include "taskflow_types.h"
+#include <memory_compat.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

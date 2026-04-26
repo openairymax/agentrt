@@ -25,6 +25,7 @@
 #include "error.h"
 #include "ipc_client.h"
 #include "safe_string_utils.h"
+#include "thread_pool.h"
 
 #include "include/memory_compat.h"
 #include <stdio.h>
@@ -74,7 +75,10 @@ typedef struct agentos_service_internal {
     
     /* 用户上下文数据 */
     void* user_data;
-    
+
+    /* 并发支持 */
+    void* thread_pool;
+
     /* 链表支持 */
     struct agentos_service_internal* next;
 } agentos_service_internal_t;
@@ -495,6 +499,82 @@ agentos_error_t agentos_service_stop(agentos_service_t svc, bool force) {
     agentos_platform_mutex_unlock(&service->state_mutex);
     
     return err;
+}
+
+typedef struct {
+    agentos_service_t service;
+    char* method;
+    char* params_json;
+    agentos_svc_async_complete_fn on_complete;
+    void* user_data;
+} async_request_context_t;
+
+static void async_request_worker(void* arg) {
+    async_request_context_t* ctx = (async_request_context_t*)arg;
+    if (!ctx) return;
+
+    char* response_json = NULL;
+    agentos_error_t err = AGENTOS_EINVAL;
+
+    agentos_service_internal_t* svc = (agentos_service_internal_t*)ctx->service;
+    if (svc && svc->iface.handle_request) {
+        err = svc->iface.handle_request(ctx->service, ctx->method,
+                                         ctx->params_json, &response_json,
+                                         svc->user_data);
+    }
+
+    if (ctx->on_complete) {
+        ctx->on_complete(ctx->service, ctx->method, err, response_json, ctx->user_data);
+    } else {
+        if (response_json) free(response_json);
+    }
+
+    free(ctx->method);
+    free(ctx->params_json);
+    free(ctx);
+}
+
+agentos_error_t agentos_service_set_thread_pool(agentos_service_t svc, void* pool) {
+    if (!svc) return AGENTOS_EINVAL;
+    agentos_service_internal_t* service = (agentos_service_internal_t*)svc;
+    service->thread_pool = pool;
+    return AGENTOS_SUCCESS;
+}
+
+int agentos_service_handle_request_async(
+    agentos_service_t service,
+    const char* method,
+    const char* params_json,
+    agentos_svc_async_complete_fn on_complete,
+    void* user_data
+) {
+    if (!service || !method) return -1;
+
+    agentos_service_internal_t* svc = (agentos_service_internal_t*)service;
+
+    async_request_context_t* ctx = (async_request_context_t*)calloc(1, sizeof(*ctx));
+    if (!ctx) return -2;
+
+    ctx->service = service;
+    ctx->method = strdup(method);
+    ctx->params_json = params_json ? strdup(params_json) : NULL;
+    ctx->on_complete = on_complete;
+    ctx->user_data = user_data;
+
+    if (svc->thread_pool) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-function-type"
+        int rc = thread_pool_submit(svc->thread_pool, async_request_worker, ctx);
+#pragma GCC diagnostic pop
+        if (rc != 0) {
+            free(ctx->method); free(ctx->params_json); free(ctx);
+            return rc;
+        }
+        return 0;
+    }
+
+    async_request_worker(ctx);
+    return 0;
 }
 
 agentos_error_t agentos_service_pause(agentos_service_t svc) {
