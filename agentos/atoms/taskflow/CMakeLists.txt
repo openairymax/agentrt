@@ -45,10 +45,11 @@ else()
 endif()
 
 # 包含目录
+set(TASKFLOW_COMMONS_MEMORY_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/memory/include)
+
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${AGENTOS_COMMONS_INCLUDE_DIR}
-    ${AGENTOS_ATOMS_INCLUDE_DIR}
+    ${TASKFLOW_COMMONS_MEMORY_INCLUDE}
 )
 
 # ========================================================================
@@ -84,6 +85,7 @@ add_library(agentos_taskflow STATIC ${TASKFLOW_CORE_SOURCES})
 # 头文件包含路径
 target_include_directories(agentos_taskflow PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${TASKFLOW_COMMONS_MEMORY_INCLUDE}>
     $<INSTALL_INTERFACE:include/agentos/taskflow>
 )
 
@@ -131,17 +133,33 @@ target_include_directories(agentos_taskflow PRIVATE
 # ========================================================================
 
 if(BUILD_TESTS)
-    # 测试可执行文件
-    add_executable(taskflow_test
-        tests/test_taskflow.c
-        tests/test_graph_engine.c
-        tests/test_pregel_engine.c
+    add_executable(test_taskflow_advanced
+        tests/unit/test_taskflow_advanced.c
     )
-    
-    target_link_libraries(taskflow_test agentos_taskflow)
-    
-    # 添加测试
-    add_test(NAME taskflow_basic_test COMMAND taskflow_test)
+
+    target_include_directories(test_taskflow_advanced PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${TASKFLOW_COMMONS_MEMORY_INCLUDE}
+    )
+
+    target_link_libraries(test_taskflow_advanced
+        agentos_taskflow
+        -Wl,--whole-archive
+        agentos_coreloopthree
+        -Wl,--no-whole-archive
+        agentos_core
+        agentos_common
+        Threads::Threads
+        dl
+        m
+    )
+
+    if(UNIX)
+        target_link_options(test_taskflow_advanced PRIVATE
+            -Wl,--allow-multiple-definition)
+    endif()
+
+    add_test(NAME taskflow_advanced_test COMMAND test_taskflow_advanced)
 endif()
 
 # ========================================================================

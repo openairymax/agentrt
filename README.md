@@ -24,6 +24,17 @@ English | [简体中文](README_CN.md)
 
 </div>
 
+### 🚀 Airymax AgentOS Preview Released
+
+<div align="center">
+
+| User Type | Product | Version | Download |
+|:---------:|:-------:|:-------:|:--------:|
+| 👨‍💼 **Pro Users** | Docker | `v0.0.4` | [📦 Get Docker](https://atomgit.com/openairymax/docker/releases/v0.0.4) |
+| 👤 **Personal Users** | Desktop | `v0.0.4` | [🖥️ Get Desktop](https://atomgit.com/openairymax/desktop/releases/v0.0.4) |
+
+</div>
+
 ## 🌟 Introduction
 
 **AgentOS** is an intelligent agent operating system that provides comprehensive OS-level support for orchestrating agent teams.
@@ -33,7 +44,7 @@ English | [简体中文](README_CN.md)
 Personal Client Preview
 
 <div align="center">
-<img src="docs/Source_Other/AgentOS-desktop-preview.gif" alt="AgentOS Preview" width="800">
+<img src="scripts/source_other/AgentOS-desktop-preview.gif" alt="AgentOS Preview" width="800">
 </div>
 
 ## 💡 Innovation Highlights
@@ -264,7 +275,7 @@ See [Contributing Guide](CONTRIBUTING.md)
 Fork Project → Create Branch → Develop & Test → Submit PR → Code Review → Merge to Main
 ```
 
-**Main Platforms**: [AtomGit](https://atomgit.com/spharx/agentos) (Recommended) · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)
+**Main Platforms**: [AtomGit](https://atomgit.com/openairymax/agentos) (Recommended) · [Gitee](https://gitee.com/spharx/agentos) · [GitHub](https://github.com/SpharxTeam/AgentOS)
 
 ### Contributors
 
@@ -282,7 +293,7 @@ This project is licensed under the **Apache License 2.0**. See [LICENSE](LICENSE
 
 <img src="scripts/source_other/feishu-community-qr.png" width="200" />
 
-<a href="https://atomgit.com/spharx/agentos">AtomGit</a> ·
+<a href="https://atomgit.com/openairymax/agentos">AtomGit</a> ·
 <a href="https://gitee.com/spharx/agentos">Gitee</a> ·
 <a href="https://github.com/SpharxTeam/AgentOS">GitHub</a> ·
 <a href="https://spharx.cn">Official Website</a>
