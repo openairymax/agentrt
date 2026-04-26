@@ -450,7 +450,8 @@ static int load_daemon_config(const char* config_path) {
             
             char* content = (char*)malloc(len + 1);
             if (content) {
-                fread(content, 1, len, f);
+                size_t nread = fread(content, 1, len, f);
+                (void)nread;
                 content[len] = '\0';
                 
                 cJSON* root = cJSON_Parse(content);
@@ -605,7 +606,10 @@ int main(int argc, char** argv) {
             continue;
         }
         
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-function-type"
         thread_pool_submit(pool, (thread_task_fn_t)handle_client, (void*)(uintptr_t)client_fd);
+#pragma GCC diagnostic pop
     }
     
     /* 清理 */

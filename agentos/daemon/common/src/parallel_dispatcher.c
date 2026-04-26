@@ -110,7 +110,7 @@ static void dispatch_worker(void* arg) {
     ctx->result_slot->error = NULL;
 
     ipc_service_bus_t bus = ctx->dispatcher->bus;
-    bool ipc_ok = false;
+    bool ipc_ok __attribute__((unused)) = false;
 
     if (bus) {
         char request_payload[2048];

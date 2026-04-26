@@ -30,7 +30,10 @@ static agentos_execution_engine_t* g_execution = NULL;
 void agentos_sys_init(void* cognition, void* execution, void* memory) {
     g_cognition = (agentos_cognition_engine_t*)cognition;
     g_execution = (agentos_execution_engine_t*)execution;
-    // memory �?memory.c 使用，通过单独�?setter 设置
+    if (memory) {
+        extern void agentos_sys_set_memory(void*);
+        agentos_sys_set_memory(memory);
+    }
 }
 
 /* -------------------- 辅助函数 -------------------- */

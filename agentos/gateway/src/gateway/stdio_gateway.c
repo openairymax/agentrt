@@ -17,6 +17,7 @@
 #include "../utils/syscall_router.h"
 #include "../utils/gateway_utils.h"
 #include "../utils/gateway_rpc_handler.h"
+#include <cjson/cJSON.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,7 +50,7 @@
  */
 typedef struct stdio_gateway {
     void* handler_adapter;           /**< 公共回调适配器（动态分配） */
-    gateway_request_handler_t handler; /**< 请求处理回调 */
+    gateway_internal_handler_t handler; /**< 请求处理回调 */
     void* handler_data;              /**< 回调用户数据 */
     
     atomic_bool running;             /**< 运行标志 */
@@ -104,11 +105,14 @@ static char* handle_jsonrpc(stdio_gateway_t* gateway, const char* json_str) {
         return jsonrpc_create_error_response(NULL, -32700, "Parse error", NULL);
     }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-function-type"
     rpc_result_t result = gateway_rpc_handle_request(
         request,
         (int (*)(const char*, char**, void*))gateway->handler,
         gateway->handler_data
     );
+#pragma GCC diagnostic pop
 
     if (result.error_code != 0 || !result.response_json) {
         char* error_resp = result.response_json ? result.response_json :
@@ -313,7 +317,7 @@ static agentos_error_t stdio_gateway_get_stats(void* gateway_impl, char** out_js
 /**
  * @brief 设置请求处理回调
  */
-static agentos_error_t stdio_gateway_set_handler(void* gateway_impl, gateway_request_handler_t handler, void* user_data) {
+static agentos_error_t stdio_gateway_set_handler(void* gateway_impl, gateway_internal_handler_t handler, void* user_data) {
     stdio_gateway_t* gateway = (stdio_gateway_t*)gateway_impl;
     if (!gateway) return AGENTOS_EINVAL;
 

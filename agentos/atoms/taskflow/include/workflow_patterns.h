@@ -47,6 +47,8 @@ typedef enum {
     NODE_SUBWORKFLOW            /**< 子工作流节点 */
 } workflow_node_type_t;
 
+typedef int (*workflow_condition_func_t)(void* context);
+
 /**
  * @brief 工作流节点结构
  */

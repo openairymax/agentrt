@@ -378,3 +378,21 @@ agentos_error_t agentos_layer2_feature_search(
 
     return err;
 }
+
+agentos_error_t agentos_layer2_feature_stats(
+    agentos_layer2_feature_t* l2,
+    size_t* out_count) {
+    if (!l2 || !out_count) return AGENTOS_EINVAL;
+    if (!l2->hnsw) {
+        *out_count = 0;
+        return AGENTOS_SUCCESS;
+    }
+    pthread_mutex_lock(&l2->hnsw->mutex);
+    size_t active = 0;
+    for (size_t i = 0; i < l2->hnsw->node_count; i++) {
+        if (!l2->hnsw->nodes[i]->deleted) active++;
+    }
+    pthread_mutex_unlock(&l2->hnsw->mutex);
+    *out_count = active;
+    return AGENTOS_SUCCESS;
+}

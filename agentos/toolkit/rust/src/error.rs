@@ -377,7 +377,7 @@ impl From<reqwest::Error> for AgentOSError {
             AgentOSError::connection_refused(&err.to_string())
         } else if err.is_request() {
             AgentOSError::network(&err.to_string())
-        } else if err.is_response() {
+        } else if err.is_status() {
             AgentOSError::http(&err.to_string())
         } else if err.is_body() || err.is_decode() {
             AgentOSError::json(&err.to_string())

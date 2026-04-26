@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <pthread.h>
+#include <errno.h>
 
 // ============================================================================
 // 内部数据结构
@@ -298,9 +299,10 @@ static void worker_thread_func(void* arg) {
                 engine->config.compute_func(
                     engine->vertex_states[i].vertex_id,
                     engine->vertex_states[i].value,
+                    engine->vertex_states[i].value_size,
                     engine->vertex_states[i].incoming_messages,
                     engine->vertex_states[i].incoming_message_count,
-                    engine);
+                    engine->config.user_context);
             }
         }
 
@@ -1017,7 +1019,7 @@ taskflow_error_t pregel_engine_run_superstep(pregel_engine_handle_t engine)
         e->active_vertices = 0;
         pthread_cond_broadcast(&e->cond_var);
         pthread_mutex_unlock(&e->mutex);
-        return TASKFLOW_ERROR_NO_ACTIVE_VERTICES;
+        return (taskflow_error_t)20;
     }
 
     e->active_vertices = active_count;

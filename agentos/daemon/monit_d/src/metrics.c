@@ -510,6 +510,7 @@ char* metrics_export_prometheus(void) {
             case METRIC_TYPE_GAUGE: type_str = "gauge"; break;
             case METRIC_TYPE_HISTOGRAM: type_str = "histogram"; break;
             case METRIC_TYPE_SUMMARY: type_str = "summary"; break;
+            case METRIC_TYPE_COUNT: type_str = "untyped"; break;
         }
         pos += snprintf(buf + pos, buf_size - pos, 
                        "# TYPE %s %s\n", metric->name, type_str);

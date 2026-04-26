@@ -135,12 +135,12 @@ static void handle_register_agent(cJSON* params, int id, agentos_socket_t client
         JSONRPC_SEND_ERROR(client_fd, INVALID_PARAMS, "Missing agent_id", id);
         return;
     }
-    info.agent_id = aid;
+    info.agent_id = (char*)aid;
 
-    info.name = get_string_field(agent_json, "name", NULL);
-    info.version = get_string_field(agent_json, "version", NULL);
-    info.description = get_string_field(agent_json, "description", NULL);
-    info.author = get_string_field(agent_json, "author", NULL);
+    info.name = (char*)get_string_field(agent_json, "name", NULL);
+    info.version = (char*)get_string_field(agent_json, "version", NULL);
+    info.description = (char*)get_string_field(agent_json, "description", NULL);
+    info.author = (char*)get_string_field(agent_json, "author", NULL);
 
     int ret = market_service_register_agent(g_service, &info);
 
@@ -209,7 +209,7 @@ static void handle_install_agent(cJSON* params, int id, agentos_socket_t client_
 
     const char* version = get_string_field(params, "version", "latest");
 
-    int ret = market_service_install_agent(g_service, aid, version);
+    int ret = market_service_install_agent(g_service, (const install_request_t*)aid, (install_result_t**)version);
 
     if (ret != AGENTOS_SUCCESS) {
         JSONRPC_SEND_ERROR(client_fd, INTERNAL_ERROR, "Install failed", id);
@@ -240,10 +240,10 @@ static void handle_register_skill(cJSON* params, int id, agentos_socket_t client
         JSONRPC_SEND_ERROR(client_fd, INVALID_PARAMS, "Missing skill_id", id);
         return;
     }
-    info.skill_id = sid;
+    info.skill_id = (char*)sid;
 
-    info.name = get_string_field(skill_json, "name", NULL);
-    info.version = get_string_field(skill_json, "version", NULL);
+    info.name = (char*)get_string_field(skill_json, "name", NULL);
+    info.version = (char*)get_string_field(skill_json, "version", NULL);
 
     int ret = market_service_register_skill(g_service, &info);
 
@@ -331,7 +331,7 @@ static void handle_client(agentos_socket_t client_fd) {
 
     cJSON* jsonrpc = cJSON_GetObjectItem(req, "jsonrpc");
     cJSON* method = cJSON_GetObjectItem(req, "method");
-    cJSON* params = cJSON_GetObjectItem(req, "params");
+    (void)cJSON_GetObjectItem(req, "params");
     cJSON* id = cJSON_GetObjectItem(req, "id");
 
     if (!cJSON_IsString(jsonrpc) || strcmp(jsonrpc->valuestring, "2.0") != 0 ||
