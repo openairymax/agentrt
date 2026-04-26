@@ -101,7 +101,7 @@ static int openai_rl_check_rpm(openai_rate_limiter_t* rl) {
     return 0;
 }
 
-static int openai_rl_check_tpm(openai_rate_limiter_t* rl, int tokens) {
+static int __attribute__((unused)) openai_rl_check_tpm(openai_rate_limiter_t* rl, int tokens) {
     time_t now = time(NULL);
     pthread_mutex_lock(&rl->lock);
 

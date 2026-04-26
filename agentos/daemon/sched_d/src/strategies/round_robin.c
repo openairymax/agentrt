@@ -280,7 +280,7 @@ static int round_robin_schedule(void* data, const task_info_t* task_info, sched_
         return ROUND_ROBIN_ERROR_NO_AGENT;
     }
 
-    size_t start_index = rrd->current_index;
+    size_t __attribute__((unused)) start_index = rrd->current_index;
     size_t attempts = 0;
 
     while (attempts < rrd->agent_count) {

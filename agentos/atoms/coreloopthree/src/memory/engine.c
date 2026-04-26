@@ -272,8 +272,15 @@ agentos_error_t agentos_memory_evolve(
     agentos_memory_engine_t* engine,
     int force) {
     if (!engine) return AGENTOS_EINVAL;
-    (void)force;
-    return AGENTOS_SUCCESS;
+
+    agentos_mutex_lock(engine->lock);
+    if (engine->rov_handle) {
+        agentos_error_t err = agentos_memoryrov_evolve(engine->rov_handle, force);
+        agentos_mutex_unlock(engine->lock);
+        return err;
+    }
+    agentos_mutex_unlock(engine->lock);
+    return AGENTOS_ENOTINIT;
 }
 
 /**
@@ -285,14 +292,28 @@ agentos_error_t agentos_memory_health_check(
 
     if (!engine || !out_json) return AGENTOS_EINVAL;
 
-    cJSON* root = cJSON_CreateObject();
-    if (!root) return AGENTOS_ENOMEM;
-
-    cJSON_AddStringToObject(root, "status", "healthy");
-
+    char* rov_stats = NULL;
     agentos_mutex_lock(engine->lock);
-    cJSON_AddNumberToObject(root, "records", 0);
+    if (engine->rov_handle) {
+        agentos_memoryrov_stats(engine->rov_handle, &rov_stats);
+    }
     agentos_mutex_unlock(engine->lock);
+
+    cJSON* root = cJSON_CreateObject();
+    if (!root) {
+        if (rov_stats) AGENTOS_FREE(rov_stats);
+        return AGENTOS_ENOMEM;
+    }
+
+    cJSON_AddStringToObject(root, "status", engine->rov_handle ? "healthy" : "degraded");
+
+    if (rov_stats) {
+        cJSON* stats_obj = cJSON_Parse(rov_stats);
+        if (stats_obj) {
+            cJSON_AddItemToObject(root, "memoryrov", stats_obj);
+        }
+        AGENTOS_FREE(rov_stats);
+    }
 
     char* json = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);

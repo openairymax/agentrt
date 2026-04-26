@@ -168,6 +168,11 @@ agentos_memoryrov_handle_t* agentos_memoryrov_create(void);
  */
 void agentos_memoryrov_destroy(agentos_memoryrov_handle_t* handle);
 
+agentos_error_t agentos_memoryrov_mount(
+    agentos_memoryrov_handle_t* handle,
+    const char* record_id,
+    const char* context);
+
 /**
  * @brief 添加记忆条目
  * @param handle [in] 系统句柄（非 NULL）

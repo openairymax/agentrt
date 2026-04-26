@@ -153,12 +153,18 @@ typedef int32_t agentos_error_t;
 /* 通用基础错误 (-1 到 -99) */
 #define AGENTOS_ERR_INVALID_PARAM      (-2)
 #define AGENTOS_ERR_NULL_POINTER       (-3)
+#ifndef AGENTOS_ERR_OUT_OF_MEMORY
 #define AGENTOS_ERR_OUT_OF_MEMORY      (-4)
+#endif
 #define AGENTOS_ERR_BUFFER_TOO_SMALL   (-5)
 #define AGENTOS_ERR_NOT_FOUND          (-6)
+#ifndef AGENTOS_ERR_ALREADY_EXISTS
 #define AGENTOS_ERR_ALREADY_EXISTS     (-7)
+#endif
 #define AGENTOS_ERR_TIMEOUT            (-8)
+#ifndef AGENTOS_ERR_NOT_SUPPORTED
 #define AGENTOS_ERR_NOT_SUPPORTED      (-9)
+#endif
 #define AGENTOS_ERR_PERMISSION_DENIED  (-10)
 #define AGENTOS_ERR_IO                 (-11)
 #define AGENTOS_ERR_PARSE_ERROR        (-12)

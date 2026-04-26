@@ -292,8 +292,7 @@ workflow_context_t* workflow_context_create(
         taskflow_config_t tf_config = {
             .max_vertices = config->max_nodes,
             .max_edges = config->max_edges,
-            .max_workers = 4,
-            .enable_checkpoint = config->enable_checkpoint
+            .enable_fault_tolerance = config->enable_checkpoint,
         };
         
         context->taskflow_engine = taskflow_engine_create(&tf_config);
@@ -596,7 +595,7 @@ taskflow_error_t workflow_build_conditional(
     vertex_id_t true_branch_node_id,
     vertex_id_t false_branch_node_id,
     vertex_id_t merge_node_id,
-    bool (*condition_func)(void* ctx),
+    workflow_condition_func_t condition_func,
     void* condition_context)
 {
     if (!context) return TASKFLOW_ERROR_INVALID_ARG;
@@ -664,7 +663,7 @@ taskflow_error_t workflow_build_loop(
     vertex_id_t loop_body_node_id,
     vertex_id_t loop_condition_node_id,
     vertex_id_t loop_end_node_id,
-    bool (*continue_condition_func)(void* ctx),
+    workflow_condition_func_t continue_condition_func,
     void* condition_context)
 {
     if (!context) return TASKFLOW_ERROR_INVALID_ARG;

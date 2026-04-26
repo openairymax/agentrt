@@ -33,6 +33,7 @@ static void monit_config_from_common(
     monitor_config_t* monit_cfg,
     const agentos_svc_config_t* common_cfg
 ) {
+    (void)common_cfg;
     memset(monit_cfg, 0, sizeof(monitor_config_t));
     monit_cfg->metrics_collection_interval_ms = 5000;
     monit_cfg->health_check_interval_ms = 10000;
@@ -58,7 +59,7 @@ static agentos_error_t monit_adapter_init(
 
     if (!ctx->monit_svc) {
         monit_config_from_common(&ctx->monit_cfg, &ctx->common_cfg);
-        int ret = monitor_service_create(&ctx->monit_cfg, &ctx->monit_svc);
+        int ret = monitor_service_create(&ctx->monit_cfg, (monitor_service_t**)&ctx->monit_svc);
         if (ret != 0 || !ctx->monit_svc) {
             SVC_LOG_ERROR("监控服务创建失败: %d", ret);
             return AGENTOS_ERR_UNKNOWN;
@@ -79,6 +80,7 @@ static agentos_error_t monit_adapter_start(agentos_service_t service) {
 
 static agentos_error_t monit_adapter_stop(agentos_service_t service, bool force) {
     if (!service) return AGENTOS_EINVAL;
+    (void)force;
     monit_adapter_ctx_t* ctx = monit_get_ctx(service);
     if (!ctx) return AGENTOS_EINVAL;
     SVC_LOG_INFO("监控服务适配器已停止");

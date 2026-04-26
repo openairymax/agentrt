@@ -23,6 +23,7 @@
 #include "jsonrpc_helpers.h"
 #include "method_dispatcher.h"
 #include "param_validator.h"
+#include "thread_pool.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -244,7 +245,7 @@ static void handle_get_stats(int id, agentos_socket_t client_fd) {
  */
 static void handle_health_check(int id, agentos_socket_t client_fd) {
     bool healthy = false;
-    int ret = sched_service_health_check(g_service, &healthy);
+    (void)sched_service_health_check(g_service, &healthy);
 
     cJSON* result = cJSON_CreateObject();
     cJSON_AddStringToObject(result, "service", "sched_d");
@@ -285,7 +286,7 @@ static void handle_client(agentos_socket_t client_fd) {
 
     cJSON* jsonrpc = cJSON_GetObjectItem(req, "jsonrpc");
     cJSON* method = cJSON_GetObjectItem(req, "method");
-    cJSON* params = cJSON_GetObjectItem(req, "params");
+    (void)cJSON_GetObjectItem(req, "params");
     cJSON* id = cJSON_GetObjectItem(req, "id");
 
     if (!cJSON_IsString(jsonrpc) || strcmp(jsonrpc->valuestring, "2.0") != 0 ||
@@ -429,6 +430,21 @@ int main(int argc, char** argv) {
 
     SVC_LOG_INFO("Scheduler service started successfully");
 
+    thread_pool_config_t tp_config;
+    tp_config.min_threads = 4;
+    tp_config.max_threads = 8;
+    tp_config.queue_size = 256;
+    tp_config.idle_timeout_ms = 30000;
+    thread_pool_t* pool = thread_pool_create(&tp_config);
+    if (!pool) {
+        SVC_LOG_ERROR("Failed to create thread pool");
+        agentos_socket_close(server_fd);
+        sched_service_destroy(g_service);
+        agentos_mutex_destroy(&g_running_lock);
+        agentos_socket_cleanup();
+        return 1;
+    }
+
     /* 主事件循环 */
     while (g_running) {
         agentos_socket_t client_fd = agentos_socket_accept(server_fd, 5000);
@@ -437,12 +453,16 @@ int main(int argc, char** argv) {
             continue;
         }
 
-        /* 处理客户端请求 */
-        handle_client(client_fd);
+        /* 并发处理客户端请求 */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-function-type"
+        thread_pool_submit(pool, (thread_task_fn_t)handle_client, (void*)(uintptr_t)client_fd);
+#pragma GCC diagnostic pop
     }
 
     /* 清理资源 */
     SVC_LOG_INFO("Scheduler service stopping...");
+    thread_pool_destroy(pool);
     agentos_socket_close(server_fd);
     sched_service_destroy(g_service);
     if (g_dispatcher) method_dispatcher_destroy(g_dispatcher);

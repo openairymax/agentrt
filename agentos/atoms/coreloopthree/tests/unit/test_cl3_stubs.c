@@ -58,6 +58,17 @@ agentos_error_t agentos_compensation_compensate(
 /* memoryrov FFI stubs - signatures must exactly match memoryrovol.h */
 static int g_memoryrov_stub_initialized = 0;
 
+/* syscall stubs */
+void* agentos_sys_memory_search(const char* query, size_t limit) {
+    (void)query; (void)limit;
+    return NULL;
+}
+
+void agentos_sys_free(void* ptr) {
+    (void)ptr;
+    free(ptr);
+}
+
 agentos_memoryrov_handle_t* agentos_memoryrov_create(void) {
     g_memoryrov_stub_initialized = 1;
     return (agentos_memoryrov_handle_t*)&g_memoryrov_stub_initialized;

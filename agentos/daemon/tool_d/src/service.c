@@ -397,8 +397,26 @@ int tool_service_execute_stream(tool_service_t* svc,
     }
 
     /* 4. 执行工具（带流式回调） */
-    int ret = tool_executor_run_async(svc->executor, meta, req->params_json,
-                                      callback, callback_data, out_result);
+    tool_result_t* res = NULL;
+    int ret = tool_executor_run(svc->executor, meta, req->params_json, &res);
+
+    if (ret == 0 && res) {
+        if (callback) {
+            if (res->output) {
+                callback(res->output, 0, callback_data);
+            }
+            if (res->error) {
+                callback(res->error, 1, callback_data);
+            }
+        }
+        if (out_result) {
+            *out_result = res;
+        }
+    } else {
+        if (out_result) {
+            *out_result = res;
+        }
+    }
     
     if (ret != 0) {
         SVC_LOG_ERROR("Tool stream execution failed: %s, error: %d", req->tool_id, ret);

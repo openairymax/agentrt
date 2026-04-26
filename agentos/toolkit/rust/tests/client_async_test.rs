@@ -4,7 +4,7 @@
 //
 // 测试异步客户端的超时、并发和错误处理
 
-use agentos::*;
+use agentos_rs::*;
 use std::time::Duration;
 use tokio::time::sleep;
 

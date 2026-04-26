@@ -142,9 +142,41 @@ static uint64_t get_timestamp_ns(void) {
     return (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
 }
 
-static double calculate_health_score(void) {
-    /* 简化实现：返回固定值 */
-    return 0.95;
+static double calculate_health_score(const agentos_monitoring_t* monitoring) {
+    if (!monitoring) return 0.0;
+
+    double score = 1.0;
+
+    uint64_t total_ops = 0;
+    uint64_t total_errors = 0;
+    for (int i = 0; i < 4; i++) {
+        total_ops += monitoring->layer_data[i].write_count + monitoring->layer_data[i].read_count;
+        total_errors += monitoring->layer_data[i].error_count;
+    }
+    if (total_ops > 0) {
+        double error_rate = (double)total_errors / (double)total_ops;
+        score -= error_rate * 0.5;
+    }
+
+    if (monitoring->resource_data.max_memory_bytes > 0) {
+        double mem_usage = (double)monitoring->resource_data.memory_usage_bytes /
+                          (double)monitoring->resource_data.max_memory_bytes;
+        if (mem_usage > 0.8) {
+            score -= (mem_usage - 0.8) * 2.0;
+        }
+    }
+
+    if (monitoring->retrieval_data.query_count > 0) {
+        double avg_latency = (double)monitoring->retrieval_data.total_query_time_ns /
+                            (double)monitoring->retrieval_data.query_count;
+        if (avg_latency > (double)WARNING_HIGH_LATENCY_MS * 1000000.0) {
+            score -= 0.1;
+        }
+    }
+
+    if (score < 0.0) score = 0.0;
+    if (score > 1.0) score = 1.0;
+    return score;
 }
 
 /* ==================== 监控管理器 ==================== */
@@ -308,7 +340,7 @@ agentos_error_t agentos_monitoring_health_check(agentos_monitoring_t* monitoring
     monitoring->last_health_check_ns = get_timestamp_ns();
 
     /* 计算健康分数 */
-    double health_score = calculate_health_score();
+    double health_score = calculate_health_score(monitoring);
     
     health_status_t status = HEALTH_STATUS_HEALTHY;
     if (health_score < 0.5) {

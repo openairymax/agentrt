@@ -159,7 +159,7 @@ static void handle_record_metric(cJSON* params, int id, agentos_socket_t client_
     }
 
     metric.name = strdup(mname);
-    metric.description = get_string_field(metric_json, "description", NULL);
+    metric.description = (char*)get_string_field(metric_json, "description", NULL);
     metric.type = (metric_type_t)get_int_field(metric_json, "type", 0);
     metric.value = get_double_field(metric_json, "value", 0.0);
 
@@ -230,11 +230,11 @@ static void handle_trigger_alert(cJSON* params, int id, agentos_socket_t client_
     }
 
     alert_info_t alert = {0};
-    alert.alert_id = get_string_field(alert_json, "alert_id", NULL);
-    alert.message = get_string_field(alert_json, "message", NULL);
+    alert.alert_id = (char*)get_string_field(alert_json, "alert_id", NULL);
+    alert.message = (char*)get_string_field(alert_json, "message", NULL);
     alert.level = (alert_level_t)get_int_field(alert_json, "level", 0);
-    alert.service_name = get_string_field(alert_json, "service_name", NULL);
-    alert.resource_id = get_string_field(alert_json, "resource_id", NULL);
+    alert.service_name = (char*)get_string_field(alert_json, "service_name", NULL);
+    alert.resource_id = (char*)get_string_field(alert_json, "resource_id", NULL);
 
     alert.timestamp = (uint64_t)time(NULL) * 1000;
     alert.is_resolved = false;
@@ -367,7 +367,7 @@ static void handle_client(agentos_socket_t client_fd) {
 
     cJSON* jsonrpc = cJSON_GetObjectItem(req, "jsonrpc");
     cJSON* method = cJSON_GetObjectItem(req, "method");
-    cJSON* params = cJSON_GetObjectItem(req, "params");
+    (void)cJSON_GetObjectItem(req, "params");
     cJSON* id = cJSON_GetObjectItem(req, "id");
 
     if (!cJSON_IsString(jsonrpc) || strcmp(jsonrpc->valuestring, "2.0") != 0 ||
@@ -524,7 +524,10 @@ int main(int argc, char** argv) {
     while (g_running) {
         agentos_socket_t client_fd = agentos_socket_accept(server_fd, 5000);
         if (client_fd == AGENTOS_INVALID_SOCKET) continue;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-function-type"
         thread_pool_submit(pool, (thread_task_fn_t)handle_client, (void*)(uintptr_t)client_fd);
+#pragma GCC diagnostic pop
     }
 
     /* 清理资源 */

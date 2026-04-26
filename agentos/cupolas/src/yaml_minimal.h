@@ -91,6 +91,7 @@ bool yaml_as_bool(struct yaml_node* node, bool default_val);
 bool yaml_has_key(struct yaml_node* node, const char* key);
 
 void yaml_dump(struct yaml_node* node, char* buf, size_t bufsize, int indent);
+char* yaml_serialize(yaml_document_t* doc);
 
 #ifdef __cplusplus
 }

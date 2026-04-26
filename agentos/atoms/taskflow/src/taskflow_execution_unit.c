@@ -47,19 +47,19 @@ static agentos_error_t taskflow_unit_execute_impl(
     void** out_output)
 {
     if (!unit || !input_data || !out_output) {
-        return AGENTOS_ERROR_INVALID_ARG;
+        return TASKFLOW_ERROR_INVALID_ARG;
     }
     
     taskflow_unit_private_t* private = (taskflow_unit_private_t*)unit->execution_unit_data;
     if (!private || !private->initialized) {
-        return AGENTOS_ERROR_NOT_INITIALIZED;
+        return TASKFLOW_ERROR_NOT_INITIALIZED;
     }
     
     // 解析输入数据
     const agentos_task_t* agentos_task = (const agentos_task_t*)input_data;
     taskflow_task_input_t* task_input = taskflow_parse_task_input(agentos_task);
     if (!task_input) {
-        return AGENTOS_ERROR_INVALID_ARG;
+        return TASKFLOW_ERROR_INVALID_ARG;
     }
     
     // 创建执行上下文
@@ -67,7 +67,7 @@ static agentos_error_t taskflow_unit_execute_impl(
         (taskflow_execution_context_t*)calloc(1, sizeof(taskflow_execution_context_t));
     if (!context) {
         taskflow_task_input_destroy(task_input);
-        return AGENTOS_ERROR_MEMORY;
+        return TASKFLOW_ERROR_MEMORY;
     }
     
     context->unit_private = private;
@@ -79,7 +79,7 @@ static agentos_error_t taskflow_unit_execute_impl(
     if (!context->output) {
         free(context);
         taskflow_task_input_destroy(task_input);
-        return AGENTOS_ERROR_MEMORY;
+        return TASKFLOW_ERROR_MEMORY;
     }
     
     // 执行图计算
@@ -147,7 +147,7 @@ cleanup:
     context->output->result_data = context;
     context->output->result_data_size = sizeof(taskflow_execution_context_t);
     
-    return AGENTOS_SUCCESS;
+    return TASKFLOW_SUCCESS;
 }
 
 // 执行单元销毁方法（接口实现）
@@ -374,13 +374,13 @@ agentos_error_t taskflow_register_unit(
     const taskflow_unit_config_t* config)
 {
     if (!engine || !unit_name || !config) {
-        return AGENTOS_ERROR_INVALID_ARG;
+        return TASKFLOW_ERROR_INVALID_ARG;
     }
     
     // 创建TaskFlow执行单元
     agentos_execution_unit_t* unit = taskflow_unit_create(config);
     if (!unit) {
-        return AGENTOS_ERROR_MEMORY;
+        return TASKFLOW_ERROR_MEMORY;
     }
     
     // 注册到执行引擎
