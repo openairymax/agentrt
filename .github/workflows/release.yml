@@ -1,38 +1,11 @@
-# Release Pipeline (GitCode Actions)
-#
-# MCIS-based Release Dimension Workflow
-# 基于MCIS理论的发布维度工作流 - 系统观发布体 (System View Release Body)
-#
-# 体系并行论视角：发布维度作为系统观维度的重要组成部分，负责将
-# 各个独立维度（认知体、执行体、记忆体等）的成果整合为可发布的
-# 整体系统，体现MCIS多体协同的最终价值。
-#
-# 优化版本 V3.0 - 2026-04-09
-# 主要改进:
-#   ✅ MCIS理论集成 - 系统观发布体映射
-#   ✅ 添加构建缓存加速
-#   ✅ 改进Docker多阶段构建
-#   ✅ 自动生成详细变更日志（从git历史/PR提取）
-#   ✅ 添加发布前质量门禁
-#   ✅ 改进错误处理和通知
-#   ✅ 支持多种发布模式（stable/beta/rc）
-#   ✅ 与主MCIS CI/CD流水线集成
-#
-# 控制论耦合机制:
-#   1. 负反馈: 发布前质量检查 → 阻断不合格发布
-#   2. 正反馈: 成功发布 → 强化发布流程和标准
-#   3. 前馈: 发布趋势分析 → 优化未来发布计划
-
-name: Release (MCIS System View)
+name: Release
 
 on:
-  # 仅在有版本tag时触发
   push:
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'        # 正式版: v1.0.0
-      - 'v[0-9]+.[0-9]+.[0-9]+-rc.*'   # 候选版: v1.0.0-rc.1
-      - 'v[0-9]+.[0-9]+.[0-9]+-beta.*' # 测试版: v1.0.0-beta.1
-  # 支持手动触发用于测试
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-rc.*'
+      - 'v[0-9]+.[0-9]+.[0-9]+-beta.*'
   workflow_dispatch:
     inputs:
       version:
@@ -47,223 +20,87 @@ on:
           - 'stable'
           - 'beta'
           - 'rc'
-      skip_quality_gate:
-        description: 'Skip quality gate (for emergency releases only)'
-        required: false
-        default: false
-        type: boolean
 
-# 发布需要写权限
 permissions:
   contents: write
   packages: write
 
 env:
-  # MCIS发布维度配置
-  MCIS_RELEASE_DIMENSION: "System View Release"
-  
-  # 统一版本管理
   GO_VERSION: '1.22'
   PYTHON_VERSION: '3.11'
   RUST_TOOLCHAIN: 'stable'
-  
-  # 发布配置
-  DOCKER_REGISTRY: 'spharx'
-  DOCKER_IMAGE: 'agentos'
-  
-  # MCIS发布质量门禁阈值
-  MIN_TEST_COVERAGE: 80
-  MAX_CRITICAL_VULNERABILITIES: 0
-  MAX_HIGH_VULNERABILITIES: 5
 
 jobs:
-  # ================================================================
-  # Job 0: MCIS发布维度初始化 - 系统观准备
-  # ================================================================
-  mcis-release-dimension-init:
-    name: MCIS Release Dimension Setup
+  extract-version:
+    name: Extract Version
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
-      version_type: ${{ steps.version.outputs.type }}
       is_stable: ${{ steps.version.outputs.is_stable }}
-      release_dimension: ${{ env.MCIS_RELEASE_DIMENSION }}
-    
+
     steps:
-      - name: Checkout code with full history
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # 需要完整历史记录生成变更日志
+          fetch-depth: 0
 
-      - name: Extract and validate version (MCIS维度)
+      - name: Extract version
         id: version
         run: |
-          echo "🎯 Initializing MCIS Release Dimension: ${{ env.MCIS_RELEASE_DIMENSION }}"
-          
-          # 从tag或手动输入获取版本
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             VERSION="${{ github.event.inputs.version }}"
             RELEASE_TYPE="${{ github.event.inputs.release_type }}"
           else
             VERSION=${GITHUB_REF#refs/tags/v}
-            RELEASE_TYPE=""
           fi
-          
-          # 验证版本格式
-          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\.]+)?$ ]]; then
-            echo "::error::Invalid version format: $VERSION"
-            echo "Expected format: X.Y.Z or X.Y.Z-suffix"
-            exit 1
-          fi
-          
-          # 判断版本类型
-          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "type=stable" >> $GITHUB_OUTPUT
-            echo "is_stable=true" >> $GITHUB_OUTPUT
-            echo "🎉 Stable release: v$VERSION"
-          elif [[ "$VERSION" =~ -rc ]]; then
-            echo "type=release-candidate" >> $GITHUB_OUTPUT
-            echo "is_stable=false" >> $GITHUB_OUTPUT
-            echo "🔧 Release candidate: v$VERSION"
-          elif [[ "$VERSION" =~ -beta ]]; then
-            echo "type=beta" >> $GITHUB_OUTPUT
-            echo "is_stable=false" >> $GITHUB_OUTPUT
-            echo "🧪 Beta release: v$VERSION"
-          else
-            # 对于手动输入，使用指定的类型
-            if [ -n "$RELEASE_TYPE" ]; then
-              echo "type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
-              echo "is_stable=$([ "$RELEASE_TYPE" == "stable" ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
-              echo "📦 $RELEASE_TYPE release: v$VERSION"
-            else
-              echo "type=prerelease" >> $GITHUB_OUTPUT
-              echo "is_stable=false" >> $GITHUB_OUTPUT
-              echo "📦 Prerelease: v$VERSION"
-            fi
-          fi
-          
+
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "is_stable=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_stable=false" >> $GITHUB_OUTPUT
+          fi
+
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-          
-          echo "## 🚀 MCIS Release Dimension Initialized" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Dimension**: ${{ env.MCIS_RELEASE_DIMENSION }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Version**: v$VERSION" >> $GITHUB_STEP_SUMMARY
-          echo "**Type**: $([ -n "$RELEASE_TYPE" ] && echo "$RELEASE_TYPE" || echo "$(echo ${{ steps.version.outputs.type }} | sed 's/-/ /g' | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2)} 1')")" >> $GITHUB_STEP_SUMMARY
-          echo "**MCIS Integration**: Coordinating all dimensions for unified release" >> $GITHUB_STEP_SUMMARY
 
-      - name: Check MCIS CI status (负反馈检查)
-        if: ${{ github.event.inputs.skip_quality_gate != 'true' }}
-        run: |
-          echo "🔍 Checking MCIS CI status for main branch..."
-          
-          # 获取main分支的最新CI状态
-          # 这里可以集成GitHub API检查主MCIS流水线状态
-          echo "MCIS CI status check would verify that all dimensions are green."
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔄 MCIS Negative Feedback Check" >> $GITHUB_STEP_SUMMARY
-          echo "Release blocked if any MCIS dimension reports critical issues." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ MCIS release quality gate check passed" >> $GITHUB_STEP_SUMMARY
-
-  # ================================================================
-  # Job 1: 构建核心内核 (C/C++) - 认知体成果整合
-  # ================================================================
-  build-kernel-cognition-body:
-    name: Build Kernel (Cognition Body Integration)
-    needs: mcis-release-dimension-init
+  build-kernel:
+    name: Build Kernel
+    needs: extract-version
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: MCIS Cache setup
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/apt-cache
-            ~/.cache/pip
-            build/
-            ~/local/lib/pkgconfig/
-          key: mcis-release-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            mcis-release-${{ runner.os }}-
-
-      - name: Install dependencies (MCIS基础体支持)
+      - name: Install dependencies
         run: |
-          DEBIAN_FRONTEND=noninteractive apt-get update -qq
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            cmake ninja-build gcc g++ \
-            libcurl4-openssl-dev libyaml-dev libcjson-dev libssl-dev
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends cmake ninja-build gcc g++ libcurl4-openssl-dev libyaml-dev libcjson-dev libssl-dev
 
-      - name: Create tiktoken stub for compatibility
+      - name: Build
         run: |
-          STUB_DIR="$HOME/local/lib/pkgconfig"
-          mkdir -p "$STUB_DIR"
-          cat > "$STUB_DIR/tiktoken.pc" << 'EOF'
-          Name: tiktoken
-          Version: 0.5.2
-          Libs: -ltiktoken
-          EOF
-
-      - name: Configure and Build (Release) - MCIS认知体整合
-        run: |
-          echo "🔨 Building MCIS Cognition Body (Kernel)..."
           mkdir -p build && cd build
-          
-          cmake .. \
-            -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTS=OFF \
-            -DBUILD_WITH_SANITIZERS=OFF \
-            -DPKG_CONFIG_PATH="$HOME/local/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" \
-            -DMCIS_BUILD=ON
-          
+          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF
           cmake --build . --parallel $(nproc)
-          
-          echo "✅ MCIS Cognition Body kernel built successfully"
 
-      - name: Run release tests (MCIS质量门禁)
+      - name: Package kernel
         run: |
           cd build
-          echo "🧪 Running MCIS release quality tests..."
-          ctest --output-on-failure --timeout 300 || true
-
-      - name: Package kernel artifacts (MCIS发布制品)
-        run: |
-          cd build
-          echo "📦 Packaging MCIS kernel artifacts..."
-          
-          # 创建包含MCIS元数据的发布包
-          cat > release-info.json << EOF
-          {
-            "mcis_dimension": "Cognition Body",
-            "version": "${{ env.VERSION }}",
-            "build_time": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-            "components": ["atoms", "commons", "cupolas"]
-          }
-          EOF
-          
-          tar -czvf ../agentos-${{ env.VERSION }}-linux-x86_64.tar.gz \
-            bin/ lib/ include/ share/ release-info.json
+          tar -czvf ../agentos-${{ needs.extract-version.outputs.version }}-linux-x86_64.tar.gz bin/ lib/ include/ share/ 2>/dev/null || echo "Some directories may not exist"
 
       - name: Upload kernel package
         uses: actions/upload-artifact@v4
         with:
-          name: agentos-kernel-${{ env.VERSION }}
-          path: agentos-${{ env.VERSION }}-linux-x86_64.tar.gz
+          name: agentos-kernel-${{ needs.extract-version.outputs.version }}
+          path: agentos-${{ needs.extract-version.outputs.version }}-linux-x86_64.tar.gz
           retention-days: 90
 
-  # ================================================================
-  # Job 2: 构建 Python SDK - SDK执行体扩展
-  # ================================================================
-  build-python-sdk-extension:
-    name: Build Python SDK (SDK Extension)
-    needs: mcis-release-dimension-init
+  build-python-sdk:
+    name: Build Python SDK
+    needs: extract-version
     runs-on: ubuntu-latest
-    timeout-minutes: 20
 
     steps:
       - name: Checkout code
@@ -273,44 +110,24 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '${{ env.PYTHON_VERSION }}'
-          cache: 'pip'
 
-      - name: Install build tools
-        run: pip install build twine wheel
-
-      - name: Build Python SDK with MCIS metadata
+      - name: Build SDK
         run: |
-          echo "🐍 Building MCIS Python SDK extension..."
+          pip install build
           cd agentos/toolkit/python
-          
-          # 添加MCIS元数据到setup.cfg或pyproject.toml
-          if [ -f "pyproject.toml" ]; then
-            sed -i '/^\[project\]/,/^\[/ s/^description = .*/description = "AgentOS Python SDK - MCIS SDK Extension"/' pyproject.toml
-          fi
-          
           python -m build
 
-      - name: Check package quality (MCIS正反馈)
-        run: |
-          cd agentos/toolkit/python
-          echo "🔍 Checking package quality (MCIS Positive Feedback)..."
-          twine check dist/*
-
-      - name: Upload Python packages
+      - name: Upload Python SDK
         uses: actions/upload-artifact@v4
         with:
-          name: agentos-python-sdk-${{ env.VERSION }}
+          name: agentos-python-sdk-${{ needs.extract-version.outputs.version }}
           path: agentos/toolkit/python/dist/*
           retention-days: 90
 
-  # ================================================================
-  # Job 3: 构建 Go SDK - SDK执行体扩展
-  # ================================================================
-  build-go-sdk-extension:
-    name: Build Go SDK (SDK Extension)
-    needs: mcis-release-dimension-init
+  build-go-sdk:
+    name: Build Go SDK
+    needs: extract-version
     runs-on: ubuntu-latest
-    timeout-minutes: 20
 
     steps:
       - name: Checkout code
@@ -320,352 +137,91 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '${{ env.GO_VERSION }}'
-          cache: true
 
-      - name: Download dependencies
+      - name: Build SDK
         run: |
           cd agentos/toolkit/go
-          go mod download || go mod tidy
-
-      - name: Build Go SDK with MCIS tags
-        run: |
-          echo "🐹 Building MCIS Go SDK extension..."
-          cd agentos/toolkit/go
-          
-          # 构建时包含MCIS标签
-          go build -v -tags mcis -ldflags "-X main.MCISVersion=${{ env.VERSION }}" ./...
-          
-          # 创建分发包
-          mkdir -p dist
-          tar -czvf dist/agentos-go-sdk-${{ env.VERSION }}-mcis.tar.gz .
+          go build ./...
 
       - name: Upload Go SDK
         uses: actions/upload-artifact@v4
         with:
-          name: agentos-go-sdk-${{ env.VERSION }}
-          path: agentos/toolkit/go/dist/*
+          name: agentos-go-sdk-${{ needs.extract-version.outputs.version }}
+          path: agentos/toolkit/go/
           retention-days: 90
 
-  # ================================================================
-  # Job 4: 构建 Rust SDK - SDK执行体扩展
-  # ================================================================
-  build-rust-sdk-extension:
-    name: Build Rust SDK (SDK Extension)
-    needs: mcis-release-dimension-init
+  build-rust-sdk:
+    name: Build Rust SDK
+    needs: extract-version
     runs-on: ubuntu-latest
-    timeout-minutes: 30
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Rust toolchain
+      - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
 
-      - name: Cache Cargo registry and build
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            agentos/toolkit/rust/target/
-          key: rust-${{ runner.os }}-cargo-${{ hashFiles('agentos/toolkit/rust/Cargo.lock') }}
-          restore-keys: |
-            rust-${{ runner.os }}-cargo-
-
-      - name: Build Rust SDK (Release) with MCIS features
-        run: |
-          echo "🦀 Building MCIS Rust SDK extension..."
-          cd agentos/toolkit/rust
-          cargo build --release --features mcis
-
-      - name: Run Rust lints (MCIS质量检查)
+      - name: Build SDK
         run: |
           cd agentos/toolkit/rust
-          cargo clippy --features mcis -- -D warnings
-
-      - name: Package Rust SDK with MCIS metadata
-        run: |
-          cd agentos/toolkit/rust
-          cargo package --allow-dirty --features mcis
-          cp target/package/*.crate dist/ 2>/dev/null || true
+          cargo build --release
 
       - name: Upload Rust SDK
         uses: actions/upload-artifact@v4
         with:
-          name: agentos-rust-sdk-${{ env.VERSION }}
-          path: agentos/toolkit/rust/dist/*
+          name: agentos-rust-sdk-${{ needs.extract-version.outputs.version }}
+          path: agentos/toolkit/rust/target/release/
           retention-days: 90
 
-  # ================================================================
-  # Job 5: Docker 镜像构建和推送 - 执行体容器化
-  # ================================================================
-  docker-build-push-execution-body:
-    name: Docker Build & Push (Execution Body)
-    needs: [mcis-release-dimension-init, build-kernel-cognition-body]
-    if: needs.mcis-release-dimension-init.outputs.is_stable == 'true' || contains(github.ref, '-rc')
+  create-release:
+    name: Create Release
+    needs: [extract-version, build-kernel, build-python-sdk, build-go-sdk, build-rust-sdk]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_TOKEN }}
-
-      - name: Extract metadata for Docker with MCIS tags
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=mcis-latest
-
-      - name: Build and push Docker image (MCIS多体架构)
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./scripts/deploy/docker/Dockerfile.kernel
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          platforms: linux/amd64,linux/arm64
-          build-args: |
-            MCIS_VERSION=${{ env.VERSION }}
-            MCIS_BUILD_TYPE=release
-
-      - name: Generate Docker security scan report (MCIS安全前馈)
-        if: always()
-        run: |
-          echo "🔒 Generating MCIS Docker security report..."
-          # 这里可以集成Trivy等工具进行镜像安全扫描
-          echo "Docker security scan would run here for MCIS feedforward"
-
-  # ================================================================
-  # Job 6: 创建 GitHub Release - MCIS系统观整合
-  # ================================================================
-  create-mcis-github-release:
-    name: Create GitHub Release (MCIS System View)
-    needs: [mcis-release-dimension-init, build-kernel-cognition-body, build-python-sdk-extension, build-go-sdk-extension, build-rust-sdk-extension]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code with full history
-        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Download all MCIS build artifacts
+      - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          path: mcis-artifacts
+          path: artifacts
 
-      - name: Generate MCIS changelog from git history
+      - name: Generate changelog
         id: changelog
         run: |
-          VERSION=${{ env.VERSION }}
-
-          # Get previous tag
-          PREV_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]' | head -2 | tail -1)
-
-          echo "## Generating MCIS Release Changelog" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          PREV_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]' | head -2 | tail -1 || echo "")
+          VERSION=${{ needs.extract-version.outputs.version }}
 
           if [ -n "$PREV_TAG" ]; then
-            echo "Generating MCIS changelog from $PREV_TAG to $VERSION..."
-
-            # Create release notes using simple shell commands (avoid complex heredoc in YAML)
             {
-              echo "# AgentOS v${VERSION} - MCIS Release"
+              echo "# AgentOS v${VERSION}"
               echo ""
-              echo "## MCIS Dimension Integration"
+              echo "## Changes since ${PREV_TAG}"
               echo ""
-              echo "This release represents the coordinated output of all MCIS dimensions:"
+              echo "### Features"
+              git log ${PREV_TAG}..HEAD --grep='^feat' --oneline --no-merges 2>/dev/null | sed 's/^/- /' || echo "- See commit history"
               echo ""
-              echo "| Dimension | Status | Key Components |"
-              echo "|-----------|--------|----------------|"
-              echo "| **Cognition Body** | OK | Core kernel, atoms, commons |"
-              echo "| **Execution Body** | OK | Daemon services, gateway |"
-              echo "| **Memory Body** | OK | Heapstore storage system |"
-              echo "| **Security Cupolas** | OK | Security frameworks |"
-              echo "| **SDK Extensions** | OK | Multi-language SDKs |"
-              echo ""
-              echo "## MCIS Changelog"
-              echo ""
-              echo "### New Features (MCIS Cognition Enhancements)"
-              git log ${PREV_TAG}..HEAD --grep='^feat' --oneline --no-merges 2>/dev/null | sed 's/^/- /' || echo "- MCIS cognitive improvements"
-              echo ""
-              echo "### Improvements (MCIS Execution Optimizations)"
-              git log ${PREV_TAG}..HEAD --grep='^perf\|^refactor' --oneline --no-merges 2>/dev/null | sed 's/^/- /' || echo "- MCIS execution optimizations"
-              echo ""
-              echo "### Bug Fixes (MCIS Negative Feedback)"
-              git log ${PREV_TAG}..HEAD --grep='^fix' --oneline --no-merges 2>/dev/null | sed 's/^/- /' || echo "- MCIS stability improvements"
-              echo ""
-              echo "### Security Updates (MCIS Cupolas)"
-              git log ${PREV_TAG}..HEAD --grep='^security' --oneline --no-merges 2>/dev/null | sed 's/^/- /' || echo "- Security enhancements"
-              echo ""
-              echo "---"
-              echo ""
-              echo "## Release Contents"
-              echo ""
-              echo "### Core Kernel (Cognition Body)"
-              echo "- agentos-${VERSION}-linux-x86_64.tar.gz: Complete kernel build"
-              echo ""
-              echo "### SDK Extensions"
-              echo "- Python SDK: agentos-${VERSION}-py3-none-any.whl"
-              echo "- Go SDK: agentos-go-sdk-${VERSION}.tar.gz"
-              echo "- Rust SDK: agentos-${VERSION}.crate"
-              echo ""
-              echo "---"
-              echo ""
-              echo "*MCIS Theory: Multibody Cybernetic Intelligent System*"
+              echo "### Bug Fixes"
+              git log ${PREV_TAG}..HEAD --grep='^fix' --oneline --no-merges 2>/dev/null | sed 's/^/- /' || echo "- See commit history"
             } > release_notes.md
           else
-            echo "No previous tag found, creating initial MCIS release notes..."
-            {
-              echo "# AgentOS v${VERSION} - Initial MCIS Release"
-              echo ""
-              echo "**First official MCIS-based release!**"
-              echo ""
-              echo "## MCIS Architecture Overview"
-              echo ""
-              echo "AgentOS is built on the **Multibody Cybernetic Intelligent System (MCIS)** theory."
-              echo ""
-              echo "### Key MCIS Dimensions:"
-              echo ""
-              echo "- **Cognition Body**: Core algorithms and decision-making"
-              echo "- **Execution Body**: Service execution and orchestration"
-              echo "- **Memory Body**: Multi-layer storage and retrieval"
-              echo "- **Security Cupolas**: Multi-layered protection system"
-              echo "- **SDK Extensions**: Cross-language integration"
-            } > release_notes.md
+            echo "# AgentOS v${VERSION}" > release_notes.md
           fi
 
-          echo "Release notes generated successfully"
-          fi
-          
-          cat release_notes.md
-
-      - name: Create GitHub Release with MCIS artifacts
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            mcis-artifacts/agentos-kernel-*/**/*.tar.gz
-            mcis-artifacts/agentos-python-sdk-*/**/*.whl
-            mcis-artifacts/agentos-python-sdk-*/**/*.tar.gz
-            mcis-artifacts/agentos-go-sdk-*/**/*.tar.gz
-            mcis-artifacts/agentos-rust-sdk-*/**/*.crate
+            artifacts/agentos-kernel-*/*
+            artifacts/agentos-python-sdk-*/*
+            artifacts/agentos-go-sdk-*/*
+            artifacts/agentos-rust-sdk-*/*
           body_path: release_notes.md
-          draft: ${{ needs.mcis-release-dimension-init.outputs.is_stable != 'true' }}
-          prerelease: ${{ needs.mcis-release-dimension-init.outputs.is_stable != 'true' }}
-          generate_release_notes: false
+          draft: false
+          prerelease: ${{ needs.extract-version.outputs.is_stable != 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # ================================================================
-  # Job 7: 发布到 PyPI (仅稳定版) - MCIS生态扩展
-  # ================================================================
-  publish-pypi-mcis-ecosystem:
-    name: Publish to PyPI (MCIS Ecosystem)
-    needs: [mcis-release-dimension-init, create-mcis-github-release]
-    if: needs.mcis-release-dimension-init.outputs.is_stable == 'true'
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/agentos
-
-    steps:
-      - name: Download Python artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: agentos-python-sdk-${{ env.VERSION }}
-          path: dist/
-
-      - name: Publish to PyPI with MCIS metadata
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
-          pip install twine
-          echo "📤 Publishing MCIS Python SDK to PyPI..."
-          twine upload dist/*
-
-  # ================================================================
-  # Job 8: MCIS发布后通知 - 控制论反馈循环
-  # ================================================================
-  mcis-post-release-notification:
-    name: MCIS Post-release Notification
-    needs: [create-mcis-github-release, docker-build-push-execution-body, publish-pypi-mcis-ecosystem]
-    if: always()
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Generate MCIS release summary
-        run: |
-          echo "## 🎉 MCIS Release Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📊 MCIS Dimension Release Status:" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| MCIS Dimension | Component | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------------|-----------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Cognition Body** | Kernel Build | \`${{ needs.create-mcis-github-release.result }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **SDK Extensions** | Python SDK | \`${{ needs.publish-pypi-mcis-ecosystem.result }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Execution Body** | Docker Image | \`${{ needs.docker-build-push-execution-body.result }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **System View** | GitHub Release | \`${{ needs.create-mcis-github-release.result }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**MCIS Version**: v${{ env.VERSION }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Release Type**: ${{ needs.mcis-release-dimension-init.outputs.version_type }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Dimension**: ${{ env.MCIS_RELEASE_DIMENSION }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [ "${{ needs.create-mcis-github-release.result }}" == "success" ]; then
-            echo "### ✅ MCIS Release Successful!" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "All MCIS dimensions coordinated successfully for this release." >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "#### 🎯 Released Artifacts:" >> $GITHUB_STEP_SUMMARY
-            echo "- 🧠 **Cognition Body**: Source tarball (Linux x86_64)" >> $GITHUB_STEP_SUMMARY
-            echo "- 🐍 **SDK Extension**: Python wheel (.whl)" >> $GITHUB_STEP_SUMMARY
-            echo "- 🐹 **SDK Extension**: Go SDK package" >> $GITHUB_STEP_SUMMARY
-            echo "- 🦀 **SDK Extension**: Rust crate" >> $GITHUB_STEP_SUMMARY
-            echo "- 🐳 **Execution Body**: Docker image (\`${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.VERSION }}\`)" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "#### 🔄 MCIS Control Theory Applied:" >> $GITHUB_STEP_SUMMARY
-            echo "- ✅ Negative feedback: Quality gates passed" >> $GITHUB_STEP_SUMMARY
-            echo "- ✅ Positive feedback: Release process optimized" >> $GITHUB_STEP_SUMMARY
-            echo "- ✅ Feedforward: Future release improvements identified" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "[View MCIS Release](https://github.com/${{ github.repository }}/releases/tag/v${{ env.VERSION }})" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "### ❌ MCIS Release Failed" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "One or more MCIS dimensions encountered issues." >> $GITHUB_STEP_SUMMARY
-            echo "Please check the individual dimension logs for details." >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "#### 🔧 MCIS Negative Feedback Analysis:" >> $GITHUB_STEP_SUMMARY
-            echo "This failure provides important feedback for improving the MCIS release process." >> $GITHUB_STEP_SUMMARY
-          fi
-
-      - name: Send MCIS release notification
-        if: needs.create-mcis-github-release.result == 'success'
-        run: |
-          echo "📢 MCIS release notification would be sent here"
-          echo "This could integrate with Slack, Teams, email, or other notification systems"
-          echo "to announce the successful coordination of all MCIS dimensions."

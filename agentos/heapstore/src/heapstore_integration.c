@@ -303,7 +303,6 @@ agentos_error_t heapstore_syscall_trace_save(
     record.end_time_ns = (uint64_t)end_time_us * 1000;
     snprintf(record.status, sizeof(record.status), "%d", status);
     if (events_json) {
-        /* attributes 是 void*，这里简化处理 */
         if (strlen(events_json) > 0) {
             record.attributes = strdup(events_json);
             if (!record.attributes) {

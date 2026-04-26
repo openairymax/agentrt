@@ -33,8 +33,11 @@ set(SOURCES
     src/agent.c
     src/skill.c
     src/sandbox.c
+    src/sandbox_permission.c
+    src/sandbox_utils.c
     src/sandbox_quota.c
     src/circuit_breaker.c
+    src/rate_limiter.c
 )
 
 add_library(agentos_syscall STATIC ${SOURCES})

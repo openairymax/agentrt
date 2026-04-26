@@ -347,7 +347,8 @@ int handle_http_request(void* cls, struct MHD_Connection* connection,
             client_ip = MHD_lookup_connection_value(connection, MHD_HEADER_KIND, "X-Real-IP");
         }
         if (!client_ip) {
-            const struct sockaddr* addr = MHD_get_connection_info(connection, MHD_CONNECTION_INFO_CLIENT_ADDRESS);
+            const union MHD_ConnectionInfo* cinfo = MHD_get_connection_info(connection, MHD_CONNECTION_INFO_CLIENT_ADDRESS);
+            const struct sockaddr* addr = cinfo ? (const struct sockaddr*)cinfo->client_addr : NULL;
             if (addr) {
                 char ip_buf[64];
                 if (addr->sa_family == AF_INET) {
@@ -399,7 +400,8 @@ int handle_http_request(void* cls, struct MHD_Connection* connection,
         context->start_time_ns = gateway_time_ns();
         *con_cls = context;
         
-        MHD_get_connection_values(connection, MHD_HEADER_KIND, parse_headers, context);
+        MHD_get_connection_values(connection, MHD_HEADER_KIND,
+            (MHD_KeyValueIterator)parse_headers, context);
         
         return MHD_YES;
     }

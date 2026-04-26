@@ -70,7 +70,7 @@ static const char* A2A_SIGNATURES[] = {
 // 静态辅助函数
 // ============================================================================
 
-static int string_contains_any(const char* str, const char** patterns) {
+static int __attribute__((unused)) string_contains_any(const char* str, const char** patterns) {
     if (!str || !patterns) return 0;
     for (size_t i = 0; patterns[i] != NULL; i++) {
         if (strstr(str, patterns[i]) != NULL) return 1;

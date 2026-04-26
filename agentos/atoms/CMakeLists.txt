@@ -298,6 +298,7 @@ add_subdirectory(corekern)
 add_subdirectory(coreloopthree)
 add_subdirectory(memoryrovol)
 add_subdirectory(syscall)
+add_subdirectory(taskflow)
 
 # 安装配置
 # 库文件安装

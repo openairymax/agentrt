@@ -95,13 +95,25 @@ agentos_coordinator_strategy_t* agentos_dual_model_coordinator_create(
     const char* secondary1,
     const char* secondary2,
     agentos_llm_service_t* llm) {
-    (void)secondary2;
-    (void)llm;
 
     agentos_coordinator_base_t* base = NULL;
-    agentos_error_t err = agentos_coordinator_dual_model_create(
-        primary_model, secondary1, 0.7f, 0.3f, &base);
-    if (err != AGENTOS_SUCCESS || !base) return NULL;
+
+    if (secondary2 && secondary2[0]) {
+        const char* model_names[3] = { primary_model, secondary1, secondary2 };
+        float weights[3] = { 0.5f, 0.3f, 0.2f };
+        agentos_error_t err = agentos_coordinator_weighted_create(
+            model_names, weights, 3, &base);
+        if (err != AGENTOS_SUCCESS || !base) return NULL;
+    } else {
+        agentos_error_t err = agentos_coordinator_dual_model_create(
+            primary_model, secondary1, 0.7f, 0.3f, &base);
+        if (err != AGENTOS_SUCCESS || !base) return NULL;
+    }
+
+    strategy_adapter_data_t* adapter = (strategy_adapter_data_t*)AGENTOS_MALLOC(sizeof(strategy_adapter_data_t));
+    if (!adapter) return NULL;
+    adapter->base = base;
+    adapter->base->llm = llm;
 
     return wrap_base_to_strategy(base);
 }
@@ -110,12 +122,13 @@ agentos_coordinator_strategy_t* agentos_majority_coordinator_create(
     const char** model_names,
     size_t model_count,
     agentos_llm_service_t* llm) {
-    (void)llm;
 
     agentos_coordinator_base_t* base = NULL;
     agentos_error_t err = agentos_coordinator_majority_create(
         model_count, 0.5f, &base);
     if (err != AGENTOS_SUCCESS || !base) return NULL;
+
+    base->llm = llm;
 
     return wrap_base_to_strategy(base);
 }

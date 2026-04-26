@@ -33,6 +33,7 @@
  * @param src 源字符串
  * @return 写入后的结束位置
  */
+static char* safe_strcat(char* dest, size_t dest_size, const char* src) __attribute__((unused));
 static char* safe_strcat(char* dest, size_t dest_size, const char* src) {
     size_t dest_len = strlen(dest);
     size_t remaining = dest_size - dest_len - 1;
@@ -200,7 +201,7 @@ llm_service_t* llm_service_create(const char* config_path) {
                 int rule_count = 0;
                 pricing_rule_t* rules = load_pricing_rules(root, &rule_count);
                 if (rules && rule_count > 0) {
-                    svc->rules = rules;
+                    svc->rules = (void**)rules;
                     svc->rule_count = rule_count;
                     SVC_LOG_INFO("Loaded %d pricing rules", rule_count);
                 } else if (rules) {
@@ -237,7 +238,7 @@ llm_service_t* llm_service_create(const char* config_path) {
     }
 
     /* 创建成本追踪器 */
-    svc->cost = cost_tracker_create(svc->rules, svc->rule_count);
+    svc->cost = cost_tracker_create((const pricing_rule_t*)svc->rules, (int)svc->rule_count);
     if (!svc->cost) {
         SVC_LOG_ERROR("Failed to create cost tracker");
         cache_destroy(svc->cache);
@@ -289,7 +290,7 @@ void llm_service_destroy(llm_service_t* svc) {
     }
     
     if (svc->rules) {
-        free_pricing_rules(svc->rules, svc->rule_count);
+        free_pricing_rules((pricing_rule_t*)svc->rules, (int)svc->rule_count);
         svc->rules = NULL;
         svc->rule_count = 0;
     }
@@ -584,7 +585,7 @@ int svc_config_load(const char* config_path, service_config_t* cfg) {
     if (item && cJSON_IsString(item)) {
         size_t enc_len = strlen(item->valuestring);
         if (enc_len < sizeof(cfg->token_encoding)) {
-            memcpy(cfg->token_encoding, item->valuestring, enc_len + 1);
+            memcpy((char*)cfg->token_encoding, item->valuestring, enc_len + 1);
         }
     }
     

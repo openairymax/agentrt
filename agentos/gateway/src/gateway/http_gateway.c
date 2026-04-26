@@ -103,7 +103,7 @@ static bool is_cors_origin_allowed(const http_gateway_t* gateway, const char* or
  * @param content_len 内容长度
  * @return MHD 响应对象
  */
-static struct MHD_Response* create_http_response_ex(
+static struct MHD_Response* __attribute__((unused)) create_http_response_ex(
     http_gateway_t* gateway,
     struct MHD_Connection* connection,
     int status_code, 
@@ -180,7 +180,7 @@ struct MHD_Response* create_http_response(int status_code, const char* content, 
 /**
  * @brief 解析HTTP请求头
  */
-static int parse_headers(void* cls, enum MHD_ValueKind kind, const char* key, const char* value) {
+static int __attribute__((unused)) parse_headers(void* cls, enum MHD_ValueKind kind, const char* key, const char* value) {
     (void)cls;
     (void)kind;
     (void)key;
@@ -240,7 +240,7 @@ typedef struct {
  * @param user_data 指向 http_handler_adapter_t 的指针
  * @return JSON 响应字符串（需调用者 free），或 NULL
  */
-static char* http_handler_adapter(void* request, void* user_data) {
+static char* __attribute__((unused)) http_handler_adapter(void* request, void* user_data) {
     http_handler_adapter_t* adapter = (http_handler_adapter_t*)user_data;
     if (!adapter || !adapter->public_handler) return NULL;
 
@@ -258,6 +258,27 @@ static char* http_handler_adapter(void* request, void* user_data) {
     /* response_json 的所有权转移给调用者 */
     return response_json;
 }
+
+typedef struct {
+    gateway_internal_handler_t internal_handler;
+    void* internal_data;
+} internal_to_public_adapter_t;
+
+static int internal_handler_public_wrapper(const char* request_json, char** response_json, void* user_data) {
+    internal_to_public_adapter_t* adapter = (internal_to_public_adapter_t*)user_data;
+    if (!adapter || !adapter->internal_handler) {
+        *response_json = NULL;
+        return -1;
+    }
+    char* resp = adapter->internal_handler((void*)request_json, adapter->internal_data);
+    if (resp) {
+        *response_json = resp;
+        return 0;
+    }
+    *response_json = NULL;
+    return -1;
+}
+
 /**
  * @brief 处理JSON-RPC请求（使用统一RPC处理器）
  * @param gateway 网关实例
@@ -269,21 +290,27 @@ char* handle_jsonrpc_request(http_gateway_t* gateway, http_request_context_t* co
     
     /* 检查是否有多协议处理器和原始数据 */
     if (gateway->protocol_handler && context->upload_data && context->upload_data_size > 0) {
-        /* 使用多协议处理器处理原始请求数据 */
+        internal_to_public_adapter_t adapter = {
+            .internal_handler = gateway->handler,
+            .internal_data = gateway->handler_data
+        };
         result = gateway_protocol_handle_request(
             gateway->protocol_handler,
             context->upload_data,
             context->upload_data_size,
-            AGENTOS_PROTOCOL_COUNT,  /* 自动检测协议类型 */
-            gateway->handler,
-            gateway->handler_data
+            AGENTOS_PROTOCOL_COUNT,
+            internal_handler_public_wrapper,
+            &adapter
         );
     } else if (context->json_request) {
-        /* 使用原有的JSON-RPC处理器 */
+        internal_to_public_adapter_t adapter = {
+            .internal_handler = gateway->handler,
+            .internal_data = gateway->handler_data
+        };
         result = gateway_rpc_handle_request(
             context->json_request,
-            gateway->handler,
-            gateway->handler_data
+            internal_handler_public_wrapper,
+            &adapter
         );
     } else {
         /* 无效请求 */
@@ -335,6 +362,8 @@ static agentos_error_t http_gateway_start(void* gateway_impl) {
     if (env_conn) { unsigned long v = strtoul(env_conn, NULL, 10); if (v > 0) conn_limit = (unsigned int)v; }
     if (env_timeout) { unsigned long v = strtoul(env_timeout, NULL, 10); if (v > 0) conn_timeout = (unsigned int)v; }
     
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wincompatible-pointer-types"
     gateway->daemon = MHD_start_daemon(
         MHD_USE_EPOLL_INTERNAL_THREAD | MHD_USE_TURBO,
         gateway->port,
@@ -346,6 +375,7 @@ static agentos_error_t http_gateway_start(void* gateway_impl) {
         MHD_OPTION_THREAD_POOL_SIZE, 4,
         MHD_OPTION_NOTIFY_COMPLETED, http_request_completed_callback, NULL,
         MHD_OPTION_END);
+#pragma GCC diagnostic pop
     
     if (!gateway->daemon) {
         return AGENTOS_EBUSY;
