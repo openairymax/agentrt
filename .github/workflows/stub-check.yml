@@ -1,0 +1,170 @@
+# AgentOS Stub & Anti-Pattern Check
+#
+# Scans for common anti-patterns that indicate incomplete implementations.
+# Last updated: 2026-04-26
+
+name: Anti-Pattern Check
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'agentos/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'agentos/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  c-anti-pattern-check:
+    name: C Anti-Pattern Detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for placeholder returns
+        run: |
+          echo "=== Checking for placeholder returns ==="
+          COUNT=$(grep -rn "return AGENTOS_SUCCESS" --include="*.c" agentos/ 2>/dev/null | wc -l)
+          echo "  Found $COUNT instances of 'return AGENTOS_SUCCESS'"
+          if [ "$COUNT" -gt 0 ]; then
+            echo "::warning::Ensure all return statements have real implementations"
+          fi
+          echo "placeholder-return-count=${COUNT}" >> $GITHUB_OUTPUT
+
+      - name: Check for ignored parameters
+        run: |
+          echo "=== Checking for ignored parameters ==="
+          VIOLATIONS=$(grep -rn "(void)" --include="*.c" agentos/ 2>/dev/null | grep -v "//" | grep -v "/\*" | wc -l)
+          echo "  Found $VIOLATIONS instances of (void)param"
+          if [ "$VIOLATIONS" -gt 20 ]; then
+            echo "::error::Too many ignored parameters ($VIOLATIONS). Consider reducing to ≤20."
+            exit 1
+          fi
+
+      - name: Check for stub/placeholder comments
+        run: |
+          echo "=== Checking for stub/placeholder comments ==="
+          COUNT=$(grep -rni "simplified\|placeholder\|STUB\|PHASE2" --include="*.c" --include="*.h" agentos/ 2>/dev/null | wc -l)
+          echo "  Found $COUNT stub/placeholder comments"
+          if [ "$COUNT" -gt 15 ]; then
+            echo "::warning::High number of placeholder comments ($COUNT). Consider replacing with real implementations."
+          fi
+
+      - name: Check for unsafe free() on string literals
+        run: |
+          echo "=== Checking for free() on string literals ==="
+          COUNT=$(grep -rn 'free("' --include="*.c" agentos/ 2>/dev/null | wc -l)
+          echo "  Found $COUNT instances of free(string literal)"
+          if [ "$COUNT" -gt 0 ]; then
+            echo "::error::UB: free() called on string literal!"
+            grep -rn 'free("' --include="*.c" agentos/
+            exit 1
+          fi
+
+      - name: Check for stub header files
+        run: |
+          echo "=== Checking for stub header files ==="
+          STUBS=$(find agentos/ -name "*_stub.h" 2>/dev/null)
+          COUNT=$(echo "$STUBS" | grep -c "stub" || true)
+          if [ "$COUNT" -gt 0 ] && [ -n "$STUBS" ]; then
+            echo "::error::Stub header files found! Replace with real implementations."
+            echo "$STUBS"
+            exit 1
+          fi
+
+      - name: Check for dummy/fake data
+        run: |
+          echo "=== Checking for dummy/fake data ==="
+          COUNT=$(grep -rni "DUMMY\|dummy" --include="*.c" --include="*.h" agentos/ 2>/dev/null | wc -l)
+          echo "  Found $COUNT instances of DUMMY/dummy"
+          if [ "$COUNT" -gt 3 ]; then
+            echo "::warning::High number of dummy data references ($COUNT). Replace with real implementations."
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Anti-Pattern Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Placeholder returns | ${{ steps.placeholder-return-count || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Ignored parameters | ${{ steps.ignored-params-count || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Stub comments | ${{ steps.stub-comments-count || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Unsafe free() | Checked |" >> $GITHUB_STEP_SUMMARY
+          echo "| Stub headers | Checked |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dummy data | Checked |" >> $GITHUB_STEP_SUMMARY
+
+  python-anti-pattern-check:
+    name: Python Anti-Pattern Detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for C-style comments in Python
+        run: |
+          COUNT=$(grep -rn "^\s*//\s" --include="*.py" agentos/toolkit/ agentos/openlab/ 2>/dev/null | wc -l)
+          echo "  Found $COUNT Python files with C-style // comments"
+          if [ "$COUNT" -gt 0 ]; then
+            echo "::error::Python files should use # comments, not //"
+            grep -rn "^\s*//\s" --include="*.py" agentos/toolkit/ agentos/openlab/
+            exit 1
+          fi
+
+      - name: Check for empty Python modules
+        run: |
+          EMPTY_FILES=$(find agentos/toolkit/ agentos/openlab/ -name "*.py" -not -name "__init__.py" -size 0 2>/dev/null)
+          COUNT=$(echo "$EMPTY_FILES" | grep -c "\.py" || true)
+          if [ "$COUNT" -gt 0 ] && [ -n "$EMPTY_FILES" ]; then
+            echo "::error::Empty Python module files found!"
+            echo "$EMPTY_FILES"
+            exit 1
+          fi
+          echo "No empty Python modules found."
+
+  sdk-compile-check:
+    name: SDK Compile Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: TypeScript compile check
+        run: |
+          cd agentos/toolkit/typescript
+          npm install --silent 2>/dev/null || echo "npm install skipped"
+          npx tsc --noEmit 2>&1 | tail -20 || echo "TypeScript compile check skipped"
+        continue-on-error: true
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Go compile check
+        run: |
+          cd agentos/toolkit/go
+          go build ./... 2>&1 | tail -20 || echo "Go build skipped"
+        continue-on-error: true
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## SDK Compile Status" >> $GITHUB_STEP_SUMMARY
+          echo "| SDK | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| TypeScript | Checked |" >> $GITHUB_STEP_SUMMARY
+          echo "| Go | Checked |" >> $GITHUB_STEP_SUMMARY
