@@ -194,6 +194,24 @@ static void* collector_thread_func(void* arg) {
     return NULL;
 }
 
+static void* reporter_thread_func(void* arg) {
+    cupolas_monitoring_t* mgr = (cupolas_monitoring_t*)arg;
+
+    while (mgr->reporter_running) {
+        cupolas_sleep_ms(mgr->collect_interval_ms * 2);
+
+        cupolas_rwlock_wrlock(&mgr->lock);
+
+        metrics_export_prometheus(mgr->metrics_buffer, sizeof(mgr->metrics_buffer) - 1);
+        mgr->metrics_buffer_size = strlen(mgr->metrics_buffer);
+        mgr->last_report_time = metrics_get_timestamp_ns();
+
+        cupolas_rwlock_unlock(&mgr->lock);
+    }
+
+    return NULL;
+}
+
 /* ========== Minimal Prometheus HTTP Server ========== */
 
 static void send_http_response(int fd, int status_code,
@@ -496,6 +514,8 @@ void cupolas_monitoring_stop(cupolas_monitoring_t* mgr) {
     }
 
     void* retval = NULL;
+    cupolas_thread_join(mgr->reporter_thread, &retval);
+
     cupolas_thread_join(mgr->collector_thread, &retval);
     (void)retval;
 

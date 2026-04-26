@@ -227,14 +227,14 @@ def print_result(result: GenerationResult, verbose: bool = False) -> None:
                     print(f"    ... and {len(result.warnings) - 5} more")
         
         if verbose:
-            print(f"\nGenerated files:")
+            print(f"nGenerated files:")
             for file_path in result.generated_files[:10]:  # Show first 10 files
                 print(f"  - {file_path}")
             if len(result.generated_files) > 10:
                 print(f"  ... and {len(result.generated_files) - 10} more")
             
             if result.skipped_files:
-                print(f"\nSkipped files: {len(result.skipped_files)}")
+                print(f"nSkipped files: {len(result.skipped_files)}")
                 for file_path in result.skipped_files[:5]:  # Show first 5 skipped files
                     print(f"  - {file_path}")
                 if len(result.skipped_files) > 5:
@@ -302,7 +302,7 @@ async def run_generation(config_path: str, watch: bool = False, verbose: bool = 
                 await generator.watch()
             except KeyboardInterrupt:
                 logger.info("File watcher stopped by user")
-                print("\nFile watcher stopped.")
+                print("nFile watcher stopped.")
                 return 0
         
         else:
@@ -354,7 +354,7 @@ async def run_generation(config_path: str, watch: bool = False, verbose: bool = 
         return 1
     
     except KeyboardInterrupt:
-        print("\nOperation cancelled by user", file=sys.stderr)
+        print("nOperation cancelled by user", file=sys.stderr)
         return 130
     
     except Exception as e:
@@ -484,7 +484,7 @@ def run() -> None:
         exit_code = asyncio.run(main())
         sys.exit(exit_code)
     except KeyboardInterrupt:
-        print("\nOperation cancelled by user", file=sys.stderr)
+        print("nOperation cancelled by user", file=sys.stderr)
         sys.exit(130)
 
 

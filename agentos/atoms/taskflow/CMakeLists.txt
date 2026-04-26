@@ -61,12 +61,7 @@ set(TASKFLOW_CORE_SOURCES
     src/pregel_engine.c
     src/taskflow_execution_unit.c
     src/workflow_patterns.c
-    # TODO: 以下文件待实现
-    # src/task_scheduler.c
-    # src/vertex_context.c
-    # src/message_passing.c
-    # src/checkpoint_manager.c
-    # src/partition_strategy.c
+    src/taskflow_advanced.c
 )
 
 set(TASKFLOW_HEADERS
@@ -76,12 +71,7 @@ set(TASKFLOW_HEADERS
     include/taskflow_integration.h
     include/workflow_patterns.h
     include/taskflow_types.h
-    # TODO: 以下头文件待实现
-    # include/task_scheduler.h
-    # include/vertex_context.h
-    # include/message_passing.h
-    # include/checkpoint_manager.h
-    # include/partition_strategy.h
+    include/taskflow_advanced.h
 )
 
 # ========================================================================

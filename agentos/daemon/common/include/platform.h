@@ -43,6 +43,18 @@ typedef agentos_mutex_t agentos_platform_mutex_t;
 #define agentos_platform_mutex_destroy agentos_mutex_destroy
 #define agentos_platform_get_time_ms   agentos_time_ms
 
+typedef agentos_cond_t agentos_platform_cond_val_t;
+#define agentos_platform_cond_init     agentos_cond_init
+#define agentos_platform_cond_destroy  agentos_cond_destroy
+#define agentos_platform_cond_wait     agentos_cond_wait
+#define agentos_platform_cond_timedwait agentos_cond_timedwait
+#define agentos_platform_cond_signal   agentos_cond_signal
+#define agentos_platform_cond_broadcast agentos_cond_broadcast
+
+typedef agentos_thread_t agentos_platform_thread_t;
+#define agentos_platform_thread_create agentos_platform_thread_create
+#define agentos_platform_thread_join   agentos_platform_thread_join
+
 #ifndef AGENTOS_THREAD_LOCAL
 #define AGENTOS_THREAD_LOCAL _Thread_local
 #endif

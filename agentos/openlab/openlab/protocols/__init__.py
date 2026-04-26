@@ -3,10 +3,10 @@
 """
 AgentOS openlab.protocols — Protocol Integration Bindings
 
-将 AgentOS 协议系统集成到 OpenLab 应用框架中，提供：
+将 AgentOS 协议系统集成到 OpenLab 应用框架中,提供:
 - ProtocolSessionManager — 协议会话管理器
 - ProtocolAgentAdapter — 协议感知的智能体适配器
-- ProtocolToolBridge — 协议工具桥接（MCP工具→AgentOS Skill）
+- ProtocolToolBridge — 协议工具桥接(MCP工具→AgentOS Skill)
 - UnifiedProtocolRunner — 统一协议运行器
 
 @since 2.0.0
@@ -122,8 +122,8 @@ class ProtocolResponse:
 
 
 # ============================================================================
-// Abstract Base: Protocol Handler
-// ============================================================================
+# Abstract Base: Protocol Handler
+# ============================================================================
 
 class ProtocolHandler(ABC):
     """Base class for protocol-specific message handlers."""
@@ -146,8 +146,8 @@ class ProtocolHandler(ABC):
 
 
 # ============================================================================
-// Protocol Session Manager
-// ============================================================================
+# Protocol Session Manager
+# ============================================================================
 
 class ProtocolSessionManager:
     """
@@ -385,8 +385,8 @@ class ProtocolSessionManager:
 
 
 # ============================================================================
-// Built-in Handlers
-// ============================================================================
+# Built-in Handlers
+# ============================================================================
 
 class JSONRPCHandler(ProtocolHandler):
     """Handler for JSON-RPC 2.0 protocol messages."""

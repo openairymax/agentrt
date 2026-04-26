@@ -34,6 +34,8 @@ add_library(agentos_core STATIC ${COREKERN_SOURCES})
 # 使用统一的头文件路径管理
 target_link_libraries(agentos_core PUBLIC agentos_atoms agentos_common)
 
+target_compile_definitions(agentos_core PUBLIC AGENTOS_USE_SCHEDULER_THREAD_IMPL)
+
 target_include_directories(agentos_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )

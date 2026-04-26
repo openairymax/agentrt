@@ -10,6 +10,8 @@
 
 #include "pregel_engine.h"
 #include "graph_engine.h"
+#include "taskflow.h"
+#include "taskflow_types.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -425,7 +427,13 @@ void pregel_engine_destroy(pregel_engine_handle_t engine)
                 free(e->vertex_states[i].value);
             }
             if (e->vertex_states[i].incoming_messages) {
-                free(e->vertex_states[i].incoming_messages);
+                graph_message_t* msg = e->vertex_states[i].incoming_messages;
+                while (msg) {
+                    graph_message_t* next = msg->next;
+                    if (msg->payload) free(msg->payload);
+                    free(msg);
+                    msg = next;
+                }
             }
         }
         free(e->vertex_states);
@@ -596,8 +604,8 @@ taskflow_error_t pregel_engine_pause(pregel_engine_handle_t engine)
     
     e->paused = true;
 
-    // 工作线程在worker_thread_func中检测paused标志并等待pause_cond
     pthread_mutex_lock(&e->mutex);
+    pthread_cond_broadcast(&e->cond_var);
     pthread_mutex_unlock(&e->mutex);
     
     return TASKFLOW_SUCCESS;

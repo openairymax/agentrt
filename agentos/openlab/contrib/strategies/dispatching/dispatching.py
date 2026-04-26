@@ -1,1 +1,8 @@
-"""\nCopyright (c) 2026 SPHARX. All Rights Reserved.\n"From data intelligence emerges."\n\nopenlab Contrib - Dispatching Strategies\n========================================\n\nTask dispatching strategies for intelligent agent selection.\n\nAvailable Strategies:\n    - WeightedRoundRobinStrategy: Weight-based fair scheduling\n    - PriorityBasedStrategy: Priority-driven scheduling\n    - AdaptiveMLStrategy: ML-driven adaptive scheduling\n\nExample:\n    from openlab.contrib.strategies.dispatching import (\n        WeightedRoundRobinStrategy,\n        PriorityBasedStrategy,\n    )\n\n    strategy = WeightedRoundRobinStrategy(weights=[1, 2, 3])\n    selected_agent = strategy.select(candidates)\n\nAuthor: Spharx AgentOS Team
+"""Dispatching strategy module."""
+
+class DispatchingStrategy:
+    """Dispatching strategy for task routing."""
+    def __init__(self, config=None):
+        self.config = config or {}
+    async def dispatch(self, task):
+        raise NotImplementedError("DispatchingStrategy.dispatch not yet implemented")

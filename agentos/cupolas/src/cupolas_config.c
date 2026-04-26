@@ -47,6 +47,9 @@ typedef struct config_entry {
     config_version_t version;
     time_t last_modified;
     void* data;
+    void* snapshot;
+    size_t snapshot_size;
+    config_version_t snapshot_version;
 } config_entry_t;
 
 typedef struct config_watcher {
@@ -205,6 +208,22 @@ int cupolas_config_load(cupolas_config_t* cfg, config_type_t type, const char* f
 #endif
 
     if (entry->data) {
+        if (entry->snapshot) free(entry->snapshot);
+        entry->snapshot = NULL;
+        entry->snapshot_size = 0;
+
+        char* serialized = yaml_serialize((yaml_document_t*)entry->data);
+        if (serialized) {
+            size_t slen = strlen(serialized) + 1;
+            entry->snapshot = malloc(slen);
+            if (entry->snapshot) {
+                memcpy(entry->snapshot, serialized, slen);
+                entry->snapshot_size = slen;
+                entry->snapshot_version = entry->version;
+            }
+            free(serialized);
+        }
+
         yaml_destroy((yaml_document_t*)entry->data);
         entry->data = NULL;
     }
@@ -409,13 +428,54 @@ int cupolas_config_rollback(cupolas_config_t* cfg, config_type_t type) {
     if (type >= 0 && type < CONFIG_TYPE_ALL) {
         config_entry_t* entry = &cfg->entries[type];
         config_status_t prev_status = entry->status;
-        entry->status = CONFIG_STATUS_ROLLBACK;
-        snprintf(cfg->last_error, sizeof(cfg->last_error),
-                "Rolled back %s (from %s)", config_type_names[type],
-                config_status_names[prev_status]);
-        if (entry->version.major > 0) {
-            entry->version.patch = (entry->version.patch > 0) ? entry->version.patch - 1 : 0;
+
+        if (entry->snapshot && entry->snapshot_size > 0) {
+            if (entry->data) {
+                free(entry->data);
+                entry->data = NULL;
+            }
+            entry->data = malloc(entry->snapshot_size);
+            if (entry->data) {
+                memcpy(entry->data, entry->snapshot, entry->snapshot_size);
+            }
+            entry->version = entry->snapshot_version;
+
+            snprintf(cfg->last_error, sizeof(cfg->last_error),
+                    "Rolled back %s to v%u.%u.%u (from %s)",
+                    config_type_names[type],
+                    entry->snapshot_version.major,
+                    entry->snapshot_version.minor,
+                    entry->snapshot_version.patch,
+                    config_status_names[prev_status]);
+        } else {
+            if (entry->file_path[0]) {
+                cupolas_config_load(cfg, type, entry->file_path);
+                snprintf(cfg->last_error, sizeof(cfg->last_error),
+                        "Rolled back %s by reloading from file (no snapshot)",
+                        config_type_names[type]);
+            } else {
+                snprintf(cfg->last_error, sizeof(cfg->last_error),
+                        "Rolled back %s (no snapshot, no file path)",
+                        config_type_names[type]);
+            }
         }
+
+        entry->status = CONFIG_STATUS_ROLLBACK;
+    } else if (type == CONFIG_TYPE_ALL) {
+        for (int t = 0; t < CONFIG_TYPE_ALL; t++) {
+            config_entry_t* entry = &cfg->entries[t];
+            if (entry->snapshot && entry->snapshot_size > 0) {
+                if (entry->data) { free(entry->data); entry->data = NULL; }
+                entry->data = malloc(entry->snapshot_size);
+                if (entry->data) memcpy(entry->data, entry->snapshot, entry->snapshot_size);
+                entry->version = entry->snapshot_version;
+            } else if (entry->file_path[0]) {
+                cupolas_config_load(cfg, (config_type_t)t, entry->file_path);
+            }
+            entry->status = CONFIG_STATUS_ROLLBACK;
+        }
+        snprintf(cfg->last_error, sizeof(cfg->last_error),
+                "Rolled back all config types");
     }
 
     cupolas_rwlock_unlock(&cfg->lock);

@@ -66,7 +66,7 @@ class AgentCapability(Enum):
 
 class AgentContext:
 
-    """Agent 鎵ц与婁笅鏂"""
+    """Agent 鎵ц与婁笅鏂"""
 
     agent_id: str
 
@@ -88,7 +88,7 @@ class AgentContext:
 
 class TaskResult:
 
-    """浠诲姟鎵ц缁撴灉"""
+    """浠诲姟鎵ц缁撴灉"""
 
     success: bool
 
@@ -108,7 +108,7 @@ class TaskResult:
 
 class Message:
 
-    """Agent 濞戝牊浼呴崺铏硅"""
+    """Agent 濞戝牊浼呴崺铏硅"""
 
     
 
@@ -220,7 +220,7 @@ class Agent(ABC):
 
     def context(self) -> Optional[AgentContext]:
 
-        """鑾峰彇褰撳墠鎵ц与婁笅鏂"""
+        """鑾峰彇褰撳墠鎵ц与婁笅鏂"""
 
         return self._context
 
@@ -236,7 +236,7 @@ class Agent(ABC):
 
         
 
-        韫囧懘銆忕圭偟骞囬惃鍕煙濞夋洩绱濋崷?Agent 閸氼垰濮╅弮鎯扮殶閻?        """
+        韫囧懘銆忕圭偟骞囬惃鍕煙濞夋洩绱濋崷?Agent 閸氼垰濮╅弮鎯扮殶閻?        """
 
         pass
 
@@ -248,7 +248,7 @@ class Agent(ABC):
 
         """
 
-        閹笛嗩攽娴犺濮
+        閹笛嗩攽娴犺濮
 
         
 
@@ -260,7 +260,7 @@ class Agent(ABC):
 
         Returns:
 
-            TaskResult: 娴犺濮熼幍褑顢戠紒鎾寸亯
+            TaskResult: 娴犺濮熼幍褑顢戠紒鎾寸亯
 
         """
 
@@ -278,7 +278,7 @@ class Agent(ABC):
 
         
 
-        濞撳懐鎮婄挧鍕爱閿涘奔绱梿鍛粹偓鈧崙?        """
+        濞撳懐鎮婄挧鍕爱閿涘奔绱梿鍛粹偓鈧崙?        """
 
         pass
 
@@ -328,7 +328,7 @@ class Agent(ABC):
 
         """
 
-        濞夈劌鍞藉銉ュ徔
+        濞夈劌鍞藉銉ュ徔
 
         
 
@@ -348,7 +348,7 @@ class Agent(ABC):
 
         """
 
-        閼惧嘲褰囧銉ュ徔
+        閼惧嘲褰囧銉ュ徔
 
         
 
@@ -386,7 +386,7 @@ class Agent(ABC):
 
 class AgentRegistry:
 
-    '''Agent 注册表，线程安全的 Agent 注册与管理'''
+    '''Agent 注册表,线程安全的 Agent 注册与管理'''
 
     
 

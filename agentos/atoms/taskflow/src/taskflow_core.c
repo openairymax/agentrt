@@ -15,6 +15,22 @@
 #include <stdio.h>
 #include <time.h>
 #include <pthread.h>
+#include <errno.h>
+
+#ifndef TASKFLOW_ERROR_NO_ACTIVE_VERTICES
+#define TASKFLOW_ERROR_NO_ACTIVE_VERTICES ((taskflow_error_t)20)
+#endif
+
+#ifndef TASKFLOW_ERROR_ALREADY_RUNNING
+#define TASKFLOW_ERROR_ALREADY_RUNNING ((taskflow_error_t)21)
+#endif
+
+typedef struct {
+    vertex_id_t source;
+    vertex_id_t target;
+    void* payload;
+    size_t payload_size;
+} taskflow_message_t;
 
 // ============================================================================
 // 内部数据结构
@@ -28,43 +44,29 @@ struct taskflow_engine_s {
     bool running;
     bool paused;
 
-    // 统计信息
     execution_stats_t stats;
 
-    // 检查点管理
     uint64_t last_checkpoint_id;
 
-    // 同步原语与线程管理
     pthread_mutex_t engine_mutex;
     pthread_cond_t pause_cond;
     pthread_t worker_thread;
     bool worker_active;
 
-    // 异步执行支持
+    taskflow_message_t* message_queue;
+    size_t message_count;
+    size_t message_capacity;
     pthread_t async_thread;
     int async_thread_active;
     bool async_cancel_requested;
     pthread_cond_t async_complete_cond;
     taskflow_error_t async_result;
 
-    // 异步执行参数（在线程生命周期内有效）
     taskflow_graph_handle_t async_graph;
     size_t async_max_supersteps;
     void (*async_callback)(taskflow_error_t result, void* user_data);
     void* async_user_data;
 
-    // 消息队列（基础实现）
-    typedef struct {
-        vertex_id_t source;
-        vertex_id_t target;
-        void* payload;
-        size_t payload_size;
-    } taskflow_message_t;
-    taskflow_message_t* message_queue;
-    size_t message_count;
-    size_t message_capacity;
-
-    // 日志回调
     void (*log_callback)(const char* message, void* user_data);
     void* log_user_data;
 };
@@ -256,6 +258,39 @@ taskflow_error_t taskflow_engine_init(taskflow_handle_t engine)
     return TASKFLOW_SUCCESS;
 }
 
+static void* engine_worker_thread(void* arg) {
+    struct taskflow_engine_s* e = (struct taskflow_engine_s*)arg;
+    if (!e) return NULL;
+
+    while (e->worker_active) {
+        pthread_mutex_lock(&e->engine_mutex);
+
+        while (e->paused && e->worker_active) {
+            pthread_cond_wait(&e->pause_cond, &e->engine_mutex);
+        }
+
+        if (!e->worker_active) {
+            pthread_mutex_unlock(&e->engine_mutex);
+            break;
+        }
+
+        if (e->pregel_engine) {
+            taskflow_error_t err = pregel_engine_run_superstep(e->pregel_engine);
+            if (err == TASKFLOW_ERROR_NO_ACTIVE_VERTICES || err == TASKFLOW_ERROR_NOT_INITIALIZED) {
+                pthread_mutex_unlock(&e->engine_mutex);
+                break;
+            }
+        }
+
+        pthread_mutex_unlock(&e->engine_mutex);
+
+        struct timespec ts = {0, 10000000L};
+        nanosleep(&ts, NULL);
+    }
+
+    return NULL;
+}
+
 taskflow_error_t taskflow_engine_start(taskflow_handle_t engine)
 {
     if (!engine) {
@@ -269,15 +304,20 @@ taskflow_error_t taskflow_engine_start(taskflow_handle_t engine)
     }
     
     if (e->running) {
-        return TASKFLOW_SUCCESS; // 已经在运行
+        return TASKFLOW_SUCCESS;
     }
     
-    // 启动工作线程和消息处理
     pthread_mutex_lock(&e->engine_mutex);
     e->paused = false;
     e->worker_active = true;
     pthread_mutex_unlock(&e->engine_mutex);
-    
+
+    int ret = pthread_create(&e->worker_thread, NULL, engine_worker_thread, e);
+    if (ret != 0) {
+        e->worker_active = false;
+        return TASKFLOW_ERROR_INTERNAL;
+    }
+
     e->running = true;
     return TASKFLOW_SUCCESS;
 }
@@ -299,12 +339,13 @@ taskflow_error_t taskflow_engine_stop(taskflow_handle_t engine)
         pregel_engine_stop(e->pregel_engine);
     }
     
-    // 停止工作线程和清理资源
     pthread_mutex_lock(&e->engine_mutex);
     e->worker_active = false;
     e->paused = false;
     pthread_cond_broadcast(&e->pause_cond);
     pthread_mutex_unlock(&e->engine_mutex);
+
+    pthread_join(e->worker_thread, NULL);
     
     e->running = false;
     return TASKFLOW_SUCCESS;
@@ -498,7 +539,7 @@ taskflow_error_t taskflow_execute_sync(taskflow_handle_t engine,
     if (!e->running || !e->initialized) return TASKFLOW_ERROR_NOT_INITIALIZED;
 
     size_t vertex_count = 0;
-    graph_engine_get_stats(e->graph_engine, &vertex_count, NULL, NULL);
+    graph_engine_get_stats(e->graph_engine, &vertex_count, NULL, NULL, NULL);
 
     for (size_t step = 0; step < max_supersteps || max_supersteps == 0; step++) {
         pthread_mutex_lock(&e->engine_mutex);
@@ -512,18 +553,17 @@ taskflow_error_t taskflow_execute_sync(taskflow_handle_t engine,
         if (e->pregel_engine) {
             taskflow_error_t perr = pregel_engine_run_superstep(e->pregel_engine);
             if (perr != TASKFLOW_SUCCESS) {
-                e->stats.errors++;
                 if (perr == TASKFLOW_ERROR_NO_ACTIVE_VERTICES) break;
             }
         } else if (e->graph_engine && vertex_count > 0) {
             for (size_t v = 0; v < vertex_count; v++) {
                 if (e->config.compute_func) {
-                    e->config.compute_func(v, step, e->config.user_data);
+                    e->config.compute_func((vertex_id_t)v, NULL, 0, NULL, 0, e->config.user_context);
                 }
             }
         }
 
-        e->stats.supersteps_completed++;
+        e->stats.completed_supersteps++;
         if (max_supersteps > 0 && step >= max_supersteps - 1) break;
     }
 
@@ -683,7 +723,7 @@ taskflow_error_t taskflow_send_message(taskflow_handle_t engine,
     }
     memcpy(msg->payload, payload, payload_size);
     e->message_count++;
-    e->stats.messages_sent++;
+    e->stats.total_messages++;
 
     pthread_mutex_unlock(&e->engine_mutex);
     return TASKFLOW_SUCCESS;
