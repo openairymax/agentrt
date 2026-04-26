@@ -145,9 +145,9 @@ static int ml_based_create(const sched_config_t* manager, void** data) {
     if (mld->model_path) {
         FILE* test_file = fopen(mld->model_path, "rb");
         if (test_file) {
-            fclose(test_file);
             fseek(test_file, 0, SEEK_END);
-            long file_size = ftell(test_file);
+            long file_size __attribute__((unused)) = ftell(test_file);
+            fclose(test_file);
 
             typedef struct {
                 uint32_t magic;
@@ -273,7 +273,7 @@ static int ml_based_schedule(void* data, const task_info_t* task_info, sched_res
 
     agent_info_t* best_agent = NULL;
     float best_score = -1.0f;
-    size_t best_index = 0;
+    size_t __attribute__((unused)) best_index = 0;
 
     for (size_t i = 0; i < mld->agent_count; i++) {
         agent_info_t* agent = mld->agents[i];

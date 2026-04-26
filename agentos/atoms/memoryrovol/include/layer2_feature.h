@@ -79,6 +79,10 @@ agentos_error_t agentos_layer2_feature_search(
     float** out_scores,
     size_t* out_count);
 
+agentos_error_t agentos_layer2_feature_stats(
+    agentos_layer2_feature_t* l2,
+    size_t* out_count);
+
 typedef struct agentos_bm25_index agentos_bm25_index_t;
 
 agentos_bm25_index_t* agentos_bm25_index_create(size_t capacity);

@@ -43,7 +43,7 @@ static struct {
     bool signature_enabled;
     bool vault_enabled;
     bool audit_enabled;
-} g_daemon_security = {false, SANITIZE_LEVEL_NORMAL, false, false, false, false};
+} g_daemon_security __attribute__((unused)) = {false, SANITIZE_LEVEL_NORMAL, false, false, false, false};
 
 /* ---------- Initialization and Shutdown ---------- */
 
@@ -544,8 +544,10 @@ static struct {
     size_t acl_count;
     FILE* audit_fp;
     char audit_log_path[256];
-} g_security_ctx = {false, SANITIZE_LEVEL_NORMAL, true, true, true, true,
-                     {0}, 0, {0}, 0, NULL, {0}};
+} g_security_ctx = {
+    {false, SANITIZE_LEVEL_NORMAL, true, true, true, true},
+    {{0}}, 0, {{0}}, 0, NULL, {0}
+};
 
 static const char* DANGEROUS_PATTERNS[] = {
     ";", "|", "`", "$(", "${", "&&", "||", ">", ">>", "<", "<<",

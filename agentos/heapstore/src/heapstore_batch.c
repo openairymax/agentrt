@@ -37,6 +37,8 @@ static heapstore_error_t batch_commit_log(const void* data) {
         log_entry->trace_id[0] ? log_entry->trace_id : NULL,
         NULL, 0,
         log_entry->message);
+
+    return heapstore_SUCCESS;
 }
 
 /**

@@ -9,7 +9,8 @@ use std::time::Instant;
 const DEFAULT_MAX_DATA_POINTS: usize = 1000;
 const DEFAULT_MAX_SPANS: usize = 500;
 
-/// Span ﻝﭘﮔ?#[derive(Debug, Clone, PartialEq, Eq)]
+/// Span 状态
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SpanStatus {
     OK,
     Error,
@@ -26,7 +27,8 @@ impl std::fmt::Display for SpanStatus {
     }
 }
 
-/// ﮔﮔ ﮔﺍﮔ؟ﻝ?#[derive(Debug, Clone)]
+/// 指标数据点
+#[derive(Debug, Clone)]
 pub struct MetricPoint {
     pub name: String,
     pub value: f64,
@@ -34,7 +36,7 @@ pub struct MetricPoint {
     pub tags: HashMap<String, String>,
 }
 
-/// Span ﻟﺟﺛﻟﺕ۹
+/// Span 追踪
 #[derive(Debug, Clone)]
 pub struct Span {
     pub name: String,
@@ -46,7 +48,7 @@ pub struct Span {
 }
 
 impl Span {
-    /// ﮒﮒﭨﭦﮔﺍﻝ Span
+    /// 创建新的 Span
     pub fn new(name: &str) -> Self {
         Span {
             name: name.to_string(),
@@ -58,7 +60,8 @@ impl Span {
         }
     }
 
-    /// ﻝﭨﮔ Span ﮒﺗﭘﻟ؟۰ﻝ؟ﮔﻝﭨ­ﮔﭘﻠ?    pub fn finish(&mut self) {
+    /// 结束 Span 并计算持续时间
+    pub fn finish(&mut self) {
         self.end_time = Some(Self::now_nanos());
         self.duration = self.end_time.map(|end| {
             (end - self.start_time) as f64 / 1_000_000_000.0
@@ -73,14 +76,15 @@ impl Span {
     }
 }
 
-/// ﮔﮔ ﮔﭘﻠﮒ?#[derive(Debug)]
+/// 指标收集器
+#[derive(Debug)]
 pub struct Meter {
     data_points: Vec<MetricPoint>,
     max_data_points: usize,
 }
 
 impl Meter {
-    /// ﮒﮒﭨﭦﮔﺍﻝ Meter
+    /// 创建新的 Meter
     pub fn new() -> Self {
         Meter {
             data_points: Vec::new(),
@@ -88,7 +92,7 @@ impl Meter {
         }
     }
 
-    /// ﮒﮒﭨﭦﮒﺕ۵ﻟ۹ﮒ؟ﻛﺗﻛﺕﻠﻝ?Meter
+    /// 创建带自定义上限的 Meter
     pub fn with_max(max_data_points: usize) -> Self {
         Meter {
             data_points: Vec::new(),
@@ -96,7 +100,8 @@ impl Meter {
         }
     }
 
-    /// ﻟ؟ﺍﮒﺛﮔﮔ ﮔﺍﮔ؟ﻝ?    pub fn record(&mut self, name: &str, value: f64, tags: Option<HashMap<String, String>>) {
+    /// 记录指标数据点
+    pub fn record(&mut self, name: &str, value: f64, tags: Option<HashMap<String, String>>) {
         let point = MetricPoint {
             name: name.to_string(),
             value,
@@ -113,7 +118,7 @@ impl Meter {
         self.data_points.push(point);
     }
 
-    /// ﻟﺓﮒﮔﮒ؟ﮒﻝ۶ﺍﻝﮔﮔ ﮔﺍﮔ؟ﻝﺗ
+    /// 获取指定名称的指标数据点
     pub fn get(&self, name: &str) -> Vec<&MetricPoint> {
         self.data_points
             .iter()
@@ -121,7 +126,8 @@ impl Meter {
             .collect()
     }
 
-    /// ﻟﺓﮒﮔﮔﮔﮔ ﮒﻝ۶?    pub fn get_all_names(&self) -> Vec<String> {
+    /// 获取所有指标名称
+    pub fn get_all_names(&self) -> Vec<String> {
         let mut names: Vec<String> = self
             .data_points
             .iter()
@@ -132,24 +138,26 @@ impl Meter {
         names
     }
 
-    /// ﻟﺓﮒﮔﮔﮔﺍﮔ؟ﻝﺗ
+    /// 获取所有数据点
     pub fn get_all(&self) -> &[MetricPoint] {
         &self.data_points
     }
 
-    /// ﻠﻝﺛ؟ﮔﮔﮔﺍﮔ?    pub fn reset(&mut self) {
+    /// 重置所有数据
+    pub fn reset(&mut self) {
         self.data_points.clear();
     }
 }
 
-/// ﻟﺟﺛﻟﺕ۹ﮒ?#[derive(Debug)]
+/// 追踪器
+#[derive(Debug)]
 pub struct Tracer {
     spans: Vec<Span>,
     max_spans: usize,
 }
 
 impl Tracer {
-    /// ﮒﮒﭨﭦﮔﺍﻝ Tracer
+    /// 创建新的 Tracer
     pub fn new() -> Self {
         Tracer {
             spans: Vec::new(),
@@ -157,7 +165,7 @@ impl Tracer {
         }
     }
 
-    /// ﮒﮒﭨﭦﮒﺕ۵ﻟ۹ﮒ؟ﻛﺗﻛﺕﻠﻝ?Tracer
+    /// 创建带自定义上限的 Tracer
     pub fn with_max(max_spans: usize) -> Self {
         Tracer {
             spans: Vec::new(),
@@ -165,7 +173,7 @@ impl Tracer {
         }
     }
 
-    /// ﮒﺙﮒ۶ﮔﺍﻝ?Span
+    /// 开始新的 Span
     pub fn start_span(&mut self, name: &str) -> Span {
         if self.spans.len() >= self.max_spans {
             self.spans.remove(0);
@@ -175,23 +183,24 @@ impl Tracer {
         span
     }
 
-    /// ﻝﭨﮔ Span
+    /// 结束 Span
     pub fn finish_span(&mut self, span: &mut Span) {
         span.finish();
     }
 
-    /// ﻟﺓﮒﮔﮔ?Span
+    /// 获取所有 Span
     pub fn get_spans(&self) -> &[Span] {
         &self.spans
     }
 
-    /// ﻠﻝﺛ؟ﮔﮔ?Span
+    /// 重置所有 Span
     pub fn reset(&mut self) {
         self.spans.clear();
     }
 }
 
-/// ﻠ۴ﮔﭖﻟﮒﮒ?#[derive(Debug)]
+/// 遥测聚合器
+#[derive(Debug)]
 pub struct Telemetry {
     service_name: String,
     meter: Arc<Mutex<Meter>>,
@@ -199,7 +208,8 @@ pub struct Telemetry {
 }
 
 impl Telemetry {
-    /// ﮒﮒﭨﭦﮔﺍﻝﻠ۴ﮔﭖﻟﮒﮒ?    pub fn new(service_name: &str) -> Self {
+    /// 创建新的遥测聚合器
+    pub fn new(service_name: &str) -> Self {
         Telemetry {
             service_name: service_name.to_string(),
             meter: Arc::new(Mutex::new(Meter::new())),
@@ -207,24 +217,28 @@ impl Telemetry {
         }
     }
 
-    /// ﮒﮒﭨﭦﮒﺕ۵ﻠﭨﻟ؟۳ﮔﮒ۰ﮒﻝﻠ۴ﮔﭖﻟﮒﮒ۷
+    /// 创建带默认服务名的遥测聚合器
     pub fn default_telemetry() -> Self {
         Telemetry::new("agentos-sdk")
     }
 
-    /// ﻟﺓﮒﮔﮒ۰ﮒ?    pub fn service_name(&self) -> &str {
+    /// 获取服务名
+    pub fn service_name(&self) -> &str {
         &self.service_name
     }
 
-    /// ﻟﺓﮒ Meter ﻝﮒﻠﮒﺙﻝ?    pub fn meter(&self) -> Arc<Mutex<Meter>> {
+    /// 获取 Meter 的克隆引用
+    pub fn meter(&self) -> Arc<Mutex<Meter>> {
         Arc::clone(&self.meter)
     }
 
-    /// ﻟﺓﮒ Tracer ﻝﮒﻠﮒﺙﻝ?    pub fn tracer(&self) -> Arc<Mutex<Tracer>> {
+    /// 获取 Tracer 的克隆引用
+    pub fn tracer(&self) -> Arc<Mutex<Tracer>> {
         Arc::clone(&self.tracer)
     }
 
-    /// ﻠﻝﺛ؟ﮔﮔﻠ۴ﮔﭖﮔﺍﮔ?    pub fn reset(&self) {
+    /// 重置所有遥测数据
+    pub fn reset(&self) {
         if let Ok(mut meter) = self.meter.lock() {
             meter.reset();
         }

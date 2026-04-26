@@ -278,8 +278,8 @@ static struct yaml_node* parse_mapping(struct parse_ctx* ctx, int base_indent) {
 
         skip_ws(ctx);
         if (peek(ctx) != ':') {
-            free(key);
             set_error(ctx, "line %d: expected ':' after key '%s'", ctx->line, key);
+            free(key);
             break;
         }
         advance(ctx);
@@ -433,8 +433,16 @@ static struct yaml_node* parse_value(struct parse_ctx* ctx, int base_indent) {
         return map;
     }
 
+    size_t saved_pos = ctx->pos;
     char* scalar = parse_plain_scalar(ctx, base_indent);
     if (!scalar) return alloc_node(ctx->doc, YAML_NODE_NONE);
+
+    skip_ws(ctx);
+    if (peek(ctx) == ':') {
+        free(scalar);
+        ctx->pos = saved_pos;
+        return parse_mapping(ctx, base_indent);
+    }
 
     struct yaml_node* n = alloc_node(ctx->doc, YAML_NODE_SCALAR);
     if (n) {
@@ -576,8 +584,8 @@ bool yaml_as_bool(struct yaml_node* node, bool default_val) {
 void yaml_dump(struct yaml_node* node, char* buf, size_t bufsize, int indent) {
     if (!node || !buf || bufsize == 0) return;
     size_t off = strlen(buf);
-    #define APPEND(fmt...) do { \
-        off += snprintf(buf + off, bufsize > off ? bufsize - off : 0, fmt); \
+    #define APPEND(...) do { \
+        off += snprintf(buf + off, bufsize > off ? bufsize - off : 0, __VA_ARGS__); \
     } while(0)
 
     for (int i = 0; i < indent; i++) APPEND("  ");
@@ -628,4 +636,23 @@ void yaml_dump(struct yaml_node* node, char* buf, size_t bufsize, int indent) {
         }
     }
     #undef APPEND
+}
+
+char* yaml_serialize(yaml_document_t* doc) {
+    if (!doc || !doc->root) return NULL;
+
+    size_t bufsize = 4096;
+    char* buf = (char*)malloc(bufsize);
+    if (!buf) return NULL;
+
+    buf[0] = '\0';
+    yaml_dump(doc->root, buf, bufsize, 0);
+
+    size_t len = strlen(buf);
+    char* result = (char*)malloc(len + 1);
+    if (result) {
+        memcpy(result, buf, len + 1);
+    }
+    free(buf);
+    return result;
 }

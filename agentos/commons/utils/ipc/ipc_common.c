@@ -299,11 +299,33 @@ static uint32_t ipc_calc_crc32(const void* data, size_t len) {
  * 初始化与清理 API 实现
  * ============================================================================ */
 
+static bool g_ipc_initialized = false;
+
 agentos_error_t ipc_init(void) {
+    if (g_ipc_initialized) return AGENTOS_SUCCESS;
+
+#ifdef _WIN32
+    WSADATA wsa_data;
+    int wsa_err = WSAStartup(MAKEWORD(2, 2), &wsa_data);
+    if (wsa_err != 0) {
+        return AGENTOS_EINIT;
+    }
+#endif
+
+    srand((unsigned int)time(NULL));
+    g_ipc_initialized = true;
+
     return AGENTOS_SUCCESS;
 }
 
 void ipc_cleanup(void) {
+    if (!g_ipc_initialized) return;
+
+#ifdef _WIN32
+    WSACleanup();
+#endif
+
+    g_ipc_initialized = false;
 }
 
 /* ============================================================================

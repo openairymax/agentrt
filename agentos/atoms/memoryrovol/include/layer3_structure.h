@@ -150,6 +150,11 @@ agentos_error_t agentos_knowledge_graph_find_path(
     char*** out_path,
     size_t* out_path_length);
 
+agentos_error_t agentos_knowledge_graph_stats(
+    agentos_knowledge_graph_t* kg,
+    size_t* out_entity_count,
+    size_t* out_relation_count);
+
 #ifdef __cplusplus
 }
 #endif

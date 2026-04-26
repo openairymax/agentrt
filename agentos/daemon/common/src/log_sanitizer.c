@@ -72,25 +72,25 @@ static void ensure_initialized(void) {
 /**
  * @brief 简单的大小写不敏感字符串比较
  */
-static int log_strcasestr(const char* haystack, const char* needle) {
-    if (!haystack || !needle) return 0;
+static const char* log_strcasestr(const char* haystack, const char* needle) {
+    if (!haystack || !needle) return NULL;
     
     size_t haystack_len = strlen(haystack);
     size_t needle_len = strlen(needle);
     
-    if (needle_len > haystack_len) return 0;
+    if (needle_len > haystack_len) return NULL;
     
     for (size_t i = 0; i <= haystack_len - needle_len; i++) {
         int match = 1;
         for (size_t j = 0; j < needle_len; j++) {
-            if (tolower(haystack[i + j]) != tolower(needle[j])) {
+            if (tolower((unsigned char)haystack[i + j]) != tolower((unsigned char)needle[j])) {
                 match = 0;
                 break;
             }
         }
-        if (match) return 1;
+        if (match) return &haystack[i];
     }
-    return 0;
+    return NULL;
 }
 
 /**
@@ -180,7 +180,6 @@ static int sanitize_core(const char* message, char* buffer, size_t buffer_size) 
                 
                 /* 计算可写的空间 */
                 size_t field_name_len = after_pattern - pos;
-                size_t value_len = value_end - value_start;
                 size_t repl_len = strlen(g_patterns[i].replacement);
                 
                 size_t needed = field_name_len + 1 + repl_len + 1;

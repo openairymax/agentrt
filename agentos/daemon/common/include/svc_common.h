@@ -160,6 +160,14 @@ typedef agentos_error_t (*agentos_svc_handle_request_fn)(
     void* user_data
 );
 
+typedef void (*agentos_svc_async_complete_fn)(
+    agentos_service_t service,
+    const char* method,
+    agentos_error_t error_code,
+    char* response_json,
+    void* user_data
+);
+
 typedef struct {
     agentos_svc_init_fn init;
     agentos_svc_start_fn start;
@@ -223,6 +231,19 @@ AGENTOS_API agentos_error_t agentos_service_start(agentos_service_t service);
  * @reentrant 否
  */
 AGENTOS_API agentos_error_t agentos_service_stop(agentos_service_t service, bool force);
+
+AGENTOS_API agentos_error_t agentos_service_set_thread_pool(
+    agentos_service_t service,
+    void* pool
+);
+
+AGENTOS_API int agentos_service_handle_request_async(
+    agentos_service_t service,
+    const char* method,
+    const char* params_json,
+    agentos_svc_async_complete_fn on_complete,
+    void* user_data
+);
 
 /**
  * @brief 暂停服务

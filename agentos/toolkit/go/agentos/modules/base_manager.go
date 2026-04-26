@@ -2,7 +2,6 @@ package modules
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/spharx/agentos/toolkit/go/agentos"

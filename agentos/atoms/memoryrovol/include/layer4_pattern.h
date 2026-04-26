@@ -46,6 +46,10 @@ agentos_error_t agentos_rule_generator_from_cluster(
     size_t count,
     char** out_rule);
 
+agentos_error_t agentos_rule_generator_stats(
+    agentos_rule_generator_t* gen,
+    size_t* out_rule_count);
+
 #ifdef __cplusplus
 }
 #endif
