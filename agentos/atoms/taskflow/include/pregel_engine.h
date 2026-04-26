@@ -12,6 +12,7 @@
 #define AGENTOS_PREGEL_ENGINE_H
 
 #include "taskflow_types.h"
+#include "graph_engine.h"
 
 #ifdef __cplusplus
 extern "C" {

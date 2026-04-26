@@ -58,9 +58,9 @@ from .event import (
 )
 from .plugin import (
     PluginManager, PluginSandbox, PluginDependencyResolver,
-    HotReloadMechanism, BasePlugin,
+    HotReloadMechanism, BasePlugin, PluginRegistry,
     PluginState, PluginManifest, PluginInfo,
-    ResolutionResult, ReloadResult
+    ResolutionResult, ReloadResult, get_plugin_registry,
 )
 
 __version__ = "2.0.0"
@@ -152,9 +152,11 @@ __all__ = [
     "PluginDependencyResolver",
     "HotReloadMechanism",
     "BasePlugin",
+    "PluginRegistry",
     "PluginState",
     "PluginManifest",
     "PluginInfo",
     "ResolutionResult",
     "ReloadResult",
+    "get_plugin_registry",
 ]

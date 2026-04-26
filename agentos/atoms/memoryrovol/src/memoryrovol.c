@@ -54,6 +54,7 @@ struct agentos_memoryrov_handle {
     agentos_knowledge_graph_t* l3_struct;   /**< L3 结构层（知识图谱） */
     agentos_rule_generator_t* l4_pattern;   /**< L4 模式层（规则生成器） */
     agentos_forgetting_engine_t* forgetting; /**< 遗忘模块 */
+    agentos_raw_metadata_db_t* meta_db;     /**< 元数据数据库 */
     int initialized;                        /**< 初始化标志 */
 };
 
@@ -128,6 +129,9 @@ agentos_memoryrov_handle_t* agentos_memoryrov_create(void) {
     }
 
     handle->initialized = 1;
+
+    agentos_raw_metadata_db_create(":memory:", &handle->meta_db);
+
     return handle;
 }
 
@@ -136,6 +140,9 @@ void agentos_memoryrov_destroy(agentos_memoryrov_handle_t* handle) {
         return;
     }
 
+    if (handle->meta_db) {
+        agentos_raw_metadata_db_destroy(handle->meta_db);
+    }
     if (handle->forgetting) {
         agentos_forgetting_destroy(handle->forgetting);
     }
@@ -458,7 +465,26 @@ agentos_error_t agentos_memoryrov_write_raw(
     if (!*out_record_id) {
         return AGENTOS_ENOMEM;
     }
-    (void)metadata;
+
+    if (metadata && metadata[0] && handle->meta_db) {
+        agentos_raw_metadata_t meta;
+        memset(&meta, 0, sizeof(meta));
+        meta.record_id = id;
+        meta.data_len = len;
+        meta.data_size = len;
+        meta.content_type = (char*)metadata;
+        struct timespec ts;
+        if (clock_gettime(CLOCK_REALTIME, &ts) == 0) {
+            meta.created_ns = (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+            meta.modified_ns = meta.created_ns;
+            meta.last_access = meta.created_ns;
+            meta.timestamp = meta.created_ns;
+        }
+        meta.access_count = 0;
+        meta.importance = 1.0;
+        agentos_raw_metadata_db_upsert(handle->meta_db, &meta);
+    }
+
     return AGENTOS_SUCCESS;
 }
 
@@ -502,6 +528,57 @@ agentos_error_t agentos_memoryrov_query(
                                           out_record_ids, out_scores, out_count);
 }
 
+agentos_error_t agentos_memoryrov_stats(
+    agentos_memoryrov_handle_t* handle,
+    char** out_stats) {
+    if (!handle || !out_stats || !handle->initialized) {
+        return AGENTOS_EINVAL;
+    }
+
+    size_t l1_count = 0;
+    char** l1_ids = NULL;
+    agentos_error_t err = agentos_layer1_raw_list_ids(handle->l1_raw, &l1_ids, &l1_count);
+    if (err != AGENTOS_SUCCESS) {
+        l1_count = 0;
+    }
+    if (l1_ids) {
+        agentos_free_string_array(l1_ids, l1_count);
+    }
+
+    size_t l2_count = 0;
+    if (handle->l2_feature) {
+        agentos_layer2_feature_stats(handle->l2_feature, &l2_count);
+    }
+
+    size_t l3_entity_count = 0;
+    size_t l3_relation_count = 0;
+    if (handle->l3_struct) {
+        agentos_knowledge_graph_stats(handle->l3_struct, &l3_entity_count, &l3_relation_count);
+    }
+
+    size_t l4_rule_count = 0;
+    if (handle->l4_pattern) {
+        agentos_rule_generator_stats(handle->l4_pattern, &l4_rule_count);
+    }
+
+    char buf[1024];
+    int len = snprintf(buf, sizeof(buf),
+        "{\"l1_raw\":{\"items\":%zu},"
+        "\"l2_feature\":{\"indexed\":%zu},"
+        "\"l3_structure\":{\"entities\":%zu,\"relations\":%zu},"
+        "\"l4_pattern\":{\"rules\":%zu}}",
+        l1_count, l2_count, l3_entity_count, l3_relation_count, l4_rule_count);
+
+    if (len < 0 || len >= (int)sizeof(buf)) {
+        return AGENTOS_EOVERFLOW;
+    }
+
+    *out_stats = AGENTOS_STRDUP(buf);
+    if (!*out_stats) return AGENTOS_ENOMEM;
+
+    return AGENTOS_SUCCESS;
+}
+
 agentos_error_t agentos_memoryrov_mount(
     agentos_memoryrov_handle_t* handle,
     const char* record_id,
@@ -509,13 +586,45 @@ agentos_error_t agentos_memoryrov_mount(
     if (!handle || !record_id || !handle->initialized) {
         return AGENTOS_EINVAL;
     }
-    (void)context;
+
     void* data = NULL;
     size_t len = 0;
     agentos_error_t err = agentos_layer1_raw_read(handle->l1_raw, record_id, &data, &len);
+    if (data) AGENTOS_FREE(data);
     if (err != AGENTOS_SUCCESS) {
         return err;
     }
-    if (data) AGENTOS_FREE(data);
+
+    if (context && context[0] && handle->meta_db) {
+        agentos_raw_metadata_t* existing = NULL;
+        agentos_raw_metadata_db_query(handle->meta_db, record_id, &existing);
+        if (existing) {
+            existing->source = (char*)context;
+            existing->access_count++;
+            struct timespec ts;
+            if (clock_gettime(CLOCK_REALTIME, &ts) == 0) {
+                existing->last_access = (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+            }
+            agentos_raw_metadata_db_upsert(handle->meta_db, existing);
+            agentos_raw_metadata_free(existing);
+        } else {
+            agentos_raw_metadata_t meta;
+            memset(&meta, 0, sizeof(meta));
+            meta.record_id = (char*)record_id;
+            meta.source = (char*)context;
+            meta.data_len = len;
+            meta.data_size = len;
+            meta.access_count = 1;
+            meta.importance = 1.0;
+            struct timespec ts;
+            if (clock_gettime(CLOCK_REALTIME, &ts) == 0) {
+                meta.created_ns = (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+                meta.last_access = meta.created_ns;
+                meta.timestamp = meta.created_ns;
+            }
+            agentos_raw_metadata_db_upsert(handle->meta_db, &meta);
+        }
+    }
+
     return AGENTOS_SUCCESS;
 }

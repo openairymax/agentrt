@@ -52,7 +52,7 @@ static void guard_log_security(const char* agent_id, const char* action,
  * @brief 权限检查守卫钩子
  * @note [SECURITY] 保留供未来权限增强使用
  */
-static int permission_guard_hook(const char* agent_id, const char* action,
+static int __attribute__((unused)) permission_guard_hook(const char* agent_id, const char* action,
                                 const char* resource, const char* context,
                                 int permission_result) {
     if (!g_guard_manager || !g_guards_enabled) {
@@ -131,7 +131,7 @@ static int permission_guard_hook(const char* agent_id, const char* action,
  * @brief 命令执行守卫钩子
  * @note [SECURITY] 保留供未来命令安全增强使用
  */
-static int command_execution_guard_hook(const char* command, char* const argv[]) {
+static int __attribute__((unused)) command_execution_guard_hook(const char* command, char* const argv[]) {
     if (!g_guard_manager || !g_guards_enabled) {
         return CUPOLAS_OK; // 守卫未启用，允许执行
     }
@@ -219,7 +219,7 @@ static int command_execution_guard_hook(const char* command, char* const argv[])
  * @brief 输入净化守卫钩子
  * @note [SECURITY] 保留供未来输入净化增强使用
  */
-static int sanitizer_guard_hook(const char* input,
+static int __attribute__((unused)) sanitizer_guard_hook(const char* input,
                                char* output, size_t output_size,
                                int sanitizer_result) {
     (void)input;

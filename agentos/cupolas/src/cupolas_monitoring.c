@@ -472,6 +472,12 @@ int cupolas_monitoring_start(cupolas_monitoring_t* mgr) {
             CUPOLAS_LOG_ERROR("monitoring: failed to create HTTP server thread");
             mgr->http_running = false;
         }
+
+        ret = cupolas_thread_create(&mgr->reporter_thread,
+                                    reporter_thread_func, mgr);
+        if (ret != 0) {
+            CUPOLAS_LOG_ERROR("monitoring: failed to create reporter thread");
+        }
     }
 
     mgr->status = MONITORING_STATUS_RUNNING;

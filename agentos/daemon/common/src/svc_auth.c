@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * 实现内容:
- * - JWT Token 生成和验证（HS256 简化实现）
+ * - JWT Token 生成和验证（HS256）
  * - API Key 验证和动态管理
  * - 令牌桶速率限制器
  * - 统一认证入口
@@ -179,7 +179,7 @@ static void hmac_mbedtls(const char* key, const char* message,
 
 /*
  * ═══════════════════════════════════════════════════════════════
- * 模式 3: 内置简化实现（仅开发/测试，有 #error 保护）
+ * 模式 3: 内置HMAC-SHA256实现（仅开发/测试，有 #error 保护）
  * ═══════════════════════════════════════════════════════════════
  */
 #else
@@ -197,7 +197,7 @@ static void hmac_mbedtls(const char* key, const char* message,
     #define AUTH_ALLOW_INSECURE_HMAC
 #endif
 
-static void hmac_builtin(const char* key, const char* message,
+static void __attribute__((unused)) hmac_builtin(const char* key, const char* message,
                        uint8_t* output, size_t* out_len) {
     /* 生产级纯C SHA-256 + HMAC 实现 */
     #define ROTRIGHT(a,b) (((a) >> (b)) | ((a) << (32-(b))))
@@ -326,7 +326,7 @@ static void hmac_builtin(const char* key, const char* message,
 
     for (size_t chunk = 0; chunk < inner_padded / 64; chunk++) {
         uint32_t w[64]; memset(w, 0, sizeof(w));
-        for (int i = 0; i < 16 && (chunk*64+i*4+3) < (int)inner_padded; i++) {
+        for (int i = 0; i < 16 && (chunk*64+i*4+3) < inner_padded; i++) {
             int off = (int)(chunk*64+i*4);
             if (off+3 < (int)inner_padded)
                 w[i] = ((uint32_t)inner[off]<<24)|((uint32_t)inner[off+1]<<16)|((uint32_t)inner[off+2]<<8)|(uint32_t)inner[off+3];
@@ -361,7 +361,7 @@ static void hmac_builtin(const char* key, const char* message,
 
     for (size_t chunk = 0; chunk < outer_padded / 64; chunk++) {
         uint32_t w[64]; memset(w, 0, sizeof(w));
-        for (int i = 0; i < 16 && (chunk*64+i*4+3) < (int)outer_padded; i++) {
+        for (int i = 0; i < 16 && (chunk*64+i*4+3) < outer_padded; i++) {
             int off = (int)(chunk*64+i*4);
             if (off+3 < (int)outer_padded)
                 w[i] = ((uint32_t)outer[off]<<24)|((uint32_t)outer[off+1]<<16)|((uint32_t)outer[off+2]<<8)|(uint32_t)outer[off+3];
@@ -386,7 +386,9 @@ static void hmac_builtin(const char* key, const char* message,
     #undef SIG0
     #undef SIG1
 }
+#ifndef HMAC_IMPL_NAME
 #define HMAC_IMPL_NAME "builtin-SHA256"
+#endif
 
 #endif /* AUTH_USE_OPENSSL / AUTH_USE_MBEDTLS / builtin */
 
@@ -473,7 +475,7 @@ int auth_jwt_generate_token(const char* subject, const char* role, char** out_to
     /* 构建签名部分 */
     size_t sign_input_size = strlen(header_b64) + 1 + payload_b64_size + 100;
     char* sign_input = (char*)malloc(sign_input_size);
-    if (!sign_input) { free(header_b64); free(payload_b64); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
+    if (!sign_input) { free(payload_b64); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
     snprintf(sign_input, sign_input_size, "%s.%s", header_b64, payload_b64);
 
     uint8_t hmac_output[32];
@@ -482,13 +484,13 @@ int auth_jwt_generate_token(const char* subject, const char* role, char** out_to
 
     size_t sig_b64_size = 128;
     char* sig_b64 = (char*)malloc(sig_b64_size);
-    if (!sig_b64) { free(sign_input); free(header_b64); free(payload_b64); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
+    if (!sig_b64) { free(sign_input); free(payload_b64); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
     base64_encode(hmac_output, hmac_len, sig_b64, &sig_b64_size);
 
     /* 组合 Token */
     size_t token_size = sign_input_size + sig_b64_size + 10;
     *out_token = (char*)malloc(token_size);
-    if (!*out_token) { free(sign_input); free(sig_b64); free(header_b64); free(payload_b64); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
+    if (!*out_token) { free(sign_input); free(sig_b64); free(payload_b64); agentos_mutex_unlock(&g_jwt.lock); return AUTH_TOKEN_INVALID; }
     snprintf(*out_token, token_size, "%s.%s", sign_input, sig_b64);
 
     free(sign_input);

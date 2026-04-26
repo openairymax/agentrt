@@ -194,14 +194,14 @@ static void handle_register(cJSON* params, int id, agentos_socket_t client_fd) {
         return;
     }
 
-    meta.id = tid;
-    meta.name = tname;
-    meta.executable = texec;
+    meta.id = (char*)tid;
+    meta.name = (char*)tname;
+    meta.executable = (char*)texec;
 
-    meta.description = get_string_field(tool, "description", NULL);
+    meta.description = (char*)get_string_field(tool, "description", NULL);
     meta.timeout_sec = get_int_field(tool, "timeout_sec", 0);
     meta.cacheable = get_bool_field(tool, "cacheable", false);
-    meta.permission_rule = get_string_field(tool, "permission_rule", NULL);
+    meta.permission_rule = (char*)get_string_field(tool, "permission_rule", NULL);
 
     /* 参数列表 */
     cJSON* params_arr = cJSON_GetObjectItem(tool, "params");
@@ -385,7 +385,7 @@ static void handle_client(agentos_socket_t client_fd) {
 
     cJSON* jsonrpc = cJSON_GetObjectItem(req, "jsonrpc");
     cJSON* method = cJSON_GetObjectItem(req, "method");
-    cJSON* params = cJSON_GetObjectItem(req, "params");
+    (void)cJSON_GetObjectItem(req, "params");
     cJSON* id = cJSON_GetObjectItem(req, "id");
 
     if (!cJSON_IsString(jsonrpc) || strcmp(jsonrpc->valuestring, "2.0") != 0 ||
@@ -621,7 +621,10 @@ int main(int argc, char** argv) {
             continue;
         }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-function-type"
         thread_pool_submit(pool, (thread_task_fn_t)handle_client, (void*)(uintptr_t)client_fd);
+#pragma GCC diagnostic pop
     }
 
     /* 清理资源 */

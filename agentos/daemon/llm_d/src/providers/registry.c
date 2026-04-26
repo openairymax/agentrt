@@ -13,6 +13,7 @@
 extern const provider_ops_t openai_ops;
 extern const provider_ops_t anthropic_ops;
 extern const provider_ops_t deepseek_ops;
+extern const provider_ops_t google_ops;
 extern const provider_ops_t local_ops;
 
 struct provider_registry {
@@ -23,6 +24,7 @@ static const provider_ops_t* get_ops_by_name(const char* name) {
     if (strcmp(name, "openai") == 0) return &openai_ops;
     if (strcmp(name, "anthropic") == 0) return &anthropic_ops;
     if (strcmp(name, "deepseek") == 0) return &deepseek_ops;
+    if (strcmp(name, "google") == 0) return &google_ops;
     if (strcmp(name, "local") == 0) return &local_ops;
     return NULL;
 }
@@ -42,7 +44,7 @@ provider_registry_t* provider_registry_create(const service_config_t* cfg) {
     }
 
     for (size_t i = 0; i < count; ++i) {
-        const provider_config_t* pcfg = &cfg->providers[i];
+        const provider_config_t* pcfg = (const provider_config_t*)&cfg->providers[i];
         const provider_ops_t* ops = get_ops_by_name(pcfg->name);
         if (!ops) {
             SVC_LOG_WARN("Unknown provider: %s, skipping", pcfg->name);

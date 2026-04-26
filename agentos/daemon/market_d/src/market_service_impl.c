@@ -275,7 +275,10 @@ int market_service_install_agent(market_service_t* service, const install_reques
     }
 
     char meta_path[1024];
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
     snprintf(meta_path, sizeof(meta_path), "%s/agent.json", install_dir);
+#pragma GCC diagnostic pop
     FILE* meta_fp = fopen(meta_path, "w");
     if (meta_fp) {
         fprintf(meta_fp, "{\n");
@@ -291,7 +294,10 @@ int market_service_install_agent(market_service_t* service, const install_reques
 
     if (target->repository && strlen(target->repository) > 0) {
         char download_path[1024];
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
         snprintf(download_path, sizeof(download_path), "%s/package.tar.gz", install_dir);
+#pragma GCC diagnostic pop
         char curl_cmd[4096];
         snprintf(curl_cmd, sizeof(curl_cmd),
                 "curl -sfL -o '%s' '%s' 2>/dev/null", download_path, target->repository);
@@ -303,7 +309,7 @@ int market_service_install_agent(market_service_t* service, const install_reques
             char extract_cmd[4096];
             snprintf(extract_cmd, sizeof(extract_cmd),
                     "tar -xzf '%s' -C '%s' 2>/dev/null", download_path, install_dir);
-            system(extract_cmd);
+            (void)system(extract_cmd);
             remove(download_path);
         }
     }
@@ -511,7 +517,7 @@ int market_service_sync_registry(market_service_t* service) {
 
     char mkdir_cmd[2048];
     snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p '%s'", storage);
-    system(mkdir_cmd);
+    (void)system(mkdir_cmd);
 
     char url[2048];
     if (strncmp(service->config.registry_url, "http", 4) == 0) {
@@ -551,7 +557,8 @@ int market_service_sync_registry(market_service_t* service) {
         fclose(idx_fp);
         return -2;
     }
-    fread(idx_data, 1, (size_t)fsize, idx_fp);
+    size_t nread = fread(idx_data, 1, (size_t)fsize, idx_fp);
+    (void)nread;
     idx_data[fsize] = '\0';
     fclose(idx_fp);
 
