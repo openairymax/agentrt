@@ -11,7 +11,7 @@
 #include <sys/stat.h>
 #include "market_service.h"
 
-static int create_directory(const char* path) {
+static int __attribute__((unused)) create_directory(const char* path) {
     #ifdef _WIN32
     return mkdir(path);
     #else
@@ -19,7 +19,7 @@ static int create_directory(const char* path) {
     #endif
 }
 
-static bool directory_exists(const char* path) {
+static bool __attribute__((unused)) directory_exists(const char* path) {
     struct stat st;
     return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
 }

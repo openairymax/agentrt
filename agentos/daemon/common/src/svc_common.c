@@ -23,6 +23,7 @@
 #include "svc_logger.h"
 #include "platform.h"
 #include "error.h"
+#include "ipc_client.h"
 #include "safe_string_utils.h"
 
 #include "include/memory_compat.h"
@@ -159,8 +160,6 @@ static agentos_error_t register_service_internal(agentos_service_internal_t* ser
         return AGENTOS_EINVAL;
     }
     
-    agentos_error_t err = AGENTOS_SUCCESS;
-    
     agentos_platform_mutex_lock(&g_registry.registry_mutex);
     
     /* 检查服务是否已存在 */
@@ -188,8 +187,6 @@ static agentos_error_t unregister_service_internal(agentos_service_internal_t* s
     if (!service || !g_registry.initialized) {
         return AGENTOS_EINVAL;
     }
-    
-    agentos_error_t err = AGENTOS_SUCCESS;
     
     agentos_platform_mutex_lock(&g_registry.registry_mutex);
     
@@ -219,7 +216,7 @@ static agentos_error_t unregister_service_internal(agentos_service_internal_t* s
 /**
  * @brief 更新服务统计信息
  */
-static void update_service_stats(agentos_service_internal_t* service, 
+static void __attribute__((unused)) update_service_stats(agentos_service_internal_t* service, 
                                  bool success, 
                                  uint64_t process_time_ms) {
     if (!service) {
@@ -352,7 +349,7 @@ void agentos_service_destroy(agentos_service_t svc) {
     /* 如果服务还在运行，先停止 */
     if (service->state == AGENTOS_SVC_STATE_RUNNING || 
         service->state == AGENTOS_SVC_STATE_PAUSED) {
-        agentos_service_stop(service, true);  /* 强制停止 */
+        agentos_service_stop((agentos_service_t)service, true);  /* 强制停止 */
     }
     
     /* 从注册表注销 */
@@ -1165,6 +1162,8 @@ agentos_error_t agentos_config_load(
     config_mgr_init();
 
     char config_path[MAX_CONFIG_PATH_LEN];
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
     snprintf(config_path, sizeof(config_path), "%s/%s.json",
              g_config_mgr.config_base_path, service_name);
 
@@ -1179,6 +1178,7 @@ agentos_error_t agentos_config_load(
                  g_config_mgr.config_base_path, service_name);
         fp = fopen(config_path, "rb");
     }
+#pragma GCC diagnostic pop
 
     agentos_config_t* cfg = (agentos_config_t*)AGENTOS_CALLOC(1, sizeof(agentos_config_t));
     if (!cfg) {
@@ -1670,6 +1670,7 @@ static agentos_error_t http_client_call(
     if (!service_name || !method || !response_json) {
         return AGENTOS_EINVAL;
     }
+    (void)timeout_ms;
 
     LOG_DEBUG("HTTP client call: %s/%s (timeout=%ums)", service_name, method, timeout_ms);
 
@@ -1709,7 +1710,6 @@ static agentos_error_t http_client_call(
     }
 
     char url[768];
-    client_internal_t* cli_internal = NULL;
     snprintf(url, sizeof(url), "http://%s/api/%s", service_name, method);
 
 #ifdef AGENTOS_HAS_CURL
@@ -1730,8 +1730,6 @@ static agentos_error_t http_client_call(
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, params_json);
     }
 
-    char* response_buf = NULL;
-    size_t response_buf_size = 0;
     curl_response_buf_t resp_buf = { NULL, 0, 0 };
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &resp_buf);
@@ -1822,33 +1820,45 @@ static agentos_error_t memory_client_call(
     }
 
     agentos_service_t svc = agentos_service_find(service_name);
-    if (!svc) {
-        LOG_WARN("Memory client: service '%s' not found", service_name);
-        return AGENTOS_ENOENT;
-    }
+    if (svc) {
+        agentos_service_internal_t* internal = (agentos_service_internal_t*)svc;
 
-    agentos_service_internal_t* internal = (agentos_service_internal_t*)svc;
-
-    if (internal->iface.handle_request) {
-        agentos_error_t err = internal->iface.handle_request(
-            svc, method, params_json, response_json, internal->user_data);
-        if (err != AGENTOS_SUCCESS) {
-            LOG_WARN("Service '%s' handle_request('%s') failed: %d",
-                     service_name, method, err);
-            return err;
-        }
-        if (!*response_json) {
-            *response_json = AGENTOS_CALLOC(1, 2);
-            if (*response_json) {
-                (*response_json)[0] = '{';
-                (*response_json)[1] = '}';
+        if (internal->iface.handle_request) {
+            agentos_error_t err = internal->iface.handle_request(
+                svc, method, params_json, response_json, internal->user_data);
+            if (err != AGENTOS_SUCCESS) {
+                LOG_WARN("Service '%s' handle_request('%s') failed: %d",
+                         service_name, method, err);
+                return err;
             }
+            if (!*response_json) {
+                *response_json = (char*)AGENTOS_CALLOC(1, 2);
+                if (*response_json) {
+                    (*response_json)[0] = '{';
+                    (*response_json)[1] = '}';
+                }
+            }
+            return AGENTOS_SUCCESS;
         }
-        return AGENTOS_SUCCESS;
+
+        LOG_WARN("Service '%s' has no handle_request callback", service_name);
+        return AGENTOS_ENOTSUP;
     }
 
-    LOG_WARN("Service '%s' has no handle_request callback", service_name);
-    return AGENTOS_ENOTSUP;
+    LOG_INFO("Memory client: service '%s' not found locally, trying IPC RPC", service_name);
+
+    char rpc_method[256];
+    snprintf(rpc_method, sizeof(rpc_method), "%s.%s", service_name, method);
+
+    int rpc_err = svc_rpc_call(rpc_method, params_json, response_json,
+                               timeout_ms ? timeout_ms : 30000);
+    if (rpc_err != 0 || !(*response_json)) {
+        LOG_WARN("IPC RPC call to '%s' failed: %d", rpc_method, rpc_err);
+        return AGENTOS_EIO;
+    }
+
+    LOG_INFO("IPC RPC call to '%s' succeeded", rpc_method);
+    return AGENTOS_SUCCESS;
 }
 
 static agentos_error_t memory_client_stream(

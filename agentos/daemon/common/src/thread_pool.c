@@ -1,5 +1,5 @@
 #include "thread_pool.h"
-#include "platform.h"
+#include <platform.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -12,13 +12,13 @@ typedef struct task_node {
 
 struct thread_pool_s {
     thread_pool_config_t config;
-    agentos_platform_thread_t* threads;
+    agentos_thread_t* threads;
     uint32_t thread_count;
     task_node_t* queue_head;
     task_node_t* queue_tail;
     uint32_t queue_count;
     uint32_t active_count;
-    agentos_platform_mutex_t lock;
+    agentos_mutex_t lock;
     agentos_cond_t notify;
     bool running;
     bool shutdown;
@@ -29,14 +29,14 @@ static void* worker_thread_func(void* arg)
     thread_pool_t* pool = (thread_pool_t*)arg;
 
     while (true) {
-        agentos_platform_mutex_lock(&pool->lock);
+        agentos_mutex_lock(&pool->lock);
 
         while (pool->queue_count == 0 && !pool->shutdown) {
-            agentos_platform_cond_wait(&pool->notify, &pool->lock);
+            agentos_cond_wait(&pool->notify, &pool->lock);
         }
 
         if (pool->shutdown && pool->queue_count == 0) {
-            agentos_platform_mutex_unlock(&pool->lock);
+            agentos_mutex_unlock(&pool->lock);
             break;
         }
 
@@ -48,15 +48,15 @@ static void* worker_thread_func(void* arg)
             pool->active_count++;
         }
 
-        agentos_platform_mutex_unlock(&pool->lock);
+        agentos_mutex_unlock(&pool->lock);
 
         if (task) {
             task->fn(task->arg);
             free(task);
 
-            agentos_platform_mutex_lock(&pool->lock);
+            agentos_mutex_lock(&pool->lock);
             pool->active_count--;
-            agentos_platform_mutex_unlock(&pool->lock);
+            agentos_mutex_unlock(&pool->lock);
         }
     }
 
@@ -79,15 +79,15 @@ thread_pool_t* thread_pool_create(const thread_pool_config_t* config)
         pool->config = defaults;
     }
 
-    pool->threads = (agentos_platform_thread_t*)calloc(
-        pool->config.max_threads, sizeof(agentos_platform_thread_t));
+    pool->threads = (agentos_thread_t*)calloc(
+        pool->config.max_threads, sizeof(agentos_thread_t));
     if (!pool->threads) {
         free(pool);
         return NULL;
     }
 
-    agentos_platform_mutex_init(&pool->lock);
-    agentos_platform_cond_init(&pool->notify);
+    agentos_mutex_init(&pool->lock);
+    agentos_cond_init(&pool->notify);
 
     pool->queue_head = NULL;
     pool->queue_tail = NULL;
@@ -109,8 +109,8 @@ thread_pool_t* thread_pool_create(const thread_pool_config_t* config)
     }
 
     if (pool->thread_count == 0) {
-        agentos_platform_mutex_destroy(&pool->lock);
-        agentos_platform_cond_destroy(&pool->notify);
+        agentos_mutex_destroy(&pool->lock);
+        agentos_cond_destroy(&pool->notify);
         free(pool->threads);
         free(pool);
         return NULL;
@@ -123,10 +123,10 @@ void thread_pool_destroy(thread_pool_t* pool)
 {
     if (!pool) return;
 
-    agentos_platform_mutex_lock(&pool->lock);
+    agentos_mutex_lock(&pool->lock);
     pool->shutdown = true;
-    agentos_platform_cond_broadcast(&pool->notify);
-    agentos_platform_mutex_unlock(&pool->lock);
+    agentos_cond_broadcast(&pool->notify);
+    agentos_mutex_unlock(&pool->lock);
 
     for (uint32_t i = 0; i < pool->thread_count; i++) {
         agentos_platform_thread_join(pool->threads[i], NULL);
@@ -139,8 +139,8 @@ void thread_pool_destroy(thread_pool_t* pool)
         node = next;
     }
 
-    agentos_platform_mutex_destroy(&pool->lock);
-    agentos_platform_cond_destroy(&pool->notify);
+    agentos_mutex_destroy(&pool->lock);
+    agentos_cond_destroy(&pool->notify);
     free(pool->threads);
     free(pool);
 }
@@ -159,16 +159,16 @@ int thread_pool_submit(thread_pool_t* pool,
     node->arg = arg;
     node->next = NULL;
 
-    agentos_platform_mutex_lock(&pool->lock);
+    agentos_mutex_lock(&pool->lock);
 
     if (pool->shutdown) {
-        agentos_platform_mutex_unlock(&pool->lock);
+        agentos_mutex_unlock(&pool->lock);
         free(node);
         return -4;
     }
 
     if (pool->queue_count >= pool->config.queue_size) {
-        agentos_platform_mutex_unlock(&pool->lock);
+        agentos_mutex_unlock(&pool->lock);
         free(node);
         return -5;
     }
@@ -181,8 +181,8 @@ int thread_pool_submit(thread_pool_t* pool,
     pool->queue_tail = node;
     pool->queue_count++;
 
-    agentos_platform_cond_signal(&pool->notify);
-    agentos_platform_mutex_unlock(&pool->lock);
+    agentos_cond_signal(&pool->notify);
+    agentos_mutex_unlock(&pool->lock);
 
     return 0;
 }
@@ -190,18 +190,18 @@ int thread_pool_submit(thread_pool_t* pool,
 uint32_t thread_pool_active_count(thread_pool_t* pool)
 {
     if (!pool) return 0;
-    agentos_platform_mutex_lock(&pool->lock);
+    agentos_mutex_lock(&pool->lock);
     uint32_t count = pool->active_count;
-    agentos_platform_mutex_unlock(&pool->lock);
+    agentos_mutex_unlock(&pool->lock);
     return count;
 }
 
 uint32_t thread_pool_pending_count(thread_pool_t* pool)
 {
     if (!pool) return 0;
-    agentos_platform_mutex_lock(&pool->lock);
+    agentos_mutex_lock(&pool->lock);
     uint32_t count = pool->queue_count;
-    agentos_platform_mutex_unlock(&pool->lock);
+    agentos_mutex_unlock(&pool->lock);
     return count;
 }
 

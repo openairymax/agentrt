@@ -244,7 +244,7 @@ static void handle_get_stats(int id, agentos_socket_t client_fd) {
  */
 static void handle_health_check(int id, agentos_socket_t client_fd) {
     bool healthy = false;
-    int ret = sched_service_health_check(g_service, &healthy);
+    (void)sched_service_health_check(g_service, &healthy);
 
     cJSON* result = cJSON_CreateObject();
     cJSON_AddStringToObject(result, "service", "sched_d");
@@ -285,7 +285,7 @@ static void handle_client(agentos_socket_t client_fd) {
 
     cJSON* jsonrpc = cJSON_GetObjectItem(req, "jsonrpc");
     cJSON* method = cJSON_GetObjectItem(req, "method");
-    cJSON* params = cJSON_GetObjectItem(req, "params");
+    (void)cJSON_GetObjectItem(req, "params");
     cJSON* id = cJSON_GetObjectItem(req, "id");
 
     if (!cJSON_IsString(jsonrpc) || strcmp(jsonrpc->valuestring, "2.0") != 0 ||

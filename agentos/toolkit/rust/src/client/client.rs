@@ -260,6 +260,7 @@ impl Client {
                     return Ok(api_response);
                 }
                 Err(e) => {
+                    let should_retry = e.is_timeout() || e.is_connect();
                     let error = if e.is_timeout() {
                         AgentOSError::timeout(&format!("请求超时: {}", e))
                     } else if e.is_connect() {
@@ -268,10 +269,8 @@ impl Client {
                         AgentOSError::network(&format!("网络错误: {}", e))
                     };
 
-                    last_error = Some(error);
-
-                    // 如果是超时或连接错误，继续重试
-                    if e.is_timeout() || e.is_connect() {
+                    if should_retry {
+                        last_error = Some(error);
                         continue;
                     }
 
@@ -421,8 +420,8 @@ impl ClientBuilder {
     pub fn build(self) -> Result<Client, AgentOSError> {
         // 验证端点格式
         if !self.endpoint.starts_with("http://") && !self.endpoint.starts_with("https://") {
-            return Err(AgentOSError::manager(
-                "端点地址必须以 http:// 或 https:// 开头"
+            return Err(AgentOSError::Config(
+                "端点地址必须以 http:// 或 https:// 开头".to_string()
             ));
         }
 
@@ -431,7 +430,7 @@ impl ClientBuilder {
             .pool_max_idle_per_host(self.max_connections)
             .pool_idle_timeout(Some(self.idle_conn_timeout))
             .build()
-            .map_err(|e| AgentOSError::manager(&format!("创建 HTTP 客户端失败: {}", e)))?;
+            .map_err(|e| AgentOSError::Config(format!("创建 HTTP 客户端失败: {}", e)))?;
 
         Ok(Client {
             endpoint: self.endpoint,

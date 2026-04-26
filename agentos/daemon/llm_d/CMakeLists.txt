@@ -40,6 +40,7 @@ set(LLM_D_SOURCES
     src/providers/openai.c
     src/providers/anthropic.c
     src/providers/deepseek.c
+    src/providers/google.c
     src/providers/local.c
     src/providers/provider.c
     src/cache.c

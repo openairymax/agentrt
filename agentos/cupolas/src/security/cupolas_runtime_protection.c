@@ -250,7 +250,8 @@ int cupolas_memory_protect_enable(const cupolas_memory_protect_config_t* manager
             if (n > 0 && buf[0] != '2' && buf[0] != '1') {
                 fd = open("/proc/sys/kernel/randomize_va_space", O_WRONLY);
                 if (fd >= 0) {
-                    write(fd, "2", 1);
+                    ssize_t wr = write(fd, "2", 1);
+                    (void)wr;
                     close(fd);
                 }
             }
@@ -573,6 +574,7 @@ int cupolas_integrity_compute_code_hash(uint8_t* hash_out) {
     if (!hash_out) return -1;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#pragma GCC diagnostic ignored "-Wpedantic"
     SHA256_CTX ctx;
     SHA256_Init(&ctx);
 
@@ -620,6 +622,7 @@ int cupolas_integrity_verify_data(const uint8_t* expected_hash) {
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#pragma GCC diagnostic ignored "-Wpedantic"
     SHA256_CTX ctx;
     SHA256_Init(&ctx);
 

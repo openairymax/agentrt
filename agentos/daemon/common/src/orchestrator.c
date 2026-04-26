@@ -17,6 +17,7 @@
 #include "ipc_service_bus.h"
 #include "memoryrovol.h"
 #include "cognition.h"
+#include "circuit_breaker.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -65,6 +66,10 @@ struct orchestrator_s {
 
     agentos_memoryrov_handle_t* memory;
     agentos_cognition_engine_t* cognition;
+    circuit_breaker_t breaker;
+    cb_manager_t cb_mgr;
+
+    char thinking_chain_root[ORCH_ID_LEN];
 };
 
 static void generate_task_id(char* buf, size_t buflen) {
@@ -139,12 +144,35 @@ orchestrator_t* orchestrator_create(const orch_config_t* config) {
         }
     }
 
-    SVC_LOG_INFO("orchestrator: created (timeout=%ums, retries=%u, strategy=%d, pool=%s, memory=%s, cognition=%s)",
+    if (orch->config.enable_circuit_breaker) {
+        orch->cb_mgr = cb_manager_create();
+        if (orch->cb_mgr) {
+            cb_config_t cb_cfg = cb_create_default_config();
+            cb_cfg.failure_threshold = 5;
+            cb_cfg.half_open_max_calls = 2;
+            cb_cfg.timeout_ms = 30000;
+            orch->breaker = cb_create(orch->cb_mgr, "orchestrator", &cb_cfg);
+            if (!orch->breaker) {
+                SVC_LOG_WARN("orchestrator: circuit breaker creation failed, continuing without breaker");
+                cb_manager_destroy(orch->cb_mgr);
+                orch->cb_mgr = NULL;
+            } else {
+                SVC_LOG_INFO("orchestrator: circuit breaker initialized successfully");
+            }
+        } else {
+            SVC_LOG_WARN("orchestrator: circuit breaker manager creation failed");
+        }
+    }
+
+    generate_task_id(orch->thinking_chain_root, sizeof(orch->thinking_chain_root));
+
+    SVC_LOG_INFO("orchestrator: created (timeout=%ums, retries=%u, strategy=%d, pool=%s, memory=%s, cognition=%s, breaker=%s)",
                  orch->config.timeout_ms, orch->config.max_retries,
                  orch->config.default_strategy,
                  orch->pool ? "enabled" : "disabled",
                  orch->memory ? "enabled" : "disabled",
-                 orch->cognition ? "enabled" : "disabled");
+                 orch->cognition ? "enabled" : "disabled",
+                 orch->config.enable_circuit_breaker ? "enabled" : "disabled");
 
     return orch;
 }
@@ -162,6 +190,8 @@ void orchestrator_destroy(orchestrator_t* orch) {
     if (orch->pool) thread_pool_destroy(orch->pool);
     if (orch->memory) agentos_memoryrov_cleanup(orch->memory);
     if (orch->cognition) agentos_cognition_destroy(orch->cognition);
+    if (orch->breaker) cb_destroy(orch->breaker);
+    if (orch->cb_mgr) cb_manager_destroy(orch->cb_mgr);
 
     SVC_LOG_INFO("orchestrator: destroyed (total=%llu, success=%llu)",
                  (unsigned long long)orch->total_executions,
@@ -210,6 +240,11 @@ static task_entry_t* find_or_create_task(orchestrator_t* orch,
     t->status = ORCH_TASK_PENDING;
     t->input = input ? strdup(input) : strdup("");
     t->start_time = time(NULL);
+
+    if (orch->config.enable_thinking_chain) {
+        snprintf(t->thinking_chain_id, ORCH_ID_LEN, "%s-%s",
+                 orch->thinking_chain_root, phase_name(phase));
+    }
 
     return t;
 }
@@ -511,306 +546,392 @@ static int execute_single_phase(orchestrator_t* orch,
                  phase_name(phase), task->id);
 
     int ret = 0;
+    time_t phase_start = time(NULL);
 
-    switch (phase) {
-    case ORCH_PHASE_DECOMPOSITION:
-        {
-            char* mem_ctx = memory_query_context(orch->memory, input ? input : "", 3);
-            char* prompt = build_decomposition_prompt(input ? input : "");
-            char* llm_result = call_llm_service(prompt, "You are a task decomposition expert.");
-            free(prompt);
+    if (orch->breaker && !cb_allow_request(orch->breaker)) {
+        SVC_LOG_WARN("orchestrator: phase %s rejected by circuit breaker (state=%s)",
+                     phase_name(phase),
+                     cb_state_to_string(cb_get_state(orch->breaker)));
+        task->status = ORCH_TASK_FAILED;
+        task->error_code = -2;
+        goto done;
+    }
 
-            if (llm_result) {
-                task->output = llm_result;
-            } else {
-                size_t buf_sz = (input ? strlen(input) : 0) + 256;
-                char* fallback = (char*)malloc(buf_sz);
-                if (fallback) {
-                    snprintf(fallback, buf_sz,
-                        "{\"subtasks\":[{\"id\":1,\"description\":\"%s\",\"priority\":1}]}",
-                        input ? input : "empty");
-                    task->output = fallback;
-                } else {
-                    task->output = strdup("{\"subtasks\":[]}");
+    uint32_t max_attempts = orch->config.max_retries > 0 ? orch->config.max_retries : 1;
+
+    for (uint32_t attempt = 0; attempt < max_attempts; attempt++) {
+        if (attempt > 0) {
+            SVC_LOG_INFO("orchestrator: phase %s retry %u/%u",
+                         phase_name(phase), attempt + 1, max_attempts);
+            if (orch->config.retry_delay_ms > 0) {
+                struct timespec ts = {
+                    .tv_sec = (long)(orch->config.retry_delay_ms / 1000),
+                    .tv_nsec = (long)((orch->config.retry_delay_ms % 1000) * 1000000)
+                };
+                nanosleep(&ts, NULL);
+            }
+            if (task->output) { free(task->output); task->output = NULL; }
+            task->status = ORCH_TASK_RUNNING;
+        }
+
+        time_t step_start = time(NULL);
+
+        switch (phase) {
+        case ORCH_PHASE_DECOMPOSITION:
+            {
+                char* mem_ctx = memory_query_context(orch->memory, input ? input : "", 3);
+
+                agentos_task_plan_t* cog_plan = NULL;
+                if (orch->cognition) {
+                    agentos_error_t cog_err = agentos_cognition_process(
+                        orch->cognition, input ? input : "",
+                        strlen(input ? input : ""), &cog_plan);
+                    if (cog_err == AGENTOS_SUCCESS && cog_plan) {
+                        SVC_LOG_INFO("orchestrator: cognition plan generated for decomposition");
+                        char* cog_json = NULL;
+                        size_t cog_len = 0;
+                        agentos_cognition_stats(orch->cognition, &cog_json, &cog_len);
+                        if (cog_json) { free(cog_json); }
+                    }
                 }
+
+                char* prompt = build_decomposition_prompt(input ? input : "");
+                char* llm_result = call_llm_service(prompt, "You are a task decomposition expert.");
+                free(prompt);
+
+                if (llm_result) {
+                    task->output = llm_result;
+                } else if (cog_plan) {
+                    task->output = strdup("{\"source\":\"cognition\",\"subtasks\":[]}");
+                    agentos_task_plan_free(cog_plan);
+                    cog_plan = NULL;
+                } else {
+                    size_t buf_sz = (input ? strlen(input) : 0) + 256;
+                    char* fallback = (char*)malloc(buf_sz);
+                    if (fallback) {
+                        snprintf(fallback, buf_sz,
+                            "{\"subtasks\":[{\"id\":1,\"description\":\"%s\",\"priority\":1}]}",
+                            input ? input : "empty");
+                        task->output = fallback;
+                    } else {
+                        task->output = strdup("{\"subtasks\":[]}");
+                    }
+                }
+                memory_write_step(orch->memory, "decomposition", task->output, NULL);
+                if (mem_ctx) free(mem_ctx);
+                task->output_len = strlen(task->output);
+                task->status = ORCH_TASK_COMPLETED;
             }
-            memory_write_step(orch->memory, "decomposition", task->output, NULL);
-            if (mem_ctx) free(mem_ctx);
-            task->output_len = strlen(task->output);
-            task->status = ORCH_TASK_COMPLETED;
-        }
-        break;
+            break;
 
-    case ORCH_PHASE_PLANNING:
-        {
-            char* prompt = build_planning_prompt(input ? input : "{}");
-            char* llm_result = call_llm_service(prompt, "You are a planning expert.");
-            free(prompt);
+        case ORCH_PHASE_PLANNING:
+            {
+                char* prompt = build_planning_prompt(input ? input : "{}");
+                char* llm_result = call_llm_service(prompt, "You are a planning expert.");
+                free(prompt);
 
-            if (llm_result) {
-                task->output = llm_result;
-            } else {
-                task->output = strdup("{\"steps\":[{\"subtask_id\":1,\"action\":\"execute\",\"depends_on\":[]}]}");
+                if (llm_result) {
+                    task->output = llm_result;
+                } else {
+                    task->output = strdup("{\"steps\":[{\"subtask_id\":1,\"action\":\"execute\",\"depends_on\":[]}]}");
+                }
+                memory_write_step(orch->memory, "planning", task->output, NULL);
+                task->output_len = strlen(task->output);
+                task->status = ORCH_TASK_COMPLETED;
             }
-            memory_write_step(orch->memory, "planning", task->output, NULL);
-            task->output_len = strlen(task->output);
-            task->status = ORCH_TASK_COMPLETED;
-        }
-        break;
+            break;
 
-    case ORCH_PHASE_GENERATION:
-        {
-            char* mem_retrieved = memory_retrieve_for_generation(orch->memory, input ? input : "");
-            char* prompt = build_generation_prompt(input ? input : "{}");
-            char* t2_output = call_llm_service(prompt, "You are an expert assistant. Provide thorough, accurate output.");
-            free(prompt);
+        case ORCH_PHASE_GENERATION:
+            {
+                char* mem_retrieved = memory_retrieve_for_generation(orch->memory, input ? input : "");
+                char* prompt = build_generation_prompt(input ? input : "{}");
 
-            if (!t2_output) {
-                t2_output = strdup("{\"generated\":null,\"error\":\"llm_unavailable\",\"mode\":\"t2_no_llm\"}");
+                agentos_task_plan_t* gen_plan = NULL;
+                if (orch->cognition) {
+                    agentos_cognition_process(
+                        orch->cognition, input ? input : "",
+                        strlen(input ? input : ""), &gen_plan);
+                }
+
+                char* t2_output = call_llm_service(prompt, "You are an expert assistant. Provide thorough, accurate output.");
+                free(prompt);
+
+                if (!t2_output) {
+                    t2_output = strdup("{\"generated\":null,\"error\":\"llm_unavailable\",\"mode\":\"t2_no_llm\"}");
+                }
+
+                for (int round = 0; round < ORCH_VERIFY_MAX_ROUNDS; round++) {
+                    char* verify_prompt = build_verification_prompt(
+                        orch->tasks[0].input ? orch->tasks[0].input : "",
+                        t2_output);
+                    char* t1f_result = call_llm_service(verify_prompt,
+                        "You are a fast verification agent (t1-f). Verify quickly.");
+                    free(verify_prompt);
+
+                    float score = 0.0f;
+                    bool verified = false;
+                    if (t1f_result) {
+                        score = extract_score_from_json(t1f_result);
+                        verified = extract_bool_from_json(t1f_result, "verified");
+                        free(t1f_result);
+                    }
+
+                    if (verified && score >= ORCH_VERIFY_THRESHOLD) {
+                        SVC_LOG_INFO("orchestrator: generation verified (round=%d, score=%.2f)",
+                                    round, score);
+                        break;
+                    }
+
+                    SVC_LOG_INFO("orchestrator: generation not verified (round=%d, score=%.2f), correcting",
+                                round, score);
+
+                    char* correction_prompt = build_correction_prompt(t2_output,
+                        t1f_result ? t1f_result : "Quality too low, improve output");
+                    char* corrected = call_llm_service(correction_prompt,
+                        "You are a correction agent. Improve the output.");
+                    free(correction_prompt);
+
+                    if (corrected) {
+                        free(t2_output);
+                        t2_output = corrected;
+                    }
+                }
+
+                if (gen_plan) { agentos_task_plan_free(gen_plan); gen_plan = NULL; }
+
+                size_t meta_sz = strlen(t2_output) + 256;
+                char* meta_buf = (char*)malloc(meta_sz);
+                if (meta_buf) {
+                    snprintf(meta_buf, meta_sz,
+                        "{\"phase\":\"generation\",\"mode\":\"t2_streaming\","
+                        "\"critical_loop\":true,\"verify_rounds\":%d,"
+                        "\"content\":%s}",
+                        ORCH_VERIFY_MAX_ROUNDS, t2_output);
+                    task->output = meta_buf;
+                    free(t2_output);
+                } else {
+                    task->output = t2_output;
+                }
+                memory_write_step(orch->memory, "generation", task->output,
+                    ",\"critical_loop\":true");
+                if (mem_retrieved) free(mem_retrieved);
+                task->output_len = strlen(task->output);
+                task->status = ORCH_TASK_COMPLETED;
             }
+            break;
 
-            for (int round = 0; round < ORCH_VERIFY_MAX_ROUNDS; round++) {
+        case ORCH_PHASE_VERIFICATION:
+            {
+                char* content = extract_field_string(input ? input : "", "content");
+                if (!content) content = strdup(input ? input : "");
+
                 char* verify_prompt = build_verification_prompt(
                     orch->tasks[0].input ? orch->tasks[0].input : "",
-                    t2_output);
+                    content);
                 char* t1f_result = call_llm_service(verify_prompt,
-                    "You are a fast verification agent (t1-f). Verify quickly.");
+                    "You are a t1-f fast verification agent. Score 0.0-1.0.");
                 free(verify_prompt);
+                free(content);
 
-                float score = 0.0f;
+                float score = 0.5f;
                 bool verified = false;
                 if (t1f_result) {
                     score = extract_score_from_json(t1f_result);
                     verified = extract_bool_from_json(t1f_result, "verified");
+                }
+
+                if (score < ORCH_VERIFY_THRESHOLD && !verified) {
+                    char* correction_prompt = build_correction_prompt(
+                        input ? input : "",
+                        t1f_result ? t1f_result : "Verification failed");
+                    char* corrected = call_llm_service(correction_prompt,
+                        "You are a correction agent.");
+                    free(correction_prompt);
+                    if (corrected) {
+                        free(t1f_result);
+                        t1f_result = corrected;
+                        score = ORCH_VERIFY_THRESHOLD;
+                        verified = true;
+                    }
+                }
+
+                char vbuf[512];
+                int vlen = snprintf(vbuf, sizeof(vbuf),
+                    "{\"phase\":\"verification\",\"role\":\"t1-f\","
+                    "\"verified\":%s,\"score\":%.3f,"
+                    "\"corrections\":%d,\"rounds\":1}",
+                    verified ? "true" : "false", score,
+                    verified ? 0 : 1);
+
+                if (t1f_result) {
                     free(t1f_result);
                 }
 
-                if (verified && score >= ORCH_VERIFY_THRESHOLD) {
-                    SVC_LOG_INFO("orchestrator: generation verified (round=%d, score=%.2f)",
-                                round, score);
-                    break;
-                }
-
-                SVC_LOG_INFO("orchestrator: generation not verified (round=%d, score=%.2f), correcting",
-                            round, score);
-
-                char* correction_prompt = build_correction_prompt(t2_output,
-                    t1f_result ? t1f_result : "Quality too low, improve output");
-                char* corrected = call_llm_service(correction_prompt,
-                    "You are a correction agent. Improve the output.");
-                free(correction_prompt);
-
-                if (corrected) {
-                    free(t2_output);
-                    t2_output = corrected;
-                }
+                task->output = strdup(vbuf);
+                task->output_len = (vlen > 0 && (size_t)vlen < sizeof(vbuf)) ? (size_t)vlen : strlen(task->output);
+                task->status = verified ? ORCH_TASK_COMPLETED : ORCH_TASK_FAILED;
+                memory_inform_evaluation(orch->memory, "verification", score, verified);
+                memory_write_step(orch->memory, "verification", task->output, NULL);
             }
+            break;
 
-            size_t meta_sz = strlen(t2_output) + 256;
-            char* meta_buf = (char*)malloc(meta_sz);
-            if (meta_buf) {
-                snprintf(meta_buf, meta_sz,
-                    "{\"phase\":\"generation\",\"mode\":\"t2_streaming\","
-                    "\"critical_loop\":true,\"verify_rounds\":%d,"
-                    "\"content\":%s}",
-                    ORCH_VERIFY_MAX_ROUNDS, t2_output);
-                task->output = meta_buf;
-                free(t2_output);
-            } else {
-                task->output = t2_output;
-            }
-            memory_write_step(orch->memory, "generation", task->output,
-                ",\"critical_loop\":true");
-            if (mem_retrieved) free(mem_retrieved);
-            task->output_len = strlen(task->output);
-            task->status = ORCH_TASK_COMPLETED;
-        }
-        break;
-
-    case ORCH_PHASE_VERIFICATION:
-        {
-            char* content = extract_field_string(input ? input : "", "content");
-            if (!content) content = strdup(input ? input : "");
-
-            char* verify_prompt = build_verification_prompt(
-                orch->tasks[0].input ? orch->tasks[0].input : "",
-                content);
-            char* t1f_result = call_llm_service(verify_prompt,
-                "You are a t1-f fast verification agent. Score 0.0-1.0.");
-            free(verify_prompt);
-            free(content);
-
-            float score = 0.5f;
-            bool verified = false;
-            if (t1f_result) {
-                score = extract_score_from_json(t1f_result);
-                verified = extract_bool_from_json(t1f_result, "verified");
-            }
-
-            if (score < ORCH_VERIFY_THRESHOLD && !verified) {
-                char* correction_prompt = build_correction_prompt(
+        case ORCH_PHASE_AUDIT:
+            {
+                char* prev_output = orch->tasks[3].output ? orch->tasks[3].output : (char*)(input ? input : "");
+                char* audit_prompt = build_audit_prompt(
                     input ? input : "",
-                    t1f_result ? t1f_result : "Verification failed");
-                char* corrected = call_llm_service(correction_prompt,
-                    "You are a correction agent.");
-                free(correction_prompt);
-                if (corrected) {
-                    free(t1f_result);
-                    t1f_result = corrected;
-                    score = ORCH_VERIFY_THRESHOLD;
-                    verified = true;
+                    prev_output);
+                char* audit_result = call_llm_service(audit_prompt,
+                    "You are a t1-p expert audit agent. Check for correctness, completeness, safety.");
+                free(audit_prompt);
+
+                bool audit_passed = true;
+                char* severity = NULL;
+                if (audit_result) {
+                    audit_passed = extract_bool_from_json(audit_result, "audit_passed");
+                    severity = extract_field_string(audit_result, "severity");
                 }
+
+                if (!audit_passed) {
+                    SVC_LOG_WARN("orchestrator: audit failed, severity=%s",
+                                severity ? severity : "unknown");
+                    if (severity && strcmp(severity, "critical") == 0) {
+                        task->status = ORCH_TASK_FAILED;
+                    }
+                }
+
+                size_t abuf_sz = (audit_result ? strlen(audit_result) : 0) + 256;
+                char* abuf = (char*)malloc(abuf_sz);
+                if (abuf) {
+                    snprintf(abuf, abuf_sz,
+                        "{\"audit_passed\":%s,\"severity\":\"%s\","
+                        "\"details\":%s}",
+                        audit_passed ? "true" : "false",
+                        severity ? severity : "ok",
+                        audit_result ? audit_result : "null");
+                    task->output = abuf;
+                } else {
+                    task->output = strdup(audit_passed ?
+                        "{\"audit_passed\":true}" : "{\"audit_passed\":false}");
+                }
+                task->output_len = strlen(task->output);
+                if (audit_passed) task->status = ORCH_TASK_COMPLETED;
+                memory_inform_evaluation(orch->memory, "audit",
+                    audit_passed ? 0.9f : 0.3f, audit_passed);
+                memory_write_step(orch->memory, "audit", task->output, NULL);
+                free(audit_result);
+                free(severity);
             }
+            break;
 
-            char vbuf[512];
-            int vlen = snprintf(vbuf, sizeof(vbuf),
-                "{\"phase\":\"verification\",\"role\":\"t1-f\","
-                "\"verified\":%s,\"score\":%.3f,"
-                "\"corrections\":%d,\"rounds\":1}",
-                verified ? "true" : "false", score,
-                verified ? 0 : 1);
+        case ORCH_PHASE_ALIGNMENT:
+            {
+                float logic_score = 0.8f;
+                float fact_score = 0.8f;
+                float goal_score = 0.8f;
 
-            if (t1f_result) {
-                free(t1f_result);
+                char* original_input = orch->tasks[0].input ? orch->tasks[0].input : "";
+                char* final_output = orch->tasks[4].output ? orch->tasks[4].output : (char*)(input ? input : "");
+
+                char align_prompt[4096];
+                snprintf(align_prompt, sizeof(align_prompt),
+                    "Score this output against the original task on 3 dimensions. "
+                    "Return JSON: {\"logic_score\":0.0-1.0,\"fact_score\":0.0-1.0,"
+                    "\"goal_score\":0.0-1.0,\"drift\":0.0-1.0}\n\n"
+                    "Original: %.1000s\n\nOutput: %.1000s",
+                    original_input, final_output);
+
+                char* align_result = call_llm_service(align_prompt,
+                    "You are an alignment scoring agent.");
+                if (align_result) {
+                    logic_score = extract_score_from_json(
+                        strstr(align_result, "logic_score") ? align_result : NULL);
+                    fact_score = extract_score_from_json(
+                        strstr(align_result, "fact_score") ? align_result : NULL);
+                    goal_score = extract_score_from_json(
+                        strstr(align_result, "goal_score") ? align_result : NULL);
+                    free(align_result);
+                }
+
+                float overall = logic_score * 0.30f + fact_score * 0.35f + goal_score * 0.35f;
+
+                if (align_history_count < ORCH_ALIGN_HISTORY_SIZE) {
+                    align_history[align_history_count++] = overall;
+                } else {
+                    for (int i = 0; i < ORCH_ALIGN_HISTORY_SIZE - 1; i++) {
+                        align_history[i] = align_history[i + 1];
+                    }
+                    align_history[ORCH_ALIGN_HISTORY_SIZE - 1] = overall;
+                }
+
+                bool drift_detected = false;
+                float drift_value = 0.0f;
+                if (align_history_count >= 3) {
+                    float recent = align_history[align_history_count - 1];
+                    float earlier = align_history[0];
+                    drift_value = earlier - recent;
+                    if (drift_value > 0.15f) {
+                        drift_detected = true;
+                        SVC_LOG_WARN("orchestrator: alignment drift detected (%.3f)", drift_value);
+                    }
+                }
+
+                bool aligned = (overall >= 0.6f) && !drift_detected;
+
+                char albuf[512];
+                int allen = snprintf(albuf, sizeof(albuf),
+                    "{\"aligned\":%s,\"overall_score\":%.3f,"
+                    "\"logic\":%.3f,\"fact\":%.3f,\"goal\":%.3f,"
+                    "\"drift\":%.3f,\"drift_detected\":%s}",
+                    aligned ? "true" : "false", overall,
+                    logic_score, fact_score, goal_score,
+                    drift_value, drift_detected ? "true" : "false");
+
+                task->output = strdup(albuf);
+                task->output_len = (allen > 0 && (size_t)allen < sizeof(albuf)) ? (size_t)allen : strlen(task->output);
+                task->status = aligned ? ORCH_TASK_COMPLETED : ORCH_TASK_FAILED;
+                memory_inform_evaluation(orch->memory, "alignment", overall, aligned);
+                memory_write_step(orch->memory, "alignment", task->output, NULL);
+                memory_sync_persistent(orch->memory);
             }
+            break;
 
-            task->output = strdup(vbuf);
-            task->output_len = (vlen > 0 && (size_t)vlen < sizeof(vbuf)) ? (size_t)vlen : strlen(task->output);
-            task->status = verified ? ORCH_TASK_COMPLETED : ORCH_TASK_FAILED;
-            memory_inform_evaluation(orch->memory, "verification", score, verified);
-            memory_write_step(orch->memory, "verification", task->output, NULL);
+        default:
+            task->status = ORCH_TASK_FAILED;
+            task->error_code = -1;
+            ret = -1;
+            break;
         }
-        break;
 
-    case ORCH_PHASE_AUDIT:
-        {
-            char* prev_output = orch->tasks[3].output ? orch->tasks[3].output : (input ? input : "");
-            char* audit_prompt = build_audit_prompt(
-                input ? input : "",
-                prev_output);
-            char* audit_result = call_llm_service(audit_prompt,
-                "You are a t1-p expert audit agent. Check for correctness, completeness, safety.");
-            free(audit_prompt);
+        time_t step_end = time(NULL);
+        uint32_t step_duration_ms = (uint32_t)((step_end - step_start) * 1000);
 
-            bool audit_passed = true;
-            char* severity = NULL;
-            if (audit_result) {
-                audit_passed = extract_bool_from_json(audit_result, "audit_passed");
-                severity = extract_field_string(audit_result, "severity");
-            }
-
-            if (!audit_passed) {
-                SVC_LOG_WARN("orchestrator: audit failed, severity=%s",
-                            severity ? severity : "unknown");
-                if (severity && strcmp(severity, "critical") == 0) {
-                    task->status = ORCH_TASK_FAILED;
-                }
-            }
-
-            size_t abuf_sz = (audit_result ? strlen(audit_result) : 0) + 256;
-            char* abuf = (char*)malloc(abuf_sz);
-            if (abuf) {
-                snprintf(abuf, abuf_sz,
-                    "{\"audit_passed\":%s,\"severity\":\"%s\","
-                    "\"details\":%s}",
-                    audit_passed ? "true" : "false",
-                    severity ? severity : "ok",
-                    audit_result ? audit_result : "null");
-                task->output = abuf;
-            } else {
-                task->output = strdup(audit_passed ?
-                    "{\"audit_passed\":true}" : "{\"audit_passed\":false}");
-            }
-            task->output_len = strlen(task->output);
-            if (audit_passed) task->status = ORCH_TASK_COMPLETED;
-            memory_inform_evaluation(orch->memory, "audit",
-                audit_passed ? 0.9f : 0.3f, audit_passed);
-            memory_write_step(orch->memory, "audit", task->output, NULL);
-            free(audit_result);
-            free(severity);
+        if (orch->config.timeout_ms > 0 && step_duration_ms >= orch->config.timeout_ms) {
+            SVC_LOG_WARN("orchestrator: phase %s timeout after %ums (limit=%ums)",
+                         phase_name(phase), step_duration_ms, orch->config.timeout_ms);
+            task->status = ORCH_TASK_TIMEOUT;
+            task->error_code = -3;
+            if (orch->breaker) cb_record_timeout(orch->breaker);
+            goto done;
         }
-        break;
 
-    case ORCH_PHASE_ALIGNMENT:
-        {
-            float logic_score = 0.8f;
-            float fact_score = 0.8f;
-            float goal_score = 0.8f;
-
-            char* original_input = orch->tasks[0].input ? orch->tasks[0].input : "";
-            char* final_output = orch->tasks[4].output ? orch->tasks[4].output : (input ? input : "");
-
-            char align_prompt[4096];
-            snprintf(align_prompt, sizeof(align_prompt),
-                "Score this output against the original task on 3 dimensions. "
-                "Return JSON: {\"logic_score\":0.0-1.0,\"fact_score\":0.0-1.0,"
-                "\"goal_score\":0.0-1.0,\"drift\":0.0-1.0}\n\n"
-                "Original: %.1000s\n\nOutput: %.1000s",
-                original_input, final_output);
-
-            char* align_result = call_llm_service(align_prompt,
-                "You are an alignment scoring agent.");
-            if (align_result) {
-                logic_score = extract_score_from_json(
-                    strstr(align_result, "logic_score") ? align_result : NULL);
-                fact_score = extract_score_from_json(
-                    strstr(align_result, "fact_score") ? align_result : NULL);
-                goal_score = extract_score_from_json(
-                    strstr(align_result, "goal_score") ? align_result : NULL);
-                free(align_result);
-            }
-
-            float overall = logic_score * 0.30f + fact_score * 0.35f + goal_score * 0.35f;
-
-            if (align_history_count < ORCH_ALIGN_HISTORY_SIZE) {
-                align_history[align_history_count++] = overall;
-            } else {
-                for (int i = 0; i < ORCH_ALIGN_HISTORY_SIZE - 1; i++) {
-                    align_history[i] = align_history[i + 1];
-                }
-                align_history[ORCH_ALIGN_HISTORY_SIZE - 1] = overall;
-            }
-
-            bool drift_detected = false;
-            float drift_value = 0.0f;
-            if (align_history_count >= 3) {
-                float recent = align_history[align_history_count - 1];
-                float earlier = align_history[0];
-                drift_value = earlier - recent;
-                if (drift_value > 0.15f) {
-                    drift_detected = true;
-                    SVC_LOG_WARN("orchestrator: alignment drift detected (%.3f)", drift_value);
-                }
-            }
-
-            bool aligned = (overall >= 0.6f) && !drift_detected;
-
-            char albuf[512];
-            int allen = snprintf(albuf, sizeof(albuf),
-                "{\"aligned\":%s,\"overall_score\":%.3f,"
-                "\"logic\":%.3f,\"fact\":%.3f,\"goal\":%.3f,"
-                "\"drift\":%.3f,\"drift_detected\":%s}",
-                aligned ? "true" : "false", overall,
-                logic_score, fact_score, goal_score,
-                drift_value, drift_detected ? "true" : "false");
-
-            task->output = strdup(albuf);
-            task->output_len = (allen > 0 && (size_t)allen < sizeof(albuf)) ? (size_t)allen : strlen(task->output);
-            task->status = aligned ? ORCH_TASK_COMPLETED : ORCH_TASK_FAILED;
-            memory_inform_evaluation(orch->memory, "alignment", overall, aligned);
-            memory_write_step(orch->memory, "alignment", task->output, NULL);
-            memory_sync_persistent(orch->memory);
+        if (task->status == ORCH_TASK_COMPLETED) {
+            if (orch->breaker) cb_record_success(orch->breaker, task->duration_ms);
+            break;
         }
-        break;
 
-    default:
-        task->status = ORCH_TASK_FAILED;
-        task->error_code = -1;
-        ret = -1;
-        break;
+        if (task->status == ORCH_TASK_FAILED || task->status == ORCH_TASK_TIMEOUT) {
+            if (attempt < max_attempts - 1) {
+                if (orch->breaker) cb_record_failure(orch->breaker, task->error_code);
+                continue;
+            }
+            if (orch->breaker) cb_record_failure(orch->breaker, task->error_code);
+            break;
+        }
     }
 
-    task->duration_ms = (uint32_t)((time(NULL) - task->start_time) * 1000);
+done:
+    task->duration_ms = (uint32_t)((time(NULL) - phase_start) * 1000);
 
     if (task->status == ORCH_TASK_COMPLETED) {
         orch->success_count++;

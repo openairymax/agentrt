@@ -626,7 +626,27 @@ static char** reconstruct_path_from_bfs(agentos_knowledge_graph_t* kg,
 
     path = build_reversed_path(temp_path, idx, path_len);
 
-    /* 释放temp_path数组，但不释放其中的字符串（已转移到path） */
     AGENTOS_FREE(temp_path);
     return path;
+}
+
+agentos_error_t agentos_knowledge_graph_stats(
+    agentos_knowledge_graph_t* kg,
+    size_t* out_entity_count,
+    size_t* out_relation_count) {
+    if (!kg || !out_entity_count || !out_relation_count) return AGENTOS_EINVAL;
+
+    agentos_mutex_lock(kg->mutex);
+
+    *out_entity_count = kg->entity_count;
+    size_t total_relations = 0;
+    for (size_t i = 0; i < kg->entity_count; i++) {
+        if (kg->entities[i]) {
+            total_relations += kg->entities[i]->relation_count;
+        }
+    }
+    *out_relation_count = total_relations;
+
+    agentos_mutex_unlock(kg->mutex);
+    return AGENTOS_SUCCESS;
 }

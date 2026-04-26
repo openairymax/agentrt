@@ -63,7 +63,7 @@ typedef struct http_gateway {
     char* host;                      /**< 监听地址 */
 
     void* handler_adapter;           /**< 公共回调适配器（动态分配） */
-    gateway_request_handler_t handler; /**< 内部请求处理回调 */
+    gateway_internal_handler_t handler; /**< 内部请求处理回调 */
     void* handler_data;              /**< 回调用户数据 */
     
     atomic_bool running;             /**< 运行标志 */

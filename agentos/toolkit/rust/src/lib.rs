@@ -29,6 +29,7 @@ pub mod skill;
 pub mod syscall;
 pub mod telemetry;
 pub mod agent;
+pub mod plugin;
 
 // ============================================================
 // 版本信息
@@ -72,6 +73,13 @@ pub use types::{
     PaginationOptions, SortOptions, FilterOptions, ListOptions,
     // 请求选项函数
     with_request_timeout, with_header, with_query_param,
+};
+
+// 插件框架
+pub use plugin::{
+    PluginState, PluginManifest, PluginDependency, PluginInfo,
+    BasePlugin, PluginFactory, PluginRegistry, PluginManager,
+    get_plugin_registry,
 };
 
 // 业务模块管理器

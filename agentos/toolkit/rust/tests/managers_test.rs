@@ -4,7 +4,7 @@
 //
 // 测试所有 Manager 模块的功能
 
-use agentos::*;
+use agentos_rs::*;
 use std::time::Duration;
 
 // ============================================================

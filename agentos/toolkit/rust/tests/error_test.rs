@@ -4,7 +4,7 @@
 //
 // 测试错误码映射、错误链和错误处理
 
-use agentos::*;
+use agentos_rs::*;
 
 #[test]
 fn test_error_code_mapping() {

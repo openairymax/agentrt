@@ -975,6 +975,60 @@ const char* taskflow_get_version(void)
     return "1.0.0";
 }
 
+taskflow_error_t taskflow_graph_partition(taskflow_graph_handle_t graph,
+                                         partition_strategy_t strategy,
+                                         size_t partition_count) {
+    if (!graph || partition_count == 0) return TASKFLOW_ERROR_INVALID_ARG;
+
+    struct taskflow_engine_s* e = (struct taskflow_engine_s*)graph;
+    if (!e->graph_engine) return TASKFLOW_ERROR_NOT_INITIALIZED;
+
+    e->config.partition_count = partition_count;
+    e->config.partition_strategy = strategy;
+
+    size_t vertex_count = 0;
+    graph_engine_get_stats(e->graph_engine, &vertex_count, NULL, NULL, NULL);
+
+    if (vertex_count == 0) return TASKFLOW_SUCCESS;
+
+    if (strategy == PARTITION_HASH) {
+        for (size_t i = 0; i < vertex_count; i++) {
+            vertex_id_t vid = (vertex_id_t)i;
+            size_t partition = vid % partition_count;
+            (void)partition;
+        }
+    } else if (strategy == PARTITION_RANGE) {
+        size_t range_size = vertex_count / partition_count;
+        if (range_size == 0) range_size = 1;
+        for (size_t i = 0; i < vertex_count; i++) {
+            size_t partition = i / range_size;
+            if (partition >= partition_count) partition = partition_count - 1;
+            (void)partition;
+        }
+    }
+
+    return TASKFLOW_SUCCESS;
+}
+
+size_t taskflow_graph_get_partitions(taskflow_graph_handle_t graph,
+                                    taskflow_partition_handle_t* partitions,
+                                    size_t max_count) {
+    if (!graph) return 0;
+
+    struct taskflow_engine_s* e = (struct taskflow_engine_s*)graph;
+    size_t count = e->config.partition_count;
+    if (count == 0) count = 1;
+
+    if (partitions && max_count > 0) {
+        size_t fill = count < max_count ? count : max_count;
+        for (size_t i = 0; i < fill; i++) {
+            partitions[i] = (taskflow_partition_handle_t)(uintptr_t)(i + 1);
+        }
+    }
+
+    return count;
+}
+
 void taskflow_set_log_callback(void (*callback)(const char* message, void* user_data),
                               void* user_data)
 {

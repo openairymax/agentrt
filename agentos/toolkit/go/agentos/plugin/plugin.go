@@ -185,7 +185,8 @@ func (r *PluginRegistry) Unregister(pluginID string) bool {
 	}
 
 	if _, loaded := r.instances[pluginID]; loaded {
-		r.Unload(pluginID)
+		delete(r.instances, pluginID)
+		r.states[pluginID] = StateUnloaded
 	}
 
 	delete(r.factories, pluginID)

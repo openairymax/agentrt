@@ -6,7 +6,7 @@
 #include <unistd.h>
 
 static volatile int g_running = 1;
-static channel_service_t* g_svc = NULL;
+static channel_service_t* g_svc __attribute__((unused)) = NULL;
 
 static void signal_handler(int sig)
 {

@@ -5,9 +5,10 @@
 use serde_json::{json, Value};
 use std::time::{Duration, Instant};
 
-use crate::{AgentOSError, Client};
+use crate::{AgentOSError, Client, client::APIClient};
 
-/// ﻛﭨﭨﮒ۰ﻝﭘﮔﮔﻛﺕ?#[derive(Debug, Clone, PartialEq, Eq)]
+/// 任务状态枚举
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TaskStatus {
     Pending,
     Running,
@@ -17,7 +18,8 @@ pub enum TaskStatus {
 }
 
 impl TaskStatus {
-    /// ﻛﭨﮒ­ﻝ؛۵ﻛﺕﺎﻟ۶۲ﮔﻛﭨﭨﮒ۰ﻝﭘﮔ?    pub fn from_str(s: &str) -> Option<Self> {
+    /// 从字符串解析任务状态
+    pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "pending" => Some(TaskStatus::Pending),
             "running" => Some(TaskStatus::Running),
@@ -28,7 +30,7 @@ impl TaskStatus {
         }
     }
 
-    /// ﻟﺛ؛ﮔ۱ﻛﺕﭦﮒ­ﻝ؛۵ﻛﺕﺎﻟ۰۷ﻝ۳ﭦ
+    /// 转换为字符串表示
     pub fn as_str(&self) -> &'static str {
         match self {
             TaskStatus::Pending => "pending",
@@ -38,6 +40,11 @@ impl TaskStatus {
             TaskStatus::Cancelled => "cancelled",
         }
     }
+
+    /// 是否为终态
+    pub fn is_terminal(&self) -> bool {
+        matches!(self, TaskStatus::Completed | TaskStatus::Failed | TaskStatus::Cancelled)
+    }
 }
 
 impl std::fmt::Display for TaskStatus {
@@ -46,7 +53,7 @@ impl std::fmt::Display for TaskStatus {
     }
 }
 
-/// ﻛﭨﭨﮒ۰ﻝﭨﮔ
+/// 任务结果
 #[derive(Debug)]
 pub struct TaskResult {
     pub id: String,
@@ -57,7 +64,7 @@ pub struct TaskResult {
 
 type Result<T> = std::result::Result<T, AgentOSError>;
 
-/// AgentOS ﻛﭨﭨﮒ۰
+/// AgentOS 任务
 #[derive(Debug, Clone)]
 pub struct Task {
     client: Client,
@@ -65,21 +72,22 @@ pub struct Task {
 }
 
 impl Task {
-    /// ﮒﮒﭨﭦﮔﺍﻝ Task ﮒﺁﺗﻟﺎ۰
+    /// 创建新的 Task 对象
     pub fn new(client: Client, id: String) -> Self {
         Task { client, id }
     }
 
-    /// ﻟﺓﮒﻛﭨﭨﮒ۰ ID
+    /// 获取任务 ID
     pub fn task_id(&self) -> &str {
         &self.id
     }
 
-    /// ﮔ۴ﻟﺁ۱ﻛﭨﭨﮒ۰ﻝﭘﮔ?    pub async fn query(&self) -> Result<TaskStatus> {
+    /// 查询任务状态
+    pub async fn query(&self) -> Result<TaskStatus> {
         let path = format!("/api/v1/tasks/{}", self.id);
-        let response = self.client.request("GET", &path, None).await?;
+        let response = self.client.get(&path, None).await?;
 
-        let status = response
+        let status = response.data
             .get("status")
             .and_then(|v| v.as_str())
             .ok_or_else(|| {
@@ -91,7 +99,7 @@ impl Task {
         })
     }
 
-    /// ﻝ­ﮒﺝﻛﭨﭨﮒ۰ﮒ؟ﮔ
+    /// 等待任务完成
     pub async fn wait(&self, timeout: Option<Duration>) -> Result<TaskResult> {
         let start = Instant::now();
 
@@ -103,13 +111,13 @@ impl Task {
                 | TaskStatus::Failed
                 | TaskStatus::Cancelled => {
                     let path = format!("/api/v1/tasks/{}", self.id);
-                    let response = self.client.request("GET", &path, None).await?;
+                    let response = self.client.get(&path, None).await?;
 
-                    let output = response
+                    let output = response.data
                         .get("output")
                         .and_then(|v| v.as_str())
                         .map(|s| s.to_string());
-                    let error = response
+                    let error = response.data
                         .get("error")
                         .and_then(|v| v.as_str())
                         .map(|s| s.to_string());
@@ -136,12 +144,12 @@ impl Task {
         }
     }
 
-    /// ﮒﮔﭘﻛﭨﭨﮒ۰
+    /// 取消任务
     pub async fn cancel(&self) -> Result<bool> {
         let path = format!("/api/v1/tasks/{}/cancel", self.id);
-        let response = self.client.request("POST", &path, None).await?;
+        let response = self.client.post(&path, None, None).await?;
 
-        let success = response
+        let success = response.data
             .get("success")
             .and_then(|v| v.as_bool())
             .ok_or_else(|| {

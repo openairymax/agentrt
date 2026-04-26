@@ -179,17 +179,17 @@ int monitor_get_stats(void* data, void** stats) {
     }
 
     snprintf(stats_str, 512, 
-             "Total Tasks: %llu\n" 
-             "Successful Tasks: %llu\n" 
-             "Failed Tasks: %llu\n" 
+             "Total Tasks: %lu\n" 
+             "Successful Tasks: %lu\n" 
+             "Failed Tasks: %lu\n" 
              "Success Rate: %.2f%%\n" 
              "Average Execution Time: %.2f ms\n" 
              "Available Agents: %zu/%zu\n" 
              "Last Health Check: %s" 
              "Last Stats Report: %s",
-             md->total_tasks,
-             md->successful_tasks,
-             md->failed_tasks,
+             (unsigned long)md->total_tasks,
+             (unsigned long)md->successful_tasks,
+             (unsigned long)md->failed_tasks,
              success_rate * 100.0f,
              avg_execution_time,
              md->available_agents,
