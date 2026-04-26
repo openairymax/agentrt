@@ -30,9 +30,9 @@ class ToolCapability(Enum):
 @dataclass
 class ToolContext:
     """
-    宸ュ叿鎵ц涓婁笅鏂?    
+    宸ュ叿鎵ц涓婁笅鏂?    
     閬靛惊鍘熷垯:
-    - E-3 璧勬簮纭畾鎬э細鏄庣‘鐨勮祫婧愮鐞?    - A-1 绠€绾﹁嚦涓婏細鏈€灏忓繀瑕佷俊鎭?    """
+    - E-3 璧勬簮纭畾鎬э細鏄庣'鐨勮祫婧愮鐞?    - A-1 绠绾﹁嚦涓婏細鏈灏忓繀瑕佷俊鎭?    """
     tool_id: str
     agent_id: Optional[str] = None
     task_id: Optional[str] = None
@@ -45,10 +45,10 @@ class ToolContext:
 @dataclass
 class ToolResult:
     """
-    宸ュ叿鎵ц缁撴灉
+    宸ュ叿鎵ц缁撴灉
     
     閬靛惊鍘熷垯:
-    - E-6 閿欒鍙拷婧細瀹屾暣鐨勯敊璇俊鎭?    - A-2 鏋佽嚧缁嗚妭锛氳缁嗙殑鎵ц鎸囨爣
+    - E-6 閿欒鍙拷婧細瀹屾暣鐨勯敊璇俊鎭?    - A-2 鏋佽嚧缁嗚妭锛氳缁嗙殑鎵ц鎸囨爣
     """
     success: bool
     output: Optional[Any] = None
@@ -64,9 +64,9 @@ class Tool(ABC):
     宸ュ叿鎶借薄鍩虹被
     
     閬靛惊鍘熷垯:
-    - K-2 鎺ュ彛濂戠害鍖栵細瀹屾暣鐨?docstring 鍜岀被鍨嬫敞瑙?    - K-4 鍙彃鎷旂瓥鐣ワ細鏀寔杩愯鏃舵浛鎹?    - E-1 瀹夊叏鍐呯敓锛氬唴缃畨鍏ㄦ鏌?    """
+    - K-2 鎺ュ彛濂戠害鍖栵細瀹屾暣鐨?docstring 鍜岀被鍨嬫敞瑙?    - K-4 鍙彃鎷旂瓥鐣ワ細鏀寔杩愯鏃舵浛鎹?    - E-1 瀹夊叏鍐呯敓锛氬唴缃畨鍏ㄦ鏌?    """
     
-    # 绫荤骇鍒父閲?    NAME: str = ""
+    # 绫荤骇鍒父閲?    NAME: str = ""
     DESCRIPTION: str = ""
     CATEGORY: ToolCategory = ToolCategory.CUSTOM
     CAPABILITIES: Set[ToolCapability] = set()
@@ -76,9 +76,9 @@ class Tool(ABC):
     
     def __init__(self, tool_id: Optional[str] = None):
         """
-        鍒濆鍖栧伐鍏?        
+        鍒濆鍖栧伐鍏?        
         Args:
-            tool_id: 宸ュ叿鍞竴鏍囪瘑
+            tool_id: 宸ュ叿鍞竴鏍囪瘑
         """
         self.tool_id = tool_id or f"{self.NAME}_{id(self)}"
         self._enabled = True
@@ -87,7 +87,7 @@ class Tool(ABC):
     
     @property
     def enabled(self) -> bool:
-        """宸ュ叿鏄惁鍚敤"""
+        """宸ュ叿鏄惁鍚敤"""
         return self._enabled
     
     @enabled.setter
@@ -112,14 +112,14 @@ class Tool(ABC):
         context: ToolContext
     ) -> ToolResult:
         """
-        鎵ц宸ュ叿
+        鎵ц宸ュ叿
         
         瀛愮被蹇呴』瀹炵幇鐨勬牳蹇冩柟娉?        
         Args:
-            parameters: 鎵ц鍙傛暟
-            context: 鎵ц涓婁笅鏂?            
+            parameters: 鎵ц鍙傛暟
+            context: 鎵ц涓婁笅鏂?            
         Returns:
-            ToolResult: 鎵ц缁撴灉
+            ToolResult: 鎵ц缁撴灉
         """
         pass
     
@@ -129,15 +129,15 @@ class Tool(ABC):
         context: Optional[ToolContext] = None
     ) -> ToolResult:
         """
-        鎵ц宸ュ叿锛堝叕鍏辨帴鍙ｏ級
+        鎵ц宸ュ叿锛堝叕鍏辨帴鍙ｏ級
         
-        鍖呭惈鍓嶇疆妫€鏌ャ€佹墽琛屻€佸悗缃鐞嗙殑瀹屾暣娴佺▼
+        鍖呭惈鍓嶇疆妫鏌ャ佹墽琛屻佸悗缃鐞嗙殑瀹屾暣娴佺▼
         
         Args:
-            parameters: 鎵ц鍙傛暟
-            context: 鎵ц涓婁笅鏂?            
+            parameters: 鎵ц鍙傛暟
+            context: 鎵ц涓婁笅鏂?            
         Returns:
-            ToolResult: 鎵ц缁撴灉
+            ToolResult: 鎵ц缁撴灉
         """
         # 检查工具是否启用
         if not self._enabled:
@@ -161,7 +161,7 @@ class Tool(ABC):
                     error_code="INVALID_INPUT"
                 )
         
-        # 鎵ц鍓嶆鏌ワ紙瀹夊叏妫€鏌ワ級
+        # 鎵ц鍓嶆鏌ワ紙瀹夊叏妫鏌ワ級
         security_result = await self._pre_execute_check(parameters, context)
         if not security_result[0]:
             return ToolResult(
@@ -170,13 +170,13 @@ class Tool(ABC):
                 error_code="SECURITY_CHECK_FAILED"
             )
         
-        # 鎵ц
+        # 鎵ц
         start_time = time.time()
         try:
             result = await self._do_execute(parameters, context)
             result.execution_time = time.time() - start_time
             
-            # 鏇存柊缁熻
+            # 鏇存柊缁熻
             self._last_used = time.time()
             self._usage_count += 1
             
@@ -210,12 +210,12 @@ class Tool(ABC):
             parameters: 杈撳叆鍙傛暟
             
         Returns:
-            tuple[bool, Optional[str]]: (鏄惁鏈夋晥锛岄敊璇秷鎭?
+            tuple[bool, Optional[str]]: (鏄惁鏈夋晥锛岄敊璇秷鎭?
         """
         if not self.INPUT_SCHEMA:
             return True, None
         
-        # 绠€鍖栫殑 JSON Schema 楠岃瘉
+        # 绠鍖栫殑 JSON Schema 楠岃瘉
         required = self.INPUT_SCHEMA.get("required", [])
         properties = self.INPUT_SCHEMA.get("properties", {})
         
@@ -249,12 +249,12 @@ class Tool(ABC):
             output: 杈撳嚭鏁版嵁
             
         Returns:
-            tuple[bool, Optional[str]]: (鏄惁鏈夋晥锛岄敊璇秷鎭?
+            tuple[bool, Optional[str]]: (鏄惁鏈夋晥锛岄敊璇秷鎭?
         """
         if not self.OUTPUT_SCHEMA:
             return True, None
         
-        # 绠€鍖栫殑楠岃瘉閫昏緫
+        # 绠鍖栫殑楠岃瘉閫昏緫
         expected_type = self.OUTPUT_SCHEMA.get("type")
         
         if expected_type == "string" and not isinstance(output, str):
@@ -274,16 +274,16 @@ class Tool(ABC):
         context: ToolContext
     ) -> tuple[bool, Optional[str]]:
         """
-        鎵ц鍓嶆鏌ワ紙瀹夊叏妫€鏌ワ級
+        鎵ц鍓嶆鏌ワ紙瀹夊叏妫鏌ワ級
         
-        瀛愮被鍙互閲嶅啓姝ゆ柟娉曟坊鍔犺嚜瀹氫箟瀹夊叏妫€鏌?        
+        瀛愮被鍙互閲嶅啓姝ゆ柟娉曟坊鍔犺嚜瀹氫箟瀹夊叏妫鏌?        
         Args:
-            parameters: 鎵ц鍙傛暟
-            context: 鎵ц涓婁笅鏂?            
+            parameters: 鎵ц鍙傛暟
+            context: 鎵ц涓婁笅鏂?            
         Returns:
-            tuple[bool, Optional[str]]: (鏄惁閫氳繃妫€鏌ワ紝閿欒娑堟伅)
+            tuple[bool, Optional[str]]: (鏄惁閫氳繃妫鏌ワ紝閿欒娑堟伅)
         """
-        # 榛樿瀹炵幇锛氭€绘槸閫氳繃
+        # 榛樿瀹炵幇锛氭绘槸閫氳繃
         return True, None
     
     def get_info(self) -> Dict[str, Any]:
@@ -313,8 +313,8 @@ class ToolRegistry:
     """
     宸ュ叿娉ㄥ唽琛?    
     閬靛惊鍘熷垯:
-    - K-4 鍙彃鎷旂瓥鐣ワ細鏀寔鍔ㄦ€佹敞鍐?娉ㄩ攢
-    - E-3 璧勬簮纭畾鎬э細鏄庣‘鐨勮祫婧愮鐞?    """
+    - K-4 鍙彃鎷旂瓥鐣ワ細鏀寔鍔ㄦ佹敞鍐?娉ㄩ攢
+    - E-3 璧勬簮纭畾鎬э細鏄庣'鐨勮祫婧愮鐞?    """
     
     def __init__(self):
         self._tools: Dict[str, Tool] = {}
@@ -328,7 +328,7 @@ class ToolRegistry:
             tool: 宸ュ叿瀹炰緥
             
         Returns:
-            bool: 娉ㄥ唽鏄惁鎴愬姛
+            bool: 娉ㄥ唽鏄惁鎴愬姛
         """
         async with self._lock:
             if tool.tool_id in self._tools:
@@ -344,7 +344,7 @@ class ToolRegistry:
             tool_id: 宸ュ叿 ID
             
         Returns:
-            bool: 娉ㄩ攢鏄惁鎴愬姛
+            bool: 娉ㄩ攢鏄惁鎴愬姛
         """
         async with self._lock:
             if tool_id not in self._tools:
@@ -367,7 +367,7 @@ class ToolRegistry:
     
     async def list_tools(self) -> List[Tool]:
         """
-        鍒楀嚭鎵€鏈夊伐鍏?        
+        鍒楀嚭鎵鏈夊伐鍏?        
         Returns:
             List[Tool]: 宸ュ叿鍒楄〃
         """
@@ -376,7 +376,7 @@ class ToolRegistry:
     
     async def find_by_category(self, category: ToolCategory) -> List[Tool]:
         """
-        鎸夌被鍒煡鎵惧伐鍏?        
+        鎸夌被鍒煡鎵惧伐鍏?        
         Args:
             category: 宸ュ叿绫诲埆
             
@@ -410,11 +410,11 @@ class ToolRegistry:
 
 class ToolExecutor:
     """
-    宸ュ叿鎵ц鍣?    
-    璐熻矗宸ュ叿鐨勮皟搴﹀拰鎵ц绠＄悊
+    宸ュ叿鎵ц鍣?    
+    璐熻矗宸ュ叿鐨勮皟搴拰鎵ц绠＄悊
     
     閬靛惊鍘熷垯:
-    - E-3 璧勬簮纭畾鎬э細骞跺彂鎺у埗鍜岃秴鏃剁鐞?    - S-1 鍙嶉闂幆锛氬畬鏁寸殑鎵ц鍙嶉
+    - E-3 璧勬簮纭畾鎬э細骞跺彂鎺у埗鍜岃秴鏃剁鐞?    - S-1 鍙嶉闂幆锛氬畬鏁寸殑鎵ц鍙嶉
     """
     
     def __init__(
@@ -423,11 +423,11 @@ class ToolExecutor:
         default_timeout: float = 60.0
     ):
         """
-        鍒濆鍖栧伐鍏锋墽琛屽櫒
+        鍒濆鍖栧伐鍏锋墽琛屽櫒
         
         Args:
-            max_concurrent: 鏈€澶у苟鍙戞墽琛屾暟
-            default_timeout: 榛樿瓒呮椂鏃堕棿锛堢锛?        """
+            max_concurrent: 鏈澶у苟鍙戞墽琛屾暟
+            default_timeout: 榛樿瓒呮椂鏃堕棿锛堢锛?        """
         self.max_concurrent = max_concurrent
         self.default_timeout = default_timeout
         self._semaphore = asyncio.Semaphore(max_concurrent)
@@ -443,7 +443,7 @@ class ToolExecutor:
             tool: 宸ュ叿瀹炰緥
             
         Returns:
-            bool: 娉ㄥ唽鏄惁鎴愬姛
+            bool: 娉ㄥ唽鏄惁鎴愬姛
         """
         return await self._registry.register(tool)
     
@@ -454,14 +454,14 @@ class ToolExecutor:
         context: Optional[ToolContext] = None
     ) -> ToolResult:
         """
-        鎵ц宸ュ叿
+        鎵ц宸ュ叿
         
         Args:
             tool_id: 宸ュ叿 ID
-            parameters: 鎵ц鍙傛暟
-            context: 鎵ц涓婁笅鏂?            
+            parameters: 鎵ц鍙傛暟
+            context: 鎵ц涓婁笅鏂?            
         Returns:
-            ToolResult: 鎵ц缁撴灉
+            ToolResult: 鎵ц缁撴灉
         """
         if self._shutdown:
             return ToolResult(
@@ -485,14 +485,14 @@ class ToolExecutor:
             if context.timeout is None:
                 context.timeout = self.default_timeout
             
-            # 鎵ц
+            # 鎵ц
             try:
                 result = await asyncio.wait_for(
                     tool.execute(parameters, context),
                     timeout=context.timeout
                 )
                 
-                # 璁板綍鎵ц鍘嗗彶
+                # 璁板綍鎵ц鍘嗗彶
                 self._execution_history.append({
                     "tool_id": tool_id,
                     "parameters": parameters,
@@ -511,21 +511,21 @@ class ToolExecutor:
     
     async def shutdown(self, wait: bool = True) -> None:
         """
-        鍏抽棴鎵ц鍣?        
+        鍏抽棴鎵ц鍣?        
         Args:
-            wait: 鏄惁绛夊緟杩愯涓殑浠诲姟瀹屾垚
+            wait: 鏄惁绛夊緟杩愯涓殑浠诲姟瀹屾垚
         """
         self._shutdown = True
         
         if wait:
-            # 绛夊緟鎵€鏈夊苟鍙戜换鍔″畬鎴?            await self._semaphore.acquire()
+            # 绛夊緟鎵鏈夊苟鍙戜换鍔"畬鎴?            await self._semaphore.acquire()
             self._semaphore.release()
     
     def get_stats(self) -> Dict[str, Any]:
         """
-        鑾峰彇鎵ц鍣ㄧ粺璁′俊鎭?        
+        鑾峰彇鎵ц鍣ㄧ粺璁′俊鎭?        
         Returns:
-            Dict[str, Any]: 缁熻淇℃伅
+            Dict[str, Any]: 缁熻淇℃伅
         """
         return {
             "max_concurrent": self.max_concurrent,

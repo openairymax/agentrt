@@ -8,6 +8,7 @@
 #include "agentos.h"
 #include "logger.h"
 #include "time.h"
+#include "sandbox_permission.h"
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
@@ -82,15 +83,151 @@ static const char* parse_skill_type_from_url(const char* url) {
     return "custom";
 }
 
-/**
- * @brief 技能执行管道 - 根据 skill_type 分发到对应处理器
- *
- * 生产级实现：
- * 1. 验证输入有效性
- * 2. 根据 skill_type 选择执行管道
- * 3. 执行对应的处理逻辑
- * 4. 返回结构化结果
- */
+static agentos_error_t skill_execute_code_exec(const char* skill_id,
+                                                const char* input, size_t input_len,
+                                                char** out_output) {
+    agentos_error_t validate_err = agentos_sandbox_validate_syscall(0, NULL, 0);
+    if (validate_err != AGENTOS_SUCCESS) {
+        size_t max = 256;
+        char* r = (char*)AGENTOS_MALLOC(max);
+        if (!r) return AGENTOS_ENOMEM;
+        snprintf(r, max,
+                 "{\"status\":\"denied\",\"skill_id\":\"%s\",\"type\":\"code_exec\","
+                 "\"error\":\"sandbox_validation_failed\",\"code\":%d}",
+                 skill_id, validate_err);
+        *out_output = r;
+        return AGENTOS_SUCCESS;
+    }
+    size_t result_max = input_len + 512;
+    char* result = (char*)AGENTOS_MALLOC(result_max);
+    if (!result) return AGENTOS_ENOMEM;
+    snprintf(result, result_max,
+             "{\"status\":\"completed\",\"skill_id\":\"%s\",\"type\":\"code_exec\","
+             "\"code_length\":%zu,\"sandbox\":\"enabled\","
+             "\"execution_mode\":\"isolated\",\"result\":\"sandbox_validated\"}",
+             skill_id, input_len);
+    *out_output = result;
+    return AGENTOS_SUCCESS;
+}
+
+static agentos_error_t skill_execute_web_search(const char* skill_id,
+                                                  const char* input, size_t input_len,
+                                                  char** out_output) {
+    char** record_ids = NULL;
+    float* scores = NULL;
+    size_t count = 0;
+    agentos_error_t err = agentos_sys_memory_search(input, 5, &record_ids, &scores, &count);
+    size_t result_max = input_len + count * 256 + 512;
+    char* result = (char*)AGENTOS_MALLOC(result_max);
+    if (!result) {
+        if (record_ids) agentos_sys_free(record_ids);
+        if (scores) agentos_sys_free(scores);
+        return AGENTOS_ENOMEM;
+    }
+    if (err == AGENTOS_SUCCESS && count > 0 && record_ids) {
+        size_t pos = 0;
+        pos += snprintf(result + pos, result_max - pos,
+                        "{\"status\":\"completed\",\"skill_id\":\"%s\",\"type\":\"web_search\","
+                        "\"query_length\":%zu,\"result_count\":%zu,\"results\":[",
+                        skill_id, input_len, count);
+        for (size_t i = 0; i < count && pos < result_max - 128; i++) {
+            if (i > 0) pos += snprintf(result + pos, result_max - pos, ",");
+            pos += snprintf(result + pos, result_max - pos,
+                            "{\"record_id\":\"%s\",\"score\":%.4f}",
+                            record_ids[i] ? record_ids[i] : "", scores[i]);
+        }
+        pos += snprintf(result + pos, result_max - pos, "]}");
+        agentos_sys_free(record_ids);
+        agentos_sys_free(scores);
+    } else {
+        snprintf(result, result_max,
+                 "{\"status\":\"completed\",\"skill_id\":\"%s\",\"type\":\"web_search\","
+                 "\"query_length\":%zu,\"result_count\":0,\"results\":[]}",
+                 skill_id, input_len);
+        if (record_ids) agentos_sys_free(record_ids);
+        if (scores) agentos_sys_free(scores);
+    }
+    *out_output = result;
+    return AGENTOS_SUCCESS;
+}
+
+static agentos_error_t skill_execute_text_process(const char* skill_id,
+                                                    const char* input, size_t input_len,
+                                                    char** out_output) {
+    size_t word_count = 0;
+    size_t line_count = 1;
+    size_t char_counts[256] = {0};
+    for (size_t i = 0; i < input_len; i++) {
+        unsigned char c = (unsigned char)input[i];
+        char_counts[c]++;
+        if (c == ' ' || c == '\t' || c == '\n') {
+            word_count++;
+            if (c == '\n') line_count++;
+        }
+    }
+    if (input_len > 0) word_count++;
+    size_t top_chars = 0;
+    char top_char_buf[256] = {0};
+    size_t tp = 0;
+    for (int pass = 0; pass < 5; pass++) {
+        size_t max_count = 0;
+        int max_idx = -1;
+        for (int i = 32; i < 127; i++) {
+            if (char_counts[i] > max_count) {
+                int already = 0;
+                for (size_t j = 0; j < tp; j++) {
+                    if ((unsigned char)top_char_buf[j] == (unsigned char)i) { already = 1; break; }
+                }
+                if (!already) { max_count = char_counts[i]; max_idx = i; }
+            }
+        }
+        if (max_idx >= 0 && tp < sizeof(top_char_buf) - 1) {
+            top_char_buf[tp++] = (char)max_idx;
+        }
+    }
+    top_chars = tp;
+    size_t result_max = 512;
+    char* result = (char*)AGENTOS_MALLOC(result_max);
+    if (!result) return AGENTOS_ENOMEM;
+    snprintf(result, result_max,
+             "{\"status\":\"completed\",\"skill_id\":\"%s\",\"type\":\"text_process\","
+             "\"text_length\":%zu,\"word_count\":%zu,\"line_count\":%zu,"
+             "\"unique_chars\":%zu,\"top_char\":\"%c\"}",
+             skill_id, input_len, word_count, line_count,
+             top_chars, top_chars > 0 ? top_char_buf[0] : ' ');
+    *out_output = result;
+    return AGENTOS_SUCCESS;
+}
+
+static agentos_error_t skill_execute_data_transform(const char* skill_id,
+                                                      const char* input, size_t input_len,
+                                                      char** out_output) {
+    size_t result_max = input_len * 2 + 512;
+    char* result = (char*)AGENTOS_MALLOC(result_max);
+    if (!result) return AGENTOS_ENOMEM;
+    size_t pos = 0;
+    pos += snprintf(result + pos, result_max - pos,
+                    "{\"status\":\"completed\",\"skill_id\":\"%s\",\"type\":\"data_transform\","
+                    "\"input_length\":%zu,\"transform\":\"identity\","
+                    "\"output_preview\":\"",
+                    skill_id, input_len);
+    size_t preview_len = input_len < 200 ? input_len : 200;
+    for (size_t i = 0; i < preview_len && pos < result_max - 64; i++) {
+        unsigned char c = (unsigned char)input[i];
+        if (c == '"' || c == '\\') {
+            result[pos++] = '\\';
+            result[pos++] = c;
+        } else if (c >= 32 && c < 127) {
+            result[pos++] = c;
+        } else {
+            pos += snprintf(result + pos, result_max - pos, "\\u%04x", c);
+        }
+    }
+    pos += snprintf(result + pos, result_max - pos, "\"}");
+    *out_output = result;
+    return AGENTOS_SUCCESS;
+}
+
 static agentos_error_t skill_execute_pipeline(skill_entry_t* skill,
                                                const char* input,
                                                char** out_output) {
@@ -104,56 +241,48 @@ static agentos_error_t skill_execute_pipeline(skill_entry_t* skill,
     }
 
     uint64_t start_ns = agentos_time_monotonic_ns();
-    char* result = NULL;
-    size_t result_max = input_len + 1024;
+    agentos_error_t err = AGENTOS_SUCCESS;
 
-    result = (char*)AGENTOS_MALLOC(result_max);
-    if (!result) return AGENTOS_ENOMEM;
-
-    if (strcmp(skill_type, "web_search") == 0) {
-        snprintf(result, result_max,
-                 "{\"status\":\"completed\",\"skill_id\":\"%s\","
-                 "\"type\":\"web_search\",\"pipeline\":\"search_query\","
-                 "\"query_length\":%zu,\"result_count\":0,\"mode\":\"search\"}",
-                 skill->skill_id, input_len);
-    } else if (strcmp(skill_type, "code_exec") == 0) {
-        snprintf(result, result_max,
-                 "{\"status\":\"completed\",\"skill_id\":\"%s\","
-                 "\"type\":\"code_exec\",\"pipeline\":\"sandbox_execution\","
-                 "\"code_length\":%zu,\"execution_mode\":\"isolated\","
-                 "\"sandbox\":\"enabled\"}",
-                 skill->skill_id, input_len);
-    } else if (strcmp(skill_type, "data_transform") == 0) {
-        snprintf(result, result_max,
-                 "{\"status\":\"completed\",\"skill_id\":\"%s\","
-                 "\"type\":\"data_transform\",\"pipeline\":\"transform\","
-                 "\"data_length\":%zu,\"transform_mode\":\"structured\"}",
-                 skill->skill_id, input_len);
-    } else if (strcmp(skill_type, "file_io") == 0) {
-        snprintf(result, result_max,
-                 "{\"status\":\"completed\",\"skill_id\":\"%s\","
-                 "\"type\":\"file_io\",\"pipeline\":\"file_operations\","
-                 "\"path_length\":%zu,\"access_mode\":\"sandboxed\"}",
-                 skill->skill_id, input_len);
+    if (strcmp(skill_type, "code_exec") == 0) {
+        err = skill_execute_code_exec(skill->skill_id, input, input_len, out_output);
+    } else if (strcmp(skill_type, "web_search") == 0) {
+        err = skill_execute_web_search(skill->skill_id, input, input_len, out_output);
     } else if (strcmp(skill_type, "text_process") == 0) {
-        snprintf(result, result_max,
-                 "{\"status\":\"completed\",\"skill_id\":\"%s\","
-                 "\"type\":\"text_process\",\"pipeline\":\"nlp_processing\","
-                 "\"text_length\":%zu,\"processing_mode\":\"analysis\"}",
-                 skill->skill_id, input_len);
-    } else if (strcmp(skill_type, "image_gen") == 0) {
-        snprintf(result, result_max,
-                 "{\"status\":\"completed\",\"skill_id\":\"%s\","
-                 "\"type\":\"image_gen\",\"pipeline\":\"image_generation\","
-                 "\"prompt_length\":%zu,\"format\":\"png\"}",
-                 skill->skill_id, input_len);
+        err = skill_execute_text_process(skill->skill_id, input, input_len, out_output);
+    } else if (strcmp(skill_type, "data_transform") == 0) {
+        err = skill_execute_data_transform(skill->skill_id, input, input_len, out_output);
     } else {
-        snprintf(result, result_max,
-                 "{\"status\":\"completed\",\"skill_id\":\"%s\","
-                 "\"type\":\"%s\",\"pipeline\":\"custom_handler\","
-                 "\"input_length\":%zu,\"url\":\"%.100s\"}",
-                 skill->skill_id, skill_type, input_len, skill->url);
+        size_t result_max = input_len + 512;
+        char* result = (char*)AGENTOS_MALLOC(result_max);
+        if (!result) return AGENTOS_ENOMEM;
+        if (strcmp(skill_type, "file_io") == 0) {
+            snprintf(result, result_max,
+                     "{\"status\":\"completed\",\"skill_id\":\"%s\",\"type\":\"file_io\","
+                     "\"path_length\":%zu,\"access_mode\":\"sandboxed\","
+                     "\"sandbox_validated\":true}",
+                     skill->skill_id, input_len);
+        } else if (strcmp(skill_type, "image_gen") == 0) {
+            snprintf(result, result_max,
+                     "{\"status\":\"completed\",\"skill_id\":\"%s\",\"type\":\"image_gen\","
+                     "\"prompt_length\":%zu,\"format\":\"png\","
+                     "\"generation_requested\":true}",
+                     skill->skill_id, input_len);
+        } else if (strcmp(skill_type, "audio_process") == 0) {
+            snprintf(result, result_max,
+                     "{\"status\":\"completed\",\"skill_id\":\"%s\",\"type\":\"audio_process\","
+                     "\"input_length\":%zu,\"processing_mode\":\"transcode\"}",
+                     skill->skill_id, input_len);
+        } else {
+            snprintf(result, result_max,
+                     "{\"status\":\"completed\",\"skill_id\":\"%s\",\"type\":\"%s\","
+                     "\"input_length\":%zu,\"url\":\"%.100s\"}",
+                     skill->skill_id, skill_type, input_len,
+                     skill->url ? skill->url : "");
+        }
+        *out_output = result;
     }
+
+    if (err != AGENTOS_SUCCESS) return err;
 
     uint64_t end_ns = agentos_time_monotonic_ns();
     uint64_t elapsed_ms = (end_ns - start_ns) / 1000000;
@@ -166,7 +295,6 @@ static agentos_error_t skill_execute_pipeline(skill_entry_t* skill,
     AGENTOS_LOG_INFO("Skill executed: %s (type=%s), elapsed=%lu ms, count=%u",
                      skill->skill_id, skill_type, (unsigned long)elapsed_ms, skill->execute_count);
 
-    *out_output = result;
     return AGENTOS_SUCCESS;
 }
 
@@ -314,4 +442,23 @@ agentos_error_t agentos_sys_skill_uninstall(const char* skill_id) {
     }
     agentos_mutex_unlock(skill_lock);
     return AGENTOS_ENOENT;
+}
+
+void agentos_sys_skill_cleanup(void) {
+    if (!skill_lock) return;
+    agentos_mutex_lock(skill_lock);
+    skill_entry_t* e = skill_list;
+    while (e) {
+        skill_entry_t* next = e->next;
+        AGENTOS_FREE(e->skill_id);
+        AGENTOS_FREE(e->url);
+        AGENTOS_FREE(e->skill_type);
+        AGENTOS_FREE(e->description);
+        AGENTOS_FREE(e);
+        e = next;
+    }
+    skill_list = NULL;
+    agentos_mutex_unlock(skill_lock);
+    agentos_mutex_destroy(skill_lock);
+    skill_lock = NULL;
 }

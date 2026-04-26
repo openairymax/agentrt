@@ -14,8 +14,8 @@
  */
 
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { newError, NetworkError, TimeoutError, HttpError, ValidationError } from './errors';
-import { newConfig, ConfigOption, ClientConfig, cloneConfig } from './config';
+import { newError, NetworkError, TimeoutError, HttpError } from './errors';
+import { newConfig, ConfigOption, ClientConfig, cloneConfig, withEndpoint, manager } from './config';
 
 // ============================================================================
 // Types
@@ -87,12 +87,12 @@ export interface ProtocolCapabilities {
  * ```
  */
 export class ProtocolClient {
-  private config: Required<ClientConfig> & { protocolType: ProtocolType; retryCount: number; retryDelay: number; enableStreaming: boolean };
+  private config: manager & { protocolType: ProtocolType; retryCount: number; retryDelay: number; enableStreaming: boolean };
   private httpClient: AxiosInstance;
   private stats: { requestsSent: number; transformations: number };
 
   constructor(options: ProtocolConfigOptions = {}) {
-    const baseConfig = options.endpoint ? newConfig([withEndpoint(options.endpoint)]) : newConfig([]);
+    const baseConfig = options.endpoint ? newConfig(withEndpoint(options.endpoint)) : newConfig();
 
     this.config = {
       ...baseConfig,
@@ -126,10 +126,10 @@ export class ProtocolClient {
       (error) => {
         if (error.response?.status && error.response.status >= 400) {
           throw new HttpError(
-            error.response.status,
             typeof error.response.data === 'string'
               ? error.response.data
               : JSON.stringify(error.response.data)?.slice(0, 200) ?? 'HTTP Error',
+            error.response.status,
           );
         }
         if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
@@ -151,7 +151,7 @@ export class ProtocolClient {
         timeout: 10000,
       });
 
-      const contentType = response.headers['content-type'] || '';
+      const contentType = String(response.headers['content-type'] || '');
       const body = typeof response.data === 'string' ? response.data : JSON.stringify(response.data ?? {});
 
       let confidence = 50.0;
@@ -331,7 +331,7 @@ export class ProtocolClient {
       }
       case ProtocolType.MCP: {
         const mcpMethod = method.includes('.') ? method.split('.').pop()! : method;
-        return { protocol: 'mcp', version: '1.0', method: mcpMethod, params: rest };
+        return { protocol: 'mcp', version: '1.0', method: mcpMethod, params };
       }
       case ProtocolType.A2A: {
         const mapping: Record<string, string> = { 'agent.list': 'agent/discover', 'task.create': 'task/delegate' };

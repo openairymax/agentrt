@@ -152,15 +152,21 @@ typedef agentos_error_t (*agentos_svc_healthcheck_fn)(
     agentos_service_t service
 );
 
-/**
- * @brief 服务接口结构
- */
+typedef agentos_error_t (*agentos_svc_handle_request_fn)(
+    agentos_service_t service,
+    const char* method,
+    const char* params_json,
+    char** response_json,
+    void* user_data
+);
+
 typedef struct {
-    agentos_svc_init_fn init;          /**< 初始化函数 */
-    agentos_svc_start_fn start;        /**< 启动函数 */
-    agentos_svc_stop_fn stop;          /**< 停止函数 */
-    agentos_svc_destroy_fn destroy;    /**< 销毁函数 */
-    agentos_svc_healthcheck_fn healthcheck; /**< 健康检查函数 */
+    agentos_svc_init_fn init;
+    agentos_svc_start_fn start;
+    agentos_svc_stop_fn stop;
+    agentos_svc_destroy_fn destroy;
+    agentos_svc_healthcheck_fn healthcheck;
+    agentos_svc_handle_request_fn handle_request;
 } agentos_svc_interface_t;
 
 /* ==================== 服务生命周期管理 ==================== */

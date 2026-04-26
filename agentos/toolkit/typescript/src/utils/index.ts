@@ -6,3 +6,4 @@
 // 与 Go SDK utils/helpers.go 保持一致。
 
 export * from './helpers';
+export { Logger, LogLevel, getLogger, setLogger, newLogger } from './logger';

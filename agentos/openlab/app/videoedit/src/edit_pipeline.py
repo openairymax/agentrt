@@ -341,7 +341,7 @@ class FFmpegWrapper:
 
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
             for path in input_paths:
-                f.write(f"file '{path}'\n")
+                f.write(f"file '{path}'n")
             list_file = f.name
 
         try:

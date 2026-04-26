@@ -70,7 +70,7 @@ static agentos_checkpoint_stats_t g_checkpoint_stats = {0};
 /* ==================== 内部辅助函数 ==================== */
 
 /**
- * @brief 计算数据校验和（CRC32简化版）
+ * @brief 计算数据校验和（CRC32）
  *
  * 圈复杂度: 3 (<7)
  */

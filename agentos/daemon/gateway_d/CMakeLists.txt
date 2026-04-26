@@ -107,6 +107,7 @@ target_include_directories(gateway_d PRIVATE
     # 本模块头文件
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/protocol
     # Gateway 公共 API（service.c 引用 "gateway.h"）
     ${GATEWAY_INCLUDE_DIR}
     # Gateway 内部头文件（gateway_api.c 引用 http_gateway.h 等）

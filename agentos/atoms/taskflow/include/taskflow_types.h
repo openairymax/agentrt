@@ -118,7 +118,7 @@ typedef struct {
 /**
  * @brief 图消息结构
  */
-typedef struct {
+typedef struct graph_message {
     message_id_t id;                /**< 消息唯一ID */
     vertex_id_t sender;             /**< 发送者顶点ID */
     vertex_id_t receiver;           /**< 接收者顶点ID */
@@ -126,6 +126,7 @@ typedef struct {
     size_t payload_size;            /**< 消息负载大小 */
     superstep_t step;               /**< 发送超步 */
     message_direction_t direction;  /**< 消息方向 */
+    struct graph_message* next;     /**< 链表指针 */
 } graph_message_t;
 
 /**

@@ -5,6 +5,12 @@
  */
 
 #include "syscalls.h"
+#include "agentos.h"
+#include "cognition.h"
+#include "memoryrovol.h"
+#include "logger.h"
+#include "memory_compat.h"
+#include "string_compat.h"
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
@@ -230,7 +236,12 @@ agentos_error_t agentos_syscalls_init(void) {
 
 void agentos_syscalls_cleanup(void) {
     extern void agentos_sys_agent_cleanup(void);
+    extern void agentos_sys_skill_cleanup(void);
+
     agentos_sys_agent_cleanup();
+    agentos_sys_skill_cleanup();
+
+    AGENTOS_LOG_INFO("Syscalls layer cleanup completed");
 }
 
 void agentos_sys_free(void* ptr) {

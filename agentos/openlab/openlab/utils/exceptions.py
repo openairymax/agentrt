@@ -1,1 +1,124 @@
-"""\nCopyright (c) 2026 SPHARX. All Rights Reserved.\n"From data intelligence emerges."\n\nopenlab.utils.exceptions - Custom exception classes\n===================================================\n\nProvides a hierarchy of custom exceptions for openlab.\n\nBase Exception Hierarchy:\n    OpenLabError\n    鈹溾攢鈹€ AgentError\n    鈹?  鈹溾攢鈹€ AgentInitializationError\n    鈹?  鈹溾攢鈹€ AgentExecutionError\n    鈹?  鈹斺攢鈹€ AgentNotFoundError\n    鈹溾攢鈹€ TaskError\n    鈹?  鈹溾攢鈹€ TaskCreationError\n    鈹?  鈹溾攢鈹€ TaskExecutionError\n    鈹?  鈹斺攢鈹€ TaskNotFoundError\n    鈹溾攢鈹€ ToolError\n    鈹?  鈹溾攢鈹€ ToolInitializationError\n    鈹?  鈹溾攢鈹€ ToolExecutionError\n    鈹?  鈹斺攢鈹€ ToolNotFoundError\n    鈹溾攢鈹€ StorageError\n    鈹?  鈹溾攢鈹€ StorageConnectionError\n    鈹?  鈹溾攢鈹€ StorageReadError\n    鈹?  鈹斺攢鈹€ StorageWriteError\n    鈹斺攢鈹€ ValidationError\n        鈹溾攢鈹€ InputValidationError\n        鈹斺攢鈹€ ConfigurationError\n\nExample:\n    from openlab.utils.exceptions import AgentError, AgentExecutionError\n\n    try:\n        await agent.execute(context, input_data)\n    except AgentExecutionError as e:\n        logger.error(f"Agent execution failed: {e}")\n    except AgentError as e:\n        logger.error(f"Agent error: {e}")\n\nAuthor: Spharx AgentOS Team
+"""
+openlab.utils.exceptions - Custom exception classes
+
+Base Exception Hierarchy:
+    OpenLabError
+    +-- AgentError
+    |   +-- AgentInitializationError
+    |   +-- AgentExecutionError
+    |   +-- AgentNotFoundError
+    +-- TaskError
+    |   +-- TaskCreationError
+    |   +-- TaskExecutionError
+    |   +-- TaskNotFoundError
+    +-- ToolError
+    |   +-- ToolInitializationError
+    |   +-- ToolExecutionError
+    |   +-- ToolNotFoundError
+    +-- StorageError
+    |   +-- StorageConnectionError
+    |   +-- StorageReadError
+    |   +-- StorageWriteError
+    +-- ValidationError
+        +-- InputValidationError
+        +-- ConfigurationError
+"""
+
+
+class OpenLabError(Exception):
+    def __init__(self, message: str = "", code: str = "", details: dict = None):
+        super().__init__(message)
+        self.message = message
+        self.code = code
+        self.details = details or {}
+
+    def __str__(self):
+        if self.code:
+            return f"[{self.code}] {self.message}"
+        return self.message
+
+
+class AgentError(OpenLabError):
+    pass
+
+
+class AgentInitializationError(AgentError):
+    pass
+
+
+class AgentExecutionError(AgentError):
+    pass
+
+
+class AgentNotFoundError(AgentError):
+    pass
+
+
+class TaskError(OpenLabError):
+    pass
+
+
+class TaskCreationError(TaskError):
+    pass
+
+
+class TaskExecutionError(TaskError):
+    pass
+
+
+class TaskNotFoundError(TaskError):
+    pass
+
+
+class ToolError(OpenLabError):
+    pass
+
+
+class ToolInitializationError(ToolError):
+    pass
+
+
+class ToolExecutionError(ToolError):
+    pass
+
+
+class ToolNotFoundError(ToolError):
+    pass
+
+
+class StorageError(OpenLabError):
+    pass
+
+
+class StorageConnectionError(StorageError):
+    pass
+
+
+class StorageReadError(StorageError):
+    pass
+
+
+class StorageWriteError(StorageError):
+    pass
+
+
+class ValidationError(OpenLabError):
+    pass
+
+
+class InputValidationError(ValidationError):
+    pass
+
+
+class ConfigurationError(ValidationError):
+    pass
+
+
+__all__ = [
+    "OpenLabError",
+    "AgentError", "AgentInitializationError", "AgentExecutionError", "AgentNotFoundError",
+    "TaskError", "TaskCreationError", "TaskExecutionError", "TaskNotFoundError",
+    "ToolError", "ToolInitializationError", "ToolExecutionError", "ToolNotFoundError",
+    "StorageError", "StorageConnectionError", "StorageReadError", "StorageWriteError",
+    "ValidationError", "InputValidationError", "ConfigurationError",
+]
