@@ -45,6 +45,14 @@ agentos_error_t agentos_memoryrov_mount(
     const char* record_id,
     const char* context);
 
+agentos_error_t agentos_memoryrov_evolve(
+    agentos_memoryrov_handle_t* handle,
+    int force);
+
+agentos_error_t agentos_memoryrov_stats(
+    agentos_memoryrov_handle_t* handle,
+    char** out_stats);
+
 #ifdef __cplusplus
 }
 #endif

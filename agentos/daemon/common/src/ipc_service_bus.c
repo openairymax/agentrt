@@ -80,7 +80,7 @@ static uint64_t g_bus_instance_count = 0;
 
 /* ==================== 辅助函数 ==================== */
 
-static uint64_t generate_msg_id(ipc_service_bus_internal_t* bus) {
+static uint64_t __attribute__((unused)) generate_msg_id(ipc_service_bus_internal_t* bus) {
     uint64_t id = bus->next_msg_id++;
     if (bus->next_msg_id == 0) bus->next_msg_id = 1;
     return id;

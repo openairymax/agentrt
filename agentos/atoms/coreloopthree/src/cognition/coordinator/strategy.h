@@ -40,6 +40,7 @@ typedef struct agentos_coordination_context {
  */
 typedef struct agentos_coordinator_base {
     void* data;                       /**< 私有数据指针（指向具体实现的私有数据） */
+    struct agentos_llm_service* llm;  /**< LLM服务客户端 */
     
     /**
      * @brief 协调执行函数

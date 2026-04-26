@@ -47,6 +47,8 @@ typedef enum {
     NODE_SUBWORKFLOW            /**< 子工作流节点 */
 } workflow_node_type_t;
 
+typedef int (*workflow_condition_func_t)(void* context);
+
 /**
  * @brief 工作流节点结构
  */
@@ -207,7 +209,9 @@ taskflow_error_t workflow_build_conditional(
     vertex_id_t condition_node_id,
     vertex_id_t true_branch_node_id,
     vertex_id_t false_branch_node_id,
-    vertex_id_t merge_node_id);
+    vertex_id_t merge_node_id,
+    workflow_condition_func_t condition_func,
+    void* condition_context);
 
 /**
  * @brief 创建循环工作流
@@ -216,6 +220,8 @@ taskflow_error_t workflow_build_conditional(
  * @param loop_body_node_id 循环体节点ID
  * @param loop_condition_node_id 循环条件节点ID
  * @param loop_end_node_id 循环结束节点ID
+ * @param continue_condition_func 继续循环条件函数
+ * @param condition_context 条件函数上下文
  * @return 错误码
  */
 taskflow_error_t workflow_build_loop(
@@ -223,7 +229,9 @@ taskflow_error_t workflow_build_loop(
     vertex_id_t loop_start_node_id,
     vertex_id_t loop_body_node_id,
     vertex_id_t loop_condition_node_id,
-    vertex_id_t loop_end_node_id);
+    vertex_id_t loop_end_node_id,
+    workflow_condition_func_t continue_condition_func,
+    void* condition_context);
 
 // ============================================================================
 // 工作流执行控制

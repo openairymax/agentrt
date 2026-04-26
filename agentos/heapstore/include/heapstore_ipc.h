@@ -141,6 +141,12 @@ heapstore_error_t heapstore_ipc_get_stats(uint32_t* channel_count, uint32_t* buf
  * @since v1.0.0*/
 bool heapstore_ipc_is_healthy(void);
 
+heapstore_error_t heapstore_ipc_send(const char* channel_id, const void* data, size_t len);
+heapstore_error_t heapstore_ipc_receive(const char* channel_id, void** data, size_t* len);
+heapstore_error_t heapstore_ipc_create_channel(const char* channel_id, const char* name,
+                                              const char* type, size_t buffer_size);
+heapstore_error_t heapstore_ipc_destroy_channel(const char* channel_id);
+
 #ifdef __cplusplus
 }
 #endif

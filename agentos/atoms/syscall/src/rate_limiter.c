@@ -28,12 +28,8 @@
 #include <stdio.h>
 #include <time.h>
 
-/* JSON解析库 - 必需依赖（SEC-017: 禁止桩函数） */
-#ifndef AGENTOS_HAS_CJSON
+/* JSON解析库 */
 #include <cjson/cJSON.h>
-#else
-#include <cjson/cJSON.h>
-#endif
 
 /**
  * @brief 令牌桶限流器
@@ -103,7 +99,7 @@ agentos_error_t agentos_sys_rate_limiter_acquire(int tokens) {
     agentos_mutex_unlock(g_rate_limiter->lock);
     AGENTOS_LOG_DEBUG("Rate limit exceeded (available=%d, requested=%d)",
                      g_rate_limiter->tokens, tokens);
-    return AGENTOS_ERATELIMITED;
+    return AGENTOS_EBUSY;
 }
 
 /**

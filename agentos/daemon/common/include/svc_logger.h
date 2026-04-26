@@ -150,7 +150,7 @@ static inline int agentos_log_init(const agentos_logger_config_t* config) {
     log_config_t log_cfg = {0};
     
     if (config) {
-        log_cfg.level = config->level;
+        log_cfg.level = (log_level_t)config->level;
         log_cfg.format = config->json_format ? LOG_FORMAT_JSON : LOG_FORMAT_TEXT;
         log_cfg.outputs = (1 << LOG_OUTPUT_CONSOLE);  /* 默认控制台输出 */
         
@@ -189,7 +189,7 @@ static inline void agentos_log_set_level(agentos_log_level_t level) {
  * @return 当前日志级别
  */
 static inline agentos_log_level_t agentos_log_get_level(void) {
-    return LOG_LEVEL_INFO;
+    return (agentos_log_level_t)LOG_LEVEL_INFO;
 }
 
 /* ==================== 追踪上下文接口 ==================== */
@@ -328,7 +328,7 @@ static inline void agentos_logger_log(agentos_logger_t logger,
     
     va_list args;
     va_start(args, fmt);
-    log_write_va(level, file, line, fmt, args);
+    log_write_va((log_level_t)level, file, line, fmt, args);
     va_end(args);
 }
 
@@ -353,7 +353,7 @@ static inline void agentos_logger_log_with_trace(agentos_logger_t logger,
     
     va_list args;
     va_start(args, fmt);
-    log_write_va(level, file, line, fmt, args);
+    log_write_va((log_level_t)level, file, line, fmt, args);
     va_end(args);
 }
 
@@ -494,14 +494,14 @@ static inline void agentos_logger_log_with_trace(agentos_logger_t logger,
  * @brief 日志级别转字符串
  */
 static inline const char* agentos_log_level_to_string(agentos_log_level_t level) {
-    return log_level_to_string(level);
+    return log_level_to_string((log_level_t)level);
 }
 
 /**
  * @brief 字符串转日志级别
  */
 static inline agentos_log_level_t agentos_log_level_from_string(const char* str) {
-    return log_level_from_string(str);
+    return (agentos_log_level_t)log_level_from_string(str);
 }
 
 #ifdef __cplusplus

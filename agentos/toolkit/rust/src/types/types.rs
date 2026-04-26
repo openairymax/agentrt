@@ -382,27 +382,27 @@ pub struct RequestOptions {
 }
 
 /// RequestOption 请求选项函数签名
-pub type RequestOption = fn(&mut RequestOptions);
+pub type RequestOption = Box<dyn Fn(&mut RequestOptions) + Send + Sync>;
 
 /// 设置单次请求超时
 pub fn with_request_timeout(timeout: Duration) -> RequestOption {
-    |opts: &mut RequestOptions| {
+    Box::new(move |opts: &mut RequestOptions| {
         opts.timeout = Some(timeout);
-    }
+    })
 }
 
 /// 添加自定义请求头
 pub fn with_header(key: String, value: String) -> RequestOption {
-    |opts: &mut RequestOptions| {
-        opts.headers.insert(key, value);
-    }
+    Box::new(move |opts: &mut RequestOptions| {
+        opts.headers.insert(key.clone(), value.clone());
+    })
 }
 
 /// 添加查询参数
 pub fn with_query_param(key: String, value: String) -> RequestOption {
-    |opts: &mut RequestOptions| {
-        opts.query_params.insert(key, value);
-    }
+    Box::new(move |opts: &mut RequestOptions| {
+        opts.query_params.insert(key.clone(), value.clone());
+    })
 }
 
 /// APIResponse 通用 API 响应结构

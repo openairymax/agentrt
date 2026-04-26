@@ -343,31 +343,75 @@ void log_store_service_free_entries(char** entries, int count)
  */
 int log_store_service_cleanup_old_files(int days_to_keep)
 {
+    if (!g_ctx.is_initialized) return -1;
     if (days_to_keep <= 0) {
-        days_to_keep = 30; // 默认保留30天
+        days_to_keep = 30;
     }
-    
-    // 简化实现：返回0
-    return 0;
+
+    time_t cutoff = time(NULL) - ((time_t)days_to_keep * 86400);
+    int deleted_count = 0;
+
+    DIR* dir = opendir(g_ctx.storage_path);
+    if (!dir) return 0;
+
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_name[0] == '.') continue;
+
+        char filepath[1024];
+        snprintf(filepath, sizeof(filepath), "%s/%s", g_ctx.storage_path, entry->d_name);
+
+        struct stat file_stat;
+        if (stat(filepath, &file_stat) != 0) continue;
+        if (S_ISDIR(file_stat.st_mode)) continue;
+
+        if (file_stat.st_mtime < cutoff) {
+            if (unlink(filepath) == 0) {
+                deleted_count++;
+            }
+        }
+    }
+
+    closedir(dir);
+    return deleted_count;
 }
 
-/**
- * @brief 获取存储服务状态
- *
- * @param out_total_bytes 输出总存储字节数
- * @param out_file_count 输出文件数
- * @param out_oldest_timestamp 输出最旧日志时间戳
- * @return int 0成功，非0错误码
- */
 int log_store_service_get_status(uint64_t* out_total_bytes,
                                  uint32_t* out_file_count,
                                  time_t* out_oldest_timestamp)
 {
-    if (out_total_bytes) *out_total_bytes = 0;
-    if (out_file_count) *out_file_count = 0;
-    if (out_oldest_timestamp) *out_oldest_timestamp = 0;
-    
-    // 简化实现
+    if (!g_ctx.is_initialized) return -1;
+
+    uint64_t total_bytes = 0;
+    uint32_t file_count = 0;
+    time_t oldest_ts = 0;
+
+    DIR* dir = opendir(g_ctx.storage_path);
+    if (dir) {
+        struct dirent* entry;
+        while ((entry = readdir(dir)) != NULL) {
+            if (entry->d_name[0] == '.') continue;
+
+            char filepath[1024];
+            snprintf(filepath, sizeof(filepath), "%s/%s", g_ctx.storage_path, entry->d_name);
+
+            struct stat file_stat;
+            if (stat(filepath, &file_stat) != 0) continue;
+            if (S_ISDIR(file_stat.st_mode)) continue;
+
+            total_bytes += (uint64_t)file_stat.st_size;
+            file_count++;
+            if (oldest_ts == 0 || file_stat.st_mtime < oldest_ts) {
+                oldest_ts = file_stat.st_mtime;
+            }
+        }
+        closedir(dir);
+    }
+
+    if (out_total_bytes) *out_total_bytes = total_bytes;
+    if (out_file_count) *out_file_count = file_count;
+    if (out_oldest_timestamp) *out_oldest_timestamp = oldest_ts;
+
     return 0;
 }
 

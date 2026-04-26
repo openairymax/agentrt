@@ -24,6 +24,17 @@ Powered by OpenAirymax
 
 </div>
 
+### 🚀 Airymax AgentOS 预览版已发布
+
+<div align="center">
+
+| 用户类型 | 产品 | 版本 | 下载 |
+|:--------:|:----:|:----:|:----:|
+| 👨‍💼 **专业用户** | Docker | `v0.0.4` | [📦 获取 Docker](https://atomgit.com/openairymax/docker/releases/v0.0.4) |
+| 👤 **个人用户** | Desktop | `v0.0.4` | [🖥️ 获取 Desktop](https://atomgit.com/openairymax/desktop/releases/v0.0.4) |
+
+</div>
+
 ## 🌟 项目简介
 
 **AgentOS** 是一个智能体底层操作系统，为驱动智能体团队提供完整的操作系统级支持。
