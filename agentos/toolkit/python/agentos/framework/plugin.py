@@ -982,6 +982,199 @@ class PluginManager:
             return None
 
 
+class PluginRegistry:
+    """
+    插件注册表
+
+    提供简化的插件注册/发现/加载/卸载API，
+    与PluginManager的高级生命周期管理互补。
+
+    使用示例:
+        registry = PluginRegistry()
+
+        # 注册插件类
+        registry.register(MyPlugin)
+
+        # 发现插件
+        plugins = registry.discover()
+
+        # 加载插件
+        instance = registry.load("my_plugin")
+
+        # 调用插件
+        result = await instance.on_activate({})
+
+        # 卸载插件
+        registry.unload("my_plugin")
+    """
+
+    def __init__(self):
+        self._plugin_classes: Dict[str, Type[BasePlugin]] = {}
+        self._instances: Dict[str, BasePlugin] = {}
+        self._manifests: Dict[str, PluginManifest] = {}
+        self._states: Dict[str, PluginState] = {}
+
+    def register(self, plugin_class: Type[BasePlugin], manifest: Optional[PluginManifest] = None) -> str:
+        """
+        注册插件类
+
+        Args:
+            plugin_class: 插件类（必须继承BasePlugin）
+            manifest: 可选的插件清单，不提供则自动推断
+
+        Returns:
+            插件ID
+
+        Raises:
+            TypeError: 如果plugin_class不继承BasePlugin
+            ValueError: 如果插件ID已存在
+        """
+        if not (isinstance(plugin_class, type) and issubclass(plugin_class, BasePlugin)):
+            raise TypeError(f"Plugin class must be a subclass of BasePlugin, got {plugin_class}")
+
+        temp = plugin_class()
+        plugin_id = temp.plugin_id
+
+        if plugin_id in self._plugin_classes:
+            raise ValueError(f"Plugin '{plugin_id}' already registered")
+
+        if manifest is None:
+            manifest = PluginManifest(
+                plugin_id=plugin_id,
+                name=plugin_class.__name__,
+                version=getattr(plugin_class, '__version__', '1.0.0'),
+                description=plugin_class.__doc__ or '',
+                capabilities=temp.get_capabilities(),
+            )
+
+        self._plugin_classes[plugin_id] = plugin_class
+        self._manifests[plugin_id] = manifest
+        self._states[plugin_id] = PluginState.DISCOVERED
+
+        logger.info(f"Plugin registered: {plugin_id}")
+        return plugin_id
+
+    def unregister(self, plugin_id: str) -> bool:
+        """
+        注销插件
+
+        Args:
+            plugin_id: 插件ID
+
+        Returns:
+            是否成功注销
+        """
+        if plugin_id not in self._plugin_classes:
+            return False
+
+        if plugin_id in self._instances:
+            self.unload(plugin_id)
+
+        del self._plugin_classes[plugin_id]
+        del self._manifests[plugin_id]
+        del self._states[plugin_id]
+
+        logger.info(f"Plugin unregistered: {plugin_id}")
+        return True
+
+    def discover(self, capability: Optional[str] = None) -> List[PluginManifest]:
+        """
+        发现已注册的插件
+
+        Args:
+            capability: 可选的能力过滤条件
+
+        Returns:
+            插件清单列表
+        """
+        if capability:
+            return [
+                m for m in self._manifests.values()
+                if capability in m.capabilities
+            ]
+        return list(self._manifests.values())
+
+    def load(self, plugin_id: str) -> Optional[BasePlugin]:
+        """
+        加载插件实例
+
+        Args:
+            plugin_id: 插件ID
+
+        Returns:
+            插件实例，失败返回None
+        """
+        if plugin_id not in self._plugin_classes:
+            logger.warning(f"Plugin not found: {plugin_id}")
+            return None
+
+        if plugin_id in self._instances:
+            return self._instances[plugin_id]
+
+        plugin_class = self._plugin_classes[plugin_id]
+        instance = plugin_class()
+        instance.plugin_id = plugin_id
+
+        self._instances[plugin_id] = instance
+        self._states[plugin_id] = PluginState.LOADED
+
+        logger.info(f"Plugin loaded: {plugin_id}")
+        return instance
+
+    def unload(self, plugin_id: str) -> bool:
+        """
+        卸载插件实例
+
+        Args:
+            plugin_id: 插件ID
+
+        Returns:
+            是否成功卸载
+        """
+        if plugin_id not in self._instances:
+            return False
+
+        self._instances.pop(plugin_id)
+        self._states[plugin_id] = PluginState.UNLOADED
+
+        logger.info(f"Plugin unloaded: {plugin_id}")
+        return True
+
+    def get(self, plugin_id: str) -> Optional[BasePlugin]:
+        """获取已加载的插件实例"""
+        return self._instances.get(plugin_id)
+
+    def get_manifest(self, plugin_id: str) -> Optional[PluginManifest]:
+        """获取插件清单"""
+        return self._manifests.get(plugin_id)
+
+    def get_state(self, plugin_id: str) -> Optional[PluginState]:
+        """获取插件状态"""
+        return self._states.get(plugin_id)
+
+    def list_plugins(self) -> List[str]:
+        """列出所有已注册的插件ID"""
+        return list(self._plugin_classes.keys())
+
+    def find_by_capability(self, capability: str) -> List[str]:
+        """按能力查找插件"""
+        return [
+            pid for pid, manifest in self._manifests.items()
+            if capability in manifest.capabilities
+        ]
+
+
+_global_registry: Optional[PluginRegistry] = None
+
+
+def get_plugin_registry() -> PluginRegistry:
+    """获取全局插件注册表单例"""
+    global _global_registry
+    if _global_registry is None:
+        _global_registry = PluginRegistry()
+    return _global_registry
+
+
 __all__ = [
     "PluginManager",
     "PluginSandbox",
@@ -991,6 +1184,8 @@ __all__ = [
     "PluginState",
     "PluginManifest",
     "PluginInfo",
+    "PluginRegistry",
     "ResolutionResult",
     "ReloadResult",
+    "get_plugin_registry",
 ]

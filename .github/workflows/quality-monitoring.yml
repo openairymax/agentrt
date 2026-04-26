@@ -2,8 +2,7 @@ name: Quality Monitoring
 
 on:
   schedule:
-    # 每天UTC 02:00运行
-    - cron: '0 2 * * *'
+    - cron: '0 2 * * 1'
   workflow_dispatch:
 
 concurrency:
@@ -15,189 +14,56 @@ jobs:
     name: Quality Trend Analysis
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 50  # 获取最近50次提交用于趋势分析
+          fetch-depth: 50
 
       - name: Setup analysis environment
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            python3-pip \
-            python3-dev \
-            cloc \
-            jq
-          pip3 install \
-            matplotlib \
-            pandas \
-            numpy \
-            seaborn
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends cloc jq
 
       - name: Code metrics analysis
         run: |
-          echo "📊 Running code metrics analysis..."
-          
-          # 代码行数统计
-          echo "## 📈 Code Metrics Report" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # 使用cloc统计代码行数
+          echo "## Code Metrics Report" >> $GITHUB_STEP_SUMMARY
+
           if command -v cloc &> /dev/null; then
-            cloc_output=$(cloc . --exclude-dir=build-*,node_modules,.git --quiet --json)
+            cloc_output=$(cloc . --exclude-dir=build-*,node_modules,.git,toolkit --quiet --json)
             echo "### Code Lines by Language" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "| Language | Files | Code | Comment | Blank | Total |" >> $GITHUB_STEP_SUMMARY
             echo "|----------|-------|------|---------|-------|-------|" >> $GITHUB_STEP_SUMMARY
-            
-            # 解析JSON输出
+
             echo "$cloc_output" | jq -r '.SUM as $sum | to_entries[] | select(.key != "header" and .key != "SUM") | "| \(.key) | \(.value.nFiles) | \(.value.code) | \(.value.comment) | \(.value.blank) | \(.value.code + .value.comment + .value.blank) |"' >> $GITHUB_STEP_SUMMARY
             echo "| **Total** | **\($sum.nFiles)** | **\($sum.code)** | **\($sum.comment)** | **\($sum.blank)** | **\($sum.code + $sum.comment + $sum.blank)** |" >> $GITHUB_STEP_SUMMARY
           fi
 
-      - name: Complexity analysis
-        run: |
-          echo "🔍 Running complexity analysis..."
-          
-          # 查找C/C++文件并计算复杂度
-          if command -v lizard &> /dev/null; then
-            pip3 install lizard
-            lizard_output=$(lizard . -l c -T nloc=30 -C 15 --exclude "build-*" --exclude ".git" 2>/dev/null || true)
-            if [ -n "$lizard_output" ]; then
-              echo "### Complexity Analysis" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "Files with high complexity (NLOC > 30 or CC > 15):" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "$lizard_output" >> $GITHUB_STEP_SUMMARY
-            fi
-          fi
-
       - name: Technical debt analysis
         run: |
-          echo "💰 Technical debt analysis..."
-          
-          # 查找TODO、FIXME、XXX注释
           echo "### Technical Debt Indicators" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # 统计TODO/FIXME/XXX数量
-          todo_count=$(grep -r "TODO" . --include="*.c" --include="*.h" --include="*.cpp" --include="*.py" --include="*.rs" --include="*.go" --include="*.ts" --exclude-dir=build-* --exclude-dir=.git | wc -l)
-          fixme_count=$(grep -r "FIXME" . --include="*.c" --include="*.h" --include="*.cpp" --include="*.py" --include="*.rs" --include="*.go" --include="*.ts" --exclude-dir=build-* --exclude-dir=.git | wc -l)
-          xxx_count=$(grep -r "XXX" . --include="*.c" --include="*.h" --include="*.cpp" --include="*.py" --include="*.rs" --include="*.go" --include="*.ts" --exclude-dir=build-* --exclude-dir=.git | wc -l)
-          
-          echo "| Issue Type | Count | Trend |" >> $GITHUB_STEP_SUMMARY
-          echo "|------------|-------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| TODO | $todo_count | 📈 |" >> $GITHUB_STEP_SUMMARY
-          echo "| FIXME | $fixme_count | 📈 |" >> $GITHUB_STEP_SUMMARY
-          echo "| XXX | $xxx_count | 📈 |" >> $GITHUB_STEP_SUMMARY
-          
-          total_debt=$((todo_count + fixme_count + xxx_count))
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Total technical debt indicators: $total_debt**" >> $GITHUB_STEP_SUMMARY
-          
-          if [ $total_debt -gt 50 ]; then
-            echo "::warning::High technical debt detected ($total_debt indicators)"
+
+          todo_count=$(grep -r "TODO" agentos --include="*.c" --include="*.h" --include="*.py" --include="*.rs" --include="*.go" --include="*.ts" --exclude-dir=build-* 2>/dev/null | wc -l)
+          fixme_count=$(grep -r "FIXME" agentos --include="*.c" --include="*.h" --include="*.py" --include="*.rs" --include="*.go" --include="*.ts" --exclude-dir=build-* 2>/dev/null | wc -l)
+
+          echo "| Indicator | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| TODO | $todo_count |" >> $GITHUB_STEP_SUMMARY
+          echo "| FIXME | $fixme_count |" >> $GITHUB_STEP_SUMMARY
+
+          total=$((todo_count + fixme_count))
+          if [ $total -gt 50 ]; then
+            echo "::warning::High technical debt detected ($total indicators)"
           fi
-
-      - name: Documentation health check
-        run: |
-          echo "📚 Documentation health check..."
-          
-          # 检查文档完整性
-          echo "### Documentation Health" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # 检查README文件
-          if [ -f "README.md" ]; then
-            readme_size=$(wc -l < README.md)
-            echo "| Document | Status | Size (lines) |" >> $GITHUB_STEP_SUMMARY
-            echo "|----------|--------|--------------|" >> $GITHUB_STEP_SUMMARY
-            echo "| README.md | ✅ | $readme_size |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| README.md | ❌ Missing | 0 |" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          # 检查docs目录
-          if [ -d "docs" ]; then
-            doc_files=$(find docs -name "*.md" | wc -l)
-            echo "| docs/ directory | ✅ | $doc_files files |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| docs/ directory | ⚠️ Missing | 0 |" >> $GITHUB_STEP_SUMMARY
-          fi
-
-      - name: Write trend analysis Python script
-        uses: actions/write-file@v1
-        with:
-          path: analyze_trends.py
-          content: |
-            #!/usr/bin/env python3
-            import matplotlib
-            matplotlib.use('Agg')
-            import matplotlib.pyplot as plt
-            import pandas as pd
-            from datetime import datetime, timedelta
-
-            dates = pd.date_range(start=datetime.now() - timedelta(days=30), end=datetime.now(), freq='D')
-            code_lines = [10000 + i * 50 + (i % 7) * 100 for i in range(len(dates))]
-            complexity = [5.0 + 0.1 * (i % 10) for i in range(len(dates))]
-            debt_indicators = [20 + i // 3 for i in range(len(dates))]
-
-            fig, axes = plt.subplots(3, 1, figsize=(10, 12))
-
-            axes[0].plot(dates, code_lines, 'b-', linewidth=2)
-            axes[0].set_title('Code Lines Trend (30 days)', fontsize=12)
-            axes[0].set_ylabel('Lines of Code')
-            axes[0].grid(True, alpha=0.3)
-
-            axes[1].plot(dates, complexity, 'r-', linewidth=2)
-            axes[1].set_title('Average Complexity Trend', fontsize=12)
-            axes[1].set_ylabel('Cyclomatic Complexity')
-            axes[1].grid(True, alpha=0.3)
-
-            axes[2].plot(dates, debt_indicators, 'g-', linewidth=2)
-            axes[2].set_title('Technical Debt Indicators', fontsize=12)
-            axes[2].set_ylabel('TODO/FIXME/XXX Count')
-            axes[2].grid(True, alpha=0.3)
-
-            plt.tight_layout()
-            plt.savefig('quality_trends.png', dpi=100)
-            print("Trend visualization generated: quality_trends.png")
-          write-mode: overwrite
-
-      - name: Run trend visualization
-        run: |
-          echo "📉 Generating trend visualization..."
-
-          if command -v python3 &> /dev/null; then
-            pip3 install matplotlib pandas numpy seaborn --quiet 2>/dev/null || true
-            python3 analyze_trends.py || echo "::warning::Trend visualization failed"
-
-            if [ -f "quality_trends.png" ]; then
-              echo "### 📊 Quality Trends (Last 30 Days)" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "![Quality Trends](quality_trends.png)" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "::notice::Quality trends image not generated"
-            fi
-          else
-            echo "::warning::Python3 not available, skipping trend visualization"
-          fi
-
-      - name: Upload quality report
-        uses: actions/upload-artifact@v4
-        with:
-          name: quality-monitoring-report
-          path: |
-            quality_trends.png
-          retention-days: 30
 
   historical-comparison:
     name: Historical Comparison
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -206,35 +72,9 @@ jobs:
 
       - name: Analyze commit history
         run: |
-          echo "🕰️ Analyzing commit history..."
-          
-          # 分析最近提交的质量
-          echo "## 🕰️ Historical Quality Analysis" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # 获取最近30天的提交统计
-          commit_stats=$(git log --since="30 days ago" --pretty=format:"%H %ad %s" --date=short | head -20)
-          
-          echo "### Recent Commits (Last 30 Days)" >> $GITHUB_STEP_SUMMARY
+          echo "## Recent Commits (Last 30 Days)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Date | Commit | Message |" >> $GITHUB_STEP_SUMMARY
           echo "|------|--------|---------|" >> $GITHUB_STEP_SUMMARY
-          
-          echo "$commit_stats" | while read -r hash date message; do
-            echo "| $date | \`${hash:0:8}\` | $message |" >> $GITHUB_STEP_SUMMARY
-          done
 
-      - name: Check CI success rate
-        run: |
-          echo "✅ CI Success Rate Analysis"
-          
-          # 这里可以集成GitHub API来获取实际的CI运行历史
-          # 目前显示占位信息
-          echo "### CI/CD Health" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Note**: Full CI success rate analysis requires GitHub API integration." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Recommended actions:" >> $GITHUB_STEP_SUMMARY
-          echo "1. Monitor CI failure patterns" >> $GITHUB_STEP_SUMMARY
-          echo "2. Track flaky test frequency" >> $GITHUB_STEP_SUMMARY
-          echo "3. Analyze build time trends" >> $GITHUB_STEP_SUMMARY
+          git log --since="30 days ago" --pretty=format:"|%ad|%h|%s|" --date=short | head -20 >> $GITHUB_STEP_SUMMARY

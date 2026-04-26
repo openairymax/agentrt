@@ -230,7 +230,24 @@ void* sys_skill_uninstall(void** args, int argc) {
     return (void*)res;
 }
 
+static agentos_cognition_engine_t* g_cognition_engine = NULL;
+static agentos_memoryrov_handle_t* g_memoryrov_handle = NULL;
+
 agentos_error_t agentos_syscalls_init(void) {
+    agentos_error_t err = agentos_cognition_create(NULL, NULL, NULL, &g_cognition_engine);
+    if (err != AGENTOS_SUCCESS) {
+        AGENTOS_LOG_WARN("Cognition engine init failed: %d, continuing without cognition", err);
+    }
+
+    g_memoryrov_handle = agentos_memoryrov_create();
+    if (!g_memoryrov_handle) {
+        AGENTOS_LOG_WARN("MemoryRovol init failed, continuing without memory subsystem");
+    }
+
+    AGENTOS_LOG_INFO("Syscalls layer initialized (cognition=%s, memory=%s)",
+        g_cognition_engine ? "ok" : "unavailable",
+        g_memoryrov_handle ? "ok" : "unavailable");
+
     return AGENTOS_SUCCESS;
 }
 
@@ -240,6 +257,15 @@ void agentos_syscalls_cleanup(void) {
 
     agentos_sys_agent_cleanup();
     agentos_sys_skill_cleanup();
+
+    if (g_cognition_engine) {
+        agentos_cognition_destroy(g_cognition_engine);
+        g_cognition_engine = NULL;
+    }
+    if (g_memoryrov_handle) {
+        agentos_memoryrov_destroy(g_memoryrov_handle);
+        g_memoryrov_handle = NULL;
+    }
 
     AGENTOS_LOG_INFO("Syscalls layer cleanup completed");
 }

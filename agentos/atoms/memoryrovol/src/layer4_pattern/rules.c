@@ -17,6 +17,7 @@
 struct agentos_rule_generator {
     agentos_llm_service_t* llm;
     agentos_mutex_t* lock;
+    size_t rule_count;
 };
 
 agentos_error_t agentos_rule_generator_create(
@@ -95,5 +96,17 @@ agentos_error_t agentos_rule_generator_generate(
 
     *out_rule = AGENTOS_STRDUP(resp->text);
     agentos_llm_response_free(resp);
-    return *out_rule ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
+    if (*out_rule) {
+        gen->rule_count++;
+        return AGENTOS_SUCCESS;
+    }
+    return AGENTOS_ENOMEM;
+}
+
+agentos_error_t agentos_rule_generator_stats(
+    agentos_rule_generator_t* gen,
+    size_t* out_rule_count) {
+    if (!gen || !out_rule_count) return AGENTOS_EINVAL;
+    *out_rule_count = gen->rule_count;
+    return AGENTOS_SUCCESS;
 }

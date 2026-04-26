@@ -255,9 +255,7 @@ static int do_rpc_call(ipc_pool_entry_t* entry,
     } while (0)
 
 int svc_ipc_init(const char* baseruntime_url) {
-    int ret = SVC_OK;
     struct ipc_client* client = NULL;
-    int curl_initialized_here = 0;
     
     if (!baseruntime_url) {
         SVC_ERROR(SVC_ERR_INVALID_PARAM, "baseruntime_url is NULL");
@@ -273,7 +271,6 @@ int svc_ipc_init(const char* baseruntime_url) {
             SVC_ERROR(SVC_ERR_IO, "Failed to initialize libcurl");
         }
         g_curl_initialized = 1;
-        curl_initialized_here = 1;
     }
     
     /* 如果已经初始化，直接返回 */

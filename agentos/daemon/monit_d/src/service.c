@@ -519,6 +519,9 @@ int monitor_service_start_agent_trace(monitor_service_t* service, const char* ag
     if (!service || !trace) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
+    (void)agent_id;
+    (void)task_id;
+    (void)loop_config;
 
     if (!service->config.enable_tracing) {
         return AGENTOS_ERR_STATE_ERROR;
@@ -537,7 +540,7 @@ int monitor_service_start_agent_trace(monitor_service_t* service, const char* ag
 
     trace_entry_t* entry = &service->traces[service->trace_count];
     char tid[64];
-    snprintf(tid, sizeof(tid), "trace-%zu-%llu", service->trace_count, get_timestamp_ms());
+    snprintf(tid, sizeof(tid), "trace-%zu-%lu", service->trace_count, (unsigned long)get_timestamp_ms());
     entry->trace_id = strdup(tid);
     entry->operation_name = task_id ? strdup(task_id) : strdup("unknown");
     entry->service_name = agent_id ? strdup(agent_id) : NULL;
@@ -576,6 +579,7 @@ int monitor_service_check_loop(monitor_service_t* service,
     if (!service || !is_loop || !confidence) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
+    (void)trace;
     *is_loop = false;
     *confidence = 0.0;
     return AGENTOS_SUCCESS;

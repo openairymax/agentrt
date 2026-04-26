@@ -4,31 +4,34 @@
 
 use crate::Client;
 
-/// AgentOS ﻛﭨ۲ﻝﮒ۴ﮒ۲
+/// AgentOS 代理入口
 #[derive(Debug, Clone)]
 pub struct Agent {
     client: Client,
 }
 
 impl Agent {
-    /// ﮒﮒﭨﭦﮔﺍﻝ AgentOS ﻛﭨ۲ﻝ
+    /// 创建新的 AgentOS 代理
     pub fn new(client: Client) -> Self {
         Agent { client }
     }
 
-    /// ﻟﺓﮒﮒﭦﮒﺎﮒ؟۱ﮔﺓﻝ،ﺁﮒﺙﻝ?    pub fn client(&self) -> &Client {
+    /// 获取底层客户端引用
+    pub fn client(&self) -> &Client {
         &self.client
     }
 
-    /// ﻟﺓﮒﮒ؟۱ﮔﺓﻝ،ﺁﮒﻠ?    pub fn into_client(self) -> Client {
+    /// 获取客户端克隆
+    pub fn into_client(self) -> Client {
         self.client
     }
 
-    /// ﮒ۴ﮒﭦﺓﮔ۲ﮔ?    pub async fn health(&self) -> bool {
-        self.client.health().await.unwrap_or(false)
+    /// 健康检查
+    pub async fn health(&self) -> bool {
+        self.client.health().await.is_ok()
     }
 
-    /// ﻟﺓﮒﻝ،ﺁﻝﺗﮒﺍﮒ
+    /// 获取端点地址
     pub fn endpoint(&self) -> &str {
         self.client.endpoint()
     }

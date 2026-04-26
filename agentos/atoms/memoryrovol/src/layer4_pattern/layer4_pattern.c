@@ -15,9 +15,10 @@
 #include <stdio.h>
 
 struct agentos_rule_generator {
-    agentos_llm_service_t* llm;  /* 使用具体类型而不是void* */
+    agentos_llm_service_t* llm;
     agentos_mutex_t* lock;
     char* system_prompt;
+    size_t rule_count;
 };
 
 /**
@@ -136,5 +137,13 @@ agentos_error_t agentos_pattern_match(
     int* out_matches) {
     if (!rule || !memory_id || !out_matches) return AGENTOS_EINVAL;
     *out_matches = 1;
+    return AGENTOS_SUCCESS;
+}
+
+agentos_error_t agentos_rule_generator_stats(
+    agentos_rule_generator_t* gen,
+    size_t* out_rule_count) {
+    if (!gen || !out_rule_count) return AGENTOS_EINVAL;
+    *out_rule_count = gen->rule_count;
     return AGENTOS_SUCCESS;
 }
