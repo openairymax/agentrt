@@ -138,13 +138,25 @@ int mcp_server_register_resource(mcp_server_t server, const char* uri,
     if (!server || !uri || !handler) return -1;
     if (server->resource_count >= MCP_MAX_RESOURCES) return -2;
 
-    mcp_resource_entry_t* entry = &server->resources[server->resource_count++];
+    mcp_resource_entry_t* entry = &server->resources[server->resource_count];
     entry->uri = strdup(uri);
     entry->name = name ? strdup(name) : strdup("");
     entry->description = description ? strdup(description) : strdup("");
     entry->mime_type = mime_type ? strdup(mime_type) : strdup("text/plain");
+    if (!entry->uri || !entry->name || !entry->description || !entry->mime_type) {
+        free(entry->uri);
+        free(entry->name);
+        free(entry->description);
+        free(entry->mime_type);
+        entry->uri = NULL;
+        entry->name = NULL;
+        entry->description = NULL;
+        entry->mime_type = NULL;
+        return -3;
+    }
     entry->handler = handler;
     entry->user_data = user_data;
+    server->resource_count++;
     return 0;
 }
 
@@ -154,12 +166,20 @@ int mcp_server_register_prompt(mcp_server_t server, const char* name,
     if (!server || !name || !handler) return -1;
     if (server->prompt_count >= MCP_MAX_PROMPTS) return -2;
 
-    mcp_prompt_entry_t* entry = &server->prompts[server->prompt_count++];
+    mcp_prompt_entry_t* entry = &server->prompts[server->prompt_count];
     entry->name = strdup(name);
     entry->description = description ? strdup(description) : strdup("");
+    if (!entry->name || !entry->description) {
+        free(entry->name);
+        free(entry->description);
+        entry->name = NULL;
+        entry->description = NULL;
+        return -3;
+    }
     entry->argument_schema = argument_schema ? cJSON_Duplicate(argument_schema, 1) : NULL;
     entry->handler = handler;
     entry->user_data = user_data;
+    server->prompt_count++;
     return 0;
 }
 

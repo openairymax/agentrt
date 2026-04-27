@@ -9,10 +9,13 @@ import os
 import json
 import hashlib
 import time
+import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -238,7 +241,7 @@ class CheckpointManager:
                     checkpoints.append(checkpoint)
             except (json.JSONDecodeError, KeyError) as e:
                 # 忽略损坏的检查点文件
-                print(f"警告：检查点文件 {filepath} 损坏：{e}")
+                logger.warning("检查点文件 %s 损坏: %s", filepath, e)
         
         # 更新索引
         if checkpoints:
@@ -271,7 +274,7 @@ class CheckpointManager:
                 self._remove_from_index(checkpoint_id)
                 return True
             except OSError as e:
-                print(f"删除检查点失败：{e}")
+                logger.error("删除检查点失败: %s", e)
                 return False
         
         return False
@@ -397,10 +400,10 @@ class CheckpointManager:
                 if checkpoint.task_id == task_id:
                     return checkpoint
                 else:
-                    print(f"警告：检查点 {checkpoint_id} 不属于任务 {task_id}")
+                    logger.warning("检查点 %s 不属于任务 %s", checkpoint_id, task_id)
                     return None
         except (json.JSONDecodeError, KeyError) as e:
-            print(f"加载检查点失败：{e}")
+            logger.error("加载检查点失败: %s", e)
             return None
     
     def _load_latest(self, task_id: str) -> Optional[CheckpointData]:

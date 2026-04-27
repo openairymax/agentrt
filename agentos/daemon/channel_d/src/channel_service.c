@@ -1,4 +1,5 @@
 #include "channel_service.h"
+#include "platform.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

@@ -340,7 +340,8 @@ func (t *TelemetrySyscall) GetMetrics(ctx context.Context) (*SyscallResponse, er
 	})
 }
 
-// MockSyscallBinding implements SyscallBinding for testing
+// MockSyscallBinding implements SyscallBinding for testing ONLY.
+// WARNING: This is a testing utility. Do NOT use in production code.
 type MockSyscallBinding struct {
 	mu        sync.RWMutex
 	responses map[string]*SyscallResponse

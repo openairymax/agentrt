@@ -5,14 +5,13 @@
  */
 
 #include "../include/layer1_raw.h"
+#include "platform.h"
 #include <stdlib.h>
 
-/* Unified base library compatibility layer */
 #include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
 #include <stdio.h>
-#include <pthread.h>
 #include <dirent.h>
 
 #ifdef _WIN32
@@ -45,10 +44,10 @@ typedef struct agentos_layer1_raw_inner {
     uint32_t queue_size;
     uint32_t async_workers;
     void* queue;
-    pthread_mutex_t mutex;
-    pthread_cond_t cond;
+    agentos_mutex_t mutex;
+    agentos_cond_t cond;
     int shutdown;
-    pthread_t* workers;
+    agentos_thread_t* workers;
 } agentos_layer1_raw_inner_t;
 
 struct agentos_layer1_raw {
@@ -70,8 +69,8 @@ typedef struct async_queue {
     queue_entry_t* tail;
     size_t count;
     size_t max_size;
-    pthread_mutex_t mutex;
-    pthread_cond_t cond;
+    agentos_mutex_t mutex;
+    agentos_cond_t cond;
     int shutdown;
 } async_queue_t;
 
@@ -110,8 +109,8 @@ agentos_error_t agentos_layer1_raw_create_async(
     l1->inner->async_workers = workers > 0 ? workers : DEFAULT_WORKERS;
     l1->inner->shutdown = 0;
 
-    pthread_mutex_init(&l1->inner->mutex, NULL);
-    pthread_cond_init(&l1->inner->cond, NULL);
+    agentos_mutex_init(&l1->inner->mutex);
+    agentos_cond_init(&l1->inner->cond);
 
     *out = l1;
     return AGENTOS_SUCCESS;
@@ -121,7 +120,7 @@ void agentos_layer1_raw_destroy(agentos_layer1_raw_t* l1) {
     if (!l1) return;
     if (l1->inner) {
         l1->inner->shutdown = 1;
-        pthread_cond_broadcast(&l1->inner->cond);
+        agentos_cond_broadcast(&l1->inner->cond);
 
         const char* path = l1->inner->storage_path;
         if (path && *path && strstr(path, "agentos_l1_test_") != NULL) {
@@ -139,8 +138,8 @@ void agentos_layer1_raw_destroy(agentos_layer1_raw_t* l1) {
             }
         }
 
-        pthread_mutex_destroy(&l1->inner->mutex);
-        pthread_cond_destroy(&l1->inner->cond);
+        agentos_mutex_destroy(&l1->inner->mutex);
+        agentos_cond_destroy(&l1->inner->cond);
         AGENTOS_FREE(l1->inner);
     }
     AGENTOS_FREE(l1);
@@ -318,35 +317,31 @@ agentos_error_t agentos_layer1_raw_flush(
     uint32_t timeout_ms) {
     if (!l1) return AGENTOS_EINVAL;
 
-    pthread_mutex_lock(&l1->inner->mutex);
+    agentos_mutex_lock(&l1->inner->mutex);
 
     if (l1->inner->queue) {
         async_queue_t* q = (async_queue_t*)l1->inner->queue;
         uint64_t deadline = 0;
         if (timeout_ms > 0) {
-            struct timespec ts;
-            clock_gettime(CLOCK_REALTIME, &ts);
-            deadline = (uint64_t)ts.tv_sec * 1000 + (uint64_t)ts.tv_nsec / 1000000 + timeout_ms;
+            deadline = agentos_time_ms() + timeout_ms;
         }
 
         while (q->count > 0) {
             if (timeout_ms > 0) {
-                struct timespec ts;
-                clock_gettime(CLOCK_REALTIME, &ts);
-                uint64_t now = (uint64_t)ts.tv_sec * 1000 + (uint64_t)ts.tv_nsec / 1000000;
+                uint64_t now = agentos_time_ms();
                 if (now >= deadline) {
-                    pthread_mutex_unlock(&l1->inner->mutex);
+                    agentos_mutex_unlock(&l1->inner->mutex);
                     return AGENTOS_ETIMEDOUT;
                 }
             }
-            pthread_mutex_unlock(&l1->inner->mutex);
+            agentos_mutex_unlock(&l1->inner->mutex);
             struct timespec wait_ts = { .tv_sec = 0, .tv_nsec = 10000000L };
             nanosleep(&wait_ts, NULL);
-            pthread_mutex_lock(&l1->inner->mutex);
+            agentos_mutex_lock(&l1->inner->mutex);
         }
     }
 
-    pthread_mutex_unlock(&l1->inner->mutex);
+    agentos_mutex_unlock(&l1->inner->mutex);
     return AGENTOS_SUCCESS;
 }
 
