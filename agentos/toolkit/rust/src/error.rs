@@ -6,7 +6,6 @@
 // 所有异常继承自 AgentOSError，支持错误链追踪。
 // 对应 Go SDK: errors.go
 
-use std::fmt;
 use thiserror::Error;
 
 // ============================================================

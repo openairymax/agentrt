@@ -98,6 +98,8 @@ endif()
 # - config.c -> agentos/commons/utils/config_unified
 # - svc_cache.c -> agentos/commons/utils/cache
 
+set(ATOMS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../atoms")
+
 set(SVC_COMMON_SOURCES
     src/svc_common.c          # 服务框架核心实现
     src/ipc_client.c
@@ -120,6 +122,12 @@ set(SVC_COMMON_SOURCES
     src/orchestrator.c        # 流程编排器
     src/thread_pool.c         # 工作线程池
     src/parallel_dispatcher.c # 工具并行执行引擎
+    ${ATOMS_DIR}/coreloopthree/src/cognition/metacognition.c
+    ${ATOMS_DIR}/coreloopthree/src/cognition/confidence_calibrator.c
+    ${ATOMS_DIR}/coreloopthree/src/cognition/thinking_chain.c
+    ${ATOMS_DIR}/coreloopthree/src/cognition/engine.c
+    ${ATOMS_DIR}/coreloopthree/src/memory/engine.c
+    ${ATOMS_DIR}/coreloopthree/src/utils/id_utils.c
 )
 
 # 创建静态库
@@ -129,6 +137,7 @@ add_library(svc_common STATIC ${SVC_COMMON_SOURCES})
 find_package(OpenSSL QUIET)
 target_link_libraries(svc_common PUBLIC
     agentos_common
+    agentos_memoryrovol
     ${OPENSSL_CRYPTO_LIBRARY}
 )
 
@@ -186,11 +195,10 @@ target_include_directories(svc_common PUBLIC
     $<BUILD_INTERFACE:${COMMONS_DIR}/utils/ipc/include>
 )
 
-set(ATOMS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../atoms")
-
 target_include_directories(svc_common PUBLIC
     $<BUILD_INTERFACE:${ATOMS_DIR}/memoryrovol/include>
     $<BUILD_INTERFACE:${ATOMS_DIR}/coreloopthree/include>
+    $<BUILD_INTERFACE:${ATOMS_DIR}/coreloopthree/src/cognition>
 )
 if(LIBCURL_FOUND)
     target_compile_definitions(svc_common PUBLIC AGENTOS_HAS_CURL)

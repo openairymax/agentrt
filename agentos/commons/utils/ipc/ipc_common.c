@@ -187,13 +187,13 @@ typedef struct rpc_method_node {
  * @brief RPC 请求/响应消息格式
  */
 typedef struct {
-    uint32_t magic;                   /**< RPC 魔数 */
-    uint32_t version;                 /**< 协议版本 */
-    uint64_t request_id;              /**< 请求 ID（用于匹配响应） */
-    uint32_t method_name_len;         /**< 方法名称长度 */
-    uint32_t payload_len;             /**< 负载长度 */
-    uint32_t status;                  /**< 响应状态码 */
-    char method_name[256];            /**< 方法名称 */
+    uint32_t magic;
+    uint32_t version;
+    uint64_t request_id;
+    uint32_t method_name_len;
+    uint64_t payload_len;
+    uint32_t status;
+    char method_name[256];
 } ipc_rpc_header_t;
 
 #define IPC_RPC_MAGIC 0x52504300  /* "RPC\0" */
@@ -813,9 +813,9 @@ agentos_error_t ipc_send_request(
                     memset(response, 0, sizeof(ipc_message_t));
                     response->header.type = IPC_MSG_RESPONSE;
                     response->header.correlation_id = request->header.msg_id;
-                    response->header.payload_len = (uint32_t)n;
+                    response->header.payload_len = (uint64_t)n;
                     response->payload = channel->internal_buffer;
-                    response->payload_size = (uint32_t)n;
+                    response->payload_size = (uint64_t)n;
                     channel->stats.messages_received++;
                     return AGENTOS_SUCCESS;
                 }
@@ -2368,11 +2368,7 @@ agentos_error_t ipc_rpc_server_process(ipc_rpc_server_t* server, uint32_t timeou
     rsp_hdr.request_id = msg.header.msg_id;
     rsp_hdr.status = (handler_err == AGENTOS_SUCCESS) ? 0 : (uint32_t)handler_err;
     rsp_hdr.method_name_len = (uint32_t)strlen(method_name);
-    if (response_len > UINT32_MAX) {
-        rsp_hdr.payload_len = UINT32_MAX;
-    } else {
-        rsp_hdr.payload_len = (uint32_t)response_len;
-    }
+    rsp_hdr.payload_len = response_len;
     memcpy(rsp_hdr.method_name, method_name, strlen(method_name));
 
     /* 发送响应 */

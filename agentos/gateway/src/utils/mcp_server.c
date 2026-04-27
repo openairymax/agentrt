@@ -124,7 +124,7 @@ int mcp_server_register_tool(mcp_server_t server, const char* name,
 
     mcp_tool_entry_t* entry = &server->tools[server->tool_count++];
     entry->name = strdup(name);
-    entry->description = description ? strdup(description) : "";
+    entry->description = description ? strdup(description) : strdup("");
     entry->input_schema = input_schema ? cJSON_Duplicate(input_schema, 1) : NULL;
     entry->handler = handler;
     entry->user_data = user_data;
@@ -140,9 +140,9 @@ int mcp_server_register_resource(mcp_server_t server, const char* uri,
 
     mcp_resource_entry_t* entry = &server->resources[server->resource_count++];
     entry->uri = strdup(uri);
-    entry->name = name ? strdup(name) : "";
-    entry->description = description ? strdup(description) : "";
-    entry->mime_type = mime_type ? strdup(mime_type) : "text/plain";
+    entry->name = name ? strdup(name) : strdup("");
+    entry->description = description ? strdup(description) : strdup("");
+    entry->mime_type = mime_type ? strdup(mime_type) : strdup("text/plain");
     entry->handler = handler;
     entry->user_data = user_data;
     return 0;
@@ -156,7 +156,7 @@ int mcp_server_register_prompt(mcp_server_t server, const char* name,
 
     mcp_prompt_entry_t* entry = &server->prompts[server->prompt_count++];
     entry->name = strdup(name);
-    entry->description = description ? strdup(description) : "";
+    entry->description = description ? strdup(description) : strdup("");
     entry->argument_schema = argument_schema ? cJSON_Duplicate(argument_schema, 1) : NULL;
     entry->handler = handler;
     entry->user_data = user_data;
@@ -243,8 +243,12 @@ static int handle_tools_call(mcp_server_t server, const cJSON* params,
 
     const char* tool_name = cJSON_GetObjectItem(params, "name")
                            ? cJSON_GetObjectItem(params, "name")->valuestring : NULL;
-    cJSON* arguments = cJSON_GetObjectItem(params, "arguments")
-                     ? cJSON_GetObjectItem(params, "arguments") : cJSON_CreateObject();
+    cJSON* arguments = cJSON_GetObjectItem(params, "arguments");
+    int owns_arguments = 0;
+    if (!arguments) {
+        arguments = cJSON_CreateObject();
+        owns_arguments = 1;
+    }
 
     if (!tool_name) {
         *response = mcp_make_result(
@@ -272,6 +276,7 @@ static int handle_tools_call(mcp_server_t server, const cJSON* params,
 
             *response = mcp_make_result(tool_result);
             cJSON_Delete(tool_result);
+            if (owns_arguments) cJSON_Delete(arguments);
             return 0;
         }
     }
@@ -389,10 +394,15 @@ static int handle_prompts_get(mcp_server_t server, const cJSON* params,
 
     const char* prompt_name = cJSON_GetObjectItem(params, "name")
                              ? cJSON_GetObjectItem(params, "name")->valuestring : NULL;
-    cJSON* arguments = cJSON_GetObjectItem(params, "arguments")
-                      ? cJSON_GetObjectItem(params, "arguments") : cJSON_CreateObject();
+    cJSON* arguments = cJSON_GetObjectItem(params, "arguments");
+    int owns_arguments = 0;
+    if (!arguments) {
+        arguments = cJSON_CreateObject();
+        owns_arguments = 1;
+    }
 
     if (!prompt_name) {
+        if (owns_arguments) cJSON_Delete(arguments);
         *response = mcp_make_result(
             mcp_make_error(MCP_ERROR_INVALID_PARAMS, "Missing prompt name", NULL));
         return MCP_ERROR_INVALID_PARAMS;
@@ -409,6 +419,7 @@ static int handle_prompts_get(mcp_server_t server, const cJSON* params,
                 char err_msg[256];
                 snprintf(err_msg, sizeof(err_msg),
                          "Prompt get failed for '%s': %d", prompt_name, ret);
+                if (owns_arguments) cJSON_Delete(arguments);
                 *response = mcp_make_result(
                     mcp_make_error(MCP_ERROR_INTERNAL, err_msg, NULL));
                 return MCP_ERROR_INTERNAL;
@@ -416,6 +427,7 @@ static int handle_prompts_get(mcp_server_t server, const cJSON* params,
 
             *response = mcp_make_result(prom_result);
             cJSON_Delete(prom_result);
+            if (owns_arguments) cJSON_Delete(arguments);
             return 0;
         }
     }

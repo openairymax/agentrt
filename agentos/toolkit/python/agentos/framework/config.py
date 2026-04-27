@@ -581,7 +581,7 @@ class ConfigurationCenter:
             req = urllib.request.Request(url, headers=headers)
 
             timeout_sec = source.reload_interval or 10.0
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             response = await loop.run_in_executor(
                 None,
                 lambda: urllib.request.urlopen(req, timeout=int(timeout_sec))
