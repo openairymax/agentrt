@@ -4,7 +4,6 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
 
 const DEFAULT_MAX_DATA_POINTS: usize = 1000;
 const DEFAULT_MAX_SPANS: usize = 500;

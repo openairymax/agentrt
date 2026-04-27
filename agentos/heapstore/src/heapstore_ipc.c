@@ -585,8 +585,6 @@ heapstore_error_t heapstore_ipc_send(const char* channel_id,
 
     ipc_active_channel_t* ac = find_active_channel(channel_id);
     if (!ac || !ac->shm) {
-        pthread_mutex_unlock(&s_ipc_lock);
-
         heapstore_ipc_create_channel(channel_id, channel_id, "auto", len + 256);
         ac = find_active_channel(channel_id);
         if (!ac) {

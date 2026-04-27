@@ -1009,6 +1009,8 @@ class PluginRegistry:
     """
 
     def __init__(self):
+        import threading
+        self._lock = threading.RLock()
         self._plugin_classes: Dict[str, Type[BasePlugin]] = {}
         self._instances: Dict[str, BasePlugin] = {}
         self._manifests: Dict[str, PluginManifest] = {}
@@ -1029,6 +1031,10 @@ class PluginRegistry:
             TypeError: 如果plugin_class不继承BasePlugin
             ValueError: 如果插件ID已存在
         """
+        with self._lock:
+            return self._register_unlocked(plugin_class, manifest)
+
+    def _register_unlocked(self, plugin_class: Type[BasePlugin], manifest: Optional[PluginManifest] = None) -> str:
         if not (isinstance(plugin_class, type) and issubclass(plugin_class, BasePlugin)):
             raise TypeError(f"Plugin class must be a subclass of BasePlugin, got {plugin_class}")
 
@@ -1064,6 +1070,10 @@ class PluginRegistry:
         Returns:
             是否成功注销
         """
+        with self._lock:
+            return self._unregister_unlocked(plugin_id)
+
+    def _unregister_unlocked(self, plugin_id: str) -> bool:
         if plugin_id not in self._plugin_classes:
             return False
 
@@ -1094,16 +1104,21 @@ class PluginRegistry:
             ]
         return list(self._manifests.values())
 
-    def load(self, plugin_id: str) -> Optional[BasePlugin]:
+    def load(self, plugin_id: str, context: dict = None) -> Optional[BasePlugin]:
         """
         加载插件实例
 
         Args:
             plugin_id: 插件ID
+            context: 可选的加载上下文
 
         Returns:
             插件实例，失败返回None
         """
+        with self._lock:
+            return self._load_unlocked(plugin_id, context)
+
+    def _load_unlocked(self, plugin_id: str, context: dict = None) -> Optional[BasePlugin]:
         if plugin_id not in self._plugin_classes:
             logger.warning(f"Plugin not found: {plugin_id}")
             return None
@@ -1114,6 +1129,30 @@ class PluginRegistry:
         plugin_class = self._plugin_classes[plugin_id]
         instance = plugin_class()
         instance.plugin_id = plugin_id
+
+        try:
+            import asyncio
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+            if loop:
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    future = pool.submit(asyncio.run, instance.on_load(context or {}))
+                    future.result(timeout=30)
+            else:
+                asyncio.run(instance.on_load(context or {}))
+        except Exception as e:
+            logger.error(f"Plugin {plugin_id} on_load failed: {e}")
+            try:
+                import asyncio
+                asyncio.run(instance.on_error(e))
+            except (RuntimeError, ImportError):
+                import asyncio
+                asyncio.new_event_loop().run_until_complete(instance.on_error(e))
+            self._states[plugin_id] = PluginState.ERROR
+            return None
 
         self._instances[plugin_id] = instance
         self._states[plugin_id] = PluginState.LOADED
@@ -1131,13 +1170,119 @@ class PluginRegistry:
         Returns:
             是否成功卸载
         """
+        with self._lock:
+            return self._unload_unlocked(plugin_id)
+
+    def _unload_unlocked(self, plugin_id: str) -> bool:
         if plugin_id not in self._instances:
             return False
 
-        self._instances.pop(plugin_id)
+        instance = self._instances[plugin_id]
+
+        try:
+            import asyncio
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+            if loop:
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    future = pool.submit(asyncio.run, instance.on_unload())
+                    future.result(timeout=30)
+            else:
+                asyncio.run(instance.on_unload())
+        except Exception as e:
+            logger.error(f"Plugin {plugin_id} on_unload failed: {e}")
+            try:
+                import asyncio
+                asyncio.run(instance.on_error(e))
+            except (RuntimeError, ImportError):
+                import asyncio
+                asyncio.new_event_loop().run_until_complete(instance.on_error(e))
+
+        del self._instances[plugin_id]
         self._states[plugin_id] = PluginState.UNLOADED
 
         logger.info(f"Plugin unloaded: {plugin_id}")
+        return True
+
+    def activate(self, plugin_id: str, context: dict = None) -> bool:
+        with self._lock:
+            return self._activate_unlocked(plugin_id, context)
+
+    def _activate_unlocked(self, plugin_id: str, context: dict = None) -> bool:
+        if plugin_id not in self._instances:
+            return False
+        if self._states.get(plugin_id) not in (PluginState.LOADED, PluginState.INACTIVE):
+            return False
+
+        instance = self._instances[plugin_id]
+        try:
+            import asyncio
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+            if loop:
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    future = pool.submit(asyncio.run, instance.on_activate(context or {}))
+                    future.result(timeout=30)
+            else:
+                asyncio.run(instance.on_activate(context or {}))
+        except Exception as e:
+            logger.error(f"Plugin {plugin_id} on_activate failed: {e}")
+            try:
+                import asyncio
+                asyncio.run(instance.on_error(e))
+            except (RuntimeError, ImportError):
+                import asyncio
+                asyncio.new_event_loop().run_until_complete(instance.on_error(e))
+            self._states[plugin_id] = PluginState.ERROR
+            return False
+
+        self._states[plugin_id] = PluginState.ACTIVE
+        logger.info(f"Plugin activated: {plugin_id}")
+        return True
+
+    def deactivate(self, plugin_id: str) -> bool:
+        with self._lock:
+            return self._deactivate_unlocked(plugin_id)
+
+    def _deactivate_unlocked(self, plugin_id: str) -> bool:
+        if plugin_id not in self._instances:
+            return False
+        if self._states.get(plugin_id) != PluginState.ACTIVE:
+            return False
+
+        instance = self._instances[plugin_id]
+        try:
+            import asyncio
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+            if loop:
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    future = pool.submit(asyncio.run, instance.on_deactivate())
+                    future.result(timeout=30)
+            else:
+                asyncio.run(instance.on_deactivate())
+        except Exception as e:
+            logger.error(f"Plugin {plugin_id} on_deactivate failed: {e}")
+            try:
+                import asyncio
+                asyncio.run(instance.on_error(e))
+            except (RuntimeError, ImportError):
+                import asyncio
+                asyncio.new_event_loop().run_until_complete(instance.on_error(e))
+            self._states[plugin_id] = PluginState.ERROR
+            return False
+
+        self._states[plugin_id] = PluginState.INACTIVE
+        logger.info(f"Plugin deactivated: {plugin_id}")
         return True
 
     def get(self, plugin_id: str) -> Optional[BasePlugin]:
