@@ -24,16 +24,13 @@ English | [简体中文](README_CN.md)
 
 </div>
 
-### 🚀 Airymax AgentOS Preview Released
-
-<div align="center">
+## 🚀 Airymax AgentOS Preview Released  
 
 | User Type | Product | Version | Download |
 |:---------:|:-------:|:-------:|:--------:|
-| 👨‍💼 **Pro Users** | Docker | `v0.0.4` | [📦 Get Docker](https://atomgit.com/openairymax/docker/releases/v0.0.4) |
-| 👤 **Personal Users** | Desktop | `v0.0.4` | [🖥️ Get Desktop](https://atomgit.com/openairymax/desktop/releases/v0.0.4) |
+|  **Pro Users** | Docker | `v0.0.4` | [📦 Get Docker](https://atomgit.com/openairymax/docker/releases/v0.0.4) |
+|  **Personal Users** | Desktop | `v0.0.4` | [🖥️ Get Desktop](https://atomgit.com/openairymax/desktop/releases/v0.0.4) |
 
-</div>
 
 ## 🌟 Introduction
 
