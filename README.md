@@ -26,7 +26,7 @@ English | [简体中文](README_CN.md)
 
 ---
 
-## 🚀 Airymax AgentOS Preview Released  
+## 🎉 Preview Released  
 
 | User Type | Product | Version | Download |
 |:---------:|:-------:|:-------:|:--------:|
