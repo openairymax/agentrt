@@ -5,9 +5,8 @@
 // 提供 HTTP 通信层、APIClient 接口定义和依赖倒转抽象。
 // 对应 Go SDK: client/client.go
 
-use reqwest::{Client as ReqwestClient, RequestBuilder, Response, StatusCode};
-use serde_json::{json, Value};
-use std::collections::HashMap;
+use reqwest::{Client as ReqwestClient, RequestBuilder, StatusCode};
+use serde_json::Value;
 use std::time::Duration;
 
 use crate::error::{AgentOSError, http_status_to_code};

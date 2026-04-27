@@ -18,6 +18,8 @@
 #include "memoryrovol.h"
 #include "cognition.h"
 #include "circuit_breaker.h"
+#include "metacognition.h"
+#include "confidence_calibrator.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -25,6 +27,7 @@
 #include <time.h>
 #include <stdatomic.h>
 #include <math.h>
+#include <pthread.h>
 
 #define ORCH_MAX_TASKS 64
 #define ORCH_MAX_STEPS 32
@@ -69,6 +72,9 @@ struct orchestrator_s {
     circuit_breaker_t breaker;
     cb_manager_t cb_mgr;
 
+    agentos_metacognition_t* metacognition;
+    confidence_calibrator_t* calibrator;
+
     char thinking_chain_root[ORCH_ID_LEN];
 };
 
@@ -83,7 +89,7 @@ static void generate_task_id(char* buf, size_t buflen) {
 static const char* phase_name(orch_phase_t phase) {
     static const char* names[] = {
         "decomposition", "planning", "generation",
-        "verification", "audit", "alignment"
+        "critique", "verification", "audit", "alignment"
     };
     if (phase >= 0 && phase < ORCH_PHASE_MAX) return names[phase];
     return "unknown";
@@ -144,6 +150,32 @@ orchestrator_t* orchestrator_create(const orch_config_t* config) {
         }
     }
 
+    if (orch->config.enable_critique_loop) {
+        agentos_error_t mc_err = agentos_mc_create(&orch->metacognition);
+        if (mc_err != AGENTOS_SUCCESS) {
+            SVC_LOG_WARN("orchestrator: metacognition init failed (err=%d), continuing without critique loop", mc_err);
+            orch->metacognition = NULL;
+        } else {
+            orch->metacognition->acceptance_threshold = orch->config.critique_acceptance_threshold;
+            orch->metacognition->auto_correct_threshold = orch->config.critique_auto_correct_threshold;
+            SVC_LOG_INFO("orchestrator: metacognition initialized (threshold=%.2f)",
+                        orch->config.critique_acceptance_threshold);
+
+            orch->calibrator = confidence_calibrator_create(CC_DEFAULT_DECAY_FACTOR);
+            if (!orch->calibrator) {
+                SVC_LOG_WARN("orchestrator: confidence calibrator creation failed");
+            } else {
+                SVC_LOG_INFO("orchestrator: confidence calibrator initialized successfully");
+            }
+        }
+    }
+
+    if (orch->cognition) {
+        agentos_cognition_set_context(orch->cognition,
+            orch->memory ? "memoryrovol_integrated" : "standalone",
+            orch->metacognition ? "dual_thinking_enabled" : "single_thinking");
+    }
+
     if (orch->config.enable_circuit_breaker) {
         orch->cb_mgr = cb_manager_create();
         if (orch->cb_mgr) {
@@ -166,13 +198,14 @@ orchestrator_t* orchestrator_create(const orch_config_t* config) {
 
     generate_task_id(orch->thinking_chain_root, sizeof(orch->thinking_chain_root));
 
-    SVC_LOG_INFO("orchestrator: created (timeout=%ums, retries=%u, strategy=%d, pool=%s, memory=%s, cognition=%s, breaker=%s)",
+    SVC_LOG_INFO("orchestrator: created (timeout=%ums, retries=%u, strategy=%d, pool=%s, memory=%s, cognition=%s, breaker=%s, critique=%s)",
                  orch->config.timeout_ms, orch->config.max_retries,
                  orch->config.default_strategy,
                  orch->pool ? "enabled" : "disabled",
                  orch->memory ? "enabled" : "disabled",
                  orch->cognition ? "enabled" : "disabled",
-                 orch->config.enable_circuit_breaker ? "enabled" : "disabled");
+                 orch->config.enable_circuit_breaker ? "enabled" : "disabled",
+                 orch->metacognition ? "enabled" : "disabled");
 
     return orch;
 }
@@ -190,6 +223,8 @@ void orchestrator_destroy(orchestrator_t* orch) {
     if (orch->pool) thread_pool_destroy(orch->pool);
     if (orch->memory) agentos_memoryrov_cleanup(orch->memory);
     if (orch->cognition) agentos_cognition_destroy(orch->cognition);
+    if (orch->metacognition) agentos_mc_destroy(orch->metacognition);
+    if (orch->calibrator) confidence_calibrator_destroy(orch->calibrator);
     if (orch->breaker) cb_destroy(orch->breaker);
     if (orch->cb_mgr) cb_manager_destroy(orch->cb_mgr);
 
@@ -250,6 +285,7 @@ static task_entry_t* find_or_create_task(orchestrator_t* orch,
 }
 
 static ipc_service_bus_t g_orch_bus = NULL;
+static pthread_mutex_t g_orch_bus_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static char* memory_query_context(agentos_memoryrov_handle_t* mem, const char* query, uint32_t limit) {
     if (!mem || !query) return NULL;
@@ -354,14 +390,18 @@ static char* memory_retrieve_for_generation(agentos_memoryrov_handle_t* mem, con
 static char* call_llm_service(const char* prompt, const char* system_role) {
     if (!prompt) return NULL;
 
+    pthread_mutex_lock(&g_orch_bus_mutex);
     if (!g_orch_bus) {
         g_orch_bus = ipc_service_bus_create("orchestrator_bus", NULL);
         if (!g_orch_bus) {
+            pthread_mutex_unlock(&g_orch_bus_mutex);
             SVC_LOG_WARN("orchestrator: IPC bus creation failed, using local fallback");
             return NULL;
         }
         ipc_service_bus_start(g_orch_bus);
     }
+    ipc_service_bus_t bus = g_orch_bus;
+    pthread_mutex_unlock(&g_orch_bus_mutex);
 
     char params[4096];
     if (system_role) {
@@ -386,7 +426,7 @@ static char* call_llm_service(const char* prompt, const char* system_role) {
     ipc_bus_message_t response;
     memset(&response, 0, sizeof(response));
 
-    agentos_error_t err = ipc_service_bus_request(g_orch_bus, "llm_d",
+    agentos_error_t err = ipc_service_bus_request(bus, "llm_d",
                                                     &request, &response, 30000);
     if (err != AGENTOS_SUCCESS || !response.payload) {
         SVC_LOG_WARN("orchestrator: LLM call failed (err=%d), using fallback", err);
@@ -526,6 +566,7 @@ static char* extract_field_string(const char* json, const char* field) {
 
 static float align_history[ORCH_ALIGN_HISTORY_SIZE];
 static int align_history_count = 0;
+static pthread_mutex_t g_align_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static int execute_single_phase(orchestrator_t* orch,
                                 orch_phase_t phase,
@@ -582,39 +623,83 @@ static int execute_single_phase(orchestrator_t* orch,
                 char* mem_ctx = memory_query_context(orch->memory, input ? input : "", 3);
 
                 agentos_task_plan_t* cog_plan = NULL;
+                bool cognition_produced_plan = false;
                 if (orch->cognition) {
                     agentos_error_t cog_err = agentos_cognition_process(
                         orch->cognition, input ? input : "",
                         strlen(input ? input : ""), &cog_plan);
-                    if (cog_err == AGENTOS_SUCCESS && cog_plan) {
-                        SVC_LOG_INFO("orchestrator: cognition plan generated for decomposition");
-                        char* cog_json = NULL;
-                        size_t cog_len = 0;
-                        agentos_cognition_stats(orch->cognition, &cog_json, &cog_len);
-                        if (cog_json) { free(cog_json); }
+                    if (cog_err == AGENTOS_SUCCESS && cog_plan &&
+                        cog_plan->task_plan_node_count > 0 &&
+                        cog_plan->task_plan_nodes) {
+                        cognition_produced_plan = true;
+                        SVC_LOG_INFO("orchestrator: cognition produced %zu nodes for decomposition",
+                                    cog_plan->task_plan_node_count);
                     }
                 }
 
-                char* prompt = build_decomposition_prompt(input ? input : "");
-                char* llm_result = call_llm_service(prompt, "You are a task decomposition expert.");
-                free(prompt);
-
-                if (llm_result) {
-                    task->output = llm_result;
-                } else if (cog_plan) {
-                    task->output = strdup("{\"source\":\"cognition\",\"subtasks\":[]}");
+                if (cognition_produced_plan && cog_plan) {
+                    size_t buf_sz = cog_plan->task_plan_node_count * 384 + 128;
+                    char* plan_json = (char*)malloc(buf_sz);
+                    if (plan_json) {
+                        size_t pos = snprintf(plan_json, buf_sz,
+                            "{\"source\":\"cognition\",\"plan_id\":\"%.*s\",\"subtasks\":[",
+                            (int)(cog_plan->task_plan_id_len < 64 ? cog_plan->task_plan_id_len : 64),
+                            cog_plan->task_plan_id ? cog_plan->task_plan_id : "unknown");
+                        for (size_t n = 0; n < cog_plan->task_plan_node_count && pos < buf_sz - 2; n++) {
+                            agentos_task_node_t* node = cog_plan->task_plan_nodes[n];
+                            if (!node) continue;
+                            if (n > 0) pos += snprintf(plan_json + pos, buf_sz - pos, ",");
+                            const char* desc = node->task_node_agent_role ?
+                                node->task_node_agent_role :
+                                (node->task_node_id ? node->task_node_id : "unnamed");
+                            int did = (int)(node->task_node_id_len < 48 ? node->task_node_id_len : 48);
+                            int drole = (int)(node->task_node_role_len < 200 ? node->task_node_role_len : 200);
+                            pos += snprintf(plan_json + pos, buf_sz - pos,
+                                "{\"id\":%zu,\"description\":\"%.*s\",\"priority\":%u,"
+                                "\"timeout_ms\":%u,\"depends_on\":[",
+                                n + 1,
+                                drole, desc,
+                                (unsigned)node->task_node_priority,
+                                node->task_node_timeout_ms);
+                            if (node->task_node_depends_on && node->task_node_depends_count > 0) {
+                                for (size_t d = 0; d < node->task_node_depends_count && pos < buf_sz - 2; d++) {
+                                    if (d > 0) pos += snprintf(plan_json + pos, buf_sz - pos, ",");
+                                    pos += snprintf(plan_json + pos, buf_sz - pos, "\"%s\"",
+                                        node->task_node_depends_on[d] ? node->task_node_depends_on[d] : "");
+                                }
+                            }
+                            pos += snprintf(plan_json + pos, buf_sz - pos, "],\"node_id\":\"%.*s\"}",
+                                did, node->task_node_id ? node->task_node_id : "");
+                        }
+                        pos += snprintf(plan_json + pos, buf_sz - pos, "]}");
+                        task->output = plan_json;
+                    } else {
+                        task->output = strdup("{\"error\":\"memory_allocation_failed\","
+                            "\"code\":-2,\"phase\":\"decomposition\"}");
+                    }
                     agentos_task_plan_free(cog_plan);
                     cog_plan = NULL;
                 } else {
-                    size_t buf_sz = (input ? strlen(input) : 0) + 256;
-                    char* fallback = (char*)malloc(buf_sz);
-                    if (fallback) {
-                        snprintf(fallback, buf_sz,
-                            "{\"subtasks\":[{\"id\":1,\"description\":\"%s\",\"priority\":1}]}",
-                            input ? input : "empty");
-                        task->output = fallback;
+                    if (cog_plan) { agentos_task_plan_free(cog_plan); cog_plan = NULL; }
+
+                    char* prompt = build_decomposition_prompt(input ? input : "");
+                    char* llm_result = call_llm_service(prompt, "You are a task decomposition expert.");
+                    free(prompt);
+
+                    if (llm_result) {
+                        task->output = llm_result;
                     } else {
-                        task->output = strdup("{\"subtasks\":[]}");
+                        task->output = strdup(
+                            "{\"error\":\"decomposition_failed\","
+                            "\"code\":-1,"
+                            "\"reason\":\"llm_service_unavailable\","
+                            "\"phase\":\"decomposition\","
+                            "\"message\":\"Both LLM service and cognition engine were unavailable. "
+                            "Cannot decompose task without a reasoning backend.\"}");
+                        SVC_LOG_ERROR("orchestrator: decomposition failed - no LLM, no cognition output");
+                        task->status = ORCH_TASK_FAILED;
+                        task->error_code = -1;
+                        goto done;
                     }
                 }
                 memory_write_step(orch->memory, "decomposition", task->output, NULL);
@@ -633,7 +718,16 @@ static int execute_single_phase(orchestrator_t* orch,
                 if (llm_result) {
                     task->output = llm_result;
                 } else {
-                    task->output = strdup("{\"steps\":[{\"subtask_id\":1,\"action\":\"execute\",\"depends_on\":[]}]}");
+                    task->output = strdup(
+                        "{\"error\":\"planning_failed\","
+                        "\"code\":-1,"
+                        "\"reason\":\"llm_service_unavailable\","
+                        "\"phase\":\"planning\","
+                        "\"message\":\"LLM service unavailable for planning phase.\"}");
+                    SVC_LOG_ERROR("orchestrator: planning failed - LLM unavailable");
+                    task->status = ORCH_TASK_FAILED;
+                    task->error_code = -1;
+                    goto done;
                 }
                 memory_write_step(orch->memory, "planning", task->output, NULL);
                 task->output_len = strlen(task->output);
@@ -644,20 +738,92 @@ static int execute_single_phase(orchestrator_t* orch,
         case ORCH_PHASE_GENERATION:
             {
                 char* mem_retrieved = memory_retrieve_for_generation(orch->memory, input ? input : "");
-                char* prompt = build_generation_prompt(input ? input : "{}");
 
                 agentos_task_plan_t* gen_plan = NULL;
+                bool gen_cog_has_output = false;
                 if (orch->cognition) {
-                    agentos_cognition_process(
+                    agentos_error_t gerr = agentos_cognition_process(
                         orch->cognition, input ? input : "",
                         strlen(input ? input : ""), &gen_plan);
+                    if (gerr == AGENTOS_SUCCESS && gen_plan && gen_plan->task_plan_nodes) {
+                        for (size_t n = 0; n < gen_plan->task_plan_node_count; n++) {
+                            if (gen_plan->task_plan_nodes[n] &&
+                                gen_plan->task_plan_nodes[n]->task_node_output) {
+                                gen_cog_has_output = true;
+                                break;
+                            }
+                        }
+                        if (gen_cog_has_output) {
+                            SVC_LOG_INFO("orchestrator: cognition provided %zu nodes with output hints for generation",
+                                        gen_plan->task_plan_node_count);
+                        }
+                    }
+                }
+
+                char* prompt = build_generation_prompt(input ? input : "{}");
+                if (gen_cog_has_output && gen_plan) {
+                    size_t hint_len = 0;
+                    for (size_t n = 0; n < gen_plan->task_plan_node_count; n++) {
+                        agentos_task_node_t* nd = gen_plan->task_plan_nodes[n];
+                        if (nd && nd->task_node_output)
+                            hint_len += strlen((char*)nd->task_node_output) + 64;
+                    }
+                    if (hint_len > 0) {
+                        size_t new_len = strlen(prompt) + hint_len + 128;
+                        char* enhanced = (char*)realloc(prompt, new_len);
+                        if (enhanced) {
+                            prompt = enhanced;
+                            strcat(prompt, "\n\nCognition engine context:\n");
+                            for (size_t n = 0; n < gen_plan->task_plan_node_count; n++) {
+                                agentos_task_node_t* nd = gen_plan->task_plan_nodes[n];
+                                if (nd && nd->task_node_output) {
+                                    size_t plen = strlen(prompt);
+                                    snprintf(prompt + plen, new_len - plen,
+                                        "  [Node %zu/%zu]: %s\n",
+                                        n + 1, gen_plan->task_plan_node_count,
+                                        (const char*)nd->task_node_output);
+                                }
+                            }
+                        }
+                    }
                 }
 
                 char* t2_output = call_llm_service(prompt, "You are an expert assistant. Provide thorough, accurate output.");
                 free(prompt);
 
                 if (!t2_output) {
-                    t2_output = strdup("{\"generated\":null,\"error\":\"llm_unavailable\",\"mode\":\"t2_no_llm\"}");
+                    if (gen_cog_has_output && gen_plan) {
+                        size_t cbuf_sz = 512;
+                        for (size_t n = 0; n < gen_plan->task_plan_node_count; n++) {
+                            agentos_task_node_t* nd = gen_plan->task_plan_nodes[n];
+                            if (nd && nd->task_node_output)
+                                cbuf_sz += strlen((char*)nd->task_node_output) + 64;
+                        }
+                        char* cog_fallback = (char*)malloc(cbuf_sz);
+                        if (cog_fallback) {
+                            size_t cp = snprintf(cog_fallback, cbuf_sz,
+                                "{\"generated\":\"cognition_fallback\","
+                                "\"mode\":\"t2_cognition\",\"reason\":\"llm_unavailable\","
+                                "\"cognition_nodes\":[");
+                            for (size_t n = 0; n < gen_plan->task_plan_node_count && cp < cbuf_sz - 2; n++) {
+                                agentos_task_node_t* nd = gen_plan->task_plan_nodes[n];
+                                if (!nd || !nd->task_node_output) continue;
+                                if (n > 0) cp += snprintf(cog_fallback + cp, cbuf_sz - cp, ",");
+                                cp += snprintf(cog_fallback + cp, cbuf_sz - cp,
+                                    "{\"id\":\"%.*s\",\"output\":\"%.200s\"}",
+                                    (int)(nd->task_node_id_len < 48 ? nd->task_node_id_len : 48),
+                                    nd->task_node_id ? nd->task_node_id : "",
+                                    (const char*)nd->task_node_output);
+                            }
+                            snprintf(cog_fallback + cp, cbuf_sz - cp, "]}");
+                            t2_output = cog_fallback;
+                            SVC_LOG_WARN("orchestrator: generation using cognition fallback (LLM unavailable)");
+                        } else {
+                            t2_output = strdup("{\"generated\":null,\"error\":\"llm_unavailable_and_alloc_failed\",\"mode\":\"t2_no_llm\"}");
+                        }
+                    } else {
+                        t2_output = strdup("{\"generated\":null,\"error\":\"llm_unavailable\",\"mode\":\"t2_no_llm\"}");
+                    }
                 }
 
                 for (int round = 0; round < ORCH_VERIFY_MAX_ROUNDS; round++) {
@@ -673,12 +839,13 @@ static int execute_single_phase(orchestrator_t* orch,
                     if (t1f_result) {
                         score = extract_score_from_json(t1f_result);
                         verified = extract_bool_from_json(t1f_result, "verified");
-                        free(t1f_result);
                     }
 
                     if (verified && score >= ORCH_VERIFY_THRESHOLD) {
                         SVC_LOG_INFO("orchestrator: generation verified (round=%d, score=%.2f)",
                                     round, score);
+                        free(t1f_result);
+                        t1f_result = NULL;
                         break;
                     }
 
@@ -687,6 +854,8 @@ static int execute_single_phase(orchestrator_t* orch,
 
                     char* correction_prompt = build_correction_prompt(t2_output,
                         t1f_result ? t1f_result : "Quality too low, improve output");
+                    free(t1f_result);
+                    t1f_result = NULL;
                     char* corrected = call_llm_service(correction_prompt,
                         "You are a correction agent. Improve the output.");
                     free(correction_prompt);
@@ -717,6 +886,188 @@ static int execute_single_phase(orchestrator_t* orch,
                 if (mem_retrieved) free(mem_retrieved);
                 task->output_len = strlen(task->output);
                 task->status = ORCH_TASK_COMPLETED;
+            }
+            break;
+
+        case ORCH_PHASE_CRITIQUE:
+            {
+                if (!orch->metacognition) {
+                    SVC_LOG_WARN("orchestrator: critique phase skipped - metacognition not initialized");
+                    task->output = strdup("{\"critique\":\"skipped\",\"reason\":\"metacognition_unavailable\"}");
+                    task->output_len = strlen(task->output);
+                    task->status = ORCH_TASK_COMPLETED;
+                    break;
+                }
+
+                const char* original_input = orch->tasks[0].input ? orch->tasks[0].input : "";
+                const char* gen_output = orch->tasks[2].output ? orch->tasks[2].output : (input ? input : "");
+                size_t gen_out_len = strlen(gen_output);
+
+                uint32_t max_critique_rounds = orch->config.critique_max_rounds > 0 ?
+                    orch->config.critique_max_rounds : 3;
+                float accept_thresh = orch->config.critique_acceptance_threshold > 0 ?
+                    orch->config.critique_acceptance_threshold : 0.7f;
+
+                char* current_output = strdup(gen_output);
+                float best_score = 0.0f;
+                int critique_accepted = 0;
+                int total_critique_rounds = 0;
+                char* final_critique_text = NULL;
+
+                for (uint32_t round = 0; round < max_critique_rounds; round++) {
+                    total_critique_rounds++;
+
+                    agentos_thinking_step_t eval_step;
+                    memset(&eval_step, 0, sizeof(eval_step));
+                    eval_step.step_id = (uint32_t)(100 + round);
+                    eval_step.raw_input = (char*)original_input;
+                    eval_step.raw_input_len = strlen(original_input);
+                    eval_step.content = current_output;
+                    eval_step.content_len = strlen(current_output);
+                    eval_step.confidence = best_score > 0 ? best_score : 0.5f;
+                    eval_step.status = 1;
+
+                    mc_evaluation_result_t mc_result;
+                    memset(&mc_result, 0, sizeof(mc_result));
+
+                    agentos_error_t mc_err = agentos_mc_evaluate_step(
+                        orch->metacognition, &eval_step,
+                        original_input, strlen(original_input), &mc_result);
+
+                    if (mc_err != AGENTOS_SUCCESS) {
+                        SVC_LOG_WARN("orchestrator: critique round %u - metacognition evaluate failed (err=%d)",
+                                    round, mc_err);
+                        if (mc_result.critique_text) free(mc_result.critique_text);
+                        break;
+                    }
+
+                    float round_score = mc_result.overall_score;
+                    if (round_score > best_score) best_score = round_score;
+
+                    SVC_LOG_INFO("orchestrator: critique round %u score=%.3f acceptable=%d strategy=%d severity=%d",
+                                round, round_score, mc_result.is_acceptable,
+                                mc_result.strategy, mc_result.severity);
+
+                    if (final_critique_text) free(final_critique_text);
+                    final_critique_text = mc_result.critique_text ? strdup(mc_result.critique_text) : NULL;
+                    if (mc_result.critique_text) { free(mc_result.critique_text); mc_result.critique_text = NULL; }
+
+                    if (mc_result.is_acceptable || round_score >= accept_thresh) {
+                        critique_accepted = 1;
+                        if (round > 0) {
+                            free(current_output);
+                            current_output = NULL;
+                        }
+                        break;
+                    }
+
+                    if (mc_result.strategy == MC_CORRECT_ESCALATE) {
+                        SVC_LOG_ERROR("orchestrator: critique ESCALATE at round %u (score=%.3f)",
+                                     round, round_score);
+                        free(current_output);
+                        current_output = NULL;
+                        task->status = ORCH_TASK_FAILED;
+                        task->error_code = -4;
+                        goto done;
+                    }
+
+                    if (round < max_critique_rounds - 1) {
+                        size_t corr_input_sz = strlen(original_input) + strlen(current_output) + 256;
+                        if (mc_result.critique_text)
+                            corr_input_sz += strlen(mc_result.critique_text);
+                        char* corr_input = (char*)malloc(corr_input_sz);
+                        if (!corr_input) break;
+
+                        int cpos = snprintf(corr_input, corr_input_sz,
+                            "[ORIGINAL REQUEST]\n%s\n\n"
+                            "[CURRENT OUTPUT - round %u, score=%.2f]\n%s\n\n"
+                            "[S1 CRITIQUE - %s]\n%s\n\n"
+                            "[INSTRUCTION] Improve the output to address all critique points above. "
+                            "Return only the improved output, no explanation.",
+                            original_input, round + 1, round_score, current_output,
+                            mc_result.severity == MC_SEV_CRITICAL ? "CRITICAL" :
+                            mc_result.severity == MC_SEV_ERROR ? "ERROR" :
+                            mc_result.severity == MC_SEV_WARNING ? "WARNING" : "INFO",
+                            mc_result.critique_text ? mc_result.critique_text : "No specific critique");
+
+                        char* corrected = call_llm_service(corr_input,
+                            "You are a self-correction agent. Critically improve the given output based on the S1 evaluation.");
+                        free(corr_input);
+
+                        if (corrected) {
+                            free(current_output);
+                            current_output = corrected;
+
+                            if (orch->calibrator) {
+                                confidence_calibrator_update(orch->calibrator,
+                                    round_score < accept_thresh ? 0.0 : 1.0,
+                                    round_score, CC_DIM_ACCURACY);
+                                confidence_calibrator_update(orch->calibrator,
+                                    round_score < accept_thresh ? 0.0 : 1.0,
+                                    round_score, CC_DIM_COMPLETENESS);
+                            }
+                        } else {
+                            SVC_LOG_WARN("orchestrator: critique round %u correction LLM call failed", round);
+                        }
+                    }
+
+                    if (mc_result.critique_text) {
+                        agentos_mc_feedback(orch->metacognition, round_score,
+                            (round_score >= accept_thresh) ? 1 : 0);
+                    }
+                }
+
+                float calibrated_confidence = best_score;
+                if (orch->calibrator && best_score > 0) {
+                    calibrated_confidence = (float)confidence_calibrator_calibrate(
+                        orch->calibrator, (double)best_score, CC_DIM_CONFIDENCE);
+                }
+
+                if (orch->metacognition && total_critique_rounds > 1) {
+                    mc_error_pattern_t* patterns = NULL;
+                    size_t pat_count = 0;
+                    agentos_mc_detect_patterns(orch->metacognition, &patterns, &pat_count);
+                    if (pat_count > 0) {
+                        SVC_LOG_INFO("orchestrator: critique detected %zu error patterns after %u rounds",
+                                    pat_count, total_critique_rounds);
+                    }
+                }
+
+                size_t cbuf_sz = 512 + (final_critique_text ? strlen(final_critique_text) : 0) +
+                                  (current_output ? strlen(current_output) : 0);
+                char* cbuf = (char*)malloc(cbuf_sz);
+                if (cbuf) {
+                    int clen = snprintf(cbuf, cbuf_sz,
+                        "{\"phase\":\"critique\","
+                        "\"accepted\":%s,"
+                        "\"score\":%.4f,"
+                        "\"calibrated_confidence\":%.4f,"
+                        "\"rounds\":%d,"
+                        "\"max_rounds\":%u,"
+                        "\"strategy\":\"%s\","
+                        "\"critique\":%s}",
+                        critique_accepted ? "true" : "false",
+                        best_score,
+                        calibrated_confidence,
+                        total_critique_rounds,
+                        max_critique_rounds,
+                        critique_accepted ? "ACCEPT" :
+                        (best_score >= orch->config.critique_auto_correct_threshold ? "AUTO_CORRECTED" : "REJECTED"),
+                        final_critique_text ? final_critique_text : "null");
+                    task->output = cbuf;
+                } else {
+                    task->output = strdup(
+                        "{\"phase\":\"critique\",\"error\":\"alloc_failed\"}");
+                }
+
+                if (final_critique_text) free(final_critique_text);
+                if (current_output) free(current_output);
+
+                memory_write_step(orch->memory, "critique", task->output, NULL);
+                task->output_len = strlen(task->output);
+                task->status = critique_accepted ? ORCH_TASK_COMPLETED : ORCH_TASK_FAILED;
+                if (!critique_accepted)
+                    task->error_code = -5;
             }
             break;
 
@@ -777,7 +1128,7 @@ static int execute_single_phase(orchestrator_t* orch,
 
         case ORCH_PHASE_AUDIT:
             {
-                char* prev_output = orch->tasks[3].output ? orch->tasks[3].output : (char*)(input ? input : "");
+                char* prev_output = orch->tasks[4].output ? orch->tasks[4].output : (char*)(input ? input : "");
                 char* audit_prompt = build_audit_prompt(
                     input ? input : "",
                     prev_output);
@@ -785,11 +1136,13 @@ static int execute_single_phase(orchestrator_t* orch,
                     "You are a t1-p expert audit agent. Check for correctness, completeness, safety.");
                 free(audit_prompt);
 
-                bool audit_passed = true;
+                bool audit_passed = false;
                 char* severity = NULL;
                 if (audit_result) {
                     audit_passed = extract_bool_from_json(audit_result, "audit_passed");
                     severity = extract_field_string(audit_result, "severity");
+                } else {
+                    SVC_LOG_ERROR("orchestrator: audit LLM unavailable - failing safe (audit_passed=false)");
                 }
 
                 if (!audit_passed) {
@@ -826,12 +1179,12 @@ static int execute_single_phase(orchestrator_t* orch,
 
         case ORCH_PHASE_ALIGNMENT:
             {
-                float logic_score = 0.8f;
-                float fact_score = 0.8f;
-                float goal_score = 0.8f;
+                float logic_score = 0.0f;
+                float fact_score = 0.0f;
+                float goal_score = 0.0f;
 
                 char* original_input = orch->tasks[0].input ? orch->tasks[0].input : "";
-                char* final_output = orch->tasks[4].output ? orch->tasks[4].output : (char*)(input ? input : "");
+                char* final_output = orch->tasks[5].output ? orch->tasks[5].output : (char*)(input ? input : "");
 
                 char align_prompt[4096];
                 snprintf(align_prompt, sizeof(align_prompt),
@@ -855,6 +1208,7 @@ static int execute_single_phase(orchestrator_t* orch,
 
                 float overall = logic_score * 0.30f + fact_score * 0.35f + goal_score * 0.35f;
 
+                pthread_mutex_lock(&g_align_mutex);
                 if (align_history_count < ORCH_ALIGN_HISTORY_SIZE) {
                     align_history[align_history_count++] = overall;
                 } else {
@@ -875,6 +1229,7 @@ static int execute_single_phase(orchestrator_t* orch,
                         SVC_LOG_WARN("orchestrator: alignment drift detected (%.3f)", drift_value);
                     }
                 }
+                pthread_mutex_unlock(&g_align_mutex);
 
                 bool aligned = (overall >= 0.6f) && !drift_detected;
 
@@ -972,10 +1327,52 @@ int orchestrator_execute(orchestrator_t* orch,
 
     orch->task_count = 0;
 
+    if (orch->memory && orch->cognition && orch->metacognition) {
+        agentos_memory_t* vol_results = NULL;
+        size_t vol_count = 0;
+        agentos_error_t qerr = agentos_memoryrov_retrieve(
+            orch->memory, input, 8, &vol_results, &vol_count);
+        if (qerr == AGENTOS_SUCCESS && vol_count > 0 && vol_results) {
+            SVC_LOG_INFO("orchestrator: loaded %zu memory volumes for dual-thinking context", vol_count);
+            size_t ctx_len = 0;
+            for (size_t v = 0; v < vol_count; v++) {
+                if (vol_results[v].data)
+                    ctx_len += strlen((char*)vol_results[v].data) + 64;
+            }
+            if (ctx_len > 0) {
+                char* vol_ctx = (char*)malloc(ctx_len + 128);
+                if (vol_ctx) {
+                    size_t vp = snprintf(vol_ctx, ctx_len + 128,
+                        "[MEMORY_VOLUME_CONTEXT entries=%zu]\n", vol_count);
+                    for (size_t v = 0; v < vol_count && vp < ctx_len + 100; v++) {
+                        if (vol_results[v].data) {
+                            vp += snprintf(vol_ctx + vp, ctx_len + 128 - vp,
+                                "  [vol_%zu score=%.2f id=%s]: %s\n",
+                                v + 1, vol_results[v].score,
+                                vol_results[v].record_id ? vol_results[v].record_id : "?",
+                                (const char*)vol_results[v].data);
+                        }
+                    }
+                    agentos_memoryrov_mount(orch->memory, "orch_volume_context", vol_ctx);
+                    SVC_LOG_DEBUG("orchestrator: volume context mounted to memory (%zu bytes)",
+                                strlen(vol_ctx));
+                    free(vol_ctx);
+                }
+            }
+            for (size_t v = 0; v < vol_count; v++) {
+                free(vol_results[v].record_id);
+                free(vol_results[v].metadata);
+                free(vol_results[v].data);
+            }
+            free(vol_results);
+        }
+    }
+
     static const orch_phase_t default_phases[] = {
         ORCH_PHASE_DECOMPOSITION,
         ORCH_PHASE_PLANNING,
         ORCH_PHASE_GENERATION,
+        ORCH_PHASE_CRITIQUE,
         ORCH_PHASE_VERIFICATION,
         ORCH_PHASE_AUDIT,
         ORCH_PHASE_ALIGNMENT
@@ -1009,6 +1406,12 @@ int orchestrator_execute(orchestrator_t* orch,
         }
 
         current_input = results[completed - 1].output;
+    }
+
+    if (completed >= ORCH_PHASE_MAX - 1 && orch->memory && results[completed - 1].output) {
+        char* final_out = results[completed - 1].output;
+        agentos_memoryrov_add_memory(orch->memory, final_out, strlen(final_out));
+        SVC_LOG_DEBUG("orchestrator: execution result written back to memory volume");
     }
 
     *out_results = results;
