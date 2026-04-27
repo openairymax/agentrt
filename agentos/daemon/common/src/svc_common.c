@@ -1539,7 +1539,7 @@ agentos_error_t agentos_service_monitor_start(
             g_monitor.services[i].stop_requested = 1;
             if (g_monitor.services[i].monitor_thread) {
                 agentos_platform_mutex_unlock(&g_monitor.mutex);
-                agentos_thread_join(g_monitor.services[i].monitor_thread, NULL);
+                agentos_platform_thread_join(g_monitor.services[i].monitor_thread, NULL);
                 agentos_platform_mutex_lock(&g_monitor.mutex);
             }
             memcpy(&g_monitor.services[i].config, config, sizeof(agentos_monitor_config_t));
@@ -1551,7 +1551,7 @@ agentos_error_t agentos_service_monitor_start(
             g_monitor.services[i].last_check_time = agentos_platform_get_time_ms();
             g_monitor.services[i].next_restart_time = 0;
 
-            int thread_err = agentos_thread_create(
+            int thread_err = agentos_platform_thread_create(
                 &g_monitor.services[i].monitor_thread,
                 monitor_thread_func,
                 &g_monitor.services[i]
@@ -1590,7 +1590,7 @@ agentos_error_t agentos_service_monitor_start(
     mon->stop_requested = 0;
     mon->monitor_thread = (agentos_thread_t)0;
 
-    int thread_err = agentos_thread_create(
+    int thread_err = agentos_platform_thread_create(
         &mon->monitor_thread,
         monitor_thread_func,
         mon
@@ -1635,7 +1635,7 @@ agentos_error_t agentos_service_monitor_stop(agentos_service_t service) {
             agentos_platform_mutex_unlock(&g_monitor.mutex);
 
             if (thread) {
-                agentos_thread_join(thread, NULL);
+                agentos_platform_thread_join(thread, NULL);
             }
 
             agentos_platform_mutex_lock(&g_monitor.mutex);

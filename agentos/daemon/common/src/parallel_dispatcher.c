@@ -76,6 +76,13 @@ static void session_release(dispatch_session_t* session) {
         agentos_platform_mutex_destroy(&session->lock);
         agentos_cond_destroy(&session->cond);
         if (session->contexts) AGENTOS_FREE(session->contexts);
+        if (session->results) {
+            for (size_t i = 0; i < session->task_count; i++) {
+                if (session->results[i].output) AGENTOS_FREE(session->results[i].output);
+                if (session->results[i].error) AGENTOS_FREE(session->results[i].error);
+            }
+            AGENTOS_FREE(session->results);
+        }
         AGENTOS_FREE(session);
     }
 }
@@ -333,10 +340,19 @@ wait_done:
     }
 
     int errors = session->error_count;
-    agentos_platform_mutex_destroy(&session->lock);
-    agentos_cond_destroy(&session->cond);
-    if (session->contexts) AGENTOS_FREE(session->contexts);
-    AGENTOS_FREE(session);
+    bool session_freed_by_worker = false;
+    agentos_platform_mutex_lock(&session->lock);
+    if ((size_t)session->completed_count >= session->task_count) {
+        session_freed_by_worker = true;
+    }
+    agentos_platform_mutex_unlock(&session->lock);
+
+    if (!session_freed_by_worker) {
+        agentos_platform_mutex_destroy(&session->lock);
+        agentos_cond_destroy(&session->cond);
+        if (session->contexts) AGENTOS_FREE(session->contexts);
+        AGENTOS_FREE(session);
+    }
 
     return (errors > 0) ? 1 : 0;
 }

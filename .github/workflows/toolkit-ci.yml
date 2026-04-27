@@ -36,14 +36,16 @@ jobs:
           sudo apt-get install -y cmake gcc libcurl4-openssl-dev libcjson-dev libssl-dev libuuid1 uuid-dev
 
       - name: Configure CMake
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
+        working-directory: AgentOS
+        run: cmake -S . -B ../AgentOS-build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
 
       - name: Build
-        run: cmake --build build -j$(nproc)
+        working-directory: AgentOS-build
+        run: cmake --build . -j$(nproc)
 
       - name: Test
-        working-directory: build
-        run: ctest --output-on-failure -j$(nproc) || true
+        working-directory: AgentOS-build
+        run: ctest --output-on-failure -j$(nproc)
 
   python-test:
     name: Python SDK Test
@@ -68,7 +70,7 @@ jobs:
 
       - name: Test
         working-directory: agentos/toolkit/python
-        run: python -m pytest -p no:cacheprovider -o "addopts=" --tb=short || true
+        run: python -m pytest -p no:cacheprovider -o "addopts=" --tb=short -v
 
   rust-build-test:
     name: Rust SDK Build & Test
@@ -86,7 +88,7 @@ jobs:
 
       - name: Test
         working-directory: agentos/toolkit/rust
-        run: cargo test --verbose || true
+        run: cargo test --verbose
 
   go-build-test:
     name: Go SDK Build & Test
@@ -106,10 +108,10 @@ jobs:
 
       - name: Test
         working-directory: agentos/toolkit/go
-        run: go test -v ./... || true
+        run: go test -v ./...
 
   ts-build:
-    name: TypeScript SDK Build
+    name: TypeScript SDK Build & Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -130,7 +132,7 @@ jobs:
 
       - name: Test
         working-directory: agentos/toolkit/typescript
-        run: npm test || true
+        run: npx jest --no-coverage
 
   openlab-import:
     name: OpenLab Import Check
@@ -149,7 +151,7 @@ jobs:
         run: pip install -e .
 
       - name: Import check
-        run: python -c "import openlab; print(f'OpenLab v{openlab.__version__} imported successfully')"
+        run: python -c "import openlab; print('OpenLab imported OK')"
 
   stub-check:
     name: Stub File Check (BAN-11)

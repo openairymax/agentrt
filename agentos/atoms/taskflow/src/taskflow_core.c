@@ -36,6 +36,14 @@ typedef struct {
 // 内部数据结构
 // ============================================================================
 
+typedef struct {
+    uint64_t checkpoint_id;
+    superstep_t superstep;
+    size_t active_vertices;
+    size_t message_count;
+    uint64_t timestamp;
+} checkpoint_entry_t;
+
 struct taskflow_engine_s {
     taskflow_config_t config;
     graph_engine_handle_t graph_engine;
@@ -47,6 +55,8 @@ struct taskflow_engine_s {
     execution_stats_t stats;
 
     uint64_t last_checkpoint_id;
+    checkpoint_entry_t checkpoints[64];
+    size_t checkpoint_count;
 
     pthread_mutex_t engine_mutex;
     pthread_cond_t pause_cond;
@@ -96,12 +106,13 @@ static void* g_taskflow_log_user_data = NULL;
 
 static void taskflow_engine_init_defaults(taskflow_config_t* config);
 static taskflow_error_t taskflow_engine_validate_config(const taskflow_config_t* config);
+static taskflow_error_t taskflow_engine_stop_core(taskflow_handle_t engine);
 
 // ============================================================================
-// 核心API实现
+// 核心API实现 (内部Pregel引擎接口)
 // ============================================================================
 
-taskflow_handle_t taskflow_engine_create(const taskflow_config_t* config)
+taskflow_handle_t taskflow_engine_create_core(const taskflow_config_t* config)
 {
     if (!config) {
         return NULL;
@@ -167,7 +178,7 @@ taskflow_handle_t taskflow_engine_create(const taskflow_config_t* config)
     return (taskflow_handle_t)engine;
 }
 
-void taskflow_engine_destroy(taskflow_handle_t engine)
+void taskflow_engine_destroy_core(taskflow_handle_t engine)
 {
     if (!engine) return;
     
@@ -175,7 +186,7 @@ void taskflow_engine_destroy(taskflow_handle_t engine)
     
     // 停止引擎（如果正在运行）
     if (e->running) {
-        taskflow_engine_stop(engine);
+        taskflow_engine_stop_core(engine);
     }
     
     // 销毁图引擎
@@ -291,7 +302,7 @@ static void* engine_worker_thread(void* arg) {
     return NULL;
 }
 
-taskflow_error_t taskflow_engine_start(taskflow_handle_t engine)
+taskflow_error_t taskflow_engine_start_core(taskflow_handle_t engine)
 {
     if (!engine) {
         return TASKFLOW_ERROR_INVALID_ARG;
@@ -322,7 +333,7 @@ taskflow_error_t taskflow_engine_start(taskflow_handle_t engine)
     return TASKFLOW_SUCCESS;
 }
 
-taskflow_error_t taskflow_engine_stop(taskflow_handle_t engine)
+taskflow_error_t taskflow_engine_stop_core(taskflow_handle_t engine)
 {
     if (!engine) {
         return TASKFLOW_ERROR_INVALID_ARG;
@@ -351,7 +362,7 @@ taskflow_error_t taskflow_engine_stop(taskflow_handle_t engine)
     return TASKFLOW_SUCCESS;
 }
 
-taskflow_error_t taskflow_engine_pause(taskflow_handle_t engine)
+taskflow_error_t taskflow_engine_pause_core(taskflow_handle_t engine)
 {
     if (!engine) {
         return TASKFLOW_ERROR_INVALID_ARG;
@@ -376,7 +387,7 @@ taskflow_error_t taskflow_engine_pause(taskflow_handle_t engine)
     return TASKFLOW_SUCCESS;
 }
 
-taskflow_error_t taskflow_engine_resume(taskflow_handle_t engine)
+taskflow_error_t taskflow_engine_resume_core(taskflow_handle_t engine)
 {
     if (!engine) {
         return TASKFLOW_ERROR_INVALID_ARG;
@@ -839,12 +850,30 @@ uint64_t taskflow_create_checkpoint(taskflow_handle_t engine)
         if (cp_id > 0) {
             e->last_checkpoint_id = cp_id;
             e->stats.checkpoints_taken++;
+            if (e->checkpoint_count < 64) {
+                checkpoint_entry_t* cp = &e->checkpoints[e->checkpoint_count];
+                cp->checkpoint_id = cp_id;
+                cp->superstep = pregel_engine_get_current_superstep(e->pregel_engine);
+                cp->active_vertices = pregel_engine_get_active_vertices(e->pregel_engine);
+                cp->message_count = pregel_engine_get_queued_messages(e->pregel_engine);
+                cp->timestamp = (uint64_t)time(NULL);
+                e->checkpoint_count++;
+            }
         }
         return cp_id;
     }
 
     e->last_checkpoint_id++;
     e->stats.checkpoints_taken++;
+    if (e->checkpoint_count < 64) {
+        checkpoint_entry_t* cp = &e->checkpoints[e->checkpoint_count];
+        cp->checkpoint_id = e->last_checkpoint_id;
+        cp->superstep = 0;
+        cp->active_vertices = 0;
+        cp->message_count = e->message_count;
+        cp->timestamp = (uint64_t)time(NULL);
+        e->checkpoint_count++;
+    }
     return e->last_checkpoint_id;
 }
 
@@ -865,8 +894,23 @@ taskflow_error_t taskflow_delete_checkpoint(taskflow_handle_t engine, uint64_t c
 {
     if (!engine || checkpoint_id == 0) return TASKFLOW_ERROR_INVALID_ARG;
 
-    (void)checkpoint_id;
-    return TASKFLOW_SUCCESS;
+    struct taskflow_engine_s* e = (struct taskflow_engine_s*)engine;
+
+    if (e->pregel_engine) {
+        taskflow_error_t err = pregel_engine_restore_checkpoint(e->pregel_engine, checkpoint_id);
+        if (err != TASKFLOW_SUCCESS) return err;
+    }
+
+    for (size_t i = 0; i < e->checkpoint_count; i++) {
+        if (e->checkpoints[i].checkpoint_id == checkpoint_id) {
+            memmove(&e->checkpoints[i], &e->checkpoints[i + 1],
+                    (e->checkpoint_count - i - 1) * sizeof(checkpoint_entry_t));
+            e->checkpoint_count--;
+            return TASKFLOW_SUCCESS;
+        }
+    }
+
+    return TASKFLOW_ERROR_INVALID_ARG;
 }
 
 size_t taskflow_list_checkpoints(taskflow_handle_t engine,
@@ -875,11 +919,12 @@ size_t taskflow_list_checkpoints(taskflow_handle_t engine,
 {
     if (!engine || !checkpoints || max_count == 0) return 0;
 
-    if (max_count > 0 && ((struct taskflow_engine_s*)engine)->last_checkpoint_id > 0) {
-        checkpoints[0] = ((struct taskflow_engine_s*)engine)->last_checkpoint_id;
-        return 1;
+    struct taskflow_engine_s* e = (struct taskflow_engine_s*)engine;
+    size_t fill = e->checkpoint_count < max_count ? e->checkpoint_count : max_count;
+    for (size_t i = 0; i < fill; i++) {
+        checkpoints[i] = e->checkpoints[i].checkpoint_id;
     }
-    return 0;
+    return fill;
 }
 
 // ============================================================================
