@@ -41,6 +41,7 @@ import importlib.util
 import inspect
 import logging
 import sys
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -506,7 +507,7 @@ class AgentApplication:
         Returns:
             执行结果
         """
-        start_time = asyncio.get_event_loop().time()
+        start_time = time.perf_counter()
 
         if not self.is_running:
             return ExecutionResult(
@@ -538,7 +539,7 @@ class AgentApplication:
 
             result_output = await self._execute_internal(input_data, agent_ctx)
 
-            execution_time = (asyncio.get_event_loop().time() - start_time) * 1000
+            execution_time = (time.perf_counter() - start_time) * 1000
 
             agent_ctx.pop_frame()
 
@@ -565,7 +566,7 @@ class AgentApplication:
                 "input_data": str(input_data)[:200],
                 "trace_id": agent_ctx.trace_id
             })
-            execution_time = (asyncio.get_event_loop().time() - start_time) * 1000
+            execution_time = (time.perf_counter() - start_time) * 1000
 
             agent_ctx.pop_frame()
 

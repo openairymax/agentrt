@@ -37,9 +37,10 @@ typedef enum {
     ORCH_PHASE_DECOMPOSITION = 0,
     ORCH_PHASE_PLANNING      = 1,
     ORCH_PHASE_GENERATION    = 2,
-    ORCH_PHASE_VERIFICATION  = 3,
-    ORCH_PHASE_AUDIT         = 4,
-    ORCH_PHASE_ALIGNMENT     = 5,
+    ORCH_PHASE_CRITIQUE      = 3,
+    ORCH_PHASE_VERIFICATION  = 4,
+    ORCH_PHASE_AUDIT         = 5,
+    ORCH_PHASE_ALIGNMENT     = 6,
     ORCH_PHASE_MAX
 } orch_phase_t;
 
@@ -84,6 +85,10 @@ typedef struct {
     bool enable_thinking_chain;
     bool enable_metacognition;
     bool enable_circuit_breaker;
+    bool enable_critique_loop;
+    uint32_t critique_max_rounds;
+    float critique_acceptance_threshold;
+    float critique_auto_correct_threshold;
 } orch_config_t;
 
 /* ========== 任务结果 ========== */
@@ -180,6 +185,10 @@ static inline void orch_config_get_defaults(orch_config_t* cfg) {
     cfg->enable_thinking_chain = true;
     cfg->enable_metacognition = true;
     cfg->enable_circuit_breaker = true;
+    cfg->enable_critique_loop = true;
+    cfg->critique_max_rounds = 3;
+    cfg->critique_acceptance_threshold = 0.7f;
+    cfg->critique_auto_correct_threshold = 0.5f;
 }
 
 #ifdef __cplusplus
