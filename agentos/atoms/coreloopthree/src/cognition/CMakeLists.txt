@@ -9,6 +9,7 @@ file(GLOB COGNITION_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/planner/*.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/coordinator/*.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/dispatcher/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../memory/engine.c"
 )
 
 add_library(agentos_cognition STATIC ${COGNITION_SOURCES})
@@ -19,10 +20,12 @@ target_include_directories(agentos_cognition PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../corekern/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../memoryrovol/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../memory
 )
 
 target_link_libraries(agentos_cognition
     agentos_core
+    agentos_memoryrovol
     m
 )
 

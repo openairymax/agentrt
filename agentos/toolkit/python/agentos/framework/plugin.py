@@ -1034,6 +1034,23 @@ class PluginRegistry:
         with self._lock:
             return self._register_unlocked(plugin_class, manifest)
 
+    @staticmethod
+    def _invoke_hook(instance, hook_name, *args):
+        result = getattr(instance, hook_name)(*args)
+        if inspect.iscoroutine(result):
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+            if loop:
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    future = pool.submit(asyncio.run, result)
+                    return future.result(timeout=30)
+            else:
+                return asyncio.run(result)
+        return result
+
     def _register_unlocked(self, plugin_class: Type[BasePlugin], manifest: Optional[PluginManifest] = None) -> str:
         if not (isinstance(plugin_class, type) and issubclass(plugin_class, BasePlugin)):
             raise TypeError(f"Plugin class must be a subclass of BasePlugin, got {plugin_class}")
@@ -1131,26 +1148,13 @@ class PluginRegistry:
         instance.plugin_id = plugin_id
 
         try:
-            import asyncio
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                loop = None
-            if loop:
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor() as pool:
-                    future = pool.submit(asyncio.run, instance.on_load(context or {}))
-                    future.result(timeout=30)
-            else:
-                asyncio.run(instance.on_load(context or {}))
+            self._invoke_hook(instance, 'on_load', context or {})
         except Exception as e:
             logger.error(f"Plugin {plugin_id} on_load failed: {e}")
             try:
-                import asyncio
-                asyncio.run(instance.on_error(e))
-            except (RuntimeError, ImportError):
-                import asyncio
-                asyncio.new_event_loop().run_until_complete(instance.on_error(e))
+                self._invoke_hook(instance, 'on_error', e)
+            except Exception:
+                pass
             self._states[plugin_id] = PluginState.ERROR
             return None
 
@@ -1180,26 +1184,13 @@ class PluginRegistry:
         instance = self._instances[plugin_id]
 
         try:
-            import asyncio
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                loop = None
-            if loop:
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor() as pool:
-                    future = pool.submit(asyncio.run, instance.on_unload())
-                    future.result(timeout=30)
-            else:
-                asyncio.run(instance.on_unload())
+            self._invoke_hook(instance, 'on_unload')
         except Exception as e:
             logger.error(f"Plugin {plugin_id} on_unload failed: {e}")
             try:
-                import asyncio
-                asyncio.run(instance.on_error(e))
-            except (RuntimeError, ImportError):
-                import asyncio
-                asyncio.new_event_loop().run_until_complete(instance.on_error(e))
+                self._invoke_hook(instance, 'on_error', e)
+            except Exception:
+                pass
 
         del self._instances[plugin_id]
         self._states[plugin_id] = PluginState.UNLOADED
@@ -1219,26 +1210,13 @@ class PluginRegistry:
 
         instance = self._instances[plugin_id]
         try:
-            import asyncio
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                loop = None
-            if loop:
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor() as pool:
-                    future = pool.submit(asyncio.run, instance.on_activate(context or {}))
-                    future.result(timeout=30)
-            else:
-                asyncio.run(instance.on_activate(context or {}))
+            self._invoke_hook(instance, 'on_activate', context or {})
         except Exception as e:
             logger.error(f"Plugin {plugin_id} on_activate failed: {e}")
             try:
-                import asyncio
-                asyncio.run(instance.on_error(e))
-            except (RuntimeError, ImportError):
-                import asyncio
-                asyncio.new_event_loop().run_until_complete(instance.on_error(e))
+                self._invoke_hook(instance, 'on_error', e)
+            except Exception:
+                pass
             self._states[plugin_id] = PluginState.ERROR
             return False
 
@@ -1258,26 +1236,13 @@ class PluginRegistry:
 
         instance = self._instances[plugin_id]
         try:
-            import asyncio
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                loop = None
-            if loop:
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor() as pool:
-                    future = pool.submit(asyncio.run, instance.on_deactivate())
-                    future.result(timeout=30)
-            else:
-                asyncio.run(instance.on_deactivate())
+            self._invoke_hook(instance, 'on_deactivate')
         except Exception as e:
             logger.error(f"Plugin {plugin_id} on_deactivate failed: {e}")
             try:
-                import asyncio
-                asyncio.run(instance.on_error(e))
-            except (RuntimeError, ImportError):
-                import asyncio
-                asyncio.new_event_loop().run_until_complete(instance.on_error(e))
+                self._invoke_hook(instance, 'on_error', e)
+            except Exception:
+                pass
             self._states[plugin_id] = PluginState.ERROR
             return False
 
