@@ -178,21 +178,26 @@ func (r *PluginRegistry) Register(factory PluginFactory, manifest *PluginManifes
 // Unregister 注销插件
 func (r *PluginRegistry) Unregister(pluginID string) bool {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 
 	if _, exists := r.factories[pluginID]; !exists {
+		r.mu.Unlock()
 		return false
 	}
 
-	if _, loaded := r.instances[pluginID]; loaded {
+	if instance, loaded := r.instances[pluginID]; loaded {
+		r.mu.Unlock()
+		if err := instance.OnUnload(); err != nil {
+			instance.OnError(err)
+		}
+		r.mu.Lock()
 		delete(r.instances, pluginID)
-		r.states[pluginID] = StateUnloaded
 	}
 
 	delete(r.factories, pluginID)
 	delete(r.manifests, pluginID)
 	delete(r.states, pluginID)
 
+	r.mu.Unlock()
 	return true
 }
 
@@ -220,22 +225,35 @@ func (r *PluginRegistry) Discover(capability string) []PluginManifest {
 // Load 加载插件实例
 func (r *PluginRegistry) Load(pluginID string) (BasePlugin, error) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 
 	factory, exists := r.factories[pluginID]
 	if !exists {
+		r.mu.Unlock()
 		return nil, fmt.Errorf("plugin '%s' not found", pluginID)
 	}
 
 	if instance, loaded := r.instances[pluginID]; loaded {
+		r.mu.Unlock()
 		return instance, nil
 	}
 
 	instance := factory()
 	instance.SetPluginID(pluginID)
 
+	r.mu.Unlock()
+
+	if err := instance.OnLoad(nil); err != nil {
+		r.mu.Lock()
+		r.states[pluginID] = StateError
+		r.mu.Unlock()
+		instance.OnError(err)
+		return nil, fmt.Errorf("plugin '%s' on_load failed: %w", pluginID, err)
+	}
+
+	r.mu.Lock()
 	r.instances[pluginID] = instance
 	r.states[pluginID] = StateLoaded
+	r.mu.Unlock()
 
 	return instance, nil
 }
@@ -243,15 +261,78 @@ func (r *PluginRegistry) Load(pluginID string) (BasePlugin, error) {
 // Unload 卸载插件实例
 func (r *PluginRegistry) Unload(pluginID string) bool {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 
-	if _, exists := r.instances[pluginID]; !exists {
+	instance, exists := r.instances[pluginID]
+	if !exists {
+		r.mu.Unlock()
 		return false
 	}
 
+	r.mu.Unlock()
+
+	if err := instance.OnUnload(); err != nil {
+		instance.OnError(err)
+	}
+
+	r.mu.Lock()
 	delete(r.instances, pluginID)
 	r.states[pluginID] = StateUnloaded
+	r.mu.Unlock()
 
+	return true
+}
+
+// Activate 激活插件实例
+func (r *PluginRegistry) Activate(pluginID string) bool {
+	r.mu.Lock()
+
+	instance, exists := r.instances[pluginID]
+	state, _ := r.states[pluginID]
+	if !exists || (state != StateLoaded && state != StateInactive) {
+		r.mu.Unlock()
+		return false
+	}
+
+	r.mu.Unlock()
+
+	if err := instance.OnActivate(nil); err != nil {
+		instance.OnError(err)
+		r.mu.Lock()
+		r.states[pluginID] = StateError
+		r.mu.Unlock()
+		return false
+	}
+
+	r.mu.Lock()
+	r.states[pluginID] = StateActive
+	r.mu.Unlock()
+	return true
+}
+
+// Deactivate 停用插件实例
+func (r *PluginRegistry) Deactivate(pluginID string) bool {
+	r.mu.Lock()
+
+	instance, exists := r.instances[pluginID]
+	state, _ := r.states[pluginID]
+	if !exists || state != StateActive {
+		r.mu.Unlock()
+		return false
+	}
+
+	r.mu.Unlock()
+
+	if err := instance.OnDeactivate(); err != nil {
+		instance.OnError(err)
+		r.mu.Lock()
+		r.states[pluginID] = StateError
+		r.mu.Unlock()
+		return false
+	}
+
+	r.mu.Lock()
+	r.states[pluginID] = StateInactive
+	r.mu.Unlock()
 	return true
 }
 
@@ -379,7 +460,11 @@ func (pm *PluginManager) UnloadPlugin(pluginID string) bool {
 	}
 
 	if info.State == StateActive {
-		pm.DeactivatePlugin(pluginID)
+		if info.ActivatedAt != nil {
+			activeTime := time.Since(*info.ActivatedAt).Seconds()
+			info.TotalActiveTimeSeconds += activeTime
+		}
+		info.State = StateInactive
 	}
 
 	info.State = StateUnloaded

@@ -1028,7 +1028,20 @@ taskflow_error_t pregel_engine_run_superstep(pregel_engine_handle_t engine)
     e->stats.completed_supersteps++;
     e->stats.active_supersteps = e->current_superstep;
 
-    // 执行超步开始回调
+    for (size_t i = 0; i < e->vertex_state_count; i++) {
+        pregel_vertex_state_t* vs = &e->vertex_states[i];
+        if (vs->incoming_messages) {
+            for (size_t j = 0; j < vs->incoming_message_count; j++) {
+                if (vs->incoming_messages[j].payload) {
+                    free(vs->incoming_messages[j].payload);
+                }
+            }
+            free(vs->incoming_messages);
+            vs->incoming_messages = NULL;
+        }
+        vs->incoming_message_count = 0;
+    }
+
     if (e->config.start_func) {
         e->config.start_func(e->current_superstep, e->config.user_context);
     }
@@ -1038,14 +1051,25 @@ taskflow_error_t pregel_engine_run_superstep(pregel_engine_handle_t engine)
         while (!message_queue_is_empty(e->next_step_queue)) {
             message_queue_entry_t* entry = message_queue_dequeue(e->next_step_queue);
             if (entry) {
-                size_t worker_id = vertex_id_hash(entry->target, e->worker_count);
-                if (worker_id < e->config.max_workers && e->message_queues[worker_id]) {
-                    // 转发到目标顶点的消息队列（不复制payload，转移所有权）
-                    size_t target_idx = get_vertex_state_index(e, entry->target);
-                    if (target_idx != SIZE_MAX) {
-                        pregel_vertex_state_t* vs = &e->vertex_states[target_idx];
-                        vs->incoming_message_count++;
-                        // 简化：直接释放入口消息（完整实现需要消息聚合）
+                size_t target_idx = get_vertex_state_index(e, entry->target);
+                if (target_idx != SIZE_MAX) {
+                    pregel_vertex_state_t* vs = &e->vertex_states[target_idx];
+                    size_t new_count = vs->incoming_message_count + 1;
+                    graph_message_t* new_msgs = (graph_message_t*)realloc(
+                        vs->incoming_messages, new_count * sizeof(graph_message_t));
+                    if (new_msgs) {
+                        vs->incoming_messages = new_msgs;
+                        graph_message_t* msg = &vs->incoming_messages[vs->incoming_message_count];
+                        memset(msg, 0, sizeof(graph_message_t));
+                        msg->id = (message_id_t)(vs->incoming_message_count + 1);
+                        msg->sender = entry->target;
+                        msg->receiver = entry->target;
+                        msg->payload = entry->payload;
+                        msg->payload_size = entry->payload_size;
+                        msg->step = entry->step;
+                        msg->direction = MESSAGE_INCOMING;
+                        vs->incoming_message_count = new_count;
+                        entry->payload = NULL;
                     }
                 }
                 if (entry->payload) free(entry->payload);

@@ -100,13 +100,13 @@ class TestPluginStateIntegration(unittest.TestCase):
         )
 
         import asyncio
-        info = asyncio.get_event_loop().run_until_complete(
+        info = asyncio.run(
             pm.load_plugin("", manifest_override=manifest)
         )
         self.assertIsNotNone(info)
         self.assertEqual(info.state, PluginState.LOADED)
 
-        asyncio.get_event_loop().run_until_complete(pm.activate_plugin("e2e_state_test"))
+        asyncio.run(pm.activate_plugin("e2e_state_test"))
         self.assertEqual(info.state, PluginState.ACTIVE)
 
 
