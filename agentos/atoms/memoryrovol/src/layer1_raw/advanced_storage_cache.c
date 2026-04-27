@@ -7,6 +7,7 @@
 #include "advanced_storage_cache.h"
 #include "agentos.h"
 #include "logger.h"
+#include "layer1_raw.h"
 #include <string.h>
 
 /* 基础库兼容性层 */
@@ -223,18 +224,19 @@ size_t advanced_cache_flush_dirty(cache_manager_t* cache, shard_manager_t* shard
 
         agentos_mutex_lock(entry->lock);
         if (entry->state == CACHE_ENTRY_DIRTY) {
-            /* 实际写入磁盘操作 */
             if (shard->storage && entry->data && entry->data_size > 0) {
-                /* 注意：这里需要外部提供写入函数 */
-                /* 简化实现，实际应该调用 agentos_layer1_raw_write */
-                AGENTOS_LOG_DEBUG("Would flush dirty entry %s (size: %zu)", entry->id, entry->data_size);
-                entry->state = CACHE_ENTRY_CLEAN;
-                flushed_count++;
-                
-                /* 更新统计信息 */
-                agentos_mutex_lock(shard->stats_lock);
-                shard->write_count++;
-                agentos_mutex_unlock(shard->stats_lock);
+                agentos_error_t write_err = agentos_layer1_raw_write(
+                    shard->storage, entry->id, entry->data, entry->data_size);
+                if (write_err == AGENTOS_SUCCESS) {
+                    entry->state = CACHE_ENTRY_CLEAN;
+                    flushed_count++;
+                    agentos_mutex_lock(shard->stats_lock);
+                    shard->write_count++;
+                    agentos_mutex_unlock(shard->stats_lock);
+                } else {
+                    AGENTOS_LOG_WARN("Failed to flush dirty cache entry %s: error=%d",
+                                    entry->id, write_err);
+                }
             } else {
                 AGENTOS_LOG_WARN("Cannot write dirty cache entry %s: invalid storage or data",
                                 entry->id);

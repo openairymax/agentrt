@@ -791,7 +791,6 @@ taskflow_error_t workflow_execute_async(
     void (*callback)(taskflow_error_t result, void* user_data),
     void* user_data)
 {
-    // 简化实现：调用同步版本
     taskflow_error_t result = workflow_execute_sync(context, max_iterations);
     
     if (callback) {

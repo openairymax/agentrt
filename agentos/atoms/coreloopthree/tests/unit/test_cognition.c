@@ -321,10 +321,10 @@ static void test_cognition_enum_values(void) {
     assert(TASK_STATUS_RETRYING == 5);
     TEST_PASS("task status enum values correct");
 
-    assert(MEMORY_TYPE_RAW == 0);
-    assert(MEMORY_TYPE_FEATURE == 1);
-    assert(MEMORY_TYPE_STRUCTURE == 2);
-    assert(MEMORY_TYPE_PATTERN == 3);
+    assert(AGENTOS_MEMTYPE_TEXT == 0);
+    assert(AGENTOS_MEMTYPE_EMBEDDING == 1);
+    assert(AGENTOS_MEMTYPE_STRUCTURED == 2);
+    assert(AGENTOS_MEMTYPE_BINARY == 3);
     TEST_PASS("memory type enum values correct");
 }
 
