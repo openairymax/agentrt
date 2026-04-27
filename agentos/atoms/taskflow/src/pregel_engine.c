@@ -893,6 +893,53 @@ taskflow_error_t pregel_engine_restore_checkpoint(pregel_engine_handle_t engine,
     return TASKFLOW_SUCCESS;
 }
 
+taskflow_error_t pregel_engine_delete_checkpoint(pregel_engine_handle_t engine,
+                                                 uint64_t checkpoint_id)
+{
+    if (!engine || checkpoint_id == 0) {
+        return TASKFLOW_ERROR_INVALID_ARG;
+    }
+
+    struct pregel_engine_s* e = (struct pregel_engine_s*)engine;
+
+    if (!e->initialized) {
+        return TASKFLOW_ERROR_NOT_INITIALIZED;
+    }
+
+    pthread_mutex_lock(&e->mutex);
+
+    for (size_t i = 0; i < e->checkpoint_count; i++) {
+        if (e->checkpoints[i].checkpoint_id == checkpoint_id) {
+            if (e->checkpoints[i].snapshot_data) {
+                AGENTOS_FREE(e->checkpoints[i].snapshot_data);
+            }
+
+            if (i != e->checkpoint_count - 1) {
+                memmove(&e->checkpoints[i], &e->checkpoints[i + 1],
+                        (e->checkpoint_count - i - 1) * sizeof(checkpoint_t));
+            }
+            e->checkpoint_count--;
+
+            if (e->checkpoint_count > 0) {
+                checkpoint_t* new_arr = (checkpoint_t*)AGENTOS_REALLOC(
+                    e->checkpoints, e->checkpoint_count * sizeof(checkpoint_t));
+                if (new_arr) {
+                    e->checkpoints = new_arr;
+                }
+            } else {
+                AGENTOS_FREE(e->checkpoints);
+                e->checkpoints = NULL;
+            }
+
+            pthread_mutex_unlock(&e->mutex);
+            return TASKFLOW_SUCCESS;
+        }
+    }
+
+    pthread_mutex_unlock(&e->mutex);
+    return TASKFLOW_ERROR_INVALID_ARG;
+}
+
 taskflow_error_t pregel_engine_get_stats(pregel_engine_handle_t engine,
                                         execution_stats_t* stats)
 {
@@ -1020,7 +1067,7 @@ taskflow_error_t pregel_engine_run_superstep(pregel_engine_handle_t engine)
         e->active_vertices = 0;
         pthread_cond_broadcast(&e->cond_var);
         pthread_mutex_unlock(&e->mutex);
-        return (taskflow_error_t)20;
+        return TASKFLOW_ERROR_NO_ACTIVE_VERTICES;
     }
 
     e->active_vertices = active_count;

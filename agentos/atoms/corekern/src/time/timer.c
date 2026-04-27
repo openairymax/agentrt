@@ -101,7 +101,33 @@ agentos_error_t agentos_timer_stop(agentos_timer_t* timer) {
 
 void agentos_timer_destroy(agentos_timer_t* timer) {
     if (!timer) return;
-    agentos_timer_stop(timer);
+
+    if (!timer_lock) {
+        AGENTOS_FREE(timer);
+        return;
+    }
+
+    agentos_mutex_lock(timer_lock);
+
+    agentos_timer_t** pp = &timer_list;
+    int found = 0;
+    while (*pp) {
+        if (*pp == timer) {
+            *pp = timer->next;
+            timer->next = NULL;
+            timer->active = 0;
+            found = 1;
+            break;
+        }
+        pp = &(*pp)->next;
+    }
+
+    agentos_mutex_unlock(timer_lock);
+
+    if (!found) {
+        return;
+    }
+
     AGENTOS_FREE(timer);
 }
 

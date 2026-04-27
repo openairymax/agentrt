@@ -17,14 +17,6 @@
 #include <pthread.h>
 #include <errno.h>
 
-#ifndef TASKFLOW_ERROR_NO_ACTIVE_VERTICES
-#define TASKFLOW_ERROR_NO_ACTIVE_VERTICES ((taskflow_error_t)20)
-#endif
-
-#ifndef TASKFLOW_ERROR_ALREADY_RUNNING
-#define TASKFLOW_ERROR_ALREADY_RUNNING ((taskflow_error_t)21)
-#endif
-
 typedef struct {
     vertex_id_t source;
     vertex_id_t target;
@@ -897,8 +889,7 @@ taskflow_error_t taskflow_delete_checkpoint(taskflow_handle_t engine, uint64_t c
     struct taskflow_engine_s* e = (struct taskflow_engine_s*)engine;
 
     if (e->pregel_engine) {
-        taskflow_error_t err = pregel_engine_restore_checkpoint(e->pregel_engine, checkpoint_id);
-        if (err != TASKFLOW_SUCCESS) return err;
+        return pregel_engine_delete_checkpoint(e->pregel_engine, checkpoint_id);
     }
 
     for (size_t i = 0; i < e->checkpoint_count; i++) {
