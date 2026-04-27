@@ -24,6 +24,8 @@ Powered by OpenAirymax
 
 </div>
 
+---
+
 ## 🚀 Airymax AgentOS 预览版已发布  
 
 | 用户类型 | 产品 | 版本 | 下载 |
