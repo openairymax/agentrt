@@ -14,13 +14,20 @@
 #include "memory.h"
 
 #define TEST_PASS(name) printf("[PASS] %s\n", name)
-#define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)
+#define TEST_FAIL(name, msg) do { printf("[FAIL] %s: %s\n", name, msg); tests_failed++; } while(0)
 
 static int tests_run = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-#define RUN_TEST(func) do { tests_run++; func(); tests_passed++; } while(0)
+#define RUN_TEST(func) do { \
+    tests_run++; \
+    int prev_failed = tests_failed; \
+    func(); \
+    if (prev_failed == tests_failed) { \
+        tests_passed++; \
+    } \
+} while(0)
 
 /* ==================== 认知引擎生命周期 ==================== */
 
