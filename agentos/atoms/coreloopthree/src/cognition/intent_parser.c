@@ -453,8 +453,15 @@ static size_t extract_entities_from_text(const char* text, extracted_entity_t* e
             }
             entities[count].value_len = strlen(keyword);
             entities[count].confidence = confidence;
-            entities[count].start_pos = 0;  // 简化实现
-            entities[count].end_pos = 0;    // 简化实现
+            /* 计算关键词在原文中的位置 */
+            const char* pos = strstr(text, keyword);
+            if (pos) {
+                entities[count].start_pos = (size_t)(pos - text);
+                entities[count].end_pos = entities[count].start_pos + strlen(keyword);
+            } else {
+                entities[count].start_pos = 0;
+                entities[count].end_pos = 0;
+            }
             count++;
         }
     }
@@ -832,7 +839,10 @@ agentos_error_t agentos_intent_parser_health_check(agentos_intent_parser_t* pars
     cJSON_AddStringToObject(health_json, "component", "intent_parser");
     cJSON_AddStringToObject(health_json, "parser_id", parser->parser_id);
     cJSON_AddStringToObject(health_json, "status", "healthy");
-    cJSON_AddNumberToObject(health_json, "rule_count", 0);  // 简化
+    size_t rule_count = 0;
+    intent_rule_t* r = parser->rule_list;
+    while (r) { rule_count++; r = r->next; }
+    cJSON_AddNumberToObject(health_json, "rule_count", (double)rule_count);
 
     // 检查资源
     int resources_ok = 1;

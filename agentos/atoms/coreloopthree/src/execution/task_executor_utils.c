@@ -32,7 +32,7 @@ typedef enum {
     TASK_STATE_TIMEOUT
 } task_state_t;
 
-/* 任务内部结构（简化版） */
+/* 任务内部结构 */
 struct agentos_task {
     uint64_t task_id;
     char* task_name;

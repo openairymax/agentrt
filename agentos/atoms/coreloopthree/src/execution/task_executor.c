@@ -321,21 +321,30 @@ agentos_error_t agentos_task_executor_wait(agentos_task_executor_t* executor,
                                           agentos_task_t* task, uint32_t timeout_ms) {
     if (!executor || !task) return AGENTOS_EINVAL;
 
-    uint64_t start = 0;
-    (void)start;
-    (void)timeout_ms;
-
     agentos_mutex_lock(task->lock);
-    while (task->state != TASK_STATE_COMPLETED && 
-           task->state != TASK_STATE_FAILED &&
-           task->state != TASK_STATE_CANCELLED &&
-           task->state != TASK_STATE_TIMEOUT) {
-        if (timeout_ms > 0) {
-            agentos_cond_timedwait(task->cond, task->lock, (int)timeout_ms);
-        } else {
+    if (timeout_ms > 0) {
+        uint64_t deadline = agentos_get_monotonic_time_ns() + (uint64_t)timeout_ms * 1000000ULL;
+        while (task->state != TASK_STATE_COMPLETED && 
+               task->state != TASK_STATE_FAILED &&
+               task->state != TASK_STATE_CANCELLED &&
+               task->state != TASK_STATE_TIMEOUT) {
+            uint64_t remaining_ns = 0;
+            if (deadline > agentos_get_monotonic_time_ns()) {
+                remaining_ns = deadline - agentos_get_monotonic_time_ns();
+            } else {
+                break;
+            }
+            uint32_t remaining_ms = (uint32_t)(remaining_ns / 1000000ULL);
+            if (remaining_ms == 0) remaining_ms = 1;
+            agentos_cond_timedwait(task->cond, task->lock, (int)remaining_ms);
+        }
+    } else {
+        while (task->state != TASK_STATE_COMPLETED && 
+               task->state != TASK_STATE_FAILED &&
+               task->state != TASK_STATE_CANCELLED &&
+               task->state != TASK_STATE_TIMEOUT) {
             agentos_cond_wait(task->cond, task->lock);
         }
-        break; /* 简化实现 */
     }
     agentos_mutex_unlock(task->lock);
 
