@@ -21,13 +21,6 @@
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
 
-#ifdef _WIN32
-    #define WIN32_LEAN_AND_MEAN
-    #include <windows.h>
-#else
-    #include <unistd.h>
-#endif
-
 /**
  * @brief 核心循环结构体
  */
@@ -38,6 +31,7 @@ struct agentos_core_loop {
     agentos_loop_config_t manager;
     volatile int running;
     volatile int stop_requested;
+    volatile int task_pending;
     agentos_mutex_t* lock;
     agentos_cond_t* cond;
 };
@@ -404,19 +398,20 @@ AGENTOS_API agentos_error_t agentos_loop_run(agentos_core_loop_t* loop)
 
     while (1) {
         agentos_mutex_lock(loop->lock);
+        while (!loop->stop_requested && !loop->task_pending) {
+            agentos_cond_timedwait(loop->cond, loop->lock, 50);
+        }
         if (loop->stop_requested) {
             loop->running = 0;
+            loop->task_pending = 0;
             agentos_cond_broadcast(loop->cond);
             agentos_mutex_unlock(loop->lock);
             break;
         }
+        if (loop->task_pending) {
+            loop->task_pending = 0;
+        }
         agentos_mutex_unlock(loop->lock);
-
-#ifdef _WIN32
-        Sleep(10);
-#else
-        usleep(10000);
-#endif
     }
 
     return AGENTOS_SUCCESS;
@@ -501,6 +496,13 @@ AGENTOS_API agentos_error_t agentos_loop_submit(
     task.task_timeout_ms = loop->manager.loop_config_task_timeout_ms;
 
     err = agentos_execution_submit(loop->execution, &task, out_task_id);
+
+    if (err == AGENTOS_SUCCESS) {
+        agentos_mutex_lock(loop->lock);
+        loop->task_pending = 1;
+        agentos_cond_signal(loop->cond);
+        agentos_mutex_unlock(loop->lock);
+    }
 
     /* 清理临时资源 */
     agentos_task_plan_free(plan);

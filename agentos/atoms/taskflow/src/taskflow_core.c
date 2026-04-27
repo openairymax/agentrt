@@ -10,11 +10,11 @@
 #include "taskflow.h"
 #include "graph_engine.h"
 #include "pregel_engine.h"
+#include "platform.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
-#include <pthread.h>
 #include <errno.h>
 
 typedef struct {
@@ -50,18 +50,18 @@ struct taskflow_engine_s {
     checkpoint_entry_t checkpoints[64];
     size_t checkpoint_count;
 
-    pthread_mutex_t engine_mutex;
-    pthread_cond_t pause_cond;
-    pthread_t worker_thread;
+    agentos_mutex_t engine_mutex;
+    agentos_cond_t pause_cond;
+    agentos_thread_t worker_thread;
     bool worker_active;
 
     taskflow_message_t* message_queue;
     size_t message_count;
     size_t message_capacity;
-    pthread_t async_thread;
+    agentos_thread_t async_thread;
     int async_thread_active;
     bool async_cancel_requested;
-    pthread_cond_t async_complete_cond;
+    agentos_cond_t async_complete_cond;
     taskflow_error_t async_result;
 
     taskflow_graph_handle_t async_graph;
@@ -145,9 +145,9 @@ taskflow_handle_t taskflow_engine_create_core(const taskflow_config_t* config)
     engine->last_checkpoint_id = 0;
 
     // 初始化同步原语
-    pthread_mutex_init(&engine->engine_mutex, NULL);
-    pthread_cond_init(&engine->pause_cond, NULL);
-    pthread_cond_init(&engine->async_complete_cond, NULL);
+    agentos_mutex_init(&engine->engine_mutex);
+    agentos_cond_init(&engine->pause_cond);
+    agentos_cond_init(&engine->async_complete_cond);
 
     // 初始化异步执行状态
     engine->async_thread_active = 0;
@@ -200,9 +200,9 @@ void taskflow_engine_destroy_core(taskflow_handle_t engine)
     }
 
     // 销毁同步原语
-    pthread_mutex_destroy(&e->engine_mutex);
-    pthread_cond_destroy(&e->pause_cond);
-    pthread_cond_destroy(&e->async_complete_cond);
+    agentos_mutex_destroy(&e->engine_mutex);
+    agentos_cond_destroy(&e->pause_cond);
+    agentos_cond_destroy(&e->async_complete_cond);
 
     free(e);
 }
@@ -266,29 +266,33 @@ static void* engine_worker_thread(void* arg) {
     if (!e) return NULL;
 
     while (e->worker_active) {
-        pthread_mutex_lock(&e->engine_mutex);
+        agentos_mutex_lock(&e->engine_mutex);
 
         while (e->paused && e->worker_active) {
-            pthread_cond_wait(&e->pause_cond, &e->engine_mutex);
+            agentos_cond_wait(&e->pause_cond, &e->engine_mutex);
         }
 
         if (!e->worker_active) {
-            pthread_mutex_unlock(&e->engine_mutex);
+            agentos_mutex_unlock(&e->engine_mutex);
             break;
         }
 
         if (e->pregel_engine) {
             taskflow_error_t err = pregel_engine_run_superstep(e->pregel_engine);
             if (err == TASKFLOW_ERROR_NO_ACTIVE_VERTICES || err == TASKFLOW_ERROR_NOT_INITIALIZED) {
-                pthread_mutex_unlock(&e->engine_mutex);
+                agentos_mutex_unlock(&e->engine_mutex);
                 break;
             }
         }
 
-        pthread_mutex_unlock(&e->engine_mutex);
+        agentos_mutex_unlock(&e->engine_mutex);
 
+#ifdef _WIN32
+        Sleep(10);
+#else
         struct timespec ts = {0, 10000000L};
         nanosleep(&ts, NULL);
+#endif
     }
 
     return NULL;
@@ -310,12 +314,12 @@ taskflow_error_t taskflow_engine_start_core(taskflow_handle_t engine)
         return TASKFLOW_SUCCESS;
     }
     
-    pthread_mutex_lock(&e->engine_mutex);
+    agentos_mutex_lock(&e->engine_mutex);
     e->paused = false;
     e->worker_active = true;
-    pthread_mutex_unlock(&e->engine_mutex);
+    agentos_mutex_unlock(&e->engine_mutex);
 
-    int ret = pthread_create(&e->worker_thread, NULL, engine_worker_thread, e);
+    int ret = agentos_thread_create(&e->worker_thread, engine_worker_thread, e);
     if (ret != 0) {
         e->worker_active = false;
         return TASKFLOW_ERROR_INTERNAL;
@@ -342,13 +346,13 @@ taskflow_error_t taskflow_engine_stop_core(taskflow_handle_t engine)
         pregel_engine_stop(e->pregel_engine);
     }
     
-    pthread_mutex_lock(&e->engine_mutex);
+    agentos_mutex_lock(&e->engine_mutex);
     e->worker_active = false;
     e->paused = false;
-    pthread_cond_broadcast(&e->pause_cond);
-    pthread_mutex_unlock(&e->engine_mutex);
+    agentos_cond_broadcast(&e->pause_cond);
+    agentos_mutex_unlock(&e->engine_mutex);
 
-    pthread_join(e->worker_thread, NULL);
+    agentos_thread_join(e->worker_thread, NULL);
     
     e->running = false;
     return TASKFLOW_SUCCESS;
@@ -372,9 +376,9 @@ taskflow_error_t taskflow_engine_pause_core(taskflow_handle_t engine)
     }
     
     // 暂停其他组件（消息处理等）
-    pthread_mutex_lock(&e->engine_mutex);
+    agentos_mutex_lock(&e->engine_mutex);
     e->paused = true;
-    pthread_mutex_unlock(&e->engine_mutex);
+    agentos_mutex_unlock(&e->engine_mutex);
     
     return TASKFLOW_SUCCESS;
 }
@@ -397,10 +401,10 @@ taskflow_error_t taskflow_engine_resume_core(taskflow_handle_t engine)
     }
     
     // 恢复其他组件（消息处理等）
-    pthread_mutex_lock(&e->engine_mutex);
+    agentos_mutex_lock(&e->engine_mutex);
     e->paused = false;
-    pthread_cond_broadcast(&e->pause_cond);
-    pthread_mutex_unlock(&e->engine_mutex);
+    agentos_cond_broadcast(&e->pause_cond);
+    agentos_mutex_unlock(&e->engine_mutex);
     
     return TASKFLOW_SUCCESS;
 }
@@ -545,12 +549,12 @@ taskflow_error_t taskflow_execute_sync(taskflow_handle_t engine,
     graph_engine_get_stats(e->graph_engine, &vertex_count, NULL, NULL, NULL);
 
     for (size_t step = 0; step < max_supersteps || max_supersteps == 0; step++) {
-        pthread_mutex_lock(&e->engine_mutex);
+        agentos_mutex_lock(&e->engine_mutex);
         while (e->paused) {
-            pthread_cond_wait(&e->pause_cond, &e->engine_mutex);
+            agentos_cond_wait(&e->pause_cond, &e->engine_mutex);
         }
         bool still_running = e->running && e->worker_active;
-        pthread_mutex_unlock(&e->engine_mutex);
+        agentos_mutex_unlock(&e->engine_mutex);
         if (!still_running) break;
 
         if (e->pregel_engine) {
@@ -585,10 +589,10 @@ static void* async_execute_worker(void* arg) {
     e->async_result = taskflow_execute_sync(e, e->async_graph, e->async_max_supersteps);
 
     // 通知完成
-    pthread_mutex_lock(&e->engine_mutex);
+    agentos_mutex_lock(&e->engine_mutex);
     e->async_thread_active = 0;
-    pthread_cond_broadcast(&e->async_complete_cond);
-    pthread_mutex_unlock(&e->engine_mutex);
+    agentos_cond_broadcast(&e->async_complete_cond);
+    agentos_mutex_unlock(&e->engine_mutex);
 
     // 调用用户回调
     if (e->async_callback) {
@@ -608,9 +612,9 @@ taskflow_error_t taskflow_execute_async(taskflow_handle_t engine,
     struct taskflow_engine_s* e = (struct taskflow_engine_s*)engine;
     if (!e->running || !e->initialized) return TASKFLOW_ERROR_NOT_INITIALIZED;
 
-    pthread_mutex_lock(&e->engine_mutex);
+    agentos_mutex_lock(&e->engine_mutex);
     if (e->async_thread_active) {
-        pthread_mutex_unlock(&e->engine_mutex);
+        agentos_mutex_unlock(&e->engine_mutex);
         return TASKFLOW_ERROR_ALREADY_RUNNING;
     }
 
@@ -623,13 +627,13 @@ taskflow_error_t taskflow_execute_async(taskflow_handle_t engine,
     e->async_thread_active = 1;
 
     // 创建异步工作线程
-    int ret = pthread_create(&e->async_thread, NULL, async_execute_worker, e);
+    int ret = agentos_thread_create(&e->async_thread, async_execute_worker, e);
     if (ret != 0) {
         e->async_thread_active = 0;
-        pthread_mutex_unlock(&e->engine_mutex);
+        agentos_mutex_unlock(&e->engine_mutex);
         return TASKFLOW_ERROR_INTERNAL;
     }
-    pthread_mutex_unlock(&e->engine_mutex);
+    agentos_mutex_unlock(&e->engine_mutex);
 
     return TASKFLOW_SUCCESS;
 }
@@ -639,13 +643,13 @@ taskflow_error_t taskflow_execute_cancel(taskflow_handle_t engine)
     if (!engine) return TASKFLOW_ERROR_INVALID_ARG;
     struct taskflow_engine_s* e = (struct taskflow_engine_s*)engine;
 
-    pthread_mutex_lock(&e->engine_mutex);
+    agentos_mutex_lock(&e->engine_mutex);
     if (!e->async_thread_active) {
-        pthread_mutex_unlock(&e->engine_mutex);
+        agentos_mutex_unlock(&e->engine_mutex);
         return TASKFLOW_SUCCESS;
     }
     e->async_cancel_requested = true;
-    pthread_mutex_unlock(&e->engine_mutex);
+    agentos_mutex_unlock(&e->engine_mutex);
 
     return TASKFLOW_SUCCESS;
 }
@@ -655,40 +659,37 @@ taskflow_error_t taskflow_execute_wait(taskflow_handle_t engine, uint32_t timeou
     if (!engine) return TASKFLOW_ERROR_INVALID_ARG;
     struct taskflow_engine_s* e = (struct taskflow_engine_s*)engine;
 
-    pthread_mutex_lock(&e->engine_mutex);
+    agentos_mutex_lock(&e->engine_mutex);
     if (!e->async_thread_active) {
-        pthread_mutex_unlock(&e->engine_mutex);
+        agentos_mutex_unlock(&e->engine_mutex);
         return TASKFLOW_SUCCESS;
     }
 
     if (timeout_ms == 0 || timeout_ms == UINT32_MAX) {
         while (e->async_thread_active) {
-            pthread_cond_wait(&e->async_complete_cond, &e->engine_mutex);
+            agentos_cond_wait(&e->async_complete_cond, &e->engine_mutex);
         }
-        pthread_mutex_unlock(&e->engine_mutex);
+        agentos_mutex_unlock(&e->engine_mutex);
         return e->async_result;
     }
 
-    struct timespec deadline;
-    clock_gettime(CLOCK_REALTIME, &deadline);
-    uint64_t extra_ns = (uint64_t)timeout_ms * 1000000ULL;
-    deadline.tv_sec += (time_t)(extra_ns / 1000000000ULL);
-    deadline.tv_nsec += (long)(extra_ns % 1000000000ULL);
-    if (deadline.tv_nsec >= 1000000000L) {
-        deadline.tv_sec++;
-        deadline.tv_nsec -= 1000000000L;
-    }
-
+    uint64_t start_ms = agentos_time_ms();
     while (e->async_thread_active) {
-        int ret = pthread_cond_timedwait(&e->async_complete_cond, &e->engine_mutex, &deadline);
-        if (ret == ETIMEDOUT) {
-            pthread_mutex_unlock(&e->engine_mutex);
+        uint64_t elapsed = agentos_time_ms() - start_ms;
+        if (elapsed >= timeout_ms) {
+            agentos_mutex_unlock(&e->engine_mutex);
+            return TASKFLOW_ERROR_TIMEOUT;
+        }
+        uint32_t remaining = (uint32_t)(timeout_ms - elapsed);
+        int ret = agentos_cond_timedwait(&e->async_complete_cond, &e->engine_mutex, remaining);
+        if (ret != 0) {
+            agentos_mutex_unlock(&e->engine_mutex);
             return TASKFLOW_ERROR_TIMEOUT;
         }
     }
 
     taskflow_error_t result = e->async_result;
-    pthread_mutex_unlock(&e->engine_mutex);
+    agentos_mutex_unlock(&e->engine_mutex);
     return result;
 }
 
@@ -708,10 +709,10 @@ taskflow_error_t taskflow_send_message(taskflow_handle_t engine,
         return pregel_engine_send_message(e->pregel_engine, source, target, payload, payload_size);
     }
 
-    pthread_mutex_lock(&e->engine_mutex);
+    agentos_mutex_lock(&e->engine_mutex);
 
     if (e->message_count >= e->message_capacity) {
-        pthread_mutex_unlock(&e->engine_mutex);
+        agentos_mutex_unlock(&e->engine_mutex);
         return TASKFLOW_ERROR_GRAPH_TOO_LARGE;
     }
 
@@ -721,14 +722,14 @@ taskflow_error_t taskflow_send_message(taskflow_handle_t engine,
     msg->payload_size = payload_size;
     msg->payload = malloc(payload_size);
     if (!msg->payload) {
-        pthread_mutex_unlock(&e->engine_mutex);
+        agentos_mutex_unlock(&e->engine_mutex);
         return TASKFLOW_ERROR_MEMORY;
     }
     memcpy(msg->payload, payload, payload_size);
     e->message_count++;
     e->stats.total_messages++;
 
-    pthread_mutex_unlock(&e->engine_mutex);
+    agentos_mutex_unlock(&e->engine_mutex);
     return TASKFLOW_SUCCESS;
 }
 
@@ -785,7 +786,7 @@ size_t taskflow_get_incoming_messages(taskflow_handle_t engine,
     struct taskflow_engine_s* e = (struct taskflow_engine_s*)engine;
     size_t found = 0;
 
-    pthread_mutex_lock(&e->engine_mutex);
+    agentos_mutex_lock(&e->engine_mutex);
     for (size_t i = 0; i < e->message_count && found < max_count; i++) {
         if (e->message_queue[i].target == vertex_id) {
             messages[found].id = (message_id_t)(i + 1);
@@ -798,7 +799,7 @@ size_t taskflow_get_incoming_messages(taskflow_handle_t engine,
             found++;
         }
     }
-    pthread_mutex_unlock(&e->engine_mutex);
+    agentos_mutex_unlock(&e->engine_mutex);
 
     return found;
 }
@@ -809,7 +810,7 @@ taskflow_error_t taskflow_clear_messages(taskflow_handle_t engine, vertex_id_t v
 
     struct taskflow_engine_s* e = (struct taskflow_engine_s*)engine;
 
-    pthread_mutex_lock(&e->engine_mutex);
+    agentos_mutex_lock(&e->engine_mutex);
     size_t write_idx = 0;
     for (size_t i = 0; i < e->message_count; i++) {
         if (e->message_queue[i].target == vertex_id) {
@@ -822,7 +823,7 @@ taskflow_error_t taskflow_clear_messages(taskflow_handle_t engine, vertex_id_t v
         }
     }
     e->message_count = write_idx;
-    pthread_mutex_unlock(&e->engine_mutex);
+    agentos_mutex_unlock(&e->engine_mutex);
 
     return TASKFLOW_SUCCESS;
 }

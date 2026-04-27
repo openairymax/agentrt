@@ -95,9 +95,7 @@ static taskflow_error_t execute_node_task(workflow_context_t* context,
     // 更新内部状态
     size_t state_idx = find_node_state_index(internal_state, node_id);
     if (state_idx != SIZE_MAX) {
-        struct timespec ts;
-        clock_gettime(CLOCK_MONOTONIC, &ts);
-        internal_state->node_states[state_idx].start_time = (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+        internal_state->node_states[state_idx].start_time = agentos_time_ns();
         internal_state->node_states[state_idx].executed = true;
     }
     
@@ -110,9 +108,7 @@ static taskflow_error_t execute_node_task(workflow_context_t* context,
         // 标记为成功
         if (state_idx != SIZE_MAX) {
             internal_state->node_states[state_idx].succeeded = true;
-            struct timespec ts_end;
-            clock_gettime(CLOCK_MONOTONIC, &ts_end);
-            internal_state->node_states[state_idx].end_time = (uint64_t)ts_end.tv_sec * 1000000000ULL + (uint64_t)ts_end.tv_nsec;
+            internal_state->node_states[state_idx].end_time = agentos_time_ns();
         }
     }
     
@@ -132,7 +128,7 @@ static vertex_id_t get_next_executable_node(const workflow_context_t* context,
     // 实际实现应考虑工作流模式（顺序、并行等）
     
     // 获取当前节点的出边
-    const size_t MAX_EDGES = 16;
+    #define MAX_EDGES 16
     workflow_edge_t outgoing_edges[MAX_EDGES];
     size_t edge_count = 0;
     
@@ -209,7 +205,7 @@ static taskflow_error_t execute_parallel_workflow(workflow_context_t* context,
     if (!context || !internal_state) return TASKFLOW_ERROR_INVALID_ARG;
 
     // 并行执行：找出所有从start_node直接可达的节点，并行执行它们
-    const size_t MAX_PARALLEL = 32;
+    #define MAX_PARALLEL 32
     vertex_id_t parallel_nodes[MAX_PARALLEL];
     size_t parallel_count = 0;
 
