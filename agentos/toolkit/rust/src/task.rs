@@ -2,7 +2,6 @@
 // Version: 2.0.0
 // Last updated: 2026-03-23
 
-use serde_json::{json, Value};
 use std::time::{Duration, Instant};
 
 use crate::{AgentOSError, Client, client::APIClient};

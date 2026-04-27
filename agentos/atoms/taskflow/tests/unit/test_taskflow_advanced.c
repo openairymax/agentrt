@@ -129,7 +129,7 @@ static void test_register_workflow(void) {
     strncpy(wf.description, "A simple test workflow",
             sizeof(wf.description) - 1);
     strncpy(wf.version, "1.0.0", sizeof(wf.version) - 1);
-    strncpy(wf.initial_node_id, "node_start", sizeof(wf.initial_node_id) - 1);
+    wf.initial_node_id = strdup("node_start");
     wf.default_timeout_ms = 5000;
 
     int rc = taskflow_engine_register_workflow(engine, &wf);
@@ -155,7 +155,7 @@ static void test_start_execution(void) {
     memset(&wf, 0, sizeof(wf));
     strncpy(wf.id, "wf_start_test", sizeof(wf.id) - 1);
     strncpy(wf.name, "Start Test", sizeof(wf.name) - 1);
-    strncpy(wf.initial_node_id, "n1", sizeof(wf.initial_node_id) - 1);
+    wf.initial_node_id = strdup("n1");
 
     taskflow_engine_register_handler(engine, "h1", mock_task_handler, NULL);
     taskflow_engine_register_workflow(engine, &wf);
@@ -180,7 +180,7 @@ static void test_cancel_pause_resume(void) {
     memset(&wf, 0, sizeof(wf));
     strncpy(wf.id, "wf_cpr_test", sizeof(wf.id) - 1);
     strncpy(wf.name, "CPR Test", sizeof(wf.name) - 1);
-    strncpy(wf.initial_node_id, "n1", sizeof(wf.initial_node_id) - 1);
+    wf.initial_node_id = strdup("n1");
     taskflow_engine_register_workflow(engine, &wf);
 
     int r1 = taskflow_engine_cancel(engine, "exec_dummy");
@@ -203,7 +203,7 @@ static void test_step_and_rtc(void) {
     memset(&wf, 0, sizeof(wf));
     strncpy(wf.id, "wf_step_test", sizeof(wf.id) - 1);
     strncpy(wf.name, "Step Test", sizeof(wf.name) - 1);
-    strncpy(wf.initial_node_id, "n1", sizeof(wf.initial_node_id) - 1);
+    wf.initial_node_id = strdup("n1");
     taskflow_engine_register_workflow(engine, &wf);
 
     int r1 = taskflow_engine_step(engine, "exec_dummy");
@@ -310,7 +310,11 @@ static void test_counts_after_registration(void) {
         memset(&wf, 0, sizeof(wf));
         snprintf(wf.id, sizeof(wf.id), "wf_cnt_%03d", i);
         snprintf(wf.name, sizeof(wf.name), "Workflow %d", i);
-        snprintf(wf.initial_node_id, sizeof(wf.initial_node_id), "n%d", i);
+        {
+            char buf[32];
+            snprintf(buf, sizeof(buf), "n%d", i);
+            wf.initial_node_id = strdup(buf);
+        }
         taskflow_engine_register_workflow(engine, &wf);
     }
 

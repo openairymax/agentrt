@@ -150,6 +150,13 @@ taskflow_error_t pregel_engine_start(pregel_engine_handle_t engine,
                                     size_t max_supersteps);
 
 /**
+ * @brief 执行单个超步
+ * @param engine 引擎句柄
+ * @return 错误码
+ */
+taskflow_error_t pregel_engine_run_superstep(pregel_engine_handle_t engine);
+
+/**
  * @brief 停止 Pregel 计算
  * @param engine 引擎句柄
  * @return 错误码
