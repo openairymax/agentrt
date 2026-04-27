@@ -11,10 +11,11 @@ request/response structures used throughout the SDK.
 Corresponds to Go SDK: types/types.go
 """
 
-from enum import Enum
+from enum import Enum, IntEnum
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from datetime import datetime
+import time
 
 
 # ============================================================
@@ -62,6 +63,18 @@ class MemoryLayer(str, Enum):
             bool: 如果是有效的层级，返回 True
         """
         return self in (MemoryLayer.L1, MemoryLayer.L2, MemoryLayer.L3, MemoryLayer.L4)
+
+
+class MemoryRecordType(IntEnum):
+    """
+    Types of memory records supported by AgentOS.
+
+    对应 Go SDK: types.MemoryRecordType
+    """
+    RAW = 0
+    FEATURE = 1
+    STRUCTURE = 2
+    PATTERN = 3
 
 
 class SessionStatus(str, Enum):
@@ -162,6 +175,52 @@ class MemorySearchResult:
     total: int
     query: str
     top_k: int
+
+
+@dataclass
+class MemoryInfo:
+    """
+    Information about a memory record.
+
+    对应 Go SDK: types.MemoryInfo
+    """
+    record_id: str
+    record_type: MemoryRecordType
+    data_size: int
+    metadata: Optional[Dict[str, Any]] = None
+    created_at: float = field(default_factory=time.time)
+    access_count: int = 0
+    importance_score: float = 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "record_id": self.record_id,
+            "record_type": self.record_type.name,
+            "data_size": self.data_size,
+            "metadata": self.metadata,
+            "created_at": self.created_at,
+            "access_count": self.access_count,
+            "importance_score": self.importance_score
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "MemoryInfo":
+        raw_type = data.get("record_type", 0)
+        if isinstance(raw_type, str):
+            record_type = MemoryRecordType[raw_type]
+        elif isinstance(raw_type, int):
+            record_type = MemoryRecordType(raw_type)
+        else:
+            record_type = MemoryRecordType.RAW
+        return cls(
+            record_id=data["record_id"],
+            record_type=record_type,
+            data_size=data["data_size"],
+            metadata=data.get("metadata"),
+            created_at=data.get("created_at", time.time()),
+            access_count=data.get("access_count", 0),
+            importance_score=data.get("importance_score", 0.0)
+        )
 
 
 @dataclass

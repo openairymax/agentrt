@@ -581,7 +581,7 @@ config_error_t config_schema_apply_defaults(config_schema_t* schema, config_cont
         
         if (item->default_value) {
             // 检查是否已存在配置�?            // 简化实现：假设有config_context_has_key函数
-            bool has_key = false; // config_context_has_key(ctx, item->key);
+            bool has_key = config_context_has(ctx, item->key);
             
             if (!has_key) {
                 // 根据类型创建配置�?                config_value_t* default_value = NULL;

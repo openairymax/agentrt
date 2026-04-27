@@ -299,9 +299,10 @@ agentos_error_t agentos_checkpoint_shutdown(void) {
         return AGENTOS_SUCCESS;
     }
 
-#ifndef _WIN32
-    pthread_mutex_destroy(&g_checkpoint_mutex);
-#endif
+    if (g_checkpoint_mutex_initialized) {
+        agentos_platform_mutex_destroy(&g_checkpoint_mutex);
+        g_checkpoint_mutex_initialized = 0;
+    }
 
     g_checkpoint_initialized = 0;
     return AGENTOS_SUCCESS;

@@ -239,10 +239,7 @@ int gw_protocol_bridge_process_request(
 
     memset(out_response, 0, sizeof(*gw_processed_response_t));
 
-    uint64_t start_ns = 0;
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    start_ns = (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+    uint64_t start_ns = agentos_time_ns();
 
     gw_detection_result_t detection;
     int det_ret = gw_protocol_bridge_detect_protocol(
@@ -252,7 +249,9 @@ int gw_protocol_bridge_process_request(
     if (det_ret != 0) {
         out_response->status_code = 400;
         out_response->response_data = strdup("{\"error\":\"Protocol detection failed\"}");
-        out_response->response_size = strlen(out_response->response_data);
+        if (out_response->response_data) {
+            out_response->response_size = strlen(out_response->response_data);
+        }
         out_response->content_type = strdup("application/json");
         out_response->detected_protocol = strdup("unknown");
         return det_ret;
@@ -337,8 +336,7 @@ int gw_protocol_bridge_process_request(
 
     out_response->content_type = strdup("application/json");
 
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    uint64_t end_ns = (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+    uint64_t end_ns = agentos_time_ns();
     out_response->process_time_ns = end_ns - start_ns;
 
     uint64_t total_time = b->stats.total_requests > 0 ?

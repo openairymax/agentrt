@@ -8,7 +8,6 @@
 #include "logger.h"
 #include <stdlib.h>
 
-/* Unified base library compatibility layer */
 #include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
@@ -20,45 +19,41 @@ typedef struct async_write_req {
     void* userdata;
 } async_write_req_t;
 
-/**
- * @brief 释放深拷贝的记忆记录
- */
 static void free_record_copy(agentos_memory_record_t* rec) {
     if (!rec) return;
-    if (rec->record_id) AGENTOS_FREE(rec->record_id);
-    if (rec->source_agent) AGENTOS_FREE(rec->source_agent);
-    if (rec->trace_id) AGENTOS_FREE(rec->trace_id);
-    if (rec->data) AGENTOS_FREE(rec->data);
+    if (rec->memory_record_id) AGENTOS_FREE(rec->memory_record_id);
+    if (rec->memory_record_source_agent) AGENTOS_FREE(rec->memory_record_source_agent);
+    if (rec->memory_record_trace_id) AGENTOS_FREE(rec->memory_record_trace_id);
+    if (rec->memory_record_data) AGENTOS_FREE(rec->memory_record_data);
     AGENTOS_FREE(rec);
 }
 
-/**
- * @brief 深拷贝记忆记录
- * @return 成功返回拷贝指针，失败返回NULL
- */
 static agentos_memory_record_t* deep_copy_record(const agentos_memory_record_t* record) {
     agentos_memory_record_t* copy = (agentos_memory_record_t*)AGENTOS_CALLOC(1, sizeof(agentos_memory_record_t));
     if (!copy) return NULL;
 
-    if (record->record_id) {
-        copy->record_id = AGENTOS_STRDUP(record->record_id);
-        if (!copy->record_id) goto fail;
+    if (record->memory_record_id) {
+        copy->memory_record_id = AGENTOS_STRDUP(record->memory_record_id);
+        if (!copy->memory_record_id) goto fail;
     }
-    if (record->source_agent) {
-        copy->source_agent = AGENTOS_STRDUP(record->source_agent);
-        if (!copy->source_agent) goto fail;
+    if (record->memory_record_source_agent) {
+        copy->memory_record_source_agent = AGENTOS_STRDUP(record->memory_record_source_agent);
+        if (!copy->memory_record_source_agent) goto fail;
     }
-    if (record->trace_id) {
-        copy->trace_id = AGENTOS_STRDUP(record->trace_id);
-        if (!copy->trace_id) goto fail;
+    if (record->memory_record_trace_id) {
+        copy->memory_record_trace_id = AGENTOS_STRDUP(record->memory_record_trace_id);
+        if (!copy->memory_record_trace_id) goto fail;
     }
-    if (record->data && record->data_len > 0) {
-        copy->data = AGENTOS_MALLOC(record->data_len);
-        if (!copy->data) goto fail;
-        memcpy(copy->data, record->data, record->data_len);
-        copy->data_len = record->data_len;
+    if (record->memory_record_data && record->memory_record_data_len > 0) {
+        copy->memory_record_data = AGENTOS_MALLOC(record->memory_record_data_len);
+        if (!copy->memory_record_data) goto fail;
+        memcpy(copy->memory_record_data, record->memory_record_data, record->memory_record_data_len);
+        copy->memory_record_data_len = record->memory_record_data_len;
     }
-    copy->type = record->type;
+    copy->memory_record_type = record->memory_record_type;
+    copy->memory_record_timestamp_ns = record->memory_record_timestamp_ns;
+    copy->memory_record_importance = record->memory_record_importance;
+    copy->memory_record_access_count = record->memory_record_access_count;
     return copy;
 
 fail:
@@ -66,9 +61,6 @@ fail:
     return NULL;
 }
 
-/**
- * @brief 异步写入线程入口
- */
 static void async_write_thread(void* arg) {
     async_write_req_t* req = (async_write_req_t*)arg;
     if (!req) return;
@@ -85,14 +77,6 @@ static void async_write_thread(void* arg) {
     AGENTOS_FREE(req);
 }
 
-/**
- * @brief 异步写入记忆记录
- * @param engine 记忆引擎
- * @param record 记录数据（函数内部深拷贝，调用者可立即释放）
- * @param callback 写入完成回调（可为NULL）
- * @param userdata 回调用户数据
- * @return AGENTOS_SUCCESS 或错误码
- */
 agentos_error_t agentos_memory_write_async(
     agentos_memory_engine_t* engine,
     const agentos_memory_record_t* record,

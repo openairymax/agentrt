@@ -142,6 +142,7 @@ from .types import (
     # 枚举类型
     TaskStatus,
     MemoryLayer,
+    MemoryRecordType,
     SessionStatus,
     SkillStatus,
     SpanStatus,
@@ -149,6 +150,7 @@ from .types import (
     Task,
     TaskResult,
     Memory,
+    MemoryInfo,
     MemorySearchResult,
     Session,
     Skill,
@@ -330,7 +332,6 @@ __all__ = [
     "APIResponse",
     "HealthStatus",
     "Metrics",
-    "MockClient",
 
     # ============================================================
     # 模块层（v3.0.0 新增）
@@ -346,6 +347,7 @@ __all__ = [
     # 枚举类型
     "TaskStatus",
     "MemoryLayer",
+    "MemoryRecordType",
     "SessionStatus",
     "SkillStatus",
     "SpanStatus",
@@ -353,6 +355,7 @@ __all__ = [
     "Task",
     "TaskResult",
     "Memory",
+    "MemoryInfo",
     "MemorySearchResult",
     "Session",
     "Skill",
@@ -413,6 +416,7 @@ __all__ = [
     # 枚举类型
     "TaskStatus",
     "MemoryLayer",
+    "MemoryRecordType",
     "SessionStatus",
     "SkillStatus",
     "SpanStatus",
@@ -420,6 +424,7 @@ __all__ = [
     "Task",
     "TaskResult",
     "Memory",
+    "MemoryInfo",
     "MemorySearchResult",
     "Session",
     "Skill",

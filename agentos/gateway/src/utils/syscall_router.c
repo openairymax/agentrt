@@ -14,15 +14,14 @@
 #include "syscall_router.h"
 #include "jsonrpc.h"
 #include "syscalls.h"
-
+#include "platform.h"
 #include <cJSON.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <pthread.h>
 
-#define RUNTIME_LOCK()   pthread_mutex_lock(&g_runtime.mutex)
-#define RUNTIME_UNLOCK() pthread_mutex_unlock(&g_runtime.mutex)
+#define RUNTIME_LOCK()   agentos_mutex_lock(&g_runtime.mutex)
+#define RUNTIME_UNLOCK() agentos_mutex_unlock(&g_runtime.mutex)
 
 /**
  * @brief 路由任务管理相关系统调用
@@ -653,12 +652,12 @@ static struct {
     hash_table_t agent_index;
     uint64_t total_tasks_submitted;
     uint64_t total_memory_writes;
-    pthread_mutex_t mutex;
+    agentos_mutex_t mutex;
     bool initialized;
 } g_runtime = {0};
 
 static void __attribute__((constructor)) runtime_init(void) {
-    pthread_mutex_init(&g_runtime.mutex, NULL);
+    agentos_mutex_init(&g_runtime.mutex);
     
     const char* env;
     g_max_tasks = MAX_TASKS_DEFAULT;
@@ -679,6 +678,18 @@ static void __attribute__((constructor)) runtime_init(void) {
     g_runtime.records = (memory_record_t*)calloc(g_max_records, sizeof(memory_record_t));
     g_runtime.sessions = (session_entry_t*)calloc(g_max_sessions, sizeof(session_entry_t));
     g_runtime.agents = (agent_entry_t*)calloc(g_max_agents, sizeof(agent_entry_t));
+    if (!g_runtime.tasks || !g_runtime.records || !g_runtime.sessions || !g_runtime.agents) {
+        SVC_LOG_ERROR("syscall_router: runtime_init calloc failed");
+        free(g_runtime.tasks);
+        free(g_runtime.records);
+        free(g_runtime.sessions);
+        free(g_runtime.agents);
+        g_runtime.tasks = NULL;
+        g_runtime.records = NULL;
+        g_runtime.sessions = NULL;
+        g_runtime.agents = NULL;
+        return;
+    }
     ht_init(&g_runtime.task_index, g_max_tasks * 2);
     ht_init(&g_runtime.record_index, g_max_records * 2);
     ht_init(&g_runtime.session_index, g_max_sessions * 2);
@@ -687,7 +698,7 @@ static void __attribute__((constructor)) runtime_init(void) {
 }
 
 static void __attribute__((destructor)) runtime_cleanup(void) {
-    pthread_mutex_destroy(&g_runtime.mutex);
+    agentos_mutex_destroy(&g_runtime.mutex);
     ht_destroy(&g_runtime.task_index);
     ht_destroy(&g_runtime.record_index);
     ht_destroy(&g_runtime.session_index);

@@ -18,11 +18,13 @@ type PluginState string
 
 const (
 	StateDiscovered  PluginState = "discovered"
+	StateLoading     PluginState = "loading"
 	StateLoaded      PluginState = "loaded"
 	StateActivating  PluginState = "activating"
 	StateActive      PluginState = "active"
 	StateDeactivating PluginState = "deactivating"
 	StateInactive    PluginState = "inactive"
+	StateUnloading   PluginState = "unloading"
 	StateError       PluginState = "error"
 	StateUnloaded    PluginState = "unloaded"
 )
@@ -239,7 +241,8 @@ func (r *PluginRegistry) Load(pluginID string) (BasePlugin, error) {
 
 	instance := factory()
 	instance.SetPluginID(pluginID)
-
+	r.instances[pluginID] = instance
+	r.states[pluginID] = StateLoading
 	r.mu.Unlock()
 
 	if err := instance.OnLoad(nil); err != nil {
@@ -251,7 +254,6 @@ func (r *PluginRegistry) Load(pluginID string) (BasePlugin, error) {
 	}
 
 	r.mu.Lock()
-	r.instances[pluginID] = instance
 	r.states[pluginID] = StateLoaded
 	r.mu.Unlock()
 
@@ -261,13 +263,14 @@ func (r *PluginRegistry) Load(pluginID string) (BasePlugin, error) {
 // Unload 卸载插件实例
 func (r *PluginRegistry) Unload(pluginID string) bool {
 	r.mu.Lock()
-
 	instance, exists := r.instances[pluginID]
 	if !exists {
 		r.mu.Unlock()
 		return false
 	}
 
+	delete(r.instances, pluginID)
+	r.states[pluginID] = StateUnloading
 	r.mu.Unlock()
 
 	if err := instance.OnUnload(); err != nil {
@@ -275,7 +278,6 @@ func (r *PluginRegistry) Unload(pluginID string) bool {
 	}
 
 	r.mu.Lock()
-	delete(r.instances, pluginID)
 	r.states[pluginID] = StateUnloaded
 	r.mu.Unlock()
 
@@ -293,6 +295,7 @@ func (r *PluginRegistry) Activate(pluginID string) bool {
 		return false
 	}
 
+	r.states[pluginID] = StateActivating
 	r.mu.Unlock()
 
 	if err := instance.OnActivate(nil); err != nil {
@@ -320,6 +323,7 @@ func (r *PluginRegistry) Deactivate(pluginID string) bool {
 		return false
 	}
 
+	r.states[pluginID] = StateDeactivating
 	r.mu.Unlock()
 
 	if err := instance.OnDeactivate(); err != nil {

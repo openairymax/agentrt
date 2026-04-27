@@ -200,14 +200,16 @@ int monitor_service_record_metric(monitor_service_t* service, const metric_info_
 
     if (service->metric_cache_count < MAX_METRICS) {
         metric_info_t* entry = (metric_info_t*)calloc(1, sizeof(metric_info_t));
-        if (entry) {
-            entry->name = metric->name ? strdup(metric->name) : NULL;
-            entry->description = metric->description ? strdup(metric->description) : NULL;
-            entry->type = metric->type;
-            entry->value = metric->value;
-            entry->timestamp = metric->timestamp ? metric->timestamp : get_timestamp_ms();
-            service->metric_cache[service->metric_cache_count++] = entry;
+        if (!entry) {
+            agentos_mutex_unlock(&service->metric_lock);
+            return AGENTOS_ENOMEM;
         }
+        entry->name = metric->name ? strdup(metric->name) : NULL;
+        entry->description = metric->description ? strdup(metric->description) : NULL;
+        entry->type = metric->type;
+        entry->value = metric->value;
+        entry->timestamp = metric->timestamp ? metric->timestamp : get_timestamp_ms();
+        service->metric_cache[service->metric_cache_count++] = entry;
     }
 
     agentos_mutex_unlock(&service->metric_lock);
@@ -692,6 +694,9 @@ int monitor_service_get_agent_summary(monitor_service_t* service, const char* ag
              service->trace_count, service->alert_count, service->metric_cache_count);
 
     *summary = strdup(buf);
+    if (!*summary) {
+        return AGENTOS_ENOMEM;
+    }
     return AGENTOS_SUCCESS;
 }
 
@@ -743,6 +748,10 @@ int monitor_service_get_active_agents(monitor_service_t* service,
     }
 
     char** ids = (char**)calloc(active, sizeof(char*));
+    if (!ids) {
+        agentos_mutex_unlock(&service->trace_lock);
+        return AGENTOS_ENOMEM;
+    }
     size_t idx = 0;
     for (size_t i = 0; i < service->trace_count && idx < active; i++) {
         if (service->traces[i].end_time == 0 && service->traces[i].service_name) {

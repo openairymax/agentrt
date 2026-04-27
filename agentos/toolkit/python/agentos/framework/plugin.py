@@ -565,7 +565,8 @@ class HotReloadMechanism:
         try:
             content = file_path.read_bytes()
             return hashlib.md5(content).hexdigest()
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to compute file hash for %s: %s", file_path, e)
             return ""
 
     def get_reload_history(self, limit: int = 20) -> List[Dict[str, Any]]:
@@ -1153,8 +1154,8 @@ class PluginRegistry:
             logger.error(f"Plugin {plugin_id} on_load failed: {e}")
             try:
                 self._invoke_hook(instance, 'on_error', e)
-            except Exception:
-                pass
+            except Exception as hook_err:
+                logger.warning("Plugin %s on_error hook also failed: %s", plugin_id, hook_err)
             self._states[plugin_id] = PluginState.ERROR
             return None
 
@@ -1189,8 +1190,8 @@ class PluginRegistry:
             logger.error(f"Plugin {plugin_id} on_unload failed: {e}")
             try:
                 self._invoke_hook(instance, 'on_error', e)
-            except Exception:
-                pass
+            except Exception as hook_err:
+                logger.warning("Plugin %s on_error hook also failed during unload: %s", plugin_id, hook_err)
 
         del self._instances[plugin_id]
         self._states[plugin_id] = PluginState.UNLOADED
@@ -1215,8 +1216,8 @@ class PluginRegistry:
             logger.error(f"Plugin {plugin_id} on_activate failed: {e}")
             try:
                 self._invoke_hook(instance, 'on_error', e)
-            except Exception:
-                pass
+            except Exception as hook_err:
+                logger.warning("Plugin %s on_error hook also failed during activate: %s", plugin_id, hook_err)
             self._states[plugin_id] = PluginState.ERROR
             return False
 
@@ -1241,8 +1242,8 @@ class PluginRegistry:
             logger.error(f"Plugin {plugin_id} on_deactivate failed: {e}")
             try:
                 self._invoke_hook(instance, 'on_error', e)
-            except Exception:
-                pass
+            except Exception as hook_err:
+                logger.warning("Plugin %s on_error hook also failed during deactivate: %s", plugin_id, hook_err)
             self._states[plugin_id] = PluginState.ERROR
             return False
 

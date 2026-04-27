@@ -1,9 +1,12 @@
 # AgentOS Python SDK - Mock Client Implementation
 # Version: 3.0.0
-# Last updated: 2026-03-24
+# Last updated: 2026-04-27
 
 """
-Mock client implementation for testing purposes.
+Mock client implementation for testing purposes ONLY.
+
+WARNING: This module is a testing utility. Do NOT use in production code.
+Import from agentos.client.mock only in test files.
 
 Provides a mock implementation of the APIClient interface that can be used
 for unit testing without requiring a real AgentOS server.
