@@ -180,7 +180,15 @@ class TestPluginManagerLifecycle(unittest.TestCase):
         self.manager = PluginManager(sandbox_enabled=False)
 
     def _run(self, coro):
-        return asyncio.get_event_loop().run_until_complete(coro)
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            pass
+        else:
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                return pool.submit(asyncio.run, coro).result(timeout=30)
+        return asyncio.run(coro)
 
     def test_load_and_activate(self):
         manifest = PluginManifest(
@@ -233,6 +241,168 @@ class TestGetPluginRegistry(unittest.TestCase):
         r1 = get_plugin_registry()
         r2 = get_plugin_registry()
         self.assertIs(r1, r2)
+
+
+class TestLifecycleHookInvocation(unittest.TestCase):
+    """测试生命周期钩子确实被调用（通过副作用验证）"""
+
+    def setUp(self):
+        self.registry = PluginRegistry()
+        self.registry.register(LoggerPlugin)
+        self.registry.register(MetricsPlugin)
+
+    def test_load_calls_on_load_via_side_effect(self):
+        instance = self.registry.load("LoggerPlugin", {"max_entries": 50})
+        self.assertIsNotNone(instance)
+        self.assertEqual(instance._max_entries, 50)
+
+    def test_unload_clears_logs_via_on_unload(self):
+        instance = self.registry.load("LoggerPlugin")
+        instance.log("INFO", "before unload")
+        self.assertEqual(instance.count(), 1)
+
+        self.registry.unload("LoggerPlugin")
+        self.assertEqual(instance.count(), 0)  # on_unload cleared logs
+
+    def test_unload_clears_counters_via_on_unload(self):
+        instance = self.registry.load("MetricsPlugin")
+        instance.increment("test_counter", 42)
+        self.assertAlmostEqual(instance.get_counter("test_counter"), 42.0)
+
+        self.registry.unload("MetricsPlugin")
+        self.assertAlmostEqual(instance.get_counter("test_counter"), 0.0)  # on_unload cleared
+
+    def test_error_state_on_failed_load(self):
+        class BrokenPlugin(BasePlugin):
+            async def on_load(self, context):
+                raise RuntimeError("broken")
+            async def on_activate(self, context): pass
+            async def on_deactivate(self): pass
+            async def on_unload(self): pass
+            async def on_error(self, error): pass
+            def get_capabilities(self): return ['broken']
+
+        pid = self.registry.register(BrokenPlugin)
+        result = self.registry.load(pid)
+        self.assertIsNone(result)
+        self.assertEqual(self.registry.get_state(pid), PluginState.ERROR)
+
+
+class TestLoadUnloadCycle(unittest.TestCase):
+    """测试加载→卸载→重载循环"""
+
+    def setUp(self):
+        self.registry = PluginRegistry()
+        self.registry.register(LoggerPlugin)
+
+    def test_reload_creates_new_instance(self):
+        inst1 = self.registry.load("LoggerPlugin")
+        self.registry.unload("LoggerPlugin")
+        inst2 = self.registry.load("LoggerPlugin")
+
+        self.assertIsNotNone(inst1)
+        self.assertIsNotNone(inst2)
+        self.assertNotEqual(id(inst1), id(inst2))
+
+    def test_state_transitions_through_cycle(self):
+        self.assertEqual(
+            self.registry.get_state("LoggerPlugin"), PluginState.DISCOVERED
+        )
+
+        self.registry.load("LoggerPlugin")
+        self.assertEqual(
+            self.registry.get_state("LoggerPlugin"), PluginState.LOADED
+        )
+
+        self.registry.unload("LoggerPlugin")
+        self.assertEqual(
+            self.registry.get_state("LoggerPlugin"), PluginState.UNLOADED
+        )
+
+        self.registry.load("LoggerPlugin")
+        self.assertEqual(
+            self.registry.get_state("LoggerPlugin"), PluginState.LOADED
+        )
+
+    def test_double_unload_returns_false(self):
+        self.registry.load("LoggerPlugin")
+        result1 = self.registry.unload("LoggerPlugin")
+        result2 = self.registry.unload("LoggerPlugin")
+
+        self.assertTrue(result1)
+        self.assertFalse(result2)
+
+
+class TestErrorHandlingInHooks(unittest.TestCase):
+    """测试钩子中的错误处理"""
+
+    def setUp(self):
+        self.registry = PluginRegistry()
+
+        class FailingLoadPlugin(BasePlugin):
+            async def on_load(self, context):
+                raise RuntimeError("Intentional load failure")
+
+            async def on_activate(self, context): pass
+            async def on_deactivate(self): pass
+            async def on_unload(self): pass
+            async def on_error(self, error): pass
+            def get_capabilities(self):
+                return ['fail']
+
+        self.FailingLoadPlugin = FailingLoadPlugin
+
+    def test_load_failure_sets_error_state(self):
+        pid = self.registry.register(self.FailingLoadPlugin)
+        instance = self.registry.load(pid)
+        self.assertIsNone(instance)
+        self.assertEqual(self.registry.get_state(pid), PluginState.ERROR)
+
+    def test_failed_load_does_not_add_to_instances(self):
+        pid = self.registry.register(self.FailingLoadPlugin)
+        self.registry.load(pid)
+        self.assertIsNone(self.registry.get(pid))
+
+
+class TestConcurrentAccess(unittest.TestCase):
+    """测试并发访问安全性"""
+
+    def test_concurrent_register(self):
+        import threading
+        registry = PluginRegistry()
+        errors = []
+
+        def register_plugin(i):
+            try:
+                class ConcurrentPlugin(BasePlugin):
+                    def __init__(self):
+                        super().__init__()
+                        self._pid = f"concurrent_{i}"
+
+                    @property
+                    def plugin_id(self):
+                        return self._pid
+
+                    async def on_load(self, context): pass
+                    async def on_activate(self, context): pass
+                    async def on_deactivate(self): pass
+                    async def on_unload(self): pass
+                    async def on_error(self, error): pass
+                    def get_capabilities(self):
+                        return ['concurrent']
+
+                registry.register(ConcurrentPlugin)
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=register_plugin, args=(i,)) for i in range(50)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        self.assertEqual(len(errors), 0, f"Concurrent registration had errors: {errors}")
+        self.assertEqual(len(registry.list_plugins()), 50)
 
 
 if __name__ == "__main__":

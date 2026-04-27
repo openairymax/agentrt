@@ -6,7 +6,7 @@
 // 与 Python SDK: framework/plugin.py 保持一致。
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 /// 插件状态枚举
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -187,7 +187,12 @@ impl PluginRegistry {
             return false;
         }
 
-        self.instances.remove(plugin_id);
+        if let Some(mut instance) = self.instances.remove(plugin_id) {
+            if let Err(e) = instance.on_unload() {
+                instance.on_error(&e);
+            }
+        }
+
         self.factories.remove(plugin_id);
         self.manifests.remove(plugin_id);
         self.states.remove(plugin_id);
@@ -223,6 +228,12 @@ impl PluginRegistry {
         let mut instance = factory();
         instance.set_plugin_id(plugin_id);
 
+        if let Err(e) = instance.on_load(&HashMap::new()) {
+            self.states.insert(plugin_id.to_string(), PluginState::Error);
+            instance.on_error(&e);
+            return Err(format!("plugin '{}' on_load failed: {}", plugin_id, e));
+        }
+
         self.instances.insert(plugin_id.to_string(), instance);
         self.states.insert(plugin_id.to_string(), PluginState::Loaded);
 
@@ -231,13 +242,59 @@ impl PluginRegistry {
 
     /// 卸载插件实例
     pub fn unload(&mut self, plugin_id: &str) -> bool {
-        if !self.instances.contains_key(plugin_id) {
+        let mut instance = match self.instances.remove(plugin_id) {
+            Some(i) => i,
+            None => return false,
+        };
+
+        if let Err(e) = instance.on_unload() {
+            instance.on_error(&e);
+        }
+
+        self.states.insert(plugin_id.to_string(), PluginState::Unloaded);
+
+        true
+    }
+
+    /// 激活插件实例
+    pub fn activate(&mut self, plugin_id: &str) -> bool {
+        let state = self.states.get(plugin_id);
+        if state != Some(&PluginState::Loaded) && state != Some(&PluginState::Inactive) {
             return false;
         }
 
-        self.instances.remove(plugin_id);
-        self.states.insert(plugin_id.to_string(), PluginState::Unloaded);
+        if let Some(instance) = self.instances.get_mut(plugin_id) {
+            if let Err(e) = instance.on_activate(&HashMap::new()) {
+                instance.on_error(&e);
+                self.states.insert(plugin_id.to_string(), PluginState::Error);
+                return false;
+            }
+        } else {
+            return false;
+        }
 
+        self.states.insert(plugin_id.to_string(), PluginState::Active);
+        true
+    }
+
+    /// 停用插件实例
+    pub fn deactivate(&mut self, plugin_id: &str) -> bool {
+        let state = self.states.get(plugin_id);
+        if state != Some(&PluginState::Active) {
+            return false;
+        }
+
+        if let Some(instance) = self.instances.get_mut(plugin_id) {
+            if let Err(e) = instance.on_deactivate() {
+                instance.on_error(&e);
+                self.states.insert(plugin_id.to_string(), PluginState::Error);
+                return false;
+            }
+        } else {
+            return false;
+        }
+
+        self.states.insert(plugin_id.to_string(), PluginState::Inactive);
         true
     }
 
@@ -407,6 +464,12 @@ impl PluginManager {
             "sandbox_enabled".to_string(),
             serde_json::Value::Bool(self.sandbox_enabled),
         );
+        stats.insert(
+            "state_counts".to_string(),
+            serde_json::Value::Object(
+                state_counts.into_iter().map(|(k, v)| (k, serde_json::Value::Number(v.into()))).collect()
+            ),
+        );
 
         stats
     }
@@ -417,9 +480,18 @@ use std::sync::MutexGuard;
 
 static GLOBAL_REGISTRY: Lazy<Mutex<PluginRegistry>> = Lazy::new(|| Mutex::new(PluginRegistry::new()));
 
-/// 获取全局插件注册表
+/// 获取全局插件注册表（通过闭包安全访问，避免暴露MutexGuard）
+pub fn with_plugin_registry<F, R>(f: F) -> R
+where
+    F: FnOnce(&mut PluginRegistry) -> R,
+{
+    let mut guard = GLOBAL_REGISTRY.lock().expect("plugin registry mutex poisoned");
+    f(&mut guard)
+}
+
+/// 获取全局插件注册表（直接访问，需注意不要在持有锁时回调注册表方法）
 pub fn get_plugin_registry() -> MutexGuard<'static, PluginRegistry> {
-    GLOBAL_REGISTRY.lock().unwrap()
+    GLOBAL_REGISTRY.lock().expect("plugin registry mutex poisoned")
 }
 
 #[cfg(test)]

@@ -117,8 +117,15 @@ export class PluginRegistry {
     pluginClass: new () => BasePlugin,
     manifest?: Partial<PluginManifest>
   ): string {
-    const temp = new pluginClass();
-    const pluginId = temp.pluginId;
+    let temp: BasePlugin;
+    try {
+      temp = new pluginClass();
+    } catch {
+      throw new TypeError(`Plugin class must be a subclass of BasePlugin`);
+    }
+
+    const instancePluginId = temp.pluginId;
+    const pluginId = manifest?.pluginId || instancePluginId;
 
     if (this._pluginClasses.has(pluginId)) {
       throw new Error(`Plugin '${pluginId}' already registered`);
@@ -152,13 +159,13 @@ export class PluginRegistry {
   /**
    * 注销插件
    */
-  unregister(pluginId: string): boolean {
+  async unregister(pluginId: string): Promise<boolean> {
     if (!this._pluginClasses.has(pluginId)) {
       return false;
     }
 
     if (this._instances.has(pluginId)) {
-      this.unload(pluginId);
+      await this.unload(pluginId);
     }
 
     this._pluginClasses.delete(pluginId);
@@ -186,7 +193,7 @@ export class PluginRegistry {
   /**
    * 加载插件实例
    */
-  load(pluginId: string): BasePlugin | null {
+  async load(pluginId: string, context?: Record<string, unknown>): Promise<BasePlugin | null> {
     const pluginClass = this._pluginClasses.get(pluginId);
     if (!pluginClass) {
       return null;
@@ -198,7 +205,23 @@ export class PluginRegistry {
     }
 
     const instance = new pluginClass();
-    instance.pluginId = pluginId;
+    try {
+      (instance as any).pluginId = pluginId;
+    } catch {
+      // Subclass may define pluginId as read-only getter
+    }
+
+    try {
+      await instance.onLoad(context || {});
+    } catch (e) {
+      this._states.set(pluginId, PluginState.ERROR);
+      try {
+        await instance.onError(e instanceof Error ? e : new Error(String(e)));
+      } catch (nestedError) {
+        // onError itself failed, state already set to ERROR
+      }
+      return null;
+    }
 
     this._instances.set(pluginId, instance);
     this._states.set(pluginId, PluginState.LOADED);
@@ -209,14 +232,76 @@ export class PluginRegistry {
   /**
    * 卸载插件实例
    */
-  unload(pluginId: string): boolean {
+  async unload(pluginId: string): Promise<boolean> {
     if (!this._instances.has(pluginId)) {
       return false;
+    }
+
+    const instance = this._instances.get(pluginId)!;
+    try {
+      await instance.onUnload();
+    } catch (e) {
+      try {
+        await instance.onError(e instanceof Error ? e : new Error(String(e)));
+      } catch (nestedError) {
+        // onError itself failed
+      }
     }
 
     this._instances.delete(pluginId);
     this._states.set(pluginId, PluginState.UNLOADED);
 
+    return true;
+  }
+
+  async activate(pluginId: string, context?: Record<string, unknown>): Promise<boolean> {
+    const instance = this._instances.get(pluginId);
+    if (!instance) {
+      return false;
+    }
+    const state = this._states.get(pluginId);
+    if (state !== PluginState.LOADED && state !== PluginState.INACTIVE) {
+      return false;
+    }
+
+    try {
+      await instance.onActivate(context || {});
+    } catch (e) {
+      this._states.set(pluginId, PluginState.ERROR);
+      try {
+        await instance.onError(e instanceof Error ? e : new Error(String(e)));
+      } catch (nestedError) {
+        // onError itself failed
+      }
+      return false;
+    }
+
+    this._states.set(pluginId, PluginState.ACTIVE);
+    return true;
+  }
+
+  async deactivate(pluginId: string): Promise<boolean> {
+    const instance = this._instances.get(pluginId);
+    if (!instance) {
+      return false;
+    }
+    if (this._states.get(pluginId) !== PluginState.ACTIVE) {
+      return false;
+    }
+
+    try {
+      await instance.onDeactivate();
+    } catch (e) {
+      this._states.set(pluginId, PluginState.ERROR);
+      try {
+        await instance.onError(e instanceof Error ? e : new Error(String(e)));
+      } catch (nestedError) {
+        // onError itself failed
+      }
+      return false;
+    }
+
+    this._states.set(pluginId, PluginState.INACTIVE);
     return true;
   }
 
