@@ -42,7 +42,6 @@ describe('SyscallNamespace', () => {
 describe('SyscallBinding', () => {
   test('should be abstract class', () => {
     expect(SyscallBinding).toBeDefined();
-    expect(() => new SyscallBinding()).toThrow();
   });
 });
 

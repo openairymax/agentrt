@@ -123,7 +123,7 @@ static memory_pool_t* get_loop_memory_pool(void)
 #endif
             g_pool_mutex = new_mutex;
         } else {
-            agentos_mutex_destroy(new_mutex);
+            agentos_mutex_free(new_mutex);
         }
     }
 
@@ -181,7 +181,7 @@ static agentos_error_t initialize_loop_resources(agentos_core_loop_t* loop, cons
 
     loop->cond = agentos_cond_create();
     if (!loop->cond) {
-        agentos_mutex_destroy(loop->lock);
+        agentos_mutex_free(loop->lock);
         return AGENTOS_ENOMEM;
     }
 
@@ -258,12 +258,12 @@ static void cleanup_loop_resources(agentos_core_loop_t* loop)
     }
 
     if (loop->cond) {
-        agentos_cond_destroy(loop->cond);
+        agentos_cond_free(loop->cond);
         loop->cond = NULL;
     }
 
     if (loop->lock) {
-        agentos_mutex_destroy(loop->lock);
+        agentos_mutex_free(loop->lock);
         loop->lock = NULL;
     }
 
@@ -376,11 +376,11 @@ AGENTOS_API void agentos_loop_destroy(agentos_core_loop_t* loop)
         loop->cognition = NULL;
     }
     if (loop->cond) {
-        agentos_cond_destroy(loop->cond);
+        agentos_cond_free(loop->cond);
         loop->cond = NULL;
     }
     if (loop->lock) {
-        agentos_mutex_destroy(loop->lock);
+        agentos_mutex_free(loop->lock);
         loop->lock = NULL;
     }
 

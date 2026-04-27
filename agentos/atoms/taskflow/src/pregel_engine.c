@@ -453,10 +453,11 @@ void pregel_engine_destroy(pregel_engine_handle_t engine)
         free(e->workers);
     }
 
-    // 销毁同步原语
-    agentos_mutex_destroy(&e->mutex);
-    agentos_cond_destroy(&e->cond_var);
-    agentos_cond_destroy(&e->pause_cond);
+    if (e->initialized) {
+        agentos_mutex_destroy(&e->mutex);
+        agentos_cond_destroy(&e->cond_var);
+        agentos_cond_destroy(&e->pause_cond);
+    }
     
     // 释放检查点
     if (e->checkpoints) {

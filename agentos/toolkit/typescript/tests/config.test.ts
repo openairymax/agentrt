@@ -17,8 +17,8 @@ import {
   withMaxConnections,
   withHeaders,
   DEFAULT_POLL_INTERVAL_MS,
-  ConfigError,
 } from '../src/config';
+import { ConfigError } from '../src/errors';
 
 describe('Config - defaultConfig', () => {
   test('should return default configuration', () => {
