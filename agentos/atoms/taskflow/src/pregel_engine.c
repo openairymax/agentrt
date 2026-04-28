@@ -540,17 +540,43 @@ taskflow_error_t pregel_engine_start(pregel_engine_handle_t engine,
     
     // 启动工作线程
     agentos_mutex_lock(&e->mutex);
-    for (size_t i = 0; i < e->worker_count; i++) {
-        e->workers[i].running = true;
-        agentos_thread_create(&e->workers[i].thread_handle,
-                       worker_thread_func, &e->workers[i]);
-    }
-    agentos_mutex_unlock(&e->mutex);
-    
     e->running = true;
     e->paused = false;
     e->computation_done = false;
-    
+
+    size_t started_count = 0;
+    for (size_t i = 0; i < e->worker_count; i++) {
+        e->workers[i].running = true;
+        if (agentos_thread_create(&e->workers[i].thread_handle,
+                       worker_thread_func, &e->workers[i]) != 0) {
+            e->workers[i].running = false;
+            e->workers[i].thread_handle = AGENTOS_INVALID_THREAD;
+            break;
+        }
+        started_count++;
+    }
+
+    /* 如果部分线程创建失败，回滚所有已创建的线程 */
+    if (started_count < e->worker_count) {
+        for (size_t i = 0; i < started_count; i++) {
+            e->workers[i].running = false;
+        }
+        agentos_cond_broadcast(&e->cond_var);
+        agentos_cond_broadcast(&e->pause_cond);
+        agentos_mutex_unlock(&e->mutex);
+
+        for (size_t i = 0; i < started_count; i++) {
+            if (e->workers[i].thread_handle != AGENTOS_INVALID_THREAD) {
+                agentos_thread_join(e->workers[i].thread_handle, NULL);
+                e->workers[i].thread_handle = AGENTOS_INVALID_THREAD;
+            }
+        }
+        e->running = false;
+        return TASKFLOW_ERROR_INIT_FAILED;
+    }
+
+    agentos_mutex_unlock(&e->mutex);
+
     return TASKFLOW_SUCCESS;
 }
 
@@ -575,8 +601,10 @@ taskflow_error_t pregel_engine_stop(pregel_engine_handle_t engine)
     agentos_mutex_unlock(&e->mutex);
 
     for (size_t i = 0; i < e->worker_count; i++) {
-        agentos_thread_join(e->workers[i].thread_handle, NULL);
-        e->workers[i].thread_handle = AGENTOS_INVALID_THREAD;
+        if (e->workers[i].thread_handle != AGENTOS_INVALID_THREAD) {
+            agentos_thread_join(e->workers[i].thread_handle, NULL);
+            e->workers[i].thread_handle = AGENTOS_INVALID_THREAD;
+        }
     }
     
     e->running = false;
