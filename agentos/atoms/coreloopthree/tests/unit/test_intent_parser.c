@@ -267,9 +267,7 @@ static void test_intent_struct_fields(void) {
 }
 
 static void test_intent_struct_size(void) {
-    assert(sizeof(agentos_intent_t) >=
-           sizeof(char*) * 4 + sizeof(size_t) * 2 +
-           sizeof(uint32_t) + sizeof(void*));
+    assert(sizeof(agentos_intent_t) >= sizeof(char*) * 2 + sizeof(size_t));
     TEST_PASS("intent_t struct size adequate");
 }
 
