@@ -410,7 +410,30 @@ AGENTOS_API int am_evaluate(const char* metric_name, double value) {
 }
 
 AGENTOS_API int am_evaluate_all(void) {
-    return 0;
+    agentos_platform_mutex_lock(&g_am.mutex);
+
+    int total_triggered = 0;
+    uint64_t now = agentos_platform_get_time_ms();
+
+    for (uint32_t i = 0; i < g_am.rule_count; i++) {
+        am_rule_t* rule = &g_am.rules[i];
+        if (!rule->enabled) continue;
+
+        if (rule->last_triggered > 0 &&
+            (now - rule->last_triggered) < (uint64_t)rule->cooldown_seconds * 1000)
+            continue;
+
+        double value = 0.0;
+        if (rule->metric_name[0] != '\0') {
+            agentos_platform_mutex_unlock(&g_am.mutex);
+            int result = am_evaluate(rule->metric_name, value);
+            agentos_platform_mutex_lock(&g_am.mutex);
+            if (result > 0) total_triggered += result;
+        }
+    }
+
+    agentos_platform_mutex_unlock(&g_am.mutex);
+    return total_triggered;
 }
 
 /* ==================== 通知通道 ==================== */

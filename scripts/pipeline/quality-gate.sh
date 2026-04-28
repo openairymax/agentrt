@@ -132,7 +132,8 @@ gate_cpp_static_analysis() {
                 else
                     log_warn "  $line"
                 fi
-            done <<< "$cppcheck_output"
+            fi
+        done <<< "$cppcheck_output"
     done
 
     if [[ $error_count -eq 0 ]]; then
