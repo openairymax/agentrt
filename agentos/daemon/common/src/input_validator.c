@@ -304,3 +304,48 @@ int validate_string_field(const cJSON* obj, const char* field, size_t min_len, s
 
     return 0;
 }
+
+int validate_sanitized_string(const cJSON* obj, const char* field,
+                               unsigned int sanitize_flags, char** out_error) {
+    if (!obj || !field) {
+        if (out_error) *out_error = strdup("Invalid parameters");
+        return -1;
+    }
+
+    cJSON* item = cJSON_GetObjectItem(obj, field);
+    if (!item) {
+        if (out_error) {
+            char err[256];
+            snprintf(err, sizeof(err), "Missing field: %s", field);
+            *out_error = strdup(err);
+        }
+        return -1;
+    }
+
+    if (!cJSON_IsString(item)) {
+        if (out_error) {
+            char err[256];
+            snprintf(err, sizeof(err), "Field '%s' is not a string", field);
+            *out_error = strdup(err);
+        }
+        return -1;
+    }
+
+    if (sanitize_flags == 0) return 0;
+
+    char* violation = NULL;
+    int ret = security_check_string(item->valuestring, sanitize_flags, &violation);
+    if (ret != 0) {
+        if (out_error) {
+            char err[512];
+            snprintf(err, sizeof(err), "Field '%s' failed sanitization: %s",
+                     field, violation ? violation : "unknown violation");
+            *out_error = strdup(err);
+        }
+        free(violation);
+        return ret;
+    }
+
+    free(violation);
+    return 0;
+}

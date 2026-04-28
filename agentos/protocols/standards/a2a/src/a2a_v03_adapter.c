@@ -69,6 +69,19 @@ struct a2a_v03_adapter_s {
     size_t agent_count;
     uint64_t task_counter;
     bool initialized;
+    a2a_v03_config_t config;
+    a2a_task_t* tasks[A2A_V03_MAX_TASKS];
+    size_t task_count;
+    a2a_notification_handler_t notification_handler;
+    void* notification_handler_user_data;
+    a2a_task_handler_t task_handler;
+    void* task_handler_user_data;
+    a2a_message_handler_t message_handler;
+    void* message_handler_user_data;
+    a2a_negotiation_handler_t negotiation_handler;
+    void* negotiation_handler_user_data;
+    a2a_streaming_handler_t streaming_handler;
+    void* streaming_handler_user_data;
 };
 
 static struct a2a_v03_adapter_s* g_a2a_instance = NULL;
@@ -764,4 +777,481 @@ const char* a2a_crypto_method_string(a2a_crypto_method_t method) {
         case A2A_CRYPTO_AES_256_GCM: return "aes-256-gcm";
         default:                     return "unknown";
     }
+}
+
+/* ============================================================================
+ * New-Style API implementations (a2a_v03_adapter.h declared functions)
+ * ============================================================================ */
+
+a2a_v03_config_t a2a_v03_config_default(void) {
+    a2a_v03_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.capabilities = A2A_CAP_TASK_EXECUTION | A2A_CAP_STREAMING | A2A_CAP_NEGOTIATION |
+                       A2A_CAP_PUSH_NOTIFICATIONS | A2A_CAP_MULTI_TURN | A2A_CAP_STATE_TRANSITION;
+    cfg.max_agents = 256;
+    cfg.max_tasks = 4096;
+    cfg.max_message_size = 65536;
+    cfg.default_timeout_ms = 60000;
+    cfg.enable_negotiation = true;
+    cfg.enable_streaming = true;
+    cfg.enable_push_notifications = true;
+    cfg.require_authentication = false;
+    cfg.default_authentication = NULL;
+    return cfg;
+}
+
+a2a_v03_context_t* a2a_v03_context_create(const a2a_v03_config_t* config) {
+    a2a_v03_config_t cfg = config ? *config : a2a_v03_config_default();
+    a2a_handle_t handle = NULL;
+    a2a_config_t legacy_cfg;
+    memset(&legacy_cfg, 0, sizeof(legacy_cfg));
+    legacy_cfg.max_agents = (uint32_t)cfg.max_agents;
+    legacy_cfg.max_tasks = (uint32_t)cfg.max_tasks;
+    legacy_cfg.default_timeout_ms = cfg.default_timeout_ms;
+    if (a2a_v03_create(legacy_cfg, &handle) != 0) return NULL;
+    return (a2a_v03_context_t*)handle;
+}
+
+void a2a_v03_context_destroy(a2a_v03_context_t* ctx) {
+    if (ctx) a2a_v03_destroy((a2a_handle_t)ctx);
+}
+
+int a2a_v03_unregister_agent(a2a_v03_context_t* ctx, const char* agent_id) {
+    if (!ctx || !agent_id) return -1;
+    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+    if (!adapter->initialized) return -2;
+    for (size_t i = 0; i < adapter->agent_count; i++) {
+        if (strcmp(adapter->agents[i].id, agent_id) == 0) {
+            free(adapter->agents[i].name);
+            free(adapter->agents[i].url);
+            if (i < adapter->agent_count - 1) {
+                adapter->agents[i] = adapter->agents[adapter->agent_count - 1];
+            }
+            adapter->agent_count--;
+            return 0;
+        }
+    }
+    return -3;
+}
+
+int a2a_v03_create_task(a2a_v03_context_t* ctx, const char* agent_id,
+                         const char* description, const char* input_json,
+                         a2a_task_t** task) {
+    if (!ctx || !task) return -1;
+    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+    if (!adapter->initialized) return -2;
+    if (adapter->task_count >= A2A_V03_MAX_TASKS) return -3;
+
+    a2a_task_t* t = (a2a_task_t*)calloc(1, sizeof(a2a_task_t));
+    if (!t) return -4;
+
+    snprintf(t->id, sizeof(t->id), "task_%zu_%u", adapter->task_count,
+             (unsigned int)(a2a_timestamp_ms() % 100000));
+    if (agent_id) strncpy(t->agent_id, agent_id, sizeof(t->agent_id) - 1);
+    t->description = description ? strdup(description) : NULL;
+    t->input_json = input_json ? strdup(input_json) : NULL;
+    t->output_json = NULL;
+    t->state = A2A_TASK_SUBMITTED;
+    t->created_at = a2a_timestamp_ms();
+    t->updated_at = t->created_at;
+    t->progress = 0.0;
+
+    adapter->tasks[adapter->task_count] = t;
+    adapter->task_count++;
+
+    if (adapter->task_handler) {
+        a2a_task_state_t new_state = t->state;
+        char* output = NULL;
+        adapter->task_handler(ctx, t, &new_state, &output, adapter->task_handler_user_data);
+        t->state = new_state;
+        if (output) { free(t->output_json); t->output_json = output; }
+    }
+
+    *task = t;
+    return 0;
+}
+
+int a2a_v03_update_task(a2a_v03_context_t* ctx, const char* task_id,
+                         a2a_task_state_t new_state, const char* output_json,
+                         double progress) {
+    if (!ctx || !task_id) return -1;
+    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+    if (!adapter->initialized) return -2;
+
+    for (size_t i = 0; i < adapter->task_count; i++) {
+        if (strcmp(adapter->tasks[i]->id, task_id) == 0) {
+            a2a_task_t* t = adapter->tasks[i];
+            t->state = new_state;
+            if (output_json) {
+                free(t->output_json);
+                t->output_json = strdup(output_json);
+            }
+            t->progress = progress;
+            t->updated_at = a2a_timestamp_ms();
+            return 0;
+        }
+    }
+    return -3;
+}
+
+int a2a_v03_cancel_task(a2a_v03_context_t* ctx, const char* task_id,
+                         const char* reason) {
+    if (!ctx || !task_id) return -1;
+    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+    if (!adapter->initialized) return -2;
+
+    for (size_t i = 0; i < adapter->task_count; i++) {
+        if (strcmp(adapter->tasks[i]->id, task_id) == 0) {
+            adapter->tasks[i]->state = A2A_TASK_CANCELED;
+            adapter->tasks[i]->updated_at = a2a_timestamp_ms();
+            (void)reason;
+            return 0;
+        }
+    }
+    return -3;
+}
+
+int a2a_v03_get_task(a2a_v03_context_t* ctx, const char* task_id,
+                      a2a_task_t** task) {
+    if (!ctx || !task_id || !task) return -1;
+    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+    if (!adapter->initialized) return -2;
+
+    for (size_t i = 0; i < adapter->task_count; i++) {
+        if (strcmp(adapter->tasks[i]->id, task_id) == 0) {
+            *task = adapter->tasks[i];
+            return 0;
+        }
+    }
+    return -3;
+}
+
+int a2a_v03_send_message(a2a_v03_context_t* ctx, const char* target_agent_id,
+                          const a2a_message_t* message,
+                          a2a_message_t** response, size_t* response_count) {
+    if (!ctx || !target_agent_id || !message) return -1;
+    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+    if (!adapter->initialized) return -2;
+
+    if (adapter->message_handler) {
+        return adapter->message_handler(ctx, target_agent_id, message,
+                                         response, response_count,
+                                         adapter->message_handler_user_data);
+    }
+
+    if (response && response_count) {
+        a2a_message_t* resp = (a2a_message_t*)calloc(1, sizeof(a2a_message_t));
+        if (resp) {
+            resp->role = strdup("assistant");
+            resp->type = A2A_MSG_STRUCTURED;
+            resp->content_json = strdup("{\"status\":\"received\",\"ack\":true}");
+            resp->mime_type = strdup("application/json");
+            *response = resp;
+            *response_count = 1;
+        }
+    }
+    return 0;
+}
+
+int a2a_v03_negotiate(a2a_v03_context_t* ctx, const a2a_negotiation_t* proposal,
+                       a2a_negotiation_action_t* response_action,
+                       char** response_terms) {
+    if (!ctx || !proposal) return -1;
+    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+    if (!adapter->initialized) return -2;
+
+    if (adapter->negotiation_handler) {
+        return adapter->negotiation_handler(ctx, proposal, response_action,
+                                             response_terms,
+                                             adapter->negotiation_handler_user_data);
+    }
+
+    if (response_action) *response_action = A2A_NEGOTIATE_ACCEPT;
+    if (response_terms) *response_terms = strdup("{\"accepted\":true}");
+    return 0;
+}
+
+int a2a_v03_subscribe_notifications(a2a_v03_context_t* ctx,
+                                     a2a_notification_handler_t handler,
+                                     void* user_data) {
+    if (!ctx || !handler) return -1;
+    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+    adapter->notification_handler = handler;
+    adapter->notification_handler_user_data = user_data;
+    return 0;
+}
+
+int a2a_v03_unsubscribe_notifications(a2a_v03_context_t* ctx) {
+    if (!ctx) return -1;
+    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+    adapter->notification_handler = NULL;
+    adapter->notification_handler_user_data = NULL;
+    return 0;
+}
+
+int a2a_v03_send_notification(a2a_v03_context_t* ctx,
+                               const a2a_notification_t* notification) {
+    if (!ctx || !notification) return -1;
+    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+    if (!adapter->notification_handler) return -3;
+    adapter->notification_handler(ctx, notification,
+                                   adapter->notification_handler_user_data);
+    return 0;
+}
+
+int a2a_v03_stream_task_update(a2a_v03_context_t* ctx, const char* task_id,
+                                double progress, const char* chunk_json,
+                                bool is_final) {
+    if (!ctx || !task_id) return -1;
+    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+    if (!adapter->initialized) return -2;
+
+    for (size_t i = 0; i < adapter->task_count; i++) {
+        if (strcmp(adapter->tasks[i]->id, task_id) == 0) {
+            adapter->tasks[i]->progress = progress;
+            adapter->tasks[i]->updated_at = a2a_timestamp_ms();
+            if (is_final) {
+                adapter->tasks[i]->state = A2A_TASK_COMPLETED;
+                if (chunk_json) {
+                    free(adapter->tasks[i]->output_json);
+                    adapter->tasks[i]->output_json = strdup(chunk_json);
+                }
+            }
+            break;
+        }
+    }
+
+    if (adapter->streaming_handler) {
+        adapter->streaming_handler(ctx, task_id, progress, chunk_json,
+                                    is_final, adapter->streaming_handler_user_data);
+    }
+    return 0;
+}
+
+int a2a_v03_set_task_handler(a2a_v03_context_t* ctx, a2a_task_handler_t handler,
+                              void* user_data) {
+    if (!ctx) return -1;
+    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+    adapter->task_handler = handler;
+    adapter->task_handler_user_data = user_data;
+    return 0;
+}
+
+int a2a_v03_set_message_handler(a2a_v03_context_t* ctx,
+                                 a2a_message_handler_t handler,
+                                 void* user_data) {
+    if (!ctx) return -1;
+    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+    adapter->message_handler = handler;
+    adapter->message_handler_user_data = user_data;
+    return 0;
+}
+
+int a2a_v03_set_negotiation_handler(a2a_v03_context_t* ctx,
+                                      a2a_negotiation_handler_t handler,
+                                      void* user_data) {
+    if (!ctx) return -1;
+    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+    adapter->negotiation_handler = handler;
+    adapter->negotiation_handler_user_data = user_data;
+    return 0;
+}
+
+int a2a_v03_set_streaming_handler(a2a_v03_context_t* ctx,
+                                    a2a_streaming_handler_t handler,
+                                    void* user_data) {
+    if (!ctx) return -1;
+    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+    adapter->streaming_handler = handler;
+    adapter->streaming_handler_user_data = user_data;
+    return 0;
+}
+
+int a2a_v03_route_request(a2a_v03_context_t* ctx, const char* method,
+                           const char* params_json, char** response_json) {
+    if (!ctx || !method || !response_json) return -1;
+    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+    if (!adapter->initialized) return -2;
+    *response_json = NULL;
+
+    if (strcmp(method, "agent/discover") == 0) {
+        size_t buf_size = 256 + adapter->agent_count * 128;
+        char* buf = (char*)malloc(buf_size);
+        if (!buf) return -3;
+        int pos = snprintf(buf, buf_size, "{\"agents\":[");
+        for (size_t i = 0; i < adapter->agent_count; i++) {
+            pos += snprintf(buf + pos, buf_size - (size_t)pos,
+                           "%s{\"id\":\"%s\",\"name\":\"%s\"}",
+                           i > 0 ? "," : "",
+                           adapter->agents[i].id,
+                           adapter->agents[i].name ? adapter->agents[i].name : "");
+        }
+        snprintf(buf + pos, buf_size - (size_t)pos, "]}");
+        *response_json = buf;
+        return 0;
+    }
+
+    if (strcmp(method, "task/create") == 0) {
+        a2a_task_t* task = NULL;
+        int rc = a2a_v03_create_task(ctx, NULL, params_json, NULL, &task);
+        if (rc == 0 && task) {
+            size_t buf_size = 256;
+            char* buf = (char*)malloc(buf_size);
+            if (buf) {
+                snprintf(buf, buf_size, "{\"task_id\":\"%s\",\"state\":\"submitted\"}", task->id);
+                *response_json = buf;
+            }
+        }
+        return rc;
+    }
+
+    if (strcmp(method, "task/list") == 0) {
+        size_t buf_size = 256 + adapter->task_count * 128;
+        char* buf = (char*)malloc(buf_size);
+        if (!buf) return -3;
+        int pos = snprintf(buf, buf_size, "{\"tasks\":[");
+        for (size_t i = 0; i < adapter->task_count; i++) {
+            pos += snprintf(buf + pos, buf_size - (size_t)pos,
+                           "%s{\"id\":\"%s\",\"state\":%d}",
+                           i > 0 ? "," : "",
+                           adapter->tasks[i]->id,
+                           (int)adapter->tasks[i]->state);
+        }
+        snprintf(buf + pos, buf_size - (size_t)pos, "]}");
+        *response_json = buf;
+        return 0;
+    }
+
+    if (strcmp(method, "stats") == 0) {
+        size_t buf_size = 256;
+        char* buf = (char*)malloc(buf_size);
+        if (!buf) return -3;
+        snprintf(buf, buf_size,
+                 "{\"agent_count\":%zu,\"task_count\":%zu,\"capabilities\":%u}",
+                 adapter->agent_count, adapter->task_count, adapter->config.capabilities);
+        *response_json = buf;
+        return 0;
+    }
+
+    *response_json = strdup("{\"error\":\"unknown method\"}");
+    return -10;
+}
+
+static int a2a_adapter_init_cb(void* context) { (void)context; return 0; }
+static int a2a_adapter_destroy_cb(void* context) { a2a_v03_context_destroy((a2a_v03_context_t*)context); return 0; }
+static int a2a_adapter_encode_cb(void* c, const void* m, void** o, size_t* s) { (void)c;(void)m;(void)o;(void)s; return -1; }
+static int a2a_adapter_decode_cb(void* c, const void* d, size_t s, void* o) { (void)c;(void)d;(void)s;(void)o; return -1; }
+static int a2a_adapter_connect_cb(void* c, const char* e) { (void)c;(void)e; return 0; }
+static int a2a_adapter_disconnect_cb(void* c) { (void)c; return 0; }
+static int a2a_adapter_is_connected_cb(void* c) { return c ? 1 : 0; }
+static int a2a_adapter_send_cb(void* c, const void* d, size_t s) { (void)c;(void)d;(void)s; return -1; }
+static int a2a_adapter_receive_cb(void* c, void** d, size_t* s, uint32_t t) { (void)c;(void)d;(void)s;(void)t; return -1; }
+static int a2a_adapter_handle_request_cb(void* c, const void* r, void** rp) { (void)c;(void)r;(void)rp; return -1; }
+static int a2a_adapter_get_version_cb(void* c, char* b, size_t s) { (void)c; snprintf(b, s, "0.3.0"); return 0; }
+static uint32_t a2a_adapter_capabilities_cb(void* c) { (void)c; return A2A_CAP_TASK_EXECUTION|A2A_CAP_STREAMING|A2A_CAP_NEGOTIATION; }
+static int a2a_adapter_get_stats_cb(void* c, char* b, size_t s) {
+    if (!c || !b || s == 0) return -1;
+    struct a2a_v03_adapter_s* a = (struct a2a_v03_adapter_s*)c;
+    snprintf(b, s, "{\"agents\":%zu,\"tasks\":%zu}", a->agent_count, a->task_count);
+    return 0;
+}
+
+const protocol_adapter_t* a2a_v03_get_adapter(void) {
+    static protocol_adapter_t s_adapter;
+    static bool s_init = false;
+    if (!s_init) {
+        memset(&s_adapter, 0, sizeof(s_adapter));
+        s_adapter.type = AGENTOS_PROTOCOL_A2A;
+        s_adapter.name = "a2a-v0.3";
+        s_adapter.version = "0.3.0";
+        s_adapter.description = "A2A v0.3 Protocol Adapter";
+        s_adapter.init = a2a_adapter_init_cb;
+        s_adapter.destroy = a2a_adapter_destroy_cb;
+        s_adapter.encode = a2a_adapter_encode_cb;
+        s_adapter.decode = a2a_adapter_decode_cb;
+        s_adapter.connect = a2a_adapter_connect_cb;
+        s_adapter.disconnect = a2a_adapter_disconnect_cb;
+        s_adapter.is_connected = a2a_adapter_is_connected_cb;
+        s_adapter.send = a2a_adapter_send_cb;
+        s_adapter.receive = a2a_adapter_receive_cb;
+        s_adapter.handle_request = a2a_adapter_handle_request_cb;
+        s_adapter.get_version = a2a_adapter_get_version_cb;
+        s_adapter.capabilities = a2a_adapter_capabilities_cb;
+        s_adapter.get_stats = a2a_adapter_get_stats_cb;
+        s_init = true;
+    }
+    return &s_adapter;
+}
+
+size_t a2a_v03_get_agent_count(a2a_v03_context_t* ctx) {
+    if (!ctx) return 0;
+    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+    return adapter->agent_count;
+}
+
+size_t a2a_v03_get_task_count(a2a_v03_context_t* ctx) {
+    if (!ctx) return 0;
+    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+    return adapter->task_count;
+}
+
+uint32_t a2a_v03_get_capabilities(a2a_v03_context_t* ctx) {
+    if (!ctx) return 0;
+    struct a2a_v03_adapter_s* adapter = (struct a2a_v03_adapter_s*)ctx;
+    return adapter->config.capabilities;
+}
+
+void a2a_agent_card_destroy(a2a_agent_card_t* card) {
+    if (!card) return;
+    free(card->id);
+    free(card->name);
+    free(card->description);
+    free(card->url);
+    free(card->version);
+    free(card->provider_name);
+    free(card->provider_url);
+    free(card->documentation_url);
+    free(card->authentication_schemes_json);
+    free(card->capabilities_json);
+    if (card->skills) {
+        for (size_t i = 0; i < card->skill_count; i++) {
+            free(card->skills[i].name);
+            free(card->skills[i].description);
+            free(card->skills[i].schema_json);
+        }
+        free(card->skills);
+    }
+    free(card);
+}
+
+void a2a_task_destroy(a2a_task_t* task) {
+    if (!task) return;
+    free(task->id);
+    free(task->session_id);
+    free(task->agent_id);
+    free(task->description);
+    free(task->input_json);
+    free(task->output_json);
+    free(task->error_message);
+    free(task);
+}
+
+void a2a_message_destroy(a2a_message_t* msg) {
+    if (!msg) return;
+    free(msg->role);
+    free(msg->content_json);
+    free(msg->mime_type);
+    free(msg->file_name);
+    free(msg->file_data);
+    free(msg);
+}
+
+void a2a_negotiation_destroy(a2a_negotiation_t* neg) {
+    if (!neg) return;
+    free(neg->task_id);
+    free(neg->agent_id);
+    free(neg->terms_json);
+    free(neg->counter_proposal_json);
+    free(neg->reason);
+    free(neg);
 }
