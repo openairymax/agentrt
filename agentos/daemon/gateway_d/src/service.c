@@ -6,6 +6,9 @@
 
 #include "gateway_service.h"
 #include "platform.h"
+#ifdef GATEWAY_HAS_HTTP
+#include "http_gateway.h"
+#endif
 #include <stdlib.h>
 #include <string.h>
 
@@ -21,6 +24,9 @@ struct gateway_service_s {
     gw_state_t state;
     uint64_t requests_total;
     uint64_t requests_failed;
+#ifdef GATEWAY_HAS_HTTP
+    void* http_gateway;
+#endif
 };
 
 void gateway_service_get_default_config(gateway_service_config_t* config) {
@@ -83,6 +89,11 @@ void gateway_service_destroy(gateway_service_t service) {
     if (service->state == GW_STATE_RUNNING) {
         gateway_service_stop(service, true);
     }
+#ifdef GATEWAY_HAS_HTTP
+    if (service->http_gateway) {
+        http_gateway_destroy(service->http_gateway);
+    }
+#endif
     free(service);
 }
 
@@ -100,6 +111,18 @@ agentos_error_t gateway_service_start(gateway_service_t service) {
         return AGENTOS_EPERM;
     }
     service->state = GW_STATE_RUNNING;
+
+#ifdef GATEWAY_HAS_HTTP
+    if (service->config.http.enabled) {
+        service->http_gateway = http_gateway_create(
+            service->config.http.host,
+            service->config.http.port);
+        if (!service->http_gateway) {
+            service->state = GW_STATE_STOPPED;
+            return AGENTOS_ENOMEM;
+        }
+    }
+#endif
     return AGENTOS_SUCCESS;
 }
 
@@ -107,6 +130,12 @@ agentos_error_t gateway_service_stop(gateway_service_t service, bool force) {
     if (!service) return AGENTOS_EINVAL;
     if (service->state != GW_STATE_RUNNING) return AGENTOS_SUCCESS;
     (void)force;
+#ifdef GATEWAY_HAS_HTTP
+    if (service->http_gateway) {
+        http_gateway_destroy(service->http_gateway);
+        service->http_gateway = NULL;
+    }
+#endif
     service->state = GW_STATE_STOPPED;
     return AGENTOS_SUCCESS;
 }
