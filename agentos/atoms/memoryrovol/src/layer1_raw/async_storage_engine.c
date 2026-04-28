@@ -20,13 +20,13 @@
  */
 
 #include "../include/layer1_raw.h"
+#include "layer1_raw_internal.h"
 #include "layer1_raw_io.h"
 #include "layer1_raw_queue.h"
 #include "agentos.h"
 #include "logger.h"
-#include "observability.h"
-#include "manager.h"
-#include "utils/resource/resource_quota.h"
+#include "observability_compat.h"
+#include "id_utils.h"
 #include <stdlib.h>
 #include <string.h>
 
