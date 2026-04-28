@@ -483,7 +483,7 @@ describe('List parsing', () => {
     });
 
     test('should throw for invalid response', () => {
-      expect(() => parseList(null as any, 'tasks')).toThrow(AgentOSError);
+      expect(() => parseList(null as any, 'tasks', (item: any) => item)).toThrow(AgentOSError);
     });
   });
 });

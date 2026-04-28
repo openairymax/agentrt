@@ -87,16 +87,23 @@ static obs_metric_entry_t* find_metric(const char* name, const char* labels) {
 }
 
 int agentos_observability_init(const agentos_observability_config_t* config) {
-    if (g_obs.initialized) {
-        return AGENTOS_SUCCESS;
-    }
-
     if (!g_obs.lock) {
-        g_obs.lock = agentos_mutex_create();
-        if (!g_obs.lock) return AGENTOS_ENOMEM;
+        agentos_mutex_t* new_lock = agentos_mutex_create();
+        if (!new_lock) return AGENTOS_ENOMEM;
+
+        agentos_mutex_t* expected = NULL;
+        if (!__atomic_compare_exchange_n(&g_obs.lock, &expected, new_lock,
+                                         0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+            agentos_mutex_free(new_lock);
+        }
     }
 
     agentos_mutex_lock(g_obs.lock);
+
+    if (g_obs.initialized) {
+        agentos_mutex_unlock(g_obs.lock);
+        return AGENTOS_SUCCESS;
+    }
 
     if (config) {
         memcpy(&g_obs.config, config, sizeof(agentos_observability_config_t));
@@ -118,7 +125,7 @@ int agentos_observability_init(const agentos_observability_config_t* config) {
 }
 
 void agentos_observability_shutdown(void) {
-    if (!g_obs.initialized) return;
+    if (!g_obs.lock) return;
 
     agentos_mutex_lock(g_obs.lock);
     g_obs.metric_count = 0;
@@ -126,11 +133,6 @@ void agentos_observability_shutdown(void) {
     g_obs.span_count = 0;
     g_obs.initialized = 0;
     agentos_mutex_unlock(g_obs.lock);
-
-    if (g_obs.lock) {
-        agentos_mutex_free(g_obs.lock);
-        g_obs.lock = NULL;
-    }
 }
 
 int agentos_health_check_register(const char* name,

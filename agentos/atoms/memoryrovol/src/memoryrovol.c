@@ -22,15 +22,15 @@
 #include "retrieval.h"
 #include "forgetting.h"
 #include "agentos.h"
+#include "platform.h"
 #include <stdlib.h>
-#include <time.h>  /* time()函数 */
+#include <time.h>
 
 /* Unified base library compatibility layer */
 #include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
 #include <stdio.h>
-#include <time.h>
 
 /* ==================== 内部常量 ==================== */
 
@@ -473,13 +473,10 @@ agentos_error_t agentos_memoryrov_write_raw(
         meta.data_len = len;
         meta.data_size = len;
         meta.content_type = (char*)metadata;
-        struct timespec ts;
-        if (clock_gettime(CLOCK_REALTIME, &ts) == 0) {
-            meta.created_ns = (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
-            meta.modified_ns = meta.created_ns;
-            meta.last_access = meta.created_ns;
-            meta.timestamp = meta.created_ns;
-        }
+        meta.created_ns = agentos_time_ns();
+        meta.modified_ns = meta.created_ns;
+        meta.last_access = meta.created_ns;
+        meta.timestamp = meta.created_ns;
         meta.access_count = 0;
         meta.importance = 1.0;
         agentos_raw_metadata_db_upsert(handle->meta_db, &meta);
@@ -601,10 +598,7 @@ agentos_error_t agentos_memoryrov_mount(
         if (existing) {
             existing->source = (char*)context;
             existing->access_count++;
-            struct timespec ts;
-            if (clock_gettime(CLOCK_REALTIME, &ts) == 0) {
-                existing->last_access = (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
-            }
+            existing->last_access = agentos_time_ns();
             agentos_raw_metadata_db_upsert(handle->meta_db, existing);
             agentos_raw_metadata_free(existing);
         } else {
@@ -616,12 +610,9 @@ agentos_error_t agentos_memoryrov_mount(
             meta.data_size = len;
             meta.access_count = 1;
             meta.importance = 1.0;
-            struct timespec ts;
-            if (clock_gettime(CLOCK_REALTIME, &ts) == 0) {
-                meta.created_ns = (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
-                meta.last_access = meta.created_ns;
-                meta.timestamp = meta.created_ns;
-            }
+            meta.created_ns = agentos_time_ns();
+            meta.last_access = meta.created_ns;
+            meta.timestamp = meta.created_ns;
             agentos_raw_metadata_db_upsert(handle->meta_db, &meta);
         }
     }

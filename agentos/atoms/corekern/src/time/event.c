@@ -10,6 +10,7 @@
 
 #include "memory_compat.h"
 #include "string_compat.h"
+#include <stdatomic.h>
 
 struct agentos_event {
     volatile int signaled;
@@ -17,7 +18,7 @@ struct agentos_event {
     agentos_cond_t* cond;
 };
 
-static volatile int eventloop_running = 0;
+static atomic_int eventloop_running = 0;
 
 agentos_event_t* agentos_event_create(void) {
     agentos_event_t* ev = (agentos_event_t*)AGENTOS_CALLOC(1, sizeof(agentos_event_t));
@@ -79,21 +80,21 @@ void agentos_event_destroy(agentos_event_t* event) {
 }
 
 agentos_error_t agentos_time_eventloop_init(void) {
-    eventloop_running = 0;
+    atomic_store(&eventloop_running, 0);
     return AGENTOS_SUCCESS;
 }
 
 void agentos_time_eventloop_run(void) {
-    eventloop_running = 1;
+    atomic_store(&eventloop_running, 1);
 
-    while (eventloop_running) {
+    while (atomic_load(&eventloop_running)) {
         agentos_time_timer_process();
         agentos_task_yield();
     }
 }
 
 void agentos_time_eventloop_stop(void) {
-    eventloop_running = 0;
+    atomic_store(&eventloop_running, 0);
 }
 
 void agentos_time_eventloop_cleanup(void) {
