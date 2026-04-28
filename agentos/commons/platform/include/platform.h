@@ -280,9 +280,17 @@ int agentos_platform_thread_create(agentos_thread_t* thread, agentos_thread_func
  */
 int agentos_platform_thread_join(agentos_thread_t thread, void** retval);
 
+/**
+ * @brief 分离线程（线程结束后自动回收资源）
+ * @param thread 线程句柄
+ * @return 0 成功，非0 失败
+ */
+int agentos_platform_thread_detach(agentos_thread_t thread);
+
 #ifndef AGENTOS_USE_SCHEDULER_THREAD_IMPL
 #define agentos_thread_create agentos_platform_thread_create
 #define agentos_thread_join agentos_platform_thread_join
+#define agentos_thread_detach agentos_platform_thread_detach
 #endif
 
 /**
