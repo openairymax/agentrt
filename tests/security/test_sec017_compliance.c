@@ -131,9 +131,30 @@ static void sec_sandbox_real_dispatch(void)
     printf("\n--- [SEC-017-T2] Sandbox Invoke源码分发验证 ---\n");
 
     /* 直接分析sandbox.c源码确认已修复桩函数 */
-    FILE* f = fopen(
-        "/home/spharx/SpharxWorks/OpenAirymax/AgentOS/"
-        "agentos/atoms/syscall/src/sandbox.c", "r");
+    const char* agentos_root = getenv("AGENTOS_ROOT");
+    if (!agentos_root) {
+        const char* try_paths[] = {
+            ".", "..", "../..", NULL
+        };
+        agentos_root = ".";
+        for (int i = 0; try_paths[i]; i++) {
+            char test_path[512];
+            snprintf(test_path, sizeof(test_path),
+                     "%s/agentos/atoms/syscall/src/sandbox.c", try_paths[i]);
+            FILE* tf = fopen(test_path, "r");
+            if (tf) {
+                fclose(tf);
+                agentos_root = try_paths[i];
+                break;
+            }
+        }
+    }
+
+    char sandbox_path[512];
+    snprintf(sandbox_path, sizeof(sandbox_path),
+             "%s/agentos/atoms/syscall/src/sandbox.c", agentos_root);
+
+    FILE* f = fopen(sandbox_path, "r");
     if (!f) {
         TEST_ASSERT(0, "无法打开sandbox.c进行验证");
         return;
@@ -176,10 +197,13 @@ static void sec_ban02_void_param(void)
     printf("\n--- [BAN-02] (void)参数忽略检测 ---\n");
 
     /* 检查核心源码目录中是否还有(void)未使用变量模式 */
+    const char* agentos_root = getenv("AGENTOS_ROOT");
+    if (!agentos_root) agentos_root = ".";
+
     const char* scan_dirs[] = {
-        "/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/atoms/corekern/src",
-        "/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/atoms/syscall/src",
-        "/home/spharx/SpharxWorks/OpenAirymax/AgentOS/agentos/daemon/common/src",
+        "agentos/atoms/corekern/src",
+        "agentos/atoms/syscall/src",
+        "agentos/daemon/common/src",
         NULL
     };
 
@@ -309,10 +333,13 @@ static void sec_source_scan_keywords(void)
 
     int total_violations = 0;
 
+    const char* agentos_root = getenv("AGENTOS_ROOT");
+    if (!agentos_root) agentos_root = ".";
+
     for (int d = 0; dirs[d]; d++) {
         char base_path[512];
         snprintf(base_path, sizeof(base_path),
-                 "/home/spharx/SpharxWorks/OpenAirymax/AgentOS/%s", dirs[d]);
+                 "%s/%s", agentos_root, dirs[d]);
 
         for (int p = 0; bad_patterns[p]; p++) {
             char cmd[600];
