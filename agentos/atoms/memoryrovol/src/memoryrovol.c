@@ -60,6 +60,26 @@ struct agentos_memoryrov_handle {
 
 /* ==================== 公共接口实现 ==================== */
 
+agentos_error_t agentos_memoryrov_init(
+    const agentos_memoryrov_config_t* manager,
+    agentos_memoryrov_handle_t** out_handle) {
+    if (!out_handle) return AGENTOS_EINVAL;
+
+    agentos_memoryrov_handle_t* handle = agentos_memoryrov_create();
+    if (!handle) return AGENTOS_ENOMEM;
+
+    if (manager) {
+        handle->initialized = 1;
+    }
+
+    *out_handle = handle;
+    return AGENTOS_SUCCESS;
+}
+
+void agentos_memoryrov_cleanup(agentos_memoryrov_handle_t* handle) {
+    agentos_memoryrov_destroy(handle);
+}
+
 agentos_memoryrov_handle_t* agentos_memoryrov_create(void) {
     agentos_memoryrov_handle_t* handle =
         (agentos_memoryrov_handle_t*)AGENTOS_CALLOC(1, sizeof(agentos_memoryrov_handle_t));

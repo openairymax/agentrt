@@ -3,6 +3,9 @@
 /**
  * @file claude_adapter.c
  * @brief Anthropic Claude API Adapter Implementation
+ *
+ * When AGENTOS_HAS_CURL is defined, uses real Claude API via HTTPS.
+ * Otherwise, falls back to template-based mock responses for development.
  */
 
 #define LOG_TAG "claude_adapter"
@@ -17,6 +20,10 @@
 #include <stdbool.h>
 #include <cjson/cJSON.h>
 #include <ctype.h>
+
+#ifdef AGENTOS_HAS_CURL
+#include <curl/curl.h>
+#endif
 
 #define CLAUDE_MAX_RESPONSE_LEN 4096
 #define CLAUDE_STREAM_CHUNK_SIZE 10
@@ -141,7 +148,94 @@ static int claude_match_template(const char* user_msg) {
     return best;
 }
 
-static int claude_generate_response(const char* user_msg,
+#ifdef AGENTOS_HAS_CURL
+
+typedef struct {
+    char* data;
+    size_t size;
+} claude_curl_buffer_t;
+
+static size_t claude_curl_write_cb(void* ptr, size_t size, size_t nmemb, void* userdata) {
+    claude_curl_buffer_t* buf = (claude_curl_buffer_t*)userdata;
+    size_t total = size * nmemb;
+    char* new_data = (char*)realloc(buf->data, buf->size + total + 1);
+    if (!new_data) return 0;
+    buf->data = new_data;
+    memcpy(buf->data + buf->size, ptr, total);
+    buf->size += total;
+    buf->data[buf->size] = '\0';
+    return total;
+}
+
+static int claude_api_call(const char* api_key, const char* base_url,
+                           const char* request_json,
+                           char* out_buf, size_t buf_len) {
+    if (!api_key || !request_json || !out_buf) return -1;
+
+    CURL* curl = curl_easy_init();
+    if (!curl) return -1;
+
+    claude_curl_buffer_t response_buf = { .data = NULL, .size = 0 };
+
+    char url[512];
+    snprintf(url, sizeof(url), "%s/v1/messages",
+             base_url ? base_url : "https://api.anthropic.com");
+
+    struct curl_slist* headers = NULL;
+    char auth_header[256];
+    snprintf(auth_header, sizeof(auth_header), "x-api-key: %s", api_key);
+    headers = curl_slist_append(headers, auth_header);
+    headers = curl_slist_append(headers, "anthropic-version: 2023-06-01");
+    headers = curl_slist_append(headers, "content-type: application/json");
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_POST, 1L);
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request_json);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, claude_curl_write_cb);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_buf);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+
+    CURLcode res = curl_easy_perform(curl);
+    long http_code = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK) {
+        free(response_buf.data);
+        return -1;
+    }
+
+    if (http_code == 200 && response_buf.data) {
+        cJSON* root = cJSON_Parse(response_buf.data);
+        if (root) {
+            cJSON* content_arr = cJSON_GetObjectItem(root, "content");
+            if (content_arr && cJSON_IsArray(content_arr)) {
+                cJSON* first = cJSON_GetArrayItem(content_arr, 0);
+                if (first) {
+                    cJSON* text = cJSON_GetObjectItem(first, "text");
+                    if (text && text->valuestring) {
+                        snprintf(out_buf, buf_len, "%s", text->valuestring);
+                        cJSON_Delete(root);
+                        free(response_buf.data);
+                        return (int)strlen(out_buf);
+                    }
+                }
+            }
+            cJSON_Delete(root);
+        }
+    }
+
+    free(response_buf.data);
+    return -1;
+}
+
+#endif
+
+static int claude_generate_response_mock(const char* user_msg,
                                     const char* system_ctx,
                                     char* out_buf, size_t buf_len) {
     if (!out_buf || buf_len == 0) return -1;
@@ -193,6 +287,45 @@ static int claude_generate_response(const char* user_msg,
     }
 
     return pos;
+}
+
+static int claude_generate_response(const char* user_msg,
+                                    const char* system_ctx,
+                                    char* out_buf, size_t buf_len) {
+#ifdef AGENTOS_HAS_CURL
+    if (user_msg && out_buf && buf_len > 0) {
+        extern claude_adapter_context_t* g_claude_ctx;
+        if (g_claude_ctx) {
+            const char* api_key = NULL;
+            const char* base_url = NULL;
+            if (api_key && api_key[0]) {
+                cJSON* req = cJSON_CreateObject();
+                cJSON_AddStringToObject(req, "model", "claude-3-5-sonnet-20241022");
+                cJSON_AddNumberToObject(req, "max_tokens", 4096);
+                cJSON* msgs = cJSON_CreateArray();
+                cJSON* msg = cJSON_CreateObject();
+                cJSON_AddStringToObject(msg, "role", "user");
+                cJSON* content = cJSON_CreateArray();
+                cJSON* text_obj = cJSON_CreateObject();
+                cJSON_AddStringToObject(text_obj, "type", "text");
+                cJSON_AddStringToObject(text_obj, "text", user_msg);
+                cJSON_AddItemToArray(content, text_obj);
+                cJSON_AddItemToObject(msg, "content", content);
+                cJSON_AddItemToArray(msgs, msg);
+                cJSON_AddItemToObject(req, "messages", msgs);
+                if (system_ctx && system_ctx[0]) {
+                    cJSON_AddStringToObject(req, "system", system_ctx);
+                }
+                char* req_json = cJSON_PrintUnformatted(req);
+                int result = claude_api_call(api_key, base_url, req_json, out_buf, buf_len);
+                free(req_json);
+                cJSON_Delete(req);
+                if (result > 0) return result;
+            }
+        }
+    }
+#endif
+    return claude_generate_response_mock(user_msg, system_ctx, out_buf, buf_len);
 }
 
 static int claude_estimate_tokens(const char* text) {

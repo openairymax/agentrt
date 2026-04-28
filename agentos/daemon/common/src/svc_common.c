@@ -1798,7 +1798,6 @@ static agentos_error_t http_client_call(
     if (!service_name || !method || !response_json) {
         return AGENTOS_EINVAL;
     }
-    (void)timeout_ms;
 
     LOG_DEBUG("HTTP client call: %s/%s (timeout=%ums)", service_name, method, timeout_ms);
 
@@ -1889,7 +1888,6 @@ static agentos_error_t http_client_call(
         *response_json = resp_buf.data;
     }
 #else
-    (void)cli_internal;
     LOG_ERROR("Remote call to '%s' failed: libcurl not available", service_name);
     return AGENTOS_EIO;
 #endif
