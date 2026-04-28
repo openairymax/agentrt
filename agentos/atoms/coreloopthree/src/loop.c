@@ -21,13 +21,6 @@
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
 
-#ifdef _WIN32
-    #define WIN32_LEAN_AND_MEAN
-    #include <windows.h>
-#else
-    #include <unistd.h>
-#endif
-
 /**
  * @brief 核心循环结构体
  */
@@ -38,6 +31,7 @@ struct agentos_core_loop {
     agentos_loop_config_t manager;
     volatile int running;
     volatile int stop_requested;
+    volatile int task_pending;
     agentos_mutex_t* lock;
     agentos_cond_t* cond;
 };
@@ -129,7 +123,7 @@ static memory_pool_t* get_loop_memory_pool(void)
 #endif
             g_pool_mutex = new_mutex;
         } else {
-            agentos_mutex_destroy(new_mutex);
+            agentos_mutex_free(new_mutex);
         }
     }
 
@@ -187,7 +181,7 @@ static agentos_error_t initialize_loop_resources(agentos_core_loop_t* loop, cons
 
     loop->cond = agentos_cond_create();
     if (!loop->cond) {
-        agentos_mutex_destroy(loop->lock);
+        agentos_mutex_free(loop->lock);
         return AGENTOS_ENOMEM;
     }
 
@@ -264,12 +258,12 @@ static void cleanup_loop_resources(agentos_core_loop_t* loop)
     }
 
     if (loop->cond) {
-        agentos_cond_destroy(loop->cond);
+        agentos_cond_free(loop->cond);
         loop->cond = NULL;
     }
 
     if (loop->lock) {
-        agentos_mutex_destroy(loop->lock);
+        agentos_mutex_free(loop->lock);
         loop->lock = NULL;
     }
 
@@ -382,11 +376,11 @@ AGENTOS_API void agentos_loop_destroy(agentos_core_loop_t* loop)
         loop->cognition = NULL;
     }
     if (loop->cond) {
-        agentos_cond_destroy(loop->cond);
+        agentos_cond_free(loop->cond);
         loop->cond = NULL;
     }
     if (loop->lock) {
-        agentos_mutex_destroy(loop->lock);
+        agentos_mutex_free(loop->lock);
         loop->lock = NULL;
     }
 
@@ -404,19 +398,20 @@ AGENTOS_API agentos_error_t agentos_loop_run(agentos_core_loop_t* loop)
 
     while (1) {
         agentos_mutex_lock(loop->lock);
+        while (!loop->stop_requested && !loop->task_pending) {
+            agentos_cond_timedwait(loop->cond, loop->lock, 50);
+        }
         if (loop->stop_requested) {
             loop->running = 0;
+            loop->task_pending = 0;
             agentos_cond_broadcast(loop->cond);
             agentos_mutex_unlock(loop->lock);
             break;
         }
+        if (loop->task_pending) {
+            loop->task_pending = 0;
+        }
         agentos_mutex_unlock(loop->lock);
-
-#ifdef _WIN32
-        Sleep(10);
-#else
-        usleep(10000);
-#endif
     }
 
     return AGENTOS_SUCCESS;
@@ -494,19 +489,43 @@ AGENTOS_API agentos_error_t agentos_loop_submit(
         return AGENTOS_EINVAL;
     }
 
-    /* 步骤 4: 执行层提交任务 */
-    agentos_task_t task;
-    memset(&task, 0, sizeof(task));
-    task.task_input = (void*)process_input;
-    task.task_timeout_ms = loop->manager.loop_config_task_timeout_ms;
+    /* 步骤 4: 执行层按计划节点提交任务 */
+    agentos_error_t first_err = AGENTOS_SUCCESS;
+    for (size_t i = 0; i < plan->task_plan_node_count; i++) {
+        agentos_task_node_t* node = plan->task_plan_nodes[i];
+        if (!node) continue;
 
-    err = agentos_execution_submit(loop->execution, &task, out_task_id);
+        agentos_task_t task;
+        memset(&task, 0, sizeof(task));
+        task.task_input = node->task_node_input ? node->task_node_input : (void*)process_input;
+        task.task_timeout_ms = node->task_node_timeout_ms > 0
+            ? node->task_node_timeout_ms
+            : loop->manager.loop_config_task_timeout_ms;
+
+        char* node_task_id = NULL;
+        err = agentos_execution_submit(loop->execution, &task, &node_task_id);
+        if (err != AGENTOS_SUCCESS && first_err == AGENTOS_SUCCESS) {
+            first_err = err;
+        }
+        if (node_task_id) AGENTOS_FREE(node_task_id);
+    }
+
+    if (first_err == AGENTOS_SUCCESS && out_task_id) {
+        *out_task_id = NULL;
+    }
+
+    if (first_err == AGENTOS_SUCCESS) {
+        agentos_mutex_lock(loop->lock);
+        loop->task_pending = 1;
+        agentos_cond_signal(loop->cond);
+        agentos_mutex_unlock(loop->lock);
+    }
 
     /* 清理临时资源 */
     agentos_task_plan_free(plan);
     if (enhanced_input) AGENTOS_FREE(enhanced_input);
 
-    return err;
+    return first_err;
 }
 
 AGENTOS_API agentos_error_t agentos_loop_wait(

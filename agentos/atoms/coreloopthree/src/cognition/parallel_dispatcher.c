@@ -1,16 +1,16 @@
 #include "parallel_dispatcher.h"
+#include "delegate.h"
 #include "agentos.h"
+#include "platform.h"
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
-#include <time.h>
 
 typedef struct tool_exec_context {
     agentos_tool_execute_fn executor;
     void* user_data;
     const agentos_tool_call_t* call;
     agentos_tool_result_t* result;
-    pthread_t thread;
+    agentos_thread_t thread;
     int started;
     int joined;
 } tool_exec_context_t;
@@ -19,7 +19,8 @@ struct agentos_parallel_dispatcher {
     int max_parallel;
     agentos_tool_execute_fn executor;
     void* executor_user_data;
-    pthread_mutex_t mutex;
+    agentos_mutex_t mutex;
+    volatile int cancelled;
 };
 
 static int has_path_conflict(const agentos_tool_call_t* a, const agentos_tool_call_t* b) {
@@ -43,8 +44,7 @@ static void* tool_exec_thread(void* arg) {
     tool_exec_context_t* ctx = (tool_exec_context_t*)arg;
     if (!ctx || !ctx->executor || !ctx->call || !ctx->result) return NULL;
 
-    struct timespec start, end;
-    clock_gettime(CLOCK_MONOTONIC, &start);
+    uint64_t start_ns = agentos_time_ns();
 
     char* output = NULL;
     size_t output_len = 0;
@@ -56,15 +56,33 @@ static void* tool_exec_thread(void* arg) {
         &output_len,
         ctx->user_data);
 
-    clock_gettime(CLOCK_MONOTONIC, &end);
+    uint64_t end_ns = agentos_time_ns();
 
     ctx->result->error = err;
     ctx->result->output = output;
     ctx->result->output_len = output_len;
-    ctx->result->elapsed_ns = (uint64_t)(end.tv_sec - start.tv_sec) * 1000000000ULL +
-                               (uint64_t)(end.tv_nsec - start.tv_nsec);
+    ctx->result->elapsed_ns = end_ns - start_ns;
 
     return NULL;
+}
+
+static agentos_error_t exec_single_tool(
+    agentos_tool_execute_fn executor,
+    void* user_data,
+    const agentos_tool_call_t* call,
+    agentos_tool_result_t* result) {
+    uint64_t start_ns = agentos_time_ns();
+    char* output = NULL;
+    size_t output_len = 0;
+    agentos_error_t err = executor(
+        call->tool_name, call->arguments, call->arguments_len,
+        &output, &output_len, user_data);
+    uint64_t end_ns = agentos_time_ns();
+    result->error = err;
+    result->output = output;
+    result->output_len = output_len;
+    result->elapsed_ns = end_ns - start_ns;
+    return err;
 }
 
 agentos_parallel_dispatcher_t* agentos_parallel_dispatcher_create(int max_parallel) {
@@ -74,13 +92,14 @@ agentos_parallel_dispatcher_t* agentos_parallel_dispatcher_create(int max_parall
     d->max_parallel = max_parallel > 0 ? max_parallel : 4;
     d->executor = NULL;
     d->executor_user_data = NULL;
-    pthread_mutex_init(&d->mutex, NULL);
+    d->cancelled = 0;
+    agentos_mutex_init(&d->mutex);
     return d;
 }
 
 void agentos_parallel_dispatcher_destroy(agentos_parallel_dispatcher_t* dispatcher) {
     if (!dispatcher) return;
-    pthread_mutex_destroy(&dispatcher->mutex);
+    agentos_mutex_destroy(&dispatcher->mutex);
     free(dispatcher);
 }
 
@@ -89,10 +108,10 @@ agentos_error_t agentos_parallel_dispatcher_set_executor(
     agentos_tool_execute_fn executor,
     void* user_data) {
     if (!dispatcher || !executor) return AGENTOS_EINVAL;
-    pthread_mutex_lock(&dispatcher->mutex);
+    agentos_mutex_lock(&dispatcher->mutex);
     dispatcher->executor = executor;
     dispatcher->executor_user_data = user_data;
-    pthread_mutex_unlock(&dispatcher->mutex);
+    agentos_mutex_unlock(&dispatcher->mutex);
     return AGENTOS_SUCCESS;
 }
 
@@ -105,7 +124,14 @@ agentos_error_t agentos_parallel_dispatcher_dispatch(
     if (!dispatcher || !calls || call_count == 0 || !out_results || !out_result_count) {
         return AGENTOS_EINVAL;
     }
-    if (!dispatcher->executor) return AGENTOS_ENOTINIT;
+
+    agentos_mutex_lock(&dispatcher->mutex);
+    if (!dispatcher->executor) {
+        agentos_mutex_unlock(&dispatcher->mutex);
+        return AGENTOS_ENOTINIT;
+    }
+    dispatcher->cancelled = 0;
+    agentos_mutex_unlock(&dispatcher->mutex);
 
     agentos_tool_result_t* results = (agentos_tool_result_t*)calloc(
         call_count, sizeof(agentos_tool_result_t));
@@ -121,35 +147,38 @@ agentos_error_t agentos_parallel_dispatcher_dispatch(
 
     if (any_interactive(calls, call_count)) {
         for (size_t i = 0; i < call_count; i++) {
-            struct timespec start, end;
-            clock_gettime(CLOCK_MONOTONIC, &start);
-            char* output = NULL;
-            size_t output_len = 0;
-            agentos_error_t err = dispatcher->executor(
-                calls[i].tool_name, calls[i].arguments, calls[i].arguments_len,
-                &output, &output_len, dispatcher->executor_user_data);
-            clock_gettime(CLOCK_MONOTONIC, &end);
-            results[i].error = err;
-            results[i].output = output;
-            results[i].output_len = output_len;
-            results[i].elapsed_ns = (uint64_t)(end.tv_sec - start.tv_sec) * 1000000000ULL +
-                                     (uint64_t)(end.tv_nsec - start.tv_nsec);
+            if (dispatcher->cancelled) {
+                results[i].error = AGENTOS_ECANCELLED;
+                continue;
+            }
+            exec_single_tool(dispatcher->executor, dispatcher->executor_user_data,
+                             &calls[i], &results[i]);
         }
         *out_results = results;
         *out_result_count = call_count;
         return AGENTOS_SUCCESS;
     }
 
-    int* group_id = (int*)calloc(call_count, sizeof(int));
-    int group_count = 0;
+    int* group_id = (int*)malloc(call_count * sizeof(int));
     int* serial_flags = (int*)calloc(call_count, sizeof(int));
+    if (!group_id || !serial_flags) {
+        free(group_id);
+        free(serial_flags);
+        for (size_t i = 0; i < call_count; i++) {
+            free(results[i].tool_name);
+        }
+        free(results);
+        return AGENTOS_ENOMEM;
+    }
 
     for (size_t i = 0; i < call_count; i++) {
+        group_id[i] = -1;
         if (must_be_serial(&calls[i])) {
             serial_flags[i] = 1;
         }
     }
 
+    int group_count = 0;
     for (size_t i = 0; i < call_count; i++) {
         if (group_id[i] >= 0) continue;
         group_id[i] = group_count;
@@ -183,6 +212,15 @@ agentos_error_t agentos_parallel_dispatcher_dispatch(
     }
 
     for (int g = 0; g < group_count; g++) {
+        if (dispatcher->cancelled) {
+            for (size_t i = 0; i < call_count; i++) {
+                if (group_id[i] == g) {
+                    results[i].error = AGENTOS_ECANCELLED;
+                }
+            }
+            continue;
+        }
+
         size_t group_size = 0;
         for (size_t i = 0; i < call_count; i++) {
             if (group_id[i] == g) group_size++;
@@ -197,19 +235,12 @@ agentos_error_t agentos_parallel_dispatcher_dispatch(
         if (is_serial || group_size == 1) {
             for (size_t i = 0; i < call_count; i++) {
                 if (group_id[i] != g) continue;
-                struct timespec start, end;
-                clock_gettime(CLOCK_MONOTONIC, &start);
-                char* output = NULL;
-                size_t output_len = 0;
-                agentos_error_t err = dispatcher->executor(
-                    calls[i].tool_name, calls[i].arguments, calls[i].arguments_len,
-                    &output, &output_len, dispatcher->executor_user_data);
-                clock_gettime(CLOCK_MONOTONIC, &end);
-                results[i].error = err;
-                results[i].output = output;
-                results[i].output_len = output_len;
-                results[i].elapsed_ns = (uint64_t)(end.tv_sec - start.tv_sec) * 1000000000ULL +
-                                         (uint64_t)(end.tv_nsec - start.tv_nsec);
+                if (dispatcher->cancelled) {
+                    results[i].error = AGENTOS_ECANCELLED;
+                    continue;
+                }
+                exec_single_tool(dispatcher->executor, dispatcher->executor_user_data,
+                                 &calls[i], &results[i]);
             }
         } else {
             size_t parallel_count = group_size;
@@ -230,13 +261,18 @@ agentos_error_t agentos_parallel_dispatcher_dispatch(
             size_t ctx_idx = 0;
             for (size_t i = 0; i < call_count && ctx_idx < parallel_count; i++) {
                 if (group_id[i] != g) continue;
+                if (dispatcher->cancelled) {
+                    results[i].error = AGENTOS_ECANCELLED;
+                    continue;
+                }
                 contexts[ctx_idx].executor = dispatcher->executor;
                 contexts[ctx_idx].user_data = dispatcher->executor_user_data;
                 contexts[ctx_idx].call = &calls[i];
                 contexts[ctx_idx].result = &results[i];
                 contexts[ctx_idx].started = 0;
                 contexts[ctx_idx].joined = 0;
-                int ret = pthread_create(&contexts[ctx_idx].thread, NULL, tool_exec_thread, &contexts[ctx_idx]);
+                int ret = agentos_thread_create(&contexts[ctx_idx].thread,
+                                                tool_exec_thread, &contexts[ctx_idx]);
                 contexts[ctx_idx].started = (ret == 0);
                 if (ret != 0) {
                     results[i].error = AGENTOS_EIO;
@@ -246,7 +282,7 @@ agentos_error_t agentos_parallel_dispatcher_dispatch(
 
             for (size_t j = 0; j < ctx_idx; j++) {
                 if (contexts[j].started && !contexts[j].joined) {
-                    pthread_join(contexts[j].thread, NULL);
+                    agentos_thread_join(contexts[j].thread, NULL);
                     contexts[j].joined = 1;
                 }
             }
@@ -262,97 +298,19 @@ agentos_error_t agentos_parallel_dispatcher_dispatch(
     return AGENTOS_SUCCESS;
 }
 
-static int g_delegate_depth = 0;
-
-agentos_delegate_task_t* agentos_delegate_create(
-    const char* task_description,
-    const agentos_delegate_config_t* config) {
-    if (!task_description) return NULL;
-    if (g_delegate_depth >= 2) return NULL;
-
-    agentos_delegate_task_t* task = (agentos_delegate_task_t*)calloc(
-        1, sizeof(agentos_delegate_task_t));
-    if (!task) return NULL;
-
-    static uint64_t task_counter = 0;
-    task->task_id = (char*)malloc(64);
-    if (task->task_id) {
-        snprintf(task->task_id, 64, "delegate_%lu", (unsigned long)(task_counter++));
-    }
-    task->description = strdup(task_description);
-    task->status = AGENTOS_SUCCESS;
-    task->result = NULL;
-    task->result_len = 0;
-    task->completed = 0;
-
-    if (config) {
-        task->config = *config;
-        task->config.focus_prompt = config->focus_prompt ? strdup(config->focus_prompt) : NULL;
-    } else {
-        memset(&task->config, 0, sizeof(agentos_delegate_config_t));
-        task->config.max_depth = 2;
-        task->config.max_iterations = 10;
-        task->config.token_budget_ratio = 0.3f;
-    }
-
-    return task;
+agentos_error_t agentos_parallel_dispatcher_cancel(
+    agentos_parallel_dispatcher_t* dispatcher) {
+    if (!dispatcher) return AGENTOS_EINVAL;
+    agentos_mutex_lock(&dispatcher->mutex);
+    dispatcher->cancelled = 1;
+    dispatcher->executor = NULL;
+    dispatcher->executor_user_data = NULL;
+    agentos_mutex_unlock(&dispatcher->mutex);
+    return AGENTOS_SUCCESS;
 }
 
-void agentos_delegate_destroy(agentos_delegate_task_t* task) {
-    if (!task) return;
-    if (task->task_id) free(task->task_id);
-    if (task->description) free(task->description);
-    if (task->result) free(task->result);
-    if (task->config.focus_prompt) free((void*)task->config.focus_prompt);
-    free(task);
-}
-
-agentos_error_t agentos_delegate_assign(
-    agentos_delegate_task_t* task,
-    agentos_tool_execute_fn executor,
-    void* user_data) {
-    if (!task || !executor) return AGENTOS_EINVAL;
-    if (task->completed) return AGENTOS_EBUSY;
-    if (g_delegate_depth >= task->config.max_depth) return AGENTOS_EPERM;
-
-    g_delegate_depth++;
-
-    char* output = NULL;
-    size_t output_len = 0;
-    agentos_error_t err = executor(
-        "delegate_task",
-        task->description,
-        task->description ? strlen(task->description) : 0,
-        &output,
-        &output_len,
-        user_data);
-
-    g_delegate_depth--;
-
-    task->status = err;
-    task->result = output;
-    task->result_len = output_len;
-    task->completed = 1;
-
-    return err;
-}
-
-agentos_error_t agentos_delegate_collect(
-    agentos_delegate_task_t* task,
-    char** out_result,
-    size_t* out_result_len) {
-    if (!task || !out_result) return AGENTOS_EINVAL;
-    if (!task->completed) return AGENTOS_EBUSY;
-
-    if (task->result && task->result_len > 0) {
-        *out_result = task->result;
-        if (out_result_len) *out_result_len = task->result_len;
-        task->result = NULL;
-        task->result_len = 0;
-    } else {
-        *out_result = NULL;
-        if (out_result_len) *out_result_len = 0;
-    }
-
-    return task->status;
+bool agentos_parallel_dispatcher_is_cancelled(
+    const agentos_parallel_dispatcher_t* dispatcher) {
+    if (!dispatcher) return false;
+    return dispatcher->cancelled != 0;
 }

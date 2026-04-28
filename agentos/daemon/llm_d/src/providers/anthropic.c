@@ -414,12 +414,14 @@ static llm_response_t* ant_build_stream_response(ant_stream_acc_t* acc) {
     r->prompt_tokens = acc->prompt_tokens;
     r->completion_tokens = acc->completion_tokens;
     r->total_tokens = r->prompt_tokens + r->completion_tokens;
-    r->choice_count = 1;
     r->choices = (llm_message_t*)calloc(1, sizeof(llm_message_t));
     if (r->choices) {
+        r->choice_count = 1;
         r->choices[0].role = strdup("assistant");
         r->choices[0].content = acc->acc_content;
         acc->acc_content = NULL;
+    } else {
+        r->choice_count = 0;
     }
     r->finish_reason = acc->finish_reason ? acc->finish_reason : strdup("end_turn");
     acc->finish_reason = NULL;

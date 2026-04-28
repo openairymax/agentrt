@@ -25,15 +25,7 @@
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
 
-/* 平台特定头文件 */
-#ifdef _WIN32
-    #define WIN32_LEAN_AND_MEAN
-    #include <windows.h>
-    #include <process.h>
-#else
-    #include <pthread.h>
-    #include <unistd.h>
-#endif
+#include "platform.h"
 
 typedef struct task_control_block {
     char* task_id;
