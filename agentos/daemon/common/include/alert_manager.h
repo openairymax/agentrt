@@ -213,6 +213,14 @@ int am_acknowledge(const char* name);
 /* ==================== 指标评估 ==================== */
 
 /**
+ * @brief 记录指标值（供 am_evaluate_all 使用）
+ * @param metric_name 指标名称
+ * @param value 指标当前值
+ * @return 0成功，非0失败
+ */
+int am_record_metric(const char* metric_name, double value);
+
+/**
  * @brief 评估指标值（检查是否触发规则）
  * @param metric_name 指标名称
  * @param value 指标值
