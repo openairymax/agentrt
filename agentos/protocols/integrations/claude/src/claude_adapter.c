@@ -296,8 +296,8 @@ static int claude_generate_response(const char* user_msg,
     if (user_msg && out_buf && buf_len > 0) {
         extern claude_adapter_context_t* g_claude_ctx;
         if (g_claude_ctx) {
-            const char* api_key = NULL;
-            const char* base_url = NULL;
+            const char* api_key = g_claude_ctx->config.api_key;
+            const char* base_url = g_claude_ctx->config.base_url;
             if (api_key && api_key[0]) {
                 cJSON* req = cJSON_CreateObject();
                 cJSON_AddStringToObject(req, "model", "claude-3-5-sonnet-20241022");
@@ -606,7 +606,11 @@ claude_adapter_context_t* claude_adapter_create(const claude_config_t* config) {
 void claude_adapter_destroy(claude_adapter_context_t* ctx) {
     if (!ctx) return;
 
-    free(ctx->config.api_key);
+    if (ctx->config.api_key) {
+        size_t key_len = strlen(ctx->config.api_key);
+        memset(ctx->config.api_key, 0, key_len);
+        free(ctx->config.api_key);
+    }
     free(ctx->config.base_url);
     free(ctx->config.system_prompt);
     free(ctx->config.metadata_json);
