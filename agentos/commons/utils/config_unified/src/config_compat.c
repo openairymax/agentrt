@@ -307,9 +307,39 @@ int config_validate_schema(const char* schema_file) {
     return 0;
 }
 
-int config_begin_transaction(void) { return 0; }
-int config_commit_transaction(void) { return 0; }
-int config_rollback_transaction(void) { return 0; }
+static config_context_t* g_transaction_ctx = NULL;
+static int g_transaction_depth = 0;
+
+int config_begin_transaction(void) {
+    if (!g_transaction_ctx) {
+        g_transaction_ctx = _get_or_create_ctx();
+        if (!g_transaction_ctx) return -1;
+    }
+    g_transaction_depth++;
+    return 0;
+}
+
+int config_commit_transaction(void) {
+    if (g_transaction_depth <= 0) return -1;
+    g_transaction_depth--;
+    if (g_transaction_depth == 0) {
+        config_error_t err = config_save(g_transaction_ctx);
+        if (err != CONFIG_SUCCESS) return -1;
+        g_transaction_ctx = NULL;
+    }
+    return 0;
+}
+
+int config_rollback_transaction(void) {
+    if (g_transaction_depth <= 0) return -1;
+    g_transaction_depth--;
+    if (g_transaction_depth == 0) {
+        config_error_t err = config_reload(g_transaction_ctx);
+        if (err != CONFIG_SUCCESS) return -1;
+        g_transaction_ctx = NULL;
+    }
+    return 0;
+}
 
 void* agentos_config_create(void) {
     g_compat_stats.agentos_config_calls++;

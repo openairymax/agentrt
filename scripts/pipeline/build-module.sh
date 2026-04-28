@@ -44,7 +44,6 @@ declare -A MODULE_SOURCES=(
     [cupolas]="agentos/cupolas"
     [gateway]="agentos/gateway"
     [heapstore]="agentos/heapstore"
-    [manager]="agentos/manager"
 )
 
 declare -A MODULE_CMAKE_OPTIONS=(
@@ -54,7 +53,6 @@ declare -A MODULE_CMAKE_OPTIONS=(
     [cupolas]="-DBUILD_TESTS=ON"
     [gateway]="-DBUILD_TESTS=ON"
     [heapstore]="-DBUILD_TESTS=ON"
-    [manager]="-DBUILD_TESTS=ON"
 )
 
 ###############################################################################
