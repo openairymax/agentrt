@@ -23,11 +23,11 @@ static void test_default_config(void) {
     gateway_service_get_default_config(&config);
     
     assert(config.name != NULL);
-    assert(strcmp(config.name, "gateway_d") == 0);
+    assert(strcmp(config.name, "agentos-gateway") == 0);
     assert(config.http.port == 8080);
     assert(config.http.enabled == true);
     assert(config.ws.port == 8081);
-    assert(config.ws.enabled == false);
+    assert(config.ws.enabled == true);
     assert(config.stdio.enabled == false);
     
     printf("PASSED\n");

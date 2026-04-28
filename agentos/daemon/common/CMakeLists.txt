@@ -297,7 +297,6 @@ install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/include/config_manager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/api_recovery.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/thread_pool.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/conn_pool.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/orchestrator.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/daemon_defaults.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/parallel_dispatcher.h
