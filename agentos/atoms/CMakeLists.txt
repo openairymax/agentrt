@@ -300,6 +300,10 @@ add_subdirectory(memoryrovol)
 add_subdirectory(syscall)
 add_subdirectory(taskflow)
 
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/frameworks/CMakeLists.txt")
+    add_subdirectory(frameworks)
+endif()
+
 # 安装配置
 # 库文件安装
 # install(TARGETS agentos_atoms agentos_core agentos_coreloopthree agentos_memoryrovol agentos_syscall agentos_cognition agentos_execution

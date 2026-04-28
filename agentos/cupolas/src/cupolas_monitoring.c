@@ -169,9 +169,42 @@ static int get_thread_count(void) {
 
 #else
 
-static uint64_t get_process_rss_bytes(void) { return 0; }
-static double get_process_cpu_seconds(void) { return 0.0; }
-static int get_thread_count(void) { return 1; }
+#if cupolas_PLATFORM_WINDOWS
+static uint64_t get_process_rss_bytes(void) {
+    PROCESS_MEMORY_COUNTERS_EX pmc;
+    if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc))) {
+        return pmc.WorkingSetSize;
+    }
+    return 0;
+}
+
+static double get_process_cpu_seconds(void) {
+    FILETIME creation, exit, kernel, user;
+    if (GetProcessTimes(GetCurrentProcess(), &creation, &exit, &kernel, &user)) {
+        ULARGE_INTEGER kt, ut;
+        kt.LowPart = kernel.dwLowDateTime; kt.HighPart = kernel.dwHighDateTime;
+        ut.LowPart = user.dwLowDateTime; ut.HighPart = user.dwHighDateTime;
+        return (double)(kt.QuadPart + ut.QuadPart) / 10000000.0;
+    }
+    return 0.0;
+}
+
+static int get_thread_count(void) {
+    return 1;
+}
+#else
+static uint64_t get_process_rss_bytes(void) {
+    return 0;
+}
+
+static double get_process_cpu_seconds(void) {
+    return 0.0;
+}
+
+static int get_thread_count(void) {
+    return 1;
+}
+#endif
 
 #endif
 

@@ -141,13 +141,14 @@ static int anthropic_parse_response(const char* body, llm_response_t** out) {
         cJSON* first = cJSON_GetArrayItem(content, 0);
         cJSON* text = cJSON_GetObjectItem(first, "text");
         if (cJSON_IsString(text) && text->valuestring) {
-            resp->choice_count = 1;
             resp->choices = (llm_message_t*)calloc(1, sizeof(llm_message_t));
             if (!resp->choices) {
+                resp->choice_count = 0;
                 cJSON_Delete(root);
                 llm_response_free(resp);
                 return AGENTOS_ERR_OUT_OF_MEMORY;
             }
+            resp->choice_count = 1;
             resp->choices[0].role = strdup("assistant");
             resp->choices[0].content = strdup(text->valuestring);
         }
