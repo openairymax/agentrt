@@ -1,7 +1,7 @@
 # =============================================================================
 # AgentOS .gitignore 文件
-# 版本：9.0.0
-# 最后更新：2026-04-19
+# 版本：9.1.0
+# 最后更新：2026-04-28
 # 说明：规范化排除所有不应纳入版本控制的文件和目录
 #
 # 设计原则：
@@ -11,6 +11,12 @@
 # 4. 空目录通过 .gitkeep 保留，但排除目录内容
 # 5. 项目必需文件使用否定规则明确保留
 # 6. 通配符规则限定作用范围，避免意外排除项目必需文件
+#
+# V9.1.0更新（脚本整理与文档优化版）：
+# - 添加 scripts/release/ 目录否定规则（保留发布脚本）
+# - 优化 Visual Studio 规则避免误匹配 scripts/release/
+# - 确保所有文档使用相对路径（BUILD.md 已更新）
+# - 完善项目文档追踪规则
 #
 # V9.0.0更新（全面强化版）：
 # - 强化构建产物排除规则
@@ -71,6 +77,19 @@ build_no_daemon/
 # 1. CMake 构建系统（构建产物，不追踪）
 # =============================================================================
 
+# IDE 配置（包含本地路径，不追踪）
+.clangd/
+.clangd
+.compile_flags.txt
+
+# CMake缓存和临时文件（所有层级）
+**/CMakeCache.txt
+**/CMakeFiles/
+**/cmake_install.cmake
+**/cmake_install.*
+**/CTestTestfile.cmake
+
+# CMake用户配置
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
@@ -84,18 +103,25 @@ CMakePresets.json
 # CMake自动生成的版本配置文件
 **/AgentOSConfigVersion.cmake
 
-# CMake自动生成的测试配置文件
-**/CTestTestfile.cmake
+# =============================================================================
+# 1.1 构建输出目录（所有层级，关键规则！）
+# =============================================================================
 
-# 编译生成的可执行文件（无扩展名，按daemon命名规则）
-agentos/daemon/*/agentos-*
-agentos/daemon/gateway_d/gateway_d
-
-# CMake 构建目录
+# 根目录构建目录
 build/
+_build/
 build_test/
 build_test_protocol/
-_build/
+build_no_daemon/
+
+# 子目录中的构建产物（防止源内构建）
+**/build/
+**/_build/
+agentos/build/
+agentos/*/build/
+agentos/*/*/build/
+
+# IDE构建目录
 cmake-build*/
 cmake-build-debug/
 cmake-build-release/
@@ -104,6 +130,7 @@ cmake-build-coverage/
 # 外部构建目录（Out-of-Source Build）
 # 所有构建产物统一输出到此目录，保持源码仓库纯净
 AgentOS-build/
+AgentOS-build-*/
 
 # CMake 构建输出目录（库和可执行文件）
 agentos/lib/
@@ -328,6 +355,7 @@ out/
 .sln.docstates
 [Dd]ebug/
 [Rr]elease/
+!scripts/release/
 x64/
 x86/
 bld/
@@ -721,6 +749,9 @@ docs/api/man/
 
 # 关键文档
 !docs/**/*.md
+!BUILD.md
+!README.md
+!README_zh.md
 !CONTRIBUTING.md
 !AUTHORS.md
 !SECURITY.md
@@ -737,6 +768,14 @@ docs/api/man/
 !scripts/**/*.yml
 !scripts/**/*.yaml
 !scripts/deploy/docker/.gitignore
+
+# scripts/release/ 发布脚本和清理脚本（保留脚本，排除发布产物）
+!scripts/release/release.sh
+!scripts/release/cleanup_builds.sh
+scripts/release/artifacts/
+scripts/release/packages/
+scripts/release/*.tar.gz
+scripts/release/*.zip
 
 # scripts/development/ 开发配置
 !scripts/development/config/.clang-format
@@ -862,6 +901,14 @@ docs/api/man/
 # =============================================================================
 # 结束
 # =============================================================================
+#
+# V9.1.0 维护说明：
+# 1. 添加新规则时，必须验证不会误排除项目必需文件
+# 2. 使用 git check-ignore -v <file> 验证规则生效
+# 3. 定期运行 git status --porcelain 检查是否有意外追踪的文件
+# 4. 项目必需文件必须在第21节有明确的否定规则(!前缀)
+# 5. scripts/ 目录已按功能分类（setup/verify/release/cli）
+# 6. 所有文档应使用相对路径，禁止硬编码本地开发路径
 #
 # V9.0.0 维护说明：
 # 1. 添加新规则时，必须验证不会误排除项目必需文件
