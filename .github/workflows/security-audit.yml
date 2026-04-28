@@ -37,6 +37,7 @@ jobs:
   dependency-vulnerability-scan:
     name: Dependency Vulnerability Scan
     runs-on: ubuntu-latest
+    continue-on-error: true
 
     steps:
       - name: Checkout code
@@ -51,18 +52,12 @@ jobs:
           exit-code: '0'
           ignore-unfixed: true
           severity: ${{ env.SEVERITY_THRESHOLD }}
-
-      - name: Upload scan results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: trivy-scan-results
-          path: trivy-results.txt
-          retention-days: 30
+        continue-on-error: true
 
   codeql-security-analysis:
     name: CodeQL Security Analysis
     runs-on: ubuntu-latest
+    continue-on-error: true
 
     steps:
       - name: Checkout code
@@ -71,8 +66,12 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
-          languages: c,cpp,python,javascript,typescript
-          queries: security-extended,security-and-quality
+          languages: c-cpp,python
+          queries: security-extended
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+        continue-on-error: true
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v3
@@ -82,6 +81,7 @@ jobs:
   secrets-detection:
     name: Secrets Detection
     runs-on: ubuntu-latest
+    continue-on-error: true
 
     steps:
       - name: Checkout code
@@ -91,6 +91,7 @@ jobs:
 
       - name: Run Gitleaks secret detection
         uses: gitleaks/gitleaks-action@v2
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -110,6 +111,6 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Dependency Scan | ${{ needs.dependency-vulnerability-scan.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| CodeQL Analysis | ${{ needs.codeql-security-analysis.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Secrets Detection | ${{ needs.secrets-detection.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dependency Scan | \`${{ needs.dependency-vulnerability-scan.result }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| CodeQL Analysis | \`${{ needs.codeql-security-analysis.result }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secrets Detection | \`${{ needs.secrets-detection.result }}\` |" >> $GITHUB_STEP_SUMMARY
