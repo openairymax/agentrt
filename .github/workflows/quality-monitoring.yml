@@ -24,21 +24,29 @@ jobs:
       - name: Setup analysis environment
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends cloc jq
+          sudo apt-get install -y --no-install-recommends cloc jq 2>/dev/null || true
 
       - name: Code metrics analysis
+        continue-on-error: true
         run: |
           echo "## Code Metrics Report" >> $GITHUB_STEP_SUMMARY
 
           if command -v cloc &> /dev/null; then
-            cloc_output=$(cloc . --exclude-dir=build-*,node_modules,.git,toolkit --quiet --json)
+            cloc_output=$(cloc . --exclude-dir=build-*,node_modules,.git,AgentOS-build --quiet --json 2>/dev/null || echo "{}")
             echo "### Code Lines by Language" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "| Language | Files | Code | Comment | Blank | Total |" >> $GITHUB_STEP_SUMMARY
-            echo "|----------|-------|------|---------|-------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Language | Files | Code | Comment | Blank |" >> $GITHUB_STEP_SUMMARY
+            echo "|----------|-------|------|---------|-------|" >> $GITHUB_STEP_SUMMARY
 
-            echo "$cloc_output" | jq -r '.SUM as $sum | to_entries[] | select(.key != "header" and .key != "SUM") | "| \(.key) | \(.value.nFiles) | \(.value.code) | \(.value.comment) | \(.value.blank) | \(.value.code + .value.comment + .value.blank) |"' >> $GITHUB_STEP_SUMMARY
-            echo "| **Total** | **\($sum.nFiles)** | **\($sum.code)** | **\($sum.comment)** | **\($sum.blank)** | **\($sum.code + $sum.comment + $sum.blank)** |" >> $GITHUB_STEP_SUMMARY
+            echo "$cloc_output" | jq -r '
+              to_entries[] |
+              select(.key != "header" and .key != "SUM") |
+              "| \(.key) | \(.value.nFiles) | \(.value.code) | \(.value.comment) | \(.value.blank) |"
+            ' >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "| (cloc parse error) | | | | |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "cloc not available, using fallback" >> $GITHUB_STEP_SUMMARY
+            TOTAL_C=$(find agentos \( -name '*.c' -o -name '*.h' \) -type f 2>/dev/null | wc -l)
+            echo "| C/H Files | ${TOTAL_C} | | | |" >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Technical debt analysis

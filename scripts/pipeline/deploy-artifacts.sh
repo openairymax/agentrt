@@ -211,7 +211,10 @@ collect_binaries() {
 # 3. Docker 镜像构建
 ###############################################################################
 build_docker_images() {
-    local docker_dir="${PROJECT_ROOT}/scripts/deploy/docker"
+    local docker_dir="${PROJECT_ROOT}/scripts/deployment/docker"
+    if [[ ! -d "$docker_dir" ]]; then
+        docker_dir="${PROJECT_ROOT}/scripts/deploy/docker"
+    fi
 
     if [[ ! -d "$docker_dir" ]]; then
         log_warn "Docker directory not found: $docker_dir"

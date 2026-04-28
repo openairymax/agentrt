@@ -241,7 +241,9 @@ run_pytest() {
     )
 
     # 并行
-    pytest_args+=("-n" "auto" 2>/dev/null || true)
+    if python3 -m pytest --help 2>/dev/null | grep -q "\-n"; then
+        pytest_args+=("-n" "auto")
+    fi
 
     # 覆盖率
     if [[ "$TEST_COVERAGE" == "true" ]]; then
