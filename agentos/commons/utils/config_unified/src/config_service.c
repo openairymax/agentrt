@@ -12,6 +12,7 @@
 #include "config_service.h"
 #include "core_config.h"
 #include "config_source.h"
+#include <platform.h>
 #include <stdlib.h>
 
 /* Unified base library compatibility layer */
@@ -59,13 +60,15 @@ typedef struct {
 
 /** 热更新管理器结构?*/
 struct config_hot_reload_manager {
-    config_context_t* ctx;           // 配置上下?    config_source_manager_t* source_manager; // 配置源管理器
-    change_callback_item_t* callbacks; // 回调函数数组
-    size_t callback_count;           // 回调函数数量
-    size_t callback_capacity;        // 回调函数容量
-    bool running;                    // 是否正在运行
-    uint32_t check_interval_ms;      // 检查间?    void* thread_handle;             // 监控线程句柄（简化实现）
-    void* lock;                      // 线程安全锁
+    config_context_t* ctx;
+    config_source_manager_t* source_manager;
+    change_callback_item_t* callbacks;
+    size_t callback_count;
+    size_t callback_capacity;
+    volatile bool running;
+    uint32_t check_interval_ms;
+    void* thread_handle;
+    void* lock;
 };
 
 /** 配置版本�?*/
@@ -720,21 +723,29 @@ config_error_t config_hot_reload_register_callback(config_hot_reload_manager_t* 
     return CONFIG_SUCCESS;
 }
 
+static void* config_hot_reload_thread_func(void* arg);
+
 config_error_t config_hot_reload_start(config_hot_reload_manager_t* manager, uint32_t check_interval_ms) {
     if (!manager) return CONFIG_ERROR_INVALID_ARG;
-    
+
     if (manager->running) return CONFIG_SUCCESS;
-    
+
     manager->check_interval_ms = check_interval_ms > 0 ? check_interval_ms : 5000;
     manager->running = true;
     
     if (manager->thread_handle == NULL) {
-        extern void* config_hot_reload_thread_func(void* arg);
-        manager->thread_handle = agentos_thread_create(config_hot_reload_thread_func, manager);
-        if (!manager->thread_handle) {
+        agentos_thread_t* thread = malloc(sizeof(agentos_thread_t));
+        if (!thread) {
             manager->running = false;
             return CONFIG_ERROR_OUT_OF_MEMORY;
         }
+        int rc = agentos_thread_create(thread, config_hot_reload_thread_func, manager);
+        if (rc != 0) {
+            free(thread);
+            manager->running = false;
+            return CONFIG_ERROR_THREAD;
+        }
+        manager->thread_handle = thread;
     }
     
     return CONFIG_SUCCESS;
@@ -748,12 +759,35 @@ config_error_t config_hot_reload_stop(config_hot_reload_manager_t* manager) {
     manager->running = false;
     
     if (manager->thread_handle) {
-        agentos_thread_join(manager->thread_handle);
-        agentos_thread_free(manager->thread_handle);
+        agentos_thread_t* thread = (agentos_thread_t*)manager->thread_handle;
+        agentos_thread_join(*thread, NULL);
+        free(thread);
         manager->thread_handle = NULL;
     }
     
     return CONFIG_SUCCESS;
+}
+
+static void* config_hot_reload_thread_func(void* arg) {
+    config_hot_reload_manager_t* manager = (config_hot_reload_manager_t*)arg;
+    if (!manager) return NULL;
+
+    while (manager->running) {
+        uint32_t interval = manager->check_interval_ms > 0 ? manager->check_interval_ms : 5000;
+        struct timespec ts;
+        ts.tv_sec = interval / 1000;
+        ts.tv_nsec = (interval % 1000) * 1000000L;
+        nanosleep(&ts, NULL);
+
+        if (!manager->running) break;
+
+        config_error_t err = config_hot_reload_trigger(manager);
+        if (err != CONFIG_SUCCESS) {
+            continue;
+        }
+    }
+
+    return NULL;
 }
 
 config_error_t config_hot_reload_trigger(config_hot_reload_manager_t* manager) {

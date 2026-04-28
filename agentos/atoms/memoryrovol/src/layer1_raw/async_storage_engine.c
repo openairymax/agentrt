@@ -175,6 +175,54 @@ agentos_error_t agentos_layer1_raw_create_production(
             sizeof(engine->inner->storage_path) - 1);
     engine->inner->storage_path[sizeof(engine->inner->storage_path) - 1] = '\0';
 
+static void rollback_workers(storage_engine_inner_t* inner, size_t up_to) {
+    if (!inner || !inner->workers) return;
+    for (size_t i = 0; i < up_to; i++) {
+        if (inner->workers[i]) {
+            inner->workers[i]->running = 0;
+        }
+    }
+#ifdef _WIN32
+    if (inner->worker_threads) {
+        if (up_to > 0) {
+            WaitForMultipleObjects((DWORD)up_to, inner->worker_threads, TRUE, 5000);
+        }
+        for (size_t i = 0; i < up_to; i++) {
+            if (inner->worker_threads[i]) {
+                CloseHandle(inner->worker_threads[i]);
+            }
+        }
+    }
+#else
+    if (inner->worker_threads) {
+        for (size_t i = 0; i < up_to; i++) {
+            if (inner->worker_threads[i]) {
+                agentos_thread_join(inner->worker_threads[i], NULL);
+            }
+        }
+    }
+#endif
+    for (size_t i = 0; i < up_to; i++) {
+        if (inner->workers[i]) {
+            if (inner->workers[i]->storage_path) AGENTOS_FREE(inner->workers[i]->storage_path);
+            AGENTOS_FREE(inner->workers[i]);
+            inner->workers[i] = NULL;
+        }
+    }
+}
+
+static void cleanup_engine_resources(agentos_layer1_raw_t* engine) {
+    if (!engine || !engine->inner) return;
+    if (engine->inner->obs) agentos_observability_destroy(engine->inner->obs);
+    if (engine->inner->worker_threads) AGENTOS_FREE(engine->inner->worker_threads);
+    if (engine->inner->workers) AGENTOS_FREE(engine->inner->workers);
+    if (engine->inner->queue) async_queue_destroy(engine->inner->queue);
+    if (engine->inner->engine_id) AGENTOS_FREE(engine->inner->engine_id);
+    if (engine->inner->last_error) AGENTOS_FREE(engine->inner->last_error);
+    AGENTOS_FREE(engine->inner);
+    AGENTOS_FREE(engine);
+}
+
     agentos_error_t dir_result = layer1_raw_ensure_directory_exists(config->storage_path);
     if (dir_result != AGENTOS_SUCCESS) {
         AGENTOS_LOG_ERROR("Failed to create storage directory: %s", config->storage_path);
@@ -186,7 +234,6 @@ agentos_error_t agentos_layer1_raw_create_production(
     size_t queue_capacity = config->queue_size > 0 ? config->queue_size : DEFAULT_ASYNC_QUEUE_SIZE;
     engine->inner->queue = async_queue_create(queue_capacity);
     if (!engine->inner->queue) {
-        AGENTOS_LOG_ERROR("Failed to create async queue");
         AGENTOS_FREE(engine->inner);
         AGENTOS_FREE(engine);
         return AGENTOS_ENOMEM;
@@ -229,17 +276,22 @@ agentos_error_t agentos_layer1_raw_create_production(
                                               AGENTOS_METRIC_COUNTER, "Failed writes");
     }
 
-
     engine->inner->engine_id = agentos_generate_uuid();
     if (!engine->inner->engine_id) {
         engine->inner->engine_id = AGENTOS_STRDUP("storage_engine_default");
     }
 
     engine->inner->healthy = 1;
+    engine->inner->shutdown = 0;
 
+    size_t created_count = 0;
     for (size_t i = 0; i < worker_count; i++) {
         worker_context_t* worker = (worker_context_t*)AGENTOS_CALLOC(1, sizeof(worker_context_t));
-        if (!worker) continue;
+        if (!worker) {
+            rollback_workers(engine->inner, created_count);
+            cleanup_engine_resources(engine);
+            return AGENTOS_ENOMEM;
+        }
 
         worker->worker_id = (int)i;
         worker->queue = engine->inner->queue;
@@ -260,6 +312,9 @@ agentos_error_t agentos_layer1_raw_create_production(
             AGENTOS_FREE(worker->storage_path);
             AGENTOS_FREE(worker);
             engine->inner->workers[i] = NULL;
+            rollback_workers(engine->inner, created_count);
+            cleanup_engine_resources(engine);
+            return AGENTOS_EIO;
         }
 #else
         if (agentos_thread_create(&engine->inner->worker_threads[i], worker_thread_func, worker) != 0) {
@@ -267,31 +322,18 @@ agentos_error_t agentos_layer1_raw_create_production(
             AGENTOS_FREE(worker->storage_path);
             AGENTOS_FREE(worker);
             engine->inner->workers[i] = NULL;
+            rollback_workers(engine->inner, created_count);
+            cleanup_engine_resources(engine);
+            return AGENTOS_EIO;
         }
 #endif
+        created_count++;
     }
 
-    int active_threads = 0;
-    for (size_t i = 0; i < worker_count; i++) {
-        if (engine->inner->workers[i]) active_threads++;
-    }
+    engine->inner->worker_count = worker_count;
 
-    if (active_threads == 0) {
-        if (engine->inner->obs) agentos_observability_destroy(engine->inner->obs);
-        if (engine->inner->engine_id) AGENTOS_FREE(engine->inner->engine_id);
-        AGENTOS_FREE(engine->inner->worker_threads);
-        AGENTOS_FREE(engine->inner->workers);
-        async_queue_destroy(engine->inner->queue);
-        AGENTOS_FREE(engine->inner);
-        AGENTOS_FREE(engine);
-        return AGENTOS_EIO;
-    }
-
-    engine->inner->worker_count = active_threads;
-    engine->inner->shutdown = 0;
-
-    AGENTOS_LOG_INFO("Production storage engine created: %s (workers: %d, queue: %zu)",
-                    engine->inner->engine_id, active_threads, queue_capacity);
+    AGENTOS_LOG_INFO("Production storage engine created: %s (workers: %zu, queue: %zu)",
+                    engine->inner->engine_id, worker_count, queue_capacity);
 
     *out_engine = engine;
     return AGENTOS_SUCCESS;
@@ -311,9 +353,7 @@ void agentos_layer1_raw_destroy_production(agentos_layer1_raw_t* engine) {
         }
     }
 
-    async_queue_destroy(engine->inner->queue);
-    engine->inner->queue = NULL;
-
+    /* 先 join 等待所有工作线程退出，再销毁队列，避免 use-after-free */
 #ifdef _WIN32
     if (engine->inner->worker_threads) {
         WaitForMultipleObjects((DWORD)engine->inner->worker_count,
@@ -333,6 +373,9 @@ void agentos_layer1_raw_destroy_production(agentos_layer1_raw_t* engine) {
         }
     }
 #endif
+
+    async_queue_destroy(engine->inner->queue);
+    engine->inner->queue = NULL;
 
     if (engine->inner->workers) {
         for (size_t i = 0; i < engine->inner->worker_count; i++) {

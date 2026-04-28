@@ -55,7 +55,8 @@ typedef enum {
     TASKFLOW_ERROR_COMMUNICATION,   /**< 通信错误 */
     TASKFLOW_ERROR_INTERNAL,        /**< 内部错误 */
     TASKFLOW_ERROR_NO_ACTIVE_VERTICES, /**< 无活跃顶点(计算完成) */
-    TASKFLOW_ERROR_ALREADY_RUNNING  /**< 引擎已在运行 */
+    TASKFLOW_ERROR_ALREADY_RUNNING,     /**< 引擎已在运行 */
+    TASKFLOW_ERROR_INIT_FAILED          /**< 引擎初始化/线程创建失败 */
 } taskflow_error_code_t;
 
 // ============================================================================
