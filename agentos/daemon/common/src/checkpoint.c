@@ -19,6 +19,7 @@
 
 #include "../include/checkpoint.h"
 #include "agentos.h"
+#include "platform.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -43,7 +44,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <pthread.h>
 #endif
 
 /* ==================== 常量定义 ==================== */
@@ -61,9 +61,8 @@
 static char g_checkpoint_storage_path[MAX_CHECKPOINT_PATH] = {0};
 static int g_checkpoint_initialized = 0;
 
-#ifndef _WIN32
-static pthread_mutex_t g_checkpoint_mutex = PTHREAD_MUTEX_INITIALIZER;
-#endif
+static agentos_platform_mutex_t g_checkpoint_mutex;
+static int g_checkpoint_mutex_initialized = 0;
 
 static agentos_checkpoint_stats_t g_checkpoint_stats = {0};
 
@@ -281,9 +280,13 @@ agentos_error_t agentos_checkpoint_init(const char* storage_path) {
     memcpy(g_checkpoint_storage_path, path, len);
     g_checkpoint_storage_path[len] = '\0';
 
-#ifndef _WIN32
-    pthread_mutex_init(&g_checkpoint_mutex, NULL);
-#endif
+    if (!g_checkpoint_mutex_initialized) {
+        agentos_error_t mutex_err = agentos_platform_mutex_init(&g_checkpoint_mutex);
+        if (mutex_err != AGENTOS_SUCCESS) {
+            return AGENTOS_EINIT;
+        }
+        g_checkpoint_mutex_initialized = 1;
+    }
 
     memset(&g_checkpoint_stats, 0, sizeof(g_checkpoint_stats));
     g_checkpoint_initialized = 1;
@@ -296,9 +299,10 @@ agentos_error_t agentos_checkpoint_shutdown(void) {
         return AGENTOS_SUCCESS;
     }
 
-#ifndef _WIN32
-    pthread_mutex_destroy(&g_checkpoint_mutex);
-#endif
+    if (g_checkpoint_mutex_initialized) {
+        agentos_platform_mutex_destroy(&g_checkpoint_mutex);
+        g_checkpoint_mutex_initialized = 0;
+    }
 
     g_checkpoint_initialized = 0;
     return AGENTOS_SUCCESS;
@@ -356,7 +360,7 @@ agentos_error_t agentos_checkpoint_create(
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t agentos_checkpoint_save(const agentos_task_checkpoint_t* cp) {
+agentos_error_t agentos_checkpoint_save(agentos_task_checkpoint_t* cp) {
     if (!g_checkpoint_initialized) {
         return AGENTOS_ENOTINIT;
     }
@@ -612,12 +616,12 @@ agentos_error_t agentos_checkpoint_cleanup(uint64_t max_age_sec, size_t max_cnt)
         return AGENTOS_ENOTINIT;
     }
 
-    pthread_mutex_lock(&g_checkpoint_mutex);
+    agentos_platform_mutex_lock(&g_checkpoint_mutex);
     uint64_t now = (uint64_t)time(NULL);
 
     if (max_age_sec > 0) {
         char pattern[MAX_CHECKPOINT_PATH];
-        snprintf(pattern, sizeof(pattern), "%s/*.chk", g_checkpoint_storage_path);
+        snprintf(pattern, sizeof(pattern), "%s/*.json", g_checkpoint_storage_path);
 
 #ifdef _WIN32
         WIN32_FIND_DATAA find_data;
@@ -648,7 +652,7 @@ agentos_error_t agentos_checkpoint_cleanup(uint64_t max_age_sec, size_t max_cnt)
             struct dirent* entry;
             while ((entry = readdir(dir)) != NULL) {
                 size_t len = strlen(entry->d_name);
-                if (len < 4 || strcmp(entry->d_name + len - 4, ".chk") != 0)
+                if (len < 5 || strcmp(entry->d_name + len - 5, ".json") != 0)
                     continue;
 
                 char filepath[MAX_CHECKPOINT_PATH];
@@ -675,7 +679,7 @@ agentos_error_t agentos_checkpoint_cleanup(uint64_t max_age_sec, size_t max_cnt)
         g_checkpoint_stats.total_checkpoints = max_cnt;
     }
 
-    pthread_mutex_unlock(&g_checkpoint_mutex);
+    agentos_platform_mutex_unlock(&g_checkpoint_mutex);
     return AGENTOS_SUCCESS;
 }
 

@@ -112,9 +112,16 @@ static int priority_based_register_agent(void* data, const agent_info_t* agent_i
             // 更新现有 Agent
             free(pbd->agents[i]->agent_id);
             free(pbd->agents[i]->agent_name);
-            
+
             pbd->agents[i]->agent_id = strdup(agent_info->agent_id);
             pbd->agents[i]->agent_name = strdup(agent_info->agent_name);
+            if (!pbd->agents[i]->agent_id || !pbd->agents[i]->agent_name) {
+                free(pbd->agents[i]->agent_id);
+                free(pbd->agents[i]->agent_name);
+                pbd->agents[i]->agent_id = NULL;
+                pbd->agents[i]->agent_name = NULL;
+                return -1;
+            }
             pbd->agents[i]->load_factor = agent_info->load_factor;
             pbd->agents[i]->success_rate = agent_info->success_rate;
             pbd->agents[i]->avg_response_time_ms = agent_info->avg_response_time_ms;
@@ -133,6 +140,12 @@ static int priority_based_register_agent(void* data, const agent_info_t* agent_i
 
     new_agent->agent_id = strdup(agent_info->agent_id);
     new_agent->agent_name = strdup(agent_info->agent_name);
+    if (!new_agent->agent_id || !new_agent->agent_name) {
+        free(new_agent->agent_id);
+        free(new_agent->agent_name);
+        free(new_agent);
+        return -1;
+    }
     new_agent->load_factor = agent_info->load_factor;
     new_agent->success_rate = agent_info->success_rate;
     new_agent->avg_response_time_ms = agent_info->avg_response_time_ms;
