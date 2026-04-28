@@ -6,10 +6,10 @@
  */
 
 #include "log_sanitizer.h"
+#include "platform.h"
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
-#include <pthread.h>
 
 /* 默认敏感字段模式 */
 static const sensitive_field_t default_patterns[] = {
@@ -34,7 +34,15 @@ static const sensitive_field_t default_patterns[] = {
 static sensitive_field_t* g_patterns = NULL;
 static size_t g_pattern_count = 0;
 static size_t g_pattern_capacity = 0;
-static pthread_mutex_t g_mutex = PTHREAD_MUTEX_INITIALIZER;
+static agentos_mutex_t g_mutex;
+static int g_mutex_initialized = 0;
+
+static void ensure_mutex_init(void) {
+    if (!g_mutex_initialized) {
+        agentos_mutex_init(&g_mutex);
+        g_mutex_initialized = 1;
+    }
+}
 static int g_initialized = 0;
 
 /* 默认替换字符串 */
@@ -46,27 +54,27 @@ static int g_initialized = 0;
  */
 static void ensure_initialized(void) {
     if (g_initialized) return;
-    
-    pthread_mutex_lock(&g_mutex);
+
+    ensure_mutex_init();
+    agentos_mutex_lock(&g_mutex);
     if (g_initialized) {
-        pthread_mutex_unlock(&g_mutex);
+        agentos_mutex_unlock(&g_mutex);
         return;
     }
-    
+
     g_pattern_capacity = 32;
     g_patterns = calloc(g_pattern_capacity, sizeof(sensitive_field_t));
     if (!g_patterns) {
-        pthread_mutex_unlock(&g_mutex);
+        agentos_mutex_unlock(&g_mutex);
         return;
     }
-    
-    /* 添加默认模式 */
+
     for (size_t i = 0; i < sizeof(default_patterns) / sizeof(default_patterns[0]); i++) {
         g_patterns[g_pattern_count++] = default_patterns[i];
     }
-    
+
     g_initialized = 1;
-    pthread_mutex_unlock(&g_mutex);
+    agentos_mutex_unlock(&g_mutex);
 }
 
 /**
@@ -217,30 +225,31 @@ static int sanitize_core(const char* message, char* buffer, size_t buffer_size) 
 }
 
 void log_sanitizer_init(size_t max_fields) {
-    pthread_mutex_lock(&g_mutex);
-    
+    ensure_mutex_init();
+    agentos_mutex_lock(&g_mutex);
+
     if (g_patterns) {
         free(g_patterns);
     }
-    
+
     g_pattern_capacity = max_fields > 0 ? max_fields : 32;
     g_patterns = calloc(g_pattern_capacity, sizeof(sensitive_field_t));
     g_pattern_count = 0;
-    
-    /* 添加默认模式 */
+
     for (size_t i = 0; i < sizeof(default_patterns) / sizeof(default_patterns[0]); i++) {
         if (g_pattern_count < g_pattern_capacity) {
             g_patterns[g_pattern_count++] = default_patterns[i];
         }
     }
-    
+
     g_initialized = 1;
-    pthread_mutex_unlock(&g_mutex);
+    agentos_mutex_unlock(&g_mutex);
 }
 
 void log_sanitizer_destroy(void) {
-    pthread_mutex_lock(&g_mutex);
-    
+    ensure_mutex_init();
+    agentos_mutex_lock(&g_mutex);
+
     if (g_patterns) {
         free(g_patterns);
         g_patterns = NULL;
@@ -248,26 +257,27 @@ void log_sanitizer_destroy(void) {
     g_pattern_count = 0;
     g_pattern_capacity = 0;
     g_initialized = 0;
-    
-    pthread_mutex_unlock(&g_mutex);
+
+    agentos_mutex_unlock(&g_mutex);
 }
 
 bool log_sanitizer_add_pattern(const char* pattern, const char* replacement) {
     if (!pattern) return false;
-    
-    pthread_mutex_lock(&g_mutex);
+
+    ensure_mutex_init();
+    agentos_mutex_lock(&g_mutex);
     ensure_initialized();
-    
+
     if (g_pattern_count >= g_pattern_capacity) {
-        pthread_mutex_unlock(&g_mutex);
+        agentos_mutex_unlock(&g_mutex);
         return false;
     }
-    
+
     g_patterns[g_pattern_count].pattern = pattern;
     g_patterns[g_pattern_count].replacement = replacement ? replacement : DEFAULT_REPLACEMENT;
     g_pattern_count++;
-    
-    pthread_mutex_unlock(&g_mutex);
+
+    agentos_mutex_unlock(&g_mutex);
     return true;
 }
 

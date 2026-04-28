@@ -197,12 +197,14 @@ static llm_response_t* loc_build_stream_response(loc_stream_acc_t* acc) {
     resp->model = acc->resp_model ? acc->resp_model : strdup("unknown");
     acc->resp_model = NULL;
     resp->created = acc->resp_created;
-    resp->choice_count = 1;
     resp->choices = (llm_message_t*)calloc(1, sizeof(llm_message_t));
     if (resp->choices) {
+        resp->choice_count = 1;
         resp->choices[0].role = strdup("assistant");
         resp->choices[0].content = acc->acc_content;
         acc->acc_content = NULL;
+    } else {
+        resp->choice_count = 0;
     }
     resp->finish_reason = acc->finish_reason ? acc->finish_reason : strdup("stop");
     acc->finish_reason = NULL;

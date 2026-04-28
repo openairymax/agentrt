@@ -81,7 +81,9 @@ struct monitor_service {
 };
 
 static uint64_t get_timestamp_ms(void) {
-    return (uint64_t)time(NULL) * 1000;
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000ULL + (uint64_t)ts.tv_nsec / 1000000ULL;
 }
 
 int monitor_service_create(const monitor_config_t* config, monitor_service_t** service) {
@@ -200,14 +202,16 @@ int monitor_service_record_metric(monitor_service_t* service, const metric_info_
 
     if (service->metric_cache_count < MAX_METRICS) {
         metric_info_t* entry = (metric_info_t*)calloc(1, sizeof(metric_info_t));
-        if (entry) {
-            entry->name = metric->name ? strdup(metric->name) : NULL;
-            entry->description = metric->description ? strdup(metric->description) : NULL;
-            entry->type = metric->type;
-            entry->value = metric->value;
-            entry->timestamp = metric->timestamp ? metric->timestamp : get_timestamp_ms();
-            service->metric_cache[service->metric_cache_count++] = entry;
+        if (!entry) {
+            agentos_mutex_unlock(&service->metric_lock);
+            return AGENTOS_ENOMEM;
         }
+        entry->name = metric->name ? strdup(metric->name) : NULL;
+        entry->description = metric->description ? strdup(metric->description) : NULL;
+        entry->type = metric->type;
+        entry->value = metric->value;
+        entry->timestamp = metric->timestamp ? metric->timestamp : get_timestamp_ms();
+        service->metric_cache[service->metric_cache_count++] = entry;
     }
 
     agentos_mutex_unlock(&service->metric_lock);
@@ -568,20 +572,89 @@ int monitor_service_update_agent_state(monitor_service_t* service,
     if (!service || !trace) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
-    (void)new_state;
-    (void)location;
+
+    if (!service->config.enable_tracing) {
+        return AGENTOS_ERR_STATE_ERROR;
+    }
+
+    trace->current_state = new_state;
+
+    uint64_t now = get_timestamp_ms();
+    switch (new_state) {
+    case AGENT_STATE_CREATED:
+        trace->start_time = now;
+        break;
+    case AGENT_STATE_RUNNING:
+        if (!trace->last_update_time || trace->last_update_time < now - 1000)
+            trace->last_update_time = now;
+        break;
+    case AGENT_STATE_WAITING:
+    case AGENT_STATE_THINKING:
+    case AGENT_STATE_EXECUTING_TOOL:
+        if (location && trace->trace_point_count < trace->trace_point_capacity) {
+            size_t idx = trace->trace_point_count++;
+            agent_trace_point_t* tp = &trace->trace_points[idx];
+            tp->timestamp = now;
+            tp->state = new_state;
+            free(tp->location);
+            tp->location = strdup(location);
+            tp->loop_count = 0;
+            tp->memory_usage = 0;
+            tp->cpu_usage = 0.0;
+        }
+        break;
+    case AGENT_STATE_COMPLETED:
+    case AGENT_STATE_FAILED:
+    case AGENT_STATE_CANCELLED:
+    case AGENT_STATE_STUCK:
+        trace->last_update_time = now;
+        break;
+    default:
+        break;
+    }
+
     return AGENTOS_SUCCESS;
 }
 
 int monitor_service_check_loop(monitor_service_t* service,
-                               agent_execution_trace_t* trace,
-                               bool* is_loop, double* confidence) {
-    if (!service || !is_loop || !confidence) {
+                                agent_execution_trace_t* trace,
+                                bool* is_loop,
+                                double* confidence) {
+    if (!service || !trace || !is_loop || !confidence) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
-    (void)trace;
+
     *is_loop = false;
     *confidence = 0.0;
+
+    if (trace->trace_point_count < 3) {
+        return AGENTOS_SUCCESS;
+    }
+
+    size_t loop_count = 0;
+    size_t total_pairs = trace->trace_point_count - 1;
+
+    for (size_t i = 0; i < total_pairs; i++) {
+        for (size_t j = i + 2; j < trace->trace_point_count && j < i + 5; j++) {
+            agent_trace_point_t* pi = &trace->trace_points[i];
+            agent_trace_point_t* pj = &trace->trace_points[j];
+            if (pi->location && pj->location &&
+                strcmp(pi->location, pj->location) == 0) {
+                loop_count++;
+            }
+        }
+    }
+
+    if (loop_count > 0) {
+        double ratio = (double)loop_count / (double)total_pairs;
+        if (ratio > (double)service->config.loop_threshold) {
+            *is_loop = true;
+            *confidence = ratio > 0.9 ? 0.95 : ratio;
+            trace->is_suspected_loop = true;
+            trace->loop_detection_count++;
+        }
+    }
+
     return AGENTOS_SUCCESS;
 }
 
@@ -595,8 +668,8 @@ int monitor_service_end_agent_trace(monitor_service_t* service,
 
     agentos_mutex_lock(&service->trace_lock);
     for (size_t i = 0; i < service->trace_count; i++) {
-        if (service->traces[i].trace_id && trace->agent_id && 
-            strcmp(service->traces[i].trace_id, trace->agent_id) == 0) {
+        if (service->traces[i].trace_id && trace->trace_id &&
+            strcmp(service->traces[i].trace_id, trace->trace_id) == 0) {
             service->traces[i].end_time = get_timestamp_ms();
             service->traces[i].status = 0;
             break;
@@ -623,6 +696,9 @@ int monitor_service_get_agent_summary(monitor_service_t* service, const char* ag
              service->trace_count, service->alert_count, service->metric_cache_count);
 
     *summary = strdup(buf);
+    if (!*summary) {
+        return AGENTOS_ENOMEM;
+    }
     return AGENTOS_SUCCESS;
 }
 
@@ -674,6 +750,10 @@ int monitor_service_get_active_agents(monitor_service_t* service,
     }
 
     char** ids = (char**)calloc(active, sizeof(char*));
+    if (!ids) {
+        agentos_mutex_unlock(&service->trace_lock);
+        return AGENTOS_ENOMEM;
+    }
     size_t idx = 0;
     for (size_t i = 0; i < service->trace_count && idx < active; i++) {
         if (service->traces[i].end_time == 0 && service->traces[i].service_name) {
@@ -689,10 +769,21 @@ int monitor_service_get_active_agents(monitor_service_t* service,
 }
 
 int monitor_service_reset_loop_detection(monitor_service_t* service,
-                                         agent_execution_trace_t* trace) {
-    if (!service) {
+                                          agent_execution_trace_t* trace) {
+    if (!service || !trace) {
         return AGENTOS_ERR_INVALID_PARAM;
     }
-    (void)trace;
+
+    trace->is_suspected_loop = false;
+    trace->loop_detection_count = 0;
+
+    for (size_t i = 0; i < trace->trace_point_count; i++) {
+        agent_trace_point_t* tp = &trace->trace_points[i];
+        free(tp->location);
+        tp->location = NULL;
+        tp->loop_count = 0;
+    }
+    trace->trace_point_count = 0;
+
     return AGENTOS_SUCCESS;
 }

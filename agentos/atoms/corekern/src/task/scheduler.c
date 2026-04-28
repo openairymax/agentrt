@@ -121,15 +121,23 @@ static task_info_core_t* find_task_by_id(agentos_task_id_t tid)
         return NULL;
     }
 
-    /* 获取核心上下文锁 */
     agentos_mutex_lock(ctx->task_table_lock);
 
-    /* 使用核心层哈希查找 */
     task_info_core_t* info = scheduler_core_hash_find(tid);
 
-    agentos_mutex_unlock(ctx->task_table_lock);
+    if (!info) {
+        agentos_mutex_unlock(ctx->task_table_lock);
+    }
 
     return info;
+}
+
+static void release_task_lock(void)
+{
+    scheduler_core_ctx_t* ctx = scheduler_core_get_ctx();
+    if (ctx && ctx->task_table_lock) {
+        agentos_mutex_unlock(ctx->task_table_lock);
+    }
 }
 
 /* ==================== 公共接口实现 ==================== */
@@ -434,21 +442,22 @@ agentos_error_t agentos_task_set_priority(agentos_task_id_t tid, int priority)
         return AGENTOS_EINVAL;
     }
 
-    /* 获取平台适配器操作集 */
     const scheduler_platform_ops_t* ops = scheduler_platform_get_ops();
     if (!ops) {
+        release_task_lock();
         return AGENTOS_ENOSYS;
     }
 
-    /* 使用平台适配器设置线程优先级 */
     int result = ops->thread_set_priority(task_info->platform_handle, priority);
     if (result != 0) {
+        task_info->priority = priority;
+        release_task_lock();
         return AGENTOS_EINVAL;
     }
 
-    /* 更新任务信息中的优先级 */
     task_info->priority = priority;
 
+    release_task_lock();
     return AGENTOS_SUCCESS;
 }
 
@@ -475,6 +484,7 @@ agentos_error_t agentos_task_get_priority(agentos_task_id_t tid, int* out_priori
 
     *out_priority = task_info->priority;
 
+    release_task_lock();
     return AGENTOS_SUCCESS;
 }
 
@@ -493,7 +503,6 @@ agentos_error_t agentos_task_get_state(agentos_task_id_t tid, agentos_task_state
         return AGENTOS_EINVAL;
     }
 
-    /* 查找任务信息 */
     task_info_core_t* task_info = find_task_by_id(tid);
     if (!task_info) {
         return AGENTOS_EINVAL;
@@ -501,6 +510,7 @@ agentos_error_t agentos_task_get_state(agentos_task_id_t tid, agentos_task_state
 
     *out_state = task_info->state;
 
+    release_task_lock();
     return AGENTOS_SUCCESS;
 }
 

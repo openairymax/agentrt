@@ -27,7 +27,7 @@
 #include <time.h>
 #include <stdatomic.h>
 #include <math.h>
-#include <pthread.h>
+#include "platform.h"
 
 #define ORCH_MAX_TASKS 64
 #define ORCH_MAX_STEPS 32
@@ -285,7 +285,8 @@ static task_entry_t* find_or_create_task(orchestrator_t* orch,
 }
 
 static ipc_service_bus_t g_orch_bus = NULL;
-static pthread_mutex_t g_orch_bus_mutex = PTHREAD_MUTEX_INITIALIZER;
+static agentos_platform_mutex_t g_orch_bus_mutex;
+static int g_orch_bus_mutex_initialized = 0;
 
 static char* memory_query_context(agentos_memoryrov_handle_t* mem, const char* query, uint32_t limit) {
     if (!mem || !query) return NULL;
@@ -566,7 +567,8 @@ static char* extract_field_string(const char* json, const char* field) {
 
 static float align_history[ORCH_ALIGN_HISTORY_SIZE];
 static int align_history_count = 0;
-static pthread_mutex_t g_align_mutex = PTHREAD_MUTEX_INITIALIZER;
+static agentos_platform_mutex_t g_align_mutex;
+static int g_align_mutex_initialized = 0;
 
 static int execute_single_phase(orchestrator_t* orch,
                                 orch_phase_t phase,
@@ -1208,7 +1210,12 @@ static int execute_single_phase(orchestrator_t* orch,
 
                 float overall = logic_score * 0.30f + fact_score * 0.35f + goal_score * 0.35f;
 
-                pthread_mutex_lock(&g_align_mutex);
+                if (!g_align_mutex_initialized) {
+                    agentos_platform_mutex_init(&g_align_mutex);
+                    g_align_mutex_initialized = 1;
+                }
+
+                agentos_platform_mutex_lock(&g_align_mutex);
                 if (align_history_count < ORCH_ALIGN_HISTORY_SIZE) {
                     align_history[align_history_count++] = overall;
                 } else {
@@ -1229,7 +1236,7 @@ static int execute_single_phase(orchestrator_t* orch,
                         SVC_LOG_WARN("orchestrator: alignment drift detected (%.3f)", drift_value);
                     }
                 }
-                pthread_mutex_unlock(&g_align_mutex);
+                agentos_platform_mutex_unlock(&g_align_mutex);
 
                 bool aligned = (overall >= 0.6f) && !drift_detected;
 

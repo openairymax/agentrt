@@ -53,7 +53,9 @@ typedef enum {
     TASKFLOW_ERROR_TIMEOUT,         /**< 超时错误 */
     TASKFLOW_ERROR_FAULT_DETECTED,  /**< 检测到故障 */
     TASKFLOW_ERROR_COMMUNICATION,   /**< 通信错误 */
-    TASKFLOW_ERROR_INTERNAL         /**< 内部错误 */
+    TASKFLOW_ERROR_INTERNAL,        /**< 内部错误 */
+    TASKFLOW_ERROR_NO_ACTIVE_VERTICES, /**< 无活跃顶点(计算完成) */
+    TASKFLOW_ERROR_ALREADY_RUNNING  /**< 引擎已在运行 */
 } taskflow_error_code_t;
 
 // ============================================================================

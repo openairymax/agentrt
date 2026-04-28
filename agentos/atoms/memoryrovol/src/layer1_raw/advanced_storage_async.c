@@ -94,8 +94,8 @@ agentos_error_t advanced_async_op_wait(async_operation_t* op, uint32_t timeout_m
 
         agentos_condition_wait(op->cond, op->lock, timeout_ms);
 
-        /* 简化超时处理 */
-        if (timeout_ms > 0) {
+        if (timeout_ms > 0 && (op->state == ASYNC_OP_PENDING || op->state == ASYNC_OP_RUNNING)) {
+            op->state = ASYNC_OP_TIMEOUT;
             agentos_mutex_unlock(op->lock);
             return AGENTOS_ETIMEDOUT;
         }

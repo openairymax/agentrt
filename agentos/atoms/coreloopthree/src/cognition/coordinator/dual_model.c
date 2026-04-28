@@ -228,7 +228,7 @@ static void record_decision(performance_stats_t* stats,
     SAFE_STRNCPY(record->selected_model, model_name, sizeof(record->selected_model));
     record->similarity = similarity;
     record->confidence = confidence;
-    record->timestamp = (uint64_t)time(NULL);  /* 简化：使用当前时间 */
+    record->timestamp = agentos_get_monotonic_time_ns() / 1000000ULL;
     record->was_consistent = is_consistent;
     
     /* 移动索引 */
@@ -299,19 +299,34 @@ static float enhanced_similarity(const char* str1, const char* str2) {
     size_t min_len = (len1 < len2) ? len1 : len2;
     
     float length_sim = (max_len > 0) ? (float)min_len / (float)max_len : 0.0f;
-    
-    /* 关键词重叠因子（简化实现） */
+
     int keyword_match = 0;
-    const char* keywords[] = {"error", "success", "fail", "complete", "process"};
-    int keyword_count = sizeof(keywords) / sizeof(keywords[0]);
-    
-    for (int i = 0; i < keyword_count; i++) {
-        if (strstr(str1, keywords[i]) && strstr(str2, keywords[i])) {
-            keyword_match++;
+    int t1_count = 0, t2_count = 0;
+    const char* delimiters = " \t\n\r.,;:!?()[]{}\"'";
+    char* copy1 = AGENTOS_STRDUP(str1);
+    char* copy2 = AGENTOS_STRDUP(str2);
+    if (copy1 && copy2) {
+        char* tokens1[64];
+        char* tokens2[64];
+        char* save1 = NULL, *save2 = NULL;
+        char* tok = strtok_r(copy1, delimiters, &save1);
+        while (tok && t1_count < 64) { tokens1[t1_count++] = tok; tok = strtok_r(NULL, delimiters, &save1); }
+        tok = strtok_r(copy2, delimiters, &save2);
+        while (tok && t2_count < 64) { tokens2[t2_count++] = tok; tok = strtok_r(NULL, delimiters, &save2); }
+        for (int i = 0; i < t1_count; i++) {
+            for (int j = 0; j < t2_count; j++) {
+                if (strcmp(tokens1[i], tokens2[j]) == 0) {
+                    keyword_match++;
+                    break;
+                }
+            }
         }
     }
-    
-    float keyword_sim = (keyword_count > 0) ? (float)keyword_match / (float)keyword_count : 0.0f;
+    AGENTOS_FREE(copy1);
+    AGENTOS_FREE(copy2);
+
+    int total_tokens = (t1_count > t2_count) ? t1_count : t2_count;
+    float keyword_sim = (total_tokens > 0) ? (float)keyword_match / (float)total_tokens : 0.0f;
     
     /* 组合相似度（加权平均） */
     float enhanced = 0.6f * base_sim + 0.25f * length_sim + 0.15f * keyword_sim;

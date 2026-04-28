@@ -4,7 +4,7 @@
  *
  * test_parallel_dispatcher.c - ParallelDispatcher 并行调度器 单元测试
  *
- * 覆盖调度器生命周期、安全分类、冲突检测、并行分发、Delegate子Agent。
+ * 覆盖调度器生命周期、安全分类、冲突检测、并行分发、Delegate子Agent、Cancel取消。
  */
 
 #include <stdio.h>
@@ -12,14 +12,27 @@
 #include <string.h>
 #include <assert.h>
 #include "cognition/parallel_dispatcher.h"
+#include "cognition/delegate.h"
 
 #define TEST_PASS(name) printf("[PASS] %s\n", name)
 #define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)
 
 static int tests_run = 0;
 static int tests_passed = 0;
+static int tests_failed = 0;
 
-#define RUN_TEST(func) do { tests_run++; func(); tests_passed++; } while(0)
+#define RUN_TEST(func) do { \
+    tests_run++; \
+    printf("  Running: %s\n", #func); \
+    func(); \
+    tests_passed++; \
+} while(0)
+
+#define RUN_TEST_MAY_FAIL(func) do { \
+    tests_run++; \
+    printf("  Running: %s\n", #func); \
+    func(); \
+} while(0)
 
 static int g_exec_count = 0;
 
@@ -42,7 +55,14 @@ static agentos_error_t mock_executor(const char* tool_name,
     return AGENTOS_SUCCESS;
 }
 
-/* ==================== 调度器生命周期 ==================== */
+static void free_results(agentos_tool_result_t* results, size_t count) {
+    if (!results) return;
+    for (size_t i = 0; i < count; i++) {
+        if (results[i].tool_name) free(results[i].tool_name);
+        if (results[i].output) free(results[i].output);
+    }
+    free(results);
+}
 
 static void test_dispatcher_create_destroy(void) {
     agentos_parallel_dispatcher_t* d =
@@ -52,6 +72,7 @@ static void test_dispatcher_create_destroy(void) {
         agentos_parallel_dispatcher_destroy(d);
     } else {
         TEST_FAIL("dispatcher create", "returned NULL");
+        tests_failed++;
     }
 }
 
@@ -59,8 +80,6 @@ static void test_destroy_null(void) {
     agentos_parallel_dispatcher_destroy(NULL);
     TEST_PASS("destroy handles NULL");
 }
-
-/* ==================== 执行器设置 ==================== */
 
 static void test_set_executor(void) {
     agentos_parallel_dispatcher_t* d =
@@ -79,12 +98,10 @@ static void test_set_executor(void) {
     agentos_parallel_dispatcher_destroy(d);
 }
 
-/* ==================== 并行分发 ==================== */
-
 static void test_dispatch_single_call(void) {
     agentos_parallel_dispatcher_t* d =
         agentos_parallel_dispatcher_create(2);
-    if (!d) { TEST_FAIL("dispatch single", "create failed"); return; }
+    if (!d) { TEST_FAIL("dispatch single", "create failed"); tests_failed++; return; }
 
     agentos_parallel_dispatcher_set_executor(d, mock_executor, NULL);
 
@@ -105,7 +122,7 @@ static void test_dispatch_single_call(void) {
            err, result_count, g_exec_count);
     TEST_PASS("dispatch single call");
 
-    if (results) free(results);
+    free_results(results, result_count);
     agentos_parallel_dispatcher_destroy(d);
 }
 
@@ -136,7 +153,7 @@ static void test_dispatch_multiple_calls(void) {
            result_count, g_exec_count);
     TEST_PASS("dispatch multiple calls");
 
-    if (results) free(results);
+    free_results(results, result_count);
     agentos_parallel_dispatcher_destroy(d);
 }
 
@@ -158,8 +175,6 @@ static void test_dispatch_safety_classification(void) {
     TEST_PASS("safety classification correct");
 }
 
-/* ==================== Delegate子Agent ==================== */
-
 static void test_delegate_create_destroy(void) {
     agentos_delegate_config_t config;
     memset(&config, 0, sizeof(config));
@@ -171,12 +186,15 @@ static void test_delegate_create_destroy(void) {
         agentos_delegate_create("Analyze the dataset", &config);
 
     if (task != NULL) {
-        printf("    Delegate task: id=%.32s\n",
-               task->task_id ? task->task_id : "(null)");
+        printf("    Delegate task: id=%.32s, state=%d\n",
+               task->task_id ? task->task_id : "(null)",
+               agentos_delegate_get_state(task));
+        assert(agentos_delegate_get_state(task) == AGENTOS_DELEGATE_IDLE);
         TEST_PASS("delegate create/destroy");
         agentos_delegate_destroy(task);
     } else {
         TEST_FAIL("delegate create", "returned NULL");
+        tests_failed++;
     }
 }
 
@@ -188,11 +206,12 @@ static void test_delegate_assign_collect(void) {
 
     agentos_delegate_task_t* task =
         agentos_delegate_create("Process user request", &config);
-    if (!task) { TEST_FAIL("delegate assign", "create failed"); return; }
+    if (!task) { TEST_FAIL("delegate assign", "create failed"); tests_failed++; return; }
 
     g_exec_count = 0;
     agentos_error_t err = agentos_delegate_assign(task, mock_executor, NULL);
-    printf("    Assign result: %d\n", err);
+    printf("    Assign result: %d, state=%d\n", err, agentos_delegate_get_state(task));
+    assert(agentos_delegate_get_state(task) == AGENTOS_DELEGATE_COMPLETED);
 
     char* result = NULL;
     size_t result_len = 0;
@@ -222,7 +241,115 @@ static void test_delegate_max_depth_limit(void) {
     }
 }
 
-/* ==================== 枚举值验证 ==================== */
+static void test_delegate_cancel_idle(void) {
+    agentos_delegate_config_t config;
+    memset(&config, 0, sizeof(config));
+    config.max_depth = 2;
+
+    agentos_delegate_task_t* task =
+        agentos_delegate_create("Cancel test", &config);
+    if (!task) { TEST_FAIL("delegate cancel", "create failed"); tests_failed++; return; }
+
+    assert(agentos_delegate_get_state(task) == AGENTOS_DELEGATE_IDLE);
+
+    agentos_error_t err = agentos_delegate_cancel(task);
+    printf("    Cancel idle: err=%d, state=%d\n", err, agentos_delegate_get_state(task));
+    assert(err == AGENTOS_SUCCESS);
+    assert(agentos_delegate_get_state(task) == AGENTOS_DELEGATE_CANCELLED);
+
+    agentos_error_t err2 = agentos_delegate_cancel(task);
+    assert(err2 == AGENTOS_EINVAL);
+
+    agentos_error_t assign_err = agentos_delegate_assign(task, mock_executor, NULL);
+    assert(assign_err == AGENTOS_EBUSY);
+
+    TEST_PASS("delegate cancel idle task");
+    agentos_delegate_destroy(task);
+}
+
+static void test_delegate_cancel_completed(void) {
+    agentos_delegate_config_t config;
+    memset(&config, 0, sizeof(config));
+    config.max_depth = 2;
+
+    agentos_delegate_task_t* task =
+        agentos_delegate_create("Cancel completed test", &config);
+    if (!task) { TEST_FAIL("delegate cancel completed", "create failed"); tests_failed++; return; }
+
+    agentos_delegate_assign(task, mock_executor, NULL);
+    assert(agentos_delegate_get_state(task) == AGENTOS_DELEGATE_COMPLETED);
+
+    agentos_error_t err = agentos_delegate_cancel(task);
+    assert(err == AGENTOS_EINVAL);
+
+    TEST_PASS("delegate cancel completed task returns EINVAL");
+    agentos_delegate_destroy(task);
+}
+
+static void test_dispatcher_cancel(void) {
+    agentos_parallel_dispatcher_t* d =
+        agentos_parallel_dispatcher_create(4);
+    if (!d) { TEST_FAIL("dispatcher cancel", "create failed"); tests_failed++; return; }
+
+    agentos_parallel_dispatcher_set_executor(d, mock_executor, NULL);
+
+    assert(!agentos_parallel_dispatcher_is_cancelled(d));
+
+    agentos_error_t err = agentos_parallel_dispatcher_cancel(d);
+    assert(err == AGENTOS_SUCCESS);
+    assert(agentos_parallel_dispatcher_is_cancelled(d));
+
+    agentos_tool_call_t call;
+    memset(&call, 0, sizeof(call));
+    call.tool_name = "test_tool";
+    call.arguments = "{}";
+    call.arguments_len = 2;
+    call.safety_class = AGENTOS_TOOL_READ_ONLY;
+
+    agentos_tool_result_t* results = NULL;
+    size_t result_count = 0;
+    err = agentos_parallel_dispatcher_dispatch(d, &call, 1, &results, &result_count);
+    assert(err == AGENTOS_ENOTINIT);
+
+    TEST_PASS("dispatcher cancel sets cancelled flag and blocks dispatch");
+    agentos_parallel_dispatcher_destroy(d);
+}
+
+static void test_dispatcher_cancel_null(void) {
+    agentos_error_t err = agentos_parallel_dispatcher_cancel(NULL);
+    assert(err == AGENTOS_EINVAL);
+    TEST_PASS("dispatcher cancel NULL returns EINVAL");
+}
+
+static void test_dispatcher_is_cancelled_null(void) {
+    bool cancelled = agentos_parallel_dispatcher_is_cancelled(NULL);
+    assert(!cancelled);
+    TEST_PASS("dispatcher is_cancelled NULL returns false");
+}
+
+static void test_delegate_get_state_null(void) {
+    agentos_delegate_state_t state = agentos_delegate_get_state(NULL);
+    assert(state == AGENTOS_DELEGATE_IDLE);
+    TEST_PASS("delegate get_state NULL returns IDLE");
+}
+
+static void test_delegate_collect_not_completed(void) {
+    agentos_delegate_config_t config;
+    memset(&config, 0, sizeof(config));
+    config.max_depth = 2;
+
+    agentos_delegate_task_t* task =
+        agentos_delegate_create("Collect not completed test", &config);
+    if (!task) { TEST_FAIL("delegate collect", "create failed"); tests_failed++; return; }
+
+    char* result = NULL;
+    size_t result_len = 0;
+    agentos_error_t err = agentos_delegate_collect(task, &result, &result_len);
+    assert(err == AGENTOS_EBUSY);
+
+    TEST_PASS("delegate collect on idle task returns EBUSY");
+    agentos_delegate_destroy(task);
+}
 
 static void test_enum_values(void) {
     assert(AGENTOS_TOOL_READ_ONLY == 0);
@@ -231,8 +358,6 @@ static void test_enum_values(void) {
     assert(AGENTOS_TOOL_SIDE_EFFECT == 3);
     TEST_PASS("safety class enum values correct");
 }
-
-/* ==================== 结构体大小验证 ==================== */
 
 static void test_struct_sizes(void) {
     assert(sizeof(agentos_tool_call_t) >=
@@ -245,11 +370,9 @@ static void test_struct_sizes(void) {
            sizeof(int) * 2 + sizeof(float));
     assert(sizeof(agentos_delegate_task_t) >=
            sizeof(char*) * 2 + sizeof(agentos_delegate_config_t) +
-           sizeof(agentos_error_t) + sizeof(size_t) + sizeof(int));
+           sizeof(agentos_error_t) + sizeof(agentos_delegate_state_t));
     TEST_PASS("struct sizes adequate");
 }
-
-/* ==================== 主函数 ==================== */
 
 int main(void) {
     printf("\n========================================\n");
@@ -271,10 +394,19 @@ int main(void) {
     RUN_TEST(test_delegate_assign_collect);
     RUN_TEST(test_delegate_max_depth_limit);
 
+    RUN_TEST(test_delegate_cancel_idle);
+    RUN_TEST(test_delegate_cancel_completed);
+    RUN_TEST(test_delegate_collect_not_completed);
+    RUN_TEST(test_delegate_get_state_null);
+
+    RUN_TEST(test_dispatcher_cancel);
+    RUN_TEST(test_dispatcher_cancel_null);
+    RUN_TEST(test_dispatcher_is_cancelled_null);
+
     printf("\n========================================\n");
     printf("  测试结果: %d 运行, %d 通过, %d 失败\n",
-           tests_run, tests_passed, 0);
+           tests_run, tests_passed, tests_failed);
     printf("========================================\n");
 
-    return 0;
+    return tests_failed > 0 ? 1 : 0;
 }

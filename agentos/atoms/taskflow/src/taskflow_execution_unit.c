@@ -143,7 +143,7 @@ cleanup:
     taskflow_task_input_destroy(task_input);
     
     // 注意：不释放context，它被包装在output中或需要单独管理
-    // 这里简化处理，将context存储在output的user_data中
+    // 将context存储在output的user_data中
     context->output->result_data = context;
     context->output->result_data_size = sizeof(taskflow_execution_context_t);
     

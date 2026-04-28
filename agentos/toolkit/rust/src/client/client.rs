@@ -54,9 +54,9 @@ impl Client {
     ///
     /// # 示例
     /// ```rust
-    /// use agentos::client::Client;
+    /// use agentos_rs::Client;
     ///
-    /// let client = Client::new("http://localhost:18789")?;
+    /// let client = Client::new("http://localhost:18789");
     /// ```
     pub fn new(endpoint: &str) -> Result<Self, AgentOSError> {
         Self::builder(endpoint).build()

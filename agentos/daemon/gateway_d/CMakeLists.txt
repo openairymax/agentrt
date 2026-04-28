@@ -73,6 +73,9 @@ set(PROTOCOLS_MCP_DIR ${PROTOCOLS_DIR}/mcp)
 set(PROTOCOLS_MCP_INCLUDE_DIR ${PROTOCOLS_MCP_DIR}/include)
 set(PROTOCOLS_COMMON_INCLUDE_DIR ${PROTOCOLS_DIR}/common/include)
 
+# ==================== 协议栈开关 ====================
+option(AGENTOS_ENABLE_PROTOCOLS "Enable MCP/A2A/OpenAI protocol stack" ON)
+
 # ==================== 源文件 ====================
 set(GATEWAY_D_SOURCES
     src/main.c
@@ -80,8 +83,24 @@ set(GATEWAY_D_SOURCES
     src/gateway_svc_adapter.c
 )
 
+if(AGENTOS_ENABLE_PROTOCOLS)
+    list(APPEND GATEWAY_D_SOURCES
+        src/protocol/gateway_mcp_server.c
+        src/protocol/gateway_a2a_handler.c
+        src/protocol/gateway_openai_compat.c
+        src/protocol/gateway_protocol_router.c
+    )
+    message(STATUS "[gateway_d] Protocol stack: ENABLED (MCP/A2A/OpenAI)")
+else()
+    message(STATUS "[gateway_d] Protocol stack: DISABLED")
+endif()
+
 # 可执行文件
 add_executable(gateway_d ${GATEWAY_D_SOURCES})
+
+if(AGENTOS_ENABLE_PROTOCOLS)
+    target_compile_definitions(gateway_d PRIVATE AGENTOS_PROTOCOLS_ENABLED=1)
+endif()
 
 # ==================== 平台特定配置 ====================
 if(WIN32)

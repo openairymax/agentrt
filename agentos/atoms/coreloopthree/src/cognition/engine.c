@@ -553,8 +553,8 @@ agentos_error_t agentos_cognition_process(
 
                 char fb[384];
                 snprintf(fb, sizeof(fb),
-                    "{\"composite\":%.2f,\"logic\":.2f,\"fact\":.2f,"
-                    "\"goal\":.2f,\"trend\":.3f,\"severity\":\"%s\","
+                    "{\"composite\":%.2f,\"logic\":%.2f,\"fact\":%.2f,"
+                    "\"goal\":%.2f,\"trend\":%.3f,\"severity\":\"%s\","
                     "\"replan\":%s,\"history_count\":%zu}",
                     composite, logic_score, fact_score, goal_score,
                     drift_trend, severity,

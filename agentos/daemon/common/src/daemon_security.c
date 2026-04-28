@@ -303,8 +303,9 @@ int daemon_check_llm_permission(const char* agent_id, const char* model_name,
     }
 
     if (!g_daemon_security.initialized || !g_daemon_security.permission_enabled) {
-        SVC_LOG_WARN("LLM permission check bypassed (security not fully initialized)");
-        return 1;
+        SVC_LOG_ERROR("LLM permission check DENIED (security not fully initialized): agent=%s model=%s action=%s",
+                     agent_id, model_name, action);
+        return 0;
     }
 
     /* Build resource path for LLM model */
@@ -336,13 +337,8 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
     *is_valid = false;
 
     if (!g_daemon_security.initialized || !g_daemon_security.signature_enabled) {
-        SVC_LOG_WARN("Signature verification skipped (not enabled)");
-        /* For security, deny unsigned packages in production */
-#ifdef DEBUG
-        *is_valid = true;  /* Allow in debug mode */
-#else
+        SVC_LOG_ERROR("Signature verification DENIED (not enabled): package=%s", package_path);
         *is_valid = false;
-#endif
         return 0;
     }
 

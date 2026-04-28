@@ -14,7 +14,7 @@
 #include "syscall_router.h"
 #include "jsonrpc.h"
 #include "syscalls.h"
-
+#include "platform.h"
 #include <cJSON.h>
 #include <string.h>
 #include <stdlib.h>
@@ -679,6 +679,18 @@ static void __attribute__((constructor)) runtime_init(void) {
     g_runtime.records = (memory_record_t*)calloc(g_max_records, sizeof(memory_record_t));
     g_runtime.sessions = (session_entry_t*)calloc(g_max_sessions, sizeof(session_entry_t));
     g_runtime.agents = (agent_entry_t*)calloc(g_max_agents, sizeof(agent_entry_t));
+    if (!g_runtime.tasks || !g_runtime.records || !g_runtime.sessions || !g_runtime.agents) {
+        fprintf(stderr, "syscall_router: runtime_init calloc failed\n");
+        free(g_runtime.tasks);
+        free(g_runtime.records);
+        free(g_runtime.sessions);
+        free(g_runtime.agents);
+        g_runtime.tasks = NULL;
+        g_runtime.records = NULL;
+        g_runtime.sessions = NULL;
+        g_runtime.agents = NULL;
+        return;
+    }
     ht_init(&g_runtime.task_index, g_max_tasks * 2);
     ht_init(&g_runtime.record_index, g_max_records * 2);
     ht_init(&g_runtime.session_index, g_max_sessions * 2);

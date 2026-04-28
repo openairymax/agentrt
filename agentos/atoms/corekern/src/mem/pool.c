@@ -28,6 +28,7 @@ struct agentos_mem_pool {
     uint32_t block_count;
     uint32_t free_count;
     uint32_t* block_tags;
+    agentos_mutex_t* lock;
 };
 
 static inline int32_t pool_block_index(agentos_mem_pool_t* pool, void* ptr) {
@@ -72,6 +73,7 @@ agentos_mem_pool_t* agentos_mem_pool_create(size_t block_size, uint32_t block_co
     pool->block_count = block_count;
     pool->free_count = block_count;
     pool->raw_memory = raw;
+    pool->lock = agentos_mutex_create();
 
     uint8_t* blocks = (uint8_t*)raw;
     pool->free_list = NULL;
@@ -91,7 +93,16 @@ void* agentos_mem_pool_alloc(agentos_mem_pool_t* pool_handle) {
     agentos_mem_pool_t* pool = pool_handle;
     if (pool->magic != POOL_MAGIC) return NULL;
 
-    if (!pool->free_list) return NULL;
+    if (pool->lock) {
+        agentos_mutex_lock(pool->lock);
+    }
+
+    if (!pool->free_list) {
+        if (pool->lock) {
+            agentos_mutex_unlock(pool->lock);
+        }
+        return NULL;
+    }
 
     pool_block_t* block = pool->free_list;
     pool->free_list = block->next;
@@ -103,6 +114,11 @@ void* agentos_mem_pool_alloc(agentos_mem_pool_t* pool_handle) {
     }
 
     memset(block, 0, pool->block_size);
+
+    if (pool->lock) {
+        agentos_mutex_unlock(pool->lock);
+    }
+
     return block;
 }
 
@@ -111,16 +127,29 @@ agentos_error_t agentos_mem_pool_free(agentos_mem_pool_t* pool_handle, void* ptr
     agentos_mem_pool_t* pool = pool_handle;
     if (pool->magic != POOL_MAGIC) return AGENTOS_EINVAL;
 
+    if (pool->lock) {
+        agentos_mutex_lock(pool->lock);
+    }
+
     int32_t idx = pool_block_index(pool, ptr);
     if (idx < 0) {
+        if (pool->lock) {
+            agentos_mutex_unlock(pool->lock);
+        }
         return AGENTOS_EINVAL;
     }
 
     if (pool->block_tags[idx] == BLOCK_FREED) {
+        if (pool->lock) {
+            agentos_mutex_unlock(pool->lock);
+        }
         return AGENTOS_EALREADY;
     }
 
     if (pool->block_tags[idx] != BLOCK_ALLOCATED) {
+        if (pool->lock) {
+            agentos_mutex_unlock(pool->lock);
+        }
         return AGENTOS_EINVAL;
     }
 
@@ -130,6 +159,10 @@ agentos_error_t agentos_mem_pool_free(agentos_mem_pool_t* pool_handle, void* ptr
     block->next = pool->free_list;
     pool->free_list = block;
     pool->free_count++;
+
+    if (pool->lock) {
+        agentos_mutex_unlock(pool->lock);
+    }
 
     return AGENTOS_SUCCESS;
 }

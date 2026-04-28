@@ -15,6 +15,8 @@
 #include "platform.h"
 #include "error.h"
 #include "safe_string_utils.h"
+#include "svc_common.h"
+#include "ipc_client.h"
 
 #include "include/memory_compat.h"
 
@@ -370,16 +372,65 @@ AGENTOS_API agentos_error_t ipc_service_bus_request(
 
     if (timeout_ms == 0) timeout_ms = bus->default_config.timeout_ms;
 
-    uint64_t elapsed = agentos_platform_get_time_ms() - start_time;
-    if (elapsed >= timeout_ms) {
-        agentos_platform_mutex_lock(&bus->mutex);
-        bus->pending_count--;
-        bus->stats.timeouts++;
-        agentos_platform_mutex_unlock(&bus->mutex);
-        return AGENTOS_ETIMEDOUT;
+    const char* req_payload = (const char*)request->payload;
+    char* resp_json = NULL;
+    agentos_error_t svc_err = AGENTOS_SUCCESS;
+
+    char rpc_method[256];
+    snprintf(rpc_method, sizeof(rpc_method), "%s.handle", target_service);
+
+    int rpc_err = svc_rpc_call(rpc_method,
+        req_payload ? req_payload : "{}", &resp_json, timeout_ms);
+    if (rpc_err != 0) {
+        svc_err = AGENTOS_EIO;
     }
 
     agentos_platform_mutex_lock(&bus->mutex);
+
+    if (svc_err == AGENTOS_SUCCESS && resp_json) {
+        size_t resp_len = strlen(resp_json) + 1;
+        pending->response = (ipc_bus_message_t*)calloc(1, sizeof(ipc_bus_message_t));
+        if (pending->response) {
+            pending->response->header.msg_type = IPC_BUS_MSG_RESPONSE;
+            pending->response->header.protocol = request->header.protocol;
+            snprintf(pending->response->header.target, sizeof(pending->response->header.target),
+                     "%s", request->header.source);
+            snprintf(pending->response->header.source, sizeof(pending->response->header.source),
+                     "%s", target_service);
+            pending->response->payload = resp_json;
+            pending->response->payload_size = resp_len;
+            pending->completed = 1;
+        } else {
+            free(resp_json);
+            pending->completed = 0;
+        }
+    } else {
+        size_t err_len = 128;
+        char* err_payload = (char*)malloc(err_len);
+        if (err_payload) {
+            int elen = snprintf(err_payload, err_len,
+                "{\"error\":{\"code\":%d,\"message\":\"service_call_failed\"}}", svc_err);
+            pending->response = (ipc_bus_message_t*)calloc(1, sizeof(ipc_bus_message_t));
+            if (pending->response) {
+                pending->response->header.msg_type = IPC_BUS_MSG_RESPONSE;
+                pending->response->header.protocol = request->header.protocol;
+                pending->response->payload = err_payload;
+                pending->response->payload_size = (size_t)(elen > 0 ? elen : 0) + 1;
+                pending->completed = 1;
+            } else {
+                free(err_payload);
+            }
+        }
+        if (resp_json) free(resp_json);
+    }
+
+    uint64_t elapsed = agentos_platform_get_time_ms() - start_time;
+    if (elapsed >= (uint64_t)timeout_ms && !pending->completed) {
+        bus->stats.timeouts++;
+        bus->pending_count--;
+        agentos_platform_mutex_unlock(&bus->mutex);
+        return AGENTOS_ETIMEDOUT;
+    }
 
     if (pending->completed && pending->response) {
         memcpy(response, pending->response, sizeof(ipc_bus_message_t));
@@ -398,8 +449,8 @@ AGENTOS_API agentos_error_t ipc_service_bus_request(
 
     agentos_platform_mutex_unlock(&bus->mutex);
 
-    LOG_DEBUG("Bus '%s': request to '%s' completed in %llums",
-              bus->name, target_service, (unsigned long long)latency);
+    LOG_DEBUG("Bus '%s': request to '%s' completed in %llums (completed=%d)",
+              bus->name, target_service, (unsigned long long)latency, pending->completed);
     return AGENTOS_SUCCESS;
 }
 

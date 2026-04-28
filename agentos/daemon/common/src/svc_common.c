@@ -827,22 +827,70 @@ agentos_svc_state_t agentos_svc_state_from_string(const char* str) {
 /* 服务注册表 */
 
 agentos_error_t agentos_service_register(agentos_service_t svc) {
-    /* 在 agentos_service_create 中已经注册，这里只是兼容性包装 */
     if (!svc) {
         return AGENTOS_EINVAL;
     }
-    
-    /* 服务已经通过 agentos_service_create 注册到内部注册表 */
+
+    if (!g_registry.initialized) {
+        agentos_error_t err = svc_common_module_init();
+        if (err != AGENTOS_SUCCESS) {
+            return err;
+        }
+    }
+
+    agentos_service_internal_t* internal = (agentos_service_internal_t*)svc;
+    agentos_platform_mutex_lock(&g_registry.registry_mutex);
+
+    for (agentos_service_internal_t* current = g_registry.services; current; current = current->next) {
+        if (current == internal) {
+            agentos_platform_mutex_unlock(&g_registry.registry_mutex);
+            LOG_DEBUG("Service '%s' already registered", internal->name);
+            return AGENTOS_SUCCESS;
+        }
+    }
+
+    internal->next = g_registry.services;
+    g_registry.services = internal;
+    g_registry.service_count++;
+
+    agentos_platform_mutex_unlock(&g_registry.registry_mutex);
+
+    LOG_INFO("Service '%s' explicitly registered (total: %u)", internal->name, g_registry.service_count);
     return AGENTOS_SUCCESS;
 }
 
 agentos_error_t agentos_service_unregister(agentos_service_t svc) {
-    /* 实际注销在 agentos_service_destroy 中处理 */
     if (!svc) {
         return AGENTOS_EINVAL;
     }
-    
-    return AGENTOS_SUCCESS;
+
+    if (!g_registry.initialized) {
+        return AGENTOS_ENOTINIT;
+    }
+
+    agentos_service_internal_t* internal = (agentos_service_internal_t*)svc;
+    agentos_platform_mutex_lock(&g_registry.registry_mutex);
+
+    agentos_service_internal_t** prev = &g_registry.services;
+    agentos_service_internal_t* current = g_registry.services;
+
+    while (current) {
+        if (current == internal) {
+            *prev = current->next;
+            g_registry.service_count--;
+
+            agentos_platform_mutex_unlock(&g_registry.registry_mutex);
+            LOG_INFO("Service '%s' unregistered (remaining: %u)", internal->name, g_registry.service_count);
+            return AGENTOS_SUCCESS;
+        }
+
+        prev = &current->next;
+        current = current->next;
+    }
+
+    agentos_platform_mutex_unlock(&g_registry.registry_mutex);
+    LOG_WARN("Service '%s' not found in registry for unregistration", internal->name);
+    return AGENTOS_ENOENT;
 }
 
 agentos_service_t agentos_service_find(const char* name) {

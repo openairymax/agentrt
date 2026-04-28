@@ -1,8 +1,8 @@
 // AgentOS TypeScript SDK - Mock Client
 // Version: 3.0.0
-// Last updated: 2026-03-24
+// Last updated: 2026-04-27
 //
-// 提供 Mock 客户端用于测试和开发环境。
+// WARNING: 测试工具，仅供单元测试使用。不应在生产代码中引用。
 // 与 Go SDK client/mock.go 保持一致。
 
 import { APIClient } from './client';
