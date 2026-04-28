@@ -453,12 +453,14 @@ static llm_response_t* oai_build_stream_response(oai_stream_acc_t* acc) {
 
     resp->created = acc->resp_created;
 
-    resp->choice_count = 1;
     resp->choices = (llm_message_t*)calloc(1, sizeof(llm_message_t));
     if (resp->choices) {
+        resp->choice_count = 1;
         resp->choices[0].role = strdup("assistant");
         resp->choices[0].content = acc->acc_content;
         acc->acc_content = NULL;
+    } else {
+        resp->choice_count = 0;
     }
 
     if (acc->finish_reason) {

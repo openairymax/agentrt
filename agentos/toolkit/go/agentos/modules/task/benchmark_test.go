@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/spharx/agentos/toolkit/go/agentos/types"
 )
 
 func BenchmarkTaskSubmit(b *testing.B) {
@@ -101,11 +103,11 @@ func newMockClient() MockAPIClient {
 
 type MockAPIClient struct{}
 
-func (m MockAPIClient) Get(ctx context.Context, path string) (interface{}, error) {
-	return map[string]interface{}{
-		"code":    "0x0000",
-		"message": "success",
-		"data": map[string]interface{}{
+func (m MockAPIClient) Get(ctx context.Context, path string, opts ...types.RequestOption) (*types.APIResponse, error) {
+	return &types.APIResponse{
+		Success: true,
+		Message: "success",
+		Data: map[string]interface{}{
 			"task_id":     "test-task-id",
 			"status":     "pending",
 			"description": "test task",
@@ -113,11 +115,11 @@ func (m MockAPIClient) Get(ctx context.Context, path string) (interface{}, error
 	}, nil
 }
 
-func (m MockAPIClient) Post(ctx context.Context, path string, body interface{}) (interface{}, error) {
-	return map[string]interface{}{
-		"code":    "0x0000",
-		"message": "success",
-		"data": map[string]interface{}{
+func (m MockAPIClient) Post(ctx context.Context, path string, body interface{}, opts ...types.RequestOption) (*types.APIResponse, error) {
+	return &types.APIResponse{
+		Success: true,
+		Message: "success",
+		Data: map[string]interface{}{
 			"task_id":     "test-task-id",
 			"status":     "pending",
 			"description": "test task",
@@ -125,10 +127,16 @@ func (m MockAPIClient) Post(ctx context.Context, path string, body interface{}) 
 	}, nil
 }
 
-func (m MockAPIClient) Delete(ctx context.Context, path string) (interface{}, error) {
-	return map[string]interface{}{
-		"code":    "0x0000",
-		"message": "success",
-		"data":    nil,
+func (m MockAPIClient) Delete(ctx context.Context, path string, opts ...types.RequestOption) (*types.APIResponse, error) {
+	return &types.APIResponse{
+		Success: true,
+		Message: "success",
+	}, nil
+}
+
+func (m MockAPIClient) Put(ctx context.Context, path string, body interface{}, opts ...types.RequestOption) (*types.APIResponse, error) {
+	return &types.APIResponse{
+		Success: true,
+		Message: "success",
 	}, nil
 }

@@ -14,13 +14,20 @@
 #include "memory.h"
 
 #define TEST_PASS(name) printf("[PASS] %s\n", name)
-#define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)
+#define TEST_FAIL(name, msg) do { printf("[FAIL] %s: %s\n", name, msg); tests_failed++; } while(0)
 
 static int tests_run = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-#define RUN_TEST(func) do { tests_run++; func(); tests_passed++; } while(0)
+#define RUN_TEST(func) do { \
+    tests_run++; \
+    int prev_failed = tests_failed; \
+    func(); \
+    if (prev_failed == tests_failed) { \
+        tests_passed++; \
+    } \
+} while(0)
 
 /* ==================== 认知引擎生命周期 ==================== */
 
@@ -321,10 +328,10 @@ static void test_cognition_enum_values(void) {
     assert(TASK_STATUS_RETRYING == 5);
     TEST_PASS("task status enum values correct");
 
-    assert(MEMORY_TYPE_RAW == 0);
-    assert(MEMORY_TYPE_FEATURE == 1);
-    assert(MEMORY_TYPE_STRUCTURE == 2);
-    assert(MEMORY_TYPE_PATTERN == 3);
+    assert(AGENTOS_MEMTYPE_TEXT == 0);
+    assert(AGENTOS_MEMTYPE_EMBEDDING == 1);
+    assert(AGENTOS_MEMTYPE_STRUCTURED == 2);
+    assert(AGENTOS_MEMTYPE_BINARY == 3);
     TEST_PASS("memory type enum values correct");
 }
 

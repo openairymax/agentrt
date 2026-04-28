@@ -423,6 +423,70 @@ static void test_destroy_functions_null_safe(void) {
     TEST_PASS("destroy functions null-safe");
 }
 
+/* ==================== 未注册工作流注销测试 ==================== */
+
+static void test_unregister_workflow(void) {
+    taskflow_engine_t* engine = taskflow_engine_create();
+    if (!engine) return;
+
+    int rc_before = taskflow_engine_unregister_workflow(engine, "nonexistent_wf");
+    printf("    Unregister nonexistent: rc=%d (expected -1)\n", rc_before);
+
+    taskflow_workflow_t wf;
+    memset(&wf, 0, sizeof(wf));
+    strncpy(wf.id, "wf_unregister", sizeof(wf.id) - 1);
+    strncpy(wf.name, "Workflow for Unregister", sizeof(wf.name) - 1);
+    strncpy(wf.version, "1.0", sizeof(wf.version) - 1);
+    wf.initial_node_id = strdup("node_start");
+
+    taskflow_node_t node;
+    memset(&node, 0, sizeof(node));
+    strncpy(node.id, "node_start", sizeof(node.id) - 1);
+    strncpy(node.name, "Start", sizeof(node.name) - 1);
+    node.type = TASKFLOW_NODE_TASK;
+    node.task_handler_name = strdup("mock");
+
+    taskflow_engine_register_handler(engine, "mock", mock_task_handler, NULL);
+    wf.nodes = &node;
+    wf.node_count = 1;
+
+    int rc_reg = taskflow_engine_register_workflow(engine, &wf);
+    printf("    Register for unregister: rc=%d\n", rc_reg);
+    assert(rc_reg == 0);
+    assert(taskflow_engine_get_workflow_count(engine) == 1);
+
+    int rc_after = taskflow_engine_unregister_workflow(engine, "wf_unregister");
+    printf("    Unregister success: rc=%d, count=%zu\n", rc_after,
+           taskflow_engine_get_workflow_count(engine));
+    assert(rc_after == 0);
+    assert(taskflow_engine_get_workflow_count(engine) == 0);
+
+    free(wf.initial_node_id);
+    taskflow_engine_destroy(engine);
+    TEST_PASS("unregister workflow");
+}
+
+/* ==================== notify_event + get_execution测试 ==================== */
+
+static void test_notify_event_and_get_execution(void) {
+    taskflow_engine_t* engine = taskflow_engine_create();
+    if (!engine) return;
+
+    int rc_get = taskflow_engine_get_execution(engine, "nonexistent", NULL);
+    printf("    Get nonexistent execution: rc=%d (expected -1)\n", rc_get);
+    assert(rc_get != 0);
+
+    int rc_notify = taskflow_engine_notify_event(engine, "nonexistent", "test", "{}");
+    printf("    Notify nonexistent event: rc=%d\n", rc_notify);
+
+    rc_notify = taskflow_engine_notify_event(NULL, "exec", "test", "{}");
+    printf("    Notify with NULL engine: rc=%d\n", rc_notify);
+    assert(rc_notify != 0);
+
+    taskflow_engine_destroy(engine);
+    TEST_PASS("notify_event + get_execution");
+}
+
 /* ==================== 主函数 ==================== */
 
 int main(void) {
@@ -442,6 +506,7 @@ int main(void) {
     RUN_TEST(test_unregister_handler);
 
     RUN_TEST(test_register_workflow);
+    RUN_TEST(test_unregister_workflow);
 
     RUN_TEST(test_start_execution);
     RUN_TEST(test_cancel_pause_resume);
@@ -455,6 +520,8 @@ int main(void) {
     RUN_TEST(test_counts_after_registration);
 
     RUN_TEST(test_load_workflow_json);
+
+    RUN_TEST(test_notify_event_and_get_execution);
 
     printf("\n========================================\n");
     printf("  测试结果: %d 运行, %d 通过, %d 失败\n",

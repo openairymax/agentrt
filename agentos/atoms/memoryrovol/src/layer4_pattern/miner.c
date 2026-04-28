@@ -19,7 +19,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
-#include <pthread.h>
+#include "platform.h"
 #include <unistd.h>
 #include <time.h>
 
@@ -55,7 +55,7 @@ struct agentos_layer4_pattern {
     agentos_pattern_validator_t* validator;
     agentos_mutex_t* lock;
     agentos_layer4_pattern_config_t manager;
-    pthread_t auto_thread;
+    agentos_thread_t auto_thread;
     int auto_running;
     void* data_source_ctx;
     agentos_error_t (*get_vectors_func)(void* ctx, float** out_vectors, char*** out_ids, size_t* out_count);
@@ -438,7 +438,7 @@ agentos_error_t agentos_pattern_miner_start_auto(agentos_layer4_pattern_t* miner
     if (miner->auto_running) return AGENTOS_SUCCESS;
 
     miner->auto_running = 1;
-    if (pthread_create(&miner->auto_thread, NULL, auto_miner_thread_func, miner) != 0) {
+    if (agentos_thread_create(&miner->auto_thread, auto_miner_thread_func, miner) != 0) {
         miner->auto_running = 0;
         AGENTOS_LOG_ERROR("Failed to create auto mining thread");
         return AGENTOS_ENOMEM;
@@ -449,7 +449,7 @@ agentos_error_t agentos_pattern_miner_start_auto(agentos_layer4_pattern_t* miner
 void agentos_pattern_miner_stop_auto(agentos_layer4_pattern_t* miner) {
     if (!miner || !miner->auto_running) return;
     miner->auto_running = 0;
-    pthread_join(miner->auto_thread, NULL);
+    agentos_thread_join(miner->auto_thread, NULL);
 }
 
 /* ==================== 设置数据源回�?==================== */

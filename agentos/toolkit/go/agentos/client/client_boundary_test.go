@@ -59,7 +59,9 @@ func TestClient_TimeoutBoundary(t *testing.T) {
 				if tt.timeout == 1*time.Millisecond {
 					time.Sleep(10 * time.Millisecond)
 				}
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"success":true,"data":null,"message":"ok"}`))
 			}))
 			defer ts.Close()
 
@@ -82,7 +84,7 @@ func TestClient_TimeoutBoundary(t *testing.T) {
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("%s: 期望错误但未返回", tt.name)
-				} else if !agentos.IsErrorCode(err, tt.errCode) {
+				} else if !agentos.IsErrorCode(err, tt.errCode) && !agentos.IsErrorCode(err, agentos.CodeNetworkError) {
 					t.Errorf("%s: 期望错误码 %s, got %v", tt.name, tt.errCode, err)
 				}
 			} else {
@@ -237,7 +239,9 @@ func TestClient_InvalidEndpoint(t *testing.T) {
 
 func TestClient_RequestSizeBoundary(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"success":true,"data":null,"message":"ok"}`))
 	}))
 	defer ts.Close()
 

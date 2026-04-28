@@ -146,9 +146,9 @@ pub use error::{
 ///
 /// # 示例
 /// ```rust
-/// use agentos;
+/// use agentos_rs::new_client;
 ///
-/// let client = agentos::new_client("http://localhost:18789")?;
+/// let client = new_client("http://localhost:18789");
 /// ```
 pub fn new_client(endpoint: &str) -> Result<Client, AgentOSError> {
     Client::new(endpoint)

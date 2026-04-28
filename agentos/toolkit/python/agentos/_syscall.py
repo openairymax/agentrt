@@ -258,9 +258,20 @@ class SyscallProxy:
 
     def _verify_library_version(self) -> None:
         """Verify that the loaded library version is compatible."""
-        # Placeholder for version verification
-        # In production, this would call a version query function
-        logger.info("Library version verification completed")
+        required_symbols = [
+            'agentos_sys_task_submit',
+            'agentos_sys_task_query',
+            'agentos_sys_memory_write',
+            'agentos_sys_memory_read',
+            'agentos_sys_session_create',
+            'agentos_sys_skill_load',
+        ]
+        missing = [s for s in required_symbols if not hasattr(self._lib, s)]
+        if missing:
+            raise RuntimeError(
+                f"Library missing required symbols: {', '.join(missing)}"
+            )
+        logger.info("Library version verification completed (%d symbols validated)", len(required_symbols))
 
     def _get_library_name(self) -> str:
         """Get the name of the loaded library."""

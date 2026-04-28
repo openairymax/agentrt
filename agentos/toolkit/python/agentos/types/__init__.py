@@ -15,6 +15,7 @@ from .common import (
     # 枚举类型
     TaskStatus,
     MemoryLayer,
+    MemoryRecordType,
     SessionStatus,
     SkillStatus,
     SpanStatus,
@@ -22,6 +23,7 @@ from .common import (
     Task,
     TaskResult,
     Memory,
+    MemoryInfo,
     MemorySearchResult,
     Session,
     Skill,
@@ -38,6 +40,7 @@ __all__ = [
     # 枚举类型
     "TaskStatus",
     "MemoryLayer",
+    "MemoryRecordType",
     "SessionStatus",
     "SkillStatus",
     "SpanStatus",
@@ -45,6 +48,7 @@ __all__ = [
     "Task",
     "TaskResult",
     "Memory",
+    "MemoryInfo",
     "MemorySearchResult",
     "Session",
     "Skill",
