@@ -728,7 +728,14 @@ config_error_t config_hot_reload_start(config_hot_reload_manager_t* manager, uin
     manager->check_interval_ms = check_interval_ms > 0 ? check_interval_ms : 5000;
     manager->running = true;
     
-    // 简化实现：实际应启动监控线�?    // 这里只设置标志位
+    if (manager->thread_handle == NULL) {
+        extern void* config_hot_reload_thread_func(void* arg);
+        manager->thread_handle = agentos_thread_create(config_hot_reload_thread_func, manager);
+        if (!manager->thread_handle) {
+            manager->running = false;
+            return CONFIG_ERROR_OUT_OF_MEMORY;
+        }
+    }
     
     return CONFIG_SUCCESS;
 }
@@ -740,7 +747,11 @@ config_error_t config_hot_reload_stop(config_hot_reload_manager_t* manager) {
     
     manager->running = false;
     
-    // 简化实现：实际应停止监控线�?    // 这里只清除标志位
+    if (manager->thread_handle) {
+        agentos_thread_join(manager->thread_handle);
+        agentos_thread_free(manager->thread_handle);
+        manager->thread_handle = NULL;
+    }
     
     return CONFIG_SUCCESS;
 }
@@ -748,13 +759,38 @@ config_error_t config_hot_reload_stop(config_hot_reload_manager_t* manager) {
 config_error_t config_hot_reload_trigger(config_hot_reload_manager_t* manager) {
     if (!manager) return CONFIG_ERROR_INVALID_ARG;
     
-    // 检查配置源是否变化
     if (!manager->source_manager) return CONFIG_ERROR_INVALID_ARG;
     
-    // 简化实现：实际应检查配置源并触发回�?    // 这里只返回成�?    
+    agentos_mutex_lock(manager->lock);
+    
+    size_t source_count = config_source_manager_get_count(manager->source_manager);
+    bool changed = false;
+    
+    for (size_t i = 0; i < source_count; i++) {
+        config_source_t* source = config_source_manager_get_at(manager->source_manager, i);
+        if (source && config_source_check_changed(source)) {
+            changed = true;
+            config_error_t err = config_source_reload(source);
+            if (err != CONFIG_SUCCESS) {
+                agentos_mutex_unlock(manager->lock);
+                return err;
+            }
+        }
+    }
+    
+    if (changed) {
+        for (size_t i = 0; i < manager->callback_count; i++) {
+            change_callback_item_t* cb = &manager->callbacks[i];
+            if (cb->callback) {
+                cb->callback(manager->ctx, cb->key, cb->user_data);
+            }
+        }
+    }
+    
+    agentos_mutex_unlock(manager->lock);
     return CONFIG_SUCCESS;
 }
-
+    
 /* ==================== 配置加密实现 ==================== */
 
 static char* config_bytes_to_hex(const unsigned char* data, size_t len) {
