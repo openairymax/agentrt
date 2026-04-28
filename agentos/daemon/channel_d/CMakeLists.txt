@@ -62,3 +62,31 @@ install(FILES
     include/channel_service.h
     DESTINATION include/agentos/daemon/channel_d
 )
+
+find_package(Cmocka QUIET)
+if(CMOCKA_FOUND OR TARGET cmocka)
+    enable_testing()
+    add_executable(test_channel_e2e tests/test_channel_e2e.c src/channel_service.c)
+    target_include_directories(test_channel_e2e PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(test_channel_e2e PRIVATE
+        ${CMOCKA_LIBRARIES}
+        pthread rt
+    )
+    target_compile_options(test_channel_e2e PRIVATE -Wall -Wextra)
+    add_test(NAME channel_e2e COMMAND test_channel_e2e)
+else()
+    enable_testing()
+    add_executable(test_channel_e2e tests/test_channel_e2e.c src/channel_service.c)
+    target_include_directories(test_channel_e2e PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${COMMONS_DIR}/tests/utils
+    )
+    target_link_libraries(test_channel_e2e PRIVATE pthread rt)
+    target_compile_options(test_channel_e2e PRIVATE -Wall -Wextra)
+    target_compile_definitions(test_channel_e2e PRIVATE USE_CMOCKA_STUB)
+    add_test(NAME channel_e2e COMMAND test_channel_e2e)
+endif()

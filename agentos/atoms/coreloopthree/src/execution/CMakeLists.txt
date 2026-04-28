@@ -10,6 +10,8 @@ file(GLOB EXECUTION_SOURCES
     "compensation.c"
     "trace.c"
     "units/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../utils/error_utils.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../utils/id_utils.c"
 )
 
 add_library(agentos_execution STATIC ${EXECUTION_SOURCES})
@@ -22,8 +24,12 @@ target_include_directories(agentos_execution PRIVATE
 )
 
 target_link_libraries(agentos_execution
-    agentos_core
+    PUBLIC agentos_core
 )
+
+if(UNIX AND NOT APPLE)
+    target_link_libraries(agentos_execution PUBLIC uuid)
+endif()
 
 if(WIN32)
     target_compile_options(agentos_execution PRIVATE /W3 /O2)

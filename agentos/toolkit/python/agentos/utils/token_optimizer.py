@@ -8,11 +8,14 @@
 
 import time
 import hashlib
+import logging
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import IntEnum
+
+logger = logging.getLogger(__name__)
 
 
 class TokenModelType(IntEnum):
@@ -627,7 +630,8 @@ class TokenOptimizer:
         cache_size_mb: int = 50,
         cache_ttl: int = 3600,
         daily_budget: int = 1000000,
-        per_request_limit: int = 8000
+        per_request_limit: int = 8000,
+        llm_client: Optional[Any] = None
     ):
         """
         初始化优化器
@@ -637,6 +641,7 @@ class TokenOptimizer:
             cache_ttl: 缓存 TTL
             daily_budget: 每日预算
             per_request_limit: 单次请求限制
+            llm_client: LLM 客户端实例（需提供 call(prompt, model) 方法）
         """
         self.cache = LRUCache(
             max_size_mb=cache_size_mb,
@@ -649,6 +654,7 @@ class TokenOptimizer:
         )
         
         self.compressor = ContextCompressor()
+        self._llm_client = llm_client
         
         # 统计信息
         self.total_tokens_used = 0
@@ -695,16 +701,21 @@ class TokenOptimizer:
         if not self.budget.can_spend(estimated_tokens):
             raise RuntimeError("Token 预算不足")
         
-        # 执行实际调用（需要集成 LLM 客户端）
-        # response = llm_client.call(prompt, model)
-        # token_count = response.usage.total_tokens
-        
-        # 模拟响应
-        response = {
-            "content": "模拟响应",
-            "model": model
-        }
-        token_count = estimated_tokens
+        if self._llm_client is not None:
+            response = self._llm_client.call(prompt, model)
+            token_count = getattr(
+                getattr(response, 'usage', None), 'total_tokens', estimated_tokens
+            )
+        else:
+            logger.warning(
+                "未配置 LLM 客户端，使用 token 估算值代替实际调用"
+            )
+            response = {
+                "content": prompt,
+                "model": model,
+                "token_count": estimated_tokens
+            }
+            token_count = estimated_tokens
         
         # 更新预算
         self.budget.spend(token_count)

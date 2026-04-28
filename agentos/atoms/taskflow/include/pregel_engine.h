@@ -263,6 +263,15 @@ taskflow_error_t pregel_engine_restore_checkpoint(pregel_engine_handle_t engine,
                                                  uint64_t checkpoint_id);
 
 /**
+ * @brief 删除检查点
+ * @param engine 引擎句柄
+ * @param checkpoint_id 检查点ID
+ * @return 错误码
+ */
+taskflow_error_t pregel_engine_delete_checkpoint(pregel_engine_handle_t engine,
+                                                 uint64_t checkpoint_id);
+
+/**
  * @brief 获取执行统计信息
  * @param engine 引擎句柄
  * @param stats 统计信息结构（输出）

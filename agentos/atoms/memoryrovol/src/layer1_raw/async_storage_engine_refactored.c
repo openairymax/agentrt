@@ -26,7 +26,7 @@
 #ifdef _WIN32
 #include <windows.h>
 #else
-#include <pthread.h>
+#include "platform.h"
 #endif
 
 /* ==================== 常量定义 ==================== */
@@ -76,7 +76,7 @@ typedef struct storage_engine_inner {
 #ifdef _WIN32
     HANDLE* worker_threads;
 #else
-    pthread_t* worker_threads;
+    agentos_thread_t* worker_threads;
 #endif
 
     int shutdown;
@@ -214,7 +214,7 @@ agentos_error_t agentos_layer1_raw_create_production(
 #ifdef _WIN32
     engine->inner->worker_threads = (HANDLE*)AGENTOS_CALLOC(worker_count, sizeof(HANDLE));
 #else
-    engine->inner->worker_threads = (pthread_t*)AGENTOS_CALLOC(worker_count, sizeof(pthread_t));
+    engine->inner->worker_threads = (agentos_thread_t*)AGENTOS_CALLOC(worker_count, sizeof(agentos_thread_t));
 #endif
 
     if (!engine->inner->worker_threads) {
@@ -272,7 +272,7 @@ agentos_error_t agentos_layer1_raw_create_production(
             engine->inner->workers[i] = NULL;
         }
 #else
-        if (pthread_create(&engine->inner->worker_threads[i], NULL, worker_thread_func, worker) != 0) {
+        if (agentos_thread_create(&engine->inner->worker_threads[i], worker_thread_func, worker) != 0) {
             worker->running = 0;
             AGENTOS_FREE(worker->storage_path);
             AGENTOS_FREE(worker);
@@ -338,7 +338,7 @@ void agentos_layer1_raw_destroy_production(agentos_layer1_raw_t* engine) {
     if (engine->inner->worker_threads) {
         for (size_t i = 0; i < engine->inner->worker_count; i++) {
             if (engine->inner->worker_threads[i]) {
-                pthread_join(engine->inner->worker_threads[i], NULL);
+                agentos_thread_join(engine->inner->worker_threads[i], NULL);
             }
         }
     }
