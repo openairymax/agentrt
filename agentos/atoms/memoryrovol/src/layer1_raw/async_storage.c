@@ -200,6 +200,7 @@ agentos_error_t agentos_layer1_raw_create(const char* storage_path, uint32_t wor
     l1->running = 1;
     l1->healthy = 1;
 
+    size_t started_count = 0;
     for (uint32_t i = 0; i < l1->worker_count; i++) {
         l1->workers[i].index = i;
         l1->workers[i].running = 1;
@@ -209,7 +210,23 @@ agentos_error_t agentos_layer1_raw_create(const char* storage_path, uint32_t wor
         if (!l1->workers[i].thread) {
             AGENTOS_LOG_ERROR("Failed to create worker thread %u", i);
             l1->workers[i].running = 0;
+            /* 回滚已创建的线程 */
+            l1->running = 0;
+            for (uint32_t j = 0; j < started_count; j++) {
+                if (l1->workers[j].thread) {
+                    agentos_thread_join(l1->workers[j].thread);
+                    agentos_thread_destroy(l1->workers[j].thread);
+                }
+            }
+            if (l1->queue) async_queue_destroy(l1->queue);
+            if (l1->lock) agentos_mutex_destroy(l1->lock);
+            if (l1->obs) agentos_observability_destroy(l1->obs);
+            if (l1->workers) AGENTOS_FREE(l1->workers);
+            if (l1->storage_path) AGENTOS_FREE(l1->storage_path);
+            AGENTOS_FREE(l1);
+            return AGENTOS_EIO;
         }
+        started_count++;
     }
 
     *out_l1 = l1;

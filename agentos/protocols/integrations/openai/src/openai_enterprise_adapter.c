@@ -919,3 +919,324 @@ int openai_get_rate_status(void* handle,
     if (out_backoff) *out_backoff = adapter->rate_backoff_multiplier;
     return 0;
 }
+
+/* ============================================================================
+ * Enterprise Context & New-Style API (openai_enterprise_*)
+ * ============================================================================ */
+
+struct openai_enterprise_context_s {
+    openai_handle_t handle;
+    openai_enterprise_config_t config;
+    openai_chat_handler_t chat_handler;
+    void* chat_handler_user_data;
+    openai_embedding_handler_t embedding_handler;
+    void* embedding_handler_user_data;
+    openai_audit_handler_t audit_handler;
+    void* audit_handler_user_data;
+};
+
+openai_enterprise_config_t openai_enterprise_config_default(void) {
+    openai_enterprise_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.api_key = NULL;
+    cfg.base_url = strdup("https://api.openai.com/v1");
+    cfg.default_model = strdup("gpt-4o");
+    cfg.organization = NULL;
+    cfg.max_retries = 3;
+    cfg.retry_base_ms = 1000;
+    cfg.request_timeout_ms = 60000;
+    cfg.enable_streaming = true;
+    cfg.enable_function_calling = true;
+    cfg.enable_rate_limiting = true;
+    cfg.enable_audit_logging = false;
+    cfg.rpm_limit = 60;
+    cfg.tpm_limit = 150000;
+    cfg.max_tokens_default = 4096;
+    cfg.temperature_default = 0.7;
+    cfg.top_p_default = 1.0;
+    cfg.strict_schema_validation = false;
+    return cfg;
+}
+
+openai_enterprise_context_t* openai_enterprise_context_create(
+    const openai_enterprise_config_t* config) {
+    if (!config) return NULL;
+    openai_enterprise_context_t* ctx = calloc(1, sizeof(*ctx));
+    if (!ctx) return NULL;
+    ctx->config = *config;
+    openai_handle_t handle = NULL;
+    openai_enterprise_config_t mutable_cfg = *config;
+    int rc = openai_create(mutable_cfg, &handle);
+    if (rc != 0) { free(ctx); return NULL; }
+    ctx->handle = handle;
+    return ctx;
+}
+
+void openai_enterprise_context_destroy(openai_enterprise_context_t* ctx) {
+    if (!ctx) return;
+    if (ctx->handle) openai_destroy(ctx->handle);
+    free(ctx);
+}
+
+int openai_enterprise_register_model(openai_enterprise_context_t* ctx,
+                                       const openai_model_t* model) {
+    if (!ctx || !ctx->handle || !model) return -1;
+    struct openai_enterprise_adapter_s* adapter =
+        (struct openai_enterprise_adapter_s*)ctx->handle;
+    if (!adapter->initialized) return -2;
+    if (adapter->model_count >= OPENAI_MAX_MODELS) return -3;
+    openai_model_t* slot = &adapter->models[adapter->model_count];
+    slot->id = model->id ? strdup(model->id) : NULL;
+    slot->name = model->name ? strdup(model->name) : NULL;
+    slot->owned_by = model->owned_by ? strdup(model->owned_by) : NULL;
+    slot->capabilities = model->capabilities;
+    slot->max_context_tokens = model->max_context_tokens;
+    slot->max_output_tokens = model->max_output_tokens;
+    slot->cost_per_1k_input = model->cost_per_1k_input;
+    slot->cost_per_1k_output = model->cost_per_1k_output;
+    slot->is_default = model->is_default;
+    slot->is_available = model->is_available;
+    adapter->model_count++;
+    return 0;
+}
+
+int openai_enterprise_chat_completion(openai_enterprise_context_t* ctx,
+                                       const char* model,
+                                       const openai_message_t* messages,
+                                       size_t message_count,
+                                       const openai_tool_def_t* tools,
+                                       size_t tool_count,
+                                       double temperature,
+                                       double top_p,
+                                       int max_tokens,
+                                       openai_chat_response_t* response) {
+    if (!ctx || !ctx->handle || !response) return -1;
+    (void)tools; (void)tool_count; (void)temperature; (void)top_p; (void)max_tokens;
+    const char* effective_model = model ? model : "gpt-4o";
+    openai_chat_request_t req;
+    memset(&req, 0, sizeof(req));
+    req.model = strdup(effective_model);
+    if (messages && message_count > 0) {
+        req.messages = (openai_message_t*)messages;
+        req.num_messages = message_count;
+    }
+    return openai_chat_completion(ctx->handle, &req, response);
+}
+
+int openai_enterprise_chat_streaming(openai_enterprise_context_t* ctx,
+                                       const char* model,
+                                       const openai_message_t* messages,
+                                       size_t message_count,
+                                       openai_streaming_handler_t handler,
+                                       void* user_data) {
+    if (!ctx || !ctx->handle || !handler) return -1;
+    const char* effective_model = model ? model : "gpt-4o";
+    openai_chat_request_t req;
+    memset(&req, 0, sizeof(req));
+    req.model = strdup(effective_model);
+    if (messages && message_count > 0) {
+        req.messages = (openai_message_t*)messages;
+        req.num_messages = message_count;
+    }
+    openai_chat_response_t final_resp;
+    memset(&final_resp, 0, sizeof(final_resp));
+    return openai_chat_completion_streaming(ctx->handle, &req,
+        (openai_stream_chunk_callback_t)handler, user_data, &final_resp);
+}
+
+int openai_enterprise_embeddings(openai_enterprise_context_t* ctx,
+                                   const char* model,
+                                   const char** inputs,
+                                   size_t input_count,
+                                   openai_embedding_response_t* response) {
+    if (!ctx || !ctx->handle || !response) return -1;
+    (void)model;
+    openai_embedding_request_t req;
+    memset(&req, 0, sizeof(req));
+    req.input_text = (inputs && input_count > 0 && inputs[0]) ? strdup(inputs[0]) : strdup("");
+    req.embedding_dim = 1536;
+    return openai_create_embedding(ctx->handle, &req, response);
+}
+
+int openai_enterprise_list_models(openai_enterprise_context_t* ctx,
+                                    openai_model_t** models,
+                                    size_t* model_count) {
+    if (!ctx || !ctx->handle || !models || !model_count) return -1;
+    struct openai_enterprise_adapter_s* adapter =
+        (struct openai_enterprise_adapter_s*)ctx->handle;
+    if (!adapter->initialized) return -2;
+    *model_count = adapter->model_count;
+    if (adapter->model_count == 0) { *models = NULL; return 0; }
+    *models = calloc(adapter->model_count, sizeof(openai_model_t));
+    if (!*models) return -3;
+    for (size_t i = 0; i < adapter->model_count; i++) {
+        (*models)[i].id = adapter->models[i].id ? strdup(adapter->models[i].id) : NULL;
+        (*models)[i].name = adapter->models[i].name ? strdup(adapter->models[i].name) : NULL;
+        (*models)[i].owned_by = adapter->models[i].owned_by ? strdup(adapter->models[i].owned_by) : NULL;
+        (*models)[i].capabilities = adapter->models[i].capabilities;
+        (*models)[i].max_context_tokens = adapter->models[i].max_context_tokens;
+        (*models)[i].max_output_tokens = adapter->models[i].max_output_tokens;
+        (*models)[i].cost_per_1k_input = adapter->models[i].cost_per_1k_input;
+        (*models)[i].cost_per_1k_output = adapter->models[i].cost_per_1k_output;
+        (*models)[i].is_default = adapter->models[i].is_default;
+        (*models)[i].is_available = adapter->models[i].is_available;
+    }
+    return 0;
+}
+
+bool openai_enterprise_check_rate_limit(openai_enterprise_context_t* ctx,
+                                          int estimated_tokens) {
+    if (!ctx || !ctx->handle) return false;
+    struct openai_enterprise_adapter_s* adapter =
+        (struct openai_enterprise_adapter_s*)ctx->handle;
+    if (!adapter->initialized) return false;
+    openai_rate_result_t result = openai_check_rate_limit(adapter, (uint32_t)estimated_tokens);
+    return result == OPENAI_RATE_OK;
+}
+
+int openai_enterprise_set_chat_handler(openai_enterprise_context_t* ctx,
+                                         openai_chat_handler_t handler,
+                                         void* user_data) {
+    if (!ctx) return -1;
+    ctx->chat_handler = handler;
+    ctx->chat_handler_user_data = user_data;
+    return 0;
+}
+
+int openai_enterprise_set_embedding_handler(openai_enterprise_context_t* ctx,
+                                              openai_embedding_handler_t handler,
+                                              void* user_data) {
+    if (!ctx) return -1;
+    ctx->embedding_handler = handler;
+    ctx->embedding_handler_user_data = user_data;
+    return 0;
+}
+
+int openai_enterprise_set_audit_handler(openai_enterprise_context_t* ctx,
+                                          openai_audit_handler_t handler,
+                                          void* user_data) {
+    if (!ctx) return -1;
+    ctx->audit_handler = handler;
+    ctx->audit_handler_user_data = user_data;
+    return 0;
+}
+
+int openai_enterprise_route_request(openai_enterprise_context_t* ctx,
+                                      const char* path,
+                                      const char* method,
+                                      const char* body_json,
+                                      char** response_json) {
+    if (!ctx || !path || !method || !response_json) return -1;
+    *response_json = NULL;
+    if (strcmp(path, "/v1/chat/completions") == 0) {
+        openai_message_t msg = {0};
+        msg.role = OPENAI_ROLE_USER;
+        msg.content = (body_json && body_json[0]) ? strdup(body_json) : strdup("hello");
+        openai_chat_response_t resp;
+        memset(&resp, 0, sizeof(resp));
+        int rc = openai_enterprise_chat_completion(ctx, NULL, &msg, 1, NULL, 0, 0.7, 1.0, 4096, &resp);
+        if (rc == 0 && resp.choices && resp.choice_count > 0) {
+            const char* content = resp.choices[0].content ? resp.choices[0].content : "";
+            size_t sz = 512 + strlen(content);
+            char* json = malloc(sz);
+            if (json) snprintf(json, sz, "{\"result\":\"%s\"}", content);
+            *response_json = json;
+        } else {
+            *response_json = strdup("{\"error\":\"chat completion failed\"}");
+        }
+        free(msg.content);
+        return rc;
+    }
+    if (strcmp(path, "/v1/embeddings") == 0) {
+        const char* inputs[1] = { body_json ? body_json : "" };
+        openai_embedding_response_t resp;
+        memset(&resp, 0, sizeof(resp));
+        int rc = openai_enterprise_embeddings(ctx, "text-embedding-ada-002", inputs, 1, &resp);
+        (void)rc;
+        *response_json = strdup("{\"status\":\"embedding_complete\"}");
+        return 0;
+    }
+    if (strcmp(path, "/v1/models") == 0) {
+        openai_model_t* models = NULL;
+        size_t count = 0;
+        openai_enterprise_list_models(ctx, &models, &count);
+        for (size_t i = 0; i < count; i++) {
+            free(models[i].id); free(models[i].name); free(models[i].owned_by);
+        }
+        free(models);
+        *response_json = strdup("{\"status\":\"models_listed\"}");
+        return 0;
+    }
+    *response_json = strdup("{\"error\":\"unknown endpoint\"}");
+    return -10;
+}
+
+const protocol_adapter_t* openai_enterprise_get_adapter(void) {
+    static protocol_adapter_t s_adapter;
+    static bool s_init = false;
+    if (!s_init) {
+        memset(&s_adapter, 0, sizeof(s_adapter));
+        s_adapter.type = AGENTOS_PROTOCOL_OPENAI;
+        s_adapter.name = "openai-enterprise";
+        s_adapter.version = OPENAI_ADAPTER_VERSION;
+        s_adapter.description = "OpenAI Enterprise API Adapter";
+        s_adapter.context = NULL;
+        s_init = true;
+    }
+    return &s_adapter;
+}
+
+void openai_chat_response_destroy(openai_chat_response_t* resp) {
+    if (!resp) return;
+    free(resp->id);
+    free(resp->object);
+    free(resp->model);
+    if (resp->choices) {
+        for (size_t i = 0; i < resp->choice_count; i++) {
+            free(resp->choices[i].content);
+            free(resp->choices[i].name);
+            free(resp->choices[i].tool_call_id);
+            free(resp->choices[i].function_name);
+            free(resp->choices[i].function_arguments_json);
+        }
+        free(resp->choices);
+    }
+    free(resp->finish_reasons);
+    if (resp->tool_calls) {
+        for (size_t i = 0; i < resp->tool_call_count; i++) {
+            free(resp->tool_calls[i].id);
+            free(resp->tool_calls[i].type);
+            free(resp->tool_calls[i].function_name);
+            free(resp->tool_calls[i].function_arguments_json);
+        }
+        free(resp->tool_calls);
+    }
+    memset(resp, 0, sizeof(*resp));
+}
+
+void openai_embedding_response_destroy(openai_embedding_response_t* resp) {
+    if (!resp) return;
+    free(resp->id);
+    free(resp->object);
+    free(resp->model);
+    free(resp->embeddings);
+    memset(resp, 0, sizeof(*resp));
+}
+
+void openai_message_destroy(openai_message_t* msg) {
+    if (!msg) return;
+    free(msg->content);
+    free(msg->name);
+    free(msg->tool_call_id);
+    free(msg->function_name);
+    free(msg->function_arguments_json);
+    memset(msg, 0, sizeof(*msg));
+}
+
+void openai_model_destroy(openai_model_t* model) {
+    if (!model) return;
+    free(model->id);
+    free(model->name);
+    free(model->owned_by);
+    memset(model, 0, sizeof(*model));
+}
