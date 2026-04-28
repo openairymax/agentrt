@@ -26,6 +26,7 @@ extern "C" {
 
 /* 前向声明 */
 typedef struct agentos_cognition_engine agentos_cognition_engine_t;
+typedef struct agentos_memory_engine agentos_memory_engine_t;
 typedef struct agentos_intent agentos_intent_t;
 typedef struct agentos_task_plan agentos_task_plan_t;
 typedef struct agentos_plan_strategy agentos_plan_strategy_t;
@@ -332,6 +333,10 @@ AGENTOS_API void agentos_cognition_set_context(
     agentos_cognition_engine_t* engine,
     void* context,
     void (*destroy)(void*));
+
+AGENTOS_API void agentos_cognition_set_memory(
+    agentos_cognition_engine_t* engine,
+    agentos_memory_engine_t* memory);
 
 /**
  * @brief 获取认知引擎的当前统计信息
