@@ -1,6 +1,6 @@
 /**
  * @file browser.c
- * @brief 浏览器控制单元（基于Playwright的简化模拟）
+ * @brief 浏览器控制单元（基于Playwright模拟）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 

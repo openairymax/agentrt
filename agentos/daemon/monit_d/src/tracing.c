@@ -245,6 +245,10 @@ int tracing_start_trace(const char* operation_name, const char* parent_trace_id,
     generate_hex_id(root_span->span_id, SPAN_ID_LEN);
     root_span->parent_span_id[0] = '\0';
     root_span->operation_name = strdup(operation_name);
+    if (!root_span->operation_name) {
+        g_tracing.traces[g_tracing.trace_count].trace_id[0] = '\0';
+        return -1;
+    }
     root_span->kind = SPAN_KIND_SERVER;
     root_span->start_time = (uint64_t)time(NULL) * 1000000;
     root_span->end_time = 0;

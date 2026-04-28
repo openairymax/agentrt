@@ -12,6 +12,7 @@
 
 #include "metacognition.h"
 #include "agentos.h"
+#include "platform.h"
 #include "memory_compat.h"
 #include <stdlib.h>
 #include <string.h>
@@ -19,14 +20,8 @@
 #include <math.h>
 #include <inttypes.h>
 
-/* ============================================================================
- * 内部辅助
- * ============================================================================ */
-
 static uint64_t mc_time_now(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+    return agentos_time_ns();
 }
 
 static float clampf(float v, float lo, float hi) {

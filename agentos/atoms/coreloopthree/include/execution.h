@@ -29,7 +29,9 @@ extern "C" {
 /* 前向声明 */
 typedef struct agentos_execution_engine agentos_execution_engine_t;
 typedef struct agentos_execution_unit agentos_execution_unit_t;
+#ifndef AGENTOS_TASK_T_DEFINED
 typedef struct agentos_task agentos_task_t;
+#endif
 typedef struct agentos_compensation agentos_compensation_t;
 
 /**

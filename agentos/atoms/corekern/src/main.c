@@ -9,7 +9,9 @@
 static volatile int g_core_initialized = 0;
 
 int agentos_core_init(void) {
-    if (g_core_initialized) {
+    int expected = 0;
+    if (!__atomic_compare_exchange_n(&g_core_initialized, &expected, 1,
+                                     0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
         return AGENTOS_SUCCESS;
     }
 
@@ -27,7 +29,6 @@ int agentos_core_init(void) {
     ret = agentos_time_eventloop_init();
     if (ret != 0) goto cleanup_ipc;
 
-    g_core_initialized = 1;
     return AGENTOS_SUCCESS;
 
 cleanup_ipc:
@@ -37,15 +38,16 @@ cleanup_task:
 cleanup_mem:
     agentos_mem_cleanup();
 fail:
+    __atomic_store_n(&g_core_initialized, 0, __ATOMIC_SEQ_CST);
     return ret;
 }
 
 void agentos_core_shutdown(void) {
-    if (!g_core_initialized) {
+    int expected = 1;
+    if (!__atomic_compare_exchange_n(&g_core_initialized, &expected, 0,
+                                     0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
         return;
     }
-
-    g_core_initialized = 0;
 
     agentos_time_eventloop_cleanup();
     agentos_time_timer_cleanup();
