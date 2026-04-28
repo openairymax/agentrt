@@ -948,7 +948,6 @@ taskflow_error_t graph_engine_remove_edge(graph_engine_handle_t engine,
 
         // 更新out/in edge index中被移动边的引用
         size_t src_hash = vertex_id_hash(last_edge->source, e->index_size);
-        out_edge_index_entry_t** oep = (out_edge_index_entry_t**)&e->out_edge_index[src_hash];
         out_edge_index_entry_t* oee = e->out_edge_index[src_hash];
         while (oee) {
             if (oee->edge_idx == e->edge_count - 1) {
@@ -958,7 +957,6 @@ taskflow_error_t graph_engine_remove_edge(graph_engine_handle_t engine,
             oee = oee->next;
         }
         size_t tgt_hash = vertex_id_hash(last_edge->target, e->index_size);
-        in_edge_index_entry_t** iep = (in_edge_index_entry_t**)&e->in_edge_index[tgt_hash];
         in_edge_index_entry_t* iee = e->in_edge_index[tgt_hash];
         while (iee) {
             if (iee->edge_idx == e->edge_count - 1) {
@@ -1127,7 +1125,7 @@ taskflow_error_t graph_engine_bfs(graph_engine_handle_t engine,
         visitor(current, user_data);
         
         // 获取所有邻居
-        const size_t MAX_NEIGHBORS_PER_BATCH = 32;
+        #define MAX_NEIGHBORS_PER_BATCH 32
         vertex_id_t neighbors[MAX_NEIGHBORS_PER_BATCH];
         
         size_t offset = 0;
@@ -1206,18 +1204,17 @@ taskflow_error_t graph_engine_dfs(graph_engine_handle_t engine,
         visitor(current, user_data);
         
         // 获取所有邻居
-        const size_t MAX_NEIGHBORS_PER_BATCH = 32;
-        vertex_id_t neighbors[MAX_NEIGHBORS_PER_BATCH];
+        #define MAX_NEIGHBORS_PER_BATCH_DFS 32
+        vertex_id_t neighbors[MAX_NEIGHBORS_PER_BATCH_DFS];
         
         size_t offset = 0;
         while (true) {
             size_t count = collect_neighbors(e, current, 
                                            neighbors + offset, 
-                                           MAX_NEIGHBORS_PER_BATCH - offset,
+                                           MAX_NEIGHBORS_PER_BATCH_DFS - offset,
                                            true);
             if (count == 0) break;
             
-            // 逆序入栈，保证顺序遍历（可选）
             for (size_t i = count; i > 0; i--) {
                 vertex_id_t neighbor = neighbors[offset + i - 1];
                 
@@ -1228,7 +1225,7 @@ taskflow_error_t graph_engine_dfs(graph_engine_handle_t engine,
             }
             
             offset += count;
-            if (offset >= MAX_NEIGHBORS_PER_BATCH) {
+            if (offset >= MAX_NEIGHBORS_PER_BATCH_DFS) {
                 offset = 0;
             }
         }

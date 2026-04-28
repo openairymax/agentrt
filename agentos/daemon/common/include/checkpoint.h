@@ -113,7 +113,7 @@ agentos_error_t agentos_checkpoint_create(
  * @see agentos_checkpoint_create()
  * @see agentos_checkpoint_restore()
  */
-agentos_error_t agentos_checkpoint_save(const agentos_task_checkpoint_t* checkpoint);
+agentos_error_t agentos_checkpoint_save(agentos_task_checkpoint_t* checkpoint);
 
 /**
  * @brief 恢复检查点

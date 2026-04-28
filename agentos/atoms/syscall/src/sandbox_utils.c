@@ -5,6 +5,7 @@
  */
 
 #include "sandbox_utils.h"
+#include "sandbox_quota.h"
 #include "agentos.h"
 #include "logger.h"
 #include <string.h>
@@ -106,28 +107,34 @@ void sandbox_release_resource(agentos_sandbox_t* sandbox, int syscall_num,
                              void* args, int result) {
     if (!sandbox) return;
 
-    /* 参数用于资源释放策略选择（非桩） */
-    if (syscall_num <= 0 || result != 0) {
-        /* 错误结果或无效调用号：仅重置基本配额 */
-    }
-    if (args == NULL) {
-        /* 无参数调用：跳过参数相关清理 */
-    }
-
     agentos_mutex_lock(sandbox->lock);
 
-    /* 简化实现：重置资源配额 */
-    /* 实际应该根据具体资源类型释放 */
-    
+    if (result != 0) {
+        sandbox_quota_release(sandbox, RESOURCE_CPU, 1);
+        if (args) {
+            sandbox_quota_release(sandbox, RESOURCE_MEMORY, 256);
+        }
+    } else {
+        sandbox_quota_release(sandbox, RESOURCE_CPU, 1);
+        if (syscall_num == 2 && args) {
+            sandbox_quota_release(sandbox, RESOURCE_IO, 1);
+        } else if (syscall_num == 3 && args) {
+            sandbox_quota_release(sandbox, RESOURCE_MEMORY, 4096);
+        }
+    }
+
     agentos_mutex_unlock(sandbox->lock);
 }
 
 char* sandbox_generate_args_hash(void* args) {
     if (!args) return NULL;
-    
-    /* 简化实现：返回参数的哈希表示 */
-    /* 实际应该根据参数类型进行序列化后哈希 */
+
+    unsigned char* bytes = (unsigned char*)args;
+    uint32_t hash = 5381;
+    for (size_t i = 0; i < sizeof(void*) * 2; i++) {
+        hash = ((hash << 5) + hash) + bytes[i % sizeof(void*)];
+    }
     char hash_str[32];
-    snprintf(hash_str, sizeof(hash_str), "%p", args);
+    snprintf(hash_str, sizeof(hash_str), "%08x", hash);
     return AGENTOS_STRDUP(hash_str);
 }

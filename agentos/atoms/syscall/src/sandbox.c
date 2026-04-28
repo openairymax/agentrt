@@ -377,9 +377,7 @@ agentos_error_t agentos_sandbox_invoke(agentos_sandbox_t* sandbox,
     if (!sandbox || !out_result) return AGENTOS_EINVAL;
 
     /* 记录调用开始时间用于性能统计 */
-    struct timespec ts = {0, 0};
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    uint64_t start_time = (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+    uint64_t start_time = agentos_time_ns();
 
     sandbox->call_count++;
     if (g_sandbox_manager) {
@@ -428,9 +426,7 @@ agentos_error_t agentos_sandbox_invoke(agentos_sandbox_t* sandbox,
     sandbox_add_audit_entry(sandbox, syscall_num, NULL, AGENTOS_SUCCESS, 0, "Executed");
 
     /* 更新性能统计（使用start_time计算耗时） */
-    struct timespec ts_end = {0, 0};
-    clock_gettime(CLOCK_MONOTONIC, &ts_end);
-    uint64_t end_time = (uint64_t)ts_end.tv_sec * 1000000000ULL + ts_end.tv_nsec;
+    uint64_t end_time = agentos_time_ns();
     uint64_t elapsed_ns = end_time - start_time;
     
     sandbox->perf_stats.total_syscalls++;

@@ -137,11 +137,23 @@ static int google_parse_response(const char* body, llm_response_t** out) {
                 cJSON* part0 = cJSON_GetArrayItem(parts, 0);
                 cJSON* text = cJSON_GetObjectItem(part0, "text");
                 if (cJSON_IsString(text) && text->valuestring) {
-                    resp->choice_count = 1;
                     resp->choices = (llm_message_t*)calloc(1, sizeof(llm_message_t));
                     if (resp->choices) {
-                        resp->choices[0].role = strdup("assistant");
-                        resp->choices[0].content = strdup(text->valuestring);
+                        char* role_copy = strdup("assistant");
+                        char* content_copy = strdup(text->valuestring);
+                        if (role_copy && content_copy) {
+                            resp->choices[0].role = role_copy;
+                            resp->choices[0].content = content_copy;
+                            resp->choice_count = 1;
+                        } else {
+                            free(role_copy);
+                            free(content_copy);
+                            free(resp->choices);
+                            resp->choices = NULL;
+                            resp->choice_count = 0;
+                        }
+                    } else {
+                        resp->choice_count = 0;
                     }
                 }
             }
@@ -415,12 +427,21 @@ static llm_response_t* gg_build_stream_response(gg_stream_acc_t* acc) {
     r->prompt_tokens = acc->prompt_tokens;
     r->completion_tokens = acc->completion_tokens;
     r->total_tokens = r->prompt_tokens + r->completion_tokens;
-    r->choice_count = 1;
     r->choices = (llm_message_t*)calloc(1, sizeof(llm_message_t));
     if (r->choices) {
-        r->choices[0].role = strdup("assistant");
-        r->choices[0].content = acc->acc_content;
-        acc->acc_content = NULL;
+        char* role_copy = strdup("assistant");
+        if (role_copy) {
+            r->choices[0].role = role_copy;
+            r->choices[0].content = acc->acc_content;
+            acc->acc_content = NULL;
+            r->choice_count = 1;
+        } else {
+            free(r->choices);
+            r->choices = NULL;
+            r->choice_count = 0;
+        }
+    } else {
+        r->choice_count = 0;
     }
     r->finish_reason = acc->finish_reason ? acc->finish_reason : strdup("stop");
     acc->finish_reason = NULL;

@@ -160,6 +160,19 @@ int market_service_register_skill(market_service_t* service, const skill_info_t*
     new_skill->author = strdup(skill_info->author);
     new_skill->repository = strdup(skill_info->repository);
     new_skill->dependencies = strdup(skill_info->dependencies);
+    if (!new_skill->skill_id || !new_skill->name || !new_skill->version ||
+        !new_skill->description || !new_skill->author ||
+        !new_skill->repository || !new_skill->dependencies) {
+        free(new_skill->skill_id);
+        free(new_skill->name);
+        free(new_skill->version);
+        free(new_skill->description);
+        free(new_skill->author);
+        free(new_skill->repository);
+        free(new_skill->dependencies);
+        free(new_skill);
+        return -3;
+    }
     new_skill->rating = skill_info->rating;
     new_skill->download_count = skill_info->download_count;
     new_skill->last_updated = (uint64_t)time(NULL);

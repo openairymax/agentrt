@@ -24,6 +24,7 @@ typedef struct {
     char* metrics_storage_path;             /**< 指标存储路径 */
     bool enable_tracing;                    /**< 是否启用追踪 */
     bool enable_alerting;                   /**< 是否启用告警 */
+    double loop_threshold;                  /**< 死循环检测阈值（0.0-1.0） */
 } monitor_config_t;
 
 /**
@@ -215,7 +216,11 @@ typedef enum {
     AGENT_STATE_CREATED = 0,     /**< 已创建 */
     AGENT_STATE_INITIALIZING,    /**< 初始化中 */
     AGENT_STATE_READY,           /**< 就绪 */
+    AGENT_STATE_RUNNING,         /**< 运行中 */
+    AGENT_STATE_WAITING,         /**< 等待中 */
+    AGENT_STATE_THINKING,        /**< 思考中 */
     AGENT_STATE_EXECUTING,       /**< 执行中 */
+    AGENT_STATE_EXECUTING_TOOL,  /**< 执行工具中 */
     AGENT_STATE_PAUSED,          /**< 暂停 */
     AGENT_STATE_COMPLETED,       /**< 完成 */
     AGENT_STATE_FAILED,          /**< 失败 */
@@ -252,14 +257,23 @@ typedef struct {
 typedef struct {
     char* agent_id;              /**< Agent ID */
     char* task_id;               /**< 任务 ID */
+    char* trace_id;              /**< Trace ID */
     agent_execution_state_t current_state; /**< 当前状态 */
     uint64_t start_time;         /**< 开始时间 */
+    uint64_t end_time;           /**< 结束时间 */
     uint64_t last_update_time;   /**< 最后更新时间 */
+    int status;                  /**< 状态码 */
+    char* service_name;          /**< 服务名称 */
     agent_trace_point_t* trace_points; /**< 轨迹点数组 */
     size_t trace_point_count;    /**< 轨迹点数量 */
     size_t trace_point_capacity; /**< 轨迹点容量 */
     size_t loop_detection_count; /**< 循环检测计数 */
     bool is_suspected_loop;      /**< 是否疑似死循环 */
+    bool loop_detected;          /**< 是否检测到死循环 */
+    double loop_confidence;      /**< 死循环置信度 */
+    char** locations;            /**< 位置历史数组 */
+    uint64_t* location_times;    /**< 位置时间戳数组 */
+    size_t location_count;       /**< 位置数量 */
 } agent_execution_trace_t;
 
 /**

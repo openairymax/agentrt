@@ -171,7 +171,7 @@ export function createAgentOS(...opts: ConfigOption[]): AgentOS {
 // ============================================================
 
 // 客户端
-export { Client, APIClient, MockClient };
+export { Client, APIClient };
 
 // 配置
 export {

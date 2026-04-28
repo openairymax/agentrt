@@ -48,8 +48,14 @@ agentos_error_t agentos_timer_start(
     if (!timer || interval_ms == 0) return AGENTOS_EINVAL;
 
     if (!timer_lock) {
-        timer_lock = agentos_mutex_create();
-        if (!timer_lock) return AGENTOS_ENOMEM;
+        agentos_mutex_t* new_lock = agentos_mutex_create();
+        if (!new_lock) return AGENTOS_ENOMEM;
+
+        agentos_mutex_t* expected = NULL;
+        if (!__atomic_compare_exchange_n(&timer_lock, &expected, new_lock,
+                                         0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+            agentos_mutex_free(new_lock);
+        }
     }
 
     agentos_mutex_lock(timer_lock);
@@ -101,7 +107,33 @@ agentos_error_t agentos_timer_stop(agentos_timer_t* timer) {
 
 void agentos_timer_destroy(agentos_timer_t* timer) {
     if (!timer) return;
-    agentos_timer_stop(timer);
+
+    if (!timer_lock) {
+        AGENTOS_FREE(timer);
+        return;
+    }
+
+    agentos_mutex_lock(timer_lock);
+
+    agentos_timer_t** pp = &timer_list;
+    int found = 0;
+    while (*pp) {
+        if (*pp == timer) {
+            *pp = timer->next;
+            timer->next = NULL;
+            timer->active = 0;
+            found = 1;
+            break;
+        }
+        pp = &(*pp)->next;
+    }
+
+    agentos_mutex_unlock(timer_lock);
+
+    if (!found) {
+        return;
+    }
+
     AGENTOS_FREE(timer);
 }
 

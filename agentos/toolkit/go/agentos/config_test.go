@@ -109,7 +109,7 @@ func TestValidate_Valid(t *testing.T) {
 }
 
 func TestValidate_EmptyEndpoint(t *testing.T) {
-	cfg := &manager{Endpoint: "", Timeout: 30 * time.Second, MaxConnections: 10}
+	cfg := &Config{Endpoint: "", Timeout: 30 * time.Second, MaxConnections: 10}
 	err := cfg.Validate()
 	if err == nil {
 		t.Error("空端点应返回错误")
@@ -120,7 +120,7 @@ func TestValidate_EmptyEndpoint(t *testing.T) {
 }
 
 func TestValidate_ZeroTimeout(t *testing.T) {
-	cfg := &manager{Endpoint: "http://localhost:18789", Timeout: 0, MaxConnections: 10}
+	cfg := &Config{Endpoint: "http://localhost:18789", Timeout: 0, MaxConnections: 10}
 	err := cfg.Validate()
 	if err == nil {
 		t.Error("零超时应返回错误")
@@ -128,7 +128,7 @@ func TestValidate_ZeroTimeout(t *testing.T) {
 }
 
 func TestValidate_ZeroMaxConnections(t *testing.T) {
-	cfg := &manager{Endpoint: "http://localhost:18789", Timeout: 30 * time.Second, MaxConnections: 0}
+	cfg := &Config{Endpoint: "http://localhost:18789", Timeout: 30 * time.Second, MaxConnections: 0}
 	err := cfg.Validate()
 	if err == nil {
 		t.Error("零连接数应返回错误")
@@ -160,7 +160,7 @@ func TestMerge_Nil(t *testing.T) {
 
 func TestMerge_NonZero(t *testing.T) {
 	base := DefaultConfig()
-	override := &manager{Endpoint: "http://override:8080", APIKey: "new-key"}
+	override := &Config{Endpoint: "http://override:8080", APIKey: "new-key"}
 	merged := base.Merge(override)
 
 	if merged.Endpoint != "http://override:8080" {
@@ -173,7 +173,7 @@ func TestMerge_NonZero(t *testing.T) {
 
 func TestMerge_ZeroValuePreserved(t *testing.T) {
 	base := NewConfig(WithTimeout(60 * time.Second))
-	override := &manager{Endpoint: "http://override:8080"}
+	override := &Config{Endpoint: "http://override:8080"}
 	merged := base.Merge(override)
 
 	if merged.Timeout != 60*time.Second {
@@ -183,7 +183,7 @@ func TestMerge_ZeroValuePreserved(t *testing.T) {
 
 func TestMerge_DebugAlwaysOverride(t *testing.T) {
 	base := NewConfig(WithDebug(false))
-	override := &manager{Debug: true}
+	override := &Config{Debug: true}
 	merged := base.Merge(override)
 	if !merged.Debug {
 		t.Error("Debug 应始终取 override 的值")

@@ -20,11 +20,12 @@
 #include "logger.h"
 #include "monitoring_metrics.h"
 #include "platform.h"
-"utils/observability/include/observability_compat.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+
+static agentos_error_t agentos_monitoring_stop(agentos_monitoring_t* monitoring);
 
 /* 基础库兼容性层 */
 #include "memory_compat.h"

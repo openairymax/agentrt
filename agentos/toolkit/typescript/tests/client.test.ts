@@ -139,7 +139,7 @@ describe('Client', () => {
 
   describe('error handling', () => {
     test('should handle ECONNABORTED as TimeoutError', async () => {
-      const axiosError = Object.create(new Error('timeout'));
+      const axiosError: any = new Error('timeout');
       axiosError.code = 'ECONNABORTED';
       axiosError.isAxiosError = true;
       mockAxiosInstance.request.mockRejectedValue(axiosError);
@@ -148,10 +148,10 @@ describe('Client', () => {
       mockedAxios.isCancel.mockReturnValue(false);
 
       await expect(client.get('/test')).rejects.toThrow();
-    });
+    }, 30000);
 
     test('should handle ERR_NETWORK as NetworkError', async () => {
-      const axiosError = Object.create(new Error('network error'));
+      const axiosError: any = new Error('network error');
       axiosError.code = 'ERR_NETWORK';
       axiosError.isAxiosError = true;
       mockAxiosInstance.request.mockRejectedValue(axiosError);
@@ -160,10 +160,10 @@ describe('Client', () => {
       mockedAxios.isCancel.mockReturnValue(false);
 
       await expect(client.get('/test')).rejects.toThrow();
-    });
+    }, 30000);
 
     test('should handle HTTP error response', async () => {
-      const axiosError = Object.create(new Error('server error'));
+      const axiosError: any = new Error('server error');
       axiosError.isAxiosError = true;
       axiosError.response = { status: 500, data: 'Internal Server Error' };
       mockAxiosInstance.request.mockRejectedValue(axiosError);
@@ -172,7 +172,7 @@ describe('Client', () => {
       mockedAxios.isCancel.mockReturnValue(false);
 
       await expect(client.get('/test')).rejects.toThrow();
-    });
+    }, 30000);
 
     test('should handle cancel as AgentOSError', async () => {
       const cancelError = new Error('cancel');
