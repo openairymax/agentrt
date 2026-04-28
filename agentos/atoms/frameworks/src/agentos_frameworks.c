@@ -13,11 +13,30 @@
 #include <string.h>
 #include <stdio.h>
 
-/* ==================== 内部常量 ==================== */
-
 #define FW_MAX_CALLBACKS 8
 #define FW_MAX_NAME_LEN  32
 #define FW_MAX_VERSION_LEN 16
+
+#ifndef AGENTOS_API
+#define AGENTOS_API
+#endif
+
+#ifndef AGENTOS_CALLOC
+#define AGENTOS_CALLOC(nmemb, size) calloc(nmemb, size)
+#endif
+
+#ifndef AGENTOS_FREE
+#define AGENTOS_FREE(ptr) free(ptr)
+#endif
+
+static int fw_safe_strcpy(char* dest, const char* src, size_t dest_size) {
+    if (!dest || !src || dest_size == 0) return -1;
+    size_t len = strlen(src);
+    if (len >= dest_size) len = dest_size - 1;
+    memcpy(dest, src, len);
+    dest[len] = '\0';
+    return 0;
+}
 
 /* ==================== 框架描述 ==================== */
 
@@ -92,8 +111,8 @@ static void init_fw_info(fw_instance_t* fw, agentos_framework_t type) {
     const fw_descriptor_t* desc = &g_fw_descriptors[type];
     memset(&fw->info, 0, sizeof(agentos_fw_info_t));
     fw->info.type = type;
-    safe_strcpy(fw->info.name, desc->name, FW_MAX_NAME_LEN);
-    safe_strcpy(fw->info.version, desc->version, FW_MAX_VERSION_LEN);
+    fw_safe_strcpy(fw->info.name, desc->name, FW_MAX_NAME_LEN);
+    fw_safe_strcpy(fw->info.version, desc->version, FW_MAX_VERSION_LEN);
     fw->info.state = AGENTOS_FW_STATE_UNINITIALIZED;
     fw->info.capabilities = desc->default_capabilities;
 }
