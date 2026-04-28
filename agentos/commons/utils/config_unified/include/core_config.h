@@ -52,7 +52,8 @@ typedef enum {
     CONFIG_ERROR_PARSE = 6,       // 解析错误
     CONFIG_ERROR_VALIDATION = 7,  // 验证失败
     CONFIG_ERROR_LOCKED = 8,      // 配置被锁定
-    CONFIG_ERROR_UNSUPPORTED = 9  // 不支持的操作
+    CONFIG_ERROR_UNSUPPORTED = 9, // 不支持的操作
+    CONFIG_ERROR_THREAD = 10      // 线程操作失败
 } config_error_t;
 
 /* ==================== 配置上下文 ==================== */

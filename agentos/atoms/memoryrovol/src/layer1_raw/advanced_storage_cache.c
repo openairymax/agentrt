@@ -199,8 +199,8 @@ size_t advanced_cache_evict_lru(cache_manager_t* cache, size_t required_space) {
             to_evict->state = CACHE_ENTRY_EVICTED;
             agentos_mutex_unlock(to_evict->lock);
 
-            /* 异步销毁（避免在锁内执行耗时操作） */
-            agentos_thread_create(NULL, (agentos_thread_func_t)advanced_cache_entry_destroy, to_evict);
+            /* 同步销毁（线程句柄为NULL会导致无法join的资源泄漏） */
+            advanced_cache_entry_destroy(to_evict);
         } else {
             agentos_mutex_unlock(to_evict->lock);
         }
