@@ -1,9 +1,17 @@
 # AgentOS clangd configuration
-# Purpose: IDE single-file analysis requires explicit include paths (no CMake context)
-# CompilationDatabase: Points to out-of-source build directory
+# SPDX-FileCopyrightText: 2026 SPHARX Ltd.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# This file uses RELATIVE paths and is safe to commit.
+# Each developer must build the project first to generate compile_commands.json:
+#   mkdir -p ../AgentOS-build && cd ../AgentOS-build
+#   cmake ../AgentOS -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+#
+# If compile_commands.json exists, clangd will use it for accurate analysis.
+# If not, the fallback CompileFlags below provide basic single-file analysis.
 
 CompileFlags:
-  CompilationDatabase: /home/spharx/SpharxWorks/OpenAirymax/AgentOS-build
+  CompilationDatabase: ../AgentOS-build
   Add:
     - -std=c11
     - -D_GNU_SOURCE
@@ -34,6 +42,7 @@ CompileFlags:
     - -Iagentos/commons/utils/io/include
     - -Iagentos/commons/utils/logging/include
     - -Iagentos/commons/utils/sync/include
+    - -Iagentos/commons/utils/observability/include
     - -Iagentos/cupolas/include
     - -Iagentos/cupolas/src
     - -Iagentos/cupolas/src/security
@@ -54,7 +63,12 @@ CompileFlags:
     - -Iagentos/gateway/src
     - -Iagentos/manager/include
     - -Iagentos/manager/src
-    - -I/usr/include
+    - -Iagentos/protocols/common/include
+    - -Iagentos/protocols/common/src
+    - -Iagentos/protocols/core/router/include
+    - -Iagentos/protocols/core/router/src
+    - -Iagentos/protocols/core/transformers/include
+    - -Iagentos/protocols/core/transformers/src
   Remove:
     - -Wno-*
     - -Werror
@@ -68,10 +82,10 @@ Diagnostics:
       - readability-magic-numbers
       - readability-identifier-length
       - bugprone-easily-swappable-parameters
+      - readability-function-cognitive-complexity
 
 Hover:
-  ShowAKA: Yes
-  ShowIncludeInsertion: Yes
+  ShowAKa: Yes
 
 Index:
   StandardLibrary: Yes
