@@ -85,7 +85,7 @@ Diagnostics:
       - readability-function-cognitive-complexity
 
 Hover:
-  ShowAKa: Yes
+  ShowAKA: Yes
 
 Index:
   StandardLibrary: Yes
