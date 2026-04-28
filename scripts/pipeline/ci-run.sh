@@ -214,7 +214,7 @@ phase_build() {
 build_modules_fallback() {
     local modules=()
     if [[ "$CI_MODULE" == "all" ]]; then
-        modules=("daemon" "atoms" "commons" "cupolas" "gateway" "heapstore" "manager")
+        modules=("daemon" "atoms" "commons" "cupolas" "gateway" "heapstore")
     else
         IFS=',' read -ra modules <<< "$CI_MODULE"
     fi
