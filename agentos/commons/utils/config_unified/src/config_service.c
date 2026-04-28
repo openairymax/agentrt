@@ -537,7 +537,7 @@ bool config_schema_validate(config_schema_t* schema, const config_context_t* ctx
         schema_item_internal_t* item = &schema->items[i];
         
         // 查找配置�?        // 简化实现：假设有config_context_get_value函数
-        config_value_t* value = NULL; // config_context_get_value(ctx, item->key);
+        config_value_t* value = config_context_get(ctx, item->key);
         
         if (item->required && !value) {
             add_schema_error(schema, "Required configuration item '%s' is missing", item->key);
@@ -560,7 +560,25 @@ bool config_schema_validate(config_schema_t* schema, const config_context_t* ctx
     }
     
     if (strict) {
-        // 检查是否有未在Schema中定义的配置�?        // 简化实现：暂时跳过
+        // 检查是否有未在Schema中定义的配置项
+        const config_iterator_t* it = config_context_iterator(ctx);
+        if (it) {
+            config_iterator_reset(it);
+            while (config_iterator_has_next(it)) {
+                const char* key = config_iterator_next_key(it);
+                bool found = false;
+                for (size_t j = 0; j < schema->count; j++) {
+                    if (strcmp(schema->items[j].key, key) == 0) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    add_schema_error(schema, "Configuration key '%s' is not defined in schema", key);
+                    valid = false;
+                }
+            }
+        }
     }
     
     return valid;
@@ -1299,13 +1317,16 @@ config_error_t config_expand_template(config_context_t* ctx,
 }
 
 config_error_t config_apply_template(config_context_t* ctx, config_context_t* template_ctx) {
+    if (!ctx || !template_ctx) return CONFIG_ERROR_INVALID_ARG;
 
     const config_iterator_t* it = config_context_iterator(template_ctx);
+    if (!it) return CONFIG_SUCCESS;
 
     config_iterator_reset(it);
     while (config_iterator_has_next(it)) {
         const char* key = config_iterator_next_key(it);
         const config_value_t* val = config_context_get(template_ctx, key);
+        if (val && !config_context_has(ctx, key)) {
             config_value_t* cloned = config_value_clone(val);
             if (cloned) {
                 config_context_set(ctx, key, cloned);
@@ -1341,9 +1362,11 @@ config_context_t* config_service_create(const char* service_name,
 config_error_t config_service_load(config_context_t* ctx,
                                    config_source_t** sources,
                                    size_t source_count) {
+    if (!ctx || !sources || source_count == 0) return CONFIG_ERROR_INVALID_ARG;
 
     config_error_t err = CONFIG_SUCCESS;
     for (size_t i = 0; i < source_count; i++) {
+        if (!sources[i]) continue;
         err = config_source_load(sources[i], ctx);
         if (err != CONFIG_SUCCESS) return err;
     }
@@ -1351,7 +1374,9 @@ config_error_t config_service_load(config_context_t* ctx,
     return CONFIG_SUCCESS;
 }
 
+
 config_error_t config_service_save(config_context_t* ctx, config_source_t* primary_source) {
+    if (!ctx || !primary_source) return CONFIG_ERROR_INVALID_ARG;
 
     return config_source_save(primary_source, ctx);
 }
@@ -1361,13 +1386,11 @@ config_error_t config_service_get_status(config_context_t* ctx,
                                          size_t status_size) {
     if (!ctx || !status_json || status_size == 0) return CONFIG_ERROR_INVALID_ARG;
     
-    // 简化实现：生成状态JSON
-    const char* status = "{\"status\":\"ok\",\"message\":\"Configuration service is running\"}";
-    size_t len = strlen(status);
-    if (len >= status_size) len = status_size - 1;
-    
-    memcpy(status_json, status, len);
-    status_json[len] = '\0';
-    
+    // 生成状态JSON
+    snprintf(status_json, status_size,
+             '{"status":"ok","service":"%s","sources":%zu}',
+             ctx ? config_context_get_name(ctx) : "unknown",
+             source_count);
+
     return CONFIG_SUCCESS;
 }

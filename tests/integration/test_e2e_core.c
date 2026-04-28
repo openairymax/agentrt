@@ -35,6 +35,7 @@
 
 /* syscall */
 #include "syscalls.h"
+#include "platform.h"
 
 /* ==================== 测试框架 ==================== */
 
