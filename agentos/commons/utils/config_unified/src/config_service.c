@@ -57,14 +57,15 @@ typedef struct {
     void* user_data;                 // 用户数据
 } change_callback_item_t;
 
-/** 热更新管理器结构�?*/
+/** 热更新管理器结构?*/
 struct config_hot_reload_manager {
-    config_context_t* ctx;           // 配置上下�?    config_source_manager_t* source_manager; // 配置源管理器
+    config_context_t* ctx;           // 配置上下?    config_source_manager_t* source_manager; // 配置源管理器
     change_callback_item_t* callbacks; // 回调函数数组
     size_t callback_count;           // 回调函数数量
     size_t callback_capacity;        // 回调函数容量
     bool running;                    // 是否正在运行
-    uint32_t check_interval_ms;      // 检查间�?    void* thread_handle;             // 监控线程句柄（简化实现）
+    uint32_t check_interval_ms;      // 检查间?    void* thread_handle;             // 监控线程句柄（简化实现）
+    void* lock;                      // 线程安全锁
 };
 
 /** 配置版本�?*/
@@ -646,6 +647,12 @@ config_hot_reload_manager_t* config_hot_reload_manager_create(config_context_t* 
     
     manager->callback_count = 0;
     manager->thread_handle = NULL;
+    manager->lock = agentos_mutex_create();
+    if (!manager->lock) {
+        AGENTOS_FREE(manager->callbacks);
+        AGENTOS_FREE(manager);
+        return NULL;
+    }
     
     return manager;
 }
@@ -653,16 +660,15 @@ config_hot_reload_manager_t* config_hot_reload_manager_create(config_context_t* 
 void config_hot_reload_manager_destroy(config_hot_reload_manager_t* manager) {
     if (!manager) return;
     
-    // 停止监控
     config_hot_reload_stop(manager);
     
-    // 释放回调资源
     for (size_t i = 0; i < manager->callback_count; i++) {
         change_callback_item_t* cb = &manager->callbacks[i];
         if (cb->key) AGENTOS_FREE(cb->key);
     }
     
     if (manager->callbacks) AGENTOS_FREE(manager->callbacks);
+    if (manager->lock) agentos_mutex_free(manager->lock);
     AGENTOS_FREE(manager);
 }
 
@@ -1293,10 +1299,20 @@ config_error_t config_expand_template(config_context_t* ctx,
 }
 
 config_error_t config_apply_template(config_context_t* ctx, config_context_t* template_ctx) {
-    if (!ctx || !template_ctx) return CONFIG_ERROR_INVALID_ARG;
-    
-    // 简化实现：实际应将模板配置应用到目标配�?    // 这里直接返回成功
-    
+
+    const config_iterator_t* it = config_context_iterator(template_ctx);
+
+    config_iterator_reset(it);
+    while (config_iterator_has_next(it)) {
+        const char* key = config_iterator_next_key(it);
+        const config_value_t* val = config_context_get(template_ctx, key);
+            config_value_t* cloned = config_value_clone(val);
+            if (cloned) {
+                config_context_set(ctx, key, cloned);
+            }
+        }
+    }
+
     return CONFIG_SUCCESS;
 }
 
@@ -1325,21 +1341,19 @@ config_context_t* config_service_create(const char* service_name,
 config_error_t config_service_load(config_context_t* ctx,
                                    config_source_t** sources,
                                    size_t source_count) {
-    if (!ctx || !sources || source_count == 0) return CONFIG_ERROR_INVALID_ARG;
-    
-    // 简化实现：实际应从所有配置源加载配置
-    // 这里返回成功
-    
+
+    config_error_t err = CONFIG_SUCCESS;
+    for (size_t i = 0; i < source_count; i++) {
+        err = config_source_load(sources[i], ctx);
+        if (err != CONFIG_SUCCESS) return err;
+    }
+
     return CONFIG_SUCCESS;
 }
 
 config_error_t config_service_save(config_context_t* ctx, config_source_t* primary_source) {
-    if (!ctx || !primary_source) return CONFIG_ERROR_INVALID_ARG;
-    
-    // 简化实现：实际应保存配置到主配置源
-    // 这里返回成功
-    
-    return CONFIG_SUCCESS;
+
+    return config_source_save(primary_source, ctx);
 }
 
 config_error_t config_service_get_status(config_context_t* ctx,

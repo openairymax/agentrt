@@ -103,17 +103,14 @@ scheduler_core_ctx_t* scheduler_core_get_ctx(void) {
 }
 
 int scheduler_core_init(void) {
-    /* 双重检查锁模式 */
-    if (g_core_ctx) {
-        return 0;  /* 已经初始�?*/
+    if (__atomic_load_n(&g_core_ctx, __ATOMIC_ACQUIRE)) {
+        return 0;
     }
 
-    /* 创建初始化锁（如果需要） */
     if (!g_ctx_init_lock) {
         void* new_lock = agentos_mutex_create();
         if (!new_lock) return -1;
 
-        /* CAS操作设置锁 */
         void* expected = NULL;
 #ifdef _WIN32
         if (!atomic_compare_exchange_strong_ptr(&g_ctx_init_lock, &expected, new_lock, memory_order_seq_cst, memory_order_seq_cst)) {
@@ -121,29 +118,25 @@ int scheduler_core_init(void) {
         if (!__atomic_compare_exchange_n(&g_ctx_init_lock, &expected, new_lock,
                                          0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
 #endif
-            /* 其他线程已经设置了锁 */
             agentos_mutex_free(new_lock);
         }
     }
 
-    /* 加锁 */
     agentos_mutex_lock(g_ctx_init_lock);
 
-    /* 再次检查（在锁内） */
-    if (g_core_ctx) {
+    if (__atomic_load_n(&g_core_ctx, __ATOMIC_ACQUIRE)) {
         agentos_mutex_unlock(g_ctx_init_lock);
         return 0;
     }
 
-    /* 创建核心上下�?*/
     g_core_ctx = create_core_ctx();
     if (!g_core_ctx) {
         agentos_mutex_unlock(g_ctx_init_lock);
         return -1;
     }
 
-    /* 标记为已初始化 */
     atomic_store_int(&g_core_ctx->initialized, 1);
+    __atomic_thread_fence(__ATOMIC_RELEASE);
 
     agentos_mutex_unlock(g_ctx_init_lock);
     return 0;
