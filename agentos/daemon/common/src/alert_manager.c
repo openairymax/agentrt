@@ -40,6 +40,9 @@ static struct {
     uint32_t callback_count;
     bool initialized;
     agentos_platform_mutex_t mutex;
+    struct { char name[128]; double value; } latest_metrics[AM_MAX_RULES];
+    struct { char name[128]; double values[8]; uint32_t count; uint32_t head; } metric_history[AM_MAX_RULES];
+    uint32_t metric_count;
 } g_am = {0};
 
 /* ==================== 辅助函数 ==================== */
@@ -371,7 +374,7 @@ AGENTOS_API int am_evaluate(const char* metric_name, double value) {
                 condition_met = evaluate_condition(value, rule->comparison, rule->threshold);
                 break;
             case AM_RULE_TREND:
-                condition_met = evaluate_condition(value, rule->comparison, rule->threshold);
+                condition_met = evaluate_trend(metric_name, rule->comparison, rule->threshold);
                 break;
             default:
                 condition_met = evaluate_condition(value, rule->comparison, rule->threshold);
@@ -409,6 +412,83 @@ AGENTOS_API int am_evaluate(const char* metric_name, double value) {
     return triggered;
 }
 
+AGENTOS_API int am_record_metric(const char* metric_name, double value) {
+    if (!metric_name) return -1;
+
+    agentos_platform_mutex_lock(&g_am.mutex);
+
+    for (uint32_t i = 0; i < g_am.metric_count; i++) {
+        if (strcmp(g_am.latest_metrics[i].name, metric_name) == 0) {
+            g_am.latest_metrics[i].value = value;
+            uint32_t tail = (g_am.metric_history[i].head + g_am.metric_history[i].count) % 8;
+            g_am.metric_history[i].values[tail] = value;
+            if (g_am.metric_history[i].count < 8)
+                g_am.metric_history[i].count++;
+            else
+                g_am.metric_history[i].head = (g_am.metric_history[i].head + 1) % 8;
+            agentos_platform_mutex_unlock(&g_am.mutex);
+            return 0;
+        }
+    }
+
+    if (g_am.metric_count < AM_MAX_RULES) {
+        strncpy(g_am.latest_metrics[g_am.metric_count].name, metric_name, 127);
+        g_am.latest_metrics[g_am.metric_count].name[127] = '\0';
+        g_am.latest_metrics[g_am.metric_count].value = value;
+
+        strncpy(g_am.metric_history[g_am.metric_count].name, metric_name, 127);
+        g_am.metric_history[g_am.metric_count].name[127] = '\0';
+        g_am.metric_history[g_am.metric_count].values[0] = value;
+        g_am.metric_history[g_am.metric_count].count = 1;
+        g_am.metric_history[g_am.metric_count].head = 0;
+        g_am.metric_count++;
+    }
+
+    agentos_platform_mutex_unlock(&g_am.mutex);
+    return 0;
+}
+
+static double am_get_latest_metric_value(const char* metric_name) {
+    for (uint32_t i = 0; i < g_am.metric_count; i++) {
+        if (strcmp(g_am.latest_metrics[i].name, metric_name) == 0) {
+            return g_am.latest_metrics[i].value;
+        }
+    }
+    return 0.0;
+}
+
+static bool evaluate_trend(const char* metric_name, am_comparison_t op, double threshold) {
+    for (uint32_t i = 0; i < g_am.metric_count; i++) {
+        if (strcmp(g_am.metric_history[i].name, metric_name) != 0) continue;
+        if (g_am.metric_history[i].count < 2) return false;
+
+        double sum = 0.0;
+        uint32_t n = g_am.metric_history[i].count;
+        for (uint32_t j = 0; j < n; j++) {
+            uint32_t idx = (g_am.metric_history[i].head + j) % 8;
+            sum += g_am.metric_history[i].values[idx];
+        }
+        double avg = sum / n;
+
+        double first_half_sum = 0.0, second_half_sum = 0.0;
+        uint32_t half = n / 2;
+        for (uint32_t j = 0; j < half; j++) {
+            uint32_t idx = (g_am.metric_history[i].head + j) % 8;
+            first_half_sum += g_am.metric_history[i].values[idx];
+        }
+        for (uint32_t j = half; j < n; j++) {
+            uint32_t idx = (g_am.metric_history[i].head + j) % 8;
+            second_half_sum += g_am.metric_history[i].values[idx];
+        }
+        double first_avg = half > 0 ? first_half_sum / half : 0.0;
+        double second_avg = (n - half) > 0 ? second_half_sum / (n - half) : 0.0;
+        double trend_delta = second_avg - first_avg;
+
+        return evaluate_condition(trend_delta, op, threshold);
+    }
+    return false;
+}
+
 AGENTOS_API int am_evaluate_all(void) {
     agentos_platform_mutex_lock(&g_am.mutex);
 
@@ -423,8 +503,8 @@ AGENTOS_API int am_evaluate_all(void) {
             (now - rule->last_triggered) < (uint64_t)rule->cooldown_seconds * 1000)
             continue;
 
-        double value = 0.0;
         if (rule->metric_name[0] != '\0') {
+            double value = am_get_latest_metric_value(rule->metric_name);
             agentos_platform_mutex_unlock(&g_am.mutex);
             int result = am_evaluate(rule->metric_name, value);
             agentos_platform_mutex_lock(&g_am.mutex);
