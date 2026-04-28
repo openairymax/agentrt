@@ -218,11 +218,25 @@ int proto_ext_send_message(proto_ext_framework_t* fw,
                 size_t encoded_size = 0;
                 int rc = fw->adapters[i].callbacks.encode_message(
                     fw->adapters[i].adapter_context, message, &encoded, &encoded_size);
-                free(encoded);
                 if (rc != 0) {
+                    free(encoded);
                     fw->adapters[i].error_count++;
                     return rc;
                 }
+
+                if (encoded && encoded_size > 0 && fw->adapters[i].callbacks.handle_request) {
+                    char params_json[64];
+                    snprintf(params_json, sizeof(params_json), "{\"size\":%zu}", encoded_size);
+                    char* response = NULL;
+                    int send_rc = fw->adapters[i].callbacks.handle_request(
+                        fw->adapters[i].adapter_context, "send", params_json, &response);
+                    free(response);
+                    if (send_rc != 0) {
+                        fw->adapters[i].error_count++;
+                    }
+                }
+
+                free(encoded);
             }
 
             fw->adapters[i].messages_processed++;
