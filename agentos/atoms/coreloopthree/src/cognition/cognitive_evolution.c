@@ -124,6 +124,7 @@ int cog_evolution_record_experience(cog_evolution_t* evo, const cog_experience_t
     if (!evo || !experience) return -1;
 
     if (evo->experience_count >= COG_EVO_MAX_EXPERIENCES) {
+        evo->total_fitness -= evo->experiences[0].reward;
         free_experience(&evo->experiences[0]);
         memmove(evo->experiences, evo->experiences + 1,
                 (evo->experience_count - 1) * sizeof(cog_experience_t));

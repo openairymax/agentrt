@@ -65,12 +65,95 @@ agentos_error_t agentos_memoryrov_init(
     agentos_memoryrov_handle_t** out_handle) {
     if (!out_handle) return AGENTOS_EINVAL;
 
-    agentos_memoryrov_handle_t* handle = agentos_memoryrov_create();
+    agentos_memoryrov_handle_t* handle =
+        (agentos_memoryrov_handle_t*)AGENTOS_CALLOC(1, sizeof(agentos_memoryrov_handle_t));
     if (!handle) return AGENTOS_ENOMEM;
 
+    const char* raw_path = NULL;
+    const char* idx_path = NULL;
+    const char* emb_model = "default";
+    uint32_t dimension = 768;
+    uint32_t index_type = AGENTOS_INDEX_HNSW;
+    uint32_t hnsw_m = 16;
+    uint32_t ivf_nlist = 100;
+    uint32_t forget_strategy = AGENTOS_FORGET_EBBINGHAUS;
+    double forget_lambda = DEFAULT_FORGET_LAMBDA;
+    double forget_threshold = DEFAULT_FORGET_THRESHOLD;
+    uint32_t forget_check_interval = 3600;
+
     if (manager) {
-        handle->initialized = 1;
+        if (manager->raw_storage_path) raw_path = manager->raw_storage_path;
+        if (manager->index_path) idx_path = manager->index_path;
+        if (manager->embedding_model) emb_model = manager->embedding_model;
+        if (manager->embedding_dim > 0) dimension = manager->embedding_dim;
+        if (manager->index_type > 0) index_type = manager->index_type;
+        if (manager->hnsw_m > 0) hnsw_m = manager->hnsw_m;
+        if (manager->ivf_nlist > 0) ivf_nlist = manager->ivf_nlist;
+        if (manager->forget_strategy > 0) forget_strategy = manager->forget_strategy;
+        if (manager->forget_lambda > 0.0) forget_lambda = manager->forget_lambda;
+        if (manager->forget_threshold > 0.0) forget_threshold = manager->forget_threshold;
+        if (manager->forget_check_interval > 0) forget_check_interval = manager->forget_check_interval;
     }
+
+    agentos_error_t err = agentos_layer1_raw_create_async(raw_path, 1024, 4, &handle->l1_raw);
+    if (err != AGENTOS_SUCCESS || !handle->l1_raw) {
+        AGENTOS_FREE(handle);
+        return AGENTOS_ENOMEM;
+    }
+
+    agentos_layer2_feature_config_t l2_config = {
+        .index_path = idx_path,
+        .embedding_model = emb_model,
+        .dimension = dimension,
+        .index_type = index_type,
+        .hnsw_m = hnsw_m,
+        .ivf_nlist = ivf_nlist
+    };
+    err = agentos_layer2_feature_create(&l2_config, &handle->l2_feature);
+    if (err != AGENTOS_SUCCESS || !handle->l2_feature) {
+        agentos_layer1_raw_destroy(handle->l1_raw);
+        AGENTOS_FREE(handle);
+        return AGENTOS_ENOMEM;
+    }
+
+    err = agentos_knowledge_graph_create(&handle->l3_struct);
+    if (err != AGENTOS_SUCCESS || !handle->l3_struct) {
+        agentos_layer2_feature_destroy(handle->l2_feature);
+        agentos_layer1_raw_destroy(handle->l1_raw);
+        AGENTOS_FREE(handle);
+        return AGENTOS_ENOMEM;
+    }
+
+    err = agentos_rule_generator_create(NULL, &handle->l4_pattern);
+    if (err != AGENTOS_SUCCESS || !handle->l4_pattern) {
+        agentos_knowledge_graph_destroy(handle->l3_struct);
+        agentos_layer2_feature_destroy(handle->l2_feature);
+        agentos_layer1_raw_destroy(handle->l1_raw);
+        AGENTOS_FREE(handle);
+        return AGENTOS_ENOMEM;
+    }
+
+    agentos_forgetting_config_t forget_config = {
+        .strategy = forget_strategy,
+        .lambda = forget_lambda,
+        .threshold = forget_threshold,
+        .min_access = 1,
+        .check_interval_sec = forget_check_interval,
+        .archive_path = NULL
+    };
+    err = agentos_forgetting_create(&forget_config, handle->l1_raw, handle->l2_feature, &handle->forgetting);
+    if (err != AGENTOS_SUCCESS || !handle->forgetting) {
+        agentos_rule_generator_destroy(handle->l4_pattern);
+        agentos_knowledge_graph_destroy(handle->l3_struct);
+        agentos_layer2_feature_destroy(handle->l2_feature);
+        agentos_layer1_raw_destroy(handle->l1_raw);
+        AGENTOS_FREE(handle);
+        return AGENTOS_ENOMEM;
+    }
+
+    handle->initialized = 1;
+
+    agentos_raw_metadata_db_create(":memory:", &handle->meta_db);
 
     *out_handle = handle;
     return AGENTOS_SUCCESS;
