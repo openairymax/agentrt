@@ -76,7 +76,7 @@ struct config_context {
     bool locked;
     
     /** 互斥锁保护上下文 */
-    void* mutex; // 简化实现，实际应使用pthread_mutex_t
+    void* mutex; /**< 互斥锁 (pthread_mutex_t*) */
 };
 
 /* ==================== 内部辅助函数 ==================== */

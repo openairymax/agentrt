@@ -171,9 +171,11 @@ endif()
 # 安装配置
 if(AGENTOS_BUILD_ALL)
     # 创建安装目标
-    install(DIRECTORY docs/ DESTINATION share/doc/agentos
-            PATTERN ".gitignore" EXCLUDE
-            PATTERN "*.pyc" EXCLUDE)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/docs")
+        install(DIRECTORY docs/ DESTINATION share/doc/agentos
+                PATTERN ".gitignore" EXCLUDE
+                PATTERN "*.pyc" EXCLUDE)
+    endif()
 
     # 安装许可证文件
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
@@ -193,6 +195,9 @@ set(CPACK_PACKAGE_NAME "AgentOS")
 set(CPACK_PACKAGE_VENDOR "SPHARX")
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Intelligent Agent Operating System")
+set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+set(CPACK_PACKAGE_CONTACT "support@spharx.com")
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "SPHARX <support@spharx.com>")
 set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 
