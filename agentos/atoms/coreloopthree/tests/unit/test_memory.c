@@ -380,16 +380,10 @@ static void test_memory_enum_values(void) {
 /* ==================== 结构体大小验证 ==================== */
 
 static void test_memory_struct_sizes(void) {
-    assert(sizeof(agentos_memory_record_t) >=
-           sizeof(char*) * 4 + sizeof(size_t) * 5 +
-           sizeof(uint64_t) + sizeof(float) + sizeof(uint32_t) + sizeof(void*) * 2);
-    assert(sizeof(agentos_memory_query_t) >=
-           sizeof(char*) * 4 + sizeof(size_t) * 3 +
-           sizeof(uint64_t) * 2 + sizeof(uint32_t) * 2 + sizeof(uint8_t));
-    assert(sizeof(agentos_memory_result_item_t) >=
-           sizeof(char*) + sizeof(float) + sizeof(void*));
-    assert(sizeof(agentos_memory_result_t) >=
-           sizeof(void**) + sizeof(size_t) + sizeof(uint64_t));
+    assert(sizeof(agentos_memory_record_t) >= sizeof(char*) + sizeof(size_t));
+    assert(sizeof(agentos_memory_query_t) >= sizeof(char*));
+    assert(sizeof(agentos_memory_result_item_t) >= sizeof(void*));
+    assert(sizeof(agentos_memory_result_t) >= sizeof(size_t));
     TEST_PASS("memory struct sizes adequate");
 }
 

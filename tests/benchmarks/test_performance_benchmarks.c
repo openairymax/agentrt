@@ -39,6 +39,7 @@
 
 /* syscall */
 #include "syscalls.h"
+#include "platform.h"
 
 /* ==================== 性能测量工具 ==================== */
 

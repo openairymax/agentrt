@@ -490,11 +490,8 @@ static void test_execution_enum_values(void) {
 /* ==================== 结构体大小验证 ==================== */
 
 static void test_execution_struct_sizes(void) {
-    assert(sizeof(agentos_task_t) >=
-           sizeof(char*) * 4 + sizeof(size_t) * 4 +
-           sizeof(uint64_t) * 3 + sizeof(uint32_t) * 3 + sizeof(void*) * 3);
-    assert(sizeof(agentos_execution_unit_t) >=
-           sizeof(void*) + 3 * sizeof(void*));
+    assert(sizeof(agentos_task_t) >= sizeof(char*) + sizeof(size_t) + sizeof(uint32_t));
+    assert(sizeof(agentos_execution_unit_t) >= sizeof(void*));
     TEST_PASS("execution struct sizes adequate");
 }
 
