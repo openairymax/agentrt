@@ -489,15 +489,32 @@ AGENTOS_API agentos_error_t agentos_loop_submit(
         return AGENTOS_EINVAL;
     }
 
-    /* 步骤 4: 执行层提交任务 */
-    agentos_task_t task;
-    memset(&task, 0, sizeof(task));
-    task.task_input = (void*)process_input;
-    task.task_timeout_ms = loop->manager.loop_config_task_timeout_ms;
+    /* 步骤 4: 执行层按计划节点提交任务 */
+    agentos_error_t first_err = AGENTOS_SUCCESS;
+    for (size_t i = 0; i < plan->task_plan_node_count; i++) {
+        agentos_task_node_t* node = plan->task_plan_nodes[i];
+        if (!node) continue;
 
-    err = agentos_execution_submit(loop->execution, &task, out_task_id);
+        agentos_task_t task;
+        memset(&task, 0, sizeof(task));
+        task.task_input = node->task_node_input ? node->task_node_input : (void*)process_input;
+        task.task_timeout_ms = node->task_node_timeout_ms > 0
+            ? node->task_node_timeout_ms
+            : loop->manager.loop_config_task_timeout_ms;
 
-    if (err == AGENTOS_SUCCESS) {
+        char* node_task_id = NULL;
+        err = agentos_execution_submit(loop->execution, &task, &node_task_id);
+        if (err != AGENTOS_SUCCESS && first_err == AGENTOS_SUCCESS) {
+            first_err = err;
+        }
+        if (node_task_id) AGENTOS_FREE(node_task_id);
+    }
+
+    if (first_err == AGENTOS_SUCCESS && out_task_id) {
+        *out_task_id = NULL;
+    }
+
+    if (first_err == AGENTOS_SUCCESS) {
         agentos_mutex_lock(loop->lock);
         loop->task_pending = 1;
         agentos_cond_signal(loop->cond);
@@ -508,7 +525,7 @@ AGENTOS_API agentos_error_t agentos_loop_submit(
     agentos_task_plan_free(plan);
     if (enhanced_input) AGENTOS_FREE(enhanced_input);
 
-    return err;
+    return first_err;
 }
 
 AGENTOS_API agentos_error_t agentos_loop_wait(

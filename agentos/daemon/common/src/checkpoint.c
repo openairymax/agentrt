@@ -360,7 +360,7 @@ agentos_error_t agentos_checkpoint_create(
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t agentos_checkpoint_save(const agentos_task_checkpoint_t* cp) {
+agentos_error_t agentos_checkpoint_save(agentos_task_checkpoint_t* cp) {
     if (!g_checkpoint_initialized) {
         return AGENTOS_ENOTINIT;
     }
@@ -621,7 +621,7 @@ agentos_error_t agentos_checkpoint_cleanup(uint64_t max_age_sec, size_t max_cnt)
 
     if (max_age_sec > 0) {
         char pattern[MAX_CHECKPOINT_PATH];
-        snprintf(pattern, sizeof(pattern), "%s/*.chk", g_checkpoint_storage_path);
+        snprintf(pattern, sizeof(pattern), "%s/*.json", g_checkpoint_storage_path);
 
 #ifdef _WIN32
         WIN32_FIND_DATAA find_data;
@@ -652,7 +652,7 @@ agentos_error_t agentos_checkpoint_cleanup(uint64_t max_age_sec, size_t max_cnt)
             struct dirent* entry;
             while ((entry = readdir(dir)) != NULL) {
                 size_t len = strlen(entry->d_name);
-                if (len < 4 || strcmp(entry->d_name + len - 4, ".chk") != 0)
+                if (len < 5 || strcmp(entry->d_name + len - 5, ".json") != 0)
                     continue;
 
                 char filepath[MAX_CHECKPOINT_PATH];

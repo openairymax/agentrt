@@ -48,8 +48,14 @@ agentos_error_t agentos_timer_start(
     if (!timer || interval_ms == 0) return AGENTOS_EINVAL;
 
     if (!timer_lock) {
-        timer_lock = agentos_mutex_create();
-        if (!timer_lock) return AGENTOS_ENOMEM;
+        agentos_mutex_t* new_lock = agentos_mutex_create();
+        if (!new_lock) return AGENTOS_ENOMEM;
+
+        agentos_mutex_t* expected = NULL;
+        if (!__atomic_compare_exchange_n(&timer_lock, &expected, new_lock,
+                                         0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+            agentos_mutex_free(new_lock);
+        }
     }
 
     agentos_mutex_lock(timer_lock);

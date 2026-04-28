@@ -35,6 +35,7 @@ struct channel_service {
     bool healthy;
     uint64_t total_messages_sent;
     uint64_t total_messages_received;
+    pthread_mutex_t lock;
 };
 
 static uint64_t get_time_ms(void)
@@ -167,6 +168,7 @@ channel_service_t* channel_service_create(const channel_config_t* config)
     }
 
     svc->healthy = true;
+    pthread_mutex_init(&svc->lock, NULL);
     return svc;
 }
 
@@ -182,6 +184,7 @@ void channel_service_destroy(channel_service_t* svc)
         destroy_channel(&svc->channels[i]);
     }
 
+    pthread_mutex_destroy(&svc->lock);
     free(svc);
 }
 
@@ -219,7 +222,12 @@ int channel_service_open(channel_service_t* svc,
 {
     if (!svc || !channel_id || !name) return -1;
     if (svc->channel_count >= svc->config.max_channels) return -2;
-    if (find_channel(svc, channel_id)) return -3;
+
+    pthread_mutex_lock(&svc->lock);
+    if (find_channel(svc, channel_id)) {
+        pthread_mutex_unlock(&svc->lock);
+        return -3;
+    }
 
     channel_entry_t* entry = &svc->channels[svc->channel_count];
     memset(entry, 0, sizeof(channel_entry_t));
@@ -267,6 +275,7 @@ int channel_service_open(channel_service_t* svc,
     }
 
     if (rc < 0) {
+        pthread_mutex_unlock(&svc->lock);
         return -4;
     }
 
@@ -274,10 +283,12 @@ int channel_service_open(channel_service_t* svc,
     entry->recv_buffer = (uint8_t*)calloc(1, entry->recv_buffer_size);
     if (!entry->recv_buffer) {
         destroy_channel(entry);
+        pthread_mutex_unlock(&svc->lock);
         return -5;
     }
 
     svc->channel_count++;
+    pthread_mutex_unlock(&svc->lock);
     return 0;
 }
 
@@ -285,6 +296,7 @@ int channel_service_close(channel_service_t* svc, const char* channel_id)
 {
     if (!svc || !channel_id) return -1;
 
+    pthread_mutex_lock(&svc->lock);
     for (size_t i = 0; i < svc->channel_count; i++) {
         if (strcmp(svc->channels[i].info.channel_id, channel_id) == 0) {
             destroy_channel(&svc->channels[i]);
@@ -295,9 +307,11 @@ int channel_service_close(channel_service_t* svc, const char* channel_id)
                 svc->channels[svc->channel_count - 1].shm_fd = -1;
             }
             svc->channel_count--;
+            pthread_mutex_unlock(&svc->lock);
             return 0;
         }
     }
+    pthread_mutex_unlock(&svc->lock);
     return -2;
 }
 
@@ -308,36 +322,41 @@ int channel_service_send(channel_service_t* svc,
 {
     if (!svc || !channel_id || !data || data_len == 0) return -1;
 
+    pthread_mutex_lock(&svc->lock);
     channel_entry_t* entry = find_channel(svc, channel_id);
-    if (!entry || entry->info.status != CHANNEL_STATUS_OPEN) return -2;
+    if (!entry || entry->info.status != CHANNEL_STATUS_OPEN) {
+        pthread_mutex_unlock(&svc->lock);
+        return -2;
+    }
 
     entry->info.last_activity = get_time_ms();
 
     switch (entry->info.type) {
         case CHANNEL_TYPE_SOCKET: {
-            if (entry->socket_fd < 0) return -3;
+            if (entry->socket_fd < 0) { pthread_mutex_unlock(&svc->lock); return -3; }
             struct sockaddr_un client_addr;
             memset(&client_addr, 0, sizeof(client_addr));
             client_addr.sun_family = AF_UNIX;
             strncpy(client_addr.sun_path, entry->info.endpoint, sizeof(client_addr.sun_path) - 1);
             client_addr.sun_path[sizeof(client_addr.sun_path) - 1] = '\0';
             int client_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-            if (client_fd < 0) return -3;
+            if (client_fd < 0) { pthread_mutex_unlock(&svc->lock); return -3; }
             if (connect(client_fd, (struct sockaddr*)&client_addr, sizeof(client_addr)) < 0) {
                 close(client_fd);
+                pthread_mutex_unlock(&svc->lock);
                 return -3;
             }
             uint32_t net_len = htonl((uint32_t)data_len);
             ssize_t w1 = write(client_fd, &net_len, sizeof(net_len));
             ssize_t w2 = write(client_fd, data, data_len);
             close(client_fd);
-            if (w1 < 0 || w2 < 0) return -3;
+            if (w1 < 0 || w2 < 0) { pthread_mutex_unlock(&svc->lock); return -3; }
             break;
         }
         case CHANNEL_TYPE_SHM: {
-            if (!entry->shm_ptr) return -3;
+            if (!entry->shm_ptr) { pthread_mutex_unlock(&svc->lock); return -3; }
             size_t header_size = sizeof(uint32_t) * 2;
-            if (data_len + header_size > entry->shm_size) return -4;
+            if (data_len + header_size > entry->shm_size) { pthread_mutex_unlock(&svc->lock); return -4; }
             volatile uint32_t* msg_len = (volatile uint32_t*)entry->shm_ptr;
             volatile uint32_t* msg_flag = (volatile uint32_t*)((char*)entry->shm_ptr + sizeof(uint32_t));
             *msg_len = (uint32_t)data_len;
@@ -349,15 +368,16 @@ int channel_service_send(channel_service_t* svc,
         case CHANNEL_TYPE_PIPE: {
             if (entry->info.endpoint[0]) {
                 int fd = open(entry->info.endpoint, O_WRONLY | O_NONBLOCK);
-                if (fd < 0) return -3;
+                if (fd < 0) { pthread_mutex_unlock(&svc->lock); return -3; }
                 uint32_t net_len = htonl((uint32_t)data_len);
-                if (write(fd, &net_len, sizeof(net_len)) < 0) { close(fd); return -3; }
-                if (write(fd, data, data_len) < 0) { close(fd); return -3; }
+                if (write(fd, &net_len, sizeof(net_len)) < 0) { close(fd); pthread_mutex_unlock(&svc->lock); return -3; }
+                if (write(fd, data, data_len) < 0) { close(fd); pthread_mutex_unlock(&svc->lock); return -3; }
                 close(fd);
             }
             break;
         }
         default:
+            pthread_mutex_unlock(&svc->lock);
             return -3;
     }
 
@@ -365,9 +385,14 @@ int channel_service_send(channel_service_t* svc,
     svc->total_messages_sent++;
 
     if (entry->callback) {
-        entry->callback(channel_id, data, data_len, entry->callback_user_data);
+        channel_message_cb_t cb = entry->callback;
+        void* ud = entry->callback_user_data;
+        pthread_mutex_unlock(&svc->lock);
+        cb(channel_id, data, data_len, ud);
+        return 0;
     }
 
+    pthread_mutex_unlock(&svc->lock);
     return 0;
 }
 
@@ -378,43 +403,48 @@ int channel_service_receive(channel_service_t* svc,
 {
     if (!svc || !channel_id || !out_data || !out_len) return -1;
 
+    pthread_mutex_lock(&svc->lock);
     channel_entry_t* entry = find_channel(svc, channel_id);
-    if (!entry || entry->info.status != CHANNEL_STATUS_OPEN) return -2;
+    if (!entry || entry->info.status != CHANNEL_STATUS_OPEN) {
+        pthread_mutex_unlock(&svc->lock);
+        return -2;
+    }
 
     entry->info.last_activity = get_time_ms();
 
     switch (entry->info.type) {
         case CHANNEL_TYPE_SOCKET: {
-            if (entry->socket_fd < 0) return -3;
+            if (entry->socket_fd < 0) { pthread_mutex_unlock(&svc->lock); return -3; }
             int client_fd = accept(entry->socket_fd, NULL, NULL);
-            if (client_fd < 0) return -3;
+            if (client_fd < 0) { pthread_mutex_unlock(&svc->lock); return -3; }
             uint32_t net_len = 0;
             ssize_t r1 = read(client_fd, &net_len, sizeof(net_len));
-            if (r1 <= 0) { close(client_fd); return -3; }
+            if (r1 <= 0) { close(client_fd); pthread_mutex_unlock(&svc->lock); return -3; }
             uint32_t msg_len = ntohl(net_len);
             if (msg_len == 0 || msg_len > svc->config.default_buffer_size) {
                 close(client_fd);
+                pthread_mutex_unlock(&svc->lock);
                 return -4;
             }
             void* buf = malloc(msg_len);
-            if (!buf) { close(client_fd); return -5; }
+            if (!buf) { close(client_fd); pthread_mutex_unlock(&svc->lock); return -5; }
             ssize_t r2 = read(client_fd, buf, msg_len);
             close(client_fd);
-            if (r2 <= 0) { free(buf); return -3; }
+            if (r2 <= 0) { free(buf); pthread_mutex_unlock(&svc->lock); return -3; }
             *out_data = buf;
             *out_len = (size_t)r2;
             break;
         }
         case CHANNEL_TYPE_SHM: {
-            if (!entry->shm_ptr) return -3;
+            if (!entry->shm_ptr) { pthread_mutex_unlock(&svc->lock); return -3; }
             volatile uint32_t* msg_len = (volatile uint32_t*)entry->shm_ptr;
             volatile uint32_t* msg_flag = (volatile uint32_t*)((char*)entry->shm_ptr + sizeof(uint32_t));
             __sync_synchronize();
-            if (*msg_flag != 1) return 0;
+            if (*msg_flag != 1) { pthread_mutex_unlock(&svc->lock); return 0; }
             uint32_t len = *msg_len;
-            if (len == 0 || len > entry->shm_size - sizeof(uint32_t) * 2) return -4;
+            if (len == 0 || len > entry->shm_size - sizeof(uint32_t) * 2) { pthread_mutex_unlock(&svc->lock); return -4; }
             void* buf = malloc(len);
-            if (!buf) return -5;
+            if (!buf) { pthread_mutex_unlock(&svc->lock); return -5; }
             memcpy(buf, (char*)entry->shm_ptr + sizeof(uint32_t) * 2, len);
             __sync_synchronize();
             *msg_flag = 0;
@@ -425,30 +455,33 @@ int channel_service_receive(channel_service_t* svc,
         case CHANNEL_TYPE_PIPE: {
             if (entry->info.endpoint[0]) {
                 int fd = open(entry->info.endpoint, O_RDONLY | O_NONBLOCK);
-                if (fd < 0) return 0;
+                if (fd < 0) { pthread_mutex_unlock(&svc->lock); return 0; }
                 uint32_t net_len = 0;
                 ssize_t r1 = read(fd, &net_len, sizeof(net_len));
-                if (r1 <= 0) { close(fd); return 0; }
+                if (r1 <= 0) { close(fd); pthread_mutex_unlock(&svc->lock); return 0; }
                 uint32_t msg_len = ntohl(net_len);
-                if (msg_len == 0) { close(fd); return 0; }
+                if (msg_len == 0) { close(fd); pthread_mutex_unlock(&svc->lock); return 0; }
                 void* buf = malloc(msg_len);
-                if (!buf) { close(fd); return -5; }
+                if (!buf) { close(fd); pthread_mutex_unlock(&svc->lock); return -5; }
                 ssize_t r2 = read(fd, buf, msg_len);
                 close(fd);
-                if (r2 <= 0) { free(buf); return 0; }
+                if (r2 <= 0) { free(buf); pthread_mutex_unlock(&svc->lock); return 0; }
                 *out_data = buf;
                 *out_len = (size_t)r2;
             } else {
+                pthread_mutex_unlock(&svc->lock);
                 return 0;
             }
             break;
         }
         default:
+            pthread_mutex_unlock(&svc->lock);
             return -3;
     }
 
     entry->info.messages_received++;
     svc->total_messages_received++;
+    pthread_mutex_unlock(&svc->lock);
     return 0;
 }
 
@@ -459,6 +492,7 @@ int channel_service_list(channel_service_t* svc,
 {
     if (!svc || !out_list || !out_count) return -1;
 
+    pthread_mutex_lock(&svc->lock);
     size_t count = svc->channel_count;
     if (count > list_capacity) count = list_capacity;
 
@@ -467,6 +501,7 @@ int channel_service_list(channel_service_t* svc,
     }
 
     *out_count = count;
+    pthread_mutex_unlock(&svc->lock);
     return 0;
 }
 
@@ -476,10 +511,15 @@ int channel_service_get_info(channel_service_t* svc,
 {
     if (!svc || !channel_id || !out_info) return -1;
 
+    pthread_mutex_lock(&svc->lock);
     channel_entry_t* entry = find_channel(svc, channel_id);
-    if (!entry) return -2;
+    if (!entry) {
+        pthread_mutex_unlock(&svc->lock);
+        return -2;
+    }
 
     *out_info = entry->info;
+    pthread_mutex_unlock(&svc->lock);
     return 0;
 }
 
@@ -490,11 +530,16 @@ int channel_service_set_callback(channel_service_t* svc,
 {
     if (!svc || !channel_id) return -1;
 
+    pthread_mutex_lock(&svc->lock);
     channel_entry_t* entry = find_channel(svc, channel_id);
-    if (!entry) return -2;
+    if (!entry) {
+        pthread_mutex_unlock(&svc->lock);
+        return -2;
+    }
 
     entry->callback = callback;
     entry->callback_user_data = user_data;
+    pthread_mutex_unlock(&svc->lock);
     return 0;
 }
 

@@ -18,6 +18,7 @@
 #include <string.h>
 #include <time.h>
 #include <dirent.h>
+#include <errno.h>
 
 #ifdef _WIN32
 #include <windows.h>
