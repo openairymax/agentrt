@@ -117,6 +117,10 @@ int agentos_platform_thread_join(agentos_thread_t thread, void** retval) {
     return pthread_join(thread, retval);
 }
 
+int agentos_platform_thread_detach(agentos_thread_t thread) {
+    return pthread_detach(thread);
+}
+
 #endif
 
 /* ==================== 互斥锁实现 ==================== */
