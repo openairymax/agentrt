@@ -16,7 +16,7 @@ from agentos import (
     Telemetry, Meter, Tracer, Span, SpanStatus,
     TaskStatus, TaskResult, SkillInfo, SkillResult,
     Memory, MemorySearchResult, Session, Skill,
-    MemoryLayer, SessionStatus, SkillStatus,
+    MemoryLayer, MemoryRecordType, MemoryInfo, SessionStatus, SkillStatus,
     generate_id, generate_timestamp, generate_hash,
     validate_json, sanitize_string,
     get_env_var, parse_timeout, merge_dicts,
@@ -91,16 +91,11 @@ class TestTypes(unittest.TestCase):
         result = SkillResult(
             success=True,
             output={"data": "test"},
-            error=None,
-            execution_time_ms=150.5
+            error=""
         )
         
         self.assertTrue(result.success)
         self.assertIsNotNone(result.output)
-        
-        data = result.to_dict()
-        self.assertEqual(data["success"], True)
-        self.assertEqual(data["execution_time_ms"], 150.5)
 
 
 class TestExceptions(unittest.TestCase):

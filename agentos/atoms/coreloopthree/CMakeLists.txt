@@ -44,9 +44,6 @@ endif()
 add_library(agentos_coreloopthree STATIC
     src/loop.c
     src/config_loader.c
-    src/utils/error_utils.c
-    src/utils/id_utils.c
-    src/memory/engine.c
     src/cognition/semantic_unit.c
     src/cognition/triple_coordinator.c
 )

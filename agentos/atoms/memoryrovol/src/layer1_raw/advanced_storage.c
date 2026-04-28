@@ -15,6 +15,7 @@
 #include "advanced_storage_utils.h"
 #include "advanced_storage_cache.h"
 #include "advanced_storage_async.h"
+#include "platform.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -168,6 +169,14 @@ agentos_error_t agentos_advanced_storage_create(const char* storage_id,
     storage->default_enc_algo = ENCRYPTION_AES_256_GCM;
     storage->shard_count = 1;
 
+    /* 生成随机加密密钥和IV */
+    for (size_t i = 0; i < ENCRYPTION_KEY_LENGTH; i++) {
+        storage->encryption_key[i] = (uint8_t)agentos_random_uint32(0, 255);
+    }
+    for (size_t i = 0; i < ENCRYPTION_IV_LENGTH; i++) {
+        storage->master_iv[i] = (uint8_t)agentos_random_uint32(0, 255);
+    }
+
     if (!storage->storage_id || !storage->global_lock) {
         AGENTOS_LOG_ERROR("Failed to initialize storage resources");
         if (storage->storage_id) AGENTOS_FREE(storage->storage_id);
@@ -262,10 +271,26 @@ agentos_error_t agentos_advanced_storage_write(agentos_advanced_storage_t* stora
         return err;
     }
 
-    /* 写入底层存储 */
-    err = agentos_layer1_raw_write(shard->storage, id, encrypted_data, encrypted_len);
+    /* 将 tag 追加到加密数据末尾: [encrypted_data | tag_len(4 bytes) | tag] */
+    size_t total_len = encrypted_len + 4 + tag_len;
+    void* stored_data = AGENTOS_MALLOC(total_len);
+    if (!stored_data) {
+        AGENTOS_FREE(encrypted_data);
+        if (tag) AGENTOS_FREE(tag);
+        return AGENTOS_ENOMEM;
+    }
+    memcpy(stored_data, encrypted_data, encrypted_len);
+    uint32_t tag_len_u32 = (uint32_t)tag_len;
+    memcpy((uint8_t*)stored_data + encrypted_len, &tag_len_u32, 4);
+    if (tag && tag_len > 0) {
+        memcpy((uint8_t*)stored_data + encrypted_len + 4, tag, tag_len);
+    }
     AGENTOS_FREE(encrypted_data);
     if (tag) AGENTOS_FREE(tag);
+
+    /* 写入底层存储 */
+    err = agentos_layer1_raw_write(shard->storage, id, stored_data, total_len);
+    AGENTOS_FREE(stored_data);
 
     if (err == AGENTOS_SUCCESS) {
         agentos_mutex_lock(shard->stats_lock);
@@ -302,14 +327,27 @@ agentos_error_t agentos_advanced_storage_read(agentos_advanced_storage_t* storag
         return err;
     }
 
+    /* 从存储数据中分离 tag: [encrypted_data | tag_len(4 bytes) | tag] */
+    if (encrypted_len < 4) {
+        AGENTOS_FREE(encrypted_data);
+        return AGENTOS_EINVAL;
+    }
+    uint32_t stored_tag_len = 0;
+    memcpy(&stored_tag_len, (uint8_t*)encrypted_data + encrypted_len - 4 - 0, 4);
+    size_t actual_encrypted_len = encrypted_len - 4 - stored_tag_len;
+    uint8_t* stored_tag = NULL;
+    if (stored_tag_len > 0 && actual_encrypted_len < encrypted_len) {
+        stored_tag = (uint8_t*)encrypted_data + actual_encrypted_len + 4;
+    }
+
     /* 解密数据 */
     void* compressed_data = NULL;
     size_t compressed_len = 0;
-    err = advanced_storage_decrypt(encrypted_data, encrypted_len,
+    err = advanced_storage_decrypt(encrypted_data, actual_encrypted_len,
                                   storage->default_enc_algo,
                                   storage->encryption_key, ENCRYPTION_KEY_LENGTH,
                                   storage->master_iv, ENCRYPTION_IV_LENGTH,
-                                  NULL, 0,  /* tag 需要从元数据中获取 */
+                                  stored_tag, stored_tag_len,
                                   &compressed_data, &compressed_len);
     AGENTOS_FREE(encrypted_data);
 

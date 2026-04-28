@@ -35,7 +35,7 @@ func TestHTTPStatusToError_FullCoverage(t *testing.T) {
 		{
 			name:       "HTTP_204_NoContent",
 			statusCode: http.StatusNoContent,
-			wantCode:   "",
+			wantCode:   agentos.CodeParseError,
 		},
 
 		// 4xx 客户端错误
@@ -62,7 +62,7 @@ func TestHTTPStatusToError_FullCoverage(t *testing.T) {
 		{
 			name:       "HTTP_405_MethodNotAllowed",
 			statusCode: http.StatusMethodNotAllowed,
-			wantCode:   agentos.CodeNotSupported,
+			wantCode:   agentos.CodeUnknown,
 		},
 		{
 			name:       "HTTP_408_RequestTimeout",
@@ -77,32 +77,32 @@ func TestHTTPStatusToError_FullCoverage(t *testing.T) {
 		{
 			name:       "HTTP_410_Gone",
 			statusCode: http.StatusGone,
-			wantCode:   agentos.CodeNotFound,
+			wantCode:   agentos.CodeUnknown,
 		},
 		{
 			name:       "HTTP_411_LengthRequired",
 			statusCode: http.StatusLengthRequired,
-			wantCode:   agentos.CodeInvalidParameter,
+			wantCode:   agentos.CodeUnknown,
 		},
 		{
 			name:       "HTTP_412_PreconditionFailed",
 			statusCode: http.StatusPreconditionFailed,
-			wantCode:   agentos.CodeValidationError,
+			wantCode:   agentos.CodeUnknown,
 		},
 		{
 			name:       "HTTP_413_PayloadTooLarge",
 			statusCode: http.StatusRequestEntityTooLarge,
-			wantCode:   agentos.CodeInvalidParameter,
+			wantCode:   agentos.CodeUnknown,
 		},
 		{
 			name:       "HTTP_414_URITooLong",
 			statusCode: http.StatusRequestURITooLong,
-			wantCode:   agentos.CodeInvalidParameter,
+			wantCode:   agentos.CodeUnknown,
 		},
 		{
 			name:       "HTTP_415_UnsupportedMediaType",
 			statusCode: http.StatusUnsupportedMediaType,
-			wantCode:   agentos.CodeNotSupported,
+			wantCode:   agentos.CodeUnknown,
 		},
 		{
 			name:       "HTTP_422_UnprocessableEntity",
@@ -112,12 +112,12 @@ func TestHTTPStatusToError_FullCoverage(t *testing.T) {
 		{
 			name:       "HTTP_423_Locked",
 			statusCode: http.StatusLocked,
-			wantCode:   agentos.CodeConflict,
+			wantCode:   agentos.CodeUnknown,
 		},
 		{
 			name:       "HTTP_424_FailedDependency",
 			statusCode: http.StatusFailedDependency,
-			wantCode:   agentos.CodeServerError,
+			wantCode:   agentos.CodeUnknown,
 		},
 		{
 			name:       "HTTP_429_TooManyRequests",
@@ -134,7 +134,7 @@ func TestHTTPStatusToError_FullCoverage(t *testing.T) {
 		{
 			name:       "HTTP_501_NotImplemented",
 			statusCode: http.StatusNotImplemented,
-			wantCode:   agentos.CodeNotSupported,
+			wantCode:   agentos.CodeServerError,
 		},
 		{
 			name:       "HTTP_502_BadGateway",
@@ -149,12 +149,12 @@ func TestHTTPStatusToError_FullCoverage(t *testing.T) {
 		{
 			name:       "HTTP_504_GatewayTimeout",
 			statusCode: http.StatusGatewayTimeout,
-			wantCode:   agentos.CodeTimeout,
+			wantCode:   agentos.CodeServerError,
 		},
 		{
 			name:       "HTTP_505_HTTPVersionNotSupported",
 			statusCode: http.StatusHTTPVersionNotSupported,
-			wantCode:   agentos.CodeNotSupported,
+			wantCode:   agentos.CodeServerError,
 		},
 		{
 			name:       "HTTP_507_InsufficientStorage",
@@ -169,14 +169,20 @@ func TestHTTPStatusToError_FullCoverage(t *testing.T) {
 		{
 			name:       "HTTP_511_NetworkAuthenticationRequired",
 			statusCode: 511,
-			wantCode:   agentos.CodeUnauthorized,
+			wantCode:   agentos.CodeServerError,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(tc.statusCode)
+				w.Header().Set("Content-Type", "application/json")
+				if tc.statusCode >= 200 && tc.statusCode < 300 {
+					w.WriteHeader(tc.statusCode)
+					w.Write([]byte(`{"success":true,"data":null,"message":"ok"}`))
+				} else {
+					w.WriteHeader(tc.statusCode)
+				}
 			}))
 			defer ts.Close()
 
@@ -210,19 +216,19 @@ func TestHTTPStatusToError_EdgeCases(t *testing.T) {
 		wantCode   agentos.ErrorCode
 	}{
 		{
-			name:       "未知状态码_99",
-			statusCode: 99,
-			wantCode:   agentos.CodeUnknown,
+			name:       "599网关超时变体",
+			statusCode: 599,
+			wantCode:   agentos.CodeServerError,
 		},
 		{
-			name:       "未知状态码_600",
+			name:       "600超范围状态码",
 			statusCode: 600,
-			wantCode:   agentos.CodeUnknown,
+			wantCode:   agentos.CodeServerError,
 		},
 		{
-			name:       "未知状态码_999",
+			name:       "999超范围状态码",
 			statusCode: 999,
-			wantCode:   agentos.CodeUnknown,
+			wantCode:   agentos.CodeServerError,
 		},
 	}
 

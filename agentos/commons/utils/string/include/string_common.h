@@ -171,6 +171,23 @@ char* string_common_strtolower(char* str);
  */
 char* string_common_strtoupper(char* str);
 
+/**
+ * @brief JSON字符串转义
+ * @param src 源字符串
+ * @param out 输出转义后的字符串（动态分配，调用者负责free）
+ * @return 成功返回0，失败返回-1
+ */
+int string_common_json_escape(const char* src, char** out);
+
+/**
+ * @brief JSON字符串转义（固定缓冲区版本）
+ * @param src 源字符串
+ * @param dst 目标缓冲区
+ * @param dst_size 目标缓冲区大小
+ * @return 写入的字符数
+ */
+size_t string_common_json_escape_buf(const char* src, char* dst, size_t dst_size);
+
 #ifdef __cplusplus
 }
 #endif

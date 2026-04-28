@@ -18,7 +18,7 @@ class TestConverter implements ResourceConverter<TestResource> {
   convert(data: Record<string, unknown>, context?: string): TestResource {
     const id = data.id as string;
     if (!id) {
-      throw new AgentOSError(ErrorCode.InvalidResponse, context || 'missing id');
+      throw new AgentOSError(ErrorCode.INVALID_RESPONSE, context || 'missing id');
     }
     return new TestResource(id, (data.name as string) || '');
   }
@@ -28,6 +28,12 @@ class TestManager extends BaseManager<TestResource> {
   constructor(api: APIClient) {
     super(api, 'test', new TestConverter());
   }
+
+  public testLogWarning(message: string) { this.logWarning(message); }
+  public testLogInfo(message: string) { this.logInfo(message); }
+  public testLogError(op: string, err: Error) { this.logError(op, err); }
+  public testLogOperation(op: string, id: string) { this.logOperation(op, id); }
+  public testBuildListOptions(opts?: import('../src/types').ListOptions) { return this.buildListOptions(opts); }
 
   async getItem(id: string): Promise<TestResource> {
     return this.executeGet(`/api/v1/tests/${id}`, '获取测试资源失败');
@@ -114,7 +120,7 @@ describe('BaseManager', () => {
   });
 
   test('should build list options with pagination', () => {
-    const params = manager.buildListOptions({
+    const params = manager.testBuildListOptions({
       pagination: { page: 2, pageSize: 10 },
     });
     expect(params).toContain('page=2');
@@ -122,49 +128,46 @@ describe('BaseManager', () => {
   });
 
   test('should build list options with sort', () => {
-    const params = manager.buildListOptions({
-      sort: { field: 'name', order: 'asc' },
-    });
+    const params = manager.testBuildListOptions({ sort: { field: 'name', order: 'asc' } });
     expect(params).toContain('sort_by=name');
     expect(params).toContain('sort_order=asc');
   });
 
   test('should build list options with filter', () => {
-    const params = manager.buildListOptions({
-      filter: { status: 'active', priority: 1 },
-    });
-    expect(params).toContain('status=active');
+    const params = manager.testBuildListOptions({ filter: { key: 'status', value: 'active' } });
+    expect(params).toContain('key=status');
+    expect(params).toContain('value=active');
   });
 
   test('should return empty array for no options', () => {
-    const params = manager.buildListOptions();
+    const params = manager.testBuildListOptions();
     expect(params).toEqual([]);
   });
 
   test('should log operation', () => {
     const logger = jest.spyOn(require('../src/utils/logger').getLogger(), 'debug');
-    manager.logOperation('test-op', 'res-123');
+    manager.testLogOperation('test-op', 'res-123');
     expect(logger).toHaveBeenCalledWith('[test] test-op: ID=res-123');
     logger.mockRestore();
   });
 
   test('should log error', () => {
     const logger = jest.spyOn(require('../src/utils/logger').getLogger(), 'error');
-    manager.logError('test-op', new Error('test error'));
+    manager.testLogError('test-op', new Error('test error'));
     expect(logger).toHaveBeenCalledWith('[test] test-op failed: test error');
     logger.mockRestore();
   });
 
   test('should log warning', () => {
     const logger = jest.spyOn(require('../src/utils/logger').getLogger(), 'warn');
-    manager.logWarning('test warning');
+    manager.testLogWarning('test warning');
     expect(logger).toHaveBeenCalledWith('[test] test warning');
     logger.mockRestore();
   });
 
   test('should log info', () => {
     const logger = jest.spyOn(require('../src/utils/logger').getLogger(), 'info');
-    manager.logInfo('test info');
+    manager.testLogInfo('test info');
     expect(logger).toHaveBeenCalledWith('[test] test info');
     logger.mockRestore();
   });

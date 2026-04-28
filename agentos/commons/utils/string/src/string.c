@@ -651,6 +651,122 @@ bool string_is_blank(const char* str) {
     return true;
 }
 
+int string_common_json_escape(const char* src, char** out) {
+    if (!src || !out) return -1;
+
+    size_t len = 0;
+    const char* p = src;
+    while (*p) {
+        unsigned char ch = (unsigned char)*p;
+        switch (ch) {
+            case '"': case '\\': case '/':
+                len += 2;
+                break;
+            case '\b': case '\f': case '\n': case '\r': case '\t':
+                len += 2;
+                break;
+            default:
+                if (ch < 0x20) {
+                    len += 6;
+                } else {
+                    len += 1;
+                }
+                break;
+        }
+        p++;
+    }
+
+    char* escaped = (char*)AGENTOS_MALLOC(len + 1);
+    if (!escaped) return -1;
+
+    char* q = escaped;
+    p = src;
+    while (*p) {
+        unsigned char ch = (unsigned char)*p;
+        switch (ch) {
+            case '"':  *q++ = '\\'; *q++ = '"';  break;
+            case '\\': *q++ = '\\'; *q++ = '\\'; break;
+            case '/':  *q++ = '\\'; *q++ = '/';  break;
+            case '\b': *q++ = '\\'; *q++ = 'b';  break;
+            case '\f': *q++ = '\\'; *q++ = 'f';  break;
+            case '\n': *q++ = '\\'; *q++ = 'n';  break;
+            case '\r': *q++ = '\\'; *q++ = 'r';  break;
+            case '\t': *q++ = '\\'; *q++ = 't';  break;
+            default:
+                if (ch < 0x20) {
+                    q += snprintf(q, 7, "\\u%04x", ch);
+                } else {
+                    *q++ = (char)ch;
+                }
+                break;
+        }
+        p++;
+    }
+    *q = '\0';
+
+    *out = escaped;
+    return 0;
+}
+
+size_t string_common_json_escape_buf(const char* src, char* dst, size_t dst_size) {
+    if (!src || !dst || dst_size == 0) return 0;
+
+    char* q = dst;
+    const char* end = dst + dst_size - 1;
+    const char* p = src;
+
+    while (*p && q < end) {
+        unsigned char ch = (unsigned char)*p;
+        switch (ch) {
+            case '"':
+                if (q + 2 > end) goto done;
+                *q++ = '\\'; *q++ = '"';
+                break;
+            case '\\':
+                if (q + 2 > end) goto done;
+                *q++ = '\\'; *q++ = '\\';
+                break;
+            case '/':
+                if (q + 2 > end) goto done;
+                *q++ = '\\'; *q++ = '/';
+                break;
+            case '\b':
+                if (q + 2 > end) goto done;
+                *q++ = '\\'; *q++ = 'b';
+                break;
+            case '\f':
+                if (q + 2 > end) goto done;
+                *q++ = '\\'; *q++ = 'f';
+                break;
+            case '\n':
+                if (q + 2 > end) goto done;
+                *q++ = '\\'; *q++ = 'n';
+                break;
+            case '\r':
+                if (q + 2 > end) goto done;
+                *q++ = '\\'; *q++ = 'r';
+                break;
+            case '\t':
+                if (q + 2 > end) goto done;
+                *q++ = '\\'; *q++ = 't';
+                break;
+            default:
+                if (ch < 0x20) {
+                    if (q + 6 > end) goto done;
+                    q += snprintf(q, 7, "\\u%04x", ch);
+                } else {
+                    *q++ = (char)ch;
+                }
+                break;
+        }
+        p++;
+    }
+
+done:
+    *q = '\0';
+    return (size_t)(q - dst);
+}
+
 bool string_is_digit(const char* str) {
     if (str == NULL || *str == '\0') {
         return false;
