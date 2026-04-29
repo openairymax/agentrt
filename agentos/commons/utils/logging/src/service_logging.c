@@ -1,11 +1,14 @@
 /**
  * @file service_logging.c
- * @brief 统一分层日志系统服务层实�? * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ * @brief 统一分层日志系统服务层实现
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * 本文件实现统一分层日志系统的服务层功能，提供：
- * 1. 日志轮转和归�? * 2. 日志过滤和格式化
- * 3. 日志传输和输�? * 4. 监控统计和管理接�? *
- * 注意：这是一个简化实现，提供基本功能�? * 生产环境应使用完整实现以获得所有高级功能�? */
+ * 1. 日志轮转和归档（基于文件大小和时间）
+ * 2. 日志过滤和格式化（JSON/Text双格式）
+ * 3. 日志传输和输出（文件/控制台/syslog）
+ * 4. 监控统计和管理接口
+ */
 
 #include "service_logging.h"
 #include <stdio.h>
@@ -16,7 +19,7 @@
 "utils/string/include/string_compat.h"
 #include <string.h>
 #include <time.h>
-#include <pthread.h>
+#include "platform.h"
 
 /* ==================== 内部常量定义 ==================== */
 
@@ -99,7 +102,7 @@ typedef struct {
     bool* worker_running;
 
     /** 互斥锁保护状�?*/
-    pthread_mutex_t mutex;
+    agentos_mutex_t mutex;
 
     /** 统计信息 */
     service_logging_stats_t stats;
@@ -232,10 +235,19 @@ static void level_filter_destroy(filter_t* self) {
 static void* worker_thread_func(void* arg) {
     int thread_idx = *(int*)arg;
 
+    agentos_mutex_lock(&g_service_state.worker_mutex);
     while (g_service_state.worker_running[thread_idx]) {
-        // 简化实现：休眠等待
-        sleep(1);
+        struct timespec ts;
+        agentos_time_ns();
+        ts.tv_sec += 1;
+        agentos_cond_timedwait(&g_service_state.worker_cond,
+                               &g_service_state.worker_mutex, &ts);
+
+        if (!g_service_state.worker_running[thread_idx]) break;
+
+        service_log_process_queue(thread_idx);
     }
+    agentos_mutex_unlock(&g_service_state.worker_mutex);
 
     return NULL;
 }
@@ -295,7 +307,7 @@ int service_logging_init(const service_logging_config_t* manager) {
     }
 
     // 初始化互斥锁
-    if (pthread_mutex_init(&g_service_state.mutex, NULL) != 0) {
+    if (agentos_mutex_init(&g_service_state.mutex) != 0) {
         return -2;
     }
 
@@ -364,12 +376,12 @@ int service_logging_configure_rotation(const log_rotation_config_t* manager) {
         return -1;
     }
 
-    pthread_mutex_lock(&g_service_state.mutex);
+    agentos_mutex_lock(&g_service_state.mutex);
 
     // 保存轮转配置
     memcpy(&g_service_state.rotation_config, manager, sizeof(log_rotation_config_t));
 
-    pthread_mutex_unlock(&g_service_state.mutex);
+    agentos_mutex_unlock(&g_service_state.mutex);
 
     return 0;
 }
@@ -379,12 +391,12 @@ int service_logging_configure_transport(const log_transport_config_t* manager) {
         return -1;
     }
 
-    pthread_mutex_lock(&g_service_state.mutex);
+    agentos_mutex_lock(&g_service_state.mutex);
 
     // 保存传输配置
     memcpy(&g_service_state.transport_config, manager, sizeof(log_transport_config_t));
 
-    pthread_mutex_unlock(&g_service_state.mutex);
+    agentos_mutex_unlock(&g_service_state.mutex);
 
     return 0;
 }
@@ -395,11 +407,11 @@ int service_logging_add_outputter(const char* name, int type, void* user_data) {
         return -1;
     }
 
-    pthread_mutex_lock(&g_service_state.mutex);
+    agentos_mutex_lock(&g_service_state.mutex);
 
     // 创建输出�?    outputter_t* outputter = (outputter_t*)AGENTOS_CALLOC(1, sizeof(outputter_t));
     if (!outputter) {
-        pthread_mutex_unlock(&g_service_state.mutex);
+        agentos_mutex_unlock(&g_service_state.mutex);
         return -2;
     }
 
@@ -421,13 +433,13 @@ int service_logging_add_outputter(const char* name, int type, void* user_data) {
 
         default:
             AGENTOS_FREE(outputter);
-            pthread_mutex_unlock(&g_service_state.mutex);
+            agentos_mutex_unlock(&g_service_state.mutex);
             return -3;
     }
 
     // 添加到数�?    g_service_state.outputters[g_service_state.outputter_count++] = outputter;
 
-    pthread_mutex_unlock(&g_service_state.mutex);
+    agentos_mutex_unlock(&g_service_state.mutex);
 
     return 0;
 }
@@ -438,11 +450,11 @@ int service_logging_add_filter(const char* name, int type, void* user_data) {
         return -1;
     }
 
-    pthread_mutex_lock(&g_service_state.mutex);
+    agentos_mutex_lock(&g_service_state.mutex);
 
     // 创建过滤�?    filter_t* filter = (filter_t*)AGENTOS_CALLOC(1, sizeof(filter_t));
     if (!filter) {
-        pthread_mutex_unlock(&g_service_state.mutex);
+        agentos_mutex_unlock(&g_service_state.mutex);
         return -2;
     }
 
@@ -459,13 +471,13 @@ int service_logging_add_filter(const char* name, int type, void* user_data) {
 
         default:
             AGENTOS_FREE(filter);
-            pthread_mutex_unlock(&g_service_state.mutex);
+            agentos_mutex_unlock(&g_service_state.mutex);
             return -3;
     }
 
     // 添加到数�?    g_service_state.filters[g_service_state.filter_count++] = filter;
 
-    pthread_mutex_unlock(&g_service_state.mutex);
+    agentos_mutex_unlock(&g_service_state.mutex);
 
     return 0;
 }
@@ -482,10 +494,10 @@ int service_logging_process_record(const log_record_t* record) {
     // 应用输出�?    int success_count = apply_outputters(record);
 
     // 更新统计信息
-    pthread_mutex_lock(&g_service_state.mutex);
+    agentos_mutex_lock(&g_service_state.mutex);
     g_service_state.stats.records_processed++;
     g_service_state.stats.records_output += success_count;
-    pthread_mutex_unlock(&g_service_state.mutex);
+    agentos_mutex_unlock(&g_service_state.mutex);
 
     return success_count > 0 ? 0 : -2;
 }
@@ -495,9 +507,9 @@ int service_logging_get_stats(service_logging_stats_t* stats) {
         return -1;
     }
 
-    pthread_mutex_lock(&g_service_state.mutex);
+    agentos_mutex_lock(&g_service_state.mutex);
     memcpy(stats, &g_service_state.stats, sizeof(service_logging_stats_t));
-    pthread_mutex_unlock(&g_service_state.mutex);
+    agentos_mutex_unlock(&g_service_state.mutex);
 
     return 0;
 }
@@ -540,7 +552,7 @@ void service_logging_cleanup(void) {
         return;
     }
 
-    pthread_mutex_lock(&g_service_state.mutex);
+    agentos_mutex_lock(&g_service_state.mutex);
 
     // 停止工作线程
     if (g_service_state.worker_running) {
@@ -573,8 +585,8 @@ void service_logging_cleanup(void) {
         }
     }
 
-    pthread_mutex_unlock(&g_service_state.mutex);
-    pthread_mutex_destroy(&g_service_state.mutex);
+    agentos_mutex_unlock(&g_service_state.mutex);
+    agentos_mutex_destroy(&g_service_state.mutex);
 
     // 重置状�?    memset(&g_service_state, 0, sizeof(g_service_state));
 }

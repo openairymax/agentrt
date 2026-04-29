@@ -4,8 +4,8 @@
  * @file claude_adapter.c
  * @brief Anthropic Claude API Adapter Implementation
  *
- * When AGENTOS_HAS_CURL is defined, uses real Claude API via HTTPS.
- * Otherwise, falls back to template-based mock responses for development.
+ * Production implementation using real Claude API via HTTPS.
+ * Requires AGENTOS_HAS_CURL to be defined for compilation.
  */
 
 #define LOG_TAG "claude_adapter"
@@ -292,7 +292,15 @@ static int claude_generate_response_mock(const char* user_msg,
 static int claude_generate_response(const char* user_msg,
                                     const char* system_ctx,
                                     char* out_buf, size_t buf_len) {
-#ifdef AGENTOS_HAS_CURL
+#ifndef AGENTOS_HAS_CURL
+    (void)user_msg;
+    (void)system_ctx;
+    if (out_buf && buf_len > 0) {
+        out_buf[0] = '\0';
+    }
+    LOG_ERROR("Claude API not available: AGENTOS_HAS_CURL not defined");
+    return -1;
+#else
     if (user_msg && out_buf && buf_len > 0) {
         extern claude_adapter_context_t* g_claude_ctx;
         if (g_claude_ctx) {
@@ -324,8 +332,9 @@ static int claude_generate_response(const char* user_msg,
             }
         }
     }
+    LOG_ERROR("Claude API call failed: invalid configuration or network error");
+    return -1;
 #endif
-    return claude_generate_response_mock(user_msg, system_ctx, out_buf, buf_len);
 }
 
 static int claude_estimate_tokens(const char* text) {

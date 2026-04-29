@@ -1,58 +1,58 @@
-# AgentOS Pull Request / 拉取请求
+## Pull Request 模板
 
-感谢您的贡献！请填写以下信息以帮助我们审查您的变更。  
-Thank you for contributing to AgentOS! Please fill in the following to help us review your changes.
+### 变更类型 (请勾选一项)
+- [ ] Bug 修复
+- [ ] 新功能
+- [ ] 重构/代码清理
+- [ ] 性能优化
+- [ ] 文档更新
+- [ ] 测试补充
 
-## 描述 / Description
+### 相关 Issue / 任务编号
+- 大轮次编号: R-09-__
+- 详细任务: R-09-__-__
+- 负责团队: [A/B/C]
 
-<!-- 简要描述此 PR 的作用和原因 -->
-<!-- Briefly describe what this PR does and why -->
+### 变更摘要
+<!-- 简要描述本次变更的内容 -->
 
-## 变更类型 / Type of Change
+### 影响范围
+<!-- 列出受影响的模块和文件 -->
+- 模块:
+- 文件:
 
-- [ ] 修复 Bug / Bug fix
-- [ ] 新功能 / New feature
-- [ ] 破坏性变更 / Breaking change
-- [ ] 文档更新 / Documentation update
-- [ ] 重构 / Refactoring
-- [ ] 测试改进 / Test improvement
+### 测试验证
+<!-- 描述测试覆盖情况 -->
+- [ ] 单元测试通过
+- [ ] 集成测试通过
+- [ ] 编译零错误零警告
+- [ ] 无 BAN 违规（simplified/stub/mock/fake/dummy）
+- [ ] CROSS 合规（无 pthread.h/clock_gettime 直接使用）
+- [ ] 性能基准无明显退化
 
-## 关联 Issue / Related Issues
-
-<!-- 使用 `Closes #123` 或 `Fixes #123` 关联相关 Issue -->
-<!-- Link any related issues using `Closes #123` or `Fixes #123` -->
-
-## 测试 / Testing
-
-<!-- 描述您如何测试这些变更 -->
-<!-- Describe how you tested these changes -->
-
-- [ ] 我已添加/更新测试 / I have added/updated tests
-- [ ] 所有现有测试通过 / All existing tests pass
-
-### 构建验证 / Build Verification
-
-请确认构建通过 / Please confirm your build passes:
-
+### 构建验证命令
 ```bash
-# C 核心 / C core
-cmake -B AgentOS-build && cmake --build AgentOS-build && ctest --test-dir AgentOS-build
-
-# SDK（如适用）/ SDK (as applicable)
-cd toolkit/python && python -m pytest
-cd toolkit/rust && cargo test
-cd toolkit/go && go test ./...
-cd toolkit/typescript && npx tsc --noEmit
+cmake -B build -DBUILD_TESTS=ON && cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
-## 检查清单 / Checklist
+### Commit Message 格式规范
+```
+<类型>(<范围>): <简短描述>
 
-- [ ] 我的代码遵循项目的编码规范 / My code follows the project's coding style
-- [ ] 我已在必要时添加代码注释 / I have commented my code where necessary
-- [ ] 我已对文档作出相应更新（如适用）/ I have made corresponding changes to the documentation (if applicable)
-- [ ] 我的变更不会产生新的警告 / My changes generate no new warnings
+<body>
 
-## 补充说明 / Additional Notes
+<footer>
+```
+**类型**: feat/fix/refactor/docs/test/perf/chore
+**范围**: checkpoint/multiagent/memoryrovol/coreloopthree/daemon/commons
 
-<!-- 任何其他上下文、截图或审查者需要了解的信息 -->
-<!-- Any other context, screenshots, or information reviewers should know -->
+### 审查清单
+- [ ] 代码符合 .clang-format 规范
+- [ ] 所有公共 API 有 Doxygen 注释
+- [ ] 错误路径正确处理（非桩函数返回）
+- [ ] 内存分配失败有安全回退
+- [ ] 跨平台兼容（platform.h 抽象层）
+
+### 额外说明
+<!-- 其他需要审查者注意的事项 -->

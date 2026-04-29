@@ -1413,17 +1413,23 @@ config_context_t* config_service_create(const char* service_name,
                                         config_schema_t* schema,
                                         bool enable_hot_reload,
                                         bool enable_encryption) {
-    // 简化实现：创建基础配置上下�?    (void)schema;
-    (void)enable_hot_reload;
-    (void)enable_encryption;
-
     if (!service_name) return NULL;
 
     config_context_t* ctx = config_context_create(service_name);
     if (!ctx) return NULL;
 
     if (schema) {
+        ctx->schema = schema;
         config_schema_apply_defaults(schema, ctx);
+    }
+
+    if (enable_hot_reload) {
+        ctx->hot_reload_enabled = true;
+        ctx->reload_interval_ms = 5000;
+    }
+
+    if (enable_encryption) {
+        ctx->encryption_enabled = true;
     }
 
     return ctx;

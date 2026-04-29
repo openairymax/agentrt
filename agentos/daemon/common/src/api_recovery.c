@@ -466,7 +466,6 @@ const char* api_rec_degradation_string(api_rec_degradation_level_t level) {
         case API_REC_DEGRADE_NONE:       return "none";
         case API_REC_DEGRADE_LOWER_TIER: return "lower_tier";
         case API_REC_DEGRADE_CACHE:      return "cache";
-        case API_REC_DEGRADE_MOCK:       return "mock";
         default:                         return "unknown";
     }
 }
