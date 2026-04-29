@@ -151,29 +151,7 @@ static void* worker_thread_func(void* param) {
 #endif
 }
 
-agentos_error_t agentos_layer1_raw_create_production(
-    const agentos_layer1_raw_config_t* config,
-    agentos_layer1_raw_t** out_engine) {
-
-    if (!config || !out_engine || !config->storage_path) {
-        return AGENTOS_EINVAL;
-    }
-
-    agentos_layer1_raw_t* engine = (agentos_layer1_raw_t*)AGENTOS_CALLOC(1, sizeof(agentos_layer1_raw_t));
-    if (!engine) {
-        AGENTOS_LOG_ERROR("Failed to allocate storage engine");
-        return AGENTOS_ENOMEM;
-    }
-
-    engine->inner = (storage_engine_inner_t*)AGENTOS_CALLOC(1, sizeof(storage_engine_inner_t));
-    if (!engine->inner) {
-        AGENTOS_FREE(engine);
-        return AGENTOS_ENOMEM;
-    }
-
-    strncpy(engine->inner->storage_path, config->storage_path,
-            sizeof(engine->inner->storage_path) - 1);
-    engine->inner->storage_path[sizeof(engine->inner->storage_path) - 1] = '\0';
+/* ==================== 资源管理辅助函数 ==================== */
 
 static void rollback_workers(storage_engine_inner_t* inner, size_t up_to) {
     if (!inner || !inner->workers) return;
@@ -184,12 +162,11 @@ static void rollback_workers(storage_engine_inner_t* inner, size_t up_to) {
     }
 #ifdef _WIN32
     if (inner->worker_threads) {
-        if (up_to > 0) {
-            WaitForMultipleObjects((DWORD)up_to, inner->worker_threads, TRUE, 5000);
-        }
         for (size_t i = 0; i < up_to; i++) {
             if (inner->worker_threads[i]) {
+                WaitForSingleObject(inner->worker_threads[i], 5000);
                 CloseHandle(inner->worker_threads[i]);
+                inner->worker_threads[i] = NULL;
             }
         }
     }
@@ -222,6 +199,30 @@ static void cleanup_engine_resources(agentos_layer1_raw_t* engine) {
     AGENTOS_FREE(engine->inner);
     AGENTOS_FREE(engine);
 }
+
+agentos_error_t agentos_layer1_raw_create_production(
+    const agentos_layer1_raw_config_t* config,
+    agentos_layer1_raw_t** out_engine) {
+
+    if (!config || !out_engine || !config->storage_path) {
+        return AGENTOS_EINVAL;
+    }
+
+    agentos_layer1_raw_t* engine = (agentos_layer1_raw_t*)AGENTOS_CALLOC(1, sizeof(agentos_layer1_raw_t));
+    if (!engine) {
+        AGENTOS_LOG_ERROR("Failed to allocate storage engine");
+        return AGENTOS_ENOMEM;
+    }
+
+    engine->inner = (storage_engine_inner_t*)AGENTOS_CALLOC(1, sizeof(storage_engine_inner_t));
+    if (!engine->inner) {
+        AGENTOS_FREE(engine);
+        return AGENTOS_ENOMEM;
+    }
+
+    strncpy(engine->inner->storage_path, config->storage_path,
+            sizeof(engine->inner->storage_path) - 1);
+    engine->inner->storage_path[sizeof(engine->inner->storage_path) - 1] = '\0';
 
     agentos_error_t dir_result = layer1_raw_ensure_directory_exists(config->storage_path);
     if (dir_result != AGENTOS_SUCCESS) {
@@ -308,20 +309,16 @@ static void cleanup_engine_resources(agentos_layer1_raw_t* engine) {
 #ifdef _WIN32
         engine->inner->worker_threads[i] = CreateThread(NULL, 0, worker_thread_func, worker, 0, NULL);
         if (!engine->inner->worker_threads[i]) {
-            worker->running = 0;
             AGENTOS_FREE(worker->storage_path);
             AGENTOS_FREE(worker);
-            engine->inner->workers[i] = NULL;
             rollback_workers(engine->inner, created_count);
             cleanup_engine_resources(engine);
             return AGENTOS_EIO;
         }
 #else
         if (agentos_thread_create(&engine->inner->worker_threads[i], worker_thread_func, worker) != 0) {
-            worker->running = 0;
             AGENTOS_FREE(worker->storage_path);
             AGENTOS_FREE(worker);
-            engine->inner->workers[i] = NULL;
             rollback_workers(engine->inner, created_count);
             cleanup_engine_resources(engine);
             return AGENTOS_EIO;
