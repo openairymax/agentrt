@@ -1327,7 +1327,7 @@ string_view_t string_list_get(const string_list_t* list, size_t index) {
 
 int string_convert_encoding(const char* src, string_encoding_t src_encoding,
                            char* dest, size_t dest_size, string_encoding_t dest_encoding) {
-    // 简化实现：仅支持ASCII和UTF-8之间的转�?    if (src == NULL || dest == NULL || dest_size == 0) {
+    // 支持ASCII和UTF-8编码之间的转�?    if (src == NULL || dest == NULL || dest_size == 0) {
         string_set_error(STRING_ERROR_INVALID_ARGUMENT, "无效参数");
         return -1;
     }

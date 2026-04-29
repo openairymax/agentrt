@@ -16,6 +16,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "error.h"
 
 #ifdef __cplusplus
 extern "C" {

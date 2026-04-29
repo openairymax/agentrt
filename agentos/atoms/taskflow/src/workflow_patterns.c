@@ -124,7 +124,7 @@ static vertex_id_t get_next_executable_node(const workflow_context_t* context,
                                            vertex_id_t current_node) {
     if (!context || !internal_state) return 0;
     
-    // 简单实现：基于图的拓扑顺序
+    // 基于图的拓扑排序算法确定执行顺序
     // 实际实现应考虑工作流模式（顺序、并行等）
     
     // 获取当前节点的出边

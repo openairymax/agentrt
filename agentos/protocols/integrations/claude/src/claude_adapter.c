@@ -12,6 +12,7 @@
 
 #include "claude_adapter.h"
 #include "protocol_transformers.h"
+#include "logging_common.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -298,7 +299,7 @@ static int claude_generate_response(const char* user_msg,
     if (out_buf && buf_len > 0) {
         out_buf[0] = '\0';
     }
-    LOG_ERROR("Claude API not available: AGENTOS_HAS_CURL not defined");
+    LOG_ERROR(LOG_TAG, "Claude API not available: AGENTOS_HAS_CURL not defined");
     return -1;
 #else
     if (user_msg && out_buf && buf_len > 0) {

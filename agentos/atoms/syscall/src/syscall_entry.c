@@ -8,12 +8,15 @@
 #include "agentos.h"
 #include "cognition.h"
 #include "memoryrovol.h"
+#include "memory_provider.h"
 #include "logger.h"
 #include "memory_compat.h"
 #include "string_compat.h"
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+
+extern void agentos_sys_set_memory_provider(agentos_memory_provider_t* provider);
 
 #define CHECK_ARGS() do { if (args == NULL && argc > 0) return (void*)(intptr_t)AGENTOS_EINVAL; } while(0)
 
