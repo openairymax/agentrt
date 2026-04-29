@@ -18,11 +18,10 @@
 #include <time.h>
 
 #ifdef _WIN32
-#include <windows.h>
 #include <dbghelp.h>
 #else
-#include <pthread.h>
 #include <execinfo.h>
+#include "platform.h"
 #endif
 
 /**
@@ -62,9 +61,9 @@ typedef struct {
     
     // 线程同步
 #ifdef _WIN32
-    CRITICAL_SECTION lock;                /**< Windows临界�?*/
+    agentos_mutex_t lock;                /**< Windows临界�?*/
 #else
-    pthread_mutex_t lock;                 /**< POSIX互斥�?*/
+    agentos_mutex_t lock;                 /**< POSIX互斥�?*/
 #endif
     
     // 回调函数
@@ -111,7 +110,7 @@ static memory_debug_state_t g_debug_state = {
 #ifdef _WIN32
     .lock = {0},
 #else
-    .lock = PTHREAD_MUTEX_INITIALIZER,
+    .lock = {0},
 #endif
     .callback = NULL,
     .callback_user_data = NULL,
@@ -127,10 +126,10 @@ static memory_debug_state_t g_debug_state = {
  */
 static bool memory_debug_lock_init(void) {
 #ifdef _WIN32
-    InitializeCriticalSection(&g_debug_state.lock);
+    agentos_mutex_init(&g_debug_state.lock);
     return true;
 #else
-    return pthread_mutex_init(&g_debug_state.lock, NULL) == 0;
+    return agentos_mutex_init(&g_debug_state.lock) == 0;
 #endif
 }
 
@@ -138,9 +137,9 @@ static bool memory_debug_lock_init(void) {
  * @brief 内部锁销�? */
 static void memory_debug_lock_destroy(void) {
 #ifdef _WIN32
-    DeleteCriticalSection(&g_debug_state.lock);
+    agentos_mutex_destroy(&g_debug_state.lock);
 #else
-    pthread_mutex_destroy(&g_debug_state.lock);
+    agentos_mutex_destroy(&g_debug_state.lock);
 #endif
 }
 
@@ -149,9 +148,9 @@ static void memory_debug_lock_destroy(void) {
  */
 static void memory_debug_lock(void) {
 #ifdef _WIN32
-    EnterCriticalSection(&g_debug_state.lock);
+    agentos_mutex_lock(&g_debug_state.lock);
 #else
-    pthread_mutex_lock(&g_debug_state.lock);
+    agentos_mutex_lock(&g_debug_state.lock);
 #endif
 }
 
@@ -160,9 +159,9 @@ static void memory_debug_lock(void) {
  */
 static void memory_debug_unlock(void) {
 #ifdef _WIN32
-    LeaveCriticalSection(&g_debug_state.lock);
+    agentos_mutex_unlock(&g_debug_state.lock);
 #else
-    pthread_mutex_unlock(&g_debug_state.lock);
+    agentos_mutex_unlock(&g_debug_state.lock);
 #endif
 }
 

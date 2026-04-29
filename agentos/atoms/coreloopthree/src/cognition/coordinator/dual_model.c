@@ -6,6 +6,7 @@
 
 #include "strategy.h"
 #include "agentos.h"
+#include "observability_compat.h"
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>

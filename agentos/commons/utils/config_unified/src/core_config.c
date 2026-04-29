@@ -480,7 +480,7 @@ config_context_t* config_context_create(const char* name) {
     
     ctx->count = 0;
     ctx->locked = false;
-    agentos_platform_mutex_init(&ctx->mutex);
+    agentos_mutex_init(&ctx->mutex);
     
     return ctx;
 }
@@ -490,7 +490,7 @@ void config_context_destroy(config_context_t* ctx) {
         return;
     }
     
-    agentos_platform_mutex_destroy(&ctx->mutex);
+    agentos_mutex_destroy(&ctx->mutex);
     
     for (size_t i = 0; i < ctx->count; i++) {
         AGENTOS_FREE(ctx->items[i].key);

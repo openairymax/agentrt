@@ -72,28 +72,28 @@ static memory_state_t g_state = {
  * @return 成功返回true，失败返回false
  */
 static bool memory_lock_init(void) {
-    return agentos_platform_mutex_init(&g_state.lock) == 0;
+    return agentos_mutex_init(&g_state.lock) == 0;
 }
 
 /**
  * @brief 内部锁销毁
  */
 static void memory_lock_destroy(void) {
-    agentos_platform_mutex_destroy(&g_state.lock);
+    agentos_mutex_destroy(&g_state.lock);
 }
 
 /**
  * @brief 加锁
  */
 static void memory_lock(void) {
-    agentos_platform_mutex_lock(&g_state.lock);
+    agentos_mutex_lock(&g_state.lock);
 }
 
 /**
  * @brief 解锁
  */
 static void memory_unlock(void) {
-    agentos_platform_mutex_unlock(&g_state.lock);
+    agentos_mutex_unlock(&g_state.lock);
 }
 
 /**

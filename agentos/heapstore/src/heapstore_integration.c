@@ -15,20 +15,19 @@
 #include <stdio.h>
 
 #ifdef _WIN32
-#include <windows.h>
 #else
-#include <pthread.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include "platform.h"
 #endif
 
 static bool g_integration_initialized = false;
 static char g_root_path[512] = {0};
 
 #ifdef _WIN32
-static CRITICAL_SECTION g_integration_mutex;
+static agentos_mutex_t g_integration_mutex;
 #else
-static pthread_mutex_t g_integration_mutex = PTHREAD_MUTEX_INITIALIZER;
+static agentos_mutex_t g_integration_mutex = {0};
 #endif
 
 /**
@@ -36,7 +35,7 @@ static pthread_mutex_t g_integration_mutex = PTHREAD_MUTEX_INITIALIZER;
  */
 static void __attribute__((unused)) integration_lock_init(void) {
 #ifdef _WIN32
-    InitializeCriticalSection(&g_integration_mutex);
+    agentos_mutex_init(&g_integration_mutex);
 #endif
 }
 
@@ -45,7 +44,7 @@ static void __attribute__((unused)) integration_lock_init(void) {
  */
 static void __attribute__((unused)) integration_lock_cleanup(void) {
 #ifdef _WIN32
-    DeleteCriticalSection(&g_integration_mutex);
+    agentos_mutex_destroy(&g_integration_mutex);
 #endif
 }
 
@@ -54,9 +53,9 @@ static void __attribute__((unused)) integration_lock_cleanup(void) {
  */
 static void integration_lock(void) {
 #ifdef _WIN32
-    EnterCriticalSection(&g_integration_mutex);
+    agentos_mutex_lock(&g_integration_mutex);
 #else
-    pthread_mutex_lock(&g_integration_mutex);
+    agentos_mutex_lock(&g_integration_mutex);
 #endif
 }
 
@@ -65,9 +64,9 @@ static void integration_lock(void) {
  */
 static void integration_unlock(void) {
 #ifdef _WIN32
-    LeaveCriticalSection(&g_integration_mutex);
+    agentos_mutex_unlock(&g_integration_mutex);
 #else
-    pthread_mutex_unlock(&g_integration_mutex);
+    agentos_mutex_unlock(&g_integration_mutex);
 #endif
 }
 

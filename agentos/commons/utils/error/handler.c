@@ -23,10 +23,9 @@
 #include <time.h>
 
 #ifdef _WIN32
-#include <windows.h>
 #else
-#include <pthread.h>
 #include <sys/time.h>
+#include "platform.h"
 #endif
 
 /* ==================== 平台相关定义 ==================== */
@@ -55,37 +54,37 @@ static struct {
 } g_error_stats;
 
 #ifdef _WIN32
-static CRITICAL_SECTION g_error_stats_mutex;
+static agentos_mutex_t g_error_stats_mutex;
 static volatile LONG g_error_stats_initialized = 0;
 
 static void ensure_stats_init(void) {
     if (InterlockedCompareExchange(&g_error_stats_initialized, 1, 0) == 0) {
-        InitializeCriticalSection(&g_error_stats_mutex);
+        agentos_mutex_init(&g_error_stats_mutex);
     }
 }
 
 #define STATS_LOCK() \
     do { \
         ensure_stats_init(); \
-        EnterCriticalSection(&g_error_stats_mutex); \
+        agentos_mutex_lock(&g_error_stats_mutex); \
     } while (0)
 
 #define STATS_UNLOCK() \
     do { \
-        LeaveCriticalSection(&g_error_stats_mutex); \
+        agentos_mutex_unlock(&g_error_stats_mutex); \
     } while (0)
 
 #else
-static pthread_mutex_t g_error_stats_mutex = PTHREAD_MUTEX_INITIALIZER;
+static agentos_mutex_t g_error_stats_mutex = {0};
 
 #define STATS_LOCK() \
     do { \
-        pthread_mutex_lock(&g_error_stats_mutex); \
+        agentos_mutex_lock(&g_error_stats_mutex); \
     } while (0)
 
 #define STATS_UNLOCK() \
     do { \
-        pthread_mutex_unlock(&g_error_stats_mutex); \
+        agentos_mutex_unlock(&g_error_stats_mutex); \
     } while (0)
 #endif
 

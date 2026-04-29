@@ -51,9 +51,9 @@ struct cupolas_entitlements {
     uint64_t load_time;
     int is_verified;
 #ifdef _WIN32
-    CRITICAL_SECTION lock;
+    agentos_mutex_t lock;
 #else
-    pthread_mutex_t lock;
+    agentos_mutex_t lock;
 #endif
 };
 
@@ -395,9 +395,9 @@ void cupolas_entitlements_free(cupolas_entitlements_t* entitlements) {
     cupolas_free_string_array(entitlements->info.allowed_capabilities, entitlements->info.cap_count);
     
 #ifdef _WIN32
-    DeleteCriticalSection(&entitlements->lock);
+    agentos_mutex_destroy(&entitlements->lock);
 #else
-    pthread_mutex_destroy(&entitlements->lock);
+    agentos_mutex_destroy(&entitlements->lock);
 #endif
     
     free(entitlements);

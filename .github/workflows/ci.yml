@@ -80,9 +80,18 @@ jobs:
           sudo apt-get update && sudo apt-get install -y \
             build-essential cmake gcc g++ make ccache \
             libcurl4-openssl-dev libjson-c-dev \
+            libcjson-dev \
             libmicrohttpd-dev libssl-dev \
             libwebsockets-dev libcmocka-dev \
             python3-yaml 2>/dev/null || true
+          if ! dpkg -l libcjson-dev &>/dev/null; then
+            echo "libcjson-dev not available from apt, installing from source..."
+            git clone --depth 1 https://github.com/DaveGamble/cJSON.git /tmp/cjson-build 2>/dev/null
+            cd /tmp/cjson-build && mkdir build && cd build
+            cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_SHARED_LIBS=ON -DENABLE_CJSON_UTILS=OFF
+            sudo make install -j$(nproc)
+            sudo ldconfig
+          fi
           ccache --set-config=max_size=500M 2>/dev/null || true
           ccache --zero-stats 2>/dev/null || true
 
@@ -156,8 +165,17 @@ jobs:
           sudo apt-get update && sudo apt-get install -y \
             build-essential cmake gcc g++ libcmocka-dev \
             libcurl4-openssl-dev libjson-c-dev \
+            libcjson-dev \
             libmicrohttpd-dev libssl-dev \
             valgrind lcov cppcheck 2>/dev/null || true
+          if ! dpkg -l libcjson-dev &>/dev/null; then
+            echo "libcjson-dev not available from apt, installing from source..."
+            git clone --depth 1 https://github.com/DaveGamble/cJSON.git /tmp/cjson-build 2>/dev/null
+            cd /tmp/cjson-build && mkdir build && cd build
+            cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_SHARED_LIBS=ON -DENABLE_CJSON_UTILS=OFF
+            sudo make install -j$(nproc)
+            sudo ldconfig
+          fi
 
       - name: Build with tests enabled
         run: |
@@ -355,7 +373,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: Desktop/package-lock.json
 

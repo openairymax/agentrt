@@ -16,7 +16,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -25,6 +24,7 @@
 #else
 #include <unistd.h>
 #include <sys/stat.h>
+#include "platform.h"
 #endif
 
 #define heapstore_MEMORY_MAX_POOLS 64
@@ -32,7 +32,7 @@
 #define heapstore_MEMORY_MAX_PATH 512
 
 static bool s_initialized = false;
-static pthread_mutex_t s_memory_lock = PTHREAD_MUTEX_INITIALIZER;
+static agentos_mutex_t s_memory_lock = {0};
 static heapstore_memory_pool_t s_pools[heapstore_MEMORY_MAX_POOLS];
 static size_t s_pool_count = 0;
 static heapstore_memory_allocation_t s_allocations[heapstore_MEMORY_MAX_ALLOCATIONS];
@@ -82,7 +82,7 @@ void heapstore_memory_shutdown(void) {
         return;
     }
 
-    pthread_mutex_lock(&s_memory_lock);
+    agentos_mutex_lock(&s_memory_lock);
 
     memset(s_pools, 0, sizeof(s_pools));
     memset(s_allocations, 0, sizeof(s_allocations));
@@ -90,7 +90,7 @@ void heapstore_memory_shutdown(void) {
     s_allocation_count = 0;
 
     s_initialized = false;
-    pthread_mutex_unlock(&s_memory_lock);
+    agentos_mutex_unlock(&s_memory_lock);
 }
 
 heapstore_error_t heapstore_memory_record_pool(const heapstore_memory_pool_t* pool) {
@@ -102,17 +102,17 @@ heapstore_error_t heapstore_memory_record_pool(const heapstore_memory_pool_t* po
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    pthread_mutex_lock(&s_memory_lock);
+    agentos_mutex_lock(&s_memory_lock);
 
     if (s_pool_count >= heapstore_MEMORY_MAX_POOLS) {
-        pthread_mutex_unlock(&s_memory_lock);
+        agentos_mutex_unlock(&s_memory_lock);
         return heapstore_ERR_OUT_OF_MEMORY;
     }
 
     for (size_t i = 0; i < s_pool_count; i++) {
         if (strcmp(s_pools[i].pool_id, pool->pool_id) == 0) {
             memcpy(&s_pools[i], pool, sizeof(heapstore_memory_pool_t));
-            pthread_mutex_unlock(&s_memory_lock);
+            agentos_mutex_unlock(&s_memory_lock);
             return heapstore_SUCCESS;
         }
     }
@@ -120,7 +120,7 @@ heapstore_error_t heapstore_memory_record_pool(const heapstore_memory_pool_t* po
     memcpy(&s_pools[s_pool_count], pool, sizeof(heapstore_memory_pool_t));
     s_pool_count++;
 
-    pthread_mutex_unlock(&s_memory_lock);
+    agentos_mutex_unlock(&s_memory_lock);
 
     return heapstore_SUCCESS;
 }
@@ -134,17 +134,17 @@ heapstore_error_t heapstore_memory_get_pool(const char* pool_id, heapstore_memor
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    pthread_mutex_lock(&s_memory_lock);
+    agentos_mutex_lock(&s_memory_lock);
 
     for (size_t i = 0; i < s_pool_count; i++) {
         if (strcmp(s_pools[i].pool_id, pool_id) == 0) {
             memcpy(pool, &s_pools[i], sizeof(heapstore_memory_pool_t));
-            pthread_mutex_unlock(&s_memory_lock);
+            agentos_mutex_unlock(&s_memory_lock);
             return heapstore_SUCCESS;
         }
     }
 
-    pthread_mutex_unlock(&s_memory_lock);
+    agentos_mutex_unlock(&s_memory_lock);
     return heapstore_ERR_NOT_FOUND;
 }
 
@@ -157,18 +157,18 @@ heapstore_error_t heapstore_memory_update_pool_usage(const char* pool_id, size_t
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    pthread_mutex_lock(&s_memory_lock);
+    agentos_mutex_lock(&s_memory_lock);
 
     for (size_t i = 0; i < s_pool_count; i++) {
         if (strcmp(s_pools[i].pool_id, pool_id) == 0) {
             s_pools[i].used_size = used_size;
             s_pools[i].free_block_count = free_block_count;
-            pthread_mutex_unlock(&s_memory_lock);
+            agentos_mutex_unlock(&s_memory_lock);
             return heapstore_SUCCESS;
         }
     }
 
-    pthread_mutex_unlock(&s_memory_lock);
+    agentos_mutex_unlock(&s_memory_lock);
     return heapstore_ERR_NOT_FOUND;
 }
 
@@ -181,17 +181,17 @@ heapstore_error_t heapstore_memory_record_allocation(const heapstore_memory_allo
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    pthread_mutex_lock(&s_memory_lock);
+    agentos_mutex_lock(&s_memory_lock);
 
     if (s_allocation_count >= heapstore_MEMORY_MAX_ALLOCATIONS) {
-        pthread_mutex_unlock(&s_memory_lock);
+        agentos_mutex_unlock(&s_memory_lock);
         return heapstore_ERR_OUT_OF_MEMORY;
     }
 
     for (size_t i = 0; i < s_allocation_count; i++) {
         if (strcmp(s_allocations[i].allocation_id, allocation->allocation_id) == 0) {
             memcpy(&s_allocations[i], allocation, sizeof(heapstore_memory_allocation_t));
-            pthread_mutex_unlock(&s_memory_lock);
+            agentos_mutex_unlock(&s_memory_lock);
             return heapstore_SUCCESS;
         }
     }
@@ -199,7 +199,7 @@ heapstore_error_t heapstore_memory_record_allocation(const heapstore_memory_allo
     memcpy(&s_allocations[s_allocation_count], allocation, sizeof(heapstore_memory_allocation_t));
     s_allocation_count++;
 
-    pthread_mutex_unlock(&s_memory_lock);
+    agentos_mutex_unlock(&s_memory_lock);
 
     return heapstore_SUCCESS;
 }
@@ -213,17 +213,17 @@ heapstore_error_t heapstore_memory_get_allocation(const char* allocation_id, hea
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    pthread_mutex_lock(&s_memory_lock);
+    agentos_mutex_lock(&s_memory_lock);
 
     for (size_t i = 0; i < s_allocation_count; i++) {
         if (strcmp(s_allocations[i].allocation_id, allocation_id) == 0) {
             memcpy(allocation, &s_allocations[i], sizeof(heapstore_memory_allocation_t));
-            pthread_mutex_unlock(&s_memory_lock);
+            agentos_mutex_unlock(&s_memory_lock);
             return heapstore_SUCCESS;
         }
     }
 
-    pthread_mutex_unlock(&s_memory_lock);
+    agentos_mutex_unlock(&s_memory_lock);
     return heapstore_ERR_NOT_FOUND;
 }
 
@@ -236,18 +236,18 @@ heapstore_error_t heapstore_memory_free_allocation(const char* allocation_id) {
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    pthread_mutex_lock(&s_memory_lock);
+    agentos_mutex_lock(&s_memory_lock);
 
     for (size_t i = 0; i < s_allocation_count; i++) {
         if (strcmp(s_allocations[i].allocation_id, allocation_id) == 0) {
             s_allocations[i].freed_at = (uint64_t)time(NULL);
             strncpy(s_allocations[i].status, "freed", sizeof(s_allocations[i].status) - 1);
-            pthread_mutex_unlock(&s_memory_lock);
+            agentos_mutex_unlock(&s_memory_lock);
             return heapstore_SUCCESS;
         }
     }
 
-    pthread_mutex_unlock(&s_memory_lock);
+    agentos_mutex_unlock(&s_memory_lock);
     return heapstore_ERR_NOT_FOUND;
 }
 
@@ -256,7 +256,7 @@ heapstore_error_t heapstore_memory_get_stats(uint32_t* pool_count, uint32_t* tot
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&s_memory_lock);
+    agentos_mutex_lock(&s_memory_lock);
 
     if (pool_count) {
         *pool_count = (uint32_t)s_pool_count;
@@ -272,7 +272,7 @@ heapstore_error_t heapstore_memory_get_stats(uint32_t* pool_count, uint32_t* tot
         *total_size = size;
     }
 
-    pthread_mutex_unlock(&s_memory_lock);
+    agentos_mutex_unlock(&s_memory_lock);
 
     return heapstore_SUCCESS;
 }

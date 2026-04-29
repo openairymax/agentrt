@@ -101,7 +101,7 @@ thread_pool_t* thread_pool_create(const thread_pool_config_t* config)
     if (num_threads > pool->config.max_threads) num_threads = pool->config.max_threads;
 
     for (uint32_t i = 0; i < num_threads; i++) {
-        int rc = agentos_platform_thread_create(&pool->threads[i],
+        int rc = agentos_thread_create(&pool->threads[i],
                                                   worker_thread_func, pool);
         if (rc == 0) {
             pool->thread_count++;
@@ -129,7 +129,7 @@ void thread_pool_destroy(thread_pool_t* pool)
     agentos_mutex_unlock(&pool->lock);
 
     for (uint32_t i = 0; i < pool->thread_count; i++) {
-        agentos_platform_thread_join(pool->threads[i], NULL);
+        agentos_thread_join(pool->threads[i], NULL);
     }
 
     task_node_t* node = pool->queue_head;
