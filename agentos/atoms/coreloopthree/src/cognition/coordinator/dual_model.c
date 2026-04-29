@@ -369,7 +369,7 @@ static agentos_error_t dual_coordinate(
     const char* secondary_output = (input_count > 1) ? inputs[1] : "";
 
     /* ========== 健康监控故障转移 ========== */
-    uint64_t now_ns = (uint64_t)time(NULL) * 1000000000ULL;
+    uint64_t now_ns = (uint64_t)agentos_time_ns();
     if (coordinator->last_health_check_time == 0 ||
         now_ns > coordinator->last_health_check_time + coordinator->health_check_interval) {
         coordinator->last_health_check_time = now_ns;
@@ -561,19 +561,19 @@ static agentos_error_t dual_coordinate(
     /* 错误计数：低置信度或不一致时递增 */
     if (primary_confidence < 0.3f || (input_count > 0 && !*primary_output)) {
         coordinator->primary_error_count++;
-        coordinator->primary_last_error_time = (uint64_t)time(NULL) * 1000000000ULL;
+        coordinator->primary_last_error_time = (uint64_t)agentos_time_ns();
     }
     if (input_count > 1 && (secondary_confidence < 0.3f || !*secondary_output)) {
         coordinator->secondary_error_count++;
-        coordinator->secondary_last_error_time = (uint64_t)time(NULL) * 1000000000ULL;
+        coordinator->secondary_last_error_time = (uint64_t)agentos_time_ns();
     }
     if (!is_consistent && final_confidence < 0.5f) {
         if (coordinator->primary_weight >= coordinator->secondary_weight) {
             coordinator->primary_error_count++;
-            coordinator->primary_last_error_time = (uint64_t)time(NULL) * 1000000000ULL;
+            coordinator->primary_last_error_time = (uint64_t)agentos_time_ns();
         } else {
             coordinator->secondary_error_count++;
-            coordinator->secondary_last_error_time = (uint64_t)time(NULL) * 1000000000ULL;
+            coordinator->secondary_last_error_time = (uint64_t)agentos_time_ns();
         }
     }
 

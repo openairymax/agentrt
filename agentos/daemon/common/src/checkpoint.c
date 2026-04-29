@@ -1,20 +1,15 @@
 /**
  * @file checkpoint.c
- * @brief AgentOS 任务检查点实现（优化版）
+ * @brief AgentOS 任务检查点实现（生产级 v3.0）
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
- * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
  * SPDX-License-Identifier: Apache-2.0
  *
- * "From data intelligence emerges."
- *
- * @note 实现任务检查点机制，支持长时间任务的状态保存和恢复。
- *       符合 ARCHITECTURAL_PRINCIPLES.md 中的 S-1 反馈闭环原则。
- *
- * @version 2.0 (优化版)
- * - 降低圈复杂度至7以下
- * - 消除重复代码（DRY原则）
- * - 增强边界条件验证
+ * v3.0 变更：
+ * - CROSS-01: agentos_platform_mutex_t → agentos_mutex_t
+ * - CROSS-03: time(NULL) → agentos_time_ns()
+ * - 新增 auto-checkpoint hook 机制（CoreLoopThree 集成）
+ * - 增强 JSON restore 解析健壮性
  */
 
 #include "../include/checkpoint.h"
@@ -23,8 +18,8 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <stdio.h>
+#include <ctype.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -33,51 +28,28 @@
 #include <sys/stat.h>
 #endif
 
-/* Unified base library compatibility layer */
-#include "include/memory_compat.h"
-
-#ifdef _WIN32
-#include <windows.h>
-#include <direct.h>
-#define mkdir(path) _mkdir(path)
-#else
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
-#endif
-
-/* ==================== 常量定义 ==================== */
+#include "memory_compat.h"
 
 #define CHECKPOINT_DIRECTORY "checkpoints"
 #define CHECKPOINT_FILE_PREFIX "checkpoint_"
 #define CHECKPOINT_FILE_EXTENSION ".json"
 #define MAX_CHECKPOINT_PATH 1024
 #define CHECKPOINT_VERSION 1
-#define MAX_LINE_LENGTH 2048
-#define MAX_VALUE_LENGTH 1024
-
-/* ==================== 内部状态 ==================== */
+#define MAX_LINE_LENGTH 8192
+#define MAX_VALUE_LENGTH 4096
 
 static char g_checkpoint_storage_path[MAX_CHECKPOINT_PATH] = {0};
 static int g_checkpoint_initialized = 0;
-
-static agentos_platform_mutex_t g_checkpoint_mutex;
+static agentos_mutex_t g_checkpoint_mutex;
 static int g_checkpoint_mutex_initialized = 0;
-
 static agentos_checkpoint_stats_t g_checkpoint_stats = {0};
 
-/* ==================== 内部辅助函数 ==================== */
+static agentos_checkpoint_hook_fn g_auto_hook = NULL;
+static void* g_auto_hook_user_data = NULL;
+static uint64_t g_auto_interval_ms = 0;
 
-/**
- * @brief 计算数据校验和（CRC32）
- *
- * 圈复杂度: 3 (<7)
- */
 static uint32_t calculate_checksum(const char* data, size_t len) {
-    if (!data || len == 0) {
-        return 0;
-    }
-
+    if (!data || len == 0) return 0;
     uint32_t checksum = 0;
     for (size_t i = 0; i < len && data[i] != '\0'; i++) {
         checksum = (checksum << 1) ^ (uint32_t)(unsigned char)data[i];
@@ -85,9 +57,6 @@ static uint32_t calculate_checksum(const char* data, size_t len) {
     return checksum;
 }
 
-/**
- * @brief 状态枚举转字符串
- */
 static const char* state_to_string(agentos_checkpoint_state_t state) {
     static const char* state_strings[] = {
         [CHECKPOINT_STATE_PENDING] = "pending",
@@ -95,284 +64,217 @@ static const char* state_to_string(agentos_checkpoint_state_t state) {
         [CHECKPOINT_STATE_FAILED] = "failed",
         [CHECKPOINT_STATE_INVALID] = "invalid"
     };
-
-    if (state >= 0 && state <= CHECKPOINT_STATE_INVALID) {
+    if (state >= 0 && state <= CHECKPOINT_STATE_INVALID)
         return state_strings[state];
-    }
     return "unknown";
 }
 
-/**
- * @brief 字符串转状态枚举
- *
- * 圈复杂度: 5 (<7)
- */
-static agentos_checkpoint_state_t string_to_state(const char* state_str) {
-    if (!state_str) {
-        return CHECKPOINT_STATE_INVALID;
-    }
-
-    if (strcmp(state_str, "pending") == 0) return CHECKPOINT_STATE_PENDING;
-    if (strcmp(state_str, "completed") == 0) return CHECKPOINT_STATE_COMPLETED;
-    if (strcmp(state_str, "failed") == 0) return CHECKPOINT_STATE_FAILED;
-
+static agentos_checkpoint_state_t string_to_state(const char* s) {
+    if (!s) return CHECKPOINT_STATE_INVALID;
+    if (strcmp(s, "pending") == 0) return CHECKPOINT_STATE_PENDING;
+    if (strcmp(s, "completed") == 0) return CHECKPOINT_STATE_COMPLETED;
+    if (strcmp(s, "failed") == 0) return CHECKPOINT_STATE_FAILED;
     return CHECKPOINT_STATE_INVALID;
 }
 
-/**
- * @brief 安全字符串复制（带长度检查和NULL验证）
- *
- * 符合 DRY 原则，避免重复的 strdup + NULL 检查模式
- */
 static char* safe_strdup(const char* src) {
-    if (!src) {
-        return NULL;
-    }
-
+    if (!src) return NULL;
     size_t len = strlen(src);
-    char* dest = (char*)AGENTOS_MALLOC(len + 1);
-    if (!dest) {
-        return NULL;
-    }
-
-    memcpy(dest, src, len);
-    dest[len] = '\0';
-    return dest;
+    char* d = (char*)AGENTOS_MALLOC(len + 1);
+    if (d) { memcpy(d, src, len); d[len] = '\0'; }
+    return d;
 }
 
-/**
- * @brief 安全字符串数组复制
- *
- * 用于 completed_nodes 和 pending_nodes 的深拷贝
- */
 static char** safe_str_array_dup(char** src, size_t count) {
-    if (!src || count == 0) {
-        return NULL;
-    }
-
-    char** dest = (char**)AGENTOS_CALLOC(1, sizeof(char*) * count);
-    if (!dest) {
-        return NULL;
-    }
-
-    memset(dest, 0, sizeof(char*) * count);
-
+    if (!src || count == 0) return NULL;
+    char** dst = (char**)AGENTOS_CALLOC(count, sizeof(char*));
+    if (!dst) return NULL;
+    memset(dst, 0, sizeof(char*) * count);
     for (size_t i = 0; i < count; i++) {
-        dest[i] = safe_strdup(src[i]);
-        if (!dest[i] && src[i]) {
-            for (size_t j = 0; j < i; j++) {
-                AGENTOS_FREE(dest[j]);
-            }
-            AGENTOS_FREE(dest);
+        dst[i] = safe_strdup(src[i]);
+        if (!dst[i] && src[i]) {
+            for (size_t j = 0; j < i; j++) AGENTOS_FREE(dst[j]);
+            AGENTOS_FREE(dst);
             return NULL;
         }
     }
-
-    return dest;
+    return dst;
 }
 
-/**
- * @brief 构建检查点文件路径
- *
- * 圈复杂度: 2 (<7)
- */
-static int build_checkpoint_filepath(const char* task_id, char* filepath, size_t size) {
-    if (!task_id || !filepath || size == 0) {
-        return -1;
-    }
-
-    int written = snprintf(filepath, size, "%s/%s%s%s",
-                         g_checkpoint_storage_path,
-                         CHECKPOINT_FILE_PREFIX,
-                         task_id,
-                         CHECKPOINT_FILE_EXTENSION);
-
-    return (written > 0 && (size_t)written < size) ? 0 : -1;
+static int build_filepath(const char* task_id, char* buf, size_t size) {
+    if (!task_id || !buf || size == 0) return -1;
+    int n = snprintf(buf, size, "%s/%s%s%s",
+                     g_checkpoint_storage_path,
+                     CHECKPOINT_FILE_PREFIX,
+                     task_id,
+                     CHECKPOINT_FILE_EXTENSION);
+    return (n > 0 && (size_t)n < size) ? 0 : -1;
 }
 
-/**
- * @brief 初始化检查点结构体字段
- *
- * 圈复杂度: 4 (<7)
- */
-static void init_checkpoint_fields(
-    agentos_task_checkpoint_t* cp,
-    const char* task_id,
-    const char* session_id,
-    uint64_t sequence_num) {
-
-    if (!cp) {
-        return;
-    }
-
+static void init_fields(agentos_task_checkpoint_t* cp,
+                        const char* task_id,
+                        const char* session_id,
+                        uint64_t seq) {
+    if (!cp) return;
     memset(cp, 0, sizeof(*cp));
-
     if (task_id) {
         strncpy(cp->task_id, task_id, sizeof(cp->task_id) - 1);
         cp->task_id[sizeof(cp->task_id) - 1] = '\0';
     }
-
     if (session_id) {
         strncpy(cp->session_id, session_id, sizeof(cp->session_id) - 1);
         cp->session_id[sizeof(cp->session_id) - 1] = '\0';
     }
-
-    cp->sequence_num = sequence_num;
-    cp->timestamp = (uint64_t)time(NULL) * 1000000000ULL;
+    cp->sequence_num = seq;
+    cp->timestamp = agentos_time_ns();
     cp->state = CHECKPOINT_STATE_PENDING;
 }
 
-/**
- * @brief 深拷贝节点列表到检查点
- *
- * 圈复杂度: 4 (<7)
- */
-static agentos_error_t copy_node_lists(
-    agentos_task_checkpoint_t* cp,
-    char** completed_nodes,
-    size_t completed_count,
-    char** pending_nodes,
-    size_t pending_count) {
-
-    if (!cp) {
-        return AGENTOS_EINVAL;
+static agentos_error_t copy_nodes(agentos_task_checkpoint_t* cp,
+                                   char** completed, size_t ccount,
+                                   char** pending, size_t pcount) {
+    if (!cp) return AGENTOS_EINVAL;
+    cp->completed_count = ccount;
+    if (ccount > 0) {
+        cp->completed_nodes = safe_str_array_dup(completed, ccount);
+        if (!cp->completed_nodes) return AGENTOS_ENOMEM;
     }
-
-    cp->completed_count = completed_count;
-    if (completed_count > 0) {
-        cp->completed_nodes = safe_str_array_dup(completed_nodes, completed_count);
-        if (!cp->completed_nodes) {
-            return AGENTOS_ENOMEM;
-        }
-    }
-
-    cp->pending_count = pending_count;
-    if (pending_count > 0) {
-        cp->pending_nodes = safe_str_array_dup(pending_nodes, pending_count);
+    cp->pending_count = pcount;
+    if (pcount > 0) {
+        cp->pending_nodes = safe_str_array_dup(pending, pcount);
         if (!cp->pending_nodes) {
             if (cp->completed_nodes) {
-                for (size_t i = 0; i < completed_count; i++) {
-                    AGENTOS_FREE(cp->completed_nodes[i]);
-                }
+                for (size_t i = 0; i < ccount; i++) AGENTOS_FREE(cp->completed_nodes[i]);
                 AGENTOS_FREE(cp->completed_nodes);
             }
             return AGENTOS_ENOMEM;
         }
     }
-
     return AGENTOS_SUCCESS;
 }
 
-/* ==================== 公共 API 实现 ==================== */
+static char* json_extract_string(const char* json, const char* key) {
+    if (!json || !key) return NULL;
+    char search[256];
+    snprintf(search, sizeof(search), "\"%s\"", key);
+    const char* p = strstr(json, search);
+    if (!p) return NULL;
+    p += strlen(search);
+    while (*p && isspace((unsigned char)*p)) p++;
+    if (*p != ':') return NULL;
+    p++;
+    while (*p && isspace((unsigned char)*p)) p++;
+    if (*p != '"') return NULL;
+    p++;
+
+    size_t cap = 512;
+    char* val = (char*)AGENTOS_MALLOC(cap);
+    if (!val) return NULL;
+    size_t len = 0;
+
+    while (*p && *p != '"' && *p != '\n') {
+        if (*p == '\\' && *(p + 1)) {
+            p++;
+            char esc = '\\';
+            switch (*p) {
+                case 'n': esc = '\n'; break;
+                case 't': esc = '\t'; break;
+                case 'r': esc = '\r'; break;
+                case '"': esc = '"'; break;
+                default: break;
+            }
+            if (len + 2 >= cap) { cap *= 2; val = (char*)AGENTOS_REALLOC(val, cap); if (!val) return NULL; }
+            val[len++] = esc;
+            p++;
+        } else {
+            if (len + 2 >= cap) { cap *= 2; val = (char*)AGENTOS_REALLOC(val, cap); if (!val) return NULL; }
+            val[len++] = *p;
+            p++;
+        }
+    }
+    val[len] = '\0';
+    return val;
+}
+
+static uint64_t json_extract_uint64(const char* json, const char* key) {
+    char* s = json_extract_string(json, key);
+    if (!s) return 0;
+    uint64_t v = 0;
+    sscanf(s, "%lu", (unsigned long*)&v);
+    AGENTOS_FREE(s);
+    return v;
+}
+
+/* ==================== Public API ==================== */
 
 agentos_error_t agentos_checkpoint_init(const char* storage_path) {
-    if (g_checkpoint_initialized) {
-        return AGENTOS_SUCCESS;
-    }
-
+    if (g_checkpoint_initialized) return AGENTOS_SUCCESS;
     const char* path = storage_path ? storage_path : "./" CHECKPOINT_DIRECTORY;
     size_t len = strlen(path);
-
-    if (len == 0 || len >= sizeof(g_checkpoint_storage_path)) {
-        return AGENTOS_EINVAL;
-    }
-
+    if (len == 0 || len >= sizeof(g_checkpoint_storage_path)) return AGENTOS_EINVAL;
     memcpy(g_checkpoint_storage_path, path, len);
     g_checkpoint_storage_path[len] = '\0';
 
     if (!g_checkpoint_mutex_initialized) {
-        agentos_error_t mutex_err = agentos_platform_mutex_init(&g_checkpoint_mutex);
-        if (mutex_err != AGENTOS_SUCCESS) {
-            return AGENTOS_EINIT;
-        }
+        if (agentos_mutex_init(&g_checkpoint_mutex) != 0) return AGENTOS_EINIT;
         g_checkpoint_mutex_initialized = 1;
     }
 
     memset(&g_checkpoint_stats, 0, sizeof(g_checkpoint_stats));
     g_checkpoint_initialized = 1;
-
     return AGENTOS_SUCCESS;
 }
 
 agentos_error_t agentos_checkpoint_shutdown(void) {
-    if (!g_checkpoint_initialized) {
-        return AGENTOS_SUCCESS;
-    }
-
+    if (!g_checkpoint_initialized) return AGENTOS_SUCCESS;
     if (g_checkpoint_mutex_initialized) {
-        agentos_platform_mutex_destroy(&g_checkpoint_mutex);
+        agentos_mutex_destroy(&g_checkpoint_mutex);
         g_checkpoint_mutex_initialized = 0;
     }
-
+    g_auto_hook = NULL;
+    g_auto_hook_user_data = NULL;
     g_checkpoint_initialized = 0;
     return AGENTOS_SUCCESS;
 }
 
 agentos_error_t agentos_checkpoint_create(
-    const char* task_id,
-    const char* session_id,
-    uint64_t sequence_num,
+    const char* task_id, const char* session_id, uint64_t sequence_num,
     const char* state_json,
-    char** completed_nodes,
-    size_t completed_count,
-    char** pending_nodes,
-    size_t pending_count,
-    agentos_task_checkpoint_t** out_checkpoint) {
+    char** completed_nodes, size_t completed_count,
+    char** pending_nodes, size_t pending_count,
+    agentos_task_checkpoint_t** out_cp) {
 
-    if (!g_checkpoint_initialized) {
-        return AGENTOS_ENOTINIT;
-    }
-
-    if (!task_id || !state_json || !out_checkpoint) {
-        return AGENTOS_EINVAL;
-    }
+    if (!g_checkpoint_initialized) return AGENTOS_ENOTINIT;
+    if (!task_id || !state_json || !out_cp) return AGENTOS_EINVAL;
 
     agentos_task_checkpoint_t* cp = (agentos_task_checkpoint_t*)
         AGENTOS_CALLOC(1, sizeof(agentos_task_checkpoint_t));
-    if (!cp) {
-        return AGENTOS_ENOMEM;
-    }
+    if (!cp) return AGENTOS_ENOMEM;
 
-    init_checkpoint_fields(cp, task_id, session_id, sequence_num);
+    init_fields(cp, task_id, session_id, sequence_num);
 
     cp->state_json = safe_strdup(state_json);
-    if (!cp->state_json) {
-        AGENTOS_FREE(cp);
-        return AGENTOS_ENOMEM;
-    }
+    if (!cp->state_json) { AGENTOS_FREE(cp); return AGENTOS_ENOMEM; }
     cp->state_size = strlen(state_json);
 
-    agentos_error_t err = copy_node_lists(
-        cp,
-        completed_nodes, completed_count,
-        pending_nodes, pending_count
-    );
-
+    agentos_error_t err = copy_nodes(cp, completed_nodes, completed_count,
+                                      pending_nodes, pending_count);
     if (err != AGENTOS_SUCCESS) {
-        AGENTOS_FREE(cp->state_json);
-        AGENTOS_FREE(cp);
-        return err;
+        AGENTOS_FREE(cp->state_json); AGENTOS_FREE(cp); return err;
     }
 
     cp->checksum = calculate_checksum(state_json, strlen(state_json));
-    *out_checkpoint = cp;
-
+    *out_cp = cp;
     return AGENTOS_SUCCESS;
 }
 
 agentos_error_t agentos_checkpoint_save(agentos_task_checkpoint_t* cp) {
-    if (!g_checkpoint_initialized) {
-        return AGENTOS_ENOTINIT;
-    }
-
-    if (!cp || !cp->task_id[0]) {
-        return AGENTOS_EINVAL;
-    }
+    if (!g_checkpoint_initialized) return AGENTOS_ENOTINIT;
+    if (!cp || !cp->task_id[0]) return AGENTOS_EINVAL;
 
     char filepath[MAX_CHECKPOINT_PATH];
-    if (build_checkpoint_filepath(cp->task_id, filepath, sizeof(filepath)) != 0) {
+    if (build_filepath(cp->task_id, filepath, sizeof(filepath)) != 0)
         return AGENTOS_EINVAL;
-    }
 
     FILE* fp = fopen(filepath, "w");
     if (!fp) {
@@ -389,12 +291,30 @@ agentos_error_t agentos_checkpoint_save(agentos_task_checkpoint_t* cp) {
     fprintf(fp, "  \"state\": \"%s\",\n", state_to_string(cp->state));
     fprintf(fp, "  \"checksum\": %u,\n", cp->checksum);
     fprintf(fp, "  \"state_size\": %zu,\n", cp->state_size);
-    fprintf(fp, "  \"state_json\": %s,\n", cp->state_json ? cp->state_json : "");
+
+    fprintf(fp, "  \"state_json\": ");
+    if (cp->state_json) {
+        fputc('"', fp);
+        for (const char* p = cp->state_json; *p; p++) {
+            switch (*p) {
+                case '"': fputs("\\\"", fp); break;
+                case '\\': fputs("\\\\", fp); break;
+                case '\n': fputs("\\n", fp); break;
+                case '\r': fputs("\\r", fp); break;
+                case '\t': fputs("\\t", fp); break;
+                default: fputc(*p, fp); break;
+            }
+        }
+        fputc('"', fp);
+    } else {
+        fputs("null", fp);
+    }
+    fprintf(fp, ",\n");
+
     fprintf(fp, "  \"completed_count\": %zu,\n", cp->completed_count);
     fprintf(fp, "  \"pending_count\": %zu,\n", cp->pending_count);
     fprintf(fp, "  \"metadata\": \"%s\"\n", cp->metadata);
     fprintf(fp, "}\n");
-
     fclose(fp);
 
     cp->state = CHECKPOINT_STATE_COMPLETED;
@@ -404,7 +324,8 @@ agentos_error_t agentos_checkpoint_save(agentos_task_checkpoint_t* cp) {
 
     if (g_checkpoint_stats.total_checkpoints > 0) {
         g_checkpoint_stats.avg_checkpoint_size =
-            (g_checkpoint_stats.avg_checkpoint_size * (g_checkpoint_stats.total_checkpoints - 1) +
+            (g_checkpoint_stats.avg_checkpoint_size *
+             (g_checkpoint_stats.total_checkpoints - 1) +
              cp->state_size) / g_checkpoint_stats.total_checkpoints;
     } else {
         g_checkpoint_stats.avg_checkpoint_size = cp->state_size;
@@ -414,99 +335,76 @@ agentos_error_t agentos_checkpoint_save(agentos_task_checkpoint_t* cp) {
 }
 
 agentos_error_t agentos_checkpoint_restore(
-    const char* task_id,
-    uint64_t sequence_num,
+    const char* task_id, uint64_t sequence_num,
     agentos_task_checkpoint_t** out_cp) {
 
-    if (!g_checkpoint_initialized) {
-        return AGENTOS_ENOTINIT;
-    }
-
-    if (!task_id || !out_cp) {
-        return AGENTOS_EINVAL;
-    }
-
-    /* sequence_num用于选择特定版本检查点（非桩） */
-    if (sequence_num == 0) {
-        /* sequence_num=0 表示恢复最新版本 */
-    } else {
-        /* 未来支持：根据sequence_num恢复特定版本 */
-    }
+    if (!g_checkpoint_initialized) return AGENTOS_ENOTINIT;
+    if (!task_id || !out_cp) return AGENTOS_EINVAL;
 
     char filepath[MAX_CHECKPOINT_PATH];
-    if (build_checkpoint_filepath(task_id, filepath, sizeof(filepath)) != 0) {
+    if (build_filepath(task_id, filepath, sizeof(filepath)) != 0)
         return AGENTOS_EINVAL;
-    }
 
     FILE* fp = fopen(filepath, "r");
-    if (!fp) {
-        return AGENTOS_ENOENT;
+    if (!fp) return AGENTOS_ENOENT;
+
+    fseek(fp, 0, SEEK_END);
+    long file_size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    if (file_size <= 0 || file_size > 10 * 1024 * 1024) {
+        fclose(fp);
+        return AGENTOS_EIO;
     }
+
+    char* json_buf = (char*)AGENTOS_MALLOC((size_t)(file_size + 1));
+    if (!json_buf) { fclose(fp); return AGENTOS_ENOMEM; }
+
+    size_t read_len = fread(json_buf, 1, (size_t)file_size, fp);
+    json_buf[read_len] = '\0';
+    fclose(fp);
 
     agentos_task_checkpoint_t* cp = (agentos_task_checkpoint_t*)
         AGENTOS_CALLOC(1, sizeof(agentos_task_checkpoint_t));
-    if (!cp) {
-        fclose(fp);
-        return AGENTOS_ENOMEM;
+    if (!cp) { AGENTOS_FREE(json_buf); return AGENTOS_ENOMEM; }
+
+    char* state_str = json_extract_string(json_buf, "state");
+    char* sj = json_extract_string(json_buf, "state_json");
+
+    init_fields(cp, task_id, "", 0);
+
+    if (state_str) {
+        cp->state = string_to_state(state_str);
+        AGENTOS_FREE(state_str);
+    }
+    if (sj) {
+        cp->state_json = sj;
+        cp->state_size = strlen(sj);
+        cp->checksum = calculate_checksum(sj, strlen(sj));
     }
 
-    char line[MAX_LINE_LENGTH];
-    char state_str[64] = {0};
-
-    while (fgets(line, sizeof(line), fp)) {
-        char key[128], value[MAX_VALUE_LENGTH];
-
-        if (sscanf(line, "  \"%127[^\"]\": \"%1023[^\"]\"", key, value) == 2) {
-            if (strcmp(key, "task_id") == 0) {
-                strncpy(cp->task_id, value, sizeof(cp->task_id) - 1);
-                cp->task_id[sizeof(cp->task_id) - 1] = '\0';
-            } else if (strcmp(key, "session_id") == 0) {
-                strncpy(cp->session_id, value, sizeof(cp->session_id) - 1);
-                cp->session_id[sizeof(cp->session_id) - 1] = '\0';
-            } else if (strcmp(key, "state") == 0) {
-                strncpy(state_str, value, sizeof(state_str) - 1);
-                state_str[sizeof(state_str) - 1] = '\0';
-            } else if (strcmp(key, "state_json") == 0) {
-                cp->state_json = safe_strdup(value);
-                if (cp->state_json) {
-                    cp->state_size = strlen(value);
-                }
-            }
-        }
+    char* sid = json_extract_string(json_buf, "session_id");
+    if (sid) {
+        strncpy(cp->session_id, sid, sizeof(cp->session_id) - 1);
+        AGENTOS_FREE(sid);
     }
+    cp->sequence_num = json_extract_uint64(json_buf, "sequence_num");
+    cp->timestamp = json_extract_uint64(json_buf, "timestamp");
 
-    fclose(fp);
-
-    cp->state = string_to_state(state_str);
+    AGENTOS_FREE(json_buf);
     g_checkpoint_stats.total_restore_ops++;
     *out_cp = cp;
-
     return AGENTOS_SUCCESS;
 }
 
 agentos_error_t agentos_checkpoint_delete(const char* task_id, uint64_t seq_num) {
-    if (!g_checkpoint_initialized) {
-        return AGENTOS_ENOTINIT;
-    }
-
-    if (!task_id) {
-        return AGENTOS_EINVAL;
-    }
-
-    /* seq_num用于未来支持删除特定版本（非桩） */
-    if (seq_num > 0) {
-        /* 未来：根据seq_num删除特定版本检查点 */
-    }
+    if (!g_checkpoint_initialized) return AGENTOS_ENOTINIT;
+    if (!task_id) return AGENTOS_EINVAL;
 
     char filepath[MAX_CHECKPOINT_PATH];
-    if (build_checkpoint_filepath(task_id, filepath, sizeof(filepath)) != 0) {
+    if (build_filepath(task_id, filepath, sizeof(filepath)) != 0)
         return AGENTOS_EINVAL;
-    }
 
-    if (unlink(filepath) == 0) {
-        return AGENTOS_SUCCESS;
-    }
-
+    if (unlink(filepath) == 0) return AGENTOS_SUCCESS;
     return AGENTOS_ENOENT;
 }
 
@@ -515,109 +413,64 @@ agentos_error_t agentos_checkpoint_list(
     agentos_task_checkpoint_t*** out_cps,
     size_t* out_count) {
 
-    if (!g_checkpoint_initialized) {
-        return AGENTOS_ENOTINIT;
-    }
-
-    if (!task_id || !out_cps || !out_count) {
-        return AGENTOS_EINVAL;
-    }
+    if (!g_checkpoint_initialized) return AGENTOS_ENOTINIT;
+    if (!task_id || !out_cps || !out_count) return AGENTOS_EINVAL;
 
     *out_cps = NULL;
     *out_count = 0;
 
     agentos_task_checkpoint_t* cp = NULL;
     agentos_error_t err = agentos_checkpoint_restore(task_id, 0, &cp);
-    if (err != AGENTOS_SUCCESS) {
-        return err;
-    }
+    if (err != AGENTOS_SUCCESS) return err;
 
     *out_cps = (agentos_task_checkpoint_t**)AGENTOS_MALLOC(sizeof(agentos_task_checkpoint_t*));
-    if (!*out_cps) {
-        agentos_checkpoint_destroy(cp);
-        return AGENTOS_ENOMEM;
-    }
-
+    if (!out_cps) { agentos_checkpoint_destroy(cp); return AGENTOS_ENOMEM; }
     (*out_cps)[0] = cp;
     *out_count = 1;
-
     return AGENTOS_SUCCESS;
 }
 
 agentos_error_t agentos_checkpoint_get_stats(agentos_checkpoint_stats_t* stats) {
-    if (!g_checkpoint_initialized) {
-        return AGENTOS_ENOTINIT;
-    }
-
-    if (!stats) {
-        return AGENTOS_EINVAL;
-    }
-
+    if (!g_checkpoint_initialized) return AGENTOS_ENOTINIT;
+    if (!stats) return AGENTOS_EINVAL;
     memcpy(stats, &g_checkpoint_stats, sizeof(agentos_checkpoint_stats_t));
     return AGENTOS_SUCCESS;
 }
 
 agentos_error_t agentos_checkpoint_verify(
-    const agentos_task_checkpoint_t* cp,
-    bool* is_valid) {
+    const agentos_task_checkpoint_t* cp, bool* is_valid) {
 
-    if (!cp || !is_valid) {
-        return AGENTOS_EINVAL;
-    }
-
+    if (!cp || !is_valid) return AGENTOS_EINVAL;
     *is_valid = false;
-
-    if (cp->state == CHECKPOINT_STATE_INVALID) {
-        return AGENTOS_SUCCESS;
-    }
-
-    if (!cp->state_json || cp->state_size == 0) {
-        return AGENTOS_SUCCESS;
-    }
-
+    if (cp->state == CHECKPOINT_STATE_INVALID) return AGENTOS_SUCCESS;
+    if (!cp->state_json || cp->state_size == 0) return AGENTOS_SUCCESS;
     uint32_t calc = calculate_checksum(cp->state_json, cp->state_size);
     *is_valid = (calc == cp->checksum);
-
     return AGENTOS_SUCCESS;
 }
 
 agentos_error_t agentos_checkpoint_destroy(agentos_task_checkpoint_t* cp) {
-    if (!cp) {
-        return AGENTOS_SUCCESS;
-    }
-
-    if (cp->state_json) {
-        AGENTOS_FREE(cp->state_json);
-        cp->state_json = NULL;
-    }
-
+    if (!cp) return AGENTOS_SUCCESS;
+    if (cp->state_json) { AGENTOS_FREE(cp->state_json); cp->state_json = NULL; }
     if (cp->completed_nodes) {
-        for (size_t i = 0; i < cp->completed_count; i++) {
+        for (size_t i = 0; i < cp->completed_count; i++)
             AGENTOS_FREE(cp->completed_nodes[i]);
-        }
-        AGENTOS_FREE(cp->completed_nodes);
-        cp->completed_nodes = NULL;
+        AGENTOS_FREE(cp->completed_nodes); cp->completed_nodes = NULL;
     }
-
     if (cp->pending_nodes) {
-        for (size_t i = 0; i < cp->pending_count; i++) {
+        for (size_t i = 0; i < cp->pending_count; i++)
             AGENTOS_FREE(cp->pending_nodes[i]);
-        }
-        AGENTOS_FREE(cp->pending_nodes);
-        cp->pending_nodes = NULL;
+        AGENTOS_FREE(cp->pending_nodes); cp->pending_nodes = NULL;
     }
-
     AGENTOS_FREE(cp);
     return AGENTOS_SUCCESS;
 }
 
 agentos_error_t agentos_checkpoint_cleanup(uint64_t max_age_sec, size_t max_cnt) {
-    if (!g_checkpoint_initialized) {
-        return AGENTOS_ENOTINIT;
-    }
+    if (!g_checkpoint_initialized) return AGENTOS_ENOTINIT;
 
-    agentos_platform_mutex_lock(&g_checkpoint_mutex);
-    uint64_t now = (uint64_t)time(NULL);
+    agentos_mutex_lock(&g_checkpoint_mutex);
+    uint64_t now_sec = agentos_time_ms() / 1000ULL;
 
     if (max_age_sec > 0) {
         char pattern[MAX_CHECKPOINT_PATH];
@@ -631,19 +484,12 @@ agentos_error_t agentos_checkpoint_cleanup(uint64_t max_age_sec, size_t max_cnt)
                 char filepath[MAX_CHECKPOINT_PATH];
                 snprintf(filepath, sizeof(filepath), "%s/%s",
                          g_checkpoint_storage_path, find_data.cFileName);
-
-                ULARGE_INTEGER file_time;
-                file_time.LowPart = find_data.ftLastWriteTime.dwLowDateTime;
-                file_time.HighPart = find_data.ftLastWriteTime.dwHighDateTime;
-                uint64_t mod_time = (file_time.QuadPart / 10000000ULL) - 11644473600ULL;
-
-                if ((now - mod_time) > max_age_sec) {
-                    DeleteFileA(filepath);
-                    g_checkpoint_stats.total_checkpoints =
-                        (g_checkpoint_stats.total_checkpoints > 0)
-                            ? g_checkpoint_stats.total_checkpoints - 1 : 0;
-                }
-            } while (FindNextFileA(hFind, &find_data));
+                ULARGE_INTEGER ft;
+                ft.LowPart = find_data.ftLastWriteTime.dwLowDateTime;
+                ft.HighPart = find_data.ftLastWriteTime.dwHighDateTime;
+                uint64_t mod_sec = (ft.QuadPart / 10000000ULL) - 11644473600ULL;
+                if ((now_sec - mod_sec) > max_age_sec) DeleteFileA(filepath);
+            } while (FindNextFile(hFind, &find_data));
             FindClose(hFind);
         }
 #else
@@ -651,23 +497,16 @@ agentos_error_t agentos_checkpoint_cleanup(uint64_t max_age_sec, size_t max_cnt)
         if (dir) {
             struct dirent* entry;
             while ((entry = readdir(dir)) != NULL) {
-                size_t len = strlen(entry->d_name);
-                if (len < 5 || strcmp(entry->d_name + len - 5, ".json") != 0)
+                size_t nlen = strlen(entry->d_name);
+                if (nlen < 5 || strcmp(entry->d_name + nlen - 5, ".json") != 0)
                     continue;
-
                 char filepath[MAX_CHECKPOINT_PATH];
                 snprintf(filepath, sizeof(filepath), "%s/%s",
                          g_checkpoint_storage_path, entry->d_name);
-
                 struct stat st;
                 if (stat(filepath, &st) == 0) {
-                    uint64_t mod_time = (uint64_t)st.st_mtime;
-                    if ((now - mod_time) > max_age_sec) {
+                    if ((now_sec - (uint64_t)st.st_mtime) > max_age_sec)
                         remove(filepath);
-                        g_checkpoint_stats.total_checkpoints =
-                            (g_checkpoint_stats.total_checkpoints > 0)
-                                ? g_checkpoint_stats.total_checkpoints - 1 : 0;
-                    }
                 }
             }
             closedir(dir);
@@ -675,34 +514,23 @@ agentos_error_t agentos_checkpoint_cleanup(uint64_t max_age_sec, size_t max_cnt)
 #endif
     }
 
-    if (max_cnt > 0 && g_checkpoint_stats.total_checkpoints > max_cnt) {
+    if (max_cnt > 0 && g_checkpoint_stats.total_checkpoints > max_cnt)
         g_checkpoint_stats.total_checkpoints = max_cnt;
-    }
 
-    agentos_platform_mutex_unlock(&g_checkpoint_mutex);
+    agentos_mutex_unlock(&g_checkpoint_mutex);
     return AGENTOS_SUCCESS;
 }
 
 agentos_error_t agentos_snapshot_create(const char* task_id, const char* snap_path) {
-    if (!g_checkpoint_initialized) {
-        return AGENTOS_ENOTINIT;
-    }
-
-    if (!task_id || !snap_path) {
-        return AGENTOS_EINVAL;
-    }
+    if (!g_checkpoint_initialized) return AGENTOS_ENOTINIT;
+    if (!task_id || !snap_path) return AGENTOS_EINVAL;
 
     agentos_task_checkpoint_t* cp = NULL;
     agentos_error_t err = agentos_checkpoint_restore(task_id, 0, &cp);
-    if (err != AGENTOS_SUCCESS) {
-        return err;
-    }
+    if (err != AGENTOS_SUCCESS) return err;
 
     FILE* fp = fopen(snap_path, "wb");
-    if (!fp) {
-        agentos_checkpoint_destroy(cp);
-        return AGENTOS_EIO;
-    }
+    if (!fp) { agentos_checkpoint_destroy(cp); return AGENTOS_EIO; }
 
     fprintf(fp, "SNAPSHOT_V1\n");
     fprintf(fp, "TaskID: %s\n", cp->task_id);
@@ -711,61 +539,63 @@ agentos_error_t agentos_snapshot_create(const char* task_id, const char* snap_pa
     fprintf(fp, "Timestamp: %lu\n", (unsigned long)cp->timestamp);
     fprintf(fp, "StateSize: %zu\n", cp->state_size);
     fprintf(fp, "---DATA---\n");
-
-    if (cp->state_json && cp->state_size > 0) {
+    if (cp->state_json && cp->state_size > 0)
         fwrite(cp->state_json, 1, cp->state_size, fp);
-    }
-
     fprintf(fp, "\n---END---\n");
-
     fclose(fp);
     agentos_checkpoint_destroy(cp);
-
     return AGENTOS_SUCCESS;
 }
 
 agentos_error_t agentos_snapshot_restore(const char* snap_path, char** tid) {
-    if (!g_checkpoint_initialized) {
-        return AGENTOS_ENOTINIT;
-    }
-
-    if (!snap_path || !tid) {
-        return AGENTOS_EINVAL;
-    }
+    if (!g_checkpoint_initialized) return AGENTOS_ENOTINIT;
+    if (!snap_path || !tid) return AGENTOS_EINVAL;
 
     FILE* fp = fopen(snap_path, "rb");
-    if (!fp) {
-        return AGENTOS_ENOENT;
-    }
+    if (!fp) return AGENTOS_ENOENT;
 
     char header[64];
-    if (!fgets(header, sizeof(header), fp) || strncmp(header, "SNAPSHOT_V1", 11) != 0) {
-        fclose(fp);
-        return AGENTOS_EIO;
+    if (!fgets(header, sizeof(header), fp) ||
+        strncmp(header, "SNAPSHOT_V1", 11) != 0) {
+        fclose(fp); return AGENTOS_EIO;
     }
 
     char line[256];
     *tid = NULL;
-
     while (fgets(line, sizeof(line), fp)) {
         if (strncmp(line, "TaskID: ", 8) == 0) {
             *tid = safe_strdup(line + 8);
             if (*tid) {
-                size_t len = strlen(*tid);
-                if (len > 0 && (*tid)[len - 1] == '\n') {
-                    (*tid)[len - 1] = '\0';
-                }
+                size_t tlen = strlen(*tid);
+                if (tlen > 0 && (*tid)[tlen - 1] == '\n') (*tid)[tlen - 1] = '\0';
             }
         } else if (strncmp(line, "---DATA---", 10) == 0) {
             break;
         }
     }
-
     fclose(fp);
+    if (!*tid) return AGENTOS_EIO;
+    return AGENTOS_SUCCESS;
+}
 
-    if (!*tid) {
-        return AGENTOS_EIO;
-    }
+/* ========== Auto-checkpoint hooks (CoreLoopThree integration) ========== */
 
+agentos_error_t agentos_checkpoint_set_auto_hook(
+    agentos_checkpoint_hook_fn hook,
+    void* user_data,
+    uint64_t interval_ms) {
+
+    if (!g_checkpoint_initialized) return AGENTOS_ENOTINIT;
+    g_auto_hook = hook;
+    g_auto_hook_user_data = user_data;
+    g_auto_interval_ms = interval_ms;
+    return AGENTOS_SUCCESS;
+}
+
+agentos_error_t agentos_checkpoint_trigger_auto(const char* task_id) {
+    if (!g_checkpoint_initialized) return AGENTOS_ENOTINIT;
+    if (!g_auto_hook || !task_id) return AGENTOS_EINVAL;
+
+    g_auto_hook(task_id, NULL, g_auto_hook_user_data);
     return AGENTOS_SUCCESS;
 }

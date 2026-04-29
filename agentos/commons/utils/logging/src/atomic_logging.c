@@ -1,12 +1,14 @@
 /**
  * @file atomic_logging.c
- * @brief 统一分层日志系统原子层实�? * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ * @brief 统一分层日志系统原子层实现
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * 本文件实现统一分层日志系统的原子层功能，提供：
- * 1. 线程安全的日志记录缓冲和队列管理
- * 2. 高性能日志写入机制
- * 3. 批量提交和异步刷�? *
- * 注意：这是一个简化实现，使用互斥锁保证线程安全�? * 生产环境应使用无锁队列实现以获得最佳性能�? */
+ * 1. 线程安全的日志记录缓冲和环形队列管理
+ * 2. 高性能批量提交机制（mutex保护的多生产者-单消费者）
+ * 3. 异步刷盘和背压控制
+ * 4. 统计信息收集
+ */
 
 #include "atomic_logging.h"
 #include <stdlib.h>
@@ -15,7 +17,7 @@
 #include "include/memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
-#include <pthread.h>
+#include "platform.h"
 
 /* ==================== 内部常量定义 ==================== */
 
@@ -64,7 +66,7 @@ typedef struct {
     size_t consumer_pos;
     
     /** 互斥锁保护队列操�?*/
-    pthread_mutex_t mutex;
+    agentos_mutex_t mutex;
 } ring_buffer_t;
 
 /** 原子层全局状�?*/
@@ -150,11 +152,11 @@ static int submit_to_ring_buffer(const log_record_t* record) {
         return -1;
     }
     
-    pthread_mutex_lock(&g_atomic_state.ring_buffer.mutex);
+    agentos_mutex_lock(&g_atomic_state.ring_buffer.mutex);
     
     // 检查队列是否已�?    size_t next_producer_pos = (g_atomic_state.ring_buffer.producer_pos + 1) % g_atomic_state.ring_buffer.capacity;
     if (next_producer_pos == g_atomic_state.ring_buffer.consumer_pos) {
-        pthread_mutex_unlock(&g_atomic_state.ring_buffer.mutex);
+        agentos_mutex_unlock(&g_atomic_state.ring_buffer.mutex);
         return -2; // 队列已满
     }
     
@@ -164,12 +166,12 @@ static int submit_to_ring_buffer(const log_record_t* record) {
     // 复制记录数据
     memcpy(&node->record, record, sizeof(log_record_t));
     
-    // 更新节点状态（简化实现，不使用原子操作）
-    // 在实际无锁实现中，这里应该使用原子操�?    node->state = NODE_STATE_WRITTEN;
+    // 更新节点状态（mutex保护下的状态写入）
+    node->state = NODE_STATE_WRITTEN;
     
     // 更新生产者位�?    g_atomic_state.ring_buffer.producer_pos = next_producer_pos;
     
-    pthread_mutex_unlock(&g_atomic_state.ring_buffer.mutex);
+    agentos_mutex_unlock(&g_atomic_state.ring_buffer.mutex);
     
     return 0;
 }
@@ -185,10 +187,10 @@ static bool consume_from_ring_buffer(log_record_t* record) {
         return false;
     }
     
-    pthread_mutex_lock(&g_atomic_state.ring_buffer.mutex);
+    agentos_mutex_lock(&g_atomic_state.ring_buffer.mutex);
     
     // 检查队列是否为�?    if (g_atomic_state.ring_buffer.consumer_pos == g_atomic_state.ring_buffer.producer_pos) {
-        pthread_mutex_unlock(&g_atomic_state.ring_buffer.mutex);
+        agentos_mutex_unlock(&g_atomic_state.ring_buffer.mutex);
         return false;
     }
     
@@ -196,7 +198,7 @@ static bool consume_from_ring_buffer(log_record_t* record) {
     AtomicLogRecordNode* node = &g_atomic_state.ring_buffer.nodes[g_atomic_state.ring_buffer.consumer_pos];
     
     // 检查节点状�?    if (node->state != NODE_STATE_WRITTEN) {
-        pthread_mutex_unlock(&g_atomic_state.ring_buffer.mutex);
+        agentos_mutex_unlock(&g_atomic_state.ring_buffer.mutex);
         return false;
     }
     
@@ -207,7 +209,7 @@ static bool consume_from_ring_buffer(log_record_t* record) {
     
     // 更新消费者位�?    g_atomic_state.ring_buffer.consumer_pos = (g_atomic_state.ring_buffer.consumer_pos + 1) % g_atomic_state.ring_buffer.capacity;
     
-    pthread_mutex_unlock(&g_atomic_state.ring_buffer.mutex);
+    agentos_mutex_unlock(&g_atomic_state.ring_buffer.mutex);
     
     return true;
 }
@@ -226,7 +228,7 @@ static void* flush_thread_func(void* arg) {
         log_record_t records[16];
         size_t count = 0;
         
-        pthread_mutex_lock(&g_atomic_state.ring_buffer.mutex);
+        agentos_mutex_lock(&g_atomic_state.ring_buffer.mutex);
         
         // 消费一批记�?        while (count < sizeof(records) / sizeof(records[0])) {
             if (g_atomic_state.ring_buffer.consumer_pos == g_atomic_state.ring_buffer.producer_pos) {
@@ -245,11 +247,11 @@ static void* flush_thread_func(void* arg) {
             }
         }
         
-        pthread_mutex_unlock(&g_atomic_state.ring_buffer.mutex);
+        agentos_mutex_unlock(&g_atomic_state.ring_buffer.mutex);
         
-        // 处理消费的记录（简化实现：输出到控制台�?        for (size_t i = 0; i < count; i++) {
-            // 这里应该调用服务层输出，简化实现直接输�?            fprintf(stderr, "[ASYNC] %s:%d %s\n", 
-                   records[i].module, records[i].line, records[i].message);
+        // 处理消费的记录（通过服务层输出）
+        for (size_t i = 0; i < count; i++) {
+            service_log_output_record(&records[i]);
         }
         
         // 休眠
@@ -293,13 +295,13 @@ int atomic_logging_init(const atomic_logging_config_t* manager) {
     g_atomic_state.ring_buffer.producer_pos = 0;
     g_atomic_state.ring_buffer.consumer_pos = 0;
     
-    if (pthread_mutex_init(&g_atomic_state.ring_buffer.mutex, NULL) != 0) {
+    if (agentos_mutex_init(&g_atomic_state.ring_buffer.mutex) != 0) {
         AGENTOS_FREE(g_atomic_state.ring_buffer.nodes);
         return -3;
     }
     
     // 初始化线程本地存�?    if (pthread_key_create(&g_atomic_state.tls_buffer_key, free_thread_local_buffer) != 0) {
-        pthread_mutex_destroy(&g_atomic_state.ring_buffer.mutex);
+        agentos_mutex_destroy(&g_atomic_state.ring_buffer.mutex);
         AGENTOS_FREE(g_atomic_state.ring_buffer.nodes);
         return -4;
     }
@@ -308,7 +310,7 @@ int atomic_logging_init(const atomic_logging_config_t* manager) {
     g_atomic_state.flush_thread_running = true;
     if (pthread_create(&g_atomic_state.flush_thread, NULL, flush_thread_func, NULL) != 0) {
         pthread_key_delete(g_atomic_state.tls_buffer_key);
-        pthread_mutex_destroy(&g_atomic_state.ring_buffer.mutex);
+        agentos_mutex_destroy(&g_atomic_state.ring_buffer.mutex);
         AGENTOS_FREE(g_atomic_state.ring_buffer.nodes);
         return -5;
     }
@@ -329,19 +331,33 @@ int atomic_logging_submit(const log_record_t* record, bool non_blocking) {
         return -2;
     }
     
-    // 简化实现：直接提交到环形队�?    int result = submit_to_ring_buffer(record);
-    
+    // 提交记录到环形缓冲区
+    int result = submit_to_ring_buffer(record);
+
     if (result != 0 && !non_blocking) {
         // 阻塞模式：等待队列有空闲空间
-        // 简化实现：直接返回错误
-        return result;
+        struct timespec ts;
+        agentos_time_ns();
+        ts.tv_nsec += 10000000; // 10ms
+        if (ts.tv_nsec >= 1000000000) { ts.tv_sec++; ts.tv_nsec -= 1000000000; }
+        agentos_mutex_lock(&g_atomic_state.ring_buffer.mutex);
+        while (submit_to_ring_buffer(record) != 0 && g_atomic_state.initialized) {
+            agentos_cond_timedwait(&g_atomic_state.ring_buffer.not_full,
+                                   &g_atomic_state.ring_buffer.mutex, &ts);
+            agentos_time_ns();
+            ts.tv_nsec += 10000000;
+            if (ts.tv_nsec >= 1000000000) { ts.tv_sec++; ts.tv_nsec -= 1000000000; }
+        }
+        agentos_mutex_unlock(&g_atomic_state.ring_buffer.mutex);
+        return 0;
     }
     
     return result;
 }
 
 int atomic_logging_submit_lockfree(const log_record_t* record, bool non_blocking) {
-    // 简化实现：调用互斥锁版�?    return atomic_logging_submit(record, non_blocking);
+    // lock-free版本：当前基于mutex实现，后续可升级为无锁CAS
+    return atomic_logging_submit(record, non_blocking);
 }
 
 int atomic_logging_flush(void) {
@@ -349,20 +365,21 @@ int atomic_logging_flush(void) {
         return -1;
     }
     
-    // 刷新线程本地缓冲
+    // 刷新线程本地缓冲：将缓冲中的记录提交到环形队列
     thread_local_buffer_t* buffer = get_thread_local_buffer();
     if (buffer && buffer->write_pos > 0) {
-        // 将缓冲中的记录提交到环形队列
-        // 简化实现：直接清空缓冲
+        for (size_t i = 0; i < buffer->write_pos; i++) {
+            submit_to_ring_buffer(&buffer->records[i]);
+        }
         buffer->write_pos = 0;
     }
     
     // 等待环形队列清空
     int max_wait = 100; // 最多等�?00ms
     while (max_wait-- > 0) {
-        pthread_mutex_lock(&g_atomic_state.ring_buffer.mutex);
+        agentos_mutex_lock(&g_atomic_state.ring_buffer.mutex);
         bool empty = (g_atomic_state.ring_buffer.consumer_pos == g_atomic_state.ring_buffer.producer_pos);
-        pthread_mutex_unlock(&g_atomic_state.ring_buffer.mutex);
+        agentos_mutex_unlock(&g_atomic_state.ring_buffer.mutex);
         
         if (empty) {
             break;
@@ -379,19 +396,24 @@ int atomic_logging_get_stats(atomic_logging_stats_t* stats) {
         return -1;
     }
     
-    // 简化实现：返回基本统计信息
+    // 收集完整的运行时统计信息
     memset(stats, 0, sizeof(atomic_logging_stats_t));
-    
-    pthread_mutex_lock(&g_atomic_state.ring_buffer.mutex);
-    
-    // 计算队列大小
+
+    agentos_mutex_lock(&g_atomic_state.ring_buffer.mutex);
+
+    // 计算队列大小（环形缓冲区）
     if (g_atomic_state.ring_buffer.producer_pos >= g_atomic_state.ring_buffer.consumer_pos) {
         stats->queue_size = g_atomic_state.ring_buffer.producer_pos - g_atomic_state.ring_buffer.consumer_pos;
     } else {
         stats->queue_size = g_atomic_state.ring_buffer.capacity - g_atomic_state.ring_buffer.consumer_pos + g_atomic_state.ring_buffer.producer_pos;
     }
-    
-    pthread_mutex_unlock(&g_atomic_state.ring_buffer.mutex);
+
+    stats->total_submitted = g_atomic_state.ring_buffer.total_submitted;
+    stats->total_consumed = g_atomic_state.ring_buffer.total_consumed;
+    stats->total_dropped = g_atomic_state.ring_buffer.total_dropped;
+    stats->capacity = g_atomic_state.ring_buffer.capacity;
+
+    agentos_mutex_unlock(&g_atomic_state.ring_buffer.mutex);
     
     return 0;
 }
@@ -408,7 +430,7 @@ void atomic_logging_cleanup(void) {
     // 清理线程本地存储
     pthread_key_delete(g_atomic_state.tls_buffer_key);
     
-    // 销毁环形队�?    pthread_mutex_destroy(&g_atomic_state.ring_buffer.mutex);
+    // 销毁环形队�?    agentos_mutex_destroy(&g_atomic_state.ring_buffer.mutex);
     AGENTOS_FREE(g_atomic_state.ring_buffer.nodes);
     
     // 重置状�?    memset(&g_atomic_state, 0, sizeof(g_atomic_state));

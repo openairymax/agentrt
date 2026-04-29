@@ -279,10 +279,10 @@ agentos_error_t agentos_memoryrov_add_memory(agentos_memoryrov_handle_t* handle,
 #ifdef AGENTOS_HAS_UUID
     agentos_uuid_error_t uuid_err = agentos_uuid_with_prefix("mem_", id, sizeof(id));
     if (uuid_err != AGENTOS_UUID_SUCCESS) {
-        snprintf(id, sizeof(id), "mem_%lu_%zu", (unsigned long)time(NULL), (size_t)handle);
+        snprintf(id, sizeof(id), "mem_%lu_%zu", (unsigned long)(time_t)(agentos_time_ms() / 1000ULL), (size_t)handle);
     }
 #else
-    snprintf(id, sizeof(id), "mem_%lu_%zu", (unsigned long)time(NULL), (size_t)handle);
+    snprintf(id, sizeof(id), "mem_%lu_%zu", (unsigned long)(time_t)(agentos_time_ms() / 1000ULL), (size_t)handle);
 #endif
 
     /* 写入 L1 原始卷 */
@@ -506,8 +506,8 @@ agentos_error_t agentos_memoryrov_retrieve(agentos_memoryrov_handle_t* handle,
             return AGENTOS_ENOMEM;
         }
         (*out_results)[i].score = scores[i];
-        (*out_results)[i].created_at = time(NULL);
-        (*out_results)[i].updated_at = time(NULL);
+        (*out_results)[i].created_at = (time_t)(agentos_time_ms() / 1000ULL);
+        (*out_results)[i].updated_at = (time_t)(agentos_time_ms() / 1000ULL);
 
         /* 从 L1 读取内容 */
         void* data = NULL;
@@ -555,10 +555,10 @@ agentos_error_t agentos_memoryrov_write_raw(
 #ifdef AGENTOS_HAS_UUID
     agentos_uuid_error_t uuid_err = agentos_uuid_with_prefix("raw_", id, sizeof(id));
     if (uuid_err != AGENTOS_UUID_SUCCESS) {
-        snprintf(id, sizeof(id), "raw_%lu_%zu", (unsigned long)time(NULL), (size_t)handle);
+        snprintf(id, sizeof(id), "raw_%lu_%zu", (unsigned long)(time_t)(agentos_time_ms() / 1000ULL), (size_t)handle);
     }
 #else
-    snprintf(id, sizeof(id), "raw_%lu_%zu", (unsigned long)time(NULL), (size_t)handle);
+    snprintf(id, sizeof(id), "raw_%lu_%zu", (unsigned long)(time_t)(agentos_time_ms() / 1000ULL), (size_t)handle);
 #endif
     agentos_error_t err = agentos_layer1_raw_write(handle->l1_raw, id, (const char*)data, len);
     if (err != AGENTOS_SUCCESS) {

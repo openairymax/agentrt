@@ -298,7 +298,7 @@ agentos_error_t agentos_sandbox_create(const sandbox_config_t* manager,
         
         memset(&sandbox->policy, 0, sizeof(security_policy_t));
         sandbox->policy.version = 1;
-        sandbox->policy.last_updated = time(NULL);
+        sandbox->policy.last_updated = (time_t)(agentos_time_ms() / 1000ULL);
         strncpy(sandbox->policy.updated_by, "system", 
                 sizeof(sandbox->policy.updated_by) - 1);
         sandbox->policy.allow_dynamic_update = 1;
@@ -307,7 +307,7 @@ agentos_error_t agentos_sandbox_create(const sandbox_config_t* manager,
         sandbox->policy.risk_threshold = 0.7f;
         
         memset(&sandbox->perf_stats, 0, sizeof(sandbox_perf_stats_t));
-        sandbox->perf_stats.stats_reset_time = time(NULL);
+        sandbox->perf_stats.stats_reset_time = (time_t)(agentos_time_ms() / 1000ULL);
         
         sandbox->enable_input_sanitization = 1;
         sandbox->enable_resource_monitoring = 1;
@@ -679,7 +679,7 @@ static void sandbox_add_enhanced_audit_entry(
     audit_entry_t* entry = &sandbox->audit_log[sandbox->audit_write_index];
     
     /* 填充审计记录 */
-    entry->timestamp = (uint64_t)time(NULL);
+    entry->timestamp = (uint64_t)(time_t)(agentos_time_ms() / 1000ULL);
     entry->event_type = (result == AGENTOS_SUCCESS) ? 1 : 2; /* 1=成功, 2=失败/违规 */
     entry->syscall_num = syscall_num;
     entry->result = (int)result;
@@ -740,7 +740,7 @@ agentos_error_t agentos_sandbox_update_security_policy(
     
     /* 应用新策略 */
     memcpy(&sandbox->policy, new_policy, sizeof(security_policy_t));
-    sandbox->policy.last_updated = time(NULL);
+    sandbox->policy.last_updated = (time_t)(agentos_time_ms() / 1000ULL);
     
     /* 记录策略更新事件 */
     char log_msg[AUDIT_LOG_BUFFER_SIZE];
@@ -805,7 +805,7 @@ agentos_error_t agentos_sandbox_reset_performance_stats(agentos_sandbox_t* sandb
     agentos_mutex_lock(sandbox->lock);
     
     memset(&sandbox->perf_stats, 0, sizeof(sandbox_perf_stats_t));
-    sandbox->perf_stats.stats_reset_time = time(NULL);
+    sandbox->perf_stats.stats_reset_time = (time_t)(agentos_time_ms() / 1000ULL);
     
     agentos_mutex_unlock(sandbox->lock);
     
