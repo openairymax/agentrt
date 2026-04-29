@@ -13,7 +13,7 @@
 #include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
-#include "platform.h"
+#include <pthread.h>
 #include <math.h>
 
 #define DEFAULT_HNSW_M 16
@@ -44,7 +44,7 @@ typedef struct hnsw_index {
     uint32_t m;
     uint32_t ef_construction;
     uint32_t ef_search;
-    agentos_mutex_t mutex;
+    pthread_mutex_t mutex;
 } hnsw_index_t;
 
 struct agentos_layer2_feature {
@@ -117,7 +117,7 @@ static hnsw_index_t* hnsw_create(uint32_t dimension, uint32_t m) {
         AGENTOS_FREE(index);
         return NULL;
     }
-    agentos_mutex_init(&index->mutex);
+    pthread_mutex_init(&index->mutex, NULL);
     return index;
 }
 
@@ -137,7 +137,7 @@ static void hnsw_destroy(hnsw_index_t* index) {
         }
     }
     AGENTOS_FREE(index->nodes);
-    agentos_mutex_destroy(&index->mutex);
+    pthread_mutex_destroy(&index->mutex);
     AGENTOS_FREE(index);
 }
 
@@ -147,13 +147,13 @@ static void hnsw_destroy(hnsw_index_t* index) {
 static agentos_error_t hnsw_add(hnsw_index_t* index, const char* id, const float* vector) {
     if (!index || !id || !vector) return AGENTOS_EINVAL;
 
-    agentos_mutex_lock(&index->mutex);
+    pthread_mutex_lock(&index->mutex);
 
     if (index->node_count >= index->capacity) {
         size_t new_cap = index->capacity * 2;
         hnsw_node_t** new_nodes = (hnsw_node_t**)AGENTOS_REALLOC(index->nodes, new_cap * sizeof(hnsw_node_t*));
         if (!new_nodes) {
-            agentos_mutex_unlock(&index->mutex);
+            pthread_mutex_unlock(&index->mutex);
             return AGENTOS_ENOMEM;
         }
         index->nodes = new_nodes;
@@ -162,21 +162,21 @@ static agentos_error_t hnsw_add(hnsw_index_t* index, const char* id, const float
 
     hnsw_node_t* node = (hnsw_node_t*)AGENTOS_CALLOC(1, sizeof(hnsw_node_t));
     if (!node) {
-        agentos_mutex_unlock(&index->mutex);
+        pthread_mutex_unlock(&index->mutex);
         return AGENTOS_ENOMEM;
     }
 
     node->id = AGENTOS_STRDUP(id);
     if (!node->id) {
         AGENTOS_FREE(node);
-        agentos_mutex_unlock(&index->mutex);
+        pthread_mutex_unlock(&index->mutex);
         return AGENTOS_ENOMEM;
     }
     node->vector = (float*)AGENTOS_MALLOC(index->dimension * sizeof(float));
     if (!node->vector) {
         AGENTOS_FREE(node->id);
         AGENTOS_FREE(node);
-        agentos_mutex_unlock(&index->mutex);
+        pthread_mutex_unlock(&index->mutex);
         return AGENTOS_ENOMEM;
     }
     memcpy(node->vector, vector, index->dimension * sizeof(float));
@@ -191,7 +191,7 @@ static agentos_error_t hnsw_add(hnsw_index_t* index, const char* id, const float
     if (!node->neighbors) {
         AGENTOS_FREE(node->vector);
         AGENTOS_FREE(node);
-        agentos_mutex_unlock(&index->mutex);
+        pthread_mutex_unlock(&index->mutex);
         return AGENTOS_ENOMEM;
     }
     node->neighbor_counts = (size_t*)AGENTOS_CALLOC(node->level + 1, sizeof(size_t));
@@ -199,13 +199,13 @@ static agentos_error_t hnsw_add(hnsw_index_t* index, const char* id, const float
         AGENTOS_FREE(node->neighbors);
         AGENTOS_FREE(node->vector);
         AGENTOS_FREE(node);
-        agentos_mutex_unlock(&index->mutex);
+        pthread_mutex_unlock(&index->mutex);
         return AGENTOS_ENOMEM;
     }
 
     index->nodes[index->node_count++] = node;
 
-    agentos_mutex_unlock(&index->mutex);
+    pthread_mutex_unlock(&index->mutex);
     return AGENTOS_SUCCESS;
 }
 
@@ -215,10 +215,10 @@ static agentos_error_t hnsw_add(hnsw_index_t* index, const char* id, const float
 static agentos_error_t hnsw_search(hnsw_index_t* index, const float* query, uint32_t k, char*** out_ids, float** out_scores, size_t* out_count) {
     if (!index || !query || !out_ids || !out_scores || !out_count) return AGENTOS_EINVAL;
 
-    agentos_mutex_lock(&index->mutex);
+    pthread_mutex_lock(&index->mutex);
 
     if (index->node_count == 0) {
-        agentos_mutex_unlock(&index->mutex);
+        pthread_mutex_unlock(&index->mutex);
         *out_ids = NULL;
         *out_scores = NULL;
         *out_count = 0;
@@ -230,7 +230,7 @@ static agentos_error_t hnsw_search(hnsw_index_t* index, const float* query, uint
         if (!index->nodes[i]->deleted) active_count++;
     }
     if (active_count == 0) {
-        agentos_mutex_unlock(&index->mutex);
+        pthread_mutex_unlock(&index->mutex);
         *out_ids = NULL;
         *out_scores = NULL;
         *out_count = 0;
@@ -244,7 +244,7 @@ static agentos_error_t hnsw_search(hnsw_index_t* index, const float* query, uint
     if (!ids || !scores) {
         if (ids) AGENTOS_FREE(ids);
         if (scores) AGENTOS_FREE(scores);
-        agentos_mutex_unlock(&index->mutex);
+        pthread_mutex_unlock(&index->mutex);
         return AGENTOS_ENOMEM;
     }
 
@@ -278,7 +278,7 @@ static agentos_error_t hnsw_search(hnsw_index_t* index, const float* query, uint
         }
     }
 
-    agentos_mutex_unlock(&index->mutex);
+    pthread_mutex_unlock(&index->mutex);
 
     *out_ids = ids;
     *out_scores = scores;
@@ -347,17 +347,17 @@ agentos_error_t agentos_layer2_feature_remove(
     hnsw_index_t* index = l2->hnsw;
     if (!index) return AGENTOS_ENOENT;
 
-    agentos_mutex_lock(&index->mutex);
+    pthread_mutex_lock(&index->mutex);
 
     for (size_t i = 0; i < index->node_count; i++) {
         if (!index->nodes[i]->deleted && strcmp(index->nodes[i]->id, id) == 0) {
             index->nodes[i]->deleted = 1;
-            agentos_mutex_unlock(&index->mutex);
+            pthread_mutex_unlock(&index->mutex);
             return AGENTOS_SUCCESS;
         }
     }
 
-    agentos_mutex_unlock(&index->mutex);
+    pthread_mutex_unlock(&index->mutex);
     return AGENTOS_ENOENT;
 }
 
@@ -387,12 +387,12 @@ agentos_error_t agentos_layer2_feature_stats(
         *out_count = 0;
         return AGENTOS_SUCCESS;
     }
-    agentos_mutex_lock(&l2->hnsw->mutex);
+    pthread_mutex_lock(&l2->hnsw->mutex);
     size_t active = 0;
     for (size_t i = 0; i < l2->hnsw->node_count; i++) {
         if (!l2->hnsw->nodes[i]->deleted) active++;
     }
-    agentos_mutex_unlock(&l2->hnsw->mutex);
+    pthread_mutex_unlock(&l2->hnsw->mutex);
     *out_count = active;
     return AGENTOS_SUCCESS;
 }
