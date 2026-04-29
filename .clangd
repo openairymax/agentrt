@@ -1,6 +1,6 @@
-# AgentOS clangd configuration
+﻿# AgentOS clangd configuration
 # SPDX-FileCopyrightText: 2026 SPHARX Ltd.
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 #
 # This file uses RELATIVE paths and is safe to commit.
 # Each developer must build the project first to generate compile_commands.json:
