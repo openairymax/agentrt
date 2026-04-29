@@ -1,260 +1,156 @@
-name: Release
+# AgentOS Release v3.0 - 发布+桌面客户端构建
+# align: 工程规范化标准手册 v10.15
+# trigger: tag推送(v*) + manual
+# v3.0: 合并release.yml + build-desktop.yml
+
+name: Release v3.0
 
 on:
   push:
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
-      - 'v[0-9]+.[0-9]+.[0-9]+-rc.*'
-      - 'v[0-9]+.[0-9]+.[0-9]+-beta.*'
+      - 'v*.*.*'
+      - 'v*.*.*-rc.*'
+      - 'v*.*.*-beta.*'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., 1.0.0)'
+        description: 'Release version (e.g., v0.4.0)'
         required: true
       release_type:
         description: 'Release type'
         required: false
         default: 'stable'
         type: choice
-        options:
-          - 'stable'
-          - 'beta'
-          - 'rc'
+        options: [stable, beta, rc]
 
 permissions:
   contents: write
   packages: write
 
-env:
-  PYTHON_VERSION: '3.11'
-
 jobs:
-  extract-version:
-    name: Extract Version
+  # ============================================================
+  # Job 1: Build C Core + Package
+  # ============================================================
+  build-core:
+    name: "Build C Core"
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      is_stable: ${{ steps.version.outputs.is_stable }}
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
+          submodules: recursive
           fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y \
+            build-essential cmake gcc g++ make \
+            libcurl4-openssl-dev libjson-c-dev \
+            libmicrohttpd-dev libssl-dev 2>/dev/null || true
 
       - name: Extract version
         id: version
         run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-            RELEASE_TYPE="${{ github.event.inputs.release_type }}"
-          else
-            VERSION=${GITHUB_REF#refs/tags/v}
-          fi
-
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "is_stable=true" >> $GITHUB_OUTPUT
-          else
-            echo "is_stable=false" >> $GITHUB_OUTPUT
-          fi
-
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-
-  build-kernel:
-    name: Build Kernel
-    needs: extract-version
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends cmake gcc g++ \
-            libcurl4-openssl-dev libyaml-dev libcjson-dev libssl-dev \
-            libmicrohttpd-dev libwebsockets-dev libjson-c-dev
-
-      - name: Configure CMake (Out-of-Source)
-        run: |
-          cmake -S . -B build \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTS=OFF \
-            -DBUILD_DAEMON=ON
+          VERSION="${{ github.ref_name }}"
+          echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
+          echo "RELEASE_VERSION=${VERSION#v}" >> $GITHUB_ENV
 
       - name: Build
-        run: cmake --build build -j$(nproc)
-
-      - name: Package kernel
         run: |
-          cd build
-          tar -czvf ../agentos-${{ needs.extract-version.outputs.version }}-linux-x86_64.tar.gz \
-            agentos/lib/*.a agentos/bin/* 2>/dev/null || \
-            tar -czvf ../agentos-${{ needs.extract-version.outputs.version }}-linux-x86_64.tar.gz \
-            lib/*.a bin/* 2>/dev/null || \
-            echo "No binaries found to package"
+          cmake -S . -B AgentOS-build -DBUILD_DAEMON=ON -DCMAKE_BUILD_TYPE=Release
+          cmake --build AgentOS-build -j$(nproc)
 
-      - name: Upload kernel package
-        uses: actions/upload-artifact@v4
-        with:
-          name: agentos-kernel-${{ needs.extract-version.outputs.version }}
-          path: agentos-${{ needs.extract-version.outputs.version }}-linux-x86_64.tar.gz
-          retention-days: 90
-          if-no-files-found: warn
-
-  build-python-sdk:
-    name: Build Python SDK
-    needs: extract-version
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '${{ env.PYTHON_VERSION }}'
-
-      - name: Build SDK
-        continue-on-error: true
+      - name: Package artifacts
         run: |
-          if [ -f "agentos/toolkit/python/pyproject.toml" ] || [ -f "agentos/toolkit/python/setup.py" ]; then
-            pip install build
-            cd agentos/toolkit/python
-            python -m build
-          else
-            echo "Python SDK build files not found, skipping"
+          mkdir -p artifacts
+          tar czf artifacts/agentos-core-${{ steps.version.outputs.version }}.tar.gz \
+            AgentOS-build/agentos/lib/*.a \
+            AgentOS-build/agentos/bin/* 2>/dev/null || true
+          # Python SDK
+          if [ -d "agentos/toolkit/python" ]; then
+            tar czf artifacts/agentos-sdk-python-${{ steps.version.outputs.version }}.tar.gz \
+              -C agentos/toolkit/python . --exclude=__pycache__ 2>/dev/null || true
           fi
-
-      - name: Upload Python SDK
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: agentos-python-sdk-${{ needs.extract-version.outputs.version }}
-          path: agentos/toolkit/python/dist/*
-          retention-days: 90
-          if-no-files-found: ignore
-
-  build-go-sdk:
-    name: Build Go SDK
-    needs: extract-version
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-
-      - name: Build SDK
-        continue-on-error: true
-        run: |
-          if [ -f "agentos/toolkit/go/go.mod" ]; then
-            cd agentos/toolkit/go
-            go build ./...
-          else
-            echo "Go SDK build files not found, skipping"
+          # Go SDK
+          if [ -d "agentos/toolkit/go" ]; then
+            tar czf artifacts/agentos-sdk-go-${{ steps.version.outputs.version }}.tar.gz \
+              -C agentos/toolkit/go . 2>/dev/null || true
           fi
-
-      - name: Upload Go SDK
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: agentos-go-sdk-${{ needs.extract-version.outputs.version }}
-          path: agentos/toolkit/go/
-          retention-days: 90
-          if-no-files-found: ignore
-
-  build-rust-sdk:
-    name: Build Rust SDK
-    needs: extract-version
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Build SDK
-        continue-on-error: true
-        run: |
-          if [ -f "agentos/toolkit/rust/Cargo.toml" ]; then
-            cd agentos/toolkit/rust
-            cargo build --release
-          else
-            echo "Rust SDK build files not found, skipping"
+          # Rust SDK
+          if [ -d "agentos/toolkit/rust" ]; then
+            cd agentos/toolkit/rust && cargo build --release 2>/dev/null || true
+            cd ../../..
           fi
+          # TypeScript SDK
+          if [ -d "agentos/toolkit/typescript" ]; then
+            tar czf artifacts/agentos-sdk-ts-${{ steps.version.outputs.version }}.tar.gz \
+              -C agentos/toolkit/typescript src/ package.json tsconfig.json 2>/dev/null || true
+          fi
+          ls -la artifacts/
 
-      - name: Upload Rust SDK
-        if: always()
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: agentos-rust-sdk-${{ needs.extract-version.outputs.version }}
-          path: agentos/toolkit/rust/target/release/
+          name: release-artifacts
+          path: artifacts/
           retention-days: 90
-          if-no-files-found: ignore
 
+  # ============================================================
+  # Job 2: Desktop Client Build (if exists)
+  # ============================================================
+  build-desktop:
+    name: "Desktop Client"
+    runs-on: ubuntu-latest
+    needs: build-core
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check desktop client source
+        id: check
+        run: |
+          if [ -f "scripts/desktop-client/package.json" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Desktop client source not found, skipping"
+          fi
+      - name: Build (placeholder)
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          echo "Desktop client build placeholder - Tauri build requires Node.js 20 + Rust"
+          echo "Run on desktop-specific runners with full webkit2gtk dependencies"
+
+  # ============================================================
+  # Job 3: Create GitHub Release
+  # ============================================================
   create-release:
-    name: Create Release
-    needs: [extract-version, build-kernel, build-python-sdk, build-go-sdk, build-rust-sdk]
+    name: "Create GitHub Release"
+    needs: [build-core, build-desktop]
     runs-on: ubuntu-latest
-    if: always()
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          name: release-artifacts
+          path: artifacts/
 
       - name: Generate changelog
-        id: changelog
         run: |
-          PREV_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]' | head -2 | tail -1 || echo "")
-          VERSION=${{ needs.extract-version.outputs.version }}
+          echo "## What's Changed" > changelog.md
+          echo "" >> changelog.md
+          git log $(git describe --tags --abbrev=0 2>/dev/null || echo "HEAD~20")..HEAD \
+            --oneline --no-merges 2>/dev/null | while read line; do
+            echo "- $line" >> changelog.md
+          done || echo "Initial release" > changelog.md
 
-          if [ -n "$PREV_TAG" ]; then
-            {
-              echo "# AgentOS v${VERSION}"
-              echo ""
-              echo "## Changes since ${PREV_TAG}"
-              echo ""
-              echo "### Features"
-              git log ${PREV_TAG}..HEAD --grep='^feat' --oneline --no-merges 2>/dev/null | sed 's/^/- /' || echo "- See commit history"
-              echo ""
-              echo "### Bug Fixes"
-              git log ${PREV_TAG}..HEAD --grep='^fix' --oneline --no-merges 2>/dev/null | sed 's/^/- /' || echo "- See commit history"
-            } > release_notes.md
-          else
-            echo "# AgentOS v${VERSION}" > release_notes.md
-          fi
-
-      - name: Create GitHub Release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            artifacts/agentos-kernel-*/*
-            artifacts/agentos-python-sdk-*/*
-            artifacts/agentos-go-sdk-*/*
-            artifacts/agentos-rust-sdk-*/*
-          body_path: release_notes.md
+          body_path: changelog.md
+          files: artifacts/*
           draft: false
-          prerelease: ${{ needs.extract-version.outputs.is_stable != 'true' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          generate_release_notes: false
