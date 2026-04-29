@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: 2026 SPHARX Ltd.
-// SPDX-License-Identifier: GPL-3.0-or-later
+﻿// SPDX-FileCopyrightText: 2026 SPHARX Ltd.
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @file multi_agent_collaboration.h
  * @brief Multi-Agent Collaboration Framework for AgentOS

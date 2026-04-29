@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: 2026 SPHARX Ltd.
-// SPDX-License-Identifier: GPL-3.0-or-later
+﻿// SPDX-FileCopyrightText: 2026 SPHARX Ltd.
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @file ipc_service_bus.c
  * @brief IPC服务总线实现 - 守护进程间统一通信框架

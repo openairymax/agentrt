@@ -1,5 +1,5 @@
-// SPDX-FileCopyrightText: 2026 SPHARX Ltd.
-// SPDX-License-Identifier: GPL-3.0-or-later
+﻿// SPDX-FileCopyrightText: 2026 SPHARX Ltd.
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @file service_discovery.h
  * @brief 跨进程服务发现机制
