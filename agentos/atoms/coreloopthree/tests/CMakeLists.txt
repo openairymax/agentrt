@@ -59,7 +59,7 @@ foreach(TEST_SRC ${CL3_TEST_SOURCES})
         agentos_cognition
         agentos_execution
         agentos_core
-        agentos_memoryrovol
+        agentos_memory
         agentos_atoms
         pthread
         dl
