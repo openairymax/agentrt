@@ -1,10 +1,11 @@
 # AgentOS CI/CD 标准化配置文档
 
-> **版本**: v3.0.0
-> **更新日期**: 2026-04-09
+> **版本**: v3.1.0
+> **更新日期**: 2026-04-27
 > **状态**: 生产就绪 (Production Ready)
-> **位置**: `scripts/ci/`
+> **位置**: `.github/workflows/` (6个核心工作流) + `scripts/pipeline/` (CI编排脚本)
 > **理论框架**: 体系并行论 (MCIS) - 多体控制论智能系统
+> **v3.1变更**: 全面重构——14个旧工作流精简合并为6个核心工作流，消除冗余
 
 ---
 
@@ -21,63 +22,32 @@
 | **并行优化** | 多模块矩阵并行构建 | 执行体 |
 | **可观测性** | 质量监控、趋势分析、技术债务追踪 | 可观测体 |
 
-### 1.2 流水线阶段
+## 2. 流水线架构（6个核心工作流）
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    触发条件                               │
-│  push: main, develop, feature/*, bugfix/*               │
-│  pull_request: main, develop                             │
-│  workflow_dispatch: 手动触发                              │
-│  schedule: 定时任务(安全审计/依赖更新/质量监控)            │
-└───────────────────┬─────────────────────────────────────┘
-                    ▼
-┌─────────────────────────────────────────────────────────┐
-│     Phase 1: 环境准备 (MCIS Base Infrastructure)         │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │ Smart Cache  │  │ vcpkg Setup  │  │ Deps Install │  │
-│  │ (ccache)     │  │ (C++ deps)   │  │ (pip+apt)    │  │
-│  └──────────────┘  └──────────────┘  └──────────────┘  │
-└───────────────────┬─────────────────────────────────────┘
-                    ▼
-┌─────────────────────────────────────────────────────────┐
-│     Phase 2: 并行构建 (MCIS Cognition/Execution/Memory)  │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │ Cognition: atoms, commons, cupolas                │  │
-│  │ Execution: daemon, gateway, manager               │  │
-│  │ Memory:    heapstore                               │  │
-│  │ SDK:       Go, Python, Rust, TypeScript            │  │
-│  └───────────────────────────────────────────────────┘  │
-└───────────────────┬─────────────────────────────────────┘
-                    ▼
-┌─────────────────────────────────────────────────────────┐
-│     Phase 3: 测试验证 (MCIS Validation Dimension)        │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │ Unit Tests   │  │ Integration  │  │ Memory Check │  │
-│  │ (pytest/ctest)│ │ Tests        │  │ (Valgrind)   │  │
-│  └──────────────┘  └──────────────┘  └──────────────┘  │
-└───────────────────┬─────────────────────────────────────┘
-                    ▼
-┌─────────────────────────────────────────────────────────┐
-│     Phase 4: 质量门禁 (MCIS Quality Gate)                │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │ Static Analy │  │ Code Format  │  │ Python Qual  │  │
-│  │ (cppcheck)   │  │ (clang-fmt)  │  │ (pylint/mypy)│  │
-│  └──────────────┘  └──────────────┘  └──────────────┘  │
-└───────────────────┬─────────────────────────────────────┘
-                    ▼
-┌─────────────────────────────────────────────────────────┐
-│     Phase 5: 制品打包 (MCIS Artifact Packaging)          │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │ Source Arch  │  │ Docker Image │  │ SDK Packages │  │
-│  └──────────────┘  └──────────────┘  └──────────────┘  │
-└───────────────────┬─────────────────────────────────────┘
-                    ▼
-┌─────────────────────────────────────────────────────────┐
-│     Phase 6: 发布 (仅 main 分支, MCIS Release Dimension) │
-│  → GitCode Release / GitHub Release                      │
-└─────────────────────────────────────────────────────────┘
-```
+### 2.1 工作流清单
+
+AgentOS CI/CD 由 6 个核心工作流构成（v3.1，从14个精简重构）：
+
+| 工作流 | 触发条件 | 功能 | 合并来源 |
+|--------|---------|------|---------|
+| `ci.yml` | push/PR main,develop | C核心构建(Release+Debug) + CTest + BAN反模式检测 + 质量门禁 | 旧ci.yml + tests-test.yml + quality-gate.yml + stub-check.yml |
+| `sdk-ci.yml` | push/PR toolkit路径 | 5种SDK(Go/Python/Rust/TS)构建+测试 | 旧toolkit-ci.yml |
+| `quality-security.yml` | 定时(每日/每周) + manual | 安全审计 + 质量监控 + Stale管理 | security-audit.yml + quality-monitoring.yml + stale.yml |
+| `docs-ci.yml` | push/PR文档路径 + 定时 | Markdown链接检查 + Doxygen API文档发布 | docs-check.yml + api-docs.yml |
+| `release.yml` | tag推送(v*) + manual | C核心+SDK打包 + 桌面客户端 + GitHub Release | release.yml + build-desktop.yml |
+| `protocol-ci.yml` | push/PR gateway/protocol路径 | Gateway构建 + 协议兼容性验证 | 旧protocol-compatibility.yml |
+
+**已移除的冗余工作流**（功能已合并或由GitHub内置功能替代）：
+- `dependency-update.yml` → 由 Dependabot 替代
+- `quality-monitoring.yml` → 合并入 quality-security.yml
+- `stale.yml` → 合并入 quality-security.yml
+- `stub-check.yml` → 合并入 ci.yml (BAN-01~13)
+- `build-desktop.yml` → 合并入 release.yml
+- `api-docs.yml` → 合并入 docs-ci.yml
+- `docs-check.yml` → 合并入 docs-ci.yml
+- `tests-test.yml` → 合并入 ci.yml
+
+### 2.2 流水线阶段（MCIS 并行架构）
 
 ---
 
