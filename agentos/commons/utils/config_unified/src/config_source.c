@@ -90,7 +90,7 @@ struct config_source_manager {
     bool watching;
     
     /** 互斥锁保护管理器 */
-    void* mutex; // 简化实现，实际应使用pthread_mutex_t
+    agentos_mutex_t internal_mutex;
 };
 
 /* ==================== 内部辅助函数 ==================== */
@@ -1048,7 +1048,7 @@ config_source_manager_t* config_source_manager_create(void) {
     manager->change_callback = NULL;
     manager->callback_user_data = NULL;
     manager->watching = false;
-    manager->mutex = NULL; // 简化实�?    
+    agentos_mutex_init(&manager->internal_mutex);
     return manager;
 }
 

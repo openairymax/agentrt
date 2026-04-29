@@ -79,7 +79,7 @@ void agentos_generate_session_id(char* buf, size_t len) {
     if (!buf || len == 0) return;
 
     // 使用时间戳和计数器生成会话ID
-    time_t now = time(NULL);
+    time_t now = (time_t)(agentos_time_ms() / 1000ULL);
 
 #ifdef _WIN32
     LONG id = InterlockedIncrement(&session_counter);

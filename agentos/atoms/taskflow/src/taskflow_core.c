@@ -849,7 +849,7 @@ uint64_t taskflow_create_checkpoint(taskflow_handle_t engine)
                 cp->superstep = pregel_engine_get_current_superstep(e->pregel_engine);
                 cp->active_vertices = pregel_engine_get_active_vertices(e->pregel_engine);
                 cp->message_count = pregel_engine_get_queued_messages(e->pregel_engine);
-                cp->timestamp = (uint64_t)time(NULL);
+                cp->timestamp = (uint64_t)(time_t)(agentos_time_ms() / 1000ULL);
                 e->checkpoint_count++;
             }
         }
@@ -864,7 +864,7 @@ uint64_t taskflow_create_checkpoint(taskflow_handle_t engine)
         cp->superstep = 0;
         cp->active_vertices = 0;
         cp->message_count = e->message_count;
-        cp->timestamp = (uint64_t)time(NULL);
+        cp->timestamp = (uint64_t)(time_t)(agentos_time_ms() / 1000ULL);
         e->checkpoint_count++;
     }
     return e->last_checkpoint_id;

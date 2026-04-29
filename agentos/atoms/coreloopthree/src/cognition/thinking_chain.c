@@ -11,23 +11,17 @@
 
 #include "thinking_chain.h"
 #include "agentos.h"
+#include "platform.h"
 #include "memory_compat.h"
 #include "string_compat.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <time.h>
 #include <inttypes.h>
 #include <math.h>
 
-/* ============================================================================
- * 内部辅助函数
- * ============================================================================ */
-
 static uint64_t tc_time_now_ns(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+    return agentos_time_ns();
 }
 
 static size_t estimate_token_count(const char* data, size_t len) {
