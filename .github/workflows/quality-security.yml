@@ -1,0 +1,149 @@
+# AgentOS Quality & Security v3.0 - 安全审计+质量监控+Stale管理
+# align: SEC-016, SEC-017, 工程规范化标准手册 v10.15
+# trigger: scheduled(每日/每周) + manual
+# v3.0: 合并security-audit.yml + quality-monitoring.yml + stale.yml
+
+name: Quality & Security v3.0
+
+on:
+  schedule:
+    - cron: '0 3 * * *'     # 每日03:00 - 安全审计
+    - cron: '0 2 * * 1'     # 每周一02:00 - 质量监控
+    - cron: '0 0 * * 1'     # 每周一00:00 - Stale管理
+  workflow_dispatch:
+    inputs:
+      scan_mode:
+        description: 'Security scan mode'
+        required: false
+        default: 'standard'
+        type: choice
+        options: [standard, comprehensive, fast]
+      severity:
+        description: 'Minimum severity to report'
+        required: false
+        default: 'HIGH'
+        type: choice
+        options: [CRITICAL, HIGH, MEDIUM, LOW]
+
+permissions:
+  contents: read
+  security-events: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: quality-security
+  cancel-in-progress: false
+
+jobs:
+  # ============================================================
+  # Job 1: Security Audit (每日)
+  # ============================================================
+  security-audit:
+    name: "Security Audit"
+    if: github.event.schedule == '0 3 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run custom security check
+        run: |
+          if [ -f "scripts/pipeline/security_check.py" ]; then
+            python3 scripts/pipeline/security_check.py agentos/ 2>&1 | head -50
+          else
+            echo "=== Basic security check ==="
+            echo "Unsafe functions:"
+            grep -rn "strcpy\|strcat\|sprintf\|gets" --include="*.c" agentos/ 2>/dev/null | grep -v test_ | grep -v "deprecated\|DISABLE" | head -10 || echo "None found"
+            echo "✅ Security check complete"
+          fi
+
+      - name: Hardcoded secret scan
+        run: |
+          SECRETS=$(grep -rn "sk-[A-Za-z0-9]\{20,\}\|AKIA[A-Z0-9]\{16,\}\|password\s*=\s*['\"][^'\"]\{3,\}" \
+            --include="*.c" --include="*.h" --include="*.py" agentos/ 2>/dev/null \
+            | grep -v test_ | grep -v "example\|sample\|placeholder" | wc -l)
+          echo "Potential secrets: $SECRETS"
+          if [ "$SECRETS" -gt 0 ]; then echo "::warning::$SECRETS potential secrets found"; fi
+
+  # ============================================================
+  # Job 2: Quality Monitoring (每周)
+  # ============================================================
+  quality-monitor:
+    name: "Quality Monitoring"
+    if: github.event.schedule == '0 2 * * 1' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 100
+
+      - name: Install tools
+        run: |
+          sudo apt-get update && sudo apt-get install -y cloc jq 2>/dev/null || true
+
+      - name: Code statistics
+        run: |
+          echo "=== Code Statistics ==="
+          cloc agentos/ --quiet --json 2>/dev/null | python3 -c "
+import sys,json
+try:
+    d = json.load(sys.stdin)
+    print(f\"C: {d.get('C',{}).get('code',0)} lines\")
+    print(f\"C/C++ Header: {d.get('C/C++ Header',{}).get('code',0)} lines\")
+    print(f\"Python: {d.get('Python',{}).get('code',0)} lines\")
+    print(f\"Total: {d.get('SUM',{}).get('code',0)} lines\")
+except: print('cloc unavailable')" 2>/dev/null || echo "cloc failed"
+
+      - name: Technical debt analysis
+        run: |
+          TODOS=$(grep -rn "TODO\|FIXME" --include="*.c" --include="*.h" --include="*.py" agentos/ 2>/dev/null | grep -v "DONE\|已完成" | wc -l)
+          echo "TODO/FIXME count: $TODOS"
+          if [ "$TODOS" -gt 50 ]; then echo "::warning::$TODOS TODO/FIXME items found"; fi
+          echo "✅ Quality monitoring complete"
+
+  # ============================================================
+  # Job 3: Stale Management (每周)
+  # ============================================================
+  stale:
+    name: "Stale Management"
+    if: github.event.schedule == '0 0 * * 1' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          stale-issue-message: 'This issue has been inactive for 30 days. Will be closed in 7 days.'
+          stale-pr-message: 'This PR has been inactive for 60 days. Will be closed in 14 days.'
+          days-before-issue-stale: 30
+          days-before-issue-close: 7
+          days-before-pr-stale: 60
+          days-before-pr-close: 14
+          exempt-issue-labels: 'pinned,security,good first issue'
+          exempt-pr-labels: 'pinned,security'
+          operations-per-run: 100
+
+  # ============================================================
+  # Job 4: Summary
+  # ============================================================
+  summary:
+    name: "Summary"
+    runs-on: ubuntu-latest
+    needs: [security-audit, quality-monitor]
+    if: always()
+    steps:
+      - name: Generate report
+        run: |
+          cat << 'REPORT' >> $GITHUB_STEP_SUMMARY
+          # Quality & Security v3.0 — Summary
+
+          | Job | Schedule | Status |
+          |-----|----------|--------|
+          | Security Audit | Daily 03:00 | ${{ needs.security-audit.result == 'success' && '✅ Complete' || '⚠ Issues' }} |
+          | Quality Monitor | Weekly Mon 02:00 | ${{ needs.quality-monitor.result == 'success' && '✅ Complete' || '⚠ Issues' }} |
+          | Stale Management | Weekly Mon 00:00 | ${{ needs.stale.result == 'success' && '✅ Complete' || '⚠ Review' }} |
+
+          ---
+          *Generated by AgentOS Quality & Security v3.0*
+          REPORT

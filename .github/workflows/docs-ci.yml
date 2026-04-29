@@ -1,0 +1,102 @@
+# AgentOS Docs CI v3.1 - 文档检查+API文档生成
+# align: 工程规范化标准手册 v10.15
+# trigger: push/PR文档路径 + 定时 + manual
+# v3.1: 修复路径问题(Docs/ vs docs/)
+
+name: Docs CI v3.1
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'Docs/**'
+      - 'Doxyfile'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'Docs/**'
+  schedule:
+    - cron: '0 2 * * *'    # 每日02:00 - API文档生成
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: docs-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ============================================================
+  # Job 1: Documentation Link Check
+  # ============================================================
+  docs-check:
+    name: "Documentation Link Check"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check internal markdown links
+        run: |
+          echo "=== Checking internal markdown links ==="
+          ERROR_COUNT=0
+          for file in $(find Docs/ -name "*.md" 2>/dev/null); do
+            dir=$(dirname "$file")
+            while IFS= read -r line; do
+              if echo "$line" | grep -qE '\]\((\.\.?/[^)]+)\)'; then
+                link=$(echo "$line" | sed -n 's/.*](\([^)]*\)).*/\1/p')
+                # skip external links and anchors
+                if echo "$link" | grep -qE '^(http|https|ftp|#)'; then continue; fi
+                target="$dir/$link"
+                # normalize path
+                target=$(realpath -m "$target" 2>/dev/null || echo "$target")
+                if [ ! -f "$target" ] && [ ! -d "$target" ]; then
+                  echo "::warning::Broken link in $file: $link"
+                  ERROR_COUNT=$((ERROR_COUNT+1))
+                fi
+              fi
+            done < "$file"
+          done
+          echo "Broken links found: $ERROR_COUNT"
+          if [ "$ERROR_COUNT" -gt 0 ]; then echo "::warning::$ERROR_COUNT broken links"; fi
+          echo "✅ Documentation link check complete"
+
+  # ============================================================
+  # Job 2: API Docs Generation (main branch only)
+  # ============================================================
+  api-docs:
+    name: "API Docs (Doxygen)"
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Doxygen
+        run: |
+          sudo apt-get update && sudo apt-get install -y \
+            doxygen graphviz fonts-noto-cjk 2>/dev/null || true
+
+      - name: Generate API docs
+        run: |
+          if [ -f "Doxyfile" ]; then
+            doxygen Doxyfile 2>&1 | tee doxygen.log
+            WARNINGS=$(grep -c "warning" doxygen.log 2>/dev/null || echo 0)
+            echo "Doxygen warnings: $WARNINGS"
+            if [ "$WARNINGS" -gt 200 ]; then
+              echo "::warning::Doxygen warnings ($WARNINGS) exceed threshold (200)"
+            fi
+            echo "✅ Doxygen documentation generated"
+          else
+            echo "No Doxyfile found, skipping"
+          fi
+
+      - name: Publish to GitHub Pages
+        if: success()
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/api/html
+          destination_dir: api-docs
+          keep_files: false
