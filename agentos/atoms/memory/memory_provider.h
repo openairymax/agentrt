@@ -146,9 +146,11 @@ agentos_error_t agentos_memory_provider_set_active(agentos_memory_provider_t* pr
  */
 agentos_error_t agentos_builtin_memory_provider_init(const char* storage_path);
 
-/**
- * @brief 释放查询结果
- */
+agentos_memory_provider_t* agentos_builtin_provider_create(void);
+
+void agentos_memory_provider_free_query_results(
+    char** record_ids, float* scores, size_t count);
+
 void agentos_memory_query_result_free(agentos_memory_query_result_t* result);
 
 #ifdef __cplusplus

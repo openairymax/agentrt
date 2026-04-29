@@ -15,9 +15,8 @@
 
 #if defined(_WIN32) || defined(_WIN64)
 
-#include <windows.h>
 
-/* agentos_mutex_t 在 platform.h 中定义为 CRITICAL_SECTION */
+/* agentos_mutex_t 在 platform.h 中定义为 agentos_mutex_t */
 /* agentos_cond_t 在 platform.h 中定义为 CONDITION_VARIABLE */
 
 agentos_mutex_t* agentos_mutex_create(void) {
@@ -32,7 +31,7 @@ agentos_mutex_t* agentos_mutex_create(void) {
 
 void agentos_mutex_destroy(agentos_mutex_t* mutex) {
     if (mutex) {
-        DeleteCriticalSection(mutex);
+        agentos_mutex_destroy(mutex);
     }
 }
 
@@ -54,12 +53,12 @@ void agentos_cond_destroy(agentos_cond_t* cond) {
 
 #else
 
-#include <pthread.h>
 #include <time.h>
 #include <errno.h>
+#include "platform.h"
 
-/* agentos_mutex_t 在 platform.h 中定义为 pthread_mutex_t */
-/* agentos_cond_t 在 platform.h 中定义为 pthread_cond_t */
+/* agentos_mutex_t 在 platform.h 中定义为 agentos_mutex_t */
+/* agentos_cond_t 在 platform.h 中定义为 agentos_cond_t */
 
 agentos_mutex_t* agentos_mutex_create(void) {
     agentos_mutex_t* mutex = (agentos_mutex_t*)AGENTOS_MALLOC(sizeof(agentos_mutex_t));
@@ -67,7 +66,7 @@ agentos_mutex_t* agentos_mutex_create(void) {
     pthread_mutexattr_t attr;
     pthread_mutexattr_init(&attr);
     pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
-    if (pthread_mutex_init(mutex, &attr) != 0) {
+    if (agentos_mutex_init(mutex) != 0) {
         pthread_mutexattr_destroy(&attr);
         AGENTOS_FREE(mutex);
         return NULL;
@@ -78,14 +77,14 @@ agentos_mutex_t* agentos_mutex_create(void) {
 
 void agentos_mutex_destroy(agentos_mutex_t* mutex) {
     if (mutex) {
-        pthread_mutex_destroy(mutex);
+        agentos_mutex_destroy(mutex);
     }
 }
 
 agentos_cond_t* agentos_cond_create(void) {
     agentos_cond_t* cond = (agentos_cond_t*)AGENTOS_MALLOC(sizeof(agentos_cond_t));
     if (!cond) return NULL;
-    if (pthread_cond_init(cond, NULL) != 0) {
+    if (agentos_cond_init(cond) != 0) {
         AGENTOS_FREE(cond);
         return NULL;
     }
@@ -94,7 +93,7 @@ agentos_cond_t* agentos_cond_create(void) {
 
 void agentos_cond_destroy(agentos_cond_t* cond) {
     if (cond) {
-        pthread_cond_destroy(cond);
+        agentos_cond_destroy(cond);
     }
 }
 

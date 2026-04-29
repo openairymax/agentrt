@@ -16,7 +16,7 @@ struct parallel_dispatcher_s {
 typedef struct dispatch_context_s dispatch_context_t;
 
 typedef struct {
-    agentos_platform_mutex_t lock;
+    agentos_mutex_t lock;
     agentos_cond_t cond;
     parallel_result_t* results;
     dispatch_context_t* contexts;
@@ -66,14 +66,14 @@ static char* json_extract_field(const char* json, const char* key) {
 static void session_release(dispatch_session_t* session) {
     if (!session) return;
     bool should_free = false;
-    agentos_platform_mutex_lock(&session->lock);
+    agentos_mutex_lock(&session->lock);
     if ((size_t)session->completed_count >= session->task_count) {
         should_free = true;
     }
-    agentos_platform_mutex_unlock(&session->lock);
+    agentos_mutex_unlock(&session->lock);
 
     if (should_free) {
-        agentos_platform_mutex_destroy(&session->lock);
+        agentos_mutex_destroy(&session->lock);
         agentos_cond_destroy(&session->cond);
         if (session->contexts) AGENTOS_FREE(session->contexts);
         if (session->results) {
@@ -93,7 +93,7 @@ static void dispatch_worker(void* arg) {
 
     dispatch_session_t* session = ctx->session;
 
-    agentos_platform_mutex_lock(&session->lock);
+    agentos_mutex_lock(&session->lock);
     if (session->cancel_flag) {
         ctx->result_slot->success = 0;
         ctx->result_slot->error = strdup("cancelled");
@@ -104,11 +104,11 @@ static void dispatch_worker(void* arg) {
             session->on_complete(ctx->task_index, ctx->result_slot, session->cb_user_data);
         }
         agentos_cond_signal(&session->cond);
-        agentos_platform_mutex_unlock(&session->lock);
+        agentos_mutex_unlock(&session->lock);
         session_release(session);
         return;
     }
-    agentos_platform_mutex_unlock(&session->lock);
+    agentos_mutex_unlock(&session->lock);
 
     uint64_t start = time_ms();
     ctx->result_slot->task_index = ctx->task_index;
@@ -168,7 +168,7 @@ static void dispatch_worker(void* arg) {
 
     ctx->result_slot->duration_ms = time_ms() - start;
 
-    agentos_platform_mutex_lock(&session->lock);
+    agentos_mutex_lock(&session->lock);
     session->completed_count++;
     if (!ctx->result_slot->success) session->error_count++;
 
@@ -181,7 +181,7 @@ static void dispatch_worker(void* arg) {
     }
 
     agentos_cond_signal(&session->cond);
-    agentos_platform_mutex_unlock(&session->lock);
+    agentos_mutex_unlock(&session->lock);
 
     session_release(session);
 }
@@ -239,7 +239,7 @@ static dispatch_session_t* session_create(
     dispatch_session_t* session = (dispatch_session_t*)AGENTOS_CALLOC(1, sizeof(dispatch_session_t));
     if (!session) return NULL;
 
-    agentos_platform_mutex_init(&session->lock);
+    agentos_mutex_init(&session->lock);
     agentos_cond_init(&session->cond);
     session->results = results;
     session->task_count = task_count;
@@ -252,7 +252,7 @@ static dispatch_session_t* session_create(
 
     session->contexts = (dispatch_context_t*)AGENTOS_CALLOC(task_count, sizeof(dispatch_context_t));
     if (!session->contexts) {
-        agentos_platform_mutex_destroy(&session->lock);
+        agentos_mutex_destroy(&session->lock);
         agentos_cond_destroy(&session->cond);
         AGENTOS_FREE(session);
         return NULL;
@@ -289,31 +289,31 @@ int parallel_dispatcher_execute(
     }
 
     for (size_t i = 0; i < task_count; i++) {
-        agentos_platform_mutex_lock(&session->lock);
+        agentos_mutex_lock(&session->lock);
         if (session->cancel_flag) {
-            agentos_platform_mutex_unlock(&session->lock);
+            agentos_mutex_unlock(&session->lock);
             break;
         }
 
         while (thread_pool_active_count(dispatcher->pool) >= dispatcher->config.max_concurrency) {
             if (should_return(dispatcher->config.wait_mode, session->completed_count, task_count)) {
-                agentos_platform_mutex_unlock(&session->lock);
+                agentos_mutex_unlock(&session->lock);
                 goto wait_done;
             }
             agentos_cond_timedwait(&session->cond, &session->lock, 100);
         }
-        agentos_platform_mutex_unlock(&session->lock);
+        agentos_mutex_unlock(&session->lock);
 
         int rc = thread_pool_submit(dispatcher->pool, dispatch_worker, &session->contexts[i]);
         if (rc != 0) {
             session->contexts[i].result_slot->success = 0;
             session->contexts[i].result_slot->error = strdup("submit failed");
             session->contexts[i].result_slot->task_index = i;
-            agentos_platform_mutex_lock(&session->lock);
+            agentos_mutex_lock(&session->lock);
             session->completed_count++;
             session->error_count++;
             agentos_cond_signal(&session->cond);
-            agentos_platform_mutex_unlock(&session->lock);
+            agentos_mutex_unlock(&session->lock);
         }
     }
 
@@ -321,10 +321,10 @@ wait_done:
     {
         uint64_t deadline = time_ms() + dispatcher->config.timeout_ms;
         while (1) {
-            agentos_platform_mutex_lock(&session->lock);
+            agentos_mutex_lock(&session->lock);
             bool done = should_return(dispatcher->config.wait_mode,
                 session->completed_count, task_count);
-            agentos_platform_mutex_unlock(&session->lock);
+            agentos_mutex_unlock(&session->lock);
 
             if (done) break;
 
@@ -333,22 +333,22 @@ wait_done:
                 break;
             }
 
-            agentos_platform_mutex_lock(&session->lock);
+            agentos_mutex_lock(&session->lock);
             agentos_cond_timedwait(&session->cond, &session->lock, 50);
-            agentos_platform_mutex_unlock(&session->lock);
+            agentos_mutex_unlock(&session->lock);
         }
     }
 
     int errors = session->error_count;
     bool session_freed_by_worker = false;
-    agentos_platform_mutex_lock(&session->lock);
+    agentos_mutex_lock(&session->lock);
     if ((size_t)session->completed_count >= session->task_count) {
         session_freed_by_worker = true;
     }
-    agentos_platform_mutex_unlock(&session->lock);
+    agentos_mutex_unlock(&session->lock);
 
     if (!session_freed_by_worker) {
-        agentos_platform_mutex_destroy(&session->lock);
+        agentos_mutex_destroy(&session->lock);
         agentos_cond_destroy(&session->cond);
         if (session->contexts) AGENTOS_FREE(session->contexts);
         AGENTOS_FREE(session);
@@ -384,15 +384,15 @@ int parallel_dispatcher_execute_async(
             results[i].error = strdup("submit failed");
             results[i].task_index = i;
             if (on_complete) on_complete(i, &results[i], user_data);
-            agentos_platform_mutex_lock(&session->lock);
+            agentos_mutex_lock(&session->lock);
             session->completed_count++;
             session->error_count++;
-            agentos_platform_mutex_unlock(&session->lock);
+            agentos_mutex_unlock(&session->lock);
         }
     }
 
     if (submitted == 0) {
-        agentos_platform_mutex_destroy(&session->lock);
+        agentos_mutex_destroy(&session->lock);
         agentos_cond_destroy(&session->cond);
         if (session->contexts) AGENTOS_FREE(session->contexts);
         AGENTOS_FREE(session);

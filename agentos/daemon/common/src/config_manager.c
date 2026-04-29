@@ -49,7 +49,7 @@ static struct {
     uint32_t validator_count;
     uint64_t global_version;
     bool initialized;
-    agentos_platform_mutex_t mutex;
+    agentos_mutex_t mutex;
 } g_cm = {0};
 
 /* ==================== 辅助函数 ==================== */
@@ -147,7 +147,7 @@ AGENTOS_API int cm_init(const cm_config_t* config) {
         g_cm.config = cm_create_default_config();
     }
 
-    agentos_error_t err = agentos_platform_mutex_init(&g_cm.mutex);
+    agentos_error_t err = agentos_mutex_init(&g_cm.mutex);
     if (err != AGENTOS_SUCCESS) return -1;
 
     g_cm.global_version = 1;
@@ -163,11 +163,11 @@ AGENTOS_API int cm_init(const cm_config_t* config) {
 AGENTOS_API void cm_shutdown(void) {
     if (!g_cm.initialized) return;
 
-    agentos_platform_mutex_lock(&g_cm.mutex);
+    agentos_mutex_lock(&g_cm.mutex);
     g_cm.initialized = false;
-    agentos_platform_mutex_unlock(&g_cm.mutex);
+    agentos_mutex_unlock(&g_cm.mutex);
 
-    agentos_platform_mutex_destroy(&g_cm.mutex);
+    agentos_mutex_destroy(&g_cm.mutex);
 
     LOG_INFO("Config manager shutdown");
 }
@@ -178,12 +178,12 @@ AGENTOS_API const char* cm_get(const char* key, const char* default_value) {
     if (!key) return default_value;
     if (!g_cm.initialized) cm_init(NULL);
 
-    agentos_platform_mutex_lock(&g_cm.mutex);
+    agentos_mutex_lock(&g_cm.mutex);
 
     cm_entry_t* entry = find_entry(key);
     const char* result = entry ? entry->value : default_value;
 
-    agentos_platform_mutex_unlock(&g_cm.mutex);
+    agentos_mutex_unlock(&g_cm.mutex);
     return result;
 }
 
@@ -215,10 +215,10 @@ AGENTOS_API int cm_set(const char* key, const char* value, const char* source) {
     if (!key) return -1;
     if (!g_cm.initialized) cm_init(NULL);
 
-    agentos_platform_mutex_lock(&g_cm.mutex);
+    agentos_mutex_lock(&g_cm.mutex);
 
     if (g_cm.config.enable_validation && !validate_value(key, value)) {
-        agentos_platform_mutex_unlock(&g_cm.mutex);
+        agentos_mutex_unlock(&g_cm.mutex);
         return -1;
     }
 
@@ -241,13 +241,13 @@ AGENTOS_API int cm_set(const char* key, const char* value, const char* source) {
 
         add_history(key, old_value, value, source);
 
-        agentos_platform_mutex_unlock(&g_cm.mutex);
+        agentos_mutex_unlock(&g_cm.mutex);
         notify_watchers(key, old_value, value);
         return 0;
     }
 
     if (g_cm.entry_count >= CM_MAX_ENTRIES) {
-        agentos_platform_mutex_unlock(&g_cm.mutex);
+        agentos_mutex_unlock(&g_cm.mutex);
         return -1;
     }
 
@@ -266,7 +266,7 @@ AGENTOS_API int cm_set(const char* key, const char* value, const char* source) {
 
     add_history(key, "", value, source);
 
-    agentos_platform_mutex_unlock(&g_cm.mutex);
+    agentos_mutex_unlock(&g_cm.mutex);
     notify_watchers(key, "", value);
     return 0;
 }
@@ -462,10 +462,10 @@ AGENTOS_API int cm_watch(const char* key_pattern, cm_change_callback_t callback,
     if (!callback) return -1;
     if (!g_cm.initialized) cm_init(NULL);
 
-    agentos_platform_mutex_lock(&g_cm.mutex);
+    agentos_mutex_lock(&g_cm.mutex);
 
     if (g_cm.watcher_count >= CM_MAX_WATCHERS) {
-        agentos_platform_mutex_unlock(&g_cm.mutex);
+        agentos_mutex_unlock(&g_cm.mutex);
         return -1;
     }
 
@@ -476,7 +476,7 @@ AGENTOS_API int cm_watch(const char* key_pattern, cm_change_callback_t callback,
     w->user_data = user_data;
     g_cm.watcher_count++;
 
-    agentos_platform_mutex_unlock(&g_cm.mutex);
+    agentos_mutex_unlock(&g_cm.mutex);
 
     return 0;
 }
@@ -484,7 +484,7 @@ AGENTOS_API int cm_watch(const char* key_pattern, cm_change_callback_t callback,
 AGENTOS_API int cm_unwatch(const char* key_pattern, cm_change_callback_t callback) {
     if (!callback) return -1;
 
-    agentos_platform_mutex_lock(&g_cm.mutex);
+    agentos_mutex_lock(&g_cm.mutex);
 
     for (uint32_t i = 0; i < g_cm.watcher_count; i++) {
         if (g_cm.watchers[i].callback == callback &&
@@ -498,7 +498,7 @@ AGENTOS_API int cm_unwatch(const char* key_pattern, cm_change_callback_t callbac
         }
     }
 
-    agentos_platform_mutex_unlock(&g_cm.mutex);
+    agentos_mutex_unlock(&g_cm.mutex);
     return 0;
 }
 
@@ -516,10 +516,10 @@ AGENTOS_API int cm_reload(void) {
 AGENTOS_API int cm_register_validator(const char* key_pattern, cm_validator_t validator) {
     if (!validator) return -1;
 
-    agentos_platform_mutex_lock(&g_cm.mutex);
+    agentos_mutex_lock(&g_cm.mutex);
 
     if (g_cm.validator_count >= CM_MAX_VALIDATORS) {
-        agentos_platform_mutex_unlock(&g_cm.mutex);
+        agentos_mutex_unlock(&g_cm.mutex);
         return -1;
     }
 
@@ -529,14 +529,14 @@ AGENTOS_API int cm_register_validator(const char* key_pattern, cm_validator_t va
     v->validator = validator;
     g_cm.validator_count++;
 
-    agentos_platform_mutex_unlock(&g_cm.mutex);
+    agentos_mutex_unlock(&g_cm.mutex);
     return 0;
 }
 
 AGENTOS_API int cm_validate_all(void) {
     int failures = 0;
 
-    agentos_platform_mutex_lock(&g_cm.mutex);
+    agentos_mutex_lock(&g_cm.mutex);
 
     for (uint32_t i = 0; i < g_cm.entry_count; i++) {
         if (!validate_value(g_cm.entries[i].key, g_cm.entries[i].value)) {
@@ -544,7 +544,7 @@ AGENTOS_API int cm_validate_all(void) {
         }
     }
 
-    agentos_platform_mutex_unlock(&g_cm.mutex);
+    agentos_mutex_unlock(&g_cm.mutex);
     return failures;
 }
 
@@ -554,7 +554,7 @@ AGENTOS_API int cm_get_history(const char* key, cm_change_record_t* records,
                                uint32_t max_count, uint32_t* found_count) {
     if (!records || !found_count) return -1;
 
-    agentos_platform_mutex_lock(&g_cm.mutex);
+    agentos_mutex_lock(&g_cm.mutex);
 
     uint32_t count = 0;
     for (uint32_t i = 0; i < g_cm.history_count && count < max_count; i++) {
@@ -568,14 +568,14 @@ AGENTOS_API int cm_get_history(const char* key, cm_change_record_t* records,
     }
 
     *found_count = count;
-    agentos_platform_mutex_unlock(&g_cm.mutex);
+    agentos_mutex_unlock(&g_cm.mutex);
     return 0;
 }
 
 AGENTOS_API int cm_rollback(const char* key, uint64_t version) {
     if (!key) return -1;
 
-    agentos_platform_mutex_lock(&g_cm.mutex);
+    agentos_mutex_lock(&g_cm.mutex);
 
     for (uint32_t i = 0; i < g_cm.history_count; i++) {
         uint32_t idx = (g_cm.history_head + CM_MAX_HISTORY - 1 - i) % CM_MAX_HISTORY;
@@ -583,13 +583,13 @@ AGENTOS_API int cm_rollback(const char* key, uint64_t version) {
 
         if (strcmp(rec->key, key) == 0) {
             if (version == 0 || true) {
-                agentos_platform_mutex_unlock(&g_cm.mutex);
+                agentos_mutex_unlock(&g_cm.mutex);
                 return cm_set(key, rec->old_value, "rollback");
             }
         }
     }
 
-    agentos_platform_mutex_unlock(&g_cm.mutex);
+    agentos_mutex_unlock(&g_cm.mutex);
     return -1;
 }
 
@@ -603,9 +603,9 @@ AGENTOS_API const char* cm_get_environment(void) {
 AGENTOS_API int cm_set_environment(const char* env) {
     if (!env) return -1;
 
-    agentos_platform_mutex_lock(&g_cm.mutex);
+    agentos_mutex_lock(&g_cm.mutex);
     safe_strcpy(g_cm.config.environment, env, sizeof(g_cm.config.environment));
-    agentos_platform_mutex_unlock(&g_cm.mutex);
+    agentos_mutex_unlock(&g_cm.mutex);
 
     cm_load_environment_config(env);
 
@@ -635,12 +635,12 @@ AGENTOS_API int cm_load_environment_config(const char* env) {
 AGENTOS_API char* cm_export_json(const char* namespace_) {
     if (!g_cm.initialized) return NULL;
 
-    agentos_platform_mutex_lock(&g_cm.mutex);
+    agentos_mutex_lock(&g_cm.mutex);
 
     size_t buf_size = 8192;
     char* buf = (char*)AGENTOS_MALLOC(buf_size);
     if (!buf) {
-        agentos_platform_mutex_unlock(&g_cm.mutex);
+        agentos_mutex_unlock(&g_cm.mutex);
         return NULL;
     }
     size_t pos = 0;
@@ -664,7 +664,7 @@ AGENTOS_API char* cm_export_json(const char* namespace_) {
 
     pos += snprintf(buf + pos, buf_size - pos, "}}");
 
-    agentos_platform_mutex_unlock(&g_cm.mutex);
+    agentos_mutex_unlock(&g_cm.mutex);
     return buf;
 }
 

@@ -18,17 +18,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "platform.h"
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
 
 /* 平台特定头文件 */
 #ifdef _WIN32
-    #define WIN32_LEAN_AND_MEAN
-    #include <windows.h>
-#else
-    #include <pthread.h>
-#endif
+        #else
+    #endif
 
 /* ==================== 常量定义 ==================== */
 
@@ -50,9 +48,9 @@ static atomic_uint_fast64_t g_total_batch_ops = 0;
 static atomic_uint_fast64_t g_last_operation_time = 0;
 
 #ifdef _WIN32
-static CRITICAL_SECTION g_token_mutex;
+static agentos_mutex_t g_token_mutex;
 #else
-static pthread_mutex_t g_token_mutex = PTHREAD_MUTEX_INITIALIZER;
+static agentos_mutex_t g_token_mutex = {0};
 #endif
 
 /* ==================== 内部数据结构和函数 ==================== */
@@ -69,35 +67,35 @@ static int g_budget_count = 0;
 
 #ifdef _WIN32
 static void token_mutex_init(void) {
-    InitializeCriticalSection(&g_token_mutex);
+    agentos_mutex_init(&g_token_mutex);
 }
 
 static void token_mutex_destroy(void) {
-    DeleteCriticalSection(&g_token_mutex);
+    agentos_mutex_destroy(&g_token_mutex);
 }
 
 static void token_mutex_lock(void) {
-    EnterCriticalSection(&g_token_mutex);
+    agentos_mutex_lock(&g_token_mutex);
 }
 
 static void token_mutex_unlock(void) {
-    LeaveCriticalSection(&g_token_mutex);
+    agentos_mutex_unlock(&g_token_mutex);
 }
 #else
 static void token_mutex_init(void) {
-    pthread_mutex_init(&g_token_mutex, NULL);
+    agentos_mutex_init(&g_token_mutex);
 }
 
 static void token_mutex_destroy(void) {
-    pthread_mutex_destroy(&g_token_mutex);
+    agentos_mutex_destroy(&g_token_mutex);
 }
 
 static void token_mutex_lock(void) {
-    pthread_mutex_lock(&g_token_mutex);
+    agentos_mutex_lock(&g_token_mutex);
 }
 
 static void token_mutex_unlock(void) {
-    pthread_mutex_unlock(&g_token_mutex);
+    agentos_mutex_unlock(&g_token_mutex);
 }
 #endif
 

@@ -61,7 +61,7 @@ static bool memory_pool_lock_init(memory_pool_t* pool) {
         return true;
     }
     
-    return agentos_platform_mutex_init(&pool->lock) == 0;
+    return agentos_mutex_init(&pool->lock) == 0;
 }
 
 /**
@@ -74,7 +74,7 @@ static void memory_pool_lock_destroy(memory_pool_t* pool) {
         return;
     }
     
-    agentos_platform_mutex_destroy(&pool->lock);
+    agentos_mutex_destroy(&pool->lock);
 }
 
 /**
@@ -87,7 +87,7 @@ static void memory_pool_lock(memory_pool_t* pool) {
         return;
     }
     
-    agentos_platform_mutex_lock(&pool->lock);
+    agentos_mutex_lock(&pool->lock);
 }
 
 /**
@@ -100,7 +100,7 @@ static void memory_pool_unlock(memory_pool_t* pool) {
         return;
     }
     
-    agentos_platform_mutex_unlock(&pool->lock);
+    agentos_mutex_unlock(&pool->lock);
 }
 
 /**

@@ -78,7 +78,7 @@ static int g_resource_mutex_initialized = 0;
 
 static void ensure_mutex_initialized(void) {
     if (!g_resource_mutex_initialized) {
-        agentos_platform_mutex_init(&g_resource_mutex);
+        agentos_mutex_init(&g_resource_mutex);
         g_resource_mutex_initialized = 1;
     }
 }
@@ -106,10 +106,10 @@ void agentos_resource_track_alloc(void* resource, const char* type, const char* 
     record->timestamp_ns = get_monotonic_ns();
     
     ensure_mutex_initialized();
-    agentos_platform_mutex_lock(&g_resource_mutex);
+    agentos_mutex_lock(&g_resource_mutex);
     record->next = g_resource_head;
     g_resource_head = record;
-    agentos_platform_mutex_unlock(&g_resource_mutex);
+    agentos_mutex_unlock(&g_resource_mutex);
 }
 
 void agentos_resource_track_free(void* resource) {
@@ -118,7 +118,7 @@ void agentos_resource_track_free(void* resource) {
     }
     
     ensure_mutex_initialized();
-    agentos_platform_mutex_lock(&g_resource_mutex);
+    agentos_mutex_lock(&g_resource_mutex);
     
     agentos_resource_record_t* prev = NULL;
     agentos_resource_record_t* curr = g_resource_head;
@@ -137,12 +137,12 @@ void agentos_resource_track_free(void* resource) {
         curr = curr->next;
     }
     
-    agentos_platform_mutex_unlock(&g_resource_mutex);
+    agentos_mutex_unlock(&g_resource_mutex);
 }
 
 int agentos_resource_track_report(char** out_report) {
     ensure_mutex_initialized();
-    agentos_platform_mutex_lock(&g_resource_mutex);
+    agentos_mutex_lock(&g_resource_mutex);
     
     int count = 0;
     agentos_resource_record_t* curr = g_resource_head;
@@ -178,13 +178,13 @@ int agentos_resource_track_report(char** out_report) {
         }
     }
     
-    agentos_platform_mutex_unlock(&g_resource_mutex);
+    agentos_mutex_unlock(&g_resource_mutex);
     return count;
 }
 
 void agentos_resource_track_clear(void) {
     ensure_mutex_initialized();
-    agentos_platform_mutex_lock(&g_resource_mutex);
+    agentos_mutex_lock(&g_resource_mutex);
     
     agentos_resource_record_t* curr = g_resource_head;
     while (curr) {
@@ -194,7 +194,7 @@ void agentos_resource_track_clear(void) {
     }
     g_resource_head = NULL;
     
-    agentos_platform_mutex_unlock(&g_resource_mutex);
+    agentos_mutex_unlock(&g_resource_mutex);
 }
 
 #endif /* AGENTOS_RESOURCE_TRACKING */
