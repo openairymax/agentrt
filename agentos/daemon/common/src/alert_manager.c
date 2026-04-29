@@ -47,6 +47,8 @@ static struct {
 
 /* ==================== 辅助函数 ==================== */
 
+static bool evaluate_trend(const char* metric_name, am_comparison_t op, double threshold);
+
 static am_alert_t* find_active_alert(const char* name) {
     for (uint32_t i = 0; i < g_am.active_alert_count; i++) {
         if (strcmp(g_am.active_alerts[i].name, name) == 0)
