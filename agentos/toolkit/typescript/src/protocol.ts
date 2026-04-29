@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2026 SPHARX Ltd.
+﻿﻿// SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 // SPDX-License-Identifier: Apache-2.0
 /**
  * @file protocol.ts
