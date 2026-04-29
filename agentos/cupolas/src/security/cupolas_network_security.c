@@ -63,11 +63,7 @@ static struct {
     
     void (*ids_callback)(const char* alert_type, const char* details, const cupolas_connection_info_t* conn);
     
-#ifdef _WIN32
-    CRITICAL_SECTION lock;
-#else
-    pthread_mutex_t lock;
-#endif
+    cupolas_mutex_t lock;
 } g_net_security;
 
 static void cupolas_free_filter_rule(cupolas_net_filter_rule_t* rule) {

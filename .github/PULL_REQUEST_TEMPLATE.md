@@ -30,10 +30,17 @@
 - [ ] CROSS 合规（无 pthread.h/clock_gettime 直接使用）
 - [ ] 性能基准无明显退化
 
-### 构建验证命令
+### 构建验证命令（符合 v11.14 BAN-33 规范）
 ```bash
-cmake -B build -DBUILD_TESTS=ON && cmake --build build
-ctest --test-dir build --output-on-failure
+# ✅ 正确：构建产物在 AgentOS-build/ 目录（源码目录保持纯净）
+cd AgentOS
+cmake -B ../AgentOS-build -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build ../AgentOS-build --parallel 8
+cd ../AgentOS-build && ctest --output-on-failure
+
+# ❌ 禁止：以下方式违反 BAN-33（在源码目录内构建）
+# cmake -B build
+# cmake --build .
 ```
 
 ### Commit Message 格式规范

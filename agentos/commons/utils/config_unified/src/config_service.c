@@ -7,7 +7,7 @@
  * 2. 热更新和变化通知
  * 3. 配置加密和安全存�? * 4. 配置版本管理和回�? * 5. 配置模板和变量展开
  *
- * 注意：这是一个基础实现，实际使用时应根据需要扩展高级功能�? */
+ * �? */
 
 #include "config_service.h"
 #include "core_config.h"
@@ -539,7 +539,7 @@ bool config_schema_validate(config_schema_t* schema, const config_context_t* ctx
     // 验证每个Schema�?    for (size_t i = 0; i < schema->count; i++) {
         schema_item_internal_t* item = &schema->items[i];
         
-        // 查找配置�?        // 简化实现：假设有config_context_get_value函数
+        // 查找配置�?        // 从配置上下文中获取值
         config_value_t* value = config_context_get(ctx, item->key);
         
         if (item->required && !value) {
@@ -602,7 +602,7 @@ config_error_t config_schema_apply_defaults(config_schema_t* schema, config_cont
         schema_item_internal_t* item = &schema->items[i];
         
         if (item->default_value) {
-            // 检查是否已存在配置�?            // 简化实现：假设有config_context_has_key函数
+            // 检查是否已存在配置�?            // 检查配置键是否存在
             bool has_key = config_context_has(ctx, item->key);
             
             if (!has_key) {

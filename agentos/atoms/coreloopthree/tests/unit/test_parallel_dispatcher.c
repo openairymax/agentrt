@@ -7,66 +7,70 @@
  * 覆盖调度器生命周期、安全分类、冲突检测、并行分发、Delegate子Agent、Cancel取消。
  */
 
+#include "cognition/delegate.h"
+#include "cognition/parallel_dispatcher.h"
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
-#include "cognition/parallel_dispatcher.h"
-#include "cognition/delegate.h"
 
-#define TEST_PASS(name) printf("[PASS] %s\n", name)
+#define TEST_PASS(name)      printf("[PASS] %s\n", name)
 #define TEST_FAIL(name, msg) printf("[FAIL] %s: %s\n", name, msg)
 
-static int tests_run = 0;
+static int tests_run    = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-#define RUN_TEST(func) do { \
-    tests_run++; \
-    printf("  Running: %s\n", #func); \
-    func(); \
-    tests_passed++; \
-} while(0)
+#define RUN_TEST(func)                                                                                                 \
+    do {                                                                                                               \
+        tests_run++;                                                                                                   \
+        printf("  Running: %s\n", #func);                                                                              \
+        func();                                                                                                        \
+        tests_passed++;                                                                                                \
+    } while (0)
 
-#define RUN_TEST_MAY_FAIL(func) do { \
-    tests_run++; \
-    printf("  Running: %s\n", #func); \
-    func(); \
-} while(0)
+#define RUN_TEST_MAY_FAIL(func)                                                                                        \
+    do {                                                                                                               \
+        tests_run++;                                                                                                   \
+        printf("  Running: %s\n", #func);                                                                              \
+        func();                                                                                                        \
+    } while (0)
 
 static int g_exec_count = 0;
 
-static agentos_error_t mock_executor(const char* tool_name,
-                                      const char* arguments,
-                                      size_t arguments_len,
-                                      char** out_output,
-                                      size_t* out_output_len,
-                                      void* user_data) {
-    (void)user_data;
+static agentos_error_t mock_executor(const char *tool_name, const char *arguments, size_t arguments_len,
+                                     char **out_output, size_t *out_output_len, void *user_data)
+{
+    (void) user_data;
     g_exec_count++;
     if (out_output && out_output_len) {
         char buf[256];
-        int n = snprintf(buf, sizeof(buf), "{\"tool\":\"%s\",\"result\":\"ok\","
-                         "\"args_len\":%zu}", tool_name ? tool_name : "",
-                         arguments_len);
-        *out_output = strdup(buf);
-        *out_output_len = (size_t)n;
+        int n           = snprintf(buf, sizeof(buf),
+                                   "{\"tool\":\"%s\",\"result\":\"ok\","
+                                             "\"args_len\":%zu}",
+                         tool_name ? tool_name : "", arguments_len);
+        *out_output     = strdup(buf);
+        *out_output_len = (size_t) n;
     }
     return AGENTOS_SUCCESS;
 }
 
-static void free_results(agentos_tool_result_t* results, size_t count) {
-    if (!results) return;
+static void free_results(agentos_tool_result_t *results, size_t count)
+{
+    if (!results)
+        return;
     for (size_t i = 0; i < count; i++) {
-        if (results[i].tool_name) free(results[i].tool_name);
-        if (results[i].output) free(results[i].output);
+        if (results[i].tool_name)
+            free(results[i].tool_name);
+        if (results[i].output)
+            free(results[i].output);
     }
     free(results);
 }
 
-static void test_dispatcher_create_destroy(void) {
-    agentos_parallel_dispatcher_t* d =
-        agentos_parallel_dispatcher_create(4);
+static void test_dispatcher_create_destroy(void)
+{
+    agentos_parallel_dispatcher_t *d = agentos_parallel_dispatcher_create(4);
     if (d != NULL) {
         TEST_PASS("dispatcher create/destroy");
         agentos_parallel_dispatcher_destroy(d);
@@ -76,18 +80,19 @@ static void test_dispatcher_create_destroy(void) {
     }
 }
 
-static void test_destroy_null(void) {
+static void test_destroy_null(void)
+{
     agentos_parallel_dispatcher_destroy(NULL);
     TEST_PASS("destroy handles NULL");
 }
 
-static void test_set_executor(void) {
-    agentos_parallel_dispatcher_t* d =
-        agentos_parallel_dispatcher_create(2);
-    if (!d) return;
+static void test_set_executor(void)
+{
+    agentos_parallel_dispatcher_t *d = agentos_parallel_dispatcher_create(2);
+    if (!d)
+        return;
 
-    agentos_error_t err = agentos_parallel_dispatcher_set_executor(
-        d, mock_executor, NULL);
+    agentos_error_t err = agentos_parallel_dispatcher_set_executor(d, mock_executor, NULL);
 
     if (err == AGENTOS_SUCCESS) {
         TEST_PASS("set executor succeeds");
@@ -98,75 +103,76 @@ static void test_set_executor(void) {
     agentos_parallel_dispatcher_destroy(d);
 }
 
-static void test_dispatch_single_call(void) {
-    agentos_parallel_dispatcher_t* d =
-        agentos_parallel_dispatcher_create(2);
-    if (!d) { TEST_FAIL("dispatch single", "create failed"); tests_failed++; return; }
+static void test_dispatch_single_call(void)
+{
+    agentos_parallel_dispatcher_t *d = agentos_parallel_dispatcher_create(2);
+    if (!d) {
+        TEST_FAIL("dispatch single", "create failed");
+        tests_failed++;
+        return;
+    }
 
     agentos_parallel_dispatcher_set_executor(d, mock_executor, NULL);
 
     g_exec_count = 0;
     agentos_tool_call_t call;
     memset(&call, 0, sizeof(call));
-    call.tool_name = "test_tool";
-    call.arguments = "{\"param\":\"value\"}";
+    call.tool_name     = "test_tool";
+    call.arguments     = "{\"param\":\"value\"}";
     call.arguments_len = strlen(call.arguments);
-    call.safety_class = AGENTOS_TOOL_READ_ONLY;
+    call.safety_class  = AGENTOS_TOOL_READ_ONLY;
 
-    agentos_tool_result_t* results = NULL;
-    size_t result_count = 0;
-    agentos_error_t err = agentos_parallel_dispatcher_dispatch(
-        d, &call, 1, &results, &result_count);
+    agentos_tool_result_t *results = NULL;
+    size_t result_count            = 0;
+    agentos_error_t err            = agentos_parallel_dispatcher_dispatch(d, &call, 1, &results, &result_count);
 
-    printf("    Single dispatch: err=%d, results=%zu, exec=%d\n",
-           err, result_count, g_exec_count);
+    printf("    Single dispatch: err=%d, results=%zu, exec=%d\n", err, result_count, g_exec_count);
     TEST_PASS("dispatch single call");
 
     free_results(results, result_count);
     agentos_parallel_dispatcher_destroy(d);
 }
 
-static void test_dispatch_multiple_calls(void) {
-    agentos_parallel_dispatcher_t* d =
-        agentos_parallel_dispatcher_create(4);
-    if (!d) return;
+static void test_dispatch_multiple_calls(void)
+{
+    agentos_parallel_dispatcher_t *d = agentos_parallel_dispatcher_create(4);
+    if (!d)
+        return;
 
     agentos_parallel_dispatcher_set_executor(d, mock_executor, NULL);
 
     g_exec_count = 0;
     agentos_tool_call_t calls[5];
-    const char* tools[] = {"search", "read", "write", "list", "calc"};
+    const char *tools[] = {"search", "read", "write", "list", "calc"};
     for (int i = 0; i < 5; i++) {
         memset(&calls[i], 0, sizeof(calls[i]));
-        calls[i].tool_name = tools[i];
-        calls[i].arguments = "{}";
+        calls[i].tool_name     = tools[i];
+        calls[i].arguments     = "{}";
         calls[i].arguments_len = 2;
-        calls[i].safety_class = (agentos_tool_safety_class_t)(i % 4);
+        calls[i].safety_class  = (agentos_tool_safety_class_t) (i % 4);
     }
 
-    agentos_tool_result_t* results = NULL;
-    size_t result_count = 0;
-    agentos_parallel_dispatcher_dispatch(d, calls, 5,
-                                         &results, &result_count);
+    agentos_tool_result_t *results = NULL;
+    size_t result_count            = 0;
+    agentos_parallel_dispatcher_dispatch(d, calls, 5, &results, &result_count);
 
-    printf("    Multi dispatch: results=%zu, exec=%d\n",
-           result_count, g_exec_count);
+    printf("    Multi dispatch: results=%zu, exec=%d\n", result_count, g_exec_count);
     TEST_PASS("dispatch multiple calls");
 
     free_results(results, result_count);
     agentos_parallel_dispatcher_destroy(d);
 }
 
-static void test_dispatch_safety_classification(void) {
+static void test_dispatch_safety_classification(void)
+{
     agentos_tool_call_t calls[4];
-    const char* names[] = {"read_only", "write_shared",
-                           "interactive", "side_effect"};
+    const char *names[] = {"read_only", "write_shared", "interactive", "side_effect"};
     for (int i = 0; i < 4; i++) {
         memset(&calls[i], 0, sizeof(calls[i]));
-        calls[i].tool_name = names[i];
-        calls[i].arguments = "{}";
+        calls[i].tool_name     = names[i];
+        calls[i].arguments     = "{}";
         calls[i].arguments_len = 2;
-        calls[i].safety_class = (agentos_tool_safety_class_t)i;
+        calls[i].safety_class  = (agentos_tool_safety_class_t) i;
     }
     assert(calls[0].safety_class == AGENTOS_TOOL_READ_ONLY);
     assert(calls[1].safety_class == AGENTOS_TOOL_WRITE_SHARED);
@@ -175,19 +181,18 @@ static void test_dispatch_safety_classification(void) {
     TEST_PASS("safety classification correct");
 }
 
-static void test_delegate_create_destroy(void) {
+static void test_delegate_create_destroy(void)
+{
     agentos_delegate_config_t config;
     memset(&config, 0, sizeof(config));
-    config.focus_prompt = "Focus on data analysis";
-    config.max_depth = 1;
+    config.focus_prompt   = "Focus on data analysis";
+    config.max_depth      = 1;
     config.max_iterations = 5;
 
-    agentos_delegate_task_t* task =
-        agentos_delegate_create("Analyze the dataset", &config);
+    agentos_delegate_task_t *task = agentos_delegate_create("Analyze the dataset", &config);
 
     if (task != NULL) {
-        printf("    Delegate task: id=%.32s, state=%d\n",
-               task->task_id ? task->task_id : "(null)",
+        printf("    Delegate task: id=%.32s, state=%d\n", task->task_id ? task->task_id : "(null)",
                agentos_delegate_get_state(task));
         assert(agentos_delegate_get_state(task) == AGENTOS_DELEGATE_IDLE);
         TEST_PASS("delegate create/destroy");
@@ -198,40 +203,44 @@ static void test_delegate_create_destroy(void) {
     }
 }
 
-static void test_delegate_assign_collect(void) {
+static void test_delegate_assign_collect(void)
+{
     agentos_delegate_config_t config;
     memset(&config, 0, sizeof(config));
-    config.max_depth = 1;
+    config.max_depth      = 1;
     config.max_iterations = 3;
 
-    agentos_delegate_task_t* task =
-        agentos_delegate_create("Process user request", &config);
-    if (!task) { TEST_FAIL("delegate assign", "create failed"); tests_failed++; return; }
+    agentos_delegate_task_t *task = agentos_delegate_create("Process user request", &config);
+    if (!task) {
+        TEST_FAIL("delegate assign", "create failed");
+        tests_failed++;
+        return;
+    }
 
-    g_exec_count = 0;
+    g_exec_count        = 0;
     agentos_error_t err = agentos_delegate_assign(task, mock_executor, NULL);
     printf("    Assign result: %d, state=%d\n", err, agentos_delegate_get_state(task));
     assert(agentos_delegate_get_state(task) == AGENTOS_DELEGATE_COMPLETED);
 
-    char* result = NULL;
+    char *result      = NULL;
     size_t result_len = 0;
-    err = agentos_delegate_collect(task, &result, &result_len);
+    err               = agentos_delegate_collect(task, &result, &result_len);
 
-    printf("    Collect: err=%d, len=%zu, exec=%d\n",
-           err, result_len, g_exec_count);
+    printf("    Collect: err=%d, len=%zu, exec=%d\n", err, result_len, g_exec_count);
     TEST_PASS("delegate assign and collect cycle");
 
-    if (result) free(result);
+    if (result)
+        free(result);
     agentos_delegate_destroy(task);
 }
 
-static void test_delegate_max_depth_limit(void) {
+static void test_delegate_max_depth_limit(void)
+{
     agentos_delegate_config_t config;
     memset(&config, 0, sizeof(config));
     config.max_depth = 10;
 
-    agentos_delegate_task_t* task =
-        agentos_delegate_create("Deep delegation test", &config);
+    agentos_delegate_task_t *task = agentos_delegate_create("Deep delegation test", &config);
     if (task) {
         assert(config.max_depth <= 10 || config.max_depth >= 0);
         TEST_PASS("delegate max depth limit valid");
@@ -241,14 +250,18 @@ static void test_delegate_max_depth_limit(void) {
     }
 }
 
-static void test_delegate_cancel_idle(void) {
+static void test_delegate_cancel_idle(void)
+{
     agentos_delegate_config_t config;
     memset(&config, 0, sizeof(config));
     config.max_depth = 2;
 
-    agentos_delegate_task_t* task =
-        agentos_delegate_create("Cancel test", &config);
-    if (!task) { TEST_FAIL("delegate cancel", "create failed"); tests_failed++; return; }
+    agentos_delegate_task_t *task = agentos_delegate_create("Cancel test", &config);
+    if (!task) {
+        TEST_FAIL("delegate cancel", "create failed");
+        tests_failed++;
+        return;
+    }
 
     assert(agentos_delegate_get_state(task) == AGENTOS_DELEGATE_IDLE);
 
@@ -267,14 +280,18 @@ static void test_delegate_cancel_idle(void) {
     agentos_delegate_destroy(task);
 }
 
-static void test_delegate_cancel_completed(void) {
+static void test_delegate_cancel_completed(void)
+{
     agentos_delegate_config_t config;
     memset(&config, 0, sizeof(config));
     config.max_depth = 2;
 
-    agentos_delegate_task_t* task =
-        agentos_delegate_create("Cancel completed test", &config);
-    if (!task) { TEST_FAIL("delegate cancel completed", "create failed"); tests_failed++; return; }
+    agentos_delegate_task_t *task = agentos_delegate_create("Cancel completed test", &config);
+    if (!task) {
+        TEST_FAIL("delegate cancel completed", "create failed");
+        tests_failed++;
+        return;
+    }
 
     agentos_delegate_assign(task, mock_executor, NULL);
     assert(agentos_delegate_get_state(task) == AGENTOS_DELEGATE_COMPLETED);
@@ -286,10 +303,14 @@ static void test_delegate_cancel_completed(void) {
     agentos_delegate_destroy(task);
 }
 
-static void test_dispatcher_cancel(void) {
-    agentos_parallel_dispatcher_t* d =
-        agentos_parallel_dispatcher_create(4);
-    if (!d) { TEST_FAIL("dispatcher cancel", "create failed"); tests_failed++; return; }
+static void test_dispatcher_cancel(void)
+{
+    agentos_parallel_dispatcher_t *d = agentos_parallel_dispatcher_create(4);
+    if (!d) {
+        TEST_FAIL("dispatcher cancel", "create failed");
+        tests_failed++;
+        return;
+    }
 
     agentos_parallel_dispatcher_set_executor(d, mock_executor, NULL);
 
@@ -301,49 +322,56 @@ static void test_dispatcher_cancel(void) {
 
     agentos_tool_call_t call;
     memset(&call, 0, sizeof(call));
-    call.tool_name = "test_tool";
-    call.arguments = "{}";
+    call.tool_name     = "test_tool";
+    call.arguments     = "{}";
     call.arguments_len = 2;
-    call.safety_class = AGENTOS_TOOL_READ_ONLY;
+    call.safety_class  = AGENTOS_TOOL_READ_ONLY;
 
-    agentos_tool_result_t* results = NULL;
-    size_t result_count = 0;
-    err = agentos_parallel_dispatcher_dispatch(d, &call, 1, &results, &result_count);
+    agentos_tool_result_t *results = NULL;
+    size_t result_count            = 0;
+    err                            = agentos_parallel_dispatcher_dispatch(d, &call, 1, &results, &result_count);
     assert(err == AGENTOS_ENOTINIT);
 
     TEST_PASS("dispatcher cancel sets cancelled flag and blocks dispatch");
     agentos_parallel_dispatcher_destroy(d);
 }
 
-static void test_dispatcher_cancel_null(void) {
+static void test_dispatcher_cancel_null(void)
+{
     agentos_error_t err = agentos_parallel_dispatcher_cancel(NULL);
     assert(err == AGENTOS_EINVAL);
     TEST_PASS("dispatcher cancel NULL returns EINVAL");
 }
 
-static void test_dispatcher_is_cancelled_null(void) {
+static void test_dispatcher_is_cancelled_null(void)
+{
     bool cancelled = agentos_parallel_dispatcher_is_cancelled(NULL);
     assert(!cancelled);
     TEST_PASS("dispatcher is_cancelled NULL returns false");
 }
 
-static void test_delegate_get_state_null(void) {
+static void test_delegate_get_state_null(void)
+{
     agentos_delegate_state_t state = agentos_delegate_get_state(NULL);
     assert(state == AGENTOS_DELEGATE_IDLE);
     TEST_PASS("delegate get_state NULL returns IDLE");
 }
 
-static void test_delegate_collect_not_completed(void) {
+static void test_delegate_collect_not_completed(void)
+{
     agentos_delegate_config_t config;
     memset(&config, 0, sizeof(config));
     config.max_depth = 2;
 
-    agentos_delegate_task_t* task =
-        agentos_delegate_create("Collect not completed test", &config);
-    if (!task) { TEST_FAIL("delegate collect", "create failed"); tests_failed++; return; }
+    agentos_delegate_task_t *task = agentos_delegate_create("Collect not completed test", &config);
+    if (!task) {
+        TEST_FAIL("delegate collect", "create failed");
+        tests_failed++;
+        return;
+    }
 
-    char* result = NULL;
-    size_t result_len = 0;
+    char *result        = NULL;
+    size_t result_len   = 0;
     agentos_error_t err = agentos_delegate_collect(task, &result, &result_len);
     assert(err == AGENTOS_EBUSY);
 
@@ -351,7 +379,8 @@ static void test_delegate_collect_not_completed(void) {
     agentos_delegate_destroy(task);
 }
 
-static void test_enum_values(void) {
+static void test_enum_values(void)
+{
     assert(AGENTOS_TOOL_READ_ONLY == 0);
     assert(AGENTOS_TOOL_WRITE_SHARED == 1);
     assert(AGENTOS_TOOL_INTERACTIVE == 2);
@@ -359,22 +388,19 @@ static void test_enum_values(void) {
     TEST_PASS("safety class enum values correct");
 }
 
-static void test_struct_sizes(void) {
-    assert(sizeof(agentos_tool_call_t) >=
-           sizeof(char*) * 3 + sizeof(size_t) + sizeof(int));
+static void test_struct_sizes(void)
+{
+    assert(sizeof(agentos_tool_call_t) >= sizeof(char *) * 3 + sizeof(size_t) + sizeof(int));
     assert(sizeof(agentos_tool_result_t) >=
-           sizeof(char*) * 2 + sizeof(agentos_error_t) +
-           sizeof(size_t) + sizeof(uint64_t));
-    assert(sizeof(agentos_delegate_config_t) >=
-           sizeof(char*) * 2 + sizeof(size_t) +
-           sizeof(int) * 2 + sizeof(float));
-    assert(sizeof(agentos_delegate_task_t) >=
-           sizeof(char*) * 2 + sizeof(agentos_delegate_config_t) +
-           sizeof(agentos_error_t) + sizeof(agentos_delegate_state_t));
+           sizeof(char *) * 2 + sizeof(agentos_error_t) + sizeof(size_t) + sizeof(uint64_t));
+    assert(sizeof(agentos_delegate_config_t) >= sizeof(char *) * 2 + sizeof(size_t) + sizeof(int) * 2 + sizeof(float));
+    assert(sizeof(agentos_delegate_task_t) >= sizeof(char *) * 2 + sizeof(agentos_delegate_config_t) +
+                                                  sizeof(agentos_error_t) + sizeof(agentos_delegate_state_t));
     TEST_PASS("struct sizes adequate");
 }
 
-int main(void) {
+int main(void)
+{
     printf("\n========================================\n");
     printf("  ParallelDispatcher 并行调度器 单元测试\n");
     printf("========================================\n\n");
@@ -404,8 +430,7 @@ int main(void) {
     RUN_TEST(test_dispatcher_is_cancelled_null);
 
     printf("\n========================================\n");
-    printf("  测试结果: %d 运行, %d 通过, %d 失败\n",
-           tests_run, tests_passed, tests_failed);
+    printf("  测试结果: %d 运行, %d 通过, %d 失败\n", tests_run, tests_passed, tests_failed);
     printf("========================================\n");
 
     return tests_failed > 0 ? 1 : 0;

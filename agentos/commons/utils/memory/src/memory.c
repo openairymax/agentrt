@@ -35,11 +35,7 @@ typedef struct {
     memory_stats_t stats;                 /**< 内存统计信息 */
     
     // 线程同步
-#ifdef _WIN32
-    CRITICAL_SECTION lock;                /**< Windows临界区 */
-#else
-    pthread_mutex_t lock;                 /**< POSIX互斥锁 */
-#endif
+    agentos_mutex_t lock;                 /**< 平台抽象互斥锁 */
     
     // 调试信息链表头
     struct memory_debug_info* debug_list_head; /**< 调试信息链表头*/
@@ -64,11 +60,7 @@ static memory_state_t g_state = {
         .fail_callback_user_data = NULL
     },
     .stats = {0},
-#ifdef _WIN32
     .lock = {0},
-#else
-    .lock = PTHREAD_MUTEX_INITIALIZER,
-#endif
     .debug_list_head = NULL,
     .fail_callback = NULL,
     .fail_callback_user_data = NULL
@@ -80,45 +72,28 @@ static memory_state_t g_state = {
  * @return 成功返回true，失败返回false
  */
 static bool memory_lock_init(void) {
-#ifdef _WIN32
-    InitializeCriticalSection(&g_state.lock);
-    return true;
-#else
-    return pthread_mutex_init(&g_state.lock, NULL) == 0;
-#endif
+    return agentos_platform_mutex_init(&g_state.lock) == 0;
 }
 
 /**
  * @brief 内部锁销毁
  */
 static void memory_lock_destroy(void) {
-#ifdef _WIN32
-    DeleteCriticalSection(&g_state.lock);
-#else
-    pthread_mutex_destroy(&g_state.lock);
-#endif
+    agentos_platform_mutex_destroy(&g_state.lock);
 }
 
 /**
  * @brief 加锁
  */
 static void memory_lock(void) {
-#ifdef _WIN32
-    EnterCriticalSection(&g_state.lock);
-#else
-    pthread_mutex_lock(&g_state.lock);
-#endif
+    agentos_platform_mutex_lock(&g_state.lock);
 }
 
 /**
  * @brief 解锁
  */
 static void memory_unlock(void) {
-#ifdef _WIN32
-    LeaveCriticalSection(&g_state.lock);
-#else
-    pthread_mutex_unlock(&g_state.lock);
-#endif
+    agentos_platform_mutex_unlock(&g_state.lock);
 }
 
 /**

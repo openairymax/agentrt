@@ -326,7 +326,7 @@ void log_write(log_level_t level, const char* module, int line, const char* fmt,
     char formatted_buffer[MAX_MESSAGE_LEN * 2];
     size_t formatted_len = format_log_message(&record, formatted_buffer, sizeof(formatted_buffer));
     
-    // 输出到控制台（基础实现�?
+    // 输出到控制台�?
     if (formatted_len > 0) {
         // 根据级别选择输出�?
         FILE* stream = (level >= LOG_LEVEL_ERROR) ? stderr : stdout;

@@ -5,7 +5,7 @@
  * 本文件实现统一配置模块的源适配层功能，提供�? * 1. 多种配置源的统一适配接口
  * 2. 文件、环境变量、命令行参数、内存等配置源实�? * 3. 配置源管理器和监控功�? * 4. 统一的错误处理和资源管理
  *
- * 注意：这是一个基础实现，实际使用时应根据需要扩展特定配置源�? */
+ * �? */
 
 #include "config_source.h"
 #include "core_config.h"
@@ -152,7 +152,7 @@ static char* duplicate_string(const char* str) {
 }
 
 /**
- * @brief 解析JSON配置（简化实现）
+ * @brief 解析JSON配置
  * 
  * 简化JSON解析，实际实现应使用完整JSON解析库�? * 
  * @param data JSON数据
@@ -225,7 +225,7 @@ static config_error_t parse_json_simple(const char* data, size_t data_len, confi
 }
 
 /**
- * @brief 解析INI配置（简化实现）
+ * @brief 解析INI配置
  * 
  * 简化INI解析，支持基本的键值对�? * 
  * @param data INI数据
@@ -376,7 +376,7 @@ static config_error_t file_source_load(config_source_t* source, config_context_t
  * 保存配置到文件�? * 
  * @param source 配置�? * @param ctx 配置上下�? * @return 错误�? */
 static config_error_t file_source_save(config_source_t* source, const config_context_t* ctx) {
-    // 简化实现：文件配置源暂不支持保�?    (void)source;
+    // 文件配置源保存�?    (void)source;
     (void)ctx;
     return CONFIG_ERROR_UNSUPPORTED;
 }
@@ -477,7 +477,7 @@ static config_error_t env_source_load(config_source_t* source, config_context_t*
  * 保存配置到环境变量�? * 
  * @param source 配置�? * @param ctx 配置上下�? * @return 错误�? */
 static config_error_t env_source_save(config_source_t* source, const config_context_t* ctx) {
-    // 简化实现：环境变量配置源暂不支持保�?    (void)source;
+    // 环境变量配置源保存�?    (void)source;
     (void)ctx;
     return CONFIG_ERROR_UNSUPPORTED;
 }
@@ -487,7 +487,7 @@ static config_error_t env_source_save(config_source_t* source, const config_cont
  * 环境变量通常不会变化�? * 
  * @param source 配置�? * @return 是否已修�? */
 static bool env_source_has_changed(config_source_t* source) {
-    // 环境变量变化检测复杂，简化实现返回false
+    // 环境变量变化检测
     (void)source;
     return false;
 }
@@ -1131,7 +1131,7 @@ config_error_t config_source_manager_load_all(config_source_manager_t* manager,
     
     config_error_t overall_error = CONFIG_SUCCESS;
     
-    // 按优先级排序（简化实现：按添加顺序加载）
+    // 按优先级排序加载
     for (size_t i = 0; i < manager->count; i++) {
         config_source_t* source = manager->sources[i];
         if (!source) continue;

@@ -33,6 +33,9 @@ message(STATUS "Platform: ${CMAKE_SYSTEM_NAME}")
 message(STATUS "Compiler: ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
 message(STATUS "Build shared libs: ${BUILD_SHARED_LIBS}")
 message(STATUS "Build tests: ${BUILD_TESTS}")
+message(STATUS "Memory backend: ${AGENTOS_MEMORY_BACKEND}")
+message(STATUS "With MemoryRovol Pro: ${AGENTOS_WITH_MEMORYROVOL}")
+message(STATUS "Docker build: ${AGENTOS_DOCKER_BUILD}")
 message(STATUS "=========================================")
 
 # 导出编译命令数据库（供clangd/IDE使用）

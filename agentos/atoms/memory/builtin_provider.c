@@ -9,6 +9,7 @@
  */
 
 #include "memory_provider.h"
+#include "error.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

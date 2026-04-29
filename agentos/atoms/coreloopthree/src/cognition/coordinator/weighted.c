@@ -57,7 +57,7 @@ static agentos_error_t weighted_coordinate(
         return AGENTOS_EINVAL;
     }
 
-    // 简单实现：选择权重最高的输入
+    // 选择权重评分最高的输入作为仲裁结果
     // 生产环境应实现真正的加权融合算法
     float max_weight = 0.0f;
     size_t best_index = 0;

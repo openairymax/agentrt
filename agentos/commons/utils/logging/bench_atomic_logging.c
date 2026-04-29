@@ -306,7 +306,7 @@ static void bench_memory_usage(int iterations) {
 
     // 初始化日志系�?    log_init(NULL);
 
-    // 记录初始内存状态（简化实现）
+    // 记录初始内存状态
     printf("  内存使用测试 - 开始\n");
 
     for (int i = 0; i < iterations; i++) {
