@@ -55,28 +55,28 @@ typedef agentos_mutex_t trace_mutex_t;
  * @brief 初始化互斥锁
  */
 static int trace_mutex_init(trace_mutex_t* mutex) {
-    return agentos_platform_mutex_init(mutex);
+    return agentos_mutex_init(mutex);
 }
 
 /**
  * @brief 销毁互斥锁
  */
 static void trace_mutex_destroy(trace_mutex_t* mutex) {
-    agentos_platform_mutex_destroy(mutex);
+    agentos_mutex_destroy(mutex);
 }
 
 /**
  * @brief 加锁
  */
 static void trace_mutex_lock(trace_mutex_t* mutex) {
-    agentos_platform_mutex_lock(mutex);
+    agentos_mutex_lock(mutex);
 }
 
 /**
  * @brief 解锁
  */
 static void trace_mutex_unlock(trace_mutex_t* mutex) {
-    agentos_platform_mutex_unlock(mutex);
+    agentos_mutex_unlock(mutex);
 }
 
 /**

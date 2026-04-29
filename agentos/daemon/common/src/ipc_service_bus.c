@@ -48,8 +48,8 @@ typedef struct {
     uint64_t msg_id;
     ipc_bus_message_t* response;
     volatile int completed;
-    agentos_platform_mutex_t mutex;
-    agentos_platform_cond_t cond;
+    agentos_mutex_t mutex;
+    agentos_cond_t cond;
 } pending_request_t;
 
 typedef struct ipc_bus_channel_s {
@@ -74,7 +74,7 @@ typedef struct ipc_service_bus_s {
     uint32_t pending_count;
     ipc_bus_stats_t stats;
     bool running;
-    agentos_platform_mutex_t mutex;
+    agentos_mutex_t mutex;
     uint64_t next_msg_id;
 } ipc_service_bus_internal_t;
 
@@ -171,7 +171,7 @@ AGENTOS_API ipc_service_bus_t ipc_service_bus_create(
         bus->default_config.buffer_size = IPC_BUS_MAX_MESSAGE_SIZE;
     }
 
-    agentos_error_t err = agentos_platform_mutex_init(&bus->mutex);
+    agentos_error_t err = agentos_mutex_init(&bus->mutex);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_FREE(bus);
         return NULL;
@@ -207,7 +207,7 @@ AGENTOS_API void ipc_service_bus_destroy(ipc_service_bus_t bus_handle) {
         }
     }
 
-    agentos_platform_mutex_destroy(&bus->mutex);
+    agentos_mutex_destroy(&bus->mutex);
     AGENTOS_FREE(bus);
 
     LOG_INFO("IPC service bus destroyed");
@@ -218,14 +218,14 @@ AGENTOS_API agentos_error_t ipc_service_bus_start(ipc_service_bus_t bus_handle) 
 
     ipc_service_bus_internal_t* bus = (ipc_service_bus_internal_t*)bus_handle;
 
-    agentos_platform_mutex_lock(&bus->mutex);
+    agentos_mutex_lock(&bus->mutex);
     if (bus->running) {
-        agentos_platform_mutex_unlock(&bus->mutex);
+        agentos_mutex_unlock(&bus->mutex);
         return AGENTOS_SUCCESS;
     }
 
     bus->running = true;
-    agentos_platform_mutex_unlock(&bus->mutex);
+    agentos_mutex_unlock(&bus->mutex);
 
     LOG_INFO("IPC service bus '%s' started", bus->name);
     return AGENTOS_SUCCESS;
@@ -236,9 +236,9 @@ AGENTOS_API agentos_error_t ipc_service_bus_stop(ipc_service_bus_t bus_handle) {
 
     ipc_service_bus_internal_t* bus = (ipc_service_bus_internal_t*)bus_handle;
 
-    agentos_platform_mutex_lock(&bus->mutex);
+    agentos_mutex_lock(&bus->mutex);
     bus->running = false;
-    agentos_platform_mutex_unlock(&bus->mutex);
+    agentos_mutex_unlock(&bus->mutex);
 
     LOG_INFO("IPC service bus '%s' stopped", bus->name);
     return AGENTOS_SUCCESS;
@@ -254,16 +254,16 @@ AGENTOS_API ipc_bus_channel_t ipc_bus_channel_create(
 
     ipc_service_bus_internal_t* bus = (ipc_service_bus_internal_t*)bus_handle;
 
-    agentos_platform_mutex_lock(&bus->mutex);
+    agentos_mutex_lock(&bus->mutex);
 
     if (bus->channel_count >= IPC_BUS_MAX_CHANNELS) {
-        agentos_platform_mutex_unlock(&bus->mutex);
+        agentos_mutex_unlock(&bus->mutex);
         LOG_ERROR("Cannot create channel: max channels reached");
         return NULL;
     }
 
     if (find_channel(bus, config->name)) {
-        agentos_platform_mutex_unlock(&bus->mutex);
+        agentos_mutex_unlock(&bus->mutex);
         LOG_ERROR("Channel '%s' already exists", config->name);
         return NULL;
     }
@@ -271,7 +271,7 @@ AGENTOS_API ipc_bus_channel_t ipc_bus_channel_create(
     ipc_bus_channel_internal_t* ch =
         (ipc_bus_channel_internal_t*)AGENTOS_CALLOC(1, sizeof(ipc_bus_channel_internal_t));
     if (!ch) {
-        agentos_platform_mutex_unlock(&bus->mutex);
+        agentos_mutex_unlock(&bus->mutex);
         return NULL;
     }
 
@@ -282,7 +282,7 @@ AGENTOS_API ipc_bus_channel_t ipc_bus_channel_create(
     bus->channels = ch;
     bus->channel_count++;
 
-    agentos_platform_mutex_unlock(&bus->mutex);
+    agentos_mutex_unlock(&bus->mutex);
 
     LOG_INFO("Channel '%s' created on bus '%s'", config->name, bus->name);
     return (ipc_bus_channel_t)ch;
@@ -314,17 +314,17 @@ AGENTOS_API agentos_error_t ipc_service_bus_send(
 
     ipc_service_bus_internal_t* bus = (ipc_service_bus_internal_t*)bus_handle;
 
-    agentos_platform_mutex_lock(&bus->mutex);
+    agentos_mutex_lock(&bus->mutex);
 
     if (!bus->running) {
-        agentos_platform_mutex_unlock(&bus->mutex);
+        agentos_mutex_unlock(&bus->mutex);
         return AGENTOS_ESTATE;
     }
 
     bus->stats.messages_sent++;
     bus->stats.bytes_sent += message->payload_size;
 
-    agentos_platform_mutex_unlock(&bus->mutex);
+    agentos_mutex_unlock(&bus->mutex);
 
     LOG_DEBUG("Bus '%s': sent message to '%s' (type=%d, proto=%d, size=%zu)",
               bus->name, target_service,
@@ -345,15 +345,15 @@ AGENTOS_API agentos_error_t ipc_service_bus_request(
 
     ipc_service_bus_internal_t* bus = (ipc_service_bus_internal_t*)bus_handle;
 
-    agentos_platform_mutex_lock(&bus->mutex);
+    agentos_mutex_lock(&bus->mutex);
 
     if (!bus->running) {
-        agentos_platform_mutex_unlock(&bus->mutex);
+        agentos_mutex_unlock(&bus->mutex);
         return AGENTOS_ESTATE;
     }
 
     if (bus->pending_count >= IPC_BUS_MAX_PENDING) {
-        agentos_platform_mutex_unlock(&bus->mutex);
+        agentos_mutex_unlock(&bus->mutex);
         return AGENTOS_EBUSY;
     }
 
@@ -368,7 +368,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_request(
     bus->stats.messages_sent++;
     bus->stats.bytes_sent += request->payload_size;
 
-    agentos_platform_mutex_unlock(&bus->mutex);
+    agentos_mutex_unlock(&bus->mutex);
 
     if (timeout_ms == 0) timeout_ms = bus->default_config.timeout_ms;
 
@@ -385,7 +385,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_request(
         svc_err = AGENTOS_EIO;
     }
 
-    agentos_platform_mutex_lock(&bus->mutex);
+    agentos_mutex_lock(&bus->mutex);
 
     if (svc_err == AGENTOS_SUCCESS && resp_json) {
         size_t resp_len = strlen(resp_json) + 1;
@@ -428,7 +428,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_request(
     if (elapsed >= (uint64_t)timeout_ms && !pending->completed) {
         bus->stats.timeouts++;
         bus->pending_count--;
-        agentos_platform_mutex_unlock(&bus->mutex);
+        agentos_mutex_unlock(&bus->mutex);
         return AGENTOS_ETIMEDOUT;
     }
 
@@ -447,7 +447,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_request(
     if (latency * 1000 > bus->stats.max_latency_us)
         bus->stats.max_latency_us = latency * 1000;
 
-    agentos_platform_mutex_unlock(&bus->mutex);
+    agentos_mutex_unlock(&bus->mutex);
 
     LOG_DEBUG("Bus '%s': request to '%s' completed in %llums (completed=%d)",
               bus->name, target_service, (unsigned long long)latency, pending->completed);
@@ -462,10 +462,10 @@ AGENTOS_API agentos_error_t ipc_service_bus_broadcast(
 
     ipc_service_bus_internal_t* bus = (ipc_service_bus_internal_t*)bus_handle;
 
-    agentos_platform_mutex_lock(&bus->mutex);
+    agentos_mutex_lock(&bus->mutex);
 
     if (!bus->running) {
-        agentos_platform_mutex_unlock(&bus->mutex);
+        agentos_mutex_unlock(&bus->mutex);
         return AGENTOS_ESTATE;
     }
 
@@ -477,7 +477,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_broadcast(
     bus->stats.messages_sent += target_count;
     bus->stats.bytes_sent += message->payload_size * target_count;
 
-    agentos_platform_mutex_unlock(&bus->mutex);
+    agentos_mutex_unlock(&bus->mutex);
 
     LOG_DEBUG("Bus '%s': broadcast to %u endpoints", bus->name, target_count);
     return AGENTOS_SUCCESS;
@@ -519,23 +519,23 @@ AGENTOS_API agentos_error_t ipc_service_bus_register_handler(
 
     ipc_service_bus_internal_t* bus = (ipc_service_bus_internal_t*)bus_handle;
 
-    agentos_platform_mutex_lock(&bus->mutex);
+    agentos_mutex_lock(&bus->mutex);
 
     if (bus->channel_count == 0) {
         ipc_bus_channel_config_t config;
         memcpy(&config, &bus->default_config, sizeof(ipc_bus_channel_config_t));
         safe_strcpy(config.name, "default", IPC_BUS_CHANNEL_NAME_LEN);
-        agentos_platform_mutex_unlock(&bus->mutex);
+        agentos_mutex_unlock(&bus->mutex);
 
         ipc_bus_channel_t ch = ipc_bus_channel_create(bus_handle, &config);
         if (!ch) return AGENTOS_ENOMEM;
 
-        agentos_platform_mutex_lock(&bus->mutex);
+        agentos_mutex_lock(&bus->mutex);
     }
 
     ipc_bus_channel_internal_t* ch = bus->channels;
     if (!ch || ch->handler_count >= IPC_BUS_MAX_HANDLERS) {
-        agentos_platform_mutex_unlock(&bus->mutex);
+        agentos_mutex_unlock(&bus->mutex);
         return AGENTOS_ENOMEM;
     }
 
@@ -543,7 +543,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_register_handler(
     ch->handlers[ch->handler_count].user_data = user_data;
     ch->handler_count++;
 
-    agentos_platform_mutex_unlock(&bus->mutex);
+    agentos_mutex_unlock(&bus->mutex);
 
     LOG_INFO("Message handler registered on bus '%s'", bus->name);
     return AGENTOS_SUCCESS;
@@ -557,7 +557,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_unregister_handler(
 
     ipc_service_bus_internal_t* bus = (ipc_service_bus_internal_t*)bus_handle;
 
-    agentos_platform_mutex_lock(&bus->mutex);
+    agentos_mutex_lock(&bus->mutex);
 
     ipc_bus_channel_internal_t* ch = bus->channels;
     while (ch) {
@@ -573,7 +573,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_unregister_handler(
         ch = ch->next;
     }
 
-    agentos_platform_mutex_unlock(&bus->mutex);
+    agentos_mutex_unlock(&bus->mutex);
     return AGENTOS_SUCCESS;
 }
 
@@ -587,10 +587,10 @@ AGENTOS_API agentos_error_t ipc_service_bus_register_event_handler(
 
     ipc_service_bus_internal_t* bus = (ipc_service_bus_internal_t*)bus_handle;
 
-    agentos_platform_mutex_lock(&bus->mutex);
+    agentos_mutex_lock(&bus->mutex);
 
     if (bus->event_handler_count >= IPC_BUS_MAX_EVENTS) {
-        agentos_platform_mutex_unlock(&bus->mutex);
+        agentos_mutex_unlock(&bus->mutex);
         return AGENTOS_ENOMEM;
     }
 
@@ -600,7 +600,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_register_event_handler(
     entry->user_data = user_data;
     bus->event_handler_count++;
 
-    agentos_platform_mutex_unlock(&bus->mutex);
+    agentos_mutex_unlock(&bus->mutex);
 
     LOG_INFO("Event handler registered for '%s' on bus '%s'", event_name, bus->name);
     return AGENTOS_SUCCESS;
@@ -616,20 +616,20 @@ AGENTOS_API agentos_error_t ipc_service_bus_register_endpoint(
 
     ipc_service_bus_internal_t* bus = (ipc_service_bus_internal_t*)bus_handle;
 
-    agentos_platform_mutex_lock(&bus->mutex);
+    agentos_mutex_lock(&bus->mutex);
 
     int32_t idx = find_endpoint_index(bus, endpoint->service_name);
     if (idx >= 0) {
         memcpy(&bus->endpoints[idx], endpoint, sizeof(ipc_bus_endpoint_t));
         bus->endpoints[idx].last_heartbeat = agentos_platform_get_time_ms();
-        agentos_platform_mutex_unlock(&bus->mutex);
+        agentos_mutex_unlock(&bus->mutex);
         LOG_INFO("Endpoint '%s' updated on bus '%s'",
                  endpoint->service_name, bus->name);
         return AGENTOS_SUCCESS;
     }
 
     if (bus->endpoint_count >= IPC_BUS_MAX_SERVICES) {
-        agentos_platform_mutex_unlock(&bus->mutex);
+        agentos_mutex_unlock(&bus->mutex);
         return AGENTOS_ENOMEM;
     }
 
@@ -638,7 +638,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_register_endpoint(
     bus->endpoint_count++;
     bus->stats.active_endpoints = bus->endpoint_count;
 
-    agentos_platform_mutex_unlock(&bus->mutex);
+    agentos_mutex_unlock(&bus->mutex);
 
     LOG_INFO("Endpoint '%s' registered on bus '%s' (endpoint=%s)",
              endpoint->service_name, bus->name, endpoint->endpoint);
@@ -653,11 +653,11 @@ AGENTOS_API agentos_error_t ipc_service_bus_unregister_endpoint(
 
     ipc_service_bus_internal_t* bus = (ipc_service_bus_internal_t*)bus_handle;
 
-    agentos_platform_mutex_lock(&bus->mutex);
+    agentos_mutex_lock(&bus->mutex);
 
     int32_t idx = find_endpoint_index(bus, service_name);
     if (idx < 0) {
-        agentos_platform_mutex_unlock(&bus->mutex);
+        agentos_mutex_unlock(&bus->mutex);
         return AGENTOS_ENOENT;
     }
 
@@ -668,7 +668,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_unregister_endpoint(
     bus->endpoint_count--;
     bus->stats.active_endpoints = bus->endpoint_count;
 
-    agentos_platform_mutex_unlock(&bus->mutex);
+    agentos_mutex_unlock(&bus->mutex);
 
     LOG_INFO("Endpoint '%s' unregistered from bus '%s'", service_name, bus->name);
     return AGENTOS_SUCCESS;
@@ -686,7 +686,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_discover(
 
     ipc_service_bus_internal_t* bus = (ipc_service_bus_internal_t*)bus_handle;
 
-    agentos_platform_mutex_lock(&bus->mutex);
+    agentos_mutex_lock(&bus->mutex);
 
     uint32_t count = 0;
     for (uint32_t i = 0; i < bus->endpoint_count && count < max_count; i++) {
@@ -712,7 +712,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_discover(
     }
 
     *found_count = count;
-    agentos_platform_mutex_unlock(&bus->mutex);
+    agentos_mutex_unlock(&bus->mutex);
 
     LOG_DEBUG("Service discovery: found %u endpoints (name=%s, proto=%d)",
               count, service_name ? service_name : "*", protocol);
@@ -729,7 +729,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_select_endpoint(
 
     ipc_service_bus_internal_t* bus = (ipc_service_bus_internal_t*)bus_handle;
 
-    agentos_platform_mutex_lock(&bus->mutex);
+    agentos_mutex_lock(&bus->mutex);
 
     ipc_bus_endpoint_t* best = NULL;
     uint32_t best_load = UINT32_MAX;
@@ -763,12 +763,12 @@ AGENTOS_API agentos_error_t ipc_service_bus_select_endpoint(
     }
 
     if (!best) {
-        agentos_platform_mutex_unlock(&bus->mutex);
+        agentos_mutex_unlock(&bus->mutex);
         return AGENTOS_ENOENT;
     }
 
     memcpy(endpoint, best, sizeof(ipc_bus_endpoint_t));
-    agentos_platform_mutex_unlock(&bus->mutex);
+    agentos_mutex_unlock(&bus->mutex);
 
     return AGENTOS_SUCCESS;
 }
@@ -782,11 +782,11 @@ AGENTOS_API agentos_error_t ipc_service_bus_update_endpoint_health(
 
     ipc_service_bus_internal_t* bus = (ipc_service_bus_internal_t*)bus_handle;
 
-    agentos_platform_mutex_lock(&bus->mutex);
+    agentos_mutex_lock(&bus->mutex);
 
     int32_t idx = find_endpoint_index(bus, service_name);
     if (idx < 0) {
-        agentos_platform_mutex_unlock(&bus->mutex);
+        agentos_mutex_unlock(&bus->mutex);
         return AGENTOS_ENOENT;
     }
 
@@ -794,7 +794,7 @@ AGENTOS_API agentos_error_t ipc_service_bus_update_endpoint_health(
     bus->endpoints[idx].healthy = healthy;
     bus->endpoints[idx].last_heartbeat = agentos_platform_get_time_ms();
 
-    agentos_platform_mutex_unlock(&bus->mutex);
+    agentos_mutex_unlock(&bus->mutex);
 
     if (was_healthy && !healthy) {
         LOG_WARN("Endpoint '%s' became unhealthy on bus '%s'",
@@ -898,11 +898,11 @@ AGENTOS_API agentos_error_t ipc_service_bus_get_stats(
 
     ipc_service_bus_internal_t* bus = (ipc_service_bus_internal_t*)bus_handle;
 
-    agentos_platform_mutex_lock(&bus->mutex);
+    agentos_mutex_lock(&bus->mutex);
     memcpy(stats, &bus->stats, sizeof(ipc_bus_stats_t));
     stats->active_channels = bus->channel_count;
     stats->active_endpoints = bus->endpoint_count;
-    agentos_platform_mutex_unlock(&bus->mutex);
+    agentos_mutex_unlock(&bus->mutex);
 
     return AGENTOS_SUCCESS;
 }
@@ -912,9 +912,9 @@ AGENTOS_API agentos_error_t ipc_service_bus_reset_stats(ipc_service_bus_t bus_ha
 
     ipc_service_bus_internal_t* bus = (ipc_service_bus_internal_t*)bus_handle;
 
-    agentos_platform_mutex_lock(&bus->mutex);
+    agentos_mutex_lock(&bus->mutex);
     memset(&bus->stats, 0, sizeof(ipc_bus_stats_t));
-    agentos_platform_mutex_unlock(&bus->mutex);
+    agentos_mutex_unlock(&bus->mutex);
 
     return AGENTOS_SUCCESS;
 }

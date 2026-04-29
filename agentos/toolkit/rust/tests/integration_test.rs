@@ -43,9 +43,32 @@ fn test_client_builder() {
 
 #[test]
 fn test_client_invalid_endpoint() {
-    let client = Client::new("invalid-endpoint");
-    // 由于我们在 builder 中使用了 panic，这里会 panic
-    // 在实际应用中，应该返回错误而不是 panic
+    let result = Client::new("invalid-endpoint");
+    match result {
+        Ok(_) => panic!("Client::new should fail with invalid endpoint"),
+        Err(e) => {
+            assert!(
+                e.to_string().contains("invalid") || e.to_string().contains("endpoint") || e.to_string().contains("URL"),
+                "Error message should describe the invalid endpoint problem, got: {}",
+                e
+            );
+        }
+    }
+
+    let result2 = Client::new("");
+    assert!(result2.is_err(), "Client::new should fail with empty endpoint");
+
+    let result3 = Client::new("ftp://not-http.com");
+    match result3 {
+        Ok(_) => {}
+        Err(e) => {
+            assert!(
+                e.to_string().contains("invalid") || e.to_string().contains("endpoint") || e.to_string().contains("scheme"),
+                "Error message should describe the scheme problem, got: {}",
+                e
+            );
+        }
+    }
 }
 
 // ============================================================

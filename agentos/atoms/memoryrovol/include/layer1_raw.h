@@ -1,6 +1,6 @@
 /**
  * @file layer1_raw.h
- * @brief L1 原始卷接口（简化版）
+ * @brief L1 原始卷接口
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -113,6 +113,13 @@ agentos_error_t agentos_raw_metadata_db_open(
     agentos_raw_metadata_db_t** out_db);
 
 void agentos_raw_metadata_db_close(
+    agentos_raw_metadata_db_t* db_handle);
+
+agentos_error_t agentos_raw_metadata_db_create(
+    const char* db_path,
+    agentos_raw_metadata_db_t** out_db);
+
+void agentos_raw_metadata_db_destroy(
     agentos_raw_metadata_db_t* db_handle);
 
 agentos_error_t agentos_raw_metadata_db_upsert(

@@ -26,7 +26,7 @@ static struct {
     uint32_t module_count;
     um_stats_t stats;
     bool initialized;
-    agentos_platform_mutex_t mutex;
+    agentos_mutex_t mutex;
 } g_um = {0};
 
 /* ==================== 辅助函数 ==================== */
@@ -94,7 +94,7 @@ AGENTOS_API int um_init(const um_config_t* config) {
         g_um.config = um_create_default_config();
     }
 
-    agentos_error_t err = agentos_platform_mutex_init(&g_um.mutex);
+    agentos_error_t err = agentos_mutex_init(&g_um.mutex);
     if (err != AGENTOS_SUCCESS) return -1;
 
     memset(g_um.modules, 0, sizeof(g_um.modules));
@@ -114,11 +114,11 @@ AGENTOS_API int um_init(const um_config_t* config) {
 AGENTOS_API void um_shutdown(void) {
     if (!g_um.initialized) return;
 
-    agentos_platform_mutex_lock(&g_um.mutex);
+    agentos_mutex_lock(&g_um.mutex);
     g_um.initialized = false;
-    agentos_platform_mutex_unlock(&g_um.mutex);
+    agentos_mutex_unlock(&g_um.mutex);
 
-    agentos_platform_mutex_destroy(&g_um.mutex);
+    agentos_mutex_destroy(&g_um.mutex);
 
     LOG_INFO("Unified metrics collector shutdown");
 }
@@ -133,15 +133,15 @@ AGENTOS_API int um_register_module(const char* module_name, const char* instance
     if (!module_name) return -1;
     if (!g_um.initialized) um_init(NULL);
 
-    agentos_platform_mutex_lock(&g_um.mutex);
+    agentos_mutex_lock(&g_um.mutex);
 
     if (find_module(module_name)) {
-        agentos_platform_mutex_unlock(&g_um.mutex);
+        agentos_mutex_unlock(&g_um.mutex);
         return 0;
     }
 
     if (g_um.module_count >= UM_MAX_MODULES) {
-        agentos_platform_mutex_unlock(&g_um.mutex);
+        agentos_mutex_unlock(&g_um.mutex);
         LOG_ERROR("Max metric modules reached");
         return -1;
     }
@@ -164,7 +164,7 @@ AGENTOS_API int um_register_module(const char* module_name, const char* instance
     g_um.module_count++;
     g_um.stats.active_modules = g_um.module_count;
 
-    agentos_platform_mutex_unlock(&g_um.mutex);
+    agentos_mutex_unlock(&g_um.mutex);
 
     LOG_INFO("Metrics module registered: %s (instance=%s)", module_name, mod->instance_id);
     return 0;
@@ -173,11 +173,11 @@ AGENTOS_API int um_register_module(const char* module_name, const char* instance
 AGENTOS_API int um_unregister_module(const char* module_name) {
     if (!module_name) return -1;
 
-    agentos_platform_mutex_lock(&g_um.mutex);
+    agentos_mutex_lock(&g_um.mutex);
 
     um_module_metrics_t* mod = find_module(module_name);
     if (!mod) {
-        agentos_platform_mutex_unlock(&g_um.mutex);
+        agentos_mutex_unlock(&g_um.mutex);
         return -1;
     }
 
@@ -191,7 +191,7 @@ AGENTOS_API int um_unregister_module(const char* module_name) {
     g_um.module_count--;
     g_um.stats.active_modules = g_um.module_count;
 
-    agentos_platform_mutex_unlock(&g_um.mutex);
+    agentos_mutex_unlock(&g_um.mutex);
 
     return 0;
 }
@@ -208,27 +208,27 @@ AGENTOS_API int um_register_metric(
     if (!module_name || !name) return -1;
     if (!g_um.initialized) um_init(NULL);
 
-    agentos_platform_mutex_lock(&g_um.mutex);
+    agentos_mutex_lock(&g_um.mutex);
 
     um_module_metrics_t* mod = find_module(module_name);
     if (!mod) {
-        agentos_platform_mutex_unlock(&g_um.mutex);
+        agentos_mutex_unlock(&g_um.mutex);
         um_register_module(module_name, NULL);
-        agentos_platform_mutex_lock(&g_um.mutex);
+        agentos_mutex_lock(&g_um.mutex);
         mod = find_module(module_name);
         if (!mod) {
-            agentos_platform_mutex_unlock(&g_um.mutex);
+            agentos_mutex_unlock(&g_um.mutex);
             return -1;
         }
     }
 
     if (find_metric(mod, name)) {
-        agentos_platform_mutex_unlock(&g_um.mutex);
+        agentos_mutex_unlock(&g_um.mutex);
         return 0;
     }
 
     if (mod->metric_count >= UM_MAX_METRICS_PER_MOD) {
-        agentos_platform_mutex_unlock(&g_um.mutex);
+        agentos_mutex_unlock(&g_um.mutex);
         return -1;
     }
 
@@ -247,7 +247,7 @@ AGENTOS_API int um_register_metric(
         g_um.stats.total_metrics += g_um.modules[i].metric_count;
     }
 
-    agentos_platform_mutex_unlock(&g_um.mutex);
+    agentos_mutex_unlock(&g_um.mutex);
 
     return 0;
 }
@@ -255,17 +255,17 @@ AGENTOS_API int um_register_metric(
 AGENTOS_API int um_increment(const char* module_name, const char* name, uint64_t value) {
     if (!module_name || !name) return -1;
 
-    agentos_platform_mutex_lock(&g_um.mutex);
+    agentos_mutex_lock(&g_um.mutex);
 
     um_module_metrics_t* mod = find_module(module_name);
     if (!mod) {
-        agentos_platform_mutex_unlock(&g_um.mutex);
+        agentos_mutex_unlock(&g_um.mutex);
         return -1;
     }
 
     um_metric_entry_t* entry = find_metric(mod, name);
     if (!entry) {
-        agentos_platform_mutex_unlock(&g_um.mutex);
+        agentos_mutex_unlock(&g_um.mutex);
         return -1;
     }
 
@@ -275,24 +275,24 @@ AGENTOS_API int um_increment(const char* module_name, const char* name, uint64_t
 
     g_um.stats.total_increments++;
 
-    agentos_platform_mutex_unlock(&g_um.mutex);
+    agentos_mutex_unlock(&g_um.mutex);
     return 0;
 }
 
 AGENTOS_API int um_gauge_set(const char* module_name, const char* name, double value) {
     if (!module_name || !name) return -1;
 
-    agentos_platform_mutex_lock(&g_um.mutex);
+    agentos_mutex_lock(&g_um.mutex);
 
     um_module_metrics_t* mod = find_module(module_name);
     if (!mod) {
-        agentos_platform_mutex_unlock(&g_um.mutex);
+        agentos_mutex_unlock(&g_um.mutex);
         return -1;
     }
 
     um_metric_entry_t* entry = find_metric(mod, name);
     if (!entry) {
-        agentos_platform_mutex_unlock(&g_um.mutex);
+        agentos_mutex_unlock(&g_um.mutex);
         return -1;
     }
 
@@ -301,24 +301,24 @@ AGENTOS_API int um_gauge_set(const char* module_name, const char* name, double v
 
     g_um.stats.total_updates++;
 
-    agentos_platform_mutex_unlock(&g_um.mutex);
+    agentos_mutex_unlock(&g_um.mutex);
     return 0;
 }
 
 AGENTOS_API int um_observe(const char* module_name, const char* name, double value) {
     if (!module_name || !name) return -1;
 
-    agentos_platform_mutex_lock(&g_um.mutex);
+    agentos_mutex_lock(&g_um.mutex);
 
     um_module_metrics_t* mod = find_module(module_name);
     if (!mod) {
-        agentos_platform_mutex_unlock(&g_um.mutex);
+        agentos_mutex_unlock(&g_um.mutex);
         return -1;
     }
 
     um_metric_entry_t* entry = find_metric(mod, name);
     if (!entry) {
-        agentos_platform_mutex_unlock(&g_um.mutex);
+        agentos_mutex_unlock(&g_um.mutex);
         return -1;
     }
 
@@ -329,7 +329,7 @@ AGENTOS_API int um_observe(const char* module_name, const char* name, double val
 
     g_um.stats.total_updates++;
 
-    agentos_platform_mutex_unlock(&g_um.mutex);
+    agentos_mutex_unlock(&g_um.mutex);
     return 0;
 }
 
@@ -342,26 +342,26 @@ AGENTOS_API char* um_export_prometheus(void) {
 AGENTOS_API char* um_export_prometheus_module(const char* module_name) {
     if (!g_um.initialized) return NULL;
 
-    agentos_platform_mutex_lock(&g_um.mutex);
+    agentos_mutex_lock(&g_um.mutex);
 
     size_t buf_size = 8192;
     char* buf = (char*)AGENTOS_MALLOC(buf_size);
     if (!buf) {
-        agentos_platform_mutex_unlock(&g_um.mutex);
+        agentos_mutex_unlock(&g_um.mutex);
         return NULL;
     }
     size_t pos = 0;
 
 #define PAPPEND(fmt, ...) do { \
     int w = snprintf(buf + pos, buf_size - pos, fmt, ##__VA_ARGS__); /* flawfinder: ignore - bounded snprintf in PAPPEND macro */ \
-    if (w < 0) { AGENTOS_FREE(buf); agentos_platform_mutex_unlock(&g_um.mutex); return NULL; } \
+    if (w < 0) { AGENTOS_FREE(buf); agentos_mutex_unlock(&g_um.mutex); return NULL; } \
     if ((size_t)w >= buf_size - pos) { \
         buf_size *= 2; \
         char* nb = (char*)AGENTOS_MALLOC(buf_size); \
-        if (!nb) { AGENTOS_FREE(buf); agentos_platform_mutex_unlock(&g_um.mutex); return NULL; } \
+        if (!nb) { AGENTOS_FREE(buf); agentos_mutex_unlock(&g_um.mutex); return NULL; } \
         memcpy(nb, buf, pos); AGENTOS_FREE(buf); buf = nb; \
         w = snprintf(buf + pos, buf_size - pos, fmt, ##__VA_ARGS__); /* flawfinder: ignore - bounded realloc+snprintf retry */ \
-        if (w < 0 || (size_t)w >= buf_size - pos) { AGENTOS_FREE(buf); agentos_platform_mutex_unlock(&g_um.mutex); return NULL; } \
+        if (w < 0 || (size_t)w >= buf_size - pos) { AGENTOS_FREE(buf); agentos_mutex_unlock(&g_um.mutex); return NULL; } \
     } \
     pos += (size_t)w; \
 } while(0)
@@ -419,7 +419,7 @@ AGENTOS_API char* um_export_prometheus_module(const char* module_name) {
 #undef PAPPEND
 
     g_um.stats.total_exports++;
-    agentos_platform_mutex_unlock(&g_um.mutex);
+    agentos_mutex_unlock(&g_um.mutex);
 
     return buf;
 }
@@ -427,12 +427,12 @@ AGENTOS_API char* um_export_prometheus_module(const char* module_name) {
 AGENTOS_API char* um_export_json(void) {
     if (!g_um.initialized) return NULL;
 
-    agentos_platform_mutex_lock(&g_um.mutex);
+    agentos_mutex_lock(&g_um.mutex);
 
     size_t buf_size = 8192;
     char* buf = (char*)AGENTOS_MALLOC(buf_size);
     if (!buf) {
-        agentos_platform_mutex_unlock(&g_um.mutex);
+        agentos_mutex_unlock(&g_um.mutex);
         return NULL;
     }
     size_t pos = 0;
@@ -459,7 +459,7 @@ AGENTOS_API char* um_export_json(void) {
     pos += snprintf(buf + pos, buf_size - pos, "}}");
 
     g_um.stats.total_exports++;
-    agentos_platform_mutex_unlock(&g_um.mutex);
+    agentos_mutex_unlock(&g_um.mutex);
 
     return buf;
 }
@@ -525,9 +525,9 @@ AGENTOS_API void um_update_default_metrics(void) {
 AGENTOS_API int um_get_stats(um_stats_t* stats) {
     if (!stats) return -1;
 
-    agentos_platform_mutex_lock(&g_um.mutex);
+    agentos_mutex_lock(&g_um.mutex);
     memcpy(stats, &g_um.stats, sizeof(um_stats_t));
-    agentos_platform_mutex_unlock(&g_um.mutex);
+    agentos_mutex_unlock(&g_um.mutex);
 
     return 0;
 }

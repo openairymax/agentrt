@@ -26,7 +26,6 @@
 #include <curl/curl.h>
 #include <time.h>
 #include <math.h>
-#include <pthread.h>
 
 #define OPENAI_DEFAULT_BASE "https://api.openai.com/v1"
 #define OPENAI_DEFAULT_MODEL "gpt-3.5-turbo"
@@ -44,7 +43,7 @@
 /* ---------- 速率限制器状态 ---------- */
 
 typedef struct {
-    pthread_mutex_t lock;
+    agentos_mutex_t lock;
     time_t rpm_window_start;       /* RPM窗口起始时间 */
     int rpm_count;                  /* 当前窗口内请求数 */
     int rpm_limit;                 /* RPM限制 */
@@ -66,7 +65,7 @@ typedef struct {
 /* ========== 速率限制器内部函数 ========== */
 
 static void openai_rl_init(openai_rate_limiter_t* rl) {
-    pthread_mutex_init(&rl->lock, NULL);
+    agentos_mutex_init(&rl->lock);
     rl->rpm_window_start = time(NULL);
     rl->rpm_count = 0;
     rl->rpm_limit = OPENAI_DEFAULT_RPM;
@@ -79,12 +78,12 @@ static void openai_rl_init(openai_rate_limiter_t* rl) {
 }
 
 static void openai_rl_destroy(openai_rate_limiter_t* rl) {
-    pthread_mutex_destroy(&rl->lock);
+    agentos_mutex_destroy(&rl->lock);
 }
 
 static int openai_rl_check_rpm(openai_rate_limiter_t* rl) {
     time_t now = time(NULL);
-    pthread_mutex_lock(&rl->lock);
+    agentos_mutex_lock(&rl->lock);
 
     if (now - rl->rpm_window_start >= 60) {
         rl->rpm_count = 0;
@@ -92,18 +91,18 @@ static int openai_rl_check_rpm(openai_rate_limiter_t* rl) {
     }
 
     if (rl->rpm_count >= rl->rpm_limit) {
-        pthread_mutex_unlock(&rl->lock);
+        agentos_mutex_unlock(&rl->lock);
         return -1;
     }
 
     rl->rpm_count++;
-    pthread_mutex_unlock(&rl->lock);
+    agentos_mutex_unlock(&rl->lock);
     return 0;
 }
 
 static int __attribute__((unused)) openai_rl_check_tpm(openai_rate_limiter_t* rl, int tokens) {
     time_t now = time(NULL);
-    pthread_mutex_lock(&rl->lock);
+    agentos_mutex_lock(&rl->lock);
 
     if (now - rl->tpm_window_start >= 60) {
         rl->tpm_count = 0;
@@ -111,18 +110,18 @@ static int __attribute__((unused)) openai_rl_check_tpm(openai_rate_limiter_t* rl
     }
 
     if (rl->tpm_count + tokens > rl->tpm_limit) {
-        pthread_mutex_unlock(&rl->lock);
+        agentos_mutex_unlock(&rl->lock);
         return -1;
     }
 
     rl->tpm_count += tokens;
-    pthread_mutex_unlock(&rl->lock);
+    agentos_mutex_unlock(&rl->lock);
     return 0;
 }
 
 static void openai_rl_record_429(openai_rate_limiter_t* rl, int retry_after) {
     time_t now = time(NULL);
-    pthread_mutex_lock(&rl->lock);
+    agentos_mutex_lock(&rl->lock);
 
     rl->last_429_time = now;
     rl->consecutive_429s++;
@@ -132,11 +131,11 @@ static void openai_rl_record_429(openai_rate_limiter_t* rl, int retry_after) {
         rl->retry_after_sec = 0;
     }
 
-    pthread_mutex_unlock(&rl->lock);
+    agentos_mutex_unlock(&rl->lock);
 }
 
 static int openai_rl_get_wait_ms(openai_rate_limiter_t* rl, int attempt) {
-    pthread_mutex_lock(&rl->lock);
+    agentos_mutex_lock(&rl->lock);
 
     int wait_ms;
 
@@ -151,15 +150,15 @@ static int openai_rl_get_wait_ms(openai_rate_limiter_t* rl, int attempt) {
         wait_ms = (int)((double)base_delay + jitter);
     }
 
-    pthread_mutex_unlock(&rl->lock);
+    agentos_mutex_unlock(&rl->lock);
     return wait_ms;
 }
 
 static void openai_rl_reset_429(openai_rate_limiter_t* rl) {
-    pthread_mutex_lock(&rl->lock);
+    agentos_mutex_lock(&rl->lock);
     rl->consecutive_429s = 0;
     rl->retry_after_sec = 0;
-    pthread_mutex_unlock(&rl->lock);
+    agentos_mutex_unlock(&rl->lock);
 }
 
 /* ========== HTTP 429 Retry-After 解析 ========== */

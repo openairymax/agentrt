@@ -6,7 +6,7 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * v3.0 变更：
- * - CROSS-01: agentos_platform_mutex_t → agentos_mutex_t
+ * - CROSS-01: agentos_mutex_t → agentos_mutex_t
  * - CROSS-03: time(NULL) → agentos_time_ns()
  * - 新增 auto-checkpoint hook 机制（CoreLoopThree 集成）
  * - 增强 JSON restore 解析健壮性
