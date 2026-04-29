@@ -275,7 +275,7 @@ int svc_logger_set_level(int level)
     log_level_t new_level = convert_old_level_to_new(level);
     
     /* 映射到新架构的全局级别设置 */
-    log_set_global_level(new_level);
+    log_set_level(new_level);
     LOG_INFO("Service logger level set to %d via compatibility layer", level);
     
     return 0;
