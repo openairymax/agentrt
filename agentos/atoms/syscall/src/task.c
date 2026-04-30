@@ -120,7 +120,7 @@ static int* kahn_algorithm(cJSON* name_to_idx, int* indeg, agentos_task_plan_t* 
 }
 
 /**
- * 拓扑排序：根据依赖关系返回可执行的任务顺序（简单实现，假设无环）
+ * 拓扑排序：根据依赖关系返回可执行的任务顺序（假设任务图无环）
  * 返回节点索引数组，需调用者释放
  */
 static int* topological_sort(agentos_task_plan_t* plan, size_t* out_count) {

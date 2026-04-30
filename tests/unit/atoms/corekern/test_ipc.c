@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_ipc.c
  * @brief IPC 单元测试
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

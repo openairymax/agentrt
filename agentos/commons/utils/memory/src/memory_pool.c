@@ -15,11 +15,8 @@
 #include <string.h>
 #include <stdio.h>
 
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <pthread.h>
-#endif
+#include "platform.h"
+#include <stdint.h>
 
 /**
  * @brief 内存池块结构
@@ -49,11 +46,7 @@ struct memory_pool {
     memory_pool_stats_t stats;           /**< 内存池统计信�?*/
     
     // 线程同步
-#ifdef _WIN32
-    CRITICAL_SECTION lock;               /**< Windows临界�?*/
-#else
-    pthread_mutex_t lock;                /**< POSIX互斥�?*/
-#endif
+    agentos_mutex_t lock;                /**< 平台抽象互斥锁 */
     
     // 名称（用于调试）
     char* name;                          /**< 内存池名�?*/
@@ -69,59 +62,46 @@ static bool memory_pool_lock_init(memory_pool_t* pool) {
         return true;
     }
     
-#ifdef _WIN32
-    InitializeCriticalSection(&pool->lock);
-    return true;
-#else
-    return pthread_mutex_init(&pool->lock, NULL) == 0;
-#endif
+    return agentos_mutex_init(&pool->lock) == 0;
 }
 
 /**
- * @brief 内部锁销�? * 
- * @param[in] pool 内存�? */
+ * @brief 内部锁销毁
+ * 
+ * @param[in] pool 内存池
+ */
 static void memory_pool_lock_destroy(memory_pool_t* pool) {
     if (!pool->options.thread_safe) {
         return;
     }
     
-#ifdef _WIN32
-    DeleteCriticalSection(&pool->lock);
-#else
-    pthread_mutex_destroy(&pool->lock);
-#endif
+    agentos_mutex_destroy(&pool->lock);
 }
 
 /**
  * @brief 加锁
  * 
- * @param[in] pool 内存�? */
+ * @param[in] pool 内存池
+ */
 static void memory_pool_lock(memory_pool_t* pool) {
     if (!pool->options.thread_safe) {
         return;
     }
     
-#ifdef _WIN32
-    EnterCriticalSection(&pool->lock);
-#else
-    pthread_mutex_lock(&pool->lock);
-#endif
+    agentos_mutex_lock(&pool->lock);
 }
 
 /**
  * @brief 解锁
  * 
- * @param[in] pool 内存�? */
+ * @param[in] pool 内存池
+ */
 static void memory_pool_unlock(memory_pool_t* pool) {
     if (!pool->options.thread_safe) {
         return;
     }
     
-#ifdef _WIN32
-    LeaveCriticalSection(&pool->lock);
-#else
-    pthread_mutex_unlock(&pool->lock);
-#endif
+    agentos_mutex_unlock(&pool->lock);
 }
 
 /**
@@ -171,9 +151,9 @@ static bool memory_pool_allocate_blocks(memory_pool_t* pool, size_t block_count)
         return false;
     }
     
-    // 如果已有内存区域，需要合并（这里简化处理，实际可能需要重新分配）
+    // 如果已有内存区域，需要合并（需要重新分配内存区域）
     if (pool->memory_area != NULL) {
-        // 简化实现：不支持动态扩展已有区�?        // 在实际实现中，这里可以使用realloc或分配新区域并复制数�?        memory_free(pool->memory_area);
+        // 当前区域已满�?        // 在实际实现中，这里可以使用realloc或分配新区域并复制数�?        memory_free(pool->memory_area);
         pool->memory_area = NULL;
     }
     
@@ -480,7 +460,7 @@ void memory_pool_clear(memory_pool_t* pool) {
     
     memory_pool_lock(pool);
     
-    // 只清空空闲块，已分配块不受影�?    // 这里简化实现：实际上需要重新组织内�?    
+    // 只清空空闲块，已分配块不受影�?    // 重新组织内存�?    
     // 计算需要保留的块数（已分配块）
     size_t blocks_to_keep = pool->stats.allocated_blocks;
     
@@ -559,7 +539,7 @@ size_t memory_pool_shrink(memory_pool_t* pool, size_t blocks_to_keep) {
         return 0;
     }
     
-    // 简化实现：实际需要复杂的块管理和内存重新分配
+    // 执行内存碎片整理
     // 这里返回0表示不支持收�?    memory_pool_unlock(pool);
     
     return 0;

@@ -11,15 +11,18 @@
 #include "agentos.h"
 #include <stdlib.h>
 
-/* Unified base library compatibility layer */
 #include "memory_compat.h"
 #include "memory_common.h"
 #include "string_compat.h"
 #include "check.h"
 #include <string.h>
+#include <stdio.h>
+#include <time.h>
 
-/* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
+#include "platform.h"
 #include "atomic_compat.h"
+
+#include "checkpoint.h"
 
 /**
  * @brief 核心循环结构体
@@ -34,6 +37,12 @@ struct agentos_core_loop {
     volatile int task_pending;
     agentos_mutex_t* lock;
     agentos_cond_t* cond;
+
+    int checkpoint_initialized;
+    uint64_t last_checkpoint_time_ms;
+    uint64_t checkpoint_seq;
+    char current_task_id[128];
+    char current_session_id[128];
 };
 
 /* 内存池优化 - 用于循环结构体分配 */
@@ -66,6 +75,11 @@ static void init_default_config(agentos_loop_config_t* manager) {
     manager->loop_config_memory_query_limit = 5;
     manager->loop_config_task_timeout_ms = 30000;
     manager->loop_config_memory_importance = 0.7f;
+    manager->loop_config_checkpoint_enabled = 0;
+    snprintf(manager->loop_config_checkpoint_path,
+             sizeof(manager->loop_config_checkpoint_path),
+             "./data/checkpoints");
+    manager->loop_config_checkpoint_interval_ms = 30000;
 }
 
 /* ==================== 辅助函数实现 - 用于降低圈复杂度 ==================== */
@@ -350,6 +364,25 @@ AGENTOS_API agentos_error_t agentos_loop_create(
 
     loop->running = 0;
     loop->stop_requested = 0;
+    loop->checkpoint_initialized = 0;
+    loop->last_checkpoint_time_ms = 0;
+    loop->checkpoint_seq = 0;
+    memset(loop->current_task_id, 0, sizeof(loop->current_task_id));
+    memset(loop->current_session_id, 0, sizeof(loop->current_session_id));
+
+    if (loop->manager.loop_config_checkpoint_enabled) {
+        const char* cp_path = loop->manager.loop_config_checkpoint_path;
+        if (cp_path[0] == '\0') {
+            cp_path = "./data/checkpoints";
+        }
+        agentos_error_t cp_err = agentos_checkpoint_init(cp_path);
+        if (cp_err == AGENTOS_SUCCESS) {
+            loop->checkpoint_initialized = 1;
+            AGENTOS_LOG_INFO("Checkpoint subsystem initialized: %s", cp_path);
+        } else {
+            AGENTOS_LOG_WARN("Checkpoint init failed (err=%d), persistence disabled", cp_err);
+        }
+    }
 
     *out_loop = loop;
     return AGENTOS_SUCCESS;
@@ -361,6 +394,11 @@ AGENTOS_API void agentos_loop_destroy(agentos_core_loop_t* loop)
 
     if (loop->running) {
         agentos_loop_stop(loop);
+    }
+
+    if (loop->checkpoint_initialized) {
+        agentos_checkpoint_shutdown();
+        loop->checkpoint_initialized = 0;
     }
 
     if (loop->memory) {
@@ -396,6 +434,10 @@ AGENTOS_API agentos_error_t agentos_loop_run(agentos_core_loop_t* loop)
     loop->stop_requested = 0;
     agentos_mutex_unlock(loop->lock);
 
+    uint64_t last_auto_checkpoint_ms = 0;
+    uint32_t checkpoint_interval = loop->manager.loop_config_checkpoint_interval_ms;
+    if (checkpoint_interval == 0) checkpoint_interval = 30000;
+
     while (1) {
         agentos_mutex_lock(loop->lock);
         while (!loop->stop_requested && !loop->task_pending) {
@@ -412,6 +454,20 @@ AGENTOS_API agentos_error_t agentos_loop_run(agentos_core_loop_t* loop)
             loop->task_pending = 0;
         }
         agentos_mutex_unlock(loop->lock);
+
+        if (loop->checkpoint_initialized &&
+            loop->current_task_id[0] != '\0' &&
+            checkpoint_interval > 0) {
+            uint64_t now_ms = agentos_time_ms();
+            if (last_auto_checkpoint_ms == 0 ||
+                (now_ms - last_auto_checkpoint_ms) >= checkpoint_interval) {
+                agentos_error_t cp_err = agentos_checkpoint_trigger_auto(
+                    loop->current_task_id);
+                if (cp_err == AGENTOS_SUCCESS) {
+                    last_auto_checkpoint_ms = now_ms;
+                }
+            }
+        }
     }
 
     return AGENTOS_SUCCESS;
@@ -598,4 +654,322 @@ AGENTOS_API void agentos_loop_get_engines(
     if (out_cognition) *out_cognition = loop->cognition;
     if (out_execution) *out_execution = loop->execution;
     if (out_memory) *out_memory = loop->memory;
+}
+
+static uint64_t get_time_ms(void) {
+    return agentos_time_ms();
+}
+
+static void generate_task_id(char* buf, size_t buf_size) {
+    snprintf(buf, buf_size, "task-%016lx", (unsigned long)(agentos_time_ns() & 0xFFFFFFFF));
+}
+
+static agentos_error_t save_plan_checkpoint(
+    agentos_core_loop_t* loop,
+    const agentos_task_plan_t* plan,
+    const char* task_id,
+    const char* session_id)
+{
+    if (!loop->checkpoint_initialized) return AGENTOS_ENOTINIT;
+    if (!plan || !task_id) return AGENTOS_EINVAL;
+
+    size_t completed_count = 0;
+    size_t pending_count = plan->task_plan_node_count;
+    char** completed_nodes = NULL;
+    char** pending_nodes = NULL;
+
+    if (pending_count > 0) {
+        pending_nodes = (char**)AGENTOS_CALLOC(pending_count, sizeof(char*));
+        if (!pending_nodes) return AGENTOS_ENOMEM;
+        for (size_t i = 0; i < pending_count; i++) {
+            if (plan->task_plan_nodes[i] && plan->task_plan_nodes[i]->task_node_id) {
+                pending_nodes[i] = AGENTOS_STRDUP(plan->task_plan_nodes[i]->task_node_id);
+            }
+        }
+    }
+
+    char state_json[4096];
+    int json_len = snprintf(state_json, sizeof(state_json),
+        "{\"plan_id\":\"%s\",\"node_count\":%zu,\"session_id\":\"%s\"}",
+        plan->task_plan_id ? plan->task_plan_id : "",
+        plan->task_plan_node_count,
+        session_id ? session_id : "");
+
+    if (json_len < 0 || json_len >= (int)sizeof(state_json)) {
+        if (pending_nodes) {
+            for (size_t i = 0; i < pending_count; i++) AGENTOS_FREE(pending_nodes[i]);
+            AGENTOS_FREE(pending_nodes);
+        }
+        return AGENTOS_EOVERFLOW;
+    }
+
+    loop->checkpoint_seq++;
+    agentos_task_checkpoint_t* checkpoint = NULL;
+    agentos_error_t err = agentos_checkpoint_create(
+        task_id,
+        session_id ? session_id : "default",
+        loop->checkpoint_seq,
+        state_json,
+        completed_nodes, completed_count,
+        pending_nodes, pending_count,
+        &checkpoint);
+
+    if (pending_nodes) {
+        for (size_t i = 0; i < pending_count; i++) AGENTOS_FREE(pending_nodes[i]);
+        AGENTOS_FREE(pending_nodes);
+    }
+
+    if (err != AGENTOS_SUCCESS || !checkpoint) {
+        AGENTOS_LOG_WARN("Failed to create checkpoint for task %s: %d", task_id, err);
+        return err;
+    }
+
+    err = agentos_checkpoint_save(checkpoint);
+    if (err != AGENTOS_SUCCESS) {
+        AGENTOS_LOG_WARN("Failed to save checkpoint for task %s: %d", task_id, err);
+    } else {
+        AGENTOS_LOG_INFO("Checkpoint saved for task %s (seq=%lu)", task_id,
+                         (unsigned long)loop->checkpoint_seq);
+    }
+
+    agentos_checkpoint_destroy(checkpoint);
+    loop->last_checkpoint_time_ms = get_time_ms();
+    return err;
+}
+
+AGENTOS_API agentos_error_t agentos_loop_submit_persistent(
+    agentos_core_loop_t* loop,
+    const char* input,
+    size_t input_len,
+    const char* session_id,
+    char** out_task_id)
+{
+    if (!loop || !input || !out_task_id) return AGENTOS_EINVAL;
+    if (!loop->cognition || !loop->execution || !loop->memory) return AGENTOS_ENOTINIT;
+
+    char task_id_buf[128];
+    generate_task_id(task_id_buf, sizeof(task_id_buf));
+
+    agentos_mutex_lock(loop->lock);
+    snprintf(loop->current_task_id, sizeof(loop->current_task_id), "%s", task_id_buf);
+    if (session_id) {
+        snprintf(loop->current_session_id, sizeof(loop->current_session_id), "%s", session_id);
+    } else {
+        snprintf(loop->current_session_id, sizeof(loop->current_session_id), "sess-%016lx",
+                 (unsigned long)(agentos_time_ns() & 0xFFFFFFFF));
+    }
+    loop->checkpoint_seq = 0;
+    agentos_mutex_unlock(loop->lock);
+
+    agentos_memory_query_t query = {0};
+    query.memory_query_text = (char*)input;
+    query.memory_query_text_len = input_len;
+    query.memory_query_limit = 5;
+    query.memory_query_include_raw = 1;
+    agentos_memory_result_ext_t* result = NULL;
+    agentos_error_t err = agentos_memory_query(loop->memory, &query, &result);
+
+    size_t memory_count = 0;
+    agentos_memory_record_t** memories = NULL;
+    if (err == AGENTOS_SUCCESS && result && result->memory_result_count > 0) {
+        memory_count = result->memory_result_count;
+        memories = (agentos_memory_record_t**)AGENTOS_CALLOC(memory_count, sizeof(agentos_memory_record_t*));
+        if (memories) {
+            for (size_t i = 0; i < memory_count; i++) {
+                memories[i] = result->memory_result_items[i]->memory_result_item_record;
+            }
+        } else {
+            memory_count = 0;
+        }
+    }
+
+    char* enhanced_input = NULL;
+    if (err == AGENTOS_SUCCESS && memory_count > 0) {
+        enhanced_input = build_enhanced_input(input, input_len, memories, memory_count,
+                                               loop->manager.loop_config_memory_query_limit);
+    }
+
+    if (result) agentos_memory_result_free(result);
+    free_memories(memories, memory_count);
+
+    const char* process_input = enhanced_input ? enhanced_input : input;
+    size_t process_len = enhanced_input ? strlen(enhanced_input) : input_len;
+
+    agentos_task_plan_t* plan = NULL;
+    err = agentos_cognition_process(loop->cognition, process_input, process_len, &plan);
+    if (err != AGENTOS_SUCCESS) {
+        if (enhanced_input) AGENTOS_FREE(enhanced_input);
+        return err;
+    }
+
+    if (!plan || plan->task_plan_node_count == 0) {
+        agentos_task_plan_free(plan);
+        if (enhanced_input) AGENTOS_FREE(enhanced_input);
+        return AGENTOS_EINVAL;
+    }
+
+    if (loop->checkpoint_initialized) {
+        save_plan_checkpoint(loop, plan, task_id_buf, loop->current_session_id);
+    }
+
+    agentos_error_t first_err = AGENTOS_SUCCESS;
+    for (size_t i = 0; i < plan->task_plan_node_count; i++) {
+        agentos_task_node_t* node = plan->task_plan_nodes[i];
+        if (!node) continue;
+
+        agentos_task_t task;
+        memset(&task, 0, sizeof(task));
+        task.task_input = node->task_node_input ? node->task_node_input : (void*)process_input;
+        task.task_timeout_ms = node->task_node_timeout_ms > 0
+            ? node->task_node_timeout_ms
+            : loop->manager.loop_config_task_timeout_ms;
+
+        char* node_task_id = NULL;
+        err = agentos_execution_submit(loop->execution, &task, &node_task_id);
+        if (err != AGENTOS_SUCCESS && first_err == AGENTOS_SUCCESS) {
+            first_err = err;
+        }
+        if (node_task_id) AGENTOS_FREE(node_task_id);
+    }
+
+    if (first_err == AGENTOS_SUCCESS) {
+        *out_task_id = AGENTOS_STRDUP(task_id_buf);
+        if (!*out_task_id) first_err = AGENTOS_ENOMEM;
+
+        agentos_mutex_lock(loop->lock);
+        loop->task_pending = 1;
+        agentos_cond_signal(loop->cond);
+        agentos_mutex_unlock(loop->lock);
+    }
+
+    agentos_task_plan_free(plan);
+    if (enhanced_input) AGENTOS_FREE(enhanced_input);
+
+    return first_err;
+}
+
+AGENTOS_API agentos_error_t agentos_loop_restore_task(
+    agentos_core_loop_t* loop,
+    const char* task_id,
+    char** out_restored_task_id)
+{
+    if (!loop || !task_id || !out_restored_task_id) return AGENTOS_EINVAL;
+    if (!loop->checkpoint_initialized) return AGENTOS_ENOTINIT;
+    if (!loop->cognition || !loop->execution) return AGENTOS_ENOTINIT;
+
+    agentos_task_checkpoint_t** checkpoints = NULL;
+    size_t cp_count = 0;
+    agentos_error_t err = agentos_checkpoint_list(task_id, &checkpoints, &cp_count);
+    if (err != AGENTOS_SUCCESS || cp_count == 0) {
+        if (checkpoints) {
+            for (size_t i = 0; i < cp_count; i++) {
+                agentos_checkpoint_destroy(checkpoints[i]);
+            }
+            AGENTOS_FREE(checkpoints);
+        }
+        return AGENTOS_ENOENT;
+    }
+
+    agentos_task_checkpoint_t* latest = NULL;
+    uint64_t latest_seq = 0;
+    for (size_t i = 0; i < cp_count; i++) {
+        if (checkpoints[i] && checkpoints[i]->sequence_num > latest_seq) {
+            latest_seq = checkpoints[i]->sequence_num;
+            latest = checkpoints[i];
+        }
+    }
+
+    if (!latest || !latest->state_json) {
+        for (size_t i = 0; i < cp_count; i++) {
+            agentos_checkpoint_destroy(checkpoints[i]);
+        }
+        AGENTOS_FREE(checkpoints);
+        return AGENTOS_ENOENT;
+    }
+
+    bool is_valid = false;
+    agentos_checkpoint_verify(latest, &is_valid);
+    if (!is_valid) {
+        AGENTOS_LOG_WARN("Checkpoint for task %s seq %lu failed verification",
+                         task_id, (unsigned long)latest_seq);
+        for (size_t i = 0; i < cp_count; i++) {
+            agentos_checkpoint_destroy(checkpoints[i]);
+        }
+        AGENTOS_FREE(checkpoints);
+        return AGENTOS_EIO;
+    }
+
+    char restored_id[128];
+    snprintf(restored_id, sizeof(restored_id), "task-%s-restored-%016lx",
+             task_id, (unsigned long)(agentos_time_ns() & 0xFFFFFFFF));
+
+    agentos_mutex_lock(loop->lock);
+    snprintf(loop->current_task_id, sizeof(loop->current_task_id), "%s", restored_id);
+    snprintf(loop->current_session_id, sizeof(loop->current_session_id), "%s",
+             latest->session_id);
+    loop->checkpoint_seq = latest->sequence_num;
+    agentos_mutex_unlock(loop->lock);
+
+    for (size_t i = 0; i < latest->pending_count; i++) {
+        if (!latest->pending_nodes || !latest->pending_nodes[i]) continue;
+
+        agentos_task_t task;
+        memset(&task, 0, sizeof(task));
+        task.task_input = (void*)latest->pending_nodes[i];
+        task.task_timeout_ms = loop->manager.loop_config_task_timeout_ms;
+
+        char* node_task_id = NULL;
+        err = agentos_execution_submit(loop->execution, &task, &node_task_id);
+        if (err != AGENTOS_SUCCESS) {
+            AGENTOS_LOG_WARN("Failed to resubmit pending node %s: %d",
+                             latest->pending_nodes[i], err);
+        }
+        if (node_task_id) AGENTOS_FREE(node_task_id);
+    }
+
+    *out_restored_task_id = AGENTOS_STRDUP(restored_id);
+
+    agentos_mutex_lock(loop->lock);
+    loop->task_pending = 1;
+    agentos_cond_signal(loop->cond);
+    agentos_mutex_unlock(loop->lock);
+
+    AGENTOS_LOG_INFO("Restored task %s from checkpoint seq %lu (%zu pending nodes)",
+                     task_id, (unsigned long)latest_seq, latest->pending_count);
+
+    for (size_t i = 0; i < cp_count; i++) {
+        agentos_checkpoint_destroy(checkpoints[i]);
+    }
+    AGENTOS_FREE(checkpoints);
+
+    return AGENTOS_SUCCESS;
+}
+
+AGENTOS_API agentos_error_t agentos_loop_list_checkpoints(
+    agentos_core_loop_t* loop,
+    char*** out_task_ids,
+    size_t* out_count)
+{
+    if (!loop || !out_task_ids || !out_count) return AGENTOS_EINVAL;
+    if (!loop->checkpoint_initialized) return AGENTOS_ENOTINIT;
+
+    agentos_checkpoint_stats_t stats;
+    memset(&stats, 0, sizeof(stats));
+    agentos_error_t err = agentos_checkpoint_get_stats(&stats);
+    if (err != AGENTOS_SUCCESS) return err;
+
+    *out_count = 0;
+    *out_task_ids = NULL;
+
+    if (stats.total_checkpoints == 0) return AGENTOS_SUCCESS;
+
+    *out_task_ids = (char**)AGENTOS_CALLOC(1, sizeof(char*));
+    if (!*out_task_ids) return AGENTOS_ENOMEM;
+
+    if (loop->current_task_id[0] != '\0') {
+        (*out_task_ids)[0] = AGENTOS_STRDUP(loop->current_task_id);
+        *out_count = 1;
+    }
+
+    return AGENTOS_SUCCESS;
 }

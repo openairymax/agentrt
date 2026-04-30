@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @file a2a_v03_adapter.c
  * @brief A2A (Agent-to-Agent) Protocol v0.3 Adapter Implementation

@@ -13,6 +13,7 @@
 #include "string_compat.h"
 #include <string.h>
 #include <cjson/cJSON.h>
+#include <stdint.h>
 
 typedef struct metric_counter {
     char* name;

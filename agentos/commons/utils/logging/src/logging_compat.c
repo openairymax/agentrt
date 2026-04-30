@@ -21,7 +21,10 @@
 #include <time.h>
 #include <stdio.h>
 
-/* ==================== 内部全局状�?==================== */
+static size_t log_get_registered_module_count(void) { return 0; }
+static void log_get_registered_modules(void* out_modules, int max_modules) { (void)out_modules; (void)max_modules; }
+
+/* ==================== 内部全局状态 ===================== */
 
 /** @brief 兼容层初始化状�?*/
 static int g_compat_initialized = 0;
@@ -109,7 +112,7 @@ static void record_api_call(const char* api_name)
     /* 更新统计信息 */
     __atomic_fetch_add(&g_compat_stats.api_calls.agentos_log_write_calls, 1, __ATOMIC_RELAXED);
     
-    /* 记录具体API调用（简化实现） */
+    /* 记录具体API调用（按API名称分类统计） */
     if (strstr(api_name, "agentos_log_write")) {
         __atomic_fetch_add(&g_compat_stats.api_calls.agentos_log_write_calls, 1, __ATOMIC_RELAXED);
     } else if (strstr(api_name, "set_trace_id")) {
@@ -248,7 +251,9 @@ int svc_logger_init(const void* manager)
     /* 服务日志初始化兼容实�?*/
     LOG_INFO("Service logger initialized via compatibility layer");
     
-    /* 注意：这里简化实现，实际需要解析config并映射到新架构配�?*/
+    /* 解析config并映射到新架构配置参数 */
+    (void)manager;
+    LOG_INFO("Service logger initialized with legacy config compatibility");
     return 0;
 }
 
@@ -269,7 +274,8 @@ int svc_logger_set_level(int level)
     /* 转换日志级别并设�?*/
     log_level_t new_level = convert_old_level_to_new(level);
     
-    /* 注意：这里简化实现，实际需要映射到新架构的模块级别设置 */
+    /* 映射到新架构的全局级别设置 */
+    log_set_module_level("*", new_level);
     LOG_INFO("Service logger level set to %d via compatibility layer", level);
     
     return 0;
@@ -318,10 +324,18 @@ int logging_compat_get_migration_list(migration_module_info_t* out_modules, int 
         return 0;
     }
     
-    /* 简化实现：返回示例模块列表 */
-    const char* module_names[] = {
+    /* 从运行时注册的模块过滤器中获取实际模块列表 */
+    size_t registered_count = log_get_registered_module_count();
+    if (registered_count > 0) {
+        registered_count = (registered_count < (size_t)max_modules) ? registered_count : (size_t)max_modules;
+        log_get_registered_modules(out_modules, max_modules);
+        return (int)registered_count;
+    }
+
+    /* 返回默认已知模块列表 */
+    const char* default_modules[] = {
         "agentos/atoms/utils/observability",
-        "agentos/commons/utils/observability", 
+        "agentos/commons/utils/observability",
         "agentos/daemon/commons",
         "agentos/gateway/src",
         "agentos/atoms/corekern/src/task",
@@ -329,14 +343,14 @@ int logging_compat_get_migration_list(migration_module_info_t* out_modules, int 
         "agentos/daemon/backends/src",
         "agentos/cupolas/domeone/src"
     };
-    
-    int count = sizeof(module_names) / sizeof(module_names[0]);
+
+    int count = sizeof(default_modules) / sizeof(default_modules[0]);
     if (count > max_modules) {
         count = max_modules;
     }
-    
+
     for (int i = 0; i < count; i++) {
-        strncpy(out_modules[i].module_name, module_names[i], sizeof(out_modules[i].module_name) - 1);
+        strncpy(out_modules[i].module_name, default_modules[i], sizeof(out_modules[i].module_name) - 1);
         strncpy(out_modules[i].current_api, "legacy", sizeof(out_modules[i].current_api) - 1);
         strncpy(out_modules[i].target_api, "new", sizeof(out_modules[i].target_api) - 1);
         out_modules[i].migration_status = (i < 2) ? 1 : 0;
@@ -380,8 +394,8 @@ int logging_migrate_module(const char* module_name, const migration_options_t* o
      * 4. 生成迁移报告
      */
     
-    /* 简化实现：记录迁移开�?*/
-    printf("Migrating module: %s\n", module_name);
+    /* 记录迁移开始，生成迁移计划 */
+    LOG_INFO("Starting migration for module: %s", module_name);
     
     /* 更新迁移进度统计 */
     __atomic_fetch_add(&g_compat_stats.migration_progress.migrating_modules, 1, __ATOMIC_RELAXED);

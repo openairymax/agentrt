@@ -135,10 +135,12 @@ target_include_directories(agentos_taskflow PRIVATE
 if(BUILD_TESTS)
     add_executable(test_taskflow_advanced
         tests/unit/test_taskflow_advanced.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit/test_cl3_stubs.c
     )
 
     target_include_directories(test_taskflow_advanced PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../coreloopthree/tests/unit
         ${TASKFLOW_COMMONS_MEMORY_INCLUDE}
     )
 

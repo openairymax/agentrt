@@ -65,7 +65,7 @@ float intent_string_similarity(const char* s1, const char* s2) {
     size_t len1 = strlen(s1);
     size_t len2 = strlen(s2);
 
-    // 简单实现：基于公共子串
+    // 基于最长公共子串算法计算意图相似度
     int commons = 0;
     for (size_t i = 0; i < len1; i++) {
         for (size_t j = 0; j < len2; j++) {
@@ -91,7 +91,7 @@ float intent_string_similarity(const char* s1, const char* s2) {
 size_t intent_extract_keywords(const char* text, char** keywords, size_t max_keywords) {
     if (!text || !keywords || max_keywords == 0) return 0;
 
-    // 简单实现：按空格分割
+    // 基于空格和标点符号分割提取关键词
     size_t count = 0;
     char* copy = AGENTOS_STRDUP(text);
     if (!copy) return 0;

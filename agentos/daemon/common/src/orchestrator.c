@@ -285,7 +285,7 @@ static task_entry_t* find_or_create_task(orchestrator_t* orch,
 }
 
 static ipc_service_bus_t g_orch_bus = NULL;
-static agentos_platform_mutex_t g_orch_bus_mutex;
+static agentos_mutex_t g_orch_bus_mutex;
 static int g_orch_bus_mutex_initialized = 0;
 
 static char* memory_query_context(agentos_memoryrov_handle_t* mem, const char* query, uint32_t limit) {
@@ -391,18 +391,18 @@ static char* memory_retrieve_for_generation(agentos_memoryrov_handle_t* mem, con
 static char* call_llm_service(const char* prompt, const char* system_role) {
     if (!prompt) return NULL;
 
-    pthread_mutex_lock(&g_orch_bus_mutex);
+    agentos_mutex_lock(&g_orch_bus_mutex);
     if (!g_orch_bus) {
         g_orch_bus = ipc_service_bus_create("orchestrator_bus", NULL);
         if (!g_orch_bus) {
-            pthread_mutex_unlock(&g_orch_bus_mutex);
+            agentos_mutex_unlock(&g_orch_bus_mutex);
             SVC_LOG_WARN("orchestrator: IPC bus creation failed, using local fallback");
             return NULL;
         }
         ipc_service_bus_start(g_orch_bus);
     }
     ipc_service_bus_t bus = g_orch_bus;
-    pthread_mutex_unlock(&g_orch_bus_mutex);
+    agentos_mutex_unlock(&g_orch_bus_mutex);
 
     char params[4096];
     if (system_role) {
@@ -567,7 +567,7 @@ static char* extract_field_string(const char* json, const char* field) {
 
 static float align_history[ORCH_ALIGN_HISTORY_SIZE];
 static int align_history_count = 0;
-static agentos_platform_mutex_t g_align_mutex;
+static agentos_mutex_t g_align_mutex;
 static int g_align_mutex_initialized = 0;
 
 static int execute_single_phase(orchestrator_t* orch,
@@ -1211,11 +1211,11 @@ static int execute_single_phase(orchestrator_t* orch,
                 float overall = logic_score * 0.30f + fact_score * 0.35f + goal_score * 0.35f;
 
                 if (!g_align_mutex_initialized) {
-                    agentos_platform_mutex_init(&g_align_mutex);
+                    agentos_mutex_init(&g_align_mutex);
                     g_align_mutex_initialized = 1;
                 }
 
-                agentos_platform_mutex_lock(&g_align_mutex);
+                agentos_mutex_lock(&g_align_mutex);
                 if (align_history_count < ORCH_ALIGN_HISTORY_SIZE) {
                     align_history[align_history_count++] = overall;
                 } else {
@@ -1236,7 +1236,7 @@ static int execute_single_phase(orchestrator_t* orch,
                         SVC_LOG_WARN("orchestrator: alignment drift detected (%.3f)", drift_value);
                     }
                 }
-                agentos_platform_mutex_unlock(&g_align_mutex);
+                agentos_mutex_unlock(&g_align_mutex);
 
                 bool aligned = (overall >= 0.6f) && !drift_detected;
 

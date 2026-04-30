@@ -44,6 +44,9 @@ typedef struct agentos_loop_config {
     agentos_plan_strategy_t* loop_config_plan_strategy;      /**< 规划策略（可选） */
     agentos_coordinator_strategy_t* loop_config_coord_strategy; /**< 协同策略（可选） */
     agentos_dispatching_strategy_t* loop_config_disp_strategy; /**< 调度策略（可选） */
+    uint32_t loop_config_checkpoint_enabled;        /**< Checkpoint启用标志（0禁用，1启用） */
+    char     loop_config_checkpoint_path[256];       /**< Checkpoint存储路径 */
+    uint32_t loop_config_checkpoint_interval_ms;    /**< Checkpoint保存间隔（毫秒，默认30000） */
 } agentos_loop_config_t;
 
 /**
@@ -156,6 +159,68 @@ AGENTOS_API void agentos_loop_get_engines(
     agentos_cognition_engine_t** out_cognition,
     agentos_execution_engine_t** out_execution,
     agentos_memory_engine_t** out_memory);
+
+/**
+ * @brief 提交持久化长任务（带检查点恢复能力）
+ *
+ * 与 agentos_loop_submit 不同，此函数在任务计划生成后自动保存检查点，
+ * 确保长任务在进程崩溃或重启后可从最近检查点恢复。
+ *
+ * @param loop [in] 循环句柄（非NULL）
+ * @param input [in] 输入字符串（非NULL）
+ * @param input_len [in] 输入长度
+ * @param session_id [in] 会话ID（可为NULL，自动生成）
+ * @param out_task_id [out] 输出任务ID（调用者负责释放）
+ * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
+ *
+ * @ownership out_task_id 由调用者负责释放
+ * @threadsafe 是（内部使用互斥锁保护）
+ * @reentrant 否
+ * @see agentos_loop_restore_task()
+ */
+AGENTOS_API agentos_error_t agentos_loop_submit_persistent(
+    agentos_core_loop_t* loop,
+    const char* input,
+    size_t input_len,
+    const char* session_id,
+    char** out_task_id);
+
+/**
+ * @brief 从检查点恢复长任务
+ *
+ * 查找指定任务的最新检查点，恢复任务状态并继续执行未完成的节点。
+ *
+ * @param loop [in] 循环句柄（非NULL）
+ * @param task_id [in] 原任务ID（非NULL）
+ * @param out_restored_task_id [out] 输出恢复后的新任务ID（调用者负责释放）
+ * @return agentos_error_t AGENTOS_SUCCESS 恢复成功，AGENTOS_ENOENT 无检查点
+ *
+ * @ownership out_restored_task_id 由调用者负责释放
+ * @threadsafe 是（内部使用互斥锁保护）
+ * @reentrant 否
+ * @see agentos_loop_submit_persistent()
+ */
+AGENTOS_API agentos_error_t agentos_loop_restore_task(
+    agentos_core_loop_t* loop,
+    const char* task_id,
+    char** out_restored_task_id);
+
+/**
+ * @brief 列出可恢复的检查点任务
+ *
+ * @param loop [in] 循环句柄（非NULL）
+ * @param out_task_ids [out] 输出任务ID数组（调用者负责释放数组及每个元素）
+ * @param out_count [out] 输出数量
+ * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
+ *
+ * @ownership out_task_ids 由调用者负责释放
+ * @threadsafe 是
+ * @reentrant 否
+ */
+AGENTOS_API agentos_error_t agentos_loop_list_checkpoints(
+    agentos_core_loop_t* loop,
+    char*** out_task_ids,
+    size_t* out_count);
 
 #ifdef __cplusplus
 }
