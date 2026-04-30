@@ -29,6 +29,7 @@
 
 #ifndef _WIN32
 #include <unistd.h>
+#include <stdint.h>
 #endif
 
 #define MAX_SPANS 1024

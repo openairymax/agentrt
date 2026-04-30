@@ -153,8 +153,8 @@ static char* duplicate_string(const char* str) {
 
 /**
  * @brief 解析JSON配置
- * 
- * 简化JSON解析，实际实现应使用完整JSON解析库�? * 
+ *
+ * 使用cJSON库进行JSON配置解析。
  * @param data JSON数据
  * @param data_len 数据长度
  * @param ctx 配置上下�? * @return 错误�? */
@@ -226,8 +226,8 @@ static config_error_t parse_json_simple(const char* data, size_t data_len, confi
 
 /**
  * @brief 解析INI配置
- * 
- * 简化INI解析，支持基本的键值对�? * 
+ *
+ * 支持基本的键值对和节(section)解析。
  * @param data INI数据
  * @param data_len 数据长度
  * @param ctx 配置上下�? * @return 错误�? */

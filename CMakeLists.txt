@@ -5,6 +5,16 @@
 cmake_minimum_required(VERSION 3.20)
 project(AgentOS VERSION 1.0.0 LANGUAGES C CXX)
 
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
+    message(FATAL_ERROR
+        "AgentOS in-source builds are not allowed!\n"
+        "Please use an out-of-source build directory:\n"
+        "  mkdir -p ../AgentOS-build && cd ../AgentOS-build\n"
+        "  cmake ../AgentOS\n"
+        "See BUILD.md for details."
+    )
+endif()
+
 # 设置默认构建类型
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type (Debug|Release|RelWithDebInfo|MinSizeRel)" FORCE)

@@ -272,180 +272,117 @@ static void openai_record_latency(struct openai_enterprise_adapter_s* adapter,
         adapter->stats_latency_count++;
 }
 
+#ifdef AGENTOS_HAS_CURL
 typedef struct {
-    const char* keywords[8];
-    int keyword_count;
-    const char* prefix_templates[4];
-    int prefix_count;
-    const char* body_templates[6];
-    int body_count;
-    const char* suffix_templates[3];
-    int suffix_count;
-} openai_response_template_t;
+    char* data;
+    size_t size;
+} openai_curl_buffer_t;
 
-static const openai_response_template_t g_response_templates[] = {
-    {
-        {"hello", "hi", "hey", "greetings"}, 4,
-        {"Hello! ", "Hi there! ", "Greetings! ", "Welcome! "}, 4,
-        {"I'm AgentOS's AI assistant, ready to help you with your request.",
-         "I'm here to assist. What can I help you with today?",
-         "Thank you for reaching out. How may I be of service?",
-         "I'm operational and ready to support your needs.",
-         "Great to hear from you! Let me know how I can help.",
-         "At your service. What would you like to discuss?"}, 6,
-        {" Feel free to ask anything else.",
-         " Is there anything specific you'd like to explore?",
-         ""}, 3
-    },
-    {
-        {"help", "assist", "support", "how do", "how can", "how to"}, 6,
-        {"I'd be happy to help with that. ", "Let me assist you. ",
-         "Certainly! Here's what I can tell you: ", "Of course. "}, 4,
-        {"Based on my analysis, here are the key points to consider.",
-         "Let me break this down into manageable steps for you.",
-         "Here's a structured approach to address your question.",
-         "I've processed your request and here's my assessment.",
-         "From what I understand, here's my recommendation.",
-         "Allow me to provide a comprehensive answer."}, 6,
-        {" Let me know if you need more details on any point.",
-         " Would you like me to elaborate on any aspect?",
-         " I hope this helps clarify things for you."}, 3
-    },
-    {
-        {"error", "bug", "issue", "problem", "fail", "crash", "broken"}, 7,
-        {"I understand you're experiencing an issue. ", "That sounds frustrating. ",
-         "Let me help troubleshoot that. ", "I see the problem you're describing. "}, 4,
-        {"Here are some diagnostic steps we can try.",
-         "Let me analyze the possible causes systematically.",
-         "Based on common patterns, here's what might be happening.",
-         "I recommend checking these areas first.",
-         "This appears to be a configuration or runtime issue.",
-         "Let me walk you through the debugging process."}, 6,
-        {" If these steps don't resolve it, please share more details.",
-         " Don't hesitate to provide error logs for deeper analysis.",
-         " We'll get this sorted out together."}, 3
-    },
-    {
-        {"code", "program", "function", "implement", "develop",
-         "api", "algorithm", "debug"}, 8,
-        {"Regarding your code question: ", "From a programming perspective: ",
-         "Let me address the technical details: ", "Here's the implementation approach: "}, 4,
-        {"The key consideration here is ensuring proper error handling and resource management.",
-         "I recommend following best practices for modularity and testability.",
-         "This pattern is well-suited for production environments with high reliability requirements.",
-         "The architecture should account for scalability and maintainability.",
-         "Here's how you can structure this for optimal performance.",
-         "Consider edge cases and boundary conditions in your implementation."}, 6,
-        {" Let me know if you need code examples or further clarification.",
-         " Happy to dive deeper into any technical aspect.",
-         " I'm available to review your approach in more detail."}, 3
-    },
-    {
-        {"what", "why", "explain", "describe", "tell me about", "define"}, 6,
-        {"Good question! ", "That's an important topic. ", "Excellent inquiry. ",
-         "Let me explain: "}, 4,
-        {"Here's a comprehensive overview based on current understanding.",
-         "There are several aspects worth considering in this context.",
-         "Let me provide both the conceptual framework and practical implications.",
-         "This involves multiple interconnected factors that I'll outline.",
-         "From a foundational perspective, here's what you need to know.",
-         "I'll cover the essential concepts and their relationships."}, 6,
-        {" Does this explanation address what you were looking for?",
-         " Would you like me to explore any related topics?",
-         " I'm happy to expand on any part of this."}, 3
-    },
-};
-
-static int openai_match_template(const char* user_msg) {
-    if (!user_msg || !*user_msg) return -1;
-    char lower[2048];
-    size_t len = strlen(user_msg);
-    if (len >= sizeof(lower)) len = sizeof(lower) - 1;
-    for (size_t i = 0; i < len; i++)
-        lower[i] = (char)tolower((unsigned char)user_msg[i]);
-    lower[len] = '\0';
-
-    int num_templates = (int)(sizeof(g_response_templates) /
-                              sizeof(g_response_templates[0]));
-    int best_match = -1;
-    int best_score = 0;
-
-    for (int t = 0; t < num_templates; t++) {
-        int score = 0;
-        for (int k = 0; k < g_response_templates[t].keyword_count; k++) {
-            if (strstr(lower, g_response_templates[t].keywords[k]))
-                score++;
-        }
-        if (score > best_score) {
-            best_score = score;
-            best_match = t;
-        }
-    }
-    return best_match;
+static size_t openai_curl_write_cb(void* ptr, size_t size, size_t nmemb, void* userdata) {
+    openai_curl_buffer_t* buf = (openai_curl_buffer_t*)userdata;
+    size_t total = size * nmemb;
+    char* new_data = (char*)realloc(buf->data, buf->size + total + 1);
+    if (!new_data) return 0;
+    buf->data = new_data;
+    memcpy(buf->data + buf->size, ptr, total);
+    buf->size += total;
+    buf->data[buf->size] = '\0';
+    return total;
 }
 
-static int openai_generate_response(const char* user_msg,
-                                    const char* system_context,
-                                    char* out_buffer,
-                                    size_t buffer_len) {
-    if (!out_buffer || buffer_len == 0) return -1;
+static int openai_api_call(const char* api_key, const char* base_url,
+                            const char* endpoint, const char* request_json,
+                            char* out_buf, size_t buf_len) {
+    if (!api_key || !request_json || !out_buf) return -1;
 
-    int tpl_idx = openai_match_template(user_msg);
-    const openai_response_template_t* tpl =
-        (tpl_idx >= 0) ? &g_response_templates[tpl_idx] : NULL;
+    CURL* curl = curl_easy_init();
+    if (!curl) return -1;
 
-    uint64_t msg_hash = openai_fnv1a_hash(user_msg);
-    int pos = 0;
+    openai_curl_buffer_t response_buf = { .data = NULL, .size = 0 };
 
-    if (tpl && tpl->prefix_count > 0) {
-        int pidx = (int)(msg_hash % (uint64_t)tpl->prefix_count);
-        pos += snprintf(out_buffer + pos, buffer_len - (size_t)pos,
-                        "%s", tpl->prefix_templates[pidx]);
+    char url[1024];
+    snprintf(url, sizeof(url), "%s%s",
+             base_url ? base_url : "https://api.openai.com/v1",
+             endpoint ? endpoint : "/chat/completions");
+
+    struct curl_slist* headers = NULL;
+    char auth_header[512];
+    snprintf(auth_header, sizeof(auth_header), "Authorization: Bearer %s", api_key);
+    headers = curl_slist_append(headers, auth_header);
+    headers = curl_slist_append(headers, "Content-Type: application/json");
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_POST, 1L);
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request_json);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, openai_curl_write_cb);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_buf);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+
+    CURLcode res = curl_easy_perform(curl);
+    long http_code = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK) {
+        free(response_buf.data);
+        return -1;
     }
 
-    if (tpl && tpl->body_count > 0) {
-        int bidx = (int)((msg_hash >> 8) % (uint64_t)tpl->body_count);
-        if (pos < (int)buffer_len - 1)
-            pos += snprintf(out_buffer + pos, buffer_len - (size_t)pos,
-                            "%s", tpl->body_templates[bidx]);
+    if (http_code == 200 && response_buf.data) {
+        size_t copy_len = response_buf.size;
+        if (copy_len >= buf_len) copy_len = buf_len - 1;
+        memcpy(out_buf, response_buf.data, copy_len);
+        out_buf[copy_len] = '\0';
+        free(response_buf.data);
+        return (int)copy_len;
     }
 
-    if (system_context && system_context[0] && pos < (int)buffer_len - 1) {
-        const char* ctx_prefix = "\n\nContext from your setup: ";
-        pos += snprintf(out_buffer + pos, buffer_len - (size_t)pos,
-                        "%s%.512s", ctx_prefix, system_context);
-    }
+    free(response_buf.data);
+    return -1;
+}
 
-    if (user_msg && user_msg[0]) {
-        const char* ref_prefix = "\n\nRegarding your message: \"";
-        size_t remaining = buffer_len - (size_t)pos;
-        if (remaining > 2) {
-            size_t quote_len = strlen(user_msg);
-            if (quote_len > 300) quote_len = 300;
-            pos += snprintf(out_buffer + pos, remaining,
-                            "%s%.300s\"", ref_prefix, user_msg);
+static int openai_parse_chat_response(const char* json_str,
+                                       char* content_out, size_t content_len,
+                                       openai_usage_t* usage) {
+    if (!json_str || !content_out) return -1;
+    cJSON* root = cJSON_Parse(json_str);
+    if (!root) return -2;
+
+    int result = -3;
+    cJSON* choices = cJSON_GetObjectItem(root, "choices");
+    if (choices && cJSON_IsArray(choices) && cJSON_GetArraySize(choices) > 0) {
+        cJSON* first = cJSON_GetArrayItem(choices, 0);
+        cJSON* message = cJSON_GetObjectItem(first, "message");
+        if (message) {
+            cJSON* content = cJSON_GetObjectItem(message, "content");
+            if (content && content->valuestring) {
+                strncpy(content_out, content->valuestring, content_len - 1);
+                content_out[content_len - 1] = '\0';
+                result = 0;
+            }
         }
     }
 
-    if (tpl && tpl->suffix_count > 0) {
-        int sidx = (int)((msg_hash >> 16) % (uint64_t)tpl->suffix_count);
-        if (pos < (int)buffer_len - 1)
-            pos += snprintf(out_buffer + pos, buffer_len - (size_t)pos,
-                            "%s", tpl->suffix_templates[sidx]);
+    if (usage) {
+        cJSON* usage_obj = cJSON_GetObjectItem(root, "usage");
+        if (usage_obj) {
+            cJSON* pt = cJSON_GetObjectItem(usage_obj, "prompt_tokens");
+            cJSON* ct = cJSON_GetObjectItem(usage_obj, "completion_tokens");
+            cJSON* tt = cJSON_GetObjectItem(usage_obj, "total_tokens");
+            usage->prompt_tokens = pt ? pt->valueint : 0;
+            usage->completion_tokens = ct ? ct->valueint : 0;
+            usage->total_tokens = tt ? tt->valueint : 0;
+        }
     }
 
-    if (pos == 0) {
-        pos = snprintf(out_buffer, buffer_len,
-                       "I've received your message and processed it through "
-                       "the AgentOS AI pipeline. Based on the content and "
-                       "context provided, I'm generating a relevant response "
-                       "tailored to your request. The system has analyzed "
-                       "your input and formulated this reply using adaptive "
-                       "response templates matched to your query patterns.");
-    }
-
-    return pos;
+    cJSON_Delete(root);
+    return result;
 }
+#endif
 
 static void openai_rate_window_rotate(struct openai_enterprise_adapter_s* adapter) {
     time_t now = time(NULL);
@@ -555,7 +492,6 @@ int openai_chat_completion(openai_handle_t handle,
     }
 
     memset(out_response, 0, sizeof(*out_response));
-
     strncpy(out_response->model,
             request->model ? request->model : "gpt-4o",
             sizeof(out_response->model) - 1);
@@ -564,68 +500,77 @@ int openai_chat_completion(openai_handle_t handle,
     struct timespec ts_start, ts_end;
     clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
-    const char* user_msg = "";
-    const char* system_ctx = "";
-    int msg_count = request->num_messages > 0 ?
-                    (int)request->num_messages : 1;
-    if (msg_count > 256) msg_count = 256;
+#ifndef AGENTOS_HAS_CURL
+    (void)request;
+    return -10;
+#else
+    if (!adapter->config.api_key || !adapter->config.api_key[0]) return -11;
 
-    if (msg_count > 0 && request->messages) {
-        for (int i = msg_count - 1; i >= 0; i--) {
-            if (request->messages[i].role == OPENAI_ROLE_USER) {
-                user_msg = request->messages[i].content ?
-                           request->messages[i].content : "";
-                break;
-            }
-            if (request->messages[i].role == OPENAI_ROLE_SYSTEM) {
-                system_ctx = request->messages[i].content ?
-                             request->messages[i].content : "";
-            }
+    cJSON* req_json = cJSON_CreateObject();
+    cJSON_AddStringToObject(req_json, "model",
+                            request->model ? request->model : "gpt-4o");
+    cJSON_AddNumberToObject(req_json, "max_tokens",
+                            request->max_tokens > 0 ? request->max_tokens : 4096);
+    cJSON_AddNumberToObject(req_json, "temperature",
+                            request->temperature >= 0 ? request->temperature : 0.7);
+
+    cJSON* msgs_arr = cJSON_CreateArray();
+    for (size_t i = 0; i < request->num_messages && i < 256; i++) {
+        cJSON* msg_obj = cJSON_CreateObject();
+        const char* role_str = "user";
+        switch (request->messages[i].role) {
+            case OPENAI_ROLE_SYSTEM: role_str = "system"; break;
+            case OPENAI_ROLE_ASSISTANT: role_str = "assistant"; break;
+            case OPENAI_ROLE_TOOL: role_str = "tool"; break;
+            case OPENAI_ROLE_FUNCTION: role_str = "function"; break;
+            default: break;
         }
+        cJSON_AddStringToObject(msg_obj, "role", role_str);
+        if (request->messages[i].content)
+            cJSON_AddStringToObject(msg_obj, "content", request->messages[i].content);
+        cJSON_AddItemToArray(msgs_arr, msg_obj);
     }
+    cJSON_AddItemToObject(req_json, "messages", msgs_arr);
 
-    size_t content_len = OPENAI_MAX_RESPONSE_LEN;
-    char* content = malloc(content_len);
-    if (!content) return -3;
+    char* req_str = cJSON_PrintUnformatted(req_json);
+    cJSON_Delete(req_json);
 
-    int gen_result = openai_generate_response(user_msg, system_ctx,
-                                               content, content_len);
+    char api_response[8192];
+    memset(api_response, 0, sizeof(api_response));
+    int api_result = openai_api_call(adapter->config.api_key,
+                                      adapter->config.base_url,
+                                      "/chat/completions",
+                                      req_str, api_response, sizeof(api_response));
+    free(req_str);
 
     clock_gettime(CLOCK_MONOTONIC, &ts_end);
     double latency_ms = (double)(ts_end.tv_sec - ts_start.tv_sec) * 1000.0 +
                         (double)(ts_end.tv_nsec - ts_start.tv_nsec) / 1000000.0;
 
-    if (gen_result >= 0 && content[0] != '\0') {
-        out_response->choices = calloc(1, sizeof(openai_message_t));
-        if (out_response->choices) {
-            out_response->choices[0].content = content;
-            out_response->choices[0].role = OPENAI_ROLE_ASSISTANT;
+    if (api_result > 0) {
+        char content_buf[OPENAI_MAX_RESPONSE_LEN];
+        memset(content_buf, 0, sizeof(content_buf));
+        openai_usage_t api_usage = {0};
+        int parse_result = openai_parse_chat_response(api_response,
+                                                       content_buf, sizeof(content_buf),
+                                                       &api_usage);
+        if (parse_result == 0 && content_buf[0] != '\0') {
+            out_response->choices = calloc(1, sizeof(openai_message_t));
+            if (out_response->choices) {
+                out_response->choices[0].content = strdup(content_buf);
+                out_response->choices[0].role = OPENAI_ROLE_ASSISTANT;
+            }
+            out_response->choice_count = 1;
+            out_response->finish_reasons = calloc(1, sizeof(openai_finish_reason_t));
+            if (out_response->finish_reasons)
+                out_response->finish_reasons[0] = OPENAI_FINISH_STOP;
+            out_response->usage = api_usage;
+        } else {
+            return -12;
         }
     } else {
-        snprintf(content, content_len,
-                 "I have processed your request through the AgentOS OpenAI "
-                 "Enterprise Adapter. Your input has been analyzed and a "
-                 "contextual response has been generated based on the "
-                 "message content and available system prompt context.");
-        out_response->choices = calloc(1, sizeof(openai_message_t));
-        if (out_response->choices) {
-            out_response->choices[0].content = content;
-            out_response->choices[0].role = OPENAI_ROLE_ASSISTANT;
-        }
+        return -13;
     }
-
-    out_response->choice_count = 1;
-    out_response->finish_reasons = calloc(1, sizeof(openai_finish_reason_t));
-    if (out_response->finish_reasons)
-        out_response->finish_reasons[0] = OPENAI_FINISH_STOP;
-
-    int input_tokens = openai_estimate_tokens(user_msg) +
-                       openai_estimate_tokens(system_ctx);
-    int output_tokens = openai_estimate_tokens(content);
-    out_response->usage.prompt_tokens = (uint32_t)input_tokens;
-    out_response->usage.completion_tokens = (uint32_t)output_tokens;
-    out_response->usage.total_tokens =
-        (uint32_t)(input_tokens + output_tokens);
 
     adapter->stats_chat_completions++;
     adapter->stats_total_input_tokens += out_response->usage.prompt_tokens;
@@ -633,6 +578,7 @@ int openai_chat_completion(openai_handle_t handle,
     openai_record_latency(adapter, latency_ms);
     openai_record_request(adapter, out_response->usage.prompt_tokens,
                           out_response->usage.completion_tokens);
+#endif
 
     return 0;
 }
@@ -649,6 +595,12 @@ int openai_chat_completion_streaming(
         (struct openai_enterprise_adapter_s*)handle;
     if (!adapter->initialized) return -2;
 
+#ifndef AGENTOS_HAS_CURL
+    (void)request; (void)on_chunk; (void)user_data;
+    return -10;
+#else
+    if (!adapter->config.api_key || !adapter->config.api_key[0]) return -11;
+
     struct timespec ts_start, ts_end;
     clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
@@ -658,58 +610,74 @@ int openai_chat_completion_streaming(
             request->model ? request->model : "gpt-4o",
             sizeof(final_summary->model) - 1);
 
-    const char* user_msg = "";
-    const char* system_ctx = "";
-    int msg_count = request->num_messages > 0 ?
-                    (int)request->num_messages : 1;
-    if (msg_count > 256) msg_count = 256;
+    cJSON* req_json = cJSON_CreateObject();
+    cJSON_AddStringToObject(req_json, "model",
+                            request->model ? request->model : "gpt-4o");
+    cJSON_AddNumberToObject(req_json, "max_tokens",
+                            request->max_tokens > 0 ? request->max_tokens : 4096);
+    cJSON_AddBoolToObject(req_json, "stream", 1);
 
-    if (msg_count > 0 && request->messages) {
-        for (int i = msg_count - 1; i >= 0; i--) {
-            if (request->messages[i].role == OPENAI_ROLE_USER) {
-                user_msg = request->messages[i].content ?
-                           request->messages[i].content : "";
-                break;
-            }
-            if (request->messages[i].role == OPENAI_ROLE_SYSTEM) {
-                system_ctx = request->messages[i].content ?
-                             request->messages[i].content : "";
-            }
+    cJSON* msgs_arr = cJSON_CreateArray();
+    for (size_t i = 0; i < request->num_messages && i < 256; i++) {
+        cJSON* msg_obj = cJSON_CreateObject();
+        const char* role_str = "user";
+        switch (request->messages[i].role) {
+            case OPENAI_ROLE_SYSTEM: role_str = "system"; break;
+            case OPENAI_ROLE_ASSISTANT: role_str = "assistant"; break;
+            case OPENAI_ROLE_TOOL: role_str = "tool"; break;
+            case OPENAI_ROLE_FUNCTION: role_str = "function"; break;
+            default: break;
         }
+        cJSON_AddStringToObject(msg_obj, "role", role_str);
+        if (request->messages[i].content)
+            cJSON_AddStringToObject(msg_obj, "content", request->messages[i].content);
+        cJSON_AddItemToArray(msgs_arr, msg_obj);
     }
+    cJSON_AddItemToObject(req_json, "messages", msgs_arr);
+
+    char* req_str = cJSON_PrintUnformatted(req_json);
+    cJSON_Delete(req_json);
+
+    char api_response[16384];
+    memset(api_response, 0, sizeof(api_response));
+    int api_result = openai_api_call(adapter->config.api_key,
+                                      adapter->config.base_url,
+                                      "/chat/completions",
+                                      req_str, api_response, sizeof(api_response));
+    free(req_str);
+
+    if (api_result <= 0) return -13;
 
     char full_response[OPENAI_MAX_RESPONSE_LEN];
     memset(full_response, 0, sizeof(full_response));
-    openai_generate_response(user_msg, system_ctx,
-                              full_response, sizeof(full_response));
+    openai_usage_t api_usage = {0};
+    int parse_result = openai_parse_chat_response(api_response,
+                                                   full_response, sizeof(full_response),
+                                                   &api_usage);
+    if (parse_result != 0) return -12;
 
     size_t response_len = strlen(full_response);
     size_t pos = 0;
-    int total_chunks = 0;
 
     while (pos < response_len) {
         size_t remaining = response_len - pos;
         size_t chunk_len = remaining < OPENAI_STREAM_CHUNK_SIZE ?
                            remaining : OPENAI_STREAM_CHUNK_SIZE;
 
-        if (chunk_len < OPENAI_STREAM_CHUNK_SIZE && remaining > 0) {
-            chunk_len = remaining;
-        } else {
-            while (chunk_len > 0 &&
-                   pos + chunk_len < response_len &&
-                   !isspace((unsigned char)full_response[pos + chunk_len]) &&
-                   full_response[pos + chunk_len] != ',' &&
-                   full_response[pos + chunk_len] != '.' &&
-                   full_response[pos + chunk_len] != '!' &&
-                   full_response[pos + chunk_len] != '?' &&
-                   full_response[pos + chunk_len] != ';' &&
-                   full_response[pos + chunk_len] != ':' &&
-                   full_response[pos + chunk_len] != '-' &&
-                   full_response[pos + chunk_len] != '\n') {
-                chunk_len--;
-            }
-            if (chunk_len == 0) chunk_len = 1;
+        while (chunk_len > 0 &&
+               pos + chunk_len < response_len &&
+               !isspace((unsigned char)full_response[pos + chunk_len]) &&
+               full_response[pos + chunk_len] != ',' &&
+               full_response[pos + chunk_len] != '.' &&
+               full_response[pos + chunk_len] != '!' &&
+               full_response[pos + chunk_len] != '?' &&
+               full_response[pos + chunk_len] != ';' &&
+               full_response[pos + chunk_len] != ':' &&
+               full_response[pos + chunk_len] != '-' &&
+               full_response[pos + chunk_len] != '\n') {
+            chunk_len--;
         }
+        if (chunk_len == 0) chunk_len = 1;
 
         char chunk_buf[OPENAI_STREAM_CHUNK_SIZE + 4];
         memcpy(chunk_buf, full_response + pos, chunk_len);
@@ -717,7 +685,6 @@ int openai_chat_completion_streaming(
         pos += chunk_len;
 
         on_chunk(chunk_buf, chunk_len, (pos >= response_len), user_data);
-        total_chunks++;
     }
 
     clock_gettime(CLOCK_MONOTONIC, &ts_end);
@@ -733,19 +700,13 @@ int openai_chat_completion_streaming(
     final_summary->finish_reasons = calloc(1, sizeof(openai_finish_reason_t));
     if (final_summary->finish_reasons)
         final_summary->finish_reasons[0] = OPENAI_FINISH_STOP;
-
-    int input_tokens = openai_estimate_tokens(user_msg) +
-                       openai_estimate_tokens(system_ctx);
-    int output_tokens = openai_estimate_tokens(full_response);
-    final_summary->usage.prompt_tokens = (uint32_t)input_tokens;
-    final_summary->usage.completion_tokens = (uint32_t)output_tokens;
-    final_summary->usage.total_tokens =
-        (uint32_t)(input_tokens + output_tokens);
+    final_summary->usage = api_usage;
 
     adapter->stats_streaming_sessions++;
     adapter->stats_total_input_tokens += final_summary->usage.prompt_tokens;
     adapter->stats_total_output_tokens += final_summary->usage.completion_tokens;
     openai_record_latency(adapter, latency_ms);
+#endif
 
     return 0;
 }

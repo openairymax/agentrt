@@ -22,7 +22,6 @@
 #ifdef _WIN32
 #include <windows.h>
 #else
-#include <pthread.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <dlfcn.h>
@@ -90,9 +89,9 @@ static struct {
     void (*integrity_callback)(int result);
     
 #ifdef _WIN32
-    agentos_mutex_t lock;
+    cupolas_mutex_t lock;
 #else
-    agentos_mutex_t lock;
+    cupolas_mutex_t lock;
 #endif
 } g_runtime_prot;
 

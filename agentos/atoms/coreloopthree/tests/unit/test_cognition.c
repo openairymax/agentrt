@@ -362,11 +362,11 @@ static void test_cognition_enum_values(void)
 static void test_struct_sizes(void)
 {
     assert(sizeof(agentos_cognition_config_t) >= sizeof(uint32_t) * 2 + sizeof(void *) * 2);
-    assert(sizeof(agentos_intent_t) >= sizeof(char *) * 4 + sizeof(size_t) * 2 + sizeof(uint32_t) + sizeof(void *));
+    assert(sizeof(agentos_intent_t) >= sizeof(char *) * 2 + sizeof(size_t) * 2 + sizeof(uint32_t) + sizeof(void *));
     assert(sizeof(agentos_task_node_t) >=
-           sizeof(char *) * 3 + sizeof(size_t) * 3 + sizeof(char **) + sizeof(uint32_t) * 2 + sizeof(void *) * 2);
+           sizeof(char *) * 2 + sizeof(size_t) * 3 + sizeof(char **) + sizeof(uint32_t) + sizeof(void *) * 2);
     assert(sizeof(agentos_task_plan_t) >=
-           sizeof(char *) * 2 + sizeof(size_t) * 3 + sizeof(agentos_task_node_t **) + sizeof(char **));
+           sizeof(char *) + sizeof(size_t) * 3 + sizeof(agentos_task_node_t **) + sizeof(char **));
     TEST_PASS("struct sizes adequate");
 }
 

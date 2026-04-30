@@ -27,6 +27,7 @@
  */
 
 #include "ipc_common.h"
+#include "platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -62,6 +63,7 @@
     #include <arpa/inet.h>
     #include <fcntl.h>
     #include <errno.h>
+#include <stdint.h>
 #endif
 
 #ifndef OFF_MAX
@@ -238,9 +240,7 @@ static uint64_t ipc_get_timestamp_ns(void) {
     QueryPerformanceCounter(&counter);
     return (uint64_t)((double)counter.QuadPart / freq.QuadPart * 1000000000.0);
 #else
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+    return agentos_time_ns();
 #endif
 }
 
@@ -262,7 +262,7 @@ static uint64_t ipc_get_timestamp_ns(void) {
  * - 输出反射: 是
  * 
  * 实现方式:
- * - 使用查表法（Table-driven）的简化版本
+ * - 使用查表法（Table-driven）实现
  * - 逐位计算（bit-by-bit computation）
  * - 时间复杂度: O(n) 其中n为数据长度（字节）
  * 
@@ -312,7 +312,7 @@ agentos_error_t ipc_init(void) {
     }
 #endif
 
-    srand((unsigned int)time(NULL));
+    srand((unsigned int)(agentos_time_ns() & 0xFFFFFFFF));
     g_ipc_initialized = true;
 
     return AGENTOS_SUCCESS;
@@ -1571,15 +1571,15 @@ static int ipc_mq_lock(ipc_mq_t* mq, uint32_t timeout_ms) {
     if (timeout_ms == 0) {
         return agentos_mutex_lock(&mq->mutex);
     } else {
-        struct timespec ts;
-        clock_gettime(CLOCK_REALTIME, &ts);
-        ts.tv_sec += timeout_ms / 1000;
-        ts.tv_nsec += (timeout_ms % 1000) * 1000000;
-        if (ts.tv_nsec >= 1000000000) {
-            ts.tv_sec++;
-            ts.tv_nsec -= 1000000000;
+        uint64_t deadline = agentos_time_ms() + timeout_ms;
+        while (agentos_mutex_trylock(&mq->mutex) != 0) {
+            if (agentos_time_ms() >= deadline) {
+                return ETIMEDOUT;
+            }
+            struct timespec ts = {0, 1000000};
+            nanosleep(&ts, NULL);
         }
-        return agentos_mutex_timedlock(&mq->mutex, &ts);
+        return 0;
     }
 #endif
 }
@@ -1622,20 +1622,10 @@ static bool ipc_mq_wait_for_message(ipc_mq_t* mq, uint32_t timeout_ms) {
     // 重新获取锁
     WaitForSingleObject(mq->hMutex, INFINITE);
 #else
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    ts.tv_sec += timeout_ms / 1000;
-    ts.tv_nsec += (timeout_ms % 1000) * 1000000;
-    if (ts.tv_nsec >= 1000000000) {
-        ts.tv_sec++;
-        ts.tv_nsec -= 1000000000;
-    }
-    
-    // 使用条件变量等待
-    agentos_mutex_lock(&mq->mutex);  // 重新获取锁
+    agentos_mutex_lock(&mq->mutex);
     while (mq->current_count == 0) {
-        int wait_result = agentos_cond_timedwait(&mq->not_empty, &mq->mutex), &ts);
-        if (wait_result == ETIMEDOUT) {
+        int wait_result = agentos_cond_timedwait(&mq->not_empty, &mq->mutex, timeout_ms);
+        if (wait_result != 0) {
             agentos_mutex_unlock(&mq->mutex);
             return false;
         }

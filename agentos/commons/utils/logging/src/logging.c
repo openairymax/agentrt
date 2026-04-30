@@ -28,6 +28,8 @@
 
 /* ==================== 内部常量定义 ==================== */
 
+static AGENTOS_THREAD_LOCAL char g_tls_trace_id[128] = {0};
+
 /** 日志级别名称数组 */
 static const char* LEVEL_NAMES[] = {
     "DEBUG",
@@ -62,13 +64,8 @@ typedef struct {
     /** 互斥锁保护配置和状�?*/
     agentos_mutex_t mutex;
     
-    /** 默认配置 */
     log_config_t default_config;
     
-    /** 线程局部存储的追踪ID */
-    pthread_key_t trace_id_key;
-    
-    /** 模块级别过滤器表（支持精确匹配和通配符） */
     struct {
         char pattern[128];
         log_level_t level;
@@ -107,7 +104,7 @@ static uint64_t get_current_timestamp(void) {
  * @return 线程ID
  */
 static uint64_t get_current_thread_id(void) {
-    return (uint64_t)pthread_self();
+    return agentos_thread_id();
 }
 
 /**
@@ -250,13 +247,9 @@ int log_init(const log_config_t* manager) {
         return -1;
     }
     
-    // 初始化线程局部存�?
-    if (pthread_key_create(&g_logging_state.trace_id_key, free) != 0) {
-        agentos_mutex_destroy(&g_logging_state.mutex);
-        return -2;
-    }
+    g_tls_trace_id[0] = '\0';
     
-    // 设置配置
+    g_logging_state.initialized = true;
     if (manager) {
         memcpy(&g_logging_state.manager, manager, sizeof(log_config_t));
     } else {
@@ -375,45 +368,21 @@ void log_write_va(log_level_t level, const char* module, int line, const char* f
 }
 
 const char* log_set_trace_id(const char* trace_id) {
-    if (!g_logging_state.initialized) {
-        return NULL;
-    }
+    if (!g_logging_state.initialized) return NULL;
     
-    // 获取当前线程的追踪ID存储
-    char* stored_id = pthread_getspecific(g_logging_state.trace_id_key);
-    
-    // 释放旧的追踪ID
-    if (stored_id) {
-        AGENTOS_FREE(stored_id);
-    }
-    
-    // 设置新的追踪ID
     if (trace_id) {
-        stored_id = AGENTOS_STRDUP(trace_id);
+        strncpy(g_tls_trace_id, trace_id, sizeof(g_tls_trace_id) - 1);
+        g_tls_trace_id[sizeof(g_tls_trace_id) - 1] = '\0';
     } else {
-        // 生成默认追踪ID
-        static uint64_t counter = 0;
-        char default_id[64];
-        snprintf(default_id, sizeof(default_id), "trace-%llu-%llu",
-                (unsigned long long)get_current_process_id(),
-                (unsigned long long)counter++);
-        stored_id = AGENTOS_STRDUP(default_id);
+        g_tls_trace_id[0] = '\0';
     }
     
-    if (stored_id) {
-        pthread_setspecific(g_logging_state.trace_id_key, stored_id);
-    }
-    
-    return stored_id;
+    return g_tls_trace_id;
 }
 
 const char* log_get_trace_id(void) {
-    if (!g_logging_state.initialized) {
-        return NULL;
-    }
-    
-    char* stored_id = pthread_getspecific(g_logging_state.trace_id_key);
-    return stored_id;
+    if (!g_logging_state.initialized) return NULL;
+    return g_tls_trace_id[0] ? g_tls_trace_id : NULL;
 }
 
 int log_set_module_level(const char* module_pattern, log_level_t level) {
@@ -512,13 +481,7 @@ void log_cleanup(void) {
 
     agentos_mutex_lock(&g_logging_state.mutex);
 
-    char* stored_id = pthread_getspecific(g_logging_state.trace_id_key);
-    if (stored_id) {
-        AGENTOS_FREE(stored_id);
-        pthread_setspecific(g_logging_state.trace_id_key, NULL);
-    }
-
-    pthread_key_delete(g_logging_state.trace_id_key);
+    g_tls_trace_id[0] = '\0';
 
     for (size_t i = 0; i < g_logging_state.module_level_count; i++) {
         memset(&g_logging_state.module_levels[i], 0, sizeof(g_logging_state.module_levels[i]));

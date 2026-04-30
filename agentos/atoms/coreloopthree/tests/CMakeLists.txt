@@ -21,6 +21,10 @@ set(CL3_TEST_SOURCES
     unit/test_parallel_dispatcher.c
 )
 
+set(CL3_BENCH_SOURCES
+    unit/test_performance_benchmark.c
+)
+
 set(CL3_COMMON_INCLUDES
     ${CORELOOPTHREE_DIR}/include
     ${CORELOOPTHREE_DIR}/src
@@ -81,6 +85,51 @@ foreach(TEST_SRC ${CL3_TEST_SOURCES})
     endif()
 
     add_test(NAME cl3_${TEST_SHORT_NAME} COMMAND test_cl3_${TEST_SHORT_NAME})
+endforeach()
+
+foreach(BENCH_SRC ${CL3_BENCH_SOURCES})
+    get_filename_component(BENCH_NAME ${BENCH_SRC} NAME_WE)
+    string(REPLACE "test_" "" BENCH_SHORT_NAME ${BENCH_NAME})
+
+    add_executable(test_cl3_${BENCH_SHORT_NAME} ${BENCH_SRC}
+        ${CMAKE_CURRENT_SOURCE_DIR}/unit/test_cl3_stubs.c
+    )
+
+    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/unit/test_cl3_stubs.c
+        PROPERTIES COMPILE_FLAGS "-fno-lto"
+    )
+
+    target_include_directories(test_cl3_${BENCH_SHORT_NAME} PRIVATE ${CL3_COMMON_INCLUDES})
+
+    target_link_libraries(test_cl3_${BENCH_SHORT_NAME} PRIVATE
+        -Wl,--whole-archive
+        agentos_coreloopthree
+        -Wl,--no-whole-archive
+        agentos_cognition
+        agentos_execution
+        agentos_core
+        agentos_memory
+        agentos_atoms
+        pthread
+        dl
+        m
+    )
+
+    if(UNIX)
+        target_link_libraries(test_cl3_${BENCH_SHORT_NAME} PRIVATE rt)
+    endif()
+
+    target_compile_options(test_cl3_${BENCH_SHORT_NAME} PRIVATE
+        -Wall -Wextra -g -Wno-unused-function
+    )
+
+    if(UNIX)
+        target_link_options(test_cl3_${BENCH_SHORT_NAME} PRIVATE
+            -Wl,--allow-multiple-definition
+        )
+    endif()
+
+    add_test(NAME cl3_${BENCH_SHORT_NAME} COMMAND test_cl3_${BENCH_SHORT_NAME})
 endforeach()
 
 enable_testing()
