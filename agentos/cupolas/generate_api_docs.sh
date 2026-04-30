@@ -1,8 +1,8 @@
-#!/bin/bash
+﻿#!/bin/bash
 # generate_api_docs.sh - cupolas 模块 Doxygen API 文档生成脚本
 #
 # SPDX-FileCopyrightText: 2026 SPHARX Ltd.
-# SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause
+# SPDX-License-Identifier: Apache-2.0
 #
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 #

@@ -16,7 +16,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
 #include <time.h>
 
 #ifdef _WIN32
@@ -32,6 +31,7 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <errno.h>
+#include "platform.h"
 #endif
 
 #define heapstore_IPC_MAX_CHANNELS 256
@@ -39,7 +39,7 @@
 #define heapstore_IPC_MAX_PATH 512
 
 static bool s_initialized = false;
-static pthread_mutex_t s_ipc_lock = PTHREAD_MUTEX_INITIALIZER;
+static agentos_mutex_t s_ipc_lock = {0};
 static heapstore_ipc_channel_t s_channels[heapstore_IPC_MAX_CHANNELS];
 static size_t s_channel_count = 0;
 static heapstore_ipc_buffer_t s_buffers[heapstore_IPC_MAX_BUFFERS];
@@ -224,7 +224,7 @@ void heapstore_ipc_shutdown(void) {
         return;
     }
 
-    pthread_mutex_lock(&s_ipc_lock);
+    agentos_mutex_lock(&s_ipc_lock);
 
 #ifndef _WIN32
     for (size_t i = 0; i < s_shm_region_count; i++) {
@@ -247,7 +247,7 @@ void heapstore_ipc_shutdown(void) {
     s_buffer_count = 0;
 
     s_initialized = false;
-    pthread_mutex_unlock(&s_ipc_lock);
+    agentos_mutex_unlock(&s_ipc_lock);
 }
 
 heapstore_error_t heapstore_ipc_record_channel(const heapstore_ipc_channel_t* channel) {
@@ -259,17 +259,17 @@ heapstore_error_t heapstore_ipc_record_channel(const heapstore_ipc_channel_t* ch
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    pthread_mutex_lock(&s_ipc_lock);
+    agentos_mutex_lock(&s_ipc_lock);
 
     if (s_channel_count >= heapstore_IPC_MAX_CHANNELS) {
-        pthread_mutex_unlock(&s_ipc_lock);
+        agentos_mutex_unlock(&s_ipc_lock);
         return heapstore_ERR_OUT_OF_MEMORY;
     }
 
     for (size_t i = 0; i < s_channel_count; i++) {
         if (strcmp(s_channels[i].channel_id, channel->channel_id) == 0) {
             memcpy(&s_channels[i], channel, sizeof(heapstore_ipc_channel_t));
-            pthread_mutex_unlock(&s_ipc_lock);
+            agentos_mutex_unlock(&s_ipc_lock);
             return heapstore_SUCCESS;
         }
     }
@@ -285,7 +285,7 @@ heapstore_error_t heapstore_ipc_record_channel(const heapstore_ipc_channel_t* ch
     }
 #endif
 
-    pthread_mutex_unlock(&s_ipc_lock);
+    agentos_mutex_unlock(&s_ipc_lock);
 
     return heapstore_SUCCESS;
 }
@@ -299,26 +299,26 @@ heapstore_error_t heapstore_ipc_get_channel(const char* channel_id, heapstore_ip
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    pthread_mutex_lock(&s_ipc_lock);
+    agentos_mutex_lock(&s_ipc_lock);
 
     for (size_t i = 0; i < s_channel_count; i++) {
         if (strcmp(s_channels[i].channel_id, channel_id) == 0) {
             memcpy(channel, &s_channels[i], sizeof(heapstore_ipc_channel_t));
-            pthread_mutex_unlock(&s_ipc_lock);
+            agentos_mutex_unlock(&s_ipc_lock);
             return heapstore_SUCCESS;
         }
     }
 
-    pthread_mutex_unlock(&s_ipc_lock);
+    agentos_mutex_unlock(&s_ipc_lock);
 
     heapstore_error_t file_err = load_channel_from_file(channel_id, channel);
     if (file_err == heapstore_SUCCESS) {
-        pthread_mutex_lock(&s_ipc_lock);
+        agentos_mutex_lock(&s_ipc_lock);
         if (s_channel_count < heapstore_IPC_MAX_CHANNELS) {
             memcpy(&s_channels[s_channel_count], channel, sizeof(heapstore_ipc_channel_t));
             s_channel_count++;
         }
-        pthread_mutex_unlock(&s_ipc_lock);
+        agentos_mutex_unlock(&s_ipc_lock);
         return heapstore_SUCCESS;
     }
 
@@ -334,17 +334,17 @@ heapstore_error_t heapstore_ipc_update_channel_activity(const char* channel_id) 
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    pthread_mutex_lock(&s_ipc_lock);
+    agentos_mutex_lock(&s_ipc_lock);
 
     for (size_t i = 0; i < s_channel_count; i++) {
         if (strcmp(s_channels[i].channel_id, channel_id) == 0) {
             s_channels[i].last_activity_at = (uint64_t)time(NULL);
-            pthread_mutex_unlock(&s_ipc_lock);
+            agentos_mutex_unlock(&s_ipc_lock);
             return heapstore_SUCCESS;
         }
     }
 
-    pthread_mutex_unlock(&s_ipc_lock);
+    agentos_mutex_unlock(&s_ipc_lock);
     return heapstore_ERR_NOT_FOUND;
 }
 
@@ -357,17 +357,17 @@ heapstore_error_t heapstore_ipc_record_buffer(const heapstore_ipc_buffer_t* buff
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    pthread_mutex_lock(&s_ipc_lock);
+    agentos_mutex_lock(&s_ipc_lock);
 
     if (s_buffer_count >= heapstore_IPC_MAX_BUFFERS) {
-        pthread_mutex_unlock(&s_ipc_lock);
+        agentos_mutex_unlock(&s_ipc_lock);
         return heapstore_ERR_OUT_OF_MEMORY;
     }
 
     for (size_t i = 0; i < s_buffer_count; i++) {
         if (strcmp(s_buffers[i].buffer_id, buffer->buffer_id) == 0) {
             memcpy(&s_buffers[i], buffer, sizeof(heapstore_ipc_buffer_t));
-            pthread_mutex_unlock(&s_ipc_lock);
+            agentos_mutex_unlock(&s_ipc_lock);
             return heapstore_SUCCESS;
         }
     }
@@ -377,7 +377,7 @@ heapstore_error_t heapstore_ipc_record_buffer(const heapstore_ipc_buffer_t* buff
 
     persist_buffer_to_file(buffer);
 
-    pthread_mutex_unlock(&s_ipc_lock);
+    agentos_mutex_unlock(&s_ipc_lock);
 
     return heapstore_SUCCESS;
 }
@@ -391,26 +391,26 @@ heapstore_error_t heapstore_ipc_get_buffer(const char* buffer_id, heapstore_ipc_
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    pthread_mutex_lock(&s_ipc_lock);
+    agentos_mutex_lock(&s_ipc_lock);
 
     for (size_t i = 0; i < s_buffer_count; i++) {
         if (strcmp(s_buffers[i].buffer_id, buffer_id) == 0) {
             memcpy(buffer, &s_buffers[i], sizeof(heapstore_ipc_buffer_t));
-            pthread_mutex_unlock(&s_ipc_lock);
+            agentos_mutex_unlock(&s_ipc_lock);
             return heapstore_SUCCESS;
         }
     }
 
-    pthread_mutex_unlock(&s_ipc_lock);
+    agentos_mutex_unlock(&s_ipc_lock);
 
     heapstore_error_t file_err = load_buffer_from_file(buffer_id, buffer);
     if (file_err == heapstore_SUCCESS) {
-        pthread_mutex_lock(&s_ipc_lock);
+        agentos_mutex_lock(&s_ipc_lock);
         if (s_buffer_count < heapstore_IPC_MAX_BUFFERS) {
             memcpy(&s_buffers[s_buffer_count], buffer, sizeof(heapstore_ipc_buffer_t));
             s_buffer_count++;
         }
-        pthread_mutex_unlock(&s_ipc_lock);
+        agentos_mutex_unlock(&s_ipc_lock);
         return heapstore_SUCCESS;
     }
 
@@ -422,7 +422,7 @@ heapstore_error_t heapstore_ipc_get_stats(uint32_t* channel_count, uint32_t* buf
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&s_ipc_lock);
+    agentos_mutex_lock(&s_ipc_lock);
 
     if (channel_count) {
         *channel_count = (uint32_t)s_channel_count;
@@ -441,7 +441,7 @@ heapstore_error_t heapstore_ipc_get_stats(uint32_t* channel_count, uint32_t* buf
         *total_size = size;
     }
 
-    pthread_mutex_unlock(&s_ipc_lock);
+    agentos_mutex_unlock(&s_ipc_lock);
 
     return heapstore_SUCCESS;
 }
@@ -497,17 +497,17 @@ heapstore_error_t heapstore_ipc_create_channel(const char* channel_id,
     if (!channel_id || !name || !type) return heapstore_ERR_INVALID_PARAM;
     if (buffer_size < 256) buffer_size = 65536;
 
-    pthread_mutex_lock(&s_ipc_lock);
+    agentos_mutex_lock(&s_ipc_lock);
 
     ipc_active_channel_t* existing = find_active_channel(channel_id);
     if (existing) {
-        pthread_mutex_unlock(&s_ipc_lock);
+        agentos_mutex_unlock(&s_ipc_lock);
         return heapstore_SUCCESS;
     }
 
     ipc_active_channel_t* ac = create_active_channel(channel_id, buffer_size);
     if (!ac) {
-        pthread_mutex_unlock(&s_ipc_lock);
+        agentos_mutex_unlock(&s_ipc_lock);
         return heapstore_ERR_INTERNAL;
     }
 
@@ -524,7 +524,7 @@ heapstore_error_t heapstore_ipc_create_channel(const char* channel_id,
     memcpy(&s_channels[s_channel_count], &ch, sizeof(heapstore_ipc_channel_t));
     s_channel_count++;
 
-    pthread_mutex_unlock(&s_ipc_lock);
+    agentos_mutex_unlock(&s_ipc_lock);
     return heapstore_SUCCESS;
 }
 
@@ -532,7 +532,7 @@ heapstore_error_t heapstore_ipc_destroy_channel(const char* channel_id) {
     if (!s_initialized) return heapstore_ERR_NOT_INITIALIZED;
     if (!channel_id) return heapstore_ERR_INVALID_PARAM;
 
-    pthread_mutex_lock(&s_ipc_lock);
+    agentos_mutex_lock(&s_ipc_lock);
 
     for (size_t i = 0; i < s_active_count; i++) {
         if (strcmp(s_active_channels[i].channel_id, channel_id) == 0) {
@@ -571,7 +571,7 @@ heapstore_error_t heapstore_ipc_destroy_channel(const char* channel_id) {
         }
     }
 
-    pthread_mutex_unlock(&s_ipc_lock);
+    agentos_mutex_unlock(&s_ipc_lock);
     return heapstore_SUCCESS;
 }
 
@@ -581,21 +581,21 @@ heapstore_error_t heapstore_ipc_send(const char* channel_id,
     if (!s_initialized) return heapstore_ERR_NOT_INITIALIZED;
     if (!channel_id || !data || len == 0) return heapstore_ERR_INVALID_PARAM;
 
-    pthread_mutex_lock(&s_ipc_lock);
+    agentos_mutex_lock(&s_ipc_lock);
 
     ipc_active_channel_t* ac = find_active_channel(channel_id);
     if (!ac || !ac->shm) {
         heapstore_ipc_create_channel(channel_id, channel_id, "auto", len + 256);
         ac = find_active_channel(channel_id);
         if (!ac) {
-            pthread_mutex_unlock(&s_ipc_lock);
+            agentos_mutex_unlock(&s_ipc_lock);
             return heapstore_ERR_INTERNAL;
         }
     }
 
     size_t header_size = sizeof(uint32_t) * 2;
     if (len + header_size > ac->shm->mapped_size) {
-        pthread_mutex_unlock(&s_ipc_lock);
+        agentos_mutex_unlock(&s_ipc_lock);
         return heapstore_ERR_INTERNAL;
     }
 
@@ -616,7 +616,7 @@ heapstore_error_t heapstore_ipc_send(const char* channel_id,
         }
     }
 
-    pthread_mutex_unlock(&s_ipc_lock);
+    agentos_mutex_unlock(&s_ipc_lock);
     return heapstore_SUCCESS;
 }
 
@@ -629,11 +629,11 @@ heapstore_error_t heapstore_ipc_receive(const char* channel_id,
     *out_data = NULL;
     *out_len = 0;
 
-    pthread_mutex_lock(&s_ipc_lock);
+    agentos_mutex_lock(&s_ipc_lock);
 
     ipc_active_channel_t* ac = find_active_channel(channel_id);
     if (!ac || !ac->shm) {
-        pthread_mutex_unlock(&s_ipc_lock);
+        agentos_mutex_unlock(&s_ipc_lock);
         return heapstore_ERR_NOT_FOUND;
     }
 
@@ -641,20 +641,20 @@ heapstore_error_t heapstore_ipc_receive(const char* channel_id,
     __sync_synchronize();
 
     if (*msg_ready != 1) {
-        pthread_mutex_unlock(&s_ipc_lock);
+        agentos_mutex_unlock(&s_ipc_lock);
         return heapstore_ERR_NOT_FOUND;
     }
 
     volatile uint32_t* msg_len = (volatile uint32_t*)ac->shm->mapped;
     uint32_t len = *msg_len;
     if (len == 0 || len > ac->shm->mapped_size - sizeof(uint32_t) * 2) {
-        pthread_mutex_unlock(&s_ipc_lock);
+        agentos_mutex_unlock(&s_ipc_lock);
         return heapstore_ERR_INVALID_PARAM;
     }
 
     void* buf = malloc(len);
     if (!buf) {
-        pthread_mutex_unlock(&s_ipc_lock);
+        agentos_mutex_unlock(&s_ipc_lock);
         return heapstore_ERR_OUT_OF_MEMORY;
     }
 
@@ -667,7 +667,7 @@ heapstore_error_t heapstore_ipc_receive(const char* channel_id,
     *out_data = buf;
     *out_len = len;
 
-    pthread_mutex_unlock(&s_ipc_lock);
+    agentos_mutex_unlock(&s_ipc_lock);
     return heapstore_SUCCESS;
 }
 

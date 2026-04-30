@@ -11,7 +11,7 @@
 #include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
-#include <pthread.h>
+#include "platform.h"
 #include <limits.h>
 
 #define INITIAL_CAPACITY 1024

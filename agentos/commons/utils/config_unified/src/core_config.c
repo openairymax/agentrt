@@ -6,7 +6,7 @@
  * 1. 统一的配置数据模型和基础接口
  * 2. 类型安全的配置访问接�? * 3. 内存所有权明确，避免内存泄�? * 4. 线程安全的基础操作
  *
- * 注意：这是一个基础实现，支持所有配置类型�? * 生产环境应使用完整实现以获得最佳性能�? */
+ * �? * �? */
 
 #include "core_config.h"
 #include <stdlib.h>
@@ -17,6 +17,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
+
+#include "platform.h"
 
 /* ==================== 内部数据结构 ==================== */
 
@@ -76,7 +78,7 @@ struct config_context {
     bool locked;
     
     /** 互斥锁保护上下文 */
-    void* mutex; /**< 互斥锁 (pthread_mutex_t*) */
+    agentos_mutex_t mutex;
 };
 
 /* ==================== 内部辅助函数 ==================== */
@@ -478,6 +480,7 @@ config_context_t* config_context_create(const char* name) {
     
     ctx->count = 0;
     ctx->locked = false;
+    agentos_mutex_init(&ctx->mutex);
     
     return ctx;
 }
@@ -487,7 +490,8 @@ void config_context_destroy(config_context_t* ctx) {
         return;
     }
     
-    // 清理所有配置项
+    agentos_mutex_destroy(&ctx->mutex);
+    
     for (size_t i = 0; i < ctx->count; i++) {
         AGENTOS_FREE(ctx->items[i].key);
         config_value_destroy(ctx->items[i].value);

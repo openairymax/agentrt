@@ -78,12 +78,14 @@ fn test_public_api_export() {
 
 #[test]
 fn test_backward_compatibility() {
-    // 测试旧模块是否仍然可用（虽然已标记为 deprecated）
-    // 注意：由于这些模块已标记为 deprecated，编译器会发出警告
-    // 但为了向后兼容，它们应该仍然可用
+    let client = Client::new("http://localhost:18789");
+    assert!(client.is_ok(), "Client::new should succeed with valid endpoint");
 
-    // 这些测试主要用于确保 API 没有破坏性变更
-    // 在实际使用中，应该迁移到新的模块结构
+    let bad_client = Client::new("");
+    assert!(bad_client.is_err(), "Client::new should fail with empty endpoint");
+
+    let bad_client2 = Client::new("not-a-url");
+    assert!(bad_client2.is_err(), "Client::new should fail with invalid endpoint");
 }
 
 // ============================================================
@@ -92,39 +94,37 @@ fn test_backward_compatibility() {
 
 #[test]
 fn test_structure_consistency_with_go_sdk() {
-    // 验证 Rust SDK 结构与 Go SDK 一致
+    let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
 
-    // 1. 客户端层 (client/)
-    // Go: client/client.go
-    // Rust: client/client.rs
-    assert!(std::path::Path::new("src/client/client.rs").exists() || true);
+    let expected_files = vec![
+        "client/client.rs",
+        "types/types.rs",
+        "utils/helpers.rs",
+        "modules/task/manager.rs",
+        "modules/memory/manager.rs",
+        "modules/session/manager.rs",
+        "modules/skill/manager.rs",
+    ];
 
-    // 2. 类型定义层 (types/)
-    // Go: types/types.go
-    // Rust: types/types.rs
-    assert!(std::path::Path::new("src/types/types.rs").exists() || true);
+    let mut missing: Vec<&str> = Vec::new();
+    for file in &expected_files {
+        let full_path = base.join(file);
+        if !full_path.exists() {
+            missing.push(file);
+        }
+    }
 
-    // 3. 工具函数层 (utils/)
-    // Go: utils/helpers.go
-    // Rust: utils/helpers.rs
-    assert!(std::path::Path::new("src/utils/helpers.rs").exists() || true);
+    if !missing.is_empty() {
+        eprintln!("WARNING: Missing SDK source files: {:?}", missing);
+    }
 
-    // 4. 业务模块层 (modules/)
-    // Go: modules/task/manager.go
-    // Rust: modules/task/manager.rs
-    assert!(std::path::Path::new("src/modules/task/manager.rs").exists() || true);
-
-    // Go: modules/memory/manager.go
-    // Rust: modules/memory/manager.rs
-    assert!(std::path::Path::new("src/modules/memory/manager.rs").exists() || true);
-
-    // Go: modules/session/manager.go
-    // Rust: modules/session/manager.rs
-    assert!(std::path::Path::new("src/modules/session/manager.rs").exists() || true);
-
-    // Go: modules/skill/manager.go
-    // Rust: modules/skill/manager.rs
-    assert!(std::path::Path::new("src/modules/skill/manager.rs").exists() || true);
+    assert!(
+        missing.len() < expected_files.len() / 2,
+        "Too many SDK source files missing ({}/{}): {:?}",
+        missing.len(),
+        expected_files.len(),
+        missing
+    );
 }
 
 #[test]

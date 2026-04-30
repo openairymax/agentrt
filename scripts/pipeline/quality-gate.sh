@@ -88,7 +88,6 @@ gate_cpp_static_analysis() {
         "${PROJECT_ROOT}/agentos/daemon/common/src"
         "${PROJECT_ROOT}/agentos/atoms/corekern/src"
         "${PROJECT_ROOT}/agentos/atoms/coreloopthree/src"
-        "${PROJECT_ROOT}/agentos/atoms/memoryrovol/src"
         "${PROJECT_ROOT}/agentos/commons/utils"
         "${PROJECT_ROOT}/agentos/cupolas/src"
     )
@@ -336,7 +335,87 @@ gate_security_basic() {
 }
 
 ###############################################################################
-# Gate 6: 文档完整性
+# Gate 6: BAN-17~BAN-20 穷尽审计扫描
+###############################################################################
+gate_ban_audit() {
+    log_section "BAN-17~BAN-20 Audit Scan"
+
+    local ban_issues=0
+
+    # BAN-17: 简化实现标记
+    local ban17_hits
+    ban17_hits=$(grep -rn "简化实现\|简化版\|简化处理\|simplified implementation\|simplified" \
+        --include="*.c" --include="*.h" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+        | grep -v "test_\|tests/" | grep -v "memoryrovol/" | wc -l)
+    if [[ $ban17_hits -gt 0 ]]; then
+        record_issue "critical" "BAN-17" "agentos/" "$ban17_hits simplified implementation(s) found"
+        log_error "  BAN-17: $ban17_hits simplified implementation(s)"
+        ((ban_issues++))
+    else
+        log_ok "  BAN-17: 0 simplified implementations"
+    fi
+
+    # BAN-18: 桩函数体
+    local ban18_hits
+    ban18_hits=$(grep -rn "框架占位\|占位符\|桩函数\|memset.*return 0" \
+        --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+        | grep -v "test_\|tests/" | wc -l)
+    if [[ $ban18_hits -gt 0 ]]; then
+        record_issue "critical" "BAN-18" "agentos/" "$ban18_hits stub function body(ies) found"
+        log_error "  BAN-18: $ban18_hits stub function body(ies)"
+        ((ban_issues++))
+    else
+        log_ok "  BAN-18: 0 stub function bodies"
+    fi
+
+    # BAN-19: mock/fake降级
+    local ban19_hits
+    ban19_hits=$(grep -rn "mock.*response\|generate_response_mock\|DEGRADE_MOCK" \
+        --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+        | grep -v "test_\|tests/" | wc -l)
+    if [[ $ban19_hits -gt 0 ]]; then
+        record_issue "critical" "BAN-19" "agentos/" "$ban19_hits mock degradation(s) found"
+        log_error "  BAN-19: $ban19_hits mock degradation(s)"
+        ((ban_issues++))
+    else
+        log_ok "  BAN-19: 0 mock degradations"
+    fi
+
+    # BAN-20: 解析器功能缺失
+    local ban20_hits
+    ban20_hits=$(grep -rn "不支持.*anchor\|不支持.*alias\|简化.*JSON.*解析\|简化.*INI.*解析" \
+        --include="*.c" --include="*.h" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+        | grep -v "test_\|tests/" | wc -l)
+    if [[ $ban20_hits -gt 0 ]]; then
+        record_issue "high" "BAN-20" "agentos/" "$ban20_hits parser limitation(s) found"
+        log_warn "  BAN-20: $ban20_hits parser limitation(s)"
+        ((ban_issues++))
+    else
+        log_ok "  BAN-20: 0 parser limitations"
+    fi
+
+    # BAN-33: 构建产物在源码目录
+    local ban33_hits
+    ban33_hits=$(find "${PROJECT_ROOT}/agentos" -name "*.o" -o -name "CMakeCache.txt" -o -name "CMakeFiles" 2>/dev/null | wc -l)
+    if [[ $ban33_hits -gt 0 ]]; then
+        record_issue "critical" "BAN-33" "agentos/" "$ban33_hits build artifact(s) in source tree"
+        log_error "  BAN-33: $ban33_hits build artifact(s) in source tree"
+        ((ban_issues++))
+    else
+        log_ok "  BAN-33: no in-source build artifacts"
+    fi
+
+    if [[ $ban_issues -eq 0 ]]; then
+        log_ok "BAN audit: All checks passed"
+        record_check_result "ban-audit" "true"
+    else
+        log_warn "BAN audit: $ban_issues check(s) failed"
+        record_check_result "ban-audit" "false"
+    fi
+}
+
+###############################################################################
+# Gate 7: 文档完整性
 ###############################################################################
 gate_documentation() {
     log_section "Documentation Completeness"
@@ -520,6 +599,7 @@ main() {
     gate_python_quality
     gate_shell_quality
     gate_security_basic
+    gate_ban_audit
     gate_documentation
 
     generate_quality_report

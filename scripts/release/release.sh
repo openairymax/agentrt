@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # SPDX-FileCopyrightText: 2026 SPHARX Ltd.
-# SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause
+# SPDX-License-Identifier: Apache-2.0
 #
 # AgentOS One-Click Release Script
 # 一键发布脚本 - 集成质量门禁、版本验证、多平台构建

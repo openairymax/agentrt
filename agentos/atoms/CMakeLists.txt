@@ -260,6 +260,7 @@ set(AGENTOS_INCLUDE_DIRS
     # atoms 内部模块头文件
     ${CMAKE_CURRENT_SOURCE_DIR}/corekern/include
     ${CMAKE_CURRENT_SOURCE_DIR}/coreloopthree/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/memory
     ${CMAKE_CURRENT_SOURCE_DIR}/memoryrovol/include
     ${CMAKE_CURRENT_SOURCE_DIR}/syscall/include
     # commons 基础库头文件 (完整覆盖所有子模块)
@@ -296,6 +297,7 @@ target_include_directories(agentos_atoms INTERFACE
 # Kernel subdirectories
 add_subdirectory(corekern)
 add_subdirectory(coreloopthree)
+add_subdirectory(memory)
 add_subdirectory(memoryrovol)
 add_subdirectory(syscall)
 add_subdirectory(taskflow)

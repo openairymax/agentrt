@@ -135,7 +135,7 @@ int scheduler_core_init(void) {
         return -1;
     }
 
-    __atomic_store_n(&g_core_ctx->initialized, 1, __ATOMIC_SEQ_CST);
+    atomic_store_int(&g_core_ctx->initialized, 1);
     __atomic_thread_fence(__ATOMIC_RELEASE);
 
     agentos_mutex_unlock(g_ctx_init_lock);
@@ -157,7 +157,7 @@ void scheduler_core_destroy(void) {
 }
 
 int scheduler_core_is_initialized(void) {
-    return g_core_ctx && (__atomic_load_n(&g_core_ctx->initialized, __ATOMIC_ACQUIRE) == 1);
+    return g_core_ctx && (atomic_load_int(&g_core_ctx->initialized) == 1);
 }
 
 uint64_t scheduler_core_fetch_add_task_id(void) {

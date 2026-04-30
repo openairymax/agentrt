@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @file service_discovery.c
  * @brief 跨进程服务发现机制实现
@@ -36,7 +36,7 @@ typedef struct {
     uint32_t total_instances;
     uint64_t last_modified;
     uint32_t checksum;
-    agentos_platform_mutex_t shm_mutex;
+    agentos_mutex_t shm_mutex;
 } sd_registry_header_t;
 
 #define SD_REGISTRY_MAGIC 0x53445247
@@ -56,7 +56,7 @@ typedef struct service_discovery_s {
     uint32_t callback_count;
     sd_stats_t stats;
     bool running;
-    agentos_platform_mutex_t mutex;
+    agentos_mutex_t mutex;
     uint32_t rr_counter;
     void* shm_handle;
     void* shm_ptr;
@@ -285,7 +285,7 @@ AGENTOS_API service_discovery_t sd_create(const sd_config_t* config) {
         sd->config = sd_create_default_config();
     }
 
-    agentos_error_t err = agentos_platform_mutex_init(&sd->mutex);
+    agentos_error_t err = agentos_mutex_init(&sd->mutex);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_FREE(sd);
         return NULL;
@@ -314,7 +314,7 @@ AGENTOS_API void sd_destroy(service_discovery_t sd_handle) {
         sd->shm_ptr = NULL;
     }
 
-    agentos_platform_mutex_destroy(&sd->mutex);
+    agentos_mutex_destroy(&sd->mutex);
     AGENTOS_FREE(sd);
 
     LOG_INFO("Service discovery instance destroyed");
@@ -325,14 +325,14 @@ AGENTOS_API agentos_error_t sd_start(service_discovery_t sd_handle) {
 
     sd_internal_t* sd = (sd_internal_t*)sd_handle;
 
-    agentos_platform_mutex_lock(&sd->mutex);
+    agentos_mutex_lock(&sd->mutex);
     if (sd->running) {
-        agentos_platform_mutex_unlock(&sd->mutex);
+        agentos_mutex_unlock(&sd->mutex);
         return AGENTOS_SUCCESS;
     }
 
     sd->running = true;
-    agentos_platform_mutex_unlock(&sd->mutex);
+    agentos_mutex_unlock(&sd->mutex);
 
     LOG_INFO("Service discovery started (heartbeat=%ums, expire=%ums)",
              sd->config.heartbeat_interval_ms, sd->config.expire_timeout_ms);
@@ -344,9 +344,9 @@ AGENTOS_API agentos_error_t sd_stop(service_discovery_t sd_handle) {
 
     sd_internal_t* sd = (sd_internal_t*)sd_handle;
 
-    agentos_platform_mutex_lock(&sd->mutex);
+    agentos_mutex_lock(&sd->mutex);
     sd->running = false;
-    agentos_platform_mutex_unlock(&sd->mutex);
+    agentos_mutex_unlock(&sd->mutex);
 
     LOG_INFO("Service discovery stopped");
     return AGENTOS_SUCCESS;
@@ -367,7 +367,7 @@ AGENTOS_API agentos_error_t sd_register(
 
     sd_internal_t* sd = (sd_internal_t*)sd_handle;
 
-    agentos_platform_mutex_lock(&sd->mutex);
+    agentos_mutex_lock(&sd->mutex);
 
     int32_t svc_idx = find_service_index(sd, service_name);
     sd_service_entry_t* entry = NULL;
@@ -376,7 +376,7 @@ AGENTOS_API agentos_error_t sd_register(
         entry = &sd->services[svc_idx];
     } else {
         if (sd->service_count >= SD_MAX_SERVICES) {
-            agentos_platform_mutex_unlock(&sd->mutex);
+            agentos_mutex_unlock(&sd->mutex);
             LOG_ERROR("Service registry full, cannot register '%s'", service_name);
             return AGENTOS_ENOMEM;
         }
@@ -403,7 +403,7 @@ AGENTOS_API agentos_error_t sd_register(
                 : agentos_platform_get_time_ms();
     } else {
         if (entry->instance_count >= SD_MAX_INSTANCES) {
-            agentos_platform_mutex_unlock(&sd->mutex);
+            agentos_mutex_unlock(&sd->mutex);
             LOG_ERROR("Instance limit reached for service '%s'", service_name);
             return AGENTOS_ENOMEM;
         }
@@ -427,7 +427,7 @@ AGENTOS_API agentos_error_t sd_register(
         sd->stats.active_instances += sd->services[i].instance_count;
     }
 
-    agentos_platform_mutex_unlock(&sd->mutex);
+    agentos_mutex_unlock(&sd->mutex);
 
     notify_event(sd, SD_EVENT_REGISTERED, service_name, instance);
 
@@ -445,18 +445,18 @@ AGENTOS_API agentos_error_t sd_deregister(
 
     sd_internal_t* sd = (sd_internal_t*)sd_handle;
 
-    agentos_platform_mutex_lock(&sd->mutex);
+    agentos_mutex_lock(&sd->mutex);
 
     int32_t svc_idx = find_service_index(sd, service_name);
     if (svc_idx < 0) {
-        agentos_platform_mutex_unlock(&sd->mutex);
+        agentos_mutex_unlock(&sd->mutex);
         return AGENTOS_ENOENT;
     }
 
     sd_service_entry_t* entry = &sd->services[svc_idx];
     int32_t inst_idx = find_instance_index(entry, instance_id);
     if (inst_idx < 0) {
-        agentos_platform_mutex_unlock(&sd->mutex);
+        agentos_mutex_unlock(&sd->mutex);
         return AGENTOS_ENOENT;
     }
 
@@ -474,7 +474,7 @@ AGENTOS_API agentos_error_t sd_deregister(
         sd->stats.active_instances += sd->services[i].instance_count;
     }
 
-    agentos_platform_mutex_unlock(&sd->mutex);
+    agentos_mutex_unlock(&sd->mutex);
 
     notify_event(sd, SD_EVENT_DEREGISTERED, service_name, &removed);
 
@@ -490,18 +490,18 @@ AGENTOS_API agentos_error_t sd_deregister_all(
 
     sd_internal_t* sd = (sd_internal_t*)sd_handle;
 
-    agentos_platform_mutex_lock(&sd->mutex);
+    agentos_mutex_lock(&sd->mutex);
 
     int32_t svc_idx = find_service_index(sd, service_name);
     if (svc_idx < 0) {
-        agentos_platform_mutex_unlock(&sd->mutex);
+        agentos_mutex_unlock(&sd->mutex);
         return AGENTOS_ENOENT;
     }
 
     sd->services[svc_idx].instance_count = 0;
     sd->services[svc_idx].last_updated = agentos_platform_get_time_ms();
 
-    agentos_platform_mutex_unlock(&sd->mutex);
+    agentos_mutex_unlock(&sd->mutex);
 
     LOG_INFO("All instances of service '%s' deregistered", service_name);
     return AGENTOS_SUCCESS;
@@ -521,14 +521,14 @@ AGENTOS_API agentos_error_t sd_discover(
 
     sd_internal_t* sd = (sd_internal_t*)sd_handle;
 
-    agentos_platform_mutex_lock(&sd->mutex);
+    agentos_mutex_lock(&sd->mutex);
 
     expire_stale_instances(sd);
 
     int32_t svc_idx = find_service_index(sd, service_name);
     if (svc_idx < 0) {
         *found_count = 0;
-        agentos_platform_mutex_unlock(&sd->mutex);
+        agentos_mutex_unlock(&sd->mutex);
         return AGENTOS_ENOENT;
     }
 
@@ -544,7 +544,7 @@ AGENTOS_API agentos_error_t sd_discover(
     *found_count = count;
     sd->stats.discoveries++;
 
-    agentos_platform_mutex_unlock(&sd->mutex);
+    agentos_mutex_unlock(&sd->mutex);
 
     LOG_DEBUG("Discovered %u healthy instances for service '%s'", count, service_name);
     return AGENTOS_SUCCESS;
@@ -562,7 +562,7 @@ AGENTOS_API agentos_error_t sd_discover_by_type(
 
     sd_internal_t* sd = (sd_internal_t*)sd_handle;
 
-    agentos_platform_mutex_lock(&sd->mutex);
+    agentos_mutex_lock(&sd->mutex);
 
     expire_stale_instances(sd);
 
@@ -577,7 +577,7 @@ AGENTOS_API agentos_error_t sd_discover_by_type(
     *found_count = count;
     sd->stats.discoveries++;
 
-    agentos_platform_mutex_unlock(&sd->mutex);
+    agentos_mutex_unlock(&sd->mutex);
 
     return AGENTOS_SUCCESS;
 }
@@ -594,7 +594,7 @@ AGENTOS_API agentos_error_t sd_discover_by_tags(
 
     sd_internal_t* sd = (sd_internal_t*)sd_handle;
 
-    agentos_platform_mutex_lock(&sd->mutex);
+    agentos_mutex_lock(&sd->mutex);
 
     expire_stale_instances(sd);
 
@@ -630,7 +630,7 @@ AGENTOS_API agentos_error_t sd_discover_by_tags(
     *found_count = count;
     sd->stats.discoveries++;
 
-    agentos_platform_mutex_unlock(&sd->mutex);
+    agentos_mutex_unlock(&sd->mutex);
 
     return AGENTOS_SUCCESS;
 }
@@ -645,13 +645,13 @@ AGENTOS_API agentos_error_t sd_select_instance(
 
     sd_internal_t* sd = (sd_internal_t*)sd_handle;
 
-    agentos_platform_mutex_lock(&sd->mutex);
+    agentos_mutex_lock(&sd->mutex);
 
     expire_stale_instances(sd);
 
     int32_t svc_idx = find_service_index(sd, service_name);
     if (svc_idx < 0) {
-        agentos_platform_mutex_unlock(&sd->mutex);
+        agentos_mutex_unlock(&sd->mutex);
         return AGENTOS_ENOENT;
     }
 
@@ -683,7 +683,7 @@ AGENTOS_API agentos_error_t sd_select_instance(
         sd->stats.lb_selections++;
     }
 
-    agentos_platform_mutex_unlock(&sd->mutex);
+    agentos_mutex_unlock(&sd->mutex);
 
     return err;
 }
@@ -699,25 +699,25 @@ AGENTOS_API agentos_error_t sd_heartbeat(
 
     sd_internal_t* sd = (sd_internal_t*)sd_handle;
 
-    agentos_platform_mutex_lock(&sd->mutex);
+    agentos_mutex_lock(&sd->mutex);
 
     int32_t svc_idx = find_service_index(sd, service_name);
     if (svc_idx < 0) {
-        agentos_platform_mutex_unlock(&sd->mutex);
+        agentos_mutex_unlock(&sd->mutex);
         return AGENTOS_ENOENT;
     }
 
     sd_service_entry_t* entry = &sd->services[svc_idx];
     int32_t inst_idx = find_instance_index(entry, instance_id);
     if (inst_idx < 0) {
-        agentos_platform_mutex_unlock(&sd->mutex);
+        agentos_mutex_unlock(&sd->mutex);
         return AGENTOS_ENOENT;
     }
 
     entry->instances[inst_idx].last_heartbeat = agentos_platform_get_time_ms();
     sd->stats.heartbeats++;
 
-    agentos_platform_mutex_unlock(&sd->mutex);
+    agentos_mutex_unlock(&sd->mutex);
 
     return AGENTOS_SUCCESS;
 }
@@ -732,18 +732,18 @@ AGENTOS_API agentos_error_t sd_update_health(
 
     sd_internal_t* sd = (sd_internal_t*)sd_handle;
 
-    agentos_platform_mutex_lock(&sd->mutex);
+    agentos_mutex_lock(&sd->mutex);
 
     int32_t svc_idx = find_service_index(sd, service_name);
     if (svc_idx < 0) {
-        agentos_platform_mutex_unlock(&sd->mutex);
+        agentos_mutex_unlock(&sd->mutex);
         return AGENTOS_ENOENT;
     }
 
     sd_service_entry_t* entry = &sd->services[svc_idx];
     int32_t inst_idx = find_instance_index(entry, instance_id);
     if (inst_idx < 0) {
-        agentos_platform_mutex_unlock(&sd->mutex);
+        agentos_mutex_unlock(&sd->mutex);
         return AGENTOS_ENOENT;
     }
 
@@ -752,7 +752,7 @@ AGENTOS_API agentos_error_t sd_update_health(
     entry->instances[inst_idx].last_heartbeat = agentos_platform_get_time_ms();
     entry->last_updated = agentos_platform_get_time_ms();
 
-    agentos_platform_mutex_unlock(&sd->mutex);
+    agentos_mutex_unlock(&sd->mutex);
 
     if (was_healthy != healthy) {
         sd_event_type_t event = healthy ? SD_EVENT_INSTANCE_UP : SD_EVENT_INSTANCE_DOWN;
@@ -780,24 +780,24 @@ AGENTOS_API agentos_error_t sd_update_connections(
 
     sd_internal_t* sd = (sd_internal_t*)sd_handle;
 
-    agentos_platform_mutex_lock(&sd->mutex);
+    agentos_mutex_lock(&sd->mutex);
 
     int32_t svc_idx = find_service_index(sd, service_name);
     if (svc_idx < 0) {
-        agentos_platform_mutex_unlock(&sd->mutex);
+        agentos_mutex_unlock(&sd->mutex);
         return AGENTOS_ENOENT;
     }
 
     sd_service_entry_t* entry = &sd->services[svc_idx];
     int32_t inst_idx = find_instance_index(entry, instance_id);
     if (inst_idx < 0) {
-        agentos_platform_mutex_unlock(&sd->mutex);
+        agentos_mutex_unlock(&sd->mutex);
         return AGENTOS_ENOENT;
     }
 
     entry->instances[inst_idx].active_connections = active_connections;
 
-    agentos_platform_mutex_unlock(&sd->mutex);
+    agentos_mutex_unlock(&sd->mutex);
 
     return AGENTOS_SUCCESS;
 }
@@ -814,17 +814,17 @@ AGENTOS_API agentos_error_t sd_get_dependencies(
 
     sd_internal_t* sd = (sd_internal_t*)sd_handle;
 
-    agentos_platform_mutex_lock(&sd->mutex);
+    agentos_mutex_lock(&sd->mutex);
 
     int32_t svc_idx = find_service_index(sd, service_name);
     if (svc_idx < 0) {
-        agentos_platform_mutex_unlock(&sd->mutex);
+        agentos_mutex_unlock(&sd->mutex);
         return AGENTOS_ENOENT;
     }
 
     safe_strcpy(dependencies, sd->services[svc_idx].dependencies, (uint32_t)max_len);
 
-    agentos_platform_mutex_unlock(&sd->mutex);
+    agentos_mutex_unlock(&sd->mutex);
 
     return AGENTOS_SUCCESS;
 }
@@ -839,11 +839,11 @@ AGENTOS_API agentos_error_t sd_check_dependencies(
 
     sd_internal_t* sd = (sd_internal_t*)sd_handle;
 
-    agentos_platform_mutex_lock(&sd->mutex);
+    agentos_mutex_lock(&sd->mutex);
 
     int32_t svc_idx = find_service_index(sd, service_name);
     if (svc_idx < 0) {
-        agentos_platform_mutex_unlock(&sd->mutex);
+        agentos_mutex_unlock(&sd->mutex);
         return AGENTOS_ENOENT;
     }
 
@@ -884,7 +884,7 @@ AGENTOS_API agentos_error_t sd_check_dependencies(
         token = strtok_r(NULL, ",", &saveptr);
     }
 
-    agentos_platform_mutex_unlock(&sd->mutex);
+    agentos_mutex_unlock(&sd->mutex);
 
     if (missing_deps && max_len > 0) {
         safe_strcpy(missing_deps, missing, (uint32_t)max_len);
@@ -904,10 +904,10 @@ AGENTOS_API agentos_error_t sd_register_event_callback(
 
     sd_internal_t* sd = (sd_internal_t*)sd_handle;
 
-    agentos_platform_mutex_lock(&sd->mutex);
+    agentos_mutex_lock(&sd->mutex);
 
     if (sd->callback_count >= SD_MAX_CALLBACKS) {
-        agentos_platform_mutex_unlock(&sd->mutex);
+        agentos_mutex_unlock(&sd->mutex);
         return AGENTOS_ENOMEM;
     }
 
@@ -915,7 +915,7 @@ AGENTOS_API agentos_error_t sd_register_event_callback(
     sd->callbacks[sd->callback_count].user_data = user_data;
     sd->callback_count++;
 
-    agentos_platform_mutex_unlock(&sd->mutex);
+    agentos_mutex_unlock(&sd->mutex);
 
     return AGENTOS_SUCCESS;
 }
@@ -928,14 +928,14 @@ AGENTOS_API agentos_error_t sd_get_stats(
 
     sd_internal_t* sd = (sd_internal_t*)sd_handle;
 
-    agentos_platform_mutex_lock(&sd->mutex);
+    agentos_mutex_lock(&sd->mutex);
     memcpy(stats, &sd->stats, sizeof(sd_stats_t));
     stats->active_services = sd->service_count;
     stats->active_instances = 0;
     for (uint32_t i = 0; i < sd->service_count; i++) {
         stats->active_instances += sd->services[i].instance_count;
     }
-    agentos_platform_mutex_unlock(&sd->mutex);
+    agentos_mutex_unlock(&sd->mutex);
 
     return AGENTOS_SUCCESS;
 }
@@ -944,9 +944,9 @@ AGENTOS_API uint32_t sd_service_count(service_discovery_t sd_handle) {
     if (!sd_handle) return 0;
     sd_internal_t* sd = (sd_internal_t*)sd_handle;
 
-    agentos_platform_mutex_lock(&sd->mutex);
+    agentos_mutex_lock(&sd->mutex);
     uint32_t count = sd->service_count;
-    agentos_platform_mutex_unlock(&sd->mutex);
+    agentos_mutex_unlock(&sd->mutex);
 
     return count;
 }
