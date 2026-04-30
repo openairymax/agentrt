@@ -118,9 +118,9 @@ cupolas_config_t* cupolas_config_create(const char* config_dir) {
         snprintf(cfg->config_dir, sizeof(cfg->config_dir), "%s", config_dir);
     } else {
 #if cupolas_PLATFORM_WINDOWS
-        snprintf(cfg->config_dir, sizeof(cfg->config_dir), "C:\\ProgramData\\cupolas\\conf");
+        snprintf(cfg->config_dir, sizeof(cfg->config_dir), AGENTOS_CONFIG_DIR "\\cupolas\\conf");
 #else
-        snprintf(cfg->config_dir, sizeof(cfg->config_dir), "/etc/agentos/cupolas/conf");
+        snprintf(cfg->config_dir, sizeof(cfg->config_dir), AGENTOS_CONFIG_DIR "/cupolas/conf");
 #endif
     }
 
