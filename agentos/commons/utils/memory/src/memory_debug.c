@@ -18,11 +18,11 @@
 #include <time.h>
 
 #ifdef _WIN32
-#include <windows.h>
 #include <dbghelp.h>
 #else
-#include <pthread.h>
 #include <execinfo.h>
+#include "platform.h"
+#include <stdint.h>
 #endif
 
 /**
@@ -62,9 +62,9 @@ typedef struct {
     
     // 线程同步
 #ifdef _WIN32
-    CRITICAL_SECTION lock;                /**< Windows临界�?*/
+    agentos_mutex_t lock;                /**< Windows临界�?*/
 #else
-    pthread_mutex_t lock;                 /**< POSIX互斥�?*/
+    agentos_mutex_t lock;                 /**< POSIX互斥�?*/
 #endif
     
     // 回调函数
@@ -111,7 +111,7 @@ static memory_debug_state_t g_debug_state = {
 #ifdef _WIN32
     .lock = {0},
 #else
-    .lock = PTHREAD_MUTEX_INITIALIZER,
+    .lock = {0},
 #endif
     .callback = NULL,
     .callback_user_data = NULL,
@@ -127,10 +127,10 @@ static memory_debug_state_t g_debug_state = {
  */
 static bool memory_debug_lock_init(void) {
 #ifdef _WIN32
-    InitializeCriticalSection(&g_debug_state.lock);
+    agentos_mutex_init(&g_debug_state.lock);
     return true;
 #else
-    return pthread_mutex_init(&g_debug_state.lock, NULL) == 0;
+    return agentos_mutex_init(&g_debug_state.lock) == 0;
 #endif
 }
 
@@ -138,9 +138,9 @@ static bool memory_debug_lock_init(void) {
  * @brief 内部锁销�? */
 static void memory_debug_lock_destroy(void) {
 #ifdef _WIN32
-    DeleteCriticalSection(&g_debug_state.lock);
+    agentos_mutex_destroy(&g_debug_state.lock);
 #else
-    pthread_mutex_destroy(&g_debug_state.lock);
+    agentos_mutex_destroy(&g_debug_state.lock);
 #endif
 }
 
@@ -149,9 +149,9 @@ static void memory_debug_lock_destroy(void) {
  */
 static void memory_debug_lock(void) {
 #ifdef _WIN32
-    EnterCriticalSection(&g_debug_state.lock);
+    agentos_mutex_lock(&g_debug_state.lock);
 #else
-    pthread_mutex_lock(&g_debug_state.lock);
+    agentos_mutex_lock(&g_debug_state.lock);
 #endif
 }
 
@@ -160,9 +160,9 @@ static void memory_debug_lock(void) {
  */
 static void memory_debug_unlock(void) {
 #ifdef _WIN32
-    LeaveCriticalSection(&g_debug_state.lock);
+    agentos_mutex_unlock(&g_debug_state.lock);
 #else
-    pthread_mutex_unlock(&g_debug_state.lock);
+    agentos_mutex_unlock(&g_debug_state.lock);
 #endif
 }
 
@@ -924,16 +924,58 @@ void memory_debug_log_operation(const char* operation, void* ptr, size_t size,
     }
 }
 
+/**
+ * @brief 检查点数据结构
+ */
+typedef struct {
+    unsigned int id;                    /**< 检查点ID */
+    char name[256];                     /**< 检查点名称 */
+    size_t block_count;                 /**< 创建时的块数�?*/
+    size_t total_allocations;           /**< 总分配次数 */
+    size_t total_frees;                 /**< 总释放次�?*/
+    size_t error_count;                 /**< 错误数量 */
+    uint64_t timestamp;                 /**< 创建时间戳 */
+    bool valid;                         /**< 是否有效 */
+} memory_checkpoint_t;
+
+#define MAX_CHECKPOINTS 16
+
+static memory_checkpoint_t g_checkpoints[MAX_CHECKPOINTS];
+static int g_checkpoint_count = 0;
+
 unsigned int memory_debug_checkpoint(const char* name) {
-    // 简化实现：返回一个ID，实际不保存检查点
     if (!g_debug_state.initialized) {
         return 0;
     }
     
     memory_debug_lock();
+    
+    if (g_checkpoint_count >= MAX_CHECKPOINTS) {
+        memory_debug_unlock();
+        return 0;
+    }
+    
     unsigned int id = g_debug_state.next_checkpoint_id++;
     
-    if (name != NULL && g_debug_state.options.verbosity_level >= 2) {
+    memory_checkpoint_t* cp = &g_checkpoints[g_checkpoint_count];
+    cp->id = id;
+    cp->block_count = g_debug_state.block_count;
+    cp->total_allocations = g_debug_state.total_allocations;
+    cp->total_frees = g_debug_state.total_frees;
+    cp->error_count = g_debug_state.error_count;
+    cp->timestamp = memory_debug_get_timestamp();
+    cp->valid = true;
+    
+    if (name != NULL) {
+        strncpy(cp->name, name, sizeof(cp->name) - 1);
+        cp->name[sizeof(cp->name) - 1] = '\0';
+    } else {
+        cp->name[0] = '\0';
+    }
+    
+    g_checkpoint_count++;
+    
+    if (g_debug_state.options.verbosity_level >= 2) {
         FILE* log = stderr;
         if (g_debug_state.options.log_file != NULL) {
             log = fopen(g_debug_state.options.log_file, "a");
@@ -943,7 +985,7 @@ unsigned int memory_debug_checkpoint(const char* name) {
         }
         
         fprintf(log, "[检查点] ID=%u, 名称=%s, 块数=%zu\n", 
-               id, name, g_debug_state.block_count);
+               id, cp->name, cp->block_count);
         
         if (log != stderr) {
             fclose(log);
@@ -958,10 +1000,97 @@ unsigned int memory_debug_checkpoint(const char* name) {
 size_t memory_debug_compare_checkpoints(unsigned int checkpoint1,
                                        unsigned int checkpoint2,
                                        memory_leak_report_t* diff_report) {
-    // 简化实现：检查点功能未完整实现
     if (diff_report != NULL) {
         memset(diff_report, 0, sizeof(memory_leak_report_t));
     }
     
-    return 0;
+    if (!g_debug_state.initialized) {
+        return 0;
+    }
+    
+    memory_debug_lock();
+    
+    int cp1_idx = -1, cp2_idx = -1;
+    
+    for (int i = 0; i < g_checkpoint_count; i++) {
+        if (g_checkpoints[i].id == checkpoint1 && g_checkpoints[i].valid) {
+            cp1_idx = i;
+        }
+        if (g_checkpoints[i].id == checkpoint2 && g_checkpoints[i].valid) {
+            cp2_idx = i;
+        }
+    }
+    
+    if (cp1_idx < 0 || cp2_idx < 0) {
+        memory_debug_unlock();
+        return 0;
+    }
+    
+    memory_checkpoint_t* cp1 = &g_checkpoints[cp1_idx];
+    memory_checkpoint_t* cp2 = &g_checkpoints[cp2_idx];
+    
+    size_t new_allocations = 0;
+    size_t new_frees = 0;
+    size_t leaked_bytes = 0;
+    
+    if (cp2->total_allocations > cp1->total_allocations) {
+        new_allocations = cp2->total_allocations - cp1->total_allocations;
+    }
+    if (cp2->total_frees > cp1->total_frees) {
+        new_frees = cp2->total_frees - cp1->total_frees;
+    }
+    
+    if (cp2->block_count > cp1->block_count && diff_report != NULL) {
+        size_t leak_diff = cp2->block_count - cp1->block_count;
+        diff_report->leak_count = leak_diff;
+        
+        memory_debug_block_t* current = g_debug_state.block_list_head;
+        size_t report_idx = 0;
+        
+        while (current != NULL && report_idx < 100) {
+            if (current->allocated && 
+                current->timestamp >= cp1->timestamp && 
+                current->timestamp <= cp2->timestamp) {
+                
+                diff_report->leaks[report_idx].address = 
+                    (uint8_t*)current + g_debug_state.options.redzone_size;
+                diff_report->leaks[report_idx].size = current->size;
+                diff_report->leaks[report_idx].tag = current->tag;
+                diff_report->leaks[report_idx].file = current->file;
+                diff_report->leaks[report_idx].line = current->line;
+                diff_report->leaks[report_idx].function = current->function;
+                diff_report->leaks[report_idx].timestamp = current->timestamp;
+                
+                leaked_bytes += current->size;
+                report_idx++;
+            }
+            current = current->next;
+        }
+        
+        diff_report->total_leaked_bytes = leaked_bytes;
+    }
+    
+    if (g_debug_state.options.verbosity_level >= 2) {
+        FILE* log = stderr;
+        if (g_debug_state.options.log_file != NULL) {
+            log = fopen(g_debug_state.options.log_file, "a");
+            if (log == NULL) {
+                log = stderr;
+            }
+        }
+        
+        fprintf(log, "[检查点比较] CP1(#%u) vs CP2(#%u)\n", checkpoint1, checkpoint2);
+        fprintf(log, "  新分配: %zu次\n", new_allocations);
+        fprintf(log, "  新释放: %zu次\n", new_frees);
+        fprintf(log, "  泄漏块: %zu个\n", diff_report ? diff_report->leak_count : 0);
+        fprintf(log, "  泄漏字节: %zu\n", leaked_bytes);
+        
+        if (log != stderr) {
+            fclose(log);
+        }
+    }
+    
+    memory_debug_unlock();
+    
+    return leaked_bytes;
 }

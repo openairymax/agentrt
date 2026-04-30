@@ -12,6 +12,7 @@
 
 #include "logger.h"
 #include "../../logging/include/logging_compat.h"
+#include <stdint.h>
 
 /* ==================== 模块初始�?==================== */
 

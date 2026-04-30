@@ -246,12 +246,16 @@ int api_rec_degrade(api_rec_pool_t* pool) {
     if (pool->current_fallback_idx < pool->fallback_count) {
         pool->current_fallback_idx++;
         if (pool->current_fallback_idx >= pool->fallback_count) {
-            pool->current_level = API_REC_DEGRADE_MOCK;
+            pool->current_level = API_REC_DEGRADE_CACHE;
+            SVC_LOG_ERROR("API rec[%s]: all fallback models exhausted, using cache only",
+                         pool->name);
         } else {
             pool->current_level = API_REC_DEGRADE_LOWER_TIER;
         }
     } else {
         pool->current_level = API_REC_DEGRADE_CACHE;
+        SVC_LOG_ERROR("API rec[%s]: already at cache level, cannot degrade further",
+                     pool->name);
     }
 
     SVC_LOG_WARN("API rec[%s]: degraded to level=%d model='%s'",
@@ -466,7 +470,6 @@ const char* api_rec_degradation_string(api_rec_degradation_level_t level) {
         case API_REC_DEGRADE_NONE:       return "none";
         case API_REC_DEGRADE_LOWER_TIER: return "lower_tier";
         case API_REC_DEGRADE_CACHE:      return "cache";
-        case API_REC_DEGRADE_MOCK:       return "mock";
         default:                         return "unknown";
     }
 }

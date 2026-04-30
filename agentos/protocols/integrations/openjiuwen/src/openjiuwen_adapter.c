@@ -258,7 +258,7 @@ int openjiuwen_unified_to_native(const unified_message_t* msg,
     safe_strcpy(header.target_agent, "OpenJiuwen",
                 sizeof(header.target_agent));
 
-    /* 计算载荷长度（简化处理，实际应根据消息内容计算） */
+    /* 计算载荷长度（根据消息内容计算） */
     size_t payload_length = 0;
     if (msg->payload && msg->payload_size > 0) {
         payload_length = msg->payload_size;
