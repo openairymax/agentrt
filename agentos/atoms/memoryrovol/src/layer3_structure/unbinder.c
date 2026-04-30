@@ -34,7 +34,7 @@ void agentos_unbinder_destroy(agentos_unbinder_t* unbinder) {
 }
 
 /**
- * 实数域解绑（简化版：仅支持Q=1且使用伪逆）
+ * 实数域解绑（当前仅支持Q=1且使用伪逆）
  */
 static void unbind_real_q1(const float* bound, const float* known, float* out,
                            size_t dim, float* mat) {

@@ -191,3 +191,12 @@ agentos_error_t agentos_memoryrov_forget(agentos_memoryrov_handle_t *handle)
     (void) handle;
     return 0;
 }
+
+agentos_error_t agentos_memoryrov_mount(agentos_memoryrov_handle_t *handle, const char *record_id,
+                                         const char *context)
+{
+    (void) handle;
+    (void) record_id;
+    (void) context;
+    return 0;
+}

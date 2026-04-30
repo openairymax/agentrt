@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Unified base library compatibility layer */
+#include "platform.h"
 #include "../include/memory_compat.h"
 #include <stdio.h>
 #include <time.h>
@@ -19,8 +19,8 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #else
-#include <pthread.h>
 #include <sys/time.h>
+#include <stdint.h>
 #endif
 
 /**

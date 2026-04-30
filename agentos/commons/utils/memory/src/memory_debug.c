@@ -22,6 +22,7 @@
 #else
 #include <execinfo.h>
 #include "platform.h"
+#include <stdint.h>
 #endif
 
 /**

@@ -19,6 +19,8 @@
 #include <math.h>
 #include <time.h>
 
+#include "platform.h"
+
 #define ML_FEATURE_COUNT 4
 #define ML_MAX_HISTORY 256
 
@@ -140,7 +142,7 @@ static agentos_error_t ml_dispatch(
                 *out_agent_id = AGENTOS_STRDUP(best_id);
                 snprintf(data->last_selected_agent_id,
                          sizeof(data->last_selected_agent_id), "%s", best_id);
-                data->last_dispatch_time_ns = (uint64_t)time(NULL) * 1000000000ULL;
+                data->last_dispatch_time_ns = agentos_time_ns();
                 return AGENTOS_SUCCESS;
             }
         }
@@ -164,7 +166,7 @@ static agentos_error_t ml_dispatch(
             *out_agent_id = AGENTOS_STRDUP(best_id);
             snprintf(data->last_selected_agent_id,
                      sizeof(data->last_selected_agent_id), "%s", best_id);
-            data->last_dispatch_time_ns = (uint64_t)time(NULL) * 1000000000ULL;
+            data->last_dispatch_time_ns = agentos_time_ns();
             return AGENTOS_SUCCESS;
         }
     }

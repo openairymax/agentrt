@@ -16,6 +16,7 @@
 #include <stdio.h>
 
 #include "platform.h"
+#include <stdint.h>
 
 /**
  * @brief 内存池块结构
@@ -150,7 +151,7 @@ static bool memory_pool_allocate_blocks(memory_pool_t* pool, size_t block_count)
         return false;
     }
     
-    // 如果已有内存区域，需要合并（这里简化处理，实际可能需要重新分配）
+    // 如果已有内存区域，需要合并（需要重新分配内存区域）
     if (pool->memory_area != NULL) {
         // 当前区域已满�?        // 在实际实现中，这里可以使用realloc或分配新区域并复制数�?        memory_free(pool->memory_area);
         pool->memory_area = NULL;

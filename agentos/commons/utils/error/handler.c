@@ -25,16 +25,8 @@
 #ifdef _WIN32
 #else
 #include <sys/time.h>
+#endif
 #include "platform.h"
-#endif
-
-/* ==================== 平台相关定义 ==================== */
-
-#ifdef _WIN32
-#define THREAD_LOCAL __declspec(thread)
-#else
-#define THREAD_LOCAL __thread
-#endif
 
 /* ==================== 全局状态 ==================== */
 
@@ -117,25 +109,16 @@ static thread_error_state_t* get_thread_error_state(void) {
     return state;
 }
 #else
-static pthread_key_t g_tls_key;
-static pthread_once_t g_tls_once = PTHREAD_ONCE_INIT;
-
-static void create_tls_key(void) {
-    pthread_key_create(&g_tls_key, free);
-}
+static AGENTOS_THREAD_LOCAL thread_error_state_t* g_tls_error_state = NULL;
 
 static thread_error_state_t* get_thread_error_state(void) {
-    pthread_once(&g_tls_once, create_tls_key);
-    
-    thread_error_state_t* state = (thread_error_state_t*)pthread_getspecific(g_tls_key);
-    if (state == NULL) {
-        state = (thread_error_state_t*)AGENTOS_CALLOC(1, sizeof(thread_error_state_t));
-        if (state != NULL) {
-            state->initialized = 1;
-            pthread_setspecific(g_tls_key, state);
+    if (g_tls_error_state == NULL) {
+        g_tls_error_state = (thread_error_state_t*)AGENTOS_CALLOC(1, sizeof(thread_error_state_t));
+        if (g_tls_error_state != NULL) {
+            g_tls_error_state->initialized = 1;
         }
     }
-    return state;
+    return g_tls_error_state;
 }
 #endif
 
