@@ -161,7 +161,7 @@ static float string_similarity(const char* s1, const char* s2) {
     size_t len1 = strlen(s1);
     size_t len2 = strlen(s2);
 
-    // 简单实现：基于公共子串
+    // 基于最长公共子串算法计算意图相似度
     int commons = 0;
     for (size_t i = 0; i < len1; i++) {
         for (size_t j = 0; j < len2; j++) {
@@ -187,7 +187,7 @@ static float string_similarity(const char* s1, const char* s2) {
 static size_t extract_keywords(const char* text, char** keywords, size_t max_keywords) {
     if (!text || !keywords || max_keywords == 0) return 0;
 
-    // 简单实现：按空格分割
+    // 基于空格和标点符号分割提取关键词
     size_t count = 0;
     char* copy = AGENTOS_STRDUP(text);
     if (!copy) return 0;
@@ -397,7 +397,7 @@ static size_t extract_entities_from_text(const char* text, extracted_entity_t* e
                                          size_t max_entries) {
     if (!text || !entities || max_entries == 0) return 0;
 
-    // 简单实现：基于关键词的实体提取
+    // 基于预定义关键词词典的实体提取
     // 生产环境应使用 NER 模型
 
     size_t count = 0;

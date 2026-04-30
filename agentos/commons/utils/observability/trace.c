@@ -25,12 +25,11 @@
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
 
-#ifdef _WIN32
-    #define WIN32_LEAN_AND_MEAN
-    #include <windows.h>
-#else
-    #include <pthread.h>
-    #include <unistd.h>
+#include "platform.h"
+
+#ifndef _WIN32
+#include <unistd.h>
+#include <stdint.h>
 #endif
 
 #define MAX_SPANS 1024
@@ -51,55 +50,34 @@ typedef struct trace_event {
 /**
  * @brief 跨平台互斥锁类型
  */
-#ifdef _WIN32
-typedef CRITICAL_SECTION trace_mutex_t;
-#else
-typedef pthread_mutex_t trace_mutex_t;
-#endif
+typedef agentos_mutex_t trace_mutex_t;
 
 /**
  * @brief 初始化互斥锁
  */
 static int trace_mutex_init(trace_mutex_t* mutex) {
-#ifdef _WIN32
-    InitializeCriticalSection(mutex);
-    return 0;
-#else
-    return pthread_mutex_init(mutex, NULL);
-#endif
+    return agentos_mutex_init(mutex);
 }
 
 /**
  * @brief 销毁互斥锁
  */
 static void trace_mutex_destroy(trace_mutex_t* mutex) {
-#ifdef _WIN32
-    DeleteCriticalSection(mutex);
-#else
-    pthread_mutex_destroy(mutex);
-#endif
+    agentos_mutex_destroy(mutex);
 }
 
 /**
  * @brief 加锁
  */
 static void trace_mutex_lock(trace_mutex_t* mutex) {
-#ifdef _WIN32
-    EnterCriticalSection(mutex);
-#else
-    pthread_mutex_lock(mutex);
-#endif
+    agentos_mutex_lock(mutex);
 }
 
 /**
  * @brief 解锁
  */
 static void trace_mutex_unlock(trace_mutex_t* mutex) {
-#ifdef _WIN32
-    LeaveCriticalSection(mutex);
-#else
-    pthread_mutex_unlock(mutex);
-#endif
+    agentos_mutex_unlock(mutex);
 }
 
 /**

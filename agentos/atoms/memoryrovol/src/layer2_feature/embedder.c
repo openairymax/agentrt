@@ -14,7 +14,7 @@
 #include "memory_compat.h"
 #include "string_compat.h"
 #include <string.h>
-#include <pthread.h>
+#include "platform.h"
 #include <math.h>
 
 typedef struct embedding_entry {

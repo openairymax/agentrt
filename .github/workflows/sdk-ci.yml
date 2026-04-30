@@ -45,7 +45,16 @@ jobs:
           sudo apt-get update && sudo apt-get install -y \
             build-essential cmake gcc g++ \
             libcurl4-openssl-dev libjson-c-dev \
+            libcjson-dev \
             libmicrohttpd-dev libssl-dev libcmocka-dev 2>/dev/null || true
+          if ! dpkg -l libcjson-dev &>/dev/null; then
+            echo "libcjson-dev not available from apt, installing from source..."
+            git clone --depth 1 https://github.com/DaveGamble/cJSON.git /tmp/cjson-build 2>/dev/null
+            cd /tmp/cjson-build && mkdir build && cd build
+            cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_SHARED_LIBS=ON -DENABLE_CJSON_UTILS=OFF
+            sudo make install -j$(nproc)
+            sudo ldconfig
+          fi
 
       - name: Build C core
         run: |
@@ -112,6 +121,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.22'
+          cache: false
       - name: Build
         working-directory: agentos/toolkit/go
         run: |
@@ -133,7 +143,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
       - name: Install dependencies
         working-directory: agentos/toolkit/typescript
         run: |

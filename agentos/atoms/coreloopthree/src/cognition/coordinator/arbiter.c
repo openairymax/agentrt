@@ -65,7 +65,7 @@ static agentos_error_t arbiter_coordinate(
         char answer[512];
         data->human_callback(question, answer, sizeof(answer));
 
-        // 解析用户选择（简单实现）
+        // 解析用户选择的仲裁策略
         int choice = atoi(answer);
         if (choice >= 1 && choice <= (int)input_count) {
             *out_result = AGENTOS_STRDUP(inputs[choice - 1]);

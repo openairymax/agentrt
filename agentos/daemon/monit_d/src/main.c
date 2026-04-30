@@ -31,7 +31,7 @@
 
 /* ==================== 配置常量 ==================== */
 
-#define DEFAULT_SOCKET_PATH_UNIX "/var/run/agentos/monit.sock"
+#define DEFAULT_SOCKET_PATH_UNIX AGENTOS_RUNTIME_DIR "/monit.sock"
 #define DEFAULT_SOCKET_PATH_WIN "\\\\.\\pipe\\agentos_monit"
 #define DEFAULT_TCP_PORT 9090
 #define MAX_BUFFER 65536

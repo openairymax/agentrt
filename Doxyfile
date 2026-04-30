@@ -129,6 +129,17 @@ INPUT                  = agentos/atoms \
                          agentos/gateway/include \
                          agentos/gateway/src \
                          agentos/heapstore/include \
+                         agentos/atoms/memory/include \
+                         agentos/protocols/standards/mcp/include \
+                         agentos/protocols/standards/a2a/include \
+                         agentos/protocols/standards/agntcy/include \
+                         agentos/protocols/integrations/openai/include \
+                         agentos/protocols/integrations/claude/include \
+                         agentos/protocols/integrations/china_eco/include \
+                         agentos/protocols/integrations/openclaw/include \
+                         agentos/protocols/integrations/openjiuwen/include \
+                         agentos/protocols/core \
+                         agentos/protocols/common \
                          docs/api/mainpage.dox
 
 FILE_PATTERNS          = *.c \
@@ -265,6 +276,7 @@ SEARCH_INCLUDES        = YES
 INCLUDE_PATH           = agentos/atoms/corekern/include \
                          agentos/atoms/coreloopthree/include \
                          agentos/atoms/memoryrovol/include \
+                         agentos/atoms/memory/include \
                          agentos/atoms/syscall/include \
                          agentos/atoms/taskflow/include \
                          agentos/atoms/frameworks/include \
@@ -288,12 +300,23 @@ INCLUDE_PATH           = agentos/atoms/corekern/include \
                          agentos/daemon/llm_d/include \
                          agentos/daemon/tool_d/include \
                          agentos/gateway/include \
-                         agentos/heapstore/include
+                         agentos/heapstore/include \
+                         agentos/protocols/standards/mcp/include \
+                         agentos/protocols/standards/a2a/include \
+                         agentos/protocols/standards/agntcy/include \
+                         agentos/protocols/integrations/openai/include \
+                         agentos/protocols/integrations/claude/include \
+                         agentos/protocols/integrations/china_eco/include \
+                         agentos/protocols/integrations/openclaw/include \
+                         agentos/protocols/integrations/openjiuwen/include \
+                         agentos/protocols/core \
+                         agentos/protocols/common
 
 PREDEFINED             = __cplusplus \
                          AGENTOS_API= \
                          AGENTOS_EXPORT= \
                          CUPOLAS_API= \
+                         AGENTOS_HAS_CURL \
                          AGENTOS_PLATFORM_WINDOWS= \
                          AGENTOS_PLATFORM_LINUX= \
                          AGENTOS_PLATFORM_MACOS= \

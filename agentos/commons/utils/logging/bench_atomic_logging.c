@@ -25,13 +25,7 @@
 #include <string.h>
 #include <time.h>
 
-#if defined(_WIN32)
-    #define WIN32_LEAN_AND_MEAN
-    #include <windows.h>
-#else
-    #include <pthread.h>
-    #include <unistd.h>
-#endif
+#include "platform.h"
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
@@ -221,11 +215,9 @@ static double bench_multi_thread(int thread_count, int total_iterations) {
 
     // 创建并启动线�?    uint64_t overall_start_time = get_nanoseconds();
 
-#if defined(_WIN32)
-    HANDLE* threads = (HANDLE*)AGENTOS_CALLOC(thread_count, sizeof(HANDLE));
+    agentos_thread_t* threads = (agentos_thread_t*)AGENTOS_CALLOC(thread_count, sizeof(agentos_thread_t));
     for (int i = 0; i < thread_count; i++) {
-        threads[i] = CreateThread(NULL, 0, worker_thread, &params[i], 0, NULL);
-        if (!threads[i]) {
+        if (agentos_thread_create(&threads[i], worker_thread, &params[i]) != 0) {
             printf("创建线程 %d 失败！\n", i);
             AGENTOS_FREE(params);
             AGENTOS_FREE(threads);
@@ -242,9 +234,9 @@ static double bench_multi_thread(int thread_count, int total_iterations) {
 
     AGENTOS_FREE(threads);
 #else
-    pthread_t* threads = (pthread_t*)AGENTOS_CALLOC(thread_count, sizeof(pthread_t));
+    agentos_thread_t* threads = (agentos_thread_t*)AGENTOS_CALLOC(thread_count, sizeof(agentos_thread_t));
     for (int i = 0; i < thread_count; i++) {
-        if (pthread_create(&threads[i], NULL, worker_thread, &params[i]) != 0) {
+        if (agentos_thread_create(&threads[i], worker_thread, &params[i]) != 0) {
             printf("创建线程 %d 失败！\n", i);
             AGENTOS_FREE(params);
             AGENTOS_FREE(threads);
@@ -252,8 +244,8 @@ static double bench_multi_thread(int thread_count, int total_iterations) {
         }
     }
 
-    // 等待所有线程完�?    for (int i = 0; i < thread_count; i++) {
-        pthread_join(threads[i], NULL);
+    for (int i = 0; i < thread_count; i++) {
+        agentos_thread_join(threads[i], NULL);
     }
 
     AGENTOS_FREE(threads);
@@ -306,7 +298,7 @@ static void bench_memory_usage(int iterations) {
 
     // 初始化日志系�?    log_init(NULL);
 
-    // 记录初始内存状态（简化实现）
+    // 记录初始内存状态
     printf("  内存使用测试 - 开始\n");
 
     for (int i = 0; i < iterations; i++) {

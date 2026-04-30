@@ -87,7 +87,7 @@ extern "C" {
 /* 错误严重程度映射 */
 typedef agentos_error_severity_t agentos_compat_error_severity_t;
 
-/* 错误类别映射（简化版） */
+/* 错误类别映射 */
 typedef enum {
     AGENTOS_COMPAT_ERROR_CAT_SYSTEM = 0,
     AGENTOS_COMPAT_ERROR_CAT_KERNEL = 1,

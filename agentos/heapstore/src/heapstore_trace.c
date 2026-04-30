@@ -17,7 +17,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <pthread.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -27,6 +26,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include "platform.h"
 #endif
 
 #define heapstore_TRACE_MAX_PATH 512
@@ -35,7 +35,7 @@
 
 static bool s_initialized = false;
 static char s_trace_path[heapstore_TRACE_MAX_PATH] = {0};
-static pthread_mutex_t s_trace_lock = PTHREAD_MUTEX_INITIALIZER;
+static agentos_mutex_t s_trace_lock = {0};
 static heapstore_span_t* s_span_buffer = NULL;
 static size_t s_span_count = 0;
 static heapstore_trace_exporter_config_t s_exporter_config = {0};
@@ -77,7 +77,7 @@ void heapstore_trace_shutdown(void) {
         return;
     }
 
-    pthread_mutex_lock(&s_trace_lock);
+    agentos_mutex_lock(&s_trace_lock);
 
     if (s_span_buffer) {
         free(s_span_buffer);
@@ -86,7 +86,7 @@ void heapstore_trace_shutdown(void) {
     s_span_count = 0;
 
     s_initialized = false;
-    pthread_mutex_unlock(&s_trace_lock);
+    agentos_mutex_unlock(&s_trace_lock);
 }
 
 heapstore_error_t heapstore_trace_write_span(const heapstore_span_t* span) {
@@ -98,17 +98,17 @@ heapstore_error_t heapstore_trace_write_span(const heapstore_span_t* span) {
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    pthread_mutex_lock(&s_trace_lock);
+    agentos_mutex_lock(&s_trace_lock);
 
     if (s_span_count >= heapstore_TRACE_MAX_SPANS) {
-        pthread_mutex_unlock(&s_trace_lock);
+        agentos_mutex_unlock(&s_trace_lock);
         return heapstore_ERR_OUT_OF_MEMORY;
     }
 
     memcpy(&s_span_buffer[s_span_count], span, sizeof(heapstore_span_t));
     s_span_count++;
 
-    pthread_mutex_unlock(&s_trace_lock);
+    agentos_mutex_unlock(&s_trace_lock);
 
     return heapstore_SUCCESS;
 }
@@ -122,17 +122,17 @@ heapstore_error_t heapstore_trace_write_spans_batch(const heapstore_span_t* span
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    pthread_mutex_lock(&s_trace_lock);
+    agentos_mutex_lock(&s_trace_lock);
 
     if (s_span_count + count > heapstore_TRACE_MAX_SPANS) {
-        pthread_mutex_unlock(&s_trace_lock);
+        agentos_mutex_unlock(&s_trace_lock);
         return heapstore_ERR_OUT_OF_MEMORY;
     }
 
     memcpy(&s_span_buffer[s_span_count], spans, count * sizeof(heapstore_span_t));
     s_span_count += count;
 
-    pthread_mutex_unlock(&s_trace_lock);
+    agentos_mutex_unlock(&s_trace_lock);
 
     return heapstore_SUCCESS;
 }
@@ -146,7 +146,7 @@ heapstore_error_t heapstore_trace_query_by_trace(const char* trace_id, heapstore
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    pthread_mutex_lock(&s_trace_lock);
+    agentos_mutex_lock(&s_trace_lock);
 
     size_t match_count = 0;
     for (size_t i = 0; i < s_span_count; i++) {
@@ -156,7 +156,7 @@ heapstore_error_t heapstore_trace_query_by_trace(const char* trace_id, heapstore
     }
 
     if (match_count == 0) {
-        pthread_mutex_unlock(&s_trace_lock);
+        agentos_mutex_unlock(&s_trace_lock);
         *spans = NULL;
         *count = 0;
         return heapstore_ERR_NOT_FOUND;
@@ -164,7 +164,7 @@ heapstore_error_t heapstore_trace_query_by_trace(const char* trace_id, heapstore
 
     heapstore_span_t* result = (heapstore_span_t*)malloc(match_count * sizeof(heapstore_span_t));
     if (!result) {
-        pthread_mutex_unlock(&s_trace_lock);
+        agentos_mutex_unlock(&s_trace_lock);
         return heapstore_ERR_OUT_OF_MEMORY;
     }
 
@@ -179,7 +179,7 @@ heapstore_error_t heapstore_trace_query_by_trace(const char* trace_id, heapstore
     *spans = result;
     *count = match_count;
 
-    pthread_mutex_unlock(&s_trace_lock);
+    agentos_mutex_unlock(&s_trace_lock);
 
     return heapstore_SUCCESS;
 }
@@ -193,7 +193,7 @@ heapstore_error_t heapstore_trace_query_by_time_range(uint64_t start_time, uint6
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    pthread_mutex_lock(&s_trace_lock);
+    agentos_mutex_lock(&s_trace_lock);
 
     size_t match_count = 0;
     for (size_t i = 0; i < s_span_count; i++) {
@@ -203,7 +203,7 @@ heapstore_error_t heapstore_trace_query_by_time_range(uint64_t start_time, uint6
     }
 
     if (match_count == 0) {
-        pthread_mutex_unlock(&s_trace_lock);
+        agentos_mutex_unlock(&s_trace_lock);
         *spans = NULL;
         *count = 0;
         return heapstore_ERR_NOT_FOUND;
@@ -211,7 +211,7 @@ heapstore_error_t heapstore_trace_query_by_time_range(uint64_t start_time, uint6
 
     heapstore_span_t* result = (heapstore_span_t*)malloc(match_count * sizeof(heapstore_span_t));
     if (!result) {
-        pthread_mutex_unlock(&s_trace_lock);
+        agentos_mutex_unlock(&s_trace_lock);
         return heapstore_ERR_OUT_OF_MEMORY;
     }
 
@@ -226,7 +226,7 @@ heapstore_error_t heapstore_trace_query_by_time_range(uint64_t start_time, uint6
     *spans = result;
     *count = match_count;
 
-    pthread_mutex_unlock(&s_trace_lock);
+    agentos_mutex_unlock(&s_trace_lock);
 
     return heapstore_SUCCESS;
 }
@@ -246,9 +246,9 @@ heapstore_error_t heapstore_trace_config_exporter(const heapstore_trace_exporter
         return heapstore_ERR_INVALID_PARAM;
     }
 
-    pthread_mutex_lock(&s_trace_lock);
+    agentos_mutex_lock(&s_trace_lock);
     memcpy(&s_exporter_config, manager, sizeof(s_exporter_config));
-    pthread_mutex_unlock(&s_trace_lock);
+    agentos_mutex_unlock(&s_trace_lock);
 
     return heapstore_SUCCESS;
 }
@@ -258,10 +258,10 @@ heapstore_error_t heapstore_trace_flush(void) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&s_trace_lock);
+    agentos_mutex_lock(&s_trace_lock);
 
     if (s_span_count == 0) {
-        pthread_mutex_unlock(&s_trace_lock);
+        agentos_mutex_unlock(&s_trace_lock);
         return heapstore_SUCCESS;
     }
 
@@ -275,7 +275,7 @@ heapstore_error_t heapstore_trace_flush(void) {
 
     FILE* fp = fopen(filepath, "w");
     if (!fp) {
-        pthread_mutex_unlock(&s_trace_lock);
+        agentos_mutex_unlock(&s_trace_lock);
         return heapstore_ERR_FILE_OPEN_FAILED;
     }
 
@@ -294,7 +294,7 @@ heapstore_error_t heapstore_trace_flush(void) {
     fclose(fp);
     s_span_count = 0;
 
-    pthread_mutex_unlock(&s_trace_lock);
+    agentos_mutex_unlock(&s_trace_lock);
 
     return heapstore_SUCCESS;
 }
@@ -304,7 +304,7 @@ heapstore_error_t heapstore_trace_get_stats(uint64_t* total_spans, uint64_t* pen
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&s_trace_lock);
+    agentos_mutex_lock(&s_trace_lock);
 
     if (total_spans) {
         *total_spans = s_span_count;
@@ -316,7 +316,7 @@ heapstore_error_t heapstore_trace_get_stats(uint64_t* total_spans, uint64_t* pen
         *total_size_bytes = s_span_count * sizeof(heapstore_span_t);
     }
 
-    pthread_mutex_unlock(&s_trace_lock);
+    agentos_mutex_unlock(&s_trace_lock);
 
     return heapstore_SUCCESS;
 }
@@ -336,7 +336,7 @@ heapstore_error_t heapstore_trace_cleanup(int days_to_keep, uint64_t* freed_byte
 
     time_t cutoff_time = time(NULL) - (days_to_keep * 86400);
 
-    pthread_mutex_lock(&s_trace_lock);
+    agentos_mutex_lock(&s_trace_lock);
 
     char spans_path[heapstore_TRACE_MAX_PATH];
     snprintf(spans_path, sizeof(spans_path), "%s/spans", s_trace_path);
@@ -395,7 +395,7 @@ heapstore_error_t heapstore_trace_cleanup(int days_to_keep, uint64_t* freed_byte
     }
 #endif
 
-    pthread_mutex_unlock(&s_trace_lock);
+    agentos_mutex_unlock(&s_trace_lock);
 
     return heapstore_SUCCESS;
 }
@@ -420,11 +420,11 @@ heapstore_error_t heapstore_trace_export_to_json(char** out_json, bool include_e
 
     (void)include_events; /* 预留参数，当前版本不使用 */
 
-    pthread_mutex_lock(&s_trace_lock);
+    agentos_mutex_lock(&s_trace_lock);
 
     if (s_span_count == 0) {
         *out_json = strdup("[]");
-        pthread_mutex_unlock(&s_trace_lock);
+        agentos_mutex_unlock(&s_trace_lock);
         return (*out_json != NULL) ? heapstore_SUCCESS : heapstore_ERR_OUT_OF_MEMORY;
     }
 
@@ -432,7 +432,7 @@ heapstore_error_t heapstore_trace_export_to_json(char** out_json, bool include_e
     size_t estimated_size = s_span_count * 512 + 64;
     char* json_buffer = (char*)malloc(estimated_size);
     if (!json_buffer) {
-        pthread_mutex_unlock(&s_trace_lock);
+        agentos_mutex_unlock(&s_trace_lock);
         return heapstore_ERR_OUT_OF_MEMORY;
     }
 
@@ -482,7 +482,7 @@ heapstore_error_t heapstore_trace_export_to_json(char** out_json, bool include_e
             char* new_buffer = (char*)realloc(json_buffer, estimated_size);
             if (!new_buffer) {
                 free(json_buffer);
-                pthread_mutex_unlock(&s_trace_lock);
+                agentos_mutex_unlock(&s_trace_lock);
                 return heapstore_ERR_OUT_OF_MEMORY;
             }
             json_buffer = new_buffer;
@@ -491,7 +491,7 @@ heapstore_error_t heapstore_trace_export_to_json(char** out_json, bool include_e
 
     pos += snprintf(json_buffer + pos, estimated_size - pos, "]");
 
-    pthread_mutex_unlock(&s_trace_lock);
+    agentos_mutex_unlock(&s_trace_lock);
 
     *out_json = json_buffer;
 

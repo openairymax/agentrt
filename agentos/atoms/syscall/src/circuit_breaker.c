@@ -88,7 +88,7 @@ agentos_error_t agentos_sys_circuit_breaker_check(void) {
     circuit_state_t state = g_circuit_breaker->state;
 
     if (state == CIRCUIT_OPEN) {
-        time_t now = time(NULL);
+        time_t now = (time_t)(agentos_time_ms() / 1000ULL);
         if (now - g_circuit_breaker->last_state_change >= g_circuit_breaker->timeout_ms / 1000) {
             g_circuit_breaker->state = CIRCUIT_HALF_OPEN;
             agentos_mutex_unlock(g_circuit_breaker->lock);
@@ -117,7 +117,7 @@ void agentos_sys_circuit_breaker_success(void) {
         g_circuit_breaker->success_count = 0;
         g_circuit_breaker->failure_count = 0;
         g_circuit_breaker->state = CIRCUIT_CLOSED;
-        g_circuit_breaker->last_state_change = time(NULL);
+        g_circuit_breaker->last_state_change = (time_t)(agentos_time_ms() / 1000ULL);
         AGENTOS_LOG_INFO("Circuit breaker closed (recovered)");
     }
 
@@ -133,15 +133,15 @@ void agentos_sys_circuit_breaker_failure(void) {
     agentos_mutex_lock(g_circuit_breaker->lock);
 
     g_circuit_breaker->failure_count++;
-    g_circuit_breaker->last_failure_time = time(NULL);
+    g_circuit_breaker->last_failure_time = (time_t)(agentos_time_ms() / 1000ULL);
 
     if (g_circuit_breaker->state == CIRCUIT_HALF_OPEN) {
         g_circuit_breaker->state = CIRCUIT_OPEN;
-        g_circuit_breaker->last_state_change = time(NULL);
+        g_circuit_breaker->last_state_change = (time_t)(agentos_time_ms() / 1000ULL);
         AGENTOS_LOG_WARN("Circuit breaker opened (failure in half-open state)");
     } else if (g_circuit_breaker->failure_count >= g_circuit_breaker->failure_threshold) {
         g_circuit_breaker->state = CIRCUIT_OPEN;
-        g_circuit_breaker->last_state_change = time(NULL);
+        g_circuit_breaker->last_state_change = (time_t)(agentos_time_ms() / 1000ULL);
         AGENTOS_LOG_WARN("Circuit breaker opened (threshold reached)");
     }
 
@@ -172,7 +172,7 @@ void agentos_sys_circuit_breaker_reset(void) {
     g_circuit_breaker->state = CIRCUIT_CLOSED;
     g_circuit_breaker->failure_count = 0;
     g_circuit_breaker->success_count = 0;
-    g_circuit_breaker->last_state_change = time(NULL);
+    g_circuit_breaker->last_state_change = (time_t)(agentos_time_ms() / 1000ULL);
 
     agentos_mutex_unlock(g_circuit_breaker->lock);
     AGENTOS_LOG_INFO("Circuit breaker reset");

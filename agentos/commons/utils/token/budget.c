@@ -18,25 +18,23 @@
 #include "string_compat.h"
 #include <string.h>
 #include <time.h>
+#include "platform.h"
 
 /* 跨平台原子操作支持 - 使用统一的 atomic_compat.h */
 #include "atomic_compat.h"
 
 #ifdef _WIN32
-    #define WIN32_LEAN_AND_MEAN
-    #include <windows.h>
-#else
-    #include <pthread.h>
-    #include <unistd.h>
+        #else
+        #include <unistd.h>
 #endif
 
 /**
  * @brief 跨平台互斥锁类型
  */
 #ifdef _WIN32
-typedef CRITICAL_SECTION budget_mutex_t;
+typedef agentos_mutex_t budget_mutex_t;
 #else
-typedef pthread_mutex_t budget_mutex_t;
+typedef agentos_mutex_t budget_mutex_t;
 #endif
 
 /**
@@ -44,10 +42,10 @@ typedef pthread_mutex_t budget_mutex_t;
  */
 static int budget_mutex_init(budget_mutex_t* mutex) {
 #ifdef _WIN32
-    InitializeCriticalSection(mutex);
+    agentos_mutex_init(mutex);
     return 0;
 #else
-    return pthread_mutex_init(mutex, NULL);
+    return agentos_mutex_init(mutex);
 #endif
 }
 
@@ -56,9 +54,9 @@ static int budget_mutex_init(budget_mutex_t* mutex) {
  */
 static void budget_mutex_destroy(budget_mutex_t* mutex) {
 #ifdef _WIN32
-    DeleteCriticalSection(mutex);
+    agentos_mutex_destroy(mutex);
 #else
-    pthread_mutex_destroy(mutex);
+    agentos_mutex_destroy(mutex);
 #endif
 }
 
@@ -67,9 +65,9 @@ static void budget_mutex_destroy(budget_mutex_t* mutex) {
  */
 static void budget_mutex_lock(budget_mutex_t* mutex) {
 #ifdef _WIN32
-    EnterCriticalSection(mutex);
+    agentos_mutex_lock(mutex);
 #else
-    pthread_mutex_lock(mutex);
+    agentos_mutex_lock(mutex);
 #endif
 }
 
@@ -78,9 +76,9 @@ static void budget_mutex_lock(budget_mutex_t* mutex) {
  */
 static void budget_mutex_unlock(budget_mutex_t* mutex) {
 #ifdef _WIN32
-    LeaveCriticalSection(mutex);
+    agentos_mutex_unlock(mutex);
 #else
-    pthread_mutex_unlock(mutex);
+    agentos_mutex_unlock(mutex);
 #endif
 }
 

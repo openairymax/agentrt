@@ -1,4 +1,5 @@
 #include "taskflow_advanced.h"
+#include "platform.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -222,7 +223,7 @@ int taskflow_engine_start(taskflow_engine_t* engine,
     ee->execution.superstep = 0;
     ee->execution.completed_nodes = 0;
     ee->execution.total_nodes = wf->node_count;
-    ee->execution.started_at = (uint64_t)time(NULL);
+    ee->execution.started_at = (uint64_t)(time_t)(agentos_time_ms() / 1000ULL);
     ee->active = 1;
     ee->checkpoint_count = 0;
     ee->variables_json = strdup("{}");
@@ -272,7 +273,7 @@ int taskflow_engine_start(taskflow_engine_t* engine,
     if (ee->execution.completed_nodes >= ee->execution.total_nodes &&
         ee->execution.state == TASKFLOW_STATE_RUNNING) {
         ee->execution.state = TASKFLOW_STATE_COMPLETED;
-        ee->execution.completed_at = (uint64_t)time(NULL);
+        ee->execution.completed_at = (uint64_t)(time_t)(agentos_time_ms() / 1000ULL);
         ee->execution.progress = 1.0;
     }
 
@@ -292,7 +293,7 @@ int taskflow_engine_cancel(taskflow_engine_t* engine, const char* execution_id) 
     for (size_t i = 0; i < engine->execution_count; i++) {
         if (strcmp(engine->executions[i].execution.execution_id, execution_id) == 0) {
             engine->executions[i].execution.state = TASKFLOW_STATE_CANCELED;
-            engine->executions[i].execution.completed_at = (uint64_t)time(NULL);
+            engine->executions[i].execution.completed_at = (uint64_t)(time_t)(agentos_time_ms() / 1000ULL);
             return 0;
         }
     }
@@ -352,7 +353,7 @@ int taskflow_engine_step(taskflow_engine_t* engine, const char* execution_id) {
             ee->execution.progress = (double)ee->execution.completed_nodes / (double)wf->node_count;
             if (ee->execution.completed_nodes >= wf->node_count) {
                 ee->execution.state = TASKFLOW_STATE_COMPLETED;
-                ee->execution.completed_at = (uint64_t)time(NULL);
+                ee->execution.completed_at = (uint64_t)(time_t)(agentos_time_ms() / 1000ULL);
                 ee->execution.progress = 1.0;
             }
         }
@@ -375,7 +376,7 @@ int taskflow_engine_run_to_completion(taskflow_engine_t* engine,
         ee->execution.completed_nodes = wf->node_count;
         ee->execution.progress = 1.0;
         ee->execution.state = TASKFLOW_STATE_COMPLETED;
-        ee->execution.completed_at = (uint64_t)time(NULL);
+        ee->execution.completed_at = (uint64_t)(time_t)(agentos_time_ms() / 1000ULL);
 
         if (engine->progress_cb) {
             engine->progress_cb(ee->execution.execution_id, NULL,
@@ -413,7 +414,7 @@ int taskflow_engine_create_checkpoint(taskflow_engine_t* engine,
                      ee->execution.completed_nodes,
                      ee->variables_json ? ee->variables_json : "{}");
         }
-        cp->timestamp = (uint64_t)time(NULL);
+        cp->timestamp = (uint64_t)(time_t)(agentos_time_ms() / 1000ULL);
 
         if (checkpoint_id) {
             *checkpoint_id = strdup(cp->id);

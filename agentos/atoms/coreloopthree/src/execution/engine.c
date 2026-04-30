@@ -4,20 +4,20 @@
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#include "../../include/execution.h"
 #include "../../include/agent_registry.h"
+#include "../../include/error_utils.h"
+#include "../../include/execution.h"
+#include "../../include/id_utils.h"
 #include "agentos.h"
 #include "logging_compat.h"
-#include "../../include/id_utils.h"
-#include "../../include/error_utils.h"
-#include <stdlib.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 /* Unified base library compatibility layer */
 #include "memory_compat.h"
 #include "string_compat.h"
-#include <string.h>
 #include <stdio.h>
+#include <string.h>
 
 /* JSON解析库 */
 #include <cjson/cJSON.h>
@@ -28,51 +28,52 @@
 #include "platform.h"
 
 typedef struct task_control_block {
-    char* task_id;
-    agentos_task_t* task_desc;
+    char *task_id;
+    agentos_task_t *task_desc;
     agentos_task_status_t status;
     uint64_t submit_time_ns;
     uint64_t start_time_ns;
     uint64_t end_time_ns;
-    void* result;
+    void *result;
     size_t result_len;
-    agentos_cond_t* completed_cond;
-    agentos_mutex_t* tcb_lock;
+    agentos_cond_t *completed_cond;
+    agentos_mutex_t *tcb_lock;
     int ref_count;
-    struct task_control_block* next;
-    struct task_control_block* hash_next;
+    struct task_control_block *next;
+    struct task_control_block *hash_next;
 } task_tcb_t;
 
 typedef struct {
-    task_tcb_t** buckets;
+    task_tcb_t **buckets;
     size_t size;
-    agentos_mutex_t* lock;
+    agentos_mutex_t *lock;
 } task_hash_table_t;
 
 struct agentos_execution_engine {
     uint32_t max_concurrency;
     uint32_t current_concurrency;
-    agentos_mutex_t* queue_lock;
-    agentos_mutex_t* running_lock;
-    task_tcb_t* task_queue;
-    task_tcb_t* running_tasks;
-    task_hash_table_t* task_map;
-    agentos_cond_t* task_available_cond;
-    agentos_thread_t* worker_threads;
+    agentos_mutex_t *queue_lock;
+    agentos_mutex_t *running_lock;
+    task_tcb_t *task_queue;
+    task_tcb_t *running_tasks;
+    task_hash_table_t *task_map;
+    agentos_cond_t *task_available_cond;
+    agentos_thread_t *worker_threads;
     size_t worker_count;
     volatile int running;
 };
 
-static void tcb_retain(task_tcb_t* tcb);
-static void tcb_release(task_tcb_t* tcb);
+static void tcb_retain(task_tcb_t *tcb);
+static void tcb_release(task_tcb_t *tcb);
 
 /**
  * @brief 哈希函数（djb2 变体�?
  */
-static size_t task_hash(const char* task_id, size_t table_size) {
+static size_t task_hash(const char *task_id, size_t table_size)
+{
     size_t hash = 5381;
     while (*task_id) {
-        hash = ((hash << 5) + hash) + (unsigned char)*task_id++;
+        hash = ((hash << 5) + hash) + (unsigned char) *task_id++;
     }
     return hash % table_size;
 }
@@ -80,12 +81,14 @@ static size_t task_hash(const char* task_id, size_t table_size) {
 /**
  * @brief 创建哈希�?
  */
-static task_hash_table_t* task_hash_table_create(size_t size) {
-    task_hash_table_t* table = (task_hash_table_t*)AGENTOS_CALLOC(1, sizeof(task_hash_table_t));
-    if (!table) return NULL;
+static task_hash_table_t *task_hash_table_create(size_t size)
+{
+    task_hash_table_t *table = (task_hash_table_t *) AGENTOS_CALLOC(1, sizeof(task_hash_table_t));
+    if (!table)
+        return NULL;
 
-    table->size = size;
-    table->buckets = (task_tcb_t**)AGENTOS_CALLOC(size, sizeof(task_tcb_t*));
+    table->size    = size;
+    table->buckets = (task_tcb_t **) AGENTOS_CALLOC(size, sizeof(task_tcb_t *));
     if (!table->buckets) {
         AGENTOS_FREE(table);
         return NULL;
@@ -104,15 +107,17 @@ static task_hash_table_t* task_hash_table_create(size_t size) {
 /**
  * @brief 销毁哈希表，释放所有持有引�?
  */
-static void task_hash_table_destroy(task_hash_table_t* table) {
-    if (!table) return;
+static void task_hash_table_destroy(task_hash_table_t *table)
+{
+    if (!table)
+        return;
 
     agentos_mutex_lock(table->lock);
     for (size_t i = 0; i < table->size; i++) {
-        task_tcb_t* tcb = table->buckets[i];
+        task_tcb_t *tcb = table->buckets[i];
         while (tcb) {
-            task_tcb_t* next = tcb->hash_next;
-            tcb->hash_next = NULL;
+            task_tcb_t *next = tcb->hash_next;
+            tcb->hash_next   = NULL;
             tcb_release(tcb);
             tcb = next;
         }
@@ -128,14 +133,16 @@ static void task_hash_table_destroy(task_hash_table_t* table) {
 /**
  * @brief 向哈希表插入任务（增加引用计数）
  */
-static void task_hash_table_insert(task_hash_table_t* table, task_tcb_t* tcb) {
-    if (!table || !tcb || !tcb->task_id) return;
+static void task_hash_table_insert(task_hash_table_t *table, task_tcb_t *tcb)
+{
+    if (!table || !tcb || !tcb->task_id)
+        return;
 
     tcb_retain(tcb);
 
     size_t index = task_hash(tcb->task_id, table->size);
     agentos_mutex_lock(table->lock);
-    tcb->hash_next = table->buckets[index];
+    tcb->hash_next        = table->buckets[index];
     table->buckets[index] = tcb;
     agentos_mutex_unlock(table->lock);
 }
@@ -143,13 +150,15 @@ static void task_hash_table_insert(task_hash_table_t* table, task_tcb_t* tcb) {
 /**
  * @brief 在哈希表中查找任务（不增加引用计数）
  */
-static task_tcb_t* task_hash_table_find(task_hash_table_t* table, const char* task_id) {
-    if (!table || !task_id) return NULL;
+static task_tcb_t *task_hash_table_find(task_hash_table_t *table, const char *task_id)
+{
+    if (!table || !task_id)
+        return NULL;
 
     size_t index = task_hash(task_id, table->size);
     agentos_mutex_lock(table->lock);
 
-    task_tcb_t* tcb = table->buckets[index];
+    task_tcb_t *tcb = table->buckets[index];
     while (tcb) {
         if (strcmp(tcb->task_id, task_id) == 0) {
             agentos_mutex_unlock(table->lock);
@@ -165,18 +174,20 @@ static task_tcb_t* task_hash_table_find(task_hash_table_t* table, const char* ta
 /**
  * @brief 从哈希表中移除任务（减少引用计数�?
  */
-static void task_hash_table_remove(task_hash_table_t* table, const char* task_id) {
-    if (!table || !task_id) return;
+static void task_hash_table_remove(task_hash_table_t *table, const char *task_id)
+{
+    if (!table || !task_id)
+        return;
 
     size_t index = task_hash(task_id, table->size);
     agentos_mutex_lock(table->lock);
 
-    task_tcb_t** p = &table->buckets[index];
+    task_tcb_t **p = &table->buckets[index];
     while (*p) {
         if (strcmp((*p)->task_id, task_id) == 0) {
-            task_tcb_t* tcb = *p;
-            *p = tcb->hash_next;
-            tcb->hash_next = NULL;
+            task_tcb_t *tcb = *p;
+            *p              = tcb->hash_next;
+            tcb->hash_next  = NULL;
             agentos_mutex_unlock(table->lock);
             tcb_release(tcb);
             return;
@@ -190,11 +201,12 @@ static void task_hash_table_remove(task_hash_table_t* table, const char* task_id
 /**
  * @brief 从链表中移除指定 TCB
  */
-static void remove_tcb_from_list(task_tcb_t** list, task_tcb_t* target) {
-    task_tcb_t** p = list;
+static void remove_tcb_from_list(task_tcb_t **list, task_tcb_t *target)
+{
+    task_tcb_t **p = list;
     while (*p) {
         if (*p == target) {
-            *p = target->next;
+            *p           = target->next;
             target->next = NULL;
             return;
         }
@@ -205,8 +217,10 @@ static void remove_tcb_from_list(task_tcb_t** list, task_tcb_t* target) {
 /**
  * @brief 增加任务引用计数
  */
-static void tcb_retain(task_tcb_t* tcb) {
-    if (!tcb) return;
+static void tcb_retain(task_tcb_t *tcb)
+{
+    if (!tcb)
+        return;
     agentos_mutex_lock(tcb->tcb_lock);
     tcb->ref_count++;
     agentos_mutex_unlock(tcb->tcb_lock);
@@ -215,8 +229,10 @@ static void tcb_retain(task_tcb_t* tcb) {
 /**
  * @brief 减少任务引用计数，归零时释放
  */
-static void tcb_release(task_tcb_t* tcb) {
-    if (!tcb) return;
+static void tcb_release(task_tcb_t *tcb)
+{
+    if (!tcb)
+        return;
     int need_free = 0;
     agentos_mutex_lock(tcb->tcb_lock);
     tcb->ref_count--;
@@ -227,14 +243,20 @@ static void tcb_release(task_tcb_t* tcb) {
     if (need_free) {
         AGENTOS_FREE(tcb->task_id);
         if (tcb->task_desc) {
-            if (tcb->task_desc->task_id) AGENTOS_FREE(tcb->task_desc->task_id);
-            if (tcb->task_desc->task_agent_id) AGENTOS_FREE(tcb->task_desc->task_agent_id);
-            if (tcb->task_desc->task_input) AGENTOS_FREE(tcb->task_desc->task_input);
+            if (tcb->task_desc->task_id)
+                AGENTOS_FREE(tcb->task_desc->task_id);
+            if (tcb->task_desc->task_agent_id)
+                AGENTOS_FREE(tcb->task_desc->task_agent_id);
+            if (tcb->task_desc->task_input)
+                AGENTOS_FREE(tcb->task_desc->task_input);
             AGENTOS_FREE(tcb->task_desc);
         }
-        if (tcb->result) AGENTOS_FREE(tcb->result);
-        if (tcb->completed_cond) agentos_cond_destroy(tcb->completed_cond);
-        if (tcb->tcb_lock) agentos_mutex_destroy(tcb->tcb_lock);
+        if (tcb->result)
+            AGENTOS_FREE(tcb->result);
+        if (tcb->completed_cond)
+            agentos_cond_destroy(tcb->completed_cond);
+        if (tcb->tcb_lock)
+            agentos_mutex_destroy(tcb->tcb_lock);
         AGENTOS_FREE(tcb);
     }
 }
@@ -242,31 +264,39 @@ static void tcb_release(task_tcb_t* tcb) {
 /**
  * @brief 深拷贝任务描�?
  */
-static agentos_task_t* task_desc_deep_copy(const agentos_task_t* task) {
-    agentos_task_t* copy = (agentos_task_t*)AGENTOS_CALLOC(1, sizeof(agentos_task_t));
-    if (!copy) return NULL;
+static agentos_task_t *task_desc_deep_copy(const agentos_task_t *task)
+{
+    agentos_task_t *copy = (agentos_task_t *) AGENTOS_CALLOC(1, sizeof(agentos_task_t));
+    if (!copy)
+        return NULL;
 
     if (task->task_id) {
         copy->task_id = AGENTOS_STRDUP(task->task_id);
-        if (!copy->task_id) goto fail;
+        if (!copy->task_id)
+            goto fail;
     }
     if (task->task_agent_id) {
         copy->task_agent_id = AGENTOS_STRDUP(task->task_agent_id);
-        if (!copy->task_agent_id) goto fail;
+        if (!copy->task_agent_id)
+            goto fail;
     }
     if (task->task_input) {
-        size_t input_len = strnlen((const char*)task->task_input, 65536);
+        size_t input_len = strnlen((const char *) task->task_input, 65536);
         copy->task_input = AGENTOS_MALLOC(input_len + 1);
-        if (!copy->task_input) goto fail;
+        if (!copy->task_input)
+            goto fail;
         memcpy(copy->task_input, task->task_input, input_len + 1);
     }
     copy->task_timeout_ms = task->task_timeout_ms;
     return copy;
 
 fail:
-    if (copy->task_id) AGENTOS_FREE(copy->task_id);
-    if (copy->task_agent_id) AGENTOS_FREE(copy->task_agent_id);
-    if (copy->task_input) AGENTOS_FREE(copy->task_input);
+    if (copy->task_id)
+        AGENTOS_FREE(copy->task_id);
+    if (copy->task_agent_id)
+        AGENTOS_FREE(copy->task_agent_id);
+    if (copy->task_input)
+        AGENTOS_FREE(copy->task_input);
     AGENTOS_FREE(copy);
     return NULL;
 }
@@ -274,28 +304,35 @@ fail:
 /**
  * @brief 深拷贝任务结�?
  */
-static agentos_task_t* task_result_deep_copy(const task_tcb_t* tcb) {
-    agentos_task_t* result = (agentos_task_t*)AGENTOS_CALLOC(1, sizeof(agentos_task_t));
-    if (!result) return NULL;
+static agentos_task_t *task_result_deep_copy(const task_tcb_t *tcb)
+{
+    agentos_task_t *result = (agentos_task_t *) AGENTOS_CALLOC(1, sizeof(agentos_task_t));
+    if (!result)
+        return NULL;
 
     if (tcb->task_desc->task_id) {
         result->task_id = AGENTOS_STRDUP(tcb->task_desc->task_id);
-        if (!result->task_id) goto fail;
+        if (!result->task_id)
+            goto fail;
     }
     if (tcb->task_desc->task_agent_id) {
         result->task_agent_id = AGENTOS_STRDUP(tcb->task_desc->task_agent_id);
-        if (!result->task_agent_id) goto fail;
+        if (!result->task_agent_id)
+            goto fail;
     }
     if (tcb->result && tcb->result_len > 0) {
         result->task_output = AGENTOS_MALLOC(tcb->result_len);
-        if (!result->task_output) goto fail;
+        if (!result->task_output)
+            goto fail;
         memcpy(result->task_output, tcb->result, tcb->result_len);
     }
     return result;
 
 fail:
-    if (result->task_id) AGENTOS_FREE(result->task_id);
-    if (result->task_agent_id) AGENTOS_FREE(result->task_agent_id);
+    if (result->task_id)
+        AGENTOS_FREE(result->task_id);
+    if (result->task_agent_id)
+        AGENTOS_FREE(result->task_agent_id);
     AGENTOS_FREE(result);
     return NULL;
 }
@@ -303,11 +340,12 @@ fail:
 /**
  * @brief 工作线程主函�?
  */
-static void* worker_thread_func(void* arg) {
-    agentos_execution_engine_t* engine = (agentos_execution_engine_t*)arg;
+static void *worker_thread_func(void *arg)
+{
+    agentos_execution_engine_t *engine = (agentos_execution_engine_t *) arg;
 
     while (engine->running) {
-        task_tcb_t* tcb = NULL;
+        task_tcb_t *tcb = NULL;
         agentos_mutex_lock(engine->queue_lock);
         while (engine->task_queue == NULL && engine->running) {
             agentos_cond_wait(engine->task_available_cond, engine->queue_lock);
@@ -316,30 +354,30 @@ static void* worker_thread_func(void* arg) {
             agentos_mutex_unlock(engine->queue_lock);
             break;
         }
-        tcb = engine->task_queue;
+        tcb                = engine->task_queue;
         engine->task_queue = tcb->next;
-        tcb->next = NULL;
+        tcb->next          = NULL;
         agentos_mutex_unlock(engine->queue_lock);
 
         agentos_mutex_lock(engine->running_lock);
         engine->current_concurrency++;
-        tcb->next = engine->running_tasks;
+        tcb->next             = engine->running_tasks;
         engine->running_tasks = tcb;
         agentos_mutex_unlock(engine->running_lock);
 
         agentos_mutex_lock(tcb->tcb_lock);
         tcb->start_time_ns = agentos_time_monotonic_ns();
-        tcb->status = TASK_STATUS_RUNNING;
+        tcb->status        = TASK_STATUS_RUNNING;
         agentos_mutex_unlock(tcb->tcb_lock);
 
-        agentos_execution_unit_t* unit = agentos_registry_get_unit(tcb->task_desc->task_agent_id);
-        void* output = NULL;
-        size_t output_len = 0;
+        agentos_execution_unit_t *unit = agentos_registry_get_unit(tcb->task_desc->task_agent_id);
+        void *output                   = NULL;
+        size_t output_len              = 0;
         agentos_error_t exec_err;
         if (unit) {
             exec_err = unit->execution_unit_execute(unit, tcb->task_desc->task_input, &output);
             if (output) {
-                output_len = strlen((const char*)output);
+                output_len = strlen((const char *) output);
             }
         } else {
             exec_err = AGENTOS_ENOENT;
@@ -348,9 +386,9 @@ static void* worker_thread_func(void* arg) {
 
         agentos_mutex_lock(tcb->tcb_lock);
         tcb->end_time_ns = agentos_time_monotonic_ns();
-        tcb->status = (exec_err == AGENTOS_SUCCESS) ? TASK_STATUS_SUCCEEDED : TASK_STATUS_FAILED;
-        tcb->result = output;
-        tcb->result_len = output_len;
+        tcb->status      = (exec_err == AGENTOS_SUCCESS) ? TASK_STATUS_SUCCEEDED : TASK_STATUS_FAILED;
+        tcb->result      = output;
+        tcb->result_len  = output_len;
         agentos_cond_signal(tcb->completed_cond);
         agentos_mutex_unlock(tcb->tcb_lock);
 
@@ -380,35 +418,40 @@ static void* worker_thread_func(void* arg) {
  *
  * @warning 调用者负责释放返回的执行引擎（使�?agentos_execution_destroy�?
  */
-agentos_error_t agentos_execution_create(
-    uint32_t max_concurrency,
-    agentos_execution_engine_t** out_engine) {
+agentos_error_t agentos_execution_create(uint32_t max_concurrency, agentos_execution_engine_t **out_engine)
+{
 
-    if (!out_engine) return AGENTOS_EINVAL;
-    if (max_concurrency == 0) max_concurrency = 1;
+    if (!out_engine)
+        return AGENTOS_EINVAL;
+    if (max_concurrency == 0)
+        max_concurrency = 1;
 
-    agentos_execution_engine_t* engine = (agentos_execution_engine_t*)AGENTOS_CALLOC(1, sizeof(agentos_execution_engine_t));
+    agentos_execution_engine_t *engine =
+        (agentos_execution_engine_t *) AGENTOS_CALLOC(1, sizeof(agentos_execution_engine_t));
     if (!engine) {
         AGENTOS_LOG_ERROR("Failed to allocate execution engine");
         return AGENTOS_ENOMEM;
     }
 
-    engine->max_concurrency = max_concurrency;
-    engine->queue_lock = agentos_mutex_create();
-    engine->running_lock = agentos_mutex_create();
+    engine->max_concurrency     = max_concurrency;
+    engine->queue_lock          = agentos_mutex_create();
+    engine->running_lock        = agentos_mutex_create();
     engine->task_available_cond = agentos_cond_create();
     if (!engine->queue_lock || !engine->running_lock || !engine->task_available_cond) {
-        if (engine->queue_lock) agentos_mutex_destroy(engine->queue_lock);
-        if (engine->running_lock) agentos_mutex_destroy(engine->running_lock);
-        if (engine->task_available_cond) agentos_cond_destroy(engine->task_available_cond);
+        if (engine->queue_lock)
+            agentos_mutex_destroy(engine->queue_lock);
+        if (engine->running_lock)
+            agentos_mutex_destroy(engine->running_lock);
+        if (engine->task_available_cond)
+            agentos_cond_destroy(engine->task_available_cond);
         AGENTOS_FREE(engine);
         AGENTOS_LOG_ERROR("Failed to create synchronization primitives");
         return AGENTOS_ENOMEM;
     }
 
-    engine->running = 1;
-    engine->worker_count = max_concurrency;
-    engine->worker_threads = (agentos_thread_t*)AGENTOS_MALLOC(engine->worker_count * sizeof(agentos_thread_t));
+    engine->running        = 1;
+    engine->worker_count   = max_concurrency;
+    engine->worker_threads = (agentos_thread_t *) AGENTOS_MALLOC(engine->worker_count * sizeof(agentos_thread_t));
     if (!engine->worker_threads) {
         agentos_mutex_destroy(engine->queue_lock);
         agentos_mutex_destroy(engine->running_lock);
@@ -450,8 +493,10 @@ agentos_error_t agentos_execution_create(
     return AGENTOS_SUCCESS;
 }
 
-void agentos_execution_destroy(agentos_execution_engine_t* engine) {
-    if (!engine) return;
+void agentos_execution_destroy(agentos_execution_engine_t *engine)
+{
+    if (!engine)
+        return;
     engine->running = 0;
     agentos_cond_broadcast(engine->task_available_cond);
 
@@ -462,10 +507,10 @@ void agentos_execution_destroy(agentos_execution_engine_t* engine) {
 
     // 清理等待队列
     agentos_mutex_lock(engine->queue_lock);
-    task_tcb_t* tcb = engine->task_queue;
+    task_tcb_t *tcb = engine->task_queue;
     while (tcb) {
-        task_tcb_t* next = tcb->next;
-        tcb_release(tcb);  // 释放引用（将递减引用计数并可能释放）
+        task_tcb_t *next = tcb->next;
+        tcb_release(tcb); // 释放引用（将递减引用计数并可能释放）
         tcb = next;
     }
     engine->task_queue = NULL;
@@ -475,7 +520,7 @@ void agentos_execution_destroy(agentos_execution_engine_t* engine) {
     agentos_mutex_lock(engine->running_lock);
     tcb = engine->running_tasks;
     while (tcb) {
-        task_tcb_t* next = tcb->next;
+        task_tcb_t *next = tcb->next;
         tcb_release(tcb);
         tcb = next;
     }
@@ -508,54 +553,56 @@ void agentos_execution_destroy(agentos_execution_engine_t* engine) {
  *
  * @warning 返回的任务ID需要调用者使�?AGENTOS_FREE() 释放
  */
-agentos_error_t agentos_execution_submit(
-    agentos_execution_engine_t* engine,
-    const agentos_task_t* task,
-    char** out_task_id) {
+agentos_error_t agentos_execution_submit(agentos_execution_engine_t *engine, const agentos_task_t *task,
+                                         char **out_task_id)
+{
 
     if (!engine || !task || !out_task_id) {
-        AGENTOS_LOG_ERROR("Invalid parameters to execution_submit: engine=%p, task=%p, out_task_id=%p",
-                         (void*)engine, (void*)task, (void*)out_task_id);
+        AGENTOS_LOG_ERROR("Invalid parameters to execution_submit: engine=%p, task=%p, out_task_id=%p", (void *) engine,
+                          (void *) task, (void *) out_task_id);
         return AGENTOS_EINVAL;
     }
 
-    agentos_task_t* task_copy = task_desc_deep_copy(task);
+    agentos_task_t *task_copy = task_desc_deep_copy(task);
     if (!task_copy) {
         AGENTOS_LOG_ERROR("Failed to deep copy task description");
         return AGENTOS_ENOMEM;
     }
 
-    task_tcb_t* tcb = (task_tcb_t*)AGENTOS_CALLOC(1, sizeof(task_tcb_t));
+    task_tcb_t *tcb = (task_tcb_t *) AGENTOS_CALLOC(1, sizeof(task_tcb_t));
     if (!tcb) {
         AGENTOS_FREE(task_copy);
-        AGENTOS_LOG_ERROR("Failed to allocate task control block: %s (code %d)",
-                        agentos_error_string(AGENTOS_ENOMEM), AGENTOS_ENOMEM);
+        AGENTOS_LOG_ERROR("Failed to allocate task control block: %s (code %d)", agentos_error_string(AGENTOS_ENOMEM),
+                          AGENTOS_ENOMEM);
         return AGENTOS_ENOMEM;
     }
 
     char id_buf[64];
     agentos_generate_task_id("task", id_buf, sizeof(id_buf));
-    tcb->task_id = AGENTOS_STRDUP(id_buf);
-    tcb->task_desc = task_copy;
-    tcb->status = TASK_STATUS_PENDING;
+    tcb->task_id        = AGENTOS_STRDUP(id_buf);
+    tcb->task_desc      = task_copy;
+    tcb->status         = TASK_STATUS_PENDING;
     tcb->submit_time_ns = agentos_time_monotonic_ns();
     tcb->completed_cond = agentos_cond_create();
-    tcb->tcb_lock = agentos_mutex_create();
-    tcb->ref_count = 1;  // 初始引用
+    tcb->tcb_lock       = agentos_mutex_create();
+    tcb->ref_count      = 1; // 初始引用
 
     if (!tcb->task_id || !tcb->completed_cond || !tcb->tcb_lock) {
-        AGENTOS_LOG_ERROR("Failed to create task resources: task_id=%p, cond=%p, lock=%p",
-                         (void*)tcb->task_id, (void*)tcb->completed_cond, (void*)tcb->tcb_lock);
-        if (tcb->task_id) AGENTOS_FREE(tcb->task_id);
-        if (tcb->completed_cond) agentos_cond_destroy(tcb->completed_cond);
-        if (tcb->tcb_lock) agentos_mutex_destroy(tcb->tcb_lock);
+        AGENTOS_LOG_ERROR("Failed to create task resources: task_id=%p, cond=%p, lock=%p", (void *) tcb->task_id,
+                          (void *) tcb->completed_cond, (void *) tcb->tcb_lock);
+        if (tcb->task_id)
+            AGENTOS_FREE(tcb->task_id);
+        if (tcb->completed_cond)
+            agentos_cond_destroy(tcb->completed_cond);
+        if (tcb->tcb_lock)
+            agentos_mutex_destroy(tcb->tcb_lock);
         AGENTOS_FREE(tcb);
         AGENTOS_FREE(task_copy);
         return AGENTOS_ENOMEM;
     }
 
     agentos_mutex_lock(engine->queue_lock);
-    tcb->next = engine->task_queue;
+    tcb->next          = engine->task_queue;
     engine->task_queue = tcb;
     agentos_cond_signal(engine->task_available_cond);
     agentos_mutex_unlock(engine->queue_lock);
@@ -572,15 +619,15 @@ agentos_error_t agentos_execution_submit(
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t agentos_execution_query(
-    agentos_execution_engine_t* engine,
-    const char* task_id,
-    agentos_task_status_t* out_status) {
+agentos_error_t agentos_execution_query(agentos_execution_engine_t *engine, const char *task_id,
+                                        agentos_task_status_t *out_status)
+{
 
-    if (!engine || !task_id || !out_status) return AGENTOS_EINVAL;
+    if (!engine || !task_id || !out_status)
+        return AGENTOS_EINVAL;
 
     // 使用哈希表快速查找任�?
-    task_tcb_t* tcb = task_hash_table_find(engine->task_map, task_id);
+    task_tcb_t *tcb = task_hash_table_find(engine->task_map, task_id);
     if (tcb) {
         agentos_mutex_lock(tcb->tcb_lock);
         *out_status = tcb->status;
@@ -591,21 +638,21 @@ agentos_error_t agentos_execution_query(
     return AGENTOS_ENOENT;
 }
 
-agentos_error_t agentos_execution_wait(
-    agentos_execution_engine_t* engine,
-    const char* task_id,
-    uint32_t timeout_ms,
-    agentos_task_t** out_result) {
+agentos_error_t agentos_execution_wait(agentos_execution_engine_t *engine, const char *task_id, uint32_t timeout_ms,
+                                       agentos_task_t **out_result)
+{
 
-    if (!engine || !task_id) return AGENTOS_EINVAL;
+    if (!engine || !task_id)
+        return AGENTOS_EINVAL;
 
     // 使用哈希表快速查找任�?
-    task_tcb_t* tcb = task_hash_table_find(engine->task_map, task_id);
-    if (!tcb) return AGENTOS_ENOENT;
+    task_tcb_t *tcb = task_hash_table_find(engine->task_map, task_id);
+    if (!tcb)
+        return AGENTOS_ENOENT;
 
-    tcb_retain(tcb);  // 增加引用，防止等待期间被释放
+    tcb_retain(tcb); // 增加引用，防止等待期间被释放
 
-    agentos_cond_t* cond = tcb->completed_cond;
+    agentos_cond_t *cond = tcb->completed_cond;
     agentos_mutex_lock(tcb->tcb_lock);
     while (tcb->status == TASK_STATUS_PENDING || tcb->status == TASK_STATUS_RUNNING) {
         if (timeout_ms == 0) {
@@ -622,7 +669,7 @@ agentos_error_t agentos_execution_wait(
     agentos_mutex_unlock(tcb->tcb_lock);
 
     if (out_result) {
-        agentos_task_t* result_copy = task_result_deep_copy(tcb);
+        agentos_task_t *result_copy = task_result_deep_copy(tcb);
         if (!result_copy) {
             tcb_release(tcb);
             return AGENTOS_ENOMEM;
@@ -634,22 +681,23 @@ agentos_error_t agentos_execution_wait(
     return AGENTOS_SUCCESS;
 }
 
-agentos_error_t agentos_execution_cancel(
-    agentos_execution_engine_t* engine,
-    const char* task_id) {
+agentos_error_t agentos_execution_cancel(agentos_execution_engine_t *engine, const char *task_id)
+{
 
-    if (!engine || !task_id) return AGENTOS_EINVAL;
+    if (!engine || !task_id)
+        return AGENTOS_EINVAL;
 
     // 使用哈希表快速查找任�?
-    task_tcb_t* tcb = task_hash_table_find(engine->task_map, task_id);
-    if (!tcb) return AGENTOS_ENOENT;
+    task_tcb_t *tcb = task_hash_table_find(engine->task_map, task_id);
+    if (!tcb)
+        return AGENTOS_ENOENT;
 
     // 检查任务是否在队列�?
     agentos_mutex_lock(engine->queue_lock);
-    task_tcb_t** p = &engine->task_queue;
+    task_tcb_t **p = &engine->task_queue;
     while (*p) {
         if (*p == tcb) {
-            *p = tcb->next;
+            *p        = tcb->next;
             tcb->next = NULL;
             agentos_mutex_unlock(engine->queue_lock);
 
@@ -658,7 +706,7 @@ agentos_error_t agentos_execution_cancel(
 
             tcb_retain(tcb);
             agentos_mutex_lock(tcb->tcb_lock);
-            tcb->status = TASK_STATUS_CANCELLED;
+            tcb->status      = TASK_STATUS_CANCELLED;
             tcb->end_time_ns = agentos_time_monotonic_ns();
             agentos_cond_signal(tcb->completed_cond);
             agentos_mutex_unlock(tcb->tcb_lock);
@@ -671,16 +719,17 @@ agentos_error_t agentos_execution_cancel(
     return AGENTOS_ENOENT;
 }
 
-agentos_error_t agentos_execution_get_result(
-    agentos_execution_engine_t* engine,
-    const char* task_id,
-    agentos_task_t** out_result) {
+agentos_error_t agentos_execution_get_result(agentos_execution_engine_t *engine, const char *task_id,
+                                             agentos_task_t **out_result)
+{
 
-    if (!engine || !task_id || !out_result) return AGENTOS_EINVAL;
+    if (!engine || !task_id || !out_result)
+        return AGENTOS_EINVAL;
 
     // 使用哈希表快速查找任�?
-    task_tcb_t* tcb = task_hash_table_find(engine->task_map, task_id);
-    if (!tcb) return AGENTOS_ENOENT;
+    task_tcb_t *tcb = task_hash_table_find(engine->task_map, task_id);
+    if (!tcb)
+        return AGENTOS_ENOENT;
 
     tcb_retain(tcb);
 
@@ -692,7 +741,7 @@ agentos_error_t agentos_execution_get_result(
     }
     agentos_mutex_unlock(tcb->tcb_lock);
 
-    agentos_task_t* result_copy = task_result_deep_copy(tcb);
+    agentos_task_t *result_copy = task_result_deep_copy(tcb);
     if (!result_copy) {
         tcb_release(tcb);
         return AGENTOS_ENOMEM;
@@ -703,34 +752,47 @@ agentos_error_t agentos_execution_get_result(
     return AGENTOS_SUCCESS;
 }
 
-void agentos_task_free(agentos_task_t* task) {
-    if (!task) return;
-    if (task->task_id) AGENTOS_FREE(task->task_id);
-    if (task->task_agent_id) AGENTOS_FREE(task->task_agent_id);
-    if (task->task_input) AGENTOS_FREE(task->task_input);
-    if (task->task_output) AGENTOS_FREE(task->task_output);
+void agentos_task_free(agentos_task_t *task)
+{
+    if (!task)
+        return;
+    if (task->task_id)
+        AGENTOS_FREE(task->task_id);
+    if (task->task_agent_id)
+        AGENTOS_FREE(task->task_agent_id);
+    if (task->task_input)
+        AGENTOS_FREE(task->task_input);
+    if (task->task_output)
+        AGENTOS_FREE(task->task_output);
     AGENTOS_FREE(task);
 }
 
-agentos_error_t agentos_execution_health_check(
-    agentos_execution_engine_t* engine,
-    char** out_json) {
+agentos_error_t agentos_execution_health_check(agentos_execution_engine_t *engine, char **out_json)
+{
 
-    if (!engine || !out_json) return AGENTOS_EINVAL;
+    if (!engine || !out_json)
+        return AGENTOS_EINVAL;
 
-    cJSON* root = cJSON_CreateObject();
-    if (!root) return AGENTOS_ENOMEM;
+    cJSON *root = cJSON_CreateObject();
+    if (!root)
+        return AGENTOS_ENOMEM;
 
     agentos_mutex_lock(engine->queue_lock);
     size_t queue_len = 0;
-    task_tcb_t* t = engine->task_queue;
-    while (t) { queue_len++; t = t->next; }
+    task_tcb_t *t    = engine->task_queue;
+    while (t) {
+        queue_len++;
+        t = t->next;
+    }
     agentos_mutex_unlock(engine->queue_lock);
 
     agentos_mutex_lock(engine->running_lock);
     size_t running_len = 0;
-    t = engine->running_tasks;
-    while (t) { running_len++; t = t->next; }
+    t                  = engine->running_tasks;
+    while (t) {
+        running_len++;
+        t = t->next;
+    }
     uint32_t cur = engine->current_concurrency;
     agentos_mutex_unlock(engine->running_lock);
 
@@ -741,9 +803,10 @@ agentos_error_t agentos_execution_health_check(
     cJSON_AddNumberToObject(root, "max_concurrency", engine->max_concurrency);
     cJSON_AddNumberToObject(root, "running", engine->running);
 
-    char* json = cJSON_PrintUnformatted(root);
+    char *json = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
-    if (!json) return AGENTOS_ENOMEM;
+    if (!json)
+        return AGENTOS_ENOMEM;
 
     *out_json = json;
     return AGENTOS_SUCCESS;

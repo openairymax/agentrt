@@ -330,4 +330,4 @@ git commit -m "docs: update API documentation"
 **维护者**: SPHARX Ltd. - AgentOS Team
 
 **SPDX-FileCopyrightText: 2026 SPHARX Ltd.**
-**SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause**
+**SPDX-License-Identifier: Apache-2.0**

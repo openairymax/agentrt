@@ -29,6 +29,9 @@
 #include <sys/types.h>
 #endif
 
+static void trace_store_service_check_storage_limit(const char* current_file);
+static int trace_store_service_cleanup_old_files(int max_files);
+
 #ifndef HEAPSTORE_TRACE_POINT_DEFINED
 #define HEAPSTORE_TRACE_POINT_DEFINED
 
@@ -173,7 +176,7 @@ int trace_store_service_store_point(const heapstore_trace_point_t* trace_point)
     g_ctx.total_traces_stored++;
     g_ctx.total_bytes_stored += sizeof(heapstore_trace_point_t);
 
-    trace_store_service_check_storage_limit(filepath);
+    trace_store_service_check_storage_limit(filename);
 
     return 0;
 }

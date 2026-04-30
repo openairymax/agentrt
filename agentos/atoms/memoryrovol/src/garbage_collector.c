@@ -1,17 +1,15 @@
 #include "garbage_collector.h"
+#include "platform.h"
 #include "logger.h"
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 #define GC_HASH_BUCKETS 256
 #define GC_MAX_ROOTS 1024
 #define GC_DEFAULT_PROMOTE_THRESHOLD 6
 
 static uint64_t gc_time_ns(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+    return agentos_time_ns();
 }
 
 static size_t gc_hash_ptr(void* ptr) {
