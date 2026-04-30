@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <time.h>
 
+#include "platform.h"
 #include "atomic_compat.h"
 
 #include "checkpoint.h"
@@ -457,7 +458,7 @@ AGENTOS_API agentos_error_t agentos_loop_run(agentos_core_loop_t* loop)
         if (loop->checkpoint_initialized &&
             loop->current_task_id[0] != '\0' &&
             checkpoint_interval > 0) {
-            uint64_t now_ms = (uint64_t)time(NULL) * 1000;
+            uint64_t now_ms = agentos_time_ms();
             if (last_auto_checkpoint_ms == 0 ||
                 (now_ms - last_auto_checkpoint_ms) >= checkpoint_interval) {
                 agentos_error_t cp_err = agentos_checkpoint_trigger_auto(
@@ -656,13 +657,11 @@ AGENTOS_API void agentos_loop_get_engines(
 }
 
 static uint64_t get_time_ms(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return (uint64_t)ts.tv_sec * 1000 + (uint64_t)ts.tv_nsec / 1000000;
+    return agentos_time_ms();
 }
 
 static void generate_task_id(char* buf, size_t buf_size) {
-    snprintf(buf, buf_size, "task-%016lx", (unsigned long)time(NULL));
+    snprintf(buf, buf_size, "task-%016lx", (unsigned long)(agentos_time_ns() & 0xFFFFFFFF));
 }
 
 static agentos_error_t save_plan_checkpoint(
@@ -757,7 +756,7 @@ AGENTOS_API agentos_error_t agentos_loop_submit_persistent(
         snprintf(loop->current_session_id, sizeof(loop->current_session_id), "%s", session_id);
     } else {
         snprintf(loop->current_session_id, sizeof(loop->current_session_id), "sess-%016lx",
-                 (unsigned long)time(NULL));
+                 (unsigned long)(agentos_time_ns() & 0xFFFFFFFF));
     }
     loop->checkpoint_seq = 0;
     agentos_mutex_unlock(loop->lock);
@@ -902,7 +901,7 @@ AGENTOS_API agentos_error_t agentos_loop_restore_task(
 
     char restored_id[128];
     snprintf(restored_id, sizeof(restored_id), "task-%s-restored-%016lx",
-             task_id, (unsigned long)time(NULL));
+             task_id, (unsigned long)(agentos_time_ns() & 0xFFFFFFFF));
 
     agentos_mutex_lock(loop->lock);
     snprintf(loop->current_task_id, sizeof(loop->current_task_id), "%s", restored_id);

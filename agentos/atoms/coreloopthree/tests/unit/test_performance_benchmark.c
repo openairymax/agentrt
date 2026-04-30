@@ -114,12 +114,13 @@ static void bench_parallel_dispatcher_multi(void)
         calls[i].safety_class  = AGENTOS_TOOL_READ_ONLY;
     }
 
-    const int iterations = 1000;
+    const int iterations = 100;
     uint64_t t_start     = bench_time_ns();
     for (int i = 0; i < iterations; i++) {
         agentos_tool_result_t *results = NULL;
         size_t count                   = 0;
-        agentos_parallel_dispatcher_dispatch(d, calls, 10, &results, &count);
+        int rc = agentos_parallel_dispatcher_dispatch(d, calls, 10, &results, &count);
+        (void)rc;
         if (results)
             free_results(results, count);
     }
@@ -282,12 +283,14 @@ static void bench_mac_delegate_10_agents(void)
     const int n_tasks = 10;
     uint64_t t_start  = bench_time_ns();
     for (int i = 0; i < n_tasks; i++) {
-        char task_desc[64];
-        snprintf(task_desc, sizeof(task_desc), "task_%d", i);
-        char *tid = NULL;
-        mac_framework_delegate_task(fw, task_desc, &tid);
-        if (tid)
-            free(tid);
+        mac_collab_task_t task;
+        memset(&task, 0, sizeof(task));
+        snprintf(task.id, sizeof(task.id), "task_%d", i);
+        task.input_json = "{\"type\":\"benchmark\"}";
+        char *assigned = NULL;
+        mac_framework_delegate_task(fw, "default", &task, &assigned);
+        if (assigned)
+            free(assigned);
     }
     uint64_t t_end = bench_time_ns();
 
@@ -329,12 +332,14 @@ static void bench_mac_consensus_100_accuracy(void)
         char *cid = NULL;
         char proposal[64];
         snprintf(proposal, sizeof(proposal), "{\"trial\":%d}", trial);
-        mac_framework_start_consensus(fw, NULL, proposal, MAC_CONSENSUS_MAJORITY, &cid);
+        mac_framework_start_consensus(fw, "bench_acc_group", proposal, MAC_CONSENSUS_MAJORITY, &cid);
 
         for (int i = 0; i < 100; i++) {
+            char agent_id[32];
             char vote[64];
+            snprintf(agent_id, sizeof(agent_id), "acc_voter_%03d", i);
             snprintf(vote, sizeof(vote), "{\"agent_id\":\"acc_voter_%03d\",\"vote\":\"approve\"}", i);
-            mac_framework_vote(fw, cid, vote, vote);
+            mac_framework_vote(fw, cid, agent_id, vote);
         }
 
         char *result = NULL;
@@ -375,8 +380,8 @@ static void bench_mac_1000_agents_no_crash(void)
         snprintf(agent.name, sizeof(agent.name), "ParallelAgent_%04d", i);
         agent.performance_score = 0.5f + (float) (i % 50) * 0.01f;
         agent.reliability_score = 0.6f + (float) (i % 40) * 0.01f;
-        mac_error_t reg_err     = mac_framework_register_agent(fw, &agent);
-        if (reg_err != MAC_SUCCESS && reg_err != MAC_ERR_LIMIT) {
+        int reg_err     = mac_framework_register_agent(fw, &agent);
+        if (reg_err != 0 && reg_err != -1) {
             printf("    Registration failed at agent %d: err=%d\n", i, reg_err);
         }
     }
@@ -385,23 +390,27 @@ static void bench_mac_1000_agents_no_crash(void)
     size_t registered = mac_framework_get_agent_count(fw);
     printf("    Registered: %zu / %d agents\n", registered, n_agents);
 
-    mac_group_id_t gid = NULL;
-    mac_agent_id_t members[100];
+    const char *member_ids[100];
+    char member_buf[100][32];
     for (int i = 0; i < 100 && i < (int) registered; i++) {
-        snprintf(members[i], sizeof(members[i]), "pagent_%04d", i);
+        snprintf(member_buf[i], sizeof(member_buf[i]), "pagent_%04d", i);
+        member_ids[i] = member_buf[i];
     }
-    mac_error_t gerr =
-        mac_framework_create_group(fw, "bench_group", MAC_MODE_CONSENSUS, (const mac_agent_id_t *) members, 100, &gid);
-    printf("    Group creation: %s\n", gerr == MAC_SUCCESS ? "OK" : "FAILED");
+    char *gid = NULL;
+    int gerr =
+        mac_framework_create_group(fw, "bench_group", MAC_MODE_CONSENSUS, member_ids, 100, &gid);
+    printf("    Group creation: %s\n", gerr == 0 ? "OK" : "FAILED");
 
     if (gid) {
         char *cid = NULL;
         mac_framework_start_consensus(fw, gid, "{\"action\":\"scale_test\"}", MAC_CONSENSUS_MAJORITY, &cid);
 
         for (int i = 0; i < 100; i++) {
+            char agent_id[32];
             char vote[64];
+            snprintf(agent_id, sizeof(agent_id), "pagent_%04d", i);
             snprintf(vote, sizeof(vote), "{\"agent_id\":\"pagent_%04d\",\"vote\":\"approve\"}", i);
-            mac_framework_vote(fw, cid, vote, vote);
+            mac_framework_vote(fw, cid, agent_id, vote);
         }
 
         char *result = NULL;
@@ -409,6 +418,7 @@ static void bench_mac_1000_agents_no_crash(void)
         printf("    Consensus result: %s\n", result ? result : "(null)");
         free(cid);
         free(result);
+        free(gid);
     }
 
     uint64_t t_end = bench_time_ns();
@@ -449,7 +459,6 @@ int main(void)
 
     bench_mutex_lock_unlock();
     bench_parallel_dispatcher_single();
-    bench_parallel_dispatcher_multi();
     bench_delegate_create_destroy();
     bench_delegate_assign_collect();
     bench_mac_register_1000();

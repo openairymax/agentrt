@@ -6,6 +6,8 @@
  *
  * Production implementation using real Claude API via HTTPS.
  * Requires AGENTOS_HAS_CURL to be defined for compilation.
+ *
+ * BAN-19 合规：无 curl 时 fail-closed，不使用 mock/模板生成假响应。
  */
 
 #define LOG_TAG "claude_adapter"
@@ -19,135 +21,15 @@
 #include <time.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <cjson/cJSON.h>
 #include <ctype.h>
 
 #ifdef AGENTOS_HAS_CURL
 #include <curl/curl.h>
+#include <cjson/cJSON.h>
 #endif
 
 #define CLAUDE_MAX_RESPONSE_LEN 4096
 #define CLAUDE_STREAM_CHUNK_SIZE 10
-
-typedef struct {
-    const char* keywords[10];
-    int keyword_count;
-    const char* prefix_templates[4];
-    int prefix_count;
-    const char* body_templates[6];
-    int body_count;
-    const char* suffix_templates[3];
-    int suffix_count;
-} claude_response_template_t;
-
-static const claude_response_template_t g_claude_templates[] = {
-    {
-        {"hello", "hi", "hey", "greetings"}, 4,
-        {"Hello! ", "Hi there! ", "Greetings! ", "Welcome! "}, 4,
-        {"I'm Claude, an AI assistant by Anthropic, running through AgentOS.",
-         "I'm Claude, ready to help you through the AgentOS protocol layer.",
-         "Thank you for reaching out. I'm Claude, at your service.",
-         "I'm operational as Claude via AgentOS integration.",
-         "Great to connect! I'm Claude, your AI assistant.",
-         "At your service. I'm Claude, ready to assist."}, 6,
-        {" How may I help you today?",
-         " What would you like to explore?",
-         ""}, 3
-    },
-    {
-        {"help", "assist", "support", "how do", "how can", "how to",
-         "explain", "describe"}, 7,
-        {"I'd be happy to help with that. ", "Let me assist you. ",
-         "Certainly! Here's my analysis: ", "Of course. "}, 4,
-        {"Based on my understanding of your request, here are the key points.",
-         "Let me break this down systematically for clarity.",
-         "Here's a structured approach to address your question.",
-         "I've analyzed your request thoroughly. Here's my assessment.",
-         "From what I understand, here's my recommendation.",
-         "Allow me to provide a comprehensive answer."}, 6,
-        {" Let me know if you need more details on any point.",
-         " Would you like me to elaborate further?",
-         " I hope this helps clarify things."}, 3
-    },
-    {
-        {"error", "bug", "issue", "problem", "fail", "crash",
-         "broken", "fix", "debug", "troubleshoot"}, 10,
-        {"I understand you're experiencing an issue. ", "That sounds frustrating. ",
-         "Let me help troubleshoot that. ", "I see the problem. "}, 4,
-        {"Here are some diagnostic steps we can work through together.",
-         "Let me analyze the possible causes systematically.",
-         "Based on common patterns, here's what might be happening.",
-         "I recommend checking these areas first.",
-         "This appears to be a configuration or runtime issue.",
-         "Let me walk you through the debugging process."}, 6,
-        {" If these steps don't resolve it, please share more details.",
-         " Don't hesitate to provide error logs for deeper analysis.",
-         " We'll get this sorted out together."}, 3
-    },
-    {
-        {"code", "program", "function", "implement", "develop",
-         "api", "algorithm", "software", "write"}, 9,
-        {"Regarding your code question: ", "From a programming perspective: ",
-         "Let me address the technical details: ", "Here's the implementation approach: "}, 4,
-        {"The key consideration is ensuring proper error handling and resource management.",
-         "I recommend following best practices for modularity and testability.",
-         "This pattern works well in production environments with high reliability needs.",
-         "The architecture should account for scalability and maintainability.",
-         "Here's how you can structure this for optimal performance.",
-         "Consider edge cases and boundary conditions carefully."}, 6,
-        {" Let me know if you need code examples or further clarification.",
-         " Happy to dive deeper into any technical aspect.",
-         " I'm available to review your approach in more detail."}, 3
-    },
-    {
-        {"analyze", "analysis", "compare", "evaluate", "review",
-         "assess", "examine", "study"}, 8,
-        {"Let me analyze this carefully. ", "Here's my analysis: ",
-         "Based on careful examination: ", "From an analytical perspective: "}, 4,
-        {"I've considered multiple factors in forming this assessment.",
-         "There are several key dimensions worth exploring here.",
-         "Let me present both the strengths and potential concerns.",
-         "My analysis takes into account the broader context provided.",
-         "Here's a balanced view of the situation.",
-         "I'll structure this analysis around the core criteria."}, 6,
-        {" Does this align with what you were looking for?",
-         " Would you like me to explore any specific angle?",
-         " I'm happy to refine this analysis."}, 3
-    },
-};
-
-static uint64_t claude_fnv1a_hash(const char* str) {
-    uint64_t hash = 2166136261ULL;
-    if (!str) return hash;
-    for (; *str; str++) {
-        hash ^= (unsigned char)*str;
-        hash *= 16777619ULL;
-    }
-    return hash;
-}
-
-static int claude_match_template(const char* user_msg) {
-    if (!user_msg || !*user_msg) return -1;
-    char lower[2048];
-    size_t len = strlen(user_msg);
-    if (len >= sizeof(lower)) len = sizeof(lower) - 1;
-    for (size_t i = 0; i < len; i++)
-        lower[i] = (char)tolower((unsigned char)user_msg[i]);
-    lower[len] = '\0';
-
-    int num_tpls = (int)(sizeof(g_claude_templates) / sizeof(g_claude_templates[0]));
-    int best = -1, best_score = 0;
-
-    for (int t = 0; t < num_tpls; t++) {
-        int score = 0;
-        for (int k = 0; k < g_claude_templates[t].keyword_count; k++) {
-            if (strstr(lower, g_claude_templates[t].keywords[k]))
-                score++;
-        }
-        if (score > best_score) { best_score = score; best = t; }
-    }
-    return best;
-}
 
 #ifdef AGENTOS_HAS_CURL
 
@@ -236,105 +118,46 @@ static int claude_api_call(const char* api_key, const char* base_url,
 
 #endif
 
-static int claude_generate_response_mock(const char* user_msg,
-                                    const char* system_ctx,
-                                    char* out_buf, size_t buf_len) {
-    if (!out_buf || buf_len == 0) return -1;
-
-    int tpl_idx = claude_match_template(user_msg);
-    const claude_response_template_t* tpl =
-        (tpl_idx >= 0) ? &g_claude_templates[tpl_idx] : NULL;
-
-    uint64_t h = claude_fnv1a_hash(user_msg);
-    int pos = 0;
-
-    if (tpl && tpl->prefix_count > 0) {
-        int pidx = (int)(h % (uint64_t)tpl->prefix_count);
-        pos += snprintf(out_buf + pos, buf_len - (size_t)pos,
-                        "%s", tpl->prefix_templates[pidx]);
-    }
-
-    if (tpl && tpl->body_count > 0) {
-        int bidx = (int)((h >> 8) % (uint64_t)tpl->body_count);
-        if (pos < (int)buf_len - 1)
-            pos += snprintf(out_buf + pos, buf_len - (size_t)pos,
-                            "%s", tpl->body_templates[bidx]);
-    }
-
-    if (system_ctx && system_ctx[0] && pos < (int)buf_len - 1) {
-        pos += snprintf(out_buf + pos, buf_len - (size_t)pos,
-                        "\n\nSystem context: %.512s", system_ctx);
-    }
-
-    if (user_msg && user_msg[0] && pos < (int)buf_len - 1) {
-        size_t qlen = strlen(user_msg);
-        if (qlen > 300) qlen = 300;
-        pos += snprintf(out_buf + pos, buf_len - (size_t)pos,
-                        "\n\nRegarding your message: \"%.300s\"", user_msg);
-    }
-
-    if (tpl && tpl->suffix_count > 0) {
-        int sidx = (int)((h >> 16) % (uint64_t)tpl->suffix_count);
-        if (pos < (int)buf_len - 1)
-            pos += snprintf(out_buf + pos, buf_len - (size_t)pos,
-                            "%s", tpl->suffix_templates[sidx]);
-    }
-
-    if (pos == 0) {
-        pos = snprintf(out_buf, buf_len,
-                       "I'm Claude, operating through the AgentOS protocol layer. "
-                       "I've processed your input and generated this response using "
-                       "contextual template matching. How may I assist you further?");
-    }
-
-    return pos;
-}
-
 static int claude_generate_response(const char* user_msg,
                                     const char* system_ctx,
                                     char* out_buf, size_t buf_len) {
 #ifndef AGENTOS_HAS_CURL
     (void)user_msg;
     (void)system_ctx;
-    if (out_buf && buf_len > 0) {
-        out_buf[0] = '\0';
-    }
-    LOG_ERROR(LOG_TAG, "Claude API not available: AGENTOS_HAS_CURL not defined");
+    if (out_buf && buf_len > 0) out_buf[0] = '\0';
     return -1;
 #else
-    if (user_msg && out_buf && buf_len > 0) {
-        extern claude_adapter_context_t* g_claude_ctx;
-        if (g_claude_ctx) {
-            const char* api_key = g_claude_ctx->config.api_key;
-            const char* base_url = g_claude_ctx->config.base_url;
-            if (api_key && api_key[0]) {
-                cJSON* req = cJSON_CreateObject();
-                cJSON_AddStringToObject(req, "model", "claude-3-5-sonnet-20241022");
-                cJSON_AddNumberToObject(req, "max_tokens", 4096);
-                cJSON* msgs = cJSON_CreateArray();
-                cJSON* msg = cJSON_CreateObject();
-                cJSON_AddStringToObject(msg, "role", "user");
-                cJSON* content = cJSON_CreateArray();
-                cJSON* text_obj = cJSON_CreateObject();
-                cJSON_AddStringToObject(text_obj, "type", "text");
-                cJSON_AddStringToObject(text_obj, "text", user_msg);
-                cJSON_AddItemToArray(content, text_obj);
-                cJSON_AddItemToObject(msg, "content", content);
-                cJSON_AddItemToArray(msgs, msg);
-                cJSON_AddItemToObject(req, "messages", msgs);
-                if (system_ctx && system_ctx[0]) {
-                    cJSON_AddStringToObject(req, "system", system_ctx);
-                }
-                char* req_json = cJSON_PrintUnformatted(req);
-                int result = claude_api_call(api_key, base_url, req_json, out_buf, buf_len);
-                free(req_json);
-                cJSON_Delete(req);
-                if (result > 0) return result;
-            }
-        }
-    }
-    LOG_ERROR("Claude API call failed: invalid configuration or network error");
-    return -1;
+    if (!user_msg || !out_buf || buf_len == 0) return -1;
+
+    extern claude_adapter_context_t* g_claude_ctx;
+    if (!g_claude_ctx || !g_claude_ctx->config.api_key ||
+        !g_claude_ctx->config.api_key[0]) return -2;
+
+    cJSON* req = cJSON_CreateObject();
+    cJSON_AddStringToObject(req, "model",
+                            claude_model_id_to_api_name(g_claude_ctx->config.default_model));
+    cJSON_AddNumberToObject(req, "max_tokens", g_claude_ctx->config.max_tokens);
+    cJSON* msgs = cJSON_CreateArray();
+    cJSON* msg = cJSON_CreateObject();
+    cJSON_AddStringToObject(msg, "role", "user");
+    cJSON* content = cJSON_CreateArray();
+    cJSON* text_obj = cJSON_CreateObject();
+    cJSON_AddStringToObject(text_obj, "type", "text");
+    cJSON_AddStringToObject(text_obj, "text", user_msg);
+    cJSON_AddItemToArray(content, text_obj);
+    cJSON_AddItemToObject(msg, "content", content);
+    cJSON_AddItemToArray(msgs, msg);
+    cJSON_AddItemToObject(req, "messages", msgs);
+    if (system_ctx && system_ctx[0])
+        cJSON_AddStringToObject(req, "system", system_ctx);
+
+    char* req_json = cJSON_PrintUnformatted(req);
+    int result = claude_api_call(g_claude_ctx->config.api_key,
+                                 g_claude_ctx->config.base_url,
+                                 req_json, out_buf, buf_len);
+    free(req_json);
+    cJSON_Delete(req);
+    return result > 0 ? result : -1;
 #endif
 }
 
@@ -402,6 +225,7 @@ static int claude_proto_handle_request(void* context,
     const char* user_content = "";
     const char* system_content = "";
 
+#ifdef AGENTOS_HAS_CURL
     if (request->payload) {
         cJSON* json = cJSON_Parse(request->payload);
         if (json) {
@@ -423,6 +247,11 @@ static int claude_proto_handle_request(void* context,
             cJSON_Delete(json);
         }
     }
+#else
+    if (request->payload) {
+        user_content = request->payload;
+    }
+#endif
 
     if (request->body && request->body_length > 0)
         user_content = (const char*)request->body;
@@ -668,42 +497,113 @@ int claude_messages_create(claude_adapter_context_t* ctx,
         return ret;
     }
 
+#ifdef AGENTOS_HAS_CURL
+    if (!ctx->config.api_key || !ctx->config.api_key[0]) return -10;
+
+    const char* model_name = claude_model_id_to_api_name(ctx->config.default_model);
+    const char* user_content = "";
+    const char* sys_ctx = system_prompt ? system_prompt : ctx->config.system_prompt;
+
+    for (size_t i = message_count; i > 0; i--) {
+        if (messages[i-1].role == CLAUDE_ROLE_USER && messages[i-1].content) {
+            user_content = messages[i-1].content;
+            break;
+        }
+    }
+
+    cJSON* req = cJSON_CreateObject();
+    cJSON_AddStringToObject(req, "model", model_name);
+    cJSON_AddNumberToObject(req, "max_tokens", ctx->config.max_tokens);
+    cJSON* msgs = cJSON_CreateArray();
+    for (size_t i = 0; i < message_count && i < 128; i++) {
+        cJSON* msg = cJSON_CreateObject();
+        const char* role = "user";
+        if (messages[i].role == CLAUDE_ROLE_ASSISTANT) role = "assistant";
+        cJSON_AddStringToObject(msg, "role", role);
+        cJSON* content_arr = cJSON_CreateArray();
+        cJSON* text_obj = cJSON_CreateObject();
+        cJSON_AddStringToObject(text_obj, "type", "text");
+        cJSON_AddStringToObject(text_obj, "text",
+                                messages[i].content ? messages[i].content : "");
+        cJSON_AddItemToArray(content_arr, text_obj);
+        cJSON_AddItemToObject(msg, "content", content_arr);
+        cJSON_AddItemToArray(msgs, msg);
+    }
+    cJSON_AddItemToObject(req, "messages", msgs);
+    if (sys_ctx && sys_ctx[0])
+        cJSON_AddStringToObject(req, "system", sys_ctx);
+
+    char* req_json = cJSON_PrintUnformatted(req);
+    cJSON_Delete(req);
+
+    char api_response[8192];
+    memset(api_response, 0, sizeof(api_response));
+    int api_result = claude_api_call(ctx->config.api_key, ctx->config.base_url,
+                                      req_json, api_response, sizeof(api_response));
+    free(req_json);
+
+    if (api_result <= 0) return -11;
+
+    cJSON* root = cJSON_Parse(api_response);
+    if (!root) return -12;
+
     static uint32_t msg_counter = 0;
     msg_counter++;
-
     char resp_id[64];
     snprintf(resp_id, sizeof(resp_id), "msg_%08x", msg_counter);
     response->id = strdup(resp_id);
-    response->model = strdup(claude_model_id_to_api_name(ctx->config.default_model));
+    response->model = strdup(model_name);
     response->role = CLAUDE_ROLE_ASSISTANT;
     response->stop_reason = CLAUDE_STOP_END_TURN;
 
-    size_t content_len = 128 + (system_prompt ? strlen(system_prompt) : 0);
-    for (size_t i = 0; i < message_count && i < 8; i++) {
-        if (messages[i].content)
-            content_len += strlen(messages[i].content);
+    cJSON* content_arr = cJSON_GetObjectItem(root, "content");
+    int block_count = 0;
+    if (content_arr && cJSON_IsArray(content_arr))
+        block_count = cJSON_GetArraySize(content_arr);
+
+    if (block_count > 0) {
+        response->content_blocks = (claude_content_block_t*)calloc(
+            (size_t)block_count, sizeof(claude_content_block_t));
+        response->block_count = (size_t)block_count;
+        for (int i = 0; i < block_count; i++) {
+            cJSON* block = cJSON_GetArrayItem(content_arr, i);
+            cJSON* type = cJSON_GetObjectItem(block, "type");
+            if (type && type->valuestring && strcmp(type->valuestring, "text") == 0) {
+                cJSON* text = cJSON_GetObjectItem(block, "text");
+                response->content_blocks[i].type = strdup("text");
+                response->content_blocks[i].content.text =
+                    strdup(text && text->valuestring ? text->valuestring : "");
+            } else if (type && type->valuestring && strcmp(type->valuestring, "tool_use") == 0) {
+                cJSON* id = cJSON_GetObjectItem(block, "id");
+                cJSON* name = cJSON_GetObjectItem(block, "name");
+                cJSON* input = cJSON_GetObjectItem(block, "input");
+                response->content_blocks[i].type = strdup("tool_use");
+                response->content_blocks[i].content.tool_use.id =
+                    strdup(id && id->valuestring ? id->valuestring : "");
+                response->content_blocks[i].content.tool_use.name =
+                    strdup(name && name->valuestring ? name->valuestring : "");
+                char* input_str = input ? cJSON_PrintUnformatted(input) : strdup("{}");
+                response->content_blocks[i].content.tool_use.input_json = input_str;
+                ctx->total_tool_calls++;
+            }
+        }
     }
 
-    char* reply_text = (char*)malloc(content_len);
-    snprintf(reply_text, content_len,
-        "Hello! I'm Claude running through AgentOS protocol layer v%s. "
-        "I've processed %zu message(s). How can I help you today?",
-        CLAUDE_ADAPTER_VERSION, message_count);
+    cJSON* usage_obj = cJSON_GetObjectItem(root, "usage");
+    if (usage_obj) {
+        cJSON* it = cJSON_GetObjectItem(usage_obj, "input_tokens");
+        cJSON* ot = cJSON_GetObjectItem(usage_obj, "output_tokens");
+        response->input_tokens = it ? it->valueint : 0;
+        response->output_tokens = ot ? ot->valueint : 0;
+    }
 
-    response->content_blocks = (claude_content_block_t*)calloc(1, sizeof(claude_content_block_t));
-    response->block_count = 1;
-    response->content_blocks[0].type = "text";
-    response->content_blocks[0].content.text = reply_text;
-
-    response->input_tokens = (int)(content_len / 4);
-    response->output_tokens = (int)(strlen(reply_text) / 4);
-    response->cache_creation_input_tokens = 0;
-    response->cache_read_input_tokens = 0;
-
+    cJSON_Delete(root);
     ctx->total_tokens_in += response->input_tokens;
     ctx->total_tokens_out += response->output_tokens;
-
     return 0;
+#else
+    return -10;
+#endif
 }
 
 int claude_messages_stream(claude_adapter_context_t* ctx,

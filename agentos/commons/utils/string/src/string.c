@@ -250,7 +250,7 @@ int string_compare(const char* str1, const char* str2, int options) {
         // 区分大小写比�?        return strcmp(str1, str2);
     }
     
-    // 注意：自然排序和区域感知比较需要更复杂的实�?    // 这里简化处理，只实现基本功�?}
+    // 当前实现基本功能
 
 int string_compare_n(const char* str1, const char* str2, size_t len, int options) {
     if (str1 == str2 || len == 0) {
@@ -1487,7 +1487,7 @@ bool string_utf8_validate(const char* str, size_t len) {
         }
         
         // 检查Unicode码点是否在有效范围内
-        // 这里简化检查，实际可能需要更复杂的验�?        uint32_t code_point = 0;
+        // 当前检查方式
         if (char_len == 2) {
             code_point = ((first & 0x1F) << 6) | (str[i + 1] & 0x3F);
         } else if (char_len == 3) {

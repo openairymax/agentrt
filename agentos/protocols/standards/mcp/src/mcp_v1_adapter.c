@@ -6,6 +6,7 @@
  */
 
 #include "mcp_v1_adapter.h"
+#include "mcp_transport.h"
 #include "unified_protocol.h"
 #include <cjson/cJSON.h>
 #include <stdlib.h>
@@ -63,6 +64,8 @@ struct mcp_v1_context_s {
     void* log_user_data;
 
     mcp_log_level_t log_level;
+
+    mcp_transport_t* transport;
 
     uint64_t request_counter;
 };
@@ -1170,6 +1173,17 @@ static protocol_adapter_t mcp_v1_adapter_internal = {
 
 const protocol_adapter_t* mcp_v1_get_adapter(void) {
     return &mcp_v1_adapter_internal;
+}
+
+int mcp_v1_set_transport(mcp_v1_context_t* ctx, mcp_transport_t* transport) {
+    if (!ctx) return -1;
+    ctx->transport = transport;
+    return 0;
+}
+
+mcp_transport_t* mcp_v1_get_transport(mcp_v1_context_t* ctx) {
+    if (!ctx) return NULL;
+    return ctx->transport;
 }
 
 size_t mcp_v1_get_tool_count(mcp_v1_context_t* ctx) {
