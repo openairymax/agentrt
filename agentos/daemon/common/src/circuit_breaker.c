@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @file circuit_breaker.c
  * @brief 熔断器与自愈框架实现
@@ -44,7 +44,7 @@ typedef struct circuit_breaker_s {
     uint32_t window_calls;
     bool destroying;
     struct cb_manager_s* manager;
-    agentos_platform_mutex_t mutex;
+    agentos_mutex_t mutex;
 } cb_internal_t;
 
 typedef struct cb_manager_s {
@@ -52,7 +52,7 @@ typedef struct cb_manager_s {
     uint32_t breaker_count;
     cb_callback_entry_t callbacks[CB_MAX_CALLBACKS];
     uint32_t callback_count;
-    agentos_platform_mutex_t mutex;
+    agentos_mutex_t mutex;
 } cb_manager_internal_t;
 
 /* ==================== 辅助函数 ==================== */
@@ -176,7 +176,7 @@ AGENTOS_API cb_manager_t cb_manager_create(void) {
         (cb_manager_internal_t*)AGENTOS_CALLOC(1, sizeof(cb_manager_internal_t));
     if (!mgr) return NULL;
 
-    agentos_error_t err = agentos_platform_mutex_init(&mgr->mutex);
+    agentos_error_t err = agentos_mutex_init(&mgr->mutex);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_FREE(mgr);
         return NULL;
@@ -191,18 +191,18 @@ AGENTOS_API void cb_manager_destroy(cb_manager_t manager) {
 
     cb_manager_internal_t* mgr = (cb_manager_internal_t*)manager;
 
-    agentos_platform_mutex_lock(&mgr->mutex);
+    agentos_mutex_lock(&mgr->mutex);
     for (uint32_t i = 0; i < mgr->breaker_count; i++) {
         if (mgr->breakers[i]) {
             mgr->breakers[i]->destroying = true;
-            agentos_platform_mutex_destroy(&mgr->breakers[i]->mutex);
+            agentos_mutex_destroy(&mgr->breakers[i]->mutex);
             AGENTOS_FREE(mgr->breakers[i]);
         }
     }
     mgr->breaker_count = 0;
-    agentos_platform_mutex_unlock(&mgr->mutex);
+    agentos_mutex_unlock(&mgr->mutex);
 
-    agentos_platform_mutex_destroy(&mgr->mutex);
+    agentos_mutex_destroy(&mgr->mutex);
     AGENTOS_FREE(mgr);
 
     LOG_INFO("Circuit breaker manager destroyed");
@@ -217,24 +217,24 @@ AGENTOS_API circuit_breaker_t cb_create(
 
     cb_manager_internal_t* mgr = (cb_manager_internal_t*)manager;
 
-    agentos_platform_mutex_lock(&mgr->mutex);
+    agentos_mutex_lock(&mgr->mutex);
 
     if (mgr->breaker_count >= CB_MAX_BREAKERS) {
-        agentos_platform_mutex_unlock(&mgr->mutex);
+        agentos_mutex_unlock(&mgr->mutex);
         LOG_ERROR("Max circuit breakers reached");
         return NULL;
     }
 
     for (uint32_t i = 0; i < mgr->breaker_count; i++) {
         if (strcmp(mgr->breakers[i]->name, name) == 0) {
-            agentos_platform_mutex_unlock(&mgr->mutex);
+            agentos_mutex_unlock(&mgr->mutex);
             return (circuit_breaker_t)mgr->breakers[i];
         }
     }
 
     cb_internal_t* cb = (cb_internal_t*)AGENTOS_CALLOC(1, sizeof(cb_internal_t));
     if (!cb) {
-        agentos_platform_mutex_unlock(&mgr->mutex);
+        agentos_mutex_unlock(&mgr->mutex);
         return NULL;
     }
 
@@ -252,17 +252,17 @@ AGENTOS_API circuit_breaker_t cb_create(
     cb->window_start = agentos_platform_get_time_ms();
     cb->manager = mgr;
 
-    agentos_error_t err = agentos_platform_mutex_init(&cb->mutex);
+    agentos_error_t err = agentos_mutex_init(&cb->mutex);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_FREE(cb);
-        agentos_platform_mutex_unlock(&mgr->mutex);
+        agentos_mutex_unlock(&mgr->mutex);
         return NULL;
     }
 
     mgr->breakers[mgr->breaker_count] = cb;
     mgr->breaker_count++;
 
-    agentos_platform_mutex_unlock(&mgr->mutex);
+    agentos_mutex_unlock(&mgr->mutex);
 
     LOG_INFO("Circuit breaker '%s' created (failure_threshold=%u, timeout=%ums)",
              name, cb->config.failure_threshold, cb->config.timeout_ms);
@@ -278,7 +278,7 @@ AGENTOS_API void cb_destroy(circuit_breaker_t breaker) {
     if (cb->manager) {
         cb_manager_internal_t* mgr = cb->manager;
 
-        agentos_platform_mutex_lock(&mgr->mutex);
+        agentos_mutex_lock(&mgr->mutex);
         for (uint32_t i = 0; i < mgr->breaker_count; i++) {
             if (mgr->breakers[i] == cb) {
                 /* 将后续元素前移填补空位 */
@@ -290,16 +290,16 @@ AGENTOS_API void cb_destroy(circuit_breaker_t breaker) {
                 break;
             }
         }
-        agentos_platform_mutex_unlock(&mgr->mutex);
+        agentos_mutex_unlock(&mgr->mutex);
     }
 
-    agentos_platform_mutex_lock(&cb->mutex);
+    agentos_mutex_lock(&cb->mutex);
     cb->destroying = true;
-    agentos_platform_mutex_unlock(&cb->mutex);
+    agentos_mutex_unlock(&cb->mutex);
 
     LOG_INFO("Circuit breaker '%s' destroyed", cb->name);
 
-    agentos_platform_mutex_destroy(&cb->mutex);
+    agentos_mutex_destroy(&cb->mutex);
     AGENTOS_FREE(cb);
 }
 
@@ -308,12 +308,12 @@ AGENTOS_API bool cb_allow_request(circuit_breaker_t breaker) {
 
     cb_internal_t* cb = (cb_internal_t*)breaker;
 
-    agentos_platform_mutex_lock(&cb->mutex);
-    if (cb->destroying) { agentos_platform_mutex_unlock(&cb->mutex); return false; }
+    agentos_mutex_lock(&cb->mutex);
+    if (cb->destroying) { agentos_mutex_unlock(&cb->mutex); return false; }
 
     switch (cb->state) {
         case CB_STATE_CLOSED:
-            agentos_platform_mutex_unlock(&cb->mutex);
+            agentos_mutex_unlock(&cb->mutex);
             return true;
 
         case CB_STATE_OPEN: {
@@ -321,26 +321,26 @@ AGENTOS_API bool cb_allow_request(circuit_breaker_t breaker) {
             if (now - cb->state_changed_at >= cb->config.timeout_ms) {
                 cb_manager_internal_t* mgr = NULL;
                 transition_state(cb, mgr, CB_STATE_HALF_OPEN);
-                agentos_platform_mutex_unlock(&cb->mutex);
+                agentos_mutex_unlock(&cb->mutex);
                 return true;
             }
             cb->stats.rejected_calls++;
-            agentos_platform_mutex_unlock(&cb->mutex);
+            agentos_mutex_unlock(&cb->mutex);
             return false;
         }
 
         case CB_STATE_HALF_OPEN:
             if (cb->half_open_calls < cb->config.half_open_max_calls) {
                 cb->half_open_calls++;
-                agentos_platform_mutex_unlock(&cb->mutex);
+                agentos_mutex_unlock(&cb->mutex);
                 return true;
             }
             cb->stats.rejected_calls++;
-            agentos_platform_mutex_unlock(&cb->mutex);
+            agentos_mutex_unlock(&cb->mutex);
             return false;
 
         default:
-            agentos_platform_mutex_unlock(&cb->mutex);
+            agentos_mutex_unlock(&cb->mutex);
             return false;
     }
 }
@@ -350,8 +350,8 @@ AGENTOS_API void cb_record_success(circuit_breaker_t breaker, uint32_t duration_
 
     cb_internal_t* cb = (cb_internal_t*)breaker;
 
-    agentos_platform_mutex_lock(&cb->mutex);
-    if (cb->destroying) { agentos_platform_mutex_unlock(&cb->mutex); return; }
+    agentos_mutex_lock(&cb->mutex);
+    if (cb->destroying) { agentos_mutex_unlock(&cb->mutex); return; }
 
     cb->stats.total_calls++;
     cb->stats.successful_calls++;
@@ -377,7 +377,7 @@ AGENTOS_API void cb_record_success(circuit_breaker_t breaker, uint32_t duration_
         }
     }
 
-    agentos_platform_mutex_unlock(&cb->mutex);
+    agentos_mutex_unlock(&cb->mutex);
 }
 
 AGENTOS_API void cb_record_failure(circuit_breaker_t breaker, int32_t error_code) {
@@ -385,8 +385,8 @@ AGENTOS_API void cb_record_failure(circuit_breaker_t breaker, int32_t error_code
 
     cb_internal_t* cb = (cb_internal_t*)breaker;
 
-    agentos_platform_mutex_lock(&cb->mutex);
-    if (cb->destroying) { agentos_platform_mutex_unlock(&cb->mutex); return; }
+    agentos_mutex_lock(&cb->mutex);
+    if (cb->destroying) { agentos_mutex_unlock(&cb->mutex); return; }
 
     cb->stats.total_calls++;
     cb->stats.failed_calls++;
@@ -411,7 +411,7 @@ AGENTOS_API void cb_record_failure(circuit_breaker_t breaker, int32_t error_code
         transition_state(cb, NULL, CB_STATE_OPEN);
     }
 
-    agentos_platform_mutex_unlock(&cb->mutex);
+    agentos_mutex_unlock(&cb->mutex);
 
     LOG_DEBUG("Circuit breaker '%s': failure recorded (error=%d, consecutive=%u)",
               cb->name, error_code, cb->stats.consecutive_failures);
@@ -422,8 +422,8 @@ AGENTOS_API void cb_record_timeout(circuit_breaker_t breaker) {
 
     cb_internal_t* cb = (cb_internal_t*)breaker;
 
-    agentos_platform_mutex_lock(&cb->mutex);
-    if (cb->destroying) { agentos_platform_mutex_unlock(&cb->mutex); return; }
+    agentos_mutex_lock(&cb->mutex);
+    if (cb->destroying) { agentos_mutex_unlock(&cb->mutex); return; }
 
     cb->stats.total_calls++;
     cb->stats.timeout_calls++;
@@ -449,7 +449,7 @@ AGENTOS_API void cb_record_timeout(circuit_breaker_t breaker) {
         transition_state(cb, NULL, CB_STATE_OPEN);
     }
 
-    agentos_platform_mutex_unlock(&cb->mutex);
+    agentos_mutex_unlock(&cb->mutex);
 
     LOG_DEBUG("Circuit breaker '%s': timeout recorded", cb->name);
 }
@@ -473,10 +473,10 @@ AGENTOS_API agentos_error_t cb_get_stats(circuit_breaker_t breaker, cb_stats_t* 
 
     cb_internal_t* cb = (cb_internal_t*)breaker;
 
-    agentos_platform_mutex_lock(&cb->mutex);
-    if (cb->destroying) { agentos_platform_mutex_unlock(&cb->mutex); return AGENTOS_EINVAL; }
+    agentos_mutex_lock(&cb->mutex);
+    if (cb->destroying) { agentos_mutex_unlock(&cb->mutex); return AGENTOS_EINVAL; }
     memcpy(stats, &cb->stats, sizeof(cb_stats_t));
-    agentos_platform_mutex_unlock(&cb->mutex);
+    agentos_mutex_unlock(&cb->mutex);
 
     return AGENTOS_SUCCESS;
 }
@@ -486,8 +486,8 @@ AGENTOS_API void cb_reset(circuit_breaker_t breaker) {
 
     cb_internal_t* cb = (cb_internal_t*)breaker;
 
-    agentos_platform_mutex_lock(&cb->mutex);
-    if (cb->destroying) { agentos_platform_mutex_unlock(&cb->mutex); return; }
+    agentos_mutex_lock(&cb->mutex);
+    if (cb->destroying) { agentos_mutex_unlock(&cb->mutex); return; }
 
     cb_state_t old = cb->state;
     cb->state = CB_STATE_CLOSED;
@@ -504,7 +504,7 @@ AGENTOS_API void cb_reset(circuit_breaker_t breaker) {
         cb->stats.last_state_change_time = cb->state_changed_at;
     }
 
-    agentos_platform_mutex_unlock(&cb->mutex);
+    agentos_mutex_unlock(&cb->mutex);
 
     LOG_INFO("Circuit breaker '%s' reset to CLOSED", cb->name);
 }
@@ -513,20 +513,20 @@ AGENTOS_API void cb_force_open(circuit_breaker_t breaker) {
     if (!breaker) return;
     cb_internal_t* cb = (cb_internal_t*)breaker;
 
-    agentos_platform_mutex_lock(&cb->mutex);
-    if (cb->destroying) { agentos_platform_mutex_unlock(&cb->mutex); return; }
+    agentos_mutex_lock(&cb->mutex);
+    if (cb->destroying) { agentos_mutex_unlock(&cb->mutex); return; }
     transition_state(cb, NULL, CB_STATE_OPEN);
-    agentos_platform_mutex_unlock(&cb->mutex);
+    agentos_mutex_unlock(&cb->mutex);
 }
 
 AGENTOS_API void cb_force_close(circuit_breaker_t breaker) {
     if (!breaker) return;
     cb_internal_t* cb = (cb_internal_t*)breaker;
 
-    agentos_platform_mutex_lock(&cb->mutex);
-    if (cb->destroying) { agentos_platform_mutex_unlock(&cb->mutex); return; }
+    agentos_mutex_lock(&cb->mutex);
+    if (cb->destroying) { agentos_mutex_unlock(&cb->mutex); return; }
     transition_state(cb, NULL, CB_STATE_CLOSED);
-    agentos_platform_mutex_unlock(&cb->mutex);
+    agentos_mutex_unlock(&cb->mutex);
 }
 
 /* ==================== 故障转移 ==================== */
@@ -539,10 +539,10 @@ AGENTOS_API agentos_error_t cb_set_failover_config(
 
     cb_internal_t* cb = (cb_internal_t*)breaker;
 
-    agentos_platform_mutex_lock(&cb->mutex);
-    if (cb->destroying) { agentos_platform_mutex_unlock(&cb->mutex); return AGENTOS_EINVAL; }
+    agentos_mutex_lock(&cb->mutex);
+    if (cb->destroying) { agentos_mutex_unlock(&cb->mutex); return AGENTOS_EINVAL; }
     memcpy(&cb->failover_config, config, sizeof(cb_failover_config_t));
-    agentos_platform_mutex_unlock(&cb->mutex);
+    agentos_mutex_unlock(&cb->mutex);
 
     LOG_INFO("Circuit breaker '%s': failover config updated (strategy=%d)",
              cb->name, config->strategy);
@@ -559,8 +559,8 @@ AGENTOS_API agentos_error_t cb_execute_failover(
 
     cb_internal_t* cb = (cb_internal_t*)breaker;
 
-    agentos_platform_mutex_lock(&cb->mutex);
-    if (cb->destroying) { agentos_platform_mutex_unlock(&cb->mutex); return AGENTOS_EINVAL; }
+    agentos_mutex_lock(&cb->mutex);
+    if (cb->destroying) { agentos_mutex_unlock(&cb->mutex); return AGENTOS_EINVAL; }
 
     cb_failover_config_t* fc = &cb->failover_config;
     agentos_error_t err = AGENTOS_EFAIL;
@@ -601,7 +601,7 @@ AGENTOS_API agentos_error_t cb_execute_failover(
             break;
     }
 
-    agentos_platform_mutex_unlock(&cb->mutex);
+    agentos_mutex_unlock(&cb->mutex);
 
     LOG_INFO("Circuit breaker '%s': failover executed (strategy=%d, error=%d)",
              cb->name, fc->strategy, original_error);
@@ -619,10 +619,10 @@ AGENTOS_API agentos_error_t cb_register_event_callback(
 
     cb_manager_internal_t* mgr = (cb_manager_internal_t*)manager;
 
-    agentos_platform_mutex_lock(&mgr->mutex);
+    agentos_mutex_lock(&mgr->mutex);
 
     if (mgr->callback_count >= CB_MAX_CALLBACKS) {
-        agentos_platform_mutex_unlock(&mgr->mutex);
+        agentos_mutex_unlock(&mgr->mutex);
         return AGENTOS_ENOMEM;
     }
 
@@ -630,7 +630,7 @@ AGENTOS_API agentos_error_t cb_register_event_callback(
     mgr->callbacks[mgr->callback_count].user_data = user_data;
     mgr->callback_count++;
 
-    agentos_platform_mutex_unlock(&mgr->mutex);
+    agentos_mutex_unlock(&mgr->mutex);
 
     return AGENTOS_SUCCESS;
 }
@@ -640,16 +640,16 @@ AGENTOS_API circuit_breaker_t cb_find(cb_manager_t manager, const char* name) {
 
     cb_manager_internal_t* mgr = (cb_manager_internal_t*)manager;
 
-    agentos_platform_mutex_lock(&mgr->mutex);
+    agentos_mutex_lock(&mgr->mutex);
 
     for (uint32_t i = 0; i < mgr->breaker_count; i++) {
         if (strcmp(mgr->breakers[i]->name, name) == 0) {
-            agentos_platform_mutex_unlock(&mgr->mutex);
+            agentos_mutex_unlock(&mgr->mutex);
             return (circuit_breaker_t)mgr->breakers[i];
         }
     }
 
-    agentos_platform_mutex_unlock(&mgr->mutex);
+    agentos_mutex_unlock(&mgr->mutex);
     return NULL;
 }
 

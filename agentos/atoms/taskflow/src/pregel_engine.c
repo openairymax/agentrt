@@ -844,7 +844,7 @@ uint64_t pregel_engine_create_checkpoint(pregel_engine_handle_t engine)
             size_t idx = e->checkpoint_count;
             e->checkpoints[idx].checkpoint_id = cp_id;
             e->checkpoints[idx].superstep = e->current_superstep;
-            e->checkpoints[idx].timestamp = (uint64_t)time(NULL);
+            e->checkpoints[idx].timestamp = (uint64_t)(time_t)(agentos_time_ms() / 1000ULL);
             e->checkpoints[idx].data_size = snapshot_size;
             e->checkpoints[idx].snapshot_data = snapshot;
             e->checkpoints[idx].is_consistent = true;
@@ -856,7 +856,7 @@ uint64_t pregel_engine_create_checkpoint(pregel_engine_handle_t engine)
                 15 * sizeof(checkpoint_t));
         e->checkpoints[15].checkpoint_id = cp_id;
         e->checkpoints[15].superstep = e->current_superstep;
-        e->checkpoints[15].timestamp = (uint64_t)time(NULL);
+        e->checkpoints[15].timestamp = (uint64_t)(time_t)(agentos_time_ms() / 1000ULL);
         e->checkpoints[15].data_size = snapshot_size;
         e->checkpoints[15].snapshot_data = snapshot;
         e->checkpoints[15].is_consistent = true;

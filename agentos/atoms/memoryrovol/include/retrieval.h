@@ -1,6 +1,6 @@
 /**
  * @file retrieval.h
- * @brief 检索系统接口（简化版）
+ * @brief 检索系统接口
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
