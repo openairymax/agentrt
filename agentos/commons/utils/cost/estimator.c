@@ -16,24 +16,11 @@
 #include <ctype.h>
 #include <stdio.h>
 
-#ifdef _WIN32
-    #include "../../platform/include/platform.h"
-#else
-    #include <pthread.h>
-#endif
+#include "../../platform/include/platform.h"
 
 /* Unified base library compatibility layer */
 #include <memory_compat.h>
 #include <string_compat.h>
-
-#ifdef _WIN32
-    /* Windows: 使用 agentos_mutex_t 替代 pthread_mutex_t */
-    #define pthread_mutex_t   agentos_mutex_t
-    #define pthread_mutex_init(m, a)  agentos_mutex_init(m)
-    #define pthread_mutex_destroy(m)  agentos_mutex_destroy(m)
-    #define pthread_mutex_lock(m)     agentos_mutex_lock(m)
-    #define pthread_mutex_unlock(m)   agentos_mutex_unlock(m)
-#endif
 
 #define MAX_MODEL_NAME 64
 #define MAX_CONFIG_ENTRIES 16
@@ -55,7 +42,7 @@ typedef struct {
 struct agentos_cost_estimator {
     model_cost_config_t configs[MAX_CONFIG_ENTRIES];  /**< 模型配置数组 */
     int config_count;                                 /**< 配置数量 */
-    pthread_mutex_t mutex;                           /**< 互斥�?*/
+    agentos_mutex_t mutex;                           /**< 互斥�?*/
     double total_cost;                               /**< 累计成本 */
     size_t total_input_tokens;                       /**< 累计输入Token */
     size_t total_output_tokens;                      /**< 累计输出Token */
@@ -162,7 +149,7 @@ agentos_cost_estimator_t* agentos_cost_estimator_create(const char* config_path)
     
     memset(estimator, 0, sizeof(agentos_cost_estimator_t));
     
-    if (pthread_mutex_init(&estimator->mutex, NULL) != 0) {
+    if (agentos_mutex_init(&estimator->mutex) != 0) {
         AGENTOS_FREE(estimator);
         return NULL;
     }
@@ -198,7 +185,7 @@ void agentos_cost_estimator_destroy(agentos_cost_estimator_t* estimator) {
         return;
     }
     
-    pthread_mutex_destroy(&estimator->mutex);
+    agentos_mutex_destroy(&estimator->mutex);
     AGENTOS_FREE(estimator);
 }
 
@@ -222,14 +209,14 @@ double agentos_cost_estimator_estimate(agentos_cost_estimator_t* estimator,
     double output_cost = (output_tokens / 1000.0) * manager->output_cost_per_1k;
     double total_cost = input_cost + output_cost;
     
-    pthread_mutex_lock(&estimator->mutex);
+    agentos_mutex_lock(&estimator->mutex);
     
     estimator->total_cost += total_cost;
     estimator->total_input_tokens += input_tokens;
     estimator->total_output_tokens += output_tokens;
     estimator->request_count++;
     
-    pthread_mutex_unlock(&estimator->mutex);
+    agentos_mutex_unlock(&estimator->mutex);
     
     return total_cost;
 }
@@ -239,9 +226,9 @@ double agentos_cost_estimator_get_total(agentos_cost_estimator_t* estimator) {
         return 0.0;
     }
     
-    pthread_mutex_lock(&estimator->mutex);
+    agentos_mutex_lock(&estimator->mutex);
     double total = estimator->total_cost;
-    pthread_mutex_unlock(&estimator->mutex);
+    agentos_mutex_unlock(&estimator->mutex);
     
     return total;
 }
@@ -251,9 +238,9 @@ size_t agentos_cost_estimator_get_input_tokens(agentos_cost_estimator_t* estimat
         return 0;
     }
     
-    pthread_mutex_lock(&estimator->mutex);
+    agentos_mutex_lock(&estimator->mutex);
     size_t tokens = estimator->total_input_tokens;
-    pthread_mutex_unlock(&estimator->mutex);
+    agentos_mutex_unlock(&estimator->mutex);
     
     return tokens;
 }
@@ -263,9 +250,9 @@ size_t agentos_cost_estimator_get_output_tokens(agentos_cost_estimator_t* estima
         return 0;
     }
     
-    pthread_mutex_lock(&estimator->mutex);
+    agentos_mutex_lock(&estimator->mutex);
     size_t tokens = estimator->total_output_tokens;
-    pthread_mutex_unlock(&estimator->mutex);
+    agentos_mutex_unlock(&estimator->mutex);
     
     return tokens;
 }
@@ -275,9 +262,9 @@ uint64_t agentos_cost_estimator_get_request_count(agentos_cost_estimator_t* esti
         return 0;
     }
     
-    pthread_mutex_lock(&estimator->mutex);
+    agentos_mutex_lock(&estimator->mutex);
     uint64_t count = estimator->request_count;
-    pthread_mutex_unlock(&estimator->mutex);
+    agentos_mutex_unlock(&estimator->mutex);
     
     return count;
 }
@@ -287,14 +274,14 @@ void agentos_cost_estimator_reset(agentos_cost_estimator_t* estimator) {
         return;
     }
     
-    pthread_mutex_lock(&estimator->mutex);
+    agentos_mutex_lock(&estimator->mutex);
     
     estimator->total_cost = 0.0;
     estimator->total_input_tokens = 0;
     estimator->total_output_tokens = 0;
     estimator->request_count = 0;
     
-    pthread_mutex_unlock(&estimator->mutex);
+    agentos_mutex_unlock(&estimator->mutex);
 }
 
 int agentos_cost_estimator_add_model(agentos_cost_estimator_t* estimator,
@@ -309,7 +296,7 @@ int agentos_cost_estimator_add_model(agentos_cost_estimator_t* estimator,
         return -1;
     }
     
-    pthread_mutex_lock(&estimator->mutex);
+    agentos_mutex_lock(&estimator->mutex);
     
     strncpy(estimator->configs[estimator->config_count].model_name,
            model_name,
@@ -320,7 +307,7 @@ int agentos_cost_estimator_add_model(agentos_cost_estimator_t* estimator,
     estimator->configs[estimator->config_count].max_output_tokens = 4096;
     estimator->config_count++;
     
-    pthread_mutex_unlock(&estimator->mutex);
+    agentos_mutex_unlock(&estimator->mutex);
     
     return 0;
 }

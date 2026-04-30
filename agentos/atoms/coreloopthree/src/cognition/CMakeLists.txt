@@ -19,13 +19,13 @@ target_include_directories(agentos_cognition PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../corekern/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../memoryrovol/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../memory
     ${CMAKE_CURRENT_SOURCE_DIR}/../memory
 )
 
 target_link_libraries(agentos_cognition
     agentos_core
-    agentos_memoryrovol
+    agentos_memory
     m
 )
 

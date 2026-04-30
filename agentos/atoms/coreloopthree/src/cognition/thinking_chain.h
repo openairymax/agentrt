@@ -191,7 +191,7 @@ struct agentos_working_memory {
     size_t capacity;                          /**< 最大容量 */
     size_t count;                             /**< 当前条目数 */
 
-    /* LRU索引（简化实现：按访问时间排序） */
+    /* LRU索引：按访问时间排序 */
     uint32_t* lru_order;                      /**< LRU顺序（索引到entries） */
     size_t lru_index;                         /**< 当前LRU写入位置 */
 

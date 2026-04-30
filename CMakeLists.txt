@@ -5,6 +5,16 @@
 cmake_minimum_required(VERSION 3.20)
 project(AgentOS VERSION 1.0.0 LANGUAGES C CXX)
 
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
+    message(FATAL_ERROR
+        "AgentOS in-source builds are not allowed!\n"
+        "Please use an out-of-source build directory:\n"
+        "  mkdir -p ../AgentOS-build && cd ../AgentOS-build\n"
+        "  cmake ../AgentOS\n"
+        "See BUILD.md for details."
+    )
+endif()
+
 # 设置默认构建类型
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type (Debug|Release|RelWithDebInfo|MinSizeRel)" FORCE)
@@ -33,6 +43,9 @@ message(STATUS "Platform: ${CMAKE_SYSTEM_NAME}")
 message(STATUS "Compiler: ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
 message(STATUS "Build shared libs: ${BUILD_SHARED_LIBS}")
 message(STATUS "Build tests: ${BUILD_TESTS}")
+message(STATUS "Memory backend: ${AGENTOS_MEMORY_BACKEND}")
+message(STATUS "With MemoryRovol Pro: ${AGENTOS_WITH_MEMORYROVOL}")
+message(STATUS "Docker build: ${AGENTOS_DOCKER_BUILD}")
 message(STATUS "=========================================")
 
 # 导出编译命令数据库（供clangd/IDE使用）
