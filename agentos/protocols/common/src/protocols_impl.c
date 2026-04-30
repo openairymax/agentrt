@@ -85,6 +85,8 @@ size_t protocol_manager_get_stacks(protocol_manager_handle_t manager,
 
 static protocol_adapter_t s_http_adapter = {0};
 static protocol_adapter_t s_ws_adapter = {0};
+static protocol_adapter_t s_grpc_adapter = {0};
+static protocol_adapter_t s_mqtt_adapter = {0};
 static bool s_adapters_init = false;
 
 static void init_static_adapters(void) {
@@ -98,6 +100,16 @@ static void init_static_adapters(void) {
     s_ws_adapter.name = "websocket";
     s_ws_adapter.version = "1.0";
     s_ws_adapter.description = "WebSocket Protocol Adapter";
+
+    s_grpc_adapter.type = PROTOCOL_GRPC;
+    s_grpc_adapter.name = "grpc";
+    s_grpc_adapter.version = "1.0";
+    s_grpc_adapter.description = "gRPC Protocol Adapter (HTTP/2 framing)";
+
+    s_mqtt_adapter.type = PROTOCOL_MQTT;
+    s_mqtt_adapter.name = "mqtt";
+    s_mqtt_adapter.version = "3.1.1";
+    s_mqtt_adapter.description = "MQTT Protocol Adapter (pub/sub)";
 
     s_adapters_init = true;
 }
@@ -114,12 +126,12 @@ const protocol_adapter_t* protocol_adapter_websocket(void) {
 
 const protocol_adapter_t* protocol_adapter_grpc(void) {
     init_static_adapters();
-    return &s_ws_adapter;
+    return &s_grpc_adapter;
 }
 
 const protocol_adapter_t* protocol_adapter_mqtt(void) {
     init_static_adapters();
-    return &s_ws_adapter;
+    return &s_mqtt_adapter;
 }
 
 const char* protocol_error_to_string(protocol_error_t error) {

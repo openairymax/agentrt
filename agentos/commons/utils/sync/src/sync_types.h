@@ -18,58 +18,30 @@
 
 #include "sync.h"
 #include "include/memory_compat.h"
-
-#ifdef _WIN32
-    #define WIN32_LEAN_AND_MEAN
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #include <windows.h>
-    #include <synchapi.h>
-#else
-    #include <pthread.h>
-    #include <semaphore.h>
-#endif
+#include "sync_platform.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/**
- * @brief 互斥锁内部结构
- */
 struct sync_mutex {
     sync_type_t type;
     bool initialized;
     const char* name;
     sync_stats_t stats;
-#ifdef _WIN32
-    CRITICAL_SECTION mutex;
-#else
-    pthread_mutex_t mutex;
-#endif
+    platform_mutex_t mutex;
 };
 
-/**
- * @brief 递归互斥锁内部结构
- */
 struct sync_recursive_mutex {
     sync_type_t type;
     bool initialized;
     const char* name;
     sync_stats_t stats;
     size_t recursive_count;
-#ifdef _WIN32
-    DWORD owner_thread;
-    CRITICAL_SECTION mutex;
-#else
-    pthread_t owner_thread;
-    pthread_mutex_t mutex;
-#endif
+    uint64_t owner_thread;
+    platform_recursive_mutex_t mutex;
 };
 
-/**
- * @brief 读写锁内部结构
- */
 struct sync_rwlock {
     sync_type_t type;
     bool initialized;
@@ -77,62 +49,34 @@ struct sync_rwlock {
     sync_stats_t stats;
     size_t read_count;
     bool is_writer;
-#ifdef _WIN32
-    SRWLOCK rwlock;
-#else
-    pthread_rwlock_t rwlock;
-#endif
+    platform_rwlock_t rwlock;
 };
 
-/**
- * @brief 自旋锁内部结构
- */
 struct sync_spinlock {
     sync_type_t type;
     bool initialized;
     const char* name;
     sync_stats_t stats;
-#ifdef _WIN32
-    volatile LONG lock;
-#else
-    pthread_spinlock_t lock;
-#endif
+    platform_spinlock_t lock;
 };
 
-/**
- * @brief 信号量内部结构
- */
 struct sync_semaphore {
     sync_type_t type;
     bool initialized;
     const char* name;
     sync_stats_t stats;
     unsigned int max_value;
-#ifdef _WIN32
-    HANDLE semaphore;
-#else
-    sem_t semaphore;
-#endif
+    platform_semaphore_t semaphore;
 };
 
-/**
- * @brief 条件变量内部结构
- */
 struct sync_condition {
     sync_type_t type;
     bool initialized;
     const char* name;
     sync_stats_t stats;
-#ifdef _WIN32
-    CONDITION_VARIABLE cond;
-#else
-    pthread_cond_t cond;
-#endif
+    platform_condition_t cond;
 };
 
-/**
- * @brief 屏障内部结构
- */
 struct sync_barrier {
     sync_type_t type;
     bool initialized;
@@ -141,17 +85,9 @@ struct sync_barrier {
     unsigned int count;
     unsigned int current;
     unsigned int generation;
-#ifdef _WIN32
-    CRITICAL_SECTION cs;
-    CONDITION_VARIABLE cond;
-#else
-    pthread_barrier_t barrier;
-#endif
+    platform_barrier_t barrier;
 };
 
-/**
- * @brief 事件内部结构
- */
 struct sync_event {
     sync_type_t type;
     bool initialized;
@@ -159,12 +95,7 @@ struct sync_event {
     sync_stats_t stats;
     bool manual_reset;
     bool signaled;
-#ifdef _WIN32
-    HANDLE event;
-#else
-    pthread_mutex_t mutex;
-    pthread_cond_t cond;
-#endif
+    platform_event_t event;
 };
 
 #ifdef __cplusplus

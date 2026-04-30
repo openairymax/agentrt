@@ -1,6 +1,12 @@
 /**
  * @file yaml_minimal.h
- * @brief Minimal YAML 1.1 subset parser for AgentOS configuration files
+ * @brief YAML 1.1 parser for AgentOS configuration files
+ *
+ * Supports: Anchors (&), Aliases (*), Tags (!!), Document markers (---/...),
+ * Folded scalars (>), Literal scalars (|), Merge keys (<<),
+ * Chomping indicators (|-/|+/|2), YAML directives (%YAML/%TAG),
+ * Flow/Block styles, Complex keys, BOM handling.
+ *
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
@@ -56,6 +62,8 @@ typedef struct yaml_document {
     char* source;
     size_t source_len;
     char* error_msg;
+    int document_index;
+    struct yaml_document* next;
 } yaml_document_t;
 
 yaml_document_t* yaml_create(void);
@@ -63,6 +71,8 @@ void yaml_destroy(yaml_document_t* doc);
 
 int yaml_parse_string(yaml_document_t* doc, const char* input, size_t len);
 int yaml_parse_file(yaml_document_t* doc, const char* filepath);
+int yaml_parse_multi(yaml_document_t* doc, const char* input, size_t len);
+void yaml_destroy_chain(yaml_document_t* doc);
 
 const char* yaml_get_error(const yaml_document_t* doc);
 

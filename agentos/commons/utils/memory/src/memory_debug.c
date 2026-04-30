@@ -547,11 +547,18 @@ size_t memory_debug_check_leaks(memory_leak_report_t* report, bool dump_to_log) 
 }
 
 bool memory_debug_validate(void* ptr, memory_error_report_t* error) {
-    if (!g_debug_state.initialized || ptr == NULL) {
+    if (ptr == NULL) {
+        if (error != NULL) {
+            memset(error, 0, sizeof(memory_error_report_t));
+            error->type = MEMORY_ERROR_NULL_POINTER;
+        }
+        return false;
+    }
+    if (!g_debug_state.initialized) {
         if (error != NULL) {
             memset(error, 0, sizeof(memory_error_report_t));
         }
-        return true;
+        return false;
     }
     
     memory_debug_lock();
