@@ -2,6 +2,7 @@
 #include "agentos.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 agentos_model_context_t* agentos_model_context_create(size_t capacity) {
     agentos_model_context_t* ctx = (agentos_model_context_t*)calloc(1, sizeof(agentos_model_context_t));

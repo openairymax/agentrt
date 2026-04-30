@@ -41,7 +41,7 @@ static void signal_handler(int signum);
 
 /* ==================== 配置常量 ==================== */
 
-#define DEFAULT_SOCKET_PATH_UNIX "/var/run/agentos/sched.sock"
+#define DEFAULT_SOCKET_PATH_UNIX AGENTOS_RUNTIME_DIR "/sched.sock"
 #define DEFAULT_SOCKET_PATH_WIN "\\\\.\\pipe\\agentos_sched"
 #define DEFAULT_TCP_PORT 8083
 #define MAX_BUFFER 65536

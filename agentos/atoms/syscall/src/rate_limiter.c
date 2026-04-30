@@ -56,7 +56,7 @@ agentos_error_t agentos_sys_rate_limiter_create(int capacity, double rate) {
     bucket->capacity = capacity > 0 ? capacity : 100;
     bucket->tokens = bucket->capacity;
     bucket->refill_rate = rate > 0 ? rate : 10.0;
-    bucket->last_refill = time(NULL);
+    bucket->last_refill = (time_t)(agentos_time_ms() / 1000ULL);
     bucket->lock = agentos_mutex_create();
 
     if (!bucket->lock) {
@@ -80,7 +80,7 @@ agentos_error_t agentos_sys_rate_limiter_acquire(int tokens) {
     agentos_mutex_lock(g_rate_limiter->lock);
 
     // 补充令牌
-    time_t now = time(NULL);
+    time_t now = (time_t)(agentos_time_ms() / 1000ULL);
     double elapsed = difftime(now, g_rate_limiter->last_refill);
     int to_add = (int)(elapsed * g_rate_limiter->refill_rate);
     if (to_add > 0) {
@@ -134,7 +134,7 @@ void agentos_sys_rate_limiter_reset(void) {
 
     agentos_mutex_lock(g_rate_limiter->lock);
     g_rate_limiter->tokens = g_rate_limiter->capacity;
-    g_rate_limiter->last_refill = time(NULL);
+    g_rate_limiter->last_refill = (time_t)(agentos_time_ms() / 1000ULL);
     agentos_mutex_unlock(g_rate_limiter->lock);
 
     AGENTOS_LOG_INFO("Rate limiter reset");

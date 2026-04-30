@@ -46,6 +46,7 @@ add_library(agentos_coreloopthree STATIC
     src/config_loader.c
     src/cognition/semantic_unit.c
     src/cognition/triple_coordinator.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/common/src/checkpoint.c
 )
 # 使用统一的头文件路径管理
 target_link_libraries(agentos_coreloopthree PUBLIC agentos_atoms)
@@ -82,14 +83,15 @@ endif()
 
 target_include_directories(agentos_coreloopthree PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../memoryrovol/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../memory
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/common/include
 )
 
 target_link_libraries(agentos_coreloopthree PUBLIC
     agentos_cognition
     agentos_execution
     agentos_core
-    agentos_memoryrovol
+    agentos_memory
 )
 
 if(WIN32)

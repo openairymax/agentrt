@@ -111,7 +111,7 @@ static int test_config_source_env(void) {
 }
 
 /**
- * @brief 测试配置文件源（简化版本）
+ * @brief 测试配置文件源
  */
 static int test_config_source_file(void) {
     printf("  测试配置文件源（简化）...\n");

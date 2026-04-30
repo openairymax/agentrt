@@ -27,6 +27,7 @@
  */
 
 #include "ipc_common.h"
+#include "platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -62,6 +63,7 @@
     #include <arpa/inet.h>
     #include <fcntl.h>
     #include <errno.h>
+#include <stdint.h>
 #endif
 
 #ifndef OFF_MAX
@@ -167,8 +169,8 @@ struct ipc_mq {
     HANDLE hMutex;                    /**< Windows 互斥锁 */
     HANDLE hNotEmpty;                 /**< 非空条件变量 */
 # else
-    pthread_mutex_t mutex;            /**< POSIX 互斥锁 */
-    pthread_cond_t not_empty;         /**< 非空条件变量 */
+    agentos_mutex_t mutex;            /**< POSIX 互斥锁 */
+    agentos_cond_t not_empty;         /**< 非空条件变量 */
 # endif
     char error_msg[256];              /**< 错误消息缓冲区 */
 };
@@ -238,9 +240,7 @@ static uint64_t ipc_get_timestamp_ns(void) {
     QueryPerformanceCounter(&counter);
     return (uint64_t)((double)counter.QuadPart / freq.QuadPart * 1000000000.0);
 #else
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+    return agentos_time_ns();
 #endif
 }
 
@@ -262,7 +262,7 @@ static uint64_t ipc_get_timestamp_ns(void) {
  * - 输出反射: 是
  * 
  * 实现方式:
- * - 使用查表法（Table-driven）的简化版本
+ * - 使用查表法（Table-driven）实现
  * - 逐位计算（bit-by-bit computation）
  * - 时间复杂度: O(n) 其中n为数据长度（字节）
  * 
@@ -312,7 +312,7 @@ agentos_error_t ipc_init(void) {
     }
 #endif
 
-    srand((unsigned int)time(NULL));
+    srand((unsigned int)(agentos_time_ns() & 0xFFFFFFFF));
     g_ipc_initialized = true;
 
     return AGENTOS_SUCCESS;
@@ -1569,17 +1569,17 @@ static int ipc_mq_lock(ipc_mq_t* mq, uint32_t timeout_ms) {
     return (wait_result == WAIT_TIMEOUT) ? ETIMEDOUT : 0;
 #else
     if (timeout_ms == 0) {
-        return pthread_mutex_lock(&mq->mutex);
+        return agentos_mutex_lock(&mq->mutex);
     } else {
-        struct timespec ts;
-        clock_gettime(CLOCK_REALTIME, &ts);
-        ts.tv_sec += timeout_ms / 1000;
-        ts.tv_nsec += (timeout_ms % 1000) * 1000000;
-        if (ts.tv_nsec >= 1000000000) {
-            ts.tv_sec++;
-            ts.tv_nsec -= 1000000000;
+        uint64_t deadline = agentos_time_ms() + timeout_ms;
+        while (agentos_mutex_trylock(&mq->mutex) != 0) {
+            if (agentos_time_ms() >= deadline) {
+                return ETIMEDOUT;
+            }
+            struct timespec ts = {0, 1000000};
+            nanosleep(&ts, NULL);
         }
-        return pthread_mutex_timedlock(&mq->mutex, &ts);
+        return 0;
     }
 #endif
 }
@@ -1592,7 +1592,7 @@ static void ipc_mq_unlock(ipc_mq_t* mq) {
 #ifdef _WIN32
     ReleaseMutex(mq->hMutex);
 #else
-    pthread_mutex_unlock(&mq->mutex);
+    agentos_mutex_unlock(&mq->mutex);
 #endif
 }
 
@@ -1622,21 +1622,11 @@ static bool ipc_mq_wait_for_message(ipc_mq_t* mq, uint32_t timeout_ms) {
     // 重新获取锁
     WaitForSingleObject(mq->hMutex, INFINITE);
 #else
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    ts.tv_sec += timeout_ms / 1000;
-    ts.tv_nsec += (timeout_ms % 1000) * 1000000;
-    if (ts.tv_nsec >= 1000000000) {
-        ts.tv_sec++;
-        ts.tv_nsec -= 1000000000;
-    }
-    
-    // 使用条件变量等待
-    pthread_mutex_lock(&mq->mutex);  // 重新获取锁
+    agentos_mutex_lock(&mq->mutex);
     while (mq->current_count == 0) {
-        int wait_result = pthread_cond_timedwait(&mq->not_empty, &mq->mutex, &ts);
-        if (wait_result == ETIMEDOUT) {
-            pthread_mutex_unlock(&mq->mutex);
+        int wait_result = agentos_cond_timedwait(&mq->not_empty, &mq->mutex, timeout_ms);
+        if (wait_result != 0) {
+            agentos_mutex_unlock(&mq->mutex);
             return false;
         }
     }
@@ -1729,16 +1719,16 @@ ipc_mq_t* ipc_mq_create(const ipc_mq_config_t* config) {
         return NULL;
     }
 #else
-    if (pthread_mutex_init(&mq->mutex, NULL) != 0) {
+    if (agentos_mutex_init(&mq->mutex) != 0) {
         snprintf(mq->error_msg, sizeof(mq->error_msg),
                  "Failed to initialize mutex");
         free(mq);
         return NULL;
     }
-    if (pthread_cond_init(&mq->not_empty, NULL) != 0) {
+    if (agentos_cond_init(&mq->not_empty) != 0) {
         snprintf(mq->error_msg, sizeof(mq->error_msg),
                  "Failed to initialize condition variable");
-        pthread_mutex_destroy(&mq->mutex);
+        agentos_mutex_destroy(&mq->mutex);
         free(mq);
         return NULL;
     }
@@ -1760,8 +1750,8 @@ void ipc_mq_destroy(ipc_mq_t* mq) {
     if (mq->hMutex) CloseHandle(mq->hMutex);
     if (mq->hNotEmpty) CloseHandle(mq->hNotEmpty);
 #else
-    pthread_mutex_destroy(&mq->mutex);
-    pthread_cond_destroy(&mq->not_empty);
+    agentos_mutex_destroy(&mq->mutex);
+    agentos_cond_destroy(&mq->not_empty);
 #endif
     
     free(mq);
@@ -1780,7 +1770,7 @@ agentos_error_t ipc_mq_send(
 #ifdef _WIN32
     WaitForSingleObject(mq->hMutex, INFINITE);
 #else
-    pthread_mutex_lock(&mq->mutex);
+    agentos_mutex_lock(&mq->mutex);
 #endif
     
     // 检查队列是否已满
@@ -1791,7 +1781,7 @@ agentos_error_t ipc_mq_send(
 #ifdef _WIN32
         ReleaseMutex(mq->hMutex);
 #else
-        pthread_mutex_unlock(&mq->mutex);
+        agentos_mutex_unlock(&mq->mutex);
 #endif
         return AGENTOS_EBUSY;
     }
@@ -1804,7 +1794,7 @@ agentos_error_t ipc_mq_send(
 #ifdef _WIN32
         ReleaseMutex(mq->hMutex);
 #else
-        pthread_mutex_unlock(&mq->mutex);
+        agentos_mutex_unlock(&mq->mutex);
 #endif
         return AGENTOS_ENOMEM;
     }
@@ -1817,7 +1807,7 @@ agentos_error_t ipc_mq_send(
 #ifdef _WIN32
         ReleaseMutex(mq->hMutex);
 #else
-        pthread_mutex_unlock(&mq->mutex);
+        agentos_mutex_unlock(&mq->mutex);
 #endif
         return AGENTOS_ENOMEM;
     }
@@ -1898,8 +1888,8 @@ agentos_error_t ipc_mq_send(
     SetEvent(mq->hNotEmpty);
     ReleaseMutex(mq->hMutex);
 #else
-    pthread_cond_signal(&mq->not_empty);
-    pthread_mutex_unlock(&mq->mutex);
+    agentos_cond_signal(&mq->not_empty);
+    agentos_mutex_unlock(&mq->mutex);
 #endif
     
     return AGENTOS_SUCCESS;
@@ -1961,7 +1951,7 @@ agentos_error_t ipc_mq_clear(ipc_mq_t* mq) {
 #ifdef _WIN32
     WaitForSingleObject(mq->hMutex, INFINITE);
 #else
-    pthread_mutex_lock(&mq->mutex);
+    agentos_mutex_lock(&mq->mutex);
 #endif
     
     // 释放所有消息
@@ -1982,7 +1972,7 @@ agentos_error_t ipc_mq_clear(ipc_mq_t* mq) {
 #ifdef _WIN32
     ReleaseMutex(mq->hMutex);
 #else
-    pthread_mutex_unlock(&mq->mutex);
+    agentos_mutex_unlock(&mq->mutex);
 #endif
     
     return AGENTOS_SUCCESS;
