@@ -30,13 +30,14 @@
 #include <synchapi.h>
 #include <process.h>
 #else
-#include <pthread.h>
 #include <semaphore.h>
 #include <sched.h>
 #include <unistd.h>
 #include <sys/time.h>
 #include <errno.h>
 #endif
+
+#include "sync_platform.h"
 
 /**
  * @brief 全局同步模块状态结构体
