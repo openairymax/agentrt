@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0
 /**
  * @file agentos_frameworks.h
  * @brief AgentOS统一框架抽象层 - 五大框架生产级接口

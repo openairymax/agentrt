@@ -83,7 +83,7 @@ void heapstore_registry_shutdown(void) {
 typedef struct {
     sqlite3* db;
     char db_path[512];
-    pthread_mutex_t lock;
+    agentos_mutex_t lock;
     int initialized;
 } registry_db_t;
 
@@ -180,7 +180,7 @@ heapstore_error_t heapstore_registry_init(void) {
         return err;
     }
 
-    pthread_mutex_init(&s_registry.lock, NULL);
+    agentos_mutex_init(&s_registry.lock);
     s_registry.initialized = true;
 
     return heapstore_SUCCESS;
@@ -191,7 +191,7 @@ void heapstore_registry_shutdown(void) {
         return;
     }
 
-    pthread_mutex_lock(&s_registry.lock);
+    agentos_mutex_lock(&s_registry.lock);
 
     if (s_registry.db) {
         sqlite3_close(s_registry.db);
@@ -199,8 +199,8 @@ void heapstore_registry_shutdown(void) {
     }
 
     s_registry.initialized = false;
-    pthread_mutex_unlock(&s_registry.lock);
-    pthread_mutex_destroy(&s_registry.lock);
+    agentos_mutex_unlock(&s_registry.lock);
+    agentos_mutex_destroy(&s_registry.lock);
 }
 
 static heapstore_error_t execute_sql_with_lock(const char* sql,
@@ -210,12 +210,12 @@ static heapstore_error_t execute_sql_with_lock(const char* sql,
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&s_registry.lock);
+    agentos_mutex_lock(&s_registry.lock);
 
     sqlite3_stmt* stmt = NULL;
     int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_ERR_DB_QUERY_FAILED;
     }
 
@@ -223,14 +223,14 @@ static heapstore_error_t execute_sql_with_lock(const char* sql,
         heapstore_error_t err = bind_func(stmt, bind_data);
         if (err != heapstore_SUCCESS) {
             sqlite3_finalize(stmt);
-            pthread_mutex_unlock(&s_registry.lock);
+            agentos_mutex_unlock(&s_registry.lock);
             return err;
         }
     }
 
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
-    pthread_mutex_unlock(&s_registry.lock);
+    agentos_mutex_unlock(&s_registry.lock);
 
     if (rc != SQLITE_DONE && rc != SQLITE_ROW) {
         return heapstore_ERR_DB_QUERY_FAILED;
@@ -282,14 +282,14 @@ heapstore_error_t heapstore_registry_get_agent(const char* id, heapstore_agent_r
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&s_registry.lock);
+    agentos_mutex_lock(&s_registry.lock);
 
     const char* sql = "SELECT id, name, type, version, status, config_path, created_at, updated_at FROM agents WHERE id = ?;";
     sqlite3_stmt* stmt;
 
     int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_ERR_DB_QUERY_FAILED;
     }
 
@@ -326,12 +326,12 @@ heapstore_error_t heapstore_registry_get_agent(const char* id, heapstore_agent_r
         record->updated_at = sqlite3_column_int64(stmt, 7);
 
         sqlite3_finalize(stmt);
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_SUCCESS;
     }
 
     sqlite3_finalize(stmt);
-    pthread_mutex_unlock(&s_registry.lock);
+    agentos_mutex_unlock(&s_registry.lock);
     return heapstore_ERR_NOT_FOUND;
 }
 
@@ -344,7 +344,7 @@ heapstore_error_t heapstore_registry_update_agent(const heapstore_agent_record_t
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&s_registry.lock);
+    agentos_mutex_lock(&s_registry.lock);
 
     const char* sql =
         "UPDATE agents SET "
@@ -354,7 +354,7 @@ heapstore_error_t heapstore_registry_update_agent(const heapstore_agent_record_t
 
     int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_ERR_DB_QUERY_FAILED;
     }
 
@@ -368,7 +368,7 @@ heapstore_error_t heapstore_registry_update_agent(const heapstore_agent_record_t
 
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
-    pthread_mutex_unlock(&s_registry.lock);
+    agentos_mutex_unlock(&s_registry.lock);
 
     if (rc != SQLITE_DONE) {
         return heapstore_ERR_DB_QUERY_FAILED;
@@ -386,14 +386,14 @@ heapstore_error_t heapstore_registry_delete_agent(const char* id) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&s_registry.lock);
+    agentos_mutex_lock(&s_registry.lock);
 
     const char* sql = "DELETE FROM agents WHERE id = ?;";
     sqlite3_stmt* stmt;
 
     int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_ERR_DB_QUERY_FAILED;
     }
 
@@ -401,7 +401,7 @@ heapstore_error_t heapstore_registry_delete_agent(const char* id) {
 
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
-    pthread_mutex_unlock(&s_registry.lock);
+    agentos_mutex_unlock(&s_registry.lock);
 
     if (rc != SQLITE_DONE) {
         return heapstore_ERR_DB_QUERY_FAILED;
@@ -426,12 +426,12 @@ heapstore_error_t heapstore_registry_query_agents(const char* filter_type, const
         snprintf(sql + pos, sizeof(sql) - pos, " AND status = ?");
     }
 
-    pthread_mutex_lock(&s_registry.lock);
+    agentos_mutex_lock(&s_registry.lock);
 
     sqlite3_stmt* stmt;
     int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_ERR_DB_QUERY_FAILED;
     }
 
@@ -446,7 +446,7 @@ heapstore_error_t heapstore_registry_query_agents(const char* filter_type, const
     heapstore_registry_iter_t* new_iter = (heapstore_registry_iter_t*)calloc(1, sizeof(heapstore_registry_iter_t));
     if (!new_iter) {
         sqlite3_finalize(stmt);
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_ERR_OUT_OF_MEMORY;
     }
     new_iter->stmt = stmt;
@@ -454,7 +454,7 @@ heapstore_error_t heapstore_registry_query_agents(const char* filter_type, const
     new_iter->has_more = 1;
 
     *iter = new_iter;
-    pthread_mutex_unlock(&s_registry.lock);
+    agentos_mutex_unlock(&s_registry.lock);
     return heapstore_SUCCESS;
 }
 
@@ -467,7 +467,7 @@ heapstore_error_t heapstore_registry_add_skill(const heapstore_skill_record_t* r
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&s_registry.lock);
+    agentos_mutex_lock(&s_registry.lock);
 
     const char* sql =
         "INSERT INTO skills "
@@ -477,7 +477,7 @@ heapstore_error_t heapstore_registry_add_skill(const heapstore_skill_record_t* r
 
     int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_ERR_DB_QUERY_FAILED;
     }
 
@@ -490,7 +490,7 @@ heapstore_error_t heapstore_registry_add_skill(const heapstore_skill_record_t* r
 
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
-    pthread_mutex_unlock(&s_registry.lock);
+    agentos_mutex_unlock(&s_registry.lock);
 
     if (rc != SQLITE_DONE) {
         return heapstore_ERR_DB_QUERY_FAILED;
@@ -508,14 +508,14 @@ heapstore_error_t heapstore_registry_get_skill(const char* id, heapstore_skill_r
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&s_registry.lock);
+    agentos_mutex_lock(&s_registry.lock);
 
     const char* sql = "SELECT id, name, version, library_path, manifest_path, installed_at FROM skills WHERE id = ?;";
     sqlite3_stmt* stmt;
 
     int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_ERR_DB_QUERY_FAILED;
     }
 
@@ -536,12 +536,12 @@ heapstore_error_t heapstore_registry_get_skill(const char* id, heapstore_skill_r
         if (text) strncpy(record->manifest_path, text, sizeof(record->manifest_path) - 1);
         record->installed_at = sqlite3_column_int64(stmt, 5);
         sqlite3_finalize(stmt);
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_SUCCESS;
     }
 
     sqlite3_finalize(stmt);
-    pthread_mutex_unlock(&s_registry.lock);
+    agentos_mutex_unlock(&s_registry.lock);
     return heapstore_ERR_NOT_FOUND;
 }
 
@@ -554,14 +554,14 @@ heapstore_error_t heapstore_registry_delete_skill(const char* id) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&s_registry.lock);
+    agentos_mutex_lock(&s_registry.lock);
 
     const char* sql = "DELETE FROM skills WHERE id = ?;";
     sqlite3_stmt* stmt;
 
     int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_ERR_DB_QUERY_FAILED;
     }
 
@@ -569,7 +569,7 @@ heapstore_error_t heapstore_registry_delete_skill(const char* id) {
 
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
-    pthread_mutex_unlock(&s_registry.lock);
+    agentos_mutex_unlock(&s_registry.lock);
 
     if (rc != SQLITE_DONE) {
         return heapstore_ERR_DB_QUERY_FAILED;
@@ -587,7 +587,7 @@ heapstore_error_t heapstore_registry_add_session(const heapstore_session_record_
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&s_registry.lock);
+    agentos_mutex_lock(&s_registry.lock);
 
     const char* sql =
         "INSERT INTO sessions "
@@ -597,7 +597,7 @@ heapstore_error_t heapstore_registry_add_session(const heapstore_session_record_
 
     int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_ERR_DB_QUERY_FAILED;
     }
 
@@ -610,7 +610,7 @@ heapstore_error_t heapstore_registry_add_session(const heapstore_session_record_
 
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
-    pthread_mutex_unlock(&s_registry.lock);
+    agentos_mutex_unlock(&s_registry.lock);
 
     if (rc != SQLITE_DONE) {
         return heapstore_ERR_DB_QUERY_FAILED;
@@ -628,14 +628,14 @@ heapstore_error_t heapstore_registry_get_session(const char* id, heapstore_sessi
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&s_registry.lock);
+    agentos_mutex_lock(&s_registry.lock);
 
     const char* sql = "SELECT id, user_id, created_at, last_active_at, ttl_seconds, status FROM sessions WHERE id = ?;";
     sqlite3_stmt* stmt;
 
     int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_ERR_DB_QUERY_FAILED;
     }
 
@@ -654,12 +654,12 @@ heapstore_error_t heapstore_registry_get_session(const char* id, heapstore_sessi
         text = (const char*)sqlite3_column_text(stmt, 5);
         if (text) strncpy(record->status, text, sizeof(record->status) - 1);
         sqlite3_finalize(stmt);
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_SUCCESS;
     }
 
     sqlite3_finalize(stmt);
-    pthread_mutex_unlock(&s_registry.lock);
+    agentos_mutex_unlock(&s_registry.lock);
     return heapstore_ERR_NOT_FOUND;
 }
 
@@ -672,14 +672,14 @@ heapstore_error_t heapstore_registry_update_session(const heapstore_session_reco
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&s_registry.lock);
+    agentos_mutex_lock(&s_registry.lock);
 
     const char* sql = "UPDATE sessions SET user_id = ?, last_active_at = ?, ttl_seconds = ?, status = ? WHERE id = ?;";
     sqlite3_stmt* stmt;
 
     int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_ERR_DB_QUERY_FAILED;
     }
 
@@ -691,7 +691,7 @@ heapstore_error_t heapstore_registry_update_session(const heapstore_session_reco
 
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
-    pthread_mutex_unlock(&s_registry.lock);
+    agentos_mutex_unlock(&s_registry.lock);
 
     if (rc != SQLITE_DONE) {
         return heapstore_ERR_DB_QUERY_FAILED;
@@ -709,14 +709,14 @@ heapstore_error_t heapstore_registry_delete_session(const char* id) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&s_registry.lock);
+    agentos_mutex_lock(&s_registry.lock);
 
     const char* sql = "DELETE FROM sessions WHERE id = ?;";
     sqlite3_stmt* stmt;
 
     int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_ERR_DB_QUERY_FAILED;
     }
 
@@ -724,7 +724,7 @@ heapstore_error_t heapstore_registry_delete_session(const char* id) {
 
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
-    pthread_mutex_unlock(&s_registry.lock);
+    agentos_mutex_unlock(&s_registry.lock);
 
     if (rc != SQLITE_DONE) {
         return heapstore_ERR_DB_QUERY_FAILED;
@@ -742,21 +742,21 @@ heapstore_error_t heapstore_registry_query_skills(heapstore_registry_iter_t** it
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&s_registry.lock);
+    agentos_mutex_lock(&s_registry.lock);
 
     const char* sql = "SELECT id, name, version, library_path, manifest_path, installed_at FROM skills ORDER BY installed_at DESC;";
     sqlite3_stmt* stmt;
 
     int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_ERR_DB_QUERY_FAILED;
     }
 
     heapstore_registry_iter_t* new_iter = (heapstore_registry_iter_t*)malloc(sizeof(heapstore_registry_iter_t));
     if (!new_iter) {
         sqlite3_finalize(stmt);
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_ERR_OUT_OF_MEMORY;
     }
 
@@ -765,7 +765,7 @@ heapstore_error_t heapstore_registry_query_skills(heapstore_registry_iter_t** it
     new_iter->has_more = 1;
 
     *iter = new_iter;
-    pthread_mutex_unlock(&s_registry.lock);
+    agentos_mutex_unlock(&s_registry.lock);
 
     return heapstore_SUCCESS;
 }
@@ -786,7 +786,7 @@ heapstore_error_t heapstore_registry_query_sessions(const char* filter_status, h
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&s_registry.lock);
+    agentos_mutex_lock(&s_registry.lock);
 
     const char* sql;
     sqlite3_stmt* stmt;
@@ -799,7 +799,7 @@ heapstore_error_t heapstore_registry_query_sessions(const char* filter_status, h
 
     int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_ERR_DB_QUERY_FAILED;
     }
 
@@ -810,7 +810,7 @@ heapstore_error_t heapstore_registry_query_sessions(const char* filter_status, h
     heapstore_registry_iter_t* new_iter = (heapstore_registry_iter_t*)malloc(sizeof(heapstore_registry_iter_t));
     if (!new_iter) {
         sqlite3_finalize(stmt);
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_ERR_OUT_OF_MEMORY;
     }
 
@@ -819,7 +819,7 @@ heapstore_error_t heapstore_registry_query_sessions(const char* filter_status, h
     new_iter->has_more = 1;
 
     *iter = new_iter;
-    pthread_mutex_unlock(&s_registry.lock);
+    agentos_mutex_unlock(&s_registry.lock);
 
     return heapstore_SUCCESS;
 }
@@ -923,9 +923,9 @@ heapstore_error_t heapstore_registry_vacuum(void) {
         return heapstore_ERR_NOT_INITIALIZED;
     }
 
-    pthread_mutex_lock(&s_registry.lock);
+    agentos_mutex_lock(&s_registry.lock);
     sqlite3_exec(s_registry.db, "VACUUM;", NULL, NULL, NULL);
-    pthread_mutex_unlock(&s_registry.lock);
+    agentos_mutex_unlock(&s_registry.lock);
 
     return heapstore_SUCCESS;
 }
@@ -944,19 +944,19 @@ heapstore_error_t heapstore_registry_batch_insert_agents(const heapstore_agent_r
         "(id, name, type, version, status, config_path, created_at, updated_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?);";
 
-    pthread_mutex_lock(&s_registry.lock);
+    agentos_mutex_lock(&s_registry.lock);
 
     sqlite3_stmt* stmt = NULL;
     int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_ERR_DB_QUERY_FAILED;
     }
 
     rc = sqlite3_exec(s_registry.db, "BEGIN TRANSACTION;", NULL, NULL, NULL);
     if (rc != SQLITE_OK) {
         sqlite3_finalize(stmt);
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_ERR_DB_QUERY_FAILED;
     }
 
@@ -991,7 +991,7 @@ heapstore_error_t heapstore_registry_batch_insert_agents(const heapstore_agent_r
     }
 
     sqlite3_finalize(stmt);
-    pthread_mutex_unlock(&s_registry.lock);
+    agentos_mutex_unlock(&s_registry.lock);
 
     return result;
 }
@@ -1010,19 +1010,19 @@ heapstore_error_t heapstore_registry_batch_insert_sessions(const heapstore_sessi
         "(id, user_id, created_at, last_active_at, ttl_seconds, status) "
         "VALUES (?, ?, ?, ?, ?, ?);";
 
-    pthread_mutex_lock(&s_registry.lock);
+    agentos_mutex_lock(&s_registry.lock);
 
     sqlite3_stmt* stmt = NULL;
     int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_ERR_DB_QUERY_FAILED;
     }
 
     rc = sqlite3_exec(s_registry.db, "BEGIN TRANSACTION;", NULL, NULL, NULL);
     if (rc != SQLITE_OK) {
         sqlite3_finalize(stmt);
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_ERR_DB_QUERY_FAILED;
     }
 
@@ -1055,7 +1055,7 @@ heapstore_error_t heapstore_registry_batch_insert_sessions(const heapstore_sessi
     }
 
     sqlite3_finalize(stmt);
-    pthread_mutex_unlock(&s_registry.lock);
+    agentos_mutex_unlock(&s_registry.lock);
 
     return result;
 }
@@ -1074,19 +1074,19 @@ heapstore_error_t heapstore_registry_batch_insert_skills(const heapstore_skill_r
         "(id, name, version, library_path, manifest_path, installed_at) "
         "VALUES (?, ?, ?, ?, ?, ?);";
 
-    pthread_mutex_lock(&s_registry.lock);
+    agentos_mutex_lock(&s_registry.lock);
 
     sqlite3_stmt* stmt = NULL;
     int rc = sqlite3_prepare_v2(s_registry.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_ERR_DB_QUERY_FAILED;
     }
 
     rc = sqlite3_exec(s_registry.db, "BEGIN TRANSACTION;", NULL, NULL, NULL);
     if (rc != SQLITE_OK) {
         sqlite3_finalize(stmt);
-        pthread_mutex_unlock(&s_registry.lock);
+        agentos_mutex_unlock(&s_registry.lock);
         return heapstore_ERR_DB_QUERY_FAILED;
     }
 
@@ -1119,7 +1119,7 @@ heapstore_error_t heapstore_registry_batch_insert_skills(const heapstore_skill_r
     }
 
     sqlite3_finalize(stmt);
-    pthread_mutex_unlock(&s_registry.lock);
+    agentos_mutex_unlock(&s_registry.lock);
 
     return result;
 }

@@ -151,7 +151,7 @@ static void record_adaptive_sample(adaptive_state_t* state,
     record->record_id[sizeof(record->record_id) - 1] = '\0';
     record->predicted_weight = predicted;
     record->actual_access_rate = actual_accessed ? 1.0f : 0.0f;
-    record->timestamp = (uint64_t)time(NULL);
+    record->timestamp = (uint64_t)(time_t)(agentos_time_ms() / 1000ULL);
     
     /* 更新索引（环形缓冲） */
     state->sample_index = (state->sample_index + 1) % ADAPTIVE_SAMPLE_SIZE;

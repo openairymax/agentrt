@@ -23,19 +23,10 @@
 #include <time.h>
 
 #ifdef _WIN32
-#include <windows.h>
 #else
-#include <pthread.h>
 #include <sys/time.h>
 #endif
-
-/* ==================== 平台相关定义 ==================== */
-
-#ifdef _WIN32
-#define THREAD_LOCAL __declspec(thread)
-#else
-#define THREAD_LOCAL __thread
-#endif
+#include "platform.h"
 
 /* ==================== 全局状态 ==================== */
 
@@ -55,37 +46,37 @@ static struct {
 } g_error_stats;
 
 #ifdef _WIN32
-static CRITICAL_SECTION g_error_stats_mutex;
+static agentos_mutex_t g_error_stats_mutex;
 static volatile LONG g_error_stats_initialized = 0;
 
 static void ensure_stats_init(void) {
     if (InterlockedCompareExchange(&g_error_stats_initialized, 1, 0) == 0) {
-        InitializeCriticalSection(&g_error_stats_mutex);
+        agentos_mutex_init(&g_error_stats_mutex);
     }
 }
 
 #define STATS_LOCK() \
     do { \
         ensure_stats_init(); \
-        EnterCriticalSection(&g_error_stats_mutex); \
+        agentos_mutex_lock(&g_error_stats_mutex); \
     } while (0)
 
 #define STATS_UNLOCK() \
     do { \
-        LeaveCriticalSection(&g_error_stats_mutex); \
+        agentos_mutex_unlock(&g_error_stats_mutex); \
     } while (0)
 
 #else
-static pthread_mutex_t g_error_stats_mutex = PTHREAD_MUTEX_INITIALIZER;
+static agentos_mutex_t g_error_stats_mutex = {0};
 
 #define STATS_LOCK() \
     do { \
-        pthread_mutex_lock(&g_error_stats_mutex); \
+        agentos_mutex_lock(&g_error_stats_mutex); \
     } while (0)
 
 #define STATS_UNLOCK() \
     do { \
-        pthread_mutex_unlock(&g_error_stats_mutex); \
+        agentos_mutex_unlock(&g_error_stats_mutex); \
     } while (0)
 #endif
 
@@ -118,25 +109,16 @@ static thread_error_state_t* get_thread_error_state(void) {
     return state;
 }
 #else
-static pthread_key_t g_tls_key;
-static pthread_once_t g_tls_once = PTHREAD_ONCE_INIT;
-
-static void create_tls_key(void) {
-    pthread_key_create(&g_tls_key, free);
-}
+static AGENTOS_THREAD_LOCAL thread_error_state_t* g_tls_error_state = NULL;
 
 static thread_error_state_t* get_thread_error_state(void) {
-    pthread_once(&g_tls_once, create_tls_key);
-    
-    thread_error_state_t* state = (thread_error_state_t*)pthread_getspecific(g_tls_key);
-    if (state == NULL) {
-        state = (thread_error_state_t*)AGENTOS_CALLOC(1, sizeof(thread_error_state_t));
-        if (state != NULL) {
-            state->initialized = 1;
-            pthread_setspecific(g_tls_key, state);
+    if (g_tls_error_state == NULL) {
+        g_tls_error_state = (thread_error_state_t*)AGENTOS_CALLOC(1, sizeof(thread_error_state_t));
+        if (g_tls_error_state != NULL) {
+            g_tls_error_state->initialized = 1;
         }
     }
-    return state;
+    return g_tls_error_state;
 }
 #endif
 

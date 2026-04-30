@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_corekern_extended.c
  * @brief corekern模块扩展单元测试
  * @copyright (c) 2026 SPHARX. All Rights Reserved.

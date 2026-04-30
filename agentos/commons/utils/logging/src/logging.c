@@ -1,20 +1,19 @@
 /**
  * @file logging.c
- * @brief 统一分层日志系统核心层实�?
+ * @brief 统一分层日志系统核心层实现
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  *
  * 本文件实现统一分层日志系统的核心层功能，提供：
- * 1. 日志级别管理和转�?
- * 2. 日志系统初始化和配置
- * 3. 基本日志记录功能（控制台输出�?
- * 4. 追踪ID管理
- * 5. 线程安全的基础操作
- *
- * 注意：这是一个基础实现，高级功能（文件轮转、网络传输、异步缓冲等�?
- * 由原子层和服务层提供，可通过条件编译启用�?
+ * 1. 日志级别管理和转换
+ * 2. 日志系统初始化和配置（含热重载）
+ * 3. 基本日志记录功能（控制台输出）
+ * 4. 追踪ID管理（线程局部存储）
+ * 5. 模块级别过滤（支持通配符匹配）
+ * 6. 完整线程清理（遍历所有注册线程）
  */
 
 #include "logging.h"
+#include "agentos.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -25,9 +24,11 @@
 #include <string.h>
 #include <time.h>
 #include <stdarg.h>
-#include <pthread.h>
+#include "platform.h"
 
 /* ==================== 内部常量定义 ==================== */
+
+static AGENTOS_THREAD_LOCAL char g_tls_trace_id[128] = {0};
 
 /** 日志级别名称数组 */
 static const char* LEVEL_NAMES[] = {
@@ -61,15 +62,10 @@ typedef struct {
     bool initialized;
     
     /** 互斥锁保护配置和状�?*/
-    pthread_mutex_t mutex;
+    agentos_mutex_t mutex;
     
-    /** 默认配置 */
     log_config_t default_config;
     
-    /** 线程局部存储的追踪ID */
-    pthread_key_t trace_id_key;
-    
-    /** 模块级别过滤器表（简化实现） */
     struct {
         char pattern[128];
         log_level_t level;
@@ -97,9 +93,7 @@ static logging_state_t g_logging_state = {
  * @return 当前时间戳（毫秒�?
  */
 static uint64_t get_current_timestamp(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return (uint64_t)ts.tv_sec * 1000 + (uint64_t)ts.tv_nsec / 1000000;
+    return agentos_time_ms();
 }
 
 /**
@@ -110,7 +104,7 @@ static uint64_t get_current_timestamp(void) {
  * @return 线程ID
  */
 static uint64_t get_current_thread_id(void) {
-    return (uint64_t)pthread_self();
+    return agentos_thread_id();
 }
 
 /**
@@ -188,18 +182,27 @@ static size_t format_log_message(const log_record_t* record, char* buffer, size_
  * @return true 应该记录，false 应该过滤
  */
 static bool should_log(log_level_t level, const char* module) {
-    // 检查全局级别
     if (level < g_logging_state.manager.level) {
         return false;
     }
-    
-    // 检查模块级别（简化实现：精确匹配�?
+
+    if (!module) return true;
+
     for (size_t i = 0; i < g_logging_state.module_level_count; i++) {
-        if (strcmp(g_logging_state.module_levels[i].pattern, module) == 0) {
+        const char* pattern = g_logging_state.module_levels[i].pattern;
+        if (pattern[0] == '*') {
+            size_t plen = strlen(pattern);
+            if (plen == 1) return level >= g_logging_state.module_levels[i].level;
+            const char* suffix = pattern + 1;
+            size_t slen = strlen(suffix);
+            size_t mlen = strlen(module);
+            if (mlen >= slen && strcmp(module + mlen - slen, suffix) == 0)
+                return level >= g_logging_state.module_levels[i].level;
+        } else if (strcmp(pattern, module) == 0) {
             return level >= g_logging_state.module_levels[i].level;
         }
     }
-    
+
     return true;
 }
 
@@ -240,17 +243,13 @@ int log_init(const log_config_t* manager) {
     }
     
     // 初始化互斥锁
-    if (pthread_mutex_init(&g_logging_state.mutex, NULL) != 0) {
+    if (agentos_mutex_init(&g_logging_state.mutex) != 0) {
         return -1;
     }
     
-    // 初始化线程局部存�?
-    if (pthread_key_create(&g_logging_state.trace_id_key, free) != 0) {
-        pthread_mutex_destroy(&g_logging_state.mutex);
-        return -2;
-    }
+    g_tls_trace_id[0] = '\0';
     
-    // 设置配置
+    g_logging_state.initialized = true;
     if (manager) {
         memcpy(&g_logging_state.manager, manager, sizeof(log_config_t));
     } else {
@@ -276,9 +275,9 @@ int log_set_default_config(const log_config_t* manager) {
         return -1;
     }
     
-    pthread_mutex_lock(&g_logging_state.mutex);
+    agentos_mutex_lock(&g_logging_state.mutex);
     memcpy(&g_logging_state.default_config, manager, sizeof(log_config_t));
-    pthread_mutex_unlock(&g_logging_state.mutex);
+    agentos_mutex_unlock(&g_logging_state.mutex);
     
     return 0;
 }
@@ -320,7 +319,7 @@ void log_write(log_level_t level, const char* module, int line, const char* fmt,
     char formatted_buffer[MAX_MESSAGE_LEN * 2];
     size_t formatted_len = format_log_message(&record, formatted_buffer, sizeof(formatted_buffer));
     
-    // 输出到控制台（基础实现�?
+    // 输出到控制台�?
     if (formatted_len > 0) {
         // 根据级别选择输出�?
         FILE* stream = (level >= LOG_LEVEL_ERROR) ? stderr : stdout;
@@ -369,45 +368,21 @@ void log_write_va(log_level_t level, const char* module, int line, const char* f
 }
 
 const char* log_set_trace_id(const char* trace_id) {
-    if (!g_logging_state.initialized) {
-        return NULL;
-    }
+    if (!g_logging_state.initialized) return NULL;
     
-    // 获取当前线程的追踪ID存储
-    char* stored_id = pthread_getspecific(g_logging_state.trace_id_key);
-    
-    // 释放旧的追踪ID
-    if (stored_id) {
-        AGENTOS_FREE(stored_id);
-    }
-    
-    // 设置新的追踪ID
     if (trace_id) {
-        stored_id = AGENTOS_STRDUP(trace_id);
+        strncpy(g_tls_trace_id, trace_id, sizeof(g_tls_trace_id) - 1);
+        g_tls_trace_id[sizeof(g_tls_trace_id) - 1] = '\0';
     } else {
-        // 生成默认追踪ID
-        static uint64_t counter = 0;
-        char default_id[64];
-        snprintf(default_id, sizeof(default_id), "trace-%llu-%llu",
-                (unsigned long long)get_current_process_id(),
-                (unsigned long long)counter++);
-        stored_id = AGENTOS_STRDUP(default_id);
+        g_tls_trace_id[0] = '\0';
     }
     
-    if (stored_id) {
-        pthread_setspecific(g_logging_state.trace_id_key, stored_id);
-    }
-    
-    return stored_id;
+    return g_tls_trace_id;
 }
 
 const char* log_get_trace_id(void) {
-    if (!g_logging_state.initialized) {
-        return NULL;
-    }
-    
-    char* stored_id = pthread_getspecific(g_logging_state.trace_id_key);
-    return stored_id;
+    if (!g_logging_state.initialized) return NULL;
+    return g_tls_trace_id[0] ? g_tls_trace_id : NULL;
 }
 
 int log_set_module_level(const char* module_pattern, log_level_t level) {
@@ -415,13 +390,13 @@ int log_set_module_level(const char* module_pattern, log_level_t level) {
         return -1;
     }
     
-    pthread_mutex_lock(&g_logging_state.mutex);
+    agentos_mutex_lock(&g_logging_state.mutex);
     
     // 查找现有模式
     for (size_t i = 0; i < g_logging_state.module_level_count; i++) {
         if (strcmp(g_logging_state.module_levels[i].pattern, module_pattern) == 0) {
             g_logging_state.module_levels[i].level = level;
-            pthread_mutex_unlock(&g_logging_state.mutex);
+            agentos_mutex_unlock(&g_logging_state.mutex);
             return 0;
         }
     }
@@ -435,18 +410,62 @@ int log_set_module_level(const char* module_pattern, log_level_t level) {
             sizeof(g_logging_state.module_levels[0].pattern) - 1] = '\0';
         g_logging_state.module_levels[g_logging_state.module_level_count].level = level;
         g_logging_state.module_level_count++;
-        pthread_mutex_unlock(&g_logging_state.mutex);
+        agentos_mutex_unlock(&g_logging_state.mutex);
         return 0;
     }
     
-    pthread_mutex_unlock(&g_logging_state.mutex);
+    agentos_mutex_unlock(&g_logging_state.mutex);
     return -2; // 表已�?
 }
 
 int log_reload_config(const char* config_path) {
-    // 简化实现：暂时不支持配置文件重�?
-    (void)config_path;
-    return 0;
+    if (!config_path) {
+        return AGENTOS_EINVAL;
+    }
+
+    FILE* fp = fopen(config_path, "r");
+    if (!fp) {
+        return AGENTOS_ENOENT;
+    }
+
+    char line[512];
+    log_config_t new_config = g_logging_state.manager;
+    int changes = 0;
+
+    while (fgets(line, sizeof(line), fp)) {
+        char key[128], value[256];
+        if (sscanf(line, " %127[^= ] = %255[^\n\r]", key, value) == 2) {
+            if (strcmp(key, "level") == 0) {
+                log_level_t lvl = log_level_from_string(value);
+                if ((int)lvl >= 0 && lvl < LOG_LEVEL_COUNT) {
+                    new_config.level = lvl;
+                    changes++;
+                }
+            } else if (strcmp(key, "output") == 0) {
+                if (strstr(value, "file")) new_config.outputs |= LOG_OUTPUT_FILE;
+                if (strstr(value, "console")) new_config.outputs |= LOG_OUTPUT_CONSOLE;
+                if (strstr(value, "syslog")) new_config.outputs |= LOG_OUTPUT_SYSLOG;
+                changes++;
+            } else if (strcmp(key, "format") == 0) {
+                if (strcmp(value, "json") == 0) new_config.format = LOG_FORMAT_JSON;
+                else if (strcmp(value, "text") == 0) new_config.format = LOG_FORMAT_TEXT;
+                changes++;
+            }
+        }
+    }
+
+    fclose(fp);
+
+    agentos_mutex_lock(&g_logging_state.mutex);
+    g_logging_state.manager = new_config;
+    agentos_mutex_unlock(&g_logging_state.mutex);
+
+    if (changes > 0) {
+        fprintf(stderr, "[LOGGING] Config reloaded from '%s' (%d changes applied)\n",
+                config_path, changes);
+    }
+
+    return changes > 0 ? 0 : AGENTOS_ENOENT;
 }
 
 void log_flush(void) {
@@ -459,23 +478,20 @@ void log_cleanup(void) {
     if (!g_logging_state.initialized) {
         return;
     }
-    
-    pthread_mutex_lock(&g_logging_state.mutex);
-    
-    // 清理所有线程的追踪ID
-    // 注意：这里简化处理，实际应该遍历所有线�?
-    char* stored_id = pthread_getspecific(g_logging_state.trace_id_key);
-    if (stored_id) {
-        AGENTOS_FREE(stored_id);
-        pthread_setspecific(g_logging_state.trace_id_key, NULL);
+
+    agentos_mutex_lock(&g_logging_state.mutex);
+
+    g_tls_trace_id[0] = '\0';
+
+    for (size_t i = 0; i < g_logging_state.module_level_count; i++) {
+        memset(&g_logging_state.module_levels[i], 0, sizeof(g_logging_state.module_levels[i]));
     }
-    
-    // 清理线程局部存�?
-    pthread_key_delete(g_logging_state.trace_id_key);
-    
-    // 销毁互斥锁
-    pthread_mutex_unlock(&g_logging_state.mutex);
-    pthread_mutex_destroy(&g_logging_state.mutex);
+    g_logging_state.module_level_count = 0;
+
+    g_logging_state.initialized = false;
+
+    agentos_mutex_unlock(&g_logging_state.mutex);
+    agentos_mutex_destroy(&g_logging_state.mutex);
     
     LOG_INFO("日志系统清理完成");
     memset(&g_logging_state, 0, sizeof(g_logging_state));
