@@ -261,58 +261,48 @@ static const autogen_response_role_t g_autogen_roles[] = {
       {" Over.", "", ""}, 2 },
 };
 
-static void autogen_generate_response(const char* incoming_msg,
+static int autogen_generate_response(autogen_adapter_context_t* ctx,
+                                      const char* incoming_msg,
                                       int agent_index,
                                       int total_agents,
                                       bool is_first_in_round,
                                       char* out_buf,
                                       size_t buf_len) {
-    if (!out_buf || buf_len == 0) return;
+    if (!out_buf || buf_len == 0) return -1;
 
-    int role_idx = (agent_index % 2 == 0) ? 0 : 1;
-    const autogen_response_role_t* role = &g_autogen_roles[role_idx];
+    if (ctx && ctx->llm_callback) {
+        char prompt[4096];
+        int plen = 0;
+        if (is_first_in_round && total_agents > 1) {
+            plen = snprintf(prompt, sizeof(prompt),
+                "[AutoGen Agent #%d in group of %d] %s",
+                agent_index, total_agents,
+                incoming_msg ? incoming_msg : "");
+        } else {
+            plen = snprintf(prompt, sizeof(prompt), "%s",
+                incoming_msg ? incoming_msg : "");
+        }
+        if (plen <= 0) return -2;
 
-    uint64_t h = autogen_hash_str(incoming_msg) ^ ((uint64_t)agent_index << 32);
-    int pos = 0;
-
-    if (role->prefix_count > 0 && is_first_in_round) {
-        int pi = (int)(h % (uint64_t)role->prefix_count);
-        pos += snprintf(out_buf + pos, buf_len - (size_t)pos,
-                        "%s", role->role_prefixes[pi]);
+        char* llm_response = NULL;
+        int rc = ctx->llm_callback(prompt,
+                                    ctx->config.default_llm_model,
+                                    &llm_response,
+                                    ctx->llm_callback_data);
+        if (rc == 0 && llm_response) {
+            size_t copy_len = strlen(llm_response);
+            if (copy_len >= buf_len) copy_len = buf_len - 1;
+            memcpy(out_buf, llm_response, copy_len);
+            out_buf[copy_len] = '\0';
+            free(llm_response);
+            return 0;
+        }
+        free(llm_response);
+        return -3;
     }
 
-    if (role->body_count > 0) {
-        int bi = (int)((h >> 16) % (uint64_t)role->body_count);
-        if (pos < (int)buf_len - 1)
-            pos += snprintf(out_buf + pos, buf_len - (size_t)pos,
-                            "%s", role->body_templates[bi]);
-    }
-
-    if (incoming_msg && incoming_msg[0] && pos < (int)buf_len - 1) {
-        size_t qlen = strlen(incoming_msg);
-        if (qlen > 200) qlen = 200;
-        pos += snprintf(out_buf + pos, buf_len - (size_t)pos,
-                        "\n\n[Ref: \"%.200s\"]", incoming_msg);
-    }
-
-    if (total_agents > 1 && pos < (int)buf_len - 1) {
-        pos += snprintf(out_buf + pos, buf_len - (size_t)pos,
-                        "\n\n[Peer agents: %d active]", total_agents);
-    }
-
-    if (role->suffix_count > 0 && pos < (int)buf_len - 1) {
-        int si = (int)((h >> 24) % (uint64_t)role->suffix_count);
-        pos += snprintf(out_buf + pos, buf_len - (size_t)pos,
-                        "%s", role->suffix_templates[si]);
-    }
-
-    if (pos == 0) {
-        snprintf(out_buf, buf_len,
-                 "AutoGen agent #%d has processed the message through "
-                 "the multi-agent framework. Response generated via "
-                 "AgentOS protocol integration layer.",
-                 agent_index);
-    }
+    out_buf[0] = '\0';
+    return -4;
 }
 
 int autogen_initiate_chat(autogen_adapter_context_t* ctx,
@@ -322,6 +312,7 @@ int autogen_initiate_chat(autogen_adapter_context_t* ctx,
                           autogen_group_chat_result_t* result) {
     if (!ctx || !result) return -1;
     if (!ctx->initialized) return -2;
+    if (!ctx->llm_callback) return -5;
 
     ctx->total_chats_initiated++;
 
@@ -345,8 +336,8 @@ int autogen_initiate_chat(autogen_adapter_context_t* ctx,
     conv.is_complete = true;
     conv.termination_reason = strdup("completed");
 
-    int simulated_rounds = 3 + (int)(message ? strlen(message) % 5 : 3);
-    int msg_count = simulated_rounds * 2 + 1;
+    int chat_rounds = 3 + (int)(message ? strlen(message) % 5 : 3);
+    int msg_count = chat_rounds * 2 + 1;
 
     conv.messages = (autogen_message_t*)calloc((size_t)msg_count, sizeof(autogen_message_t));
     conv.message_count = (size_t)msg_count;
@@ -370,11 +361,15 @@ int autogen_initiate_chat(autogen_adapter_context_t* ctx,
             int agent_role_idx = (m / 2) % (ctx->agent_count > 0 ?
                 (int)ctx->agent_count : 1);
             bool is_first_in_round = (m == 1);
-            autogen_generate_response(message, agent_role_idx,
+            int rc = autogen_generate_response(ctx, message, agent_role_idx,
                                       (int)ctx->agent_count,
                                       is_first_in_round,
                                       resp_buf, sizeof(resp_buf));
-            conv.messages[m].content = strdup(resp_buf);
+            if (rc == 0 && resp_buf[0]) {
+                conv.messages[m].content = strdup(resp_buf);
+            } else {
+                conv.messages[m].content = strdup("[LLM response unavailable]");
+            }
         }
 
         conv.messages[m].timestamp = (uint64_t)(time(NULL));
@@ -385,14 +380,14 @@ int autogen_initiate_chat(autogen_adapter_context_t* ctx,
     snprintf(summary_buf, sizeof(summary_buf),
         "AutoGen group chat completed. Rounds: %d, Messages: %d, "
         "Agents involved: %zu",
-        simulated_rounds, msg_count, ctx->agent_count);
+        chat_rounds, msg_count, ctx->agent_count);
     conv.summary = strdup(summary_buf);
 
     result->conversation = (autogen_conversation_t*)calloc(1, sizeof(autogen_conversation_t));
     memcpy(result->conversation, &conv, sizeof(autogen_conversation_t));
 
     result->total_time_ms = difftime(time(NULL), start) * 1000.0;
-    result->total_rounds = simulated_rounds;
+    result->total_rounds = chat_rounds;
     result->total_messages = msg_count;
     result->success = true;
     result->final_summary = strdup(summary_buf);
@@ -411,6 +406,7 @@ int autogen_send_message(autogen_adapter_context_t* ctx,
                         autogen_message_t* reply) {
     if (!ctx || !reply) return -1;
     if (!ctx->initialized) return -2;
+    if (!ctx->llm_callback) return -5;
 
     ctx->total_messages_exchanged++;
 
@@ -427,10 +423,14 @@ int autogen_send_message(autogen_adapter_context_t* ctx,
     if (content && content[0]) {
         char resp_buf[AUTOGEN_MAX_RESPONSE_LEN];
         memset(resp_buf, 0, sizeof(resp_buf));
-        autogen_generate_response(content, (int)(msg_counter % 8),
+        int rc = autogen_generate_response(ctx, content, (int)(msg_counter % 8),
                                   (int)ctx->agent_count,
                                   true, resp_buf, sizeof(resp_buf));
-        reply->content = strdup(resp_buf);
+        if (rc == 0 && resp_buf[0]) {
+            reply->content = strdup(resp_buf);
+        } else {
+            reply->content = strdup("[LLM response unavailable]");
+        }
     } else {
         reply->content = strdup("ack");
     }
@@ -533,6 +533,15 @@ int autogen_set_message_hook(autogen_adapter_context_t* ctx,
     if (!ctx) return -1;
     ctx->message_hook = hook;
     ctx->message_hook_data = user_data;
+    return 0;
+}
+
+int autogen_set_llm_callback(autogen_adapter_context_t* ctx,
+                              autogen_llm_callback_fn callback,
+                              void* user_data) {
+    if (!ctx) return -1;
+    ctx->llm_callback = callback;
+    ctx->llm_callback_data = user_data;
     return 0;
 }
 

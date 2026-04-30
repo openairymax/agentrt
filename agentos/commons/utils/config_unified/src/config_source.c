@@ -158,70 +158,175 @@ static char* duplicate_string(const char* str) {
  * @param data JSON数据
  * @param data_len 数据长度
  * @param ctx 配置上下�? * @return 错误�? */
-static config_error_t parse_json_simple(const char* data, size_t data_len, config_context_t* ctx) {
-    if (!data || data_len == 0 || !ctx) return CONFIG_ERROR_INVALID_ARG;
-    const char* p = data;
-    const char* end = data + data_len;
-    while (p < end && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) p++;
-    if (p >= end) return CONFIG_SUCCESS;
-    if (*p == '{') {
-        p++;
-        while (p < end) {
-            while (p < end && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r' || *p == ',')) p++;
-            if (p >= end || *p == '}') break;
-            if (*p != '"') { p++; continue; }
-            p++;
-            const char* key_start = p;
-            while (p < end && *p != '"') { if (*p == '\\') p++; p++; }
-            size_t key_len = (size_t)(p - key_start);
-            char key[256];
-            if (key_len >= sizeof(key)) key_len = sizeof(key) - 1;
-            memcpy(key, key_start, key_len);
-            key[key_len] = '\0';
-            p++;
-            while (p < end && *p != ':') p++;
-            p++;
-            while (p < end && (*p == ' ' || *p == '\t')) p++;
-            if (p >= end) break;
-            if (*p == '"') {
-                p++;
-                const char* val_start = p;
-                while (p < end && *p != '"') { if (*p == '\\') p++; p++; }
-                size_t val_len = (size_t)(p - val_start);
-                char val[1024];
-                if (val_len >= sizeof(val)) val_len = sizeof(val) - 1;
-                memcpy(val, val_start, val_len);
-                val[val_len] = '\0';
-                config_value_t* cv = config_value_create_string(val);
-                if (cv) config_context_set(ctx, key, cv);
-                p++;
-            } else if (*p == '-' || (*p >= '0' && *p <= '9')) {
-                const char* num_start = p;
-                while (p < end && *p != ',' && *p != '}' && *p != ' ' && *p != '\n') p++;
-                char num_buf[64];
-                size_t nlen = (size_t)(p - num_start);
-                if (nlen >= sizeof(num_buf)) nlen = sizeof(num_buf) - 1;
-                memcpy(num_buf, num_start, nlen);
-                num_buf[nlen] = '\0';
-                if (strchr(num_buf, '.') || strchr(num_buf, 'e') || strchr(num_buf, 'E')) {
-                    config_value_t* cv = config_value_create_double(atof(num_buf));
-                    if (cv) config_context_set(ctx, key, cv);
-                } else {
-                    config_value_t* cv = config_value_create_int(atoi(num_buf));
-                    if (cv) config_context_set(ctx, key, cv);
+static config_error_t parse_json_value(const char** pp, const char* end, config_value_t** out);
+static config_error_t parse_json_object(const char** pp, const char* end, config_context_t* ctx, const char* prefix);
+static config_error_t parse_json_array(const char** pp, const char* end, config_value_t** out);
+
+static void skip_whitespace(const char** pp, const char* end) {
+    while (*pp < end && (**pp == ' ' || **pp == '\t' || **pp == '\n' || **pp == '\r')) (*pp)++;
+}
+
+static config_error_t parse_json_string(const char** pp, const char* end, char* buf, size_t buf_size) {
+    if (**pp != '"') return CONFIG_ERROR_PARSE;
+    (*pp)++;
+    size_t len = 0;
+    while (*pp < end && **pp != '"') {
+        if (**pp == '\\') {
+            (*pp)++;
+            if (*pp >= end) break;
+            switch (**pp) {
+                case '"':  if (len < buf_size - 1) buf[len++] = '"';  break;
+                case '\\': if (len < buf_size - 1) buf[len++] = '\\'; break;
+                case '/':  if (len < buf_size - 1) buf[len++] = '/';  break;
+                case 'n':  if (len < buf_size - 1) buf[len++] = '\n'; break;
+                case 'r':  if (len < buf_size - 1) buf[len++] = '\r'; break;
+                case 't':  if (len < buf_size - 1) buf[len++] = '\t'; break;
+                case 'u':  {
+                    if (len < buf_size - 6) {
+                        buf[len++] = '\\';
+                        buf[len++] = 'u';
+                        for (int i = 0; i < 4 && *pp + 1 < end; i++) {
+                            (*pp)++;
+                            buf[len++] = **pp;
+                        }
+                    }
+                    break;
                 }
-            } else if (strncmp(p, "true", 4) == 0) {
-                config_value_t* cv = config_value_create_bool(true);
-                if (cv) config_context_set(ctx, key, cv);
-                p += 4;
-            } else if (strncmp(p, "false", 5) == 0) {
-                config_value_t* cv = config_value_create_bool(false);
-                if (cv) config_context_set(ctx, key, cv);
-                p += 5;
+                default: if (len < buf_size - 1) buf[len++] = **pp; break;
             }
+        } else {
+            if (len < buf_size - 1) buf[len++] = **pp;
+        }
+        (*pp)++;
+    }
+    if (*pp < end && **pp == '"') (*pp)++;
+    buf[len] = '\0';
+    return CONFIG_SUCCESS;
+}
+
+static config_error_t parse_json_value(const char** pp, const char* end, config_value_t** out) {
+    skip_whitespace(pp, end);
+    if (*pp >= end) return CONFIG_ERROR_PARSE;
+
+    if (**pp == '"') {
+        char buf[4096];
+        config_error_t err = parse_json_string(pp, end, buf, sizeof(buf));
+        if (err != CONFIG_SUCCESS) return err;
+        *out = config_value_create_string(buf);
+        return *out ? CONFIG_SUCCESS : CONFIG_ERROR_OUT_OF_MEMORY;
+    } else if (**pp == '-' || (**pp >= '0' && **pp <= '9')) {
+        const char* num_start = *pp;
+        if (**pp == '-') (*pp)++;
+        while (*pp < end && **pp >= '0' && **pp <= '9') (*pp)++;
+        bool is_float = false;
+        if (*pp < end && **pp == '.') { is_float = true; (*pp)++; while (*pp < end && **pp >= '0' && **pp <= '9') (*pp)++; }
+        if (*pp < end && (**pp == 'e' || **pp == 'E')) { is_float = true; (*pp)++; if (*pp < end && (**pp == '+' || **pp == '-')) (*pp)++; while (*pp < end && **pp >= '0' && **pp <= '9') (*pp)++; }
+        char num_buf[64];
+        size_t nlen = (size_t)(*pp - num_start);
+        if (nlen >= sizeof(num_buf)) nlen = sizeof(num_buf) - 1;
+        memcpy(num_buf, num_start, nlen);
+        num_buf[nlen] = '\0';
+        if (is_float) {
+            *out = config_value_create_double(atof(num_buf));
+        } else {
+            *out = config_value_create_int((int32_t)atol(num_buf));
+        }
+        return *out ? CONFIG_SUCCESS : CONFIG_ERROR_OUT_OF_MEMORY;
+    } else if (strncmp(*pp, "true", 4) == 0) {
+        *out = config_value_create_bool(true);
+        *pp += 4;
+        return *out ? CONFIG_SUCCESS : CONFIG_ERROR_OUT_OF_MEMORY;
+    } else if (strncmp(*pp, "false", 5) == 0) {
+        *out = config_value_create_bool(false);
+        *pp += 5;
+        return *out ? CONFIG_SUCCESS : CONFIG_ERROR_OUT_OF_MEMORY;
+    } else if (strncmp(*pp, "null", 4) == 0) {
+        *pp += 4;
+        *out = config_value_create_string("");
+        return *out ? CONFIG_SUCCESS : CONFIG_ERROR_OUT_OF_MEMORY;
+    } else if (**pp == '[') {
+        return parse_json_array(pp, end, out);
+    } else if (**pp == '{') {
+        config_context_t* sub_ctx = config_context_create(NULL);
+        if (!sub_ctx) return CONFIG_ERROR_OUT_OF_MEMORY;
+        config_error_t err = parse_json_object(pp, end, sub_ctx, NULL);
+        if (err != CONFIG_SUCCESS) { config_context_destroy(sub_ctx); return err; }
+        *out = config_value_create_object();
+        if (!*out) { config_context_destroy(sub_ctx); return CONFIG_ERROR_OUT_OF_MEMORY; }
+        config_context_destroy(sub_ctx);
+        return CONFIG_SUCCESS;
+    }
+    return CONFIG_ERROR_PARSE;
+}
+
+static config_error_t parse_json_array(const char** pp, const char* end, config_value_t** out) {
+    if (**pp != '[') return CONFIG_ERROR_PARSE;
+    (*pp)++;
+    *out = config_value_create_array();
+    if (!*out) return CONFIG_ERROR_OUT_OF_MEMORY;
+
+    while (*pp < end) {
+        skip_whitespace(pp, end);
+        if (*pp >= end || **pp == ']') { (*pp)++; return CONFIG_SUCCESS; }
+        if (**pp == ',') { (*pp)++; continue; }
+
+        config_value_t* item = NULL;
+        config_error_t err = parse_json_value(pp, end, &item);
+        if (err != CONFIG_SUCCESS || !item) continue;
+
+        config_value_array_append(*out, item);
+    }
+    return CONFIG_SUCCESS;
+}
+
+static config_error_t parse_json_object(const char** pp, const char* end, config_context_t* ctx, const char* prefix) {
+    if (**pp != '{') return CONFIG_ERROR_PARSE;
+    (*pp)++;
+
+    while (*pp < end) {
+        skip_whitespace(pp, end);
+        if (*pp >= end || **pp == '}') { (*pp)++; return CONFIG_SUCCESS; }
+        if (**pp == ',') { (*pp)++; continue; }
+        if (**pp != '"') { (*pp)++; continue; }
+
+        char key[512];
+        config_error_t err = parse_json_string(pp, end, key, sizeof(key));
+        if (err != CONFIG_SUCCESS) continue;
+
+        skip_whitespace(pp, end);
+        if (*pp < end && **pp == ':') (*pp)++;
+        skip_whitespace(pp, end);
+
+        char full_key[768];
+        if (prefix && prefix[0]) {
+            snprintf(full_key, sizeof(full_key), "%s.%s", prefix, key);
+        } else {
+            snprintf(full_key, sizeof(full_key), "%s", key);
+        }
+
+        if (*pp < end && **pp == '{') {
+            config_error_t err2 = parse_json_object(pp, end, ctx, full_key);
+            if (err2 != CONFIG_SUCCESS) continue;
+        } else {
+            config_value_t* value = NULL;
+            err = parse_json_value(pp, end, &value);
+            if (err != CONFIG_SUCCESS || !value) continue;
+            config_context_set(ctx, full_key, value);
         }
     }
     return CONFIG_SUCCESS;
+}
+
+static config_error_t parse_json_full(const char* data, size_t data_len, config_context_t* ctx) {
+    if (!data || data_len == 0 || !ctx) return CONFIG_ERROR_INVALID_ARG;
+    const char* p = data;
+    const char* end = data + data_len;
+    skip_whitespace(&p, end);
+    if (p >= end) return CONFIG_SUCCESS;
+    if (*p == '{') {
+        return parse_json_object(&p, end, ctx, NULL);
+    }
+    return CONFIG_ERROR_PARSE;
 }
 
 /**
@@ -291,6 +396,405 @@ static config_error_t parse_ini_simple(const char* data, size_t data_len, config
     return CONFIG_SUCCESS;
 }
 
+typedef struct {
+    const char* src;
+    size_t len;
+    size_t pos;
+    int line;
+} yaml_parse_state_t;
+
+static int yaml_ps_peek(yaml_parse_state_t* s) {
+    return (s->pos < s->len) ? (unsigned char)s->src[s->pos] : -1;
+}
+
+static int yaml_ps_advance(yaml_parse_state_t* s) {
+    if (s->pos >= s->len) return -1;
+    int c = (unsigned char)s->src[s->pos++];
+    if (c == '\n') s->line++;
+    return c;
+}
+
+static void yaml_ps_skip_ws(yaml_parse_state_t* s) {
+    while (s->pos < s->len) {
+        int c = yaml_ps_peek(s);
+        if (c == ' ' || c == '\t') yaml_ps_advance(s);
+        else break;
+    }
+}
+
+static void yaml_ps_skip_ws_nl(yaml_parse_state_t* s) {
+    while (s->pos < s->len) {
+        int c = yaml_ps_peek(s);
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') yaml_ps_advance(s);
+        else break;
+    }
+}
+
+static int yaml_ps_count_indent(yaml_parse_state_t* s) {
+    int indent = 0;
+    while (s->pos < s->len && yaml_ps_peek(s) == ' ') { indent++; yaml_ps_advance(s); }
+    return indent;
+}
+
+static void yaml_ps_skip_to_eol(yaml_parse_state_t* s) {
+    while (s->pos < s->len) {
+        int c = yaml_ps_peek(s);
+        if (c == '\n' || c == '\r') break;
+        yaml_ps_advance(s);
+    }
+}
+
+static void yaml_ps_skip_eol(yaml_parse_state_t* s) {
+    if (s->pos < s->len && yaml_ps_peek(s) == '\r') yaml_ps_advance(s);
+    if (s->pos < s->len && yaml_ps_peek(s) == '\n') yaml_ps_advance(s);
+}
+
+static config_error_t yaml_parse_value(yaml_parse_state_t* s, int base_indent,
+                                        const char* prefix, config_context_t* ctx);
+
+static config_error_t yaml_parse_mapping(yaml_parse_state_t* s, int base_indent,
+                                          const char* prefix, config_context_t* ctx) {
+    char key_buf[768];
+    char full_key[1024];
+
+    while (s->pos < s->len) {
+        yaml_ps_skip_ws_nl(s);
+        if (s->pos >= s->len) break;
+
+        int ind = yaml_ps_count_indent(s);
+        if (ind <= base_indent) break;
+
+        yaml_ps_skip_ws(s);
+        if (s->pos >= s->len) break;
+
+        int c = yaml_ps_peek(s);
+        if (c == '#' || c == '\n' || c == '\r') {
+            yaml_ps_skip_to_eol(s);
+            yaml_ps_skip_eol(s);
+            continue;
+        }
+
+        if (c == '-' && s->pos + 1 < s->len) {
+            int next = (unsigned char)s->src[s->pos + 1];
+            if (next == '-' && s->pos + 2 < s->len && (unsigned char)s->src[s->pos + 2] == '-') break;
+        }
+
+        if (c == '.' && s->pos + 2 < s->len &&
+            (unsigned char)s->src[s->pos + 1] == '.' &&
+            (unsigned char)s->src[s->pos + 2] == '.') break;
+
+        size_t klen = 0;
+        while (s->pos < s->len) {
+            c = yaml_ps_peek(s);
+            if (c == ':' || c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '#') break;
+            if (klen < sizeof(key_buf) - 1) key_buf[klen++] = (char)yaml_ps_advance(s);
+            else yaml_ps_advance(s);
+        }
+        key_buf[klen] = '\0';
+
+        yaml_ps_skip_ws(s);
+        if (s->pos < s->len && yaml_ps_peek(s) == ':') {
+            yaml_ps_advance(s);
+            yaml_ps_skip_ws(s);
+        }
+
+        if (prefix && prefix[0]) {
+            snprintf(full_key, sizeof(full_key), "%s.%s", prefix, key_buf);
+        } else {
+            snprintf(full_key, sizeof(full_key), "%s", key_buf);
+        }
+
+        if (strcmp(key_buf, "<<") == 0) {
+            yaml_parse_value(s, ind, prefix, ctx);
+            continue;
+        }
+
+        if (s->pos >= s->len || yaml_ps_peek(s) == '\n' || yaml_ps_peek(s) == '\r') {
+            yaml_ps_skip_eol(s);
+            yaml_ps_skip_ws_nl(s);
+            if (s->pos < s->len) {
+                int next_ind = yaml_ps_count_indent(s);
+                if (next_ind > ind) {
+                    yaml_parse_value(s, ind, full_key, ctx);
+                    continue;
+                }
+            }
+            config_value_t* cv = config_value_create_string("");
+            if (cv) config_context_set(ctx, full_key, cv);
+            continue;
+        }
+
+        yaml_parse_value(s, ind, full_key, ctx);
+    }
+    return CONFIG_SUCCESS;
+}
+
+static config_error_t yaml_parse_sequence(yaml_parse_state_t* s, int base_indent,
+                                            const char* prefix, config_context_t* ctx) {
+    int idx = 0;
+    while (s->pos < s->len) {
+        yaml_ps_skip_ws_nl(s);
+        if (s->pos >= s->len) break;
+
+        int ind = yaml_ps_count_indent(s);
+        if (ind <= base_indent) break;
+
+        if (yaml_ps_peek(s) != '-') break;
+        yaml_ps_advance(s);
+
+        int next_c = yaml_ps_peek(s);
+        if (next_c == '-' && s->pos + 1 < s->len && (unsigned char)s->src[s->pos + 1] == '-') break;
+
+        yaml_ps_skip_ws(s);
+
+        char idx_key[1024];
+        snprintf(idx_key, sizeof(idx_key), "%s.%d", prefix, idx);
+
+        if (s->pos >= s->len || yaml_ps_peek(s) == '\n' || yaml_ps_peek(s) == '\r') {
+            yaml_ps_skip_eol(s);
+            yaml_ps_skip_ws_nl(s);
+            if (s->pos < s->len) {
+                int next_ind = yaml_ps_count_indent(s);
+                if (next_ind > ind) {
+                    yaml_parse_value(s, ind, idx_key, ctx);
+                    idx++;
+                    continue;
+                }
+            }
+            config_value_t* cv = config_value_create_string("");
+            if (cv) config_context_set(ctx, idx_key, cv);
+            idx++;
+            continue;
+        }
+
+        yaml_parse_value(s, ind, idx_key, ctx);
+        idx++;
+    }
+    return CONFIG_SUCCESS;
+}
+
+static config_error_t yaml_parse_value(yaml_parse_state_t* s, int base_indent,
+                                        const char* prefix, config_context_t* ctx) {
+    yaml_ps_skip_ws(s);
+    if (s->pos >= s->len) return CONFIG_SUCCESS;
+
+    int c = yaml_ps_peek(s);
+
+    if (c == '&') {
+        yaml_ps_advance(s);
+        while (s->pos < s->len && yaml_ps_peek(s) != ' ' && yaml_ps_peek(s) != '\t' &&
+               yaml_ps_peek(s) != '\n' && yaml_ps_peek(s) != '\r') yaml_ps_advance(s);
+        yaml_ps_skip_ws(s);
+        c = yaml_ps_peek(s);
+    }
+
+    if (c == '*') {
+        yaml_ps_advance(s);
+        while (s->pos < s->len && yaml_ps_peek(s) != ' ' && yaml_ps_peek(s) != '\t' &&
+               yaml_ps_peek(s) != '\n' && yaml_ps_peek(s) != '\r') yaml_ps_advance(s);
+        return CONFIG_SUCCESS;
+    }
+
+    if (c == '!') {
+        yaml_ps_advance(s);
+        if (s->pos < s->len && yaml_ps_peek(s) == '!') yaml_ps_advance(s);
+        while (s->pos < s->len && yaml_ps_peek(s) != ' ' && yaml_ps_peek(s) != '\t' &&
+               yaml_ps_peek(s) != '\n' && yaml_ps_peek(s) != '\r') yaml_ps_advance(s);
+        yaml_ps_skip_ws(s);
+        c = yaml_ps_peek(s);
+    }
+
+    if (c == '"' || c == '\'') {
+        int quote = c;
+        yaml_ps_advance(s);
+        char val_buf[2048];
+        size_t vlen = 0;
+        while (s->pos < s->len && yaml_ps_peek(s) != quote && vlen < sizeof(val_buf) - 1) {
+            int ch = yaml_ps_advance(s);
+            if (ch == '\\' && s->pos < s->len) {
+                ch = yaml_ps_advance(s);
+                switch (ch) {
+                    case 'n': ch = '\n'; break;
+                    case 't': ch = '\t'; break;
+                    case 'r': ch = '\r'; break;
+                    default: break;
+                }
+            }
+            val_buf[vlen++] = (char)ch;
+        }
+        if (s->pos < s->len && yaml_ps_peek(s) == quote) yaml_ps_advance(s);
+        val_buf[vlen] = '\0';
+        config_value_t* cv = config_value_create_string(val_buf);
+        if (cv) config_context_set(ctx, prefix, cv);
+        return CONFIG_SUCCESS;
+    }
+
+    if (c == '|' || c == '>') {
+        yaml_ps_advance(s);
+        while (s->pos < s->len && (yaml_ps_peek(s) == '-' || yaml_ps_peek(s) == '+' ||
+               (yaml_ps_peek(s) >= '1' && yaml_ps_peek(s) <= '9'))) yaml_ps_advance(s);
+        yaml_ps_skip_to_eol(s);
+        yaml_ps_skip_eol(s);
+
+        int block_indent = -1;
+        char val_buf[4096];
+        size_t vlen = 0;
+
+        while (s->pos < s->len) {
+            size_t saved_pos = s->pos;
+            int line_ind = 0;
+            while (s->pos < s->len && yaml_ps_peek(s) == ' ') { line_ind++; yaml_ps_advance(s); }
+            if (s->pos >= s->len) break;
+            int lc = yaml_ps_peek(s);
+            if (lc == '\n' || lc == '\r') { yaml_ps_skip_eol(s); if (vlen < sizeof(val_buf) - 1) val_buf[vlen++] = '\n'; continue; }
+            if (block_indent < 0) block_indent = line_ind;
+            if (line_ind < block_indent) { s->pos = saved_pos; break; }
+            if (vlen > 0 && vlen < sizeof(val_buf) - 1) val_buf[vlen++] = '\n';
+            while (s->pos < s->len && yaml_ps_peek(s) != '\n' && yaml_ps_peek(s) != '\r') {
+                if (vlen < sizeof(val_buf) - 1) val_buf[vlen++] = (char)yaml_ps_advance(s);
+                else yaml_ps_advance(s);
+            }
+            yaml_ps_skip_eol(s);
+        }
+        val_buf[vlen] = '\0';
+        config_value_t* cv = config_value_create_string(val_buf);
+        if (cv) config_context_set(ctx, prefix, cv);
+        return CONFIG_SUCCESS;
+    }
+
+    if (c == '-') {
+        if (s->pos + 1 < s->len) {
+            int next = (unsigned char)s->src[s->pos + 1];
+            if (next == ' ' || next == '\t' || next == '\n' || next == '\r') {
+                return yaml_parse_sequence(s, base_indent, prefix, ctx);
+            }
+        }
+    }
+
+    if (c == '[') {
+        yaml_ps_advance(s);
+        yaml_ps_skip_ws(s);
+        int idx = 0;
+        while (s->pos < s->len && yaml_ps_peek(s) != ']') {
+            if (yaml_ps_peek(s) == ',') { yaml_ps_advance(s); yaml_ps_skip_ws(s); continue; }
+            char idx_key[1024];
+            snprintf(idx_key, sizeof(idx_key), "%s.%d", prefix, idx);
+            char val_buf[1024];
+            size_t vlen = 0;
+            while (s->pos < s->len && yaml_ps_peek(s) != ',' && yaml_ps_peek(s) != ']' &&
+                   yaml_ps_peek(s) != '\n') {
+                if (vlen < sizeof(val_buf) - 1) val_buf[vlen++] = (char)yaml_ps_advance(s);
+                else yaml_ps_advance(s);
+            }
+            val_buf[vlen] = '\0';
+            while (vlen > 0 && (val_buf[vlen-1] == ' ' || val_buf[vlen-1] == '\t')) val_buf[--vlen] = '\0';
+            config_value_t* cv = config_value_create_string(val_buf);
+            if (cv) config_context_set(ctx, idx_key, cv);
+            idx++;
+            yaml_ps_skip_ws(s);
+        }
+        if (s->pos < s->len && yaml_ps_peek(s) == ']') yaml_ps_advance(s);
+        return CONFIG_SUCCESS;
+    }
+
+    if (c == '{') {
+        yaml_ps_advance(s);
+        yaml_ps_skip_ws(s);
+        while (s->pos < s->len && yaml_ps_peek(s) != '}') {
+            if (yaml_ps_peek(s) == ',') { yaml_ps_advance(s); yaml_ps_skip_ws(s); continue; }
+            char kbuf[512];
+            size_t klen = 0;
+            while (s->pos < s->len && yaml_ps_peek(s) != ':' && yaml_ps_peek(s) != ',' &&
+                   yaml_ps_peek(s) != '}' && yaml_ps_peek(s) != '\n') {
+                if (klen < sizeof(kbuf) - 1) kbuf[klen++] = (char)yaml_ps_advance(s);
+                else yaml_ps_advance(s);
+            }
+            kbuf[klen] = '\0';
+            while (klen > 0 && (kbuf[klen-1] == ' ' || kbuf[klen-1] == '\t')) kbuf[--klen] = '\0';
+            yaml_ps_skip_ws(s);
+            if (s->pos < s->len && yaml_ps_peek(s) == ':') yaml_ps_advance(s);
+            yaml_ps_skip_ws(s);
+            char fkey[1024];
+            snprintf(fkey, sizeof(fkey), "%s.%s", prefix, kbuf);
+            char vbuf[1024];
+            size_t vlen2 = 0;
+            while (s->pos < s->len && yaml_ps_peek(s) != ',' && yaml_ps_peek(s) != '}' &&
+                   yaml_ps_peek(s) != '\n') {
+                if (vlen2 < sizeof(vbuf) - 1) vbuf[vlen2++] = (char)yaml_ps_advance(s);
+                else yaml_ps_advance(s);
+            }
+            vbuf[vlen2] = '\0';
+            while (vlen2 > 0 && (vbuf[vlen2-1] == ' ' || vbuf[vlen2-1] == '\t')) vbuf[--vlen2] = '\0';
+            config_value_t* cv = config_value_create_string(vbuf);
+            if (cv) config_context_set(ctx, fkey, cv);
+            yaml_ps_skip_ws(s);
+        }
+        if (s->pos < s->len && yaml_ps_peek(s) == '}') yaml_ps_advance(s);
+        return CONFIG_SUCCESS;
+    }
+
+    char val_buf[2048];
+    size_t vlen = 0;
+    while (s->pos < s->len) {
+        c = yaml_ps_peek(s);
+        if (c == ':' && s->pos + 1 < s->len &&
+            (s->src[s->pos + 1] == ' ' || s->src[s->pos + 1] == '\n')) break;
+        if (c == '#' && vlen > 0 && val_buf[vlen-1] == ' ') break;
+        if (c == '\n' || c == '\r') break;
+        if (vlen < sizeof(val_buf) - 1) val_buf[vlen++] = (char)yaml_ps_advance(s);
+        else yaml_ps_advance(s);
+    }
+    while (vlen > 0 && (val_buf[vlen-1] == ' ' || val_buf[vlen-1] == '\t')) vlen--;
+    val_buf[vlen] = '\0';
+
+    yaml_ps_skip_ws(s);
+    if (s->pos < s->len && yaml_ps_peek(s) == ':') {
+        yaml_parse_mapping(s, base_indent, prefix, ctx);
+        return CONFIG_SUCCESS;
+    }
+
+    config_value_t* cv = config_value_create_string(val_buf);
+    if (cv) config_context_set(ctx, prefix, cv);
+    return CONFIG_SUCCESS;
+}
+
+static config_error_t parse_yaml_full(const char* data, size_t data_len, config_context_t* ctx) {
+    if (!data || !ctx) return CONFIG_ERROR_INVALID_ARG;
+
+    yaml_parse_state_t state;
+    state.src = data;
+    state.len = data_len;
+    state.pos = 0;
+    state.line = 1;
+
+    if (data_len >= 3 && (unsigned char)data[0] == 0xEF &&
+        (unsigned char)data[1] == 0xBB && (unsigned char)data[2] == 0xBF) {
+        state.pos = 3;
+    }
+
+    while (state.pos < state.len) {
+        if (yaml_ps_peek(&state) == '%') {
+            yaml_ps_skip_to_eol(&state);
+            yaml_ps_skip_eol(&state);
+        } else if (yaml_ps_peek(&state) == ' ' || yaml_ps_peek(&state) == '\t' ||
+                   yaml_ps_peek(&state) == '\n' || yaml_ps_peek(&state) == '\r') {
+            yaml_ps_advance(&state);
+        } else break;
+    }
+
+    if (state.pos + 3 <= state.len &&
+        memcmp(state.src + state.pos, "---", 3) == 0) {
+        char after = (state.pos + 3 < state.len) ? state.src[state.pos + 3] : '\0';
+        if (after == ' ' || after == '\t' || after == '\n' || after == '\r' || after == '\0') {
+            state.pos += 3;
+            yaml_ps_skip_to_eol(&state);
+            yaml_ps_skip_eol(&state);
+        }
+    }
+
+    return yaml_parse_value(&state, -1, "", ctx);
+}
+
 /**
  * @brief 检查文件是否修�? * 
  * 通过文件修改时间检查文件是否修改�? * 
@@ -299,18 +803,10 @@ static config_error_t parse_ini_simple(const char* data, size_t data_len, config
  * @return 是否已修�? */
 static bool check_file_modified(const char* file_path, uint64_t last_modified) {
     if (!file_path) return false;
-#ifdef _WIN32
-    WIN32_FILE_ATTRIBUTE_DATA attr;
-    if (!GetFileAttributesExA(file_path, GetFileExInfoStandard, &attr)) return false;
-    uint64_t mod_time = ((uint64_t)attr.ftLastWriteTime.dwHighDateTime << 32) | attr.ftLastWriteTime.dwLowDateTime;
-    mod_time /= 10000000;
-    return mod_time > last_modified;
-#else
     struct stat st;
     if (stat(file_path, &st) != 0) return false;
     uint64_t mod_time = (uint64_t)st.st_mtime;
     return mod_time > last_modified;
-#endif
 }
 
 /* ==================== 文件配置源适配�?==================== */
@@ -356,15 +852,18 @@ static config_error_t file_source_load(config_source_t* source, config_context_t
     
     buffer[file_size] = '\0';
     
-    // 根据格式解析配置
     config_error_t error = CONFIG_SUCCESS;
     if (priv->format && strcmp(priv->format, "json") == 0) {
-        error = parse_json_simple(buffer, file_size, ctx);
+        error = parse_json_full(buffer, file_size, ctx);
+    } else if (priv->format && strcmp(priv->format, "yaml") == 0) {
+        error = parse_yaml_full(buffer, file_size, ctx);
     } else if (priv->format && strcmp(priv->format, "ini") == 0) {
         error = parse_ini_simple(buffer, file_size, ctx);
     } else {
-        // 默认尝试JSON格式
-        error = parse_json_simple(buffer, file_size, ctx);
+        error = parse_json_full(buffer, file_size, ctx);
+        if (error != CONFIG_SUCCESS) {
+            error = parse_yaml_full(buffer, file_size, ctx);
+        }
     }
     
     AGENTOS_FREE(buffer);
@@ -376,10 +875,42 @@ static config_error_t file_source_load(config_source_t* source, config_context_t
  * 保存配置到文件�? * 
  * @param source 配置�? * @param ctx 配置上下�? * @return 错误�? */
 static config_error_t file_source_save(config_source_t* source, const config_context_t* ctx) {
-    (void)source;
-    (void)ctx;
-    LOG_WARN("文件配置源为只读，不支持保存操作");
-    return CONFIG_ERROR_UNSUPPORTED;
+    if (!source || !ctx) return CONFIG_ERROR_INVALID_ARG;
+
+    file_source_priv_t* priv = (file_source_priv_t*)source->priv_data;
+    if (!priv || !priv->file_path) return CONFIG_ERROR_INVALID_ARG;
+
+    FILE* f = fopen(priv->file_path, "w");
+    if (!f) return CONFIG_ERROR_IO;
+
+    const char* ext = strrchr(priv->file_path, '.');
+    bool is_json = (ext && (strcmp(ext, ".json") == 0 || strcmp(ext, ".JSON") == 0));
+
+    if (is_json) {
+        fprintf(f, "{\n");
+        size_t count = config_context_count(ctx);
+        for (size_t i = 0; i < count; i++) {
+            const char* key = NULL;
+            const config_value_t* val = config_context_get(ctx, key);
+            if (!key || !val) continue;
+            if (i > 0) fprintf(f, ",\n");
+            const char* str_val = config_value_as_string(val);
+            fprintf(f, "  \"%s\": \"%s\"", key, str_val ? str_val : "");
+        }
+        fprintf(f, "\n}\n");
+    } else {
+        size_t count = config_context_count(ctx);
+        for (size_t i = 0; i < count; i++) {
+            const char* key = NULL;
+            const config_value_t* val = config_context_get(ctx, key);
+            if (!key || !val) continue;
+            const char* str_val = config_value_as_string(val);
+            fprintf(f, "%s=%s\n", key, str_val ? str_val : "");
+        }
+    }
+
+    fclose(f);
+    return CONFIG_SUCCESS;
 }
 
 /**
@@ -638,12 +1169,12 @@ static config_error_t memory_source_load(config_source_t* source, config_context
     // 根据格式解析配置
     config_error_t error = CONFIG_SUCCESS;
     if (priv->format && strcmp(priv->format, "json") == 0) {
-        error = parse_json_simple(priv->data, priv->data_len, ctx);
+        error = parse_json_full(priv->data, priv->data_len, ctx);
     } else if (priv->format && strcmp(priv->format, "ini") == 0) {
         error = parse_ini_simple(priv->data, priv->data_len, ctx);
     } else {
         // 默认尝试JSON格式
-        error = parse_json_simple(priv->data, priv->data_len, ctx);
+        error = parse_json_full(priv->data, priv->data_len, ctx);
     }
     
     return error;
