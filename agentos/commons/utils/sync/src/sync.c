@@ -198,7 +198,7 @@ sync_result_t sync_set_option(void* lock, int option, void* value) {
     }
     (void)option;
     (void)value;
-    return SYNC_SUCCESS;
+    return SYNC_ERROR_UNSUPPORTED;
 }
 
 /**
@@ -218,7 +218,7 @@ sync_result_t sync_get_option(void* lock, int option, void* value) {
         return SYNC_ERROR_INVALID;
     }
     (void)option;
-    return SYNC_SUCCESS;
+    return SYNC_ERROR_UNSUPPORTED;
 }
 
 /**

@@ -376,8 +376,9 @@ static config_error_t file_source_load(config_source_t* source, config_context_t
  * 保存配置到文件�? * 
  * @param source 配置�? * @param ctx 配置上下�? * @return 错误�? */
 static config_error_t file_source_save(config_source_t* source, const config_context_t* ctx) {
-    // 文件配置源保存�?    (void)source;
+    (void)source;
     (void)ctx;
+    LOG_WARN("文件配置源为只读，不支持保存操作");
     return CONFIG_ERROR_UNSUPPORTED;
 }
 
@@ -477,8 +478,9 @@ static config_error_t env_source_load(config_source_t* source, config_context_t*
  * 保存配置到环境变量�? * 
  * @param source 配置�? * @param ctx 配置上下�? * @return 错误�? */
 static config_error_t env_source_save(config_source_t* source, const config_context_t* ctx) {
-    // 环境变量配置源保存�?    (void)source;
+    (void)source;
     (void)ctx;
+    LOG_WARN("环境变量配置源为只读，不支持保存操作");
     return CONFIG_ERROR_UNSUPPORTED;
 }
 
@@ -570,8 +572,9 @@ static config_error_t args_source_load(config_source_t* source, config_context_t
  * 命令行配置源不支持保存�? * 
  * @param source 配置�? * @param ctx 配置上下�? * @return 错误�? */
 static config_error_t args_source_save(config_source_t* source, const config_context_t* ctx) {
-    // 命令行配置源不支持保�?    (void)source;
+    (void)source;
     (void)ctx;
+    LOG_WARN("命令行配置源为只读，不支持保存操作");
     return CONFIG_ERROR_UNSUPPORTED;
 }
 
@@ -651,9 +654,9 @@ static config_error_t memory_source_load(config_source_t* source, config_context
  * 内存配置源不支持保存�? * 
  * @param source 配置�? * @param ctx 配置上下�? * @return 错误�? */
 static config_error_t memory_source_save(config_source_t* source, const config_context_t* ctx) {
-    // 内存配置源不支持保存
     (void)source;
     (void)ctx;
+    LOG_WARN("内存配置源为只读，不支持保存操作");
     return CONFIG_ERROR_UNSUPPORTED;
 }
 
@@ -727,8 +730,9 @@ static config_error_t defaults_source_load(config_source_t* source, config_conte
  * 默认值配置源不支持保存�? * 
  * @param source 配置�? * @param ctx 配置上下�? * @return 错误�? */
 static config_error_t defaults_source_save(config_source_t* source, const config_context_t* ctx) {
-    // 默认值配置源不支持保�?    (void)source;
+    (void)source;
     (void)ctx;
+    LOG_WARN("默认值配置源为只读，不支持保存操作");
     return CONFIG_ERROR_UNSUPPORTED;
 }
 

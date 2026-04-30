@@ -124,16 +124,16 @@ typedef struct daemon_security_config {
  * @code
  * daemon_security_config_t sec_config = {
  *     .sanitize_level = SANITIZE_LEVEL_STRICT,
- *     .sanitizer_rules_path = "/etc/agentos/cupolas/sanitizer_rules.yaml",
- *     .permission_rules_path = "/etc/agentos/cupolas/permission_rules.yaml",
+ *     .sanitizer_rules_path = AGENTOS_CONFIG_DIR "/cupolas/sanitizer_rules.yaml",
+ *     .permission_rules_path = AGENTOS_CONFIG_DIR "/cupolas/permission_rules.yaml",
  *     .enable_permission_cache = true,
  *     .enable_signature_verification = true,
- *     .trusted_ca_path = "/etc/agentos/cupolas/ca",
+ *     .trusted_ca_path = AGENTOS_CONFIG_DIR "/cupolas/ca",
  *     .expected_signer = "SPHARX Trusted Signer",
  *     .enable_vault = true,
- *     .vault_storage_path = "/var/lib/agentos/cupolas/vault",
+ *     .vault_storage_path = AGENTOS_CACHE_DIR "/cupolas/vault",
  *     .enable_audit_logging = true,
- *     .audit_log_dir = "/var/log/cupolas"
+ *     .audit_log_dir = AGENTOS_LOG_DIR "/cupolas"
  * };
  * 
  * agentos_error_t error;

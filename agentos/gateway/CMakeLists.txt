@@ -128,6 +128,7 @@ target_include_directories(gateway
 
 target_link_libraries(gateway PRIVATE
     agentos_protocols
+    agentos_common
 )
 
 # 条件链接依赖库

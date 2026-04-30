@@ -49,6 +49,7 @@ foreach(TEST_SRC ${SCHED_TEST_SOURCES})
 
     target_link_libraries(test_sched_${TEST_NAME} PRIVATE
         svc_common
+        agentos_common
         Threads::Threads
         m
     )

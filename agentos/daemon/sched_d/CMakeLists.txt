@@ -46,11 +46,13 @@ if(WIN32)
         _CRT_SECURE_NO_WARNINGS
     )
     target_link_libraries(agentos-sched-d PRIVATE
+        agentos_common
         ws2_32
         bcrypt
     )
 elseif(UNIX)
     target_link_libraries(agentos-sched-d PRIVATE
+        agentos_common
         pthread
         rt
         m

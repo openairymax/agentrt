@@ -36,6 +36,8 @@ target_include_directories(channel_d PRIVATE
 
 if(UNIX)
     target_link_libraries(channel_d PRIVATE
+        svc_common
+        agentos_common
         pthread
         rt
     )
@@ -73,6 +75,8 @@ if(CMOCKA_FOUND OR TARGET cmocka)
     )
     target_link_libraries(test_channel_e2e PRIVATE
         ${CMOCKA_LIBRARIES}
+        svc_common
+        agentos_common
         pthread rt
     )
     target_compile_options(test_channel_e2e PRIVATE -Wall -Wextra)
@@ -85,7 +89,7 @@ else()
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${COMMONS_DIR}/tests/utils
     )
-    target_link_libraries(test_channel_e2e PRIVATE pthread rt)
+    target_link_libraries(test_channel_e2e PRIVATE pthread rt svc_common agentos_common)
     target_compile_options(test_channel_e2e PRIVATE -Wall -Wextra)
     target_compile_definitions(test_channel_e2e PRIVATE USE_CMOCKA_STUB)
     add_test(NAME channel_e2e COMMAND test_channel_e2e)
