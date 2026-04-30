@@ -187,8 +187,8 @@ int protocol_router_route(protocol_router_handle_t router,
         *transformed = *message;
         transformed->protocol = r->default_protocol;
         
-        if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
-            uint64_t end_time = (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+        {
+            uint64_t end_time = agentos_time_ns();
             if (start_time > 0) {
                 r->total_conversion_time_ns += (end_time - start_time);
             }
