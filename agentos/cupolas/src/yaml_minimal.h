@@ -2,20 +2,6 @@
  * @file yaml_minimal.h
  * @brief Minimal YAML 1.1 subset parser for AgentOS configuration files
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
- *
- * Supported YAML features:
- * - Mappings (key-value pairs, indentation-based nesting)
- * - Sequences (arrays with '-' prefix)
- * - Scalar types: string, integer, float, boolean, null
- * - Quoted strings (single and double)
- * - Comments (# to end of line)
- * - Multi-line values (literal block '|', folded '>')
- *
- * NOT supported (intentionally):
- * - Anchors (&) / Aliases (*)
- * - Tags (!!)
- * - Document markers (--- / ...)
- * - Complex keys
  */
 
 #ifndef CUPOLAS_YAML_MINIMAL_H
@@ -58,6 +44,8 @@ struct yaml_node {
         struct { struct yaml_sequence_item* items; size_t count; } sequence;
     };
     int line;
+    char* anchor_name;
+    char* tag;
 };
 
 typedef struct yaml_document {

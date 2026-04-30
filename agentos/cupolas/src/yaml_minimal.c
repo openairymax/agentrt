@@ -15,6 +15,12 @@
 #define MAX_LINE_LEN 8192
 #define MAX_DEPTH 64
 #define MAX_KEY_LEN 256
+#define MAX_ANCHORS 64
+
+struct anchor_entry {
+    char* name;
+    struct yaml_node* node;
+};
 
 struct parse_ctx {
     const char* src;
@@ -22,8 +28,21 @@ struct parse_ctx {
     size_t pos;
     int line;
     int line_pos;
+    int col;
     yaml_document_t* doc;
+    struct anchor_entry anchors[MAX_ANCHORS];
+    int anchor_count;
+    char* error_msg;
 };
+
+static char peek(struct parse_ctx* ctx);
+static char advance(struct parse_ctx* ctx);
+static bool at_end(struct parse_ctx* ctx);
+static struct yaml_node* parse_value(struct parse_ctx* ctx, int base_indent);
+static void register_anchor(struct parse_ctx* ctx, const char* name, struct yaml_node* node);
+static struct yaml_node* lookup_anchor(struct parse_ctx* ctx, const char* name);
+static char* parse_tag(struct parse_ctx* ctx);
+static char* parse_anchor_name(struct parse_ctx* ctx);
 
 static struct yaml_node* alloc_node(yaml_document_t* doc, yaml_node_type_t type) {
     if (doc->node_count >= doc->node_capacity) {
