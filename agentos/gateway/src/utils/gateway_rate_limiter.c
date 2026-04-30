@@ -16,11 +16,9 @@
 
 /* Windows 特定头文件和定义 */
 #ifdef _WIN32
-    #define WIN32_LEAN_AND_MEAN
-    #include <winsock2.h>
+        #include <winsock2.h>
     #include <ws2tcpip.h>
-    #include <windows.h>
-    #define strdup _strdup
+        #define strdup _strdup
 #endif
 
 #include "gateway_rate_limiter.h"
@@ -29,7 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <pthread.h>
+#include "platform.h"
 
 /* ========== 客户端状态结构 ========== */
 
@@ -65,9 +63,9 @@ struct gateway_rate_limiter {
 
     /* 哈希表互斥锁 - 保护 clients_table 结构修改 */
 #ifdef _WIN32
-    CRITICAL_SECTION table_lock;
+    agentos_mutex_t table_lock;
 #else
-    pthread_mutex_t table_lock;
+    agentos_mutex_t table_lock;
 #endif
 };
 
@@ -135,9 +133,9 @@ static client_state_t* get_or_create_client(gateway_rate_limiter_t* limiter,
     uint32_t hash = hash_string(client_key, limiter->table_size);
 
 #ifdef _WIN32
-    EnterCriticalSection(&limiter->table_lock);
+    agentos_mutex_lock(&limiter->table_lock);
 #else
-    pthread_mutex_lock(&limiter->table_lock);
+    agentos_mutex_lock(&limiter->table_lock);
 #endif
 
     /* 查找现有客户端 */
@@ -147,9 +145,9 @@ static client_state_t* get_or_create_client(gateway_rate_limiter_t* limiter,
             current->last_access_time = time(NULL);
 
 #ifdef _WIN32
-            LeaveCriticalSection(&limiter->table_lock);
+            agentos_mutex_unlock(&limiter->table_lock);
 #else
-            pthread_mutex_unlock(&limiter->table_lock);
+            agentos_mutex_unlock(&limiter->table_lock);
 #endif
             return current;
         }
@@ -160,9 +158,9 @@ static client_state_t* get_or_create_client(gateway_rate_limiter_t* limiter,
     client_state_t* new_client = client_state_create(client_key, now_ns);
     if (!new_client) {
 #ifdef _WIN32
-        LeaveCriticalSection(&limiter->table_lock);
+        agentos_mutex_unlock(&limiter->table_lock);
 #else
-        pthread_mutex_unlock(&limiter->table_lock);
+        agentos_mutex_unlock(&limiter->table_lock);
 #endif
         return NULL;
     }
@@ -174,9 +172,9 @@ static client_state_t* get_or_create_client(gateway_rate_limiter_t* limiter,
     atomic_fetch_add(&limiter->active_clients, 1);
 
 #ifdef _WIN32
-    LeaveCriticalSection(&limiter->table_lock);
+    agentos_mutex_unlock(&limiter->table_lock);
 #else
-    pthread_mutex_unlock(&limiter->table_lock);
+    agentos_mutex_unlock(&limiter->table_lock);
 #endif
 
     return new_client;
@@ -249,9 +247,9 @@ static void cleanup_expired_clients(gateway_rate_limiter_t* limiter) {
     time_t expire_threshold = now - 3600;  /* 1小时未活跃 */
 
 #ifdef _WIN32
-    EnterCriticalSection(&limiter->table_lock);
+    agentos_mutex_lock(&limiter->table_lock);
 #else
-    pthread_mutex_lock(&limiter->table_lock);
+    agentos_mutex_lock(&limiter->table_lock);
 #endif
 
     for (size_t i = 0; i < limiter->table_size; i++) {
@@ -272,9 +270,9 @@ static void cleanup_expired_clients(gateway_rate_limiter_t* limiter) {
     limiter->last_cleanup_time = now;
 
 #ifdef _WIN32
-    LeaveCriticalSection(&limiter->table_lock);
+    agentos_mutex_unlock(&limiter->table_lock);
 #else
-    pthread_mutex_unlock(&limiter->table_lock);
+    agentos_mutex_unlock(&limiter->table_lock);
 #endif
 }
 
@@ -386,9 +384,9 @@ gateway_rate_limiter_t* gateway_rate_limiter_create(const gateway_rate_limit_con
 
     /* 初始化哈希表互斥锁 */
 #ifdef _WIN32
-    InitializeCriticalSection(&limiter->table_lock);
+    agentos_mutex_init(&limiter->table_lock);
 #else
-    pthread_mutex_init(&limiter->table_lock, NULL);
+    agentos_mutex_init(&limiter->table_lock);
 #endif
 
     limiter->last_cleanup_time = time(NULL);
@@ -403,9 +401,9 @@ void gateway_rate_limiter_destroy(gateway_rate_limiter_t* limiter) {
 
     /* 锁定哈希表进行完整清理 */
 #ifdef _WIN32
-    EnterCriticalSection(&limiter->table_lock);
+    agentos_mutex_lock(&limiter->table_lock);
 #else
-    pthread_mutex_lock(&limiter->table_lock);
+    agentos_mutex_lock(&limiter->table_lock);
 #endif
 
     /* 清理所有客户端状态 */
@@ -422,11 +420,11 @@ void gateway_rate_limiter_destroy(gateway_rate_limiter_t* limiter) {
     }
 
 #ifdef _WIN32
-    LeaveCriticalSection(&limiter->table_lock);
-    DeleteCriticalSection(&limiter->table_lock);
+    agentos_mutex_unlock(&limiter->table_lock);
+    agentos_mutex_destroy(&limiter->table_lock);
 #else
-    pthread_mutex_unlock(&limiter->table_lock);
-    pthread_mutex_destroy(&limiter->table_lock);
+    agentos_mutex_unlock(&limiter->table_lock);
+    agentos_mutex_destroy(&limiter->table_lock);
 #endif
 
     free(limiter);
@@ -481,9 +479,9 @@ void gateway_rate_limiter_reset_client(gateway_rate_limiter_t* limiter, const ch
     uint32_t hash = hash_string(client_key, limiter->table_size);
 
 #ifdef _WIN32
-    EnterCriticalSection(&limiter->table_lock);
+    agentos_mutex_lock(&limiter->table_lock);
 #else
-    pthread_mutex_lock(&limiter->table_lock);
+    agentos_mutex_lock(&limiter->table_lock);
 #endif
 
     client_state_t* current = limiter->clients_table[hash];
@@ -495,9 +493,9 @@ void gateway_rate_limiter_reset_client(gateway_rate_limiter_t* limiter, const ch
             current->last_update_ns = gateway_time_ns();
 
 #ifdef _WIN32
-            LeaveCriticalSection(&limiter->table_lock);
+            agentos_mutex_unlock(&limiter->table_lock);
 #else
-            pthread_mutex_unlock(&limiter->table_lock);
+            agentos_mutex_unlock(&limiter->table_lock);
 #endif
             return;
         }
@@ -505,8 +503,8 @@ void gateway_rate_limiter_reset_client(gateway_rate_limiter_t* limiter, const ch
     }
 
 #ifdef _WIN32
-    LeaveCriticalSection(&limiter->table_lock);
+    agentos_mutex_unlock(&limiter->table_lock);
 #else
-    pthread_mutex_unlock(&limiter->table_lock);
+    agentos_mutex_unlock(&limiter->table_lock);
 #endif
 }

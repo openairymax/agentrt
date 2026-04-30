@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/* SPDX-License-Identifier: Apache-2.0 */
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
@@ -22,7 +22,6 @@
 #ifdef _WIN32
 #include <windows.h>
 #else
-#include <pthread.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <dlfcn.h>
@@ -90,9 +89,9 @@ static struct {
     void (*integrity_callback)(int result);
     
 #ifdef _WIN32
-    CRITICAL_SECTION lock;
+    cupolas_mutex_t lock;
 #else
-    pthread_mutex_t lock;
+    cupolas_mutex_t lock;
 #endif
 } g_runtime_prot;
 
@@ -147,9 +146,9 @@ int cupolas_runtime_protect_init(const cupolas_runtime_protect_config_t* manager
     memset(&g_runtime_prot, 0, sizeof(g_runtime_prot));
     
 #ifdef _WIN32
-    InitializeCriticalSection(&g_runtime_prot.lock);
+    agentos_mutex_init(&g_runtime_prot.lock);
 #else
-    pthread_mutex_init(&g_runtime_prot.lock, NULL);
+    agentos_mutex_init(&g_runtime_prot.lock);
 #endif
     
     if (manager) {

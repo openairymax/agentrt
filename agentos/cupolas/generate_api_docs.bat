@@ -3,7 +3,7 @@ REM ---------------------------------------------------------------------------
 REM generate_api_docs.bat - cupolas 模块 Doxygen API 文档生成脚本
 REM
 REM SPDX-FileCopyrightText: 2026 SPHARX Ltd.
-REM SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause
+REM SPDX-License-Identifier: Apache-2.0
 REM
 REM Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 REM

@@ -96,7 +96,7 @@ typedef struct scheduler_core_ctx {
     void* task_table_lock;  /* 平台无关锁句柄 */
 
     /** @brief 初始化状态标志 */
-    _Atomic int initialized;
+    volatile int initialized;
 
     /** @brief 下一个任务ID */
     volatile uint64_t next_task_id;

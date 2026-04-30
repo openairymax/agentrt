@@ -926,9 +926,9 @@ struct heapstore_batch_context {
     heapstore_batch_item_t* head;
     heapstore_batch_item_t* tail;
 #ifdef _WIN32
-    CRITICAL_SECTION lock;
+    agentos_mutex_t lock;
 #else
-    pthread_mutex_t lock;
+    agentos_mutex_t lock;
 #endif
 };
 
@@ -943,9 +943,9 @@ heapstore_batch_context_t* heapstore_batch_begin(size_t batch_size) {
         ctx->capacity = HEAPSTORE_BATCH_MAX_ITEMS;
     }
 #ifdef _WIN32
-    InitializeCriticalSection(&ctx->lock);
+    agentos_mutex_init(&ctx->lock);
 #else
-    pthread_mutex_init(&ctx->lock, NULL);
+    agentos_mutex_init(&ctx->lock);
 #endif
     return ctx;
 }
@@ -1298,9 +1298,9 @@ void heapstore_batch_context_destroy(heapstore_batch_context_t* ctx) {
 
     heapstore_batch_rollback(ctx);
 #ifdef _WIN32
-    DeleteCriticalSection(&ctx->lock);
+    agentos_mutex_destroy(&ctx->lock);
 #else
-    pthread_mutex_destroy(&ctx->lock);
+    agentos_mutex_destroy(&ctx->lock);
 #endif
     free(ctx);
 }

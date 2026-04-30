@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause */
+/* SPDX-License-Identifier: Apache-2.0 */
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
@@ -14,6 +14,7 @@
 
 #include "cupolas_network_security.h"
 #include "utils/cupolas_utils.h"
+#include "../platform/platform.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -24,7 +25,6 @@
 #include <ws2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
 #else
-#include <pthread.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -63,11 +63,7 @@ static struct {
     
     void (*ids_callback)(const char* alert_type, const char* details, const cupolas_connection_info_t* conn);
     
-#ifdef _WIN32
-    CRITICAL_SECTION lock;
-#else
-    pthread_mutex_t lock;
-#endif
+    cupolas_mutex_t lock;
 } g_net_security;
 
 static void cupolas_free_filter_rule(cupolas_net_filter_rule_t* rule) {
