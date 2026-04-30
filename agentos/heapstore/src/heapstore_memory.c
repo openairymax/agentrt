@@ -12,6 +12,7 @@
 #include "heapstore_memory.h"
 #include "private.h"
 #include "utils.h"
+#include "platform.h"
 
 #include <stdio.h>
 #include <stdlib.h>

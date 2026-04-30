@@ -47,6 +47,7 @@ add_library(agentos_heapstore STATIC ${heapstore_SOURCES} ${heapstore_HEADERS})
 
 target_include_directories(agentos_heapstore PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../commons/platform/include>
     $<INSTALL_INTERFACE:include>
 )
 
@@ -58,6 +59,10 @@ target_compile_definitions(agentos_heapstore PRIVATE
 
 find_package(Threads REQUIRED)
 target_link_libraries(agentos_heapstore PRIVATE Threads::Threads)
+
+if(TARGET agentos_common)
+    target_link_libraries(agentos_heapstore PUBLIC agentos_common)
+endif()
 
 if(NOT DEFINED SQLITE3_FOUND)
     find_package(PkgConfig QUIET)

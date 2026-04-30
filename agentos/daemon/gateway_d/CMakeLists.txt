@@ -198,6 +198,10 @@ target_include_directories(gateway_lib_obj PUBLIC
     ${SYSCALL_INCLUDE_DIR}
     ${COREKERN_INCLUDE_DIR}
     ${CJSON_INCLUDE_DIRS}
+    ${COMMONS_DIR}/platform/include
+    ${COMMONS_DIR}/utils/logging/include
+    ${COMMONS_DIR}/utils/error/include
+    ${COMMONS_DIR}/utils/sync/include
 )
 
 # 查找 gateway 所需的外部库
