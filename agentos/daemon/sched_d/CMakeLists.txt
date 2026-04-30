@@ -53,7 +53,7 @@ if(WIN32)
 elseif(UNIX)
     target_link_libraries(agentos-sched-d PRIVATE
         agentos_common
-        pthread
+        Threads::Threads
         rt
         m
     )

@@ -44,6 +44,7 @@
 
 /* 确保系统头文件声明在项目头文件之后仍然可用 */
 #include <string.h>
+#include "platform.h"
 
 /**
  * @brief 获取当前平台类型
@@ -672,9 +673,7 @@ uint64_t platform_get_timestamp_ms(void) {
     uint64_t timestamp = ((uint64_t)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
     return timestamp / 10000; /* Convert 100-nanosecond intervals to milliseconds */
 #else
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return (uint64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+    return agentos_time_ms();
 #endif
 }
 
@@ -688,9 +687,7 @@ uint64_t platform_get_timestamp_us(void) {
     uint64_t timestamp = ((uint64_t)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
     return timestamp / 10; /* Convert 100-nanosecond intervals to microseconds */
 #else
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return (uint64_t)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+    return agentos_time_ns() / 1000;
 #endif
 }
 

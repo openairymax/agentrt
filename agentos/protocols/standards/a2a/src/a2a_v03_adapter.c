@@ -424,14 +424,13 @@ void a2a_free_agent_list(a2a_agent_list_t* list) {
 
 #include <time.h>
 #include <ctype.h>
+#include "platform.h"
 
 #define A2A_MAX_SESSIONS 128
 #define A2A_MAX_TOKENS   256
 
 static uint64_t a2a_timestamp_ms(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return (uint64_t)ts.tv_sec * 1000ULL + (uint64_t)ts.tv_nsec / 1000000ULL;
+    return agentos_time_ms();
 }
 
 static void a2a_hex_encode(const uint8_t* data, size_t len, char* out, size_t out_size) {

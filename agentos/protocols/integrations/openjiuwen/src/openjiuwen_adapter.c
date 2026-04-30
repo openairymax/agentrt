@@ -15,6 +15,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include "platform.h"
 
 /* ============================================================================
  * 内部辅助函数
@@ -30,9 +31,7 @@ static uint32_t get_timestamp(void) {
 }
 
 static uint64_t get_timestamp_ms(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return (uint64_t)ts.tv_sec * 1000ULL + (uint64_t)ts.tv_nsec / 1000000ULL;
+    return agentos_time_ms();
 }
 
 static int openjiuwen_reconnect(openjiuwen_adapter_t* adapter) {

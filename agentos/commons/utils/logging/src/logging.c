@@ -246,36 +246,28 @@ log_level_t log_level_from_string(const char* str) {
 
 int log_init(const log_config_t* manager) {
     if (g_logging_state.initialized) {
-        // 已经初始化，可以重新初始�?
-        log_cleanup();
+        return 0;
     }
-    
-    // 初始化互斥锁
+
     if (agentos_mutex_init(&g_logging_state.mutex) != 0) {
         return -1;
     }
-    
+
     g_tls_trace_id[0] = '\0';
     g_tls_span_id[0] = '\0';
 
-    g_logging_state.initialized = true;
     if (manager) {
         memcpy(&g_logging_state.manager, manager, sizeof(log_config_t));
     } else {
-        // 使用默认配置
         g_logging_state.manager.level = DEFAULT_LOG_LEVEL;
-        g_logging_state.manager.outputs = 1 << LOG_OUTPUT_CONSOLE; // 控制台输�?
+        g_logging_state.manager.outputs = 1 << LOG_OUTPUT_CONSOLE;
         g_logging_state.manager.format = DEFAULT_LOG_FORMAT;
         g_logging_state.manager.async_mode = false;
         g_logging_state.manager.enable_statistics = false;
     }
-    
+
     g_logging_state.initialized = true;
-    
-    // 记录初始化日�?
-    LOG_INFO("日志系统初始化完成，级别: %s", 
-             log_level_to_string(g_logging_state.manager.level));
-    
+
     return 0;
 }
 
@@ -460,7 +452,10 @@ int log_reload_config(const char* config_path) {
     }
 
     char line[512];
+    agentos_mutex_lock(&g_logging_state.mutex);
     log_config_t new_config = g_logging_state.manager;
+    agentos_mutex_unlock(&g_logging_state.mutex);
+
     int changes = 0;
 
     while (fgets(line, sizeof(line), fp)) {
@@ -524,7 +519,6 @@ void log_cleanup(void) {
 
     agentos_mutex_unlock(&g_logging_state.mutex);
     agentos_mutex_destroy(&g_logging_state.mutex);
-    
-    LOG_INFO("日志系统清理完成");
+
     memset(&g_logging_state, 0, sizeof(g_logging_state));
 }

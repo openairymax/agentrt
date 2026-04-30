@@ -5,7 +5,7 @@
  * @brief 统一配置管理系统
  *
  * 提供跨守护进程的统一配置管理，支持：
- * - 多格式配置（JSON/YAML/TOML/ENV）
+ * - 多格式配置（JSON/YAML/INI/ENV）
  * - 配置热更新（文件监视+回调通知）
  * - 配置版本控制（变更历史+回滚）
  * - 环境差异化配置（dev/staging/prod）
@@ -172,10 +172,15 @@ int cm_set_namespaced(const char* namespace_, const char* key,
 /* ==================== 配置加载 ==================== */
 
 /**
- * @brief 从JSON文件加载配置
+ * @brief 从配置文件加载配置
+ *
+ * 支持 JSON、YAML、INI 格式的配置文件。
+ * 自动检测文件格式并使用对应的解析器。
+ * 对于简单键值对格式（key=value 或 key: value），使用行解析。
+ *
  * @param path 文件路径
  * @param namespace_ 命名空间（NULL使用默认）
- * @return 0成功，非0失败
+ * @return 加载的配置项数量，-1表示失败
  */
 int cm_load_json(const char* path, const char* namespace_);
 

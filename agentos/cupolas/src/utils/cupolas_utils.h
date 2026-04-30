@@ -60,88 +60,24 @@ extern "C" {
  * Platform Abstraction Layer - Unified Thread Synchronization Primitives
  * ============================================================================
  *
- * These macros provide a unified interface for mutex operations across
- * different platforms, eliminating the need for #ifdef blocks in business logic.
+ * Uses cupolas platform abstraction layer for cross-platform mutex support.
  *
- * @note On Windows, maps to CRITICAL_SECTION API
- * @note On POSIX systems, maps to pthread_mutex_t API
  * @warning Not recursive: calling LOCK twice on same thread will deadlock
  *
  * @threadsafe All operations are thread-safe when used correctly
  */
 
-#ifdef _WIN32
-#include <windows.h>
+#include "../platform/platform.h"
 
-/**
- * @brief Platform-specific mutex type (Windows)
- */
-#define CUPOLAS_MUTEX_TYPE CRITICAL_SECTION
+#define CUPOLAS_MUTEX_TYPE cupolas_mutex_t
 
-/**
- * @brief Initialize a mutex (Windows version)
- * @param m Pointer to CUPOLAS_MUTEX_TYPE variable
- * @pre m must point to valid memory
- * @post Mutex is initialized and ready for use
- */
-#define CUPOLAS_MUTEX_INIT(m) InitializeCriticalSection(m)
+#define CUPOLAS_MUTEX_INIT(m) cupolas_mutex_init(m)
 
-/**
- * @brief Acquire mutex lock (blocking)
- * @param m Pointer to initialized mutex
- * @note Blocks until lock is acquired
- * @threadsafe Safe to call from multiple threads
- */
-#define CUPOLAS_MUTEX_LOCK(m) EnterCriticalSection(m)
+#define CUPOLAS_MUTEX_LOCK(m) cupolas_mutex_lock(m)
 
-/**
- * @brief Release mutex lock
- * @param m Pointer to locked mutex
- * @pre Mutex must be locked by current thread
- * @post Mutex is available for other threads
- */
-#define CUPOLAS_MUTEX_UNLOCK(m) LeaveCriticalSection(m)
+#define CUPOLAS_MUTEX_UNLOCK(m) cupolas_mutex_unlock(m)
 
-/**
- * @brief Destroy mutex and free resources
- * @param m Pointer to initialized mutex
- * @post Mutex cannot be used after this call
- */
-#define CUPOLAS_MUTEX_DESTROY(m) DeleteCriticalSection(m)
-
-#else
-#include <pthread.h>
-
-/**
- * @brief Platform-specific mutex type (POSIX)
- */
-#define CUPOLAS_MUTEX_TYPE pthread_mutex_t
-
-/**
- * @brief Initialize a mutex (POSIX version)
- * @param m Pointer to CUPOLAS_MUTEX_TYPE variable
- */
-#define CUPOLAS_MUTEX_INIT(m) pthread_mutex_init(m, NULL)
-
-/**
- * @brief Acquire mutex lock (POSIX version)
- * @param m Pointer to initialized mutex
- */
-#define CUPOLAS_MUTEX_LOCK(m) pthread_mutex_lock(m)
-
-/**
- * @brief Release mutex lock (POSIX version)
- * @param m Pointer to locked mutex
- */
-#define CUPOLAS_MUTEX_UNLOCK(m) pthread_mutex_unlock(m)
-
-/**
- * @brief Destroy mutex (POSIX version)
- * @param m Pointer to initialized mutex
- */
-#define CUPOLAS_MUTEX_DESTROY(m) pthread_mutex_destroy(m)
-
-#endif /* _WIN32 */
+#define CUPOLAS_MUTEX_DESTROY(m) cupolas_mutex_destroy(m)
 
 /* ============================================================================
  * Memory Management Macros - Unified Allocation and Deallocation

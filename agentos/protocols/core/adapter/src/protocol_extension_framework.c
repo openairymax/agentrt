@@ -679,9 +679,71 @@ static int fw_adapter_get_stats(void* ctx, char* stats_json, size_t max_size) {
     return (written >= 0 && (size_t)written < max_size) ? 0 : -2;
 }
 
+static int fw_adapter_connect(void* ctx, const char* endpoint) {
+    (void)ctx;
+    if (!endpoint) return -1;
+    if (!g_framework_instance) return -2;
+    for (size_t i = 0; i < g_framework_instance->adapter_count; i++) {
+        if (g_framework_instance->adapters[i].state == PROTO_EXT_STATE_INITIALIZED) {
+            g_framework_instance->adapters[i].state = PROTO_EXT_STATE_RUNNING;
+            g_framework_instance->adapters[i].last_activity_ms = current_time_ms();
+            return 0;
+        }
+    }
+    return -3;
+}
+
+static int fw_adapter_disconnect(void* ctx) {
+    (void)ctx;
+    if (!g_framework_instance) return -2;
+    for (size_t i = 0; i < g_framework_instance->adapter_count; i++) {
+        if (g_framework_instance->adapters[i].state == PROTO_EXT_STATE_RUNNING) {
+            g_framework_instance->adapters[i].state = PROTO_EXT_STATE_LOADED;
+        }
+    }
+    return 0;
+}
+
+static int fw_adapter_send(void* ctx, const void* data, size_t size) {
+    (void)ctx;
+    if (!data || size == 0) return -1;
+    if (!g_framework_instance) return -2;
+    for (size_t i = 0; i < g_framework_instance->adapter_count; i++) {
+        if (g_framework_instance->adapters[i].state == PROTO_EXT_STATE_RUNNING) {
+            g_framework_instance->adapters[i].messages_processed++;
+            g_framework_instance->adapters[i].last_activity_ms = current_time_ms();
+            g_framework_instance->total_messages++;
+            return 0;
+        }
+    }
+    return -3;
+}
+
+static int fw_adapter_receive(void* ctx, void** data, size_t* size) {
+    (void)ctx;
+    if (!data || !size) return -1;
+    if (!g_framework_instance) return -2;
+    *data = NULL;
+    *size = 0;
+    for (size_t i = 0; i < g_framework_instance->adapter_count; i++) {
+        if (g_framework_instance->adapters[i].state == PROTO_EXT_STATE_RUNNING) {
+            return 0;
+        }
+    }
+    return -3;
+}
+
 static int fw_adapter_handle_request(void* ctx, const void* req, void** resp) {
     (void)ctx;
     if (!req || !resp) return -1;
+    if (!g_framework_instance) return -2;
+    for (size_t i = 0; i < g_framework_instance->adapter_count; i++) {
+        if (g_framework_instance->adapters[i].state == PROTO_EXT_STATE_RUNNING) {
+            g_framework_instance->adapters[i].messages_processed++;
+            g_framework_instance->total_messages++;
+            break;
+        }
+    }
     *resp = strdup("{\"status\":\"ok\",\"framework\":\"extension\"}");
     return *resp ? 0 : -1;
 }

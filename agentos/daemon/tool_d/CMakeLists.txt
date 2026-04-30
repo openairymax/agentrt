@@ -57,7 +57,7 @@ if(WIN32)
 elseif(UNIX)
     target_link_libraries(agentos-tool-d PRIVATE
         agentos_common
-        pthread
+        Threads::Threads
         rt
     )
 endif()
