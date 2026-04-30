@@ -17,6 +17,7 @@
 #include "heapstore_ipc.h"
 #include "heapstore_memory.h"
 #include "utils.h"
+#include "platform.h"
 
 #include <stdio.h>
 #include <stdlib.h>

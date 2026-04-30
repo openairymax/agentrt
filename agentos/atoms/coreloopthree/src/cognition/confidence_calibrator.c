@@ -9,7 +9,6 @@
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
-#include <stdint.h>
 
 confidence_calibrator_t* confidence_calibrator_create(double decay_factor) {
     confidence_calibrator_t* cb = (confidence_calibrator_t*)AGENTOS_CALLOC(1, sizeof(confidence_calibrator_t));
