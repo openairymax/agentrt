@@ -510,11 +510,11 @@ agentos_error_t heapstore_logging_write(
 
     heapstore_log_level_t log_level;
     switch (level) {
-        case 0: log_level = heapstore_LOG_DEBUG; break;
-        case 1: log_level = heapstore_LOG_INFO; break;
-        case 2: log_level = heapstore_LOG_WARN; break;
-        case 3: log_level = heapstore_LOG_ERROR; break;
-        default: log_level = heapstore_LOG_INFO; break;
+        case 0: log_level = HEAPSTORE_LOG_DEBUG; break;
+        case 1: log_level = HEAPSTORE_LOG_INFO; break;
+        case 2: log_level = HEAPSTORE_LOG_WARN; break;
+        case 3: log_level = HEAPSTORE_LOG_ERROR; break;
+        default: log_level = HEAPSTORE_LOG_INFO; break;
     }
 
     heapstore_log_file_info_t info;

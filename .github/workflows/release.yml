@@ -48,13 +48,24 @@ jobs:
             git clone --depth 1 https://github.com/DaveGamble/cJSON.git /tmp/cjson
             cmake -S /tmp/cjson -B /tmp/cjson/build -DBUILD_SHARED_LIBS=ON -DENABLE_CJSON_UTILS=OFF
             sudo cmake --build /tmp/cjson/build --target install
+            sudo ldconfig
           fi
 
       - name: Extract version
         id: version
         run: |
-          VERSION="${{ github.ref_name }}"
+          VERSION="${{ github.event.inputs.version || github.ref_name }}"
           echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
+
+      - name: Install Rust toolchain
+        if: hashFiles('agentos/toolkit/rust/Cargo.toml') != ''
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Go toolchain
+        if: hashFiles('agentos/toolkit/go/go.mod') != ''
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
 
       - name: Build C Core
         run: |
@@ -130,7 +141,7 @@ jobs:
           fi
 
       - name: Deploy to Pages
-        if: success()
+        if: success() && hashFiles('docs/api/html') != ''
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -170,4 +181,4 @@ jobs:
           body_path: changelog.md
           files: artifacts/*
           draft: false
-          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') || github.event.inputs.release_type == 'beta' || github.event.inputs.release_type == 'rc' }}

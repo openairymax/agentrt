@@ -1,8 +1,4 @@
-# AgentOS Quality & Security v4.0
-# v4.0: 合并原3个cron为1个, BAN-33合规
-# trigger: scheduled(每日) + manual
-
-name: Quality & Security v4.0
+name: Quality & Security v4.1
 
 on:
   schedule:
@@ -25,33 +21,78 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # ============================================================
-  # Job 1: Security Audit + Quality Metrics (每日)
-  # ============================================================
   audit:
     name: Security & Quality
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Install security tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cppcheck cloc jq python3 2>/dev/null || true
+
       - name: Custom security check
+        id: security
         run: |
           if [ -f "scripts/pipeline/security_check.py" ]; then
-            python3 scripts/pipeline/security_check.py agentos/ 2>&1 | head -30
+            python3 scripts/pipeline/security_check.py agentos/ 2>&1
+            EXIT_CODE=$?
+            if [ $EXIT_CODE -ne 0 ]; then
+              echo "::error::Security check found CRITICAL issues (exit code: $EXIT_CODE)"
+              exit $EXIT_CODE
+            fi
           else
             echo "=== Basic security check ==="
             unsafe=$(grep -rn "strcpy\|strcat\|sprintf\|gets" --include="*.c" agentos/ 2>/dev/null | grep -v test_ | wc -l)
             echo "Unsafe function calls: $unsafe"
-            secrets=$(grep -rn "sk-[A-Za-z0-9]\{20,\}\|AKIA[A-Z0-9]\{16,\}" --include="*.c" --include="*.h" --include="*.py" agentos/ 2>/dev/null | grep -v test_ | wc -l)
+            if [ "$unsafe" -gt 0 ]; then
+              echo "::warning::$unsafe unsafe function calls found (strcpy/strcat/sprintf/gets)"
+            fi
+            secrets=$(grep -rn "sk-[A-Za-z0-9]\{20,\}\|AKIA[A-Z0-9]\{16,\}\|ghp_[A-Za-z0-9]\{36,\}\|glpat-[A-Za-z0-9\-]\{20,\}" --include="*.c" --include="*.h" --include="*.py" --include="*.sh" agentos/ 2>/dev/null | grep -v test_ | wc -l)
             echo "Potential secrets: $secrets"
+            if [ "$secrets" -gt 0 ]; then
+              echo "::error::$secrets potential secrets detected in source code"
+              exit 1
+            fi
           fi
+
+      - name: Cppcheck static analysis
+        continue-on-error: true
+        run: |
+          if command -v cppcheck &>/dev/null; then
+            cppcheck --enable=warning,performance,portability --suppress=missingInclude \
+              --error-exitcode=0 --inline-suppr \
+              agentos/ 2>&1 | tail -50
+          fi
+
+      - name: BAN compliance check
+        run: |
+          echo "=== BAN-17: Simplified implementation check ==="
+          hits=$(grep -rn "简化实现\|简化版\|simplified implementation" --include="*.c" --include="*.h" agentos/ 2>/dev/null | grep -v test_ | grep -v tests/ | wc -l)
+          echo "BAN-17 violations: $hits"
+          if [ "$hits" -gt 0 ]; then echo "::error::BAN-17: $hits simplified implementations found"; exit 1; fi
+
+          echo "=== BAN-18: Stub function check ==="
+          stubs=$(grep -rn "return AGENTOS_SUCCESS;" --include="*.c" agentos/ 2>/dev/null | grep -v test_ | grep -v "if " | head -20 | wc -l)
+          echo "BAN-18 potential stubs: $stubs (manual review needed)"
+
+          echo "=== BAN-33: In-source build directory check ==="
+          if [ -d "agentos/build" ] || [ -d "agentos/build-test" ] || [ -d "build" ]; then
+            echo "::error::BAN-33: Build directory found in source tree"
+            exit 1
+          fi
+          echo "BAN-33: Clean"
+
+          echo "=== BAN-26: Environment variable bypass check ==="
+          bypass=$(grep -rn "getenv.*DEV\|getenv.*BYPASS\|getenv.*SKIP" --include="*.c" agentos/ 2>/dev/null | grep -v test_ | wc -l)
+          echo "BAN-26 potential bypasses: $bypass"
+          if [ "$bypass" -gt 0 ]; then echo "::warning::BAN-26: $bypass potential env var bypasses found"; fi
 
       - name: Code statistics
         run: |
-          sudo apt-get install -y -qq cloc jq 2>/dev/null || true
           if command -v cloc &>/dev/null; then
             cloc agentos/ --quiet --json 2>/dev/null | python3 -c "
 import sys,json
@@ -70,9 +111,6 @@ except: print('cloc unavailable')" 2>/dev/null || true
           echo "TODO/FIXME count: $todos"
           if [ "$todos" -gt 50 ]; then echo "::warning::$todos TODO/FIXME items found"; fi
 
-  # ============================================================
-  # Job 2: Stale Management (每周)
-  # ============================================================
   stale:
     name: Stale Management
     runs-on: ubuntu-latest

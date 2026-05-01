@@ -403,7 +403,7 @@ static void print_usage(const char* prog) {
     printf("  --help             Show this help\n");
     printf("\n");
     printf("Examples:\n");
-    printf("  %s --manager AGENTOS_CONFIG_DIR "/monit.yaml"\n", prog);
+    printf("  %s --manager AGENTOS_CONFIG_DIR \"/monit.yaml\"\n", prog);
     printf("  %s --tcp           # Use TCP mode on port 9090\n", prog);
 }
 
