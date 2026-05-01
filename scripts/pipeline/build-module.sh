@@ -181,7 +181,7 @@ setup_build_env() {
 build_module() {
     local module="$1"
     local source_dir="${PROJECT_ROOT}/${MODULE_SOURCES[$module]}"
-    local build_dir="${PROJECT_ROOT}/build-${module}"
+    local build_dir="${PROJECT_ROOT}/../AgentOS-build/${module}"
 
     # 验证源码目录
     if [[ ! -d "$source_dir" ]]; then

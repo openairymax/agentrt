@@ -132,7 +132,7 @@ run_ctest() {
     local jobs=$(get_parallel_jobs)
 
     for module in $modules; do
-        local build_dir="${PROJECT_ROOT}/build-${module}"
+        local build_dir="${PROJECT_ROOT}/../AgentOS-build/${module}"
 
         if [[ ! -d "$build_dir" ]]; then
             log_warn "Build directory not found: $build_dir, skipping ctest for $module"
