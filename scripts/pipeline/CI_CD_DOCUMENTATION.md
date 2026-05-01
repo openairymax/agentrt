@@ -1,11 +1,11 @@
 # AgentOS CI/CD 标准化配置文档
 
-> **版本**: v3.1.0
-> **更新日期**: 2026-04-27
+> **版本**: v4.1.0
+> **更新日期**: 2026-05-01
 > **状态**: 生产就绪 (Production Ready)
-> **位置**: `.github/workflows/` (6个核心工作流) + `scripts/pipeline/` (CI编排脚本)
+> **位置**: `.github/workflows/` (3个核心工作流) + `scripts/pipeline/` (CI编排脚本)
 > **理论框架**: 体系并行论 (MCIS) - 多体控制论智能系统
-> **v3.1变更**: 全面重构——14个旧工作流精简合并为6个核心工作流，消除冗余
+> **v4.1变更**: 3条流水线系统性重构——修复protocol触发条件、产物复用、PIPESTATUS可靠性
 
 ---
 
@@ -22,29 +22,29 @@
 | **并行优化** | 多模块矩阵并行构建 | 执行体 |
 | **可观测性** | 质量监控、趋势分析、技术债务追踪 | 可观测体 |
 
-## 2. 流水线架构（6个核心工作流）
+## 2. 流水线架构（3个核心工作流）
 
 ### 2.1 工作流清单
 
-AgentOS CI/CD 由 6 个核心工作流构成（v3.1，从14个精简重构）：
+AgentOS CI/CD 由 3 个核心工作流构成（v4.1）：
 
-| 工作流 | 触发条件 | 功能 | 合并来源 |
-|--------|---------|------|---------|
-| `ci.yml` | push/PR main,develop | C核心构建(Release+Debug) + CTest + BAN反模式检测 + 质量门禁 | 旧ci.yml + tests-test.yml + quality-gate.yml + stub-check.yml |
-| `sdk-ci.yml` | push/PR toolkit路径 | 5种SDK(Go/Python/Rust/TS)构建+测试 | 旧toolkit-ci.yml |
-| `quality-security.yml` | 定时(每日/每周) + manual | 安全审计 + 质量监控 + Stale管理 | security-audit.yml + quality-monitoring.yml + stale.yml |
-| `docs-ci.yml` | push/PR文档路径 + 定时 | Markdown链接检查 + Doxygen API文档发布 | docs-check.yml + api-docs.yml |
-| `release.yml` | tag推送(v*) + manual | C核心+SDK打包 + 桌面客户端 + GitHub Release | release.yml + build-desktop.yml |
-| `protocol-ci.yml` | push/PR gateway/protocol路径 | Gateway构建 + 协议兼容性验证 | 旧protocol-compatibility.yml |
+| 工作流 | 触发条件 | 功能 |
+|--------|---------|------|
+| `ci.yml` | push/PR main,develop | C核心构建(Release+Debug) + CTest + BAN反模式检测 + Protocol兼容性 |
+| `quality-security.yml` | 定时(每日) + manual | 安全审计 + BAN合规检查 + Stale管理 |
+| `release.yml` | tag推送(v*) + manual | C核心+SDK打包 + API文档发布 + GitHub Release |
 
 **已移除的冗余工作流**（功能已合并或由GitHub内置功能替代）：
+- `sdk-ci.yml` → 合并入 ci.yml
+- `docs-ci.yml` → 合并入 release.yml
+- `protocol-ci.yml` → 合并入 ci.yml (protocol job)
 - `dependency-update.yml` → 由 Dependabot 替代
 - `quality-monitoring.yml` → 合并入 quality-security.yml
 - `stale.yml` → 合并入 quality-security.yml
-- `stub-check.yml` → 合并入 ci.yml (BAN-01~13)
+- `stub-check.yml` → 合并入 ci.yml (BAN审计)
 - `build-desktop.yml` → 合并入 release.yml
-- `api-docs.yml` → 合并入 docs-ci.yml
-- `docs-check.yml` → 合并入 docs-ci.yml
+- `api-docs.yml` → 合并入 release.yml
+- `docs-check.yml` → 合并入 release.yml
 - `tests-test.yml` → 合并入 ci.yml
 
 ### 2.2 流水线阶段（MCIS 并行架构）

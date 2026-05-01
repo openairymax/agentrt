@@ -7,8 +7,9 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKS_DIR="$(dirname "$SCRIPT_DIR")"
-BUILD_DIR="${BACKS_DIR}/build"
-REPORT_DIR="${BACKS_DIR}/reports"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+BUILD_DIR="${PROJECT_ROOT}/../AgentOS-build"
+REPORT_DIR="${PROJECT_ROOT}/../AgentOS-build/reports"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -91,7 +92,7 @@ cmake_configure() {
     log_info "CMake配置..."
     
     cd "${BUILD_DIR}"
-    cmake .. \
+    cmake "${BACKS_DIR}" \
         -DCMAKE_BUILD_TYPE=Debug \
         -DCMAKE_C_FLAGS="--coverage -fprofile-arcs -ftest-coverage" \
         -DCMAKE_EXE_LINKER_FLAGS="--coverage"
