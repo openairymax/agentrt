@@ -385,16 +385,43 @@ int agentos_token_check_quota(
     if (!quota) {
         return -1;
     }
-    
-    // 检查单次请求限制
-    if (quota->max_tokens_per_request > 0 && 
+
+    if (quota->max_tokens_per_request > 0 &&
         requested_tokens > quota->max_tokens_per_request) {
-        return 1;  // 超出单次请求限制
+        return 1;
     }
-    
-    // 注意：当前使用情况检查需要外部实现
-    // 这里只提供框架，实际使用需要集成监控系统
-    (void)current_usage;  // 暂时未使用
-    
-    return 0;  // 配额足够
+
+    if (current_usage) {
+        if (quota->max_tokens_per_minute > 0 &&
+            current_usage->tokens_used_per_minute + requested_tokens > quota->max_tokens_per_minute) {
+            return 2;
+        }
+
+        if (quota->max_tokens_per_hour > 0 &&
+            current_usage->tokens_used_per_hour + requested_tokens > quota->max_tokens_per_hour) {
+            return 3;
+        }
+
+        if (quota->max_tokens_per_day > 0 &&
+            current_usage->tokens_used_per_day + requested_tokens > quota->max_tokens_per_day) {
+            return 4;
+        }
+
+        if (quota->max_requests_per_minute > 0 &&
+            current_usage->requests_used_per_minute + 1 > quota->max_requests_per_minute) {
+            return 5;
+        }
+
+        if (quota->max_requests_per_hour > 0 &&
+            current_usage->requests_used_per_hour + 1 > quota->max_requests_per_hour) {
+            return 6;
+        }
+
+        if (quota->max_requests_per_day > 0 &&
+            current_usage->requests_used_per_day + 1 > quota->max_requests_per_day) {
+            return 7;
+        }
+    }
+
+    return 0;
 }

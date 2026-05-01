@@ -37,6 +37,7 @@ TEST_PARALLEL="auto"
 TEST_OUTPUT_FORMAT="human"
 TEST_PYTEST_ONLY=false
 TEST_CTEST_ONLY=false
+TEST_BUILD_DIR="${AGENTOS_BUILD_DIR:-${PROJECT_ROOT}/../AgentOS-build}"
 
 # 测试结果统计
 TOTAL_PASSED=0
@@ -127,84 +128,73 @@ run_ctest() {
     log_info "CTest: C/C++ Tests"
     log_info "==========================================="
 
-    local modules
-    modules=$(get_ctest_modules)
+    local build_dir="$TEST_BUILD_DIR"
+
+    if [[ ! -d "$build_dir" ]]; then
+        log_warn "Build directory not found: $build_dir, skipping ctest"
+        return 0
+    fi
+
+    if [[ ! -f "${build_dir}/CTestTestfile.cmake" ]]; then
+        log_warn "No CTestTestfile.cmake in $build_dir, skipping"
+        return 0
+    fi
+
+    log_info "Running CTest from: $build_dir"
+    cd "$build_dir"
+
     local jobs=$(get_parallel_jobs)
 
-    for module in $modules; do
-        local build_dir="${PROJECT_ROOT}/build-${module}"
+    local ctest_args=(
+        "--output-on-failure"
+        "--timeout" "$TEST_TIMEOUT"
+        "-j$jobs"
+    )
 
-        if [[ ! -d "$build_dir" ]]; then
-            log_warn "Build directory not found: $build_dir, skipping ctest for $module"
-            continue
+    if [[ "$TEST_COVERAGE" == "true" ]]; then
+        ctest_args+=("-T" "Coverage")
+    fi
+
+    case "$TEST_OUTPUT_FORMAT" in
+        json)  ctest_args+=("--no-compress-output" "-T" "Test" "-O" "${PROJECT_ROOT}/ci-logs/ctest.json") ;;
+        junit) ctest_args+=("--no-compress-output" "-T" "Test" "-O" "JUnitTestResults.xml") ;;
+        xml)   ctest_args+=("--no-compress-output" "-T" "Test" "-O" "TestResults.xml") ;;
+        *)     ctest_args+=("-V") ;;
+    esac
+
+    local test_output
+    local test_exit_code=0
+    test_output=$(ctest "${ctest_args[@]}" 2>&1) || test_exit_code=$?
+
+    local passed=0
+    local failed=0
+    local total=0
+
+    local summary_line
+    summary_line=$(echo "$test_output" | grep -E "[0-9]+% tests passed" | tail -1 || true)
+    if [[ -n "$summary_line" ]]; then
+        total=$(echo "$summary_line" | grep -oP 'out of \K[0-9]+' || echo "0")
+        failed=$(echo "$summary_line" | grep -oP '[0-9]+ tests failed' | grep -oP '[0-9]+' || echo "0")
+        passed=$((total - failed))
+    else
+        passed=$(echo "$test_output" | grep -oP '\d+(?= tests? passed)' | tail -1 || echo "0")
+        failed=$(echo "$test_output" | grep -oP '\d+(?= tests? failed)' | tail -1 || echo "0")
+    fi
+
+    if [[ "$test_exit_code" -eq 0 ]]; then
+        ((TOTAL_PASSED += passed))
+        log_ok "CTest passed ($passed tests)"
+    else
+        ((TOTAL_FAILED += failed))
+        FAILED_TESTS+=("ctest")
+        log_fail "CTest failed ($failed test(s))"
+
+        if [[ "$TEST_VERBOSE" == "true" ]]; then
+            echo "$test_output" | tail -50
         fi
+    fi
 
-        if [[ ! -f "${build_dir}/CTestTestfile.cmake" ]]; then
-            log_warn "No CTestTestfile.cmake in $build_dir, skipping"
-            continue
-        fi
-
-        log_info "Running CTest for module: $module"
-        cd "$build_dir"
-
-        local ctest_args=(
-            "--output-on-failure"
-            "--timeout" "$TEST_TIMEOUT"
-            "-j$jobs"
-        )
-
-        # 覆盖率支持
-        if [[ "$TEST_COVERAGE" == "true" ]]; then
-            ctest_args+=("-T" "Coverage")
-        fi
-
-        # 输出格式
-        case "$TEST_OUTPUT_FORMAT" in
-            json)  ctest_args+=("--no-compress-output" "-T" "Test" "-O" "${PROJECT_ROOT}/ci-logs/${module}-ctest.json") ;;
-            junit) ctest_args+=("--no-compress-output" "-T" "Test" "-O" "JUnitTestResults.xml") ;;
-            xml)   ctest_args+=("--no-compress-output" "-T" "Test" "-O" "TestResults.xml") ;;
-            *)     ctest_args+=("-V") ;;
-        esac
-
-        # 执行测试
-        local test_output
-        local test_exit_code=0
-        test_output=$(ctest "${ctest_args[@]}" 2>&1) || test_exit_code=$?
-
-        # 解析结果 - 从ctest输出的总结行提取
-        local passed=0
-        local failed=0
-        local total=0
-
-        # 尝试从 "X% tests passed, Y tests failed out of Z" 格式解析
-        local summary_line
-        summary_line=$(echo "$test_output" | grep -E "[0-9]+% tests passed" | tail -1 || true)
-        if [[ -n "$summary_line" ]]; then
-            total=$(echo "$summary_line" | grep -oP 'out of \K[0-9]+' || echo "0")
-            failed=$(echo "$summary_line" | grep -oP '[0-9]+ tests failed' | grep -oP '[0-9]+' || echo "0")
-            passed=$((total - failed))
-        else
-            # 回退：从 "tests passed" 和 "tests failed" 行计数
-            passed=$(echo "$test_output" | grep -oP '\d+(?= tests? passed)' | tail -1 || echo "0")
-            failed=$(echo "$test_output" | grep -oP '\d+(?= tests? failed)' | tail -1 || echo "0")
-        fi
-
-        if [[ "$test_exit_code" -eq 0 ]]; then
-            ((TOTAL_PASSED += passed))
-            log_ok "Module $module: CTest passed ($passed tests)"
-        else
-            ((TOTAL_FAILED += failed))
-            FAILED_TESTS+=("ctest:${module}")
-            log_fail "Module $module: CTest failed ($failed test(s))"
-
-            # 输出失败详情
-            if [[ "$TEST_VERBOSE" == "true" ]]; then
-                echo "$test_output" | tail -50
-            fi
-        fi
-
-        cd "$PROJECT_ROOT"
-    done
+    cd "$PROJECT_ROOT"
 }
 
 ###############################################################################

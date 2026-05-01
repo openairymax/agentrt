@@ -40,7 +40,7 @@
 #define heapstore_LOG_MAX_SERVICES 32
 #define heapstore_LOG_MAX_PATH 512
 
-static heapstore_log_level_t s_log_level = heapstore_LOG_INFO;
+static heapstore_log_level_t s_log_level = HEAPSTORE_LOG_INFO;
 static agentos_mutex_t s_log_lock = {0};
 static FILE* s_main_log_file = NULL;
 static char s_log_root_path[heapstore_LOG_MAX_PATH] = {0};
@@ -60,10 +60,10 @@ static agentos_mutex_t s_service_lock = {0};
 
 static const char* level_to_string(heapstore_log_level_t level) {
     switch (level) {
-        case heapstore_LOG_ERROR: return "ERROR";
-        case heapstore_LOG_WARN: return "WARN";
-        case heapstore_LOG_INFO: return "INFO";
-        case heapstore_LOG_DEBUG: return "DEBUG";
+        case HEAPSTORE_LOG_ERROR: return "ERROR";
+        case HEAPSTORE_LOG_WARN: return "WARN";
+        case HEAPSTORE_LOG_INFO: return "INFO";
+        case HEAPSTORE_LOG_DEBUG: return "DEBUG";
         default: return "UNKNOWN";
     }
 }
@@ -170,7 +170,7 @@ heapstore_error_t heapstore_log_init(void) {
     }
 
     s_initialized = true;
-    s_log_level = heapstore_LOG_INFO;
+    s_log_level = HEAPSTORE_LOG_INFO;
 
     return heapstore_SUCCESS;
 }
