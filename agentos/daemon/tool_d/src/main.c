@@ -30,7 +30,7 @@
 
 /* ==================== 配置常量 ==================== */
 
-#define DEFAULT_SOCKET_PATH_UNIX "/var/run/agentos/tool.sock"
+#define DEFAULT_SOCKET_PATH_UNIX AGENTOS_RUNTIME_DIR "/tool.sock"
 #define DEFAULT_SOCKET_PATH_WIN "\\\\.\\pipe\\agentos_tool"
 #define DEFAULT_TCP_PORT 8081
 #define MAX_BUFFER 65536

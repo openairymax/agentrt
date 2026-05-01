@@ -29,6 +29,7 @@
 /* ==================== 内部常量定义 ==================== */
 
 static AGENTOS_THREAD_LOCAL char g_tls_trace_id[128] = {0};
+static AGENTOS_THREAD_LOCAL char g_tls_span_id[64] = {0};
 
 /** 日志级别名称数组 */
 static const char* LEVEL_NAMES[] = {
@@ -157,6 +158,13 @@ static size_t format_log_message(const log_record_t* record, char* buffer, size_
         if ((size_t)len >= buffer_size) len = (int)buffer_size - 1;
     }
 
+    if (record->span_id && record->span_id[0] != '\0') {
+        len += snprintf(buffer + len, buffer_size - (size_t)len,
+            " [span:%s]", record->span_id);
+        if (len < 0) return 0;
+        if ((size_t)len >= buffer_size) len = (int)buffer_size - 1;
+    }
+
     len += snprintf(buffer + len, buffer_size - (size_t)len,
         " [thread:%llu] [process:%u]",
         (unsigned long long)record->thread_id,
@@ -238,35 +246,28 @@ log_level_t log_level_from_string(const char* str) {
 
 int log_init(const log_config_t* manager) {
     if (g_logging_state.initialized) {
-        // 已经初始化，可以重新初始�?
-        log_cleanup();
+        return 0;
     }
-    
-    // 初始化互斥锁
+
     if (agentos_mutex_init(&g_logging_state.mutex) != 0) {
         return -1;
     }
-    
+
     g_tls_trace_id[0] = '\0';
-    
-    g_logging_state.initialized = true;
+    g_tls_span_id[0] = '\0';
+
     if (manager) {
         memcpy(&g_logging_state.manager, manager, sizeof(log_config_t));
     } else {
-        // 使用默认配置
         g_logging_state.manager.level = DEFAULT_LOG_LEVEL;
-        g_logging_state.manager.outputs = 1 << LOG_OUTPUT_CONSOLE; // 控制台输�?
+        g_logging_state.manager.outputs = 1 << LOG_OUTPUT_CONSOLE;
         g_logging_state.manager.format = DEFAULT_LOG_FORMAT;
         g_logging_state.manager.async_mode = false;
         g_logging_state.manager.enable_statistics = false;
     }
-    
+
     g_logging_state.initialized = true;
-    
-    // 记录初始化日�?
-    LOG_INFO("日志系统初始化完成，级别: %s", 
-             log_level_to_string(g_logging_state.manager.level));
-    
+
     return 0;
 }
 
@@ -293,16 +294,17 @@ void log_write(log_level_t level, const char* module, int line, const char* fmt,
         return;
     }
     
-    // 获取追踪ID
+    // 获取追踪ID和Span ID
     const char* trace_id = log_get_trace_id();
-    
-    // 格式化消�?
+    const char* span_id = log_get_span_id();
+
+    // 格式化消息
     char message_buffer[MAX_MESSAGE_LEN];
     va_list args;
     va_start(args, fmt);
     vsnprintf(message_buffer, sizeof(message_buffer), fmt, args); /* flawfinder: ignore - variadic logging wrapper */
     va_end(args);
-    
+
     // 构建日志记录
     log_record_t record = {
         .timestamp = get_current_timestamp(),
@@ -310,6 +312,7 @@ void log_write(log_level_t level, const char* module, int line, const char* fmt,
         .module = module,
         .line = line,
         .trace_id = trace_id,
+        .span_id = span_id,
         .message = message_buffer,
         .thread_id = get_current_thread_id(),
         .process_id = get_current_process_id()
@@ -337,10 +340,11 @@ void log_write_va(log_level_t level, const char* module, int line, const char* f
         return;
     }
     
-    // 获取追踪ID
+    // 获取追踪ID和Span ID
     const char* trace_id = log_get_trace_id();
-    
-    // 格式化消�?
+    const char* span_id = log_get_span_id();
+
+    // 格式化消息
     char message_buffer[MAX_MESSAGE_LEN];
     vsnprintf(message_buffer, sizeof(message_buffer), fmt, args); /* flawfinder: ignore - variadic logging wrapper */
     // 构建日志记录
@@ -350,6 +354,7 @@ void log_write_va(log_level_t level, const char* module, int line, const char* f
         .module = module,
         .line = line,
         .trace_id = trace_id,
+        .span_id = span_id,
         .message = message_buffer,
         .thread_id = get_current_thread_id(),
         .process_id = get_current_process_id()
@@ -383,6 +388,24 @@ const char* log_set_trace_id(const char* trace_id) {
 const char* log_get_trace_id(void) {
     if (!g_logging_state.initialized) return NULL;
     return g_tls_trace_id[0] ? g_tls_trace_id : NULL;
+}
+
+const char* log_set_span_id(const char* span_id) {
+    if (!g_logging_state.initialized) return NULL;
+
+    if (span_id) {
+        strncpy(g_tls_span_id, span_id, sizeof(g_tls_span_id) - 1);
+        g_tls_span_id[sizeof(g_tls_span_id) - 1] = '\0';
+    } else {
+        g_tls_span_id[0] = '\0';
+    }
+
+    return g_tls_span_id;
+}
+
+const char* log_get_span_id(void) {
+    if (!g_logging_state.initialized) return NULL;
+    return g_tls_span_id[0] ? g_tls_span_id : NULL;
 }
 
 int log_set_module_level(const char* module_pattern, log_level_t level) {
@@ -429,7 +452,10 @@ int log_reload_config(const char* config_path) {
     }
 
     char line[512];
+    agentos_mutex_lock(&g_logging_state.mutex);
     log_config_t new_config = g_logging_state.manager;
+    agentos_mutex_unlock(&g_logging_state.mutex);
+
     int changes = 0;
 
     while (fgets(line, sizeof(line), fp)) {
@@ -482,6 +508,7 @@ void log_cleanup(void) {
     agentos_mutex_lock(&g_logging_state.mutex);
 
     g_tls_trace_id[0] = '\0';
+    g_tls_span_id[0] = '\0';
 
     for (size_t i = 0; i < g_logging_state.module_level_count; i++) {
         memset(&g_logging_state.module_levels[i], 0, sizeof(g_logging_state.module_levels[i]));
@@ -492,7 +519,6 @@ void log_cleanup(void) {
 
     agentos_mutex_unlock(&g_logging_state.mutex);
     agentos_mutex_destroy(&g_logging_state.mutex);
-    
-    LOG_INFO("日志系统清理完成");
+
     memset(&g_logging_state, 0, sizeof(g_logging_state));
 }

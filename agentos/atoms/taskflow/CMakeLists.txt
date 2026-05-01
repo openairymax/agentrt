@@ -46,10 +46,12 @@ endif()
 
 # 包含目录
 set(TASKFLOW_COMMONS_MEMORY_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/memory/include)
+set(TASKFLOW_COMMONS_PLATFORM_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/platform/include)
 
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${TASKFLOW_COMMONS_MEMORY_INCLUDE}
+    ${TASKFLOW_COMMONS_PLATFORM_INCLUDE}
 )
 
 # ========================================================================
@@ -86,16 +88,17 @@ add_library(agentos_taskflow STATIC ${TASKFLOW_CORE_SOURCES})
 target_include_directories(agentos_taskflow PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${TASKFLOW_COMMONS_MEMORY_INCLUDE}>
+    $<BUILD_INTERFACE:${TASKFLOW_COMMONS_PLATFORM_INCLUDE}>
     $<INSTALL_INTERFACE:include/agentos/taskflow>
 )
 
 # 链接依赖
-if(TARGET commons)
-    target_link_libraries(agentos_taskflow PUBLIC commons)
+if(TARGET agentos_common)
+    target_link_libraries(agentos_taskflow PUBLIC agentos_common)
 endif()
 
-if(TARGET atoms)
-    target_link_libraries(agentos_taskflow PUBLIC atoms)
+if(TARGET agentos_coreloopthree)
+    target_link_libraries(agentos_taskflow PUBLIC agentos_coreloopthree)
 endif()
 
 # 安全编译选项（基于 AgentOS C 编码风格指南附录 A）

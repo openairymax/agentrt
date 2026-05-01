@@ -497,8 +497,7 @@ int openai_chat_completion(openai_handle_t handle,
             sizeof(out_response->model) - 1);
     out_response->created = (uint64_t)time(NULL);
 
-    struct timespec ts_start, ts_end;
-    clock_gettime(CLOCK_MONOTONIC, &ts_start);
+    uint64_t ts_start_ms = agentos_time_ms();
 
 #ifndef AGENTOS_HAS_CURL
     (void)request;
@@ -543,9 +542,8 @@ int openai_chat_completion(openai_handle_t handle,
                                       req_str, api_response, sizeof(api_response));
     free(req_str);
 
-    clock_gettime(CLOCK_MONOTONIC, &ts_end);
-    double latency_ms = (double)(ts_end.tv_sec - ts_start.tv_sec) * 1000.0 +
-                        (double)(ts_end.tv_nsec - ts_start.tv_nsec) / 1000000.0;
+    uint64_t ts_end_ms = agentos_time_ms();
+    double latency_ms = (double)(ts_end_ms - ts_start_ms);
 
     if (api_result > 0) {
         char content_buf[OPENAI_MAX_RESPONSE_LEN];
@@ -601,8 +599,7 @@ int openai_chat_completion_streaming(
 #else
     if (!adapter->config.api_key || !adapter->config.api_key[0]) return -11;
 
-    struct timespec ts_start, ts_end;
-    clock_gettime(CLOCK_MONOTONIC, &ts_start);
+    uint64_t ts_start_ms = agentos_time_ms();
 
     memset(final_summary, 0, sizeof(*final_summary));
     final_summary->created = (uint64_t)time(NULL);
@@ -687,9 +684,8 @@ int openai_chat_completion_streaming(
         on_chunk(chunk_buf, chunk_len, (pos >= response_len), user_data);
     }
 
-    clock_gettime(CLOCK_MONOTONIC, &ts_end);
-    double latency_ms = (double)(ts_end.tv_sec - ts_start.tv_sec) * 1000.0 +
-                        (double)(ts_end.tv_nsec - ts_start.tv_nsec) / 1000000.0;
+    uint64_t ts_end_ms = agentos_time_ms();
+    double latency_ms = (double)(ts_end_ms - ts_start_ms);
 
     final_summary->choices = calloc(1, sizeof(openai_message_t));
     if (final_summary->choices) {
@@ -723,8 +719,7 @@ int openai_create_embedding(openai_handle_t handle,
         (struct openai_enterprise_adapter_s*)handle;
     if (!adapter->initialized) return -2;
 
-    struct timespec ts_start, ts_end;
-    clock_gettime(CLOCK_MONOTONIC, &ts_start);
+    uint64_t ts_start_ms = agentos_time_ms();
 
     memset(out_response, 0, sizeof(*out_response));
 
@@ -794,9 +789,8 @@ int openai_create_embedding(openai_handle_t handle,
             out_response->embeddings[i] = 0.0;
     }
 
-    clock_gettime(CLOCK_MONOTONIC, &ts_end);
-    double latency_ms = (double)(ts_end.tv_sec - ts_start.tv_sec) * 1000.0 +
-                        (double)(ts_end.tv_nsec - ts_start.tv_nsec) / 1000000.0;
+    uint64_t ts_end_ms = agentos_time_ms();
+    double latency_ms = (double)(ts_end_ms - ts_start_ms);
 
     out_response->usage.prompt_tokens = (uint32_t)
         openai_estimate_tokens(request->input_text);

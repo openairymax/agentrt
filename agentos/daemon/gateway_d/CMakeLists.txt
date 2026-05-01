@@ -111,12 +111,14 @@ if(WIN32)
         _CRT_SECURE_NO_WARNINGS
     )
     target_link_libraries(gateway_d PRIVATE
+        agentos_common
         ws2_32
         bcrypt
     )
 elseif(UNIX)
     target_link_libraries(gateway_d PRIVATE
-        pthread
+        agentos_common
+        Threads::Threads
         rt
     )
 endif()
@@ -196,6 +198,10 @@ target_include_directories(gateway_lib_obj PUBLIC
     ${SYSCALL_INCLUDE_DIR}
     ${COREKERN_INCLUDE_DIR}
     ${CJSON_INCLUDE_DIRS}
+    ${COMMONS_DIR}/platform/include
+    ${COMMONS_DIR}/utils/logging/include
+    ${COMMONS_DIR}/utils/error/include
+    ${COMMONS_DIR}/utils/sync/include
 )
 
 # 查找 gateway 所需的外部库
@@ -227,6 +233,7 @@ endif()
 target_link_libraries(gateway_d PRIVATE
     $<TARGET_OBJECTS:gateway_lib_obj>
     svc_common
+    agentos_common
     Threads::Threads
 )
 

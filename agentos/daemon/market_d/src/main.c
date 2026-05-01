@@ -40,7 +40,7 @@ static void signal_handler(int signum);
 
 /* ==================== 配置常量 ==================== */
 
-#define DEFAULT_SOCKET_PATH_UNIX "/var/run/agentos/market.sock"
+#define DEFAULT_SOCKET_PATH_UNIX AGENTOS_RUNTIME_DIR "/market.sock"
 #define DEFAULT_SOCKET_PATH_WIN "\\\\.\\pipe\\agentos_market"
 #define DEFAULT_TCP_PORT 8082
 #define MAX_BUFFER 65536

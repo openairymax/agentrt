@@ -301,7 +301,7 @@ CUPOLAS_API int cupolas_guards_init(const guard_manager_config_t* config) {
 
     // 创建审计日志记录器
     if (!g_guard_audit_logger) {
-        g_guard_audit_logger = audit_logger_create("/tmp/cupolas_audit", "guard",
+        g_guard_audit_logger = audit_logger_create(AGENTOS_TMP_DIR "/cupolas_audit", "guard",
                                                     1024 * 1024, 10);
     }
 

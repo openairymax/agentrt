@@ -12,6 +12,7 @@
 #include "heapstore_log.h"
 #include "private.h"
 #include "utils.h"
+#include "platform.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -276,14 +277,13 @@ void heapstore_log_writev(heapstore_log_level_t level,
 
     agentos_mutex_lock(&s_log_lock);
 
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    time_t now = ts.tv_sec;
+    uint64_t now_ms = agentos_time_ms();
+    time_t now = (time_t)(now_ms / 1000);
     struct tm* tm_info = localtime(&now);
     char timestamp[32];
     strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", tm_info);
     char msec[8];
-    snprintf(msec, sizeof(msec), "%03d", (int)(ts.tv_nsec / 1000000));
+    snprintf(msec, sizeof(msec), "%03d", (int)(now_ms % 1000));
 
     char message[heapstore_LOG_MAX_LINE_LEN];
     vsnprintf(message, sizeof(message), format, args); /* flawfinder: ignore - bounded buffer heapstore_LOG_MAX_LINE_LEN */

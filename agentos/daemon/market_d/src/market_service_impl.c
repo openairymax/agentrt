@@ -524,7 +524,7 @@ int market_service_sync_registry(market_service_t* service) {
     }
 
     const char* storage = service->config.storage_path ?
-                          service->config.storage_path : "/tmp/agentos";
+                          service->config.storage_path : AGENTOS_CACHE_DIR;
     char index_path[1024];
     snprintf(index_path, sizeof(index_path), "%s/registry_index.json", storage);
 

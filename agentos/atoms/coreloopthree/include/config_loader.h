@@ -15,9 +15,13 @@ extern "C" {
 #endif
 
 /**
- * @brief 从YAML文件加载配置为JSON字符串（简化，直接返回文件内容）
+ * @brief 从配置文件加载内容为字符串
+ *
+ * 读取指定路径的配置文件内容，支持 YAML/JSON/INI 格式。
+ * 返回原始文件内容字符串，由调用者负责解析。
+ *
  * @param path 配置文件路径
- * @param out_json 输出JSON字符串（需调用者释放）
+ * @param out_json 输出文件内容字符串（需调用者释放）
  * @return agentos_error_t
  */
 agentos_error_t agentos_config_load(const char* path, char** out_json);

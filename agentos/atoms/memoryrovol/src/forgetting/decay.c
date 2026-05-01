@@ -8,6 +8,7 @@
 #include "../include/layer1_raw.h"
 #include "../include/layer2_feature.h"
 #include "agentos.h"
+#include "platform.h"
 #include <math.h>
 #include <stdlib.h>
 #include <time.h>
@@ -73,7 +74,7 @@ agentos_error_t agentos_forgetting_create(
         eng->manager.threshold = 0.3;
         eng->manager.min_access = 1;
         eng->manager.check_interval_sec = 3600; // 1小时
-        eng->manager.archive_path = "/var/agentos/archive";
+        eng->manager.archive_path = AGENTOS_CACHE_DIR "/archive";
     }
 
     eng->layer1 = layer1;

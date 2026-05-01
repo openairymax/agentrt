@@ -1,6 +1,6 @@
 /**
  * @file layer2_feature.h
- * @brief L2 特征层接口
+ * @brief L2 特征层接口（简化版）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 

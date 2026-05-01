@@ -601,7 +601,7 @@ int daemon_security_init(const daemon_security_config_t* config, agentos_error_t
 
     if (g_security_ctx.audit_enabled && g_security_ctx.audit_log_path[0] == '\0') {
         snprintf(g_security_ctx.audit_log_path, sizeof(g_security_ctx.audit_log_path),
-                "/tmp/agentos_daemon_audit.log");
+                AGENTOS_LOG_DIR "/daemon_audit.log");
     }
 
     if (g_security_ctx.audit_enabled) {
@@ -836,7 +836,7 @@ int daemon_verify_package_signature(const char* package_path, bool* is_valid,
 #ifdef AGENTOS_HAS_OPENSSL
     const char* trusted_keys_dir = getenv("AGENTOS_TRUSTED_KEYS_DIR");
     if (!trusted_keys_dir) {
-        trusted_keys_dir = "/etc/agentos/trusted_keys";
+        trusted_keys_dir = AGENTOS_CONFIG_DIR "/trusted_keys";
     }
 
     DIR* dir = opendir(trusted_keys_dir);

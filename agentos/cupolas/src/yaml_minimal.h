@@ -1,21 +1,13 @@
 /**
  * @file yaml_minimal.h
- * @brief Minimal YAML 1.1 subset parser for AgentOS configuration files
+ * @brief YAML 1.1 parser for AgentOS configuration files
+ *
+ * Supports: Anchors (&), Aliases (*), Tags (!!), Document markers (---/...),
+ * Folded scalars (>), Literal scalars (|), Merge keys (<<),
+ * Chomping indicators (|-/|+/|2), YAML directives (%YAML/%TAG),
+ * Flow/Block styles, Complex keys, BOM handling.
+ *
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
- *
- * Supported YAML features:
- * - Mappings (key-value pairs, indentation-based nesting)
- * - Sequences (arrays with '-' prefix)
- * - Scalar types: string, integer, float, boolean, null
- * - Quoted strings (single and double)
- * - Comments (# to end of line)
- * - Multi-line values (literal block '|', folded '>')
- *
- * NOT supported (intentionally):
- * - Anchors (&) / Aliases (*)
- * - Tags (!!)
- * - Document markers (--- / ...)
- * - Complex keys
  */
 
 #ifndef CUPOLAS_YAML_MINIMAL_H
@@ -58,6 +50,8 @@ struct yaml_node {
         struct { struct yaml_sequence_item* items; size_t count; } sequence;
     };
     int line;
+    char* anchor_name;
+    char* tag;
 };
 
 typedef struct yaml_document {
@@ -68,6 +62,8 @@ typedef struct yaml_document {
     char* source;
     size_t source_len;
     char* error_msg;
+    int document_index;
+    struct yaml_document* next;
 } yaml_document_t;
 
 yaml_document_t* yaml_create(void);
@@ -75,6 +71,8 @@ void yaml_destroy(yaml_document_t* doc);
 
 int yaml_parse_string(yaml_document_t* doc, const char* input, size_t len);
 int yaml_parse_file(yaml_document_t* doc, const char* filepath);
+int yaml_parse_multi(yaml_document_t* doc, const char* input, size_t len);
+void yaml_destroy_chain(yaml_document_t* doc);
 
 const char* yaml_get_error(const yaml_document_t* doc);
 

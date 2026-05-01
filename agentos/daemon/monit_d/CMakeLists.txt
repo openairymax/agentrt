@@ -45,12 +45,14 @@ if(WIN32)
         _CRT_SECURE_NO_WARNINGS
     )
     target_link_libraries(agentos-monit-d PRIVATE
+        agentos_common
         ws2_32
         bcrypt
     )
 elseif(UNIX)
     target_link_libraries(agentos-monit-d PRIVATE
-        pthread
+        agentos_common
+        Threads::Threads
         rt
     )
 endif()

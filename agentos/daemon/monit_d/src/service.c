@@ -81,9 +81,7 @@ struct monitor_service {
 };
 
 static uint64_t get_timestamp_ms(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000ULL + (uint64_t)ts.tv_nsec / 1000000ULL;
+    return agentos_time_ms();
 }
 
 int monitor_service_create(const monitor_config_t* config, monitor_service_t** service) {

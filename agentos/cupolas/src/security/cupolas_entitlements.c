@@ -392,11 +392,7 @@ void cupolas_entitlements_free(cupolas_entitlements_t* entitlements) {
     cupolas_free_string_array(entitlements->info.allowed_syscalls, entitlements->info.syscall_count);
     cupolas_free_string_array(entitlements->info.allowed_capabilities, entitlements->info.cap_count);
     
-#ifdef _WIN32
-    agentos_mutex_destroy(&entitlements->lock);
-#else
-    agentos_mutex_destroy(&entitlements->lock);
-#endif
+    cupolas_mutex_destroy(&entitlements->lock);
     
     free(entitlements);
 }
