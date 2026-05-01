@@ -104,11 +104,11 @@ static void test_logging_across_services(void) {
     heapstore_error_t err = heapstore_init(&manager);
     assert(err == heapstore_SUCCESS);
 
-    heapstore_log_set_level(heapstore_LOG_DEBUG);
+    heapstore_log_set_level(HEAPSTORE_LOG_DEBUG);
 
-    heapstore_LOG_INFO("service_a", "trace_001", "Service A started");
-    heapstore_LOG_INFO("service_b", "trace_002", "Service B started");
-    heapstore_LOG_ERROR("service_c", "trace_003", "Service C encountered error");
+    HEAPSTORE_LOG_INFO("service_a", "trace_001", "Service A started");
+    HEAPSTORE_LOG_INFO("service_b", "trace_002", "Service B started");
+    HEAPSTORE_LOG_ERROR("service_c", "trace_003", "Service C encountered error");
 
     char path[512];
     err = heapstore_log_get_service_path("service_a", path, sizeof(path));
@@ -195,8 +195,8 @@ static void test_concurrent_access_simulation(void) {
     assert(err == heapstore_SUCCESS);
 
     for (int i = 0; i < 10; i++) {
-        heapstore_log_set_level(heapstore_LOG_INFO);
-        heapstore_LOG_INFO("concurrent_service", "trace_concurrent", "Log iteration %d", i);
+        heapstore_log_set_level(HEAPSTORE_LOG_INFO);
+        HEAPSTORE_LOG_INFO("concurrent_service", "trace_concurrent", "Log iteration %d", i);
 
         uint64_t total = 0, pending = 0, size = 0;
         heapstore_trace_get_stats(&total, &pending, &size);

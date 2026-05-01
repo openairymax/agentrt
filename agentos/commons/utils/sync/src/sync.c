@@ -179,8 +179,7 @@ sync_result_t sync_reset_stats(void* lock) {
 /**
  * @brief 设置锁的选项
  *
- * @note 当前为预留接口，暂不支持任何选项配置
- * @future 可扩展支持：
+ * @note 预留接口，可扩展支持：
  *       - 默认超时时间设置
  *       - 调试级别配置
  *       - 优先级继承设置

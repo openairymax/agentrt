@@ -42,8 +42,7 @@ typedef enum {
 typedef enum {
     API_REC_DEGRADE_NONE = 0,
     API_REC_DEGRADE_LOWER_TIER,
-    API_REC_DEGRADE_CACHE,
-    API_REC_DEGRADE_MOCK
+    API_REC_DEGRADE_CACHE
 } api_rec_degradation_level_t;
 
 typedef struct {
