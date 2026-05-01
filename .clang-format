@@ -35,7 +35,7 @@ ContinuationIndentWidth: 4
 Cpp11BracedListStyle: true
 DerivePointerAlignment: false
 FixNamespaceComments: true
-IncludeBlocks:   Regroup
+IncludeBlocks:   Preserve
 IndentCaseLabels: false
 IndentPPDirectives: None
 IndentWrappedFunctionNames: false
@@ -43,7 +43,7 @@ MaxEmptyLinesToKeep: 1
 NamespaceIndentation: None
 PointerAlignment: Right
 ReflowComments:  true
-SortIncludes:    true
+SortIncludes:    Never
 SortUsingDeclarations: true
 SpaceAfterCStyleCast: false
 SpaceAfterTemplateKeyword: true

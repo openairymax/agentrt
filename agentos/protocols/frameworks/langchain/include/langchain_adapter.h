@@ -204,6 +204,11 @@ typedef void (*langchain_trace_fn)(const char* trace_event,
                                    const char* trace_data_json,
                                    void* user_data);
 
+typedef int (*langchain_llm_callback_fn)(const char* prompt,
+                                         const char* model,
+                                         char** response,
+                                         void* user_data);
+
 typedef struct langchain_adapter_context_s {
     langchain_config_t config;
     langchain_chain_instance_t chains[LANGCHAIN_MAX_CHAINS];

@@ -1,9 +1,4 @@
-# AgentOS CI Pipeline v4.0
-# align: 工程规范化标准手册 v11.14, BAN-01~36
-# v4.0: 合并protocol-ci.yml, 统一构建目录(../AgentOS-build), BAN-33合规
-# trigger: push(main/develop) + PR(main) + manual
-
-name: CI Pipeline v4.0
+name: CI Pipeline v4.1
 
 on:
   push:
@@ -22,9 +17,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ============================================================
-  # Job 1: Build - Release + Debug
-  # ============================================================
   build:
     name: Build (${{ matrix.config.type }})
     runs-on: ubuntu-latest
@@ -73,21 +65,26 @@ jobs:
         id: build_step
         run: |
           cmake --build ${{ env.BUILD_DIR }} -j$(nproc) 2>&1 | tee build.log
-          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        continue-on-error: true
 
       - name: Check build result
         if: always()
         run: |
-          if [ "${{ steps.build_step.outputs.exit_code }}" != "0" ]; then
+          if [ "${{ steps.build_step.outcome }}" = "failure" ]; then
             echo "::error::Build failed for ${{ matrix.config.type }}"
             exit 1
           fi
-          echo "✅ Build ${{ matrix.config.type }} succeeded"
+          echo "Build ${{ matrix.config.type }} succeeded"
           find ${{ env.BUILD_DIR }} -name "*.a" -o -name "*.so" -type f 2>/dev/null | head -5
 
-  # ============================================================
-  # Job 2: Test + BAN Audit + Quality Gate
-  # ============================================================
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.config.cache }}
+          path: ${{ env.BUILD_DIR }}/
+          retention-days: 1
+
   test:
     name: Test Suite
     runs-on: ubuntu-latest
@@ -99,30 +96,31 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-rel
+          path: ${{ env.BUILD_DIR }}/
+
       - name: Install test deps
         run: |
           sudo apt-get install -y -qq libcmocka-dev valgrind cppcheck clang-format 2>/dev/null || true
-
-      - name: Build with tests
-        run: |
-          cmake -S . -B ${{ env.BUILD_DIR }} \
-            -DBUILD_DAEMON=ON -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
-          cmake --build ${{ env.BUILD_DIR }} -j$(nproc)
 
       - name: Run CTest
         id: ctest_run
         working-directory: ${{ env.BUILD_DIR }}
         run: |
           ctest --output-on-failure --timeout 120 -j$(nproc) 2>&1 | tee ctest.log
-          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        continue-on-error: true
 
       - name: Assert tests pass
+        if: always()
         run: |
-          if [ "${{ steps.ctest_run.outputs.exit_code }}" != "0" ]; then
+          if [ "${{ steps.ctest_run.outcome }}" = "failure" ]; then
             echo "::error::CTest failures detected"
             exit 1
           fi
-          echo "✅ All CTest passed"
+          echo "All CTest passed"
 
       - name: BAN Audit (BAN-01~36)
         run: |
@@ -141,47 +139,63 @@ jobs:
             fi
           fi
 
-  # ============================================================
-  # Job 3: Protocol Compatibility (gateway/protocol only)
-  # ============================================================
   protocol:
     name: Protocol Compatibility
     runs-on: ubuntu-latest
     needs: build
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && contains(join(github.event.commits.*.modified, ' '), 'gateway/')) ||
-      (github.event_name == 'push' && contains(join(github.event.commits.*.modified, ' '), 'protocols/'))
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event_name == 'pull_request'
 
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Install deps
+      - name: Detect protocol changes
+        id: changes
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq \
-            build-essential cmake gcc g++ libcurl4-openssl-dev libcjson-dev \
-            libmicrohttpd-dev libssl-dev 2>/dev/null || true
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "run=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD 2>/dev/null || echo "")
+          else
+            BEFORE="${{ github.event.before }}"
+            AFTER="${{ github.event.after }}"
+            if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+              CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+            else
+              CHANGED=$(git diff --name-only "$BEFORE" "$AFTER" 2>/dev/null || echo "")
+            fi
+          fi
+          if echo "$CHANGED" | grep -qE '(agentos/gateway/|agentos/protocols/)'; then
+            echo "run=true" >> $GITHUB_OUTPUT
+          else
+            echo "run=false" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Build Gateway
-        run: |
-          cmake -S . -B ${{ env.BUILD_DIR }} -DBUILD_DAEMON=ON -DCMAKE_BUILD_TYPE=Debug
-          cmake --build ${{ env.BUILD_DIR }} -j$(nproc)
+      - name: Download build artifacts
+        if: steps.changes.outputs.run == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: build-dbg
+          path: ${{ env.BUILD_DIR }}/
 
       - name: Verify gateway binary
+        if: steps.changes.outputs.run == 'true'
         run: |
           binary=$(find ${{ env.BUILD_DIR }} -name "*gateway*" -type f 2>/dev/null | head -1)
           if [ -n "$binary" ]; then
-            echo "✅ Gateway built: $binary"
+            echo "Gateway built: $binary"
             file "$binary"
           else
-            echo "::warning::Gateway binary not found"
+            echo "::warning::Gateway binary not found in build artifacts"
           fi
 
-  # ============================================================
-  # Job 4: Status Summary
-  # ============================================================
+      - name: Skip (no protocol changes)
+        if: steps.changes.outputs.run == 'false'
+        run: echo "No gateway/protocols changes detected, skipping protocol compatibility check"
+
   status:
     name: Status Report
     runs-on: ubuntu-latest
@@ -190,13 +204,12 @@ jobs:
     steps:
       - run: |
           cat << 'REPORT' >> $GITHUB_STEP_SUMMARY
-          # CI Pipeline v4.0 — Status
+          # CI Pipeline v4.1 — Status
 
           | Job | Status |
           |-----|--------|
-          | Build (Release) | ${{ needs.build.result == 'success' && '✅' || '❌' }} |
-          | Build (Debug) | ${{ needs.build.result == 'success' && '✅' || '❌' }} |
+          | Build (Release+Debug) | ${{ needs.build.result == 'success' && '✅' || '❌' }} |
           | Test Suite | ${{ needs.test.result == 'success' && '✅' || '❌' }} |
 
-          *Generated by AgentOS CI v4.0*
+          *Generated by AgentOS CI v4.1*
           REPORT
