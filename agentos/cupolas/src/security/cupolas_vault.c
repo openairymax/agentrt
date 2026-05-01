@@ -212,8 +212,14 @@ int cupolas_vault_unlock(cupolas_vault_t* vault, const char* password) {
     PKCS5_PBKDF2_HMAC(password, strlen(password), salt, SALT_SIZE,
                       100000, EVP_sha256(), AES_KEY_SIZE, vault->master_key);
 #else
-    (void)password;
-    memset(vault->master_key, 0, AES_KEY_SIZE);
+    if (!password || strlen(password) == 0) {
+        cupolas_rwlock_unlock(&vault->lock);
+        return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
+    }
+    size_t pw_len = strlen(password);
+    for (size_t i = 0; i < AES_KEY_SIZE; i++) {
+        vault->master_key[i] = (uint8_t)(password[i % pw_len] ^ (i & 0xFF));
+    }
 #endif
 
     vault->is_locked = false;
@@ -317,7 +323,7 @@ int cupolas_vault_store(cupolas_vault_t* vault,
     EVP_CIPHER_CTX_free(ctx);
 #else
     cupolas_rwlock_unlock(&vault->lock);
-    return -10;
+    return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
 #endif
 
     if (acl) {
@@ -385,8 +391,8 @@ int cupolas_vault_retrieve(cupolas_vault_t* vault,
     *data_len = entry->encrypted_len;
     EVP_CIPHER_CTX_free(ctx);
 #else
-    memcpy(data_out, entry->encrypted_data, entry->encrypted_len);
-    *data_len = entry->encrypted_len;
+    cupolas_rwlock_unlock(&vault->lock);
+    return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
 #endif
 
     cupolas_rwlock_unlock(&vault->lock);
@@ -488,7 +494,7 @@ int cupolas_vault_update(cupolas_vault_t* vault,
     EVP_CIPHER_CTX_free(ctx);
 #else
     cupolas_rwlock_unlock(&vault->lock);
-    return -10;
+    return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
 #endif
 
     entry->metadata.updated_at = (uint64_t)time(NULL);
@@ -863,11 +869,7 @@ int cupolas_vault_generate_keypair(char* public_key_out, size_t* pub_len,
 
     return 0;
 #else
-    (void)public_key_out;
-    (void)private_key_out;
-    (void)pub_len;
-    (void)priv_len;
-    return -1; /* fail-closed: no crypto = no key generation */
+    return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
 #endif
 }
 
@@ -994,7 +996,7 @@ int cupolas_vault_export(cupolas_vault_t* vault,
     return 0;
 #else
     (void)agent_id;
-    return -10;
+    return cupolas_VAULT_ERR_CRYPTO_UNAVAILABLE;
 #endif
 }
 
@@ -1175,8 +1177,7 @@ int cupolas_vault_import(cupolas_vault_t* vault,
 
     return (int)imported;
 #else
-    (void)password;
-    (void)agent_id;
+    if (!password || !agent_id) return cupolas_VAULT_ERR_INVALID;
 
     FILE* f = fopen(import_path, "r");
     if (!f) return -3;

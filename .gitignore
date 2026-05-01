@@ -114,12 +114,14 @@ CMakePresets.json
 build/
 _build/
 build_test/
+build-test/
 build_test_protocol/
 build_no_daemon/
 
 # 子目录中的构建产物（防止源内构建）
 **/build/
 **/_build/
+**/build-test/
 agentos/build/
 agentos/*/build/
 agentos/*/*/build/
