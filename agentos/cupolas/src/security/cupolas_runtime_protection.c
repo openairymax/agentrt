@@ -145,11 +145,7 @@ int cupolas_runtime_protect_init(const cupolas_runtime_protect_config_t* manager
     
     memset(&g_runtime_prot, 0, sizeof(g_runtime_prot));
     
-#ifdef _WIN32
-    agentos_mutex_init(&g_runtime_prot.lock);
-#else
-    agentos_mutex_init(&g_runtime_prot.lock);
-#endif
+    cupolas_mutex_init(&g_runtime_prot.lock);
     
     if (manager) {
         g_runtime_prot.manager = *manager;

@@ -30,13 +30,14 @@
 #include <synchapi.h>
 #include <process.h>
 #else
-#include <pthread.h>
 #include <semaphore.h>
 #include <sched.h>
 #include <unistd.h>
 #include <sys/time.h>
 #include <errno.h>
 #endif
+
+#include "sync_platform.h"
 
 /**
  * @brief 全局同步模块状态结构体
@@ -198,7 +199,7 @@ sync_result_t sync_set_option(void* lock, int option, void* value) {
     }
     (void)option;
     (void)value;
-    return SYNC_SUCCESS;
+    return SYNC_ERROR_UNSUPPORTED;
 }
 
 /**
@@ -218,7 +219,7 @@ sync_result_t sync_get_option(void* lock, int option, void* value) {
         return SYNC_ERROR_INVALID;
     }
     (void)option;
-    return SYNC_SUCCESS;
+    return SYNC_ERROR_UNSUPPORTED;
 }
 
 /**

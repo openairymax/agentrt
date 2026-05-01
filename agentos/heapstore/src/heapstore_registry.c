@@ -11,6 +11,7 @@
 
 #include "heapstore_registry.h"
 #include "private.h"
+#include "platform.h"
 
 #include <stdio.h>
 #include <stdlib.h>

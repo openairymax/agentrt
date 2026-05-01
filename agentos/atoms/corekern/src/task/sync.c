@@ -56,7 +56,6 @@ void agentos_cond_destroy(agentos_cond_t* cond) {
 #include <time.h>
 #include <errno.h>
 #include "platform.h"
-#include <stdint.h>
 
 /* agentos_mutex_t 在 platform.h 中定义为 agentos_mutex_t */
 /* agentos_cond_t 在 platform.h 中定义为 agentos_cond_t */

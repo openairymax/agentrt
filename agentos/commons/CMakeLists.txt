@@ -82,6 +82,7 @@ set(SOURCES
     utils/string/string_common.c
     # 统一线程同步原语模块
     utils/sync/src/sync.c
+    utils/sync/src/sync_platform.c
     utils/sync/sync_common.c
     # 缓存模块
     utils/cache/cache_common.c

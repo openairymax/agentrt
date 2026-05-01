@@ -73,6 +73,7 @@ typedef enum {
     SYNC_ERROR_MEMORY,                   /**< 内存分配失败 */
     SYNC_ERROR_PERMISSION,               /**< 权限不足 */
     SYNC_ERROR_BUSY,                     /**< 资源繁忙 */
+    SYNC_ERROR_UNSUPPORTED,              /**< 不支持的操作 */
     SYNC_ERROR_UNKNOWN                   /**< 未知错误 */
 } sync_result_t;
 

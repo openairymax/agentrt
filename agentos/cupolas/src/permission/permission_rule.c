@@ -13,6 +13,7 @@
  */
 
 #include "permission_rule.h"
+#include "../yaml_minimal.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -99,60 +100,6 @@ static int cupolas_permission_match_pattern(const char* pattern, const char* str
     return *p == '\0';
 }
 
-static int cupolas_permission_parse_yaml_line(const char* line, char** agent_id, char** action,
-                           char** resource, int* allow, int* priority) {
-    *agent_id = NULL;
-    *action = NULL;
-    *resource = NULL;
-    *allow = 1;
-    *priority = DEFAULT_PRIORITY;
-    
-    char buf[MAX_LINE_LENGTH];
-    strncpy(buf, line, MAX_LINE_LENGTH - 1);
-    buf[MAX_LINE_LENGTH - 1] = '\0';
-    
-    char* p = buf;
-    while (*p == ' ' || *p == '\t') p++;
-    
-    if (*p == '\0' || *p == '#' || *p == '\n' || *p == '\r') {
-        return -1;
-    }
-    
-    char* token;
-    char* saveptr;
-    
-    token = strtok_r(p, ":\n\r", &saveptr);
-    if (!token) return -1;
-    
-    while (token) {
-        char* key = token;
-        while (*key == ' ' || *key == '\t') key++;
-        
-        char* value = strchr(key, ' ');
-        if (value) {
-            *value = '\0';
-            value++;
-            while (*value == ' ' || *value == '\t') value++;
-        }
-        
-        if (strcmp(key, "agent") == 0 && value) {
-            *agent_id = cupolas_strdup(value);
-        } else if (strcmp(key, "action") == 0 && value) {
-            *action = cupolas_strdup(value);
-        } else if (strcmp(key, "resource") == 0 && value) {
-            *resource = cupolas_strdup(value);
-        } else if (strcmp(key, "allow") == 0 && value) {
-            *allow = (strcmp(value, "true") == 0 || strcmp(value, "1") == 0) ? 1 : 0;
-        } else if (strcmp(key, "priority") == 0 && value) {
-            *priority = atoi(value);
-        }
-        
-        token = strtok_r(NULL, ":\n\r", &saveptr);
-    }
-    
-    return 0;
-}
-
 rule_manager_t* rule_manager_create(const char* path) {
     rule_manager_t* mgr = (rule_manager_t*)cupolas_mem_alloc(sizeof(rule_manager_t));
     if (!mgr) return NULL;
@@ -208,43 +155,71 @@ int rule_manager_reload(rule_manager_t* mgr) {
     if (mtime == mgr->last_mtime) {
         return cupolas_OK;
     }
-    
-    FILE* fp = fopen(mgr->path, "r");
-    if (!fp) {
+
+    yaml_document_t* doc = yaml_create();
+    if (!doc) return cupolas_ERROR_NO_MEMORY;
+
+    if (yaml_parse_file(doc, mgr->path) != 0) {
+        yaml_destroy(doc);
         return cupolas_ERROR_IO;
     }
-    
+
     permission_rule_t* new_rules = NULL;
     permission_rule_t** tail = &new_rules;
-    
-    char line[MAX_LINE_LENGTH];
-    while (fgets(line, sizeof(line), fp)) {
-        char* agent_id = NULL;
-        char* action = NULL;
-        char* resource = NULL;
-        int allow = 1;
-        int priority = DEFAULT_PRIORITY;
-        
-        if (cupolas_permission_parse_yaml_line(line, &agent_id, &action, &resource, &allow, &priority) != 0) {
-            continue;
+
+    struct yaml_node* root = yaml_root(doc);
+    if (root) {
+        if (root->type == YAML_NODE_SEQUENCE) {
+            size_t count = yaml_size(root);
+            for (size_t i = 0; i < count; i++) {
+                struct yaml_node* entry = yaml_get_index(root, i);
+                if (!entry || entry->type != YAML_NODE_MAPPING) continue;
+
+                const char* agent_id = yaml_as_string(yaml_get(entry, "agent"), "*");
+                const char* action = yaml_as_string(yaml_get(entry, "action"), "*");
+                const char* resource = yaml_as_string(yaml_get(entry, "resource"), "*");
+                int allow = (int)yaml_as_bool(yaml_get(entry, "allow"), true);
+                int priority = (int)yaml_as_int64(yaml_get(entry, "priority"), DEFAULT_PRIORITY);
+
+                permission_rule_t* rule = cupolas_permission_create_rule(
+                    agent_id, action, resource, allow, priority);
+                if (!rule) {
+                    yaml_destroy(doc);
+                    cupolas_permission_free_rules(new_rules);
+                    return cupolas_ERROR_NO_MEMORY;
+                }
+                *tail = rule;
+                tail = &rule->next;
+            }
+        } else if (root->type == YAML_NODE_MAPPING) {
+            struct yaml_node* rules_node = yaml_get(root, "rules");
+            if (rules_node && rules_node->type == YAML_NODE_SEQUENCE) {
+                size_t count = yaml_size(rules_node);
+                for (size_t i = 0; i < count; i++) {
+                    struct yaml_node* entry = yaml_get_index(rules_node, i);
+                    if (!entry || entry->type != YAML_NODE_MAPPING) continue;
+
+                    const char* agent_id = yaml_as_string(yaml_get(entry, "agent"), "*");
+                    const char* action = yaml_as_string(yaml_get(entry, "action"), "*");
+                    const char* resource = yaml_as_string(yaml_get(entry, "resource"), "*");
+                    int allow = (int)yaml_as_bool(yaml_get(entry, "allow"), true);
+                    int priority = (int)yaml_as_int64(yaml_get(entry, "priority"), DEFAULT_PRIORITY);
+
+                    permission_rule_t* rule = cupolas_permission_create_rule(
+                        agent_id, action, resource, allow, priority);
+                    if (!rule) {
+                        yaml_destroy(doc);
+                        cupolas_permission_free_rules(new_rules);
+                        return cupolas_ERROR_NO_MEMORY;
+                    }
+                    *tail = rule;
+                    tail = &rule->next;
+                }
+            }
         }
-        
-        permission_rule_t* rule = cupolas_permission_create_rule(agent_id, action, resource, allow, priority);
-        cupolas_mem_free(agent_id);
-        cupolas_mem_free(action);
-        cupolas_mem_free(resource);
-        
-        if (!rule) {
-            fclose(fp);
-            cupolas_permission_free_rules(new_rules);
-            return cupolas_ERROR_NO_MEMORY;
-        }
-        
-        *tail = rule;
-        tail = &rule->next;
     }
-    
-    fclose(fp);
+
+    yaml_destroy(doc);
     
     cupolas_rwlock_wrlock(&mgr->rwlock);
     permission_rule_t* old_rules = mgr->rules;

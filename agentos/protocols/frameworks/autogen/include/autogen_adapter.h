@@ -193,6 +193,11 @@ typedef int (*autogen_human_callback_fn)(const char* prompt,
 typedef void (*autogen_message_hook_fn)(const autogen_message_t* msg,
                                        void* user_data);
 
+typedef int (*autogen_llm_callback_fn)(const char* prompt,
+                                        const char* model,
+                                        char** response,
+                                        void* user_data);
+
 autogen_config_t autogen_config_default(void);
 
 autogen_adapter_context_t* autogen_adapter_create(const autogen_config_t* config);
@@ -251,6 +256,10 @@ int autogen_set_human_callback(autogen_adapter_context_t* ctx,
 int autogen_set_message_hook(autogen_adapter_context_t* ctx,
                              autogen_message_hook_fn hook,
                              void* user_data);
+
+int autogen_set_llm_callback(autogen_adapter_context_t* ctx,
+                              autogen_llm_callback_fn callback,
+                              void* user_data);
 
 int autogen_get_statistics(autogen_adapter_context_t* ctx,
                           char* stats_json,

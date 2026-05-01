@@ -36,11 +36,16 @@ target_include_directories(channel_d PRIVATE
 
 if(UNIX)
     target_link_libraries(channel_d PRIVATE
-        pthread
+        svc_common
+        agentos_common
+        Threads::Threads
         rt
     )
     target_compile_definitions(channel_d PRIVATE
         _GNU_SOURCE
+        AGENTOS_TMP_DIR="/tmp/agentos"
+        AGENTOS_CONFIG_DIR="/etc/agentos"
+        AGENTOS_LOG_DIR="/var/log/agentos"
     )
 endif()
 
@@ -73,7 +78,9 @@ if(CMOCKA_FOUND OR TARGET cmocka)
     )
     target_link_libraries(test_channel_e2e PRIVATE
         ${CMOCKA_LIBRARIES}
-        pthread rt
+        svc_common
+        agentos_common
+        Threads::Threads rt
     )
     target_compile_options(test_channel_e2e PRIVATE -Wall -Wextra)
     add_test(NAME channel_e2e COMMAND test_channel_e2e)
@@ -85,8 +92,13 @@ else()
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${COMMONS_DIR}/tests/utils
     )
-    target_link_libraries(test_channel_e2e PRIVATE pthread rt)
+    target_link_libraries(test_channel_e2e PRIVATE Threads::Threads rt svc_common agentos_common)
     target_compile_options(test_channel_e2e PRIVATE -Wall -Wextra)
-    target_compile_definitions(test_channel_e2e PRIVATE USE_CMOCKA_STUB)
+    target_compile_definitions(test_channel_e2e PRIVATE
+        USE_CMOCKA_STUB
+        AGENTOS_TMP_DIR="/tmp/agentos"
+        AGENTOS_CONFIG_DIR="/etc/agentos"
+        AGENTOS_LOG_DIR="/var/log/agentos"
+    )
     add_test(NAME channel_e2e COMMAND test_channel_e2e)
 endif()

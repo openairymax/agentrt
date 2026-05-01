@@ -1,6 +1,6 @@
 /**
  * @file layer4_pattern.h
- * @brief L4 模式层接口
+ * @brief L4 模式层接口（简化版）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 

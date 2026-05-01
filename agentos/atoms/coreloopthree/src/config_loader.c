@@ -17,9 +17,9 @@
 #define AGENTOS_MAX_CONFIG_SIZE (4 * 1024 * 1024)
 
 /**
- * @brief 从文件加载配置内�?
+ * @brief 从文件加载配置内容
  * @param path 文件路径
- * @param out_json 输出 JSON 字符串（需调用者释放）
+ * @param out_json 输出文件内容字符串（需调用者释放）
  * @return AGENTOS_SUCCESS 或错误码
  */
 agentos_error_t agentos_config_load(const char* path, char** out_json) {
